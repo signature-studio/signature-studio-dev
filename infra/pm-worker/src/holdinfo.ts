@@ -19,6 +19,8 @@ export interface Hold {
   reason: string;
   // 時間で解除される見込み時刻 (ISO)。窓が時間で閉じないもの (他 issue・人・PM の判断待ち) は null。
   until: string | null;
+  // stopped の判定根拠 (どのマーカー・run-outcome で停止と判定したか)。stopped 以外と根拠が無いときは出さない (#5234)。
+  basis?: string;
 }
 
 // recent の行 (classify.ts の rows.recent と engine.ts の oc:no-pr cooldown) の理由と解除見込み。
@@ -41,7 +43,8 @@ export function readyHold(n: number, why: string, t: { restReset?: number }): Ho
 }
 
 // stopped の行の理由。本文の抜粋は出さない。既知の語以外は bot の報告による停止 (bot-report) とする。
-export function stoppedHold(n: number, note: string): Hold {
+// basis は判定根拠 (classify.ts の stopBasis・engine.ts の noPr)。見出し由来・run-outcome 由来などを行ごとに説明する。
+export function stoppedHold(n: number, note: string, basis?: string): Hold {
   const reason = note.startsWith("oc:no-pr") ? "oc:no-pr"
     : note.startsWith("artifact:") ? "artifact"
     : note.startsWith("killed x") ? "killed"
@@ -49,5 +52,5 @@ export function stoppedHold(n: number, note: string): Hold {
     : note === "launch-unobserved" ? "launch-unobserved"
     : note === "stop" || note === "split" ? note
     : "bot-report";
-  return { n, row: "stopped", reason, until: null };
+  return basis === undefined ? { n, row: "stopped", reason, until: null } : { n, row: "stopped", reason, until: null, basis };
 }
