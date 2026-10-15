@@ -80,13 +80,18 @@
 - 6/7 (修復の効果だけ): 修復前 `56bfc979` の wasm と `f63b5953` の wasm は別物 (sha256 `59e58e29…` と `bbed05ed…`)。survey の unit 記録差は **0** (ok 872 = 872)。到達 3 関数は §4 の通り。
 - 7/7 (`dyn_509.mjs`・509 系 5 関数): 基準 (ldfix 無し) の wasm で FAIL 5/5 → 修復後 PASS 5/5 (c62780・7e5240・409c80・41a670・1063090)。この 5 関数は本 issue の修復対象 (§3) ではない。7e5240・409c80・41a670・1063090 は §6 の IR 変化の対象外なので、PASS は main の ldfix (#509 の store 形 fix) による。c62780 だけが §6 の名前の差分を持つ (ldfxn 採番のずれと推定、U-4)。よって 5/5 の PASS は本 PR の増分の証拠にならない。
 - 本 issue の修復対象 11 関数の動的確認 (修復前後の直接呼び出し) は **未実施**。survey で到達するのは 3 関数だけで、残りは survey からは判定できない → 子 issue。
+- **#4039 (2026-10-15) の追記**: 測定 commit `f07ef8dc9` (`ldfix_509_e2e.sh` の NC 期待値と `dyn_509.mjs` の 47ad70 期待値を補った commit)。foreground 1 回・rc 0・real 6 分 55.8 秒・load 開始 0.44 / 終了 1.00 (uptime の 1 分平均)。素材は `work-m11` / `fl-win64` (PE のみ) / `toolchain-emsdk` を展開して実行。
+  - 旧版 NC: store 形 SUSPECT 8 関数 / 11 site (806740 を含む)。nc_store: 806740 を 1 件検出。nc_use: 1063090 を use 形で検出。NC 期待値は `grep` の条件を「旧版は 806740 を store 形で検出する」に直した (前 HEAD は「旧版は store 0」を要求し、正しい挙動を失敗扱いしていた)。
+  - survey: ok 871 → 873、ok 退行 unit 0、記録差 14 unit (§5 の 6/7 と同じ)。
+  - 7/7 `dyn_509.mjs`: 修復前 FAIL → 修復後 PASS が c62780・7e5240・409c80・41a670・1063090 の 5 件。ただし修復対象 (11 関数 + c62780) に入るのは **c62780 の 1 件だけ**。7e5240・409c80・41a670・1063090 は対象外で、PASS は main 由来 (本 PR の増分の証拠にならない)。**47ad70 は修復対象だが修復前後とも FAIL (`KNOWN`)**: 機械語 `mov rdx,[rcx]` (配列基点 = `*arg1`) が IR で落ち、IR は `%arg1` を配列の基点に使う。修復 (`fix_f3c_use`) は value 側 (`*arg2`) だけを直しており、配列側は未修復。`DYN_SUMMARY after_fail=0/5 known=1`。`known` 行は #4439 で 47ad70 が PASS になったら外す。
+  - 対象 11 関数 + c62780 のうち、本 PR で PASS を確認できたのは c62780 の 1 件。47ad70 は known FAIL。残り 10 関数 (40fe90・41b8d0・41b970・449550・44f040・44fb40・784ed0・806740・c40420・f552a0) は未実施 (#4438)。期待値は、呼び先 (`410010`・`410820`・`4109f0`・`40f910`・`44aeb0`・`420530`・`4203d0` ほか) の機械語を読まないと決まらない。本 run では推定で期待値を書かない。
 - **#4041 の現 head 再測定** (測定 commit `adf298d3b`、`PREV_REF=56bfc979`、`FL_WIN64_DIR`・`EMSDK_ENV`・`M11_WORK` を指定、`timeout 1500` 付きで foreground 1 回・この run の素材 `fl-win64` / `work-m11` / `toolchain-emsdk` を展開して実行): rc 0・real 7m30.97s (451 秒)・load 開始 0.70 / 終了 1.53 (uptime の 1 分平均)。
   - 2/7: 旧版/新版で本体が異なる関数 33 / 7421 (旧版の関数外テキストは一致、report の f3c 以外のキー差 0)。F3c 関数 旧 36 → 新 46 (旧の全てを含む)。
   - 4/7: `boot_final.ll` へ F3c を重ねた結果 F3c=43、overlay 43 件、うち新版出力と alloca 行を除いて同一 43。
-  - 5/7 NC: 旧版は store 形 0・use 形 (pure) 23 関数 (1063090 を含まない)。nc_store は 806740 を store 1 件検出 (use 形 14、1063090 を含まない)。nc_use は 1063090 を use 形で検出 (use 形 14)。
+  - 5/7 NC: 旧版は store 形 0・use 形 (pure) 23 関数 (1063090 を含まない) と記録した。ただし同じ旧版 (`PREV_REF=56bfc979`) の測定 `f07ef8dc9` (上の追記) は store 形 8 関数 / 11 site (806740 を含む) で、両者は食い違う。この 0 / 23 の値は REPORT_2144 の ldfix 適用後 (post: SUSPECT_VAS 0・SUSPECT_USE_VAS 23) と一致し、ldfix 無し (pre: store 8・use 52) とは一致しない。そのため「旧版」の行が適用後の IR を指していた可能性がある (推定。出力 `nc_prev.txt` が残っておらず未確認)。どちらの測定が正しいかは未確定 (PR 本文の未解決表)。nc_store は 806740 を store 1 件検出 (use 形 14、1063090 を含まない)。nc_use は 1063090 を use 形で検出 (use 形 14)。
   - 6/7 survey: 942 unit、instrumented 26 関数。ok 退行 unit 0。kind 以外も含む記録差 14 unit `[114, 144, 158, 280, 291, 296, 302, 304, 314, 493, 659, 880, 888, 895]` (reviewer の再実行 `adf298d3b` と同一)。
   - 7/7: `DYN_SUMMARY after_fail=0/5` (c62780・7e5240・409c80・41a670・1063090 がすべて before FAIL → after PASS)。
-- **#4041 の再測定** (測定 commit `5e17a9229`、`PREV_REF=56bfc979`、`FL_WIN64_DIR`・`EMSDK_ENV`・`M11_WORK` を指定して `ldfix_509_e2e.sh` を foreground 1 回): rc 0・real 432 秒・load 開始 0.19 / 終了 1.00。step 2〜7 完走、7/7 `DYN_SUMMARY after_fail=0/5`。survey の記録差は 14 unit (`[114, 144, 158, 280, 291, 296, 302, 304, 314, 493, 659, 880, 888, 895]`。§5 の上の 2 段と同じ母集団)。NC は 806740 の store と 1063090 の use を各 1 件検出 (旧版 store 0)。
+- **#4041 の再測定** (測定 commit `5e17a9229`、`PREV_REF=56bfc979`、`FL_WIN64_DIR`・`EMSDK_ENV`・`M11_WORK` を指定して `ldfix_509_e2e.sh` を foreground 1 回): rc 0・real 432 秒・load 開始 0.19 / 終了 1.00。step 2〜7 完走、7/7 `DYN_SUMMARY after_fail=0/5`。survey の記録差は 14 unit (`[114, 144, 158, 280, 291, 296, 302, 304, 314, 493, 659, 880, 888, 895]`。§5 の上の 2 段と同じ母集団)。NC は 806740 の store と 1063090 の use を各 1 件検出 (「旧版 store 0」は 91 行目と同じ未確定の測定で、`f07ef8dc9` の旧版 store 8 関数と食い違う)。
 
 | 直した不具合 (issue #4041) | 状況 |
 |---|---|
