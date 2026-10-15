@@ -93,6 +93,20 @@ def verify_thunk(m):
     return 1
 
 
+def verify_iat_name(m):
+    """0x41c8f0 の呼出し先 0x4070e0 (IAT thunk) の IAT スロットが KERNEL32.dll!WideCharToMultiByte であること (pefile)"""
+    import pefile
+    call = disasm(m, 0x41c8f0, 16)[0]
+    assert (call.mnemonic, call.op_str) == ('call', '0x%x' % THUNK), '0x41c8f0: 呼出し先が 0x%x でない: %s %s' % (THUNK, call.mnemonic, call.op_str)
+    th = disasm(m, THUNK, 8)[0]
+    mem = [o for o in th.operands if o.type == capstone.x86.X86_OP_MEM][0]
+    slot = THUNK + th.size + mem.mem.disp
+    m.pef.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_IMPORT']])
+    names = [(e.dll.lower(), imp.name) for e in m.pef.DIRECTORY_ENTRY_IMPORT for imp in e.imports if imp.address == slot]
+    assert names == [(b'kernel32.dll', b'WideCharToMultiByte')], '0x4070e0 の IAT スロット 0x%x の import 名が想定と違う: %r' % (slot, names)
+    return 2
+
+
 def fn_body(src, fn):
     fns = list(re.finditer(r'^define [^\n]*@function_%x\(.*?\n}\n' % fn, src, re.M | re.S))
     assert len(fns) == 1, 'IR: function_%x の定義が 1 件でない: %d' % (fn, len(fns))
@@ -217,6 +231,7 @@ def check_fixed_machine(m):
         (0x412fdc, 'mov', 'qword ptr [rsp + 0x20], rcx'), (0x412fe1, 'mov', 'dword ptr [rsp + 0x28], edx'),
         (0x412fe5, 'mov', 'qword ptr [rsp + 0x30], 0'), (0x412fee, 'mov', 'qword ptr [rsp + 0x38], 0'),
         (0x412ff7, 'mov', 'ecx, eax'), (0x412ff9, 'mov', 'edx, r10d')], '0x412ffc (412fc0)')
+    n += verify_iat_name(m)
     return n
 
 
@@ -237,20 +252,37 @@ def check_fixed(src, m):
     return check_fixed_machine(m) + check_fixed_ir(src)
 
 
-def passthrough_violations(code):
-    """negctl 用: 任意の機械語列 (VA 0x41c8c0 起点) で rcx〜r9 を書く命令を数える"""
-    cs = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
-    cs.detail = True
-    return [i for i in cs.disasm(code, FN_B) if set(writes(i)) & ARG_FAM]
+class _Patched:
+    """negctl 用: Machine の read だけを差し替えるラッパ (PE ファイルは変えない)。rva の位置を data で上書きする。"""
+
+    def __init__(self, m, rva, data):
+        self.m, self.rva, self.data = m, rva, data
+        self.pef = m.pef
+
+    def read(self, rva, n):
+        b = bytearray(self.m.read(rva, n))
+        for i, c in enumerate(self.data):
+            k = self.rva + i - rva
+            if 0 <= k < len(b):
+                b[k] = c
+        return bytes(b)
 
 
 def negctl_fixed(src, m):
     bad = 0
     cases = []
-    # NC6: 0x41c8c0 の先頭に rcx を書く命令を足す (機械語の rcx 転送の改変)
-    real = m.read(FN_B - 0x400000, 0x30)
-    v = passthrough_violations(bytes([0x31, 0xc9]) + real)
-    cases.append(('NC6 0x41c8c0 の先頭に xor ecx,ecx (rcx 転送の改変)', len(v) > 0))
+    # 対照: 無改変の PE は gate を通る
+    try:
+        n = check_fixed_machine(m)
+    except AssertionError as e:
+        print('[verify_abi_3426] 対照 (無改変): 通らなかった (NG): %s' % str(e)[:110])
+        bad += 1
+    else:
+        print('[verify_abi_3426] 対照 (無改変): 通る OK (%d 項目)' % n)
+    # NC6: 0x41c8c0 の先頭 4 バイト (sub rsp,0x48) を xor ecx,ecx + nop×2 に置換する (rcx 転送の改変・命令の位置は保つ)。
+    # 読み出しだけを差し替えて check_fixed_machine (gate) を呼び、拒否されることを見る。
+    patched = _Patched(m, FN_B - 0x400000, bytes([0x31, 0xc9, 0x90, 0x90]))
+    cases.append(('NC6 0x41c8c0 の先頭を xor ecx,ecx に改変 (gate)', _rejects(check_fixed_machine, patched)))
     # NC7: 呼出元の 1 つを 4 引数に戻す (呼出元の引数数の不一致)
     old7 = 'call i64 @function_41c8c0(i64 65001, i64 0, i64 %arg3, i64 %arg4, i64 %arg1, i64 %2, i64 0, i64 0)'
     src7 = src.replace(old7, 'call i64 @function_41c8c0(i64 %arg1, i64 %2, i64 0, i64 0)', 1)
@@ -267,7 +299,8 @@ def negctl_fixed(src, m):
 def _rejects(fn, *a):
     try:
         fn(*a)
-    except AssertionError:
+    except AssertionError as e:
+        print('  (理由: %s)' % str(e)[:120])
         return True
     return False
 
