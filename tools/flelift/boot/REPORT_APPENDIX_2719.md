@@ -242,6 +242,7 @@ FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FLE_BOOT_RUNS="default" FLE_EXTRA_ROOTS= bash
 - `outmem` (現 head 1 回): `full` `c9f39e3e…`・`no_cstack` `a6cf4946…`。`stack.base`・`end` は `0x11dbef00`・`0x115bef00` で一致。`full` の値は 12 の非決定性どおり毎回変わるため、この値を正として比べない。
 - 測定 commit `e3954b032` 時点の値。現 head での再確認は未了 (未解決表の行)。`e3954b032` から現 head までに `fle_boot.c` (#4004 の probe)・`fle_boot.mjs`・`x64c.py` (#4054 の rcpps 近似表) に差分がある。現 head では `FLE_SHARDS=8` の link が `kh_rcp_exact` 未定義で失敗 (`approx_rcp_decl` は shard 0 にしか出力されない・main 同一。#4412 は未 merge)。`FLE_SHARDS=1` は clang の RSS cap (11000MB) で打ち切り。よって現 head の値は取れていない。
 - 注: 再測定で `results/boot_summary_fle6_tol.json` が上書きされたが、絶対 path を含む `stack` が入るため差し替えず、`git restore` で HEAD の版に戻した (`boot_cfi_stack_fle6_tol_named.json` が関数名付きの根拠)。
+- 再測定 (#4642・測定 commit `aec77d7a9`・`FLE_SHARDS=8`): `FLE_EXTRA_LDF` 無しは rc 0・`mismatch=0 undefined=0 dup=0`・dispatch 209・`threw: exit` (名前付き stack なし)。`FLE_EXTRA_LDF="-g --profiling-funcs"` と `FLE_EXTRA_ROOTS=0x6a7b70,0x1375990` を付けた再測定は rc 0・dispatch 209・`threw: oob`。`cfi.stack` は `f_410320` ← `f_5af120` ← `f_1105350` ← `f_13752f0` ← `f_1375990` ← `ott_dispatch` ← `fle_run` で一致 (§7・§12-1 と同じ chain)。修正前の shard 別 link 失敗 (`kh_rcp_exact` undefined) は本 run では再現確認していない (#4414 の記録のみ)。
 
 ## 13. CFI 経路の値の観測 (#4384 [WIN-49])
 
