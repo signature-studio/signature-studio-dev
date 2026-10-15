@@ -1,0 +1,52 @@
+{
+ "wasm": "m11_gui.cjs",
+ "boot": {
+  "ok": false,
+  "err": "unreachable"
+ },
+ "host": {
+  "ptr": "0x21354e88",
+  "version": 1,
+  "flags": 0,
+  "name_ptr": "0x2134ce68",
+  "cmd_ptr": "0x2134ce80",
+  "iface_out": "0x21354ec8"
+ },
+ "call": {
+  "returned": false,
+  "err": "mod._CreateFruityInstance is not a function",
+  "failfast": false,
+  "ms": 1
+ },
+ "reach": [
+  {
+   "order": 1,
+   "name": "LoadStringW",
+   "calls": 3,
+   "kind": "IMPL",
+   "prio": "1"
+  }
+ ],
+ "errs_tail": [
+  "[m11][stub-notimpl] EnumCalendarInfoW called (0 を返して継続)",
+  "[m11][VA] #1 addr=0 size=131399680 (0x7d50000) type=0x101000 prot=0x4",
+  "[m11][VA-big] #1 size=131399680 (125.3 MB) live=1.3MB",
+  "[m11][VA] #2 addr=0 size=131399680 (0x7d50000) type=0x101000 prot=0x4",
+  "[m11][VA-big] #2 size=131399680 (125.3 MB) live=132.7MB",
+  "[m11][VA] #3 addr=0 size=720896 (0xb0000) type=0x101000 prot=0x4",
+  "[m11][VA] #4 addr=0 size=720896 (0xb0000) type=0x101000 prot=0x4",
+  "[m11][VA] #5 addr=0 size=720896 (0xb0000) type=0x101000 prot=0x4",
+  "[m11][VA] #6 addr=0 size=720896 (0xb0000) type=0x101000 prot=0x4",
+  "[m11][VA] #7 addr=0 size=720896 (0xb0000) type=0x101000 prot=0x4",
+  "[gui] GUI-REACH 1 LoadStringW 3 IMPL P1",
+  "[gui] GUI-REACH-SUMMARY reached=1 impl=1 stub=0"
+ ],
+ "iface": "0x0",
+ "open_trace": [],
+ "errs_n": 16,
+ "icall_miss": 5,
+ "icall_miss_targets": [
+  "0x457860",
+  "0xfa9390"
+ ]
+}
