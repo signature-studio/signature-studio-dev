@@ -15,7 +15,7 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
 
 ## 0. 対象と前提
 
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` を `tar --zstd -xf ... -C /tmp/opencode/fl --wildcards '*block00031_PE.bin'` で展開 (1.6 秒)。`FL_WIN64_DIR=/tmp/opencode/fl`。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf ... -C <展開先> --wildcards '*block00031_PE.bin'` で展開 (1.6 秒)。`FL_WIN64_DIR=<展開先>`。
 - 検証起点: origin/main `267ee2069`。
 - VMT: TMenuItem = 0x838c10 (自己ポインタ + classname "TMenuItem" の照合で 1 件)、TQuickMenuItem = 0x725a58 (同)。
 
@@ -47,7 +47,7 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
 
 - probe: `tools/python/analysis/flapi/pe_py320_fire_site.py` (検査 11 件)。
 - 測定 commit (コードを変えた最後の commit): `1dc704e13`。測定は HEAD `ec11dfec5` (差分は REPORT・DOC_MAP のみ) で行った。
-- 実行: `FL_WIN64_DIR=/tmp/opencode/fl python3 tools/python/analysis/flapi/pe_py320_fire_site.py`。
+- 実行: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py320_fire_site.py`。
   - 実測 (08:36:56 UTC・HEAD `ec11dfec5`): real 23.504 秒・終了 0・PASS 11 / FAIL 0。load average 開始 0.05・終了 0.38。
 - 既存 probe: `pe_py268_rdx.py` を同じ素材・同じ HEAD で実行: real 24.283 秒・終了 0・検査 PASS 22 件 (集計行「件数 22 / 22」)。load average 開始 0.29・終了 0.54 (08:37:34 UTC)。
 - 負の対照: `0x840cd0` の `[+0xf0]` 枝は `+0x100` 検出 0 件・`+0xf0` 検出 1 件 (`0x840d1b`) で、検出器が枝を区別する。

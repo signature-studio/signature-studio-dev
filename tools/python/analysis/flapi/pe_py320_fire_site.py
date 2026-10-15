@@ -3,7 +3,7 @@
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py320_fire_site.py
 
-展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin' (<展開先>/extracted/block00031_PE.bin に展開される)
+展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin' (<展開先>/extracted/block00031_PE.bin に展開される)
 Delphi x64 の VMT 配置: 自己ポインタ VMT-0xc8、動的メソッド表ポインタ以外の仮想スロットは VMT+8*k。
 終了 0 = 全 PASS。1 件でも FAIL なら終了 1。負の対照は検出できれば PASS。
 前段: pe_py268_rdx.py (VMT 0x1277f38・公開表 0x12793f3 の照合)。
