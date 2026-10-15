@@ -181,7 +181,7 @@
 
 ## 8. 測定 commit と差分 (docs/WORKFLOW.md §6)
 
-- 測定 commit = **`1083467fe`** (`feat(massivex): follow copy/merge destinations for xmm0-3 classification (MX-37 #3774)`)。前版 = `d9a2b7ec2` (MX-33 #3032)。
+- 測定 commit = **`d106f3c23`** (`fix(massivex): record merge follow-up reasons for xmm0-3 undetermined (MX-37 #3774)`)。前版 = `1083467fe` (`feat(massivex): follow copy/merge destinations ... (MX-37 #3774)`、PR #4620)。
   変更 (#3774): `scripts/mx33_xmm03.py` (複写先・merge 上位の後続追跡 `follow()`・NC 6 件追加)・`scripts/mx6_vectorcall.py` (`analyze()` の返り値に `cfg` を追加・JSON には出さない)。
 - commit `1083467fe` 自身の変更は上記 2 ファイルのみ (`mx6_e2e.sh` は commit `1083467fe` では未変更)。
   ただし `git diff d9a2b7ec2 1083467fe -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は 3 ファイル (+154/−20 行) で、`mx6_e2e.sh` の 37 行は main 取り込み (他 PR の変更) による差分。
