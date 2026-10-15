@@ -6,7 +6,8 @@
 #   bash tools/m11/m11_reloc_gate.sh [PE]     PE 省略時: $FL_WIN64_DIR/extracted/block00031_PE.bin
 set -u
 cd "$(dirname "$0")"
-PE="${1:-${FL_WIN64_DIR:-/home/ubuntu/work/analysis/win64}/extracted/block00031_PE.bin}"
+source ../shared/env.sh   # FL_WIN64_DIR (既定は従来どおり /home/ubuntu/work/analysis/win64)
+PE="${1:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 [ -f "$PE" ] || { echo "[gate] FAIL: PE 無し: $PE"; exit 2; }
 T="$(mktemp -d "${TMPDIR:-/tmp}/m11_reloc_gate.XXXXXX")"
 trap 'rm -rf "$T"' EXIT
