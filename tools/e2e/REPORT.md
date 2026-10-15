@@ -126,6 +126,14 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
 | repo variable `E2E_URL` と secrets `E2E_ACCESS_CLIENT_ID/SECRET` の登録 | 週次 remote ジョブは登録まで skip | 本 issue (#66) へコメント (ユーザ/PM 作業。token secret は `deploy/work/secrets/` にしか無い) |
 | 実 URL に対する週次ジョブの初回実績 | remote の PASS 未確認 | #66 (登録後に `gh workflow run e2e.yaml -f remote=true`) |
 
+### 適用 (#66。PM が PAT で `.github/workflows/e2e.yaml` へ配置。検証起点 `origin/main` `7c85004e` に本 PR を載せたクリーン worktree・node v24.19.0・Chrome 154.0.8037.97・`/opt/emsdk` 6.0.12)
+
+- 停止報告 (2026-10-14 17:24Z) の diff を `git apply` で適用した (140 行・新規 1 ファイル)。`.proposed` は消していない (本 PR の範囲外。適用後は `.github/workflows/e2e.yaml` が正で、`.proposed` は古い写し)。
+- 差分からの変更 2 点: (1) remote ジョブの `if` に `&& vars.E2E_URL != ''` を足した (PM 判断。実デプロイ #36 の後に `E2E_URL` と secrets を登録するまで、週次でも skip)。(2) local ジョブに emsdk の install step を足した (下記)。
+- local ジョブと同じ `bash tools/e2e/run.sh --driver both --targets preview,edge-sim`: exit 0・**PASS=34 FAIL=0 SKIP=6**・12.2 s (build 込み・n=1)。SKIP 6 = `fl-boot` (FL 未統合) 4 + `edge-policy` の preview 側 (strict 限定) 2。
+- emcc が無い環境の再現: 同じコマンドを `EMSDK_ENV=/nonexistent/emsdk_env.sh` で実行すると exit 1・`[audio] emcc not found` (`run.sh` → `tools/audio/integration/stage_app.sh` → `tools/audio/build.sh`)。`ubuntu-latest` (Ubuntu 24.04 image 20261004.327.1) の Readme に Emscripten の記載は無いため、(2) の step (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` を `emsdk install`、`EMSDK_ENV` で `build.sh` に渡す) を足した。同じ方式の `emsdk install 6.0.12` は「FL 起動契約 (#65)」節の #2744 の再測定で 28 s だった。
+- 未確認: (2) の step はこの環境では実行できなかった (python の `urlopen` が `CERTIFICATE_VERIFY_FAILED`。環境固有)。Actions 上の結果は本 PR の check で見る。remote ジョブは未実行 (`E2E_URL` と secrets が無い)。
+
 ## 839 E2E-5: dummy-worklet 参照の差し替え後の再測定 (#839・#1010)
 `/worklets/dummy-worklet.js` の参照を `/worklets/fl-audio-worklet.js` へ差し替えた後 (commit `8e27b776` → 修正 commit は PR head を参照)、
 edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` の 404 で FAIL していた。原因は edge-sim が `work/dist` を
