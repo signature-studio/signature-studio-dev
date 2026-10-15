@@ -293,14 +293,28 @@ class Explorer:
         return calls, "OK", steps
 
 
+def describe(img, fn):
+    ins = img.insns(fn)
+    calls = [f"{a:#x}->{i.op_str}" for a, i in sorted(ins.items()) if i.mnemonic == "call"]
+    rets = sum(1 for i in ins.values() if i.mnemonic == "ret")
+    print(f"[{fn:#x}] size={img.ends[fn - img.base] + img.base - fn:#x} insns={len(ins)} ret={rets}")
+    print(f"  calls({len(calls)}): {' '.join(calls)}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("fn")
-    ap.add_argument("ops")
+    ap.add_argument("ops", nargs="?", default="")
     ap.add_argument("--from", dest="dispatch_from", default="0", help="確定分岐を cond に残す下限 VA (16進)")
     ap.add_argument("--arg", default=None, help="edx (第 2 引数) の既知値 (16進)。省略時は未知")
+    ap.add_argument("--describe", nargs="*", default=None, help="関数の大きさと直接の呼出し先 (16進 VA の列)")
     args = ap.parse_args()
     img = Image(os.path.join(os.environ["FL_WIN64_DIR"], "extracted", "block00031_PE.bin"))
+    if args.describe is not None:
+        for d in args.describe:
+            describe(img, int(d, 16))
+        if not args.ops:
+            return
     fn = int(args.fn, 16)
     ex = Explorer(img, fn, int(args.dispatch_from, 16))
     for op_s in args.ops.split(","):
