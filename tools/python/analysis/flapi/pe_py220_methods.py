@@ -140,6 +140,8 @@ def main():
     vmts = [v for v in range(T0 + 0xC8, T1) if is_vmt(v)]
     print(f"VMT (自己ポインタ判定) 全件: {len(vmts)}、うち 8 バイト整列 {sum(1 for v in vmts if v % 8 == 0)}")
     check("全 VMT は 8 バイト整列 (スロットの整列の前提)", vmts and all(v % 8 == 0 for v in vmts), f"{len(vmts)}")
+    check("陽性対照: 既知の VMT TPublicChannel (0xfe2cf8) のスロット 35 (0xfe2e10) を同じ判定で VMT と認める",
+          vmt_nearest(0xFE2E10) == (0xFE2CF8, 35))
     a = [L for L in range(T0, T1 - 8) if u64(L) == 0x12AB520]
     align = [L % 8 for L in a]
     print(f"0x12ab520 の qword 参照 (VA): {[hex(x) for x in a]} (mod 8 = {align})")
