@@ -14,7 +14,7 @@
 
 - ハンドラ探索: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前...>` (`extracted/block00031_PE.bin`)。10 件とも entry・fn・flags が issue 本文の表と一致した。`init` は entry 0x151e5b8 を選んだ (0x151e058 は別の名前衝突)。
 - 逆アセンブル: `analysis/flapi/pe_disasm.py <VA>`。共通の読み方は REPORT_PY121_2985 と同じ (`call 0xd7eca0` → `[rax]` → `+0x50` → `+0x3f8` で scr)。
-- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先>` (7.9 秒)。emsdk は `/opt/emsdk` を使用 (`toolchain-emsdk` の展開先 `$RUNNER_TEMP/tc` は build には未使用)。
+- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先>` (7.9 秒)。emsdk は `[EMSDK]` (docs/REFERENCES.md) の既定位置を使用 (`toolchain-emsdk` の展開は build には未使用)。
 
 ## PE 根拠 (10 件)
 
