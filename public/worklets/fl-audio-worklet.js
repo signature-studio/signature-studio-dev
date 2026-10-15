@@ -99,7 +99,7 @@ class FlShimProcessor extends AudioWorkletProcessor {
       if (nj === 1) Atomics.store(i, x.clock_first_q, qv);
       Atomics.store(i, x.clock_last_q, qv);
       if (nj <= 256) this.port.postMessage({ type: "clock_jump", q: Atomics.load(i, x.quanta), d, frame, prev: this.prevFrame, ms: Date.now(),
-        ct: time, pn: typeof performance !== "undefined" ? performance.now() : -1, cb: Atomics.load(i, x.cb_count) });   // 全件の位置 (上限 256 件)。ct = currentTime, pn = performance.now() (不可なら -1), cb = producer の bufferSwitch 通し番号
+        ct: time, cb: Atomics.load(i, x.cb_count) });   // 全件の位置 (上限 256 件)。ct = currentTime, cb = producer の bufferSwitch 通し番号。pn (performance.now()) は worklet に performance が無いため main thread の受信時に shim が入れる
       if (d > 0) Atomics.add(i, x.clock_skip_frames, d); else Atomics.add(i, x.clock_dup_frames, -d);
       if (Math.abs(d) > Atomics.load(i, x.clock_jump_max)) {
         Atomics.store(i, x.clock_jump_max, Math.abs(d));

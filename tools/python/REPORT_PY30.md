@@ -123,10 +123,47 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_handler_probe.py add
 ## 6. 再現
 
 ```
-bash build_cpython_wasm.sh                                    # 2 分 45 秒
+bash build_cpython_wasm.sh                                    # 2 分 45 秒 (#3175 の実測では 4 分 2 秒)
 FL_WIN64_DIR=<fl-win64 展開先>/extracted "$PY312" analysis/extract_pyc_blocks.py work/fl_extract
 FLPY_SKIP_TABLE=1 FL_WIN64_DIR=<fl-win64 展開先> bash build_flpy.sh
 node tests/chord_progression_e2e.mjs                          # 41/41
 node tests/chord_progression_e2e.mjs --neg                    # 34/41 (exit 1)
 node tests/chord_progression_call_probe.mjs                   # 呼べた 3/9
 ```
+
+## 7. #3175 (PY-165): ChordMarker の属性の根拠確定 (部分達成)
+
+結論: **部分達成**。ChordMarker の `alternativeCount` と `getAlternative` は FLEngine PE から確定して実装した。`time`・`length`・`name` は PE 内に候補が複数あり所属を確定できなかったため未実装 (AttributeError のまま)。probe の呼べた数は **3/9 のまま**。失敗位置は `text_to_chord` が `alternativeCount` を越え、空の要素 (None) の `locked` で止まるところまで進んだ。
+
+### 7.1 根拠 (`pe_handler_probe.py`・FLEngine PE `block00031_PE.bin`)
+
+| 属性 | 種別 | fn | 根拠 | 実装 |
+|---|---|---|---|---|
+| `alternativeCount` | getset (get のみ) | `0xd2eb30` | `mov ecx,7` → `call [slot 0x15e4280]` (`PyLong_FromLong`)。定数 7 を返す | 確定 (`return 7`) |
+| `getAlternative` | PyMethodDef (VARARGS・書式 `'i'`) | `0xd2eb50` | index が 0〜7 の範囲なら `[self+0x64 + index*8]` の要素。範囲外は `0xc38bc0` の戻り値 (None 推定・§2.3) | 確定 (範囲外は None) |
+| `time`・`length`・`name` | 候補複数 (`0x15028a8` `0x1502b70` ほか) | 未確定 | 同名のエントリが複数あり、どれが ChordMarker に属するか未確定 | 未実装 (mock 扱いせず AttributeError) |
+| `ChordAlternative` の属性 | — | 未確定 | 本 run で未調査 | 未実装 |
+
+- `getAlternative` の範囲上限 `7` は `cmp dword ptr [rbp+0x2c], 7` (0xd2eb82) で確認。
+- 注記 (mock の挙動): `src/flcpt.py` の `ChordMarker._alternatives` に要素を入れる経路は無い (要素は PE 側が `self+0x64` に入れる想定)。そのため mock では `getAlternative` は常に None を返す。0〜7 の範囲で要素を返すのは PE 実体の動作であり、mock 側では再現していない。
+- `pyc` 側の使い方 (`util.pyc` `refresh_alternatives`・`get_alternatives` 等が `alternativeCount` と `getAlternative` を読む) と整合する。
+
+### 7.2 実測 (変更前 = HEAD `32e6f8b46` / 変更後 = 本 PR の commit)
+
+| 項目 | 変更前 (`32e6f8b46`) | 変更後 |
+|---|---|---|
+| `node tests/chord_progression_e2e.mjs` | 41/41 PASS (0.5 s) | 41/41 PASS (0.6 s) |
+| `node tests/chord_progression_e2e.mjs --neg` | 34/41・FAIL 7・exit 1 | 34/41・FAIL 7・exit 1 |
+| `node tests/chord_progression_call_probe.mjs` (呼べた数) | 3/9 | 3/9 (増えない) |
+| probe の `text_to_chord` | `AttributeError: 'ChordMarker' has no attribute 'alternativeCount'` | `AttributeError: 'NoneType' object has no attribute 'locked'` |
+
+- 測定環境: fl-win64 展開 (`tar --zstd -xf`・5.8 s)・`build_cpython_wasm.sh` exit 0 (4 分 2 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` exit 0 (6 s)・emsdk は runner 同梱 (EMSDK_DIR で指定)。
+- `text_to_chord` の変化は ChordMarker の属性が読めるようになった結果で、呼べた数 (成功扱い) には入らない。
+
+### 7.3 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| ChordMarker の `time`・`length`・`name` の所属確定と実装 | text_to_chord・get_chord_root・reset が呼べない。probe 3/9 のまま | #4024 (PY-293) |
+| `ChordAlternative` の属性 (`name`・`note_classes`・`extensions`・`locked`) | `getAlternative` の戻り値を読む先が空。text_to_chord は `locked` で止まる | #4024 (PY-293) |
+| 範囲外の None 戻り値 (`0xc38bc0`) | 推定のまま (§2.3) | #3034 (PY-141) 既存 |

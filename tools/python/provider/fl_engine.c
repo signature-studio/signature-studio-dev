@@ -35,6 +35,8 @@ static int playing;
 static int64_t hl_cb;
 static int n_pr, n_run;
 static int dev_port, midi_out_n;
+static double idle_elapsed;
+static int midi_out_assigned, master_sync;
 /* PY-227 (#3655): midiOutMsg が送った 32bit word の列。dev_assigned=0 は -7・link_assigned=0 は -6 (PE 0xd747f0) */
 #define NMIDI 256
 static uint32_t midi_words[NMIDI];
@@ -101,6 +103,7 @@ void fl_engine_reset(void) {
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
     scr_alive = 0; scr_menu_show = 0; scr_dirty = 0; scr_setup_l = 0; for (int i = 0; i < 5; i++) scr_setup_t[i] = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
+    idle_elapsed = 0; midi_out_assigned = 0; master_sync = 0;
     midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
     lp_row = lp_flag49e = lp_flag54 = lp_n = 0;
 }
@@ -549,6 +552,21 @@ FL_H(ui, getFocusedFormCaption) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getFocusedPluginName) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getHintMsg) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, isInPopupMenu) { NARGS(0, 0); return fl_ret_b(c, 0); }
+/* PY-128 (#3005): PE 0xd6c250 は状態を読まず、rodata の UTF-16 定数 "FL Studio 2026" (長さ接頭辞 14) を返す (REPORT_PY128) */
+FL_H(ui, getProgTitle) { NARGS(0, 0); return fl_ret_s(c, "FL Studio 2026"); }
+/* PE 0xd6cb60 は PyArg "ii" (None・文字列・実数は TypeError) の後、0x11f1a70 で (int32)(value*100) を max で割り、
+ * 最近接偶数 (cvtsd2si) で整数化して "%" を付ける。状態は読まない。範囲外と NaN は INT64_MIN (REPORT_PY128) */
+FL_H(ui, getHintValue) {
+    NARGS(2, 2);
+    for (int i = 0; i < 2; i++) if (c->a[i].tag != 'I' && c->a[i].tag != 'B') WRONGN();
+    int64_t v = A_INT(0, 0), m = A_INT(1, 0);
+    int32_t num = (int32_t)((uint32_t)v * 100u);
+    double q = (double)num / (double)(int32_t)m;
+    int64_t n = (q >= -9223372036854775808.0 && q < 9223372036854775808.0) ? (int64_t)nearbyint(q) : INT64_MIN;
+    char buf[32];
+    snprintf(buf, sizeof buf, "%lld%%", (long long)n);
+    return fl_ret_s(c, buf);
+}
 /* PY-130 (#3007): PE 0xd6ee00 (setBrowserAutoHide) は O+0x8c4 に (v==1) を書く。0xd6f170 (setStepEditMode) は S=[O+0xab8] の +0x49e を (v==1) にする (末端は vtbl[0x200] 経由で未確定)。値は未実測の仮置き (REPORT_PY130_3007) */
 FL_H(ui, setBrowserAutoHide) { NARGS(1, 1); ui_browser_auto_hide = A_INT(0, 0) == 1; return fl_ret_none(c); }
 FL_H(ui, setStepEditMode) { NARGS(1, 1); ui_step_edit = A_INT(0, 0) == 1; return fl_ret_none(c); }
@@ -679,17 +697,29 @@ FL_H(screen, menuPrev) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
 FL_H(device, isAssigned) { return fl_ret_b(c, 1); }
 FL_H(device, setHasMeters) { return fl_ret_none(c); }
-FL_H(device, forwardMIDICC) { (void)A_INT(0, 0); (void)A_INT(1, 1); midi_out_n++; return fl_ret_none(c); }
-/* PE 0xd747f0 (書式 i|iiii)。device 無し → -7、送出先無し → -6 (channel によらず先に判定)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
-FL_H(device, midiOutMsg) {
-    int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);
+/* PE 0xd747f0 (midiOutMsg) と PE 0xd748e0 (forwardMIDICC) の共通判定: device 無し → -7、送出先無し → -6 (送出の前に判定)。通ったら word を送出として記録する */
+static int midi_send(fl_call *c, uint32_t w) {
     if (!dev_assigned) return fl_err(c, FL_E_DEVICE, "Device not assigned");
     if (!link_assigned) return fl_err(c, FL_E_LINKED_DEVICE, "Linked device not assigned");
-    uint32_t w = (uint32_t)msg;
-    if (ch >= 0) w = ((uint32_t)(ch & 0xf) | w) + ((uint32_t)d1 << 8) + ((uint32_t)d2 << 16) + ((uint32_t)a4 << 24);
     midi_out_n++;
     if (midi_word_n < NMIDI) midi_words[midi_word_n++] = w;
     return fl_ret_none(c);
+}
+FL_H(device, createRefreshThread) { return fl_ret_none(c); }
+FL_H(device, destroyRefreshThread) { return fl_ret_none(c); }
+FL_H(device, fullRefresh) { return fl_ret_none(c); }
+FL_H(device, getIdleElapsed) { return fl_ret_d(c, idle_elapsed); }
+FL_H(device, isMidiOutAssigned) { return fl_ret_b(c, midi_out_assigned); }
+FL_H(device, getMasterSync) { return fl_ret_b(c, master_sync); }
+FL_H(device, setMasterSync) { master_sync = A_INT(0, 0) == 1; return fl_ret_none(c); }
+/* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。値の変化検出は未実装 (REPORT_PY231 §4) */
+FL_H(device, forwardMIDICC) { int64_t msg = A_INT(0, 0); (void)A_INT(1, 1); return midi_send(c, (uint32_t)msg); }
+/* PE 0xd747f0 (書式 i|iiii)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
+FL_H(device, midiOutMsg) {
+    int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);
+    uint32_t w = (uint32_t)msg;
+    if (ch >= 0) w = ((uint32_t)(ch & 0xf) | w) + ((uint32_t)d1 << 8) + ((uint32_t)d2 << 16) + ((uint32_t)a4 << 24);
+    return midi_send(c, w);
 }
 
 /* ---- plugins (7) ---- (引数順: paramIndex 系は先頭、index/slotIndex/useGlobalIndex が後続) */

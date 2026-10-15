@@ -15,6 +15,7 @@
     assoc      Ghidra は浮動小数の積/和の結合括弧を表示で落とす (`a*(b*c)` を `a * b * c` と印字 → C は左結合 `(a*b)*c` で 1 ulp ずれる)。
                実機 x86 の演算順 (逆アセンブルで確認) に合わせ手で括弧を戻す = patches.py の (name, regex, repl) 表。**手作業 1 件 = 1 行**
     stackpair  lStack_e8/lStack_e0 のように「隣接を仮定して &lStack_e8 を配列として渡される」2 変数を long long[2] にする
+    gtype      `_DAT_<va>` の C 型を patches.py の GTYPE (実機の命令の幅で確認した整数マスク) で上書きする
     lanes      Delay の 128bit ローカル auStack_118/128/138 を、参照されるレーンの型 (_0_8_・_8_8_ は double、_8_4_・_12_4_ は uint32) を持つ V128L にする (#3094)
 """
 import json
@@ -200,11 +201,19 @@ def main():
         ls = [l for l in alltxt.split('\n') if ('%s_%x' % (kind, va)) in l]
         ts = infer_type(ls, '%s_%x' % (kind, va))
         gtypes[va] = ('uint' if kind == '_UNK' or 'uint' in ts else ('double' if 'double' in ts else 'float'), kind, sorted(ts))
+    if 'gtype' in fixes:
+        from patches import GTYPE
+        for k, ty in GTYPE.get(name, {}).items():
+            va = int(k, 16)
+            assert va in gtypes, 'gtype rule not used (global not in %s): %s' % (name, k)
+            gtypes[va] = (ty, gtypes[va][1], gtypes[va][2])
     out = ['#include "ghidra_shim.h"', '/* 自動生成: ghidra_to_c.py %s (fix=%s) */' % (name, ','.join(sorted(f for f in fixes if f)) or 'none')]
     if 'rcpps(' in alltxt:
         out.append(RCPPS_HELPER % approx_rcp_table())
     if 'rsqrtps(' in alltxt:
         out.append(RSQRTPS_HELPER % approx_rsq_tables())
+    if name == 'stereo':  # callee の戻り xmm0 (縮約値) の helper (KH-74)。式と突合は kh_xmm0.h / xmm0_check.c
+        out.append(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'kh_xmm0.h')).read())
     if 'lanes' in fixes and re.search(r'undefined1 auStack_(118|128|138) \[16\];', alltxt):
         out.append(LANE_HELPER)
     for va, (ty, kind, _) in sorted(gtypes.items()):
@@ -250,7 +259,7 @@ def main():
         if 'lanes' in fixes:
             t = re.sub(r'undefined1 (auStack_(?:118|128|138)) \[16\];', r'V128L \1;', t)
         t = re.sub(r'\b(in_XMM\d+)\._0_8_\b', r'\1._0_8_d', t)
-        t = re.sub(r'\bmaxps\((\w+),_DAT_([0-9a-f]+)\)', r'maxps(\1,(*(V128 *)gd_\2))', t)
+        t = re.sub(r'\b(maxps|minps|vpand_avx|vpor_avx|vpsubq_avx|vpsubd_avx)\((\w+),_DAT_([0-9a-f]+)\)', r'\1(\2,(*(V128 *)gd_\3))', t)
         if tbase is not None:
             t = re.sub(r'&UNK_([0-9a-f]{8,9})\b', lambda m: '((unsigned char*)gt_%x + 0x%x)' % (tbase, int(m.group(1), 16) - tbase), t)
         t = re.sub(r'\*\(undefined1 \(\*\) \[16\]\)\((.*?)\) = (auVar\d+) << 0x20;', r'v128_store_shl32((void*)(\1), \2);', t)

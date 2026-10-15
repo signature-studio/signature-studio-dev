@@ -10,6 +10,26 @@ ASSOC = {
     'gate': [('ramp (1 site)',) + RAMP,
              ('smoothstep (1 site)', r'\(fVar4 - \(fVar23 \+ fVar23\)\) \* fVar23 \* fVar23', '(fVar4 - (fVar23 + fVar23)) * (fVar23 * fVar23)')],
 }
+# グローバル型表 (gtype・Delay の型不一致): Ghidra は `_DAT_<va>` の型を印字しないため、ghidra_to_c.py の infer_type が
+# 使い方から float と推定する。実機の逆アセンブル (capstone・RIP 相対参照の命令の幅) で整数マスクと確認したものだけを入れる。
+# 1 行 = 1 グローバル。値 = C の型。根拠の命令は REPORT_APPENDIX_3801.md の表が正本。
+GTYPE = {
+    'delay': {
+        '182280be0': 'ulonglong',  # cmp/mov qword・Ghidra: (ulonglong)dVar12 との & 比較
+        '182280c10': 'ulonglong',  # mov qword・0x000fffffffffffff (double 仮数マスク)
+        '182280c30': 'ulonglong',  # and/or qword・0x0008000000000000 (bit 51) (& の 64bit 項)
+        '182280c68': 'ulonglong',  # mov qword・>> の被演算子 (64bit シフト)
+        '182280c70': 'ulonglong',  # mov qword・>> の被演算子 (64bit シフト)
+        '182280ce0': 'ulonglong',  # cmp/mov qword・0x7ff0000000000000 との | (ulonglong)
+        '182281e70': 'ulonglong',  # mov qword・| (ulonglong) の被演算子
+        '182282780': 'ulonglong',  # andpd (下位 8 bytes)・0x7fffffffffffffff (abs マスク)
+        '18141d060': 'ulonglong',  # xorps (下位 8 bytes)・0x8000000000000000 (符号マスク)
+        '1813d1a80': 'uint',       # xorps/pxor/movaps (下位 4 bytes)・0x80000000 (符号マスク)
+        '181422a10': 'uint',       # minps/movaps・& -(uint)(...) の 4 byte マスク
+        '182280bc0': 'longlong',   # cmp r10,qword・(longlong) 比較
+        '182280bc8': 'longlong',   # cmp r10,qword・(longlong) 比較
+    },
+}
 # ABI 表 (resonator 残件 emcc 4 件 = param_1 不足 3・引数数不一致 1)。Ghidra が呼出元で引数・戻り値を落としたため、
 # 呼出元の機械語 (capstone 逆アセンブル, HeartCore 0x180fbc1f4・0x180fbbfb8) のレジスタ設定から復元する。
 #   FUN_180fcf904: 引数 float (xmm0)・戻り値 short (ax)。呼出元 180fbc1f4 は xmm0 = 入力 float (= afStackX_8[0])、
@@ -45,6 +65,11 @@ ABI = {
         ('stereo 185 FUN_180fce0d0 2nd arg xmm1 unset (placeholder 0.0)', r'dVar11 = \(double\)FUN_180fce0d0\(dVar12\);', 'dVar11 = (double)FUN_180fce0d0(dVar12, 0.0);'),
         ('stereo 186 FUN_180fcd690 2nd arg xmm1 unset (placeholder 0.0)', r'dVar12 = \(double\)FUN_180fcd690\(dVar12\);', 'dVar12 = (double)FUN_180fcd690(dVar12, 0.0);'),
         ('stereo 567 FUN_180fdc660 arg double = param_1 bits (movq xmm0,r9 180fce528; ulonglong uVar1 を数値変換しない)', r'uVar3 = (?:func_0x000|FUN_)180fdc660\(uVar1\);', 'uVar3 = FUN_180fdc660(param_1);'),
+        # KH-74 (#3853): FUN_180fdc660 の戻り xmm0 = t2 を kh_xmm0.h の helper で出す (機械語 180fdc6c5 vmovapd xmm0,xmm2)。
+        # 本体の rax 式は helper と同じ値 (k&3) なので置換する。呼出元の extraout_XMM0_Qa_00 は kh_xmm0_180fdc660 を読む。
+        ('stereo FUN_180fdc660 body = kh_fn_180fdc660 (rax と xmm0 を 1 式で出す)', r'return \(int\)\(\(param_1 \* _DAT_18228a860 \+ _DAT_18228a8a0\) - _DAT_18228a8a0\) & 3;', 'return kh_fn_180fdc660(param_1);'),
+        ('stereo 82 caller 180fcd690 reads xmm0 of 660 (extraout_Qa_00)', r'uVar4 = FUN_180fdc660\(dVar2\);\n(\s*)dVar2 = extraout_XMM0_Qa_00;', r'uVar4 = FUN_180fdc660(dVar2);\n\1dVar2 = kh_xmm0_180fdc660;'),
+        ('stereo 24 caller 180fce0d0 reads xmm0 of 660 (extraout_Qa_00)', r'uVar3 = FUN_180fdc660\(param_1\);\n(\s*)dVar2 = extraout_XMM0_Qa_00;', r'uVar3 = FUN_180fdc660(param_1);\n\1dVar2 = kh_xmm0_180fdc660;'),
     ],
     # delay (#3800 KH-64): 引数過不足のうち、呼出先 FUN_180fd4f30 (longlong 1 引数) の 22 件 = FUN_180fe3690 13 件・FUN_180fe3310 4 件・FUN_180fe3cd0 5 件。
     #   呼出元の機械語 (180fe3690 の capstone): `mov rcx,[rbx+off]` → `cmp rcx,[global]` → `je` → `call FUN_180fd4f30` (rbx = 入力 param_1)。
