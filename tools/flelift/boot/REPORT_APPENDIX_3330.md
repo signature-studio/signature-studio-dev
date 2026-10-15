@@ -81,7 +81,7 @@
 
 - 修正 (`1ca5989f6`): (1) `outmem` を summary のトップレベルに出し、`boot` の外へ移した (署名 `variant_boot.sh` = boot + ipp に C heap の非決定を入れない)。(2) `outmem_compare.py` の rc は受入 1 (`image_writable` と各書込み可能セクションの変種間一致) と node 照合 (`full`・`no_cstack`) だけで決める。`full`・`no_cstack` の変種間一致は参考表示に格下げ。ネガコンは別行。(3) `outmem_variants.sh mutant` を追加 (比較器の検出力)。
 - 測定 commit: `1ca5989f6` (コードを変えた最後の commit)。その後の code 差分: `git diff 1ca5989f6 HEAD -- tools/flelift/boot ':(exclude)*.md'` は空 (本節は md だけの変更)。旧測定 commit `09e7239c0` からの差分 (`git diff 09e7239c0 1ca5989f6 -- tools/flelift/boot`) は空でない = 上記 (1)〜(3) の修正 (m1)。
-- 作業場 `$RUNNER_TEMP/boot3330` (repo 外)。素材は `fl-win64` (`extracted/block00031_PE.bin`) と `/opt/emsdk` (emcc 6.0.12・REPORT §C-1 と同版)。
+- 作業場 `$RUNNER_TEMP/boot3330` (repo 外)。素材は `fl-win64` (`extracted/block00031_PE.bin`) と runner 同梱の emsdk (emcc 6.0.12・REPORT §C-1 と同版)。
 
 ### G-1. 署名 (summary.tsv の `signature` 列 = boot + ipp の sha256 先頭 16 桁)
 
