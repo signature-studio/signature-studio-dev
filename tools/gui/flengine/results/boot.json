@@ -195,9 +195,9 @@
   "GetCurrentThread:1"
  ],
  "probes": {
-  "GetMem": 760,
+  "GetMem": 761,
   "FreeMem": 24,
-  "FastMM_GetMem(407a50)": 781,
+  "FastMM_GetMem(407a50)": 782,
   "FastMM_FreeMem(407e20)": 24,
   "InitUnits": 0,
   "Halt0": 1,
