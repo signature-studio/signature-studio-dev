@@ -42,7 +42,7 @@
 
 測定 commit は `12db2a260` (main `ce906a3be` の取り込み merge)。以下の全件をこの commit で再実行した (CPython・flpy を含む)。`tools/python` の md 以外は `e5ea7a6dc` (PR 前 HEAD) から `12db2a260` まで、pe129.json の追加と provider_check.mjs の main 側採用のみ。
 
-環境: runner 4 core。`load` は OS の 1 分平均の負荷値 (`/proc/loadavg` の 1 分値)。`fl-win64` を `$RUNNER_TEMP/fl-win64` に展開し (`FL_WIN64_DIR`)、`fetch_inputs.sh` で `work/` に配置した (win64 経路。mac pkg 無し)。`toolchain-emsdk.tar.zst` を展開し `/opt/emsdk` (`[EMSDK]`) でビルドした。`wall` の「未計測」は時間を測っていない行。
+環境: runner 4 core。`load` は OS の 1 分平均の負荷値 (`/proc/loadavg` の 1 分値)。`fl-win64` を `$RUNNER_TEMP/fl-win64` に展開し (`FL_WIN64_DIR`)、`fetch_inputs.sh` で `work/` に配置した (win64 経路。mac pkg 無し)。`toolchain-emsdk.tar.zst` を展開し `[EMSDK]` (emscripten 6.0.12) でビルドした。`wall` の「未計測」は時間を測っていない行。
 
 | コマンド | 測定 commit | 結果 | wall | load |
 |---|---|---|---|---|
