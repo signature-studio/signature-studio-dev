@@ -11,7 +11,7 @@
 ## 0. 測定の前提
 
 - 測定 commit: `c0f249266` (origin/main 取り込み後の HEAD。本 PR はこの上に REPORT のみを足す)。
-- 素材: `$ARTIFACTS_DIR` の `fl-win64.tar.zst` (2.3 GB) を `$RUNNER_TEMP/fl-win64` に、`toolchain-emsdk.tar.zst` を `$HOME/emsdk-root` に `tar --zstd -xf` で展開 (各 6 秒前後)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`EMSDK_DIR=$HOME/emsdk-root/emsdk`。
+- 素材: `$ARTIFACTS_DIR` の `fl-win64.tar.zst` (2.3 GB) を `tar --zstd -xf` で展開し、その展開先を `FL_WIN64_DIR` ([WIN64])、`toolchain-emsdk.tar.zst` の展開先を `EMSDK_DIR` ([EMSDK]) に指定した (各 6 秒前後)。
 - `FL_MAC_DIR` は無い。`fetch_inputs.sh` は win64 の DATA block から MCPTools.pyc・midi.py・utils.py・device script を取った (rc 0)。`flapi_table.py` は mac dylib 無しの WARN を出し、midi_script_callbacks_in_binary は既存値 27 件を引き継いだ (`analysis/flapi/` に差分は出ない)。
 
 ## 1. 実測
@@ -38,7 +38,7 @@
 ## 3. 検証の手順 (再現用)
 
 ```
-EMSDK_DIR=$HOME/emsdk-root/emsdk FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/python/build_cpython_wasm.sh
+EMSDK_DIR=<emsdk 展開先> FL_WIN64_DIR=<fl-win64 展開先> bash tools/python/build_cpython_wasm.sh
 EMSDK_DIR=... FL_WIN64_DIR=... bash tools/python/fetch_inputs.sh
 EMSDK_DIR=... FL_WIN64_DIR=... bash tools/python/build_flpy.sh          # §2 の zlib を置いた後
 EMSDK_ENV=$EMSDK_DIR/emsdk_env.sh bash tools/python/provider/build.sh
