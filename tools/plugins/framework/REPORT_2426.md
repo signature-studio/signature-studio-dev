@@ -97,7 +97,7 @@ cd tools/plugins/work/hs && node ../../framework/hostshim/hs_preinit.mjs ../fw/f
 
 ### 9.1 実測
 
-環境: 4 vCPU・RAM 15 GiB。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開、`work-fw-stage1`・`work-liftlib` を worktree 直下に展開 (`$ARTIFACTS_DIR` の実在を確認済み)。`/opt/emsdk`・`/opt/retdec` は runner に既存。load は `/proc/loadavg` の 1 分値 (開始 → 終了)。
+環境: 4 vCPU・RAM 15 GiB。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開、`work-fw-stage1`・`work-liftlib` を worktree 直下に展開 (`$ARTIFACTS_DIR` の実在を確認済み)。emsdk・retdec は runner に既存 (`docs/REFERENCES.md` の `[EMSDK]`・`[RETDEC]`)。load は `/proc/loadavg` の 1 分値 (開始 → 終了)。
 
 | 手順 | commit | 結果 | 所要 (real) | load |
 |---|---|---|---|---|
