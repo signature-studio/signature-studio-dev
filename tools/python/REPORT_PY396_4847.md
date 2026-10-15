@@ -58,6 +58,6 @@
 ## 測定
 
 - 測定 commit: `814f2ebba` (probe `pe_ret_propagation.py` を追加した最後のコード commit)。HEAD で再現した。
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` の `extracted/block00031_PE.bin` (22,227,016 B)。展開 2.2 秒。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` の `extracted/block00031_PE.bin` (22,227,016 B)。展開 2.2 秒。
 - 再現: 上記 2 コマンド。測定 2 は HEAD で 0.6 秒 (1725 件)。測定 1 は 46.6 秒 (load は未計測)。
 - 差分: `git diff 814f2ebba HEAD -- tools/python/analysis` は REPORT 追記のみで、解析コードは変わらない。
