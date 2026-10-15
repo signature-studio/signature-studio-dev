@@ -415,12 +415,16 @@ if (process.env.FLE_PY106_BIND === '1') {
     const hx = (v) => '0x' + BigInt.asUintN(64, BigInt(v)).toString(16);
     const rd64 = (a) => new DataView(m.HEAPU8.buffer).getBigUint64(Number(a), true);
     const head0 = rd64(SLOT_HEAD);
-    let threw = null, n = 0;
-    try { n = m._fle_py_bind_probe(); } catch (e) { threw = classify(e); }
+    const getproc0 = m._fle_n_getproc();
+    let threw = null;
+    try { m._fle_py_bind_probe(); } catch (e) { threw = classify(e); }
+    // throw (exit) の経路でも C 側の計数と名前表を読む。読みは戻り値に頼らず、名前表は空文字まで、計数は前後差で取る
+    const getproc_calls = m._fle_n_getproc() - getproc0, hook_calls = m._fle_py_bind_hook_n();
     const ringTail = []; for (let k = 96; k < 128; k++) ringTail.push('0x' + (Number(m._fle_ring_at(k)) >>> 0).toString(16));
     console.log('FLEBOOT_PY106RING ' + JSON.stringify(ringTail));
     const names = [];
-    for (let i = 0; i < n; i++) names.push({ i, name: m.UTF8ToString(m._fle_py_bind_name(i)), cell: BigInt(m._fle_py_bind_cell(i)) });
+    for (let i = 0; i < 128; i++) { const nm = m.UTF8ToString(m._fle_py_bind_name(i)); if (nm === '') break; names.push({ i, name: nm, cell: BigInt(m._fle_py_bind_cell(i)) }); }
+    const n = names.length;
     const nameOf = (v) => { const x = names.find((y) => y.cell === BigInt.asUintN(64, BigInt(v))); return x ? x.name : null; };
     const slotExc = rd64(SLOT_EXC);
     // boot 停止時の head は 0 (unit 209 で 0 化)。sink と同じ load を辿るため、head を PE の値 (SLOT_EXC) に戻してから読む
@@ -428,7 +432,7 @@ if (process.env.FLE_PY106_BIND === '1') {
     const v1 = rd64(SLOT_HEAD), v2 = rd64(v1), v3 = rd64(v2);
     const tok = Number(v3) - 0x7f300000;
     const pyB = {
-        probe: { threw, names_n: n },
+        probe: { threw, names_n: n, getproc_calls, hook_calls },
         head_at_stop: hx(head0), slot_exc_after_bind: hx(slotExc), name_of_slot_exc: nameOf(slotExc),
         slot_setstr_after_bind: hx(rd64(SLOT_SETSTR)), name_of_slot_setstr: nameOf(rd64(SLOT_SETSTR)),
         slot_newinterp_after_bind: hx(rd64(SLOT_NEWINTERP)), name_of_slot_newinterp: nameOf(rd64(SLOT_NEWINTERP)),
@@ -437,7 +441,7 @@ if (process.env.FLE_PY106_BIND === '1') {
         names: names.map((x) => [x.i, x.name, hx(x.cell)]),
     };
     writeFileSync(outPath.replace(/\.json$/, '_py106bind.json'), JSON.stringify(pyB, null, 1));
-    console.log('FLEBOOT_PY106B ' + JSON.stringify({ threw: pyB.probe.threw, names_n: n, head_at_stop: pyB.head_at_stop, name_of_slot_exc: pyB.name_of_slot_exc, name_of_slot_setstr: pyB.name_of_slot_setstr, name_of_slot_newinterp: pyB.name_of_slot_newinterp, type_name: pyB.chain.type_name, load3: pyB.chain.load3_type_tok }));
+    console.log('FLEBOOT_PY106B ' + JSON.stringify({ threw: pyB.probe.threw, names_n: n, getproc_calls, hook_calls, head_at_stop: pyB.head_at_stop, name_of_slot_exc: pyB.name_of_slot_exc, name_of_slot_setstr: pyB.name_of_slot_setstr, name_of_slot_newinterp: pyB.name_of_slot_newinterp, type_name: pyB.chain.type_name, load3: pyB.chain.load3_type_tok }));
 }
 // FLE-6 ネガコン判定: shim 無し (既定 / FLE_IPP=0) なら 0x15F34A0 = 0、shim 有り (FLE_IPP=1) なら非 0 でなければならない。
 // mode 2 (#2702) は停止を測る測定モードなので判定しない (ok の値は出すが終了コードは変えない)。

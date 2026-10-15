@@ -244,10 +244,10 @@ static int ipp_call(u64 t) {   /* fle_ff から。処理したら 1 */
 }
 #define IPP_HMOD 0x7F0F0000u   /* wasm メモリ外の擬似 HMODULE */
 #define PY_HMOD 0x7F0E0000u    /* PY-106 (#2909): Python312 の擬似 HMODULE (束縛呼出し中だけ有効) */
-static int g_py_probe = 0;
+static int g_py_probe = 0; static u32 g_py_hook_n;
 static HMODULE fle_ipp_load_hook(const char* name, DWORD flags) {
     (void)flags;
-    if (g_py_probe && name && strstr(name, "Python312")) return (HMODULE)(uintptr_t)PY_HMOD;
+    if (g_py_probe && name && strstr(name, "Python312")) { g_py_hook_n++; return (HMODULE)(uintptr_t)PY_HMOD; }
     if (g_ipp_on && name && strstr(name, "dsp_ippv2")) { g_ipp_h = IPP_HMOD; return (HMODULE)(uintptr_t)IPP_HMOD; }
     return 0;
 }
@@ -366,11 +366,12 @@ void imp_GetProcAddress(void) {  /* m11 旧 stub 揃え (REPORT §4)。FLE-6: ds
 }
 /* PY-106 (#2909): boot 停止後に束縛関数 0xc395a0 を直接実行する。戻り値 = 束縛された名前の数 (計測のみ) */
 EMSCRIPTEN_KEEPALIVE int fle_py_bind_probe(void) {
-    g_py_nm_n = 0; g_py_probe = 1;
+    g_py_nm_n = 0; g_py_hook_n = 0; g_py_probe = 1;
     fle_run(0xc395a0u, 0, 0, 0, 0, 0, 0, 0, 0);
     g_py_probe = 0;
     return (int)g_py_nm_n;
 }
+EMSCRIPTEN_KEEPALIVE int fle_py_bind_hook_n(void) { return (int)g_py_hook_n; }
 EMSCRIPTEN_KEEPALIVE const char* fle_py_bind_name(int i) { return (u32)i < g_py_nm_n ? g_py_nm[i] : ""; }
 EMSCRIPTEN_KEEPALIVE u32 fle_py_bind_cell(int i) { return (u32)i < g_py_nm_n ? (u32)(uintptr_t)&g_py_cell[i] : 0; }
 void imp_LoadStringW(void) {   /* gui_compat.c と同一: buf[0]=0 を書かないと LoadResString が暴走 */
