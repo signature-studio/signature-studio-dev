@@ -34,14 +34,14 @@
 
 測定 commit: `3bdba9d55` (コードを変えた最後の commit。`feat(python): ui.getProgTitle / getHintValue を PE 確定・mock/C 実装 (#3005)`)。以降の変更は `REPORT_PY128.md` と `docs/DOC_MAP.md` (md のみ)。
 
-環境: runner 4 core。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`fl-win64` の `block00031_PE.bin`・`block24429/24430/25159/24618_DATA.bin` を展開)。`toolchain-emsdk` は [EMSDK] (`/opt/emsdk`)。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、3 分 40 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
+環境: runner 4 core、load average 0.15 (HEAD 再現時、03:22:27)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`fl-win64` の `block00031_PE.bin`・`block24429/24430/25159/24618_DATA.bin` を展開)。`toolchain-emsdk` は [EMSDK] (`/opt/emsdk`)。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、3 分 40 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
 
-| コマンド | 結果 |
-|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 157 (155 + 2) |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 157 / 未実装 278 / MCP 静的 60) |
-| `node tests/ui_state_diff.mjs` | calls 56、diffs 0、PASS |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true |
+| コマンド | 結果 | wall |
+|---|---|---|
+| `bash provider/build.sh` | rc 0・ハンドラ 157 (155 + 2) | 1.3 秒 (emcc キャッシュ済み) |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 157 / 未実装 278 / MCP 静的 60) | 0.28 秒 |
+| `node tests/ui_state_diff.mjs` | calls 56、diffs 0、PASS | 0.04 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.28 秒 |
 
 mock と C の値 (同一): `getProgTitle()` = `FL Studio 2026`、`getHintValue(50,100)` = `50%`、`(-1,100)` = `-1%`、`(1,8)` = `12%` (12.5 は偶数側)、`(5,0)` と `(0,0)` = `-9223372036854775808%`、`(2147483647,1)` = `-100%` (int32 折返し)、`(None,1)` = code 5。
 
