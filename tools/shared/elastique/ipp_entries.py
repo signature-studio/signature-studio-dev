@@ -12,9 +12,12 @@
 - 照合 = 本体の正規化命令列 (分岐先・rip 相対変位・大きな即値を伏せる) の SHA-1 一致。一致しなければ
   variant 集合に対する bigram Jaccard で上位を取り SequenceMatcher の比を出す (参考値、一致扱いはしない)。
 - 出力: data/entries.csv (197 行の対応表・コミット対象) と tools/shared/work/elastique/facts.json (中間物・gitignore)。
-- 関数ポインタ経由の到達: .text の lea rip 相対で IPPCODE を指す箇所・間接 call/jmp・
+- 関数ポインタ経由の到達: .text と IPPCODE の lea rip 相対で IPPCODE を指す箇所・.text の間接 call/jmp・
   .rdata/.data 中の IPPCODE 向き 8 byte 値を数え、入口集合との差を出す (静的確認。実行トレースではない)。
+- direct_calls の範囲: .text の関数は pdata の End まで、IPPCODE (pdata 無し) は次の既知の関数先頭
+  (IPPCODE 内の rel32 call 着地点) まで、かつ SPAN_IPP バイトまで。範囲が取れないときだけ ret で止める。
 """
+import bisect
 import collections
 import csv
 import difflib
@@ -33,6 +36,7 @@ ELQ = os.environ.get('ELASTIQUE_DLL', os.path.join(HERE, '..', 'work', 'win', 'e
 DSP = os.environ.get('DSP_IPP_DLL') or os.path.join(
     os.environ.get('FL_WIN64_DIR', ''), 'extracted', 'block24356_PE.bin')
 MAXINS = 200
+SPAN_IPP = 0x2000
 TABLE_MAX = 16
 REACH_DEPTH = 12
 TRIVIAL = 8
@@ -50,6 +54,10 @@ def load(path):
     for k, n in (('ipp', 'IPPCODE'), ('text', '.text')):
         img[k + '_lo'] = secs[n].VirtualAddress
         img[k + '_hi'] = img[k + '_lo'] + secs[n].Misc_VirtualSize
+    pd = sorted((e.struct.BeginAddress, e.struct.EndAddress) for e in getattr(pe, 'DIRECTORY_ENTRY_EXCEPTION', []))
+    img['pdata'] = pd
+    img['pdata_b'] = [b for b, _ in pd]
+    img['starts'] = []
     return img
 
 
@@ -57,10 +65,11 @@ def in_code(img, rva):
     return img['text_lo'] <= rva < img['text_hi'] or img['ipp_lo'] <= rva < img['ipp_hi']
 
 
-def sweep(img, md, on_ins):
-    """.text の線形走査。invalid byte は 1 byte 飛ばす。"""
+def sweep(img, md, on_ins, lo=None, hi=None):
+    """線形走査 (既定は .text)。invalid byte は 1 byte 飛ばす。"""
     mem, base = img['mem'], img['base']
-    lo, hi = img['text_lo'], img['text_hi']
+    lo = img['text_lo'] if lo is None else lo
+    hi = img['text_hi'] if hi is None else hi
     CH = 1 << 16
     pos = lo
     while pos < hi:
@@ -150,18 +159,64 @@ def dispatch_table(img, md, rva):
     return out or [rva]
 
 
+def call_targets(img, md):
+    """.text と IPPCODE の rel32 call の着地点 (関数先頭の候補)。"""
+    out = set()
+
+    def on(rva, ins):
+        if ins.bytes[0] == 0xE8 and ins.size == 5:
+            out.add(rva + 5 + int.from_bytes(ins.bytes[1:5], 'little', signed=True))
+    sweep(img, md, on, img['text_lo'], img['text_hi'])
+    sweep(img, md, on, img['ipp_lo'], img['ipp_hi'])
+    return out
+
+
+def pdata_end(img, rva):
+    """rva を含む pdata 関数の End。含まなければ None。"""
+    i = bisect.bisect_right(img['pdata_b'], rva) - 1
+    if i >= 0 and rva < img['pdata'][i][1]:
+        return img['pdata'][i][1]
+    return None
+
+
+def fn_span(img, rva):
+    """rva の関数の終端 (RVA・排他)。pdata に入る関数は pdata の End。IPPCODE (pdata 無し) は次の既知の関数先頭 (IPPCODE 内の call 着地点) と SPAN_IPP・節の終端のうち最小。それ以外は None (範囲を取れない)。"""
+    end = pdata_end(img, rva)
+    if end is not None:
+        return end
+    if not (img['ipp_lo'] <= rva < img['ipp_hi']):
+        return None
+    starts = img['starts']
+    j = bisect.bisect_right(starts, rva)
+    nxt = starts[j] if j < len(starts) else img['ipp_hi']
+    return min(nxt, rva + SPAN_IPP, img['ipp_hi'])
+
+
 def direct_calls(img, md, rva, maxins=MAXINS):
-    """本体から線形に読み、rel32 の call 先のうち .text / IPPCODE 内のものを返す (ret まで)。"""
+    """本体の rel32 call 先のうち .text / IPPCODE 内のものを返す。範囲は fn_span (早期 ret で止めない)。範囲が取れないときだけ ret まで。"""
     mem, base = img['mem'], img['base']
+    end = fn_span(img, rva)
+    if end is None:
+        code, stop_ret = mem[rva:rva + maxins * 15], True
+    else:
+        code, stop_ret = mem[rva:end], False
     out = []
-    for n, ins in enumerate(md.disasm(mem[rva:rva + maxins * 15], base + rva)):
+    for n, ins in enumerate(md.disasm(code, base + rva)):
         if ins.mnemonic == 'call' and ins.bytes[0] == 0xE8 and ins.size == 5:
             t = ins.address - base + 5 + int.from_bytes(ins.bytes[1:5], 'little', signed=True)
             if in_code(img, t):
                 out.append(t)
-        if ins.mnemonic == 'ret' or n >= maxins:
+        if stop_ret and (ins.mnemonic == 'ret' or n >= maxins):
             break
     return out
+
+
+def span_tail(img, md, rva, end):
+    """範囲 [rva, end) の最後の命令の mnemonic (関数の終端で切れていれば ret・jmp・nop/int3 のパディングになる)。"""
+    last = None
+    for ins in md.disasm(img['mem'][rva:end], img['base'] + rva):
+        last = ins
+    return last.mnemonic if last else None
 
 
 def reach(img, md, roots, depth=3):
@@ -213,25 +268,32 @@ def bigrams(toks):
 
 
 def indirect_scan(elq, md, entries):
-    """.text の lea rip 相対 IPPCODE 参照、間接 call/jmp、.rdata/.data の IPPCODE 向きポインタを数える。"""
+    """lea rip 相対で IPPCODE を指す箇所 (.text と IPPCODE の両方を走査)、.text の間接 call/jmp と IPPCODE 向き即値、.rdata/.data の IPPCODE 向きポインタを数える。"""
     base = elq['base']
     lea_targets = collections.Counter()
+    lea_ipp_src = []
     ind_sites = []
+    ind_ipp_sites = []
     imm_ipp = []
 
-    def on(rva, ins):
-        if ins.mnemonic == 'lea' and 'rip' in ins.op_str:
-            t = rva + ins.size + int.from_bytes(ins.bytes[-4:], 'little', signed=True)
-            if elq['ipp_lo'] <= t < elq['ipp_hi']:
-                lea_targets[t] += 1
-        if ins.mnemonic in ('call', 'jmp') and not ins.op_str.startswith('0x'):
-            ind_sites.append((rva, ins.mnemonic, ins.op_str))
-        if not ins.mnemonic.startswith('j') and ins.mnemonic != 'call':
-            for h in re.findall(r'0x[0-9a-f]{6,}', ins.op_str):
-                v = int(h, 16) - base
-                if elq['ipp_lo'] <= v < elq['ipp_hi']:
-                    imm_ipp.append((rva, ins.op_str))
-    sweep(elq, md, on)
+    def on(in_text):
+        def f(rva, ins):
+            if ins.mnemonic == 'lea' and 'rip' in ins.op_str:
+                t = rva + ins.size + int.from_bytes(ins.bytes[-4:], 'little', signed=True)
+                if elq['ipp_lo'] <= t < elq['ipp_hi']:
+                    lea_targets[t] += 1
+                    if not in_text:
+                        lea_ipp_src.append((rva, t))
+            if ins.mnemonic in ('call', 'jmp') and not ins.op_str.startswith('0x'):
+                (ind_sites if in_text else ind_ipp_sites).append((rva, ins.mnemonic, ins.op_str))
+            if in_text and not ins.mnemonic.startswith('j') and ins.mnemonic != 'call':
+                for h in re.findall(r'0x[0-9a-f]{6,}', ins.op_str):
+                    v = int(h, 16) - base
+                    if elq['ipp_lo'] <= v < elq['ipp_hi']:
+                        imm_ipp.append((rva, ins.op_str))
+        return f
+    sweep(elq, md, on(True), elq['text_lo'], elq['text_hi'])
+    sweep(elq, md, on(False), elq['ipp_lo'], elq['ipp_hi'])
     data_ptrs = set()
     for n in ('.rdata', '.data', '.pdata', '_RDATA', 'IPPDATA'):
         s = elq['secs'].get(n)
@@ -243,7 +305,7 @@ def indirect_scan(elq, md, entries):
             v = int.from_bytes(raw[off:off + 8], 'little') - base
             if elq['ipp_lo'] <= v < elq['ipp_hi']:
                 data_ptrs.add(v)
-    return lea_targets, ind_sites, data_ptrs, imm_ipp
+    return lea_targets, lea_ipp_src, ind_sites, ind_ipp_sites, data_ptrs, imm_ipp
 
 
 def write_csv(rows):
@@ -296,10 +358,24 @@ def main():
     sizes = collections.Counter(len(v) for v in exp_tables.values())
     print(f'dsp export {len(exports)}: variant 数の分布 (表の項数) {dict(sorted(sizes.items()))}')
 
+    dsp['starts'] = sorted(call_targets(dsp, md) | set(dsp['pdata_b']))
+    print(f'dsp 関数先頭の候補 (pdata 先頭と .text・IPPCODE の rel32 call 着地点): {len(dsp["starts"])}')
     roots = collections.defaultdict(list)
     for name, vs in exp_tables.items():
         roots[name] = vs
     reached = reach(dsp, md, roots, depth=REACH_DEPTH)
+    span_kind = collections.Counter()
+    tails = collections.defaultdict(collections.Counter)
+    for f in reached:
+        end = fn_span(dsp, f)
+        kind = 'pdata' if pdata_end(dsp, f) is not None else (
+            'IPPCODE 次の先頭まで' if end is not None else 'ret まで (範囲なし)')
+        span_kind[kind] += 1
+        if end is not None:
+            tails[kind][span_tail(dsp, md, f, end)] += 1
+            span_kind[kind + ' SPAN_IPP 打ち切り'] += end - f == SPAN_IPP
+    print(f'direct_calls の範囲 (到達集合 {len(reached)} 本体): {dict(span_kind)}')
+    print(f'範囲の最後の命令 (mnemonic): {({k: dict(v.most_common(6)) for k, v in tails.items()})}')
     dsp_hits = rel_targets(dsp, md)
     origin = collections.defaultdict(set)
     depth_of = {}
@@ -369,14 +445,16 @@ def main():
     print(f'照合: {dict(cnt)}')
     print(f'区分: {dict(collections.Counter(r["class"] for r in rows))}')
 
-    lea_t, ind, data_ptrs, imm_ipp = indirect_scan(elq, md, entries)
+    lea_t, lea_ipp_src, ind, ind_ipp, data_ptrs, imm_ipp = indirect_scan(elq, md, entries)
     ind_pat = collections.Counter(re.sub(r'\s+', ' ', o) if 'r10 + rax*8' not in o else 'table[r10+rax*8]' for _, _, o in ind)
     print(f'間接 call/jmp の形: {dict(ind_pat.most_common(12))}')
-    print(f'即値・変位に IPPCODE 番地を含む命令: {len(imm_ipp)}')
+    print(f'即値・変位に IPPCODE 番地を含む命令 (.text): {len(imm_ipp)}')
     neg = negative_control(elq, dsp, md, rows_entries=entries)
     eset = set(entries)
-    print(f'lea rip で IPPCODE を指す箇所: {sum(lea_t.values())} 箇所 / {len(lea_t)} 着地点 (うち入口 {len(eset & set(lea_t))})')
-    print(f'間接 call/jmp (.text): {len(ind)} 箇所 (例 {ind[:3]})')
+    lea_ipp_dst = {d for _, d in lea_ipp_src}
+    print(f'lea rip で IPPCODE を指す箇所 (.text と IPPCODE): {sum(lea_t.values())} 箇所 / {len(lea_t)} 着地点 (うち入口 {len(eset & set(lea_t))})')
+    print(f'  うち IPPCODE 内から: {len(lea_ipp_src)} 箇所 / {len(lea_ipp_dst)} 着地点 (うち入口 {len(eset & lea_ipp_dst)}) 例 {[(hex(elq["base"] + s), hex(elq["base"] + d)) for s, d in lea_ipp_src[:5]]} (全件は facts.json)')
+    print(f'間接 call/jmp (.text): {len(ind)} 箇所 (例 {ind[:3]})。IPPCODE 内: {len(ind_ipp)} 箇所')
     print(f'.rdata/.data の IPPCODE 向きポインタ: {len(data_ptrs)} (うち入口 {len(eset & data_ptrs)}、入口外 {len(data_ptrs - eset)})')
 
     write_csv(rows)
@@ -386,7 +464,10 @@ def main():
                'call_jmp_sites': n_sites, 'pdata_text_functions': len(fns),
                'pdata_callers_of_entries': n_pdata_callers,
                'lea_rip_ipp_targets': {hex(elq['base'] + k): v for k, v in lea_t.items()},
+               'lea_rip_ipp_from_ipp': [(hex(elq['base'] + s), hex(elq['base'] + d)) for s, d in lea_ipp_src],
                'indirect_sites': [(hex(elq['base'] + a), m, o) for a, m, o in ind],
+               'indirect_sites_ipp_count': len(ind_ipp),
+               'direct_call_span': dict(span_kind),
                'data_ptrs_ipp': sorted(hex(elq['base'] + d) for d in data_ptrs),
                'data_ptrs_ipp_not_entry': sorted(hex(elq['base'] + d) for d in data_ptrs - eset),
                'imm_ipp_sites': len(imm_ipp), 'indirect_pattern': dict(ind_pat),
