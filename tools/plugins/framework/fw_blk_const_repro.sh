@@ -71,11 +71,25 @@ b[off + 0x18:off + 0x1a] = b'\x00\x00'
 out('b18_pair_00', b)
 # "24 00" だけを残し、0x18 の残り 6 byte を 0 にした variant (十分性の確認)。
 out('b18_keep24', keep_only(0x18, 0x1a))
+# #5165: 残す slot の先頭 2 byte ("24 00") だけを残す variant (slot 0x08・0x10・0x18)・0x18 の 0x25 切り分け。
+def pair_only(slot, pair):
+    b = blank(0)
+    b[off + slot:off + slot + 2] = pair
+    return b
+out('k08_pair', pair_only(0x08, b'\x24\x00'))
+out('k10_pair', pair_only(0x10, b'\x24\x00'))
+out('k18_pair_only', pair_only(0x18, b'\x24\x00'))
+out('k18_b1_01', pair_only(0x18, b'\x24\x01'))
+# WRITE 属性 (IMAGE_SCN_MEM_WRITE = 0x80000000) を .icall から外した variant (属性の影響の確認)。
+nw = bytearray(src)
+ch = struct.unpack_from('<I', nw, ic + 36)[0]
+struct.pack_into('<I', nw, ic + 36, ch & ~0x80000000)
+out('nowrite', nw)
 PY
 
 REPS="${REPS:-1}"
 printf '%-10s %-4s %-14s %-10s\n' variant rep const_globals blk_loads
-for v in base zero nop only08 only18 $(ls "$W" | sed -n 's/^\(b[0-9a-f][0-9a-f]_[0-9a-z_]*\)\.dll$/\1/p'); do
+for v in base zero nop only08 only18 nowrite k08_pair k10_pair k18_pair_only k18_b1_01 $(ls "$W" | sed -n 's/^\(b[0-9a-f][0-9a-f]_[0-9a-z_]*\)\.dll$/\1/p'); do
   for r in $(seq 1 "$REPS"); do
     rm -f "$v.ll"
     timeout 200 "$RETDEC_BIN" "$v.dll" -o "$v.c" \
