@@ -46,8 +46,9 @@ class Session:
         W = self.t['work']
         self.sigs = json.load(open(W + '/sigs.json'))
         for name, rt in (self.t.get('ret_override') or {}).items():   # LD-158 (#3470): 実戻りが xmm0 と確定した関数の署名を直す
-            if name in self.sigs:
-                self.sigs[name] = dict(self.sigs[name], ret=rt, tr=True)
+            if name not in self.sigs:
+                raise KeyError('ret_override: %s が sigs.json に無い (名前の typo を疑う)' % name)
+            self.sigs[name] = dict(self.sigs[name], ret=rt, tr=True)
         st = json.load(open(W + '/stubs.json'))
         self.stub_info = {n: {'widths': st.get('widths', {}).get(n, [32] * 4)} for n in st['stubs']}
         self.pe = PE(self.t['pe'])

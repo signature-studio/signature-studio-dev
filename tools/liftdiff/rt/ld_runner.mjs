@@ -101,7 +101,7 @@ function runCase(line) {
       const r = vm.runInThisContext('__ld_call()', { timeout: wasmTimeoutMs });
       if (rt === 'void') hasRet = 0;
       else if (rt === 'double') x0 = tr ? BigInt.asUintN(64, r) : f64bits(r);
-      else if (rt === 'float') x0 = f32bits(r);
+      else if (rt === 'float') x0 = tr ? BigInt.asUintN(32, r) : f32bits(r);
       else if (typeof r === 'bigint') rax = BigInt.asUintN(64, r);
       else if (typeof r === 'number') rax = BigInt(r >>> 0);
     } catch (e) {
