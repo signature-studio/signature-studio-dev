@@ -128,7 +128,7 @@ CC 1 件 (flapi 1.000/件) の所要時間を、mock engine ハンドラ内 (`ha
 - **読み 3 (大きさは時刻で変わる)**: 間隔 20ms の Python 込みは、同じ条件で 130µs (予備) と 400µs (本節) に分かれた。steal time (`/proc/stat` の steal 列) は計測中も 0 で、ホスト側の起床遅延かどうかは確認できない。**大きさの値は計測時刻に依存するので、絶対値として使わない。**
 - **読み 4 (機構は部分的)**: worker を回し続けた対照 (spin) でも、間隔 20ms の遅れ (中央値 +20〜+60µs) は残る。このため、受け側 (main、`Atomics.waitAsync`) の idle 後の wake が寄与している。worker 側の寄与 (sleep と spin の差) は時刻によって符号が揃わず、確定できない。同一 CPU への固定は一貫して小さいとは言えない (本節の値は時刻で割れる)。
 - **対策の候補 (未実施)**: 受け側の短時間 spin、または MIDI のバースト中だけ起きたままにする設計。本計測では有効性を確認していない。採否は PM 判断 (未解決表)。
-- 検証 (run 9): 素材は `toolchain-emsdk` のみ (`/opt/emsdk` の emcc 6.0.12)。`build_cpython_wasm.sh` rc=0 (2 分 40 秒)、`FLPY_SKIP_TABLE=1 build_flpy.sh` rc=0 (4 秒)。runner は 4 core、node 22.23.3。
+- 検証 (run 9): 素材は `toolchain-emsdk` のみ (EMSDK_DIR の emsdk、emcc 6.0.12)。`build_cpython_wasm.sh` rc=0 (2 分 40 秒)、`FLPY_SKIP_TABLE=1 build_flpy.sh` rc=0 (4 秒)。runner は 4 core、node 22.23.3。
 - 再現 (前提: `build_cpython_wasm.sh` と `FLPY_SKIP_TABLE=1 build_flpy.sh` 済み。fl-win64 は不要): `cd tools/python && node tests/rpc_gap_diag.mjs 300 3 0,2,5,20 sleep` / `node tests/rpc_gap_diag.mjs 300 3 0,2,20 spin` / `taskset -c 0,1 node tests/rpc_gap_diag.mjs 300 3 0,2,5,20 sleep` / `taskset -c 0 node tests/rpc_gap_diag.mjs 300 3 0,2,5,20 sleep` / `node tests/rtt_gap_bench.mjs 300 3 0,2,20 sleep` / `node tests/rtt_gap_bench.mjs 300 3 0,20 spin`。
 
 ## 検証範囲 / 範囲外
