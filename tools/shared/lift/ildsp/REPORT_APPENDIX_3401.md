@@ -74,12 +74,12 @@
 ### 8-6 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| slot 1・3 (DSP 本体 0x17f700・0x180830 と、そこから呼ばれる helper) を含む閉包の lift と native 差分。7 root の unsup は 2,472 site | 受入 (3) の残り (閉包全体の全バイト差分) | 子 [T-SH-81] |
+| slot 1・3 (DSP 本体 0x17f700・0x180830 と、そこから呼ばれる helper) を含む閉包の lift と native 差分。7 root の unsup は 2,472 site | 受入 (3) の残り (閉包全体の全バイト差分) | 子 #4237 [T-SH-105] |
 | x64c の unsup: 閉包全体で ymm 語 2,396 site・VEX-128 ほか 76 site。実装は PR #3471 (`3428-x64c-psola-ymm`) が進行中 | 上の lift の前提。未対応のまま呼ばれると trap になる | 子 [T-SH-82] (#3428) |
-| slot 2 (`0x1ab690` → `0x1804b0`): 閉包は unsup 0 だが、本 PR では差分テストを行っていない | 受入 (3) の残り | 子 [T-SH-81] の受入に含める |
+| slot 2 (`0x1ab690` → `0x1804b0`): 閉包は unsup 0 だが、本 PR では差分テストを行っていない | 受入 (3) の残り | 子 #4237 [T-SH-105] の受入に含める |
 | 間接 call の native 到達実測と扱い (helper `0x1aedc0`・`0x1b6f4c` の 4 件、画像内ポインタ `0x268260`・`0x268268`)。PSOLA の閉包も同じ helper を含む (`REPORT_CLOSURE.md` §4.6) | 受入 (2)。PSOLA の IAT 16 件は stub で lift 済み | 既存 #3250 [T-SH-54] (GPS の同じ helper の実測。PSOLA でも同一アドレス) |
 | x64c の closure (235 関数) と `ildsp_closure.py` の closure (82 関数) の関数集合の差 (重なり 71) | 規模の数値の定義。どちらを使うかで閉包の大きさが変わる | #161 (親・PM 判断) |
-| 差分が 1 経路 (.data 不変・全 case 同一経路) | 分岐網羅の証拠にならない | 子 [T-SH-81] の受入に含める |
+| 差分が 1 経路 (.data 不変・全 case 同一経路) | 分岐網羅の証拠にならない | 子 #4237 [T-SH-105] の受入に含める |
 
 ### 8-7 slot 4・5 の差分テストの位置付け
 - slot 4 (クリア) と slot 5 (`return [+0x98]`) は呼び出しの memory 効果を差分に含める。戻り値は slot 5 だけ畳み込む (§8-4)。slot 4 の戻り値は未検証。
@@ -89,7 +89,7 @@
 - #3428 (PR #3471) の ymm 対応が main に入った後の実測。7 root (基準 + slot 1–3) の閉包は **unsup 0** (§8-3 の 2,472 site が解消)。235 関数・60,095 命令・unlifted callees 0・traps 0・imports 18 (`lift_psola_closure.sh` の lift)。
 - 差分 (呼出しは基準と同じ CreateInstance → slot 0 → slot 4 → slot 5): PASS 64 / FAIL 0 (wasm 3,549,536 B・trap 0)。閉包を広げても基準の一致は保たれる。
 - slot 1–3 を差分に入れると、native 側が全 64 case で addr 0 の SIGSEGV になり比較対象が 0 件になる (`wc diff` は PASS 0・excluded 64)。DSP 本体 (0x17f700 ほか) は `this` の内部フィールド (+0xc4・+0xcc・+0x33c・+0x6a0・+0x24・+0x6bc など) を書いてから helper を呼ぶ。null 参照の原因 (未設定の内部ポインタ) は未特定。host 側の事前設定が要る。
-- 未解決 (子 T-SH-81 の受入): slot 1–3 の host 前提の確定と、その入力での native 対 wasm 差分。slot 2 の差分は未実施。
+- 未解決 (子 #4237 [T-SH-105] の受入): slot 1–3 の host 前提の確定と、その入力での native 対 wasm 差分。slot 2 の差分は未実施。
 
 ### 8-8 測定後のコード差分 (差分 0 の証跡)
 測定 commit `9b1902fe5` 以降に変えたのは本付録・`REPORT.md`・`DOC_MAP.md` (`.md` のみ)。
