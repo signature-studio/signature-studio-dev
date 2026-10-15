@@ -56,10 +56,10 @@
 
 ## 4. 測定
 
-- 測定 commit: 本 PR の最後のコード変更 commit (PR 本文に記載)。
+- 測定 commit (コードを変えた最後の commit): `5d5216087`。`git diff 5d5216087 HEAD -- tools/python/analysis` は 0 行。
 - 実行: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_k_struct_probe.py 2`。
-  - 拡張前: 終了 0・73.2 秒 (線形走査 72.1 秒)・load 0.3 (開始時)。
-  - 拡張後: 終了 0・155.8 秒・load 1.0 (終了時)。
+  - 拡張前 (ext 追加前の版): 終了 0・73.2 秒 (線形走査 72.1 秒)・load 0.3 (開始時)。
+  - 測定 commit `5d5216087` (ext 追加後): 終了 0・155.3 秒・load 0.45 (開始時) / 0.96 (終了時)。
 - 拡張前後で `direct_K_writes=0 direct_K_reads=2`・正の対照 V 書込み 3 件 (`0xf82b80`・`0xf82c55`・`0xf82c5f`)・`returned pointers=7`・`alias accesses=38 K writes=0` は一致。
 
 ## 5. 未解決 (起票先付き)
