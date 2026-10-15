@@ -12,7 +12,7 @@ REPORT.md の §16 (refs_orphan 検出 #2337) の未解決を解消した記録�
 ## 2. 実測 (指標の変更点・再現スクリプト)
 
 - 測定 commit: `889ec098` (コードを変えた最後の commit)。窓の終端 `2026-10-15T00:00:48Z` (固定。スクリプトの `--end` の既定値)。
-- 再現スクリプト: [`refs_only_remeasure.ts`](refs_only_remeasure.ts)。1 コマンド: `cd <repo> && node --experimental-strip-types --no-warnings tools/pm/refs_only_remeasure.ts` (読み取りだけ。HEAD `1bdc5948` で実測 20.7 秒)。
+- 再現スクリプト: [`refs_only_remeasure.ts`](refs_only_remeasure.ts)。1 コマンド: `cd <repo> && node --experimental-strip-types --no-warnings tools/pm/refs_only_remeasure.ts` (読み取りだけ。コミット済み HEAD `97341832` で再実行し、同じ数値を得た。実測 20.7 秒)。
 - 旧判定: `origin/main` の `infra/pm-worker/src/webhook.ts` から `REFS_RE`・`CLOSE_RE` の正規表現リテラルを読み出して評価した (手写しをしない)。新判定: HEAD の `refsOnlyBody` (`src/webhook.ts`)。`refsOnlyNumbers` (`src/refs.ts`) との不一致も数えた。
 - 母集団: REST の `repos/<repo>/pulls` を updated 降順に、窓の始点まで読み切って取り、merged_at が窓内の PR を数えた。
 
