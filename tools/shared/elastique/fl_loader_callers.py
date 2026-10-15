@@ -23,7 +23,8 @@ PE_NAME = 'block00031_PE.bin'
 LOADER_NAME = 'LoadSharedElastiqueDll'
 CREATE_NAMES = ['ElPro_CreateInstance', 'ElProDirect_CreateInstance', 'ElProV3_CreateInstance',
                 'ElProV3Direct_CreateInstance', 'ElResampleSource_CreateInstance',
-                'Auftakt_CreateInstance', 'SolPitchAn_CreateInstance']
+                'Auftakt_CreateInstance', 'SolPitchAn_CreateInstance',
+                 'SolPitchAn_CreatePitchMarks']
 RIP_RE = re.compile(r'\[rip \+ (0x[0-9a-f]+)\]')
 
 
@@ -61,27 +62,31 @@ def main():
     call_refs = {}
     slot_name = {}
     slot_calls = {}
-    last_name = {}
+    pending = None
+    resolved = None
     o = 0
     while o < len(code):
         ins = next(md.disasm(code[o:o + 16], base + o), None)
         if ins is None:
             o += 1
             continue
+        cur, resolved = resolved, None
         m = RIP_RE.search(ins.op_str) if 'rip' in ins.op_str else None
         if m:
             t = ins.address + ins.size + int(m.group(1), 16)
             if ins.mnemonic == 'lea' and t in names:
                 lea_refs.setdefault(names[t], []).append(ins.address)
-                last_name[fn_of(ins.address)] = names[t]
+                pending = names[t]
             elif ins.mnemonic == 'mov' and ins.op_str.startswith('qword ptr [rip') and ins.op_str.endswith(', rax'):
-                n = last_name.get(fn_of(ins.address))
-                if n and n != LOADER_NAME:
-                    slot_name[t] = n
+                if cur and cur != LOADER_NAME:
+                    slot_name[t] = cur
             elif ins.mnemonic == 'call':
                 slot_calls.setdefault(t, []).append(ins.address)
         if ins.mnemonic in ('call', 'jmp') and ins.op_str.startswith('0x'):
             call_refs.setdefault(int(ins.op_str, 16), []).append(ins.address)
+            if ins.mnemonic == 'call' and pending:
+                resolved = pending
+                pending = None
         o += ins.size
 
     loader_fns = sorted({fn_of(a) for a in lea_refs.get(LOADER_NAME, [])} - {None})
