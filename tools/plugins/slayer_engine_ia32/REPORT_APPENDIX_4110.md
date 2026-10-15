@@ -5,7 +5,7 @@
 - 測定 commit (コードを変えた最後の commit): `922ead531`。 検証 HEAD: 同じ (`git diff 922ead531 HEAD -- tools/ott tools/plugins/slayer_engine_ia32` は 0 行)。
 - 比較基準: `ead1c1399` (origin/main) を `git worktree` で展開して同じ試験を実行 (§3)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は生成した試行のみ (fl-win64 は回帰試験の入力だけ)。
-- 素材: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst`・313 本の `_PE.bin`)。
+- 素材: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst`・313 本の `_PE.bin`)。
 
 ## 1. 結論
 
