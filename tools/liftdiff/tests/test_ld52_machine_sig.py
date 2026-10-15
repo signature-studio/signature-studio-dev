@@ -41,6 +41,10 @@ def main():
     assert compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '22', '33'])), CTX, sigs) is None
     r = compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '22', '0'])), CTX, sigs)
     assert r and r['kind'] == 'entry_arg' and r['pos'] == 2, r
+    # LD-248: i128 位置の領域内ポインタは arena 座標の rebase (delta) で一致する (偽の不一致を出さない)
+    ctx_d = compare.Ctx(0x100000, [(0, 0x10000)], (0, 1 << 32))
+    n = trace(entry('653c80', 3, ['11', '22', hex(0x100000 + 0x40)[2:]]))
+    assert compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '22', '40'])), ctx_d, sigs) is None
     r = compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '23', '0'])), CTX, sigs)
     assert r and r['kind'] == 'entry_arg' and r['pos'] == 1, r
     r = compare.cmp_trace(n, trace(entry('653c80', 3, ['10', '22', '0'])), CTX, sigs)

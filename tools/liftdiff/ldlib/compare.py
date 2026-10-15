@@ -184,9 +184,9 @@ def cmp_trace(n, w, ctx, sigs, prefix='function_', skip=frozenset()):
             else:
                 vn, vw = int(a[2 + pos], 16), int(b[2 + pos], 16)
             if pos < len(ir) and ir[pos] == 'i128':
-                # LD-248 (#4975): i128 位置は値を bit 単位で比べる。ctx.eq の stack 範囲規則は native の大きい値と
-                # wasm の 0 を一致と見なすため (1.5 と 0 が一致扱いになる)、i128 位置には当てない。
-                if (vn & M64) != (vw & M64):
+                # LD-248 (#4975): i128 位置は ctx.eq の stack 範囲規則を使わない (native の大きい値と wasm の 0 を
+                # 一致と見なし、xmm0 の 1.5 と 0 の不一致を隠すため)。領域内ポインタの rebase (n2w) だけは当てる。
+                if (vn & M64) != (vw & M64) and (ctx.n2w(vn & M64) & M64) != (vw & M64):
                     return {'index': i, 'kind': 'entry_arg', 'va': a[0], 'pos': pos, 'type': ty, 'native': hex(vn), 'wasm': hex(vw)}
                 continue
             if not ctx.eq(vn, vw, width):
