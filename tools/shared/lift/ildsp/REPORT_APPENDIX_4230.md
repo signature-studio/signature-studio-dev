@@ -10,7 +10,7 @@ issue 本文の測定 commit `180307dfc` は repo に存在しない (`git cat-f
 ## 結論
 - **`0x1b6ea0` が 0 を返す経路は 2 つ**: (a) `HeapAlloc` が NULL を返す (b) 要求サイズが `0xffffffe0` 超 (`0x1b9c25` の `ja` → `0x1b9c67` で `xor eax`)。`0x1ac9ce` (new handler 呼出し) は (a) (b) のどちらかの 0 返却の後にだけ実行される。
 - **正の対照 (決定的)**: 1 回目の slot 内 `HeapAlloc` を失敗させると、slot 1 (v0〜v3) の全 4 設定で `0x1ac9ce`・`0x1aedc0` (helper 入口)・`0x1aee04`・`0x1aee4a`・`0x1b6f6c` が各 1 回発火する (B_k1v0〜v3)。
-- **注入なし (非決定的)**: slot 1 v0 は 6 回中 2 回で `0x1ac9ce`・`0x1b6f6c` が約 230 万回発火し、15 秒で timeout する (A_k1v0)。残り 4 回は発火 0。巨大 `rdx` (`0x100000`) は 6 回中 3 回で全 5 点が発火 (C)。発火の有無を決める要因は未特定 (ASLR・未初期化値・ヒープ位置のいずれか。未検証)。
+- **注入なし (非決定的)**: slot 1 v0 は 6 回中 2 回で `0x1ac9ce`・`0x1b6f6c` が約 230 万回発火し、15 秒で timeout する (A_k1v0)。残り 4 回は発火 0。HEAD `98ff44f13` の matrix 再実行では、slot 1 v0 が発火 0、v1〜v3 が各約 116 万回発火して timeout。slot 1 のどの v で起きるかも実行ごとに変わる。巨大 `rdx` (`0x100000`) は 6 回中 3 回で全 5 点が発火 (C)。発火の有無を決める要因は未特定 (ASLR・未初期化値・ヒープ位置のいずれか。未検証)。
 - **`0x1aedf6` は未発火**: helper 入口で `testb $0x10,(%rdx)` (`rdx` は呼出し引数) が真の枝に入ると `call [0x268260]` に進む。本測定の入力では一度も真の枝に入らなかった (B・C)。真にする入力は未特定。
 - **`0x1aedf6` 以外の 3 件は、到達は示せた**。ただし到達は「全 slot 入力の通常経路」ではなく、alloc 失敗 (例外 path) または巨大サイズでだけ確認した。
 - **trap 化か stub 化か**: 本測定は判断を下さない。4 件は alloc 失敗・巨大サイズの例外 path でのみ到達し、既定入力の決定的な到達は確認できなかった。扱いの決定は PM 判断 (下の未解決)。
@@ -32,7 +32,7 @@ issue 本文の測定 commit `180307dfc` は repo に存在しない (`git cat-f
 | 区分 | 設定 | 結果 |
 |---|---|---|
 | A (注入なし) | slot 1 v0 (6 回) | 2 回で `0x1ac9ce`・`0x1b6f6c` が約 230 万回 (rc 124)。4 回は発火 0 |
-| A | slot 1 v1〜v3・slot 2・slot 4・slot 5 | 発火 0 (rc 0) |
+| A | slot 1 v1〜v3・slot 2・slot 4・slot 5 | 発火 0 (rc 0)。ただし HEAD `98ff44f13` の再実行では slot 1 v1〜v3 が約 116 万回発火して timeout (rc 124)、v0 は発火 0。A の行は実行ごとに変わる |
 | A | slot 3 v1〜v3 | rc 139 (SIGSEGV)。発火 0 |
 | B (1 回目の alloc 失敗) | slot 1 v0〜v3 | `0x1ac9ce`・`0x1aedc0`・`0x1aee04`・`0x1aee4a`・`0x1b6f6c` が各 1 回 (rc 96 = RaiseException で停止) |
 | B | slot 2・slot 4・slot 5 | 発火 0 (rc 0) |
