@@ -146,6 +146,7 @@ git diff 40d3a788d origin/main -- tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_4
 ```
 
 - 上の範囲の差分は 0 行 (`... | wc -l` → 0)。よって `origin/main` 取り込み後の再測定は不要 (`docs/WORKFLOW.md` §6)。
+- §8 の採取 (trap 144・149) の測定 commit は `b959fc472` (origin/main・本 run の worktree の起点)。`git diff b959fc472 HEAD -- tools/m11` は 2 commit で `trap144_probe_3608.py` (新規)・`trap144_read_3608.mjs` (新規)・`REPORT_3608.md` (§8 ほか) のみ。測定経路 (§6 の一覧) の差分は `ldfix_e2e.sh` (+3)・`m11_build.sh` (+13/−1)・`m11_gen_ir2.sh` (+10) で、§1 の件数は本 run で再現した (ldfix_e2e rc 0・prod fix 872/47/22)。
 - §1 の全変種・§1-3 の数値は、測定 commit `87208313b` で得た値と、HEAD `e6c940834` での再測定 (下記) が一致する。同じ経路 (上の一覧) について `git diff 87208313b HEAD --numstat` は 5 ファイル・90 行追加・7 行削除 (`ldfix/ldfix.py` 44 追加・3 削除、`ldfix/ldfix_e2e.sh` 6 追加、`ldfix/fix_site_3372.py` 3 追加・1 削除、`m11_build.sh` 14 追加・3 削除、`m11_gen_ir2.sh` 23 追加)。
 - HEAD `e6c940834` での再測定 (本 run・`$ARTIFACTS_DIR` の `work-m11.tar.zst` と `fl-win64.tar.zst` を展開。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`TMPDIR=$RUNNER_TEMP`):
   - `ldfix_e2e.sh`: rc 0・所要 71.9 秒 (実測 wall)・load 0.78 → 1.16・判定 PASS。stage4 到達 4/6 (base/fix)・survey ok 136 / miss 14 / trap 9 (base/fix)。`STAGE4_JUDGE` の `pass: true`。
@@ -193,10 +194,10 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 ### 8-1 unit 144 (OOB・最内 `function_44aeb0`)
 
 - 採取値: `function_44aeb0` の entry arg1 = `0x5f007000730064`・arg2 = `0x418b4820`。
-- 上流: `function_44f040` (arg1 = `0x10aa13f0`・arg2 = `0x2539c8`) ← `function_653660` (arg1 = `0x10aa1400`・arg2 = `0x2572dc`・arg3 = 1・arg4 = 0) ← `function_6539e0` (arg1 = `0x2572dc`・arg2 = 1・arg3 = 0)。
-- `[0x10aa13f0]` の最後の書込み: `function_653660` の IR 219682 行 `store i64 %13, ptr %stack_var_-32`。`%13` は `%13 = load [stack_var_-56]` (219656 行付近) で、その前の `call function_439550(&stack_var_-56, arg2 = 0x2572dc)` が書いた値。
+- 上流: `function_44f040` (arg1 = `0x10aa13f0`・arg2 = `0x2539c8`・arg3 = 0) ← `function_653660` (arg1 = `0x10aa1400`・arg2 = `0x2572dc`・arg3 = 1・arg4 = 0) ← `function_6539e0` (arg1 = `0x2572dc`・arg2 = 1・arg3 = 0)。
+- `[0x10aa13f0]` の最後の書込み: `function_653660` の IR 219682 行 `store i64 %13, ptr %stack_var_-32`。`%13` は `%13 = load [stack_var_-56]` (219681 行) で、その前の `call function_439550(&stack_var_-56, arg2 = 0x2572dc)` が書いた値。
 - `function_439550` は arg2 から 16bit ずつ読み、A-Z の範囲だけ小文字化 (`|0x20`) して arg1 へ書く (IR 134964 行〜・store は 135001 行)。よって `0x2572dc` の文字列 `"dsp_ippv2.dll"` (UTF-16LE・image 内の実値) を小文字化したものが `0x5f007000730064` (`"d\0s\0p\0_\0"` の 8 byte) になる。
-- 書込み元の要約: unit 144 の a1 は `function_6539e0` の定数文字列 `0x2572dc` (`dsp_ippv2.dll`) が `function_439550` でコピーされたもの。値の選択 (なぜ `dsp_ippv2.dll` を渡すか) は未追跡。
+- 書込み元の要約: unit 144 の a1 は、`function_6539e0` が渡す定数文字列 `0x2572dc` (`dsp_ippv2.dll`) を `function_439550` が小文字化してコピーしたもの。値の選択 (なぜ `dsp_ippv2.dll` を渡すか) は未追跡。
 
 ### 8-2 unit 149 (OOB・最内 `function_412e40`)
 
