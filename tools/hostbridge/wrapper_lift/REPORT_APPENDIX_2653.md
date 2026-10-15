@@ -3,7 +3,7 @@
 > **正本の分担**: 結論と数値の表は `tools/hostbridge/wrapper_lift/REPORT.md` §15。本付録は表に無い値 (観測ログ・呼出の形・再現手順・未解決) の正本。
 
 測定 commit: `e702caa14` (harness コードを変えた最後の commit)。検証起点: `origin/main` @ `72d5f3cc0` (作業ブランチ `2653-fruity-cpi-complete`、worktree `ws-2653`)。
-環境: `[EMSDK]` 6.0.12 (`/opt/emsdk`)・`fl-win64` の `extracted/block19091_PE.bin`・`block23676_PE.bin`・node v22.23.3。4 vCPU。全段直列 (並列 1)。
+環境: `[EMSDK]` 6.0.12 (`<EMSDK>` と書く。`docs/REFERENCES.md` §4)・`fl-win64` の `extracted/block19091_PE.bin`・`block23676_PE.bin`・node v22.23.3。4 vCPU。全段直列 (並列 1)。
 
 ## 1. 受入条件の対応
 
@@ -51,7 +51,7 @@
 ## 5. 再現手順
 
 ```sh
-export FL_WIN64_DIR=$RUNNER_TEMP/r2653/extracted EM_CONFIG=/opt/emsdk/.emscripten PATH=/opt/emsdk/upstream/emscripten:$PATH
+export FL_WIN64_DIR=$RUNNER_TEMP/r2653/extracted EM_CONFIG=<EMSDK>/.emscripten PATH=<EMSDK>/upstream/emscripten:$PATH   # <EMSDK> = [EMSDK]
 python3 tools/hostbridge/wrapper_lift/x64c_wrapper.py block19091_PE.bin $RUNNER_TEMP/r2653/x64c19091      # 61 s (block23676 も同じ手順で 61 s)
 W=$RUNNER_TEMP/r2653/cpi19091; mkdir -p $W/x64c && ln -sf $RUNNER_TEMP/r2653/x64c19091/ott_lifted.c $W/x64c/ott_lifted.c
 bash tools/hostbridge/wrapper_lift/cpi_reach.sh block19091_PE.bin $W                              # 3.1 (host 0x600000)
