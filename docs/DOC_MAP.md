@@ -121,6 +121,7 @@
 | `tools/qfclift/REPORT.md` | ~185 | T-SH-12 (#154 部分達成): QuickFontCache_x64.dll の x64c lift (6,347 関数・unsup 0) + SSSE3 handler 注入 (pshufb/pmulhrsw/phaddw) + native-vs-wasm の SSSE3 spot diff (§0〜§6)。boot (#3289・T-SH-60): DllMain の wasm 実行は FAIL で停止点を実測 (§7・§8)。FT_* の GetProcAddress 解決 (T-SH-79 / #3412) の結論は §9 (全文は付録)。ILTools は `tools/iltools/REPORT.md` 参照。FruityPlug は未着手 |
 | `tools/qfclift/REPORT_APPENDIX_3411.md` | ~40 | T-SH-78 (#3411) の付録: REPORT §10 の全文。DllMain 経路の直接呼出し計数 (5 件・表・Windows 仕様との対応)・計数の限界 (間接経由は未計数)・未解決 |
 | `tools/qfclift/REPORT_APPENDIX_3410.md` | ~47 | T-SH-77 (#3410) の付録: REPORT §7.8 の全文。longjmp (0x40f9c0) の override (`qfc_ov.c`) と戻り先 root `0x59c210` の切り分け表 (soft 版の停止点は `ExitProcess(0)`・偽の停止の可能性は未検証)・boot / e2e の実測 |
+| `tools/qfclift/REPORT_APPENDIX_4510.md` | ~30 | T-SH-126 (#4510) の付録: longjmp 継続の偽の停止 (`ExitProcess(0)`) の修正 (`qfc_run` の setjmp アンカー)・修正前後の対照表・e2e / boot の実測 |
 | `tools/qfclift/REPORT_APPENDIX_3412.md` | ~50 | T-SH-79 (#3412) の付録: REPORT §9 の全文。FT_* 14 本の token 経由呼出 (表・直接呼出との照合・ネガコン)・FreeType wasm32 ビルド (#145 方式)・検証範囲と未解決 |
 | `tools/qfclift/REPORT_APPENDIX_3434.md` | ~35 | T-SH-83 (#3434) の付録: REPORT §11 の全文。`imp_GetProcAddress` → `qfc_gpa` の結線 (hook 形・e2e 実測・boot 停止点)・未解決 |
 | `tools/iltools/REPORT.md` | ~66 | T-SH-12 (#154): ILTools_x64.dll の export 閉包 lift gate (閉包 824 関数・unsup 0 / 閉包外の x87 関数 45 本は `x64c --trap` の trap stub・陰性対照 2 本)。全 .pdata 測定 (unsup 1,236 は全て x87) は §3 |
