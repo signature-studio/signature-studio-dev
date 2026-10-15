@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { configuredApp, issuePayload, j, markFresh, send, T0, type Call } from "./helpers.ts";
+import { PM_LIMITS } from "../src/pm.ts";
 
 // launch の停止 (#2795) の統合。/status.launch_halted と launch_halted_overdue・PM への 1 回の通知・区間の解消を、時計を進めて確かめる。
 const MIN = 60_000;
@@ -133,4 +134,22 @@ test("降格中は停止通知を送らず would に数え、解除の後に 1 �
   assert.equal((ctx.app.engine.status() as any).launch_halted?.since, iso(0), "区間は解消していない");
   await tickAt(41);
   assert.equal(digestCalls(ctx.m.calls).length, 1, "送ったあとは同じ区間で繰り返さない");
+});
+
+test("停止通知が毎時上限で見送られたら、pm_skipped_hour_24h に tick ごとに数え、区間の 1 回は使わない (#3462)", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ live: true, now: clock, handlers: [ok], env: { IMPORT_REQUIRED: "1", LIVE_LAUNCH: "0" } });
+  const tickAt = async (min: number) => {
+    clock.t = T0 + min * MIN;
+    await markFresh(ctx);
+    await ctx.app.engine.tick();
+  };
+  await tickAt(0);
+  ctx.store.put("meta", "pmDispatch", Array.from({ length: PM_LIMITS.hourMax }, (_, i) => ({ kind: "stuck", ref: 500 + i, at: T0 + 30 * MIN })));
+  await tickAt(31);
+  assert.equal(digestCalls(ctx.m.calls).length, 0, "毎時上限の内は停止通知を送らない");
+  assert.equal((ctx.app.engine.status() as any).pm_skipped_hour_24h, 1);
+  assert.equal(ctx.app.engine.meta.halt?.notifiedAt, undefined, "見送った通知は区間の 1 回を使わない");
+  await tickAt(32);
+  assert.equal((ctx.app.engine.status() as any).pm_skipped_hour_24h, 2);
 });
