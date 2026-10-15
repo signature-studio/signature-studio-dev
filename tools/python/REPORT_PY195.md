@@ -89,4 +89,5 @@
 
 ## 5. 差分の証跡
 
-- 測定 commit `4df135f10` 以降に変えたのは本 REPORT と `docs/DOC_MAP.md` の索引行だけ。`git diff 4df135f10 HEAD -- tools/python/analysis/flapi` は 0 行。測定値は再測定せずに有効。
+- 測定 commit `4df135f10` 以降、`analysis/flapi` で変わったのは main 取り込み (merge `fe10569cf`) で追加された 2 本だけ。`git diff 4df135f10 HEAD -- tools/python/analysis/flapi` の出力: `pe_py183_probe.py | 206 ++++`・`pe_vmt_probe.py | 108 ++++` (2 files, 314 insertions)。PY-195 の `pe_item_tag_probe.py`・`pe_item_tag_scan.py`・`pe_xref.py` の差分は 0 行。
+- main 取り込み後の再測定 (HEAD `fe10569cf`・load 0.33 (1 分平均)・4 CPU): probe 20 PASS・summary OK・終了 0 / ネガティブコントロール (`0xf8ca60` の即値 `0x0f`→`0x0e`) `FAIL 0xf8ca60 cmp edx, 0xfff (got: cmp edx, 0xeff)`・終了 1 / scan real 9.335 秒・終了 0 / xref real 34.4 秒・終了 0。件数は §測定 の値と全件一致。以降の変更は本 REPORT のみで、`git diff fe10569cf HEAD -- tools/python/analysis/flapi` は 0 行。
