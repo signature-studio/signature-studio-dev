@@ -4,7 +4,7 @@
 
 ## 7. #3188: LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (Actions runner で実測)
 
-測定 commit: `47574748` (main `49f1a94d` の merge commit。この commit が tools/m11 のコードを最後に変えた commit)。検証 HEAD はこの節を含む最後の commit (下 §7-6 で、測定 commit から HEAD までの tools/m11 コード差分は 0)。測定 runner: Actions runner (load average は未採取)。
+測定 commit: `37081470a` (main `c2e5ba01c` の merge と競合解消の commit。この commit が tools/m11 のコードを最後に変えた commit)。検証 HEAD は測定 commit の後の docs commit で、`git diff 37081470a HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` の出力は空。測定 runner: Actions runner (nproc 4・開始時 load average 0.35 / 0.90)。
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の ID は未付与。NULL 源の memcpy は下 §7-4 の候補で、既存類型との対応は未確認)。
 素材: `fl-win64` (`extracted/block00031_PE.bin` 22,227,016 B を `FL_WIN64_DIR` (`tools/shared/env.sh`) の展開先へ展開・2 s)・`work-m11` (`tools/m11/work/` へ展開・2 s)・`toolchain-emsdk` は展開せず runner 既存の emsdk ([EMSDK]、`docs/REFERENCES.md` §4) を使った。`toolchain-retdec`・`work-liftdiff` は使っていない (lift を走らせていない)。
 `m11_e2e.sh` の全再生成 (指紋検査) は使わず、後段だけ `m11_lb_tolerant_repro.sh` で回した (gen_ir2 → data/image → lb_check → build → `m11_tolerant.mjs`)。
@@ -12,6 +12,7 @@
 ### 7-0. 再測定の対象 (round 2 の要求への対応)
 
 - 2 つの commit を測った。`15341d0e` (round 1 の fix commit = レビュー時の HEAD) と `47574748` (それに main `49f1a94d` を merge した commit)。merge は競合が無く (`git merge-tree` が clean)、main が #2211・#1325 系で `tools/m11/ldfix/ldfix.py` などを変えていたため、merge 後の code で測り直した。
+- 3 つ目 (競合解消): `37081470a` (main `c2e5ba01c` の merge)。競合は 2 件。`m11_lb_ir_fn_diff.py` は同名の別ツール (main の #3229 版) なので main 側を残し、本 PR 側を `m11_lb_ir_fn_diff_3188.py` に改名した。`REPORT_N403.md` §7 は main の #3229 節を `REPORT_APPENDIX_3229.md` へ分割移動し、本 PR の節は §8 のポインタにした。main 側の tools/m11 変更を含むため、merge 後の code で測り直した (下 §7-3 の最終 2 行)。
 - `15341d0e` の LB=0 は reviewer の実測 (942/867/1/47/74) と一致した (下 §7-3)。
 - main の取り込みで変わった code: `git diff 15341d0e 47574748 -- tools/m11 ':(exclude)tools/m11/REPORT*'` (main 由来の ldfix 変更)。この差で unit 56 の kind が変わった (§7-3)。
 - 本 PR が main に対して加えるのは tools/m11 では `m11_lb_ir_fn_diff_3188.py` だけ (REPORT 除く)。よって merge 後の寛容起動の結果は main の同じ code の結果と同じになる。
@@ -43,6 +44,10 @@ LB=0 の出力は修正前後で変わらない (修正は LB=0 で同じ定数�
 | LB=0 @ `47574748` (1 回目) | 942 | 868 | 1 | 47 | 73 (19・7・0・0) | 1 m 23.8 s |
 | LB=0 @ `47574748` (2 回目) | 942 | 868 | 1 | 47 | 73 (19・7・0・0) | (tolerant 12.9 s) |
 | LB=0x10000 @ `47574748` | 942 | 868 | 1 | 47 | 73 (oob 16・halt0 8・abort 2・unreachable 0) | 1 m 25.5 s |
+| LB=0 @ `37081470a` (解消後の HEAD) | 942 | 868 | 1 | 47 | 73 (19・7・0・0) | 1 m 34.6 s (tolerant 16.0 s) |
+| LB=0x10000 @ `37081470a` (解消後の HEAD) | 942 | 868 | 1 | 47 | 73 (oob 16・halt0 8・abort 2・unreachable 0) | 1 m 36.8 s (tolerant 19.1 s) |
+
+- `37081470a` の突合 (`m11_lb_unit_diff.py`): kind 差 8 件で、unit は `47574748` と同じ (40・153・158・291・296・304・555・745)。`lb_check` は両 LB とも PASS。IR 突合 (`m11_lb_ir_fn_diff_3188.py`) の差行数も §7-4 と同じ (412770: 2・4128b0: 23)。
 
 - `15341d0e` の LB=0 は `REPORT_N403.md` §6-1 と一致 (差 0)。値の正本は下の表で、§6-1 とは「一致」の 1 行だけ。
 - 集計の定義: units = ok + noproc + skipped。skipped は `m11_tolerant.mjs` の SKIP 集合 (halt0・oob・unreachable・abort・other・oom・miss・clobber) の計で、miss を含む。内訳 (oob・halt0・unreachable・abort) の計は miss と別。
