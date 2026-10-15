@@ -57,3 +57,11 @@ FL_WIN64_DIR=<fl-win64 展開先> FLE_BOOT_WORK=<work> WVAL_OBJWATCH=1 bash tool
 | obj+0xc4 の初期値 0 の出所 (確保時の 0 埋め・ホスト C の書込み) | mode の設定元の確定 (受入条件 1) | #4287 (本 issue・部分達成のため残す) |
 | `f_6cd5f0` 経由の `f_6cd520` 呼出し (実行時の呼出元) | 呼出し連鎖の上流 | #4287 |
 | 既定経路で boot が `exit` で止まる原因 (IPP 判定 NG) | 既定経路の書込み元の比較 | #3868 (OPEN・既定経路の書込み元と obj+0xc4 の追跡。本 PR では扱わない) |
+
+## F. 追補 (FLE-22 再実行): 確保内の store と getmem の戻り値
+
+- 監視の穴: `wo_obj_` は `f_6ba1f0` の `L_6ba25b` (確保の後) で初めて設定されるため、確保内 (`f_410320` → 仮想 NewInstance `0x40f960` → `getmem` `0x409410` → 初期化 `0x40fb40`) の store は見えていなかった。固定値 `--fixobj 0x12d6a090` (前回実測の obj) で確保内も監視した。
+- 結果: 確保内を含めても `obj+0xc4` への lifted の store は `f_6bc010` の `0x6bc010` **1 件** (`v=0`) のみ。確保・初期化の区間で 0 を書く lifted の store は無い。
+- `fle_ov_getmem` の戻り時の実測 (`fle_boot.c` の `[wobj-getmem]`、obj を含む確保のみ出力): `p=0x12d6a090 size=320 obj+0xc4=0`。`size=70` の行は `+0xc4` が確保領域の外なので参照値にならない。
+- 判断: obj の mode の 0 は、lifted の store ではなく **host の getmem (FastMM) が返した領域の初期値** に由来する見込み。ただし「FastMM が 0 埋めしたのか、解放済みの 0 の領域の再利用か」は、確保前の値を測っていないため未確定。
+- 受入条件 1 (設定元の VA) は、lifted コード内の VA としては特定できない (設定元はホスト側の getmem)。部分達成。
