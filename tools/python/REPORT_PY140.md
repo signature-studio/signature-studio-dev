@@ -99,7 +99,8 @@
 | `bash tools/python/provider/build.sh` (emsdk 6.0.12・`$RUNNER_TEMP` に上流から導入) | rc 0。`dist/flprov.{js,wasm}` 生成 | 2.07 秒 |
 | `node tests/ui_keys_diff.mjs` | rc 0。`{"calls":26,"diffs":0,"PASS":true}` | 0.049 秒 |
 | ネガティブコントロール: `host/fl_mock.mjs` の `ui.selectWindow` の符号を反転して `node tests/ui_keys_diff.mjs` | rc 1。`ui 送出キー差分 4 件` (selectWindow の arg 1・0 などで mock と C が食い違う)。検証後に mock を元へ戻し、`git diff` は 0 行 | — |
-| `node tests/provider_check.mjs` | rc 1。§1・§2 (表の整合・エラー code) のアサートは通過。§3 で `work/midi.py` が無く ENOENT (`work/` は gitignore の素材置き場。`fetch_inputs.sh` 未実行)。受入 4・5 の未達は未解決表 (#4579) のとおり | — |
+| `node tests/ui_diff.mjs` | rc 0。`{"calls":17,"diffs":0,"outOfRangeKnownDiffs":3,"PASS":true}` (範囲外 index 3 件は既知の差分として分けて報告) | — |
+| `node tests/provider_check.mjs` | rc 1。§1 (表の整合) は通過し、件数は `{"functions":435,"implemented":220,"unimplemented":215,"mcp_static":60,"PASS":true}` (§1 のみを切り出して実行。rc 0)。§2 (エラー code) のアサートも通過。§3 で `work/midi.py` が無く ENOENT (`work/` は gitignore の素材置き場。`fetch_inputs.sh` 未実行)。受入 4・5 の未達は未解決表 (#4579) のとおり | — |
 
 - 修飾子 (`rdx`) の値: 上の出力では cut/copy/paste = 0x4、selectWindow の arg≤0 = 0x1、他 = 0x0。PE の静的値と一致。
 - 差分の証跡 (`docs/WORKFLOW.md` §6): `git diff a0fc92492 HEAD -- tools/python ':!*.md'` の出力は 0 byte (コード差分 0。再測定は不要)。
