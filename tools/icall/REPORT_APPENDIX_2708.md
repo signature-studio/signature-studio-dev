@@ -116,13 +116,20 @@ bash tools/icall/diff/fa_sweep.sh 8 60                            # 期待 (base
 ## 8. 子 #3198 (ICALL-87) の実装結果 (オプトイン `FA_FALL_FRAG=1`・既定 OFF)
 
 - 修正: `icall_rewrite.py` に、非断片関数の末尾が断片先頭へ fall-through するとき、その断片を複製する経路を入れた。既定 OFF (`FA_FALL_FRAG=1` で有効)。断片内の分岐先は closure か断片 (`in_closure`) に無いものを含むときは複製しない。
-- 既定 (OFF) の rewriter 出力が `origin/main` と byte 一致するかは **未実測** (素材 `plugins-freshair` と `work-icall` が run に無く、rewrite を再実行できない)。コード上は、`FA_FALL_FRAG` 未設定で `fall_target` が常に `None` を返し、`fall_frag` が空になるため、main と同じ経路を通る (`fns`・`add_frag` の処理が main と同一)。
-- 指摘対応 (reviewer round 1): `fall_target` を `FALL` で gate した (既定 OFF の fall-through 複製経路を封じた)。ON 時の経路は変えていないので、上の ON の数値は前の HEAD の測定値のまま。再測定は素材が揃った後に行う。
+- **既定 (OFF) の rewriter 出力と `origin/main` の byte 一致 (`fc3779a8c` で実測)**:
+  - 比較: `68d5cb3c4` の main (reviewer 指定) と PR head `fc3779a8c`。main 側は `origin/main` = `09d6e4b84` で測った (`git diff 68d5cb3c4 09d6e4b84 -- tools/icall/icall_rewrite.py` は空。rewriter は両者で同一)。
+  - 入力: `SlateCore.core_64` (`plugins-freshair` を `FA_DL=... tools/targets/freshair/fetch.sh` で展開。36,285,952 B) と `F.ranges` (`work-icall` の `tools/icall/work/rt_freshair-core/F.ranges`、sha256 `99f09d3b…`)。
+  - 実行: `env -u FA_FALL_FRAG python3 tools/icall/icall_rewrite.py --pe <SlateCore.core_64> --funcs F.ranges --out rw.dll --map map.json`。
+  - 結果: `rw.dll` の sha256 `cc921929f54c92a9…` が両 commit で一致し、`cmp` も一致 (**byte 一致**)。`rewrite.txt` は出力パス以外一致。
+  - `map.json` は PE の絶対パスを含むため、sha256 は作業ディレクトリに依存する (両者とも `pe` と出力先以外の内容は一致、パスを除いた sha256 `431fbab6…` 同一)。reviewer 報告の `map.json` sha256 `01bb1da0…` とは作業ディレクトリが違うため一致しない。
+  - 従って、既定 OFF の rewriter 出力は main と同一。`fall_target` の `FALL` gate により、既定 OFF で fall-through 複製経路に入らないことも出力で確認した。
+- 指摘対応 (reviewer round 1): `fall_target` を `FALL` で gate した (既定 OFF の fall-through 複製経路を封じた)。ON 時の経路は変えていないので、上の ON の数値は `a58d24e87` の測定値のまま。既定 OFF の rewriter 出力は main と byte 一致 (上記)。OFF の sweep / fa_cmp の数値は `fc3779a8c` で未再測定 (RetDec・emsdk 未取得)。
 - 測定 (同一パイプライン: rewrite → RetDec decode-only → ir_icall_restore → fa_route_build → fa_cmp / fa_sweep 8 60。native は `tools/ott/native/build.sh`)
 
 | 条件 | fa_cmp 180da4030 --n 8 | fa_sweep 8 60 (bit一致/crash/wasm_err/不一致) |
 |---|---|---|
-| 既定 (OFF) | match 0 / mismatch 8 | 55 / 65 / 10 / 1 |
+| 既定 (OFF)・`a58d24e87` で測定 (gate 前) | match 0 / mismatch 8 | 55 / 65 / 10 / 1 |
+| 既定 (OFF)・`fc3779a8c` | **未再測定**。RetDec (decode-only) と emsdk が run に無く (`toolchain-retdec` / `toolchain-emsdk` 未取得)、fa_route_build・fa_cmp・fa_sweep を実行できない | — |
 | `FA_FALL_FRAG=1` | **match 8 / mismatch 0** | 55 / 65 / 11 / 0 |
 
 - 既定 OFF と ON の per-function 差 (同一パイプライン): `0x180da4030` mismatch → match (受入 2 を達成)。`0x180c99430` match → wasm_err (`memory access out of bounds`)。**回帰 1 件が未解決。** 既定 OFF で `0x1803de190` が wasm_err になるのは旧 artifact (`work-icall` の RetDec decode) との差で、同一パイプラインでは出ない。
