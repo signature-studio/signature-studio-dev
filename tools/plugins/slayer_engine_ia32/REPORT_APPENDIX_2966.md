@@ -4,8 +4,8 @@
 
 - 親 REPORT: `REPORT_APPENDIX_1099.md` §8 (残り x87 unsup 87 件の内訳) と §9 (未解決)。 方式: `docs/DECISIONS.md` D28 (f80→f64)。 本付録が本 issue の測定値の正本。
 - 測定 commit: `38fea99e1` (HEAD。 x87 差分試験 (主・`--nega`・`--nega-c1`・`--rc`・`--skip`) と `x87_crosscheck.py` を HEAD で再実行した)。 HEAD は main の `139c2c9b5` (`ott_x87.h` の C1 模型化) と `0d527f38a` (`x64c.py` の `i_rcr` 書き換え) を含む。 main の x87 差分試験 (#2967: 16 byte slot・m80 入力・`--nega80`・`--rc-arith`) は `c508291cf` で取り込み済み。
-  `git diff c508291cf HEAD -- tools/ott/rt/ott_x87.h tools/ott/lift/x64c.py` の出力は `ott_x87.h` 11 行・`x64c.py` 16 行 (C1 模型化と `i_rcr`)。 x87 差分試験の入力経路 (`x87_diff.py`・`x87_diff_main.h`・`x87_crosscheck.py`) は `c508291cf` から HEAD まで変わらない。
-- lift (`x64c --arch ia32` の出力) は測定 commit `f29c59648` と HEAD で差がある (`i_rcr` の 1 命令 4 行の C 文のみ。 §4 の確認)。 x64 回帰 (`x64_regress_1099.py`) は HEAD で 8/8 一致 (§5)。
+  `c508291cf` は `139c2c9b5` (C1 模型化) を含む。 `git diff c508291cf HEAD -- tools/ott/rt/ott_x87.h` は 0 行 (runtime は測定 commit と同じ)。 `git diff c508291cf HEAD -- tools/ott/lift/x64c.py` は 29 行 (`0d527f38a`・`i_rcr` の書き換え)。 x87 差分試験の入力経路 (`x87_diff.py`・`x87_diff_main.h`・`x87_crosscheck.py`) も `c508291cf` から HEAD まで変わらない。
+- lift (`x64c --arch ia32` の出力) は `f29c59648` と HEAD で差がある (`i_rcr` の C 文 4 箇所のみ。 §4 の確認)。 `c508291cf` と HEAD の間の lift 差分は `x64c.py` の `i_rcr` だけ。 x64 回帰 (`x64_regress_1099.py`) は HEAD で 8/8 一致 (§5)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` (`$FL_WIN64_DIR/extracted/`) と生成した試行のみ。
 
 ## 1. 結論
@@ -76,7 +76,7 @@ before = `origin/main` (`e99fe343c`) を detached worktree で展開して `lift
 - pass1 の before (87 件) は付録 1099 §8 の 87 件と一致する。
 - pass2 の before が 89 件なのは、(b) の roots 追加で `fscale` が 2 件多く現れるため (pass2 の関数数が 465 → 472 に増える)。
 - 被覆は before/after で同じ (lift の起点は増えず、unsup だった x87 が lift されただけ)。
-- HEAD (`38fea99e1`) での再確認 (2026-10-15): `x64c --arch ia32` を `lift_text.py` の roots (254 本) で `f29c59648` の `tools/ott` と HEAD で実行した。 `lift_meta.json` の unsup は両方とも fsin 15・f2xm1 8・fprem 5・fcos 2・fyl2x 2・fnsave・frstor・fnstenv・fldenv (計 36 件) で一致。 `ott_lifted.c` の起点集合は 20,212 件で md5 が一致 (被覆 85.37% は同じ)。 差は `x64c.py` の `i_rcr` が出す C 文だけ (rcr の 2 箇所・計 4 行、各 2 行の `<`/`>` 差分)。 `i_rcr` は x87 の差分試験 (rcr を含まない) と x87 の lowering 経路には効かない。
+- HEAD (`38fea99e1`) での再確認 (2026-10-15): `x64c --arch ia32` を `lift_text.py` の roots (254 本) で `f29c59648` の `tools/ott` と HEAD で実行した。 `lift_meta.json` の unsup は両方とも fsin 15・f2xm1 8・fprem 5・fcos 2・fyl2x 2・fnsave・frstor・fnstenv・fldenv (計 36 件) で一致。 `ott_lifted.c` の起点集合は 20,212 件で md5 が一致 (被覆 85.37% は同じ)。 差は `x64c.py` の `i_rcr` が出す C 文だけ (rcr の 4 箇所・各 1 行。 `diff` の `<`/`>` は計 8 行)。 `i_rcr` は x87 の差分試験 (rcr を含まない) と x87 の lowering 経路には効かない。
 - 注: `lift_text.py` の coverage・pass2 の完全再実行は emcc が runner に無いため本 run では行っていない (pass1 の x64c 出力を上記で比べた)。
 
 ## 5. x64 回帰 (x64 出力が変わらないこと)
