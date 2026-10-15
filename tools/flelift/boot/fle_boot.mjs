@@ -304,6 +304,12 @@ if (TOLERANT) {
     const CFI_VA = 0x1375990;
     const cstk0 = Number(m._emscripten_stack_get_current()), rsp0 = Number(m._fle_rsp_get());
     const lj0 = Number(m._fle_n_longjmp()), s0 = softSnap(), e0 = Number(m._fle_n_exit());
+    // #4464: FLE_CFI_SEED=1 のとき、CFI 経路の global slot (0x1104e30・0x5ac270) を PE の静的値に戻してから呼ぶ。
+    // 既定 (未指定) は従来どおり。slot は boot 中に 0 になっており、chain は rcx をこの slot から再読込する。
+    if (process.env.FLE_CFI_SEED === '1') {
+        const seed = [[0x1104e30, 0x1104ef8], [0x5ac270, 0x5ac338]];
+        for (const [slot, val] of seed) { const dv = new DataView(m.HEAPU8.buffer); console.error('[cfi-seed] before ' + slot.toString(16) + '=0x' + dv.getBigUint64(slot, true).toString(16) + ' ac308=0x' + dv.getBigUint64(0x5ac308, true).toString(16)); dv.setBigUint64(slot, BigInt(val), true); }
+    }
     let cr = null, cerr = null;
     try { cr = m._fle_run(CFI_VA, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n); } catch (e) { cerr = e; }
     m.__emscripten_stack_restore(cstk0); m._fle_rsp_set(rsp0);
