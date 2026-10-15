@@ -6,14 +6,20 @@
 判定箇所 = `mov eax, [rbp+0x5c0]` の直後の `test eax, M`。直後の jcc で分岐先を決める。
   je  : M のビットが全部 0 (落ち側) が分岐先。fall-through が立ち側。
   jne : M のどれかが 1 (立ち側) が分岐先。fall-through が落ち側。
-各側の入口から fall-through だけで直線に辿り、経路上の作用を記録する。
-  writes : 先頭オペランドがメモリの命令 (経路上・無条件)
-  calls  : call (直接・間接)
-  edges  : 経路上の jcc/jmp の分岐先 (early_exit = 0x104cc72 への辺)
-  end    : jmp / ret / 共通後半 0x104caae (tail) / 0x104cc72 (exit, fall-through) / 関数外
+各側の入口から経路を辿る (chain)。経路の規則:
+  - fall-through は辿る。無条件 jmp は分岐先へ辿る。
+  - 条件 jcc は分岐先を辿らない (fall-through だけを辿る)。分岐先は edges に、未追跡の本数は open_jcc に記録する。
+  - 止める所: 共通後半 0x104caae (tail)・早期 exit 0x104cc72 (exit)・ret・関数外・経路の再訪 (loop)。
+記録 (経路上):
+  writes  : 先頭オペランドがメモリの命令
+  calls   : call (直接・間接)。呼出し先の中の書込みは見ない
+  edges   : 経路上の jcc/jmp の分岐先 (jmp は追跡済み・jcc は未追跡)
+  early   : edges のうち分岐先が 0x104cc72 の本数
+  end     : tail / exit / ret / oob / loop。end_src は終端へ入った命令の VA
+  tail_src: end が tail の側について、入口までの経路で最後に [rbp+0x5b8] へ書かれた命令 (VA と式)。無ければ「入口前の値」
 同じ計算を objdump (intel) の逆アセンブルで独立に行い、判定箇所と経路の記録を照合する (mismatch 0 で exit 0)。
-出力: <outdir>/r8d_sites.tsv (判定箇所ごとに両側の行)・<outdir>/r8d_scope.md (対象 13 マスクの要約表)。
-共通後半 0x104caae 以降で [rbp+0x5b8] を読む命令も stdout に出す (tail_reads_5b8)。
+出力: <outdir>/r8d_sites.tsv (判定箇所ごとに両側の行)・r8d_scope.md (対象 13 マスクの要約表)・
+r8d_tail_src.md (end が tail の側の読み値の決まり)。共通後半 0x104caae 以降で [rbp+0x5b8] を読む命令は stdout に出す (tail_reads_5b8)。
 """
 import os
 import re
@@ -28,6 +34,10 @@ FN_START = 0x1046A30
 FN_END = 0x104CCCB
 SCOPE = {0x4, 0x10, 0x14, 0x10000, 0x8000, 0x8A1, 0x240, 0x200, 0x1000, 0x2000, 0x2800, 0x4000, 0x3C0}
 NO_WRITE = {"cmp", "test", "push", "call", "jmp", "lea", "ucomisd", "comisd", "ucomiss", "comiss"}
+MOV_LIKE = {"mov", "movzx", "movsx", "movsxd", "movss", "movsd", "movaps", "movups", "movd", "movq"}
+SLOT = "rbp+0x5b8"
+HEAD = ("site", "mask", "jcc_va", "jcc", "side", "entry", "n_instr", "end", "end_src",
+        "writes", "calls", "edges", "early_exit", "open_jcc", "tail_src")
 
 
 def load_objdump(pe_path):
@@ -67,12 +77,25 @@ def mem_dst(mn, ops):
     return re.sub(r"(?<!\w)(\d+)(?!\w)", lambda d: f"{int(d.group(1)):#x}", m.group(1).replace(" ", ""))
 
 
+def reads_slot(mn, ops):
+    o = norm(ops)
+    if mn == "lea" or f"[{SLOT}]" not in o:
+        return False
+    if f"[{SLOT}]" not in o.split(",")[0]:
+        return True
+    return not (mn in MOV_LIKE or mn.startswith("set"))
+
+
 def target(ops):
     return int(ops.split()[0], 16)
 
 
 def norm(ops):
     return ops.replace(" ", "").lower()
+
+
+def canon(ops):
+    return re.sub(r"\s*([+,])\s*", r"\1", ops).lower()
 
 
 def call_text(ops):
@@ -110,20 +133,30 @@ def chain(ins, nxt, start):
             end = ("ret", a)
             break
         if mn == "jmp":
-            end = ("jmp", target(ops))
             edges.append((a, target(ops)))
-            break
+            a = target(ops)
+            continue
         if mn.startswith("j"):
             edges.append((a, target(ops)))
         a = nxt[a]
-    early = [a for a, t in edges if t == EXIT]
+    w5 = [w for w in writes if w.endswith(f":{SLOT}")]
+    if end[0] != "tail":
+        tail_src = "-"
+    elif w5:
+        va = int(w5[-1].split(":")[0], 16)
+        tail_src = f"{va:#x} {ins[va][0]} {canon(ins[va][1])}"
+    else:
+        tail_src = "入口前の値"
     return {
         "n": len(seq),
         "end": end,
+        "src": seq[-1] if seq else None,
         "writes": writes,
         "calls": calls,
         "edges": edges,
-        "early": early,
+        "early": [x for x, t in edges if t == EXIT],
+        "open_jcc": [x for x, _ in edges if ins[x][0] != "jmp"],
+        "tail_src": tail_src,
     }
 
 
@@ -165,11 +198,13 @@ def row(site, side):
     tva, mask, jva, jmn, jops = site
     lab, jmn_, entry, c = side
     if c is None:
-        return (f"{tva:#x}", f"{mask:#x}", f"{jva:#x}", jmn_, lab, "-", "0", "", "", "", "", "")
+        return (f"{tva:#x}", f"{mask:#x}", f"{jva:#x}", jmn_, lab, "-", "0", "-", "-", "", "", "", "0", "", "-")
     return (
         f"{tva:#x}", f"{mask:#x}", f"{jva:#x}", jmn_, lab, f"{entry:#x}", str(c["n"]),
-        fmt_end(c["end"]), ";".join(c["writes"]), ";".join(c["calls"]),
+        fmt_end(c["end"]), f"{c['src']:#x}" if c["src"] is not None else "-",
+        ";".join(c["writes"]), ";".join(c["calls"]),
         ";".join(f"{a:#x}->{t:#x}" for a, t in c["edges"]), str(len(c["early"])),
+        ";".join(f"{a:#x}" for a in c["open_jcc"]) or "-", c["tail_src"],
     )
 
 
@@ -193,38 +228,48 @@ def main():
     mismatch = 0
     if len(cap_rows) != len(ob_rows):
         mismatch += abs(len(cap_rows) - len(ob_rows))
-    head = ("site", "mask", "jcc_va", "jcc", "side", "entry", "n_instr", "end",
-            "writes", "calls", "edges", "early_exit")
     for x, y in zip(cap_rows, ob_rows):
         if x != y:
             mismatch += 1
-            cols = [head[i] for i in range(len(x)) if x[i] != y[i]]
+            cols = [HEAD[i] for i in range(len(x)) if x[i] != y[i]]
             if mismatch <= 5:
                 print(f"MISMATCH site={x[0]} side={x[4]} cols={cols}")
 
     os.makedirs(outdir, exist_ok=True)
-    head = ("site", "mask", "jcc_va", "jcc", "side", "entry", "n_instr", "end",
-            "writes", "calls", "edges", "early_exit")
     with open(os.path.join(outdir, "r8d_sites.tsv"), "w") as f:
-        f.write("\t".join(head) + "\n")
+        f.write("\t".join(HEAD) + "\n")
         for r in cap_rows:
             f.write("\t".join(r) + "\n")
 
     side_of = {(r[0], r[4]): r for r in cap_rows}
     with open(os.path.join(outdir, "r8d_scope.md"), "w") as f:
-        f.write("| 判定 | mask | jcc | 立ち: 入口 / 命令 / 終端 / 書込み ([rbp+0x5b8] の VA) / 呼出し | 落ち: 同じ |\n")
+        f.write("| 判定 | mask | jcc | 立ち: 入口 / 命令 / 終端 (終端へ入った命令) / 書込み ([rbp+0x5b8] の VA) / 呼出し / 未追跡 jcc | 落ち: 同じ |\n")
         f.write("|---|---|---|---|---|\n")
         for site in dict.fromkeys(r[0] for r in cap_rows if int(r[1], 16) in SCOPE):
             cells = []
             for side in ("立ち", "落ち"):
                 r = side_of[(site, side)]
-                w5 = [w.split(":")[0] for w in r[8].split(";") if w.endswith("rbp+0x5b8")]
-                calls = len([c for c in r[9].split(";") if c])
-                writes = len([w for w in r[8].split(";") if w])
-                cells.append(f"{r[5]} / {r[6]} / {r[7]} / {writes} ({','.join(w5) or '-'}) / {calls}")
+                w5 = [w.split(":")[0] for w in r[9].split(";") if w.endswith(f":{SLOT}")]
+                calls = len([c for c in r[10].split(";") if c])
+                writes = len([w for w in r[9].split(";") if w])
+                opn = len([j for j in r[13].split(";") if j and j != "-"])
+                cells.append(f"{r[5]} / {r[6]} / {r[7]} ({r[8]}) / {writes} ({','.join(w5) or '-'}) / {calls} / {opn}")
             f.write(f"| {site} | {r[1]} | {r[3]} | {cells[0]} | {cells[1]} |\n")
-    tail = [a for a in region(ins, nxt, TAIL) if "[rbp + 0x5b8]" in ins[a][1] and not ins[a][1].startswith("dword ptr [rbp + 0x5b8]")]
+    with open(os.path.join(outdir, "r8d_tail_src.md"), "w") as f:
+        f.write("| 判定 | mask | 側 | 入口 | 経路の命令数 | 読み値の決まり (経路上で最後に [rbp+0x5b8] へ書かれた命令・無ければ入口前の値) |\n")
+        f.write("|---|---|---|---|---|---|\n")
+        for r in cap_rows:
+            if r[7].startswith("tail:"):
+                f.write(f"| {r[0]} | {r[1]} | {r[4]} | {r[5]} | {r[6]} | {r[14]} |\n")
+
+    tail = [a for a in region(ins, nxt, TAIL) if reads_slot(*ins[a])]
     print("tail_reads_5b8=" + ",".join(f"{a:#x}" for a in tail))
+    sides = [sd[3] for _, sd in cap if sd[3] is not None]
+    print(f"sides={len(sides)} end_exit={sum(c['end'][0] == 'exit' for c in sides)} "
+          f"end_tail={sum(c['end'][0] == 'tail' for c in sides)} "
+          f"sides_with_exit_jcc={sum(any(ins[x][0] != 'jmp' and t == EXIT for x, t in c['edges']) for c in sides)} "
+          f"sides_with_open_jcc={sum(bool(c['open_jcc']) for c in sides)} "
+          f"sides_with_5b8_write={sum(any(w.endswith(':' + SLOT) for w in c['writes']) for c in sides)}")
 
     n_sites = len({r[0] for r in cap_rows})
     print(f"sites={n_sites} rows={len(cap_rows)} objdump_rows={len(ob_rows)} mismatch={mismatch}")
