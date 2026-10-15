@@ -156,6 +156,16 @@ return np;
 - 未確定: `4133f0` 自体の内部のどの store / helper が書いたか。`414c70` の入口でも `"he.d"` の出現を再確認していない。
 - 次の一手 (#3972): (1) `4133f0` の入口・出口で同じ監視を入れ、c2/c3 の差 (run 間の揺れ・IR 生成の非決定性) を切り分ける。(2) 書込みの先頭 (`4133f0` の中の helper) を特定する。
 
+### #3972 run 5: 入口計装で `4133f0`・`414c70` を観測 (`entry_3972.sh`)
+
+- 手段: `entry_3972.py` が `function_4133f0` (id=1)・`function_414c70` (id=2) の入口に `m11_wprobe` を入れ、unit 158 の実行だけ引数と監視番地 `0x10aa1428` の 8 バイトを出す (読み取りだけ)。派生 script・計装の C・Python は commit `7f0a63ec3` (`tools/m11/trap_triage/entry_3972.{sh,py,c}`)。
+- 再現: `cd tools/m11 && bash trap_triage/entry_3972.sh <tag>` (前提: `work-m11`・`fl-win64`・`[EMSDK]`・`bash m11_gen_ir2.sh` 済み。出力 `work/probe3972/en_<tag>.err`)。
+- 測定 (commit `6739a2745`・`M11_FIX_4136A0=1`・unit 158・n=2): IR `m11_gen_ir2.sh` rc 0 (54 s)。`ir_conditions.json` は `ldfix=applied` `450560=applied`・`ir_sha256=e48c31d2…` (生成直後。レビュー run の `af3e9e05…` とは一致しない。再生成ごとの sha 差は未切り分け)。2 回とも同じ結果: `[wp] id=2 n=1 a1=10aa1488 a2=64002e00650068 a3=2539c8 watch=680065002e006400`。`id=1` (`4133f0` の入口) は 0 件。unit 158 は `halt0`。
+- callchk (commit `6739a2745`・n=1): `[cc] site=10499 hit=5 old=0000000000000000 new=680065002e006400 -> function_414c70 IR line 121120 call function_4133f0`。
+- 読み: `414c70` の入口で既に監視番地は `"he.d"` (UTF-16LE)。書込みは `414c70` の入口より前 (監視 ON 以前の unit 0〜157 を含む) に書かれていた。`m11_watch_on(1)` の直前の値は記録していないため、書込みが unit 158 の中で起きたとは言えない。`4133f0` の入口には届いていない。
+- 前回 (run 4) の callchk は c3 で site 10499 (`414c70` 内の `call 4133f0`) を指したが、今回の callchk の再実行 (r4a) でも同じ site 10499 が `"he.d"` を出した。ただし entry 計装では `4133f0` の入口が 0 件なので、site 10499 の値変化は `4133f0` の呼出し以前に起きたものを検出した可能性もある (callchk は call 直後に比べるため)。書込み元は `414c70` の入口より前 (監視 ON 以前を含む) と読む。
+- 未確定: `414c70` の呼出し元 (`414c70` を呼ぶ関数) と、入口より前の書込み経路。次の一手: unit 158 の `414c70` 呼出しの直前 (呼出し元の入口) に同じ計装を入れる。
+
 ## #5093 (M11-32): [0x64] の書込み元の探索 (部分・未達)
 
 - 測定 commit: `59e21b78f` (probe `probe_5093.mjs` と本節を含む PR の tree。build 対象のコードは `2e3c6d554` と同一: `git diff 2e3c6d554 59e21b78f -- tools/m11` は `probe_5093.mjs` と本付録の追加 35 行だけ)。OFF (既定) の build。IR `ir_sha256=d66e24aa…` (gen 直後)・build 後 `64a0e5dc…`。#3643 の `597757f4…` とは IR が違う (再生成の差。未切り分け)。

@@ -53,7 +53,7 @@
 
 ## 6. 未確定 14 件の追跡 (#3363 / KH-55・対照 Gain・all)
 
-件数の出所: §2 の対照 Gain・all の行 (測定 commit `5e1162712` で測定した after_cfg 1,995 関数 / 731,396 B、未確定 14 件・kind 内訳 call_ret 8・reg_copy 2・other_write:ror 2・other_write:mov 1・label 1)。下表の分類と理由は、その 14 件の逆アセンブルの静的な読みによる分類であり、実行で再確認したものではない。下表の逆アセンブル事実 (helper `0x180fd7d94`・`0x180fd1b00` のアドレス、グローバル `0x184162118`・`0x184161fa8`、store 箇所 `0x180fd0b38`・`0x180fd1abc`、分岐 `0x180fb5ee2`・`0x180fb5f1f`) は、本 run では HeartCore の展開ができず未検証 (前の作業時の読み)。`unresolved_cfg_sites.py` (新規・`5e1162712` に無い) の head 実行は本 PR では未実施。`plugins-kilohearts` の素材が実行環境に無いため、本 run では実行できなかった。head での再実行と件数の照合は子 issue #4252 の範囲とする。
+件数の出所: §2 の対照 Gain・all の行 (測定 commit `5e1162712` で測定した after_cfg 1,995 関数 / 731,396 B、未確定 14 件・kind 内訳 call_ret 8・reg_copy 2・other_write:ror 2・other_write:mov 1・label 1)。下表の分類と理由は、その 14 件の逆アセンブルの静的な読みによる分類であり、実行で再確認したものではない。下表の逆アセンブル事実のうち、helper・分岐・IAT 呼び出しは #5119 の head 再計測で照合した (下の再計測の箇条)。store 箇所 2 件は照合できなかった。`unresolved_cfg_sites.py` は `5e1162712` の後に追加されたため、その commit では実行していない。
 
 | 分類 | 件数 | 確定 | 理由 (呼び先が静的に決まらない根拠) |
 |---|--:|---|---|
@@ -65,9 +65,12 @@
 
 - 結論: 14 件はいずれも静的に確定できない。確定不能の理由は上表の 5 種類 (実行時解決・実行時書換・引数由来の添字・分岐の複数経路) に収まる。
 - 確定できなかったので、閉包 (`after_cfg`) は変えない。呼び先が未確定の site はそのまま `unresolved` として残る (§3 の判定は不変)。
-- 再現コマンド (未実行・素材が揃った環境用): `python3 scripts/unresolved_cfg_sites.py <core> <callgraph.pkl> <rtti_vtables.json> gain all <out.json>`。出力 `{"unresolved": ..., "by_kind": ...}` が §2 の 14 件・kind 内訳と一致するかは未確認 (子 issue #4252 の受入)。
+- **head 再計測 (#5119・測定 commit `2d0357a51`・4 vCPU・各 1 回・検証 HEAD `2341dca4f` の fix run で実施)**: 素材 `plugins-kilohearts` → `HeartCore.core_64` (76,642,304 B、sha256 先頭 16 桁 `d55ce8b4c0ad7ebe`、REPORT の記録と一致)。再現: `scripts/rtti_walk.py <core> <rtti_vtables.json>` → `scripts/callgraph.py <core> <rtti_vtables.json> <callgraph.pkl> 14` → `scripts/unresolved_cfg_sites.py <core> <callgraph.pkl> <rtti_vtables.json> gain all <out.json>`。出力 `{"unresolved": 14, "by_kind": {"call_ret": 8, "reg_copy": 2, "other_write:ror": 2, "other_write:mov": 1, "label_barrier": 1}}`。件数と kind 内訳は §2 の対照 Gain・all の行と一致した。所要: rtti_walk.py 1.8 s、callgraph.py 7.8 s、unresolved_cfg_sites.py 1.1 s。出力 JSON の各行は `fn` (関数開始) と `site` (未確定の呼び出し・書込み箇所) を持つ。
+  - 出力との照合 (`fn` と `site` を分けて書く): `call_ret` 8 件のうち 6 件は `fn` `0x180fd8134`・`0x180fd82b4`・`0x180fd83f8`・`0x180fd8464`・`0x180fd8538`・`0x180fd86a8` (site `0x180fd818b`・`0x180fd830c`・`0x180fd843a`・`0x180fd84b1`・`0x180fd8590`・`0x180fd86ea`)。1 件は `fn` `0x180fd1ac4` (site `0x180fd1ae4`)、1 件は IAT 呼び出しの site `0x180fd0b1a` (`fn` `0x180fd0ac8`)。分岐 `0x180fb5ee2`・`0x180fb5f1f` は label_barrier の `fn` `0x180fb5e6c` の中にある。store 箇所 `0x180fd0b38`・`0x180fd1abc` は未確定 site の関数の範囲に入らず、確認していない。
+  - 未確認: §6 の表の「直前の call の先が helper `0x180fd7d94`」と「復号 helper `0x180fd1b00`」の読みは、本 run では逆アセンブルで再確認していない (出力の `fn` と一致するのは上の 6 件・1 件の関数開始のみ)。
+  - 結論は変わらない: 14 件は静的に確定できず、閉包 (`after_cfg`) も変えない。実行時 trace の作業は子 issue #4252 (KH-92) の範囲。
 - 単体テスト: `python3 scripts/test_rax_source.py` → 12 件 OK (`call_ret` と `reg_copy` (`r11`) の 2 件を追加)。
-- 未確定 (残件): 上 14 件の呼び先の確定は、静的解析では不可能と読んだ。実行時の trace (GetProcAddress 結果・復号値・オブジェクト状態) が要る。実行時 trace の作業と、head での `unresolved_cfg_sites.py` 再実行は子 issue **#4252** ([KH-92]) で扱う (本 issue の範囲外)。
+- 未確定 (残件): 上 14 件の呼び先の確定は、静的解析では不可能と読んだ。実行時の trace (GetProcAddress 結果・復号値・オブジェクト状態) が要る。この実行時 trace の作業は子 issue **#4252** ([KH-92]) で扱う (本 issue の範囲外)。件数の再計測は上の head 再計測で完了している。
 
 ## 4. 検証 (単体テスト・コード差分・鮮度)
 

@@ -173,6 +173,14 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate      
 - 受入 2 (`0xed0bb0` を vptr として得る経路の不在): **未達**。`0xed0bb0` の絶対値は 0 件。算術経路は未検査。
 - 未解決 (#3888 で継続・子は起票せず): 受入 1 の実行時経路 (動的な vtable 構築か別 block の未解析部分) と受入 2 の算術経路。
 
+### PY-264 第 5 run (#3888): 算術経路の走査 (受入 2・部分達成)
+
+- 検査 `analysis/py264_arith_scan.py` (直線区間の定数伝播: lea rip・mov imm・mov reg・add/sub imm。候補 `0xed0bb0`・`0xed0c28` の値を持つレジスタを qword の `mov [..], reg` の源にする箇所を列挙)。測定 commit `ec6b96de2`。素材 `fl-win64`。
+- 陽性対照: 候補 `0x13acb88` (既知の vtable 格納 `0x44a86e`・`pe_vptr_stores.py 0` で検出済み) を block00031 に当てると 1 件検出 (PASS)。検出器は格納を見つけられる。
+- block00031 (5,022,467 命令): 候補 `0xed0bb0`・`0xed0c28` の算術格納は 0 件・38.0 秒 (HEAD `ec6b96de2` で再現)。
+- 全 313 block は未完走。1 プロセス 900 秒・4 並列 480 秒の上限で打ち切り (負荷 3.8〜3.9、4 コア)。全 block の結果は無い。
+- 受入 2: block00031 の範囲では算術で作る経路は見つからない。全 block の結論は未達。
+
 ## PY-266 (#3890): flag `+0x49e` の書込み元 (部分達成)
 
 - 測定 commit: `251f0e1a5` (`analysis/py266_0x49e_writers.py` の追加 commit)。素材 `fl-win64`・block00031 のみ展開 (1.6 秒)。`.text` 5,022,299 命令・`.pdata` 57,816 関数。

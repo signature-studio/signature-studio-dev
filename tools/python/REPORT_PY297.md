@@ -6,7 +6,8 @@
 
 - 受入条件 1: `load_config` を経由しない入口として、`flrack.rack.loop_starter_config` の**直接属性読出し**を特定し、probe で実測した。未設定の読出しは `AttributeError` になった。
 - 限界: この実測の `flrack.rack` は **mock (根拠なし)** の `__slots__` クラスである。本物の `flrack` は FL 本体の native モジュールで、この wasm には無い。`AttributeError` は CPython の T_OBJECT_EX (未設定 NULL の読出し) の性質に基づく推定を wasm 上で確かめたもので、FL 実機の挙動の実測ではない。
-- 受入条件 2 (呼べた数の変化の REPORT 記載) と 3 (反映できない部分の `mock (根拠なし)` 明記) は本 run では扱わない。3 のうち本付録で明記したのは `flrack.rack` の型だけである。
+- 受入条件 2 (呼べた数の変化): chord probe を設定時・未設定時で実行し、呼べた数は 3/9 のまま変わらなかった (§2b)。
+- 受入条件 3 (反映できない部分の `mock (根拠なし)` 明記): §3 の表で、`flrack.rack` の型・未設定時の実 FL の挙動・実 FL の値を mock (根拠なし) / 未確認と明記した。
 
 ## 1. 入口の特定
 
@@ -34,6 +35,27 @@ probe: `node tests/loop_starter_unset_probe.mjs` (`work/fl_extract/` と `dist/f
 
 - `load_config` の `OK` は REPORT_PY168 の `OK` と同じで、`try` が AttributeError を吸収したことを示す。
 
+## 2b. 呼べた数の変化 (受入条件 2・#4070)
+
+`tests/chord_progression_call_probe.mjs` を設定時と未設定時で実行した (`LOOP_STARTER_UNSET=1` で `flrack.rack` を `__slots__ = ('loop_starter_config',)` の未設定 mock に切り替え)。
+
+| 関数 | 設定時 | 未設定時 |
+|---|---|---|
+| apply_chord_preset | OK | OK |
+| get_chord_name | AttributeError (list.split) | AttributeError (list.split) |
+| text_to_chord | AttributeError (None.locked) | AttributeError (None.locked) |
+| get_chord_root | TypeError | TypeError |
+| get_chord_preset_str | OK | OK |
+| get_rhythm_preset_str | IndexError | IndexError |
+| get_chord_pool_preset_str | NotImplementedError | NotImplementedError |
+| analyse_chord | StopIteration | StopIteration |
+| reset | OK | OK |
+| **呼べた数** | **3/9** | **3/9** |
+
+- 9 行は完全に一致した。未設定時に呼べた数は増えも減りもしない。
+- 未設定 mock を `__slots__ = ()` (書込み不可) にすると、`import control` の時点で `rack.py` の `load_config` 163 行の書込み (`STORE_ATTR`) が AttributeError になり、probe 全体が落ちた。書込みを許す `__slots__ = ('loop_starter_config',)` が、REPORT_PY168 の条件と揃う。
+- 注: 本 probe は `loop_starter_config` の読出しが関数呼出し中に起きるかを見ていない (`SEEN` は flcpt 属性のみ)。関数内の読出しの有無は未確認。
+
 ## 3. 反映できない部分 (mock (根拠なし) の明記)
 
 | 項目 | 状態 | 根拠 | 起票先 |
@@ -51,6 +73,6 @@ FL_WIN64_DIR=<fl-win64 展開先>/extracted $PY312 analysis/extract_pyc_blocks.p
 node tests/loop_starter_unset_probe.mjs
 ```
 
-前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0・4 分 10 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0・22.6 秒・`flpy.wasm` 5,924,680 B)。`extract_pyc_blocks.py` は fl-win64 の DATA block を全件展開しないと `pyscript ... 0 block` の ERROR で失敗した (一部展開時)。全件展開後の再実行で成功。
+前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0・所要時間は未記録)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0・22.6 秒・`flpy.wasm` 5,924,680 B)。`extract_pyc_blocks.py` は fl-win64 の DATA block を全件展開しないと `pyscript ... 0 block` の ERROR で失敗した (一部展開時)。全件展開後の再実行で成功。
 
-測定 commit: `0ccb27aac` (probe の変更を含むコミット)。`git diff 0ccb27aac HEAD -- tools/python ':!*.md'` は 0 行 (測定後のコード変更は無い。本 PR の差分は `tools/python/REPORT_PY297.md` の新規追加と `docs/DOC_MAP.md` の 1 行のみ)。
+測定 commit: `4392aa502` (probe の変更を含む最後のコード commit)。確認: `git diff 4392aa502 HEAD -- tools/python ':!*.md'` の出力は 0 行 (測定後のコード変更は無い。本 PR の差分は `tools/python/REPORT_PY297.md` の新規追加と `docs/DOC_MAP.md` の 1 行のみ)。
