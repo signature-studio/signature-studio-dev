@@ -1,6 +1,7 @@
 # #3095 (KH-43) Delay の SIMD 疑似関数・swi の規則 (付録)
 
 - **結論**: 現 main の Delay emcc 残件 576 件のうち、SIMD 疑似関数 25 件 (13 種) を shim に**実装**し、swi 21 件を **fail-fast** (abort) とした。emcc 残件は **506 件** (SIMD・swi の未宣言 0)。Gain/Haas/Gate は 1000/1000 bit-exact (回帰なし)。実装 13 種はホスト x86 intrinsics と 200,000 試行で一致 (ネガティブコントロールは FAIL)。
+- **main 取り込み後の値は §8** (測定 commit `793662e84`): emcc 残件 **485 件** (main の #3096 で code 間接呼出し 21 件が消えた分を含む)。突合と回帰の結果は同じ。
 - **入力の訂正**: issue 本文の「SIMD 40 件・swi(3) 21 件」は測定 commit `7d1d0e2e` の値 (emcc 601 件) である。現 main では SIMD 25 件。差 15 件 (ABS 10・ZEXT416 2・maxps 2・vpsrldq_avx 1) は #3071 で shim に定義済み。swi 21 件の内訳は **swi(3) 17 件 + swi(0x29) 4 件** (issue の「swi(3) 21 件」は誤り)。
 
 ## 1. 測定の前提
@@ -89,3 +90,28 @@ bash ghidra_route/build_cmp.sh gain 1000 7 bitcast,intload,stackpair,assoc,conca
 | 引数過不足 108・型不一致 186 (V128 同士の `*`・`^` を含む)・code 間接呼出し 21・未定義 identifier 17・未関数化 6・その他 2 (計 340) | 同上 | #3096 [KH-44] |
 | 実装 13 種のオペランド順 (Ghidra pcodeop の規約: 先頭が vvvv の src1) を機械語で個別確認していない。swi の到達は未確認 | 反転・到達の誤りは Delay の native 突合でしか検出できない | #3073 [KH-41] |
 | レーン 200 → 190 の 10 件の原因 (`7d1d0e2e` 以降の変更のどれか) | 件数の説明のみ | 起票しない (件数の説明だけの未解決) |
+
+## 8. main 取り込み後の再測定 (測定 commit `793662e84`)
+
+- 経緯: PR 作成後に main (`45182bf1b`) が進み、`docs/DOC_MAP.md` が競合した (KH-43 行と KH-44 行が同じ位置に追加された)。両行を残して解消し、merge commit `793662e84` とした。main 側の `ghidra_shim.h` の変更 (`typedef void code;` → 関数ポインタ、#3096) は自動マージで入った。§0・§3・§4 の数値は取り込み前 (`12647936d`) の値で、以下が統合後の値。
+- 前提: §1 と同じ素材・道具 (`plugins-kilohearts` → `HeartCore.core_64` 76,642,304 B、Ghidra 12.1.4 sha256 一致、JDK 21、emcc 6.0.12)。
+- decompile: lift 141 件 **141/141 OK** (`analyzeHeadless` wall 37.4 s, n=1)。Gain/Haas/Gate の 10 関数 **10/10 OK** (wall 25.3 s)。
+- emcc (`--fix bitcast,intload,stackpair,assoc,concat`・`emcc -c -ferror-limit=0`): 13.5 s、rc 1 (残件あり)。census は **485 件**。Win API・LOCK・MXCSR は 0 件のため表から省いた。
+
+| 分類 | 506 (`12647936d`, §3) | 485 (`793662e84`) |
+|---|---|---|
+| 未関数化 callee | 6 | 6 |
+| レーン型 | 166 | 166 |
+| 引数数不一致 | 108 | 108 |
+| SIMD・AVX・swi 疑似関数 | 0 | 0 |
+| code 型の間接呼出し | 21 | **0** (main #3096 で解消) |
+| 未定義 identifier | 17 | 17 |
+| 演算・代入の型不一致 | 186 | 186 |
+| その他 | 2 | 2 |
+| **合計** | **506** | **485** |
+
+- 単体突合 (`simd_shim_check.c`): 実装 13 種 × 200,000 試行 **mismatches: 0** (rc 0)。ネガティブコントロール (`-DKH_NEG=1`) は **mismatches: 200000** (rc 1)。
+- 回帰 (`build_cmp.sh <n> 1000 7 bitcast,intload,stackpair,assoc,concat`): Gain **1000/1000** (calls 4999/4999・wasm 15,161 B)、Haas **1000/1000** (calls 5500/5500・wasm 16,878 B)、Gate **1000/1000** (calls 4999/4999・wasm 17,367 B)。wasm サイズは §4 と一致。
+- 再現の注意: `build_cmp.sh` は `snapins/work/<n>/` が無いと `native_ref` が segfault する (`run_all.sh` [1] は `mkdir -p` している)。本測定では事前に作成した。
+- 未実施: Delay の native 突合 (emcc が 485 件で通らないため)。#3073 の範囲。
+- 測定 commit から HEAD までのコード差分: `git diff 793662e84 HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` の出力は 0 行 (この節を含む REPORT の commit は範囲外)。
