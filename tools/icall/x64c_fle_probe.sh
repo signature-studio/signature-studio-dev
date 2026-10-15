@@ -4,7 +4,8 @@
 #   出力: lift 関数数 / 命令数 / 未対応命令 site 数と内訳, UStrAsg(0x4133f0) 単体実行
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; T="$HERE/.."; W="$HERE/work/x64c"; mkdir -p "$W/out_all"
-PE="${ANALYSIS_DIR:-/home/ubuntu/work/analysis}/win64/extracted/block00031_PE.bin"
+source "$T/shared/env.sh"
+PE="$FL_WIN64_DIR/extracted/block00031_PE.bin"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 cp "$T/ott/lift/x64c.py" "$W/x64c_fle.py" && patch -s "$W/x64c_fle.py" "$HERE/integration/x64c_fle.patch"
 python3 -c "
