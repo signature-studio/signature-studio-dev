@@ -85,6 +85,7 @@
 | `tools/m3/REPORT.md` | ~100 | M3: 中規模 lift → wasm (純計算 4 関数 bit-exact) |
 | `tools/m5/REPORT.md` | ~120 | M5: Delphi lift → wasm E2E + native bit-exact |
 | `tools/liftlib/REPORT.md` | ~221 | 共通 lift 修復基盤の統合 (CAB-49/54/55/220/239/LIFTLIB-2)。§21 は DIR64 補正境界の全数列挙と修正 (#593)。§10〜§12 は `REPORT_APPENDIX_A.md`・§13〜§16 は `REPORT_APPENDIX_B.md`・§17 (iargs)・§18 (#241 ymm/pcmpistri/F2 xmm 戻り) は `REPORT_APPENDIX.md`・§19 (PERF-P1 #155 標準ビルド設定 + 署名ガード)・§20 (#478 ott_auto_none) は `REPORT_APPENDIX_C.md` に分割。§22 (LIFTLIB-9 #668) は要約のみで全文は `REPORT_APPENDIX_D.md` |
+| `tools/liftlib/REPORT_APPENDIX_3137.md` | ~70 | liftlib #3137: `legacy_p1` の残留分岐 66 件 (br_other 17 / no_branch 49) の D1a 同型判定 (折畳み形 13 件・非同型 53 件)・`p1_repmap_census.py --residual` の実測 |
 | `tools/liftlib/REPORT_APPENDIX_A.md` | ~240 | liftlib §10〜§12 全文 (lowbase 取り込み CAB-220 / mini-lifter 語彙 + leaf spec CAB-239 / LIFTLIB-2 CAB-256) |
 | `tools/liftlib/REPORT_APPENDIX_B.md` | ~250 | liftlib §13〜§16 全文 (LIFTLIB-3 CAB-264 / LIFTLIB-4 CAB-272 / LIFTLIB-1 #224 検収 / 環境パス置換 #386) |
 | `tools/liftlib/REPORT_APPENDIX.md` | ~266 | liftlib §17 全文 (HB-H3 #93 iargs pass)・§18 全文 (LIFTLIB #241 ymm(i256) helper ABI / pcmpistri / F2 xmm 戻り搬送) |
@@ -789,6 +790,8 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_3064.md` | ~36 | KH-37 (#3064): 対照 Gain の x64c 閉包 148 と `gain_before_160.tsv` 160 行の数え方の差 12 件 (iat_thunk 2・tail_absorbed 9・SEH 着地点 1) と、`0xfd0995` が SEH の `__except` 着地点である実測 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3065.md` | ~90 | KH-38 (#3065) 対照 Gain before 160 closure の unsup 285 site / 48 種 → 0 (flelift x64c の VEX/FMA/rcr 被覆)。before/after の測定値の正本。再測定 `scripts/lift_closure_x64c.sh`、差分テスト `tools/flelift/tests/x64c_vex_diff.py`、rcr 実機照合 `tools/flelift/tests/rcr_native_check.py` |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3075.md` | ~34 | #1216 差し戻し round 4: merge 後 head (`2a17665f`) での Stereo / Delay 再測定 (emcc 12・577 件)・merge 前後の C の cmp・census。§10-7p-3 の正本 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_3802.md` | ~126 | #3802 (KH-66): Delay の DAT_/uRam の型規則・未関数化 callee の fail-fast stub・スタブと本体の衝突の解消。結果と測定は付録 §10-7u が正本。§⑧ は main 取り込み後の状態 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_3802_DIFF.md` | ~165 | #3802 付録 §⑧ の差分の全文: 測定 commit `6323671e7` → HEAD の `ghidra_route` の `git diff` 出力 (main 取り込み分を含む)。差分の記録であり測定値の正本ではない |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3800.md` | ~66 | KH-64 (#3800): Delay の引数過不足のうち呼出先 FUN_180fd4f30 分の ABI 規則 (部分)。根拠・census・未解決は §10-7u が正本 (残りは子 #3844・#3847) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3096.md` | ~70 | KH-44 (#3096): `code` 関数ポインタ化で Delay の間接呼出し 21 件を解消 (emcc 577 → 556)・gain/haas/gate の .o 新旧 byte 一致・残件の子 issue 分割。§10-7t の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3071.md` | ~85 | KH-39 (#3071): Stereo の emcc 残件の機械修復 (emcc 39 → 10 件)・ABI 規則 1〜11・rsqrtps 突合・回帰・in_XMM3 の live-in 判定・未解決 1〜5 の全文 (REPORT_APPENDIX §10-7r の分割移動) |
