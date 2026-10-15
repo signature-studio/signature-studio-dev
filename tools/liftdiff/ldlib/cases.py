@@ -145,7 +145,20 @@ MACHINE_ENTRY = {
     0x40c750: ['double'],               # xmm0
     0x653c80: ['i64', 'i64', 'i64'],    # r8 の整数 (rcx・rdx は未使用)
     0x691dd0: ['i64', 'i64', 'i64'],    # rcx: オブジェクトのポインタ / rdx: i64 / r8: 1 byte flag
+    0x442a50: ['double', 'i64', 'i64', 'i64'],  # xmm0 (4428c0 経由で 40c660)。rdx/r8/r9 は出力 word*
+    0x442b90: ['double'],               # xmm0 (442420 → 40c660)
+    0x664890: ['double'],               # xmm0 (476930 → 40c1d0)
+    0x6649b0: ['double', 'i64', 'i64'], # xmm0 (476500 → 40bf40)。rdx/r8 は出力 ptr
+    0x6649c0: ['float', 'i64', 'i64'],  # xmm0 は float (4764c0 が cvtss2sd)。rdx/r8 は出力 float*
+    0x664a80: ['double', 'double'],     # xmm0・xmm1 (476020)
     0x4256c0: ['i64'],                  # rcx: POINT の値 (x = 下位 32bit, y = 上位 32bit)
+}
+
+
+# LD-203 (#4200): 653c80 の間接 call slot (VA 0x15f3480 = RVA 0x11f3480)。boot 状態では null で、call で segv する。
+# 仮 proc の番地 (VMT 域の 0x50012000) を入れると、native / wasm が同じ仮 proc を見る。根拠は REPORT_APPENDIX_LD203.md。
+PATCH_BY_VA = {
+    0x653c80: 'i:0x11f3480:q=0x50012000',
 }
 
 
@@ -176,6 +189,8 @@ def case_line(va, name_prefix, pattern, sig, trace=True, xfill=True, stkfill=Non
         s += ' wsig=' + ','.join(sig['wsig'])
     if stkfill is not None:
         s += ' stkfill=%x' % stkfill
+    if va in PATCH_BY_VA:
+        extra = (extra + ' ' if extra else '') + 'p=' + PATCH_BY_VA[va]
     if extra:
         s += ' ' + extra
     return s

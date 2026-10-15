@@ -30,7 +30,12 @@ for i, (ret, name, a_) in enumerate(decls):
     if op == "movss" and a == ["i32"] and ret == "i128": body = "return (u128)p0;"
     elif op == "movss" and a == ["i128"] and ret in ("i64", "i32"): body = f"return ({T[ret]})(uint32_t)p0;"
     elif op == "movaps" and a == ["i128"] and ret == "i128": body = "return p0;"
-    elif op == "movaps" and a == ["i128"] and ret in ("i64", "i32"): body = f"return ({T[ret]})p0;"
+    elif op in ("movaps", "movapd") and a == ["i128"] and ret in ("i64", "i32"): body = f"return ({T[ret]})p0;"
+    elif op == "movq" and a == ["i64"] and ret == "i128": body = "return (u128)p0;"
+    elif op == "punpcklbw" and a == ["i128", "i128"] and ret == "i128":
+        body = "u128 r=0; for(int k=0;k<8;k++){ r|=((p0>>(8*k))&0xff)<<(16*k); r|=((p1>>(8*k))&0xff)<<(16*k+8); } return r;"
+    elif op == "int3" and a == [] and ret == "i64": body = "__builtin_trap(); return 0;"
+    elif op == "sfence" and a == [] and ret == "i64": body = "return 0;"
     elif op in ARITH and len(a) == 2 and a[0] == "i128" and ret == "i128" and a[1] in ("i128", "i32"):
         y = "f0(p1)" if a[1] == "i128" else "fb(p1)"
         sym = BROKEN[op] if brk == op else ARITH[op]
