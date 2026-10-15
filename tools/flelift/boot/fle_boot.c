@@ -642,6 +642,8 @@ void fle_ov_getmem(void) {
         R[4] += 8;                                  /* 拙い push/pop 釣合 (下記注記) */
         u64 p = R[0];
         py_watch(6, gsz, p);
+        if (p && p <= 0x12d6a090ull && 0x12d6a090ull < p + gsz)   /* #4287 診断: obj を含む確保の戻り時の [obj+0xc4] */
+            fprintf(stderr, "[wobj-getmem] p=%#llx size=%u obj+0xc4=%#x\n", (unsigned long long)p, gsz, (unsigned)LD8(0x12d6a090ull + 0xc4ull));
         fle_blk_getmem_post((u32)p, gsz);
         if (!p) { R[1] = (R[1] & ~0xffull) | 1; R[4] -= 8; ST64(R[4], 0x409433ull); f_409730(); }
         R[3] = save_rbx; R[0] = p;

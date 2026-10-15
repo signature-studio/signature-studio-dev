@@ -151,7 +151,7 @@ production 呼出し (dl=0・flag=0) では `key == K` のとき `V ← (dir+1)<
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| P = `0x53de80()` の実体 (vtable、+0x18 の (sub,key) 判定、+0x20 の id 供給) | id の値と key 一致判定の入力が未確定 | #4319 [PY-316] (親 #3402) |
+| P = `0x53de80()` の実体 | §8 (PY-316 / #4319) で vtable・+0x18・+0x20 を確定。解消済み | — |
 | T0 の転送先 (`[this+0x28]`・`[this+0x30]`・`[this+0x38]`・`[this+0x40]`) の書込み元 (VMT `0xf808d8` の thunk `0xf8e830`・`0xf8e860` は TMethod を呼ぶだけ) | 通知の実体 (どの関数に転送されるか) が未確定 | #4315 [PY-315] (親 #3402) |
 | L1・L2 の実体 (`0x11e83d0`・`0x11e8280`)、`[0x655bf8]` の実行時値 | item の tag (高 16 bit) が未確定 | #3403 [PY-195] |
 | K の間接書込みの有無 (構造体の一括複写など) | K = 0 の結論の前提。静的走査 (RIP 相対・絶対 disp32・即値) の範囲外 | #3403 [PY-195] |
@@ -175,3 +175,17 @@ production 呼出し (dl=0・flag=0) では `key == K` のとき `V ← (dir+1)<
 - ネガティブコントロール (測定 commit `1609ab4d8` で再実行。1 byte を壊した複製を repo 外の一時領域に置いて実行): `add r14, 0x24` の 0x24 を 0x28 に変えた (file offset `0xb8d87e`・VA `0xf8e47e`・`cmp -l` で `44 → 50` 八進)。出力は `FAIL f8e3f0: 要素 stride 0x24 (36 byte)`・`summary: 1 FAIL`・終了 1 (所要 91.0 秒。`12771b3e7` での結果も同一)。
 - 書込み検査の制御 (repo 外の合成バイト列で `sweep_writes_to` を直接呼ぶ): RIP 相対で K を指す `mov`・`xchg`・`cmpxchg`・`lock cmpxchg`・`fstp` の書込み 5 件を検出した。K を読むだけの `mov` (ロード)・`cmp`・`fld` の 3 件は検出せず、別の番地を指す書込みは 0 件。旧判定は mov・add・sub・inc・dec・and・or・xor の書込みしか見ないため、`xchg`・`cmpxchg`・`fstp` を取りこぼす。capstone 5.0.7 は `cmpxchg`・`fstp` のメモリ書込みを READ と返すので、助記 (`cmpxchg`・`fst*`・`fist*`) で補っている。
 - 候補 vtable `0xf808d8` の参照検査 (repo 外の一時スクリプト。capstone で `.text` を全走査): RIP 相対の参照 0 件・即値と絶対 disp32 の参照 0 件。ファイル全体の 4 byte 列 `d8 08 f8 00` は 2 件 (§7 の未確定表の 2 箇所と同じ位置。所要 94.6 秒)。
+
+## 8. 追加解析 (PY-316 / #4319): 補助オブジェクト P `0x53de80()` の vtable (PE 実測)
+
+- `0x53de80()` は `cl=1`・`rdx=[0x4010b8]` (typeinfo `System.Integer`)・`r8=4` で `0x479b40` を呼ぶ。`0x479b40` は typeinfo の kind (先頭 byte の下位) で表 `0x13b2c28` (エントリ 16 byte) を引き、kind 1 の関数 `0x478420` を呼ぶ。
+- `0x478420` は typeinfo の別 byte (`[ti+nameLen+2]` = 4) から 0 / 1 / 2 系列の分岐で `.data` の静的アドレスを返す。Integer の分岐は `0x478453` の `lea` で P = `0x13b21f0` を返す。
+- P の先頭 qword は vtable `0x13b21b8`。`.text` 内の P への参照は 2 件 (`0x478453`・`0x478b52`) で、どちらも load (`lea`) のみ・書込み 0 件 (`pe_xref.py`)。ctor による実行時の書換えは無い。
+- vtable (`.data`): `+0x00` = `0x478200`、`+0x08` = `0x4781e0`、`+0x10` = `0x4781f0`、`+0x18` = `0x478310`、`+0x20` = `0x478320`、`+0x28` = `0x13b2168` (未検査。値のみ記録)。
+- `+0x18` = `0x478310`: `cmp edx, r8d; sete al; ret`。引数 (sub, key) のうち、sub (`edx`) と key (`r8d`) の 32 bit 一致判定。戻り値は 0/1。
+- `+0x20` = `0x478320`: `edx` (u32) を `[rsp+0x38]` に積み、長さ 4・seed `0x811c9dc5` で `0x475ba0` を呼ぶ。`0x475ba0` は FNV-1a の 1 段ループ (`xor` → `imul 0x1000193`)。戻り値は 32 bit ハッシュ。
+- `0xf8e4a0` は `P.vtable[+0x20]` の戻り値を `and 0x7fffffff`・`+1`・`and 0x7fffffff` して id とする。値域は 0〜0x7fffffff (31 bit)。ハッシュが 0x7fffffff のとき `+1` が 0x80000000 になり、2 度目の `and` で 0 になる。これで §2 の「id 供給」の本体が確定する。
+- probe: `analysis/flapi/pe_py316_p_vtable.py` (10 検査。`lea` 先・vtable・+0x18・+0x20・FNV-1a・id 計算を確認)。
+- 実測 (2026-10-15・GitHub Actions の Linux runner・`fl-win64` の `block00031_PE.bin` を展開して使用): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py316_p_vtable.py` → PASS 10 件・FAIL 0・終了 0・所要 0.09 秒 (`time` の real)。実行直前の load average は 1 分値 0.23・5 分値 0.47 (`uptime`)。
+- ネガティブコントロール: `0x475ba0` の `imul` 即値 `0x1000193` の 3 byte 目を 1 bit 変えた複製 (repo 外の一時領域) で実行 → `FAIL 0x475ba0 は FNV-1a ...`・`summary: 1 FAIL`・終了 1。
+- 未確定として残るもの: `0x478420` の kind 1 分岐の入力 (typeinfo 側の byte) の由来と、Integer 以外の分岐の対応は未検査 (受入の範囲外。起票先: #4559 [PY-340])。

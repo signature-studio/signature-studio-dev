@@ -94,7 +94,7 @@ E 直前の命令の内訳 (before dsm): 11 件中 9 件は不成立の `je`/`jl
 
 ## 6. 既知の揺れ (base sweep)
 
-- 本 run の sweep base は 55/65/9/2。前版 (REPORT_APPENDIX_2696 §4) の 54/66/9/2 と 1 件違う (crash/timeout → bit 一致の 1 件)。旧 sweep.jsonl が無いため、どの関数かは特定していない。前版でも同種の揺れ (`0x1803dee20`・#2302) を記録している。本 PR は差を記録するだけで、追跡は #2302 のまま。
+- 本 run の sweep base は 55/65/9/2。前版 (REPORT_APPENDIX_2696 §4) の 54/66/9/2 と 1 件違う (crash/timeout → bit 一致の 1 件)。旧 sweep.jsonl が無いため、どの関数かは特定していない。前版でも同種の揺れ (`0x1803dee20`・#2302) を記録している。本 PR は差を記録するだけで、追跡は #3198 (ICALL-87・OPEN。#2302 は CLOSED のため付け替え)。
 - 本 run の `0x1803dee20` の fa_cmp は match 0 / mismatch 8 (本 run 内の値)。
 
 ## 7. 再現
@@ -128,7 +128,7 @@ bash tools/icall/diff/fa_sweep.sh 8 60                            # 期待 (base
   - 手順: `env -u FA_FALL_FRAG icall_rewrite.py` → `retdec-decompiler --select-decode-only` (`after.0.drc.ll`) → `ir_icall_restore.py` (comis 14 / dispatch 93 / sites 98 で前回と一致) → `fa_route_build.sh` (OK) → `fa_cmp 180da4030 --n 8` → `fa_sweep 8 60`。
   - 作業ディレクトリ: 生成物は `tools/icall/work/rt_remeasure/` (gitignore 対象)。次回の再測定は `work/` 以外で行う (AGENTS §4.4 に当たるため。今回は diff 外の生成物として minor 扱い)。`fa_route_build` / `fa_cmp` は固定の `tools/icall/work/rt_freshair-core/` を読むため、その中身を本 run の生成物で置き換えた (元の `work-icall` 展開物は別名で退避)。`rw.dll` の sha256 は `cc921929…` で、前回 §8 の値と一致。
   - `map.json` の sha256 差の説明: 元 `work-icall` 展開物の `map.json` は `pe` が別マシンの作業場所 (repo 外) を指し、`section_size` 75565・`ncomis` 9 で、本 run の `section_size` 80477・`ncomis` 14 と一致しない。`rw.dll` も本 run は sha256 `cc921929…` (reviewer 報告・本文と一致)、元の展開物は `2098d2f3…`。つまり元の展開物は現 HEAD の rewriter 出力ではない (古い生成物)。`map.json` は PE の絶対パスを含むため、作業ディレクトリ `tools/icall/work/rt_remeasure/` (本 run) と元の展開物の作業場所の差は sha256 の差として残る。
-- 測定 (`c2c9ab08d`・既定 OFF): `0x180da4030` は match 0 / mismatch 8 (期待どおり)。sweep は bit 一致 54 (前回 55)・不一致 2 (前回 1)。不一致の増分は `0x1803dee20` で、`fa_cmp` は match 0 / mismatch 8。この関数は前版 (REPORT_APPENDIX_2696 §4) から揺れている既知の関数 (#2302 で追跡。§6)。`0x1803de190` の wasm_err は OFF で出る (同一パイプラインの OFF 値)。
+- 測定 (`c2c9ab08d`・既定 OFF): `0x180da4030` は match 0 / mismatch 8 (期待どおり)。sweep は bit 一致 54 (前回 55)・不一致 2 (前回 1)。不一致の増分は `0x1803dee20` で、`fa_cmp` は match 0 / mismatch 8。この関数は前版 (REPORT_APPENDIX_2696 §4) から揺れている既知の関数 (追跡は #3198。§6)。`0x1803de190` の wasm_err は OFF で出る (同一パイプラインの OFF 値)。
 - gate の影響の切り分け: `a58d24e87` の `icall_rewrite.py` で既定 OFF の rw.dll を作ると sha256 `cc921929…` で、現 head と一致する (gate は OFF の出力を変えない)。同じ入力で sweep を 2 回取ると 54/65/10/2 で安定した。
 - 測定 (同一パイプライン: rewrite → RetDec decode-only → ir_icall_restore → fa_route_build → fa_cmp / fa_sweep 8 60。native は `tools/ott/native/build.sh`)
 
@@ -150,3 +150,36 @@ bash tools/icall/diff/fa_sweep.sh 8 60                            # 期待 (base
 | `FA_FALL_FRAG=1` で `0x180c99430` が wasm_err (out-of-bounds) | 既定 OFF なので現行の出力は変わらない。ON にすると 1 関数回帰する | #3198 (本 PR は Refs) |
 | A 型 11 件の判定の再実施・`0x180ca1480` の判定 | 受入 3・4 の残り | #3198 |
 | 既定 ON 化の判断 | 回帰解消まで既定 OFF | #3198 |
+
+## 10. 修復前後の sweep 比較 (ICALL-101 / #4353)
+
+- 測定 commit: `a17fca6fb` (origin/main)。コードは変えていない。`git diff a17fca6fb HEAD -- tools/icall` のうち、コード (.py/.sh) の差分は空 (md の差分のみ)。
+- 素材: `work-icall` (`tools/icall/work/rt_freshair-core/`)・`plugins-freshair` (`fetch.sh` で `SlateCore.core_64`)・`toolchain-retdec` (`[RETDEC]`)・`toolchain-emsdk` (`[EMSDK]`)。
+- 手順 (両条件とも同じ): `icall_rewrite.py --pe <SlateCore.core_64> --funcs F.ranges` → `retdec-decompiler --select-ranges <after.ranges> --select-decode-only` → `ir_icall_restore.py` → `fa_route_build.sh` (`FA_CORE` は各条件の `rw.dll`) → `fa_sweep.sh 8 60`。
+  - 修復前 = 既定 (`env -u FA_FALL_FRAG`)。修復後 = `FA_FALL_FRAG=1`。
+- `rw.dll` の sha256: 既定 `cc921929…` (§8 と一致)。`FA_FALL_FRAG=1` は `38311421…` (新規)。
+- restore の件数: 既定 comis 14 / dispatch 93 / sites 98 (§8 と一致)。`FA_FALL_FRAG=1` は comis 15 / dispatch 110 / sites 115。
+
+| 条件 | fa_sweep 8 60 (bit一致/crash・timeout/wasm のみ err/値の不一致) | 1 回目 | 2 回目 (再現) |
+|---|---|---|---|
+| 修復前 (既定 OFF) | 55 / 65 / 10 / 1 | 55/65/10/1 | 55/65/10/1 |
+| 修復後 (`FA_FALL_FRAG=1`) | 55 / 65 / 11 / 0 | 55/65/11/0 | 55/65/11/0 |
+
+- 基準との差: 本 issue の基準 (§2) は 55/65/9/2。同素材・同手順で測り直した修復前は 55/65/10/1 で、基準と 1 件ずつ違う (`wasm のみ err` と `値の不一致` が 1 件ずつ入れ替わる)。原因は未特定。最初に測った 56/65/9/1 は、素材の既存 `after.0.restored.ll` (古い rewriter 出力・section_size 75565) を入力にした値で、現 HEAD の rewriter 出力ではない。比較の基準は現 HEAD の出力で揃えた上の表 (55/65/10/1) とする。どちらも §6 の揺れの範囲で、追跡は #3198。
+
+### 10.1 変化した関数 (per-function 差分)
+
+| 関数 | 修復前 | 修復後 | 理由 |
+|---|---|---|---|
+| `0x180da4030` | mismatch 8 | **match 8** | 断片 `0x180da4081` が親の fall-through 先として複製された (ON で `nfrag_inlined` 0 → 8)。期待どおりの修復 (受入 2 の達成) |
+| `0x180c99430` | match 8 | **wasm_err 8** (`memory access out of bounds`) | 同じ経路で断片 `0x180c9946a`–`0x180c99598` が複製された。断片は `mov [rsp+0x20], r15`・`lea r15,[rdi+0x50]`・`je` の後に `call qword ptr [rax+0x10/0x20]` 等の間接 call とメモリ書込みを持つ。out-of-bounds の機構は**未確定** (§8 の未解決を継続) |
+
+- 他の関数は修復前後で分類が変わらない。`0x1803de190`・`0x1803b5500`・`0x18040c950`・`0x180da5f20` は両条件で wasm_err、`0x1803dee20` は両条件で match。
+- 修復後の断片複製数: 8 (`nfrag_inlined`)。`errors` は両条件とも空。関数の増減 (`func_map`) は無い (131 件)。
+
+### 10.2 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `FA_FALL_FRAG=1` で `0x180c99430` が out-of-bounds (機構未確定) | 既定 OFF なので現行の出力は変わらない。ON にすると 1 関数回帰 | #3198 |
+| 修復前の基準 55/65/9/2 と本測定 55/65/10/1 の差 | 基準の再現性が取れない。受入の比較は本節の同一条件で行った | #3198 |

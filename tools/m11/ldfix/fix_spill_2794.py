@@ -183,6 +183,57 @@ def judge_callarg(mach, body, site, ins, m_refs, i_refs):
     return True, 'ok', names[0], 'read=%x call=%s argi=%d' % (r, callee, argi)
 
 
+CMP_MNEMONIC = 'cmp'
+
+
+def judge_cmp(mach, K, touches, ins, body):
+    """icmp 側の根拠 (#4418 / LD-213)。K の機械語の読み出し 2 本 (M = 2) のうち、ちょうど 1 本が
+    `mov rD,[rip+X]` の直後に `cmp dword ptr [rD], 0` (disp 0) を持ち、IR の K の i32 読み出しのうち
+    `icmp <pred> i32 %v, 0` の被演算子になるものがちょうど 1 本のときだけ真 (X = K + 0x400000)。
+    → (ok, reason, IR の結果名, 根拠の要約)"""
+    X = K + 0x400000
+    refs = touches.get(X, [])
+    if len(refs) != 2:
+        return False, 'cmp_machine_refs=%d' % len(refs), None, None
+    by_addr = {i.address: i for i in ins}
+    cmps = []
+    for addr, _, rl in refs:
+        ld = by_addr.get(addr)
+        if not rl or ld is None or len(ld.operands) != 2:
+            continue
+        nx = [i for i in ins if i.address == addr + ld.size]
+        if len(nx) != 1:
+            continue
+        c = nx[0]
+        if c.mnemonic != CMP_MNEMONIC or len(c.operands) != 2:
+            continue
+        m0, im = c.operands
+        if m0.type != capstone.CS_OP_MEM or m0.size != 4 or m0.mem.index or m0.mem.disp:
+            continue
+        if im.type != capstone.CS_OP_IMM or im.imm != 0:
+            continue
+        if mach.cs.reg_name(m0.mem.base) != reg_name_of(mach, ld.operands[0]):
+            continue
+        cmps.append(addr)
+    if len(cmps) != 1:
+        return False, 'cmp_pattern=%d' % len(cmps), None, None
+    if len(re.findall(r'i64 %d to ptr\b' % K, body)) != 2:
+        return False, 'cmp_m_ne_i', None, None
+    names = []
+    for lm in re.finditer(LOAD_RE % K, body, re.M):
+        if int(lm.group(4)) != 32:
+            continue
+        if re.search(r'= icmp \w+ i32 ' + re.escape(lm.group(2)) + r', 0\b', body, re.M):
+            names.append(lm.group(2))
+    if len(names) != 1:
+        return False, 'cmp_ir_icmp=%d' % len(names), None, None
+    return True, 'ok', names[0], 'machine=%x' % cmps[0]
+
+
+def reg_name_of(mach, op):
+    return mach.cs.reg_name(op.reg) if op.type == capstone.CS_OP_REG else None
+
+
 def reg_fam(n):
     """32 bit と 64 bit の汎用レジスタを同じ族にする (eax → rax・r8d → r8)"""
     if len(n) == 3 and n[0] == 'e':
@@ -203,10 +254,11 @@ def ins_reads(mach, X, ins):
     return out
 
 
-def fix_text(ir, mach, audit, allow, gate):
-    """→ (新しい IR 本文, 修復リスト, 見送りリスト)"""
+def fix_text(ir, mach, audit, allow, gate, cmp_on=True):
+    """→ (新しい IR 本文, 修復リスト, 見送りリスト, icmp 側の修復リスト, icmp 側の見送りリスト)"""
     tg = spill_targets(audit, allow)
     fixed, skipped = [], []
+    cmp_fixed, cmp_skipped = [], []
     parts, last = [], 0
     for m in DEF_RE.finditer(ir):
         va = m.group(1)
@@ -248,12 +300,31 @@ def fix_text(ir, mach, audit, allow, gate):
             new = new[:mm.start()] + rep + new[mm.end():]
             fixed.append(dict(fn=va, site=addr, K='%x' % K, X='%x' % X, ty=ty, w=w, m=m_refs, i=i_refs,
                               ev=ev or '1to1', ir_name=nm))
+        if gate == 'both' and cmp_on:
+            for K in sorted({s[1] for s in tg[va]}):
+                ok, why, name, detail = judge_cmp(mach, K, touches, ins, new)
+                if not ok:
+                    cmp_skipped.append(dict(fn=va, K='%x' % K, why=why))
+                    continue
+                pat = r'^(\s*)(%s) = load (i(\d+)), ptr inttoptr \(i64 %d to ptr\)([^\n]*)$' % (re.escape(name), K)
+                mm = re.search(pat, new, re.M)
+                if mm is None:
+                    cmp_skipped.append(dict(fn=va, K='%x' % K, why='ir_not_intload_at_apply'))
+                    continue
+                ind, nm, ty, rest = mm.group(1), mm.group(2), mm.group(3), mm.group(5)
+                p = '%%cellps.%x' % K
+                if re.search(re.escape(p) + r'(?![\w.])', new):
+                    p = '%%cellps.%x.%s' % (K, nm.lstrip('%'))
+                rep = (ind + p + ' = load ptr, ptr inttoptr (i64 ' + str(K) + ' to ptr)' + rest + '\n'
+                       + ind + nm + ' = load ' + ty + ', ptr ' + p + rest)
+                new = new[:mm.start()] + rep + new[mm.end():]
+                cmp_fixed.append(dict(fn=va, K='%x' % K, X='%x' % (K + 0x400000), ty=ty, ir_name=nm, ev='cmp:' + detail))
         if new != body:
             parts.append(ir[last:m.start()])
             parts.append(new)
             last = end
     parts.append(ir[last:])
-    return ''.join(parts), fixed, skipped
+    return ''.join(parts), fixed, skipped, cmp_fixed, cmp_skipped
 
 
 def main():
@@ -266,19 +337,25 @@ def main():
     ap.add_argument('--tsv', required=True, help='spill37_1169.tsv (判定。TRUE_DROP だけを対象にする)')
     ap.add_argument('--report')
     ap.add_argument('--gate', choices=['both', '1to1', 'none'], default='both')
+    ap.add_argument('--cmp', choices=['on', 'off'], default='on', help='icmp 側の根拠 (#4418)。off はネガコン用')
     a = ap.parse_args()
     audit = json.load(open(a.audit))
     ir = open(a.infile, errors='replace').read()
     mach = ImageMachine(a.image, a.cfg)
-    out, fixed, skipped = fix_text(ir, mach, audit, true_drop_set(a.tsv), a.gate)
+    out, fixed, skipped, cmp_fixed, cmp_skipped = fix_text(ir, mach, audit, true_drop_set(a.tsv), a.gate, a.cmp == 'on')
     open(a.outfile, 'w').write(out)
-    rep = dict(gate=a.gate, fixed=fixed, skipped=skipped)
+    rep = dict(gate=a.gate, fixed=fixed, skipped=skipped, cmp_fixed=cmp_fixed, cmp_skipped=cmp_skipped)
     print('spill fixed=%d skipped=%d fixed_fns=%d' % (len(fixed), len(skipped), len({x['fn'] for x in fixed})))
     for x in fixed:
         if x['ev'] != '1to1':
             print('  fixed %s %s K=%s %s' % (x['fn'], x['site'], x['K'], x['ev']))
     for x in skipped:
         print('  skip %s %s K=%s %s' % (x['fn'], x['site'], x['K'], x['why']))
+    print('cmp fixed=%d skipped=%d' % (len(cmp_fixed), len(cmp_skipped)))
+    for x in cmp_fixed:
+        print('  cmp-fixed %s K=%s %s' % (x['fn'], x['K'], x['ev']))
+    for x in cmp_skipped:
+        print('  cmp-skip %s K=%s %s' % (x['fn'], x['K'], x['why']))
     if a.report:
         json.dump(rep, open(a.report, 'w'), indent=1, ensure_ascii=False)
 

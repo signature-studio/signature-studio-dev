@@ -284,6 +284,36 @@ def p45caller():
     return rows
 
 
+def g18_caller():
+    """0x41d8f0 (G18 の書込み関数) を r9=1・r9=0 で単独実行し、0x41d919 (mov [G18], rdi) の到達と書込み直前の値を出す (受入 1)。
+    rdi は 0x41d8ff で r8 から複写されるため、観測は r8 (= ID) で行う。"""
+    rows = []
+    for r9 in (1, 0):
+        for ident in (0x18, 0x45, 0x54, 0x56, 0x64, 0x65):
+            r = emulate(0x41d8f0, {'rcx': E.HOST, 'rdx': E.TAG, 'r8': ident, 'r9': r9}, [(0x41d8f0, 0x41d8f0 + 0x200)],
+                        probes={0x41d919: ['r8', 'rcx']}, sent_ret=E.SENT)
+            hit = [vals for va, vals in r['probe'] if va == 0x41d919]
+            print('G18 caller: r9=%d ID=0x%02x 0x41d919 %s rax=0x%x stop=%s' % (
+                r9, ident, ('reached r8=0x%x' % hit[0]['r8']) if hit else 'NOT reached', r['rax'], r['stop']))
+            rows.append((r9, ident, bool(hit)))
+    return rows
+
+
+def p45_caller():
+    """0x11fba90 (P45 の書込み関数) を this=HOST・[this+0x34a8]=0 で単独実行する (受入 1)。
+    0x11fbb4f の分岐 (eax==0xb) に届くには [[rbp+0x140]+0x10] の前提が要る。現状は 0x11fbaef までしか届かず未確定。"""
+    this = E.HOST
+    r = emulate(0x11fba90, {'rcx': this, 'rdx': 0, 'r8': 0x45, 'r9': 0}, [(0x11fba90, 0x11fba90 + 0x1000)],
+                probes={0x11fbaef: ['rcx'], 0x11fbb4f: ['rbp+0x140:8'], 0x11fc2b3: ['rax', 'rbp+0x170:8']},
+                sent_ret=E.SENT, mem_init=[(this + 0x34a8, (0).to_bytes(4, 'little'))])
+    print('P45 caller: rax=0x%x stop=%s 0x11fbaef=%s 0x11fbb4f=%s 0x11fc2b3=%s' % (
+        r['rax'], r['stop'],
+        any(va == 0x11fbaef for va, _ in r['probe']),
+        any(va == 0x11fbb4f for va, _ in r['probe']),
+        any(va == 0x11fc2b3 for va, _ in r['probe'])))
+    return r
+
+
 if __name__ == '__main__':
     mode = sys.argv[1] if len(sys.argv) > 1 else 'disp'
     if mode == 'disp':
@@ -306,5 +336,9 @@ if __name__ == '__main__':
         g18caller()
     elif mode == 'p45caller':
         p45caller()
+    elif mode == 'g18_caller':
+        g18_caller()
+    elif mode == 'p45_caller':
+        p45_caller()
     else:
         raise SystemExit('unknown mode %s' % mode)
