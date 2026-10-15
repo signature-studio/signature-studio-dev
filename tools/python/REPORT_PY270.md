@@ -92,8 +92,8 @@ WheelDelta として読まれる `movsx ..., word ptr [reg+0xa]` は 11 箇所�
 - 前提の `pe_py203_probe.py` → 27/27 PASS・終了 0。検証 HEAD で所要 153.74 秒 (load 0.41 → 0.95)。PY-203 の結論は変えていない。
 - 検証スクリプト `pe_py220_methods.py` → 11/11 PASS・終了 0・15.13 秒 (検証 HEAD)。issue 本文の 10 件とは件数が違う (#3616 へ報告)。
 - 負の対照: 形の条件から r9 の符号付き条件を外すと 2 → 618 件 (スクリプトの判定 `loose`)。
-- 差分 0 の証跡 (実行されるコード): `git diff 8e2540ebe HEAD -- tools/python/analysis/flapi/pe_py270_wheel_source.py tools/python/analysis/flapi/pe_callgraph.py` は 0 行。
-  flapi 全体の `git diff 8e2540ebe HEAD -- tools/python/analysis/flapi` は 163 行で、main 由来の `pe_py220_methods.py` の追加 (163 insertions) のみ。
+- 測定 commit 以降のコード差分: `git diff 8e2540ebe HEAD -- tools/python/analysis/flapi/pe_py270_wheel_source.py tools/python/analysis/flapi/pe_callgraph.py` は、検査名 1 行 (m3・`check(...)` の文字列) の変更のみ。判定の式は不変。
+  flapi 全体の `git diff 8e2540ebe HEAD --stat -- tools/python/analysis/flapi` は 2 files (`pe_py220_methods.py` 163 insertions = main 由来、`pe_py270_wheel_source.py` 1 行)。
 
 ## 6. 次の一手 (推定・未検証)
 
