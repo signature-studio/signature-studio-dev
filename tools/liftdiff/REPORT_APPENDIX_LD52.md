@@ -98,7 +98,7 @@ sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実�
 - LD-180 (#3863) の測定 commit `46bc0cd35` (`ldlib/cases.py` の 6 行追加のみ)。`git diff 46bc0cd35 HEAD -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh` の出力は本 commit 時点で 0 行 (REPORT の commit のみ)。
 - 前回の測定 commit `f6abfd073`。`git diff f6abfd073 46bc0cd35 -- tools/liftdiff/ldlib` は `cases.py` の `MACHINE_ENTRY` 6 行追加のみ。
 - 単体: `python3 tools/liftdiff/tests/test_ld52_machine_sig.py` → `PASS test_ld52_machine_sig`。
-- 素材の展開: `$HOME/artifacts` の `fl-win64`・`work-m11`・`work-liftdiff` を展開 (`fl-win64` は `$RUNNER_TEMP/fl-win64`)。emcc は `/opt/emsdk` (6.0.12) を使用。
+- 素材の展開: Actions の `oc_artifacts` 素材 `fl-win64`・`work-m11`・`work-liftdiff` を展開 (`fl-win64` は `FL_WIN64_DIR`、`docs/REFERENCES.md` の `[WIN64]`)。emcc は `[EMSDK]` (6.0.12) を使用。
 - 機械語の読み (6 件) は `/tmp` の一時スクリプトで capstone を使って行った (commit しない)。LD-53 の `ld53_arg_regs.py` の計数は使わず、呼び先の本体を人が読んだ (§1 の表が根拠)。
 - 単体: `python3 tools/liftdiff/tests/test_ld52_machine_sig.py` → `PASS test_ld52_machine_sig` (e2e `[0/4]` に追加)。
 - 製品 KPI (FLEngine 起動・最初のウィンドウ): 本 PR は起動・GUI に関わらないため書かない。
