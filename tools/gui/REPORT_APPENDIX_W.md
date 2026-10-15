@@ -32,3 +32,25 @@
 | wasm / Chrome の OffscreenCanvas 読み戻しの sha256 一致 (受入 5) | native と wasm の一致は未確認 | 子 issue [WIN-31] |
 | `GUI-REACH` の順序検査 (受入 4) と `tools/gui/e2e.sh` への組込み (受入 6) | trace の機械検査は未実施 | 子 issue [WIN-32] |
 | `gui_lift_post.py` の変更の wasm 経路 (`gui_wasm.sh`・`e2e.sh` 全体) の回帰 | emcc 未展開のため未実行 | [WIN-31] の e2e 再実行に含める |
+
+## 測定: lift 後処理の変更の既存利用者への影響 (差し戻し対応・測定 HEAD `f6a2619f3`)
+- 比較: `tools/gui/lift/gui_lift_post.py` の base (`6ef4ef958`) と head (`f6a2619f3`) を、同じ `retdec.c` と同じ PE に適用し、出力 `lifted.c` の sha256 を比べた。`gui_lift_post.py` は main (`origin/main`) でも `6ef4ef958` と同一 (`git diff 6ef4ef958 origin/main` 0 行)。
+- 素材: mingw は `apt` で導入 (`x86_64-w64-mingw32-gcc` 13)。RetDec は上流 v5.0 Linux 配布物 (`RetDec-v5.0-Linux-Release.tar.xz`) を本 run で取得した。R2 の `toolchain-retdec` は本 run に展開されていない (`$ARTIFACTS_DIR` は `fl-win64` のみ)。版は `docs/REFERENCES.md` の `toolchain-retdec` (v5.0) と同じ。
+- PE の作り方: `gui_app.c`・`gui_app_ff.c`・`gui_nc_app.c` は `lift/gui_lift.sh` (WndProc 指定無し・自動検出)。`pe_image_app.c` は `test/pe_image_e2e.sh` と同じ mingw 行 (`-Wl,--dynamicbase`)。
+- 判定: 4 PE 全てで base と head の `lifted.c` は**バイト一致**。wasm 経路 (`gui_wasm.sh`) が受ける `lifted.c` も変わらない。4 PE の retdec.c には `(*gN)(` 形の関数ポインタ大域も `(T (*)(...))(int64_t)` のキャストも無く、変更した 2 分岐は通らない。
+
+| PE | retdec.c (B) | sha256 (base 後処理) | sha256 (head 後処理) | 判定 |
+|---|---|---|---|---|
+| `gui_app.c` | 24537 | `2bf479fe686fc05e95ef64af1414df7ec7577f2c6f8adb77fb00515e14bbef62` | `2bf479fe686fc05e95ef64af1414df7ec7577f2c6f8adb77fb00515e14bbef62` | 一致 |
+| `gui_app_ff.c` | 5501 | `09f88d1417f147ef350159bc5d4e413174bfc8d61e337307df214c186799b4a4` | `09f88d1417f147ef350159bc5d4e413174bfc8d61e337307df214c186799b4a4` | 一致 |
+| `gui_nc_app.c` | 11262 | `a473260e28bdefa2767a1d6a1d949de78aed70c0f92e0e4d33fe5ce065c38e9c` | `a473260e28bdefa2767a1d6a1d949de78aed70c0f92e0e4d33fe5ce065c38e9c` | 一致 |
+| `pe_image_app.c` | 1871 | `e79071048ffb033bf0d54a4be1cfa3c1f29e73e1c2cf0a2356ea80c59528d481` | `e79071048ffb033bf0d54a4be1cfa3c1f29e73e1c2cf0a2356ea80c59528d481` | 一致 |
+
+- 差が出た PE は W 版ゲスト `gui_app_w.c` の 1 つだけ (意図した変更)。差分は 6 行 (`#define g39` の追加と `g39 = ...` の 1 行)。base の `lifted.c` は `g39` が未宣言で gcc が 2 箇所でエラーになる (`error: 'g39' undeclared`)。head は 0 エラー。
+- gate (差が出た PE の検証): `bash tools/gui/test/native_w_e2e.sh` を head で実行。lift は rc 0 で、native 実行は `SEGV on unknown address 0x0000400011f8` の rc=1。変更前の記録 (本付録の上の節) と同じ既知の欠陥 (関数 VA の 32 bit 切り詰め・子 #3508) で、変更の影響ではない。
+- 測定の証跡 (`git diff --stat 0705571e4 f6a2619f3 -- tools/gui`。付録に置く: REPORT.md は 250 行上限のため):
+```
+ tools/gui/REPORT.md            |  3 +++
+ tools/gui/REPORT_APPENDIX_W.md | 34 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
+```

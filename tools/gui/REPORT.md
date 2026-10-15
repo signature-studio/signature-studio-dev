@@ -245,4 +245,5 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - 再現: `bash tools/gui/e2e.sh` (連続は for ループ)。
 
 ## 21. WIN-23 (#3460): FL 非依存の W 版 Win32 テストゲストと headless surface 統計
+既知類型との関係: `docs/DEFECTS.md` D11 (PE VA リテラルの切り捨て) と同族 (絶対 VA の即値が幅を失う)。機構は別で、D11 は wasm32 のポインタ幅、本件は RetDec 出力の関数 VA 即値 `0x400011f8` (正しくは `0x1400011f8`) が native x86_64 で SEGV する。D11 の変種として扱うか新規類型にするかは子 #3508 で判断 (測定は付録 W)。
 - 結論: headless surface 統計 (`gui_hl_stats`: w×h・非背景・厳密な色数・sha256 (RGB 3 バイト列)) と単体テスト 21/21 PASS を実測。W 版ゲスト `gui_app_w.c` は lift まで通るが、lift 後の関数 VA の 32 bit 切り詰めで native が SEGV し、オラクル比較・wasm 比較は未達 (子 issue)。全文は [REPORT_APPENDIX_W.md](REPORT_APPENDIX_W.md)。
