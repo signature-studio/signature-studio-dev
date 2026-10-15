@@ -246,5 +246,5 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 
 ### 10-3 未測定と原因
 
-- LB=0x10000 の boot5=0 の 2 通り (`b50_ld1_lb010000`・`b50_ld0_lb010000`): `LBM_RESULT` 行が出なかった。原因は未確認。`m11_lb_matrix.sh` は `timeout 300` を `node m11_run.mjs` にだけ掛け、survey の後にも `LBM_RESULT` を出す。よって `LBM_RESULT` 無しは gen_ir2・data/image・lb_check・build のいずれかが `FAILED` で exit 1 した場合に限られる。どの段で止まったかは、`work/lbm/b50_ld*_lb010000/` のログ (gen.log・build.log・run.out の末尾) が残っていれば確認できる (本 runner には無い)。次の run で再測定する。
+- LB=0x10000 の boot5=0 の 2 通り: 再測定済み (rc_survey 124 = 600 s 打ち切り・unit 296 で停止)。詳細は `REPORT_APPENDIX_3161.md` §10-5。
 - 受入 3: 未達。`--full` の IR での値 (LB=0 873/21・LB=0x10000 870/25) は #403 の引用値と異なる。所要時間・寛容起動との関係・結論の全文は `REPORT_APPENDIX_3161.md`。

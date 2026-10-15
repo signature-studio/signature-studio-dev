@@ -1069,8 +1069,9 @@ class FnLift:
             'vmovhpd': ('movhpd', False)}
     VEX2 = {'vmovd': 'movd', 'vmovq': 'movq', 'vcvtdq2pd': 'cvtdq2pd', 'vcvtps2pd': 'cvtps2pd',
             'vcvtpd2dq': 'cvtpd2dq', 'vcvttpd2dq': 'cvttpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd',
-            'vpmovsxdq': 'pmovsxdq', 'vcvtdq2ps': 'cvtdq2ps', 'vrcpps': 'rcpps'}
-    VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vcomiss': 'comiss', 'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
+            'vpmovsxdq': 'pmovsxdq', 'vrcpps': 'rcpps', 'vrsqrtps': 'rsqrtps', 'vcvtdq2ps': 'cvtdq2ps'}
+    VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vcomiss': 'comiss',
+            'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
 
     def vex_leg(self, ins, ops, m):
         if any(o.type == X86_OP_REG and self.isymm(ins, o.reg) for o in ops):
@@ -1417,6 +1418,10 @@ class FnLift:
         di = self.xd(ins, ops[0])
         self.approx_used = True
         self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 4; k_++) X[%d].d[k_] = kh_rcp_exact(b_.d[k_]); }' % (self.xs(ins, ops[1], 'x128'), di))
+
+    def i_rsqrtps(self, ins, ops):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 4; k_++) X[%d].d[k_] = fle_rsqrt_exact(b_.d[k_]); }' % (self.xs(ins, ops[1], 'x128'), di))
 
     def bitw(self, ins, ops, op):
         di = self.xd(ins, ops[0])
@@ -1949,7 +1954,7 @@ def main():
     ninsn = 0
     textrefs = set()
     jt_ranges = set()
-    approx_used = False
+    shard_approx = [False] * nsh
     with contextlib.ExitStack() as stack:
         bfs = [stack.enter_context(open(p, 'w')) for p in body_paths]
         for i, e in enumerate(sorted(done)):
@@ -1957,7 +1962,7 @@ def main():
             f = FnLift(pe, e, known, md, thunks)
             bf.write(('void f_%x(void) { %s(); }' % (e, overrides[e])) if e in overrides else f.lift())
             bf.write('\n')
-            approx_used = approx_used or f.approx_used
+            shard_approx[i % nsh] = shard_approx[i % nsh] or f.approx_used
             unsup.update(f.unsup)
             unsup_sites += ['%x' % va for va in f.unsup_va]
             for t in f.calls:
@@ -1981,7 +1986,7 @@ def main():
     for k, name in enumerate(names):
         with open(os.path.join(out, name), 'w') as fh:
             fh.write('#include "fle_cpu.h"\n')
-            if approx_used and k == 0:
+            if shard_approx[k]:
                 fh.write(approx_rcp_decl())
             for nm in used_imps:
                 fh.write('void imp_%s(void);\n' % nm)

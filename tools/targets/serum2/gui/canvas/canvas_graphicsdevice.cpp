@@ -2,12 +2,15 @@
 // SR-50 #3260: drawRect・clearRect を bitmap へ描く。bitmap は createBitmapContext で結線し、clip は bitmap 境界で保持する。
 // SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap を bitmap へ描く。
 // SR-78 #4551: fillRectWithBitmap の拡大縮小と bilinear、drawBitmapNinePartTiled の 9 部分拡大縮小を入れる。
+// SR-62 #4233: fillLinearGradient・fillRadialGradient・drawBitmapNinePartTiled・fillRectWithBitmap を bitmap へ描く。
 
 #include "canvas_graphicsdevice.h"
 #include "canvas_bitmap.h"
 #include "canvas_graphicspath.h"
+#include "vstgui/lib/platform/iplatformgradient.h"
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <vector>
 
 namespace VSTGUI {
@@ -75,12 +78,76 @@ uint8_t toByte (double value)
 }
 
 //------------------------------------------------------------------------
+double distanceToSegment (double px, double py, const CPoint& from, const CPoint& to)
+{
+	const auto dx = to.x - from.x;
+	const auto dy = to.y - from.y;
+	const auto lengthSquared = dx * dx + dy * dy;
+	const auto qx = px - from.x;
+	const auto qy = py - from.y;
+	const auto t = lengthSquared > 0. ? std::clamp ((qx * dx + qy * dy) / lengthSquared, 0., 1.) : 0.;
+	const auto ex = qx - t * dx;
+	const auto ey = qy - t * dy;
+	return std::sqrt (ex * ex + ey * ey);
+}
+
+//------------------------------------------------------------------------
+template <typename F>
+void forEachBresenhamPixel (CPoint from, CPoint to, F&& visit)
+{
+	auto x0 = static_cast<int32_t> (std::lround (from.x));
+	auto y0 = static_cast<int32_t> (std::lround (from.y));
+	auto x1 = static_cast<int32_t> (std::lround (to.x));
+	auto y1 = static_cast<int32_t> (std::lround (to.y));
+	auto dx = std::abs (x1 - x0);
+	auto dy = -std::abs (y1 - y0);
+	auto sx = x0 < x1 ? 1 : -1;
+	auto sy = y0 < y1 ? 1 : -1;
+	auto err = dx + dy;
+	while (true)
+	{
+		visit (x0, y0);
+		if (x0 == x1 && y0 == y1)
+			break;
+		auto e2 = 2 * err;
+		if (e2 >= dy)
+		{
+			err += dy;
+			x0 += sx;
+		}
+		if (e2 <= dx)
+		{
+			err += dx;
+			y0 += sy;
+		}
+	}
+}
+
+//------------------------------------------------------------------------
 void writeRGBA (uint8_t* dst, const CColor& color)
 {
 	dst[0] = color.red;
 	dst[1] = color.green;
 	dst[2] = color.blue;
 	dst[3] = color.alpha;
+}
+
+//------------------------------------------------------------------------
+// 色停止点 (位置 0〜1) の間を線形に補間する。stops は空でないこと。
+CColor gradientColorAt (const GradientColorStopMap& stops, double t)
+{
+	t = std::clamp (t, 0., 1.);
+	auto next = stops.lower_bound (t);
+	if (next == stops.end ())
+		return std::prev (next)->second;
+	if (next == stops.begin ())
+		return next->second;
+	auto prev = std::prev (next);
+	auto span = next->first - prev->first;
+	auto f = span > 0. ? (t - prev->first) / span : 0.;
+	auto mix = [f] (uint8_t a, uint8_t b) { return static_cast<uint8_t> (std::lround (a + (b - a) * f)); };
+	return CColor (mix (prev->second.red, next->second.red), mix (prev->second.green, next->second.green),
+	               mix (prev->second.blue, next->second.blue), mix (prev->second.alpha, next->second.alpha));
 }
 
 //------------------------------------------------------------------------
@@ -155,7 +222,7 @@ bool CanvasGraphicsDeviceContext::endDraw () const
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 {
-	plotLine (transformPoint (line.first), transformPoint (line.second), frameColor);
+	plotLines ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
 	return true;
 }
 
@@ -163,7 +230,7 @@ bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 bool CanvasGraphicsDeviceContext::drawLines (const LineList& lines) const
 {
 	for (const auto& line : lines)
-		plotLine (transformPoint (line.first), transformPoint (line.second), frameColor);
+		plotLines ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
 	return true;
 }
 
@@ -284,30 +351,37 @@ bool CanvasGraphicsDeviceContext::fillLinearGradient (IPlatformGraphicsPath& pat
                                                       CPoint startPoint, CPoint endPoint,
                                                       bool evenOdd, TransformMatrix* transformation) const
 {
-	(void)path;
-	(void)gradient;
-	(void)startPoint;
-	(void)endPoint;
-	(void)evenOdd;
-	(void)transformation;
-	return false;
+	const auto& stops = gradient.getColorStops ();
+	if (stops.empty ())
+		return false;
+	auto dx = endPoint.x - startPoint.x;
+	auto dy = endPoint.y - startPoint.y;
+	auto len2 = dx * dx + dy * dy;
+	fillPathByPixel (path, evenOdd, transformation, [&] (CPoint p, CColor& color) {
+		auto t = len2 > 0. ? ((p.x - startPoint.x) * dx + (p.y - startPoint.y) * dy) / len2 : 0.;
+		color = gradientColorAt (stops, t);
+		return true;
+	});
+	return true;
 }
 
 //------------------------------------------------------------------------
+// originOffset だけ焦点をずらした放射状。色は焦点からの距離 / radius で求める (楕円形の放射は未対応)。
 bool CanvasGraphicsDeviceContext::fillRadialGradient (IPlatformGraphicsPath& path,
                                                       const IPlatformGradient& gradient,
                                                       CPoint center, CCoord radius,
                                                       CPoint originOffset, bool evenOdd,
                                                       TransformMatrix* transformation) const
 {
-	(void)path;
-	(void)gradient;
-	(void)center;
-	(void)radius;
-	(void)originOffset;
-	(void)evenOdd;
-	(void)transformation;
-	return false;
+	const auto& stops = gradient.getColorStops ();
+	if (stops.empty () || radius <= 0.)
+		return false;
+	auto focal = CPoint (center.x + originOffset.x, center.y + originOffset.y);
+	fillPathByPixel (path, evenOdd, transformation, [&] (CPoint p, CColor& color) {
+		color = gradientColorAt (stops, std::hypot (p.x - focal.x, p.y - focal.y) / radius);
+		return true;
+	});
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -493,6 +567,71 @@ uint8_t* CanvasGraphicsDeviceContext::pixelAt (int32_t x, int32_t y) const noexc
 }
 
 //------------------------------------------------------------------------
+// path の内側の画素ごとに colorAt で色を決めて source-over で置く。colorAt は path と同じ座標 (transformation の逆変換後) の点を受け取る。
+void CanvasGraphicsDeviceContext::fillPathByPixel (IPlatformGraphicsPath& path, bool evenOdd,
+                                                   TransformMatrix* transformation,
+                                                   const std::function<bool (CPoint, CColor&)>& colorAt) const
+{
+	auto bounds = path.getBoundingBox ();
+	if (transformation)
+		transformation->transform (bounds);
+	auto box = pixelBoxOf (bounds);
+	for (auto y = box.y0; y < box.y1; ++y)
+	{
+		for (auto x = box.x0; x < box.x1; ++x)
+		{
+			auto* dst = pixelAt (x, y);
+			if (!dst)
+				continue;
+			CPoint p (x + 0.5, y + 0.5);
+			if (!path.hitTest (p, evenOdd, transformation))
+				continue;
+			CPoint local = p;
+			if (transformation)
+				transformation->inverse ().transform (local);
+			CColor color;
+			if (colorAt (local, color))
+				blendRGBA (dst, color, globalAlpha);
+		}
+	}
+}
+
+//------------------------------------------------------------------------
+// source の srcRect を左上から繰り返して dstRect へ 1:1 で置く。srcRect の整数化した範囲を 1 タイルとする。
+void CanvasGraphicsDeviceContext::tileBitmap (CanvasBitmap& source, CRect srcRect, CRect dstRect,
+                                              double alpha) const
+{
+	const auto& sourceSize = source.getSize ();
+	auto srcWidth = static_cast<int32_t> (sourceSize.x);
+	auto srcHeight = static_cast<int32_t> (sourceSize.y);
+	auto tile = pixelBoxOf (srcRect);
+	auto tileWidth = tile.x1 - tile.x0;
+	auto tileHeight = tile.y1 - tile.y0;
+	if (tileWidth <= 0 || tileHeight <= 0)
+		return;
+	auto box = pixelBoxOf (dstRect);
+	for (auto y = box.y0; y < box.y1; ++y)
+	{
+		auto sy = tile.y0 + (y - box.y0) % tileHeight;
+		if (sy < 0 || sy >= srcHeight)
+			continue;
+		for (auto x = box.x0; x < box.x1; ++x)
+		{
+			auto sx = tile.x0 + (x - box.x0) % tileWidth;
+			if (sx < 0 || sx >= srcWidth)
+				continue;
+			const uint8_t* src = source.data () + (static_cast<size_t> (sy) * srcWidth + sx) * 4;
+			if (src[3] == 0)
+				continue;
+			auto* dst = pixelAt (x, y);
+			if (!dst)
+				continue;
+			blendRGBA (dst, CColor (src[0], src[1], src[2], src[3]), alpha * globalAlpha);
+		}
+	}
+}
+
+//------------------------------------------------------------------------
 void CanvasGraphicsDeviceContext::paintRect (const CRect& rect, const CColor& color, bool blend) const
 {
 	auto box = pixelBoxOf (rect);
@@ -522,71 +661,91 @@ void CanvasGraphicsDeviceContext::strokeRect (const CRect& rect, const CColor& c
 }
 
 //------------------------------------------------------------------------
-// 太さ 1 かつ aliasing は 1 px の Bresenham 線 (端点は四捨五入して画素に置く)。それ以外は plotThickLine で描く。
-void CanvasGraphicsDeviceContext::plotLine (CPoint from, CPoint to, const CColor& color) const
+// 画素ごとに標本点 (AA は 4x4・aliasing は 1 点) の bit mask を bbox 上に持ち、線分ごとに、その線分の bbox を半幅 +1 で広げた範囲だけ標本を立てる。
+// 最後に被覆 (立った標本の割合) を alpha に掛けて 1 回だけ合成する。接合部で辺が重なっても二重に合成しない。
+// 太さ 1 かつ aliasing は Bresenham の画素を立てる (頂点の画素も 1 回だけ合成する)。
+void CanvasGraphicsDeviceContext::plotLines (const PointList& points, bool closed, const CColor& color) const
 {
-	if (lineWidth > 1. || drawMode.antiAliasing ())
-	{
-		plotThickLine (from, to, color);
+	if (points.size () < 2)
 		return;
-	}
-	auto x0 = static_cast<int32_t> (std::lround (from.x));
-	auto y0 = static_cast<int32_t> (std::lround (from.y));
-	auto x1 = static_cast<int32_t> (std::lround (to.x));
-	auto y1 = static_cast<int32_t> (std::lround (to.y));
-	auto dx = std::abs (x1 - x0);
-	auto dy = -std::abs (y1 - y0);
-	auto sx = x0 < x1 ? 1 : -1;
-	auto sy = y0 < y1 ? 1 : -1;
-	auto err = dx + dy;
-	while (true)
-	{
-		blendPixel (x0, y0, color);
-		if (x0 == x1 && y0 == y1)
-			break;
-		auto e2 = 2 * err;
-		if (e2 >= dy)
-		{
-			err += dy;
-			x0 += sx;
-		}
-		if (e2 <= dx)
-		{
-			err += dx;
-			y0 += sy;
-		}
-	}
-}
-
-//------------------------------------------------------------------------
-// 線分から画素中心までの距離で被覆を求める。太さ lineWidth の半分以内を塗る (端は丸い)。
-// aliasing は被覆 0/1 の二値、kAntiAliasing は境界の 1 px を線形に薄めて alpha に掛ける。
-void CanvasGraphicsDeviceContext::plotThickLine (CPoint from, CPoint to, const CColor& color) const
-{
+	const auto segmentCount = closed ? points.size () : points.size () - 1;
+	const bool bresenham = lineWidth <= 1. && !drawMode.antiAliasing ();
 	const auto half = std::max (lineWidth, 1.) / 2.;
-	const bool antiAliasing = drawMode.antiAliasing ();
-	const auto dx = to.x - from.x;
-	const auto dy = to.y - from.y;
-	const auto lengthSquared = dx * dx + dy * dy;
-	auto box = pixelBoxOf (CRect (std::min (from.x, to.x) - half - 1., std::min (from.y, to.y) - half - 1.,
-	                              std::max (from.x, to.x) + half + 1., std::max (from.y, to.y) + half + 1.));
-	auto clip = pixelBoxOf (clipRect);
-	for (auto y = std::max (box.y0, clip.y0); y < std::min (box.y1, clip.y1); ++y)
+	const int sub = drawMode.antiAliasing () ? 4 : 1;
+	CRect bounds (points[0].x, points[0].y, points[0].x, points[0].y);
+	for (const auto& p : points)
 	{
-		for (auto x = std::max (box.x0, clip.x0); x < std::min (box.x1, clip.x1); ++x)
+		bounds.left = std::min (bounds.left, p.x);
+		bounds.top = std::min (bounds.top, p.y);
+		bounds.right = std::max (bounds.right, p.x);
+		bounds.bottom = std::max (bounds.bottom, p.y);
+	}
+	bounds.inset (-half - 1., -half - 1.);
+	auto box = pixelBoxOf (bounds);
+	auto clip = pixelBoxOf (clipRect);
+	box.x0 = std::max (box.x0, clip.x0);
+	box.y0 = std::max (box.y0, clip.y0);
+	box.x1 = std::min (box.x1, clip.x1);
+	box.y1 = std::min (box.y1, clip.y1);
+	if (box.x0 >= box.x1 || box.y0 >= box.y1)
+		return;
+	const auto width = static_cast<size_t> (box.x1 - box.x0);
+	const uint16_t fullMask = static_cast<uint16_t> ((1u << (sub * sub)) - 1u);
+	std::vector<uint16_t> covered (width * static_cast<size_t> (box.y1 - box.y0), 0);
+	auto cover = [&] (int32_t x, int32_t y) -> uint16_t& {
+		return covered[static_cast<size_t> (y - box.y0) * width + static_cast<size_t> (x - box.x0)];
+	};
+	for (size_t i = 0; i < segmentCount; ++i)
+	{
+		const auto& from = points[i];
+		const auto& to = points[(i + 1) % points.size ()];
+		if (bresenham)
 		{
-			const auto px = x + 0.5 - from.x;
-			const auto py = y + 0.5 - from.y;
-			const auto t = lengthSquared > 0. ? std::clamp ((px * dx + py * dy) / lengthSquared, 0., 1.) : 0.;
-			const auto ex = px - t * dx;
-			const auto ey = py - t * dy;
-			const auto distance = std::sqrt (ex * ex + ey * ey);
-			const auto coverage = antiAliasing ? std::clamp (half + 0.5 - distance, 0., 1.)
-			                                   : (distance <= half ? 1. : 0.);
-			if (coverage <= 0.)
+			forEachBresenhamPixel (from, to, [&] (int32_t x, int32_t y) {
+				if (x >= box.x0 && x < box.x1 && y >= box.y0 && y < box.y1)
+					cover (x, y) = 1;
+			});
+			continue;
+		}
+		// 半幅以内の標本点は線分の bbox を半幅 +1 で広げた範囲に必ず入る。それ以外は走査しない。
+		CRect segment (std::min (from.x, to.x), std::min (from.y, to.y), std::max (from.x, to.x),
+		               std::max (from.y, to.y));
+		segment.inset (-half - 1., -half - 1.);
+		auto segBox = pixelBoxOf (segment);
+		for (auto y = std::max (segBox.y0, box.y0); y < std::min (segBox.y1, box.y1); ++y)
+		{
+			for (auto x = std::max (segBox.x0, box.x0); x < std::min (segBox.x1, box.x1); ++x)
+			{
+				auto& bits = cover (x, y);
+				if (bits == fullMask)
+					continue;
+				for (int sy = 0; sy < sub; ++sy)
+				{
+					for (int sx = 0; sx < sub; ++sx)
+					{
+						const auto px = x + (sx + 0.5) / sub;
+						const auto py = y + (sy + 0.5) / sub;
+						if (distanceToSegment (px, py, from, to) <= half)
+							bits |= static_cast<uint16_t> (1u << (sy * sub + sx));
+					}
+				}
+			}
+		}
+	}
+	for (auto y = box.y0; y < box.y1; ++y)
+	{
+		for (auto x = box.x0; x < box.x1; ++x)
+		{
+			const uint16_t bits = cover (x, y);
+			if (bits == 0)
 				continue;
-			if (auto* dst = pixelAt (x, y))
-				blendRGBA (dst, color, globalAlpha * coverage);
+			auto* dst = pixelAt (x, y);
+			if (!dst)
+				continue;
+			int hits = 0;
+			for (int b = 0; b < sub * sub; ++b)
+				hits += (bits >> b) & 1;
+			blendRGBA (dst, color, globalAlpha * (hits / double (sub * sub)));
 		}
 	}
 }
@@ -632,10 +791,7 @@ void CanvasGraphicsDeviceContext::fillPolygon (const PointList& points, const CC
 void CanvasGraphicsDeviceContext::strokePolyline (const PointList& points, bool closed,
                                                   const CColor& color) const
 {
-	for (size_t i = 0; i + 1 < points.size (); ++i)
-		plotLine (points[i], points[i + 1], color);
-	if (closed && points.size () > 2)
-		plotLine (points.back (), points.front (), color);
+	plotLines (points, closed && points.size () > 2, color);
 }
 
 //------------------------------------------------------------------------
