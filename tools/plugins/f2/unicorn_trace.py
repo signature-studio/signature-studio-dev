@@ -16,7 +16,7 @@ import struct
 import pefile
 import unicorn
 from unicorn import (Uc, UcError, UC_ARCH_X86, UC_MODE_64, UC_PROT_ALL, UC_PROT_READ,
-                     UC_PROT_WRITE, UC_HOOK_CODE, UC_HOOK_MEM_WRITE)
+                     UC_PROT_WRITE, UC_HOOK_CODE, UC_HOOK_MEM_WRITE, UC_HOOK_MEM_READ)
 from unicorn.x86_const import (UC_X86_REG_RAX, UC_X86_REG_RBP, UC_X86_REG_RCX, UC_X86_REG_RDX,
                                UC_X86_REG_RSP, UC_X86_REG_RIP)
 
@@ -51,6 +51,9 @@ def main():
     ap.add_argument('-w', action='append', default=[], help='書込み監視範囲 lo:hi (hex)')
     ap.add_argument('-q', action='append', default=[], type=lambda s: int(s, 0),
                     help='実行前後に表示する qword アドレス')
+    ap.add_argument('-R', action='append', default=[], help='読取り監視範囲 lo:hi (hex)。読んだ命令 (rip) ごとに件数を出す')
+    ap.add_argument('-S', action='store_true',
+                    help='user32!LoadStringW を PE の .rsrc (RT_STRING) から返す (uID の block は (uID>>4)+1、16 件ずつ。戻り値は文字数。無いと 0)')
     ap.add_argument('-m', type=int, default=2000000, help='最大命令数')
     ap.add_argument('-d', action='append', default=[], help='実行前に書く qword addr=val (hex)')
     ap.add_argument('-t', action='append', default=[], type=lambda s: int(s, 0),
@@ -59,7 +62,7 @@ def main():
                     help='本体の前に同じメモリ上で順に実行する関数 hex (arena 初期化等。rcx/rdx は -H の host)。'
                          'hex:reg=val,... で、その前処理だけ初期レジスタを与える (DllMain の reason=rdx=1 等)')
     ap.add_argument('-V', action='store_true',
-                    help='kernel32!VirtualAlloc が 64KB 境界で POOL (0x50000000〜) の領域を返す (dwSize=rdx。pool 超過は error を出して 0)')
+                    help='kernel32!VirtualAlloc と kernel32!LocalAlloc が 64KB 境界で POOL (0x50000000〜) の領域を返す (size=rdx。pool 超過は error を出して 0)。LocalAlloc を 0 で返すと DllMain の attach が 0xe2 の致命エラーで longjmp する (#2574)')
     ap.add_argument('-H', action='store_true',
                     help='合成 host: rcx を SCRATCH+0x10000 の host に向け、[host]=vtable (0x40 スロット、全て ret stub)')
     ap.add_argument('-z', action='store_true',
@@ -124,6 +127,24 @@ def main():
                 if nm == 'host' and i == 0:
                     rets[sva] = obj
 
+    strings = {}
+    if a.S:
+        pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_RESOURCE']])
+        for t in pe.DIRECTORY_ENTRY_RESOURCE.entries:
+            if t.id != 6:
+                continue
+            for b in t.directory.entries:
+                ent = b.directory.entries[0].data.struct
+                d = pe.get_data(ent.OffsetToData, ent.Size)
+                pos = 0
+                for i in range(16):
+                    n = struct.unpack_from('<H', d, pos)[0]
+                    pos += 2
+                    if n:
+                        strings[(b.id - 1) * 16 + i] = d[pos:pos + 2 * n].decode('utf-16-le')
+                        pos += 2 * n
+        print('rsrc strings: %d' % len(strings))
+
     hits = {}
     log = []
 
@@ -157,16 +178,25 @@ def main():
             print(info)
         if addr in names:
             hits[names[addr]] = hits.get(names[addr], 0) + 1
-            if a.V and names[addr].lower() == 'kernel32.dll!virtualalloc':
+            if a.V and names[addr].lower() in ('kernel32.dll!virtualalloc', 'kernel32.dll!localalloc'):
                 size = uc_.reg_read(UC_X86_REG_RDX)
                 need = (size + 0xffff) & ~0xffff
                 if pool[0] + need > POOL + POOL_SIZE:
-                    print('error: VirtualAlloc dwSize=%#x は pool の残り %#x を超える (戻り 0)' % (
-                        size, POOL + POOL_SIZE - pool[0]))
+                    print('error: %s size=%#x は pool の残り %#x を超える (戻り 0)' % (
+                        names[addr], size, POOL + POOL_SIZE - pool[0]))
                     uc_.reg_write(UC_X86_REG_RAX, 0)
                 else:
                     uc_.reg_write(UC_X86_REG_RAX, pool[0])
                     pool[0] += need
+            elif a.S and names[addr].lower() == 'user32.dll!loadstringw':
+                uid = uc_.reg_read(UC_X86_REG_RDX)
+                buf = uc_.reg_read(unicorn.x86_const.UC_X86_REG_R8)
+                cch = uc_.reg_read(unicorn.x86_const.UC_X86_REG_R9)
+                s = strings.get(uid, '')
+                w = s[:max(cch - 1, 0)]
+                if s and cch:
+                    uc_.mem_write(buf, w.encode('utf-16-le') + b'\0\0')
+                uc_.reg_write(UC_X86_REG_RAX, len(w) if s else 0)
             else:
                 uc_.reg_write(UC_X86_REG_RAX, rets.get(addr, 0))
 
@@ -175,10 +205,21 @@ def main():
             rip = uc_.reg_read(UC_X86_REG_RIP)
             log.append('  write %#x size=%d val=%#x rip=%#x' % (addr, size, value, rip))
 
+    rreads = collections.Counter()
+    rfirst = {}
+
+    def on_read(uc_, access, addr, size, value, ud):
+        rip = uc_.reg_read(UC_X86_REG_RIP)
+        rreads[rip] += 1
+        rfirst.setdefault(rip, addr)
+
     uc.hook_add(UC_HOOK_CODE, on_code)
     for item in a.w:
         lo, hi = item.split(':')
         uc.hook_add(UC_HOOK_MEM_WRITE, on_write, begin=int(lo, 16), end=int(hi, 16) - 1)
+    for item in a.R:
+        lo, hi = item.split(':')
+        uc.hook_add(UC_HOOK_MEM_READ, on_read, begin=int(lo, 16), end=int(hi, 16) - 1)
 
     for q in a.q:
         print('before [%#x] = %#x' % (q, struct.unpack('<Q', uc.mem_read(q, 8))[0]))
@@ -224,6 +265,10 @@ def main():
     print('watch writes (%d shown):' % len(log))
     for line in log:
         print(line)
+    if a.R:
+        print('watch reads (%d rip, %d reads):' % (len(rreads), sum(rreads.values())))
+        for rip, c in sorted(rreads.items()):
+            print('  rip=%#x reads=%d first addr=%#x' % (rip, c, rfirst[rip]))
 
 
 if __name__ == '__main__':
