@@ -97,7 +97,9 @@ const result = {
   reach, reach_summary: sum && sum.replace(/^.*GUI-REACH-SUMMARY /, ''),
   failfast_apis: failfast, softstub_apis: softstub, failfast_count: num(mod._gf_failfast_count),
   gui_icall_calls: num(mod._gf_icall_count), gui_ring_discarded: num(mod._gf_ring_discarded),
-  icall_miss: num(mod._m11_icall_miss), m11_stub_total: num(mod._m11_stub_total), m11_stubs: stubs, probes,
+  icall_miss: num(mod._m11_icall_miss), icall_miss_uniq: num(mod._m11_icall_miss_uniq),
+  icall_miss_targets: Array.from({ length: num(mod._m11_icall_miss_uniq) || 0 }, (_, i) => '0x' + (mod._m11_icall_miss_at(i) >>> 0).toString(16)),
+  m11_stub_total: num(mod._m11_stub_total), m11_stubs: stubs, probes,
   va_calls: num(mod._m11_va_calls), va_bytes: num(mod._m11_va_used),
 };
 const json = JSON.stringify(result);
