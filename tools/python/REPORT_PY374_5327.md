@@ -12,7 +12,7 @@
 
 ## 手段
 
-- 展開: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先>` (全体展開 11 秒)。`FL_WIN64_DIR=<展開先>`・`extracted/block00031_PE.bin`。
+- 展開: 素材 `[WIN64]` (fl-win64) を `tar --zstd -xf <素材> -C <展開先>` で展開 (全体展開 11 秒)。`FL_WIN64_DIR=<展開先>`・`extracted/block00031_PE.bin`。
 - 逆アセンブル: `cd tools/python && FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>`。本文の命令列はこのコマンドで読んだもの。
 - RIP 相対の先は手計算 (次命令のアドレス + disp32)。検算: `0xd7d55d + 0x1b3 = 0xd7d710`、`0xd7d575 + 0x19b = 0xd7d710`、`0xd7d5db + 0x13d = 0xd7d718`。読んだ定数: `0xd7d710` = 0.4999999701976776 (double)、`0xd7d718` = 2.0。
 - 引数の位置: `0xd7d460` の `rbp` は entry の `rsp - 0xd8`。5 番目以降の stack 引数は `[rbp+0x100]`・`[rbp+0x108]`・`[rbp+0x110]`・`[rbp+0x118]` に入る (entry + 0x28 / 0x30 / 0x38 / 0x40 を `rbp = entry - 0xd8` で換算)。
