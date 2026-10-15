@@ -125,7 +125,7 @@
 | 0x5dfbe0 | rc_chop | 0 / 0 | fldcw (RC=chop) を含む 80-bit 中間値を f64 で近似していた | §18.4 と同じ ext pass (`f80_lower --ext`) を適用 |
 | 0x5dfc90 | rc_chop | 0 / 0 | 同上 | 同上 |
 | 0x5dfdb0 | rc_chop | 0 / 0 | 同上 | 同上 |
-| 0x5dffc0 | f64mem | 0 / **0** (§22 で修正後) | a/b の入替え + `(1+a)·K` → `fsincos` → sin/cos。修復前は sin/cos を `llvm.sin/cos.f80` (host の sinl) で近似していた。x87 fsincos は 66-bit π で縮約するため差が出る (§22) | 本体 (IR の縮約を §22 で置換) |
+| 0x5dffc0 | f64mem | 0 / **0** (§23 で修正後) | a/b の入替え + `(1+a)·K` → `fsincos` → sin/cos。修復前は sin/cos を `llvm.sin/cos.f80` (host の sinl) で近似していた。x87 fsincos は 66-bit π で縮約するため差が出る (§23) | 本体 (IR の縮約を §23 で置換) |
 | 0x5df340 | sse | 0 / 0 | 4 lane の乗数ランプ (vector ごとに +d)。端数は生の arg5 を加算。IR は乗数を定数化していた | 本体 (SIMD の加算順を再現) |
 | 0x5e03f0 | sse | 0 / 0 | `@global_var_6fffb0` が 0 初期化。PE の 0x6FFFB0 は (0.5, 0.5) | GLOBAL_INITS で初期値を設定 |
 | 0x5e12c0 | sse | 0 / 0 | in-place clip (|x| < C なら 0) の IR 誤り | 本体 |
@@ -139,7 +139,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x5dffc0 の残差 (10000 case で buf_diff=3) | 解消 (§22。測定 commit `9e49eb950`) | #3280 [P0c-19] (解消) |
+| 0x5dffc0 の残差 (10000 case で buf_diff=3) | 解消 (§23。測定 commit `9e49eb950`) | #3280 [P0c-19] (解消) |
 | 手書き本体 (k80_hand_bodies.py) を lift 側の一般修正に置き換えていない。RetDec raw lift の x87 スタック参照・xmm2/xmm3 入替の根本原因は未特定 | 同型の誤りを他 kernel で自動検出できない。本体は関数単位で保守が必要 | #3281 [P0c-20] |
 
 ### 19.4 silent miscompile 類型の行案 (docs/DEFECTS.md 形式・PM 判断で採否を決める)
@@ -176,7 +176,7 @@
    1 file changed, 1 insertion(+), 1 deletion(-)
   ```
   差分はコメント 1 行のみ。IR 出力は変わらない (`work/diff3/k80.hb.ll` を変更前の出力と `cmp` で byte 一致)。`1224865b` で `p0c4_abi_e2e.py 2000` を再実行: rc 0・27.8 秒・`run=67 ok=67 sig11=0`・全 67 kernel buf_diff=0。p0c_e2e.sh と 10000 case は `5d168e1e` の値をそのまま使う (実行される IR と実行コードは同一)。
-- 0x5dffc0 の 10000 case 残差は §22 で解消 (測定 commit `9e49eb950`)。80 本の完全判定 (#2182 の §18.6) は未変更。
+- 0x5dffc0 の 10000 case 残差は §23 で解消 (測定 commit `9e49eb950`)。80 本の完全判定 (#2182 の §18.6) は未変更。
 
 ## 20. #197: 未測定 13 kernel と Group B 12 kernel の分類
 
@@ -221,46 +221,13 @@ abi-mismatch 1 本:
 
 - **§18.6 の訂正**: 0x5e12b0 の旧担当 #938 (`[T-SH-22]`) は libkio の受入 (`Fix_RCSf` / `LimitFloat_RCSfff` 40/40) で 2026-10-14 に closed。0x5e12b0 はその受入範囲に含まれない。open の担当が無かったため #3439 [P0c-21] を起票した (親 #197)。#3439 で 0x5e12b0 は修復済み (`REPORT_APPENDIX_I.md` §21)。
 - open のまま残る P0c 系 issue (PM の close 条件表には無いが、80 本の bit-exact に効く):
-  - #3280 [P0c-19]: 0x5dffc0 の 10000 case buf_diff=3 は §22 で 0 (解消)
+  - #3280 [P0c-19]: 0x5dffc0 の 10000 case buf_diff=3 は §23 で 0 (解消)
   - #3281 [P0c-20]: RetDec raw lift の x87 スタック参照・xmm 入替えの一般 pass 化 (手書き本体 `k80_hand_bodies.py` の削減)
   - #1283 [P0c-16]: ext 鎖の f80 2 本と hs_e2e の skip 原因 (依存: #2510・#2566 は open)
 - Group B 12 本: §20.3 のとおり数値差分の対象外。扱いは PM 判断。
-- 結論: 未測定 13 本の分類は本節で記録した。#197 の close は、上の open な担当 issue (#1283・#3280・#3281) の扱い (0x5e12b0 は #3439 で修復済み。#3280 は §22 で解消)と Group B 12 本の扱いを PM が決めてからになる。
+- 結論: 未測定 13 本の分類は本節で記録した。#197 の close は、上の open な担当 issue (#1283・#3280・#3281) の扱い (0x5e12b0 は #3439 で修復済み。#3280 は §23 で解消)と Group B 12 本の扱いを PM が決めてからになる。
 
-## 22. #3280: 0x5dffc0 の 10000 case 残差 (x87 fsincos の縮約) の解消
+## 23. #3280: 0x5dffc0 の 10000 case 残差の解消
 
-### 22.1 結果
-
-- 測定 commit: `9e49eb950` (`k80_hand_bodies.py` の `function_5dffc0` のみ変更)。修正前の基準は `c2324dea6`。
-- `k80_diff.py --cases 10000 --only 0x5dffc0`: 修正前 buf_diff=3 (maxulp 535) → 修正後 **buf_diff=0** (maxulp 0)。
-- `k80_diff.py --cases 100000 --only 0x5dffc0` (修正後): buf_diff=0・16 秒。
-- `p0c4_abi_e2e.py 2000` (修正後): rc 0・29 秒・`run=68 ok=68 sig11=0`・CSV 全 68 kernel buf_diff=0。
-- `p0c_e2e.sh` (修正後): rc 0・`== e2e OK ==`・9 秒。kernel_matrix と k80 lift は work/ の既存物を使った (skip)。完全再生成の所要は 508 秒 (修正前の `c2324dea6` の main checkout で測定)。
-
-### 22.2 原因 (機械語と高精度計算での突き合わせ)
-
-修正前に 10000 case で残った 3 件 (driver の debug 出力で特定。`a` は xmm2 の f32、`t = (1+a)·K`、`K` は double の π/4):
-
-| cs | 出力 | a | t (80-bit) | k・象限 | native (機械語) | IR (sinl) | 厳密 sin/cos | 66-bit π 縮約 |
-|---:|---|---|---|---|---|---|---|---|
-| 2423 | p1 = sin·be | -0x1.5484p+14 | -17115.396776757 | -10896・0 | 9.478545059948829e-09 | 9.478857698752563e-09 | 9.478857698752563e-09 | 9.478545059948829e-09 |
-| 5417 | p0 = cos·be | -0x1.a1b8p+13 | -10497.631851970 | -6683・1 | 2.4061150360137453e-15 | 2.406194657110787e-15 | 2.406194657110787e-15 | 2.4061150360137453e-15 |
-| 7535 | p0 = cos·be | 0x1.bcdp+12 | 5590.464127063 | 3559・3 | 1.1225849416707234e-10 | 1.1226220647531093e-10 | 1.1226220647531093e-10 | 1.1225849416707234e-10 |
-
-- 3 件とも、native は「t を `k·π66/2` (π66 = π を 66 bit に丸めた値) で引いた r の sin/cos」と f32 まで一致する。厳密な π で引いた値とは一致しない。IR の `llvm.sin/cos.f80` (host の sinl) は厳密値と一致する。
-- 残差 r は約 1e-13 (|t| が π/2 の整数倍に近い) なので、π66 の誤差 (k·2^-66 程度) が r に対して相対 1e-4 程度になり、f32 で数百 ulp の差になる (maxulp 535 と整合)。
-- 結論: x87 の `fsincos` は 66-bit の π で縮約する、と仮定すると 3/3 件が一致する。
-
-### 22.3 修復
-
-`function_5dffc0` の IR で sin/cos の呼出しを次の縮約に置き換えた (他の kernel は不変)。
-
-- `k = rint(t·2/π)`。`r = (t − k·H1) − k·H2`。`H1 = 0xK3FFFC90FDAA200000000`、`H2 = 0xK3FDD85A308D300000000` で、`H1 + H2 = π66/2` が厳密に成り立つ (残差 0)。`k·H1` と `k·H2` は厳密。
-- `sin(r)`・`cos(r)` は `llvm.sin/cos.f80`。`k mod 4` で象限を選ぶ (sin: 0:+sr 1:+cr 2:−sr 3:−cr / cos: 0:+cr 1:−sr 2:−cr 3:+sr)。
-- 適用範囲: `k·H1` が厳密なのは |k| < 2^32 (|t| < 2^32·π/2)。本 kernel の harness 入力域 (|a| ≤ 2^15) は内側。|t| が 2^32 を超える域は未確認 (native の分岐は |t| < 2^63)。
-
-### 22.4 未解決
-
-- なし (#3280 の受入 1 (10000 case buf_diff=0)・2 (2000 case 全 kernel 0 の維持)・3 (原因の記録) を満たす)。
-- 手書き本体 (`k80_hand_bodies.py`) の一般 pass 化は #3281 [P0c-20] (open) の範囲で、本節の変更では減らない。
-
+- 測定 commit `9e49eb950`。`k80_diff.py --cases 10000 --only 0x5dffc0` は buf_diff 3 → 0、100000 case も 0。2000 case の全 68 kernel buf_diff=0 を維持。
+- 原因 (x87 fsincos の 66-bit π 縮約) と修復 (IR の縮約) の詳細は `REPORT_APPENDIX_J.md` §23。
