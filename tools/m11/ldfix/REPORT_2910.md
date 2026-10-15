@@ -15,7 +15,7 @@
 ## 1. 測定条件
 
 - 測定 commit: `170bc1639` (コードを変えた最後の commit: `fix(m11): repair spill TRUE_DROP sites by call-argument flow (#2910)`)。起点 `origin/main` = `4868fc52b`。作業 worktree `ws-2910` (branch `2910-spill-equal-read-repair`)。
-- 素材: `work-m11` を `$RUNNER_TEMP/m11work` に展開し、`M11_WORK=<その tools/m11/work>` で指定 (`tools/m11/work/` への展開は行わない)。emcc は runner の `[EMSDK]` (`/opt/emsdk`)。`work-liftdiff` は本 e2e では未使用 (受入の `oc_artifacts` 行には残す)。`work-m11` は #516 以前の snapshot なので、結論はこの IR に限る (`REPORT_1169.md` §1 と同じ)。
+- 素材: `work-m11` を `$RUNNER_TEMP/m11work` に展開し、`M11_WORK=<その tools/m11/work>` で指定 (`tools/m11/work/` への展開は行わない)。emcc は runner の `[EMSDK]` (`docs/REFERENCES.md`)。`work-liftdiff` は本 e2e では未使用 (受入の `oc_artifacts` 行には残す)。`work-m11` は #516 以前の snapshot なので、結論はこの IR に限る (`REPORT_1169.md` §1 と同じ)。
 - 実行: `M11_WORK=... TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground)。
 - 実測 (測定 commit `170bc1639`、n=2): real **47.37 s / 47.63 s**、rc **0 / 0**、load average (1 分) 実行前 0.50、終了後 0.90。
 - 基準 (修復前。`origin/main` の script で同じ e2e を 1 回): real 46.50 s、rc 0、load average (1 分) 終了後 0.91。
