@@ -163,7 +163,9 @@ mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜940 の `clo
 - trap: 入口の後に間接 dispatch の記録が無いため、trap は `0x1375990` の本体内、または直接呼出し先 (直接 call は dispatch 記録に出ない) で起きたと読める。地点は未特定。
 - API 段 (S12〜S22) の到達: 記録しているのは soft 呼出しだけで、0 件。`RegisterClassW`・`CreateWindowExW` は shimx の実装にも curated にも無く、gen_boot.py の規則で soft スタブになるため、呼出しが有れば `soft_called` に出ていた。実装済み shim (getmem・getproc 等) の呼出しは CFI について計数していない。
 - soft 名の表示: `fle_boot.mjs` の `softSnap`・`soft_called`・`soft_top` は C 文字列のポインタ番号を名前として出す (既存の欠陥。#3969 [WIN-41] で直す)。CFI 中の soft 0 件の判定は件数の差分で行うため、この結論は表示に依存しない。
-- trap 地点の特定は #3969 [WIN-41] の範囲。本 issue では観測までに留める。
+- trap 地点 (#3969 [WIN-41]・測定は `UTF8ToString` 修正後の HEAD で実施。`cfi.stack` の診断フィールドは後から足したため、結果 JSON の既存 `cfi` には無い。計数は変わらず。mode 1 と mode 2 とも同じ): wasm の関数名を出す `-g --profiling-funcs` で再 link (`tools/flelift/work/boot/tm/`・gitignore) し、`fle_boot.mjs` の `cfi.stack` (例外スタック) で読んだ。呼出し chain は `0x1375990` → `0x13752f0` → `0x1105350` → `0x5af120` → `0x410320` (最内で oob)。`0x410320` は dl=1 のとき `call [rax-0x30]` の間接 call を行う関数 (`REPORT_APPENDIX_3652.md` §3.2 の記述。同じ VA の関数と推定)。つまり trap は CFI 本体の直接呼出し先の中、メモリ間接 call の受け手の段で起きている。受け手の vtable 実体は未確定。
+- 注: 既定の `-O0` のまま名前を出すため `-g --profiling-funcs` を足して link したもので、`fleboot_plain.cjs.wasm` の関数 index とは一致しない (別 wasm)。VA は関数名 (`f_<VA>`) で読む。
+- soft 名の表示 (#3969 [WIN-41] の 2 件目): `fle_boot.mjs` の `softSnap`・`softs` で `m.UTF8ToString` を通すよう直した。`soft_top` に `LoadImageW:21`・`GetStockObject:7`・`RegisterClassW:1`・`CreateWindowExW:1` など名前で出ることを 2 mode で確認 (`boot_summary_fle6_tol.json`・`..._tol2.json`)。CFI 呼出し中の `soft_called` は 0 件 (変わらず)。
 
 ## 8. 製品 KPI の前後 (PR 本文の表と同じ値)
 
@@ -181,8 +183,9 @@ mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜940 の `clo
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| CFI (0x1375990) の trap 地点と、CS 0x12bd390 の登録経路 | 最初のウィンドウ未達。S12〜S22 の到達なし | #3969 [WIN-41] (起票。#3077 [WIN-16] は部分達成で close 済み) |
-| soft 名の表示 (`softSnap`・`soft_top`・`soft_called` が C 文字列のポインタ番号を出す。`UTF8ToString` を通していない) | CFI の結論には影響しない (件数差分で判定・CFI 中の soft 0 件)。名前の読み取りは未了 | #3969 [WIN-41] (起票。#3077 [WIN-16] は部分達成で close 済み) |
+| CFI (0x1375990) の trap 地点: 最内 `0x410320` まで特定。受け手の vtable 実体 (間接 call 先) は未確定 | 最初のウィンドウ未達。S12〜S22 の到達なし | #3969 [WIN-41] (部分達成。残りは子 issue へ) |
+| `boot_metric.py` の S1 locator (`tools/startup/boot_metric.py` 464 行) が、#3832 で REPORT から移した `測定 commit ・judge ・S1` 文言を探して失敗する。main でも同じ失敗 | `boot_metric.json` を再生成できない (`--check` も失敗)。§7 の文言反映は未反映 | 子 issue (#3969 から起票・番号は PR 本文) |
+| soft 名の表示 | 解決済み (`UTF8ToString` を通した) | - |
 | unit 245 (VA 0x733090) の ExitProcess (RunError 経路) の原因と、`f_6a7b70` の広域ゼロ埋めの範囲 | 寛容起動が 245 で fatal 扱いになる。clobber 695 の原因 | #3060 [FLE-11] (既存) |
 | 補修 (mode 2) の妥当性。戻す範囲の外の欠落 (R1) | mode 2 の ok 811 の確度 | #3060 (受入に追加済み) |
 | x64c の寛容起動レコードを `tools/startup/boot_metric.json` に追加 | 受入 6 (WIN-2 と同一スキーマ) | #3147 [WIN-17] |

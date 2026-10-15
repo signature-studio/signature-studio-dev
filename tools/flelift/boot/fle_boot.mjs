@@ -298,7 +298,7 @@ console.log('FLEBOOT_OUTMEM ' + JSON.stringify({ full: outMem.full, no_cstack: o
 // ---------------- CreateFruityInstance 観測 (#2719) ----------------
 // 寛容起動の後で CreateFruityInstance (0x1375990) を 1 回呼ぶ。soft (未実装 import) の呼出し回数の差分で、
 // 呼出中に現れた API 名を記録する (RegisterClassW / CreateWindowExW の自然到達の有無)。
-const softSnap = () => { const mp = new Map(); for (let i = 0; i < Number(m._fle_n_soft_uniq()); i++) mp.set(m._fle_soft_name(i), Number(m._fle_soft_count(i))); return mp; };
+const softSnap = () => { const mp = new Map(); for (let i = 0; i < Number(m._fle_n_soft_uniq()); i++) mp.set(m.UTF8ToString(m._fle_soft_name(i)), Number(m._fle_soft_count(i))); return mp; };
 let cfi = null;
 if (TOLERANT) {
     const CFI_VA = 0x1375990;
@@ -313,6 +313,8 @@ if (TOLERANT) {
         va: '0x' + CFI_VA.toString(16),
         rc: cerr ? null : '0x' + BigInt.asUintN(64, BigInt(cr)).toString(16),
         threw: cerr ? classify(cerr) : null,
+        // trap 地点の手掛かり: wasm の例外スタック (関数 index → VA は fle_lifted の対応表で引く)
+        stack: cerr && cerr.stack ? String(cerr.stack).split('\n').slice(0, 12).join('\n') : null,
         longjmp: Number(m._fle_n_longjmp()) - lj0, exit: Number(m._fle_n_exit()) - e0,
         // dispatch リングの末尾 4 件 (CFI 呼出し中の最後の関数 VA。trap 地点の推定に使う)
         last_dispatch: [124, 125, 126, 127].map((k) => '0x' + (Number(m._fle_ring_at(k)) >>> 0).toString(16)),
@@ -363,7 +365,7 @@ if (SURVEY) {
 }
 
 const softs = [];
-for (let i = 0; i < Number(m._fle_n_soft_uniq()); i++) softs.push(`${m._fle_soft_name(i)}:${m._fle_soft_count(i)}`);
+for (let i = 0; i < Number(m._fle_n_soft_uniq()); i++) softs.push(`${m.UTF8ToString(m._fle_soft_name(i))}:${m._fle_soft_count(i)}`);
 softs.sort((a, b) => Number(b.split(':')[1]) - Number(a.split(':')[1]));
 
 // FLE-15 (#3770): 画素ストア 0x6bbc20 の計数 (fle_boot.c px_probe)。呼出し点 ret=0x6c9380 (f_6c9280 の 0x6c937a 直後) の回数と矩形
