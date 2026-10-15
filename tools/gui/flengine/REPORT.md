@@ -477,7 +477,3 @@ PM 指示: 「main でも同じ 870 vs 872 なら既存の欠陥、違えば本 
 **R2 の FAIL は回避の副作用の可能性が高い (未確定)**: 回避後の main では `EnumDisplayMonitors` / `GetMonitorInfoW` が reach に出ず (`missing=['EnumDisplayMonitors', 'GetMonitorInfoW']`、reached 30 ≥ floor 19 だが欠落 2 件で FAIL)。直前の main 測定 (§6e、ソース側で重複を削除した版) では R2 PASS の 13/14 だった。回避方法で R2 が変わるため、本節の R2 は main の欠陥の根拠にしない。S1 の値は両方法で `870/1/47/24/0` と一致する。
 
 **結論**: S1 の `870/1/47/24/0` (base `872/1/47/22/0`) は `origin/main` (`b4a8422c`) でも同一。**PR #577 の変更が原因ではない**。S1 は FAIL のまま (判定を緩和していない)。原因の追跡は子 issue **#1442** (`[GUI-21]`、親 #564)。#1275 (`[M11-N78]`) とは対象 unit が一致するが、同一原因か・同系統かは未確認 (機械語・IR の突合は未実施)。
-
-## 6k. WIN-21 (#3352) の S1 unit 差と現 HEAD の実測
-
-`REPORT_APPENDIX_3352.md` §6k に移動 (測定 commit `c3ee6daa7`)。S1 の差は unit 304・555 の 2 件のみ (base OOB trap・soft ok)。judge は 12/14 (B1 と S1 が FAIL)。判定式は変えていない。
