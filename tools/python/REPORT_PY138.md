@@ -11,7 +11,7 @@
 - **setMapItemTarget は保留**。flapi の戻り型は `int` だが、PE の成功経路は int 変換を通らない。項目書込みの取得関数 0x416750 も未確定 (#3745)。
 - **-2 のゲートは `general.safeToEdit` (0xd6a2c0) と同じ述語** `[0x15e4790]→[+8]→vt[+0x98]` を見る。例外化の判定 (0xd82c20 の負の code 経路の `vt[+0x88]`) は、オブジェクトが実行時に作られるため静的に同定できない (#3746)。
 - **持ち越し 1〜3 は未確定**。確定に必要な情報を §持ち越し に書いた (#3746)。
-- 件数 (`length`) は仮置き 0 のまま変えない。provider_check は 実装 162→**165**・未実装 273→**270** (本 PR 単独)。main (`1d04852b0`・PY-130 #3007 の pe130 3 件と PY-132 #3013 の pe132 3 件を含む) の取り込み後は 168→**171**・267→**264** (§検証)。
+- 件数 (`length`) は仮置き 0 のまま変えない。provider_check は 実装 162→**165**・未実装 273→**270** (本 PR 単独)。main (`93202140d`・PY-130 #3007 の pe130 3 件と PY-132 #3013 の pe132 3 件を含む) の取り込み後は 168→**171**・267→**264** (§検証)。
 
 ## 手段
 
@@ -61,27 +61,27 @@
 
 ## 検証
 
-測定 commit: `04a50c667` (コードを変えた最後の commit。main `1d04852b0` の取り込み merge。競合は `tests/provider_check.mjs` の 1 件 (main の `pe132` と本 PR の `pe138` を判定集合の両方に入れた) で、期待値を 実装 171・未実装 264 に更新)。途中の取り込み (`f8600e9c6`・`24ec522f5`) と取り込み前の測定 (`fa78f9a1a`・実装 165・未実装 270) は Git 履歴に残し、本節では置き換えた。
-環境: runner (4 core、測定時の load average 0.49 (1 分平均)、node 22.23.3、emcc 6.0.12 ([EMSDK]))。素材 `fl-win64` の `block00031_PE.bin` と DATA 4 件を `$RUNNER_TEMP/fl-win64` へ展開 (`FL_WIN64_DIR`・2.8 秒)。
+測定 commit: `b6b2fb505` (コードを変えた最後の commit。main `93202140d` の取り込み merge。競合はなし)。直前の取り込みの測定 (`04a50c667`・main `1d04852b0`・実装 171・未実装 264。競合は `tests/provider_check.mjs` の 1 件で、main の `pe132` と本 PR の `pe138` を判定集合の両方に入れた) と、取り込み前の測定 (`fa78f9a1a`・実装 165・未実装 270) は Git 履歴に残し、本節では置き換えた。
+環境: runner (4 core、測定時の load average 0.87〜1.30 (1 分平均)、node 22.23.3、emcc 6.0.12 ([EMSDK]))。素材 `fl-win64` の `block00031_PE.bin` と DATA 4 件を `$RUNNER_TEMP/fl-win64` へ展開 (`FL_WIN64_DIR`・2.8 秒)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `fetch_inputs.sh` | rc 0 | 0.7 s |
+| `fetch_inputs.sh` | rc 0 | 0.7 s (取り込み前の測定時) |
 | `build_cpython_wasm.sh` (32 bit) | rc 0 (本 HEAD で増分。クリーンビルドは `f8600e9c6` 系で rc 0・244.7 s。`build_cpython_wasm.sh`・`build_flpy.sh`・`src/` は main 取り込みで差分 0) | 0.9 s |
 | `FLPY_SKIP_TABLE=1 build_flpy.sh` | rc 0 | 6.0 s |
-| `provider/build.sh` | rc 0 (`dist/flprov.wasm`) | 1.1 s |
+| `provider/build.sh` | rc 0 (`dist/flprov.wasm`。main 取り込みで `fl_engine.c` が変わったため再ビルド) | 1.1 s |
 | `pe_launchmap_entries.py` | 12/12 OK (entry・fn・flags・docstring が flapi と一致) | 0.09 s |
-| `node tests/provider_check.mjs` | PASS (functions 435 / implemented 171 / unimplemented 264 / mcp_static 60) | 0.35 s |
+| `node tests/provider_check.mjs` | PASS (functions 435 / implemented 171 / unimplemented 264 / mcp_static 60) | 0.36 s |
 | `node tests/launchmap_diff.mjs` | calls 15・diffs 0・PASS | 0.05 s |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true | 2.1 s |
-| `tests/*_diff.mjs` (launchmap・ui_browser・ui_state・ui_display・arrangement・arrangement_selection・channels・device・general・mixer・patterns・patterns_group・playlist・screen・step_item・transport・ui・midi_path・note_enum の 19 件) | 全て rc 0・diffs 0 | 19 件合計 1.9 s |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true | 2.2 s |
+| `tests/*_diff.mjs` (launchmap・ui_browser・ui_state・ui_display・arrangement・arrangement_selection・channels・device・general・mixer・patterns・patterns_group・playlist・screen・step_item・transport・ui・midi_path・note_enum・plugins の 20 件) | 全て rc 0・diffs 0 | 19 件 (launchmap を除く) 合計 1.8 s |
 | 負のコントロール: mock の `createOverlayMap` の引数個数を `4,4` から `3,4` に緩める | `launchMapPages 差分 1 件` で rc 1 (検出)。mock を元に戻して rc 0 | — |
 
-- main 取り込みで入った tools/python の変更 (`fa78f9a1a` から測定 commit まで・19 ファイル・+1986/−21) も、上の測定に含めて測定した。
+- main 取り込みで入った tools/python の変更 (`fa78f9a1a` から測定 commit まで) も、上の測定に含めて測定した。
 - コード差分 (測定 commit 以降、テスト・mock・C・解析に効く範囲): 下の出力を最終 HEAD で取った (REPORT と PR 本文の変更のみ)。
 
 ```
-$ git diff 04a50c667 HEAD -- tools/python ':!*.md'
+$ git diff b6b2fb505 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
