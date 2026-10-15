@@ -1,4 +1,5 @@
-/* native_vocalfilter.c — VocalFilter snapin process (SlateCore 0x1808e1f30) を実機機械語で実行する参照ハーネス。
+/* native_vocalfilter.c — VocalFilter snapin process (SlateCore 0x1808e1fa0) を実機機械語で実行する参照ハーネス。
+ * 0x1808e1f30 は deleting destructor (vtable 書換え + free(this, 0x120)) なので process ではない (#4071 で訂正)。
  *   ./native_vocalfilter <core> <scen.txt> [fma]
  * native_filter.c と同じ方式 (FA_IAT・FA_POKES・IAT 束縛)。
  * シナリオ: sidx ncalls { nW {region off val}* n L[n] R[n] }*  region 0=S 1=P 2=ctx (+0x10 で 1 byte 書込)
@@ -13,7 +14,7 @@ int main(int argc, char** argv) {
     if (getenv("FA_IAT_ALL")) patch_iat_all(); else patch_iat(getenv("FA_IAT") ? getenv("FA_IAT") : "iat_slots.txt");
     patch_pokes(getenv("FA_POKES") ? getenv("FA_POKES") : "pokes.txt");
     volatile int* fma = (int*)0x1813070f8ULL; int fma_v = argc > 3 ? atoi(argv[3]) : 0;
-    proc_t fn = (proc_t)0x1808e1f30ULL;
+    proc_t fn = (proc_t)0x1808e1fa0ULL;
     FILE* fp = fopen(argv[2], "r"); if (!fp) { perror("scen"); return 2; }
     static char line[1 << 22]; static unsigned long tok[1 << 20];
     int guard_viol_total = 0;

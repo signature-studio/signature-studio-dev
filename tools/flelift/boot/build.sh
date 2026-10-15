@@ -72,7 +72,7 @@ cc "$HERE/fle_boot.c"      "$W/obj/${LBL}_boot.o"    $CCF $CHKF -I"$FLE/rt" -I"$
 OBJS="$LIFTED_OBJS $W/obj/${LBL}_data.o $W/obj/${LBL}_cpu.o $W/obj/${LBL}_glue.o $W/obj/${LBL}_bridge.o $W/obj/${LBL}_tw.o $W/obj/${LBL}_boot.o"
 [ $NOSX = 1 ] || OBJS="$OBJS $W/obj/sx_*.o"
 emcc $OBJS -o "$W/fleboot_$LBL.cjs.tmp" \
-  $OPT -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 \
+  $OPT ${FLE_EXTRA_LDF:-} -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 \
   -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=flebootcreate -sEXIT_RUNTIME=1 \
   -sEXPORTED_FUNCTIONS=$EXPORTS -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPU32 \
   -Wl,--initial-memory=$((0x36000000)) -Wl,--max-memory=$((0x36000000)) 2> "$W/link_$LBL.log" || { tail -40 "$W/link_$LBL.log"; exit 1; }
