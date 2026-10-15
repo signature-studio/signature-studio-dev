@@ -79,10 +79,10 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 | `ctor_heap_probe.mjs 145` (対照) | 完了 (wall 1 s)・`bytes_per_ctor` 3673793 | 同上 |
 
 観察 (本 run で確認した数値):
-- ctor 1 回で wasm heap の先頭が約 3.67 MB 進む (`bytes_per_ctor` 3673793)。`ctor` は `operator new` (`f_1801a04d0`・`f_1801a7794`) で `0x40000` などを 6〜14 回確保する (`ott_lifted.c` 18011d720 付近)。
+- ctor 1 回で wasm heap の先頭が約 3.67 MB 進む (`bytes_per_ctor` 3673793)。`ctor` は `operator new` (`f_1801a04d0`・`f_1801a7794`) で `0x40000` などを 6〜14 回確保する (commit 済みの根拠: `tools/hostbridge/evidence/ott_ottprocessor_ctor.asm` の 172〜196 行、`MOV ECX,0x40000` / `CALL 0x1801a7794`)。
 - 145 回後の heap 先頭は `0x2ff93020`。次の 3.67 MB の確保範囲が image の data 領域 (`0x301e2000`〜`0x30284124`) と重なる。
 - `ott_data_install` が敷く rdata・data の領域 (`0x301e2000`〜`0x30284124`) は、wasm heap の伸びる範囲と重なる。heap 側の確保は `imp_HeapAlloc` が確保ごとに `memset(0)` する (`tools/ott/rt/ott_cpu.c` 76 行。ただし `HeapAlloc` のゼロ化は確保した領域だけに効く)。
-- heap を 64 MiB ずらすと (`malloc` を先に呼ぶ)、止まる位置が 146 回目から 127 回目 (index) へ早まる (約 64 MiB ÷ 3.67 MB ≈ 17.4 回と整合)。Node・1 run のみ・`work/` で実施 (commit 外)。
+- heap を 64 MiB ずらすと (`malloc` を先に呼ぶ)、止まる位置が `before_call` index 145 (146 回目) から index 127 (128 回目) へ早まる。index で 18 回早まる。64 MiB ÷ 3.67 MB (`bytes_per_ctor` 3673793 B) ≈ 18.3 回と整合する。Node・1 run のみ・`work/` で実施 (commit 外)。
 
 **未確定 (この節の結論ではない)**: 「heap が data 領域に届いた確保が、data の内容を変えて ctor を戻らなくする」という機構は**仮説**。実測したのは次の 2 点だけ: (a) 145 回目までの ctor では data 領域の hash が不変 (Node・1 run。プローブは commit 外で、コミット済みの再現は未整備)、(b) 146 回目の ctor が戻らないこと (HEAD で 3/3)。146 回目の確保直後に data が変わることの直接確認と、どの関数で戻らなくなるかは未了。
 
@@ -93,4 +93,5 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 | ctor (`0x18011d400`) が同一 instance で 146 回目に戻らない原因 | 上限 145 の意味が未確定。M=146 を通す修正方針が立たない | #4392 [PERF-P26] |
 | Chrome の M=147・149〜151・153〜159 と M=2〜129・131〜144 の成否 (単調性) | 成功最大 145 と失敗最小 146 の範囲外は未確認 | #4392 (コメントで追加) |
 | Node 掃引の再測定と生データの commit (§1) | 掃引の数値が根拠にならない | #4392 (コメントで追加) |
+| §3b の監視プローブ (145 回までの data hash 不変・`next_span_overlaps_data`) が commit 外・再現未整備 | §3b の (a) は再現できない。`ctor_heap_probe.mjs` の 3673848 (`next_span_overlaps_data` の判定定数) と観測 `bytes_per_ctor` 3673793 の 55 B 差は判定に影響しないが、由来は未記録 | #4392 (次の run で commit) |
 | 154 の run の wasm sha が未記録 (§2) | 154 と HEAD の wasm が同一かを示せない。HEAD の 155 測定 (M=145・146) は素材 wasm で再現済み | #4392 (コメントで追加) |
