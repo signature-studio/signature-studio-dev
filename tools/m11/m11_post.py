@@ -241,6 +241,7 @@ M11_INSTR_40FF70 = os.environ.get('M11_INSTR_40FF70') == '1'
 M11_INSTR_40FFE0 = os.environ.get('M11_INSTR_40FFE0') == '1'
 M11_INSTR_60A270 = os.environ.get('M11_INSTR_60A270') == '1'
 M11_INSTR_412770 = os.environ.get('M11_INSTR_412770') == '1'
+M11_INSTR_4128B0 = os.environ.get('M11_INSTR_4128B0') == '1'   # #4457: 計測専用。function_4128b0 の入口で 412770 分岐の 3 値を観測する (既定 0 では入れない)
 M11_INSTR_E3EF60 = os.environ.get('M11_INSTR_E3EF60') == '1'
 
 
@@ -277,6 +278,8 @@ def weaken(m):
             w += ['  call void @m11_a270_obs(i64 %p0)']
         if va == 0x412770 and M11_INSTR_412770:
             w += ['  %pi = ptrtoint ptr %p0 to i64', '  call void @m11_412770_obs(i64 %pi)']
+        if va == 0x4128b0 and M11_INSTR_4128B0:
+            w += ['  call void @m11_4128b0_obs()']
         if va == 0xe3ef60 and M11_INSTR_E3EF60:
             w += ['  call void @m11_e3ef60_obs(i64 %p0)']
         if rt == 'void':
@@ -386,7 +389,7 @@ for (nm, ret, args) in fns:
 open(dst.replace('.ll', '_sigs.h'), 'w').write('\n'.join(hdr) + '\n')
 ent = ', '.join('{ i32, ptr } { i32 %d, ptr @m11_tr_%s }' % (va, nm) for va, nm in tab)
 # 計測時 (M11_INSTR_413060=1) のみ PROBES に 0x413060 が入り、dest 観測の宣言が出る
-tail = ['', 'declare void @m11_probe(i32)'] + (['declare void @m11_dest_obs(i64)'] if 0x413060 in PROBES and M11_PROBE_VARIANT not in ('nodecl', 'noren') else []) + (['declare void @m11_p144_obs(i64)'] if M11_INSTR_40FF70 else []) + (['declare void @m11_ffe0_obs(i64)'] if M11_INSTR_40FFE0 else []) + (['declare void @m11_a270_obs(i64)'] if M11_INSTR_60A270 else []) + (['declare void @m11_412770_obs(i64)'] if M11_INSTR_412770 else []) + (['declare void @m11_e3ef60_obs(i64)'] if M11_INSTR_E3EF60 else []) + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
+tail = ['', 'declare void @m11_probe(i32)'] + (['declare void @m11_dest_obs(i64)'] if 0x413060 in PROBES and M11_PROBE_VARIANT not in ('nodecl', 'noren') else []) + (['declare void @m11_p144_obs(i64)'] if M11_INSTR_40FF70 else []) + (['declare void @m11_ffe0_obs(i64)'] if M11_INSTR_40FFE0 else []) + (['declare void @m11_a270_obs(i64)'] if M11_INSTR_60A270 else []) + (['declare void @m11_412770_obs(i64)'] if M11_INSTR_412770 else []) + (['declare void @m11_4128b0_obs()'] if M11_INSTR_4128B0 else []) + (['declare void @m11_e3ef60_obs(i64)'] if M11_INSTR_E3EF60 else []) + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
 tail.extend(tr)
 tail.append('@m11_disp_n = constant i32 %d' % len(tab))
 tail.append('@m11_disp_tab = constant [%d x { i32, ptr }] [%s]' % (len(tab), ent))
