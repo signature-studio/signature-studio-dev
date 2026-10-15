@@ -1,7 +1,8 @@
 // SR-39 #2107: canvas platform (wasm) の IPlatformGraphicsDevice* 実装。
 // SR-50 #3260: drawRect (塗り・線 1px)・clearRect・drawString (canvas_font.cpp) は bitmap へ画素を書く。
 // SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap (1:1 転写) も bitmap へ画素を書く。
-// 他の描画命令 (drawArc・drawPoint・drawGraphicsPath・gradient・9 分割・fillRectWithBitmap) は no-op で false を返す。
+// SR-62 #4233: fillLinearGradient・fillRadialGradient (path の内側を色停止点で塗る)・drawBitmapNinePartTiled (9 分割を各部分で 1:1 タイル)・fillRectWithBitmap (タイル塗り) も bitmap へ画素を書く。
+// 他の描画命令 (drawArc・drawPoint・drawGraphicsPath) は no-op で false を返す。
 // 状態設定は lineWidth (1px 固定で描く)・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha だけ値を保持し、他 (lineStyle・drawMode・transformMatrix・global state の save/restore) は何もしない。
 
 #pragma once
@@ -12,6 +13,7 @@
 #include "vstgui/lib/crect.h"
 #include "vstgui/lib/platform/iplatformgraphicsdevice.h"
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 namespace VSTGUI {
@@ -100,6 +102,9 @@ private:
 	void fillPolygon (const PointList& points, const CColor& color) const;
 	void strokePolyline (const PointList& points, bool closed, const CColor& color) const;
 	CRect clipWithinBitmap (CRect clip) const;
+	void fillPathByPixel (IPlatformGraphicsPath& path, bool evenOdd, TransformMatrix* transformation,
+	                      const std::function<bool (CPoint, CColor&)>& colorAt) const;
+	void tileBitmap (CanvasBitmap& source, CRect srcRect, CRect dstRect, double alpha) const;
 
 	std::shared_ptr<const CanvasGraphicsDevice> device;
 	PlatformBitmapPtr bitmap;
