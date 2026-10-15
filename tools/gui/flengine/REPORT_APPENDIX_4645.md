@@ -29,4 +29,4 @@ survey には 2 つの結果ファイルがあり、値が違う。REPORT の旧
 ## 4. 測定の鮮度
 
 - 測定 commit `f0235912` 以降の `tools/m11` には差分がある (`git diff f0235912 HEAD -- tools/m11`: 19 files、+460/-21)。`m11_gen_ir2.sh` (`M11_FIX_LD236`)・`ldfix/ldfix.py` (`fix_f3c_use` の門。#4439) などが含まれる。
-- この差分を反映した再測定は本 run では未実施 (素材 `work-m11`・retdec・mingw が runner に無い)。詳細は REPORT §6j の「測定鮮度」を参照。
+- この差分を反映した再測定は本 PR の差し戻し run では未実施 (素材 `work-m11`・`toolchain-retdec`・`apt-mingw` が runner に無い。`ARTIFACTS_DIR` にあるのは `fl-win64` のみ)。現 HEAD の e2e 実測は未取得。
