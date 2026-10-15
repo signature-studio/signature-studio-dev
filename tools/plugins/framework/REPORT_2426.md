@@ -117,7 +117,8 @@ cd tools/plugins/work/hs && node ../../framework/hostshim/hs_preinit.mjs ../fw/f
 ### 9.2 修復 (`hs_irfix.py`)
 
 - `fix_40c4d0` (native `0x40c4d0`: `mov rax,[rcx]`・`movsxd rax,[rax-0x80]`・`lea rsi,[rcx+rax-8]`)。lift は rcx を文字列定数 `@1` (`"$"`・1 byte = 0x24) に畳み、`[rcx]` の読みを定数 `inttoptr -92` (= 0x24 − 0x80) にしていた。修復: `rcx = load BLK+0x08`・`vt = load [rcx]`・`load i32 [vt-0x80]`。`rdx`/`r8` の定数 store (`@2`・`@4`) は関数内で書換えないため消して caller の値を素通しにする。出力 `function_40c4d0 patched`。
-- before/after (IR): 修正なし (`fw_flat4_canon3.ll` の `function_40c4d0`・29243〜29246 行) は `ce5 = inttoptr i64 -92` と `ce6 = ptrtoint ptr @1` で、入力に依らず定数の境界外読みになる。修正あり (`hs_flat.ll` の同関数・29245 行) は `rcx = load BLK+0x08` で、実行時の rcx は `0x10fcbcf0` (§9.3)。修正なしの実行は計測していない (IR の比較のみ)。
+- before/after (IR): 修正なし (`fw_flat4_canon3.ll` の `function_40c4d0`・29243〜29246 行) は `ce5 = inttoptr i64 -92` と `ce6 = ptrtoint ptr @1` で、入力に依らず定数の境界外読みになる。修正あり (`hs_flat.ll` の同関数・29245 行) は `rcx = load BLK+0x08` で、実行時の rcx は `0x10fcbcf0` (§9.3)。
+- 実行の negative control (scratch・非追跡: `fix_40c4d0`・`fix_40b3f0` だけを外した variant `work/hs_nofix/hs_route.cjs`、`hs_e2e.sh` と同じ手順で 1 分 30 秒 (emcc 込み)): DllMain は同じ unit (`unit counter=19`)・同じ関数 `function_40c4d0` で `memory access out of bounds`。OOB の wasm オフセットは `0x4e697` (修正なし) → `0x4e67d` (修正あり)。修正は OOB の位置を変えたが、止まる idx (18) は変えない。修正なし build の probe の `[this]` の行は 40c4d0 が読まない caller 側の値 (参考外)。
 - `fix_40b3f0` (native `0x40b3f0`: `this=rcx`・`flag=dl`、flag≠0 なら `call 0x40bce0(rcx, rdx=flag)`)。lift は this を `@594`・flag を `@593` ("$") に畳んでいた。修復: this = `load BLK+0x08`、flag = `load i8 BLK+0x10` を entry で 1 回読み、以降の分岐は SSA 値を使う。出力 `function_40b3f0 patched`。
 - Phase A (framework smoke) は全修正で `dispatch=38 ff=0` の PASS を維持 (回帰なし)。
 
