@@ -70,10 +70,10 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 
 - **方式**: `pe.Analyzer.fault_arg(va, rip)`。fault rip の命令のメモリ base を、entry から rip 直前まで線形に走査した mov 伝播 (rcx/rdx/r8/r9 の引数由来を追跡。call で全消去、分岐・ret を跨ぐと None) で引数 index に寄せる。`session.fvm_cand` は候補が 2 件以上のとき、その引数が候補に含まれれば候補を 1 つに決めて case を作る。決まらなければ従来どおり `multi_candidate` で対象外。`cases.py` (blob・args) は変更していない。
 - **事前測定** (base の jsonl・fvm 以外に equal/diff/wasm_trap 無し・候補 2 件以上の 73 件): fault base が引数由来に伝播できたのは 36 件 (arg0 34 / arg1 1 / arg2 1)。base が引数由来でない 42 件 (`rbx`・`rax` などの 2 段目以降の間接参照。`0x41a7c0` 系の 6 件を含む)、分岐で線形追跡を打ち切った 9 件、ret 断片 1 件。
-- **未検証の注記 (レビュー差し戻し対応)**: 上の内訳は修正前の `fault_arg` (commit `85f5e93f7`) に基づく。この内訳は 36 + 42 + 9 = 87 で、対象 73 件とは合わない (ret 断片 1 件は fvm 前に除外されるため、残りは 72 件以内で数え直す必要がある)。base の jsonl (`work-liftdiff`) が本環境に無く、再計算できていない。
+- **未検証の注記 (レビュー差し戻し対応)**: 上の内訳は修正前の `fault_arg` (commit `85f5e93f7`) に基づく。この内訳は 36 + 42 + 9 = 87 で、対象 73 件とは合わない (ret 断片は 73 件に含まれない)。残り 37 件 (73 − 36) の内訳を数え直す必要がある。base の jsonl (`work-liftdiff`) が本環境に無く、再計算できていない。
 - **修正 (commit `1b53c5b86`)**: `fault_arg` は (a) 3000 命令で打ち切ったら `None`、(b) 64bit の reg-reg `mov` 以外で書かれた族 (明示 dst・capstone の暗黙 write・`cmpxchg` の暗黙 rax・部分書き込み) を全て `prov` から外す。単体で `xchg`・`cqo`・`mul`・`cmpxchg`・`xadd`・`mov cl, dl` の書き込み族を確認した (`_written_fams`)。
 - **再測定は未実施**: `$ARTIFACTS_DIR` に `work-m11` (`boot_final3.ll`・`m11_image.bin`) と `work-liftdiff` が無く、`liftdiff_e2e.sh --m11-only` が入力不足で止まる。上の表と fvm の件数は修正前 code の値であり、修正後の値ではない。
-- **差分証跡** (WORKFLOW §6): `git diff 85f5e93f7 1b53c5b86 -- tools/liftdiff` は `pe.py` のみ (`fault_arg` 修正と `_written_fams` 追加)。REPORT の数字は再測定まで変わらない前提で書いていない。
+- **差分証跡** (WORKFLOW §6): `git diff 85f5e93f7 1b53c5b86 -- tools/liftdiff` は `pe.py` のみ (`fault_arg` 修正と `_written_fams` 追加)。したがって上の表は**修正前 code** の測定値で、現 HEAD の測定値ではない。
 - **測定 commit**: `85f5e93f7` (コードを変えた最後の commit)。base: `1f12b1b6d` (origin/main)。両方とも同一環境で `liftdiff_e2e.sh --m11-only` を 1 回ずつ実行 (base 189 s PASS・HEAD 197 s PASS・`LIFTDIFF_E2E PASS`)。
 - **証跡**: `git diff 1f12b1b6d 85f5e93f7 -- tools/liftdiff` は `pe.py` の `fault_arg` 追加と `session.py` の `fvm_cand` の分岐追加の 2 ファイル (+39 行)。
 
