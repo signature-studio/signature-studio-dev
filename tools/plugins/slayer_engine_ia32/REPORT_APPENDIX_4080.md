@@ -4,7 +4,7 @@
 
 - 親: #4066 (判定の正本は `REPORT_APPENDIX_4066.md` §1)。 前提 #4084 は merge 済み。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` と乱数 (seed 2989)。 静的解析と x87 命令の突合のみ。
-- 測定 commit: `x87_fn_diff.py` の変更を含む最後の commit (§4 で記す)。
+- 測定 commit: `fc5445ee8` (コードを変えた最後の commit)。
 
 ## 1. 独立入口 4 本の引数形 (逆アセンブルで確定)
 
@@ -39,5 +39,4 @@
 ## 4. 測定 commit と検証
 
 - 変更は `tools/plugins/slayer_engine_ia32/x87_fn_diff.py` (TARGETS 2 本・PROBE 2 本・`double1` 生成器) のみ。
-- 測定 commit: 本 PR の最後のコード commit (PR 本文の検証節を参照)。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/plugins/slayer_engine_ia32/lift_text.py` の後 `python3 x87_fn_diff.py` (rc 0)、`--nega` (bit 一致 22619 → 22618)、`--nega-lower` (f32 不一致 4000/4000)。
