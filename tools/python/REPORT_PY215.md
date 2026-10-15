@@ -87,13 +87,21 @@
 
 ## 6. main 取り込み後の再測定 (PR #3848 の競合解消)
 
-PR #3848 は main が先に進んだため 2 回競合した (1 回目 `f4d8cf90e`・2 回目 `b93159de4`)。rebase・force は使わず、`origin/main` を merge した (測定 commit `602ed5be9`)。競合は `tests/provider_check.mjs` の実装判定の行と件数だけで、main 側の判定 (`pe132` など) を残し、本 PR の `pe215` を足した。件数は main の 173 / 262 から **174 / 261** になる。
+PR #3848 は main が先に進むたびに競合した (1 回目 `f4d8cf90e`・2 回目 `b93159de4`・3 回目 `ac7ca0637`)。rebase・force は使わず、`origin/main` を merge した。3 回目の競合は `tests/provider_check.mjs` の判定行と件数だけで、main 側の `pe133` (PY-133・`ui.showPicker`・`ui.openEventEditor`) を残し、本 PR の `pe215` を足した。main の期待値は 175 / 260 (`ac7ca0637`)。本 PR はそこに 1 件を足すため **176 / 259** になる (起票時の 168 → 169 からの差は main 側の追加分)。
 
-測定 commit (コードを変えた最後の commit): `602ed5be9` (merge)。`git diff 602ed5be9 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節の commit は REPORT だけ)。
+測定 commit (コードを変えた最後の commit): `789333bc1` (`origin/main` の取り込み merge)。`git diff 789333bc1 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節の commit は REPORT だけ)。main との差分 (`git diff origin/main HEAD -- tools/python/provider tools/python/host tools/python/tests`) は `device.getLinkedChannel` (C・mock・検査) の追加だけ。
 
-| 検査 | コマンド | rc | 結果 |
-|---|---|---|---|
-| provider ビルド | `bash provider/build.sh` | 0 | flprov.js / flprov.wasm 生成 |
-| provider_check | `node tests/provider_check.mjs` | 0 | functions 435・implemented **174**・unimplemented 261・PASS |
-| device_diff | `node tests/device_diff.mjs` | 0 | linked_channel `[-1,null,null,-1,null,null]`・**diffs 0**・PASS |
-| all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 0 | total 48・**ok 48**・host_calls 37,425 |
+素材: fl-win64 (`tar --zstd -xf` 7.6 秒) と toolchain-emsdk (2.4 秒) を作業用の展開先に置いた。CPython・flpy・provider の emsdk は既定の [EMSDK] (`/opt/emsdk`)。provider_check は `work/` の入力と `dist/flpy.js` を要するため、同じ前段 (取得・CPython・flpy) を先に実行した。
+
+| 検査 | コマンド | rc | 所要 | 結果 |
+|---|---|---|---|---|
+| 入力取得 | `FL_WIN64_DIR=<展開先> bash fetch_inputs.sh` | 0 | 1.0 秒 | work/midi.py・utils.py・MCPTools.pyc |
+| CPython wasm | `bash build_cpython_wasm.sh` | 0 | 196 秒 | python.wasm |
+| flpy | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | 0 | 5 秒 | flpy.js/wasm/data |
+| provider ビルド | `bash provider/build.sh` | 0 | 1 秒 | flprov.js/wasm・警告 0 |
+| provider_check | `node tests/provider_check.mjs` | 0 | 0 秒 | functions 435・**implemented 176**・unimplemented **259**・PASS |
+| device_diff | `node tests/device_diff.mjs` | 0 | 0 秒 | calls 11・link_calls 6・rejects 7・linked_channel `[-1,null,null,-1,null,null]`・**diffs 0**・PASS |
+| all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 0 | 1 秒 | total 48・**ok 48**・soft_error 0・raised 0・host_calls 37,425 |
+| all_tools (JS mock) | `node tests/all_tools.mjs` | 0 | 2 秒 | total 48・**ok 48**・host_calls 37,425 |
+
+所要・load: 検査は逐次 (並列数 1)。各検査開始時の load average (1 分) は 0.49〜2.94 (4 core)。ネガティブコントロールは §5 (`d911ecb97`) で実施済み。本節では再実施していない。
