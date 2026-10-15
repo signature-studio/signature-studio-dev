@@ -1,6 +1,6 @@
 # ildsp PSOLA_CreateInstance 閉包の x64c lift — T-SH-82 (#3428)
 
-親: #3401 (ildsp の子)。本件: #3428 (T-SH-82)。REPORT.md §8 から参照する付録 (測定値の正本)。
+親: #3401 (ildsp の子)。本件: #3428 (T-SH-82)。REPORT.md §9 から参照する付録 (測定値の正本)。
 既知類型との関係: `docs/DEFECTS.md` の D6 (merge 型命令の dest 上位 lane。VEX.128 のスカラ命令は d=s1 を複写してから legacy 命令で merge し、テストの `xz`・`xl` で上位 lane を検証) と D12 (比較をレジスタ状態全体に広げ、callee-saved 破損を見えるようにした) に関連し、いずれも回避済み。新規の類型は見つからず (D1a〜D25 のうち他は RetDec の IR 段の類型で、x64c は IR を経由しない)。
 検証起点: `730320c46` (origin/main。a1325f0e4 から rebase して再測定)。測定 commit (コードを変えた最後の commit): `e49bf7c9d` (`tools/flelift/x64c.py`・`tools/flelift/tests/x64c_vex_diff.py`。前回の測定 commit は `b2b898522`)。
 
