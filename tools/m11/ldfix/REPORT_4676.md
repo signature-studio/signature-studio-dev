@@ -7,7 +7,7 @@
 - `10479c7` の判定根拠 (ii) (`%492` と slot の対応) と (iii) (`stack_var_16` の後続の読み) を確認した。判定は**判定不能のまま**。理由は §3。
 - `spill178_1161.tsv` は再生成した。既存の結果と**一致** (差分 0 行)。
 - 本番 unit e2e (既定 OFF と `M11_FIX_LD236=1` の 2 通り) は、unit 結果 (run・survey・trap・miss・clobber) が**一致**した。`1046a30` の読み値は実行時に確認していない (§4)。
-- 本番 e2e の回帰ゲートは OFF・ON とも `survey ok=875 != 期待 873` で失敗した。修正の影響ではなく、素材の指紋検査を迂回した参考値の環境による (§4)。
+- 本番 e2e の回帰ゲートは OFF・ON とも `survey ok=875 != 期待 873` で失敗した。原因は未確認 (素材の指紋検査を迂回した参考値による環境差の可能性。§4・§5)。OFF でも同じ失敗のため、修正 (`M11_FIX_LD236`) が原因ではないことだけは確認した。
 
 ## 2. 再判定 (受入 1)
 
@@ -28,7 +28,7 @@
 
 `TMPDIR=$RUNNER_TEMP M11_WORK=<work-m11 展開先> LD_WORK=<work-liftdiff 展開先> bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` の実測:
 
-- 測定 commit `740289e98` (コードを変えた最後の commit。HEAD と同じ)。実行: real 3m00.4s・load 1.10 (11:30:57 時点の uptime)・rc=0・7/7 完走 + step 8 完走。
+- 測定 commit `740289e98` (コードを変えた最後の commit。以後 HEAD までのコード差分は 0 行)。実行: real 3m00.4s・load 1.10 (11:30:57 時点の uptime)・rc=0・7/7 完走 + step 8 完走。
 - `[spill178_1161.tsv] results/ と一致`・`[spill178 (修復後 IR)] results/spill178_1161.tsv と一致`。
 - 集計: spill 宛 unk site 178 / 71 関数。確定 154 / 判定不能 23 / 未判定 1。`10479c7` の判定不能は既存 (REPORT_2958)。
 
@@ -44,7 +44,8 @@
 - ON の IR は `m11_gen_ir2.sh` を `M11_FIX_LD236=1` で再実行して作った (`ir_conditions.json` の `ld236=applied`・`fx236` 4 箇所)。OFF の IR と 3 行差 (`444153` → `444156` 行)。
 - `m11_e2e.sh` 単体では、`M11_FIX_LD236=1` を付けても IR を作り直さない (既存 OFF の IR を再利用する)。ON で測るには `m11_gen_ir2.sh` を先に走らせる必要がある。これは本 PR で直していない (§5 の未解決)。
 - unit 結果の比較: `tolerant_units.json` は一致。survey の差は ir_sha256 と wasm のアドレス・ハッシュだけ。ok/trap/miss の値は一致。
-- ゲートの失敗は OFF でも同じ。`M11_EXPECT_SURVEY_OK=873` は canonical `--full` の値で、参考値 (指紋迂回) では一致しない。
+- ゲートの失敗は OFF でも同じ。`M11_EXPECT_SURVEY_OK=873` は canonical `--full` の値。差 875 との原因は測っていない (§5)。
+- ON の build: `m11_e2e.sh` は IR 生成の後に `m11_build.sh` を必ず呼ぶ (増分ビルド・`work/obj/*.o` キャッシュ)。ON の wasm のハッシュが OFF と違う (`ir_sha256`・wasm アドレス) ことから、ON では build が走ったことを確認した。build 時間と OFF の 3m01s との内訳 (build の時間・キャッシュの効き) は測っていない。そのため real 1m05s と 3m01s の差の理由は未確認。
 
 `1046a30` の読み値 (X・P の実行時の値) は確認していない。確認には trace が要る。
 
@@ -64,5 +65,7 @@ W=$RUNNER_TEMP/m11w/tools/m11/work
 python3 tools/m11/ldfix/fix_ld236.py $W/boot_final3.ll $RUNNER_TEMP/boot_final3.ld236.ll
 TMPDIR=$RUNNER_TEMP M11_WORK=$RUNNER_TEMP/m11w/tools/m11/work LD_WORK=$RUNNER_TEMP/ldw/tools/liftdiff/work \
   bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh
-FL_WIN64_DIR=$RUNNER_TEMP/win64 M11_FIX_LD236=1 M11_SKIP_LIFT_FP=1 M11_LB_BASE=0 bash tools/m11/m11_e2e.sh   # 注: 先に m11_gen_ir2.sh を M11_FIX_LD236=1 で走らせる
+# ON: 先に IR を M11_FIX_LD236=1 で作り直す (m11_e2e.sh は既存 IR を再利用するため)。その後 m11_e2e.sh が m11_build.sh (増分) を内部で呼ぶ
+(cd tools/m11 && FL_WIN64_DIR=$RUNNER_TEMP/win64 M11_FIX_LD236=1 M11_SKIP_LIFT_FP=1 M11_LB_BASE=0 bash m11_gen_ir2.sh)
+FL_WIN64_DIR=$RUNNER_TEMP/win64 M11_FIX_LD236=1 M11_SKIP_LIFT_FP=1 M11_LB_BASE=0 bash tools/m11/m11_e2e.sh
 ```
