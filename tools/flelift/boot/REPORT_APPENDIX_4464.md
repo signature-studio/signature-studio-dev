@@ -52,3 +52,12 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 | 実機で受け手 slot `0x5ac308` に入る値 (loader の充填)。harness では 0 のまま | 実機の受け手 VA は未特定。S13 以降に進めない | #4384 [WIN-49] |
 | `[icall]` の target `0x0` と、wasm stack の先頭 `f_410360` の対応 (stack 名の解釈) | trap 段の厳密な特定に使う。推定のまま | #4384 [WIN-49] |
 | harness が `self` を渡さない (`fle_run(0x1375990)` の全引数 0) | 実機の `self` を harness で再現できない | #4384 [WIN-49] |
+
+## 6. 統合 HEAD での再測定 (#4464・測定 commit `09eedbf0c`・mode 1 のみ)
+
+- 理由: 先行 run のブランチを `origin/main` と統合した (`x64c.py` の `shard_approx[k]` を採用)。統合後の値を取り直した。
+- 測定: `FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0・所要 3 分 27 秒 (lift 80 s・clang plain 84 s・boot tol 25 s)。load 1.1〜1.9。
+- 結果: dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob`・longjmp 0・exit 0。§11・§12-1 と一致。
+- 入口の値 (probe 生成器 `cfi_entry_probe.py` を `work/` の lift 複製に適用・`FLE_CFI_SEED` 無し): §2 の表と一致 (`0x410320` は rcx=0・rdx=1・dl=1)。
+- seed 有 (`FLE_CFI_SEED=1`): `[cfi-seed]` の書く前の live 値は `0x1104e30=0x0`・`0x5ac270=0x0`・`0x5ac308=0x0`。chain の rcx は `0x1105350` で `0x1104ef8`・`0x5af120` と `0x410320` で `0x5ac338`。`[icall] rax=0x5ac338 target=0x0`。
+- 差分 (測定 commit から HEAD まで): 本節の追加のみ (`git diff 09eedbf0c HEAD -- tools/flelift` は REPORT のみ)。
