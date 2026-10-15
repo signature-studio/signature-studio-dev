@@ -24,11 +24,11 @@ load average・並列数は前回 run で未記録のため、所要は §6-1 �
 - `function_412770` の `__asm_rep_movsq_memcpy(ptr %4, ptr null, i64 37)` は両 LB の IR に残る (LB 非依存)。機械語 (本 run の実測): `tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin'` の後、`objdump -d block00031_PE.bin --start-address=0x412770 --stop-address=0x4127a0` で `41277d mov %rcx,%rax` → `412790 mov (%rax),%rsi` → `rep movsq` 37 qword。rax は arg1 (rcx) なので、源は `[arg1+0]` の load で、IR では `ptr null` になっている。
 - LB=0x10000 の `work/m11_image.bin` の先頭 0x10000 バイトは全て 0 (前回 run の実測)。LB=0 で PE ヘッダが address 0 に来る記録は #3229 本文 (判明済み) の引用で、本 run では image を生成していない。
 
-### 7-3 修正の判定 (受入 2: 修正なし・子 #3296 へ)
+### 7-3 修正の判定 (受入 2: 修正なし・子 #3389 へ)
 
 - LB 直書き: 確認した範囲では見つからず (差は LB 分のシフトだけ)。修正は入れていない。照合文字列の LB 加算は #3160 で修正済み (§6-4)。
 - (a) は否定済みのため方針から外す。`function_412770` の源を `[arg1+0]` の load に戻しても 8 件は不変 (#3229 本文の記録。前回 run の実験で、本 run では再実行していない)。この load の脱落は 8 件の原因ではなく、LB に依らない別件。
-- 8 件の機構は未特定 (推定のみ)。候補 (未検証): (b) address 0 の内容 (LB=0 の PE ヘッダ / LB=0x10000 の 0 埋め)、(c) `tools/m11/m11_ov.c:194` の icall tkey 換算 (LVA → VA)。検証は子 #3296 で行い、判定は `m11_lb_unit_diff.py` の kind 差。
+- 8 件の機構は未特定 (推定のみ)。候補 (未検証): (b) address 0 の内容 (LB=0 の PE ヘッダ / LB=0x10000 の 0 埋め)、(c) `tools/m11/m11_ov.c:194` の icall tkey 換算 (LVA → VA)。検証は子 #3389 で行い、判定は `m11_lb_unit_diff.py` の kind 差。
 
 ### 7-4 既知類型の判定 (`docs/DEFECTS.md`)
 
@@ -40,9 +40,9 @@ load average・並列数は前回 run で未記録のため、所要は §6-1 �
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 8 件の機構 (候補 (b)・(c)) の特定と修正 (kind 差 8 → 0) | LB 依存の寛容起動の結果 | 子 #3296 (親 #3229) |
+| 8 件の機構 (候補 (b)・(c)) の特定と修正 (kind 差 8 → 0) | LB 依存の寛容起動の結果 | 子 #3389 (親 #3229) |
 | 全 7,422 関数の LB 差の全件確認 | 解消 (§7-6・#5069。4,023 件は全て shift_only) | 解消 (#5069) |
-| `m11_ov.c:194` の tkey 検証と LB=0 の address 0 (PE ヘッダ) の実測 | 候補のみ・#3229 記録の再確認は未実施 | 子 #3296 |
+| `m11_ov.c:194` の tkey 検証と LB=0 の address 0 (PE ヘッダ) の実測 | 候補のみ・#3229 記録の再確認は未実施 | 子 #3389 |
 | `function_412770` の `ptr null` 源 (D4 変種) の lift 修正 | kind 差とは独立 (§7-3) | 子 #3296 (別受入) |
 | D4 症状欄への「代用値 null」の追記 | DEFECTS の記述 | PM |
 
@@ -59,10 +59,10 @@ load average・並列数は前回 run で未記録のため、所要は §6-1 �
 | うち shift_only (差は全て +0x10000 = 65,536) | 4,023 |
 | うち other | 0 |
 
-- 整数の差の分布は +65,536 が 20,153 箇所のみ。
+- 整数の差は全て +65,536 (数値の差だけで判定。どの整数が LB 由来かを意味論で確かめたものではない。非アドレスの定数が偶然同じ差になる場合も shift_only に入る)。箇所数は本 run のスクリプトでは出していない (関数単位の件数のみ)。
 - 負例: LB=0x10000 の IR の `function_412770` 内 1 整数を +1 に改変すると、other 1 件 (`int_delta_1`) で検出した (`shift_check_neg.json`)。判定器は非シフト差を見ている。
 - 寛容起動 (同じ 2 IR・942 unit): LB=0 は ok 871 / miss 47 / oob 17 / halt0 6 / noproc 1。LB=0x10000 は ok 866 / miss 47 / oob 20 / halt0 8 / noproc 1。kind 差は 8 件 (40・153・158・291・296・304・745・895)。
-- **§7-4 の 8 件リストとの違い**: 前回記録の 555 が今回は 895 になっている (40・745 等は一致)。前回 run と本 run の IR・build が同一でないためと推定するが、未確認。
-- 結論: 「確認した関数だけ」の注記は解消された。全関数の差はシフトだけで、IR 段に LB 依存の非シフト差は無い。8 件の機構は依然として未特定 (子 #3296 の範囲)。
+- **前回 run (§7-1) との違い**: 前回 ok 867 (両 LB) → 今回 LB=0 が 871・LB=0x10000 が 866 (コードは両方とも同一)。kind 差は前回 555 → 今回 895 (40・745 等は一致)。ok と kind 差の両方が変わったため、前回と本 run の入力 (IR・build) が違うと推定する。ただし同一でないことの確認は未了。
+- 結論: 関数本体 (`define` 内) の範囲で、差は全て +0x10000 の整数シフトだけ。8 件の機構は依然として未特定 (子 #3389 の範囲)。
 - 測定 commit `26cfc6106` (`m11_lb_ir_shift_check.py` を追加した commit)。`git diff 26cfc6106 HEAD -- tools/m11` の出力は 0 行 (本 PR のコード変更はこの commit のみ)。
-- 制限: `work-m11` に `lift_pe.sha256` が無く、PE (`block00031_PE.bin`) の sha256 は照合していない。IR は `m11_lb_tolerant_repro.sh` (`m11_gen_ir2.sh` の再生成) で作った。LB 別の `ir_conditions.json` は LB ごとに保存していない (後の run で上書きされる)。
+- 制限: 比較は `define` ブロックのみ。global 初期化子・`declare`・metadata など `define` 外の行は比較していない。`work-m11` に `lift_pe.sha256` が無く、PE (`block00031_PE.bin`) の sha256 は照合していない。IR は `m11_lb_tolerant_repro.sh` (`m11_gen_ir2.sh` の再生成) で作った。LB 別の `ir_conditions.json` は LB ごとに保存していない (後の run で上書きされる)。
