@@ -1,0 +1,6 @@
+{
+  "tag": "stub41",
+  "refs": ["#1514"],
+  "note": "公開 stub の戻り型・説明で意味論を決めた 6 関数 (REPORT_PY41 追補・REPORT_PY41_1514 追補・PY-41 #1514)。PE での範囲外 code 確認は未了",
+  "functions": ["channels.isChannelMuted", "channels.isChannelSolo", "channels.getChannelColor", "channels.getGridBit", "channels.channelNumber", "channels.getChannelType"]
+}

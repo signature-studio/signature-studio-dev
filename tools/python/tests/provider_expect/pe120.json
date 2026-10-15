@@ -1,0 +1,6 @@
+{
+  "tag": "pe120",
+  "refs": ["#2984"],
+  "note": "PE で件数の読出しを確定した launchMapPages.length 1 件 (REPORT_PY120_2984・PY-120 #2984)。件数は仮置き 0、tests/launchmap_diff.mjs が mock と照合",
+  "functions": ["launchMapPages.length"]
+}
