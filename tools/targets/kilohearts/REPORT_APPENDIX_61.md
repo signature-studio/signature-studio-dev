@@ -5,9 +5,10 @@
 
 ## 0. 結論 (先出し)
 
-- **Snap Heap (`MicropassDsp`)**: process = slot 14 = `0x1807d8a60`。根 14 本の閉包 = **242 関数 / 18,402 命令**。unsup **65 site**・imports 30・traps 0。
-- **Multipass (`MultipassDsp`)**: process = slot 14 = `0x1805488d0`。根 14 本の閉包 = **251 関数 / 20,764 命令**。unsup **65 site**・imports 30・traps 0。
-- 両者の unsup は同じ 8 種。rcpps 29 + rsqrtps 25 = 54 site (83%) が近似命令。残り 11 site は VEX / SSE の語彙不足 (vcomiss 4・vcvtdq2ps 2・vpsrld 2・vpslld 1・haddps 1・vandps 1)。
+- **結論 (語彙追加後, 測定 commit `5ab8ae7f5`)**: 両ホストの unsup は **65 → 54 site**。残 54 site はすべて近似命令 2 種 (rcpps 29・rsqrtps 25)。語彙不足によるものは 0 件。受入 1 (unsup 0) は近似表の組み込みまで未達 (§5)。
+- **Snap Heap (`MicropassDsp`)**: process = slot 14 = `0x1807d8a60`。根 14 本の閉包 = **242 関数 / 18,402 命令**。unsup 54 site (語彙追加後)・imports 30・traps 0。
+- **Multipass (`MultipassDsp`)**: process = slot 14 = `0x1805488d0`。根 14 本の閉包 = **251 関数 / 20,764 命令**。unsup 54 site (語彙追加後)・imports 30・traps 0。
+- 語彙追加前 (`9087f36d2` 時点) の値: unsup 65 site。内訳は rcpps 29 + rsqrtps 25 = 54 (83%) の近似命令と、残り 11 site の VEX / SSE 語彙不足 (vcomiss 4・vcvtdq2ps 2・vpsrld 2・vpslld 1・haddps 1・vandps 1)。以下 §1〜§4 の unsup 65 は、この語彙追加前の値。
 - **ネガコン**: 根を process 1 本にすると Snap Heap 148 関数 / 11,102 命令、Multipass 160 関数 / 13,856 命令。unsup は両者とも 65 のまま。差の 94 / 91 関数は独自 slot 由来で、unsup を持たない。
 
 ## 1. 数え方の定義
@@ -63,7 +64,7 @@ unsup の内訳 (両ホスト同一):
 
 ## 5. #3994 (KH-81): 語彙追加の結果 (unsup 65 → 54)
 
-- 追加した x64c handler (`tools/flelift/x64c.py`): VEX `vcomiss` / `vcvtdq2ps` / `vpsrld`・`vpslld` (imm) / `vandps` (xmm・mem) の経路追加と、legacy `haddps` の新規 handler。差分テスト `tests/x64c_vex_diff.py` に 6 件を追加し 97/97 PASS。
+- 追加した x64c handler (`tools/flelift/x64c.py`): VEX `vcomiss` / `vcvtdq2ps` / `vpsrld`・`vpslld` (imm) / `vandps` (xmm・dst=src1 の形) の経路追加と、legacy `haddps` の新規 handler。差分テスト `tests/x64c_vex_diff.py` に 6 件を追加し 97/97 PASS。`vandps` の mem 経路と非破壊形 (dst ≠ src1) は差分テストで検証していない (未検証)。
 - 測定 commit: `5ab8ae7f5` (語彙追加。`scripts/host_x64c_closure.sh` は変更なし)。同一スクリプトを `9087f36d2` 時点の x64c で測った値が本付録 §2。
 - 結果 (測定 commit で 1 回、スクリプト全体 57.7 s、測定後 load average 0.67・nproc=4):
 
