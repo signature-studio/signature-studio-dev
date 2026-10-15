@@ -76,9 +76,10 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。§1〜§4 (
 
 - longjmp の呼出元 (戻り番地) は `0x40fa94` (`0x40fa40` 内)。スタック範囲出力 (`0x400000`〜`0x620000` の全語) に `0x40fcbd` (経路 B の後続) と `0x59c254` (DllMain の setjmp 後の本体スキップ経路) が現れる。ただし範囲が広く過去の残存値を含みうるため、**呼出元を区別する証拠にはならない**。
 - 戻り値 `eax = ([0x5aa000] != 0) + 1` は 1 (`[0x5aa000]` = 0 の入口値)。静的な読みでは DllMain の `cmp eax,1` (`0x59c210`) で本体を飛ばす側 (`0x59c254`) へ進む。`0x59c254` へ進んだことは未確認。
-- longjmp 時点で `[0x5d0cb0]` が 0 に見えるのは、保存 frame の複写による見かけの値と読んでいる (静的な推定)。
-- **経路 A と B のどちらから `0x40fa40` に入ったかは、この実測では区別できていない。** `f_40fa40` 入口の flag = 2 は、経路 A (`0x40fbcf`) からの呼出しでも同じ値になるため。区別には `[0x5d0db0]` (arm フラグ) の実測値が要る。`qfc_ov_trace_4263.c` は longjmp 入口で `flagA(0x5d0db0)` を出すが、その実測値は本付録に未掲載 (今回の run では trace を再取得していない)。
-- **表現の限界 (経路 B は実行時発火とは確定しない)**: `f_40fa40` 入口の flag 2 は、経路 A (`0x40fbcf`) 経由の呼出しでも同じ値になる。経路 A の arm フラグ `[0x5d0db0]` の実測値は本付録に載っていない (今回の run では trace を再取得していない)。確定するまでは「flag 2 で `f_40fa40` に入る。経路 A/B の対応は静的推定」とする。
+- longjmp 時点で `[0x5d0cb0]` が 0 に見えるのは、保存 frame の複写による見かけの値と読んでいる (静的な推定。判定は呼出し前の `CALL_B` で行う)。
+- 経路 A と B の区別は、下の §5.2 の `CALL_A`・`CALL_B` 差し込みで実測した (経路 B のみ発火)。
+- **経路 B の発火 (実測・測定 HEAD `e2f4ecabc` = origin/main の lift + 計測差し込み)**: `0x40fcb8` の call 直前で `flagB=2` を記録 (`CALL_B`)。`0x40fbcf` の call (`CALL_A`) は DllMain 段で 1 回も出ない。`[0x5d0db0]` (arm) は 0 のまま (`0x40fba6` で `0x40fbd4` へ飛ぶ)。`f_40fa40` の入口は `CALL_B` の直後の 1 回だけ。したがって DllMain (reason 1) で longjmp に入るのは経路 B のみ。
+  - 測定は `qfc_trace_4263.sh` の lift コピーに `CALL_A`・`CALL_B` の fprintf を差し込んで再ビルドした (work/ のみ・tools の lift は不変)。ログは `work/trace4263/trace2.log`。
 - 別 reason (≥2) と経路 A の挙動は boot (reason 1) では測れないため未解決。
 
 ### 5.3 reason を変えた実行 (`QFC_REASON`・測定のみ)
@@ -100,13 +101,13 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。§1〜§4 (
 
 - `qfc_boot.sh` (strict / soft) の結果: strict は `MISSING IMPORT LocalAlloc` で DllMain の trap (FAIL)。soft は `DllMain(PROCESS_ATTACH)` が `ok rax=0x1`、続く `FontCache_GetStats` で `call to UNLIFTED function 0 ret=0x57fb09` (FAIL)。
 - 既存の lift 設定 (override `0x40f9c0=qfc_ov_longjmp`・root `0x59c210`) で、経路 B の戻り先は既に入っている。このため新しい override・root の追加は不要。
-- 経路 B の静的な発火条件は §5 で確定した。実行時の発火は未測定 (§5 の未トレース)。停止点 (`FontCache_GetStats`) が経路 B の後の段であるかは推定で、実測からは確定していない。次の停止点は FT 解決 (`0x563000`) の未解決ポインタと推定する (#4296 / #4510 §2)。
+- 経路 B の発火条件は §5 で確定し、reason 1 では実行時にも発火することを §5.2 で測定した。停止点 (`FontCache_GetStats`) が経路 B の後の段であるかは推定で、実測からは確定していない。次の停止点は FT 解決 (`0x563000`) の未解決ポインタと推定する (#4296 / #4510 §2)。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 経路 A の発火は DllMain reason 1 では静的には起きない (`r13=0x5d0c80`)。reason ≥2 の経路 (boot 未測定) | 別 reason の挙動が不明 | #4263 (継続) |
+| 経路 A の発火は DllMain reason 1 では起きない (実測: `CALL_A` 0 件・arm 0)。reason ≥2 の経路 A (boot 未測定) | 別 reason の挙動が不明 | #4263 (継続) |
 | `ExitProcess(0)` の呼出し元と、`[0x5d0c80]` の boot 時の値 | 偽の停止か否かの判定 | #4262 (T-SH-106) |
 | 呼出元 `0x40946b` (fn `0x409460`) の上位呼出元 | setter へ渡る code の出所 | #4263 (継続) |
 
