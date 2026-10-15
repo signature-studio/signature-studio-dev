@@ -120,6 +120,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_3090.md` | ~80 | FLE-12 (#3090) の詳細: 0x6a7b70 への dispatch の呼出元 (0x6c7923 ← 0x815920)・幅 r8 の源 (即値 2^20 由来の推定)・未修復の理由・0x15F34A0 書込み元の未了。REPORT §0 から参照 |
 | `tools/flelift/boot/REPORT_APPENDIX_3770.md` | ~110 | FLE-15 (#3770) の詳細: 診断 route の有界実行 (時間・ログ上限)・呼出点 0x6c9380 の呼出し回数と矩形 (0,0,2^20,2^20)・既定経路の再実測。測定値の正本。REPORT §0 から参照 |
 | `tools/flelift/boot/REPORT_APPENDIX_2702.md` | ~80 | FLE-10 (#2702) の付録: 工程の実測 (§A)・再現コマンド (§B)・IPP 呼出しと slot の実測 (§C)・停止点 (§D)・旧 REPORT §10 (FLE-6 #672) の全文 (§E。250 行上限のため分割移動) |
+| `tools/flelift/boot/REPORT_APPENDIX_4783.md` | ~75 | #4783 (ILT 既定変更の影響): 受入 1 の survey (942 unit・mode 0/3)・ILTools native 読込 (未達)・他経路 (strict/nosx)・再現。`REPORT_APPENDIX_672.md` §D から分割移動 |
 | `tools/flelift/boot/REPORT_APPENDIX_672.md` | ~110 | FLE-672 (#672) の付録: buf = 0 の fill を戻す診断 (`FLE_DIAG_NULLFILL=1`) の結果表 (5 route)・仮説 ①②③ の成否・停止点 `unlifted 0x6bbc20`・既定経路の不変の証跡。REPORT §11 と §A (旧記述の移動) から参照 |
 | `tools/flelift/boot/REPORT_APPENDIX_2719.md` | ~190 | #2719 (WIN-8) の付録: x64c 寛容起動 (`FLE_TOLERANT` 1/2) の 942 unit 逐次試行の結果表・skip 一覧 (84)・survey との差 (77)・silent miscompile のリスク評価・CreateFruityInstance (0x1375990) の観測 (oob 即時・API 0 件) |
 | `tools/qfclift/REPORT.md` | ~185 | T-SH-12 (#154 部分達成): QuickFontCache_x64.dll の x64c lift (6,347 関数・unsup 0) + SSSE3 handler 注入 (pshufb/pmulhrsw/phaddw) + native-vs-wasm の SSSE3 spot diff (§0〜§6)。boot (#3289・T-SH-60): DllMain の wasm 実行は FAIL で停止点を実測 (§7・§8)。FT_* の GetProcAddress 解決 (T-SH-79 / #3412) の結論は §9 (全文は付録)。ILTools は `tools/iltools/REPORT.md` 参照。FruityPlug は未着手 |
@@ -604,6 +605,8 @@
 | `tools/python/REPORT_PY99_3085.md` | 81 | PY-99 (#3085) 付録: SLOT? 49 件の先行辺 p ごとの store 集合 S_p・算法 A/B の検算とネガティブコントロール・未解決。S_p の全件表は `analysis/py99_merge_sets.md` (自動生成)。PY-41 付録から分割移動 (250 行上限のため) |
 | `tools/python/REPORT_PY41_3860.md` | ~125 | PY-262 (#3860): PY-65 節の受入 2 (戻り値 `[rbp+0x584]` の書込み元) の付録。0x104cc65 に届く `[rbp+0x5b8]` の書込み 72 件 (`analysis/py65_ret584_reach.py`)。判定の行き先と戻り値分岐の突合 (`analysis/py342_r8d_ret_cross.py`・§7)。分岐ごとの式は未確定 (250 行上限のため `REPORT_PY41.md` から分割)。§9 (PY-341): 書込みごとの必須分岐 (`analysis/py341_ret584_dominators.py`) |
 | `tools/python/REPORT_APPENDIX_PY341.md` | ~80 | PY-341 (#4574): `REPORT_PY41_3860.md` §9 の 72 件の表 (書く値の直前命令・必須分岐) |
+| `tools/python/REPORT_APPENDIX_PY392.md` | ~80 | PY-392 (#4828): `REPORT_PY41_3860.md` §10 の 72 件の表 (書く値の式・必須分岐数・cube の分岐数)。自動生成 (`analysis/py392_summary.py`) |
+| `tools/python/REPORT_APPENDIX_PY392_cubes.tsv` | ~73 | PY-392 (#4828): 72 件の代表 cube の全分岐 VA (立ちは無印・落ちは `!`)。自動生成 (`analysis/py392_summary.py`) |
 | `tools/python/REPORT_PY99_3104_APPENDIX_4332.md` | ~36 | PY-317 (#4332) 付録: rint 6 件の negative control (`--negctl drop-part`・辺 `0x1047543 → 0x104754a` で mismatch 1・exit 1)。`REPORT_PY99_3104.md` の 250 行上限のため分割移動 |
 | `tools/python/REPORT_PY99_APPENDIX.md` | ~127 | PY-99 (#2874) 付録: `call 0x10469f0` の本体式 `edx + rint(2^-30·ecx·(r8d−edx))` と、その 7 件の戻り値式 (ecx は入口 edx)。後ろ向き CFG 経路列挙の節 (`[rbp+X]` 読み 171 件の到達 store)。`REPORT_PY41_APPENDIX.md` の 250 行上限のため別置き |
 | `tools/python/REPORT_PY159.md` | 134 | PY-159 (#3086): PY-88 の 65 件の `[rbp+0x5b8]` 書込みの全件表 (VA・式・未確定印)。手計算突合 (SLOT 非依存の 7 件) とネガティブコントロールを実施。結果は `REPORT_PY159.md` §4。残りの SLOT 依存 55 件と ACC 合流は #2874 (PY-99) |
@@ -687,6 +690,7 @@
 | `tools/python/REPORT_PY224.md` | 99 | PY-224 (#3628): getGridBitWithLoop の loop 分岐 (PE 0x12d3ff0 の式) を C provider と mock に実装。式は逆アセンブルと 1 点ずつ照合。行 T[1] の作成経路は子 #3659 (PY-229・前提 PY-223 #3627) |
 | `tools/python/REPORT_PY101.md` | 102 | PY-101 (#2878): channels.isGridBitAssigned・getGridBitWithLoop の PE 経路 (grid `+0x7ac` の生成元 `0xff63f0`・読出し `0x12d3e20`・loop 分岐の読めた範囲) と実装。getGridBit の position<0 を 4 から 0 に直した照合結果。loop の G1・G2 と行テーブルは未確定 (子 #3595) |
 | `tools/python/REPORT_PY218.md` | 110 | PY-218 (#3596): getGridBit・getGridBitWithLoop の件数超えの event 経路 (PE 0x12d3e20・0x12d16a0・0x12df210・0x12df530・0xfe8bb0) を PE で確定し、mock/C に写した。件数 `[grid+0x22fc]-8` の値は未確定 (子 #3651・PY-225) |
+| `tools/python/REPORT_PY390.md` | ~80 | PY-390 (#4830): findEventID・isDoubleClick の戻り値・status 経路を PE で確定 (isDoubleClick は全経路、findEventID は成功・失敗経路)。未発見時の値と値変換器は子 #4870 |
 | `tools/python/REPORT_PY215.md` | 129 | PY-215 (#3568): device linked 系 8 関数の PE 確定。getLinkedChannel のみ全分岐を確定して実装 (-1 → -1・表が空なら None の仮置き)。残り 7 関数は VA 表で未確定のまま残す (親 #3494) |
 | `tools/python/REPORT_PY112.md` | ~100 | PY-112 (#2932・部分): getGridBit・getGridBitWithLoop の件数超えを PE 照合 (位置の範囲検査なし・件数超えは event 経路。RANGE を外して false)。loop 分岐の条件式は PE で確定。T の書込み元と G2 の値は未確定 (子 #3595・#3596) |
 | `tools/python/REPORT_PY111.md` | ~140 | PY-111 (#2929): channels.setGridBit・fillEachNSteps が作る note の生成経路 (0x12d4100 の creation path・init 0x1062210・既定値の PE 照合・param 8 の書込み元 0x12d42ac)。C provider・mock の既定値を PE に合わせ、channels_diff に param 7/8 の検査を追加。実測は REPORT_PY111 §6 |
@@ -885,9 +889,11 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_3905.md` | 64 | fs: (TEB) を読み書きする 8 関数のうち 3 本の native vs wasm 突合 192/192・ネガコン (fs 基底を TEB 相当の buffer に向ける方式、 0 埋めと非 0 の TEB)。 残り 5 本は子 PLG-G2-52 (#4356)、 巨大 heap 経路は PLG-G2-53 (#4357)。 測定値の正本 (REPORT §13 の付録) |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4065.md` | ~60 | x87 native ランナー (`x87_fn_native.c`) の終了コード化 (#4065 PLG-G2-41) と、#3715 の 12 本の初期実測 (native SIGSEGV 6 本・wasm 側 6 本は未確認)。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4088.md` | ~90 | 残り x87 leaf 関数 12 本 (#4065 の一覧) の差分試験の結果と、判定を通らない 3 種類の理由 (ebp 相対の非自明性・空スタック読み・ecx 基底の segfault)。 測定値の正本。 TARGETS は 2 本のまま (#4088) |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4087.md` | ~70 | x87 leaf 12 本の異常終了の原因 (#4087 PLG-G2-44)。 native SIGSEGV 6 本の落ちる命令と読み先 (strace si_addr)・wasm 側の trap の有無。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4066.md` | ~45 | x87 断片 10 本の入口判定 (#4066 PLG-G2-42): 直接 call・間接ジャンプテーブルの参照から callee 4 本と switch-arm 断片 6 本に分類 (規則は `x87_fn_diff.py --classify`)。 親関数の入口は未確定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2989.md` | ~115 | x87 を含む leaf 関数 2 本の native vs wasm 差分試験 (#2989 PLG-G2-25): eax・x87 深さ・ST(0)・OBJ 窓の突合、ST(0) の f64 の丸め差の分布、ネガコン 2 種 (判定器・lowering の 1 演算の取り違え)、例外値 (NaN・inf・非正規・±0) の突合 (#3716 PLG-G2-32、§7。 NaN どうしのビット差は未解決)。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_3715.md` | ~130 | x87 leaf 関数 42 本の候補の分類 (§2)・突合が成立した 5 本の測定 (§4)・構造が一致しない・ランナーが異常終了する関数の未解決 (§5・子 #4064・#4065・#4080)。 PLG-G2-31 (#3715)。 測定値の正本 |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4080.md` | ~45 | x87 独立入口 4 本の引数形 (逆アセンブル確定) と突合 (thiscall 2 本は TARGETS、cdecl double 2 本は PROBE)。 断片 6 本の親入口 `0x1000c077` は未確定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4064.md` | ~60 | x87 leaf 3 本 (`0x10009eb5`・`0x1000b526`・`0x1000bf60`) の eax・ST(0) の差の切り分け (#4064 PLG-G2-40): 模型 (`ott_x87.h`) の例外フラグ・C1 の限界。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4105.md` | ~60 | `0x1000bf60` の ST(0) の NaN・ゼロの食い違いの分類 (#4105 PLG-G2-47): 非 normal オペランド (denorm・unnorm) で模型の限界 (例外処理)、normal 系は一致。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4185.md` | ~60 | `0x10009eb5` の ST(0) の NaN の原因 (#4185 PLG-G2-51): `frndint` ではなく空スタックの読み (underflow) による。 仮説の検証 (一時変更・コミットせず) と未解決。 測定値の正本 |
@@ -931,6 +937,7 @@
 | `tools/shared/lift/rex/REPORT_APPENDIX_3589.md` | ~50 | rex REPORT の付録 (T-SH-90 #3589: movnti の到達 (memset 8 箇所は a1 ≥ 0x70000 で入力だけで到達・memcpy 16 箇所は直接 call では到達しない)・x64c 対応の要否・未解決) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_3894.md` | ~40 | rex REPORT の付録 (T-SH-94 #3894: info 4 件の trap の原因 (ハーネス入力の arena 越境・lift の欠陥ではない)・movnti 閾値 0x70000 の sweep 実測 64/64) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2969.md` | ~45 | rex REPORT の付録 (T-SH-48 #2969: 中核閉包 (REXCreate / REXGetInfoFromBuffer / REXRenderSlice) の owner tier 配置と REX_SIDE 除外の実測。測定 commit `9593fe1c1`) |
+| `tools/shared/lift/rex/REPORT_APPENDIX_4833.md` | ~60 | rex REPORT §12 (T-SH-129 #4833: `.data` 書込 stub の到達元 (DllMain `reason==1` 経路)・呼出連鎖・DllMain 閉包の規模 (import 63・movnti 24)・実行方法 (方式 A)。測定 `writer_chain.py` (静的)) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_3587.md` | ~53 | rex REPORT §11 (T-SH-88 #3587: REXGetInfo (fn=1) の成功経路 (戻り値 1) の arena 書込の全バイト一致・`.data` 書込は DllMain 初期化経路で export からは到達しない (子 #3850)。測定 commit `142df3b53`) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_3588.md` | ~75 | rex REPORT の付録 (T-SH-89 #3588: 元の機械語が落ちる 73 件の分類 (fault 命令・レジスタ・入力による切り分け)・ネガコン・未解決。測定 commit `54b2272b0`) |
 
@@ -1006,6 +1013,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_2176.md` | 125 | KH-35 (#2176): 対照 Gain の before 160 関数の AI 判定 (人手検証ではない。`verified` 列は 160 行とも auto のまま。人手確認は #3254)・検算 `gain_manual_check.py` とネガティブコントロール・ROOT 27 行の vtable slot・保持規則の限界。測定値の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3064.md` | ~36 | KH-37 (#3064): 対照 Gain の x64c 閉包 148 と `gain_before_160.tsv` 160 行の数え方の差 12 件 (iat_thunk 2・tail_absorbed 9・SEH 着地点 1) と、`0xfd0995` が SEH の `__except` 着地点である実測 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3065.md` | ~90 | KH-38 (#3065) 対照 Gain before 160 closure の unsup 285 site / 48 種 → 0 (flelift x64c の VEX/FMA/rcr 被覆)。before/after の測定値の正本。再測定 `scripts/lift_closure_x64c.sh`、差分テスト `tools/flelift/tests/x64c_vex_diff.py`、rcr 実機照合 `tools/flelift/tests/rcr_native_check.py` |
+| `tools/targets/kilohearts/REPORT_APPENDIX_4838.md` | ~60 | KH-119 (#4838): Delay の代入の pointer⇔整数 5 行の規則 (`DELAY_RULES`)。測定と未解決 (呼出元の確認 #4894) は付録の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4685.md` | ~60 | KH-108 (#4685): Delay の型不一致 残り 3 行を機械語で確定し `DELAY_RULES` で規則化。残件の起票先は REPORT 付録 ③。結果の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4687.md` | ~50 | KH-110 (#4687): Delay の BINOP 残件のうち `_DAT_` グローバル 4 件 (`184162118`・`184162a88`・`184162a98`・`182989380`) を `GTYPE` の `ulonglong` に直した規則 (型不一致 110 → 104・emcc 363 → 357・Gain/Haas/Gate の `.o` 不変)・残件の分類と起票先。測定の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3849.md` | ~45 | KH-80 (#3849): Delay の型不一致 残件のうち Win API 戻り値 9 件 (`HeapAlloc`・`GetCurrentProcess`・`RtlLookupFunctionEntry`・`RtlPcToFileHeader`) を shim の戻り型 `longlong` で解消 (119 → 110)・Gain/Haas/Gate の `.o` 不変。残り 23 件 (関数ポインタ 9・void 戻り値 7・BINOP 7) は子 issue へ。結果の正本 |
