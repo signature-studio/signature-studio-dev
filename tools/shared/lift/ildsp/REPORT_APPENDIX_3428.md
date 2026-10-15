@@ -86,7 +86,7 @@ origin/main の x64c で同じ root を lift すると unsup 2,472 (issue 本文
 
 | 測定 (`39fbdae8a`) | 結果 |
 |---|---|
-| `lift_wc.sh ok` (WaveformColouring 回帰) | **PASS 64/64**・FAIL 0・traps 0・native SIGSEGV/SIGBUS 0・functions 60・insns 2,656・unsup 2 (`vpmovsxdq`・`vshufps`)・wasm 138,736 B・18.58 s (load 0.50→1.20)・rc 0 |
+| `lift_wc.sh ok` (WaveformColouring 回帰) | **PASS 64/64**・FAIL 0・traps 0・native SIGSEGV/SIGBUS 0・functions 60・insns 2,656・unsup 2 (`vpmovsxdq`・`vshufps`)・wasm 138,736 B・18.58 s (emcc の system library を生成した初回。load 0.50→1.20)・rc 0。2 回目以降は約 2 s |
 | `lift_psola.sh ok` (CreateInstance + slot 0・4・5) | **PASS 64/64**・FAIL 0・traps 0・functions 36・insns 1,046・unsup `{}`・wasm 80,737 B・1.71 s (load 1.10→1.09)・rc 0 |
 | 閉包 99 の lift (base `b5435017a`) | functions 235・insns 60,095・traps 0・**unsup 2,472** (§3 の内訳と一致)・2.67 s・rc 0 |
 | 閉包 99 の lift (head `39fbdae8a`) | functions 235・insns 60,095・traps 0・**unsup 0**・2.76 s・rc 0 |
