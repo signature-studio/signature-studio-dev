@@ -43,6 +43,9 @@
 #   open の障害 issue があれば追記のみ (OC_WORKER_NOTE_MIN 分に 1 回まで)。24 時間以内に close した障害 issue は reopen して追記する。
 #   fresh が true で last_tick が 5 分以内なら、open の障害 issue にコメントして close する。
 #   ファイルが無い・取得失敗・JSON 不正は警告だけ出して何もしない (終了コードは変えない)。OC_WORKER_URL_FILE で URL のファイルを差し替えられる (テスト用)。
+#   launch の停止 (#CI-135): /status の launch_halted (区間 {reason, since}) が止まっていて launch_halted_overdue が true (15 分以上止まり、着手待ちと空き枠がある) なら、
+#   障害 issue に理由と止まり始めを追記する (無ければ上と同じ規則で起票。題名は『PM Worker launch 停止』)。reason が review-only (意図した停止) なら追記しない。
+#   止まっている間 (review-only を除く) や形の読めない launch_halted の間は、fresh でも回復として close しない。launch_halted が無い・null なら従来どおり。
 #
 # PM Worker の率制限 alert (#CI-142): fresh=true の /status で、rate_limit_alert が true (Worker が 5 件・30%・2 回連続と判定。ratealert.ts)
 #   または rest_remaining が 1500 未満 (ratelimit.ts) なら、ラベル oc:rate-limit の open issue があれば 60 分に 1 回まで追記、無ければ
@@ -164,6 +167,7 @@ WORKER_NOTE_MIN="${OC_WORKER_NOTE_MIN:-60}" # 既存の障害 issue への追記
 WORKER_TITLE_LIMIT=3000 # [CI-n] の採番に読む題名の件数 (gh の既定値では足りない)。これに達したら一覧が欠けうるので起票しない
 worker_line="worker=unknown"
 worker_status_json=""
+launch_state=none launch_reason="" launch_since="" launch_overdue=false
 worker_open_issues() { # open で pm-worker-down ラベルの issue を「番号 作成時刻」で新しい順に出す。一覧が取れなければ失敗 (REST の一覧は PR だけを返す場合があるため gh issue list を使う)
   local raw
   raw="$(gh issue list --repo "$R" --state open --label "$WORKER_LABEL" --limit 200 --json number,createdAt,closedAt)" || return 1
@@ -172,19 +176,26 @@ worker_open_issues() { # open で pm-worker-down ラベルの issue を「番号
 worker_status_copy() { # worker_status_copy <status json>: /status の写し。秘密を示す名前のキーは念のため除く
   jq -S 'walk(if type == "object" then with_entries(select(.key | test("token|secret|key|private|password|pem|jwt|credential"; "i") | not)) else . end)' <<< "$1"
 }
-worker_body() { # worker_body <kind: new|note> <理由> <status json>
-  local at
+worker_body() { # worker_body <kind: new|note> <理由> <status json> [what: worker (既定) | launch]
+  local at what="${4:-worker}"
   at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  if [ "$1" = new ]; then
+  if [ "$1" = new ] && [ "$what" = launch ]; then
+    printf '%s\n' "PM Worker (\`signature-studio-pm\`) は稼働していますが、launch が止まっています。watchdog.sh が \`/status\` を読んで検知しました (${at})。" ""
+    printf '%s\n' "- 判定: $2" "- 条件: \`launch_halted\` があり、\`launch_halted_overdue\` が true (15 分以上止まり、着手待ち (ready) と空き枠 (room) がある。\`review-only\` は除く)" ""
+  elif [ "$1" = new ]; then
     printf '%s\n' "PM Worker (\`signature-studio-pm\`) が停止している可能性があります。watchdog.sh が \`/status\` を読んで検知しました (${at})。" ""
     printf '%s\n' "- 判定: $2" "- 条件: \`configured\` と \`installed\` がともに true (一度でも稼働に入った Worker) で、\`fresh\` が false、または \`last_tick\` が 15 分より古い" ""
+  elif [ "$what" = launch ]; then
+    printf '%s\n' "[watchdog] launch はまだ止まっています (${at})。判定: $2" ""
   else
     printf '%s\n' "[watchdog] PM Worker はまだ回復していません (${at})。判定: $2" ""
   fi
   printf '%s\n' "## /status の写し (集計のみ。秘密を含まない)" '```json'
   worker_status_copy "$3"
   printf '%s\n' '```' ""
-  if [ "$1" = new ]; then
+  if [ "$1" = new ] && [ "$what" = launch ]; then
+    printf '%s\n' "確認すること: \`launch_halted.reason\` の条件 (infra/pm-worker/README.md『launch の停止と通知』の表)。止まりが解けると (\`launch_halted\` が null に戻り、\`fresh\` が true かつ \`last_tick\` が 5 分以内) watchdog.sh がこの issue にコメントして close します。" "" "@pycabbage" "<!-- oc-worker-down -->"
+  elif [ "$1" = new ]; then
     printf '%s\n' "確認すること: cron / Durable Object alarm の停止・例外、GitHub App (PM) の失効。回復すると (\`fresh\` が true かつ \`last_tick\` が 5 分以内) watchdog.sh がこの issue にコメントして close します。" "" "@pycabbage" "<!-- oc-worker-down -->"
   else
     printf '%s\n' "<!-- oc-worker-down-note -->"
@@ -210,8 +221,8 @@ ci_next_title_n() { # ci_next_title_n: [CI-n] の次の番号 (題名の最大 +
   maxn="$(jq -s -r '[.[][] | (.title // "") | capture("^\\[CI-(?<n>[0-9]+)[a-z]?\\]") | .n | tonumber] | max // 0' <<< "$all"$'\n'"$allpr")"
   ci_next_n=$((maxn + 1))
 }
-worker_down() { # worker_down <status json> <理由>
-  local body="$1" reason="$2" open target created cm last closed f="${RUNNER_TEMP:-/tmp}/oc-worker-down-body.md"
+worker_down() { # worker_down <status json> <理由> [what: worker (既定) | launch]
+  local body="$1" reason="$2" what="${3:-worker}" open target created cm last closed title f="${RUNNER_TEMP:-/tmp}/oc-worker-down-body.md"
   if ! open="$(worker_open_issues)"; then
     echo "::warning::failed to list $WORKER_LABEL issues; no issue is filed or updated"
     return 0
@@ -231,7 +242,7 @@ worker_down() { # worker_down <status json> <理由>
       echo "worker: #$target is already reported (last note ${last}); no new note"
       return 0
     fi
-    worker_body note "$reason" "$body" > "$f"
+    worker_body note "$reason" "$body" "$what" > "$f"
     do_it "add a note to the open $WORKER_LABEL issue #$target" worker_note "$target" "$f"
     return 0
   fi
@@ -242,14 +253,15 @@ worker_down() { # worker_down <status json> <理由>
   target="$(jq -r --argjson sec "$WORKER_REOPEN_SEC" \
     '[.[] | select(.pull_request == null and .closedAt != null and (.closedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > (now - $sec))] | sort_by(.closedAt) | last | .number // empty' <<< "$closed")"
   if [ -n "$target" ]; then
-    worker_body note "$reason" "$body" > "$f"
+    worker_body note "$reason" "$body" "$what" > "$f"
     do_it "reopen #$target (closed within 24h) and add a note" worker_reopen "$target" "$f"
     return 0
   fi
   ci_next_title_n || return 0
-  worker_body new "$reason" "$body" > "$f"
-  do_it "file '[CI-$ci_next_n] PM Worker 停止 ($(date -u +%Y-%m-%d))' with label $WORKER_LABEL" \
-    worker_file "[CI-$ci_next_n] PM Worker 停止 ($(date -u +%Y-%m-%d))" "$f"
+  title="[CI-$ci_next_n] PM Worker 停止 ($(date -u +%Y-%m-%d))"
+  [ "$what" = launch ] && title="[CI-$ci_next_n] PM Worker launch 停止 ($(date -u +%Y-%m-%d))"
+  worker_body new "$reason" "$body" "$what" > "$f"
+  do_it "file '$title' with label $WORKER_LABEL" worker_file "$title" "$f"
 }
 worker_recovered() { # worker_recovered <last_tick> <age 秒>: open の障害 issue にコメントして close する
   local open line
@@ -262,6 +274,32 @@ worker_recovered() { # worker_recovered <last_tick> <age 秒>: open の障害 is
     do_it "close #${line%% *} (PM Worker recovered)" gh issue close "${line%% *}" --repo "$R" \
       --comment "[watchdog] PM Worker が回復しました (fresh=true、last_tick=$1、$(($2 / 60)) 分前)。この issue を close します。24 時間以内に再び停止した場合は reopen します。<!-- oc-worker-recovered -->"
   done <<< "$open"
+}
+launch_parse() { # launch_parse <status json>: launch_halted の形を読む (#CI-135)。launch_state は none (止まっていない) / halted / unknown (形が読めない)
+  launch_state=none launch_reason="" launch_since="" launch_overdue=false
+  launch_state="$(jq -r '
+    if (.launch_halted_overdue // false | type) != "boolean" then "unknown"
+    elif .launch_halted == null then "none"
+    elif (.launch_halted | type) == "object" and (.launch_halted.reason | type) == "string" and (.launch_halted.since | type) == "string" then "halted"
+    else "unknown" end' <<< "$1")" || launch_state=unknown
+  case "$launch_state" in
+    halted)
+      launch_reason="$(jq -r .launch_halted.reason <<< "$1")"
+      launch_since="$(jq -r .launch_halted.since <<< "$1")"
+      launch_overdue="$(jq -r '.launch_halted_overdue // false' <<< "$1")"
+      ;;
+    none) ;;
+    *)
+      launch_state=unknown
+      echo "::warning::/status launch_halted has an unexpected shape; launch check skipped"
+      ;;
+  esac
+}
+launch_abnormal() { [ "$launch_state" = halted ] && [ "$launch_reason" != review-only ]; } # 止まっている launch (意図した review-only を除く)
+launch_hold() { [ "$launch_state" = unknown ] || launch_abnormal; }                       # 止まっている間・形が読めない間は、fresh でも回復として close しない
+worker_launch() { # 止まっている launch が overdue (15 分以上・着手待ちと空き枠あり) なら、障害 issue に理由と起点を追記する (起票・重複排除は worker_down の規則)
+  launch_abnormal && [ "$launch_overdue" = true ] || return 0
+  worker_down "$worker_status_json" "launch が止まっています (reason=$launch_reason、止まり始め $launch_since)" launch
 }
 worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返す
   local url body cfg inst fresh tick age="" ts reason=""
@@ -288,6 +326,7 @@ worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返
     return 0
   fi
   worker_status_json="$body"
+  launch_parse "$body"
   cfg="$(jq -r .configured <<< "$body")"
   inst="$(jq -r .installed <<< "$body")"
   fresh="$(jq -r .fresh <<< "$body")"
@@ -298,7 +337,11 @@ worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返
   fi
   if [ "$fresh" = true ] && [ -n "$age" ] && [ "$age" -le "$WORKER_RECOVER_SEC" ]; then
     worker_line="worker=ok (fresh=true last_tick=${age}s ago)"
-    worker_recovered "$tick" "$age"
+    if launch_hold; then
+      worker_launch
+    else
+      worker_recovered "$tick" "$age"
+    fi
   elif [ "$cfg" != true ] || [ "$inst" != true ]; then
     worker_line="worker=not-set-up (configured=$cfg installed=$inst; no issue is filed)"
   elif [ "$fresh" = false ]; then
@@ -314,6 +357,10 @@ worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返
     worker_down "$body" "$reason"
   else
     worker_line="worker=ok (fresh=true last_tick=${age}s ago)"
+    worker_launch
+  fi
+  if [ "$launch_state" = halted ]; then
+    worker_line="$worker_line launch=halted (reason=$launch_reason、止まり始め $launch_since、overdue=$launch_overdue)"
   fi
   return 0
 }
