@@ -24,7 +24,7 @@
 
 ## 手段
 
-- 素材: `fl-win64` (`$ARTIFACTS_DIR`・`tar --zstd -xf` で 8.2 秒で展開)。`toolchain-emsdk` の素材は取得されていなかったため、上流 emsdk を `git clone` して `emsdk install 6.0.12` (pin は `tools/m1/flags.sh`) で導入し、`/opt/emsdk` に symlink した。
+- 素材: `fl-win64` (`tar --zstd -xf` で 8.2 秒で展開)。`toolchain-emsdk` の素材は取得されていなかったため、上流 emsdk を `git clone` して `emsdk install 6.0.12` (pin は `tools/m1/flags.sh`) で導入し、`[EMSDK]` の位置に symlink した。
 - `build_cpython_wasm.sh` (rc 0)、`fetch_inputs.sh` (rc 0・stubs 取得)、`build_flpy.sh` (rc 0・`dist/flpy.js` 生成)。`extract_pyc_blocks.py` (rc 0)。
 - `extract_pyc_blocks.py` (pyc 40・pyscript 2・drum_patterns 1)。
 - 同 probe の出力は `work/` 配下 (gitignore)。
