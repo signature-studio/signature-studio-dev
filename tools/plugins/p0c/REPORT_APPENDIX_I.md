@@ -64,6 +64,7 @@
 
 ### 21.7 検証範囲
 
-- 測定 commit: `14731ce2c` (コードを変えた最後の commit)。その後の commit は本 REPORT のみ。
-- `git diff 14731ce2c HEAD -- tools/plugins/p0c ':!*REPORT*'` の出力: 空 (後続 commit はコード変更なし)。
+- 測定 commit: `14731ce2c` (測定に使ったコード)。その後の commit は REPORT・DOC_MAP と、`p0c4_abi_e2e.py` のコメント 1 行 (`REPORT_APPENDIX_H §20` → `REPORT_APPENDIX_I §21`) だけ。
+- `git diff 14731ce2c HEAD -- tools/plugins/p0c ':!*REPORT*'` の出力: `p0c4_abi_e2e.py` の 199 行目のコメント 1 行の `-`/`+` 組のみ。
+- 同ファイルを `ast.dump` で比べると、14731ce2c 版と HEAD 版は一致 (コメントは AST に入らない)。実行されるコードは測定時と同じで、測定値は現 HEAD に有効 (WORKFLOW §6)。
 - 未実行: `p0c_e2e.sh` の全段 (kernel_matrix を含み数分)、`p0c4_nega.py`。`k80_argfix.py` を使う p0c2 / p0c3 / p0c4 の経路は 21.3 で実行済み。
