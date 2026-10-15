@@ -241,4 +241,4 @@ GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow �
 | 6. `oss/ffmpeg`・`oss/lame` (PoC ハーネス) と `oss/ilsvg` は record を書かない (配布用の `sidemod` が書く。ilsvg は `bundled=false`) | ilsvg を同梱化するとき記録が必要 | [T-SH-18] #19 にコメント |
 | 7. LGPL §6(b) の「適切な共有ライブラリ機構」に side module が当たるかは未確定 | NOTICES の案内文は事実記述のみ | LGL-4 #87 (既出) |
 | 8. `guard.test.mjs` #6 が `randomBytes` 依存で不安定 (上記 791/20000)。本 PR は未修正 | `pnpm release-guard:test` が偶発的に 11/12 になる | 新規 `[LGL-n]` (LGL-2 の test fix: 固定バイト列にする)。PM が起票 |
-| 9. `ci/notices.patch` (paths 撤去) は未適用。適用後の実 run (job の発火・所要) は未確認 | 適用まで filter の外の LICENSE 追加を検出しない | #3301 (PM が適用して実 run を確認後に close) |
+| 9. `ci/notices.patch` (paths 撤去) は未適用。適用後の実 run (job の発火・所要) は未確認 | 適用まで filter の外の LICENSE 追加を検出しない | #3395 [LGL-12] (親 #3301。PM が適用して実 run を確認) |
