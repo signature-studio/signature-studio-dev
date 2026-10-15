@@ -247,5 +247,4 @@ PSOLA の閉包の正本は vtable 経由 (82 関数・4,601 命令・間接 cal
 ## 9. PSOLA_CreateInstance 閉包の x64c lift — T-SH-82 (#3428・部分達成)
 
 ### 結論 (1 行)
-PSOLA 閉包 (CreateInstance + vtable slot 先) の unsup を 2,472 site から 0 にした (ymm 算術・vextractf128 ほか)。命令単位の差分 88 件 PASS、WaveformColouring の回帰 PASS 64/64。閉包単位の native 差分は子 issue に分離。
-全文 (再現・内訳・差分テストの内訳・実測・未解決) は `REPORT_APPENDIX_3428.md` が正本 (測定 commit `e49bf7c9d`)。
+PSOLA 閉包 (CreateInstance + vtable slot 先) の unsup を 2,472 site から 0 にした (ymm 算術・vextractf128 ほか)。命令単位の差分 88 件 PASS、WaveformColouring の回帰 PASS 64/64。閉包単位の native 差分は子 issue に分離。 全文 (再現・内訳・差分テストの内訳・実測・未解決) は `REPORT_APPENDIX_3428.md` が正本 (測定 commit `e49bf7c9d`)。
