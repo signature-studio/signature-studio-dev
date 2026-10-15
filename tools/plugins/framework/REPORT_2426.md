@@ -88,3 +88,75 @@ cd tools/plugins/work/hs && node ../../framework/hostshim/hs_preinit.mjs ../fw/f
 
 - 逆アセ確認: `objdump -d -M intel --start-address=0x414390 --stop-address=0x4143d0 tools/plugins/work/fw/fw_icall.dll`・同 `0x40ffe0`・`0x40c4d0`。
 - 計測用の probe (BLK 値とチェーンの表示) は scratch で、コミットしていない。
+
+## 9. #2534: `function_40c4d0` の入力定数を修復 (InitUnits は idx 18 で止まったまま・止まりの原因を記録)
+
+- 担当 issue: #2534 `[PLG-P0b-19]` (親 #2426)。受入 1 は部分達成 (40c4d0 の IR 修復は済・DllMain は未完走)。受入 2・3 は未達 (未到達) で、子 #3355 (`[PLG-P0b-34]`)・#3356 (`[PLG-P0b-35]`) へ移した。
+- 測定 commit: `b87aa8e6` (コードを変えた最後の commit・`hs_irfix.py` の `fix_40c4d0` / `fix_40b3f0`)。起点 `origin/main` `8303a813`。
+- 結論: `function_40c4d0` の rcx (this) と `[rcx]` の読みを、BLK+0x08 と実メモリから読むように直した (`hs_irfix.py` `fix_40c4d0`)。`function_40b3f0` のエントリ引数 (this・flag) も同じ型で直した。それでも DllMain(attach) は `function_40c4d0` で OOB し、InitUnits は idx 18 のまま (unit counter=19/290)。OOB の直接原因は this = 0 (§9.3)。
+
+### 9.1 実測
+
+環境: 4 vCPU・RAM 15 GiB。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開、`work-fw-stage1`・`work-liftlib` を worktree 直下に展開 (`$ARTIFACTS_DIR` の実在を確認済み)。`/opt/emsdk`・`/opt/retdec` は runner に既存。load は `/proc/loadavg` の 1 分値 (開始 → 終了)。
+
+| 手順 | commit | 結果 | 所要 (real) | load |
+|---|---|---|---|---|
+| `fw_stage2.sh` (非 fresh・stage-1 から全生成・n=1) | 8303a813 (stage-2 は本 PR の対象外) | rc 1。`fw_flat4_canon3.ll` 等は生成済み。末尾の `fw_smoke_check` が FAIL (runerr got 1 / expect 0、init_reach got 16 / expect 288)。`SMOKE PASS` (`dispatch=38 units_done=0 va=1 heap=1 ff=0`) は出る | 7 分 10 秒 | 0.76 → 2.28 |
+| `hs_e2e.sh --fresh` (修正 1: fix_40c4d0) | 8303a813 + 修正 | rc 1。Phase A PASS (`dispatch=38 ff=0`)・Phase B `memory access out of bounds`・`plug=0x0 rec=7` | 2 分 38.9 秒 | 未記録 |
+| `hs_e2e.sh --fresh` (修正 3: fix_40b3f0 追加・最終) | **b87aa8e6** | rc 1。Phase A PASS (`dispatch=38 ff=0`)・Phase B `memory access out of bounds`・`plug=0x0 rec=7` | 2 分 40 秒 | 0.61 → 0.98 |
+| `hs_preinit.mjs` (最終) | b87aa8e6 | DllMain OOB。チェーン `0x445a40 → 0x43ecb0 → 0x439df0 → 0x43b130 → 0x40c4d0` (wasm `0x4e67d`)。`unit counter=19/290`。`[0x710030]=0x404c00`・`[0x710038]=0x404c10`・`[0x710040]=0x43d940` | 計時なし | 計時なし |
+| `hs_e2e.sh` 増分 n=3 (最終) | b87aa8e6 | 3 回とも rc 1・Phase A PASS・Phase B OOB (`status=0xffffffff plug=0x0 rec=7`) | 344 / 349 / 339 ms (`date +%s%N` 差分) | 計時なし |
+
+- `fw_smoke_check` の FAIL は本 PR の前から起きている (origin/main `8303a813` の stage-2 で再現)。本 PR は hs 経路 (`hs_irfix.py`) だけを変え、stage-2 の生成物 (`fw_flat4_canon3.ll`) は変えない。framework 単体の期待値 (`init_reach=288`) との差は未解決 (§9.5)。
+- `hs_e2e` の増分 n=3 は最終の `--fresh` (b87aa8e6) の後に、同じ `hs_route.cjs` で取った。
+
+### 9.2 修復 (`hs_irfix.py`)
+
+- `fix_40c4d0` (native `0x40c4d0`: `mov rax,[rcx]`・`movsxd rax,[rax-0x80]`・`lea rsi,[rcx+rax-8]`)。lift は rcx を文字列定数 `@1` (`"$"`・1 byte = 0x24) に畳み、`[rcx]` の読みを定数 `inttoptr -92` (= 0x24 − 0x80) にしていた。修復: `rcx = load BLK+0x08`・`vt = load [rcx]`・`load i32 [vt-0x80]`。`rdx`/`r8` の定数 store (`@2`・`@4`) は関数内で書換えないため消して caller の値を素通しにする。出力 `function_40c4d0 patched`。
+- `fix_40b3f0` (native `0x40b3f0`: `this=rcx`・`flag=dl`、flag≠0 なら `call 0x40bce0(rcx, rdx=flag)`)。lift は this を `@594`・flag を `@593` ("$") に畳んでいた。修復: this = `load BLK+0x08`、flag = `load i8 BLK+0x10` を entry で 1 回読み、以降の分岐は SSA 値を使う。出力 `function_40b3f0 patched`。
+- Phase A (framework smoke) は全修正で `dispatch=38 ff=0` の PASS を維持 (回帰なし)。
+
+### 9.3 直接原因: `function_40c4d0` の this が 0
+
+- probe (`work/hs/probe_40c4.mjs`・scratch・コミットせず): `function_43b130` が `call function_40c4d0` の前に rcx として読む `[0x7165b8]` は、OOB の時点で **0**。`[0]` を VMT として読むと `0xa56b6705` (ゴミ) になり、`[vt-0x80]` が範囲外になる。
+- `0x7165b8` の書込み (native): `0x445b06` (`function_445a40` 内・`call 0x40b3f0` の戻り値 `rax` を格納) と `0x824d94` (別関数) の 2 箇所。`0x445a40` では `0x445b12` で `call 0x43ecb0` に入る。lift の `function_445a40` も同じ順で、`store i64 %90, ptr inttoptr (i64 7431608)` (IR 172057 行) の後に `call function_43ecb0` (172098 行) がある。つまり lift では `function_40b3f0` の戻り値が 0 で、それが store された。
+- `function_40b3f0` の戻り値は `function_40bce0` (VMT 呼出し `__icall_dispatch(4242670)` の後 BLK+0x80 を返す) か `function_40bd20` の戻り値。`function_40bce0` も this と分岐 (`and(@578,@578)` の符号) を `"$"` 定数 (`@578`・`@579`) に畳んでおり、同じ型。ここまでは確認したが、戻り値が 0 になる最終経路は未特定 (推定・未検証)。
+- 定数 `@593` ("$") の参照は `fw_flat4_canon3.ll` に 515 行ある (`grep -c`)。entry 引数の "$" 畳み込みは関数単位で広く起きており、生成側の修復は #2510 (`[PLG-P0b-18]`) の範囲。本 PR は hs 経路の個別修復にとどめる。
+
+### 9.4 受入条件の判定
+
+| 受入 | 結果 |
+|---|---|
+| 1. `function_40c4d0` の入力定数化を IR 修復で解消・DllMain が InitUnits を完走 (unit counter=290) か、止まる次の idx と原因を記録 | 部分達成。40c4d0 の IR 修復は済 (`fix_40c4d0`)。完走は未達 (idx 18 で停止・unit counter=19)。止まりの原因は §9.3 (this=0・`function_40b3f0` の戻り値 0)。残り → 子 #3355 (`[PLG-P0b-34]`) |
+| 2. `function_40ffe0` の `jne` 分岐落ちを確認し、native 戻り値と hs 経路 r8 を実測で比べる | 未達 (未到達)。InitUnits が idx 18 で止まるため、hs 経路で `function_40ffe0` に到達しない。動かしていない。残り → 子 #3356 (`[PLG-P0b-35]`) |
+| 3. InitUnits 完走後、同一 instance で Phase B を実行し `plug != 0` を n≥3 で示す。`[0x710030]`・`[0x710038]`・`[0x710040]` を確認 | 未達。Phase B は n=3 とも `plug=0x0` で OOB。`[0x710030]=0x404c00`・`[0x710038]=0x404c10`・`[0x710040]=0x43d940` は観測したが、完走前の値で判定には使えない。残り → 子 #3356 (`[PLG-P0b-35]`) |
+
+### 9.5 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `function_40b3f0` → `40bce0`/`40bd20` の戻り値 0 (this=0 で `40c4d0` が OOB)。entry 引数の "$" 畳み込み (`@578`・`@579`・`@593`・`@594`) | InitUnits idx 18 の完走 (受入 1・3) | 子 #3355 (`[PLG-P0b-34]`) (hs 経路の個別修復)。生成側は既存 #2510 |
+| `function_40ffe0` の `jne` 分岐落ちと r8 の値の実測 | 受入 2 | 子 #3356 (`[PLG-P0b-35]`) |
+| InitUnits 完走後の Phase B `plug != 0` (n≥3) | 受入 3 | 子 #3356 (`[PLG-P0b-35]`) ([PLG-P0b-34] 完了後) |
+| `fw_stage2.sh` の `fw_smoke_check` FAIL (runerr 1/0・init_reach 16/288) | framework 単体の照合が red。本 PR の変更とは無関係 (8303a813 で再現) | 起票先なし。既存の差分として本節に記録 (#2426 の REPORT §5 の表と同じ扱い) |
+
+### 9.6 製品 KPI (起動経路の変更)
+
+| 指標 | 前 | 後 (b87aa8e6) |
+|---|---|---|
+| FLEngine 起動 dispatch 数 (Phase A `dispatch=`) | 38 (§1 a63e33ab 実測。本 run の 8303a813 の stage-2 smoke でも 38) | 38 |
+| 通過 unit 数 (InitUnits `unit counter`) | 19 / 290 (§1 と同じ idx 18 で停止) | 19 / 290 (変化なし) |
+| 最初のウィンドウ | なし (`plug=0`) | なし |
+
+### 9.7 再現
+
+```sh
+export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 ANALYSIS_DIR=$RUNNER_TEMP/analysis
+mkdir -p $RUNNER_TEMP/fl-win64 && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64
+tar --zstd -xf $ARTIFACTS_DIR/work-fw-stage1.tar.zst && tar --zstd -xf $ARTIFACTS_DIR/work-liftlib.tar.zst   # repo ルートで展開
+bash tools/plugins/framework/fw_stage2.sh                        # 非 fresh で stage-2 を生成 (smoke_check は §9.5 の FAIL)
+bash tools/plugins/framework/hostshim/hs_e2e.sh --fresh           # Phase A PASS・Phase B OOB (2 分 40 秒)
+cd tools/plugins/work/hs && node ../../framework/hostshim/hs_preinit.mjs ../fw/fw_image.bin hs_route.cjs   # DllMain のチェーン
+```
+
+- 逆アセ: `objdump -d -M intel --start-address=0x40c4d0 --stop-address=0x40c540 tools/plugins/work/fw/fw_icall.dll`・同 `0x40b3f0`・`0x445a40` (`0x445b06` の `0x7165b8` 格納)・`0x43b130` (`0x43b17e` の `0x7165b8` 読み)。
