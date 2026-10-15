@@ -102,7 +102,7 @@ pdata の関数境界ごとに逆アセンブル (capstone) し、E8/E9 の直�
 
 ## 7. 測定 (`lift2/fa31_refs.py`)
 
-- 測定 commit: 本節の commit (`fa31_refs.py` を追加した commit)。`git diff <測定 commit> HEAD -- tools/targets/freshair/lift2` = 0 行 (以後の変更は本付録のみ)。
-- `python3 tools/targets/freshair/lift2/fa31_refs.py "<SlateCore.core_64>"`: 9.6 s (n=1)。素材 `plugins-freshair` を展開済み (`fetch.sh`)。
+- 測定 commit: `12c4a4fda` (`fa31_refs.py` を追加した commit)。`git diff 12c4a4fda HEAD -- tools/targets/freshair/lift2` = 0 行 (以後の変更は本付録のみ)。
+- `python3 tools/targets/freshair/lift2/fa31_refs.py "<SlateCore.core_64>"`: rc=0・9.8 s (n=1)・load 0.14→0.27・出力 13 行 (VA ごとの 1 行 + data-ptr 1 行)。素材 `plugins-freshair` を展開済み (`fetch.sh`)。
 - 判定には使わない (表示のみ)。harness (`native/native_ctrl.c`) と `run_fa9.sh`・`run_ctrl.sh` の経路は本 commit で変えていないため、再測定は不要 (WORKFLOW §6)。
 - 製品 KPI: 動かしていない (静的解析のみ。起動・GUI の挙動は不変)。
