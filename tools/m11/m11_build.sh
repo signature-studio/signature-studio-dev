@@ -26,7 +26,7 @@ M11_LINK_INSTR="${M11_LINK_INSTR:-$M11_INSTR_413060}"   # #1701: リンク時の
 M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (指紋) を止める。読出しが挙動を変えるかの切り分け用。既定 1
 M11_FIX_535BF2="${M11_FIX_535BF2:-0}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現); 0 = lift 版 (既定)
 M11_FIX_50A830="${M11_FIX_50A830:-0}"   # #2439: 1 = m11_ov.c の function_50a830 転記 (list Add の Grow/Notify 復元 + Grow 実体 50aac0/50ade0 の転記); 0 = lift 版 (既定)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_FIX_50A830=$M11_FIX_50A830 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_DEST_GUARD=${M11_DEST_GUARD:-0} -DM11_INSTR_40F960=${M11_INSTR_40F960:-0} -DM11_INSTR_40FFE0=${M11_INSTR_40FFE0:-0} -DM11_INSTR_60A270=${M11_INSTR_60A270:-0} -DM11_INSTR_412770=${M11_INSTR_412770:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_NOVCALL=${M11_NOVCALL:-0} -DM11_RT_PADPRE=${M11_RT_PADPRE:-0} -DM11_RT_PADPOST=${M11_RT_PADPOST:-0} -DM11_RT_EMPTY=${M11_RT_EMPTY:-0} -DM11_PRINT_DEST_2118=${M11_PRINT_DEST_2118:-0} -DM11_RT_NODATA=${M11_RT_NODATA:-0}"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_FIX_50A830=$M11_FIX_50A830 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_DEST_GUARD=${M11_DEST_GUARD:-0} -DM11_INSTR_40F960=${M11_INSTR_40F960:-0} -DM11_INSTR_40FFE0=${M11_INSTR_40FFE0:-0} -DM11_INSTR_60A270=${M11_INSTR_60A270:-0} -DM11_PROBE_2400=${M11_PROBE_2400:-0} -DM11_INSTR_412770=${M11_INSTR_412770:-0} -DM11_INSTR_E3EF60=${M11_INSTR_E3EF60:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_NOVCALL=${M11_NOVCALL:-0} -DM11_RT_PADPRE=${M11_RT_PADPRE:-0} -DM11_RT_PADPOST=${M11_RT_PADPOST:-0} -DM11_RT_EMPTY=${M11_RT_EMPTY:-0} -DM11_PRINT_DEST_2118=${M11_PRINT_DEST_2118:-0} -DM11_RT_NODATA=${M11_RT_NODATA:-0}"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -130,6 +130,12 @@ echo "$S_INSTR40" > work/instr_40ff70.stamp
 # #3325: function_412770 観測 probe の ON/OFF で post 結果と ov.o を作り直す (stamp)
 if [ "$(cat work/instr_412770.stamp 2>/dev/null || echo 0)" != "${M11_INSTR_412770:-0}" ]; then rm -f work/boot_final3.ll work/obj/ov.o; fi
 echo "${M11_INSTR_412770:-0}" > work/instr_412770.stamp
+# #2400: function_e3ef60 の 60a270 呼出し probe の ON/OFF で post 結果と ov.o を作り直す (stamp)
+if [ "$(cat work/instr_2400.stamp 2>/dev/null || echo 0)" != "${M11_PROBE_2400:-0}" ]; then rm -f work/boot_final3.ll work/obj/ov.o; fi
+echo "${M11_PROBE_2400:-0}" > work/instr_2400.stamp
+# #2407: function_e3ef60 観測 probe の ON/OFF で post 結果と ov.o を作り直す (stamp)
+if [ "$(cat work/instr_e3ef60.stamp 2>/dev/null || echo 0)" != "${M11_INSTR_E3EF60:-0}" ]; then rm -f work/boot_final3.ll work/obj/ov.o; fi
+echo "${M11_INSTR_E3EF60:-0}" > work/instr_e3ef60.stamp
 S_P134="${M11_PROBE_134:-0}"   # #134: 1 = 計測用 IR probe (8c5eb0 の arg2・R・list; trap_triage/probe134_ir.py) を boot_final3.ll に入れる。既定 0 では入れない
 if [ "$(cat work/instr_134.stamp 2>/dev/null || echo 0)" != "$S_P134" ]; then rm -f work/boot_final3.ll; fi
 echo "$S_P134" > work/instr_134.stamp
@@ -166,6 +172,7 @@ if [ ! -f work/boot_final3.ll ] || [ "$POST_IN" -nt work/boot_final3.ll ] || [ m
 fi
 if [ "$S_P134" = 1 ]; then python3 trap_triage/probe134_ir.py work/boot_final3.ll || exit 1; fi   # #134 計測専用 (既定 0 では何もしない)
 if [ "$S_P2780" = 1 ]; then python3 trap_triage/probe2780_ir.py work/boot_final3.ll || exit 1; fi   # #2780 計測専用 (既定 0 では何もしない)
+if [ "${M11_PROBE_2400:-0}" = 1 ]; then python3 trap_triage/probe2400_ir.py work/boot_final3.ll || exit 1; fi   # #2400 計測専用 (既定 0 では何もしない)
 # SIMD helper (C) は IR の declare から署名駆動で再生成 (m11_simd2.py)
 if [ ! -f work/m11_simd.c ] || [ work/boot_final.ll -nt work/m11_simd.c ] || [ m11_simd2.py -nt work/m11_simd.c ]; then
   python3 m11_simd2.py work/boot_final.ll > work/m11_simd.c 2> work/simd2.log

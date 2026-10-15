@@ -207,3 +207,11 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 - e2e の内容は §3 と同一: functions 6,347 / unsup 0 / unlifted 0 / spot diff 12/12 equal (H1〜H3 とも) / ネガコン 3 本 (pmulhrsw・pshufb・phaddw) すべて FAIL 検出 (H1〜H3 とも)。
 - boot (`qfc_boot.sh`、HEAD `1fd48d2ce`、n=3): §7.3 の通り (real 26–26 s、判定は 3 run とも FAIL)。
 - `find tools/qfclift -type f -size +20M -not -path '*/work/*'` → 0 件。生成物は `work/` (gitignore)。
+
+## 9. FT_* の GetProcAddress 解決と FreeType wasm32 ビルド (T-SH-79 / #3412)
+
+既知類型との関係 (DEFECTS.md): 該当なし。測定 commit = `c9767a62f`。全文 (§9.1〜§9.5・実測値・ネガコン) は `REPORT_APPENDIX_3412.md`。
+
+**結論 (部分達成)**: FT_* 14 本の解決経路を実装し、token 経由で 14 本すべての呼出を直接呼出と照合して、native / wasm32 / wasm64 で同一結果であることを確認した (e2e PASS。数値は付録 §9.3)。
+guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行は未着手 (子 #3434。DllMain の 0x563000 は #3410・#3411 の後段で未到達)。
+負の `face_index` による `long` 符号拡張は区別できていない (付録 §9.4・§9.5)。

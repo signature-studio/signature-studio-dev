@@ -1,6 +1,6 @@
 // AU-2 (#187) 行列の集計: results/au2/<cond>_r<rep>.json を読み、セルごとの P1〜P4 を Markdown 表で出す。
 // 使い方: node tools/audio/au2_summary.mjs [results/au2 のパス]
-// P2 は worklet が公開する burst_obs (連続 process の総フレーム数の最大値) のみ。p99 は未計測 (分布を取るには worklet 側の拡張が要る)。
+// P2 は worklet が公開する burst_obs (連続 process の総フレーム数の最大値) と burst_p99 (burst_hist の 512 f 刻み bin の上端で読んだ p99, AU-30 #3151)。
 // P4: T_req = ceil((burst×1.25 + B)/B)×B を各セルの最大 burst から再計算し、実 T (stats.T) と比べる。
 import fs from "node:fs";
 import path from "node:path";
@@ -18,7 +18,7 @@ for (const f of fs.readdirSync(dir).filter((x) => /^(fake|null|(windows|macos)-l
     const key = `${cond} | ${r?.sr ?? "-"} | ${x.name}`;
     if (!rows.has(key)) rows.set(key, []);
     rows.get(key).push({
-      ok: x.ok, underruns: s.underruns ?? -1, silence: s.silence_frames ?? -1, burst, T: s.T ?? 0, B,
+      ok: x.ok, underruns: s.underruns ?? -1, silence: s.silence_frames ?? -1, burst, p99: s.burst_p99 ?? 0, T: s.T ?? 0, B,
       Treq: B ? Math.ceil((burst * 1.25 + B) / B) * B : 0,
       base: (ctx.baseLatency ?? 0) * 1000, out: (ctx.outputLatency ?? 0) * 1000, clock: r?.clock?.rate_hz ?? 0,
     });
@@ -27,8 +27,8 @@ for (const f of fs.readdirSync(dir).filter((x) => /^(fake|null|(windows|macos)-l
 const f1 = (v) => v.toFixed(1);
 // 最小〜最大 (n=3 のセル内レンジ)。min と max が同じなら単一値
 const rng = (lo, hi, fmt = String) => (lo === hi ? fmt(lo) : `${fmt(lo)}〜${fmt(hi)}`);
-console.log("| 条件 | sr | シナリオ | n | PASS | underrun (合計) | burst max (f) | 実 T (f) | T_req (f) | T≥T_req | baseLatency (ms) | outputLatency (ms) | clock (Hz, 平均) |");
-console.log("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+console.log("| 条件 | sr | シナリオ | n | PASS | underrun (合計) | burst max (f) | burst p99 (f, bin 上端) | 実 T (f) | T_req (f) | T≥T_req | baseLatency (ms) | outputLatency (ms) | clock (Hz, 平均) |");
+console.log("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
 for (const [key, xs] of rows) {
   const [cond, sr, name] = key.split(" | ");
   const mx = (k) => Math.max(...xs.map((x) => x[k]));
@@ -38,5 +38,5 @@ for (const [key, xs] of rows) {
   const ur = xs.reduce((a, x) => a + x.underruns, 0);
   // T≥T_req は run ごとの判定 (表の脚注参照)。セル最大 burst 基準の判定は REPORT 側に書く
   const tOk = xs.every((x) => x.T >= x.Treq);
-  console.log(`| ${cond} | ${sr} | ${name} | ${xs.length} | ${pass}/${xs.length} | ${ur} | ${rng(mn("burst"), mx("burst"))} | ${rng(mn("T"), mx("T"))} | ${mx("Treq")} | ${tOk ? "OK" : "NG"} | ${rng(mn("base"), mx("base"), f1)} | ${rng(mn("out"), mx("out"), f1)} | ${f1(avg("clock"))} |`);
+  console.log(`| ${cond} | ${sr} | ${name} | ${xs.length} | ${pass}/${xs.length} | ${ur} | ${rng(mn("burst"), mx("burst"))} | ${rng(mn("p99"), mx("p99"))} | ${rng(mn("T"), mx("T"))} | ${mx("Treq")} | ${tOk ? "OK" : "NG"} | ${rng(mn("base"), mx("base"), f1)} | ${rng(mn("out"), mx("out"), f1)} | ${f1(avg("clock"))} |`);
 }
