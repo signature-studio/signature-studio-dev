@@ -32,7 +32,7 @@
 | baseline `PLUG_COMIS_FLAGS=0` | 19048 | 4 | **4** | 0 | 0 | **0** | 64 |
 | 反映 (既定 1) | 19048 | 9 | **9** | 0 | 0 | **0** | 64 |
 
-- 測定: `bash tools/plugins/sampler/engine_lift.sh <B>` (反映) と `PLUG_COMIS_FLAGS=0 bash tools/plugins/sampler/engine_lift.sh <B>` (baseline) を各 1 回、commit `c45bf383a` で実行。 PE は `fl-win64` の `extracted/block19252_PE.bin`・`block19048_PE.bin` (2 本だけ展開)。 emcc は `/opt/emsdk`、RetDec は `/opt/retdec` (`lift_ranges.sh`)。
+- 測定: `bash tools/plugins/sampler/engine_lift.sh <B>` (反映) と `PLUG_COMIS_FLAGS=0 bash tools/plugins/sampler/engine_lift.sh <B>` (baseline) を各 1 回、commit `c45bf383a` で実行。 PE は `fl-win64` の `extracted/block19252_PE.bin`・`block19048_PE.bin` (2 本だけ展開)。 emcc と RetDec は runner に既存の toolchain をそのまま使った (`toolchain-*.tar.zst` は展開していない。 `lift_ranges.sh`・`engine_lift.sh` が直接参照する)。
 - 生の行 (`summary.csv`・c45bf383a): `19252,522,0,551,1,3,1,0,1,17,2,165,0,29,549,0` (baseline) / `19252,522,0,551,1,7,1,0,1,16,2,165,0,29,549,0` (反映) / `19048,1658,0,1712,0,4,0,0,0,64,2,97,0,54,1710,0` (baseline) / `19048,1658,0,1712,0,9,0,0,0,64,2,97,0,54,1710,0` (反映)。
 - 19252 の `emcc (argw)` = 1 は baseline から変わらない (`do not know how to soften fp_extend`。f80 段で 0 になる既存の挙動)。 受入の `emcc -c` rc 0 は f80 後の列で判定した。
 - 19252 の baseline unimpl が 4 → 3 に変わった理由: `dfe82526` の 4 件は `__asm_vcomisd`・`__asm_vmovsd(i64,i128)`・`__asm_vucomisd`・`__asm_vucomiss`、`c45bf383a` は vmovsd を除く 3 件。 原因は main 側の `ir5_patch.py` `forward_vmovsd_store` (#2017・`db8de2922`・dfe82526 より後)。 `__asm_vmovsd` を含む行は 39 → 35 (`e.final.ll`)。 baseline は `PLUG_COMIS_FLAGS=0` なので comis の反映とは無関係。
