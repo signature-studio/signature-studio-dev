@@ -5,7 +5,7 @@
   (`tools/targets/massivex/scripts/parse_setup_headers.py` → `extract_massivex.py <exe> <work> key`) で展開。
   `Massive X.vst3` = 95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca` (REPORT §0 の記録値と一致)。
 - 前回 run の「素材を展開できない」停止は誤り (innoextract のみで判断していた)。本 run は既存パーサで展開済み。
-- 測定 commit (コードを変えた最後の commit) = **fbc9971f**。再現: `bash tools/targets/massivex/dsp/mx6_e2e.sh` (`MX_PE` で PE を指定)。
+- 測定 commit (コードを変えた最後の commit) = **51953f46d** (§7・§8)。§1 の表は fbc9971f での測定値で、step 1-5 の数値は 51953f46d でも同一。再現: `bash tools/targets/massivex/dsp/mx6_e2e.sh` (`MX_PE` で PE を指定)。
 
 ## 0. 結論 (先出し)
 
@@ -120,14 +120,14 @@
 
 ## 7. 検証 commit と差分 (docs/WORKFLOW.md §6)
 
-- 測定 commit = **fbc9971f** (`dsp/scripts/mx6_*.py` と `dsp/mx6_e2e.sh` を最後に変えた commit)。
-- `git diff fbc9971f HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は **0 行**
+- 測定 commit = **51953f46d** (main 取り込み後の merge。`dsp/scripts/mx6_*.py` と `dsp/mx6_e2e.sh` を最後に変えた commit)。
+- `git diff 51953f46d HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は **0 行**
   (本 REPORT の commit は docs のみ。コードの変更は無い)。
-- 検証: e2e は測定 commit fbc9971f で実行し PASS (§1)。差し戻し後の修正 run では `plugins-massivex` が無く PE を展開できず、e2e は再実行していない。NC selftest は修正後の HEAD で再実行し 5/5 PASS。
+- 検証: e2e (step 1-8 全件 PASS・exit 0) は測定 commit 51953f46d で実行 (§8)。NC selftest は step 1 (5/5)・step 4 (9/9)・step 8 (3/3) すべて PASS。
 
 ## 8. FH4 FuncInfo4 の固定部 (U4a・#3791 部分)
 
-- 測定 commit = **81573d876** (`scripts/mx6_fh4.py` と `mx6_e2e.sh` を最後に変えた commit)。再現: `bash tools/targets/massivex/dsp/mx6_e2e.sh` (step 6/6)。
+- 測定 commit = **51953f46d** (main 取り込み後の merge。`scripts/mx6_fh4.py` は 81573d876 で追加し以後無変更)。再現: `bash tools/targets/massivex/dsp/mx6_e2e.sh` (step 8/8)。
 - 構造の出典: MSVC 公式記事 "Making C++ Exception Handling Smaller On x64" (C++ Team Blog, 2019-03-07) の FuncInfo4 定義 (`ehdata4_export.h` の抜粋)。
   header 1 byte の bit は LSB から isCatch / isSeparated / BBT / UnwindMap / TryBlockMap / EHs / NoExcept / reserved。
   bbtFlags (可変長・BBT のとき)、dispUnwindMap (UnwindMap のとき)、dispTryBlockMap (TryBlockMap のとき)、dispIPtoStateMap (常に)、dispFrame (可変長・isCatch のとき・末尾) の順。
@@ -144,7 +144,7 @@
 | 固定部のポインタが画像外 | **2 件** (fi `0x64cbbe0`・`0x659b6e0`、header `0x28`、dispUnwindMap = `0xa0d2a1e9`・`0xadda9ce9`)。原因未確定 → [MX-42] (#3807) |
 
 - NC (`mx6_fh4.py --selftest`): 3/3 PASS。(a) 正例: 既知の 2 件以外が全て通る。(b) 負例: 問題の無い 1 件の dispIPtoStateMap を 0 に壊すと `dispIPtoStateMap_outside_image` で FAIL。(c) 負例: BBT ビットを立てた合成ヘッダは固定部未解決として扱われる (位置を推測しない)。
-- 実行: `MX_PE='$RUNNER_TEMP/mx/work/extracted/VST3/Massive X.vst3' MX6_WORK='$RUNNER_TEMP/massivex-mx6' bash tools/targets/massivex/dsp/mx6_e2e.sh` → exit 0。step 1-5 の判定は §1 と同一 (NC 5/5・livein 0・FH3 funclet 533 / 529)。所要 **42.7 s** (HEAD `557719d58` の実測・load average 0.18 0.28 0.20 → 0.71 0.41 0.25)。
+- 実行: `MX_PE='$RUNNER_TEMP/mx/work/extracted/VST3/Massive X.vst3' MX6_WORK='$RUNNER_TEMP/massivex-mx6' bash tools/targets/massivex/dsp/mx6_e2e.sh` → exit 0 (測定 commit 51953f46d・step 1-8 全件 PASS)。step 1-5 の判定は §1 と同一 (NC 5/5・livein 0・FH3 funclet 533 / 529)。所要 **43 s** (load average 0.02 0.16 0.18 → 0.57 0.29 0.22)。
 - 素材: `plugins-massivex` の `Native Instruments Massive X v1.7.1.exe` を展開し既存パーサで `Massive X.vst3` = 95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca` (§0 の記録値と一致)。
 - 未解決 (起票先): 可変長整数の符号化、unwind map / try map / IP-to-state map の中身、funclet RVA の全数取り出し、独立再計算、2 件の画像外ポインタ → [MX-42] (#3807・親 #3791)。
-- 検証差分 (docs/WORKFLOW.md §6): `git diff 81573d876 HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は **0 行** (REPORT の変更のみ)。
+- 検証差分 (docs/WORKFLOW.md §6): `git diff 51953f46d HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は **0 行** (REPORT の変更のみ)。
