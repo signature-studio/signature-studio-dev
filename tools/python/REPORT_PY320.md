@@ -9,7 +9,7 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
 | 受入 | 結果 | 根拠 |
 |---|---|---|
 | 1. 0x12acb70 を TMethod(Code, Data) として呼ぶ箇所 (関数と VA) と rdx の出どころ | **部分達成**。呼出し箇所は確定 (§1)。rdx = Self (`rbx`) は確定 (§2)。0x12acb70 がその枝で実際に `[Self+0x100]` に入ることは**未確定** (静的な推定) | §1・§2・§4 |
-| 2. 検証 probe を追加し、既存 probe が PASS のまま | probe `pe_py320_fire_site.py` 追加 (10 件 PASS)。`pe_py268_rdx.py` 22/22 PASS (測定 §5) | §5 |
+| 2. 検証 probe を追加し、既存 probe が PASS のまま | probe `pe_py320_fire_site.py` 追加 (11 件 PASS)。`pe_py268_rdx.py` 22/22 PASS (測定 §5) | §5 |
 
 `pe_py274_dispatch.py` と `REPORT_PY274.md` は main に存在しないため、既存 probe としては照合できなかった (issue 本文の前提と不一致)。
 
@@ -32,7 +32,7 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
 - よって rdx (第 2 引数) = **Self** (`0x840b50` の rcx = 呼出し元の rbx)。Self は `0x72db20` で `rbx = rcx` の `TQuickMenuItem` インスタンスとみられる。
 - 対照: `0x840be8` と `0x840c2e` の 0x12acb70 への到達は、`[rbx+0x100]` が 0x12acb70 の値を持つことを要する。その値の書込み先は未確認。
 
-## 3. 未確定 → #3937 (起票先)
+## 3. 未確定 → #4405 [PY-325] (起票先)
 
 - `0x72db20` の呼出し元: `call [reg + 0xd0]` は 244 箇所あり、そのうち MoveLeftMenu の OnClick を発火する箇所は未同定。
 - `[Self+0x100]` に 0x12acb70 が書き込まれる箇所 (DFM 読込みの TMethod 生成) は未確認。REPORT_PY268 §3 の推定 (`TMethod(Code = 0x12acb70, Data = TFXForm)`) の裏付けは未取得。
