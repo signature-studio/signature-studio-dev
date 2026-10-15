@@ -871,6 +871,7 @@
 | `tools/targets/kilohearts/license/REPORT.md` | ~125 | HeartCore ライセンス層の呼出点特定 |
 | `tools/targets/kilohearts/license/KH9_REPORT.md`・`KH10_REPORT.md`・`KH11_REPORT.md`・`KH249_REPORT.md`・`KH656_REPORT.md`・`KH656_REPORT_APPENDIX_1821.md`・`KH656_REPORT_APPENDIX_3590.md`・`KH3306_REPORT.md`・`VERIFY_CAB247.md` | ~125/105/115/115/242/107/83/146/185 | KH-9/10/11 実施記録・#249 (ブラウザ分類 lift・ctor 47 vs 46 同定)・#656 (分類 module F の閉包展開・§9 は #3591 の閉包各ラウンドの入口経路。付録 1821 は #1821 の入口 OOB の原因 (D11)・gen_globals の負の avail。付録 3590 は #3590 の閉包 round 1〜8 の実測・round 6 失敗の切り分け・round 9 の停止)・#3306 (xmm/ymm 下位 128bit 同期の kh_lower 規則と合成検証・module F sha 不変) と CAB-247 検証 |
 | `tools/targets/kilohearts/license/KH709_REPORT.md` | 66 | #709 (KH-14): ymm (VEX.256) 整数語彙の gen_simd 対応・module F の 2 関数の試行と未解決 (xmm/ymm 別グローバル #3306・SSE 語彙 #3307) |
+| `tools/targets/kilohearts/license/KH3307_REPORT.md` | 74 | #3307 (KH-52): gen_simd の SSE 整数語彙 6 件の追加と bit 突合・module F の 2 関数の試行。2 関数の実機突合と product 登録は #4153 (KH-91) |
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3256.md` | ~82 | KH-48 (#3256): vmovaps ymm・FMA3 scalar 7 語彙の検証 (`ymm_vocab_check.py` / `fma_vocab_check.py`) の生出力全行 |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3707.md` | ~100 | KH-59 (#3707): emcc 段の RSS cap (`rss_cap.py`) の実測。変更前後の sha256 一致・ネガコン・snapins 14 本 + module F の emcc ピーク RSS 表・cap 超過 4 本の未解決 |
