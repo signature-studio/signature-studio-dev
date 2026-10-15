@@ -152,3 +152,12 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate      
 - 大域ポインタ格納 `0x15dff78` 経由の書込みは本 run で未走査 (次の一手)。
 - `pe_vptr_stores.py 0x0` (`lea` で作った vptr を `[reg+0]` に格納する箇所を全 .text 走査): 1 件 (`0x44a86e`・vtbl `0x13acb88`)。このツールは disp 0 だけを見るので、`0xed0c28` は disp 0 への `lea` 格納には現れなかった。他の disp (`0x120` 系の基底オフセットなど) は未走査。
 - 受入 1・2 は引き続き未達。`0xed0c28` の格納箇所は未確定。
+
+### PY-264 第 3 run (#3888): 呼出し経路の確定 (部分達成)
+
+- 検査 `analysis/py264_chain_probe.py` → `chain.check PASS`・rc 0 (測定 commit は下記)。所要 211 秒 (n=1)。
+- `0x1375990` の直接 call 元は 0 件 (`pe_callgraph.py callers`)。`0x11b2ac0` を格納するのは `0x1375a18` (`lea`) → `0x1375a1f` (`mov [rax], rcx`) で、`rax` は `[rip+0x26a560]` の値 (= セル `0x15dff78`)。セル `0x15dff78` の RIP 相対参照は 1 件 (`0x1375a11`)。
+- 第 2 run の「`0x15e0f78` の 27 件」は、この経路の訂正により、呼出し経路の根拠として使わない。
+- `0x11b2ac0` の本体は `0xed0b60` の値を rcx に読んで `0xed4ee0` を `dl=1` で呼ぶ (1 件)。`0xed4ee0` は `0x410320` を経由して vtable の間接 call (`call [rbx-0x28]`・`call [rbx-0x50]`) を行うが、vptr の格納はしていない。
+- 未解決 (受入 1・2): `0x1375990` の呼出し元が直接 call で見えないため、間接 call の受け手を特定できていない。`0xed0c28` を receiver の vptr として格納する箇所は未確定。`0xed0bb0` の算術経路は未検査。
+- 次の一手: `0x1375990` を格納する vtable (`0x11b2ac0` を含む間接 call の受け手) の探索。
