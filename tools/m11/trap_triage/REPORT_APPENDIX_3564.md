@@ -92,7 +92,7 @@ python3 tools/m11/trap_triage/negctl_3564.py <PE>
 
 ## 8. 本 run の追加判定 (run 2): 行 37 の実害と保留 8 件の機構
 
-- 測定 commit: `28b96a18c` (`frame_ops_3564.py` の追加 commit)。以後、判定に使ったコード (`tools/m11/guard699/`・`tools/m11/ldfix/ldmach.py`・`tools/m11/trap_triage/strict_evidence.py`・`judge_src.py`・`judge_ctx.py`) は変更していない。
+- 測定 commit: `28b96a18c` (`frame_ops_3564.py` の追加 commit)。以後、判定に使ったコード (`tools/m11/guard699/`・`tools/m11/ldfix/ldmach.py`・`tools/m11/trap_triage/strict_evidence.py`・`judge_src.py`・`judge_ctx.py`) は変更していない (main (`abf0981f7`) の取り込み `2f8c8dccf` 後も、同じパスの `git diff 28b96a18c HEAD` は 0 行)。
 - 入力: `work/boot_final.ll` (main の checkout 側 `tools/m11/work/`・gitignore・sha256 `69c774de…`・19,787,837 B)、`block00031_PE.bin` (`fl-win64` の `extracted/`・22,227,016 B。`tar --zstd -xf fl-win64.tar.zst extracted/block00031_PE.bin` で取得)。`scan_guard.py --report` で fn 6969・jcc 25618・dropped 1380・strict 288、`strict_evidence.py` で TSV 288 行 (§3 と一致)。
 
 ### 8.1 行 37 (`function_125da90`・jcc `125e022` → `125e06d`): 偽陽性・実害なし
@@ -100,13 +100,14 @@ python3 tools/m11/trap_triage/negctl_3564.py <PE>
 - 機械語: `125e00d: mov esi,[rbp+0xac]` → `125e013: sub esi,1` → `125e016: mov [rbp+0xb8],eax` (eax = 0) → `125e01c: cmp [rbp+0xb8],esi` → `125e022: jg 125e06d`。jcc は `0 > [rbp+0xac] − 1` のとき成立する。
 - `[rbp+0xac]` への書込み: `125df0d: mov dword [rbp+0xac], 0x40` の 1 箇所だけ (`frame_ops_3564.py <IR> function_125da90 <PE> "rbp \+ 0xac\]"` の出力)。残りは読出し (`div` 125df3a・`mov` 125df53・125e00d・125e06e・125e07a)。
 - 別名の確認: 関数内の `lea` (rbp 相対) は 37 個。書込み後の 125df0d〜125e022 に、0xac を指す番地は無い。`lea` の番地は `rbp+0xc0` 以上 (`[rbp+0xc0]`・`[rax+rbp+0xc0]` 等)。IR の frame base (`%stack_var_-16920` = rbp+0) の派生は `%152 = %53 + 192` (= rbp+0xc0) だけ。負の添字による別名は未確認。
+- ネガティブコントロール (fix run で実測): `frame_ops_3564.py` の `rbp \+ 0xa4\]` は既知の書込み `125df07` を含む 7 件を出し、照合器は書込みを拾う。`rbp \+ 0xa[0-9a-f]\]` (rbp+0xa0〜0xaf の全アクセス) は 17 件で、すべて dword (0xa4・0xa8・0xac)。0xac にかかるのは `[rbp+0xac]` の dword 6 件だけで、0xa4・0xa8 の dword (4 byte) は 0xac に届かない。別幅のアクセスは無い。
 - 結論: `[rbp+0xac]` = 0x40 は定数で、esi = 63。`0 > 63` は偽で jcc は**機械語の命令列だけで不成立**。IR の L (`125e034`) は入口判定を持たず、`exitcond` (`count == 64`) で 64 回回る。機械語も 0〜63 の 64 回で一致する。
 - 判定: **偽陽性** (jcc 不成立)。実害なし (IR の本体の回数は機械語と一致)。§4j 注 1 の『N=0x40。実害未確認』は、この確認で解消した。§4j の表の『真陽性』は PR #3571 側の判定で、本付録は変えない (§5 参照)。
 
 ### 8.2 保留 8 件の機構 (機械語と IR の count 源の比較)
 
 機構の名前 (本節だけの用語):
-- **M1 (段数)**: 機械語は K (= 機械語の `rip` 相対の番地 − 0x400000) を qword で読み、その先を 1 段以上 deref する。IR は K を 1 回だけ読む (または 1 段少ない)。`ldfix/REPORT_2794.md` の類型 (2 段 deref が 1 段に潰れる) と同型。REPORT_2794 の site #1 (K = 0x11e2218・`function_1003c20`) と同じ K。
+- **M1 (段数)**: 機械語は K (= 機械語の `rip` 相対の番地 − 0x400000) を qword で読み、その先を 1 段以上 deref する。IR は K を 1 回だけ読む (または 1 段少ない)。`ldfix/REPORT_2794.md` の類型 (2 段 deref が 1 段に潰れる) と同型かは未確認 (下の注 2)。
 - **M2 (幅)**: 機械語は K を qword (ポインタ) で読む。IR は同じ K を `i32` で読み、その下位 32 bit を番地に使う。
 - **M3 (入口判定の幅)**: 行 39 の L の入口判定だけが、機械語と幅が違う (下表)。
 
@@ -122,9 +123,9 @@ python3 tools/m11/trap_triage/negctl_3564.py <PE>
 | 61 | function_12cab20 | `mov rcx,[rip+X]` (qword P) → `mov esi,[rcx+0x14]` | 同 K (`load i32`) → sext → +20 | M2 | 保留 |
 | 65 | function_12cb680 | `mov rcx,[rip+X]` (qword P) → `mov esi,[rcx]` (dword P) | `load i32 @K` (`align 8`) を count に使う (1 段) | M1 | 保留 |
 
-- 対応の確認 (IR 側の K の読み方): K = 18752024 (41・47・40) は IR 全体で `load i32` が 269 箇所、`load i64` は 0 箇所。K = 22281208 (57・59・61) は `load i32` が 11 箇所、`load i64` は 0。K = 18751896 (42) は `load i32` が 31 箇所、`load i64` は 0。K = 18742616 (65) は `load i32` が 3 箇所、`load i64` は 0。真陽性の行 (51〜56・58・60・62〜64・66) は、同じ種類の G を `load i64` で読んでいる (例: K = 19649808・22281224)。保留 8 件の K だけが i32 で読まれる。
+- 対応の確認 (IR 側の K の読み方。件数は §8.4 のコマンドで出した): K = 18752024 (41・47・40) は IR で `load i32` が 269 箇所で、他の型は無い。K = 22281208 (57・59・61) は `load i32` が 11 箇所で、他の型は無い。K = 18751896 (42) は `load i32` 31 箇所・`load ptr` (qword) 3 箇所・`load i16` 1 箇所。K = 18742616 (65) は `load i32` 3 箇所・`load ptr` 1 箇所。`load i64` は保留 8 件の 4 つの K のどれにも無い。K は i32 でも ptr でも読まれるので、『K だけが i32 で読まれる』とは言えない。真陽性の G は `load i64` で読まれる (19649808 = 13 箇所・22281224 = 12 箇所・22281256 = 5 箇所)。行 42 の『IR は 1 段』は、count 源の `%11 = load i32` (`function_127cea0`・`%18 = sub i32 %5, %11`) に限って言う。
 - 行 39 の L の入口判定 (M3): IR は `index` (sext i32) と `load i64 [P+16]` を `ult` で比べ、機械語は `esi` (index) と `dword [P+16] − 1` を `jg` (符号付き) で比べる。P+16 の上位 4 byte (dword の隣の値) は静的な PE からは確定できない (P はヒープ) ため、同値は作れない。
-- 行 40・41 の参照経路差 (§4j 注 2) の対応: 機械語は K から 3 段 (`mov rcx,[rip+X]; mov rcx,[rcx]; mov edi,[rcx+0x10]`。§4j 注 2 の『2 段 deref』は、rip 相対の K の読みを除いて数えた値で、3 回のメモリ読みは同じ)、IR は K を 1 回読むだけ。番地のずれではない (K = X − 0x400000 は全件で一致)。`ldfix/REPORT_2794.md` の site #1 (`function_1003c20`・K = 0x11e2218) と同じ K・同じ型で、REPORT_2794 は『同一とは確定しない』と書いている。子 issue #2940 (LD-141) は close 済みで、起点は未特定のまま。
+- 行 40・41 の参照経路差 (§4j 注 2) の対応: 機械語は K から 3 段 (`mov rcx,[rip+X]; mov rcx,[rcx]; mov edi,[rcx+0x10]`。§4j 注 2 の『2 段 deref』は、rip 相対の K の読みを除いて数えた値で、3 回のメモリ読みは同じ)、IR は K を 1 回読むだけ (127bc80 の段数の差: 機械語 3 段・IR 2 段。本 PR の観測)。番地のずれではない (K = X − 0x400000 は全件で一致)。K = 0x11e2218 は `ldfix/REPORT_2794.md` の site #1 (`function_1003c20`) と同じ K だが、型 (段数) が同じとは確認していない。`ldfix/REPORT_2940.md` §2・§3 は、その site #1 の読みの欠落を『分岐の欠落 (lift 段)』と確定している (不成立側 block が IR に無い)。よって site #1 は 2 段 deref の潰れの類型ではない。行 40・41 は『K の共有だけ。型は未確認』とし、REPORT_2794 の類型名は借りない。#2940 (LD-141) は close 済み。同 REPORT の未特定は 128c320 だけで、子 #3612 に移してある。
 
 ### 8.3 判定の結論と限界
 
@@ -141,4 +142,11 @@ python3 tools/m11/trap_triage/judge_src.py <IR> function_125da90 --pe <PE> --jcc
 python3 tools/m11/trap_triage/judge_src.py <IR> function_12a75e0 --pe <PE> --jcc 12a760d --n 6
 python3 tools/m11/trap_triage/judge_src.py <IR> function_12ca640 --pe <PE> --jcc 12ca666 --n 12
 python3 tools/m11/trap_triage/judge_src.py <IR> function_1274260 --pe <PE> --jcc 12742fa --n 12
+python3 tools/m11/trap_triage/frame_ops_3564.py <IR> function_125da90 <PE> "rbp \+ 0xa4\]"
+python3 tools/m11/trap_triage/judge_src.py <IR> function_127cea0 --pe <PE> --jcc 127cf07 --n 8
+python3 tools/m11/trap_triage/judge_src.py <IR> function_127cea0 127cf0e 127cf60 --mx 12
+grep -oE "load [a-z0-9]+, ptr inttoptr \(i64 (18752024|22281208|18751896|18742616) to ptr" <IR> | sort | uniq -c
 ```
+
+- §8.2 の件数 (IR 側・`grep` の出力): 18752024 = `load i32` 269 のみ。22281208 = `load i32` 11 のみ。18751896 = `load i32` 31・`load ptr` 3・`load i16` 1。18742616 = `load i32` 3・`load ptr` 1。
+- 行 42 の機械語 (`--jcc 127cf07`): `127cec8: mov rax,[rip+X]` (qword) → `127ced1: sub esi,[rax]` (dword) で esi = arg − dword[*X] (2 段)。IR 側 (`127cf0e` = ループ先頭) は count 源の `%20 = load i32` (ループ本体) と脱出先 `127cf60` の `%41 = load i32` を出す。ループ先頭の `%20` は本付録の count 源の表 (§8.2) の対象外で、段数は未照合。
