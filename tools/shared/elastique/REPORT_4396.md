@@ -38,7 +38,7 @@ FL 本体の 2 段構成である。
 3. **export と呼出しの関係**: `block24349` (i386) と `block24350` (x64) の export `LoadSharedElastiqueDll` は QuickFontCache 側の定義。FL 本体 `block00031` は export 表を引かず、UTF-16 名を `0x4235f0` で解決する。
 4. **`0xc69c10` の呼出し形**: 手で逆アセンブル (`0xc69c10`〜`0xc69c9e`) し、`call rax` が無いことを確認した。形は `call 0x677d10` (ローダ・`0xc69c2a`) → `call 0x4235f0` (`0xc69c4e`・`0xc69c68`) → `0x16b8890`・`0x16b8898` へ格納 → return。export の呼出しは上位の `0xc69d10` (`0xc69d3a`) と `0xc69d60` (`0xc69d70`) で行う。`call rax` はローダ `0x677d10` の `0x677d4f` にあり、解決した `LoadSharedElastiqueDll` を呼ぶ (`0x677d10`〜`0x677e27` の逆アセンブルで確認)。
 6. **`0x6535a0` の呼出元** (QFC の lea がある `0x6532f0` との関係): `0x6535a0` の直接 call/jmp 呼出元は 11 件 (`0x6538a9`・`0x6538d1`・`0x653a32`・`0x668c28`・`0x9c4d29`・`0xc3941f`・`0xc3b531`・`0x11016f7`・`0x1133683`・`0x1199160`・`0x131bb07`)。`0x6532f0` (QFC の `LoadSharedElastiqueDll` 名の lea を含む関数) は `0x6535a0` を直接 call せず、呼出元 11 件のどれも `0x6532f0` 内には無い。両者の間接的なつながりは確かめていない (§4)。
-5. **再現**: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/shared/elastique/fl_loader_callers.py`。測定 commit `fc97566e2` (スクリプト・REPORT の最終変更)。コミット済み HEAD `64792bdca` で再実行: rc 0・経過 38.9 s・load 0.09→0.54 (nproc 4・出力は上の表と一致)。コードの差分は 0 (`fl_loader_callers.py` は測定 commit から変わっていない)。REPORT 本文のみ後続の commit で変えた (`git diff fc97566e2 HEAD -- tools/shared/elastique/fl_loader_callers.py` は 0 行)。
+5. **再現**: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/shared/elastique/fl_loader_callers.py`。測定 commit `66f52756b` (`fl_loader_callers.py` の最終変更)。同 HEAD で再実行: rc 0・経過 28.9 s・load 0.05→0.42 (nproc 4・出力は上の表と一致)。測定後の commit は REPORT 本文のみ (`git diff 66f52756b HEAD -- tools/shared/elastique/fl_loader_callers.py` は 0 行)。
 
 ## 3. 限界
 
