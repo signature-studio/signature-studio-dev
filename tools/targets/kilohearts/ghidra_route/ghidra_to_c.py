@@ -205,6 +205,8 @@ def main():
         out.append(RCPPS_HELPER % approx_rcp_table())
     if 'rsqrtps(' in alltxt:
         out.append(RSQRTPS_HELPER % approx_rsq_tables())
+    if name == 'stereo':  # callee の戻り xmm0 (縮約値) の helper (KH-74)。式と突合は kh_xmm0.h / xmm0_check.c
+        out.append(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'kh_xmm0.h')).read())
     if 'lanes' in fixes and re.search(r'undefined1 auStack_(118|128|138) \[16\];', alltxt):
         out.append(LANE_HELPER)
     for va, (ty, kind, _) in sorted(gtypes.items()):
