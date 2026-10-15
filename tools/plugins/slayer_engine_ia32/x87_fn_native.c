@@ -11,8 +11,8 @@ typedef unsigned int u32;
 #ifndef OBJ_WIN
 #define OBJ_WIN 0x540u
 #endif
-#define IBUF_SZ (1u << 25)
-#define OBUF_SZ (1u << 25)
+#define IBUF_SZ (1u << 26)
+#define OBUF_SZ (1u << 26)
 
 static long sc3(long n, long a, long b, long c) {
     long r;

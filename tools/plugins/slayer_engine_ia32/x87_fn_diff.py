@@ -24,6 +24,7 @@ IMG_BASE = 0x10000000
 OBJ = 0x10F80000
 OBJ_WIN = 0x540
 N_PER_TARGET = 4000
+N_PER_MIXED = 200
 SEED = 2989
 
 # va: 入口 VA。 gen: 引数と OBJ 窓の初期値の作り方 (ecx = OBJ)。 どちらも leaf で x87 を含み、import・未 lift の call が無い。
@@ -32,6 +33,12 @@ SEED = 2989
 TARGETS = [
     {'va': 0x10002EE0, 'name': 'fn_10002ee0', 'gen': 'idx_store'},
     {'va': 0x10005400, 'name': 'fn_10005400', 'gen': 'state_update'},
+    # #3715 (PLG-G2-31): lift 済みの残り leaf x87 関数 (call・間接分岐・未対応命令を含まず、x87 を含む)。
+    # 引数の型は関数ごとに分からないので、a0 は float、a1..a5 は 0..15 の整数 (gen 'mixed')。 行数は N_PER_MIXED。
+    # 除外 (付録 §6): fn_10009eb5 (eax 不一致)・fn_1000b526 (eax 不一致 101 行)・fn_1000d6fb (ST(0) が NaN と -0 で不一致)・fn_1000bf60 (eax 不一致 4 行)。 さらに ST(0) が 0 固定で OBJ 窓も書かない定数関数 (非自明性なし) を除外: fn_100011a0・fn_10001200・fn_10001ac0・fn_1000b390・fn_1000b4e6・fn_1000b4f4・fn_1000b6d1・fn_1000b894・fn_1000b89d・fn_1000d684・fn_1000d691。 fn_10001290 は ST(0) が非ゼロだが、非自明性の判定から見て残す。
+    {'va': 0x10005D20, 'name': 'fn_10005d20', 'gen': 'mixed'},
+    {'va': 0x1000B3A2, 'name': 'fn_1000b3a2', 'gen': 'mixed'},
+    {'va': 0x10001290, 'name': 'fn_10001290', 'gen': 'mixed'},
 ]
 
 
@@ -60,10 +67,12 @@ def gen_rows(seed, n):
     rng = random.Random(seed)
     rows = []
     for t in TARGETS:
-        for _ in range(n):
+        for _ in range(n if t['gen'] != 'mixed' else N_PER_MIXED):
             init = b''.join(struct.pack('<f', rng.uniform(-1000, 1000)) for _ in range(OBJ_WIN // 4))
             if t['gen'] == 'idx_store':
                 a = [f32(rng.uniform(-1000, 1000)), rng.randrange(16), 0, 0, 0, 0]
+            elif t['gen'] == 'mixed':
+                a = [f32(rng.uniform(-100, 100))] + [rng.randrange(16) for _ in range(5)]
             else:
                 a = [f32(rng.uniform(-100, 100)) for _ in range(5)] + [0]
             line = '%08x %08x %s %s' % (t['va'], OBJ, ' '.join('%08x' % v for v in a), init.hex())
@@ -138,7 +147,7 @@ def compare(nat, act, scen, quiet=False):
     ok = True
     agg = {}
     for t in TARGETS:
-        agg[t['name']] = {'rows': 0, 'eq': 0, 'f32_eq': 0, 'eax_bad': 0, 'd_bad': 0, 'effect': 0,
+        agg[t['name']] = {'rows': 0, 'eq': 0, 'f32_eq': 0, 'eax_bad': 0, 'd_bad': 0, 'effect': 0, 'nontrivial': 0,
                           'st0': {}, 'st0d': {}, 'mem': {}}
     for i, (t, line, init) in enumerate(scen):
         a = agg[t['name']]
@@ -150,6 +159,8 @@ def compare(nat, act, scen, quiet=False):
             a['d_bad'] += 1
         if e['mem'] != init.hex():
             a['effect'] += 1
+        if e['mem'] != init.hex() or (e['st0'] != '00000000' and e['st0'] != '80000000'):
+            a['nontrivial'] += 1
         if e == w:
             a['eq'] += 1
         if e['st0'] == w['st0'] and e['mem'] == w['mem'] and e['eax'] == w['eax']:
@@ -164,7 +175,7 @@ def compare(nat, act, scen, quiet=False):
     for t in TARGETS:
         a = agg[t['name']]
         n = a['rows']
-        if a['eax_bad'] or a['d_bad'] or a['effect'] == 0 or n == 0:
+        if a['eax_bad'] or a['d_bad'] or a['nontrivial'] == 0 or n == 0:
             ok = False
         if quiet:
             continue
