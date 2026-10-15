@@ -100,7 +100,7 @@ theme object の型と `vtbl[+0x218]` の実体は未確定 (vtable の書込み
 - 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を実在確認後、`tar --zstd -xf ... -C $RUNNER_TEMP/fl-win64 extracted`・real 4.3 s)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。
 - 再現 (1 コマンド): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/playlist_time_facts.py`。
 - 実測: real 8.217 / 8.169 / 7.960 s (n=3)。`/proc/loadavg` 実行直前 `0.18 0.49 0.31`・`0.25 0.49 0.32`・`0.36 0.51 0.32`。並列 1。
-- 測定 commit (コードを最後に変えた commit): `eb0024a88` (`feat(flapi): extract time-block and critical-section facts (PY-105)`)。以後の差分: `git diff eb0024a88 HEAD -- tools/python/analysis/flapi` の出力は 0 行 (この commit より後の変更は REPORT と DOC_MAP だけ)。
+- 測定 commit (コードを最後に変えた commit): `eb0024a88` (`feat(flapi): extract time-block and critical-section facts (PY-105)`)。以後の差分: 測定に使うコードは `playlist_time_facts.py`・`pe_disasm.py` の 2 本で、`git diff eb0024a88 HEAD -- tools/python/analysis/flapi/playlist_time_facts.py tools/python/analysis/flapi/pe_disasm.py` の出力は 0 行。`analysis/flapi` 全体では main 取り込みで他 PR の新規 2 件 (`pe_mixer_wrappers.py`・`pe_va_read.py`・計 158 行) が増えたが、両スクリプトは import しない (import は os・re・struct・sys・capstone・pefile のみ)。REPORT と DOC_MAP の変更は、この測定の後に入った (番地の訂正・記述の修正)。
 - 逆アセンブルの再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_disasm.py <VA> <命令数>` (本文の VA は全てこれで確認)。
 - 番地の照合 (指摘対応): 本文の `[rip+X]` は全て『次命令の VA + X』で再計算し、pe_disasm.py の命令列の該当行と照合した。所属 section は PE section 表で判定 (`.text` = READ-ONLY、`.data`・`.bss` = WRITE)。本文の番地は全て VA で書く (変位は命令の確認用の併記に限る)。
 - ネガティブコントロール: なし (抽出のみ。`playlist_time_facts.py` は FAIL 判定を持たない)。
