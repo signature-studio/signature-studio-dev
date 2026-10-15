@@ -81,5 +81,5 @@ python3 fxa_nc.py work/boot_final.ll only40c_full.ll --pe <PE> --report nc_repor
 
 - `m11_sigfix40c_ab.py`: 入力は素材の `boot_final.ll` と PE。only40c は `fix_xmm_args.py --only-funcs function_40c650` で作る (既定の `NO_CONV` は `--only-funcs` で明示された関数だけ外す)。`BODY_OLD` の一意性は `function_40c650` の定義の中だけで判定する (素材 IR では同じ本体が 4 関数にある)。
 - 規則テスト: `tools/m11/test_sigfix40c_ab.py` (callee 定義が 1 件でない・本体が 1 件でないとき止まる)。
-- 実測 (測定 commit は本 PR の生成器コミット): `python3 m11_sigfix40c_ab.py work/boot_final.ll work/sigfix40c --pe <PE>` は rc 0 (4 variant 生成)。
+- 未実施 (受入条件 1): 素材 `work-m11` の `boot_final.ll` で `python3 m11_sigfix40c_ab.py work/boot_final.ll work/sigfix40c --pe <PE>` を実行し、rc・`fixed=`・入力 IR の sha256 を記録する。本 run では素材 `work-m11` が `$ARTIFACTS_DIR` に無く、上書きした `work/boot_final.ll` を戻せなかった。上書き後の IR での rc 0 (`only40c fixed=1`) は受入条件 1 の証跡にならない。
 - 未確定: survey の数値は本 run で安定しなかった。同じ既定版 (`M11_XMM_ARGS=0`) の build で、再生成した `boot_final.ll` では 873/1/47/21/0、続く再 build では 136/1/796/8/1 と出た。原因は未特定 (IR 再生成の揺れか、build の stamp 状態か)。このため ctlB・ctlC・sigzero の survey 差は未確定。
