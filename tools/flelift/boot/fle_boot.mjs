@@ -341,16 +341,16 @@ if (SURVEY) {
         const TO = Math.min(Number(process.env.FLE_SURVEY_TO || total), total);
         const byCls = {}; const details = [];
         let longjmp0 = Number(m._fle_n_longjmp());
+        // noproc / empty も jsonl に 1 行ずつ残す (merge_survey.py が 942 件を数えられるように・#4854)
+        const emit = (i, cls, info) => { try { appendFileSync(outPath.replace(/\.json$/, '.jsonl'), JSON.stringify([i, cls, info]) + '\n'); } catch { } };
         for (let i = FROM; i < TO; i++) {
             console.error('[survey] unit ' + i + '/' + total);
             const proc = Number(m._fle_unit_proc(i) >>> 0);
-            // noproc / empty も jsonl に 1 行ずつ残す (merge_survey.py が 942 件を数えられるように・#4854)
-            const emit = (cls, info) => { try { appendFileSync(outPath.replace(/\.json$/, '.jsonl'), JSON.stringify([i, cls, info]) + '\n'); } catch { } };
-            if (!proc) { byCls['noproc'] = (byCls['noproc'] || 0) + 1; details.push([i, 'noproc', 0]); emit('noproc', 0); continue; }
+            if (!proc) { byCls['noproc'] = (byCls['noproc'] || 0) + 1; details.push([i, 'noproc', 0]); emit(i, 'noproc', 0); continue; }
             // InitUnits と同じ [proc]!=0 check (実機 semantics: 先頭 8B が 0 なら skip)
             let zero8 = true;
             for (let k = 0; k < 8; k++) if (U8[proc + k]) { zero8 = false; break; }
-            if (zero8) { byCls['empty'] = (byCls['empty'] || 0) + 1; details.push([i, 'empty', proc]); emit('empty', proc); continue; }
+            if (zero8) { byCls['empty'] = (byCls['empty'] || 0) + 1; details.push([i, 'empty', proc]); emit(i, 'empty', proc); continue; }
             const lj = Number(m._fle_n_longjmp());
             let cls = 'ok', info = 0;
             try {
