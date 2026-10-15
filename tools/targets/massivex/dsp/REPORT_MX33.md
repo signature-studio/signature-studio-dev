@@ -8,7 +8,8 @@
 
 ## 0. 結論 (先出し)
 
-1. **受入 1 の結論: 17 件は定義どおりには 1 件も確定しない。** scalar 0 / 128 bit 0 / 判定不能 **17**。
+1. **受入 1 の結論 (#3774 後): 17 件のうち確定は 1 件。** scalar **1** (0x17b680) / 128 bit 0 / 判定不能 **16**。
+   前版 (#3032) は scalar 0 / 128 bit 0 / 判定不能 17。残 16 件の内訳は §2 末尾。
    17 件の入口読み 21 本はすべて「reg-reg 複写」(9 件) か「VEX 3 オペランドの上位保持 (merge)」(8 件) で、
    scalar 読みも packed 証拠も 1 本もない (§1・§2)。
 2. **merge 8 件は引数の根拠にならない。** `vcvtsi2sd xmm0, xmm0, rax` 型は xmm の下位 32/64 bit を読まずに上書きし、
@@ -55,7 +56,7 @@
 | 7 | 0x1109b0–0x1109f8 | 19 | 2 | 0x1801109b9 `movaps xmm6, xmm2` (A: 複写) | – | 判定不能 |
 | 8 | 0x110a30–0x110a75 | 21 | 2 | 0x180110a3a `movaps xmm6, xmm2` (A: 複写) | – | 判定不能 |
 | 9 | 0x17b4e0–0x17b63d | 76 | 2 | 0x18017b505 `movaps xmm6, xmm2` (A: 複写) | 0 | 判定不能 |
-| 10 | 0x17b680–0x17b7ed | 79 | 2 | 0x18017b6a5 `movaps xmm6, xmm2` (A: 複写) | 0 | 判定不能 |
+| 10 | 0x17b680–0x17b7ed | 79 | 2 | 0x18017b6a5 `movaps xmm6, xmm2` (複写先 xmm6 の後続は全て scalar・#3774) | 0 | **scalar** |
 | 11 | 0x7d38d0–0x7d3b05 | 127 | 2 | 0x1807d3937 `vcvtsi2ss xmm0, xmm2, dword ptr [rax+0xc]` (A: merge) | 0,1,2,3 | 判定不能 |
 | 12 | 0x7d3b10–0x7d3d95 | 149 | 2 | 0x1807d3bb6 `vcvtsi2ss xmm0, xmm2, dword ptr [rax+0xc]` (A: merge) | 0,1,2,3 | 判定不能 |
 | 13 | 0x7dcb60–0x7dcca8 | 71 | 0, 1 | 0x1807dcbad `vcvtsi2sd xmm0, xmm0, r9d`・0x1807dcbb2 `vcvtsi2sd xmm1, xmm1, r10d` (A: merge) | 0,1,2,3 | 判定不能 |
@@ -146,8 +147,9 @@
 
 ## 8. 測定 commit と差分 (docs/WORKFLOW.md §6)
 
-- 測定 commit = **`d9a2b7ec2`** (`feat(massivex): classify xmm0-3 vectorcall candidates (MX-33 #3032)`)。
-  変更: `scripts/mx6_vectorcall.py` (読み位置の返却: +4/−1 行)・`scripts/mx33_xmm03.py` (新規)・`mx6_e2e.sh` (step 4/7 と assert の追加)。
-- `git diff d9a2b7ec2 HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` → **0 行** (コードの差分 0)。
+- 測定 commit = **`1083467fe`** (`feat(massivex): follow copy/merge destinations for xmm0-3 classification (MX-37 #3774)`)。前版 = `d9a2b7ec2` (MX-33 #3032)。
+  変更 (#3774): `scripts/mx33_xmm03.py` (複写先・merge 上位の後続追跡 `follow()`・NC 6 件追加)・`scripts/mx6_vectorcall.py` (`analyze()` の返り値に `cfg` を追加・JSON には出さない)。
+- `git diff d9a2b7ec2 1083467fe -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` の差分は上記 2 ファイルのみ (`mx6_e2e.sh` は未変更)。
+- 測定 (#3774・`mx6_e2e.sh`・MX_PE = 展開 `Massive X.vst3`・md5 `622993e7…` 一致): **exit 0・elapsed 48 s・load 0.08 0.06 0.09 → 0.64 0.21 0.14**。受入 1 の件数は scalar 1 / 128 bit 0 / 判定不能 16 (前版 0 / 0 / 17)。
   `tools/targets/massivex/dsp` 全体の差分は本 REPORT の追加 (docs commit `61e1aabbe`) のみで、測定対象外。
 - MX-6 測定 commit (`fbc9971f`) からの変更 (`mx6_vectorcall.py` の +4/−1 行・`mx6_e2e.sh`) は、MX-6 の表示値を変えないことを e2e (§5) で確認した。
