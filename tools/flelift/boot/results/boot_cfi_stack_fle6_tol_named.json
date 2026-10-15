@@ -1,0 +1,11 @@
+{
+ "va": "0x1375990",
+ "threw": {
+  "cls": "oob",
+  "msg": "memory access out of bounds"
+ },
+ "stack": "RuntimeError: memory access out of bounds\n    at f_410320\n    at f_5af120\n    at f_1105350\n    at f_13752f0\n    at f_1375990\n    at ott_dispatch\n    at fle_run\n    at Object._fle_run (/home/runner/work/signature-studio-dev/ws-3969/tools/flelift/work/boot/fleboot_plain.cjs:543:12)\n    at file:///home/runner/work/signature-studio-dev/ws-3969/tools/flelift/boot/fle_boot.mjs:308:18",
+ "stack_note": "関数名付き link (FLE_EXTRA_LDF=-g --profiling-funcs) の例外スタック。wasm の絶対 path は除いた",
+ "measure_commit": "2ff548657",
+ "mode": 1
+}
