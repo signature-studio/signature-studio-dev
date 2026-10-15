@@ -4,6 +4,8 @@
 //   同期は全てイベント駆動 (page 内 waitLog/フレーム ack の Promise を eval で await)。固定 sleep なし。
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { BUILD, H, ROOT, W, decodePNG, diffRGB, openDriver, readPPM, startServer, writePPM } from "./e2e_lib.mjs";
 
 const OUTDIR = path.join(BUILD, "e2e");
@@ -32,6 +34,50 @@ async function main() {
   log("boot:", JSON.stringify(boot));
   need(boot.crossOriginIsolated === true, "crossOriginIsolated must be true (COOP/COEP)");
   need(boot.sab === true, "wasm memory must be SharedArrayBuffer");
+  if (process.env.E2E_MODE === "w") {   // W 版ゲスト (test/gui_app_w.c): 入力なし。WM_PAINT 1 回 -> ESC で終了 (#3509)
+    const L = (expr) => E(`window.__e2e.host.${expr}`);
+    await L(`waitLog("w: roundtrip ok")`);
+    log("W guest: WM_PAINT and SetWindowTextW/GetWindowTextW round trip done");
+    // 期待画像は独立オラクル (golden/gen_golden_w.py; shim の C 実装と無関係)。E2E_TAMPER=1 では 1 画素改竄する
+    const tamper = process.env.E2E_TAMPER === "1";
+    const expFile = path.join(OUTDIR, tamper ? "w_expected_tamper.ppm" : "w_expected.ppm");
+    execFileSync("python3", [path.join(ROOT, "golden", "gen_golden_w.py"), "emit", expFile, ...(tamper ? ["--tamper"] : [])], { stdio: "inherit" });
+    const want = readPPM(expFile);
+    const rb = await E(`(async () => { const r = await window.__e2e.host.readback(); let s = ""; const d = r.data; for (let i = 0; i < d.length; i += 0x8000) s += String.fromCharCode.apply(null, d.subarray(i, i + 0x8000)); return { w: r.width, h: r.height, b64: btoa(s) }; })()`);
+    const rbuf = Buffer.from(rb.b64, "base64");   // RGBA (BGRA->RGBA 変換済み; worker)
+    const gotPx = (x, y) => { const o = (y * rb.w + x) * 4; return [rbuf[o], rbuf[o + 1], rbuf[o + 2]]; };
+    const d1 = diffRGB(want.data, W, H, gotPx);
+    writePPM(path.join(OUTDIR, "w_canvas_readback.ppm"), W, H, gotPx);
+    need(rb.w === W && rb.h === H, `readback size ${rb.w}x${rb.h}`);
+    need(d1.diff === 0, `OffscreenCanvas readback != oracle: ${d1.diff} px differ, first=${JSON.stringify(d1.first)}`);
+    log(`OffscreenCanvas readback vs oracle: ${d1.diff === 0 ? "EXACT MATCH" : "MISMATCH"} (${d1.diff} differing px of ${W * H})`);
+    // 統計側で alpha を落として RGB 3 バイト列の sha256 を取る (gui_hl_stats の定義と同じ)。native は native_w_e2e.sh の surface 行
+    const rgb = Buffer.alloc(W * H * 3);
+    for (let i = 0; i < W * H; i++) { rgb[i * 3] = rbuf[i * 4]; rgb[i * 3 + 1] = rbuf[i * 4 + 1]; rgb[i * 3 + 2] = rbuf[i * 4 + 2]; }
+    const sha = createHash("sha256").update(rgb).digest("hex");
+    const nlog = fs.existsSync(path.join(BUILD, "native_w_run.log")) ? fs.readFileSync(path.join(BUILD, "native_w_run.log"), "utf8") : "";
+    const nsha = /\[native_w_run\] surface .*sha256=([0-9a-f]{64})/.exec(nlog)?.[1];
+    need(!!nsha, "native_w_run.log lacks the native surface sha256 (run tools/gui/test/native_w_e2e.sh first)");
+    need(sha === nsha, `readback sha256 ${sha} != native surface sha256 ${nsha}`);
+    log(`readback sha256 ${sha} vs native ${nsha}: ${sha === nsha ? "MATCH" : "MISMATCH"}`);
+    const shotFile = path.join(OUTDIR, "w_screenshot.png");
+    await drv.screenshot(shotFile);
+    const png = decodePNG(fs.readFileSync(shotFile));
+    const d2 = diffRGB(want.data, W, H, (x, y) => { const o = (y * png.w + x) * png.bpp; return [png.data[o], png.data[o + 1], png.data[o + 2]]; });
+    need(png.w >= W && png.h >= H, `screenshot size ${png.w}x${png.h}`);
+    need(d2.diff === 0, `screenshot != oracle: ${d2.diff} px differ, first=${JSON.stringify(d2.first)}`);
+    log(`on-screen screenshot vs oracle: ${d2.diff === 0 ? "EXACT MATCH" : "MISMATCH"} (${d2.diff} differing px)`);
+    await drv.press("Escape");
+    await L(`waitLog("w: destroy")`);
+    const code = await E(`window.__e2e.host.exited`);
+    need(code === 0, `exit code ${code}`);
+    log("W guest exited via ExitProcess, code=" + code);
+    const errs = await E("window.__e2e.errors");
+    need(errs.length === 0, "page errors: " + JSON.stringify(errs));
+    const perr = await drv.pageErrors();
+    need(perr.length === 0, "driver page errors: " + JSON.stringify(perr));
+    return;
+  }
   if (process.env.E2E_MODE === "failfast") {   // 未実装 API 到達 -> 即 abort + EXIT(0xFA11) が host に届くこと
     const code = await E("window.__e2e.host.exited");
     need(code === 0xFA11, `fail-fast exit code ${code} (want ${0xFA11})`);
