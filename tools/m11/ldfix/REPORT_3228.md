@@ -60,8 +60,9 @@
 
 ### 3.4 差分 (WORKFLOW §6)
 
-- 測定 commit: `028bbd9fb`。
-- `git diff 028bbd9fb HEAD -- tools/m11/ldfix` は REPORT_3228.md と結果 JSON 2 本 (`frame_store_callee_3228.json`・`negctl_callee_3228_transparent.json`) の追加だけ (PR 本文の検証結果に出力を載せる)。
+- 測定 commit: `028bbd9fb`。検証 HEAD: `878c87dfc` (origin/main 取り込みの merge commit)。
+- 判定が実行するファイル (判定器 `audit_frame_store_callee_3228.py`・`ldmach.py`・`audit_frame_store_verdict.py`・`audit_frame_store_alias_2211.py`・入力 `results/audit_undefload_564_full.json`・`results/f4_564_post.json`・`results/frame_store_verdict_2211.json`) は、`git diff --stat 028bbd9fb 878c87dfc -- <上の 7 ファイル>` が空 (差分 0)。
+- `git diff --stat 028bbd9fb 878c87dfc -- tools/m11/ldfix` の全体は 9 ファイル (本 PR の追加 3 本 = REPORT_3228.md と結果 JSON 2 本、main 取り込み由来 6 本 = REPORT_1325.md・REPORT_3195.md・REPORT_3230.md・residual_3195.py・fix_shx_t40.py・u3_check_4040.py)。main 由来の変更は判定に使わない。
 
 ## 4. 未達の受入条件 (起票先)
 
