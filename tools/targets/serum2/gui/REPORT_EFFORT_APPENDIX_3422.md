@@ -91,7 +91,7 @@
 
 ### 3-3. 判定
 - `check_line_width.sh` に角のケースを追加 (`corner_tri_w4_aa`: 頂点 (8.5,50.5)・(32.5,10.5)・(56.5,50.5)、w4 AA の閉じた三角形)。参照値は同じ標本法で「線分の和集合の被覆」を直接求めた値。判定 `corner_no_double_blend` は `over` (参照値より alpha が 1 を超えて濃い画素数) = 0 を要求。
-- 変更前 (`check_line_width.sh` 追加直後・本体は `9d4a6d5c0` 相当): `corner_join over=105 maxdiff=64` → `corner_no_double_blend: fail`。
+- 変更前 (本体 = `origin/main` `d355f2a71`・判定は本 commit の新版): `corner_join over=105 maxdiff=64` → `corner_no_double_blend: fail`。
 - 変更後 (測定 commit `66f9d8acd`): `corner_join over=0 maxdiff=0` → pass。rc=0。
 
 | ケース | 変更前 nonzero / partial / full | 変更後 nonzero / partial / full |
