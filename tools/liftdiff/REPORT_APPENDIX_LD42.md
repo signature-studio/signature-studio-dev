@@ -76,7 +76,8 @@ python3 tests/ld42_basis.py work/m11/batch_sample_800.jsonl work/m11/batch_sampl
   - **B. hybrid で実行不能: 1 件** (行 13 = InitUnits 0x4120c0)。units の一致 11/11 は InitUnits の空振り (§4)。hybrid は native segv 11/11 (`native_null_deref_all_patterns`)。
   - **C. hybrid で一致 (差分 0): 13 件**。units の主因は callee_divergence 9・wasm_trap 4。
   - **F. units 一致 → hybrid 不一致: 25 件**。全件の主因が callee_divergence。pattern 内訳は diff 11 が 20 件、equal 1 + diff 10 が 5 件。
-- 「pattern 内訳」は 11 pattern の outcome 件数。`equal` 一致・`diff` 差分・`native_fault` native だけ fault・`both_fault` 両側 fault・`wasm_trap` wasm の trap・`hang` 上限超過・`wasm_timeout_native_long` wasm のみ上限超過。
+- 「pattern 内訳」は、その関数の `cases` 全件の outcome 件数 (`tests/ld42_basis.py` の `outcome_counts`)。基本の pattern は 11 件。`equal` 一致・`diff` 差分・`native_fault` native だけ fault・`both_fault` 両側 fault・`wasm_trap` wasm の trap・`hang` 上限超過・`wasm_timeout_native_long` wasm のみ上限超過。
+- **units 側の合計が 11 を超える行は、fvm (LD-23) の case を含む。** `ldlib/session.py::_fvm_cases` は、基本 11 pattern が全て equal/diff/wasm_trap でない関数に `pattern='fvm'` の case を追加する。該当は 13 行 (行 1・6・7・10・15・17・28・29・30・41・49・55・62)。追加分 (合計 − 11) は行 1・10・29 が 8、行 6・7・15 が 7、行 17・28・30・41・49・55 が 5、行 62 が 3 で、計 78 件。fvm の outcome は表の列に混ざっており、この表では `pattern=fvm` を分離していない。hybrid 側は 68 行すべて合計 11 件で、fvm の追加は無い。
 - 注記: 行 10 (0x12f9ec0) は pattern 8 件が `native_fault` のままで一致判定になっている (`equal` 3)。
 
 | # | va | 名前 | units → hybrid | units 主因 | hybrid 主因 | units の pattern 内訳 | hybrid の pattern 内訳 | 根拠 |
@@ -190,7 +191,7 @@ python3 tests/ld42_basis.py work/m11/batch_sample_800.jsonl work/m11/batch_sampl
 | 2d149de9 (LD-50 の HEAD・e2e 再実行。hybrid は未再実行) | 360 / 233 / 207 | — | — | units 5.61 |
 
 - units は 3 回の測定で 一致 360–361・不一致 230–233・実行不能 207–210 (1–3 件の揺れ)。hybrid は不一致 +12・実行不能 −11 動いた。遷移は 67 から 68 に変わった。
-- 同じ条件の再測定ではない (f9df8bf4 の hybrid batch は終了時 load 8.25 の環境で走った)。pattern の outcome 件数は units の hang 271・hybrid の hang 264。hang / timeout 判定の負荷依存が揺れの候補だが、未検証。子 issue #3350 (LD-154)。
+- 同じ条件の再測定ではない (f9df8bf4 の hybrid batch は終了時 load 8.25 の環境で走った)。pattern の outcome 件数 (units の hang 271・hybrid の hang 264) の集計範囲は未確認。fvm case を含むかは、元データ (batch jsonl) が本 run に無く再集計できないため判定できない。units 側の fvm case は §6 の表から計 78 件 (そのうち hang の件数は未確認)。hang / timeout 判定の負荷依存が揺れの候補だが、未検証。子 issue #3350 (LD-154)。
 - 1 回の測定の件数を基準値にしない。
 
 ### 8.2 hybrid へ切り替える条件
@@ -204,5 +205,5 @@ python3 tests/ld42_basis.py work/m11/batch_sample_800.jsonl work/m11/batch_sampl
 
 - 測定 commit: `2d149de9` (コードを変えた最後の commit)。e2e (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/liftdiff/liftdiff_e2e.sh --m11-only`): rc 0 / 185 s / 終了時 load 5.61 / `CHECK_INITUNITS PASS` (units の空振り 11/11・hybrid の native_fault 11・空振り 0) / 一致 360・不一致 233・実行不能 207 / `LIFTDIFF_E2E PASS`。
 - 同じ e2e を f9df8bf4 で実行: rc 0 / 188 s / 終了時 load 5.90 / `CHECK_INITUNITS PASS` / 361・232・207 / `LIFTDIFF_E2E PASS`。
-- 測定 commit 以降のコード差分 (`git diff 2d149de9 HEAD -- tools/liftdiff/*.py tools/liftdiff/ldlib tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh tools/liftdiff/rt`) は 0 行。以後の commit は本付録の文書のみ。
+- 測定 commit 以降のコード差分: `git diff 2d149de9 -- tools/liftdiff/*.py tools/liftdiff/ldlib tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh tools/liftdiff/rt` は `tests/ld42_basis.py` の docstring 1 行 (1 insertion・1 deletion) のみ。この範囲から `tests/ld42_basis.py` を除くと 0 行。`liftdiff_e2e.sh` は `ld42_basis.py` を呼ばないため、e2e の経路は不変で再測定は不要。以後の commit は本付録・DOC_MAP・`ld42_basis.py` の docstring のみ。
 - 本付録の §6 の表は `tests/ld42_basis.py` で再生成できる (1 コマンド。§6 冒頭)。

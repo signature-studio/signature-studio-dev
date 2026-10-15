@@ -2,7 +2,7 @@
 
 使い方: python3 tests/ld42_basis.py <units.jsonl> <hybrid.jsonl> [--md out.md]
 出力: 遷移 1 件 1 行の Markdown 表。units / hybrid の判定、主因タグ (DEFECTS の優先順位)、
-pattern (11 件) の outcome 内訳、根拠の区分。
+pattern の outcome 内訳 (`cases` 全件。units 側は全 pattern が equal/diff/wasm_trap でない関数に fvm (LD-23) の case を追加するため、11 件を超える行がある)、根拠の区分。
 根拠の区分は上から順に判定する: units の実行不能の解消 → hybrid の実行不能 → native 異常 → wasm trap → 両側実行の差分。
 """
 import collections
