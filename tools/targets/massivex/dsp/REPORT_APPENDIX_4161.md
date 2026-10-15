@@ -108,7 +108,7 @@ index 8b5319ecf..32a371373 100644
 実測 (受入 4「wasm 化が通る」・HEAD = `27b04ff2b`・`tools/shimx` のコード変更は `d896246c4` が最後):
 
 - コマンド: `bash tools/shimx/test.sh --quick` (foreground・`PATH` に emsdk の `upstream/bin` を追加し、`[EMSDK]` (emsdk 6.0.12) を runner 上の展開先に symlink。`llvm-nm` は `upstream/emscripten` 側に symlink)
-- 結果: **exit 0・所要 119 s**。emsdk 6.0.12 (`emcc --version`)・node v22.23.3 (`build/versions.txt`)。runner は 4 vCPU
+- 結果: **exit 0・所要 119 s** (`27b04ff2b`)。最終 HEAD `dd643cf49` でも再測定し **exit 0・116 s**・`fh3 OK` (MT/ST 各 1)・`ALL PASS` (MT/ST)。`git diff dd643cf49 HEAD -- tools/shimx` は差分 0 行 (測定 commit と同じ)。emsdk 6.0.12 (`emcc --version`)・node v22.23.3 (`build/versions.txt`)。runner は 4 vCPU
 - PASS 行: `build/mt.out` = `[shimx-test] ALL PASS (build=mt(pthreads))`、`build/mt.err` に `fh3 OK`。`build/st.out` = `[shimx-test] ALL PASS (build=st)`、`build/st.err` に `fh3 OK`
 - 内訳: 公開関数 699 本・MT 9 グループ PASS・ST PASS・fail-fast 14 件 PASS・M4 互換 PASS・SKIP (M11/M8 IR 無し・コミット済み生成物は不変)・guard 7b 全 OK
 - 作業ツリーの追跡ファイルは変化なし (`git status` clean。ビルド物は gitignore)
