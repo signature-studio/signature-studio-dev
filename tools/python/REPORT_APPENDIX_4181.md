@@ -32,10 +32,11 @@
 ## 測定
 
 - 測定 commit: `1f12b1b6d` (origin/main。分析スクリプトは変えていない)。
-- 素材: `fl-win64.tar.zst` の `block00031_PE.bin` (22,227,016 byte) を `$RUNNER_TEMP/fl/extracted` に展開 (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl extracted/block00031_PE.bin`、実測 2.9 秒)。
-- 逆アセ (`analysis/flapi/pe_disasm.py`、`FL_WIN64_DIR=$RUNNER_TEMP/fl`、要求命令数で打ち切り): `0xf823f0` (120)・`0x40c660`・`0x661450`・`0x10469f0` (ret まで 0x1046a1d)・`0xf824b0` (60)・`0x1051c90` (60)・`0xbaffb0`・`0xbadd00` (60)・`0xfe8bb0`。全て終了 0。
+- 素材: `fl-win64.tar.zst` の `block00031_PE.bin` (22,227,016 byte) を `$RUNNER_TEMP/fl-win64/extracted` に展開 (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 extracted/block00031_PE.bin`、実測 2.9 秒)。
+- 逆アセ (`analysis/flapi/pe_disasm.py`、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、要求命令数で打ち切り): `0xf823f0` (120)・`0x40c660`・`0x661450`・`0x10469f0` (ret まで 0x1046a1d)・`0xf824b0` (60)・`0x1051c90` (60)・`0xbaffb0`・`0xbadd00` (60)・`0xfe8bb0`。全て終了 0。
 - 定数 (`pe_rip_consts.py`): `0xf82518`=2^-30 (qword の f64 表示 9.3132e-10)・`0xf82520`=1.0 (f32)・`0xf82524`=2^30 (f32)・`0x1046a20`=2^-30 (f64)。`0x1051cc9` の参照先 slot `0x15e2218` は値の型を未確認 (ポインタ経由で読まれる)。
-- 呼び出し元 (E8 相対の走査): `0x10469f0` は 8 箇所、`0x1051c90` は 3 箇所。
+- 呼び出し元 (`.text` の線形走査、capstone、命令境界で揃えた直接 `call` の即値): `0x10469f0` は 8 箇所 (`0x1047714`・`0x1047964`・`0x1047d93`・`0x1049b2c`・`0x104a48f`・`0x104b300`・`0x104b83e`・`0x1051806`)、`0x1051c90` は 3 箇所 (`0x1051f0e`・`0x1051f7f`・`0x1051fb0`)。非命令境界の `E8` バイト走査でも同数。無効バイトは 161,366 byte を 1 byte 飛ばしで処理。
+- `flags & 2` のときの `lo = 0`・`hi = 0x100000` は REPORT_APPENDIX_4109 の確定事項 (8 行目・29 行目) を出典とする。本 REPORT では再確認していない。
 
 ## 未確定 (子 issue へ)
 
