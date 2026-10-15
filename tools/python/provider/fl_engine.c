@@ -409,8 +409,10 @@ FL_H(mixer, setTrackVolume) { MX(0); t->vol = A_DBL(1, 0); return fl_ret_none(c)
 FL_H(mixer, getTrackPan) { MX(0); return fl_ret_d(c, t->pan); }
 FL_H(mixer, setTrackPan) { MX(0); t->pan = A_DBL(1, 0); return fl_ret_none(c); }
 FL_H(mixer, setTrackColor) { MX(0); t->color = fl_swap_rb((uint32_t)A_INT(1, 0)) | 0xff000000u; t->color_set = 1; return fl_ret_none(c); }
+/* PE 0xd5ec60: 範囲外 (idx < 0 または idx > NMIX-1) は例外を立てず、int 0 を返す (警告は初回のみ・REPORT_PY118 §2) */
 FL_H(mixer, getTrackColor) {
-    MX(0); uint32_t u = t->color_set ? (uint32_t)t->color : fl_swap_rb(MIX_DEFAULT_COLOR);
+    int64_t _m = A_INT(0, 0); if (_m < 0 || _m >= NMIX) return fl_ret_i(c, 0);
+    Mix *t = &mx[_m]; uint32_t u = t->color_set ? (uint32_t)t->color : fl_swap_rb(MIX_DEFAULT_COLOR);
     return fl_ret_i(c, (int64_t)(fl_swap_rb(u) | 0xff000000u));
 }
 FL_H(mixer, isTrackSelected) { MX(0); return fl_ret_b(c, t->sel); }

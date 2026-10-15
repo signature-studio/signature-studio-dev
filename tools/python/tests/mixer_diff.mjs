@@ -23,6 +23,11 @@ const run = (eng, name, args) => {
 // 既定経路 (未設定 track 2) の確定値 (.bss 0x15f6774 = 0xff636c71・REPORT_PY118)。seq の set より前に pin する
 assert.deepEqual(run(mock, "mixer.getTrackColor", [2]), { ok: 0xff636c71 });
 assert.deepEqual(run(wasm, "mixer.getTrackColor", [2]), { ok: 0xff636c71 });
+// 範囲外 (-1・127) は例外でなく int 0 (PE 0xd5ec60 の範囲判定・REPORT_PY118 §2)
+for (const i of [-1, 127]) {
+  assert.deepEqual(run(mock, "mixer.getTrackColor", [i]), { ok: 0 });
+  assert.deepEqual(run(wasm, "mixer.getTrackColor", [i]), { ok: 0 });
+}
 
 const seq = [
   ["mixer.trackCount", []],
