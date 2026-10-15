@@ -200,7 +200,7 @@ thisc_rows = [r for r in rows if r[2] == "vptr:THIS-CHILD"]
 
 print(f"== ARG 240 件 (直接の引数): 判定 {dict(Counter(judge(r[4]) for r in arg_rows))}")
 print(f"   呼出元の値の内訳 {dict(sorted(Counter(v for r in arg_rows for v in set(r[4])).items()))}")
-_na = [r for r in arg_rows if r[4] == ["nocaller"]]
+_na = [r for r in arg_rows if set(r[4]) == {"nocaller"}]
 print(f"   直接呼出元なし {len(_na)} 件 (関数 {len({r[1] for r in _na})} 個)。うち関数アドレスとしてデータ表に現れる関数 {sum(1 for r in _na if r[1] in TAKEN)} 件")
 
 print(f"== ARG-CHILD {len(argc_rows)} 件 (親の引数が SC か): 判定 {dict(Counter(judge(r[4]) for r in argc_rows))}")
