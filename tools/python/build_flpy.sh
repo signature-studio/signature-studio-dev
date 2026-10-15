@@ -20,6 +20,7 @@ EMSDK_DIR="${EMSDK_DIR:-/opt/emsdk}"
 WORK="$HERE/work"; SRC="$WORK/Python-3.12.1"; B="$WORK/build-wasm"; D="${FLPY_OUT:-$HERE/dist}"; ST="$WORK/staging"; C="${FLPY_C:-$HERE/src/flpy.c}"
 # shellcheck disable=SC1091
 source "$EMSDK_DIR/emsdk_env.sh" >/dev/null 2>&1
+EMSDK_DIR="$EMSDK_DIR" bash "$HERE/fetch_zlib_port.sh"   # -sUSE_ZLIB の port (GitHub tag 404 対策・PY-298)
 
 rm -rf "$ST"; mkdir -p "$ST/fl/Lib" "$ST/usr/local/lib/python3.12/lib-dynload" "$D"
 cp "$HERE/src/fl_rt.py" "$HERE/src/fl_api.py" "$HERE/src/flpianoroll.py" "$HERE/src/enveditor.py" "$HERE/src/flcpt.py" "$OUTF/flapi_table.json" "$ST/fl/Lib/"

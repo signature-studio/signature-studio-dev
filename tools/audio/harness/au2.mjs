@@ -58,6 +58,13 @@ function watchSink(sinkIdx) {
   }, 300);
   return { stop: () => clearInterval(iv), summary: () => { const rows = [...seen.values()]; return { seen: rows.length > 0, on_expected: rows.some((r) => r.sink === sinkIdx), expected: EXPECTED, specs: [...new Set(rows.map((r) => r.spec))] }; } };
 }
+// AU-37 (#3323): burst_hist (512 f 刻み・32 bin, 末尾 bin は以上) から p99 を出す。harness/run.mjs と同じ式 (p99 は該当 bin の上端)
+const burstStats = (h) => {
+  const n = h.reduce((a, b) => a + b, 0), need = Math.ceil(0.99 * n);
+  let c = 0;
+  for (let k = 0; k < h.length && n; k++) { c += h[k]; if (c >= need) return { burst_runs: n, burst_p99: (k + 1) * 512 }; }
+  return { burst_runs: n, burst_p99: 0 };
+};
 const underrunFree = (r) => r.stats.underruns === 0 && r.stats.silence_frames === 0;
 const sineOk = (r) => r.verify?.sine && r.verify.sine.max_abs_err < 1e-5 && r.verify.sine.zero_runs_ge16 === 0;
 
@@ -82,12 +89,13 @@ await withFirefox({ root: path.join(here, "../build/web"), page: "index.html?" +
       msg = `underruns=${r.stats.underruns} silence=${r.stats.silence_frames}f sine maxErr=${r.verify?.sine?.max_abs_err?.toExponential(2)} zeroRuns=${r.verify?.sine?.zero_runs_ge16} ctx.sampleRate=${r.ctx?.sampleRate}(want ${sc.sr}) on expected sink=${conn.on_expected}`;
     }
     if (!ok) failed++;
+    if (Array.isArray(r?.stats?.burst_hist)) Object.assign(r.stats, burstStats(r.stats.burst_hist));
     const s = r?.stats ?? {};
     results.push({ name: sc.name, sr: sc.sr, query: sc.q, ok, msg, error: err, sink_route: conn,
-      ctx: r?.ctx ?? null, burst: s.burst_obs ?? null, T: s.T ?? null, clock_hz: r?.clock?.rate_hz ?? null, underruns: s.underruns ?? null,
+      ctx: r?.ctx ?? null, burst: s.burst_obs ?? null, burst_p99: s.burst_p99 ?? null, burst_runs: s.burst_runs ?? null, T: s.T ?? null, clock_hz: r?.clock?.rate_hz ?? null, underruns: s.underruns ?? null,
       silence_frames: s.silence_frames ?? null, cb_count: s.cb_count ?? null, result: r });
     console.log(`${ok ? "PASS" : "FAIL"} ${sc.name.padEnd(24)} ${msg}${err ? " ERR " + err : ""}`);
-    console.log(`       burst=${s.burst_obs ?? "-"} T=${s.T ?? "-"} clock=${r?.clock?.rate_hz?.toFixed(1) ?? "-"}Hz on expected sink=${conn.on_expected} specs=${JSON.stringify(conn.specs)}`);
+    console.log(`       burst=${s.burst_obs ?? "-"} p99=${s.burst_p99 ?? "-"} runs=${s.burst_runs ?? "-"} T=${s.T ?? "-"} clock=${r?.clock?.rate_hz?.toFixed(1) ?? "-"}Hz on expected sink=${conn.on_expected} specs=${JSON.stringify(conn.specs)}`);
   }
   probe = await ff.eval(PROBE);
 });

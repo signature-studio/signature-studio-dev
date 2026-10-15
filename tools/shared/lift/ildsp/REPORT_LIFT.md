@@ -61,7 +61,7 @@ FL_WIN64_DIR=<fl-win64 展開先> ILDSP_WORK=<作業先> RETDEC_BIN=<toolchain-r
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `gen_helpers.py` が `__asm_cvttss2si(i128)` で停止 (残りの未対応 op の全数は未測定) | 新 closure の wasm 化に進めない | [T-SH-63] #3316 |
+| `gen_helpers.py` の未対応シグネチャの C 実装 (件数の定義は libreverb/REPORT.md §0。distinct op 名 54 種は closure 全体の数) | 新 closure の wasm 化に進めない | [T-SH-65] #3318 |
 | RetDec が閉包の範囲内の 0x1801bd4f0・0x1801be14e を独立の関数として出す理由 (閉包の辺の到達先ではない・.pdata に無し) | 閉包の関数の開始番地に無い 2 関数が RetDec の .ll に余分に入る。wasm 化で扱いを決める必要 | [T-SH-63] #3316 |
 | 閉包内の間接 call 18 件・間接 jmp 6 件 (issue の 4 件を含む) の扱い (trap 化または静的解決) | 未処理のまま lift すると誤変換の恐れ | [T-SH-70] #3346 |
 | vtable slot 5 (0x1aa470) の lift と差分テスト | slot 5 が未 lift | [T-SH-84] #3404 |
