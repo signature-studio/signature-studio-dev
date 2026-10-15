@@ -128,16 +128,18 @@
 | 項目 | 結果 | VA と事実 | 残り (理由) |
 |---|---|---|---|
 | `vtbl+0x10` の呼出し | 呼出し箇所は確定 | `0x101b8f6`・`0x101bc1f` の `call [rbx+0x10]`。`rbx` = `[elem]`、引数 `rcx = elem`・`dl = [rbp+0xc8]` (= r9b、updateHistory==1 の真偽) | 呼ばれる実体は未確定 (下) |
-| `vtbl+0x40` の呼出し | 呼出し箇所は確定 | `0x101b98e` (`record+0x0c`) と `0x101b9d4` (`record+0x14`) の `call [rbx+0x40]`。引数の `rdx` は `[global 0x15e2aa0 + 24*(record+0x28)*8 + 0x20]` (.bss の要素 table) | 同上 |
+| `vtbl+0x40` の呼出し | 呼出し箇所は確定 | `0x101b98e` (`record+0x0c`) と `0x101b9d4` (`record+0x14`) の `call [rbx+0x40]`。引数の `rdx` は (未検証: 本検査は呼出し位置だけを確認) `[global 0x15e2aa0 + 24*(record+0x28)*8 + 0x20]` と読める。`0x15e2aa0` は `.data` (RVA 0xfa5000 の範囲内) で、先頭 6 qword の初期値は `0x193fce0`・`0x13e9458`・`0x1403bdc`・`0x6a8030`・`0x425bb0`・`0x15d3296` | 同上 |
 | `vtbl+0x18` の呼出し | 呼出し箇所は確定 | `0x102b690` の `call [rax+0x18]`。`rcx` = registry+0x18 の object、`dl` = entry の byte (`[r14+4]`)、`r8d` = c。`0x102b610` の線形探索で真になった位置の索引を返す | c と名前の対応は未確定 (下) |
 
 **実体が確定しなかった理由 (PE の静的な読みの範囲)**:
 
 - registry 要素の型 global `0x430df0` (`0x102caca`・`0x102cb01` の `mov rcx,[rip+..]`) の値は `0x430eb8` で `.text` 内。その先頭 qword は `0x449240` (これも `.text`)。vtable ポインタとして読むと、`+0x10`・`+0x18`・`+0x40` のどれも命令列のバイトになり、vtable として読めなかった。`.rdata` は 0x45 バイトしか無く、vtable の置き場所が別にあるかもしれない。要素の型は特定しなかった (静的 object の形を別途読む必要がある)。
-- record 要素の table `0x15e2aa0` は `.bss` (実行時に埋まる)。PE だけでは要素の型も vtable も決まらない。
+- record 要素の table `0x15e2aa0` は `.data` にあり、先頭 6 qword の初期値は上の表のとおり (PE から読める)。table 自体は静的に読めるが、要素が指す先の object の型は PE だけでは決まらない (要素の vtable は未読)。
 - name 引数の global `0x15e4c18` の値 `0x425c60` は `.text` 内の名前 object で、`0x15ec298` を指す (vtbl の確定には不要)。
 
-**未確定 (子へ移す)**: `vtbl+0x10`・`+0x40` の実体 (record に何を書くか) と、`vtbl+0x18` の c→名前の対応。`0x430eb8` の object layout (静的 object の読み方) と `0x15e2aa0` の実行時の中身の観測が要る。
+**未確定 (子へ移す)**: `vtbl+0x10`・`+0x40` の実体 (record に何を書くか) と、`vtbl+0x18` の c→名前の対応。`0x430eb8` の object layout (静的 object の読み方) と、`0x15e2aa0` が指す要素 object の型・vtable (table 自体は静的に読めるので、要素の読み先を辿れば決まる)。
+
+**検査の範囲**: `analysis/py4904_saveundo_vtbl.py` が assert するのは call 命令の位置 (`0x101b8f6` 等) だけ。`rbx = [elem]`・`dl = [rbp+0xc8]`・`rdx` の式は本検査では確認していない (上の表で「未検証」と書いたもの)。
 
 ## 5. 未確定と起票先
 
