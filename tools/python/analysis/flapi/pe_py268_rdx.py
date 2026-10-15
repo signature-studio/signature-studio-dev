@@ -196,6 +196,16 @@ for s in range(BOUND - 15, BOUND):
         preds.append((hex(s), ins.mnemonic, ins.op_str))
 check("0x127a2ba: 0x127a2ba で終わる命令 (fall-through 元) は 0 件 (15 バイト前からの全開始位置)", len(preds) == 0,
       f"preds={preds}")
+abs_hits = []
+for pat in (struct.pack("<I", BOUND), struct.pack("<Q", BOUND)):
+    i = -1
+    while True:
+        i = RAW.find(pat, i + 1)
+        if i < 0:
+            break
+        abs_hits.append(i)
+check("0x127a2ba: 絶対値 (4 バイト・8 バイト) としての出現は 0 件 (テーブル経由の間接分岐先ではない)", abs_hits == [],
+      f"fileoffs={[hex(x) for x in abs_hits]}")
 seq = next(md.disasm(RAW[va_to_fo(BOUND):va_to_fo(BOUND) + 16], BOUND), None)
 print("INFO 0x127a2ba からの逐次復号:", f"{seq.mnemonic} {seq.op_str}" if seq else None,
       "(DMT の index 上位 0x05 と address 欄 0x12ab520 の重なり読み。fall-through 元 0 件のため到達しない)")
