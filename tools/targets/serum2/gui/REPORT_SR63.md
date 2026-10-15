@@ -4,7 +4,7 @@
 - 範囲: 静的解析のみ。実 VSTGUI 上の動的確認は範囲外。
 - 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3` (x86_64-win)。本 run で展開し、sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` を実測 (REPORT_SR54 §0 の値と一致)。作業用 dir はリポジトリ外。
 - 測定 commit (解析に使ったコード): `40902feb7` (origin/main)。本 run の setState 出力 md5 `434362cc04773d5d60b957d5888a7de2` は REPORT_SR54 §1 の値と一致 (再現)。
-- 測定 commit の差分: `917e48fc7` (REPORT_SR54 の測定 commit) から HEAD までに `slot_reach.py` (+39 行の差分) と `receiver_this_trace.py` が変わっている。REPORT_SR54 の『差分 0 行』は後続 commit で成り立たなくなった。出力の md5 は変わらなかった (§1)。
+- 測定 commit の差分: `917e48fc7` (REPORT_SR54 の測定 commit) から HEAD までに `slot_reach.py` (`git diff --numstat` で +6/-1) と `receiver_this_trace.py` が変わっている。REPORT_SR54 の『差分 0 行』は後続 commit で成り立たなくなった。出力の md5 は変わらなかった (§1)。
 
 ## 0. 結論
 
@@ -86,8 +86,8 @@ venv/bin/python $P/disasm_range.py Serum2_win64.vst3 0x1800c3080 0x1800c3140
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (a) 件 1・件 2 の要素の型 (vptr 先の vtable が SC の index 17 か)。`[rsi+0x22380]`・`[this+0x1da80]` の要素を書く箇所の追跡 | 受入 2 (デモ bit=0 で Splice 表示が偽になる経路の有無) | [SR-63] #4242 の後続 (子 issue を起票) |
-| (b) `+0x22798` の lea escape 先 (ctor `0x1800a9f40` の `lea` 先の callee)、`+0x20408` の書込元 `0x1803573f0` の呼出元 | 受入 3 | 同上 |
+| (a) 件 1・件 2 の要素の型 (vptr 先の vtable が SC の index 17 か)。`[rsi+0x22380]`・`[this+0x1da80]` の要素を書く箇所の追跡 | 受入 2 (デモ bit=0 で Splice 表示が偽になる経路の有無) | #4483 [SR-75] |
+| (b) `+0x22798` の lea escape 先 (ctor `0x1800a9f40` の `lea` 先の callee)、`+0x20408` の書込元 `0x1803573f0` の呼出元 | 受入 3 | #4484 [SR-76] |
 | (c) 閉包外へ出る間接 call の宛先 (REPORT_SR44 §9 (a)) | 受入 2 の『非到達』の完全性 | [SR-53] (#3398) |
 
 ## 6. 起動・GUI への影響 (AGENTS 規範 2)
