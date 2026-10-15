@@ -3,7 +3,7 @@
 - 親 REPORT: `tools/plugins/slayer_engine_ia32/REPORT.md` §13 (結論 1 行)。 本付録が測定値の正本。 前提の harness は #1223 (`REPORT_APPENDIX_1223.md`)。
 - 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない。 本件は実行結果の突合と import の ABI モデル)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` (sha256 `84b64c43…de724a9`)。
-- 測定 commit: `dadf4ea18` (main `1cda538f5` の取り込み後。 コードを変えた最後の commit)。 そこから HEAD (`1258391e1`、main `ba0f22fb0` の取り込み) までの測定範囲のコード差分は 0 行 (§6 の鮮度証跡)。
+- 測定 commit: `dadf4ea18` (main `1cda538f5` の取り込み後。 コードを変えた最後の commit)。 そこから HEAD (`6c5e25f46`、PR 先頭 `6cda37e84` の取り込み) までの測定範囲のコード差分は 0 行 (§6 の鮮度証跡)。
 
 ## 1. 結論と範囲
 
@@ -84,14 +84,15 @@
 | 項目 | 値 |
 |---|---|
 | 突合 (`python3 diff_entry.py`) | `[compare] PASS: 448 / 448 件が bit 一致、不一致 0 件`・`[diff_entry] PASS`・exit 0 (3 回とも同一) |
+| 突合の再実行の出力 (`6c5e25f46`・n=3) | build: native 0.05–0.06 s・wasm emcc 7.03–7.14 s。 run: native 0.031–0.035 s・wasm (node) 0.049–0.053 s。 load1 (run 直前) 0.16・0.23・0.35 |
 | ネガティブコントロール (`--nega`) | `[compare] FAIL: 447 / 448 件が bit 一致、不一致 1 件`・`[nega] 1 bit 壊した出力を検出 (FAIL, exit 1)。 ネガコン OK`・exit 0 (方法は §5) |
-| import 呼出し数 (wasm 側・計数用の一時ビルド) | `1000e1b7`: HeapAlloc 64・VirtualAlloc 64・HeapReAlloc 4・HeapFree 0 (64 行で計 132 件)。 `1000ea7d`: LeaveCriticalSection 64。 `10007ca0` (main): 0 件 (64 行とも)。 leaf 4 本: 0 件。 合計 196 件。 計数は `dadf4ea18` で再現 (一致)。 HEAD `1258391e1` では再計数していない (測定範囲のコード差分 0 行) |
+| import 呼出し数 (wasm 側・計数用の一時ビルド・`6c5e25f46`) | HeapAlloc 64・HeapReAlloc 4・VirtualAlloc 64・LeaveCriticalSection 64・HeapFree 0。 合計 196 件 (`grep '^IMP ' stderr \| sort \| uniq -c` の実出力)。 `dadf4ea18` の計数と一致 |
 | 計数の方式 | 一時コピー (`git archive`) の `rt32_glue.c` の `imp_*` 入口と `ott_call32` に stderr 出力 (`ROW`・`IMP`) を入れ、 行ごとに数えた。 計数なしのビルドと出力 (`wasm_out.txt`) は `cmp` で一致。 リポジトリにはコードを入れていない。 上の 4 名以外の import は 0 件 |
 | 非自明性 | native 実行で OBJ 領域が変わった行 256 / 448 (leaf 4 本の 256 行。 main・heap・LeaveCS の行は OBJ を変えない)。 heap 先頭 64 B が非 0 なのは `1000e1b7` の 64 行のみ (毎行の reset で heap 先頭 4 KiB を 0 に戻すため、 他の入口の行に前行の残りは出ない)。 `1000e1b7` は `eax=108004f4` などの heap アドレスを返す |
 | 戻り値の内訳 | `10007ca0` (main) は 64 行とも eax=0 (callback 0 経路)。 `1000ea7d` (LeaveCriticalSection) は 64 行とも eax=0。 `1000e1b7` は eax が heap のアドレス (`108004f4`・`108004e0`・…) |
-| ビルド (min–max, n=3) | native build 0.04–0.20 s (0.20 s は 1 回目)、 wasm emcc 3.12–11.83 s (11.83 s は 1 回目。 2 回目以降は 3.12–3.14 s) |
-| 実行 (min–max, n=3) | native 0.024–0.026 s、 wasm (node) 0.041–0.073 s (0.073 s は 1 回目) |
-| load1 (run 直前、 n=3) | 1.90・1.91・1.91 |
+| ビルド (min–max, n=3・`6c5e25f46`) | native build 0.05–0.06 s、 wasm emcc 7.03–7.14 s |
+| 実行 (min–max, n=3・`6c5e25f46`) | native 0.031–0.035 s、 wasm (node) 0.049–0.053 s |
+| load1 (run 直前、 n=3・`6c5e25f46`) | 0.16・0.23・0.35 |
 | 件数 | 入口 7 本 × 64 = 448 行 (期待値と一致) |
 
 ## 5. ネガティブコントロール (測定 commit `dadf4ea18`)
@@ -109,7 +110,7 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py    # 突合 (exit 0)
 python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 ```
 
-- 鮮度: 測定 commit は `dadf4ea18` (コードを変えた最後の commit)。 そこから HEAD `1258391e1` までのコード差分は `git diff dadf4ea18 HEAD -- tools/plugins/slayer_engine_ia32/{diff_entry.py,native_entry.c,rt32_glue.c,entry_wasm.mjs,lift_text.py} tools/ott/rt tools/ott/lift` の出力が 0 行 (PR 本文の『検証 HEAD』欄が正)。
+- 鮮度: 測定 commit は `dadf4ea18` (コードを変えた最後の commit)。 そこから `6cda37e84` (PR 先頭) までの `git diff dadf4ea18 6cda37e84 -- tools/plugins/slayer_engine_ia32/{diff_entry.py,native_entry.c,rt32_glue.c,entry_wasm.mjs,lift_text.py} tools/ott/rt tools/ott/lift` は 159 行 (`tools/ott/lift/x64c.py` 18 行・`tools/ott/rt/ott_x87.h` 146 行。 main の取り込みで入った x87 の変更)。 ハーネス側 (`tools/plugins/slayer_engine_ia32/` の 5 ファイル) は 0 行。 `6cda37e84` から HEAD `6c5e25f46` までは 0 行 (`git diff 6cda37e84 HEAD -- <同じ範囲>`)。 HEAD での突合は 448 / 448 PASS (§4) で、 x87 の変更は本件の 448 行の結果を変えなかった。
 - 補足: `lift_text.py` の結果は `imports 41`・`functions 472` (pass2)。 pass1 の `38` は REPORT_APPENDIX_1098 §2 の値。
 
 ## 7. 未解決
@@ -117,17 +118,23 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | export main の callback 非 0 経路 (`f_10009f64` → `f_1000a402`。 定数 `0x8298d8` は PE 外の host オブジェクト) | main の CRT 初期化・残りの import の経路が未突合。 0 埋めでは native が null 参照で SIGSEGV するため、 host オブジェクトのモデル化が要る | [PLG-G2-38] #3917 (本 PR で起票) |
-| 突合で未通過の KERNEL32 import 13 件: 実装 8 件 (EnterCriticalSection・InitializeCriticalSection・GetLastError・SetLastError・TlsGetValue・TlsSetValue・HeapFree・VirtualFree) と stub 5 件 (GetCurrentThreadId・GetModuleFileNameA・GetStdHandle・LoadLibraryA・WriteFile) | 既存の入口は 1 回も呼ばない (§8)。 実行で未検証で、 方針表の値は両側の仮定が一致することしか示していない | [PLG-G2-39] #3960 (Refs・部分達成。 残りは §8 の経路に依存) |
+| 突合で未通過の KERNEL32 import 13 件: 実装 8 件 (EnterCriticalSection・InitializeCriticalSection・GetLastError・SetLastError・TlsGetValue・TlsSetValue・HeapFree・VirtualFree) と stub 5 件 (GetCurrentThreadId・GetModuleFileNameA・GetStdHandle・LoadLibraryA・WriteFile) | 既存の入口は実行で 1 回も呼ばない (計数 0 件。 静的には `HeapFree` が `f_1000e1b7` の失敗分岐から到達するが、 実行では通らない。 他 12 件はゲート経路のみ。 §8)。 実行で未検証で、 方針表の値は両側の仮定が一致することしか示していない | [PLG-G2-39] #3960 (Refs・部分達成。 残りは §8 の経路に依存) |
 | fail-fast の 24 import の実行検証 | 呼ばれた時の止まり方を実行で確認していない (448 行では 1 件も呼ばれない)。 静的にも 23 件は入口から到達しない | [PLG-G2-39] #3960 (Refs・部分達成) |
 | `0x100106a5` (SEH: `mov eax, fs:[0]`・`mov fs:[0], esp`) を通る経路 (`0x1000d791` 等) | native に fs 基底が無く fs:[0] への書込みで落ちる。 wasm は `ott_teb_blk` (0 埋め)。 本入口からは外した | [PLG-G2-37] #3905 (fs: TEB を含む 8 関数) |
 | 間接 call 先 (`ott_dispatch`)・sahf の AF・fs: TEB の 0 埋め | #3128 で測定済み (結果は `REPORT_APPENDIX_3128.md`)。 fs: TEB の native 未達は上の `0x100106a5` の行 (子 [PLG-G2-37] #3905) | 測定済み (#3128・CLOSED) |
 
 ## 8. 13 件・fail-fast 24 件の到達経路 (#3960・静的解析)
 
-- 測定 commit: 本 PR (`reach_import.py` を追加した commit)。 入力は lift 出力 `work/lift_text/ott_lifted.c` (472 関数・41 import)。 再現: `python3 tools/plugins/slayer_engine_ia32/reach_import.py` (表)・`--check` (入口からゲート無しで到達する import の集合が `HeapAlloc,HeapFree,HeapReAlloc,LeaveCriticalSection,VirtualAlloc` と一致するか)。
+- 測定 commit: `6c5e25f46` (`reach_import.py` の commit)。 入力は lift 出力 `work/lift_text/ott_lifted.c` (472 関数・41 import)。
+- 再現 (`6c5e25f46` で実測): `python3 tools/plugins/slayer_engine_ia32/reach_import.py` (表)・`--paths` (入口から各 import までの最短経路)・`--check` (期待集合との照合)。
+- `--check` の実出力: `[reach_import] PASS: ゲート無しで静的到達 HeapAlloc,HeapFree,HeapReAlloc,LeaveCriticalSection,VirtualAlloc (実測 HeapAlloc,HeapReAlloc,LeaveCriticalSection,VirtualAlloc / 静的のみ HeapFree<-f_1000e1b7)`・exit 0。 期待集合は「実測の 4 件」と「静的のみの 1 件 (HeapFree、 直接の呼出し元が入口 `f_1000e1b7` であることも確かめる)」の和。
+- `--paths` の実出力 (抜粋): `HeapFree 入口→ f_10007ca0 > f_10009f64 > f_1000a402 > f_1000a42e > f_1000deae > f_1000e1b7 | ゲート無し: f_1000e1b7`。 `f_1000e1b7` が `imp_HeapFree` を直接呼ぶ (`f_1000deae` は経由するが、 ゲート無しの入口は `f_1000e1b7` 自身)。
+- `HeapFree` の分岐: `f_1000e1b7` は `VirtualAlloc` の戻り値を `edi` (`xor edi, edi` で 0) と比べ、 等しいとき (失敗扱い) にだけ `imp_HeapFree` を呼ぶ。 harness の `imp_VirtualAlloc` は常に bump で成功するため、 実行では 0 件 (計数の表)。 静的な上界では到達するが、 実行では通らない。
 - 静的解析は分岐の条件を見ない上界。 「静的に到達しない」は呼ばれない根拠になるが、 「到達する」は実行で通るとは限らない。
 - **ゲート**: main (`0x10007ca0`) の callback が非 0 を返す経路。 `f_10009f64`・`f_10007f30` を遮断すると、 main から到達する import は 0 件になる。 つまり main の **callback 0 経路は、 本節の 13 件も fail-fast 24 件 (RaiseException を含む) も通らない**。
-- 13 件 (実装・stub): 静的に入口から到達するのは、 ゲート経路でのみ `main` から到達する 8 件 (EnterCriticalSection・InitializeCriticalSection・GetLastError・SetLastError・TlsGetValue・TlsSetValue・HeapFree・VirtualFree) と 5 件 (GetCurrentThreadId・GetModuleFileNameA・GetStdHandle・LoadLibraryA・WriteFile) のいずれも、 harness の入口 (7 本) からは直接の呼出し元 (`f_1001044f`・`f_1001047e`・`f_100121dc`・`f_100100c3`・`f_1001019b`・`f_10012973`・`f_10012c3e`・`f_1000ed9d`・`f_1000f41e`・`f_100112e9`・`f_1000d791`) に到達しない。 これらは `f_1000d791` 等の関数が `f_100106a5` (fs: を使う SEH) を通るため、 native で実行できない (§7 の `0x100106a5` の行)。
-- 直接の呼出し元のうち `f_1000f41e` (4 import) と `f_100112e9` (LoadLibraryA のみ) は、 fs: を使わない候補。 ただし本 run では入口として追加して実行していない (未測定)。 `f_100112e9` は `ott_dispatch` を通るため、 §7 の間接 call 先の行 (#3128) に依存する。
-- fail-fast 24 件: 静的に入口から到達するのは RaiseException の 1 件のみ (ゲート経路)。 残り 23 件は、 どの入口からも到達しない。
-- 結論: **入口の追加だけでは 13 件の実行検証はできない**。 入口から到達させるには、 fs: 経路 (#3905) の native 対応、 または callback 非 0 の経路 (#3917) の host オブジェクトのモデル化が要る。 本 run は、 その依存関係を測定で示すところまでで止める。
+- 13 件 (実装・stub) の経路 (`--paths`・`6c5e25f46` の実出力):
+  - ゲート無しで入口から静的に到達するのは `HeapFree` の 1 件 (`f_1000e1b7` が直接呼ぶ。 上記の失敗分岐)。 実行では 0 件。
+  - 残り 12 件は `--paths` で「ゲート無し: なし」。 入口からの最短経路はすべてゲート `f_10009f64` または `f_10007f30` を通る (例: EnterCriticalSection は `f_10007ca0 > f_10009f64 > f_1000a402 > f_1000a42e > f_1000ea1c`、 GetLastError は `f_10007ca0 > f_10007f30 > ... > f_1000d791`)。
+  - 直接の呼出し元 `f_1000f41e` (GetModuleFileNameA・GetStdHandle・LoadLibraryA・WriteFile の経路) と `f_100112e9` (LoadLibraryA の経路) は、 ゲート経路で入口から到達する。 旧記述の「fs: を使わない候補として入口に足す」は、 ゲートを通る経路では実行できないので成り立たない。
+- fail-fast 24 件: ゲート無しで静的に到達する件は 0 件。 RaiseException のみ、 ゲート経路 (`f_10007f30 > ... > f_1000adc4`) で到達する。 残り 23 件は、 どの入口からも到達しない。
+- 結論: **ゲート無しで入口から実行できるのは `HeapFree` の失敗分岐 (実行では 0 件) だけで、 残りの 12 件と RaiseException は現在の入口では実行できない**。 入口から到達させるには、 ゲート経路の host オブジェクトのモデル化 (#3917) や fs: 経路の native 対応 (#3905) が要る。 本 run は、 その依存関係を静的解析で示すところまでで止める。
