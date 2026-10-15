@@ -1,7 +1,7 @@
 # PY-262 (#3860): 戻り値 `[rbp+0x584]` の書込み経路と式 (部分・REPORT_PY41.md の PY-65 節の受入 2 の付録)
 
 親: #2034 (PY-65)。前段: `REPORT_PY41.md` の PY-65 節 (受入 2 は未達)・PY-60 (戻り値の書込みと早期 exit の入辺 9 件)。
-測定 commit: 本 PR の commit (`analysis/` 同梱の `tools/python/analysis/py65_ret584_reach.py` を追加した commit)。
+測定 commit: `a6ce09858` (`analysis/py262_ret584_paths.py` を追加し、§4 の数値を測ったコードの最後の commit)。`git diff a6ce09858 HEAD -- tools/python/analysis/` の出力は空 (0 行・差分 0)。`py65_ret584_reach.py` は main (`ea7f810ca`・`8706f8e89`) で入ったもので、本 PR の commit ではない。
 素材: `oc_artifacts: fl-win64` (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`・`block00031_PE.bin` 22,227,016 B)。
 再現: `python3 tools/python/analysis/py53_dispatch.py <PE> <work/py53>` → `fn=4664 dispatch=13 r8d_tests=174` (本 run で再現)。続けて `python3 tools/python/analysis/py65_ret584_reach.py <work/py53/fn.txt> 0x104cc65`。
 
@@ -51,6 +51,7 @@
 - 経路長 (命令数) の最小は 82、最大は 203 (`path_len` 列の最小値・最大値)。
 - 条件なしは 1 件: 0x1046d6b (関数入口の `mov [rbp+0x5b8], edx`・引数の退避)。
 - 最短経路の条件は**代表 1 本**であり、同じ書込みに至る別経路の条件は含まない。経路ごとの式 (受入 1 の完全形) は未了。
+- 直前のフラグ設定命令は、jcc の直前 7 命令の中で後ろから見て最初に見つけた設定命令。jcc と無関係な命令を拾う可能性がある。
 
 ## 5. 未確定 (受入 1・3 の残り)
 
@@ -58,7 +59,7 @@
 - 72/74 の切り分けは §3 で確定 (戻り値に届かない 2 件は上書きされる)。
 - **受入 3 (判定の行き先と戻り値分岐の突合)** は未実施。`py65_r8d_bits.py` の照合 (objdump 対 capstone) は 174 件 mismatch 0・negctl 1 件で、これは判定の取り直しの一致であり、「行き先と戻り値分岐の対応」の突合ではない。突合の定義と実施は未了。`REPORT_PY41.md` の PY-65 節の受入 3 とは別物。
 
-## 5. 未解決
+## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
