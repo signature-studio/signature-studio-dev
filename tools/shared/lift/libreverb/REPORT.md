@@ -77,7 +77,7 @@ ildsp の規模測定 (命令数・call 数・export closure 表) と未解決�
 | 遅延線ポインタ 14 本 (`this+0xbc+8i`, i=0..13) | **14/14 が 0** |
 | `Process_Fruity_32FM_32FS` (n=4) を実インスタンスに対して 1 回 | **SIGSEGV (11)** |
 
-- 読み: Fruity は `qword [this+0xbc+8i]` (0xbc・0xc4・…・0x124 の 14 本。例 0x13a7 `rax, qword ptr [r10+0xbc]`) を読み、NULL をそのままたどる。遅延線 1 本のレイアウトは、逆アセンブル (0x1220・0x1180) から `+4` = buffer ポインタ・`+0x10` = index・`+0x14` = mask と推定 (2 本の実測値と一致)。
+- 読み: Fruity は `qword [this+0xbc+8i]` を 13 本 (0xbc〜0x11c。例 0x13a7 `rax, qword ptr [r10+0xbc]`) 読み、UF は加えて 0x124 を読む (計 14 本)。NULL をそのままたどる。遅延線 1 本のレイアウトは、逆アセンブル (0x1220・0x1180) から `+4` = buffer ポインタ・`+0x10` = index・`+0x14` = mask と推定 (2 本の実測値と一致)。
 - 未特定 (子 [T-SH-71] #3361 の対象): コンストラクタが作るのは 2 本だけ。vtable の先頭 6 slot (RVA 0x28d0・0x3270・0x2980・0x3f80・0x3f90・0x2950) のうち、slot 1 (0x3270・665 命令) は float パラメータ (`this+0x20`・`0x200`・`0x208`) を読むが、確保の call を含まない。slot 3 (0x3f80) は `this+0x10` を返す getter、slot 4 (0x3f90) は `ret 0`。`qword ptr [reg+disp]` 形の 14 本への書き込みは静的走査で見つからなかった (`dword` の書き込みは 0xd0〜0x14c にあり、遅延線の index 更新と見られる)。
 - 検証範囲: 静的な書き込み命令の走査と、生成直後の 1 状態 (引数 NULL) での実行。ポインタを埋めた状態で Fruity が通るかは未実施 (子 #3361)。
 
