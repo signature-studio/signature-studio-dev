@@ -30,7 +30,7 @@
 
 ## 測定
 
-- 測定 commit: 本 PR の HEAD (コードを変えた最後の commit = `ghidra_to_c.py` の規則追加)。
+- 測定 commit (コードを変えた最後の commit): `ca1f38304` (`ghidra_to_c.py` の規則追加)。`git diff ca1f38304 HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` の出力は 0 行 (本節を含む REPORT の commit は範囲外)。
 - 基準: 同じ素材・同じ道具で、`git archive origin/main` の `ghidra_route`・`snapins/lift`・`snapins/scripts` を使う変換器の出力。
 - 素材: `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`、76,642,304 B)。`toolchain-emsdk` (emcc 6.0.12)。Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致・JDK 21)。
 - decompile: 挿入順の lift 集合 (142 件・重複 1 件) で **142/142 OK** (wall 40 s)。
