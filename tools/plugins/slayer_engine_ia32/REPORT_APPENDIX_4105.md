@@ -3,8 +3,8 @@
 既知類型との関係: 模型の限界 (無効演算の NaN 生成) の候補。 lowering の取り違えは、normal×normal の行に 1 件も出ないことで否定した (§2)。 `docs/DEFECTS.md` の既存 ID へは当てていない。
 親: #4064 (付録 `REPORT_APPENDIX_4064.md` §1 の 0x1000bf60 行)。 子 #4105 (PLG-G2-47)。
 
-- 測定 commit: `a0c2776e8` (main (`89d688e39`) を取り込んだ merge commit。 この commit の `x87_fn_diff.py` の TARGETS・PROBE・gen で測った)。
-- 検証 HEAD: `a0c2776e8` (PROBE 付きの実行を HEAD で再現した。 以前の測定 commit `37ab14c3e` の値は main 取り込みで変わったため使わない)。
+- 測定 commit: `38a3de0ba` (main (`1ff7c6880`) を取り込んだ merge commit。 この commit の `x87_fn_diff.py` の TARGETS・PROBE・gen で測った)。
+- 検証 HEAD: `38a3de0ba` (PROBE 付き・既定 gate をこの HEAD で再実行した)。 以前の測定 commit `a0c2776e8`・`37ab14c3e` の値は main 取り込みと PROBE・gen の変更で変わるため使わない。 `git diff 38a3de0ba HEAD -- tools/plugins/slayer_engine_ia32/` は、この付録の改稿 commit 以外でコード差分 0。
 - 入力: fl-win64 の `block22434_PE.bin` (179,512 B・sha256 `84b64c43…e724a9`)。 乱数 seed 2989。 lift は `lift_text.py` の出力 (functions 479、被覆 86.18%)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。
 
