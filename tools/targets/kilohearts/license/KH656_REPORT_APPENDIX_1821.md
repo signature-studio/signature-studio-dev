@@ -182,3 +182,18 @@ section 単位の内訳: **未測定**。
 - 受入 4: 未測定の箇所は本文に未測定と明記した。未測定の範囲: lift-8 の `56254af13` での値 (`gen_simd.py` の lift-8 への影響の有無)・sha 差の section 内訳。HEAD 基準の値だけを結論に使う。
 - `kh656_closure.py --rounds 4` は収束せず `FAIL` になる (`lic_config.json` の F ブロックを書き換えた状態で終わるため、測定後は HEAD に戻した)。収束の再確認は本 issue の範囲外。
 - 閉包の 4 ラウンド不収束は #1817 (KH-28) の範囲。
+
+## 9. #4257 の実測 (`.rdata` 生 VA の検出・許可リスト)
+
+測定 commit: `557154c14` (コードを変えた最後の commit。module E の検査を `rdata_str` 持ちに限定 + テスト定数名)。E の「検出あり」行だけ前の commit `728eab8b9` で測った。
+素材: `plugins-kilohearts` (installer zip → `windows.zip` → `work/winpkg`)・`toolchain-emsdk` ([EMSDK])。環境: nproc=4・RAM 15 GB。
+
+| module | 条件 | 結果 | wasm bytes | wasm sha256 |
+|---|---|---|---|---|
+| E | merge-base `f2c86e136` (検出なし) | build 成功 | 364,770 | `0cf066d1…6fed8` |
+| E | `728eab8b9` (検出あり・検査が `raw_va` のみ) | 停止: `rdata 生 VA が窓化されず残った` (許可外 8 件: `1813af278`・`1813af778`・`1813b0e98`・`1813b10d8`・`1813d26f8`・`1813d4828`・`1813d48c8`・`1813d6e18`) | — | — |
+| E | 修正後 (検査を `rdata_str` 持ちに限定) | build 成功・検査は走らない | 364,770 | `0cf066d1…6fed8` (不変) |
+| F (lift-8) | 修正後 | build 成功・undefined import 0 | 54,487 | `3d2bc6fd…e77287` (不変) |
+
+- E の 8 件は `.rdata` 上の vtable・RTTI の値 (E は `raw_va` で値を生 VA のまま残す設計)。窓化対象外のため、検査は窓化を行う `--rdata-str` の module に限定した。
+- テスト: `python3 lift/test_rdata_raw.py -v` → OK (3 件・skip 0)。

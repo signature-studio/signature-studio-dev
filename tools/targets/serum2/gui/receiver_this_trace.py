@@ -37,6 +37,7 @@ HEAD = int(ARGS[ARGS.index("--vtable") + 1], 16) if "--vtable" in ARGS else 0x18
 TSV = ARGS[ARGS.index("--tsv") + 1] if "--tsv" in ARGS else None
 MAXLOAD = 5
 MAXSTEP = 64
+NODOM_TSV = ARGS[ARGS.index("--nodom-tsv") + 1] if "--nodom-tsv" in ARGS else None
 MEM = re.compile(r"\[([^\]]*)\]")
 
 
@@ -288,12 +289,36 @@ def find_store(fn, k, mem):
     return None
 
 
+NODOM_WHY = {}
+CUR_CALL = [None]
+
+
+def nodom_why(fn, u, d):
+    """NODOM の理由。indirect: 間接 jmp を含む関数 / back-edge: 定義 d が使用 u から到達できる (ループ) / merge: u へ d を通らない経路がある。"""
+    if fn.indirect:
+        return "indirect"
+    seen, stack = {u}, [u]
+    while stack:
+        x = stack.pop()
+        for y in fn.succ[x]:
+            if y not in seen:
+                seen.add(y)
+                stack.append(y)
+    return "back-edge" if d in seen else "merge"
+
+
+def mark_nodom(fn, u, d):
+    if CUR_CALL[0] is not None:
+        NODOM_WHY[CUR_CALL[0]] = nodom_why(fn, u, d)
+
+
 def value(fn, pos, reg, strict):
     for _ in range(MAXSTEP):
         kind, info, k = resolve(fn, pos, reg)
         if k is None:
             return ("entry", info, None)
         if strict and not fn.dominated(k, pos):
+            mark_nodom(fn, pos, k)
             return ("nodom", None, k)
         if kind == "copy":
             pos, reg = k, info
@@ -306,6 +331,7 @@ def value(fn, pos, reg, strict):
                 return ("stackslot", info, k)
             s, src = sp
             if strict and not fn.dominated(s, k):
+                mark_nodom(fn, k, s)
                 return ("nodom", None, s)
             pos, reg = s, src
             continue
@@ -411,7 +437,9 @@ def analyze(strict):
             continue
         fn = get_fn(f)
         i = fn.index[ins.address]
+        CUR_CALL[0] = ins.address
         mode, root, steps = receiver(fn, i, mm["base"], strict)
+        CUR_CALL[0] = None
         cat = category(root, steps) if mode.startswith("vptr") else mode
         if mode.startswith("vptr"):
             cat = mode + ":" + cat
@@ -445,6 +473,12 @@ paths = Counter(r[5] for r in rows_s if "CHILD" in r[4])
 print("== strict CHILD の経路 (上位 15) ==")
 for p, n in paths.most_common(15):
     print(f"{n:5d}  {p}")
+if NODOM_TSV:
+    with open(NODOM_TSV, "w") as fh:
+        fh.write("call_va\tfunc\treason\n")
+        for r in rows_s:
+            if r[4] in ("vptr:NODOM", "R-nodom", "vptr-emb:NODOM"):
+                fh.write(f"{r[0]:#x}\t{(r[1] or 0):#x}\t{NODOM_WHY.get(r[0], 'unknown')}\n")
 if TSV:
     with open(TSV, "w") as fh:
         fh.write("call_va\tfunc\treg\tdisp\tcat_strict\tcat_loose\tpath_strict\tevidence\n")

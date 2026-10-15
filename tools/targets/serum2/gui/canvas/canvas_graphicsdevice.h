@@ -2,13 +2,16 @@
 // SR-50 #3260: drawRect (塗り・線 1px)・clearRect・drawString (canvas_font.cpp) は bitmap へ画素を書く。
 // SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap (1:1 転写) も bitmap へ画素を書く。
 // 他の描画命令 (drawArc・drawPoint・drawGraphicsPath・gradient・9 分割・fillRectWithBitmap) は no-op で false を返す。
-// 状態設定は lineWidth (1px 固定で描く)・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha だけ値を保持し、他 (lineStyle・drawMode・transformMatrix・global state の save/restore) は何もしない。
+// SR-69 #4428: transformMatrix は点・線・多角形・楕円・矩形・clearRect・bitmap の dest 位置・文字の基準点へ適用する (clipRect は CDrawContext が device 座標で渡すので変換しない)。回転・傾斜は矩形を外接矩形で近似し、拡大縮小は bitmap と文字に掛けない。
+// SR-68 #4427: 線は lineWidth の太さで描く (太さ 1 かつ aliasing は従来の Bresenham)。drawMode の kAntiAliasing は線の被覆率を alpha に掛けて描く。
+// 状態設定は lineWidth・drawMode・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha・transformMatrix を保持し、他 (lineStyle・global state の save/restore) は何もしない。
 
 #pragma once
 
 #include "vstgui/lib/cbitmap.h"
 #include "vstgui/lib/ccolor.h"
 #include "vstgui/lib/cdrawdefs.h"
+#include "vstgui/lib/cgraphicstransform.h"
 #include "vstgui/lib/crect.h"
 #include "vstgui/lib/platform/iplatformgraphicsdevice.h"
 #include <cstdint>
@@ -91,12 +94,18 @@ public:
 	// 文字列描画 (canvas_font.cpp) から呼ぶ。1 画素を globalAlpha 付きの source-over で合成する。クリップ外・bitmap 外は書かない。
 	void blendPixel (int32_t x, int32_t y, const CColor& color) const;
 
+	// 文字列描画 (canvas_font.cpp) から呼ぶ。文字の基準点を transformMatrix で device 座標へ変換する。
+	CPoint transformPoint (const CPoint& p) const;
+
 private:
 	CanvasBitmap* canvas () const noexcept;
 	uint8_t* pixelAt (int32_t x, int32_t y) const noexcept;
+	PointList transformPoints (const PointList& points) const;
+	CRect deviceRect (const CRect& rect) const;
 	void paintRect (const CRect& rect, const CColor& color, bool blend) const;
 	void strokeRect (const CRect& rect, const CColor& color) const;
 	void plotLine (CPoint from, CPoint to, const CColor& color) const;
+	void plotThickLine (CPoint from, CPoint to, const CColor& color) const;
 	void fillPolygon (const PointList& points, const CColor& color) const;
 	void strokePolyline (const PointList& points, bool closed, const CColor& color) const;
 	CRect clipWithinBitmap (CRect clip) const;
@@ -107,7 +116,9 @@ private:
 	mutable CColor fillColor {};
 	mutable CColor frameColor {};
 	mutable CCoord lineWidth {1.};
+	mutable CDrawMode drawMode {};
 	mutable CRect clipRect {};
+	mutable TransformMatrix transformMatrix {};
 };
 
 } // VSTGUI

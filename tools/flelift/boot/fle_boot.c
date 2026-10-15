@@ -288,8 +288,17 @@ static int diag_nullfill_skip(void) {
 
 /* fle_cpu.c の fail-fast を JS 例外化 (survey を 1 インスタンスで継続できるように)。
  * unlifted(0) は m11 の icall-miss (ret 0) 揃えで容忍: retaddr を pop して RAX=0 で dispatch に戻る。 */
+static u32 g_slot_probe_n;
 static void fle_ff(const char* kind, u64 a) {
     char buf[160];
+    if (!strcmp(kind, "unlifted") && g_slot_probe_n < 16 && (LD64(R[4]) == 0x67264du || LD64(R[4]) == 0x6b91e8u || (a >= IPP_TOK_BASE && a < IPP_TOK_BASE + g_ipp_n))) {   /* #4004: IPP 呼出し時の slot 値・ret・引数 */
+        u64 slot = LD64(0x15e0a48u), dst = R[1]; u32 len = (u32)(R[2] & 0xffffffffu), nz = 0;
+        if (dst && len && len <= 0x100000u) for (u32 k = 0; k < len; k++) nz += LD8(dst + k) != 0;
+        snprintf(buf, sizeof buf, "[fleboot][slot] ret=0x%llx [0x15e0a48]=0x%llx [slot]=0x%llx target=0x%llx dst=0x%llx len=0x%x nonzero=%u",
+                 (unsigned long long)LD64(R[4]), (unsigned long long)slot, (unsigned long long)LD64(slot), (unsigned long long)a, (unsigned long long)dst, len, nz);
+        fle_js_err(buf);
+        g_slot_probe_n++;
+    }
     if (!strcmp(kind, "unlifted") && ipp_call(a)) return;
     if (g_diag_nullfill && !strcmp(kind, "unlifted") && a == 0x6a7b70u && diag_nullfill_skip()) return;
     if (!strcmp(kind, "unlifted") && a == 0) {
@@ -633,6 +642,8 @@ void fle_ov_getmem(void) {
         R[4] += 8;                                  /* 拙い push/pop 釣合 (下記注記) */
         u64 p = R[0];
         py_watch(6, gsz, p);
+        if (p && p <= 0x12d6a090ull && 0x12d6a090ull < p + gsz)   /* #4287 診断: obj を含む確保の戻り時の [obj+0xc4] */
+            fprintf(stderr, "[wobj-getmem] p=%#llx size=%u obj+0xc4=%#x\n", (unsigned long long)p, gsz, (unsigned)LD8(0x12d6a090ull + 0xc4ull));
         fle_blk_getmem_post((u32)p, gsz);
         if (!p) { R[1] = (R[1] & ~0xffull) | 1; R[4] -= 8; ST64(R[4], 0x409433ull); f_409730(); }
         R[3] = save_rbx; R[0] = p;
