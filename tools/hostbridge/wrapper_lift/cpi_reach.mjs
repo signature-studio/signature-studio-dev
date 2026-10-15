@@ -1,13 +1,15 @@
-// cpi_reach.mjs: lift 済み Fruity Wrapper (wasm) で CreatePlugInstance (VA 0x86ab10) への入場を確認する (#829 受入 2)。
+// cpi_reach.mjs: lift 済み Fruity Wrapper (wasm) で CreatePlugInstance への入場と完走を確認する (#829 受入 2・#2653)。
 // usage: node cpi_reach.mjs <cpi.cjs> <image.bin> <ImageBase 16進> <entry VA 16進> [a0 16進] [a1 16進]
-// 判定は JSON で出す (null, 1 で整形するため複数行): entered = 入場ログ "[cpi] enter <entry VA>" を受けたか。false なら err_tail の末尾が最初に失敗した地点。
-// a0/a1 省略時は 0 (NULL)。ゼロ埋めの guest 領域 (例 0x30000000) を渡すと、NULL の逆参照で落ちる地点を越えられるかを見る。
+// 判定は JSON で出す (null, 1 で整形するため複数行): entered = 入場ログ "[cpi] enter <entry VA>" を受けたか。
+// ret は戻り値 (rax)。trap があれば最初に失敗した地点は last_insn の末尾 (命令 VA)。
+// host_calls = host の vtable 呼び (cpi_miss) と未 lift import (cpi_miss_imp) の記録件数。host_log は先頭 40 件。
+// a0 は host object の guest アドレス (cpi_host.c の CPI_HOST = 0x600000)。a0 = 0 (NULL) なら host は無い。
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const require = createRequire(import.meta.url);
-const [cjs, imgPath, baseHex, vaHex, a0Hex = '0x0', a1Hex = '0x0'] = process.argv.slice(2);
+const [cjs, imgPath, baseHex, vaHex, a0Hex = '0x600000', a1Hex = '0x0'] = process.argv.slice(2);
 const base = Number(baseHex);
 const va = Number(vaHex);
 const out = [];
@@ -18,8 +20,8 @@ const m = await createModule({
   printErr: (s) => err.push(s),
 });
 m.HEAPU8.set(readFileSync(imgPath), base);
+m._cpi_host_setup();
 
-// CreatePlugInstance(host, tag): 既定は host = NULL。host 実体は無いため、失敗地点の特定が目的。
 let ret = null;
 let trap = null;
 let trapStack = null;
@@ -39,6 +41,7 @@ for (let i = Math.max(0, n - 16); i < n; i++) {
 }
 const enterTag = `[cpi] enter 0x${va.toString(16)}`;
 const entered = err.some((l) => l.includes(enterTag));
+const hostLog = err.filter((l) => l.startsWith('[cpi] host') || l.startsWith('[cpi] import'));
 console.log(JSON.stringify({
   entered,
   ret: ret === null ? null : String(ret),
@@ -46,6 +49,8 @@ console.log(JSON.stringify({
   trap_stack: trapStack,
   insn_count: n,
   last_insn: last,
+  host_calls: hostLog.length,
+  host_log: hostLog.slice(0, 40),
   err_tail: err.slice(-6),
   out_tail: out.slice(-3),
 }, null, 1));
