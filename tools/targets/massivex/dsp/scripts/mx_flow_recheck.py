@@ -57,8 +57,8 @@ def bfs_check(s, rounds_json):
 
 
 def cap_first_ok(md, chunk, va):
-    # capstone 側の判定。closure (mx_closure.block_ok) と同じ SDM の LOCK/REX 規則 (insn_sdm_ok) を通す。
-    # REX2 (d5) は APX 接頭辞で x64 基準では不正 (capstone 5.0.7 は APX として復号するため除外する)。
+    # capstone 側の判定。LOCK/REX は closure (mx_closure.block_ok) と同じ insn_sdm_ok を通す。
+    # REX2 (d5) の除外はこの関数だけの追加規則で、mx_closure.block_ok には無い (capstone 5.0.7 は APX として復号するため)。
     n = 0
     try:
         for ea, iz, mn, ops in md.disasm_lite(chunk, va):
