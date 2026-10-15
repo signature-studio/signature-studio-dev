@@ -113,8 +113,8 @@ pdata の関数境界ごとに逆アセンブル (capstone) し、E8/E9 の直�
   - 8 シナリオ S900–S907 とも **`FAULT rip=0x125afc6 addr=0x125afc6`** (guard の SEGV 捕捉。呼出後に戻らない)。
   - `caa820`・`e13590`・`d8c4f0`・`d8ae60`・`e15030`・`e12f20`・`d8d700`・`d8c140` は全て **0 回**。`CAA31` 行は無し。
   - 落ちる位置 `0x125afc6` は `.text` の外 (`0x18...` の VA ではない)。popup 入力の内部ポインタを 0 埋めのまま辿った結果と見られる。**未確認**: どのフィールドが偽ポインタか (`P` の構築の不足)。
-- 既定経路 (`FA_UI31` 無し): `fa31_ctl.sh` の base は `ca7db0=72`・`caa820=0` で §3 と一致。`run_ctrl.sh 2 5` は **BIT-EXACT 15/15** (wall 2.7 s・n=1・rc=0)。
-- 所要 (n=1): `build_ctrl.sh` 30.0 s・`fa31_ctl.sh` 0.37 s・load 0.30→0.55 (参考値)。
+- 既定経路 (`FA_UI31` 無し) の回帰確認: `run_ctrl.sh 2 5` は **BIT-EXACT 15/15** (rc=0)。`fa31_ctl.sh` の base は §3 と一致。
+- 所要 (n=1・参考値): `build_ctrl.sh` 30.0 s・`fa31_ctl.sh` 0.37 s・`run_ctrl.sh 2 5` 2.7 s・load 0.30→0.55。この節が所要の唯一の記載箇所。
 - 製品 KPI: **動かしていない** (native harness の診断のみ)。
 
 受入の状況 (#3718):
