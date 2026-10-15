@@ -14,7 +14,7 @@
 | 項目 | 値 |
 |---|---|
 | 測定 commit (コードを最後に変えた commit) | `2d4c7ae52` (`fix(python): poc_mcp の値検査を channel の pv に直し、mock の引数型検査を C と揃える (PY-228)`)。初版の測定 commit は `a84a424ad` (round 1 の前) |
-| 素材 | `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (real 5.355 s)。emsdk は runner 同梱の `/opt/emsdk` を使い、`toolchain-emsdk` は展開していない |
+| 素材 | `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (real 5.355 s)。emsdk は runner 同梱のもの (`EMSDK_DIR` の既定値) を使い、`toolchain-emsdk` は展開していない |
 | 入力 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/python/fetch_inputs.sh` (midi.py・utils.py・fl-stubs を取得。real 0.522 s) |
 | flpy | `bash tools/python/build_cpython_wasm.sh` (native + wasm の CPython 3.12.1。rc 0・real 4 m 05 s)、`FL_WIN64_DIR=… bash tools/python/build_flpy.sh` (rc 0・real 7.074 s。`dist/flpy.{js,wasm,data}`)。`analysis/flapi` の追跡物は再生成後も差分なし |
 | build (provider) | `bash tools/python/provider/build.sh`。rc 0。警告 0 |
