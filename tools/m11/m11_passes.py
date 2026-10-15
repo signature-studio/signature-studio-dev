@@ -293,6 +293,19 @@ def pass_m2q_fn980ed0(text, report):
     return text
 
 
+def pass_m2r_fn1046a30(text, report):
+    """[M2r] function_1046a30 の cell 参照 `%ce12n11_function_1046a30` の定数 VA 22946304 (0x15e2200) を LVA に remap (#2958 / LD-142).
+    機械語 104754c `mov rax,[rip+0x59acad]` は VA 0x15e2200 (LVA 18752000) を読む。RetDec が 10 進 VA で出したこの 1 件だけが VA→LVA 漏れ (M2q と同型)。
+    残ると IR の load は linear 22946304 (画像長 22515781 の外) を読み、1047556 の spill 宛の値が機械語と食い違う。全件 remap (M2P) は使わない (#417)。"""
+    old = '%ce12n11_function_1046a30 = inttoptr i64 22946304 to ptr'
+    n = text.count(old)
+    new = '%ce12n11_function_1046a30 = inttoptr i64 ' + str(shiftva(22946304)) + ' to ptr'
+    text = text.replace(old, new)
+    stage('M2r', 'function_1046a30 VA->LVA remap: %d sites' % n)
+    report['m2r_fn1046a30_remap'] = n
+    return text
+
+
 def pass_m2b(text, report):
     n = [0]
 
@@ -793,6 +806,7 @@ def main():
     text = pass_m1(text, report)
     text = pass_m2(text, report)
     text = pass_m2q_fn980ed0(text, report)
+    text = pass_m2r_fn1046a30(text, report)
     if os.environ.get('M11_M2P') == '1':   # #417: 既定 OFF (有効化すると unit 503 で survey がハング, REPORT 参照)
         text = pass_m2p_dec_inttoptr(text, report)
     text = pass_m2c(text, report)
