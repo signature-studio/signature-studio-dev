@@ -285,19 +285,6 @@ export function createMockEngine() {
     },
     // PY-89 (#2805): C と同一。identity (全 channel が 1 グループ)・既定 -2 (未割当)
     "channels.getChannelIndex": (...a) => { arity(a, 1, 1); const i = ix(a[0]); ch(i); return i; },
-    // PE 0xd5a600 の mode 分岐 (C provider と同一)。raw (cents) はピッチ曲げの状態が未モデルのため 0。範囲外 mode は範囲外と同じ code 4
-    "channels.getChannelPitch": (...a) => {
-      arity(a, 1, 3);
-      const k = ch(a[0]); const m = argI(a, 1, 0); argI(a, 2, 0);
-      if (m === 0) return F(0 / (k.pitchN * 100));
-      if (m === 1) return 0;
-      if (m === 2) return k.pitchN;
-      throw RANGE();
-    },
-    // PE 0xd5d060: float(channel [+0x7a4])。発音の活動は未モデルのため 0.0 を仮置き (C provider と同一)
-    "channels.getActivityLevel": (...a) => { arity(a, 1, 2); ch(a[0]); argI(a, 1, 0); return F(0); },
-    // PE 0xd5c8f0: bool([[g]+0xa9])。showGraphEditor は no-op で状態を立てないため false を仮置き (C provider と同一)
-    "channels.isGraphEditorVisible": (...a) => { arity(a, 0, 0); return false; },
     "channels.getChannelMidiInPort": (...a) => { arity(a, 1, 2); ch(a[0]); argI(a, 1, 0); return -2; },
     "channels.selectChannel": (i, v) => { ch(i).sel = tog(ch(i).sel, v); },
     "channels.deselectAll": () => { st.channels.forEach((c) => (c.sel = false)); },
