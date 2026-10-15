@@ -168,11 +168,11 @@
  "outmem": {
   "mem_bytes": 905969664,
   "stack": {
-   "base": "0x11dd2080",
-   "end": "0x115d2080"
+   "base": "0x11dd20d0",
+   "end": "0x115d20d0"
   },
-  "full": "fd64480c17b096ed69d2349b4f2deaa78e856c8eafa37380dc044804beefe50e",
-  "no_cstack": "15e395e03ef4e56c5cb3e12e5e3b4ab509dfa61a5ecfc2b0573d16391d337d17",
+  "full": "07e0865fd1a2668d06b20f6cde1b458c57606d739cd6ef0437249874b75a4df1",
+  "no_cstack": "7131c652363d2ce6e27777c337c07d8e4699e4156975318b0df6762ba1f15920",
   "sections": {}
  },
  "survey": null,
@@ -182,8 +182,8 @@
   "cap": 268435456,
   "time_cap_s": 0,
   "quiet_bin": false,
-  "bytes": 932532,
-  "lines": 14421,
+  "bytes": 932857,
+  "lines": 14429,
   "bin_lines": 0,
   "bin_bytes": 0,
   "hit": null,
@@ -270,7 +270,7 @@
    "FLEBOOT_PY123 {\"n\":6,\"over\":0,\"events\":[{\"unit\":0,\"site\":0,\"slot\":\"0x15e1c78\",\"proc\":\"0x0\",\"old\":\"0x0\",\"new\":\"0x16bb068\",\"aux\":\"0x0\"},{\"unit\":0,\"site\":0,\"slot\":\"0x15e4790\",\"proc\":\"0x0\",\"old\":\"0x0\",\"new\":\"0x141d6b8\",\"aux\":\"0x0\"},{\"unit\":0,\"s",
    "FLEBOOT_PY201 {\"last\":{\"unit\":895,\"pos\":0,\"count\":0,\"mgr\":\"0x16bb068\",\"safe_g\":\"0x141d6b8\",\"safe_obj\":\"0x0\",\"f98\":\"0x0\",\"f88\":\"0x0\",\"sing\":\"0x0\"},\"trace\":[{\"unit\":0,\"pos\":0,\"count\":0,\"mgr\":\"0x16bb068\",\"safe_g\":\"0x141d6b8\",\"safe_obj\":\"0x0\",\"",
    "FLEBOOT_PY106 {\"chain_0x15e1140\":\"0x16b8488\",\"slot_0x16b8488\":\"0x0\",\"exc_type\":null,\"bind_0x16b8250\":\"0x0\"}",
-   "FLEBOOT_OUTMEM {\"full\":\"fd64480c17b096ed69d2349b4f2deaa78e856c8eafa37380dc044804beefe50e\",\"no_cstack\":\"15e395e03ef4e56c5cb3e12e5e3b4ab509dfa61a5ecfc2b0573d16391d337d17\",\"sections\":{}}"
+   "FLEBOOT_OUTMEM {\"full\":\"07e0865fd1a2668d06b20f6cde1b458c57606d739cd6ef0437249874b75a4df1\",\"no_cstack\":\"7131c652363d2ce6e27777c337c07d8e4699e4156975318b0df6762ba1f15920\",\"sections\":{}}"
   ]
  },
  "px6bbc20": {
