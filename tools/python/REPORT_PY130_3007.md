@@ -41,11 +41,11 @@
 - `host/fl_mock.mjs`: `ui.setBrowserAutoHide` (`st.uiBrowserAutoHide = (v === 1)`)・`ui.setStepEditMode` (`st.uiStepEdit = (v === 1)`)・`ui.getVersion` (mode 4..6 → `""`、他 → `0`)。引数検査は既存の `arity`/`argI` (PY-119 と同じ)。
 - `provider/fl_engine.c`: 同じ 3 関数 (`NARGS(1,1)`・`NARGS(0,1)`・`A_INT(0, 4)` の既定 4)。
 - `tests/ui_state_diff.mjs`: 本 PR で 25 呼出しを追加 (setter → getter の順で状態の一致を見る 19 件と、引数個数違い 6 件)。追加前は 33 呼出し、追加後 58 呼出し。
-- `tests/provider_check.mjs`: `pe130` 集合を追加し、実装 155 → 158・未実装 280 → 277 (総数 435 は不変)。実装件数 158 は `provider/build.sh` の `ハンドラ 158` と一致する (件数の assert 自体は未実行)。
+- `tests/provider_check.mjs`: `pe130` 集合を追加し、実装 155 → 158・未実装 280 → 277 (総数 435 は不変)。実装件数 158 は `provider/build.sh` の `ハンドラ 158` と一致する (件数の assert 自体は未実行)。main 取り込み後の値は 165・270 (§検証 の『main 取り込み後』)。
 
 ## 検証
 
-測定 commit: `0dd1d67c8` (コードを変えた最後の commit)。以降のコード差分は無い (本 REPORT と DOC_MAP の md のみ)。
+測定 commit: `0dd1d67c8` (PR 作成時、main 取り込み前)。以下の表と下の差分は取り込み前の測定。取り込み後の測定は次節 (測定 commit `d0e81d2f8`)。
 
 環境: runner 4 core。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst`・`toolchain-emsdk.tar.zst` を確認済み。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` に `block00031_PE.bin` と `block24429/24430/25159/24618_DATA.bin` を展開し、`fetch_inputs.sh` (rc 0) で `work/` を作った。
 
@@ -58,10 +58,30 @@
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | **未実行**: 同上 (`work/midi.py` は生成済み・`dist/flpy.js` が無い) | — |
 
 - ネガティブコントロール: 未実施 (時間不足)。
-- コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外): 空。
+- コード差分 (取り込み前の測定 commit から PR 作成時の HEAD まで、`tools/python` の .md 以外): 空。
 
 ```
-$ git diff 0dd1d67c8 HEAD -- tools/python ':!*.md'
+$ git diff 0dd1d67c8 9692b214a -- tools/python ':!*.md'
+(空)
+```
+
+### main 取り込み後 (測定 commit `d0e81d2f8`)
+
+`origin/main` (`1bb93134e`) を merge した。競合は `tests/provider_check.mjs` の 1 箇所だけで、PR 側の `pe130` 条件式と main 側の `pl61` 条件式を両方残し、件数の期待値を 158/277 → 165/270 に直した。自動マージされた `provider/fl_engine.c`・`host/fl_mock.mjs`・`docs/DOC_MAP.md` は PR 側の変更が残っていることを確認した。
+
+| コマンド | 結果 |
+|---|---|
+| `python3 provider/gen_provider.py --check-handlers provider/fl_engine.c` | rc 0・`fl_table.c 435 関数, ハンドラ 165` |
+| `gcc -fsyntax-only -Wall -Wextra` (`fl_dispatch.c` `fl_engine.c`、`gen/fl_table.c` も同様) | rc 0・警告 0 |
+| `node --check` (`host/fl_mock.mjs`・`tests/provider_check.mjs`・`tests/ui_state_diff.mjs`) | 3 件とも OK |
+| provider_check の件数を、テストの `if` 条件式に現れる集合の和集合から再計算 | impl 165・unimpl 270 (総数 435)。同じ方法で HEAD 版 158/277・main 版 162/273 を再現 |
+| mock の直接呼出し (`createMockEngine().call`) | `setBrowserAutoHide(1)` → `isBrowserAutoHide` = true・`setStepEditMode(1)` → `getStepEditMode` = true・`getVersion()` = `""` (mode 4)・mode 9 → `0`・引数 2 個 → code 5 |
+| `node tests/ui_state_diff.mjs`・`node tests/provider_check.mjs`・`FL_ENGINE=wasm node tests/all_tools.mjs` | **未実行**: runner に emcc / emsdk が無く `dist/flprov.js` を作れない |
+
+取り込み後のコード差分 (`d0e81d2f8` から HEAD まで、`tools/python` の .md 以外): 空 (本節は md のみ)。
+
+```
+$ git diff d0e81d2f8 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
