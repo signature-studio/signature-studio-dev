@@ -131,6 +131,9 @@ export function createMockEngine() {
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
     prScripts: {},
     midiOut: [],
+    // PY-227 (#3655): device 割当 (false で -7)・送出先 (false で -6)。既定は両方あり (provider/fl_engine.c と同じ)
+    devAssigned: true,
+    linkAssigned: true,
     log: [],
   };
   // channels / playlist の index は整数のみ (C provider の A_INT と同じ: 文字列・None・非整数は code 5)、範囲外は code 4
@@ -420,7 +423,14 @@ export function createMockEngine() {
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
     "device.forwardMIDICC": (message, mode = 1) => { st.midiOut.push({ api: "forwardMIDICC", message, mode }); },
-    "device.midiOutMsg": (...a) => { st.midiOut.push({ api: "midiOutMsg", args: a }); },
+    // PY-227 (#3655): PE 0xd747f0 と同じ順 (引数 → -7 → -6)。channel ≤ -1 は message の下位 32bit、channel ≥ 0 は arg4 を bit 24–31 に入れた word を記録する
+    "device.midiOutMsg": (...a) => {
+      const msg = argI(a, 0, 0), ch = argI(a, 1, -1), d1 = argI(a, 2, 0), d2 = argI(a, 3, 0), a4 = argI(a, 4, 0);
+      if (!st.devAssigned) throw new FlError("Device not assigned", 7);
+      if (!st.linkAssigned) throw new FlError("Linked device not assigned", 6);
+      const word = ch >= 0 ? (((ch & 0xf) | msg) + (d1 << 8) + (d2 << 16) + (a4 << 24)) >>> 0 : msg >>> 0;
+      st.midiOut.push({ api: "midiOutMsg", args: a, word });
+    },
     ...createIlmcp(st, {
       RANGE,
       INVALID: (m) => new FlError(m, 1),
