@@ -189,3 +189,45 @@
 - 測定 (#3774・`mx6_e2e.sh`・MX_PE = 展開 `Massive X.vst3`・md5 `622993e7…` 一致): **exit 0・elapsed 48 s・load 0.08 0.06 0.09 → 0.64 0.21 0.14**。受入 1 の件数は scalar 1 / 128 bit 0 / 判定不能 16 (前版 0 / 0 / 17)。
   `git diff 1083467fe HEAD -- tools/targets/massivex/dsp` の差分は本 REPORT の修正 (docs のみ・測定対象外)。
 - MX-6 測定 commit (`fbc9971f`) からの変更 (`mx6_vectorcall.py` の +4/−1 行・`mx6_e2e.sh`) は、MX-6 の表示値を変えないことを e2e (§5) で確認した。
+
+## 7. MX-54 (#5019): U3e (引数転送の xmm4/5) と U3g (非 vectorcall float の感度)
+
+- 実装: `scripts/mx54_u3e.py` (`mx6_vectorcall` の `analyze`・`effects` を再利用)。入力は `mx6_e2e.sh` が生成する `surface_seeds_x64c.json`。
+- 測定 commit: 本節を含む commit (コードを変えた最後の commit)。素材: `plugins-massivex` の `Massive X.vst3` (md5 `622993e7…` 一致)。
+
+### 7.1 U3e: F が xmm4/5 を読まず direct call/jmp で G へ渡す形
+
+- 母集団: seeds の pdata 始点 566 件 (`mx6_vectorcall` の rows と同じ)。F ごとに、F 内の direct call/jmp (即値) で、
+  転送前に xmm4/5 が F 内で定義されていない site を数える。
+- 除外: 転送前のいずれかの経路に call がある site は除外 (call は xmm0〜5 を clobber しうるため、入口値との同一性を示せない)。
+- 判定: G (転送先) の入口 livein xmm4/5 が 1 以上なら候補。
+
+| 項目 | 件数 |
+|---|--:|
+| 解析した F (pdata 始点 seeds) | 566 |
+| 直接 call/jmp (即値) を持つ F | 480 |
+| 到達可能な direct site | 2,657 |
+| うち前段の call を含むため除外 | 1,453 |
+| うち転送前に xmm4/5 未定義 | 383 |
+| うち G の入口 livein xmm4/5 ≠ 0 (候補) | **42 site / 42 F** |
+| うち G 解析不能 (画像外など) | 26 |
+| G が pdata 始点 | 0 |
+
+- **結論: 候補 42 件** (受入 1 の「47 件」とは一致しない)。`REPORT_APPENDIX_4989.md` と `mx4989_probe.py` は本リポジトリ・git 履歴のどこにも無く、47 の由来を再現できなかった。
+  42 件は本節のスクリプトの測定値。47 との差の原因は未確定 (子 issue で扱う)。
+- **注意 (未確定)**: 42 件の G は全て pdata 範囲内だが pdata 始点ではない (関数途中の address)。
+  G の一部は逆アセンブルが意味をなさない (例: `0x8020e3` が `or eax, ...` で始まる)。
+  よって「G が入口で xmm4/5 を読む」の判定は、G を入口とみなした線形・CFG 解析の結果であり、
+  G が実際の関数入口かは確認していない。F→G の呼出しの site 3 件 (`0xfb13`・`0x6ba2ba`・`0x6da2ae`) は、
+  バイト列 `E8`/`E9` と rel32 が逆アセンブルの目的先に一致することを確認した (全 42 件の確認はしていない)。
+
+### 7.2 U3g: 既知の非 vectorcall float 関数での scalar 落ち
+
+- VST3 の import 名 282 件に libm / CRT の float 関数 (sin・cos・pow・sqrt・floor 等) は無い。
+  内部の既知形 (定数テーブルを持つ float 関数) の同定は本節では行っていない。
+- **結論: 同定できず、scalar 落ちの確認は未実施**。理由は「import に既知の float 関数が無く、内部の既知形の同定が未着手」。
+
+### 7.3 再現
+
+- `python3 scripts/mx54_u3e.py "<Massive X.vst3>" <surface_seeds_x64c.json> <out.json>` (実測 5.7 s・load は e2e と同程度)。
+- 素材の展開: `tar --zstd -xf $HOME/artifacts/plugins-massivex.tar.zst` → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key`。
