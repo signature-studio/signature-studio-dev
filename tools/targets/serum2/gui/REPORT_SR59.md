@@ -29,14 +29,16 @@ ARG の型を確定するには、F を呼ぶ側の引数を見る作業が要�
 
 | 分類 (F の入口が載る表の RTTI) | ARG 240 | ARG-CHILD 68 |
 |---|---|---|
-| XferViewCreator<...> (GUI 生成関数の表) | 226 | 0 |
-| std::num_get (標準ライブラリ) | 0 | 10 |
-| その他の RTTI (VSTGUI 等) | 3 | 4 |
+| RTTI `XferViewCreator<...>` | 226 | 0 |
+| RTTI `std::num_get` | 0 | 10 |
+| その他の RTTI | 3 | 4 |
 | データ表に現れない (vtable 外) | 10 | 54 |
-| 表の先頭が見つからない | 1 | 0 |
+| 表の先頭が見つからない (未確認・§3) | 1 | 0 |
 | **SerumController** | **0** | **0** |
 
 - 関数単位 (ARG 系の所属関数 145 個): データ表に現れる 129 個・現れない 16 個。SerumController の表に現れる関数は 0 個。
+- 単位: 240・68・67・191 は呼出 (`receiver_this_trace.py` の TSV の行) の数で、関数の数ではない (関数は ARG 系 145 個)。
+- 未記録: 表の列への集計 (TSV 行と `arg_vtable_callers.py` の関数表の join) を行うスクリプトは本 PR に無い。F が複数の RTTI の表に載る場合 (`n_tables` ≥ 2) に、その行をどの分類に数えたかは本 REPORT に記録していない。この数え方は再現できていない (§4 参照)。
 - 読み方: 226 件は「所属関数の this が XferViewCreator」を示すだけで、ARG の型ではない。ARG 240 件・ARG-CHILD 68 件は、すべて「確定 0 件・未確定 308 件」。
 
 ### 2b. THIS 系 (受入 2)
@@ -55,7 +57,7 @@ ARG の型を確定するには、F を呼ぶ側の引数を見る作業が要�
 
 - **表の境界の決め方 (受入 3 の要求) は未実装**。本ツールは、F の入口が 8 byte 値として現れる各位置を数えるだけで、「連続する関数ポインタの run の先頭」は決めていない。`n_tables` は run の数ではなく出現の数。
 - 「表に現れない」(ARG 10 + 54、THIS 24) は、データ表経由の登録が見つからない関数。直接呼出元の有無はこの REPORT では見ていない。
-- 「表の先頭が見つからない」(ARG 1・THIS-CHILD 14) と、`0x180139ff0` (24 出現・表の先頭なし) は、COL を指す vtable 形ではない。配列状の関数ポインタ表と見られるが、本 run では中身を調べていない。
+- 「表の先頭が見つからない」(ARG 1・THIS-CHILD 14) と、`0x180139ff0` (24 出現・表の先頭なし) の原因は未確認。`find_head` は手前 64 slot (`range(64)`) までしか探さない。vtable の index が 63 を超えると、COL があっても `-` になる。窓を広げた対照 (例: 4096 slot) は未実施 (入力 PE が無い)。配列状の関数ポインタ表という見方も確認していない。
 - 「F が表に載る」は、F が仮想関数として登録されていることまでを示す。F が実際に vtable 経由で呼ばれるかは示さない。
 - 関数間の引数 (rdx/r8/r9) の型は確定していない。ARG の確定は子 [SR-60 #4164] の作業。
 
@@ -82,9 +84,27 @@ venv/bin/python $P/arg_vtable_callers.py Serum2_win64.vst3 trace.tsv --cats vptr
 | 2 | 22.83 | 21.64 | 0.35 |
 | 3 | 22.83 | 21.65 | 0.58 |
 
-- 決定性: TSV md5 は 3 回とも `ea2d93a2…` (SR-43 の値と一致)。`arg_vtable_callers.py` の出力 md5 は 3 回とも `78ba6b53…` (ARG 系) で一致。THIS 系の TSV md5 は `d8851c27…`。
-- `arg_vtable_callers.py` の実測: real 3.57 s (ARG 系)。
-- 報告前コマンド (`docs/WORKFLOW.md` §6): `git diff ea3ffa68d HEAD -- tools/targets/serum2/gui` の出力を本 PR の検証欄に添付する。
+- 決定性: `receiver_this_trace.py` の TSV md5 は 3 回とも `ea2d93a2…` (SR-43 の値と一致)。THIS 系の TSV md5 は `d8851c27…` (1 回の値)。
+- `arg_vtable_callers.py` の実測: 単発 (n=1)。real 3.57 s。load・並列数は未記録。n=3 の min–max は無い。上の表の `receiver_this_trace.py` の n=3 とは別の測定。
+- 注: 上の 3 回の TSV md5 一致は `receiver_this_trace.py` のもの。`arg_vtable_callers.py` は 1 回だけ実行したので、出力 md5 の再現性は確認していない。
+
+### 鮮度の証跡 (`docs/WORKFLOW.md` §6)
+
+- 測定 commit `ea3ffa68d` → `3ba9939e6` (レビュー対象の head) の差分。本 commit での REPORT の追記は、PR 本文に最終 HEAD の差分を別途添付する。
+- `git diff --stat ea3ffa68d 3ba9939e6 -- tools/targets/serum2/gui` の出力:
+
+```
+ tools/targets/serum2/gui/REPORT_SR59.md | 96 +++++++++++++++++++++++++++++++++
+ 1 file changed, 96 insertions(+)
+```
+
+- code 範囲 (`*.py`) の差分: `git diff --stat ea3ffa68d 3ba9939e6 -- 'tools/targets/serum2/gui/*.py'` は出力 0 行。`git log --oneline ea3ffa68d..3ba9939e6 -- 'tools/targets/serum2/gui/*.py'` も 0 行。
+- 結論: 測定に使ったコードは変わっていないので、再測定は不要。この REPORT の修正 commit は `*.py` を変えない (REPORT のみ)。最終 HEAD の差分は PR コメントに添付する。
+
+### 未再現 (入力 PE 不在)
+
+- `plugins-serum2` が `$ARTIFACTS_DIR` に無い (`fl-win64.tar.zst` のみ)。このため、§2 の件数の再集計・窓の対照・md5 の再確認は、この run では実行していない。
+- 必要な素材: `plugins-serum2` (`docs/WORKFLOW.md` §11)。取得後に §2 の集計手順と §3 の窓の対照を再実行する。
 
 ## 5. 未解決 (起票先)
 
