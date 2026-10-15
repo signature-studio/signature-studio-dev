@@ -68,7 +68,7 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 
 ## 17. #523 f80 関数の関数単位除外による部分集合の `emcc -c` (2026-10-15 · 実測 · 到達性のみ)
 
-- **測定 commit**: `83e92e2c1` (`engine_f80_stub.py` / `engine_f80_subset.sh` を追加した commit。 gate はこの commit で実行)。 19165 の lift 出力は `42357b73e` で生成し、そのまま再利用。 19000 は `83e92e2c1` で lift からやり直した。 `git diff 42357b73e 83e92e2c1 -- tools/lift tools/p0c tools/plugins/reverb_delay/engine_lift.sh` は空 (lift 鎖は未変更)。
+- **測定 commit**: `b2fc00a71` (gate スクリプトの最終版。 gate は `b2fc00a71` で再実行して PASS)。 それ以前の `83e92e2c1` でも同じ判定を実行したが、emsdk の既定パスを直書きしていた版である。 19165 の lift 出力は `42357b73e` で生成し、そのまま再利用。 19000 は `83e92e2c1` で lift からやり直した (lift 鎖は同一)。 `git diff 42357b73e b2fc00a71 -- tools/lift tools/p0c tools/plugins/reverb_delay/engine_lift.sh` は空 (lift 鎖は未変更)。
 - **方法**: `engine_f80_stub.py` が `e.fixcmp.ll` の `x86_fp80` を含む関数の定義を `declare` に置換する (本体は捨てる。 除外は関数単位で、 名前・VA・理由を `f80_excluded.tsv` に記録)。 `engine_f80_subset.sh` が部分集合を `emcc -c` し、gate を判定する。 gate: rc 0 かつ define 数が除外数だけ減る (除外が f80 関数以外に及んでいないことの確認)。 NC は同じ入力の無改変 `emcc -c` rc (`engine_lift.sh` の summary 第 9 列)。
 
 | engine | 条件 | lift rc | define | f80 関数 (除外) | NC: 無改変 `emcc -c` | 部分集合 `emcc -c` | gate |
