@@ -125,7 +125,7 @@ DYN_POSCTRL=1 tools/shared/work/venv/bin/python tools/shared/elastique/dyn_trace
 
 分類の根拠 (fault 番地・直前の戻り番地は `dyn_trace.py` が記録):
 
-- **A (17 件)**: 例外は `0x1802c164d` (`int3` で埋まった領域)。`0x1802c1610` の関数が `0x1802c1619` で間接呼出し (slot `0x1804afc30`) し、戻りが 0 だと `0x1802c1636`〜`0x1802caea8` を経て `int3` に入る。割当の要求サイズは `0x300FFBE0` などスタック番地の範囲で、同じ要求の host.malloc 呼出しが 0 を返したことを ALLOC ログで確認。slot `0x1804afc30` の中身は `ElAllocator_SetFunctions` が書く DLL 内の番地 (`0x1802844d0`) で、そこから host.malloc までの経路は未追跡。**1 GB プール (補助実験) でも 17 件残り、同じ要求への戻り値も 0 のまま**。プール不足だけでは説明できない理由は未確定。要求サイズの出所も未追跡。
+- **A (17 件)**: 例外は `0x1802c164d` (`int3` で埋まった領域)。`0x1802c1610` の関数が `0x1802c1619` で間接呼出し (slot `0x1804afc30`) し、戻りが 0 だと `0x1802c1636`〜`0x1802caea8` を経て `int3` に入る。割当の要求サイズは `0x300FFBE0` などスタック番地の範囲に見える。host.malloc の要求サイズと戻り値 0 は**未確認** (`dyn_trace.py` は ALLOC を出力しない)。slot `0x1804afc30` の中身は `ElAllocator_SetFunctions` が書く DLL 内の番地 (`0x1802844d0`) で、そこから host.malloc までの経路は未追跡。1 GB プールの写し (参考値・commit 外。下記) でも trap 17 件が残ったが、この参考値は根拠にしない。プール不足の説明は未検証。要求サイズの出所も未追跡。
 - **B (18 件)**: 読み先が `0xac44` (44100) か `0xbb80` (48000) と一致。合成の sample-rate 引数が、thunk 先頭の関数でポインタとして使われている。
 - **C (18 件)**: 読み先が `0x40100000` (scratch 1 MB の直後)。scratch を 16 MB にすると 16 件が消え、残り 2 件は `0x41000000` (16 MB の直後) へ移る。合成バッファ長が足りない。
 - **D (2 件)**: `0xfdd000000000300f` を実行先として取った (`Declicker_CreateInstance`・scratch と obj0)。値は合成データ由来と推定 (未追跡)。
@@ -143,4 +143,4 @@ DYN_SCRATCH_SIZE=0x1000000 tools/shared/work/venv/bin/python tools/shared/elasti
 ```
 
 - 補助実験の CSV は上書きされる。実行後に `git show fd5fb31e7:tools/shared/elastique/data/runtime_indirect.csv > tools/shared/elastique/data/runtime_indirect.csv` で戻す。
-- 1 GB プールの補助実験は `dyn_trace.py` の `POOL_SIZE` を一時的に `0x40000000` にした写しで行った (commit 外・`tools/shared/work/` の下)。trap 17 件は残った。写しの最後の CSV 書き込みは出力先のパスの誤りで失敗したが、run ログの `uc_error` 行は全て出ている。55 → 54 の 1 件の差は未追跡。
+- 1 GB プールの補助実験 (参考値・根拠にしない): `dyn_trace.py` の `POOL_SIZE` を一時的に `0x40000000` にした写しで行った (commit 外・`tools/shared/work/` の下)。trap 17 件が残った。写しの最後の CSV 書き込みは出力先のパスの誤りで失敗した。run ログの `uc_error` 行は全て出ているが、55 → 54 の 1 件の差は未追跡のため、この実験は結論の根拠にしない。再現には `POOL_SIZE` を環境変数で変える改修が要るため、本 PR では行わず #3386 の範囲に残す。
