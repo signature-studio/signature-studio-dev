@@ -32,9 +32,10 @@
 | 読出し | 0x11fbc2f・0x11fbc39 | `rax = [rbp+0x140]` → `edx = [rax+0x18]`・`r8d = [rax+0x20]` |
 | 呼出し | 0x11fbc44 `call 0x1192f80` | ecx = `[rbp+0x170]` (エントリの rcx)。0x11fbc28 の枝は node の型 `[node+0x10]` が 0 のとき |
 
-- 関数 0x11fba90 (0x11fba90〜0x11fc650、622 命令) の `[rbp+0x140]` を書く命令は上の 2 件だけ (`pe_py221_chain.py` W)。
+- 関数 0x11fba90 (0x11fba90〜0x11fc650、622 命令) の `[rbp+0x140]` への直接の書込み命令 (`mov qword ptr [rbp+0x140], reg`) は上の 2 件だけ (`pe_py221_chain.py` W)。
 - 読出し窓 [0x11fbb3d, 0x11fbc40] (67 命令): call 0・`[rbp+0x140]` への書込み 0・間接 jmp 0・ret 0 (N・N2)。窓の外から窓の内部への直接 jmp/jcc は 0 (J)。ループ頭 0x11fbb3d へ入る経路は、0x11fbb37 の fallthrough (初回) と 0x11fc535 の `jne` (2 回目以降) だけ (L)。
 - よって 0x11fbc40 の時点の `[rbp+0x140]` は、直前に通った書込み A か B の値そのもの。窓内で値が変わる経路は無い。
+- 限界 (呼出し先の書込み): 関数内で `[rbp+0x140]` の番地を渡す `lea` は 0 件。番地を渡す `lea` は `[rbp+0x130]` 2 件 (0x11fbf39 → `call 0x104f580`、0x11fc56d → `call 0x412d60`)・`[rbp+0x138]` 1 件 (0x11fbfe9)・`[rbp+0x148]` 2 件 (0x11fbf28・0x11fc03d) で、呼出し先がそこから `[rbp+0x140]` を書く経路は検査していない。読出し窓 N には call が無いので、受入 3 の結論 (0x11fbc39 の値) には影響しない。0x11fbc39 以外の読出しは本 REPORT の対象外。
 
 ### 1-2 初回の P と 0x6668d0
 
@@ -77,16 +78,18 @@
 
 ## 2. 検証
 
-- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_py221_chain.py` → 17/17 PASS・終了 0。
-- 所要 (n=3、commit `357e58987`): 24.4・24.2・24.3 秒。load average 0.56・0.68・0.79 (1 分値、並列 1)。
-- ネガティブコントロール: `--ablate-write 0x11fc526` (書込み B を観測から外す) → W が FAIL・`summary: 15/16`・終了 1。
+- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_py221_chain.py` → 17/17 PASS・終了 0 (HEAD `f3490a59d` で再現)。
+- 実行機器: GitHub-hosted runner (AMD EPYC 9V45・vCPU 4・メモリ 15 GiB・ubuntu24 イメージ 20261004.327.1)。
+- 所要 (同機器・HEAD `f3490a59d`・n=3): `pe_py221_chain.py` 24.7・25.7・25.6 秒 (開始時の load 1 分値 0.50・0.67・0.79、並列 1)。`pe_py203_edx_sites.py` 21.6 秒 (1 run・load 0.87)。
+- 旧測定 (測定 commit `357e58987`、機器は未記録): `pe_py221_chain.py` 24.4・24.2・24.3 秒 (load 0.56・0.68・0.79)、`pe_py203_edx_sites.py` 20.99 秒。別機器のレビュー再実行では `pe_py221_chain.py` 44 秒 (load 0.46) で、機器差と読める。
+- ネガティブコントロール: `--ablate-write 0x11fc526` (書込み B を観測から外す) → `summary: 16/17 PASS`・終了 1。FAIL は W の 1 件だけ (同機器・HEAD `f3490a59d` で実測)。
 - 別アルゴリズムの検算 (既存ツール `pe_rip_refs.py`、RIP 相対の解決を別の実装で行う): `pe_rip_refs.py 0x15e2e18` → hits 35 (スクリプトの G と一致)。`pe_rip_refs.py 0x16b6e00` → hits 4 (Y と一致)。
-- 差分: `git diff 357e58987 HEAD -- tools/python/analysis/flapi` の出力は 0 行 (測定 commit から flapi は変わらない)。
+- 差分: 測定 commit は `357e58987` (コードを変えた最後の commit)。`git diff 357e58987 HEAD -- tools/python/analysis/flapi` の出力は 0 行 (測定 commit から flapi は変わらない)。
 
 ## 3. 受入 1・2 (未着手。子 issue #3926・#3927 に移した。前段の状態)
 
 - 受入 1 (0x45c290 の戻り値 eax = `[rbp+0x3c]` の意味): 書込み 36 件の内訳 (call 24・読出し 12) は `REPORT_PY203.md` §3 のまま。
-- 受入 2 (0x128f9e0 の直接呼出し 60 箇所の edx の基底): `pe_py203_edx_sites.py` を再実行 → 60 行・終了 0 (20.99 秒、1 run)。クラス件数 IMM 7・COPY 7・MEM 38・AMBIG 8 は `REPORT_PY203.md` §2 と一致 (件数のみ照合。site 単位の一致は未照合)。
+- 受入 2 (0x128f9e0 の直接呼出し 60 箇所の edx の基底): `pe_py203_edx_sites.py` を再実行 → 60 行・終了 0 (所要は §2)。クラス件数 IMM 7・COPY 7・MEM 38・AMBIG 8 は `REPORT_PY203.md` §2 と一致 (件数のみ照合。site 単位の一致は未照合)。
 
 ## 4. 未解決 (起票先)
 
