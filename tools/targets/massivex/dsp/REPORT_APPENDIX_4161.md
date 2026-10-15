@@ -33,7 +33,8 @@ MX-45 (#4161) の受入 1 (FH3 FuncInfo の funclet walk の C 移植) の実測
 - 測定 commit = **e1c5152ac** (`tools/shimx` の最後のコード変更)。検証スクリプトは `e1e11d8ad` で追加。
 - 素材: `plugins-massivex` → `Massive X.vst3` (95,356,824 B、md5 `622993e7…`)。
 - 実測 (e1c5152ac 時点): exit 0・**3.2 s**・FH3 FuncInfo **13,356**。C と Python が一致 **13,002**、不一致 **0**。両方が棄却 (上限・magic) **354**。C 側の棄却のみ 0。
-- 再実行 (reviewer 環境): 不可。`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみで `plugins-massivex` が無い。
+- 起動コマンド: `python3 tools/targets/massivex/dsp/scripts/mx45_fh3_parity.py <Massive X.vst3> <out.json> [tools/shimx/src/seh_fh3.c]` (clang 18.1.3 で `seh_fh3.c` を `-O1 -shared` ビルドする。`pefile` が必要)。
+- 再実行 (reviewer 環境・本 run): 不可。`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみで `plugins-massivex` が無い。
 
 ### 3.2 コード差分 (測定 commit から HEAD まで)
 
@@ -104,8 +105,16 @@ index 8b5319ecf..32a371373 100644
 
 ### 3.3 単体テスト
 
-- `bash tools/shimx/test.sh --quick` は emcc (EMSDK の環境) が runner に無く、この run では実行できなかった。
-- 代わりに `test_fh3.c` の `t_walk` を、ホストの clang と最小ヘッダで単独に実行した: PASS (修正後)。修正前の `t_walk` も PASS (期待値は 2 件のみを見ていた)。
+実測 (受入 4「wasm 化が通る」・HEAD = `27b04ff2b`・`tools/shimx` のコード変更は `d896246c4` が最後):
+
+- コマンド: `bash tools/shimx/test.sh --quick` (foreground・`PATH` に emsdk の `upstream/bin` を追加し、`[EMSDK]` (emsdk 6.0.12) を runner 上の展開先に symlink。`llvm-nm` は `upstream/emscripten` 側に symlink)
+- 結果: **exit 0・所要 119 s**。emsdk 6.0.12 (`emcc --version`)・node v22.23.3 (`build/versions.txt`)。runner は 4 vCPU
+- PASS 行: `build/mt.out` = `[shimx-test] ALL PASS (build=mt(pthreads))`、`build/mt.err` に `fh3 OK`。`build/st.out` = `[shimx-test] ALL PASS (build=st)`、`build/st.err` に `fh3 OK`
+- 内訳: 公開関数 699 本・MT 9 グループ PASS・ST PASS・fail-fast 14 件 PASS・M4 互換 PASS・SKIP (M11/M8 IR 無し・コミット済み生成物は不変)・guard 7b 全 OK
+- 作業ツリーの追跡ファイルは変化なし (`git status` clean。ビルド物は gitignore)
+- `test_fh3.c` の out_cap 超過の期待値 (cap=16 → 2・cap=1 → `>= 2`・`out[0]==0x500`) も上の MT/ST で実行済み。
+
+補足: ホストの clang で `t_walk` を単独に実行した結果 (PASS) は、上の emcc 経由の結果の補助にすぎない。
 
 ## 4. 未解決
 
