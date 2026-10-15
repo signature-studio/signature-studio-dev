@@ -5,6 +5,8 @@ Complete Object Locator (COL): signature == 1 and pSelf (COL+0x14, RVA) == the C
 The COL's pTypeDescriptor (COL+0x0C, RVA) gives the mangled class name (TypeDescriptor+0x10, ".?AV<cls>@<ns>@@").
 A member is a function entry by definition, so a gap block whose start is a member is a strong entry (vt hit).
 Controls: block starts shifted by +8 bytes must hit ~0 members.
+Owner of a member = the first vtable in scan order (sections .rdata, .data, _RDATA; ascending RVA) that lists it
+(member_owner.setdefault). A member shared by several vtables keeps that one owner; all owners are kept in `owners`.
 usage: sr21_vtable.py <pe> <index.npz> <sr21_classify.tsv> <out_dir>"""
 import sys, bisect, collections, re, struct
 import numpy as np
@@ -92,9 +94,11 @@ for a, b in DATA_SPANS:
         vtables.append(dict(rva=r, col=col, cls=name, mem=mem))
 
 member_owner = {}
+owners = collections.defaultdict(set)
 for vt in vtables:
     for m in vt['mem']:
         member_owner.setdefault(m, vt)
+        owners[m].add(vt['cls'])
 
 rows = [ln.rstrip('\n').split('\t') for ln in open(CLS)][1:]
 blk = {}
@@ -159,6 +163,26 @@ for h in hits:
 oss = re.compile(r'^(mu::|ZL|nlohmann|libsfz|sqlite|zstd|FLAC|PFFFT|pffft|Vorbis|sndfile)')
 oss_out = collections.Counter(h[5] for h in hits if h[6] == '-' and oss.match(h[5]))
 names = collections.Counter(h[5] for h in hits)
+cut_of = {int(h[0], 16) - IMG: h[6] for h in hits}
+gap_m = sorted(cut_of)
+multi_all = sum(1 for m in member_owner if len(owners[m]) >= 2)
+multi_gs = sum(1 for m in member_owner if member_loc[m] == 'gap_start' and len(owners[m]) >= 2)
+oss_first = [m for m in gap_m if cut_of[m] == '-' and oss.match(member_owner[m]['cls'])]
+oss_any = [m for m in gap_m if cut_of[m] == '-' and any(oss.match(c) for c in owners[m])]
+mid_bytes = [img[m - 1] for m in gap_m if member_loc[m] == 'gap_mid']
+mid_hex = collections.Counter(f"0x{b:02X}" for b in mid_bytes)
+mid_cat = collections.Counter('0xCC (int3)' if b == 0xCC else 'ret (0xC2/0xC3)' if b in (0xC2, 0xC3) else 'other' for b in mid_bytes)
+NAME_CLS = [('VSTGUI', r'^VSTGUI::'), ('Steinberg', r'^Steinberg::'), ('std', r'^std::'), ('OSS', oss.pattern),
+            ('Serum', r'^(Serum|Xfer|V[A-Z])|ProxyParameter|Controller|Editor|Lane|NoteGrid|PianoRoll'), ('other', '')]
+
+
+def name_class(n):
+    for k, p in NAME_CLS:
+        if p == '' or re.search(p, n):
+            return k
+
+
+name_cnt = collections.Counter(name_class(member_owner[m]['cls']) for m in gap_m)
 
 lines = []
 lines.append(f"COL signature==1 candidates (slot-1 pointer into .rdata/.data): {n_sig1}")
@@ -170,9 +194,23 @@ lines.append('## gap_start members by block class: class / blocks / vt-member bl
 for k in ['entry_call', 'entry_rip', 'branch_only', 'table_ptr', 'ptr_single', 'unref', 'data']:
     lines.append(f"{k}\t{cls_tot[k]}\t{cls_hit[k]}\t{cls_hit_B[k]}")
 lines.append(f"control: non-padding block starts +8 that hit a member\t{ctrl_hits}\texpected by chance\t{chance:.2f}")
-lines.append('## OSS-namespace members outside the cut windows (cut_library -)')
+lines.append(f"owner sharing: members with >=2 distinct owner class names\t{multi_all} of {len(member_owner)}\tgap_start {multi_gs} of {loc['gap_start']}")
+lines.append('## gap members by name class of first owner (regex; first match wins)')
+for k, p in NAME_CLS:
+    lines.append(f"{k}\t{name_cnt[k]}\t{p or '(rest)'}")
+lines.append('## gap_mid members: byte before the member (hex count, then category)')
+for k, c in sorted(mid_hex.items(), key=lambda kv: (-kv[1], kv[0])):
+    lines.append(f"{k}\t{c}")
+for k in ['0xCC (int3)', 'ret (0xC2/0xC3)', 'other']:
+    lines.append(f"{k}\t{mid_cat[k]}")
+lines.append('## OSS-namespace members outside the cut windows (cut_library -): first owner / any owner')
+lines.append(f"OSS outside cut windows\t{len(oss_first)}\t{len(oss_any)}")
 for n, c in oss_out.most_common():
     lines.append(f"{c}\t{n}")
+lines.append('## OSS members counted only through a non-first owner (outside cut windows): va / first owner / OSS owners')
+for m in oss_any:
+    if m not in oss_first:
+        lines.append(f"{hex(IMG + m)}\t{member_owner[m]['cls']}\t{' | '.join(sorted(c for c in owners[m] if oss.match(c)))}")
 lines.append('## rtti class of gap members (top 25)')
 for n, c in names.most_common(25):
     lines.append(f"{c}\t{n}")
