@@ -94,7 +94,7 @@ grep -c '^wp ' work/wp_F.txt; tail -1 work/wp_F.txt     # wp 件数・wpsum
 - round 7 の fix (レビュー差し戻し): 「page 保護: 解決」を未解決に戻した (`wp_arm` は R|X、`wp_finish` は毎回 R|X に戻す。元の RWX には戻らない)。§8.4・§8.8 を書き直した (表 1・表 2 で `0x11e69bf` の揺れを示し、216 要素の扱いを未確定と書いた)。`cmp_img_2770.py` に rsp の一致確認・要素数・片側だけの要素数を足した。`rt/ld_native.c` は変えていない。164 行のコメント「結果が変わらないことは未確認」は §8.4 (未確認) と一致する。
 - 本 PR (受入の範囲を縮めた再測定): `rt/ld_native.c` に opt-in の `LD_PIN_CPU` (`sched_setaffinity`) を足した (`b90d87438`。未指定時の動作は変えない)。`cmp_img_2770.py` に state・detail の一致判定を足した (`d94083396`)。CPU 固定下の測定は §8.9。読取りのみの監視 (page 保護を変えない方式) は子 #3648 に移した。
 - レビュー round 2 の fix (差し戻し): §8.8 の run 数を 23 run (直列 21 run と strace 付き 2 run) に直した。表 1 の bc80 行の env を「LD_PAD なし」に直した。216 要素の扱いと img の列挙の定義を書き直した。§8.1 の EFAULT の記述から「確認した」を外した。`cmp_img_2770.py` は rsp が取れない時に `UNKNOWN: not comparable` と出す。DOC_MAP の行を本付録の現行の内容に合わせた。`rt/ld_native.c` は変えていない。
-- レビュー round 4 の fix (差し戻し): §8.9 を全 12 run で `97c4bc87c` から取り直した。`0x15e69bf` の監視 (W0・W2) を表と再現手順に足し、窓内 wp 3 件の記述を wp 行の範囲 (8 byte) に合わせた。結論行の因果断定を「一致する (因果は未特定)」に直した。閉じた #2769 を起票先にした行を「起票なし (表で追跡)」に直した。`rt/ld_native.c` の `LD_PIN_CPU` を strtol で検証し、`cmp_img_2770.py` の JSON を `with open` で読むようにした。
+- 今回の差し戻し (oc-review round=1) への fix: §8.9 を全 12 run で `97c4bc87c` から取り直した。`0x15e69bf` の監視 (W0・W2) を表と再現手順に足し、窓内 wp 3 件の記述を wp 行の範囲 (8 byte) に合わせた。結論行の因果断定を「一致する (因果は未特定)」に直した。閉じた #2769 を起票先にした行を「起票なし (表で追跡)」に直した。`rt/ld_native.c` の `LD_PIN_CPU` を strtol で検証し、`cmp_img_2770.py` の JSON を `with open` で読むようにした。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
