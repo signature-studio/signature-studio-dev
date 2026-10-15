@@ -150,7 +150,8 @@
 ## 7. 検証 commit と差分 (docs/WORKFLOW.md §6)
 
 - 測定 commit = **5de22167f** (`dsp/scripts/mx41_pdata2_census.py` と `dsp/mx6_e2e.sh` を最後に変えた commit。MX-41)。
-- `git diff 5de22167f HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は **0 行**
-  (本 REPORT と付録の commit は docs のみ。コードの変更は無い)。
+- `git diff 5de22167f HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は **314 行** (3 ファイル・+236/−9)。main 取り込み (merge `1de8d3ad2`) の xmm0〜3 判定 (`mx33_xmm03.py`・`mx6_vectorcall.py`・工程 4 と工程 7) が入ったため。
+- **merge 後の e2e は未再測定**: 本 run では素材 `plugins-massivex` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、`Massive X.vst3` を作れなかった。merge 後の工程 1〜7 と判定 6/7 は未実行。再測定には `oc_artifacts: fl-win64 plugins-massivex` での再起動が要る。
+- 本 run で実行したもの: `bash -n mx6_e2e.sh` OK・`mx6_vectorcall.py --selftest` 5/5 PASS・`mx33_xmm03.py` / `mx41_pdata2_census.py` の py_compile OK。
 - 検証: e2e は測定 commit 5de22167f を `git worktree` (`ws-3792`) で再現して PASS (§1・40 s)。素材は `plugins-massivex` を `$RUNNER_TEMP` に展開し、`parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` で `Massive X.vst3` を再生成 (md5 `622993e7` 一致)。
   MX-6 本体の数値は前回 fbc9971f の測定と同一 (seeds 567・pdata 186,960・入口 livein 0・anyref 183 / 1,296・1 本目 187,060 / 62,526 / 23,293 / 160)。
