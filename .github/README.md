@@ -39,6 +39,7 @@ github.event.comment.user.type == 'Bot' && github.event.comment.user.login == va
 | `actions/agent-setup/action.yml` | ツールチェイン (uv/pnpm/node26/bun/opencode) と R2 からの素材ダウンロード |
 | `actions/opencode/action.yml` | `opencode auth import` → `opencode run --format json` (JSONL をファイルへ) → `Dump OpenCode events` が allowlist の投影 (text 全文・tool 名/状態/所要 ms/入力の先頭 200 文字・cost/tokens。tool の出力と生 JSONL はログに出さない) を job ログへ → `Write step summary` が text ブロックを全て順に + steps/cost を `$GITHUB_STEP_SUMMARY` とログへ |
 | `scripts/install-opencode.sh` | opencode CLI のインストール (pin・指数バックオフ・フォールバック) |
+| `scripts/fetch-artifacts.sh` | agent-setup の R2 素材取得。1 素材 3 回まで再試行 (指数バックオフ)・取得後のサイズを R2 と突合・404 だけ missing 扱い (#3976) |
 | `scripts/prepare-event-context.sh` | untrusted なイベント値をファイルに隔離し、制御変数を `$GITHUB_ENV` へ 1 行ずつ書く |
 | `scripts/assemble-prompt.sh` | イベント文脈を実装エージェント用プロンプトに流し込む |
 | `scripts/assemble-reviewer-prompt.sh` | 同じ方式でレビュワー用プロンプトを組み立てる |

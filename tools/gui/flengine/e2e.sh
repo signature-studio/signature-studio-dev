@@ -21,6 +21,7 @@ SNAP="$W/snap"; rm -rf "$SNAP"; mkdir -p "$SNAP"
 cp -a "$GF_M11" "$SNAP/m11" && cp -a "$GF_M11/../shared" "$SNAP/shared" && cp -a "$GF_M11/../shim" "$SNAP/shim" || { S "検証スナップショットの複製に失敗"; exit 2; }
 export GF_M11="$SNAP/m11"; M="$GF_M11"; S "検証スナップショット: $M (元の tools/m11 は読取のみ)"
 
+export GF_SURVEY_RESET=1   # survey の全実行 (base / ff / soft) で、各 unit を boot 直後の全メモリ状態から始める。chained 実行だと前 unit の副作用で base と soft の結果が食い違う (REPORT_APPENDIX_1635.md)
 S "0/6 複製: tools/m11 + tools/shim + tools/shared → $TREE (m11_build.sh の相対参照を保つ)"
 rm -rf "$TREE"; mkdir -p "$TREE"; cp -a "$SRC" "$GF_GUI/../shim" "$GF_GUI/../shared" "$GF_GUI/../m2" "$GF_GUI/../m5" "$TREE/"   # m2/m5: m11_lift.sh が ../m2/ir_normalize.py・../m5/ir5_patch.py を呼ぶ
 mkdir -p "$TREE/m6" && cp -a "$GF_GUI/../m6/ottlib.py" "$TREE/m6/"   # m11_wndclass_scan.py は ../m6/ottlib.py を import する
@@ -36,7 +37,7 @@ S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11
 ( cd "$M" && node m11_run.mjs 2>/dev/null | sed -n 's/^M11_RESULT //p' > "$W/res/baseline_boot.json" )
 [ -s "$W/res/baseline_boot.json" ] || { S "baseline 取得失敗"; exit 2; }
 bash "$HERE/build.sh" --base > "$W/res/build_base.log" 2>&1 || { S "build base 失敗"; tail -5 "$W/res/build_base.log"; exit 2; }   # 比較元は GUI と同じ -pthread build (shim 無し)。非 pthread の m11_boot.cjs と比べると 8 unit ぶん順序・ビルド条件差が出る (REPORT §5-6)
-( cd "$HERE" && node run.mjs --survey --wasm "$W/m11_base.cjs" --out "$W/res/baseline_base_survey.json" > /dev/null )
+( cd "$HERE" && GF_SURVEY_UNITS="$W/res/baseline_units.json" node run.mjs --survey --wasm "$W/m11_base.cjs" --out "$W/res/baseline_base_survey.json" > /dev/null )
 python3 -c "import json,sys; d=json.load(open(sys.argv[1]))['survey']; json.dump(d, open(sys.argv[2],'w'))" "$W/res/baseline_base_survey.json" "$W/res/baseline_survey.json" 2>/dev/null
 [ -s "$W/res/baseline_survey.json" ] || { S "baseline survey 取得失敗"; exit 2; }
 
@@ -51,17 +52,19 @@ cd "$HERE"
 node run.mjs                                                  --out "$W/res/boot_ff.json"     > /dev/null
 node run.mjs --survey                                         --out "$W/res/survey_ff.json"   > /dev/null
 GF_SURVEY_UNITS="$W/res/survey_soft_units.json" node run.mjs --survey --wasm "$W/m11_gui_soft.cjs" --out "$W/res/survey_soft.json" > /dev/null
+GF_SURVEY_RESET=0 node run.mjs --survey --wasm "$W/m11_gui_soft.cjs" --out "$W/res/survey_soft_chain.json" > /dev/null   # R2 (到達 floor) は前 unit の状態を引き継ぐ従来の survey で見る (隔離版では到達が 12 件に減る)
 node probe.mjs                                                --out "$W/res/probe.json"       > /dev/null
 node run.mjs --wasm "$W/m11_gui_plain.cjs"                    --out "$W/res/boot_plain.json"  > /dev/null
-for f in boot_ff survey_ff survey_soft probe boot_plain baseline_boot baseline_survey; do [ -s "$W/res/$f.json" ] || { S "結果 JSON が空: $f"; exit 1; }; done
+for f in boot_ff survey_ff survey_soft survey_soft_chain probe boot_plain baseline_boot baseline_survey baseline_units survey_soft_units; do [ -s "$W/res/$f.json" ] || { S "結果 JSON が空: $f"; exit 1; }; done
 
 S "2b/6 WNDCLASS scan (m11_wndclass_scan.py --check: fn WNDPROC は最終 IR に定義されていること)"
 python3 "$M/m11_wndclass_scan.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" --ir "$M/work/boot_final.ll" --json-out "$W/res/wndclass.json" --check --min-instances 11 -q > "$W/res/wndclass.out" 2>&1; tail -1 "$W/res/wndclass.out"
 [ -s "$W/res/wndclass.json" ] || { S "wndclass.json が空"; exit 1; }
 S "3/6 judge"
 python3 judge.py --dir "$W/res"; rc=$?
-cp "$W/res/boot_ff.json" "$R/boot.json"; cp "$W/res/survey_soft.json" "$R/survey_soft.json"; cp "$W/res/survey_ff.json" "$R/survey_ff.json"; cp "$W/res/probe.json" "$R/probe.json"
+cp "$W/res/boot_ff.json" "$R/boot.json"; cp "$W/res/survey_soft.json" "$R/survey_soft.json"; cp "$W/res/survey_soft_chain.json" "$R/survey_soft_chain.json"; cp "$W/res/survey_ff.json" "$R/survey_ff.json"; cp "$W/res/probe.json" "$R/probe.json"
 cp "$W/res/baseline_boot.json" "$R/baseline_boot.json"; cp "$W/res/baseline_survey.json" "$R/baseline_survey.json"
+cp "$W/res/baseline_units.json" "$W/res/survey_soft_units.json" "$R/"   # unit 別の出力 (judge の S3 が突き合わせる。REPORT_APPENDIX_1635.md §2-4)
 python3 "$GF_GUI/gen_api.py" > /dev/null    # IMPORTS.md の「実到達」列・§4 を今回の results で再生成
 
 S "4/6 native selftest (tools/gui/test/selftest.sh)"
@@ -116,6 +119,16 @@ for w in p['windows']:
 json.dump(p, open(o + '/probe_null_window.json', 'w'))
 PY
 nc "N9 TLightweightLayeredControl の hwnd が NULL (seed 無し相当)" "P5 TLightweightLayeredControl.*FAIL" python3 judge.py --dir "$W/res" --probe "$W/nc/probe_null_window.json"
+# N10: soft の unit 別出力の 1 unit を ok→trap に壊す (S1 の totals は変わらず、unit 単位の S3 だけが落ちること)
+python3 - "$W/res" "$W/nc" <<'PY'
+import json, sys
+d, o = sys.argv[1:3]
+u = json.load(open(d + '/survey_soft_units.json'))
+k = next(j for j, e in enumerate(u) if e[1] == 'ok')
+u[k] = [u[k][0], 'trap', 'NC-flipped']
+json.dump(u, open(o + '/survey_soft_units_broken.json', 'w'))
+PY
+nc "N10 soft の 1 unit (ok→trap) の unit 別出力 (S3 unit parity)" "S3 unit parity \(soft vs base\) +FAIL" python3 judge.py --dir "$W/res" --soft-units "$W/nc/survey_soft_units_broken.json"
 
 S "6/6 done: $(( $(date +%s) - t0 )) s, load=$(cut -d' ' -f1-3 /proc/loadavg)  → exit $rc"
 exit $rc
