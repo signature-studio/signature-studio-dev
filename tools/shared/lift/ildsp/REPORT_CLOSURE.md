@@ -144,7 +144,7 @@ IAT 名の内訳 (件数):
 | REPORT.md §1 の SIMD 比 30.7% の出典 | 旧 REPORT 値の再現 | #161 |
 
 ### 7. CreateInstance の native 実行 (#2528 / T-SH-38・#3249 slot 役割・#4116 slot 3 引数・#4117 slot 0)
-- 結論・測定値・表: `REPORT_APPENDIX_3249.md` (§7 の全文を分割移動)。受入 1・4 は #2528 で満たして `Closes`。受入 2 (slot 役割) は #3249、受入 3 は #3250。
+- 結論・測定値・表: `REPORT_APPENDIX_3249.md` (§7 の全文を分割移動)。受入 1・4 は #2528 で満たして `Closes`。受入 2 (slot 役割) は #3249、受入 3 は #3250。非 null メンバでの slot 0 (#4154) の実測は `REPORT_APPENDIX_3249.md` §7.3.1。
 
 ### 8. 0x161fc0 閉包の間接 call / jmp (T-SH-70 #3346)
 - 結論: 閉包の間接 call / jmp の宛先は、静的に確定する IAT と、実行時の `rax` で決まる CFG/XFG dispatch に分かれる。後者は trap 化する (実装は [T-SH-65] #3318・[T-SH-61] #3299)。正本は `REPORT_APPENDIX_3346.md`。
