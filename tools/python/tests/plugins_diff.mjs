@@ -84,6 +84,18 @@ const seq = [
   ["plugins.getParamValueString", [0]],
   ["plugins.setParamValue", [0.5, 0]],
   ["plugins.getParamValueString", ["0", 0]],
+  // 型 (code 5): useGlobalIndex・pickupMode・setParamValue の値が文字列。C は fl_a_int / fl_a_dbl で同じ code を返す
+  ["plugins.getParamValueString", [0, 0, -1, "x"]],
+  ["plugins.getParamValue", [0, "0"]],
+  ["plugins.setParamValue", ["0.5", 0, 0]],
+  ["plugins.setParamValue", [0.5, 2, 1, -1, 0, "x"]],
+  ["plugins.setParamValue", [0.5, 2, 1, -1, "x"]],
+  // 型が正しい bool と None (既定値)。channel 1 の param 2 (Gain) だけを書く
+  ["plugins.setParamValue", [true, 2, 1, -1]],
+  ["plugins.getParamValueString", [2, 1, -1]],
+  ["plugins.getParamValueString", [0, 0, null, null]],
+  ["plugins.setParamValue", [0.5, 2, 1, -1, 0, 1]],
+  ["plugins.getParamValueString", [2, 1, -1]],
   // 最後に slot の値を書き直す (期待値の直接検査で使う)
   ["plugins.setParamValue", [0.75, 0, 1, 0]],
 ];
@@ -106,5 +118,8 @@ for (const eng of [mock, wasm]) {
   assert.equal(str(eng, 0, 1, 0), "75.0 %", "slot の値");
   assert.equal(val(eng, "plugins.getParamValue", [0, 1, 0]).v, 0.75);
   assert.equal(str(eng, 0, 0, -1), "25.0 %", "slot の set は channel に波及しない");
+  assert.equal(str(eng, 2, 1, -1), "50.0 %", "bool (1.0) の後に 0.5 で書き直した channel 1 の Gain");
+  assert.equal(run(eng, "plugins.setParamValue", ["0.5", 0, 0]).code, 5, "文字列の値は code 5");
+  assert.equal(run(eng, "plugins.getParamValueString", [0, 0, -1, "x"]).code, 5, "文字列の useGlobalIndex は code 5");
 }
 console.log(JSON.stringify({ calls: seq.length, diffs: 0, PASS: true }));

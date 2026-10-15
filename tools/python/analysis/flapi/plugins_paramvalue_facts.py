@@ -21,6 +21,7 @@ import pefile
 
 PE = os.path.join(os.environ["FL_WIN64_DIR"], "extracted", "block00031_PE.bin")
 PSTR = 0xD7F940
+SLOT_PATH = 0xD7FB34  # cmp [rbp+0xa8], -1 の jne 先 (slotIndex != -1 の経路の先頭)
 MIX_COUNT = 0x15E2198  # mixer track の件数 (dword)。PY-115 の setter と同じ変数
 PARAM_INFO_GETTER = 0xD7FDA0
 PARAM_SET = 0xD80160
@@ -43,14 +44,22 @@ def load():
 
 
 def disasm(raw, v2o, va, n):
+    return [s for _, s in disasm_va(raw, v2o, va, n)]
+
+
+def disasm_va(raw, v2o, va, n):
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     fo = v2o(va)
-    return [f"{i.mnemonic} {i.op_str}".strip() for _, i in zip(range(n), md.disasm(raw[fo:fo + n * 16], va))]
+    return [(i.address, f"{i.mnemonic} {i.op_str}".strip()) for _, i in zip(range(n), md.disasm(raw[fo:fo + n * 16], va))]
 
 
 def main():
     raw, v2o = load()
-    body = disasm(raw, v2o, PSTR, 400)
+    body_va = disasm_va(raw, v2o, PSTR, 400)
+    body = [s for _, s in body_va]
+    # 経路の所属: slotIndex == -1 の飛び先 (0xd7fb34) より前が channel 経路、以降が slot 経路
+    chan_path = [s for a, s in body_va if a < SLOT_PATH]
+    slot_path = [s for a, s in body_va if a >= SLOT_PATH]
     getter = disasm(raw, v2o, PARAM_INFO_GETTER, 200)
     setter = disasm(raw, v2o, PARAM_SET, 140)
     core = disasm(raw, v2o, 0x12BE250, 8)
@@ -62,17 +71,17 @@ def main():
     ref = ins.address + ins.size + int(ins.op_str.split("+")[1].split("]")[0], 16)
     checks = {
         "getParamValueString: slot == -1 の判定 (cmp [rbp+0xa8], -1)": any(s == "cmp dword ptr [rbp + 0xa8], -1" for s in body),
-        "slot == -1 経路: 0x1005730 で channel 解決": any(s == "call 0x1005730" for s in body),
-        "slot == -1 経路: 0x132f780 で有効性": any(s == "call 0x132f780" for s in body),
+        "slot == -1 経路: 0x1005730 で channel 解決": any(s == "call 0x1005730" for s in chan_path),
+        "slot == -1 経路: 0x132f780 で有効性": any(s == "call 0x132f780" for s in chan_path),
         "slot >= 0 経路: 件数 [0x15e2198] の参照先": ref == MIX_COUNT,
-        "slot >= 0 経路: slot の上限 9 (cmp rax, 9)": any(s == "cmp rax, 9" for s in body),
-        "slot >= 0 経路: 要素 = base + index*0x28f*8 (imul rcx,rcx,0x28f)": any(s == "imul rcx, rcx, 0x28f" for s in body),
-        "slot >= 0 経路: 0x12be250(index, slot) を id の基底に使う": any(s == "call 0x12be250" for s in body),
-        "id (slot >= 0): add r8d, 0x70008000": any(s == "add r8d, 0x70008000" for s in body),
-        "id (slot -1): add r8d, 0x8000 (+ [obj+0x9c])": any(s == "add r8d, 0x8000" for s in body) and any(s == "add r8d, dword ptr [rbp + 0xa4]" for s in body),
+        "slot >= 0 経路: slot の上限 9 (cmp rax, 9)": any(s == "cmp rax, 9" for s in slot_path),
+        "slot >= 0 経路: 要素 = base + index*0x28f*8 (imul rcx,rcx,0x28f)": any(s == "imul rcx, rcx, 0x28f" for s in slot_path),
+        "slot >= 0 経路: 0x12be250(index, slot) を id の基底に使う": any(s == "call 0x12be250" for s in slot_path),
+        "id (slot >= 0): add r8d, 0x70008000": any(s == "add r8d, 0x70008000" for s in slot_path),
+        "id (slot -1): add r8d, 0x8000 (+ [obj+0x9c])": any(s == "add r8d, 0x8000" for s in chan_path) and any(s == "add r8d, dword ptr [rbp + 0xa4]" for s in chan_path),
         "値の参照: call 0xd84740 (2 回)": sum(1 for s in body if s == "call 0xd84740") == 2,
         "文字列化: call 0x104d2b0 → 0xc3cfa0": any(s == "call 0x104d2b0" for s in body) and any(s == "call 0xc3cfa0" for s in body),
-        "paramIndex の範囲: count-1 との比較 (sub eax, 1)": sum(1 for s in body if s == "sub eax, 1") >= 2,
+        "paramIndex の範囲: count-1 との比較 (sub eax, 1) が両経路に": any(s == "sub eax, 1" for s in chan_path) and any(s == "sub eax, 1" for s in slot_path),
         "0x12be250 = ((index<<6)+slot)<<16": core[:4] == ["mov eax, ecx", "shl eax, 6", "add eax, edx", "shl eax, 0x10"],
         "0x132f780 = ([obj+0x64] >= 0)": obj_valid[:1] == ["cmp dword ptr [rcx + 0x64], 0"],
         "0x1005730: dl (useGlobalIndex>0) で 2 表を切替 (test dl, dl)": any(s == "test dl, dl" for s in chan),

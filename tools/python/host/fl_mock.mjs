@@ -168,6 +168,10 @@ export function createMockEngine() {
   const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
   // float 引数 (fl_a_dbl と同じ: None は 0、bool・整数・実数は可、他は code 5)。PE の書式 'f' は float32 に丸める
   const argF = (a, i) => { const v = a[i]; if (i >= a.length || v === undefined) return 0; if (typeof v === "boolean") return +v; if (typeof v === "number") return Math.fround(v); throw WRONG(); };
+  // fl_a_dbl と同じ (plugins.setParamValue の値): None は 0、bool・実数は可 (丸めない)、他は code 5
+  const argD = (a, i) => { const v = a[i]; if (i >= a.length || v === undefined) return 0; if (typeof v === "boolean") return +v; if (typeof v === "number") return v; throw WRONG(); };
+  // plugins の値 API の引数は C と同じ順に型検査してから解決する (paramIndex・index・slotIndex・useGlobalIndex・(setParamValue の pickupMode))。o = paramIndex の位置、n = 最大個数
+  const plugIn = (a, o, n) => { const q = argI(a, o, 0), i = argI(a, o + 1, 0), s = argI(a, o + 2, -1); for (let k = o + 3; k < n; k++) argI(a, k, 0); return plugPV(i, s, q); };
   const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
 
   const impl = {
@@ -365,9 +369,9 @@ export function createMockEngine() {
     "plugins.getPluginName": (i, slot = -1, userName) => (slot < 0 ? ch(i).plugin : (tr(i).slots[slot] ?? "")),
     "plugins.getParamCount": () => st.params.length,
     "plugins.getParamName": (p) => st.params[p]?.name ?? "",
-    "plugins.getParamValue": (...a) => { arity(a, 2, 4); const [pv, q] = plugPV(a[1], ix(a[2] ?? -1), a[0]); return F(pv[q]); },
-    "plugins.getParamValueString": (...a) => { arity(a, 2, 4); const [pv, q] = plugPV(a[1], ix(a[2] ?? -1), a[0]); return `${(pv[q] * 100).toFixed(1)} %`; },
-    "plugins.setParamValue": (...a) => { arity(a, 3, 6); const [pv, q] = plugPV(a[2], ix(a[3] ?? -1), a[1]); pv[q] = a[0]; },
+    "plugins.getParamValue": (...a) => { arity(a, 2, 4); const [pv, q] = plugIn(a, 0, 4); return F(pv[q]); },
+    "plugins.getParamValueString": (...a) => { arity(a, 2, 4); const [pv, q] = plugIn(a, 0, 4); return `${(pv[q] * 100).toFixed(1)} %`; },
+    "plugins.setParamValue": (...a) => { arity(a, 3, 6); const x = argD(a, 0); const [pv, q] = plugIn(a, 1, 6); pv[q] = x; },
     // MIDI scripting (PY-6): device script が使う device.* の最小模擬。forwardMIDICC / midiOutMsg は呼出しを st.midiOut に記録する
     // general.getVersion = MIDI scripting API バージョン (int)。実機値は未実測のため固定のモック値 (同梱 script は print するだけ)
     "general.getVersion": (...a) => { arity(a, 0, 0); return st.scriptingVersion ?? 1; },
