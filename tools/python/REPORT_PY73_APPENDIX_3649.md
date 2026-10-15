@@ -1,23 +1,25 @@
-# PY-225 付録 (#3649): 3 フラグ書込みの呼出し元・bl/cl の由来・note-off 側と `0x10602e0` (親 #2926)
+# PY-283 付録 (#3649): 3 フラグ書込みの呼出し元・bl/cl の由来・note-off 側と `0x10602e0` (親 #2926)
 
-親: #2926 (PY-110)。前段: `tools/python/REPORT_PY73_APPENDIX_2926.md` §1〜§4 (書込み 18 件の VA と値)・`REPORT_PY73_APPENDIX_2817.md` §5〜§6 (vtable 先 `0x1262a90`・ゲート式)。本体: `tools/python/REPORT_PY73.md` §2・§8-3。
+親: #2926 (PY-110)。前段: `tools/python/REPORT_PY73_APPENDIX_2926.md` §1〜§4 (書込み 18 件の VA と値)・`REPORT_PY73_APPENDIX_2817.md` §5〜§6 (vtable 先 `0x1262a90`・ゲート式)。本体: `tools/python/REPORT_PY73.md` §2・§8-3。子: #3965 (PY-278)・#3966 (PY-279)。
 既知類型との関係: 該当なし (lift 作業ではない。逆アセンブルと直接 call の閉包)。
 実装: 0 件 (`provider/`・`host/`・`tests/` は未変更)。製品 KPI: 対象外 (起動・GUI に関わらない解析)。
 
 ## 結論
 
 - **bl (`0xfff3c3`) と cl (`0x10440af`) は、フラグ B 自身の旧値**。関数に入って flagB を 1 にする前に読んだ値を、関数の終わり近くで戻す (save/restore)。定数ではない (§2)。
-- **書込み 18 件の所属関数と直接呼出し元を全件列挙した** (§1)。flagC の `0x1262977` は vt+0x60 (`V = 0x125b1c0` の +0x60 の格納値 `0x1262970` で確認) で、直接呼出し元は 0 件。`[reg+0x60]` の間接 call は 519 箇所あり、個々の特定は子へ。
+- **書込み 18 件の所属関数と直接呼出し元を全件列挙した** (§1)。flagC の `0x1262977` は vt+0x60 (`V = 0x125b1c0` の +0x60 の格納値 `0x1262970` で確認) で、直接呼出し元は 0 件。`call qword ptr [reg+0x60]` の間接 call は 517 箇所あり、個々の特定は子へ。
 - **書込み関数 12 件のどれも、直接 call だけでは midiNoteOn ハンドラ `0xd5c800` に到達しない** (深さ 60 まで 0/12)。ゲート (`0xd5c858`) より前に書込みが実行されるかは、この経路では決まらない (§3)。
 - note-off 側 (`0x1000614`〜`0x1000747`) と `0x1000c36`・`0x10602e0` は一部のみ読了 (§4)。残りは子。
+- 探索器の対照 (正 4・負 1・変更 3) を §7 に数値で残した。既知の直接経路は見つかり、1 件足すと 0/12 が 1/12 に変わるので、0/12 は探索器の見落としとは言えない。
 
 ## 測定
 
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 22,227,016 B。実測 2.8 秒)。`toolchain-retdec` は未使用。
-- 測定 commit: `3f190e5de` (`tools/python/analysis/flapi/pe_flag_scope_check.py` を追加した commit。クリーンな worktree で実行)。
-- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_flag_scope_check.py`。実測 37.7 秒 (real)・開始時 load 0.14〜0.23・並列 1。出力 44 行。§1・§3 の数値はこの出力から転記した。
-- 逆アセンブル・命令列の確認: `analysis/flapi/pe_disasm.py` と `pe_callgraph.py` (`load`・`walk` は新スクリプトから再利用)。
-- 差分 0 の証跡: `git diff 3f190e5de HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (§6)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 22,227,016 B。実測 2.9 秒)。`toolchain-retdec` は未使用。
+- 測定 commit: `c7bbcc03a` (間接 call の数え方を直し、対照スクリプトを加えた commit。コードを変えた最後の commit)。
+- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_flag_scope_check.py`。実測 37.8 秒・37.6 秒 (real, n=2)・開始時 load 0.16・0.76・並列 1。出力 44 行。2 回の出力はバイト単位で一致。§1・§3 の数値はこの出力から転記した。
+- 対照: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_flag_scope_negctl.py` (実測 38.5 秒・load 0.16・並列 1)。§7。
+- 逆アセンブル・命令列の確認: `analysis/flapi/pe_disasm.py` と `pe_callgraph.py` (`load`・`walk` は新スクリプトから再利用)。間接 call の数と §2-2 の呼出し先は `objdump -d -M intel` でも検算した。
+- 差分 0 の証跡: §6。
 - 検証範囲: 逆アセンブル・直接 call の閉包・vtable 格納値の読取りだけ。wasm・mock の実行は未実施。
 
 ## 1. 書込み 18 件の所属関数と直接呼出し元
@@ -43,12 +45,13 @@
 | B | `0x11d6310` | 0 | `0x11d55c0` | 2 (同上) | clear |
 | B | `0x11d631f` | 0 | `0x11d55c0` | 2 (同上) | clear |
 | C | `0x11c761c` | 1 | `0x11c71b0` | 1: `0x11c88d3` (in `0x11c8870`) | set。C への 0 の書込みは無い |
-| C | `0x1262977` | 1 | `0x1262970` | 0 | vt+0x60 の関数 (§1-1)。`[reg+0x60]` の間接 call 519 箇所 |
+| C | `0x1262977` | 1 | `0x1262970` | 0 | vt+0x60 の関数 (§1-1)。`[reg+0x60]` の間接 call 517 箇所 |
 
 ### 1-1 vtable・関数ポインタ格納の確認
 
 - `V = 0x125b1c0` の格納値 (ファイル上): +0x48 = `0x1262950` (flagC の読出し)・+0x60 = `0x1262970` (flagC の set)・+0x88 = `0x1262a90` (ゲート)・+0x90 = `0x1262ad0`。`0x1262970` を 8 byte 境界で格納する箇所は `0x125b220` (= V+0x60) のみ。
-- 間接 call の数 (`.text` 全体): `call qword ptr [reg+0x60]` 519 箇所、`[reg+0x88]` 333 箇所。`[reg+0x60]` のうち、どのオブジェクトの vtable 経由かは未特定 (子 #3965 (PY-278))。
+- 間接 call の数 (`.text` 全体): `call qword ptr [reg+0x60]` 517 箇所、`[reg+0x88]` 333 箇所。far call (`call FWORD PTR [reg+0x60]`・FF /3) の 2 件 (`0x5a5d95`・`0x6e561e`) は数えない。objdump (`call QWORD PTR [..+0x60]` 517・`[..+0x88]` 333) でも一致。
+- `[reg+0x60]` のうち、どのオブジェクトの vtable 経由かは未特定 (子 #3965 (PY-278))。
 
 ### 1-2 関数ポインタ表 (`0xfff070`)
 
@@ -89,9 +92,10 @@
 ```
 
 - `[rbp+0x47]` を読み書きする箇所は 0x1042e3d (保存) と 0x10440aa (復元) の 2 箇所のみ。`lea` でその領域を指す命令、0x40〜0x47 を指すポインタを渡す call は関数内に 0 件。
+- `rbp` 自身を `rcx` に入れて call する箇所は関数内に 5 件 (`mov rcx,rbp` の直後 6 命令以内に call がある件数。objdump の検算で、0x1042eaa・0x1043223・0x1043346・0x10433ac・0x104340b)。5 件の呼出し先はすべて `0x1042d00` で、その本体 (`push rbp` から `ret` まで 10 命令) は `mov ecx,[rcx+0xf8]` と `[rax+rdx*8]` の読取りだけで、書込み命令は無い (`objdump -d -M intel --start-address=0x1042d00`)。`rbp` を他の引数レジスタに入れて渡す call と、残りの callee が `[rbp+0x47]` を書かないことは未確認。
 - 0x1042e32〜0x10440b1 の区間で、区間外へ出る分岐・ret は 0 件 (内部分岐だけ)。
 
-両関数とも、flagB は「関数の動的範囲の中だけ 1」になり、関数を抜けると入った時点の値に戻る。ゲート `0x1262a90` の flagB 判定が -2 を返すのは、その範囲の中で midiNoteOn のゲートが評価されたときだけ。
+両関数とも、flagB は「関数の動的範囲の中だけ 1」になり、関数を抜けると入った時点の値に戻る (復元は ret より前。§2-1・§2-2 の区間)。ゲート `0x1262a90` の flagB 判定が -2 を返すのは、その範囲の中で midiNoteOn のゲートが評価されたときだけ、という点は 2817 付録からの推論で、本付録では検証していない。
 
 ## 3. ゲート前後と閉包 (未確定。子 #3965 (PY-278))
 
@@ -118,7 +122,7 @@
 ### 3-3 静的に確定した寿命 (フラグごと)
 
 - **flagC**: 静的に見える書込みは全て 1 (`0x11c761c`・`0x1262977`)。0 を書く箇所は無い。したがって、静的に見える範囲では一度 1 になると 0 に戻らない (ラッチの候補。0 を書く間接経路の有無は未確定)。
-- **flagA**: `0xc4ecf0` の中で、set (`0xc4f32e` の呼出し → `0xc4dba0`) と clear (`0xc4f35b` の呼出し → `0xc4e570`) が対。その間に `0xc4f333`〜`0xc4f34e` の loop (`0xc51f80` 等の呼出し)。一方 `0xd17fd0` (呼出し元 6) は 1 を書くだけで、0 を書くのは `0xd1af20` のみ。`0xd1af20` は静的な呼出し経路が 0 件のため、`0xd1af20` が間接に呼ばれない限り `0xd17fd0` の後も 1 のまま (間接経路の有無は未確定。子 #3965 (PY-278))。
+- **flagA**: set は 2 件 (`0xc4dea0` = `0xc4dba0` 内、`0xd1a2ac` = `0xd17fd0` 内)。clear も 2 件 (`0xc4ea3b` = `0xc4e570` 内、`0xd1cb19` = `0xd1af20` 内)。`0xc4ecf0` の中で、set (`0xc4f32e` の呼出し → `0xc4dba0`) と clear (`0xc4f35b` の呼出し → `0xc4e570`) が対。その間に `0xc4f333`〜`0xc4f34e` の loop (`0xc51f80` 等の呼出し)。一方 `0xd17fd0` (呼出し元 6) は 1 を書くだけで、同関数に clear は無い。`0xd17fd0` の後に走るのが `0xc4e570` (`0xc4ecf0` の `0xc4f35b` からだけ直接 call される) か `0xd1af20` (静的な呼出し経路が 0 件) かは未確定。したがって `0xd17fd0` の後に flagA が 0 へ戻る経路の有無は未確定 (子 #3965 (PY-278) の範囲)。
 - **flagB**: 同一関数内で set と clear が対になるもの (`0xf51fd0`・`0xfefba0`・`0x11d55c0`)、clear のみ (`0xf46310`)、save/restore (`0xfff070`・`0x1042d20`)。
 
 ## 4. note-off 側と `0x1000c36`・`0x10602e0` (一部確定。残りは子 #3966 (PY-279))
@@ -160,9 +164,29 @@
 
 子 issue に移した範囲 (本文から外した):
 
-- ゲート (`0xd5c858`) より前に書込みが実行されるかと、間接呼出し元 (§3) → 子 #3965 (PY-278)
+- ゲート (`0xd5c858`) より前に書込みが実行されるかと、間接呼出し元 (§3)・flagA の clear 2 件の実行順 (§3-3) → 子 #3965 (PY-278)
 - note-off 側 (`0x1000614` 以降)・`0x1000c36` の呼出し先・`0x10602e0` の仮想呼出し先と副作用 (§4) → 子 #3966 (PY-279)
 
 ## 6. 差分 0 の証跡
 
-- 測定 commit `3f190e5de` から本付録の commit までの `git diff 3f190e5de HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本付録の commit 直前に確認)。
+- 測定 commit `c7bbcc03a` から本付録の commit までの `git diff c7bbcc03a HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本付録の commit 直前に確認)。
+- 測定 commit の直前 (`68d3da528`・main 取り込み) から測定 commit までの差分は、`pe_flag_scope_check.py` (間接 call の regex 2 行と docstring 1 行) と `pe_flag_scope_negctl.py` (新規) だけ。
+
+## 7. 対照 (正の対照・負の対照・1 件変更)
+
+再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_flag_scope_negctl.py` (測定 commit `c7bbcc03a`・実測 38.5 秒・load 0.16・並列 1)。
+
+| 対照 | 期待 | 実測 |
+|---|---|---|
+| 正: `0xc4dba0` → `0x10002a0` | 経路あり (深さ 1) | depth 1: `0xc4dba0 -> 0x10002a0` |
+| 正: `0xc4ecf0` → `0x10002a0` | 経路あり (深さ 2) | depth 2: `0xc4ecf0 -> 0xc4dba0 -> 0x10002a0` |
+| 正: `0xd5c800` → `0x10002a0` | 経路あり (深さ 1) | depth 1: `0xd5c800 -> 0x10002a0` |
+| 正: `0xd5c800` → `0x63a730` | 経路あり (深さ 1) | depth 1: `0xd5c800 -> 0x63a730` |
+| 負: `0xc4dba0` → `0xd5c800` | 経路なし | no path |
+| 基準 | 到達 0/12・`mov byte ptr` 18/18 | 到達 0 of 12・18 of 18 |
+| 変更 1: 0xc4f32e の直接 call (`0xc4ecf0` → `0xc4dba0`) を 1 件外す | `0xc4ecf0` → `0x10002a0` が消える | no path |
+| 変更 2: `0xc4dba0` → `0xd5c800` の直接 call を 1 件足す | 到達 0/12 → 1/12 | 1 of 12 |
+| 変更 3: 書込み VA `0xd1a2ac` を +1 にずらす | `mov byte ptr` 18/18 → 17/18 | 17 of 18 |
+
+- 書込み 18 件の列挙は #2926 付録の表が入力で、本スクリプトはその VA を読む。変更 3 の `mov byte ptr` 検査は「VA が byte 書込み命令の先頭か」だけを確かめる。書込みの値 (0/1・bl/cl) は §1・§2 の逆アセンブルで確認した。
+- 対照は、同じ逆アセンブル結果の上で、呼出し辞書を複製して 1 件だけ変えて走らせた (PE ファイルは変更しない)。
