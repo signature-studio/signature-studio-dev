@@ -1,6 +1,6 @@
 # REPORT 付録 — WIN-19 (#3245): LoadImageW の shim 実装と boot 停止点の実測
 
-測定 commit: `2c7f14fe5` (`fix(gui): LoadImageW の ID 制限の記述を LoadIconW/LoadCursorW と揃える`。コードを変えた最後の commit)。PR 本文の HEAD はこの後に results の commit だけを積む (§6)。素材: [WIN64] (fl-win64 26.1.7.5653)、[EMSDK] (`/opt/emsdk`)、[RETDEC] (`/opt/retdec`、v5.0)、work-m11。
+測定 commit: `2c7f14fe5` (`fix(gui): LoadImageW の ID 制限の記述を LoadIconW/LoadCursorW と揃える`。コードを変えた最後の commit)。PR 本文の HEAD はこの後に results の commit だけを積む (§6)。素材: [WIN64] (fl-win64 26.1.7.5653)、[EMSDK]、[RETDEC] (v5.0)、work-m11。
 
 ## 1. 結論
 
