@@ -39,12 +39,22 @@ movnti は memset (`f_18001c8f0`・8 箇所) の大ブロック経路にだけ�
 - **memcpy の movnti 16 箇所: 直接 call の範囲では不要。** 唯一の直接の呼出し元 (`f_18001bde8`) が長さ 0x40 固定で、movnti の閾値 0x10000 に届かない (静的読み・未実測)。「不要」は、間接 call 経路 (§1) が未確認である限り、この限定付きで書く。
 - 本付録では x64c を変えない (`tools/flelift/` は触らない)。
 
+## 3.5 `REX_RUN_CRASHED=1` で 296 件を流す停止の修復 — #3895 (T-SH-95)
+- 測定 commit: `4d7b8316b` (`tools/shared/lift/rex/run_wasm.mjs` を変えた最後の commit。修復は `52cde16ed`・`4d7b8316b` の 2 本)。測定 HEAD: `4d7b8316b`。
+- 原因: wasm の `rex_run` は同期実行で、JS 側から途中で止められない。元の機械語は `native_ref.c` の `ualarm(300 ms)` で止まるが、wasm 側に時間制限が無かった。case 101 (fn=1・a1=0x6dd) が wasm で戻らず、全件の実行が時間切れになった (120 s 超・rc 124)。native 側でも case 101 は SIGALRM で打ち切られている。
+- 修復: `run_wasm.mjs` を case ごとの worker_threads で走らせ、`REX_CASE_MS` (既定 2000 ms) を超えて戻らない case は捨て (`timeout.txt`)、次の case から worker を作り直して続ける。`trap_kind.txt` を新設し、VA が 0 の trap の種類 (JS の例外メッセージ) を case 単位で残す。`trap.txt` の形式は変えていない (`movnti_check.py` が読む)。
+- 実測 (HEAD `4d7b8316b`・`REX_RUN_CRASHED=1`・`ok` で作り直した cases.bin 296 件): rc 0・elapsed 2 s・load `0.25 0.38 0.35 → 0.31 0.39 0.36`・cases=296 traps=38 timeouts=1 (case 101)。戻らなかった case は 1 件。
+- trap の内訳 (38 件): `memory access out of bounds` 36 件 (VA 0)、`unreachable` 2 件 (VA `0x18001788f` = `idiv by zero`)。境界外 36 件の原因は未特定。36 件はいずれも元の機械語が落ちた case (比較対象外) で、wasm 側だけ trap する。`ok` の比較 (223 件) では wasm の trap は 0 件。
+- 戻らなかった case の数と原因 (受入 2): 1 件 (case 101)。元の機械語も SIGALRM で打ち切られる入力で、比較対象外。wasm 側も同じ入力で終わらない経路に入る。
+- `lift_x64c.sh all` (HEAD `4d7b8316b`): ALL OK (本検査 PASS・ネガコン 3 件 FAIL 期待通り・movnti 到達 16/16)。elapsed 14 s。
+- 未解決: 境界外 trap 36 件の原因 (子 #3894 の info 4 件と同系の可能性。未確認)・`idiv by zero` の未対応 (VA `0x18001788f`) は既存の未対応として残す。
+
 ## 4. 未解決 (起票先)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | movnti (memset 8 箇所) の x64c 対応の実装。到達時は fail-fast で trap | a1 ≥ 0x70000 の入力で wasm が trap | 子 #3893 [T-SH-93] |
 | info 4 件 (a1 ∈ [0x10000, 0x70000)) が `ott_unsup` 以外で trap (VA 0)。閾値 0x70000 の静的読みと食い違う。原因未特定 | 閾値の静的読みの反証が未了 | 子 #3894 [T-SH-94] |
-| `REX_RUN_CRASHED=1` で 248 件すべてを流すと wasm が戻らない (movnti モードの 20 件は完走) | 元が落ちる入力を全件 wasm で流せない | 子 #3895 [T-SH-95] |
+| `REX_RUN_CRASHED=1` で wasm が戻らない (case 101 が時間切れ) → §3.5 で修復済み。残る境界外 trap 36 件の原因は未特定 | 元が落ちる入力の wasm 側の trap 原因が未確認 | #3895 [T-SH-95] (本 PR で修復・残りは未解決表に移す) |
 | fn=1 (REXGetInfo) では movnti に到達しなかった (memset の前の node 参照で落ちる) | fn=1 からの到達は未確認 | #3587 [T-SH-88] (open。fn=1 の成功経路の入力を扱う。閉じた #3588 から付け替え) |
 | memcpy 16 箇所の間接 call 経路 (`f_18001f260` = `ott_dispatch` の register 間接 call 6 箇所の表・`case 0x3001ca80` に memmove) からの到達 | 「memcpy は不要」は直接 call と定数参照の静的読みに限る | 未起票 (追跡のみ。子は起票しない。本表で追跡) |
 | 本番の host が REXGetCreatorInfo に渡す a1 の値域 | 到達が本番で起きるかの判断 | [未確認]。依頼者が FL 側の呼出し値で確認する |
