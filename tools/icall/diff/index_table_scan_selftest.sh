@@ -2,7 +2,7 @@
 # index_table_scan_selftest.sh — index_table_scan.py の負の対照 (ICALL-85 / #3089)。合成 PE で検出と非検出を確かめる。
 #   合成 PE: .rdata 1 section (VA 0x1810c4000・VirtualSize 0x1c000) の表 0x1810df738 の a=3 (p=0x1810df744) に値を置く。
 #   正 1: v=87,069 → 一致 1 件 (p=0x1810df744・a=3・site=180703b7c)。
-#   正 2: v=87,075 → 一致 2 件 (site=180703b7c,180703913)。
+#   正 2: v=87,075 → 一致 1 dword・site 2 件 (site=180703b7c,180703913)。
 #   負 1: v=87,070 (どの site にも届かない値) → 一致 0 件。
 #   負 2: 全 dword を 0 にする → 一致 0 件。
 #   用法: bash tools/icall/diff/index_table_scan_selftest.sh   (rc=0 で全件 PASS)
@@ -49,7 +49,7 @@ check_none() {
   if grep -qF '一致=0' <<< "$rdata" && ! grep -qF 'p=0x' <<< "$out"; then echo "PASS $name ($rdata)"; else echo "FAIL $name ($rdata)"; rc=1; fi
 }
 check "正1 (一致 1)" "$W/pos1.bin" "p=0x1810df744 v=87,069 a=3 site=180703b7c"
-check "正2 (一致 2 site)" "$W/pos2.bin" "p=0x1810df744 v=87,075 a=3 site=180703b7c,180703913"
+check "正2 (1 dword・site 2 件)" "$W/pos2.bin" "p=0x1810df744 v=87,075 a=3 site=180703b7c,180703913"
 check_none "負1 届かない値 87,070 (一致 0)" "$W/neg1.bin"
 check_none "負2 全 0 (一致 0)" "$W/neg2.bin"
 exit $rc
