@@ -236,7 +236,7 @@
 | `tools/m11/REPORT_APPENDIX_3188.md` | ~95 | m11 #3188 (親 #3188・子 #3296): LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (REPORT_N403 §8 の全文。main 取り込み後の HEAD での再測定・IR 突合・memcpy 源 NULL の修正の参照・未特定の原因) |
 | `tools/m11/REPORT_N134.md` | ~74 | m11 #134 の付録: REPORT §14 (unit 23 の IntToStr 修正・judge の Halt0 分離) と §18 (停止点 unit 101・e2e 期待値の更新・切り分け) の本文 (250 行上限のため分割) |
 | `tools/m11/REPORT_N15.md` | ~16 | m11 REPORT §16 (#490 main HEAD の 4c3baa4 / faee5b6 状態の実測・ネガコン) の付録 (250 行上限のため分割) |
-| `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` | ~203 | #2770 (LD-129): native 側 0x5ac308 の書込み監視 (`rt/ld_native.c` の `LD_WATCH_ADDR`)。REPORT_1783.md の旧 §8 を 250 行上限のため分割移動した節 (§8.1〜§8.8)。分割後に §8.2・§8.4・§8.6・§8.8 を再測定・改訂したので、測定値と判定の正本は本付録 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` | ~244 | #2770 (LD-129): native 側 0x5ac308 の書込み監視 (`rt/ld_native.c` の `LD_WATCH_ADDR`)。REPORT_1783.md の旧 §8 を 250 行上限のため分割移動した節 (§8.1〜§8.9)。分割後に §8.2・§8.4・§8.6・§8.8 を再測定・改訂したので、測定値と判定の正本は本付録 |
 | `tools/m11/REPORT_APPENDIX_1430.md` | ~60 | m11 #1430 の基準 (before) 節の全文 (`REPORT_APPENDIX.md` §9 の後続。xmm 引数の callee 署名復元の前測定 (survey 基準 ok/trap/miss/noproc の実測)・`work-m11` 由来の 7 カテゴリ (和 1,963)。全再生成 IR の測定は #1532) |
 | `tools/m11/REPORT_APPENDIX.md` | ~238 | m11 REPORT §8 (LB_BASE=0x10000 適用 #222)・§9 (sigfix 0 詰め #131)・§10a (#132 commit 別測定表と注記)・§10b (#132 真因・修正 4 点・NC・次 blocker・外した内容)・§12 の一部 (#513 新規類型の行案)・§12b (#513 巨大 VirtualAlloc の n の出所) の全文 (250 行上限のため本体から無変更で分割移動) |
 | `tools/m11/REPORT_N1318.md` | ~69 | #1318 (N82): 10 進 inttoptr 4364 件の VA→LVA 仕分け表 (分類件数・判定規則・QPF 整数定数 1 件の誤 remap)・再現 `m11_inttoptr_class.py` |
@@ -244,6 +244,7 @@
 | `tools/m11/REPORT_N154.md` | 94 | #2762: arity 不一致 callee の xmm 呼出し引数の復元 (i128 placeholder を float/double へ変換)・復元 39 件・survey 差 0・`function_40c650` の退行による保留 |
 | `tools/m11/REPORT_N165.md` | 81 | #2903: arity 不一致の 9 callee の分類 (呼出し site の個数・型で 8 件が IR 引数の欠落・1 件が余分な引数の型)・復元 0 件・survey A/B 差 0 件・結論は手書き条件の IR に限る・`fix_xmm_args.py` の cause 出力 |
 | `tools/m11/REPORT_N1479.md` | 82 | #1479 (M11-2): xmm 引数を読む callee の署名復元 (opt-in `M11_XMM_ARGS=1`) の現 HEAD での unit 別 A/B (942 本・差 0・ok 喪失 0・unit 838/882/885 ok)・判定スクリプト `m11_xmm_ab.sh`・全再生成基準との未対応 |
+| `tools/m11/REPORT_N190.md` | 107 | #3641 (M11-N190): scalar double (`*sd`) の xmm 読み幅を 64 bit に直す (`p0c/k80abi.py`)・packed 整数の `*sd` (pmaxsd 等) は 32 bit のまま・survey 差 0 (942 本・ok 872・ok 喪失 0・3 回実測)・枠型が変わる 3 callee・語尾判定の誤り 4 件 (cvtss2sd の源は単精度) の回避・判定検査 `test_k80abi_width.py` (手動実行のみ) |
 | `tools/m11/REPORT_N55.md` | 74 | #955: sigfix 0 詰め site 1,049 件の liftdiff 差分ハーネス判定 (一致 174 / 不一致 289 / 未到達 586)・判定表 `results/sigfix_zeropad_liftdiff.tsv`・再現 `m11_zeropad_liftdiff.py` |
 | `tools/m11/REPORT_N53.md` | ~49 | #953: sigfix 0 詰め引数の理由別 (why) 内訳・未復元件数 (kind 件数の正本は REPORT_APPENDIX §9)・`M11_SIGFIX_RECOVER=1` の退行検査 (#131 子) |
 | `tools/m11/REPORT_N21.md` | ~35 | M11-N21 (#572): m11_data_gen.py の DIR64 補正境界 off-by-one の全数照合・参照経路・修正・ネガコン・実測 (REPORT §11 は要約のみ) |
@@ -543,6 +544,7 @@
 | `tools/python/REPORT_PY101.md` | 102 | PY-101 (#2878): channels.isGridBitAssigned・getGridBitWithLoop の PE 経路 (grid `+0x7ac` の生成元 `0xff63f0`・読出し `0x12d3e20`・loop 分岐の読めた範囲) と実装。getGridBit の position<0 を 4 から 0 に直した照合結果。loop の G1・G2 と行テーブルは未確定 (子 #3595) |
 | `tools/python/REPORT_PY218.md` | 110 | PY-218 (#3596): getGridBit・getGridBitWithLoop の件数超えの event 経路 (PE 0x12d3e20・0x12d16a0・0x12df210・0x12df530・0xfe8bb0) を PE で確定し、mock/C に写した。件数 `[grid+0x22fc]-8` の値は未確定 (子 #3651・PY-225) |
 | `tools/python/REPORT_PY112.md` | ~100 | PY-112 (#2932・部分): getGridBit・getGridBitWithLoop の件数超えを PE 照合 (位置の範囲検査なし・件数超えは event 経路。RANGE を外して false)。loop 分岐の条件式は PE で確定。T の書込み元と G2 の値は未確定 (子 #3595・#3596) |
+| `tools/python/REPORT_PY111.md` | ~140 | PY-111 (#2929): channels.setGridBit・fillEachNSteps が作る note の生成経路 (0x12d4100 の creation path・init 0x1062210・既定値の PE 照合・param 8 の書込み元 0x12d42ac)。C provider・mock の既定値を PE に合わせ、channels_diff に param 7/8 の検査を追加。実測は REPORT_PY111 §6 |
 | `tools/python/REPORT_PY100.md` | ~150 | PY-100 (#2879): channels.getStepParam・getCurrentStepParam の PE 確定 (書式 `iiii\|i`/`iii\|i`・kwlist・padsStride 既定 16・`[global]` = patternNumber と同じ slot・param 0〜8 の写像・-1/-3/-4 の経路) と C provider・mock の実装、`channels_diff` diffs 0 (実測は REPORT_PY100 §11)。構造体 (note) の生成経路と既定値は未確定 (子 issue) |
 | `tools/python/REPORT_PY84.md` | ~183 | PY-84 (#2663): fl-win64 の DATA block から chord progression の pyscript 2 本 (cpt / stack) と drum_patterns.json を抽出する同定規則 (内容一致・件数 fail-closed)。e2e 41/41 PASS (3 回)・NC・所要/load。run_all 全体は fl-win64 と toolchain-emsdk だけで rc=0 (`41d9c3b9` で実測、mac 側 step は SKIP) |
 | `tools/python/REPORT_PY102.md` | ~220 | PY-102 (#2883): playlist.muteTrackLock の value を実装 (binary `0xd56510`・表の個数 1→2)。取り込み前の flapi 表の個数と binary 書式の不一致 24 件の根拠 (分類と stub 宣言)・実害 3 関数。不一致は main の #2927 (PR #2956) で 0 件。残件は #2950 (PY-115)・#2952 (PY-116)・#2959 (PY-117) |
@@ -582,10 +584,12 @@
 | `tools/python/REPORT_PY115_2950.md` | ~79 | PY-115 (#2950): flapi 表の追加引数のうち `mixer.getTrackName` の `maxLen` (mask 外の文字の削除) を PE (`0x12be470`) で確定し C/mock に実装。`channels.soloChannel` の `value` は -1 の反転呼出しのみ PE で確認し、`value ≠ -1` の比較対象は未同定 (推定で実装)。差分検査の結果は REPORT §1。残りは子 #3654・#3655・#3656 |
 | `tools/python/REPORT_PY120_2984.md` | ~186 | PY-120 (#2984): launchMapPages 12 件のうち `length` 1 件を PE (0xd791b0) で確定・mock/C 差分 0 (件数は仮置き 0)。残り 11 件は子 #3027・#3029・#3030 |
 | `tools/python/REPORT_APPENDIX_2984.md` | ~184 | PY-120 (#2984) の付録: REPORT §検証 から分割移動した過去の測定節 (初回〜merge `a2a56bf8`)。内容は削除していない。正本は `REPORT_PY120_2984.md` |
+| `tools/python/REPORT_PY130_3007.md` | ~80 | PY-130 (#3007): ui の setter 2 件 (setBrowserAutoHide・setStepEditMode) と ui 版 getVersion の PE 確定・mock/C 差分 0 (ui_state_diff 58 呼出し)・値は仮置き。setTimeDispMin は保留 (子 issue)。wasm 経路の provider_check・all_tools は未実行 |
 | `tools/python/REPORT_PY119_2977.md` | ~100 | PY-119 (#2977): general の setter 6 件 (setRecPPQ / setNumerator / setDenominator / setUndoHistoryPos / Count / Last) の PE 確定 (範囲・status 文言の VA・undo 書込み先)・mock/C 差分 0・ゲート (G = 0x15e4790)・例外型・既定値は未確定 (親 #2830 にコメント)。解析補助 `analysis/flapi/pe_cstr.py` |
 | `tools/python/REPORT_PY121.md` | 72 | PY-121 (#2979): general の log・rec 系 4 件 (clearLog・dumpScoreLog・processRECEvent・getRecPPB) の PE 根拠 (entry・fn VA・書式・呼出し鎖)。戻り値の意味は未確定で実装なし。残りは #3001・#3002・#3003 |
 | `tools/python/REPORT_PY121_2982.md` | ~90 | PY-121 (#2982): ui の表示・メニュー 15 件の PE 書式と時間引数の頭打ち (0x7d0)。6 件を mock/C 差分 0 で実装 (表示矩形 3・通知 1・メニューを閉じる 2)。残り 9 件は #3012・#3013・#3014 |
 | `tools/python/REPORT_PY132.md` | ~110 | PY-132 (#3013): ui のブラウザ 3 件の PE 書式・戻り値 None・toggleBrowserNode の値 -1/0/1 の分岐を確定。mock/C 差分 0 で実装 (作用は未モデル)。作用の確定は子 #3724 [PY-240]・#3726 [PY-241] |
+| `tools/python/REPORT_PY131.md` | 93 | PY-131 (#3012): ui のブラウザ移動 3 件 (navigateBrowser・navigateBrowserMenu・navigateBrowserTabs) の PE 根拠。3 件とも保留 (戻り値 str の中身と作用先の状態が未同定)・mock/C は変更なし。作用先の同定は子 PY-239 (#3720) |
 | `tools/python/REPORT_PY121_2985.md` | 89 | PY-121 (#2985): screen 状態の 5 関数 (isBlanked / isUnBlank / getScreenActiveCounter / setScreenActiveCounter / unBlank) の PE 根拠・mock/C 差分 0 (int・bool・float・str の入力まで)・値は未実測の仮置き。残り 23 件は子 #3021 (PY-134)・#3022 (PY-135)・#3025 (PY-136) |
 | `tools/python/REPORT_PY23.md` | ~85 | PY-23 (#1054): `enveditor` (Edison API・仕様は block24447) の実装と Audio scripts 12 本の import/実行検証。数値 oracle 6 本・NEG-d・未解決 |
 | `tools/python/REPORT_PY19.md` | ~57 | PY-19 (#792): `Score.loadScoreFromFile` (仮想 FS・JSON) と `ScriptDialog.DialogParams` (MOCK)・数え方の定義 (母集団 64) と再計算・実測・未解決 |
@@ -658,6 +662,7 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1099.md` | 116 | x87 subset の ia32 lowering (#1099、測定 commit `ce0f0872`)。 実 x87 との差分試験 (`x87_diff.py`)・ネガコン・lift の before/after・x64 回帰。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2967.md` | 120 | x87 の m80 経路 (fld/fstp tbyte)・RC 固定の算術と fst m32/m64・f80↔f64 往復 (#2967、測定 commit `59fb4abd6`)。 ネガコン 2 種 (fsub 取り違え・m80 取り違え)。 RC≠nearest の材料 (ADR D28 改訂は PM 判断)。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1223.md` | ~54 | Slayer_Engine.dll (block22434) の native vs wasm 差分試験 (#1223 PLG-G2-11): leaf 関数 4 本の eax と OBJ 領域の bit 突合・ネガコン。 測定値の正本 (REPORT §13 の付録) |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2989.md` | ~95 | x87 を含む leaf 関数 2 本の native vs wasm 差分試験 (#2989 PLG-G2-25): eax・x87 深さ・ST(0)・OBJ 窓の突合、ST(0) の f64 の丸め差の分布、ネガコン 2 種 (判定器・lowering の 1 演算の取り違え)。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/MARSHAL.md` | ~80 | 殻 (x64) ↔ Slayer_Engine.dll (ia32) の VST2 構造体 marshal 表の仕様 (#674 受入 3)。測定値は REPORT.md §9 |
 | `tools/shared/REPORT.md` | ~212 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC。win freetype.dll = 2.4.10 確定 (#145, §3.1) |
 | `tools/shared/elastique/REPORT.md` | ~210 | élastique 2.2.15 (win x64) の静的 IPP 入口 197 件の API 同定 (T-SH-40 / #2613): 線形走査の入口再現・dsp_ippv2 の本体照合 (一意名 8・族候補 26・未同定 163)・tools/ipp の stub 名 28 (stub のみ 18・混在 16 入口。#2613 受入 2)・間接経路の静的確認。§8 は unicorn による間接 call/jmp の実行時宛先 (T-SH-42 / #2643・実行範囲 75/2,714 サイト・IPPCODE 入口 0 件)。対応表は `data/entries.csv`、間接 edge は `data/runtime_indirect.csv` |
@@ -744,6 +749,7 @@
 | `tools/targets/kilohearts/license/KH709_REPORT.md` | 66 | #709 (KH-14): ymm (VEX.256) 整数語彙の gen_simd 対応・module F の 2 関数の試行と未解決 (xmm/ymm 別グローバル #3306・SSE 語彙 #3307) |
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3256.md` | ~82 | KH-48 (#3256): vmovaps ymm・FMA3 scalar 7 語彙の検証 (`ymm_vocab_check.py` / `fma_vocab_check.py`) の生出力全行 |
+| `tools/targets/kilohearts/snapins/REPORT_APPENDIX_780.md` | 65 | KH-17 (#780): Ladder Filter (ksla) の process 閉包を x64c で測る。数え方・測定値・ネガコン・測定 commit は付録 §1〜§3 が正本。未解決は §5 |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_781.md` | 86 | KH-18 (#781): Carve EQ (ksge) の IAT 呼出 site 19 件の扱い (判定は付録 §2 が正本)・process 経路 (slot 14) の unique 側 25 関数に IAT 0 件 (共通基盤 120 関数は未集計)・間接 call の下限。測定 commit `fcf3a630` |
 | `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
@@ -754,7 +760,7 @@
 | `tools/targets/freshair/REPORT_APPENDIX_FA22.md` | ~60 | freshair FA-22 (#1578) の付録。FA_NODE1=1 時の setter 0x180c9d74c の失敗形 (逆アセンブル・実測)。部分達成で、判定は子 #1789・#1791 に分割 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA39.md` | ~110 | freshair FA-39 (#3507) の付録。Filter の SC ⇄ KH 同一シナリオ native 比較。KH 0x1804655e0 の機械語読み・SC/KH の呼出し先の対応表・FMA の確認 (`ks_semantic_filter_scen.sh`・`ks_filter_scen_cmp.py`)。判定: 差分あり・未解決。数値は付録 §3 が正本。判定基準の `REPORT_APPENDIX_2739.md` は main に無い (付録冒頭に記載) |
 | `tools/targets/freshair/REPORT_APPENDIX_FA32.md` | ~95 | freshair FA-32 (#2306) の付録。`FA_NODE1=1` の setter ERR 8 行の原因は harness の注入 node 配線 (値オブジェクト Z が 0x40 のため `Z+0x2c0` を guard・非正準アドレスで読む)。issue 本文の `rip=74c addr=50` は ALT9 の署名。偽オブジェクト (`FA_NODE1_ZOBJ`) で ERR 0/8。実機の `C+0x2b0` の中身は未判定 (#2207) |
-| `tools/targets/freshair/REPORT_APPENDIX_FA31.md` | ~70 | freshair FA-31 (#2207) の付録。controller 木 (`[ctl+0xa8]`) を埋める候補経路を静的に特定 (UI 系 ModulationKnobsPopup slot 5 → 0x180e15030 → ModulationFormatter vtable slot 2 → 挿入候補 0x180caa820)。harness の PROCESS・F ctor では 0 回のため node 有無は未観測 (#2207)。再現は `lift2/fa31_ctl.sh` |
+| `tools/targets/freshair/REPORT_APPENDIX_FA31.md` | ~110 | freshair FA-31 (#2207) の付録。controller 木 (`[ctl+0xa8]`) を埋める候補経路を静的に特定 (UI 系 ModulationKnobsPopup slot 5 → 0x180e15030 → ModulationFormatter vtable slot 2 → 挿入候補 0x180caa820)。harness の PROCESS・F ctor では 0 回のため node 有無は未観測 (#2207)。§6 は直接呼出・絶対ポインタ参照の静的到達性 (`lift2/fa31_refs.py`)。再現は `lift2/fa31_ctl.sh` |
 | `tools/targets/freshair/REPORT_APPENDIX_FA30.md` | ~60 | freshair FA-30 (#2187) の付録。2 回目の `ca1480` 呼出 (C=Z) の呼出元は setter 0x180c9d700 の再帰 (0x180c9d827)。注入 node (`FA_NODE1=1`) の found 経路でのみ発生。実機 map の観測は未解決 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA38.md` | 108 | freshair #2739 / FA-38 (#3506) の付録。KH Compressor (`compressor::CompressorDsp` slot 14 = 0x1802abc20) の機械語 harness (`ks_kh_comp_native.c`・`ks_kh_comp.sh`)。RTTI で VA を確認し、引数・state・P/Q の写像を機械語の読みで列挙。200 case × 3 seed で ERR 0・決定性一致・負例を実測。SC との bit 比較は未実施 (子 #3534 (FA-41)) |
 | `tools/targets/freshair/REPORT_APPENDIX_FA29.md` | ~50 | freshair FA-29 (#2145) の付録。`ca1480` の out[0]=Z+0x2b0 の由来 (key 無し分岐 `C+0x2b0`・2 回目の呼出 C=Z)・full probe が 2 回目で ERR する理由。部分達成で、呼出元の特定は #2187 |
