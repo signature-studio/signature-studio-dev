@@ -129,7 +129,7 @@ ABI = {
 }
 # stereo 閉包 (#4871 KH-124) も、同じ 3 呼出元 (FUN_180fe3690・FUN_180fe3310・FUN_180fe3cd0。VA と機械語が delay と同一) を含む。
 # FUN_180fd4f30() の引数なし呼出 22 件を delay の規則 22 本で書き換える (各規則の件数 1 は ABI の assert で確認)。
-ABI['stereo'] = ABI['stereo'] + ABI['delay']
+ABI['stereo'] = ABI['stereo'] + [r for r in ABI['delay'] if 'FUN_180fd4f30(' in r[2]]
 # V128 演算 (#3108 KH-45): Ghidra は x86 の `mul r64` (rdx:rax = rax × r64) と 128bit 加算 (add/adc) を、128bit ベクタの
 # `*` `+` と `SUB168(x, n)` (下位・上位 8 バイトの切出し) で印字する。stereo 180fdc470 (mul 180fdc4ba・4c8・4e6 / add 4d4)・
 # 180fdfdb0 (mul 180fdfdfa・fe08・fe26 / adc fe17) で確認。両オペランドの上位 qword は 0 (`_8_8_ = 0`) なので、
