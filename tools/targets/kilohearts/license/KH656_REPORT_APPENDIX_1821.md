@@ -134,6 +134,8 @@ git diff a65a71ed1 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md
 
 測定 commit: `091c68915` (測定 driver `scripts/kh656_window_measure.py` の追加 commit。コードを変えた最後の commit)。再現: `python3 scripts/kh656_window_measure.py lift8 on|off`。
 
+現行の `lic_config.json` は F lift 1305 件のため、8 件固定版での再現は #4670 で対応する。
+
 | 条件 | wasm bytes | sha256 | globals |
 |---|---|---|---|
 | lift-8 `rdata_str` 無し | 54,394 | `7ba79e65…8c7707` | 9 |
@@ -145,7 +147,9 @@ section 単位の内訳: **未測定**。
 - 再パースには `work/m4272_lift8_{off,on}` の wasm が要る。この run には素材 (`plugins-kilohearts`・`toolchain-emsdk`・`toolchain-retdec`) が展開されておらず、wasm を再生成できなかった。素材を付けた再実行で測る。
 - sha 差の原因 (窓の追加・文字列 VA の置換の別、global・code の寄与) も未測定。
 
-### 8.2 #4272: 313 集合の on/off と raw_va の値 store (実測)
+### 8.2 #4272: 313 集合の on/off と raw_va の値 store (測定 commit `091c68915` 時点の値。HEAD は未測定 (集合の定義元 `work/kh656_rounds.json` が repo に無い))
+
+以下の値は測定 commit `091c68915` 時点の実測。HEAD の値は未測定で、再測定は #4670 (集合の tracked 化が前提)。
 
 313 集合: F の初期 lift 8 件 + `kh656_rounds.json` の new_lift (全 4 ラウンド) − `1813846e0` (memset shim)。`kh656_closure.py` は 4 ラウンドで収束せず `FAIL` (lift 8→42→80→166 の途中)。313 はその記録から復元した (lift 件数の記録と一致)。
 
