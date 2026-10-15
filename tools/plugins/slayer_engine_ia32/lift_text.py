@@ -20,7 +20,7 @@ X64C = os.path.join(ROOT, 'tools', 'ott', 'lift', 'x64c.py')
 RT = os.path.join(ROOT, 'tools', 'ott', 'rt')
 WORK = os.path.join(HERE, 'work')
 EXPORT_MAIN = 0x10007CA0
-# 判定保留 (全数未確認): (b) と分類されても roots に入れない。 根拠と未解決は REPORT_APPENDIX_3546.md §2。
+# 判定保留 (全数未確認): (b) と分類されても roots に入れない。 根拠と未解決は REPORT_APPENDIX_3546.md §2・REPORT_APPENDIX_4727.md。
 HOLD_B = {0x10010BC0}
 # --no-emcc: emcc -c を飛ばす (被覆の測定だけに使う。 gate C1〜C4・jt/iat は実行されない)。
 NO_EMCC = '--no-emcc' in sys.argv
