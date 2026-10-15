@@ -119,7 +119,36 @@
 |---|---|---|
 | 親フレームを callee の view に結線する修復 pass (`function_448490` の `-28` store の欠落の補完、`this` object の拡幅 (`-104`〜`+16`)、call 前後の count・length・arg1 の同期) | unit 18 を越えられず、逐次 boot の ftrace が 0 のまま | `[SHX-T40] #3234` (親 #2444 の子) |
 | 修復 OFF/ON の before-after 実測 (`units_run ≥ 18`・`VirtualAlloc(0x76910000)` 不発・`MessageBoxA` 不発・ネガコン) と、`docs/DEFECTS.md` D23 の「修復」列 | 子 issue の受入 | `[SHX-T40] #3234` |
-| 301 site の真偽 (真の D23 か、通常の rbp 渡しの局所参照か) | 修復範囲の決定 | `[SHX-T40] #3234` (修復の受入に含める) |
+| 301 site の真偽のうち site 単位の機械語突合 (IR 幅による分類は §10 で実施済み。判定は組単位・IR 幅ベース) | 修復範囲の決定 | `[SHX-T40] #3234` (修復の受入に含める) |
 | boot5 (`m11_extra_ranges5.txt`・25 関数) を RetDec で再 lift して IR に含めた経路の閉包数と baseline。本測定の IR は boot5 を含まない (§2) | 閉包と baseline の数値が変わりうる | 起票せず (本 PR の未解決表で追跡) |
 | lift 元 PE との一致 (素材に `lift_pe.sha256` が無い。画像の一致は §2 で確認済み) | lift 成果物の由来は直接には未確認 | 起票せず (本 PR の未解決表で追跡) |
 | `signature mismatch`: T27 §4-A は 1、`786c0144` の build は 0 (原因未確認) | 検証値の再現性の注記のみ | 起票せず (§7) |
+
+## 10. 301 site の分類 (SHX-T43 / #4123・測定 commit `ba0e4e1ac`)
+
+- 分類器 `tools/m11/frame_share/classify.py` (新規)。detect.py の mov 渡し・shared site ごとに、親 IR が callee へ第 1 引数で渡す alloca の大きさ S と、callee が base から触る最大端 E を比べる。E > S なら `ir_frame_too_small` (親 IR のフレームが callee の触る範囲を覆わない)、E ≤ S なら `ir_frame_covers`、IR に該当 call が無ければ `unmatched`。
+- 判定は IR の alloca 幅だけで行う。**真の D23 かどうかの確定ではない**。確定に使えるのは、機械語で確認した site だけ (下の表の機械語列)。
+
+| 分類 | site 数 | (親, callee) 組 | 意味 |
+|---|---|---|---|
+| `ir_frame_too_small` | 207 | 72 | 真の D23 の候補 (IR のフレームが callee の触る範囲より小さい) |
+| `ir_frame_covers` | 38 | 3 | 通常の rbp 渡しとして説明できる候補 (偽陽性の候補) |
+| `unmatched` | 56 | 19 | IR 上に親から callee への直接 call が無く判定不能 |
+| 合計 | 301 | 94 | |
+
+- `function_448490` の mov 渡し 10 site (`function_4483f0` 8 件: `0x448588`・`0x4485c6`・`0x448692`・`0x4486ca`・`0x4486e0`・`0x448708`・`0x448720`・`0x44872c`、`function_448430` 2 件: `0x44864a`・`0x44865b`) は、すべて `ir_frame_too_small` (need=120 B・親 IR の渡し先 `%stack_var_-104` は 48 B)。`0x448578`・`0x448754` は lea で、本分類の対象外 (lea の site は detect.py の参考件数)。
+- 機械語の確認 (静的・`ldmach.Machine.disasm_fn`)。確認した範囲は次のとおり:
+  - 親 `0x4484b3`: `mov [rbp+0x70], rcx` で親の引数 (entry の rcx) を保存する。
+  - callee `function_4483f0` の先頭 `0x4483ff`: `mov rcx, [rbx+0x70]` (rbx = 渡された rbp) で、その値を `function_413760` へ渡す。callee の本体は 8 site で同一なので、読み先 (`+0x70`・`+0x4c`・`+0x48`) も同一。
+  - callee が読む `+0x70` は親 IR の 48 B の alloca の外側にあり、親 IR の `%arg1` (SSA) に対応する。これは §6 の機構と一致する。
+  - **未確認**: 8 site の call 直前の引数 (`mov rcx, rbp` の後の rdx 等) を site ごとに読んでいない。「真の D23」の判定は、callee 側の読み先と IR の幅の突合に基づく。site 単位の機械語突合は残課題。
+- `function_448430` の 2 site も同じ callee 構造 (`+0x70` を読む) だが、`function_448430` 本体は機械語の確認をしていない。
+- `ir_frame_covers` の 3 組 (`function_457c70→function_457c40`・`function_9ce9e0→function_9ce950`・`function_cc7c50→function_cc7c00`) は、機械語の確認をしていない。偽陽性の候補として残す。
+- `unmatched` 19 組は、親 IR に該当 call が無いため (最適化・名前の差)。判定は未了。
+
+### 再現 (測定 commit `ba0e4e1ac`)
+
+- IR: `FL_WIN64_DIR=/tmp/opencode/fl bash tools/m11/m11_gen_ir2.sh` (rc 0・`[gen_ir2] OK: work/boot_final.ll (490761 行)`)・`m11_build.sh` (rc 0・`signature mismatch: 0, undefined symbol: 0`)。
+- 検出器: `python3 frame_share/detect.py --ir work/boot_final3.ll --out work/frame_share.json` (13 s・rc 0)。summary は §4 と一致 (307 / 301 / 63 / 94 / callee_only 6)。
+- 分類器: `python3 frame_share/classify.py --ir work/boot_final3.ll --sites work/frame_share.json --out work/frame_share_classify.json` (0 s・rc 0)。表の件数はこの出力。
+- 負荷: 測定時 1 分平均 0.14〜0.22 (nproc 4)。
