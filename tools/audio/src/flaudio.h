@@ -137,9 +137,13 @@ typedef struct fla_ctl {
      * 起床時刻 µs, 完了時刻 µs] (performance.now の下 32bit)。pw_n は通算数 (添字 = pw_n % FLA_PW_N) ---- */
     uint32_t pw_n;             /* 384 */
     uint32_t pw_trace[FLA_PW_N * 4]; /* 388 */
+    /* ---- @16772: worklet が書く (AU-30 #3151)。main の既存 offset を動かさないため pw_trace の後ろに置く ---- */
+    uint32_t burst_hist[32];   /* 16772 バースト長ヒストグラム: 連続 process() (Date.now 差 <=1ms) の 1 run が終わるごとに bin=floor(len/512) を +1。末尾 bin は >=15872 f を含む */
 } fla_ctl_t;
 
-#define FLA_CTL_SIZE 16776u
+#define FLA_CTL_SIZE 16904u
+#define FLA_BURST_BIN 512u         /* burst_hist の bin 幅 (frames)。worklet は同じ値を持つ (fl-audio-worklet.js) */
+#define FLA_BURST_BINS 32u
 
 /* ---- ABI 自己検証用: JS が同じ配列を持つ (audio-layout.ts) ---- */
 typedef struct { const char *name; uint32_t off; } fla_layout_entry_t;

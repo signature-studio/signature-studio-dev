@@ -333,5 +333,6 @@ void flasio_get_stats(flasio_stats_t *s) {
     s->timeinfo_cb = A.timeinfo_cb; s->latency_changes = A.latency_changes; s->T = A.depth * A.B; s->burst_obs = LD(c->burst_obs);
     s->grows = A.grows; s->shrinks = A.shrinks; s->T_max = A.T_max; s->T0 = A.T0;
     for (int k = 0; k < 6; k++) s->wake_hist[k] = c->wake_hist[k];
+    for (int k = 0; k < 32; k++) s->burst_hist[k] = LD(c->burst_hist[k]);
 }
 

@@ -275,6 +275,7 @@ export class FlAudioShim {
       processorOptions: {
         buffer: this.api.getBuffer(),   // fla_open の malloc 後 (= ring 確保後) の最新 SAB
         ctlPtr: this.ctlPtr,
+        ctlSize: FLA_CTL_SIZE,
         layout,
         capture: this.lastCapture,
       },
