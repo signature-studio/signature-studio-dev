@@ -67,7 +67,7 @@ getTrackCount                    fn=0xd641d0 flags=0x4 calls=['ind rax->[0x15e42
 
 - 測定 commit: `6017e8201` (main `03df83be4` の取り込み merge。コードを変えた最後の commit。以後の REPORT 更新 commit はコード範囲の外)。
 - 取り込みで衝突したのは `tools/python/tests/provider_check.mjs` のみ。main の `pe179` (patterns 4 件・#3271) と本 PR の `pe205` (mixer 2 件) を両方残し、件数を `impl 155 / unimpl 280` に更新 (main 153/282 + 本 PR 2 件。合計 435 は不変)。`provider/fl_engine.c`・`host/fl_mock.mjs`・`docs/DOC_MAP.md` は自動マージ。
-- wasm 化: `/opt/emsdk` (emcc 6.0.12) で `bash tools/python/provider/build.sh` → `dist/flprov.wasm` 63,522 B (約 1.2 秒)。
+- wasm 化: `[EMSDK]` (emcc 6.0.12) で `bash tools/python/provider/build.sh` → `dist/flprov.wasm` 63,522 B (約 1.2 秒)。
 - load average (測定時): 0.17 (1 分)・0.35 (5 分)。4 core。
 
 | 検証 | 結果 | 所要 |
