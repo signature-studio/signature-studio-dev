@@ -8,7 +8,7 @@
 - `src/` の flrack 実装は無く、変更は tests の mock 2 箇所だけ。`flrack.flr` の mock を外した (PE に `flrack.flr` は無く、pyc も読まない。`REPORT_PY167.md` §3)。`loop_starter_config` の mock は、PE 契約 (書込み可・未設定で AttributeError) に**置換していない**。根拠の無い JSON 値であることを残す。
 - HEAD (本 PR のコミット) の e2e は 41/41 PASS・`--neg` は 34/41 (FAIL 7) で、`REPORT_PY22.md` の記載と一致した。
 - `loop_starter_config` を未設定にした場合、`rack.Rack().load_config()` 単体は例外なく `OK` で返る (`tests/loop_starter_unset_probe.mjs`)。`rack.pyc` の `load_config` は 140 行目で `json.loads(flrack.rack.loop_starter_config)` を `try` で囲み、`AttributeError` を `remote_config = {}` に置き換えるため、AttributeError は外へ出ない。未設定の影響は後段の `KeyError: 'genres'` として現れる (e2e で 4 件 FAIL)。受入条件の「AttributeError を probe で実測」は、この経路では AttributeError 自体は観測できないという結果になった。
-- `chord_progression_call_probe.mjs` の未設定時の結果は未測定 (本 run では emsdk 未取得で `dist/flpy.js` を作れず、HEAD で実行していない)。下表の 3/9 は設定時のみの値。
+- `chord_progression_call_probe.mjs` の未設定時の結果は未測定 (HEAD では実行していない)。下表の 3/9 は設定時のみの値。
 
 ## 実測 (HEAD、コミット済み)
 
@@ -20,12 +20,12 @@
 | `chord_progression_e2e.mjs --neg` | 34/41・FAIL 7・exit 1 |
 | `chord_progression_call_probe.mjs` (`loop_starter_config` 設定) | 9 関数中 `OK` 3・失敗 6 (`called: 3, failed: 6`) |
 | `loop_starter_unset_probe.mjs` (未設定で `rack.Rack().load_config()`) | `OK` (例外なし) |
-| e2e・loop_starter_config 未設定 (一時コピーで除去・測定後に削除) | **未再測定 (HEAD)**。`flrack.flr` mock の除去 (cb53d6096) より前の測定値: 37/41・FAIL 4 (`Notes/drums.pyc`・`control_rack.pyc`・`util_rack.pyc`・`stack.pyscript` の `KeyError: 'genres'`)。HEAD のコードでは再実行していない |
+| e2e・loop_starter_config 未設定 (一時コピーで除去・測定後に削除) | 37/41・FAIL 4 (`Notes/drums.pyc`・`control_rack.pyc`・`util_rack.pyc`・`stack.pyscript` の `KeyError: 'genres'`)。HEAD (f03a1bc5f) の一時コピーで再測定。cb53d6096 より前の値 (37/41) と一致 |
 
 ## 手段
 
-- 素材: `fl-win64` (`$ARTIFACTS_DIR`・`tar --zstd -xf` で 7.5 秒で展開)。`toolchain-emsdk` は `EMSDK_DIR` (既定) に存在 (`docs/REFERENCES.md` §4 の `[EMSDK]`)。
-- `build_cpython_wasm.sh` (rc 0・06:03:13 UTC に完了)、`fetch_inputs.sh` (stubs 取得)、`build_flpy.sh` (rc 0)。
+- 素材: `fl-win64` (`$ARTIFACTS_DIR`・`tar --zstd -xf` で 8.2 秒で展開)。`toolchain-emsdk` の素材は取得されていなかったため、上流 emsdk を `git clone` して `emsdk install 6.0.12` (pin は `tools/m1/flags.sh`) で導入し、`/opt/emsdk` に symlink した。
+- `build_cpython_wasm.sh` (rc 0)、`fetch_inputs.sh` (rc 0・stubs 取得)、`build_flpy.sh` (rc 0・`dist/flpy.js` 生成)。`extract_pyc_blocks.py` (rc 0)。
 - `extract_pyc_blocks.py` (pyc 40・pyscript 2・drum_patterns 1)。
 - 同 probe の出力は `work/` 配下 (gitignore)。
 
