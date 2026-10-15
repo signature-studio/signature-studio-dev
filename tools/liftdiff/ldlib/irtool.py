@@ -187,6 +187,8 @@ def instrument(ll_in, ll_out, prefix='function_', blocks=False, sites=False):
                         body.append('  %s = ptrtoint ptr %s to i64' % (t, ref)); A[i] = t
                     elif mi and int(mi.group(1)) == 64:
                         A[i] = ref
+                    elif mi and int(mi.group(1)) == 128:
+                        body.append('  %s = trunc i128 %s to i64' % (t, ref)); A[i] = t
                     elif mi and int(mi.group(1)) < 64:
                         body.append('  %s = zext %s %s to i64' % (t, ty, ref)); A[i] = t
                     elif ty == 'double':

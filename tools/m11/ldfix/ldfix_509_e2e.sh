@@ -107,9 +107,9 @@ for k in prev nc_store nc_use; do
   "$PY" "$HERE/audit_lsf.py" "$F" "$IMG" "$CFG" > "$OUT/nc_$k.txt" || { echo "[ldfix_509_e2e] NC:$k の audit 失敗: $OUT/nc_$k.txt" >&2; NCFAIL=1; }
   echo "[NC:$k] $(grep -o '"suspect_fns": [0-9]*, "suspect_sites": [0-9]*' "$OUT/nc_$k.txt" || echo 'store 形 SUSPECT 0') / $(grep '^SUSPECT_VAS' "$OUT/nc_$k.txt" | cut -c1-120) / use 形(pure): $(grep '^SUSPECT_USE_VAS' "$OUT/nc_$k.txt" | awk '{print NF-1}') 関数 (1063090 を含む: $(grep '^SUSPECT_USE_VAS' "$OUT/nc_$k.txt" | grep -c ' 1063090'))"
 done
-# 期待値: 旧版 (修復前相当) は store/use とも SUSPECT 0。戻した NC は各 1 件を検出する (検出できないなら NC として無効)
-grep -q '^SUSPECT_VAS 806740' "$OUT/nc_nc_store.txt" && grep -q '^SUSPECT_USE_VAS.* 1063090' "$OUT/nc_nc_use.txt" && ! grep -q '^SUSPECT_VAS [0-9]' "$OUT/nc_prev.txt" \
-  || { echo "[ldfix_509_e2e] NC の期待値 (store 806740 / use 1063090 を検出・旧版は store 0) を満たさない" >&2; NCFAIL=1; }
+# 期待値: 旧版 (修復を外した版) は store 形 806740 を検出する (REPORT_509 §4.5)。戻した NC はそれぞれ 806740 (store) / 1063090 (use) を検出する (検出できないなら NC として無効)
+grep -q '^SUSPECT_VAS.* 806740' "$OUT/nc_prev.txt" && grep -q '^SUSPECT_VAS 806740' "$OUT/nc_nc_store.txt" && grep -q '^SUSPECT_USE_VAS.* 1063090' "$OUT/nc_nc_use.txt" \
+  || { echo "[ldfix_509_e2e] NC の期待値 (旧版 store 806740 / nc_store 806740 / nc_use 1063090 を検出) を満たさない" >&2; NCFAIL=1; }
 
 step "6/7 survey 前後 (wasm 再ビルド) と動的到達"
 B="$OUT/build"; mkdir -p "$B/tools"; cp -a "$REPO/tools/shim" "$REPO/tools/shared" "$B/tools/"; cp -a "$REPO/tools/m11" "$B/tools/m11_src"; rm -rf "$B/tools/m11_src/work"; mv "$B/tools/m11_src" "$B/tools/m11"; cp -a "$W" "$B/tools/m11/work"
