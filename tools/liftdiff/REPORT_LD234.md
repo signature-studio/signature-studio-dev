@@ -4,7 +4,7 @@
 
 ## 1. 結論
 
-- `FL_WIN64_DIR=<展開先> bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 2 回完走させた。どちらも `LIFTDIFF_E2E PASS`、rc 0。
+- `FL_WIN64_DIR=<展開先> bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 2 回実行した。有効な測定は run 2 (専用 worktree) の 1 回だけ。run 1 は共有 main での実行のため参考値。run 2 は `LIFTDIFF_E2E PASS`、rc 0。**単独 run の 2 回目は素材不足で未実施** (§6)。
 - 所要時間 (time の real): **3m15.559s** (run 1) / **3m13.983s** (run 2)。`[4/4]` のバッチ単体は両 run とも **116 秒**。
 - `[4/4]` の件数は両 run で同一: **801 関数 = 一致 360 / 不一致 235 / 実行不能 206**。
 - 測定 commit は **`fbb19946c`** (main)。run 2 はこの commit の worktree で実行した。
@@ -23,7 +23,7 @@
 
 | 項目 | run 1 | run 2 |
 |---|---|---|
-| 実行 | 共有 main チェックアウト | worktree `ws-4667` (fbb19946c) |
+| 実行 | 共有 main チェックアウト (規約違反・参考値) | worktree `ws-4667` (fbb19946c) = 有効 |
 | real | 3m15.559s | 3m13.983s |
 | user | 5m28.896s | 5m29.204s |
 | sys | 0m20.241s | 0m18.051s |
