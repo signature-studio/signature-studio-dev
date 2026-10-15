@@ -504,6 +504,7 @@
 | `tools/python/REPORT_PY30.md` | 132 | PY-30 (#1327): flcpt.cpt の CPT 4 メンバ (addChordMarker・getChordMarker・clearChordMarkers・chordMarkerCount) の引数書式・int 戻り値・要素返却を FLEngine PE の表とハンドラから確定し `src/flcpt.py` に実装。None 戻り値は推定 (#3034)。probe の呼べた数は 3/9 のまま (残りは子 #3174〜#3176) |
 | `tools/python/REPORT_PY115.md` | ~100 | PY-115 (#2951): mixer.setTrackColor の格納先 (track 要素 +0 フラグ・+4 値、`swap_rb(v)|0xff000000`) と mixer.getTrackColor の取得式を VA 付きで確定し、C/mock を合わせる。フラグ無し track の既定色は実行時値で未確定 (子 #2975 PY-118) |
 | `tools/python/REPORT_PY109.md` | ~100 | PY-109 (#2919): 静的版 subinterp の 12 check を headless Chrome で実行 (wasm32 は 12/12 PASS・node 版と一致、MEMORY64=1 は 11/12)。失敗 1 件 (反復で線形メモリが増える) は #2918 へ |
+| `tools/python/REPORT_PY108.md` | ~130 | PY-108 (#2918): MEMORY64=2 の静的版 (flpy_static64l) を作り、subinterp 反復の heap 増加を再現・比較。増加は MEMORY64 に固有ではない (wasm32 も 400 回で増える)。リークか断片化かは未切り分け |
 | `tools/python/REPORT_PY58.md` | ~57 | PY-58 (#1973, 部分・未達): `+0x794` 書込み候補 16 件の分類 (chan ではないと判断 11・保留・未確定 4)。chan 上の書込み元は未特定 |
 | `tools/python/REPORT_PY66.md` | 70 | PY-66 (#2078, 部分・未達): `+0x794` の未確定 2 件 (`0x1306dbf`・`0x130760f`) は同一 global `0x196eba0` 経由と確定。その書込み元と chan の対応は未特定 |
 | `tools/python/REPORT_PY67.md` | 242 | PY-67 (#2159, 部分・未達): `0x196eba0` (g) への書込み元を `0x86a4e1` (関数 `0x86a470`) と特定。PY-71 (#2501, §5): g の値 P の型 (TGraphEditorForm) と `0xffe370` の所属 (TPublicChannel) を特定 (値は REPORT_PY71.md)。受入条件 2b・3・4 は子 #2701 |
