@@ -205,7 +205,7 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 
 ## 7. #3229: 8 unit の LB 依存差の切り分け (受入 1: 部分達成 / 受入 2: 未達)
 
-測定主体: 本 PR の作業 runner (2026-10-14/15)。素材は work-m11 (#516 以前の snapshot・`lift_pe.sha256` 無し)・fl-win64 (`block00031_PE.bin` のみ)・`/opt/emsdk`。全再生成は使わず、`m11_lb_tolerant_repro.sh` (gen_ir2 → 画像 → lb_check → build → 寛容起動) を LB ごとに実行した。
+測定主体: 本 PR の作業 runner (2026-10-14/15)。素材は work-m11 (#516 以前の snapshot・`lift_pe.sha256` 無し)・fl-win64 (`block00031_PE.bin` のみ)・[EMSDK]。全再生成は使わず、`m11_lb_tolerant_repro.sh` (gen_ir2 → 画像 → lb_check → build → 寛容起動) を LB ごとに実行した。
 測定 commit: `c0607b7a` (コードを変えた最後の commit。`m11_lb_tolerant_repro.sh` に build 後の `boot_final.ll` の保存を足した版)。`git diff c0607b7a HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` の出力は空。
 
 ### 7-1 再現 (実測・本 runner)
