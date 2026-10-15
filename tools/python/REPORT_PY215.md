@@ -66,7 +66,7 @@
 
 測定 commit: `d911ecb97` (`feat(python): device getLinkedChannel を PE 0xd75d30 の意味論で C provider・mock に実装 (PY-215, #3568)`。コードを変えた最後の commit)。基点: `origin/main` = `1d04852b0`。検証 HEAD: 本 REPORT の commit。`git diff d911ecb97 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 REPORT と DOC_MAP だけが後続)。
 
-素材: fl-win64 は `tar --zstd -xf <artifacts>/fl-win64.tar.zst -C <展開先>` (5.6 秒)。emsdk は `toolchain-emsdk.tar.zst` を展開 (3.7 秒) し、provider の build は `EMSDK_ENV=<展開先>/emsdk/emsdk_env.sh` で実行。`build_cpython_wasm.sh` と `build_flpy.sh` は既定の `/opt/emsdk` (同じ 6.0.12) を使った。
+素材: fl-win64 は `tar --zstd -xf <artifacts>/fl-win64.tar.zst -C <展開先>` (5.6 秒)。emsdk は `toolchain-emsdk.tar.zst` を展開 (3.7 秒) し、provider の build は `EMSDK_ENV=<展開先>/emsdk/emsdk_env.sh` で実行。`build_cpython_wasm.sh` と `build_flpy.sh` は既定の emsdk (`[EMSDK]`、同じ 6.0.12) を使った。
 
 | 検査 | コマンド | rc | 所要 | 結果 |
 |---|---|---|---|---|
