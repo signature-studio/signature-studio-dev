@@ -247,4 +247,4 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 
 - 変更: `lift/gen_stubs_sigs.py` の `HEAP_C` と `harness/scen_khmath.h` `n_HeapAlloc` / `scen_khmaster.h` `khb_HeapAlloc` を同じ規約 (1MiB 超・領域超過で `return 0`、cursor 不変) に揃えた。
 - 実測 (HEAD 19cdf357、gcc -O0 x86_64 ホスト): `python3 tools/targets/kilohearts/snapins/harness/heap_alloc_diff.py` → `total=32 mismatches=0` (exit 0)。
-- 未実施: `run_all.sh` による 13 本 + khmrel/khmaster/khmring の bit-exact 突合、RetDec lift、emcc 再ビルド。理由は素材不足 (`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ = FL Studio インストーラー 1 本。`plugins-kilohearts` / `toolchain-retdec` / `toolchain-emsdk` 無し)。#1116 で継続。
+- e2e (測定 commit 0735b3b89): ネガコン 8/8 PASS。`run_all.sh` は Path B 10 本・Path A 3 本・libm 2 本が bit-exact。phaser/delay/limiter/khbase は emcc RSS cap (11GB) 超過で未達、khm* は未実行。詳細と未解決は [REPORT_APPENDIX_1116.md](REPORT_APPENDIX_1116.md)。#1116 で継続。
