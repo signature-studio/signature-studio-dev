@@ -120,6 +120,8 @@ ildsp の規模測定 (命令数・call 数・export closure 表) と未解決�
 - 全 `.text` 走査 (`scan_writes.py`・測定 commit `cb82259bf`): 90,226 命令のうち `[reg+0xbc+8i]` (i=0..13) を書き先にする命令は qword 0 件。dword 26 件は `0xd4`〜`0x104` のカウンタ更新で、ポインタ代入ではない (内訳: `sub dword ptr […], 1` 11 件・`mov dword ptr […], eax` 11 件・`mov dword ptr [r10+0xfc], ecx` と `[r13+0xfc], ecx` の 4 件。`0xfc` の 4 件は `eax` ではなく `ecx` の書き込み)。word 2 件 (0x3f09b・0x3f19b) は `0xbc` の 16 bit 書き込み。
 - export は 3 件 (`CreateReverbInstance` 0x3fa0・`Process_Fruity_32FM_32FS` 0x1b80・`Process_UF_32FM_32FS` 0x2790)。14 本を埋める entry は、この 3 件の外 (内部関数・ホストが直接呼ぶ別経路) にあると見られるが、未特定。
 - 観測の限界: 観測は `this` 直下の書き込みだけを見る。14 本を別オブジェクトや間接的な経路で書くなら、`this` 直下の観測では見えない。
+- 走査の穴埋め (#4461・測定 commit `162b92651`・`scan_writes.py` を index 付き・lea 形も数えるよう拡張。HEAD までのコード差分は 0 行): 88,690 命令。`[reg+0xbc+8i]` の qword 直接書き込みは 0 件 (従来通り)。index 付き書き込みで disp が 0xbc〜0x12c の命令は 3 件 (0x4b69c・0x4b808・0x4b88d の `[rdi+r15*8+0x128]`)。disp 0x128 は 14 本のどのオフセットにも当たらない (0xbc+8i は 0x124 まで)。`lea` で 0xbc〜0x12c を基点にする命令は 24 件で、いずれも後続に 14 本への書き込みを持たない (`lea` の基点として数えただけ)。結論: 14 本の書き込みは、静的に見える形 (直接・index 付き・lea 基点) の全てで 0 件。書き込み元はこの静的な形に現れない (間接ポインタ経由・別オブジェクト経由) と見られる。
+- 測定 (`162b92651`・4 core・1 回): `scan_writes.py` 1.09 s (load 0.10 → 0.10)。
 
 ### 実測 (4 core・3 回)
 
