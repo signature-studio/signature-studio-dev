@@ -11,11 +11,12 @@
 
 ## 測定
 
-- 測定 commit (コードを最後に変えた commit): `317a10e46` (`tools/python/analysis/flapi/pattern_write_cores.py` の追加)。この PR で他に変えたのは本 REPORT と `docs/DOC_MAP.md` の索引行だけ。
-- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を確認)。展開: `tools/python` で `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py5130 --wildcards '*block00031_PE.bin'` (実測 real 1.577 s)。展開先は `work/py5130/extracted/` (gitignore・commit しない)。
-- 再現 (1 コマンド): `cd tools/python && python3 analysis/flapi/pattern_write_cores.py work/py5130/extracted/block00031_PE.bin` (実測 real 0.060 s・user 0.044 s・sys 0.016 s、n=1。実行直前の load average は `0.00 0.16 0.14`)。
+- 測定 commit (コードを最後に変えた commit): `dc31ff4c8` (`tools/python/analysis/flapi/pattern_write_semantics.py` の追加と本 REPORT の訂正)。
+- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を確認)。展開: `tools/python` で `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py5130 --wildcards '*block00031_PE.bin'` (実測 real 2.910 s)。展開先は `work/py5130/extracted/` (gitignore・commit しない)。
+- 再現 (1 コマンド): `cd tools/python && python3 analysis/flapi/pattern_write_semantics.py work/py5130/extracted/block00031_PE.bin` (HEAD `dc31ff4c8` で実測 real 0.086 s・user 0.069 s・sys 0.018 s、n=1。実行直前の load average は `0.09 0.19 0.08`。結果 `RESULT OK fail=0 total=11`)。
+- 前段の再現: `cd tools/python && python3 analysis/flapi/pattern_write_cores.py work/py5130/extracted/block00031_PE.bin` (実測 real 0.060 s・user 0.044 s・sys 0.016 s、n=1。`pattern_write_cores.py` は `317a10e46` で追加・変更なし)。
 - 逆アセンブル: `python3 analysis/py41_disasm.py work/py5130/extracted/block00031_PE.bin <VA...>` (`pe_disasm.py` と同じ capstone + pefile の方式)。
-- コード差分 (測定 commit から HEAD まで): `git diff 317a10e46 HEAD -- tools/python/analysis tools/python/provider tools/python/host` の出力は 0 行 (C provider・mock・テストは変えない。`all_tools.mjs` は再測定しない: `docs/WORKFLOW.md` §6)。
+- コード差分 (測定 commit から HEAD まで): `git diff dc31ff4c8 HEAD -- tools/python/analysis tools/python/provider tools/python/host` の出力は 0 行 (C provider・mock・テストは変えない。`all_tools.mjs` は再測定しない: `docs/WORKFLOW.md` §6)。
 
 ## 1. 共通の呼び出し形
 
@@ -27,15 +28,16 @@
 
 | # | 関数 (wrapper VA) | 書式 (fmt) と既定値 | コア VA | 範囲 code (根拠 VA) | 確定した経路 | 未確定 |
 |---|---|---|---|---|---|---|
-| 1 | clearPattern (0xd66d50) | `\|i`・index 既定 -1 (0xd66d84) | 0xd66cb0 | index > 999 → -4 (0xd66d39)。index ≤ -1 → 無音 no-op・status 0 (`jle` 0xd66d03→0xd66d41) | ready → index == -1 なら global int32 `[0x87d324]` (現在パターン) で置換 (0xd66ced)。0..999 なら `0x12d8af0(index)` → `[obj+0x10]->vt+0x100(index)` | vt+0x100 の中身 (消去の範囲・副作用) |
+| 1 | clearPattern (0xd66d50) | `\|i`・index 既定 -1 (0xd66d84) | 0xd66cb0 | index > 999 → -4 (0xd66d39)。index ≤ -1 → 無音 no-op・status 0 (`jle` 0xd66d03→0xd66d41) | ready → index == -1 なら global int32 `[0x87d324]` (現在パターン) で置換 (0xd66ced)。0..999 なら `0x12d8af0(index)` (値を返さない・§6) の後、`[[0x87da6f]+0x10]->vt+0x100(index)` (0xd66d31) | vt+0x100 の中身 (消去の範囲・副作用)。vtable の型 |
 | 2 | clonePattern (0xd66b80) | `\|ii`・arg1/arg2 既定 -1 (0xd66bb4・0xd66bbe) | 0xd669f0 | arg1 > 999 → -4 (0xd66a84→0xd66b36)。arg1 ≤ -1 → 無音 no-op (0xd66a69) | arg1 == -1 は global int32 `[0x87d5c6]` で置換。`0x12d8af0(arg1)`。arg2 == -1 なら `0x418190`・`0xe81d00` で空き範囲を求め `vt+0xe8(obj, base, last)`。arg2 ≠ -1 なら `vt+0xf0(obj, arg1, arg2)` | vt+0xe8・vt+0xf0 の中身。arg2 の範囲検査は core に無い (vt+0xf0 側は未読) |
 | 3 | setChannelLoop (0xd65e00) | `ii` (index, value) | 0xd65d60 | wrapper: index < 0 または index > (list 要素数 - 1) → -4 (0xd65f5f → 0xd65f66)。dispatch 前に判定する | list `[0x87a38b]` の `0xfe8bb0(list, index)` が NULL なら無音 (0xd65dab)。非 NULL なら list2 `[0x87a374]` の `0xfe8bb0(list2, index)` → `[elem+0x7f4]` を sub-obj として `vt+0x1f0(sub, value, 1)` (0xd65dd2) | vt+0x1f0 の中身。成功後の `0x12cfce0`・`0x12d0090`・`0x11e7fa0` (0xd65de1〜) |
-| 4 | burnLoop (0xd666d0) | `i\|ii` (index, storeUndo, updateUi)・storeUndo 既定 1 (0xd66712)・updateUi 既定 1 (0xd66708)。注: 既定値の書込みは 0xd66708・0xd66712 | 0xd66630 | wrapper は index に範囲判定を持たない。core も無し。判定は `0x1063c40` 側 (未読) | obj = `g_table[cur].+0x28` (`cur` = int32 `[0x87d9a4]`、stride 24)。`0x12d16a0` が作る record を読む (§2-6)。`call 0x1063c40(obj, index, storeUndo==1 → r8b, updateUi==1 → r9b, -1)` | `0x1063c40` の本体 (途中まで読了: 0x1063c40 は `[obj+0x54]`・`[obj+0x58]` の list を走査)。obj が NULL のときの挙動 (core に NULL 判定は無い) |
-| 5 | setLoopStarterRootNote (0xd668c0) | `i` (rootNoteNum) | 0xd66830 | 範囲 code 無し。clamp: n ≤ 0 → 0、n > 11 → 11 (0xd6687a〜0xd66884) | global flag `*[0x87af0b]` == 0 なら無音 no-op (0xd66871)。非 0 なら `0xdc0cc0(obj, clampedNote, r8d=[0x87d77c] int32)` | 0xdc0cc0 の後段 `0xdc2ed0`・`0xdc0700`。`[0x87af0b]` の正体 |
-| 6 | ensureValidNoteRecord (0xd65930) | `i\|i` (index, playNow)・playNow 既定 0 (0xd65938) | なし (dispatch 無し) | index < 0 または index > 999 → -4 (0xd659a3)。0..999 のみ有効 | `0x12d16a0(index, playNow==1)`: `g_table[index].+0x28` が NULL なら `0x1063a20` で record を作り `+0x3c = index`。playNow かつ flag 非 0 なら `0x11e7430`。戻りは record。成功時の wrapper の戻りは定数 0 を変換器に渡した結果 (0xd65998) | `0x1063a20` の本体・`0x11e7430`・変換器 `[0x87e8e1]` の正体 (値 0 は確定、型は未確定) |
+| 4 | burnLoop (0xd666d0) | `i\|ii` (index, storeUndo, updateUi)・storeUndo 既定 1 (0xd66712)・updateUi 既定 1 (0xd66708)。注: 既定値の書込みは 0xd66708・0xd66712 | 0xd66630 | wrapper は index に範囲判定を持たない。core も無し。判定は `0x1063c40` 側 | obj = `g_table[cur].+0x28` (`cur` = int32 `[0x87d9a4]`、stride 24)。`0x12d16a0` が作る record を読む (§2-6)。`call 0x1063c40(obj, index, storeUndo==1 → r8b, updateUi==1 → r9b, -1)` | obj が NULL のときの挙動 (core に NULL 判定は無い)。`0x1063c40` 入口の `[obj+0x54] == 0` で後始末 `0x1064077` へ抜ける (§6)。range 外 code の有無は、`[obj+0x58]` の list 走査で key 一致が無いときに後始末へ抜けるため、core からは -2/-4 を返す経路は見当たらない (§3) |
+| 5 | setLoopStarterRootNote (0xd668c0) | `i` (rootNoteNum) | 0xd66830 | 範囲 code 無し。clamp: n ≤ 0 → 0、n > 11 → 11 (0xd6687a〜0xd66884) | global flag `*[0x87af0b]` == 0 なら無音 no-op (0xd66871)。非 0 なら `0xdc0cc0(obj, clampedNote, r8d=[0x87d77c] int32)` | `0xdc2ed0`・`[0x87af0b]` の正体。`0xdc0700` の即値 `0xc3bfb9` は Python コード片 (§6) で、表示文字列ではない |
+| 6 | ensureValidNoteRecord (0xd65930) | `i\|i` (index, playNow)・playNow 既定 0 (0xd65938) | なし (dispatch 無し) | index < 0 または index > 999 → -4 (0xd659a3)。0..999 のみ有効 | `0x12d16a0(index, playNow==1)`: `g_table[index].+0x28` が NULL なら `0x1063a20` で record を作り `+0x3c = index`。playNow かつ flag 非 0 なら `0x11e7430`。戻りは record。成功時の wrapper の戻りは定数 0 を変換器に渡した結果 (0xd65998) | `0x11e7430` 後段 (`0x11c8eb0` 以降・`0x11e7652` 以降の走査の意味)・変換器 `[0x87e8e1]` の正体 (値 0 は確定、型は未確定) |
 
 ### 2-1 補足 (読んだ範囲の事実)
 
+- `0x12d8af0` の訂正 (§6): 値を返さない (`ret` 前に戻り値の設定が無い)。中身は `[[global 0x87…] + 0x7a8]` の object の `vt+0x1f0(index, 1)` と、後段の条件呼び出し。
 - `0xfe8bb0(list, index)` = 要素取得。0 ≤ index ≤ count-1 なら `list[index]`、それ以外は NULL (0xfe8bb3〜0xfe8bd5)。
 - `0xc38bc0` = global の値 (None) を返す (0xc38bc0〜0xc38bc7)。
 - `0xd67690` = 引数の解析・取得 (dispatch 前の共通処理)。値の意味は未読。
@@ -52,10 +54,11 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| vt+0x100 (clearPattern)・vt+0xe8 / vt+0xf0 (clonePattern)・vt+0x1f0 (setChannelLoop) の中身 (副作用の書込み先) | 3 関数の副作用が決まらない | #5130 (本 issue を Refs で残す) |
-| `0x1063c40` (burnLoop) の本体・obj が NULL のときの挙動 | burnLoop の副作用・範囲外 code が決まらない | #5130 |
-| `0x12d8af0`・`0xdc0cc0` 後段 (`0xdc2ed0`・`0xdc0700`)・`[0x87af0b]` の flag の正体 | clearPattern / clonePattern / setLoopStarterRootNote の前提 | #5130 |
-| `0x1063a20` (record 生成)・`0x11e7430`・変換器 `[0x87e8e1]` の型 | ensureValidNoteRecord の戻り値の型 (値 0 は確定) | #5130 |
+| vt+0x100 (clearPattern)・vt+0xe8 / vt+0xf0 (clonePattern)・vt+0x1f0 (setChannelLoop) の vtable の型と中身 (副作用の書込み先) | 3 関数の副作用が決まらない | #5130 (本 issue を Refs で残す) |
+| burnLoop の obj が NULL のときの挙動 (core に NULL 判定無し・`0x1063c40` 入口の `[obj+0x54]` 判定は読了) | 未登録 pattern に burnLoop を呼んだときの振る舞い | #5130 |
+| `0x11e7430` 後段 (`0x11c8eb0` 以降・`0x11e7652` 以降の走査)・`0x663bf0` / `0x1046a30` の意味 | ensureValidNoteRecord の playNow 側の副作用 | #5130 |
+| `0xdc0cc0` 後段 `0xdc2ed0`・`[0x87af0b]` の flag の正体・即値 `0xc3bfb9` (Python コード片) を `0x6682f0` が何に使うか | setLoopStarterRootNote の no-op 条件と表示の意味 | #5130 |
+| 変換器 `[0x87e8e1]` の型 | ensureValidNoteRecord の戻り値の型 (値 0 は確定) | #5130 |
 
 - 本 PR は **受入条件を全て満たしていない** (副作用の本体が未読)。`Refs #5130`。本 run の範囲では、子 issue は起票しない (未読の leaf は同じ issue の続きとして #5130 に残す)。
 - 実装 (`provider/fl_engine.c`) は行わない。issue の「確定しなかった関数は #4215 に渡さない」に従い、本 REPORT の確定事項だけを #4215 の入力にする。
@@ -64,4 +67,17 @@
 
 - `pattern_write_cores.py` の出力は、§2 の handler・fmt・core VA と一致する (実測)。
 - 5 コアの入口 (`[rbx+0x60]` = -2 → 準備判定) は `0xd65d60`・`0xd66cb0`・`0xd669f0`・`0xd66630`・`0xd66830` で確認した。
+- `pattern_write_semantics.py` (§6 の読解を VA ごとに命令順で判定): 11 件 PASS・0 件 FAIL (実測 `RESULT OK fail=0 total=11`)。
 - 負の対照: ハンドラ以外の VA (`0xd843d0` 等) を `pattern_write_cores.py` の対象に入れていない。書式抽出は `FMT` (英字と `|` のみ) で判定しており、文字列でない場合は除外される。
+
+## 6. 読解の証跡 (本 PR で読み直した事実・VA と命令)
+
+前 run までの §2 の記述を、逆アセンブル (`analysis/py41_disasm.py`) で読み直した結果。`pattern_write_semantics.py` が同じ判定をする。
+
+- **`0x12d8af0` (訂正)**: 値を返さない。`[[0x87…]+0x7a8]` の object (rcx) に対し `call [vt+0x1f0]` (edx = index, r8b = 1) を呼ぶ (0x12d8b30)。後段は `[0x87…]` の list 範囲判定と `0x11e84a0`・`0x12ddaa0`・`0x1046710` の条件呼び出し。
+- **clearPattern のコア `0xd66cb0` (0..999)**: `0x12d8af0(index)` → `[[0x87da6f]+0x10]->vt+0x100(index)` (0xd66d15〜0xd66d31)。`vt+0x100` の型は未確定。
+- **burnLoop のコア `0x1063c40`**: 入口 (0x1063c6f) で `[obj+0x54]` が 0 なら 0x1064077 (後始末: `0x412d60` → `0x418190`) へ抜ける。0 でなければ `[obj+0x58]` の list (stride 20) を先頭から走査し、`key == index` (+0) かつ `flag != 0` (+4) の要素を探す。見つからなければ後段へ進まず後始末へ抜ける (0x1063cf0)。
+- **record 生成 `0x1063a20`**: `[obj+0x54] = 0` (0x1063a5c)・`[obj+0x50] = 1` (0x1063a64)。戻りは obj。
+- **`0x11e7430` 前半**: `[0x87…]` の 1000 件 (stride 0xc0) に `+0x6c = 0x80000001` (0x11e74ce)・`+0x70 = 0x7fffffff` (0x11e74d5) を設定 (0x11e74bf〜0x11e74e8)。後段は 0x11e7652 以降で、record の `+0x4` と `+0x8` を使って `0x663bf0` (比較) と `0x1046a30` を呼ぶ。意味は未確定。
+- **setLoopStarterRootNote の後段 `0xdc0cc0` → `0xdc0700`**: `0xdc0700` は `table[cur].+0xa4 != 0` のとき `+0xa8 - 1` を `0x661dc0` に渡し、`[0x87…]+0x9c0` 系の値を `0x413480` に渡す (0xdc0757〜0xdc0779)。その後 `0x6682f0(obj+0x340, 0xc3bfb9)` を呼ぶ (0xdc07a3〜0xdc07b3)。即値 `0xc3bfb9` は UTF-16LE の Python コード片 (`spec_from_file_location('imported_code', …)` で始まる) で、表示文字列ではない。`0x6682f0` の用途は未確定。
+- **注意**: 前 run の「`0xdc0700` は表示用の文字列経路と推定」は誤り。上の記述で置き換える。

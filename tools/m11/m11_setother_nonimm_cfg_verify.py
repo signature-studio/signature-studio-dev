@@ -217,7 +217,7 @@ def run(insns, probe, fam):
                 fl = ('res', r, w)
                 i += 1
                 continue
-            if mn in ('shl', 'sal', 'shr') and len(ops) == 2 and ops[0] in REG:
+            if mn in ('shl', 'sal', 'shr', 'sar') and len(ops) == 2 and ops[0] in REG:
                 dst, src = ops
                 w = REG[dst][1]
                 a = get(st, dst)
@@ -232,6 +232,9 @@ def run(insns, probe, fam):
                     r = None
                 elif mn == 'shr':
                     r = (a >> c) & msk(w)
+                elif mn == 'sar':
+                    s = a - (1 << w) if (a >> (w - 1)) & 1 else a
+                    r = (s >> c) & msk(w)
                 else:
                     r = (a << c) & msk(w)
                 put(st, dst, r)
@@ -408,6 +411,10 @@ def selftest():
         ('D3 idiv 除数が未知 → 判定不能', 'b807000000' '99' 'e800000000' 'f7f9' 'c3', 5, 'rdx', None, '判定不能'),
         ('D4 idiv 除数 0 → 判定不能', 'b807000000' '99' 'bb00000000' 'f7fb' 'c3', 5, 'rdx', None, '判定不能'),
         ('D5 idiv メモリ除数 → 商・余りは未知', 'b807000000' '99' '8b0d00000000' 'f77900' 'c3', 4, 'rdx', None, '判定不能'),
+        ('E1 sar ebx,1 (-4 → -2, 下位 8bit 0xfe)', 'bbfcffffff' 'd1fb' '0fb6d3c3', 3, 'rdx', 0xfe, 'PASS'),
+        ('E1 ネガティブ (0x7f)', 'bbfcffffff' 'd1fb' '0fb6d3c3', 3, 'rdx', 0x7f, 'FAIL'),
+        ('E2 sar ebx,4 (0x80 → 0x8 、符号なし)', 'bb80000000c1fb040fb6d3c3', 3, 'rdx', 0x8, 'PASS'),
+        ('E2 ネガティブ (0x0)', 'bb80000000c1fb040fb6d3c3', 3, 'rdx', 0x0, 'FAIL'),
     ]
     bad = 0
     for name, hx, probe, fam, claim, expect in cases:

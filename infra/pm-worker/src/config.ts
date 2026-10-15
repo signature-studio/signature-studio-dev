@@ -136,7 +136,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     reviewerLogin: env.REVIEWER_LOGIN ?? DEFAULT_REVIEWER_LOGIN,
     markLogin: env.MARK_LOGIN ?? DEFAULT_MARK_LOGIN,
     importRequired: env.IMPORT_REQUIRED === "1",
-    pmTargetBots: ["opencode-for-signature-studio[bot]", "oc-reviewer-for-signature-studio[bot]"],
+    pmTargetBots: ["opencode-for-signature-studio[bot]", "oc-reviewer-for-signature-studio[bot]", "oc-pm-for-signature-studio[bot]"],
     build: buildCommit(env.BUILD_COMMIT),
     manualDeps,
   };
