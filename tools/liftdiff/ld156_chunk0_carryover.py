@@ -20,6 +20,7 @@ from ldlib.session import Session
 TSV = os.path.join(HERE, 'results', 'ld58_m11_sample800_shards_t1.tsv')
 TARGET = os.path.join(HERE, 'targets', 'm11.json')
 MASK = {'none': 0, 'stk': 1, 'sta': 2, 'img': 4, 'all': 7}
+NMASK = dict(MASK, mmap=8, sta_mmap=10, all_mmap=15)   # LD-229 (#4631): native 側の候補。mmap = anon rw-p mapping (ヒープ外)
 
 
 def read_19():
@@ -37,7 +38,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--native', type=int, choices=[0, 1], required=True)
     ap.add_argument('--reset', choices=sorted(MASK), required=True)
-    ap.add_argument('--native-reset', choices=sorted(MASK), default='none',
+    ap.add_argument('--native-reset', choices=sorted(NMASK), default='none',
                     help='LD-209 (#4305): native 側の候補単位の戻し (NRESET)。native を作り直さない (--native 0) ときだけ使う')
     ap.add_argument('--out', required=True)
     ap.add_argument('--chunk', type=int, default=400)
@@ -45,7 +46,7 @@ def main():
     a = ap.parse_args()
     if a.native_reset != 'none' and a.native:
         raise SystemExit('--native-reset は --native 0 のときだけ使う (作り直すと native の持ち越しは消える)')
-    nmask = MASK[a.native_reset]
+    nmask = NMASK[a.native_reset]
     ns = argparse.Namespace(target=TARGET, state='auto')
     sess = Session(TARGET, shards=1, build=False, trace=True, timeout=10.0, state=liftdiff.state_path(ns))
     irfeats = {} if sess.t.get('clift') else irtool.ir_features(sess.t['ir'], sess.prefix)
