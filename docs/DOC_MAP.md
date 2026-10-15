@@ -146,7 +146,7 @@
 | `tools/liftdiff/tests/ld24_sig_breakdown.py` | ~110 | LD-24 (#976) の署名内訳スクリプト: `unsupported_sig` 50 行の va/name を IR (`boot_final3.ll`) の define/declare 行から引き、署名形ごとの件数と #1193/#1194 振り分けを出力 (IR 必須・IR 無しは終了コード 1) |
 | `tools/liftdiff/REPORT_LD39.md` | ~75 | liftdiff LD-39 (#1194) 節 (途中報告): i128 / %tagPOINT の 11 関数の振り分けと機械語入口の実測。i128 の渡し方は 2 候補とも未決。case 生成・runner は未実装 |
 | `tools/liftdiff/REPORT_APPENDIX_LD53.md` | ~120 | liftdiff LD-53 (#1546) 節: i128 引数の呼出し側全件 (命令境界の線形走査) と呼び先の判定。(a)/(b) は 691dd0 を含め棄却 (§7)。IR 型誤りの修正は #1479 (§7.4) |
-| `tools/liftdiff/REPORT_APPENDIX_LD52.md` | ~80 | liftdiff LD-52 (#1528) 節: i128 引数・%tagPOINT の機械語入口型 (`cases.MACHINE_ENTRY`・wsig) による case 投入の方式と、対象 11 関数の実行可能件数の実測 (§2)。未解決の起票先は #3862〜#3864 (§4) |
+| `tools/liftdiff/REPORT_APPENDIX_LD52.md` | ~70 | liftdiff LD-52 (#1528) 節: i128 引数・%tagPOINT の機械語入口型 (`cases.MACHINE_ENTRY`・wsig) による case 投入の方式と、対象 11 関数の実行可能件数の実測 (§2)。未解決の起票先は #3862〜#3864 (§4) |
 | `tools/liftdiff/tests/ld157_batch_diff.py` | ~80 | LD-157 (#3423) の突合: 同じ batch の 2 回の jsonl を関数単位で比べ、判定の変化・case の変化を、同じ chunk・shard で先行した関数の差分 (chain) と自分の case の wasm 打切り (own) に分ける |
 | `tools/liftdiff/tests/ld39_abi_dump.py` | ~80 | LD-39 (#1194) の ABI 入口ダンプ: 11 関数の PE 先頭命令列を capstone で並べ、jmp thunk の IAT 先を解決する。ABI は断定せず、判定は REPORT_LD39.md で人が行う |
 | `tools/liftdiff/REPORT_LD158.md` | ~190 | liftdiff LD-158 (#3470) 節: ret=i128 39 関数の実戻りレジスタの動的実測 (rax / rdx / xmm0 の書換え) と、xmm0 戻り 8 関数の署名 double 化 (`ret_override`・m11_tr_ 経由)。判定不能 11 と併存 20 は LD-162 (#3572) へ |
