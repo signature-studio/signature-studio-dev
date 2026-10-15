@@ -15,6 +15,20 @@ SLOT_FN = """define i64 @function_1(i64 %arg1) local_unnamed_addr {
 entry:
   %cf.0.reg2mem = alloca i1
   %zf.0.reg2mem = alloca i1
+  %pf.0.reg2mem = alloca i1
+  %x = call i128 @__asm_movaps(i128 %1)
+  call void @__asm_comiss(i128 %x, i128 %y)
+  %cf.0.reload = load i1, ptr %cf.0.reg2mem
+  %zf.0.reload = load i1, ptr %zf.0.reg2mem
+  %pf.0.reload = load i1, ptr %pf.0.reg2mem
+  %r = or i1 %cf.0.reload, %zf.0.reload
+  ret i64 0
+}
+"""
+SLOT_CZ_FN = """define i64 @function_1(i64 %arg1) local_unnamed_addr {
+entry:
+  %cf.0.reg2mem = alloca i1
+  %zf.0.reg2mem = alloca i1
   %x = call i128 @__asm_movaps(i128 %1)
   call void @__asm_comiss(i128 %x, i128 %y)
   %cf.0.reload = load i1, ptr %cf.0.reg2mem
@@ -65,8 +79,18 @@ class TestRewrite(unittest.TestCase):
         self.assertNotIn('call void @__asm_comiss(', out)
         self.assertIn('fcmp ult float', out)
         self.assertIn('fcmp ueq float', out)
+        self.assertIn('fcmp uno float', out)
         self.assertIn('store i1 %cfl', out)
+        self.assertIn('ptr %pf.0.reg2mem', out)
         self.assertNotIn('declare void @__asm_comiss(', out)
+
+    def test_cz_only_slot_reflects_cf_zf_without_pf(self):
+        out = run_pass(DECLS + SLOT_CZ_FN)
+        self.assertNotIn('call void @__asm_comiss(', out)
+        self.assertIn('fcmp ult float', out)
+        self.assertIn('fcmp ueq float', out)
+        self.assertNotIn('fcmp uno', out)
+        self.assertNotIn('pf.0.reg2mem', out)
 
     def test_no_slot_function_keeps_call_and_decl(self):
         out = run_pass(DECLS + NOSLOT_FN)
