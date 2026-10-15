@@ -47,7 +47,7 @@ PE 上で確定した事項 (REPORT_PY172 §1・§2 と同じ):
 
 ## 4. 実装・検証
 
-測定 HEAD: `4147df576` (runner・2026-10-15 08:20〜08:29 UTC。`6a7d2634e` 以降に `origin/main` (`9721869b7`) を取り込んだ merge `4147df576` を含む。測定後の commit はこの REPORT の追加だけ)。emsdk は `$RUNNER_TEMP/emsdk` に `emsdk install 6.0.12` で入れ、`/opt/emsdk` に symlink を張った (`build_cpython_wasm.sh` / `provider/build.sh` が `/opt/emsdk/emsdk_env.sh` を直接 source するため。`toolchain-emsdk` 素材は本 run に無い)。fl-win64 は `$ARTIFACTS_DIR` から展開した。
+測定 HEAD: `4147df576` (runner・2026-10-15 08:20〜08:29 UTC。`6a7d2634e` 以降に `origin/main` (`9721869b7`) を取り込んだ merge `4147df576` を含む。測定後の commit はこの REPORT の追加だけ)。emsdk は `$RUNNER_TEMP/emsdk` に `emsdk install 6.0.12` で入れ、`[EMSDK]` の既定位置に symlink を張った (`build_cpython_wasm.sh` / `provider/build.sh` が既定位置の `emsdk_env.sh` を直接 source するため。`toolchain-emsdk` 素材は本 run に無い)。fl-win64 は `$ARTIFACTS_DIR` から展開した。
 
 | 検査 | 手順 (コマンド) | 結果 (測定 HEAD `4147df576`) |
 |---|---|---|
