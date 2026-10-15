@@ -45,7 +45,11 @@ echo "relay lines: $(wc -l < trace.log)"
 # 範囲判定は LoadLibrary の基底 (実測 7bde0000) と PE の SizeOfImage から行う (filter_gpa.py)。
 # 件数は Call 行のみ。陽性対照として probe.exe (ImageBase 0x140000000) の呼出しを同じ判定器に通す。
 QFC_BASE="$(sed -n 's/^LoadLibrary=\([0-9a-f]*\) .*/\1/p' probe_out.txt)"
-[ -n "$QFC_BASE" ] && [ "$QFC_BASE" != "0000000000000000" ] || { echo "LoadLibrary 失敗: 範囲判定不可"; exit 1; }
+# DllMain が返らず probe が出力しない場合 (PATCH_ENTRY=0 の既知の挙動) は relay の PE DLL 行から基底を取る
+if [ -z "$QFC_BASE" ] || [ "$QFC_BASE" = "0000000000000000" ]; then
+  QFC_BASE="$(grep -m1 -oE 'module=[0-9A-Fa-f]+ L"QuickFontCache_x64.dll"' trace.log | sed -E 's/module=([0-9A-Fa-f]+).*/\1/' | tr 'A-F' 'a-f' || true)"
+fi
+[ -n "$QFC_BASE" ] && [ "$QFC_BASE" != "0000000000000000" ] || { echo "基底が取れない: 範囲判定不可"; exit 1; }
 python3 "$HERE/filter_gpa.py" trace.log QuickFontCache_x64.dll "$QFC_BASE" > qfc_gpa_calls.txt || true
 python3 "$HERE/filter_gpa.py" trace.log QuickFontCache_x64.dll "$QFC_BASE" 'FT_' > qfc_ft_calls.txt || true
 python3 "$HERE/filter_gpa.py" trace.log probe.exe 140000000 'CreateVST3Instance|InitDll' > probe_pos_ctrl.txt || true
