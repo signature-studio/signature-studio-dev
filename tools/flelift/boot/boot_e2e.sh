@@ -84,7 +84,7 @@ BUILD() { # BUILD <variant> <bridge.c> [extra emcc flags...] [-- nosx]
      -DFLEBOOT_STRICT=$([ "$v" = strict ] && echo 1 || echo 0) -DFLEBOOT_NOSX=$([ "$v" = nosx ] && echo 1 || echo 0)
   local OBJS="$W/obj/${v}_lifted.o $W/obj/${v}_data.o $W/obj/${v}_cpu.o $W/obj/${v}_glue.o $W/obj/${v}_bridge.o $W/obj/${v}_tw.o $W/obj/${v}_boot.o"
   [ $nosx = 1 ] || OBJS="$OBJS $W/obj/sx_*.o"
-  local EXPORTS=_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_fle_boot_set_nullpage,_fle_boot_set_blkdiag,_fle_blkdiag_stat,_fle_boot_set_ipp,_fle_ipp_total,_fle_ipp_names,_fle_ipp_name,_fle_ipp_count
+  local EXPORTS=_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_fle_boot_set_nullpage,_fle_boot_set_blkdiag,_fle_blkdiag_stat,_fle_boot_set_ipp,_fle_boot_set_diag_nullfill,_fle_diag_skip_n,_fle_diag_pass_n,_fle_ipp_total,_fle_ipp_names,_fle_ipp_name,_fle_ipp_count
   [ $nosx = 1 ] || EXPORTS="$EXPORTS,_shimx_set_trace,_shimx_init"
   emcc $OBJS -o "$W/fleboot_$v.cjs.tmp" \
     -O0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 \
