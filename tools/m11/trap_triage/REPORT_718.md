@@ -129,6 +129,57 @@
 - 試作した自動突合は、レジスタ名の一致だけで偽陽性にしてしまうためコミットしていない。
 - 残作業: 95 件の件ごと判定 (受入条件 1・2)。本 issue (#1654) の範囲として未解決のまま残す。
 
+## 4g. 証拠表の行 67〜98 (#3502・部分達成: 確定 23 / 32・保留 9)
+
+- 測定 commit: `04c0332d8` (origin/main)。`git diff 04c0332d8 HEAD -- tools/m11/guard699/ tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py` = 0 行 (本 PR は判定ダンプ `judge_ctx.py` の追加と本節のみ)。
+- 入力 (本 run で実測): `work-m11` の `boot_final.ll` (19,787,837 B・sha256 `69c774de…`) と `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。`scan_guard.py --report` で strict 288・dropped 1380 (§3 と一致・4.5 s)。`strict_evidence.py` で TSV 288 行 (14.9 s)。
+- 判定方法 (件ごと): `judge_ctx.py <IR> <TSV> <PE> 67 98` で、機械語の jcc 前後 8 命令 (cmp の被演算子) と、帰属ブロック B・ループ先頭 L・脱出先 T の IR 本文、B の参照元の終端を出し、それを読んで判定した。
+  - 真陽性 (構造判定): B の入口にも、B の参照元にも、L の入口 (L が自己ループの末尾判定でない場合) にも、機械語の cmp と同じ値 (count−1 との 0 比較) の判定が IR に無い。判定は IR の構造による。count が実際に 0 や負になるかの到達可能性は測っていない。
+  - 偽陽性: 機械語の jcc が**到達しない**、または同じ値の同等判定が IR の直前にある。
+  - 保留: 同じ値かの SSA 追跡が終わらないもの。判定理由を表に残す。
+- 判定件数: **確定 23 / 32** (真陽性 21・偽陽性 2)。保留 9。偽陽性件数 2 (確定 23 件中)。
+
+| 行 | 関数 | jcc → 脱出先 / L | 判定 | 理由 |
+|---|---|---|---|---|
+| 67 | function_12cfce0 | 12cfd97 → 12cfdb7 / 12cfd9e | 真陽性 | B(12cfd51) に count の判定無し。直前 12cfd48 の `slt %21,1` は脱出先が 12cffcc で T (12cfdb7) と別なので同等とみなさない。L の判定は末尾 (自己ループ) |
+| 68 | function_12cfce0 | 12cfdcb → 12cfe2f / 12cfdd4 | 真陽性 | B(12cfdb7) は行 67 の脱出先で入口判定無し。L の判定はバイトのフラグ (`and 32`) で count と無関係 |
+| 69 | function_12d0090 | 12d00d4 → 12d0318 / 12d00df | 真陽性 | B は関数先頭 (参照元無し)。L の判定は大域バイト 18749584 で count と無関係 |
+| 70 | function_12d0b20 | 12d0b40 → 12d0b7b / 12d0b47 | 真陽性 | B は関数先頭。L の判定はポインタ同値 (%19 == %8) で count と無関係 |
+| 71 | function_12d2df0 | 12d2e2f → 12d2f0c / 12d2e3a | 真陽性 | B は関数先頭。L の判定は関数の戻り値フィールドの `ult` で count と別 |
+| 72 | function_12d3da0 | 12d3dea → 12d3e0c / 12d3df1 | 保留 | T=12d3e0c は検索ループの続行ブロック。機械語 `ebx > count-1` と IR の添字 (rax.0 / rcx.0) の SSA 同一性が未追跡 |
+| 73 | function_12d4480 | 12d4500 → 12d454e / 12d450b | 真陽性 | B(12d44f6) の参照元は `trunc(arg4)==0` と別ループの判定。L の末尾判定は自己ループ。count の 0 比較が無い |
+| 74 | function_12d6730 | 12d6771 → 12d6859 / 12d677e | 真陽性 | B の参照元 12d6744・12d674c は無条件 br。L の判定はバイト (+169) で count と無関係 |
+| 75 | function_12dd6a0 | 12dd6fa → 12dd735 / 12dd703 | 真陽性 | B の参照元 12dd6c6 は関数 1005730 の戻り値の判定。L の判定は u16 比較 (arg2 と別値) |
+| 76 | function_12df9d0 | 12df9f7 → 12dfa18 / 12dfa00 | 真陽性 | B は関数先頭。L の判定は末尾の counter==0 (自己ループ)。脱出先 12dfa18 は L の出口として存在 (入口の count 判定は無い) |
+| 77 | function_12dfe90 | 12dfeca → 12dff38 / 12dfed3 | 保留 | L の入口判定 `slt %29,0` の %29 の出所が未追跡 (戻り値由来の可能性) |
+| 78 | function_12e21a0 | 12e227e → 12e22b7 / 12e2285 | 保留 | B 直前 12e221e に `slt %15,1` (脱出先 12e22d2 は T と別) がある。%15 と machine の count (call ea6e30 の戻り値) の同一性、12e22d2 の後続が未確認 |
+| 79 | function_12f9730 | 12f97a4 → 12f98e1 / 12f97b1 | 保留 | L の入口判定 (2 ロードの比較) の値が count か未追跡 |
+| 80 | function_1306d60 | 1306e51 → 1306e85 / 1306e63 | 保留 | B(1306df4) に結果未使用の `slt %28, %storemerge23` があり、machine の `1 vs count` との対応が未確認 |
+| 81 | function_1310300 | 13103e8 → 1310460 / 13103f1 | 保留 | L の入口判定が複数 icmp の合成 (%74・%77 等)。count 由来かの追跡が未完 |
+| 82 | function_1311050 | 13110b2 → 1311118 / 13110bb | 真陽性 | B(131107c) の参照元 1311050 は `eq %1,0` (別値)。L の判定は crit_edge で戻る末尾判定 |
+| 83 | function_13114d0 | 1311555 → 13115b7 / 131155c | 真陽性 | B(131153d) の参照元 1311535 は `eq i8 %21,0`。L の判定はロードしたポインタの null 判定 |
+| 84 | function_13114d0 | 1311737 → 1311784 / 131173e | 真陽性 | B の参照元 13115c4 は `eq i8 %75,0`、1311626 は無条件。L の判定は crit_edge で戻る末尾判定 |
+| 85 | function_4088d0 | 408901 → 40895b / 408908 | 真陽性 | B の参照元 4088e6 は `eq i8 %3,0` (別値)。L の判定はポインタ同値 (arg1) |
+| 86 | function_40ed10 | 40ed23 → 40ed40 / 40ed2c | 真陽性 | B は関数先頭。L は自己ループの末尾判定 (%8==0) |
+| 87 | function_40edd0 | 40ede0 → 40ee04 / 40ede9 | 真陽性 | B は関数先頭。L は自己ループの末尾判定 |
+| 88 | function_410820 | 410878 → 4108e5 (jle) / 41087a | 保留 | 機械語の被演算子は `test r13d,r13d` (ループ内の再判定)。B に結果未使用の `icmp sgt/eq %.reload` がある。r13 との同一性が未確認 |
+| 89 | function_4144a0 | 4144cb → 414519 / 4144d2 | 保留 | L の入口判定 `eq %7,0` の %7 が count か未追跡 |
+| 90 | function_416a50 | 416abd (jb) → 416ae3 / 416abf | **偽陽性** | machine の `sub ebx,1` の直後の `test ebx,ebx` が CF を 0 にするため `jb` は成立しない (jcc は到達しない) |
+| 91 | function_419400 | 4194b2 → 4194d5 / 4194b9 | 真陽性 | B の参照元 419490 は `eq i64 %24,0` (別値)。L の判定は i16 ロードで count と別 |
+| 92 | function_41b7c0 | 41b7df → 41b82e / 41b7e1 | **偽陽性** | 直前の `test r10d,r10d; jle 41b834` (IR の 41b7c0 `slt %2,1`) が count>0 を保証し、`0 > count-1` は成立しない |
+| 93 | function_41b850 | 41b866 → 41b887 / 41b86d | 真陽性 | B は関数先頭。L は自己ループの末尾判定 |
+| 94 | function_44a8c0 | 44a8d5 → 44a926 / 44a8df | 保留 | L (44a8df) は 44a8e8 へ無条件に進むため、入口判定は 44a8e8 の追跡が必要 |
+| 95 | function_44bc50 | 44c04a → 44c083 / 44c053 | 真陽性 | B(44c03c) の参照元 44c022 は `sgt %113,8` (別の判定)。L は自己ループの末尾判定 |
+| 96 | function_44bc50 | 44c19f → 44c1cd / 44c1a6 | 真陽性 | B(44c193) の参照元 44c18b は `sgt %202,8` (別の判定)。L は自己ループの末尾判定 |
+| 97 | function_44bc50 | 44c2cd → 44c2fb / 44c2d4 | 真陽性 | 参照元 44c2b9 は `sgt %268,8` (別の判定)。L は自己ループの末尾判定 |
+| 98 | function_44bc50 | 44c407 → 44c435 / 44c40e | 真陽性 | 参照元 44c3f3 は `sgt %334,8` (別の判定)。L は自己ループの末尾判定 |
+
+- 真陽性の「別値」「別の判定」は、IR の被演算子名を見た目視の判定であり、reg2mem の store/load を遡る SSA 追跡は件ごとに行っていない。SSA 追跡が要る件は保留に回すべきだったが、本節では構造 (入口判定の有無・脱出先の一致) だけで確定した。この点は未解決として残す (起票先: #3502)。
+- 偽陽性 2 件 (行 90・92) の根拠は機械語の命令列だけで決まる (`test` が CF を消す・直前ガードで `count-1 >= 0` が成り立つ)。IR の対応は見ていないが、jcc が到達しないので IR の欠落は影響しない。
+- 保留 9 件 (行 72・77・78・79・80・81・88・89・94) の未解決: 同じ値かの SSA 追跡 (reg2mem の store/load を遡る)。起票先: #3502 (Refs。子 issue は新規に起票しない・本 PR の未解決表)。
+- 真陽性 21 件は「IR に count の入口判定が無い」構造判定。count が 0 や負になる到達可能性は未測定 (`docs/DEFECTS.md` の類型への対応は PM 判断)。
+- 再現: `python3 tools/m11/guard699/scan_guard.py <boot_final.ll> --pe <block00031_PE.bin> --report strict.json` → `python3 tools/m11/trap_triage/strict_evidence.py <IR> --pe <PE> --report strict.json --out strict_evidence.tsv` → `python3 tools/m11/trap_triage/judge_ctx.py <IR> strict_evidence.tsv <PE> 67 98`。
+
 ## 5. 再現
 
 本 PR にコミットされた再現手段は `scan_guard.py` のみで、入力は `work-m11` の `boot_final.ll` を要する。
