@@ -41,6 +41,7 @@ M11_APPENDIX = "tools/m11/REPORT_APPENDIX_1430.md"
 M11_N2714 = "tools/m11/REPORT_N2714.md"
 GUI_DIR = "tools/gui/flengine"
 GUI_REPORT = "tools/gui/flengine/REPORT.md"
+GUI_HISTORY_3832 = "tools/gui/flengine/REPORT_APPENDIX_HISTORY_3832_A.md"  # #3832 で REPORT.md の judge/S1 行を移動
 GUI_BOOT = "tools/gui/flengine/results/boot.json"
 GUI_SURVEY = "tools/gui/flengine/results/survey_soft.json"
 X64_DIR = "tools/flelift/boot"
@@ -460,7 +461,7 @@ def _m11_gui_boot(src):
 def _m11_gui_survey(src):
     src.begin()
     commit, ok_r, noproc_r, miss_r, trap_r, clobber_r = src.find(
-        GUI_REPORT,
+        GUI_HISTORY_3832,
         r"測定 commit `([0-9a-f]{8})`・judge [0-9]+/[0-9]+・S1 `(\d+)/(\d+)/(\d+)/(\d+)/(\d+)`",
         measured_group=0,
     )
