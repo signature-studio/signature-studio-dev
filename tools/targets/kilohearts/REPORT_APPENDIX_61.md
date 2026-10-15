@@ -93,4 +93,5 @@ unsup の内訳 (両ホスト同一):
 - 差分テスト `python3 tools/flelift/tests/x64c_vex_diff.py` (測定 commit): pass 102 / fail 0 (rc 0)。近似の参照値は表を直接読む Python 別実装 (`approx_ref`)。
 - FLEngine e2e `bash tools/flelift/fle_e2e.sh` (測定 commit・素材 `fl-win64`): PASS。lift 7,018 関数 / 340,761 insns / unsup 0 / unlifted 0。smoke OK。spot diff equal 16/16・mismatch 0。D9 mismatch 0。所要 2m30s (`time` 実測 real 149.8 s)。
 - FLEngine lift 出力の同一性: `origin/main` (6441decbb) と測定 commit で `fle_lifted.c` / `fle_data.c` が `cmp` 一致。新 handler は FLEngine 側で元から unsup 0 の経路だけに効く。
+- main 取り込み後の再確認 (HEAD `837d9d232`・#4479 競合解消): FLEngine e2e `fle_e2e.sh` PASS (real 1m37.4s)。lift 7,018 関数 / 340,761 insns / unsup 0。spot diff equal 16/16・D9 mismatch 0。閉包 (`host_x64c_closure.sh`) は入力 `HeartCore.core_64` が素材 `fl-win64` に無いため再測定していない (上の表は `b91c8c212` の値)。差分テストは main 側の追加分を含めて 108/0。
 - 表の出所の注意: 表は AMD Ryzen 9 9950X で抽出した値。今回の実行ホストは AMD EPYC 7763 (Zen 3) で、近似表の同一性は本測定では未検証 (REPORT §13 の既存の注記と同じ)。
