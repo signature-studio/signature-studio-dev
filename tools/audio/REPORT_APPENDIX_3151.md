@@ -89,7 +89,7 @@
 - **ABI 照合**: `flaudio.c` の `g_layout` (C の `offsetof`) と `audio-layout.ts` の `FLA_LAYOUT` を突き合わせ、69 フィールド全て一致 (不一致 0)。`sizeof(fla_ctl_t)` = 16904 = `FLA_CTL_SIZE`。
 - **不具合 (`ba34d3521` で発見・`fb5a0d69` で修正)**: worklet は ctl を `new Int32Array(buf, ctlPtr, 128)` (128 ints 固定) で見ていた。@16772 の `burst_hist` (index 4193〜) は範囲外で、`Atomics.add` は worklet の `run()` の `try/catch` に飲まれ、`burst_hist` は全 run で 0 のまま。`ba34d3521` の 1 rep では **p99 が 6 条件とも 0 で、6/6 PASS** (判定は p99 を見ないため通過)。修正: ビュー長を `processorOptions.ctlSize` (= `FLA_CTL_SIZE`) から取る。
 - **測定 commit と差分**: 測定 commit は `fb5a0d69` (測定対象コードを最後に変えた commit)。`git diff --stat fb5a0d69 HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は **0 行** (測定時の HEAD は `3e1025b7e`・docs のみ)。
-- **環境**: ubuntu runner (nproc 4)・google-chrome 154.0.8037.97 (headless)・emsdk 6.0.12 (素材 `toolchain-emsdk` を `/opt/emsdk` に展開して使用)・PulseAudio 16.1 (apt 導入。fake は `pulseaudio -k` で停止、null は `module-null-sink sink_name=ci_null` を既定 sink)。
+- **環境**: ubuntu runner (nproc 4)・google-chrome 154.0.8037.97 (headless)・emsdk 6.0.12 (素材 `toolchain-emsdk` を展開した環境 `<emsdk>` を使用)・PulseAudio 16.1 (apt 導入。fake は `pulseaudio -k` で停止、null は `module-null-sink sink_name=ci_null` を既定 sink)。
 - **再現**: `bash tools/audio/build.sh` (`[audio] build OK`) → `AU2_OUT=tools/audio/results/au30_p99_r3 bash tools/audio/au2_matrix.sh 3` (exit 0・wall 9 分 49 秒・01:38:53 → 01:48:42)。集計: `node tools/audio/au2_summary.mjs tools/audio/results/au30_p99_r3`。
 - **結果** (`au2_summary.mjs` の出力そのまま):
 
