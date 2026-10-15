@@ -5,7 +5,7 @@
 ## 1. 結論
 
 - `0x1000ba05` の引数 `edx` は **ポインタ** で、指す先の **8 バイトの double** を読む。 `[edx+4]` (上位 dword) の指数部が全 1 (Inf/NaN) のときは、符号と指数を組み直して ST(0) に積む。 それ以外は `fld qword [edx]` で積む。 戻り値は `eax` (上位 dword の該当部)・ST(0) に積んだ値。
-- 呼出し元 (逆アセンブル上 `call 0x1000ba05` は 4 箇所) は、確認した 3 箇所 (`0x10009cdd`・`0x10009d0c`・`0x10009dba`) で直前に `lea edx,[esp+N]` を置き、呼出し元のスタック上の double を渡す。 残り 1 箇所 (`0x10009d7d`) は未確認。 harness が `edx=0` に固定していたため、native が `[0+4]` を読んで rc -11 になっていた (#4087)。
+- 呼出し元は lift 上の直接 `call 0x1000ba05` が 3 箇所 (`0x10009d0c`・`0x10009d7d`・`0x10009dba`)。 いずれも直前に `lea edx,[esp+8]` (`0x10009cfc`・`0x10009d79`・`0x10009db6`) を置き、呼出し元のスタック上の double を渡す。 ジャンプテーブル経由の呼出しは未確認。 harness が `edx=0` に固定していたため、native が `[0+4]` を読んで rc -11 になっていた (#4087)。
 - `edx` に OBJ 窓 (`0x10F80000`) の番地を入れ、先頭 8 バイトに double を置く入力で、native と wasm を **2000 / 2000 行一致** (eax・ST(0) の float64 bit・x87 深さ・OBJ 窓)。 native・wasm とも rc 0 で終わる。
 - 同じ commit の既存 harness (`edx=0`) では、`fn_1000ba05` は native rc -11 のまま (§3)。 既定ゲートの経路は変えていない。
 
@@ -25,7 +25,7 @@
 | big | 333 / 333 |
 | **全体** | **2000 / 2000** |
 
-- 一致の自明性: native の出力は eax の種類 655、ST(0) の float64 bit の種類 1337。 x87 深さは全行 1。 OBJ 窓は全行で入力の先頭 8 B と一致 (`mem` 差分 0 行)。 Inf/NaN 分岐 (`0x10009cdd` 側の `je`) の行を含む。
+- 一致の自明性: native の出力は eax の種類 655、ST(0) の float64 bit の種類 1337。 x87 深さは全行 1。 OBJ 窓は全行で入力の先頭 8 B と一致 (`mem` 差分 0 行)。 Inf/NaN 分岐 (callee 側 `1000ba12: je 0x1000ba17`) の行を含む。
 - 実測 (測定 commit `189d9580b`): `lift_text.py` real 23.93 s・rc 0 (load1 0.35 時点)。 `probe_ba05_4923.py` real 10.72 s・rc 0 (load1 0.67 時点)。
 - 再現: `cd tools/plugins/slayer_engine_ia32 && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 lift_text.py && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 probe_ba05_4923.py` (`emcc` を PATH に入れる)。
 
@@ -39,4 +39,4 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 既存 harness (`x87_fn_native.c`・`x87_fn_glue.c`) の `edx` を有効な番地にする変更 | 既定の経路では `0x1000ba05` は突合できない。 本付録はプローブの複製で測った | #4147 (PLG-G2-50) |
-| 呼出し元 4 箇所の、呼出し時の x87 深さ・double の値の実際の分布 | 本付録の入力は代表値の循環。 実呼出しの入力の分布は未測定 | #4147 (PLG-G2-50) |
+| 呼出し元 3 箇所 (直接 call。ジャンプテーブル経由は未確認) の、呼出し時の x87 深さ・double の値の実際の分布 | 本付録の入力は代表値の循環。 実呼出しの入力の分布は未測定 | #4147 (PLG-G2-50) |
