@@ -73,13 +73,16 @@ class は `results/m11_typeb_cause.md` の各 case 行の `class=` 欄。件数�
 
 - 生成元 `tests/trace_fullcompare_typeb.py` が R 行ごとに、L または呼出元の機械語にメモリ間接 call があり、IR の call 数 ≤ 直接 call 先数なら `D15`、それ以外は `other` を出す。この判定は `trace_diverge_unreachable.py` §1 (L のみ判定) より広い (呼出元も見る)。件数は `results/m11_typeb_cause.md` の `## R 類の D15 判定` 行が正本。
 - 結果: R 9 行 (xfill=0 5・xfill=1 4) はすべて `other`。D15 候補は 0。
-- ldfix 型は未判定。機械語のメモリ読み数と IR の load 数を比べる試作は、読み方の違い (スタック・spill の除外方法) で 0〜5 件と揺れたため採らなかった。判定基準の定義 (`docs/DEFECTS.md` の ldfix 行) を決めてから再判定する。
+- ldfix 型の判定: 機械語のメモリ読み数と IR の load 数を比べる試作は、読み方の違い (スタック・spill の除外方法) で 0〜5 件と揺れたため採らない。代わりに既存の検出器 `tools/m11/ldfix/audit_lsf.py` の判定 (SUSPECT_VAS / SUSPECT_USE_VAS / SUSPECT_DISP_VAS) を R 行の L・呼出元に当てる (`ldfix_kind`)。判定は 1 つでも出れば `ldfix`、なければ `none`。件数は `## R 類の ldfix 判定` 行が正本。
+- 結果: R 9 行はすべて `none` (ldfix 候補 0)。同じ検出器は全体では SUSPECT を出す (`41a670` で SUSPECT_VAS・SUSPECT_USE_VAS・SUSPECT_DISP_VAS がすべて立つ、陽性対照)。よって R 行の `none` は「検出器が見逃した」ではなく「その形が無い」と読める。
+- 残り: R 9 行は D15 でも ldfix でも説明できず、「その他」に残る。個別原因 (機構) は未特定。検出器の判定は関数単位 (L・呼出元の関数) なので、関数内の個別 site まで同定したものではない。
+- 集計の置き場: 受入条件は `trace_diverge_unreachable.py` §1b の拡張を指すが、R 判定は `trace_fullcompare_typeb.py` (完全 trace 版) に入れた。§1b は trace_head 基準の L のみ判定するため、R 9 行の呼出元・完全 trace を見られない。
 
 ## 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| R 類 (集計行の R 件数) の個別原因。D15 では説明できない (9 行とも `other`)。ldfix 型の判定基準が未定 | 型 B 受入条件 1 | #5113 (Refs) |
+| R 類 (集計行の R 件数) の個別原因。D15 でも ldfix でも説明できない (9 行とも `other`・`none`)。機構は未特定 | 型 B 受入条件 1 | #5113 (Refs) |
 | M 類の wasm MXCSR 戻り値 0 の修正効果 (`m11_ov.c` 上書きを liftdiff build に適用したときの一致) | M 類の解消可否 | #1034 (wasm 再ビルドが要る) |
 | X 類の修復 (xmm0 入力の接続・sig の float 引数) | X 類 | 既存 #547 (PLG-F2-4 の ARG pass 接続) |
 | ~~rax の直接計測 (runner の戻り値計装)~~ | 解決: LD-220 (#4466) で計測。下記「rax の直接計測」 | — |

@@ -138,3 +138,4 @@ fn=0xcd1a70 pat=p0 xfill=0 class=X L_full=0x40c660 typeB_full=B next(native,wasm
    L_x0(native,wasm)=0x224b,0x220b caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x2207 post=[-] jcc=-
 ## 集計 (xfill, class): [((0, 'M'), 4), ((0, 'R'), 5), ((0, 'X'), 25), ((1, 'M'), 2), ((1, 'R'), 4), ((1, 'X'), 28)]
 ## R 類の D15 判定 (xfill, 判定): [((0, 'other'), 5), ((1, 'other'), 4)]
+## R 類の ldfix 判定 (xfill, 判定): [((0, 'none'), 5), ((1, 'none'), 4)]
