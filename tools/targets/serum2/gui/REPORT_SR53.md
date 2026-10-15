@@ -3,7 +3,7 @@
 - 日付: 2026-10-15 / 親: #2175 (SR-44) / 前段: `REPORT_SR44.md` (測定 commit `917e48fc7`・PR #3407 merge 済み)
 - 範囲: 静的解析のみ。動的な確認 (FLEngine 起動・Serum2 の GUI 実行) は範囲外。
 - 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3` (x86_64-win)。sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` / 19,236,864 B (REPORT_SR44 と一致)。作業用 dir はリポジトリ外。
-- 測定 commit: `55b77e19a` (`slot17_vptr.py --root` の追加)。本ファイルの数値はすべてこの版の出力。`git diff 55b77e19a HEAD -- tools/targets/serum2/gui/*.py` は差分 0 行。
+- 測定 commit: `55b77e19a` (`slot17_vptr.py --root` の追加)。本ファイルの数値はすべてこの版の出力。`git diff 55b77e19a HEAD -- tools/targets/serum2/gui/slot_reach.py tools/targets/serum2/gui/slot17_vptr.py` は差分 0 行 (main 側の gui 差分 `arg_vtable_callers.py` 100 行は本解析の実行経路に含まれない)。
 
 ## 0. 結論
 
