@@ -93,7 +93,7 @@ def main():
                 if ins.mnemonic == "mov" and len(ops) == 2 and ops[0].type == capstone.x86.X86_OP_MEM \
                         and ops[0].mem.base not in (capstone.x86.X86_REG_RIP, capstone.x86.X86_REG_RBP,
                                                     capstone.x86.X86_REG_RSP) \
-                        and ops[0].mem.disp == disp and ops[0].mem.index == 0 \
+                        and ops[0].mem.disp == disp and ops[0].mem.index == 0 and ops[0].size == 8 \
                         and ops[1].type == capstone.x86.X86_OP_REG:
                     src = FAM.get(ins.reg_name(ops[1].reg))
                     if src in lea and seq - lea[src][1] <= WIN and is_vtable(raw, pe.sections, base, lea[src][0]):
@@ -104,7 +104,7 @@ def main():
                         and ops[1].mem.base == capstone.x86.X86_REG_RIP and ops[0].type == capstone.x86.X86_OP_REG:
                     v = ins.address + ins.size + ops[1].mem.disp
                     lea[FAM.get(ins.reg_name(ops[0].reg))] = (v, seq)
-                elif ops and ops[0].type == capstone.x86.X86_OP_REG and ins.mnemonic not in ("cmp", "test"):
+                elif ops and ops[0].type == capstone.x86.X86_OP_REG and ins.mnemonic not in ("cmp", "test", "push"):
                     lea.pop(FAM.get(ins.reg_name(ops[0].reg)), None)
             off = end if end > off else off + 1
     for addr, v, ops in hits:
