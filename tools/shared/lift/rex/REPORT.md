@@ -241,3 +241,6 @@ python3 tools/shared/lift/rex/importers.py <fl-win64 展開先> --json OUT.json 
 
 ### 9.4 再現
 - `FL_WIN64_DIR=<fl-win64 展開先> REX_SIDE=1 bash tools/shared/lift/rex/lift_x64c.sh all` (`REX_SIDE=0` も同じ)。配信物の確認は `cd tools/shared/work/lift/rex && find owner -type f | sort && sha256sum rex.wasm owner/rex_side.wasm`。
+
+### 9.5 測定後のコード差分 (差分 0 の証跡)
+`git diff 105733875 HEAD -- tools/shared/lift/rex tools/flelift tools/shared/env.sh ':(exclude)*.md'` の出力: 行数 0 (0 = コード差分なし)。HEAD は本 REPORT を含む commit (commit 2 は `845592bbc`)。
