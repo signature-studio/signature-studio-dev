@@ -70,10 +70,10 @@
 
 ## 6. 検証
 
-- 測定 commit: 本ファイルを含む修正 commit (§7 の `git diff` は、その commit から HEAD までの差分)。
+- 測定 commit: `a0d9722fe` (コード変更を含む最後の commit)。コミット済み HEAD で再測定した (clean 既定: survey ok 873・trap 22・miss 46・noproc 1・survey ptr 71001 / ON (`M11_FIX_50A830=1`): ok 872・trap 23・survey ptr 71005。どちらも survey の判定ゲートは既定の pin と一致しない = (b)(c) の数値そのもの)。
 - 修正前後の表 (§2 の最後の 3 行) で、修正後は「既定 → ON → 既定」の値が切替えごとに正しく変わる。
 - `tools/m11/m11_e2e.sh` の全体は未実行 (素材の full 再生成が必要で、run の時間上限に収まらない)。run・survey・tolerant・judge・gate は §2 の手順で個別に実行した。gate の結果: strict (101 ≠ 56) と survey (873 ≠ 872) は FAIL のまま (期待値は変えていない)。
 
 ## 7. 差分
 
-(PR 本文に `git diff <測定 commit> HEAD -- tools/m11` の出力を添える)
+`git diff a0d9722fe HEAD -- tools/m11` の出力は、本 commit (REPORT の §6・§7 の追記) だけで、コードの差分は 0 行。
