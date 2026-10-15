@@ -61,6 +61,19 @@ const seq = [
   ["channels.getChannelPan", [2]],
   ["channels.setChannelPan", [2, -0.5]],
   ["channels.getChannelPan", [2]],
+  ["channels.setChannelPitch", [0, 0.5]],
+  ["channels.setChannelPitch", [1, -2.5, 1]],
+  ["channels.setChannelPitch", [2, 47.5, 2]],
+  ["channels.setChannelPitch", [2, 0.5, 2]],
+  ["channels.setChannelPitch", [2, 1e30, 2]],
+  ["channels.setChannelPitch", [2, 1, 2, 0, true]],
+  ["channels.setChannelPitch", [0, 1, 7]],
+  ["channels.setChannelPitch", [0, NaN, 2]],
+  ["channels.setChannelPitch", [9, NaN, 2]],
+  ["channels.setChannelPitch", [9, 0.5]],
+  ["channels.setChannelPitch", [0, "x"]],
+  ["channels.setChannelPitch", [0]],
+  ["channels.setChannelPitch", [0, 1, 0, 0, 0, 0]],
   ["channels.setChannelColor", [1, 0x123456]],
   ["channels.getTargetFxTrack", [0]],
   ["channels.setTargetFxTrack", [0, 5]],
@@ -232,4 +245,7 @@ for (const [name, args] of seq) {
 }
 
 assert.deepEqual(diffs, [], `channels/playlist 差分 ${diffs.length} 件`);
+// ネガティブコントロール: index 範囲外の setChannelPitch は両側とも code 4 (Index out of range) になること (差分 0 が空振りでないことの確認)
+assert.deepEqual(run(mock, "channels.setChannelPitch", [9, 0.5]), { code: 4 });
+assert.deepEqual(run(wasm, "channels.setChannelPitch", [9, 0.5]), { code: 4 });
 console.log(JSON.stringify({ calls: seq.length, diffs: 0, PASS: true }));
