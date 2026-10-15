@@ -4,9 +4,9 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `9f225f5e0` (`hs_store_supplier.py` 追加。コードを変えた最後の commit)。`hs_disp_emu.py`・`hs_resp_src.py`・`hs_store_cov.py` は `origin/main` (`8635f4546`) から変更なし。
+- 測定 commit: `9f225f5e0` (`hs_store_supplier.py` 追加。コードを変えた最後の commit)。基準 run と `hs_store_cov.py` の数値は `origin/main` (`8635f4546`) で測った (その時点で `hs_store_supplier.py` は未存在)。`hs_disp_emu.py`・`hs_resp_src.py`・`hs_store_cov.py` は `8635f4546` から変更なし。
 - 素材: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B) だけを `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` で 1 件)。Python は venv に `unicorn 2.1.4`・`pefile`・`capstone 5.0.7`。
-- 基準 run の再現: `HS_DISP_PATH=1` の全 256 ID (既定・callee 戻り値 0)。73 秒 (実測 1 分 12.8 秒)。`distinct (rax, path) = 109` / unmapped 61 ID・5,340 件・200 組・197 ページ。`hs_store_cov.py`: 静的 69・基準被覆 30・未実行 39・no-case-store 202。3735 の値と全て一致。
+- 基準 run の再現: `HS_DISP_PATH=1` の全 256 ID (既定・callee 戻り値 0)。実測 1 分 12.8 秒 (`time` の real 72.8 秒)。`distinct (rax, path) = 109` / unmapped 61 ID・5,340 件・200 組・197 ページ。`hs_store_cov.py`: 静的 69・基準被覆 30・未実行 39・no-case-store 202。3735 の値と全て一致。
 - 実行は n=1。load は測定中 0.84 前後。
 
 ## 2. 受入 1: 11 件の供給元 (機械語から確定)
@@ -70,6 +70,6 @@ FL_WIN64_DIR=<展開先> python3 hs_store_supplier.py                           
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 3 件 (0x1320e23・0x13213f3・0x1322971) の受け手 vtable 先と、実行時の受け手オブジェクトの値 | 応答表への反映の可否 | 子 issue (本 run で起票) |
-| 8 件の即値格納の gate 入力 (`0x15e4790` 連鎖の初期化が書く値・`[rbp+0x89f]` の書込み元の経路) | 8 件を実行させる条件 | 子 issue (本 run で起票) |
+| 3 件 (0x1320e23・0x13213f3・0x1322971) の受け手 vtable 先と、実行時の受け手オブジェクトの値 | 応答表への反映の可否 | 子 #4443 (PLG-P0b-48) |
+| 8 件の即値格納の gate 入力 (`0x15e4790` 連鎖の初期化が書く値・`[rbp+0x89f]` の書込み元の経路) | 8 件を実行させる条件 | 子 #4444 (PLG-P0b-49) |
 | Phase A の回帰 (`dispatch=38 ff=0`) の実測 | 応答表は未変更のため影響なし。回帰の確認のみ | 本 PR の未解決表。素材 (`fw_flat4_canon3.ll` 等) と emsdk が揃う run で実施 |
