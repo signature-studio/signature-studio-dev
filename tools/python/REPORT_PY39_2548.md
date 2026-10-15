@@ -80,7 +80,7 @@ item の field と clamp (`0x130f5f8`〜`0x130f68c` で確認):
 
 ## PY-78 追補 (#2581): 項目書換え規則 (param 0〜8) の確定と provider / mock 実装
 
-- 測定: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py 0x130f3d0 330`・`0x130f200 130` (各 1 回・終了 0)。展開: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` (2.9 秒)。
+- 測定: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py 0x130f3d0 330`・`0x130f200 130` (各 1 回・終了 0)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` (2.9 秒)。
 - 測定 commit: `add61c2c` (実装の最後の commit)。
 
 ### 呼出し (PE 実測)
