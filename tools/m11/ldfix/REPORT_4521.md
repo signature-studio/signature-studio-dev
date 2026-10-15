@@ -34,7 +34,7 @@
 
 ## 3. 検証
 
-測定 commit: コード変更の最後の commit (本 PR の commit)。
+測定 commit: **`50ccce1dc`** (コード変更の最後の commit)。コード差分 (測定 commit から HEAD まで): `git diff 50ccce1dc HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/ldfix_e2e.sh` は空 (本 PR の後の commit は REPORT・PR 本文のみ)。
 
 `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` (rc 0・wall 58.77 s・user 53.34 s・load 0.68 (10:00 時点)):
 
