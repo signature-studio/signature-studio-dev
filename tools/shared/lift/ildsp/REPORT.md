@@ -204,6 +204,6 @@ GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0・42 命令・直接 call / 間�
 |---|---|---|
 | 間接 call 4 件 (0x1aedc0 の 3 件・0x1b6f4c の 1 件) の扱い | 候補 A の closure を完全に検証できない | #2528 (T-SH-38) と子 #3300 |
 | slot 1–3 (0x161fc0・0x162760・0x162f90) の lift と差分 | vtable の残り method が未 lift | 子 #3299 (T-SH-61) |
-| slot 5 (0x1aa470, `xor eax,eax; ret`) | 本 PR に含めない | 未起票 (必要なら #3299 に含める) |
+| slot 5 (0x1aa470, `xor eax,eax; ret`) | 本 PR に含めない | 子 #3299 (T-SH-61) の受入条件に追記 |
 | CreateInstance 本体 (候補 A、36 関数・961 命令) | 本 PR の範囲外 | 子 #3300 (T-SH-62) |
 | 候補 A の命令数: 961 (`ildsp_closure.json`) と 924 (本 REPORT §4-5) の数え方の不一致 | 選定根拠の数値の正本が未確定 | 子 #3300 (数え方を統一) |
