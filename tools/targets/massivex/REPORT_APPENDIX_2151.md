@@ -154,3 +154,33 @@
 - 差し替え点 (`mx_lic_stub.py` の RULES): 未確定のまま (呼び出し元が無いため、呼び出し側に差し替え点を置けない)。
 - 残件の起票先: #2195 [MX-32] (PR 本文の未解決表の 4 行)。残る作業は静的走査の外 (動的な確認手段) である。
 - e2e (wasm) は本 run で対象コードを変えていないため未実行 (§12.6・§12.10 が正本)。
+
+### 12.16 MX-32 (#2195) の間接参照走査: N5 読み手・N6 呼び出し元は未確定 (測定 commit `6c63b66a`・2026-10-15)
+
+- 素材: `plugins-massivex` → `$RUNNER_TEMP/mx` → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work/key key`。DLL = 95,249,816 B、md5 `9b3f9107a7b2d7ccd9146622bb39eefb` (§12.12〜§12.15 と一致)。
+- 走査器 `license/scripts/mx_dll_indirect.py` (新規・`--selftest` PASS rc 0)。実行 `python3 license/scripts/mx_dll_indirect.py` (rc 0・実測 6 min 54 s・load 1.02)。出力は `work/` のみ (非コミット)。
+- 検出条件: `.text` の全バイト位置で disp32 を変位 4・5・6・8 の RIP 相対として評価し、復号できる命令が RIP 相対 mem を持つもの、または `.text` 内を指す rel32 の call/jmp/jcc だけを採用 (`.rdata` への call は復号の誤りとして除外)。
+
+| 項目 | 結果 |
+|---|---|
+| S1 RIP 相対 (領域内の任意 offset) | N5 blob `[0x184862000,0x184863000)` 25 件・N5 UTF-16 `[0x18414c000,0x18414e000)` 5 件・N6 blob `[0x184fe7000,0x184fe9000)` 237 件・N6 blob2 `[0x184ffc000,0x184ffe000)` 246 件 |
+| S1 うち N5 文字列 span `[0x184862d19,0x184862f10)` / `MXDemoPopup.qml` UTF-16 `[0x18414cd91,0x18414cdb5)` への参照 | 0 件 / 0 件 |
+| 領域内の絶対 8B・RVA 4B (全セクション) | N5 blob: abs8 2 件 (`.rdata` `0x184863628`・`0x184863630` が `0x184862ab0`・`0x184862fa0` を指す。N5 の開始位置ではない)・rva4 5 件。UTF-16 領域: abs8 0・rva4 126 件 (整列・表の裏付けは未判定) |
+| S2 表 (RIP mem の実効先 B 106,737 件、B から 2048 entry の 4B 符号付き・2B 符号付き/符号なし) | N5 `0x184862d19` 2 件・`0x184862e67` 3 件・`0x184862e7a` 3 件・UTF-16 0 件。N6 読み手 8 件は各 0 件。N6 文字列 8 件は 36〜332 件 |
+| S2 対照 (同じ領域内の非文字列 VA 各 8 件) | N5 近傍 3〜31 件・N6 近傍 48〜362 件。対象の件数は対照と同じ水準のため、偶然一致と判定 |
+| S3 読み出し経路 | `0x181733070`: RIP 0・abs8 0・rva4 0 (読み出し元なし)。`0x184021d48`: RIP 0 (唯一の参照は `0x1838565d4` の `call 0x184021d48`。`.rdata` への call のため偶然一致) |
+
+- **ラベルの訂正**: `0x184862d19` は `demoExpiredChanged`、`0x184862e67` は `demoExpired` (文字列ダンプで確認)。§12.12〜§12.15 と `mx_dll_relscan.py` の N5 ラベルは入れ替わっている。アドレスは正しい。`mx_dll_table_refs.py` のラベルは正しい。
+- **N5 文字列の正体 (仮説・未検証)**: `0x184862c78` の `Lechtal::MX::Gui::MXFrameController` に続く NUL 区切りの名前列 (`demoPopupVisibleChanged`・`demoExpiredChanged`・`demoExpired`・`subscriptionExpired` …) は Qt の moc 文字列表の形。N5 の 4 文字列は Qt メタオブジェクトの名前で、読み手は個別の関数ではなく Qt の meta-object 機構 (インデックス・オフセット経由) の可能性が高い。UTF-16 `MXDemoPopup.qml` も Qt リソース名の列の一部。どちらも VA を直接指す参照は作られないため、本走査では捉えられない。
+
+- **`0x1838544f0` の部分 decode の原因 (確定)**: `0x1838545ba` の `85 00` (test dword ptr [rax], eax・2 B) は閉じている。`0x1838545bc` の単独の `00` は直前の命令の続きではない。線形復号はこれを `add byte ptr [rcx-0x48], cl` (`00 49 b8`・3 B) として取り、`0x1838545bd` の `movabs r8, 0x07ffffffffffffff` (`49 b8` + 8 B) の REX (`49`) を食う。以後 `ff` が続き、`0x1838545bf` から invalid になる (スクリプト外のインライン確認: 関数先頭からの線形で invalid 115 件)。`0x1838545bd` から復号すると `0x1838545c7` (`cmp byte ptr [rcx+0x19], r13b`) で整合する。`0x1838545bc` の 1 バイトを置いた理由 (データ・パディング・難読化) は未確定。
+- `.pdata` の x64 本体判定は §12.15 (a) で確定済み (本節では再測定していない)。
+
+判定:
+- 受入 1 (N5 読み手の特定): **未達**。直接・RIP 相対・絶対・RVA・自己相対・表 (S2) のいずれでも、N5 span・UTF-16 `MXDemoPopup.qml` への参照は 0 件。読み手は Qt の meta-object 機構の可能性がある (仮説)。
+- 受入 2 (N6 読み手 8 件の呼び出し元): **未達**。rel32 の直接 call/jmp は §12.15 (d) の全バイト走査で 0 件 (本節では再実行していない)。RIP 相対・絶対・RVA・表 (S2) は 0 件 (表の N6 読み手 hit は 0)。残るのは実行時にだけ決まる経路 (静的の形式は尽きた)。
+- 受入 3 (`0x1838544f0` の部分 decode の原因): **確定** (上記)。
+- 受入 4 (`0x181733070` の読み出し経路・表 idx 239): 読み出し経路は**見つからない** (RIP・絶対・RVA 0 件)。表基準 `0x184021d48` は RIP 参照 0 件のため、idx 239 の判定は偶然一致とする。
+- 差し替え点 (`mx_lic_stub.py` の RULES): 未確定のまま変更しない (呼び出し元が無いため、呼び出し側に差し替え点を置けない)。
+- e2e (wasm) は本 run でコードを変えていないため未実行。
+- 未解決 (起票先 #2195): (1) N5 読み手: Qt moc 文字列表 (`MXFrameController`) の構造と、その表を指す `staticMetaObject`・`qt_static_metacall` の逆引き。(2) N6 呼び出し元: 実行時の呼び出し記録 (動的な確認手段) の選定。
