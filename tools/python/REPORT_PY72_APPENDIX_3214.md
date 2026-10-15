@@ -8,10 +8,10 @@
 
 ### 測定
 
-- 測定 commit: `44235515` (`pe_scan_store.py` に dword/qword の指定を追加。コードを変えた最後の commit)。以降の commit は本節の REPORT だけ。`git diff 44235515 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
-- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (1.6 秒。`--wildcards` は使わない)。素材は `$ARTIFACTS_DIR` の実在を確認してから使った (`fl-win64.tar.zst` 2.3 GB)。展開先は repo 外。
-- 実行: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <N>`・`pe_xref.py <VA>`・`pe_callgraph.py callers <VA>`・`pe_scan_store.py 0x2f4 dword` (30 hits・19.5 秒)。`pe_xref.py 0x1001b70,0xffe290` は instructions=5,022,467 hits=0 stores=0 (34.2 秒)。`pe_callgraph.py callers 0xffe290,0x1001b70` は直接 call 0 件。
-- 補助 (repo 外の一時スクリプト): `.text` の即値 0x550・0x562・0x150・0x162 の走査 (capstone・IMM オペランド)、`.data` の 8 バイト絶対ポインタ走査 (`.data` 内の .text を指す値 12,894 件)。
+- 測定 commit: `6951c076` (`origin/main` 取り込みの merge。測定した 4 ツール (`analysis/flapi/pe_disasm.py`・`pe_xref.py`・`pe_callgraph.py`・`pe_scan_store.py`) は `44235515` (`pe_scan_store.py` に dword/qword の指定を追加) から無変更)。`git diff 44235515 HEAD -- analysis/flapi/pe_disasm.py analysis/flapi/pe_xref.py analysis/flapi/pe_callgraph.py analysis/flapi/pe_scan_store.py` の出力は 0 行。main 由来の差分 (`host`・`provider`・`tests`・`analysis/py167_flr_pyc.py`・`analysis/py68_vmt.py`・`analysis/flapi/pe_flrack_flr_probe.py`) は測定対象外。以降の commit は本節の REPORT だけ。
+- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (測定 run では 2.8 秒。`--wildcards` は使わない)。素材は `$ARTIFACTS_DIR` の実在を確認してから使った (`fl-win64.tar.zst` 2.3 GB)。展開先は repo 外。
+- 実行 (測定 commit `6951c076` の HEAD。load average (1 分値) は開始 00:11 UTC 0.09・終了 00:14 UTC 0.89): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA>`・`pe_xref.py <VA>`・`pe_callgraph.py callers <VA>`・`pe_scan_store.py 0x2f4 dword`。`pe_disasm.py` は `0xd5a9ad`・`0xd84498`・`0x617920`・`0x6178e0` の 4 件 (各 0.08 秒・終了 0。`0xd5a9ad` に `mov edx, 0x550`・`call 0x425210`、`0xd84498` に `mov edx, 0x562`・`call 0x425210`)。`pe_scan_store.py 0x2f4 dword` は hits 30 (35.7 秒)。`pe_xref.py 0x1001b70,0xffe290` は instructions=5,022,467 hits=0 stores=0 (62.4 秒)。`pe_callgraph.py callers 0xffe290,0x1001b70` は直接 call 0 件 (36.4 秒)。すべて終了 0。所要は前回 (`44235515` 時点) の xref 34.2 秒・scan 19.5 秒より長い。原因は未確認 (結果の数値は一致)。
+- 補助 (repo 外の一時スクリプト。44235515 時点で実施し、今回の再測定の対象外): `.text` の即値 0x550・0x562・0x150・0x162 の走査 (capstone・IMM オペランド)、`.data` の 8 バイト絶対ポインタ走査 (`.data` 内の .text を指す値 12,894 件)。
 
 ### 結論 (PE 実測で確定した範囲)
 
