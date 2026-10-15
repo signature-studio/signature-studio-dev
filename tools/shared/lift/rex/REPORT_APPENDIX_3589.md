@@ -64,3 +64,28 @@ movnti は memset (`f_18001c8f0`・8 箇所) の大ブロック経路にだけ�
 | fn=1 (REXGetInfo) では movnti に到達しなかった (memset の前の node 参照で落ちる) | fn=1 からの到達は未確認 | #3587 [T-SH-88] (open。fn=1 の成功経路の入力を扱う。閉じた #3588 から付け替え) |
 | memcpy 16 箇所の間接 call 経路 (`f_18001f260` = `ott_dispatch` の register 間接 call 6 箇所の表・`case 0x3001ca80` に memmove) からの到達 | 「memcpy は不要」は直接 call と定数参照の静的読みに限る | 未起票 (追跡のみ。子は起票しない。本表で追跡) |
 | 本番の host が REXGetCreatorInfo に渡す a1 の値域 | 到達が本番で起きるかの判断 | [未確認]。依頼者が FL 側の呼出し値で確認する |
+
+## 付録: #3893 (T-SH-93) の実装と実測 — i_movnti の追加
+
+- 変更: `tools/flelift/x64c.py` に `i_movnti` を追加 (`i_mov` へ委譲。単一スレッドでは通常の store と同じ)。lift 出力の差分は movnti 24 行の `ott_unsup` → `ST64` のみ (lift 出力比較: main と同じ DLL・同じ引数で `diff` 48 行 = 24 削除 + 24 追加。他の行は不変)。
+- 実測 (`lift_x64c.sh movnti`): `ott_unsup` (movnti VA `0x18001c9a0`) は消えた。reach 16 件は wasm が `memory access out of bounds` (VA 0) で trap する。`FLE_CHK` を有効にした build で、`rcx = 0xd8a01030` の書込みと、その後の `0xd8a016b8` (境界外) の読み出しを確認。native も同じ入力で arena 外 (0x30110000) で落ちる。
+- 原因: memset (`count ≥ 0x70000`) が 64 KiB の arena を越えて書く。native と wasm の両方が同じ越境で落ちるため、受入 1 (「trap せず memset が完了する」) は、この入力の作り方では満たせない。
+- 判定: `movnti_check.py` は「movnti VA で trap」を前提にしているため、16/16 が NG (RESULT FAIL)。受入 2 の `all` はこの点で FAIL のまま。
+- 受入 2 の内訳 (実測): `ok` PASS (exit 0・owner 一覧 OK) / `neg-cmp` FAIL 検出 (期待どおり) / `neg-ctx` FAIL 検出 (期待どおり) / `neg-owner` FAIL 検出 (期待どおり)。
+- 未解決: reach 16 件を arena 内で完了させる入力 (または harness の arena モデル) の決定。子 issue に分ける。
+
+## 付録 (review r1 対応): movnti の gate 期待値 (#4324 既知の未達) と再測定
+
+- 変更: `movnti_check.py` の判定を 2 つに分けた。(1) 実装判定 = `fle_lifted.c` の movnti の `ott_unsup` が 0 件 (#3893。1 件でも残れば FAIL)。(2) reach 16 件 = 既知の未達 (#4324)。reach は「native が arena 外で落ちる」だけを判定し、wasm が movnti 経路を完了したかは判定しない。`movnti` の結果行に 0/16 を既知として出す。`lift_x64c.sh` の `all` は既知の状態で ALL OK になる。期待値を変えた理由: x64c が movnti を ST64 に lift したため、旧判定 (movnti VA で trap) は構造的に成り立たなくなった。解消条件: #4324 で reach 16 件を arena 内で完了させる。解消したら reach 判定を「wasm が完了する」に戻す。
+- 測定 commit: `143b84a9a` (main 取り込み後の merge commit。`movnti_check.py` の解消を含む最後のコード変更)。`all` を foreground で 1 回 (rc 0・ALL OK・real 12 s・load 0.04 0.20 0.17 → 0.19 0.23 0.18)。
+  - ok: PASS・比較 223・一致 223・不一致 0 (296 case・native crash 除外 73)・owner 一覧 `owner/rex_side.wasm` で期待どおり (3 s)。
+  - neg-cmp: 期待どおり FAIL 検出 (比較 223・一致 222・不一致 1)。
+  - neg-ctx: 期待どおり FAIL 検出 (比較 223・不一致 223)。
+  - neg-owner: 期待どおり FAIL 検出 (一覧 `owner/rex_glue.c owner/rex_side.wasm`・期待 `owner/rex_side.wasm`)。
+  - movnti: 実装 OK (ott_unsup 0 件)・reach native 境界外 16/16・wasm 完了 0/16 (既知の未達 #4324)・trap VA=0 が 12 件・trap 記録なし 4 件。1 s。
+- 直前の測定 (round 2・`c7ad74763`・main 取り込み前): `all` は ALL OK (real 23 s)。merge 後の値 (上) で置き換える。
+- main 取り込みでの判定の扱い: main (#3894・`22b39992c`) の `movnti_check.py` は sweep 閾値 (movnti に入る ⇔ a1 ≥ 0x70000) を「movnti の VA で trap する」で判定していた。本 PR で x64c が movnti を ST64 に下ろしたため movnti の VA で trap しない。main の sweep 判定を残すと `all` が必ず FAIL になるので、本 PR では sweep の閾値判定を判定に入れず、表示のみにした (未解決 #3894 で扱う)。kind 名は main の `sweep` に合わせた。
+- 素材: `toolchain-emsdk.tar.zst` と `fl-win64.tar.zst` を `$RUNNER_TEMP` (repo 外) に展開し、`EMSDK_ENV` で展開した emsdk を使った (上流 install はしていない)。round 1 の上流 emsdk による実測は、この素材版の実測で置き換えた。
+- 今回の case 数 (296 件・比較 223) は §2 の 248 件・比較 175 と一致しない。原因: `gen_cases.py` が 55fe773b2 以降に変わり (成功経路の case を追加。`git diff 55fe773b2 HEAD -- tools/shared/lift/rex/gen_cases.py`)、その後の `native_ref.c` / `crash_class.py` 等も変わった。§2 の数値は 55fe773b2 の入力に対するもので、現 HEAD の入力では再現しない。現 HEAD の値 (296・223) を正とする。
+- lift 差分 (main `59ca0477f` と本 PR の `x64c.py` を同 DLL・同引数で比較): `fle_lifted.c` は movnti 24 行の `ott_unsup` → `ST64` のみ (48 行)。`lift_meta.json` は movnti 24 サイトの `unsup` / `unsup_sites` の削除のみ (他は不変)。
+- memcpy 16 箇所の間接 call 経路: 未起票。`docs/WORKFLOW.md` §3 の規則で、「未解決の追跡」だけの子は起票しない。本付録 §4 と PR 本文の未解決表で追跡する。
