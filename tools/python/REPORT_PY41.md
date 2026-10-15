@@ -214,7 +214,7 @@
 
 - 素材 `oc_artifacts: fl-win64` (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`・2.8 秒)。`analysis/py53_dispatch.py` → `fn=4664 r8d_tests=174` (0.1 秒・uptime load 0.06〜0.15)。
 - 母集団 (検算): `[rbp+0x5c0]` の参照は 186 件。fn のバイト走査 (`c0 05 00 00`) と capstone の件数が両方 186 で一致。内訳は test 173・and 1 (判定の母集団 174)、mov+and+cmp+jcc 5、値の受け渡し 6、格納 1。
-- 照合 (別算法): `analysis/py65_r8d_bits.py` が objdump で 174 件を取り直し、VA・種別・マスク・次の jcc/setcc・分岐先を比べる → **174/174 一致・mismatch 0**。`--negctl` (先頭 1 件のマスク 0x8a1→0x8e1) は **mismatch 1 を検出**。0x104a835 の `setne` は bool を `[rbp+0x51e]`/`[rbp+0x51d]` へ格納 (0x104a829・0x104a83d)。
+- 照合 (別算法): `analysis/py65_r8d_bits.py` が objdump で 174 件を取り直し、VA・種別・マスク・次の jcc/setcc・分岐先を比べる → **174/174 一致・mismatch 0**。`--negctl` (先頭 1 件のマスク 0x8a1→0x8e1) は **mismatch 1 を検出**。0x104a821 の `setne` (0xffffffdd) は bool を `[rbp+0x51e]` へ (0x104a829)、0x104a835 の `setne` (0x2) は `[rbp+0x51d]` へ (0x104a83d)。
 
 ### ビット別の作用 (判定 174 件・分岐先は VA。je は「ビット落ちで分岐」、jne は「ビット立ちで分岐」)
 
