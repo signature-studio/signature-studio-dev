@@ -59,9 +59,9 @@ sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `4256c0` (%tagPOINT) の POINT 値が `m11_tr_` で渡らない (`tools/m11/m11_post.py` の生成が `zeroinitializer` を渡す)。`MACHINE_ENTRY` に入れられない | 実行不能 1 | [LD-179] |
-| 残り 6 件 (`442a50` `442b90` `664890` `6649b0` `6649c0` `664a80`) の入口型を機械語で確定していない | 実行不能 6 | [LD-180] |
-| `653c80` `691dd0` の native segv (691dd0 は rcx のオブジェクト内容、653c80 は fault addr 未記録)。`irtool.instrument` が IR の i128 入口を `0` と記録する (callee の入口比較の偽陽性の源。sample:800 への影響は未測定) | 実行不能 2・比較の信頼性 | [LD-181] |
+| `4256c0` (%tagPOINT) の POINT 値が `m11_tr_` で渡らない (`tools/m11/m11_post.py` の生成が `zeroinitializer` を渡す)。`MACHINE_ENTRY` に入れられない | 実行不能 1 | #3862 ([LD-179]) |
+| 残り 6 件 (`442a50` `442b90` `664890` `6649b0` `6649c0` `664a80`) の入口型を機械語で確定していない | 実行不能 6 | #3863 ([LD-180]) |
+| `653c80` `691dd0` の native segv (691dd0 は rcx のオブジェクト内容、653c80 は fault addr 未記録)。`irtool.instrument` が IR の i128 入口を `0` と記録する (callee の入口比較の偽陽性の源。sample:800 への影響は未測定) | 実行不能 2・比較の信頼性 | #3864 ([LD-181]) |
 
 ## 5. 検証
 
