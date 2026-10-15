@@ -67,9 +67,11 @@ for i in range(n):
 compared = n - len(crashed)
 
 cov = {'compared': compared, 'native_crash_excluded': len(crashed), 'distinct_rax': len(rax_hist),
-       'import_cases': hit_cases, 'ctx_null': ctxnull, 'fn0': fns.count(0), 'fn1': fns.count(1)}
+       'import_cases': hit_cases, 'ctx_null': ctxnull, 'fn0': fns.count(0), 'fn1': fns.count(1),
+       'rax1_success': rax_hist[1], 'rax3': rax_hist[3], 'write_cases': w_any}
 cov_ok = (compared >= n // 2 and cov['distinct_rax'] >= 2 and cov['import_cases'] >= 1 and cov['ctx_null'] >= 1
-          and cov['fn0'] >= 1 and cov['fn1'] >= 1)
+          and cov['fn0'] >= 1 and cov['fn1'] >= 1 and cov['rax1_success'] >= 1 and cov['rax3'] >= 1
+          and cov['write_cases'] >= 1)
 print('[diff] cases=%d compared=%d match=%d mismatch=%d native_crash_excluded=%d' % (n, compared, compared - len(bad), len(bad), len(crashed)))
 print('[diff] first mismatches (case, byte offset in record): %s' % bad[:5])
 print('[diff] writes (入力 arena・初期 .data から変化した case, ctx 除く): any=%d arena=%d data=%d / compared=%d' % (w_any, w_arena, w_data, compared))
