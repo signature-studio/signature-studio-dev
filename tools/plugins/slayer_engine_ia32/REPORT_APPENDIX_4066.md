@@ -26,8 +26,8 @@
 ## 2. 再現手順
 
 ```sh
-export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64
-tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 --wildcards '*block22434_PE.bin'
+export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64    # 素材 [WIN64] (docs/REFERENCES.md)
+mkdir -p $FL_WIN64_DIR && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $FL_WIN64_DIR --wildcards '*block22434_PE.bin'
 python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --classify
 ```
 
@@ -37,5 +37,5 @@ python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --classify
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 独立入口 4 本 (`100052d0`・`10005550`・`10009bc4`・`1000bf1e`) の `TARGETS` 投入と native/wasm 突合 | 受入条件 2 の前半が未達 | [PLG-G2-43] 子 issue (親 #4066) |
-| 断片 6 本の親関数の入口の確定と、親の入口での試験 | 受入条件 2 の後半が未達。 断片の単独呼出しは試験対象にならない | [PLG-G2-43] 子 issue (親 #4066) |
+| 独立入口 4 本 (`100052d0`・`10005550`・`10009bc4`・`1000bf1e`) の `TARGETS` 投入と native/wasm 突合 | 子へ移した範囲。 本 issue では行わない | #4080 (親 #4066) |
+| 断片 6 本の親関数の入口の確定と、親の入口での試験 | 子へ移した範囲。 断片の単独呼出しは試験対象にならない | #4080 (親 #4066) |
