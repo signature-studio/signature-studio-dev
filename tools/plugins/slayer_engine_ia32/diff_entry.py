@@ -99,6 +99,22 @@ def compare(exp_path, act_path, n_expected):
     return 1 if bad else 0
 
 
+def build():
+    nat = os.path.join(WORK, 'native_entry')
+    t_nat_build = run(['gcc', '-m32', '-O1', '-fno-pic', '-fno-pie', '-fno-stack-protector', '-fcf-protection=none',
+                       '-fno-asynchronous-unwind-tables', '-ffreestanding', '-nostdlib', '-static', '-no-pie',
+                       '-o', nat, os.path.join(HERE, 'native_entry.c')], 'native build')
+    mjs = os.path.join(WORK, 'wasm_entry.cjs')
+    t_wasm_build = run(['emcc', '-O1', '-ffp-contract=off', '-fno-fast-math', '-w', '-I', RT, '-I', HERE,
+                        os.path.join(HERE, 'rt32_glue.c'), LIFT, os.path.join(RT, 'ott_cpu.c'),
+                        '-Wl,--allow-multiple-definition',   # ott_cpu.c の x64 規約の imp_* を rt32_glue.c (ia32 規約) が先勝ちで上書き
+                        '-sENVIRONMENT=node', '-sMODULARIZE=1', '-sEXPORT_NAME=createModule', '-sEXIT_RUNTIME=0',
+                        '-sEXPORTED_FUNCTIONS=_ott_call32', '-sEXPORTED_RUNTIME_METHODS=HEAPU8',
+                        '-sGLOBAL_BASE=%d' % 0x11000000, '-sSTACK_SIZE=2097152', '-sINITIAL_MEMORY=%d' % 0x14000000,
+                        '-sALLOW_MEMORY_GROWTH=0', '-o', mjs], 'wasm build (emcc)', timeout=900)
+    return nat, t_nat_build, mjs, t_wasm_build
+
+
 def effect_count(exp_path, scen_rows):
     changed = 0
     for row, line in zip(scen_rows, open(exp_path).read().splitlines()):
@@ -119,18 +135,7 @@ def main():
     print('[scen] entries %d x %d = %d 行 (seed %d)' % (len(ENTRIES), N_PER_ENTRY, len(rows), SEED))
     if not os.path.isfile(LIFT):
         sys.exit('[diff_entry] FAIL: %s が無い (lift_text.py を先に実行)' % LIFT)
-    nat = os.path.join(WORK, 'native_entry')
-    t_nat_build = run(['gcc', '-m32', '-O1', '-fno-pic', '-fno-pie', '-fno-stack-protector', '-fcf-protection=none',
-                       '-fno-asynchronous-unwind-tables', '-ffreestanding', '-nostdlib', '-static', '-no-pie',
-                       '-o', nat, os.path.join(HERE, 'native_entry.c')], 'native build')
-    mjs = os.path.join(WORK, 'wasm_entry.cjs')
-    t_wasm_build = run(['emcc', '-O1', '-ffp-contract=off', '-fno-fast-math', '-w', '-I', RT, '-I', HERE,
-                        os.path.join(HERE, 'rt32_glue.c'), LIFT, os.path.join(RT, 'ott_cpu.c'),
-                        '-Wl,--allow-multiple-definition',   # ott_cpu.c の x64 規約の imp_* を rt32_glue.c (ia32 規約) が先勝ちで上書き
-                        '-sENVIRONMENT=node', '-sMODULARIZE=1', '-sEXPORT_NAME=createModule', '-sEXIT_RUNTIME=0',
-                        '-sEXPORTED_FUNCTIONS=_ott_call32', '-sEXPORTED_RUNTIME_METHODS=HEAPU8',
-                        '-sGLOBAL_BASE=%d' % 0x11000000, '-sSTACK_SIZE=2097152', '-sINITIAL_MEMORY=%d' % 0x14000000,
-                        '-sALLOW_MEMORY_GROWTH=0', '-o', mjs], 'wasm build (emcc)', timeout=900)
+    nat, t_nat_build, mjs, t_wasm_build = build()
     nat_out = os.path.join(WORK, 'native_out.txt')
     wasm_out = os.path.join(WORK, 'wasm_out.txt')
     load = os.getloadavg()[0]

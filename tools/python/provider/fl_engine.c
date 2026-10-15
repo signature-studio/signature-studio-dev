@@ -51,6 +51,9 @@ static int64_t disp_time;
 static int browser_op;
 static int64_t arr_time;
 static int scr_blanked, scr_unblank, scr_active;
+static int scr_alive, scr_menu_show, scr_dirty;
+static int64_t scr_setup_l;
+static int scr_setup_t[5];
 /* PY-224 (#3628): getGridBitWithLoop の loop 行 T[G1] (G1 = 1・G2 = 24)。行の作成経路 (0x12da6d0・PY-223) は未モデルで、既定は行なし (.bss の 0)。テストは fl_engine_loop_set / fl_engine_loop_add で置く */
 #define LP_N 8
 #define LP_G2 24
@@ -96,6 +99,7 @@ void fl_engine_reset(void) {
     sel_start = -1; sel_end = -1;
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
+    scr_alive = 0; scr_menu_show = 0; scr_dirty = 0; scr_setup_l = 0; for (int i = 0; i < 5; i++) scr_setup_t[i] = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
     midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
     lp_row = lp_flag49e = lp_flag54 = lp_n = 0;
@@ -570,6 +574,18 @@ FL_H(general, getProjectGenre) { NARGS(0, 0); return fl_ret_s(c, proj_genre); }
 /* PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない */
 FL_H(general, clearLog) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(general, dumpScoreLog) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
+/* PY-235 (#3701): 成功経路 (gate 0 を仮定) は戻り値 = value (int32)。family の定義は host/fl_mock.mjs の recPassFamily と同一 (REPORT_PY235) */
+static int rec_pass_family(uint32_t e) {
+    return (e & 0xffff) != 8 && ((e >= 0x10000000u && e < 0x40000000u) || (e >= 0x40000003u && e <= 0x40000004u) || (e > 0x40000005u && e < 0x70000000u) || e >= 0xf0000000u);
+}
+FL_H(general, processRECEvent) {
+    NARGS(3, 3);
+    uint32_t e = (uint32_t)A_INT(0, 0);
+    int64_t v = A_INT(1, 0);
+    (void)A_INT(2, 0);
+    if (!rec_pass_family(e)) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error (not implemented: general.processRECEvent)");
+    return fl_ret_i(c, (int32_t)v);
+}
 /* PY-119 (#2977): PE 0xd69350/0xd694e0/0xd69670 は範囲外で status -3 (Range error)。ゲートは未確定のため真と仮定 (REPORT_PY119_2977) */
 static int numerator = 4, denominator = 4;
 FL_H(general, setRecPPQ) { NARGS(1, 1); int64_t v = A_INT(0, 0); if (v < 24 || v > 960) RANGE_MSG("Range error"); rec_ppq = (int)v; return fl_ret_none(c); }
@@ -639,22 +655,46 @@ FL_H(screen, isUnBlank) { NARGS(0, 0); return fl_ret_b(c, scr_unblank); }
 FL_H(screen, getScreenActiveCounter) { NARGS(0, 0); return fl_ret_i(c, scr_active); }
 FL_H(screen, setScreenActiveCounter) { NARGS(1, 1); scr_active = (int)((unsigned)scr_active + (unsigned)A_INT(0, 0)); return fl_ret_none(c); }
 FL_H(screen, unBlank) { NARGS(1, 1); scr_unblank = A_INT(0, 0) == 1; return fl_ret_none(c); }
+/* ---- screen 初期化・メニュー系 (10) ---- PY-136 (#3025): PE 0xd7aa40・0xd7ab00・0xd7b0a0・0xd7b000・0xd7ccb0・0xd7b1f0・0xd7b170・0xd7c9a0・0xd7cac0・0xd7cbe0 (REPORT_PY136)。
+   scr は init で生成し deInit で破棄する。scr 未生成の経路は PE で AV (例外を返さない) なので Unspecified error を仮置き */
+#define SCR_NEED() do { if (!scr_alive) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error"); } while (0)
+static void scr_new(void) {
+    static const int def[5] = {30, 10, 10, 2, 4000};
+    scr_alive = 1; scr_dirty = 0; scr_menu_show = 0; scr_setup_l = 0;
+    for (int i = 0; i < 5; i++) scr_setup_t[i] = def[i];
+}
+FL_H(screen, init) { NARGS(6, 6); scr_new(); return fl_ret_none(c); }
+FL_H(screen, setup) { NARGS(6, 6); SCR_NEED(); scr_setup_l = A_INT(0, 0); for (int i = 0; i < 5; i++) scr_setup_t[i] = (int)A_INT(i + 1, 0); return fl_ret_none(c); }
+FL_H(screen, update) { NARGS(0, 0); if (scr_alive) scr_dirty = 0; return fl_ret_none(c); }
+FL_H(screen, deInit) { NARGS(0, 0); scr_alive = 0; scr_dirty = 0; scr_menu_show = 0; return fl_ret_none(c); }
+FL_H(screen, keepDisplayActive) { NARGS(0, 0); if (scr_alive) scr_dirty = 1; return fl_ret_none(c); }
+FL_H(screen, hideMenu) { NARGS(0, 0); SCR_NEED(); scr_menu_show = 0; return fl_ret_none(c); }
+FL_H(screen, menuShowing) { NARGS(0, 0); SCR_NEED(); return fl_ret_b(c, scr_menu_show); }
+/* メニュー項目の選択・移動は PE で scr 有りのときだけ helper を呼ぶ。helper の効果は未同定 (REPORT_PY136) */
+FL_H(screen, menuItemClick) { NARGS(0, 0); return fl_ret_none(c); }
+FL_H(screen, menuNext) { NARGS(0, 0); return fl_ret_none(c); }
+FL_H(screen, menuPrev) { NARGS(0, 0); return fl_ret_none(c); }
 
 /* ---- device (5, MIDI scripting 用の最小面) ---- mock と同じ: forwardMIDICC / midiOutMsg は呼出しを数える */
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
 FL_H(device, isAssigned) { return fl_ret_b(c, 1); }
 FL_H(device, setHasMeters) { return fl_ret_none(c); }
-FL_H(device, forwardMIDICC) { (void)A_INT(0, 0); (void)A_INT(1, 1); midi_out_n++; return fl_ret_none(c); }
-/* PE 0xd747f0 (書式 i|iiii)。device 無し → -7、送出先無し → -6 (channel によらず先に判定)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
-FL_H(device, midiOutMsg) {
-    int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);
+/* PE 0xd747f0 (midiOutMsg) と PE 0xd748e0 (forwardMIDICC) の共通判定: device 無し → -7、送出先無し → -6 (送出の前に判定)。通ったら word を送出として記録する */
+static int midi_send(fl_call *c, uint32_t w) {
     if (!dev_assigned) return fl_err(c, FL_E_DEVICE, "Device not assigned");
     if (!link_assigned) return fl_err(c, FL_E_LINKED_DEVICE, "Linked device not assigned");
-    uint32_t w = (uint32_t)msg;
-    if (ch >= 0) w = ((uint32_t)(ch & 0xf) | w) + ((uint32_t)d1 << 8) + ((uint32_t)d2 << 16) + ((uint32_t)a4 << 24);
     midi_out_n++;
     if (midi_word_n < NMIDI) midi_words[midi_word_n++] = w;
     return fl_ret_none(c);
+}
+/* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。値の変化検出は未実装 (REPORT_PY231 §4) */
+FL_H(device, forwardMIDICC) { int64_t msg = A_INT(0, 0); (void)A_INT(1, 1); return midi_send(c, (uint32_t)msg); }
+/* PE 0xd747f0 (書式 i|iiii)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
+FL_H(device, midiOutMsg) {
+    int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);
+    uint32_t w = (uint32_t)msg;
+    if (ch >= 0) w = ((uint32_t)(ch & 0xf) | w) + ((uint32_t)d1 << 8) + ((uint32_t)d2 << 16) + ((uint32_t)a4 << 24);
+    return midi_send(c, w);
 }
 
 /* ---- plugins (7) ---- (引数順: paramIndex 系は先頭、index/slotIndex/useGlobalIndex が後続) */
