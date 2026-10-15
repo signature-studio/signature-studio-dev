@@ -102,7 +102,7 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
 
 既知類型との関係: 該当なし (lift/IR 系ではない)。検証起点: `origin/main` 2847625。
 
-- `local` ジョブ: PR / main push (src・vite 設定・tools/e2e・deploy/config 等の path のみ) / 手動で
+- `local` ジョブ: PR / main push (src・vite 設定・tools/e2e・deploy/config 等の path のみ。tools/audio・tools/legal/notices・tools/m1/flags.sh は未登録 = #3335) / 手動で
   `run.sh --driver both --targets preview,edge-sim`。結果 JSON・スクリーンショット・ログを artifact (14 日)、表を job summary に出す
   (`tools/e2e/suite/summary.mjs`)。
 - `remote` ジョブ: 週次 (月曜 03:17 UTC) / 手動 (`remote=true`) で `run.sh --url "$E2E_URL" --driver both`。
@@ -123,11 +123,13 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| repo variable `E2E_URL` と secrets `E2E_ACCESS_CLIENT_ID/SECRET` の登録 | 週次 remote ジョブは登録まで skip | #3303 [E2E-9] (PM/ユーザ作業。token secret は `deploy/work/secrets/` にしか無い) |
+| repo variable `E2E_URL` と secrets `E2E_ACCESS_CLIENT_ID/SECRET` の登録 | 週次 remote ジョブは登録まで skip | #3302 [E2E-8] (PM/ユーザ作業。token secret は `deploy/work/secrets/` にしか無い) |
 | 実 URL に対する週次ジョブの初回実績 | remote の PASS 未確認 | #3303 [E2E-9] (登録後に `gh workflow run e2e.yaml -f remote=true`) |
+| path filter (`on.pull_request.paths`・`on.push.paths`) に `tools/audio/**`・`tools/legal/notices/**`・`tools/m1/flags.sh` が無い | これだけを変えた PR では workflow が起動せず、merge 前に E2E で検証されない | #3335 [E2E-10] (PM / 依頼者が依頼コメントの diff を適用。#3292 の merge 後) |
 
 ### 適用 (#66。PM が PAT で `.github/workflows/e2e.yaml` へ配置。検証起点 `origin/main` `7c85004e` に本 PR を載せたクリーン worktree・node v24.19.0・Chrome 154.0.8037.97・emsdk 6.0.12 (`[EMSDK]`))
 
+- Actions 結果 (PR #3292 head `4c89a7b0`): run 38659352731 (`E2E / local` success・job 70 s (00:19:24 → 00:20:34Z)、`E2E / remote` skipped = `vars.E2E_URL` 未登録)。
 - Actions 結果 (PR #3292 head `75131c60`): Actions run 38658202074 (head 75131c60・job local success・SUMMARY PASS=34 FAIL=0 SKIP=6・emsdk install 26 s・job 所要 72 s・n=1)。`E2E / local` (job 116172905176、00:07:39 → 00:08:51Z)。runner は Ubuntu 24.04.5・Chrome 154.0.8037.97・node v26.10.0・pnpm 12.10.1。remote ジョブは `vars.E2E_URL` 未登録のため skip。
 - 測定 commit = `75131c60`。`git diff 75131c60 HEAD -- src public tools/e2e tools/audio tools/m1 deploy/config deploy/lib ':(exclude)tools/e2e/REPORT.md' ':(exclude)tools/e2e/ci'` は 0 行 (実行パスに差分なし。以後の差分は本 REPORT・`deploy/README.md`・`.proposed` の削除のみ)。
 - 停止報告 (2026-10-14 17:24Z) の diff を `git apply` で適用した (140 行・新規 1 ファイル)。`.proposed` は PR #3292 の fix で削除した (適用後は `.github/workflows/e2e.yaml` が正)。
