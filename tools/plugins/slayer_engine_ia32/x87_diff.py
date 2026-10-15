@@ -90,7 +90,7 @@ def templates():
     return T
 
 
-RC_NAMES = {'fld', 'fild', 'fld1', 'fldz', 'fst', 'fstp', 'fist', 'fistp', 'fnstcw', 'fnstsw'}
+RC_NAMES = {'fld', 'fild', 'fld1', 'fldz', 'fst', 'fstp', 'fist', 'fistp', 'fnstcw', 'fnstsw', 'frndint'}
 
 
 def slot_key(o):
