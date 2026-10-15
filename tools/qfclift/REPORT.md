@@ -187,6 +187,7 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 - override `qfc_ov_longjmp` (FLEngine `fle_ov_longjmp` と同型) と boot 専用の戻り先 root `0x59c210` を追加。e2e の entries と assert (6,347) は不変。
 - 停止点の切り分け (soft・各 1 回): override のみでは `0x59c210` の UNLIFTED のまま。**root を加えると `ExitProcess(0)` へ進む** (停止点を動かしたのは root)。
   この進行は longjmp 後の継続の不整合による偽の停止の可能性がある (推定。未検証)。DllMain の完走は未達。
+  #4510 で偽の停止を修正 (`qfc_run` の setjmp アンカーで古い C フレームを捨てる)。`ExitProcess` は出なくなり、停止点は `FontCache_GetStats` へ進んだ (付録 `REPORT_APPENDIX_4510.md`)。boot は依然 FAIL。
 - 判定: boot は FAIL のまま (strict は `LocalAlloc`)。起動元・切り分け表・測定は付録 `REPORT_APPENDIX_3410.md` §1〜§3 が正本。
 
 ## 8. 検証実行・再現 (§7 の追加分・実測)
