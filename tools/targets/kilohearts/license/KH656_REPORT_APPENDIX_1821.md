@@ -133,7 +133,7 @@ git diff a65a71ed1 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md
 ## 9. #4257 の実測 (`.rdata` 生 VA の検出・許可リスト)
 
 測定 commit: `557154c14` (コードを変えた最後の commit。module E の検査を `rdata_str` 持ちに限定 + テスト定数名)。E の「検出あり」行だけ前の commit `728eab8b9` で測った。
-素材: `plugins-kilohearts` (installer zip → `windows.zip` → `work/winpkg`)・`toolchain-emsdk` (`/opt/emsdk`)。環境: nproc=4・RAM 15 GB。
+素材: `plugins-kilohearts` (installer zip → `windows.zip` → `work/winpkg`)・`toolchain-emsdk` ([EMSDK])。環境: nproc=4・RAM 15 GB。
 
 | module | 条件 | 結果 | wasm bytes | wasm sha256 |
 |---|---|---|---|---|
