@@ -496,7 +496,14 @@ static void ld_fakeproc_vmt_init(void) {
     }
   }
 }
+/* LD-153: 仮 proc の thunk は GetProcAddress 登録時にしか敷かれない。boot state を別プロセスへ移送すると、
+ * 状態中の仮 proc 値 (index<LD_VMT_IDX0) が未生成の 0 埋めページを指し、実行で addr 0 に segv する。
+ * snapshot 時に GetProcAddress 域の thunk も全部敷く (名前は別プロセスでは "?freeproc" になる)。 */
+static void ld_fakeproc_thunks_init(void) {
+  for (u64 i = 0; i < LD_VMT_IDX0; i++) ld_fake_ptr(i);
+}
 static void ld_snapshot(void) {
+  ld_fakeproc_thunks_init();
   ld_fakeproc_vmt_init();
   for (int i = 0; i < ld_nwr; i++) {
     free(ld_wr[i].pristine);

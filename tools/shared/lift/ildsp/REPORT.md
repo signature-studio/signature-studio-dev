@@ -198,15 +198,17 @@ Issue 本文の「sub-object の vtable」という前提は誤り。CreateInsta
   - よって 2 件の格納先 `[rcx]` は、どちらの経路でも呼び出し元が直前に作ったスタック上のアドレスで、WC instance (ヒープ上の 0x228 B) ではない。
   - 範囲: `ildsp_wc_dispatch.py` の `direct_callers` (exec セクション全走査の直接 call/jmp) と `## 対象 VA への参照` 節 (全画像走査の RIP 相対の命令参照と 8 バイト絶対値)。対象 `0x1acfe8`・`0x164740`・`0x1ad008`・`0x1ad028`・`0x1ac9c0` は、RIP 相対 0 件・8 バイト値 0 件。レジスタに計算した値からの参照と、4 バイト相対値のテーブルは網羅していない。
 - `0x1b6f4c` の `0x1b6f6c` は `0x268268` → `0x1cb600` (`jmp [0x268260]`) で、同じ `jmp rax` に至る。`rax` の値は静的に不明。
-- 扱いの案 (未確認・推定): 例外送出の path とみなし、lift では trap を第一候補にする。正常系に到達しないことは子 [T-SH-52] の native 実行で確かめる。
+- 扱いの案 (未確認・推定): 例外送出の path とみなし、lift では trap を第一候補にする。正常系の到達は `REPORT_APPENDIX_3276.md` で確定 (HeapAlloc 成功時は 0 回)。
 
 ### 5-5. 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | instance の vptr が `0x3e01b0` のまま変わらないこと (動的な書き換えは静的には見ていない)。他 vtable 格納 2 件の書き込み先は §5-4 でスタック上と確認済み | §5-2 の解決 (`0x1a9de0`) の前提 | 子 [T-SH-52] #3216 |
-| helper `0x1aedc0`・`0x1b6f4c` の正常系到達 (§5-4) | 画像内関数ポインタ 2 件の扱い (trap か stub か) | 子 [T-SH-52] #3216 |
+| 例外 path の catch 先 (`RaiseException` の先) が trap か stub か (`REPORT_APPENDIX_3276.md` の未解決) | 画像内関数ポインタ 2 件 (§5-4) の扱い | 子 [T-SH-52] #3216 |
 | IAT 16 件の扱い (GetLastError・HeapAlloc 等) | lift 規模 | 子 [T-SH-52] #3216 |
 | 70 関数の lift・native 全バイト差分・ネガティブコントロール・gate (#2484 の受入条件 2・3) | 本 PR では未実施 | 子 [T-SH-52] #3216 |
+
+- native 確定 (T-SH-59 #3276): 正常系で helper `0x1aedc0`・`0x1b6f4c` は 0 回。例外 path の vptr 格納先はスタック。詳細と実測は `REPORT_APPENDIX_3276.md`。
 
 ### 5-6. 検証
 - 再現 (3 コマンド): `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_closure.py` → `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_wc_dispatch.py` → `python3 tools/shared/scripts/ildsp_wc_dispatch_check.py tools/shared/work/raw/ildsp_wc_dispatch.json <PE>`。
