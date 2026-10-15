@@ -90,7 +90,7 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 - **測定 commit**: `e1efecc2f` (コード差分 0 の HEAD)。`pe.py`・`session.py`・`cases.py` の最後の code commit は `1b53c5b86`。
 - **差分証跡** (WORKFLOW §6): `git diff e1efecc2f HEAD -- tools/liftdiff` の出力は、後続の commit で本節と `ld198_recount.py` の追記だけになる (`ldlib/`・`liftdiff.py`・`liftdiff_e2e.sh` の差分は 0 件)。
 - **fvm 12 → 41 (+29) と 29 件の差の説明**: fvm 関数は base 12 → HEAD 41。新規 29 件と resolved 29 件は同一集合 (`resolved==newfvm`)、消えた件数は 0 件。
-- **測定**: base `1f12b1b6d` と HEAD `e1efecc2f` を同一環境で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 1 回ずつ実行。`work-m11` は `m11_gen_ir2.sh` を実行して `ir_conditions.json` (ldfix applied・`ir_sha256` 597757f4…) を作った後。emsdk は pin 6.0.12 を上流から取得して `/opt/emsdk` に置いた (素材 `toolchain-emsdk` は本 run に無い)。base 2 分 44 秒 PASS・HEAD 2 分 44 秒 PASS (`LIFTDIFF_E2E PASS`)。
+- **測定**: base `1f12b1b6d` と HEAD `e1efecc2f` を同一環境で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 1 回ずつ実行。`work-m11` は `m11_gen_ir2.sh` を実行して `ir_conditions.json` (ldfix applied・`ir_sha256` 597757f4…) を作った後。emsdk は pin 6.0.12 を上流から取得して `[EMSDK]` に置いた (素材 `toolchain-emsdk` は本 run に無い)。base 2 分 44 秒 PASS・HEAD 2 分 44 秒 PASS (`LIFTDIFF_E2E PASS`)。
 
 | run | match / mismatch / unexec | fvm case (native_fault / both_fault / diff / hang) | fvm 関数数 | 所要 |
 |---|---|---|---|---|
