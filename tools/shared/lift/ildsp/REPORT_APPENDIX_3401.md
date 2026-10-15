@@ -118,3 +118,54 @@
 `git diff 9b1902fe5 HEAD -- tools/shared/lift/ildsp tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh tools/shared/scripts ':!*.md'` の出力は `9b1902fe5` 時点では空だった (差分 0)。
 現在の HEAD では #3471 の変更で差分がある (`x64c.py` +130 ほか)。このため現在の鮮度の根拠にはしない。現在の根拠は §8-9。
 測定 commit には main 取り込み (`52e768489`・`ba70aa677` 経由) の code 差分を含む (`tools/flelift/rt/fle_cpu.{c,h}`・`ildsp/lift_wc.sh`・`ildsp/wc_image.py`・`ildsp/closure_select.py` ほか)。経路外かどうかで除外せず、全 code で測定した。
+
+## 9. slot 2 の差分追加と slot 1・3 の native 落ち原因 — T-SH-105 (#4237)
+
+測定 commit: `00950fccc` (§9-2・§9-3・§9-5 の実測の HEAD)。最後に実行コードを変えた commit は `60c53a04b` (main 取り込み `8d93a181a` を含む)。`60c53a04b..00950fccc` の実行コード差分は 0 バイト (`git diff 60c53a04b 00950fccc -- tools/shared/lift/ildsp tools/shared/scripts tools/flelift tools/shared/env.sh ':!*.md'`)。
+
+### 9-1 結論
+slot 2 を加えて 64/64 PASS (ネガコン FAIL 64/64)。slot 1・3 は復号鍵 `[0x3f7ad0]` が 0 のため native が 64/64 で落ちるので差分に入れない (鍵の書込み元は #4302)。
+
+### 9-2 slot 1〜3 の native 単独呼出し (実測・測定 commit `00950fccc`・各 64 case・`lift_wc.sh`)
+測定: `00950fccc` (測定 commit と同じ)。`WC_ROOTS` は `lift_psola.sh` と同じ。`WC_CALL_IDX` と `WC_RET_IDX=5` を指定して `lift_wc.sh` を直接呼ぶ。
+| WC_CALL_IDX | native 結果 | 備考 |
+|---|---|---|
+| `1` (CreateInstance → slot 1) | SIGSEGV/SIGBUS 64/64・addr 0x0 | slot 0 を呼ばない |
+| `2` (CreateInstance → slot 2) | PASS 64/64 (落ちない・wasm 差分 PASS 64/64) | 単独でも成立 |
+| `3` (CreateInstance → slot 3) | SIGSEGV/SIGBUS 64/64・addr 0x0 | |
+| `1 4 5` | SIGSEGV/SIGBUS 64/64 | |
+| `0 1 4 5` | SIGSEGV/SIGBUS 64/64 | slot 0 (dtor) の後でも同じ |
+
+注: `lift_psola.sh` は `WC_CALL_IDX` を無条件に上書きするため、上の表は `lift_wc.sh` を直接呼んで得た。`lift_psola.sh` 経由では別の slot 集合になる。
+
+### 9-3 落ち箇所の特定 (slot 1 単独・RIP を実測)
+- SIGSEGV 時の RIP は RVA `0x1cb5e0` (`jmp rax`)・`rax=0xae64b77e88c8000` (`00950fccc` で 64/64 同一)。計測は `lift_wc` の native harness の複製 (RIP と rax を stderr に出す 1 行を足した作業用・repo 外。repo の harness は変更していない)。
+- `rax` の値は `0x1b6f4c` の復号結果と一致する。`0x1b6f4c` の (a) `0x1b6f88` は `rbx = ror([0x3f5d98] ^ [0x3f7ad0], cl)` を計算する。`[0x3f5d98] = 0x2b992ddfa232`・`[0x3f7ad0] = 0` (ロード後の image)・`cl = 50` から `ror = 0xae64b77e88c8000`。よって鍵が 0 のとき復号結果が不正なポインタになり、`jmp rax` が addr 0 を踏む。鍵を `A` (= `[0x3f5d98]`) にすると復号結果は 0 になる (算術の検算。#4302 の §3 と一致)。(b) `movabs r10, 0xd1ed0fdf1cd32070` を置き、(c) `call [rip+0xb12f6]` (RVA `0x268268`) を呼ぶ。
+- 直接 call: `0x1b6f4c` を直接呼ぶ E8 call は画像内に 4 箇所ある (`0x1ac9ce`・`0x1b9049`・`0x1b9c45`・`0x1c20a9`。`objdump -D` で確認。rel32 の解決先は `0x1b6f4c`)。ハーネスの hook 表 (`ildsp_native.c`・`60c53a04b`) では `0x1b9049`・`0x1b9c45`・`0x1c20a9` が kind 1 (direct の trace)、`0x1ac9ce` が kind 2 (1 命令の単歩で同じ call を覆う正の対照) として載る。`--slot 1 0` の単独実行では `0x1aa29f` (CreateInstance 先頭) だけが hit し、slot 1 の呼出し経路上でこの 4 箇所の hit は観測されなかった。`ildsp_reach_matrix.sh` (`00950fccc`) の注入なし run (A 系) でも同じ。1 回目の HeapAlloc 失敗を注入した run (B 系・rc 96) では `0x1ac9ce` と `0x1b6f6c` が 1 回 hit する。`ildsp_native` 単体の `--slot 1 0` は落ちず (rc 0)、落ちるのは `lift_wc` の harness (§9-2 の表) である。
+- 鍵 `0x3f7ad0` の参照: `0x1b6fa2` (`xor rbx, [0x3f7ad0]`・読み) と `0x1b6f44` (`mov [0x3f7ad0], rcx; ret`・書き) の 2 箇所。`objdump` の RIP 相対コメントで確認。`0x1b6f44` は関数として存在するが、画像内に直接の call/jmp は無く、絶対アドレスの参照も無い。書き込みの呼出し元は main の #4302 で `0x1b7d80` と特定済み (本付録は `0x1b7d80` の経路を追っていない。詳細は `REPORT_APPENDIX_4302.md`)。
+- 未確認 (旧記述から取り下げ): 旧 §9-3 の thunk の `rcx = [this+8]` 読みは、`0x17f700` の逆アセンブルで確認できなかった。戻り番地 `0x1b6f72` も HEAD の `lift_wc` 側では再確認していない。
+
+### 9-4 受入の達成状況 (issue #4237)
+| 受入 | 状態 |
+|---|---|
+| (1) slot 1・3 の host 前提 (`this` の内部フィールド・未設定ポインタ) を特定し差分の入力に決める | **部分**。落ち箇所 (`0x1b6f4c` の復号鍵 `0x3f7ad0` が 0 → 復号結果が不正ポインタ) まで HEAD で特定。鍵の書込み元は main の #4302 で `0x1b7d80` と特定 (REPORT_APPENDIX_4302.md)。入力には決めていない |
+| (2) slot 1–3 を含む呼出し順で native 対 wasm の差分 | **部分**。slot 2 を含む差分は `WC_CALL_IDX="0 2 4 5"` で実施 (64/64・ネガコン 64/64)。slot 1・3 は未達 |
+| (3) .data 入力の変化で分岐の到達を数値に示す | **未達**。差分は従来どおり .data 不変・同一経路 (§8-4 と同じ制限) |
+
+### 9-5 実測 (slot 2 を含む差分・測定 commit `00950fccc`・4 core・1 回)
+測定 commit: `00950fccc` (測定 HEAD。最後のコード変更は `60c53a04b`・差分 0 バイト)。
+| 項目 | 値 |
+|---|---|
+| `lift_psola.sh all` elapsed | 18.89 s (real・rc 0。内訳は ok 17.11 s・neg-cmp 1.75 s) |
+| 本検査 (ok) | PASS 64 / FAIL 0 (wasm trap 0・native crash 0・SIGSEGV/SIGBUS 0) |
+| neg-cmp | FAIL 64 (rc 1・期待どおり)・ALL OK |
+| x64c | 37 関数・1,059 命令・unsup 0 (従来の基準 36・1,046 から slot 2 の 1 関数・13 命令を追加) |
+| wasm | 81,451 B (SizeOfImage 0x447000。#4303 の coverage 追加で `fcf3b1c03` の 81,303 B から増えた) |
+| load | 開始 0.59 0.36 0.14 → 本検査終了 1.06 0.48 0.19 |
+| 環境 | emsdk 6.0.12 (toolchain-emsdk 素材を展開して `EMSDK_ENV` に指定)・fl-win64 は `$RUNNER_TEMP` に展開 |
+
+### 9-6 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| slot 1・3 の復号鍵 `[0x3f7ad0]` を設定する host 初期化の特定 | 受入 (1)(2) の残り。slot 1・3 を差分に入れられない | #4302 [T-SH-114] |
+| `.data` 入力の変化による分岐の数値化 | 受入 (3) | #4303 [T-SH-115] |
