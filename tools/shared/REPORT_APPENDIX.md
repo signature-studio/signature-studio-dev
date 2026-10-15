@@ -88,6 +88,11 @@
     - **pair 46 (RVA `0x19cac0`) と FT 解決の接続**: 前進走査が呼ぶ `first` = `0x563840` は `[0x5d9f20]` を減算し、結果が -1 のときだけ `0x563000` (FT 解決) を呼ぶ。`second` = `0x563820` は加算し、結果が 0 のとき `0x5637f0` を呼ぶ。`0x563000` の FT 名の解決は `call 0x41d760` で行われる (`[0x563000, 0x5637f0)` 内に 14 箇所。`0x41d760` は `call 0x41d750` (GetProcAddress への jmp thunk) を持ち、その戻り番地が `0x41d7be`)。
     - **表への直接参照は 0 件**: `objdump -d` 全体の rip 相対参照・即値、および `.text`/`.data`/`.rdata` 内の 8 byte 絶対値 (VA `0x59c7e0`〜`0x59ccf0`) を走査しても、表を指すものは無い。`.reloc` の DIR64 entry 44,887 件のうち、値が表の範囲に入るものは 0 件。表は走査関数が registry 経由で読む (= 従来の「表を指す参照 0 件」を実測で再確認)。
   - **未解決 (起票先: 子 issue)**: (a) registry `[0x5d0c90]` の書込み元。コードの rip 相対の書込みは 0 件で、別の経路 (間接アドレス・他モジュール) が疑われるが未追跡。(b) 表の 81 組の意味 (各組の名前・所属 module)。(c) `0x40f360` と `0x40f406` (後退走査の呼出し元 2 箇所) は `.pdata` に独立の関数が無く、`0x40f2f0` の範囲に含まれて見える。
+  - **main 取り込み後の再測定 (測定 commit `f56737bb8` = 競合解消の merge commit。コードを変えた最後の commit。以後は REPORT のみ)**: `run.sh` の既定を #2220 と同じ無改変 DllMain (`PATCH_ENTRY` 既定 0。`QFC_PATCH_ENTRY` も受ける) にして再測定。apt の wine64 9.0 (`9.0~repack-4build3`) と `gcc-mingw-w64-x86-64` で実行。
+    - `bash oss/freetype/qfc_gpa_trace/run.sh` (既定): script 完了・wine rc 124 (150 s 時間切れ、想定どおり) / wall 162 s / uptime 1 分平均 0.29→0.03 (nproc=4)。QuickFontCache 範囲の GetProcAddress・`FT_*` 名・序数・欠落 17 本・陽性対照は、上の bfb35bfa の項と同じ値 (950 / 14 / 0 / 0 / 1)。
+    - `PATCH_ENTRY=1 bash oss/freetype/qfc_gpa_trace/run.sh` (旧方式): rc 0 / wall 11.2 s / uptime 0.03 / relay 3,606 行 (bfb35bfa の 3,494 行とは run ごとの記録量の差) / QuickFontCache 範囲 0 件 / FT_ 0 件。
+    - `bash oss/freetype/qfc_gpa_trace/run_table.sh`: rc 0 / wall 10.8 s / uptime 0.02 / GetTickCount 162 件 (ret `0x7bdef3f9` 81 件・`0x7bdef355` 81 件。上と同じ 2 戻り番地)。
+    - `git diff f56737bb8 HEAD -- tools/shared/oss/freetype` の出力は 0 行 (以後は REPORT のみの commit)。
 
 ## 10. 各ライブラリのビルド詳細
 
