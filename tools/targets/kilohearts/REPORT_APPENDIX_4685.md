@@ -54,7 +54,7 @@
 | `kh_xmm0.h` (+189 新規) | xmm0 helper (#3885) |
 | `xmm0_check.c` (+35/-9) | xmm0 規則 (#3885) |
 
-- 測定 commit (`40e8af6de`) 以降の `ghidra_route` の差分は、本 REPORT の commit だけでは 0 (下の証跡)。
+- 測定 commit (`40e8af6de`) 以降の `ghidra_route` の差分: `git diff --stat 40e8af6de HEAD -- tools/targets/kilohearts/ghidra_route` = 0 行。
 - 旧測定 (`c682f1185`・base `b28128e48`): Delay emcc error 328・型不一致 107 (未割当 0)・Gain/Haas/Gate 1000/1000。この値は main 取り込み前のもので、現 HEAD では読まない。
 
 ## ⑤. 未解決
