@@ -162,7 +162,7 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 - 遷移: `booting` → `running` (GUI フレーム 1 枚以上) / `error` (window `error`・`unhandledrejection`・`fail()`)。`error` は終端で最初のエラーを保持、`frames` は単調増加。
 - frames の供給: `GuiHost.attach({ onFrame })` の累計フレーム数を `controller.setFrames()` に渡す (`src/runtime/gui.ts`)。
   **実 FL の GuiHost 接続は未実装** (FL 本体がページに統合されていないため。ハーネスのテストフレームは計上しない)。
-- `guest: 'fl' | 'test'` (#3461): 載せたゲストの種別。`setGuest` まで契約に現れない。`/?gui=wasm` のテストゲストは `test` で、`fl-boot` は `guest === 'fl'` を要求する (テストゲストで PASS させない: D5)。
+- `guest: 'fl' | 'test'` (#3461): 載せたゲストの種別。`setGuest` まで契約に現れない。`/?gui=wasm` のテストゲストは `test` で、`fl-boot` は `guest === 'fl'` を要求する (テストゲストで PASS させない)。
 - e2e: `webstudio-contract` は常時 (形状)、`fl-boot` は `E2E_REQUIRE_FL=1` で `state==='running' && frames>0` を 180s 待ち、canvas の画素を検査 (#32 の受入に接続)。
   FL 未統合の現状では `E2E_REQUIRE_FL=1` は FAIL する (意図通り)。
 - 実測 (HEAD 8bf83d9、Chrome 154、node v22.23.3): `--driver both --targets preview,edge-sim,dev` = **PASS 50 / FAIL 0 / SKIP 10** (28.1s、`webstudio-contract` 6/6 PASS = `{"state":"booting","frames":0}`、fl-boot 6 SKIP + edge-policy 4 SKIP)。
@@ -176,7 +176,7 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 ## gui=wasm: 製品ページへのテストゲスト結線 (WIN-24 #3461)
 `/?gui=wasm&glue=<app.js>&app=<descriptor>` で、FL ではない検証用ゲスト (`tools/gui/test/text_wasm_app.c`・`GUI_NO_FT=1` = 内蔵 8x8) を chunked descriptor (64 KiB part × 2、sha256 検証) から読み、GuiHost 経由で専用 canvas `#gui-canvas` に描く。`window.__webstudio` は `running` / `frames=1` / `guest='test'`。1 byte 改竄した part は `state=error`・`frames=0` で止まる。実装は `src/runtime/gui_guest.ts`、ゲストのビルドは `tools/gui/e2e/build_guest.sh`。
 - 経路: `fetchCompile` (chunked・sha256) → glue `createGuiApp` (`instantiateWasm` で compile 済み Module を注入。`loader_boot.ts` の `createEmscriptenPthreadModule` と同じ方式) → `GuiHost.attach` (専用 canvas・`onFrame` → `webstudio.setFrames`) → `window.__guiGuest` (e2e が `readback()` で画素を読む)。
-- 設計: 起動はメインスレッド (`text_main.js` の経路を踏襲)。fl-runtime Worker への移管は未了 (#2717 受入 2)。入力経路 (PumpInput ↔ GuiShared 入力リング) は未結線 (#174・#32 の決定待ち)。`gui=wasm` では `#screen` に縞を描かない。契約 `guest` は `setGuest` まで現れない (既存の `webstudio-contract` の形状を変えない)、`fl-boot` は `guest === 'fl'` を要求する (D5)。
+- 設計: 起動はメインスレッド (`text_main.js` の経路を踏襲)。fl-runtime Worker への移管は未了 (#2717 受入 2)。入力経路 (PumpInput ↔ GuiShared 入力リング) は未結線 (#174・#32 の決定待ち)。`gui=wasm` では `#screen` に縞を描かない。契約 `guest` は `setGuest` まで現れない (既存の `webstudio-contract` の形状を変えない)、`fl-boot` は `guest === 'fl'` を要求する (テストゲストでは PASS させない)。
 
 **測定** (測定 commit `0d614c059` = `origin/main` (`cf9dce6f`) を取り込んだ後の HEAD。Chrome 154.0.8037.97、node v22.23.3、emsdk 6.0.12、mingw-w64 11.0.1、開始時 load average 0.38 / 1 分)
 | 検査 (ms。`drv.open` を含む検査全体) | preview / agent-browser | preview / puppeteer-core | edge-sim / agent-browser | edge-sim / puppeteer-core |
@@ -192,7 +192,7 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 
 **素材・環境**: `toolchain-emsdk` (`[EMSDK]`) を使用。`gen_api.py` は `x86_64-w64-mingw32-gcc` を要する。`build_guest.sh` は mingw が無ければ apt で導入する (`gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev`)。CI の `E2E / local` ジョブは mingw を入れていないため、この導入に依存する。`fl-win64` は使わない。
 
-**未実施 (子 issue)**: オラクル画素の完全一致とネガコン (a)(b)(c)・`text_wasm_e2e.sh` 回帰 → #3495 (WIN-27)。GUI-REACH trace → #3496 (WIN-28)。D5 のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
+**未実施 (子 issue)**: オラクル画素の完全一致とネガコン (a)(b)(c)・`text_wasm_e2e.sh` 回帰 → #3495 (WIN-27)。GUI-REACH trace → #3496 (WIN-28)。`fl-boot` のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
 
 ## ユーザ依頼事項
 1. **公開ホスト名** (例: `studio.<既存ゾーン>`)。案 S の既定は workers.dev (`deploy/README.md` §移行で自前ドメインへ)。

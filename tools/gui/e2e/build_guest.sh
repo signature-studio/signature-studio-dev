@@ -13,10 +13,10 @@ if ! command -v x86_64-w64-mingw32-gcc >/dev/null; then
   sudo -n DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev >/dev/null
 fi
 python3 "$ROOT/gen_api.py" >/dev/null
-TMPB="$(mktemp -d)"
+TMPB="$(mktemp -d)"; trap 'rm -rf "$TMPB"' EXIT
 GUI_NO_FT=1 bash "$ROOT/lift/gui_wasm.sh" "$ROOT/test/text_wasm_app.c" "$TMPB" | tail -1
 cp "$TMPB/app.js" "$TMPB/app.wasm" "$OUT/"
 node "$HERE/stage_guest.mjs" "$OUT/app.wasm" 65536
-# ネガコン (d): part 0 を 1 バイト改竄したコピー (descriptor の sha256 は元のまま。chunked の検証で止まること)
+# ネガコン (d): part 0 (index.json の parts[0]) を 1 バイト改竄したコピー (descriptor の sha256 は元のまま。chunked の検証で止まること)
 rm -rf "$OUT/tampered" && mkdir -p "$OUT/tampered" && cp -r "$OUT/app.wasm.parts" "$OUT/tampered/app.wasm.parts"
 node -e 'const fs = require("fs"); const d = process.argv[1]; const p = d + "/" + JSON.parse(fs.readFileSync(d + "/index.json", "utf8")).parts[0].name; const b = fs.readFileSync(p); b[0] ^= 0xff; fs.writeFileSync(p, b);' "$OUT/tampered/app.wasm.parts"

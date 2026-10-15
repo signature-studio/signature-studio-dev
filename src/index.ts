@@ -31,7 +31,8 @@ const target: FrameTarget | null = setupCanvas("screen");
 
 // 起動確認用: 黒画面に 1 枚テストフレームを blit する (putImageData 経路の疎通確認)
 // gui=wasm (ゲスト結線) では #screen に縞を描かない (fl-boot の画素検査を縞で空振りさせないため)
-const guiWasm = new URLSearchParams(location.search).get("gui") === "wasm";
+const runtimeParams = new URLSearchParams(location.search);
+const guiWasm = runtimeParams.get("gui") === "wasm";
 if (!guiWasm && target && target.width > 0 && target.height > 0) {
   const frame = new Uint8ClampedArray(target.width * target.height * 4);
   // 中央に灰色の縞を数本 (putImageData 疎通の可視化)
@@ -141,7 +142,6 @@ startBtn.addEventListener("click", async () => {
 // ランタイム (Worker 実行基盤) — /?runtime=<id|all>&cache=…&compile=…&pump=1 で起動
 // 詳細: tools/runtime/DESIGN.md
 // ---------------------------------------------------------------------------
-const runtimeParams = new URLSearchParams(location.search);
 if (runtimeParams.has("runtime")) {
   void mountRuntimePanel(runtimeParams);
 }

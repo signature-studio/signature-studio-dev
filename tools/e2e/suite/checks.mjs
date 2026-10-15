@@ -250,7 +250,7 @@ export const checks = [
       const st = await ctx.drv.eval(`JSON.stringify(window.__webstudio ?? null)`);
       assert(ok, `FL が 180s 以内に running にならない: ${st}`);
       const s = JSON.parse(st);
-      // D5: テストゲスト (guest: "test") では FL の起動として PASS させない
+      // テストゲスト (guest: "test") では FL の起動として PASS させない (guest 要件)
       assertEq(s.guest, "fl", `ゲスト種別 (テストゲストでは fl-boot を PASS させない: ${st})`);
       assertEq(s.state, "running", `state (${st})`);
       assert(typeof s.frames === "number" && s.frames > 0, `GUI フレーム 0: ${st}`);
@@ -310,7 +310,7 @@ export const checks = [
   },
   {
     id: "gui-guest-tamper",
-    title: "ネガコン (gui=wasm): chunked の part 1 バイト改竄は sha256 検証で停止 (state=error・running にならない)",
+    title: "ネガコン (gui=wasm): chunked の part 0 を 1 バイト改竄すると compile が中断され state=error・frames=0 (sha256 不一致の同定は node 側 REPORT)",
     async run(ctx) {
       const q = "/?gui=wasm&glue=/__e2e__/gui-guest/app.js&app=/__e2e__/gui-guest/tampered/app.wasm.parts/index.json";
       await ctx.drv.open(new URL(q, ctx.url).href);
@@ -327,6 +327,42 @@ export const checks = [
       assert(/WebAssembly compilation aborted/.test(s.error ?? ""), `error が compile 中断ではない: ${st}`);
       assertEq(s.frames, 0, `改竄ゲストで frames が進んだ: ${st}`);
       return st;
+    },
+  },
+  {
+    id: "gui-guest-origin",
+    title: "ネガコン (gui=wasm): glue が別オリジン・data:・//host なら読まず state=error (script は実行されない)",
+    async run(ctx) {
+      const other = new URL(ctx.url);
+      other.hostname = other.hostname === "127.0.0.1" ? "localhost" : "127.0.0.1";
+      const app = "/__e2e__/gui-guest/app.wasm.parts/index.json";
+      const glues = {
+        "data:": `data:text/javascript,${encodeURIComponent("window.__guiGlueRan = 1;")}`,
+        "別オリジン": `${other.origin}/__e2e__/gui-guest/app.js`,
+        "//host": `//${other.host}/__e2e__/gui-guest/app.js`,
+      };
+      const notes = [];
+      for (const [label, glue] of Object.entries(glues)) {
+        const q = `/?gui=wasm&glue=${encodeURIComponent(glue)}&app=${app}`;
+        await ctx.drv.open(new URL(q, ctx.url).href);
+        const ok = await ctx.drv.waitFn(
+          `window.__webstudio?.state === 'running' || window.__webstudio?.state === 'error'`,
+          60000,
+        );
+        const st = await ctx.drv.eval(`JSON.stringify(window.__webstudio ?? null)`);
+        assert(ok, `${label}: 60s 以内に判定が出ない: ${st}`);
+        const s = JSON.parse(st);
+        assertEq(s.state, "error", `${label}: state (${st})`);
+        assert(/同一オリジン/.test(s.error ?? ""), `${label}: 同一オリジンの検査で止まっていない: ${st}`);
+        const ran = await ctx.drv.eval(`window.__guiGlueRan ?? null`);
+        assertEq(ran, null, `${label}: glue が実行された`);
+        const foreign = await ctx.drv.eval(
+          `[...document.querySelectorAll('script[src]')].filter((x) => new URL(x.src).origin !== location.origin).length`,
+        );
+        assertEq(foreign, 0, `${label}: 別オリジンの script 要素が挿入された`);
+        notes.push(label);
+      }
+      return `別オリジン・data:・//host の glue を読まず state=error (${notes.join(", ")})`;
     },
   },
 ];

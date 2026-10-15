@@ -9,7 +9,7 @@
  */
 export type WebstudioState = "booting" | "running" | "error";
 
-/** 載せているゲストの種別。"test" は FL でない検証用 wasm (fl-boot は PASS させない: D5) */
+/** 載せているゲストの種別。"test" は FL でない検証用 wasm (fl-boot は guest === "fl" を要求するので PASS しない) */
 export type WebstudioGuest = "fl" | "test";
 
 export type WebstudioContract = {
