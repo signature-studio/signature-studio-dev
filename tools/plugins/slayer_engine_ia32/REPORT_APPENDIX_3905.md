@@ -4,7 +4,7 @@
 - 由来: `REPORT_APPENDIX_3128.md` §5・§8 (fs: の列挙と未達)。 import の方式は `REPORT_APPENDIX_3127.md` §3 (KERNEL32 方針表)。
 - 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない。 本件は実行結果の突合)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` (sha256 `84b64c43…de724a9`)。
-- 測定 commit: `c71986f10` (`feat(plugins): fs: TEB native vs wasm diff for 3 functions (PLG-G2-37)`。 コードを変えた最後の commit)。
+- 測定 commit: `c71986f10` (`feat(plugins): fs: TEB native vs wasm diff for 3 functions (PLG-G2-37)`。 コードを変えた最後の commit)。 検証 HEAD: `2217f6748` (main 取り込み後の merge commit。 §3 の時間値はこの HEAD の run)。 `c71986f10..2217f6748` で測定対象コードの差分は 0 行。
 
 ## 1. 結論と範囲
 
@@ -23,7 +23,7 @@
 | 入力 | `diff_teb.py` の `gen_scen`。 seed 3905、 入口 3 本 × 64 行 = 192 行。 偶数行は TEB 0 埋め、 奇数行は非 0 |
 | 範囲の制約 | `0x1000a42e` の `a0` と `0x100106a5` の `a0`・`a1` を小さく絞る (`LIM_SIZE`・`a0 < 0x8000`・`a1 < 0x10`)。 `HeapAlloc` の巨大サイズ経路に入ると native の heap モデル (4 KiB の bump 領域) を超えて SIGSEGV するため (§4) |
 
-## 3. 実測 (測定 commit `c71986f10`、 n=1 の run + ネガコン)
+## 3. 実測 (検証 HEAD `2217f6748`、 n=1 の run + ネガコン。 emsdk 6.0.12 を上流から新規取得して実行)
 
 | 項目 | 値 |
 |---|---|
@@ -32,11 +32,12 @@
 | 非自明性 (OBJ) | native 実行で OBJ 領域が変わった行 **0 / 192** (`[effect]`)。 OBJ 領域は TEB に依存しない比較のため、 この突合の感度は下記の eax と TEB 欄が担う |
 | 感度 (eax) | 3 入口とも eax は全行で単一の値 (`1000a307`: `00000001`、 `1000a42e`・`100106a5`: `10800008`)。 TEB の 0 埋めと非 0 で eax は変わらなかった。 **TEB の値が結果に効くことは示していない** (下記の注を参照) |
 | TEB の書込み | 呼出し後の TEB は 192 / 192 行とも入力と一致 (`fs:[0]` を入口で保存し出口で戻す)。 この 3 入口は TEB の値を結果に出さない |
-
-- 注: 3 入口は `fs:[0]` を入口で保存し出口で戻すだけで、 TEB の内容は eax にも OBJ にも出ない。 よって「TEB の値に依存しない」ことを突合で確かめたのは 0 埋めと非 0 の 2 通りの範囲に限る。 TEB の値が効く経路 (例外処理で ExceptionList を辿る経路) は、 この 3 入口では通らない。
 | 回帰 (`python3 diff_entry.py`) | `[compare] PASS: 448 / 448 件が bit 一致`・exit 0 (`native_entry.c`・`rt32_glue.c` の変更後)。 ネガ `FAIL: 447 / 448` |
 | 回帰 (`python3 diff_runtime.py`) | `[compare] PASS: 128 / 128 件が bit 一致`・exit 0 |
-| ビルド・実行 | native build 0.05 s、 wasm emcc 5.71 s (emsdk 6.0.12)。 native run 0.011 s、 wasm(node) 0.096 s。 load1 0.25 |
+| ビルド・実行 | native build 0.24 s、 wasm emcc 9.56 s (emsdk 6.0.12)。 native run 0.014 s、 wasm(node) 0.088 s。 load1 0.59 (`diff_teb.py` の `[build]`・`[run]` 行の値) |
+
+注: 3 入口は `fs:[0]` を入口で保存し出口で戻すだけで、 TEB の内容は eax にも OBJ にも出ない。 よって「TEB の値に依存しない」ことを突合で確かめたのは 0 埋めと非 0 の 2 通りの範囲に限る。 TEB の値が効く経路 (例外処理で ExceptionList を辿る経路) は、 この 3 入口では通らない。
+
 
 ## 4. 落ちた経路 (測定の過程)
 
