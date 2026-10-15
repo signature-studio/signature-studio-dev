@@ -8,7 +8,9 @@ if (_libc.personality(0xffffffff) & 0x0040000) == 0 and os.environ.get('FLE_NOAS
     os.execvp('setarch', ['setarch', 'x86_64', '-R', sys.executable] + sys.argv)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DLL = os.environ.get('FLE_PE') or os.path.join(os.environ.get('FL_WIN64_DIR', '/home/ubuntu/work/analysis/win64'), 'extracted', 'block00031_PE.bin')
+sys.path.insert(0, os.path.join(HERE, '..', 'shared'))
+from paths import FL_WIN64_DIR
+DLL = os.environ.get('FLE_PE') or os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
 _lib = ctypes.CDLL(os.path.join(HERE, 'work', 'libflenative.so'))
 _lib.fle_call.restype = ctypes.c_uint64
 _lib.fle_call.argtypes = [ctypes.c_uint64, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_long, ctypes.c_void_p]
