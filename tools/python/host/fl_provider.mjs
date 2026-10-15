@@ -81,11 +81,13 @@ export async function createWasmEngine({ flprovUrl, ids }) {
     highlightCb: () => Number(M._fl_engine_highlight_cb()),
     channelCount: () => M._fl_engine_channel_count(),
     midiOutCount: () => M._fl_engine_midi_out_count(),
+    midiWords: () => Array.from({ length: M._fl_engine_midi_word_count() }, (_, i) => Number(M._fl_engine_midi_word(i))),
+    setDeviceLink: (dev, link) => M._fl_engine_set_device_link(dev ? 1 : 0, link ? 1 : 0),
     gridBit: (c, p) => M._fl_engine_grid_bit(c, p),
     // PY-224 (#3628): 検査用に loop 行 T[1] を置く (mock の setLoop と同じ引数)
     setLoop: (row, flag49e, flag54, recs) => {
       M._fl_engine_loop_set(+!!row, +!!flag49e, +!!flag54);
-      for (const [cid, f4, len] of recs) M._fl_engine_loop_add(cid, f4, len);
+      for (const [cid, f4, len] of recs) if (!M._fl_engine_loop_add(cid, f4, len)) throw new Error("loop record 超過 (上限 8)");
     },
     displayTime: () => Number(M._fl_engine_display_time()),
     stepItemProbe: (prm, v, s0, s1) => M._fl_engine_step_item_probe(prm, v, s0, s1),

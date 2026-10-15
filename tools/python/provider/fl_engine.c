@@ -33,6 +33,10 @@ static int playing;
 static int64_t hl_cb;
 static int n_pr, n_run;
 static int dev_port, midi_out_n;
+/* PY-227 (#3655): midiOutMsg が送った 32bit word の列。dev_assigned=0 は -7・link_assigned=0 は -6 (PE 0xd747f0) */
+#define NMIDI 256
+static uint32_t midi_words[NMIDI];
+static int midi_word_n, dev_assigned, link_assigned;
 static int sel_chan;
 static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"Resonance", 0.2}, {"Gain", 0.8}};
 static double pvals[3];
@@ -88,11 +92,17 @@ void fl_engine_reset(void) {
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0;
+    midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
     lp_row = lp_flag49e = lp_flag54 = lp_n = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
 int fl_engine_channel_count(void) { return nch; }
 int fl_engine_midi_out_count(void) { return midi_out_n; }
+/* 検査用の読出し口: midiOutMsg が送った word の件数と i 番目 (範囲外は -1)。tests/device_diff.mjs が mock と照合 */
+int fl_engine_midi_word_count(void) { return midi_word_n; }
+int64_t fl_engine_midi_word(int i) { return i < 0 || i >= midi_word_n ? -1 : (int64_t)midi_words[i]; }
+/* 検査用の設定口: device 割当 (0 で -7) と送出先 (0 で -6)。既定は両方あり */
+void fl_engine_set_device_link(int dev, int link) { dev_assigned = dev != 0; link_assigned = link != 0; }
 /* 検査用の読出し口: 最後に作用先へ渡した時間引数 (頭打ち後)。tests/ui_display_diff.mjs が mock と照合 */
 int64_t fl_engine_display_time(void) { return disp_time; }
 /* 検査用の読出し口: チャンネル c のステップ p (範囲外は -1)。tests/midi_path_diff.mjs が副作用を比べる */
@@ -100,9 +110,9 @@ int fl_engine_grid_bit(int c, int p) {
     if (c < 0 || c >= nch || p < 0 || p >= NSTEP) return -1;
     return ch[c].steps[p];
 }
-/* 検査用: 行 T[1] の有無・flag49e・flag54 を置き、record を消す。record は fl_engine_loop_add で追加 */
+/* 検査用: 行 T[1] の有無・flag49e・flag54 を置き、record を消す。record は fl_engine_loop_add で追加。上限 LP_N 件を超えた追加は 0 を返して捨てる (mock は setLoop で throw) */
 void fl_engine_loop_set(int row, int flag49e, int flag54) { lp_row = row != 0; lp_flag49e = flag49e != 0; lp_flag54 = flag54 != 0; lp_n = 0; }
-void fl_engine_loop_add(int cid, int f4, int len) { if (lp_n < LP_N) { lp_cid[lp_n] = cid; lp_f4[lp_n] = f4; lp_len[lp_n] = len; lp_n++; } }
+int fl_engine_loop_add(int cid, int f4, int len) { if (lp_n >= LP_N) return 0; lp_cid[lp_n] = cid; lp_f4[lp_n] = f4; lp_len[lp_n] = len; lp_n++; return 1; }
 /* PE 0x12d3ff0 の loop 分岐 (REPORT_PY224)。行 T[1] と flag49e・flag54 が非 0 で、channel ci の最初の record (f4 != 0) が L = len / 24 を与えるとき、p < L は base(p)、それ以外は base(p mod L) (1 なら 2・0 なら 0 で、戻り値は bool に写る) */
 static int grid_bit(int64_t index, const Chan *k, int32_t p);
 static int grid_bit_loop(int64_t ci, const Chan *k, int32_t p) {
@@ -576,7 +586,17 @@ FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
 FL_H(device, isAssigned) { return fl_ret_b(c, 1); }
 FL_H(device, setHasMeters) { return fl_ret_none(c); }
 FL_H(device, forwardMIDICC) { (void)A_INT(0, 0); (void)A_INT(1, 1); midi_out_n++; return fl_ret_none(c); }
-FL_H(device, midiOutMsg) { (void)A_INT(0, 0); (void)A_INT(1, -1); (void)A_INT(2, -1); (void)A_INT(3, -1); midi_out_n++; return fl_ret_none(c); }
+/* PE 0xd747f0 (書式 i|iiii)。device 無し → -7、送出先無し → -6 (channel によらず先に判定)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
+FL_H(device, midiOutMsg) {
+    int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);
+    if (!dev_assigned) return fl_err(c, FL_E_DEVICE, "Device not assigned");
+    if (!link_assigned) return fl_err(c, FL_E_LINKED_DEVICE, "Linked device not assigned");
+    uint32_t w = (uint32_t)msg;
+    if (ch >= 0) w = ((uint32_t)(ch & 0xf) | w) + ((uint32_t)d1 << 8) + ((uint32_t)d2 << 16) + ((uint32_t)a4 << 24);
+    midi_out_n++;
+    if (midi_word_n < NMIDI) midi_words[midi_word_n++] = w;
+    return fl_ret_none(c);
+}
 
 /* ---- plugins (7) ---- (引数順: paramIndex 系は先頭、index/slotIndex/useGlobalIndex が後続) */
 FL_H(plugins, isValid) {
