@@ -41,6 +41,9 @@ static int midi_out_assigned, master_sync;
 #define NMIDI 256
 static uint32_t midi_words[NMIDI];
 static int midi_word_n, dev_assigned, link_assigned;
+#define FCC_N 16
+static int64_t fcc_last[FCC_N];
+static int fcc_init;
 static int sel_chan;
 static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"Resonance", 0.2}, {"Gain", 0.8}};
 static int changed_flag, use_metronome, precount, rec_ppq;
@@ -105,6 +108,7 @@ void fl_engine_reset(void) {
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
     idle_elapsed = 0; midi_out_assigned = 0; master_sync = 0;
     midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
+    fcc_init = 0;
     lp_row = lp_flag49e = lp_flag54 = lp_n = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -666,6 +670,7 @@ FL_H(arrangement, currentTimeHint) {
 #define PGRP_N 0
 FL_H(patterns, getPatternGroupCount) { NARGS(0, 0); return fl_ret_i(c, PGRP_N); }
 FL_H(patterns, getPatternGroupName) { NARGS(1, 1); int64_t i = A_INT(0, 0); if (i < 0 || i >= PGRP_N) RANGE(); return fl_ret_s(c, ""); }
+FL_H(patterns, getActivePatternGroup) { NARGS(0, 0); return fl_ret_i(c, -1); }
 /* ---- patterns (4, PY-179 #3271): 述語 pred の E = 0x193fce0+i*0xc0 は .bss で未投入 (全 0) のため pred は偽。patternCount は ¬pred を i=1..999 で数えて 999。
  * patternNumber は slot 0x15e4018 → 0x15d51a0 の dword の PE 初期値 1 (1 始まり)。isPatternDefault の範囲外は status -4 = FL_E_RANGE。
  * isPatternSelected は G = [[0x15e35c8]+0xd34] の静的値 0 (null) で [0x16b82e0] (.bss 0) を返す = 偽。値は未実測の仮置き (REPORT_PY179) */
@@ -715,13 +720,22 @@ FL_H(screen, menuPrev) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
 FL_H(device, isAssigned) { return fl_ret_b(c, 1); }
 FL_H(device, setHasMeters) { return fl_ret_none(c); }
-/* PE 0xd747f0 (midiOutMsg) と PE 0xd748e0 (forwardMIDICC) の共通判定: device 無し → -7、送出先無し → -6 (送出の前に判定)。通ったら word を送出として記録する */
-static int midi_send(fl_call *c, uint32_t w) {
+/* PE 0xd747f0 (midiOutMsg) と PE 0xd748e0 (forwardMIDICC) の共通判定: device 無し → -7、送出先無し → -6 (送出の前に判定)。0 なら通過 */
+static int midi_check(fl_call *c) {
     if (!dev_assigned) return fl_err(c, FL_E_DEVICE, "Device not assigned");
     if (!link_assigned) return fl_err(c, FL_E_LINKED_DEVICE, "Linked device not assigned");
+    return 0;
+}
+/* 判定を通った word を送出として記録する */
+static int midi_record(fl_call *c, uint32_t w) {
     midi_out_n++;
     if (midi_word_n < NMIDI) midi_words[midi_word_n++] = w;
     return fl_ret_none(c);
+}
+static int midi_send(fl_call *c, uint32_t w) {
+    int r = midi_check(c);
+    if (r != 0) return r;
+    return midi_record(c, w);
 }
 /* PY-215 (#3568): PE 0xd75d30 (書式 'I'、引数 1)。-1 は -1 を返す (0xd75dc0)。それ以外は連動表を末尾から走査し、一致が無い・表が空なら status 1 → None (0xd75dce)。device・link の割当は見ない (-6/-7 経路なし)。表の供給元は未確定のため空と仮定 (REPORT_PY215 §3) */
 FL_H(device, getLinkedChannel) { int64_t i = A_INT(0, 0); if (i == -1) return fl_ret_i(c, -1); return fl_ret_none(c); }
@@ -732,8 +746,20 @@ FL_H(device, getIdleElapsed) { return fl_ret_d(c, idle_elapsed); }
 FL_H(device, isMidiOutAssigned) { return fl_ret_b(c, midi_out_assigned); }
 FL_H(device, getMasterSync) { return fl_ret_b(c, master_sync); }
 FL_H(device, setMasterSync) { master_sync = A_INT(0, 0) == 1; return fl_ret_none(c); }
-/* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。値の変化検出は未実装 (REPORT_PY231 §4) */
-FL_H(device, forwardMIDICC) { int64_t msg = A_INT(0, 0); (void)A_INT(1, 1); return midi_send(c, (uint32_t)msg); }
+/* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。
+   0xfdc8a0 は [sink+0x5c+4*添字] と同じ 32bit 値なら送らず、変わったときだけ送ってテーブルを書く (REPORT_PY231 §1)。
+   テーブルの初期値と添字の範囲は未確定 (#3949): 未設定 (-1) を初期値とみなし、範囲外の添字は重複検出せず送る仮置き */
+FL_H(device, forwardMIDICC) {
+    int64_t msg = A_INT(0, 0), idx = A_INT(1, 1);
+    uint32_t w = (uint32_t)msg;
+    if (!fcc_init) { for (int i = 0; i < FCC_N; i++) fcc_last[i] = -1; fcc_init = 1; }
+    if (idx < 0 || idx >= FCC_N) return midi_send(c, w);
+    int r = midi_check(c);
+    if (r != 0) return r;
+    if (fcc_last[idx] == (int64_t)w) return fl_ret_none(c);
+    fcc_last[idx] = (int64_t)w;
+    return midi_record(c, w);
+}
 /* PE 0xd747f0 (書式 i|iiii)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
 FL_H(device, midiOutMsg) {
     int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);

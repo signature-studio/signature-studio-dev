@@ -152,3 +152,35 @@ python3 analysis/py257_r8d_bits.py work/py65/extracted/block00031_PE.bin work/py
 - `tail_reads_5b8=0x104caec,0x104cc65`
 - `sides=342 end_exit=25 end_tail=317 sides_with_exit_jcc=4 sides_with_open_jcc=324 sides_with_5b8_write=124`
 - `sites=173 rows=344 objdump_rows=344 mismatch=0` (exit 0)
+
+## 7. mov+and+cmp+jcc の判定 5 件 (#3891)
+
+対象は `mov eax, [rbp+0x5c0]` → `and eax, M` → `cmp eax, M` → `jne` の 5 件 (§3 の `test eax, M` 173 件の外)。判定は `jne` のみ (全立ち = fall-through (立ち)・一部落ち = 分岐先 (落ち))。作用の定義は §2 と同じ (無条件 jmp を辿り、条件 jcc は分岐先を辿らない)。解析は `analysis/py3891_and_cmp_jcc.py`。
+
+- 測定 commit: `34dc9410e` (解析器を含む commit。`git diff 34dc9410e HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は本節の commit 時点で 0 行)。
+- 判定の母集団: capstone と objdump の両方で 5 件 (`sites=5`)。objdump 照合 mismatch 0 (rows 10)・負の対照 (0x104a84f の `jne` の分岐先を +7 した入力) で `mismatch=1`・exit 1。
+- 再現: `cd tools/python && python3 analysis/py3891_and_cmp_jcc.py work/py65/extracted/block00031_PE.bin work/py65/py53/fn.txt work/py3891` (素材 `block00031_PE.bin` は fl-win64 から展開。`work/` は gitignore)。
+
+| 判定 | mask | 立ち: 入口 / 命令 / 終端 (終端へ入った命令) / 書込み / 呼出し / 未追跡 jcc | 落ち: 同じ |
+|---|---|---|---|
+| 0x104a843 | 0x20 | 0x104a851 / 85 / tail (0x104aa82) / 11 / 8 / 11 | 0x104a8b0 / 69 / tail (0x104aa82) / 8 / 6 / 10 |
+| 0x104aee2 | 0x3cd | 0x104aef4 / 118 / tail (0x104b1f8) / 8 / 9 / 10 | 0x104aef8 / 117 / tail (0x104b1f8) / 8 / 9 / 10 |
+| 0x104b273 | 0x3cd | 0x104b285 / 113 / tail (0x104b734) / 9 / 10 / 11 | 0x104b289 / 112 / tail (0x104b734) / 9 / 10 / 11 |
+| 0x104b7c0 | 0x3cd | 0x104b7d2 / 145 / tail (0x104bd1d) / 7 / 12 / 16 | 0x104b7d6 / 144 / tail (0x104bd1d) / 7 / 12 / 16 |
+| 0x104bdde | 0x3cd | 0x104bdf0 / 122 / tail (0x104c263) / 7 / 10 / 13 | 0x104bdf4 / 121 / tail (0x104c263) / 7 / 10 / 13 |
+
+(終端の tail は全て 0x104caae。括弧内は終端へ入った命令の VA。早期 exit (0x104cc72) への辺は 0 件。)
+
+### 作用の内容 (確定)
+
+- **4 件 (0x104aee2・0x104b273・0x104b7c0・0x104bdde・mask 0x3cd)**: 両側の入口は `xor eax,eax` (立ち) と `mov al,0x1` (落ち) の 2 命令で、どちらも同じ `mov BYTE PTR [rbp+X], al` (X = 0x31a・0x318・0x2f6・0x2d6) に合流する。bool 値 (全立ち 0 / 一部落ち 1) を格納する diamond。合流後の書込み・呼出し・終端・末尾の読み値の決まりは両側で完全一致 (差分は `jne` の辺の 1 本のみ)。作用は bool の格納だけで、立ち/落ちで別の作用は無い。
+- **0x104a843 (mask 0x20)**: 立ち側 (fall-through 0x104a851) は `mov rax,[rbp+0x548]` から始まり、`[rbp+0x5b8]` へ 2 回 (0x104a876・0x104a8a3) 書き、0x104a8a9 で `and DWORD PTR [rbp+0x5c0], 0xffffffdf` (bit 0x20 を落とす書換え) を行う。落ち側 (分岐先 0x104a8b0) は `cmp BYTE PTR [rbp+0x51e],0` から始まり、書換えを行わない。両側とも 0x104a95f の `[rbp+0x5b8]` 書込みを経て共通後半 0x104caae に入る。立ち/落ちで書込み・呼出しの集合が異なる (立ちのみ 0x104a8a9 の書換えと 0x104a876・0x104a8a3 の `[rbp+0x5b8]` 書込み)。
+- 早期 exit (0x104cc72) への到達は 5 判定の全側で 0 件。
+
+### 未解決 (残る範囲)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 0x104a843 の立ち側の `[rbp+0x5b8]` 書込み 0x104a876・0x104a8a3 の右辺 (`eax`) の値 | 立ち側の `[rbp+0x5b8]` の値は 0x104a95f の書込みで上書きされる (経路上の順序) ため、読み値には及ばない。右辺の値は未確定 | #2874 (PY-99)・既存 (§5 と同じ) |
+| 条件 jcc の分岐先の本体 (両側とも未追跡 jcc 10〜16 件) | 経路の外の書込み・呼出し・終端は未確定 | #2034 (PY-65) に残す |
+| 4 件の bool 格納 (0x31a・0x318・0x2f6・0x2d6) の読み手 | 格納された bool の以後の使途は本節の範囲外 | 本 issue の範囲外 (PY-65 の未解決に残す) |

@@ -80,6 +80,25 @@
 - 6/7 (修復の効果だけ): 修復前 `56bfc979` の wasm と `f63b5953` の wasm は別物 (sha256 `59e58e29…` と `bbed05ed…`)。survey の unit 記録差は **0** (ok 872 = 872)。到達 3 関数は §4 の通り。
 - 7/7 (`dyn_509.mjs`・509 系 5 関数): 基準 (ldfix 無し) の wasm で FAIL 5/5 → 修復後 PASS 5/5 (c62780・7e5240・409c80・41a670・1063090)。この 5 関数は本 issue の修復対象 (§3) ではない。7e5240・409c80・41a670・1063090 は §6 の IR 変化の対象外なので、PASS は main の ldfix (#509 の store 形 fix) による。c62780 だけが §6 の名前の差分を持つ (ldfxn 採番のずれと推定、U-4)。よって 5/5 の PASS は本 PR の増分の証拠にならない。
 - 本 issue の修復対象 11 関数の動的確認 (修復前後の直接呼び出し) は **未実施**。survey で到達するのは 3 関数だけで、残りは survey からは判定できない → 子 issue。
+- **#4039 (2026-10-15) の追記**: 測定 commit `f07ef8dc9` (`ldfix_509_e2e.sh` の NC 期待値と `dyn_509.mjs` の 47ad70 期待値を補った commit)。foreground 1 回・rc 0・real 6 分 55.8 秒・load 開始 0.44 / 終了 1.00 (uptime の 1 分平均)。素材は `work-m11` / `fl-win64` (PE のみ) / `toolchain-emsdk` を展開して実行。
+  - 旧版 NC: store 形 SUSPECT 8 関数 / 11 site (806740 を含む)。nc_store: 806740 を 1 件検出。nc_use: 1063090 を use 形で検出。NC 期待値は `grep` の条件を「旧版は 806740 を store 形で検出する」に直した (前 HEAD は「旧版は store 0」を要求し、正しい挙動を失敗扱いしていた)。
+  - survey: ok 871 → 873、ok 退行 unit 0、記録差 14 unit (§5 の 6/7 と同じ)。
+  - 7/7 `dyn_509.mjs`: 修復前 FAIL → 修復後 PASS が c62780・7e5240・409c80・41a670・1063090 の 5 件。ただし修復対象 (11 関数 + c62780) に入るのは **c62780 の 1 件だけ**。7e5240・409c80・41a670・1063090 は対象外で、PASS は main 由来 (本 PR の増分の証拠にならない)。**47ad70 は修復対象だが修復前後とも FAIL (`KNOWN`)**: 機械語 `mov rdx,[rcx]` (配列基点 = `*arg1`) が IR で落ち、IR は `%arg1` を配列の基点に使う。修復 (`fix_f3c_use`) は value 側 (`*arg2`) だけを直しており、配列側は未修復。`DYN_SUMMARY after_fail=0/5 known=1`。`known` 行は #4439 で 47ad70 が PASS になったら外す。
+  - 対象 11 関数 + c62780 のうち、本 PR で PASS を確認できたのは c62780 の 1 件。47ad70 は known FAIL。残り 10 関数 (40fe90・41b8d0・41b970・449550・44f040・44fb40・784ed0・806740・c40420・f552a0) は未実施 (#4438)。期待値は、呼び先 (`410010`・`410820`・`4109f0`・`40f910`・`44aeb0`・`420530`・`4203d0` ほか) の機械語を読まないと決まらない。本 run では推定で期待値を書かない。
+- **#4041 の現 head 再測定** (測定 commit `adf298d3b`、`PREV_REF=56bfc979`、`FL_WIN64_DIR`・`EMSDK_ENV`・`M11_WORK` を指定、`timeout 1500` 付きで foreground 1 回・この run の素材 `fl-win64` / `work-m11` / `toolchain-emsdk` を展開して実行): rc 0・real 7m30.97s (451 秒)・load 開始 0.70 / 終了 1.53 (uptime の 1 分平均)。
+  - 2/7: 旧版/新版で本体が異なる関数 33 / 7421 (旧版の関数外テキストは一致、report の f3c 以外のキー差 0)。F3c 関数 旧 36 → 新 46 (旧の全てを含む)。
+  - 4/7: `boot_final.ll` へ F3c を重ねた結果 F3c=43、overlay 43 件、うち新版出力と alloca 行を除いて同一 43。
+  - 5/7 NC: 旧版は store 形 0・use 形 (pure) 23 関数 (1063090 を含まない) と記録した。ただし同じ旧版 (`PREV_REF=56bfc979`) の測定 `f07ef8dc9` (上の追記) は store 形 8 関数 / 11 site (806740 を含む) で、両者は食い違う。この 0 / 23 の値は REPORT_2144 の ldfix 適用後 (post: SUSPECT_VAS 0・SUSPECT_USE_VAS 23) と一致し、ldfix 無し (pre: store 8・use 52) とは一致しない。そのため「旧版」の行が適用後の IR を指していた可能性がある (推定。出力 `nc_prev.txt` が残っておらず未確認)。どちらの測定が正しいかは未確定 (PR 本文の未解決表)。nc_store は 806740 を store 1 件検出 (use 形 14、1063090 を含まない)。nc_use は 1063090 を use 形で検出 (use 形 14)。
+  - 6/7 survey: 942 unit、instrumented 26 関数。ok 退行 unit 0。kind 以外も含む記録差 14 unit `[114, 144, 158, 280, 291, 296, 302, 304, 314, 493, 659, 880, 888, 895]` (reviewer の再実行 `adf298d3b` と同一)。
+  - 7/7: `DYN_SUMMARY after_fail=0/5` (c62780・7e5240・409c80・41a670・1063090 がすべて before FAIL → after PASS)。
+- **#4041 の再測定** (測定 commit `5e17a9229`、`PREV_REF=56bfc979`、`FL_WIN64_DIR`・`EMSDK_ENV`・`M11_WORK` を指定して `ldfix_509_e2e.sh` を foreground 1 回): rc 0・real 432 秒・load 開始 0.19 / 終了 1.00。step 2〜7 完走、7/7 `DYN_SUMMARY after_fail=0/5`。survey の記録差は 14 unit (`[114, 144, 158, 280, 291, 296, 302, 304, 314, 493, 659, 880, 888, 895]`。§5 の上の 2 段と同じ母集団)。NC は 806740 の store と 1063090 の use を各 1 件検出 (「旧版 store 0」は 91 行目と同じ未確定の測定で、`f07ef8dc9` の旧版 store 8 関数と食い違う)。
+
+| 直した不具合 (issue #4041) | 状況 |
+|---|---|
+| 1. 旧版の `ldframe.py` 欠落 (`ModuleNotFoundError`) | `git archive PREV_REF tools/m11/ldfix` で旧版 ldfix 一式を取り出す。`009e823` の ldfix.py は ldframe を import しないので、`PREV_REF=56bfc979` 以降で必要。 |
+| 2. `"$CFG"` の glob が複数引数になる | **この HEAD では再現せず**。`ldfix_img.py` は `CFG` を 1 引数で受け、`ldmach_img` が `glob` する。挙動は変えていない。 |
+| 3. 修復後 wasm の `r8b`・`ld115` 未記録で build 拒否 | 修復後経路で `r8b=disabled ld115=disabled` を記録し、`M11_ALLOW_R8B_DISABLED=1 M11_ALLOW_LD115_DISABLED=1` を付けた (A/B の差を ldfix だけに揃える)。 |
+| (付随) NC の失敗が rc 0 で隠れていた | NC の期待値 (806740 の store・1063090 の use を検出、旧版は store 0) を assert し、失敗は rc に反映する。NC の 806740 は新版で use 側 `ldfxu` になるため、正規表現を `ldfx[nu]` に広げた。 |
 
 ## 6. IR 差分の読み方
 
@@ -89,7 +108,12 @@
 - `f3c_use_replaced` の +14 は、§3 の 11 組の rep の和 (1+1+1+1+2+2+1+1+1+1+2 = 14) と一致する。c62780 は置換の対象ではない。
 - **`f3c_fn_stores 10 → 9`**: 外れたのは 806740 の store 形 1 site。REPORT_484 の `store i64 %arg3` (機械語 806792) で、§3 の 806740 (rep 1/1/1) の唯一の使用に当たる。`fix_f3c_use` がこれを先に `load` の値へ置換するため、`fix_f3c_fn` の候補 (`f3c_ir_stores` は `store %argN` だけを拾う) から外れる。store 形の内訳 (409c80 1・41a670 1・5c0270 2・66e080 3・7e5240 1・806740 1・c62780 1 = 10) の 806740 が 1 減った。意図した経路であり、回帰とは見ていない (推定)。
 - ただし、置換後の load は B の先頭 (最初の deref より前) に置き、旧形 (`fix_f3c_fn`) は store の直前に置く。B の先頭から最初の deref までに、同じ先を書く store・call が無いことは未確認 (U-3)。806740 は REPORT_509 で unexec (native 側が NULL deref) のため、動的確認もできない。
-- **c62780 の差分**: `fix_f3c_fn` の SSA 名 `ldfxn%d` は `ctr_f3cn` (プロセス内で関数をまたぐ通し番号) で採番される。806740 の候補が 1 つ減ると、後続の store 形の関数の採番が 1 つずれる。store 形の関数で 806740 より後の VA にあるのは c62780 だけ (IR の定義順が VA 昇順であることを仮定)。§6 の正規化は `ldfxu\d+` だけなので、c62780 が名前の差分として残る。`ldfxn\d+` も正規化して一致することは work-m11 が無いため未確認 (U-4)。
+- **#4421: 間接 call を含む B の除外** (`f3c_indirect_call_before`・測定 commit `dcb46250c`): 最初の deref より前 (B の先頭から) に、呼出先が即値でない call があれば置換しない (`f3c_use_indirect_call`)。対象は c40420 (§9 の唯一の該当)。入力 `work/boot_final3.ll`: 除外前 `f3c_use_replaced` 80・`f3c_use_dom` 11・`F3c` 43 → 除外後 79・10・42 (`f3c_use_indirect_call` 1)。修復 site 数は 11 → 10 組。正規化後に IR が変わった関数は c40420 のみ (`ldfx[nu]\d+` 正規化・手元比較)。c40420 の本体に `ldfx` 行は残らない (`ldfix_509_e2e.sh` の [c40420] assert)。
+  - e2e (`ldfix_509_e2e.sh`、測定 commit `dcb46250c`、`PREV_REF=56bfc979`、foreground 1 回): rc 0・real 434 秒・終了時 load 1.01 (開始時は未採取)。`[c40420] 新版 IR に修復 load 無し`。survey: 基準 (ldfix 無し) ok 871 → 修復後 ok 873 (同一 run の比較)、ok 退行 0、記録差 14 unit (前 run と同じ集合)。7/7 `DYN_SUMMARY after_fail=0/5`。
+  - 単体: `test_f3c_indirect_4421.py` 5/5 PASS。判定関数を壊すと 2 件 FAIL (mutation)。
+  - 除外の効果 (c40420 の差) だけを切り出した survey は取っていない。survey の ok 増 2 件 (unit 158・493) は本変更の効果と断定しない。
+- **c62780 の差分 (U-4 確認済み, #4041)**: `fix_f3c_fn` の SSA 名 `ldfxn%d` は `ctr_f3cn` (プロセス内で関数をまたぐ通し番号) で採番される。`ldfxn\d+` を `LDFXN` に正規化すると、c62780 の旧版 (`56bfc979`) と新版 (HEAD) の本体は**完全一致**する (md5 一致。新版に `ldfxu` は無い)。採番のずれ (推定) は正しかった。根拠 (`$RUNNER_TEMP/ldfix_509_e2e/{prev,new}.ll` の `function_c62780` 定義行を抽出し `re.sub(r'ldfxn\d+','LDFXN',…)` 後に md5): 旧版 `694f8999609b4c0e4a51692f71b65e6b`・新版 `694f8999609b4c0e4a51692f71b65e6b` (一致)。正規化前は `a0d59b9a…` と `4cafc0d0…` で不一致。
+- **§6 の全関数の差分 (#4041 で追加確認)**: `ldfx[nu]\d+` を正規化しても、新旧の IR 全体は一致しない (50 行)。残る差分は F3c の件数増 (36→46) による関数の本体変化 (`ldfx` の挿入行) で、採番のずれではない。806740 は旧版では fn 側 (`ldfxn9`)、新版では use 側 (`ldfxu32`) で同じ修復が入る。§6 の正規化対象に `ldfxn` を足しても、33 関数の差分は消えない。
 
 ## 7. 再現・測定 commit
 
@@ -112,8 +136,8 @@ cd .. && PREV_REF=56bfc979 EMSDK_ENV=<[EMSDK] の emsdk_env.sh> PE=<block00031_P
 |---|---|---|
 | U-1 修復対象 11 関数と c62780 の動的確認 (修復前後の直接呼び出し・7/7 相当) | 修復の正しさが survey の到達 3 関数以外では確かめられていない | #3194 (LD-148) |
 | U-2 支配されない 6 組・w32 2 組・no-ir-block 1 組の修復 (6905f0 は理由の訂正のみ・REPORT_3195 §3) | 11 組の修復のみ。残りは現状のまま | #3195 (LD-149) で不能理由を記録 (REPORT_3195 §2)。修復の設計は PM 判断 (未起票) |
-| U-3 B 先頭の load 配置の安全性: §9 の機械語確認で、10 組は同じ先を書く store・call が無いことを確認。c40420 は deref の前に間接 call と store があり、見直しが必要 (未実施) | c40420 の修復値が機械語と一致するかが未確認 | 見直しは子 issue #4069 (LD-190) |
-| U-4 c62780 の名前だけの差分 (`ldfxn` 採番) の確認: `ldfxn\d+` も正規化して HEAD と prev の IR が一致するか | §6 の c62780 の説明は推定のまま | #3194 (LD-148) |
+| U-3 B 先頭の load 配置の安全性: §9 の機械語確認で、10 組は同じ先を書く store・call が無いことを確認。c40420 は間接 call を含むため #4421 で置換を除外 (§6)。即値の直接 call (806740) は除外の対象外 | 間接 call を含む関数の修復は今後も対象外。呼出先の特定 (#4069 の残件) は未実施 | #4069 (LD-190) |
+| U-4 は #4041 で解消 (c62780 は `ldfxn\d+` 正規化で一致。§6)。全関数の一致は 33 関数の F3c 件数増による本体変化のため、採番だけでは一致しない | — | — |
 | `REPORT_930` の 23/24 と 30/33 の不一致、および 47ad70 の kind=ok 5 と 6 の差 | 分類の母集団・IR の差 (本 REPORT の 21 組は `audit_509_pre.json` 基準) | #1134 (既存) |
 
 ## 9. U-3 機械語確認 (#4040)

@@ -11,7 +11,9 @@ sys.path.insert(0, os.path.join(SRC, '..', 'm6'))
 from ottlib import Bin
 
 HERE = os.path.join(SRC, 'work')
-WINF = os.environ.get('M11_PE') or os.path.join(os.environ.get('FL_WIN64_DIR') or '/home/ubuntu/work/analysis/win64', 'extracted', 'block00031_PE.bin')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared'))
+from paths import FL_WIN64_DIR
+WINF = os.environ.get('M11_PE') or os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
 EP_VA = 0x1376820
 ARR1_RVA = 0xf768e0
 ARR1_N = 0x3ae

@@ -541,6 +541,37 @@ def t16b():
     print("T16b ok (movzx edx,dh は unbound / movzx edx,dl は 0 拡張で bind)")
 
 
+def t16c():
+    """[#2861] rip 相対 lea の定数アドレスは絶対 VA を即値で返す。32bit lea は下位 32bit に切り詰める。
+    lea r8, [rip+16] @0x120000000 → 0x120000017 (i64)、lea r8d, [rip+16] → 0x20000017 (i32)。"""
+    from liftlib.mc import decode_one
+    from liftlib.passes.iargs import _resolve
+
+    class _B:
+        def bind(self, reg, C):
+            return None
+
+        def root_def(self, reg, C):
+            return ("def", 0x1000, reg)
+
+    class _MF:
+        def __init__(self, it):
+            self.insns = {0x1000: it}
+
+    cases = (
+        ("lea r8, [rip+16]", b"\x4c\x8d\x05\x10\x00\x00\x00", "r8", 0x120000017, "i64"),
+        ("lea r8d, [rip+16]", b"\x44\x8d\x05\x10\x00\x00\x00", "r8", 0x20000017, "i32"),
+    )
+    for txt, code, reg, want, ty in cases:
+        it = decode_one(code, 0x120000000)
+        assert it is not None and it.mnem == "lea" and it.mem["base"] == "rip", (txt, it)
+        ins = []
+        got = _resolve(_B(), _MF(it), None, reg, 0x1010, "", "n", ins)
+        assert got == (str(want), ty), (txt, got)
+        assert ins == [], (txt, ins)
+    print("T16c ok (rip lea は絶対 VA を即値で返す / 32bit は下位 32bit に切り詰め)")
+
+
 def t17():
     """[LIFTLIB #241] i256 ABI + pcmpistri + F2 xmm 戻り搬送。
     (a) gen.py が i256 形を u64×4 平坦化 / Y 戻りで生成し, 実体 (kernels) を持つ (stub でない)
@@ -963,7 +994,7 @@ def t31():
 
 if __name__ == "__main__":
     import traceback
-    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t28, t29, t30, t31)
+    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t28, t29, t30, t31)
     fails = []
     for f in tests:
         try:

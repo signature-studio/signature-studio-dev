@@ -14,6 +14,8 @@ export interface SnapIssue {
   // 本文の検証済み素材行 (engine の snapshot が入れる)。無ければ未設定。
   artLine?: string;
   deps?: { total_blocked_by?: number } | null;
+  // sub-issue の親 (sig.subParent の n)。本文の『親: #N』が無いときの区分の継承に使う (#3989)。
+  subParent?: number | null;
 }
 export interface SnapPr {
   number: number;
@@ -279,7 +281,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
   }
 
   // 区分は親からの継承を含む (#3973)。snapshot は open な issue だけなので、closed の親は引けず継承しない (engine の prioMap と同じ値)。
-  const prios = effectivePrioMap(d.issues.map((i) => ({ number: i.number, state: "open" as const, labels: i.labels, body: i.body })));
+  const prios = effectivePrioMap(d.issues.map((i) => ({ number: i.number, state: "open" as const, labels: i.labels, body: i.body, subParent: i.subParent ?? null })));
   const ready = rows.ready.map((n) => ({ n, title: iss.get(n)?.title ?? "", blocksCount: blocksCount.get(n) ?? 0, prio: prios.get(n) ?? "normal" }));
   rows.ready = sortReady(ready).map((r) => r.n);
   return {

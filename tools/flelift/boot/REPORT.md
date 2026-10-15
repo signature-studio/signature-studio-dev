@@ -229,7 +229,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 | mode 2 `FLE_IPP=2` (root 有) | 209 | 2,314 / 1,199 | ippsZero_8u × 2 | 非 ippsZero の IPP 0 件 → exit(0) |
 | 既定 (root 無し・未指定) | 209 | 1,890 / 776 | なし (0x67264b が dispatch(0) = icall-miss で ret 0・`ippsZero_8u` 未適用) | unlifted 0x6a7b70 |
 
-- **機構** (実測): `fle_lifted_s5.c` の `/* 672644 */ mov rax,[0x15e0a48]` の次が `/* 67264b */ call qword ptr [rax]` (`FF 10`・2 byte)。PE の逆アセンブルでも同じ。push される戻り番地は 0x67264d (summary の `ipp.called` の ret はこの値)。呼出時の target は shim 有で `ippsZero_8u` (非 0)、既定経路で 0 (`dispatch(0)`)。終了時の `[0x15e0a48]` は shim 有で 0、既定経路で 0x15F34A0 で、呼出時の値とは一致しない。shim 有で登録が呼出時には効いていたが終了前に 0 へ戻る経路は**推定** (書換え元は未特定)。よって `FLEBOOT_IPP_CHECK` (終了時の 0x15F34A0 を見る) の NG は呼出しの不発を示さない。
+- **訂正 (#4004・実測)**: `ippsZero_8u` は 0x67264b 以外に 0x6b91e8 からも呼ばれる (計 2 件)。呼出時の `[0x15e0a48]` は両 route とも 0x15F34A0 で、終了時の 0 という記述は取り下げ。詳細は `REPORT_APPENDIX_4004.md` §2・§3 (訂正元: 本節)。`FLEBOOT_IPP_CHECK` (終了時の 0x15F34A0 を見る) の NG は呼出しの不発を示さない。
 - shim 有と negctl の差: `getproc` 511 / 88、GetMem・FreeMem もともに +423。units は同じだが実行経路は同一ではない (+423 の内訳は未確認)。mode 2 (`FLE_IPP=2`) の停止経路 (`g_ipp_stop`) は未発火 (`ipp_stop`=null・発火の確認は未実施)。「非 ippsZero の呼出し 0 件」は `ipp.total` の計数 (停止判定より前) から有効。
 
 測定は route ごと n=1 (変動の min–max は未測定)。測定 commit `4869ad16` (`fle_boot.mjs` の L101 コメントの訂正のみ。コードを変えた最後の commit)。経緯: `56e515e1` → main 取り込み merge `a0f659bf` (`fle_boot.mjs` に PY-123 の `undo_probe` 出力が入り、結果 JSON に `undo_probe` 項目が増えた。units・GetMem/FreeMem・停止点は不変) → `6b62f031` (REPORT と結果 JSON の再採取) → `4869ad16` (呼出点の訂正)。`4869ad16` で再測定した結果 JSON は `6b62f031` の版とバイト一致。コード差分 `git diff 4869ad16 HEAD -- tools/flelift/x64c.py tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` は空 (差分 0)。工程秒・RSS・再現コマンドは `REPORT_APPENDIX_2702.md` §A・§B。
@@ -237,7 +237,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | unit 209 後の `MessageBoxA` (text 空) の text 源と呼出元 | 最初のウィンドウ未達 (次の blocker) | #3060 [FLE-11] |
-| 呼出時の `[0x15e0a48]`・`0x15F34A0` と、終了前に 0 へ戻す書込み元 | ippsZero 登録経路の確定。IPP_CHECK の観測点 | #3060 (受入条件に追加) |
+| 呼出時の slot は両 route とも 0x15F34A0 (付録 §2 で実測)。登録経路の確定は未了 | ippsZero 登録経路。IPP_CHECK の観測点 | #3060 (受入条件に追加) |
 | 既定経路で `ippsZero_8u` の呼出点 0x67264b の target が 0 (icall-miss) になる経路。出力のゼロ埋めが未適用 | 既定経路 (`FLE_IPP` 未指定) の出力内容 (silent miscompile の疑い) | #3060 (受入条件に追加) |
 | 既定経路の survey 再実測・0x6a7b70 root 化の可否 | 0x6a7b70 を恒久 root にするかの判断 | #918 (親・PM 判断) |
 

@@ -2,7 +2,7 @@
 // 検出に LLM は使わない。自由文は解析しない: ラベル・マーカー・番号の正規表現だけ (needs.ts・refs.ts)。issue / PR の自由文は payload に入れない。
 import { effectivePrioMap, PRIO_RANK, prioOf, type Prio } from "./launch.ts";
 import { parentNumbers } from "./refs.ts";
-import { ASSOC_OK, hasOpenPr, KILLED_STOP_AT, NEEDS_USER_LABEL, type PmState, type PrState } from "./webhook.ts";
+import { ASSOC_OK, hasOpenPr, KILLED_STOP_AT, NEEDS_USER_LABEL, prioIssues, type PmState, type PrState } from "./webhook.ts";
 
 // repository_dispatch の event_type "oc-pm" の kind (列挙 9 値)。prepare-event-context.sh の許可リストと同じ。
 export const PM_KINDS = ["stuck", "no_pr", "refs_orphan", "needs_decision", "stopped_report", "user_answered", "supply", "digest", "retro"] as const;
@@ -94,7 +94,7 @@ const prPrio = (s: PmState, p: PrState, prios: Map<number, Prio>): Prio => {
 
 export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
   const out: PmTarget[] = [];
-  const prios = effectivePrioMap(Object.values(s.issues));
+  const prios = effectivePrioMap(prioIssues(s));
   for (const p of Object.values(s.prs)) {
     if (p.state !== "open" || !authorAllowed(p, o.bots)) continue;
     const sig = s.sig[String(p.number)];

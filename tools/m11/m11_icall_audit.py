@@ -11,7 +11,9 @@ from capstone import x86
 
 W = os.path.join(HERE, 'work')
 BASE = 0x400000   # IR/boot_fns の VA = ottlib.Bin アドレス + 0x400000
-PE = os.environ.get('M11_PE') or os.path.join(os.environ.get('FL_WIN64_DIR') or '/home/ubuntu/work/analysis/win64', 'extracted', 'block00031_PE.bin')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared'))
+from paths import FL_WIN64_DIR
+PE = os.environ.get('M11_PE') or os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
 irp = sys.argv[1] if len(sys.argv) > 1 else os.path.join(W, 'boot_final.ll')
 b = Bin(PE)
 ir = open(irp).read()

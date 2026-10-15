@@ -6,6 +6,7 @@
 ## 0. 結論 (先出し)
 
 - **boot (#3289 / T-SH-60): DllMain(PROCESS_ATTACH) の wasm 実行は FAIL** (§7)。strict (実装済み import のみ) は kernel32 `LocalAlloc` で停止。
+  longjmp 継続 (#3410 / T-SH-77) は override + 戻り先 root で soft 版の停止点が `ExitProcess(0)` に変わった (§7.8・付録 `REPORT_APPENDIX_3410.md`)。
   `LocalAlloc` を実装し、残りの未実装 import を soft stub に置き換えても、setjmp 系の戻り先 `0x59c210` (関数の途中) へ longjmp して UNLIFTED で停止。
   FreeType の FT_* 結合はこの停止より後段のため未到達。**InitDll は QuickFontCache の export ではない** (§7.1)。
 - **判定: 部分達成 (lift + wasm build + 2 関数の native 一致まで。boot は §7 の停止点の測定まで)**。#154 の受入範囲
@@ -173,9 +174,20 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 戻り先 `0x59c210` (setjmp/longjmp 継続) の lift 対応 (FLEngine 同型の override と断片 entry) と longjmp の起動元の特定 | DllMain が完走しない | #3410 (T-SH-77) |
-| rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない | #3411 (T-SH-78) |
-| GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3412 (T-SH-79) |
+| 戻り先 `0x59c210` (setjmp/longjmp 継続) の lift 対応 (FLEngine 同型の override と断片 entry) と、DllMain 側の longjmp 起動元の特定 | DllMain が完走しない | #3410 (T-SH-77) |
+| `ExitProcess(0)` の呼出元と、継続後の進行が正しいか (偽の停止か) の確認 | DllMain の完走 (boot PASS) の判定 | #4262 (T-SH-106) |
+| longjmp の発生条件 (`0x40fa40` の呼出元 `0x40fbd4`・`0x40fcbd` と `[0x5aa000]` の決まり方) | 偽の停止かどうかの切り分け | #4263 (T-SH-107) |
+| rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない。直接呼出しの計数は §10 | #3411 (T-SH-78) |
+| GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3434 (T-SH-83。#3412 は closed) |
+
+(§7.9 直接呼出し (#4296): `GetStats` は DllMain の init 無しで trap、`CleanUp` は rax=0。測定 commit `c36a9b817`。詳細は `REPORT_APPENDIX_4296.md`)
+
+### 7.8 longjmp 継続の対応 (T-SH-77 / #3410・部分達成)
+
+- override `qfc_ov_longjmp` (FLEngine `fle_ov_longjmp` と同型) と boot 専用の戻り先 root `0x59c210` を追加。e2e の entries と assert (6,347) は不変。
+- 停止点の切り分け (soft・各 1 回): override のみでは `0x59c210` の UNLIFTED のまま。**root を加えると `ExitProcess(0)` へ進む** (停止点を動かしたのは root)。
+  この進行は longjmp 後の継続の不整合による偽の停止の可能性がある (推定。未検証)。DllMain の完走は未達。
+- 判定: boot は FAIL のまま (strict は `LocalAlloc`)。起動元・切り分け表・測定は付録 `REPORT_APPENDIX_3410.md` §1〜§3 が正本。
 
 ## 8. 検証実行・再現 (§7 の追加分・実測)
 
@@ -215,3 +227,24 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 **結論 (部分達成)**: FT_* 14 本の解決経路を実装し、token 経由で 14 本すべての呼出を直接呼出と照合して、native / wasm32 / wasm64 で同一結果であることを確認した (e2e PASS。数値は付録 §9.3)。
 guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行は未着手 (子 #3434。DllMain の 0x563000 は #3410・#3411 の後段で未到達)。
 負の `face_index` による `long` 符号拡張は区別できていない (付録 §9.4・§9.5)。
+
+## 10. DllMain 経路の import 呼出し計数 (T-SH-78 / #3411)
+
+測定 commit = `5c79daa2b` (HEAD の計数版 `qfc_count.sh` を実行した commit)。全文 (呼出し回数の表・未解決の詳細) は `REPORT_APPENDIX_3411.md`。
+結論: 直接呼出し `imp_<名>();` で計数された import は 6 件 (`GetCurrentThreadId`・`TlsAlloc`・`LocalAlloc`・`TlsSetValue`・`TlsGetValue`・`ExitProcess`、各 1 回)。すべて rt または `qfc_imp.c` に既存。
+間接経由 (`imp_by_index` → `imp_tab[k]()`) は未計数のため、DllMain 経路で実際に呼ばれる import の全数は未確定。停止点は `ExitProcess(0)` (偽の停止かどうかは #4262 で未確定)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 停止点 `ExitProcess(0)` が偽の停止か (longjmp 継続後の進行) | DllMain が完走したか不明 | #4262 (T-SH-106) |
+| longjmp (0x40f9c0) の発生条件と戻り先 `0x59c210` の lift 対応 | 停止点の解釈 | #4263 (T-SH-107) |
+| 間接経由の import 呼出しが未計数 | DllMain 経路の全数が不明 | #4374 (T-SH-121) |
+| rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る | #4375 (T-SH-122) |
+| `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | #4280 (T-SH-108) |
+| `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #4296 (T-SH-113) |
+
+## 11. guest imp_GetProcAddress の結線 (T-SH-83 / #3434)
+
+測定 commit = `ddafc3602`。全文 (結線の形・e2e・boot・未解決) は `REPORT_APPENDIX_3434.md`。
+
+**結論 (部分達成)**: 受入条件 1 (`imp_GetProcAddress` → `qfc_gpa` の結線) を実装した。`qfc_import_e2e.sh` の hook 経路 (`imp_GetProcAddress` → hook → token → `qfc_gpa_call`) で `FT_Get_Char_Index` が直接呼出しと一致 (PASS)。受入条件 2 (`FontCache_GetStats` / `CleanUp` の wasm 実行) は未達で、子 issue #4296 (`[T-SH-113]`) に移した (DllMain が `0x59c210` の longjmp 継続で止まり、`0x563000` の FT 解決に届かない)。

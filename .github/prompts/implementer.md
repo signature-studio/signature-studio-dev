@@ -67,7 +67,7 @@
     `docs/WORKFLOW.md` §3 ① の `gh issue list ... | grep -oE '^\[<AREA>-[0-9]+[a-z]?\]' | grep -oE '[0-9]+' | sort -n | tail -1`)。
     起票の直前に同じ確認を再度行い、`grep -cF '[<AREA>-<n>]'` が 0 件であることを確かめてから起票する。
     本文に `親: #N`・受入条件・`oc_artifacts:` 行。
-    milestone・優先度・Status は触らない)。起票した番号は最終回答と issue コメントに書く。
+    milestone・Status・`prio:*` は触らない。子 issue に `prio:*` を付けない (`gh issue create` に `--label "prio:*"` を付けない)。優先度の付与と親からの継承は PM / Worker が行う (#3973・#4387)。起票した番号は最終回答と issue コメントに書く。
     前提となる別 PR が未 merge の作業は着手せず、issue にコメントして停止する。
 12. **reviewer に差し戻されたら、PM を待たずに自分で直す**。差し戻し (changes_requested) を受けると
     workflow があなたを fix モードで自動起動する。その PR ブランチを直して push すれば review が

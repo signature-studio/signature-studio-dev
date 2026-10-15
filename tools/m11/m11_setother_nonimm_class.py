@@ -211,12 +211,36 @@ class Ctx:
             return ('実値化', 'call_ret_const', val, at)
         return (cls, 'call_ret>' + why, None, at)
 
+    def rip_load(self, x, mn, dst, at):
+        """rip 相対の読込み。書込み不可・非実行の section (.rdata 相当) で幅 8/16/32 の全幅を読めたときだけ値を読む。
+        .text (実行可)・.data/.bss (書込み可) は値を決めない (他の関数が書き換えうる・命令列)。どちらも理由語は load_global のまま。"""
+        fallback = ('未決', 'load_global', None, at)
+        m = ldmach.memops_of(self.cf.cs, x)[0]
+        bits, w = m['size_bits'] or 0, (reg_of(dst) or (None, 0))[1]
+        pef = getattr(mach, 'pef', None)
+        rva = m['rip_rva'] - (pef.OPTIONAL_HEADER.ImageBase if pef else 0)
+        sec = next((s for s in (pef.sections if pef else ())
+                    if s.VirtualAddress <= rva < s.VirtualAddress + s.Misc_VirtualSize), None)
+        if sec is None or bits not in (8, 16, 32) or w < 32:
+            return fallback
+        if sec.Characteristics & (0x80000000 | 0x20000000):
+            return fallback
+        data = sec.get_data()[rva - sec.VirtualAddress:rva - sec.VirtualAddress + bits // 8]
+        if len(data) != bits // 8:
+            return fallback
+        v = int.from_bytes(data, 'little')
+        if mn in ('movsx', 'movsxd') and (v >> (bits - 1)) & 1:
+            v -= 1 << bits
+        return ('実値化', 'rdata_const', v & ((1 << w) - 1), at)
+
     def def_reg(self, fam, x, dst, src, k, depth):
         mn, at = x.mnemonic, hex(x.address)
         info = reg_of(dst)
         w = info[1] if info else 0
         mask = (1 << w) - 1 if w else M64
         if mn in ('movzx', 'movsx', 'movsxd') and reg_of(src) and not fam.startswith('xmm'):
+            if w < 32:
+                return ('未決', 'partial_ext', None, at)
             sfam, sw = reg_of(src)
             cls, why, val, da = self.trace_reg(sfam, k - 1, depth + 1)
             if cls == '実値化':
@@ -262,6 +286,8 @@ class Ctx:
             return ('未決', 'arith' + ('_load' if '[' in src else ''), None, at)
         if mn == 'lea':
             return ('未決', 'lea_' + mem_kind(src), None, at)
+        if '[' in src and mem_kind(src) == 'global':
+            return self.rip_load(x, mn, dst, at)
         if '[' in src:
             return ('未決', 'load_' + mem_kind(src), None, at)
         if mn in ZERO and dst == src and w:

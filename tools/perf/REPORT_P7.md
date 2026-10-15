@@ -15,7 +15,7 @@
 | **Firefox の同期 compile** | メインスレッドで 32 MiB の `new WebAssembly.Module` が **成功** (48 ms)。Chrome の「メイン 8 MB 超 RangeError」は Firefox に無い |
 | **Firefox の compile 規模依存** | Worker で compile: 941 KB 43 ms / 32 MiB 57 ms (Chrome 4.6 / 16.2 ms の 3.5〜9×)。**定常実行は同じ wasm で Chrome の約 1.6〜2× 遅い** (mid 594 vs 297 µs/128f、large 969 vs 597 µs; §3 の分解能注意) |
 | **AudioWorklet** | Chrome headless / headful (Xvfb): 48 kHz・2 s で `process()` 748 / 753 回 (期待 750)、出力は参照モデルと bit 一致。**headful は最大呼出間隔 14 ms・>10 ms が 3 回** (headless は 0 回) = ホスト揺らぎ込みの 1 回測定で、underrun 判定ではない。**Firefox は AudioContext が `suspended` のまま (`Closed before resume completed`)、process() は 1 回も回らず UNMEASURED** (出力デバイス無し) |
-| **Module の transfer** | 全ブラウザで IndexedDB への `WebAssembly.Module` put は `DataCloneError`。`structuredClone(Module)` は 3 構成とも可。**AudioWorklet への `port.postMessage(Module)` は 3 構成とも JS 側で例外にならない。worklet 側の受信は版・ブラウザで分かれた**: Chrome 154.0.8037.97 (headless/headful) は `messageerror` で受信不可、Firefox 157 (headless) は受信 OK。Chrome 155.0.8059.39 は PR review の独立再実行で受信 OK (本 runner 未再現)。**「不可」は Chrome 154 の観測に限る** (§7。runner 上の結果で、実機は未取得) |
+| **Module の transfer** | 全ブラウザで IndexedDB への `WebAssembly.Module` put は `DataCloneError`。`structuredClone(Module)` は 3 構成とも可。**AudioWorklet への `port.postMessage(Module)` は 3 構成とも JS 側で例外にならない。worklet 側の受信は Chrome の版で分かれた**: Chrome 154.0.8037.97 (headless/headful) は `messageerror` で受信不可 (3 回 × 2 構成で再現)、Chrome 155.0.8059.39 (headless/headful) は受信 OK (3 回 × 2 構成すべて `isModule=true`)、Firefox 157 (headless) は受信 OK。版の差は同一 harness での版だけを変えた測定で切り分けた (§7)。**「不可」は Chrome 154 の runner (Linux) 観測に限る** (実機は未取得) |
 | **bit-exact (判定)** | Worker 27 本 (3 構成 × 3 サイズ × 3 反復) と AudioWorklet 2 本 (Chrome) すべて参照モデル `makeRef` と hash 一致。ネガコン: 期待 hash を 1 bit 壊すと 9/9 が FAIL、結果欠落で FAIL (§2) |
 
 ## 1. 方法
@@ -51,7 +51,7 @@
 | **Safari (WebKit)** | Linux runner に無い | 起票依頼: `[PERF-P7c]` macOS 実機。`p7.mjs` は Chrome/Firefox 以外の起動を未実装 (URL を開くだけで動くので `?cfg=safari` 手動オープンで可) |
 | **Android / モバイル CPU (3〜10× 低速想定)** | 実機無し | `[PERF-P7d]` Android Chrome 実機 (`chrome://inspect` かページ手動オープン)。手順は §6 |
 | headful (実ウィンドウ・GPU 有) の wasm code cache | Xvfb 上では観測できず (§0)。実機の headful で違うかは不明 | 上の実機採取に含める |
-| worklet 内 `postMessage(Module)` の受信・`messageerror` の実機採取 (#948 受入条件 3 の残り) | ハーネス拡張は済み (§7)。runner (Linux) では Chrome 154.0.8037.97 = messageerror・Firefox 157 = 受信 OK (Chrome 155.0.8059.39 の再実行では受信 OK・本 runner 未再現。§7) | 実機 (Windows/macOS) で `p7.mjs` を実行し worklet の `modRecv` / `msgerr` を採取 |
+| worklet 内 `postMessage(Module)` の受信・`messageerror` の実機採取 (#948 受入条件 3 の残り) | ハーネス拡張は済み (§7)。runner (Linux) では Chrome 154.0.8037.97 = messageerror・Chrome 155.0.8059.39 = 受信 OK・Firefox 157 = 受信 OK (§7) | 実機 (Windows/macOS) で `p7.mjs` を実行し worklet の `modRecv` / `msgerr` を採取 |
 | Firefox 上限: Memory 400 本超 | CAP を 400 にしたため上限未到達 | 実機でも必要なら CAP を上げる (RSS 0 の仮想予約のみ) |
 | compilationHints の機序・低負荷専用機での再測 | 本 run は共有 VM | 既存 REPORT §5.3 に残置 |
 
@@ -90,7 +90,15 @@ runner では Android 実機を使えないため、実機担当者が以下を�
 
 - ハーネス: `web/worklet.js` は `mod` 受信時に `modRecv {isModule}` を返し、`port.onmessageerror` で `msgerr` を返す。`web/p7.html` は `worklet.modRecv` / `worklet.msgerr` に記録する。判定 (`p7.mjs`): 受信 = PASS (Module でなければ FAIL)、`messageerror` = INFO (判定外の記録で exit は変えない)、どちらも無い = UNMEASURED (`--require-worklet` で FAIL)。
 - 測定 commit: `90e0c14c` (コードを変えた最後の commit。worklet 判定の負例を追加)。再現: `xvfb-run -a node tools/perf/p7/p7.mjs --rounds 3 --out <tmp>`。前回の本測定は `c4e4491b` (測定 commit `6edc5ada`)。判定区分を INFO に変える前の同コードの実行は、`messageerror` を FAIL として数えたため rc=1 だった (観測値は同じ)。区分変更後に再測定し rc=0。
-- ブラウザ版: runner のブラウザは Chrome 154.0.8037.97 / Firefox 157.0 のみ。Chrome 155.0.8059.39 は本 runner に無く、PR #2750 の reviewer が独立に再実行した結果 (head `c4e4491b`、`--rounds 3` と Chrome 2 構成のみの再実行 2 回の計 3 回) を引用する: いずれも両 Chrome で `modRecv {isModule:true}`、`messageerror` なし。**版の差か偶発かは未切り分け** (版を変えた再測定は未実施)。
+- 版別の切り分け (#3875): 同一 harness・同一コード (`tools/perf/p7` は `90e0c14c` 以降変更なし) で、ブラウザの版だけを変えて各 3 回測った (`CHROME=<版の実行ファイル> xvfb-run -a node tools/perf/p7/p7.mjs --cfgs chrome-headless,chrome-headful --rounds 3`)。Chrome 155.0.8059.39 は runner の `/usr/bin/google-chrome`、Chrome 154.0.8037.97 は Chrome for Testing (`chrome-linux64.zip`) から取得した。Firefox 157.0 は前節の表のとおり。
+
+| 版 | 構成 (3 回ずつ) | worklet 受信 (`modRecv`) | `messageerror` | `summary` (3 回とも同じ) |
+|---|---|---|---|---|
+| Chrome 154.0.8037.97 | chrome-headless / chrome-headful | 受信なし (6/6) | あり (6/6) | PASS=20 FAIL=0 INFO=2 |
+| Chrome 155.0.8059.39 | chrome-headless / chrome-headful | `isModule=true` (6/6) | なし (6/6) | PASS=22 FAIL=0 INFO=0 |
+
+- 結論 (観測の範囲に限る): 同一 harness で、worklet の `postMessage(Module)` の受信可否は Chrome の版に対応して分かれた (154 = 受信不可・`messageerror` / 155 = 受信可)。12 回すべてで版と一致し、偶発ではない。worker の bit-exact (3 サイズ × 3 回) と worklet の bit-exact は両版とも PASS。
+- 未確認: 版内の別 build・Chromium 155.0.8059.0 (`/usr/bin/chromium`)・実機 (Windows/macOS)。raw の JSONL は `work/p24/` (gitignore 対象) に置いた。
 
 | 構成 | ブラウザ | wall | loadavg (開始時) | worklet `process()` | worklet 内の `postMessage(Module)` |
 |---|---|---|---|---|---|

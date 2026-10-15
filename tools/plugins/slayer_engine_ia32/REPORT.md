@@ -221,6 +221,7 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 ### 9.6 `mov r,[X+8]` → `[r+idx*4]` の形による events[] 候補の列挙 (#894 受入 1 の追加調査・未達)
 
 - 結論 1 行: 候補 5 件はいずれも `events[i]` 読取と判定できず、受入 1 は未達のまま (表・再現・所要・鮮度証跡は [REPORT_APPENDIX_894.md](REPORT_APPENDIX_894.md) §9.6)。
+- 後続 (#3880): 到達解析で読取関数を特定 (`0x10008FA0`・経路は派生 dispatcher `0x10001BF0` の case 25)。 静的のみ・動的未確認。 全文は [REPORT_APPENDIX_3880.md](REPORT_APPENDIX_3880.md)。
 
 ## 10. emcc -c の再測定 (#674 受入 1 の入口, main `5a45be80`)
 
@@ -245,5 +246,5 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 ## 13. native vs wasm の差分試験 (#1223、測定は付録)
 
-- 結論: leaf 関数 4 本 (`0x10001b40`・`0x10009300`・`0x1000d77e`・`0x10008630`) を native 機械語と wasm (ia32 lift) で実行し、eax と OBJ 領域 128 B を bit 単位で突合した。 全件一致。 ネガコン 1 bit で FAIL を確認。 export `main` (#3127) は callback が 0 を返す経路だけを突合し、 全件一致・ネガコンで FAIL を確認 (数値は [REPORT_APPENDIX_3127.md](REPORT_APPENDIX_3127.md) §4、KERNEL32 import の方針は同 §3 が正本)。 非 0 経路は子 #3917。 x87 を含む関数 2 本の native vs wasm 差分試験は #2989 ([REPORT_APPENDIX_2989.md](REPORT_APPENDIX_2989.md)): 構造と float32 結果は全行一致、ST(0) の float64 の丸め差の分布は付録 §1 が正本。 実行時の 3 点 (#3128): 間接 call は 128/128 一致、AF を読む命令は lift 済み・未 lift 区間とも 0 件、fs: の TEB 突合は native 未達 (子 [PLG-G2-37])。
+- 結論: leaf 関数 4 本 (`0x10001b40`・`0x10009300`・`0x1000d77e`・`0x10008630`) を native 機械語と wasm (ia32 lift) で実行し、eax と OBJ 領域 128 B を bit 単位で突合した。 全件一致。 ネガコン 1 bit で FAIL を確認。 export `main` (#3127) は callback が 0 を返す経路だけを突合し、 全件一致・ネガコンで FAIL を確認 (数値は [REPORT_APPENDIX_3127.md](REPORT_APPENDIX_3127.md) §4、KERNEL32 import の方針は同 §3 が正本)。 非 0 経路は子 #3917。 x87 を含む関数 2 本の native vs wasm 差分試験は #2989 ([REPORT_APPENDIX_2989.md](REPORT_APPENDIX_2989.md)): 構造と float32 結果は全行一致、ST(0) の float64 の丸め差の分布は付録 §1 が正本。 残りの leaf x87 関数は #3715 ([REPORT_APPENDIX_3715.md](REPORT_APPENDIX_3715.md)): 構造が全行一致した 5 本のみ PASS、他は未解決 (子 #4064・#4065・#4080)。 実行時の 3 点 (#3128): 間接 call は 128/128 一致、AF を読む命令は lift 済み・未 lift 区間とも 0 件。fs: の TEB 突合は 8 関数のうち 3 本を 192/192 一致 (#3905、 [REPORT_APPENDIX_3905.md](REPORT_APPENDIX_3905.md))、 残り 5 本は子 issue。
 - 測定値・方式・制約・再現は [REPORT_APPENDIX_1223.md](REPORT_APPENDIX_1223.md) (正本)。 実行時の 3 点は [REPORT_APPENDIX_3128.md](REPORT_APPENDIX_3128.md) (正本)。

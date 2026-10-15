@@ -48,6 +48,7 @@ import {
   type RunState,
   WEBHOOK_EVENTS,
   handleWebhook,
+  prioIssues,
   type WebhookResult,
 } from "./webhook.ts";
 
@@ -789,7 +790,9 @@ export class Engine {
       const p = this.s.prs[k];
       if (!((i || p) && i?.state !== "open" && p?.state !== "open")) continue;
       const killRun = this.s.sig[k].killRun;
-      const keep = killRun === undefined ? undefined : { killRun };
+      const subParent = this.s.sig[k].subParent;
+      const kept = { ...(killRun === undefined ? {} : { killRun }), ...(subParent === undefined ? {} : { subParent }) };
+      const keep = Object.keys(kept).length ? kept : undefined;
       if (JSON.stringify(keep) === JSON.stringify(this.s.sig[k])) continue;
       if (keep) this.d.store.put("sig", k, keep);
       else this.d.store.del("sig", k);
@@ -803,7 +806,7 @@ export class Engine {
     const s = this.s;
     const issues = Object.values(s.issues)
       .filter((i) => i.state === "open")
-      .map((i) => ({ number: i.number, title: i.title, labels: i.labels, body: i.body, deps: { total_blocked_by: i.blockedByCount }, ...(i.artLine ? { artLine: i.artLine } : {}) }));
+      .map((i) => ({ number: i.number, title: i.title, labels: i.labels, body: i.body, deps: { total_blocked_by: i.blockedByCount }, ...(i.artLine ? { artLine: i.artLine } : {}), subParent: s.sig[String(i.number)]?.subParent?.n ?? null }));
     const prs = (Object.values(s.prs) as PrState[]).map((p) => ({ number: p.number, state: p.state, ref: p.ref, body: p.body }));
     const runs = (Object.values(s.runs) as RunState[])
       .filter((r) => r.status !== "completed")
@@ -1343,7 +1346,7 @@ export class Engine {
   // 区分の実効値 (launch・LOW_CAP・no-pr の cooldown・/status で同じ値を使う)。親からの継承を含む (#3973)。
   // closed の親も状態で判定するため、snapshot (open だけ) ではなく s.issues 全体から作る。
   private prioMap(): Map<number, Prio> {
-    return effectivePrioMap(Object.values(this.s.issues));
+    return effectivePrioMap(prioIssues(this.s));
   }
 
   async watchdog(gh: Gh | null): Promise<"dispatched" | "would" | "skipped"> {

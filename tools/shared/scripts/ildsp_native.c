@@ -27,23 +27,39 @@
 
 static uint8_t* g_img; static uint32_t g_imgsize;
 static uint8_t* g_heap; static uint64_t g_heap_off, g_heap_n;
+static int64_t g_fail_from = -1; static int64_t g_fail_cnt = -1; static uint64_t g_alloc_seq, g_fail_n;
+static int g_newh_zero; static uint64_t g_rdx_ovr;
 static uint32_t g_lasterr;
 static char g_unimpl[256][96]; static uint64_t g_unimpl_calls[256]; static int g_nunimpl;
 static uint8_t* g_thunks; static size_t g_thunk_off;
 
-typedef struct { uint64_t site; const char* name; int skip_image; uint64_t hits; uint64_t target; } Hook;
+/* kind 0: 間接 call (site 6 byte)。kind 1: 直接 call の正の対照 (E8 rel32・5 byte を emulate)。
+ * kind 2: 関数入口の正の対照 (先頭 1 byte を int3 にし、1 命令を単歩して戻す)。 */
+typedef struct { uint64_t site; const char* name; int kind; int skip_image; uint64_t hits; uint64_t target; uint8_t orig; } Hook;
 static Hook g_hooks[] = {
-    {0x1aedf6, "helper 0x1aedc0 -> [0x268260] (画像内ポインタ 0x1cb5e0)", 1, 0, 0},
-    {0x1aee04, "helper 0x1aedc0 -> [0x268088] RtlPcToFileHeader", 0, 0, 0},
-    {0x1aee4a, "helper 0x1aedc0 -> [0x268090] RaiseException", 0, 0, 0},
-    {0x1b6f6c, "0x1b6f4c -> [0x268268] (画像内ポインタ 0x1cb600)", 1, 0, 0},
+    {0x1aedf6, "helper 0x1aedc0 -> [0x268260] (画像内ポインタ 0x1cb5e0)", 0, 1, 0, 0},
+    {0x1aee04, "helper 0x1aedc0 -> [0x268088] RtlPcToFileHeader", 0, 0, 0, 0},
+    {0x1aee4a, "helper 0x1aedc0 -> [0x268090] RaiseException", 0, 0, 0, 0},
+    {0x1b6f6c, "0x1b6f4c -> [0x268268] (画像内ポインタ 0x1cb600)", 0, 1, 0, 0},
+    {0x1ac9ce, "0x1ac9c0 -> call 0x1b6f4c (正の対照: new handler 経路)", 2, 0, 0, 0},
+    {0x1aedc0, "helper 0x1aedc0 入口 (正の対照)", 2, 0, 0, 0},
+    /* 直接 call の正の対照 (kind 1・main #4241 の 12 箇所から 0x1ac9ce を除く。0x1ac9ce は kind 2 の単歩で同じ call を覆う) */
+    {0x1aa29f, "ctl direct -> 0x1ac9c0 (CreateInstance 先頭・必ず実行)", 1, 0, 0, 0},
+    {0x1647da, "ctl direct -> 0x1aedc0", 1, 0, 0, 0}, {0x1ad022, "ctl direct -> 0x1aedc0", 1, 0, 0, 0},
+    {0x1ad042, "ctl direct -> 0x1aedc0", 1, 0, 0, 0}, {0x1adcad, "ctl direct -> 0x1aedc0", 1, 0, 0, 0},
+    {0x1adcd1, "ctl direct -> 0x1aedc0", 1, 0, 0, 0}, {0x1b006a, "ctl direct -> 0x1aedc0", 1, 0, 0, 0},
+    {0x1b056d, "ctl direct -> 0x1aedc0", 1, 0, 0, 0}, {0x1cc1ae, "ctl direct -> 0x1aedc0", 1, 0, 0, 0},
+    {0x1b9049, "ctl direct -> 0x1b6f4c", 1, 0, 0, 0}, {0x1b9c45, "ctl direct -> 0x1b6f4c", 1, 0, 0, 0},
+    {0x1c20a9, "ctl direct -> 0x1b6f4c", 1, 0, 0, 0},
 };
 #define NHOOK (sizeof g_hooks / sizeof g_hooks[0])
+static uint64_t g_step_site; static int g_stepping;
 
 /* ---- Win32 stubs (ms_abi) ---- */
 MS static void* k_GetProcessHeap(void) { return (void*)0x1000; }
 MS static void* k_HeapAlloc(void* h, uint32_t fl, uint64_t n) {
     (void)h; (void)fl;
+    if (g_fail_from >= 0 && (int64_t)g_alloc_seq++ >= g_fail_from && (g_fail_cnt < 0 || (int64_t)g_fail_n < g_fail_cnt)) { g_fail_n++; return NULL; }
     if (!g_heap) {
         g_heap = mmap((void*)HEAP_BASE, HEAP_SZ, PROT_READ | PROT_WRITE,
                       MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE | MAP_NORESERVE, -1, 0);
@@ -116,15 +132,34 @@ static Hook* find_hook(uint64_t site) {
 static void on_trap(int sig, siginfo_t* si, void* vuc) {
     (void)sig; (void)si;
     ucontext_t* uc = vuc; greg_t* g = uc->uc_mcontext.gregs;
+    if (g_stepping) {
+        g_stepping = 0; g_img[g_step_site] = 0xCC; g[REG_EFL] &= ~0x100ULL;
+        return;
+    }
     uint64_t site = (uint64_t)g[REG_RIP] - 1 - IMG_BASE;
     Hook* h = find_hook(site);
     if (!h) { fprintf(stderr, "unexpected trap at 0x%llx\n", (unsigned long long)site); _exit(95); }
+    if (h->kind == 2) {
+        h->hits++; printf("hook_hit site=0x%llx (%s)\n", (unsigned long long)site, h->name); fflush(stdout);
+        g_img[site] = h->orig; g[REG_RIP] = IMG_BASE + site; g[REG_EFL] |= 0x100ULL;
+        g_stepping = 1; g_step_site = site;
+        return;
+    }
+    if (h->kind == 1) {
+        int32_t rel; memcpy(&rel, g_img + site + 1, 4);
+        uint64_t ret = IMG_BASE + site + 5, tgt2 = ret + (int64_t)rel;
+        h->hits++; h->target = tgt2; printf("hook_hit site=0x%llx (%s)\n", (unsigned long long)site, h->name); fflush(stdout);
+        g[REG_RSP] -= 8; memcpy((void*)g[REG_RSP], &ret, 8);
+        g[REG_RIP] = tgt2;
+        return;
+    }
     int32_t disp; memcpy(&disp, g_img + site + 2, 4);
     uint64_t ret = IMG_BASE + site + 6;
     uint64_t slot = ret + (int64_t)disp;
     uint64_t tgt; memcpy(&tgt, (void*)slot, 8);
     h->hits++; h->target = tgt;
-    if (h->skip_image) { g[REG_RIP] = ret; return; }
+    printf("hook_hit site=0x%llx (%s) target=0x%llx\n", (unsigned long long)site, h->name, (unsigned long long)tgt); fflush(stdout);
+    if (h->skip_image) { if (g_newh_zero && site == 0x1b6f6c) g[REG_RAX] = 0; g[REG_RIP] = ret; return; }
     g[REG_RSP] -= 8; memcpy((void*)g[REG_RSP], &ret, 8);
     g[REG_RIP] = tgt;
 }
@@ -156,7 +191,7 @@ static void install_hooks(void) {
     struct sigaction sa; memset(&sa, 0, sizeof sa);
     sa.sa_sigaction = on_trap; sa.sa_flags = SA_SIGINFO;
     sigaction(SIGTRAP, &sa, NULL);
-    for (size_t i = 0; i < NHOOK; i++) g_img[g_hooks[i].site] = 0xCC;
+    for (size_t i = 0; i < NHOOK; i++) { g_hooks[i].orig = g_img[g_hooks[i].site]; g_img[g_hooks[i].site] = 0xCC; }
 }
 
 static int load_pe(const char* path) {
@@ -210,6 +245,8 @@ static int load_pe(const char* path) {
 
 typedef MS uint64_t (*Fn0)(void);
 typedef MS uint64_t (*Fn4)(uint64_t, uint64_t, uint64_t, uint64_t);
+typedef MS uint64_t (*Fn1F)(uint64_t, float);                          /* slot 1: 2 番目の引数が xmm1 (float) */
+typedef MS uint64_t (*Fn2F)(uint64_t, uint64_t, float);                /* slot 2: rdx = index, xmm2 = float */
 typedef MS uint64_t (*Fn5)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
 static void dump_changed(const uint8_t* a, const uint8_t* b, size_t n) {
@@ -230,8 +267,13 @@ int main(int argc, char** argv) {
     if (argc < 2) { fprintf(stderr, "usage: ildsp_native <PE> [--neg-lea]\n"); return 2; }
     setvbuf(stdout, NULL, _IOLBF, 0);
     int neg = 0, only_k = -1, only_v = -1, s3bufs = 0, create_only = 0;
+    int64_t fail_from = -1, fail_cnt = -1;
     for (int i = 2; i < argc; i++) {
         if (!strcmp(argv[i], "--neg-lea")) neg = 1;
+        else if (!strcmp(argv[i], "--heap-fail-from") && i + 1 < argc) { fail_from = atoll(argv[i + 1]); i += 1; }
+        else if (!strcmp(argv[i], "--heap-fail-n") && i + 1 < argc) { fail_cnt = atoll(argv[i + 1]); i += 1; }
+        else if (!strcmp(argv[i], "--newh-zero")) g_newh_zero = 1;
+        else if (!strcmp(argv[i], "--rdx") && i + 1 < argc) { g_rdx_ovr = strtoull(argv[i + 1], NULL, 0); i += 1; }
         else if (!strcmp(argv[i], "--s3-bufs")) s3bufs = 1;
         else if (!strcmp(argv[i], "--create-only")) create_only = 1;
         else if (!strcmp(argv[i], "--slot") && i + 2 < argc) { only_k = atoi(argv[i + 1]); only_v = atoi(argv[i + 2]); i += 2; }
@@ -273,7 +315,7 @@ int main(int argc, char** argv) {
             uint64_t h0[NHOOK]; for (size_t i = 0; i < NHOOK; i++) h0[i] = g_hooks[i].hits;
             uint64_t u0 = unimpl_total();
             uint64_t f0 = g_free_n;
-            uint64_t rdx = (k == 4) ? in : rdx_list[v];
+            uint64_t rdx = (k == 4) ? in : (g_rdx_ovr ? g_rdx_ovr : rdx_list[v]);
             printf("call k=%d variant=%d rdx=0x%llx wrapper=0x%llx\n", k, v, (unsigned long long)rdx, (unsigned long long)w);
             if (k == 0) {
                 static const uint32_t mem_off[] = {0x10, 0x18, 0x20, 0x208, 0x258, 0x260};
@@ -320,7 +362,13 @@ int main(int argc, char** argv) {
                 alarm(0);
                 printf("s3_out first=%f,%f last=%f\n", obuf[0], obuf[1], obuf[(rdx * ch) - 1]);
             } else {
-                rax = ((Fn4)fn)(w, rdx, 0, 0);
+                g_alloc_seq = 0; g_fail_n = 0; g_fail_from = fail_from; g_fail_cnt = fail_cnt;
+                if (k == 1) rax = ((Fn1F)fn)(w, 1.0f);
+                else if (k == 2) rax = ((Fn2F)fn)(w, rdx, 1.0f);
+                else rax = ((Fn4)fn)(w, rdx, 0, 0);
+                g_fail_from = -1;
+                if (fail_from >= 0) printf("heap_fail_from=%lld heap_fail_n=%lld heap_fail_calls=%llu allocs=%llu\n", (long long)fail_from,
+                                           (long long)fail_cnt, (unsigned long long)g_fail_n, (unsigned long long)g_alloc_seq);
             }
             memcpy(after, (void*)in, OBJ_SZ);
             printf("slot k=%d variant=%d rdx=0x%llx fn=0x%llx rax=0x%llx unimpl_calls=%llu heapfree_calls=%llu",

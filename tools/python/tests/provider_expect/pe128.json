@@ -1,0 +1,6 @@
+{
+  "tag": "pe128",
+  "refs": ["#3005"],
+  "note": "PE で呼出し経路と値の式を確定した ui 読出し 2 件 (REPORT_PY128・PY-128 #3005)。tests/ui_state_diff.mjs が mock と照合",
+  "functions": ["ui.getProgTitle", "ui.getHintValue"]
+}

@@ -7,7 +7,9 @@
 import sys, os, struct
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-WINF = os.environ.get('M6_PE', '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared'))
+from paths import PLUGINS_DIR
+WINF = os.environ.get('M6_PE', f'{PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll')
 OUT = os.environ.get('M6_DATA_OUT', os.path.join(BASE, 'work', 'm6_data.c'))
 
 IMG_BASE = int(os.environ.get('M6_IMG_BASE', '0x180000000'), 0)    # on-disk pointer 値の寄生 base (実測)

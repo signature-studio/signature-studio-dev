@@ -1,0 +1,6 @@
+{
+  "tag": "pe101",
+  "refs": ["#2878"],
+  "note": "PE 解析で意味論を確定した 2 関数 (REPORT_PY101・PY-101 #2878。grid (+0x7ac) の生成と base 読出し)",
+  "functions": ["channels.isGridBitAssigned", "channels.getGridBitWithLoop"]
+}
