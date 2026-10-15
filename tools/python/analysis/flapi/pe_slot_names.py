@@ -4,8 +4,9 @@
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_slot_names.py <slot VA(16進)>[,<slot VA(16進)>...]
 
 登録の形: `lea rdx, [rip+slot]` の直後 (WINDOW byte 以内) の `lea r8, [rip+name]` が指す UTF-16LE 文字列を
-名前として出す。`lea rdx` の直後の `call` が登録関数 (例: 0x653dd0) である。`pe_xref.py` は register 経由の
-store (slot を `rdx` で渡して書かせる形) を見ないため、登録の名前はこのツールで読む。
+名前として出す。直後の `call` (登録関数) は確認していない。実測の 3 地点 (0x654212・0x654231・0x654250) では
+登録関数 0x653dd0 を呼んでいた。`pe_xref.py` は register 経由の store (slot を `rdx` で渡して書かせる形) を
+見ないため、登録の名前はこのツールで読む。
 展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
 """
 import os
