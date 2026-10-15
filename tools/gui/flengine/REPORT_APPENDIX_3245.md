@@ -1,6 +1,6 @@
 # REPORT 付録 — WIN-19 (#3245): LoadImageW の shim 実装と boot 停止点の実測
 
-測定 commit: `ad5b4da3` (`feat(gui): implement LoadImageW`)。比較元: `c6eca3e1` (`origin/main`)。素材: [WIN64] (fl-win64 26.1.7.5653)、[EMSDK] (`/opt/emsdk`)、[RETDEC] (`/opt/retdec`)。
+測定 commit: `ad5b4da3` (`feat(gui): implement LoadImageW`)。比較元: `c6eca3e1` (`origin/main`)。素材: [WIN64] (fl-win64 26.1.7.5653)、[EMSDK]、[RETDEC] (toolchain-retdec)。
 
 ## 1. 結論
 
