@@ -534,6 +534,17 @@ def cases():
     add('movddup xmm3, [rbx]', xl(3, lambda st: st['MEM']['data'][0], lambda st: st['MEM']['data'][0]), yprep(mem=mem_rand))
     add('lddqu xmm1, [rbx]', xl(1, lambda st: st['MEM']['data'][0], lambda st: st['MEM']['data'][1]), yprep(mem=mem_rand))
 
+    def e_addsub(st):
+        s2 = clone(st)
+        s2['X'][1] = [dbits(fval(st['X'][1][0]) - fval(st['X'][2][0])), dbits(fval(st['X'][1][1]) + fval(st['X'][2][1]))]
+        return s2
+    add('addsubpd xmm1, xmm2', e_addsub)
+
+    add('vpmovsxdq xmm1, xmm2', xz(1, lambda st: s32(st['X'][2][0]) & MASK, lambda st: s32(st['X'][2][0] >> 32) & MASK))
+    add('vshufps xmm1, xmm1, xmm2, 8', xz(1,
+        lambda st: (st['X'][1][0] & 0xffffffff) | ((st['X'][1][1] & 0xffffffff) << 32),  # r.d[0]=a.d[0], r.d[1]=a.d[2]
+        lambda st: (st['X'][2][0] & 0xffffffff) * ((1 << 32) | 1)))
+
     def e_movntpd(st):
         s2 = clone(st)
         s2['MEMQ'] = [st['X'][2][0], st['X'][2][1], 0, 0]
