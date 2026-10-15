@@ -25,7 +25,7 @@
 | (2) 基準のみ override (69669・分類 B 0) | 512b09ffa | 101 | 873 / 22 / 46 / 1 | 71001 pass | 69669 pass | 0 pass | 同上 | 0 |
 | (3) 前版 (分類 B 基準 0 を設定していた版・撤回) | e7131890b | 101 | 873 / 22 / 46 / 1 | 71001 pass | 69669 pass | 0 pass (max 0) | 同上 | 0 |
 | (4) 前版の最終 (分類 B 基準は未設定) | 8a1c7eafd | 98 + 3 = 101 | 873 / 22 / 46 / 1 | 71001 pass | 69669 pass (max 69669) | 0 (情報のみ・gate 無し) | attempted 942・ok 875・noproc 1・skipped 66 | 0 |
-| (5) **最終 (HEAD・main の分類 B 基準 0 / 3 を有効化)** | d66eb7c34 | 98 + 3 = 101 | 873 / 22 / 46 / 1 | 71001 pass (max 71001) | 69669 pass (max 69669) | **0 pass (max 0)** | attempted 942・ok 875・noproc 1・skipped 66 | **0** |
+| (5) **最終 (測定 commit `d66eb7c34`・main の分類 B 基準 0 / 3 を有効化)** | d66eb7c34 | 98 + 3 = 101 | 873 / 22 / 46 / 1 | 71001 pass (max 71001) | 69669 pass (max 69669) | **0 pass (max 0)** | attempted 942・ok 875・noproc 1・skipped 66 | **0** |
 
 - (5) の実測 (`work/e2e_full.out`・`work/e2e_survey.out` の ptrcheck JSON): run `image_va_words_new` 69669・`unremap_cand` 0・`gate.pass` true (run)。survey `image_va_words_new` 71001・`unremap_cand` 3・`gate.pass` true (survey max 3)。寛容起動 `M11_TOLERANT gate` は合格・NEGCTL 3 本検出。
 - (5) の所要: e2e 全体 wall 182 秒・開始 load 0.43 (IR 再生成・boot5・build・3 実行を含む)。
@@ -72,6 +72,12 @@ $ git diff --numstat bf3e0160c d66eb7c34 -- tools/m11 ':!*.md'
 ```
 
 - `m11_passes.py` は `m11_gen_ir2.sh` (IR 生成) から呼ばれる。e2e 経路に入るため、取り込み後の HEAD で e2e を再測定した (§2 (5))。`m11_setother_nonimm_cfg*.py` は e2e 経路から参照されない。
+- 測定 commit `d66eb7c34` から現 HEAD までの `tools/m11` の差分 (REPORT_3647.md を除く):
+
+```
+$ git diff --numstat d66eb7c34 HEAD -- tools/m11 ':!tools/m11/REPORT_3647.md'
+(空 = 0 行)
+```
 - `git diff --stat bf3e0160c d66eb7c34 -- tools/m11` の実出力 (main 取り込み分 + 本 PR の変更):
 
 ```
