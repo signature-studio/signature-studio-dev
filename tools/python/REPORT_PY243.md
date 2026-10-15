@@ -73,6 +73,6 @@ $ git diff 9edd0f327 HEAD -- tools/python ':!*.md'
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 項目書込み (0xd7a280) の副作用 (`item[itemIndex]+1` への target 書込み) と 0x416750 の意味 | `setMapItemTarget` は状態を変えない (mock・C)。実機と項目の状態が違う可能性 | 子 issue (下の起票先) |
-| itemIndex・index の範囲検査 (PE に検査が無いように見える) | 範囲外の引数の扱いは未モデル。mock・C は値をそのまま受ける | 子 issue (同上) |
-| `flapi_table.json` の `setMapItemTarget` の戻り型 `int` | 表と PE の None が食い違う。生成元 (`analysis/flapi_table.py`) の戻り型の扱いは未確認 | 子 issue (同上) |
+| 項目書込み (0xd7a280) の副作用 (`item[itemIndex]+1` への target 書込み) と 0x416750 の意味 | `setMapItemTarget` は状態を変えない (mock・C)。実機と項目の状態が違う可能性 | #4581 (PY-344) |
+| itemIndex・index の範囲検査 (PE に検査が無いように見える) | 範囲外の引数の扱いは未モデル。mock・C は値をそのまま受ける | #4581 (PY-344) |
+| `flapi_table.json` の `setMapItemTarget` の戻り型 `int` | 表と PE の None が食い違う。生成元 (`analysis/flapi_table.py`) の戻り型の扱いは未確認 | #4581 (PY-344・受入条件に追記済み) |
