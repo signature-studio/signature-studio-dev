@@ -95,7 +95,7 @@
 測定 commit: `d7a1b641e` (コードを変えた最後の commit。`lift_psola.sh` の差分)。検証起点: `e0ee551a2` (origin/main)。
 
 ### 9-1 結論 (1 行)
-slot 2 (`0x1ab690` → `0x1804b0`) を差分の呼出しに加えた (`WC_CALL_IDX="0 2 4 5"`・64/64 PASS・ネガコン FAIL 64/64)。slot 1・3 は native で `addr 0x0` の SIGSEGV になり、原因は `0x1b6f4c` の間接呼出しの復号鍵 (RVA `0x3f7ad0`) が file 上で 0 であることまで特定した。鍵を設定する host 初期化は未特定のため、slot 1・3 は差分に入れていない。
+slot 2 を差分に加えて 64/64 PASS (ネガコン FAIL 64/64)。slot 1・3 は復号鍵 `[0x3f7ad0]` が file 上で 0 のため native が落ち、鍵の初期化は未特定で差分には入れていない。
 
 ### 9-2 slot 1〜3 の native 単独呼出し (実測・各 4 case・同一 harness)
 | WC_CALL_IDX | native 結果 | 備考 |
