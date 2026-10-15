@@ -93,8 +93,9 @@ bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh         # 7/7・8/8 の TSV 一致を�
 本 REPORT の測定 commit からの差分 (コード・結果の範囲):
 
 ```
-$ git diff 91d5c5ca4 HEAD -- tools/m11/ldfix
-(出力なし)
+$ git diff 91d5c5ca4 HEAD -- 'tools/m11/ldfix/*.py' 'tools/m11/ldfix/*.sh' tools/m11/ldfix/results | wc -l
+0
 ```
 
-変更は `docs/DOC_MAP.md` (REPORT 索引の 1 行) と本 REPORT のみ。
+測定 commit から HEAD までの変更ファイルは `docs/DOC_MAP.md` (REPORT 索引の 1 行) と本 REPORT の 2 つだけ
+(`git diff --name-only 91d5c5ca4 HEAD`)。
