@@ -237,7 +237,7 @@ guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行�
 | 停止点 `ExitProcess(0)` が偽の停止か (longjmp 継続後の進行) | DllMain が完走したか不明 | #4262 (T-SH-106) |
 | longjmp (0x40f9c0) の発生条件と戻り先 `0x59c210` の lift 対応 | 停止点の解釈 | #4263 (T-SH-107) |
 | 間接経由の import 呼出しが未計数 | DllMain 経路の全数が不明 | #4374 (T-SH-121) |
-| rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る | #4375 (T-SH-122) |
+| HEAD の rt の TLS 系の残る差 (`GetLastError` 常に 0・`imp_TlsFree` 不在・`TlsAlloc` の割当値) | DllMain 後段で TLS 値・last error を読むと結果が変わり得る | #4375 (T-SH-122) |
 | `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | #4280 (T-SH-108) |
 | `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #4296 (T-SH-113) |
 
