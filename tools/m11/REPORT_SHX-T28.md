@@ -15,6 +15,7 @@
 - 素材: `work-m11` を worktree に展開 (`tools/m11/work/`・gitignore)。PE は `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B、sha256 `b2c64da4…9f9496d`)。
 - IR の作り直し: `work/lift_pe.sha256` に上記 PE の sha256 を手で書いてから `bash tools/m11/m11_gen_ir2.sh` (非 `--full`。lift は素材の `boot0〜4.lift.ll`・`boot5` を使う)。46 s・ok。続けて `bash tools/m11/m11_build.sh` 22 s・`[m11build] OK … signature mismatch: 0, undefined symbol: 0`。
   - 前提 (T27 §2 と同じ): 指紋は手で書いた。素材の lift を生成した PE との一致は未検証。`--full` は Ghidra (`functions_dll.csv`) が runner に無いため未実施。
+  - 指紋の確認 (review m2・fix run の 2026-10-15): `tools/m11/m11_e2e.sh` は `work/lift_pe.sha256` の一致で lift の再生成要否を決める (line 49〜50)。使った PE が lift 元と一致するかは、lift 元の `work-m11` (`boot0〜5`) が fix run の `$ARTIFACTS_DIR` に無いため**未確認**。素材付きの run で §8 の手順と一緒に確認する。
 - shimx: `bash tools/m11/shimx_link/build.sh --trace --soft` rc 0・13.2 s (commit 前の初回)・`signature mismatch=0 undefined symbol=0 duplicate=0`。実 boot は `SHIMX_TRACE_FILE=/ftrace.jsonl node tools/m11/shimx_link/run_trace.mjs <cjs> --out DIR` で rc 0・0.41 s。
 - 負荷: 測定時の uptime 1 分平均 1.09 (nproc 4)。
 
@@ -27,6 +28,7 @@
   3. callee のアクセス範囲が親の rbp 基準アクセス (親が `[rbp+K]` で触る範囲) と重なれば `shared` (D23 の信号)。重ならなければ `callee_only`。
 - 制限: 制御フローを無視した線型走査。32bit 書込みは 64bit 名に畳む。`lea` の site は局所 1 個の番地渡し (通常の var 参照渡し) が大半なので、D23 の信号からは外し、件数だけ参考に出す。
 - 出力: 件数の summary と site 一覧 (`--out` で JSON)。JSON は `work/` に置き、commit しない。
+- 実行: `FL_WIN64_DIR=<fl-win64 の展開先> python3 tools/m11/frame_share/detect.py --out work/frame_share.json` (既定の IR は `work/boot_final3.ll`)。PE を直接指定するなら `--pe <展開先>/extracted/block00031_PE.bin`。`FL_WIN64_DIR` も `--pe` も無いと PE が読めず失敗する。
 
 ## 4. 実測 (閉包全体・新 IR `work/boot_final3.ll`)
 
@@ -96,11 +98,25 @@
 - 測定 commit: `e0ff2fa0` (検出器 `tools/m11/frame_share/detect.py` を追加したコミット。§4・§7 の数値はこの commit の検出器で採取した)。
 - `e0ff2fa0` で再実行 (HEAD と同じ IR・同じ手順): 検出 `closure 7421`・`mov 渡し 307`・`D23 信号 301`・親 63・callee 94 (§4 と一致)。shimx `build.sh --trace --soft` は `mismatch=0`、実 boot は `units_run=17`・`dllmain_done=true`・`total_calls=106`・ftrace 0 行 (§7 と一致)。
 - `e0ff2fa0` から HEAD までのコード差分: `git diff e0ff2fa0 HEAD -- tools/m11/frame_share tools/m11/shimx_link tools/m11/*.py tools/m11/*.sh tools/m11/ldfix` の出力は、c14f55eb 時点では 0 行 (本 REPORT の文言修正のみ)。main 取り込み merge `871e59d3` 後は 7 files・+313/-7 で、main 側の変更 (`m11_lb_unit_diff.py`・`m11_lb_tolerant_repro.sh`・`ldfix/fix_ld108.py`・`ldfix/fix_ld116.py`・`ldfix/dyn_ld115.mjs`・`ldfix/ld116_e2e.sh`・`ldfix/REPORT_2513.md`) を含む。IR の既定経路 (`m11_gen_ir2.sh` → `ldfix/fix_ld108.py`) は、環境変数 `M11_LB_BASE` 未設定時の出力文字列が従来と同一 (コード読解)。`fix912/` (既定 OFF) も既定では変化しない。ただし `work-m11` 素材 (lift 済み `boot0〜5`) が本 run に無く、HEAD `871e59d3` での再現・再測定は**未実施**。この REPORT の数値は `e0ff2fa0` の測定値のまま。
+- **review 差し戻し (round 1) への fix run (2026-10-15)**: HEAD での再測定は**未実施**。`$ARTIFACTS_DIR` には `fl-win64.tar.zst` だけがあり、`work-m11` (lift 済み `boot0〜5`) と `toolchain-retdec` が無い。lift の再生成には RetDec が要るため、`m11_gen_ir2.sh` を実行できない。PR 本文に `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` を入れたので、素材付きの run で HEAD に対して `m11_gen_ir2.sh` → `m11_build.sh` → `detect.py` → `shimx_link/build.sh --trace --soft` → `run_trace.mjs` を実行し、結果で §4・§7 と本節を書き換える。
+- 差分 (`git diff e0ff2fa0 HEAD --stat -- tools/m11/frame_share tools/m11/shimx_link tools/m11/*.py tools/m11/*.sh tools/m11/ldfix`。fix run の HEAD で採取。`frame_share/` と `shimx_link/` は 0 行):
+  ```
+   tools/m11/ldfix/REPORT_2513.md     | 114 +++++++++++++++++++++++++++++++++++++
+   tools/m11/ldfix/dyn_ld115.mjs      |  35 ++++++++++--
+   tools/m11/ldfix/fix_ld108.py       |   4 +-
+   tools/m11/ldfix/fix_ld116.py       |  68 ++++++++++++++++++++++
+   tools/m11/ldfix/ld116_e2e.sh       |  59 +++++++++++++++++++
+   tools/m11/m11_lb_tolerant_repro.sh |  27 +++++++++
+   tools/m11/m11_lb_unit_diff.py      |  13 +++++
+   7 files changed, 313 insertions(+), 7 deletions(-)
+  ```
+- 既定経路に入る差分は `ldfix/fix_ld108.py` の 4 行だけ (`m11_gen_ir2.sh:59` で常時適用。`m11_gen_ir2.sh` が呼ぶのは `ldfix.py` と `fix_ld108.py` のみ)。`HEAD_ST` は `M11_LB_BASE` 未設定 (LB=0) で旧文字列 `store i64 %2, ptr inttoptr (i64 16404608 to ptr), align 8` と一致する (`python3` で文字列を比較し True)。ただし IR 全体の一致と、閉包の数値・baseline の再測定は未実施。ほかの 6 files (`fix_ld116.py`・`ld116_e2e.sh`・`dyn_ld115.mjs`・`m11_lb_*`・`REPORT_2513.md`) は既定経路から呼ばれない検証用。
 
 ## 9. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 親フレームを callee の view に結線する修復 pass (`function_448490` の `-28` store の欠落の補完、`this` object の拡幅 (`-104`〜`+16`)、call 前後の count・length・arg1 の同期) | unit 18 を越えられず、逐次 boot の ftrace が 0 のまま | `[SHX-T40]` (親 #2444 の子) |
-| 修復 OFF/ON の before-after 実測 (`units_run ≥ 18`・`VirtualAlloc(0x76910000)` 不発・`MessageBoxA` 不発・ネガコン) と、`docs/DEFECTS.md` D23 の「修復」列 | 受入条件 2・3・4 の残り | `[SHX-T40]` |
-| 301 site の真偽 (真の D23 か、通常の rbp 渡しの局所参照か) | 修復範囲の決定 | `[SHX-T40]` (修復の受入に含める) |
+| 親フレームを callee の view に結線する修復 pass (`function_448490` の `-28` store の欠落の補完、`this` object の拡幅 (`-104`〜`+16`)、call 前後の count・length・arg1 の同期) | unit 18 を越えられず、逐次 boot の ftrace が 0 のまま | `[SHX-T40] #3234` (親 #2444 の子) |
+| 修復 OFF/ON の before-after 実測 (`units_run ≥ 18`・`VirtualAlloc(0x76910000)` 不発・`MessageBoxA` 不発・ネガコン) と、`docs/DEFECTS.md` D23 の「修復」列 | 受入条件 2・3・4 の残り | `[SHX-T40] #3234` |
+| 301 site の真偽 (真の D23 か、通常の rbp 渡しの局所参照か) | 修復範囲の決定 | `[SHX-T40] #3234` (修復の受入に含める) |
+| 検証 HEAD での再測定 (§8: `detect.py` の閉包数・trace build・実 boot)。`e0ff2fa0` → HEAD で ldfix 等の 7 files が変わっている | 閉包の数値と baseline が変わりうる。受入条件 3 (HEAD 再現) が未達 | 起票せず。`oc_artifacts` 付きの run で本 PR 内で実施 |
