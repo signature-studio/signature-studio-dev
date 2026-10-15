@@ -154,7 +154,7 @@ new only: ['vaddps', 'vblendps', 'vblendvps', 'vpermilps']
 - ネガコン (b)(c) は全 bit 比較の不一致が 0 でないことで FAIL とする。
 
 ### 未解決 (本 run の範囲外)
-- **store 形 `void __asm_vmovaps(i256, i256)`**: 定義しない (abort スタブ)。メモリ書込みが IR に現れず、定義すると store が黙って消える。`kh_passes.py` の store 欠陥類型と同じ形で、lift 対応は子 issue (#3358 KH-54) で行う。
+- **store 形 `void __asm_vmovaps(i256, i256)`** (#3256 時点の状態。解決は #3358 KH-54・REPORT.md §16): #3256 時点では定義しない (abort スタブ)。メモリ書込みが IR に現れず、定義すると store が黙って消えるため。#3358 で 32B store として復元済み。
 - census の再測定 (plugins 素材の展開を含む) は未実施。
 - 14 snap-in のハッシュ不変 (`run_all.sh`) は未実施 (#3259)。
 
