@@ -16,9 +16,11 @@
 - 素材: `fl-win64` (展開先 `$RUNNER_TEMP/fl-win64` = `FL_WIN64_DIR`)・`toolchain-emsdk` ([EMSDK])・`work-m11` (`tools/m11/work/`)・`work-liftdiff` (`tools/liftdiff/work/`)。`$ARTIFACTS_DIR` に 4 件の実在を確認して展開した。
 - wasm は `build_wasm.build(t, force=True)` で `rt/ld_wasm.c` から作り直した (`wasm_size` 4464620・`sig_mismatch` 0・`undefined` 0。LD-229 と同じ値)。
 - 対象は chunk 0 の `0x5d19e0` 1 件 (`sample:800` の 0〜399 件目)。
-- 機: 4 vCPU。各 run は 1 本ずつ逐次で流した (並列は使っていない)。run 中の load average は 0.8〜0.9。
+- 機: 4 vCPU。各 run は 1 本ずつ逐次で流した (並列は使っていない)。
 
 ## 2. 方法
+
+- 成果物の名前 `results/ld268_raw/` は付番時の仮番号 LD-268 のまま。本付録の題名・issue (#5268) の番号は LD-261。
 
 - `ld156_chunk0_carryover.py` に `--wasm-restart 0|1` を追加した。`--native` と組み合わせると、対象関数の直前に作り直す側を指定できる。
   - `--native 1 --wasm-restart 1 --reset none` = `both` (LD-121 の both と同じ)
