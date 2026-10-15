@@ -25,8 +25,8 @@
 
 共通の機構 (`0x410320` と `0x40f960`、いずれも逆アセ):
 
-- `0x410320`: `mov rax, rcx; test dl, dl; jl ...; mov rcx, rax; call [rax-0x30]`。dl ≥ 0 のとき rcx の値 (VMT) で VMT-0x30 のスロットを呼ぶ。
-- 5 件の VMT (と `TARPlugin`) は、すべて VMT-0x30 のスロットが `0x40f960` (`py71_vmt.py ... 0x30` で 5 件とも同値)。
+- `0x410320`: `mov rax, rcx; test dl, dl; jl ...; mov rcx, rax; call [rax-0x30]`。dl ≥ 0 のとき rcx の値 (VMT = V) について、格納位置 `V-0x30` の値を関数ポインタとして呼ぶ。
+- 5 件の VMT (と `TARPlugin`) は、すべて `V-0x30` (V = VMT の値。`call [rax-0x30]` が読む格納位置) の 8 バイトが `0x40f960` (`py67_qword.py` で 5 件とも同値)。`py71_vmt.py ... 0x30` が出す `[+0x30]` は VMT より上の正方向の別スロット (5 件とも `0x8ee540`) で、この呼出しには使われない。
 - `0x40f960`: `mov rbx, rcx; movsxd rcx, [rbx-0x80] (インスタンスサイズ); call 0x409410 (GetMem 相当); mov rcx, rbx; mov rdx, rax; call 0x40fb40`。`rbx` に VMT が残るので、確保したインスタンスは VMT 由来のサイズで作られる。
 - `0x40fb40` (`py59_func.py $P 0x40fb40 dump`): `0x40fb4b: mov rbx, rcx` (第 1 引数 = VMT)、`0x40fb4e: mov rsi, rdx` (第 2 引数 = obj)、`0x40fb66: mov [rsi], rdi` (rdi = rbx = VMT)。よって `[obj] = VMT` を書く。Self の型 = 大域 V のクラス、の前提はこれで確認した。
 
@@ -78,7 +78,7 @@ L2 の 4 件 (`0xad0260`・`0xb64880`・`0xb69c90`・`0xb75f40`) は直接呼出
 
 ## 4. ネガティブコントロール
 
-- 非 VMT の `0xebef68` (`REPORT_PY67_2159.md` の VMT `0xebef58` + 0x10 相当の番地): `py71_vmt.py $P 0xebef68 0x30` で `[-0xc8] self = 0x0 (NG)`、`[-0x88] classname = 0x6f3290` (名前 NG)、`[-0x80] instsize = 0x40fcd0` (不正)。自己ポインタ NG 1/1、名前 NG 1/1。`py188_self.py` の NC も `VMT NG` (1/1)。
+- 非 VMT の `0xebef68` (`REPORT_PY67_2159.md` の VMT `0xebef58` + 0x10 相当の番地): `py71_vmt.py $P 0xebef68` で `[-0xc8] self = 0x0 (NG)`、`[-0x88] classname = 0x6f3290` (名前 NG)、`[-0x80] instsize = 0x40fcd0` (不正)。自己ポインタ NG 1/1、名前 NG 1/1。`py188_self.py` の NC も `VMT NG` (1/1)。
 - 大域 slot 自体を VMT とみなす誤り (`py71_vmt.py $P 0xac2640`): `[-0xc8] self = 0x100b97bf4058390 (NG)`。大域は VMT ではなく VMT-0xc8 の slot で、VMT 判定で弾かれる (期待どおり NG)。
 - 手計算の誤り (§8) で一度読み間違えた番地 `0xca3508` (値 `0x097ec13b48c96348`) は、自己ポインタ NG。正しい `0xca1508` (値 `0xca15d0`、自己 OK) と区別できた。
 
@@ -112,24 +112,26 @@ L2 の 4 件 (`0xad0260`・`0xb64880`・`0xb69c90`・`0xb75f40`) は直接呼出
   0
   ```
 
-- 実測 (wall・逐次・n=1。`nproc` = 4。load average は実行後の `/proc/loadavg` = `0.36 0.40 0.30`):
-  - `py188_self.py $P`: 37.2 秒 (`.text` 線形走査が支配的)。
-  - `py59_func.py` 6 関数の範囲: 15.3 秒 (1 関数あたり約 2.5 秒)。
-  - `py67_callers.py $P 0xac4b50,0xb4b5b0,0xb664d0,0xb6db00,0xc9dfd0`: 37.0 秒。`py67_callers.py $P 0xad0260,...,0xca24e0`: 37.2 秒。
+- 実測 (wall・逐次・`nproc` = 4。load average は各回の前後の `/proc/loadavg` の 1 分平均):
+  - `py188_self.py $P`: **n=3 で 26.7〜27.4 秒** (26.7・27.3・27.4 秒。load 0.45→0.67・0.67→0.80・0.80→0.88)。3 回の出力はバイト単位で一致。`.text` 線形走査が支配的。
+  - 参考 (単発・負荷の違う実行。n には入れない): 37.2 秒 (初回測定。load `0.36 0.40 0.30`)、48.6 秒 (レビュー時の再実行。load 0.32)。
+  - `py59_func.py` 6 関数の範囲: 15.3 秒 (1 関数あたり約 2.5 秒。n=1 の参考値)。
+  - `py67_callers.py $P 0xac4b50,0xb4b5b0,0xb664d0,0xb6db00,0xc9dfd0`: 37.0 秒。`py67_callers.py $P 0xad0260,...,0xca24e0`: 37.2 秒 (いずれも n=1 の参考値)。
   - `py67_qword.py` (find 含む): 1 秒未満。`py71_vmt.py`: 1 秒未満。
 - 再現コマンド (`tools/python` で実行。`P` は `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` で展開):
 
   ```
   P=$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin
   python3 analysis/py188_self.py "$P"
-  python3 analysis/py71_vmt.py "$P" 0xac2708,0xb449a0,0xb655c8,0xb6a348,0xca15d0 0x30
-  python3 analysis/py71_vmt.py "$P" 0xebef68 0x30
+  python3 analysis/py71_vmt.py "$P" 0xac2708,0xb449a0,0xb655c8,0xb6a348,0xca15d0
+  python3 analysis/py71_vmt.py "$P" 0xebef68
   python3 analysis/py67_qword.py "$P" 0xac2640,0xb448d8,0xb65500,0xb6a280,0xca1508
+  python3 analysis/py67_qword.py "$P" 0xac26d8,0xb44970,0xb65598,0xb6a318,0xca15a0   # 各 V-0x30 (V = 0xac2708 等)。0x40f960 と出る
   python3 analysis/py67_callers.py "$P" 0xac4b50,0xb4b5b0,0xb664d0,0xb6db00,0xc9dfd0
   python3 analysis/py59_func.py "$P" 0x40fb40 dump
   ```
 
-- `py71_vmt.py` の 5 件 (測定値): `0xac2708` TVSTPlugin (instsize `0x9e0`)・`0xb449a0` TVST3Plugin (`0x980`)・`0xb655c8` TGenericPlugin (`0x7c0`)・`0xb6a348` TCLAPPlugin (`0x9c8`)・`0xca15d0` TARPlugin (`0x808`)。5 件とも自己 OK・名前 OK。VMT-0x30 は 5 件とも `0x40f960`。親鎖: 4 件は `0x8ec050` (TBaseAudioPlugin)、`0xca15d0` は `0xc9d290` (TBridgedPlugin → TBaseAudioPlugin → TObject)。
+- `py71_vmt.py` の 5 件 (測定値): `0xac2708` TVSTPlugin (instsize `0x9e0`)・`0xb449a0` TVST3Plugin (`0x980`)・`0xb655c8` TGenericPlugin (`0x7c0`)・`0xb6a348` TCLAPPlugin (`0x9c8`)・`0xca15d0` TARPlugin (`0x808`)。5 件とも自己 OK・名前 OK。`V-0x30` (`py67_qword.py`) は 5 件とも `0x40f960`。親鎖: 4 件は `0x8ec050` (TBaseAudioPlugin)、`0xca15d0` は `0xc9d290` (TBridgedPlugin → TBaseAudioPlugin → TObject)。
 - 大域の値 (`py67_qword.py`): `0xac2640`→`0xac2708`・`0xb448d8`→`0xb449a0`・`0xb65500`→`0xb655c8`・`0xb6a280`→`0xb6a348`・`0xca1508`→`0xca15d0`。いずれも `.text` 内 (VMT 自己ポインタ slot = VMT-0xc8)。
 
 ## 7. 未解決
@@ -137,7 +139,7 @@ L2 の 4 件 (`0xad0260`・`0xb64880`・`0xb69c90`・`0xb75f40`) は直接呼出
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | L2 の 4 件 (`0xad0260`・`0xb64880`・`0xb69c90`・`0xb75f40`) に直接呼出し元が無い。絶対 8 バイト参照だけあり (ファイル offset `0x6ce858`・`0x7627c8`・`0x7682e8`・`0x7717a0`、`py67_qword.py ... find`)。参照の種類 (VMT スロット・関数ポインタ表) は未確認 | VMT 確定には影響しない。この経路が実行時に `0x8ed012` まで届くか (到達性) は未確定 | #2701 |
-| | L3 `0xca4713` (関数 `0xca43a0`) の呼出し元は未追跡 | `0xc9e07c` の 3 段目より上 (この経路の到達性) | #2701 |
+| L3 `0xca4713` (関数 `0xca43a0`) の呼出し元は未追跡 | `0xc9e07c` の 3 段目より上 (この経路の到達性) | #2701 |
 | 大域 (VMT 自己ポインタ slot、`0xac2640` 等) への書込み参照の有無は未確認 (`py66_riprefs.py` の全走査が必要。約 60 秒) | 大域の値が実行時に変わらない前提 (`.text` 配置から推定) | #2701 |
 
 - 本 REPORT は Self の VMT と chan 判定 (受入 1・2) を達成した。上表の 3 件は、結論 (非 chan) の根拠ではなく、経路の実行到達性と大域の不変性に関する残り。子 issue は起票しない (実装作業ではなく検証の残り)。
