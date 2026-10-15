@@ -8,7 +8,9 @@ from ottlib import Bin, Dis
 from collections import defaultdict, deque
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-WINF = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared'))
+from paths import PLUGINS_DIR
+WINF = f'{PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll'
 OUT_JSON = os.path.join(BASE, 'work', 'ott_closure.json')
 OUT_RANGES = os.path.join(BASE, 'work', 'ott_ranges.txt')
 

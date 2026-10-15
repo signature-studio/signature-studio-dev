@@ -256,6 +256,53 @@ def cases():
         return st
     add('vucomisd xmm0, xmm1', e_ucomi, p_ucomi)
 
+    def e_vcomiss(st):
+        s = clone(st)
+        a = f32val(st['X'][0][0]); b = f32val(st['X'][1][0])
+        s['F'] = {'ZF': 0, 'PF': 0, 'CF': 0, 'SF': 0, 'OF': 0}
+        if a > b:
+            pass
+        elif a < b:
+            s['F']['CF'] = 1
+        else:
+            s['F']['ZF'] = 1
+        return s
+    def p_vcomiss(st):
+        st['X'][0][0] = fbits32(3.0); st['X'][1][0] = fbits32(1.0)
+        return st
+    add('vcomiss xmm0, xmm1', e_vcomiss, p_vcomiss)
+
+    def p_ps4(st, v1, v2):
+        for i, vs in ((1, v1), (2, v2)):
+            st['X'][i] = [fbits32(vs[0]) | (fbits32(vs[1]) << 32), fbits32(vs[2]) | (fbits32(vs[3]) << 32)]
+        return st
+    def ps_pack(r):
+        return [fbits32(r[0]) | (fbits32(r[1]) << 32), fbits32(r[2]) | (fbits32(r[3]) << 32)]
+    def e_haddps(st):
+        s = clone(st)
+        a = [f32val(st['X'][1][k // 2] >> (32 * (k % 2))) for k in range(4)]
+        b = [f32val(st['X'][2][k // 2] >> (32 * (k % 2))) for k in range(4)]
+        s['X'][1] = ps_pack([a[0] + a[1], a[2] + a[3], b[0] + b[1], b[2] + b[3]])
+        return s
+    add('haddps xmm1, xmm2', e_haddps, lambda st: p_ps4(st, [1.25, -2.5, 3.75, 0.5], [7.0, -0.125, 10.0, 2.0]))
+
+    def e_vpsrld(st):
+        s = clone(st)
+        lanes = [(st['X'][3][k // 2] >> (32 * (k % 2))) & 0xffffffff for k in range(4)]
+        s['X'][2] = [((lanes[0] >> 5) | ((lanes[1] >> 5) << 32)), ((lanes[2] >> 5) | ((lanes[3] >> 5) << 32))]
+        s['YL'][2] = [0, 0]
+        return s
+    add('vpsrld xmm2, xmm3, 5', e_vpsrld)
+
+    def e_vpslld(st):
+        s = clone(st)
+        lanes = [(st['X'][3][k // 2] >> (32 * (k % 2))) & 0xffffffff for k in range(4)]
+        r = [(v << 3) & 0xffffffff for v in lanes]
+        s['X'][2] = [r[0] | (r[1] << 32), r[2] | (r[3] << 32)]
+        s['YL'][2] = [0, 0]
+        return s
+    add('vpslld xmm2, xmm3, 3', e_vpslld)
+
     def e_movsd_rr(st):
         s = clone(st)
         s['X'][5] = [st['X'][3][0], st['X'][5][1]]
@@ -315,6 +362,17 @@ def cases():
         s['YL'][1] = [0, 0]
         return s
     add('vxorps xmm1, xmm2, xmm3', e_xorps)
+
+    def e_andps(st):
+        s = clone(st)
+        s['X'][4] = [st['X'][4][0] & st['X'][2][0], st['X'][4][1] & st['X'][2][1]]
+        s['YL'][4] = [0, 0]
+        return s
+    def p_andps(st):
+        st['X'][2] = [0xf0f0f0f00f0f0f0f, 0xffff0000ffff0000]
+        st['X'][4] = [0x0123456789abcdef, 0xfedcba9876543210]
+        return st
+    add('vandps xmm4, xmm4, xmm2', e_andps, p_andps)
 
     def e_cvtt(st):
         s = clone(st)
@@ -451,6 +509,17 @@ def cases():
     def s32(v):
         v &= 0xffffffff
         return v - (1 << 32) if v & 0x80000000 else v
+
+    def e_vcvtdq2ps(st):
+        s = clone(st)
+        ints = [s32(st['X'][2][k // 2] >> (32 * (k % 2))) for k in range(4)]
+        s['X'][1] = ps_pack([float(v) for v in ints])
+        s['YL'][1] = [0, 0]
+        return s
+    def p_cvtdq(st):
+        st['X'][2] = [(5 & 0xffffffff) | ((-6 & 0xffffffff) << 32), (7 & 0xffffffff) | ((1000 & 0xffffffff) << 32)]
+        return st
+    add('vcvtdq2ps xmm1, xmm2', e_vcvtdq2ps, p_cvtdq)
 
     def e_cvtdq(d, s):
         def e(st):

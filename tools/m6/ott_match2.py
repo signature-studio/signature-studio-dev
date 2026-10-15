@@ -8,9 +8,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ottlib import Bin, Dis
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-MACF = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_mac_x86_64'
-WINF = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
-NMLOG = '/home/ubuntu/work/analysis/plugins/ott/report_logs/nm_ott_vst2_mac_x64.txt'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared'))
+from paths import PLUGINS_DIR
+MACF = f'{PLUGINS_DIR}/ott/binaries/OTT_vst2_mac_x86_64'
+WINF = f'{PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll'
+NMLOG = f'{PLUGINS_DIR}/ott/report_logs/nm_ott_vst2_mac_x64.txt'
 OUT_JSON2 = os.path.join(BASE, 'work', 'ott_match2.json')
 
 SERE = re.compile(r'__ZN(?:K)?(?:\d+)?(?:7Trap|8Trap|11Trap|12Trap|TrapSVF|TrapZBF|TrapPeak|TrapHiShelf|TrapLowShelf|TrapSVF)|'

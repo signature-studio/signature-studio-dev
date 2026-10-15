@@ -41,9 +41,9 @@ N_API_UNDEF=$((N_UNDEF - N_FN_UNDEF))
 echo "[e2e] signature mismatch: $N_MISMATCH 種 (期待 0)"
 echo "[e2e] undefined symbol: $N_UNDEF 種 (期待 47) | function_18*: $N_FN_UNDEF / Win/CRT API: $N_API_UNDEF"
 python3 "$M6/m6_simd_check.py" "$M6/work/ott_memfix1.ll" "$M6/msimd6.c" > "$M8/work/simd_check_e2e.log" || true
-read -r SIMD_BAD_A SIMD_BAD_B < <(python3 - <<'PYEOF'
-import re
-t = open("/home/ubuntu/work/webstudio/tools/m8/work/simd_check_e2e.log").read()
+read -r SIMD_BAD_A SIMD_BAD_B < <(python3 - "$M8/work/simd_check_e2e.log" <<'PYEOF'
+import re, sys
+t = open(sys.argv[1]).read()
 m = re.search(r'decl def mismatch:\s*(\d+)\s*/\s*callsite mismatch:\s*(\d+)', t)
 print(m.group(1), m.group(2))
 PYEOF
@@ -61,12 +61,14 @@ T1SVF=1 T1VAL=0.5 T1Z=19 T1SET=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19
 T1SVF=1 T1VAL=0.5 T1Z=19 T1SET=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 T1OUT="$M8/work/t1_vsvf05e2.hex" node "$M8/t1_sel8.mjs" > "$M8/work/t1_vsvf05e2.log" 2>&1 || true
 T1SVF=1 T1VAL=0.9 T1Z=19 T1SET=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 T1OUT="$M8/work/t1_vsvf09e.hex" node "$M8/t1_sel8.mjs" > "$M8/work/t1_vsvf09e.log" 2>&1 || true
 T1SVF=1 T1VAL=0.5 T1SIG=0.3 T1Z=19 T1SET=0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19 T1OUT="$M8/work/t1_vsvfs3e.hex" node "$M8/t1_sel8.mjs" > "$M8/work/t1_vsvfs3e.log" 2>&1 || true
-read -r D_PARAM D_INPUT < <(python3 - <<'PYEOF'
+read -r D_PARAM D_INPUT < <(python3 - "$M8/work" <<'PYEOF'
+import sys
 def load(p):
     return [l.strip() for l in open(p) if l.strip()]
-base = load("/home/ubuntu/work/webstudio/tools/m8/work/t1_vsvf05e1.hex")
-p9 = load("/home/ubuntu/work/webstudio/tools/m8/work/t1_vsvf09e.hex")
-s3 = load("/home/ubuntu/work/webstudio/tools/m8/work/t1_vsvfs3e.hex")
+w = sys.argv[1]
+base = load(w + "/t1_vsvf05e1.hex")
+p9 = load(w + "/t1_vsvf09e.hex")
+s3 = load(w + "/t1_vsvfs3e.hex")
 print(sum(1 for x, y in zip(base, p9) if x != y), sum(1 for x, y in zip(base, s3) if x != y))
 PYEOF
 )

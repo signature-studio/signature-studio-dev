@@ -70,6 +70,8 @@ static long rd_all(const char *path, char *buf, long cap) {
 #define H32_BASE 0x10800000u
 #define HOST_BASE 0x00828000u
 #define HOST_LEN 0x10000u
+#define TEB_BASE 0x00838000u
+#define TEB_LEN 0x40u
 static u32 g_top, g_lasterr, g_tls[64];
 static void zero(u32 p, u32 n) { volatile unsigned char *q = (unsigned char *)p; for (u32 i = 0; i < n; i++) q[i] = 0; }
 static void copy(u32 d, u32 s, u32 n) {
@@ -167,6 +169,14 @@ static void patch_iat(void) {
     }
 }
 
+/* fs 基底を TEB_BASE (TEB 相当の buffer) に向ける (set_thread_area・GDT の TLS entry)。 fs:[0] = ExceptionList */
+static void set_fs_base(u32 base) {
+    struct { u32 entry, base, limit, flags; } d = {(u32)-1, base, 0xfffu, 0x41u};
+    if (sc3(243, (long)&d, 0, 0) < 0) { sc3(1, 8, 0, 0); }
+    unsigned short sel = (unsigned short)((d.entry << 3) | 3);
+    __asm__ volatile("mov %0, %%fs" : : "r"(sel));
+}
+
 void entry_main(u32 *sp) {
     int argc = (int)sp[0];
     const char **argv = (const char **)(sp + 1);
@@ -177,6 +187,8 @@ void entry_main(u32 *sp) {
     if (img <= 0) { sc3(1, 4, 0, 0); }
     if (sys_mmap_fixed(HOST_BASE, HOST_LEN) != (long)HOST_BASE) { sc3(1, 7, 0, 0); }
     patch_iat();
+    if (sys_mmap_fixed(TEB_BASE, 0x1000u) != (long)TEB_BASE) { sc3(1, 10, 0, 0); }
+    set_fs_base(TEB_BASE);
     n = rd_all(argv[2], ibuf, sizeof ibuf);
     if (n <= 0) { sc3(1, 5, 0, 0); }
     long fd_out = sc3(5, (long)argv[3], 0x241, 0644);
@@ -201,12 +213,21 @@ void entry_main(u32 *sp) {
             ((unsigned char *)OBJ_ADDR)[b] = (unsigned char)hexval(ibuf + p + 2 * b, 2);
         }
         u32 a[4] = {f[2], f[3], f[4], f[5]};
+        /* 任意の 8 番目の欄 (TEB_LEN B の hex) があれば TEB の内容にする。 無ければ 0 埋め */
+        int tp = p + 2 * (int)OBJ_LEN, has_teb = 0;
+        while (tp < e && ibuf[tp] == ' ') tp++;
+        has_teb = tp < e;
+        for (int b = 0; b < (int)TEB_LEN; b++) ((unsigned char *)TEB_BASE)[b] = has_teb ? (unsigned char)hexval(ibuf + tp + 2 * b, 2) : 0;
         h32_reset();
         u32 r = call_guest(f[0], f[1], a);
         ohex(line, 4); oput(" va=", 4); ohex(f[0], 8); oput(" eax=", 5); ohex(r, 8); oput(" mem=", 5);
         for (int b = 0; b < (int)OBJ_LEN; b++) ohex(((unsigned char *)OBJ_ADDR)[b], 2);
         oput(" heap=", 6);
         for (int b = 0; b < 64; b++) ohex(((unsigned char *)H32_BASE)[b], 2);
+        if (has_teb) {
+            oput(" teb=", 5);
+            for (int b = 0; b < (int)TEB_LEN; b++) ohex(((unsigned char *)TEB_BASE)[b], 2);
+        }
         obuf[ofs++] = '\n';
         line++;
     }

@@ -272,7 +272,7 @@ int main(int argc, char** argv) {
         /* FA-42 (#3718): FA_UI31=1 は UI 入口 popup slot 5 (0x180d8c0b0) を harness から 1 回呼ぶ (診断・既定 OFF)。
          * popup 入力: [P+0xb48]=1, [P+0xbb8]=非 NULL。rdx は 0x180d215e0 のゲート対象 (先頭 byte が非0 なら通過) として G を渡す。 */
         if (getenv("FA_UI31")) {
-            unsigned char* P = gr_alloc(0x1000); unsigned char* PB = gr_alloc(0x100); unsigned char* G = gr_alloc(0x40);
+            unsigned char* P = gr_alloc(0x1000); unsigned char* PB = gr_alloc(0x1000); unsigned char* G = gr_alloc(0x40);
             P[0xb48] = 1; W64(P, 0xbb8, PB); W64(P, 0xbc0, PB); G[0] = 1;
             fprintf(stderr, "UI31 S%d call slot5 P=%p G=%p\n", sidx, (void*)P, (void*)G);
             g_in_guard = 1; int us = sigsetjmp(g_jb, 1);
