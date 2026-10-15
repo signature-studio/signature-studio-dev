@@ -85,3 +85,15 @@
 5. **[再測定] 解消 (round 3 review run・測定 HEAD `8043dfcb`)**: decompile 18/18 OK・stereo emcc 10 (`grep -c error:`)・生成 C の gain/haas/gate/stereo 4 関数が `44230a54` と diff 0 行・回帰 Gain/Haas/Gate 各 1000/1000。main 側の thunk 正規化・shim の typedef は stereo の件数と生成 C を変えていない。以降の HEAD が `8043dfcb` から変わる場合は、`git diff 8043dfcb HEAD -- tools/targets/kilohearts/ghidra_route` の差分の分だけ再測定する (`docs/WORKFLOW.md` §6)。
 - 未実施: Stereo の native 突合・ablation・ネガコン (emcc 未通過のため)。
 - 注: REPORT.md 本体への導線 1 行は、commit 範囲 (ghidra_route + REPORT_APPENDIX) の指示どおり未追加。§10-7p は本ファイル群に存在しないため、本節は REPORT_APPENDIX.md の §10-7q (#3072) の後に置いてあったものを分割移動した。
+
+## §KH-74 (#3853): callee FUN_180fdc660 の戻り xmm0 を機械語の式で C 化
+
+- 測定 commit: `1227b9e92` (コードを変えた最後の commit)。そこから HEAD までの `git diff 1227b9e92 HEAD -- tools/targets/kilohearts/ghidra_route` は 0 行 (本節は REPORT のみの commit)。
+- 素材: `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → `HeartCore.core_64` (76,642,304 B) を手展開。Ghidra 12.1.4 (sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)、emsdk 6.0.12。
+- 式 (capstone 逆アセンブル、180fdc660〜180fdc6d6・ret は 180fdc6d6 の 1 本): `k = fma(x, 2/π, 1.5·2^52) − 1.5·2^52`、`t1 = fma(−k, π/2 上位, x)`、戻り xmm0 (180fdc6c5 `vmovapd xmm0,xmm2`) = `fma(−k, 6.123e−17, t1)`、rax = `int(k) & 3`。定数は PE の `0x18228a860`・`…a8a0`・`…a870`・`…a880` (rip 相対で解決)。
+- 突合 (`ghidra_route/xmm0_check.c`・`kh_xmm0.h` を gcc で native 実行と比較): 1,000,000 試行 (乱数ビット・一様・k·π/2 近傍・特殊値) で **rax 不一致 0・xmm0 不一致 0 (PASS)**。NaN 同士の payload 差は 28,623 件 (一致扱いで別計上)。
+- ネガティブコントロール: `kM2` の仮数 1 bit を変えた版は 100,000 試行で **xmm0 不一致 23,716 (FAIL・rc=1)**。突合が効くことの確認。
+- 生成 C: `ghidra_to_c.py stereo` の出力 `stereo.c` 914 → 934 行 (+20 = `kh_xmm0.h`)。`extraout_XMM0_Qa*` の読出し **6 → 4** (解消 2: 180fcd690 の 82 行・180fce0d0 の 24 行)。残 4 = `FUN_180fdc470` 2 件・`FUN_180fdfdb0` 2 件 (子 issue へ)。
+- emcc (`-c -w -O1 -ferror-limit=0`): base (`e03d588ee`) 12 行 → HEAD 12 行。エラーは同一の残件 (KH-45 の V128 演算・SUB168・未関数化 FUN_180fd8aac・行番号のみ +20 シフト)。新規エラー 0。
+- 回帰: gain / haas / gate の生成 C は `e03d588ee` の `ghidra_to_c.py` と HEAD の差分 0 行 (3 本とも・sigs.json 一致)。stereo 限定の規則のため。gain/haas/gate の 1000/1000 bit-exact (§10-7r の測定) は生成 C 不変のため引き継ぐ。
+- 未測定: Stereo 全体の native 1000 trial 突合 (#3073)。本節は callee 単体の突合まで。
