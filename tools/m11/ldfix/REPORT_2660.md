@@ -5,8 +5,8 @@
 ## 1. 結論
 
 - 9 site を機械語・IR の両面で再検証した。**9 site すべて UNDETERMINED (判定不能) のまま**で、判定は変えない。
-- 4 site (45d570・45d581・45b1bf・45f938) は、機械語の消費者 (store 直後の load・間に call 無し) を確認できた。一方、IR の保存ブロックが entry から到達不能なのは、上流の `xor i64 0,0` (機械語 45b18b・45d0b5・45f56c の型タグ読みの置換) が作る死んだ辺による。上流が直ると辺は生き、store は IR で実行される。独立した脱落ではないため、TRUE_DROP への確定は取り下げた (§2)。上流修復の追跡は LD-127 (#2745) (§2.2)。
-- LD-127 (#2745): 上流 xor 0 の 3 関数の入口タグ読みを load に戻す pass F3d を追加した (既定無効・`--passes f3d`)。4 site の判定と `results/` は未更新 (§2.3)。F3d の既定化は #2833、4 site の判定更新は #2834 (§2.4)。
+- 4 site (45d570・45d581・45b1bf・45f938) は、機械語の消費者 (store 直後の load・間に call 無し) を確認できた。IR の保存ブロックが entry から到達不能なのは、上流の `xor i64 0,0` (機械語 45b18b・45d0b5・45f56c の型タグ読みの置換) が作る死んだ辺による。F3d 適用後は死んだ辺が消え、到達可能になる (§10.2)。ただし到達可能は store の実行を示さない。TRUE_DROP への確定は取り下げた (§2)。OK_LOAD への判定も、store の実行の根拠が立つまで入れない (§10)。上流修復の追跡は LD-127 (#2745) (§2.2)。
+- LD-127 (#2745): 上流 xor 0 の 3 関数の入口タグ読みを load に戻す pass F3d を追加した (既定無効・`--passes f3d`)。4 site の判定と `results/` は未更新 (§2.3・§10)。F3d の既定化は #2833、4 site の判定は子 #3605 (LD-167) (§10.3)。
 - 残る 5 site (41ba8a・41bfd1・41e513・45c6dd・45d754) も UNDETERMINED。所見は §3 に残し、子 issue LD-123 (#2688) に移した。
 - 脱落関数の和集合は **72 関数** (69 + TRUE_DROP 増分 3・PR 基点 `62b33c07` の results での計算。`REPORT_2265.md` §3 の公表値と同じ)。9 site が未確定のため最終化は未了。最終化は子 issue LD-124 (#2689)。現 main (`738074af`) の results は本 PR と版が違い、その和集合は未測定 (§7)。
 - 測定: 測定 commit `57d6612b` (F3d を入れたコード commit)。`audit_lsf_ssa_e2e.sh` を前景実行し rc=0・7/7 完走 (120.9 s)。HEAD `4e85ea56` でも再実行し rc=0・7/7 完走 (165.1 s)。主要値は §5。旧測定 (`8a323067`・154.7〜154.8 s) は §5 に旧版の注記付きで残す。
@@ -17,10 +17,10 @@
 
 | 関数 | site | 機械語の消費者 | IR 側の対応 | 判定 |
 |---|---|---|---|---|
-| 45d0a0 | 45d570 | 45d574 jmp → 45d5ea `mov rax,[rbp+0x38]` → ret (間に call 無し) | `dec_label_pc_45d565` は entry 到達不能 (死んだ辺 `45d381→45d38e`。`%3` = 上流 45d0b5 の `xor i64 0,0` 由来の `%122`/`%123` が定数) | UNDETERMINED (上流 xor 0 の修復待ち) |
-| 45d0a0 | 45d581 | 45d585 jmp → 45d5ea (同上) | `dec_label_pc_45d576` は entry 到達不能 (同じ死んだ辺・同じ上流) | UNDETERMINED (上流 xor 0 の修復待ち) |
-| 45b170 | 45b1bf | 45b1c3 jmp → 45b1cd `mov rax,[rbp+0x38]` (間に call 無し) | `dec_label_pc_45b1b8` は entry 到達不能。死んだ辺 `45b1a1→45b1b1` (`%8` 定数真。上流 45b18b の `xor i64 0,0` 由来) | UNDETERMINED (上流 xor 0 の修復待ち) |
-| 45f560 | 45f938 | 45f93c jmp → 45fa50 `mov rax,[rbp+0x28]` | `dec_label_pc_45f931` は entry 到達不能。死んだ辺 `45f84c→45f931` (`%122` 定数偽。上流 45f56c の `xor i64 0,0` 由来) | UNDETERMINED (上流 xor 0 の修復待ち) |
+| 45d0a0 | 45d570 | 45d574 jmp → 45d5ea `mov rax,[rbp+0x38]` → ret (間に call 無し) | `dec_label_pc_45d565` は entry 到達不能 (死んだ辺 `45d381→45d38e`。`%3` = 上流 45d0b5 の `xor i64 0,0` 由来の `%122`/`%123` が定数) | UNDETERMINED (F3d 適用後も store の実行の根拠が未確認。§10.2) |
+| 45d0a0 | 45d581 | 45d585 jmp → 45d5ea (同上) | `dec_label_pc_45d576` は entry 到達不能 (同じ死んだ辺・同じ上流) | UNDETERMINED (F3d 適用後も store の実行の根拠が未確認。§10.2) |
+| 45b170 | 45b1bf | 45b1c3 jmp → 45b1cd `mov rax,[rbp+0x38]` (間に call 無し) | `dec_label_pc_45b1b8` は entry 到達不能。死んだ辺 `45b1a1→45b1b1` (`%8` 定数真。上流 45b18b の `xor i64 0,0` 由来) | UNDETERMINED (F3d 適用後も store の実行の根拠が未確認。§10.2) |
+| 45f560 | 45f938 | 45f93c jmp → 45fa50 `mov rax,[rbp+0x28]` | `dec_label_pc_45f931` は entry 到達不能。死んだ辺 `45f84c→45f931` (`%122` 定数偽。上流 45f56c の `xor i64 0,0` 由来) | UNDETERMINED (F3d 適用後も store の実行の根拠が未確認。§10.2) |
 | 41ba50 | 41ba8a | 41ba9d `mov rbx,[rbp]` → 41baa1 `lock cmpxchg16b` の新値 | 「対応する store」が無い。値 `%15` は `%.pr` (= `%4` = `load [arg1+16]` の xadd 旧値) を指す。機械語 41ba7a の movsq は `[arg1]` を複写 | UNDETERMINED |
 | 41bfa0 | 41bfd1 | 41bfd5 `mov rax,[rbp+8]` → ret | crit-edge の `%8` (成功時の書込値) と一致。cmpxchg 失敗経路 (41bfce 再読込・41bfbd ループ) は IR に無い | UNDETERMINED |
 | 41e490 | 41e513 | 41e542 `mov rsi,[rbp]` (ループ後の再読込) | `%16 = load (%15 = r15)` と構造一致。大域は機械語 0x15ec2e0 と IR `inttoptr 18793184` (0x11ec2e0) で 0x400000 差 (同一大域) | UNDETERMINED |
@@ -63,7 +63,7 @@
 - 読み方: 「辺を除かない CFG で reachable」は修復前でも成り立つ (CFG だけを見る検査)。修復で変わったのは、死んだ辺の条件式の入力が定数 0 (上流の `xor`) から load 由来の値になった点である。`ir_reach_2660.py` で辺を除くと、修復後も UNREACHABLE になる (実測)。これは「その辺が死んでいれば届かない」ことを示すだけで、辺が生きることの証明ではない。辺が実際に生きるかは load の値に依存し、本 REPORT の範囲外。
 - 影響範囲 (F3d 単独・`boot_final3.ll` の全 7421 関数): 60 関数に当たる (3 関数は本節の対象、残り 57 関数は同じ類型か未検証)。F3d は既定無効のまま。既定化には 60 関数の IR 変更の build・e2e 検証が要る (#2833)。ガードの内訳と negative control は §2.5。
 - 既定経路の回帰: `62b33c07` の `ldfix.py` と修復後 `ldfix.py` の既定出力 (`boot_final3.ll` 入力) は `cmp` で一致 (F3d 既定無効のため)。再現は §6 の 6。
-- 4 site の判定 (`candidate_verdicts_1161.jsonl`・`spill178_1161.tsv`) は更新していない。`results/` は本番 IR (F3d 未適用) から生成されるため、F3d を既定化して IR を再生成するまで判定の根拠が無い。これは子 issue (#2834) に移した。
+- 4 site の判定 (`candidate_verdicts_1161.jsonl`・`spill178_1161.tsv`) は更新していない。`results/` は本番 IR (F3d 未適用) から生成されるため、F3d を既定化して IR を再生成するまで判定の根拠が無い。これは子 issue (#3605 LD-167) に移した。
 - 測定の版: 測定 commit は **`57d6612b`** (F3d を入れたコード commit)。`audit_lsf_ssa_e2e.sh` を前景で実行: rc=0・7/7 完走・120.9 s。`drops_510.tsv` と `spill178_1161.tsv` は `results/` と一致。spill 宛の分布は 確定 109・判定不能 28・未判定 41 (§5)。
 - コード差分: `git diff 57d6612b HEAD -- tools/m11/ldfix/results tools/m11/ldfix/*.py` は 0 行 (HEAD `4e85ea56` 時点・本節の REPORT 更新と `f3d_negctl_2745.sh` の追加は含まれない。`.sh` は audit の経路に入らない)。
 
@@ -72,7 +72,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | F3d の既定化 (60 関数の IR 変更の build・e2e 検証) | 既定の pipeline は未修復。4 site は UNDETERMINED のまま | #2833 (LD-134) |
-| 45b1bf の判定 (IR は 1 段目の値 P を store し、2 段目の load を join で行う。P と V の読みの間に store が無いことが未確認) | 45b1bf は UNDETERMINED のまま。他 3 site は §10 で OK_LOAD | Refs #2834 の未解決表 (§10.3) |
+| 45b1bf の判定 (IR は 1 段目の値 P を store し、2 段目の load を join で行う。P と V の読みの間に store が無いことが未確認) | 45b1bf は UNDETERMINED のまま。4 site とも判定は保留 (§10) | #3605 (LD-167) |
 | RetDec 内部で xor 0 化した pass の特定 (m11 の出力には `xor i64 0,0` を出す箇所は無い) | 上流 (lift 段) を直すか否かの判断に必要。F3d で IR 側に対処済み | #2745 へのコメント (本 PR の merge で close されるため、追跡はそのコメントに残す。新規子 issue は立てない) |
 | main 側 results の再測定 (現 main `738074af` は 確定 117・判定不能 30・未判定 31) | 本 PR の results は基点 `62b33c07` の版 (109/28/41)。main の和集合は未測定 | LD-124 (#2689) |
 
@@ -93,7 +93,7 @@
 
 ## 3. UNDETERMINED 9 site の所見 (LD-123 へ)
 
-- **上流 xor 0 の修復待ち 4 site (45d570・45d581・45b1bf・45f938)**: 上流の置換 (45b18b・45d0b5・45f56c、§2.2) を直した後に、死んだ辺が生きるかを確認する。生きたら store の IR 実行と機械語の消費者の対応を照合し、TRUE_DROP / OK_LOAD を判定する。直らなければ判定不能のまま残る。
+- **4 site (45d570・45d581・45b1bf・45f938)**: F3d 適用 IR で死んだ辺は消えた (§10.2)。store を囲む分岐の述語と機械語 jcc の対応を照合し、OK_LOAD / TRUE_DROP を判定する (子 #3605)。照合できなければ UNDETERMINED のまま残る。
 - **41ba8a (41ba50)**: IR 61〜64 行の `%4 = load [arg1+16]` (xadd の対象) を `stack_var_-56` (= `[rbp+0x10]`) へ格納している。機械語 41ba7a の `movsq` は `[r8]` (= arg1) を `[rbp+0x10]` へ複写する。第 1 語の複写元が不一致で、IR の `%15` (`%.pr` 経由の間接参照) は機械語と別の値。「脱落」ではなく「誤った元の値」なので TRUE_DROP の定義に当てはまらない。
 - **41bfd1 (41bfa0)**: IR は `lock cmpxchg` を成功時の `store %8` だけに落とす。機械語 41bfc9 の失敗時は 41bfce の再読込値を格納し、41bfbd のループで再試行する。単一スレッドで cmpxchg が失敗しないことの根拠は素材に無い。
 - **41e513 (41e490)**: 大域の基準 (機械語 VA と IR の 0x400000 差) は一致するが、大域の内容である pointer 値の基準 (VA か image 相対) が IR で一致するかは未確認。
@@ -101,6 +101,8 @@
 - **45d754 (45d610)**: IR の tag は `trunc i64 %arg1 to i16` (引数値そのもの) で、機械語のメモリ読み (`word[arg1]`) と一致しない。経路条件の対応を確定できない。
 
 ## 4. 脱落関数の和集合 (暫定・未確定)
+
+- 注: 本節の 21・72 は版 57d6612b の値。現 results の分類器出力は spill 宛の確定 TRUE_DROP 関数 32 で、drops_510 に無いもの 14 (§10.4)。和集合は再計算していない (LD-124 #2689)。
 
 - 和集合 = store 宛 DROP 51 ∪ spill 宛 frame 22 (drops_510.tsv) = 69 関数に、spill 宛の確定 TRUE_DROP の増分 3 (4120c0・41a5d0・6c3700) を加えた **72 関数** (`spill_classify_1161.py` の [5][6] 行)。
 - 本 PR で spill 宛 TRUE_DROP 関数は 21 のまま (旧 `3e9a7419` の 24 は取り下げた)。和集合は本 PR の results の版で 72。
@@ -120,10 +122,11 @@
 | 6/7 `negctl_510.sh` | NC0〜NC7 完走 |
 | 7/7 `spill_classify_1161.py` | 確定 109 / 判定不能 28 / 未判定 41。TRUE_DROP 関数 21 (drops_510 に無いもの 4120c0・41a5d0・6c3700)。和集合 72 (= 69 + 3)。`spill178_1161.tsv` は results と一致 |
 
+- 注: 上の表の 7/7 は版 57d6612b・4e85ea56 の値。現 results の分類器出力は §10.4 (確定 147・判定不能 30・未判定 1)。
 - 判定不能 28 のうち 16 site が本 issue (#2660) の 9 site と #2253 (LD-95) の 7 site (c3460e・dcdeee・1284dab・128cad6・128d007・128d495・12900c4) で、いずれも HEAD の results で UNDETERMINED (§8)。
 - **旧測定 (測定 commit `8a323067`・154.7〜154.8 s・2 回)**: step 1〜6 の値は現行と同じ。step 7 は 確定 97 / 判定不能 16 / 未判定 65 で、これは PR 作成時の旧基点 `858ceef0` の `results/spill178_1161.tsv` の版による値 (`8a323067` は `858ceef0` と同じ results を持つ)。TRUE_DROP 関数 21・和集合 72 は同じ。現行の測定ではない。
 - 旧測定 (`3e9a7419`・rc=0・149.87 s・7/7) は TRUE_DROP 状態のもので、results を戻したため現行には当てはまらない。
-- 残課題: 上流 xor 0 の修復 (F3d 既定化・4 site の判定更新) は #2833・#2834。上流 pass の特定は #2745 へのコメント (§2.4)。
+- 残課題: 上流 xor 0 の修復 (F3d 既定化・4 site の判定更新) は #2833・#3605 (LD-167)。上流 pass の特定は #2745 へのコメント (§2.4)。
 
 ## 6. 再現手順
 
@@ -141,7 +144,7 @@
 - 測定 commit `57d6612b` 以降のコード差分 (`git diff 57d6612b HEAD -- tools/m11/ldfix/results tools/m11/ldfix/*.py`) は 0 行 (HEAD `4e85ea56` 時点で確認)。`f3d_negctl_2745.sh` は本 commit で追加した再現スクリプトで、audit の経路には入らない。
 - 参考: `8a323067` からの差分 (`git diff 8a323067 HEAD -- tools/m11/ldfix/results tools/m11/ldfix/*.py`) は 12 ファイル・+721/-32 行。旧測定の commit の後に F3d と results が変わっている。
 - `results/` の版: PR の基点 (merge-base) は `62b33c07`。その `results/spill178_1161.tsv` は 確定 109・判定不能 28・未判定 41 で、`57d6612b` と同一 (`git diff 62b33c07 57d6612b -- tools/m11/ldfix/results` は 0 行)。旧 PR 基点 `858ceef0` の版 (97/16/65) とは `git diff --numstat 858ceef0 62b33c07 -- tools/m11/ldfix/results` で +110/-24 行の差がある。
-- 現 main (`738074af`) の `results/spill178_1161.tsv` は 確定 117・判定不能 30・未判定 31 (`git show origin/main:tools/m11/ldfix/results/spill178_1161.tsv` の集計)。本 PR はこの変更を含まず、main 側の再測定は LD-124 (#2689) で行う。
+- 現 origin/main (`8a852f69a`) の `results/spill178_1161.tsv` は本 PR の基点 `b706fb666` と同一 (確定 147・判定不能 30・未判定 1)。旧記載の `738074af` の値 (117/30/31) は本 run では確認できなかったため除く。main 側の再測定は LD-124 (#2689)。
 
 ## 8. 注記
 
@@ -193,29 +196,28 @@
 | F3d 58 関数のうち 3 対象以外の 55 関数の機械語・IR 突合と、`audit_lsf_ssa_e2e.sh` の HEAD / F3d 比較 (未実施) | 既定化の判断材料が無い | #3528 (LD-160) |
 | 既定 e2e の pin (STRICT_DONE 56・SURVEY_OK_EXACT 872) と本 snapshot の不一致 (HEAD でも発生) | 既定の e2e が rc=1 で終わる | #3528 (LD-160) の注意欄 |
 
-## 10. LD-135 (#2834): F3d 適用 IR の再生成と 4 site の判定
+## 10. LD-135 (#2834): F3d 適用 IR の再生成と 4 site の判定 (保留)
 
-- 結論: F3d を含めて IR を再生成し、4 site のうち 3 site (45d570・45d581・45f938) を OK_LOAD と判定して `results/candidate_verdicts_1161.jsonl`・`results/spill178_1161.tsv` を更新した。45b1bf は UNDETERMINED のまま (§10.3)。F3d は既定化していない (§9.3 の判断どおり。`--passes` で明示したときだけ走る)。
-- 測定 commit: origin/main `b706fb666` (コードは変更していない。本節の commit は `results/` と本 REPORT だけ)。
+- 結論: F3d を含めて IR を再生成し、4 site の到達性と機械語の消費者を確認した。store が IR で実行される根拠は示せなかったため、3 site (45d570・45d581・45f938) の OK_LOAD 判定と results 更新 (版 `2f921d4dc`) は取り下げた。4 site とも UNDETERMINED のまま。`results/` は基点 `b706fb666` と同一 (本 commit で変更なし)。判定は子 #3605 (LD-167) で行う。
+- 測定の版: IR 再生成と監査は commit `2f921d4dc` (3 site を OK_LOAD にした results) の時点。コードは `b706fb666` から変えていない。
 
-### 10.1 IR 再生成
-- 手順: `LDFIX_ARGS="--passes f1,f1v,f2,f3a,f3b,f3c,f3d,f4" bash tools/m11/m11_gen_ir2.sh` (前景・gen 45.3 s・rc 0)。`--passes` の 8 tag は既定の 7 tag に f3d を足したもの。
-- ldfix の内訳: F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=46 F3d=58 F4=10 (errors 0)。`ir_conditions.json` は `ldfix=applied`・`ld108=applied`・`ld115=applied`・`r8b=applied`、`ir_sha256=3d7a9cd3…`。同じ手順を 2 回やって sha が一致した。`boot_final3.ll` は `m11_post.py` (既定引数) で作った。
-- 対照: 同じ HEAD で F3d なし (既定) の IR を作り、関数単位で比べた。変わった関数は **58** (F3d の対象集合と一致)。45b170・45d0a0・45f560 を含む。`xor i64 0, 0` 行は `boot_final3.ll` で 3886 → 3828 行 (58 減)。
+### 10.1 IR 再生成 (版 2f921d4dc)
+- 手順: `LDFIX_ARGS="--passes f1,f1v,f2,f3a,f3b,f3c,f3d,f4" bash tools/m11/m11_gen_ir2.sh` (前景・gen 45.3 s・rc 0)。ldfix の内訳 F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=46 F3d=58 F4=10 (errors 0)。`ir_sha256` `3d7a9cd3…` を 2 回で再現。`boot_final3.ll` は素材の生成物で、本 PR には含めない。
+- 対照 (同じ HEAD で F3d 無し): 変わった関数は 58 (F3d の対象集合と一致)。`xor i64 0, 0` 行は `boot_final3.ll` で 3886 → 3828 行。
 
-### 10.2 4 site の判定 (F3d 適用 IR)
-- 到達性: `ldfix/ir_reach_2660.py` に死んだ辺を 1 本も渡さず、TARGET は `dec_label_pc_45b1b8`・`45d565`・`45d576`・`45f931` の全てで reachable (dead edges 0)。
-- 45d570・45d581 (`45d0a0`): 機械語 `45d0ac mov [rbp+0x50],rcx` (arg1 の保存) → `45d565 mov rax,[rbp+0x50]` → `45d569 mov rax,[rax+8]` → `45d56d mov rax,[rax]` の 2 段 deref を `45d570`・`45d581 mov [rbp+0x38],rax` で格納。IR の `%218=arg1+8`・`%220`・`%222` (2 段) と store (`stack_var_-16`・`rax.1.reg2mem`) が一致。消費者は機械語 `45d5ea mov rax,[rbp+0x38]` と IR の `%rax.1.reload → ret`。→ **OK_LOAD**。
-- 45f938 (`45f560`): 機械語 `45f931 mov rax,[rbx+8]` → `45f935 mov rax,[rax]` → `45f938 mov [rbp+0x28],rax` → `45f93c jmp 45fa50`。IR の `%156=arg1+8`・`%158`・`%160` (2 段) と store が一致。消費者は機械語 `45fa50 mov rax,[rbp+0x28]` と IR の `.reload → ret`。→ **OK_LOAD**。
-- 45b1bf (`45b170`): 機械語は `45b1b8 mov rax,[rbx+8]` → `45b1bc mov rax,[rax]` → `45b1bf mov [rbp+0x38],rax` で V = [P] を格納し、`45b1cd` で `movzx eax, word[rax]`。IR は `%13 = load [arg2+8]` = P を store し、2 段目の `load [P]` を join `45b1cd` の `%storemerge.in` で行う。値は同じ V になるが、P の読みと V の読みの間で memory が変わらないことの確認が要る。これは未確認のため UNDETERMINED のまま。
+### 10.2 4 site の到達性と機械語の消費者 (F3d 適用 IR)
+- 到達性: `ir_reach_2660.py` に死んだ辺を 1 本も渡さないとき、TARGET `dec_label_pc_45b1b8`・`45d565`・`45d576`・`45f931` は全て reachable (dead edges 0)。ただし同ツールの冒頭注記のとおり、除外後も到達可能なら何も言えない。到達可能は store の実行を示さない。
+- 機械語の消費者: 45d570 → 45d5ea `mov rax,[rbp+0x38]`・45d581 → 45d585 jmp → 45d5ea・45f938 → 45fa50 `mov rax,[rbp+0x28]`。45b1bf は 45b1cd `movzx eax, word[rax]` の前に [rbp+0x38] (V) を格納する。IR の対応する `.reload`・join は同じ値を読む形。
+- 保留の理由: 45d570・45d581・45f938 は、store を囲む分岐の述語 (F3d 後 IR の br 条件式) と、機械語の jcc が同じ読み込み値で同じ arm を選ぶことを示していない。F3d 後の辺は load 由来の値で決まるため、store が実行されるかは未確認。
+- 45b1bf: 機械語 `45b1b8 mov rax,[rbx+8]` → `45b1bc mov rax,[rax]` → `45b1bf mov [rbp+0x38],rax` で V = [P] を格納する。IR は `%13 = load [arg2+8]` = P を store し、2 段目の `load [P]` を join で行う。P と V の読みの間に store が無いことは未確認。
 
-### 10.3 未解決
+### 10.3 未解決 (起票先付き)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 45b1bf の判定 (P を store して join で 2 段目を読む IR と、機械語の V の store の値の一致。P と V の読みの間の store の有無) | 45b1bf は UNDETERMINED。spill 分類で 1 site が判定不能のまま | Refs #2834 (本 PR の範囲外として残す) |
-| `audit_lsf_ssa_e2e.sh` の step 6 (negctl) が `$RUNNER_TEMP/negctl_510/nc1.json` の不在を出す (rc と 7/7 には影響しない) | ネガコントロールの一部が読めていない可能性。本変更との関係は未確認 | 未起票 (既存の挙動か未確認) |
+| 4 site の store 実行の根拠 (分岐述語と jcc の対応。45b1bf は P と V の読みの間の store)・取り下げた results の更新 | 4 site は UNDETERMINED のまま | #3605 (LD-167) |
+| `negctl_510.sh` の NC1 が評価されない (`nc1.json` 不在。`function_5c0270` の `store i64 %arg2` の patch が assert で通らない疑い)。step 6 の失敗は audit の rc に表れない | 監査の NC1 が未評価。rc と 7/7 には表れない | #3602 (LD-166) |
 
-### 10.4 監査
-- `M11_WORK=<worktree>/tools/m11/work LD_WORK=<main>/tools/liftdiff/work bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (前景・2 m 05 s・rc 0・7/7)。
-- 初回の実行 (更新前の `results/`) で step 5 の `drops_510.tsv` と step 7 の `spill178_1161.tsv` は一致した。step 7 の `results/spill178_1161.tsv` は、その同じ `ssa.json` から `spill_classify_1161.py` で作り直した (3 行のみ変更: 上の 3 site)。
-- 更新後の HEAD での再現は、本 PR の検証結果 (PR 本文) に記す。
+### 10.4 監査と分類器 (版を明記)
+- 監査 `audit_lsf_ssa_e2e.sh` (`M11_WORK`・`LD_WORK` 指定・前景): 版 `2f921d4dc` で 2 m 05 s・rc 0・7/7 (3 site を OK_LOAD にした results の版)。取り下げ後の results では再実行していない (素材 work-m11・work-liftdiff が本 run に無いため)。
+- 分類器 `spill_classify_1161.py tools/m11/ldfix/results/audit_510_ssa.json` を取り下げ後の results (= `b706fb666` = origin/main) に対して実行: 178 site / 71 関数。status 確定 147・判定不能 30・未判定 1。出力は `results/spill178_1161.tsv` と `cmp` で一致。spill 宛の確定 TRUE_DROP 関数 32、うち drops_510 に無いもの 14 (4120c0 41a5d0 466af0 6bb3f0 6c3700 6c3d20 775340 815050 ddf630 f3e050 1042d20 10c7cd0 12cb680 12f9730)。
+- 版 `2f921d4dc` の分類器 status: 確定 150・判定不能 27・未判定 1 (3 site の OK_LOAD 分の差)。
