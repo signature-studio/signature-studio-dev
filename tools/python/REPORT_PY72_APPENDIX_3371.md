@@ -112,7 +112,7 @@
 ### 測定 (追補 3)
 
 - 測定 commit (`pe_fe9090_table.py` を追加した commit): `d270d6f75`。測定 HEAD はこの追補の commit。`git diff d270d6f75 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (追補の commit は REPORT だけを変える)。
-- 素材: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP --wildcards '*block00031_PE.bin'` (展開先 `$RUNNER_TEMP/extracted/block00031_PE.bin`)。
+- 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP --wildcards '*block00031_PE.bin'` (展開先 `$RUNNER_TEMP/extracted/block00031_PE.bin`)。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP python3 analysis/flapi/pe_fe9090_table.py` を 2 回。rc 0・0.23 s (両回)・出力は `cmp` で一致。load (1 分値) は 0.32。
 - 参考: `pe_slot35_sites.py` 11.82 s (rc 0・151 箇所・直接 call 元 `0xffe29b`・`0x1001b7b`)。`pe_slot35_recv_src.py` rc 0 (大域 `0x15e0c40` 起点の連鎖 54 件は前追補と同じ)。
 
