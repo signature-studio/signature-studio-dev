@@ -482,7 +482,7 @@
 | `tools/python/REPORT_PY71.md` | ~95 | PY-71 (#2501, 完了単位 1・2a): VMT (RTTI) の配置を 3 クラスで検証 (ネガティブコントロール 6/6 NG)。受入 1 (P = TGraphEditorForm・非 chan。全親鎖を実測)・2a (`0xffe370` = TPublicChannel のスロット 52、親 TChannel) を確定。2b (`call [reg+0x1a0]` 37 件の受け手)・3・4 は子 #2701 へ移した |
 | `tools/python/REPORT_PY86.md` | ~120 | PY-86 (#2701, 部分): call [reg+0x1a0] の受け手の分類 (受入 2b の一部)。残りは子 #3337・#3338。測定値は REPORT_PY86.md が正本 |
 | `tools/python/REPORT_PY116.md` | 105 | PY-116 (#2952): flapi 表の kwlist 無し引数 (flags=1) の書式を wrapper の出力ポインタ数と照合 (304 件中 302 件一致。`screen.addTextLine`・`screen.addMeter` の 6 個目は解析されない余剰で、表の個数 5 は正)。`plugins.getPresetCount` は kw 形式の唯一の flags=1 として書式 `i\|ii` を照合 (表の kwsig 1 件のみ変更)。名前の新規確定 0 件 (未確定 42 位置は `arg{i}` のまま) |
-| `tools/python/REPORT_PY123.md` | 237 | PY-123 (#3028, 未達・部分): undo 管理 global `0x15e1c78` は unit 209 の fill で 0 になる。unit 209 直前の pos/count は 0/0 (§2-6)。安全判定 obj は 0 で述語 VA は未確定。fill 後の値は #3112 待ち。0 化の命令は §2-5 (付録) |
+| `tools/python/REPORT_PY123.md` | 240 | PY-123 (#3028, 未達・部分): undo 管理 global `0x15e1c78` は unit 209 の fill で 0 になる。unit 209 直前の pos/count は 0/0 (§2-6)。安全判定 obj は 0 で述語 VA は未確定。fill 後の値は #3112 待ち。0 化の命令は §2-5 (付録) |
 | `tools/python/REPORT_APPENDIX_PY123.md` | ~32 | PY-123 (#3028): REPORT_PY123.md §2-5 (0 化の命令の特定 = fill `f_6a7b70` の `movdqu`) の全文。250 行上限のため分割移動 |
 | `tools/python/REPORT_PY12.md` | ~46 | PY-12 (#587): `_flhost` の per-module state 化・サブインタプリタ採用判断の実測 (REPORT.md の PY-12 節の全文。250 行上限のため分離) |
 | `tools/python/REPORT_PY31.md` | ~50 | PY-31 (#1329): mixer 残り 57 関数の扱い決定 (今回非実装・根拠は MCP 利用 0 件と mock 定義 0 件)、未実装 57 件の一覧、分割先 #941、検証 (provider_check / mixer_diff / all_tools) |

@@ -123,7 +123,7 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 
 ## 2-5. 0 化の命令の特定 (3 回目・WWATCH 測定 commit `009855d26`・HEAD `cd2166181`)
 
-全文は `REPORT_APPENDIX_PY123.md` §2-5 (250 行上限のため分割移動)。結論: 監視 slot を 0 にする命令は fill コールバック `f_6a7b70` の `movdqu` (VA `0x6a7b88`・`0x6a7b92`)。呼出し #5 (dst=`0x1400000`・4 MiB) で起きる。fill の幅の源は #3090 (PR #3114) で特定、修復は #3112 [FLE-13]。
+全文は `REPORT_APPENDIX_PY123.md` §2-5 (250 行上限のため分割移動)。結論: 監視 slot を 0 にする命令は fill コールバック `f_6a7b70` の `movdqu` (VA `0x6a7b88`・`0x6a7b92`)。呼出し #5 (dst=`0x1400000`・4 MiB) で起きる。fill の幅の源は #3090 (PR #3114) で推定にとどまり未確定 (即値 `movabs` 由来の推定。#3090 は open)。修復は #3112 [FLE-13]。
 
 ## 2-6. unit 209 の直前の undo 状態 (4 回目・PY-201・測定 commit `d63443334`)
 
@@ -134,8 +134,9 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 | shim 有 (`FLE_IPP=1`) | mgr `0x16bb068`・pos `0`・count `0`・safe_g `0x141d6b8`・safe_obj `0x0`・f98 `0x0`・f88 `0x0`・sing `0x0` | 1 (unit 0 のみ) | unit 0〜209 で 8 項目とも変化なし |
 | ネガコン (`FLE_IPP=0`) | 同上 | 1 | 同上 |
 
-- 測定: `FLE_BOOT_TAG=py201 FLE_BOOT_RUNS="shim negctl" bash tools/flelift/boot/fle6_measure.sh`。real 3 分 33.8 秒 (user 5 分 11.8 秒・sys 27.4 秒)。clang-plain 92 s・boot shim 21 s・negctl 22 s。boot 開始時 load `2.18 1.12 0.50`。並列 1 本。
-- 結果 JSON: `tools/flelift/boot/results/boot_summary_py201.json`・`boot_summary_py201_negctl.json` (`boot.py_snap`)。main 取り込み後に再測定し、HEAD の JSON はその出力 (§6 の 5 回目)。
+- 測定 (4 回目・commit `d63443334`): `FLE_BOOT_TAG=py201 FLE_BOOT_RUNS="shim negctl" bash tools/flelift/boot/fle6_measure.sh`。real 3 分 33.8 秒 (user 5 分 11.8 秒・sys 27.4 秒)。clang-plain 92 s・boot shim 21 s・negctl 22 s。boot 開始時 load `2.18 1.12 0.50`。並列 1 本。
+- 測定 (6 回目・commit `4f099b103`・§6): real 3 分 40.97 秒 (user 5 分 37.09 秒・sys 18.73 秒)。clang-plain 86 s・boot shim 27 s・negctl 26 s。boot 開始時 load `2.19 1.08 0.44`。並列 1 本。
+- 結果 JSON: `tools/flelift/boot/results/boot_summary_py201.json`・`boot_summary_py201_negctl.json` (`boot.py_snap`)。HEAD の JSON は 6 回目の出力 (§6)。
 - 受入 1: unit 209 の直前 (units 1〜208 の init 後) で pos 0・count 0。units 1〜208 で変化しない。**ただし** unit 209 で mgr 自体が 0 に戻り、boot はそこで止まるため、fill を越えた後 (boot が 942 units まで進んだ後) の値は本測定では分からない。
 - 受入 2: `obj` (`safe_obj`) は 0 で、`[obj+0x98]`・`[obj+0x88]` は読めない。述語の関数 VA は未確定。`obj` を設定する経路 (unit 209 より後か、unit 外の書込み) は未特定。
 - 受入 3: singleton は 0 (未設定)。`None` のオブジェクトかどうかは判定できない。
@@ -157,7 +158,7 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 | `tools/flelift/rt/fle_cpu.h`・`fle_cpu.c` | `FLE_WWATCH` 定義時だけ働く書込み監視 (`fle_wwatch`・`ST*`/`STX`/`STY` のフック)。既定ビルドのコードは変えない |
 | `tools/flelift/boot/results/boot_summary_py123def.json` | 既定ビルド (`FLE_EXTRA_CCF` 無し・shim 有) の summary (HEAD `cd2166181`) |
 | `tools/flelift/boot/results/boot_summary_py123.json`・`boot_summary_py123_negctl.json` | 再測定 (HEAD `f57b7dff`) の summary |
-| `tools/flelift/boot/fle_boot.c`・`fle_boot.mjs`・`build.sh` (4 回目) | `py_snap_undo` (unit 209 直前までの undo 状態の記録・計測のみ)・`FLEBOOT_PY201` 行と `boot.py_snap`・export 3 件 |
+| `tools/flelift/boot/fle_boot.c`・`fle_boot.mjs`・`build.sh` (4 回目) | `py_snap_undo` (unit 209 直前までの undo 状態の記録・計測のみ)・`FLEBOOT_PY201` 行と `boot.py_snap`・export 4 件 (`_fle_py_snap_trace_over` は 6 回目で追加: trace が `PY_TRACE_MAX` を超えた打切りの有無) |
 | `tools/flelift/boot/results/boot_summary_py201.json`・`boot_summary_py201_negctl.json` | 4 回目 (§2-6) の summary |
 | `tools/python/REPORT_PY123.md` | 本ファイル |
 | `tools/python/REPORT_APPENDIX_PY123.md` | 本ファイルの §2-5 (0 化の命令の特定) の全文。250 行上限のため分割移動 |
@@ -185,6 +186,7 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 - 範囲内: boot の unit 単位の変化点 (shim 有・ネガコンの 2 条件、各 1 回・`f57b7dff`)。開始時の値 (site 0)・unit 209 の GetMem(0x74) 呼出し直前の値 (site 8)・停止点 (site 4・`MessageBoxA`)。停止点の stderr 行 (§2-4)。
 - 4 回目 (§2-6): 測定 commit **`d63443334`** (`record undo state before unit 209`)。main 取り込み (merge `bbc4ff3e4`・競合は `tools/flelift/boot/build.sh` の `EXPORTS` 行のみ) で `tools/flelift/boot` の変更が入ったため、5 回目で再測定した (下記)。
 - 5 回目 (main 取り込み後の再測定・§2-6 の再現): 測定 commit **`bbc4ff3e4`** (merge)。`git diff bbc4ff3e4 HEAD -- tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` の出力は **空 (差分 0)**。HEAD の差分は `results/boot_summary_py201*.json` の更新 (再測定の出力そのもの) のみ。測定: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`fl-win64` を展開)・emsdk 6.0.12 (`$RUNNER_TEMP/emsdk`)・`FLE_BOOT_WORK=$RUNNER_TEMP/flelift-boot-work`。real 235 秒・rc=3 (shim の既知 `ok:false`・前と同じ)。units 209/942・`boot.py_snap` の `last` は pos 0・count 0、trace は unit 0 の 1 件 (前と同じ)。main 由来の変化は 2 点: `boot.diag_nullfill` (#672 の追加フィールド・全て off)、`outmem.stack` base/end (`0x11dbbaa0`→`0x11dbbb00`) と `outmem` の hash (`full`・`no_cstack`)。undo の値は不変。
+- 6 回目 (main 取り込み `fb4ee4d48` 後・trace 打切りフラグ追加): 測定 commit **`4f099b103`** (`feat(flelift): flag py_snap trace overflow`)。`git diff 4f099b103 HEAD -- tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` の出力は **空 (差分 0)**。結果: units_run 209/942・停止 `MessageBoxA`→`exit`・`py_snap.last` は pos 0・count 0・trace 1 件・`over` 0 (§2-6 と一致)。shim の `FLEBOOT_IPP_CHECK` は既知の `ok:false` (rc=3)、negctl は `ok:true`。main 由来の変化: 監視 slot が 3 → 6 件 (PY-106・#2909 の `0x15e1140`・`0x16b8488`・`0x16b8250`)。`py_events` は 9 件 (site 0 の初期値 6 件 + unit 209 の 0 化 3 件)。`0x15e1140` も unit 209 の GetMem 直前 (site 8) で 0 になる (fill と同じ)。`FLEBOOT_PY106` は `chain_0x15e1140` = `0x0`・`bind_0x16b8250` = `0x0`。§2-2 の表 (5 件) は PY-106 の追加前の値。
 - 範囲外: 起動直後 (停止経路を抜けた後)。安全判定の実体 (`obj` の設定元)。singleton の判定。
 - 3 回目 (§2-5): WWATCH の測定 commit **`009855d26`** (`FLE_WWATCH` 追加の commit)。HEAD `cd2166181` で両ビルドを再現した (WWATCH: build 1 分 16 秒・boot 18 秒。既定: `fle6_measure.sh` real 2 分 30.2 秒)。`git diff 009855d26 HEAD -- tools/flelift` の出力 (WORKFLOW §6):
 
