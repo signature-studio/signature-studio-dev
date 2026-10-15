@@ -77,7 +77,9 @@ def frame_derived(cs, seq):
         changed = False
         for ins in seq:
             ops = ins.operands
-            if not ops or ops[0].type != capstone.CS_OP_REG or not writes_dst(ins.mnemonic):
+            if not ops or ops[0].type != capstone.CS_OP_REG:
+                continue
+            if not (writes_dst(ins.mnemonic) or ins.mnemonic.startswith('lea')):
                 continue
             dst = rname(cs, ops[0].reg)
             if dst is None or dst in F:
@@ -95,24 +97,25 @@ def frame_derived(cs, seq):
     return F
 
 
-def leak_site(cs, seq, F):
-    """漏出の最初の命令 (addr, 理由) を返す。無ければ None。"""
+def leak_sites(cs, seq, F):
+    """漏出の命令 (addr, 理由) を全て返す (順序は命令順)。無ければ空リスト。"""
+    out = []
     for ins in seq:
         ops = ins.operands
         m = ins.mnemonic
         a = '%x %s %s' % (ins.address, m, ins.op_str)
         if m.startswith('call'):
             if any(r in F for r in ARG_REGS):
-                return a, 'CALL_ARG'
+                out.append((a, 'CALL_ARG'))
             continue
         if m.startswith('ret'):
             if 'rax' in F:
-                return a, 'RET_PTR'
+                out.append((a, 'RET_PTR'))
             continue
         if ops and ops[0].type == capstone.CS_OP_MEM and writes_dst(m):
             if any(op.type == capstone.CS_OP_REG and rname(cs, op.reg) in F for op in ops[1:]):
-                return a, 'STORE_PTR'
-    return None
+                out.append((a, 'STORE_PTR'))
+    return out
 
 
 NO_SYNC = False
@@ -370,12 +373,13 @@ def main():
         esc = v1.frame_escaped(mach.cs, seq)
         preds, ijmp = v1.build_preds(mach.cs, seq, va, ent[1])
         F = frame_derived(mach.cs, seq)
-        leak = leak_site(mach.cs, seq, F)
-        glk = (leak is not None) or force_glk
+        leaks = leak_sites(mach.cs, seq, F)
+        glk = bool(leaks) or force_glk
         sync = sync_range(mach.cs, seq)
         NONFRAME = nonframe_store_addrs(mach.cs, seq, preds) if glk else set()
         fn_info[fn] = dict(escaped=esc, ijmp=ijmp, n_ins=len(seq), glk=glk,
-                           leak=None if leak is None else '%s [%s]' % leak,
+                           leak=None if not leaks else '%s [%s]' % leaks[0],
+                           leaks=['%s [%s]' % x for x in leaks[:8]],
                            derived=sorted(F - set(FRAME_REGS)),
                            sync=None if sync is None else '%x-%x' % sync,
                            nonframe_stores=sorted('%x' % x for x in NONFRAME))
