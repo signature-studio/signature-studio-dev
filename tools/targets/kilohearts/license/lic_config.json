@@ -327,6 +327,7 @@
    "excluded_i256": ["180f89cf0", "180fb6124"],
    "raw_va": true,
     "rdata_str": true,
+   "rdata_raw_allow": "1813d47a2,181e79826,181e79834",
    "volatile_ret": true,
    "synth_zeroarg": true,
    "emcc_opt": "-O1"
