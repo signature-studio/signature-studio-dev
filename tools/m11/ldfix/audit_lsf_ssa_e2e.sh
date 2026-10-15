@@ -40,7 +40,7 @@ if [ -f "$LW/m11/batch_closure.jsonl" ]; then B="$LW/m11/batch_closure.jsonl"; e
 cmp "$OUT/drops_510.tsv" "$HERE/results/drops_510.tsv" && echo "[drops_510.tsv] results/ と一致"
 
 step "6/7 ネガティブコントロール"
-M11_WORK="$W" PY="$PY" bash "$HERE/negctl_510.sh"
+M11_WORK="$W" PY="$PY" bash "$HERE/negctl_510.sh" || { echo "[audit_lsf_ssa_e2e] FAIL: negctl_510.sh (6/7) が評価できなかった"; exit 1; }
 
 step "7/7 spill_classify_1161.py (LD-35)"
 "$PY" "$HERE/spill_classify_1161.py" "$OUT/ssa.json" "$OUT/spill178_1161.tsv"

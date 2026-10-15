@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # outmem_variants.sh — PERF-P22 (#3330): boot 停止時点の出力メモリ (wasm 線形メモリ) の sha256 を変種間で比べる。
 #   FL_WIN64_DIR=<fl-win64 展開先> SS_EMSDK_ENV=<emsdk_env.sh> FLE_BOOT_WORK=<repo 外の作業 dir> \
-#     bash tools/flelift/boot/outmem_variants.sh build    # gen → lift (無ければ) → plain(-O0) → o2 ∥ o2lto
-#     bash tools/flelift/boot/outmem_variants.sh boot     # 3 変種 boot (FLE_BOOT_N 回) + ネガコン (FLE_IPP=0) → outmem_compare.py
-#     bash tools/flelift/boot/outmem_variants.sh mutant   # 比較器の検出力: dump の複製 1 本の .data 先頭 1 byte を変えて FAIL (rc 1) になることを見る (boot の後)
+#     bash tools/flelift/boot/outmem_variants.sh build       # gen → lift (無ければ) → plain(-O0) → o2 ∥ o2lto
+#     bash tools/flelift/boot/outmem_variants.sh build-plain # 同上で plain だけ (ネガコンの再測定用・o2 系は作らない)
+#     bash tools/flelift/boot/outmem_variants.sh boot       # 3 変種 boot (FLE_BOOT_N 回) + ネガコン (FLE_IPP=0 / FLE_TOLERANT=1) → outmem_compare.py
+#     bash tools/flelift/boot/outmem_variants.sh boot-plain # plain だけ boot + ネガコン (build-plain の後)
+#     bash tools/flelift/boot/outmem_variants.sh mutant     # 比較器の検出力: dump の複製 1 本の .data 先頭 1 byte を変えて FAIL (rc 1) になることを見る (boot の後)
 # 工程と条件は tools/flelift/boot/fle6_measure.sh (plain = -O0, FLE_SHARDS=8) と variant_boot.sh (FLE_IPP=1) に揃える。
 # 生成物はすべて FLE_BOOT_WORK 下 (repo 外。tools/**/work/ は作業場にしない)。結果 JSON は $W/variant/。
 set -euo pipefail
@@ -23,6 +25,7 @@ NODE="$(command -v node)"
 stage() { echo "[outmem] $1 start $(date -u +%H:%M:%S) load=$(cut -d' ' -f1-3 /proc/loadavg)"; }
 
 do_build() {
+  local scope="${1:-all}"
   if [ ! -f "$LIFT/lift_meta.json" ]; then
     stage "gen-A + lift"; T=$(date +%s)
     python3 "$HERE/gen_boot.py" --pe "$PE" --out "$W" > /dev/null
@@ -38,6 +41,7 @@ do_build() {
   stage "build plain (-O0)"; T=$(date +%s)
   FLE_CC_JOBS=3 bash "$HERE/build.sh" plain
   echo "[outmem] plain done in $(( $(date +%s) - T ))s"
+  [ "$scope" = plain ] && return 0
   # shimx obj (-O1, 共有) は plain で作られる。以下 2 本は並列に走らせても共有物に触れない。
   stage "build o2 ∥ o2lto"; T=$(date +%s)
   FLE_CC_OPT="-O2" FLE_LABEL=o2 FLE_CC_JOBS=2 FLE_CC_RSS_CAP_MB=6000 bash "$HERE/build.sh" plain &
@@ -51,14 +55,21 @@ do_build() {
 }
 
 do_boot() {
+  local scope="${1:-all}" labels="plain o2 o2lto"
+  [ "$scope" = plain ] && labels="plain"
   N="${FLE_BOOT_N:-2}"
   rm -f "$W/variant/summary.tsv"
   export FLE_OUTMEM_DUMP="$W/outmem"
-  FLE_BOOT_WORK="$W" FLE_BOOT_N="$N" bash "$HERE/variant_boot.sh" plain o2 o2lto
-  # ネガコン: shim 無し (FLE_IPP=0)。出力を変える入力 (計数・ipp 状態が変わる)。
+  FLE_BOOT_WORK="$W" FLE_BOOT_N="$N" bash "$HERE/variant_boot.sh" $labels
+  # ネガコン 1: shim 無し (FLE_IPP=0)。ipp 状態は変わるが、書込み可能セクションは変わらないことを見る (参考)。
   FLE_IPP=0 FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$W/variant/boot_plain_negctl.json" --boot-only \
     > "$W/variant/run_plain_negctl.log" 2>&1 || echo "[outmem] negctl rc=$? (IPP 判定 NG 以外なら失敗)"
-  python3 "$HERE/outmem_compare.py" "$W/variant" --labels plain o2 o2lto --negctl plain_negctl --dump "$W/outmem"
+  # ネガコン 2 (受入 2 の判定に使う): 寛容起動 (FLE_TOLERANT=1・InitUnits を unit ごとに隔離して続行)。停止点より先の unit が走り、guest の状態が変わる。
+  for i in $(seq 1 "$N"); do
+    FLE_TOLERANT=1 FLE_IPP=1 FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$W/variant/boot_plain_tolerant_r$i.json" --boot-only \
+      > "$W/variant/run_plain_tolerant_r$i.log" 2>&1 || echo "[outmem] tolerant r$i rc=$? (rc≠0 なら log を見る)"
+  done
+  python3 "$HERE/outmem_compare.py" "$W/variant" --labels $labels --negctl plain_negctl plain_tolerant --dump "$W/outmem"
 }
 
 do_mutant() {
@@ -83,8 +94,10 @@ PY
 }
 
 case "${1:-}" in
-  build)  do_build ;;
-  boot)   do_boot ;;
-  mutant) do_mutant ;;
-  *) echo "usage: outmem_variants.sh build|boot|mutant"; exit 2 ;;
+  build)       do_build all ;;
+  build-plain) do_build plain ;;
+  boot)        do_boot all ;;
+  boot-plain)  do_boot plain ;;
+  mutant)      do_mutant ;;
+  *) echo "usage: outmem_variants.sh build|build-plain|boot|boot-plain|mutant"; exit 2 ;;
 esac
