@@ -76,6 +76,15 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 
 **probe (73 関数の 's' native fault)**: base レジスタ値が候補と一致 51 件 (うち fvm 対象になった 13 件)・不一致 22 件。不一致は `rep movsq` (rdi) など base が引数由来でない形。
 
+**候補多重 73 件の内訳 (算術)**: 73 = fvm 実行 13 + 非対象 60。非対象 60 = base 不一致 22 + base 一致で fvm 非対象 38。
+
+**38 件の理由は未計測** (本 run では確定できない)。sample:800 の jsonl (関数ごとの `s` fault) が `tools/liftdiff/results` に無く、`work-m11` 素材も無いため、probe と `fvm_cand` を再計算できなかった。考えられる理由 (未検証):
+- (a) probe は「候補値と一致」で数えたが、`_fault_base_arg` は「ちょうど 1 件一致」を要求するため、一致が 2 件以上で `multi_candidate` になった。
+- (b) base レジスタが `fault.detail` に無い (r9・r10〜r15。m2)。
+- (c) HEAD の run で `s` が native_fault にならず fault が無かった (run 間の揺らぎ)。
+
+どれが件数を占めるかは未確定。切り分けは #4173 (LD-198) で行う。
+
 **sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、4 コアの runner、2 回ずつ)**:
 
 | run | commit | match / mismatch / unexec | fvm case (native_fault / both_fault / diff / hang) | fvm 関数数 | e2e |
@@ -87,7 +96,14 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 
 - base → HEAD の関数単位遷移 (2 回とも同一): `unexec→mismatch 1` (`0x5c1030`)・他は不変。
 - `0x5c1030`: fvm arg 0 が `diff` (`calls.kind = native_extra_call`・native が `?vmslot3` を呼ぶ)。LD-177 §12.1.2 で未切り分けと記録した件と同じ。この 1 件が mismatch として再び見える。本物の欠陥か fvm の人工物かは #4137 (LD-194) で扱う。
-- **揺らぎ**: verdict は base 同士・HEAD 同士とも 0 件。既存 pattern の outcome (fvm 以外) は base 同士 4 関数・HEAD 同士 7 関数で変わり、コード由来ではない (native の fault/hang の揺らぎ)。
-- 候補多重 73 件のうち fvm が走った 13 件の outcome: native_fault 10・both_fault 2・diff 1。equal / wasm_trap は 0。
+- **揺らぎ**: 関数単位の verdict は base 同士・HEAD 同士とも不変 (0 件)。既存 pattern の outcome (fvm 以外) は base 同士 4 関数・HEAD 同士 7 関数で変わり、コード由来ではない (native の fault/hang の揺らぎ)。
+- **fvm 側の揺らぎ**: HEAD 1 回目は fvm case 25 件 (native_fault 12 / both_fault 10 / diff 3 / hang 0)、2 回目は 25 件 (12 / 9 / 3 / 1)。2 回目で both_fault → hang が 1 件出た。verdict は両方 235 / 205 で同じ。
+- **候補多重 73 件のうち fvm が走った 13 件の outcome**: HEAD 1 回目は native_fault 10・both_fault 2・diff 1・hang 0、2 回目は native_fault 10・both_fault 1・diff 1・hang 1。全 fvm case 合計から単一候補 12 件を引いた導出値で、単一候補の outcome は base (2 / 8 / 2 / 0) と同じと仮定した。equal / wasm_trap は 0。
+- **2 回目の所要**: 未計測 (表の e2e 列は PASS のみ)。
+- **m1 (既知の限界)**: `_fault_base_arg` は、base レジスタの値が `SMALL[i]` (3〜17 の奇数) と偶然一致する場合 (カウンタ等) を区別できない。
+- **m2**: `fault.detail` に載らないレジスタ (r9・r10〜r15) が base の場合は `None` (対象外) になる。件数は未計測 (上記 38 件の理由 (b) に含まれ得る)。
 
-**未達と起票先**: 残りの候補多重 60 件 (fvm 非対象) と、equal / wasm_trap への遷移の成立は #4173 (LD-198)。`0x5c1030` の切り分けは #4137 (LD-194)。
+**未達と起票先**: 残りの候補多重 60 件 (fvm 非対象。内訳 38 件の理由は未計測) と、equal / wasm_trap への遷移の成立は #4173 (LD-198)。`0x5c1030` の切り分けは #4137 (LD-194)。
+
+**`0x5c1030` の判断 (据え置きはしない)**: 現 HEAD の結果 (mismatch 235) をそのまま出す。既定案 (fvm の `native_extra_call` 系 diff を unexec に据え置く) は、fvm 結果の種類で判定を分ける規則を新設することになる。その規則は e2e を再測定して初めて検証できるが、本 run では `work-m11` 素材が無く再測定できない。そのため実装していない。判断は PM agent に委ねる。
+- PM agent の判断待ち: `0x5c1030` の diff を mismatch として出すか / 既定案: 据え置き (実装は未着手)。
