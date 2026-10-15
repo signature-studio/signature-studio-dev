@@ -1,1 +1,1 @@
-{"ok": 871, "noproc": 1, "miss": 47, "trap": 23, "clobber": 0, "kinds": {"halt0->longjmp": 7, "memory access out of bounds": 16}, "failfast_units": {}}
+{"ok": 764, "noproc": 1, "miss": 46, "trap": 131, "clobber": 0, "kinds": {"memory access out of bounds": 122, "halt0->longjmp": 9}, "failfast_units": {}}

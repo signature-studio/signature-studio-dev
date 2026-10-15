@@ -10,6 +10,7 @@ ap.add_argument('--dir', required=True)
 ap.add_argument('--boot', default='boot_ff.json')
 ap.add_argument('--survey-ff', default='survey_ff.json')
 ap.add_argument('--survey-soft', default='survey_soft.json')
+ap.add_argument('--survey-soft-chain', default='survey_soft_chain.json')
 ap.add_argument('--probe', default='probe.json')
 ap.add_argument('--wndscan', default='wndclass.json', help='m11_wndclass_scan.py --json-out の出力 (e2e.sh が DIR に置く)')
 ap.add_argument('--expected', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results', 'reach_expected.json'))
@@ -22,6 +23,7 @@ T = lambda f: open(os.path.join(D, f)).read()
 
 base_boot, base_sv = J('baseline_boot.json'), J('baseline_survey.json')
 boot, svf, svs, probe = J(a.boot), J(a.survey_ff), J(a.survey_soft), J(a.probe)
+chain = J(a.survey_soft_chain)
 expected = set(json.load(open(a.expected))['names'])
 res = []
 def gate(name, ok, detail):
@@ -43,7 +45,7 @@ gate('B1 boot parity', boot['units_run'] == bu and boot['dllmain_done'] == base_
 first = boot['reach'][0] if boot['reach'] else None
 gate('R1 first GUI API reaches shim (boot)', first and first['kind'] == 'IMPL' and first['calls'] > 0,
      'first=%s calls=%s kind=%s; reached=%d' % (first and first['name'], first and first['calls'], first and first['kind'], len(boot['reach'])))
-names_soft = {r['name'] for r in svs['reach']}
+names_soft = {r['name'] for r in chain['reach']}   # 到達は前 unit の状態を引き継ぐ chain 実行で見る (隔離版は到達が減る)
 gate('R2 survey reach floor', expected <= names_soft, 'reached %d (expected floor %d); missing=%s' % (len(names_soft), len(expected), sorted(expected - names_soft)))
 sv, bs = svs['survey'], base_sv
 gate('S1 survey parity (soft)', all(sv.get(k, 0) == bs.get(k, 0) for k in ('ok', 'noproc', 'miss', 'trap', 'clobber')),

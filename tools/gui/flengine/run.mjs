@@ -38,7 +38,10 @@ if (survey) {   // m11_survey.mjs と同じ隔離プロトコル: unit ごとに
   const unitVa0 = [mod._m11_unit_va(0), mod._m11_unit_va(941)];
   const tableIntact = () => mod._m11_unit_va(0) === unitVa0[0] && mod._m11_unit_va(941) === unitVa0[1];
   const snap = new Uint8Array(img.length);
-  for (let i = 0; i < 942; i++) {
+  const only = process.env.GF_SURVEY_ONLY ? process.env.GF_SURVEY_ONLY.split(',').map(Number) : null;   // 単独再測用: 指定 unit だけを (boot 直後・前 unit 無しで) 実行
+  const reset = process.env.GF_SURVEY_RESET === '1' ? new Uint8Array(mod.HEAPU8) : null;   // 各 unit を boot 直後の全メモリ状態から始める (前 unit の副作用を断つ)
+  for (const i of only ?? Array.from({ length: 942 }, (_, k) => k)) {
+    if (reset) { if (mod._gui_reach_dump) mod._gui_reach_dump(); mod.HEAPU8.set(reset, 0); }   // 前 unit の到達 (wasm 内カウンタ) を errs へ退避してから戻す
     errs.push('GF-UNIT-BEGIN ' + i);
     snap.set(mod.HEAPU8.subarray(0, img.length));
     mod._m11_va_unit_begin();
