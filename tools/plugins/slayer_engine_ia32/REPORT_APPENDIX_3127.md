@@ -117,7 +117,7 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| export main の callback 非 0 経路 (`f_10009f64` → `f_1000a402`。 定数 `0x8298d8` は PE 外の host オブジェクト) | main の CRT 初期化・残りの import の経路が未突合。 0 埋めでは native が null 参照で SIGSEGV するため、 host オブジェクトのモデル化が要る | [PLG-G2-38] #3917 (本 PR で起票) |
+| export main の callback 非 0 経路 (`f_10009f64` → `f_1000a402`。 定数 `0x8298d8` は PE 外の host オブジェクト) | main の CRT 初期化・残りの import の経路が未突合。 0 埋めでは native が null 参照で SIGSEGV するため、 host オブジェクトのモデル化が要る | [PLG-G2-38] #3917 (open) |
 | 突合で未通過の KERNEL32 import 13 件: 実装 8 件 (EnterCriticalSection・InitializeCriticalSection・GetLastError・SetLastError・TlsGetValue・TlsSetValue・HeapFree・VirtualFree) と stub 5 件 (GetCurrentThreadId・GetModuleFileNameA・GetStdHandle・LoadLibraryA・WriteFile) | 既存の入口は実行で 1 回も呼ばない (計数 0 件。 静的には `HeapFree` が `f_1000e1b7` の失敗分岐から到達するが、 実行では通らない。 他 12 件はゲート経路のみ。 §8)。 実行で未検証で、 方針表の値は両側の仮定が一致することしか示していない | [PLG-G2-39] #3960 (Refs・部分達成。 残りは §8 の経路に依存) |
 | fail-fast の 24 import の実行検証 | 呼ばれた時の止まり方を実行で確認していない (448 行では 1 件も呼ばれない)。 静的にも 23 件は入口から到達しない | [PLG-G2-39] #3960 (Refs・部分達成) |
 | `0x100106a5` (SEH: `mov eax, fs:[0]`・`mov fs:[0], esp`) を通る経路 (`0x1000d791` 等) | native に fs 基底が無く fs:[0] への書込みで落ちる。 wasm は `ott_teb_blk` (0 埋め)。 本入口からは外した | [PLG-G2-37] #3905 (fs: TEB を含む 8 関数) |
