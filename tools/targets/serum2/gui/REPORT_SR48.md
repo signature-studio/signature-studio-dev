@@ -76,7 +76,7 @@ venv/bin/python $P/sr48_arg_this.py Serum2_win64.vst3 --tsv sr48.tsv
 - `git diff 43bb2fd96 HEAD -- tools/targets/serum2/gui/sr48_arg_this.py` の出力: 空 (スクリプトのコード差分 0)
 - `git status --porcelain=v1 -- tools/targets/serum2/gui/`: 0 行
 - `find tools/targets/serum2/gui -type f -size +20M -not -path '*/work/*'`: 0 件
-- 本 REPORT の行数: 上記 79 行から §4 の修正と §6 の追加で増えた行を含む (PR 本文の値は最終 commit 時点の `wc -l` に合わせる)
+- 本 REPORT の行数 (`wc -l`): 88 (この commit 時点)
 
 ## 5. 未解決 (起票先)
 
