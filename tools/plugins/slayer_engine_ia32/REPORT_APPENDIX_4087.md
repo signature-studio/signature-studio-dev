@@ -47,7 +47,7 @@
 | `0x1000b936` | rc 0・16 行 | rc 0・16 行 | 境界外なし |
 
 - `10003fe0`・`100051f0`・`1000ba05` は、wasm は成功する。 読み先のアドレスが線形メモリ内にあり trap しないためだ。 ただし、読んだ値が native と一致するかは未測定。 native は落ちるので比較できない。 この 3 本の wasm 出力は差分試験の根拠にしない。
-- `100085a0`・`100096d0`・`1000a95a` は wasm でも trap する。 `100085a0` は最初の読み (0x114a0cc8) は線形メモリ内なので、後続の `fld [eax+edx*4+0x18]` 側で範囲外に出たと推定する (未確認)。
+- `100085a0`・`100096d0`・`1000a95a` は wasm でも trap する。 wasm の trap 位置は未測定 (trap の VA を取っていない)。
 - 落ちない 6 本は、native・wasm ともに 16 行成功した。 wasm の境界外読みは無い。
 
 ## 4. 検証
@@ -57,6 +57,8 @@
 - 再現: `cd tools/plugins/slayer_engine_ia32 && python3 lift_text.py && python3 probe12_4087.py && python3 probe12_4087_lines.py`
   (`probe12_4087_lines.py` は `probe12_4087.py` の後に実行する。 `probe12_4087_lines.py` の引数に関数名を渡すと、その関数だけ行単位で実行する)。
   gdb は無いため `strace -i` で `si_addr` を取った。
+- 実測 (検証 HEAD `9bf84b4db`・load1 は開始時): `lift_text.py` real 23.04 s (user 22.01 s・sys 1.02 s・load1 0.77)。
+  `probe12_4087.py` real 12.71 s (user 10.19 s・sys 1.38 s・load1 0.85)。 結果は §3 の表と一致。
 
 ## 5. 未解決
 
