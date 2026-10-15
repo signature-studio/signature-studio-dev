@@ -19,7 +19,7 @@ import pefile
 from capstone import x86
 
 from mx6_vectorcall import analyze, bits, effects, _regidx
-from mx33_xmm03 import follow, upper_flow_dst
+from mx33_xmm03 import classify_read, follow, upper_flow_dst
 
 def base_mnem(ins):
     m = ins.mnemonic
@@ -128,9 +128,11 @@ def livein_u3d(md, r):
         for j in bits(hit):
             up = upper_flow_dst(md, insns[k], j)
             if up is None:
-                evid.append((hex(insns[k].address), insns[k].mnemonic, insns[k].op_str, j, 'A', 'merge 形でない読み'))
-                continue
-            cls, why = follow(md, insns, succ, k, {up}, False, merge=True)
+                cls, why = classify_read(md, insns[k], j)
+                if cls == 'A':
+                    cls, why = 'A', '読み幅が未分類 (%s)' % why
+            else:
+                cls, why = follow(md, insns, succ, k, {up}, False, merge=True)
             evid.append((hex(insns[k].address), insns[k].mnemonic, insns[k].op_str, j, cls, why))
     return lin, evid
 
