@@ -65,3 +65,29 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 **未解決・子 issue**:
 - 候補多重 73 件の fvm を deref 位置から救う方式: 起票先 #4173 ([LD-198]・親 #3782)。
 - `0x5c1030` の旧 fvm diff (arg 0 の `native_extra_call`・native が `?vmslot3` を呼ぶ) の切り分け: 起票先 #4137 ([LD-194]・#3782 の受入 3 の移管先)。
+
+## 12.1.3 LD-195 (#4139): 候補多重の fvm を fault base レジスタ値で一意化する (LD-177 の残り・部分達成)
+
+**結論**: 候補多重 73 関数のうち 13 関数で fvm case が走るようになったが、equal / wasm_trap への遷移は 0 件。受入 1 の「救う」は未達 (残りは #4173 (LD-198) へ)。
+
+**方式**: 's' の native fault 命令 (rip) のメモリ base レジスタを capstone で逆アセンブルし、fault detail の同レジスタ値が候補引数 `SMALL[i]` とちょうど 1 つだけ一致すれば、その引数を pointer 候補にする (`session.fvm_cand` → `_fault_base_arg`)。一致が無い・複数なら従来どおり `multi_candidate` で対象外。既存 pattern の blob・args と、1 件候補の挙動は変えない。
+
+**採らなかった案**: fault 命令の base が引数レジスタ (rcx/rdx/r8/r9) かで決める案。候補多重 73 件の probe では base が rcx 21・rdx 3・r8 1 の 25 件しか覆えず、rbx 27・rax 16・rdi 5 (引数ではない) が多数を占めたため不採用。
+
+**probe (73 関数の 's' native fault)**: base レジスタ値が候補と一致 51 件 (うち fvm 対象になった 13 件)・不一致 22 件。不一致は `rep movsq` (rdi) など base が引数由来でない形。
+
+**sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、4 コアの runner、2 回ずつ)**:
+
+| run | commit | match / mismatch / unexec | fvm case (native_fault / both_fault / diff / hang) | fvm 関数数 | e2e |
+|---|---|---|---|---|---|
+| base 1 回目 | `1f12b1b6d` (main) | 360 / 234 / 206 | 12 (2 / 8 / 2 / 0) | 12 | 192 s PASS |
+| base 2 回目 | `1f12b1b6d` | 360 / 234 / 206 | 12 | 12 | PASS |
+| HEAD 1 回目 | `d96bda5fd` | 360 / 235 / 205 | 25 (12 / 10 / 3 / 0) | 25 | 192 s PASS |
+| HEAD 2 回目 | `d96bda5fd` | 360 / 235 / 205 | 25 (12 / 9 / 3 / 1) | 25 | PASS |
+
+- base → HEAD の関数単位遷移 (2 回とも同一): `unexec→mismatch 1` (`0x5c1030`)・他は不変。
+- `0x5c1030`: fvm arg 0 が `diff` (`calls.kind = native_extra_call`・native が `?vmslot3` を呼ぶ)。LD-177 §12.1.2 で未切り分けと記録した件と同じ。この 1 件が mismatch として再び見える。本物の欠陥か fvm の人工物かは #4137 (LD-194) で扱う。
+- **揺らぎ**: verdict は base 同士・HEAD 同士とも 0 件。既存 pattern の outcome (fvm 以外) は base 同士 4 関数・HEAD 同士 7 関数で変わり、コード由来ではない (native の fault/hang の揺らぎ)。
+- 候補多重 73 件のうち fvm が走った 13 件の outcome: native_fault 10・both_fault 2・diff 1。equal / wasm_trap は 0。
+
+**未達と起票先**: 残りの候補多重 60 件 (fvm 非対象) と、equal / wasm_trap への遷移の成立は #4173 (LD-198)。`0x5c1030` の切り分けは #4137 (LD-194)。
