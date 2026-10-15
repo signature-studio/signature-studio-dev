@@ -80,7 +80,7 @@
 | 0x12ab520・0x12acb70・0x1021670・0x12ac210 の呼出し元 (関数ポインタ・VMT 経由)、0x12ab520 の VMT 推定の検証 | 受入 1 の rdx 2 件・eax・r9d | [PY-220] #3616 |
 | 0x45c290 の戻り値の意味、0x128f9e0 の edx の MEM 38・COPY 7・AMBIG 8 の基底、0x1192f80 の r8d の呼出し元 `[[rbp+0x140]+0x20]` の `[rbp+0x140]` の上流 | 受入 1 の eax・edi/esi (ecx = sgn(edi − esi))・受入 2 の残り | [PY-221] #3617 |
 | 線形走査の限界 (非境界の飛び先 101,337 件、5 件の注記の窓)、間接 jmp・jump table 経由の飛び込み | §0・§4 の範囲外。60 箇所の結論は前向き復号と飛び先の検算で確認済み。命令境界の全面的な再構成は PY-203 の受入外 | PM 判断待ち (未起票。親 #3476 は CLOSED) |
-| PY-273 の残り (§6) | 0x128f9e0 の edx の MEM 38・COPY 7・AMBIG 8 の上流 (受入の残り) | #4588 (PY-345) |
+| PY-273 の残り (§6) | 0x128f9e0 の edx の MEM 38・COPY 7・AMBIG 8 の上流 (受入の残り) | #4588 (PY-368) |
 
 ## 6. PY-273 (#3927): edx の基底 MEM 38 の 1 段上流
 
@@ -99,7 +99,9 @@
 
 ### 6.1 2 段目 (`analysis/flapi/pe_py273_second.py`)
 
-測定対象: `pe_py273_second.py` (`pe_py273_base.py` の基底分類に 2 段目を足したもの)。
+測定 commit: `50a96b5a7` (`pe_py273_second.py` を追加した最後のコード変更 commit)。以下の出力はこの commit で実行した値。`git diff 50a96b5a7 HEAD -- tools/python/analysis/flapi` は 0 行 (本節の REPORT 以外に変更なし)。
+
+測定の中身: `pe_py273_second.py` (`pe_py273_base.py` の基底分類に 2 段目を足したもの)。
 
 - MEM 38 の基底 setter ごとに、基底の直前値を `resolve` で追った (30 秒・終了 0・MEM 38 を全件処理)。
 - **rax 19** の内訳: 大域 0x15e26a0 の RIP 相対読込み 11 件、0x15e2218 の読込み 1 件、`[rbp+0x28]` 1 件、`[rbp+0x4e8]` 1 件、`[rbp+0x30]` 3 件、`[rbp+0x520]` 1 件、`[rbx+0x968]` 1 件。
