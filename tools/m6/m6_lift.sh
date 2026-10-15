@@ -4,8 +4,9 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
+source "$HERE/../shared/env.sh"
 mkdir -p work
-BIN=/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll
+BIN="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 export TMPDIR="$HERE/work/tmp"
 
 RANGES="$(cat work/ott_ranges.txt)"
