@@ -59,7 +59,7 @@ Gate・Haas は ERR が全件 (20/20)。fault の位置と、その直前の逆�
 - [x] 3 組のうち Limiter の SC 側ハーネス `native_limiter.c` を作る。Gate・Haas は未完 (§3)。子 #4044 (Gate)・#4045 (Haas)。
 - [x] Limiter: fma 0/1 で各 20 行・ERR 0 (§2)。Gate・Haas は実行していない (ERR 20/20 のまま commit しない)。
 - [x] KH 側の登録の確認 (§1)。
-- [ ] Limiter の差分の見通し (param の写像) は未確定 (§4)。
+- Limiter の差分の見通し (param の写像) は #52 へ移した (§4・§5)。本 issue の範囲は Limiter の SC 側ハーネスと smoke まで。
 - [x] REPORT_APPENDIX_FA43.md の新規と DOC_MAP 登録。親 #52 の残件表は、#52 へのコメントで更新する。
 
 ## §7. 検証の再現
