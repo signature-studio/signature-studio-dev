@@ -70,7 +70,7 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_pattern_probe.py   #
 
 ## 6. 実行時の観測 (PY-4877 / #5168)
 
-測定 commit: `29b86956f` (`tools/flelift/boot/py4877_pred_e_probe.sh` を追加した commit)。本 §6 の数値は、この commit の script を修正した後の版で再採取した (下の「再測定」)。経路: 既定 (`FLE_IPP` 未指定 = `fle_boot.mjs` の既定 mode 3・ILTools 分岐入力・`ipp_on=true`・`fle6_measure.sh` と同じ lift・plain clang)。shim 無効 (`FLE_IPP=0`) とは別。`FLE_IPP=1` (shim 有) は units 209 で止まり、述語・初期化経路に届かない (既存の測定)。
+測定 commit: `5ca4fd6d1` (script のヘッダ・probe 点・文言を直し、本 §6 の数値を再採取した commit。`29b86956f` は script を追加した commit で、その時点の script は `0xd64d40` に probe を持たず、`0x6a7b70` の制御を書いていた)。`git diff 29b86956f 5ca4fd6d1 -- tools/flelift/boot/py4877_pred_e_probe.sh` は下記の修正のみ。経路: 既定 (`FLE_IPP` 未指定 = `fle_boot.mjs` の既定 mode 3・ILTools 分岐入力・`ipp_on=true`・`fle6_measure.sh` と同じ lift・plain clang)。shim 無効 (`FLE_IPP=0`) とは別。`FLE_IPP=1` (shim 有) は units 209 で止まり、述語・初期化経路に届かない (既存の測定)。
 
 | 観測 | 結果 |
 |---|---|
