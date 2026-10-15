@@ -20,7 +20,7 @@
 
 typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; int64_t pitch_n; } Chan;
 typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
-typedef struct { char name[NAME]; int64_t color; uint8_t lock; } Pl;
+typedef struct { char name[NAME]; int64_t color; uint8_t lock; double act; int loop, trig_mode, pos_snap, trig_snap; } Pl;
 
 static Chan ch[NCH_MAX];
 static int nch;
@@ -33,6 +33,10 @@ static int playing;
 static int64_t hl_cb;
 static int n_pr, n_run;
 static int dev_port, midi_out_n;
+/* PY-227 (#3655): midiOutMsg が送った 32bit word の列。dev_assigned=0 は -7・link_assigned=0 は -6 (PE 0xd747f0) */
+#define NMIDI 256
+static uint32_t midi_words[NMIDI];
+static int midi_word_n, dev_assigned, link_assigned;
 static int sel_chan;
 static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"Resonance", 0.2}, {"Gain", 0.8}};
 static double pvals[3];
@@ -69,7 +73,7 @@ void fl_engine_reset(void) {
         mx[i].vol = 0.8; mx[i].sel = (i == 0);
         if (i) { mx[i].act[0] = 1; mx[i].lvl[0] = 1.0; }
     }
-    for (int i = 0; i < NPL; i++) { snprintf(pl[i].name, NAME, "Track %d", i + 1); pl[i].color = 0x485156; pl[i].lock = 0; }
+    for (int i = 0; i < NPL; i++) { memset(&pl[i], 0, sizeof pl[i]); snprintf(pl[i].name, NAME, "Track %d", i + 1); pl[i].color = 0x485156; }
     memset(win, 0, sizeof win);
     win[0] = win[2] = win[4] = 1;
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
@@ -83,10 +87,16 @@ void fl_engine_reset(void) {
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0;
+    midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
 int fl_engine_channel_count(void) { return nch; }
 int fl_engine_midi_out_count(void) { return midi_out_n; }
+/* 検査用の読出し口: midiOutMsg が送った word の件数と i 番目 (範囲外は -1)。tests/device_diff.mjs が mock と照合 */
+int fl_engine_midi_word_count(void) { return midi_word_n; }
+int64_t fl_engine_midi_word(int i) { return i < 0 || i >= midi_word_n ? -1 : (int64_t)midi_words[i]; }
+/* 検査用の設定口: device 割当 (0 で -7) と送出先 (0 で -6)。既定は両方あり */
+void fl_engine_set_device_link(int dev, int link) { dev_assigned = dev != 0; link_assigned = link != 0; }
 /* 検査用の読出し口: 最後に作用先へ渡した時間引数 (頭打ち後)。tests/ui_display_diff.mjs が mock と照合 */
 int64_t fl_engine_display_time(void) { return disp_time; }
 /* 検査用の読出し口: チャンネル c のステップ p (範囲外は -1)。tests/midi_path_diff.mjs が副作用を比べる */
@@ -153,7 +163,8 @@ FL_H(channels, selectOneChannel) {
     return fl_ret_none(c);
 }
 FL_H(channels, muteChannel) { CH(0); int64_t v = A_INT(1, -1); k->mute = TOG(k->mute, v); return fl_ret_none(c); }
-FL_H(channels, soloChannel) { CH(0); k->solo = !k->solo; return fl_ret_none(c); }
+/* PE 0xd59b40 (job 実行) → 0xd843d0: value == -1 は反転、他は現在値 (0/1) の下位 1 B と一致すれば不変・不一致なら反転。useGlobalIndex は未モデル (PE は lookup container を切替える) */
+FL_H(channels, soloChannel) { CH(0); int64_t v = A_INT(1, -1); (void)A_INT(2, 0); if (v == -1 || (uint8_t)v != k->solo) k->solo = !k->solo; return fl_ret_none(c); }
 FL_H(channels, getChannelVolume) { CH(0); int64_t m = A_INT(1, 0); return fl_ret_d(c, m ? db(k->vol, 0.78125) : k->vol); }
 FL_H(channels, setChannelVolume) { CH(0); k->vol = A_DBL(1, 0); return fl_ret_none(c); }
 FL_H(channels, getChannelPan) { CH(0); return fl_ret_d(c, k->pan); }
@@ -378,7 +389,19 @@ FL_H(mixer, trackCount) { return fl_ret_i(c, NMIX); }
 FL_H(mixer, getTrackCount) { return fl_ret_i(c, NMIX - 2); }
 /* PE 0xd63870: ecx=3 を変換スロット 0x15e4280 (PyLong_FromLong・REPORT_PY152 §42) に渡すのみ (REPORT_PY205) */
 FL_H(mixer, getEqBandCount) { return fl_ret_i(c, 3); }
-FL_H(mixer, getTrackName) { MX(0); return fl_ret_s(c, t->name); }
+/* PE 0x12be470 (maxLen > 0 のみ): 長さが maxLen を超えるとき末尾から、mask 外の文字 (母音 AEIOU・記号・空白。mask = 0-9 と大文字子音) を削除し、最後に先頭 maxLen 文字へ切る。
+ * PE の文字列は UTF-16。ここは ASCII 前提 (非 ASCII 名は未確認) */
+static void track_name_fit(char *s, int64_t m) {
+    if (m <= 0 || (int64_t)strlen(s) <= m) return;
+    for (int64_t i = (int64_t)strlen(s); i >= 1; i--) {
+        if (!strchr("0123456789BCDFGHJKLMNPQRSTVWXYZ", toupper((unsigned char)s[i - 1]))) {
+            memmove(s + i - 1, s + i, strlen(s + i) + 1);
+            if ((int64_t)strlen(s) <= m) break;
+        }
+    }
+    if ((int64_t)strlen(s) > m) s[m] = 0;
+}
+FL_H(mixer, getTrackName) { MX(0); int64_t m = A_INT(1, -1); char b[NAME]; snprintf(b, sizeof b, "%s", t->name); track_name_fit(b, m); return fl_ret_s(c, b); }
 FL_H(mixer, setTrackName) { MX(0); const char *s = A_STR(1); set_name(t->name, s); return fl_ret_none(c); }
 FL_H(mixer, getTrackVolume) { MX(0); int64_t m = A_INT(1, 0); return fl_ret_d(c, m ? db(t->vol, 0.8) : t->vol); }
 FL_H(mixer, setTrackVolume) { MX(0); t->vol = A_DBL(1, 0); return fl_ret_none(c); }
@@ -435,6 +458,17 @@ FL_H(playlist, getTrackName) {
 FL_H(playlist, setTrackName) { PL(0); const char *s = A_STR(1); set_name(p->name, s); return fl_ret_none(c); }
 /* FL の格納式 (setTrackColor 0xd55f30 → 0x12e5d80): R/B を入替えて 0xffffff で切る。getTrackColor の逆変換 */
 FL_H(playlist, setTrackColor) { PL(0); uint32_t u = (uint32_t)A_INT(1, 0); p->color = (int64_t)((((u & 0xff) << 16) | (u & 0xff00) | ((u >> 16) & 0xff)) & 0xffffff); return fl_ret_none(c); }
+/* PY-62 (#2027): REPORT_PY61 §2 で型・範囲 code (index 1..500 外は -4) を確定した 8 関数。
+ * 既定値 (lock 0・act 0・各 live mode 0) は実機未測定の仮置き。getTrackColor は setTrackColor (PY-113) の逆変換 */
+FL_H(playlist, getTrackColor) { PL(0); uint32_t u = (uint32_t)p->color; return fl_ret_i(c, (int64_t)(((u & 0xff) << 16) | (u & 0xff00) | ((u >> 16) & 0xff) | 0xff000000u)); }
+FL_H(playlist, isTrackMuteLock) { PL(0); return fl_ret_b(c, p->lock != 0); }
+FL_H(playlist, getTrackActivityLevelVis) { PL(0); return fl_ret_d(c, p->act); }
+FL_H(playlist, getLiveLoopMode) { PL(0); return fl_ret_i(c, p->loop); }
+FL_H(playlist, getLiveTriggerMode) { PL(0); return fl_ret_i(c, p->trig_mode); }
+FL_H(playlist, getLivePosSnap) { PL(0); return fl_ret_i(c, p->pos_snap); }
+FL_H(playlist, getLiveTrigSnap) { PL(0); return fl_ret_i(c, p->trig_snap); }
+/* 表 (gen/fl_table.c・main #2927 で kwsig 'i|i' に合わせ value 引数が入った)。REPORT_PY61 §3 確定: value -1 (省略を含む) は反転、それ以外は下位 1 byte を lock に書く。
+ * 準備判定 (-2) は未モデル (常に準備済み) */
 /* PY-102 (#2883): binary 0xd56510 に従う。index 1..500 の外は RANGE (-4)、value -1 は反転、他は下位 1 byte を書く。準備判定 (call [rax+0x98]) は未モデル (常に準備済み) */
 FL_H(playlist, muteTrackLock) { PL(0); int64_t v = A_INT(1, -1); p->lock = v == -1 ? !p->lock : (uint8_t)v; return fl_ret_none(c); }
 #define WN(a) int64_t _w = A_INT((a), 0); if (_w < 0 || _w >= NWIN) RANGE()
@@ -543,7 +577,17 @@ FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
 FL_H(device, isAssigned) { return fl_ret_b(c, 1); }
 FL_H(device, setHasMeters) { return fl_ret_none(c); }
 FL_H(device, forwardMIDICC) { (void)A_INT(0, 0); (void)A_INT(1, 1); midi_out_n++; return fl_ret_none(c); }
-FL_H(device, midiOutMsg) { (void)A_INT(0, 0); (void)A_INT(1, -1); (void)A_INT(2, -1); (void)A_INT(3, -1); midi_out_n++; return fl_ret_none(c); }
+/* PE 0xd747f0 (書式 i|iiii)。device 無し → -7、送出先無し → -6 (channel によらず先に判定)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
+FL_H(device, midiOutMsg) {
+    int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);
+    if (!dev_assigned) return fl_err(c, FL_E_DEVICE, "Device not assigned");
+    if (!link_assigned) return fl_err(c, FL_E_LINKED_DEVICE, "Linked device not assigned");
+    uint32_t w = (uint32_t)msg;
+    if (ch >= 0) w = ((uint32_t)(ch & 0xf) | w) + ((uint32_t)d1 << 8) + ((uint32_t)d2 << 16) + ((uint32_t)a4 << 24);
+    midi_out_n++;
+    if (midi_word_n < NMIDI) midi_words[midi_word_n++] = w;
+    return fl_ret_none(c);
+}
 
 /* ---- plugins (7) ---- (引数順: paramIndex 系は先頭、index/slotIndex/useGlobalIndex が後続) */
 FL_H(plugins, isValid) {
