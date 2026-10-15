@@ -62,3 +62,109 @@ cd ../work && mkdir -p ghproj
 - 関数本体は Ghidra の自動解析による境界。関数の一部が未検出の場合、本体が短く出る可能性がある (本 run では全 8 件が関数先頭と一致し、境界の欠落は検出されなかった)。
 - 副次 vtable (COL 0xaa9750・0xaa9770) の継承元の対応は `vtable_measure.py` と同じ未検証事項を引き継ぐ (`gui/REPORT_EFFORT.md` §10-1 の限界参照)。
 - Ghidra の関数名は自動命名 (`FUN_<addr>`)。`XferOnOffButton` のメソッド名は付けていない。
+
+## 4. [SR-83 #5005] 8 関数の逆解析と呼び出し閉包の実測
+
+- 日付: 2026-10-15 / 親: #4267 (SR-64) / 前段: §2 (境界 8 件・507 B)
+- 測定 commit: `ddbadcb26` (`gui/ghidra_xferonoff_closure.java` を追加した commit)。以後このディレクトリのコードは未変更。
+- 入力: §1 と同じ (sha256 `501e7bb3…4e5283` / 19,236,864 B)。Ghidra 12.1.4 を `$HOME/ghidra` に展開 (`[GHIDRA]` の代替)、JDK 21。
+- 出力: `out/sr83_xferonoff_closure.tsv` (閉包 87 件、commit 対象)。8 関数の decompile は `work/decomp_sr83/*.c` (gitignore 対象・再配布しない)。decompile の C 本文は commit しない (Xfer の EULA は逆コンパイルを禁じる。`docs/LEGAL.md` の Xfer 条項 (c) 参照。REPORT には要点だけを書く)。
+
+### 4.1 再現手順・実測 (n=1、runner 上、逐次)
+
+```sh
+cd tools/targets/serum2/work                     # gitignore 対象
+7z x -y Install_Xfer_Serum2_2.1.5.exe '$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' -oexe
+cp -f 'exe/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' Serum2_win64.vst3
+python3 ../gui/vtable_fn_addrs.py Serum2_win64.vst3 XferOnOffButton > xferonoff_fns.tsv
+export JAVA_HOME=<JDK 21> PATH=$JAVA_HOME/bin:$PATH FN_ADDRS_TSV=$PWD/xferonoff_fns.tsv OUT_DIR=$PWD/closure
+analyzeHeadless ghproj xo -import Serum2_win64.vst3 -overwrite -scriptPath ../gui -postScript ghidra_fn_size.java
+analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scriptPath ../gui -postScript ghidra_xferonoff_closure.java
+```
+
+- 実測時間: import + 自動解析 (`ghidra_fn_size.java`) **18 分 36 秒** (real)。閉包 (`-process`、既存 project を開く) **7.4 秒** (real)。測定時の負荷は 4 vCPU の runner で他ジョブなし (実行後の load average 1 分値 0.35)。
+- 注意: `7z x ... '-i!*Serum2.vst3*'` のワイルドカードは 0 件になった。完全パス指定で取り出せた。
+- 境界の再確認: 8 件すべて `start_eq=true`・`dup_entry=false`・未対応 0・合計 **507 B** (§2 と一致)。
+
+### 4.2 受入 1: 8 関数の役割 (decompile からの推定)
+
+名前は付けていない (`FUN_` のまま)。役割は `work/decomp_sr83/` の decompile と vtable 位置から推定した。**確定ではない**。
+
+| vtable RVA | entry | 名前 | B | 推定役割 | 根拠 (decompile の要点) |
+|---|---|---|---|---|---|
+| 0x18f290 | 0x18018f290 | `FUN_18018f290` | 70 | `Release` 相当 | 副次基底の this 補正 (`[this-4]` のオフセット) を使い、参照カウントを減算。0 になると vt[0x10] を呼び、続けて vt[0] を引数 1 で呼ぶ (deleting 経路) |
+| 0x18f2e0 | 0x18018f2e0 | `FUN_18018f2e0` | 12 | `AddRef` 相当 | 同じ this 補正で参照カウントを +1。戻り値なし |
+| 0x4b5670 | 0x1804b5670 | `thunk_FUN_180117c10` | 5 | thunk (転送先 `FUN_180117c10`・348 B) | 引数 `(this, double* v4, char notify)`。`this[3]` の内部オブジェクトの +0x58/+0x60/+0x68/+0x70 (double 4 個) と比較し、同値なら return。異なる場合は値を更新し、`notify == 0` のとき通知 (間接 call 4 箇所) |
+| 0x4b6690 | 0x1804b6690 | `thunk_FUN_180142720` | 5 | thunk (転送先 `FUN_180142720`・201 B) | 転送先の役割は §4.3 の閉包表で測定。本体の読解は未実施 |
+| 0x4b66a0 | 0x1804b66a0 | `FUN_1804b66a0` | 181 | `setValue(float)` 相当 | 引数 `(this, float v)`。vt[0x220]・vt[0x210] で範囲端を取り v を clamp。`FUN_180118150` で設定。vt[0x1f0] の前後で値が変わったら vt[0x48](this,1) で変更通知 (間接 call 4 箇所) |
+| 0x622780 | 0x180622780 | `FUN_180622780` | 43 | scalar deleting dtor 相当 | `FUN_180118070` (基底 dtor 相当) を呼ぶ。引数フラグ ≠0 のとき `thunk_FUN_1809fe350(this, 0x78)` で delete (0x78 = 120 B) |
+| 0x6227b0 | 0x1806227b0 | `FUN_1806227b0` | 141 | 値の通知 (推定) | `FUN_1801382a0()` が非 null のとき vt[0x200] で値を取得し、閾値 `DAT_180a21fe4` との比較で加算値を決める。`FUN_18010cf70` の結果と vt[0x18](obj, arg, …, 1.0f) を呼ぶ。最後に vt[0x48](this,0) |
+| 0x622840 | 0x180622840 | `FUN_180622840` | 50 | scalar deleting dtor 相当 (副次基底) | `this-0x20` に補正してから `FUN_180118070` を呼び、フラグ ≠0 のとき 0x78 B を delete |
+
+- 戻り値: `FUN_180622780`・`FUN_180622840` は `this` (補正後) を返す。ほかは void。
+- 参照するメンバ: 上の表の `this[3]`・+0x58..+0x70 (double)・vtable slot (0x18・0x48・0x200・0x210・0x220 など)。
+
+### 4.3 受入 2: thunk 転送先と閉包の実測
+
+- 閉包: 呼び出し・thunk 転送で到達する **87 関数** (entry 単位で重複なし)。
+  - 内訳: 外部 import 16 件 (本体 0 B) / thunk 8 件 (45 B) / 通常関数 63 件 (10,149 B)。
+  - 通常関数 63 件のうち、名前で分類した「アプリ由来」は **43 件・7,873 B**、CRT・ランタイム (`_malloc_base`・`__acrt_*`・`_guard_*` など) は **20 件・2,276 B**。
+  - 閉包の本体合計 **10,194 B** (thunk・外部 import を含む)。
+- 転送先: `thunk_FUN_180117c10` → `FUN_180117c10` (348 B・間接 call 4)、`thunk_FUN_180142720` → `FUN_180142720` (201 B・間接 call 2)。
+- **下限である理由**: 閉包は静的な直接 call と thunk 転送だけを辿った。間接 call (`call [reg+...]`) は **51 箇所** あり、その先は含まない。実際の閉包はこれより大きい。上限は測っていない。
+- CAP (5000 件) には達していない (`cap_hit=false`)。
+
+### 4.4 受入 3: canvas 側に対応物が無いもの
+
+- 確認方法: `gui/canvas/` の全クラス名 (`canvas_*.h`) を見た。`CControl`・`CButton`・`XferOnOff` 相当の型は無い。`canvas_*` のクラスは IPlatform* の 8 種 (Bitmap・Font・Frame・Gradient・GraphicsDevice・GraphicsPath・PlatformFactory・String) だけ。
+- 判定は名前と型の grep による。機能の同等性は見ていない。
+- 結論: 8 関数 (§4.2) はすべて対応物なし。閉包のうち、アプリ由来 43 件もすべて対応物なし (下表)。CRT・ランタイム 20 件と外部 import 16 件は、canvas 側に移植しない前提 (実装時に別途判断)。
+- 実装は子 issue で行う (本 issue の範囲外)。
+
+| entry | 名前 | B | 間接 call |
+|---|---|---|---|
+| 0x18018f290 | FUN_18018f290 | 70 | 1 |
+| 0x18018f2e0 | FUN_18018f2e0 | 12 | 0 |
+| 0x1804b66a0 | FUN_1804b66a0 | 181 | 4 |
+| 0x180622780 | FUN_180622780 | 43 | 0 |
+| 0x1806227b0 | FUN_1806227b0 | 141 | 3 |
+| 0x180622840 | FUN_180622840 | 50 | 0 |
+| 0x180117c10 | FUN_180117c10 | 348 | 4 |
+| 0x180142720 | FUN_180142720 | 201 | 2 |
+| 0x180118150 | FUN_180118150 | 74 | 2 |
+| 0x180118070 | FUN_180118070 | 224 | 1 |
+| 0x1801085b0 | FUN_1801085b0 | 157 | 4 |
+| 0x18010cf70 | FUN_18010cf70 | 9 | 0 |
+| 0x1801382a0 | FUN_1801382a0 | 399 | 0 |
+| 0x1801a5760 | FUN_1801a5760 | 602 | 0 |
+| 0x180110b20 | FUN_180110b20 | 146 | 0 |
+| 0x1809fe350 | FUN_1809fe350 | 60 | 2 |
+| 0x180a188e0 | FUN_180a188e0 | 1353 | 0 |
+| 0x180018230 | FUN_180018230 | 389 | 0 |
+| 0x18008d820 | FUN_18008d820 | 394 | 0 |
+| 0x1801ab5f0 | FUN_1801ab5f0 | 219 | 0 |
+| 0x1801ab6e0 | FUN_1801ab6e0 | 194 | 0 |
+| 0x1809df55c | FUN_1809df55c | 35 | 0 |
+| 0x1809df5cc | FUN_1809df5cc | 207 | 0 |
+| 0x1809e164c | FUN_1809e164c | 365 | 6 |
+| 0x180014e20 | FUN_180014e20 | 54 | 0 |
+| 0x1809a4b80 | FUN_1809a4b80 | 59 | 1 |
+| 0x1809fe648 | FUN_1809fe648 | 144 | 2 |
+| 0x1809adea0 | FUN_1809adea0 | 30 | 0 |
+| 0x180a18f80 | FUN_180a18f80 | 725 | 0 |
+| 0x1809ada94 | FUN_1809ada94 | 11 | 0 |
+| 0x1809ca77c | FUN_1809ca77c | 167 | 3 |
+| 0x1809dea00 | FUN_1809dea00 | 51 | 0 |
+| 0x1809a7798 | FUN_1809a7798 | 31 | 0 |
+| 0x1809ad7c8 | FUN_1809ad7c8 | 31 | 0 |
+| 0x1809fe9d4 | FUN_1809fe9d4 | 181 | 3 |
+| 0x180a0080c | FUN_180a0080c | 10 | 0 |
+| 0x1809c9680 | FUN_1809c9680 | 211 | 2 |
+| 0x1809dea50 | FUN_1809dea50 | 55 | 0 |
+| 0x1809a7774 | FUN_1809a7774 | 33 | 0 |
+| 0x1809a5a08 | FUN_1809a5a08 | 33 | 0 |
+| 0x1809c97c4 | FUN_1809c97c4 | 116 | 3 |
+| 0x180a123c0 | FUN_180a123c0 | 8 | 0 |
+| 0x180a13668 | FUN_180a13668 | 50 | 0 |
+
+- 注: `FUN_180118150`・`FUN_180118070`・`FUN_1801085b0`・`FUN_1801382a0` など、§4.2 の役割で参照した関数の中身は本 REPORT では読解していない。名前の付与は別 issue。
