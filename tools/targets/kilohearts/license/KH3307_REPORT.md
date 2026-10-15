@@ -1,7 +1,7 @@
 # KH-52 (#3307) — gen_simd の SSE 整数語彙 6 件の追加と module F 2 関数の lift 試行
 
 - 親: #709 (KH-14)。前提 #3306 (KH-51, PR #3347 MERGED) と #709 の ymm 語彙 (PR #3315 MERGED) は main に入っている。
-- 素材: `fl-win64` (`HeartCore.core_64` の sha256 一致を確認)・`toolchain-retdec`・`toolchain-emsdk`・`plugins-kilohearts` が `$HOME/artifacts` に実在。
+- 素材: `fl-win64` (`HeartCore.core_64` の sha256 一致を確認)・`toolchain-retdec`・`toolchain-emsdk`・`plugins-kilohearts` が素材置き場 (`ARTIFACTS_DIR`) に実在。
 - 測定 commit: `31dafd5c3` (コードを変えた最後の commit)。
 
 ## 1. 結論
