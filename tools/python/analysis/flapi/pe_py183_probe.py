@@ -51,6 +51,11 @@ CALLS = [
     (0x1051AE0, "0x414da0"),
     (0x1051B25, "0x414da0"),
     (0x1051B3E, "0x11f1a20"),
+    (0x105183D, "0xf82a10"),
+    (0xF82A58, "0xf829c0"),
+    (0xF82AA4, "0xf829c0"),
+    (0xF82B3E, "0xf829c0"),
+    (0xF82B62, "0xf829c0"),
     (0x1051965, "0x11f1a20"),
     (0x11F1A33, "0x4232e0"),
     (0x11F1A42, "0x4133f0"),
@@ -109,6 +114,21 @@ def check(name, ok, detail=""):
         FAILS.append(name)
 
 
+def mov_stores(lo, hi):
+    out = []
+    va = lo
+    while va < hi:
+        ins = ins_at(va)
+        if ins is None:
+            va += 1
+            continue
+        dst = ins.op_str.split(",")[0]
+        if ins.mnemonic == "mov" and "ptr [" in dst and "[rbp" not in dst and "[rsp" not in dst:
+            out.append(hex(va))
+        va += ins.size
+    return out
+
+
 def main():
     for va, want in LITERALS:
         got = u16z(va)
@@ -119,6 +139,20 @@ def main():
         check(f"call {hex(va)} -> {target}", ok, f"({ins.mnemonic} {ins.op_str})" if ins else "")
     check("0x1051720 bb 初期値 0xff", ins_at(0x105180D).op_str == "byte ptr [rbp + 0xbb], 0xff")
     check("0xff 経路の入口 (0x1051849 jne 0x1051909)", ins_at(0x1051849).op_str == "0x1051909")
+    check("0x105182a lea r9, [rbp+0xac] (&ac を f82a10 へ渡す)",
+          ins_at(0x105182A).mnemonic == "lea" and ins_at(0x105182A).op_str == "r9, [rbp + 0xac]")
+    check("f82a10 が r9 (&ac) を [rbp+0xa8] に保存 (0xf82a24)",
+          ins_at(0xF82A24).op_str == "qword ptr [rbp + 0xa8], r9")
+    check("f82a10 の r8b≠0 不一致 return (0xf82a49 jne 0xf82b69)", ins_at(0xF82A49).op_str == "0xf82b69")
+    check("f829c0 の bb 書込み (0xf829cb byte [rax], dl)", ins_at(0xF829CB).op_str == "byte ptr [rax], dl")
+    check("f829c0 の ac 書込み (0xf829e0 ac←0 / 0xf82a01 ac←(v>>8&0xff)-1)",
+          ins_at(0xF829E0).op_str == "dword ptr [rax], 0" and ins_at(0xF82A01).op_str == "dword ptr [rax], r8d")
+    check("f82a10 本体の ac 書込み (0xf82acd ac←0) と bb 書込み (0xf82ada bb←0)",
+          ins_at(0xF82ACD).op_str == "dword ptr [rax], 0" and ins_at(0xF82ADA).op_str == "byte ptr [rax], 0")
+    check("0x104f580..0x1050600 の mov store (rbp/rsp 以外) は 0x1050540 の 1 件 (0x16bb13c)",
+          mov_stores(0x104F580, 0x1050600) == ["0x1050540"], str(mov_stores(0x104F580, 0x1050600)))
+    check("10519c6 枝 0x10519c6..0x1051b74 の mov store は rbp/rsp 相対のみ",
+          mov_stores(0x10519C6, 0x1051B74) == [], str(mov_stores(0x10519C6, 0x1051B74)))
     stores = []
     va = 0x1051909
     while va < 0x105193C:
@@ -138,7 +172,7 @@ def main():
         if ins.mnemonic == "mov" and ins.op_str.startswith("dword ptr [rbp + 0xac], "):
             ac_writes.append(hex(va))
         va += ins.size
-    check("ac への書込みは bb==0 経路の 0x1051857 と 0x10518b2 の 2 箇所のみ",
+    check("0x1051720 本体内の ac への直接書込みは bb==0 経路の 0x1051857 と 0x10518b2 の 2 箇所のみ",
           ac_writes == ["0x1051857", "0x10518b2"], str(ac_writes))
     check("0x105194b je 0x10519c6 (sign == ac で 10519c6 枝)",
           ins_at(0x105194B).op_str == "0x10519c6")
