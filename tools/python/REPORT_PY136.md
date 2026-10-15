@@ -59,12 +59,12 @@
 ## 検証
 
 測定 commit: `657e37a76` (コードを変えた最後の commit。PR head `99ef72c10` に main `45182bf1b` を取り込んだ merge。競合は `tools/python/provider/fl_engine.c`・`tools/python/tests/provider_check.mjs` の 2 件)。以下の表はこの commit のクリーンな作業ツリー (`git status` 空) で、`provider/build.sh` を実行してから測定した。測定の後に足す commit は md (本 REPORT) のみ。
-前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、247 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.3 秒)。素材 `fl-win64` は `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (5.7 秒) して `FL_WIN64_DIR` に渡した。emsdk は `/opt/emsdk` (`EMSDK_ENV` 既定) を使った。
+前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、247 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.3 秒)。素材 `fl-win64` は `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (5.7 秒) して `FL_WIN64_DIR` に渡した。emsdk は [EMSDK] (`EMSDK_ENV` 既定) を使った。
 環境: runner 4 core。load average は各コマンドの直前の `/proc/loadavg` (1 分値): 0.13〜0.23。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` (`EMSDK_ENV` 既定 = `/opt/emsdk`) | rc 0・`fl_table.c: 435 関数, ハンドラ 183` | 1.1 秒 |
+| `bash provider/build.sh` (`EMSDK_ENV` 既定 = [EMSDK]) | rc 0・`fl_table.c: 435 関数, ハンドラ 183` | 1.1 秒 |
 | `node tests/provider_check.mjs` | rc 0・`{"functions":435,"implemented":183,"unimplemented":252,"mcp_static":60,"PASS":true}` | 0.37 秒 |
 | `node tests/screen_menu_diff.mjs` | calls 42、diffs 0、PASS | 0.05 秒 |
 | `node tests/screen_diff.mjs` (回帰) | calls 32、diffs 0、PASS | 0.05 秒 |
