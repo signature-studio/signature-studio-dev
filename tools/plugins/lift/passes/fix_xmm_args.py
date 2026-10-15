@@ -158,9 +158,14 @@ def main():
     ap.add_argument('--pe', required=True)
     ap.add_argument('--report')
     ap.add_argument('--skip-funcs', default='')
+    ap.add_argument('--only-funcs', default='')
     a = ap.parse_args()
     skip = set(x for x in a.skip_funcs.split(',') if x)
     text = open(a.src, errors='replace').read()
+    only = set(x for x in a.only_funcs.split(',') if x)
+    noconv = NO_CONV - only
+    if only:
+        skip |= set(re.findall(r'^define [^@\n]*@(function_[0-9a-f]+)\(', text, re.M)) - only
     base, F, tva, td = K.load_pe(a.pe)
     pe = pefile.PE(a.pe, fast_load=True)
     base = pe.OPTIONAL_HEADER.ImageBase
@@ -218,7 +223,7 @@ def main():
                         rep['skipped'][fname] = 'width_unknown(%s)' % ','.join(unk)
                     elif noncall.get(fname):
                         rep['skipped'][fname] = 'non_call_ref(%d)' % noncall[fname]
-                    elif any(c != len(plist) for c in arity.get(fname, ())) and (fname in NO_CONV or not conv_ok(xs, len(plist), argsites.get(fname, []))):
+                    elif any(c != len(plist) for c in arity.get(fname, ())) and (fname in noconv or not conv_ok(xs, len(plist), argsites.get(fname, []))):
                         rep['skipped'][fname] = 'call_arity_mismatch(sites=%s, params=%d, cause=%s)' % (
                             ','.join(str(c) for c in sorted(arity[fname])), len(plist),
                             arity_cause(len(plist), argsites.get(fname, [])))
@@ -258,7 +263,7 @@ def main():
                             rep['fixed'][fname] = {'params': full, 'callers': callers.get(fname, 0)}
                             added[fname] = full[len(plist):]
                             nparams[fname] = len(plist)
-                            cvt[fname] = fname not in NO_CONV and conv_ok(xs, len(plist), argsites.get(fname, []))
+                            cvt[fname] = fname not in noconv and conv_ok(xs, len(plist), argsites.get(fname, []))
                             snap = None
                         if snap is not None:     # 適用しなかった関数: k80_argfix が数えた件数を戻す
                             for k, v in snap.items():

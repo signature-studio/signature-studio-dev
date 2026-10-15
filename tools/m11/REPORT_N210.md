@@ -74,3 +74,12 @@ python3 fxa_nc.py work/boot_final.ll only40c_full.ll --pe <PE> --report nc_repor
 - 本 run で再測定したのは入力生成 (only40c 入力の作成 49.5 秒・rc 0) と PE 展開 (2.7 秒) だけ。survey の unit 数値 (上の表) は再測定していない。
 - 鮮度の証跡: `git diff 4bb58c852 HEAD -- tools/m11` は 8 file (`m11_build.sh`・`m11_post.py`・`ldfix/spill_classify_1161.py` ほか) に差分がある。`--slots` 無し (既定) の経路は、素材 `work-m11` の `boot_final.ll` を入力に、4bb58c852 版と HEAD 版の `m11_post.py` を実行して出力を比べた。出力 IR と report JSON は `cmp` で一致 (rc 0・両方)。`m11_build.sh` の `SLOT_ARG` は `M11_SLOT_ROWS` 空のとき空文字になり、`m11_post.py` の `--slots` 分岐は入らない。`ldfix/spill_classify_1161.py` の追加 (candidate_verdicts_4676 の読込) は、`tools/m11/m11_*.sh` からの参照が無い (`grep` で確認。参照元は `ldfix/audit_lsf_ssa_e2e.sh` のみ) ため、build・survey の経路に入らない。
 - 生成物 (`work/`・`emsdk/`・`retdec/`) は gitignore または未追跡で commit しない。
+
+## 生成器の再現 (#4809 / M11-N223)
+
+作成時の記録 (上の表) は本 run では再測定していない。生成器を素材 IR から動くように直した。
+
+- `m11_sigfix40c_ab.py`: 入力は素材の `boot_final.ll` と PE。only40c は `fix_xmm_args.py --only-funcs function_40c650` で作る (既定の `NO_CONV` は `--only-funcs` で明示された関数だけ外す)。`BODY_OLD` の一意性は `function_40c650` の定義の中だけで判定する (素材 IR では同じ本体が 4 関数にある)。
+- 規則テスト: `tools/m11/test_sigfix40c_ab.py` (callee 定義が 1 件でない・本体が 1 件でないとき止まる)。
+- 実測 (測定 commit は本 PR の生成器コミット): `python3 m11_sigfix40c_ab.py work/boot_final.ll work/sigfix40c --pe <PE>` は rc 0 (4 variant 生成)。
+- 未確定: survey の数値は本 run で安定しなかった。同じ既定版 (`M11_XMM_ARGS=0`) の build で、再生成した `boot_final.ll` では 873/1/47/21/0、続く再 build では 136/1/796/8/1 と出た。原因は未特定 (IR 再生成の揺れか、build の stamp 状態か)。このため ctlB・ctlC・sigzero の survey 差は未確定。
