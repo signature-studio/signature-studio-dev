@@ -322,6 +322,8 @@ if (TOLERANT) {
     for (const [nm, c] of s1) { const d = c - (s0.get(nm) || 0); if (d > 0) called.push([nm, d]); }
     cfi = {
         va: '0x' + CFI_VA.toString(16),
+        // #4464: 0x13752f0 が rcx に読む大域 0x1104e30 の値 (CFI 開始時)。PE 上は 0x1104ef8。
+        g1104e30: '0x' + ((BigInt(m.HEAPU32[0x1104e30 / 4 + 1]) << 32n) | BigInt(m.HEAPU32[0x1104e30 / 4])).toString(16),
         rc: cerr ? null : '0x' + BigInt.asUintN(64, BigInt(cr)).toString(16),
         threw: cerr ? classify(cerr) : null,
         // trap 地点の手掛かり: wasm の例外スタック (関数 index → VA は fle_lifted の対応表で引く)
@@ -425,7 +427,7 @@ console.log('FLEBOOT_RESULT ' + JSON.stringify({
     ipp_mode: IPP_MODE, ipp_on: IPP_ON, ipp_ptr_15F34A0: boot.ipp_ptr_15F34A0,
     ipp_total: boot.ipp_total, ipp_called: boot.ipp_called, ipp_stop: boot.ipp_stop, diag_nullfill: boot.diag_nullfill,
     tolerant: TOLERANT ? { mode: TOL_MODE, started: tol.started, hook_ran: tol.hook_ran, kinds: tol.kinds, skipped_n: tol.skipped.length, restored: tol.restored, miss_units: tol.miss_units.length } : null,
-    cfi: cfi && { rc: cfi.rc, threw: cfi.threw && cfi.threw.cls, longjmp: cfi.longjmp, exit: cfi.exit },
+    cfi: cfi && { rc: cfi.rc, threw: cfi.threw && cfi.threw.cls, longjmp: cfi.longjmp, exit: cfi.exit, g1104e30: cfi.g1104e30 },
 }));
 console.log('FLEBOOT_UNDO ' + JSON.stringify(undoProbe));
 // PY-106 (#2909): 束縛関数 0xc395a0 を boot 停止後に直接実行し、resolver が引いた名前と slot の値を読む (FLE_PY106_BIND=1 のときだけ。
