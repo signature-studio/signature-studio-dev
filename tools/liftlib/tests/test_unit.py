@@ -912,6 +912,34 @@ def t27():
     print("T27 ok (ott_outhash 出力読取: 混在行の最後の JSON を読む・JSON 無しは rc と stderr を例外に残す)")
 
 
+def t27b():
+    """[LIFTLIB-23 #3145] 参照 module の .wasm 欠落の再現 (前回 run の outhash 失敗の原因)。node は stdout 空・rc=1 で
+    終わり、stderr に ENOENT (`.wasm`) が残る。outhash_json はこの stderr を例外に残すこと。"""
+    import shutil
+    import subprocess
+    import tempfile
+    from liftlib.recipes import ott as OTT
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    src = os.path.join(root, "tools", "m10", "work", "ott_m10.cjs")
+    if not os.path.exists(src):
+        print("T28 skip (tools/m10/work/ott_m10.cjs 無し・素材 work-m6-ott)")
+        return
+    d = tempfile.mkdtemp()
+    try:
+        shutil.copy(src, d)
+        mjs = os.path.join(root, "tools", "liftlib", "liftlib", "recipes", "ott", "ott_outhash.mjs")
+        r = subprocess.run(["node", mjs], capture_output=True, text=True, env=dict(os.environ, OTT_CJS=os.path.join(d, "ott_m10.cjs")), timeout=300)
+        try:
+            OTT.outhash_json(r)
+        except RuntimeError as ex:
+            assert "rc=1" in str(ex) and ".wasm" in str(ex), str(ex)
+        else:
+            raise AssertionError(".wasm 無しは JSON 無しの例外になること")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+    print("T27b ok (.wasm 欠落の module は stdout 空・rc=1・stderr の ENOENT を例外に残す)")
+
+
 def _entry_fn(params, body):
     text = "\n".join(["define i64 @function_18011e5a0(%s) local_unnamed_addr {" % params, "dec_label_pc_18011e5a0:"]
                      + body + ["}", ""])
@@ -994,7 +1022,7 @@ def t31():
 
 if __name__ == "__main__":
     import traceback
-    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t28, t29, t30, t31)
+    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t27b, t28, t29, t30, t31)
     fails = []
     for f in tests:
         try:
