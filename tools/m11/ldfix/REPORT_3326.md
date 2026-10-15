@@ -18,7 +18,7 @@ REPORT_2555 §2 の判定表 (誤り 13 箇所) の修復。新規類型では�
 
 - 入力 IR: `tools/m11/work/boot_final3.ll` (base)。pipeline: `ldfix.py` (1) → `fix_450560.py` (1b) → `fix_site_3326.py` (1c) の順。
 - 一次分類 (`verify_deref_sites_2555.py`) は ldfix 後 IR で行う。最終判定は窓の人手読み (REPORT_2555 §2 と同じ基準)。
-- PE: `block00031_PE.bin` (fl-win64 26.1.7.5653)。素材 `fl-win64` `work-m11` `work-liftdiff` `toolchain-emsdk` `toolchain-retdec` を `$HOME/artifacts` から展開して使った (展開先 `$RUNNER_TEMP/fl-win64`・`tools/m11/work/`・`tools/liftdiff/work/`)。
+- PE: `block00031_PE.bin` (fl-win64 26.1.7.5653)。素材 `fl-win64` `work-m11` `work-liftdiff` `toolchain-emsdk` `toolchain-retdec` を `docs/WORKFLOW.md` §11 の手順で展開して使った (fl-win64 の展開先は `FL_WIN64_DIR`、他は `tools/m11/work/`・`tools/liftdiff/work/`)。
 - 再現: `bash tools/m11/ldfix/ldfix_e2e.sh` (step 1c を含む)。`python3 tools/m11/ldfix/fix_site_3326.py tools/m11/work/boot_final3.ll /dev/null --pe <PE> --negctl` でネガティブコントロール。
 
 ## 2. 13 箇所の状態 (REPORT_2555 §2 の表の番号)
