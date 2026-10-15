@@ -134,7 +134,7 @@ case 差の定義は 1 つだけ: 同じ関数 VA の case を pattern 順に並
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| base との verdict 変化 1 件 (`0x7850d0` mismatch→match・head 3 回で再現) の原因。case 差 (base 対 head 12〜13 件・head の間で 0〜1 件・§8-2 の定義) の原因。有力候補は `LD_VMT_IDX0=1024` 化に伴う vmt 系の仮 proc 番地の変化 (`PATCH_BY_VA` を `0x50018000` から導くよう修正済み・単体テスト `test_ld203_slot_fill` PASS) | 判定 1 件が base と異なる。「回帰なし」とは書かない。判定の変化が仮 proc 番地由来かは未確認 | 本 PR の範囲外。起票先: 後続 issue (PM 判断) |
+| base との verdict 変化 1 件 (`0x7850d0` mismatch→match・head 3 回で再現) の原因。case 差 (base 対 head 12〜13 件・head の間で 0〜1 件・§8-2 の定義) の原因。有力候補は `LD_VMT_IDX0=1024` 化に伴う vmt 系の仮 proc 番地の変化 (`PATCH_BY_VA` を `0x50018000` から導くよう修正済み・単体テスト `test_ld203_slot_fill` PASS) | 判定 1 件が base と異なる。「回帰なし」とは書かない。判定の変化が仮 proc 番地由来かは未確認 | #5025 [LD-252] (#4874 の子) |
 | 有効化 route の boot 残りの 3 件 (unit 830 segv・他 2 件) | 928/942 (受入の下限は満たす。全数 942 には届かない) | #3946 系の既存追跡 |
 
 ## 7. 再現
