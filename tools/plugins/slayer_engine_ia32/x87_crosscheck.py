@@ -6,7 +6,9 @@
 (a) FSW (C0/C2/C3) が違う試行を、含む op で分ける (fld/fstp m80 を含むか・比較 op を含むか)。
 (b) slot の不一致の試行を、fst/fstp m32 (ADR 制限 2)・fstp m80 (#2967) を含むかで分ける。
     slot は 1 個 16 byte (lo・hi) なので、語の添字は 2 * slot 番号 (x87_diff_main.h の出力形式)。
-検算の基準は、試行の入力 (trials.txt) と出力 (native.out / lowered.out) を直接読み、x87_diff.py の compare を使わない。
+(c) fld m80 の入力の類ごとに、V (ST 値) が不一致の試行を数える。
+(d) work/x87/rcarith0..3 (RC 固定) の bit 一致を、含む op の組で分ける。
+(a)(b)(c) の基準は、試行の入力 (trials.txt) と出力 (native.out / lowered.out) を直接読み、x87_diff.py の compare を使わない。 (d) の判定にだけ compare を使う。
 """
 import importlib.util, os, struct, sys
 from collections import Counter

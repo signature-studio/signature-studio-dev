@@ -3,8 +3,19 @@
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない)。 f80→f64 の精度差と RC の扱いは `REPORT_APPENDIX_1099.md` §6 の行案の範囲。 `docs/DEFECTS.md` は未編集。
 
 - 親: #1099 (PR #2961 merge 2026-10-14)。 方式は `docs/DECISIONS.md` D28 (f80→f64)。 本付録が #2967 の測定値の正本。
-- 測定 commit: `59fb4abd6` (`feat(plugins): x87 m80 path, RC arithmetic and f80 roundtrip (#2967)`。 driver・op 表・試験・往復試験を含む)。 本付録の commit は docs のみ。
-  `git diff 59fb4abd6 HEAD -- tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_diff_main.h tools/plugins/slayer_engine_ia32/x87_diff_native.c tools/plugins/slayer_engine_ia32/x87_diff_lowered.c tools/plugins/slayer_engine_ia32/x87_crosscheck.py tools/plugins/slayer_engine_ia32/x87_f80_rt.c tools/ott` の出力は 0 行 (測定したコードは HEAD と同一)。
+- 測定 commit: `59fb4abd6` (`feat(plugins): x87 m80 path, RC arithmetic and f80 roundtrip (#2967)`。 driver・op 表・試験・往復試験を含む)。 本付録の修正 commit は docs と `x87_crosscheck.py` の docstring のみ (実行されるコードは同一)。
+  `git diff 59fb4abd6 HEAD -- tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_diff_main.h tools/plugins/slayer_engine_ia32/x87_diff_native.c tools/plugins/slayer_engine_ia32/x87_diff_lowered.c tools/plugins/slayer_engine_ia32/x87_crosscheck.py tools/plugins/slayer_engine_ia32/x87_f80_rt.c tools/ott` の出力 (docstring の 3 行の追加のみ。 式・コードは HEAD と同一):
+  ```diff
+  @@ -6,7 +6,9 @@
+   (a) FSW (C0/C2/C3) が違う試行を、含む op で分ける (fld/fstp m80 を含むか・比較 op を含むか)。
+   (b) slot の不一致の試行を、fst/fstp m32 (ADR 制限 2)・fstp m80 (#2967) を含むかで分ける。
+       slot は 1 個 16 byte (lo・hi) なので、語の添字は 2 * slot 番号 (x87_diff_main.h の出力形式)。
+  -検算の基準は、試行の入力 (trials.txt) と出力 (native.out / lowered.out) を直接読み、x87_diff.py の compare を使わない。
+  +(c) fld m80 の入力の類ごとに、V (ST 値) が不一致の試行を数える。
+  +(d) work/x87/rcarith0..3 (RC 固定) の bit 一致を、含む op の組で分ける。
+  +(a)(b)(c) の基準は、試行の入力 (trials.txt) と出力 (native.out / lowered.out) を直接読み、x87_diff.py の compare を使わない。 (d) の判定にだけ compare を使う。
+  ```
+- 最終 HEAD (docstring 修正後) で主・`--nega80`・`--nega`・`--rc`・`--rc-arith 0〜3`・`--roundtrip` と `x87_crosscheck.py main` を再実行し、§3・§3.1・§3.2・§4 の値と一致した。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は生成した試行と生成した 80bit 値のみ。 `fl-win64` 素材は使わない (x87_diff.py は FL の素材を読まない)。
 - 検証環境: gcc 13.3.0・capstone 5.0.7・Python 3 (runner)。 load は各実行の開始時 0.35〜0.84 (cpu 4)。
 
@@ -13,7 +24,7 @@
 - **m80 経路を op 表に入れた**: `fld tbyte ptr [eax]` (DB /5)・`fstp tbyte ptr [eax]` (DB /7)。 乱択 100,000 試行 (seed 1) の bit 一致は **98.44%** (98,443)。 m80 を含む試行は 94.40% (18,224/19,305)、含まない試行は 99.41% (80,219/80,695)。
 - **f80↔f64 の往復**: 実 x87 と比べると、normal・zero・inf・qNaN・denormal は不一致 0。 不一致は sNaN の quiet 化 (実 x87 は quiet 化、lowered は保つ) と、denormal 域の二重丸め 2 件だけ (R1・R2、§4)。 lowered だけの往復 (R3) は sNaN 以外で bit 一致。 f80 側の往復 (R4) が戻らないのは、64bit 仮数の丸め・指数域外・非正規で想定どおり。
 - **ネガティブコントロール (FAIL の数値)**: lowered の `fstp m80` を `fstp m64` に取り違えると、bit 一致は 98,443 → **95,443 (−3,000)**、m80 試行は 18,224 → 15,224 (−3,000)、slot 不一致試行は 563 → 3,572。 既存の fsub/fsubr 取り違え (`--nega`) も新しい op 表で 98,170 (−273) に下がり、検出力を保つ。
-- **RC≠nearest の材料 (ADR D28 改訂は PM 判断)**: 同じ試行列で RC を 0/1/2/3 に固定すると、bit 一致は 98,601 (RC=0) → 87,533 (RC=1, −11,068)・97,145 (RC=2, −1,456)・97,283 (RC=3, −1,318)。 **ADR D28 制限 (5) の「RC は fist/fistp にだけ効く。 算術と fst m32 には効かない」は、この実測では成り立たない**。 fst m32 だけを含み、算術・fst m64・fist を含まない試行では RC=0 の 2,019 件が RC=1/2/3 で 1,783/1,764/1,774 件に減る (§3)。 RC=1 の不一致 11,068 件のうち 7,916 件は符号付きゼロだけの差 (数値の ulp は 0。 §3.2)。
+- **RC≠nearest の材料 (ADR D28 改訂は PM 判断)**: 同じ試行列で RC を 0/1/2/3 に固定すると、bit 一致は 98,601 (RC=0) → 87,533 (RC=1, −11,068)・97,145 (RC=2, −1,456)・97,283 (RC=3, −1,318)。 **ADR D28 制限 (5) の「RC は fist/fistp にだけ効く。 算術と fst m32 には効かない」は、この実測では成り立たない**。 fst m32 だけを含み、算術・fst m64・fist を含まない試行では RC=0 の 2,019 件が RC=1/2/3 で 1,783/1,764/1,774 件に減る (§3)。 RC=1 の不一致は 12,467 件 (100,000 − 87,533) で、そのうち 7,916 件は符号付きゼロだけの差 (数値の ulp は 0。 §3.2)。
 
 ## 2. 対象と方法
 
@@ -69,7 +80,7 @@
 | 算術 / fst m64 のみ | 4,233 | 4,139 | 3,184 | 3,889 | 3,931 |
 
 - **RC=1 (down) の不一致の大半は符号付きゼロ**: F・S が同じで V の差が ±0 の符号だけの試行は RC=1 で 7,916 件 (全組合せの合計)、RC=0/2/3 は各 2 件。 符号差の組ごとの内訳は未集計で、算術のみの組 (−6,636) に多く含まれると推定する。 IEEE 754 では x − x は round-toward-−∞ でだけ −0 になる。 数値の ulp は 0 だが bit 一致は失われる。
-- RC=2/3 (up・trunc) の算術の減少は 6〜10 件と小さい。 RC=1 の残り (約 3,150 件) は実値の差。
+- RC=2/3 (up・trunc) の算術の減少は 6〜10 件と小さい。 RC=0 比の RC=1 の増分 11,068 件は、符号差の増分 約 7,914 件 (RC=1 の 7,916 件から RC=0 の 2 件を引く) と、実値の差の増分 約 3,150 件 (11,068 − 7,914 = 3,154) に分かれる。
 - 対照の組 (RC で動く命令が無い) は RC によらず 20,180 で変わらない。 測定系が RC の変化で他の結果を変えないことの確認。
 - fst m32 のみの組の減少は RC=1/2/3 で 236/255/245 件。 fst m32 の丸めは RC の影響を受ける (ADR D28 制限 (5) の記述と反する)。 この組は fst m64 と fist を含まないので、RC 由来の他の源は含まない。
 
@@ -113,8 +124,8 @@ python3 x87_crosscheck.py main                           # (a)(b)(c)。(d) は w
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| RC の扱い (ADR D28 制限 (5)): fst m32・fst m64 の丸めと、RC=1 の不一致 (11,068 件のうち 7,916 件は ±0 の符号差) が native と違う | RC≠nearest で実 x87 と bit が一致しない | PM 判断 (ADR D28 の改訂)。 材料は §1・§3.2 |
-| sNaN の quiet 化 (lowered の f64→f80 は sNaN を保つ) | NaN の quiet bit だけが変わる (値は NaN のまま) | PM 判断 (D28 の制限として記録するか、`ott_x87.h` の f64→f80 に quiet bit を立てるか) |
-| 指数域外の f80 (f64 の範囲外) が inf・0 に丸まる | fld m80 の指数域外の値は算術の結果を変える (V 不一致 9.8%) | PM 判断 (D28 制限 (1)(3) の範囲。 DEFECTS 行案の候補) |
+| RC の扱い (ADR D28 制限 (5)): fst m32・fst m64 の丸めと、RC=1 の不一致 (12,467 件のうち 7,916 件は ±0 の符号差) が native と違う | RC≠nearest で実 x87 と bit が一致しない | PM agent の判断待ち: ADR D28 を改訂して制限 (5) を書き換えるか・既定案: D28 は改訂しない (制限 (5) のまま。既定の挙動は変えない)。 材料は §1・§3.2 |
+| sNaN の quiet 化 (lowered の f64→f80 は sNaN を保つ) | NaN の quiet bit だけが変わる (値は NaN のまま) | PM agent の判断待ち: D28 の制限として記録するか、`ott_x87.h` の f64→f80 に quiet bit を立てるか・既定案: D28 の制限として記録する (`ott_x87.h` は変えない。既定の挙動は変えない) |
+| 指数域外の f80 (f64 の範囲外) が inf・0 に丸まる | fld m80 の指数域外の値は算術の結果を変える (V 不一致 9.8%) | PM agent の判断待ち: DEFECTS に行案として起票するか・既定案: D28 制限 (1)(3) の範囲のまま記録し、`docs/DEFECTS.md` は編集しない (既定の挙動は変えない) |
 | m80 の 64bit 仮数の精度差 (normal 3.9%・exact53 1.1%) | 精度差の既知の源 (1099 §6 の D24 案) | 既知 (ADR D28)。 追加の起票なし |
 | denormal 域の二重丸め (R2 2 件) | 件数は小さい | 1099 §9 の既知と同じ型。 追加の起票なし |
