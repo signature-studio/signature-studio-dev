@@ -331,6 +331,7 @@
 | `tools/m11/ldfix/REPORT_2660.md` | ~70 | LD-119 (#2660): spill 宛 判定不能 9 site を再検証。4 site は上流 `xor i64 0,0` (型タグ読みの置換) が作る死んだ辺に依存するため TRUE_DROP を取り下げ、判定不能のまま (`ir_reach_2660.py` で到達性を検査)。脱落関数の和集合は 72 (未確定・#1161 残) |
 | `tools/m11/ldfix/REPORT_2388.md` | ~75 | LD-109 (#2388): cf3790 の spill 宛 未判定 15 site を全て OK_LOAD と判定 (機械語・IR の行を `ld109_cf3790_verify.py` が照合して生成)・slot 名の式の独立確認 (#2389 と同じ `stack_var_(disp-0x1d8)`)・基底が上流の脱落値由来で汚染される注意。静的突合のみ |
 | `tools/m11/ldfix/REPORT_3426.md` | ~95 | CI-157 (#3426・親 #3416): `0x412fc0` の呼出規約の機械語↔IR 対応表 (5 番目引数の既定値分岐・レジスタ引数 rcx〜r9 の欠落・スタック部は一致) と D5 系の分類 (D7 は非該当)。検査器 `verify_abi_3426.py` (NC 5/5 拒否)。修復は子 #3450 (CI-163)・#3451 (CI-164) |
+| `tools/m11/ldfix/REPORT_3450.md` | ~100 | CI-163 (#3450・親 #3426): `function_41c8c0` (WideCharToMultiByte の薄いラッパ) を 8 引数化し、呼出元 4 site を機械語の rcx〜r9 と照合して接続。e2e 実測 (stage4・survey 不変)・DEFECTS D26 の行案 |
 | `tools/m11/ldfix/REPORT_3088.md` | ~70 | LD-146 (#3088): unexec 4 関数 (5c1030 / 737d10 / 7ff6e0 / d243c0) の native 実行条件。古い `work/ld_native` (vmslot 無し) を `ensure_native` で作り直し、this 疑似オブジェクトを与えて 4/4 を突合 (判定 mismatch・icall_drop = D15) |
 | `tools/m11/ldfix/REPORT_1325.md` | ~110 | LD-46 (#1325): first-deref-not-entry の支配関係つき修復。deref の IR ブロックが置換対象の全使用を支配する 11 組を修復し、残り 10 組は見送り理由を記録。survey 到達 (23 関数) を再測定 (#1134・#3194・#3195) |
 | `tools/m11/ldfix/REPORT_2688.md` | ~104 | LD-123 (#2688): spill 宛 判定不能 9 site の F3d 適用 IR 再検証。上流 xor 0 の 4 site は OK_LOAD 候補 (本番 IR は未修復・配線は #2834)、残り 5 site は UNDETERMINED |
