@@ -129,3 +129,18 @@ git diff a65a71ed1 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md
 **kh249_check の前提**: `product_index.json` は `KH_SRC=<素材の展開先>` で `scripts/kh249_product_index.py` を走らせて生成する (素材の所在は既定 `~/ダウンロード`)。
 
 測定 commit から HEAD までのコード差分 (`git diff 56254af13 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md'`) は本 commit 時点で 0 行。
+
+## 9. #4257 の実測 (`.rdata` 生 VA の検出・許可リスト)
+
+測定 commit: `728eab8b9` (検出を入れた最後の commit)。修正 commit (module E の検査を `rdata_str` 持ちに限定 + テスト定数名) は本節の後続 commit。
+素材: `plugins-kilohearts` (installer zip → `windows.zip` → `work/winpkg`)・`toolchain-emsdk` (`/opt/emsdk`)。環境: nproc=4・RAM 15 GB。
+
+| module | 条件 | 結果 | wasm bytes | wasm sha256 |
+|---|---|---|---|---|
+| E | merge-base `f2c86e136` (検出なし) | build 成功 | 364,770 | `0cf066d1…6fed8` |
+| E | `728eab8b9` (検出あり・検査が `raw_va` のみ) | 停止: `rdata 生 VA が窓化されず残った` (許可外 8 件: `1813af278`・`1813af778`・`1813b0e98`・`1813b10d8`・`1813d26f8`・`1813d4828`・`1813d48c8`・`1813d6e18`) | — | — |
+| E | 修正後 (検査を `rdata_str` 持ちに限定) | build 成功・検査は走らない | 364,770 | `0cf066d1…6fed8` (不変) |
+| F (lift-8) | 修正後 | build 成功・undefined import 0 | 54,487 | `3d2bc6fd…e77287` (不変) |
+
+- E の 8 件は `.rdata` 上の vtable・RTTI の値 (E は `raw_va` で値を生 VA のまま残す設計)。窓化対象外のため、検査は窓化を行う `--rdata-str` の module に限定した。
+- テスト: `python3 lift/test_rdata_raw.py -v` → OK (3 件・skip 0)。

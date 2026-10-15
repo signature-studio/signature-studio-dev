@@ -12,7 +12,7 @@ sys.path.insert(0, HERE)
 import kh_lower  # noqa: E402
 
 CORE = os.environ.get('KH_CORE') or os.path.join(HERE, '..', '..', 'work', 'winpkg', 'HeartCore.core_64')
-RDATA_ASCII_NONSTR = 0x1813d47a2   # UTF-16 文字列 "LicenseManagerHelper" (窓化対象外・許可リスト)
+RDATA_UTF16_NONSTR = 0x1813d47a2   # UTF-16 文字列 "LicenseManagerHelper" (窓化対象外・許可リスト)
 RDATA_UTF16 = [0x181e79826, 0x181e79834]   # UTF-16 文字列 "Groups" / "New Group..." (許可リスト)
 TEXT_VA = 0x180054c37   # .text 内の関数 VA (rdata 外。素の値として残っても検出対象外)
 
@@ -21,12 +21,12 @@ TEXT_VA = 0x180054c37   # .text 内の関数 VA (rdata 外。素の値として�
 class RdataRawUnexpected(unittest.TestCase):
     def test_allowed_is_not_reported(self):
         """(a) 許可リスト内の .rdata VA は報告しない"""
-        allow = {RDATA_ASCII_NONSTR, *RDATA_UTF16}
+        allow = {RDATA_UTF16_NONSTR, *RDATA_UTF16}
         self.assertEqual(kh_lower.rdata_raw_unexpected(CORE, allow, allow), set())
 
     def test_unallowed_rdata_is_reported(self):
         """(b) 許可外の .rdata VA は報告する (ネガティブコントロール: 許可を外すと検出される)"""
-        raw = {RDATA_ASCII_NONSTR, *RDATA_UTF16}
+        raw = {RDATA_UTF16_NONSTR, *RDATA_UTF16}
         got = kh_lower.rdata_raw_unexpected(CORE, raw, set())
         self.assertEqual(got, raw)
 

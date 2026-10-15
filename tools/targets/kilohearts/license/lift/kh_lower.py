@@ -341,7 +341,7 @@ def main():
                     help='素の VA リテラルを ptrtoint(@global_var) に置換せず値として残す (EditorModel 層: vtable store の byte parity 用)')
     ap.add_argument('--rdata-str', action='store_true',
                     help='--raw-va 時も、.rdata の NUL 終端文字列 (長さ 2〜63・印字可能) を指す素の VA リテラルは窓 (@global_var_<VA>) へ置換する (#3866 / D11)')
-    ap.add_argument('--rdata-raw-allow', default='', help='--raw-va 時に窓化されず値として残してよい .rdata の素の VA (hex, カンマ区切り)。これ以外の .rdata 生 VA が残ると loud に停止する (#4257 / D11)')
+    ap.add_argument('--rdata-raw-allow', default='', help='--rdata-str 時に窓化されず値として残してよい .rdata の素の VA (hex, カンマ区切り)。これ以外の .rdata 生 VA が残ると loud に停止する (#4257 / D11)。--rdata-str が無い module (vtable/RTTI を値のまま残す E 等) では検査しない')
     ap.add_argument('--volatile-ret', action='store_true',
                     help='kh_ 本体末尾の load @rax を volatile にする (LLVM -O1 TailCallElim による中間副作用削除の抑止)')
     ap.add_argument('--jt', default='{}', help='{"<jmp insn va hex>": {"table": va, "n": N}}  switch jump table (32bit signed offsets from table base)')
@@ -482,7 +482,7 @@ def main():
             if IMG_LO <= v < IMG_HI and rdata_cstr(a.core, v):
                 strva.add(v)
         vaset |= strva
-    if raw_va and 'rdata' not in skip:
+    if raw_va and a.rdata_str and 'rdata' not in skip:
         raw_left = set()
         for m in LIT.finditer(CAST.sub('', allt)):
             v = int(m.group(1))
