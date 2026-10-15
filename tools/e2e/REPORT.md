@@ -207,13 +207,31 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 - 単体テスト `node --test tools/e2e/same_origin.test.mjs tools/e2e/webstudio_state.test.mjs`: **9 PASS / 0 FAIL** (同一オリジン解決 1 件・別オリジン / `data:` / `javascript:` / `//host` / ポート違いのネガコン 1 件・`setGuest` 1 件ほか)。`pnpm typecheck` rc 0。
 - `open → running` は検査の所要が上限値 (`drv.open` を含む)。180 s の予算に対して十分小さい。FL の wasm での値は未計測。
 
-**ネガコン (d) の原因同定**: ブラウザの `error` は `WebAssembly compilation aborted: Network error: Failed to read from a ReadableStream.` (Chrome が stream 内の例外を包む)。同じ改竄 descriptor を node で `chunkedStream` に通すと `ChunkIntegrityError: part の sha256 不一致` (正常版は 120669 B を読み切る)。page 側に原因文言を出すのは #3497。ブラウザ側の文言は任意の stream 失敗 (404 など) でも同じなので、`gui-guest-tamper` が確かめるのは「compile が中断され `state=error`・`frames=0`」までで、sha256 不一致の同定は node 側の結果に依る。
+**#3497 (WIN-29) の測定**: 測定 commit `e067cfac4` (`fl-boot` の判定を `flBoot()` に切り出し、`fl-boot-negctrl` を追加、`loader_boot.ts` で chunk の sha256 文言を保持、`gui-guest-tamper` を sha256 文言の検査に締めた commit)。`git diff e3f55dc40 e067cfac4 -- tools/e2e src/runtime/loader_boot.ts` が変更範囲。
+- `bash tools/e2e/run.sh --driver both --targets preview,edge-sim` (EMSDK_ENV 指定・build 込み・n=1): **PASS 50 / FAIL 0 / SKIP 6**、rc 0、wall 23.8 s、load 1.39 / 0.86 / 0.39。増分 4 = `fl-boot-negctrl` × 4 組。SKIP 6 = `fl-boot` × 4 (`E2E_REQUIRE_FL` 未設定) + `edge-policy` の preview 側 × 2。
+- `fl-boot-negctrl` (テストゲスト `guest:"test"`・`state:"running"`・`frames:1` に fl-boot の判定を当てる): 4 組すべて **FAIL (期待どおり)** で、詳細は `期待 "fl" / 実際 "test"` (ゲスト種別)。D5 の guest 要件が効いている。
+- `gui-guest-tamper`: 4 組すべて PASS。`error` は `part の sha256 不一致: …0000.4a1622b2383c.part want=4a1622… got=3d3623…` (旧: `WebAssembly compilation aborted: Network error…`)。`frames=0`。
+- 単体テスト `node --test deploy/client/chunked.test.mjs`: 7 PASS / 0 FAIL。`tsc --noEmit` rc 0。
+
+**ネガコン (d) の原因同定 (#3497 で page 側に出すよう変更)**: Chrome は stream 内の例外を `WebAssembly compilation aborted: Network error: …` に包む。`src/runtime/loader_boot.ts` の `fetchCompile` は chunked の stream を読むラッパーで最初の失敗を覚え、compile の reject 時にそれを投げ直す。これで `window.__webstudio.error` に `part の sha256 不一致: …` が残る。`gui-guest-tamper` はこの文言 (sha256 不一致) を検査する。
 
 **素材・環境**: `toolchain-emsdk` は本 run の素材展開先 (素材置き場の取得対象) に無かったため、`e2e.yaml` の Emscripten step と同じ手順 (`emsdk install <tools/m1/flags.sh の pin>` ・ `activate`) で `$RUNNER_TEMP` に入れた。`gen_api.py` は `x86_64-w64-mingw32-gcc` を要する。`build_guest.sh` は mingw が無ければ apt で導入する (`gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev`)。CI の `E2E / local` ジョブは mingw を入れていないため、この導入に依存する。`fl-win64` は使わない。
 **e2e の PNG**: `ctx.shot("gui-guest")` は `e2e.yaml` が `tools/e2e/work/shots` を upload する。#3461 本文の「e2e の PNG を Actions artifact に上げない」とは食い違う。方針は PM 判断 (`pm-decision`)。
 
 **オラクル画素の完全一致 (#4312 / WIN-46)**: 完了。判定の内訳と実測は `REPORT_APPENDIX_4312.md`。
-**未実施 (子 issue)**: ネガコン (a)(b)(c)・`text_wasm_e2e.sh` 回帰 → #3495 (WIN-27)。GUI-REACH trace → #3496 (WIN-28)。`fl-boot` のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
+**未実施 (子 issue)**: ネガコン (a)(b)(c)・`text_wasm_e2e.sh` 回帰 → #3495 (WIN-27)。`fl-boot` のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
+
+## gui=wasm: GUI-REACH trace の機械検査 (WIN-28 #3496)
+`gui-guest-boot` のゲストを reach 変種 (`gui_wasm.sh … reach`) で作り、ゲストが初回 WM_PAINT の後に `gui_reach_dump()` を呼ぶ。host の `GuiHost.logs` から `GUI-REACH` / `GUI-MSG` 行を回収し、`CreateWindowExA`・`BeginPaint`・`BitBlt` の件数と、初回の順序 `RegisterClassA < CreateWindowExA < WM_PAINT < BeginPaint < BitBlt` を検査する。生ログは `tools/e2e/work/logs/gui-guest-reach.log`。
+
+- 件数 (HEAD): 到達行 25 (GUI-REACH 23 + GUI-MSG 1 + SUMMARY 1)、`CreateWindowExA`=1・`BeginPaint`=1・`BitBlt`=1・`WM_PAINT`=1。
+- 初回の順序 (生ログ): `RegisterClassA`@1 → `CreateWindowExA`@2 → `DispatchMessageA`@9 → `WM_PAINT`@(GUI-MSG 行) → `BeginPaint`@10 → `BitBlt`@20 → `EndPaint`@21。
+- 測定 commit: `b3a252976` (`feat(gui): gui=wasm reach trace (GUI-REACH) in product-page e2e`)。
+- 実行: `EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/e2e/run.sh --targets preview,edge-sim --driver agent-browser` (開始 08:02 UTC、load average 0.21 / 1 分)。wall 13.5 s (vite build・ゲストの emcc build を含む)、rc 0。**SUMMARY: PASS=23 FAIL=0 SKIP=3**。
+- `gui-guest-boot`: preview 324 ms・edge-sim 430 ms で PASS (`state==='running'`, `frames=1`, `guest='test'`, lit 38400 px, 色 ≥7)。
+- 実行環境: emsdk は素材 `toolchain-emsdk` ([EMSDK])。mingw-w64 は `build_guest.sh` が apt で導入。
+
+- **未実施**: 順序検査のネガコン (WM_PAINT 行を消した変種で FAIL することの確認) は本 PR では未実施。`tools/gui/test/reach_order_check.py` の selftest は既存。`text_wasm_e2e.sh` の回帰は未実施 (FreeType wasm32 ビルドが要る)。
 
 ## ユーザ依頼事項
 1. **公開ホスト名** (例: `studio.<既存ゾーン>`)。案 S の既定は workers.dev (`deploy/README.md` §移行で自前ドメインへ)。

@@ -190,3 +190,19 @@ node tools/m11/trap_triage/survey_units.mjs <out>.json                          
 ### 9.8 差分 0 の証跡
 
 - 測定 commit `58ed035cf` から本 commit までの build 入力の差分: `git diff 58ed035cf HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/trap_triage/survey_units.mjs` の出力は **0 bytes** (`| wc -c` = 0)。shim 試行 (§9.4) は commit していない。新規の `native_zeroinit_2891.py` は build 入力ではない。
+
+## 10. `40d210` 転記の検証 (#3921、測定 commit `22c914300`)
+
+- 変更: `tools/m11/m11_ov.c` に `function_40d210` を転記 (n <= 0 は何もしない。n > 0 のとき n byte を val で埋める)。`git diff 634d33214 22c914300 -- tools/m11/m11_ov.c` = 10 行追加のみ。
+- 測定 commit `22c914300` の既定 build: `m11_gen_ir2.sh` rc 0 (32.9 s、490,761 行) → `m11_build.sh` rc 0 (18.2 s)。load average 0.66 (開始時、1 分)。
+- 基準: 転記前の `m11_ov.c` (`origin/main` の `ee2883ab8` と同一) で既定 build と survey を取った (同じ `work-m11` snapshot・同じ PE から `m11_gen_ir2.sh` で IR を作り直した)。
+- survey 集計 (`survey_units.mjs`): 基準 `ok 873 / miss 47 / halt0 7 / oob 14 / noproc 1`、転記後 `ok 873 / miss 47 / halt0 7 / oob 14 / noproc 1` (計 942、転記後は 3 回とも同一)。survey の所要 6.5 s / 6.7 s (並列 1、nproc 4)。
+- per-unit の kind 差: 基準と転記後で **0/942**。ok → non-ok の unit は **0 件**。
+- unit 492 (probe build `M11_PROBE_2780=1`、`probe_2780_units.mjs`): `4473f0` の i=2 の `dest2` (`0x10aa1430`) の旧値 (tag 10) が、基準の `0x1_00000003` から **`0x0`** になった。この trap (`4473f0` → `function_4133f0` の `*dest = s` で OOB) は消えた。
+- unit 492 の frame の変化: 基準 `function_4133f0 ← function_4473f0 ← function_446400 ← function_446ad0 ← function_ad5700` → 転記後 `function_412e40 ← function_448490 ← function_448350 ← function_446400 ← function_446ad0 ← function_ad5700` (kind は oob のまま)。次の trap は #3918 で扱う。
+- 呼出しの整合 (受入 4): `function_4159e0` の `count << 3` (kind 10/11/15/17/18、count > 1) と `count * 24` (kind 12) は、転記した `n` の単位 (byte) と一致する。`m11_ov.c` 内の `function_416db0` 周辺 (`nkeep * elsz`・`(len - oldlen) * elsz`) も byte 数で渡している。呼出しの引数の意味は変えていない。
+- 製品 KPI (起動): **動かしていない**。`tools/flelift/boot/REPORT.md` の dispatch 数・通過 unit 数は測っていない (本 PR は m11 の unit survey の範囲)。
+
+### 10.1 差分 0 の証跡
+
+- 測定 commit `22c914300` 以降の build 入力の差分は無い (本 REPORT の追記のみ)。

@@ -22,7 +22,9 @@ mkdir -p "$W/tmp"
 NODE="$(command -v node)"
 
 T=$(date +%s)
-python3 "$HERE/wval_lift.py" --src "$LIFT" --out "$W/lift_wv" --value "$VAL"
+OBJW=()
+[ "${WVAL_OBJWATCH:-0}" = 1 ] && OBJW=(--objwatch)
+python3 "$HERE/wval_lift.py" --src "$LIFT" --out "$W/lift_wv" --value "$VAL" "${OBJW[@]}"
 echo "[wval] patch done in $(( $(date +%s) - T ))s"
 
 T=$(date +%s)
@@ -36,3 +38,5 @@ grep 'FLEBOOT_RESULT' "$LOG" || true
 echo "[wval] boot rc=$rc log=$LOG"
 echo "[wval] 一致 (store [wval] と間接呼出し [wval-call]): $(grep -c '^\[wval' "$LOG" || true) 件"
 grep '^\[wval' "$LOG" | head -60 || true
+echo "[wobj] obj+0xc4 への store・入口・obj 確定 (WVAL_OBJWATCH=1 のとき): $(grep -c '^\[wobj' "$LOG" || true) 件"
+grep '^\[wobj' "$LOG" | head -120 || true

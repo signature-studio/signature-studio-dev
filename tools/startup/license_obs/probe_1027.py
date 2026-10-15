@@ -50,3 +50,10 @@ for name, lo, n, tgt in TABLES:
             locs.append(f'{hex(i)}({sec_name(i)})')
             i = img.raw.find(q, i + 1)
         print(f'  c) {label} of {hex(tgt)}: {locs}')
+    for label, q in [('rva32', struct.pack('<I', lo - img.base)), ('abs64', struct.pack('<Q', lo))]:
+        i = img.raw.find(q)
+        locs = []
+        while i != -1:
+            locs.append(f'{hex(i)}({sec_name(i)})')
+            i = img.raw.find(q, i + 1)
+        print(f'  d) {label} of table base {hex(lo)}: {locs}')
