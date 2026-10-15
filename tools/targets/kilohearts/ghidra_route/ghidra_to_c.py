@@ -168,6 +168,8 @@ def main():
         out.append(RCPPS_HELPER % approx_rcp_table())
     if 'rsqrtps(' in alltxt:
         out.append(RSQRTPS_HELPER % approx_rsq_tables())
+    if name == 'stereo':  # callee の戻り xmm0 (縮約値) の helper (KH-74)。式と突合は kh_xmm0.h / xmm0_check.c
+        out.append(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'kh_xmm0.h')).read())
     for va, (ty, kind, _) in sorted(gtypes.items()):
         d = pe_bytes(pe, va, 16)
         out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
