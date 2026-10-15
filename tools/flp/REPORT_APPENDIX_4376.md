@@ -13,7 +13,7 @@
 結果は `tools/flp/corpus/render_export_4376.tsv`。rc=0 は 19 本、rc=124 は 4 本。
 
 - **WAV 成功 (rc=0) 19 本**: 48 kHz / 32-bit float (fmt 3 / 2ch) を確認。所要 11〜13 s。
-  - data 770,000 B が 16 本、Low Lifter が 1,538,000 B、Wave Traveller が 660,000 B。
+  - data 770,000 B が 17 本、Low Lifter が 1,538,000 B、Wave Traveller が 660,000 B (17 + 1 + 1 = 19 本)。
 - **WAV 欠落 (120 s 打ち切り) 3 本**: Maximus・Patcher (generator)・Sytrus。
 - **rc=124 だが WAV あり 1 本 (要確認)**: Patcher (effect)。WAV は 770,000 B で他と同じ長さ。プロセスの正常終了は確認できていない。成否は未判定とし、#4598 に含める。
 
