@@ -172,7 +172,7 @@ EXIT=0
   - 呼出先 `0x180fbc1f4` (52 命令・238 B) の SC 側最良候補は `0x181048180` (53 命令・r 列比 0.5905)。この関数は `ecx` による分岐のあるピッチ変換で、呼出先の構造と一致しない。対応とは判定しない。
   - process 本体 (0x180743390) の r 列は照合していない。そのため process 本体の SC 側対応は、r 列の観点では未確定のまま。
   - (d) の全出力は本ファイルに貼っていない。(d) を再実行するには `HeartCore.core_64` / `SlateCore.core_64` が要るが、現在の素材 (`fl-win64`) には含まれない。
-- 鮮度: `git diff ce6400502 HEAD -- tools/targets/freshair/ks_resonator_fa60.py` の出力は 0 行 (本 PR は REPORT の追記だけ)。
+- 鮮度: `git diff ce6400502 HEAD -- tools/targets/freshair/ks_resonator_fa60.py` の差分は docstring の 1 行 (「3 つ」→「4 つ」と (d) の説明) だけで、測定に使うコードは不変。測定 commit の結果は有効。
 
 ## §7. 未解決 (起票先)
 
