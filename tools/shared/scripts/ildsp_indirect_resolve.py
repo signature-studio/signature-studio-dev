@@ -10,7 +10,8 @@ usage: ildsp_indirect_resolve.py <json> [PE] [--key closure_seed]
   ptr : スロットが IAT 外。再配置済みポインタの値を VA で出し、その先頭命令を 2 段まで辿る
         (`jmp reg` で終われば宛先は実行時の reg 値)。
   writes : .text と IPPCODE の線形走査 (不正バイトは 1 byte 飛ばす) で、スロットを書く命令の件数
-        (メモリが第 1 オペランドの mov 系・rip 相対)。読み出し (call/jmp/mov reg,[slot]) は数えない。
+        (第 1 オペランドが rip 相対メモリの命令。lea・cmp・test・call・jmp は除く)。読み出し (call/jmp/mov reg,[slot]) は数えない。
+        変位は capstone の mem.disp で取る (即値が後ろに続く命令でも正しい)。
   guard : load config の GuardCF/XFG の check・dispatch pointer と一致する印。
 """
 import sys, os, json, argparse, struct
@@ -19,6 +20,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, ".."))
 from paths import FL_WIN64_DIR
 import pefile, capstone
+from capstone.x86 import X86_OP_MEM, X86_REG_RIP
 
 MEM_WRITE = 0x80000000
 GUARD_FIELDS = ("GuardCFCheckFunctionPointer", "GuardCFDispatchFunctionPointer",
@@ -49,6 +51,7 @@ def main():
     guard = {getattr(lc, k) - base: k for k in GUARD_FIELDS if getattr(lc, k, 0)}
     relocs = {e.rva for b in getattr(pe, "DIRECTORY_ENTRY_BASERELOC", []) for e in b.entries if e.type}
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    md.detail = True
 
     def sweep(sec):
         lo, hi = sec.VirtualAddress, sec.VirtualAddress + sec.Misc_VirtualSize
@@ -61,18 +64,20 @@ def main():
             off += ins.size
             yield ins
 
+    def rip_mem(ins):
+        return next((op.mem for op in ins.operands if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP), None)
+
     def rip_target(ins):
-        disp = struct.unpack_from("<i", bytes(ins.bytes), len(ins.bytes) - 4)[0]
-        return ins.address + ins.size + disp
+        return ins.address + ins.size + rip_mem(ins).disp
 
     slots = {int(s["slot_rva"], 16) for s in cl["indirect_calls"] + cl["indirect_jmps"] if s.get("slot_rva")}
     writes = {k: [] for k in slots}
     code = [s for n, s in secs.items() if n in (".text", "IPPCODE")]
     for sec in code:
         for ins in sweep(sec):
-            if "[rip" not in ins.op_str or ins.mnemonic in ("call", "jmp", "lea", "cmp", "test"):
+            if ins.mnemonic in ("call", "jmp", "lea", "cmp", "test"):
                 continue
-            if "[rip" not in ins.op_str.split(",")[0]:
+            if not ins.operands or ins.operands[0].type != X86_OP_MEM or ins.operands[0].mem.base != X86_REG_RIP:
                 continue
             t = rip_target(ins)
             if t in writes:
