@@ -1,10 +1,11 @@
 // #2623 の再測定: merge 済み PR の本文に、旧判定 (統一前の指標の判定) と統一後の判定 (refsOnlyBody) を当てて件数を数える。
 // 読み取りだけ (gh api GET)。数値の出所は tools/pm/REPORT_APPENDIX_2623.md §2。
-// 旧判定は --old-ref (既定 origin/main) の infra/pm-worker/src/webhook.ts から REFS_RE・CLOSE_RE の正規表現リテラルを読み出して評価する (手写しをしない)。
+// 旧判定は --old-ref (既定 7c85004e = 統一前の webhook.ts。889ec098 の親) の infra/pm-worker/src/webhook.ts から REFS_RE・CLOSE_RE の正規表現リテラルを読み出して評価する (手写しをしない)。
+// 既定を origin/main にしないのは、統一後の main には REFS_RE が無く、merge 後にこのスクリプトが動かなくなるため。
 // 窓は固定値 (--end・既定 2026-10-15T00:00:48Z)。現在時刻からの相対にしない。
 // 母集団は REST の pulls 一覧 (updated 降順) を窓の始点まで読み切って取る (search の範囲指定は 1 回 1000 件までで、窓内の PR を取りこぼした)。
 // 検算として gh search の範囲指定 (直近 24 時間) と件数・PR 番号の差を出す。
-// 使い方: cd <repo> && node --experimental-strip-types --no-warnings tools/pm/refs_only_remeasure.ts [--end 2026-10-15T00:00:48Z] [--old-ref origin/main]
+// 使い方: cd <repo> && node --experimental-strip-types --no-warnings tools/pm/refs_only_remeasure.ts [--end 2026-10-15T00:00:48Z] [--old-ref 7c85004e]
 import { execFileSync } from "node:child_process";
 import { refsOnlyBody } from "../../infra/pm-worker/src/webhook.ts";
 import { refsOnlyNumbers } from "../../infra/pm-worker/src/refs.ts";
@@ -17,7 +18,7 @@ const arg = (name: string, def: string): string => {
   return i >= 0 ? String(process.argv[i + 1]) : def;
 };
 const END = arg("end", "2026-10-15T00:00:48Z");
-const OLD_REF = arg("old-ref", "origin/main");
+const OLD_REF = arg("old-ref", "7c85004e");
 const iso = (ms: number): string => new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
 const END_MS = Date.parse(END);
 const START_24H = iso(END_MS - 24 * H);
@@ -80,12 +81,18 @@ console.log(`head=${git(["rev-parse", "--short", "HEAD"])} old-ref=${OLD_REF}(${
 report("直近 24 時間 (REST)", day);
 report("直近 7 日 (REST)", week);
 
+// 検算は補助。gh pr list は GraphQL を使うため、制限に掛かったら理由を出して REST の件数だけを使う。
 const searchRange = `merged:${START_24H}..${END}`;
-const searchDay = JSON.parse(
-  execFileSync("gh", ["pr", "list", "--repo", R, "--state", "merged", "--search", searchRange, "--limit", "1000", "--json", "number,mergedAt"], { encoding: "utf8", maxBuffer: 1 << 28 }),
-) as Array<{ number: number; mergedAt: string }>;
-const dayNums = new Set(day.map((p) => p.number));
-const searchNums = new Set(searchDay.map((p) => p.number));
-const onlyRest = [...dayNums].filter((n) => !searchNums.has(n));
-const onlySearch = [...searchNums].filter((n) => !dayNums.has(n));
-console.log(`検算 gh search "${searchRange}": ${searchDay.length} 件 / REST のみ ${onlyRest.length} 件 ${JSON.stringify(onlyRest)} / search のみ ${onlySearch.length} 件 ${JSON.stringify(onlySearch)} (search の取りこぼしを REST が補う)`);
+try {
+  const searchDay = JSON.parse(
+    execFileSync("gh", ["pr", "list", "--repo", R, "--state", "merged", "--search", searchRange, "--limit", "1000", "--json", "number,mergedAt"], { encoding: "utf8", maxBuffer: 1 << 28 }),
+  ) as Array<{ number: number; mergedAt: string }>;
+  const dayNums = new Set(day.map((p) => p.number));
+  const searchNums = new Set(searchDay.map((p) => p.number));
+  const onlyRest = [...dayNums].filter((n) => !searchNums.has(n));
+  const onlySearch = [...searchNums].filter((n) => !dayNums.has(n));
+  console.log(`検算 gh search "${searchRange}": ${searchDay.length} 件 / REST のみ ${onlyRest.length} 件 ${JSON.stringify(onlyRest)} / search のみ ${onlySearch.length} 件 ${JSON.stringify(onlySearch)} (search の取りこぼしを REST が補う)`);
+} catch (e) {
+  const why = String((e as { stderr?: unknown }).stderr ?? e).trim().split("\n")[0];
+  console.log(`検算 gh search "${searchRange}": 取得できず (${why})。判定は REST の件数だけ`);
+}
