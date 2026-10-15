@@ -194,7 +194,7 @@ bool CanvasGraphicsDeviceContext::drawRect (CRect rect, PlatformGraphicsDrawStyl
 bool CanvasGraphicsDeviceContext::drawArc (CRect rect, double startAngle1, double endAngle2,
                                            PlatformGraphicsDrawStyle drawStyle) const
 {
-	auto points = arcPoints (rect, startAngle1, endAngle2);
+	auto points = transformPoints (arcPoints (rect, startAngle1, endAngle2));
 	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
 		fillRings ({points}, fillColor, true);
 	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
@@ -217,7 +217,8 @@ bool CanvasGraphicsDeviceContext::drawEllipse (CRect rect, PlatformGraphicsDrawS
 // 1 画素を、端点と同じく四捨五入した位置に置く。
 bool CanvasGraphicsDeviceContext::drawPoint (CPoint point, CColor color) const
 {
-	blendPixel (static_cast<int32_t> (std::lround (point.x)), static_cast<int32_t> (std::lround (point.y)),
+	auto device = transformPoint (point);
+	blendPixel (static_cast<int32_t> (std::lround (device.x)), static_cast<int32_t> (std::lround (device.y)),
 	            color);
 	return true;
 }
@@ -285,6 +286,8 @@ bool CanvasGraphicsDeviceContext::drawGraphicsPath (IPlatformGraphicsPath& path,
 				transformation->transform (p.x, p.y);
 		}
 	}
+	for (auto& subpath : subpaths)
+		subpath = transformPoints (subpath);
 	if (mode != PlatformGraphicsPathDrawMode::Stroked)
 		fillRings (subpaths, fillColor, mode == PlatformGraphicsPathDrawMode::FilledEvenOdd);
 	else
