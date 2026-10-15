@@ -5,7 +5,7 @@
 ## 結論
 
 - `FUN_1802ecfc0` の `param_3`・`param_4` は、生成 C で `float *` だったが、機械語では 16 byte の `V128` オペランドである。`DELAY_RULES` 4 件 (宣言 1・本体 2・呼出元 1) で `V128 *` に直した。
-- emcc の error は 2 件減った (delay の emcc census は **418 → 416**)。内訳は表の実測差分のとおり、演算・代入・ポインタの型不一致が 1 件 (171 → 170)、128bit レーン型が 1 件 (167 → 166)。
+- emcc の error は 2 件減った (delay の emcc census は、基準 `origin/main` **417** → 本 PR **415**)。消えた 2 件は `delay.c:1271` の 2 件 (`undefined8 *` と `undefined1[11][16]` を `float *` に渡す型不一致。どちらも行番号つきの diff で確認)。内訳は演算・代入・ポインタの型不一致 1 件 (171 → 170)、128bit レーン型 1 件 (167 → 166)。
 - 本体の lane 読みは、(float) の数値変換から、ビット列 (`u2f`) へ直した。機械語の `addps` は lane のビットを float として加算するため。
 - ホスト gcc で、機械語 (`addps`・`movlps`) と生成 C 本体の突合 200,000 試行 **mismatches 0**。ネガティブコントロール (減算に変えた誤実装) は **117,490 件** で FAIL を検出した。
 
@@ -31,30 +31,31 @@
 ## 測定
 
 - 測定 commit (コードを変えた最後の commit): `ca1f38304` (`ghidra_to_c.py` の規則追加)。
-- 測定 commit から現 HEAD (`65cdeaf30`) までの差分: `git diff ca1f38304 HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` は **4 行** (`ghidra_route/patches.py` +4。main 取り込みで入った #4835 の ABI 規則 `delay 2666 FUN_180fbbfb8 rcx=param_1 (FUN_180fbdfcc)`)。本 PR の変更ではないが、`name == 'delay'` の変換に効くため、下表の census は HEAD の実行コードの値ではない。
-- **HEAD `65cdeaf30` での再測定は未実施** (本 run に `plugins-kilohearts` (`HeartCore.core_64`) と `toolchain-emsdk` が無かった)。下表は `ca1f38304` 時点の実測値で、現 HEAD の census は未確定。再測定は `oc_artifacts: plugins-kilohearts toolchain-emsdk` を付けた run で行い、結果で下表を置き換える。
-- 基準: 同じ素材・同じ道具で、`git archive origin/main` の `ghidra_route`・`snapins/lift`・`snapins/scripts` を使う変換器の出力。
-- 素材: `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`、76,642,304 B)。`toolchain-emsdk` (emcc 6.0.12)。Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致・JDK 21)。
-- decompile: 挿入順の lift 集合 (142 件・重複 1 件) で **142/142 OK** (wall 40 s)。
-- 変換: `ghidra_to_c.py delay … --fix bitcast,intload,stackpair,assoc,concat`。emcc: `emcc -c -ferror-limit=0`。load: 測定時 0.4〜1.3 (4 vCPU)。
+- 測定 commit から HEAD までの差分: `git diff ca1f38304 HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` は **4 行** (`ghidra_route/patches.py` +4。main 取り込みで入った #4835 の ABI 規則 `delay 2666 FUN_180fbbfb8 rcx=param_1 (FUN_180fbdfcc)`)。`name == 'delay'` の変換に効くため、この差分の分を下表の census は含む。
+- 測定 HEAD: `bb49a5ec0` (下表は HEAD で再測定した実測値)。基準: `origin/main` `7103cff33`。
+- 測定 commit `ca1f38304` を同じ道具で取り直すと census は 416 (下の参考行を参照)。
+- 素材: `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`、76,642,304 B。sha256 `d55ce8b4…`)。`toolchain-emsdk` (`/opt/emsdk`、emcc 6.0.12)。Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致・JDK 21)。
+- decompile: `gtype_census.sh` の lift 集合で DecompEach (151 件 OK)。
+- 変換: `ghidra_to_c.py delay … --fix bitcast,intload,stackpair,assoc,concat`。emcc: `emcc -c -ferror-limit=0`。基準は `git archive origin/main` の `ghidra_route`・`snapins/lift`・`snapins/scripts/approx_tables.b64` の変換器 (同じ decompile 出力を入力)。
 
-| 分類 | 基準 (main) | 本 PR |
+| 分類 | 基準 (main `7103cff33`) | 本 PR (`bb49a5ec0`) |
 |---|---|---|
 | 未関数化 callee | 0 | 0 |
 | 128bit レーン型 | 167 | 166 |
-| 引数数不一致 | 80 | 80 |
+| 引数数不一致 | 79 | 79 |
 | 演算・代入・ポインタの型不一致 | 171 | 170 |
-| **合計 (census)** | **418** | **416** |
-| emcc error 行 (`error:`) | 418 | 416 |
+| **合計 (census)** | **417** | **415** |
+| emcc error 行 (`error:`) | 417 | 415 |
 
-- 消えた 2 件の内訳: 演算・代入・ポインタの型不一致 1 件 (171 → 170) と 128bit レーン型 1 件 (167 → 166)。**行番号は未確認**。census の入力 (`plugins-kilohearts` の `HeartCore.core_64`) が本 run の素材に無く、diff 前後の `error:` 行を取り直せなかったため、どの行が消えたかは特定していない。特定は census の再実行 (素材が揃った run) で行う。
-- 注: この census は `main` (`0f5bcaa89`) の decompile から作ったもので、#4687 §9 の 441 件とは取り方が違う (decompile の集合・規則が main の進みで変わった)。差分の比較は同じ条件 (本 PR と基準) の値で行った。
+- 消えた 2 件 (行番号つきの diff で確認): `delay.c:1271:74` (`undefined8 *` を `float *` に渡す・分類は型不一致 171 → 170) と `delay.c:1271:86` (`undefined1[11][16]` を `float *` に渡す・分類は `undefined1[N]` を含むためレーン型 167 → 166)。
+- 参考 (同じ道具の測定 commit): `ca1f38304` の census は 416 (レーン 166・引数数不一致 80・型不一致 170)。main 取り込みで入った #4835 の ABI 規則 (`patches.py` `delay 2666`) が引数数不一致を 80 → 79 に変えた。
+- Gain/Haas/Gate の `.o` は HEAD と基準で一致 (`gtype_census.sh` の `旧規則と一致` 3 件。gain 1435 B・haas 3217 B・gate 3756 B)。
 
 ## 回帰 (Gain/Haas/Gate への影響)
 
 - 規則は `name == 'delay'` のガード内 (`DELAY_RULES`) にだけ入るため、Gain/Haas/Gate の変換は通らない。
 - 規則の件数 assert (`delay rule hit … want 1`) は、規則が 1 件ずつ当たることを変換時に検査する (外れると変換が止まる)。
-- Gain/Haas/Gate の `.o` の `cmp` は、本 PR では未実施 (decompile 集合が `work/ghidra/out` 側で別に必要なため)。これは Gain/Haas/Gate の既存測定 (`build_cmp.sh`) の範囲で、本 issue の範囲外。
+- Gain/Haas/Gate の `.o` は、本 PR (HEAD `bb49a5ec0`) と基準 (main) で `cmp` 一致 (測定節の `旧規則と一致` 3 件)。
 
 ## 単体突合 (機械語 vs 生成 C 本体)
 
@@ -68,7 +69,5 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | Delay の native 突合 (1000 trial bit-exact) | 宣言型の正しさは機械語の読みと単体突合で示したが、Delay 全体の出力は未確認 | #3073 [KH-41] |
-| Gain/Haas/Gate の `.o` の cmp (本 PR の規則の非影響の実測) | 規則のガードで影響しないと判断。実測は未実施 | 本 PR の範囲外 (規則は delay ガード内) |
-| 残件 416 (レーン 166・引数数不一致 80・型不一致 170) | Delay の emcc が通らない | #3801 [KH-65]・#3808 [KH-67]・#3809 [KH-68]・#3844 [KH-79]・#3847 [KH-73] (既存の起票先) |
-| 消えた 2 件の行番号 (census の diff 前後の `error:` 行) | 内訳は分類差分のみ確認。行の特定は未実施 | 本 PR の範囲外 (census 素材が揃った run で再測定) |
-| 突合 `work/kh136/check.c` の repo 外 (gitignore) | 200,000 試行の突合を repo から再現できない | 未起票 (突合スクリプトの追跡化は issue 未作成。再現手順は上の「単体突合」節) |
+| 残件 415 (レーン 166・引数数不一致 79・型不一致 170) | Delay の emcc が通らない | #3801 [KH-65]・#3808 [KH-67]・#3809 [KH-68]・#3844 [KH-79]・#3847 [KH-73] (既存の起票先) |
+| 突合 `work/kh136/check.c` の repo 外 (gitignore) | 200,000 試行の突合を repo から再現できない | #3073 [KH-41] (Delay の突合を扱う既存 issue。突合スクリプトの追跡化は同 issue の範囲。新規起票はしない。再現手順は上の「単体突合」節) |
