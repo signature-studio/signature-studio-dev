@@ -9,12 +9,12 @@
 - B 6 site のうち **5 site の起点を特定した** (§2)。1003c20 は分岐の欠落 (lift 段)、12a4450 は loop 脱出の読みが IR で別の値 (`trunc(%indvars.iv)`) に置き換わっている、1046a30・11f16b0・ff8b60 は読み出しの欠落ではなく計数の差 (X 形式の読みの未計数 2 件・直前の読みの再利用 1 件)。
 - **128c320 (site 128ca3f) は起点が未特定**。機械語 7 読みに対し IR 3 読み。残りの対応は支配関係の確定が要るため子 issue **#3612 [LD-168]** に移した。
 - 判定 (TRUE_DROP) は 6 site とも変えない。store site の読みは 1 段に潰れており、TRUE_DROP の根拠は残る。変えたのは B の内訳だけ (§8)。
-- 修復 pass・修復数 (9) は変えない。局所では 1 対 1 に見える 2 site (11f1785・104c3f0) は、関数単位のゲートの見直しを子 issue **#3613 [LD-169]** に移した。
+- 修復 pass は変えない。main 取り込み後の修復数は 13 (#2794 の 1 対 1 の 9 と #2910 の callarg の 4。§9-1)。局所では 1 対 1 に見える 2 site (11f1785・104c3f0) は、関数単位のゲートの見直しを子 issue **#3613 [LD-169]** に移した。
 - e2e `bash tools/m11/ldfix/fix_d17_e2e.sh` は rc=0 (§9)。
 
 ## 1. 測定条件
 
-- 測定 commit: 本 REPORT の追加と同じ commit (コード変更は `tools/m11/ldfix/origin_b_2940.py` の新規追加だけ。修復の経路は変えていない)。測定 commit は §9 に書く。
+- 測定 commit: `8e9634449` (main 取り込みの merge commit。main 側の #2910 の修復 (`fix_spill_2794.py`・`results/`) を含む。本 PR のコード変更は `tools/m11/ldfix/origin_b_2940.py` の新規追加だけ)。測定 commit は §9-1 に書く。
 - 素材: `work-m11` を `$RUNNER_TEMP/m11x` に展開し、`M11_WORK=$RUNNER_TEMP/m11x/tools/m11/work` で指定 (`tools/m11/work/` への展開は行わない)。`work-m11` は #516 以前の snapshot (REPORT_1169 §1 と同じ注意)。emcc は runner の `[EMSDK]`。`fl-win64`・`toolchain-retdec`・`toolchain-emsdk`・`work-liftdiff` は本 REPORT の e2e・スクリプトでは未使用 (`oc_artifacts` 行は既存の依頼どおり残す)。
 - 実行: `bash tools/m11/ldfix/fix_d17_e2e.sh` (`TMPDIR` は `RUNNER_TEMP`、foreground)、`python3 tools/m11/ldfix/origin_b_2940.py` (機械語と IR の対応表)。
 
@@ -76,7 +76,7 @@ M = 機械語で X (= K + 0x400000) を rip 相対で読む命令の数 (`origin
 
 - TRUE_DROP (6 site) は変えない。6 site の store site の読みは、いずれも IR で 1 段 (`load iN` の i32) に潰れている。これは TRUE_DROP の根拠であり、読みの欠落や計数の差では消えない。
 - 変えたのは B の内訳だけ: 欠落確定 (1)・差し替え (5)・計数 (2・3・6)・未特定 (4)。
-- `results/spill37_1169.tsv`・`results/spill_repair_2794.tsv` は変えない (e2e の `cmp` で一致を確認)。修復 pass (`fix_spill_2794.py`) も変えない。修復数は 9 のまま。
+- `results/spill37_1169.tsv`・`results/spill_repair_2794.tsv` は本 PR では変えない (e2e の `cmp` で一致を確認)。修復 pass (`fix_spill_2794.py`) も本 PR では変えない。修復数は main 取り込み後に 13 (§9-1)。
 - 修復の見直し候補: 11f1785 (site 3) と 104c3f0 (site 2) は、局所で 1 対 1 だが関数単位のゲートで見送られている。子 #3613 [LD-169] に移した。
 
 ## 9. 検証 (受入 3) とネガコン
@@ -90,17 +90,18 @@ M = 機械語で X (= K + 0x400000) を rip 相対で読む命令の数 (`origin
 
 ### 9-1. 実測 (測定 commit と e2e)
 
-- 測定 commit: `fc594f86a` (コードを変えた最後の commit。`origin_b_2940.py` の追加。修復の経路は変えていない)。
+- 測定 commit: `8e9634449` (コードを変えた最後の commit。`main` (f6fd31b8d) の取り込み)。main 側で `fix_spill_2794.py`・`results/spill_repair_2794.tsv` 等が #2910 により変わったため、取り込み前 (`fc594f86a`) の測定は無効になった。
 - 測定 commit からの差分 (修復の経路の範囲。空 = 0 件):
 
   ```
-  git diff fc594f86a HEAD -- tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf*.py tools/m11/ldfix/ldmach*.py tools/m11/ldfix/spill37_1169.py tools/m11/ldfix/fix_spill_2794.py tools/m11/ldfix/check_spill_2794.py tools/m11/ldfix/results tools/m11/lb_base.py
+  git diff 8e9634449 HEAD -- tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf*.py tools/m11/ldfix/ldmach*.py tools/m11/ldfix/spill37_1169.py tools/m11/ldfix/fix_spill_2794.py tools/m11/ldfix/check_spill_2794.py tools/m11/ldfix/results tools/m11/lb_base.py
   (空: 差分 0)
   ```
 
-- e2e `bash tools/m11/ldfix/fix_d17_e2e.sh` (HEAD で n=2): rc=0 / rc=0、real 47.17 s / 47.15 s、load average (1 分、実行前) 0.50 / 0.77。REPORT_2794 の測定 (46.84 s / 46.51 s) と同じ範囲。
-- e2e の出力: 修復 9 / 見送り 15 (`spill fixed=9 skipped=15`)、spill 宛 CELL_COLLAPSED 37 → 28、`check_spill_2794.py` RESULT: PASS、ネガコン 2 (`--gate none`) は `spill fixed=24 skipped=0`、emcc `-c -O0 -g1` rc=0。
-- `origin_b_2940.py`: 0.6 秒。M は 2/3/3/7/4/2、I(K) は 1/2/2/3/3/1 (§2)。
+- e2e `bash tools/m11/ldfix/fix_d17_e2e.sh` (HEAD で n=2、`M11_WORK` = work-m11 の展開先): rc=0 / rc=0、real 30.56 s / 30.46 s、load average (1 分、実行前) 0.47 / 0.49。
+- e2e の出力 (2 回とも同じ): 修復 13 / 見送り 11 (`spill fixed=13 skipped=11 fixed_fns=10`。#2794 の 1 対 1 の 9 と #2910 の callarg の 4)、spill 宛 CELL_COLLAPSED 37 → 28、`check_spill_2794.py` RESULT: PASS、ネガコン 2 (`--gate none`) は `spill fixed=24 skipped=0`、ネガコン 3 (`--gate 1to1`) と ネガコン 4 (argi を 1 つずらす) は `spill fixed=9 skipped=15`、emcc `-c -O0 -g1` rc=0。
+- 取り込み前 (`fc594f86a`) の測定 (参考): 修復 9 / 見送り 15、real 47.17 s / 47.15 s。main の #2910 が callarg 根拠の 4 site を加えたため修復数が 13 に増えた。本 PR の B 6 site は修復の対象外のまま (§8)。
+- `origin_b_2940.py`: 0.4 秒 (HEAD で rc=0)。M は 2/3/3/7/4/2、I(K) は 1/2/2/3/3/1 (§2)。
 
 ## 10. 検証の再現
 
@@ -122,5 +123,5 @@ M11_WORK=<同> bash tools/m11/ldfix/fix_d17_e2e.sh
 ## 12. 再現 (コマンドの詳細)
 
 - 対応表: `M11_WORK=… python3 tools/m11/ldfix/origin_b_2940.py` (0.6 秒)。
-- e2e: `M11_WORK=… bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground、HEAD で 47.2 秒・§9-1)。
+- e2e: `M11_WORK=… bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground、HEAD で 30.5 秒・§9-1)。
 - 素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff`。
