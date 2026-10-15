@@ -46,11 +46,11 @@ issue #4347 の受入 1 は満たしていない。`Refs #4347` の部分達成�
 
 - 新 probe: `tools/python/analysis/flapi/pe_py321_upstream.py` (8 件・全 PASS)。0x410090 の参照形態 (direct・RIP・即値は 0 件、絶対 qword は 3532 件を検出) と、msgid 0x057f の送り手の 4 命令 (0xfdd5ea・0xfdd5f9・0x60c22c・0x60c24f) を照合する。
 - 旧版の絶対 qword 判定は誤り (§1)。修正版を次 run 以降の基準とする。
-- 既存 probe: `tools/python/analysis/flapi/pe_py274_dispatch.py` 8/8 PASS (worktree 検証時 37.9 秒、load 0.78)。
-- 測定 commit (コードを変えた最後の commit): `8b902f6a9`。
+- 既存 probe: `tools/python/analysis/flapi/pe_py274_dispatch.py` 8/8 PASS・終了 0・所要 28.6 秒・load average (1 分値・4 コア) 1.15。
+- 測定 commit (コードを変えた最後の commit): `864aca131`。
   - `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py321_upstream.py`
-  - 所要 2 分 7 秒 (実測)、load average (1 分値・4 コア) 0.97。PASS 8/8。
-- 差分の証跡: `git diff 8b902f6a9 HEAD -- tools/python/analysis/flapi` は本 REPORT の commit 時点で 0 行 (probe を変えていない)。
+  - 所要 1 分 35 秒 (実測)、終了 0、load average (1 分値・4 コア) 1.24。PASS 8/8 (`0x410090` の絶対 qword 件数 3532)。
+- 差分の証跡: `git diff 864aca131 HEAD -- tools/python/analysis/flapi` は 0 行 (測定後に probe を変えていない)。
 
 ## 5. 未解決 (起票先)
 
