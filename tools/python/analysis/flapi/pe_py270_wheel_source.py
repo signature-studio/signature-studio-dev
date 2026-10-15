@@ -142,7 +142,7 @@ check("負の対照: r9 条件を外すと候補が 2 件より増える", len(l
 wd = [(a, m, o) for a, m, o in INS if re.match(r"^movsx\s+\w+,\s+word ptr \[\w+ \+ 0xa\]$", f"{m} {o}")]
 check("movsx word [reg+0xa] の読込みは 11 箇所 (9 関数)", len(wd) == 11 and len({fn_of(a) for a, _, _ in wd}) == 9,
       f"{len(wd)} / {len({fn_of(a) for a, _, _ in wd})}")
-check("0x60dc10 は WheelDelta を読み、拡大率へ換算する (wParam の Keys 0x40 の分岐つき)",
+check("0x60dc34 は WheelDelta (movsx rax, word ptr [rsi+0xa]) を読む (Keys 0x40 の分岐と換算は未検査)",
       any(a == 0x60DC34 and "movsx rax, word ptr [rsi + 0xa]" in f"{m} {o}" for a, m, o in INS))
 
 # 5. WM_MOUSEWHEEL の受取の連鎖 (0x612aa0 → 0x60c220 → 仮想 [rbx+0x80])
