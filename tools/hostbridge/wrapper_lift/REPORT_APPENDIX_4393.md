@@ -1,8 +1,8 @@
 # REPORT 付録 — #4393 (HB-H54): `statement not in loop` 27 件の飛び先注釈欠落の原因切り分け
 
-> **正本**: `tools/hostbridge/wrapper_lift/REPORT.md` §15。本付録は計測の全文。
+> **正本**: `tools/hostbridge/wrapper_lift/REPORT.md` §12。本付録は計測の全文。
 
-測定 commit: `093bed7c1` (本 PR の測定コードを入れた最初の commit。`notloop_probe.py` の追加のみ)。検証 HEAD は同じ commit。
+測定 commit: `093bed7c1` (本 PR の測定コードを入れた最初の commit。`notloop_probe.py` の追加のみ)。測定 commit から HEAD までの差分は docs のみ (`git diff 093bed7c1 HEAD` の stat は PR 本文に併記)。
 素材: `fl-win64` (`extracted/block19091_PE.bin`)・`toolchain-retdec` (RetDec v5.0)・`toolchain-emsdk` (emcc 6.0.12)。`$RUNNER_TEMP` に展開。load average (1 分値) 0.26–0.72。
 起点: origin/main `8635f4546` から `4393-retdec-statement-not-in-loop` を切った worktree。
 
@@ -26,13 +26,13 @@
 
 19 組すべてについて、飛び先 VA は当該関数の線形 decode (capstone、`Image.read`) の命令境界。
 - 19 組すべて命令境界 (boundary)。decode 範囲の欠落や、飛び先が命令の途中に当たる、という原因ではない。
-- 19 組中 16 組は同じ関数内に飛び先への直接 jump がある。残り 3 組は無い (`0x44ac34`・`0x7c3322`・`0x487f31`)。直接 jump が無い組も命令境界上にあり、RetDec が fall-through で到達する位置と推定する (未検証)。
+- 【手動観察・probe 外・未再現】19 組中 16 組は同じ関数内に飛び先への直接 jump があり、残り 3 組 (`0x44ac34`・`0x7c3322`・`0x487f31`) は無いように見えた。`notloop_probe.py` は直接 jump の有無を出力しないため、この数値は本付録の測定では再現していない。直接 jump が無い組も命令境界上にあり、RetDec が fall-through で到達する位置と推定する (未検証)。
 
 ### 2.2 原因: RetDec の backend 最適化段で注釈付きブロックが落ちる
 
 同じ関数を `--backend-no-opts` で再 lift すると、19 組すべてで飛び先の注釈 `// 0x<VA>` が出力 C に現れる (`noopt_annotated` 19/19)。既定 (最適化あり) では 0 件。
 
-代表例 `function_732ae0` (`0x732ae0-0x732b95`、飛び先 `0x732b75`):
+代表例 `function_732ae0` (`0x732ae0-0x732b95`、飛び先 `0x732b75`)。以下は【手動観察・probe 外・未再現】。`notloop_probe.py` は `.ll` を出力せず、`.ll` の内容と既定 C の差分は本測定で再現していない:
 
 - 飛び先 `0x732b75` は `mov al, 1; jmp 0x732b88` (戻り値 1 の経路)。
 - `--backend-no-opts` で出た `.ll` には `dec_label_pc_732b75` のブロックが存在する (`br label %dec_label_pc_732b88`)。backend の最適化を切らない限り IR は残る。
@@ -52,4 +52,4 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 統合を行う backend 最適化パスの特定 (`--backend-disabled-opts` の二分探索) | 27 件の直し方が決まらない | #1954 (HB-H41) |
-| `--backend-no-opts` の出力での wasm 実行 (bit 一致) | 27 件の制御構造の正しさ未検証 | #829 (HB-H20) 系 |
+| `--backend-no-opts` の出力での wasm 実行 (bit 一致) | 27 件の制御構造の正しさ未検証 | #1954 (HB-H41) |
