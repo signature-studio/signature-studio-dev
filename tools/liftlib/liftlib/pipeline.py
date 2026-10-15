@@ -110,6 +110,13 @@ def _repair_ll(cfg, raw_path, img, log, detect_only=False):
         iargs.run(mod, img, lg, st, repair=rep)
         stats["iargs"] = st
         log.extend("iargs: " + x for x in lg)
+    if (passes.get("icall") or {}).get("entry_args") and rep:
+        stats["icall_entry_args"] = {}
+        for fn in mod.funcs():
+            if fn.name in names:
+                nent = ICALL.entry_blk_args(fn)
+                stats["icall_entry_args"][fn.name] = nent
+                log.append("icall.entry_args: %s %d BLK reads -> %%arg" % (fn.name, nent))
     if passes.get("f2", True):
         st, lg = {}, []
         f2.run(mod, img, lg, st, repair=rep, only=passes.get("f2_only"), phase="callee")
