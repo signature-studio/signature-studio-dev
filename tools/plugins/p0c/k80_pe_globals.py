@@ -8,7 +8,7 @@ RetDec 由来の IR は .data に初期値を持つ global を `global iN 0` に
 PE の実バイト (little-endian) の値を入れる。PE の値が 0 のものは 0 のまま。
 関数本体には触れない。
 
-ゲート (fail-closed): EXPECT と SKIP 以外の置換対象が出た場合、EXPECT の global が IR に無い / PE の初期化済み範囲の外の場合は止める。
+ゲート (fail-closed): EXPECT 以外の置換対象が出た場合、EXPECT の global が IR に無い / PE の初期化済み範囲の外の場合は止める。
 """
 import json
 import os
@@ -21,9 +21,7 @@ from paths import FL_WIN64_DIR  # noqa: E402
 import pefile  # noqa: E402
 
 PE = os.path.join(FL_WIN64_DIR, 'extracted', 'block18983_PE.bin')
-EXPECT = [0x6fffb0]  # PE .data の (0.5, 0.5) (f64 x2)。#2182 の kernel 0x5e03f0 の修復に必要
-# 同じく .data の 0 初期化 i128 だが、置換すると kernel 0x5e1280 の buf_diff が 0 から 3996 になるため対象外 (#3281 実測)
-SKIP = [0x6fc26c]
+EXPECT = [0x6fffb0, 0x6fc26c]  # 0x6fffb0: PE .data の (0.5, 0.5) (#2182 の kernel 0x5e03f0 の修復)。0x6fc26c: 同種の 0 初期化 i128 (PE 値は f32 x4 の表)
 LINE = re.compile(r'^@global_var_([0-9a-f]+) = (.*?)global (i(8|16|32|64|128)) (-?\d+)$')
 
 
@@ -69,7 +67,7 @@ def replace_globals(text, raw, secs):
         if pv == 0 or (cur != 0 and cur != signed(pv, bits)):
             out.append(line)
             continue
-        if cur == 0 and va not in EXPECT and va not in SKIP:
+        if cur == 0 and va not in EXPECT:
             raise SystemExit('[pe_globals] 想定外の置換対象 @global_var_%x (PE 値 %d)' % (va, pv))
         if va not in EXPECT:
             out.append(line)

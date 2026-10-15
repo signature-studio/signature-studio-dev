@@ -44,7 +44,7 @@ FIX18 = ['0x5de620', '0x5dea40', '0x5dec40', '0x5dedb0', '0x5dee20', '0x5dee50',
          '0x5dfae0', '0x5dfbe0', '0x5dfc90', '0x5dfdb0', '0x5dffc0', '0x5dfff0', '0x5e0300',
          '0x5e0350', '0x5e03f0', '0x5e12c0', '0x5e1490']
 HB_N = 14  # k80_hand_bodies.py の BODIES 14 (#2182)
-PE_N = 1  # k80_pe_globals.py の置換対象 (0x6fffb0 = (0.5, 0.5) · #2182)
+PE_N = 2  # k80_pe_globals.py の置換対象 (0x6fffb0 = (0.5, 0.5) #2182 / 0x6fc26c = 同種の i128 0 初期化 #3281)
 EXT_FUNCS = 'function_5dfc90,function_5dfbe0,function_5dfd30,function_5dfdb0'
 EXT_CHOPF = 'function_5dfbe0,function_5dfc90,function_5dfdb0'
 EXT_CHOPR = '5dfbe0:5dfc0a-5dfc7c,5dfc90:5dfcb5-5dfd1e,5dfdb0:5dfded-5dfe40'
