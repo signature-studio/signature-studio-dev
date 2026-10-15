@@ -45,7 +45,7 @@
 
 - 測定 commit: `f9da4f150` (コードは `9f02a5b69` から 12 files 変更。§3 の diff 参照)。測定は `f9da4f150` の worktree で実施。日付 2026-10-15 (UTC 10:57〜10:58)。
 - 入力: `plugins-kilohearts` (`Kilohearts Offline Installer.zip`) → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B (sha256 先頭 16 hex `d55ce8b4c0ad7ebe`。§2 と同一)。抽出は `extract_installer.sh` の Windows 部分と同じ手順を `$RUNNER_TEMP/kh/` で行った (repo に生成物は置かない)。
-- ツール: 既存の `/opt/retdec` (RetDec)・`/opt/emsdk` (emsdk) を使用。`toolchain-retdec`・`toolchain-emsdk` の素材は展開していない (両者が同一版かは未確認)。
+- ツール: 既存の [RETDEC] (RetDec)・[EMSDK] (emsdk) を使用。`toolchain-retdec`・`toolchain-emsdk` の素材は展開していない (両者が同一版かは未確認)。
 
 | 実行 | 結果 |
 |---|---|
