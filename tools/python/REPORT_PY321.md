@@ -61,7 +61,8 @@ issue #4347 の受入 1 は満たしていない。`Refs #4347` の部分達成�
   - 非分岐命令の即値・disp32・絶対アドレスとして表 slot の VA (または下位 32 bit) が現れるもの 0 件 (`pe_py321b_rbx80.py` の assert 5 で実測)。分岐命令は検査対象外。
 - 含意: 0x410090 は静的な表から `[rbx+0x80]` へ写される経路では無いことを、上記の範囲で確認した。書込みは実行時 (オブジェクト生成・プロパティ設定) と見られる。この経路の特定には動的 trace か、3531 件の所属 (VMT かどうか) を別 probe で確定する必要がある。未確定。
 - probe: `tools/python/analysis/flapi/pe_py321b_rbx80.py` (5/5 PASS・終了 0・HEAD `62017c2f8` で実測: 所要 33.5 秒・load average 1.37)。
-- 再検証 (HEAD で再実行): `pe_py274_dispatch.py` 8/8 PASS・終了 0・所要 37.0 秒。`pe_py321_upstream.py` 8/8 PASS・終了 0・所要 2 分 01 秒 (前回の 1 分 35 秒より長い。load average 1.29)。
+- 再検証 (測定 commit `62017c2f8` 以降の HEAD `4ac84ac76` で再実行): `pe_py274_dispatch.py` 8/8 PASS・終了 0・所要 31.5 秒 (load average 0.94)。`pe_py321_upstream.py` 8/8 PASS・終了 0・所要 1 分 47 秒 (load average 1.20〜1.03)。
+- 測定 commit: `62017c2f8` (probe を変えた最後の commit)。差分の証跡: `git diff 62017c2f8 HEAD -- tools/python/analysis/flapi` は 0 行 (以後の commit は REPORT のみ)。
 
 ## 5. 未解決 (起票先)
 
