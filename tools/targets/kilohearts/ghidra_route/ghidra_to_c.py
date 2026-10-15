@@ -40,12 +40,13 @@ STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ル
     0x180fe5c74: 'longlong FUN_180fe5c74() { abort(); return 0; }',
     0x180fe2508: 'longlong FUN_180fe2508() { abort(); return 0; }',
 }
-# IAT thunk (jmp [rip+disp] → KERNEL32 の import) → fail-fast stub。Ghidra は thunk の引数を落として `func_0x000<va>(...)` と呼ぶ。
-# 引数無しの定義 (`()`) は呼出の arity を問わない。Win API の意味は実装しない (到達時に abort し、突合で検出する)。
+# THUNK: Ghidra が `func_0x000<va>(...)` と呼ぶ callee → fail-fast stub。引数無しの定義 (`()`) は呼出の arity を問わない。
+# 到達時に abort し、突合で検出する。2 種類ある: (a) IAT thunk (jmp [rip+disp] → KERNEL32 の import)・(b) 未関数化 callee (本体を decompile していない VA)。
 THUNK = {
+    # (a) IAT thunk。Win API の意味は実装しない
     0x180fd81e4: 'longlong func_0x000180fd81e4() { abort(); return 0; } /* KERNEL32!FlsGetValue */',
     0x180fd81ec: 'longlong func_0x000180fd81ec() { abort(); return 0; } /* KERNEL32!FlsSetValue */',
-    # 未関数化 callee (delay 閉包の外)。decompile せず fail-fast stub にする。`func_0x000<va>` 形の呼出が残る。
+    # (b) 未関数化 callee (delay 閉包の外)。decompile せず fail-fast stub にする
     0x180fbdef4: 'longlong func_0x000180fbdef4() { abort(); return 0; } /* 未関数化 callee (stub) */',
     0x180fbdd78: 'longlong func_0x000180fbdd78() { abort(); return 0; } /* 未関数化 callee (stub) */',
 }
@@ -197,8 +198,10 @@ def main():
         if n not in EXT_CTYPE:
             raise SystemExit('未定義 identifier の型が未確定 (停止): ' + n)
         ext[n] = int(n[4:], 16)
+    gd_done = set(gtypes)  # 同じ VA を指す名前 (例 DAT_x と uRam0000000x) があっても gd 配列は 1 回だけ定義する
     for n, va in sorted(ext.items(), key=lambda kv: kv[1]):
-        if va not in gtypes:
+        if va not in gd_done:
+            gd_done.add(va)
             d = pe_bytes(pe, va, 16)
             out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
         out.append('#define %s (*(%s*)gd_%x)' % (n, EXT_CTYPE[n], va))
