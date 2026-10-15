@@ -2,7 +2,8 @@
 //   node tests/provider_expect_sim.mjs <worktree の tools/python> new <tag> <fn> <0|1>
 //     provider_expect/<tag>.json を 1 つ足し、provider/fl_engine.c と host/fl_mock.mjs に実装行を足す (0: screen 側, 1: channels 側)
 //   node tests/provider_expect_sim.mjs <worktree の tools/python> old <tag> <fn> 0
-//     旧方式の再現 (provider_check.mjs 本体に const・OR 連鎖・件数 assert を足す)。基点は pe136 入りの provider_check.mjs (592f4c8e0)
+//     旧方式の再現 (provider_check.mjs 本体に const・OR 連鎖・手書き件数 assert を足す)。基点は旧方式の provider_check.mjs (origin/main の手書き件数版)。
+//     件数は正規表現で拾い、基点の値に +1 / -1 する (値は基点ごとに違うため固定しない)
 //   競合の判定: git merge-tree --write-tree --name-only <A> <B>  (REPORT_PY280.md §5)
 import fs from "node:fs";
 const [dir, mode, tag, fn, anchor] = process.argv.slice(2);
@@ -25,9 +26,11 @@ if (mode === "new") {
 } else {
   const p = rd("tests/provider_check.mjs").split("\n");
   insertBefore(p, (l) => l.startsWith("let impl = 0, unimpl = 0;"), `const ${tag} = new Set(["${fn}"]);`);
-  const s = p.join("\n")
-    .replace("|| pe136.has(id)) assert.ok", `|| pe136.has(id) || ${tag}.has(id)) assert.ok`)
-    .replace("assert.equal(impl, 186); assert.equal(unimpl, 249);", "assert.equal(impl, 187); assert.equal(unimpl, 248);");
+  const s0 = p.join("\n");
+  const s = s0
+    .replace(/\|\| (\w+)\.has\(id\)\) assert\.ok/, (_, v) => `|| ${v}.has(id) || ${tag}.has(id)) assert.ok`)
+    .replace(/assert\.equal\(impl, (\d+)\); assert\.equal\(unimpl, (\d+)\);/, (_, a, b) => `assert.equal(impl, ${+a + 1}); assert.equal(unimpl, ${+b - 1});`);
+  if (s === s0) throw new Error("old: anchor missing");
   wr("tests/provider_check.mjs", s);
 }
 console.log(`sim ${mode} ${tag} ${fn} ok`);
