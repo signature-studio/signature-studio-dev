@@ -106,7 +106,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | ゲート `0x60c220`・`0x728f50`・`0xfdeaf0` の戻り値と mode の源 (`0xfdd270` の表・`0x81c0a0`・`[0xfdd2b9]`) | 15 関数の送出の成否 | #3758 (PY-245) |
-| 送出キーの mock/C 実装 (15 関数)、ui_diff 差分 0、provider_check・all_tools の期待値 | 受入 3〜5 (mock/C は未実装) | #3759 (PY-246) |
-| `selectWindow` の shift の符号 (PE は arg>0 で修飾 0、stub は `shift: bool`) | 引数契約 | #3759 (PY-246) |
+| 送出キーの実装は PY-246 で済 (15 関数・`tests/ui_keys_diff.mjs` 差分 0)。未達: `FL_ENGINE=wasm node tests/all_tools.mjs` 48/48 と `provider_check.mjs` の flpy 経路 (素材展開先の `fetch_inputs.sh` が `/home/ubuntu` 前提で未実行) | 受入 4・5 | #3759 (PY-246・残り) |
+| `selectWindow` の shift の符号 (PE は arg>0 で修飾 0、stub は `shift: bool`)。PY-246 は PE の符号 (arg>0 で Tab) を採り、mock/C ともに同じ符号で記録する | 引数契約 (stub 側の `shift` 名と不一致のまま) | #3759 (PY-246) |
 | jog 系 5・previous/next・moveJog・horZoom/verZoom・snapOnOff の作用先、`ui.scrollWindow` の `0xd843d0` | 12 関数の作用 | #3761 (PY-247) |
 | 戻り値の値と型 (`0x415610` の out+8 既定値・`0x15e4280`・`0xc38bc0`) | 27 関数の戻り値 | #3034 (PY-141) |
