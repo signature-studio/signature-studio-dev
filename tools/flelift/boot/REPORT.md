@@ -236,6 +236,15 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 | survey 補修なし (`FLE_SURVEY_NOREPAIR=1`) | `InitTable == 0` で不成立 (`survey.error`) |
 | survey mode 0 (`FLE_IPP=0`) | `InitTable == 0` で不成立。`survey_seg_0.json` の boot は units 209・exit code 0 |
 
-- 補修あり/なしの load: 測定時の loadavg 1.7〜1.8 (1 分)。
-- mode 0 の boot 単独の再採取は、`fle_boot.mjs` の `import(cjs)` 相対解決で失敗したため未実施 (survey 実行時の値を引用)。
-- 未解決: 補修の判定への影響 → #4901 [FLE-33]。unit 280 / 659 / 895 の補修なし unlifted → #4855 [FLE-32]。
+- 未解決: 補修の判定への影響 → #4901 [FLE-33]。unit 280 / 659 / 895 の補修なし unlifted → #4855 [FLE-32]。注記 (load・mode 0 の未実施) は付録 §5。
+
+## 13. #4931: 既定経路 (mode 3) の survey で 942 unit を分類し covered=942
+
+- **結論**: 既定経路 (mode 3・補修あり) の survey で 942 unit を分類 (ok 895 / empty 46 / noproc 1)。`merge_survey.py` の covered は 942。詳細・再現・差分確認は `REPORT_APPENDIX_4931.md` (分割移動)。
+
+| 項目 (測定 commit `ceb5a0ba6`) | 結果 |
+|---|---|
+| boot 既定 (mode 3) / survey (1 セグメント) | units 895・IPP ok・窓無し / ok 895・empty 46・noproc 1 (942・重複 0) |
+| `merge_survey.py` | `covered=942` (規則テスト `merge_survey_test.py` で固定) |
+
+- 未解決: 補修が判定を変えるか → #4901 [FLE-33]。unit 280/659/895 の補修なし unlifted → #4855 [FLE-32]。
