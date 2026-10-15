@@ -147,7 +147,7 @@
 対象は 6.3 の終端 7 箇所 (スロット `[rbp+X]` の直前 store と、AMBIG の合流元)。
 
 - `[rbp+X]` を基底・複製元とする 5 件 (スロット直前 store の格納値):
-  - 0x1021826 (COPY rax ← `[rbp+0x150]`): 直前 store 0x10216ff `mov [rbp+0x150], rcx`、rcx = ENTRY 第 1 引数 (ecx)。窓 111 命令、窓内の非境界の飛び先 1 件 (0x1021733) の注記あり。
+  - 0x1021826 (COPY rax ← `[rbp+0x150]`): 直前 store 0x10216ff `mov [rbp+0x150], rcx`、rcx = ENTRY 第 1 引数 (ecx)。窓 111 命令、窓内の非境界の飛び先 1 件 (0x1021733) の注記あり。スクリプトはこの飛び先を「線形走査のずれの疑い」と判定する (窓は線形走査の再同期結果のため、この判定をそのまま採る)。
   - 0x12ab8e8 (COPY rax ← `[rbp+0xa0]` の movzx): 直前 store 0x12ab72f `mov word ptr [rbp+0xa0], r8w`。格納元は部分レジスタ r8w のため、その上流は未分類。
   - 0x118a275 (AMBIG 主経路 `[rax+0x258]`、rax = `[rbp+0x38]`): 直前 store 0x118a241 の格納値は r8 ← ENTRY 第 3 引数 (r8d)。合流 2 件 (0x118a22b→0x118a24b・0x118a23f→0x118a24b) の注記あり。
   - 0x118a3f4 (AMBIG 主経路 `[rax+0x130]`、rax = `[rbp+0x38]`): 直前 store 0x118a362 の格納値は r8 ← ENTRY 第 3 引数 (r8d)。
