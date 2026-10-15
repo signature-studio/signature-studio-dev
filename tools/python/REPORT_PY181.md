@@ -13,7 +13,7 @@
 
 - 測定 commit: `176675e75` (origin/main。PR #3286 merge 後の main)。解析コードは変更していない。本 PR の変更は `tools/python/REPORT_PY181.md` と `docs/DOC_MAP.md` の 1 行だけ。
 - 差分の証跡 (`docs/WORKFLOW.md` §6): `git diff 176675e75 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
-- 展開: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (2.9 秒・22,227,016 バイト)。`FL_WIN64_DIR=<展開先>`。
+- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (2.9 秒・22,227,016 バイト)。`FL_WIN64_DIR=<展開先>`。
 - 実行 (全て終了 0):
   - `analysis/flapi/pe_disasm.py 1046a30 4700` → 4,679 行 (0.100 秒)。
   - `analysis/flapi/pe_disasm.py ffac50 60`・`pe_disasm.py 1050f90 50`。
