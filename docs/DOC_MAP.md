@@ -952,6 +952,7 @@
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_4231.md` | ~60 | SR-61 (#4231): canvas の円弧・点・path 描画 (drawArc/drawPoint/drawGraphicsPath)。判定 harness `check_draw_ops.sh`。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_4233.md` | ~60 | SR-62 (#4233): canvas の gradient (線形・放射)・9 分割・fillRectWithBitmap の bitmap 描画。判定 harness `check_draw_ops.sh` (9 op + gradient の色数)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_4428.md` | ~43 | SR-69 (#4428): canvas の setTransformMatrix (点・線・多角形・矩形・文字の基準点への適用)・原点以外の view の実測 (判定 harness `check_transform.sh`)。測定値の正本 |
+| `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_4551.md` | ~50 | SR-78 (#4551): canvas の fillRectWithBitmap の拡大縮小と bilinear・drawBitmapNinePartTiled の 9 部分拡大縮小の実測 (判定 harness `check_draw_ops.sh`)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_3261.md` | ~100 | SR-51 (#3261): wasm の初期化経路。`platformfactory.cpp` の WASM 分岐 (patch) と upstream `init()` 経路化、harness の代替 2 点の除去。構文・compile/link/run の実測と負の対照 3 件。測定値の正本 |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
 | `tools/targets/massivex/REPORT_APPENDIX.md` | ~244 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017・§12.9 の対照と一貫性 #3154) |
