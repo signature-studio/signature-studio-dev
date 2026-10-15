@@ -126,7 +126,7 @@
 測定 commit: `710fc4c59` (`analysis/py392_ret584_suffcond.py` を追加した commit。コードを変えた最後の commit)。
 `git diff 710fc4c59 HEAD -- tools/python/analysis/` の出力は空。
 素材: `oc_artifacts: fl-win64` (`block00031_PE.bin` 22,227,016 B・`py53` で `fn=4664 dispatch=13 r8d_tests=174` を本 run で再現・`py65` で `count 72` を再現)。
-再現 (作業 dir は `tools/python`・BDD は `dd` 0.6.0 が必要):
+再現 (作業 dir は `tools/python`・BDD は `dd` 0.6.0 が必要。先に `fl-win64` を展開して PE を `work/fl/extracted/block00031_PE.bin` に置き、`python3 analysis/py53_dispatch.py work/fl/extracted/block00031_PE.bin work/py53` で `work/py53/fn.txt` を作る):
 `python3 analysis/py392_ret584_suffcond.py work/py53/fn.txt work/py392` →
 `python3 analysis/py392_verify_suffcond.py work/py53/fn.txt work/py392/suffcond.tsv` →
 `python3 analysis/py392_summary.py work/py392/suffcond.tsv work/py341/ret584_dominators.tsv .`
@@ -144,7 +144,7 @@
 | 入口から到達 (DAG 上) | 74 |
 | 書込み後に 0x104cc65 へ届く (上書きなし) | 72 |
 | 届かない 2 件 | 0x104a876・0x104a999 (§3 と一致) |
-| DAG 上の jcc 変数 | 462 |
+| DAG 上の jcc 変数 | 462 (`py392_ret584_suffcond.py` の標準出力 `vars=`。TSV には残らない) |
 | 代表 cube の分岐数 (1 件あたり) | 26〜185 (計 2,663) |
 | 必須分岐 (§9 `py341`) | 0〜16 |
 | BDD の排他 cube 数 | 1,536〜46,176 (変数順序に依存・件数の正本にしない) |
@@ -154,7 +154,7 @@
 付録: `tools/python/REPORT_APPENDIX_PY392.md` (72 件の表)・`tools/python/REPORT_APPENDIX_PY392_cubes.tsv` (各件の代表 cube の全分岐 VA)。
 
 **受入の達成範囲**:
-- 受入 1 (十分条件を VA つきで書く): **部分達成**。各件について、条件の 1 本 (代表 cube・分岐 VA の連言) を書いた。cube は含意を BDD で確認し、CFG 上でも書込みへ届くことを確認した。ただし cube は条件全体ではなく、同じ書込みに至る別の組合せは含まない。条件全体 (BDD) は約 9.5 MB 相当の式になり REPORT に載せられないため、未確認。
+- 受入 1 (十分条件を VA つきで書く): **部分達成**。各件について、条件の 1 本 (代表 cube・分岐 VA の連言) を書いた。cube は含意を BDD で確認し、CFG 上でも書込みへ届くことを確認した。ただし cube は条件全体ではなく、同じ書込みに至る別の組合せは含まない。条件全体 (BDD) は式を載せず、BDD ノード数で示す。`work/py392/suffcond.tsv` の `live_cond_dag_size` (live な 72 件) の合計は 2,735 ノード・範囲 27〜186 (`py392_ret584_suffcond.py` の実測)。条件全体の含意検証は、各件の代表 cube だけで行ったため未確認。
 - 受入 2 (経路ごとの件数): **未確認**。BDD の排他 cube 数は変数順序に依存し、経路の件数として数えられない。経路ごとの件数は正しく求められていない。
 - 書く値の式: 各件の書く値は付録の「書く値の式」列 (`py53` の直前の命令)。`add ecx, eax` の `ecx`・`eax` の由来は未確定 (§9 と同じ)。
 
