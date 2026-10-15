@@ -68,9 +68,9 @@
 
 ### 原因と修正
 1. **関数 VA の切り詰め (RetDec 側)**: `share/retdec/support/generic/types/windows.json` は `LONG_PTR` (型 ID 12922) を `long` (型 ID 15827・32 bit) と定義している。そのため `SetWindowLongPtrW` の第 3 引数が `i32` の IR になり (`call i32 @SetWindowLongPtrW(i64* %2, i32 -4, i32 1073746424)`)、関数 VA 即値 `0x400011f8` の上位 32 bit が欠ける。`retdec.config.json` の `parameters` を `i64` に書き換えても出力は `int32_t` のままだったため、ツール側の上書きは使わなかった。
-   修正: `gui_lift_post.py` の `fix_fn_va`。引数位置の 8 桁即値が、fnmap の関数 VA の下位 32 bit と一致する場合だけ完全 VA へ戻す (`0x400011f8` → `0x1400011f8`)。どの関数 VA とも一致しない即値には触らない。`[post] restored truncated function VA: 1 (0x1400011f8)` を出す。
+   修正: `gui_lift_post.py` の `fix_fn_va`。引数位置の 8 桁即値が、fnmap の関数 VA の下位 32 bit と一致する場合だけ完全 VA へ戻す (`0x400011f8` → `0x1400011f8`)。どの関数 VA とも一致しない即値には触らない。`[post] restored truncated function VA: 1 (0x1400011f8)` を出す。限界: 8 桁の整数定数が偶然 fnmap の下位 32 bit と一致すると、その即値も完全 VA へ書き換わる (silent)。現状の検出は W guest で 1 件・4 PE で 0 件のみ。
 2. **W 文字列の幅 (RetDec 側)**: RetDec は W 文字列を `L"..."` で出す。Linux / wasm では `wchar_t` が 4 byte なので、UTF-16 を読む shim の `OutputDebugStringW` が 1 文字目で止まり `[gui] w` だけになった。
-   修正: `gui_lift_post.py` の `fix_wstr`。`L"` を `u"` (char16_t, 2 byte) へ置き換える。
+   修正: `gui_lift_post.py` の `fix_wstr`。`L"` を `u"` (char16_t, 2 byte) へ置き換える。狭義の `"..."` と `'...'` は素通しする (`"Ctrl+L"` の末尾 L は変えない)。
 3. **ゲストの順序 (ゲスト側の不具合)**: `gui_app_w.c` は `ltext` へ文字を入れる前に `UpdateWindow` を呼んでいた。`UpdateWindow` は WM_PAINT を同期で送るので、最初の描画は NUL 12 個を描き、テキストが出なかった。文字の代入を `ShowWindow` の前へ移した。
 4. **harness の穴**: 修正前、`native_w_run` は FAIL 行を出した後も rc 0 で終わった。ゲストの `ExitProcess` が先に走るため。`native_w_e2e.sh` は `PASS` 行を必須にし、オラクル比較も行う。
 
@@ -91,8 +91,8 @@
 ### RetDec 欠陥の行案 (`docs/DEFECTS.md` 形式・直接編集は PM 判断)
 | ID | 担当 | 区分 | 症状 | 原因 | 検出信号 | 検出器 | 修復 |
 |---|---|---|---|---|---|---|---|
-| D24 (案) | RetDec (Win32 型 DB) | 新規 (#3508 発見) | `LONG_PTR` 引数が 32 bit 扱いになり、関数 VA 即値の上位 32 bit が欠ける。native で SEGV (silent な 1 bit 欠け) | `share/retdec/support/generic/types/windows.json` の `LONG_PTR` → `long` (15827) | `SetWindowLongPtrW(h, -4, 0x400011f8)` (正 `0x1400011f8`)。ASan SEGV at `0x0000400011f8` | `lifted.c` の引数位置の 8 桁即値が fnmap の下位 32 bit と一致 | `gui_lift_post.py` `fix_fn_va` (fnmap 一致時のみ完全 VA へ) |
-| D25 (案) | RetDec (文字列) × Linux/wasm の wchar_t | 新規 (#3508 発見) | W 文字列 `L"..."` が wchar_t (4 B) で出るため、UTF-16 を読む W API が 1 文字目で切れる (silent) | RetDec が W 文字列を `L"..."` で出力 | `OutputDebugStringW` の出力が `[gui] w` (1 文字) | `lifted.c` の `L"` の出現 | `gui_lift_post.py` `fix_wstr` (`u"`) |
+| 新規類型 (仮・番号は PM 割当) | RetDec (Win32 型 DB) | 新規 (#3508 発見) | `LONG_PTR` 引数が 32 bit 扱いになり、関数 VA 即値の上位 32 bit が欠ける。native で SEGV (silent な 1 bit 欠け) | `share/retdec/support/generic/types/windows.json` の `LONG_PTR` → `long` (15827) | `SetWindowLongPtrW(h, -4, 0x400011f8)` (正 `0x1400011f8`)。ASan SEGV at `0x0000400011f8` | `lifted.c` の引数位置の 8 桁即値が fnmap の下位 32 bit と一致 | `gui_lift_post.py` `fix_fn_va` (fnmap 一致時のみ完全 VA へ) |
+| 新規類型 (仮・番号は PM 割当) | RetDec (文字列) × Linux/wasm の wchar_t | 新規 (#3508 発見) | W 文字列 `L"..."` が wchar_t (4 B) で出るため、UTF-16 を読む W API が 1 文字目で切れる (silent) | RetDec が W 文字列を `L"..."` で出力 | `OutputDebugStringW` の出力が `[gui] w` (1 文字) | `lifted.c` の `L"` の出現 | `gui_lift_post.py` `fix_wstr` (`u"`) |
 
 D11 (wasm32 の PE VA 切り捨て) とは機構が違うため、D11 の変種にはしていない。
 
@@ -101,4 +101,23 @@ D11 (wasm32 の PE VA 切り捨て) とは機構が違うため、D11 の変種�
 |---|---|---|
 | wasm / Chrome の OffscreenCanvas 読み戻しと native の sha256 一致 (受入の範囲外) | `gui_lift_post.py` の変更の wasm 経路 (`gui_wasm.sh`) は未実行 (emsdk 素材未取得) | #3509 [WIN-31] |
 | GUI-REACH の順序検査と `tools/gui/e2e.sh` への組込み (範囲外) | trace の機械検査は未実施 | #3510 [WIN-32] |
-| D24・D25 の DEFECTS.md への登録 | 行案のみで、表には未登録 | PM 判断 (本 PR では編集しない) |
+| RetDec 欠陥の新規類型 2 件 (番号は PM 割当) の DEFECTS.md への登録 | 行案のみで、表には未登録 | PM 判断 (本 PR では編集しない) |
+
+### レビュー round 1 への対応 (修正 commit `74942e399`・再測定は未実施)
+- 修正: `fix_wstr` は狭義の `"..."` と `'...'` を素通しし、`L"..."` だけを `u"..."` にする。改竄ネガコンは `MISMATCH` 行の grep で判定する (Python 例外の rc 1 でも通らない)。
+- 測定鮮度: 測定 commit は `51a6881f7` のまま。以後のコード差分は下の 2 ファイル 6 行で、WORKFLOW §6 により再測定が要る。
+```
+git diff 51a6881f7 74942e399 -- tools/gui/lift tools/gui/test tools/gui/golden tools/gui/src
+```
+```diff
+-        return re.sub(r'(?<!\w)L"', 'u"', s)
++        return re.sub(r"""(?<!\w)L"((?:[^"\\\n]|\\.)*)"|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'""",
++                      lambda m: 'u"%s"' % m.group(1) if m.group(1) is not None else m.group(0), s)
+-if python3 "$ROOT/golden/gen_golden_w.py" compare "$BUILD/w_actual.ppm" --tamper; then echo "[native_w_e2e] FAIL: ネガコン (改竄オラクル) が不一致にならなかった" >&2; exit 1; fi
++tamper_log="$(python3 "$ROOT/golden/gen_golden_w.py" compare "$BUILD/w_actual.ppm" --tamper || true)"
++echo "$tamper_log"
++grep -q '^\[golden_w\] MISMATCH' <<< "$tamper_log" || { echo "[native_w_e2e] FAIL: ネガコン (改竄オラクル) が MISMATCH を出さなかった (例外・終了コードだけでは判定しない)" >&2; exit 1; }
+```
+- 狭義リテラルの検査 (`gui_lift_post.py` の `fix_wstr` を AST で取り出して照合・9/9 一致): `SetText("Ctrl+L");`→不変 / `SetText(L"Wide");`→`u"Wide"` / `x = L"";`→`u""` / `p = "a\"L\"b";`→不変 / `c = '"'; SetText(L"x");`→`u"x"` / `c = '"'; y = "Ctrl+L" ; z = "x";`→不変 / `foo(L"A", "B+L", L"C");`→`u"A"`・`"B+L"`不変・`u"C"` / `c = '\'';  y = L"ok";`→`u"ok"` / `wcscpy(p, L"x\n");`→`u"x\n"`。reviewer 案 (文字リテラルの選言肢なし) は `'"'; y = "Ctrl+L" ; z = "x";` を `"Ctrl+u"` に壊すため、`'...'` の選言肢を足した。
+- ネガコンの判定: 期待画像 (`oracle()` の出力) を PPM にした偽 `w_actual.ppm` で、`native_w_e2e.sh` の比較部と同じ行を実行。実 PPM は `EXACT MATCH (0)` → `[tamper]` は `MISMATCH (1 px)`。ネガコン側だけ例外を出す偽スクリプトでは FAIL (rc 1) になる。旧判定 (`if ... --tamper; then FAIL; fi`) は rc 1 のとき何も出さず通る。
+- 未実施 (再測定): `native_w_e2e.sh` の PASS・EXACT MATCH・ネガコン、W guest の `lifted.c` の sha256 が修正前と一致すること。本 run は素材が `fl-win64` のみで (`toolchain-retdec`・`apt-mingw` が無い)、RetDec も mingw も手元に無いため lift も PE ビルドもできない。PR 本文に `oc_artifacts: toolchain-retdec apt-mingw` を入れ、その run の実測値をこの節に追記する。
