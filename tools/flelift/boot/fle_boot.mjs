@@ -408,6 +408,37 @@ console.log('FLEBOOT_RESULT ' + JSON.stringify({
     cfi: cfi && { rc: cfi.rc, threw: cfi.threw && cfi.threw.cls, longjmp: cfi.longjmp, exit: cfi.exit },
 }));
 console.log('FLEBOOT_UNDO ' + JSON.stringify(undoProbe));
+// PY-106 (#2909): 束縛関数 0xc395a0 を boot 停止後に直接実行し、resolver が引いた名前と slot の値を読む (FLE_PY106_BIND=1 のときだけ。
+// summary の書出しの後で行うので boot の計数・outmem には影響しない)。sink 0xd82daf と同じ 3 段 load を実メモリで辿る。
+if (process.env.FLE_PY106_BIND === '1') {
+    const SLOT_HEAD = 0x15e1140, SLOT_EXC = 0x16b8488, SLOT_SETSTR = 0x16b8408, SLOT_NEWINTERP = 0x16b8250;
+    const hx = (v) => '0x' + BigInt.asUintN(64, BigInt(v)).toString(16);
+    const rd64 = (a) => new DataView(m.HEAPU8.buffer).getBigUint64(Number(a), true);
+    const head0 = rd64(SLOT_HEAD);
+    let threw = null, n = 0;
+    try { n = m._fle_py_bind_probe(); } catch (e) { threw = classify(e); }
+    const ringTail = []; for (let k = 96; k < 128; k++) ringTail.push('0x' + (Number(m._fle_ring_at(k)) >>> 0).toString(16));
+    console.log('FLEBOOT_PY106RING ' + JSON.stringify(ringTail));
+    const names = [];
+    for (let i = 0; i < n; i++) names.push({ i, name: m.UTF8ToString(m._fle_py_bind_name(i)), cell: BigInt(m._fle_py_bind_cell(i)) });
+    const nameOf = (v) => { const x = names.find((y) => y.cell === BigInt.asUintN(64, BigInt(v))); return x ? x.name : null; };
+    const slotExc = rd64(SLOT_EXC);
+    // boot 停止時の head は 0 (unit 209 で 0 化)。sink と同じ load を辿るため、head を PE の値 (SLOT_EXC) に戻してから読む
+    new DataView(m.HEAPU8.buffer).setBigUint64(SLOT_HEAD, BigInt(SLOT_EXC), true);
+    const v1 = rd64(SLOT_HEAD), v2 = rd64(v1), v3 = rd64(v2);
+    const tok = Number(v3) - 0x7f300000;
+    const pyB = {
+        probe: { threw, names_n: n },
+        head_at_stop: hx(head0), slot_exc_after_bind: hx(slotExc), name_of_slot_exc: nameOf(slotExc),
+        slot_setstr_after_bind: hx(rd64(SLOT_SETSTR)), name_of_slot_setstr: nameOf(rd64(SLOT_SETSTR)),
+        slot_newinterp_after_bind: hx(rd64(SLOT_NEWINTERP)), name_of_slot_newinterp: nameOf(rd64(SLOT_NEWINTERP)),
+        head_restored: hx(SLOT_EXC),
+        chain: { load1_head: hx(v1), load2: hx(v2), load3_type_tok: hx(v3), type_name: names[tok] ? names[tok].name : null },
+        names: names.map((x) => [x.i, x.name, hx(x.cell)]),
+    };
+    writeFileSync(outPath.replace(/\.json$/, '_py106bind.json'), JSON.stringify(pyB, null, 1));
+    console.log('FLEBOOT_PY106B ' + JSON.stringify({ threw: pyB.probe.threw, names_n: n, head_at_stop: pyB.head_at_stop, name_of_slot_exc: pyB.name_of_slot_exc, name_of_slot_setstr: pyB.name_of_slot_setstr, name_of_slot_newinterp: pyB.name_of_slot_newinterp, type_name: pyB.chain.type_name, load3: pyB.chain.load3_type_tok }));
+}
 // FLE-6 ネガコン判定: shim 無し (既定 / FLE_IPP=0) なら 0x15F34A0 = 0、shim 有り (FLE_IPP=1) なら非 0 でなければならない。
 // mode 2 (#2702) は停止を測る測定モードなので判定しない (ok の値は出すが終了コードは変えない)。
 const ippPtrOk = IPP_ON ? !/^0x0+$/.test(boot.ipp_ptr_15F34A0) : /^0x0+$/.test(boot.ipp_ptr_15F34A0);
