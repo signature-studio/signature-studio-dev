@@ -150,3 +150,36 @@ bash tools/icall/diff/fa_sweep.sh 8 60                            # 期待 (base
 | `FA_FALL_FRAG=1` で `0x180c99430` が wasm_err (out-of-bounds) | 既定 OFF なので現行の出力は変わらない。ON にすると 1 関数回帰する | #3198 (本 PR は Refs) |
 | A 型 11 件の判定の再実施・`0x180ca1480` の判定 | 受入 3・4 の残り | #3198 |
 | 既定 ON 化の判断 | 回帰解消まで既定 OFF | #3198 |
+
+## 10. 修復前後の sweep 比較 (ICALL-101 / #4353)
+
+- 測定 commit: `a17fca6fb` (origin/main)。コードは変えていない。`git diff a17fca6fb HEAD -- tools/icall` は空。
+- 素材: `work-icall` (`tools/icall/work/rt_freshair-core/`)・`plugins-freshair` (`fetch.sh` で `SlateCore.core_64`)・`toolchain-retdec` (`[RETDEC]`)・`toolchain-emsdk` (`[EMSDK]`)。
+- 手順 (両条件とも同じ): `icall_rewrite.py --pe <SlateCore.core_64> --funcs F.ranges` → `retdec-decompiler --select-ranges <after.ranges> --select-decode-only` → `ir_icall_restore.py` → `fa_route_build.sh` (`FA_CORE` は各条件の `rw.dll`) → `fa_sweep.sh 8 60`。
+  - 修復前 = 既定 (`env -u FA_FALL_FRAG`)。修復後 = `FA_FALL_FRAG=1`。
+- `rw.dll` の sha256: 既定 `cc921929…` (§8 と一致)。`FA_FALL_FRAG=1` は `38311421…` (新規)。
+- restore の件数: 既定 comis 14 / dispatch 93 / sites 98 (§8 と一致)。`FA_FALL_FRAG=1` は comis 15 / dispatch 110 / sites 115。
+
+| 条件 | fa_sweep 8 60 (bit一致/crash・timeout/wasm のみ err/値の不一致) | 1 回目 | 2 回目 (再現) |
+|---|---|---|---|
+| 修復前 (既定 OFF) | 55 / 65 / 10 / 1 | 55/65/10/1 | 55/65/10/1 |
+| 修復後 (`FA_FALL_FRAG=1`) | 55 / 65 / 11 / 0 | 55/65/11/0 | 55/65/11/0 |
+
+- 基準との差: 本 issue の基準 (§2) は 55/65/9/2。同素材・同手順で測り直した修復前は 55/65/10/1 で、基準と 1 件ずつ違う (`wasm のみ err` と `値の不一致` が 1 件ずつ入れ替わる)。原因は未特定。最初に測った 56/65/9/1 は、素材の既存 `after.0.restored.ll` (古い rewriter 出力・section_size 75565) を入力にした値で、現 HEAD の rewriter 出力ではない。比較の基準は現 HEAD の出力で揃えた上の表 (55/65/10/1) とする。どちらも §6 の揺れの範囲で、追跡は #2302。
+
+### 10.1 変化した関数 (per-function 差分)
+
+| 関数 | 修復前 | 修復後 | 理由 |
+|---|---|---|---|
+| `0x180da4030` | mismatch 8 | **match 8** | 断片 `0x180da4081` が親の fall-through 先として複製された (ON で `nfrag_inlined` 0 → 8)。期待どおりの修復 (受入 2 の達成) |
+| `0x180c99430` | match 8 | **wasm_err 8** (`memory access out of bounds`) | 同じ経路で断片 `0x180c9946a`–`0x180c99598` が複製された。断片は `mov [rsp+0x20], r15`・`lea r15,[rdi+0x50]`・`je` の後に `call qword ptr [rax+0x10/0x20]` 等の間接 call とメモリ書込みを持つ。out-of-bounds の機構は**未確定** (§8 の未解決を継続) |
+
+- 他の関数は修復前後で分類が変わらない。`0x1803de190`・`0x1803b5500`・`0x18040c950`・`0x180da5f20` は両条件で wasm_err、`0x1803dee20` は両条件で match。
+- 修復後の断片複製数: 8 (`nfrag_inlined`)。`errors` は両条件とも空。関数の増減 (`func_map`) は無い (131 件)。
+
+### 10.2 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `FA_FALL_FRAG=1` で `0x180c99430` が out-of-bounds (機構未確定) | 既定 OFF なので現行の出力は変わらない。ON にすると 1 関数回帰 | #3198 |
+| 修復前の基準 55/65/9/2 と本測定 55/65/10/1 の差 | 基準の再現性が取れない。受入の比較は本節の同一条件で行った | #2302 |
