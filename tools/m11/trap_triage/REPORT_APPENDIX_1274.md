@@ -131,3 +131,50 @@
 ### 差分 (測定 commit `3b581236` から本 PR の HEAD まで、tools/m11 の build 入力)
 
 - `git diff 3b581236 HEAD -- tools/m11 ':(exclude)*.md'` の対象は本 PR で追加した `trap_triage/lockstep_2131.mjs`・`boot_probe_2131.mjs`・`variants_2131.py`・`ov_2131_trace.patch` の 4 ファイルのみ。`m11_ov.c` ほか build 入力は測定 commit から変えていない (作業ツリーで一時的に変えた `m11_ov.c` は各 variant・trace build の後に元へ戻した)。
+
+## 5m. 410360 の shortcut 呼出しの切り分け (測定 commit `42c6bcfdd` = origin/main、#1274 run)
+
+- 測定 commit: `42c6bcfdd` (origin/main `Merge #3519`)。素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開 (`FL_WIN64_DIR`=`$RUNNER_TEMP/fl-win64`、`RETDEC_ROOT`=`$RUNNER_TEMP/retdec`、`EMSDK`=`$RUNNER_TEMP/emsdk`。work 系は repo 直下で展開)。`m11_gen_ir2.sh` rc=0 (51 s、F1=902、errors=0)。
+- 再現: `FL_WIN64_DIR=... RETDEC_ROOT=... EMSDK=... python3 trap_triage/probe_shortcut_1274.py <out_dir>` (変種ごとに `ov.o` を作り直し、全 942 unit を `SV_RAW=1` で survey。`m11_ov.c` は finally で復元)。所要 3 分 41 秒 (4 CPU、load 0.5 以下)。
+- 注意: §2・§5j の数値 (OFF 870/16、ON 869/15) は d33c763a 時点のもの。**現 HEAD では下表の値を使う**。
+
+| 変種 | ok / oob | OFF→変種の kind 変化 (ok→oob) | unit 190 |
+|---|--:|---|---|
+| off (`M11_OV_CLASSCREATE=0`) | 873 / 14 | (基準) | ok |
+| on (既定 ON) | 868 / 19 | 101, 190, 291, 296, 304 | oob |
+| on_nw (shortcut の `icall_bump` 2 回を、表へ書かない `icall_bump_nw` 1 回に置換) | 868 / 19 | 101, 190, 291, 296, 304 | oob |
+| on_fill00 (on_nw + `icall_bump_nw` が 512B の局所を 0x00 で埋める) | 868 / 19 | 101, 190, 291, 296, 304 | oob |
+| on_fillA5 (on_nw + 同じ 512B を 0xA5 で埋める) | 865 / 22 | 101, 134, 158, 190, 265, 291, 296, 304 | oob |
+| on_dummy (呼ばれない関数 `dummy_unused_1274` を 1 つ足す) | 868 / 19 | 101, 190, 291, 296, 304 | oob |
+| on_fix912 (ON + `M11_FIX_912=1`) | 870 / 17 | 190, 304, 555 | oob |
+
+- 決定性: on の survey は同一ビルドで 2 回とも 868/19 (再現する)。全変種の kind 表は `work/probe1274/script/<変種>.json` (commit 対象外)。
+- 現 HEAD の既定 (`M11_FIX_912` 既定 OFF) では、ON の ok 退行は **5 件** (101・190・291・296・304)。REPORT_912 の時点 (既定 ON) では 101・291・296 は修復済みだった。現既定では戻っている。
+- 単独実行 (`SV_ONLY=190`) は OFF でも oob になる (ON・OFF とも同じ oob)。unit 190 の ok は 0〜189 の前段の状態に依存する。単独 survey では ON 限定の差は出ない。
+
+読み (n=1 の変種単位。決定的な再現は確認済み):
+
+1. **表への書込みは原因ではない**。`on_nw` は shortcut の表更新 (`g_isite`・`g_itgt` の加算) を外しても ON と同じ結果 (868/19、unit 190 は oob)。
+2. **shortcut で関数を呼ぶこと自体は必要**。`on_nw` は呼出しを残し、書込みを外した。§5l の vx/vy (呼出しを外した変種・別 commit・lockstep) では unit 190 が ok だった。
+3. **呼出し後に残る stack の内容は 190 の結果を変えない** (`on_fill00`・`on_fillA5` とも 190 は oob)。ただし `on_fillA5` では unit 134・158・265 が新たに oob になる。ゲストが初期化されていない shadow stack の領域を読む経路が存在する、と読める (推定。経路は未特定)。
+4. **関数番号のずれではない** (`on_dummy` は ON と同じ結果)。
+
+配置 (`M11_LINK_MAP` の `on_map.txt`、`work/probe1274/script/on_map.txt`):
+
+| 対象 | 線形メモリ上のアドレス | サイズ |
+|---|---|---|
+| `g_isite` (struct、.data) | 0x10250ff8 | 0x10 |
+| `g_itgt` (struct、.data) | 0x10251008 | 0x10 |
+| `g_isite_e` / `g_isite_h` (.bss) | 0x10291ba0 / 0x102927a0 | 0xc00 / 0x400 |
+| `g_itgt_e` / `g_itgt_h` (.bss) | 0x10292ba0 / 0x10298ba0 | 0x6000 / 0x2000 |
+| `__stack_pointer` の初期値 (wasm global 0) | 0x10aa1530 | — |
+
+- 表の範囲は 0x10291ba0〜0x1029ada0 (C の静的領域内)。`icall_bump` は `h < 2*cap`・`n < cap` の検査で添字を範囲内に保つ (コードの読み)。ゲストの参照先 (`0xf95108` 系の表・`0xfa5320`・ヒープ 0x10bbe510 付近) とは重ならない (推定。ヒープ先頭の厳密値は未確認)。
+- 既知類型との関係: 未判定。候補は D5・D22 (未初期化 alloca 系の読み; `docs/DEFECTS.md`) だが、確定していない。
+
+未解決 (起票先付き):
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unit 190 の oob を起こす経路 (shortcut の関数呼出しが残す効果の正体。表書込みと stack 内容は原因ではないと測定済み)。併せて、呼出し後の stack を読むゲスト側の経路 (`on_fillA5` の 134・158・265) | 受入条件 2 (書込元) | #2131 |
+| 既知類型への分類 と ON の ok 退行 0 (現既定 5 件・fix912 で 3 件) | 受入条件 3・4 | #2086 |
