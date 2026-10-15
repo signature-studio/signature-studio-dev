@@ -195,7 +195,7 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 
 | 分類 | 件数 | 関数 VA | 阻害要因 |
 |---|---|---|---|
-| wasm_stub_unreach | 15 | `0xd2b5b0 0x410a50 0x64fc70 0x10293b0 0xd2b370 0xd2bb50 0x64fa70 0x47d670 0x11e7940 0x10263d0 0x101ea80 0xd2b620 0xebbfb0 0x534eb0 0x5c5500` | wasm が `function_4128b0` の未解決 call スタブで unreachable。wasm 側の lift 欠落 (icall 系) |
+| wasm_stub_unreach | 15 | `0xd2b5b0 0x410a50 0x64fc70 0x10293b0 0xd2b370 0xd2bb50 0x64fa70 0x47d670 0x11e7940 0x10263d0 0x101ea80 0xd2b620 0xebbfb0 0x534eb0 0x5c5500` | wasm が `function_4128b0` の未解決 call スタブで unreachable。原因は未確認 (推定: wasm 側の icall 欠落) |
 | native_null_field | 10 | `0x678460 0x905af0 0x102b6c0 0xa96550 0x47d460 0xebc1a0 0x102b750 0x681380 0x539e00 0x8cbe40` | native が addr 0x0〜0xff を読んで落ちる (fault addr の値のみ確認。原因は未確認)。引数の投入形が疑われる |
 | wasm_oob | 8 | `0xc3efe0 0x4fb160 0x8e7080 0xa96620 0xdc2130 0x450260 0xdc0450 0x101e250` | wasm が memory access out of bounds。引数の投入形、または wasm 側の欠陥 |
 | native_noaddr | 4 | `0xe860d0 0xe8dce0 0x808700 0x472530` | native fault に addr が無い (分岐先の不正など)。候補引数の誤りの可能性 |
@@ -209,12 +209,11 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 ### 受入 2: equal / wasm_trap へ遷移しうる件数 (未確定)
 
 - **実測の遷移: 0 件** (本 run。match 360 は前回と同じ)。
-- 分類ごとの見込み (根拠は上の分類のみ。個別の再測定はしていない):
-  - `wasm_stub_unreach` 15 件: wasm が `function_4128b0` (未解決 call スタブ) で unreachable。原因の推定は「wasm 側の icall 欠落」だが、個別には未確認。
-  - `wasm_oob` 8 件・`wasm_other` 1 件: wasm の trap 位置が native と揃わない。投入形か wasm 側の欠陥かは未切り分け。
-  - `native_null_field` 10・`native_noaddr` 4・`native_cand_arg` 1 (計 15 件): native が落ちて wasm は ok。this のフィールドを埋めれば native が ok になる可能性があるが、**未確認**。本 run では this の埋め方を変えていないため、遷移の件数は未測定 (遷移しうる上限の候補は 15 件)。
-  - `diff` 3 件: 既知の wasm 欠陥 / native_extra_call。equal には進まない (mismatch のまま)。
-- **結論**: 「遷移しうる件数」は 15 件 (上限の候補) と書けるが、根拠付きの確定数は無い。確定には、15 件の this 疑似オブジェクトのフィールドを埋める case を作って測る必要がある。これは受入 2 の残りとして本 issue #5406 に残す (`Refs #5406`)。
+- `compare_case` (`ldlib/compare.py`) の遷移の経路 (分類からの候補。個別の再測定はしていない):
+  - **wasm_trap へ遷移する経路** (`n_ok and not w_ok`): wasm が fault している件が、native を ok にした case で `wasm_trap` になりうる。候補は `both_fault` 24 件 (`wasm_stub_unreach` 15・`wasm_oob` 8・`wasm_other` 1)。
+  - **equal へ遷移する経路** (native ok・wasm ok で差分 0): 候補は `native_fault` 15 件 (`native_null_field` 10・`native_noaddr` 4・`native_cand_arg` 1。native が ok になれば wasm は ok のまま) と `diff` 3 件 (差分が消えた場合)。計 18 件。
+  - `native_fault` 15 件が `wasm_trap` になる経路は無い (wasm は ok のため)。
+- **結論**: 上限の候補は、wasm_trap 24 件・equal 18 件。ただし、これは分類から出した上限で、実際に遷移するかは未測定 (this の疑似オブジェクトのフィールドを埋めた case を作らないと測れない)。本 run では this の埋め方を変えていない。遷移の確定数は受入 2 の残りとして本 issue #5406 に残す (`Refs #5406`)。
 
 ### 受入 3 (e2e)
 
