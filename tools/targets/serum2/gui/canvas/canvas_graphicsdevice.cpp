@@ -1,6 +1,7 @@
 // SR-39 #2107: canvas platform (wasm) の IPlatformGraphicsDevice* 実装。
 // SR-50 #3260: drawRect・clearRect を bitmap へ描く。bitmap は createBitmapContext で結線し、clip は bitmap 境界で保持する。
 // SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap を bitmap へ描く。
+// SR-71 #4469: 太い線の端 (cap)・接合 (join)・破線 (setLineStyle) を描き分ける。
 
 #include "canvas_graphicsdevice.h"
 #include "canvas_bitmap.h"
@@ -46,6 +47,67 @@ PixelBox pixelBoxOf (const CRect& rect)
 {
 	return {static_cast<int32_t> (std::floor (rect.left)), static_cast<int32_t> (std::floor (rect.top)),
 	        static_cast<int32_t> (std::ceil (rect.right)), static_cast<int32_t> (std::ceil (rect.bottom))};
+}
+
+//------------------------------------------------------------------------
+// 太い線の形状 (線分の帯・端の円・接合の多角形) は凸多角形か円で表し、符号付き距離 (内側が負) から被覆を求める。
+struct Circle
+{
+	CPoint center;
+	double radius;
+};
+
+struct Convex
+{
+	std::vector<CPoint> normals; // 外向き単位法線
+	std::vector<double> offsets; // 法線と辺上の点との内積
+	double x0;
+	double y0;
+	double x1;
+	double y1;
+};
+
+//------------------------------------------------------------------------
+Convex convexOf (const std::vector<CPoint>& vertices)
+{
+	Convex s {};
+	CPoint centroid (0., 0.);
+	for (const auto& v : vertices)
+	{
+		centroid.x += v.x / static_cast<double> (vertices.size ());
+		centroid.y += v.y / static_cast<double> (vertices.size ());
+	}
+	s.x0 = s.x1 = vertices[0].x;
+	s.y0 = s.y1 = vertices[0].y;
+	for (size_t i = 0; i < vertices.size (); ++i)
+	{
+		const auto& a = vertices[i];
+		const auto& b = vertices[(i + 1) % vertices.size ()];
+		s.x0 = std::min (s.x0, a.x);
+		s.y0 = std::min (s.y0, a.y);
+		s.x1 = std::max (s.x1, a.x);
+		s.y1 = std::max (s.y1, a.y);
+		auto len = std::hypot (b.x - a.x, b.y - a.y);
+		if (len < 1e-9)
+			continue;
+		CPoint n ((b.y - a.y) / len, -(b.x - a.x) / len);
+		if (n.x * (centroid.x - a.x) + n.y * (centroid.y - a.y) > 0.)
+			n = CPoint (-n.x, -n.y);
+		s.normals.push_back (n);
+		s.offsets.push_back (n.x * a.x + n.y * a.y);
+	}
+	return s;
+}
+
+//------------------------------------------------------------------------
+double signedDistance (const Convex& s, CPoint p)
+{
+	if (s.normals.empty ())
+		return 1e300;
+	double d = -1e300;
+	for (size_t i = 0; i < s.normals.size (); ++i)
+		d = std::max (d, s.normals[i].x * p.x + s.normals[i].y * p.y - s.offsets[i]);
+	return d;
 }
 
 //------------------------------------------------------------------------
@@ -129,7 +191,7 @@ bool CanvasGraphicsDeviceContext::endDraw () const
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 {
-	plotLine (transformPoint (line.first), transformPoint (line.second), frameColor);
+	strokePolyline ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
 	return true;
 }
 
@@ -137,7 +199,7 @@ bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 bool CanvasGraphicsDeviceContext::drawLines (const LineList& lines) const
 {
 	for (const auto& line : lines)
-		plotLine (transformPoint (line.first), transformPoint (line.second), frameColor);
+		strokePolyline ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
 	return true;
 }
 
@@ -293,7 +355,7 @@ void CanvasGraphicsDeviceContext::restoreGlobalState () const {}
 //------------------------------------------------------------------------
 void CanvasGraphicsDeviceContext::setLineStyle (const CLineStyle& style) const
 {
-	(void)style;
+	lineStyle = style;
 }
 
 //------------------------------------------------------------------------
@@ -430,15 +492,103 @@ void CanvasGraphicsDeviceContext::strokeRect (const CRect& rect, const CColor& c
 	paintRect (CRect (rect.right - 1., rect.top + 1., rect.right, rect.bottom - 1.), color, true);
 }
 
+namespace {
+
 //------------------------------------------------------------------------
-// 太さ 1 かつ aliasing は 1 px の Bresenham 線 (端点は四捨五入して画素に置く)。それ以外は plotThickLine で描く。
-void CanvasGraphicsDeviceContext::plotLine (CPoint from, CPoint to, const CColor& color) const
+// 折れ線を破線の区間 (on の部分) に分け、それぞれを開いた折れ線として返す。
+// 区間の並びは dashLengths を繰り返す。要素数が奇数のときは 2 周で 1 サイクル (SVG と同じ)。
+std::vector<PointList> dashRuns (const PointList& points, bool closed, const CLineStyle& style)
 {
-	if (lineWidth > 1. || drawMode.antiAliasing ())
+	const auto& dashes = style.getDashLengths ();
+	const size_t count = dashes.size ();
+	const size_t cycle = count % 2 ? 2 * count : count;
+	double cycleLength = 0.;
+	for (size_t k = 0; k < cycle; ++k)
+		cycleLength += std::max (dashes[k % count], 0.);
+	std::vector<PointList> runs;
+	if (cycleLength <= 0.)
+		return runs;
+	auto phase = std::fmod (style.getDashPhase (), cycleLength);
+	if (phase < 0.)
+		phase += cycleLength;
+	size_t k = 0;
+	double remaining = std::max (dashes[0], 0.);
+	while (phase > 0.)
 	{
-		plotThickLine (from, to, color);
-		return;
+		if (phase >= remaining)
+		{
+			phase -= remaining;
+			k = (k + 1) % cycle;
+			remaining = std::max (dashes[k % count], 0.);
+		}
+		else
+		{
+			remaining -= phase;
+			phase = 0.;
+		}
 	}
+	bool on = k % 2 == 0;
+	PointList current;
+	auto push = [&] (const CPoint& p) {
+		if (current.empty () || current.back ().x != p.x || current.back ().y != p.y)
+			current.push_back (p);
+	};
+	// 区間の境界で on/off を切り替える。on から off では現在の区間を runs へ出す。
+	auto toggle = [&] (const CPoint& p) {
+		if (on)
+		{
+			push (p);
+			if (current.size () >= 2)
+				runs.push_back (current);
+			current.clear ();
+		}
+		else
+		{
+			current.clear ();
+			current.push_back (p);
+		}
+		on = !on;
+	};
+	if (on)
+		current.push_back (points.front ());
+	const size_t segments = closed ? points.size () : points.size () - 1;
+	for (size_t i = 0; i < segments; ++i)
+	{
+		const auto& a = points[i];
+		const auto& b = points[(i + 1) % points.size ()];
+		auto length = std::hypot (b.x - a.x, b.y - a.y);
+		if (length <= 0.)
+			continue;
+		auto ux = (b.x - a.x) / length;
+		auto uy = (b.y - a.y) / length;
+		double pos = 0.;
+		while (pos < length)
+		{
+			if (remaining <= 0.)
+			{
+				k = (k + 1) % cycle;
+				remaining = std::max (dashes[k % count], 0.);
+				toggle (CPoint (a.x + ux * pos, a.y + uy * pos));
+				continue;
+			}
+			auto step = std::min (length - pos, remaining);
+			pos += step;
+			remaining -= step;
+		}
+		if (on)
+			push (b);
+	}
+	if (on && current.size () >= 2)
+		runs.push_back (current);
+	return runs;
+}
+
+} // namespace
+
+//------------------------------------------------------------------------
+// 太さ 1 かつ aliasing は 1 px の Bresenham 線 (端点は四捨五入して画素に置く)。
+void CanvasGraphicsDeviceContext::plotThinLine (CPoint from, CPoint to, const CColor& color) const
+{
 	auto x0 = static_cast<int32_t> (std::lround (from.x));
 	auto y0 = static_cast<int32_t> (std::lround (from.y));
 	auto x1 = static_cast<int32_t> (std::lround (to.x));
@@ -468,30 +618,146 @@ void CanvasGraphicsDeviceContext::plotLine (CPoint from, CPoint to, const CColor
 }
 
 //------------------------------------------------------------------------
-// 線分から画素中心までの距離で被覆を求める。太さ lineWidth の半分以内を塗る (端は丸い)。
+// 太い線 (lineWidth > 1 または kAntiAliasing) を描く。線分ごとの帯と、端 (cap)・折れ目 (join) の形状の和で被覆を求める。
+// 同じ線の中で画素の被覆は最大値を取るので、接合部が二重に濃くならない。
 // aliasing は被覆 0/1 の二値、kAntiAliasing は境界の 1 px を線形に薄めて alpha に掛ける。
-void CanvasGraphicsDeviceContext::plotThickLine (CPoint from, CPoint to, const CColor& color) const
+void CanvasGraphicsDeviceContext::strokeThick (const PointList& points, bool closed, const CColor& color) const
 {
 	const auto half = std::max (lineWidth, 1.) / 2.;
 	const bool antiAliasing = drawMode.antiAliasing ();
-	const auto dx = to.x - from.x;
-	const auto dy = to.y - from.y;
-	const auto lengthSquared = dx * dx + dy * dy;
-	auto box = pixelBoxOf (CRect (std::min (from.x, to.x) - half - 1., std::min (from.y, to.y) - half - 1.,
-	                              std::max (from.x, to.x) + half + 1., std::max (from.y, to.y) + half + 1.));
+	const auto cap = lineStyle.getLineCap ();
+	const auto join = lineStyle.getLineJoin ();
+	std::vector<Convex> bands;
+	std::vector<Circle> discs;
+	auto segmentCount = points.size () - 1 + (closed ? 1 : 0);
+	for (size_t i = 0; i < segmentCount; ++i)
+	{
+		const auto& a = points[i];
+		const auto& b = points[(i + 1) % points.size ()];
+		auto len = std::hypot (b.x - a.x, b.y - a.y);
+		if (len <= 0.)
+			continue;
+		auto nx = -(b.y - a.y) / len * half;
+		auto ny = (b.x - a.x) / len * half;
+		bands.push_back (convexOf ({CPoint (a.x + nx, a.y + ny), CPoint (b.x + nx, b.y + ny),
+		                            CPoint (b.x - nx, b.y - ny), CPoint (a.x - nx, a.y - ny)}));
+	}
+	auto addCap = [&] (const CPoint& p, const CPoint& dir) {
+		if (cap == CLineStyle::kLineCapRound)
+			discs.push_back ({p, half});
+		else if (cap == CLineStyle::kLineCapSquare)
+		{
+			auto nx = -dir.y * half;
+			auto ny = dir.x * half;
+			auto ex = dir.x * half;
+			auto ey = dir.y * half;
+			bands.push_back (convexOf ({CPoint (p.x + nx, p.y + ny), CPoint (p.x + nx + ex, p.y + ny + ey),
+			                            CPoint (p.x - nx + ex, p.y - ny + ey), CPoint (p.x - nx, p.y - ny)}));
+		}
+	};
+	if (!closed && points.size () >= 2)
+	{
+		const auto& a = points.front ();
+		const auto& b = points[1];
+		const auto& y = points[points.size () - 2];
+		const auto& z = points.back ();
+		auto l0 = std::hypot (b.x - a.x, b.y - a.y);
+		auto l1 = std::hypot (z.x - y.x, z.y - y.y);
+		if (l0 > 0.)
+			addCap (a, CPoint ((a.x - b.x) / l0, (a.y - b.y) / l0));
+		if (l1 > 0.)
+			addCap (z, CPoint ((z.x - y.x) / l1, (z.y - y.y) / l1));
+	}
+	// 接合: 頂点 p で前後の線分をつなぐ。外側の隙間を、miter は三角形の先端、bevel は直線、round は円で埋める。
+	auto addJoin = [&] (const CPoint& prev, const CPoint& p, const CPoint& next) {
+		if (join == CLineStyle::kLineJoinRound)
+		{
+			discs.push_back ({p, half});
+			return;
+		}
+		auto ax = p.x - prev.x;
+		auto ay = p.y - prev.y;
+		auto bx = next.x - p.x;
+		auto by = next.y - p.y;
+		auto la = std::hypot (ax, ay);
+		auto lb = std::hypot (bx, by);
+		if (la <= 0. || lb <= 0.)
+			return;
+		ax /= la;
+		ay /= la;
+		bx /= lb;
+		by /= lb;
+		// 外側の側を求める: 曲がる方向の反対側。
+		auto cross = ax * by - ay * bx;
+		auto sgn = cross > 0. ? -1. : 1.;
+		CPoint n1 (-ay * half * sgn, ax * half * sgn);
+		CPoint n2 (-by * half * sgn, bx * half * sgn);
+		CPoint o1 (p.x + n1.x, p.y + n1.y);
+		CPoint o2 (p.x + n2.x, p.y + n2.y);
+		if (join == CLineStyle::kLineJoinBevel)
+		{
+			bands.push_back (convexOf ({p, o1, o2}));
+			return;
+		}
+		// miter: 2 本の外側の辺の交点を先端とする。角が鋭すぎる (比が大きい) 場合は bevel に落とす。
+		auto denom = ax * by - ay * bx;
+		if (std::abs (denom) < 1e-9)
+		{
+			bands.push_back (convexOf ({p, o1, o2}));
+			return;
+		}
+		auto t = ((o2.x - o1.x) * by - (o2.y - o1.y) * bx) / denom;
+		CPoint tip (o1.x + ax * t, o1.y + ay * t);
+		auto tipDistance = std::hypot (tip.x - p.x, tip.y - p.y);
+		if (tipDistance > 4. * half)
+			bands.push_back (convexOf ({p, o1, o2}));
+		else
+			bands.push_back (convexOf ({p, o1, tip, o2}));
+	};
+	if (closed)
+	{
+		for (size_t i = 0; i < points.size (); ++i)
+		{
+			const auto& prev = points[(i + points.size () - 1) % points.size ()];
+			const auto& next = points[(i + 1) % points.size ()];
+			addJoin (prev, points[i], next);
+		}
+	}
+	else
+	{
+		for (size_t i = 1; i + 1 < points.size (); ++i)
+			addJoin (points[i - 1], points[i], points[i + 1]);
+	}
+	double minX = points[0].x;
+	double minY = points[0].y;
+	double maxX = points[0].x;
+	double maxY = points[0].y;
+	for (const auto& p : points)
+	{
+		minX = std::min (minX, p.x);
+		minY = std::min (minY, p.y);
+		maxX = std::max (maxX, p.x);
+		maxY = std::max (maxY, p.y);
+	}
+	auto box = pixelBoxOf (CRect (minX - half - 1., minY - half - 1., maxX + half + 1., maxY + half + 1.));
 	auto clip = pixelBoxOf (clipRect);
 	for (auto y = std::max (box.y0, clip.y0); y < std::min (box.y1, clip.y1); ++y)
 	{
 		for (auto x = std::max (box.x0, clip.x0); x < std::min (box.x1, clip.x1); ++x)
 		{
-			const auto px = x + 0.5 - from.x;
-			const auto py = y + 0.5 - from.y;
-			const auto t = lengthSquared > 0. ? std::clamp ((px * dx + py * dy) / lengthSquared, 0., 1.) : 0.;
-			const auto ex = px - t * dx;
-			const auto ey = py - t * dy;
-			const auto distance = std::sqrt (ex * ex + ey * ey);
-			const auto coverage = antiAliasing ? std::clamp (half + 0.5 - distance, 0., 1.)
-			                                   : (distance <= half ? 1. : 0.);
+			const CPoint c (x + 0.5, y + 0.5);
+			// 符号付き距離 d (内側が負)。aliasing は d <= 0 の画素、AA は境界 1 px を線形に薄める。
+			double d = 1e300;
+			for (const auto& band : bands)
+			{
+				// 画素中心が形状の外接矩形から 1 px 以上離れていれば、被覆は 0 なので距離計算を省く。
+				if (c.x < band.x0 - 1. || c.x > band.x1 + 1. || c.y < band.y0 - 1. || c.y > band.y1 + 1.)
+					continue;
+				d = std::min (d, signedDistance (band, c));
+			}
+			for (const auto& disc : discs)
+				d = std::min (d, std::hypot (c.x - disc.center.x, c.y - disc.center.y) - disc.radius);
+			const auto coverage = antiAliasing ? std::clamp (0.5 - d, 0., 1.) : (d <= 0. ? 1. : 0.);
 			if (coverage <= 0.)
 				continue;
 			if (auto* dst = pixelAt (x, y))
@@ -541,10 +807,34 @@ void CanvasGraphicsDeviceContext::fillPolygon (const PointList& points, const CC
 void CanvasGraphicsDeviceContext::strokePolyline (const PointList& points, bool closed,
                                                   const CColor& color) const
 {
+	if (points.size () < 2)
+		return;
+	// 点が 2 つの閉じた線は往復になるので、閉じるのは 3 点以上のときだけにする (従来の plotLine と同じ)。
+	closed = closed && points.size () > 2;
+	const bool dashed = !lineStyle.getDashLengths ().empty ();
+	const bool thick = lineWidth > 1. || drawMode.antiAliasing ();
+	if (!dashed && thick)
+	{
+		strokeThick (points, closed, color);
+		return;
+	}
+	if (dashed)
+	{
+		// 破線は区間ごとの開いた折れ線にして、区間の中では太さに応じて描く。
+		for (const auto& run : dashRuns (points, closed, lineStyle))
+		{
+			if (thick)
+				strokeThick (run, false, color);
+			else
+				for (size_t i = 0; i + 1 < run.size (); ++i)
+					plotThinLine (run[i], run[i + 1], color);
+		}
+		return;
+	}
 	for (size_t i = 0; i + 1 < points.size (); ++i)
-		plotLine (points[i], points[i + 1], color);
+		plotThinLine (points[i], points[i + 1], color);
 	if (closed && points.size () > 2)
-		plotLine (points.back (), points.front (), color);
+		plotThinLine (points.back (), points.front (), color);
 }
 
 //------------------------------------------------------------------------

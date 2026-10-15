@@ -62,6 +62,10 @@ if [ -f "$out/line_width.js" ]; then
   chk "alias_no_partial" '[ "${part[w1_alias]:-1}" -eq 0 ] && [ "${part[w4_alias]:-1}" -eq 0 ]'
   chk "aa_has_partial" '[ "${part[w1_aa]:-0}" -gt 0 ] && [ "${part[w4_aa]:-0}" -gt 0 ]'
   chk "aa_more_pixels" '[ "${nz[w4_aa]:-0}" -gt "${nz[w4_alias]:-0}" ]'
+  # SR-71 #4469: 線端 (cap)・接合 (join)・破線 (dash) の形状。cap は butt < round < square (角の四隅まで覆う square が最大)、join は bevel < round < miter の順に画素が増える (角の外側を埋める量)。破線は solid より少ない。
+  chk "cap_shapes_differ" '[ "${nz[w8_cap_butt]:-0}" -lt "${nz[w8_cap_round]:-0}" ] && [ "${nz[w8_cap_round]:-0}" -lt "${nz[w8_cap_square]:-0}" ]'
+  chk "join_shapes_differ" '[ "${nz[w8_join_bevel]:-0}" -lt "${nz[w8_join_round]:-0}" ] && [ "${nz[w8_join_round]:-0}" -lt "${nz[w8_join_miter]:-0}" ]'
+  chk "dash_less_than_solid" '[ "${nz[w4_dash]:-0}" -gt 0 ] && [ "${nz[w4_dash]:-0}" -lt "${nz[w4_alias]:-0}" ]'
 else
   echo "run: skipped (no line_width.js)" | tee -a "$out/summary.txt"
   rc=1
