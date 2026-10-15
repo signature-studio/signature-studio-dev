@@ -136,7 +136,7 @@ IR 型は `work/boot_final.ll` の callee の define 行 (仮引数 pos 番目)�
 - 分類器 (`m11_setother_nonimm_class.py`) の変更の履歴: `0ed00d057` (58 件の判定を追加) → `7e5261ce4` (格納幅 SIZE 外を `stack_width_other` に分ける。実 PE の 349 件では理由が変わらない: 修正前の区分表に st0 は無く、修正後の `stack_width_other` は 0 件)。
 - 実 PE の測定 commit: `7e5261ce4` (§2〜§4 の数値)。その後の分類器の変更は `257c3dd51` (rip 相対) と `fa7cd079d` (`movzx`/`movsx` の部分レジスタ書込みを未決 `partial_ext` に戻す・review 指摘の修正) の 2 件。
 - `fa7cd079d` (`partial_ext` の復元) の実 PE 再測定は**実施済み** (`0f485a623` で、`work-m11` と `fl-win64` の `block00031_PE.bin` から手順 1〜5 を実行)。結果は §2〜§4 と同じ: 台帳 `fixes 33`・`match 33 / mismatch 0`・非 imm 349 は 実値化 0 / 復元不能 0 / 未決 349・基準 58 件の内訳は不変・対象外 291 件の理由変化 0・直接 call 202 件・対照 rc 0 (正 7/7・ネガ 3/3・rip 3/3・partial_ext 1/1)。`fa7cd079d` で判定は変わっていない。
-- 手順 1 の `m11_post` 出力 sha は、この再測定では `c029ada4…` になった (REPORT_N86 §4 の `ecab191b…` とは不一致)。件数 (1049 site・0 詰め引数 2064・台帳 fixes 33・非 imm 349) は一致しており、入力の sha (`boot_final.ll` `69c774de…`・`block00031_PE.bin` `b2c64da4…`) も一致している。sha の差は `m11_post` の出力の揺れで、判定には影響しない。
+- 手順 1 の `m11_post` 出力 sha は、この再測定では `c029ada4…` になった (REPORT_N86 §4 の `ecab191b…` とは不一致)。件数 (1049 site・0 詰め引数 2064・台帳 fixes 33・非 imm 349) は一致しており、入力の sha (`boot_final.ll` `69c774de…`・`block00031_PE.bin` `b2c64da4…`) も一致している。sha の差の原因は未調査。件数と判定は一致したため、判定への影響は見ていない。
 - review round 2 の fix run は素材を `fl-win64` のみで起動された (`work-m11` 不在)。PR 本文に `oc_artifacts: fl-win64 work-m11` を追加し、次の review run で再測定できるようにした。
 - 対照検査 `m11_setother_controls.py` と再現 `m11_setother_repro.py` は `4a35c7868` で追加し、`7e5261ce4` で対照 1 件を足した。
 - main の取り込み (merge `26ccd7658`) で `m11_argrecover.py`・`ldfix/` など他の m11 ファイルが変わったため、その取り込み後の tree で §2 の手順 1〜5 を再実行した (数値は取り込み前と同じ)。
