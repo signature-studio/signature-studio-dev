@@ -41,6 +41,17 @@ python3 tools/plugins/slayer_engine_ia32/gap_indirect.py $FL_WIN64_DIR/extracted
 - 依存: capstone==5.0.7・pefile (`uv venv` + `uv pip install`)。 `gap_indirect.py` の 2 番目の引数が分類表 (`GAP_CLASSES_2814.md` 形式・pass 1)、または `gap_classify.py --md` の出力 (pass 2)。 いずれも `| n | 0xVA | B | c | ... |` の行を読む。
 - 所要: `gap_indirect.py` 単体で wall 0.21 s・maxrss 59.6 MB (load 0.30 → 0.40・cpu 4)。 `lift_text.py` は wall 16.95 s。
 
+## 6. 関数/data の判定 (受入 1)
+
+- 測定 commit: 本 PR の `gap_func_4729.py` を追加した commit。 入力は §4 と同じ block22434_PE.bin (sha256 `84b64c43…`)、区間は GAP_INDIRECT_4729.md の 34 行。
+- 判定の根拠 (区間ごと): 表 [GAP_FUNC_4729.md](GAP_FUNC_4729.md) (自動生成)。 P = 先頭の prologue、C = 直接 call/jmp rel32 の先頭 (0 件)、X = 線形 decode の境界一致、E = 末尾が ret/jmp/ud2、Z = 0x00 の割合、N = 不正バイト数。
+- 結果: **func 6 / data 0 / hold 28** (計 34)。
+  - func 6: 0x1000a690・0x1000ba48・0x1000d70c・0x1000e987・0x1000ef59・0x10012415。 prologue あり・decode 境界一致・末尾が ret。 ただし呼び元 (C) は 0 件なので、**関数の確定ではない**。 prologue の 1〜2 バイトは data にも現れるため、根拠は弱い。
+  - data 0: 0x1000b883 は 0x00 が 60% だが、中身が `call rel32` (直接の参照) なので data としない。 Z (0x00 の割合) だけでは data と判定しない。
+  - hold 28: prologue も直接 call の先も無い。 末尾が `int3`・`fstp` など関数の末尾として閉じないものや、`cc` (int3 padding) だけの区間を含む。 判定を据え置く。
+- 限界 (§3 と同じ): 呼び元が静的な直接 call・間接表・reloc に無いため、func 6 の関数性と hold 28 の data 性は、どちらも確定できない。 この表の出力は「判定の根拠の並べ替え」であり、`GAP_CLASSES` の (c) を書き換える根拠にはしない。
+- 反映方式 (受入 2 の続き): `GAP_CLASSES_2814.md` は自動生成のため手で変えない。 判定は GAP_FUNC_4729.md を VA で突き合わせて読む。 再生成は `python3 gap_func_4729.py block22434_PE.bin work/gap34.md --md > GAP_FUNC_4729.md` (`work/gap34.md` は GAP_INDIRECT_4729.md の VA 列から作る。 §4 の手順で `work/final_classes.md` を作ってから `gap_func_4729.py` に渡してもよい)。
+
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
