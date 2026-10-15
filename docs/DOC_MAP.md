@@ -563,7 +563,7 @@
 | `tools/targets/serum2/gui/REPORT_SR30.md` | ~100 | SR-30 (#2000): REPORT_SR28 の vtable 0x180a86b88 前提の訂正 (RTTI は SerumEditor の sub-object)。Splice 生成の直接呼出元と demo bit 読書 (0x1800c2b50 / 0x1800c6090) を列挙。選択 state 条件と間接経路は未達 (子 #2053〜#2055) |
 | `tools/targets/serum2/gui/REPORT_M7_CANVAS.md` | ~120 | SR-7 (#68) の M7 接続照合 (静的): CanvasFrame を tools/gui の surface・out ring の記号と照合 (`gui/m7_canvas_connect.py`)。設計上は接続可・実装は一部のみ・画素形式が不一致。数値の正本は本体 §0・§2 |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
-| `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_2065.md` | ~96 | SR-36 (#2065): REPORT_EFFORT §16 の全文。CTextLabel のみの canvas 描画 harness (wasm の compile 69/69・link 未解決 0・run rc=0) と描画 0 画素 (未達)、描画系 15 件の no-op 静的計数、阻害要因と子 issue 案。測定値の正本 |
+| `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_2065.md` | ~99 | SR-36 (#2065): 描画試行 harness と no-op 静的計数の付録。測定値の正本 |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
 | `tools/targets/massivex/REPORT_APPENDIX.md` | ~244 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017・§12.9 の対照と一貫性 #3154) |
 | `tools/targets/massivex/REPORT_APPENDIX_3154.md` | ~71 | Massive X §12.2・§12.2a・§12.10 の分割移動全文 (#3154 MX-34・250 行上限のため・内容無変更) |
