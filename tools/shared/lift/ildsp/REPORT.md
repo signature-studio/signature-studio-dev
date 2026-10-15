@@ -139,8 +139,8 @@ python3 tools/shared/scripts/ildsp_vtable_check.py tools/shared/work/raw/ildsp_v
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| vtable slot 1–3・5 の役割 (どの method か) の native 実行による確定 | 受入条件 (1) の残り | 子 [T-SH-38] |
-| 間接 call 4 件 (0x1aedc0 / 0x1b6f4c) の正常系での到達実測・扱いの決定 (4-6) | 受入条件 (3) | 子 [T-SH-38] |
+| vtable slot 1–3・5 の役割 (どの method か) の native 実行による確定 | 受入条件 (1) の残り | 子 [T-SH-53] #3249 |
+| 間接 call 4 件 (0x1aedc0 / 0x1b6f4c) の正常系での到達実測・扱いの決定 (4-6) | 受入条件 (3) | 子 [T-SH-54] #3250 |
 | 15 関数 (closure は 4-5 の定義で 36 / 87 関数) の lift・native 差分・ネガコン・gate | 受入条件 (2)(4) | 子 [T-SH-39] |
 | 旧 issue 本文の「15 関数・473 命令・SIMD 11.4%」の出典 | 本 REPORT で再現できない | #2483 本文から削除 (本 PR) |
 | §2 survey 表が chained `.pdata` 未処理で下限 | §2 の数値は下限 | #161 継続 |

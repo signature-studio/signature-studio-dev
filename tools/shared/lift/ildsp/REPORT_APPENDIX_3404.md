@@ -51,6 +51,16 @@ slot 5 はメモリを読まず書かない。そのため記録の比較は戻�
 
 fn.bin sha1 (slot 4) `63fa84fd5c82f8b5477def6849428b7b41b77e07`。
 
+### 鮮度 (測定 commit `a8f449584` → 検証 HEAD)
+上の実測は測定 commit `a8f449584` で行った。その後 HEAD `860f817e7` (main 取り込みの merge・競合解消) まで、測定 commit からの差分は次のとおり:
+
+| 範囲 | `git diff --stat a8f449584 860f817e7 -- <範囲>` |
+|---|---|
+| 実行経路 (`lift.sh`・`locate.py`・`diff_test.py`・`native_ref.c`・`run_wasm.mjs`・`libkio`・`env.sh`・`paths.py`) | 出力なし (0 行) |
+| `tools/shared/lift/ildsp` の残り (`native_image.py`・`native_ref_wc.c`・main 由来) | `2 files changed, 289 insertions(+)` |
+
+後者は実行経路から参照されない (`REPORT_APPENDIX_3276.md` の付録からのみ参照される)。実行経路の差分が 0 行のため、上の実測は HEAD `860f817e7` でも有効 (`docs/WORKFLOW.md` §6)。HEAD 860f817e7 での再測定の値は PR 本文に書く。
+
 ### 検証範囲 / 範囲外
 - 範囲内: slot 5 の 2 命令の戻り値 (eax = 0)。入力はメモリ全体の乱数 (記録の全バイトで、関数が触らないことも確かめる)。
 - 範囲外: slot 5 が「どの method か」(役割)。native で 0 を返すことは確かめたが、役割の確定は REPORT.md §4 の未解決 (slot 1–3・5 の役割) に残す。slot 1–3 の lift は #3299 の残件。
@@ -58,7 +68,7 @@ fn.bin sha1 (slot 4) `63fa84fd5c82f8b5477def6849428b7b41b77e07`。
 ### 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| slot 5 の役割 (どの method か) の確定 | 戻り値 0 の実機械語は確認済み。役割は未確定 | REPORT.md §4 の未解決 (子 [T-SH-38]) |
+| slot 5 の役割 (どの method か) の確定 | 戻り値 0 の実機械語は確認済み。役割は未確定 | REPORT.md §4 の未解決 (子 [T-SH-53] #3249) |
 | slot 1–3 (0x161fc0・0x162760・0x162f90) の lift と差分 | vtable の残りの method が未 lift | 親 #3299 [T-SH-61] の移送先 |
 
 KPI: 起動・GUI に関わらないため対象外。
