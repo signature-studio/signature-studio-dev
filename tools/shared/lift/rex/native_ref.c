@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 /* native_ref.c: REX の *元の機械語* を VA 0x30000000 (wasm と同一アドレス) に敷設し、gcc の ms_abi 関数ポインタで直接実行する参照。
  * 入力は gen_cases.py の case 形式、出力は run_wasm.mjs と同一形式 (case ごと: u64 rax, u64 import 呼出回数, arena, .data)。
  * import (WaitForSingleObject / ReleaseMutex / RtlPcToFileHeader / RaiseException / GetLastError) は同じ規約のスタブを IAT に敷設する。
@@ -25,8 +26,17 @@ typedef uint64_t (__attribute__((ms_abi)) *FN)(uint64_t, uint64_t, uint64_t, uin
 static sigjmp_buf jb;
 static volatile sig_atomic_t in_case, n_segv, n_alrm, last_sig;
 static volatile uintptr_t last_addr;
+static volatile greg_t last_gregs[NGREG];
 static uint32_t n_null, n_arena, n_img, n_oth;
-static void on_fault(int sig, siginfo_t *si, void *uc) { (void)uc; if (in_case) { last_sig = sig; last_addr = (uintptr_t)si->si_addr; if (sig == SIGALRM) n_alrm++; else n_segv++; siglongjmp(jb, 1); } _exit(4); }
+static void on_fault(int sig, siginfo_t *si, void *uc) {
+    if (in_case) {
+        last_sig = sig; last_addr = (uintptr_t)si->si_addr;
+        for (int i = 0; i < NGREG; i++) last_gregs[i] = ((ucontext_t *)uc)->uc_mcontext.gregs[i];
+        if (sig == SIGALRM) n_alrm++; else n_segv++;
+        siglongjmp(jb, 1);
+    }
+    _exit(4);
+}
 #define CRASH_MARK 0xC2A5C2A5C2A5C2A5ULL
 #define DIE(...) do { fprintf(stderr, __VA_ARGS__); return 2; } while (0)
 
@@ -88,7 +98,15 @@ int main(int argc, char **argv) {
                 else if (ad >= REX_ARENA && ad < REX_ARENA + REX_ARENA_SZ) n_arena++;
                 else if (ad >= REX_BASE && ad < REX_BASE + REX_IMG_SIZE) n_img++;
                 else n_oth++;
-                fprintf(stderr, "[native] crash case=%u fn=%u sig=%d addr=0x%llx\n", c, fn, (int)last_sig, (unsigned long long)ad);
+                fprintf(stderr, "[native] crash case=%u fn=%u sig=%d addr=0x%llx rip=0x%llx", c, fn, (int)last_sig, (unsigned long long)ad,
+                        (unsigned long long)last_gregs[REG_RIP]);
+                static const struct { const char *nm; int reg; } rl[] = {
+                    {"rax", REG_RAX}, {"rbx", REG_RBX}, {"rcx", REG_RCX}, {"rdx", REG_RDX}, {"rsi", REG_RSI}, {"rdi", REG_RDI},
+                    {"rbp", REG_RBP}, {"rsp", REG_RSP}, {"r8", REG_R8}, {"r9", REG_R9}, {"r10", REG_R10}, {"r11", REG_R11},
+                    {"r12", REG_R12}, {"r13", REG_R13}, {"r14", REG_R14}, {"r15", REG_R15}};
+                for (size_t k = 0; k < sizeof rl / sizeof rl[0]; k++)
+                    fprintf(stderr, " %s=0x%llx", rl[k].nm, (unsigned long long)last_gregs[rl[k].reg]);
+                fprintf(stderr, "\n");
             }
         }
         in_case = 0;

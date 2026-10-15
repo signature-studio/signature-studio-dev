@@ -49,6 +49,7 @@ set +e
 if [ "$MODE" = neg-cmp ]; then python3 "$HERE/diff_test.py" "$W" --mutate-wasm; RC=$?; else python3 "$HERE/diff_test.py" "$W"; RC=$?; fi
 set -e
 python3 "$HERE/crash_class.py" "$W" "$W/native_stderr.txt"
+python3 "$HERE/crash_insn.py" "$W"
 T1=$(date +%s)
 echo "[rex] $MODE elapsed=$((T1-T0))s load start=[$L0] end=[$(cut -d' ' -f1-3 /proc/loadavg)]"
 if [ "$MODE" = ok ] || [ "$MODE" = neg-owner ]; then

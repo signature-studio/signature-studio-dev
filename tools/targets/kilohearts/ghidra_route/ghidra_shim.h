@@ -18,7 +18,7 @@ typedef unsigned long long ulonglong;
 typedef unsigned int uint;
 typedef unsigned char byte;
 typedef unsigned short ushort;
-typedef void code;
+typedef longlong (*code)();
 typedef unsigned char undefined;
 typedef signed char sbyte;
 

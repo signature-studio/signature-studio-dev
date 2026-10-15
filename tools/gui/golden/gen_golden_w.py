@@ -8,6 +8,7 @@ DIB 直書きの式は ((x*3)<<16) の上位ビットが alpha 側へ溢れる�
 usage:
   gen_golden_w.py compare <actual.ppm>            期待画像と画素比較。差 0 で exit 0・差ありで exit 1
   gen_golden_w.py compare <actual.ppm> --tamper   ネガコン: 期待画像の 1 画素を改竄して比較 (exit 1 になること)
+  gen_golden_w.py emit <out.ppm> [--tamper]       期待画像を P6 で書き出す (e2e.mjs の W 版モードが読む)
 """
 import os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -55,7 +56,18 @@ def read_ppm(path):
     return w, h, [[tuple(px[(y * w + x) * 3:(y * w + x) * 3 + 3]) for x in range(w)] for y in range(h)]
 
 
+def write_ppm(path, img):
+    with open(path, "wb") as f:
+        f.write(b"P6\n%d %d\n255\n" % (W, H))
+        f.write(bytes(c for row in img for px in row for c in px))
+
+
 def main():
+    if len(sys.argv) >= 3 and sys.argv[1] == "emit":
+        tamper = "--tamper" in sys.argv[3:]
+        write_ppm(sys.argv[2], oracle(tamper))
+        print("[golden_w] wrote %s%s" % (sys.argv[2], " [tamper]" if tamper else ""))
+        return 0
     if len(sys.argv) < 3 or sys.argv[1] != "compare":
         print(__doc__); return 2
     w, h, act = read_ppm(sys.argv[2])
