@@ -28,6 +28,7 @@ GTYPE = {
         '181422a10': 'uint',       # minps/movaps・& -(uint)(...) の 4 byte マスク
         '182280bc0': 'longlong',   # cmp r10,qword・(longlong) 比較
         '182280bc8': 'longlong',   # cmp r10,qword・(longlong) 比較
+        '18436cd18': 'longlong',   # mov qword [..],rax (FUN_181327120/181327348 の GS 失敗経路)・puVar3+0x40 の 8 byte 書込み (#4685)
         '184162118': 'ulonglong',  # xor qword (180fd1b1a)・uint64 として読む (qword 幅)
         '184162a88': 'ulonglong',  # xor qword (180fe2496)・mov qword 書込 (180fe24f6)
         '184162a98': 'ulonglong',  # xor qword (180fe2791・180fe27bc)・mov qword 書込 (180fe27a8)
