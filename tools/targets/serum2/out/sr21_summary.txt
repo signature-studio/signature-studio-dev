@@ -1,13 +1,18 @@
 class	blocks	bytes	ret_blocks	insns
 entry_call	844	86060	680	20747
 entry_rip	464	11800	395	2996
-branch_only	44	3397	36	910
+branch_only	49	3562	39	953
 table_ptr	3928	83235	3314	21456
 ptr_single	80	1267	10	273
-unref	15102	132498	21	15476
+unref	36	1597	18	372
 data	5	141	1	37
-TOTAL	20467	318398	4457	61895
-referenced(entry_call+entry_rip+branch_only)	1352	101257
+padding	15061	130736	0	0
+TOTAL_blocks_incl_padding	20467	318398	4457	46834
+edge_padding_in_code_blocks	0	0
+sr3_block_bytes_total	20467	318398
+interblock_padding_runs	19444	145350
+gap_bytes_total	29354	463748
+referenced(entry_call+entry_rip+branch_only)	1357	101422
 pointer_only(table_ptr+ptr_single)	4008	84502
 cut_window_blocks	217	2280
-cut_window_by_class	{'unref': 164, 'table_ptr': 30, 'entry_call': 10, 'entry_rip': 10, 'ptr_single': 3}
+cut_window_by_class	{'padding': 164, 'table_ptr': 30, 'entry_call': 10, 'entry_rip': 10, 'ptr_single': 3}

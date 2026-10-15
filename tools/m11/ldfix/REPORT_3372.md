@@ -6,7 +6,7 @@
 
 - REPORT_2555 §2 の誤り 13 箇所のうち **3 箇所を site 単位で直した**: function_44f040 (表 #5)・function_47cf10 (表 #14)・function_6074b0 (表 #15)。
   書き換えは `fix_site_3372.py` (新規)。機械語 8 + 8 + 4 = **20 命令を capstone で照合**し、一致しなければ止める。IR は書き換える行が 1 件ずつ在るときだけ書く。
-- `ldfix_e2e.sh` に step 1c (本 pass) を配線し、**最終コード (測定 commit `dd8894202`) で完走**した (rc=0)。
+- `ldfix_e2e.sh` に step 1d (本 pass) を配線し、**最終コード (測定 commit `dd8894202`) で完走**した (rc=0)。
   stage4 は base / fix とも同じ到達段 (4/6)・同じ trap (`memory access out of bounds`)。survey は 22 項目が base と一致
   (差分は trap の IR 行番号のキーだけ。§5)。**観測上の変化は無し**。wasm サイズは +199 B。
 - 一次分類 (`verify_deref_sites_2555.py`・17 行): base は OTHER 9 / ADDR 5 / MISMATCH 2 / SCAN_MISS 1、修復後は **LOAD 3** を加え OTHER 7 / ADDR 4 / MISMATCH 2 / SCAN_MISS 1。
@@ -80,9 +80,9 @@ base IR: `%0 = call 4256c0(i64 %arg1)`。修復: `%a1g = load [arg1]` を入れ�
   (`verify_3372_final.json` の `verdict` と `ir_arg` を確認)。
 - 一次分類は「機械的な振り分け」であり最終判定ではない (REPORT_2555 §5)。最終判定は、本 REPORT の §2 の窓読みによる。
 
-## 5. ldfix_e2e の実測 (step 1c を配線した最終コード)
+## 5. ldfix_e2e の実測 (step 1d を配線した最終コード)
 
-- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` (step 1c は本 PR で追加)。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` (step 1d は本 PR で追加)。
 - 測定 commit: **`dd8894202`** (コードを変えた最後の commit。`fix_site_3372.py` と `ldfix_e2e.sh` を含む)。
 - 実測 (測定 commit `dd8894202` の HEAD で 1 回。`date -u +%s.%N` で計時): wall **47.5 s**・rc=0。実行前の load average `0.35 0.50 0.41` (1/5/15 分)、実行後 `0.72 0.58 0.44` (4 vCPU)。
 
@@ -101,7 +101,7 @@ base IR: `%0 = call 4256c0(i64 %arg1)`。修復: `%a1g = load [arg1]` を入れ�
   (`1877`→`1878`、`5265`→`5266`、`14877`→`14878`・`14879`→`14880`・`14881`→`14882`)。件数は同じ。修復で IR の行数が増えたことによる。
 - 観測上の変化が無いことは、修復した 3 箇所が stage4・survey の trap を消していないことを意味する。`memory access out of bounds` (stage4 の dllmain と survey の oob 8 件) の原因は、本 PR の 3 箇所には無い。
   本 PR の変更の意味は「機械語と IR の一致を 3 箇所で取り戻した」ことに限る。stage4 の trap の原因の切り分けは別件 (#942 系)。
-- 修復の作用を e2e で見る経路: step 1c の出力 `work/ldfix_fixed.ll` の 44f040 (`%ldfxu14`・`%a1e`)・47cf10 (`%a1f`)。emcc -c の構文検証 (step 2) は通った。
+- 修復の作用を e2e で見る経路: step 1d の出力 `work/ldfix_fixed.ll` の 44f040 (`%ldfxu14`・`%a1e`)・47cf10 (`%a1f`)。emcc -c の構文検証 (step 2) は通った。
 
 ## 6. 判定表 (REPORT_2555 §2) の更新
 
@@ -139,7 +139,7 @@ base IR: `%0 = call 4256c0(i64 %arg1)`。修復: `%a1g = load [arg1]` を入れ�
 
 ## 8. 検証範囲・git diff 証跡
 
-- 範囲内: 表 #5・#14・#15 の 3 箇所の IR 修復、機械照合 20 件、NC 4 種、ldfix_e2e (step 1c 込み) の 1 回完走、一次分類 17 行。
+- 範囲内: 表 #5・#14・#15 の 3 箇所の IR 修復、機械照合 20 件、NC 4 種、ldfix_e2e (step 1d 込み) の 1 回完走、一次分類 17 行。
 - 範囲外: 他の誤り箇所 (§6 の未修復)、stage4 の trap の原因、走査定義の変更、liftdiff batch (`--batch` は未実行)。
 - 測定 commit: `dd8894202` (コード差分の最終 commit)。
   `git diff dd8894202 HEAD -- tools/m11/ldfix/fix_site_3372.py tools/m11/ldfix/ldfix_e2e.sh` の出力は、本 REPORT の commit 時点で空 (差分 0)。
