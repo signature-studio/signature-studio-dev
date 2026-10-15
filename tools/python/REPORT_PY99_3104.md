@@ -229,23 +229,25 @@
 
 ## 入口レジスタ葉 c_in・d_in・r8_in の呼出し側 (#4494 / PY-334)
 
-測定 commit: `05dedcf20` (`analysis/py334_entry_source.py` を入れた最後のコード commit)。`git diff 05dedcf20 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
+測定 commit: `a870588b5` (main を merge した後の最後のコード commit。`py99_closure.py` は #4332 の `--negctl drop-part` 追加を含む。`py334_entry_source.py` の PyArg 7 件の assert 追加を含む)。`git diff a870588b5 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
 素材: `fl-win64` の `block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin'`・2.9 秒)。`analysis/py53_dispatch.py` → `fn=4664 dispatch=13 r8d_tests=174`。
 
 ### 結論 (受入 1・2・3 の判定)
 
-- 3 葉の出どころは呼出し鎖で確定した。`c_in` (ecx) = eventId・`d_in` (edx) = value・`r8_in` (r8d) = flags。Python の PyArg `Iii` (0xd69f00 が `[rbp+0x7c]`・`[rbp+0x78]`・`[rbp+0x74]` から読む) → wrapper 0xd84740 → dispatch 0xd843d0 (`job+0x18`・`+0x20`・`+0x28` へ複写) → callback 0xd846e0 (ecx・edx・r8d へ読む) → 0x1046a30 の入口 (`[rbp+0x5b0]`・`[rbp+0x5b8]`)。15 命令を `analysis/py334_entry_source.py` が PE から assert する (全件 ok)。
+- 3 葉の出どころは呼出し鎖で確定した。`c_in` (ecx) = eventId・`d_in` (edx) = value・`r8_in` (r8d) = flags。Python の PyArg `Iii` (0xd69f00 が `[rbp+0x7c]`・`[rbp+0x78]`・`[rbp+0x74]` へ書き出し、`0xd69f65`〜`0xd69f74` で wrapper 0xd84740 へ渡す) → wrapper 0xd84740 → dispatch 0xd843d0 (`job+0x18`・`+0x20`・`+0x28` へ複写) → callback 0xd846e0 (ecx・edx・r8d へ読む) → 0x1046a30 の入口 (`[rbp+0x5b0]`・`[rbp+0x5b8]`)。`analysis/py334_entry_source.py` が PE から 22 命令 (PyArg 側 7 件 + wrapper 以降 15 件) を assert する (全件 ok)。
 - 呼出し側で確定する範囲: 3 葉の値は呼び出す Python スクリプトが渡す実行時の引数であり、バイナリの中に定数は無い。1 件の呼出しでも値は呼出しごとに違いうる。よって binary の解析だけでは確定できない。確定には、Python 側の呼出しの実値 (実行時の観測・スクリプト集合) が要る。本節の範囲では確定しない (判定: **未閉のまま**)。
 - 厳格判定の閉じた書込み: **0/49 のまま** (増減 0)。残る葉が入口のレジスタ値だけの書込みは **49/49** (#4266 の合流の閉包で `0x104bffa` の `⚠合流` が消えた後の値)。
 - 検算: 算法 A と B の mismatch **0** (49 件)。negctl `--negctl drop-pred` は mismatch **17**・exit 1 (維持)。
 
-### 実測 (commit `05dedcf20`・load average 0.08)
+### 実測 (commit `a870588b5`・load average 0.10 (09:53))
 
-| 実行 | 結果 | exit | 所要 |
+素材: `fl-win64` の `extracted/block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin'`・1.7 秒)。入力は `analysis/py53_dispatch.py <PE> work/py53` で作った `work/py53/fn.txt`。
+
+| 実行 | 結果 | exit | 所要 (real) |
 |---|---|---|---|
-| `analysis/py99_closure.py work/py53/fn.txt` | `_in` だけの書込み 49/49・閉じた書込み (B) 0/49・(A) 0/49・mismatch 0 | 0 | 0.66 秒 |
-| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred` | mismatch 17 | 1 | 0.86 秒 |
-| `FL_WIN64_DIR=<展開先> analysis/py334_entry_source.py` | 呼出し鎖 15 命令・全件 ok | 0 | 0.08 秒 |
+| `analysis/py99_closure.py work/py53/fn.txt` | `_in` だけの書込み 49/49・閉じた書込み (B) 0/49・(A) 0/49・mismatch 0 | 0 | 0.51 秒 |
+| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred` | mismatch 17 | 1 | 0.62 秒 |
+| `FL_WIN64_DIR=<展開先> analysis/py334_entry_source.py` | 呼出し鎖 22 命令・全件 ok | 0 | 0.08 秒 |
 
 ### 限界
 
@@ -256,4 +258,4 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 入口レジスタ葉 `c_in`・`d_in`・`r8_in` の値 (Python 側の呼出しの実値) | 49 件の式が関数の入力のまま。厳格判定の閉じた書込みは 0/49 | 起票先なし (呼出し側の実値は binary の解析の外。観測の計画が要る・PM 判断) |
+| 入口レジスタ葉 `c_in`・`d_in`・`r8_in` の値 (Python 側の呼出しの実値) | 49 件の式が関数の入力のまま。厳格判定の閉じた書込みは 0/49 | PM agent の判断待ち: 3 葉の実値を実行時観測で取るか / 既定案: 観測計画は起票せず本節を未閉のまま残す |
