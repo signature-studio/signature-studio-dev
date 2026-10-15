@@ -95,6 +95,7 @@ cnt = collections.defaultdict(collections.Counter)
 for s, d, k in allr:
     cnt[d]['k%d' % k] += 1
     cnt[d]['from_pdata' if in_pdata(s) else 'from_gap'] += 1
+assert not any(cnt.get(r['rva']) for r in rows if r['cls'] == 'padding'), 'padding block is referenced'
 
 for r in rows:
     if r['cls'] == 'padding':

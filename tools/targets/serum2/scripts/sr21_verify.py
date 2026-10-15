@@ -69,7 +69,7 @@ print('NEG_CONTROL  (start+1) call_hit=%d jmp_hit=%d ptr_hit=%d' % (cn, jn, pn))
 unref_any = [b for b in blocks if b[2] in ('unref', 'data') and (b[0] in calls or b[0] in jmps or b[0] in ptrs)]
 print('unref/data blocks with ANY byte-scan or ptr hit: %d' % len(unref_any))
 ptr_only = [b for b in blocks if b[2] == 'table_ptr' and b[0] in ptrs]
-print('unref blocks hit only by data pointer: %d bytes=%d' % (len(ptr_only), sum(b[1] for b in ptr_only)))
+print('table_ptr blocks hit by data pointer: %d bytes=%d' % (len(ptr_only), sum(b[1] for b in ptr_only)))
 in_run = [b for b in ptr_only if b[0] in runp]
 print('  of which in a consecutive pointer run (table-like, >=2 adjacent qwords): %d bytes=%d' % (len(in_run), sum(b[1] for b in in_run)))
 for b in ptr_only[:10]: print('  ', hex(IMG + b[0]), b[1])
