@@ -27,6 +27,7 @@ import {
   STUCK_LABEL,
   type HistoryEntry,
   type PmTarget,
+  type SkipEntry,
 } from "./pm.ts";
 import { RATE_EVAL_GAP_MS, RATE_EVAL_MAX_GAP_MS, RATE_STREAK, RATE_WINDOW_MS, rateHit } from "./ratealert.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
@@ -1385,6 +1386,17 @@ export class Engine {
   private pmHistory(): HistoryEntry[] {
     return pruneHistory(this.d.now(), this.d.store.get<HistoryEntry[]>("meta", this.pmHistoryKey()) ?? []);
   }
+  // 毎時上限で見送った件数 (#3462)。履歴と同じく live / dry-run で分ける。
+  private pmHourSkipKey(): string {
+    return this.dispatchLive() ? "pmHourSkipLive" : "pmHourSkipWould";
+  }
+  private pmHourSkips(now: number): SkipEntry[] {
+    return pruneHistory(now, this.d.store.get<SkipEntry[]>("meta", this.pmHourSkipKey()) ?? []);
+  }
+  private recordHourSkip(now: number, n: number): void {
+    if (n <= 0) return;
+    this.d.store.put("meta", this.pmHourSkipKey(), [...this.pmHourSkips(now), { at: now, n }]);
+  }
 
   // 検出した対象を oc-pm で送る。payload は kind (列挙) と ref (数字) だけ。LIVE_DISPATCH=1 のときだけ送る (oc-watchdog と同じスイッチ)。
   // 同期が古い間は送らない (誤った対象を起こさない)。
@@ -1394,7 +1406,7 @@ export class Engine {
     const live = !!(this.dispatchLive() && gh);
     const now = this.d.now();
     const hist = this.pmHistory();
-    const { send } = selectDispatch(now, this.detectPmTargets(), hist);
+    const { send, skipped } = selectDispatch(now, this.detectPmTargets(), hist);
     this.meta.counters = this.meta.counters ?? this.zero();
     for (const tg of send) {
       if (!validPayload(tg.kind, tg.ref)) continue;
@@ -1422,6 +1434,7 @@ export class Engine {
       this.d.store.put("meta", this.pmHistoryKey(), hist);
       this.saveMeta();
     }
+    this.recordHourSkip(now, skipped.filter((s) => s.why === "hour").length);
     return out;
   }
 
@@ -1524,7 +1537,10 @@ export class Engine {
     const hist = this.pmHistory();
     const within = (ms: number) => hist.filter((h) => now - h.at < ms);
     if (within(PM_LIMITS.dupMs).some((h) => h.kind === DIGEST_KIND && h.ref === DIGEST_REF)) return "skipped";
-    if (within(PM_LIMITS.hourMs).length >= PM_LIMITS.hourMax) return "skipped";
+    if (within(PM_LIMITS.hourMs).length >= PM_LIMITS.hourMax) {
+      this.recordHourSkip(now, 1);
+      return "skipped";
+    }
     const reason = halt.reasons[0] ?? "";
     const live = this.dispatchLive() && !!gh;
     const held = this.d.cfg.liveDispatch && !this.dispatchLive();
@@ -1825,6 +1841,9 @@ export class Engine {
       refs_only_merge_rate_24h: { merged: mergedDay.length, refs_only: refsOnly, rate: mergedDay.length ? refsOnly / mergedDay.length : null },
       open_issues_delta_24h: base ? open - base.open : null,
       pm_dispatch_1h: this.pmHistory().filter((h) => now - h.at < 3_600_000).length,
+      // oc-pm の毎時上限 (PM_LIMITS.hourMax) と、直近 24 時間にその上限で見送った件数 (対象ごと・tick ごとの回数。pmDispatch と haltNotify が数える)。
+      pm_dispatch_cap: PM_LIMITS.hourMax,
+      pm_skipped_hour_24h: this.pmHourSkips(now).reduce((sum, h) => sum + h.n, 0),
       // dry-run で『送るはずだった』oc-pm (直近 24 時間。kind と ref だけ)。LIVE_DISPATCH では空。
       would_dispatch_pm: this.dispatchLive() ? [] : this.pmHistory().map((h) => ({ kind: h.kind, ref: h.ref, at: iso(h.at) })),
       last_full_sync: this.meta.fullSyncAt ? iso(this.meta.fullSyncAt) : null,
