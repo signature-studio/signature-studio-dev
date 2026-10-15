@@ -40,7 +40,7 @@
 
 ## 4374 間接経由 import 呼出しの計数 (T-SH-121 / #4374)
 
-測定 commit = `71b77279b` (HEAD。コードは `93fde48ab` 以降 `tools/qfclift`・`tools/flelift/rt`・`tools/shared/oss/freetype`・`tools/flelift/x64c.py` の変更を含む。`71b77279b` 以降のコード差分は 0。下記 `git diff` の出力を参照)。
+測定 commit = `71b77279b` (コードを変えた最後の commit。`93fde48ab` からの差分は `tools/qfclift` 14 ファイル・`tools/flelift/x64c.py` などを含む)。`git diff 71b77279b HEAD -- tools/qfclift tools/flelift/rt tools/shared/oss/freetype tools/flelift/x64c.py` の出力は 0 行 (以後の commit は REPORT の md のみ)。
 手順: `QFC_BOOT_REBUILD=1 qfc_boot.sh` (rc 1・strict `MISSING IMPORT LocalAlloc`・soft は `FontCache_GetStats` で trap。boot は FAIL のまま) → `qfc_count.sh` (foreground)。素材: `fl-win64` と `toolchain-emsdk` (emcc 6.0.12)・FreeType 2.7 wasm32 を `tools/shared/work/` に作成。
 - 実行 `qfc_count.sh`: rc 0・wall 21.0 s・load 0.66 (開始時)。
 - 生成: imp_tab 行 223 (used 222)。直接呼出し書換え 1681 箇所 (名前別 222 種)。
