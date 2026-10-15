@@ -12,8 +12,10 @@ exports = {}
 cur = None
 lines = open(src, encoding='utf-8').read().split('\n')
 # store_ptr の import 名は build ごとに変わる (旧 $fimport$32・現 $fimport$34)。import 行から取る
-hook = next(m.group(1) for m in map(imp_re.match, lines) if m)
-store_ptr_re = re.compile(r'\(call \$' + re.escape(hook) + r'\b')
+imp = [m.group(1) for m in map(imp_re.match, lines) if m]
+if len(imp) != 1:
+    sys.exit('store_ptr の import が 1 件でない: %d' % len(imp))
+store_ptr_re = re.compile(r'\(call \$' + re.escape(imp[0]) + r'\b')
 for i, ln in enumerate(lines):
     m = func_re.match(ln)
     if m:
