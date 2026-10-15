@@ -297,6 +297,11 @@ def main():
     if 'lanes' in fixes and re.search(r'undefined1 aauStack_f8 \[11\] \[16\];', alltxt):
         out.append(LANE_F8_HELPER)
     for va, (ty, kind, _) in sorted(gtypes.items()):
+        if ty == 'FNPTR':  # 関数ポインタ slot (#4671): PE の thunk を値として再現せず、到達時 abort の関数を指す
+            out.append('static void FNPTR_%x() { abort(); }' % va)
+            out.append('static void (*fp_%x)() = FNPTR_%x;' % (va, va))
+            out.append('#define %s_%x fp_%x' % (kind, va, va))
+            continue
         d = pe_bytes(pe, va, 16)
         out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
         out.append('#define %s_%x (*(%s*)gd_%x)' % (kind, va, ty, va))

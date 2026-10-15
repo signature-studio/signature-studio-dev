@@ -1,0 +1,41 @@
+name: Typecheck
+
+# 変換ロジックの型契約 (mypy Tier 1) を検査する (CI-194, 親 #2319)。
+#   設定: repo ルートの mypy.ini。検査対象 (files) = liftlib の Tier 1 モジュール。
+#   Tier 1 のどれかに型エラー (引数・戻り値・属性の食い違い) が入ると赤で止める。
+#   Tier 2 (p1/base/x64c 系などの未 strict) のエラーは報告しない (拡大は別 issue)。
+#
+# 設計: python は runner 同梱の python3 を使う (setup-python を足さない)。mypy は
+#   バージョン固定 (2.4.0 = 測定に使った版)。python_version の対象は mypy.ini が固定する。
+on:
+  pull_request:
+    paths:
+      - 'mypy.ini'
+      - 'tools/liftlib/liftlib/**'
+      - 'tools/shared/**'
+      - '.github/workflows/typecheck.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'mypy.ini'
+      - 'tools/liftlib/liftlib/**'
+      - 'tools/shared/**'
+      - '.github/workflows/typecheck.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  mypy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: mypy (Tier 1 = mypy.ini の files)
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --quiet 'mypy==2.4.0'
+          python3 -m mypy --version
+          python3 -m mypy

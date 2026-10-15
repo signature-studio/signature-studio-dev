@@ -14,19 +14,23 @@ import os
 import re
 import subprocess
 import sys
+from typing import TYPE_CHECKING, Any, Match
+
+if TYPE_CHECKING:
+    from liftlib.ir import Func
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 ICALL = os.path.join(ROOT, "tools", "icall")
 
 
-def _py(script, *args):
+def _py(script: str, *args: object) -> str:
     r = subprocess.run([sys.executable, os.path.join(ICALL, script)] + [str(a) for a in args], capture_output=True, text=True)
     if r.returncode:
         raise RuntimeError("%s failed:\n%s" % (script, (r.stdout + r.stderr)[-2000:]))
     return r.stdout
 
 
-def prelift(cfg, image, funcs_file, workdir, log):
+def prelift(cfg: dict[str, Any], image: str, funcs_file: str, workdir: str, log: list[str]) -> tuple[str, str, str]:
     """書換え済み PE と RetDec ranges を作る。返値 (image', ranges_csv, map_path)"""
     pc = cfg.get("passes", {}).get("icall", {})
     out = os.path.join(workdir, cfg["name"] + ".icall.dll")
@@ -41,7 +45,7 @@ def prelift(cfg, image, funcs_file, workdir, log):
     return out, ranges, mp
 
 
-def restore(raw_ll, map_path, workdir, log):
+def restore(raw_ll: str, map_path: str, workdir: str, log: list[str]) -> str:
     """RetDec raw ll (書換え PE 由来) → 元 VA 体系 + __icall_dispatch へ。返値 restored ll path"""
     out = os.path.splitext(raw_ll)[0] + ".restored.ll"
     log.append("icall.restore: " + _py("ir_icall_restore.py", "--ir", raw_ll, "--map", map_path, "--out", out).strip())
@@ -52,13 +56,13 @@ BLK_GLOBAL = "@__icall_blk"
 BLK_GLOBAL_SIZE = 0x200
 
 
-def blk_global_text(text, blk):
+def blk_global_text(text: str, blk: int) -> tuple[str, int]:
     """#1269: BLK (icall の固定 block, 既定 VA 0x184308000) への inttoptr 定数を module-local global への GEP に張り替える。
     wasm32 では BLK VA が線形メモリ外へ切り詰められ load/store が trap するため。配置は wasm 内の global に任せる。
     対象は blk ..< blk+BLK_GLOBAL_SIZE の inttoptr のみ。返値 (text, 置換数)"""
     n = [0]
 
-    def sub(m):
+    def sub(m: Match[str]) -> str:
         v = int(m.group(1))
         if blk <= v < blk + BLK_GLOBAL_SIZE:
             n[0] += 1
@@ -73,10 +77,10 @@ def blk_global_text(text, blk):
 
 
 # icall_rewrite.py の BLK_RCX / BLK_RDX / BLK_R8 / BLK_R9 → MS x64 の整数引数位置 (0 = rcx = 第 1 引数)
-BLK_ARG_SLOT = {0x08: 0, 0x10: 1, 0x18: 2, 0x20: 3}
+BLK_ARG_SLOT: dict[int, int] = {0x08: 0, 0x10: 1, 0x18: 2, 0x20: 3}
 
 
-def entry_blk_args(fn):
+def entry_blk_args(fn: "Func") -> int:
     """#1270: leaf (harness が直接呼ぶ関数) の入口で BLK の rcx/rdx 読み (BLK+0x08/+0x10) を仮引数 %argN へ張り替える。
     harness は leaf の引数を wasm 引数 (%argN) で渡し BLK へは書かないため、BLK 読みは 0 になる (this=0 で値が合わない)。
     対象は入口ブロックで BLK への store・関数呼出し (asm helper を除く) より前にある load だけ。

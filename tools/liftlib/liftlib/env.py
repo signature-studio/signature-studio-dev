@@ -2,6 +2,7 @@
 import os
 import subprocess
 import sys
+from typing import Any, MutableMapping, Sequence
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "shared"))
 from paths import ANALYSIS_DIR, PLUGINS_DIR  # noqa: E402
@@ -13,7 +14,7 @@ OTT_DLL = os.environ.get("OTT_DLL") or os.path.join(PLUGINS_DIR, "ott", "binarie
 PATH_VARS = {"ANALYSIS_DIR": ANALYSIS_DIR, "PLUGINS_DIR": PLUGINS_DIR, "OTT_DLL": OTT_DLL}
 
 
-def ensure():
+def ensure() -> MutableMapping[str, str]:
     global _DONE
     if _DONE:
         return os.environ
@@ -21,14 +22,14 @@ def ensure():
         r = subprocess.run(["bash", "-c", "source %s/emsdk_env.sh >/dev/null 2>&1; env -0" % EMSDK], capture_output=True)
         for kv in r.stdout.split(b"\0"):
             if b"=" in kv:
-                k, v = kv.split(b"=", 1)
-                k, v = k.decode(), v.decode()
+                kb, vb = kv.split(b"=", 1)
+                k, v = kb.decode(), vb.decode()
                 if k in ("PATH", "EMSDK", "EM_CONFIG", "EMSDK_NODE", "EMSDK_PYTHON", "EM_CACHE", "EM_FROZEN_CACHE"):
                     os.environ[k] = v
     _DONE = True
     return os.environ
 
 
-def run(cmd, **kw):
+def run(cmd: Sequence[str] | str, **kw: Any) -> subprocess.CompletedProcess[Any]:
     ensure()
     return subprocess.run(cmd, **kw)

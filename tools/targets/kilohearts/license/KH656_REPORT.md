@@ -240,3 +240,25 @@ index c59421af9..7ac5ec4bf 100644
 - 結論: `todo == []` には未収束 (受入 1 未達)。round 8 (lift 589) まで build が通り、round 9 は `kh_lower` の stage0 欠落 `0x180f88488` で停止。round 6 の失敗 (i256 判定の誤り・失敗時に lift 集合が空になる) は修正済み。module F に memset shim `1813846e0` を登録 (HEAD と同じ wasm 54,394 B・kh249 ok=17 ng=0 を維持)。
 - 各ラウンドの実測・原因の切り分け・未解決: [`KH656_REPORT_APPENDIX_3590.md`](KH656_REPORT_APPENDIX_3590.md)
 - 測定 commit: `0b487d4f2` (以後は REPORT のみ)。
+
+## 11. 閉包 lift-8 / 313 窓化の HEAD 再測定 (#4670 / KH-105、実測)
+
+測定 commit: `d3bb79581` (`scripts/kh656_window_measure.py` を main に取り込んだ commit。測定はこの HEAD で実施)。
+素材: `plugins-kilohearts` (installer zip → `work/winpkg/HeartCore.core_64` 76,642,304 B)・`toolchain-retdec`・`toolchain-emsdk`。環境: nproc=4・load average 0.52〜0.67。
+
+| 測定 | wasm B | globals | sha256 先頭 8 桁 | undefined import |
+|---|---|---|---|---|
+| lift-8 off (`rdata_str` 無し) | 54,394 | 9 | `7ba79e65…` | 0 |
+| lift-8 on (`rdata_str` + `rdata_raw_allow`) | 54,487 | 10 | `3d2bc6fd…` | 0 |
+
+- 受入 1 達成: wasm B と sha256 先頭 8 桁は測定 commit `091c68915` の記録 (`KH656_REPORT_APPENDIX_1821.md` §3: lift-8 on 54,487 B・`3d2bc6fd`、lift-8 off 54,394 B・`7ba79e65`) と一致する。globals は on の 10 のみ `091c68915` の記録 (10) と一致。off の globals 9 は `091c68915` では「未記録」だったため、今回が初回記録であり、一致の根拠にはしない。
+- 注: `091c68915` の on 測定は `rdata_raw_allow` を渡さずに行われた。今回の on は `rdata_raw_allow` を渡して測ったが、sha は一致した。
+- driver は `091c68915` の `scripts/kh656_window_measure.py` を取り込んだ後に改変している (単純な取り込みではない): `lift8` を `LIFT8` 固定、on 側で `rdata_raw_allow` を渡す、`set313` の停止条件追加、出力 tag `m4670_*`、docstring。
+- lift 8 件は `LIFT8` で固定 (`lic_config.json` の F の現行 lift 集合は 1,305 件で、使わない)。`091c68915` 時点の F は lift 8 件。
+- 313 集合: **HEAD 未測定**。元の集合の源 `work/kh656_rounds.json` は gitignore で、本 runner に無い。どの commit にも 313 の VA 一覧は無い。313 の集合は uncommitted な `lic_config.json` 一時設定でのみ作っていた。よって §8.2 の表 (84 行・34 VA) は、再測定できないため置き換えない。
+- driver `set313` は `scripts/kh656_set313.json` が無ければ停止する (未 commit)。
+- 素材の再現性: 本 run の `$ARTIFACTS_DIR` には `plugins-kilohearts` が無く (`fl-win64` のみ)、`work/` も無い。driver の再実行による独立検証は行っていない。数値は `091c68915` の既存記録との照合のみ。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 313 集合の VA 一覧の再生成と commit、HEAD での 313 on / off 再測定 | 受入 2 未達 (§8.2 の HEAD 値) | PM 判断 (集合は閉包の再実行でしか作れず、lift 方針 (1,305 件の config か閉包か) を決める必要がある) |
