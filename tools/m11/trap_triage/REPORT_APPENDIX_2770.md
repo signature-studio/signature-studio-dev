@@ -204,7 +204,7 @@ python3 ../m11/trap_triage/cmp_img_2770.py work/probe/C_state.json work/probe/X6
 
 ### 8.9 CPU を固定した再測定 (`LD_PIN_CPU`)
 
-- 測定 commit: `97c4bc87c` (コードを変えた最後の commit。`LD_PIN_CPU` は `b90d87438`、値の検証 (strtol) は `b046d082e`)。前回の測定 commit `d94083396` からの差分は `git diff d94083396 97c4bc87c -- tools/liftdiff` の `rt/ld_native.c` の検証 (`b046d082e`) のみ。全 12 run を `97c4bc87c` で直列に取り直した (各 10 s 前後)。entry rsp は全 run `0x7fffffffbc20` (前回 `bcd0` は作業 dir の長さの差。比較は同じ組の中で行う)。
+- 測定 commit: `97c4bc87c` (コードを変えた最後の commit。`LD_PIN_CPU` は `b90d87438`、値の検証 (strtol) は `b046d082e`)。前回の測定 commit `d94083396` からの差分は `git diff d94083396 97c4bc87c -- tools/liftdiff` の `rt/ld_native.c` の検証 (`b046d082e`) のみ。全 12 run を `97c4bc87c` で直列に取り直した (12 run の実測: `time` の real 2m15.5s、1 分 load は未計測)。entry rsp は全 run `0x7fffffffbc20` (前回 `bcd0` は作業 dir の長さの差。比較は同じ組の中で行う)。
 - 方法: `LD_PIN_CPU=<n>` で `ld_native` 自身が CPU を固定する。`0x11e69bf` の 1 byte は、この CPU 番号 (APIC ID。`taskset` で 0〜3 を確認済み) と一致する。因果は未特定。
 - 測定 (CPU 別。`units_run` は全 run 928/942。`0x11e69bf` の値は前回 `d94083396` と全 run で一致)。
 
