@@ -28,6 +28,7 @@ class FlError extends Error {
   constructor(msg, code) { super(msg); this.flCode = code; }
 }
 const RANGE = (m) => new FlError(m || "Index out of range", 4);
+const UNSAFE = () => new FlError("Operation unsafe at current time", 3);
 // PY-76 (#2563): cvtsd2si (64bit・最近接偶数丸め)。範囲外と inf は 0x8000000000000000 (INT64_MIN) (REPORT_PY72 §callback unit 2)
 const cvtSi64 = (x) => {
   if (!(x >= -(2 ** 63) && x < 2 ** 63)) return -(2 ** 63);
@@ -387,7 +388,7 @@ export function createMockEngine() {
     "playlist.getLiveTrigSnap": (...a) => { arity(a, 1, 1); return pl(a[0]).trigSnap; },
     // 表の引数数は 1〜2 (C と同一・main #2927)。value -1 (省略を含む) は反転、それ以外は下位 1 byte を設定 (REPORT_PY61 §3)。準備判定 (-2) は未モデル
     // PY-102 (#2883): value 検査 (argI) を index の範囲検査より先に行う。C の dispatch は型を先に見るため (code 5 が先)
-    "playlist.muteTrackLock": (...a) => { arity(a, 1, 2); const v = argI(a, 1, -1); const t = pl(a[0]); t.lock = v === -1 ? (t.lock ? 0 : 1) : v & 0xff; },
+    "playlist.muteTrackLock": (...a) => { arity(a, 1, 2); const v = argI(a, 1, -1); if (!st.safeEdit) throw UNSAFE(); const t = pl(a[0]); t.lock = v === -1 ? (t.lock ? 0 : 1) : v & 0xff; },
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
@@ -409,6 +410,9 @@ export function createMockEngine() {
     "ui.showNotification": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
     "ui.closeAllMenu": (...a) => { arity(a, 0, 0); },
     "ui.closeActivePopupMenu": (...a) => { arity(a, 0, 0); },
+    // PY-133 (#3014): PE で PyArg 書式を確定した showPicker・openEventEditor (REPORT_PY133)。作用先は未モデルで、個数と型だけ検査して None
+    "ui.showPicker": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, -1); },
+    "ui.openEventEditor": (...a) => { arity(a, 2, 3); argI(a, 0, 0); argI(a, 1, 0); argI(a, 2, 0); },
     // PY-132 (#3013): toggleBrowserNode は PE の書式 '|i' (既定 -1)。値 -1/0/1 の分岐 (0xa89690 → 0xa26190 / 0xa07d00) だけを st.browserOp に残す (1 切替・2 閉じる・3 開く・0 なし)。
     // selectBrowserMenuItem・previewBrowserMenuItem は NOARGS。作用 (0xfdd2c0 のキー送出) は未モデル
     "ui.toggleBrowserNode": (...a) => { arity(a, 0, 1); const v = argI(a, 0, -1); st.browserOp = v === -1 ? 1 : v === 0 ? 2 : v === 1 ? 3 : 0; },
@@ -537,6 +541,7 @@ export function createMockEngine() {
       return f(...args.map((a) => (a === null ? undefined : a)));
     },
     implemented: () => Object.keys(impl),
+    setSafeEdit: (v) => { st.safeEdit = !!v; },
     stepItemProbe: (prm, value, seed0, seed1) => {
       const a = newItem(), b = newItem();
       itemWrite(a, prm, 0, seed0); itemWrite(b, prm, 0, seed1);

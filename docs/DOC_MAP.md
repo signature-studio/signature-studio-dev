@@ -89,6 +89,7 @@
 | `tools/liftlib/REPORT_APPENDIX.md` | ~266 | liftlib §17 全文 (HB-H3 #93 iargs pass)・§18 全文 (LIFTLIB #241 ymm(i256) helper ABI / pcmpistri / F2 xmm 戻り搬送) |
 | `tools/liftlib/REPORT_APPENDIX_448.md` | ~60 | liftlib CI-8 (#448) の付録: work-* 絶対 symlink の張り直し実測、素材 `libottnative.so` が HEAD と不整合で `lowbase_e2e.sh` [3] が FAIL した件と、[3] で `build.sh` から再生成する修正 (2f1b76fc) の実測。測定値の正本。本文は REPORT §24 |
 | `tools/liftlib/REPORT_APPENDIX_898.md` | ~35 | liftlib #898 (HB-H22) iargs 未対応 3 site の bind の付録 (REPORT_APPENDIX §17 の #898 節を分割移動)。`movzx` 合成 (1801a3117 解決)、残り 2 site は main の HB-H25 #1158 で bind 済み。高バイト unbound (T16b)。測定値は REPORT_APPENDIX_898.md が正本 |
+| `tools/liftlib/REPORT_APPENDIX_294.md` | ~57 | liftlib #294 (親 CI-4) の付録: `dir64_boundary_gate.sh` の `FL_WIN64_DIR` を `tools/shared/env.sh` 経由へ置換した実測 (測定 commit `1aa0500ba`・変更前後の出力一致・既定値同一)。gate `[1]` の既存 FAIL は `pe_image_parity.py` の旧境界 (#3832) |
 | `tools/liftlib/REPORT_APPENDIX_2128.md` | ~60 | liftlib #2128 (部分達成): ott_getparam leaf への icall runtime 配線の実測 (測定 commit `f8bd2ea0`・変更前 `df2eebde` との比較・unit T1〜T5・未解決の起票先)。測定値の正本 |
 | `tools/liftlib/REPORT_APPENDIX_3067.md` | ~95 | liftlib #3067 (LIFTLIB-21): `legacy_p1` の repmap が挿入前の行番号で登録され、挿入後の行へ当たらず 0/19 件しか書換えなかった欠陥 (D1a 同型) の修正と、修正前後の件数・単体テスト T1〜T26 の結果・e2e (`--quick`)・OTT 出力 census の実測 (測定 commit `c8316dc7`)。残留分岐は #3137 (LIFTLIB-22)。測定値の正本 |
 | `tools/liftlib/REPORT_APPENDIX_2181.md` | ~89 | liftlib #2181 (HB-H45, 部分達成): ott_getparam F=281 の SSA dominance 欠陥 (iargs の支配しない bind) の修復と emcc 成功の実測 (測定 commit `b1c2d148`・変更前後の比較・ネガティブコントロールの未達・子 #2859/#2861)。測定値の正本 |
@@ -278,6 +279,7 @@
 | `tools/m11/trap_triage/REPORT_714.md` | ~246 | #714: OOB 呼出し鎖・計測器の影響・実値採取の再試行 (§12〜§13)。#1602 r4 の要約は末尾。全文は `REPORT_APPENDIX_1602.md` |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3499.md` | ~60 | #3499: REPORT_718 §4j (証拠表の行 36〜66 の件ごとの判定・根拠・注・未解決) の全文。250 行上限のため分割移動。判定ツールは `judge_ctx_3499.py` |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3564.md` | ~70 | #3564: strict 候補の残り (証拠表の行 36〜66 の保留 6・単独 15) の件ごと判定 (真陽性 12・偽陽性 1・保留 8)。REPORT_718 §4i の全文・判定補助 `judge_src.py`・機械語側のネガティブコントロール `negctl_3564.py` (付録 §7) |
+| `tools/m11/trap_triage/REPORT_APPENDIX_3502.md` | ~85 | #3502: 証拠表の行 67〜98 の保留 30 件の件ごと再判定 (真陽性 9・偽陽性 4・保留 19・判定基準・照合範囲・未解決)。REPORT_718 §4k の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` | ~56 | #3498 (PR #3567): strict 候補の証拠表 行 4〜35 (32 件) の件ごとの表・判定規則・未解決 (REPORT_718 §4h の全文。REPORT_718.md の 250 行上限のため分割移動)。判定は保留 32 (真陽性 0・偽陽性 0) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2773.md` | ~70 | #2773 (2 回目): REPORT_679 §10 の全文。unit 101 の周回の根本原因 (4fa210 の件数 0 ガード脱落・D19 同型)・修復の測定表・原典突合・未解決 |
@@ -401,6 +403,7 @@
 | `tools/shimx/REPORT_SHX-T39.md` | 99 | SHX-T39 (#3149): unit 23 の baseline が 0xf960 の後に入る分岐条件 (`function_467c40` の slot ゲート) の IR 行つき特定。証跡と IR 行の再抽出は `tools/shimx/evidence_3149/` (`repro.sh`)。 |
 | `tools/shimx/REPORT_SHX-T9k.md` | ~76 | SHX-T9k (#2593): unit 22 の GetLastError=126 の発生元 (GetProcAddress の 1 回目) と、IR 行番号 ↔ wasm バイトオフセットの対応 (REPORT_SHX-T9j.md §2.4 の後続) |
 | `tools/shimx/REPORT_SHX-T35.md` | ~118 | SHX-T35 (#3023): HeapFree の範囲外ポインタを M4 契約に揃えた判断と測定 (REPORT.md は 250 行上限のため付録) |
+| `tools/shimx/REPORT_SHX-T36.md` | ~95 | SHX-T36 (#3069): test.sh の emcc 無出力を FAIL にし、step 6 の入力欠落で生成物 4 件を上書きしない。ガードは `test/guard/guard_test.sh` (7b)。mutant A/B/C の結果と測定 (入力あり・入力欠落) の正本 |
 | `tools/shimx/REPORT_SHX-T37.md` | 103 | SHX-T37 (#3070): HeapReAlloc・GlobalLock/GlobalUnlock/GlobalFree の不正入力の戻り値・GetLastError を M4 契約・native 参照・MSDN と突き合わせた表と「直さない」判断。実測は `tools/shimx/evidence_3070/run.sh`。範囲外 trap は #3056 (merge 済み) で解消 |
 | `tools/shimx/BACKLOG.md` | ~540 | shimx の未解決一覧 |
 | `tools/shimx/pathreg/REPORT.md` | ~200 | パス写影/レジストリ永続化の shimx 側インタフェース接続 |
@@ -594,6 +597,7 @@
 | `tools/python/REPORT_PY205.md` | 92 | PY-205 (#3493): mixer.getTrackCount (`*(*0x15e2198)` の dword − 2) と getEqBandCount (3) の PE 確定。大域は qword ポインタ・変換スロット 0x15e4280 (REPORT_PY152 §42 流用)。ネイティブ C と mock の照合 0 件差・ネガティブコントロール (−3 で 124)。絶対値 125 は実行時値未確定。wasm 版は未実行 (#3553) |
 | `tools/python/REPORT_PY172.md` | 89 | PY-172 (#3219): patterns グループ系 4 関数の PE 確定 (件数・群名・群の索引は 0 始まり・索引 -1 の意味は未確定)。getPatternGroupCount / getPatternGroupName を件数 0 の仮置きで C・mock に実装 (差分 0)。残り 2 件は子 #3278 (PY-180) |
 | `tools/python/REPORT_PY120.md` | 120 | PY-120 (#2981): ui の操作・キー・ジョグ・編集 27 関数の PE 呼出し契約 (書式・既定値・op code・経路)。PE 確定 0 件 (作用先・戻り値の値が未確定) で保留。0xd81740 は関数ではなく型記述子、0x15e1e58 は PyArg_ParseTuple スロットと訂正。mock/C 差分 0 (実装なし) |
+| `tools/python/REPORT_PY117.md` | ~80 | PY-117 (#2959): muteTrackLock の準備判定 (VMT[0x98] = 0x1262b80・真偽条件) の確定と、偽のとき -2 (FL_E_UNSAFE) の C・mock 実装。ガードの実行時値は未測 |
 | `tools/python/REPORT_PY141.md` | 115 | PY-141 (#3034): ui 操作 27 関数の戻り値の値と型・selectWindow の引数型。0x415610 は out+8 に作用しない。out+8 の書込みは経路で違う (0xd84680 経路は PE の直接 store なし・0xd843d0 経路は 0xd844c6 で `[obj+0x10]`)。成功時の値は PE から未確定。0xc38bc0 = Py_None・0x15e4280 = PyLong_FromLong (int)。selectWindow の引数は C int (`i`) が正。検算は `analysis/flapi/pe_py141_probe.py` |
 | `tools/python/REPORT_PY140.md` | 111 | PY-140 (#3035): `0xfdd2c0` (UI 側ディスパッチャ) の op 別 leaf を VA 付きで特定。27 関数のうち 15 関数は送出する仮想キー (VK・修飾・回数) が PE 確定 (`0x8186a0` → user32 SendInput)。送出の成否のゲート (`0x60c220`・`0x728f50`・`0xfdeaf0`) と mode の源は未確定で子 #3758。mock/C は未変更 (子 #3759)。残り 12 関数は子 #3761 |
 | `tools/python/REPORT_PY119.md` | ~87 | PY-119 (#2980): ui の状態・フォーカス・文字列ゲッター 6 件 (getFocused / getFocusedFormID / getFocusedFormCaption / getFocusedPluginName / getHintMsg / isInPopupMenu) の PE 根拠・mock/C 差分 0・値は仮置き。保留 12 件は #3005・#3006・#3007 |
@@ -606,6 +610,7 @@
 | `tools/python/REPORT_PY119_2977.md` | ~100 | PY-119 (#2977): general の setter 6 件 (setRecPPQ / setNumerator / setDenominator / setUndoHistoryPos / Count / Last) の PE 確定 (範囲・status 文言の VA・undo 書込み先)・mock/C 差分 0・ゲート (G = 0x15e4790)・例外型・既定値は未確定 (親 #2830 にコメント)。解析補助 `analysis/flapi/pe_cstr.py` |
 | `tools/python/REPORT_PY121.md` | 72 | PY-121 (#2979): general の log・rec 系 4 件 (clearLog・dumpScoreLog・processRECEvent・getRecPPB) の PE 根拠 (entry・fn VA・書式・呼出し鎖)。戻り値の意味は未確定で実装なし。残りは #3001・#3002・#3003 |
 | `tools/python/REPORT_PY121_2982.md` | ~90 | PY-121 (#2982): ui の表示・メニュー 15 件の PE 書式と時間引数の頭打ち (0x7d0)。6 件を mock/C 差分 0 で実装 (表示矩形 3・通知 1・メニューを閉じる 2)。残り 9 件は #3012・#3013・#3014 |
+| `tools/python/REPORT_PY133.md` | 115 | PY-133 (#3014): ui のエディタ起動・ピッカー 3 件の PE 根拠 (書式・引数の出力先・dispatch・戻り None の経路)。引数の意味は VA 付きで確定分と未確定分を分けて記録 (未確定は子 #3734)。showPicker・openEventEditor を PE の書式と戻り None で実装 (作用は未モデル)。launchAudioEditor は 5 引数の渡し方まで確定し、戻り値と引数の意味が未同定のため保留 (子 #3734 = PY-242) |
 | `tools/python/REPORT_PY132.md` | 138 | PY-132 (#3013): ui のブラウザ 3 件の PE 書式・戻り値 None・toggleBrowserNode の値 -1/0/1 の分岐を確定。mock/C 差分 0 で実装 (作用は未モデル)。作用の確定は子 #3724 [PY-240]・#3726 [PY-241] |
 | `tools/python/REPORT_PY131.md` | 93 | PY-131 (#3012): ui のブラウザ移動 3 件 (navigateBrowser・navigateBrowserMenu・navigateBrowserTabs) の PE 根拠。3 件とも保留 (戻り値 str の中身と作用先の状態が未同定)・mock/C は変更なし。作用先の同定は子 PY-239 (#3720) |
 | `tools/python/REPORT_PY140_3761.md` | 97 | PY-140 (#3761, 親 #3035・PY-247): `0xfdd2c0` の op 別の到達先 (`REPORT_PY140.md` が保留にした ui 12 関数のうち 6 関数の leaf を VA で確定: jog・jog2・stripJog → `0x1180dd0`、previous・next → `0x1180ef0`、snapOnOff → `0x12134f0`)。5 関数は `0xfdd2c0` 内に直接の作用の呼出し無し (間接 `0xfdd438` は全 op 共通で未確定)。scrollWindow は保留 (vtable)。probe は `analysis/flapi/pe_ui_dispatch_probe_3761.py` (main 版とは別実装) |
@@ -715,6 +720,7 @@
 | `tools/shared/lift/rex/REPORT_APPENDIX_2870.md` | ~50 | rex REPORT §9 全文 (T-SH-46 #2870: 成功経路 (戻り値 1 / 3) と arena 書込の一致・落ちる case の分類・未解決) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2896.md` | ~41 | rex REPORT §10 の旧版全文 (T-SH-47 #2896: REX_SIDE フラグと owner/rex_side.wasm の旧測定 (測定 commit `105733875`・133 件版)。最新は REPORT §10) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2969.md` | ~45 | rex REPORT の付録 (T-SH-48 #2969: 中核閉包 (REXCreate / REXGetInfoFromBuffer / REXRenderSlice) の owner tier 配置と REX_SIDE 除外の実測。測定 commit `9593fe1c1`) |
+| `tools/shared/lift/rex/REPORT_APPENDIX_3588.md` | ~75 | rex REPORT の付録 (T-SH-89 #3588: 元の機械語が落ちる 73 件の分類 (fault 命令・レジスタ・入力による切り分け)・ネガコン・未解決。測定 commit `54b2272b0`) |
 
 ### IPP
 
