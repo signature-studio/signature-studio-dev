@@ -8,7 +8,7 @@
 1. **note の生成経路を PE で確定した。** `channels.setGridBit` (handler `0xd5b580`) は enqueue した後、thunk `0xd5b4d0` が `0x12d4100(grid, step, value, 1, 100)` を呼ぶ。`0x12d4100` が「既存の note が無く、value > 0 (または flag 0x1234fd0 が真)」のとき note を 1 個作る。これが grid bit の正体。
 2. **既定値の PE 照合。** note の書込みは PE の即値・定数として読めた。param 0 = 60、2 = 64、3 = 120、4 = 64 は stub の既定値と一致 (2〜4 は init `0x1062210` の推定に依存。§2.4)。param 1 は setGridBit の即値 100 と一致する。fillEachNSteps は 4 番目の引数 (既定 100) を clamp して渡す (§3 行 1・#3747 で反映済み)。**param 5・6 は PE の値が 128 (stub は 64。init の推定に依存)**。**param 7 は開始 tick = step × V** (stub は 0)。**param 8 = 0** (PE の書込み `0x12d42ac`。stub に無く、従来は -1)。
 3. **param 8 の書込み元を確定した** (`0x12d42ac`: `mov byte [note+0x11], 0`。creation path の無条件書込み)。既定値は 0。
-4. C provider と mock の既定値を PE の値に合わせた (`provider/fl_engine.c`・`host/fl_mock.mjs`)。`channels_diff` diffs 0。fillEachNSteps の 4 番目の引数の反映は未モデル (子 #3747)。
+4. C provider と mock の既定値を PE の値に合わせた (`provider/fl_engine.c`・`host/fl_mock.mjs`)。`channels_diff` diffs 0。fillEachNSteps の 4 番目の引数は param 1 に反映済み (#3747・§3 行 1)。
 5. **未確定**: init 関数 `0x1062210` を container の vtable 経由で呼ぶ点 (vtable の基点は RIP 相対の参照から見つからず)、フラグ `0x1234fd0` の値、V の実行時値 (静的 24 のまま)。下の §8。
 
 ## 1. 測定の入力と再現
@@ -90,7 +90,7 @@ dword [note+0x14] = G                    ; G = [0x154a0f8] = 0x80806440
 | 8 | +0x11 byte | `0x12d42ac` | **0** | (なし。従来 -1) | **確定** (書込み元あり) |
 
 - param 7 は PY-78 節の字段で「開始 tick」(`0x130f31a`・`0x12df33a` が読む)。よって既定値は note の位置で決まる (step × V)。`V` は静的値 24 (`REPORT_APPENDIX_3310.md`)。実行時の V は未確定 (§8)。
-- param 1 の由来: setGridBit は PE の即値 100 (`0xd5b4d0` が `0x12d4100` を呼ぶ `0xd5b53f`)。`fillEachNSteps` の既定 (`0xd5b7fc`) も 100 だが、4 番目の引数で変わる (未モデル。§2.1・§3 行 1)。
+- param 1 の由来: setGridBit は PE の即値 100 (`0xd5b4d0` が `0x12d4100` を呼ぶ `0xd5b53f`)。`fillEachNSteps` の既定 (`0xd5b7fc`) も 100 だが、4 番目の引数で変わる (§2.1・§3 行 1。#3747 で反映)。
 
 ## 4. 実装 (C provider と mock)
 
