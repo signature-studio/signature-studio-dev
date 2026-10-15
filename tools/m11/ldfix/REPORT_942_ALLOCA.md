@@ -15,7 +15,7 @@
 ## 1. 測定 (HEAD `10fc87e9`・測定 commit。コード差分は新規の診断スクリプトのみ)
 
 - e2e: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` → **57.6 秒・rc 0・judge PASS**・終了後 load 0.92 / 0.54 / 0.36。stage4 units 17/942・icall 24・threw `memory access out of bounds` (base = fix)。survey ok 136 / trap 9 (base = fix)。修復件数 F3a 2 / F3c 43 / F1 0 / F2 0 / F3b 0。
-  - F3c は本 HEAD で 43 (`REPORT_942_QSTORE.md` の 33 = `c98d2c99` と不一致)。main の変更で件数が変わった。原因は未調査 (受入 3 の件)。
+  - F3c は本 HEAD で 43 (`REPORT_942_QSTORE.md` の 33 = `c98d2c99` と不一致)。原因未調査 (main の変更による変化と推定するが、未確認。受入 3 の件)。
 - A/B: `bash tools/m11/ldfix/alloca_ab_942.sh` (HEAD `10fc87e9`) → **41.0 秒** (全 variant の出力を取得)。
 
 | variant | IR | stage4 units_run / init | icall_ok | threw | dllmain_done | survey ok / miss / trap |
@@ -25,8 +25,20 @@
 | only44bae0 | raw の `function_44bae0` `stack_var_-88` だけ `[11 x i64]` | 17 / 18 | 24 | なし | True (下記 注) | 136 / 14 / 9 |
 
 - 注 (only44bae0): `dllmain_done=True` は正常完走ではない。unit 17 の後で `MessageBoxA('Runtime error 0 at 0000000010251740')` が出て `Halt0` → longjmp で抜ける (`M11_TRACE=1` の trace で確認)。unit 17 の OOB は消えたが、Delphi runtime error で止まる別の経路に入る。その VA の意味は未確認。
-- alloca 版の survey の先頭 trap unit: `0x16fde0`・`0x19f9a0`・`0x223840`・`0x25c540`・`0x264260`・... (unit 0x55790・0x158e20・0x243270・0x0 が先頭から消える)。
-- 注 (survey の母数): base の survey は ok+miss+trap = 159 で、残り 783 unit は `m11_call_unit` が **-1** (テーブル範囲外・未確認) を返す。alloca 版は 942 件すべてが 0/1/2 のいずれかに分類される。survey の ok 136→868 は母数の差を含むため、件数の改善とは断定できない (確認は次 run)。
+- alloca 版の survey の先頭 trap unit (unit 番号順): `0x16fde0`・`0x19f9a0`・`0x223840`・`0x25c540`・`0x264260`・... (unit 0x55790・0x158e20・0x243270・0x0 が先頭から消える)。
+- survey の分類 (`survey_stage4.mjs`): `m11_call_unit` の戻り値 r = 1 → ok、r = 2 → miss、r = 0 → noproc (proc 無し)、例外 → trap。表は ok / miss / trap だけを出し、noproc は出力していない。
+- 件数の内訳 (noproc は導出値。出力していない):
+
+| 区分 | raw | alloca | 差 (alloca − raw) |
+|---|--:|--:|--:|
+| ok (r=1) | 136 | 868 | +732 |
+| miss (r=2) | 14 | 47 | +33 |
+| trap (例外) | 9 | 26 | +17 |
+| noproc (r=0・導出) | 783 (= 942 − 159) | 1 (= 942 − 941) | −782 |
+| 合計 | 942 | 942 | 0 |
+
+- 注 (survey の母数の訂正): 「base の 783 件は `m11_call_unit` が -1 を返す (テーブル範囲外)」は誤り。-1 を返すのは `i >= D(tbl)` のときだけ (`tools/m11/m11_ov.c`)。units_total は 942 で (raw の stage4 出力 17/942。両変種は同じ `m11_image.bin` を使うので table は同じ)、0〜941 では -1 は返らない。よって 783 件は noproc (r=0)。alloca 版の残り 1 件も noproc と読めるが、noproc を出力していないため**実測では未確認** (次 run で出力する)。「942 件すべてが 0/1/2 に分類される」は取り下げる。
+- 注 (trap 9 → 26・+17 の内訳は**未特定**): per-unit の raw ok/miss/noproc の記録が無いため、増分 +17 が「noproc から新たに trap になった unit」か「既存の ok/miss unit の回帰」かを切り分けられない。VA 一覧も食い違う: 上の「先頭 trap unit」列挙は `0x19f9a0` (unit 87) を含むが、`REPORT_942_APPENDIX.md` の main build の base 26 件には `0x19f9a0` が無い。alloca 版の trap VA 一覧は本測定で保存していないため、どちらが正かは未確認。survey の ok 136→868 は母数の差を含むため、件数の改善とは断定できない。
 
 ## 2. 書込み元の特定 (観測フック)
 
@@ -53,9 +65,9 @@
 
 ## 4. 受入への反映
 
-- 受入 2 (boot threw の原因): **部分 → 大半を確定**。原因は既存の alloca 縮退 (44bae0 `stack_var_-88`)。ldfix 起因ではない (raw IR に既存)。次の boot trap は unit 0x16fde0 (survey unit 56)。
-- 受入 1 (trap 9 件の原因): 部分。alloca 全適用で unit 0x55790 (17)・0x158e20 (53)・0x243270 (138)・0x0 (158) は先頭の trap から消える。unit 0x16fde0 (56)・0x19f9a0 (87)・0x25c540 (144)・0x264260 (149) は残る。残 trap の引き金は未確定 (次 run)。
-- 受入 3 (件数反映): 変更なし。F3c は main の変化で 43 (§1)。
+- 受入 1 (trap 9 件の原因): **部分**。unit 0x55790 (17) は起点確定 (観測フック・§2)。unit 0x158e20 (53)・0x243270 (138)・0x0 (158) は alloca 全適用で先頭の trap から消えるが、起点は未確定 (他の alloca 縮退の寄与は未切り分け)。unit 0x16fde0 (56)・0x25c540 (144)・0x264260 (149) は alloca 版でも trap のままとの記録があるが、per-unit の保存が無く未確認。unit 0x19f9a0 (87) の残存は §1 の注のとおり未確定。残 trap の引き金は未確定 (次 run)。
+- 受入 2 (boot threw の原因): **部分**。unit 17 の原因 (既存の alloca 縮退 44bae0 `stack_var_-88`。ldfix 起因ではない・raw IR に既存) は確定。alloca 全適用でも boot は unit 0x16fde0 で threw (`memory access out of bounds`) するため、boot threw の原因としては未了。
+- 受入 3 (件数反映): 変更なし。F3c 33 → 43 は原因未調査 (§1)。
 
 ## 5. 未解決
 
@@ -63,15 +75,16 @@
 |---|---|---|
 | alloca 適用後の boot trap (unit 0x16fde0・`function_8c6530` の `i32.store` の引き金) | 受入 2・1 | #942 (次 run) |
 | only44bae0 の Runtime error 0 (`0x10251740`) の意味。`dllmain_done=True` を正常完走と見なさない判定が必要 | 測定の判定 | #942 (次 run) |
-| base survey の `r=-1` 783 件 (テーブル範囲外) の原因。alloca 版は 942 件分類 | 測定の母数 | #942 (次 run) |
-| ldfix_e2e の入力 (snapshot = qstore・alloca 前) を本番順 (alloca → ldfix → qstore) にするか | 測定の基準 | PM 判断 (#942 に記録) |
-| F3c 33 → 43 の変化の原因 (main の変更) | 受入 3 | #942 (次 run) |
+| survey の noproc (r=0) 件数と VA の未出力 (raw 783 件・alloca 1 件)。trap 9 → 26 の内訳 (noproc 由来か既存 unit の回帰か) と unit 87 (0x19f9a0) の残存の食い違い | 測定の母数・受入 1 | #942 (次 run) |
+| ldfix_e2e の入力 (snapshot = qstore・alloca 前) を本番順 (alloca → ldfix → qstore) にするか | 測定の基準 | PM agent の判断待ち (既定案: 現行 (alloca 前) を維持) |
+| F3c 33 → 43 の変化の原因 (原因未調査。main の変更は推定) | 受入 3 | #942 (次 run) |
 | work-m11 の IR と現 main の不一致 | 測定の母体 | 既存 #680 |
 
 ## 6. 差分 (`docs/WORKFLOW.md` §6)
 
 - 測定 commit: `10fc87e9` (診断スクリプトを追加した commit。e2e・A/B の実行経路 (`ldfix_e2e.sh`・`stage4.sh`・`survey_stage4.mjs`・`run_stage4.mjs`・`m11_alloca.py`) は変更していない)。
-- 差分 (e2e 経路・A/B 経路): `git diff 8303a813 HEAD -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/run_stage4.mjs tools/m11/alloca tools/m11/m11_ov.c | wc -l` → 0 (HEAD で本 REPORT・DOC_MAP のみ変更)。
+- 差分 (e2e 経路・A/B 経路): `git diff 10fc87e9 HEAD -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/run_stage4.mjs tools/m11/alloca tools/m11/m11_ov.c | wc -l` → 0 (測定 commit 以降は本 REPORT と PR 本文のみ変更)。
+- main 側: `git diff 8303a813 origin/main -- (同範囲) | wc -l` → 0 (`origin/main` = `c3ee6daa7` で確認)。
 
 ## 7. 再現
 
