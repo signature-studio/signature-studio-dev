@@ -146,12 +146,24 @@ def is_cfg_call(insn, cfg_slots):
 
 RAX_NAMES = {'rax', 'eax', 'ax', 'al', 'ah'}
 MEM_BASE_DISP = re.compile(r'qword ptr \[(r[a-z0-9]+)(?: \+ (0x[0-9a-f]+|[0-9]+))?\]')
+IMPLICIT_RAX_WRITE = {'cdqe', 'cwde', 'cbw', 'lahf', 'xlat', 'cmpxchg', 'cmpxchg8b', 'cmpxchg16b',
+                      'lods', 'lodsb', 'lodsw', 'lodsd', 'lodsq', 'cpuid', 'rdtsc', 'rdtscp', 'xgetbv', 'syscall'}
+ONE_OP_RAX_WRITE = {'mul', 'imul', 'div', 'idiv'}
+
+
+def writes_rax_implicitly(w, ops):
+    """オペランドに rax 族を明示せずに rax を書く命令 (cdqe・1 オペランドの mul/div・xchg/xadd の rax 相手 等)。"""
+    if w.mnemonic in IMPLICIT_RAX_WRITE:
+        return True
+    if w.mnemonic in ONE_OP_RAX_WRITE and len(ops) == 1:
+        return True
+    return w.mnemonic in ('xchg', 'xadd') and any(o in RAX_NAMES for o in ops)
 
 
 def rax_source(ins, idx, base, res):
     """guard 経由の call (ins[idx]) の直前で rax に入った値の出所を、同一関数内を逆向きに追う (#849)。
-    戻り値 (kind, arg): vtable_cfg (arg=disp, `mov rax, [R+disp]`) / lea_fn (arg=VA, 関数先頭) / lea_nonfn /
-    rip_load / reg_copy / other_write:<mn> / call_ret / label_barrier / block_end / unresolved。
+    戻り値 (kind, arg): vtable_cfg (arg=disp, `mov rax, [R+disp]`、R は rip 以外) / lea_fn (arg=VA, 関数先頭) / lea_nonfn /
+    rip_load (arg=参照先 VA) / reg_copy / other_write:<mn> (暗黙の書き込みを含む) / call_ret / label_barrier / block_end / unresolved。
     分岐先 (label) を跨ぐ場合は、経路が一意でないため label_barrier とする。"""
     labels = {int(i.op_str, 16) for i in ins if i.mnemonic.startswith('j') and i.op_str.startswith('0x')}
     if ins[idx].address in labels:
@@ -165,11 +177,14 @@ def rax_source(ins, idx, base, res):
             return 'call_ret', None
         if w.mnemonic in ('ret', 'jmp'):
             return 'block_end', None
-        first = w.op_str.split(',')[0].strip()
+        ops = [o.strip() for o in w.op_str.split(',')] if w.op_str else []
+        if writes_rax_implicitly(w, ops):
+            return 'other_write:' + w.mnemonic, None
+        first = ops[0] if ops else ''
         if first in RAX_NAMES and w.mnemonic not in ('cmp', 'test'):
             src = w.op_str.split(',', 1)[1].strip() if ',' in w.op_str else ''
             m = MEM_BASE_DISP.fullmatch(src)
-            if w.mnemonic == 'mov' and m:
+            if w.mnemonic == 'mov' and m and m.group(1) != 'rip':
                 d = m.group(2)
                 return 'vtable_cfg', (0 if d is None else int(d, 16) if d.startswith('0x') else int(d))
             if w.mnemonic == 'lea' and 'rip' in src:
