@@ -153,7 +153,7 @@ loader 自体 (`default.moe`・rva `0x4e0fab`) の同定は `tools/liftdiff/REPO
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `.mo` 供給後の範囲検査 (rva `0x17bcd`) の値の出所と、`rep movsq` (rva `0x12a25`) の NULL コピー元の同定。S12〜S22 の対応表 | 窓の生成に届かない | #3556 ([WIN-33]) |
-| `CreateWindowExW` の呼出元 VA (trace 無し)、surface の画素統計 (headless host) | #2760 の受入 2・3 未達 | #3557 ([WIN-34]) |
+| surface の画素統計 (headless host 接続)。`CreateWindowExW` の呼出元 VA は付録 §6.1 で解消 (#3557 [WIN-34]) | #2760 の受入 2・3 未達 | 子 issue [WIN-35] (#3618・依存 #3556) |
 | 本 PR の応答で rva `0x513da9` の rbp 破壊が起きるか (命令単位 trace)。旧記録との整合 | 旧記録の再現可否が未確定。本 fix run では素材不足で未実行 | #2760 (次の review run で `LD_STEP_N`・`LD_STEP_OUT` により確認。子は起票しない) |
 | 実行時間・sample:800 の load average と並列数 (測定時に未記録)・sample:800 の揺れ (n=1) | §5.1・§5.6 の所要と揺れを比較に使えない | #2760 (再測定時に記録。子は起票しない) |
 
