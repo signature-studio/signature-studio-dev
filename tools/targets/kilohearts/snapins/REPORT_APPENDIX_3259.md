@@ -66,3 +66,30 @@
 ## 差分 (測定 commit から HEAD まで)
 
 `git diff 3769b0f76 HEAD -- tools/targets/kilohearts/snapins` は本付録 (REPORT_APPENDIX_3259.md) のみ。コードの変更は 0。
+
+## HEAD 再測定 (main 取り込み後・測定 commit 4410b3adf)
+
+main 側に H (`3769b0f76`) より後の変更 (#3756 `c19086fdb`・#3358 `4a8c4e0a5`) が入ったため、競合解消後の HEAD で 14 本を再 build した。PR 自身はコードを変えていない (`git diff origin/main HEAD -- tools/targets/kilohearts ':!*.md'` は空)。`native_ref` は `build.py` が作らないため、`harness/native_ref.c` と `harness/scenarios.c` を `cc -O1 -Wall -o work/native_ref ... -lm` で作ってから実行した。全 14 本 rc=0。
+
+| name | sec | final.ll | simd.c | globals.c | stubs.c | sigs.json | mod.wasm | RESULT |
+|---|--:|---|---|---|---|---|---|---|
+| clipper | 14 | = B | = B | = B | = B | = B | = B | 200/200 bit-exact, calls 1100/1100 |
+| gain | 13 | = B | = B | = B | = B | = B | = B | 200/200, calls 999/999 |
+| haas | 14 | = B | = B | = B | = B | = B | = B | 200/200, calls 1100/1100 |
+| gate | 14 | = B | = B | = B | = B | = B | = B | 200/200, calls 999/999 |
+| quickeq | 15 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 999/999 |
+| resonator | 14 | = B | = B | = B | = B | = B | = B | 200/200, calls 999/999 |
+| stereo | 14 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 999/999 |
+| disperser | 14 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 999/999 |
+| formant | 14 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 999/999 |
+| matrix | 2 | = B | = B | = B | = B | = B | = B | 200/200, calls 1149/1149 |
+| phaser | 16 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 1100/1100 |
+| delay | 21 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 1299/1299 |
+| limiter | 16 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 1100/1100 |
+| khbase | 18 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 10500/10500 |
+
+- **B との比較** (B = `80fb2fd00` の sha256 は上の旧表): `final.ll`・`simd.c`・`stubs.c`・`sigs.json`・`mod.wasm` は 14 本すべて一致。`globals.c` は 8 本で不一致 (quickeq・stereo・disperser・formant・phaser・delay・limiter・khbase)。
+- **`globals.c` の不一致**: main 側の #3756 (`c19086fdb`・`gen_globals.py` の BSS 0 埋め膨張の修正) が原因。B・H の時点では 0 埋めが宣言長を超えていた。この PR の差分ではない。`globals.c` を含む生成物の変化は、この修正の意図した効果である。
+- **cap 超過の 4 本 (phaser・delay・limiter・khbase)**: #3756 の修正後は emcc RSS cap 内に収まり、wasm が出た。旧表の「未測定」は HEAD では解消。
+- **resonator・stereo**: RESULT は HEAD で 200/200 (旧 H は 80/200・12/200)。差の原因は**未切り分け** (本 PR はコードを変えていない。main 側の変更との対応は未確認)。wasm・final.ll は B・H と一致しているため、差は oracle 側の出力と読めるが、確認は未実施。
+- 測定ログ: `work/<name>/H/` (gitignore 対象・commit しない)。
