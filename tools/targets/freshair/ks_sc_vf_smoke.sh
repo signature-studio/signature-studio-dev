@@ -13,7 +13,7 @@ POKES=(); while read -r va sz val; do [[ "$va" == \#* || -z "$va" ]] && continue
 clang -O1 -w -o native_vf "$L/native/native_vocalfilter.c"
 python3 "$L/gen_sc_smoke_scen.py" vf_scen.txt "$N" 0x5C5C >/dev/null
 python3 "$L/mlift/mlift.py" "$CORE" vf.ll \
-  --root 0x1808e1f30:'void(i64,i64)' --map 0x181030490=fa_memmove \
+  --root 0x1808e1fa0:'void(i64,i64)' --map 0x181030490=fa_memmove \
   --stub 18103d37c --stub 18103d47c --stub 18102f728 "${POKES[@]}" --report vf_rep.json >/dev/null
 python3 -c "
 import json; r = json.load(open('vf_rep.json'))
