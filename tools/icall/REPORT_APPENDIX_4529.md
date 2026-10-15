@@ -27,7 +27,7 @@
 | 変更前 `636f74907` (origin/main) | `[ott_native] MISSING IMPORT SetUnhandledExceptionFilter — fail-fast` |
 | 変更後 `c29e2e270` | `[ott_native] MISSING IMPORT UnhandledExceptionFilter — fail-fast` |
 
-`18100ca28` の本体は `SetUnhandledExceptionFilter(NULL)` の後に `UnhandledExceptionFilter(ExceptionInfo)` を呼ぶ (`work/lift/fa.drc.c` 3216〜3217 行)。次の fail-fast 先は `UnhandledExceptionFilter` で、これは前付録 §3 の「`UnhandledExceptionFilter`」の誤記が指していた経路。`UnhandledExceptionFilter` は本件の範囲外で、未起票 (次に進む場合は別 issue)。
+`18100ca28` の本体は `SetUnhandledExceptionFilter(NULL)` の後に `UnhandledExceptionFilter(ExceptionInfo)` を呼ぶ (`work/lift/fa.drc.c` 3216〜3217 行)。次の fail-fast 先は `UnhandledExceptionFilter` で、これは前付録 §3 の「`UnhandledExceptionFilter`」の誤記が指していた経路。`UnhandledExceptionFilter` は本件の範囲外で、起票先は親 #4338 への提案 (§5)。
 
 ## 4. fa_sweep 実測
 
@@ -56,18 +56,18 @@ bash tools/icall/diff/fa_sweep.sh 8 60       # funcs 131 ...
 
 コード差分 (`git diff 636f74907 c29e2e270 -- tools/ott tools/icall`):
 ```
- tools/ott/native/ott_native.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ tools/ott/native/ott_native.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 ```
 
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `UnhandledExceptionFilter` (`18100ca28` の次の fail-fast 先) | `18100ca28` は依然 fail-fast | 未起票 (本件の範囲外。必要になった時点で別 issue) |
+| `UnhandledExceptionFilter` (`18100ca28` の次の fail-fast 先) | `18100ca28` は依然 fail-fast | 親 #4338 への提案 (本 PR では未着手。次に進める場合に子を起票) |
 | `RtlLookupFunctionEntry` (2 関数: `18100cc50`・`18103d218`) | unwind 情報が要る | #4362 (ICALL-103・既存) |
 | `RaiseException 0xe06d7363` 経路 (6 関数) | fail-fast のまま | #4362 (ICALL-103・既存) |
-| 前付録との基準差 (bit一致 56 → 55) | 原因未確認。前後比較には影響しない | 未起票 (数値の追跡のみ) |
+| 前付録との基準差 (bit一致 56 → 55) | 原因未確認。前後比較には影響しない | なし (追跡のみ・未解決表に記載) |
 
 ## 6. 再現
 
