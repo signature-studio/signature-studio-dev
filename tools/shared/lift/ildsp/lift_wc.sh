@@ -9,6 +9,7 @@
 #   neg-cmp : 比較器のネガティブコントロール (wasm 結果の heap 先頭 1 バイトを反転)。FAIL を検出したら exit 0。
 #   all     : ok + neg-cmp。
 set -euo pipefail
+T0=$(date +%s.%N); L0="$(cut -d' ' -f1-3 /proc/loadavg)"
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$HERE/../.."
 FLE="$ROOT/../flelift"
@@ -22,7 +23,6 @@ DLL="${ILDSP_DLL:-$FL_WIN64_DIR/extracted/block24360_PE.bin}"
 [ -f "$DLL" ] || { echo "[ildsp-wc] DLL not found: $DLL (FL_WIN64_DIR=${FL_WIN64_DIR:-})"; exit 2; }
 W="$ROOT/work/lift/ildsp-wc"; mkdir -p "$W"
 source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1
-L0="$(cut -d' ' -f1-3 /proc/loadavg)"; T0=$(date +%s)
 
 # 閉包の root: CreateInstance と vtable 0x3e01b0 の slot 先 (ildsp_closure.py の出力と一致する値)
 SIZE=$(python3 -c "import pefile,sys; pe=pefile.PE(sys.argv[1], fast_load=True); print(hex(pe.OPTIONAL_HEADER.SizeOfImage))" "$DLL")
@@ -58,8 +58,8 @@ if [ "$MODE" = neg-cmp ]; then WC_NEG=arena timeout 300 node "$HERE/run_wasm.mjs
 set +e
 python3 "$HERE/diff_test.py" "$W"; RC=$?
 set -e
-T1=$(date +%s)
-echo "[ildsp-wc] $MODE elapsed=$((T1-T0))s load start=[$L0] end=[$(cut -d' ' -f1-3 /proc/loadavg)]"
+T1=$(date +%s.%N)
+echo "[ildsp-wc] $MODE elapsed=$(awk -v a="$T0" -v b="$T1" 'BEGIN{printf "%.2f", b-a}')s load start=[$L0] end=[$(cut -d' ' -f1-3 /proc/loadavg)]"
 if [ "$MODE" = neg-cmp ]; then
   if [ $RC -ne 0 ]; then echo "[ildsp-wc] neg-cmp: FAIL を検出 (期待通り) rc=$RC"; exit 0; else echo "[ildsp-wc] neg-cmp: PASS してしまった = ゲートが効いていない"; exit 1; fi
 fi

@@ -67,9 +67,9 @@ for k in range(6):
     v = struct.unpack_from('<Q', img, VTABLE_RVA + 8 * k)[0]
     assert BASE <= v < BASE + SIZE, hex(v)
     SLOT_RVA.append(v - BASE)
-# 差分テストで CreateInstance の直後に呼ぶ slot の数。slot 0 だけ (slot 1 以降は this の内部フィールドに
-# host 側の事前設定が要り、既定の入力 (0) では null 参照で落ちる。実測は REPORT.md)。
-CALL_SLOTS = 1
+# 差分テストで CreateInstance の直後に呼ぶ slot の数。既定は slot 0 だけ (slot 1 以降は this の内部フィールドに
+# host 側の事前設定が要り、既定の入力 (0) では null 参照で落ちる)。WC_CALL_SLOTS=6 は probe_slots.sh が使う (実測は REPORT.md §5-5)。
+CALL_SLOTS = int(os.environ.get('WC_CALL_SLOTS', '1'))
 lay = {'base': BASE, 'img_size': SIZE, 'arena': ARENA, 'arena_sz': ARENA_SZ, 'entry_rva': ENTRY_RVA,
        'data_rva': data.VirtualAddress, 'data_sz': data.Misc_VirtualSize, 'text_rva': text.VirtualAddress,
        'vtable_rva': VTABLE_RVA, 'slots': SLOT_RVA, 'call_slots': CALL_SLOTS,

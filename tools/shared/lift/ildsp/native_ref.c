@@ -113,7 +113,9 @@ int main(int argc, char **argv) {
             rax = acc;
             ualarm(0, 0);
         } else {
-            /* 元の機械語が無効アクセス/時間超過: 定義された結果が無いので比較対象から外す */
+            /* 元の機械語が無効アクセス/時間超過: 定義された結果が無いので比較対象から外す。
+             * 残った SIGALRM を解除しないと、次の case の判定や _exit(4) を起こすため先に止める。 */
+            ualarm(0, 0);
             hits = CRASH_MARK; memset(arena, 0, WC_ARENA_SZ); memset(img + WC_DATA_RVA, 0, WC_DATA_SZ);
             fprintf(stderr, "[native] crash case=%u sig=%d addr=0x%llx\n", c, (int)last_sig, (unsigned long long)last_addr);
         }

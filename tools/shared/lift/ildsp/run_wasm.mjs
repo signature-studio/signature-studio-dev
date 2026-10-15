@@ -8,9 +8,15 @@ const BASE = L.base, ARENA = L.arena, ARENA_SZ = L.arena_sz, DATA = BASE + L.dat
 const ENTRY = BASE + L.entry_rva;
 const img = readFileSync(`${W}/image_wasm.bin`);
 const cases = readFileSync(`${W}/cases.bin`);
-// 未実装の WASI 呼出は 0 を返す (値は比較に影響しない)。ildsp の closure は WASI を使わない想定。
-const wasi = new Proxy({}, { get: () => () => 0 });
-const inst = await WebAssembly.instantiate(await WebAssembly.compile(readFileSync(`${W}/wc.wasm`)), { wasi_snapshot_preview1: wasi, env: wasi });
+// wasm の import は全て throw させる (0 を返して黙殺すると、呼出しが比較を誤って一致させうる)。
+// 呼ばれた場合は下の catch で trap として数え、差分は FAIL になる。
+const mod = await WebAssembly.compile(readFileSync(`${W}/wc.wasm`));
+const imports = {};
+for (const { module, name } of WebAssembly.Module.imports(mod)) {
+  (imports[module] ??= {})[name] = () => { throw new Error(`unknown import ${module}.${name}`); };
+}
+console.log(`[run_wasm] imports: ${WebAssembly.Module.imports(mod).map((i) => `${i.module}.${i.name}`).join(" ") || "(none)"}`);
+const inst = await WebAssembly.instantiate(mod, imports);
 const ex = inst.exports;
 const nat = readFileSync(`${W}/res_native.bin`);
 const REC = 16 + ARENA_SZ + DATA_SZ;
