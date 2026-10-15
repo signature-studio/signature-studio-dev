@@ -101,6 +101,8 @@
 
 ### 5.3 検算 (受入 2・`mx_flow_recheck.py` の ENTRY 対応・測定 commit `039adc3f6`)
 
+> **注記 (無効・再測定待ち)**: 下表は `LOCKABLE` に `xor` が無い版 (`039adc3f6`) の数字で、`lock xor` のメモリ形を誤って不正扱いしている。レビュー指摘 B1 で修正済み (`LOCKABLE` に `xor` を追加)。修正後の再測定には `plugins-massivex` 素材が要るため、この表の数字は使わない。再測定の結果は本節を書き直して入れる (#4068 で追跡)。
+
 直接 call 目標 (`.text` 内・thunk 外・`.pdata` begin を除く) を (i) 文字列窓 (ii) 先頭ブロック不正 (iii) 先頭ブロック正常 に分類。(ii)/(iii) の判定は objdump 2.42 (`-b binary -m i386:x86-64`) に SDM 後処理を入れた側で行い、capstone (入口の採否に使った判定) と食い違いを数えた。
 
 | ENTRY | 対象 | (i) 窓 | (ii) 不正 | (iii) 正常 | (iii) で入口に入らない (取りこぼし) | 入口で (iii) でない (過剰) | mismatch |

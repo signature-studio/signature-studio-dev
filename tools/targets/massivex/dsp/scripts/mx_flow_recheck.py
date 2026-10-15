@@ -71,7 +71,7 @@ def cap_first_ok(md, chunk, va):
 OBJ_PREFIX = {'lock', 'rep', 'repz', 'repnz', 'data16', 'addr32', 'cs', 'ds', 'es', 'ss', 'fs', 'gs',
               'notrack', 'bnd', 'xacquire', 'xrelease'}
 LOCKABLE = {'adc', 'add', 'and', 'btc', 'btr', 'bts', 'cmpxchg', 'cmpxchg8b', 'cmpxchg16b', 'dec', 'inc',
-            'neg', 'not', 'or', 'sbb', 'sub', 'xadd', 'xchg'}
+            'neg', 'not', 'or', 'sbb', 'sub', 'xadd', 'xchg', 'xor'}
 LEGACY_PREFIX = {'66', '67', 'f0', 'f2', 'f3', '2e', '36', '3e', '26', '64', '65'}
 TERM = {'ret', 'retw', 'retq', 'jmp', 'jmpw', 'jmpq'}
 
