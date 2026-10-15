@@ -36,15 +36,22 @@ PHI_VAL = re.compile(r'\[\s*([^,\]]+?)\s*,')
 OPERAND = re.compile(r'%[A-Za-z0-9_.$-]+')
 
 defs = {}
-stores = []
+funcs = []
 with open(args.ir, 'r', errors='replace') as f:
     for line in f:
+        if line.startswith('define '):
+            defs = {}
+            funcs.append((defs, []))
+            continue
+        if not funcs:
+            funcs.append((defs, []))
         m = DEF.match(line)
         if m:
             defs[m.group(1)] = m.group(2).rstrip()
             continue
         if re.match(r'^\s*store\s', line):
-            stores.append(line.rstrip('\n'))
+            funcs[-1][1].append(line.rstrip('\n'))
+stores = [(fd, s) for fd, ss in funcs for s in ss]
 
 def top_level_parts(s):
     parts, depth, cur = [], 0, ''
@@ -197,7 +204,8 @@ def store_class(line):
 
 counts = collections.Counter()
 unknown_head = collections.Counter()
-for s in stores:
+for fd, s in stores:
+    defs = fd
     c = store_class(s)
     counts[c] += 1
     p = ptr_of_store(s)
