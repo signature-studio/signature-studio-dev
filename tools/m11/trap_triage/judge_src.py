@@ -7,7 +7,7 @@
       各ブロックの本文 (先頭 N 行) と、参照する絶対アドレス (inttoptr の定数) を出す。
   python3 judge_src.py <IR.ll> <fn> --pe <PE.bin> --jcc <hex> [--n N]
       jcc の前 N 命令 (機械語) を出す。RIP 相対の参照は IR 上の絶対アドレスに直す
-      (次命令アドレス + disp − 0x400000。REPORT_718 §4h で 19649808 の一致を確認)。
+      (次命令アドレス + disp − 0x400000。REPORT_718 §4i で 19649808 の一致を確認)。
 """
 import argparse
 import os
