@@ -11,7 +11,7 @@
   3. 別名が rcx/rdx/r8/r9 で渡る direct call の先を、深さ DEPTH まで同じ方式で追う。
   4. 別名を格納する命令 (`mov [mem], 別名`) と、別名を宛先とする rep movs/stos・memcpy/memmove/memset の
      呼出しを列挙する (bulk copy の宛先が領域かどうか)。
-  5. 正の対照: V (0x16bacec) への書込み 2 件 (0xf82c55・0xf82c5f) と K の読み (0xf82a43) を検出できること。
+  5. 正の対照: V (0x16bacec) への書込み 3 件 (0xf82b80・0xf82c55・0xf82c5f) と K の読み 2 件 (0xf82a43・0xf82c48) を検出できること。
 
 限界: 別名は同一関数内 (と深さ内の direct call 先) でだけ追う。別名をメモリへ格納した先での再ロードは追わない
 (格納の列挙 (4) で所在を示す)。間接 call の先は追わない。
@@ -109,6 +109,22 @@ def raw_at(raw, secs, base, va, n):
     return b""
 
 
+def is_copy(name):
+    return any(k in name.lower() for k in ("memcpy", "memmove", "memset"))
+
+
+def frame_reg(raw, secs, base, va):
+    pd = [s for s in secs if s.Name.rstrip(b"\0") == b".pdata"]
+    n = pd[0].Misc_VirtualSize // 12
+    ent = np.frombuffer(raw[pd[0].PointerToRawData:pd[0].PointerToRawData + 12 * n], dtype="<u4").reshape(n, 3)
+    rva = va - base
+    i = int(np.searchsorted(ent[:, 0], rva, side="right")) - 1
+    if i < 0 or not ent[i, 0] <= rva < ent[i, 1]:
+        return None
+    fr = raw_at(raw, secs, base, base + int(ent[i, 2]), 4)[3] & 0xF
+    return {0: "none", 4: "rsp", 5: "rbp"}.get(fr, str(fr))
+
+
 def main():
     depth_max = int(sys.argv[1]) if len(sys.argv) > 1 else 2
     t0 = time.time()
@@ -120,8 +136,8 @@ def main():
     md.detail = True
 
     iat = {}
+    pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IMPORT"]])
     if hasattr(pe, "DIRECTORY_ENTRY_IMPORT"):
-        pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IMPORT"]])
         for ent in pe.DIRECTORY_ENTRY_IMPORT:
             for imp in ent.imports:
                 if imp.name:
@@ -149,6 +165,7 @@ def main():
     rep_sites = []
     iat_sites = []
     thunks = {}
+    call_imm = []
     n_ins = 0
     resync = 0
     for s in secs:
@@ -186,12 +203,21 @@ def main():
                     rep_sites.append((ins.address, mn))
                 if mn == "call" and ops and ops[0].type == X86_OP_IMM:
                     direct.append((ins.address, "call", "", False, None, 0))
+                    call_imm.append((ins.address, ops[0].imm & MASK))
             # 復号できないバイトで止まった (チャンク末尾でない) なら 1 バイト進めて再同期する
             if off == o_start or off - o_start + 16 < len(sl):
                 resync += 1
                 off = max(off, o_start) + 1
 
     print("scan: insns=%d resync=%d sec=%.1f" % (n_ins, resync, time.time() - t0))
+    print("imports named=%d thunks (jmp [IAT])=%d" % (len(iat), len(thunks)))
+    for a, nm in sorted(thunks.items()):
+        if "mem" in nm.lower():
+            print("  mem-named thunk 0x%x -> %s" % (a, nm))
+    mem_sites = [(a, thunks[t]) for a, t in call_imm if t in thunks and is_copy(thunks[t])]
+    mem_sites += [(a, nm) for a, mn, nm in iat_sites if mn == "call" and is_copy(nm)]
+    print("memcpy/memmove/memset call sites=%d: %s" % (
+        len(mem_sites), ", ".join("0x%x %s" % s for s in sorted(mem_sites))))
 
     direct_k_w = [d for d in direct if d[4] is not None and d[3] and d[4] <= K < d[4] + d[5]]
     direct_k_r = [d for d in direct if d[4] is not None and not d[3] and d[4] <= K < d[4] + d[5]]
@@ -273,7 +299,7 @@ def main():
                     t = target_of(ins, ops[0])
                     name = iat.get(t)
                 args = {a: alias[a] for a in ARGS if a in alias}
-                if name and ("memcpy" in name.lower() or "memmove" in name.lower() or "memset" in name.lower()):
+                if name and is_copy(name):
                     if "rcx" in alias:
                         bulk.append((origin, ins.address, name, alias["rcx"]))
                 if args:
@@ -384,6 +410,10 @@ def main():
     for sp in stores_ptr:
         if LO <= sp[3] < HI and "rbp" not in sp[2] and "rsp" not in sp[2]:
             print("  region ptr stored to non-stack: 0x%x [%s] val=0x%x" % (sp[1], sp[2], sp[3]))
+    for sp in stores_ptr:
+        if LO <= sp[3] < HI:
+            print("  region ptr store 0x%x [%s] val=0x%x FrameRegister=%s" % (
+                sp[1], sp[2], sp[3], frame_reg(raw, secs, base, sp[1])))
     for a in lo_w:
         print("  region write 0x%x %s %s eff=0x%x origin=0x%x" % (a[1], a[2], a[3], a[4], a[0][1]))
     print("region accesses by eff (root origin, insn, w):")
