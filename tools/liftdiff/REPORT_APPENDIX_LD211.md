@@ -6,7 +6,7 @@
 ## 1. 結論
 
 - 11 関数のうち **6 関数** (`45e1a0` `45e280` `45e2e0` `45eb00` `45ecc0` `45ed20`) は、整数引数 1 つを this 疑似オブジェクト (`blob=vmt`) にすると native で実行できた (`ok` 全件)。
-  6 件とも rax が書き換わった (入口 SENTINEL 以外)。rdx も書き換わっている。xmm0 は xfill=1 で入口 1.25 から 0 に変わったが、0 は入口 xfill=0 の値と同じで、書かれたかどうかは確定できない。戻りレジスタは rax・rdx・xmm0 のどれかで、呼出し側なしでは確定できない (LD-212 へ)。
+  6 件とも rax が書き換わった (入口 SENTINEL 以外)。rdx も書き換わっている。xmm0 は xfill=1 で入口 1.25 から 0 に変わったが、0 は入口 xfill=0 の値と同じで、書かれたかどうかは確定できない。戻りレジスタは rax・rdx・xmm0 のどれかで、呼出し側なしでは確定できない (LD-213 #4423 へ)。
 - **5 関数** (`668390` `6683d0` `784520` `8e7e10` `a965c0`) は、this 疑似オブジェクトを 1 引数に与えても、全引数を別々の this 領域にしても segv のまま。判定不能の残件として子 issue に切り出す (§4)。
 - 署名 (`targets/m11.json`) は変更していない。6 件の戻り型・戻りレジスタは未確定なので、`ret_override` は付けない。
 
@@ -16,6 +16,7 @@
 - 前提の build: `liftdiff.py build targets/m11.json` (`work/m11/`)。旧 `work/m11_ldfix/ld_wasm.cjs` は現行 `rt/ld_wasm.c` の `ld_w_snapshot(int)` と合わず wasm 側が起動しないため、使わない。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tests/ld211_fvm_probe.py` (native のみ。wasm 比較は行わない)。
 - 出力: `work/ld211_probe.json` (gitignore)。
+- 引数型の確認: 対象 11 関数の sig は `REPORT_LD158.md` §3.4 の関数別表で `i64` / `i64,i64` / `ptr,i64,i64` のみ。`i128` 引数は無いので、fvm case を `i64` / `ptr` に限った `main()` の選別で漏れる引数は無い。
 
 ## 3. 実測
 
@@ -40,10 +41,10 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 6 関数の戻りレジスタ (rax・rdx・xmm0 のどれか) と戻り型。`liftdiff run` の判定 (compare) への配線も未実施 | 署名修正の対象外。呼出し側の戻り値利用の確認が要る | [LD-162] #3572 (親) |
-| 5 関数 (668390 6683d0 784520 8e7e10 a965c0) の segv。this の内部 (VMT・フィールド) の与え方が未確定 | 判定不能のまま | [LD-213] (本 PR で起票) |
+| 6 関数の戻りレジスタ (rax・rdx・xmm0 のどれか) と戻り型。`liftdiff run` の判定 (compare) への配線も未実施 | 署名修正の対象外。呼出し側の戻り値利用の確認が要る | [LD-213] #4423 |
+| 5 関数 (668390 6683d0 784520 8e7e10 a965c0) の segv。this の内部 (VMT・フィールド) の与え方が未確定 | 判定不能のまま | [LD-213] #4423 (既存) |
 
 ## 5. 検証と測定 commit
 
 - 測定: `tests/ld211_fvm_probe.py` を本 PR のコード commit で実行 (§3 の表)。
-- 差分: 測定 commit から HEAD までのコード差分は PR 本文に転記する (`git diff <測定 commit> HEAD -- tools/liftdiff`)。
+- 差分: 測定 commit から HEAD までのコード差分 (`git diff 63c667217 <HEAD> -- tools/liftdiff`) の出力は PR 本文の「検証」節に転記する。
