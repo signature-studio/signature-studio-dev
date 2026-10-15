@@ -3,7 +3,7 @@
 ## 1. 測定条件
 
 - 測定 commit: `fbd89e0d7` (store 基底の出どころを機械語から出す `alias_evidence_4167.py` と結果 `results/alias_evidence_4167.json`)。判定器 `audit_frame_store_alias_2211.py` は変えていない。
-- 入力: `results/audit_undefload_564_full.json`・`results/f4_564_post.json` (#2211 と同じ)。PE は fl-win64 の `extracted/block00031_PE.bin` (sha256 先頭 16 桁 `b2c64da40921cf26`)。素材は `$HOME/artifacts/fl-win64.tar.zst` を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開して使った (展開 5.8 秒)。
+- 入力: `results/audit_undefload_564_full.json`・`results/f4_564_post.json` (#2211 と同じ)。PE は fl-win64 の `extracted/block00031_PE.bin` (sha256 先頭 16 桁 `b2c64da40921cf26`)。素材は fl-win64 (`docs/REFERENCES.md` `[WIN64]` の展開物。アーカイブを `tar --zstd -xf` で展開して使った。展開 5.8 秒)。
 - 再現確認: #2211 の判定器を同じ入力で再実行し、`DROP 3・LIVE-IN 35・UNDETERMINED 10` (関数)、`DROP 3・LIVE-IN 36・UNDETERMINED 11・PTR_READ 1` (site) を得た。#2211 の値と一致。判定器の実行は 0.27 秒 (`real 0m0.267s`)。
 - 判定器の run は HEAD (`fbd89e0d7`) 相当の作業ツリーで行った。判定器のコードは `origin/main` と同一。
 
