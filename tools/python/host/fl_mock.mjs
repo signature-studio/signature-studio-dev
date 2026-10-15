@@ -15,12 +15,36 @@ const WRONG = (m) => new FlError(m || "Wrong number of function parameters or wr
 // mixer の色の R/B 入替え (REPORT_PY115.md §2)。既定色は FL の .bss 0x15f6774 の初期値 (REPORT_PY118)
 const swapRb = (v) => ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
 const MIX_DEFAULT_COLOR = 0xff636c71;
+// PY-78 (#2581): PE 0x130f3d0 の項目書換え規則 (C provider の step_item_write / step_items_set と同一・REPORT_PY39_2548.md)。項目 = 字段の object
+const clampHi = (v, hi) => (v <= 0 ? 0 : v > hi ? hi : v);
+const newItem = () => ({ d0: 0, w0c: 0, b10: 0, b11: 0, b12: 0, b14: 0, b15: 0, b16: 0, b17: 0 });
+const itemGet = (it, prm) => ({ 0: it.w0c, 1: it.b15, 2: it.b12, 3: it.b10, 4: it.b14, 5: it.b16, 6: it.b17, 7: it.d0, 8: it.b11 })[prm] ?? 0;
+const itemWrite = (it, prm, value, delta) => {
+  switch (prm) {
+    case 0: it.w0c = clampHi(it.w0c + delta, 0x83); break;
+    case 1: it.b15 = clampHi(it.b15 + delta, 0x80); break;
+    case 2: it.b12 = clampHi(it.b12 + delta, 0x80); break;
+    case 3: it.b10 = clampHi(it.b10 + delta, 0xf0); break;
+    case 4: it.b14 = clampHi(it.b14 + delta, 0x80); break;
+    case 5: it.b16 = clampHi(it.b16 + delta, 0xff); break;
+    case 6: it.b17 = clampHi(it.b17 + delta, 0xff); break;
+    case 7: it.d0 = (it.d0 + delta) | 0; break;
+    case 8: it.b11 = value & 0xff; break;
+  }
+};
+const itemsSet = (items, prm, value) => {
+  if (!items.length || prm < 0 || prm > 8) return;
+  const delta = prm === 8 ? value : value - itemGet(items[0], prm);
+  for (const it of items) itemWrite(it, prm, value, delta);
+};
 
 export function createMockEngine() {
   const st = {
     tempo: 130,
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
+    launchPages: 0,
+    uiClosing: false, uiTimeDispMin: false, uiStartOnInput: false, uiLoopRec: false, uiStepEdit: false, uiBrowserAutoHide: false, uiSnapMode: 0,
     undoPos: 0, undoCount: 0, undoLast: 0, safeEdit: true, projTitle: "", projAuthor: "", projGenre: "",
     selStart: -1, selEnd: -1,
     arrTime: 0,
@@ -198,6 +222,17 @@ export function createMockEngine() {
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
+    // PY-95 (#2831): 状態 1 つを返すだけの ui ゲッター 9 件 (REPORT_PY95)。初期値は未実測の仮置き (provider/fl_engine.c と同じ)。
+    // isMetronomeEnabled / isPrecountEnabled は general.getUseMetronome / getPrecount と同じ状態を読む
+    "ui.isClosing": (...a) => { arity(a, 0, 0); return st.uiClosing; },
+    "ui.getTimeDispMin": (...a) => { arity(a, 0, 0); return st.uiTimeDispMin; },
+    "ui.isMetronomeEnabled": (...a) => { arity(a, 0, 0); return st.useMetronome; },
+    "ui.isPrecountEnabled": (...a) => { arity(a, 0, 0); return st.precount; },
+    "ui.isStartOnInputEnabled": (...a) => { arity(a, 0, 0); return st.uiStartOnInput; },
+    "ui.isLoopRecEnabled": (...a) => { arity(a, 0, 0); return st.uiLoopRec; },
+    "ui.getStepEditMode": (...a) => { arity(a, 0, 0); return st.uiStepEdit; },
+    "ui.isBrowserAutoHide": (...a) => { arity(a, 0, 0); return st.uiBrowserAutoHide; },
+    "ui.getSnapMode": (...a) => { arity(a, 0, 0); return st.uiSnapMode; },
     // PY-121 (#2982): PE で確定した引数書式 (PyArg fmt) と時間引数の頭打ち (0x7d0)。表示そのものは未モデルで、最後の時間引数だけ st.displayTime に残す
     "ui.crDisplayRect": (...a) => disp(a, 5, 6, 4),
     "ui.miDisplayRect": (...a) => disp(a, 3, 4, 2),
@@ -235,6 +270,8 @@ export function createMockEngine() {
     "general.getProjectTitle": (...a) => { arity(a, 0, 0); return st.projTitle; },
     "general.getProjectAuthor": (...a) => { arity(a, 0, 0); return st.projAuthor; },
     "general.getProjectGenre": (...a) => { arity(a, 0, 0); return st.projGenre; },
+    // PY-120 (#2984): PE 0xd791b0 は obj.+0x50 の配列 (+0x3c0) の件数を返す。件数は実行時の状態のため仮置き 0 (REPORT_PY120_2984)
+    "launchMapPages.length": (...a) => { arity(a, 0, 0); return st.launchPages; },
     // PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない
     "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
     "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
@@ -291,5 +328,11 @@ export function createMockEngine() {
       return f(...args.map((a) => (a === null ? undefined : a)));
     },
     implemented: () => Object.keys(impl),
+    stepItemProbe: (prm, value, seed0, seed1) => {
+      const a = newItem(), b = newItem();
+      itemWrite(a, prm, 0, seed0); itemWrite(b, prm, 0, seed1);
+      itemsSet([a, b], prm, value);
+      return itemGet(b, prm);
+    },
   };
 }

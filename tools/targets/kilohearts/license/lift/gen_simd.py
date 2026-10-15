@@ -10,6 +10,7 @@ RetDec は SSE 命令を `@__asm_<mnemonic>[.N]` の extern 関数呼び出し�
 未知 mnemonic / 未対応シグネチャは abort() スタブ + 報告 (undefined helper として可視化)。
 """
 import json
+import os
 import re
 import sys
 
@@ -48,11 +49,62 @@ def lane_arg(ty, nm, kind):
     return ('D(%s)' % nm) if ty == 'i64' else 'x_%s.g[0]' % nm
 
 
+V256_LANES = {'vpcmpeqb': 'i8', 'vpcmpeqw': 'i16', 'vpcmpeqd': 'i32'}
+
+
+def gen256(name, ret, params):
+    """VEX.256 (ymm) の整数語彙を LLVM IR 定義として返す。None = 未対応。
+    C に i256 の正体型が無いため C ではなく IR で定義する (呼出側と ABI を揃える)。
+    引数順は VEX 形 (a0 = src1, a1 = src2 / a2 = imm8)。lane 0 = bit [31:0] (LLVM の bitcast 順と一致)。"""
+    b = base_of(name)
+    ptys = [p.split()[0] for p in params]
+    if b in V256_LANES and ret == 'i256' and ptys == ['i256', 'i256']:
+        t = V256_LANES[b]
+        cnt = 256 // int(t[1:])
+        return ('define i256 @%s(i256 %%a0, i256 %%a1) {\n'
+                '  %%x = bitcast i256 %%a0 to <%d x %s>\n'
+                '  %%y = bitcast i256 %%a1 to <%d x %s>\n'
+                '  %%c = icmp eq <%d x %s> %%x, %%y\n'
+                '  %%s = sext <%d x i1> %%c to <%d x %s>\n'
+                '  %%o = bitcast <%d x %s> %%s to i256\n'
+                '  ret i256 %%o\n}') % (name, cnt, t, cnt, t, cnt, t, cnt, cnt, t, cnt, t)
+    if b == 'vpmovmskb' and ret == 'i32' and ptys == ['i256']:
+        return ('define i32 @%s(i256 %%a0) {\n'
+                '  %%x = bitcast i256 %%a0 to <32 x i8>\n'
+                '  %%c = icmp slt <32 x i8> %%x, zeroinitializer\n'
+                '  %%m = bitcast <32 x i1> %%c to i32\n'
+                '  ret i32 %%m\n}') % name
+    if b == 'vinsertf128' and ret == 'i256' and ptys == ['i256', 'i128', 'i8']:
+        return ('define i256 @%s(i256 %%a0, i128 %%a1, i8 %%a2) {\n'
+                '  %%sel = and i8 %%a2, 1\n'
+                '  %%c = icmp eq i8 %%sel, 0\n'
+                '  %%lo = trunc i256 %%a0 to i128\n'
+                '  %%hs = lshr i256 %%a0, 128\n'
+                '  %%hi = trunc i256 %%hs to i128\n'
+                '  %%L = select i1 %%c, i128 %%a1, i128 %%lo\n'
+                '  %%H = select i1 %%c, i128 %%hi, i128 %%a1\n'
+                '  %%zl = zext i128 %%L to i256\n'
+                '  %%zh = zext i128 %%H to i256\n'
+                '  %%sh = shl i256 %%zh, 128\n'
+                '  %%o = or i256 %%zl, %%sh\n'
+                '  ret i256 %%o\n}') % name
+    return None
+
+
+def stub256(name, ret, params):
+    """未対応の i256 宣言は abort() スタブ (SSE の未対応と同じ扱い)。呼ばれたら abort する。"""
+    sig = ', '.join('%s %%a%d' % (p.split()[0], i) for i, p in enumerate(params))
+    return 'define %s @%s(%s) {\n  call void @abort()\n  unreachable\n}' % (ret, name, sig)
+
+
 def gen(name, ret, params):
     R_ = ret
     """(C 本体文字列, 理由) を返す。None = 未対応"""
     b = base_of(name)
     n = len(params)
+    # ---- vzeroupper: 下位 128bit (xmm) は不変。上位は後続の ymm グローバル undef 書込みで表す (no-op)
+    if b == 'vzeroupper' and n == 0 and R_ == 'void':
+        return '(void)0;'
     # ---- FMA3 scalar/packed: vf[n]m{add,sub}{132,213,231}{sd,ss,pd,ps}  (a=dest, b=src2, c=src3(reg|mem)); fma() は単一丸め = FMA3 hardware と等価
     mf = re.match(r'^vf(n?)m(add|sub)(132|213|231)(sd|ss|pd|ps)$', b)
     if mf and n == 3 and params[0].startswith('i128') and R_ == 'i128':
@@ -277,12 +329,22 @@ def main():
     rep = {'generated': [], 'undefined': []}
     seen = set()
     out = [HEAD]
+    ll_out = []
     for line in open(src):
         m = DECL.match(line)
         if not m or m.group(2) in seen:
             continue
         ret, name, ps = m.group(1), m.group(2), split_params(m.group(3))
         seen.add(name)
+        if 'i256' in [ret] + [p.split()[0] for p in ps]:
+            ir = gen256(name, ret, ps)
+            if ir is None:
+                rep['undefined'].append('%s %s(%s)' % (ret, name, ','.join(p.split()[0] for p in ps)))
+                ir = stub256(name, ret, ps)
+            else:
+                rep['generated'].append('%s %s(%s)' % (ret, name, ','.join(p.split()[0] for p in ps)))
+            ll_out.append(ir)
+            continue
         ptys = [p.split()[0] for p in ps]
         sig = '%s %s(%s)' % (CT[ret], name, ', '.join('%s a%d' % (CT[t], i) for i, t in enumerate(ptys)) or 'void')
         body = gen(name, ret, ps)
@@ -296,6 +358,11 @@ def main():
             rep['generated'].append('%s %s(%s)' % (ret, name, ','.join(ptys)))
             out.append('EX %s { %s }' % (sig, body))
     open(dst, 'w').write('\n'.join(out) + '\n')
+    ll_dst = dst + '.i256.ll'
+    if ll_out:
+        open(ll_dst, 'w').write('\n'.join(['declare void @abort()'] + ll_out) + '\n')
+    elif os.path.exists(ll_dst):
+        os.remove(ll_dst)
     if len(sys.argv) > 4 and sys.argv[3] == '--report':
         json.dump(rep, open(sys.argv[4], 'w'), indent=1)
     print('[gen_simd] helpers %d, undefined(abort stub) %d %s' % (len(rep['generated']), len(rep['undefined']), rep['undefined'][:8]))

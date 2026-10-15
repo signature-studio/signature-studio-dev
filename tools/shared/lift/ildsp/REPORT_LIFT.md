@@ -6,7 +6,7 @@
 
 転送先 0x161fc0 を body 基準で選定した。closure は直接 call と関数外への直接 jmp の辺で求める (67 関数・2,609 命令)。閉包内に間接 call 18・間接 jmp 6 があり、trap 化は未実装 (§2・§4)。RetDec 段はこの run で再実行できず、前回値は無効 (§3)。
 
-測定 commit: `9c096c56` (`closure_select.py`・`lift.sh`・`ildsp_vtable.py` を含む最後のコード commit)。`git diff 9c096c56 HEAD -- tools/shared/lift/ildsp` は本ファイルの差分のみ。
+測定 commit: `9c096c56` (`closure_select.py`・`lift_vtable.sh`・`ildsp_vtable.py` を含む最後のコード commit)。`git diff 9c096c56 HEAD -- tools/shared/lift/ildsp` は本ファイルの差分のみ。
 
 ## 1. 選定 (3 候補の実測)
 
@@ -37,7 +37,7 @@ issue の 4 件 (`0x1aedc0` の 3 件と `0x1b6f4c` の 1 件) の到達経路 (
 ## 3. 再現と実測 (測定 commit `9c096c56`)
 
 ```sh
-FL_WIN64_DIR=<fl-win64 展開先> ILDSP_WORK=<作業先> bash tools/shared/lift/ildsp/lift.sh 0x161fc0
+FL_WIN64_DIR=<fl-win64 展開先> ILDSP_WORK=<作業先> bash tools/shared/lift/ildsp/lift_vtable.sh 0x161fc0
 ```
 
 - `ildsp_vtable_check.py`: `ALL OK`。
