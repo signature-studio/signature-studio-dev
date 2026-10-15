@@ -15,6 +15,15 @@ const wr64 = (m, a, v) => { for (let i = 0; i < 8; i++) m.HEAPU8[a + i] = Number
 const rd32 = (m, a) => (m.HEAPU8[a] | (m.HEAPU8[a + 1] << 8) | (m.HEAPU8[a + 2] << 16) | (m.HEAPU8[a + 3] << 24)) >>> 0;
 const wr32 = (m, a, v) => { for (let i = 0; i < 4; i++) m.HEAPU8[a + i] = (v >>> (8 * i)) & 0xff; };
 const cases = [
+  // 40fe90 (LD-216): 機械語 40fe99 `mov rcx,[rcx]` (*arg1 = N) → 40fe9c `call 410010(N,0)`。410010 は p=N から [p-0x78] を辿る鎖の走査 (副作用なし)。
+  //   [C]=N, [N-0x78]=M, [M]=0 → 410010 は rax=0 で `mov al,1` → 戻り 1 → 40fe90 は al≠0 で 1。修復前は *arg1 を渡さず C を渡すため [C-0x78]=0 → 0。
+  { name: '40fe90 (*arg1 を鎖の先頭に渡す)', run(m) {
+      const C = S + 0x800, N = S + 0x900, M = S + 0xa00;
+      wr64(m, C, BigInt(N)); wr64(m, N - 0x78, BigInt(M)); wr64(m, M, 0n);
+      return BigInt.asUintN(64, m._function_40fe90(BigInt(C))); }, want: 1n },
+  // 40fe90 対照: arg1 = 0 は 40fe97 `je` で即 0 を返す (副作用なし・修復前後で同じ)
+  { name: '40fe90 null (arg1=0 は 0)', run(m) {
+      return BigInt.asUintN(64, m._function_40fe90(0n)); }, want: 0n },
   // c62780: 機械語 c627ab `mov rcx,[rsi]` (rsi = r8 = arg3) → c627ae `mov [rax+rdx*8+8],rcx` (rax=[obj+8], rdx=2*idx)。期待: array[idx*16+8] = *arg3
   { name: 'c62780 (arg3 の 8B を array[idx] へ)', run(m) {
       const A = S + 0x1000; wr64(m, S + 8, A); wr64(m, S + 0x100, 0x1122334455667788n);
