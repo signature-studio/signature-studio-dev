@@ -48,13 +48,18 @@ def parse(lines):
             continue
         m = VA_RE.match(line)
         if m:
-            cur = {'fn': fn, 'va': m.group(1), 'insn': m.group(2), 'stmt': ''}
+            cur = {'fn': fn, 'va': m.group(1), 'insn': m.group(2), 'stmt': '', 'closed': False}
             rows.append(cur)
             continue
-        if cur is not None:
+        if cur is not None and not cur['closed']:
             cur['stmt'] += line.strip() + ' '
+            if 'return;' in line:
+                cur['closed'] = True
     for r in rows:
         r['kind'], r['target'] = classify(r.pop('stmt'))
+        r.pop('closed')
+        if r['insn'].startswith('jmp') and r['kind'] == 'call':
+            r['kind'] = 'jmp'
     return rows
 
 

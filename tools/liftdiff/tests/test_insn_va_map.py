@@ -32,6 +32,7 @@ L_1801c0b6c:;
   if (!CC_E) goto L_1801c0ba3;
   /* 1801c0ba3: ret */
   return;
+  f_1801bafb0();
 }
 void f_1801c20c8(void) {
 L_1801c20c8:;
@@ -80,6 +81,15 @@ class InsnVaMapTest(unittest.TestCase):
     def test_jmp_and_plain(self):
         self.assertEqual(self.by[('1801c20c8', '1801c2180')]['kind'], 'jmp')
         self.assertEqual(self.by[('1801c0b6c', '1801c0b6c')]['kind'], '')
+
+    def test_ret_does_not_absorb_following_unannotated_stmt(self):
+        r = self.by[('1801c0b6c', '1801c0ba3')]
+        self.assertEqual((r['insn'], r['kind'], r['target']), ('ret', '', ''))
+
+    def test_tail_jmp_as_call_stmt_is_jmp(self):
+        fixture = 'void f_1801c682c(void) {\n  /* 1801c699d: jmp 0x1801c0b6c */\n  f_1801c0b6c(); return;\n}\n'
+        r = insn_va_map.parse(fixture.splitlines())[0]
+        self.assertEqual((r['kind'], r['target']), ('jmp', '1801c0b6c'))
 
 
 if __name__ == '__main__':

@@ -877,7 +877,7 @@ fn	va	insn	kind	target
 1801c682c	1801c6993	mov rsi, qword ptr [rsp + 0x40]		
 1801c682c	1801c6998	add rsp, 0x20		
 1801c682c	1801c699c	pop rdi		
-1801c682c	1801c699d	jmp 0x1801c0b6c	call	1801c0b6c
+1801c682c	1801c699d	jmp 0x1801c0b6c	jmp	1801c0b6c
 1801c69cc	1801c69cc	test rcx, rcx		
 1801c69cc	1801c69cf	je 0x1801c6a01	jcc	1801c6a01
 1801c69cc	1801c69d1	push rbx		
@@ -939,4 +939,4 @@ fn	va	insn	kind	target
 1801c6a2c	1801c6acf	add rsp, 0x28		
 1801c6a2c	1801c6ad3	ret 		
 1801ce3f0	1801ce3f0	mov eax, dword ptr [rip + 0x9e79a]		
-1801ce3f0	1801ce3f6	ret 	call	1801ab1d0
+1801ce3f0	1801ce3f6	ret 		
