@@ -53,10 +53,10 @@ run() { # run <group> <label> <ranges> <mode: plain|noopts|on|off|tc> [<extra ar
 
 for i in 1 2 3; do run G1 "G1-noopts$i" "$ALL" noopts; done
 for i in 1 2 3 4; do
-  run G2 "G2-A$i"  "$A" plain
-  run G2 "G2-B$i"  "$B" plain
-  run G2 "G2-B1-$i" "$B1" plain
-  run G2 "G2-B2-$i" "$B2" plain
+  run G2-A  "G2-A$i"   "$A"  plain
+  run G2-B  "G2-B$i"   "$B"  plain
+  run G2-B1 "G2-B1-$i" "$B1" plain
+  run G2-B2 "G2-B2-$i" "$B2" plain
 done
 for m in on off tc; do
   for i in 1 2 3 4; do run "G3-$m" "G3-$m$i" "$SINGLE" "$m"; done
