@@ -70,7 +70,7 @@
 
 ```diff
 diff --git a/tools/m11/e2e_expect.env b/tools/m11/e2e_expect.env
-index 965a71ace..7c3560a9c 100644
+index 965a71ace..e324af4e5 100644
 --- a/tools/m11/e2e_expect.env
 +++ b/tools/m11/e2e_expect.env
 @@ -12,7 +12,8 @@
@@ -82,8 +82,8 @@ index 965a71ace..7c3560a9c 100644
 -: "${M11_EXPECT_PTR_UNREMAP_MAX:=}"
 -: "${M11_EXPECT_PTR_SURVEY_UNREMAP_MAX:=}"
 +# #3113: 分類 B (IR のデータ領域 VA 定数が新規 word に VA のまま入った未 remap の疑い) の基準 (ratchet)。
-+# #3129: fresh 再生成 (ir_conditions.json 付き・boot5 込み) の実測。run は B 0 件 (REPORT_N3129.md §3)、survey は B 3 件 (同 §3)。
-+# survey の 3 語の由来は未判定 (#3957)。基準 3 は増加を止めるための値で、真の未 remap かどうかの判定ではない。
++# #3129: fresh 再生成 (ir_conditions.json 付き・boot5 込み) の実測。詳細と基準の根拠は REPORT_N3129.md §3・§4。
++# survey の未 remap 疑いの語の由来は未判定 (#3957)。基準 3 は増加を止めるための値で、真の未 remap かどうかの判定ではない。
 +: "${M11_EXPECT_PTR_UNREMAP_MAX:=0}"
 +: "${M11_EXPECT_PTR_SURVEY_UNREMAP_MAX:=3}"
 ```
