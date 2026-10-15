@@ -172,6 +172,6 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 ## 8. trap 144・149・114 の引き金 (受入 1・部分) — 未再現のため測定値は撤回
 
 - 前の run で採取した entry 引数の表 (144 の `a1`・149 の `a2` など) は撤回した。採取に使った probe (`probe144.py`・`read144.mjs`) は commit されておらず (`work/` 内・gitignore)、committed HEAD から再現できない。撤回前の本節は commit `1c0911297` の `tools/m11/ldfix/REPORT_3608.md` §8 に残る。ここには値も読みも書かない。
-- `ldfix_e2e.sh`・`prod_order_3608.sh` の rc・所要時間・件数の主張も撤回した。本 run では未実行。理由: IR の生成 (`tools/m11/m11_e2e.sh`) に RetDec・emsdk・PE 素材 (`FL_WIN64_DIR`) が要り、本 runner には `/opt/retdec`・`/opt/emsdk`・PE 素材が無い。§1〜§6 の測定値は従来どおり測定 commit `40d3a788d`・`87208313b` に基づく (§6)。
+- `ldfix_e2e.sh`・`prod_order_3608.sh` の rc・所要時間・件数の主張も撤回した。本 run では未実行。理由: IR の生成 (`tools/m11/m11_e2e.sh`) に RetDec・emsdk・PE 素材 (`FL_WIN64_DIR`) が要り、本 runner には `[RETDEC]`・`[EMSDK]` と PE 素材 (`FL_WIN64_DIR`) が無い。§1〜§6 の測定値は従来どおり測定 commit `40d3a788d`・`87208313b` に基づく (§6)。
 - 未確定 (受入 1 の残り): 144 の `function_44aeb0` が受ける値の書込み元、149 の `function_412e40` の引数の上流、114 の Halt 呼出し元。採取は採取スクリプトを committed な場所に置き、IR 生成環境が揃ってから行う。
 - 検証起点: `git diff 4e9e1d974 HEAD --numstat -- tools/m11/ldfix` の出力は `tools/m11/ldfix/REPORT_3608.md` のみで、コード差分は 0 (数値は PR 本文に書く)。
