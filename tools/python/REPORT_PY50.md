@@ -26,9 +26,9 @@
 | `+0x739` | byte (flag) | 書込 `0x10445a3` (`mov byte [rax+0x739], dil`)。`dil = 1` を基本とし、別配列要素の `+0x32c == 0` かつ引数 `[rbp+0x3f]` 非 0 のときだけ `dil = 0`。読出 `0xdbdd6f`・`0xdbde7c` (非 0 を要求) | reroll 対象フラグ (挙動から。名前は暫定) |
 | `+0x738` | byte | `0xdbde85` で 0 を要求 | 除外フラグ (推定。書込箇所は未確認) |
 | `+0x794` | dword | `0xdbdec6` で `mov eax,[rax+0x794]` を読み、配列 (`rbp+0x38`) に格納する。`0xdbdd50` の `edx` 引数も同じ値 (`REPORT_PY38` の記述) | 対応先の値 (ID か index か未確定) |
-| `+0x79c` | byte 読出 / dword・qword 書込 | 読出は `0xffa6d0` の gate (`!= 0` で戻り値 1/2 を分ける)。書込は `0xec7bb8` (dword、`[rbp+0x48]` のオブジェクト) と `0xdd2002` (qword、`[rbp+0x60]` のオブジェクト) の 2 箇所で、書込先の型が統一されていない | 名前未確定。「starter 有効」は推定 |
+| `+0x79c` | byte 読出 / dword・qword 書込 | 読出は `0xffa6d0` の gate (`!= 0` で戻り値 1/2 を分ける)。書込は dword (`0xec7bb8`・`0xec6098`、TPlugListForm の所有域) と qword (`0xdd2002`、TPRBaseToolForm の所有域) の 2 型。**別構造体の同オフセット** (REPORT_PY59 §9-6・#2471) | 名前未確定。「starter 有効」は推定 |
 
-`0xfe8bb0` は `arr[index]` (index 範囲 `0..count-1`、範囲外は NULL) と確認した。`+0x79c` の書込幅の不一致は、同じフィールドを別の型のオブジェクトとして扱っている可能性があり、名前確定の前に要確認。
+`0xfe8bb0` は `arr[index]` (index 範囲 `0..count-1`、範囲外は NULL) と確認した。`+0x79c` の書込幅の不一致は、REPORT_PY59 §9-6 で**別構造体の同オフセット**と確定した (qword は TPRBaseToolForm、dword は TPlugListForm)。`0xffa6d0` の byte 読出しは chan の別系統で、chan の型は未同定 (REPORT_PY59 §9-7)。
 
 ## 2. `0xffa6d0` の戻り値
 
@@ -66,6 +66,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `+0x794`・`+0x79c` の意味 (名前・書込幅の不一致の解消) | 受入条件 1 が未達。rerollLoopStarter* の chan 対応付けが確定しない。[PY-51] で部分確定 (`+0x79c` は byte flag、`+0x794` は配列添字と判明。詳細は `REPORT_PY51.md`) | #1871 ([PY-51]) |
+| `+0x794`・`+0x79c` の名前 (書込幅の不一致は REPORT_PY59 §9-6 で別構造体と確定) | 受入条件 1 が未達。rerollLoopStarter* の chan 対応付けが確定しない。[PY-51] で部分確定 (`+0x79c` は byte flag、`+0x794` は配列添字と判明。詳細は `REPORT_PY51.md`)。chan の型は REPORT_PY59 §9-7 | #1871 ([PY-51]) |
 | `0x1046a30` の本体 (`setSwing` / `getSwing`) | `REPORT_PY41` の未確定 | [PY-41] (#1514 系) |
 | C 実装・mock 差分 0・`all_tools.mjs` 48/48 | 受入条件は本 issue の範囲外 | [PY-41] |
