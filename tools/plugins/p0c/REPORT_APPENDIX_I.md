@@ -35,7 +35,7 @@
 | `p0c3_e2e.sh 2000` | 0 | 51.6 s | 0.79 | `== p0c3 e2e OK (構造修復 3 kernel bit-exact + 回帰 0) ==` |
 
 - 基準 (修正前・同じ origin/main `730320c46` の detached worktree で同手順): `run=67 ok=67 sig11=0`・`argfix helper_xmm=16`。
-- 修正前後の差: `helper_xmm 16 → 18` (0x5e12b0 の ucomiss と movaps の 2 接続)。`p0c4` の CSV 行を比べると、追加は 0x5e12b0 の 1 行だけで、他 67 kernel の ret_diff・buf_diff・status は変わらない。
+- 修正前後の差: `helper_xmm 16 → 18`。`helper_xmm_fixed` は新しい xmm 引数を追加したときだけ +1 する (`k80_argfix.py` の `fix_helper_operand_xmm`。同じ引数への接続は `continue` で数えない)。0x5e12b0 で追加された引数は `%in.xmm0.bits`・`%in.xmm1.bits` の 2 本で、+2 はその 2 本に対応する (movaps は新しい引数を増やさない)。`p0c4` の CSV 行を比べると、追加は 0x5e12b0 の 1 行だけで、他 67 kernel の ret_diff・buf_diff・status は変わらない。
 
 **census の buf_diff は 0x5e12b0 では自明に 0 になる。** この kernel は出力バッファに書かず、戻り値 (xmm0) は k80_diff が比べる rax ではないため、flags の正しさは census からは見えない。そこで `ucomi_ret_check.py` (新規) を追加した。機械語を mmap(RWX) に置いて ctypes で呼んだ戻り値と、修復後 IR を clang で実行した戻り値 (`select i1 <分岐条件>, xmm1, xmm0`) を bit 比較する。入力は特殊値 121 組 (±0・±inf・NaN・非正規化数の組合せ)・乱数 1879 組・末尾 1 組の計 2001 組。native の機械語は `0f2ec177030f29c8c3` (ucomiss・ja +3・movaps・ret)。
 
@@ -59,8 +59,8 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | RetDec raw lift のどの段が被演算子・flags を落とすかは未特定 (一般 pass で補った) | 同型の誤りを他 kernel で自動検出できない | #3281 [P0c-20] |
-| xmm 戻り値 kernel の census 判定は未汎用化 (k80_diff は rax のみ比べる。0x5e12b0 だけ `ucomi_ret_check.py` で検証) | xmm 戻り値の他 kernel は戻り値を検証しない | #938 [T-SH-22] |
-| `or i1 CF,ZF` 以外の jcc (jb・je・jp など) の flags は未接続 (fail-closed) | 現 census に該当 kernel は無い | 該当 kernel が出た時点で子 issue |
+| xmm 戻り値 kernel の census 判定は未汎用化 (k80_diff は rax のみ比べる。0x5e12b0 だけ `ucomi_ret_check.py` で検証) | xmm 戻り値の他 kernel は戻り値を検証しない | #3513 [P0c-22] |
+| `or i1 CF,ZF` 以外の jcc (jb・je・jp など) の flags は未接続 (fail-closed) | 現 census に該当 kernel は無い | #3281 [P0c-20] (同 issue へのコメントで記録) |
 
 ### 20.7 検証範囲
 

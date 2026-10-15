@@ -215,15 +215,14 @@ abi-mismatch 1 本:
 
 | kernel | 区分 | 詳細 | 担当 |
 |---|---|---|---|
-| 0x5e12b0 | abi-mismatch | 未割当の使用 slot: xmm0, xmm1 (IR は `define i64 @function_5e12b0()` の引数ゼロ) | 起票 #3439 [P0c-21] |
+| 0x5e12b0 | abi-mismatch (測定時点) | 未割当の使用 slot: xmm0, xmm1 (IR は `define i64 @function_5e12b0()` の引数ゼロ) | 修復済 (#3439 [P0c-21]・`REPORT_APPENDIX_I.md` §20 参照) |
 
 ### 20.4 担当と残件 (close 条件への当てはめ)
 
-- **§18.6 の訂正**: 0x5e12b0 の旧担当 #938 (`[T-SH-22]`) は libkio の受入 (`Fix_RCSf` / `LimitFloat_RCSfff` 40/40) で 2026-10-14 に closed。0x5e12b0 はその受入範囲に含まれない。open の担当が無かったため #3439 [P0c-21] を起票した (親 #197)。
+- **§18.6 の訂正**: 0x5e12b0 の旧担当 #938 (`[T-SH-22]`) は libkio の受入 (`Fix_RCSf` / `LimitFloat_RCSfff` 40/40) で 2026-10-14 に closed。0x5e12b0 はその受入範囲に含まれない。open の担当が無かったため #3439 [P0c-21] を起票した (親 #197)。#3439 で 0x5e12b0 は修復済み (`REPORT_APPENDIX_I.md` §20)。
 - open のまま残る P0c 系 issue (PM の close 条件表には無いが、80 本の bit-exact に効く):
   - #3280 [P0c-19]: 0x5dffc0 の 10000 case で buf_diff=3 (2000 case は 0)
   - #3281 [P0c-20]: RetDec raw lift の x87 スタック参照・xmm 入替えの一般 pass 化 (手書き本体 `k80_hand_bodies.py` の削減)
   - #1283 [P0c-16]: ext 鎖の f80 2 本と hs_e2e の skip 原因 (依存: #2510・#2566 は open)
-  - #3439 [P0c-21]: 0x5e12b0 (新規)
 - Group B 12 本: §20.3 のとおり数値差分の対象外。扱いは PM 判断。
-- 結論: 未測定 13 本の分類は本節で記録した。#197 の close は、上の open な担当 issue (#1283・#3280・#3281・#3439) の扱いと Group B 12 本の扱いを PM が決めてからになる。
+- 結論: 未測定 13 本の分類は本節で記録した。#197 の close は、上の open な担当 issue (#1283・#3280・#3281) の扱い (0x5e12b0 は #3439 で修復済み)と Group B 12 本の扱いを PM が決めてからになる。
