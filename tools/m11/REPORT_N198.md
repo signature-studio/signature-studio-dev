@@ -1,6 +1,6 @@
 # M11 REPORT (#3916 / [M11-N198] / 親 #3140): set_other の CFG 実値化を独立に照合する
 
-結論: 前提だった実値化 1 件 (`function_f6bb50` → `function_cd1c20` pos 1 = rdx = `0x0`) は、修正版の判定器 (PR #3919) では実値化 0 件のため照合対象が無い。前提の 1 件は誤りで、経路によって `0x0` と `0x1` になる (未決)。独立照合器 `m11_setother_nonimm_cfg_verify.py` (具体実行で呼出し点の全経路の値を列挙) で、同じ 1 件が **FAIL (経路で値が違う)** と判定されることを確認した。ネガティブコントロールは、この 1 件に `0x0` と `0x1` を当てて両方が FAIL になることで確認した。34 件中 33 件は未対応命令で判定不能 (PASS にしていない)。
+結論: 前提だった実値化 1 件 (`function_f6bb50` → `function_cd1c20` pos 1 = rdx = `0x0`) は、修正版の判定器 (PR #3919) では実値化 0 件のため照合対象が無い。前提の 1 件は誤りで、経路によって `0x0` と `0x1` になる (未決)。独立照合器 `m11_setother_nonimm_cfg_verify.py` (具体実行で呼出し点の全経路の値を列挙) で、同じ 1 件が **FAIL (経路で値が違う)** と判定されることを確認した。ネガティブコントロールは、この 1 件に `0x0` と `0x1` を当てて両方が FAIL になることで確認した。34 件中 33 件は判定不能 (値が未知の経路 16・step 上限 15・cdq 2。PASS にしていない)。
 
 ## 1. 方式 (`m11_setother_nonimm_cfg_verify.py`)
 
@@ -36,7 +36,7 @@
 
 ### 2-2. 実データ (素材 `fl-win64` `block00031_PE.bin`・`work-m11`)
 
-- 測定 commit: 本 PR の最後のコード commit (下記 §5)。
+- 測定 commit: `07bae9afb` (コードを変えた最後の commit。§5)。
 - 入力: `block00031_PE.bin` sha256 `b2c64da4…`・`boot_final.ll` sha256 `69c774de…` (REPORT_N172 と一致)。
 - 台帳の再生成: `m11_post.py` → `m11_argrecover.py` → `m11_argrecover_verify.py` (`fixes 33: match 33 / mismatch 0`)→ `m11_setother_ledger_verify.py` (`match 410`)→ `m11_setother_nonimm_class.py` (349 件)→ `m11_setother_nonimm_cfg.py` (34 件)。すべて rc 0。
 - 判定器の区分 (34 件): 実値化 0 / 復元不能 0 / 未決 34 (REPORT_N172 §2-2 と一致)。非 imm 349 件: 0 / 0 / 349 (REPORT_N172 §2-4 と一致)。
@@ -46,11 +46,13 @@
 |---|---:|---|
 | 実値化 (照合で値が 1 つ) | 0 | — |
 | 未決 (経路で値が違う) | 1 | `function_f6bb50` → `function_cd1c20` pos 1 (`merge>chain>loop`) |
-| 判定不能 (未対応命令・flags 等) | 33 | `shl`・`cvtsi2ss`・`cvtsi2sd`・`ucomisd`・`ucomiss`・`mulss`・`neg`・`shr`・`sete`・`jle` 結果 flags など |
+| 判定不能 (値が未知の経路 16・step 上限 15・cdq 2) | 33 | `function_127a4a0`→`function_65f270` pos 1 ほか (内訳は下記) |
 | PASS / FAIL | 0 / 0 | — |
 
-- **差し戻し後の再実行は未実施**: 素材ディレクトリ ($ARTIFACTS_DIR) には `fl-win64.tar.zst` のみあり、`work-m11` (`nonimm_cfg_rows.json`) が無い。このため 34 件の内訳 (実値化 0 / 未決 1 / 判定不能 33) は差し戻し前の版の実測値で、`call` の flags 修正後の値は未確認。次の回で `oc_artifacts: fl-win64 work-m11` を指定して再実行し、内訳を照合する。
-- 照合器が未決にした 1 件の経路値 (実測・差し戻し前の版): `0x0` と `0x1`。REPORT_N172 §3 の機械語 (1 周目 rbx=0・2 周目 rbx=1) と一致。
+- 台帳の再生成 (本測定・`work-m11` の `boot_final.ll` と `fl-win64` の `block00031_PE.bin` から): `m11_sigfix_stats.sh` 相当の手順で `fixes 33: match 33 / mismatch 0`、`m11_setother_ledger_verify.py` で `match 410`、`m11_setother_nonimm_class.py` で非 imm 349 (reg 123・mem 150・lea 76)・未決 349、`m11_setother_nonimm_cfg.py` で 34 件。`work-m11` 単独には `nonimm_cfg_rows.json`・`nonimm_class_rows.json`・`FIXES.json` は含まれないため、上の手順で都度生成する。`final3_base.ll` の sha は `c029ada4…` で、REPORT_N86 の `ecab191b…` と異なる (台帳の件数は一致)。
+- 照合器 (`verify()` を 34 件に適用・測定 commit `07bae9afb`): 判定不能 33 (値が未知の経路 16・step 上限 15・cdq 2)・未決 1・実値化 0。判定不能の内訳は、`verify` の戻り値の理由を集計した実測値。
+- 未決 1 件 (`function_f6bb50` → `function_cd1c20` pos 1) の経路値は `0x0` と `0x1` (`経路で値が違う: 0x0,0x1`)。REPORT_N172 §3 の機械語 (1 周目 rbx=0・2 周目 rbx=1) と一致。
+- 実データのネガティブコントロール: 同じ 1 件に claim `0x0` → FAIL。claim `0x1` も FAIL (§3 の受入 2 の根拠は合成 K0〜K2 と本件の両 claim)。
 - 実データのネガティブコントロール: 同じ 1 件に claim `0x0` → FAIL (経路で値が違う)。claim `0x1` も同じく FAIL。どちらの claim も経路の値の集合と一致しないため、一致と判定されない。
 
 ## 3. 判定
@@ -69,16 +71,14 @@
 - 合成検査 (`--selftest`): 10 件 → 30 件 (S1〜S10 を追加、PASS とネガティブ控えの両方)。30 件・不一致 0。
 - 実データ (`work-m11` の再生成と `block00031_PE.bin`): 34 件の判定は **判定不能 33・未決 1・実値化 0・PASS 0・FAIL 0**。
 
-| 判定不能の理由 | 件数 (修正前 `c6df3e147`) | 件数 (`07bae9afb`) |
-|---|---:|---:|
-| 未対応命令 (`shl`・`cvtsi2sd`・`mulss`・`jle` 結果 flags 等) | 33 | 0 |
-| 未対応命令 `imul` | (上の 33 に含む) | 10 |
-| 未対応命令 `cdq` | (上の 33 に含む) | 2 |
-| 未対応命令 `not` | (上の 33 に含む) | 1 |
-| 値が未知の経路がある | — | 16 |
-| step 上限 (200000) | — | 15 |
+| 判定不能の理由 (`07bae9afb` の実測) | 件数 |
+|---|---:|
+| 値が未知の経路がある (`function_127a4a0`→`function_65f270` pos 1 の `merge>call_ret` 等) | 16 |
+| step 上限 (200000) (`function_11d4df0`→`function_7e3af0` pos 0 の `merge>load_ptr` 等) | 15 |
+| 未対応命令 `cdq` (`function_1280530`・`function_e9d8a0`) | 2 |
+| 未対応命令 `imul`・`not` | 0 |
 
-- 受入 1 (判定不能 0) は **未達**。未対応命令による打ち切りは消えたが、残りは「値が未知の経路」(16 件)・「step 上限」(15 件)・`cdq` (2 件)。照合器は「値が未知」の経路がどの `call` 越えかを報告しないので、原因の特定は次の作業。
+- 受入 1 (判定不能 0) は **未達**。残りは「値が未知の経路」(16 件)・「step 上限」(15 件)・`cdq` (2 件)。`imul`・`not` は実測で 0 件 (前版の表の「imul 10・not 1」は誤りで、本文を実測値に直した)。照合器は「値が未知」の経路がどの `call` 越えかを報告しないので、原因の特定は次の作業。
 - 実値化の 1 件 (`function_f6bb50` → `function_cd1c20` pos 1) は未決のまま (経路で `0x0`・`0x1`)。前提の 1 件が誤りという REPORT_N172 §3 の結論と一致する。
 - 台帳 (`nonimm_cfg_rows.json` 34 件) は `m11_sigfix_stats.sh` → `m11_setother_nonimm_class.py` → `m11_setother_nonimm_cfg.py` の再生成で得た (`work-m11` 単独には含まれない・§2-2 の手順)。`fixes 33: match 33 / mismatch 0`・`match 410`・非 imm 349 件・未決 349 は REPORT_N171 と一致。
 
@@ -91,8 +91,12 @@
 
 ## 5. 測定 commit と差分
 
-- 測定 commit: 差し戻し対応の commit (`call` の flags 修正・selftest K4・CLI ガード)。合成検査 (`--selftest`) はこの commit で再測定した (10 件・不一致 0・rc 0)。
-- 差分 (コードのみ): `git diff <測定 commit> HEAD -- tools/m11 ':(exclude)*.md'` (PR 本文に出力を貼る)。
+- 測定 commit: `07bae9afb` (コードを変えた最後の commit)。以降の `60d9da6a3` は本ファイルの追記のみ。
+- 差分 (コードのみ): `git diff 07bae9afb HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行 (下に貼る)。
+  ```
+  $ git diff 07bae9afb HEAD -- tools/m11 ':(exclude)*.md'
+  (出力 0 行)
+  ```
 
 ## 6. 差し戻し対応 (review round 1)
 
@@ -100,5 +104,5 @@
 |---|---|
 | 1. `call` で flags が残り、`je` が誤って実値化 `0x0` | `call` で `fl = None`。K4 (call を挟む分岐) を追加。K4 は差し戻し前の版で `実値化 0x0` になることを確認し、修正後は `未決 (0x0,0x1)` |
 | 2. `Closes #3916` と issue 本文の受入 1 の不整合 | issue #3916 本文から受入 1 を外し、原文を子 #4807 へ移す |
-| 3. 実データの素材 (`work-m11`) が PR 本文に無い | PR 本文に `oc_artifacts: fl-win64 work-m11` を追加。ただし本 run では `work-m11` が取得できず、再実行は未実施 (§2-2) |
+| 3. 実データの素材 (`work-m11`) が PR 本文に無い | PR 本文に `oc_artifacts: fl-win64 work-m11` を追加。本 run で `work-m11` と `fl-win64` を取得し、台帳を再生成して照合した (§2-2・§3-1) |
 | minor: import 時に argparse が走る | CLI を `__main__` ガードの内側へ移動 |
