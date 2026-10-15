@@ -12,12 +12,12 @@ op (ecx)・arg (edx)・mode (r8b) の値を与え、その値で決まる分岐�
 mode 未知のとき test al,2 の両方を辿るので、-1 を返す経路も出る。
 r9 = 0xf は [rbp+0x48] に保存される (セクション選択ビット)。
 setcc は上位ビットを 0 とみなす (後続が movzx rax,al・test al,al の形のときだけ使われる)。
+フラグ (ZF/SF/CF/OF) は演算幅 (8/16/32bit) から求める。幅や値が未知なら両分岐を辿る (64bit は未知扱い)。
 呼出しで書き換えられ得るのは lea で取られた [rbp+X] のみとみなす (lea 一覧は走査時に求める)。
 """
 import os
-import sys
-
 import re
+import sys
 
 import capstone
 import pefile
@@ -48,28 +48,59 @@ SETCC = {
     "seta": "a", "setae": "ae", "setb": "b", "setbe": "be",
 }
 ARITH = ("sub", "add", "xor", "or", "and")
+FLAG_KEEP = frozenset(
+    ("nop", "endbr64", "push", "pop", "mov", "movzx", "movsx", "movsxd", "lea") + tuple(SETCC)
+)
 
 
-def s32(v):
-    v &= 0xFFFFFFFF
-    return v - (1 << 32) if v & 0x80000000 else v
+def width(opnd):
+    """オペランドの幅 (bit)。8/16/32 以外 (64bit・幅の不明) は None。"""
+    if "byte ptr" in opnd or opnd in LOW8:
+        return 8
+    if "word ptr" in opnd or opnd in ("ax", "cx", "dx", "bx"):
+        return 16
+    if "dword ptr" in opnd or opnd in ("eax", "ecx", "edx", "ebx", "r8d", "r9d"):
+        return 32
+    return None
+
+
+def opwidth(ops):
+    for o in ops:
+        if o in REG or "ptr" in o:
+            return width(o)
+    return None
+
+
+def alu(kind, a, b, w):
+    """演算 kind の (結果, (ZF, SF, CF, OF))。値か幅が未知なら (None, None)。test/and/or/xor は CF=OF=0。"""
+    if a is None or b is None or w is None:
+        return None, None
+    mask = (1 << w) - 1
+    sign = 1 << (w - 1)
+    ua, ub = a & mask, b & mask
+    cf = of = False
+    if kind == "add":
+        raw = ua + ub
+        res = raw & mask
+        cf = raw > mask
+        of = bool(~(ua ^ ub) & (ua ^ res) & sign)
+    elif kind == "sub":
+        res = (ua - ub) & mask
+        cf = ua < ub
+        of = bool((ua ^ ub) & (ua ^ res) & sign)
+    else:
+        res = {"and": ua & ub, "test": ua & ub, "or": ua | ub, "xor": ua ^ ub}[kind]
+    return res, (res == 0, bool(res & sign), cf, of)
 
 
 def cond(kind, flags):
     if flags is None:
         return None
-    op, a, b = flags
-    if a is None or b is None:
-        return None
-    if op == "test":
-        zf = (a & b) & 0xFFFFFFFF == 0
-        return zf if kind == "e" else (not zf if kind == "ne" else None)
-    ua, ub = a & 0xFFFFFFFF, b & 0xFFFFFFFF
-    sa, sb = s32(a), s32(b)
+    zf, sf, cf, of = flags
     table = {
-        "e": sa == sb, "ne": sa != sb, "g": sa > sb, "ge": sa >= sb,
-        "l": sa < sb, "le": sa <= sb, "a": ua > ub, "ae": ua >= ub,
-        "b": ua < ub, "be": ua <= ub,
+        "e": zf, "ne": not zf, "g": not zf and sf == of, "ge": sf == of,
+        "l": sf != of, "le": zf or sf != of, "a": not cf and not zf, "ae": not cf,
+        "b": cf, "be": cf or zf,
     }
     return table[kind]
 
@@ -169,16 +200,17 @@ def run(insns, op, arg, mode, read):
             continue
         nr = dict(regs)
         nm = dict(mem)
-        nf = None
+        nf = flags if m in FLAG_KEEP else None
         if m in ("nop", "endbr64", "push"):
             pass
         elif m == "pop" and ops and ops[0] in REG:
             nr[REG[ops[0]]] = None
         elif m == "cmp" and len(ops) == 2:
-            nf = ("cmp", load(ops[0], regs, mem), load(ops[1], regs, mem))
+            a, b = load(ops[0], regs, mem), load(ops[1], regs, mem)
+            nf = alu("sub", a, b, opwidth(ops))[1]
         elif m == "test" and len(ops) == 2:
             a, b = load(ops[0], regs, mem), load(ops[1], regs, mem)
-            nf = ("test", a, b) if a is not None and b is not None else None
+            nf = alu("test", a, b, opwidth(ops))[1]
         elif m in SETCC and ops and ops[0] in REG:
             r = cond(SETCC[m], flags)
             nr[REG[ops[0]]] = None if r is None else int(r)
@@ -205,10 +237,15 @@ def run(insns, op, arg, mode, read):
         elif m in ARITH + ("imul", "shl", "shr", "sar") and len(ops) == 2 and ops[0] in REG:
             d = REG[ops[0]]
             a, b = regs[d], load(ops[1], regs, mem)
-            if a is not None and b is not None and m in ARITH:
-                res = {"sub": a - b, "add": a + b, "xor": a ^ b, "or": a | b, "and": a & b}[m] & 0xFFFFFFFF
-                nf = ("cmp", a, b) if m == "sub" else ("test", res, res)
-                nr[d] = res
+            if m in ARITH:
+                w = opwidth(ops)
+                res, nf = alu(m, a, b, w)
+                if res is None:
+                    nr[d] = None
+                elif w == 32:
+                    nr[d] = res
+                else:
+                    nr[d] = (a & ~((1 << w) - 1) & 0xFFFFFFFF) | res
             else:
                 nr[d] = None
         elif ops and ops[0] in REG:
