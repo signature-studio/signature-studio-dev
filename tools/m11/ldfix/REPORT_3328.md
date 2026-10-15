@@ -33,7 +33,7 @@
 - 走査: `python3 tools/m11/ldfix/scan_spill_deref_3328.py tools/m11/work/boot_final3.ll --pe $RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin --out <json>`
 - 出力 (実測): `IR 関数 7421 / .pdata 有り 6969 / CALL 11 関数 13 箇所 / CMP 13 関数 20 箇所 / COPY 49 関数 103 箇所 / EXCL 3 関数 3 箇所` (実行 3.6 s・load average 0.15 / 0.25 / 0.18)。
 - 2502 の走査 (`scan_spill_deref_2502.py`・無変更) は同じ PE・IR で 14 関数 / 16 箇所 (再実行で一致)。
-- 測定 commit: §7 を参照。
+- 測定 commit: `f602f9354` (§7)。
 
 ## 3. 偽陽性の除外 (EXCL) と負の対照
 
@@ -87,7 +87,8 @@
 
 - 2502 (14 関数 / 16 箇所) → 3328 の CALL 11 関数 / 13 箇所 + EXCL 3 関数 / 3 箇所。除外した 3 件 (0x413c00・0x414c70・0x44f240) は REPORT_2555 §3 の偽陽性と一致。減った 3 件の内訳は再ロードの枠 0x413c5d・0x414cc7・0x44f25b (§3 の表)。
 - 追加されたもの (新 kind): COPY 103 箇所 (49 関数) と CMP 20 箇所 (13 関数)。どちらも 2502 の数字とは別に数える。
-- 測定 commit と差分: 本 REPORT の commit (§8)。`git diff <測定 commit> HEAD -- tools/m11/ldfix/scan_spill_deref_3328.py | wc -l` を §8 で添える。
+- 測定 commit: `f602f9354` (コードを変えた最後の commit。走査・REPORT・DOC_MAP を同じ commit に入れた)。
+- `git diff f602f9354 HEAD -- tools/m11/ldfix/scan_spill_deref_3328.py tools/m11/ldfix/scan_spill_deref_2502.py | wc -l` → `0` (後続の commit は REPORT のみ)。
 
 ## 8. 未解決
 
