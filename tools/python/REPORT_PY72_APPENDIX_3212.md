@@ -67,3 +67,12 @@
 | O の生成関数 `0x125da90` の this の実体と O の vptr (§3) | vtable `[O+0x98]` の本体と偽になる条件が確定しない。status −2 の PE 条件が出ない | #3212 (open のまま継続) |
 | `0x4235f0` の表引き結果 (`0xc39831`・§5) | `0xd5e620` の間接先が確定しない | #3212 |
 | X = `[this+0x50]` の書込み元 (§6) | `0xd84f30` の入力の実体が確定しない | #3212 |
+
+### 測定 (main 取り込み後の再測定)
+
+- 測定 commit: `a7d1255b` (`origin/main` (`1c8ca077`) を取り込んだ merge commit。コードを変えた最後の commit)。main 側で `tools/python/analysis`・`provider`・`host`・`tests` にコード変更が入ったため、`bfceba9e` の測定は HEAD の値として使わず再測定した。
+- 差分の証跡: `git diff a7d1255b HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行 (後続の commit は本ファイル・`REPORT_PY72.md`・`docs/DOC_MAP.md` のみ)。
+- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst extracted/block00031_PE.bin` (2.9 秒・22,227,016 B。展開先は `$RUNNER_TEMP/fl3290`)。
+- 陽性 `FL_WIN64_DIR=$RUNNER_TEMP/fl3290 python3 analysis/flapi/pe_chain_stores.py 0x15e4790 8`: `instructions=5022467 intra_store=2 intra_load=277 callee_refs=5 callee_store=0 sec=73.1` (real 1 分 13.2 秒)。
+- 陰性対照 `... 0x13a5000 8` (G の値 0 で鎖が切れる): `instructions=5022467 intra_store=0 intra_load=0 callee_refs=0 callee_store=0 sec=72.5` (real 1 分 12.6 秒)。
+- load average (1 分値): 陽性の開始 0.08 → 終了 0.74、陰性の開始 0.68 → 終了 0.90。
