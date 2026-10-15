@@ -5,7 +5,7 @@
 
 ## 結論 (1 行)
 win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を RetDec で lift し、`ucomiss` flags 修復 (1 pass) + SSE scalar helper 生成で wasm 化。
-**native 実機械語 vs wasm の全バイト比較 240/240 一致** (ネガコン 4 件は全て FAIL = ゲートは効く)。**実インスタンス (CreateReverbInstance) 駆動は未達**: 生成直後の状態では `Process_Fruity` が SIGSEGV (§7 → [T-SH-71] #3361)。**ildsp は未達**: WaveformColouring は #3216 (OPEN)。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance は未起票で #161 に残す (§6)。
+**native 実機械語 vs wasm の全バイト比較 240/240 一致** (ネガコン 4 件は全て FAIL = ゲートは効く)。**実インスタンス (CreateReverbInstance) 駆動は未達**: 生成直後の状態では `Process_Fruity` が SIGSEGV (§7 → [T-SH-71] #3361)。**ildsp は未達**: WaveformColouring は #3216 (CLOSED・部分達成。残りは #3274・#3275・#3276)。GeneralPitchShifter の残件は #3318・#3320。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance は未起票で #161 に残す (§6)。
 
 ## 1. 対象の再特定 (mac の 0x25c0-0x2f87 は win では使えない)
 `python3 locate.py <Reverb.dll> <out>` が export stub → 実体 → `.pdata` の連鎖で範囲を求める (RVA, 範囲内に base reloc 0 件・外部 call 0 件)。
@@ -51,7 +51,7 @@ win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を
 
 ## 6. ildsp (`block24360_PE.bin`) 調査のみ (lift 未実施)
 ildsp の規模測定 (命令数・call 数・export closure 表) と未解決は [lift/ildsp/REPORT.md](ildsp/REPORT.md) が正本。
-追跡先: WaveformColouring は #3216 (OPEN)。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance (LimiterLite・Limiter・LowFreqEnhancer・Shimmer・StereoEnhancer・TransientLooper・Transmitter) は子 issue が未起票のため、親 #161 に残す (一覧は #161 のコメント)。GeneralPitchShifter は #2483 の子 #2528・#2529 (CLOSED)。
+追跡先 (いずれも実在): WaveformColouring は #3216 (CLOSED・部分達成。残りは #3274 [T-SH-57]・#3275 [T-SH-58]・#3276 [T-SH-59])。GeneralPitchShifter は #2483 の子 #2528・#2529・#3300 (いずれも CLOSED)。その残件は CreateInstance closure の wasm 化 #3318 [T-SH-65] と全バイト差分 #3320 [T-SH-66]、vtable slot 1–3 は #3299 [T-SH-61]、slot 5 は #3404。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance (LimiterLite・Limiter・LowFreqEnhancer・Shimmer・StereoEnhancer・TransientLooper・Transmitter) は子 issue が未起票のため、親 #161 に残す (一覧は #161 のコメント)。
 
 ## 検証範囲 / 範囲外
 - 範囲: win 版 Process_Fruity/UF の**合成状態** (乱数 + 境界値) に対する wasm と native 機械語のビット一致。
@@ -62,7 +62,7 @@ ildsp の規模測定 (命令数・call 数・export closure 表) と未解決�
 |---|---|---|
 | 実インスタンス (CreateReverbInstance → Process) の駆動検証。生成直後の状態は Process_Fruity が SIGSEGV (§7) | 14 本の遅延線ポインタの割付け元が未特定。状態レイアウトの意味づけは乱数/境界値で代替したまま | [T-SH-71] #3361 |
 | D1a 変種「分岐条件が直前の無関係な add の parity/zero flag」の DEFECTS.md 反映 | カタログ未反映 | 行案は §3。DEFECTS.md の編集は PM 判断 |
-| ir_normalize / fix pass が `libkio` 配下の流用 (汎用化されていない) | 他 lib 転用時にコピーが増える | #(T-SH-16 汎用 pass 化) にコメント |
+| ir_normalize / fix pass が `libkio` 配下の流用 (汎用化されていない) | 他 lib 転用時にコピーが増える | [T-SH-16] #144 |
 
 ## 7. 実インスタンス (CreateReverbInstance) の native 実行 — 生成直後の状態は Process_Fruity が落ちる
 
