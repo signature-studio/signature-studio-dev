@@ -184,5 +184,8 @@
   - KH-74 回帰 (`660`、seed 7 × 1,000,000): PASS。
   - ネガコン (`kPiA` の仮数 1 bit を変えた版、seed 7 × 100,000): **FAIL** (xmm0 不一致 100,000・xmm1 不一致 77,936・rc=1)。
 - 生成 C (stereo、`ghidra_to_c.py stereo ... --fix bitcast,intload,stackpair,assoc,concat`): 修正前 (`origin/main`) と差分は 3 箇所のみ: コメント 1 行 (未対応 → 式だけ持つ)・helper 宣言 (`kh_xmm1_180fdfdb0` の追加)・式 1 行。未配線のため呼出し側は不変。`extraout_XMM0_Qa*` の読出しは 9 件のまま (`FUN_180fdc470` の `extraout_XMM0_Qa_01` 系 #3884 の範囲)。
-- gain / haas / gate の生成 C: `kh_` を含まない (stereo 専用の規則) ため、kh_xmm0.h の変更で生成 C は変わらない (diff 0 行の根拠)。
-- 未達 (受入条件 2・4 の配線): 呼出元 180fcd9c8 (`movapd xmm4, xmm1`) と 180fce43e の xmm1 の読出し先は、生成 C に `extraout_XMM1` として現れない (Ghidra が xmm1 を戻り値として C に出していない)。`patches.py` の置換規則は、この読出し先 (xmm4 経由で多項式の補正項に入る経路) を機械語で確定してから書く。子 issue へ。
+- gain / haas / gate の生成 C: `kh_` を含まない (stereo 専用の規則) ため、kh_xmm0.h の変更で生成 C は変わらない (ghidra_to_c.py の規則からの論証。実測は未実施 — 素材 `plugins-kilohearts` が必要)。
+- 未達 (配線・子 #4722 KH-115 で扱う): 呼出元 180fcd9c8 (`movapd xmm4, xmm1`) と 180fce43e の xmm1 の読出し先は、生成 C に `extraout_XMM1` として現れない (Ghidra が xmm1 を戻り値として C に出していない)。`patches.py` の置換規則は、この読出し先 (xmm4 経由で多項式の補正項に入る経路) を機械語で確定してから書く。子 issue へ。
+- **鮮度 (訂正)**: 測定 commit `ebd0c63cf` から現 HEAD までの `git diff ebd0c63cf HEAD -- tools/targets/kilohearts/ghidra_route` は **0 行ではない** (`main` 取り込み由来。`kh_xmm0.h` 101 行変更、`xmm0_check.c` 27 行変更 (計 2 files・118 insertions(+)・10 deletions(-))。KH-76 の `kh_tab470`・`kh_fn_180fdc470` と `470` モードが入った)。現 HEAD での再測定は素材 `plugins-kilohearts` が無く未実施。上の数値は `ebd0c63cf` 時点のもの。
+- **再測定の残り (未実施)**: `xmm0_check dfdb0` seed 7・seed 1 × 1,000,000、`xmm0_check 660` seed 7 × 1,000,000、ネガコン `kPiA` 1 bit、生成 C (stereo) の前後差分。`gcc -O1 -ffp-contract=off -Wall` の compile は現 HEAD で rc 0・警告なし (突合は未実施)。
+- **NaN の扱い**: `xmm0_check.c` は NaN 同士を一致扱いで計上する (xmm0 と xmm1 とも。payload は見ない)。突合の PASS 条件は NaN 以外の bit 一致。
