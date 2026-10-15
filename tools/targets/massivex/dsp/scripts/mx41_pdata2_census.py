@@ -8,7 +8,7 @@
   out_of_image (UnwindInfoAddress >= SizeOfImage)・no_section (画像内で section の範囲に入らない)・
   zero_fill (VirtualSize の zero 埋め部分)・raw_zero (raw の内側で 4 バイトが 0)。
 - 独立再計算: pefile の get_section_by_rva / get_offset_from_rva で同じ分類を求め、読取不能の集合・分類・
-  読める行の flags を reader の結果と照合する。
+  読める行の flags を reader の結果と照合する。画像外の行も分類の短絡を通さず get_section_by_rva に当て、None の件数を出す。
 - ネガティブコントロール: 分類 (unreadable_rows) に入力 (st -> (e, ui)) を渡し、入力を書き換えて再分類する。
   読める 1 件の ui を画像外の値に壊す (件数 +1 を期待) / 読取不能 1 件の ui を隣の読める値に直す (件数 -1 を期待)。
   delta は再分類の件数から求める (期待値を式に入れない)。
@@ -48,11 +48,18 @@ def handler_name(rd, iat, h):
 def entries_of(sec):
     raw = sec.get_data()
     ents = {}
+    excl = collections.Counter()
     for i in range(0, len(raw) - 11, 12):
         st, e, ui = (int.from_bytes(raw[i + j:i + j + 4], 'little') for j in (0, 4, 8))
-        if st and e > st:
+        if not st:
+            excl['st_zero'] += 1
+        elif e <= st:
+            excl['e_le_st'] += 1
+        else:
+            if st in ents:
+                excl['st_dup_replaced'] += 1
             ents[st] = (e, ui)
-    return ents
+    return ents, dict(excl)
 
 
 def census(rd, iat, ents):
@@ -123,8 +130,8 @@ def main(pe_path, out_dir):
         b = data[off:off + min(4, s.SizeOfRawData - off_in)].ljust(4, b'\0')
         return ('raw_zero' if b == b'\0\0\0\0' else 'readable'), b
 
-    ents1 = entries_of(p1)
-    ents2 = entries_of(p2)
+    ents1, excl1 = entries_of(p1)
+    ents2, excl2 = entries_of(p2)
     res = {
         'SizeOfImage': soi,
         'exception_dir': {'va': ex.VirtualAddress, 'size': ex.Size},
@@ -132,6 +139,10 @@ def main(pe_path, out_dir):
                    'in_exception_dir': ex.VirtualAddress == p1.VirtualAddress and ex.Size == p1.Misc_VirtualSize},
         'pdata2': {'va': p2.VirtualAddress, 'vs': p2.Misc_VirtualSize, 'raw': p2.SizeOfRawData,
                    'in_exception_dir': ex.VirtualAddress == p2.VirtualAddress},
+        'rows_pdata1': len(p1.get_data()) // 12,
+        'excluded_pdata1': excl1,
+        'rows_pdata2': len(p2.get_data()) // 12,
+        'excluded_pdata2': excl2,
         'census_pdata1': census(rd, iat, ents1),
         'census_pdata2': census(rd, iat, ents2),
     }
@@ -182,6 +193,7 @@ def main(pe_path, out_dir):
         'unreadable_only_reader': len(set(rd_cls) - set(pef_unr)),
         'class_pefile': dict(collections.Counter(pef_unr.values())),
         'class_rows_match': sum(1 for st in rd_cls if pef_unr.get(st) == rd_cls[st]),
+        'section_by_rva_none': sum(1 for st in rd_cls if pe.get_section_by_rva(ents1[st][1]) is None),
         'flag_mismatch_readable': len(flag_diff),
         'flag_mismatch_in_pdata2_vs_range': sum(
             1 for st, ui in flag_diff if p2.VirtualAddress <= ui < p2.VirtualAddress + p2.Misc_VirtualSize),

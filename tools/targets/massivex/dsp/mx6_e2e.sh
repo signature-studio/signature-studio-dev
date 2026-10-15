@@ -49,7 +49,8 @@ ok41 = (c1['pdata_entries'] == 187060 and c1['chained_entries(CHAININFO)'] == 62
         and c1['unreadable_unwind_info'] == 160 and m['unreadable_by_class'] == {'out_of_image': 160}
         and c2['pdata_entries'] == 509 and c2.get('unreadable_unwind_info', 0) == 0
         and ip['unreadable_same_set'] and ip['class_pefile'] == m['unreadable_by_class']
-        and ip['class_rows_match'] == m['unreadable_pdata1'] and ip['flag_mismatch_readable'] == 0
+        and ip['class_rows_match'] == m['unreadable_pdata1'] and ip['section_by_rva_none'] == m['unreadable_pdata1']
+        and ip['flag_mismatch_readable'] == 0
         and nc['break']['delta'] == 1 and nc['break']['row_class_after'] == 'out_of_image'
         and nc['break']['pefile_class_after'] == 'out_of_image'
         and nc['fix']['delta'] == -1 and nc['fix']['row_removed'] and nc['fix']['pefile_class_after'] == 'readable')
