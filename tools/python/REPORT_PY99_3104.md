@@ -108,6 +108,48 @@
 
 `work/` は作業用ディレクトリ (`py53/fn.txt` を置く場所。PY-88 と #3085 と同じ入力)。
 
+## レジスタの合流の閉包 (#4266 / PY-313)
+
+測定 commit: `7bc5dd7b0` (`analysis/py99_closure.py` にレジスタ読みの CFG 到達閉包 `reg_before`・`reg_forward`・`RG[...]` 展開を入れた最後のコード commit)。`git diff 7bc5dd7b0 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
+素材: `fl-win64` の `block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin'`・1.5 秒)。`analysis/py53_dispatch.py` → `fn=4664 dispatch=13 r8d_tests=174`。
+
+- 原因: `0x104bffa` の式の `⚠合流@0x104bd49`・`⚠合流@0x104be63` は、フレーム読みではなくレジスタ読み (`{0x104bd49: …}`) に付いていた。`py88_writes.Slicer.resolve` の合流判定は線形の命令列だけを見るため、レジスタの合流を展開できなかった。共有の `py88_writes.py` は変えず、`py99_closure.py` の中に CFG 到達のレジスタ閉包を足した (A は前向き固定点・B は後ろ向き BFS)。
+- 結果: `0x104bffa` の式から `⚠合流` が消えた (未閉 → 閉。残る葉は `c_in` だけ)。他の 48 件の式は、閉包の表示 (`md`) で変化 0 行。
+
+| 項目 | 前 (`99c7696df`) | 後 (`7bc5dd7b0`) |
+|---|---|---|
+| 残る葉が入口のレジスタ値 (`_in`) だけの書込み | 48/49 | **49/49** |
+| 閉じた書込み (厳格判定・`_in` も未閉に数える) | 0/49 | 0/49 |
+| 未閉の `⚠合流` を含む書込み | 1 件 (`0x104bffa`) | 0 件 |
+| 検算 mismatch (A と B) | 0 | 0 |
+| negctl `--negctl drop-pred` の mismatch | 17・exit 1 | 17・exit 1 |
+
+受入の判定:
+
+- 受入 1 (閉じた書込みの増加): **未達**。`0/49` は増えていない。`0x104bffa` の合流は閉じたが、同じ式に `c_in` が残るため厳格判定では閉じない。増えるのは「入口レジスタ以外の葉だけが残る書込み」の数で、48/49 → 49/49。
+- 受入 2 (検算 mismatch 0 と negctl mismatch 17): **達成**。
+- 受入 3 (入口レジスタ葉の判定): **判定を下した**。`c_in`・`d_in`・`r8_in` は関数 0x1046a30 の入口の値のまま残す (未閉)。呼出し側の値を確定するには呼出しの解析が要り、本節の範囲外。ここでは閉じた式を「入口レジスタ値の式」として扱う。
+
+### 再測定 (`7bc5dd7b0`・コミット済み HEAD)
+
+| 実行 | 結果 | exit | 所要 | load (1 分) |
+|---|---|---|---|---|
+| `analysis/py99_closure.py work/py53/fn.txt` | mismatch 0 (49 件) | 0 | 0.37 秒 | 0.00 → 0.16 |
+| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred` | mismatch 17 | 1 | 0.48 秒 | 0.03 → 0.09 |
+| `analysis/py99_closure.py work/py53/fn.txt --md <out>` の再生成 | commit 済みの `analysis/py99_closure.md` と差分 0 | 0 | — | — |
+
+### 再現
+
+    cd tools/python
+    python3 analysis/py99_closure.py work/py53/fn.txt                      # 終了コード 0 (mismatch 0)
+    python3 analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred   # 終了コード 1 (mismatch 17)
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 入口のレジスタ葉 `c_in`・`d_in`・`r8_in` の呼出し側の値 | 49 件の式が関数の入力のまま。厳格判定の閉じた書込みは 0/49 | #4494 ([PY-334]・親 #4266) |
+
 ## rint 6 件の閉包 (#3913 / 親 #2788・PY-271)
 
 測定 commit: `696fb146a` (`analysis/py99_closure.py --rint` を入れた最後のコード commit)。`git diff 696fb146a HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
