@@ -71,5 +71,5 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 - seed 有 (`FLE_CFI_SEED=1`・RECV 無し): trap 段 `f_410360` ← `f_5af120` ← `f_1105350` ← `f_13752f0` ← `f_1375990`。§4 と一致。
 - seed 有 + RECV (A): trap 段の先頭 `f_410320` ← `f_976b60` ← `f_976a90` ← `f_1264050` ← `f_12652c0` ← `f_1265390` ← `f_1265690` ← `f_1375990`。`threw=oob`・dispatch 209・GetMem 2,314・FreeMem 1,199 (計数は不変)。
 - seed 有 + RECV + SELF=`0x5ac338` (B): A と同じ stack・同じ threw。`self` を渡しても、chain は `rcx` を global から再読込するため結果は変わらない。
-- 所見: 呼出し経路 `f_976b60` の `rcx` は global `0x976410` (PE 値 `0x9764d8`) から来る。その先の `0x9764a8` (PE 値 `0x40f960`) は `fle_data_install` の窓に含まれず、harness では 0 のまま。よって `f_410320` の `rax` が 0 となり、`LD64(0xffffffffffffffd0)` で oob する。
+- 所見: 呼出し経路 `f_976b60` の `rcx` は global `0x976410` (PE 値 `0x9764d8`) から来る。その先の `0x9764a8` (PE 値 `0x40f960`) は `fle_data_install` の窓に含まれず、harness では 0 のまま。よって `f_410320` の `rax` が 0 となり `LD64(0xffffffffffffffd0)` で oob する、と推定する (`rcx`・`rax` の実行時値は未計測。推定)。
 - 未解決 (起票先: #5337 に残す): (1) `0x976410` の実行時値 (敷設後) が `0` か `0x9764d8` かを probe で確定する。(2) `fle_data_install` が覆わない `.data` 窓 (`0x976410`・`0x9764a8`・`0x5ac308`) の敷設方法を決める。(3) 実機の loader が充填する値は未確認。
