@@ -245,3 +245,6 @@ rbx = callback の第 1 引数 (ctx)。ctx のフィールドは使い方から�
 
 - 確定 (受入 1): `0xffe290` と `0x1001b70` は、VMT `TPublicChannel` (VA `0xfe2cf8`) と `TPreviewChannel` (VA `0xfe2fc8`) の slot 35 (VMT+0x118)。格納元は `.text` 内の静的な VMT。
 - 未確定 (受入 2・3): slot 35 への仮想呼出しの受け手の型、一覧 A/B の要素型と追加箇所 (件数と測定は付録 `REPORT_PY72_APPENDIX_3267.md`)。子 #3371 (PY-190) へ移送。
+
+## 追加解析 (PY-197 / #3440): 通知 0x550・0x562 の受け手 (DMT の分岐先) と窓生成の由来 (要約)
+- 受け手は Delphi の動的メッセージ表で確定 (0x550 → `TPluginForm` の `0xf6d160`、0x562 → `TFruityLoopsMainForm` の `0x11d18d0`)。hwnd からの経路・実体クラスは未確定。節・測定・未解決の表は付録 `REPORT_PY72_APPENDIX_3440.md`。
