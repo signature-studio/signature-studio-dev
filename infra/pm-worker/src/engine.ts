@@ -1411,14 +1411,14 @@ export class Engine {
     for (const tg of send) {
       if (!validPayload(tg.kind, tg.ref)) continue;
       if (!live) {
-        hist.push({ kind: tg.kind, ref: tg.ref, at: now });
+        hist.push({ kind: tg.kind, ref: tg.ref, at: now, prio: tg.prio });
         this.meta.counters.wouldDispatchPm = (this.meta.counters.wouldDispatchPm ?? 0) + 1;
         this.pushLog({ kind: "would-pm-dispatch", n: tg.ref, note: tg.kind });
         out.would.push(tg);
         continue;
       }
       // 失敗した試行も履歴に数える (同じ対象を毎分叩かない。上限はそのまま効く)
-      hist.push({ kind: tg.kind, ref: tg.ref, at: now });
+      hist.push({ kind: tg.kind, ref: tg.ref, at: now, prio: tg.prio });
       try {
         await gh!.dispatchPm(tg.kind, tg.ref);
       } catch (e) {
@@ -1734,8 +1734,12 @@ export class Engine {
     const c = (k: keyof Rows) => rows[k].length;
     const open = Object.values(this.s.issues).filter((i) => i.state === "open").length;
     const detected = this.detectPmTargets();
-    const pmDetected: Record<string, number> = Object.fromEntries(DETECTED_KINDS.map((k) => [k, 0]));
-    for (const d of detected) pmDetected[d.kind]++;
+    // critical は prio:critical の対象の件数 (kind の内訳と重なる。kind の合計とは一致しない)。
+    const pmDetected: Record<string, number> = { ...Object.fromEntries(DETECTED_KINDS.map((k) => [k, 0])), critical: 0 };
+    for (const d of detected) {
+      pmDetected[d.kind]++;
+      if (d.prio === "critical") pmDetected.critical++;
+    }
     // 稼働中の run を状態別に数える (event も workflow も問わない。TARGET に数える active_runs とは別の集計)。
     const running = { in_progress: 0, queued: 0, pending: 0 };
     for (const r of Object.values(this.s.runs)) {
@@ -1759,6 +1763,9 @@ export class Engine {
     // 着手待ち (ready) を優先の区分で数える (launch は critical を先頭、low を末尾に並べる)。
     const readyByPrio = { critical: 0, normal: 0, low: 0 };
     for (const n of rows.ready) readyByPrio[prioOf(this.s.issues[String(n)]?.labels ?? [])]++;
+    // oc-pm の直近 1 時間の送信を区分別に数える (pm_dispatch_1h と同じ窓・同じ履歴。prio の無い古い履歴は normal)。
+    const pmByPrio: Record<Prio, number> = { critical: 0, normal: 0, low: 0 };
+    for (const h of this.pmHistory()) if (now - h.at < 3_600_000) pmByPrio[h.prio ?? "normal"]++;
     const noPrByReason = { split: 0, artifact: 0, unknown: 0, blocked: 0, stop: 0 };
     for (const i of openIssues.filter(withLabel(NO_PR_LABEL))) {
       const r = this.s.sig[String(i.number)]?.outcome?.reason;
@@ -1841,6 +1848,8 @@ export class Engine {
       refs_only_merge_rate_24h: { merged: mergedDay.length, refs_only: refsOnly, rate: mergedDay.length ? refsOnly / mergedDay.length : null },
       open_issues_delta_24h: base ? open - base.open : null,
       pm_dispatch_1h: this.pmHistory().filter((h) => now - h.at < 3_600_000).length,
+      // pm_dispatch_1h の内訳 (区分別。合計は pm_dispatch_1h と一致する)。
+      pm_dispatch_1h_by_prio: pmByPrio,
       // oc-pm の毎時上限 (PM_LIMITS.hourMax) と、直近 24 時間にその上限で見送った件数 (対象ごと・tick ごとの回数。pmDispatch と haltNotify が数える)。
       pm_dispatch_cap: PM_LIMITS.hourMax,
       pm_skipped_hour_24h: this.pmHourSkips(now).reduce((sum, h) => sum + h.n, 0),
