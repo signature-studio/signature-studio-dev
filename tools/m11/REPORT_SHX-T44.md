@@ -9,7 +9,7 @@
 
 ## 2. 測定条件
 
-- 測定 commit: 本 PR の HEAD (本 REPORT と `frame_share/site_check.py` の追加のみ。`tools/m11` のコードは origin/main `319b01a80` から変えていない)。
+- 測定 commit: `319b01a80` (origin/main。baseline・site 判定はこの commit のコードで行った)。本 PR の差分は `tools/m11/REPORT_SHX-T44.md` と `tools/m11/frame_share/site_check.py` (解析スクリプトの追加のみ・既存のコードは変えない)。`git diff 319b01a80 HEAD -- tools/m11/ldfix tools/m11/frame_share/detect.py tools/m11/frame_share/classify.py tools/m11/m11_gen_ir2.sh` は 0 行。
 - 素材: `fl-win64.tar.zst` の `extracted/block00031_PE.bin` (22,227,016 B)・`work-m11.tar.zst` (`tools/m11/work/`・gitignore)。`toolchain-emsdk` は runner 既存。`toolchain-retdec` は使わない (lift を再実行していない)。
 - IR: `FL_WIN64_DIR=/tmp/opencode/fl bash tools/m11/m11_gen_ir2.sh` (52 s・`[gen_ir2] OK: work/boot_final.ll (490761 行)`)。`m11_build.sh` 25 s・`signature mismatch: 0, undefined symbol: 0`。
 - baseline (既定 OFF・修復なし): `shimx_link/build.sh --trace --soft` 15 s・`mismatch=0 undefined=0 duplicate=0`。実 boot `run_trace.mjs` 0.49 s・`units_run=17`・`dllmain_done=true`・`total_calls=106`・`va_calls=2`・`icall_ok=24`・`icall_miss=1`。前回 REPORT_SHX-T28 §7 と一致。
@@ -46,7 +46,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 親フレームを callee の view に結線する修復 pass の実装 (`function_448490` の `-28` store の補完、`this` object の 120 B 拡幅、call 前後の count・length・arg1 の同期)。既定 OFF | unit 18 を越えられない (`VirtualAlloc(0x76910000)` の不発) | `[SHX-T45]` #4459 #4459 (親 #4123) |
+| 親フレームを callee の view に結線する修復 pass の実装 (`function_448490` の `-28` store の補完、`this` object の 120 B 拡幅、call 前後の count・length・arg1 の同期)。既定 OFF | unit 18 を越えられない (`VirtualAlloc(0x76910000)` の不発) | `[SHX-T45]` #4459 (親 #4123) |
 | 修復 OFF/ON の before-after 実測 (`units_run ≥ 18`・`VirtualAlloc` 不発・`MessageBoxA` 不発・ネガコン) と、`docs/DEFECTS.md` D23 の「修復」列 | 修復の受入 | `[SHX-T45]` #4459 |
 | `function_448430` 本体の機械語確認 (2 site)。本 REPORT は callee の読み先のみ確認 | 2 site の判定の裏付け | `[SHX-T45]` #4459 |
 | 真の D23 かどうかの site 単位の確定 (IR 幅による分類は REPORT_SHX-T28 §10 で実施済み) | 修復範囲の決定 | `[SHX-T45]` #4459 |
