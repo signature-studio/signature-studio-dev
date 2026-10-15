@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # AU-15 (#863) 断続失敗の捕獲。e2e.sh を繰り返し、最初の FAIL で止めて位置情報つきログを残す (PASS の間は続行)。
 #   bash tools/audio/integration/hunt.sh [最大回数=300] [時間上限秒=1500]
-# 出力 (tools/audio/work/hunt/・gitignore): summary.txt = run ごとの結果 / fail_<n>.log = 失敗 run の e2e 全出力 (ビルド段を含む)
+# 出力 (tools/audio/work/hunt/<UTC 開始時刻>/・gitignore。起動ごとに別ディレクトリ): summary.txt = run ごとの結果 / fail_<n>.log = 失敗 run の e2e 全出力 (ビルド段を含む)
 #   pass_detail.txt = PASS run ごとの dev:tone 判定行 (充填・callback・producer/consumer 統計)
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(cd -- "$HERE/../../.." && pwd)"
 MAX="${1:-300}"; BUDGET="${2:-1500}"
-OUT="$ROOT/tools/audio/work/hunt"; mkdir -p "$OUT"
+OUT="$ROOT/tools/audio/work/hunt/$(date -u +%Y%m%dT%H%M%SZ)"; mkdir -p "$OUT"
 SUM="$OUT/summary.txt"; : > "$SUM"
 DETAIL="$OUT/pass_detail.txt"; : > "$DETAIL"
 LAST="$OUT/last.log"
