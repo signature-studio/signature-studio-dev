@@ -145,7 +145,7 @@ FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_slot_writers.py 0x15e0550    
 
 ## 10. 全 PE 走査 (#5128)
 
-- 対象: 展開先 `extracted/*_PE.bin` 全 313 本 (`fl-win64.tar.zst` を `tar --zstd -xf` で展開、6.6 秒)。ImageBase は 0x400000 (165 本)・0x180000000 (101 本)・0x10000000 (20 本)・0x140000000 (6 本)・0x1c000000 (1 本) ほか 22 種 (計 25 種)。
+- 対象: 展開先 `extracted/*_PE.bin` 全 313 本 (`fl-win64.tar.zst` を `tar --zstd -xf` で展開、6.6 秒)。ImageBase は 0x400000 (165 本)・0x180000000 (101 本)・0x10000000 (20 本)・0x140000000 (6 本)・0x1c000000 (1 本) ほか 20 種 (計 25 種)。
 - 走査: `analysis/flapi/pe_xref_all.py 16b6dcc,16b6e00,15e0550,15e2e18 4` (4 並列)。`.text` の線形走査は `pe_xref.py` と同じ。
 - 結果: 313 本中、対象 VA を指す rip 相対命令は **block00031 の 47 件だけ** (§5・§6 と一致)。他の 312 本は 0 件。
 - 範囲: 上記は rip 相対命令に限る。.rdata/.rsrc の値の一致は命令参照ではない。raw の 4 バイト一致は block00031 以外で 3 箇所 (block24425 の `.rdata` に `0x16b6e00` (raw 0x9c79f)、block25164 の `.rsrc` に `0x16b6dcc` (raw 0x5f7e446) と `0x15e0550` (raw 0x1e553a))。いずれも `.text` の命令参照ではない。
