@@ -316,6 +316,105 @@ def patch_uninit_alloca(blocks):
     return blocks, nfix
 
 
+VMOVSD_STORE_CALL = re.compile(r"^  call void @__asm_vmovsd\(i64 (%[\w.\-]+), i128 (%[\w.\-]+)\)(.*)$")
+
+
+def _fn_cfg(lines):
+    labels = [(i, m.group(1)) for i, ln in enumerate(lines)
+              for m in [re.match(r"^([\w.\-]+):", ln)] if m]
+    names = [n for _, n in labels]
+    bounds = {}
+    for j, (i, n) in enumerate(labels):
+        bounds[n] = (i, labels[j + 1][0] if j + 1 < len(labels) else len(lines))
+    succ = {}
+    for n in names:
+        s, e = bounds[n]
+        succ[n] = set()
+        for ln in lines[s:e]:
+            if not re.match(r"\s*(%[\w.\-]+ = )?phi ", ln):
+                succ[n].update(re.findall(r"label %([\w.\-]+)", ln))
+    return names, bounds, succ
+
+
+def _reach(succ, start, banned):
+    seen, st = set(), [start]
+    while st:
+        b = st.pop()
+        if b in seen or b == banned:
+            continue
+        seen.add(b)
+        st.extend(succ.get(b, ()))
+    return seen
+
+
+def _forward_vmovsd_fn(lines):
+    """store 形 `call void @__asm_vmovsd(i64 %old, i128 %v)` の %old は RetDec が宛先 (alloca) から
+    load した旧値。 宛先の旧値を読み戻す後続の use を、支配される範囲で `trunc i128 %v to i64` に置換し、
+    store 呼出を値の定義に置き換える。 支配されない use は残し、後段の B1 が従来どおり 0 にする。"""
+    names, bounds, succ = _fn_cfg(lines)
+    if not names:
+        return 0
+    entry = names[0]
+    reach_all = _reach(succ, entry, None)
+    nfwd = 0
+    for i, ln in enumerate(lines):
+        m = VMOVSD_STORE_CALL.match(ln)
+        if not m:
+            continue
+        old, val, suffix = m.group(1), m.group(2), m.group(3)
+        body = "\n".join(lines)
+        dm = [j for j, l2 in enumerate(lines)
+              if re.match(rf"^  {re.escape(old)} = load i64, ptr (%[\w.\-]+)(, align \d+)?\s*$", l2)]
+        if len(dm) != 1:
+            continue
+        ptr = re.match(rf"^  {re.escape(old)} = load i64, ptr (%[\w.\-]+)", lines[dm[0]]).group(1)
+        if not re.search(rf"(?m)^  {re.escape(ptr)} = (\w+ )?alloca ", body):
+            continue
+        if re.search(rf"^  store .*?ptr {re.escape(ptr)}(?=[,)\s])", body, re.M):
+            continue
+        b = next(n for n in names if bounds[n][0] <= i < bounds[n][1])
+        dom = (set(names) & reach_all) - _reach(succ, entry, b) - {b}
+        newname = "%vmovsd_fwd_" + old[1:]
+        pat = re.compile(rf"(?<![\w.\-]){re.escape(old)}(?![\w.\-])")
+        edits, bad = [], False
+        for n in names:
+            if n != b and n not in dom:
+                continue
+            s, e = bounds[n]
+            for j in range(s, e):
+                if j == dm[0] or (n == b and j <= i) or not pat.search(lines[j]):
+                    continue
+                if re.match(r"\s*(%[\w.\-]+ = )?phi ", lines[j]) or lines[j].startswith("  uselistorder"):
+                    bad = True
+                    break
+                edits.append((j, pat.sub(newname, lines[j])))
+            if bad:
+                break
+        if bad:
+            continue
+        for j, l2 in edits:
+            lines[j] = l2
+        lines[i] = f"  {newname} = trunc i128 {val} to i64{suffix}"
+        if not any(pat.search(l2) for j, l2 in enumerate(lines) if j != dm[0]):
+            lines[dm[0]] = ""
+        nfwd += len(edits)
+    return nfwd
+
+
+def forward_vmovsd_store(blocks):
+    """[V0] B1 の前に store 形 __asm_vmovsd の宛先読み戻しを値の転送へ置換する (#2017)。"""
+    nfwd_all, nleft = 0, 0
+    for fnm, body in blocks.items():
+        if "@__asm_vmovsd(" not in body:
+            continue
+        lines = body.split("\n")
+        nfwd_all += _forward_vmovsd_fn(lines)
+        blocks[fnm] = "\n".join(lines)
+        nleft += sum(1 for ln in lines if VMOVSD_STORE_CALL.match(ln))
+    stage("V0", f"store 形 __asm_vmovsd の読み戻しを値の転送へ置換 {nfwd_all} 件 (残 store 呼出 {nleft})")
+    return blocks, nfwd_all
+
+
 CE_ARITH = ("and", "or", "xor", "add", "sub", "mul", "shl", "lshr", "ashr",
             "udiv", "urem", "srem", "ptrtoint", "inttoptr", "zext", "sext",
             "trunc", "bitcast")
@@ -864,6 +963,9 @@ def main():
 
     # [A9L] 残存 constexpr の命令化 lift
     blocks, a9_res = lift_residual_constexpr(blocks)
+
+    # [V0] store 形 __asm_vmovsd の読み戻し転送 (B1 が宛先の旧値を 0 にする前に行う; #2017)
+    blocks, n_v0 = forward_vmovsd_store(blocks)
 
     # [B1]
     blocks, nfix = patch_uninit_alloca(blocks)

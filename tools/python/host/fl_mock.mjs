@@ -21,6 +21,7 @@ export function createMockEngine() {
     tempo: 130,
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
+    uiClosing: false, uiTimeDispMin: false, uiStartOnInput: false, uiLoopRec: false, uiStepEdit: false, uiBrowserAutoHide: false, uiSnapMode: 0,
     undoPos: 0, undoCount: 0, undoLast: 0, safeEdit: true, projTitle: "", projAuthor: "", projGenre: "",
     selStart: -1, selEnd: -1,
     arrTime: 0,
@@ -198,6 +199,17 @@ export function createMockEngine() {
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
+    // PY-95 (#2831): 状態 1 つを返すだけの ui ゲッター 9 件 (REPORT_PY95)。初期値は未実測の仮置き (provider/fl_engine.c と同じ)。
+    // isMetronomeEnabled / isPrecountEnabled は general.getUseMetronome / getPrecount と同じ状態を読む
+    "ui.isClosing": (...a) => { arity(a, 0, 0); return st.uiClosing; },
+    "ui.getTimeDispMin": (...a) => { arity(a, 0, 0); return st.uiTimeDispMin; },
+    "ui.isMetronomeEnabled": (...a) => { arity(a, 0, 0); return st.useMetronome; },
+    "ui.isPrecountEnabled": (...a) => { arity(a, 0, 0); return st.precount; },
+    "ui.isStartOnInputEnabled": (...a) => { arity(a, 0, 0); return st.uiStartOnInput; },
+    "ui.isLoopRecEnabled": (...a) => { arity(a, 0, 0); return st.uiLoopRec; },
+    "ui.getStepEditMode": (...a) => { arity(a, 0, 0); return st.uiStepEdit; },
+    "ui.isBrowserAutoHide": (...a) => { arity(a, 0, 0); return st.uiBrowserAutoHide; },
+    "ui.getSnapMode": (...a) => { arity(a, 0, 0); return st.uiSnapMode; },
     // PY-121 (#2982): PE で確定した引数書式 (PyArg fmt) と時間引数の頭打ち (0x7d0)。表示そのものは未モデルで、最後の時間引数だけ st.displayTime に残す
     "ui.crDisplayRect": (...a) => disp(a, 5, 6, 4),
     "ui.miDisplayRect": (...a) => disp(a, 3, 4, 2),

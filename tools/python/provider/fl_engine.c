@@ -37,6 +37,7 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static double pvals[3];
 #define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
+static int ui_closing, ui_time_disp_min, ui_start_on_input, ui_loop_rec, ui_step_edit, ui_browser_auto_hide, ui_snap_mode;
 static int undo_pos, undo_count, undo_last, safe_edit;
 static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
 static int sel_start, sel_end;
@@ -70,6 +71,7 @@ void fl_engine_reset(void) {
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
+    ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
     undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
     set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
     sel_start = -1; sel_end = -1;
@@ -244,7 +246,7 @@ FL_H(mixer, setCurrentTempo) {
     return fl_ret_none(c);
 }
 
-/* ---- transport (2) / playlist (4) / ui (3) ---- */
+/* ---- transport (2) / playlist (4) / ui (3 + PY-95 の 9) ---- */
 FL_H(transport, start) { playing = 1; return fl_ret_none(c); }
 FL_H(transport, stop) { playing = 0; return fl_ret_none(c); }
 FL_H(transport, isPlaying) { return fl_ret_b(c, playing); }
@@ -263,6 +265,17 @@ FL_H(playlist, muteTrackLock) { PL(0); int64_t v = A_INT(1, -1); p->lock = v == 
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }
 FL_H(ui, hideWindow) { WN(0); win[_w] = 0; return fl_ret_none(c); }
+/* PY-95 (#2831): PE で状態を読んで返すだけの ui ゲッター 9 件 (REPORT_PY95)。値は未実測の仮置き。
+   isMetronomeEnabled / isPrecountEnabled は general.getUseMetronome / getPrecount と同じ状態 */
+FL_H(ui, isClosing) { NARGS(0, 0); return fl_ret_b(c, ui_closing); }
+FL_H(ui, getTimeDispMin) { NARGS(0, 0); return fl_ret_b(c, ui_time_disp_min); }
+FL_H(ui, isMetronomeEnabled) { NARGS(0, 0); return fl_ret_b(c, use_metronome); }
+FL_H(ui, isPrecountEnabled) { NARGS(0, 0); return fl_ret_b(c, precount); }
+FL_H(ui, isStartOnInputEnabled) { NARGS(0, 0); return fl_ret_b(c, ui_start_on_input); }
+FL_H(ui, isLoopRecEnabled) { NARGS(0, 0); return fl_ret_b(c, ui_loop_rec); }
+FL_H(ui, getStepEditMode) { NARGS(0, 0); return fl_ret_b(c, ui_step_edit); }
+FL_H(ui, isBrowserAutoHide) { NARGS(0, 0); return fl_ret_b(c, ui_browser_auto_hide); }
+FL_H(ui, getSnapMode) { NARGS(0, 0); return fl_ret_i(c, ui_snap_mode); }
 /* PY-121 (#2982): PE 0xd6e860 (crDisplayRect 'iiiii|i')・0xd6ea40 (miDisplayRect 'iii|i')・0xd6ebf0 (miDisplayDockRect 'iiii') は
  * PyArg で読み、時間引数 (duration / time) を 0x7d0 で頭打ちにして作用先へ渡す (cmp rax,0x7d0)。表示そのものは未モデル */
 #define DISP_MAX 0x7d0
