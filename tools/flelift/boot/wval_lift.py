@@ -98,7 +98,8 @@ static void wo_set_(uint64_t va, uint64_t obj) {
 }
 static void wo_chk_(uint64_t va, uint64_t a, uint32_t n, const void* p) {
     uint64_t q[2] = { 0, 0 };
-    if (!wo_obj_ || a != wo_obj_ + 0xc4ULL || wo_n_ >= @CAP@) return;
+    uint64_t tgt = wo_obj_ ? wo_obj_ + 0xc4ULL : @FIXOBJ@ + 0xc4ULL;
+    if (a != tgt || wo_n_ >= @CAP@) return;
     memcpy(q, p, n < 16 ? n : 16);
     wo_n_++;
     fprintf(stderr, "[wobj] va=%#llx a=%#llx n=%u v=%#llx obj=%#llx R0=%#llx R1=%#llx R2=%#llx R3=%#llx R5=%#llx ret=%#llx\n",
@@ -122,7 +123,7 @@ OBJ_ENTRY = {'L_6ba1f0:;': 0x6ba1f0, 'L_6cd520:;': 0x6cd520}
 OBJ_SET = {'L_6ba25b:;': 0x6ba25b}
 
 
-def patch(lines, value, cap, objwatch=False):
+def patch(lines, value, cap, objwatch=False, fixobj=0x12d6a090):
     out = []
     va = 0
     hooked = False
@@ -133,7 +134,7 @@ def patch(lines, value, cap, objwatch=False):
             out.append(line)
             out.append(HOOK.replace('@VALUE@', hex(value) + 'ULL').replace('@CAP@', str(cap)))
             if objwatch:
-                out.append(OBJ_HOOK.replace('@CAP@', str(cap)))
+                out.append(OBJ_HOOK.replace('@CAP@', str(cap)).replace('@FIXOBJ@', hex(fixobj) + 'ULL'))
             hooked = True
             continue
         m = COMMENT_VA.match(line)
@@ -170,6 +171,7 @@ def main():
     ap.add_argument('--value', default='0x6bbc20', help='監視する書込み値 (既定 0x6bbc20)')
     ap.add_argument('--cap', type=int, default=400, help='1 TU あたりの出力上限')
     ap.add_argument('--objwatch', action='store_true', help='obj+0xc4 (mode) への全幅 store を宛先一致で監視する (--value は使わない)')
+    ap.add_argument('--fixobj', default='0x12d6a090', help='確保前から監視する obj の既定値 (確保内の store を拾う。前回実測の obj)')
     a = ap.parse_args()
     value = int(a.value, 16)
     os.makedirs(a.out, exist_ok=True)
@@ -180,7 +182,7 @@ def main():
         dst = os.path.join(a.out, name)
         if re.match(r'^fle_lifted(_s\d+)?\.c$', name):
             lines = open(src, errors='replace').read().split('\n')
-            new, hooked, sites = patch(lines, value, a.cap, a.objwatch)
+            new, hooked, sites = patch(lines, value, a.cap, a.objwatch, int(a.fixobj, 16))
             if not hooked:
                 print('[wval] %s: #include "fle_cpu.h" が無い' % name, file=sys.stderr)
                 sys.exit(1)
