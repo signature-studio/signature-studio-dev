@@ -79,7 +79,7 @@ V1 の lift で ldfix が適用された件数 (`*.ldfix.json`) は記録して�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | (解消) `fix_xmm_args.py` の xmm 入力 slot 判定を CFG 解析へ置換し、0x6b0ef0・0x6ca5c0 の部分復元を止める | 部分復元による silent の誤り | 解消 (本 PR。§8。#2850 は本 PR で閉じる) |
-| no_placeholder 2 関数 (0x6bfec0・0x6c9b60) と slot_occupied 2 関数 (0x6c8c90・0x6cc2e0) の修復 (適用せず、理由は数値で記録済み) | 4 関数が未修復 | 未起票 (修復の着手は PM 判断。#2850 の受入は数値の記録で満たした) |
+| slot_occupied 2 関数 (0x6c8c90・0x6cc2e0) の修復 (適用せず。`slot_occupied(xmm3, IR params=4)` の理由は §8-2 に数値で記録済み) | 2 関数が未修復 | 未起票 (修復の着手は PM 判断。既定案は skip のまま。#2850 の受入は数値の記録で満たした) |
 | 呼出し元の xmm 値 (closure 内の call site で 0 を渡す) | closure 内の呼出しで float 値が失われる | #2762 (open。M11 の同種課題 `call_arity_mismatch` の xmm 呼出し側引数。2026-10-14 に f2 の事例を追記)。PR #2907 (`Closes #2762`、ready、base main) が `fix_xmm_args.py` を変更する。#2907 の merge で #2762 が閉じたら、起票先を付け替える |
 | XMMARG 単独 arm の一次採点と V1 の ldfix 適用件数 (B1 の数値の帰属) | 受入 5 の数値の帰属 | 未起票 (再測定のみ。PR 本文の未解決表に記載) |
 | 同一 commit (26f90ada) での LDFIX 単独の対照 (`PLUG_XMMARG=1` のまま `PLUG_LDFIX=0/1` の A/B)。#613 の A/B (commit 1af46f06、17/6/0) が現行で再現しない原因の切り分け (1af46f06→26f90ada の間に ldfix.py 8 件・lift_ranges.sh 7 件・fix_xmm_args.py 1 件の変更あり) | 受入 3 (LDFIX の効果) の根拠が無い。現行では LDFIX 単独の効果を判定していない | 未起票 (再測定のみ。PR 本文の未解決表に記載) |
@@ -109,6 +109,7 @@ python3 tools/plugins/f2/xmm_slot_probe.py "$FL_WIN64_DIR/extracted/block18982_P
 - 0x6b0ef0 の呼出し元は解析していない。xmm1 と rdx のどちらが意味を持つかは未確定 (#2850)。
 - 残る 1 case の不一致 (V1 の 7/8) の入力を trace で直接確認していない。
 - 測定は 1 回ずつ (V0・V1 とも `leaf_diff` は 1 回)。再現性の回数測定は未実施。
+- pe.py の到達判定の取りこぼし (合流点の伝播の欠落。子 #3708)。
 
 ## 8. #2850 (PLG-F2-9): fix_xmm_args の xmm 入力 slot を CFG 解析へ置換 (修正 commit で再測定)
 
