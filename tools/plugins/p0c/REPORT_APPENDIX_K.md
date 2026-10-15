@@ -53,3 +53,7 @@ FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 RETDEC_ROOT=$RUNNER_TEMP/retdec/retdec PATH=/
 python3 tools/plugins/p0c/p0c4_abi_e2e.py 2000
 python3 tools/plugins/p0c/k80_diff.py --ir tools/plugins/p0c/work/diff3/k80.hb.ll --cases 10000 --only 0x5e03f0
 ```
+
+### 24.4 測定 commit からの差分
+
+`git diff --stat 74ae2bbf2 HEAD -- tools/plugins/p0c ':!*REPORT*'` の出力は空 (測定後にコードは変えていない)。
