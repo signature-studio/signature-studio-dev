@@ -28,6 +28,7 @@ GTYPE = {
         '181422a10': 'uint',       # minps/movaps・& -(uint)(...) の 4 byte マスク
         '182280bc0': 'longlong',   # cmp r10,qword・(longlong) 比較
         '182280bc8': 'longlong',   # cmp r10,qword・(longlong) 比較
+        '18436cd18': 'longlong',   # mov qword [..],rax (FUN_181327120/181327348 の GS 失敗経路)・puVar3+0x40 の 8 byte 書込み (#4685)
     },
 }
 # ABI 表 (resonator 残件 emcc 4 件 = param_1 不足 3・引数数不一致 1)。Ghidra が呼出元で引数・戻り値を落としたため、
