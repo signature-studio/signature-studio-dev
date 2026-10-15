@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""fw_blk_fold_map.py — #3121 受入 2: 修正前 IR の `ptrtoint ([2 x i8]* @1 to i32)` の出どころを分類する.
+"""fw_blk_fold_map.py — #3121 受入 1: 修正前 IR の `ptrtoint ([2 x i8]* @1 to i32)` の出どころを分類する.
 
   python3 fw_blk_fold_map.py OLD.ll NEW_CHUNK.ll... [--csv OUT.csv]
   python3 fw_blk_fold_map.py --selftest
