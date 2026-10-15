@@ -230,7 +230,7 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 - **判定**: wasm サイズと emcc 時間は実測で確定 (-O0 27.6 MB / -O2 13.7 MB / -O2 -flto 11.1 MB)。出力は 3 variant で一致 (署名 `533e70fd7efebaa0`)。実行時間の LTO 効果は 2 関数の微小測定では判定できず、closure 全体は未測 (boot 連鎖の lift が RAM 上限、#918)。
 - 詳細 (表・測定条件): `REPORT_APPENDIX.md` §10
 
-## 11. #3603 (CI-169): 直下 3 本の `/home/ubuntu` 既定値の置換
+## 11. #3603 (CI-169): 直下 3 本の VM 既定の絶対パス ([ANALYSIS-DIR]) の置換
 
-- **結論: 達成**。`fle_nat.py`・`fle_diff.py`・`probe_d9_disp.py` の既定値は `tools/shared/paths.py` の `FL_WIN64_DIR` 経由 (3 本で `/home/ubuntu` 0 件)。`fle_e2e.sh` は変更前後とも PASS し、verdict は一致 (lift 7,018 関数 / spot 16/16 / D9 不一致 0)。
+- **結論: 達成**。`fle_nat.py`・`fle_diff.py`・`probe_d9_disp.py` の既定値は `tools/shared/paths.py` の `FL_WIN64_DIR` 経由 (3 本で VM 既定の絶対パス 0 件)。`fle_e2e.sh` は変更前後とも PASS し、verdict は一致 (lift 7,018 関数 / spot 16/16 / D9 不一致 0)。
 - 実測値・測定 commit (`fcc0ea6b5`)・差分 0 の証跡は `REPORT_APPENDIX.md` §11 が正本。

@@ -24,13 +24,13 @@
 -O2 と -O2 -flto の差は回ごとに入れ替わり、LTO の効果は本測定では判定できない。
 M11 級 (boot 連鎖) の closure 全体での実行時間は未測: boot closure の lift は RAM 上限で完走しない (`boot/REPORT_APPENDIX.md`, #918 = FLE-7)。
 
-## 11. #3603 (CI-169): 直下 3 本の `/home/ubuntu` 既定値を `tools/shared/paths.py` 経由へ置換
+## 11. #3603 (CI-169): 直下 3 本の VM 既定の絶対パス ([ANALYSIS-DIR]) を `tools/shared/paths.py` 経由へ置換
 
 検証起点 (before): `origin/main` 4517825a2。測定 commit (コードを変えた最後): `fcc0ea6b5`。
 既知類型との関係 (DEFECTS.md): 該当なし (パス解決のみの変更。lift 欠陥の類型に当たらない)。
-環境: Actions runner (4 vCPU)、素材 `fl-win64` + `toolchain-emsdk`。`fl-win64` は `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (5.4 秒) し `FL_WIN64_DIR` で指定。`toolchain-emsdk` は agent-setup が `/opt/emsdk` に展開済み。
+環境: Actions runner (4 vCPU)、素材 `fl-win64` + `toolchain-emsdk`。`fl-win64` は `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (5.4 秒) し `FL_WIN64_DIR` で指定。`toolchain-emsdk` は agent-setup が [EMSDK] に展開済み。
 
-変更: `fle_nat.py`・`fle_diff.py`・`probe_d9_disp.py` の PE 既定を `tools/shared/paths.py` の `FL_WIN64_DIR` 経由にした (`tools/shared/scripts/*.py` と同じ `sys.path.insert` の形)。`FLE_PE` → `FL_WIN64_DIR` の優先順は変えない。`/home/ubuntu` は 3 本で 1 → 0 件 (`grep -c`)。VM 既定の `/home/ubuntu/work/analysis` は `paths.py` の `ANALYSIS_DIR` 既定に 1 箇所だけ残る。
+変更: `fle_nat.py`・`fle_diff.py`・`probe_d9_disp.py` の PE 既定を `tools/shared/paths.py` の `FL_WIN64_DIR` 経由にした (`tools/shared/scripts/*.py` と同じ `sys.path.insert` の形)。`FLE_PE` → `FL_WIN64_DIR` の優先順は変えない。VM 既定の絶対パス (`[ANALYSIS-DIR]` の既定値) は 3 本で 1 → 0 件 (`grep -c`)。その既定値は `paths.py` の `ANALYSIS_DIR` 既定に 1 箇所だけ残る。
 
 e2e 実測 (`bash tools/flelift/fle_e2e.sh`、各版 n=1):
 
@@ -50,8 +50,8 @@ load average: after 完了時 0.97、HEAD 完了時 1.00 (before は未採取)�
 |---|---|---|
 | `FLE_PE=X` | `X` | `X` |
 | `FL_WIN64_DIR=Y` のみ | `Y/extracted/block00031_PE.bin` | 同左 |
-| `ANALYSIS_DIR=A` のみ | `A/win64/extracted/block00031_PE.bin` | `/home/ubuntu/work/analysis/win64/...` |
-| 何も無し | `/home/ubuntu/work/analysis/win64/...` | 同左 |
+| `ANALYSIS_DIR=A` のみ | `A/win64/extracted/block00031_PE.bin` | `[ANALYSIS-DIR]/win64/...` (VM 既定に固定) |
+| 何も無し | `[ANALYSIS-DIR]/win64/...` | 同左 |
 
 差は `ANALYSIS_DIR` だけを設定した行のみ (旧は `FL_WIN64_DIR` の既定を固定していた)。Actions で `analysis-*` を展開した run は、今後 `ANALYSIS_DIR` 配下の `win64` を見る。
 
@@ -61,4 +61,4 @@ load average: after 完了時 0.97、HEAD 完了時 1.00 (before は未採取)�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `tools/flelift/boot/` の `/home/ubuntu` 既定値 | boot 系の CI 再現性 (3 本の外) | #348 (既存) |
+| `tools/flelift/boot/` の VM 既定の絶対パス ([ANALYSIS-DIR]) | boot 系の CI 再現性 (3 本の外) | #348 (既存) |
