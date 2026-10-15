@@ -48,6 +48,9 @@ TARGETS = [
     # 100052d0・10005550 の float64 差は 1 ulp (f80→f64。 D28)。 float32 と構造は全行一致。
     {'va': 0x100052D0, 'name': 'fn_100052d0', 'gen': 'state_update'},
     {'va': 0x10005550, 'name': 'fn_10005550', 'gen': 'state_update'},
+    # #4858 (PLG-G2-66): 独立入口 (cdecl・a0 = double、ret)。 OBJ 窓を書かないため effect 判定は通らない。
+    # 代わりに戻り値 eax が入力の上位語から作られ、行によって 2 種類以上になることで非自明性を示す (nontrivial='eax')。
+    {'va': 0x1000BF1E, 'name': 'fn_1000bf1e', 'gen': 'double1', 'nontrivial': 'eax'},
 ]
 # ebp = 0x10F00000 - 0x1000 (x87_fn_native.c・x87_fn_glue.c)。 窓は ebp-0x100 から ebp+0xE0 (旧 ebp 0x10EFFF00 と同じ相対位置)。
 STK_LO = 0x10F00000 - 0x1100
@@ -59,8 +62,6 @@ PROBE = [
     # #4105: 0x1000bf60 は fld tbyte [esp+0x10] (a3..a5) と [esp+4] (a0..a2) の 2 つの f80 を割る。 generic は a5 = 0 のため X の指数が常に 0 (非 normal)。
     # f80pair は両オペランドを種類 (normal・zero・denorm・unnorm) つきで作り、normal×normal の行を含める。
     {'va': 0x1000BF60, 'name': 'fn_1000bf60', 'gen': 'f80pair'},
-    # #4080: double 引数の 1 本 (cdecl・a0 = double)。 1000bf1e は OBJ 窓を書かないので effect 判定が 0 になる (構造は全行一致・float 全行一致)。
-    {'va': 0x1000BF1E, 'name': 'fn_1000bf1e', 'gen': 'double1'},
     # #4840: 空スタックで呼ぶ基準線 (ST(0) の入力を積まない)。 入力は X87_PUSH64=1 で測る (付録 REPORT_APPENDIX_4840.md)。
     # 同じ name を PROBE に 2 つ置くと agg が混ざるため、#4080 の 10009bc4 (double1) 行はここでは外す。
     {'va': 0x10009BC4, 'name': 'fn_10009bc4', 'gen': 'generic'},
@@ -377,7 +378,7 @@ def compare(nat, act, scen, quiet=False):
         n = a['rows']
         mixed = sum(a[k].get('nan-num', 0) for k in ('st0', 'st0d', 'mem'))
         # 非自明性: 窓が変わった行があるか、PUSH64 (窓を書かない関数) では戻り値 eax の種類が 2 以上あること。
-        nontrivial = a['effect'] > 0 or (PUSH64 and len(a['eaxs']) >= 2)
+        nontrivial = a['effect'] > 0 or ((PUSH64 or t.get('nontrivial') == 'eax') and len(a['eaxs']) >= 2)
         if a['eax_bad'] or a['d_bad'] or not nontrivial or n == 0 or mixed:
             ok = False
         if quiet:
