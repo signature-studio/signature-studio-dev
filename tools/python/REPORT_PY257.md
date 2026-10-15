@@ -17,7 +17,7 @@
 
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` から `block00031_PE.bin` (22,227,016 B) を展開 (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py65 --wildcards '*block00031_PE.bin'`・2.7 秒)。`work/` は gitignore。
 - 逆アセンブル: `python3 analysis/py53_dispatch.py work/py65/extracted/block00031_PE.bin work/py65/py53` → `fn=4664 dispatch=13 r8d_tests=174`。
-- 測定 commit: `8ef42e74e` (作用の経路を無条件 jmp の追跡に変えた script commit)。`git diff 8ef42e74e HEAD -- tools/python/analysis` の出力は 0 行 (以後の commit は本 REPORT と DOC_MAP のみ)。
+- 測定 commit: `1327cb6db` (解析器 `analysis/py257_r8d_bits.py` を含む merge commit。解析コードは `8ef42e74e` の無条件 jmp 版を改名したもので、`8ef42e74e` の時点の出力と一致)。`git diff 1327cb6db HEAD -- tools/python/analysis` の出力は 0 行 (以後の commit は本 REPORT と DOC_MAP のみ)。
 - 判定の定義: 判定箇所の直後の分岐で両側の入口を決める。`je` は分岐先が落ち側 (M の全ビットが 0)・fall-through が立ち側。`jne` はその逆。判定 173 件のうち 171 件は `je`/`jne` (342 側)。残る 2 件 (`0x104a821` の `test eax, 0xffffffdd`・`0x104a835` の `test eax, 2`) は直後が `setne` で jcc ではないため、側を定義せず表に入れない。
 - **作用の経路 (本 REPORT の定義)**: 入口から fall-through と無条件 jmp を辿る。止める所は 0x104caae (tail)・0x104cc72 (exit)・ret・関数外・経路の再訪 (loop)。**条件 jcc は分岐先を辿らない**。分岐先は TSV の `edges` に、未追跡の本数は `open_jcc` に記録する。
 - 書込み = 先頭オペランドがメモリの命令 (cmp・test・push・call・jmp・lea・ucomi* を除く)。呼出し = call 命令 (呼出し先の中は見ない)。
@@ -148,7 +148,7 @@ python3 analysis/py257_r8d_bits.py work/py65/extracted/block00031_PE.bin work/py
 出力: `work/py65/r8d_sites.tsv` (判定箇所ごとに両側の行・15 列)・`work/py65/r8d_scope.md` (§3 の表)・`work/py65/r8d_tail_src.md` (共通後半に入る側の一覧)。
 負の対照: `work/py65/neg/neg.bin` (0x1046dc9 の `je` の変位 +1) を同じ fn.txt で走らせると `mismatch=1`・exit 1。
 
-実測 (`8ef42e74e`・全 173 判定の値。対象 126 側の内訳は §1):
+実測 (`1327cb6db`・全 173 判定の値。対象 126 側の内訳は §1):
 - `tail_reads_5b8=0x104caec,0x104cc65`
 - `sides=342 end_exit=25 end_tail=317 sides_with_exit_jcc=4 sides_with_open_jcc=324 sides_with_5b8_write=124`
 - `sites=173 rows=344 objdump_rows=344 mismatch=0` (exit 0)
