@@ -6,7 +6,7 @@
 ## 8. PSOLA_CreateInstance の closure lift と native 差分 — T-SH-75 (#3401・縮小して完了)
 
 既知類型との関係: 該当なし (差分は CreateInstance・slot 0・4・5 の範囲で 0 件。`docs/DEFECTS.md` の新しい類型は確認していない)。
-測定 commit: `87b9b9763` (コードを変えた最後の commit。main 取り込み後の code を全て含む。以降の差分は `.md` のみ・§8-8)。検証起点: `42357b73e` (origin/main)。
+測定 commit: `9b1902fe5` (コードを変えた最後の commit。main (`52e768489`) 取り込み後の code を全て含む。以降の差分は `.md` のみ・§8-8)。検証起点: `42357b73e` (origin/main)。
 
 ### 8-1 結論 (1 行)
 規模の正本は vtable 経由 closure (82 関数・4,601 命令・間接 call 18)。その一部 (CreateInstance + slot 0・4・5 の到達集合 = 36 関数・1,046 命令・unsup 0) を x64c で C に lift し wasm (80,737 B) にした。native 対 wasm は 64 case で全一致 (ネガティブコントロール FAIL 64/64)。slot 1–3 (DSP 本体へ jmp する thunk) と閉包の残りは未 lift で、子 T-SH-81 に残す。
@@ -31,7 +31,7 @@
 - 基準 root (CreateInstance + slot 0・4・5): `0x1ab540`・`0x1ab590`・`0x1ab6b0`・`0x1ab800` (`lift_psola.sh` の `WC_ROOTS`)。
 - x64c (基準): 36 関数・1,046 命令・**unsup 0**・unlifted callees 0・traps 0・imports 10 (EnterCriticalSection・FlsGetValue・FlsSetValue・GetLastError・HeapAlloc・HeapFree・LeaveCriticalSection・RaiseException・RtlPcToFileHeader・SetLastError)。
 - wasm: 80,737 B (emcc 6.0.12 `-O1`)。
-- slot を足した閉包 (`--closure 99`・測定 commit `87b9b9763`・unsup は `lift_meta.json` の `unsup_sites`。fail-fast `int 0x29` と `div by zero` の番兵は数えない):
+- slot を足した閉包 (`--closure 99`・測定 commit `9b1902fe5`・unsup は `lift_meta.json` の `unsup_sites`。fail-fast `int 0x29` と `div by zero` の番兵は数えない):
 
 | root | 関数 | 命令 | unsup site | 内訳 |
 |---|---:|---:|---:|---|
@@ -54,19 +54,19 @@
 - 方式: `lift_psola.sh` (`lift_wc.sh` の harness を環境変数で差し替え。既定値の WC は変えていない)。CreateInstance → slot 0 → slot 4 → slot 5 の順に呼ぶ (`WC_CALL_IDX="0 4 5"`)。
 - 戻り値 rax の畳み込みは CreateInstance と slot 5 だけ (`WC_RET_IDX="5"`)。理由: slot 4 の戻り値は ABI 上未定義で、最後に読んだ値か呼出し前の rax が残る。native (C 側の残り値) と wasm (`wc_run` の設定値) で一致しないため、畳み込むと harness の未定義動作を比べることになる。実測では slot 4 を畳み込むと全 64 case が rax で FAIL した (memory 差分は一致)。
 - 比較: rax・import stub の呼出回数・heap (arena 64 KiB)・.data 全体 (`wc_diff_test.py`)。
-- 実測 (`87b9b9763`・1 回): 差分 `PASS=64 FAIL=0 excluded(native crash)=0`・wasm trap 0。
+- 実測 (`9b1902fe5`・1 回): 差分 `PASS=64 FAIL=0 excluded(native crash)=0`・wasm trap 0。
 - ネガティブコントロール `neg-cmp` (wasm 結果の arena 先頭 1 bit 反転): `FAIL=64` (期待どおり)。`all` は ALL OK。
 - 観測の範囲: 64 case は同一経路 (rax は 1 種 `0x5d9b00000`・import stub 呼出 4 回・arena の sha256 は 1 種で全 case 非ゼロ)。.data は run で一度も変化しない (0 case)。よって 64 PASS は「入力 .data に依存しない 1 経路の一致」であり、分岐の網羅ではない (`REPORT_APPENDIX_3216.md` §7-6 と同じ制限)。
 
-### 8-5 実測 (測定 commit `87b9b9763`・4 core・各 1 回)
+### 8-5 実測 (測定 commit `9b1902fe5`・4 core・各 1 回)
 | 項目 | 値 |
 |---|---|
-| `lift_psola.sh ok` elapsed | 1.88 s |
-| `lift_psola.sh neg-cmp` elapsed | 1.44 s |
-| load (ok: 開始 → 終了) | 0.13 0.34 0.23 → 0.13 0.34 0.23 |
+| `lift_psola.sh ok` elapsed | 1.61 s |
+| `lift_psola.sh neg-cmp` elapsed | 1.48 s |
+| load (ok: 開始 → 終了) | 0.00 0.15 0.17 → 0.08 0.16 0.17 |
 | 差分 (ok) | PASS 64 / FAIL 0 (wasm trap 0) |
 | neg-cmp | FAIL 64 (rc 1・期待どおり)・ALL OK |
-| 回帰 (WC) `lift_wc.sh ok` | PASS 64/64・elapsed 1.73 s・load 0.19 0.35 0.23 → 0.25 0.36 0.23・x64c 60 関数・2,656 命令・unsup 3・wasm 138,754 B |
+| 回帰 (WC) `lift_wc.sh ok` | PASS 64/64・elapsed 1.70 s・load 0.07 0.16 0.17 → 0.15 0.17 0.18・x64c 60 関数・2,656 命令・unsup 3・wasm 138,754 B |
 
 - 再現 (PSOLA): `FL_WIN64_DIR=<展開先> EMSDK_ENV=<toolchain-emsdk 展開先>/emsdk/emsdk_env.sh bash tools/shared/lift/ildsp/lift_psola.sh all`
 - closure 数値: `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_closure.py` (PSOLA 行が §8-2 の表)。
@@ -86,6 +86,6 @@
 - slot 5 の `[+0x98]` は CreateInstance が 0 にする領域で、差分の rax は 0 相当の値のみ見ている。0 以外の入力での振る舞いは未検証 (`.data` は run で不変のため、内部 +0x98 は zero のまま)。
 
 ### 8-8 測定後のコード差分 (差分 0 の証跡)
-測定 commit `87b9b9763` 以降に変えたのは本付録・`REPORT.md`・`DOC_MAP.md` (`.md` のみ)。
-`git diff 87b9b9763 HEAD -- tools/shared/lift/ildsp tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh tools/shared/scripts ':!*.md'` の出力は空 (差分 0)。
-測定 commit には main 取り込み (`ba70aa677`) の code 差分 (`tools/flelift/rt/fle_cpu.{c,h}`・`native_image.py`・`native_ref_wc.c`・`ildsp_indirect_resolve.py`・`ildsp_vtable.py` 計 475 行) を含む。経路外かどうかで除外せず、全 code で測定した。
+測定 commit `9b1902fe5` 以降に変えたのは本付録・`REPORT.md`・`DOC_MAP.md` (`.md` のみ)。
+`git diff 9b1902fe5 HEAD -- tools/shared/lift/ildsp tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh tools/shared/scripts ':!*.md'` の出力は空 (差分 0)。
+測定 commit には main 取り込み (`52e768489`・`ba70aa677` 経由) の code 差分を含む (`tools/flelift/rt/fle_cpu.{c,h}`・`ildsp/lift_wc.sh`・`ildsp/wc_image.py`・`ildsp/closure_select.py` ほか)。経路外かどうかで除外せず、全 code で測定した。
