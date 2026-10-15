@@ -1,10 +1,10 @@
 /* fma_vocab_harness.c — FMA3 scalar 語彙 (census の xmm FMA 7 mnemonic) の native 突合 (fma_vocab_check.py がリンクする)。
  * __asm_<mn>(a0, a1, a2): gen_simd.py が出す C 実装を直接呼ぶ (a0 = dest, a1 = src2, a2 = src3; 128bit)。
  * oracle = ホスト FMA3 命令 (_mm_fmadd_ss 等)。上位 lane は dest から取る (_mm_move_ss / _mm_move_sd)。
- * 判定: 非 NaN の bit は 128bit 全 bit 一致 (mismatch - nan_only)。nan_only = mismatch のうち、差のある lane が
- *   両側とも NaN だった件数 (NaN payload だけの差)。wasm 仕様は算術結果の NaN payload を決定的に規定しないため
- *   payload 差は判定から外し、件数を別計上する (緩和の理由と件数は REPORT_APPENDIX §12-2)。
- *   usage: fma_vocab_harness N SEED → 語彙ごとに "<op> calls=N bits=128 mismatch=M nan_only=J"。M>0 なら exit 1。 */
+ * vfmadd132sd の oracle だけは同じ命令形の inline asm を使う (_mm_fmadd_sd の引数順では clang -O1 が vfmadd213sd に畳み、
+ *   NaN 被演算子の選択が変わる)。
+ *   判定: 128bit 全 bit 一致 (NaN payload を含む・緩和なし)。
+ *   usage: fma_vocab_harness N SEED → 語彙ごとに "<op> calls=N bits=128 mismatch=M"。M>0 なら exit 1。 */
 #include <immintrin.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -52,9 +52,6 @@ static uint64_t val64(void) {
     }
 }
 
-static int isnan32(uint32_t b) { return (b & 0x7f800000u) == 0x7f800000u && (b & 0x7fffffu); }
-static int isnan64(uint64_t b) { return (b & 0x7ff0000000000000ull) == 0x7ff0000000000000ull && (b & 0xfffffffffffffull); }
-
 /* ref: d = dest (上位 lane の源), s2 = op2, s3 = op3。Intel 順の意味を FMA3 命令で直接書く */
 static __m128i ref_213ss(__m128i d, __m128i s2, __m128i s3) {
     __m128 D = _mm_castsi128_ps(d);
@@ -81,20 +78,8 @@ static __m128i ref_nmadd231sd(__m128i d, __m128i s2, __m128i s3) {
     return _mm_castpd_si128(_mm_move_sd(D, _mm_fnmadd_sd(_mm_castsi128_pd(s2), _mm_castsi128_pd(s3), D)));
 }
 static __m128i ref_132sd(__m128i d, __m128i s2, __m128i s3) {
-    __m128d D = _mm_castsi128_pd(d);
-    return _mm_castpd_si128(_mm_move_sd(D, _mm_fmadd_sd(D, _mm_castsi128_pd(s3), _mm_castsi128_pd(s2))));
-}
-
-/* 差のある lane が両側とも NaN なら 1 (NaN payload だけの差) */
-static int nan_only(const V *g, const V *w, int sd) {
-    if (sd) {
-        for (int j = 0; j < 2; j++)
-            if (g->d[j] != w->d[j] && !(isnan64(g->d[j]) && isnan64(w->d[j]))) return 0;
-    } else {
-        for (int j = 0; j < 4; j++)
-            if (g->w[j] != w->w[j] && !(isnan32(g->w[j]) && isnan32(w->w[j]))) return 0;
-    }
-    return 1;
+    __asm__("vfmadd132sd %2, %1, %0" : "+x"(d) : "x"(s2), "x"(s3));
+    return d;
 }
 
 int main(int argc, char **argv) {
@@ -107,7 +92,7 @@ int main(int argc, char **argv) {
     ref_fn ref[7] = {ref_213sd, ref_213ss, ref_sub213ss, ref_231sd, ref_231ss, ref_nmadd231sd, ref_132sd};
     long total = 0;
     for (int k = 0; k < 7; k++) {
-        long mis = 0, nan = 0;
+        long mis = 0;
         for (long i = 0; i < n; i++) {
             V d, s2, s3, got, want;
             for (int j = 0; j < 4; j++) { d.w[j] = val32(); s2.w[j] = val32(); s3.w[j] = val32(); }
@@ -119,18 +104,16 @@ int main(int argc, char **argv) {
                                                       _mm_loadu_si128((const __m128i *)&s2),
                                                       _mm_loadu_si128((const __m128i *)&s3)));
             if (memcmp(&got, &want, sizeof got)) {
-                int isnan_ = nan_only(&got, &want, sd[k]);
-                if (isnan_) nan++;
-                if ((isnan_ && nan <= 2) || (!isnan_ && mis - nan < 3))
-                    printf("  %s %s i=%ld d0=%016llx s2=%016llx s3=%016llx got0=%016llx want0=%016llx\n", isnan_ ? "NANPAYLOAD" : "MISMATCH", names[k], i,
+                if (mis < 3)
+                    printf("  MISMATCH %s i=%ld d0=%016llx s2=%016llx s3=%016llx got0=%016llx want0=%016llx\n", names[k], i,
                            (unsigned long long)(sd[k] ? d.d[0] : d.w[0]), (unsigned long long)(sd[k] ? s2.d[0] : s2.w[0]),
                            (unsigned long long)(sd[k] ? s3.d[0] : s3.w[0]), (unsigned long long)(sd[k] ? got.d[0] : got.w[0]),
                            (unsigned long long)(sd[k] ? want.d[0] : want.w[0]));
                 mis++;
             }
         }
-        printf("%s calls=%ld bits=128 mismatch=%ld nan_only=%ld\n", names[k], n, mis, nan);
-        total += mis - nan;
+        printf("%s calls=%ld bits=128 mismatch=%ld\n", names[k], n, mis);
+        total += mis;
     }
     return total ? 1 : 0;
 }
