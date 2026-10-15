@@ -15,6 +15,7 @@
     assoc      Ghidra は浮動小数の積/和の結合括弧を表示で落とす (`a*(b*c)` を `a * b * c` と印字 → C は左結合 `(a*b)*c` で 1 ulp ずれる)。
                実機 x86 の演算順 (逆アセンブルで確認) に合わせ手で括弧を戻す = patches.py の (name, regex, repl) 表。**手作業 1 件 = 1 行**
     stackpair  lStack_e8/lStack_e0 のように「隣接を仮定して &lStack_e8 を配列として渡される」2 変数を long long[2] にする
+    lanes      Delay の 128bit ローカル auStack_118/128/138 を、参照されるレーンの型 (_0_8_・_8_8_ は double、_8_4_・_12_4_ は uint32) を持つ V128L にする (#3094)
 """
 import json
 import re
@@ -29,19 +30,43 @@ SNAPINS = {
     'haas': {'proc': 0x1804d0280, 'exports': [0x1804d0280, 0x1804d0180, 0x1804cff00, 0x1804cff90, 0x1804d0720], 'stubs': {}},
     'gate': {'proc': 0x1804c2f50, 'exports': [0x1804c2f50], 'stubs': {}, 'also': [0x180295f20, 0x180020e70]},
     'resonator': {'proc': 0x180743390, 'exports': [0x180743390], 'stubs': {}, 'also': [0x180fbc1f4, 0x180fbbfb8, 0x180fbdfcc, 0x180fbe018, 0x180fcf904, 0x180fd54cc, 0x180fd62dc, 0x180fd6320, 0x180fb6ce0, 0x180fd648c, 0x180fbdef4, 0x180fe5dfc, 0x180fd6498, 0x180fd662c, 0x180fe5f40, 0x180fd3144]},
-    'stereo': {'proc': 0x18080d4d0, 'exports': [0x18080d4d0], 'stubs': {}, 'also': [0x180fcd690, 0x180fce0d0, 0x180fdc470, 0x180fdc660, 0x180fdc700, 0x180fdfdb0, 0x180fdc6d8]},
+    'stereo': {'proc': 0x18080d4d0, 'exports': [0x18080d4d0], 'stubs': {
+        # 未関数化 callee (#3108 KH-45・2 件)。FP 例外の報告経路で、Inf 入力 (180fdc6d8 の指数全 1・仮数 0) でのみ到達する。
+        # also へ足すと閉包が広がる (§10-7j・§10-7l の前例) ため stub にする。到達時は abort (突合で検出)。
+        0x180fd8aac: 'void FUN_180fd8aac() { abort(); }',
+    }, 'also': [0x180fcd690, 0x180fce0d0, 0x180fdc470, 0x180fdc660, 0x180fdc700, 0x180fdfdb0, 0x180fdc6d8]},
     'delay': {'proc': 0x1802ed7f0, 'exports': [0x1802ed7f0], 'stubs': {}, 'also': [0x180005c50, 0x18004cf20, 0x180289ea0, 0x1802ecfc0, 0x1802ed3b0, 0x1802ed490, 0x1802ed550, 0x1802ed640, 0x1802ed790, 0x180f878e0, 0x180f8791c, 0x180f87cac, 0x180f87d40, 0x180f87f24, 0x180f88084, 0x180f880a4, 0x180f880e4, 0x180f88104, 0x180fa8534, 0x180fb5b4c, 0x180fb5bb4, 0x180fb5c20, 0x180fb5c6c, 0x180fb5dd0, 0x180fb5e6c, 0x180fb5f3c, 0x180fb5f5c, 0x180fb5f8c, 0x180fb6bf8, 0x180fb6c0c, 0x180fb6ce0, 0x180fbbfb8, 0x180fbc1f4, 0x180fbde90, 0x180fbdfcc, 0x180fbe018, 0x180fc1920, 0x180fc4590, 0x180fc61dc, 0x180fc61e4, 0x180fc6870, 0x180fc6d70, 0x180fc7468, 0x180fcce40, 0x180fcd400, 0x180fcd690, 0x180fcdbfc, 0x180fcde58, 0x180fce0d0, 0x180fcf904, 0x180fd0898, 0x180fd08d0, 0x180fd099c, 0x180fd0a64, 0x180fd0a98, 0x180fd0ac8, 0x180fd0b50, 0x180fd1540, 0x180fd172c, 0x180fd185c, 0x180fd1ac4, 0x180fd1b00, 0x180fd1b34, 0x180fd1f30, 0x180fd1f84, 0x180fd27a8, 0x180fd2a60, 0x180fd2ba0, 0x180fd2c10, 0x180fd2c90, 0x180fd2d38, 0x180fd2f20, 0x180fd2fcc, 0x180fd3144, 0x180fd320c, 0x180fd4f30, 0x180fd51cc, 0x180fd5250, 0x180fd54cc, 0x180fd5bcc, 0x180fd5bf4, 0x180fd5f04, 0x180fd5f30, 0x180fd620c, 0x180fd622c, 0x180fd62a8, 0x180fd62c8, 0x180fd62dc, 0x180fd6320, 0x180fd648c, 0x180fd6498, 0x180fd662c, 0x180fd66a0, 0x180fd7d94, 0x180fd7f54, 0x180fd8988, 0x180fd89f0, 0x180fd8aac, 0x180fd8bd4, 0x180fd8d08, 0x180fdb6e0, 0x180fdc320, 0x180fdc470, 0x180fdc660, 0x180fdc6d8, 0x180fdc6ec, 0x180fdc700, 0x180fdc714, 0x180fdc7b8, 0x180fdc844, 0x180fdc858, 0x180fdc880, 0x180fdfdb0, 0x180fe027c, 0x180fe2470, 0x180fe24b8, 0x180fe2788, 0x180fe27b0, 0x180fe3284, 0x180fe3310, 0x180fe3488, 0x180fe34b0, 0x180fe34e8, 0x180fe3510, 0x180fe3690, 0x180fe3cd0, 0x180fe4020, 0x180fe4394, 0x180fe5c6c, 0x180fe5dfc, 0x180fe5ef0, 0x180fe5f00, 0x180fe5f0a, 0x180fe5f40, 0x181327120, 0x181327314, 0x181327348, 0x18132753c]},
 }
 STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ルート (snapins/lift/kh_lower.py) の shims/fail-fast stub と同じ扱い)
     0x181384040: 'void* FUN_181384040(void* d, const void* s, ulonglong n) { return memmove(d, s, (size_t)n); }',
     0x1813846e0: 'void* FUN_1813846e0(void* d, int c, ulonglong n) { return memset(d, c, (size_t)n); }',
     0x18004cf20: 'longlong FUN_18004cf20(void* a, void* b, void* c) { abort(); return 0; }',
+    # 未関数化 callee (delay 閉包の外・decompile していない)。`()` 定義で呼出の arity を問わない。到達時に abort する。
+    0x180fe5c74: 'longlong FUN_180fe5c74() { abort(); return 0; }',
+    0x180fe2508: 'longlong FUN_180fe2508() { abort(); return 0; }',
 }
-# IAT thunk (jmp [rip+disp] → KERNEL32 の import) → fail-fast stub。Ghidra は thunk の引数を落として `func_0x000<va>(...)` と呼ぶ。
-# 引数無しの定義 (`()`) は呼出の arity を問わない。Win API の意味は実装しない (到達時に abort し、突合で検出する)。
+# THUNK: Ghidra が `func_0x000<va>(...)` と呼ぶ callee → fail-fast stub。引数無しの定義 (`()`) は呼出の arity を問わない。
+# 到達時に abort し、突合で検出する。2 種類ある: (a) IAT thunk (jmp [rip+disp] → KERNEL32 の import)・(b) 未関数化 callee (本体を decompile していない VA)。
 THUNK = {
+    # (a) IAT thunk。Win API の意味は実装しない
     0x180fd81e4: 'longlong func_0x000180fd81e4() { abort(); return 0; } /* KERNEL32!FlsGetValue */',
     0x180fd81ec: 'longlong func_0x000180fd81ec() { abort(); return 0; } /* KERNEL32!FlsSetValue */',
+    # (b) 未関数化 callee (delay 閉包の外)。decompile せず fail-fast stub にする
+    0x180fbdef4: 'longlong func_0x000180fbdef4() { abort(); return 0; } /* 未関数化 callee (stub) */',
+    0x180fbdd78: 'longlong func_0x000180fbdd78() { abort(); return 0; } /* 未関数化 callee (stub) */',
+}
+# Ghidra の下線なし名 (`DAT_<va>`・`uRam<16桁 va>`) の C 型。Ghidra は型を出さないため使用箇所から確定し、表に無い名前は停止する。
+# 根拠 (delay.c の使用行): DAT_182280d00・DAT_182280d70 = `(ulonglong)DAT_x` の bit マスク (uint64)。
+#   DAT_184161fb0 = `!= '\0'` と `= '\x01'` の once フラグ (byte)。DAT_1829899e0 = `== '\0'` (byte)。
+#   DAT_182989850 = `(DAT_x & 2) != 0` の読み出しのみ (byte 読みでも bit 1 は同じ)。
+#   DAT_182989680・DAT_184162358 = `&DAT_x` のアドレスだけ (`undefined *` 型の比較・代入先と一致)。
+#   uRam1829899cc/d0/d4 = `undefined4` 変数への読み出し (uint)。uRam18436cc00 = FUN_181327120 (GS 失敗報告経路・swi(0x29) で fail-fast) の書込み (8 byte の ExceptionInformation 相当)。
+EXT_CTYPE = {
+    'DAT_182280d00': 'ulonglong', 'DAT_182280d70': 'ulonglong', 'DAT_184161fb0': 'unsigned char',
+    'DAT_1829899e0': 'unsigned char', 'DAT_182989850': 'unsigned char', 'DAT_182989680': 'undefined',
+    'DAT_184162358': 'undefined',
+    'uRam00000001829899cc': 'uint', 'uRam00000001829899d0': 'uint', 'uRam00000001829899d4': 'uint',
+    'uRam000000018436cc00': 'ulonglong',
 }
 
 
@@ -90,6 +115,18 @@ static inline V128 kh_rsqrtps(V128 src) {
     }
     return r;
 }
+'''
+
+
+LANE_HELPER = r'''/* 128bit ローカルの型付きレーン (Delay auStack_118/128/138)。Ghidra の参照文脈で型を決めた: _0_8_・_8_8_ は double (dVar の代入と (double) 参照)、
+   _8_4_・_12_4_ は uint32 (SUB84 と (int)(x >> 0x20) の書込み)。float 型の V128 に載せると整数→浮動小数の数値変換になるため別型にする。 */
+typedef union {
+    uint8_t b[16];
+    struct { double _0_8_; };
+    struct { uint8_t _p8a[8]; double _8_8_; };
+    struct { uint8_t _p8b[8]; uint32_t _8_4_; };
+    struct { uint8_t _p12[12]; uint32_t _12_4_; };
+} V128L;
 '''
 
 
@@ -168,10 +205,27 @@ def main():
         out.append(RCPPS_HELPER % approx_rcp_table())
     if 'rsqrtps(' in alltxt:
         out.append(RSQRTPS_HELPER % approx_rsq_tables())
+    if name == 'stereo':  # callee の戻り xmm0 (縮約値) の helper (KH-74)。式と突合は kh_xmm0.h / xmm0_check.c
+        out.append(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'kh_xmm0.h')).read())
+    if 'lanes' in fixes and re.search(r'undefined1 auStack_(118|128|138) \[16\];', alltxt):
+        out.append(LANE_HELPER)
     for va, (ty, kind, _) in sorted(gtypes.items()):
         d = pe_bytes(pe, va, 16)
         out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
         out.append('#define %s_%x (*(%s*)gd_%x)' % (kind, va, ty, va))
+    # --- 下線なしの名前 (DAT_<va>・uRam<16桁>): 同じ PE 実データを指す。型は EXT_CTYPE (使用箇所で確定)。表に無い名前は停止する
+    ext = {}
+    for n in sorted(set(re.findall(r'\b(DAT_[0-9a-f]{8,9}|uRam[0-9a-f]{16})\b', alltxt))):
+        if n not in EXT_CTYPE:
+            raise SystemExit('未定義 identifier の型が未確定 (停止): ' + n)
+        ext[n] = int(n[4:], 16)
+    gd_done = set(gtypes)  # 同じ VA を指す名前 (例 DAT_x と uRam0000000x) があっても gd 配列は 1 回だけ定義する
+    for n, va in sorted(ext.items(), key=lambda kv: kv[1]):
+        if va not in gd_done:
+            gd_done.add(va)
+            d = pe_bytes(pe, va, 16)
+            out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
+        out.append('#define %s (*(%s*)gd_%x)' % (n, EXT_CTYPE[n], va))
     # --- 配列参照 (&UNK_x + 添字 = テーブル先頭からのバイト位置): 参照された範囲を 1 本の byte 配列にする
     tabs = sorted(set(int(x, 16) for x in re.findall(r'&UNK_([0-9a-f]{8,9})\b', alltxt)))
     tbase = tend = None
@@ -185,12 +239,18 @@ def main():
     protos = []
     bodies = []
     abi_hits = {}
+    from patches import V128OPS
+    v128_hits = {}
+    stubs = dict(STUB)
+    stubs.update(cfg['stubs'])
     for va in vas:
         t = src[va]
         t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
         t = rewrite_thunks(t, va)
         t = re.sub(r'undefined1 (auVar\d+) \[16\];', r'V128 \1;', t)
         t = re.sub(r'undefined1 (in_XMM\d+) \[16\];', r'V128 \1;', t)
+        if 'lanes' in fixes:
+            t = re.sub(r'undefined1 (auStack_(?:118|128|138)) \[16\];', r'V128L \1;', t)
         t = re.sub(r'\b(in_XMM\d+)\._0_8_\b', r'\1._0_8_d', t)
         t = re.sub(r'\bmaxps\((\w+),_DAT_([0-9a-f]+)\)', r'maxps(\1,(*(V128 *)gd_\2))', t)
         if tbase is not None:
@@ -217,6 +277,9 @@ def main():
         for nm, rx, rp in ABI.get(name, []):
             t, k = re.subn(rx, rp, t)
             abi_hits[nm] = abi_hits.get(nm, 0) + k
+        for nm, rx, rp, _ in V128OPS.get(name, []):
+            t, k = re.subn(rx, rp, t)
+            v128_hits[nm] = v128_hits.get(nm, 0) + k
         m = re.search(r'^([\w \*]+?)\s*\n?\s*FUN_%x\((.*?)\)\s*\n\s*\{' % va, t, re.S | re.M)
         if not m:
             m = re.search(r'^([\w \*]+?)\s+FUN_%x\((.*?)\)\s*\{?' % va, t, re.S | re.M)
@@ -225,12 +288,15 @@ def main():
         bodies.append(t)
     for nm, _, _ in ABI.get(name, []):
         assert abi_hits.get(nm) == 1, 'ABI rule hit %s: %s' % (abi_hits.get(nm), nm)
-    for va, s in STUB.items():
-        if ('FUN_%x' % va) in alltxt:
+    for nm, _, _, n in V128OPS.get(name, []):
+        assert v128_hits.get(nm) == n, 'V128 rule hit %s (want %d): %s' % (v128_hits.get(nm), n, nm)
+    # スタブは本体を decompile していない callee にだけ出す (本体がある VA に出すと宣言が衝突する: FUN_18004cf20・delay)
+    for va, s in stubs.items():
+        if ('FUN_%x' % va) in alltxt and va not in vas:
             protos.append(s.split('{')[0].strip() + ';')
     out += protos
-    out += [STUB[v] for v in STUB if ('FUN_%x' % v) in alltxt]
-    out += [THUNK[v] for v in THUNK if ('func_0x000%x' % v) in alltxt]
+    out += [stubs[v] for v in stubs if ('FUN_%x' % v) in alltxt and v not in vas]
+    out += [THUNK[v] for v in THUNK if ('func_0x000%x' % v) in alltxt and v not in vas]
     # --- 呼出名の統一: Ghidra は未命名 callee を func_0x<va> で呼ぶが、定義側は同一 va を FUN_<va> で出す (also 追加分)
     defined = set(vas)
     bodies = [re.sub(r'\bfunc_0x000(180f[0-9a-f]{5})\b', lambda m: 'FUN_' + m.group(1)

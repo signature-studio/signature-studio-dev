@@ -131,4 +131,26 @@ for (const [i, v, want] of steps) {
 }
 assert.equal(m2.state.playlist[1].lock, 0, "他 track は不変");
 
+// PY-117 (#2959): 準備判定 (general.safeToEdit) が偽のとき、muteTrackLock は index・value の検査より先に -2 (code 3) を返し、lock は変えない
+mock.state.safeEdit = false; wasm.setSafeEdit(false);
+const lockBefore = mock.state.playlist[0].lock;
+const unsafeSeq = [
+  ["general.safeToEdit", []],
+  ["playlist.muteTrackLock", [1, 1]],
+  ["playlist.muteTrackLock", [1]],
+  ["playlist.muteTrackLock", [0, 1]],
+  ["playlist.muteTrackLock", [1, "x"]],
+];
+const unsafeDiffs = [];
+for (const [name, args] of unsafeSeq) {
+  const a = run(mock, name, args);
+  const b = run(wasm, name, args);
+  if (JSON.stringify(a) !== JSON.stringify(b)) unsafeDiffs.push({ name, args, mock: a, wasm: b });
+}
+assert.deepEqual(unsafeDiffs, [], `unsafe 差分 ${unsafeDiffs.length} 件`);
+assert.deepEqual(run(mock, "playlist.muteTrackLock", [1, 1]), { code: 3 });
+assert.equal(mock.state.playlist[0].lock, lockBefore, "準備前の呼出しは lock を変えない");
+mock.state.safeEdit = true; wasm.setSafeEdit(true);
+assert.deepEqual(run(wasm, "playlist.muteTrackLock", [1, 1]), run(mock, "playlist.muteTrackLock", [1, 1]));
+
 console.log(JSON.stringify({ calls: seq.length, diffs: 0, mock_state_steps: steps.length, PASS: true }));

@@ -78,14 +78,15 @@ static void wt_rec(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk
 /* LD-161 (#3563): abort helper (case の abortret=<VA>, 例 0x409730) の入口を trace hit で保存する。
  * helper は必ず abort 経路 (RaiseException は noncontinuable) に入り、その RaiseException で入口の return 状態へ戻す
  * (rsp+8・rip=戻り先・rax=0・callee-saved と xmm は入口の値)。native 専用 (wasm は trace の int3 を持たない)。 */
-static greg_t g_ab_gr[NGREG]; static struct _libc_fpstate g_ab_fp; static u64 g_ab_va; static int g_ab_valid;
+static greg_t g_ab_gr[NGREG]; static struct _libc_fpstate g_ab_fp; static sigset_t g_ab_mask; static u64 g_ab_va; static int g_ab_valid;
 static void ab_save(ucontext_t* uc, u64 addr) {
   memcpy(g_ab_gr, uc->uc_mcontext.gregs, sizeof g_ab_gr);
   g_ab_gr[REG_RIP] = (greg_t)addr; g_ab_gr[REG_EFL] &= ~0x100;
-  g_ab_fp = *uc->uc_mcontext.fpregs; g_ab_valid = 1;
+  g_ab_fp = *uc->uc_mcontext.fpregs; g_ab_mask = uc->uc_sigmask; g_ab_valid = 1;
 }
 static void __attribute__((noreturn)) ab_return(void) {
   ucontext_t uc; memset(&uc, 0, sizeof uc);
+  uc.uc_sigmask = g_ab_mask;
   memcpy(uc.uc_mcontext.gregs, g_ab_gr, sizeof g_ab_gr);
   greg_t sp = g_ab_gr[REG_RSP];
   uc.uc_mcontext.gregs[REG_RIP] = *(greg_t*)(uintptr_t)sp;
@@ -97,6 +98,17 @@ static void __attribute__((noreturn)) ab_return(void) {
   abort();
 }
 
+#ifdef LD_GUI_HL   /* WIN-35 (#3618): tools/gui の shim への接続 (-DLD_GUI_HL のビルドだけ・実行時は LD_GUI_HL=1) */
+extern int64_t RegisterClassW(int64_t);
+extern int64_t CreateWindowExW(int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t);
+extern int64_t DefWindowProcW(int64_t, int64_t, int64_t, int64_t);
+extern int64_t SetWindowLongPtrW(int64_t, int64_t, int64_t);
+extern int64_t GetClassInfoW(int64_t, int64_t, int64_t);
+void ld_gui_init(void);
+void ld_gui_dump(FILE* f, const char* cid);
+static int g_gui_on; static FILE* g_gui_fp;
+#endif
+
 u64 ld_stub_c(u64 idx, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk) {
   const char* n = "?bad";
   if (idx >= LD_FAKEPROC_MARK) n = ld_fakeproc_name(idx - LD_FAKEPROC_MARK);   /* GetProcAddress 仮 proc */
@@ -106,6 +118,21 @@ u64 ld_stub_c(u64 idx, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk) {
     a4 = stk[0]; a5 = stk[1];                          /* MS 第5/6引数 (6引数 API のみ読む) */
   }
   u64 r = ld_stub(n, a0, a1, a2, a3, a4, a5);
+#ifdef LD_GUI_HL
+  if (g_gui_on && (!strcmp(n, "GetClassInfoW") || !strcmp(n, "RegisterClassW") || !strcmp(n, "CreateWindowExW") || !strcmp(n, "DefWindowProcW") || !strcmp(n, "SetWindowLongPtrW"))) {
+    u64 ent0 = ld_stub_ent, s[8] = {0};   /* 第5〜12引数は entry+0x28 (wt_rec と同じ) */
+    int ci = (int)ld_ncalls - 1;          /* 直前の ld_stub が積んだ記録 (呼出し記録の戻り値も直す) */
+    if (!strcmp(n, "CreateWindowExW") && ld_dst_ok(ent0 + 0x28, 64)) memcpy(s, (void*)(uintptr_t)(ent0 + 0x28), 64);
+    if (!strcmp(n, "GetClassInfoW")) r = (u64)GetClassInfoW((int64_t)a0, (int64_t)a1, (int64_t)a2);
+    else if (!strcmp(n, "RegisterClassW")) r = (u64)RegisterClassW((int64_t)a0);
+    else if (!strcmp(n, "DefWindowProcW")) r = (u64)DefWindowProcW((int64_t)a0, (int64_t)a1, (int64_t)a2, (int64_t)a3);
+    else if (!strcmp(n, "SetWindowLongPtrW")) r = (u64)SetWindowLongPtrW((int64_t)a0, (int64_t)a1, (int64_t)a2);
+    else r = (u64)CreateWindowExW((int64_t)a0, (int64_t)a1, (int64_t)a2, (int64_t)a3, (int64_t)s[0], (int64_t)s[1], (int64_t)s[2], (int64_t)s[3],
+                                  (int64_t)s[4], (int64_t)s[5], (int64_t)s[6], (int64_t)s[7]);
+    ld_stub_ent = ent0;   /* 窓プロシージャの nested 呼出しで上書きされた入口を戻す */
+    if (ci >= 0 && ci < LD_MAX_CALLS && ld_calls[ci].name == n) ld_calls[ci].ret = r;
+  }
+#endif
   if (wt_on(n)) wt_rec(n, a0, a1, a2, a3, stk, r);
   if (g_ab_valid && (a1 & 1) && strcmp(n, "RaiseException") == 0) ab_return();   /* LD-161: abort (noncontinuable) は入口の return へ */
   return r;
@@ -373,10 +400,12 @@ static void run_case(char* line) {
   struct itimerval it = { {0, 0}, {tmo_us / 1000000, tmo_us % 1000000} };
   struct timespec t0, t1;
   ld_native_ms = -1.0;
+  unsigned int host_mx = 0; __asm__ volatile("stmxcsr %0" : "=m"(host_mx));   /* ゲストの MXCSR (全例外 unmask) を host に持ち込まない (LD-161, #3563) */
   if (sigsetjmp(g_jb, 1) == 0) {
     g_in_call = 1; setitimer(ITIMER_REAL, &it, NULL);
     clock_gettime(CLOCK_MONOTONIC, &t0);
     ld_ms_call(fn, gpr, xmm, stk, nstk, out, ld_case.rax);
+    __asm__ volatile("ldmxcsr %0" : : "m"(host_mx));
     clock_gettime(CLOCK_MONOTONIC, &t1);
     ld_native_ms = (double)(t1.tv_sec - t0.tv_sec) * 1e3 + (double)(t1.tv_nsec - t0.tv_nsec) / 1e6;
     struct itimerval z = {{0,0},{0,0}}; setitimer(ITIMER_REAL, &z, NULL);
@@ -385,6 +414,7 @@ static void run_case(char* line) {
     step_end();
     puts(ld_case_end("ok", NULL, 0, 0, out[0], out[1], out[2], out[3], 1));
   } else {
+    __asm__ volatile("ldmxcsr %0" : : "m"(host_mx));
     struct itimerval z = {{0,0},{0,0}}; setitimer(ITIMER_REAL, &z, NULL);
     g_in_call = 0;
     if (ld_case.trace) tr_disarm();
@@ -412,6 +442,9 @@ static void run_case(char* line) {
       (void)p; }
     puts(ld_case_end(signame(g_sig), det, g_fault_addr, rip, 0, 0, 0, 0, 0));
   }
+#ifdef LD_GUI_HL
+  if (g_gui_on) ld_gui_dump(g_gui_fp, ld_case.id);
+#endif
   fflush(stdout);
 }
 
@@ -438,6 +471,14 @@ int main(int argc, char** argv) {
       if (!ld_cat_blob || fread(ld_cat_blob, 1, ld_cat_blob_len, cf) != ld_cat_blob_len) { fprintf(stderr, "[ld_native] LD_CATALOG_MO read failed\n"); return 6; }
       fclose(cf);
     } }
+#ifdef LD_GUI_HL
+  { const char* gh = getenv("LD_GUI_HL");   /* WIN-35 (#3618): 窓 import を gui shim へ向ける (既定は従来の応答) */
+    if (gh && !strcmp(gh, "1")) {
+      ld_gui_init(); g_gui_on = 1;
+      const char* go = getenv("LD_GUI_OUT");
+      g_gui_fp = (go && *go) ? fopen(go, "a") : stderr;
+    } }
+#endif
   while (getline(&g_line, &g_linecap, stdin) > 0) {
     char* l = g_line; size_t n = strlen(l); while (n && (l[n-1] == '\n' || l[n-1] == '\r')) l[--n] = 0;
     if (!strncmp(l, "LAYOUT ", 7)) {

@@ -23,6 +23,11 @@ const run = (eng, name, args) => {
 // 既定経路 (未設定 track 2) の確定値 (.bss 0x15f6774 = 0xff636c71・REPORT_PY118)。seq の set より前に pin する
 assert.deepEqual(run(mock, "mixer.getTrackColor", [2]), { ok: 0xff636c71 });
 assert.deepEqual(run(wasm, "mixer.getTrackColor", [2]), { ok: 0xff636c71 });
+// idx < 0 は例外でなく int 0 (PE 0xd5ec60 の jl 分岐・REPORT_PY118 §8.1)。idx = 127 (NMIX) は従来どおり RANGE (code 4)
+assert.deepEqual(run(mock, "mixer.getTrackColor", [-1]), { ok: 0 });
+assert.deepEqual(run(wasm, "mixer.getTrackColor", [-1]), { ok: 0 });
+assert.deepEqual(run(mock, "mixer.getTrackColor", [127]), { code: 4 });
+assert.deepEqual(run(wasm, "mixer.getTrackColor", [127]), { code: 4 });
 
 const seq = [
   ["mixer.trackCount", []],
@@ -83,7 +88,7 @@ const seq = [
   ["mixer.trackCount", []],
   ["mixer.getTrackCount", []],
   ["mixer.getEqBandCount", []],
-  // 範囲外 index は両者とも code 4 (RANGE)
+  // idx ≥ 127 (NMIX) は両者とも code 4 (RANGE)。idx < 0 の getTrackColor は int 0 (行 26〜28 で pin 済み)
   ["mixer.getTrackName", [127]],
   ["mixer.getTrackColor", [127]],
   ["mixer.getTrackColor", [-1]],
