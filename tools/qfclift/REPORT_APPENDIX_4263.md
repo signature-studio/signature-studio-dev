@@ -7,7 +7,7 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD
 
 - **issue 本文の番地の訂正**: `0x40fbd4`・`0x40fcbd` は `0x40fa40` の呼出しの**戻り番地**で、呼出し命令ではない。
   実際の `call 0x40fa40` は `0x40fbcf` と `0x40fcb8` (どちらも関数 `0x40fb80` 内)。`0x40fa40` の呼出元は、この 2 箇所だけ。
-- **`[0x5aa000]` (flag) は 1 箇所でだけ書かれる**: setter `0x40fd10` の `0x40fd14` (`mov [0x5aa000], ecx`)。
+- **`[0x5aa000]` (flag) の書込みは 2 箇所**: setter `0x40fd10` の `0x40fd14` (`mov [0x5aa000], ecx`) が 1 箇所。
   他に `0x40fa7f` (longjmp 側の 0 クリア) がある。書込みは「エラー code を ecx で渡す」形で、呼出元は次の表。
 - **longjmp の戻り値**: `0x40fa6e`〜`0x40fa7c` で `eax = ([0x5aa000] != 0) + 1`。flag 0 なら戻り値 1、非 0 なら 2。
   DllMain の `cmp eax,1` (`0x59c210`) はこの値で分岐する。
@@ -29,10 +29,10 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD
 
 | 呼出元 (VA・所属関数) | ecx (code) | 条件 |
 |---|---|---|
-| `0x40f00c` (fn `0x40eff0`) → `0x40fd30` | `0xd8` | 引数 rcx が NULL |
-| `0x40f1e2` / `0x40f235` / `0x40f2b3` (fn `0x40f1c0`・`0x40f290`) → `0x40fd30` | `0xd8` | リスト先頭ノードが NULL |
-| `0x4194e9` / `0x419504`… (fn `0x4194d0`) → `0x40fd30` | `0xe2` | 直前の検査が失敗 |
-| `0x43c759` (fn `0x43c750`) → `0x40fd10` | `1` | 無条件 (`0x43b1d0` の後) |
+| `0x40f00e` (fn `0x40eff0`) → `0x40fd30` | `0xd8` | 引数 rcx が NULL |
+| `0x40f1e4` / `0x40f237` / `0x40f2b5` (fn `0x40f1c0`・`0x40f290`) → `0x40fd30` | `0xd8` | リスト先頭ノードが NULL |
+| `0x4194ee` / `0x419504` (fn `0x4194d0`) → `0x40fd30` | `0xe2` | 直前の検査が失敗 |
+| `0x43c75e` (fn `0x43c750`) → `0x40fd10` | `1` | 無条件 (`0x43b1d0` の後) |
 | `0x40946b` (fn `0x409460`) → `0x40fd10` | 呼出元の ecx をそのまま通す | 呼出元は未追跡 |
 
 `0x40fd30` は `[0x5aa008]` (引数) を書いてから `0x40fd10` を呼ぶ。`0x40fb80` の先頭 (`0x40fb87`〜`0x40fb91`) は `[0x5aa008] != 0` なら `0x40f8b0` で 16 進を整形し、`0x40faa0` が `GetStdHandle(-11)` + `WriteFile` で出力する (import `0x5db870`・`0x5dbaa8` を確認)。
@@ -65,4 +65,5 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD
 ## 6. 検証
 
 - 解析: `python3 callers_4263.py <block24350_PE.bin>` (1.8 s)。`.pdata` 関数単位の逆アセンブル。
+  依存: `pip install pefile capstone` (Python 3)。表の番地は上記スクリプトの `call` 行 (呼出し命令の VA) で確認した。
 - lift 設定 (`qfc_boot.sh`・`qfc_ov.c`・`qfc_e2e.sh`) は変更していない。e2e は下記の値で確認。

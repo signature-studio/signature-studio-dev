@@ -2,6 +2,7 @@
 # callers_4263.py — QuickFontCache (block24350_PE.bin) の longjmp 相当 0x40f9c0 の呼出元と、
 # 状態変数 [0x5aa000]・[0x5d0db0]・[0x5d0ddc]・[0x5d0cb0] の書込み元を .pdata の関数単位で列挙する (T-SH-107 / #4263)。
 # 使い方: python3 callers_4263.py <block24350_PE.bin>   (出力は標準出力。REPORT_APPENDIX_4263.md の表の根拠)
+# 依存: pip install pefile capstone
 import bisect, sys
 import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
