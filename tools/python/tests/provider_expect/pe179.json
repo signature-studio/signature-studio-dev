@@ -1,0 +1,6 @@
+{
+  "tag": "pe179",
+  "refs": ["#3271"],
+  "note": "PE 静的状態から導いた仮置きの patterns 数え・選択系 4 件 (REPORT_PY179・PY-179 #3271)。tests/patterns_diff.mjs が mock と照合",
+  "functions": ["patterns.patternCount", "patterns.patternNumber", "patterns.isPatternDefault", "patterns.isPatternSelected"]
+}

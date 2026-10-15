@@ -272,6 +272,11 @@ def _resolve(binder, mf, mod, reg, C, tag, nm, ins, depth=0, own_params=None, us
         src_ty = "i%d" % sw
         t = _conv(base[0], base[1], src_ty, tag, nm + "mt", ins)
         return (_conv(t, src_ty, ty, tag, nm + "mz", ins), ty)
+    if it.mnem == "lea" and it.mem and not it.mem["index"] and it.mem["base"] == "rip" and it.mem["rip"] is not None:
+        x = it.mem["rip"]
+        if w < 64:
+            x &= (1 << w) - 1
+        return (str(x), ty)
     if it.mnem == "lea" and it.mem and not it.mem["index"] and it.mem["base"] not in (None, "rip", "rsp"):
         base = _resolve(binder, mf, mod, it.mem["base"], d, tag, nm + "b", ins, depth + 1, use=use)
         if base is None:
