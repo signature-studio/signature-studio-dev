@@ -115,3 +115,30 @@ for a in nonpad:
           f" in_closure_src={sum(1 for s in srcs if s in closure)}")
     print(f"    rip_refs={[hex(x) for x in rip_hits[a]]} abs8={[hex(x) for x in abs8]} rva4={[hex(x) for x in rv4[:6]]}"
           f"{' ...' if len(rv4) > 6 else ''} (n={len(rv4)})")
+
+
+def seh_scopes(b):
+    """b の .pdata UNWIND_INFO の EHANDLER 付き scope table (__C_specific_handler 形式) を返す。"""
+    e, u = funcs[b], struct.unpack_from("<I", image, exc.VirtualAddress + fn_sorted.index(b) * 12 + 8)[0]
+    flags = image[u] >> 3
+    ncodes = image[u + 2]
+    p = u + 4 + ((ncodes + 1) & ~1) * 2
+    if not flags & 3:
+        return None
+    p += 4
+    cnt = struct.unpack_from("<I", image, p)[0]
+    return [struct.unpack_from("<IIII", image, p + 4 + 16 * k) for k in range(cnt)]
+
+
+print("== SEH scope (EHANDLER を持つ .pdata 関数の scope table)")
+for a in nonpad:
+    f = owner(a)
+    if not f:
+        continue
+    sc = seh_scopes(f)
+    if not sc:
+        continue
+    for bgn, end, hdl, tgt in sc:
+        role = "except 本体 (target)" if tgt == a else ("try 範囲" if bgn <= a < end else "")
+        if role:
+            print(f"  {a:#x}: owner={f:#x} scope begin={bgn:#x} end={end:#x} handler={hdl:#x} target={tgt:#x} -> {role}")
