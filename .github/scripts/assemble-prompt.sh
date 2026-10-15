@@ -103,7 +103,7 @@ fence="$(fence_for "$comment")"
     printf '%s\n%s\n%s\n' "$fence" "$comment" "$fence"
     printf '\n## 期待する作業\n\n'
     printf '1. 上の kind の節に従って判断し、規則 (R1〜R9・U1〜U8) の範囲で操作する。\n'
-    printf '2. 判断ごとに decision マーカーを残す。迷ったら U として needs-user-input を積む。\n'
+    printf '2. 判断ごとに decision マーカーを残す。迷ったら PM が決めて進める (R7 の既定案)。needs-user-input は依頼者へ渡す 4 種 (実機・資格情報・課金・法的な最終判断) に当たるときだけ付ける。\n'
     printf '3. 完了時は判断の一覧 (対象 issue・rule・結果・起票番号) を書く。\n'
   else
   printf '\n## 依頼内容 (ユーザーのコメント / workflow_dispatch プロンプト)\n\n'
