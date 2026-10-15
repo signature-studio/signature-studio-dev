@@ -19,7 +19,7 @@ MAP_GET = 0x102BB20
 MAP_FIND = 0x102B610
 MAP_STORE = 0x102B750
 MAP_OFF = re.compile(r"qword ptr \[(r\w+) \+ 0x40\]")
-ARR = re.compile(r"qword ptr \[(r\w+) \+ (r\w+)\*8 \+ (?:0x)?8\]")
+ARR = re.compile(r"^r\w+, qword ptr \[(r\w+) \+ (r\w+)\*8 \+ (?:0x)?8\]$")
 SLOT1 = re.compile(r"^qword ptr \[(r\w+) \+ (?:0x)?8\]$")
 FAILS = []
 
@@ -48,7 +48,7 @@ def main():
     cand = []
     for f, body in by_fn.items():
         has_map = any(m == "mov" and MAP_OFF.search(o) for _, m, o in body)
-        has_arr = any(m == "mov" and ARR.search(o) for _, m, o in body)
+        has_arr = any(m == "mov" and ARR.match(o) for _, m, o in body)
         has_slot1 = any(m == "call" and SLOT1.match(o) for _, m, o in body)
         if has_map and has_arr and has_slot1:
             cand.append(f)
