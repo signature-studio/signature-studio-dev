@@ -134,6 +134,7 @@
 | 149: `function_412c20` の戻り値 0 の由来・`Blend2D.dll` (0x264208) を渡す上流 | 項目 1 (受入 1 の残り) | #3608 |
 | 114: Halt 呼出し元 (halt0 の probe が未実装) | 項目 1 (受入 1 の残り) | #3608 |
 | ldfix の F3a 2・F3c 43 のうち件数に反映されなかった修復 (反映は unit 895 の 1 件) の理由 | 項目 3 の理由 | #3608 |
+| `stage4.sh` が `llvm-nm` を PATH から引けず、`defined_c.txt` が空になる (`emsdk_env.sh` は `upstream/bin` を PATH に入れない)。空だと `m11_winstubs.c` と `win.o` の定義が重複し wasm-ld が落ちる | 再現環境の stage4 (§8 の採取手順 4) | #3608 |
 
 ## 6. 測定 commit と差分 (`docs/WORKFLOW.md` §6)
 
@@ -145,7 +146,7 @@ git diff 40d3a788d origin/main -- tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_4
 ```
 
 - 上の一覧の範囲で、`e6c940834` から `b959fc472` (= 本 PR が取り込んでいる origin/main) までの差分は `ldfix_e2e.sh` (+3)・`m11_build.sh` (+13/−1)・`m11_gen_ir2.sh` (+10) の main 取り込み由来の差分。件数 (§1) は `b959fc472` 上で再現した (ldfix_e2e rc 0・prod fix 872/47/22)。
-- §8 の採取 (trap 144・149) の測定 commit は `b959fc472` (origin/main・本 run の worktree の起点)。`git diff b959fc472 HEAD -- tools/m11` は `trap144_probe_3608.py`・`trap144_read_3608.mjs`・`REPORT_3608.md` の 3 ファイルのみ。測定経路 (§6 の一覧) の既存スクリプトは変えていない。
+- §8 の採取 (trap 144・149) の測定 commit は `911cd33b2` (head・再採取の値)。`b959fc472..911cd33b2` の `tools/m11` 差分は `trap144_probe_3608.py`・`trap144_read_3608.mjs`・`REPORT_3608.md` の 3 ファイル。測定経路 (§6 の一覧) の既存スクリプトは変えていない。
 - §1 の全変種・§1-3 の数値は、測定 commit `87208313b` で得た値と、HEAD `e6c940834` での再測定 (下記) が一致する。同じ経路 (上の一覧) について `git diff 87208313b HEAD --numstat` は 5 ファイル・90 行追加・7 行削除 (`ldfix/ldfix.py` 44 追加・3 削除、`ldfix/ldfix_e2e.sh` 6 追加、`ldfix/fix_site_3372.py` 3 追加・1 削除、`m11_build.sh` 14 追加・3 削除、`m11_gen_ir2.sh` 23 追加)。
 - HEAD `e6c940834` での再測定 (本 run・`$ARTIFACTS_DIR` の `work-m11.tar.zst` と `fl-win64.tar.zst` を展開。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`TMPDIR=$RUNNER_TEMP`):
   - `ldfix_e2e.sh`: rc 0・所要 71.9 秒 (実測 wall)・load 0.78 → 1.16・判定 PASS。stage4 到達 4/6 (base/fix)・survey ok 136 / miss 14 / trap 9 (base/fix)。`STAGE4_JUDGE` の `pass: true`。
@@ -188,12 +189,13 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
   4. `bash tools/m11/ldfix/stage4.sh work/t144/probe.ll t144` (rc 0・units_run 109・init 111・icall_ok 435・dllmain_done True・threw なし)
   5. `S4_NAME=t144 S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap144_read_3608.mjs > work/t144/read.txt` (26 秒)
 - 採取件数: probe 版の trap は 14 件 (全て OOB)。prod fix の OOB 14 件 (144・149・275・280・477・484・492・513・520・659・745・830・880・923) と一致。halt0 8 件は reader の対象外 (kind が OOB のみ採取) のため未採取。
-- 出力: `work/trap144_units_3608.json` (gitignore)・`work/trap144_read_3608.txt`。site 番号は `work/t144/sites.json` の `stores[sid-1]` (元 IR の関数名・行番号)。
+
 
 ### 8-1 unit 144 (OOB・最内 `function_44aeb0`)
 
 - 採取値: `function_44aeb0` の entry arg1 = `0x5f007000730064`・arg2 = `0x418b4820`。
 - 上流: `function_44f040` (arg1 = `0x10aa13f0`・arg2 = `0x2539c8`・arg3 = 0) ← `function_653660` (arg1 = `0x10aa1400`・arg2 = `0x2572dc`・arg3 = 1・arg4 = 0) ← `function_6539e0` (arg1 = `0x2572dc`・arg2 = 1・arg3 = 0)。
+- `911cd33b2` の再採取で、entry 引数と書込み元は上の値と一致した (hit 1 回)。
 - `[0x10aa13f0]` の最後の書込み: `function_653660` の IR 219682 行 `store i64 %13, ptr %stack_var_-32`。`%13` は `%13 = load [stack_var_-56]` (219681 行) で、その前の `call function_439550(&stack_var_-56, arg2 = 0x2572dc)` が書いた値。
 - `function_439550` は arg2 から 16bit ずつ読み、A-Z の範囲だけ小文字化 (`|0x20`) して arg1 へ書く (IR 134964 行〜・store は 135001 行)。よって `0x2572dc` の文字列 `"dsp_ippv2.dll"` (UTF-16LE・image 内の実値) を小文字化したものが `0x5f007000730064` (`"d\0s\0p\0_\0"` の 8 byte) になる。
 - 書込み元の要約: unit 144 の a1 は、`function_6539e0` が渡す定数文字列 `0x2572dc` (`dsp_ippv2.dll`) を `function_439550` が小文字化してコピーしたもの。値の選択 (なぜ `dsp_ippv2.dll` を渡すか) は未追跡。
@@ -203,8 +205,8 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 - 採取値: `function_412e40` の entry (4 回 hit): arg1 = `0x10aa1418`・arg2 = `0x2`。上流: `function_653660` (arg1 = `0x10aa1430`・arg2 = `0x264208`・arg3 = 0・arg4 = 0) ← `function_6539e0` (arg1 = `0x264208`・arg2 = 0・arg3 = 0)。
 - `[0x10aa1418]` の最後の書込み: `function_4136a0` の IR 119304 行 `store i64 %9, ptr %15` (%9 = `call function_412c20(len)` の戻り値。採取値は 0)。
 - 未特定: `function_412c20` の戻り値 0 の由来。`0x264208` は `"Blend2D.dll"` (UTF-16LE・image 内の実値) で、`function_6539e0` の定数文字列。
-- 注: `function_412e40` の entry は 4 回 hit で、最後の 1 回の arg1 が `0x10aa1418`。記録は最後の entry のものを読んでいる。
-- 注 (挿入位置): probe の entry 計装は、define 直後に名前付きラベルがあればその直後、無ければ define 直後に入る (合成 IR で確認)。上の hit 回数 (4 回) は、この修正の前の挿入位置 (最初のラベル直後) で採った値。実 IR (`work-m11`) で entry に名前付きラベルが無いかは、本 run では素材が無く確認していない。無い関数があれば hit 回数の意味が変わるので、採り直すまで hit 回数は暫定値として扱う。
+- 注: `function_412e40` の entry は 4 回 hit で、最後の 1 回の arg1 が `0x10aa1418`。記録は最後の entry のものを読んでいる。`911cd33b2` の再採取でも 4 回・同じ値。
+- 挿入位置 (`911cd33b2` で確認): 5 関数 (44aeb0・44f040・653660・412e40・6539e0) の entry 基本ブロックは全て名前付きラベル (`dec_label_pc_<VA>:`) で始まる (`work/boot_final3.ll` の define 直後)。計装はそのラベル直後に入る (`work/t144/probe.ll` で確認)。よって hit 回数は entry 1 回ごとの数で、上の 4 回・1 回は暫定値ではない。
 
 ### 8-3 unit 114 (halt0・Halt 呼出し元)
 
