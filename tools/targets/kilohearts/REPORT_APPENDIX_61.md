@@ -60,3 +60,20 @@ unsup の内訳 (両ホスト同一):
 | unsup 65 site (rcpps 29・rsqrtps 25 + 語彙 11) の解消 | lift・build が通らない | #3994 [KH-81] |
 | lift・build・wasm・native 比較・1 bit ネガコン | 受入の本体 | #3994 [KH-81] |
 | 閉包が直接 call の辺だけを辿る下界であること | vtable 経由の先は根に入れた slot だけ。CFG / vtable 候補 (`#849`) との統合は未実施 | #3994 [KH-81] |
+
+## 5. KH-97 (#4412): rcpps / rsqrtps の実機近似表と語彙 11 site の解消
+
+- 測定 commit: `b91c8c212` (コードを変えた最後の commit)。入力 `HeartCore.core_64` は §2 と同一 (sha256 先頭 16 桁 `d55ce8b4c0ad7ebe`、76,642,304 B)。
+- 閉包 (`bash tools/targets/kilohearts/scripts/host_x64c_closure.sh`・両ホスト・同一入力): 改変前 (`origin/main` 6441decbb) は unsup **65 site** / 改変後 (`b91c8c212`) は **0**。
+
+| ホスト | 閉包 改変前 → 後 (functions / insns / unsup) | ネガコン 改変前 → 後 (functions / insns / unsup) |
+|---|---|---|
+| micropass | 242 / 18,402 / 65 → 242 / 18,402 / **0** | 148 / 11,102 / 65 → 148 / 11,102 / **0** |
+| multipass | 251 / 20,764 / 65 → 251 / 20,764 / **0** | 160 / 13,856 / 65 → 160 / 13,856 / **0** |
+
+- 改変前の内訳 (両ホスト同一): rcpps 29・rsqrtps 25・vcomiss 4・vcvtdq2ps 2・vpsrld 2・vpslld 1・haddps 1・vandps 1。
+- 実装: `rt/fle_approx.inc` (`gen_approx_inc.py` が `approx_tables.b64` から生成)・`rt/fle_cpu.c` の `fle_rcp_exact` / `fle_rsqrt_exact` (`gen_simd.py` と同一式・同一指数則)・`x64c.py` の `i_rcpps` / `i_rsqrtps` / `i_haddps` と VEX 形。
+- 差分テスト `python3 tools/flelift/tests/x64c_vex_diff.py` (測定 commit): pass 102 / fail 0 (rc 0)。近似の参照値は表を直接読む Python 別実装 (`approx_ref`)。
+- FLEngine e2e `bash tools/flelift/fle_e2e.sh` (測定 commit・素材 `fl-win64`): PASS。lift 7,018 関数 / 340,761 insns / unsup 0 / unlifted 0。smoke OK。spot diff equal 16/16・mismatch 0。D9 mismatch 0。所要 2m30s (`time` 実測 real 149.8 s)。
+- FLEngine lift 出力の同一性: `origin/main` (6441decbb) と測定 commit で `fle_lifted.c` / `fle_data.c` が `cmp` 一致。新 handler は FLEngine 側で元から unsup 0 の経路だけに効く。
+- 表の出所の注意: 表は AMD Ryzen 9 9950X で抽出した値。今回の実行ホストは AMD EPYC 7763 (Zen 3) で、近似表の同一性は本測定では未検証 (REPORT §13 の既存の注記と同じ)。
