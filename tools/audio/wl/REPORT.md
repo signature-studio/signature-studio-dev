@@ -88,7 +88,7 @@
 
 ## 5. 検証
 
-検証 commit: `5b0c8fa02` (コード差分の最終 commit。ring の実行コードは `40aa2f8a6` と同一。`5b0c8fa02` の変更は `tools/audio/wl/mixer_reach.py` (静的解析) のみ。前回の動的測定は `f3680404`)。`git worktree add ../ws-2993 -b 2993-indirect-reach origin/main` で作業し、同 worktree で実行。本 run (`5b0c8fa02`) の素材: `toolchain-emsdk` は本 run の `$ARTIFACTS_DIR` に無かったため、上流 emsdk を `emsdk install 6.0.12` (19 s、`tools/m1/flags.sh` の pin) で取得して `EMSDK_ENV` で指定。fl-win64 は `$HOME/artifacts/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` へ展開 (7.5 s)。以下の『前回』の run (`f3680404`) でも emsdk は上流から pin 版 `6.0.12` で `emsdk install` (27 s) して取得し、`$ARTIFACTS_DIR` の `toolchain-emsdk` は使っていない。
+検証 commit: `5b0c8fa02` (コード差分の最終 commit。ring の実行コードは `40aa2f8a6` と同一。`5b0c8fa02` の変更は `tools/audio/wl/mixer_reach.py` (静的解析) のみ。前回の動的測定は `f3680404`)。`git worktree add ../ws-2993 -b 2993-indirect-reach origin/main` で作業し、同 worktree で実行。本 run (`5b0c8fa02`) の素材: `toolchain-emsdk` は本 run の `$ARTIFACTS_DIR` に無かったため、上流 emsdk を `emsdk install 6.0.12` (19 s、`tools/m1/flags.sh` の pin) で取得して `EMSDK_ENV` で指定。fl-win64 は `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` へ展開 (7.5 s)。以下の『前回』の run (`f3680404`) でも emsdk は上流から pin 版 `6.0.12` で `emsdk install` (27 s) して取得し、`$ARTIFACTS_DIR` の `toolchain-emsdk` は使っていない。
 
 | 項目 | 結果 |
 |---|---|
