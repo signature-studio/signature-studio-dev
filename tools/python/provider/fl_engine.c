@@ -38,6 +38,8 @@ static double pvals[3];
 #define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
 static int ui_closing, ui_time_disp_min, ui_start_on_input, ui_loop_rec, ui_step_edit, ui_browser_auto_hide, ui_snap_mode;
+static int undo_pos, undo_count, undo_last, safe_edit;
+static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
 static int sel_start, sel_end;
 static int64_t disp_time;
 static int64_t arr_time;
@@ -70,6 +72,8 @@ void fl_engine_reset(void) {
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
     ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
+    undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
+    set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
     sel_start = -1; sel_end = -1;
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
@@ -297,6 +301,15 @@ FL_H(general, getChangedFlag) { NARGS(0, 0); return fl_ret_i(c, changed_flag); }
 FL_H(general, getUseMetronome) { NARGS(0, 0); return fl_ret_b(c, use_metronome); }
 FL_H(general, getPrecount) { NARGS(0, 0); return fl_ret_b(c, precount); }
 FL_H(general, getRecPPQ) { NARGS(0, 0); return fl_ret_i(c, rec_ppq); }
+/* PY-94 (#2830): PE 0xd69a90/0xd69ab0/0xd69ad0 は状態の dword 1 つを読んで 0x15e4280 に渡す。0xd6a2c0 は vtbl[0x98] の bool。
+   0xd6a2f0/0xd6a3a0/0xd6a450 は project 物 (*(G)+0x10) の vtbl 0x20/0x28/0x30 から文字列を得る。値は未実測の仮置き (REPORT_PY94) */
+FL_H(general, getUndoHistoryPos) { NARGS(0, 0); return fl_ret_i(c, undo_pos); }
+FL_H(general, getUndoHistoryCount) { NARGS(0, 0); return fl_ret_i(c, undo_count); }
+FL_H(general, getUndoHistoryLast) { NARGS(0, 0); return fl_ret_i(c, undo_last); }
+FL_H(general, safeToEdit) { NARGS(0, 0); return fl_ret_b(c, safe_edit); }
+FL_H(general, getProjectTitle) { NARGS(0, 0); return fl_ret_s(c, proj_title); }
+FL_H(general, getProjectAuthor) { NARGS(0, 0); return fl_ret_s(c, proj_author); }
+FL_H(general, getProjectGenre) { NARGS(0, 0); return fl_ret_s(c, proj_genre); }
 /* PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない */
 FL_H(general, clearLog) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(general, dumpScoreLog) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
@@ -305,8 +318,7 @@ static int numerator = 4, denominator = 4;
 FL_H(general, setRecPPQ) { NARGS(1, 1); int64_t v = A_INT(0, 0); if (v < 24 || v > 960) RANGE_MSG("Range error"); rec_ppq = (int)v; return fl_ret_none(c); }
 FL_H(general, setNumerator) { NARGS(1, 1); int64_t v = A_INT(0, 0); if (v < 1 || v > 16) RANGE_MSG("Range error"); numerator = (int)v; return fl_ret_none(c); }
 FL_H(general, setDenominator) { NARGS(1, 1); int64_t v = A_INT(0, 0); if (v < 2 || v > 16) RANGE_MSG("Range error"); denominator = (int)v; return fl_ret_none(c); }
-/* undo 3 件: PE 0xd69af0 は範囲検査なし (kind 0=Pos → +0x1c, 1=Count → +0x24, 2=Last → +0x20) */
-static int undo_pos, undo_count, undo_last;
+/* undo 3 件: PE 0xd69af0 は範囲検査なし (kind 0=Pos → +0x1c, 1=Count → +0x24, 2=Last → +0x20)。getter と同じ変数に書く */
 FL_H(general, setUndoHistoryPos) { NARGS(1, 1); undo_pos = (int)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(general, setUndoHistoryCount) { NARGS(1, 1); undo_count = (int)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(general, setUndoHistoryLast) { NARGS(1, 1); undo_last = (int)A_INT(0, 0); return fl_ret_none(c); }
