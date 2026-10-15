@@ -9,9 +9,24 @@ const NLOOP = 209;
 const BUD = 0x35f80000, CNT = 0x35f80100;
 const OBJ0 = 0x31000000, STRIDE = 0x40000, IN0 = 0x34000000, OU0 = 0x34000080, BUF0 = 0x34100000, N = 128;
 const slot = (i) => ({ obj: OBJ0 + i * STRIDE, inA: IN0 + i * 0x100, ouA: OU0 + i * 0x100, buf: BUF0 + i * 0x2000 });
+// PERF_FD_WRITE=1 のとき fd_write は iovec を読んで文字列を fd_text に積み、nwritten を書く (既定は stub の return 0)。
+const FDW = process.env.PERF_FD_WRITE === '1';
+let fdText = '';
+const fdWrite = (fd, iovs, n, nw) => {
+  if (!FDW) return 0;
+  const m = U32(), b = new Uint8Array(x.memory.buffer);
+  let total = 0;
+  for (let i = 0; i < n; i++) {
+    const p = m[(iovs + i * 8) / 4], l = m[(iovs + i * 8 + 4) / 4];
+    fdText += Buffer.from(b.subarray(p, p + l)).toString('latin1');
+    total += l;
+  }
+  m[nw / 4] = total;
+  return 0;
+};
 const imports = {
   env: { _abort_js() { throw new Error('abort'); }, emscripten_resize_heap() { return 0; } },
-  wasi_snapshot_preview1: { fd_close() { return 0; }, fd_write() { return 0; }, fd_seek() { return 0; } },
+  wasi_snapshot_preview1: { fd_close() { return 0; }, fd_write: fdWrite, fd_seek() { return 0; } },
 };
 const x = new WebAssembly.Instance(new WebAssembly.Module(fs.readFileSync(wasmPath)), imports).exports;
 const U32 = () => new Uint32Array(x.memory.buffer);
@@ -22,12 +37,14 @@ const snap = () => Array.from(U32().subarray(CNT / 4, CNT / 4 + NLOOP));
 x.__wasm_call_ctors(); x.ott_data_install();
 U32()[BUD / 4] = 2000000000;
 const perCtor = [];
-let trapAt = null, err = null;
+let trapAt = null, err = null, inflight = null;
 try {
   for (let i = 0; i < M; i++) {
     const s = slot(i);
     const before = snap();
+    inflight = before;
     run(0x18011d400, [s.obj, 0]);
+    inflight = null;
     perCtor.push({ k: i + 1, delta: snap().map((v, j) => v - before[j]), budget_left: U32()[BUD / 4] });
     for (let p = 0; p < 19; p++) run(0x180120af0, [s.obj, p], [0, 0, f32b(0.5)]);
     run(0x180120800, [s.obj]);
@@ -39,8 +56,10 @@ try {
 } catch (e) {
   err = String(e);
   trapAt = perCtor.length + 1;
+  // trap した ctor の途中までの loop 別回数 (trapped: true)。budget は全 ctor 通算で減るため、この ctor の寄与を分けて見る。
+  if (inflight) perCtor.push({ k: trapAt, delta: snap().map((v, j) => v - inflight[j]), budget_left: U32()[BUD / 4], trapped: true });
 }
 const partial = snap();
-const out = { M, trap_at_ctor: trapAt, error: err, per_ctor_count: perCtor.length, partial_counts_at_trap: partial, perCtor };
+const out = { M, trap_at_ctor: trapAt, error: err, per_ctor_count: perCtor.length, partial_counts_at_trap: partial, fd_text: fdText.slice(0, 4000), perCtor };
 fs.writeFileSync(outPath, JSON.stringify(out));
 console.log(JSON.stringify({ M, trap_at_ctor: trapAt, error: err, completed: perCtor.length }));

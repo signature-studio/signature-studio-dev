@@ -122,7 +122,11 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 
 ## 3e. 子 #5403 (PERF-P28) の trace: 146 回目の ctor は仮想呼び出しで壊れ、ログ出力が止まらない (Node・同期)
 
-測定 commit: `ctor_loop_trace.mjs` と `instr_loops.py` を追加した commit (コードの最後の変更)。素材 `work-m6-ott` の `tools/ott/work/lift/ottl.wasm` (sha `e8fb06203811ff1f`) を使い、`wasm2wat` → `instr_loops.py` (loop 先頭 209 箇所に実行回数カウンタと budget) → `wat2wasm` で計装した (生成物は `tools/ott/work/` 配下のみ・commit 外)。
+測定 commit: `4266ebfd1` (`ctor_loop_trace.mjs` と `instr_loops.py` を追加した commit)。素材 `work-m6-ott` の `tools/ott/work/lift/ottl.wasm` (sha `e8fb06203811ff1f`) を使い、`wasm2wat` → `instr_loops.py` (loop 先頭 209 箇所に実行回数カウンタと budget) → `wat2wasm` で計装した (生成物は `tools/ott/work/` 配下のみ・commit 外)。
+
+**適用範囲**: 以下は Node・同期・`fd_write` stub の下でだけの観察。Chrome (AudioWorklet) の M=146 無応答は本節では測っておらず、同じ原因かは未確認。
+
+**本 run の状態**: 下表の値は前 run (測定 commit `4266ebfd1`) のもの。本 run では `work-m6-ott` が展開されておらず、再測定していない。`ctor_loop_trace.mjs` の `PERF_FD_WRITE=1` (fd_write の書込み版) と trap 時の `perCtor` 記録 (`trapped: true`) は、その後の commit で追加した未測定のコードである。
 
 | 測定 | 結果 |
 |---|---|
@@ -134,15 +138,29 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 | 同 (M=145) | 完走 |
 | 同 (`fd_write` 書き込み内容を記録) | 出力は `[ott] call to UNLIFTED function 0 (shifted VA; RVA 0xffffffffd0000000) ret=0x3011d9fc` |
 
-分かったこと:
-- **loop 170 は wasm func 92 の stdio 書き込みループ**。`fd_write` の stub (`return 0`) は `nwritten` を書かないため、ループは終わらない。M=146 の「無応答」は、この stub の下で実エラー文言の出力が終わらない結果である。
-- **ctor 146 の本当の失敗は、ctor `0x18011d400` 内の仮想呼び出し** (`ott_lifted.c` の `18011d9f9`: `mov rcx,[rdi]`・`mov rax,[rcx]`・`call [rax+0x38]`)。vtable 経由で読んだ呼び先が VA `0` (shifted RVA `0xffffffffd0000000`) になり、`ott_unlifted` が中断する。
-- つまり 146 の上限は、「heap が data 領域に届いた後で vtable が壊れる」ことで起きる、と読むのが自然。ただし、どの確保が vtable を書き換えたかは未確定。§3d の交絡 (allocator メタデータ) と同じ問題が残る。
-- 注意: `fd_write` の stub は `tools/perf/p15` ほか 9 箇所の harness にコピーされている。Chrome 側 (`chrome_worklet.mjs`・`web/*`) の 146 の「無応答」も、同じ stub のエラー出力ループの可能性がある。Chrome 側は本 run で再測定していない。
+分かったこと (前 run の観察。Node・同期):
+- **loop 170 は wasm func 92 の stdio 書き込みループと推定** (func 番号は未対応付けで、推定の根拠は前 run の観察のみ)。`fd_write` の stub (`return 0`) は `nwritten` を書かないため、ループは終わらない。Node の M=146 の timeout は、この stub の下でエラー文言の出力が終わらない結果と読める。
+- **146 回目の ctor で、ctor `0x18011d400` 内の仮想呼び出し** (`tools/hostbridge/evidence/ott_ottprocessor_ctor.asm` の L303: `18011d9f9: CALL qword ptr [RAX + 0x38]`。直前は L300〜302 で `MOV RCX,[RDI]`・`MOV RAX,[RCX]`) が、VA `0` (shifted RVA `0xffffffffd0000000`) を呼ぶ。`ott_unlifted` が中断する (前 run の `fd_write` 書込み版の出力)。
+- 146 の上限は、「heap が data 領域に届いた後で vtable が壊れる」ことで起きる、と読むのが自然な仮説。ただし、どの確保が vtable を書き換えたかは未確定。§3d の交絡 (allocator メタデータ) と同じ問題が残る。
 
 未確定:
+- **ctor 146 の `budget_left` と、ctor 146 の loop 別実行回数の上位は未測定**。`BUD` は全 loop head で減算される通算の budget (2e9) であり、trap は loop 170 だけの条件ではない。loop 170 が 399M 回でも、他の loop が残りの大半を消費した可能性を、現在の数値では否定できない。`perCtor[145].delta` と `budget_left` は本 commit の `ctor_loop_trace.mjs` で出るようにした (trap 時は `trapped: true` の行)。
 - 壊れた vtable を書いた store の特定 (watchpoint 相当の計装が必要)。
-- wasm 関数番号と VA `0x18011d400` の対応表。`ottl.wasm` に name section が無く、`ott_run` の dispatch から関数番号を取り出す作業は本 run で完了していない。`ott_lifted.c` の `f_18011d400` (195 行) が対応の正本。
+- wasm 関数番号と VA `0x18011d400` の対応表。`ottl.wasm` に name section が無く、`ott_run` の dispatch から関数番号を取り出す作業は本 run で完了していない。対応の一次証跡は `tools/hostbridge/evidence/ott_ottprocessor_ctor.asm`。
+- 「`fd_write` 書込み版で M=146 が 3/3 `_abort_js` で停止する」「`call to UNLIFTED function 0` の出力」は前 run の観察。その計装版は前 run で作ったが commit されていなかった。本 commit の `PERF_FD_WRITE=1` で再現する (未測定)。
+- `fd_write` の stub は `tools/perf/p15` の harness 8 件 (`ctor_data_overlap.mjs`・`ctor_heap_probe.mjs`・`ctor_restore_data.mjs`・`node_init_sweep.mjs`・`web/shared_worker.mjs`・`web/shared_worklet.js`・`web/worker.mjs`・`tools/perf/p8/real/web/real_worker.mjs`) と、新規の `ctor_loop_trace.mjs` (`PERF_FD_WRITE` 未指定時) に入る。`chrome_worklet.mjs` と `chrome_shared.mjs` は `fd_write` stub を含まない。Chrome 側 146 の無応答が同じ原因かは本 run で未確認。
+
+再現コマンド (素材 `work-m6-ott` 展開後。`tools/ott/work/` 配下に出力):
+
+```sh
+wasm2wat tools/ott/work/lift/ottl.wasm -o tools/ott/work/lift/ottl.wat
+python3 tools/perf/p15/instr_loops.py tools/ott/work/lift/ottl.wat tools/ott/work/lift/ottl_lc.wat
+wat2wasm tools/ott/work/lift/ottl_lc.wat -o tools/ott/work/lift/ottl_lc.wasm
+node tools/perf/p15/ctor_loop_trace.mjs tools/ott/work/lift/ottl_lc.wasm 146 $RUNNER_TEMP/perf/trace146.json
+PERF_FD_WRITE=1 node tools/perf/p15/ctor_loop_trace.mjs tools/ott/work/lift/ottl_lc.wasm 146 $RUNNER_TEMP/perf/trace146_fdw.json
+```
+
+出力 JSON の `fd_text` に `fd_write` の書込み内容 (最大 4000 字) が入る。`perCtor` は完走した ctor と trap した ctor (`trapped: true`) の loop 別回数と `budget_left` を持つ。
 
 ## 4. 未解決
 
