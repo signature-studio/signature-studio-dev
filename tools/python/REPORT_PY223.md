@@ -147,7 +147,7 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate      
 ### PY-264 続き (#3888 の再開 run)
 
 - **前節の訂正**: 「大域セル `0x15e0f78`」は誤り。`0x1375a18` の `lea rcx, [rip-0x1c2f5f]` (= `0x11b2ac0`) は、`0x1375a11` の `mov rax, [rip+0x26a560]` で得たポインタ先 (セル `0x15dff78`) に `mov [rax], rcx` で格納する (`0x1375a1f`)。`0x15e0f78` は読み出しの番地を取り違えた値。
-- `0x15e0f78` の RIP 相対参照は 27〜28 件 (`pe_rip_refs.py`)。全件が `mov reg, [rip+..]` の**読出し**で、直後 8 命令に `call` は無い (`analysis/py264_cell_callers.py`。引数の 28 番地を逆アセンブル)。関数ポインタの呼出し箇所ではない。
+- `0x15e0f78` の RIP 相対参照は 27〜28 件 (`pe_rip_refs.py`)。全件が `mov reg, [rip+..]` の**読出し**で、直後 8 命令内に `call` があるのは 6 件 (`0x1042fb8`・`0x1186416`・`0x11864a2`・`0x11f36ac`・`0x103a90a`・`0x103a915`。すべて直接 call (`call 0x12d4940` などで、間接 call は 0 件)。`analysis/py264_cell_callers.py` の引数 (hits 27 件の番地) を逆アセンブルして数えた)。残り 21 件は直後 8 命令に call が無い。直後 8 命令の範囲では間接 call が無いので、関数ポインタの呼出し箇所ではない。
 - `0x11b2ac0` の RIP 相対 `lea` は 1 件 (`0x1375a18`) で、関数 `0x1375990` (直接 call 元 0 件)。`0x1375990` が呼出し経路の起点と推定するが、呼出し側は未特定。
 - 大域ポインタ格納 `0x15dff78` 経由の書込みは本 run で未走査 (次の一手)。
 - `pe_vptr_stores.py 0x0` (`lea` で作った vptr を `[reg+0]` に格納する箇所を全 .text 走査): 1 件 (`0x44a86e`・vtbl `0x13acb88`)。このツールは disp 0 だけを見るので、`0xed0c28` は disp 0 への `lea` 格納には現れなかった。他の disp (`0x120` 系の基底オフセットなど) は未走査。
