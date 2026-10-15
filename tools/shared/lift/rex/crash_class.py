@@ -93,4 +93,5 @@ for line in open(ERR):
 
 print('[crash] 落ちた case %d 件の分類 (入力と fault 時のレジスタから切り分け): %s' % (len(rows), dict(cnt)))
 print('[crash] fault 命令 (rip, 分類): %s' % sorted(((k_[0], k_[1], v) for k_, v in rip_cnt.items())))
+print('[crash] fn 別の分類 (fn, 分類, 件数): %s' % sorted((f, c_, v) for (f, c_), v in collections.Counter((r[1], r[2]) for r in rows).items()))
 print('[crash] other の case (case, fn, 分類, addr, rip): %s' % [r for r in rows if r[2] == 'other'][:8])
