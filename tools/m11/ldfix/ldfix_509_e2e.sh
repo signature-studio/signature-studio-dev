@@ -9,10 +9,11 @@
 #   5/7 ネガティブコントロール (旧版 = 修復を外す / 新版の store 1 本・消費者 1 関数を戻す)
 #   6/7 修復前後の wasm を作り survey 942 unit を unit ごとに突合 + 修復した関数の動的到達 (reach_509.sh)
 #        修復前 wasm: step 1 の ldfix=disabled 記録 + M11_ALLOW_LDFIX_DISABLED=1 (明示 opt-in)。
-#        修復後 wasm: 修復前 IR を ldfix.py --pe で正規適用 → ldfix=applied → ld108=disabled (#2402: fix_ld108 は適用しない。REPORT_1290 の測定条件を保つ) → --bind → M11_ALLOW_LD108_DISABLED=1 で build (#1290)。
+#        修復後 wasm: 修復前 IR を ldfix.py --pe で正規適用 → ldfix=applied → ld108=disabled (#2402: fix_ld108 は適用しない。REPORT_1290 の測定条件を保つ) → --bind → r8b=disabled → ld115=disabled → --bind → M11_ALLOW_LD108_DISABLED=1 M11_ALLOW_R8B_DISABLED=1 M11_ALLOW_LD115_DISABLED=1 で build (#1290)。
 #   7/7 修復前後の wasm で 5 関数を直接呼んで期待値と突き合わせ (dyn_509.mjs)
 # 使い方: EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/m11/ldfix/ldfix_509_e2e.sh      環境変数: EMSDK_ENV (必須、[EMSDK] の emsdk_env.sh) / M11_WORK (既定 tools/m11/work) / PY (capstone+pefile 入り python) / PREV_REF (既定 009e823)
 set -uo pipefail
+FAIL=0
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 REPO="$(cd -- "$HERE/../../.." && pwd)"
 W="${M11_WORK:-$REPO/tools/m11/work}"
@@ -24,6 +25,7 @@ if [ -z "${PY:-}" ]; then
   else uv venv "$OUT/venv" -q && uv pip install -q --python "$OUT/venv/bin/python" capstone pefile && PY="$OUT/venv/bin/python"; fi
 fi
 CFG="$W/boot*.drc.config.json"; IMG="$W/m11_image.bin"
+# step 6 の FL_WIN64_DIR は PE_QS の dirname 2 回 (extracted/ の親) で得る。PE を extracted/ 以外に置くと前提が崩れる
 PE_QS="${PE:-${FL_WIN64_DIR:?FL_WIN64_DIR (fl-win64 の展開先) を指定してください}/extracted/block00031_PE.bin}"
 : "${EMSDK_ENV:?EMSDK_ENV (<[EMSDK]> の emsdk_env.sh) を指定してください}"   # reach_509.sh が要る (未指定だと 6/7 の reach だけ失敗して rc 0 になっていた)
 step() { echo "[ldfix_509_e2e] $*"; }
@@ -39,9 +41,9 @@ PRE="$OUT/gen/tools/m11/work/boot_final.ll"
 step "2/7 ldfix 旧版 ($PREV_REF) / 新版 (HEAD)"
 mkdir -p "$OUT/prev/ldfix"; cp "$HERE"/ldmach.py "$HERE"/ldmach_img.py "$HERE"/ldfix_img.py "$HERE"/ldframe.py "$OUT/prev/ldfix/"; cp "$REPO/tools/m11/lb_base.py" "$OUT/prev/"
 git -C "$REPO" show "$PREV_REF:tools/m11/ldfix/ldfix.py" > "$OUT/prev/ldfix/ldfix.py"
-"$PY" "$OUT/prev/ldfix/ldfix_img.py" "$PRE" "$OUT/prev.ll" "$IMG" "$CFG" --report "$OUT/prev_report.json" 2>&1 | tail -1
-"$PY" "$HERE/ldfix_img.py" "$PRE" "$OUT/new.ll" "$IMG" "$CFG" --report "$OUT/new_report.json" 2>&1 | tail -1
-"$PY" - "$OUT/prev.ll" "$OUT/new.ll" "$OUT/prev_report.json" "$OUT/new_report.json" <<'PYEOF'
+"$PY" "$OUT/prev/ldfix/ldfix_img.py" "$PRE" "$OUT/prev.ll" "$IMG" "$CFG" --report "$OUT/prev_report.json" 2>&1 | tail -1 || { echo "[ldfix_509_e2e] 2/7 旧版 ldfix 失敗"; FAIL=1; }
+"$PY" "$HERE/ldfix_img.py" "$PRE" "$OUT/new.ll" "$IMG" "$CFG" --report "$OUT/new_report.json" 2>&1 | tail -1 || { echo "[ldfix_509_e2e] 2/7 新版 ldfix 失敗"; FAIL=1; }
+"$PY" - "$OUT/prev.ll" "$OUT/new.ll" "$OUT/prev_report.json" "$OUT/new_report.json" <<'PYEOF' || { echo "[ldfix_509_e2e] 2/7 旧版/新版の突合に失敗"; FAIL=1; }
 import json, re, sys
 def fns(f):
     t = open(f, errors='replace').read()
@@ -60,12 +62,12 @@ PYEOF
 step "3/7 audit_lsf.py (store 形 + 消費者形): 修復前 / 旧版 / 新版"
 for k in pre prev new; do
   case $k in pre) F="$PRE";; prev) F="$OUT/prev.ll";; new) F="$OUT/new.ll";; esac
-  "$PY" "$HERE/audit_lsf.py" "$F" "$IMG" "$CFG" --json "$OUT/audit_$k.json" | sed "s/^/[$k] /" | cut -c1-700
+  "$PY" "$HERE/audit_lsf.py" "$F" "$IMG" "$CFG" --json "$OUT/audit_$k.json" | sed "s/^/[$k] /" | cut -c1-700 || { echo "[ldfix_509_e2e] 3/7 audit_lsf ($k) に失敗"; FAIL=1; }
 done
 
 step "4/7 既に ldfix 済みの work/boot_final.ll へ F3c だけ重ねる (--passes f3c)"
-"$PY" "$HERE/ldfix_img.py" "$W/boot_final.ll" "$OUT/bf_f3c.ll" "$IMG" "$CFG" --passes f3c --report "$OUT/bf_f3c_report.json" 2>&1 | tail -1
-"$PY" - "$W/boot_final.ll" "$OUT/bf_f3c.ll" "$OUT/new.ll" <<'PYEOF'
+"$PY" "$HERE/ldfix_img.py" "$W/boot_final.ll" "$OUT/bf_f3c.ll" "$IMG" "$CFG" --passes f3c --report "$OUT/bf_f3c_report.json" 2>&1 | tail -1 || { echo "[ldfix_509_e2e] 4/7 F3c 重ね失敗"; FAIL=1; }
+"$PY" - "$W/boot_final.ll" "$OUT/bf_f3c.ll" "$OUT/new.ll" <<'PYEOF' || { echo "[ldfix_509_e2e] 4/7 F3c 重ね突合に失敗"; FAIL=1; }
 import re, sys
 def fns(f):
     t = open(f, errors='replace').read()
@@ -78,7 +80,7 @@ print('[overlay] boot_final.ll から変わった関数 %d、うち 新版出力
 PYEOF
 
 step "5/7 ネガティブコントロール"
-"$PY" - "$OUT/new.ll" "$OUT" <<'PYEOF'
+"$PY" - "$OUT/new.ll" "$OUT" <<'PYEOF' || { echo "[ldfix_509_e2e] 5/7 ネガコン IR の作成に失敗 (assert)"; FAIL=1; }
 import re, sys
 t = open(sys.argv[1], errors='replace').read()
 # NC-store: 806740 の修復 store (load 経由) を %arg3 に戻す
@@ -97,14 +99,13 @@ open(sys.argv[2] + '/nc_use.ll', 'w').write(t.replace(b, b2))
 PYEOF
 for k in prev nc_store nc_use; do
   F="$OUT/$k.ll"
-  "$PY" "$HERE/audit_lsf.py" "$F" "$IMG" "$CFG" > "$OUT/nc_$k.txt"
+  "$PY" "$HERE/audit_lsf.py" "$F" "$IMG" "$CFG" > "$OUT/nc_$k.txt" || { echo "[ldfix_509_e2e] 5/7 audit_lsf ($k) 失敗"; FAIL=1; }
   echo "[NC:$k] $(grep -o '"suspect_fns": [0-9]*, "suspect_sites": [0-9]*' "$OUT/nc_$k.txt" || echo 'store 形 SUSPECT 0') / $(grep '^SUSPECT_VAS' "$OUT/nc_$k.txt" | cut -c1-120) / use 形(pure): $(grep '^SUSPECT_USE_VAS' "$OUT/nc_$k.txt" | awk '{print NF-1}') 関数 (1063090 を含む: $(grep '^SUSPECT_USE_VAS' "$OUT/nc_$k.txt" | grep -c ' 1063090'))"
 done
 
 step "6/7 survey 前後 (wasm 再ビルド) と動的到達"
 B="$OUT/build"; mkdir -p "$B/tools"; cp -a "$REPO/tools/shim" "$REPO/tools/shared" "$B/tools/"; cp -a "$REPO/tools/m11" "$B/tools/m11_src"; rm -rf "$B/tools/m11_src/work"; mv "$B/tools/m11_src" "$B/tools/m11"; cp -a "$W" "$B/tools/m11/work"
 mkdir -p "$OUT/basewasm"
-FAIL=0
 ( cd "$B/tools/m11" && cp "$OUT/gen/tools/m11/work/ir_conditions.json" work/ && cp "$PRE" work/boot_final.ll && rm -f work/boot_final3.ll \
   && M11_ALLOW_LDFIX_DISABLED=1 bash m11_build.sh > "$OUT/build_base.log" 2>&1 \
   && cp work/m11_boot.cjs work/m11_boot.cjs.wasm "$OUT/basewasm/" && node trap_triage/survey_units.mjs "$OUT/sv_base.json" | tail -1 ) || { echo "[ldfix_509_e2e] 修復前 wasm の build/survey 失敗: $OUT/build_base.log"; FAIL=1; }
@@ -113,8 +114,8 @@ FAIL=0
   && python3 m11_cond.py r8b=disabled && python3 m11_cond.py ld115=disabled && python3 m11_cond.py --bind work/boot_final.ll \
   && rm -f work/boot_final3.ll && PE="$PE_QS" FL_WIN64_DIR="$(dirname "$(dirname "$PE_QS")")" M11_ALLOW_LD108_DISABLED=1 M11_ALLOW_R8B_DISABLED=1 M11_ALLOW_LD115_DISABLED=1 bash m11_build.sh > "$OUT/build_new.log" 2>&1 \
   && node trap_triage/survey_units.mjs "$OUT/sv_new.json" | tail -1 ) || { echo "[ldfix_509_e2e] 修復後 wasm の build/survey 失敗: $OUT/build_new.log"; FAIL=1; }
-( cd "$B/tools/m11" && python3 trap_triage/survey_diff.py "$OUT/sv_base.json" "$OUT/sv_new.json" )
-"$PY" - "$OUT/sv_base.json" "$OUT/sv_new.json" <<'PYEOF'
+( cd "$B/tools/m11" && python3 trap_triage/survey_diff.py "$OUT/sv_base.json" "$OUT/sv_new.json" ) || { echo "[ldfix_509_e2e] 6/7 survey_diff 失敗"; FAIL=1; }
+"$PY" - "$OUT/sv_base.json" "$OUT/sv_new.json" <<'PYEOF' || { echo "[ldfix_509_e2e] 6/7 survey 正規化突合に失敗"; FAIL=1; }
 import json, re, sys
 def norm(r):
     r = dict(r)
