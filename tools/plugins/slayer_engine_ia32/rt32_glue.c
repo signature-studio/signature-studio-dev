@@ -9,6 +9,9 @@ uint64_t ott_gbase = 0x10000000ull;
 #define H32_BASE 0x10800000u
 #define HOST_BASE 0x00828000u
 #define HOST_LEN 0x10000u
+/* heap・VirtualAlloc の上限 (#4357): native_entry.c と同じ値・同じ規約 (失敗は 0 を返し LastError = 8) */
+#define H32_LIMIT 0x10E00000ull
+#define ERR_NOT_ENOUGH_MEMORY 8u
 static uint32_t h32_top, g_lasterr, g_tls[64];
 
 static void h32_reset(void) {
@@ -18,24 +21,28 @@ static void h32_reset(void) {
     memset((void *)(uintptr_t)HOST_BASE, 0, HOST_LEN);
 }
 static uint32_t h32_alloc(uint32_t sz) {
-    uint32_t p = (h32_top + 8 + 7) & ~7u;
-    h32_top = p + (((sz ? sz : 1) + 7) & ~7u);
-    ST32(p - 8, sz);
+    uint64_t p = ((uint64_t)h32_top + 8 + 7) & ~7ull;
+    uint64_t end = p + ((((uint64_t)(sz ? sz : 1)) + 7) & ~7ull);
+    if (end > H32_LIMIT) { g_lasterr = ERR_NOT_ENOUGH_MEMORY; return 0; }
+    h32_top = (uint32_t)end;
+    ST32((uint32_t)p - 8, sz);
     memset((void *)(uintptr_t)p, 0, sz);
-    return p;
+    return (uint32_t)p;
 }
 static uint32_t h32_realloc(uint32_t p, uint32_t sz) {
     if (!p) return h32_alloc(sz);
     uint32_t old = LD32(p - 8), n = h32_alloc(sz);
+    if (!n) return 0;
     memcpy((void *)(uintptr_t)n, (void *)(uintptr_t)p, old < sz ? old : sz);
     return n;
 }
 static uint32_t h32_valloc(uint32_t sz) {
-    h32_top = (h32_top + 4095) & ~4095u;
-    uint32_t p = h32_top;
-    h32_top += (sz + 4095) & ~4095u;
+    uint64_t p = ((uint64_t)h32_top + 4095) & ~4095ull;
+    uint64_t end = p + ((((uint64_t)sz) + 4095) & ~4095ull);
+    if (end > H32_LIMIT) { g_lasterr = ERR_NOT_ENOUGH_MEMORY; return 0; }
+    h32_top = (uint32_t)end;
     memset((void *)(uintptr_t)p, 0, sz);
-    return p;
+    return (uint32_t)p;
 }
 
 #define ARG(i) LD32(R[RSP] + 4 + 4 * (i))
