@@ -1,5 +1,5 @@
-// mixer 系 19 関数の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と C provider (provider/fl_engine.c) に流し、
-// 各呼出しの戻り値・エラー code が一致することを確認する。mock に定義が無い mixer 関数 (56 件) は対象外。
+// mixer 系 21 関数の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と C provider (provider/fl_engine.c) に流し、
+// 各呼出しの戻り値・エラー code が一致することを確認する。mock に定義が無い mixer 関数 (54 件 = flapi 表 75 − 21) は対象外。
 //   node tests/mixer_diff.mjs     (前提: provider/build.sh 済み)
 import fs from "node:fs";
 import assert from "node:assert/strict";
