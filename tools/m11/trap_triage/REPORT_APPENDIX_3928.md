@@ -1,0 +1,70 @@
+# REPORT_APPENDIX_3928 — #3928 (M11-28): unit 144 の trap と UniqueString (4136a0) の deref 脱落
+
+> 親 #3643 (M11-26)・#3592 (M11-24)・#2521 の経路の続き。正本は本付録 (REPORT_APPENDIX_2521 §9.4〜§9.5 の続き)。
+
+**結論 (部分達成)**: lift 版 `function_4136a0` (UniqueString 系) は、`mov rax,[s]` (= `*s`) の 1 段 deref を落としている (D4 同型・`417b70`・`412d60` と同じ類型)。これを C 転記 (`M11_FIX_4136A0=1`) すると unit 144 (`0x25c540`) は trap → ok になる。一方、unit 158 (`0x26d1a0`) が ok → oom (halt0) に回帰する。既定 OFF のまま残す。受入 1・2 (0x6c の出所・[0x64] の書込み元) は未特定。e2e は未実測。
+
+## 測定条件
+
+- 測定 commit: `2267e738e` (コード変更の最後の commit。`git diff 2267e738e HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は 0 行)。基点 `549edb5ea` (origin/main)。
+- 素材: `work-m11` (展開先 `tools/m11/work`)・`fl-win64` の `extracted/block00031_PE.bin` (`$RUNNER_TEMP/win64`)・`/opt/emsdk`。
+- IR: `bash m11_gen_ir2.sh` (41 s)。`ir_sha256` 生成直後 `597757f4…` (#3643 と同じ)。build 後 `362e47a9…`。
+- survey は直列 1 本、各条件 n=1。`node m11_survey.mjs` は約 12 s。build は `rm -f work/obj/ov.o` の後に実行 (約 22 s)。uptime load 0.8〜1.2 (1 分値)。
+
+## 実測
+
+| 条件 (HEAD `2267e738e`) | ok / trap / miss / noproc | unit 144 (`0x25c540`) | OFF との unit 差 |
+|---|---|---|---|
+| OFF (既定 `M11_FIX_4136A0=0`) | 873 / 21 / 47 / 1 | trap (memory access out of bounds) | — |
+| `M11_FIX_4136A0=1` | 873 / 21 / 47 / 1 | **ok** | 2 件: 144 trap→ok、**158 ok→oom (halt0->longjmp)** |
+
+参考 (同じ検証の途中で取った値。`M11_FIX_50A830` の行は基点 `549edb5ea` の作業ツリー、組合せ 2 行は測定 commit `2267e738e` と同じコード。`git diff 549edb5ea 2267e738e -- tools/m11` は `m11_build.sh` の CF・stamp と `m11_ov.c` の `4136a0` 転記だけ):
+
+| 条件 | ok / trap / miss / noproc | OFF との unit 差 |
+|---|---|---|
+| `M11_FIX_50A830=1` (既存の list Add 転記) | 873 / 21 / 47 / 1 | 0 件 (144 は trap のまま) |
+| `M11_FIX_4136A0=1 M11_OV_414AD0=1` | 873 / 21 / 47 / 1 | 2 件 (144・158 は上と同じ) |
+| `M11_FIX_4136A0=1 M11_FIX_652500=1` | 873 / 21 / 47 / 1 | 3 件 (144 ok・158 oom・895 halt0→memory access out of bounds) |
+
+- 既定 OFF の survey は #3643 (873/21/47/1・unit 144 trap) と一致。
+- 既存の `M11_FIX_50A830` と `M11_OV_414AD0` の組合せは、`4136a0` 補正の有無で 158 の結果を変えない。158 の回帰は `414ad0` と `652500` の deref 補正では消えない。
+
+## 転記の内容 (`m11_ov.c` `function_4136a0`、`M11_FIX_4136A0` で有効)
+
+```c
+u64 p = Q(s);                       /* lift 版は *s を落とし s を文字列ポインタとして読んでいた */
+if (p == 0) return 0;
+if (D(p - 8) == 1) return p;        /* refcnt (データ -8) */
+u64 np = function_412c20((u64)D(p - 4));   /* 長さ (データ -4) */
+function_409c80(p, np, (u64)(long long)(int)(D(p - 4) * 2u));
+function_412d60(s, 0);              /* *s := 0 と旧 p の解放 */
+Q(s) = np;
+return np;
+```
+
+- lift 版との比較: IR 4136a0 は `arg1` を文字列ポインタとして refcnt (`arg1-8`)・長さ (`arg1-4`)・copy 元 (`409c80(arg1, …)`) に使い、`store … [arg1]` (= `*s := 新ポインタ`) だけは PPointer として扱う。RetDec の deref 脱落の典型 (`417b70`・`412d60` の C 注記と同型)。
+- 呼出し元 `413760` (`call 4136a0; ret`) と `414bb0`・`414c70`・`43c4c0` は、dest を PPointer (変数のアドレス) として渡す。`43c4c0` の dest は `653660` の stack 変数 (`stack_var_-64`) で、`414c70` 経由で `4136a0` に届く。
+
+## unit 144 と unit 158 (FIX=1)
+
+- 144: FIX 版では `4136a0` の入口で `s < 0x10000` の呼出しが無かった (一時 trace・削除済み)。OFF の lift 版で `412d60` に渡る `0x6c` は、FIX 版では経路に現れない。`0x6c` は nil の object の +0x6c フィールドの番地と読めるが (推定)、その nil の出所は未特定 (受入 1 は未達)。`[0x64]` の書込み元も未特定 (受入 2 は未達)。
+- 158: FIX 版で `4136a0` の入口 `s = 0x10aa1428` (スタック上の変数。`653660` 経由の `43c4c0` の dest) の内容が `0x64002e00650068` (UTF-16LE の `"he.d"`)。PPointer としての値ではなく文字列の中身が入っている。その直後に `412c20(len)` へ進み、`len = [p-4]` が巨大で `409730` (エラー経路) → Halt → oom。
+- 上の 158 の値から、スタック変数の内容を文字列の中身で上書きした書込みが、`4136a0` より前の `43c4c0`・`414bb0`・`414c70`・`409c80` のどこかにあると推定 (未確定)。書込み元の特定は store watch (`WATCH_ADDR=0x10aa1428`、unit 158) が要る。
+
+## 受入条件 (#3928) の達成状況
+
+| 受入 | 状態 |
+|---|---|
+| 1. ON で `412d60` に渡る `0x6c` の出所 (nil の object の何か) | **未達** (FIX で 144 の経路が変わり、出所の採取は未実施) |
+| 2. `[0x64]` を 1 にする書込み元 | **未達** |
+| 3. ON で 144 が ok、survey ok ≥ OFF − 1 | 144 は ok・ok 873 (≥ 872) で数値は満たす。**ただし 158 が oom に回帰**するため、既定 ON 化の根拠にはしない。部分達成 |
+| 4. e2e (`m11_e2e.sh`) の rc | **未実測** (lift 全再生成が約 22 分かかる。本 run で時間が足りない) |
+| 5. 既定 ON 化の判断 | **PM 判断** (3・4 が満たされた後)。本 PR では既定 OFF のまま |
+
+## 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 158 の回帰 (FIX=1 で oom)。スタック変数への文字列の書込み元 | `M11_FIX_4136A0=1` を既定にできない | #3972 ([M11-29]) |
+| 144 の 0x6c (nil 由来) と `[0x64]` の書込み元 (受入 1・2) | unit 144 の trap の原因が未特定 | #3974 ([M11-30]) |
+| e2e (`m11_e2e.sh`) の rc と既定 ON 化 (受入 4・5) | 既定 ON 不可 (上 2 件が前提) | #3972 ([M11-29] の受入に移送) |
