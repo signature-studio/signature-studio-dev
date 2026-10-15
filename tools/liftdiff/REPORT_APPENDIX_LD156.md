@@ -18,7 +18,7 @@
 
 ## 1. 測定条件
 
-- 素材: `fl-win64` (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`extracted/block00031_PE.bin`)・`work-liftdiff` (`tools/liftdiff/work/`)・`work-m11` (`tools/m11/work/`)。`toolchain-emsdk` は `/opt/emsdk` (emcc 6.0.12・pin 版)。`ANALYSIS_DIR=$HOME/analysis`。
+- 素材: `fl-win64` ([WIN64] の展開先・`extracted/block00031_PE.bin`)・`work-liftdiff` (`tools/liftdiff/work/`)・`work-m11` (`tools/m11/work/`)。`toolchain-emsdk` は `[EMSDK]` (emcc 6.0.12・pin 版)。素材の環境変数の対応は `docs/REFERENCES.md` §4。
 - wasm は `build_wasm.build(m11, force=True)` で作り直した (9.4 s・`wasm_size` 4463245・`sig_mismatch` 0)。展開済みの `work/m11/ld_wasm.cjs` は現行 `rt/ld_wasm.c` と食い違い (`ld_w_snapshot` の引数数) で使えなかった。
 - 機: 4 vCPU・RAM 15 GiB。並列は 4〜5 本 (`&` + `wait`)。load は測定前の 1 分平均で 0.3〜1.8 (各回の load は未記録・n=1/2)。
 - 1 条件の wall: 単独 140 s (`none`)・4 並列 148〜167 s (wasm 単独)・5 並列 171〜184 s (native 作り直し)。
@@ -64,7 +64,7 @@
 ## 6. 再現
 
 ```sh
-export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64" ANALYSIS_DIR="$HOME/analysis"
+# 環境変数の設定は docs/REFERENCES.md §4 を参照 ([WIN64] の展開先を FL_WIN64_DIR に指定する)
 cd tools/liftdiff
 python3 ld156_chunk0_carryover.py --native 1 --reset sta --out work/ld156/n1_sta_r1.jsonl
 ```
