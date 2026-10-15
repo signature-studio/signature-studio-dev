@@ -130,11 +130,12 @@
 
 ## D13 — liftdiff の既定 batch 状態は units のまま据え置く (hybrid への切替は根拠待ち)
 
-- **状態**: 保留 (2026-10-13, issue #1248 [LD-42]。子 issue #1464 [LD-50] で判断)
+- **状態**: 採用 (2026-10-13 保留、2026-10-15 issue #1464 [LD-50] で据え置きを確定。hybrid への切替は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §8.2 の条件が揃うまで行わない)
 - **決定**: `liftdiff_e2e.sh` [4/4] の既定 batch 状態は `units` のまま変えない。InitTable 充足の `hybrid` は `--state` で明示したときだけ使う。
-- **比較した方式**: (a) 既定を hybrid に切替 (InitUnits が実際に走り、空振り一致が 0 件になる)、(b) units のまま据え置き (採用・保留)。
+- **比較した方式**: (a) 既定を hybrid に切替 (InitUnits が実際に走り、空振り一致が 0 件になる)、(b) units のまま据え置き (採用)。(a) は不採用: hybrid の InitUnits は native 側が 11/11 で segv し (子 #3349 LD-153)、TLS の実経路 (flag=1) の充足も未確認 (同)、件数が負荷で揺れる (子 #3350 LD-154)。
 - **理由**: hybrid にすると sample:800 の判定が変わる (件数は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §1・§3)。どちらが正しいかは関数ごとの差分根拠が無いと決まらないため、根拠無しに基準値を動かさない。units の InitUnits 空振り一致は `check_initunits.py` で検出済み (LD-25) で、この検出は hybrid 側でのみ成立する。
 - **影響**: 既定 batch の一致数は「InitUnits が呼ばれない状態での一致」である (件数の測定値は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §1)。この数値を外部へ「実行初期化済みの一致」として出さない。
+- **追記 (2026-10-15, LD-50)**: 遷移 68 件の表 (`REPORT_APPENDIX_LD42.md` §6) で、units 一致 → hybrid 差分の 25 件は全件の主因が callee_divergence で、どちらが誤りかを関数ごとに決められなかった。根拠は §6・§7 (TLS)・§8 (件数の揺れ)。
 
 ## D14 — スカラー FMA3 (vfmadd/vfmsub/vfnmadd/vfnmsub の sd 形) は ヘッダの式 + IR 引数順で実装する
 
@@ -151,6 +152,7 @@
 - **比較した方式**: (a) VEX 形を SSE 形の `(void)a; (void)b;` へ委譲して `unimpl` から消す (不採用)、(b) 既存 `lift/passes/ir6_pass.py` ([P1]) を lift 鎖に入れる (単独では不足。 19252 の comis 76 箇所中 insert 3 箇所のみ)、(c) `icall_rewrite.py` の comis 経路 (stub + sahf) を plugins 側に移植する (未評価)。
 - **理由**: (a) は flag を反映しないまま stub を消すため、`declares_unimpl` が 0 になっても silent な flag 欠落が検出できなくなる。 `lift/passes/m11_simd2.py` の既存コメントも同じ方針 (「委譲せず stub のまま残す」)。 実測は `tools/plugins/sampler/REPORT_APPENDIX_1582.md` §7b。
 - **影響**: 19252 / 19048 の unimpl に `vcomisd` / `vucomisd` / `vucomiss` が残る。 これを消すには flag 反映の実装が要るため、子 issue に分割した。
+- **続き (#1774・反映方式の決定)**: 採用は次の 2 点。 (1) 同一ブロック内で呼び出し後に読まれる flag は、`lift/passes/vex_comis_flags.py` が呼び出し直後に作る fcmp 由来の CF/ZF/PF (`ir6_pass.py` [P1] と同じ式) へ差し替える。 (2) 差し替えられない呼び出しは残す (helper は stub のまま unimpl に出る。 silent にしない)。 比較した別案: icall の stub+sahf 経路 (`PLUG_ICALL=1`) は 19252 の unimpl を 4→1 にしたが、522 関数中 490 関数の ABI を書き換えて `defines` 551→497・`missing_bytes` 165→4200 に悪化したため不採用。 実測 (機械語の消費命令と IR の参照) は `tools/plugins/sampler/REPORT_APPENDIX_1774.md` §7c。 残りは消費側が flag 名を読まず値比較を読むため、消費条件の再導出が要り、子 [PLG-F3-33] (非 VEX は [PLG-F3-34]) に分割した。
 
 ## D16 — 残 helper `__asm_vmovsd` (store 形) は宛先を定数で埋めず、spill 領域の写像を上流で直す
 

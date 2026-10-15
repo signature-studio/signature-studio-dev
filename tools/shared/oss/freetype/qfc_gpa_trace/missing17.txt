@@ -1,0 +1,17 @@
+FTC_Image_Cache_Lookup
+FTC_Image_Cache_New
+FTC_Manager_Lookup_Face
+FTC_Manager_Lookup_Size
+FTC_SBit_Cache_Lookup
+FTC_SBit_Cache_New
+FT_Alloc
+FT_Free
+FT_QAlloc
+FT_QRealloc
+FT_Realloc
+FT_Sqrt32
+FT_SqrtFixed
+ft_highpow2
+ft_stub_set_char_sizes
+ft_stub_set_pixel_sizes
+ftc_node_destroy
