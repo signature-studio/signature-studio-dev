@@ -30,11 +30,13 @@ from verify_deref_sites_2555 import fn_bodies, split_args, DEF_RE  # noqa: E402
 
 BARE_ARG = re.compile(r'^%arg\d+$')
 STORE_RE = re.compile(r'^store i\d+ (%[\w.]+), ptr (%[\w.]+)')
+CALLER_SAVED = {'rax', 'rcx', 'rdx', 'r8', 'r9', 'r10', 'r11'}
 
 
 def rewrite_argpos(ins, deref_va, call_va, deref_reg):
     """deref の値が call 時点で届く引数レジスタの argpos (1 始まり)。届かなければ None。
-    deref の後から call までを追い、値を持つレジスタ集合を mov の複写で広げ、他の命令の書込みで消す"""
+    deref の後から call までを追い、値を持つレジスタ集合を mov の複写で広げ、他の命令の書込みで消す。
+    間の call は caller-saved (rax・rcx・rdx・r8〜r11) を書き換えるので、それらを holding から落とす"""
     holding, started = {full(deref_reg)}, False
     for x in ins:
         if x.address == deref_va:
@@ -44,6 +46,9 @@ def rewrite_argpos(ins, deref_va, call_va, deref_reg):
             continue
         if x.address == call_va:
             break
+        if x.mnemonic == 'call':
+            holding -= CALLER_SAVED
+            continue
         m = REG2_RE.match(x.op_str)
         d = DST_RE.match(x.op_str)
         if x.mnemonic == 'mov' and m and full(m.group(2)) in holding:
