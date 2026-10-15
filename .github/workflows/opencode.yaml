@@ -297,7 +297,7 @@ jobs:
       # retry (write、15 分) が起動して push しうる。!cancelled() は失敗・step の timeout の後には走り、cancel の後には走らない。
       - name: Check the fix progress
         id: progress
-        if: ${{ !cancelled() && steps.context.outputs.should_run == 'true' && contains(fromJSON('["pull_request_review","repository_dispatch"]'), github.event_name) && steps.fixrec.outputs.stop != 'true' }}
+        if: ${{ !cancelled() && steps.context.outputs.should_run == 'true' && contains(fromJSON('["pull_request_review","repository_dispatch"]'), github.event_name) && steps.fixrec.outcome == 'success' && steps.fixrec.outputs.stop != 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -305,7 +305,7 @@ jobs:
 
       - name: Prepare the retry prompt
         id: retry-prompt
-        if: ${{ !cancelled() && steps.progress.outputs.result == 'none' }}
+        if: ${{ !cancelled() && steps.fixrec.outcome == 'success' && steps.fixrec.outputs.stop != 'true' && steps.progress.outputs.result == 'none' }}
         shell: bash
         env:
           OC_PROMPT_SRC: ${{ steps.prompt.outputs.prompt_file }}
@@ -313,7 +313,7 @@ jobs:
 
       - name: Run OpenCode (implementer, retry)
         id: oc-retry
-        if: ${{ !cancelled() && steps.progress.outputs.result == 'none' }}
+        if: ${{ !cancelled() && steps.fixrec.outcome == 'success' && steps.fixrec.outputs.stop != 'true' && steps.progress.outputs.result == 'none' }}
         timeout-minutes: 15
         uses: ./.github/actions/opencode
         with:
@@ -326,7 +326,7 @@ jobs:
 
       - name: Check the fix progress (retry)
         id: progress-retry
-        if: ${{ !cancelled() && steps.progress.outputs.result == 'none' }}
+        if: ${{ !cancelled() && steps.fixrec.outcome == 'success' && steps.fixrec.outputs.stop != 'true' && steps.progress.outputs.result == 'none' }}
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
