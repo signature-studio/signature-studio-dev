@@ -218,7 +218,7 @@ bash tools/perf/p20/fa_negctl.sh                                       # NC-2
 
 受入条件の「§7 に追記」は、main の §8 が PERF-P20 に使われたため本節 (§9) に置いた。
 
-**結論**: AudioWorklet 上で 1 instance (Memory 1 本) に畳んだ OTT obj は、測定点の範囲で **M=145 が成功・M=146 が失敗** (初期化・署名とも M=145 は 3 run 全て成功、署名 145/145 一致)。**M=146 は 3 run 全て無応答** (`Error: eval timeout`、30 s。1 run は 150 s でも戻らない)。単調性は未確認 (147 以上と M=2〜129・131〜144 は未測)。原因は未切り分け (子 #3959)。
+**結論** (PERF-P25 追補。受入の正本は `tools/perf/REPORT_APPENDIX_3959.md`): AudioWorklet 上で 1 instance (Memory 1 本) に畳んだ OTT obj は、Chrome 154 の測定点の範囲で **M=145 が成功・M=146 が失敗** (初期化・署名とも M=145 は 3 run 全て成功、署名 145/145 一致)。**M=146 は 3 run 全て無応答** (`Error: eval timeout`、30 s。1 run は 150 s でも戻らない)。M=148・152・160 も 3 run 全て無応答。単調性は未確認 (Chrome の M=147・149〜151・153〜159 と M=2〜129・131〜144 は、コミット済みのデータが無い)。Node 掃引の 159 点は生データが無く、本 run では再現していない。原因は未特定 (子 #4392 [PERF-P26])。
 
 | 項目 | 結果 (Chrome 154.0.8037.97・EPYC 7763) |
 |---|---|
@@ -227,7 +227,7 @@ bash tools/perf/p20/fa_negctl.sh                                       # NC-2
 | 署名 | M=145: 145/145 一致 (`6b1696f0`、3 run)。M=130: 130/130 一致 (3 run) |
 | setup_ms | M=130: 756〜802 ms (6 値。署名の run 774・781・797 と、同じ setup ループのネガティブ制御の run 756・789・802)。M=145: 799〜868 ms (6 値。初期化 3 + 署名 3) |
 | ネガティブコントロール | obj 0 の入力振幅を 0.5→0.25。M=1: 0/1 一致、M=130: 129/130 一致 (3 run とも `sig_ok=false`) |
-| 旧測定 (Chrome 155.0.8059.39・EPYC 9V45) | 成功 M=1 (setup 17〜22 ms)・M=130 (3 run、setup 446〜495 ms)、署名 130/130、ネガ M=130 129/130。M=160・176・192・256・288・320・352 は 3 run とも無応答 (timeout 値は未記録)。生データ: `results/worklet_init_limit.jsonl`・`worklet_sig.jsonl`・`worklet_negctl.jsonl` (測定 `e4d2d1799`)、HEAD 再現 `rerun_20261015_worklet_{init,negctl,sig}.jsonl` (検証 HEAD `d064d219d`。`git diff --stat e4d2d1799 d064d219d -- tools/perf/p15` は 3 ファイル 5 行の追加のみ) |
+| 旧測定 (Chrome 155.0.8059.39・EPYC 9V45) | 成功 M=1 (setup 17〜22 ms)・M=130 (3 run、setup 446〜465 ms)、署名 130/130、ネガ M=130 129/130。M=160・176・192・256・288・320・352 は 3 run とも無応答 (timeout 値は未記録)。生データ: `results/worklet_init_limit.jsonl`・`worklet_sig.jsonl`・`worklet_negctl.jsonl` (測定 `e4d2d1799`)、HEAD 再現 `rerun_20261015_worklet_{init,negctl,sig}.jsonl` (検証 HEAD `d064d219d`。`git diff --stat e4d2d1799 d064d219d -- tools/perf/p15` は 3 ファイル 5 行の追加のみ) |
 
 - **測定 commit**: `c412b8937` (`chrome_worklet.mjs` に `timeout_ms` を行へ記録。測定コードの変更はこの commit だけ)。生データ: `results/worklet_range_{init,sig,negctl,long}.jsonl` (初期化 15 行・署名 6 行・ネガ 6 行・M=146 の 150 s 試行 1 行)。測定 commit から検証 HEAD までの差分 (`git diff --stat c412b8937 HEAD -- tools/perf/p15 tools/perf/harness tools/ott`) は `results/` の 4 ファイル・28 行の追加のみ。
 - **環境**: Chrome 154.0.8037.97 (headless=new)、CPU AMD EPYC 7763 (4 vCPU)、素材 `work-m6-ott` (`tools/ott/work/lift/ottl.{wasm,cjs}`、gitignore)。旧測定と版・CPU が違うため、setup 値は直接比べない。

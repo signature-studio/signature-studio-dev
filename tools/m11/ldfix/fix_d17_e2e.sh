@@ -24,8 +24,10 @@ step "4/6 spill 宛 CELL_COLLAPSED の判定対応 (#1169)"
 "$PY" "$HERE/spill37_1169.py" "$OUT/spill37_1169.tsv" "$OUT/ssa_base.json" "$OUT/ssa_fix.json" || exit 1
 cmp "$OUT/spill37_1169.tsv" "$HERE/results/spill37_1169.tsv" || { echo "[fix_d17_e2e] FAIL: spill37_1169.tsv が results と不一致" >&2; exit 1; }
 step "5/6 spill 宛 TRUE_DROP の修復 pass (#2794): 1 対 1 のゲート付き・修復後 audit・突合"
-"$PY" "$HERE/fix_spill_2794.py" "$OUT/boot_d17.ll" "$OUT/ssa_base.json" "$IMG" "$CFG" "$OUT/boot_spill.ll" \
-  --tsv "$HERE/results/spill37_1169.tsv" --report "$OUT/spill_2794.json" || exit 1
+spillout="$("$PY" "$HERE/fix_spill_2794.py" "$OUT/boot_d17.ll" "$OUT/ssa_base.json" "$IMG" "$CFG" "$OUT/boot_spill.ll" \
+  --tsv "$HERE/results/spill37_1169.tsv" --report "$OUT/spill_2794.json")" || exit 1
+echo "$spillout" | head -1
+echo "$spillout" | grep -q '^cmp fixed=3 skipped=25$' || { echo "[fix_d17_e2e] FAIL: icmp 根拠 (cmp) の修復件数が 3 件・見送り 25 件にならない" >&2; exit 1; }
 "$PY" "$HERE/audit_lsf_ssa.py" "$OUT/boot_spill.ll" "$IMG" "$CFG" --json "$OUT/ssa_spill.json" | head -1
 "$PY" "$HERE/check_spill_2794.py" "$OUT/ssa_base.json" "$OUT/ssa_spill.json" "$OUT/spill_2794.json" "$HERE/results/spill37_1169.tsv" "$OUT/spill_repair_2794.tsv" || exit 1
 cmp "$OUT/spill_repair_2794.tsv" "$HERE/results/spill_repair_2794.tsv" || { echo "[fix_d17_e2e] FAIL: spill_repair_2794.tsv が results と不一致" >&2; exit 1; }
@@ -49,6 +51,14 @@ echo "$argi5" | head -1
 echo "$argi5" | head -1 | grep -q '^spill fixed=9 skipped=21 ' || { echo "[fix_d17_e2e] FAIL: ネガコン 4 (argi を 1 つずらす) が 9 件・見送り 21 件にならない" >&2; exit 1; }
 echo "$argi5" | grep -c ' callarg_ir_matches=0$' | grep -qx '4' || { echo "[fix_d17_e2e] FAIL: ネガコン 4 で callarg の 4 site が callarg_ir_matches=0 にならない" >&2; exit 1; }
 echo "[fix_d17_e2e] ネガコン 4: 引数位置を 1 つずらすと callarg の 4 site が見送られる (期待どおり)"
+cmpnc="$("$PY" "$HERE/fix_spill_2794.py" "$OUT/boot_d17.ll" "$OUT/ssa_base.json" "$IMG" "$CFG" "$OUT/boot_spill_cmpoff.ll" \
+  --tsv "$HERE/results/spill37_1169.tsv" --gate both --cmp off)" || exit 1
+echo "$cmpnc" | grep -q '^cmp fixed=0 skipped=0$' || { echo "[fix_d17_e2e] FAIL: ネガコン 5 (cmp gate を外す) で cmp 修復が 0 件にならない" >&2; exit 1; }
+"$PY" "$HERE/audit_lsf_ssa.py" "$OUT/boot_spill_cmpoff.ll" "$IMG" "$CFG" --json "$OUT/ssa_spill_cmpoff.json" > /dev/null || exit 1
+off_n="$("$PY" -c 'import json,sys; a=json.load(open(sys.argv[1])); print(sum(1 for v in a["functions"].values() for s in v["sites"] if s.get("frame") and (s.get("cell") or {}).get("verdict")=="CELL_COLLAPSED"))' "$OUT/ssa_spill_cmpoff.json")"
+on_n="$("$PY" -c 'import json,sys; a=json.load(open(sys.argv[1])); print(sum(1 for v in a["functions"].values() for s in v["sites"] if s.get("frame") and (s.get("cell") or {}).get("verdict")=="CELL_COLLAPSED"))' "$OUT/ssa_spill.json")"
+[ "$off_n" = 28 ] && [ "$on_n" = 25 ] || { echo "[fix_d17_e2e] FAIL: ネガコン 5 で cmp gate の有無による spill 宛 CELL_COLLAPSED の差が 3 件 (off=28 on=25) にならない: off=$off_n on=$on_n" >&2; exit 1; }
+echo "[fix_d17_e2e] ネガコン 5: icmp 根拠 (cmp) の gate を外すと spill 宛 CELL_COLLAPSED が 28 件のまま、入れると 25 件 (3 件差。突合の C2 は両方 PASS)"
 step "6/6 emcc 構文検証 (修復 IR)"
 if ! source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1 || ! command -v emcc > /dev/null 2>&1; then
   echo "[fix_d17_e2e] FAIL: emsdk が無い (/opt/emsdk/emsdk_env.sh の source か emcc の検出に失敗)" >&2

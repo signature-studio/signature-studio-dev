@@ -94,6 +94,9 @@ export async function createWasmEngine({ flprovUrl, ids }) {
     browserOp: () => M._fl_engine_browser_op(),
     stepItemProbe: (prm, v, s0, s1) => M._fl_engine_step_item_probe(prm, v, s0, s1),
     gridItemsProbe: (seed, n) => M._fl_engine_grid_items_probe(seed, n),
+    keyClear: () => M._fl_engine_key_clear(),
+    keyN: () => M._fl_engine_key_n(),
+    keyGet: (i, f) => M._fl_engine_key_get(i, f),
     noteEnumProbe: (seed, n, chan, step, V) => {
       const k = M._fl_engine_note_enum_probe(seed, n, chan, step, V);
       return Array.from(new Int32Array(M.HEAPU8.buffer, M._fl_engine_note_enum_out(), k));

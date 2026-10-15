@@ -30,5 +30,8 @@ clean = sum(1 for b in blocks if 'ott_unsup(' not in b)
 print('   lifted functions=%d (blocks=%d) clean(ott_unsup なし)=%d with_unsup=%d unsup_sites=%d insns=%d' % (
     len(m['functions']), len(blocks), clean, len(blocks) - clean, len(m['unsup_sites']), m['ninsn']))
 PY
+echo "== 3/3 .text 外候補 211 件の由来・棄却内訳・U4f〜U4i (mx47_origin.py)"
+python3 "$HERE/scripts/mx47_origin.py" "$PE" "$REACH" "$W/origin.json" > "$W/origin.stdout"
+python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print('   .text 外候補=%d (由来: 値が image 外 %s / .data %s) 棄却=%d (per FuncInfo)' % (d['out_of_text_candidates'], d['out_where'].get('value in outside_image'), d['out_where'].get('value in .data'), d['fh3_funcinfo_rejected_total']))" "$W/origin.json"
 T1=$(date +%s)
 echo "OK  elapsed=$((T1-T0))s"

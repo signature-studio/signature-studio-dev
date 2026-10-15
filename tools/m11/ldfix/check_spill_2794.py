@@ -34,19 +34,24 @@ def main():
     verdict = {(r[0], r[1]): r[3] for r in rows if len(r) > 3}
     removed = before - after
     fixed_set = set(fixed)
-    # callarg 根拠 (#2910) の修復は、audit が関数 × K 単位で判定するため、同じ K の別の i32 読み出しが残る限り CELL_COLLAPSED のまま残る
+    # callarg 根拠 (#2910) の修復は、audit が関数 × K 単位で判定するため、同じ K の別の i32 読み出しが残る限り CELL_COLLAPSED のまま残る。
+    # ただし icmp 側の根拠 (#4418) で同じ (関数, K) の i32 読み出しを全て直した場合は、その (関数, K) の callarg site も audit から消える。
+    cmp_groups = {(x['fn'], x['K']) for x in rep.get('cmp_fixed', [])}
     callarg = {k for k in fixed_set if fixed[k].get('ev', '1to1') != '1to1'}
+    callarg_open = {k for k in callarg if (k[0], fixed[k]['K']) not in cmp_groups}
+    callarg_cleared = callarg - callarg_open
     ok = True
     if not after <= before:
         print('FAIL C1: 修復後に新たな spill 宛 CELL_COLLAPSED が出た: %s' % sorted(after - before)[:5])
         ok = False
-    if removed != fixed_set - callarg:
-        print('FAIL C2: 消えた site %d 件 != 1 対 1 で修復した site %d 件 (差 %s)' % (len(removed), len(fixed_set - callarg), sorted(removed ^ (fixed_set - callarg))[:5]))
+    if removed != (fixed_set - callarg) | callarg_cleared:
+        print('FAIL C2: 消えた site %d 件 != 1 対 1 + icmp 根拠で消える callarg の %d 件 (差 %s)' % (len(removed), len((fixed_set - callarg) | callarg_cleared), sorted(removed ^ ((fixed_set - callarg) | callarg_cleared))[:5]))
         ok = False
-    if callarg - after:
-        print('FAIL C2b: callarg 根拠の修復 site が audit から消えた (判定の粒度の前提が崩れた): %s' % sorted(callarg - after)[:5])
+    if callarg_open - after:
+        print('FAIL C2b: callarg 根拠の修復 site が audit から消えた (判定の粒度の前提が崩れた): %s' % sorted(callarg_open - after)[:5])
         ok = False
-    print('callarg 根拠の修復 %d site は audit 上 CELL_COLLAPSED のまま (同一 K の別読み出しが残る)' % len(callarg & after))
+    print('callarg 根拠の修復 %d site は audit 上 CELL_COLLAPSED のまま (同一 K の別読み出しが残る)' % len(callarg_open & after))
+    print('callarg 根拠の修復 %d site は icmp 根拠 (cmp) の修復で同じ (関数, K) が全て直り audit から消えた' % len(callarg_cleared))
     bad = [k for k in fixed_set if verdict.get(k) != 'TRUE_DROP']
     if bad:
         print('FAIL C3: TRUE_DROP 以外を修復した: %s' % bad)

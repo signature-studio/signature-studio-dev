@@ -48,14 +48,15 @@
 | 対照 (規則変更なし) | 3 / 1 / 44 | 3 / 1 / 46 / 1 | `results/frame_store_alias_4204.json` |
 | `--negctl-glk` (全関数の漏出を True) | 3 / 1 / 44 | 3 / 1 / 46 / 1 | `results/negctl_alias_4204_glk.json` |
 | `--negctl-nosync` (区間 sync 無効) | 3 / 1 / 44 | 3 / 1 / 46 / 1 | `results/negctl_alias_4204_nosync.json` |
+| `--negctl-noglk` (#4330 で追加。全関数の glk を False) | 4 / 34 / 10 | 4 / 36 / 10 / 1 | `results/negctl_alias_4330_noglk.json` (`REPORT_4330.md` §3) |
 
-**ネガコンは対照と区別できない。** 3 条件は関数・site の判定が全件一致する (関数 verdict の差 0、site の差 0)。理由:
+**`--negctl-glk`・`--negctl-nosync` は対照と区別できない。** この 2 条件は関数・site の判定が全件一致する (関数 verdict の差 0、site の差 0)。`--negctl-noglk` (#4330 で追加) は対照と区別できる。理由:
 
 - 対照の時点で **45/48 関数が既に glk=True** (#4090 の `lea` 規則で F が広がったため)。`--negctl-glk` が変えるのは残り 3 関数だけ (`412160`・`6ca580`・`6ca6c0`)。
 - その 3 関数の判定は glk に依存しない。`412160` は LIVE-IN (`NO_DEF_ON_ANY_PATH`)、`6ca580`・`6ca6c0` は `BARRIER(ALIAS_FRAME_PTR)` で、どちらも glk の値では変わらない。
 - `--negctl-nosync` も判定を 1 件も変えない (rsp/rbp 同一視の区間が、対照の 48 関数の判定に効いていない)。
 
-したがって、本 PR の測定では「漏出規則が効いていること」「sync 規則が効いていること」を示せていない。前回の「ネガコンは `negctl_alias_2211_glk.json` と一致し、漏出規則が効いていることを再確認した」は、現判定器では根拠にならない (撤回)。区別できるネガコン (対照で glk=True の関数を glk=False に落とす条件など) は、子 #4330 [LD-210] で設計する。
+したがって、本 PR の測定では「漏出規則が効いていること」「sync 規則が効いていること」を示せていない。前回の「ネガコンは `negctl_alias_2211_glk.json` と一致し、漏出規則が効いていることを再確認した」は、現判定器では根拠にならない (撤回)。区別できるネガコンは #4330 [LD-210] で追加した。`--negctl-noglk` (対照で glk=True の 45 関数を glk=False に落とす) は関数 verdict 34 件・site verdict 36 件が対照と異なる (`tools/m11/ldfix/REPORT_4330.md` §3)。上の 2 種のネガコンは対照と全件一致のままで、本節の「効いていることを示せていない」は `--negctl-noglk` で補われた (glk 規則は効く)。sync 規則 (`--negctl-nosync`) は依然として対照と区別できていない。
 
 対照の `5cb210` は `5cb4aa` が `BARRIER:ALIAS_FRAME_PTR` (`5cb47d`) で、判定は UNDETERMINED。HEAD でも UNDETERMINED のままで、漏出の根 (`5cb21e`) は変わらない。
 
@@ -153,4 +154,4 @@ index af3b696de..99ddc743e 100644
 |---|---|---|
 | 呼出し先 `407a50` と 5 個 (`4073e0`・`4074d0`・`407570`・`407680`・`407770`) の戻り値規則 | `409410` の戻り値が frame 非派生と示せず、`5cb4aa` の判定が閉じない | #4238 [LD-205] (戻り値規則の続きは子 #4288 [LD-208])
 | 漏出 store `5cb47d` (`ALIAS_FRAME_PTR`・frame 自己保存 `5cb21e` などが根) | 関数 5cb210 が glk のまま `5cb4aa` が UNDETERMINED | #3225 [LD-150] |
-| 区別できるネガコンが無い (§5。対照と全件一致) | 漏出規則・sync 規則が効いていることを本 PR では示せない | #4330 [LD-210] |
+| sync 規則 (`--negctl-nosync`) が対照と全件一致 (§5)。glk 規則は `--negctl-noglk` (#4330) で区別できた | sync 規則が効いていることを示せていない | #4204 (本 issue の残件。sync 用の区別できるネガコンを別途設計する) |
