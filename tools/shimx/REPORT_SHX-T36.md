@@ -61,6 +61,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| HEAD の生成物 3 件 (`BACKLOG.md`・`data/coverage.json`・`inventory.md`) が、入力ありの再生成結果と一致しない (`midi_conv.c` の追加・運用フックの 69→79 など。HEAD の値は古い) | 入力ありの run ごとに 3 件が書き換わる。repo の値は古いまま | [SHX-T41] (子 issue) |
+| HEAD の生成物 3 件 (`BACKLOG.md`・`data/coverage.json`・`inventory.md`) が、入力ありの再生成結果と一致しない (`midi_conv.c` の追加・運用フックの 69→79 など。HEAD の値は古い) | 入力ありの run ごとに 3 件が書き換わる。repo の値は古いまま | [SHX-T41] #3819 (子 issue) |
 
 - 入力欠落時は coverage 基準 (担当範囲の未実装 0・M4 継承 53/53) の検査も SKIP される。設計どおり。この検査は入力の揃う run (`oc_artifacts: toolchain-emsdk work-m11 work-m6-ott`) でのみ行われる。
