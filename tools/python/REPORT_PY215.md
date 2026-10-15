@@ -87,13 +87,13 @@
 
 ## 6. main 取り込み後の再測定 (PR #3848 の競合解消)
 
-PR #3848 は main (`f4d8cf90e`) が先に進んだため競合した。rebase・force は使わず、`origin/main` を merge した (merge commit `1a66791d4`)。競合は `tests/provider_check.mjs` の実装判定の行と件数だけで、main 側の判定 (`pe132` など) を残し、本 PR の `pe215` を足した。件数は main の 171 / 264 から **172 / 263** になる。
+PR #3848 は main が先に進んだため 2 回競合した (1 回目 `f4d8cf90e`・2 回目 `b93159de4`)。rebase・force は使わず、`origin/main` を merge した (測定 commit `602ed5be9`)。競合は `tests/provider_check.mjs` の実装判定の行と件数だけで、main 側の判定 (`pe132` など) を残し、本 PR の `pe215` を足した。件数は main の 173 / 262 から **174 / 261** になる。
 
-測定 commit (コードを変えた最後の commit): `1a66791d4` (merge)。`git diff 1a66791d4 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節の commit は REPORT だけ)。
+測定 commit (コードを変えた最後の commit): `602ed5be9` (merge)。`git diff 602ed5be9 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節の commit は REPORT だけ)。
 
 | 検査 | コマンド | rc | 結果 |
 |---|---|---|---|
 | provider ビルド | `bash provider/build.sh` | 0 | flprov.js / flprov.wasm 生成 |
-| provider_check | `node tests/provider_check.mjs` | 0 | functions 435・implemented **172**・unimplemented 263・PASS |
+| provider_check | `node tests/provider_check.mjs` | 0 | functions 435・implemented **174**・unimplemented 261・PASS |
 | device_diff | `node tests/device_diff.mjs` | 0 | linked_channel `[-1,null,null,-1,null,null]`・**diffs 0**・PASS |
 | all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 0 | total 48・**ok 48**・host_calls 37,425 |
