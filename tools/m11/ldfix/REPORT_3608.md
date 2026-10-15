@@ -9,7 +9,7 @@
 - **項目 2 (段別 A/B・達成)**: 元の 9 件のうち 53・87・138 は **qstore だけで消える** (ldfix の後に qstore だけを足すと 9→6)。158 は **qstore と alloca の両方が要る** (qstore だけ (c4) も、qstore を外した prod fix (l_no_qstore・alloca あり) も残る)。17 は alloca、56 は guard699 で消える。**ld108・ld115・src412770 は 9 件の集合も本番順の 22 件の集合も変えない** (累積 A/B と leave-one-out の両方で確認。unit 番号の照合は §1-3)。
 - **項目 3 (r8b を含む本番順の判定・達成)**: r8b (`fix_r8b815050.py`・main の `m11_gen_ir2.sh` の既定) を含めても、件数 (survey ok/miss/trap) は r8b 無しと同じ。fix・base とも 872/47/22。fix と base の差は unit 895 (OOB → halt0) の 1 件だけ。r8b は unit 280・659 の trap を消さない (最内 frame は同じ callee `function_6cefb0`。呼出し位置の offset だけが変わる)。
 - **項目 4 (F3c 33→43 の出所・達成)**: commit `f63b5953d` (`fix(ldfix): repair first-deref-not-entry uses dominated by the deref block (refs #1325)`) で F3c 関数が 33 → 43 に増えた。同じ入力 `boot_final3.ll` で、親 (`f63b5953d^`) は 33、この commit は 43 (§4)。
-- **項目 1 (trap 144・149・114 の引き金・未達)**: unit 別の最内 frame と段ごとの変化までを記録した。引き金 (最内 IR 関数の入力値・書込み元) は未特定。PR は部分達成 (`Refs #3608`)。残りは #3608 で続行。
+- **項目 1 (trap 144・149・114 の引き金・部分達成)**: unit 別の最内 frame と段ごとの変化 (§1〜§3)。§8 で commit 済みスクリプトによる引数採取を行った。144 の a1 の書込み元 (`function_653660` 219682 行 ← `function_439550` が `dsp_ippv2.dll` を小文字化) まで特定。149 は `[0x10aa1418]` の書込み元 (`function_4136a0` 119304 行) まで、114 は未採取。PR は `Refs #3608`。
 
 ## 1. 測定 (測定 commit `e6c940834`・HEAD 再測定済み・`87208313b` と一致 (§6))
 
@@ -130,7 +130,9 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| trap 144 (最内 `function_44aeb0` の入力値・書込み元)・149 (`function_412e40`)・114 (Halt 呼出し元) の unit 単位の引き金 | 項目 1 (受入 1 の残り) | #3608 (open のまま・部分達成) |
+| 144: `function_6539e0` が `dsp_ippv2.dll` (0x2572dc) を選ぶ条件 (呼出し元の分岐) | 項目 1 (受入 1 の残り) | #3608 |
+| 149: `function_412c20` の戻り値 0 の由来・`Blend2D.dll` (0x264208) を渡す上流 | 項目 1 (受入 1 の残り) | #3608 |
+| 114: Halt 呼出し元 (halt0 の probe が未実装) | 項目 1 (受入 1 の残り) | #3608 |
 | ldfix の F3a 2・F3c 43 のうち件数に反映されなかった修復 (反映は unit 895 の 1 件) の理由 | 項目 3 の理由 | #3608 |
 | §8 の引数採取 (probe144.py・read144.mjs) が未 commit で、committed HEAD から再現できない。`--full` の IR 再生成は Ghidra (`functions_dll.csv`) が要るが、本 runner に Ghidra は無い (`work-m11` の展開で `boot_final3.ll` は使える) | §8 の全数値の根拠 (受入 1) | #3608 (採取スクリプトの commit と Ghidra 付き IR 生成環境が要る) |
 
@@ -176,9 +178,40 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 - 機械照合は 44f040 9 件・47cf10 8 件・6074b0 4 件で、いずれも従来どおり 21 件 ok。
 - **受入 1 は未着手**: 144・149 の trap 時点の引数採取 (`trap56_probe_942.mjs` 相当の probe) と書込み元の追跡は本 run では行っていない。次の run で着手する。
 
-## 8. trap 144・149・114 の引き金 (受入 1・部分) — 未再現のため測定値は撤回
+## 8. trap 144・149・114 の引き金 (受入 1・部分) — commit 済みスクリプトで採取
 
-- 前の run で採取した entry 引数の表 (144 の `a1`・149 の `a2` など) は撤回した。採取に使った probe (`probe144.py`・`read144.mjs`) は commit されておらず (`work/` 内・gitignore)、committed HEAD から再現できない。撤回前の本節は commit `1c0911297` の `tools/m11/ldfix/REPORT_3608.md` §8 に残る。ここには値も読みも書かない。
-- `ldfix_e2e.sh`・`prod_order_3608.sh` の rc・件数は、HEAD `e6c940834` で再実行して一致を確認した (§6)。素材: `$ARTIFACTS_DIR` に `fl-win64.tar.zst`・`work-m11.tar.zst`・`toolchain-retdec.tar.zst`・`toolchain-emsdk.tar.zst` が実在する。`toolchain-retdec` の `retdec/bin/retdec-decompiler`・`toolchain-emsdk` の `emsdk/emsdk_env.sh` は `tar --zstd -tf` で実物の存在を確認した (展開はしていない)。`work-m11` は展開して `tools/m11/work/boot_final3.ll` (21.8 MB) を確認し、`fl-win64` は `block00031_PE.bin` のみ展開して使った。Ghidra は本 runner に無く、`--full` の IR 再生成はしていない。
-- 未確定 (受入 1 の残り): 144 の `function_44aeb0` が受ける値の書込み元、149 の `function_412e40` の引数の上流、114 の Halt 呼出し元。採取は採取スクリプトを committed な場所に置き、IR 生成環境が揃ってから行う。
-- 検証起点: `git diff 4e9e1d974 HEAD --numstat -- tools/m11/ldfix` の出力は `tools/m11/ldfix/REPORT_3608.md` のみで、コード差分は 0 (数値は PR 本文に書く)。
+- 採取スクリプト (commit 済み): `trap144_probe_3608.py` (prod fix の IR に entry 引数と store 書込み元の記録を入れる) と `trap144_read_3608.mjs` (trap 時に読む)。前 run の撤回済みの値は使わない。
+- 採取コマンド (`export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP`):
+  1. `bash tools/m11/ldfix/ldfix_e2e.sh` (rc 0・72 秒・判定 PASS・survey ok 136 / miss 14 / trap 9)
+  2. `bash tools/m11/ldfix/prod_order_3608.sh h_nor8b fix ld108,ld115,src412770,qstore,alloca,guard699,guard4fa210` (872 / 47 / 22・trap 集合は §1-3 の S22 と一致)
+  3. `python3 tools/m11/ldfix/trap144_probe_3608.py work/p3608/h_nor8b/prod.ll work/t144/probe.ll work/t144/sites.json` (store 54,043 件に計装・3 秒)
+  4. `bash tools/m11/ldfix/stage4.sh work/t144/probe.ll t144` (rc 0・units_run 109・init 111・icall_ok 435・dllmain_done True・threw なし)
+  5. `S4_NAME=t144 S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap144_read_3608.mjs > work/t144/read.txt` (26 秒)
+- 採取件数: probe 版の trap は 14 件 (全て OOB)。prod fix の OOB 14 件 (144・149・275・280・477・484・492・513・520・659・745・830・880・923) と一致。halt0 8 件は reader の対象外 (kind が OOB のみ採取) のため未採取。
+- 出力: `work/trap144_units_3608.json` (gitignore)・`work/trap144_read_3608.txt`。site 番号は `work/t144/sites.json` の `stores[sid-1]` (元 IR の関数名・行番号)。
+
+### 8-1 unit 144 (OOB・最内 `function_44aeb0`)
+
+- 採取値: `function_44aeb0` の entry arg1 = `0x5f007000730064`・arg2 = `0x418b4820`。
+- 上流: `function_44f040` (arg1 = `0x10aa13f0`・arg2 = `0x2539c8`) ← `function_653660` (arg1 = `0x10aa1400`・arg2 = `0x2572dc`・arg3 = 1・arg4 = 0) ← `function_6539e0` (arg1 = `0x2572dc`・arg2 = 1・arg3 = 0)。
+- `[0x10aa13f0]` の最後の書込み: `function_653660` の IR 219682 行 `store i64 %13, ptr %stack_var_-32`。`%13` は `%13 = load [stack_var_-56]` (219656 行付近) で、その前の `call function_439550(&stack_var_-56, arg2 = 0x2572dc)` が書いた値。
+- `function_439550` は arg2 から 16bit ずつ読み、A-Z の範囲だけ小文字化 (`|0x20`) して arg1 へ書く (IR 134964 行〜・store は 135001 行)。よって `0x2572dc` の文字列 `"dsp_ippv2.dll"` (UTF-16LE・image 内の実値) を小文字化したものが `0x5f007000730064` (`"d\0s\0p\0_\0"` の 8 byte) になる。
+- 書込み元の要約: unit 144 の a1 は `function_6539e0` の定数文字列 `0x2572dc` (`dsp_ippv2.dll`) が `function_439550` でコピーされたもの。値の選択 (なぜ `dsp_ippv2.dll` を渡すか) は未追跡。
+
+### 8-2 unit 149 (OOB・最内 `function_412e40`)
+
+- 採取値: `function_412e40` の entry (4 回 hit): arg1 = `0x10aa1418`・arg2 = `0x2`。上流: `function_653660` (arg1 = `0x10aa1430`・arg2 = `0x264208`・arg3 = 0・arg4 = 0) ← `function_6539e0` (arg1 = `0x264208`・arg2 = 0・arg3 = 0)。
+- `[0x10aa1418]` の最後の書込み: `function_4136a0` の IR 119304 行 `store i64 %9, ptr %15` (%9 = `call function_412c20(len)` の戻り値。採取値は 0)。
+- 未特定: `function_412c20` の戻り値 0 の由来。`0x264208` は `"Blend2D.dll"` (UTF-16LE・image 内の実値) で、`function_6539e0` の定数文字列。
+- 注: `function_412e40` の entry は 4 回 hit で、最後の 1 回の arg1 が `0x10aa1418`。記録は最後の entry のものを読んでいる。
+
+### 8-3 unit 114 (halt0・Halt 呼出し元)
+
+- 未採取。probe の読みは OOB のみ (halt0 は reader の対象外)。Halt 呼出し元の特定は未実施。
+
+### 8-4 未解決 (起票先 #3608)
+
+- 149: `function_412c20` の戻り値 (0) の由来、`0x264208` (`Blend2D.dll`) を `function_6539e0` に渡す上流の呼出し元。
+- 144: `function_6539e0` が `0x2572dc` (`dsp_ippv2.dll`) を選ぶ条件 (呼出し元の分岐)。
+- 114: Halt 呼出し元 (halt0 の probe が未実装)。
+- 採取は `trap144_read_3608.mjs` の reader に halt0 の枝を足す (未実装)。
