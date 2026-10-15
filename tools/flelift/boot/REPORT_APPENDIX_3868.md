@@ -58,7 +58,9 @@ KPI (起動に関わる PR): FLEngine 起動の units_run は **前 209 / 後 20
 
 ## H. 測定 commit と差分
 
-(最終 commit の hash と `git diff <測定 commit> HEAD -- tools/flelift/boot` の出力を入れる。下の値は差分 0 を確認した後で記入する。)
+- 測定 commit (コードを変えた最後の commit): `a29a998f8`。以後の commit は REPORT・DOC_MAP のみ。
+- 既定 route の監視版 (表 B の行) は、ST8/ST16 の値比較を入れる前の `wval_lift.py` で測った (store `0x6bc1af` の 8 byte 一致の結果は同じ。narrow store の件数は未測定)。診断 route の全表は `a29a998f8` で再測定済み。
+- `git diff a29a998f8 HEAD -- tools/flelift/boot/wval_lift.py tools/flelift/boot/wval_measure.sh tools/flelift/boot/wval_scan_3868.py` は出力なし (差分 0)。
 - 1 run・n=1。決定的な boot のため同一 commit の再実行は同値と見る。
 
 ## G. 再現
