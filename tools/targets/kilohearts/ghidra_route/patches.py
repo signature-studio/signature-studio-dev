@@ -28,6 +28,9 @@ GTYPE = {
         '181422a10': 'uint',       # minps/movaps・& -(uint)(...) の 4 byte マスク
         '182280bc0': 'longlong',   # cmp r10,qword・(longlong) 比較
         '182280bc8': 'longlong',   # cmp r10,qword・(longlong) 比較
+        # 関数ポインタ slot (#4671 KH-106)。呼出し 44 箇所は全て `call/jmp [rip+slot]` (CFG dispatch) で、呼び先は直前に rax へ入る値で決まる。
+        # slot の PE 初期値は CFG thunk (`jmp [rip+..]`→`jmp rax`) で、データとして使わない。型は `void (*)()` (引数・戻り値は呼出し側で決まる)。
+        '1813a1d40': 'FNPTR',
     },
 }
 # ABI 表 (resonator 残件 emcc 4 件 = param_1 不足 3・引数数不一致 1)。Ghidra が呼出元で引数・戻り値を落としたため、
