@@ -43,7 +43,7 @@ python3 tools/plugins/slayer_engine_ia32/gap_indirect.py $FL_WIN64_DIR/extracted
 
 ## 6. 関数/data の判定 (受入 1)
 
-- 測定 commit: 本 PR の `gap_func_4729.py` を追加した commit。 入力は §4 と同じ block22434_PE.bin (sha256 `84b64c43…`)、区間は GAP_INDIRECT_4729.md の 34 行。
+- 測定 commit: `94c02ca97` (`gap_func_4729.py` と `GAP_FUNC_4729.md` を追加した commit)。 入力は §4 と同じ block22434_PE.bin (sha256 `84b64c43…`)、区間は GAP_INDIRECT_4729.md の 34 行。 `94c02ca97` で再生成した表が commit 済みの `GAP_FUNC_4729.md` と一致した。
 - 判定の根拠 (区間ごと): 表 [GAP_FUNC_4729.md](GAP_FUNC_4729.md) (自動生成)。 P = 先頭の prologue、C = 直接 call/jmp rel32 の先頭 (0 件)、X = 線形 decode の境界一致、E = 末尾が ret/jmp/ud2、Z = 0x00 の割合、N = 不正バイト数。
 - 結果: **func 6 / data 0 / hold 28** (計 34)。
   - func 6: 0x1000a690・0x1000ba48・0x1000d70c・0x1000e987・0x1000ef59・0x10012415。 prologue あり・decode 境界一致・末尾が ret。 ただし呼び元 (C) は 0 件なので、**関数の確定ではない**。 prologue の 1〜2 バイトは data にも現れるため、根拠は弱い。
