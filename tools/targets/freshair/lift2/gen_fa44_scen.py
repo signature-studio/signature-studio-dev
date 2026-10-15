@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """gen_fa44_scen.py <out> [N] [seed] — FA-44 (Delay / Disperser / Phaser / QuickEq の SC process) の smoke 用シナリオ。
 判定はしない。1 call 目に S+0x98 へ sample rate を書き、各 call で n 個の L/R サンプルを入れる。
-param の offset→意味は未確定のため、S/P への追加書込は入れない (REPORT_APPENDIX_FA44.md §2)。"""
+param の offset→意味は未確定のため、S/P への追加書込は入れない (REPORT_APPENDIX_FA44.md §4)。"""
 import random, struct, sys
 out = sys.argv[1]; N = int(sys.argv[2]) if len(sys.argv) > 2 else 20; seed = int(sys.argv[3], 0) if len(sys.argv) > 3 else 0xFA44
 rnd = random.Random(seed)

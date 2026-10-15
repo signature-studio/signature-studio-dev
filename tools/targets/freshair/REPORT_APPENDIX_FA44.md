@@ -30,7 +30,7 @@
 | QuickEq (`native_quickeq.c`) | 0 | 20 | 0 |
 | QuickEq (`native_quickeq.c`) | 1 | 20 | 0 |
 
-- 出力 md5 (fma 0): Disperser `7e8a51ef…`・Phaser `000552b1…`・QuickEq `46247ea4…` は 2 回で一致。fma 0/1 でも Disperser・Phaser・QuickEq は一致。
+- 出力 md5 (fma 0・先頭 8 hex): Disperser `7e8a51ef…`・Phaser `000552b1…`・QuickEq `46247ea4…` は 2 回の実行で一致。fma 1 の md5 は記録していない (fma 0 のみ 2 回一致)。fma 1 の ERR 0・20 行は上の表のとおり。
 - **Delay の出力は実行ごとに変わる**。原因は状態ダンプに載る heap ポインタ (`calloc` の遅延線 buffer の値。ASLR で毎回変わる)。計算結果の差ではない。Delay の出力 bit 比較は、ポインタ欄を除いた上で行う必要がある (未実施)。
 - mlift の report: Delay は 61 関数中 1 関数が未対応命令 (`pextrd`) で failed。ネイティブの実行には影響しない (lift 経路ではない) が、wasm 化には影響する (#3740 の範囲外)。
 - 限界: 出力の値が正しいこと (wasm・KH との一致) は未確認。
@@ -53,5 +53,5 @@
 |---|---|---|
 | 4 組の param 写像 (C4) の確定 | 差分実行の入力が未確定 | #4053 (子, 親 #3740) |
 | Delay の出力の比較 (ポインタ欄を除く) | Delay の bit 比較が未実施 | #4053 (子, 親 #3740) |
-| Delay の未対応命令 `pextrd` (wasm 化) | wasm 化の範囲外 | #4053 (子, 親 #3740) |
-| 4 組の出力値の正しさ (wasm・KH との一致) | smoke は実行できたまでの確認 | #4053 (子, 親 #3740) |
+| Delay の未対応命令 `pextrd` (wasm 化) | wasm 化の範囲外 | #52 (残件) |
+| 4 組の出力値の正しさ (wasm・KH との一致) | smoke は実行できたまでの確認 | #52 (残件) |

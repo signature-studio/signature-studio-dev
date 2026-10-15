@@ -1,7 +1,7 @@
 /* native_delay.c — Delay snapin process (SlateCore 0x180ba8ad0) を実機機械語で実行する参照ハーネス (#3740 / FA-44)。
  *   ./native_delay <core> <scen.txt> [fma]
  * 呼出規約は native_filter.c と同じ (proc(S, ctx))。シナリオは gen_fa44_scen.py。判定はしない (ERR 件数と行数だけ使う)。
- * シナリオの nW 書込はそのまま適用する。param の意味 (offset→値) は未確定 (REPORT_APPENDIX_FA44.md §2)。 */
+ * シナリオの nW 書込はそのまま適用する。param の意味 (offset→値) は未確定 (REPORT_APPENDIX_FA44.md §4)。 */
 #include "pe_map.h"
 #include "native_shim.h"
 typedef long long (__attribute__((ms_abi)) *proc_t)(void*, void*);
