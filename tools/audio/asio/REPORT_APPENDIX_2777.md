@@ -115,7 +115,7 @@ git diff --numstat 6b095da2 3a687abd -- tools/audio
 ## 7. 2026-10-15 再測定: 床 (`FLA_F_T_FLOOR`) 適用後の失敗の残存
 
 - 測定 commit: `c0fb6e074` (origin/main。`tools/audio` のコードは変えていない。本 PR は REPORT と付録のみ)。worktree は `ws-2777` (branch `2777-asio-com-underrun-load`)。
-- 手順: `bash tools/audio/asio/build.sh` (emsdk は `/opt/emsdk/emsdk_env.sh`・ビルド 9 秒) の後、`node harness/run_com.mjs --quick --only com_ramp_b256_d2 --out <json>` を 1 回ずつ foreground で実行。負荷下は `yes > /dev/null` を 4 本 (4 コア) 掛け、実行後に PID 指定で停止。判定基準 (underrun 0・silence 0・ramp bit-exact) は変えていない。
+- 手順: `bash tools/audio/asio/build.sh` (emsdk は環境変数 `EMSDK_ENV` で指定。素材 `toolchain-emsdk`・ビルド 9 秒) の後、`node harness/run_com.mjs --quick --only com_ramp_b256_d2 --out <json>` を 1 回ずつ foreground で実行。負荷下は `yes > /dev/null` を 4 本 (4 コア) 掛け、実行後に PID 指定で停止。判定基準 (underrun 0・silence 0・ramp bit-exact) は変えていない。
 - 実行: 負荷なし 10 回・負荷下 (yes×4) 5 回。すべて単独の `--only` 実行で、実行前 load は負荷なし 0.03〜1.15・負荷下 0.30〜5.89。
 
 | 区分 | 結果 | underrun / silence | min_fill | T (lat_out) | latency_changes | ramp 不一致 | cb_max (µs) | callback_gap max (ms) |
