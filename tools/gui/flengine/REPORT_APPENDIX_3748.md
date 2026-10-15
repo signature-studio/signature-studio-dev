@@ -71,6 +71,21 @@
 - 解釈: 比較の欠陥 (`function_40fd90`・D15 とは別の脱落) は実在するが、`function_41a800` が vtable の呼出しを持たないため、QueryInterface の結果は今も使われていない。両方直して初めて効くので、子 #4011 と #4012 に分けた。
 - 実験の IR は元に戻した (`boot_final3.ll` は `m11_build.sh` 再生成前のものに戻し、`grep -c iidlo12` は 0)。
 
+## 5-2. #4074 (WIN-45): 修復 (`M2s`) の lift 後経路での確認
+
+- 修正: `pass_m2s_fn40fd90_iid` の検索文字列が `define weak i64 @function_40fd90(` だったが、この段の IR は weak 化前の `define i64 @function_40fd90(` である。そのため `M11_M2S=1` でも 0 sites で何も入らなかった。検索を両形に対応させた (`tools/m11/m11_passes.py`)。修正後は `[ir11][M2s] function_40fd90 IID compare restore: 1 sites`。
+- 測定の組: `work-m11` (stale 版) の `lift` 済み `boot*.lift.ll` から `m11_gen_ir2.sh` → `m11_build.sh` → `tools/gui/flengine/build.sh` を実行 (素材 `fl-win64`・`work-m11` 展開、`apt-mingw` 導入)。
+- 比較: 修復あり (`M11_M2S=1`) と修復なし (既定) の 2 組。`boot_halt_probe.mjs` の結果は次のとおり。
+
+| 項目 | 修復なし (既定) | 修復あり (`M11_M2S=1`) |
+|---|---|---|
+| `units_run` / `init_count` / `icall_miss` | 109 / 111 / 7 | 109 / 111 / 7 |
+| 停止 unit (0 起算) | 114 (`0x623840`) | 114 (`0x623840`) |
+| `halt_intf.arg3_in_table` / entry 3 `hit` | true / true | true / true |
+
+- 結論: 修復ありと修復なしで停止位置は変わらない (受入 2 の「停止が解消する」は未達)。`halt_intf` の entry 3 hit は probe の JS 側の走査で、lift 後の `function_40fd90` が返す値の確認ではない。単独では停止位置は動かない、という §5 の解釈と整合する。
+- 受入 3: issue の「行 214667 付近の `icmp eq i64 %X, %argN`」は誤り。`boot_final3.ll` 214667 は `function_639ce0` の内部で `icmp` 行ではない。全 `icmp eq i64 %X, %argN` は 129 件。そのうち直前に `load i64` で `%X` を作る形は 81 件。個別に読んだのは `function_40fd90` (修復済み) と、最も近い `function_410010` (行 115966) の 2 件だけで、後者はリストの値との比較で IID 比較ではない。残り 79 件の分類は未実施 (未解決)。
+
 ## 6. 製品 KPI (起動・GUI)
 
 - 前 (`f4e471170` の再生成 IR): `units_run 110 / init_count 111 / Halt0 at unit 114 / reach 26 impl 26`。
