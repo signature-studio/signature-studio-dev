@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """PY-190 / #3371 の補助: `call qword ptr [reg + 0x118]` (VMT slot 35) の受け手レジスタについて、
-呼出し箇所の直前 (同一関数内・既定 80 命令) で最後に書かれた値の出どころを分類する。
+呼出し箇所より前 (同一関数内・関数先頭から呼出し箇所まで) で最後に書かれた値の出どころを分類する。
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_slot35_recv_src.py
 
