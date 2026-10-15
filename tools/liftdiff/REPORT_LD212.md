@@ -20,7 +20,7 @@
   - `xor r,r` 等のゼロ化イディオムは『読み』から除外した (除外しないと rdx の read が水増しされる。初回実行で確認)。
   - 分岐の先は追わず、call / jmp / ret で打ち切る。
 - 実行: `FL_WIN64_DIR=<展開先> python3 tools/liftdiff/tests/ld212_retuse.py <PE> --tsv work/ld212_retuse.tsv`。
-- 測定 commit: 本 PR の commit (main `d97c2a609` の上にのみ、新規 `tests/ld212_retuse.py` と本 REPORT を追加)。所要時間 **0.26 秒** (load 無視できる)。
+- 測定 commit: `7fe24a927` (main `d97c2a609` の上にのみ、新規 `tests/ld212_retuse.py` と本 REPORT を追加)。所要時間 **0.26 秒** (load 無視できる)。
 
 ## 3. 件数表 (実測・`ld212_retuse.py` の出力)
 
@@ -75,12 +75,12 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 20 関数の戻りレジスタ (rax / rdx / xmm0) を、呼出し元の読みで確定できない。窓内で rax / rdx を読む呼出し元が 0 件 | `ret_override` を追加できない。受入条件 2 (m11.json 反映と e2e PASS) は未達 | 本 issue #4379 の残件。窓を越えた追跡 (分岐・呼出し先の戻り値の伝播) を要する。親 #3572 |
-| 呼出し先の戻りレジスタを、呼出し元の窓を越えて追う方法が無い | 窓 24 命令の線形読みでは、戻り値の後続利用を見逃す | 本 issue の次段。窓の拡張 (分岐の追跡) の判断は PM |
-| 判定不能 11 関数 (全 22 実行 segv) | LD-158 §6 と同じ。本 issue の対象外 | #3572 の子 (未起票) |
+| 20 関数の戻りレジスタ (rax / rdx / xmm0) を、呼出し元の読みで確定できない。窓内で rax / rdx を読む呼出し元が 0 件 | `ret_override` を追加できない。受入条件 2 (m11.json 反映と e2e PASS) は未達 | #4429 (LD-215)。窓を越えた追跡 (分岐・呼出し先の戻り値の伝播) を要する |
+| 呼出し先の戻りレジスタを、呼出し元の窓を越えて追う方法が無い | 窓 24 命令の線形読みでは、戻り値の後続利用を見逃す | #4429 (LD-215)。窓の拡張 (分岐の追跡) の判断は PM |
+| 判定不能 11 関数 (全 22 実行 segv) | LD-158 §6 と同じ。本 issue の対象外 | #4378 (LD-211) |
 
 ## 5. 測定 commit からの差分
 
-- 測定 commit: 本 PR の commit (`tests/ld212_retuse.py` と本 REPORT の追加)。コード差分は新規ファイルのみで、既存の liftdiff の挙動 (e2e・`targets/m11.json`・`ldlib`) には触れない。
+- 測定 commit: `7fe24a927` (`tests/ld212_retuse.py` と本 REPORT の追加)。コード差分は新規ファイルのみで、既存の liftdiff の挙動 (e2e・`targets/m11.json`・`ldlib`) には触れない。
 - e2e `--m11-only` は本 PR で再実行しない (既存の経路を変えないため。受入条件 2 の再実行は、override を変える後続 PR で行う)。
 - 差分確認: `git diff --stat origin/main HEAD -- tools/liftdiff` は本 PR の新規 2 ファイルのみ。
