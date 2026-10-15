@@ -39,8 +39,8 @@ const calls = [
   ["ui.getFocused", [0]], ["ui.getFocused", [true]], ["ui.getFocused", ["x"]],
   // setter 3 件 (PY-129): 戻り値は None。型違い (setHintMsg は文字列のみ・setFocused / setSnapMode は整数のみ) は code 5。範囲外 (setSnapMode 15・-1) は未確認のため書込み無しの None を両者で揃える
   ["ui.setHintMsg", ["x"]], ["ui.setHintMsg", [""]], ["ui.setHintMsg", [1]], ["ui.setHintMsg", [null]],
-  ["ui.setFocused", [0]], ["ui.setFocused", [true]], ["ui.setFocused", [5]], ["ui.setFocused", ["x"]],
-  ["ui.setSnapMode", [0]], ["ui.setSnapMode", [14]], ["ui.setSnapMode", [15]], ["ui.setSnapMode", [-1]], ["ui.setSnapMode", ["x"]],
+  ["ui.setFocused", [0]], ["ui.setFocused", [true]], ["ui.setFocused", [5]], ["ui.setFocused", ["x"]], ["ui.setFocused", [null]],
+  ["ui.setSnapMode", [0]], ["ui.setSnapMode", [14]], ["ui.setSnapMode", [15]], ["ui.setSnapMode", [-1]], ["ui.setSnapMode", ["x"]], ["ui.setSnapMode", [null]],
   ...setters,
 ];
 // 引数個数違い (NOARGS の関数に引数を渡す・getFocused の 0 個と 2 個・setter の 0 個と 2 個): mock と C は共に code 5 (Wrong number of parameters)
