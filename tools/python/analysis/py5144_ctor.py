@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PY-5144 (#5144): 群 C の 2 つの VMT を書き込む命令 (コンストラクタ候補) を .text から探す。
+"""PY-5144 (#5144): 群 C の 2 つの VMT を参照する命令 (コンストラクタ候補) を .text から探す。
 
   python3 analysis/py5144_ctor.py <PE.bin>
 
@@ -7,7 +7,7 @@
 見るもの:
   - `mov qword [mem], imm32` (即値が VMT アドレス。符号拡張 imm32 を含む)
   - `lea reg, [rip+disp]` (target が VMT アドレス)
-各ヒットについて、直前 6 命令と、そのヒットを含む関数の先頭 (直前の int3 以後) を出す。
+各ヒットについて address・命令を出す (即値を含む全命令を数える。cmp・push 等を含みうる)。
 線形走査 (64KiB 単位) の近似で、データ部の誤デコードを含みうる。
 """
 import sys
@@ -43,6 +43,6 @@ while pos < len(tdata):
     pos = end
 
 for name, lst in hits.items():
-    print(f"== {name}: 書込み命令 {len(lst)} 件")
+    print(f"== {name}: 参照命令 {len(lst)} 件")
     for a, m, s in lst:
         print(f"  {a:#x}  {m} {s}")
