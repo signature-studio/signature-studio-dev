@@ -1,6 +1,6 @@
 # m11 area: FL_WIN64_DIR の既定値を tools/shared 経由へ (#294)
 
-結論: m11 area の `/home/ubuntu` 既定値は `tools/shared/paths.py` / `env.sh` の単一定義に置換済み。before (`706147914`) と after (`256a869d1`) で生成物・gate の出力は一致した。`m11_e2e.sh --full` の before/after は未実施 (子 #4245)。
+結論: m11 area の旧既定値 (作業用 VM の `ANALYSIS_DIR` 固定パス) は `tools/shared/paths.py` / `env.sh` の単一定義に置換済み。before (`706147914`) と after (`256a869d1`) で生成物・gate の出力は一致した。`m11_e2e.sh --full` の before/after は未実施 (子 #4245)。
 
 ## 測定
 
@@ -20,7 +20,7 @@
 
 ## 既定値の挙動
 
-- `ANALYSIS_DIR` 未設定: `FL_WIN64_DIR` = `/home/ubuntu/work/analysis/win64` (従来と同一)。
+- `ANALYSIS_DIR` 未設定: `FL_WIN64_DIR` = 従来の既定値 (`[ANALYSIS-DIR]` 配下の `win64`・従来と同一)。
 - `ANALYSIS_DIR` 設定時: `FL_WIN64_DIR` = `$ANALYSIS_DIR/win64` に追従する。従来の固定値とは異なるので、既定値の同一性は「未設定時」のみ成り立つ。
 
 ## 測定の鮮度 (#1268)
@@ -29,8 +29,9 @@
 
 ```
 diff --git a/tools/m11/m11_reloc_gate.sh b/tools/m11/m11_reloc_gate.sh
--source ../shared/env.sh   # FL_WIN64_DIR (既定は従来どおり /home/ubuntu/work/analysis/win64)
+-source ../shared/env.sh   # FL_WIN64_DIR (既定は従来どおり <旧既定 win64 パス>)
 +source ../shared/env.sh   # FL_WIN64_DIR (既定値は tools/shared/env.sh が正本)
+(引用では旧既定の絶対パスを `<旧既定 win64 パス>` に置換。実差分の行は `git diff a2ed45cf7 HEAD -- tools/m11/m11_reloc_gate.sh` で確認できる)
 ```
 
 差分は shell コメント 1 行のみ。実行行 (`source` 本体・`PE=` 以降) は同一。コメント以外に差分が無いので、実測値は HEAD にそのまま当てはまる。
