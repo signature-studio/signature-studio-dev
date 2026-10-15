@@ -153,7 +153,7 @@
 
 **mismatch の未確定事項**
 
-- 本節の取りこぼし 23・過剰 3 は本 PR の値。`mismatch 117` は §5.3 (`a505be525`) の値で、本 PR で再計算した値ではない。取りこぼし 23 + 過剰 3 = 26 は 117 と一致しないため、本 PR の mismatch は未確定。`mx_flow_recheck.py` を素材のある環境で head 再実行して揃える (未実施)。
+- 本節の取りこぼし 23・過剰 3 (合計 26) は、§5.7 (`4040ca5ff`) の再実行でも同じ値。mismatch の確定値と内訳は §5.7 を参照する。
 - LOCK 規則の効果 (closure 259 件減) と、capstone の LOCK 判定 (mismatch の 109 件) の関係は、再実行まで断定しない。
 - 取りこぼし 5 → 23 (新規に落ちた入口 18 件) は未解決。`pdata_call` は既定ではないため merge は可逆。
 
@@ -161,3 +161,41 @@
 
 - `45 f0 …` (REX 直後の F0) を #UD とする SDM 節は未確認。REX 直後の F3 を「REX が無視される」とする扱いとの整合も未説明。
 - 規則が正しいかは #4981 (MX-51) で判定する。
+
+## 5.7 #4981 (MX-51): 検算の capstone 判定を closure と揃えた実測
+
+- 測定 commit: `4040ca5ff` (`mx_flow_recheck.py` の capstone 側を `mx_closure.insn_sdm_ok` と REX2 (d5) 除外に揃えた commit)。閉包の再計算は `bed64571a` (`mx_closure.py` は未変更) の出力を使用。
+- 素材: `plugins-massivex` → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` (一致)。展開 125 件の md5-ok 0/125 は §8.1 の既知事象。
+- 手順: `mx_rtti.py` (3.9 s) → `mx_closure.py flow pdata_call` (3 m 01 s、22 round、169,752 入口) → `mx_flow_recheck.py` (2 m 56 s)。
+- 結果 (`RESULT=FAIL`): BFS == loop True / 入口 169,752 / (i) 0・(ii) 21,170・(iii) 160,257。取りこぼし 23・過剰 3・**mismatch 26** (前回 117)。
+- 変化: 前回の mismatch 117 のうち LOCK 109 件は検算側の判定の古さによるもので、closure の規則と揃えて解消。残り 26 件は下表。REX2 (d5) は recheck だけの除外規則で、§5.3 の内訳には REX2 の件数が無いため、解消数には数えない。件数の対応は下の表。
+
+件数の対応 (§5.3 の 117 → §5.7 の 26)。件数は各 REPORT の記載どおり。番地ごとの照合はしていない。
+
+| 区分 | 件数 | 根拠 |
+|---|--:|---|
+| §5.3 の mismatch | 117 | §5.3 の内訳 (LOCK 109 + capstone 不正 5 + 原因未確定 3) |
+| 解消 (§5.7 が「LOCK 規則」と記した分) | −109 | §5.7 の変化 |
+| 残り (§5.3 の LOCK 以外) | 8 | 117 − 109 |
+| §5.7 の mismatch | 26 | 内訳は §5.7 の表 (17 + 2 + 2 + 1 + 1 + 2 + 1) |
+
+- 8 件から 26 件への増加 (差 18 件) は、件数だけでは「規則変更で新規に出た件」と「残存」に分けられない。§5.7 の表 (REX 直後 F0 17 件など) は種類で分類したもので、§5.3 の区分とは対応づけていない。
+- **18 件 (26 − 8) の内訳は未確定。`_mismatch.tsv` が要る。** 残り 8 / 26 は内訳未確定として読むこと。
+- §5.7 の「REX2 1 件を解消」は §5.3 の内訳に REX2 の件数が無いため、この表では扱わない。§5.7 の表には rex2 1 件 (0x2693a0c) が残っている。
+- 番地ごとの対応 (どの 117 件が解消し、どの 26 件が新規か) は `_mismatch.tsv` が必要で、本 run では再生成できなかった。素材 `plugins-massivex` を取得して `mx_flow_recheck.py` を head で再実行してから作る。
+- 測定時の load: 閉包開始 1.09 0.47 0.18 / 検算開始 1.62 2.11 1.06。e2e (`MX_PE=… bash dsp/e2e.sh`) は `OK elapsed=27s`・load 2.47 3.00 1.69 → 1.97 2.84 1.67・rc 0。単体テスト `test_mx_closure_lock.py` は 8 件 OK。
+- 測定 commit 以降のコード差分 (`git diff 4040ca5ff HEAD -- tools/targets/massivex/dsp/scripts`): 本 REPORT 更新のみのため 0 行。
+
+残り mismatch 26 の内訳 (`_mismatch.tsv` の objdump 行で分類):
+
+| 件数 | 種類 | 扱い |
+|--:|---|---|
+| 17 | REX 直後に F0 (例 `4e f0 …`・`45 f0 …`)。closure は #UD とし、objdump は受理 | 規則の正否が未確定 (§5.6)。SDM の REX 節で確認するまで規則は変えない |
+| 2 | EVEX 形 (`62 02 …`)。capstone 不正・objdump 受理 | 未分類 |
+| 2 | `0f ff` / `57 ff` の形。capstone 不正・objdump 受理 | 未分類 |
+| 1 | `4e 4e …` 連続 REX。capstone 不正・objdump 受理 | 未分類 |
+| 1 | `41 f2 f0 …` (REP と LOCK の併用)。capstone 不正・objdump 受理 | 未分類 |
+| 2 | `(bad)` (0x12e3768・0x2470627)。capstone 受理・objdump 不正 | 番地ずれの疑い (前回から継続) |
+| 1 | `rex2` (0x2693a0c)。capstone は APX の lea 形として受理 | 番地ずれの疑い |
+
+- 受入 2 (mismatch 0・取りこぼし 0) は未達。閉包 169,752 は規則の判断待ち (`pdata_call` は既定ではない・既定 `any` は不変)。
