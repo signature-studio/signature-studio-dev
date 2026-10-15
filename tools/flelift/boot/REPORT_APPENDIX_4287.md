@@ -14,7 +14,8 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | `e3f55dc40` (`origin/main` 基点の `4287-fle22` で、監視の追加を含むコミット) |
+| 測定 commit | `a49255dc0` (監視の追加を含み、コードを変えた最後の commit) |
+| base | `e3f55dc40` (main 上の commit。監視の追加は含まない) |
 | 素材 | `fl-win64` / `toolchain-emsdk` を `$RUNNER_TEMP/ss4287` に展開 (repo 外) |
 | baseline (root `0x6a7b70` 無) | units_run **209** / stopped_at 209 / `unlifted 0x6bbc20` (REPORT_APPENDIX_3771 §B と同値) |
 | 監視版 (`WVAL_OBJWATCH=1`) | units_run **209** / 停止点 同じ / `[wval]` 1 件 (0x6bbc20) / `[wobj]` 1 件 (obj+0xc4 への store) |
@@ -55,4 +56,4 @@ FL_WIN64_DIR=<fl-win64 展開先> FLE_BOOT_WORK=<work> WVAL_OBJWATCH=1 bash tool
 |---|---|---|
 | obj+0xc4 の初期値 0 の出所 (確保時の 0 埋め・ホスト C の書込み) | mode の設定元の確定 (受入条件 1) | #4287 (本 issue・部分達成のため残す) |
 | `f_6cd5f0` 経由の `f_6cd520` 呼出し (実行時の呼出元) | 呼出し連鎖の上流 | #4287 |
-| 既定経路で boot が `exit` で止まる原因 (IPP 判定 NG) | 既定経路の書込み元の比較 | #3868 系の既存の追跡 (本 PR では扱わない) |
+| 既定経路で boot が `exit` で止まる原因 (IPP 判定 NG) | 既定経路の書込み元の比較 | #3868 (OPEN・既定経路の書込み元と obj+0xc4 の追跡。本 PR では扱わない) |
