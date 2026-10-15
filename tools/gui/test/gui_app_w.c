@@ -129,12 +129,11 @@ static int WINAPI WinMain_(HINSTANCE hi) {
   RegisterClassW(&wcmain);
   hmain = CreateWindowExW(0, L"GuiPocW", L"Signature GUI PoC W", WS_POPUP | WS_VISIBLE, 0, 0, GW, GH, NULL, NULL, hi, NULL);
   if (hmain == NULL) return 1;
-  ShowWindow(hmain, SW_SHOW);
-  UpdateWindow(hmain);
-
   ltext[0] = 'W'; ltext[1] = 'i'; ltext[2] = 'd'; ltext[3] = 'e'; ltext[4] = ' ';
   ltext[5] = 'T'; ltext[6] = 'e'; ltext[7] = 'x'; ltext[8] = 't'; ltext[9] = ' ';
   ltext[10] = '4'; ltext[11] = '2';
+  ShowWindow(hmain, SW_SHOW);
+  UpdateWindow(hmain);
   SetWindowTextW(hmain, L"Sig \x3042");
   i = GetWindowTextW(hmain, tbuf, 32);
   say((i == 5 && tbuf[4] == 0x3042 && tbuf[0] == 'S') ? L"w: roundtrip ok" : L"w: roundtrip NG");

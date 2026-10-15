@@ -184,6 +184,16 @@ const pySnap = (() => {
 })();
 boot.py_snap = pySnap;
 console.log('FLEBOOT_PY201 ' + JSON.stringify(pySnap));
+// PY-106 (#2909): 例外型の参照。sink 0xd82daf は rcx = M[M[M[0x15e1140]]] を PyErr_SetString の型に使う (PE の逆アセンブル)
+const pyExcProbe = (() => {
+    const u64 = (a) => (a + 8 <= m.HEAPU8.length ? new DataView(m.HEAPU8.buffer).getBigUint64(a, true) : null);
+    const hx = (v) => (v === null || v === undefined ? null : '0x' + v.toString(16));
+    const a1 = u64(0x15e1140);
+    const slot = a1 ? u64(Number(a1)) : null;
+    const excType = slot ? u64(Number(slot)) : null;
+    return { chain_0x15e1140: hx(a1), slot_0x16b8488: hx(slot), exc_type: hx(excType), bind_0x16b8250: hx(u64(0x16b8250)) };
+})();
+console.log('FLEBOOT_PY106 ' + JSON.stringify(pyExcProbe));
 // FLE-6: dsp_ippv2 GetProcAddress 結果 (0x15F34A0 = ippsZero_8u の登録値) と IPP 呼出の証跡
 boot.ipp_ptr_15F34A0 = rd64(0x15F34A0);
 boot.ipp_ptr_15F40E8 = rd64(0x15F40E8);
