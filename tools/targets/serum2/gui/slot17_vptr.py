@@ -85,9 +85,12 @@ def closure(seeds):
 
 
 ctor = None
+root = None
 for a in ("--ctor",):
     if a in sys.argv:
         ctor = int(sys.argv[sys.argv.index(a) + 1], 16)
+if "--root" in sys.argv:
+    root = int(sys.argv[sys.argv.index("--root") + 1], 16)
 if ctor is not None:
     K = closure([ctor])
     hits = [(f, a, op) for f in sorted(calls88) if f in K for a, op in calls88[f]]
@@ -95,6 +98,12 @@ if ctor is not None:
     for f, a, op in hits:
         print(f"  {a:#x} in {f:#x}: call {op}")
     print(f"whole .text call [reg+0x88] sites: {sum(len(v) for v in calls88.values())}")
+    if root is not None:
+        C = closure([root])
+        print(f"root {root:#x}: C {len(C)} funcs; C ∩ ctor-closure {len(C & K)}; "
+              f"call [reg+0x88] sites in C: {sum(len(calls88[f]) for f in C)}")
+        for f, a, op in hits:
+            print(f"  {a:#x} (in {f:#x}) in C: {f in C}")
 
 rd = sec(b".rdata")
 rraw = rd.get_data()
