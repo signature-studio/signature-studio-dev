@@ -957,7 +957,7 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4110.md` | ~60 | FLDENV/FRSTOR 後のタグ語 (TW) の復元規則 (PLG-G2-48・#4110)。 空/非空だけ読み、種類は格納時に値から分類する規則。 env 差分試験 99,982 → 100,000 (slot 18 → 0)・ネガコン・主試験の不変・x64 回帰。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4080.md` | ~45 | x87 独立入口 4 本の引数形 (逆アセンブル確定) と突合 (thiscall 2 本は TARGETS、cdecl double 2 本は PROBE)。 断片 6 本の親入口 `0x1000c077` は未確定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4064.md` | ~60 | x87 leaf 3 本 (`0x10009eb5`・`0x1000b526`・`0x1000bf60`) の eax・ST(0) の差の切り分け (#4064 PLG-G2-40): 模型 (`ott_x87.h`) の例外フラグ・C1 の限界。 測定値の正本 |
-| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_5464.md` | ~45 | `0x10003fe0` の書込み経路に入る入力 (wide_patch・#5464 / 親 #4924)。 行末の書込みの harness 対応と、書込み経路に入ったこと・eax の denormal 丸め不一致 737 行の測定。 測定値の正本 |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_5464.md` | ~45 | `0x10003fe0` の書込み経路に入る入力 (wide_patch・#5464 / 親 #4924)。 行末の書込みの harness 対応と、書込み経路に入ったこと・eax 不一致の測定 (測定専用)。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_5423.md` | ~60 | `0x100085a0` の辿るポインタ (窓の外 `ecx+0x520cc8`) の位置 (受入 1) と、窓の外の 1 語に有効な番地を書いた複製プローブの native・wasm 2000 行突合 (#5423 PLG-G2-78)。 既存 harness は変えず、プローブの複製で測定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4923.md` | ~50 | `0x1000ba05` の引数 edx の形 (指す先の 8 B の double・Inf/NaN 分岐) と、edx に有効な番地を渡した native・wasm の 2000 行突合 (#4923 PLG-G2-68)。 既存 harness の edx=0 は変えず、プローブの複製で測定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4105.md` | ~60 | `0x1000bf60` の ST(0) の NaN・ゼロの食い違いの分類 (#4105 PLG-G2-47): 非 normal オペランド (denorm・unnorm) で模型の限界 (例外処理)、normal 系は一致。 測定値の正本 |

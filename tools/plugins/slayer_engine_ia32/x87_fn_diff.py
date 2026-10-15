@@ -70,8 +70,8 @@ PROBE = [
 # ecx を ECX_HI に置くと segfault は消える。 ただし判定 (非自明性 = OBJ 窓が変わること) は通らない: 書込みが窓の外 (0x10003fe0・0x100051f0)・
 # 窓を読むだけ (0x1000a95a) のため。 測定専用 (X87_PROBE=1)。 0x100085a0・0x100096d0 は窓の中身をポインタとして辿り、0x1000ba05 は edx 経由の引数のため、入力の設計が別に要る (子 issue)。
 # #5464 (PLG-G2-79): 0x10003fe0 は ecx = ECX_HI の wide 範囲で、6 周のループの各周の状態を行末の書込み (@addr=hex) で指定する (gen 'wide_patch')。
-# 書込み経路に入る (広い範囲の変化 4000/4000 行、native と wasm の広い範囲の不一致 0) が、eax が 747 行 (denormal の float32 ビット) 不一致のため
-# 判定は通らない。 ゲートには入れず測定専用 (X87_PROBE=1)。 REPORT_APPENDIX_5464.md。
+# 書込み経路に入る (広い範囲の変化 4000/4000 行、native と wasm の広い範囲の不一致 0) が、eax に不一致があるため
+# 判定は通らない。 ゲートには入れず測定専用 (X87_PROBE=1)。 測定値は REPORT_APPENDIX_5464.md が正本。
 PROBE_ECX = [
     {'va': 0x100051F0, 'name': 'fn_100051f0', 'gen': 'mixed', 'ecx': ECX_HI},
     {'va': 0x1000A95A, 'name': 'fn_1000a95a', 'gen': 'ptr_win', 'ecx': ECX_HI},
