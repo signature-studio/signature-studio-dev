@@ -37,6 +37,28 @@ void ott_missing_import(const char* nm) {
     FLE_FF(nm, 0);
     fprintf(stderr, "[fle] MISSING IMPORT %s\n", nm); abort();
 }
+#ifdef FLE_WWATCH
+/* PY-123 (#3028): 監視 slot の値を変える書込みを、書込み元の C の __FILE__:__LINE__ 付きで出す (件数上限あり)。 */
+void fle_wwatch(uint64_t a, uint32_t n, const void* src, const char* file, int line) {
+    static const uint64_t slot[2] = { 0x15e1c78ull, 0x15e4790ull };
+    static int nlog = 0;
+    for (int k = 0; k < 2; k++) {
+        uint64_t w = slot[k];
+        if (a >= w + 8 || a + n <= w) continue;
+        uint8_t oldb[8], newb[8];
+        memcpy(oldb, (void*)(uintptr_t)w, 8); memcpy(newb, oldb, 8);
+        for (uint32_t i = 0; i < n; i++) {
+            uint64_t p = a + i;
+            if (p >= w && p < w + 8) newb[p - w] = ((const uint8_t*)src)[i];
+        }
+        if (memcmp(oldb, newb, 8) == 0 || nlog >= 5000) continue;
+        uint64_t ov, nv; memcpy(&ov, oldb, 8); memcpy(&nv, newb, 8);
+        nlog++;
+        fprintf(stderr, "[fle_wwatch] slot=%#llx a=%#llx n=%u old=%#llx new=%#llx at %s:%d\n",
+                (unsigned long long)w, (unsigned long long)a, n, (unsigned long long)ov, (unsigned long long)nv, file, line);
+    }
+}
+#endif
 #ifdef FLE_CHK
 void fle_chk(uint64_t a, int line) {
     /* wasm linear 上限 (initial-memory) と emcc static 領域 (GLOBAL_BASE 0x10000000..) を避ける */

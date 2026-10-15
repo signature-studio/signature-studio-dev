@@ -53,19 +53,41 @@ void fle_chk(uint64_t a, int line);
 #define LD64(a) (*(u64u*)A_(a))
 #define LDF32(a) (*(f32u*)A_(a))
 #define LDF64(a) (*(f64u*)A_(a))
+#ifdef FLE_WWATCH
+/* 書込み監視 (診断用・既定無効)。書込み先が監視 slot に重なるときだけ fle_wwatch が stderr に出す (fle_cpu.c)。
+ * 書込み値は一時変数に取ってから監視して store する (値の式を 2 回評価しない)。
+ * ST* の a は WW_ と A_ で 2 回評価されるので、副作用の無い式であること (x64c の生成アドレス式は純粋式)。 */
+void fle_wwatch(uint64_t a, uint32_t n, const void* src, const char* file, int line);
+#define WW_(a, n, p) fle_wwatch((uint64_t)(a), (n), (p), __FILE__, __LINE__)
+#define ST8(a, v) ({ uint8_t wv_ = (uint8_t)(v); WW_(a, 1, &wv_); (*(u8u*)A_(a) = wv_); })
+#define ST16(a, v) ({ uint16_t wv_ = (uint16_t)(v); WW_(a, 2, &wv_); (*(u16u*)A_(a) = wv_); })
+#define ST32(a, v) ({ uint32_t wv_ = (uint32_t)(v); WW_(a, 4, &wv_); (*(u32u*)A_(a) = wv_); })
+#define ST64(a, v) ({ uint64_t wv_ = (uint64_t)(v); WW_(a, 8, &wv_); (*(u64u*)A_(a) = wv_); })
+#define STF32(a, v) ({ float wv_ = (float)(v); WW_(a, 4, &wv_); (*(f32u*)A_(a) = wv_); })
+#define STF64(a, v) ({ double wv_ = (double)(v); WW_(a, 8, &wv_); (*(f64u*)A_(a) = wv_); })
+#else
 #define ST8(a, v) (*(u8u*)A_(a) = (uint8_t)(v))
 #define ST16(a, v) (*(u16u*)A_(a) = (uint16_t)(v))
 #define ST32(a, v) (*(u32u*)A_(a) = (uint32_t)(v))
 #define ST64(a, v) (*(u64u*)A_(a) = (uint64_t)(v))
 #define STF32(a, v) (*(f32u*)A_(a) = (float)(v))
 #define STF64(a, v) (*(f64u*)A_(a) = (double)(v))
+#endif
 static inline X128 LDX(uint64_t a) { X128 x; memcpy(&x, (void*)A_(a), 16); return x; }
-static inline void STX(uint64_t a, X128 x) { memcpy((void*)A_(a), &x, 16); }
+static inline void STX(uint64_t a, X128 x) {
+#ifdef FLE_WWATCH
+    WW_(a, 16, &x);
+#endif
+    memcpy((void*)A_(a), &x, 16);
+}
 /* ymm (32B): lo = X[i], hi = YL[i] */
 static inline void LDYSPLIT(uint64_t a, X128* lo, X128* hi) {
     memcpy(lo, (void*)A_(a), 16); memcpy(hi, (void*)(A_(a) + 16), 16);
 }
 static inline void STY(uint64_t a, X128 lo, X128 hi) {
+#ifdef FLE_WWATCH
+    WW_(a, 16, &lo); WW_(a + 16, 16, &hi);
+#endif
     memcpy((void*)A_(a), &lo, 16); memcpy((void*)(A_(a) + 16), &hi, 16);
 }
 
