@@ -111,22 +111,22 @@ main 75c48ab21 基準: 実装 155 → 158 (+3)、未実装 280 → 277 (-3)。`p
 
 ## main 取り込み後の再測定 (競合解消)
 
-main `8c23860cd` を merge した (競合は `provider/build.sh`・`provider/fl_engine.c`・`tests/provider_check.mjs` の 3 件。解消は両側の追加を残す方針)。測定 commit: `d8beed07c` (コードを変えた最後の commit)。以後の HEAD のコード差分 `git diff d8beed07c HEAD -- tools/python ':!*.md'` は 0 行。
+main を 2 回取り込んだ。`8c23860cd` の取り込みでは競合 3 件 (`provider/build.sh`・`provider/fl_engine.c`・`tests/provider_check.mjs`)、`1ccf20c6a` の取り込みでは競合 2 件 (`docs/DOC_MAP.md`・`tests/provider_check.mjs`) が出た。解消は両側の追加を残す方針 (`provider_check` の期待値だけ main の数に本 PR の +3 を足した)。測定 commit: `7923bbfe3` (main `1ccf20c6a` を取り込んだ merge。コードを変えた最後の commit)。以後の HEAD のコード差分 `git diff 7923bbfe3 HEAD -- tools/python ':!*.md'` は 0 行。
 
-基準 main `8c23860cd`: 実装 162 → 165 (+3)、未実装 273 → 270 (-3)。
+基準 main `1ccf20c6a`: 実装 165 → 168 (+3)、未実装 270 → 267 (-3)。
 
-| コマンド | 結果 (d8beed07c) |
+| コマンド | 結果 (7923bbfe3) |
 |---|---|
-| `bash provider/build.sh` (emsdk は `[EMSDK]` の pin 6.0.12 を上流から取得) | rc 0・ハンドラ 165・1.66 s |
-| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` (CPython wasm を `build_cpython_wasm.sh` で再ビルド後) | rc 0・6.34 s |
-| `node tests/provider_check.mjs` | PASS (関数 435・実装 165・未実装 270・mcp 静的 60) |
+| `bash provider/build.sh` (emsdk は `[EMSDK]` の pin 6.0.12 を上流から取得) | rc 0・ハンドラ 168 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` (CPython wasm は `build_cpython_wasm.sh` で再ビルド済み) | rc 0・5.98 s |
+| `node tests/provider_check.mjs` | PASS (関数 435・実装 168・未実装 267・mcp 静的 60) |
 | `node tests/ui_browser_diff.mjs` | PASS (正常 8・異常 5・diffs 0・browserOp 3) |
-| `node tests/ui_display_diff.mjs` と ui_state・ui・general・mixer・channels・transport・midi_path・ilmcp・arrangement・device の各 diff | 全て PASS (diffs 0) |
+| `node tests/ui_display_diff.mjs` と ui_state (58 calls)・ui・general・mixer・channels・transport・midi_path・ilmcp・arrangement・device の各 diff | 全て PASS (diffs 0) |
 | step_item・note_enum・patterns・patterns_group・playlist・launchmap の各 diff | 全て PASS (diffs 0) |
 | `python3 tests/kwsig_check.py` | OK |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・2.02 s |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・2.14 s |
 
-実行後の uptime load average: 0.88 / 1.33 / 0.75 (1・5・15 分)。ネガティブコントロールは取り込み前の測定 (`2b72baa3c`) のままで、本節では再実行していない。
+実行後の uptime load average: 0.84 / 0.94 / 0.68 (1・5・15 分)。ネガティブコントロールは取り込み前の測定 (`2b72baa3c`) のままで、本節では再実行していない。
 
 ## 未解決
 
