@@ -75,7 +75,7 @@
 ## 検証
 
 - 測定 commit: `77f804e70` (main。本 PR はコードを変えていない)。`git diff 77f804e70 HEAD -- tools/python ':!*.md'` の出力は空。
-- 環境: runner 4 core、測定時 `uptime` は `load average: 0.91, 1.37, 0.73` (03:29:33)。`$RUNNER_TEMP/fl-win64` に展開。emsdk は `/opt/emsdk` (既存)。
+- 環境: runner 4 core、測定時 `uptime` は `load average: 0.91, 1.37, 0.73` (03:29:33)。`$RUNNER_TEMP/fl-win64` に展開。emsdk は `[EMSDK]` (既存・`docs/REFERENCES.md` §4)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
