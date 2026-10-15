@@ -243,8 +243,11 @@ static int ipp_call(u64 t) {   /* fle_ff から。処理したら 1 */
     return 1;
 }
 #define IPP_HMOD 0x7F0F0000u   /* wasm メモリ外の擬似 HMODULE */
+#define PY_HMOD 0x7F0E0000u    /* PY-106 (#2909): Python312 の擬似 HMODULE (束縛呼出し中だけ有効) */
+static int g_py_probe = 0; static u32 g_py_hook_n;
 static HMODULE fle_ipp_load_hook(const char* name, DWORD flags) {
     (void)flags;
+    if (g_py_probe && name && strstr(name, "Python312")) { g_py_hook_n++; return (HMODULE)(uintptr_t)PY_HMOD; }
     if (g_ipp_on && name && strstr(name, "dsp_ippv2")) { g_ipp_h = IPP_HMOD; return (HMODULE)(uintptr_t)IPP_HMOD; }
     return 0;
 }
@@ -341,11 +344,36 @@ void imp_ExitProcess(void) {
     fle_throw_kind((long)(intptr_t)"exit", (long)(R[1] & 0xffffffff));
 }
 void imp_TerminateProcess(void) { g_n_exit++; fle_throw_kind((long)(intptr_t)"exit", 3); }
+/* PY-106 (#2909): 束縛関数 0xc395a0 の直接実行 (fle_py_bind_probe) 中だけ、GetProcAddress は名前ごとに
+ * 「データ変数の番地 (cell)」を返し、cell の中身に型トークン (PY_TYPE_TOK + i) を置く。resolver の結果を
+ * slot に格納する束縛と同じ形で、sink 0xd82daf の 3 段 load を実メモリで辿れる。計測のみ (boot 中は無効)。 */
+#define PY_PROBE_MAX 128
+#define PY_TYPE_TOK 0x7F300000u
+static char g_py_nm[PY_PROBE_MAX][64]; static u64 g_py_cell[PY_PROBE_MAX]; static u32 g_py_nm_n;
+static u64 py_probe_cell(const char* nm) {
+    u32 i = g_py_nm_n;
+    if (i >= PY_PROBE_MAX) return 0;
+    strncpy(g_py_nm[i], nm, 63); g_py_nm[i][63] = 0;
+    g_py_cell[i] = PY_TYPE_TOK + i;
+    g_py_nm_n++;
+    return (u64)(uintptr_t)&g_py_cell[i];
+}
 void imp_GetProcAddress(void) {  /* m11 旧 stub 揃え (REPORT §4)。FLE-6: dsp_ippv2 のみトークンを返す */
     u64 h = R[1] & 0xffffffffu, nm = R[2];
     g_n_getproc++; R[4] += 8; R[0] = 0;
+    if (g_py_probe && nm >= 0x10000ull) { R[0] = py_probe_cell((const char*)(uintptr_t)nm); return; }
     if (g_ipp_on && g_ipp_h && h == g_ipp_h && nm >= 0x10000ull) R[0] = ipp_token((const char*)(uintptr_t)nm);
 }
+/* PY-106 (#2909): boot 停止後に束縛関数 0xc395a0 を直接実行する。戻り値 = 束縛された名前の数 (計測のみ) */
+EMSCRIPTEN_KEEPALIVE int fle_py_bind_probe(void) {
+    g_py_nm_n = 0; g_py_hook_n = 0; g_py_probe = 1;
+    fle_run(0xc395a0u, 0, 0, 0, 0, 0, 0, 0, 0);
+    g_py_probe = 0;
+    return (int)g_py_nm_n;
+}
+EMSCRIPTEN_KEEPALIVE int fle_py_bind_hook_n(void) { return (int)g_py_hook_n; }
+EMSCRIPTEN_KEEPALIVE const char* fle_py_bind_name(int i) { return (u32)i < g_py_nm_n ? g_py_nm[i] : ""; }
+EMSCRIPTEN_KEEPALIVE u32 fle_py_bind_cell(int i) { return (u32)i < g_py_nm_n ? (u32)(uintptr_t)&g_py_cell[i] : 0; }
 void imp_LoadStringW(void) {   /* gui_compat.c と同一: buf[0]=0 を書かないと LoadResString が暴走 */
     u64 buf = R[9];
     g_n_loadstr++;
