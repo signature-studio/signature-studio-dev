@@ -1,0 +1,13 @@
+native	reset	rep	va	verdict	case_equal	case_total	wasm_reset_diff	native_reset_diff
+0	all	r1	0x5d19e0	mismatch	0	11	575469632	None
+0	all	r2	0x5d19e0	mismatch	0	11	575469632	None
+0	none	r1	0x5d19e0	mismatch	0	11	None	None
+0	none	r2	0x5d19e0	mismatch	0	11	None	None
+0	sta	r1	0x5d19e0	mismatch	0	11	343847	None
+0	sta	r2	0x5d19e0	mismatch	0	11	343847	None
+0	stk	r1	0x5d19e0	mismatch	0	11	575469632	None
+0	stk	r2	0x5d19e0	mismatch	0	11	575469632	None
+1	none	r1	0x5d19e0	mismatch	0	11	None	None
+1	none	r2	0x5d19e0	mismatch	0	11	None	None
+1	sta	r1	0x5d19e0	match	11	11	343847	None
+1	sta	r2	0x5d19e0	match	11	11	343847	None
