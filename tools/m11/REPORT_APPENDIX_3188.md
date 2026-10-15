@@ -14,14 +14,14 @@
 - 2 つの commit を測った。`15341d0e` (round 1 の fix commit = レビュー時の HEAD) と `47574748` (それに main `49f1a94d` を merge した commit)。merge は競合が無く (`git merge-tree` が clean)、main が #2211・#1325 系で `tools/m11/ldfix/ldfix.py` などを変えていたため、merge 後の code で測り直した。
 - `15341d0e` の LB=0 は reviewer の実測 (942/867/1/47/74) と一致した (下 §7-3)。
 - main の取り込みで変わった code: `git diff 15341d0e 47574748 -- tools/m11 ':(exclude)tools/m11/REPORT*'` (main 由来の ldfix 変更)。この差で unit 56 の kind が変わった (§7-3)。
-- 本 PR が main に対して加えるのは tools/m11 では `m11_lb_ir_fn_diff.py` だけ (REPORT 除く)。よって merge 後の寛容起動の結果は main の同じ code の結果と同じになる。
+- 本 PR が main に対して加えるのは tools/m11 では `m11_lb_ir_fn_diff_3188.py` だけ (REPORT 除く)。よって merge 後の寛容起動の結果は main の同じ code の結果と同じになる。
 - LB 直書きの修正 (`ldfix/fix_ld108.py`・`fix912/m11_fix912.py`) と再現 (`m11_lb_tolerant_repro.sh`)・突合 (`m11_lb_unit_diff.py`) は main (#3160) と同一。
 
-### 7-1. 再現スクリプト (main #3160 版を使う。本 PR で追加するのは `m11_lb_ir_fn_diff.py` のみ)
+### 7-1. 再現スクリプト (main #3160 版を使う。本 PR で追加するのは `m11_lb_ir_fn_diff_3188.py` のみ)
 
 - `tools/m11/m11_lb_tolerant_repro.sh <LB> <出力先>`: 後段だけの再現。出力は `tools/m11/<出力先>/` (`tolerant_units.json`・`boot_final.ll`・ログ)。
 - `tools/m11/m11_lb_unit_diff.py A.json B.json`: unit の index 単位で kind を突合 (VA は LB でずれるので比べない)。差は `kind_diff=N` で出る (exit 0 は差の有無と無関係)。
-- `tools/m11/m11_lb_ir_fn_diff.py A.ll B.ll function_X ...`: 関数本体の行差分と、整数定数の変化量 (LB=0x10000 側 − LB=0 側) を出す。第 2 オペランドの定数 (`add i64 %a, N`・`store i64 N`) も数える。
+- `tools/m11/m11_lb_ir_fn_diff_3188.py A.ll B.ll function_X ...`: 関数本体の行差分と、整数定数の変化量 (LB=0x10000 側 − LB=0 側) を出す。第 2 オペランドの定数 (`add i64 %a, N`・`store i64 N`) も数える。
 
 ### 7-2. 修正 (受入 2 の前段: LB 直書きの IR 書換え pass が LB=0x10000 で止まる)
 
@@ -53,7 +53,7 @@ LB=0 の出力は修正前後で変わらない (修正は LB=0 で同じ定数�
 
 ### 7-4. 原因の切り分け (途中。未特定)
 
-- **IR の再配置の漏れは見つからなかった** (`m11_lb_ir_fn_diff.py`・`47574748` の 2 本の `boot_final.ll`): 関数 412770 (差 2 行)・4128b0 (差 23 行)・411d20 (1 行)・412c20 (1 行)・412e40 (0)・535c11 (0)。行数は全て LB 間で同一。定数の変化量は全て `[65536]` か `[0, 65536]` (LB=0x10000 側 − LB=0 側) で、それ以外の変化は無い。第 2 オペランドの定数 (`add i64 %a, N`・`store i64 N`) も数えた版で確認済み。
+- **IR の再配置の漏れは見つからなかった** (`m11_lb_ir_fn_diff_3188.py`・`47574748` の 2 本の `boot_final.ll`): 関数 412770 (差 2 行)・4128b0 (差 23 行)・411d20 (1 行)・412c20 (1 行)・412e40 (0)・535c11 (0)。行数は全て LB 間で同一。定数の変化量は全て `[65536]` か `[0, 65536]` (LB=0x10000 側 − LB=0 側) で、それ以外の変化は無い。第 2 オペランドの定数 (`add i64 %a, N`・`store i64 N`) も数えた版で確認済み。
 - **image 側**: 線形 0 の NULL 領域は LB=0 で PE ヘッダ (`4d 5a 50 00 …`)、LB=0x10000 で全 0 (`lb_check` の `null_region_nonzero_bytes` = 0)。NULL を読む箇所の値が LB で変わる。
 - **候補 (unit 40 の Halt0 経路)**: `function_412770` の memcpy の源が `ptr null` (IR 全体で `ptr null` 源の memcpy は 1 件だけ)。元の機械語 (VA 0x412790) は `mov rsi,[rax]` (arg1 の先頭 8 B を読む) → `rep movsq` 37 qword で、lift が load を脱落させ NULL に置換した silent miscompile の疑い。
   - 否定結果 (旧版の記録): 源を `[arg1+0]` の load に戻すと kind 差 8 件・skipped の内訳は不変だったという記録がある。**ただし再現できない**: 実験の行の指定 (どの行をどう変えたか) は記録に無く、実験ディレクトリ (`work/exp_null_src_*`) も repo と work-m11 の snapshot に無い。この否定結果は参考扱いとし、結論には使わない。再実験は子 #3229 の項目。

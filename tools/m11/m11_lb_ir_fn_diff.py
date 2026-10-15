@@ -1,67 +1,55 @@
 #!/usr/bin/env python3
-# M11 LB 依存差の IR 突合 (#3188): 2 本の boot_final.ll (LB=0 と LB=0x10000) で指定関数の本体を比べ、行ごとの差と
-# 整数定数の変化量 (LB=0x10000 側 - LB=0 側) を出す。LB 由来の再配置 (VA→LVA) の定数は +0x10000 になる。
-# それ以外の変化 (0 でも +0x10000 でもない) は再配置の漏れ・誤りの候補。
-#   使い方: python3 tools/m11/m11_lb_ir_fn_diff.py <LB=0 の boot_final.ll> <LB=0x10000 の boot_final.ll> function_412e40 [...]
+"""#3229: 2 つの IR (.ll) を関数単位で比べる (LB 別の boot_final.ll の切り分け用)。
+  usage: m11_lb_ir_fn_diff.py A.ll B.ll [function_name ...]
+  関数名を省略すると、本文が違う関数を全て列挙する。関数名を与えると、その関数の本文の unified diff と、
+  差分行に現れる整数即値 (LB に依存しうる VA・LVA) を出す。本文の一致は差 0 として扱う。"""
 import difflib
+import json
 import re
 import sys
 
-CONST = re.compile(r'(?:\bi(?:8|16|32|64)\s+|,\s*)(-?\d+)\b')
+DEF = re.compile(r'^define\b[^@]*@([^\s(]+)\(')
+IMM = re.compile(r'(?<![\w%@.])-?\d{4,}(?![\w.])')
 
 
-def body(path, name):
-    lines = open(path, errors='replace').read().split('\n')
-    start = None
-    for k, ln in enumerate(lines):
-        if ln.startswith('define ') and ('@%s(' % name) in ln:
-            start = k
-            break
-    if start is None:
-        return None
-    out = []
-    for ln in lines[start:]:
-        out.append(ln)
-        if ln == '}':
-            break
+def functions(path):
+    out = {}
+    name = None
+    buf = []
+    for line in open(path, encoding='utf-8', errors='replace'):
+        if name is None:
+            m = DEF.match(line)
+            if m:
+                name = m.group(1)
+                buf = [line]
+            continue
+        buf.append(line)
+        if line.startswith('}'):
+            out[name] = buf
+            name = None
     return out
 
 
-def shifts(a, b):
-    ca = [int(x) for x in CONST.findall(a)]
-    cb = [int(x) for x in CONST.findall(b)]
-    return [y - x for x, y in zip(ca, cb)] if len(ca) == len(cb) else None
-
-
 def main():
-    if len(sys.argv) < 4:
-        print(__doc__.strip())
-        return 2
-    p0, p1 = sys.argv[1], sys.argv[2]
-    for name in sys.argv[3:]:
-        b0, b1 = body(p0, name), body(p1, name)
-        if b0 is None or b1 is None:
-            print('%s: 定義が無い (LB=0: %s, LB=0x10000: %s)' % (name, b0 is not None, b1 is not None))
+    a = functions(sys.argv[1])
+    b = functions(sys.argv[2])
+    if len(sys.argv) <= 3:
+        diff_names = sorted(n for n in set(a) | set(b) if a.get(n) != b.get(n))
+        print(json.dumps({'functions_a': len(a), 'functions_b': len(b), 'differ': len(diff_names), 'names': diff_names}, ensure_ascii=False))
+        return
+    for n in sys.argv[3:]:
+        if n not in a or n not in b:
+            print(json.dumps({'fn': n, 'only_in': 'A' if n in a else 'B' if n in b else 'none'}))
             continue
-        print('%s: lines LB=0=%d LB=0x10000=%d' % (name, len(b0), len(b1)))
-        if len(b0) != len(b1):
-            print('  行数が違う (構造が変わっている)')
-        sm = difflib.SequenceMatcher(a=b0, b=b1, autojunk=False)
-        n = 0
-        for tag, i0, i1, j0, j1 in sm.get_opcodes():
-            if tag == 'equal':
-                continue
-            for x, y in zip(b0[i0:i1], b1[j0:j1]):
-                n += 1
-                sh = shifts(x, y)
-                tail = ' 定数変化量=%s' % sh if sh is not None else ''
-                print('  L0: %s' % x.strip()[:200])
-                print('  L1: %s%s' % (y.strip()[:200], tail))
-            if (i1 - i0) != (j1 - j0):
-                print('  [%s] LB=0 %d 行 / LB=0x10000 %d 行' % (tag, i1 - i0, j1 - j0))
-        print('  差分行 %d' % n)
-    return 0
+        if a[n] == b[n]:
+            print(json.dumps({'fn': n, 'differ': False, 'lines': len(a[n])}))
+            continue
+        d = [l.rstrip('\n') for l in difflib.unified_diff(a[n], b[n], 'A', 'B', n=0)]
+        changed = [l for l in d if l[:1] in '+-' and l[:3] not in ('+++', '---')]
+        imms = sorted({m for l in changed for m in IMM.findall(l)})
+        print(json.dumps({'fn': n, 'differ': True, 'lines_a': len(a[n]), 'lines_b': len(b[n]), 'changed_lines': len(changed), 'imms_in_changed': imms}, ensure_ascii=False))
+        print('\n'.join(d[:200]))
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    main()
