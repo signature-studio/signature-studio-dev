@@ -65,3 +65,25 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 **未解決・子 issue**:
 - 候補多重 73 件の fvm を deref 位置から救う方式: 起票先 #4173 ([LD-198]・親 #3782)。
 - `0x5c1030` の旧 fvm diff (arg 0 の `native_extra_call`・native が `?vmslot3` を呼ぶ) の切り分け: 起票先 #4137 ([LD-194]・#3782 の受入 3 の移管先)。
+
+## 12.1.3 LD-198 (#4173): 多重候補の関数を fault base の引数伝播で救う
+
+- **方式**: `pe.Analyzer.fault_arg(va, rip)`。fault rip の命令のメモリ base を、entry から rip 直前まで線形に走査した mov 伝播 (rcx/rdx/r8/r9 の引数由来を追跡。call で全消去、分岐・ret を跨ぐと None) で引数 index に寄せる。`session.fvm_cand` は候補が 2 件以上のとき、その引数が候補に含まれれば候補を 1 つに決めて case を作る。決まらなければ従来どおり `multi_candidate` で対象外。`cases.py` (blob・args) は変更していない。
+- **事前測定** (base の jsonl・fvm 以外に equal/diff/wasm_trap 無し・候補 2 件以上の 73 件): fault base が引数由来に伝播できたのは 36 件 (arg0 34 / arg1 1 / arg2 1)。base が引数由来でない 42 件 (`rbx`・`rax` などの 2 段目以降の間接参照。`0x41a7c0` 系の 6 件を含む)、分岐で線形追跡を打ち切った 9 件、ret 断片 1 件。
+- **測定 commit**: `85f5e93f7` (コードを変えた最後の commit)。base: `1f12b1b6d` (origin/main)。両方とも同一環境で `liftdiff_e2e.sh --m11-only` を 1 回ずつ実行 (base 189 s PASS・HEAD 197 s PASS・`LIFTDIFF_E2E PASS`)。
+- **証跡**: `git diff 1f12b1b6d 85f5e93f7 -- tools/liftdiff` は `pe.py` の `fault_arg` 追加と `session.py` の `fvm_cand` の分岐追加の 2 ファイル (+39 行)。
+
+| run | match / mismatch / unexec | fvm case (native_fault / both_fault / diff / hang) | fvm 関数数 | 所要 |
+|---|---|---|---|---|
+| base `1f12b1b6d` | 360 / 234 / 206 | 12 (2 / 7 / 2 / 1) | 12 | 189 s PASS |
+| HEAD `85f5e93f7` | 360 / 235 / 205 | 41 (15 / 22 / 3 / 1) | 41 | 197 s PASS |
+
+- **関数単位の verdict 変化**: 1 件 (`0x5c1030` unexec→mismatch)。fvm の `diff` (arg 0・`native_extra_call`) によるもので、LD-177 §12.1.2 で未切り分けとしていた件 (#4137 へ)。
+- **fvm の outcome**: fvm case 41 件 (関数 41 件・各 1 case) の内訳は native_fault 15 / both_fault 22 / diff 3 / hang 1。equal / wasm_trap への遷移は 0 件。
+- **非 fvm case の変化**: `fvm_transitions.py` で `EXISTING_PATTERN_CHANGED` は base のみ 14 関数。fvm の救済で増えた case の影響ではなく、既存 pattern の outcome の変化として記録する。
+
+### 未達 (受入条件)
+
+- 受入 2 (equal / wasm_trap への遷移): 0 件。fvm の救済は native 側が fault で落ちる case を増やしただけで、wasm 側と一致する case は作れていない。
+- 受入 3 (既存 verdict の base 比): 関数単位で 1 件 (`0x5c1030`) のみ変化。揺らぎ判定 (base 同士の幅) は未実施 (同一 base の 2 回目を取っていない)。
+- 残り 37 件 (多重のうち引数由来に伝播できない関数): 起票先 #4173 で継続 (本 PR で閉じない)。
