@@ -61,6 +61,13 @@ print('[diff] report キーの差 (f3c 以外): %s' % [k for k in sorted(set(a) 
 print('[diff] F3c 関数: 旧 %d → 新 %d (旧の全てを含む: %s)' % (a['f3c_fns'], b['f3c_fns'], set(a['f3c_vas']) <= set(b['f3c_vas'])))
 print('[diff] f3c_no_store (block-local 門): 旧 %s 新 %s / F3c-fn 門 stores %s / F3c-use 置換行 %s' % (a.get('f3c_no_store'), b.get('f3c_no_store'), b.get('f3c_fn_stores'), b.get('f3c_use_replaced')))
 PYEOF
+"$PY" - "$OUT/new.ll" <<'PYEOF' || { echo "[ldfix_509_e2e] c40420 に修復 load が残っている (#4421: 間接 call を含むため置換しない)" >&2; FAIL=1; }
+import re, sys
+t = open(sys.argv[1], errors='replace').read()
+m = re.search(r'^define [^\n]*@function_c40420\(.*?\n}\n', t, re.M | re.S)
+assert m and not re.search(r'ldfx[nu]\d+', m.group(0))
+print('[c40420] 新版 IR に修復 load 無し (#4421)')
+PYEOF
 
 step "3/7 audit_lsf.py (store 形 + 消費者形): 修復前 / 旧版 / 新版"
 for k in pre prev new; do
