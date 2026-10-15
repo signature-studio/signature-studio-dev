@@ -16,3 +16,6 @@ gcc -O1 -g -w -fsanitize=address,undefined -pthread -I "$ROOT/include" -I "$ROOT
 (cd "$BUILD" && ./native_w_run "$BUILD/w_actual.ppm" 2>&1 | tee "$BUILD/native_w_run.log")
 # ゲストの ExitProcess が先に走ると native_w_run は FAIL を出す前に終わり rc 0 になる (#3508)。PASS 行を必須にする。
 grep -q '^\[native_w_run\] PASS' "$BUILD/native_w_run.log" || { echo "[native_w_e2e] FAIL: PASS 行が無い" >&2; exit 1; }
+# 独立オラクル (shim と無関係に描画規約から計算した期待画像) と画素比較。ネガコン: 1 画素改竄した期待画像では必ず不一致 (#3508)
+python3 "$ROOT/golden/gen_golden_w.py" compare "$BUILD/w_actual.ppm"
+if python3 "$ROOT/golden/gen_golden_w.py" compare "$BUILD/w_actual.ppm" --tamper; then echo "[native_w_e2e] FAIL: ネガコン (改竄オラクル) が不一致にならなかった" >&2; exit 1; fi
