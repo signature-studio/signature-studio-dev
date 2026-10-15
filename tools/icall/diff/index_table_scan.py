@@ -45,7 +45,7 @@ def main():
     with open(sys.argv[1], "rb") as f:
         data = f.read()
     targets = {}
-    for name, disp_site, disp in [(s[0], s[1], s[2]) for s in SITES]:
+    for name, _, disp in SITES:
         for n in reach(disp):
             targets.setdefault(n, []).append(name)
     for n in sorted(targets):
