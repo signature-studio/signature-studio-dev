@@ -15,15 +15,17 @@
 
 - 保持先: `A.seg_max_us[4]` (flasio.c の静的状態)。`flasio_get_stats` で `flasio_stats_t.seg_max_us[4]` に出す。
 - 統計リセット (prefill 後) で他の cb 統計と同じく 0 に戻す。
-- 結果 JSON: `com_test.c` の `stats` 直下ではなく、`seg_max_us` 名前空間 (`{"in_read","memset","bufferswitch","out_write"}`) で出す。
+- 結果 JSON: `com_test.c` の書式で、`stats` の中の `seg_max_us` オブジェクト (`{"in_read","memset","bufferswitch","out_write"}`) として出す。
 - **`fla_ctl_t` (共有 SAB 構造体) には入れていない**。`audio-layout.ts` とのオフセット突合 (fail-fast) を避けるため。issue 本文の「`fla_ctl_t` に記録」からの逸脱。
 
-## 2. 測定 (HEAD 604f9d5dd の作業ツリー・計装 commit 前後で実測)
+## 2. 測定 (計装コード = 604f9d5dd)
 
 測定コマンド: `node tools/audio/asio/harness/run_com.mjs --only com_ramp_b256_d2`
 (build: `bash tools/audio/asio/build.sh`)。判定は `underruns` / `silence_frames` / ramp mismatch の既存基準。
 
-### 2-1. 作業ツリー (計装 commit 前の作業状態) で 20 回
+### 2-1. 作業ツリーで 20 回 (計装コード 604f9d5dd の上で実施)
+
+根拠: `seg_max_us` は計装 commit `604f9d5dd` で初めて出力されるため、表の 4 区間の値は計装コードでしか得られない。`604f9d5dd` 以降に `tools/audio` のコード差分は無い (`git diff 604f9d5dd HEAD -- tools/audio/src tools/audio/asio/test tools/audio/asio/harness tools/audio/asio/build.sh` は 0 行。3b0712b7e は REPORT のみ)。ただし 20 回の実施時に `git status` / `git diff` を記録していないため、作業ツリーが `604f9d5dd` と完全一致していたことは事後に再検証できない。この点は未解決表に書く。
 
 | 回 | underruns | silence | ramp mismatch | in_read | memset | bufferswitch | out_write |
 |---|---|---|---|---|---|---|---|
@@ -57,10 +59,10 @@
 
 ### 2-2. HEAD 604f9d5dd (計装 commit) での再測定
 
-- r01 (HEAD): underruns 0 / ramp 0 / seg `{in_read 14, memset 475, bufferswitch 54, out_write 10}`。
+- h01 (HEAD): underruns 0 / ramp 0 / seg `{in_read 14, memset 475, bufferswitch 54, out_write 10}`。
 - h02 (HEAD): underruns 0 / ramp 0 / seg `{in_read 20, memset 15, bufferswitch 54, out_write 20}`。
 - h03 (HEAD): underruns 0 / ramp 0 / seg `{in_read 10, memset 14, bufferswitch 459, out_write 14}`。
-- **HEAD での連続 20 回は未実施** (時間上限のため 3 回で区切った)。FAIL 再現は HEAD では未確認。
+- **HEAD での連続 20 回は未実施** (3 回で止めた)。FAIL 再現は HEAD では未確認。
 
 ## 3. 解釈 (未確定)
 
@@ -73,6 +75,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| HEAD 604f9d5dd での連続 20 回 (FAIL 再現の確認) | FAIL の再現率は作業ツリー 20 回で 1/20 のみ。HEAD では未確認 | #4593 (本 PR の残り) |
-| `memset` 区間 127 ms の原因 (memset 内の初回 touch か、区間内の OS 停止か) | 停止の直接経路が未特定 | #4593 |
-| FAIL 時の区間ごとの内訳を複数回得ること | 1 件では再現性を言えない | #4593 |
+| HEAD 604f9d5dd での連続 20 回 (FAIL 再現の確認) | FAIL の再現率は作業ツリー 20 回で 1/20 のみ。HEAD では 3 回 PASS のみ | PM agent の判断待ち: 再測定の要否・原因切り分けの担当 |
+| 20 回実施時の作業ツリーが 604f9d5dd と完全一致していたこと | 事後再検証不可 (git status / diff 未記録)。コード差分は 604f9d5dd 以降 0 行 | PM agent の判断待ち (記録の扱い) |
+| `memset` 区間 127 ms の原因 (memset 内の初回 touch か、区間内の OS 停止か) | 停止の直接経路が未特定 | PM agent の判断待ち: 再測定の要否・原因切り分けの担当 |
+| FAIL 時の区間ごとの内訳を複数回得ること | 1 件では再現性を言えない | PM agent の判断待ち: 再測定の要否・原因切り分けの担当 |
