@@ -128,7 +128,8 @@ def gen(name, ret, params):
     if b.startswith('v') and b[1:] in ('addsd', 'subsd', 'mulsd', 'divsd', 'minsd', 'maxsd', 'sqrtsd', 'addss', 'subss', 'mulss', 'divss', 'minss', 'maxss', 'sqrtss',
                                          'addpd', 'subpd', 'mulpd', 'divpd', 'addps', 'subps', 'mulps', 'divps', 'andpd', 'andps', 'andnpd', 'andnps', 'orpd', 'orps',
                                          'xorpd', 'xorps', 'movapd', 'movaps', 'movdqa', 'movdqu', 'movupd', 'movups', 'movq', 'movd', 'movsd', 'movss', 'unpcklpd',
-                                         'unpckhpd', 'unpcklps', 'unpckhps', 'shufpd', 'shufps', 'cvttpd2dq', 'psrldq', 'pslldq', 'psrlq', 'psllq', 'haddpd', 'haddps', 'movddup'):
+                                         'unpckhpd', 'unpcklps', 'unpckhps', 'shufpd', 'shufps', 'cvttpd2dq', 'psrldq', 'pslldq', 'psrlq', 'psllq', 'haddpd', 'haddps', 'movddup',
+                                         'pxor', 'pshufd', 'pcmpeqd', 'pcmpeqw', 'pmovmskb'):
         b = b[1:]
     ptys = [p.split()[0] for p in params]
     R = ret
@@ -224,8 +225,15 @@ def gen(name, ret, params):
         body = '%s L128 r; r.w[0] = r.w[1] = %s.w[1]; r.w[2] = r.w[3] = %s.w[3]; return r.q;' % (pre, A(0), A(0))
     if b == 'movsldup' and n == 1 and ptys[0] == 'i128' and R == 'i128':
         body = '%s L128 r; r.w[0] = r.w[1] = %s.w[0]; r.w[2] = r.w[3] = %s.w[2]; return r.q;' % (pre, A(0), A(0))
-    if b in ('movmskps', 'movmskpd', 'pmovmskb'):
-        pass
+    if b == 'pcmpeqd' and ptys == ['i128', 'i128'] and R == 'i128':
+        body = '%s L128 r; for (int i = 0; i < 4; i++) r.w[i] = (%s.w[i] == %s.w[i]) ? 0xffffffffu : 0; return r.q;' % (pre, A(0), A(1))
+    if b == 'pcmpeqw' and ptys == ['i128', 'i128'] and R == 'i128':
+        body = ('%s L128 r; r.q = 0; for (int i = 0; i < 8; i++) { int s = 16 * (i & 1); u32 e = ((%s.w[i >> 1] >> s) & 0xffffu) == ((%s.w[i >> 1] >> s) & 0xffffu) ? 0xffffu : 0; r.w[i >> 1] |= e << s; } return r.q;'
+                % (pre, A(0), A(1)))
+    if b == 'pmovmskb' and ptys == ['i128'] and R == 'i32':
+        body = '%s u32 m = 0; for (int i = 0; i < 16; i++) m |= (u32)(((const unsigned char *)&%s)[i] >> 7) << i; return m;' % (pre, A(0))
+    if b == 'tzcnt' and ptys == ['i32'] and R == 'i32':
+        body = 'return a0 ? (u32)__builtin_ctz(a0) : 32u;'
     # ----- shuffles / unpack
     if b in ('unpcklps', 'punpckldq') and ptys == ['i128', 'i128'] and R == 'i128':
         body = '%s L128 r; r.w[0] = %s.w[0]; r.w[1] = %s.w[0]; r.w[2] = %s.w[1]; r.w[3] = %s.w[1]; return r.q;' % (pre, A(0), A(1), A(0), A(1))
