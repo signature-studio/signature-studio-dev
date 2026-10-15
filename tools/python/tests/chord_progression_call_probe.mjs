@@ -21,6 +21,7 @@ const walk = (d, base = "") => {
 walk(extRoot);
 files["/fl/Tools/Chord progression/Notes/genres"] = fs.readFileSync(path.join(extRoot, "drum_patterns.json"));
 files["/fl/Tools/Chord progression/Notes/pattern_presets.cpt"] = new TextEncoder().encode("");
+const UNSET = process.env.LOOP_STARTER_UNSET === "1";
 const ids = JSON.parse(fs.readFileSync(new URL("analysis/flapi/flapi_ids.json", root)));
 const lines = [];
 const py = await FlPython.create({
@@ -70,7 +71,7 @@ class _CPTRec(flcpt.CPT):
         return getattr(Rec('cpt'), k)
 flcpt.cpt = _CPTRec()
 # flcpt に chordPool は置かない (PE に名前が無い・REPORT_PY164 §3)。control は import 失敗で None を使う。
-flrack.rack = types.SimpleNamespace(loop_starter_config='{"mock": true, "genres": {}, "loops": []}', flr=types.SimpleNamespace())
+${UNSET ? "class _UnsetRack: __slots__ = ('loop_starter_config',)\nflrack.rack = _UnsetRack()" : "flrack.rack = types.SimpleNamespace(loop_starter_config='{\"mock\": true, \"genres\": {}, \"loops\": []}', flr=types.SimpleNamespace())"}
 flpianoroll.score.PPQ = 96
 sys.modules['flcpt'] = flcpt
 sys.modules['flrack'] = flrack
