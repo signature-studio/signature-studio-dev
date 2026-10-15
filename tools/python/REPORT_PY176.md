@@ -184,7 +184,7 @@ production 呼出し (dl=0・flag=0) では `key == K` のとき `V ← (dir+1)<
 - vtable (`.data`): `+0x00` = `0x478200`、`+0x08` = `0x4781e0`、`+0x10` = `0x4781f0`、`+0x18` = `0x478310`、`+0x20` = `0x478320`、`+0x28` = `0x13b2168` (未検査。値のみ記録)。
 - `+0x18` = `0x478310`: `cmp edx, r8d; sete al; ret`。引数 (sub, key) のうち、sub (`edx`) と key (`r8d`) の 32 bit 一致判定。戻り値は 0/1。
 - `+0x20` = `0x478320`: `edx` (u32) を `[rsp+0x38]` に積み、長さ 4・seed `0x811c9dc5` で `0x475ba0` を呼ぶ。`0x475ba0` は FNV-1a の 1 段ループ (`xor` → `imul 0x1000193`)。戻り値は 32 bit ハッシュ。
-- `0xf8e4a0` は `P.vtable[+0x20]` の戻り値を `and 0x7fffffff`・`+1`・`and 0x7fffffff` して id とする。値域は 1〜0x7fffffff (31 bit)。これで §2 の「id 供給」の本体が確定する。
+- `0xf8e4a0` は `P.vtable[+0x20]` の戻り値を `and 0x7fffffff`・`+1`・`and 0x7fffffff` して id とする。値域は 0〜0x7fffffff (31 bit)。ハッシュが 0x7fffffff のとき `+1` が 0x80000000 になり、2 度目の `and` で 0 になる。これで §2 の「id 供給」の本体が確定する。
 - probe: `analysis/flapi/pe_py316_p_vtable.py` (10 検査。`lea` 先・vtable・+0x18・+0x20・FNV-1a・id 計算を確認)。
 - 実測 (2026-10-15・GitHub Actions の Linux runner・`fl-win64` の `block00031_PE.bin` を展開して使用): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py316_p_vtable.py` → PASS 10 件・FAIL 0・終了 0・所要 0.09 秒 (`time` の real)。実行直前の load average は 1 分値 0.23・5 分値 0.47 (`uptime`)。
 - ネガティブコントロール: `0x475ba0` の `imul` 即値 `0x1000193` の 3 byte 目を 1 bit 変えた複製 (repo 外の一時領域) で実行 → `FAIL 0x475ba0 は FNV-1a ...`・`summary: 1 FAIL`・終了 1。
