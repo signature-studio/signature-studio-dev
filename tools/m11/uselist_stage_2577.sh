@@ -62,6 +62,25 @@ for m in on off tc; do
   for i in 1 2 3 4; do run "G3-$m" "G3-$m$i" "$SINGLE" "$m"; done
 done
 
+# G4: 出力名の長さだけを変える (相対名 9 字と 17 字)。ASLR 無効・env -i・各 2 回。
+#     --backend-no-opts と --print-after-all (stderr 全体の md5) も同じ 2 条件で比べる。
+G4="$OUT/g4"; mkdir -p "$G4"
+g4run() { # g4run <len> <tag> [extra arg]
+  local n="$1" tag="$2" extra="${3:-}" name base
+  name="$(printf 'q%.0s' $(seq 1 $((n-2)))).c"; base="${name%.c}"
+  rm -f "$G4/$base.ll"
+  ( cd "$G4" && env -i PATH=/usr/bin:/bin TMPDIR="$OUT/tmp" setarch x86_64 -R timeout 250 "$RETDEC_BIN" "$PE" \
+      -o "$name" --select-ranges "$SINGLE" --select-decode-only --timeout 100 $extra > "$G4/$base.$tag.log" 2> "$G4/$base.$tag.err" ) || true
+  printf 'G4\t%s\tlen=%s\tll=%s\terr_md5=%s\n' "$tag" "$n" "$(md5sum < "$G4/$base.ll" 2>/dev/null | cut -c1-8)" \
+    "$(md5sum < "$G4/$base.$tag.err" | cut -c1-8)" >> "$G4/g4.tsv"
+}
+: > "$G4/g4.tsv"
+for i in 1 2; do for n in 9 17; do g4run "$n" "plain$i"; done; done
+for i in 1 2; do for n in 9 17; do g4run "$n" "noopts$i" "--backend-no-opts"; done; done
+for n in 9 17; do g4run "$n" "printall" "--print-after-all"; done
+echo "== G4 (出力名の長さ・ASLR 無効・env -i。ll=.ll の md5、err_md5=stderr 全体の md5)"
+cat "$G4/g4.tsv"
+
 echo "== summary (group / label / rc / sec / load1 / ll md5 / 指示行を除いた md5 / 指示行数)"
 cat "$SUM"
 echo "== distinct .ll md5 per group"
