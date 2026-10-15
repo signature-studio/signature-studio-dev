@@ -30,7 +30,8 @@
 
 - 有効域と status: `setSnapMode` の cb (`0xd6b700`) は、gate 偽なら status -2 のまま何もしない。gate 真では status を -4 にしてから範囲検査 (`cmp eax, 0xf`・マスク `0x7fff` のビット i) に入り、i ∈ 0..14 で bit が立つときだけ書込み (`vtbl[0x1f0]`) を行い、status を 0 にする。i ∉ 0..14 (i = 15 を含む) では書込みをせず、status は -4 のまま終わる (逆アセンブル: `-2` を書く d6b709 → gate 通過で `-4` を書く d6b72f → 範囲検査が偽なら d6b75f から終了)。
 - 3 関数とも PE の戻り値は None (戻り値の格納は共通経路の `&ret` で、Python には返さない)。
-- 実装の仮置き: mock と C は型検査 (引数個数 1・setHintMsg は文字列・setFocused / setSnapMode は整数 (bool 可)) のみ行い、None を返す。`ui_state_diff` で None 呼出しを固定した (None を 0 として扱うかは未確認)。状態を変えない。範囲外の挙動は実装していない (有効域チェックはしない)。
+- setSnapMode の範囲外 (#5317): 戻り変換 `0xd82c20` を逆アセンブルし、status -4 は `cmp eax,-4 / je 0xd82d3c` の分岐で `0xd82e8c` "Index out of range" (code 4) を指すと確認した。`0xd82c20` は gate `[[0x861b1f]+8]→vtbl[0x88]` が真のときだけ例外を立て、偽なら None 相当 (`0xc38bc0`)。このゲートの実行時値は静的に決まらないため、mock と C は真と仮定して `i < 0 || i > 14` を code 4 にする (PY-119・PY-125 と同じ扱い)。範囲内 (0..14) は書込みを行い None を返す。
+- 実装の仮置き: mock と C は型検査 (引数個数 1・setHintMsg は文字列・setFocused / setSnapMode は整数 (bool 可)) を行い、setSnapMode は範囲外を code 4 にする。None を返す。`ui_state_diff` で None 呼出しを固定した (None を 0 として扱うかは未確認)。状態を変えない。範囲外の挙動は実装していない (有効域チェックはしない)。
 
 ## 保留 1 件 `ui.snapMode` (子 #3719)
 
@@ -86,6 +87,6 @@ $ git diff 12db2a260 HEAD -- tools/python ':!*.md'
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | setHintMsg / setFocused / setSnapMode の状態モデル (値を持たない。書込んだ値の読出し経路は未確定: getHintMsg の `[0x15e2eb8]→+0xbe8` と `0x11f16b0` の `+0x858` 系が同じ object か、getFocused の sub-object の読出し) | 書いた値を後で読めない。mock と C は getHintMsg / getFocused / getSnapMode を初期値で返す | 子 #3719 (PY-242) |
-| setSnapMode の範囲外 (i ∉ 0..14)。gate 真では status -4 のまま書込み無し (`0xd6b75f`)。gate 偽は -2 のまま | 範囲外の status (-4) を Python 側の戻り変換 `0xd82c20` が例外・値のどれにするかが未確認。mock と C は範囲検査せず None を返す | 子 #3719 (PY-242) |
+| setSnapMode の gate 偽 (status -2) の扱い | gate `[[0x861b1f]+8]→vtbl[0x88]` の実行時値が静的に未確定。真と仮定して mock/C は範囲外を code 4 にする | 子 #3719 (PY-242) |
 | snapMode (`0xfdd2c0` id 0x31) の意味・戻り型 | `ui.snapMode` は未実装 (Unspecified error) | 子 #3719 (PY-242) |
 | 実装 3 件の値 (None・状態なし) は実機測定していない | 実機の戻り挙動は未確認 | 子 #3719 (PY-242) |
