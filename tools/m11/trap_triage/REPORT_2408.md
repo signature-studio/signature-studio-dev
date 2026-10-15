@@ -215,22 +215,26 @@ node trap_triage/probe1676_watch.mjs                                      # base
 ### 8.0 結論
 
 1. **受入 3 (`function_535c2e`・unit 304/555 の abort)**: `M11_FIX_535BF2` の既定を 0 → 1 にした (commit `d80e9909f`)。ON (`M11_FIX_50A830=1`) では unit 304・555 が abort から oob に戻り、OFF の分類と一致する。OFF 経路は unit 単位で不変 (§8.1)。
-2. **受入 1 (unit 144 の回帰の原因)**: 未特定。trap の関数チェーン (§8.2) まで。
-3. **受入 2 (ON で unit 144 の回帰を解消)**: 未達。ON の survey ok は 872 (OFF 873 − 1) で「872 以上」は数値上満たすが、unit 144 は ok → oob のまま。
-4. **受入 4 (既定 ON 化)**: 未達。`M11_FIX_50A830` は既定 OFF のまま (受入 1・2 が前提)。
+2. **受入 1 (unit 144 の回帰の原因)**: 未特定。trap の関数チェーン (§8.2) まで。起票先: #3482。
+3. **受入 2 (ON で unit 144 の回帰を解消)**: 未達。ON の survey ok は 872 (OFF 873 − 1) で「872 以上」は数値上満たすが、unit 144 は ok → oob のまま。起票先: #3482。
+4. **受入 4 (既定 ON 化)**: 未達。`M11_FIX_50A830` は既定 OFF のまま (受入 1・2 が前提)。起票先: #3482。
 5. e2e の rc は既定・ON とも **1**。origin/main `44a7f4465` (変更前) でも同じ値で、ゲートの期待値と実測が合わない (§8.1 の 3 件)。本 PR では期待値を変えていない。
+6. **既定変更の到達先 (§8.4)**: `tools/gui/flengine/build.sh` は `m11_ov.c` を直接コンパイルするため、`-DM11_FIX_535BF2=0` で従来値に固定した (GUI 側の影響は §8.4 の前処理照合で 0)。
 
 ### 8.1 実測 (測定 commit `d80e9909f`。素材・環境は §1 と同じ。直列 1 本、load average は uptime の 1 分値 1.04 (基準 OFF の直後))
 
-| 条件 | e2e rc | wall | survey ok / trap / miss | 基準 (origin/main OFF) との unit 差 |
-|---|---|---|---|---|
-| 既定 (`d80e9909f`) | 1 | 1m11.5s | 873 / 22 / 46 | 0 |
-| `M11_FIX_50A830=1` (`d80e9909f`) | 1 | 1m10.3s | 872 / 23 / 46 | 1 (144 ok → oob。304・555 は OFF と同じ oob) |
-| 基準 OFF (`44a7f4465`、変更前) | 1 | 3m13s (初回の build を含む) | 873 / 22 / 46 | — |
-| ON + `M11_FIX_535BF2=0` (変更前の既定、`44a7f4465`) | 1 | 1m11s | 872 / 23 / 46 | 3 (144 ok → oob、304・555 oob → Aborted) = 変更前の abort を再現 (ネガコン) |
-| OFF + `M11_FIX_535BF2=1` (`44a7f4465` + フラグ) | 1 | 1m12s | 873 / 22 / 46 | 0 (535BF2 は OFF 経路の分類を変えない) |
+| 条件 | 環境変数 (`M11_FIX_50A830` / `M11_FIX_535BF2`) | e2e rc | wall | survey ok / trap / miss | 基準 (origin/main OFF) との unit 差 |
+|---|---|---|---|---|---|
+| 既定 (`d80e9909f`) | 未指定 (既定 `0` / `1`) | 1 | 1m11.5s | 873 / 22 / 46 | 0 |
+| `M11_FIX_50A830=1` (`d80e9909f`) | `1` / 未指定 (既定 `1`) | 1 | 1m10.3s | 872 / 23 / 46 | 1 (144 ok → oob。304・555 は OFF と同じ oob) |
+| 基準 OFF (`44a7f4465`、変更前) | 未指定 (既定 `0` / `0`) | 1 | 3m13s (初回の build を含む) | 873 / 22 / 46 | — |
+| ON + `M11_FIX_535BF2=0` (変更前の既定、`44a7f4465`) | `1` / `0` | 1 | 1m11s | 872 / 23 / 46 | 3 (144 ok → oob、304・555 oob → Aborted) = 変更前の abort を再現 (ネガコン) |
+| OFF + `M11_FIX_535BF2=1` (`44a7f4465` + フラグ) | `0` / `1` | 1 | 1m12s | 873 / 22 / 46 | 0 (535BF2 は OFF 経路の分類を変えない) |
+
+再現: `cd tools/m11 && FL_WIN64_DIR=<展開先> [M11_FIX_50A830=… M11_FIX_535BF2=…] bash m11_e2e.sh`。unit 別の突合は `M11_SURVEY_DETAIL=<path>` を付ける。
 
 - e2e rc=1 の内訳 (既定・ON 共通): (a) tolerant gate `通常起動の完了数 101 != 期待 56` (units_run_full 98 + skipped)、(b) `survey ok=873 != 期待 872` (OFF)、(c) ptrcheck survey `image_va_words_new 71005 > M11_EXPECT_PTR_SURVEY_NEW_MAX 71001`。期待値は変更していない (e2e_expect.env・m11_tolerant_gate.py)。
+- 根拠ログ (M6): 原本 (`work/e2e_full.out`・`work/e2e_survey.out`・`work/judge.out`) は `tools/m11/work/` (gitignore) にあり repo に残らない。本 run は素材 `work-m11` が無く再採取できなかった。上の (a)〜(c) は作成者 run の値。出力形式はコードで確認済み: (a) `m11_tolerant_gate.py:46` `通常起動の完了数 %s != 期待 %d (strict の挙動が変わった)`、(b) `:51` `survey ok=%s != 期待 %d (survey の数値が変わった)`、(c) `m11_survey.mjs:161` `FAIL: survey ptrcheck image_va_words_new=%s > max=%s (%s)`。次の run で原本を採取して本節へ貼る (未解決表)。
 - IR sha256 は `17a98d6e…` (`ir_conditions.json`)。§1 の `6909f85d…` と異なる。環境差か drift かは未切り分け。
 
 ### 8.2 unit 144 の trap 経路 (ON・`M11_SURVEY_STACK=144 node m11_survey.mjs`)
@@ -245,6 +249,17 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| unit 144 の回帰の原因と修正 (受入 1・2・4) | 既定 ON (`M11_FIX_50A830`) 不可 | 子 issue (#2521 の残り。本 PR で issue の範囲を縮めた) |
-| e2e の期待値と実測の不一致 (8.1 の (a)〜(c)) | e2e が既定でも rc=1 | PM 判断 (issue コメント) |
+| unit 144 の回帰の原因と修正 (受入 1・2・4) | 既定 ON (`M11_FIX_50A830`) 不可 | #3482 (#2521 の残り。本 PR で issue の範囲を縮めた) |
+| e2e の期待値と実測の不一致 (8.1 の (a)〜(c)) と原本ログの採取 | e2e が既定でも rc=1 | PM 判断 (issue コメント) |
+| 既定 ON の可否 (`M11_FIX_535BF2`。既定案: ON。survey は OFF と 0 差分) | 本 PR の既定変更を採るか | PM 判断 (`tools/m11/trap_triage/REPORT_1275.md` 52 行目の「既定 ON 化は PM 判断」への回答) |
+| origin/main (`cf9dce6fe`。`44a7f4465` より後) は `tools/m11` に 20 ファイルの差分があり、本 PR は取り込んでいない。main 上の survey は未測定 | merge 後の既定の挙動 | PM 判断 (merge 後の再測定の要否) |
+| `tools/m11/alloca/e2e.sh` の既定変更の影響 (既定の `m11_build.sh` を使う) | 未測定。影響の有無は未確認 (素材 `work-m11`・toolchain が本 run に無い) | 未解決 (次の run で `oc_artifacts` を付けて実行) |
 | IR sha256 の差 (`17a98d6e…` と §1 の `6909f85d…`) | 基準の再現性 | PM 判断 |
+
+### 8.4 既定変更の到達先
+
+| 経路 | 既定 1 の影響 | 対処・結果 |
+|---|---|---|
+| `tools/m11/m11_build.sh` → `work/obj/ov.o` (m11 mainline) | `function_535bf2` / `function_535c11` の C 転記が入る | 本 PR の目的。m11 側の実測は §8.1 |
+| `tools/gui/flengine/build.sh` (`m11_ov.c` を `$CF` で直接コンパイル) | 修正前は GUI の `m11_gui.cjs` にも入っていた | `CF` に `-DM11_FIX_535BF2=0` を足し、従来値 (0) に固定 (本 PR の修正 commit)。照合: `clang -E -P` の出力で、変更前 (`44a7f4465`) と修正後 HEAD の `m11_ov.c` は 1704 行で一致。修正前の `CF` を HEAD に当てると 17 行が増える (ネガコン)。GUI の e2e は再実行していない (素材 `work-m11` が本 run に無い)。GUI の実測値は `tools/gui/flengine/REPORT.md` §6j |
+| `tools/m11/alloca/e2e.sh` (既定の `m11_build.sh` を使う) | 既定変更の影響を受ける | 未実行 (§8.3 の未解決) |
