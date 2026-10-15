@@ -95,7 +95,7 @@ def m2_normalize(text: str) -> str:
 # ---- /m2 ----
 
 VERBOSE = False
-STAGE_LOG = []
+STAGE_LOG: list[str] = []
 
 
 def stage(tag, msg):

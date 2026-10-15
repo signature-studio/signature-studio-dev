@@ -5,6 +5,7 @@
   比較対象: spec の全バッファ (guard 64B 含む; ポインタ欄は (バッファ名+オフセット) トークンで比較)。
 """
 import json
+from typing import Any
 import os
 import re
 import subprocess
@@ -74,7 +75,9 @@ def parse_out(path):
     return res
 
 
-def run_diff(image, func_va, spec, cjs, ll_path, wasm_func, out_dir, n=None, seed=None, verbose=False, timeout=240):
+def run_diff(image: str, func_va: int, spec: dict[str, Any], cjs: str | None, ll_path: str, wasm_func: str,
+             out_dir: str, n: int | None = None, seed: int | None = None, verbose: bool = False,
+             timeout: int = 240) -> dict[str, Any]:
     os.makedirs(out_dir, exist_ok=True)
     scen_txt = SP.build(spec, n=n, seed=seed)
     sp = os.path.join(out_dir, "scen.txt")
@@ -89,8 +92,10 @@ def run_diff(image, func_va, spec, cjs, ll_path, wasm_func, out_dir, n=None, see
     json.dump(wasm_sig(ll_path, wasm_func), open(sigp, "w"))
     hang = False
     try:
-        r = env.run(["node", os.path.join(HERE, "wasm_runner.mjs"), cjs, wasm_func, sigp, sp, was], capture_output=True, text=True,
-                    timeout=timeout)
+        if cjs is None:                       # 型: build 前 (detect_only) の cfg では cjs が無い — 呼ぶ側の誤り
+            raise ValueError("run_diff: cjs is required (wasm CJS path)")
+        r = env.run(["node", os.path.join(HERE, "wasm_runner.mjs"), cjs, wasm_func, sigp, sp, was],
+                    capture_output=True, text=True, timeout=timeout)
         if r.returncode:
             raise RuntimeError("wasm runner rc=%d: %s" % (r.returncode, r.stderr[-800:]))
     except subprocess.TimeoutExpired:
@@ -101,8 +106,9 @@ def run_diff(image, func_va, spec, cjs, ll_path, wasm_func, out_dir, n=None, see
     cmp_ret = spec.get("compare_ret", False)
     ret_xmm0 = spec.get("ret_from_xmm0", False)      # wasm の i64 戻り = xmm0 下位 64bit (leafabi)
     ign = set(spec.get("ignore_buffers", []))
-    summ = dict(scenarios=nscen, steps=len(N), match=0, mismatch=0, native_crash=0, wasm_trap=0, wasm_hang=hang, mismatch_scen=set(), details=[])
-    dead = set()
+    summ: dict[str, Any] = dict(scenarios=nscen, steps=len(N), match=0, mismatch=0, native_crash=0, wasm_trap=0,
+                                wasm_hang=hang, mismatch_scen=set(), details=[])
+    dead: set[str] = set()
     for key in sorted(N):
         s = key[0]
         if s in dead:
@@ -151,7 +157,7 @@ def run_diff(image, func_va, spec, cjs, ll_path, wasm_func, out_dir, n=None, see
     return summ
 
 
-def fmt(summ):
+def fmt(summ: dict[str, Any]) -> str:
     return "scenarios=%d steps=%d match=%d mismatch=%d native_crash=%d wasm_trap=%d%s" % (
         summ["scenarios"], summ["steps"], summ["match"], summ["mismatch"], summ["native_crash"], summ["wasm_trap"],
         " WASM-HANG(timeout)" if summ.get("wasm_hang") else "")

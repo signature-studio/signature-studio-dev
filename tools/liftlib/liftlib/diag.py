@@ -10,12 +10,14 @@ diagnose(cfg_path):
 import copy
 import json
 import os
+from typing import Any
 
 from . import pipeline
 from .harness import diff as D
 
 
-def _evaluate(cfg, workdir_name, passes_override, n):
+def _evaluate(cfg: dict[str, Any], workdir_name: str, passes_override: dict[str, bool],
+              n: int | None) -> tuple[dict[str, Any], dict[str, Any], list[str]]:
     c = copy.deepcopy(cfg)
     c["name"] = workdir_name
     c["passes"] = dict(c.get("passes", {}))
@@ -28,19 +30,20 @@ def _evaluate(cfg, workdir_name, passes_override, n):
     cfg2, wd, cjs, stats, log = pipeline.run_all(tmp)
     spec = json.load(open(os.path.join(pipeline.HERE, "..", c["spec"])))
     img = pipeline.rpath(c["image"])
+    assert img is not None, "diag: image path が解決できない (cfg[image])"
     s = D.run_diff(img, int(c["func_va"], 16), spec, cjs, os.path.join(wd, workdir_name + "_fixed.ll"), c["wasm_func"],
                    os.path.join(wd, "diff"), n=n, timeout=60)
     return s, stats, log
 
 
-def diagnose(cfg_path, n=None):
+def diagnose(cfg_path: str, n: int | None = None) -> dict[str, Any]:
     cfg = pipeline.load_cfg(cfg_path)
-    out = dict(target=cfg["name"])
+    out: dict[str, Any] = dict(target=cfg["name"])
     base_s, base_stats, base_log = _evaluate(cfg, cfg["name"] + "_diag_base", {}, n)
     out["baseline"] = D.fmt(base_s)
     out["baseline_mismatch"] = base_s["mismatch"]
     out["ablation"] = {}
-    applied = {
+    applied: dict[str, Any] = {
         "p1": base_stats.get("p1", {}).get("reconstructed", 0) + base_stats.get("p1", {}).get("rewired", 0),
         "f7": base_stats.get("f7", {}).get("repaired", 0),
         "f2": base_stats.get("f2", {}).get("sites_fixed", 0) + base_stats.get("f2", {}).get("callee_fixed", 0),
