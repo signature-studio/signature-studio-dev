@@ -24,6 +24,8 @@ const mig = new Set(["channels.selectedChannel", "channels.fillEachNSteps", "gen
 const pe39 = new Set(["channels.selectOneChannel"]);
 // REPORT_PY61 §2 で型・範囲 code を確定した playlist 取得系 7 件 (PY-62 #2027・REPORT_PY62。muteTrackLock は pe102)
 const pl61 = new Set(["playlist.getTrackColor", "playlist.isTrackMuteLock", "playlist.getTrackActivityLevelVis", "playlist.getLiveLoopMode", "playlist.getLiveTriggerMode", "playlist.getLivePosSnap", "playlist.getLiveTrigSnap"]);
+// PE で判定順 (index → NaN → pitchUnit) と status 文言を確定し、unit 0/1 の効果を除いて実装した 1 関数 (REPORT_PY72・PY-76 #2563)。tests/channels_diff.mjs が mock と照合
+const pe76 = new Set(["channels.setChannelPitch"]);
 // PE 解析で value 引数の意味論 (準備判定を除く) を確定した関数 (REPORT_PY61 §3 の muteTrackLock・PY-102 #2883。準備判定は #2959)
 const pe102 = new Set(["playlist.muteTrackLock"]);
 // 公開 stub の戻り型・説明で意味論を決めた 6 関数 (REPORT_PY41 追補・REPORT_PY41_1514 追補・PY-41 #1514)。PE での範囲外 code 確認は未了
@@ -64,12 +66,12 @@ let impl = 0, unimpl = 0;
 for (const id of ids) {
   const r = direct(id, ...Array(40).fill(null).slice(0, 0));
   const notImpl = r.err?.startsWith("Unspecified error (not implemented:");
-  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || stub41.has(id) || pe101.has(id) || pe100.has(id) || stub89.has(id) || pe87.has(id) || pe94.has(id) || pe95.has(id) || pe96.has(id) || pe115.has(id) || pe121.has(id) || pe119.has(id) || pe119set.has(id) || pe152.has(id) || pe121_2982.has(id) || pe102.has(id) || pe125.has(id) || pe172.has(id) || pe120.has(id) || pl61.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
+  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || pe76.has(id) || stub41.has(id) || pe101.has(id) || pe100.has(id) || stub89.has(id) || pe87.has(id) || pe94.has(id) || pe95.has(id) || pe96.has(id) || pe115.has(id) || pe121.has(id) || pe119.has(id) || pe119set.has(id) || pe152.has(id) || pe121_2982.has(id) || pe102.has(id) || pe125.has(id) || pe172.has(id) || pe120.has(id) || pl61.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
   else assert.ok(notImpl, `${id} は未実装のはず`);
   notImpl ? unimpl++ : impl++;
 }
-// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 確定 1 (pe102・#2883) + stub 確定 6 (stub41) + PE 確定 2 (pe101) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 7 (pe94・#2830) + PE 確定 9 (pe95・#2831) + PE 確定 4 (pe96・#2832) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + ui PE 確定 6 (pe119・#2980) + general PE 確定 6 (pe119set・#2977) + arrangement PE 呼出し 6 (pe152・#2983) + ui 表示・メニュー 6 (pe121_2982・#2982) + general PE 確定 2 (pe125・#3001) + launchMapPages PE 確定 1 (pe120・#2984) + patterns グループ 2 (pe172・#3219) + PY61 確定 7 (pl61・#2027)
-assert.equal(impl, 150); assert.equal(unimpl, 285);
+// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 確定 1 (pe102・#2883) + stub 確定 6 (stub41) + PE 確定 2 (pe101) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 7 (pe94・#2830) + PE 確定 9 (pe95・#2831) + PE 確定 4 (pe96・#2832) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + ui PE 確定 6 (pe119・#2980) + general PE 確定 6 (pe119set・#2977) + arrangement PE 呼出し 6 (pe152・#2983) + ui 表示・メニュー 6 (pe121_2982・#2982) + general PE 確定 2 (pe125・#3001) + launchMapPages PE 確定 1 (pe120・#2984) + channels PE 判定順 1 (pe76・#2563) + patterns グループ 2 (pe172・#3219) + PY61 確定 7 (pl61・#2027)
+assert.equal(impl, 151); assert.equal(unimpl, 284);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);
@@ -80,6 +82,9 @@ assert.equal(E("channels.getChannelName", 0, false, 7).code, 5);     // 引数�
 assert.equal(E("channels.getChannelName", "0").code, 5);             // 型違い
 assert.equal(E("channels.setChannelName", 0, 5).code, 5);
 assert.equal(E("channels.setChannelVolume", 0, "x").code, 5);
+assert.deepEqual(E("channels.setChannelPitch", 9, 0.5), { err: "Index out of range", code: 4 });
+assert.deepEqual(E("channels.setChannelPitch", 0, NaN), { err: "Unspecified error", code: 2 });
+assert.equal(E("channels.setChannelPitch", 0, "x").code, 5);
 assert.equal(E("general.saveUndo").code, 2);                         // 未実装 → Unspecified error
 assert.equal(E("ilmcp.showHighlight", "a").code, 5);
 assert.equal(E("mixer.getCurrentTempo", 1, 2).code, 5);
