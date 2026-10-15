@@ -59,7 +59,7 @@ FL_WIN64_DIR=<fl-win64 展開先> SS_EMSDK_ENV=<emsdk_env.sh> bash tools/flelift
 # 期待: [py5215] 観測 (発火数): G=0 SEL=0 E70800=0 CTL=1 (D89C70・1245AC0 も 0)
 ```
 
-素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` の `*block00031_PE.bin` を `tar --zstd -xf` で展開して使った。emsdk は `/opt/emsdk/emsdk_env.sh` (本 run の runner 既定)。
+素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` の `*block00031_PE.bin` を `tar --zstd -xf` で展開して使った。emsdk は `docs/REFERENCES.md` の `[EMSDK]` (本 run の runner 既定位置)。
 
 ## 6. 検証
 
