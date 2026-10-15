@@ -85,15 +85,16 @@ capstone を使わず、生バイト列の E8/E9/0F8x 走査と .rdata/.data の
 
 ## 6. 検証 (実測)
 
-- 測定 commit: **`5ae82467`** (分類コード `scripts/sr21_classify.py` と生成物 `out/sr21_*` を含む最後のコード変更)。前版の測定 commit `0959cd09` は訂正前。
+- 測定 commit: **`a327e9bd1`** (分類コード `scripts/sr21_classify.py`・`scripts/sr21_verify.py` と生成物 `out/sr21_*` を含む最後のコード変更。assert の追加と verify ラベルの修正。`sr21_classify.tsv`・`sr21_summary.txt` は前版と同一、`sr21_verify.txt` は label 行のみ変更)。前版の測定 commit `0959cd09` は訂正前。
 - 素材: `plugins-serum2` から `Install_Xfer_Serum2_2.1.5.exe` を `tar --zstd -x` で単独展開 (1,313,084,056 B)。VST3 `Serum2_win64.vst3` の sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` (前版と同一)。
-- **e2e 再現 (HEAD 5ae82467 で実行)**:
-  - `PY=python3 bash scripts/sr3_run.sh`: 30.5 秒 (load 0.03 → 1.43)。`out/` 差分 0。
-  - `bash scripts/sr21_run.sh`: 7.5 秒 (load 1.39)。`out/sr21_*` 差分 0。
-  - 検算 `sr21_verify.py` は sr21_run に含まれ、§3 の値を再現。
-- 本 REPORT の追加以降のコード差分 (`git diff 5ae82467 HEAD -- tools/targets/serum2/scripts tools/targets/serum2/out`) は 0 行 (REPORT のみ変更)。
+- **e2e 再現 (コミット済み HEAD `64f7de94e` で実行。コード・生成物は測定 commit と同一)**:
+  - `PY=python3 bash scripts/sr3_run.sh`: 31.1 秒 (開始時 load 0.67)。VST3 sha256 一致。`out/` 差分 0。
+  - `bash scripts/sr21_run.sh`: 7.8 秒 (開始時 load 1.47)。`out/sr21_*` 差分 0。
+  - 検算 `sr21_verify.py` は sr21_run に含まれ、§3 の値を再現 (ラベルのみ `table_ptr blocks hit by data pointer: 3928`)。
+  - 追加した assert `padding block is referenced` は通過 (パディング 15,061 件への参照 0)。
+- 測定 commit 以降のコード差分 (`git diff a327e9bd1 HEAD -- tools/targets/serum2/scripts tools/targets/serum2/out`) は 0 行 (REPORT のみ変更)。
 
 ```
-git diff 5ae82467 HEAD -- tools/targets/serum2/scripts tools/targets/serum2/out
+git diff a327e9bd1 HEAD -- tools/targets/serum2/scripts tools/targets/serum2/out
 (出力 0 行)
 ```
