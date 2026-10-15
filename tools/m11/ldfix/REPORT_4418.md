@@ -14,17 +14,20 @@
 
 ## 1. 測定条件 (受入の再現)
 
-- 測定 commit: `be7fefb4a` (コードを変えた最後の commit: `fix(m11): repair icmp-consumed 2-level deref drop via cmp gate (#4418)`)。起点 `origin/main` = `6441decbb`。作業 worktree `ws-4418` (branch `4418-icmp-deref-repair`)。
+- 測定 commit: `fa3b3bbfe` (コードを変えた最後の commit。`origin/main` = `a17fca6fb` を取り込んだ merge commit。修復の commit は `be7fefb4a`、起点 `origin/main` = `6441decbb`)。作業 worktree `ws-4418` (branch `4418-icmp-deref-repair`)。
 - 素材: `work-m11` を `$RUNNER_TEMP/m11art` に展開し、`M11_WORK=<その tools/m11/work>` で指定 (`tools/m11/work/` への展開は行わない)。emcc は runner の `[EMSDK]`。`work-liftdiff` と `toolchain-retdec` は本 e2e では未使用。`work-m11` は #516 以前の snapshot なので、結論はこの IR に限る。
 - 実行: `M11_WORK=... TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground)。
-- 実測 (測定 commit `be7fefb4a`、n=2): real **56.74 s / 56.13 s**、rc **0 / 0**、load average (1 分) 実行前 0.45 / 0.56、終了後 0.78 / 0.83。
+- 実測 (測定 commit `fa3b3bbfe`、n=2、`bash tools/m11/ldfix/fix_d17_e2e.sh` 前景実行): real **63.60 s / 63.10 s**、rc **0 / 0**、RESULT: PASS (2 回とも)、load average (1 分) 実行前 0.27 / 0.53、終了後 0.74 / 0.84。emcc rc=0 (6/6)。
+- 参考 (merge 前の修復 commit `be7fefb4a`、n=2): real 56.74 s / 56.13 s、rc 0 / 0、load 0.45 → 0.78 / 0.56 → 0.83。`fa3b3bbfe` の merge 取り込み時の PR コメントに記録された real 33.0 s (n=1) は、本 REPORT の再測定 (n=2、63 s 前後) とは揃わない。原因は未確認。以後の数値は本節の n=2 を正とする。
 - 修復前の基準 (`6441decbb`、修復 pass を変える前の script で同じ e2e を 1 回): step 4 で FAIL (`spill37_1169.tsv が results と不一致`、rc=1)。step 4 までの実行時間は 24.5 s。FAIL の原因は §7。
-- 測定後のコード差分 (測定 commit から HEAD まで。この REPORT を追加する commit 以外は無い):
+- 測定後のコード差分 (測定 commit `fa3b3bbfe` から HEAD まで。この REPORT の文書だけを変える commit 以外は無い):
 
   ```
-  git diff be7fefb4a HEAD -- tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf*.py tools/m11/ldfix/ldmach*.py tools/m11/ldfix/spill37_1169.py tools/m11/ldfix/fix_spill_2794.py tools/m11/ldfix/check_spill_2794.py tools/m11/ldfix/results tools/m11/lb_base.py
+  git diff fa3b3bbfe HEAD -- tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf*.py tools/m11/ldfix/ldmach*.py tools/m11/ldfix/spill37_1169.py tools/m11/ldfix/fix_spill_2794.py tools/m11/ldfix/check_spill_2794.py tools/m11/ldfix/results tools/m11/lb_base.py
   (空: 差分 0)
   ```
+
+  修復 commit `be7fefb4a` から `fa3b3bbfe` までの `tools/m11` の差分には main 側の変更 (18 ファイル) が入る。本 PR の変更ではない。
 
 ## 2. 機械語と IR の照合 (受入 1)
 
@@ -74,7 +77,7 @@ M = `rip_touches` で数えた、X に触れる rip 相対命令の数。I = IR 
 
 - 現状の audit (`audit_lsf_ssa.cell_check`) は **関数 × K** で判定する。同じ K の i32 const load が 1 本でも残ると CELL_COLLAPSED とする。そのため、修復した site の数と audit 上の件数が一致しない (callarg 4 site のうち 1 本が 100b890 の mul の読みで残る)。
 - site 単位で数える見直し案: 各 site について、「その site の値を使う読み出しが全て直っているか」を判定し、直っていれば CELL_COLLAPSED から外す。関数 × K の集約は、そのまま残してよい (件数だけ site 単位にする)。
-- 本 issue では audit を変えない。変えると `results/` の全 TSV と e2e の全 assert が変わるため、別 issue で扱う (§7 の起票先)。
+- 本 issue では audit を変えない。変えると `results/` の全 TSV と e2e の全 assert が変わるため、別 issue で扱う。起票先: #4556 (`[LD-224]`、#4418 の子)。
 
 ## 7. e2e が修復前の main で FAIL していた件 (受入の前提)
 
@@ -94,7 +97,7 @@ M = `rip_touches` で数えた、X に触れる rip 相対命令の数。I = IR 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 100b890 cell 11e27f0 の mul 側の残存 i32 読み 2 本 (M = 3 のため cmp の型に当たらない) | 同じ関数の残存 miscompile の疑い (未検証) | 本 PR の範囲外。#3580 (LD-164) の残件として §5 に記録 |
-| audit の判定粒度 (関数 × K → site 単位) の見直し | audit の件数と修復数が一致しない | 本 PR では変えない。§6 の案で別 issue |
+| audit の判定粒度 (関数 × K → site 単位) の見直し | audit の件数と修復数が一致しない | 本 PR では変えない。§6 の案。#4556 (`[LD-224]`、#4418 の子) |
 | 修復 IR の実行検証 (FLEngine 起動) | 意味の正しさは機械語照合のみ | PM 判断 (本 issue の範囲外) |
 | `work-m11` が #516 以前の snapshot | 結論はこの IR に限る | REPORT_1169 §5 と同じ扱い |
 
