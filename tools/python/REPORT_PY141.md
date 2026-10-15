@@ -44,12 +44,14 @@
 ## 検証
 
 - 測定 commit: `8b28e291a` (probe の assert を増やした commit。コードを変えた最後の commit)。
-- 測定 commit から HEAD までのコード差分 (`tools/python` の md 以外。差分 0 の証跡):
+- 測定 commit から HEAD までの差分 (本 probe の対象で判定する。差分 0 の証跡)。main 取り込み (merge `7ce85ebe9`) で `tools/python` の非 md 9 件が入った (他 PR の変更。`git diff --stat 8b28e291a HEAD -- tools/python ':!*.md'` で確認)。probe は素材の PE (`extracted/block00031_PE.bin`) だけを読み、他の tools/python ファイルを読まないため、判定は probe 本体の差分で行う:
 
 ```
-$ git diff 8b28e291a HEAD -- tools/python ':!*.md'
+$ git diff 8b28e291a HEAD -- tools/python/analysis/flapi/pe_py141_probe.py
 (空)
 ```
+
+- 取り込み後の HEAD (`7ce85ebe9`) での再測定: PASS (29 項目 ok・rc 0)・0.176 秒 (load average 0.09 / 0.19 / 0.13、04:13 UTC)。
 
 - 検算の出力 (測定 commit `8b28e291a`・29 項目 ok・FAIL 0):
 
