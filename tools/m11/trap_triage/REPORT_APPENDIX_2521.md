@@ -44,3 +44,50 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 | `tools/m11/m11_build.sh` → `work/obj/ov.o` (m11 mainline) | `function_535bf2` / `function_535c11` の C 転記が入る | 本 PR の目的。m11 側の実測は §8.1 |
 | `tools/gui/flengine/build.sh` (`m11_ov.c` を `$CF` で直接コンパイル) | 修正前は GUI の `m11_gui.cjs` にも入っていた | `CF` に `-DM11_FIX_535BF2=0` を足し、従来値 (0) に固定 (本 PR の修正 commit)。照合: `clang -E -P` の出力で、変更前 (`44a7f4465`) と修正後 HEAD の `m11_ov.c` は 1704 行で一致。修正前の `CF` を HEAD に当てると 17 行が増える (ネガコン)。GUI の e2e は再実行していない (素材 `work-m11` が本 run に無い)。GUI の実測値は `tools/gui/flengine/REPORT.md` §6j |
 | `tools/m11/alloca/e2e.sh` (既定の `m11_build.sh` を使う) | 既定変更の影響を受ける | 未実行 (§8.3 の未解決) |
+
+## 9. #3592 (M11-24): ON/OFF の再測定と unit 144 の trap の経路 (測定 commit `68b9de191`)
+
+**結論**: 現 main (`15cf79560`) と `d80e9909f` の再生成 IR では、OFF でも unit 144 (`0x25c540`) が trap する。ON との unit 差は 0 で、ON 固有の回帰としては再現しなかった。受入 2 ([0] の書込み元) は特定した (§9.4)。
+
+### 9.1 前提の修正 (`68b9de191`)
+
+- `m11_build.sh` は `M11_FIX_50A830` の切替で `work/obj/ov.o` を作り直していなかった (他のフラグには stamp がある)。ON の後に OFF を build しても ON 版の ov.o が残り、build ログに `cc m11_ov.c` が出なかった。`work/ov_50a830.stamp` を追加して修正。
+- 修正後: ON/OFF の `work/m11_boot.cjs` の md5 が異なる (ON `eaad1e62…`・OFF `c7b07c4c…`)。ON/OFF の各 build で `cc m11_ov.c` が 1 件出る。
+
+### 9.2 素材と IR の条件
+
+- 素材 `work-m11` には `ir_conditions.json` と `lift_pe.sha256` が無い。`bash m11_gen_ir2.sh` (`FL_WIN64_DIR` = `fl-win64` の展開先、33 秒、ldfix・ld108・ld115・r8b 適用) で IR を作り直した (`boot_final.ll` 490,761 行)。
+- `m11_e2e.sh` は `lift_pe.sha256` が無いため lift 全再生成 (約 22 分) になり、本 run では実行していない。e2e の rc は未確認。
+
+### 9.3 survey の実測 (`node m11_survey.mjs`。直列。uptime load 0.41〜0.47)
+
+| 条件 | IR | `M11_FIX_50A830` | ok / trap / miss / noproc | unit 144 (`0x25c540`) |
+|---|---|---|---|---|
+| 現 main `68b9de191` | 再生成 | 1 (ON) | 873 / 21 / 47 / 1 | trap (memory access out of bounds) |
+| 現 main `68b9de191` | 再生成 | 0 (OFF) | 873 / 21 / 47 / 1 | trap (同) |
+| `d80e9909f` (worktree) | 再生成 | 0 | 873 / 21 / 47 / 1 | trap |
+| `d80e9909f` (worktree) | 再生成 | 1 | 873 / 21 / 47 / 1 | trap。ON/OFF の unit 差 0 |
+| `d80e9909f` (worktree) | 素材の `boot_final.ll` (10/10 版) + 条件記録を付与 | 0 | 872 / 22 / 47 / 1 | trap |
+
+- ON/OFF の unit 別の差は 0 件 (`detail` の `kind`・`trap` を比較)。
+- §8.1 の値 (OFF 873/22/46、unit 144 は OFF で ok) は、どの条件でも再現しなかった。原因候補は 2 つあり、未切り分け: (1) §8.3 の未解決 (IR sha256 `6909f85d…` と `17a98d6e…` の差)、(2) §8.1 の `d80e9909f` の行は stamp 修正 (`68b9de191`、9.1) より前に採られた。stamp が無いと ON/OFF の切替後に前の build の `work/obj/ov.o` が使われうるため、§8.1 の ON/OFF の数値に混ざった可能性がある (未検証)。§8.3 の IR sha256 差だけでは説明が付かない。
+
+### 9.4 unit 144 の trap の経路と [0] の書込み元 (ON で採取。OFF は未採取)
+
+- 呼出し連鎖 (`407e20` の wasm 番号 1877 は §8.2 と同じ。他は関数名で示す): `412d60` (C 転記、`m11_ov.c` の UStrClr) → `409440` (FreeMem) → `407e20` (FastMM 解放、IR `function_407e20__lifted`)。`407e20` の引数は 0x5c (= 0x6c − 0x10)。`407e20` は `[0x54]` (= 0) を読み、次ブロックとして `[0]` (= 0x865901) を読んで範囲外で trap する。
+- unit 144 の開始時点で `[0x60, 0x80)` は全て 0。trap の後も同じ。
+- IR の全 store を計装して番地 `0x60`〜`0x7f` を監視したが、unit 0〜144 で 0 件。`412d60` の refcount (`[0x64]`) を 1 にした書込みは IR store の外 (C 側の書込み、または wasm 番号の対応の誤り) と見られるが、未確定。
+- `[0]` の書込み (計装は `store_watch_2408.sh` の派生で、run 部を unit 0〜144 の全区間に変えた。`work/probe3592/sw.sh`、コミットしない。`WATCH_ALL=1 WATCH_ADDR=0x0u`)。採取条件は **ON (`M11_FIX_50A830=1`) のみ**。OFF (`M11_FIX_50A830=0`) の採取は無い。下の表の `[0]` の値は ON のもの。issue #3592 本文の旧記録 (#3482) は OFF の `[0]` を `0x10bd4c01` とし、ON の `0x865901` と一致しない。よって「ON と OFF で同一」とは言えない (OFF の採取は未実施。PR 本文の未解決表に記載):
+
+| unit | IR の位置 (関数・行) | 書込み | `[0]` の値 |
+|---|---|---|---|
+| 114 | `function_8651a0` 331555 | `store i64 0x8659b0, ptr %8` (nil への 8 バイト書込み。code アドレス) | 0x8659b0 |
+| 114 | `function_8651a0` 331562 | `store i64 0x8659d0, ptr %12` | 0x8659d0 |
+| 135 | `function_63aae0` 215899 | `store i8 1, ptr %22` (下位 1 バイト) | **0x865901** |
+
+- 同様の 8 バイト書込み (code アドレス) が unit 15 (`44a3e0`)・17 (`455100`)・22 (`467f00`)・35 (`482d10`)・37 (`4bdfa0`)・95 (`5d2680`) にもある。nil を this とするコンストラクタの VMT 書込みと見られる。
+
+### 9.5 検証
+
+- 測定 commit: `68b9de191` (コード変更の最後の commit)。以後の差分は本節 (REPORT) のみ。`git diff 68b9de191 HEAD -- tools/m11 ':!tools/m11/trap_triage/REPORT_APPENDIX_2521.md'` の出力は 0 行。
+- e2e (`m11_e2e.sh`) は未実行 (§9.2)。survey のみ実測。
