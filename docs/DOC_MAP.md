@@ -645,7 +645,7 @@
 | `tools/targets/massivex/REPORT_APPENDIX.md` | ~244 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017・§12.9 の対照と一貫性 #3154) |
 | `tools/targets/massivex/REPORT_APPENDIX_2151.md` | ~190 | Massive X §12.12〜§12.16 (#1976・#2108・#2151 MX-31・#2195 MX-32) の分割移動全文。§12.13 の「pdata 範囲外」は §12.15 (b) で訂正、x64 本体は §12.15 (a) で確定。§12.16 は間接参照走査 (N5 読み手・N6 呼び出し元は未確定) |
 | `tools/targets/massivex/REPORT_APPENDIX_3154.md` | ~71 | Massive X §12.2・§12.2a・§12.10 の分割移動全文 (#3154 MX-34・250 行上限のため・内容無変更) |
-| `tools/targets/massivex/REPORT_APPENDIX_3454.md` | ~24 | Massive X §11.5 (#3454 MX-35) の分割移動全文: dsp unsup 基準 48,612 → 38,485 site (現 HEAD `458405518`) と NC3 の base 相対判定。250 行上限のため分割移動・内容無変更 |
+| `tools/targets/massivex/REPORT_APPENDIX_3454.md` | ~24 | Massive X §11.5 (#3454 MX-35) の分割移動全文: dsp unsup 基準の更新と NC3 の base 相対判定。250 行上限のため分割移動・内容無変更 |
 | `tools/targets/massivex/dsp/REPORT.md` | ~220 | Massive X DSP closure 特定と lift 計画 |
 | `tools/targets/massivex/dsp/REPORT_MX6.md` | ~130 | MX-6 (#1123): vectorcall 静的検出・.pdata unwind census・FH3 funclet 一覧と #228 同型判定。測定値の正本 |
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
