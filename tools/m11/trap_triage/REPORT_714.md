@@ -247,4 +247,4 @@ wasm の外から、OOB 直前の値を読む計測が必要。
 
 ## 15. 923 の obj への書込み元 (#3823, 2026-10-15, n=1)
 
-結論: 923 の `obj` (0x10bd3960) の `*(obj)` を 0 にするのは、unit 830 の `function_10c7cd0` と unit 880 の `function_125da90` のバイト単位ループ書込み (IR 行 33552・57572)。ただし同一オブジェクトかと呼出し元は未確定。詳細は [REPORT_APPENDIX_3823.md](REPORT_APPENDIX_3823.md)。
+結論: 923 の `obj` (0x10bd3960) の `*(obj)` を 0 にする書込みの候補は、unit 830 の `function_10c7cd0` と unit 880 の `function_125da90` のバイト単位ループ書込み (IR 行 33552・57572)。同一オブジェクトかと呼出し元は未確定。詳細は [REPORT_APPENDIX_3823.md](REPORT_APPENDIX_3823.md)。
