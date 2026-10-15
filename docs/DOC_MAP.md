@@ -769,7 +769,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_3075.md` | ~34 | #1216 差し戻し round 4: merge 後 head (`2a17665f`) での Stereo / Delay 再測定 (emcc 12・577 件)・merge 前後の C の cmp・census。§10-7p-3 の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3096.md` | ~70 | KH-44 (#3096): `code` 関数ポインタ化で Delay の間接呼出し 21 件を解消 (emcc 577 → 556)・gain/haas/gate の .o 新旧 byte 一致・残件の子 issue 分割。§10-7t の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3071.md` | ~85 | KH-39 (#3071): Stereo の emcc 残件の機械修復 (emcc 39 → 10 件)・ABI 規則 1〜11・rsqrtps 突合・回帰・in_XMM3 の live-in 判定・未解決 1〜5 の全文 (REPORT_APPENDIX §10-7r の分割移動) |
-| `tools/targets/kilohearts/REPORT_APPENDIX_3094.md` | ~80 | KH-42 (#3094, 部分): Delay の 128bit ローカル auStack_118/128/138 を V128L (double・uint32 レーン) に型化する `lanes` 規則。emcc 577 → 556・Gain/Haas/Gate 1000/1000 の実測 (測定 commit `4c0c94150`)。残件は子 [KH-67] (#3808)・[KH-68] (#3809) |
+| `tools/targets/kilohearts/REPORT_APPENDIX_3094.md` | ~70 | KH-42 (#3094, 部分): Delay の 128bit ローカル auStack_118/128/138 を V128L に型化する `lanes` 規則。測定値と残件の正本は付録 §10-7u。残件は [KH-67] (#3808)・[KH-68] (#3809) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_1989.md` | ~69 | KH-31 (#1989): 未関数化 callee の閉包 38 関数の確定 (`closure.py`・8 反復・FAIL 0)、閉包 37 件を `also` に入れた時の emcc 7 → 54、Gain/Haas/Gate 1000/1000 の回帰。測定値の正本 (REPORT_APPENDIX §10-7s の全文) |
 | `tools/targets/kilohearts/license/REPORT.md` | ~125 | HeartCore ライセンス層の呼出点特定 |
 | `tools/targets/kilohearts/license/KH9_REPORT.md`・`KH10_REPORT.md`・`KH11_REPORT.md`・`KH249_REPORT.md`・`KH656_REPORT.md`・`KH3306_REPORT.md`・`VERIFY_CAB247.md` | ~125/105/115/115/250/146/185 | KH-9/10/11 実施記録・#249 (ブラウザ分類 lift・ctor 47 vs 46 同定)・#656 (分類 module F の閉包展開・§9 は #3591 の閉包各ラウンドの入口経路)・#3306 (xmm/ymm 下位 128bit 同期の kh_lower 規則と合成検証・module F sha 不変) と CAB-247 検証 |

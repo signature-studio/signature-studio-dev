@@ -5,7 +5,7 @@
 #### 10-7u. #3094 (KH-42) run: auStack_118/128/138 を V128L に型化 (部分・emcc は未通過)
 - 結論: `ghidra_to_c.py --fix lanes` で Delay の 128bit ローカル `auStack_118`・`auStack_128`・`auStack_138` (各 16 バイト) を、参照文脈で型を決めた `V128L` にした。emcc 件数は **577 → 556 (-21)** (旧 base `9e6ae331` 基準。main 取り込み後の値は未測定・下記「統合後の再測定」)。`member reference base type` は **138 → 117** (`undefined1[16]` 32 → 11)。残りは子 [KH-67] (#3808・`undefined1[64]` 106 件) と [KH-68] (#3809・`aauStack_f8` 11 件)。Gain/Haas/Gate は **1000/1000 bit-exact** (生成 C は旧版と不変)。
 - 測定 commit (コードを変えた最後の commit): `4c0c94150`。測定時点では `git diff 4c0c94150 HEAD -- tools/targets/kilohearts/ghidra_route` の出力は 0 行だった。
-- その後 main (`40d3a788d`) を取り込んだ (merge commit)。取り込みで `ghidra_route` に入った差分は次の 1 行だけ (#3096 KH-44 の変更。本 PR の変更ではない):
+- その後 main を 2 回取り込んだ (`40d3a788d` を `9c04abfa0`、`45182bf1b` を `c4bf5880a` で merge。どちらも競合なし)。`ghidra_route` に入った差分は次の 1 行だけ (#3096 KH-44 の変更。本 PR の変更ではない。`git diff 40d3a788d 45182bf1b -- tools/targets/kilohearts/ghidra_route` は 0 行):
   ```diff
   -typedef void code;
   +typedef longlong (*code)();
@@ -49,7 +49,7 @@
 - 対象: main 取り込み後の HEAD (merge commit) で、`delay` の decompile (141/141)・emcc census・Gain/Haas/Gate の emcc `.o` の統合前後 `cmp`。統合前 main の Delay emcc は 556 (`REPORT_APPENDIX_3096.md` §10-7t)。
 - 未実施の理由: この run の `$ARTIFACTS_DIR` には `fl-win64` だけがあり、`plugins-kilohearts` (`HeartCore.core_64` の入手元) と `toolchain-emsdk` (emcc) が無い。Delay の decompile は `HeartCore.core_64` が要るため、この run では測定できない。
 - 結果: 統合後の emcc 件数・`.o` の一致は未確定。本付録と PR 本文の 577 → 556 は旧 base `9e6ae331` 基準の値。統合後の件数はこの節で埋める。
-- 再実行: 依頼コメントに `oc_artifacts: plugins-kilohearts toolchain-emsdk` を付けて再起動する。測定後、`git diff <統合後の測定 commit> HEAD -- tools/targets/kilohearts/ghidra_route` の出力を添える。
+- 再実行: PR 本文に `oc_artifacts: plugins-kilohearts toolchain-emsdk` の行を入れた (レビュー run は PR 本文の行を読む)。素材が取得できた run で測定し、測定後に `git diff <統合後の測定 commit> HEAD -- tools/targets/kilohearts/ghidra_route` の出力を添える。
 
 ##### 未解決 (起票先付き)
 | 未解決 | 影響 | 起票先 |
