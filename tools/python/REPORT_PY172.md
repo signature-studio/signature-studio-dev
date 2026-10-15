@@ -64,15 +64,20 @@ REPORT_PY42 は「署名の不一致 3 件 (getPatternGroupName・getPatternsInG
 
 ## 6. 測定
 
-測定 commit: `235f9cca`。main 取り込みで provider・mock・テストの差分が入ったため、前回測定 (`37e37e00`) は置き換えた。
+測定 commit: `235f9cca` (コードは `87dda507` と同一。作業 tree は `87dda507` で測定した)。main 取り込みで provider・mock・テストの差分が入ったため、前回測定 (`37e37e00`) は置き換えた。flpy (CPython wasm を含む) は本測定で再ビルドした。
 
 | 検査 | 手順 (コマンド) | 結果 |
 |---|---|---|
-| ビルド (provider) | `EMSDK_ENV=<emsdk 6.0.12>/emsdk_env.sh bash provider/build.sh` | rc 0・1.4 秒 (emsdk 6.0.12 を `./emsdk install 6.0.12` で取得) |
-| provider_check (Python 型節を除く) | `tests/provider_check.mjs` の §3 (Python 型検査) を外した一時コピー | PASS。実装 133 / 未実装 302 (MCP 60)。PR の寄与は pe172 の +2 |
-| 差分検査 | `node tests/patterns_group_diff.mjs` | 14 呼出し・diffs 0・PASS |
-| mock 差分 (flpy 不要の 16 本) | `node tests/<name>.mjs` (arrangement_diff・arrangement_selection_diff・channels_diff・device_diff・general_diff・ilmcp_diff・midi_path_diff・mixer_diff・patterns_group_diff・playlist_diff・screen_diff・tool_args・transport_diff・ui_diff・ui_display_diff・ui_state_diff) | 全て rc 0・diffs 0 |
-| 未再測定 | `tests/provider_check.mjs` の §3・`FL_ENGINE=wasm node tests/all_tools.mjs` | flpy (CPython wasm) 未ビルドのため未実施。前回 (`37e37e00`) は 48/48 ok |
+| 素材 | `tar --zstd -xf fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` | rc 0・5.98 秒。`toolchain-emsdk` は R2 素材に無かったため、上流 `emscripten-core/emsdk` の tag `6.0.12` を `./emsdk install 6.0.12` (date 差 25 秒) と `./emsdk activate 6.0.12` で取得し `/opt/emsdk` に置いた |
+| 入力 | `FL_WIN64_DIR=<展開先> bash fetch_inputs.sh` | rc 0 |
+| CPython wasm | `bash build_cpython_wasm.sh` | rc 0・254 秒 (wall) |
+| flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0・6 秒 |
+| ビルド (provider) | `bash provider/build.sh` | rc 0・1 秒 |
+| all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・2 秒・**48/48 ok** (`soft_error` 0・`raised` 0・`no_args` 0・`host_calls` 37425・`callback_roundtrip` true)。load 1 分値 2.60 → 2.87 |
+| provider_check (Python 型節を含む通常版) | `node tests/provider_check.mjs` | rc 0・1 秒・PASS。実装 133 / 未実装 302 (MCP 60)。PR の寄与は pe172 の +2 |
+| 差分検査 | `node tests/patterns_group_diff.mjs` | rc 0・14 呼出し・diffs 0・PASS |
+| 差分検査 | `node tests/general_diff.mjs` | rc 0・41 呼出し・diffs 0・PASS |
+| mock 差分 (flpy 不要の 14 本) | `node tests/<name>.mjs` (arrangement_diff・arrangement_selection_diff・channels_diff・device_diff・ilmcp_diff・midi_path_diff・mixer_diff・playlist_diff・screen_diff・tool_args・transport_diff・ui_diff・ui_display_diff・ui_state_diff) | 全て rc 0・diffs 0 (tool_args は標準出力なし・rc 0) |
 
 コード差分の確認 (差分 0 の証跡):
 
