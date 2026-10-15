@@ -76,10 +76,10 @@ python3 ld156_chunk0_carryover.py --native 1 --reset sta --out work/ld156/n1_sta
 
 ## 7. 測定 commit 以降の差分 (`git diff 0de02db4e <HEAD> -- tools/liftdiff`)
 
-次の出力は HEAD `5217d7d` 時点で取った (本付録を含む commit より前)。
+次の出力は HEAD `c3f886a2b` 時点で取った (本付録を更新する commit より前)。
 
-- `git diff 0de02db4e 5217d7d -- tools/liftdiff/ld156_chunk0_carryover.py` = **0 行** (測定 driver は測定 commit から不変)。
-- `git diff 0de02db4e 5217d7d -- tools/liftdiff/ldlib` = 0 行 (測定に使った ldlib も不変)。
+- `git diff 0de02db4e c3f886a2b -- tools/liftdiff/ld156_chunk0_carryover.py` = **0 行** (測定 driver は測定 commit から不変)。
+- `git diff 0de02db4e c3f886a2b -- tools/liftdiff/ldlib` = 0 行 (測定に使った ldlib も不変)。
 - 追加ファイル (`git diff --name-status`・`--stat` の出力):
 
 ```
@@ -101,7 +101,7 @@ A	tools/liftdiff/results/ld156_raw/n1_stk_r2.jsonl
 A	tools/liftdiff/results/ld156_raw/none_r1.jsonl
 A	tools/liftdiff/results/ld156_raw/sta_r1.jsonl
 A	tools/liftdiff/results/ld156_raw/stk_r1.jsonl
- 18 files changed, 103 insertions(+)
+ 18 files changed, 140 insertions(+)
 ```
 
 - main 側との関係: `origin/main` は本 PR の merge base より 230 commit 先。`session.py` は main で fvm の候補多重・ret 断片の対象外化 (LD-177) により変わっている。`git merge-tree` で衝突 0 件。main は取り込んでいない。
