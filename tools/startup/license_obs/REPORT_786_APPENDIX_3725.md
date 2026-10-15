@@ -55,11 +55,12 @@
   この run では書込み元を g1 のスロット経由 (0x15e14a8・42 件) まで絞るところまでで、意味の確定には至らなかった。
 - 閾値 7・30・60 (REPORT_786_APPENDIX_1414 §6) から「残日数」と推定する根拠は残るが、推定のまま。
 
-## 5. 検証 (測定 commit: 本 PR の commit。コードは worktree で追加のみ)
+## 5. 検証 (測定 commit: `4cc98d49e` = コードを変えた最後の commit)
 
 | 項目 | 実測 |
 |---|---|
-| `probe_3725_retformula.py` (11 ケース) | 60.8 秒・rc 0・`all_match True` |
-| `probe_3725_observe.py` (6 入力) | 34.1 秒・rc 0 |
+| `probe_3725_retformula.py` (11 ケース・HEAD 4cc98d49e) | 61.1 秒・load average 1 分値 0.00 開始・rc 0・`all_match True` |
+| `probe_3725_observe.py` (6 入力・HEAD 4cc98d49e) | 33.8 秒・load average 1 分値 0.79 開始・rc 0 |
 
+- 測定 commit から HEAD までのコード差分 (`git diff 4cc98d49e HEAD -- tools/startup/license_obs`) は 0 行。
 - 既存コードの変更は 0 件 (新規ファイル 2 本と結果 JSON 2 件のみ)。
