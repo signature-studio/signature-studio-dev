@@ -67,7 +67,7 @@ cd ../work && mkdir -p ghproj
 
 - 日付: 2026-10-15 / 親: #4267 (SR-64) / 前段: §2 (境界 8 件・507 B)
 - 測定 commit: `ddbadcb26` (`gui/ghidra_xferonoff_closure.java` を追加した commit)。以後このディレクトリのコードは未変更。
-- 入力: §1 と同じ (sha256 `501e7bb3…4e5283` / 19,236,864 B)。Ghidra 12.1.4 を `$HOME/ghidra` に展開 (`[GHIDRA]` の代替)、JDK 21。
+- 入力: §1 と同じ (sha256 `501e7bb3…4e5283` / 19,236,864 B)。Ghidra 12.1.4 を runner の作業用ディレクトリ (repo 外) に展開 (`[GHIDRA]` の代替)、JDK 21。
 - 出力: `out/sr83_xferonoff_closure.tsv` (閉包 87 件、commit 対象)。8 関数の decompile は `work/decomp_sr83/*.c` (gitignore 対象・再配布しない)。decompile の C 本文は commit しない (Xfer の EULA は逆コンパイルを禁じる。`docs/LEGAL.md` の Xfer 条項 (c) 参照。REPORT には要点だけを書く)。
 
 ### 4.1 再現手順・実測 (n=1、runner 上、逐次)
