@@ -152,7 +152,7 @@ python3 tools/shared/scripts/ildsp_vtable_check.py tools/shared/work/raw/ildsp_v
 ## 5. vtable slot 4 (0x1aa3a0) の lift と native 差分 (#2529)
 
 既知類型との関係: 該当なし (D19 は 0 件ループの誤実行。count1=0 (36 件)・count2=0 (54 件) の経路を検査し不発。D1a・D1b はフラグを使わないため対象外)。
-検証起点 commit: `ce53db8e` (origin/main)。測定 commit (コードを変えた最後の commit): `9925f506` (`feat(ildsp): lift GeneralPitchShifter vtable slot 4 and native diff test (#2529)`)。
+検証起点 commit: `ce53db8e` (origin/main)。測定 commit (コードを変えた最後の commit): `4d2eb9ca` (`fix(ildsp): take external tool paths from env (no literal /opt) (#2529)`)。前版 `9925f506` (外部ツールの既定パスを lift.sh に直書き) でも同じ結果 (240/240・ネガコン 2 件 FAIL) を 1 回確認済み。
 
 ### 結論 (1 行)
 GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0・42 命令・直接 call / 間接 call 0) を RetDec で lift し、元の機械語との差分は 240/240 で一致。ネガティブコントロール 2 件は期待どおり FAIL。
@@ -186,17 +186,17 @@ GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0・42 命令・直接 call / 間�
 - 範囲内: slot 4 の 42 命令 (ループ 2 本の count≤0 と count>0 の両経路、固定 9 store、ポインタ欄の参照)。入力は inner の全バイト乱数と count の境界値。
 - 範囲外: slot 1–3・5 (未 lift)、間接 call 4 件 (closure 外)、CreateInstance 本体、vtable 経由の呼出し元の検証、count が負の経路 (仕様の集合外)。起動・GUI は本件に関わらないため KPI は対象外。
 
-### 実測 (測定 commit `9925f506`、4 core、機械語 fn.bin sha1 `63fa84fd5c82`、入力 sha256 `f4b23b0f…`)
+### 実測 (測定 commit `4d2eb9ca`、4 core、機械語 fn.bin sha1 `63fa84fd5c82`、入力 sha256 `f4b23b0f…`)
 | 項目 | 結果 |
 |---|---|
-| コマンド | `FL_WIN64_DIR=/home/runner/work/_temp/fl-win64 bash tools/shared/lift/ildsp/lift.sh all` |
-| 所要 (all, 3 回) | 6.470 / 6.484 / 6.494 s (min–max 6.47–6.49 s)。load 0.15→0.22 / 0.22→0.28 / 0.28→0.34 |
+| コマンド | `RETDEC_BIN=[RETDEC]/bin/retdec-decompiler EMSDK_ENV=[EMSDK]/emsdk_env.sh FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/ildsp/lift.sh all` |
+| 所要 (all, 3 回) | 6.490 / 6.530 / 6.501 s (min–max 6.49–6.53 s)。load 0.12→0.19 / 0.19→0.31 / 0.31→0.37 |
 | ok | TOTAL 240/240、RESULT: PASS (count1=0 36/36、count1>0 204/204、count2=0 54/54、count2>0 186/186、TRAP 0)。単独 2.29 s |
 | neg-compare (wasm 結果 record 0 の 1 バイトを反転) | TOTAL 239/240、RESULT: FAIL、exit 1 (期待どおり) |
 | neg-ir (ループ2 の buffer store `store i32 0, ptr %44` を `1` に、IR 1 箇所) | TOTAL 54/240、不一致 186 = count2>0 の件数 (count2=0 の 54 件は一致)、RESULT: FAIL、exit 1 (期待どおり) |
 | all | ALL OK (3 回とも exit 0) |
 
-`git diff 9925f506 HEAD -- tools/shared/lift/ildsp` の出力は空 (差分 0)。記入時点の HEAD は `9925f506`。
+`git diff 4d2eb9ca HEAD -- tools/shared/lift/ildsp` の出力は空 (差分 0)。記入時点の HEAD は `4d2eb9ca` (以後の commit は REPORT.md の文書のみ)。
 
 ### 未解決
 
