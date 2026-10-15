@@ -12,20 +12,19 @@
 
 ## 実測 (HEAD、コミット済み)
 
-測定 commit: 本 PR のコミット (`git log -1 --format=%h -- tools/python/tests`)。
+測定 commit: `cb53d6096` (コードを変えた最後の commit)。以後の commit は本 REPORT の文言だけを変える。
 
 | 項目 | 結果 |
 |---|---|
 | `chord_progression_e2e.mjs` | 41/41 PASS・0.4 s (`mock: true`) |
 | `chord_progression_e2e.mjs --neg` | 34/41・FAIL 7・exit 1 |
 | `chord_progression_call_probe.mjs` (`loop_starter_config` 設定) | 9 関数中 `OK` 3・失敗 6 (`called: 3, failed: 6`) |
-| e2e・loop_starter_config 未設定 (一時コピーで除去) | 37/41・FAIL 4 (`Notes/drums.pyc`・`control_rack.pyc`・`util_rack.pyc`・`stack.pyscript` の `KeyError: 'genres'`) |
-
-未設定の e2e は一時ファイル (`tests/_unset_e2e_tmp.mjs`) で測り、測定後に削除した。作業ツリーには残していない。
+| `loop_starter_unset_probe.mjs` (未設定で `rack.Rack().load_config()`) | `OK` (例外なし) |
+| e2e・loop_starter_config 未設定 (一時コピーで除去・測定後に削除) | 37/41・FAIL 4 (`Notes/drums.pyc`・`control_rack.pyc`・`util_rack.pyc`・`stack.pyscript` の `KeyError: 'genres'`)。この測定は `flrack.flr` mock の除去 (cb53d6096) より前に行った |
 
 ## 手段
 
-- 素材: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst` (7.5 秒)。`toolchain-emsdk` は `/opt/emsdk` に存在。
+- 素材: `fl-win64` (`$ARTIFACTS_DIR`・`tar --zstd -xf` で 7.5 秒で展開)。`toolchain-emsdk` は `EMSDK_DIR` (既定) に存在 (`docs/REFERENCES.md` §4 の `[EMSDK]`)。
 - `build_cpython_wasm.sh` (rc 0・約 4 分)、`fetch_inputs.sh` (stubs 取得)、`build_flpy.sh` (rc 0)。
 - `extract_pyc_blocks.py` (pyc 40・pyscript 2・drum_patterns 1)。
 - 同 probe の出力は `work/` 配下 (gitignore)。
