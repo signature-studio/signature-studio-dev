@@ -273,8 +273,60 @@ def scen_for_compare(scen_path):
     return rows
 
 
+CLASSIFY_ENTRIES = [
+    0x100052D0, 0x10005550, 0x10009BC4, 0x1000BF1E, 0x1000C084,
+    0x1000C08F, 0x1000C09A, 0x1000C0A0, 0x1000C0A6, 0x1000C0AC,
+]
+
+
+def classify():
+    """#4066: 入口候補の判定規則 (機械的)。 PE 全体の code section を走査する。
+    - 'callee': 直接の call (E8 rel32) の先。 独立した入口として扱える (TARGETS 候補)。
+    - 'switch-arm': direct call が無く、間接ジャンプテーブル (ff 24 85 disp32) のエントリとして現れる。
+      断片。 テーブルを引く ff 24 85 の位置を詳細に出す。 親関数の入口は規則では決めない (手で確認する)。
+    - 'tail-jmp-only': direct call が無く、直接の jmp (E9) の先だけ。 規則では判定しない (手で確認する)。
+    - 'unreferenced': どの参照も無い。
+    戻り値は {va: (verdict, 詳細)}。 同じ入力で同じ結果を返す。"""
+    img = pe_image()
+    import pefile
+    d = os.environ.get('FL_WIN64_DIR') or os.path.join(os.environ.get('RUNNER_TEMP', ''), 'fl-win64')
+    pe = pefile.PE(os.path.join(d, 'extracted', 'block22434_PE.bin'))
+    code = [(s.VirtualAddress, s.Misc_VirtualSize or s.SizeOfRawData) for s in pe.sections
+            if s.Characteristics & 0x20000000]
+    call_tgts = {}
+    jmp_tgts = {}
+    switch_sites = []
+    for rva0, size in code:
+        for i in range(rva0, min(rva0 + size, len(img) - 5)):
+            op = img[i]
+            if op in (0xE8, 0xE9):
+                dst = (IMG_BASE + i + 5 + struct.unpack_from('<i', img, i + 1)[0]) & 0xFFFFFFFF
+                (call_tgts if op == 0xE8 else jmp_tgts).setdefault(dst, []).append(IMG_BASE + i)
+            elif op == 0xFF and img[i + 1] == 0x24 and img[i + 2] == 0x85:
+                switch_sites.append((IMG_BASE + i, struct.unpack_from('<I', img, i + 3)[0]))
+    out = {}
+    for va in CLASSIFY_ENTRIES:
+        if va in call_tgts:
+            out[va] = ('callee', 'call from %s' % ', '.join('0x%x' % x for x in call_tgts[va]))
+            continue
+        sites = [s for s, tbl in switch_sites if any(
+            img[tbl - IMG_BASE + 4 * k:tbl - IMG_BASE + 4 * k + 4] == struct.pack('<I', va) for k in range(256))]
+        if sites:
+            out[va] = ('switch-arm', 'table at ff24 0x%x' % sites[0])
+            continue
+        if va in jmp_tgts:
+            out[va] = ('tail-jmp-only', 'jmp from %s' % ', '.join('0x%x' % x for x in jmp_tgts[va]))
+            continue
+        out[va] = ('unreferenced', '')
+    return out
+
+
 def main():
     global WORK
+    if '--classify' in sys.argv:
+        for va, (verdict, detail) in classify().items():
+            print('[classify] 0x%x %s %s' % (va, verdict, detail))
+        sys.exit(0)
     nega = '--nega' in sys.argv
     special = '--special' in sys.argv
     if special:

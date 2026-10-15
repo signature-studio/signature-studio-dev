@@ -13,6 +13,11 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+#include <errno.h>
+#include <stddef.h>
+#include <sys/ptrace.h>
+#include <sys/user.h>
+#include <sys/wait.h>
 
 #pragma pack(push,1)
 typedef struct { uint16_t Machine, NumberOfSections; uint32_t TimeDateStamp, PtrSym, NumSym; uint16_t SizeOfOptionalHeader, Characteristics; } FILEHDR;
@@ -268,7 +273,7 @@ static void step_end(void) {
 
 /* LD-129 (#2770): VA への書込み監視。env LD_WATCH_ADDR=<VA hex>・LD_WATCH_OUT=<path> で有効 (既定は無効)。
  * 監視 page を PROT_READ|PROT_EXEC にし、書込みの SIGSEGV で書込み命令の RIP・書込み先を採る。
- * TF で書込み 1 命令だけ実行させてから page を戻す (書込みはそのまま行う。CPU 固定下の boot 状態は不変: REPORT_APPENDIX_2770.md §8.9。page 保護を変えるため読取りのみではない: #3648)。
+ * TF で書込み 1 命令だけ実行させてから page を戻す (書込みはそのまま行う。CPU 固定下の boot 状態は不変: REPORT_APPENDIX_2770.md §8.9。page 保護を変える。page 保護を変えない方式は LD_WATCH_MODE=hw (#3648))。
  * 記録は書込み先の開始アドレスが va-15..va+7 にあるもの (書込み幅 16 以下を想定)。重ならない書込みも含む superset で、取りこぼしは無い。
  * TF の待ち (g_wp_pend) の間は SIGALRM を block する (timeout で page が RWX のまま残るのを防ぐ)。
  * LD_STEP_N・trace と同時には使わない。 */
@@ -306,6 +311,64 @@ static void wp_finish(ucontext_t* uc) {
             (unsigned long long)g_wp_rax, (unsigned long long)g_wp_rcx);
     for (int i = 0; i < 15; i++) fprintf(g_wp_fp, "%02x", g_wp_ins[i]);
     fprintf(g_wp_fp, "\n"); fflush(g_wp_fp);
+  }
+}
+
+/* LD-171 (#3648): page 保護を変えない書込み監視。env LD_WATCH_MODE=hw・LD_WATCH_ADDR=<VA hex>・LD_WATCH_OUT=<path> で有効。
+ * 子 (guest 本体) は PTRACE_TRACEME で親の監視下に入り、load_pe の後に raise(SIGSTOP) で止まる。親はそこで DR0 に va・
+ * DR1 に va-8 を置き (各 8 byte・書込みのみ)、DR7 で有効化する。以後の signal は子へ戻す (DR hit の SIGTRAP は戻さない)。
+ * 書込み命令の完了後にトラップするので、記録の RIP は書込み命令の直後。trap 1 回につき 1 行 (dr6 の bit で当たった枠を示す)。
+ * va-8 を足すのは page 方式の窓 [va-15, va+7] に合わせるため (C の 248 件の内訳は va が 247・va-8 が 1)。 */
+#define HW_NSLOT 2
+static u64 g_hw_va;
+#define HW_DR_OFF(i) ((void*)(uintptr_t)(offsetof(struct user, u_debugreg) + (i) * 8))
+static void __attribute__((noreturn)) hw_watch_parent(pid_t pid, u64 va) {
+  const char* o = getenv("LD_WATCH_OUT");
+  FILE* fp = (o && *o) ? fopen(o, "a") : NULL;
+  u64 sl[HW_NSLOT] = { va, va - 8 }, old[HW_NSLOT] = { 0, 0 };
+  int armed = 0; u64 hits = 0, stops = 0;
+  for (;;) {
+    int st;
+    if (waitpid(pid, &st, 0) < 0) { if (errno == EINTR) continue; perror("[ld_native] hw watch waitpid"); _exit(7); }
+    if (WIFEXITED(st) || WIFSIGNALED(st)) {
+      int rc = WIFEXITED(st) ? WEXITSTATUS(st) : 128 + WTERMSIG(st);
+      if (fp) { fprintf(fp, "hwsum hits=%llu stops=%llu rc=%d\n", (unsigned long long)hits, (unsigned long long)stops, rc); fclose(fp); }
+      _exit(rc);
+    }
+    int sig = WSTOPSIG(st); stops++;
+    if (!armed && sig == SIGSTOP) {
+      int bad = ptrace(PTRACE_SETOPTIONS, pid, NULL, (void*)(uintptr_t)PTRACE_O_EXITKILL) != 0;
+      u64 dr7 = 0;
+      for (int i = 0; i < HW_NSLOT; i++) {
+        bad |= ptrace(PTRACE_POKEUSER, pid, HW_DR_OFF(i), (void*)(uintptr_t)sl[i]) != 0;
+        dr7 |= (1ull << (2 * i)) | (1ull << (16 + 4 * i)) | (2ull << (18 + 4 * i));   /* Li=1・RWi=01 (書込み)・LENi=10 (8 byte) */
+        old[i] = (u64)ptrace(PTRACE_PEEKDATA, pid, (void*)(uintptr_t)sl[i], NULL);
+      }
+      bad |= ptrace(PTRACE_POKEUSER, pid, HW_DR_OFF(7), (void*)(uintptr_t)dr7) != 0;
+      if (bad) { perror("[ld_native] hw watch POKEUSER"); kill(pid, SIGKILL); _exit(9); }
+      if (fp) fprintf(fp, "hwarm va=%#llx slot1=%#llx dr7=%#llx old0=%016llx old1=%016llx\n", (unsigned long long)va,
+                      (unsigned long long)sl[1], (unsigned long long)dr7, (unsigned long long)old[0], (unsigned long long)old[1]);
+      armed = 1; ptrace(PTRACE_CONT, pid, NULL, NULL); continue;
+    }
+    if (armed && sig == SIGTRAP) {
+      u64 dr6 = (u64)ptrace(PTRACE_PEEKUSER, pid, HW_DR_OFF(6), NULL);
+      if (dr6 & 0xf) {
+        struct user_regs_struct r; ptrace(PTRACE_GETREGS, pid, NULL, &r);
+        u64 nw[HW_NSLOT];
+        for (int i = 0; i < HW_NSLOT; i++) nw[i] = (u64)ptrace(PTRACE_PEEKDATA, pid, (void*)(uintptr_t)sl[i], NULL);
+        hits++;
+        if (fp) fprintf(fp, "hw rip=%#llx dr6=%llx a0=%#llx old0=%016llx new0=%016llx chg0=%d a1=%#llx old1=%016llx new1=%016llx chg1=%d rsp=%#llx rax=%#llx rcx=%#llx\n",
+                        (unsigned long long)r.rip, (unsigned long long)(dr6 & 0xf),
+                        (unsigned long long)sl[0], (unsigned long long)old[0], (unsigned long long)nw[0], old[0] != nw[0],
+                        (unsigned long long)sl[1], (unsigned long long)old[1], (unsigned long long)nw[1], old[1] != nw[1],
+                        (unsigned long long)r.rsp, (unsigned long long)r.rax, (unsigned long long)r.rcx);
+        for (int i = 0; i < HW_NSLOT; i++) old[i] = nw[i];
+        ptrace(PTRACE_POKEUSER, pid, HW_DR_OFF(6), NULL);
+        ptrace(PTRACE_CONT, pid, NULL, (void*)((dr6 & 0x4000) ? (uintptr_t)SIGTRAP : 0));   /* BS (single-step) 同時なら信号を戻す */
+        continue;
+      }
+    }
+    ptrace(PTRACE_CONT, pid, NULL, (void*)(uintptr_t)sig);
   }
 }
 
@@ -459,9 +522,20 @@ int main(int argc, char** argv) {
     cpu_set_t cs; CPU_ZERO(&cs); CPU_SET((int)cpu, &cs);
     if (sched_setaffinity(0, sizeof cs, &cs)) { perror("LD_PIN_CPU"); return 6; }
   }
+  { const char* wm = getenv("LD_WATCH_MODE"); const char* wa = getenv("LD_WATCH_ADDR");
+    if (wm && !strcmp(wm, "hw") && wa && *wa) {   /* LD-171 (#3648): 親が監視・子が guest 本体 (hw_watch_parent) */
+      pid_t pid = fork();
+      if (pid < 0) { perror("[ld_native] fork"); return 8; }
+      if (pid) hw_watch_parent(pid, strtoull(wa, NULL, 16));
+      if (ptrace(PTRACE_TRACEME, 0, NULL, NULL)) { perror("[ld_native] PTRACE_TRACEME"); return 8; }
+      g_hw_va = strtoull(wa, NULL, 16);
+    } }
   if (load_pe(argv[1])) return 3;
   install_signals();
-  wp_arm();
+  if (g_hw_va) {
+    if (g_hw_va < g_imgbase || g_hw_va + 8 > g_imgbase + g_imgsize) { fprintf(stderr, "[ld_native] LD_WATCH_ADDR %#llx outside image\n", (unsigned long long)g_hw_va); return 2; }
+    raise(SIGSTOP);   /* 親が DR を設定する点 (load_pe の後) */
+  } else wp_arm();
   { const char* cat = getenv("LD_CATALOG_MO");   /* WIN-33 (#3556): 実カタログ供給 (未設定なら従来応答) */
     if (cat && *cat) {
       FILE* cf = fopen(cat, "rb");

@@ -19,7 +19,7 @@
  "m4_api": 53,
  "m4_api_inherited": 53,
  "shimx_public_api": 618,
- "shimx_hooks": 69,
+ "shimx_hooks": 79,
  "shimx_stub_api": 161,
  "shimx_functional_api": 457,
  "plugins": {

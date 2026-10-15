@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 FULL=0; [[ "${1:-}" == "--full" ]] && FULL=1
-export PATH="${PATH}:/home/ubuntu/.local/share/pnpm/bin"
+export PATH="${PATH}:$HOME/.local/share/pnpm/bin"
 # shellcheck source=/dev/null
 source ../shared/env.sh   # FL_WIN64_DIR (= 直下に flstudio_win64_*.exe と extracted/)
 [[ -d node_modules/esbuild ]] || npm install --no-audit --no-fund --ignore-scripts >/dev/null
