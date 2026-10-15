@@ -90,3 +90,22 @@ tools/shared/work/venv/bin/python tools/shared/elastique/dyn_trace.py   # 実測
 | 枠 33 本の読み手 (受入 3) | 実行時の到達元が未確定。静的は thunk 本体の外で 0 件 | 子 #3387 (T-SH-74) |
 | 入口以外の IPPCODE 宛先 `0x1803c4710` の IP 同定 (§9.5) | 1 件。IPP 関数への間接呼出しの候補 | 子 #3420 (T-SH-80) |
 | `rate48k`・`obj` の uc_error 30 件 (19 + 11) の原因 | 実行範囲を狭める可能性 | 子 #3386 に含める (受入に追記済み) |
+
+## 9.9 T-SH-74 (#3387): 枠読み hook の陽性対照と測定 commit
+
+- 測定 commit: **`50050cc23`** (`dyn_trace.py` に陽性対照を足した最後の commit。出力 CSV は変えていない)。検証の起点は `origin/main` (`26cf857fe`)。
+- 差分 (測定後のコード範囲): `git diff 50050cc23 HEAD -- tools/shared/elastique/dyn_trace.py tools/shared/elastique/data/runtime_indirect.csv` → 出力 0 行 (本節の追記は REPORT だけ)。
+- 陽性対照: `DYN_POSCTRL=1` で、STUB 領域に `movabs rax, <枠の番地>; mov rax, [rax]; ret` を置いて 1 run (`posctrl:slot_read`) 実行する。既定の実行 (環境変数なし) では置かない。
+  - 結果 (HEAD `50050cc23`・実測 real 16.43 秒): `thunk_slot_readers_distinct_rip` = **1** (`0x100fff0a` が枠 `0x1804afc60` を読む。thunk 頭 `0x180001800`)。hook は枠読みを検出する。
+- 既定の測定 (HEAD `50050cc23`・実測 real 16.34 秒・load average 0.17): 実行 190 run・命令 32,170,989・実行した間接サイト 77・IPPCODE 入口ヒット 0・枠読み 0 件 (`slot_readers.csv` は見出しのみ)・`indirect_edges_to_thunk_heads` 0。`#3396` の測定 (`982e50c69`) と同じ数値。
+- 再現:
+
+```sh
+mkdir -p tools/shared/work/win && cp "$RUNNER_TEMP/fl-win64/extracted/block24357_PE.bin" tools/shared/work/win/elastique_x64.dll
+uv venv tools/shared/work/venv && uv pip install --python tools/shared/work/venv/bin/python unicorn pefile capstone
+tools/shared/work/venv/bin/python tools/shared/elastique/dyn_trace.py                 # 既定: 枠読み 0
+DYN_POSCTRL=1 tools/shared/work/venv/bin/python tools/shared/elastique/dyn_trace.py   # 陽性対照: 枠読み 1
+```
+
+- 到達元 (受入 2): 実行経路に枠読みが現れないため、呼出箇所・読んだ枠の宛先は**記録なし**。読み手は計算アドレス経由と推定 (未確定)。読み手の同定は子 #3386 (T-SH-73: 引数規約の同定) の結果に依存する。
+- 限界: 合成引数で実行した範囲 (export 15 件 + thunk 頭 33 本・各 3 種の引数) に限る。FL の実呼出しでの読みは未確認。
