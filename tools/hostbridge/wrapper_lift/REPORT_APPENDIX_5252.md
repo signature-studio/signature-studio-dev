@@ -1,0 +1,58 @@
+# REPORT 付録 — #5252 (HB-H57): f_4079e0 (guest 割当て管理) の停止原因の実測
+
+> **正本の分担**: 停止点 (`f_4079e0`・VA `0x407a3e`) の観測は `REPORT_APPENDIX_3597.md` §3.2 が正本。本付録はその停止原因を実測で特定した結果。
+
+測定 commit: `<測定 commit>` (`tools/hostbridge/wrapper_lift/cpi_pool_probe.sh`・`cpi_pool_drive.mjs` を入れた最後の commit。PR 本文に記載)。
+検証起点: `origin/main` @ `7a9006b81`。環境: x64c 生成 (`block19091_PE.bin`・`ott_lifted.c` 66MB)、emsdk 6.0.12 (`toolchain-emsdk`)、`fl-win64` の `extracted/`、node v22.23.3、4 vCPU。全段直列。
+
+## 1. 受入条件の対応
+
+| # | 受入条件 (issue #5252) | 結果 | 根拠 |
+|---|---|---|---|
+| 1 | `f_4079e0` の停止原因 (割当て管理の読み出し先が範囲外になる理由) を実測で特定 | 達成 | §2・§3。停止は `rbx` のプール head の next が 0 のまま読まれるため。プール初期化 `f_4091c0` が CreatePlugInstance の実行中に一度も呼ばれない (§3) |
+
+## 2. 停止直前の実測値
+
+`cpi_reach.sh` で再現 (`trap = memory access out of bounds`・停止 VA `0x407a3e`・`insn_count=908`)。停止直前の 3 点を `[dbg]` フックで取った値 (`cpi_pool_probe.sh`):
+
+| 地点 | rcx | rdx | rbx | rax |
+|---|---|---|---|---|
+| `f_4079e0` 入場 (`4079f9` 直前) | 0x90 | 0x12 | 0x7f | 0x7f |
+| `407a23` (`mov rdx,[rbx+8]` の直前) | 0 | 0x12 | 0x898100 | 0x7f |
+| `407a3a` (`add [rdx+0x20],1` の直前) | 0xfffffffffffffff8 | 0 | 0x898100 | 0 |
+
+- `rbx = 0x898100` は `.data` 内のプール head。`[rbx+8]` (next) が 0 のため `rdx = 0`。
+- `rax = [rdx+0x18]` は `rdx = 0` なので番地 `0x18` (null 近傍) を読んだ値で、0。その `[rax-8]` (`0xfffffffffffffff8` を足して `-8`) を読む `407a3e` で範囲外になる。
+- 関数の分岐は `407a38` の `rdx == rbx` (head が自己環 = 空のプール) なら `407a54` へ飛んで安全に終わる。`f_4091c0` が自己環を張るのはこのため。`next=0` のまま `rdx != rbx` と判定されたので、非空の処理 (`407a3a` 以降) に入って読み出しが壊れた。
+
+## 3. 初期化が走らないことの実測
+
+PE ファイル上の `0x898100`〜 は `.data` の値で、`+8` (next) は 0。プールを環にする初期化は `f_4091c0` (`0x898100` から 0x40 刻みで 46 ノード、各ノードの next/prev を self に張る) が担う。
+
+`[dbg]` フックで CreatePlugInstance (`0x86ab10`) の実行中に入場した関数を記録した結果:
+
+| 関数 | 役割 | CreatePlugInstance 実行中の入場 |
+|---|---|---|
+| `f_4079e0` | 割当て (free-list 操作) | あり (停止点) |
+| `f_408900` | プール添字の計算 (`(p-0x898100)>>6`) | なし |
+| `f_4091c0` | プール初期化 (自己環) | なし |
+| `f_409070` | `f_4091c0` を呼ぶ (VirtualFree 後) | なし |
+| `f_41bcf0` | `f_409070` を呼ぶ初期化の入口 | なし |
+
+- `f_4091c0` の呼出元は `f_409070` のみ、`f_409070` の呼出元は `f_41bcf0` のみ。`f_41bcf0` は直接の呼出元が無く、`case` 表 (間接ディスパッチ) からのみ呼ばれる。PE 内に `0x41bcf0`・`0x41c480` への 8 バイトのポインタも無い (静的確認)。
+- `dbkFCallWrapperAddr` (`0x8fe2b0`) の値は 0。
+- したがって、`f_41bcf0` を起こす経路 (間接呼出しの登録元) が CreatePlugInstance の経路に無い、または登録が走っていない。これが「プールが初期化されない」直接原因の実測。
+
+## 4. 未確定 (推定を含む)
+
+- **どの経路が `f_41bcf0` を起こすべきか**は未特定。PE の entry (`0x87cdf0`) を先に走らせる試行 (`PRE_ENTRY`) は `Aborted(native code called abort())` で止まり、初期化経路まで届かなかった (`GetCurrentThreadId`・`TlsAlloc`・`LocalAlloc` の import stub 経由)。entry 経由の起動は本付録の対象外。
+- `f_41bcf0` を起こす間接呼出しの登録元の特定は次の作業 (#4582 の範囲)。推定で起動経路を決めない。
+- 測定は n=1。所要 57 秒 (`cpi_pool_probe.sh`・emcc 含む全体)、load は 0.31 (測定後の `uptime`)。
+
+## 5. 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `f_41bcf0` (プール初期化の入口) を起こす間接呼出しの登録元の特定と、その経路の修正 | CreatePlugInstance の完走は未達 | 親 #4582 (`[HB-H56]`) |
+| PE entry 経由の起動 (`abort` で停止する原因) | entry 経由の初期化経路は未検証 | 親 #4582 |
+| 完走後の wasm 実行結果 (bit 一致) | 未検証 | #3597 |
