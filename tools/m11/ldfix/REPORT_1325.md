@@ -80,6 +80,11 @@
 - 6/7 (修復の効果だけ): 修復前 `56bfc979` の wasm と `f63b5953` の wasm は別物 (sha256 `59e58e29…` と `bbed05ed…`)。survey の unit 記録差は **0** (ok 872 = 872)。到達 3 関数は §4 の通り。
 - 7/7 (`dyn_509.mjs`・509 系 5 関数): 基準 (ldfix 無し) の wasm で FAIL 5/5 → 修復後 PASS 5/5 (c62780・7e5240・409c80・41a670・1063090)。この 5 関数は本 issue の修復対象 (§3) ではない。7e5240・409c80・41a670・1063090 は §6 の IR 変化の対象外なので、PASS は main の ldfix (#509 の store 形 fix) による。c62780 だけが §6 の名前の差分を持つ (ldfxn 採番のずれと推定、U-4)。よって 5/5 の PASS は本 PR の増分の証拠にならない。
 - 本 issue の修復対象 11 関数の動的確認 (修復前後の直接呼び出し) は **未実施**。survey で到達するのは 3 関数だけで、残りは survey からは判定できない → 子 issue。
+- **#4039 (2026-10-15) の追記**: 測定 commit `f07ef8dc9` (`ldfix_509_e2e.sh` の NC 期待値と `dyn_509.mjs` の 47ad70 期待値を補った commit)。foreground 1 回・rc 0・real 6 分 55.8 秒・load 開始 0.44 / 終了 1.00 (uptime の 1 分平均)。素材は `work-m11` / `fl-win64` (PE のみ) / `toolchain-emsdk` を展開して実行。
+  - 旧版 NC: store 形 SUSPECT 8 関数 / 11 site (806740 を含む)。nc_store: 806740 を 1 件検出。nc_use: 1063090 を use 形で検出。NC 期待値は `grep` の条件を「旧版は 806740 を store 形で検出する」に直した (前 HEAD は「旧版は store 0」を要求し、正しい挙動を失敗扱いしていた)。
+  - survey: ok 871 → 873、ok 退行 unit 0、記録差 14 unit (§5 の 6/7 と同じ)。
+  - 7/7 `dyn_509.mjs`: 修復前 FAIL → 修復後 PASS が c62780・7e5240・409c80・41a670・1063090 の 5 件。**47ad70 は修復前後とも FAIL (`KNOWN`)**: 機械語 `mov rdx,[rcx]` (配列基点 = `*arg1`) が IR で落ち、IR は `%arg1` を配列の基点に使う。修復 (`fix_f3c_use`) は value 側 (`*arg2`) だけを直しており、配列側は未修復。`DYN_SUMMARY after_fail=0/5 known=1`。
+  - 残り 10 関数 (40fe90・41b8d0・41b970・449550・44f040・44fb40・784ed0・806740・c40420・f552a0) の期待値は、呼び先 (`410010`・`410820`・`4109f0`・`40f910`・`44aeb0`・`420530`・`4203d0` ほか) の機械語を読まないと決まらない。本 run では推定で期待値を書かず、未実施として残す。
 - **#4041 の現 head 再測定** (測定 commit `adf298d3b`、`PREV_REF=56bfc979`、`FL_WIN64_DIR`・`EMSDK_ENV`・`M11_WORK` を指定、`timeout 1500` 付きで foreground 1 回・この run の素材 `fl-win64` / `work-m11` / `toolchain-emsdk` を展開して実行): rc 0・real 7m30.97s (451 秒)・load 開始 0.70 / 終了 1.53 (uptime の 1 分平均)。
   - 2/7: 旧版/新版で本体が異なる関数 33 / 7421 (旧版の関数外テキストは一致、report の f3c 以外のキー差 0)。F3c 関数 旧 36 → 新 46 (旧の全てを含む)。
   - 4/7: `boot_final.ll` へ F3c を重ねた結果 F3c=43、overlay 43 件、うち新版出力と alloca 行を除いて同一 43。
