@@ -11,6 +11,12 @@ class FlError extends Error {
   constructor(msg, code) { super(msg); this.flCode = code; }
 }
 const RANGE = (m) => new FlError(m || "Index out of range", 4);
+// PY-76 (#2563): cvtsd2si (64bit・最近接偶数丸め)。範囲外と inf は 0x8000000000000000 (INT64_MIN) (REPORT_PY72 §callback unit 2)
+const cvtSi64 = (x) => {
+  if (!(x >= -(2 ** 63) && x < 2 ** 63)) return -(2 ** 63);
+  const f = Math.floor(x), d = x - f;
+  return d < 0.5 ? f : d > 0.5 ? f + 1 : (f % 2 === 0 ? f : f + 1);
+};
 const WRONG = (m) => new FlError(m || "Wrong number of function parameters or wrong parameter type", 5);
 // mixer の色の R/B 入替え (REPORT_PY115.md §2)。既定色は FL の .bss 0x15f6774 の初期値 (REPORT_PY118)
 const swapRb = (v) => ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
@@ -39,6 +45,31 @@ const itemsSet = (items, prm, value) => {
   const delta = prm === 8 ? value : value - itemGet(items[0], prm);
   for (const it of items) itemWrite(it, prm, value, delta);
 };
+// PY-184 (#3309): 項目列挙 PE 0x130f200 の判定式 (C provider の note_enum と同一・REPORT_PY39_2548.md)。note = 項目 (字段 +0 start・+6 ch・+8 len)。note 配列は start 昇順が前提
+const noteGen = (seed, n) => {
+  let s = seed >>> 0;
+  const next = () => { s = (Math.imul(s, 1103515245) + 12345) >>> 0; return s >>> 16; };
+  const arr = Array.from({ length: Math.min(Math.max(n, 0), 256) }, () => {
+    const d0 = (next() % 200) - 50;
+    const len = (next() % 40) - 5;
+    const ch = next() % 4;
+    return { ...newItem(), d0, len, ch };
+  });
+  return arr.sort((a, b) => a.d0 - b.d0);
+};
+const noteEnum = (arr, chan, step, V) => {
+  const out = [];
+  if (V <= 0) return out;
+  const thr = (step + V) | 0;
+  for (let cur = 0; cur < arr.length && arr[cur].d0 < thr; cur++) {
+    const it = arr[cur];
+    const sq = (Math.trunc(it.d0 / V) * V) | 0;
+    const end = Math.max((it.d0 + Math.max(it.len, 1)) | 0, (sq + V - 1) | 0);
+    if (step < sq || step >= end || it.ch !== (chan >>> 0)) continue;
+    out.push(cur);
+  }
+  return out;
+};
 
 export function createMockEngine() {
   const st = {
@@ -54,9 +85,9 @@ export function createMockEngine() {
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
     selectedChannel: 0,
     channels: [
-      { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0) },
-      { name: "Snare", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 2, steps: new Array(64).fill(0) },
-      { name: "3x Osc", plugin: "3x Osc", vol: 0.5, pan: 0.25, mute: false, solo: false, color: 0x7C5A6B, sel: false, fx: 0, steps: new Array(64).fill(0) },
+      { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0), pitchN: 2 },
+      { name: "Snare", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 2, steps: new Array(64).fill(0), pitchN: 2 },
+      { name: "3x Osc", plugin: "3x Osc", vol: 0.5, pan: 0.25, mute: false, solo: false, color: 0x7C5A6B, sel: false, fx: 0, steps: new Array(64).fill(0), pitchN: 2 },
     ],
     mixer: Array.from({ length: 127 }, (_, i) => ({
       name: i === 0 ? "Master" : i === 125 ? "Current" : `Insert ${i}`, vol: 0.8, pan: 0, mute: false, solo: false,
@@ -86,6 +117,8 @@ export function createMockEngine() {
     throw WRONG();
   };
   const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
+  // float 引数 (fl_a_dbl と同じ: None は 0、bool・整数・実数は可、他は code 5)。PE の書式 'f' は float32 に丸める
+  const argF = (a, i) => { const v = a[i]; if (i >= a.length || v === undefined) return 0; if (typeof v === "boolean") return +v; if (typeof v === "number") return Math.fround(v); throw WRONG(); };
   const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
 
   const impl = {
@@ -180,6 +213,14 @@ export function createMockEngine() {
     "channels.setChannelVolume": (i, v) => { ch(i).vol = v; },
     "channels.getChannelPan": (i) => F(ch(i).pan),
     "channels.setChannelPan": (i, v) => { ch(i).pan = v; },
+    // PY-76 (#2563): C provider (fl_engine.c setChannelPitch) と同一。判定順は index 範囲外 (-4) → NaN (-1) → pitchUnit。unit 0/1 の効果・guard・通知は未モデル (unit 2 だけ N を書く)
+    "channels.setChannelPitch": (...a) => {
+      arity(a, 2, 5);
+      const i = ix(a[0]); const v = argF(a, 1); const unit = argI(a, 2, 0); argI(a, 3, 0); argI(a, 4, 0);
+      const k = ch(i);
+      if (Number.isNaN(v)) throw new FlError("Unspecified error", 2);
+      if (unit === 2) k.pitchN = Math.min(48, Math.max(1, cvtSi64(v)));
+    },
     "channels.setChannelColor": (i, c) => { ch(i).color = c; },
     "channels.getTargetFxTrack": (i) => ch(i).fx,
     "channels.setTargetFxTrack": (i, t) => { ch(i).fx = t; },
@@ -316,7 +357,7 @@ export function createMockEngine() {
     ...createIlmcp(st, {
       RANGE,
       INVALID: (m) => new FlError(m, 1),
-      makeChannel: (plugin) => ({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0) }),
+      makeChannel: (plugin) => ({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0), pitchN: 2 }),
       nMixer: st.mixer.length,
     }),
   };
@@ -339,5 +380,7 @@ export function createMockEngine() {
       itemsSet([a, b], prm, value);
       return itemGet(b, prm);
     },
+    noteEnumProbe: (seed, n, chan, step, V) => noteEnum(noteGen(seed, n), chan, step, V),
+    noteEnumNotes: (notes, chan, step, V) => noteEnum(notes.map(([d0, len, ch]) => ({ ...newItem(), d0, len, ch })), chan, step, V),
   };
 }
