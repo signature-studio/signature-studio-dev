@@ -175,7 +175,7 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 戻り先 `0x59c210` (setjmp/longjmp 継続) の lift 対応 (FLEngine 同型の override と断片 entry) と、DllMain 側の longjmp 起動元の特定 | DllMain が完走しない | #3410 (T-SH-77) |
-| `ExitProcess(0)` の呼出元と、継続後の進行が正しいか (偽の停止か) の確認 | DllMain の完走 (boot PASS) の判定 | #4262 (T-SH-106) |
+| `ExitProcess(0)` の偽の停止 (判定済み。修正は未実装) | DllMain の完走 (boot PASS) の判定 | 子 issue (付録 §1b の修正) |
 | longjmp の発生条件 (`0x40fa40` の呼出元 `0x40fbd4`・`0x40fcbd` と `[0x5aa000]` の決まり方) | 偽の停止かどうかの切り分け | #4263 (T-SH-107) |
 | rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない。直接呼出しの計数は §10 | #3411 (T-SH-78) |
 | GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3434 (T-SH-83。#3412 は closed) |
@@ -184,7 +184,7 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 
 - override `qfc_ov_longjmp` (FLEngine `fle_ov_longjmp` と同型) と boot 専用の戻り先 root `0x59c210` を追加。e2e の entries と assert (6,347) は不変。
 - 停止点の切り分け (soft・各 1 回): override のみでは `0x59c210` の UNLIFTED のまま。**root を加えると `ExitProcess(0)` へ進む** (停止点を動かしたのは root)。
-  この進行は longjmp 後の継続の不整合による偽の停止の可能性がある (推定。未検証)。DllMain の完走は未達。
+  この進行は偽の停止と実測で判定した (#4262 / T-SH-106。呼出元 `0x40fcdd`・実行順は付録 §1b。longjmp 呼出し後の C フレームが戻されて `ExitProcess` へ届く)。DllMain の完走は未達。
 - 判定: boot は FAIL のまま (strict は `LocalAlloc`)。起動元・切り分け表・測定は付録 `REPORT_APPENDIX_3410.md` §1〜§3 が正本。
 
 ## 8. 検証実行・再現 (§7 の追加分・実測)
@@ -230,7 +230,7 @@ guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行�
 
 測定 commit = `5c79daa2b` (HEAD の計数版 `qfc_count.sh` を実行した commit)。全文 (呼出し回数の表・未解決の詳細) は `REPORT_APPENDIX_3411.md`。
 結論: 直接呼出し `imp_<名>();` で計数された import は 6 件 (`GetCurrentThreadId`・`TlsAlloc`・`LocalAlloc`・`TlsSetValue`・`TlsGetValue`・`ExitProcess`、各 1 回)。すべて rt または `qfc_imp.c` に既存。
-間接経由 (`imp_by_index` → `imp_tab[k]()`) は未計数のため、DllMain 経路で実際に呼ばれる import の全数は未確定。停止点は `ExitProcess(0)` (偽の停止かどうかは #4262 で未確定)。
+間接経由 (`imp_by_index` → `imp_tab[k]()`) は未計数のため、DllMain 経路で実際に呼ばれる import の全数は未確定。停止点 `ExitProcess(0)` は偽の停止と判定済み (#4262 / 付録 §1b)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
