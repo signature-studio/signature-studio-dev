@@ -98,7 +98,7 @@ git diff ffd515723 HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!
 
 ## 10. #5165 の追加測定 (slot 0x08・0x10 の 1 byte 変異・先頭 2 byte の切り分け・WRITE 属性)
 
-- 測定 commit: `2617c9d30` (`fw_blk_const_repro.sh` を最後に変えた commit)。以降の HEAD 差分は 0 行 (`git diff 2617c9d30 HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md'` = 0 行)。
+- 測定 commit: `2617c9d30` (`fw_blk_const_repro.sh` を最後に変えた commit)。以降の HEAD 差分はコード 1 行のみ (`git diff 2617c9d30 HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md' --numstat` = `fw_blk_const_repro.sh` の 1 insertion・1 deletion。コメント行のみで、実行される処理は不変。再測定は不要)。
 - 実行: `REPS=3 RETDEC_BIN=<retdec-decompiler> bash tools/plugins/framework/fw_blk_const_repro.sh`。`real 13m15s`・開始時 load 0.51・終了時 load 1.00 (`uptime`)。素材 `work-fw-stage1` (`tools/plugins/work/fw/`)・`toolchain-retdec` (`$RUNNER_TEMP/retdec`) を展開して測定。
 - 旧 commit `fe8dad13a` でも b08/b10 系 (n=3) を測り、同じ結果だった (2 回の測定で一致)。
 
