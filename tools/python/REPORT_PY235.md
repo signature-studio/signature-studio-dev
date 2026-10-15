@@ -46,9 +46,9 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
 - 測定 (HEAD `470e2d8e0`・load avg 0.00):
   - `bash provider/build.sh`: rc 0 (1.05 秒)。`fl_table.c: 435 関数, ハンドラ 163`。
   - `node tests/general_diff.mjs`: `{"calls":52,"diffs":0,"PASS":true}` (0.05 秒)。
-  - `node tests/provider_check.mjs` の第 1〜2 部 (表の整合・件数): impl 163 / unimpl 272 で PASS。**第 3 部 (Python 経由の検査) は未実行**: `dist/flpy.js` (CPython wasm) が無いため。
+  - `node tests/provider_check.mjs`: `{"functions":435,"implemented":163,"unimplemented":272,"mcp_static":60,"PASS":true}` (0.37 秒)。CPython wasm (`build_cpython_wasm.sh` 4 分 07 秒 rc 0・`FLPY_SKIP_TABLE=1 build_flpy.sh` 6.2 秒 rc 0) の後に実行。
   - `analysis/py235_process_rec_families.py`: 30 ok・0 FAIL・rc 0 (0.1 秒)。
-  - `FL_ENGINE=wasm node tests/all_tools.mjs`: **未実行** (`dist/flpy.js` が要る)。`general.processRECEvent` を呼ぶ箇所は `tests/` に無い (grep)。
+  - `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` (rc 0・2 秒)。`general.processRECEvent` を呼ぶ箇所は `tests/` に無い (grep)。
 - KPI: 起動・GUI に関わらない PR のため、製品 KPI は記載しない。
 - ネガティブコントロール: `host/fl_mock.mjs` の `(eventId & 0xffff) !== 8` を `!== 9` に変えると、`node tests/general_diff.mjs` は `general 差分 1 件` (AssertionError・rc 1) で落ちる (`[0x10000008, 9, 0]` が mock は 9、C は code 2)。元に戻した後の差分は 0 行。
 
@@ -59,4 +59,3 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
 | gate `*(0x15e1890)` の意味と書込み元・`(eventId & 0xffff) == 8` の -1 条件 (`0x663bf0`・`[0x59b752]`・`0xffac50`) | gate 0 を仮定した成功経路の前提。実行時に gate が 1 の場合の挙動が未確定 | #3777 (PY-251) |
 | 固定 eventId 4 族 (0x40000000・0x40000001・0x40000002・0x40000005) の store 8 件の右辺 | 4 族が code 2 (未実装)。provider_check の件数はこの族を含まない | #3778 (PY-252) |
 | 0x70000000 族・index 族 (eventId < 0x10000000) の戻り値式・`0xc61250` の書換え有無 | 2 族が code 2 (未実装) | #3779 (PY-253) |
-| `provider_check` の第 3 部・`all_tools.mjs` (48/48) の実行 | CPython wasm (`build_cpython_wasm.sh`・`build_flpy.sh`) のビルドが要る。本 run では未実行 | #3778 (受入 4) |
