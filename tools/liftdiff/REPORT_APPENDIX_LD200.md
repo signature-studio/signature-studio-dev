@@ -40,7 +40,7 @@
 
 - 測定 commit: `5dc9ac0a0` (本 PR のコードを変えた最後の commit)。§3 の数値はこの commit で測ったもの。
 - `git diff 5dc9ac0a0 HEAD -- tools/liftdiff tools/m11 ':!*.md'` は 19 ファイル・+2363/-28 行 (2620 行)。差分 0 ではない。main 取り込みで入った LD-179・LD-39 系・frame_share・ldfix などが大半。本 PR の変更が実行経路に入るのは `tools/m11/m11_post.py` の `%tagPOINT` 分岐の変数名のみ (`lo/sh/hi/p` → `px/ps/py/u`。生成する命令列は同一)。
-- HEAD での再測定は未実施。build に `/opt/emsdk`・`tools/m11/work/boot_final3.ll` (素材 `toolchain-emsdk`・`work-m11`) が要るが、この run の `$ARTIFACTS_DIR` には `fl-win64` しか無い。再測定は素材を揃えた次の run で行う。
+- HEAD での再測定は未実施。build に emsdk (`[EMSDK]`)・`tools/m11/work/boot_final3.ll` (素材 `toolchain-emsdk`・`work-m11`) が要るが、この run の `$ARTIFACTS_DIR` には `fl-win64` しか無い。再測定は素材を揃えた次の run で行う。
 
 ## 5. 未解決 (起票先)
 
