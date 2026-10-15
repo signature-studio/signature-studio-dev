@@ -107,3 +107,16 @@ unit 数 (942・ok 867・noproc 1・miss 47・skipped 74) は §6 の LB=0x10000
 
 測定 commit: `bd5daf9d` (コードを変えた最後の commit)。実行は HEAD `6f2b712ff` (docs のみの差分)。
 確認: `git diff bd5daf9d HEAD -- tools/m11 ':!tools/m11/REPORT*'` の出力は 0 バイト。e2e の再測定はしない。`bd5daf9d` の数値 (§7.0) は参考値のまま。
+
+### 7.8 main 取り込み後の再測定 (HEAD `39acaf9db`・参考値・指紋検査迂回)
+
+main (`554303875`) を取り込んだ HEAD で再測定した。`tools/m11` の main 側の変更 (`bd5daf9d` 以降 54 files) を含むため、§7.0〜§7.7 の数値は HEAD では再現しない。素材 `fl-win64`・`work-m11`・`work-liftdiff` を展開 (`tools/m11/work/`)。toolchain は runner の既存 [EMSDK]・[RETDEC]。node v22.23.3。nproc 4。
+
+| 条件 | 結果 | rc | wall | load (前 → 後 1/5/15 分) |
+|---|---|---|---|---|
+| LB=0 e2e (`M11_SKIP_LIFT_FP=1 M11_LB_BASE=0 bash m11_e2e.sh`) | gen_ir2・lb_check・build OK。strict: units_run 98 + skipped 3 = 完了 101 (pin 56)・survey ok 873 (pin 872)・full ptrcheck new 69,668 > max 69,359 (FAIL)・寛容起動 ok 875 / skipped 66 / noproc 1 (gate の寛容起動部は通過) | 1 (gate FAIL) | 129 s | 0.88 0.58 0.28 → 1.06 0.76 0.39 |
+| LB=0x10000 repro (`m11_lb_tolerant_repro.sh 0x10000 work/repro_lb10000_3162`) | gen_ir2 OK・lb_check PASS (errors 0)・build OK・寛容起動 rc 124 (600 s で打ち切り・出力 0 バイト) | 0 (寛容起動だけ timeout) | 659 s | 0.33 0.60 0.36 → 1.00 0.97 0.71 |
+
+- LB=0 の gate FAIL 3 点 (strict 完了数 101 ≠ 56・survey ok 873 ≠ 872・ptrcheck new 69,668 > 69,359) は pin (`tools/m11/e2e_expect.env`・`m11_tolerant_gate.py`) と main の現状の不一致。PR の差分は `m11_e2e.sh` の `M11_SKIP_LIFT_FP` 分岐だけで、未設定時は従来と同じ経路。main 単体の同条件の実測は未実施 (未確認)。
+- LB=0x10000: §7.7 (`bd5daf9d`) では repro 経路が 10.9 s で完走したが、HEAD `39acaf9db` では寛容起動が 600 s で打ち切られた。gen_ir2 では main の `fix_src412770` (#3296) が適用されている (`gen_ir2.log`)。打ち切りの原因は未特定 (この変更との関係は未確認)。
+- 受入 (ld108・fix912 の LB 修正により LB=0x10000 の gen_ir2・lb_check・build が通る) は HEAD でも満たす。寛容起動の打ち切りは本 PR の範囲外。
