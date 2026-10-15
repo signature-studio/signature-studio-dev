@@ -94,18 +94,18 @@
 ## 6. 差分 (`docs/WORKFLOW.md` §6)
 
 - 測定 commit: `c9d365465` (trap56 プローブの読出し修正の commit。この commit までで測定に使うコード・スクリプトは固定)。
-- 差分 (測定経路): `git diff c9d365465 HEAD -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/alloca_ab_942.sh tools/m11/ldfix/prod_order_942.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/run_stage4.mjs tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/trap_units.mjs tools/m11/m11_build.sh tools/m11/alloca tools/m11/guard699 tools/m11/guard4fa210 tools/m11/qstore tools/m11/ldfix/fix_ld108.py tools/m11/ldfix/fix_ld115.py tools/m11/ldfix/fix_src412770.py | wc -l` → 0 (本 REPORT と `docs/DOC_MAP.md` だけが後の commit で変わる)。
+- 差分 (測定経路): `git diff c9d365465 HEAD -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/alloca_ab_942.sh tools/m11/ldfix/prod_order_942.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/run_stage4.mjs tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/trap_units.mjs tools/m11/m11_build.sh tools/m11/alloca tools/m11/guard699 tools/m11/guard4fa210 tools/m11/qstore tools/m11/ldfix/fix_ld108.py tools/m11/ldfix/fix_ld115.py tools/m11/ldfix/fix_src412770.py | wc -l` → 0 (測定経路のコードは測定 commit から不変)。後の commit で変わったのは本 REPORT・`docs/DOC_MAP.md`・`tools/m11/ldfix/boot_trap_942.mjs` の削除だけ (診断スクリプトで、測定の表には無い。§8 の 1 行とともに削除)。
 
 ## 7. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 本番順の survey 残 trap 22 件 (OOB 14: 144・149 ほか。halt0 8) の引き金 | 受入 1・3 | #942 (次 run) |
-| 53・138・158 の消失の寄与が qstore / ld108 / ld115 / src412770 のどれか (段ごとに切り分けていない) | 受入 1 の帰属 | #942 (次 run) |
-| ldfix_e2e の入力 (snapshot = 本番順より前) を本番順に替えるか (base/fix の基準が変わる) | 測定の基準 | PM 判断 |
-| 本番 `m11_build.sh` 全体 (m11_post・argrecover・instr 段・C 上書き) での boot 再確認 | 受入 2 の範囲 | #942 (次 run) |
-| work-m11 の IR と現 main の不一致 | 測定の母体 | 既存 #680 |
-| F3c 33 → 43 の変化の原因 | 受入 3 | #942 (次 run) |
+| 本番順の survey 残 trap 22 件のうち 144・149 (OOB)・114 (halt0) の引き金 | 受入 1 | #3608 ([CI-171]) |
+| 53・138・158 の消失の寄与が qstore / ld108 / ld115 / src412770 のどれか (段ごとに切り分けていない) | 受入 1 の帰属 | #3608 ([CI-171]) |
+| ldfix_e2e の入力 (snapshot = 本番順より前) を本番順に替えるか (base/fix の基準が変わる) | 測定の基準 | PM agent の判断待ち: ldfix_e2e の入力を本番順に替えるか・既定案: 替えない (現行の入力のまま。本番順は `prod_order_942.sh` で別に測定済み) |
+| 本番 `m11_build.sh` 全体 (m11_post・argrecover・instr 段・C 上書き) での boot 再確認 | 受入 2 の範囲 (本測定は再現 chain) | PM agent の判断待ち: 本番 `m11_build.sh` 全体の boot 再確認を行うか・既定案: 本 PR の範囲外として子 issue に別に起票する |
+| work-m11 の IR と現 main の不一致 | 測定の母体 | PM agent の判断待ち: 追跡先 (#680 は closed で、対応する open issue が無い)・既定案: 新規の子は起票せず本表に残す (測定の母体は測定 commit で固定) |
+| F3c 33 → 43 の変化の原因 | 受入 3 | #3608 ([CI-171]) |
 
 ## 8. 再現
 
@@ -118,5 +118,4 @@ bash tools/m11/ldfix/prod_order_942.sh base                     # 本番順 (ldf
 python3 tools/m11/ldfix/probe_alloca_942.py tools/m11/ldfix/work/ab942/alloca.ll tools/m11/ldfix/work/ab942/probe_alloca.ll
 bash tools/m11/ldfix/stage4.sh tools/m11/ldfix/work/ab942/probe_alloca.ll probe_alloca
 S4_NAME=probe_alloca S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap56_probe_942.mjs
-S4_NAME=prod942 S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/boot_trap_942.mjs
 ```
