@@ -37,15 +37,19 @@
 - `currentTimeHint`: PPQ 96・4 拍子の仮置きで BBT を計算し `"bar:beat:tick"` を返す。0 埋めの幅は未確定のため付けない。`mode` と `setRecPPB` は検査のみ (PE の経路が未同定)。
 - C 側 `provider/fl_engine.c` は `FL_H(arrangement, getMarkerName)`・`FL_H(arrangement, currentTimeHint)`。mock 側 `host/fl_mock.mjs` は同名の定義。
 
-## 検証 (測定 commit はこの PR の最後のコード commit。作業ツリーは測定時点で `git status` が PR 内容のみ)
+## 検証 (測定 commit `86700c19b`: main 取り込み後の merge commit。以前の測定 commit `bb215b83a` の値は取り込みで無効)
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` (既定の `EMSDK_ENV`) | rc 0・ハンドラ 167 | 1.8 秒 |
+| `bash provider/build.sh` (emsdk 6.0.12 を新規に入れた) | rc 0・ハンドラ 170 (本 PR の 167 + main の PY-132 の 3) | 1.5 秒 |
 | `node tests/arrangement_diff.mjs` | calls 39、diffs 0、PASS | 0.07 秒 |
-| `node tests/general_diff.mjs` | calls 41、diffs 0、PASS | 1 秒未満 |
-| `node tests/provider_check.mjs` | 期待値を impl 167 / unimpl 268 に更新 (435 関数)。flpy 節で `work/midi.py` が無く停止 (未 PASS) | — |
+| `node tests/general_diff.mjs` | calls 41、diffs 0、PASS | 0.05 秒 |
+| `node tests/ui_browser_diff.mjs` | ok 8・bad 5・browserOp 3、diffs 0、PASS | 0.06 秒 |
+| `node tests/*_diff.mjs` (21 本) | 全て PASS (diffs 0) | 合計 1 秒未満 |
+| `node tests/provider_check.mjs` | 期待値を impl 170 / unimpl 265 に更新 (435 関数)。節 1・節 2 は PASS。節 3 以降は `work/midi.py` と flpy (cpython wasm) が無く未実行 | — |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | 未実行 (cpython wasm と flpy 生成物が無い) | — |
+
+- 測定後のコード差分: `git diff 86700c19b HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (この REPORT の更新は文書のみ)。
 
 ## 未解決
 
