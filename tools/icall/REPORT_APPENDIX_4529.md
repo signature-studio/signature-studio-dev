@@ -60,6 +60,8 @@ bash tools/icall/diff/fa_sweep.sh 8 60       # funcs 131 ...
  1 file changed, 6 insertions(+)
 ```
 
+検証 HEAD: `57e17f0b5`。`git diff c29e2e270 57e17f0b5 -- tools/ott tools/icall` は本 REPORT 1 ファイルのみ (コード差分 0 行)。
+
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
