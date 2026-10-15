@@ -32,6 +32,7 @@ frame アドレスを自分の frame に書く store (`mov [rbp+X], rbp`) も漏
   --negctl-glk:    全関数の glk を強制 True にする (ネガティブコントロール: 漏出規則が効いていることの確認用)
   --negctl-nosync: 区間 sync を無効にする (ネガティブコントロール: rsp/rbp 同一視の規則が効いていることの確認用)
   --negctl-noprov: NONFRAME 規則 (6) を無効にする (#2211 の判定に戻る。#2211 の site 判定を再現する)
+  --negctl-noglk:  全関数の glk を強制 False にする (ネガティブコントロール: 対照で glk=True の関数を glk=False に落とす。#4330)
 """
 import collections
 import json
@@ -346,6 +347,7 @@ def main():
     global NO_SYNC, NO_PROV, NONFRAME
     args = sys.argv[1:]
     force_glk = '--negctl-glk' in args
+    force_noglk = '--negctl-noglk' in args
     NO_SYNC = '--negctl-nosync' in args
     NO_PROV = '--negctl-noprov' in args
     args = [a for a in args if not a.startswith('--')]
@@ -374,7 +376,7 @@ def main():
         preds, ijmp = v1.build_preds(mach.cs, seq, va, ent[1])
         F = frame_derived(mach.cs, seq)
         leaks = leak_sites(mach.cs, seq, F)
-        glk = bool(leaks) or force_glk
+        glk = (bool(leaks) and not force_noglk) or force_glk
         sync = sync_range(mach.cs, seq)
         NONFRAME = nonframe_store_addrs(mach.cs, seq, preds) if glk else set()
         fn_info[fn] = dict(escaped=esc, ijmp=ijmp, n_ins=len(seq), glk=glk,
