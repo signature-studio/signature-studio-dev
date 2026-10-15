@@ -7,6 +7,13 @@
 win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を RetDec で lift し、`ucomiss` flags 修復 (1 pass) + SSE scalar helper 生成で wasm 化。
 **native 実機械語 vs wasm の全バイト比較 240/240 一致** (ネガコン 4 件は全て FAIL = ゲートは効く)。**実インスタンス (CreateReverbInstance) 駆動は未達**: 生成直後の状態では `Process_Fruity` が SIGSEGV (§7 → [T-SH-71] #3361)。**ildsp は未達**: WaveformColouring は #3216 (CLOSED・部分達成。残りは #3274・#3275・#3276)。GeneralPitchShifter の残件は #3318・#3320。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance は未起票で #161 に残す (§6)。
 
+## 0. gen_helpers の未対応 op 全数 (#3316・ildsp 0x161fc0 closure)
+
+測定 commit: `2ae10ac85` (`gen_helpers.py` の変更。ildsp 側の lift 入力は `c5bd6af6e` の `lift_vtable.sh 0x161fc0`)。
+- 変更: 未対応の宣言を即 exit せず**全数列挙**してから exit 1 にする。`i8` (psrldq/psrlq/psllq 等の即値) を型写像に追加 (従来は KeyError で落ちていた)。対応済み 7 種の出力は変えない。
+- 実測: `declare` 62 件が未対応 (op 名 54 種。`cvttss2si`・`movd`・`cvtdq2ps`・`divss`・`vfmadd231sd`・`ucomisd` など)。`gen_helpers.py` の rc=1。残りの wasm 化 (helper の C 実装) は [T-SH-65] #3318、native 差分は [T-SH-64] #3317 が持つ。
+- 回帰: `lift.sh ok` (libreverb、同 worktree・同 commit) は **240/240 PASS**・wasm 18,769 B・所要 23.3 秒 (`real`)。
+
 ## 1. 対象の再特定 (mac の 0x25c0-0x2f87 は win では使えない)
 `python3 locate.py <Reverb.dll> <out>` が export stub → 実体 → `.pdata` の連鎖で範囲を求める (RVA, 範囲内に base reloc 0 件・外部 call 0 件)。
 
