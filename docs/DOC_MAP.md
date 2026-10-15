@@ -779,7 +779,7 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4088.md` | ~90 | 残り x87 leaf 関数 12 本 (#4065 の一覧) の差分試験の結果と、判定を通らない 3 種類の理由 (ebp 相対の非自明性・空スタック読み・ecx 基底の segfault)。 測定値の正本。 TARGETS は 2 本のまま (#4088) |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4066.md` | ~45 | x87 断片 10 本の入口判定 (#4066 PLG-G2-42): 直接 call・間接ジャンプテーブルの参照から callee 4 本と switch-arm 断片 6 本に分類 (規則は `x87_fn_diff.py --classify`)。 親関数の入口は未確定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2989.md` | ~115 | x87 を含む leaf 関数 2 本の native vs wasm 差分試験 (#2989 PLG-G2-25): eax・x87 深さ・ST(0)・OBJ 窓の突合、ST(0) の f64 の丸め差の分布、ネガコン 2 種 (判定器・lowering の 1 演算の取り違え)、例外値 (NaN・inf・非正規・±0) の突合 (#3716 PLG-G2-32、§7。 NaN どうしのビット差は未解決)。 測定値の正本 |
-| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_3715.md` | ~130 | x87 leaf 関数 42 本の候補の分類 (§2)・突合が成立した 5 本の測定 (§4)・構造が一致しない・ランナーが異常終了する関数の未解決 (§5・子 #4064〜#4066)。 PLG-G2-31 (#3715)。 測定値の正本 |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_3715.md` | ~130 | x87 leaf 関数 42 本の候補の分類 (§2)・突合が成立した 5 本の測定 (§4)・構造が一致しない・ランナーが異常終了する関数の未解決 (§5・子 #4064・#4065・#4080)。 PLG-G2-31 (#3715)。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4064.md` | ~60 | x87 leaf 3 本 (`0x10009eb5`・`0x1000b526`・`0x1000bf60`) の eax・ST(0) の差の切り分け (#4064 PLG-G2-40): 模型 (`ott_x87.h`) の例外フラグ・C1 の限界。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/MARSHAL.md` | ~80 | 殻 (x64) ↔ Slayer_Engine.dll (ia32) の VST2 構造体 marshal 表の仕様 (#674 受入 3)。測定値は REPORT.md §9 |
 | `tools/shared/REPORT.md` | ~212 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC。win freetype.dll = 2.4.10 確定 (#145, §3.1) |
