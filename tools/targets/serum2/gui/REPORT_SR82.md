@@ -3,7 +3,7 @@
 - 日付: 2026-10-16 / 親: #4164 (SR-60) / 前段: `REPORT_SR60.md` (直接 call の呼出元・`arg_vtable_callers.py` の窓 4096)
 - 範囲: 静的解析のみ。実 VSTGUI 上の動的確認は範囲外。
 - 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3`。sha256 `501e7bb3…` / 19,236,864 B (SR-60 と一致を確認)。作業用 dir はリポジトリ外 (`work/`・gitignore)。
-- 測定 commit: `6c2b01972` (`arg_vt_indirect.py` を追加した commit。このツールの実測はこの commit で行った)。
+- 測定 commit: `3183c3c6e` (HEAD で測定。`*.py` は `b3607f9df` と同一。§5 の鮮度欄を参照)。
 
 ## 0. 結論
 
@@ -11,7 +11,7 @@
 
 | 受入条件 | 判定 |
 |---|---|
-| 1. ARG 240 件・ARG-CHILD 68 件の呼出元 (直接・vtable 経由) をたどり、引数が SC の this かを確定、件数を REPORT に書く | **未達**。vtable 経由の候補を列挙した (§2)。候補の宛先 (reg の型) は未確定のため、確定・非確定の件数は出せない |
+| 1. ARG 240 件・ARG-CHILD 68 件の呼出元 (直接・vtable 経由) をたどり、引数が SC の this かを確定、件数を REPORT に書く | **未達**。vtable 経由の候補を列挙した (§2)。候補 118,222 件・うち呼出元が SC の関数 19 件。候補の宛先 (reg の型) は未確定のため、確定・非確定の件数は出せない |
 | 2. THIS 69・THIS-CHILD 197 の SC 伝播と SC 証拠の件数 | **未達**。§3 に現状の件数のみ |
 | 3. 表の境界の決め方と、出現数の run 数への換算 | **未達**。決め方は未決定 (§4) |
 | 4. 測定 commit と再現手順 | **達成** (§5) |
@@ -25,20 +25,20 @@
 
 ## 2. vtable 経由の候補 (受入 1 の一部)
 
-`arg_vt_indirect.py` (測定 commit `6c2b01972`):
+`arg_vt_indirect.py` (測定 commit `3183c3c6e`):
 
 - ARG 系の所属関数 = 145 個 / 表の slot に現れる = 129 個 (`arg_vtable_callers.py` の値と一致)。
-- 間接 call の候補 (slot × 先頭ごと) = 113,548 件 **(旧値・取りこぼしを含む)**。
-- うち呼出元が SerumController の関数 = 12 件 **(旧値・取りこぼしを含む)**。
-- 参考: `.text` 全体で SC の関数内の `call qword ptr [reg+disp]` = 26 件 (`disp` を問わない)。
+- 間接 call の候補 (slot × 先頭ごと) = 118,222 件。
+- うち呼出元が SerumController の関数 = 19 件。
+- 参考: `.text` 全体で SC の関数内の `call qword ptr [reg+disp]` = 26 件 (`disp` を問わない)。旧 regex の時点の値であり、現 head での再計数は未実施。
 
-**注 (レビュー指摘への対応):** 測定 commit `6c2b01972` の `arg_vt_indirect.py` は `qword ptr [reg + 0x..]` だけを受けており、capstone 5.0.7 が `[reg]` (disp 0) と `[reg + 8]` (disp 8、10 進出力) を出す呼出を落としていた。上の 113,548 件と 12 件は、この取りこぼしを含む旧値である。修正 commit では正規表現を `[reg]` と `[reg + 10進|0x16進]` の両方を受けるように直した。修正後の件数は未測定 (下記)。
+**注:** 測定 commit `6c2b01972` の `arg_vt_indirect.py` は `qword ptr [reg + 0x..]` だけを受けており、capstone 5.0.7 が `[reg]` (disp 0) と `[reg + 8]` (disp 8、10 進出力) を出す呼出を落としていた。旧 commit の値 (113,548 件・SC 12 件) は、この取りこぼしを含む旧値であり、現 head の値ではない。修正 commit `b3607f9df` で正規表現を `[reg]` と `[reg + 10進|0x16進]` の両方に対応させた。
 
 読み方: 候補の大半は別クラスの同じ disp の呼出であり、ARG の型の確定には使えない。SC 関数内の件数も、受けた object が F の所属 class かは未確定。
 
 ## 3. THIS・THIS-CHILD の件数 (受入 2 の現状)
 
-`arg_vtable_callers.py --cats vptr:THIS,vptr:THIS-CHILD` (測定 commit `6c2b01972`・`REPORT_SR60.md` の窓 4096 と同じ):
+`arg_vtable_callers.py --cats vptr:THIS,vptr:THIS-CHILD` (測定 commit `6c2b01972`・`REPORT_SR60.md` の窓 4096 と同じ。`*.py` は `arg_vt_indirect.py` 以外 `6c2b01972` から不変):
 
 - THIS 系の所属関数 = 201 個 / データ表に現れる = 114 個 / 現れない = 87 個。
 - RTTI が SerumController の表に現れる関数 = 6 個。
@@ -62,27 +62,25 @@ venv/bin/python $P/receiver_this_trace.py Serum2_win64.vst3 --vtable 0x180a2bf58
 venv/bin/python $P/arg_vt_indirect.py Serum2_win64.vst3 trace.tsv --tsv vt_ind.tsv
 ```
 
-実測 (測定 commit `6c2b01972`・逐次・load は `/proc/loadavg` の 1 分値):
+実測 (測定 commit `3183c3c6e`・逐次・load は `/proc/loadavg` の 1 分値):
 
-| ツール | 実行 | real (s) | load (1 分値) | 出力 md5 |
+| ツール | 実行 | real (s) | load (開始前 → 終了後) | 出力 md5 |
 |---|---|---|---|---|
-| `receiver_this_trace.py` | 1 | 27.07 | 0.74 | (TSV 1053 行) |
-| `arg_vt_indirect.py` (旧 commit・取りこぼしあり) | 1 | 31.61 | 0.73 | `9b4cb2ff` |
-| `arg_vt_indirect.py` (旧 commit・取りこぼしあり) | 2 | 31.74 | 0.91 | `9b4cb2ff` |
+| `receiver_this_trace.py` | 1 | 19.9 | 1.40 → 1.35 | `1e1f5500…` (TSV 1053 行) |
+| `arg_vt_indirect.py` | 1 | 25.0 | 1.35 → 1.57 | `42bcf98b…` (118222 件・SC 19 件) |
+| `arg_vt_indirect.py` | 2 | 25.1 | 1.35 → 1.53 | `42bcf98b…` (2 回一致) |
 
-- 修正後の再測定は未実施。確認した事実 (fix run・head `50686a8d1`・`$ARTIFACTS_DIR` の実在を確認): `fl-win64.tar.zst` (2,324,302,252 B) のみが存在し、`plugins-serum2` は無い。PR 本文に `oc_artifacts` 行が無かったため、この run は `plugins-serum2` を要求しておらず、取得の試行も無い。`Serum2_win64.vst3` の実体も無いため、再測定は素材を用意した run で行う (未解決 (e))。
-- `receiver_this_trace.py` の TSV md5 は未記録。`trace.tsv` を生成できず、この run では md5 を取れない (未解決 (d))。
-
-### 鮮度の証跡 (`docs/WORKFLOW.md` §6)
-
-- 測定 commit `6c2b01972` から HEAD (`b3607f9df`) までのコード差分: `git diff 6c2b01972 b3607f9df -- 'tools/targets/serum2/gui/*.py'` は `arg_vt_indirect.py` の 6 行 (commit `b3607f9df`・正規表現と disp の整数化)。したがって §5 の表の値 (`9b4cb2ff`・113,548 件・12 件) は旧 regex の値であり、現 head の `arg_vt_indirect.py` の値ではない。修正後の値は未測定 (下記 (e))。
+- 素材: `plugins-serum2.tar.zst` を展開し `Install_Xfer_Serum2_2.1.5.exe` (1,313,084,056 B) から `Serum2.vst3` を取り出した。`Serum2_win64.vst3` の sha256 `501e7bb3…` / 19,236,864 B を確認 (PR 本文の記載と一致)。
+- `receiver_this_trace.py` の TSV md5 は `1e1f5500…`。`REPORT_SR60.md` §3 の `ea2d93a2…` (3 回一致) とは**不一致**。`REPORT_SR49.md`・`REPORT_SR58.md` の既定 TSV md5 は `1e1f5500…` で、こちらと一致する。SR60 の値が外れ値である可能性が高いが、SR60 の差の原因は未確認。
+- 鮮度 (`docs/WORKFLOW.md` §6): 測定 commit `3183c3c6e` から HEAD までの `*.py` の差分は 0 行 (`git diff 3183c3c6e HEAD -- 'tools/targets/serum2/gui/*.py'`)。測定 commit の `*.py` は `b3607f9df` と同一 (`git diff b3607f9df 3183c3c6e -- 'tools/targets/serum2/gui/*.py'` = 0 行)。旧 commit `6c2b01972` から `*.py` の差分は `arg_vt_indirect.py` の 6 行 (`b3607f9df`) のみ。
 
 ## 6. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (a) 間接 call の候補の宛先 (reg の指す object) の型を確定する。候補 113,548 件は disp のみの照合で、SC 関数内の 12 件も受け手は未確定 | 受入 1 | #4930 (本 issue 残・親 #4164 の子) |
+| (a) 間接 call の候補の宛先 (reg の指す object) の型を確定する。候補 118,222 件は disp のみの照合で、SC 関数内の 19 件も受け手は未確定 | 受入 1 | #4930 (本 issue 残・親 #4164 の子) |
 | (b) THIS 69・THIS-CHILD 197 の SC 伝播と、THIS-CHILD の SC 証拠 (6 件 / 5 関数) の定義を揃えた再集計 | 受入 2 | #4930 (本 issue 残) |
 | (c) 表の境界 (連続する関数ポインタの run の先頭) の決め方と、run 数への換算 | 受入 3 | #4930 (本 issue 残) |
-| (d) `receiver_this_trace.py` の TSV md5 の不一致 (REPORT_SR60 §3) | 再現性 | #4930 (本 issue 残) |
-| (e) `arg_vt_indirect.py` の修正後の再測定 (件数・md5 を 2 回一致で確認)。素材 `plugins-serum2` を要する | 受入 1 の件数 | #4930 (本 issue 残) |
+| (d) `receiver_this_trace.py` の TSV md5 が SR60 (`ea2d93a2…`) と不一致。現 head では `1e1f5500…` で再現 (SR49・SR58 と一致)。SR60 側の差の原因は未確認 | 再現性 | #4930 (本 issue 残) |
+
+(e) は §5 の再測定で閉じた (`arg_vt_indirect.py` を HEAD で 2 回実行、118,222 件・md5 `42bcf98b…` で一致)。
