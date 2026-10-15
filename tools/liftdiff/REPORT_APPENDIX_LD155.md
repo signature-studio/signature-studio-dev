@@ -55,7 +55,7 @@
 
 ## 6. 差分と測定の鮮度
 
-- 測定 commit `1fc351661` 以降、`tools/liftdiff` の差分は 0 (`git diff 1fc351661 HEAD -- tools/liftdiff | wc -l` = 0)。再測定は不要。
+- 測定 commit `1fc351661` 以降、実行コード (`tools/liftdiff/rt`・`tools/liftdiff/ld126_wasm_state.py`・`tools/liftdiff/ldlib`) の差分は 0 (`git diff 1fc351661 HEAD -- tools/liftdiff/rt tools/liftdiff/ld126_wasm_state.py tools/liftdiff/ldlib | wc -l` = 0)。本 PR が追加した REPORT・結果 TSV は実行コードではないため範囲から外す。再測定は不要。
 
 ## 7. 再現
 
