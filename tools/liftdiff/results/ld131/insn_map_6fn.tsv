@@ -895,6 +895,17 @@ fn	va	insn	kind	target
 1801c69cc	1801c69fc	add rsp, 0x20		
 1801c69cc	1801c6a00	pop rbx		
 1801c69cc	1801c6a01	ret 		
+1801c6a04	1801c6a04	test rcx, rcx		
+1801c6a04	1801c6a07	je 0x1801c6a23	jcc	1801c6a23
+1801c6a04	1801c6a09	lea rax, [rip + 0x574a0]		
+1801c6a04	1801c6a10	cmp rcx, rax		
+1801c6a04	1801c6a13	je 0x1801c6a23	jcc	1801c6a23
+1801c6a04	1801c6a15	or eax, 0xffffffff		
+1801c6a04	1801c6a18	xadd dword ptr [rcx + 0x15c], eax		
+1801c6a04	1801c6a20	dec eax		
+1801c6a04	1801c6a22	ret 		
+1801c6a04	1801c6a23	mov eax, 0x7fffffff		
+1801c6a04	1801c6a28	ret 		
 1801c6a2c	1801c6a2c	sub rsp, 0x28		
 1801c6a2c	1801c6a30	test rcx, rcx		
 1801c6a2c	1801c6a33	je 0x1801c6acf	jcc	1801c6acf
@@ -935,7 +946,7 @@ fn	va	insn	kind	target
 1801c6a2c	1801c6abd	sub r8, 1		
 1801c6a2c	1801c6ac1	jne 0x1801c6a8c	jcc	1801c6a8c
 1801c6a2c	1801c6ac3	mov rcx, qword ptr [rcx + 0x120]		
-1801c6a2c	1801c6aca	call 0x1801c6a04	call-unlifted	1801c6a04
+1801c6a2c	1801c6aca	call 0x1801c6a04	call	1801c6a04
 1801c6a2c	1801c6acf	add rsp, 0x28		
 1801c6a2c	1801c6ad3	ret 		
 1801ce3f0	1801ce3f0	mov eax, dword ptr [rip + 0x9e79a]		

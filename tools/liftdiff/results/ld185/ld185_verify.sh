@@ -16,11 +16,11 @@ ROOTS="1801ab1d0 1801ab258 1801c5e84 1801c621c 1801c682c 1801c69cc"
 python3 -c "import json,sys; json.dump({'roots':[int(x,16) for x in sys.argv[1:]],'calltgt':[]}, open('$OUT/entries6.json','w'))" $ROOTS
 
 # (1) 既定 off: ld131 と同じ呼出し
-python3 "$REPO/tools/ott/lift/x64c.py" --pe "$DLL" --entries "$OUT/entries6.json" --out "$OUT/base" --closure 6
+python3 "$REPO/tools/ott/lift/x64c.py" --pe "$DLL" --entries "$OUT/entries6.json" --out "$OUT/base" --closure 7
 sha256sum "$OUT/base/ott_lifted.c"
 
 # (2) 計装 on
-OTT_INSNTRACE=1 python3 "$REPO/tools/ott/lift/x64c.py" --pe "$DLL" --entries "$OUT/entries6.json" --out "$OUT/insn/lift" --closure 6
+OTT_INSNTRACE=1 python3 "$REPO/tools/ott/lift/x64c.py" --pe "$DLL" --entries "$OUT/entries6.json" --out "$OUT/insn/lift" --closure 7
 echo "insn_hit_calls=$(grep -c OTT_INSN_HIT "$OUT/insn/lift/ott_lifted.c")"
 python3 "$REPO/tools/ott/lift/data_gen.py" "$DLL" "$OUT/insn/lift/ott_data.c" "$OUT/insn/lift/lift_meta.json" >/dev/null
 RT="$REPO/tools/ott/rt"
