@@ -10,7 +10,7 @@
   間接 call (call reg・call [mem]) は辿らない。
 - ゲート: ハンドラ 0xd5c800 の直接 call を、ゲート呼出し 0xd5c858 (→ 0x11d1430 → vt+0x88) の前後で分ける。
 - vtable: V = 0x125b1c0 の +0x48・+0x60・+0x88・+0x90 の格納値 (ファイル上)。
-- 間接呼出しの数: `call qword ptr [reg+0x60]` と `[reg+0x88]` の箇所数。
+- 間接呼出しの数: `call qword ptr [reg+0x60]` と `[reg+0x88]` の箇所数 (far call `call ptr [..]` = FF /3 は数えない)。
 - 格納箇所: 書込み関数の先頭 VA を 8 byte 境界で格納する箇所 (関数ポインタ表・vtable の探索の入口)。
 展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
 """
@@ -76,9 +76,9 @@ def main():
             call_tgt[a] = t
             calls_of[func_of(a)].add(t)
         elif m == "call":
-            if re.search(r"\+ 0x60\]", o):
+            if re.search(r"qword ptr \[[^\]]*\+ 0x60\]", o):
                 indirect["+0x60"] += 1
-            if re.search(r"\+ 0x88\]", o):
+            if re.search(r"qword ptr \[[^\]]*\+ 0x88\]", o):
                 indirect["+0x88"] += 1
         elif m == "jmp" and o.startswith("0x"):
             jumps[int(o, 16)].append(a)
