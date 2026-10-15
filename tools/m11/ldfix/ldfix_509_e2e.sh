@@ -37,7 +37,7 @@ find "$W" -maxdepth 1 -type f -size -3M -exec cp {} "$OUT/gen/tools/m11/work/" \
 PRE="$OUT/gen/tools/m11/work/boot_final.ll"
 
 step "2/7 ldfix 旧版 ($PREV_REF) / 新版 (HEAD)"
-mkdir -p "$OUT/prev/ldfix"; cp "$HERE"/ldmach.py "$HERE"/ldmach_img.py "$HERE"/ldfix_img.py "$OUT/prev/ldfix/"; cp "$REPO/tools/m11/lb_base.py" "$OUT/prev/"
+mkdir -p "$OUT/prev/ldfix"; cp "$HERE"/ldmach.py "$HERE"/ldmach_img.py "$HERE"/ldfix_img.py "$HERE"/ldframe.py "$OUT/prev/ldfix/"; cp "$REPO/tools/m11/lb_base.py" "$OUT/prev/"
 git -C "$REPO" show "$PREV_REF:tools/m11/ldfix/ldfix.py" > "$OUT/prev/ldfix/ldfix.py"
 "$PY" "$OUT/prev/ldfix/ldfix_img.py" "$PRE" "$OUT/prev.ll" "$IMG" "$CFG" --report "$OUT/prev_report.json" 2>&1 | tail -1
 "$PY" "$HERE/ldfix_img.py" "$PRE" "$OUT/new.ll" "$IMG" "$CFG" --report "$OUT/new_report.json" 2>&1 | tail -1
@@ -110,7 +110,8 @@ FAIL=0
   && cp work/m11_boot.cjs work/m11_boot.cjs.wasm "$OUT/basewasm/" && node trap_triage/survey_units.mjs "$OUT/sv_base.json" | tail -1 ) || { echo "[ldfix_509_e2e] 修復前 wasm の build/survey 失敗: $OUT/build_base.log"; FAIL=1; }
 ( cd "$B/tools/m11" && cp "$PRE" work/boot_final.ll && "$PY" ldfix/ldfix.py work/boot_final.ll work/boot_final.ldfix.ll --pe "$PE_QS" --report work/ldfix_report.json > "$OUT/ldfix_new.log" 2>&1 \
   && mv work/boot_final.ldfix.ll work/boot_final.ll && python3 m11_cond.py ldfix=applied && python3 m11_cond.py ld108=disabled && python3 m11_cond.py --bind work/boot_final.ll \
-  && rm -f work/boot_final3.ll && M11_ALLOW_LD108_DISABLED=1 bash m11_build.sh > "$OUT/build_new.log" 2>&1 \
+  && python3 m11_cond.py r8b=disabled && python3 m11_cond.py ld115=disabled && python3 m11_cond.py --bind work/boot_final.ll \
+  && rm -f work/boot_final3.ll && PE="$PE_QS" FL_WIN64_DIR="$(dirname "$(dirname "$PE_QS")")" M11_ALLOW_LD108_DISABLED=1 M11_ALLOW_R8B_DISABLED=1 M11_ALLOW_LD115_DISABLED=1 bash m11_build.sh > "$OUT/build_new.log" 2>&1 \
   && node trap_triage/survey_units.mjs "$OUT/sv_new.json" | tail -1 ) || { echo "[ldfix_509_e2e] 修復後 wasm の build/survey 失敗: $OUT/build_new.log"; FAIL=1; }
 ( cd "$B/tools/m11" && python3 trap_triage/survey_diff.py "$OUT/sv_base.json" "$OUT/sv_new.json" )
 "$PY" - "$OUT/sv_base.json" "$OUT/sv_new.json" <<'PYEOF'
