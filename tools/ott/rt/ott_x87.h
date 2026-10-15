@@ -110,6 +110,63 @@ static inline void x87_fscale(void) {
     x87_set(0, ldexp(x87_st(0), (int)n));
 }
 
+/* x87 の default NaN (負の quiet NaN。 f80 の 0xFFFF C000… に対応する) */
+static inline double x87_indef(void) {
+    uint64_t b = 0xfff8000000000000ULL; double d;
+    memcpy(&d, &b, 8);
+    return d;
+}
+
+/* FSIN/FCOS: |ST(0)| < 2^63 のときだけ計算して C2 = 0。 有限の範囲外は ST(0) を変えず C2 = 1。 ±inf は C2 = 0 で default NaN (native 実測) */
+static inline void x87_trig(int cosine) {
+    double v = x87_st(0);
+    if (isinf(v)) { ott_fsw = (uint16_t)(ott_fsw & ~0x0400u); x87_set(0, x87_indef()); return; }
+    if (fabs(v) >= 9223372036854775808.0) { ott_fsw |= 0x0400; return; }
+    ott_fsw = (uint16_t)(ott_fsw & ~0x0400u);
+    x87_set(0, cosine ? cos(v) : sin(v));
+}
+
+/* F2XM1: ST(0) = 2^ST(0) - 1 (|ST(0)| <= 1)。 expm1 で小さい値の桁落ちを避ける。 ln2 は hi/lo に分けて引数の丸めを抑える */
+static inline void x87_f2xm1(void) {
+    double x = x87_st(0);
+    x87_set(0, expm1(x * 0.693147180559945286226764 + x * 2.319046813846299558e-17));
+}
+
+/* FYL2X: ST(1) = ST(1) * log2(ST(0)) を計算してから pop。 ST(0) < 0 は default NaN */
+static inline void x87_fyl2x(void) {
+    double x = x87_st(0), y = x87_st(1), r;
+    if (x != x) r = x;
+    else if (y != y) r = y;
+    else if (x < 0) r = x87_indef();
+    else r = y * log2(x);
+    x87_set(1, r);
+    x87_pop();
+}
+
+/* FPREM: 指数差 e < 64 なら完全 (C2 = 0)。 商の下位 3 bit (|Q|) を C0 (Q2)・C3 (Q1)・C1 (Q0) に入れる。
+ * e >= 64 は部分剰余 (C2 = 1・商のビットは 0): 除数を 2^s 倍 (s = 32・(floor(e/32) - 1)、native 実測) して 1 回だけ減らし、
+ * 残りの指数差は [32, 64) になる。 ST(1) = 0・ST(0) = inf は default NaN */
+static inline void x87_fprem(void) {
+    double a = x87_st(0), b = x87_st(1), r;
+    uint16_t c = 0;
+    if (a != a || b != b) r = a != a ? a : b;
+    else if (isinf(a) || b == 0) r = x87_indef();
+    else if (isinf(b) || a == 0) r = a;
+    else {
+        int e = ilogb(a) - ilogb(b), q;
+        double m = fabs(b), aa = fabs(a), rr;
+        if (e >= 64) { m = ldexp(m, 32 * ((e >> 5) - 1)); c = 0x0400; }
+        rr = fmod(aa, m);
+        if (!(c & 0x0400)) {
+            q = (int)nearbyint((fmod(aa, 8.0 * m) - rr) / m) & 7;
+            c |= ((q & 4) ? 0x0100 : 0) | ((q & 2) ? 0x4000 : 0) | ((q & 1) ? 0x0200 : 0);
+        }
+        r = copysign(rr, a);
+    }
+    x87_set(0, r);
+    ott_fsw = (uint16_t)((ott_fsw & ~OTT_X87_CMASK) | c);
+}
+
 /* fist/fistp の丸め (FCW.RC: 00 nearest / 01 down / 10 up / 11 truncate) */
 static inline double x87_rc(double v) {
     switch ((ott_fcw >> 10) & 3) {

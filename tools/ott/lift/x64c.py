@@ -871,6 +871,11 @@ class FnLift:
     def i_fxam(self, ins, ops): self.ia32_only('fxam'); self.L('x87_fxam();')
     def i_ftst(self, ins, ops): self.ia32_only('ftst'); self.L('x87_fcom(x87_st(0), 0.0);')
     def i_fnclex(self, ins, ops): self.ia32_only('fnclex')   # 例外フラグは模型化しない (ADR D28 制限 4)
+    def i_fsin(self, ins, ops): self.ia32_only('fsin'); self.L('x87_trig(0);')
+    def i_fcos(self, ins, ops): self.ia32_only('fcos'); self.L('x87_trig(1);')
+    def i_f2xm1(self, ins, ops): self.ia32_only('f2xm1'); self.L('x87_f2xm1();')
+    def i_fyl2x(self, ins, ops): self.ia32_only('fyl2x'); self.L('x87_fyl2x();')
+    def i_fprem(self, ins, ops): self.ia32_only('fprem'); self.L('x87_fprem();')
 
     def x87_int_arith(self, ins, ops, m, op):
         self.ia32_only(m)
