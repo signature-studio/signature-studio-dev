@@ -16,7 +16,7 @@
   - call を越える: `slot_call` (slot のアドレスが漏れているかを判定せず、保守的に止める)
   - ret・jmp: `slot_branch`
   - rsp・rbp の変更: `slot_base`、別の基底レジスタの書込み: `slot_alias_base`、ポインタ経由の書込み: `slot_ptr_write`、slot に重なる別幅の書込み: `slot_overlap`
-  - メモリ書込みの可能性がある未知の命令 (`movq`・`pop`・`rep stosq` など、ldmach の kind=other): `slot_unknown_write`。index 付きの書込み: `slot_index_write` (直接の slot 格納と見なさない)
+  - メモリ書込みの可能性がある未知の命令 (`movq`・`pop`・`rep stosq` など、ldmach の kind=other): `slot_unknown_write`。メモリオペランドを持つ `set*` (`sete`・`setne` など。ldmach は set* を空扱いするため別に判定): `slot_unknown_write`。index 付きの書込み: `slot_index_write` (直接の slot 格納と見なさない)
   - 格納が見つかった場合: `mov qword ptr [rbp+d], imm` なら実値化 (`slot_imm`)、reg 格納は未決 (`slot_reg`・未追跡)
   - 区間の先頭まで格納が無ければ `slot_entry`
   - frame 定数が求まらない (rsp で先に動かす prologue 等): `no_frame`
@@ -58,22 +58,30 @@
 | `mov qword ptr [rbp+rax*8+0x48], 1` → 読込 | 実値化 `slot_imm` 1 (誤り) | 未決 `slot_index_write` |
 | `mov qword ptr [rbp+0x48], 1` → 読込 (正例) | 実値化 `slot_imm` 1 | 実値化 `slot_imm` 1 |
 
-- 修正の中身: (a) `ldmach.memops_of` の kind=other (`movq`・`pop`・`rep stosq` などのメモリ書込みの可能性がある命令。`rip` 相対を除く) は `slot_unknown_write` で打ち切る。読むだけの `lea`・`cmp`・`test`・`bt` は元から対象外。(b) index 付きのメモリ書込みは直接の slot 格納と見なさず `slot_index_write` で打ち切る。
-- 単体テスト: `python3 tools/m11/test_setother_slot_class.py` (`df4801b10`) は 5 件 OK (正例 1・負例 4)。
+- 修正の中身: (a) `ldmach.memops_of` の kind=other (`movq`・`pop`・`rep stosq` などのメモリ書込みの可能性がある命令。`rip` 相対を除く) は `slot_unknown_write` で打ち切る。読むだけの `lea`・`cmp`・`test`・`bt` は元から対象外。(b) index 付きのメモリ書込みは直接の slot 格納と見なさず `slot_index_write` で打ち切る。(c) メモリオペランドを持つ `set*` は `slot_unknown_write` で打ち切る (`ldmach.memops_of` は set* に空リストを返すため、(a) の判定に届かない)。
+- **負例 (set* の修正)**: `sete`・`setne` のメモリ書込みを、修正前 (`4d659ab35`) と修正後 (`8391cf741`) の `load_def` に同じ機械語列で流した。
+
+| 機械語列 (直前の格納 → 読込) | 修正前 (`4d659ab35`) | 修正後 (`8391cf741`) |
+|---|---|---|
+| `mov qword ptr [rbp+0x48], 1` → `sete byte ptr [rbp+0x48]` (`0f944548`) → `mov rcx, qword ptr [rbp+0x48]` (`488b4d48`) | 実値化 `slot_imm` 1 (誤り) | 未決 `slot_unknown_write` |
+| 同上、`setne byte ptr [rbp+0x48]` (`0f954548`) | 実値化 `slot_imm` 1 (誤り) | 未決 `slot_unknown_write` |
+| `mov qword ptr [rbp+0x48], 1` → `sete cl` (`0f94c1`・レジスタ書込み) → 読込 (正例) | 実値化 `slot_imm` 1 | 実値化 `slot_imm` 1 |
+
+- 単体テスト: `python3 tools/m11/test_setother_slot_class.py` は 8 件 OK (正例 2・負例 6。`8391cf741` 時点)。修正前の `load_def` に流すと、`sete`・`setne` の 2 件が失敗する (上の表と一致)。
 
 ## 4. 測定 commit と差分
 
-- 旧コードの 110 件の実測 (§2): 測定 commit `fe41cc75`。その後の、対象の分類を変えた commit は `load_def` の修正 `df4801b10` (コードを変えた最後の commit)。
-- **修正後の 110 件の再測定は未実施**。`boot_final.ll`・`nonimm_class_rows.json`・PE (`block00031_PE.bin`) が runner に無いことを `find` で確認した (artifacts 側は `fl-win64.tar.zst` のみ)。素材が揃う run で `m11_setother_slot_class.py` を流し、§2 の表 (理由列) と本節を更新する。
-- 修正 commit から HEAD までのコード差分 (`git diff df4801b10 HEAD -- tools/m11 ':(exclude)*.md'`) は 0 行。
-- 件数が変わらないことの論拠 (実測ではない): 修正後の `load_def` は、旧コードと同じ命令を同じ順に見る。違うのは、旧コードが通過していた kind=other の書込みと index 付きの書込みで打ち切る点だけで、通過した命令の判定は同じ。よって修正後に実値化を返す行は、旧コードも同じ格納で実値化を返す行の部分集合になる。旧コードの load_stack の実値化は 0 件なので、修正後も 0 件。lea 行は `load_def` を通らないので不変。よって 実値化 25・未決 85 は変わらない見込み。ただし理由ラベルは変わりうる (§2 の理由列は旧コードの値)。
-- 旧コードの再測定 (記録): コミット済みの `fe41cc75` の script で同じ入力を流し、件数が一致 (実値化 25・未決 85。出力 `mem_class_rows_head.json` の sha `b73f8515…`)。
+- 測定 commit (§2 の実測): `fe41cc75`。コードを変えた最後の commit は `8391cf741` (set* の修正と改名)。
+- **修正後の 110 件の再測定は未実施**。`boot_final.ll`・`nonimm_class_rows.json`・PE (`block00031_PE.bin`) が runner に無いことを確認した (`$HOME/artifacts` は `fl-win64.tar.zst` のみ)。入力は `oc_artifacts: fl-win64 work-m11` の run で取得できる (`work-m11` は #516 以前の生成物で、`m11_e2e.sh --full` の再生成 (633 秒以上) とは一致しない。件数の比較は同じ入力どうしで行う)。その run で §2 の手順を流し、§2 の表 (理由列)・本節を更新する。
+- 測定経路の差分: `git diff fe41cc75 HEAD -- tools/m11/m11_post.py tools/m11/m11_argrecover.py tools/m11/m11_setother_nonimm_class.py tools/m11/ldfix/ldmach.py` は 0 行 (前段の手順と ldmach は測定時と同一)。変わったのは分類器だけ (測定時 `m11_setother_mem_class.py`・現 `m11_setother_slot_class.py`。`df4801b10`・`8391cf741`)。
+- 件数が変わらないことの論拠 (実測ではない): 修正は `load_def` に早期 return を足すだけで、他の判定値は変えない。修正後に実値化を返す行は、修正前も同じ格納で実値化を返す行の部分集合になる。修正前の load_stack の実値化は 0 件なので、修正後も 0 件。lea 行は `load_def` を通らないので不変。よって 実値化 25・未決 85 は変わらない見込み。ただし理由ラベルは変わりうる (§2 の理由列は測定時の値)。
+- 前回の記録 (出力 `mem_class_rows_head.json` の sha `b73f8515…`) は、出力先が gitignore の `work/` で repo から照合できないため取り下げた。
 
 ## 5. 受入条件の判定
 
 | 受入 | 判定 | 根拠 |
 |---|---|---|
-| 1. 110 件を 実値化 / 復元不能 / 未決 で件数実測・未分類 0 | **達成** (旧コード。修正後の再測定は未実施) | §2 (25 / 0 / 85 / 0)・§4 |
+| 1. 110 件を 実値化 / 復元不能 / 未決 で件数実測・未分類 0 | **未達** (測定は修正前のコード `fe41cc75` のみ。修正後 HEAD での再測定は素材不足で未実施) | §2 (25 / 0 / 85 / 0)・§4。未解決表の行 |
 | 2. 接続方式 (どの store・alloca を対象とするか) を REPORT に書く | **達成** | §1 |
 | 3. 実値化した値を `m11_argrecover_verify.py` で照合 | **該当なし** | 定数の実値化 0 件のため照合対象 0 件 (§3。alloca 番地 25 件は入力の範囲外) |
 
@@ -84,4 +92,4 @@
 | 接続 25 件 (lea_alloca) を IR の 0 詰め call 引数に入れていない・survey 未測定 | IR の値が未決のまま | #3932 ([M11-N201]) |
 | 未決 85 件 (slot_merge 23・slot_call 18+1・lea_alloca_absent 34・no_frame 5・その他 4) | 接続先が無い | #3933 ([M11-N202]) |
 | C 規則の IR 突合 (定義あり 36/105) | 接続 25 件の正しさが名前の存在だけで確認されている | #3933 ([M11-N202]) |
-| 修正後の 110 件の再測定 (理由列の更新) | 素材が runner に無く未実施。件数は論拠のみ (§4) | #3142 (親) |
+| 修正後の 110 件の再測定 (理由列の更新) | 素材が runner に無く未実施。件数は論拠のみ (§4) | #3906 (本 issue の受入 1・`oc_artifacts: fl-win64 work-m11` の run で実施) |
