@@ -105,6 +105,16 @@
   "ipp_token_at": [],
   "stopped_at_1based": 209
  },
+ "outmem": {
+  "mem_bytes": 905969664,
+  "stack": {
+   "base": "0x11dbb2c0",
+   "end": "0x115bb2c0"
+  },
+  "full": "276fe8a276b689f7da28fd2b2fb47d27e37a85d37993968ab8ca74c4fb2e3802",
+  "no_cstack": "e84cd67209500bb8996852234a435e2669cb1d69b85efd114353177242a58585",
+  "sections": {}
+ },
  "survey": null,
  "tolerant": null,
  "cfi": null,

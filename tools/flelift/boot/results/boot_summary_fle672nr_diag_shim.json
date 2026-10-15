@@ -100,6 +100,16 @@
   ],
   "stopped_at_1based": 209
  },
+ "outmem": {
+  "mem_bytes": 905969664,
+  "stack": {
+   "base": "0x11dbb2c0",
+   "end": "0x115bb2c0"
+  },
+  "full": "da0cb1921dd8c7ac989ee30174e2a8491c81c8b5f00991eb3134219e1e4e7f00",
+  "no_cstack": "10002504609ceda5b8fcb55c2a1187d9f43b96451065ce706e427ad81d052869",
+  "sections": {}
+ },
  "survey": null,
  "tolerant": null,
  "cfi": null,
