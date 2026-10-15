@@ -173,25 +173,7 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 | `passes/test_fold_const_ops.py` / `test_ir5_constexpr.py` | OK / OK |
 | `sampler_nega.sh` / T0 / T1 | **未測定** (本 run の時間上限)。 旧値は `REPORT_APPENDIX.md` §C (7ffab50 基準) |
 
-以下は旧検証 (5abf4d5 以前) の記録。
-
-| 項目 | 実測 |
-|---|---|
-| **HEAD 5abf4d5 (#629 取り込み後)** `sampler_e2e.sh` | exit 0、**349 s** (開始時 load 0.72)。 `judge shells` PASS 7/7、許容 (`ALLOW_UNIMPL` / 名前リスト) は空、`matrix_check` 54/54、`ids_crosscheck` 7/7 |
-| **HEAD 5abf4d5** `sampler_engines.sh` | exit 0、**291 s**。 engine 2 本 `judge engines` PASS 2/2。 未実装 helper 188 / 128 |
-| **HEAD 5abf4d5** `sampler_nega.sh` | exit 0、**11 s**。 NC1–NC7 は全て期待どおり (期待外の rc なし) |
-| **HEAD 5abf4d5** `ids_crosscheck.py` / `unreached_unique.py` | exit 0、2 s / 2 s |
-| 初回 (inventory 無し、HEAD 5abf4d5 の前段として `work/` を生成した run) | exit 0、**884 s**。 `win_funcs` 等の inventory 生成が大半 |
-| 旧 (HEAD 53c2eb6、#629 取り込み前) `sampler_e2e.sh` | exit 0、**211.95 s** (開始時 load average (1 分) 1.31)。 内訳: 7 閉包の lift 79 s、残りは `closure_facts.py` + `matrix_check.py` |
-| 同 (HEAD aec2fac) | exit 0、276.46 s (開始時 load 1.97。 engine の後段 pass 2 プロセスと RetDec 1 本が同時に走っていた) |
-| 初版 (engine 込み、HEAD 56aeefe) | **exit 1**、921.34 s。 RetDec の C 出力段が終わらず私が 2 本を停止したため engine 判定が FAIL (§5)。 現行版は engine を `sampler_engines.sh` に分離 |
-| 7 閉包の lift 秒 (`status.csv` の seconds、3 回の合計) | 76 s / 109 s / 79 s (run 2 は並走プロセスがあり Slicex 15 → 23 s、Soundfont Player 33 → 57 s)。 プラグイン別の min–max は §1 の最右列 |
-| 3 回の結果一致 | §1・§3・§4 の表 (判定列・閉包値・host・kernel) は run 2 と run 3 で完全一致 (`diff`)。 `declares_unimpl` と `unimpl_names` を含む 7 行の判定列は 3 回とも同一 |
-| `sampler_engines.sh` (HEAD 53c2eb6、2 本並列) | exit 0、**287.04 s** (開始時 load 0.36)。 2 回目の実行 (1 回目は `lift_from_ll.sh` の sed が段付き行を拾えず lift_rc 1 → 判定が **exit 1** で止まった。 修正して再実行)。 結果は停止再開版と各列一致 (§5) |
-| `matrix_check.py` | 54/54 項目一致 (閉包 6 項目 × 7 本 + `batch` 4 項目 × 3 本) |
-| `ids_crosscheck.py` | exit 0、3.16 s。 7/7 本で取りこぼしなし (§3) |
-| `unreached_unique.py` | exit 0、2.66 s。 正の対照 7/7 |
-| 前提 inventory (初回のみ、`work/` 無しから) | 533 s (`win_scan`〜`kernel_table`。 `win_funcs.py` が並列 14 プロセス / 4 core で大半)。 `block_manifest.json` が tarball に無く `nsis_names.py` が動かないため、`mk_blockmap.py` が `PLUGIN_MATRIX.json` から代替の blockmap (182 record) を合成 |
+以下は旧検証 (5abf4d5 以前) の記録は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §E (分割移動・無変更)。
 
 ### gate の設計 (#506 の reviewer 指摘への対応)
 
@@ -240,7 +222,7 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | 本 PR で DOC_MAP §3 に `REPORT.md`・`REPORT_INDIRECT.md` の 2 行を追記して解消 (REPORT 側の PM 追記は不要) |
 | `ALLOW_UNIMPL` (`rep_stosb_memset` 用の許容) の撤去 | 撤去後も既存 CSV に対する judge は PASS 7/7 (`--skip-lift`)。 stub が戻れば FAIL する | 本 PR で撤去 (main 8d883c3 以降の実測で 7 block とも `declares_unimpl` 0) |
 | lowering (f80→f64) の bit-exact 差分 (3 block) | 通過 ≠ 正しさ。 差分試験の対象外 | #197 にコメント済み (REPORT_LEA.md §7b) |
-| VEX の `vcomisd` / `vucomisd` / `vucomiss` (`__asm_v*comis*`) が未実装 stub のまま (19252: 3 件、19048: 4 件。 flag 未反映) | 2 engine の unimpl が 5 件ずつ残る。 stub は abort ではなく 0 返却のため silent な flag 欠落経路 | [PLG-F3-12] #1582 (本 PR で方式を決定、実装は子 issue) → 子 [PLG-F3-14] (起票) |
+| VEX の `vcomisd` / `vucomisd` / `vucomiss` (`__asm_v*comis*`) が未実装 stub のまま (flag 未反映) | 既定経路 (反映あり) の 2 engine の unimpl 件数と内訳は [REPORT_APPENDIX_3242.md](REPORT_APPENDIX_3242.md) §1・§2。 stub は abort ではなく 0 返却のため silent な flag 欠落経路 | [PLG-F3-33] #3241 (open。 #1582 → #1774 の残り) |
 
 - §7b の実測と方式 (#1582 [PLG-F3-12]・VEX comis/ucomis の flag 方式の検討 2 案) は [REPORT_APPENDIX_1582.md](REPORT_APPENDIX_1582.md) §7b。
 ## 8. DEFECTS.md 行案 (候補・追加の可否は PM 判断)

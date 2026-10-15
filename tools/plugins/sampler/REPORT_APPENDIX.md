@@ -58,3 +58,23 @@ REPORT §6 の旧版を移動した (250 行上限)。 入力は 7ffab50 の sam
 - 23664 は 614.57 s 時点 (`variable renaming`) で RSS 8.15 GiB、"out of memory; trying to recover" を 3 回出した (RetDec の既定メモリ上限は搭載 RAM の半分 = 約 8 GiB、`--no-memory-limit` で解除可)。 23677 は 758.98 s 時点 (`emission of the target code [c]`) で RSS 6.85 GiB。
 - 同時使用は 14.4 GiB / 15.6 GiB (空き 1.6 GiB) まで逼迫したため、621 s / 838 s で RetDec を停止した (この初版 e2e は engine 判定で exit 1。 未完の run を成功と報告しない)。
 - C は使わないので、`lift_from_ll.sh` で `.ll` 出力後に RetDec を止めて後段 pass 鎖だけ走らせる方式に変えた (`lift_ranges.sh` 本体から後段を切り出す。 共有鎖は変更していない)。 `.ll` の出力から `emcc -c` までの結果は、停止して再開した版とスクリプト一本の版で同一だった (23664: define 5,993 / 欠落 3 / 未実装 215 / f80 2、23677: define 2,525 / 欠落 1 / 未実装 151 / f80 1。 `.ll` は 23664 で 333 B 異なるが各列は一致)。
+
+## E. 旧検証 (HEAD 5abf4d5 以前・REPORT §6 の「以下は旧検証」表の全文)
+
+| 項目 | 実測 |
+|---|---|
+| **HEAD 5abf4d5 (#629 取り込み後)** `sampler_e2e.sh` | exit 0、**349 s** (開始時 load 0.72)。 `judge shells` PASS 7/7、許容 (`ALLOW_UNIMPL` / 名前リスト) は空、`matrix_check` 54/54、`ids_crosscheck` 7/7 |
+| **HEAD 5abf4d5** `sampler_engines.sh` | exit 0、**291 s**。 engine 2 本 `judge engines` PASS 2/2。 未実装 helper 188 / 128 |
+| **HEAD 5abf4d5** `sampler_nega.sh` | exit 0、**11 s**。 NC1–NC7 は全て期待どおり (期待外の rc なし) |
+| **HEAD 5abf4d5** `ids_crosscheck.py` / `unreached_unique.py` | exit 0、2 s / 2 s |
+| 初回 (inventory 無し、HEAD 5abf4d5 の前段として `work/` を生成した run) | exit 0、**884 s**。 `win_funcs` 等の inventory 生成が大半 |
+| 旧 (HEAD 53c2eb6、#629 取り込み前) `sampler_e2e.sh` | exit 0、**211.95 s** (開始時 load average (1 分) 1.31)。 内訳: 7 閉包の lift 79 s、残りは `closure_facts.py` + `matrix_check.py` |
+| 同 (HEAD aec2fac) | exit 0、276.46 s (開始時 load 1.97。 engine の後段 pass 2 プロセスと RetDec 1 本が同時に走っていた) |
+| 初版 (engine 込み、HEAD 56aeefe) | **exit 1**、921.34 s。 RetDec の C 出力段が終わらず私が 2 本を停止したため engine 判定が FAIL (§5)。 現行版は engine を `sampler_engines.sh` に分離 |
+| 7 閉包の lift 秒 (`status.csv` の seconds、3 回の合計) | 76 s / 109 s / 79 s (run 2 は並走プロセスがあり Slicex 15 → 23 s、Soundfont Player 33 → 57 s)。 プラグイン別の min–max は §1 の最右列 |
+| 3 回の結果一致 | §1・§3・§4 の表 (判定列・閉包値・host・kernel) は run 2 と run 3 で完全一致 (`diff`)。 `declares_unimpl` と `unimpl_names` を含む 7 行の判定列は 3 回とも同一 |
+| `sampler_engines.sh` (HEAD 53c2eb6、2 本並列) | exit 0、**287.04 s** (開始時 load 0.36)。 2 回目の実行 (1 回目は `lift_from_ll.sh` の sed が段付き行を拾えず lift_rc 1 → 判定が **exit 1** で止まった。 修正して再実行)。 結果は停止再開版と各列一致 (§5) |
+| `matrix_check.py` | 54/54 項目一致 (閉包 6 項目 × 7 本 + `batch` 4 項目 × 3 本) |
+| `ids_crosscheck.py` | exit 0、3.16 s。 7/7 本で取りこぼしなし (§3) |
+| `unreached_unique.py` | exit 0、2.66 s。 正の対照 7/7 |
+| 前提 inventory (初回のみ、`work/` 無しから) | 533 s (`win_scan`〜`kernel_table`。 `win_funcs.py` が並列 14 プロセス / 4 core で大半)。 `block_manifest.json` が tarball に無く `nsis_names.py` が動かないため、`mk_blockmap.py` が `PLUGIN_MATRIX.json` から代替の blockmap (182 record) を合成 |

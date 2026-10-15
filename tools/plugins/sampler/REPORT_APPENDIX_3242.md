@@ -6,7 +6,7 @@
 ## 0. 要点・測定 commit
 
 - 測定 commit: **`dfe82526`** (コードを変えた最後の commit。 `feat(plugins): reflect non-VEX comis/ucomis flags into IR`)。 検証起点: `a9733bbb` (origin/main)。
-- 差分確認: `git diff dfe82526 HEAD -- tools/plugins/lift tools/plugins/sampler/engine_lift.sh` (本 commit は付録と DOC_MAP のみで、この範囲の出力は空)。
+- 差分確認: 測定経路 `git diff dfe82526 HEAD -- tools/plugins/lift/passes/comis_flags.py tools/plugins/lift/passes/m11_simd2.py tools/plugins/lift/lift_ranges.sh tools/plugins/sampler/engine_lift.sh` の出力は空 (0 行)。 残りの差分は `test_comis_flags.py` (テストのみ。 lift 経路から呼ばれない)・`SOURCES.txt`・REPORT/付録/DOC_MAP (文書)。
 - 方式: RetDec の reg2mem 形の関数では flag が `%cf.0.reg2mem`・`%zf.0.reg2mem`・`%pf.0.reg2mem` (alloca i1) に store/load で載る。 comis の直後に fcmp で flag を計算して slot へ store し、呼出しを消す。 slot の無い関数は flag が SSA 値 (`%15 = xor i1 0, 0` など) のまま流れるため、今回は反映せず unimpl に残す (範囲外・子 [PLG-F3-36] #3305)。
 - 実装: `tools/plugins/lift/passes/comis_flags.py` (新規)・`tools/plugins/lift/passes/test_comis_flags.py` (新規)・`tools/plugins/lift/passes/m11_simd2.py` (`PLUG_COMIS_FLAGS=1` のとき comis を unimpl 化)・`tools/plugins/lift/lift_ranges.sh` (`PLUG_COMIS_FLAGS=1` で pass を m11_simd2 の前に実行)・`tools/plugins/sampler/engine_lift.sh` (既定 1)。
 
@@ -37,7 +37,7 @@
 
 ## 3. 述語の検算 (反映の向きと式)
 
-`python3 tools/plugins/lift/passes/test_comis_flags.py` (5 件 OK)。
+`python3 tools/plugins/lift/passes/test_comis_flags.py` (6 件 OK)。
 
 - 方法: ホスト x86-64 (gcc 13.3) で `comiss`・`ucomiss`・`comisd`・`ucomisd` を実行して CF/ZF/PF を採取する。 入力は 4 命令 × 11 × 11 = **484 件** (±0・±1・±2・±inf・qNaN・sNaN・最小 denormal・0.5 の組)。 pass が出す fcmp (CF=`ult`・ZF=`ueq`・PF=`uno`) の真偽と突き合わせる (独立な算法: C の inline asm 対 LLVM の述語の意味)。
 - 結果: 正しい述語で不一致 **0 / 484**。
@@ -45,7 +45,8 @@
   - CF を `olt` (順序付き) にする → 不一致 **160 / 484** (NaN で CF が一致しない)
   - ZF を `oeq` にする → 不一致 **160 / 484**
   - PF を `ult` にする → 不一致 **140 / 484**
-- IR 変換の単体テスト (合成 IR): slot を持つ関数は呼出しが消えて fcmp と store が入る / slot の無い関数は呼出しと宣言が残る / VEX は範囲外で残る、を確認。
+- IR 変換の単体テスト (合成 IR): cf/zf/pf の slot を持つ関数は呼出しが消えて fcmp (ult/ueq/uno) と store が入る / cf/zf のみの関数は fcmp uno も pf の store も入らない / slot の無い関数は呼出しと宣言が残る / VEX は範囲外で残る、を確認。
+- 述語の回帰検出: `fcmp uno` を `fcmp ueq` に壊したコピーで、IR 変換テストの `fcmp uno` の assert が FAIL することを確認 (1 件 FAIL)。
 - 未検証 (範囲外): IR の第 1 引数が x86 の第 1 オペランド (dst) であるという規約は、`m11_simd2.py` の `add`・`sub` 等 (第 1 引数 = dst) と同じ前提。 wasm 実行での flag の一致は確認していない (sampler engine の実行 harness が無い)。
 
 ## 4. 検証範囲 / 範囲外
@@ -59,7 +60,8 @@
 |---|---|---|
 | slot の無い関数の非 VEX comis 40 + 64 件、部分 slot の関数 7 + 10 件の flag が未反映 (unimpl に出る) | flag は未反映。 silent は解消 | [PLG-F3-36] #3305 (`親: #3242`) |
 | VEX の comis (19252 11 件・19048 9 件) が unimpl のまま | 従来どおり。 flag 未反映 | [PLG-F3-33] #3241 |
-| `PLUG_COMIS_FLAGS` の既定 0 の経路 (`batch_lift.sh`・他 plugin family) は silent の stub のまま | 他 family の comis 欠落は未対応 | PM 判断 (#3242 の issue コメントで依頼) |
+| `PLUG_COMIS_FLAGS` の既定 0 の経路 (`batch_lift.sh`・他 plugin family) は silent の stub のまま。 既定化は PM agent の判断待ち (既定案: 0 のまま。 他経路の挙動は変えない。 既定が可逆) | 他 family の comis 欠落は未対応 | PM agent の判断待ち |
+| comis の OF/SF/AF は未反映 (pass は CF/ZF/PF のみ書く。 SDM では comis が 0 にする)。 対象 IR で OF/SF/AF を読む分岐 (jcc・cmov・setcc) が有るかは未確認 | 読まれていれば、その分岐は直前の flag を誤って読む (silent の可能性) | 読みの有無を確認した後に PM 判断で起票 (未起票) |
 | 19252 の `emcc (argw)` rc 1 (`fp_extend` の f80 段) | 変化なし。 f80 段で rc 0 になる既存 | 既存 (本 REPORT §7b・変更なし) |
 
 ## 6. 再現
