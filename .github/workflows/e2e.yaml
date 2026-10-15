@@ -68,6 +68,14 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 26.10.0
+      - name: Emscripten (tools/m1/flags.sh の pin。run.sh が tools/audio/build.sh 経由で emcc を要する)
+        run: |
+          pin="$(sed -n 's/^EMCC_VERSION_PIN="\(.*\)"/\1/p' tools/m1/flags.sh)"
+          test -n "$pin"
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install "$pin"
+          "$RUNNER_TEMP/emsdk/emsdk" activate "$pin"
+          echo "EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh" >> "$GITHUB_ENV"
       - name: Chrome
         run: |
           google-chrome --version
