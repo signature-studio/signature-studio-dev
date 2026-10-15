@@ -1,0 +1,76 @@
+{
+ "cases": [
+  {
+   "case": "A1 ILRegKey 無し cl=0",
+   "status": "ok",
+   "obs": {
+    "v88": 0.0,
+    "v90": 0.0,
+    "v98": 0.0,
+    "ret_eax_at_0x10c9bf2": "0x7fffffff",
+    "g1_after_signed": 2147483647,
+    "gradeChar_after": "40"
+   }
+  },
+  {
+   "case": "A2 ILRegKey 無し cl=1",
+   "status": "ok",
+   "obs": {
+    "v88": 0.0,
+    "v90": 0.0,
+    "v98": 0.0,
+    "ret_eax_at_0x10c9bf2": "0x7fffffff",
+    "g1_after_signed": 2147483647,
+    "gradeChar_after": "40"
+   }
+  },
+  {
+   "case": "B1 vreg seed cl=0",
+   "status": "ok",
+   "obs": {
+    "v88": 0.0,
+    "v90": 0.0,
+    "v98": 0.0,
+    "ret_eax_at_0x10c9bf2": "0x7fffffff",
+    "g1_after_signed": 2147483647,
+    "gradeChar_after": "40"
+   }
+  },
+  {
+   "case": "B2 vreg seed cl=1",
+   "status": "ok",
+   "obs": {
+    "v88": 0.0,
+    "v90": 0.0,
+    "v98": 0.0,
+    "ret_eax_at_0x10c9bf2": "0x7fffffff",
+    "g1_after_signed": 2147483647,
+    "gradeChar_after": "40"
+   }
+  },
+  {
+   "case": "D2 空 ILRegKey cl=1",
+   "status": "ok",
+   "obs": {
+    "v88": 0.0,
+    "v90": 0.0,
+    "v98": 0.0,
+    "ret_eax_at_0x10c9bf2": "0x7fffffff",
+    "g1_after_signed": 2147483647,
+    "gradeChar_after": "40"
+   }
+  },
+  {
+   "case": "D1 非正規 128 文字 cl=1",
+   "status": "ok",
+   "obs": {
+    "v88": 0.0,
+    "v90": 0.0,
+    "v98": 0.0,
+    "ret_eax_at_0x10c9bf2": "0x7fffffff",
+    "g1_after_signed": 2147483647,
+    "gradeChar_after": "40"
+   }
+  }
+ ]
+}
