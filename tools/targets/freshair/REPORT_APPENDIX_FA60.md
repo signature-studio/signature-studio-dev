@@ -161,6 +161,17 @@ EXIT=0
 
 - 受入 (SC 側の process VA を特定。特定できなければ理由を REPORT に書く): **特定は未達**。理由 (§4) を REPORT に書いた。受入条件の分岐を満たす。
 
+## §6b. 追加照合 (commit `ce6400502`・#4978 2 回目 run)
+
+- 測定 commit: `ce6400502` (`ks_resonator_fa60.py` に (d) 呼出先の r 列照合を追加した commit)。
+- 実測: `python3 tools/targets/freshair/ks_resonator_fa60.py <HeartCore.core_64> <SlateCore.core_64> out.json`・`real 38.432 s`・`user 38.826 s`・EXIT=0・load 1 分値 0.40 (15:22 時点)。
+- 結果の要点:
+  - vtable 数: KH `ResonatorDsp` 20 slot、SC 17 slot。slot 番号の対応は決められない (前回の「KH slot 14 = process」は、SC 側に対応する slot が無いため未確定)。
+  - SC `ResonatorDsp` slot 14 は共有スタブ `0x1803b4070` (`ret` のみ)。
+  - (d) KH process の呼出先 `0x180fbc1f4` (52 命令・238 B) の SC 側最良候補は `0x181048180` (53 命令・r 列比 0.5905)。この関数は `ecx` による分岐のあるピッチ変換で、呼出先の構造と一致しない。対応とは判定しない。
+  - KH process の r 列比較 (数値を潰した比較): SC 全関数 (100〜3000 B) で 0.5 以上の候補は 0 件。
+- 鮮度: `git diff ce6400502 HEAD -- tools/targets/freshair/ks_resonator_fa60.py` の出力は 0 行 (本 PR は REPORT の追記だけ)。
+
 ## §7. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
