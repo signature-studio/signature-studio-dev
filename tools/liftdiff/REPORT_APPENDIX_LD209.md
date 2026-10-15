@@ -15,7 +15,7 @@
 
 ## 1. 測定条件
 
-- 素材: `fl-win64` (`FL_WIN64_DIR`・展開先 `$RUNNER_TEMP/fl-win64`)・`work-m11` (`tools/m11/work/`)・`work-liftdiff` (`tools/liftdiff/work/`)・`toolchain-emsdk` (`/opt/emsdk`)。
+- 素材: `fl-win64` ([WIN64]・`FL_WIN64_DIR`)・`work-m11` (`tools/m11/work/`)・`work-liftdiff` (`tools/liftdiff/work/`)・`toolchain-emsdk` ([EMSDK])。
 - wasm は `build_wasm.build(t, force=True)` で作り直した (`wasm_size` 4464346・`sig_mismatch` 0)。
 - 対象は chunk 0 の `0x5d19e0` 1 件 (`sample:800` の 0〜399 件目)。
 - 機: 4 vCPU。並列は 4 本 (`&` + `wait`)。load は 1.0〜3.8 (実行中に測定・各回の値は下表)。
