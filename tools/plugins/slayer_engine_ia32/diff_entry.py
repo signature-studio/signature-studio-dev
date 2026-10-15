@@ -109,7 +109,7 @@ def build():
                         os.path.join(HERE, 'rt32_glue.c'), LIFT, os.path.join(RT, 'ott_cpu.c'),
                         '-Wl,--allow-multiple-definition',   # ott_cpu.c の x64 規約の imp_* を rt32_glue.c (ia32 規約) が先勝ちで上書き
                         '-sENVIRONMENT=node', '-sMODULARIZE=1', '-sEXPORT_NAME=createModule', '-sEXIT_RUNTIME=0',
-                        '-sEXPORTED_FUNCTIONS=_ott_call32', '-sEXPORTED_RUNTIME_METHODS=HEAPU8',
+                        '-sEXPORTED_FUNCTIONS=_ott_call32,_ott_teb_addr,_ott_set_teb', '-sEXPORTED_RUNTIME_METHODS=HEAPU8',
                         '-sGLOBAL_BASE=%d' % 0x11000000, '-sSTACK_SIZE=2097152', '-sINITIAL_MEMORY=%d' % 0x14000000,
                         '-sALLOW_MEMORY_GROWTH=0', '-o', mjs], 'wasm build (emcc)', timeout=900)
     return nat, t_nat_build, mjs, t_wasm_build

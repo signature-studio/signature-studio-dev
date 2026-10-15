@@ -61,6 +61,11 @@ void imp_WriteFile(void) {
 void imp_VirtualAlloc(void) { RET(h32_valloc(ARG(1)), 4); }
 void imp_VirtualFree(void) { RET(1, 3); }
 
+/* fs 基底 (TEB) を g_teb に向ける (#3905)。 native_entry.c の TEB_BASE と同じ 64 B の模型 */
+uint8_t g_teb[64] __attribute__((aligned(8)));
+uint32_t ott_teb_addr(void) { return (uint32_t)(uintptr_t)g_teb; }
+void ott_set_teb(void) { ott_fsbase = (uint64_t)(uintptr_t)g_teb; }
+
 uint32_t ott_call32(uint32_t va, uint32_t ecx, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3) {
     uint32_t args[4] = {a0, a1, a2, a3};
     h32_reset();

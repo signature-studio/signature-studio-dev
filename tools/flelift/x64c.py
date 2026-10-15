@@ -27,7 +27,7 @@ ott 原版からの差分 (FLEngine 実測 1,105 未対応 site = 0.32% の解�
     movsldup/movshdup/cmpXXps (KH-38 #3065。before 160 closure の unsup 285 site → 0。差分テスト tests/x64c_vex_diff.py)
   - VEX.256 (ymm) の packed 算術 (vaddpd/vsubpd/vmulpd/vdivpd・ps 版)・bitwise・vunpckl/hpd・vshufpd・vextractf128・vcvtdq2pd を
     上位 128bit (YL) 込みで lane 計算 (KH-38 #3428。PSOLA_CreateInstance 閉包 unsup 2,472 → 0)。
-    加えて vcvtss2sd/vcvtsi2sd/vsqrtsd/vmovhpd (VEX.128)・vpunpcklqdq (専用分岐)・movddup/lddqu/movntpd/palignr/shlx/pushfq・div r/m8
+    加えて vcvtss2sd/vcvtsi2sd/vsqrtsd/vmovhpd (VEX.128)・vpunpcklqdq (専用分岐)・movddup/lddqu/movntpd/movnti (ST 系へ写す。単一スレッドでは mov と同じ)/palignr/shlx/pushfq・div r/m8
   - dispatch に IAT pseudo-VA 経路を追加: data 側で IAT slot に IMP_VA_BASE+idx を敷設し,
     `mov rax,[iat]; call rax` 形の間接呼出を imp 呼出に解決
 
@@ -540,6 +540,8 @@ class FnLift:
 
     def i_movabs(self, ins, ops): self.i_mov(ins, ops)
 
+    def i_movnti(self, ins, ops): self.i_mov(ins, ops)
+
     def i_movzx(self, ins, ops):
         self.L(self.wr(ins, ops[0], self.rd(ins, ops[1]), ops[0].size))
 
@@ -1018,18 +1020,19 @@ class FnLift:
             'vaddss': ('addss', True), 'vsubss': ('subss', False), 'vmulss': ('mulss', True), 'vdivss': ('divss', False),
             'vaddpd': ('addpd', True), 'vmulpd': ('mulpd', True),
             'vpxor': ('pxor', True), 'vpand': ('pand', True), 'vpor': ('por', True),
-            'vxorpd': ('xorpd', True), 'vxorps': ('xorps', True), 'vorpd': ('orpd', True), 'vandpd': ('andpd', True), 'vorps': ('orps', True),
+            'vxorpd': ('xorpd', True), 'vxorps': ('xorps', True), 'vorpd': ('orpd', True), 'vandpd': ('andpd', True), 'vandps': ('andps', True), 'vorps': ('orps', True),
             'vpaddq': ('paddq', True), 'vpaddd': ('paddd', True), 'vpsubq': ('psubq', False), 'vpsubd': ('psubd', False),
             'vunpcklpd': ('unpcklpd', False), 'vunpckhpd': ('unpckhpd', False), 'vpunpckldq': ('punpckldq', False),
             'vpsrlq': ('psrlq', False), 'vpsllq': ('psllq', False), 'vpsrad': ('psrad', False),
+            'vpsrld': ('psrld', False), 'vpslld': ('pslld', False),
             'vmovsd': ('movsd', False), 'vmovss': ('movss', False),
             'vcvtsd2ss': ('cvtsd2ss', False), 'vcvtsi2ss': ('cvtsi2ss', False),
             'vcvtss2sd': ('cvtss2sd', False), 'vcvtsi2sd': ('cvtsi2sd', False), 'vsqrtsd': ('sqrtsd', False),
             'vmovhpd': ('movhpd', False)}
     VEX2 = {'vmovd': 'movd', 'vmovq': 'movq', 'vcvtdq2pd': 'cvtdq2pd', 'vcvtps2pd': 'cvtps2pd',
             'vcvtpd2dq': 'cvtpd2dq', 'vcvttpd2dq': 'cvttpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd',
-            'vpmovsxdq': 'pmovsxdq'}
-    VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
+            'vpmovsxdq': 'pmovsxdq', 'vcvtdq2ps': 'cvtdq2ps'}
+    VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vcomiss': 'comiss', 'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
 
     def vex_leg(self, ins, ops, m):
         if any(o.type == X86_OP_REG and self.isymm(ins, o.reg) for o in ops):
@@ -1218,6 +1221,11 @@ class FnLift:
         di = self.xd(ins, ops[0])
         self.L('{ X128 b_ = %s; X128 a_ = X[%d]; X[%d].df[0] = a_.df[0] - b_.df[0]; X[%d].df[1] = a_.df[1] + b_.df[1]; }' % (
             self.xs(ins, ops[1], 'x128'), di, di, di))
+
+    def i_haddps(self, ins, ops):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 b_ = %s; X128 a_ = X[%d]; X128 r_; r_.f[0] = a_.f[0] + a_.f[1]; r_.f[1] = a_.f[2] + a_.f[3]; r_.f[2] = b_.f[0] + b_.f[1]; r_.f[3] = b_.f[2] + b_.f[3]; X[%d] = r_; }' % (
+            self.xs(ins, ops[1], 'x128'), di, di))
 
     def i_pmovsxdq(self, ins, ops):
         di = self.xd(ins, ops[0])

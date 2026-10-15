@@ -27,7 +27,8 @@
   4. `python3 m11_setother_nonimm_class.py work/sigfix_stats/fixes.json --pe <PE>` → **実値化 0 / 復元不能 0 / 未決 349 / 未分類 0** (下表)。
   5. `python3 m11_setother_imm_class.py work/sigfix_stats/fixes.json work/boot_final.ll --pe <PE>` → `full_const 6 / partial_write 35 / stack_partial 9 / arith 11` (計 61)。
 - 直前の HEAD `741d8696` (`bt` を変える前) の再実行も同じ件数だった。`bt` を入れても、349 件の理由に `other:bt` は現れない (件数は変わらない)。
-- 再実行 (HEAD `a7b7b0045`・#3140 の REPORT_N172 の検証で素材 `work-m11` を展開して実行): 手順 1〜4 とも同じ件数 (実値化 0 / 復元不能 0 / 未決 349 / 未分類 0・`match 410`)。宛先幅の判定 (`def_reg` の ext) は未修正のまま (子 #3961)。
+- 再実行 (HEAD `a7b7b0045`・#3140 の REPORT_N172 の検証で素材 `work-m11` を展開して実行): 手順 1〜4 とも同じ件数 (実値化 0 / 復元不能 0 / 未決 349 / 未分類 0・`match 410`)。
+- 宛先幅の修正後 (#3961・測定 commit `5817ee7e5`): 手順 1〜4 とも同じ件数 (実値化 0 / 復元不能 0 / 未決 349 / 未分類 0・`match 410`)。修正前後で 349 行の `reason` と `class` は 1 件も変わらなかった (`partial_ext` は 0 件。非 imm の reg 源 ext は宛先幅 32 以上の連鎖だけだった)。
 
 | 台帳 kind | 終端の理由 | 件数 | 区分 |
 |---|---|---|---|
@@ -88,7 +89,7 @@
 
 ## 7. 測定 commit と差分
 
-- 測定 commit: `c295b2c3` (§2 を測定した最後の commit)。以後の commit は REPORT (md) のみ。`git diff c295b2c3 HEAD -- tools/m11 ':(exclude)*.md'` は 0 行。
+- 測定 commit: `5817ee7e5` (宛先幅の修正 #3961。§2 の手順 1〜4 を再測定した最後の commit)。`git diff c295b2c3 5817ee7e5 -- tools/m11/m11_setother_nonimm_class.py` の差分は movzx 分岐の `w < 32` 判定 2 行のみ。
 - 修正 commit: `91396a79` (分類器の 3 点: `NOWRITE` 完全一致・`CMPX_W`・スロットの `MOVS` 制限)。`c295b2c3` (`bt` を `NOWRITE` に入れた)。
 - `git diff 69bab10e 91396a79 -- tools/m11 ':(exclude)*.md'` の出力 (`m11_setother_nonimm_class.py` のみ・9 行追加 3 行削除):
 
