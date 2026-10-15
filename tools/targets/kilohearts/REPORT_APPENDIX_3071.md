@@ -190,3 +190,11 @@
 - **鮮度**: 初回の式確定 (`ebd0c63cf`) から現 HEAD `e1bf5e929` までの `git diff ebd0c63cf HEAD -- tools/targets/kilohearts/ghidra_route` は 0 行ではない (`kh_xmm0.h` 101 行・`patches.py` 4 行・`xmm0_check.c` 27 行変更。計 3 files・122 insertions(+)・10 deletions(-))。`main` 取り込み由来 (KH-76 の `kh_tab470`・`kh_fn_180fdc470`・`470` モード。`patches.py` の `ulonglong` 4 件は KH-110 #4687)。PR 本文の差分 (`origin/main...HEAD`) は 3 ファイル・34 insertions / 7 deletions。上の突合の数値は、この差分を含む現 HEAD `e1bf5e929` での実測。
 - **未実施**: 生成 C (stereo) の前後差分 (`ghidra_to_c.py` の Ghidra 再実行・emcc 通過) は、この run に Ghidra (`analyzeHeadless`) と emcc が無いため未実施。gain / haas / gate の実測も未実施 (上の論証のまま)。
 - **NaN の扱い**: `xmm0_check.c` は NaN 同士を一致扱いで計上する (xmm0 と xmm1 とも。payload は見ない)。突合の PASS 条件は NaN 以外の bit 一致。
+
+## §KH-115 (#4722): stereo の呼出元 2 箇所に戻り xmm1 (残差) を配線 (生成 C の 2 行・突合は helper 単体のみ)
+- 測定 commit: `56ce407b9`。`git diff origin/main 56ce407b9 -- tools/targets/kilohearts/ghidra_route` = `patches.py` 2 規則のみ。
+- 機械語 (capstone・HeartCore.core_64 sha256 `d55ce8b4…` 一致): `180fcd9c8` / `180fce43e` = call `180fdfdb0` 直後の `movapd xmm4, xmm1`。残差は `180fcd7ac` で `[rsp+0x30]` へ退避し、偶数分岐の `dVar2*K*resid` と `resid + (...)` に入る。C の `param_2` の役と一致。
+- 生成 C (stereo・closure 49 関数・`--fix bitcast,intload,stackpair,assoc,concat`): 基準 main 2345 行 → HEAD 2347 行 (+2 = `param_2 = kh_xmm1_180fdfdb0;` を 2 箇所)。規則 hit は各 1 件 (assert 通過)。
+- emcc (stereo, `-w -O1`): 基準 main 20 error・HEAD 20 error (内容一致)。受入「error 0」は未達 (既存 20 件は本 issue の範囲外)。
+- gain / haas / gate の生成 C: main 版 (`patches.py` のみ main に戻した再生成) と diff 0 行 (gain 122 行・haas/gate は cmp 一致)。
+- 突合: `xmm0_check dfdb0` seed 7 × 1,000,000 PASS (rax・xmm0・xmm1 不一致 0・skipped 423,419)。ただし helper 単体の突合で、配線 `param_2` の数値確認は未実施 (#3073 の stereo 全体突合の範囲)。
