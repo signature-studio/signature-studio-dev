@@ -24,7 +24,7 @@
 
 - 測定 commit: `c58ccc387` (コードの差分を含む最後の commit。`c941830b` の後に main を取り込んだ merge)。
 - `git diff c58ccc387 HEAD -- tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_post.py` の出力: 空 (差分 0)。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)。`work-m11` / `work-liftdiff` を worktree 直下に展開。`toolchain-emsdk` は `/opt/emsdk` (agent-setup の展開先)。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)。`work-m11` / `work-liftdiff` を worktree 直下に展開。`toolchain-emsdk` は `[EMSDK]` (agent-setup の展開先)。
 - 比較対象は `origin/main` (`93307cc6a`) を detached worktree (`$RUNNER_TEMP/2407-base2`) に展開し、同じ手順で測った。
 - load average (1 分): 0.8〜0.9 (測定前後の `uptime`)。各 build・survey は 1 回ずつ (n=1)。
 
