@@ -25,7 +25,7 @@
 | 測定 commit | `33585cb01`。測定時の作業ツリーはこの commit と同一 (e2e の出力 `tools/gui/work/`・`tools/m11/work/` は gitignore) |
 | 日時・所要 | 2026-10-15 05:19:21 → 05:27:51 UTC (`date`)。e2e の done 行で 510 s |
 | load | 0.35 0.34 0.16 → 1.10 1.01 0.59 (nproc 4) |
-| 素材 | `fl-win64` (`extracted/` のみ展開)・`toolchain-emsdk` (`/opt/emsdk`)・`toolchain-retdec` (`/opt/retdec`)・`work-m11` (`tools/m11/work/`)。`x86_64-w64-mingw32-gcc` は runner 導入済み |
+| 素材 | `fl-win64` (`extracted/` のみ展開)・`toolchain-emsdk` ([EMSDK])・`toolchain-retdec` ([RETDEC])・`work-m11` (`tools/m11/work/`)。`x86_64-w64-mingw32-gcc` は runner 導入済み |
 
 | rc | judge | S1 soft | S3 | R2 | native selftest | ネガコン |
 |---|---|---|---|---|---|---|
@@ -107,7 +107,7 @@ R2 の一致 (`f46330b13` の `survey_soft.json` と `survey_soft_chain.json`): 
 | `33585cb01` (本 HEAD・§2-0) | `42b63536…` | `45dc73b2…` | 6917845 |
 | 検収側の再現 (同 commit・別 run・review コメント) | `4cd3e6cc…` | `d4c36a2e…` | (未報告) |
 
-素材そのままの IR (`material` 行) の指紋は全測定で同じ。同じ commit `33585cb01` の 2 回 (本 HEAD と検収側) で指紋が変わるため、IR の生成結果は run ごとに変わる。**原因 (環境差か非決定性か) は未切り分け**。生成された IR に作業ツリーの絶対パス (`ws-…`・`/home/runner`) は含まれていない (grep 0 件)。isolated S1 は 3 回 (`7f54678a7`・`33585cb01`・検収側) とも `764/1/46/131/0` で、指紋の変動は S1 に効いていない。
+素材そのままの IR (`material` 行) の指紋は全測定で同じ。同じ commit `33585cb01` の 2 回 (本 HEAD と検収側) で指紋が変わるため、IR の生成結果は run ごとに変わる。**原因 (環境差か非決定性か) は未切り分け**。生成された IR に作業ツリーの絶対パス (作業ディレクトリ名・runner の home 配下) は含まれていない (grep 0 件)。isolated S1 は 3 回 (`7f54678a7`・`33585cb01`・検収側) とも `764/1/46/131/0` で、指紋の変動は S1 に効いていない。
 
 ## 3. 変更点
 
