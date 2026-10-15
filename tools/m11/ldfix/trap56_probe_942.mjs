@@ -22,7 +22,7 @@ const read = () => {
   for (let j = 0; j < RN; j++) {
     const o = RING + j * RS;
     const n = Number(g(o + 32));
-    if (n >= hits || n < 0) continue;
+    if (n >= hits || g(o + 40) === 0n) continue;
     const idx = BigInt.asIntN(32, g(o));
     ring.push({ n, idx: Number(idx), cnt: Number(g(o + 8)), base: hx(g(o + 16)), ret: hx(g(o + 24)), obj: hx(g(o + 40)), elem: hx(g(o + 16) + idx * 8n) });
   }
