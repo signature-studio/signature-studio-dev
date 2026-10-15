@@ -73,7 +73,25 @@
 ### 測定 (main 取り込み後の再測定)
 
 - 測定 commit: `a7d1255b` (`origin/main` (`1c8ca077`) を取り込んだ merge commit。コードを変えた最後の commit)。main 側で `tools/python/analysis`・`provider`・`host`・`tests` にコード変更が入ったため、`bfceba9e` の測定は HEAD の値として使わず再測定した。
-- 差分の証跡: `git diff a7d1255b HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は `pe_chain_stores.py` の docstring の 2 行の書換えと空行 1 行の追加だけ (定数値・処理は不変。実行結果に影響しないため再測定はしない)。出力:
+- 差分の証跡: 測定に使ったのは `pe_chain_stores.py` だけで、その import は capstone・pefile のみ。この差分は docstring の 2 行の書換えと空行 1 行の追加だけ (定数値・処理は不変。実行結果に影響しないため再測定はしない)。出力は下の diff。
+- `git diff --stat a7d1255b HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力 (main 取り込み (merge) による差分。測定の入力ではない)。
+
+```
+ tools/python/analysis/flapi/pe_bb_state_probe.py | 129 +++++++++++++++++++++++
+ tools/python/analysis/flapi/pe_chain_stores.py   |   5 +-
+ tools/python/analysis/flapi/pe_pattern_probe.py  |  82 ++++++++++++++
+ tools/python/analysis/flapi/pe_scan_store.py     |  12 ++-
+ tools/python/host/fl_mock.mjs                    |  40 +++++++
+ tools/python/host/fl_provider.mjs                |   1 +
+ tools/python/provider/build.sh                   |   2 +-
+ tools/python/provider/fl_engine.c                |  60 ++++++++++-
+ tools/python/tests/provider_check.mjs            |   9 +-
+ tools/python/tests/step_item_diff.mjs            |  36 +++++++
+ tools/python/tests/ui_state_diff.mjs             |  14 +--
+ 11 files changed, 373 insertions(+), 17 deletions(-)
+```
+
+`pe_chain_stores.py` の diff (`git diff a7d1255b HEAD -- tools/python/analysis/flapi/pe_chain_stores.py`):
 
 ```diff
 diff --git a/tools/python/analysis/flapi/pe_chain_stores.py b/tools/python/analysis/flapi/pe_chain_stores.py
