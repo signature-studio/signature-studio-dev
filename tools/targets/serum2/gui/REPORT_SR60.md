@@ -1,4 +1,4 @@
-# REPORT — [SR-60 #4164] Serum 2 vtable 経由の呼出元で ARG・THIS の引数型を確定する (SR-59 残・静的)
+# REPORT — [SR-60 #4164] 表の探索窓の修正と直接呼出元の引数の出所 (SR-59 残・静的)
 
 - 日付: 2026-10-15 / 親: #4122 (SR-59) / 前段: `REPORT_SR59.md` (vtable 形の表への所属関数の出現・`arg_vtable_callers.py`)
 - 範囲: 静的解析のみ。実 VSTGUI 上の動的確認は範囲外。
@@ -7,12 +7,17 @@
 
 ## 0. 結論
 
-| 受入条件 | 判定 |
+本 issue (#4164) の範囲は、以下の 3 項目に縮めた (#4164 の本文と一致)。
+
+| 受入条件 (縮めた範囲) | 判定 |
 |---|---|
-| 1. ARG 240 件・ARG-CHILD 68 件の引数 (rdx/r8/r9) が SC の this かを、直接・vtable 経由の呼出元で確定する | **未達 (確定 0 件)**。直接 call の呼出元は追跡した (§2)。vtable 経由の呼出元は未実装。残りは子 [SR-82 #4930] |
-| 2. THIS-CHILD の SC 証拠 6 件の子の型を確定し、THIS 67 件の SC 伝播を広げる | **未達**。THIS は 69 件 (REPORT_SR59 は 67)。SC 証拠の数は §3 のとおり前 run の記録と食い違う。子 [SR-82] |
-| 3. 表の境界 (連続する関数ポインタの run の先頭) の決め方を明記し、出現数を run 数に直す | **未達 (境界は未実装)**。ただし「表の先頭の探索窓」の欠陥は直した (§1)。子 [SR-82] |
-| 4. 測定 commit と再現手順を書く | **達成** (§4)。 |
+| 1. 表の先頭の探索窓の欠陥を直し、REPORT に実測を書く | **達成** (§1・§4)。窓 64 → 4096 で `0x180139ff0` の先頭が 0/24 件 → 24/24 件 |
+| 2. 直接 call の呼出元で、F への引数 (rdx/r8/r9) の出所を分類し、件数を REPORT に書く (`arg_caller_types.py`) | **達成** (§2)。直接呼出元で SC の this と確定できた件数は 0 件 |
+| 3. 測定 commit と再現手順を REPORT に書く | **達成** (§4) |
+
+元の範囲のうち未達のものは、子 [SR-82 #4930] へ移管した (§5 の (a)〜(d))。
+- 元の受入 (未達・移管): ARG 240 件・ARG-CHILD 68 件の引数型の確定 (vtable 経由を含む) / THIS-CHILD の SC 証拠 6 件の型確定と THIS 件数の SC 伝播 / 表の境界 (連続する関数ポインタの run の先頭) の決め方と run 数への換算。
+- 直接 call の呼出元の分類 (§2) は、移管分の入力として使える。確定は行っていない。
 
 ## 1. 変更点
 
@@ -57,6 +62,7 @@ venv/bin/python $P/receiver_this_trace.py Serum2_win64.vst3 --vtable 0x180a2bf58
 venv/bin/python $P/arg_vtable_callers.py Serum2_win64.vst3 trace.tsv --tsv arg_vt.tsv
 venv/bin/python $P/arg_vtable_callers.py Serum2_win64.vst3 trace.tsv --cats vptr:THIS,vptr:THIS-CHILD --tsv this_vt.tsv
 venv/bin/python $P/arg_caller_types.py Serum2_win64.vst3 trace.tsv --tsv arg_callers.tsv
+# 窓 64 の比較 (§1): $P の arg_vtable_callers.py を作業 dir に複写し、HEAD_WINDOW = 4096 を 64 に書き換えて同じ手順で実行する (リポジトリのファイルは変えない)
 ```
 
 実測 (測定 commit `1396977c9`・逐次・load は `/proc/loadavg` の 1 分値):
@@ -70,7 +76,7 @@ venv/bin/python $P/arg_caller_types.py Serum2_win64.vst3 trace.tsv --tsv arg_cal
 | `arg_caller_types.py` | 2 | 28.08 | 0.65 | `b449ddd0…` |
 | `arg_caller_types.py` | 3 | 24.75 | 0.79 | `b449ddd0…` |
 
-- `receiver_this_trace.py` は 1 回 (real 23.96 s・load は未記録)。
+- `receiver_this_trace.py` は 1 回 (real 23.96 s・load は未記録。この run では `plugins-serum2` 素材が `$ARTIFACTS_DIR` に無く、再実行して `/proc/loadavg` を取れなかった。再測定は子 [SR-82] の最初の作業で行う)。
 
 ### 鮮度の証跡 (`docs/WORKFLOW.md` §6)
 
