@@ -6,7 +6,7 @@
 
 - boot が init 1675 に届かないのは、**`InitUnits` (`function_4120c0`) が unit 114 (0 起算) の Init 実行中に Halt0 に入り、残りの unit を実行せずに抜けるため**。停止 unit の Init は `function_623840` (VA `0x623840`)。init 1675 は `function_1266a60` で、unit 882 (0 起算) の Init (FInit は `function_12669a0`・1676) に当たる。unit 882 は停止より後なので呼ばれない。
 - `dllmain_done True` は**完走ではない**。Halt0 の longjmp 相当 (`function_412770` → JS 例外 `m11_dllmain_done`) による脱出である。REPORT_APPENDIX_3353 §1・§3-1・§9-1 の「boot は完走する」は誤り (§5 で訂正)。
-- Halt0 を起こした例外の種別と発生箇所は**未特定**。子 issue に起票 (§7)。
+- Halt0 の直接条件は §3-3 (`[0x11f7110] != 0` と第 3 引数 `0x8494fc` の非 0)。実機で同じ経路が Halt しないかは**未判定**。子 issue に起票 (§7)。
 
 ## 2. 測定の組
 
@@ -46,6 +46,13 @@
 ### 3-2. 停止の直接原因の候補を潰した実験 (commit しない)
 
 - 実験 1: `work/m11_winstubs.c` の `GlobalAddAtomW` を `0xC001`、`GetCurrentThread` を `(void*)-2` (擬似ハンドル) に変えて再 build・再実行。結果は同じ (`units_run 110 / init 111 / Halt0` at unit 114・同じ呼出し列)。**この 2 つの stub の戻り値は停止の直接原因ではない** (実測)。元の stub に戻して測定を確定した。
+
+### 3-3. Halt の直接条件 (機械語 と IR の突き合わせ)
+
+- 停止 unit の呼出し鎖の要所は `function_8494c0` (`VA 0x8494c0`)。機械語: `mov qword [rbx],0`・`call 0x849480`・`mov rdx,[rip+0xdadc2e]` (= グローバル `0x11f7110`)・`lea r8,[rip+0x13]` (= `0x8494fc`・非 0 の定数)・`call 0x41a800`。
+- `function_41a800` (IR `dec_label_pc_41a800`): 第 2 引数が非 0 で、第 3 引数の下位 32 bit が非 0 のとき `function_4096d0((arg2 & ~0xff) | 0x17, arg4)` に入り `unreachable` (= Halt 経路)。機械語の `0x41a800` も同じ分岐で読める (未検証)。
+- グローバル `0x11f7110` は `function_849480` が書く。`[0x11f7110] == 0` のときだけ `function_8495c0(0x446b00, 1)` の結果 (非 0 なら +72) を格納する。`function_8495c0` は通常 obj を返す。
+- よって、この unit で `[0x11f7110] != 0` になった時点で Halt は必然になる。実機で同じ経路が Halt しないなら、(a) グローバルが実機では 0 のまま (書込み側の差)、または (b) `function_41a800` の分岐の読みが誤り (lift 欠陥) のどちらか。**未判定**。子 #3748 の受入 1 で切り分ける。
 
 ## 4. 考察 (推定を含む)
 
