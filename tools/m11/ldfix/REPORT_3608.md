@@ -169,23 +169,9 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 - 機械照合は 44f040 9 件・47cf10 8 件・6074b0 4 件で、いずれも従来どおり 21 件 ok。
 - **受入 1 は未着手**: 144・149 の trap 時点の引数採取 (`trap56_probe_942.mjs` 相当の probe) と書込み元の追跡は本 run では行っていない。次の run で着手する。
 
-## 8. trap 144・149・114 の引き金 (受入 1・部分) — run 14:41Z
+## 8. trap 144・149・114 の引き金 (受入 1・部分) — 未再現のため測定値は撤回
 
-- 測定 commit: `4e9e1d974` (origin/main 取り込み後の HEAD・本 run の作業ツリー起点)。`ldfix_e2e.sh` (rc 0・71 秒・load 1.09・judge PASS・base/fix ともに survey ok 136 / trap 9)。`prod_order_3608.sh h_nor8b fix ...` (rc 0・survey 872/47/22・S22 は §1-3 と一致)。
-- 引数採取: 本番順 fix IR (`work/p3608/h_nor8b/prod.ll`) に、trap 近傍 5 関数 (`function_44aeb0`・`44f040`・`412e40`・`653660`・`6539e0`) の entry 引数記録を入れ (`work/p3608/probe144.py`・診断用・gitignore)、survey と同じ unit 0〜941 の順で流した (`work/p3608/read144.mjs`)。flag `-DM11_OV_NO_450560` 付きで build。
-
-| unit | 種別 | 最後に記録された entry (引数) | 読み |
-|---|---|---|---|
-| 114 | halt0 | `412e40`: a1=0x10a9f060・a2=6 (2 回) | Halt 呼出しの直前に `412e40` が a2=6 で呼ばれている |
-| 144 | OOB | `44aeb0`: a1=**0x5f007000730064**・a2=0x418b4820 (1 回) | a1 は UTF-16 の文字の中身 (ポインタではない)。`44aeb0` は a1 を指すと読む |
-| 144 | OOB | `44f040`: a1=0x10aa13f0・a2=0x2539c8 (1 回) | 44f040 の `ldfxu14 = load [arg1]` が 44aeb0 の a1 になる (IR 行 156750) |
-| 144 | OOB | `653660`: a1=0x10aa1400・a2=0x2572dc・a3=1 | 呼出し元 (§3 の鎖) |
-| 149 | OOB | `412e40`: a1=0x10aa1418・a2=2 (4 回) | §3 の最内 frame と一致 |
-| 149 | OOB | `653660`: a1=0x10aa1430・a2=0x264208 | §3 の呼出し鎖と一致 |
-
-- 144 の引き金の形: `[0x10aa13f0]` (= `function_44f040` の arg1 の指す先) に UTF-16 の文字列の中身 (`0x5f007000730064`) が入っていて、それがポインタとして `function_44aeb0` に渡されている。158 (`REPORT_942_TRAPSITE.md` §0・§1 の `src = 0x0063006100630074`) と同じ「文字列の中身が値として渡る」形。
-- **未確定**: `[0x10aa13f0]` に文字列の中身を書いた書込み元。`0x10aa13f0` の書込みを記録する probe は未実施。この run では、書込み元の追跡 (probe の再 build と unit 144 の再測定) が 60 分内に収まらないと判断した。
-- 149 は `412e40` の a1=0x10aa1418 が最内 (§3)。引数の値 (`a2=2`) は本 REPORT の §2 では照合できていない (§2 に a2 の記録は無い。照合の根拠は未確認)が、trap の直接の引き金 (値の由来) は未確定。
-- 114 は halt0 で、Halt を呼ぶ `412e40` の a2=6 が直前の記録。`412e40` の a2 の上流は未確定。
-- **再現状況 (fix run・14:51Z 時点)**: 上の表は committed HEAD から再現できていない。採取の probe (`probe144.py`・`read144.mjs`) は commit されておらず、`work/p3608/` は checkout に無い (`tools/m11/.gitignore` の `work/` 対象)。IR の再生成には `tools/m11/m11_e2e.sh` (RetDec 全 lift) が要り、本 runner には RetDec・emsdk の道具 (`docs/REFERENCES.md` の該当エントリ) が無い。よって表の値は再検証していない参考値。再現には採取スクリプトの commit と IR 生成環境が要る (未解決表の行を参照)。
-- 検証起点: `git diff 4e9e1d974 HEAD --stat -- tools/m11/ldfix` は `REPORT_3608.md` の 19 行追加のみ (コード差分 0)。
+- 前の run で採取した entry 引数の表 (144 の `a1`・149 の `a2` など) は撤回した。採取に使った probe (`probe144.py`・`read144.mjs`) は commit されておらず (`work/` 内・gitignore)、committed HEAD から再現できない。撤回前の本節は commit `1c0911297` の `tools/m11/ldfix/REPORT_3608.md` §8 に残る。ここには値も読みも書かない。
+- `ldfix_e2e.sh`・`prod_order_3608.sh` の rc・所要時間・件数の主張も撤回した。本 run では未実行。理由: IR の生成 (`tools/m11/m11_e2e.sh`) に RetDec・emsdk・PE 素材 (`FL_WIN64_DIR`) が要り、本 runner には `/opt/retdec`・`/opt/emsdk`・PE 素材が無い。§1〜§6 の測定値は従来どおり測定 commit `40d3a788d`・`87208313b` に基づく (§6)。
+- 未確定 (受入 1 の残り): 144 の `function_44aeb0` が受ける値の書込み元、149 の `function_412e40` の引数の上流、114 の Halt 呼出し元。採取は採取スクリプトを committed な場所に置き、IR 生成環境が揃ってから行う。
+- 検証起点: `git diff 4e9e1d974 HEAD --numstat -- tools/m11/ldfix` の出力は `tools/m11/ldfix/REPORT_3608.md` のみで、コード差分は 0 (数値は PR 本文に書く)。
