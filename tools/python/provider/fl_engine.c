@@ -24,6 +24,7 @@ typedef struct { char name[NAME]; int64_t color; uint8_t lock; } Pl;
 
 static Chan ch[NCH_MAX];
 static int nch;
+static int grid_n;
 static Mix mx[NMIX];
 static Pl pl[NPL];
 static int win[NWIN];
@@ -56,6 +57,7 @@ static void init_chan(Chan *c, const char *name, const char *plugin, double vol,
 
 void fl_engine_reset(void) {
     nch = 3;
+    grid_n = 0;
     init_chan(&ch[0], "Kick", "Sampler", 0.78125, 0, 1, 1, 0x5A6B7C);
     init_chan(&ch[1], "Snare", "Sampler", 0.78125, 0, 0, 2, 0x5A6B7C);
     init_chan(&ch[2], "3x Osc", "3x Osc", 0.5, 0.25, 0, 0, 0x7C5A6B);
@@ -112,12 +114,18 @@ FL_H(channels, isChannelSelected) { CH(0); return fl_ret_b(c, k->sel); }
 FL_H(channels, isChannelMuted) { CH(0); return fl_ret_b(c, k->mute); }
 FL_H(channels, isChannelSolo) { CH(0); return fl_ret_b(c, k->solo); }
 FL_H(channels, getChannelColor) { CH(0); return fl_ret_i(c, k->color); }
-/* PE 0xd5b420: 0x12d3e20 は position<0 で 0 を返す (エラーにしない)。範囲外は index の -4 のみ。p>=NSTEP の経路は PE 未照合 (REPORT_PY101) */
-FL_H(channels, getGridBit) { CH(0); int64_t p = A_INT(1, 0); if (p >= NSTEP) RANGE(); return fl_ret_b(c, p >= 0 && k->steps[p]); }
+/* PE 0xd5b420: 0x12d3e20 は position<0 で 0 を返す。0xd5b420 は position の範囲検査を持たず、件数以上は event 経路 (0x12d16a0・0x12df210) の値を返す (エラーにしない)。PY-218 (#3596) で event を grid_event に写した */
+static int grid_event(int64_t index, int32_t p);
+static int grid_bit(int64_t index, const Chan *k, int32_t p) {
+    if (p < 0) return 0;
+    if (p >= NSTEP) return grid_event(index, p);
+    return k->steps[p] != 0;
+}
+FL_H(channels, getGridBit) { CH(0); return fl_ret_b(c, grid_bit(_i, k, (int32_t)A_INT(1, 0))); }
 /* PE 0xd5b360: grid (+0x7ac) は channel 生成 0xff5aa0 が直接 call する 0xff63f0 で作られ非 null。null の経路 (status 0) は直接 call の範囲では到達しない (間接呼出しは未走査・REPORT_PY101) */
 FL_H(channels, isGridBitAssigned) { CH(0); (void)k; (void)A_INT(1, 0); return fl_ret_b(c, 1); }
-/* PE 0xd5bc10 → 0x12d3ff0: loop 記録の分岐は未モデル (mock に loop 記録が無い)。base 0x12d3e20 と同じ読出し */
-FL_H(channels, getGridBitWithLoop) { CH(0); int64_t p = A_INT(1, 0); if (p >= NSTEP) RANGE(); return fl_ret_b(c, p >= 0 && k->steps[p]); }
+/* PE 0xd5bc10 → 0x12d3ff0: loop 記録の分岐は未モデル (行テーブル T は .bss で起動直後は 0・REPORT_PY112)。base 0x12d3e20 と同じ読出し。件数以上は getGridBit と同じく 0 */
+FL_H(channels, getGridBitWithLoop) { CH(0); return fl_ret_b(c, grid_bit(_i, k, (int32_t)A_INT(1, 0))); }
 /* 選択の並びで offset 番目 (0 = 先頭)、超えたら最後の選択。負の offset は先頭扱い (stub に記述なし・仮置き)。無選択は canBeNone で -1 / 0 */
 FL_H(channels, channelNumber) {
     int64_t none = A_INT(0, 0), off = A_INT(1, 0), n = 0, pick = -1;
@@ -323,6 +331,42 @@ int fl_engine_note_enum_probe(int seed, int n, int chan, int step, int V) {
     return note_enum(note_probe_arr, n, chan, step, V, note_probe_out);
 }
 int *fl_engine_note_enum_out(void) { return note_probe_out; }
+
+/* PY-218 (#3596): 件数超え (position >= NSTEP) の event 経路 PE 0x12d3e20 (REPORT_PY218.md)。pattern 1 の項目 (字段 +0 start・+6 ch・+0x13 flag) を、
+ * 閾値 start < (position+1)*V (V = 24・PE [0x15e25f8])・start >= position*V (PE の lower_bound) で走査し、channel 一致・flag 0x20 無しが 1 件でもあれば 1 */
+#define GRID_V 24
+#define GRID_ITEM_MAX 256
+static StepItem grid_items[GRID_ITEM_MAX];
+static int grid_event(int64_t index, int32_t p) {
+    int32_t lo = (int32_t)((uint32_t)p * GRID_V), hi = (int32_t)((uint32_t)lo + GRID_V);
+    int cur = 0;
+    while (cur < grid_n && grid_items[cur].d0 < lo) cur++;
+    for (; cur < grid_n && grid_items[cur].d0 < hi; cur++) {
+        if ((int64_t)grid_items[cur].ch == index && !(grid_items[cur].b13 & 0x20)) return 1;
+    }
+    return 0;
+}
+/* 検査用: seed から n 件の項目を決定的に作って入れる (host/fl_mock.mjs の gridGen と同一の LCG)。n = 0 で空に戻す。件数を返す。tests/channels_diff.mjs が mock と照合 */
+int fl_engine_grid_items_probe(int seed, int n) {
+    uint32_t s = (uint32_t)seed;
+    if (n < 0) n = 0;
+    if (n > GRID_ITEM_MAX) n = GRID_ITEM_MAX;
+    for (int i = 0; i < n; i++) {
+        StepItem *it = &grid_items[i];
+        memset(it, 0, sizeof *it);
+        s = s * 1103515245u + 12345u; it->d0 = (int32_t)((s >> 16) % 2000) - 200;
+        s = s * 1103515245u + 12345u; it->ch = (uint16_t)((s >> 16) % 4);
+        s = s * 1103515245u + 12345u; it->b13 = (uint8_t)((s >> 16) & 0xff);
+    }
+    for (int i = 1; i < n; i++) {
+        StepItem t = grid_items[i];
+        int j = i;
+        while (j > 0 && grid_items[j - 1].d0 > t.d0) { grid_items[j] = grid_items[j - 1]; j--; }
+        grid_items[j] = t;
+    }
+    grid_n = n;
+    return grid_n;
+}
 
 /* ---- mixer (21) ---- */
 /* 色の R/B 入替え (PY-115 / REPORT_PY115.md §2)。格納は入替え + alpha 0xff、取得は入替えを再度通して alpha 0xff。 */

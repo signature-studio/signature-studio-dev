@@ -223,7 +223,7 @@
 ## 12. #1679: loop 外 break・undeclared label の制御構造復元 (測定 commit: 98c5f8ca)
 
 - 結論: loop 外の `break -> 0x<VA>` は、飛び先の注釈 `// 0x<VA>` が同じ関数内にあるものだけ `goto lab_0x<VA>` に直す (`retdec_gotofix.py`)。機械的な `break` 書換えは採らない。
-- 測定値 (emcc exit 0 件数・error 行数)・方式の根拠・未検証項目は付録 `REPORT_APPENDIX_1679.md` にのみ置く。残りは子 issue #1954 (HB-H41)。引数・代入・初期化の `L"..."` 型不一致は #2071 で修復 (測定は付録 `REPORT_APPENDIX_2071.md`)。残る struct 代入等 8 件は #2853 (HB-H47)。
+- 測定値 (emcc exit 0 件数・error 行数)・方式の根拠・未検証項目は付録 `REPORT_APPENDIX_1679.md` にのみ置く。残りは子 issue #1954 (HB-H41)。引数・代入・初期化の `L"..."` 型不一致は #2071 で修復 (測定は付録 `REPORT_APPENDIX_2071.md`)。残る 8 件のうち struct 代入・member 参照の 5 件は #2853 (HB-H47) で `retdec_repair.py --struct` により修復 (測定は付録 `REPORT_APPENDIX_2853.md`)。未宣言 identifier 2 件と整数リテラル 1 件は直さない (同付録 §2)。
 
 ## 13. #1822: exit 0 ファイルの wasm link と採用方式 (測定 commit: 7d15ceab)
 
@@ -246,5 +246,5 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| CreatePlugInstance の完走 (host object の再構成)・起動経路 (LoadLibrary → GetProcAddress) からの到達 | 完走・Dispatcher 実行は未検証 | #2653 (HB-H46) |
-| block23676 の入場 (VA 0x86a970) | build のみ検証 | #2653 (HB-H46) |
+| CreatePlugInstance の完走・起動経路 (LoadLibrary → GetProcAddress) からの到達・bit 判定 | 完走は未検証。host 再構成と停止点 (`f_409b70`) は #2653 で実測 (`REPORT_APPENDIX_2653.md`) | #3597 (HB-H51) |
+| block23676 の入場 (VA 0x86a970) | #2653 で入場を実測 (`entered=true`・測定 commit `22625fe8c`) | 解決 (#2653) |
