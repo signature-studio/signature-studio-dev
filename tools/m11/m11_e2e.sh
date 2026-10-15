@@ -7,7 +7,7 @@
 # 使い方:
 #   M11_EXPECT_STAGE=5 M11_EXPECT_SURVEY_OK=850 bash tools/m11/m11_e2e.sh  # 期待値の上書き (既定は e2e_expect.env)。下回れば exit 1 (#715)
 #   bash tools/m11/m11_e2e.sh           # work/ の成果物があれば再利用 (無ければ自動で全再生成), build は増分
-#   bash tools/m11/m11_e2e.sh --full    # RetDec lift から全再生成 (scan→functions_dll.csv (無ければ Ghidra 12.1.4 で作成)→bounds→lift 4chunk→tail 固定点→IR→build; 約 10 分 + Ghidra 初回 約 10 分)
+#   bash tools/m11/m11_e2e.sh --full    # RetDec lift から全再生成 (scan→functions_dll.csv (無ければ Ghidra 12.1.4 で作成)→bounds→lift 4chunk→tail 固定点→IR→build; 実測 約 22 分 (Ghidra での CSV 作成 約 10 分を含む。REPORT_N3172 §3))
 #   bash tools/m11/m11_e2e.sh --trace   # icall / unit init のトレースを stderr に出す
 #   M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh   # LVA = RVA + 0x10000 (#222; 既定 0 = 従来 LVA=RVA). 変更時は --full 推奨 (IR の VA→LVA remap が変わる)
 # 前提: /opt/emsdk, /opt/retdec, node(v26: ~/.local/share/pnpm/bin), analysis/win64/extracted/block00031_PE.bin
