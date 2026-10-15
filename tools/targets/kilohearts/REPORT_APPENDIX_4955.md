@@ -30,7 +30,9 @@
 
 ## 測定
 
-- 測定 commit (コードを変えた最後の commit): `ca1f38304` (`ghidra_to_c.py` の規則追加)。`git diff ca1f38304 HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` の出力は 0 行 (本節を含む REPORT の commit は範囲外)。
+- 測定 commit (コードを変えた最後の commit): `ca1f38304` (`ghidra_to_c.py` の規則追加)。
+- 測定 commit から現 HEAD (`65cdeaf30`) までの差分: `git diff ca1f38304 HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` は **4 行** (`ghidra_route/patches.py` +4。main 取り込みで入った #4835 の ABI 規則 `delay 2666 FUN_180fbbfb8 rcx=param_1 (FUN_180fbdfcc)`)。本 PR の変更ではないが、`name == 'delay'` の変換に効くため、下表の census は HEAD の実行コードの値ではない。
+- **HEAD `65cdeaf30` での再測定は未実施** (本 run に `plugins-kilohearts` (`HeartCore.core_64`) と `toolchain-emsdk` が無かった)。下表は `ca1f38304` 時点の実測値で、現 HEAD の census は未確定。再測定は `oc_artifacts: plugins-kilohearts toolchain-emsdk` を付けた run で行い、結果で下表を置き換える。
 - 基準: 同じ素材・同じ道具で、`git archive origin/main` の `ghidra_route`・`snapins/lift`・`snapins/scripts` を使う変換器の出力。
 - 素材: `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`、76,642,304 B)。`toolchain-emsdk` (emcc 6.0.12)。Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致・JDK 21)。
 - decompile: 挿入順の lift 集合 (142 件・重複 1 件) で **142/142 OK** (wall 40 s)。
@@ -69,4 +71,4 @@
 | Gain/Haas/Gate の `.o` の cmp (本 PR の規則の非影響の実測) | 規則のガードで影響しないと判断。実測は未実施 | 本 PR の範囲外 (規則は delay ガード内) |
 | 残件 416 (レーン 166・引数数不一致 80・型不一致 170) | Delay の emcc が通らない | #3801 [KH-65]・#3808 [KH-67]・#3809 [KH-68]・#3844 [KH-79]・#3847 [KH-73] (既存の起票先) |
 | 消えた 2 件の行番号 (census の diff 前後の `error:` 行) | 内訳は分類差分のみ確認。行の特定は未実施 | 本 PR の範囲外 (census 素材が揃った run で再測定) |
-| 突合 `work/kh136/check.c` の repo 外 (gitignore) | 200,000 試行の突合を repo から再現できない | 本 PR の範囲外 (突合スクリプトの追跡化は別 issue) |
+| 突合 `work/kh136/check.c` の repo 外 (gitignore) | 200,000 試行の突合を repo から再現できない | 未起票 (突合スクリプトの追跡化は issue 未作成。再現手順は上の「単体突合」節) |
