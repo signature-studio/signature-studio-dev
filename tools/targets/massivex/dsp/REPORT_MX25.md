@@ -70,14 +70,17 @@
 | 残件 | 受入 | 起票先 |
 |---|---|---|
 | 文字列窓の除外 (判定基準の決定・除外件数の記録) | 1 | 実装済み (§5.1)。除外件数を記録 |
-| 入口判定 `pdata_call` の検算: capstone と objdump の先頭ブロック判定の不一致 1,527 件の理由別全数分類 (mismatch 0 は未達) | 2 | #1987 (MX-29。残件として本 issue に残す・§5.3) |
+| 入口判定 `pdata_call` の検算: capstone と objdump の先頭ブロック判定の不一致 117 件 (mismatch 0 は未達・再測定 `a505be525`) | 2 | #4068 [MX-44] (§5.5) |
 | `pdata_call` を既定にするか・`pdata` 案で落ちる code の正しさ検証 (REPORT_MX13 §3 の範囲外) | 2 | PM 判断 (#1987 本文 5。既定は `any` のまま) |
 
 ## 5. MX-29 (#1987): 文字列窓の除外と入口判定 `ENTRY=pdata_call`
 
 - 判定基準: #1987 本文の PM 判断 (2026-10-15) のとおり。既定 `ENTRY=any` は変えない。
-- 測定 commit: `d5d83b5c` (`mx_closure.py` / `mx_flow_recheck.py` の最後のコード変更)。素材 `plugins-massivex` → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` (95,356,824 B)。
-- 測定 commit 以降のコード差分: 本 REPORT の commit だけで、`git diff d5d83b5c HEAD -- tools/targets/massivex/dsp/scripts` は 0 行。
+- 測定 commit (検算 `mx_flow_recheck.py` の再測定): `a505be525` (`LOCKABLE` に `xor` を加えた commit。`mx_closure.py` の最後のコード変更は `039adc3f6`)。素材 `plugins-massivex` → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` (95,356,824 B)。素材の展開は `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` (展開 125 件の md5-ok 0/125 は §8.1 の既知事象。VST3 本体は md5 一致)。
+- 測定 commit 以降のコード差分 (`git diff a505be525 HEAD -- tools/targets/massivex/dsp/scripts`): 本 REPORT 更新の commit ではスクリプトを変えないため 0 行 (出力は PR 本文に添付)。
+- 再測定の手順: `mx_rtti.py` → `mx_closure.py flow pdata` (4 s)・`flow pdata_call` (3 m 23 s、22 round で収束・169,974 入口) → `mx_flow_recheck.py` (`pdata` 4.9 s PASS / `pdata_call` 3 m 9 s・RESULT=FAIL)。
+- 測定時の load: `pdata_call` の開始時 0.37 0.47 0.36 (06:41)。
+- 039adc3f6 の変更: (1) `mx_closure.py`: 先頭ブロックで未文書化の FSTP1 別名 `fstpnce` (D9 D8+i) を不正扱い (SDM の命令表に無い)。閉包 169,981 → 169,974 (−7)。(2) `mx_flow_recheck.py`: objdump 出力に SDM 規則の後処理 (字句 `(bad)`・`%?`、REX2 (`d5`)、REX 直後の VEX、LOCK の非ロック命令・非メモリ宛先)。宛先は AT&T の最後のオペランドを括弧内のカンマを無視して取る。mismatch 行は `work/mx29/flow_pdata_call_mismatch.tsv` に出す。
 
 ### 5.1 文字列窓 (受入 1)
 
@@ -88,37 +91,45 @@
 
 ### 5.2 閉包サイズと round 推移 (受入 2)
 
-| ENTRY | 最終入口 | うち `.pdata` begin | `pct_pdata` | round | elapsed | leaf 判定 (capstone) ok / bad |
+| ENTRY | 最終入口 | うち `.pdata` begin | `pct_pdata` | round | elapsed | leaf 候補 (objdump 後処理) ok / bad |
 |---|--:|--:|--:|--:|--:|--:|
-| `any` (既定) | 507,258 | 13,246 | 7.08 | 34 | 276 s | — |
-| `pdata` | 614 | 613 | 0.33 | 3 | 3 s | — |
-| `pdata_call` | 169,981 | 9,521 | 5.09 | 22 | 137 s | 160,459 / 21,073 |
+| `any` (既定) | 507,258 | 13,246 | 7.08 | 34 | 276 s (§2.1 の再測定) | — |
+| `pdata` | 614 | 613 | 0.33 | 3 | — | — |
+| `pdata_call` | 169,974 | 9,521 | 5.09 | 22 | 200 s (3 m 20 s) | 160,344 / 21,188 |
 
-- `any` の値 (507,258・round 34・.pdata 13,246) は REPORT_MX13 §2 と一致 (既定経路は不変。elapsed は負荷差で 212 s → 276 s)。`pdata` の値は §2.2 と一致。
-- `pdata_call` の round 推移 (新規入口): 1,950 / 3,695 / 7,989 / 18,457 / 39,073 / 71,055 / 106,085 / 134,092 / 151,743 / 160,888 / 165,452 / 167,696 / 168,895 / 169,468 / 169,731 / 169,855 / 169,917 / 169,954 / 169,971 / 169,975 / 169,981 / 169,981 (round 1〜22)。round 22 で収束。
+- `any` の値は REPORT_MX13 §2 と一致 (既定経路は不変)。`pdata` の値は §2.2 と一致 (`pdata` は `pdata_call` の変更の影響を受けない)。
+- `pdata_call` の round 推移 (新規入口の累計・round 1〜22): 1,949 / 3,694 / 7,987 / 18,455 / 39,070 / 71,052 / 106,081 / 134,086 / 151,736 / 160,881 / 165,445 / 167,689 / 168,888 / 169,461 / 169,724 / 169,848 / 169,910 / 169,947 / 169,964 / 169,968 / 169,974 / 169,974。round 22 で増分 0 となり収束。
 - BFS 検算 (`mx_flow_recheck.py`): `pdata` / `pdata_call` とも BFS 閉包 == round ループの入口 (True)、round 別 added 合計 == 閉包 − seeds (一致)。
 
-### 5.3 検算 (受入 2・`mx_flow_recheck.py` の ENTRY 対応)
+### 5.3 検算 (受入 2・`mx_flow_recheck.py` の ENTRY 対応・測定 commit `039adc3f6`)
 
-直接 call 目標 (`.text` 内・thunk 外・`.pdata` begin を除く) を (i) 文字列窓 (ii) 先頭ブロック不正 (iii) 先頭ブロック正常に分類。先頭ブロックは capstone (closure と同じ判定) と objdump 2.42 (`-b binary -m i386:x86-64`) の 2 通りで判定し、食い違いを数えた。
+`LOCKABLE` に `xor` を加えた版 (測定 commit `a505be525`・2026-10-15 再測定) の数字。`039adc3f6` の旧数値 (118 件・113 件) は `lock xor` のメモリ形を誤って不正扱いしていたため無効で、使わない。
 
-| ENTRY | 対象 | (i) 窓 | (ii) 不正 | (iii) 正常 | (iii) で入口に入らない (取りこぼし) | 入口で (iii) でない (過剰) | mismatch 内訳 (LOCK / REX / 他 / 逆向き) |
-|---|--:|--:|--:|--:|--:|--:|---|
-| `pdata` | 1,712 | 0 | 278 | 1,434 | 1,434 (pdata 案で落ちる leaf 候補) | 0 | 15 / 4 / 2 / 1 (計 22) |
-| `pdata_call` | 181,532 | 0 | 19,572 | 161,960 | 1,514 | 13 | 970 / 92 / 452 / 13 (計 1,527) |
+直接 call 目標 (`.text` 内・thunk 外・`.pdata` begin を除く) を (i) 文字列窓 (ii) 先頭ブロック不正 (iii) 先頭ブロック正常 に分類。(ii)/(iii) の判定は objdump 2.42 (`-b binary -m i386:x86-64`) に SDM 後処理を入れた側で行い、capstone (入口の採否に使った判定) と食い違いを数えた。
 
-- 不一致の多くは objdump が受理し capstone が不正とする命令 (例: `f0 41 83 fb 08` = LOCK 接頭辞を付けたレジスタ宛 `cmp`、`4d f0 e8` = REX の後に LOCK 接頭辞、`40 c5 …` = REX の後の VEX)。これらは SDM 上 #UD のため、判定には capstone を採った。逆向きの 13 件 (capstone が受理し objdump が不正) は理由未調査。
-- **mismatch 0 は未達**。「他 452」の理由は未分類で、1,514 件の取りこぼしは decoder の方針差に依存する上限値 (0〜1,514)。残件は §4 の表 (#1987)。
+| ENTRY | 対象 | (i) 窓 | (ii) 不正 | (iii) 正常 | (iii) で入口に入らない (取りこぼし) | 入口で (iii) でない (過剰) | mismatch |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| `pdata` | 1,712 | 0 | 299 | 1,413 | 1,413 (pdata 案で落ちる leaf 候補) | 0 | **0 (PASS)** |
+| `pdata_call` | 181,532 | 0 | 21,187 | 160,345 | 5 | 112 | **117 (未達)** |
 
-### 5.4 検証 (受入 3・測定 commit `d5d83b5c`・n=1)
+- `pdata` は mismatch 0 (再測定でも変化なし)。
+- `pdata_call` の mismatch 117 の内訳 (`mx_flow_recheck.py` が出す `_mismatch.tsv` の理由別・§5.5 に分類):
+  - 109 件: objdump (SDM 規則) が LOCK 違反とし、capstone が受理する。内訳は、LOCK 可能な命令で宛先がレジスタ 80 件 (`adc` 50・`add` 19・`or` 5・`xor` 3・`and` 2・`sub` 1)、LOCK 不可の命令 29 件 (`repnz movsb`・`movsd`・`bnd`・`cvt*`・`nopl`・`movq` など)。SDM 上はいずれも #UD。capstone 5.0.7 は LOCK の宛先・命令・REP との併用を見ないため受理する。判定は capstone 側の修正が要る (子 issue #4068)。
+  - 5 件: capstone が不正・objdump が受理する。4 件は単独デコードで確認 (`62 02 …` EVEX 形 2 件と `4e 4e …` 1 件は capstone が拒否、`0f ff` は capstone が `ud0` と復号するが、スクリプトの判定では不正扱い)。残り 1 件 (0x81a740) は先頭命令は capstone が受理するため、先頭ブロック内の後続命令の不正を疑うが、個別の命令は未特定。
+  - 3 件: 原因未確定。TSV の objdump 行 (`(bad)`・`rex2`) と、対象番地を単独でデコードした結果が一致しない (例: 0x12e3768 は先頭 `00 00` が単独デコードで `add %al,(%rax)` と受理され、`(bad)` にならない)。objdump 側の番地の取り方 (連続逆アセンブル時の境界ずれ) の疑い。切り分けは #4068。
+- 取りこぼし 5 件 (objdump 側では leaf 候補、capstone 側では不採用) は上の「capstone が不正・objdump が受理」の 5 件と重なる。過剰 112 件は、objdump が不採用で capstone が採用した行 (`cap_ok_obj_bad`: LOCK 109 + `(bad)/%?/rex2` 2 + `rex2` 1 = 112) と一致する。
+- 検算は `pdata_call` の入口を正しいと認めない: mismatch 117 のため、「入口が (iii) を全て取る (取りこぼし 0)」は未達。
+- `xor` 修正 (B1) の効果: 旧 110 → 新 109 (LOCK 行) の 1 件減。残る `lock xor` 3 件 (`lock xor 0x…(%rax),%esi`・`lock xor 0x0(%rax),%dl` ×2) は宛先がレジスタで、SDM 上 #UD のため不正のまま。メモリ宛先の `lock xor` が受理されたかは、旧 TSV を残さなかったので直接は確認していない (1 件減は推定)。
 
-- e2e (`MX_PE=… bash dsp/e2e.sh`): rc 0 / `OK elapsed=22s` / load 3.95 2.60 1.58 → 2.94 2.47 1.56。
+### 5.4 検証 (受入 3・測定 commit `039adc3f6`・n=1)
+
+- e2e (`MX_PE=… bash dsp/e2e.sh`): rc 0 / `OK elapsed=27s` / load 1.46 3.00 2.38 → 1.30 2.84 2.34。
 - negctl (`MX_PE=… bash dsp/negctl.sh`): NC1 `insns=3118 (base 258087) unsup=5 (base 24258)` → FAIL<期待> / NC2 `insns=4575 unsup=302 (base 24258)` → FAIL<期待> / NC3 `insns=31 unsup=0 (base 24258)` → FAIL<期待>。
-- base の unsup 24,258 は §3 の 48,612 と異なる。原因は測定 commit `3225b096` 以降の `tools/flelift/x64c.py` の更新 (`b2b898522` 以降)。e2e・negctl は `mx_closure.py` を呼ばない (linear 経路の検証)。
+- e2e / negctl は linear 経路の検証。`mx_closure.py` は両者から呼ばれない。
 
 ### 5.5 未解決 (追跡先)
 
 | 残件 | 受入 | 起票先 |
 |---|---|---|
-| capstone と objdump の先頭ブロック判定の不一致 1,527 件の理由別全数分類 (特に「他 452」と逆向き 13)・mismatch 0 | 2 | #1987 (本 issue に残す) |
+| `pdata_call` の mismatch 117 → mismatch 0 と取りこぼし 0 の確認。内訳: capstone の LOCK 規則 109 件 (宛先レジスタ 80・LOCK 不可命令 29)・objdump 受理 capstone 不正 5 件 (単独デコードで 4 件確認・1 件未特定)・原因未確定 3 件 | 2 | #4068 [MX-44] (子 issue。本 issue から移管) |
 | `pdata_call` を既定にするか (数値は §5.2・§5.3。既定は `any` のまま) | 2 | PM 判断 (#1987 本文 5) |
