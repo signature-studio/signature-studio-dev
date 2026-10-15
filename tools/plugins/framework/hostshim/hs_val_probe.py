@@ -17,6 +17,7 @@
   mode=word41        : 0x11d06e0 (受入 4) を出力 word の初期値 0/0x60/0x5 で単独実行する
   mode=g18caller     : 0x1376820 を edx ごとに単独実行し、0x41d8f0 の r9d と G18 書込み (0x41d919) の到達を出す (#4557)
   mode=p45caller     : 0x11fba90 を [0x6668d0 戻り値]+0x10 ごとに単独実行し、P45 書込み (0x11fc2b3) の到達を出す (#4557)
+  mode=callers [IDs] : Dispatcher を ID ごとに実行し、0x1376820・0x124e410・0x41d8f0・0x11fba90 の入口と戻り番地を出す (#4557)
 """
 import os
 import sys
@@ -314,6 +315,31 @@ def p45_caller():
     return r
 
 
+def callers(ids, full=False):
+    """Dispatcher を ID ごとに実行し、G18・P45 の書込み関数の入口 (0x41d8f0・0x11fba90) と
+    その直接の呼出し先候補 (0x1376820・0x124e410) に到達したかと、入口の戻り番地 [rsp] を出す (#4557 受入 1)。
+    rel32 の直接呼出しが無い 0x1376820・0x124e410 は、実行時にこの経路で呼ばれるかを見る。
+    full=True は許可範囲をイメージ全体にする (既定は Dispatcher の窓 [0x13173a0,0x1400000) の外が stub)。"""
+    targets = (0x1376820, 0x124e410, 0x41d8f0, 0x11fba90)
+    probes = dict(DISP_PROBES)
+    probes.update({t: ['rsp+0x0:8'] for t in targets})
+    if full:
+        pe, base, size = E.load_image(open(E.PE_PATH, 'rb').read())
+        allowed = [(base, base + size)]
+    else:
+        allowed = [(0x13173a0, 0x1400000)]
+    hits = 0
+    for ident in ids:
+        r = emulate(E.DISP, {'rcx': E.HOST, 'rdx': E.TAG, 'r8': ident, 'r9': 0}, allowed,
+                    probes=probes, sent_ret=E.SENT, fill=FILL)
+        seen = [(va, vals) for va, vals in r['probe'] if va in targets]
+        hits += len(seen)
+        print('ID=0x%02x stop=%s path=%d hits=%s' % (ident, r['stop'], len(r['path']),
+              ' '.join('0x%x@ret=0x%x' % (va, vals['rsp+0x0:8']) for va, vals in seen) or '-'))
+    print('callers total hits = %d' % hits)
+    return hits
+
+
 if __name__ == '__main__':
     mode = sys.argv[1] if len(sys.argv) > 1 else 'disp'
     if mode == 'disp':
@@ -332,6 +358,9 @@ if __name__ == '__main__':
         verify_e4e970()
     elif mode == 'word41':
         verify_11d06e0()
+    elif mode == 'callers':
+        full = os.environ.get('HS_CALLERS_FULL') == '1'
+        callers([int(a, 0) for a in sys.argv[2:]] or list(range(256)), full=full)
     elif mode == 'g18caller':
         g18caller()
     elif mode == 'p45caller':
