@@ -34,7 +34,7 @@
 
 測定 commit: `3bdba9d55` (コードを変えた最後の commit。`feat(python): ui.getProgTitle / getHintValue を PE 確定・mock/C 実装 (#3005)`)。以降の変更は `REPORT_PY128.md` と `docs/DOC_MAP.md` (md のみ)。
 
-環境: runner 4 core、load average 0.15 (HEAD 再現時、03:22:27)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`fl-win64` の `block00031_PE.bin`・`block24429/24430/25159/24618_DATA.bin` を展開)。`toolchain-emsdk` は [EMSDK] (`/opt/emsdk`)。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、3 分 40 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
+環境: runner 4 core、load average 0.15 (HEAD 再現時、03:22:27)。`FL_WIN64_DIR` は素材 `fl-win64` の展開先 (`block00031_PE.bin`・`block24429/24430/25159/24618_DATA.bin` を展開)。`toolchain-emsdk` は [EMSDK] (`docs/REFERENCES.md`)。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、3 分 40 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
