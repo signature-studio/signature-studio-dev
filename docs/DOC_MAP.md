@@ -1106,6 +1106,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_3836.md` | ~70 | #3836 (KH-71): Ghidra の double ビット再解釈 `(ulonglong)dVarN` を `dbitcast` (d2u/u2d) で書換える fix の測定と未解決。Delay の 98 行の所在・emcc 件数・Gain/Haas/Gate の同一性が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_5077.md` | 152 | #5077 (KH-138): Delay の `(ulonglong)dVarN` 98 行を機械語 (p-code 経由) と突き合わせて分類した表。98 行の機械語分類の正本 (内訳の数値は REPORT 冒頭の結論。#3836 受入 1 の分割先) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3802_DIFF.md` | ~165 | #3802 付録 §⑧ の差分の全文: 測定 commit `6323671e7` → HEAD の `ghidra_route` の `git diff` 出力 (main 取り込み分を含む)。差分の記録であり測定値の正本ではない |
+| `tools/targets/kilohearts/REPORT_APPENDIX_5384.md` | ~62 | KH-158 (#5384): Delay の stereo ABI 族前半 3 callee (`FUN_180fdc6ec`・`FUN_180fdc844`・`FUN_180fdc858`) を機械語で確定し `ABI['delay']` に規則化。結論・数値・未解決は付録 §10-7z が正本。後半 3 callee は #5385 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4889.md` | ~40 | KH-128 (#4889): Delay の `FUN_180fbc1f4` 呼出し 2 件 (1082・1088) の引数を機械語で確定し規則化 (xmm0 float・戻り値 xmm0)。引数数不一致 79 → 77。§10-7w が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4883.md` | ~60 | KH-127 (#4883): Delay の引数過不足 10 件のうち 4 件 (`FUN_180fb5c6c`・`FUN_180fb5f8c`) を機械語で確定し規則化 (86 → 82)・残件 6 件は子 #4917 [KH-135]。§10-7v の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_5362.md` | ~90 | KH-154 (#5362): Delay の残件 callee `FUN_181384040` (memmove shim) の呼出し 6 行を機械語で確定し ABI 規則化 (測定値は付録の 5362-4)・Gain/Haas/Gate の `.o` 不変。残りの pointer⇔整数規則は親 #5362 に残す |
