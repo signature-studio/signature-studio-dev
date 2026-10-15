@@ -25,7 +25,7 @@
 
 - 測定 commit: `e2023b505` (コードを変えた最後の commit)。`origin/main` (`5536d48ec`) の取り込み merge `395da6392` の後に、provider のコメント 1 行 (m2) を直した。前回の測定 commit は `38fa1159c` (`origin/main` `298fd8223` の merge)。
 - merge の競合は `tests/provider_check.mjs` の 1 件のみ。本 PR の集合 `pe76` と main の `pe172` (#3219) を両方残し、件数を impl 144・unimpl 291 に直した。main の取り込みで `tools/python/{provider,host,tests}` に main 側の変更が入ったため、`38fa1159c` の実測は使わず再測定した。
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` の実在を確認し、`extracted/block00031_PE.bin` と DATA 4 本 (`block25159`・`block24429`・`block24430`・`block24618`) を `$RUNNER_TEMP/fl-win64/extracted` へ展開 (2.8 秒)。`FL_WIN64_DIR` をこれに向けた。`FL_MAC_DIR` は無いので `fetch_inputs.sh` は win64 の DATA block 経路を取った。emsdk は `/opt/emsdk` (`[EMSDK]`) を使い、`toolchain-emsdk` は展開していない。
+- 素材: `$HOME/artifacts/fl-win64.tar.zst` の実在を確認し、`extracted/block00031_PE.bin` と DATA 4 本 (`block25159`・`block24429`・`block24430`・`block24618`) を `$RUNNER_TEMP/fl-win64/extracted` へ展開 (2.8 秒)。`FL_WIN64_DIR` をこれに向けた。`FL_MAC_DIR` は無いので `fetch_inputs.sh` は win64 の DATA block 経路を取った。emsdk は `[EMSDK]` (`emcc` 6.0.12) を使い、`toolchain-emsdk` は展開していない。
 - wasm の build (`e2023b505` で順に実行。全て rc 0):
   - `fetch_inputs.sh`: rc 0 (0.47 秒)
   - `build_cpython_wasm.sh`: 4 分 8 秒 (248 秒)
