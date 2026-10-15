@@ -123,7 +123,7 @@
 
 - COPY 7 (複製元を 1 段で分類):
   - ARITH 4: 0x1193bf0 (`and esi, 0xffff`)、0x127d0cc (`sub esi, 2`)、0x12a5868 (`sub eax, 2`)、0x12a86c9 (`add ebx, 1`)。基底は無し。
-  - MEM (rbp スロット) 2: 0x1021826 (`[rbp+0x150]`、直前 store 0x10216ff)、0x12ab8e8 (`[rbp+0xa0]`、直前 store 0x12ab72f)。
+  - MEM (rbp スロット) 2: 0x1021826 (`[rbp+0x150]`)、0x12ab8e8 (`[rbp+0xa0]`)。直前 store は本測定の TSV に出ず未追跡 (0x10216ff は REPORT_PY269 §の既存記述のみ・本測定で未検証、0x12ab72f は出典なし)。
   - MEM (基底あり) 1: 0x12e3b29 ← `[rax+0x258]`、rax = `[rip+0x2fe749]` = VA 0x15e2218 (大域)。
 - AMBIG 8 (主経路の複製元を 1 段で分類):
   - MEM 3: 0x118a275 ← `[rax+0x258]`、rax = `[rbp+0x38]` (0x118a241)。0x118a3f4 ← `[rax+0x130]`、rax = `[rbp+0x38]` (0x118a362)。0x12e6abe ← `[rax+rbx*4+0xdc]`、rax = `[rbp+0x20]` (0x12e6a22)。
@@ -133,7 +133,7 @@
   - AMBIG 1: 0x12c609e (主経路 `add eax, [rcx+0x94]` の合流が、さらに経路依存)。
 - まとめ (終端の区別):
   - 値そのものが ARITH・IMM で終わる: 0x1193bf0・0x127d0cc・0x12a5868・0x12a86c9 (COPY)、0x12abcd6・0x12acbc1 (AMBIG 主経路)。
-  - 値が `[rbp+X]` の直読みで終わる: 0x1021826・0x12ab8e8 (COPY)。rbp スロットの直前 store は 1 段目で確認済み。
+  - 値が `[rbp+X]` の直読みで終わる: 0x1021826・0x12ab8e8 (COPY)。rbp スロットの直前 store は本測定では未追跡 (TSV の `@0x10217c5`・`@0x12ab885` の load 位置までを確認)。
   - 値が大域の直読みで終わる: 0x12c6240 (AMBIG 主経路・大域 0x15e22d8)。0x12e3b29 は `[rax+0x258]` で、rax が大域 0x15e2218 の読込み。
   - 値が `[基底+X]` の読込みで、基底がさらに 1 段必要: 0x118a275・0x118a3f4・0x12e6abe (AMBIG 主経路)。基底 rax は `[rbp+0x38]`・`[rbp+0x20]` (rbp スロット) で、スロットの直前 store は未追跡。0xfc820f は主経路 COPY rax ← ARITH だが、合流元 0xfc81c2→0xfc81c7 の飛び元 rdi が AMBIG のまま。
   - 未確定: 0x12c609e (主経路は ARITH `add eax, [rcx+0x94]` まで届くが、合流元 0x12c6252 の分岐を未分類)。
