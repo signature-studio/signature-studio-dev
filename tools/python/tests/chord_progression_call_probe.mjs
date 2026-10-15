@@ -71,7 +71,6 @@ class _CPTRec(flcpt.CPT):
 flcpt.cpt = _CPTRec()
 # flcpt に chordPool は置かない (PE に名前が無い・REPORT_PY164 §3)。control は import 失敗で None を使う。
 flrack.rack = types.SimpleNamespace(loop_starter_config='{"mock": true, "genres": {}, "loops": []}', flr=types.SimpleNamespace())
-flrack.flr = types.SimpleNamespace()
 flpianoroll.score.PPQ = 96
 sys.modules['flcpt'] = flcpt
 sys.modules['flrack'] = flrack

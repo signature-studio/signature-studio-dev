@@ -101,7 +101,7 @@ for c in cases:
 json.dump(nat, open(f"{W}/res_native.json", "w"))
 
 # ---- wasm ----
-subprocess.run([__import__("shutil").which("node") or "/home/ubuntu/.local/share/pnpm/bin/node", f"{HERE}/run_wasm.mjs", W], check=True)
+subprocess.run([__import__("shutil").which("node") or os.path.expanduser("~/.local/share/pnpm/bin/node"), f"{HERE}/run_wasm.mjs", W], check=True)
 wa = json.load(open(f"{W}/res_wasm.json"))
 tab = {}
 for c, n, w in zip(cases, nat, wa):

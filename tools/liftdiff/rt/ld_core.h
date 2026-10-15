@@ -264,6 +264,10 @@ static int ld_cat_on(void) {
 }
 static int ld_cat_path(u64 a) { char nm[160]; u64 l = ld_read_strW(a, nm, sizeof nm); return l >= 4 && strcmp(nm + l - 4, ".moe") == 0; }
 
+/* 6引数 API の int 引数 (a3・a5 = cbMultiByte・cchWideChar 等): 32bit 引数の上位 32bit は未定義 (lifted 側は下位 32bit だけを書く)。
+ * 下位 32bit を符号付き int として読む (-1 = 終端まで)。 */
+static int64_t ld_int_arg(u64 v) { return (int32_t)(uint32_t)v; }
+
 /* name = import 名 (kernel32 等の区別はしない), a[] = 位置引数 (ms64 先頭 4 つ) */
 static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5) {
   (void)a4; (void)a5;   /* 第5/6引数: 6引数 API (MultiByteToWideChar 等) が CAB-233 で使用 */
@@ -412,25 +416,27 @@ static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, 
     if (ld_streq(n, "CharUpperBuffW")) { if (!ld_dst_ok(a0, a1 * 2 + 2)) return a1; uint16_t* p = (uint16_t*)(uintptr_t)a0; for (u64 i = 0; p && i < a1; i++) if (p[i] >= 'a' && p[i] <= 'z') p[i] -= 32; return a1; }
     if (ld_streq(n, "MultiByteToWideChar")) {   /* CAB-233: dst (第5/6引数) への書込みあり (cp 0/1252 = Latin-1 相当) */
       char big[1024];
-      int64_t sl = (int64_t)a3;
+      int64_t sl = ld_int_arg(a3);
       u64 need;
       const u8* s = (const u8*)(uintptr_t)a2;
       if (sl < 0) { u64 l = ld_read_strA(a2, big, sizeof big); need = l + 1; s = (const u8*)big; sl = (int64_t)l; }
       else need = (u64)sl;
       if (!ld_dst_ok(a4, need * 2 + 2)) return need;
-      u64 n2 = need < a5 ? need : a5;
+      int64_t c5 = ld_int_arg(a5);
+      u64 n2 = (c5 >= 0 && (u64)c5 < need) ? (u64)c5 : need;
       for (u64 i = 0; i < n2; i++) ((uint16_t*)(uintptr_t)a4)[i] = s[i];
       return n2;
     }
     if (ld_streq(n, "WideCharToMultiByte")) {
       char big[2048];
-      int64_t wl = (int64_t)a3;
+      int64_t wl = ld_int_arg(a3);
       u64 need;
       const uint16_t* s = (const uint16_t*)(uintptr_t)a2;
       if (wl < 0) { u64 l = ld_read_strW(a2, big, sizeof big); need = l + 1; s = (const uint16_t*)big; wl = (int64_t)l; }
       else need = (u64)wl;
       if (!ld_dst_ok(a4, need + 1)) return need;
-      u64 n2 = need < a5 ? need : a5;
+      int64_t c5 = ld_int_arg(a5);
+      u64 n2 = (c5 >= 0 && (u64)c5 < need) ? (u64)c5 : need;
       for (u64 i = 0; i < n2; i++) { uint16_t ch = s[i]; ((u8*)(uintptr_t)a4)[i] = (u8)(ch < 256 ? ch : '?'); }
       return n2;
     }

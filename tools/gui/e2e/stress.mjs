@@ -8,6 +8,7 @@
 //     leak  : 後半も memory.grow を続ける (要 GUI_WASM_DIR=build/wasm_grow) → 「後半で増加」を検出すること
 //   STRESS_GROW=N : 前半に memory.grow(1 page) を N 回 (要 wasm_grow)。worker の memory.buffer 再取得後も描画が続き golden 一致すること
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { BUILD, H, ROOT, W, countPixelDiff, judgeStress, openDriver, readPPM, startServer } from "./e2e_lib.mjs";
 
@@ -15,6 +16,7 @@ const FRAMES = Number(process.env.STRESS_FRAMES || 30000);
 const SAMPLE = Number(process.env.STRESS_SAMPLE || 1000);
 const FAULT = process.env.STRESS_FAULT || "";
 const GROW = Number(process.env.STRESS_GROW || 0);
+const SLOW_EVAL_MS = Number(process.env.STRESS_SLOW_EVAL_MS || 3000);
 const WATCHDOG_MS = Number(process.env.STRESS_TIMEOUT_MS || 20 * 60 * 1000);
 const OUTDIR = path.join(BUILD, "e2e");
 fs.mkdirSync(OUTDIR, { recursive: true });
@@ -60,7 +62,13 @@ const PAGE = `(() => {
 async function main() {
   const s = await startServer(); srv = s.srv;
   drv = await openDriver(`http://127.0.0.1:${s.port}/`);
-  const E = (e) => drv.eval(e);
+  // GUI-23 (#1665): 1 eval の所要時間を採る。SLOW_EVAL_MS 超は [slow-eval] を出す (CLI 既定 action timeout 25 s との切り分け用)
+  let evalMax = 0, evalSlow = 0;
+  const E = async (e) => {
+    const t = Date.now();
+    try { return await drv.eval(e); } catch (err) { log(`eval failed after ${Date.now() - t} ms: ${e.slice(0, 40)}`); throw err; }
+    finally { const d = Date.now() - t; evalMax = Math.max(evalMax, d); if (d > SLOW_EVAL_MS) { evalSlow++; log(`slow-eval ${d} ms: ${e.slice(0, 40).replace(/\n/g, " ")}`); } }
+  };
   log("driver:", drv.name, drv.version, `FRAMES=${FRAMES} SAMPLE=${SAMPLE} FAULT=${FAULT || "-"} GROW=${GROW}`);
   const boot = await E("window.__ready");
   need(boot.sab === true, "wasm memory must be SharedArrayBuffer");
@@ -124,6 +132,7 @@ async function main() {
     fs.writeFileSync(path.join(OUTDIR, "stress.json"), JSON.stringify({ frames: FRAMES, wallSec: +wall(), fault: FAULT, grow: GROW, workerStats: st.stats, samples }, null, 1));
   }
   log(`summary: ${wall()}s frames ${first.frames}→${last.frames} moves=${last.moves} inDropped=${last.inDropped} outFullWaits=${last.outFullWaits} mem ${first.memBytes}→${last.memBytes} bufChanges=${last.bufChanges} gens=${JSON.stringify(last.gens)} (first ${JSON.stringify(first.gens)})`);
+  log(`eval: max ${evalMax} ms, slow(>${SLOW_EVAL_MS} ms) ${evalSlow}, load1 ${os.loadavg()[0].toFixed(2)}`);
 }
 
 main().then(async () => {

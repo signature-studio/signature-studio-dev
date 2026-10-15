@@ -55,7 +55,17 @@ MS static void* k_HeapAlloc(void* h, uint32_t fl, uint64_t n) {
     memset(p, 0, need);
     return p;
 }
-MS static int k_HeapFree(void* h, uint32_t fl, void* p) { (void)h; (void)fl; (void)p; return 1; }
+static uint64_t g_free_n, g_free_bad; static uint64_t g_free_ptr[256];
+MS static int k_HeapFree(void* h, uint32_t fl, void* p) {
+    (void)h; (void)fl;
+    if (!p) return 1;
+    for (uint64_t i = 0; i < g_free_n && i < 256; i++)
+        if (g_free_ptr[i] == (uint64_t)p) { g_free_bad++; printf("double_free ptr=0x%llx\n", (unsigned long long)p); }
+    printf("heapfree ptr=0x%llx\n", (unsigned long long)p);
+    if (g_free_n < 256) g_free_ptr[g_free_n] = (uint64_t)p;
+    g_free_n++;
+    return 1;
+}
 MS static uint32_t k_GetLastError(void) { return g_lasterr; }
 MS static void k_SetLastError(uint32_t e) { g_lasterr = e; }
 MS static uint64_t k_RtlPcToFileHeader(uint64_t pc, uint64_t* base) {
@@ -219,10 +229,11 @@ static uint64_t unimpl_total(void) { uint64_t t = 0; for (int i = 0; i < g_nunim
 int main(int argc, char** argv) {
     if (argc < 2) { fprintf(stderr, "usage: ildsp_native <PE> [--neg-lea]\n"); return 2; }
     setvbuf(stdout, NULL, _IOLBF, 0);
-    int neg = 0, only_k = -1, only_v = -1, s3bufs = 0;
+    int neg = 0, only_k = -1, only_v = -1, s3bufs = 0, create_only = 0;
     for (int i = 2; i < argc; i++) {
         if (!strcmp(argv[i], "--neg-lea")) neg = 1;
         else if (!strcmp(argv[i], "--s3-bufs")) s3bufs = 1;
+        else if (!strcmp(argv[i], "--create-only")) create_only = 1;
         else if (!strcmp(argv[i], "--slot") && i + 2 < argc) { only_k = atoi(argv[i + 1]); only_v = atoi(argv[i + 2]); i += 2; }
     }
     if (load_pe(argv[1])) return 3;
@@ -246,7 +257,9 @@ int main(int argc, char** argv) {
     /* 2. 各 slot を、新しい instance ごとに呼ぶ (slot 0 = dtor は呼ばない)。
      *    --slot K V を与えると、その 1 実験だけを行う (実験ごとに別プロセスで回すため) */
     const uint64_t rdx_list[] = {0, 1, 2, 0xe};
-    for (int k = 1; k <= 5; k++) {
+    int k_lo = (only_k == 0) ? 0 : 1, k_hi = (only_k == 0) ? 0 : 5;
+    if (create_only) k_hi = -1;
+    for (int k = k_lo; k <= k_hi; k++) {
         int nv = (k <= 3) ? 4 : 1;
         if (only_k >= 0 && k != only_k) continue;
         for (int v = 0; v < nv; v++) {
@@ -259,8 +272,13 @@ int main(int argc, char** argv) {
             uint64_t fn = *(uint64_t*)(vt + 8 * k);
             uint64_t h0[NHOOK]; for (size_t i = 0; i < NHOOK; i++) h0[i] = g_hooks[i].hits;
             uint64_t u0 = unimpl_total();
+            uint64_t f0 = g_free_n;
             uint64_t rdx = (k == 4) ? in : rdx_list[v];
             printf("call k=%d variant=%d rdx=0x%llx wrapper=0x%llx\n", k, v, (unsigned long long)rdx, (unsigned long long)w);
+            if (k == 0) {
+                static const uint32_t mem_off[] = {0x10, 0x18, 0x20, 0x208, 0x258, 0x260};
+                for (int m = 0; m < 6; m++) printf("member +0x%x=0x%llx\n", mem_off[m], (unsigned long long)*(uint64_t*)(in + mem_off[m]));
+            }
             uint64_t rax;
             if (k == 3 && s3bufs) {
                 /* slot 3 (Process 候補): r8=ch 数, r9=入力 float 配列, 第 5 引数=出力 float 配列 (逆アセンブル #2528 追記) */
@@ -305,9 +323,9 @@ int main(int argc, char** argv) {
                 rax = ((Fn4)fn)(w, rdx, 0, 0);
             }
             memcpy(after, (void*)in, OBJ_SZ);
-            printf("slot k=%d variant=%d rdx=0x%llx fn=0x%llx rax=0x%llx unimpl_calls=%llu",
+            printf("slot k=%d variant=%d rdx=0x%llx fn=0x%llx rax=0x%llx unimpl_calls=%llu heapfree_calls=%llu",
                    k, v, (unsigned long long)rdx, (unsigned long long)(fn - IMG_BASE), (unsigned long long)rax,
-                   (unsigned long long)(unimpl_total() - u0));
+                   (unsigned long long)(unimpl_total() - u0), (unsigned long long)(g_free_n - f0));
             dump_changed(before, after, OBJ_SZ);
             for (size_t i = 0; i < NHOOK; i++) if (g_hooks[i].hits != h0[i])
                 printf("  hook site=0x%llx hits+=%llu (%s)\n", (unsigned long long)g_hooks[i].site,
@@ -322,6 +340,7 @@ int main(int argc, char** argv) {
     for (int i = 0; i < g_nunimpl; i++)
         printf("unimpl_import %s calls=%llu\n", g_unimpl[i], (unsigned long long)g_unimpl_calls[i]);
     printf("heap_allocs=%llu\n", (unsigned long long)g_heap_n);
+    printf("heapfree_total=%llu double_free=%llu\n", (unsigned long long)g_free_n, (unsigned long long)g_free_bad);
     fflush(stdout);
     return 0;
 }
