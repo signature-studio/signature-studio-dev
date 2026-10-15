@@ -14,20 +14,21 @@
 
 ## 1. 測定条件 (受入の再現)
 
-- 測定 commit: `fa3b3bbfe` (コードを変えた最後の commit。`origin/main` = `a17fca6fb` を取り込んだ merge commit。修復の commit は `be7fefb4a`、起点 `origin/main` = `6441decbb`)。作業 worktree `ws-4418` (branch `4418-icmp-deref-repair`)。
+- 測定 commit: `375cfbc6c` (コードを変えた最後の commit。`origin/main` を取り込んだ merge commit)。修復の commit は `be7fefb4a`、起点 `origin/main` = `6441decbb`。作業 worktree `ws-4418` (branch `4418-icmp-deref-repair`)。
 - 素材: `work-m11` を `$RUNNER_TEMP/m11art` に展開し、`M11_WORK=<その tools/m11/work>` で指定 (`tools/m11/work/` への展開は行わない)。emcc は runner の `[EMSDK]`。`work-liftdiff` と `toolchain-retdec` は本 e2e では未使用。`work-m11` は #516 以前の snapshot なので、結論はこの IR に限る。
 - 実行: `M11_WORK=... TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground)。
-- 実測 (測定 commit `fa3b3bbfe`、n=2、`bash tools/m11/ldfix/fix_d17_e2e.sh` 前景実行): real **63.60 s / 63.10 s**、rc **0 / 0**、RESULT: PASS (2 回とも)、load average (1 分) 実行前 0.27 / 0.53、終了後 0.74 / 0.84。emcc rc=0 (6/6)。
+- 実測 (測定 commit `375cfbc6c` = main 取り込み後の HEAD、`bash tools/m11/ldfix/fix_d17_e2e.sh` 前景実行): real **62.95 s**、rc **0**、RESULT: PASS、load average (1 分) 実行前 0.13、終了後 0.68。emcc rc=0 (6/6)。spill 宛 CELL_COLLAPSED 37 → 25 (修復 13)、TRUE_DROP 30 = REPAIRED 13 / SKIPPED 17。
+- 同条件の前回測定 (`fa3b3bbfe`、n=2): real 63.60 s / 63.10 s、rc 0 / 0、RESULT: PASS (2 回とも)、load 0.27 → 0.74 / 0.53 → 0.84。
 - 参考 (merge 前の修復 commit `be7fefb4a`、n=2): real 56.74 s / 56.13 s、rc 0 / 0、load 0.45 → 0.78 / 0.56 → 0.83。`fa3b3bbfe` の merge 取り込み時の PR コメントに記録された real 33.0 s (n=1) は、本 REPORT の再測定 (n=2、63 s 前後) とは揃わない。原因は未確認。以後の数値は本節の n=2 を正とする。
 - 修復前の基準 (`6441decbb`、修復 pass を変える前の script で同じ e2e を 1 回): step 4 で FAIL (`spill37_1169.tsv が results と不一致`、rc=1)。step 4 までの実行時間は 24.5 s。FAIL の原因は §7。
-- 測定後のコード差分 (測定 commit `fa3b3bbfe` から HEAD まで。この REPORT の文書だけを変える commit 以外は無い):
+- 測定後のコード差分 (測定 commit `375cfbc6c` から HEAD まで。この REPORT の文書だけを変える commit 以外は無い):
 
   ```
-  git diff fa3b3bbfe HEAD -- tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf*.py tools/m11/ldfix/ldmach*.py tools/m11/ldfix/spill37_1169.py tools/m11/ldfix/fix_spill_2794.py tools/m11/ldfix/check_spill_2794.py tools/m11/ldfix/results tools/m11/lb_base.py
+  git diff 375cfbc6c HEAD -- tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf*.py tools/m11/ldfix/ldmach*.py tools/m11/ldfix/spill37_1169.py tools/m11/ldfix/fix_spill_2794.py tools/m11/ldfix/check_spill_2794.py tools/m11/ldfix/results tools/m11/lb_base.py
   (空: 差分 0)
   ```
 
-  修復 commit `be7fefb4a` から `fa3b3bbfe` までの `tools/m11` の差分には main 側の変更 (18 ファイル) が入る。本 PR の変更ではない。
+  修復 commit `be7fefb4a` から `375cfbc6c` までの `tools/m11` の差分には main 側の変更が入る。本 PR の変更ではない。
 
 ## 2. 機械語と IR の照合 (受入 1)
 
