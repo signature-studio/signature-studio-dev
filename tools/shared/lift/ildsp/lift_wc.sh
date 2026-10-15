@@ -51,12 +51,12 @@ emcc -O1 -ffp-contract=off -fno-fast-math -w -I "$FLE/rt" -I "$W" \
   -o "$W/wc.wasm"
 echo "[ildsp-wc] wasm: $(stat -c %s "$W/wc.wasm") bytes"
 
-gcc -O1 -w -I "$W" -o "$W/native_ref" "$HERE/native_ref.c"
+gcc -O1 -w -I "$W" -o "$W/native_ref" "$HERE/wc_native_ref.c"
 timeout 300 "$W/native_ref" "$W/image_native.bin" "$W/cases.bin" "$W/res_native.bin"
 
-if [ "$MODE" = neg-cmp ]; then WC_NEG=arena timeout 300 node "$HERE/run_wasm.mjs" "$W"; else timeout 300 node "$HERE/run_wasm.mjs" "$W"; fi
+if [ "$MODE" = neg-cmp ]; then WC_NEG=arena timeout 300 node "$HERE/wc_run_wasm.mjs" "$W"; else timeout 300 node "$HERE/wc_run_wasm.mjs" "$W"; fi
 set +e
-python3 "$HERE/diff_test.py" "$W"; RC=$?
+python3 "$HERE/wc_diff_test.py" "$W"; RC=$?
 set -e
 T1=$(date +%s.%N)
 echo "[ildsp-wc] $MODE elapsed=$(awk -v a="$T0" -v b="$T1" 'BEGIN{printf "%.2f", b-a}')s load start=[$L0] end=[$(cut -d' ' -f1-3 /proc/loadavg)]"

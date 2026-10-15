@@ -2,7 +2,7 @@
 """ildsp (block24360_PE.bin) を VA 0x30000000 へ敷設する 2 種のイメージと wc_layout.h / layout.json を作る (T-SH-52 / #3216)。
 
 rex/rex_image.py と同じ方式: DIR64 再配置を 0x180000000 基準 → 0x30000000 基準に直す。
-IAT slot は wasm 側が pseudo-VA (IMP_VA_BASE + index)、native 側は 0 (native_ref.c がスタブを敷設する)。
+IAT slot は wasm 側が pseudo-VA (IMP_VA_BASE + index)、native 側は 0 (wc_native_ref.c がスタブを敷設する)。
 usage: wc_image.py DLL OUTDIR
 出力: image_wasm.bin / image_native.bin (各 SizeOfImage バイト), wc_layout.h, layout.json
 """

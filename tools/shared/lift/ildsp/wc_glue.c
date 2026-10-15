@@ -1,6 +1,6 @@
 /* wc_glue.c: ildsp WaveformColouring_CreateInstance の wasm 側入口。fle_cpu.c (flelift runtime) の上に載る (T-SH-52 / #3216)。
  * 呼出規約は tools/shared/lift/rex/rex_glue.c と同じ (ms_abi: rcx/rdx/r8/r9)。
- * import スタブは native_ref.c と同じ規約 (同じ bump heap・同じ戻り値・同じ呼出回数の数え方)。 */
+ * import スタブは wc_native_ref.c と同じ規約 (同じ bump heap・同じ戻り値・同じ呼出回数の数え方)。 */
 #include "fle_cpu.h"
 #include "wc_layout.h"
 

@@ -1,6 +1,5 @@
 name: E2E
 
-# [有効化時は .github/workflows/e2e.yaml へ移す]
 # ブラウザ E2E (tools/e2e/run.sh, headless chrome)。
 #   local  : PR / main push / 手動 → build した preview + edge-sim を検証 (秘密情報不要)
 #   remote : 週次 (月曜 03:17 UTC) / 手動 → デプロイ済み URL を `run.sh --url` で検証
@@ -69,6 +68,14 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 26.10.0
+      - name: Emscripten (tools/m1/flags.sh の pin。run.sh が tools/audio/build.sh 経由で emcc を要する)
+        run: |
+          pin="$(sed -n 's/^EMCC_VERSION_PIN="\(.*\)"/\1/p' tools/m1/flags.sh)"
+          test -n "$pin"
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install "$pin"
+          "$RUNNER_TEMP/emsdk/emsdk" activate "$pin"
+          echo "EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh" >> "$GITHUB_ENV"
       - name: Chrome
         run: |
           google-chrome --version
@@ -94,7 +101,7 @@ jobs:
           retention-days: 14
 
   remote:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.remote)
+    if: (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.remote)) && vars.E2E_URL != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

@@ -151,6 +151,7 @@
 - **比較した方式**: (a) VEX 形を SSE 形の `(void)a; (void)b;` へ委譲して `unimpl` から消す (不採用)、(b) 既存 `lift/passes/ir6_pass.py` ([P1]) を lift 鎖に入れる (単独では不足。 19252 の comis 76 箇所中 insert 3 箇所のみ)、(c) `icall_rewrite.py` の comis 経路 (stub + sahf) を plugins 側に移植する (未評価)。
 - **理由**: (a) は flag を反映しないまま stub を消すため、`declares_unimpl` が 0 になっても silent な flag 欠落が検出できなくなる。 `lift/passes/m11_simd2.py` の既存コメントも同じ方針 (「委譲せず stub のまま残す」)。 実測は `tools/plugins/sampler/REPORT_APPENDIX_1582.md` §7b。
 - **影響**: 19252 / 19048 の unimpl に `vcomisd` / `vucomisd` / `vucomiss` が残る。 これを消すには flag 反映の実装が要るため、子 issue に分割した。
+- **続き (#1774・反映方式の決定)**: 採用は次の 2 点。 (1) 同一ブロック内で呼び出し後に読まれる flag は、`lift/passes/vex_comis_flags.py` が呼び出し直後に作る fcmp 由来の CF/ZF/PF (`ir6_pass.py` [P1] と同じ式) へ差し替える。 (2) 差し替えられない呼び出しは残す (helper は stub のまま unimpl に出る。 silent にしない)。 比較した別案: icall の stub+sahf 経路 (`PLUG_ICALL=1`) は 19252 の unimpl を 4→1 にしたが、522 関数中 490 関数の ABI を書き換えて `defines` 551→497・`missing_bytes` 165→4200 に悪化したため不採用。 実測 (機械語の消費命令と IR の参照) は `tools/plugins/sampler/REPORT_APPENDIX_1774.md` §7c。 残りは消費側が flag 名を読まず値比較を読むため、消費条件の再導出が要り、子 [PLG-F3-33] (非 VEX は [PLG-F3-34]) に分割した。
 
 ## D16 — 残 helper `__asm_vmovsd` (store 形) は宛先を定数で埋めず、spill 領域の写像を上流で直す
 

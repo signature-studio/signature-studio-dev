@@ -149,90 +149,89 @@ python3 tools/shared/scripts/ildsp_vtable_check.py tools/shared/work/raw/ildsp_v
 | closure の間接 call 先の解決 | 表の命令数は下限 | 起票案 (PSOLA lift) で扱う |
 | ildsp の lift 本体 | #161 後半未達 | #161 継続 |
 
-## 5. WaveformColouring_CreateInstance の x64c lift と native 差分 — T-SH-52 (#3216・部分達成)
+## 5. WaveformColouring_CreateInstance の vcall `0x1a9e2b` の dispatch 先 (#2484 / T-SH-37)
 
-既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23 に VEX 未対応・jump table 未到達の記述は無い。差分は CreateInstance と slot 0 の範囲で 0 件)。
-測定 commit: `a099ff25` (コードを変えた最後の commit。以降の差分は `.md` のみ・§5-8)。検証起点: `bea685f7` (origin/main)。
+既知類型との関係: 該当なし (逆アセと PE 読みのみ。lift・IR を作らないため D1a〜D23 の検出対象外)。
+検証起点 commit: `80fb2fd0` (PR の基点・merge-base)。測定 commit (コードを変えた最後の commit): `da2ba516` (`tools/shared/scripts/ildsp_wc_dispatch.py`。対象 VA の走査 `fdb8bae0` を追加し、走査を遅延列挙にして実行時間を戻した。初版の追加は `8b1e34ac`)。
 
-### 5-1 結論 (1 行)
-closure の入口 70 関数は x64c で C に lift し wasm (138,754 B) にした (C 本体 60 + label 8 + IAT thunk 2)。CreateInstance → slot 0 の native 対 wasm は 64 case で全バイト一致。残りは slot 1–5 の host 前提 (native が null 参照で落ちる。§5-5) と、VEX 3 命令の未対応 (unsup 3 site)。
+### 結論 (1 行)
+`0x1a9e2b` の `call [rax+0x18]` は sub-object への dispatch ではない。instance 自身 (0x228 B・vptr は +0) の WC vtable slot 3 を呼び、その値は `0x1a9de0` (DIR64 reloc あり) で、**静的に `0x1a9de0` へ確定**する。前提は §5-5 の 1 件 (他 vtable 格納 2 件の書き込み先は §5-4 で解消)。
 
-### 5-2 再現
-```
-FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<toolchain-emsdk 展開先>/emsdk/emsdk_env.sh bash tools/shared/lift/ildsp/lift_wc.sh [ok|neg-cmp|all]
-FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/ildsp/probe_slots.sh   # slot 0–5 の native のみ (emcc 不要・§5-5)
-```
-- 入力: `extracted/block24360_PE.bin` (sha256 `f4b23b0f…`)。素材は `tar --zstd -xf fl-win64.tar.zst extracted/block24360_PE.bin` で取る。
-- 段: `x64c.py` (root = CreateInstance `0x1ac470` と vtable `0x3e01b0` の slot 先 `0x1a9cf0`・`0x1a9f10`・`0x1a9e10`・`0x1a9de0`・`0x1aa0b0`・`0x1ac460`、`--closure 99`) → `wc_image.py` (DIR64 補正・IAT pseudo-VA) → `wc_cases.py` (case 0 = 元の `.data`、case 1–63 = 元の `.data` の数バイトを書き換えたもの) → emcc 6.0.12 `-O1` → `native_ref.c` (gcc・ms_abi 直接実行) → `run_wasm.mjs` (node) → `diff_test.py`。
-- vcall `0x1a9e2b` (`call [rax+0x18]` = slot 3 = `0x1a9de0`) は静的に束縛せず、x64c の `ott_dispatch` が実行時に vtable を読んで解決する。前提は instance の vptr が `0x3e01b0` (CreateInstance が `[rcx]` に置く)。
-- runtime `fle_cpu.c` の既定 `imp_HeapAlloc` は host `malloc` を使い、native とポインタが一致しない。`lift_wc.sh` は `wc_glue.c` が定義する `imp_*` だけ `-D` で改名して除外し、決定的 bump heap の定義を使う。
-- wasm の import は `run_wasm.mjs` が全て throw する関数に置き換える (旧版は 0 を返して黙殺していた)。呼ばれれば trap として数え、差分は FAIL になる。実測の import 一覧 (`[run_wasm] imports:`): `wasi_snapshot_preview1.{fd_write, fd_read, proc_exit, clock_time_get, fd_close, fd_seek, fd_fdstat_get}`・`env._Unwind_RaiseException` (計 8)。3 回の実測で trap は 0 件 = どの import も呼ばれていない。
-- native 側 (`native_ref.c`): 落ちた case の後に残った SIGALRM を `ualarm(0,0)` で解除する (旧版は解除していなかった)。
+Issue 本文の「sub-object の vtable」という前提は誤り。CreateInstance は wrapper を作らず、単一の object を返す (§5-1)。
 
-### 5-3 実測 (測定 commit `a099ff25`・`lift_wc.sh ok` を 3 回)
-所要 = `lift_wc.sh ok` の起動から終了までの wall (source・x64c・emcc・native・wasm・差分を含む。小数 2 桁)。実ログ行:
-```
-[ildsp-wc] ok elapsed=2.25s load start=[0.15 0.33 0.18] end=[0.15 0.33 0.18]
-[ildsp-wc] ok elapsed=2.26s load start=[0.15 0.33 0.18] end=[0.22 0.34 0.18]
-[ildsp-wc] ok elapsed=2.27s load start=[0.22 0.34 0.18] end=[0.22 0.34 0.18]
-```
-(4 core。3 回とも rc=0・`wc diff ... PASS=64 FAIL=0`)
+### 5-1. instance の生成と vptr (静的事実)
+- `0x1ac470`: `mov ecx,0x228` → alloc (`0x1ac9c0`) → rbx。`memset` (`0x1aef60`、r8=0x228) の後 `mov rcx,rbx` → `jmp 0x1ac4a0`。
+- `0x1ac4a0`: `lea rax,[rip+0x233cfc]` (0x1ac4ad、RVA `0x3e01b0`) → `mov [rcx],rax` (0x1ac4b4)。vptr は instance の +0 に書く。
+- closure 内で WC vtable (`0x3e01b0`) を書くのは 0x1ac4b4 の 1 件のみ (`ildsp_wc_dispatch.py` の `vptr 格納` 節)。
 
-| 項目 | 値 |
-|---|---:|
-| x64c の lift 関数 (C 本体) | 60 (`unlifted callees` 0・imports 18) |
-| closure 入口 70 のうち C に現れる | 70 (60 は `f_` 関数、8 は呼出元の関数内 label、2 は IAT thunk `jmp [rip+IAT]` = `imp_` 呼出 `0x1b932c`・`0x1b9334`) |
-| closure の命令数 (`ildsp_closure.py` と同じ 70 関数の線形走査) | 2,757 (`count_unlifted.py`) |
-| x64c が C に出した命令数 (`/* addr: */` 注釈) | 2,656 |
-| closure にあって C に無い命令 | 109 = int3 77 + nop 14 + 非 padding 18 (うち IAT thunk 2)。内訳は §5-4 |
-| C にあって closure に無い命令 | 8 (`0x1aef40`–`0x1aef4f`。x64c が辿るが closure の定義は辿らない) |
-| unsup (`ott_unsup`) | 3 site: `0x1ca277` vcvtss2sd・`0x1ca33f` vpmovsxdq・`0x1ca34c` vshufps (いずれも closure 内。CreateInstance の実行経路には無い) |
-| wasm | 138,754 B (`emcc` 6.0.12) |
-| 差分 `ok` (CreateInstance → slot 0) | cases 64 / PASS 64 / FAIL 0 / native 落ち除外 0 / wasm trap 0 |
-| 差分の観測値 | 戻り値の合成値 `0x5d9b00001` (= 返り値 `0x30500000`·31 + slot 0 の返り値 1) が両側で一致。import 呼出 1 回 (HeapAlloc 0x228 B) |
-| ネガティブコントロール `neg-cmp` (wasm 結果の heap 先頭 1 bit 反転) | FAIL 64/64 (`arena@+0x0`)・期待通り (`ALL OK`) |
+### 5-2. vcall の解決
+| 項目 | 値 | 根拠 |
+|---|---|---|
+| vcall の場所 | `0x1a9e2b`: `call qword ptr [rax+0x18]` (fn `0x1a9e10`) | objdump (検算) |
+| `0x1a9e10` の位置付け | WC vtable slot 2 (RVA `0x3e01c0` の値) | vtable の生値 |
+| 呼び出し元 | 直接 call/jmp は無い。exec セクション全走査 (`ildsp_wc_dispatch.py` の `direct_callers`: `0x1a9e10 <- []`)。8 バイト値の参照は WC vtable の slot 2 (`0x3e01c0`) だけ (`## 対象 VA への参照`) | スクリプト出力 |
+| `this` の vptr 読み | `0x1a9e16`: `mov rax,[rcx]` (rcx = instance) | objdump |
+| vptr の値 | `0x3e01b0` (§5-1) | |
+| slot 番号 | 3 (`0x18` ÷ 8) | |
+| slot RVA / 値 | `0x3e01c8` / `0x1a9de0` (VA `0x1801a9de0`、DIR64 reloc あり) | 生バイト検算 |
+| 解決先の性質 | thunk でない・closure 内・11 命令 (int3 を除く。次の pdata 先頭 `0x1a9e10` までの int3 の詰め物 10 個は数えない) | ildsp_wc_dispatch.py (`insns (int3 除く)`) |
+| 解決先の中身 (逆アセ読み) | 2 回ループで instance の +0x20・+0x24 (dword) と +0x40・+0x48 (qword) をゼロにする | objdump |
 
-### 5-4 closure と lift の差 (未 lift 109 命令の内訳・再現済み)
-再現 (`lift_wc.sh ok` の後に実行):
-```
-python3 tools/shared/scripts/ildsp_closure.py "$FL_WIN64_DIR/extracted/block24360_PE.bin" --out tools/shared/work/lift/ildsp-wc/closure.json
-python3 tools/shared/lift/ildsp/count_unlifted.py "$FL_WIN64_DIR/extracted/block24360_PE.bin" tools/shared/work/lift/ildsp-wc/closure.json tools/shared/work/lift/ildsp-wc/lift
-```
-実測出力: `functions=70 closure_insns=2757 lifted_in_C=2656 C_not_in_closure=8 missing=109`・`missing: int3=77 nop=14 nonpad=18 (IAT thunk=2)`。
+- vcall の後 (`0x1a9e2e` 以降) は、戻り値を使わずに instance の +0x8〜+0x18 等へ書く (逆アセ読み)。
 
-| 区分 | 件数 | 番地 |
+### 5-3. closure の間接 call 19 件の内訳 (WC)
+| 種別 | 件数 | 本 REPORT での扱い |
 |---|---:|---|
-| int3 (padding) | 77 | (関数の末尾) |
-| nop (padding) | 14 | (関数の末尾) |
-| IAT thunk `jmp [rip+IAT]` | 2 | `0x1b932c`・`0x1b9334` |
-| 非 padding・直接分岐の先でない | 15 | `0x1ac9b8`・`0x1b8eb1`–`0x1b8ec8` (6)・`0x1bd4b0`・`0x1bd4b7`・`0x1be14e`・`0x1be156`・`0x1be158`・`0x1be160`・`0x1be162`・`0x1be167` |
-| 非 padding・直接分岐の先 (分岐元 `0x1be156`・`0x1be160` も C に無い) | 1 | `0x1be16c` (`ret`) |
+| vcall `call [reg+disp]` | 1 (`0x1a9e2b`) | §5-2 で解決 |
+| IAT | 16 | 子 [T-SH-52] #3216 で扱う |
+| 画像内関数ポインタ | 2 (`0x1aedf6`→`0x268260`・`0x1b6f6c`→`0x268268`。helper `0x1aedc0`・`0x1b6f4c` 内) | §5-4 |
 
-- 直接分岐の先でない 15 件は、直前が無条件 `jmp`・`ret` か、その直後の未 lift 命令で、closure 内の直接 call・jmp・jcc の先にならない。直接の制御流では到達せず、到達するなら間接 jump 経由 (未確定)。
-- `0x1be16c` は未 lift の島 (`0x1be14e`–`0x1be167`) の中の `jae`・`jbe` の先。島の入口は直接分岐で届かないため、x64c の経路 (直接 call/jmp・認識した jump table) では届かない。
-- 到達した場合の挙動: 直接 call で届けば x64c が必ず lift する。`call reg` 経由で未 lift の先に届けば `ott_unlifted` で止まる (fail-fast。silent ではない)。
+件数は `ildsp_wc_dispatch.py` の `## 間接 call の内訳` (vcall 1 / IAT 16 / 画像内ポインタ 2 / レジスタ 0 / 計 19) で出し、`ildsp_closure.py` の WaveformColouring 行 (間接 19) と一致する。IAT は PE の import 表の IAT 位置と照合した。
 
-### 5-5 slot 1–5 の観測 (未確定)
-再現: `bash tools/shared/lift/ildsp/probe_slots.sh` (wc_image.py を `WC_CALL_SLOTS=6` で、CreateInstance → slot 0–5 の全呼出を native のみで実行)。
-実測 (`a099ff25`): `[native] cases=64 SIGSEGV/SIGBUS=64 SIGALRM=0`・`crashed_cases=64`。全 case で sig=11 addr=0x0。
-- slot 0 (`0x1a9cf0`): CreateInstance 直後に `this` = instance で呼べる (import 0 回)。差分 64 case に含めた。
-- slot 1 (`0x1a9f10`): `[this+0x20]` (`0x1a9f2a`) を読む。CreateInstance が 0 にしたままなので値は 0。後続の参照で null を踏む、と推定 (deref の箇所は未特定)。
-- したがって slot 1–5 は、host が事前に `this` の内部フィールドを設定する前提が要る。その前提は未確定 (子 #3274 / T-SH-57)。
+### 5-4. 共通の例外送出 helper `0x1aedc0` / `0x1b6f4c` (T-SH-36 #2483 の結果を参照)
+- 結論: 宛先 (`0x268260`・`0x268268`) は静的に確定しない。T-SH-36 の結論 (`REPORT.md` §4-6) をそのまま引く。本 issue では再調査しない。
+- `0x1aedc0` は IAT の `RtlPcToFileHeader`・`RaiseException` を呼ぶ。`0x1aedf6` の間接 call は `0x268260` → `0x1cb5e0` (`jmp rax`)。
+- `0x1aedc0` は MSVC の C++ 例外送出と推定 (RTTI 未確認)。ecx = 例外コード `0xe06d7363`、引数 4 個 (rdx = 1 = noncontinuable)、ExceptionInformation[0] = `0x19930520` (一部の経路で `0x1994000`)、[1] = 例外オブジェクト、[2] = rdx の throw 情報、[3] = `RtlPcToFileHeader` の戻り値 (イメージ基底と推定)。`RaiseException` (IAT `0x268090`) を呼ぶ。
+- 他 vtable 格納 (§5-5 前提 1 の解消)。旧出力の 3 件は 2 件: `0x1acfe0` は `jmp 0x1801b34a8` の 1 命令の stub で格納は無く、pdata の無い関数の範囲が `0x1acfe8` と重なったため `0x1acfff` を 2 回数えていた (`ildsp_wc_dispatch.py` を格納箇所ごとに 1 件に修正)。残る 2 件の書き込み先は、どちらも例外オブジェクトのスタック上の一時領域:
+  - `0x1acfff` (fn `0x1acfe8`、vptr `0x3d2778`): 直接の呼び出し元は `0x1ad011` の 1 件。`0x1ad008` の `lea rcx,[rsp+0x20]` (`0x1ad00c`) の直後にある。`0x1ad008` は `0x1ac9c0` の `0x1ac9f0` から呼ばれる。`0x1ac9c0` は確保関数 (CreateInstance の `0x1ac47b` を含む多数から呼ばれる)。確保が失敗し new handler (`0x1b6f4c`) が 0 を返したとき、`rbx == -1` なら `0x1ad028`、それ以外なら `0x1ad008` へ進む。
+  - `0x16475a` (fn `0x164740`、vptr `0x3d27a0`): 直接の呼び出し元は `0x1ad031` (fn `0x1ad028`、`lea rcx,[rsp+0x20]` は `0x1ad02c`) と `0x1647c9` (fn `0x1647c0`、`lea rcx,[rsp+0x20]` は `0x1647c4`) の 2 件。`0x1ad028` は `0x1ac9f6` から呼ばれる。
+  - よって 2 件の格納先 `[rcx]` は、どちらの経路でも呼び出し元が直前に作ったスタック上のアドレスで、WC instance (ヒープ上の 0x228 B) ではない。
+  - 範囲: `ildsp_wc_dispatch.py` の `direct_callers` (exec セクション全走査の直接 call/jmp) と `## 対象 VA への参照` 節 (全画像走査の RIP 相対の命令参照と 8 バイト絶対値)。対象 `0x1acfe8`・`0x164740`・`0x1ad008`・`0x1ad028`・`0x1ac9c0` は、RIP 相対 0 件・8 バイト値 0 件。レジスタに計算した値からの参照と、4 バイト相対値のテーブルは網羅していない。
+- `0x1b6f4c` の `0x1b6f6c` は `0x268268` → `0x1cb600` (`jmp [0x268260]`) で、同じ `jmp rax` に至る。`rax` の値は静的に不明。
+- 扱いの案 (未確認・推定): 例外送出の path とみなし、lift では trap を第一候補にする。正常系に到達しないことは子 [T-SH-52] の native 実行で確かめる。
 
-### 5-6 検証範囲 / 範囲外
-- 範囲: CreateInstance (1 呼出) → slot 0 (1 呼出)。引数は `rcx` = instance・`rdx` = arena+0x8000・`r8`・`r9` = 0。`.data` の事前状態 64 種。比較は rax (合成値)・import 呼出回数・heap 領域 64 KiB・`.data` 全体。
-- 64 case は全て同一の実行経路。native の出力 (`res_native.bin`) で `(rax, hits)` は 64 件すべて `(0x5d9b00001, 1)`、heap 領域 (arena) の sha256 は 1 種類 (全 case 同一)。出力の `.data` は 64 種類で、入力 `.data` の差はその中にのみ残る。よって 64 PASS は「入力 `.data` に依存しない 1 経路の一致」であり、分岐の網羅ではない。
-- CreateInstance の引数: native 側は引数なしで呼ぶ (rcx〜r9 は未定義)。CreateInstance 本体 (`0x1ac470`–`0x1ac49b`、12 命令) は rcx を `0x1ac476`、rdx・r8 を `0x1ac480`・`0x1ac482` で書いてから読み、r9 は現れない。呼出先 alloc `0x1ac9c0` の先頭は rcx のみ使う (`0x1ac9c6`)。よって入力の rcx〜r9 は結果に影響しない (呼出先 `0x1b6ea0` の rdx・r8 への依存は未確認)。
-- 範囲外: slot 1–5 と closure 70 関数の全体差分 (子)、VEX 3 命令 (子)、stack・TEB・TLS の比較 (比較していない)、import 戻り値の実 Windows との一致 (両側で同じ手書き規約。lift の正しさだけを見る)。
-- `issue #3216` 本文が参照する「REPORT.md §5-5 の未解決 (WC 以外の vptr 格納 3 件・helper `0x1aedc0`/`0x1b6f4c`)」は、現 HEAD の REPORT に記載が無い。`REPORT_CLOSURE.md` §4.6 の表が対応する。これは未実施 (子)。
-
-### 5-7 未解決 (起票先)
+### 5-5. 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| slot 1–5 の host 前提の確定と、closure 70 関数の native 対 wasm 全バイト差分 | 受入 (2) の残り・gate の範囲 | 子 [T-SH-57] |
-| VEX 3 命令 (vcvtss2sd・vpmovsxdq・vshufps) の x64c 対応 (unsup 3 site) | 受入 (1) の残り。実行到達時は trap | 子 [T-SH-58] |
-| REPORT_CLOSURE.md §4.6 の未解決 (WC 以外の vptr 格納 3 件・helper `0x1aedc0`/`0x1b6f4c` の正常系到達) の native 確定 | 受入 (3) | 子 [T-SH-59] |
-| 未 lift 非 padding 16 件 (直接分岐の先でない 15 + 島の 1。§5-4) の到達性 | closure の完全性 | [T-SH-57] の受入に含める |
+| instance の vptr が `0x3e01b0` のまま変わらないこと (動的な書き換えは静的には見ていない)。他 vtable 格納 2 件の書き込み先は §5-4 でスタック上と確認済み | §5-2 の解決 (`0x1a9de0`) の前提 | 子 [T-SH-52] #3216 |
+| helper `0x1aedc0`・`0x1b6f4c` の正常系到達 (§5-4) | 画像内関数ポインタ 2 件の扱い (trap か stub か) | 子 [T-SH-52] #3216 |
+| IAT 16 件の扱い (GetLastError・HeapAlloc 等) | lift 規模 | 子 [T-SH-52] #3216 |
+| 70 関数の lift・native 全バイト差分・ネガティブコントロール・gate (#2484 の受入条件 2・3) | 本 PR では未実施 | 子 [T-SH-52] #3216 |
 
-### 5-8 測定後のコード差分 (差分 0 の証跡)
-`git diff a099ff25 HEAD -- tools/shared/lift/ildsp ':!*.md'` の出力は空 (本節の REPORT 更新は `.md` のみ)。
+### 5-6. 検証
+- 再現 (3 コマンド): `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_closure.py` → `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_wc_dispatch.py` → `python3 tools/shared/scripts/ildsp_wc_dispatch_check.py tools/shared/work/raw/ildsp_wc_dispatch.json <PE>`。
+- 入力: `block24360_PE.bin` (sha256 f4b23b0f…)。`ildsp_closure.py` の WaveformColouring 行 (70 関数・2,757 命令・SIMD 23.8%・間接 19) を再現した。
+- 結果: `ildsp_wc_dispatch_check.py` は `ALL OK` (rc 0)。`ildsp_wc_dispatch.py` の `## 対象 VA への参照` 節は、対象 5 関数で RIP 相対 0 件・8 バイト値 0 件。`0x1a9de0`・`0x1a9e10` の 8 バイト値は WC vtable の slot 3 (`0x3e01c8`)・slot 2 (`0x3e01c0`) の 1 件ずつ。
+- 独立の確認 (objdump の `# 0x<VA>` 注釈を数える。スクリプトとは別): 対象 7 VA (`0x1ac9c0`・`0x1ad008`・`0x1ad028`・`0x1acfe8`・`0x164740`・`0x1a9de0`・`0x1a9e10`) の RIP 相対参照は 0 件。陽性対照の WC vtable `0x1803e01b0` は vptr 格納の `lea` で 1 件。
+- 実測 (測定 commit `da2ba516`、4 core。`ildsp_wc_dispatch.py` の 3 回の load average は実行前 0.77 / 実行後 0.82、`ildsp_wc_dispatch_check.py` の実行前は 0.35): `ildsp_wc_dispatch.py` 5.524 / 5.544 / 5.617 s (rc 0 ×3。3 回の stdout は `cmp` で完全一致)、`ildsp_wc_dispatch_check.py` 0.057 / 0.058 / 0.056 s (rc 0 ×3・ALL OK ×3)。比較のため同じ入力で旧版 (`960405ba`) を 2 回実行 (load 0.8 前後): 5.300 / 5.423 s。対象 VA の走査を入れた初版 (`fdb8bae0`) は 17 秒台で、全命令の operands 参照と命令オブジェクトの一覧保持が原因。RIP 判定を `rip` を含む命令に限り、走査を遅延列挙にして (`da2ba516`) 旧版と同等に戻した。
+- ネガティブコントロール (JSON を壊して検算を通すか。測定 commit `da2ba516` の JSON):
+
+| 名前 | 壊し方 | 結果 |
+|---|---|---|
+| neg_target | vcall の target_rva を `0x1a9de1` | `MISMATCH: slot`・rc=1 |
+| neg_store | 格納 vtable (`stores[0].vtable`) を `0x3e01b8` | `MISMATCH: store`・rc=1 |
+
+- 検算の範囲: 命令は objdump、slot 値と DIR64 reloc は PE の生バイトで照合。closure の完全性は検算していない。対象 VA の参照は、RIP 相対の命令参照と 8 バイト絶対値だけを見る (レジスタ計算値・4 バイト相対値は対象外。他 vtable 格納 2 件の書き込み先は §5-4 の走査で確認)。
+- `git diff da2ba516 HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
+
+## 6. vtable slot 4 (0x1aa3a0) の lift と native 差分 (#2529)
+
+### 結論 (1 行)
+GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0・42 命令・直接 call / 間接 call 0) を RetDec で lift し、元の機械語との差分は 240/240 で一致。ネガティブコントロール 2 件は期待どおり FAIL。
+全文 (手順・選定根拠・実測・未解決) は `REPORT_APPENDIX_2529.md` §6 が正本 (250 行上限のため分割移動)。
+
+## 7. WaveformColouring_CreateInstance の x64c lift と native 差分 — T-SH-52 (#3216・部分達成)
+
+### 結論 (1 行)
+WaveformColouring closure の入口 70 関数を x64c で C に lift し wasm にした。CreateInstance → slot 0 の native 対 wasm は 64 case で全バイト一致 (ネガティブコントロール FAIL 64/64)。slot 1–5 の host 前提と VEX 3 命令の未対応は子 T-SH-57・58・59 に残す。
+全文 (手順・実測・未解決の表) は `REPORT_APPENDIX_3216.md` §7 が正本 (250 行上限のため分割移動)。
