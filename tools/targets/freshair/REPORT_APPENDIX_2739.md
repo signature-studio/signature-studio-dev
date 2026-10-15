@@ -2,8 +2,8 @@
 
 親 #2739 ([FA-34] Gain 以外への拡大) の子 #3506 の付録。SC 側 Compressor (0x180775220) と KH 側 `compressor::CompressorDsp` (0x1802abc20) の同一入力比較のうち、**KH 側の実機機械語 harness** の結果を置く。
 
-- 結論: KH Compressor process を実機機械語のまま 200 case 実行する harness (`ks_kh_comp_native.c`) は ERR 0/200 で動く (seed 7・11・99 の 3 回)。決定性 (同 seed の 2 回が byte 一致) と感度の負例 (P+0x4 ×2 で 197〜200/200 が変化) を満たす。**SC との bit 比較は未実施** (KH 側 P フィールドの一部が出力に届いていない・未束縛 import の stub 依存があり、判定に使えない。子 #40)。
-- 測定 commit: `df31ee6e6` (harness コード)。以後の差分は本付録のみ (§5 の確認コマンド参照)。
+- 結論: KH Compressor process を実機機械語のまま 200 case 実行する harness (`ks_kh_comp_native.c`) は ERR 0/200 で動く (seed 7・11・99 の 3 回)。決定性 (同 seed の 2 回が byte 一致) と感度の負例 (P+0x4 ×2 で 197〜200/200 が変化) を満たす。**SC との bit 比較は未実施** (KH 側 P フィールドの一部が出力に届いていない・未束縛 import の stub 依存があり、判定に使えない。子 #3534 (FA-41))。
+- 測定 commit: `739c90452` (harness コード・作業 dir の分離)。以後の差分は本付録と DOC_MAP の索引行のみ (§5 の確認コマンド参照)。
 
 ## 1. 対象 VA の確認 (RTTI)
 
@@ -11,7 +11,7 @@
 - リポジトリ内に `0x1802abc20` の記録は無かった (`snapins.json` に Compressor の登録なし)。本付録が初出。
 - 機械語 (`ks_identity.py` の `disasm` = pdata 関数境界): KH 0x1802abc20 = **1,724 B / 337 命令 / 直接 call 10 本**。SC 0x180775220 = 1,664 B / 333 命令 / 直接 call 10 本 + `call [rax+0x60]` (host 値の取得)。
 - 直接 call 先: 0x180fb6830 / 0x180fbc1f4 / 0x180fc3640 (x2+) / 0x180295f20 / 0x18004cf20 (x3)。0x180fc3640 は pow 系の共通基盤 (SC 側の 0x18103fd60 と同系統と見られる。未確認)。
-- 注: 本付録 §1〜§3 に予定されていた「ID 一致 37 組の process 候補表」は main に存在しない (`git log --all -S REPORT_APPENDIX_2739` 0 件)。親 #2739 の作業で作られる表で、本付録は参照しない。
+- 注: 「ID 一致 37 組の process 候補表」は親 #2739 の作業物で、本 PR の範囲外。origin/main には無い (`git log origin/main -S REPORT_APPENDIX_2739` 0 件。表は `origin/2739-freshair-snapin-diff-criteria` にある)。本付録は参照しない。
 
 ## 2. 引数・state・param の写像 (機械語の読み)
 
@@ -42,7 +42,7 @@ KH process の引数: `rcx = this`・`rdx = ctx`・`r8 = aud` (`mov rbx,rcx` @18
 
 SC との対応 (根拠の候補。未確定): SC 側の state は `S+0x98..0x100` で、KH の `this+0x60..0xc8` と **`S = this + 0x38`** で揃う。初回フラグは KH `this+0xc4` (@1802abe03) と SC `S+0xfc` (`cmp byte[rbx+0xfc],bpl` @180775446) で、差は同じ 0x38。SC 生成器 `lift2/gen_comp_scen.py` の state 書込み先 (0x98..0x100・0xfc) もこの範囲に入る。
 
-P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r8+0x9dc4]` @18077525f・`[r8+0x9e0c]` @180775274) と掛かる時定数で、KH の `P+0x00`・`P+0x04` と使われ方が揃う。`P+0x9e54` (mode) は `cmp 2` で分岐し KH `P+0x08` と揃う。`P+0x9ea8` は `comiss xmm12,[P+0x9ea8]` (@1807753ee) で閾値比較。host 値 (SC `[P+0xa098]` の vtable slot 0x60) は KH に対応する呼び出しが無い。残りの写像と Q フラグの対応 (SC `P+0x9ffb`・`P+0x9fb3`・`P+0xa043` ↔ KH `Q+0xfc`・`Q+0xdc`・`Q+0x11c`) は子 #40 で確定する。
+P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r8+0x9dc4]` @18077525f・`[r8+0x9e0c]` @180775274) と掛かる時定数で、KH の `P+0x00`・`P+0x04` と使われ方が揃う。`P+0x9e54` (mode) は `cmp 2` で分岐し KH `P+0x08` と揃う。`P+0x9ea8` は `comiss xmm12,[P+0x9ea8]` (@1807753ee) で閾値比較。host 値 (SC `[P+0xa098]` の vtable slot 0x60) は KH に対応する呼び出しが無い。残りの写像と Q フラグの対応 (SC `P+0x9ffb`・`P+0x9fb3`・`P+0xa043` ↔ KH `Q+0xfc`・`Q+0xdc`・`Q+0x11c`) は子 #3534 (FA-41) で確定する。
 
 ## 3. harness の仕組みと stub
 
@@ -54,9 +54,9 @@ P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r
   - 件数は seed 7 で 67+67 = 134 (mode=1 の case 数と一致)。mode=1 の出力は stub 依存で、比較に使えない (§5)。
 - **初回の ERR**: 最初の版は `GetLastError` の未束縛 slot (`0x13a1790`) を踏んで 67/200 が SIGSEGV (RIP = addr = `0x286e1e0`、hint/name RVA の値へ飛んだ)。stub 化で ERR 0 になった。
 
-## 4. 実測 (commit `df31ee6e6`・`bash tools/targets/freshair/ks_kh_comp.sh 200 <seed>`)
+## 4. 実測 (commit `739c90452`・`bash tools/targets/freshair/ks_kh_comp.sh 200 <seed>`)
 
-環境: nproc=4、load average (1 分) 0.01〜0.07 (各 run の前後)。実行時間は 200 case で 0.03 s (3 seed とも同じ丸め。min–max = 0.03–0.03 s)。
+環境: nproc=4、load average (1 分) 0.10〜0.18 (各 run の前後。seed 7 は 0.10、seed 11・99 は 0.18)。実行時間は 200 case の run1 で 0.03 s (seed 7・11・99 とも実測 0.03 s)。
 
 | seed | ERR | 音声が変化した case | 通知 id の総数 | 通知 0 件の case | 未束縛 import 呼び出し | 同 seed 2 回の一致 | 負例 (P+0x4 ×2) で変化した case |
 |---|---|---|---|---|---|---|---|
@@ -77,26 +77,27 @@ P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r
 | P+0x14 ×0 / ×2 | 0 / 0 | 出力に届かない |
 | P+0x1c ×0 | 20 | 出力に効く |
 
-`P+0x00`・`P+0x10`・`P+0x14` が 200 case のどれにも効かないのは、(a) 写像の誤り、(b) 当該分岐が本シナリオの入力で到達しない、のどちらか。**SC と比べる前に確定が必要** (子 #40)。このまま比べると一致は意味を持たない。
+`P+0x00`・`P+0x10`・`P+0x14` が 200 case のどれにも効かないのは、(a) 写像の誤り、(b) 当該分岐が本シナリオの入力で到達しない、のどちらか。**SC と比べる前に確定が必要** (子 #3534 (FA-41))。このまま比べると一致は意味を持たない。
 
 ## 5. 検証範囲・限界・確認
 
 - 検証範囲: KH process の機械語を、本 harness の入力 (§2 の写像・乱数) で 200 case × 3 seed 実行。範囲外: SC との bit 比較、P フィールドの意味の確定、未束縛 import の実体の確定、mode=1 の出力の正しさ。
-- 差分確認 (コード commit から HEAD まで): `git diff df31ee6e6 HEAD -- tools/targets/freshair/ks_kh_comp.sh tools/targets/freshair/ks_kh_comp_native.c` の出力は 0 行 (本付録の commit はこの範囲の外)。
+- 差分確認: `git diff 739c90452 HEAD -- tools/targets/freshair/ks_kh_comp.sh tools/targets/freshair/ks_kh_comp_native.c` (出力 0 行)。
+- 並列実行の確認 (C1 で seed 11・99 を `xargs -P 2` で同時実行。両 script の実行区間が重なり、開始時刻の差 0.30 ms、各 script 全体 0.25 s): 両 SUMMARY と kh_a.txt が直列実行と一致 (seed 11 = 200・292・25・136、seed 99 = 198・293・29・102、byte 一致)。
 - blob 監査: 20 MiB 超の追加なし。`work/` (gitignore) は使用のみ。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| SC⇄KH 同一入力の bit 一致実測 (旧受入 2) と #52 への判定返し (旧受入 3) | Compressor の判定が未了 | 子 #40 (FA-40) |
-| `P+0x00`・`P+0x10`・`P+0x14` が出力に届かない原因 (写像か分岐か) | 比較の意味。SC の P 写像の確定 | 子 #40 |
-| 未束縛 import 2 経路 (mode=1 のみ。`0x1813a1367` の実体) の stub 依存 | mode=1 の出力 | 子 #40 |
-| 本付録の §1〜§3 (ID 一致 37 組表) が main に無い | 親の作業物の所在 | 親 #2739 へコメント |
+| SC⇄KH 同一入力の bit 一致実測 (旧受入 2) と #52 への判定返し (旧受入 3) | Compressor の判定が未了 | #3534 (FA-41) |
+| `P+0x00`・`P+0x10`・`P+0x14` が出力に届かない原因 (写像か分岐か) | 比較の意味。SC の P 写像の確定 | #3534 (FA-41) |
+| 未束縛 import 2 経路 (mode=1 のみ。`0x1813a1367` の実体) の stub 依存 | mode=1 の出力 | #3534 (FA-41) |
+| ID 一致 37 組の process 候補表 (親 #2739 の作業物。本 PR の範囲外) が main に無い | 本付録は参照しない | 親 #2739 へコメント |
 
 ## 7. 再現
 
 ```sh
 # 素材: work-liftlib-targets (tools/targets/kilohearts/work/winpkg/HeartCore.core_64)
-bash tools/targets/freshair/ks_kh_comp.sh 200 7   # ERR 0・決定性・負例を判定 (約 0.1 s)
+bash tools/targets/freshair/ks_kh_comp.sh 200 7   # ERR 0・決定性・負例を判定 (run1 実測 0.03 s)
 ```
