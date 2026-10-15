@@ -52,7 +52,7 @@ emcc -c -O1 -ffp-contract=off -fno-fast-math -w -I "$FLE/rt" $RT_RENAME "$FLE/rt
 emcc -O1 -ffp-contract=off -fno-fast-math -w -I "$FLE/rt" -I "$W" \
   "$W/lift/fle_lifted.c" "$W/fle_cpu_rt.o" "$HERE/wc_glue.c" \
   -sSTANDALONE_WASM=1 -sALLOW_MEMORY_GROWTH=0 -sINITIAL_MEMORY=$((0x31000000)) -sSTACK_SIZE=65536 -sGLOBAL_BASE=268435456 \
-  --no-entry -Wl,--no-gc-sections -Wl,--export=wc_run -Wl,--export=wc_reset -Wl,--export=wc_hits_get $COVX \
+  --no-entry -Wl,--no-gc-sections -Wl,--export=wc_run -Wl,--export=wc_run5 -Wl,--export=wc_reset -Wl,--export=wc_hits_get $COVX \
   -o "$W/wc.wasm"
 echo "[ildsp-wc] wasm: $(stat -c %s "$W/wc.wasm") bytes"
 
