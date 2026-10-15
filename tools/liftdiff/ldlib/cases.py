@@ -151,6 +151,8 @@ def case_line(va, name_prefix, pattern, sig, trace=True, xfill=True, stkfill=Non
     rt = sig['ret']
     s = 'id=%x:%s fn=%x blob=%s args=%s trace=%d xfill=%d sig=%s rt=%s' % (
         va, pattern, va, blob, ','.join(toks), 1 if trace else 0, 1 if xfill else 0, ','.join(sig['params']), rt)
+    if sig.get('tr'):
+        s += ' tr=1'
     if stkfill is not None:
         s += ' stkfill=%x' % stkfill
     if extra:
