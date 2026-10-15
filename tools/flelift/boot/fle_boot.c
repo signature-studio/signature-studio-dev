@@ -629,6 +629,8 @@ void fle_ov_longjmp(void) {
  * ずつ沈む — 呼出元の `pop rbx` が 8B 低い slot を読み、野生指针になって OOB する
  * (FLE-2 実測: f_412c20 → f_413060 の rbx = 0x43000000000000 → OOB)。
  */
+static int g_objfree_seq = 0;      /* #4287 診断: obj を含む領域が解放された記録 */
+static u32 g_objfree_p = 0, g_objfree_val = 0;
 void fle_ov_getmem(void) {
     g_n_getmem++;
     u64 save_rbx = R[3];
@@ -642,8 +644,8 @@ void fle_ov_getmem(void) {
         R[4] += 8;                                  /* 拙い push/pop 釣合 (下記注記) */
         u64 p = R[0];
         py_watch(6, gsz, p);
-        if (p && p <= 0x12d6a090ull && 0x12d6a090ull < p + gsz)   /* #4287 診断: obj を含む確保の戻り時の [obj+0xc4] */
-            fprintf(stderr, "[wobj-getmem] p=%#llx size=%u obj+0xc4=%#x\n", (unsigned long long)p, gsz, (unsigned)LD8(0x12d6a090ull + 0xc4ull));
+        if (p && p <= 0x12d7a090ull && 0x12d7a090ull < p + gsz)   /* #4287 診断: obj を含む確保の戻り時の [obj+0xc4] */
+            fprintf(stderr, "[wobj-getmem] p=%#llx size=%u obj+0xc4=%#x freed_before=%d freed_val=%#x\n", (unsigned long long)p, gsz, (unsigned)LD8(0x12d7a090ull + 0xc4ull), (int)(g_objfree_seq && g_objfree_p == p), (unsigned)g_objfree_val);
         fle_blk_getmem_post((u32)p, gsz);
         if (!p) { R[1] = (R[1] & ~0xffull) | 1; R[4] -= 8; ST64(R[4], 0x409433ull); f_409730(); }
         R[3] = save_rbx; R[0] = p;
@@ -664,6 +666,10 @@ void fle_ov_freemem(void) {
     u64 save_rbx = R[3];
     if (R[1]) {
         u32 fp = (u32)R[1], fret = (u32)LD64(R[4]);
+        if (fp <= 0x12d7a090u && 0x12d7a090u < fp + 0x1000u) {   /* 解放時の [obj+0xc4] (表に依らず、obj を含みうる近傍の解放を記録) */
+            g_objfree_seq = 1; g_objfree_p = fp; g_objfree_val = (u32)LD8(0x12d7a090ull + 0xc4ull);
+            fprintf(stderr, "[wobj-free] p=%#x obj+0xc4=%#x\n", fp, g_objfree_val);
+        }
         fle_blk_free_pre(fp, fret);              /* diag: 破壊 / 二重解放 / 未追跡の記録 */
         u64 t_ = LD64(MM_TABLE + 8);
         R[4] -= 8; ST64(R[4], 0x409454ull);
