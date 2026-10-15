@@ -15,9 +15,11 @@
 
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf --wildcards '*block00031_PE.bin'` で `work/extracted/` に展開 (22,227,016 B・1.66 秒)。
 - 新規スクリプト: `tools/python/analysis/flapi/pe_py278_indirect_probe.py` (rip・abs・raw の 3 検査)。
-- 再現: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py278_indirect_probe.py`。実測 96.4 秒 (real)・並列 1。
+- 再現: `FL_WIN64_DIR=<展開先>/extracted python3 tools/python/analysis/flapi/pe_py278_indirect_probe.py` (`<展開先>` は `tar --zstd -xf ... -C <展開先>` の先。PE は `<展開先>/extracted/block00031_PE.bin`)。
+  - 測定 (HEAD `0d6dc03fc`・クリーン展開): 2 分 38 秒 (real)・user 2 分 38 秒・並列 1・load 0.9。出力 19 行。
+  - 出力: rip 2 件・abs 10 件 (`jo`・`jne`・`loopne`・`jae`・`jrcxz` の分岐命令のみ・分岐先を除くと 0 件)・raw `0xd1af20` 0 件・`0xfff070` 1 件 (`.text+0xbe2e48`)・`0x125b1c0` 2 件・`0x1262970` 1 件 (`.text+0xe5b220`)。§1 と一致。
 - 注: abs 検査は即値・disp に対象 VA が現れる命令を全て出す。分岐命令 (`jo`・`jne`・`loopne` など) の分岐先も含むため、abs の出力のうち分岐命令の行は手で除外して数える (本付録の「絶対アドレスでの参照 0 件」は分岐先を除いた数)。
-- 既存の検査 `pe_flag_scope_check.py` の再現も実施: 21.4 秒・出力は 3649 付録 §1・§3 と一致 (0/12 到達・517・333)。
+- 既存の検査 `pe_flag_scope_check.py` の再現も実施 (HEAD `0d6dc03fc`): 32.4 秒 (real)・user 31.9 秒・load 0.9。出力は 3649 付録 §1・§3 と一致 (writes 18 (A 4 / B 12 / C 2)・0/12 到達・vt+0x60 `0x1262970`・間接 call 517・333・格納先 `0xfe2e48`・`0x125b220`)。
 - 測定 commit: `519ca703c` (`pe_py278_indirect_probe.py` を入れた commit。コードを変えた最後の commit)。
 
 ## 1. 格納による間接参照 (PE 全体の逆引き)
@@ -66,7 +68,9 @@
 ## 差分 0 の証跡
 
 - 測定 commit: `519ca703c` (上の「測定」節と同じ)。
-- 差分: `git diff 519ca703c HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (`| wc -l` = 0)。訂正 commit (`2bd440db3`) は本 REPORT のみを変えた。
+- 差分 (測定の鎖): `git diff 519ca703c HEAD -- tools/python/analysis/flapi/pe_py278_indirect_probe.py tools/python/analysis/flapi/pe_callgraph.py tools/python/analysis/flapi/pe_flag_scope_check.py` の出力は 0 行。測定に使った 3 スクリプトは測定 commit から無変更。
+- 差分 (範囲全体): `git diff 519ca703c HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 12 ファイル・673 行追加・10 行削除 (main 取り込み merge `0d6dc03fc` で入った他担当の変更: `analysis/flapi/pe_py272_probe.py`・`pe_py273_*.py`・`pe_py274_dispatch.py`・`py265_g1_writers.py`・`py65_ret584_reach.py`・`py99_closure.py`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/device_diff.mjs`・`tests/patterns_group_diff.mjs`・`tests/provider_expect/pe180.json`)。いずれも本付録の測定の鎖から import されない。
+- 訂正 commit (`b5daba019`・`0d6dc03fc`) は本 REPORT のみを変えた (`git diff 519ca703c HEAD -- tools/python/analysis/flapi/pe_py278_indirect_probe.py tools/python/analysis/flapi/pe_callgraph.py tools/python/analysis/flapi/pe_flag_scope_check.py` = 0 行)。
 
 ## 4. 受入条件の判定
 
