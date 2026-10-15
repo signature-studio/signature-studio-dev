@@ -68,8 +68,8 @@ REPORT_PY42 は「署名の不一致 3 件 (getPatternGroupName・getPatternsInG
 
 | 検査 | 手順 (コマンド) | 結果 |
 |---|---|---|
-| 素材 | `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` (展開前に `$ARTIFACTS_DIR` の実在を ls で確認) | rc 0・5.7 秒 |
-| emsdk | runner 既設の `/opt/emsdk` (`source /opt/emsdk/emsdk_env.sh`) | `emcc --version` = 6.0.12 (`tools/m1/flags.sh` の pin と一致)。`toolchain-emsdk` 素材は展開していない |
+| 素材 | `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` (展開前に `$ARTIFACTS_DIR` の実在を ls で確認) | rc 0・5.7 秒 |
+| emsdk | runner 既設の `[EMSDK]` (`source $EMSDK_DIR/emsdk_env.sh`) | `emcc --version` = 6.0.12 (`tools/m1/flags.sh` の pin と一致)。`toolchain-emsdk` 素材は展開していない |
 | 入力 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` | rc 0・0.4 秒 |
 | CPython wasm | `bash build_cpython_wasm.sh` | rc 0・wall 4 分 10 秒 |
 | flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0・6.1 秒 |
