@@ -33,4 +33,4 @@
 - 最初のウィンドウ: 無し (`px6bbc20` の rect 呼出 0 件)。
 - 結果 JSON (`results/boot_summary*.json`): 今回の実行で再生成されたが、コミットしていない (コミット済みの版は units 209 の旧 route で、§10・§11 の記述の元。今回の値は本付録の表が正本)。
 - 測定の所要: lift + clang + link + boot の全体 `real 7m38s`・`user 13m43s`・`sys 1m59s`。load average は開始 0.96 / 終了 2.05 (4 vCPU)。
-- 再現: `FL_WIN64_DIR=<展開先> bash tools/flelift/boot/boot_e2e.sh` (`toolchain-emsdk` の `/opt/emsdk` を要する)。
+- 再現: `FL_WIN64_DIR=<展開先> bash tools/flelift/boot/boot_e2e.sh` (`toolchain-emsdk` = `docs/REFERENCES.md` の `[EMSDK]` を要する)。
