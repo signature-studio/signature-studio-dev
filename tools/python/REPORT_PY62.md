@@ -97,7 +97,7 @@ python3 tools/python/analysis/flapi/sig_arity_check.py "$RUNNER_TEMP/flapi_befor
 
 - 測定 commit (コードを最後に変えた commit): `7d9e94ec8` (merge。main `5ed147dee` を取り込んだ。競合は `tests/provider_check.mjs` の 1 箇所だけで、main の pe179 (patterns の 4 件・PY-179 #3271) と本 PR の pl61 (playlist 7 件) の両集合を残し、判定式に両方を入れ、件数を 160・275 に更新した。`provider/fl_engine.c`・`host/fl_mock.mjs` は無競合で merge された)。
 - 再測定の理由: 前版の測定 commit `f5cc310da` (main `bd4463eaa` の取り込み) の後、main `bd4463eaa`→`5ed147dee` で tools/python の provider・host・tests が変わった (`fl_engine.c`・`fl_mock.mjs`・`provider_check.mjs`・新規 `patterns_diff.mjs`)。
-- コード差分: `git diff 7d9e94ec8 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 commit の後続は REPORT_PY62.md だけ)。
+- コード差分: `git diff 7d9e94ec8 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (後続は REPORT_PY62.md と main 取り込みの merge だけで、merge は provider・host・tests を変えない)。
 - 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst` real 7.941 s・`extracted/` 25,166 件)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` で `fetch_inputs.sh` を実行した (rc 0)。
 - emsdk: runner 同梱 `[EMSDK]` (emcc 6.0.12) を使用。`toolchain-emsdk` は展開していない (`build_cpython_wasm.sh` が `[EMSDK]` を固定で読むため)。PR 本文の `oc_artifacts` 行は素材の取得指定 (review run の再現用)。
 - 前段: `fetch_inputs.sh` rc 0、`build_cpython_wasm.sh` real 3 m 54.466 s rc 0 (CPython 入力は main 取り込み後も変わらず、`f5cc310da` 時点の構築を使う)、`FLPY_SKIP_TABLE=1 build_flpy.sh` real 5.726 s rc 0 (`7d9e94ec8`)。
