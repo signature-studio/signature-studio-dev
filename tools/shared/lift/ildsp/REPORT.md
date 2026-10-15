@@ -221,6 +221,7 @@ python3 tools/shared/lift/ildsp/count_unlifted.py "$FL_WIN64_DIR/extracted/block
 
 ### 5-6 検証範囲 / 範囲外
 - 範囲: CreateInstance (1 呼出) → slot 0 (1 呼出)。引数は `rcx` = instance・`rdx` = arena+0x8000・`r8`・`r9` = 0。`.data` の事前状態 64 種。比較は rax (合成値)・import 呼出回数・heap 領域 64 KiB・`.data` 全体。
+- 64 case は全て同一の実行経路。native の出力 (`res_native.bin`) で `(rax, hits)` は 64 件すべて `(0x5d9b00001, 1)`、heap 領域 (arena) の sha256 は 1 種類 (全 case 同一)。出力の `.data` は 64 種類で、入力 `.data` の差はその中にのみ残る。よって 64 PASS は「入力 `.data` に依存しない 1 経路の一致」であり、分岐の網羅ではない。
 - CreateInstance の引数: native 側は引数なしで呼ぶ (rcx〜r9 は未定義)。CreateInstance 本体 (`0x1ac470`–`0x1ac49b`、12 命令) は rcx を `0x1ac476`、rdx・r8 を `0x1ac480`・`0x1ac482` で書いてから読み、r9 は現れない。呼出先 alloc `0x1ac9c0` の先頭は rcx のみ使う (`0x1ac9c6`)。よって入力の rcx〜r9 は結果に影響しない (呼出先 `0x1b6ea0` の rdx・r8 への依存は未確認)。
 - 範囲外: slot 1–5 と closure 70 関数の全体差分 (子)、VEX 3 命令 (子)、stack・TEB・TLS の比較 (比較していない)、import 戻り値の実 Windows との一致 (両側で同じ手書き規約。lift の正しさだけを見る)。
 - `issue #3216` 本文が参照する「REPORT.md §5-5 の未解決 (WC 以外の vptr 格納 3 件・helper `0x1aedc0`/`0x1b6f4c`)」は、現 HEAD の REPORT に記載が無い。`REPORT_CLOSURE.md` §4.6 の表が対応する。これは未実施 (子)。
