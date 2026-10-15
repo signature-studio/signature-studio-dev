@@ -494,6 +494,8 @@ export function createMockEngine() {
     "launchMapPages.init": (...a) => { arity(a, 3, 3); str(a[0]); argI(a, 1, 0); argI(a, 2, 0); },
     "launchMapPages.updateMap": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
     "launchMapPages.createOverlayMap": (...a) => { arity(a, 4, 4); for (let i = 0; i < 4; i++) argI(a, i, 0); },
+    // PY-243 (#3745): PE 0xd7a3a0 は書式 iii (0xd7a3d8)・成功時の戻り [0x16b82e0] = _Py_NoneStruct (None、REPORT_PY243)。項目書込み (0xd7a280) は項目の状態を持たないため状態を変えない
+    "launchMapPages.setMapItemTarget": (...a) => { arity(a, 3, 3); for (let i = 0; i < 3; i++) argI(a, i, 0); },
     // PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない
     "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
     "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
