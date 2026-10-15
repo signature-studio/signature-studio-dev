@@ -137,5 +137,5 @@
 | `dbitcast` 規則の適用と Delay の 1000 trial 突合 | 分類結果を規則に反映していない | #3836 (受入 2) と #3073 [KH-41] |
 
 #### 5077-6. 検証
-- 測定 commit: 本 PR の最後のコード変更 commit (下のコミット hash)。`classify_ulonglong.py` を commit 済み HEAD のツリーから実行し、98 行・93/5 の内訳を再現した (出力は下の再現コマンド)。
+- 測定 commit: `143f481db` (本 PR のコード変更 commit)。`classify_ulonglong.py` を `git show 143f481db:…` で取り出して実行し、表を作業コピーの出力と `cmp` で一致させた (98 行・ビット再解釈 93・要確認 5)。
 - 再現手順: (1) 上記 `DecompEach` (8 関数) → `out/<va>.c`、(2) `MapLines.java` (`-postScript MapLines.java <dir> <va…>`) → `tokens.tsv`、(3) `python3 tools/targets/kilohearts/ghidra_route/classify_ulonglong.py tokens.tsv out` で表を出す。
