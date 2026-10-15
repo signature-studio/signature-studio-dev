@@ -6,7 +6,9 @@ m11_setother_nonimm_class.py (M11-N171) は直線区間で後ろ向きに追い�
   状態 S(i, fam) = 命令 i の直前で fam が持つ到達定義の葉の集合。
     - i が分岐先なら、全 predecessor p の「p の直後の状態」の和集合 (直線部分は 1 本)。
     - 関数入口 (index 0) の葉は entry。間接 jmp が関数内にあれば分岐先は merge_indirect (predecessor が分からない)。
-    - 循環 (ループの戻り辺) で同じ (分岐先, 族) に戻る経路は寄与を空にする (葉の最小不動点)。循環を通った途中結果はメモしない。
+    - 循環 (ループの戻り辺) で同じ (分岐先, 族) に戻る経路は、循環の経路 (DFS の現在の path) に族の定義があれば葉 loop (未決)、
+      定義が無ければ寄与を空にする。循環を通った途中結果はメモしない。
+    - 宛先 32bit 未満の ext (movzx dx,bl 等) は、上位ビットが旧値に依存する部分書込なので未決 (partial_ext)。
   葉の定義の読み方は m11_setother_nonimm_class.py と同じ (mov imm・xor・全幅 copy・ext/即値演算の連鎖)。
   call は揮発族 (rax 以外も) を壊す → 葉 call_clobber (復元不能)。rax は戻り値 → 葉 call_ret (未決)。
   区分 (34 件ごと):
@@ -92,7 +94,8 @@ class Cfg:
                     and x.operands[0].imm in self.idx:
                 self.jsrc[self.idx[x.operands[0].imm]].append(i)
         self.memo = {}
-        self.busy = set()
+        self.busy = {}
+        self.path = []
         self.cut = 0
 
     def is_def(self, i, fam):
@@ -110,14 +113,16 @@ class Cfg:
             return self.memo[key]
         if key in self.busy:
             self.cut += 1
+            if any(self.is_def(j, fam) for j in self.path[self.busy[key]:]):
+                return [('未決', 'loop', None, hex(self.addr[i]))]
             return []
         if d > 200:
             self.cut += 1
             return [('未決', 'depth', None, None)]
-        self.busy.add(key)
+        self.busy[key] = len(self.path)
         n0 = self.cut
         r = list(dict.fromkeys(self.walk(i, fam, d)))
-        self.busy.discard(key)
+        del self.path[self.busy.pop(key):]
         if self.cut == n0:
             self.memo[key] = r
         return r
@@ -125,6 +130,7 @@ class Cfg:
     def walk(self, i, fam, d):
         k = i
         while True:
+            self.path.append(k)
             if k in self.jsrc:
                 if self.indirect:
                     return [('未決', 'merge_indirect', None, hex(self.addr[k]))]
@@ -168,6 +174,8 @@ class Cfg:
         w = info[1] if info else 0
         mask = (1 << w) - 1 if w else M64
         if mn in ('movzx', 'movsx', 'movsxd') and reg_of(src):
+            if w < 32:
+                return [('未決', 'partial_ext', None, at)]
             sfam, sw = reg_of(src)
             out = []
             for c, why, v, da in self.before(p, sfam, d):
