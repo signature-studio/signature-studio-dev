@@ -9,7 +9,7 @@
 - 3 件の PyArg 書式・引数の出力先・dispatch への渡し方・戻り値の経路を PE (`block00031_PE.bin`) から VA 付きで確定した。
 - **showPicker・openEventEditor は実装した** (mock と C の差分 0)。戻り値は PE の経路で None (stub の `openEventEditor` 戻り `int` とは食い違う。下の未解決)。作用先 (picker・エディタの起動) は未モデルの no-op。
 - **launchAudioEditor は保留**。戻り値 int は callee `0x118a810` の戻り値で、その意味が未同定。値を mock/C に書くと silent miscompile になるため実装しない。子 issue #3734 (PY-242) に移した。
-- 件数 (main 取り込み後の基準): 実装 162 → 164 (+2・`pe133`)、未実装 273 → 271。
+- 件数 (main 取り込み後の基準・`pe130` (PY-130) を含む): 実装 165 → 167 (+2・`pe133`)、未実装 270 → 268。
 - 引数の意味: 検索キー・格納・分岐の用途を VA で確定した (「引数の意味」節)。意味を確定できない引数 (`showPicker` の arg1・arg2、`eventId` の上位 16 bit、`newWindow=2` の委譲先) は、理由を書いて未解決表に載せた (子 #3734)。
 
 ## PE 根拠 (3 件)
@@ -67,24 +67,23 @@ PE: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_handler_probe.p
 
 ## 検証
 
-- 測定 commit: `670e99d9d` (コードを変えた最後の commit。main を取り込んだ merge。`provider_check.mjs` の競合を解消)。取り込み前の初回測定は `aeec4c877` (`feat(python): implement ui showPicker and openEventEditor (PY-133)`、件数 155 → 157)。
-- `git diff 670e99d9d HEAD -- tools/python ':!*.md'` の出力は空 (本節の後の変更は md のみ)。
-- 環境: runner 4 core、測定時の `uptime` は `load average: 0.31, 0.62, 0.56` (03:39:01)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64.tar.zst` を `tar --zstd -xf` で全展開、7.3 秒)。emsdk は `[EMSDK]` (`docs/REFERENCES.md`) の既定位置。
-- 前提の生成物 (gitignore・本測定で再生成): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、3 分 41 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0)。
+- 測定 commit: `4c0af89e6` (コードを変えた最後の commit。`origin/main` (`bb6bdcf41`) を取り込んだ merge。競合は `docs/DOC_MAP.md` と `tools/python/tests/provider_check.mjs` の 2 件)。取り込み前の測定 (`670e99d9d`・件数 164/271) は、main 取り込みで `tools/python` のコードが変わったため無効。
+- `git diff 4c0af89e6 HEAD -- tools/python ':!*.md'` の出力は空 (測定後の変更は REPORT の md のみ)。
+- 環境: runner 4 core、測定直後の `uptime` は `load average: 0.97, 1.24, 0.67` (04:12:00)。emsdk は上流 `emsdk` を `$RUNNER_TEMP/emsdk` に `install 6.0.12` して activate し、`/opt/emsdk` へ symlink した (`build_cpython_wasm.sh`・`build_flpy.sh` の既定値が `/opt/emsdk`)。`fl-win64` 素材は `extracted/block25159_DATA.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block24618_DATA.bin` の 4 ブロックだけを `tar --zstd -xf` で展開し (2.3 秒)、`FL_WIN64_DIR` に指定した。
+- 前提の生成物 (gitignore・`work/`・`dist/`): `FL_WIN64_DIR=<展開先> bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、wasm 段 2 分 5 秒。初回は `/opt/emsdk` が無く rc 1 で止まったため symlink 後に再実行。native 段は初回に完了済み)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.6 秒。表は追跡済みの `flapi_table.json` を使った)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0 (`dist/flprov.wasm` 64,219 B) | (未計測) |
-| `node tests/ui_editor_diff.mjs` | PASS (正常 6・異常 8・diffs 0) | 0.041 秒 |
-| `node tests/ui_display_diff.mjs` | PASS (正常 12・異常 11・diffs 0・displayTime 2000) | 0.041 秒 |
-| `node tests/ui_diff.mjs` | PASS (calls 17・diffs 0・範囲外既知差分 3) | 0.042 秒 |
-| `node tests/ui_state_diff.mjs` | PASS (calls 33・diffs 0) | 0.042 秒 |
-| `node tests/provider_check.mjs` | PASS (functions 435 / 実装 164 / 未実装 271 / MCP 静的 60) | 0.286 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.419 秒 |
+| `bash provider/build.sh` | rc 0 (`dist/flprov.wasm` 66,155 B・`ハンドラ 167`) | 1.138 秒 |
+| `node tests/ui_editor_diff.mjs` | PASS (正常 6・異常 8・diffs 0) | 0.04 秒 |
+| `node tests/ui_display_diff.mjs` | PASS (正常 12・異常 11・diffs 0・displayTime 2000) | 0.04 秒 |
+| `node tests/ui_diff.mjs` | PASS (calls 17・diffs 0・範囲外既知差分 3) | 0.04 秒 |
+| `node tests/ui_state_diff.mjs` | PASS (calls 58・diffs 0) | 0.04 秒 |
+| `node tests/provider_check.mjs` | PASS (functions 435 / 実装 167 / 未実装 268 / MCP 静的 60) | 0.459 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.443 秒 |
 
-- コミット済み HEAD (`670e99d9d`) で `provider/build.sh` と `build_flpy.sh` を再実行し、上の表の検査が同じ結果で PASS することを確認した (初回の `aeec4c877` でも同じ結果)。
-- ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `ui.openEventEditor` の個数上限を 3 から 2 にすると `node tests/ui_editor_diff.mjs` は rc 1 (`AssertionError: ui.openEventEditor`)。元に戻すと PASS。
-- 差し戻し対応 (文書のみ): `git diff 670e99d9d HEAD -- tools/python ':!*.md'` の出力は空 (本 run の変更は md だけ。HEAD は PR 本文に記載)。PE は `FL_WIN64_DIR=$RUNNER_TEMP` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP`・PE は `$RUNNER_TEMP/extracted/block00031_PE.bin`) で再確認した。`analysis/flapi/pe_handler_probe.py launchAudioEditor openEventEditor showPicker` の fn VA・書式・既定値、`pe_disasm.py` の `e34450`・`e34190`・`e34220`・`e3d440`・`e366a0`・`d6ef20`・`d6f280`、`pe_va_read.py d6ef7c` (= `0x01`) は本節の VA と一致した。この run では emsdk が無く (`toolchain-emsdk` 素材は未取得)、`provider/build.sh` で `dist/flprov.js` を作れないため、node テスト (`ui_editor_diff.mjs`・`provider_check.mjs`) は再実行できなかった。コード差分が 0 行のため、上の測定表は HEAD に対して有効のままとする。
+- ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `ui.openEventEditor` の個数上限を 3 から 2 にすると `node tests/ui_editor_diff.mjs` は rc 1 (`AssertionError [ERR_ASSERTION]: ui.openEventEditor(7,2,1) は None を返す`・actual `code: 5`)。元に戻すと `arity(a, 2, 3)` に戻り、テストは PASS (本節の測定と同じ run で確認)。
+- PE の VA (「引数の意味」節) は、前の run で `pe_handler_probe.py`・`pe_disasm.py`・`pe_va_read.py` により再確認済み。本 merge は PE 解析の入力に触れていない。
 
 ## 製品 KPI (起動・GUI に関わる PR の記載)
 
