@@ -92,5 +92,13 @@ python3 tests/batch_flips.py <修正前の batch_sample_800.jsonl> <修正後の
 
 ## 8. 測定 commit と HEAD 差分
 
-- 測定 commit (コードを変えた最後の commit): `3be39188d` (int 切り詰め)。spike (§3) は `3be39188d` を committed HEAD で再現した。e2e (§3・§3.1) は `3be39188d` と byte 同一の作業ツリーで実行した (`cmp` で確認)。
-- `git diff 3be39188d HEAD -- tools/liftdiff/rt tools/liftdiff/spike_cfi.py tools/liftdiff/ldlib tools/liftdiff/liftdiff_e2e.sh` の出力は空 (コード差分 0)。以後の commit は REPORT の文書だけ。
+- 測定 commit (コードを変えた最後の commit): `20fb4ad90` (origin/main を取り込んだ merge commit)。この commit で spike・e2e を再測定した (§9)。
+- main 取り込み (`20fb4ad90`) で `rt/ld_native.c`・`spike_cfi.py`・`ldlib/*`・`liftdiff_e2e.sh` が変わったため、`3be39188d` の測定値は現 HEAD の値として使わない。
+- `git diff 3be39188d HEAD -- tools/liftdiff/rt tools/liftdiff/spike_cfi.py tools/liftdiff/ldlib tools/liftdiff/liftdiff_e2e.sh` は main 由来の差分 (8 files・139 insertions) を含む。以後の commit は REPORT の文書だけ。
+
+## 9. main 取り込み後の再測定 (HEAD `20fb4ad90`)
+
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)。`work-m11`・`work-liftdiff` を worktree の `tools/m11/work`・`tools/liftdiff/work` に展開。
+- spike (`python3 spike_cfi.py`): units_run=892/942・first_fail=149 (abort rip_rva `0x7ffff789ec0c`・InitCount 145・失敗 15 unit)。CreateFruityInstance は segv (`0xd053a9`)。実時間 10.3 s。
+- e2e (`bash liftdiff_e2e.sh --m11-only`): LIFTDIFF_E2E PASS・一致 360 / 不一致 234 / 実行不能 206。CHECK_INITUNITS PASS。実時間 2 分 44.9 秒。
+- 既定 (stk 修正あり) の spike は 928/942・830 に戻っていない。B2 の条件 (a) (既定 off の切替) または (b) (#3946 の修正を含める) は、本 run では未実装。判断は PM。
