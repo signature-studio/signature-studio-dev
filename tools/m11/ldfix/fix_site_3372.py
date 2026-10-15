@@ -83,7 +83,9 @@ def edits_6074b0(body):
                  '  %a1g_p = inttoptr i64 %arg1 to ptr\n'
                  '  %a1g = load i64, ptr %a1g_p, align 8\n'
                  '  %0 = call i64 @function_4256c0(i64 %a1g)\n')]
-    if body.count('  %0 = call i64 @function_4256c0(i64 %ldfxu24)\n') == 1:
+    m = re.findall(r'  %ldfxu(\d+)_p = inttoptr i64 %arg1 to ptr\n  %ldfxu\1 = load i64, ptr %ldfxu\1_p, align 8\n'
+                   r'  %0 = call i64 @function_4256c0\(i64 %ldfxu\1\)\n', body)
+    if len(m) == 1:
         return []
     raise AssertionError('call 4256c0 row: neither base form nor ldfix form')
 
