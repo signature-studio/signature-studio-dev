@@ -8,7 +8,7 @@
 
 - **691dd0**: native segv の原因は、小サイズ用アロケータ (`0x407a50`) のビン読み `0x407a97` (`mov rax,[rdx+0x18]`) で、rdx=0 (ビン先頭 `[rbx+8]` が 0)。fault addr は `0x18`。boot 状態を読んでも同じ segv で、LD-159 の「大域ビン (`0x407a50` の表) が 0 のまま」と同型。`691dd0` は rcx のオブジェクト (`[rcx+0x78]`・`[rcx+0x94]`・`[rcx+0x8c]`) を読んで確保 (`0x409410`) を呼ぶ。有効なオブジェクトを渡す case は作れていない (§2)。**判定には入らない** (11 パターンとも `native_null_deref_all_patterns`)。
 - **653c80**: segv の rip は **0** (`rip_rva=0xffffffffffc00000`)。`0x653c8d` の `call qword ptr [rip+0xf9f7ed]` が、.bss の slot (`VA 0x15f3480`) が 0 のまま null を呼ぶ。r8 が `0x7fffffff` 未満の経路 (`cmp r8,0x7fffffff` → `jge` を取らない) で発生する。fault addr は記録されず、呼び先 slot は boot 状態でも未設定 (§2)。**判定には入らない** (11 パターンとも `native_fault_all_patterns`)。
-- **irtool.instrument の i128 入口記録**: 修正した (受入 (a))。i128 引数を `trunc i128 %x to i64` で下位 64bit として `ld_trace` に記録する。旧版は `0` と記録していた。sample:800 の判定差は前の測定 (`57a146a96`) で **0 件** (360/234/206 のまま。関数単位の判定差 0・§3)。HEAD `d256d3432` の実測は 361/233/206 (§5)。
+- **irtool.instrument の i128 入口記録**: 修正した (受入 (a))。i128 引数を `trunc i128 %x to i64` で下位 64bit として `ld_trace` に記録する。旧版は `0` と記録していた。sample:800 の判定差は前の測定 (`57a146a96`) との突合で **0 件** (360/234/206 のまま・§3)。HEAD `d256d3432` の実測は 361/233/206 (本 run) と 360/234/206 (reviewer の round 5 実測) の 2 通りで揺れた (§3・§5)。
 - `cmp_trace` の i128 位置の除外 (`compare.py`) は**残した**。除外を外すと、xmm0 を trunc した値と native の値が合うかの確認が要るため、この PR では判定の経路を変えない (§4 の未解決)。
 
 ## 1. 方式
@@ -40,9 +40,11 @@
 |---|---|---|---|---|
 | 修正前 `feec9980a` | 360 | 234 | 206 | — |
 | 修正後 `57a146a96` (前の測定) | 360 | 234 | 206 | **0 件** (800 件を突合) |
-| 修正後 HEAD `d256d3432` (実測 2 回) | 361 | 233 | 206 | 2 回とも同値 (1 回目と 2 回目の関数単位の判定差 0 件) |
+| 修正後 HEAD `d256d3432` (実装 run の実測) | 361 | 233 | 206 | 未突合 (修正前 `feec9980a` との関数単位の突合は未実施) |
+| 修正後 HEAD `d256d3432` (reviewer の round 5 実測) | 360 | 234 | 206 | 未突合 |
 
-- 突合は修正前の `batch_sample_800.jsonl` (退避) と修正後の出力の `verdict`・`unexec_reason` の比較。
+- 関数単位の判定差 0 件は `57a146a96` の突合に限る (突合は修正前の `batch_sample_800.jsonl` (退避) と `57a146a96` の出力の `verdict`・`unexec_reason` の比較)。
+- HEAD `d256d3432` で 2 通りの値が出た。実装 run の 2 回 (e2e 内 batch と単独再実行) は 361/233/206 で一致し、reviewer の round 5 実測は 360/234/206。1 件の揺れの原因と、どの関数が揺れたかは未特定。case 単位の揺れとして #3881 ([LD-182]) に紐づける。
 
 ## 4. 未解決 (起票先)
 
@@ -57,8 +59,10 @@
 - 測定 commit `d256d3432` (検証 HEAD)。実測は素材 `fl-win64`・`work-m11`・`work-liftdiff`・`toolchain-emsdk` を `$RUNNER_TEMP` / `tools/{m11,liftdiff}/work` に展開して行った (`tools/m11/m11_gen_ir2.sh` で `ir_conditions.json` を作ってから)。
 - e2e: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/liftdiff/liftdiff_e2e.sh --m11-only` → **exit 0・`LIFTDIFF_E2E PASS`・`real 3m14.299s`** (開始時 load 0.73・終了直後 5.21)。
 - 単体 (e2e の `[0/4]`・`[3/4]`): `PASS test_ld52_machine_sig`・`PASS test_ld181_i128_entry`・`PASS test_ld179_tagpoint_tr`・`PASS` の 3 件 (UStrAsg・Move・4123c0)・`CHECK_INITUNITS PASS`。
-- sample:800 (`--shards 12 --state auto`): e2e 内の batch は `done 113s`・結果 `361 / 233 / 206`。同 HEAD で `liftdiff.py batch` を単独で再実行 (`real 1m54.597s`) しても `361 / 233 / 206`。関数単位の判定は 2 回の突合で 0 件差。
-- 前の測定 (`57a146a96`) は `360 / 234 / 206`。HEAD の実測は 1 件ずれて `361 / 233 / 206` で、2 回とも同じ。HEAD の値を正とする。
+- sample:800 (`--shards 12 --state auto`) の HEAD `d256d3432` の値は 2 通り:
+  - 実装 run: e2e 内の batch は `done 113s`・結果 `361 / 233 / 206`。同 HEAD で `liftdiff.py batch` を単独で再実行 (`real 1m54.597s`) しても `361 / 233 / 206`。
+  - reviewer の round 5 実測 (同じ HEAD・e2e exit 0・`real 3m08.717s`): `360 / 234 / 206`。
+  - 前の測定 (`57a146a96`) は `360 / 234 / 206`。HEAD の値の 1 件の揺れは、関数単位の突合を行っていないため、どの関数が揺れたかは未特定。
 - 前の測定 `57a146a96` の e2e: `real 2m44.456s`。修正前 `feec9980a`: `real 2m44.474s` (load 0.03)。
 - `57a146a96` から HEAD までのコード差分 (`git diff 57a146a96 d256d3432 -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh`):
 
