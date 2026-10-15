@@ -38,7 +38,7 @@ GTYPE = {
         '1813a1d40': 'FNPTR',
     },
     # stereo 閉包 (#4911 KH-134): 型不一致 12 → 2 (emcc error 10 件の解消。本規則が効く C の行は 6 箇所)。
-    # 型は同じ PE の同じ VA を delay の表 (上) で機械語確定済みのものを流用する。stereo 側の命令の幅は未確認 (REPORT に明記)。
+    # 型は同じ PE の同じ VA を delay の表 (上) で機械語確定済みのものを流用する。stereo 側の命令の幅は逆アセンブルで確認済み (REPORT_APPENDIX_4911.md)。
     #   stereo.c 行 1318・1869・1870・1884・1885: `_DAT_182989380`・`_DAT_184162a98` の xor/shift (64bit) → ulonglong。
     #   stereo.c 行 2290: `_DAT_18436cd18 = puVar3 + 0x40` (8 byte 書込み) → longlong。
     # 残り (1300・1888): `(*_DAT_1813a1d40)(param_1)` の間接呼出し。FNPTR (void (*)()) にすると戻り値を代入する行が void 代入の error になるため未解決。

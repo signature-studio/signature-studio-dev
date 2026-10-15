@@ -38,7 +38,18 @@
 | `184162a98` | `ulonglong` | delay 表と同一 VA。stereo の xor/shift 行 1884・1885 |
 | `18436cd18` | `longlong` | delay 表と同一 VA。stereo の代入行 2290 (`_DAT_18436cd18 = puVar3 + 0x40`) |
 
-- **注意 (未検証)**: 型は delay 表の機械語確定 (同一 PE・同一 VA) を流用した。stereo 閉包の命令の幅は逆アセンブルで**確認していない**。突合 (Stereo の 1000 trial) は未実施 (下記)。
+- **命令幅の確認 (逆アセンブル・確認済み)**: 素材 `plugins-kilohearts` の `HeartCore.core_64` (sha256 先頭 `d55ce8b4`) を `objdump -d -M intel` で全逆アセンブルし、4 VA を RIP 相対で指す命令を全件数えた。
+
+  | VA | 型 | 参照命令数 | 命令 (内訳) | 幅 |
+  |---|---|---|---|---|
+  | `182989380` | ulonglong | 3,708 | mov 3,707・cmp 1 | `QWORD PTR` 全件 |
+  | `184162118` | ulonglong | 2 | mov 1・xor 1 | `QWORD PTR` 全件 |
+  | `184162a98` | ulonglong | 3 | mov 1・xor 2 | `QWORD PTR` 全件 |
+  | `18436cd18` | longlong | 2 | mov 2 | `QWORD PTR` 全件 |
+
+  - 確認方法: 逆アセンブル全体で `# 0x<VA>` の注釈を持つ行を抽出し、RIP 相対以外の参照は 0 件、幅指定は `QWORD PTR` のみ (BYTE・WORD・DWORD・XMMWORD は 0 件)。
+  - 結論: 4 件の幅はすべて 8 byte。`GTYPE['stereo']` の 4 件は正しい。
+- 突合 (Stereo の 1000 trial) は未実施 (下記)。
 - `GTYPE` は `stereo` キーにだけ効く (gain・haas・gate の GTYPE は空)。gain・haas・gate の突合は本 HEAD で再実行し、REPORT 記載値と一致 (下記)。
 
 #### 実測
