@@ -557,6 +557,10 @@ FL_H(ui, getFocusedFormCaption) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getFocusedPluginName) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getHintMsg) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, isInPopupMenu) { NARGS(0, 0); return fl_ret_b(c, 0); }
+/* PY-129 (#3006): PE 0xd6c5b0 (setHintMsg 's')・0xd6ce50 (setFocused 'i')・0xd6b7b0 (setSnapMode 'i') は呼出し経路を確定 (REPORT_PY129)。状態は持たない (仮置き) */
+FL_H(ui, setHintMsg) { NARGS(1, 1); (void)A_STR(0); return fl_ret_none(c); }
+FL_H(ui, setFocused) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
+FL_H(ui, setSnapMode) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
 /* PY-128 (#3005): PE 0xd6c250 は状態を読まず、rodata の UTF-16 定数 "FL Studio 2026" (長さ接頭辞 14) を返す (REPORT_PY128) */
 FL_H(ui, getProgTitle) { NARGS(0, 0); return fl_ret_s(c, "FL Studio 2026"); }
 /* PE 0xd6cb60 は PyArg "ii" (None・文字列・実数は TypeError) の後、0x11f1a70 で (int32)(value*100) を max で割り、

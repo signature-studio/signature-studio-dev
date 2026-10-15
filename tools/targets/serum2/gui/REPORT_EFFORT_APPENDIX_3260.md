@@ -87,7 +87,7 @@
 | フォントサイズを無視する (`size` は保持のみ)。比例幅・ディセンダの余白なし | 文字の大きさ・字間は実フォントと一致しない | PM agent の判断待ち: 実フォント資源 (サイズ・比例幅) を扱うか・既定案: 5x7 placeholder を維持 |
 | `drawLine`・`drawLines`・`drawPolygon`・`drawArc`・`drawEllipse`・`drawBitmap`・`drawGraphicsPath`・gradient 2 件・9 分割・`fillRectWithBitmap` は no-op | CTextLabel の枠は `drawGraphicsPath` 経路なので描かれない。黒背景は `drawRect` で描かれる | 子 #3422 (SR-55) |
 | 線は lineWidth に依らず 1 px。アンチエイリアスなし | 太い線・角の見え方が実機と異なる | 子 #3424 (SR-56) |
-| `setTransformMatrix` は no-op (平行移動・拡大縮小は未適用) | 原点 (0,0) 以外の view では描画位置がずれる。harness は原点のみで検証 | 子 #3424 (SR-56) |
+| `setTransformMatrix` は no-op (平行移動・拡大縮小は未適用) | 原点 (0,0) 以外の view では描画位置がずれる。harness は原点のみで検証 | 解消: #4428 (SR-69・`REPORT_EFFORT_APPENDIX_4428.md`)。原点以外の view の実測済み |
 | placeholder の 5x7 フォント | 確認用の見た目のみ。製品の字形としては使わない | PM agent の判断待ち: 実フォント資源 (サイズ・比例幅) を扱うか・既定案: 5x7 placeholder を維持 |
 | wasm の初期化経路 (`getPlatformFactory` の代替と `CFontDesc::init()` の直呼び) | 解消済み (main の #3261 で `init()` 経路化。§17-10 の再測定で run rc=0) | #3261 (SR-51・main に取り込み済み) |
 | XferOnOffButton の canvas 実装 | 範囲外 | #3262 (SR-52) |
