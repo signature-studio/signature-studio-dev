@@ -81,7 +81,7 @@ origin/main の x64c で同じ root を lift すると unsup 2,472 (issue 本文
 ## 6. 回帰と実測
 
 - `lift_wc.sh ok` (WaveformColouring): 前回 (`b2b898522`) は **PASS 64/64**、FAIL 0、traps 0、native 64 (SIGSEGV 0)。閉包の unsup は 3 → 2 (`vcvtss2sd` が解消。残りの `vpmovsxdq`・`vshufps` は本件の範囲外)。
-  - **最終 HEAD (`e49bf7c9d`) では本 run で未実行**。`toolchain-emsdk` が素材に無く (`$HOME/artifacts` は `fl-win64.tar.zst` のみ)、emcc が無いため。本 PR 本文の `oc_artifacts: fl-win64 toolchain-emsdk` で次の検収 run が再実行する前提 (review 指摘 2)。`e49bf7c9d` の変更 (pushfq の IF 定数・vpunpcklqdq の表除去) が WC 閉包の出力に当たるかは、その再実行で判定する。
+  - **最終 HEAD (`e49bf7c9d`) では本 run で未実行**。`toolchain-emsdk` が素材に無く (取得済みの素材は `fl-win64` の 1 本のみ)、emcc が無いため。本 PR 本文の `oc_artifacts: fl-win64 toolchain-emsdk` で次の検収 run が再実行する前提 (review 指摘 2)。`e49bf7c9d` の変更 (pushfq の IF 定数・vpunpcklqdq の表除去) が WC 閉包の出力に当たるかは、その再実行で判定する。
 - 生成 C のコンパイル: PSOLA 閉包の `fle_lifted.c` を `gcc -c -I tools/flelift/rt` で通過 (rc 0・`e49bf7c9d`)。
 
 | 測定 (`e49bf7c9d`、4 core、各 3 回) | 結果 |
