@@ -1,0 +1,6 @@
+{
+  "tag": "stub89",
+  "refs": ["#2805"],
+  "note": "stub 確定 2 関数 (REPORT_PY41_1514 追補 #2805・PY-89)。PE 0xd5bd60 / 0xd5bcd0 で範囲検査と戻り field を確認",
+  "functions": ["channels.getChannelIndex", "channels.getChannelMidiInPort"]
+}

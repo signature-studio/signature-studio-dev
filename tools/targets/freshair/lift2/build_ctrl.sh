@@ -83,17 +83,19 @@ ICALLS=(
 
 # ---- FA-2c: 2 段 lift。closure 内の `lea r64,[rip+X]` 関数ポインタ (引数受け回し) を icall seed に追加する。
 #      1 回目で closure (ctrl_rep.json) を確定 → icall_extra.py で seed を抽出 → 2 回目で本 lift。
+TRACE9=(); TRACE_EXP=""
+[ -n "${FA_TRACE9:-}" ] && { TRACE9=(--trace 180c9d700:180c9d760); TRACE_EXP=",_fa_trace_ptr,_fa_trace_count"; }   # #1789: setter 入口〜出口の命令前レジスタ (既定 OFF)
 python3 "$HERE/mlift/mlift.py" "$CORE" ctrl_full.ll \
   "${ROOTS[@]}" "${ICALLS[@]}" \
   --map 0x181030490=fa_memmove --map 0x18106a3a0=fa_mxcsr_get --map 0x18106a3ba=fa_mxcsr_set \
-  --stub 18103d37c --stub 18103d47c --stub 18102f728 "${POKES[@]}" --report ctrl_rep.json
+  --stub 18103d37c --stub 18103d47c --stub 18102f728 "${POKES[@]}" "${TRACE9[@]}" --report ctrl_rep.json
 ICALL_EXTRA=$(python3 "$HERE/icall_extra.py" "$CORE" "$W/ctrl_rep.json")
 echo "icall_extra: $ICALL_EXTRA"
 
 python3 "$HERE/mlift/mlift.py" "$CORE" ctrl_full.ll \
   "${ROOTS[@]}" "${ICALLS[@]}" $ICALL_EXTRA \
   --map 0x181030490=fa_memmove --map 0x18106a3a0=fa_mxcsr_get --map 0x18106a3ba=fa_mxcsr_set \
-  --stub 18103d37c --stub 18103d47c --stub 18102f728 "${POKES[@]}" --report ctrl_rep.json
+  --stub 18103d37c --stub 18103d47c --stub 18102f728 "${POKES[@]}" "${TRACE9[@]}" --report ctrl_rep.json
 
 python3 -c "
 import json; r=json.load(open('ctrl_rep.json')); open('iat_slots.txt','w').write('\n'.join('%s %s'%(k[2:],v) for k,v in r['iat_slots'].items())+'\n')"
@@ -112,7 +114,7 @@ print(','.join('_fa_root_%s' % v.replace('0x','') for v in roots))")
 python3 "$HERE/gen_win_stubs.py" "$CORE" > win_stubs.c
 emcc -w -O1 -ffp-contract=off -frounding-math -fno-fast-math ctrl_full.ll "$HERE/shim/host_wasm.c" win_stubs.c \
   -sERROR_ON_UNDEFINED_SYMBOLS=1 -sMODULARIZE=1 -sENVIRONMENT=node -sALLOW_MEMORY_GROWTH=1 \
-  -sEXPORTED_FUNCTIONS="${EXPORTS},_fa_va2ptr,_malloc,_free,_fa_heap_zero" -sEXPORTED_RUNTIME_METHODS=HEAPU8,stackSave,stackRestore --no-entry -o ctrl_full.js
+  -sEXPORTED_FUNCTIONS="${EXPORTS},_fa_va2ptr,_malloc,_free,_fa_heap_zero${TRACE_EXP}" -sEXPORTED_RUNTIME_METHODS=HEAPU8,stackSave,stackRestore --no-entry -o ctrl_full.js
 cp ctrl_full.js ctrl_full.cjs
 clang -O1 -ffp-contract=off -frounding-math -w -o native_ctrl "$HERE/native/native_ctrl.c" || { echo "ERROR: native_ctrl の clang が失敗 (build_ctrl.sh)" >&2; exit 1; }
 [ -x native_ctrl ] && [ -f ctrl_full.cjs ] || { echo "ERROR: ctrl build の成果物 (native_ctrl / ctrl_full.cjs) が無い" >&2; exit 1; }

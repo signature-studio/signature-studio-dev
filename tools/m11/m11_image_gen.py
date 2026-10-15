@@ -13,7 +13,9 @@ from lb_base import LB, IMG_BASE
 sys.path.insert(0, os.environ.get('M11_OTTLIB_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'm6')))
 from ottlib import Bin
 HERE = os.path.dirname(os.path.abspath(__file__))
-WINF = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('M11_PE') or os.path.join(os.environ.get('FL_WIN64_DIR') or '/home/ubuntu/work/analysis/win64', 'extracted', 'block00031_PE.bin')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared'))
+from paths import FL_WIN64_DIR
+WINF = sys.argv[1] if len(sys.argv) > 1 else os.environ.get('M11_PE') or os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
 OUT = os.environ.get('M11_IMAGE_OUT', os.path.join(HERE, 'work', 'm11_image.bin'))
 KEEP = ('.text', '.data', '.rdata', '.didata')
 VA_SPAN = 0x1ac0000

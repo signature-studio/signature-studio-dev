@@ -22,6 +22,24 @@ const P_ = {
   ctor: [M._fa_root_180774cd0, M._fa_root_180b6ed50, M._fa_root_180afde00],
 };
 const RET0 = 0x1803b4070n;
+/* #1789 FA_TRACE9=1 (既定 OFF): setter 0x180c9d700 の入口〜出口の命令前レジスタ (--trace 0x180c9d700:0x180c9d760) を読み、
+ * 0x180c9d724 (ca1480 戻り直後) の rax=out[0]・rcx=out[0]+0x10 と、0x180c9d741 (vtable 読み直前) の rcx・[rcx] を出す。
+ * 行 = 81 x u64 (VA, GPR16 (rax,rcx,rdx,rbx,rsp,rbp,rsi,rdi,r8..r15), XMM16x4)。 */
+let traceFrom = 0;
+const traceSetter = (sidx) => {
+  const base = Number(M._fa_trace_ptr()), n = Number(M._fa_trace_count()); const rd = (p) => dv().getBigUint64(p, true);
+  for (let r = traceFrom; r < n; r++) {
+    const row = base + r * 81 * 8, va = Number(rd(row));
+    if (va !== 0x180c9d729 && va !== 0x180c9d741 && va !== 0x180c9d74c) continue;
+    const rax = rd(row + 8), rcx = rd(row + 16), rsp = Number(rd(row + 8 + 4 * 8));
+    const out0 = va === 0x180c9d729 ? rd(rsp + 0x48) : null;
+    const inHeap = rcx > 0n && rcx + 8n <= BigInt(M.HEAPU8.length);
+    const vt = va === 0x180c9d741 && inHeap ? rd(Number(rcx)) : null;
+    console.error('TRACE9 S' + sidx + ' va=' + va.toString(16) + ' rax=' + rax.toString(16) + ' rcx=' + rcx.toString(16) +
+      ' out0=' + (out0 === null ? 'n/a' : out0.toString(16)) + ' vt=' + (vt === null ? 'n/a' : vt.toString(16)));
+  }
+  traceFrom = n;
+};
 const mdummy = al(32);                                            // model ctor arg2: [arg2+4] を M+0xa088 に写す (0)
 const CHAIN = [1, 0, 1, 0, 2, 0, 2, 2];
 const flagPtr = Number(M._fa_va2ptr(0x1813070f8n));
@@ -103,7 +121,8 @@ for (const line of lines) {
         case 9: P_.slot10(B(F), B(ctx)); break;
         default: P_.process(B(F), B(ctx));
       }
-    } catch (e) { M.stackRestore(sp); o += ' |ERR'; if (process.env.FA_DBG) console.error('ERR', String(e).slice(0, 90), String(e.stack || '').split('\n').slice(1, 4).join(' | ')); bad = true; }
+    } catch (e) { M.stackRestore(sp); o += ' |ERR'; if (process.env.FA_DBG) console.error('ERR', String(e).slice(0, 90), String(e.stack || '').split('\n').slice(1, 4).join(' | ')); bad = true;
+      if (process.env.FA_TRACE9 && M._fa_trace_ptr) traceSetter(sidx); }
     if (bad) { /* canary 検査省略 (native も ERR 後 skip) */ }
     else {
       let gv = chk(F, 0x400) + chk(Mo, 0xc000) + chk(ctx, 0x100) + chk(L, (n + 1) * 4) + chk(R, (n + 1) * 4);
