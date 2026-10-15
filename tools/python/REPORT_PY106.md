@@ -33,7 +33,7 @@
 - 型の読み方: `0x16b8488` は束縛で resolver の戻り値が入る slot。sink の 3 段 load は、その戻り値が**型変数の番地**であること (2 段目で `[R]` を読んで型オブジェクトを得る) を要求する。resolver 0x4235f0 の data 名に対する挙動は未読 (推定)。
 - 検算: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/exc_type_chain.py` → 5 項目 `OK`・`RESULT PASS fails=0` (real 0.09 s、n=3。HEAD `73a65fc4a` で再実行して同じ結果)。
 - 直接実行の測定 (§2-2): 測定 commit `73a65fc4a` (計数と名前表の読みを throw 経路でも行う修正のみ。boot の経路は不変)。`FLE_PY106_BIND=1 FLE_BOOT_TAG=py106 FLE_BOOT_RUNS=negctl bash tools/flelift/boot/fle6_measure.sh` → rc 0・real 3 分 29.5 秒 (lift 80 s・clang plain 98 s・boot 24 s、boot 開始時 load `1.98 1.04 0.46`)。units_run 209/942・IPP 判定 ok。`FLEBOOT_PY106B` は threw `exit`・名前 0 件・GetProcAddress 0 回・Python312 の load hook 0 回 (§2-2)。
-- 測定 commit から本 REPORT の commit までのコード差分: `git diff 73a65fc4a HEAD -- tools/flelift/boot tools/python/analysis/flapi` の出力は 0 行 (以降の差分は本 REPORT と `results/` の JSON だけ)。
+- 測定 commit から本 REPORT の commit までのコード差分: `git diff 73a65fc4a HEAD -- tools/flelift/boot tools/python/analysis/flapi ':(exclude)tools/flelift/boot/results'` の出力は 0 行 (以降の差分は本 REPORT と `results/` の測定 JSON 2 件だけ。`results/` を含めると 294 行の追加)。
 - 束縛関数 0xc395a0 の呼出し元は `0xc3b3a2` の 1 件 (`.text` 全域の `e8` rel32 走査)。その上位の起動経路は未追跡。
 - **REPORT_PY91 §7 の訂正**: 同節の `rcx = *(*(0x15e1140))` は 2 段と書いたが、実際は 3 段 (上表)。PY91 §7 は式だけ直した。
 
