@@ -215,7 +215,7 @@
 | `tools/m11/REPORT_N3113.md` | 103 | #3113 (M11-N168): 新規範囲内 word の 4 類分類 (A 関数 VA / B 未 remap 疑い / D イメージ由来の LVA コピー / C 他)・分類 B の基準 (run は f3aa9450 で 0 で合格・注入で FAIL)・D の block copy 根拠 (`m11_ptrclass.py`)・survey と `--survey` の negctl 未実行の理由 (wasm が survey 用 export を持たない)・測定 commit からの差分 (§8) |
 | `tools/m11/REPORT_N2768.md` | ~185 | #2768 (M11-N155): 寛容起動で skip した unit が trap までに heap へ書いた範囲 (72 unit の表)・上位のリスク評価 (推定)・PR #2752 との環境差。heap 範囲の結論は REPORT §0 を参照。集計は `m11_tolerant_heap.py`・測定は `m11_tolerant.mjs` の `M11_HEAP_FROM`/`M11_HEAP_OUT` |
 | `tools/m11/REPORT_N2714.md` | ~150 | #2714 (WIN-3): m11 寛容起動 (tolerant boot) の実測 (942 試行・ok 874・skip 67 の種類別・DllMain 戻り値 1)・skip unit の状態欠落リスク順位 (推定)・既存経路の回帰 (strict 56・survey 872) とネガコン。実装は `m11_tolerant.mjs`・`m11_tolerant_gate.py`・§4-2 の区間内訳は `m11_tolerant_sections.py` |
-| `tools/m11/REPORT_APPENDIX_3188.md` | ~81 | m11 #3188 (親 #3188・子 #3229): LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (REPORT_N403 §7 の全文。旧測定 `6a20f8b1`・merge 後の状態 §7-0・未特定の原因) |
+| `tools/m11/REPORT_APPENDIX_3188.md` | ~95 | m11 #3188 (親 #3188・子 #3296): LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (REPORT_N403 §8 の全文。main 取り込み後の HEAD での再測定・IR 突合・memcpy 源 NULL の修正の参照・未特定の原因) |
 | `tools/m11/REPORT_N15.md` | ~16 | m11 REPORT §16 (#490 main HEAD の 4c3baa4 / faee5b6 状態の実測・ネガコン) の付録 (250 行上限のため分割) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` | ~134 | #2770 (LD-129): native 側 0x5ac308 の書込み監視 (`rt/ld_native.c` の `LD_WATCH_ADDR`)。REPORT_1783.md の旧 §8 を 250 行上限のため無変更で分割移動した節の全文 |
 | `tools/m11/REPORT_APPENDIX_1430.md` | ~60 | m11 #1430 の基準 (before) 節の全文 (`REPORT_APPENDIX.md` §9 の後続。xmm 引数の callee 署名復元の前測定 (survey 基準 ok/trap/miss/noproc の実測)・`work-m11` 由来の 7 カテゴリ (和 1,963)。全再生成 IR の測定は #1532) |
