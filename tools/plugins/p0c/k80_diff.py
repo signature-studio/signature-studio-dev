@@ -538,6 +538,10 @@ def gen_driver(kernels, funcs, cases, proto=None):
                 si2, isfp = ent[0], ent[1]
                 if pt in ('float', 'double'):
                     ir_expr.append('(%s)vI[%d].f' % (pt, si2))
+                elif isfp and kind2 == 'xmm' and d2[1] == 64:
+                    # 64bit の xmm (*sd: mulsd 等) は機械語が double として読む (#3641)。
+                    # 値は double で敷設済み (vI.f) なので、その bit 表現をそのまま渡す
+                    ir_expr.append('(u64)vI[%d].u' % si2)
                 elif isfp:
                     # fp slot の値を整数型引数 (i32 = f32 bits) に渡す: float の bit 表現
                     ir_expr.append('fbits((float)vI[%d].f)' % si2 if pt in ('i32', 'i16', 'i8')

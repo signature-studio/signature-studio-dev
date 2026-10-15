@@ -117,6 +117,16 @@ pdata の関数境界ごとに逆アセンブル (capstone) し、E8/E9 の直�
 - 所要 (n=1・参考値): `build_ctrl.sh` 30.0 s・`fa31_ctl.sh` 0.37 s・`run_ctrl.sh 2 5` 2.7 s・load 0.30→0.55。この節が所要の唯一の記載箇所。
 - 製品 KPI: **動かしていない** (native harness の診断のみ)。
 
+### 8.1 FA-46 (#4036): popup 入力 PB の範囲修正
+
+- 逆アセンブル (`disasm.py`): `0x180d8c0b0` は `[P+0xbb8]` (PB) を this にして `0x180d0a040` を呼ぶ。`0x180d0a040` は `[this+0xb30]`〜`[this+0xb40]` を読み書きし、`0x180d09ac0`・`0x180f8feb0`・`0x180cbb270` を呼ぶ。旧 harness は PB を 0x100 B しか確保しておらず、`+0xb40` まで範囲外だった。
+- 修正: `native_ctrl.c` の `FA_UI31` 節で PB を 0x1000 B に拡張 (既定 OFF の診断経路のみ)。
+- 実測 (コミット済み HEAD `e6a608487`、`FA_UI31=1 bash fa31_ctl.sh`): base・node1 とも rc=0、S900–S907 は 8 件とも `FAULT rip=125afc6`。`caa820=0 d8d700=0 d8c140=0`。**SEGV は解消せず**。PB の範囲だけでは原因が残ることを確認した。
+- SEGV の呼出元 (どの間接 call が `0x125afc6` を指すか) は未特定。gdb は素材環境に無く、guard の `rip`/`addr` だけでは呼出元が取れない。
+- 判定: `run_ctrl.sh 2 5` = BIT-EXACT 15/15 (rc=0・2.657 s・load 0.04)。既定経路は不変。
+- 測定 commit: `e6a608487`。`git diff e6a608487 HEAD -- tools/targets/freshair/lift2` は本節の追記のみ (コードは変えない)。
+- 残り (受入 1〜3・P の構築根拠) は子 issue に分割 (FA-53)。
+
 受入の状況 (#3718):
 - 受入 1 (`0x180d8c0b0` から `caa820` まで到達): **未達**。`0x180d8c0b0` は実行されるが、popup 入力が不完全で `d8d700` に届く前に SEGV。
 - 受入 2 (`this` と controller の同一判定): **未達** (1 の未達により判定対象なし)。
