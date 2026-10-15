@@ -9,7 +9,7 @@ int main(int argc, char** argv) {
     uint8_t* im = pe_map(argv[1]); guard_install();
     static const unsigned long long stubs[] = {0x18103d37c, 0x18103d47c, 0x18102f728};
     for (unsigned k = 0; k < sizeof stubs / sizeof *stubs; k++) im[stubs[k] - 0x180000000ULL] = 0xCC;
-    patch_iat(getenv("FA_IAT") ? getenv("FA_IAT") : "iat_slots.txt");
+    if (getenv("FA_IAT_ALL")) patch_iat_all(); else patch_iat(getenv("FA_IAT") ? getenv("FA_IAT") : "iat_slots.txt");
     patch_pokes(getenv("FA_POKES") ? getenv("FA_POKES") : "pokes.txt");
     volatile int* fma = (int*)0x1813070f8ULL; int fma_v = argc > 3 ? atoi(argv[3]) : 0;
     proc_t fn = (proc_t)0x180b6f050ULL;
