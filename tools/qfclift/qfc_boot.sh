@@ -25,7 +25,7 @@ d = json.load(open(out + '.base'))
 d['roots'] = sorted(set(d['roots']) | {0x59c210})
 json.dump(d, open(out, 'w'))
 PY
-export QFC_ENTRIES="$QFC/work/boot/entries_boot.json" QFC_OVERRIDE="0x40f9c0=qfc_ov_longjmp" QFC_EXTRA_C="$QFC/qfc_ov.c"
+export QFC_ENTRIES="$QFC/work/boot/entries_boot.json" QFC_OVERRIDE="0x40f9c0=qfc_ov_longjmp" QFC_EXTRA_C="$QFC/qfc_ov.c" QFC_EXTRA_EXPORTS=_qfc_run
 if [ ! -f work/boot/lift/lift_meta.json ] || [ -n "${QFC_BOOT_REBUILD:-}" ]; then
   echo "== lift + wasm build =="
   lift_build "$QFC/work/boot/lift" ""

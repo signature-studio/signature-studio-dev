@@ -444,6 +444,10 @@ export function createMockEngine() {
     "ui.getFocusedPluginName": (...a) => { arity(a, 0, 0); return ""; },
     "ui.getHintMsg": (...a) => { arity(a, 0, 0); return ""; },
     "ui.isInPopupMenu": (...a) => { arity(a, 0, 0); return false; },
+    // PY-129 (#3006): PE で呼出し経路を確定した ui setter 3 件 (REPORT_PY129)。状態は持たない (仮置き)。書込み先と書込み値の読出し経路は未確定。範囲外の挙動も未確認
+    "ui.setHintMsg": (...a) => { arity(a, 1, 1); str(a[0]); },
+    "ui.setFocused": (...a) => { arity(a, 1, 1); ix(a[0]); },
+    "ui.setSnapMode": (...a) => { arity(a, 1, 1); ix(a[0]); },
     // PY-128 (#3005): getProgTitle は PE rodata の定数 (UTF-16)。getHintValue は状態を読まず、(int32)(value*100) / max を最近接偶数で整数化して "%" (REPORT_PY128)
     "ui.getProgTitle": (...a) => { arity(a, 0, 0); return "FL Studio 2026"; },
     "ui.getHintValue": (...a) => {
