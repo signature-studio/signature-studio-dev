@@ -24,6 +24,7 @@
 ## 2. 判定の突合 (測定 commit `94c133e12`)
 
 突合は `tests/ld157_batch_diff.py` (`--chunk 400 --shards 12`)。判定と case 単位の行のみ。wasm 側の件数は §0 のとおり撤回。
+下の行形式は現行ツールの出力に合わせた。ただし own 列 (`own r1` `r2`) は jsonl が無いため未算出で、手で書いた注記 (ツールの出力ではない)。wasm 側 3 種の件数行も同じ理由で出していない。
 
 ```
 functions 800
@@ -31,12 +32,12 @@ run1 verdict match 352 / mismatch 259 / unexec 189
 run2 verdict match 352 / mismatch 259 / unexec 189
 verdict changes 0: -
 case-level changes 1 functions
-- 0xa9ece0 chunk 1 shard 2 pos 290 | verdict mismatch->mismatch | chain - | own 未算出
+- 0xa9ece0 chunk 1 shard 2 pos 290 | verdict mismatch->mismatch | chain(同 shard の先行に差分) - | own r1 未算出 | r2 未算出
 ```
 
 ## 3. 判定の突合 (旧 `5ed1552bc`)
 
-判定と case 単位の行。`chain` は、同じ shard で先行し、case 単位で r1/r2 が違った関数 (同時性の相関のみ。因果ではない)。`own` (自 case の wasm 側の打切り) は未算出。
+判定と case 単位の行。`chain` は、同じ shard で先行し、case 単位で r1/r2 が違った関数 (同時性の相関のみ。因果ではない)。`own` (自 case の wasm 側の打切り) は未算出。行形式は §2 と同じく現行ツールに合わせたが、own 列は手で書いた「未算出」の注記である。
 
 ```
 functions 800
@@ -44,14 +45,14 @@ run1 verdict match 352 / mismatch 258 / unexec 190
 run2 verdict match 352 / mismatch 258 / unexec 190
 verdict changes 2: 0x959a40 mismatch->match, 0x10348b0 match->mismatch
 case-level changes 8 functions
-- 0x47d450 chunk 1 shard 8 pos 68 | verdict match->match | chain - | own 未算出
-- 0xd2c5a0 chunk 1 shard 2 pos 218 | verdict mismatch->mismatch | chain - | own 未算出
-- 0xa9ece0 chunk 1 shard 2 pos 290 | verdict mismatch->mismatch | chain 0xd2c5a0 | own 未算出
-- 0x50abe0 chunk 1 shard 4 pos 316 | verdict unexec->unexec | chain - | own 未算出
-- 0x43a3f0 chunk 1 shard 4 pos 328 | verdict mismatch->mismatch | chain 0x50abe0 | own 未算出
-- 0x959a40 chunk 1 shard 4 pos 340 | verdict mismatch->match | chain 0x50abe0,0x43a3f0 | own 未算出
-- 0xff0d70 chunk 1 shard 4 pos 352 | verdict unexec->unexec | chain 0x50abe0,0x43a3f0,0x959a40 | own 未算出
-- 0x10348b0 chunk 1 shard 4 pos 376 | verdict match->mismatch | chain 0x50abe0,0x43a3f0,0x959a40,0xff0d70 | own 未算出
+- 0x47d450 chunk 1 shard 8 pos 68 | verdict match->match | chain(同 shard の先行に差分) - | own r1 未算出 | r2 未算出
+- 0xd2c5a0 chunk 1 shard 2 pos 218 | verdict mismatch->mismatch | chain(同 shard の先行に差分) - | own r1 未算出 | r2 未算出
+- 0xa9ece0 chunk 1 shard 2 pos 290 | verdict mismatch->mismatch | chain(同 shard の先行に差分) 0xd2c5a0 | own r1 未算出 | r2 未算出
+- 0x50abe0 chunk 1 shard 4 pos 316 | verdict unexec->unexec | chain(同 shard の先行に差分) - | own r1 未算出 | r2 未算出
+- 0x43a3f0 chunk 1 shard 4 pos 328 | verdict mismatch->mismatch | chain(同 shard の先行に差分) 0x50abe0 | own r1 未算出 | r2 未算出
+- 0x959a40 chunk 1 shard 4 pos 340 | verdict mismatch->match | chain(同 shard の先行に差分) 0x50abe0,0x43a3f0 | own r1 未算出 | r2 未算出
+- 0xff0d70 chunk 1 shard 4 pos 352 | verdict unexec->unexec | chain(同 shard の先行に差分) 0x50abe0,0x43a3f0,0x959a40 | own r1 未算出 | r2 未算出
+- 0x10348b0 chunk 1 shard 4 pos 376 | verdict match->mismatch | chain(同 shard の先行に差分) 0x50abe0,0x43a3f0,0x959a40,0xff0d70 | own r1 未算出 | r2 未算出
 ```
 
 ## 4. 原因の候補 (旧 `5ed1552bc`)
