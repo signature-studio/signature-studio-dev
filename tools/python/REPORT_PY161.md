@@ -112,7 +112,13 @@ py88 の分類 (stderr の件数表・`REPORT_PY159.md` §1 の内訳と同じ)�
 
 - 6 件は式まで閉じた (残る葉は入口の `d_in`・`c_in` だけ)。`0x1049b31` は #3101 の受入 2 (`vtbl` の解決・実行時データ) に依存する。
 - 検算: 算法 A と B の閉包の比較 `mismatch 0` (7 件)。直接式 49 件と `--rint` 6 件は変化 0 (`mismatch 0`・exit 0)。
-- 測定: `analysis/py99_closure.py work/py53/fn.txt --callargs --md work/callargs.md` 0.40 秒・load 0.17 (5 分時点)。
+- 測定 (2026-10-15 11:18 UTC・4 vCPU の GitHub Actions runner・HEAD `0d2c11608` で実行 (`git diff 4d3264600 HEAD -- tools/python/{analysis,provider,host,tests}` は 0 行)・`fl-win64` の `block00031_PE.bin` から `py53_dispatch` で作った `work/py53/fn.txt`・測定前の `/proc/loadavg` 1 分値 0.56):
+
+| 実行 | 結果 | exit | 所要 (`/usr/bin/time`) |
+|---|---|---|---|
+| `py99_closure.py work/py53/fn.txt` | 書込み 49 件・mismatch 0 | 0 | 0.40 秒 |
+| `py99_closure.py work/py53/fn.txt --rint` | 書込み 6 件・mismatch 0 | 0 | 0.22 秒 |
+| `py99_closure.py work/py53/fn.txt --callargs` | 書込み 7 件・mismatch 0・閉 6/7 | 0 | 0.24 秒 |
 
 ## 8. 再現
 
