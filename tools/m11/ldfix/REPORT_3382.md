@@ -77,7 +77,7 @@ ERR_BARE 14 件 (deref VA → call VA。`judge_copy_3382.py` の出力): 0x12802
 
 - 範囲内: COPY 103 箇所の一次分類と、0x7888f0 の 3 箇所の窓での確認。
 - 範囲外: 全 103 箇所の人手判定、修復、ldfix_e2e の実測。
-- 測定 commit: `d781643f9` (§9 の再現をこの HEAD で行った。対象スクリプトの最終変更は `80fc6efe2`)。`judge_copy_3382.py` は本 PR で追加した。
+- 測定 commit: `80fc6efe2` (コードを変えた最後の commit。対象スクリプトはこの commit 以降変わっていない)。`judge_copy_3382.py` は本 PR で追加した。
 
 ## 8. ERR_BARE の窓による確認 (#4211 / CI-186)
 
