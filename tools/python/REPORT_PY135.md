@@ -9,8 +9,8 @@
 - **`blank` (0xd7c600) は効果を確定した**: 第 1 引数が 1 なら `isBlanked` (`scr+0x1d0`) を真に書く。真→偽の解除では `scr+0x1cc ← scr+0x1dc` (activeCounter の復元) を行う。`scr+0x1dc` の初期値は未実測のため仮置き 0。
 - **`addMeter` (0xd7ada0) は観測できる状態を変える (PE で確定。round 1 で追加)**: 書式解析が成功 (rc>0) し `scr≠0` のとき `0xd7d9e0` が呼ばれ、その分岐なしの経路で `isUnBlank` (`scr+0x1d1`) を真に、`activeCounter` (`scr+0x1cc`) を `scr+0x1dc` (仮置き 0) にする。mock と C はこの遷移を持ち、`tests/screen_diff.mjs` の期待値で検査する。
 - **残り 5 件** (`displayBar`・`fillRect`・`drawRect`・`drawText`・`eraseRect`) は、**API から観測できる状態を変えないと推定**する。根拠は本体と dispatch callback の先頭 1200 命令に `scr+0x1c?`・`+0x1d?` への直接の書込みが無かったことだけで、本体の全経路と下位呼出しは未確認 (未解決 (a)〜(d))。mock と C は引数検査と None だけを模す (`arrangement.selectionSet` 等と同じ扱い)。描画の引数の意味 (矩形の書式 x/y/w/h か l/t/r/b か) は保留。
-- 実装・未実装の件数は main (`a8fc92eb5`) の 162/273 → **169/266** (`fl_table.c` 435 関数)。`tests/screen_diff.mjs` は 87 呼出しで mock と C の差分 0、期待値の不一致 0。
-- 測定 commit: `524693988` (コードを変えた最後の commit。addMeter の状態遷移を mock と C に入れた)。e2e はすべて PASS (下の検証表)。
+- 実装・未実装の件数は main (`e13f1efd2`) の 165/270 → **172/263** (`fl_table.c` 435 関数。本 PR の 7 件を加えた)。`tests/screen_diff.mjs` は 87 呼出しで mock と C の差分 0、期待値の不一致 0。
+- 測定 commit: `d40d9af26` (コードを変えた最後の commit。main `e13f1efd2` を取り込んだ merge)。e2e はすべて PASS (下の検証表)。
 
 ## PE 根拠 (VA)
 
@@ -73,18 +73,18 @@
 
 ## 検証
 
-測定 commit: `524693988` (`fix(python): model addMeter state effect from PE 0xd7d9e0 (#3022)`。コードを変えた最後の commit)。以下は同じ commit のクリーンな作業ツリーで実行した。round 0 の測定 (`a60dccce8`) は addMeter の遷移を含まないため無効であり、本節が新しい測定。
+測定 commit: `d40d9af26` (`Merge remote-tracking branch 'origin/main' into 3022-py135-screen-draw-pe`。コードを変えた最後の commit)。以下は同じ commit のクリーンな作業ツリーで実行した。前回の測定 (`524693988`、merge 前。169/266) と round 0 の測定 (`a60dccce8`、addMeter の遷移を含まない) は無効であり、本節が新しい測定。
 
-環境: runner 4 core。emsdk は pin の 6.0.12 (`tools/m1/flags.sh`) を `$RUNNER_TEMP/emsdk` に初回セットアップし、`[EMSDK]` の位置へ symlink した (`build_cpython_wasm.sh`・`build_flpy.sh` が `[EMSDK]` を固定で読むため)。`toolchain-emsdk` の素材は本 run に無く、展開していない。fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (7.6 秒)、`FL_WIN64_DIR` はその展開先。`fetch_inputs.sh` は `FL_WIN64_DIR` を指定して rc 0 (`work/midi.py`・`utils.py`・`MCPTools.pyc` を配置)。前提生成物: `build_cpython_wasm.sh` (rc 0。wall は未計測)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0。wall は未計測)。測定時の load average (1 分値): 0.77 → 0.71。
+環境: runner 4 core。emsdk は pin の 6.0.12 (`tools/m1/flags.sh`) を `$RUNNER_TEMP/emsdk` に初回セットアップし、`[EMSDK]` の位置へ symlink した (`build_cpython_wasm.sh`・`build_flpy.sh` が `[EMSDK]` を固定で読むため)。`toolchain-emsdk` の素材は本 run に無く、展開していない。fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (7.6 秒)、`FL_WIN64_DIR` はその展開先。`fetch_inputs.sh` は `FL_WIN64_DIR` を指定して rc 0 (`work/midi.py`・`utils.py`・`MCPTools.pyc` を配置)。前提生成物: `build_cpython_wasm.sh` (rc 0。wall は未計測)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0。wall は未計測。merge 後に再実行)。main の取り込みで衝突したのは `tests/provider_check.mjs` の期待値と条件行だけで、両方の変更を残した (期待値は 172/263)。測定時の load average (1 分値): 0.04 → 0.09。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・`fl_table.c: 435 関数, ハンドラ 169` | 0.68 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 169 / 未実装 266 / MCP 静的 60) | 0.38 秒 |
-| `node tests/screen_diff.mjs` | calls 87、diffs 0、PASS | 0.03 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.11 秒 |
+| `bash provider/build.sh` | rc 0・`fl_table.c: 435 関数, ハンドラ 172` | 0.64 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 172 / 未実装 263 / MCP 静的 60) | 0.22 秒 |
+| `node tests/screen_diff.mjs` | calls 87、diffs 0、PASS | 0.04 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.06 秒 |
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5)。`59dac085f` では `blank` の解除時の復元 (1) と `drawText` の文字列検査 (2) を外して FAIL を確かめた。今回は addMeter の状態遷移を外して確かめた。
+ネガティブコントロール (`docs/WORKFLOW.md` §5)。`59dac085f` では `blank` の解除時の復元 (1) と `drawText` の文字列検査 (2) を外して FAIL を確かめた。addMeter の状態遷移は次の 2 件で確かめ、どちらも `d40d9af26` で再実行した。
 
 - (3) mock の `addMeter` から `isUnBlank`・`activeCounter` の書込みを外す → `AssertionError: screen 型違い 期待値と不一致 5 件`、rc 1 (FAIL)。戻すと PASS (calls 87)。
 - (4) C の `addMeter` から同じ書込みを外す → 同じ 5 件、rc 1 (FAIL)。戻すと PASS (calls 87)。
@@ -93,7 +93,7 @@
 コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 524693988 HEAD -- tools/python ':!*.md'
+$ git diff d40d9af26 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
