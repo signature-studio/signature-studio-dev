@@ -143,7 +143,7 @@ index 72a788e2c..80d069f06 100644
 
 ## 9. 特殊値の不一致行の分類 (#4743 PLG-G2-58)
 
-- 測定 commit `63b9e06ab` (`x87_fn_diff.py` に `mismatch_classes` を加えた最後のコード commit。判定の条件は変えていない)。 検証 HEAD は同じ。 `python3 x87_fn_diff.py --special` (exit 0、wall 20.3 s、load1 0.45)。 `--special --nega-nan` (exit 0、ネガコン検出)。 通常モード (`python3 x87_fn_diff.py`、exit 0) も同じ commit で §3 と一致した (`0x10002ee0` 3,890/4,000、`0x10005400` 3,405/4,000)。
+- 測定 commit `63b9e06ab` (`x87_fn_diff.py` に `mismatch_classes` を加えた最後のコード commit。判定の条件は変えていない)。 検証 HEAD と再測定は §11 を参照。 `python3 x87_fn_diff.py --special` (exit 0、wall 20.3 s、load1 0.45)。 `--special --nega-nan` (exit 0、ネガコン検出)。 通常モード (`python3 x87_fn_diff.py`、exit 0) も同じ commit で §3 と一致した (`0x10002ee0` 3,890/4,000、`0x10005400` 3,405/4,000)。
 - 入力: `--special` の 20,000 行 (seed 2989 の特殊値系列)。 行の不一致は次の 3 種だけで、`other` (それ以外) は 0 件。
 
 | 関数 | NaN どうしのビット差 | float64 のみ 1〜2 ulp (float32 は一致) | 計 |
@@ -210,3 +210,29 @@ index 72a788e2c..80d069f06 100644
 
 - PM agent の判断待ち: NaN どうしのビット差 (符号・ペイロード) を許容するか (実 FL の x87 の値と一致させるか)。 既定案は許容 (IPP の #142 の許容は x87 には当てはまらない)。 判断材料は §9.1 の判断案と 10.1・10.2 の実測。
 - 起票先: 10.2 の後段の算術 (NaN を読む演算) の検査は、判断の結果に応じて PM が決める (本 issue では検査しない)。
+
+## 11. 測定 commit と検証 HEAD の記録 (#4744 PLG-G2-59)
+
+- 測定 commit: `cfd295fa1` (`origin/main`・PR #5245 取り込み後)。 検証 HEAD: `cfd295fa1` (本節を含む commit は docs のみ)。
+- §9 の測定 commit `63b9e06ab` の後に、試験のコードを変える commit が入っていた。 `git diff 63b9e06ab cfd295fa1 -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c tools/plugins/slayer_engine_ia32/x87_fn_glue.c tools/plugins/slayer_engine_ia32/x87_fn_entry_wasm.mjs tools/plugins/slayer_engine_ia32/lift_text.py tools/ott/lift tools/ott/rt` の `--stat` (全文の diff は同じコマンドで出る):
+
+```
+ tools/ott/lift/x64c.py                             |   3 +
+ tools/ott/rt/ott_cpu.c                             |  16 +++
+ tools/ott/rt/ott_cpu.h                             |   8 ++
+ tools/ott/rt/ott_x87.h                             |   9 +-
+ tools/plugins/slayer_engine_ia32/lift_text.py      |  16 ++-
+ tools/plugins/slayer_engine_ia32/x87_fn_diff.py    | 123 +++++++++++++++++++--
+ .../slayer_engine_ia32/x87_fn_entry_wasm.mjs       |   4 +-
+ tools/plugins/slayer_engine_ia32/x87_fn_glue.c     |   9 ++
+ tools/plugins/slayer_engine_ia32/x87_fn_native.c   |  13 ++-
+ 9 files changed, 180 insertions(+), 21 deletions(-)
+```
+
+- 再測定 (HEAD `cfd295fa1`・素材 `fl-win64` の `block22434_PE.bin`・`toolchain-emsdk` 6.0.12 の実 emcc・`lift_text.py` で lift を作り直した後):
+  - `python3 x87_fn_diff.py --special`: exit 0・PASS、wall 37.2 s (emcc のビルドを含む)、開始時 load1 1.12。 入力は 7 関数 × 4,000 = 28,000 行 (TARGETS の現行版。 §9 の 20,000 行は 5 関数の版)。
+  - `--special --nega-nan`: exit 0 (ネガコン検出: 行 0 の NaN を 1.0 に置換 → `nan-num` 0 → 1、判定 FAIL)、wall 16.4 s。
+  - 通常モード (`python3 x87_fn_diff.py`): exit 0・PASS、wall 19.5 s。 `fn_10002ee0` bit 一致 3,890 / 4,000、`fn_10005400` 3,405 / 4,000 (§3 と一致)。
+- 特殊値モードの NaN どうしのビット差 (§9 の分類と同じ形式): `fn_10002ee0` 858 行 (f80 1〜2 ulp 2 行)、`fn_10005400` 701 行 (f80 28 行)、`fn_10005d20` 458 行。 追加の 2 関数: `fn_100052d0` 692 行 (f80 9 行)、`fn_10005550` 697 行 (f80 29 行)。 `eax` の数値どうしの不一致と x87 深さの不一致は、7 関数すべて 0 行。
+- §9 の `fn_10005400` の NaN どうし 701 行・f80 28 行と、`fn_10005d20` の 458 行は今回と一致。 ただし §9 の `--special` 20,000 行の件数との比較は、TARGETS が増えたため同じ条件ではない。 件数の数値は同じ HEAD の再測定値を正とする。
+- 本節の数値はすべて HEAD `cfd295fa1` の出力 (`work/x87fn_special/`)。 `wasm_out.txt` の md5 `b7172a8b…` は、§9.1 の `5254ee2f…`・§10.2 の `23fc7196…` とは別の入力 (7 関数版) の出力で、直接比べられない。
