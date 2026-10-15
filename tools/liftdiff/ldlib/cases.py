@@ -30,7 +30,7 @@ BLOBS = {'r1': (101, 0.30), 'r2': (202, 0.30), 'r3': (303, 0.30), 'r4': (404, 0.
 
 
 VMT_SLOTS = 8
-LD_VMT_IDX0 = 256  # rt/ld_core.h LD_VMT_IDX0 (GetProcAddress の index 0..255 と別域)
+LD_VMT_IDX0 = 1024  # rt/ld_core.h LD_VMT_IDX0 (GetProcAddress の index 0..1023 と別域)
 LD_FAKEPROC_BASE = 0x50010000
 LD_FAKEPROC_SZ = 32
 

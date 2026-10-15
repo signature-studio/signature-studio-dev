@@ -78,8 +78,45 @@ boot の変化 (928 → 892) の原因を、修正の内訳を 1 つずつ変え
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 修正後の libc abort 15 unit (最初 149 `664260`) の直接原因。dst 書込みの後続 | native boot 892/942 (基準 928/942)。製品 KPI の悪化 | 子 issue [LD-184] #3946 (B1 を候補に追加・実験 D で boot の応答は変わらないと実測) |
-| PM agent の判断待ち: KPI 悪化 (928/942・830 → 892/942・149) を承認して stk 修正を先に入れるか。既定案: #3946 の原因修正と同時に merge | 製品 KPI の悪化。merge の可否 | PM agent (本 PR の判断) |
+| ~~修正後の libc abort 15 unit (最初 149 `664260`) の直接原因~~ → **解決 (#4874・§8)**: GetProcAddress の仮 proc 表 (256 件) の上限超過で `abort()`。上限を 1024 にして 928/942・830 に戻した | 解消 | #4874 |
+| ~~PM agent の判断待ち: KPI 悪化を承認して stk 修正を先に入れるか~~ → 悪化は解消したため判断不要 | 解消 | #3946 / #4874 |
+
+## 8. #4874: abort の直接原因 (仮 proc 表の上限超過) と修正
+
+§4・§6 の推定 (dst 書込みによる guest 状態の破壊・libc 内の不正 rip) は**誤り**。以下に訂正する。
+
+- 原因: `rt/ld_core.h` `ld_fakeproc_get` が、GetProcAddress の仮 proc 表 `ld_fakeprocs[256]` が満杯 (256 件) になった後に呼ばれると、`abort()` を**意図的に**呼ぶ (`[ld_core] 仮 proc が上限 256 を超えた`)。stderr を捕まえると 14 件 (unit 段) + 1 件 (entry) がこの行。
+- 経緯: `stk` を MS 第 5 引数に直した (#3619) ことで boot が 149 unit 目まで進み、その間の IPP 名 (`d!ippsMulPack_*`・`d!ippsFFT*` 等の列挙) で 256 件に達した。stk 212 の既定経路は 830 で止まり、この上限には届かない (実測: 既定 `stk=212` の spike は 928/942・overflow 0 件)。
+- `rip_rva` の読み方の訂正: spike の `rip_rva` は `rip - ImageBase` (`ImageBase=0x400000`)。`0x7ffff789ec0c` は実 rip `0x7ffff7c9ec0c` (libc 内 `abort`) で、data 領域ではない。
+- 修正: `ld_fakeprocs` と `LD_VMT_IDX0` を 256 → 1024 (`rt/ld_core.h`・`ldlib/cases.py`)。VMT 域は 1024 以降に移る。`ld_stub` の範囲判定 (`fle_ldbridge.c` の `ott_dispatch`) も `LD_VMT_IDX0` から導くので両側で一致する。
+
+### 8-1. 実測 (HEAD 修正版・`fc48aa8a5` の上に修正を 1 commit)
+
+| route | 修正前 units / first_fail | 修正後 units / first_fail | 所要 (spike) |
+|---|---|---|---|
+| `LD_STK_ENTRY28=1` (有効化) | 892/942 / 149 (abort) | **928/942 / 830** (segv 3 件) | 15.7 s |
+| 既定 (`stk` 212) | 928/942 / 830 | 928/942 / 830 | 16.1 s |
+
+- 有効化の stderr: 修正前 `仮 proc が上限 256 を超えた` 14 件・修正後 0 件。
+- 測定 commit: 修正を含むコミット (本 PR)。検証起点 `origin/main` `fc48aa8a5`。
+
+### 8-2. liftdiff e2e (`--m11-only`・sample:800) の前後
+
+| run | 関数判定 (一致/不一致/実行不能) | verdict の変化 (対 base) | case 結果の変化 (対 base) |
+|---|---|---|---|
+| base (`origin/main` `ld_core.h`・`LD_VMT_IDX0=256`) | 359 / 236 / 206 (PASS) | - | - |
+| 修正 (1 回目) | 360 / 235 / 206 (PASS) | 1 件 (`0x7850d0` mismatch→match) | 42 |
+| 修正 (再実行・同一コード) | 360 / 235 / 206 (PASS) | 0 件 (対 1 回目) | 2 |
+
+- base は別の batch 実行 (同一コードの再実行で 359/236 と 360/235 が出る揺らぎは未測定)。修正版は再実行で case 2 件が揺らぐ。base との差 (verdict 1・case 42) は修正版の 2 回実行の揺らぎ (2) より大きい。
+- 差の内訳 (`hang` ↔ `both_fault`・`native_fault` 等) は vmt blob の値 (`LD_VMT_IDX0` 由来の番地) が変わったことによる。`vmt` 専用 blob (`make_blob_vmt`) の番地だけが変わるはずだが、`vm0`・`p0` 等の他 pattern にも差が出る。**差の原因 (なぜ他 pattern に波及するか) は未切り分け** (起票先: 下記)。
+
+### 8-3. 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| e2e sample:800 で base との case 差 42 件 (verdict 1 件 `0x7850d0` mismatch→match) の波及経路。vmt blob の番地変更が他 pattern に効く理由は未切り分け | liftdiff の判定の一部が変わる。PR 内では「回帰なし」と断定しない | 本 PR の本文で明示 (未切り分け) |
+| 有効化 route の boot 残りの 3 件 (unit 830 segv・他 2 件) | 928/942 (受入の下限は満たす。全数 942 には届かない) | #3946 系の既存追跡 |
 
 ## 7. 再現
 
