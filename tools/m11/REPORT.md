@@ -242,3 +242,7 @@ unit 149 は OFF/ON とも oob のまま。ON で kind が変わるのは unit 8
 - 対応の根拠 (未独立確認): pass は `%arg2` を this (vtable 読出し元 `[rsi]`)・`%arg3` を IID として `m11_icall(vtva, arg2, ptrtoint arg3, out, ...)` に渡す。`%arg3` の下位 32 bit を判定に使っていた旧 IR と対応する。IR (`work/`) は本 run に無く、1 site 適用は作者の stage ログの記載のみで、本 run では独立確認していない。
 - 受入: 1 (`last_unit.index0 > 114`) 未達 (114 で OOB)。2 (vtable[0] の戻り値判定) 部分達成 (`0x41c180` 以降の戻り値経路は未実測)。
 - 未解決: unit 114 以降の OOB・`function_40fcf0` の AddRef `call [rax+8]` (`40fd3a`) 未復元 → 次の run (#4011)。受入 3 (CS-INIT 0x12bd390) は範囲外で #4031。
+
+## 20. #4011 段 2: `pass_m2v_fn40fcf0_arg1` (gated `M11_M2V`, 既定 OFF, 受入 1 未達)
+
+`function_40fcf0` の `function_40fd90` 呼出しの第 1 引数を `[self]` (VMT) に直す。`M11_M2V=1 M11_M2S=1` で last_unit 114→144 に前進したが OOB が残り、icall miss 7→16。「偽の前進」の疑いがあり、受入 1 は未達。測定・測定 commit・差分 0 の証跡・未解決は [REPORT_N4011.md](REPORT_N4011.md)。
