@@ -21,7 +21,7 @@ VMT = 0x1012F40
 SLOT1 = 0x1021670
 CLASSREF = 0x1012E78
 FN_REF = 0x101CA60
-CALLER_DYN = re.compile(r"\[(r\w+) \+ (0x[0-9a-f]+|\d+)\]")
+CALLER_DYN = re.compile(r"qword ptr \[(r\w+) \+ (0x[0-9a-f]+|\d+)\]")
 FN_END = 0x1021A40
 RIP = re.compile(r"\[rip ([+-]) (0x[0-9a-f]+)\]")
 FAILS = []
@@ -72,8 +72,32 @@ def main():
             mm = CALLER_DYN.search(o)
             if mm and int(mm.group(2), 0) == 8:
                 dyn.append(a)
-    check("C3 call qword ptr [reg+8] (スロット 1 の仮想呼出し) は 1639 件 (10 進 8 も数える)",
-          len(dyn) == 1639, f"{len(dyn)} 件")
+    check("C3 call qword ptr [reg+8] (スロット 1 の仮想呼出し) は 1638 件 (10 進 8 も数える)",
+          len(dyn) == 1638, f"{len(dyn)} 件")
+    table = [a for a in dyn if b"\x42\x00\xf1\xff" in raw[fo(a) - 24:fo(a) + 24]]
+    check("C3b 1638 件の ±24 バイトにデータ表の目印 42 00 f1 ff を含む箇所は 0 件",
+          not table, str([hex(a) for a in table]))
+
+    def junk(m, o):
+        return (m in ("int1", "(bad)") or (m == "add" and (o == "cl, sil" or (
+            o.startswith("byte ptr [") and o.endswith("], al")))) or (m == "adc" and o == "al, 1"))
+
+    addr_k = {a: k for k, (a, _, _) in enumerate(insns)}
+    jl = [a for a in dyn if any(junk(m, o) for _, m, o in insns[max(0, addr_k[a] - 12):addr_k[a] + 4])]
+    check("C3c 直前 12 命令 (後 3 命令) に誤デコード (junk) を含む箇所は 6 件 (いずれも関数本体内・REPORT §3)",
+          sorted(jl) == sorted([0x50CF45, 0x7CE110, 0xACCA20, 0xACCA90, 0x1006B93, 0x12D7B0F]),
+          str([hex(a) for a in jl]))
+
+    regcalls = [k for k, (a, m, o) in enumerate(insns) if m == "call" and re.fullmatch(r"r\w+", o)]
+    two = []
+    for k in regcalls:
+        reg = insns[k][2]
+        if any(jm == "mov" and jo.startswith(reg + ", qword ptr [") and re.search(r" \+ (0x8|8)\]$", jo)
+               for _, jm, jo in insns[max(0, k - 8):k]):
+            two.append(insns[k][0])
+    check("C11 call reg の直前 8 命令に mov reg, qword ptr [X+8] の 2 段形は 2 件 (0x479b83・0x1249553)",
+          len(regcalls) == 1237 and sorted(two) == [0x479B83, 0x1249553],
+          f"call reg {len(regcalls)} 件、2 段形 {[hex(a) for a in two]}")
 
     refs_vmt, refs_cls = [], []
     for k, (a, m, o) in enumerate(insns):
@@ -96,6 +120,14 @@ def main():
     check("C6 プロローグで [rbp+0x30]・[rbp+0x48]・[rbp+0x60] の 3 連続 24 バイトをゼロ化",
           all(x in zeroed for x in ("rdi, [rbp + 0x30]", "rdi, [rbp + 0x48]", "rdi, [rbp + 0x60]")),
           str(zeroed[:6]))
+
+    def zero24(off):
+        k = [i for i, (a, m, o) in enumerate(pro) if m == "lea" and o == f"rdi, [rbp + {off:#x}]"][0]
+        return [(m, o) for _, m, o in pro[k + 1:k + 5]] == (
+            [("xor", "eax, eax")] + [("stosq", "qword ptr [rdi], rax")] * 3)
+
+    check("C6b [rbp+0x30]・[rbp+0x48]・[rbp+0x60] の各ゼロ化は xor eax,eax の後の stosq ×3 (24 バイト)",
+          all(zero24(x) for x in (0x30, 0x48, 0x60)))
 
     def find(lo, hi, text):
         return [a for a, m, o in insns if lo <= a < hi and f"{m} {o}" == text]
