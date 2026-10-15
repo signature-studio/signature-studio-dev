@@ -4,7 +4,8 @@
 
 ## 4i. 証拠表の行 36〜66 (#3499・部分達成: 母数 31・判定 25 件 (真陽性 25・偽陽性 0)・保留 6 件)
 
-- 測定 commit: `4b6ec01b0` (origin/main。本 PR の基点)。`git diff 4b6ec01b0 HEAD -- tools/m11/guard699/ tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py` = 0 行。本 PR は `tools/m11/trap_triage/judge_ctx_3499.py` (文脈ダンプ) を追加するだけで、既存の走査・証拠表・ダンプのコードは変えない。
+- 初回の測定 commit: `4b6ec01b0` (origin/main。本 PR の基点)。`git diff 4b6ec01b0 HEAD -- tools/m11/guard699/ tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py` = 0 行。初回の判定はこのコードで行った。
+- 再測定 commit: `0e7700d53` (main `feff012eb` 取り込み後の merge)。`git diff 0e7700d53 HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py tools/m11/trap_triage/judge_ctx.py tools/m11/trap_triage/judge_ctx_3499.py` = 0 行。判定の件数・表は初回のまま (再測定は走査・証拠表・ダンプを作り直しただけ)。本 PR は `tools/m11/trap_triage/judge_ctx_3499.py` (文脈ダンプ) を追加するだけで、既存の走査・証拠表・ダンプのコードは変えない。
 - 入力 (本 run で展開): `work-m11` の `boot_final.ll` (19,787,837 B・sha256 `69c774de…`。§4a・§4d・§4e・§4f と一致)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
 - 再現 (本 run で実行): `scan_guard.py --report` で fn 6969 / jcc 25618 / dropped 1380 / dropped_target_not_label 6868 / strict 288 (§3 の最終版と一致)。`strict_evidence.py --out` で TSV 288 行 (ヘッダ除く)。`judge_dump.py <IR> <TSV> 36 66` と `judge_ctx_3499.py <IR> <TSV> 36 66` で文脈を出した。TSV とダンプは `tools/m11/work/` (gitignore・未コミット)。
 - 判定方法 (件ごと。機械語と IR の突合):
@@ -15,7 +16,7 @@
 - 確度: 「2 系統」= 独立した 2 系統の判定が一致、または本 run で IR を直接確認。「単独」= 1 系統のみで、本 run では未照合。
 - 判定の経緯: 並列の判定 2 系統 (A: 行 36〜50、B: 行 36〜66) を取った。A は依頼文に範囲が無かったため 36〜50 のみ判定した。B の一部 (行 40・45・46) は本 run で IR を直接確認して採った。判定が割れた件は、上記の直接確認か保留で扱った。
 - 行 41 の扱い: 行 41 は A の範囲 (36〜50) にも入るが、A の判定記録に行 41 の結論が残っていない。A が行 41 を判定しなかったのか、判定を記録し損ねたのかは、この記録からは確定できない。A と B の結論が割れたという記録も無い。そのため行 41 は B の 1 系統だけの『単独』とし、2 系統目の照合を #3564 に残す。
-- 差し戻し対応の run では `work-m11` が展開されず、IR 側 (B・L・T の preds) を再確認していない。上記の件数 (真陽性 25・偽陽性 0・保留 6、うち 2 系統か直接確認 10・単独 15) は変えていない。
+- 修正 commit `d3d318ec2` の run では `work-m11` が `$ARTIFACTS_DIR` に無く展開できず、IR 側 (B・L・T の preds) を再確認していない。上記の件数 (真陽性 25・偽陽性 0・保留 6、うち 2 系統か直接確認 10・単独 15) は変えていない。
 
 | 行 | 関数 | jcc → T | 判定 | 確度 | 根拠 |
 |---|---|---|---|---|---|
@@ -29,7 +30,7 @@
 | 43 | function_1280530 | 1285e80 jg → 1285ebc | 保留 | 2 系統 | IR の count は定数 501。機械語 ebx の源が未確認 |
 | 44 | function_129f140 | 129f179 jg → 129f1f2 | 真陽性 | 2 系統 | B が同じ global を読む。入口判定無し。T の preds は L のみ |
 | 45 | function_12a3ff0 | 12a415e jg → 12a41b6 | 真陽性 | 直接確認 | 機械語の count は call 12f9ed0 の戻り値 (eax−1)。B `12a414e` も同じ戻り値を count に使う。L `12a4165` に icmp 無し。T の preds は `12a41ab` (本体末尾) のみ |
-| 46 | function_12a4450 | 12a4621 jg → 12a4671 | 真陽性 | 直接確認 | 機械語 r13d=[[G]+0x10]−1 (3 段参照) と IR (B `12a45fe`) の 3 段参照が一致。L `12a462a` の icmp は counter 判定のみ。T の preds は `12a4665` のみ |
+| 46 | function_12a4450 | 12a4621 jg → 12a4671 | 真陽性 | 直接確認 | 機械語 r13d=[[G]+0x10]−1 (3 段参照) と IR (B `12a45fe`) の 3 段参照が一致。L `12a462a` の icmp は `icmp eq i64 %97, 0` (フィールドの null 判定。counter 同士の比較は L に無い)。T の preds は `12a4665` のみ |
 | 47 | function_12a75e0 | 12a760d jg → 12a7685 | 保留 | 2 系統 | L の icmp は探索判定 (`==arg`)。T の preds が 3 本あり、入口判定の有無を確定できない |
 | 48 | function_12b51d0 | 12b51ea jg → 12b5216 | 真陽性 | 2 系統 | B `12b51d0` → L `12b51f1` に入口判定無し。T の preds は L のみ |
 | 49 | function_12b5220 | 12b523a jg → 12b5269 | 真陽性 | 2 系統 | 行 48 と同型 |
@@ -44,7 +45,7 @@
 | 58 | function_12ca770 | 12ca79a jg → 12caaaf | 真陽性 | 単独 | L に N 判定無し。T は本体内からのみ |
 | 59 | function_12cab20 | 12cad0f jg → 12cad72 | 真陽性 | 単独 | 2 段で一致。T は本体末尾からのみ |
 | 60 | function_12cab20 | 12cad89 jg → 12cae48 | 真陽性 | 単独 | 2 段で一致。T は counter 判定の後段のみ |
-| 61 | function_12cab20 | 12cadcb jg → 12cae11 | 真陽性 | 単独 | 2 段で一致。T は L 内の本体後の分岐のみ |
+| 61 | function_12cab20 | 12cadcb jg → 12cae11 | 真陽性 | 単独 | 2 段で一致。T の preds は `12cae01` (L の分岐先) と T 自身 `12cae11` (自己ループ) のみ。自己ループは L を経由しないので、B→L の入口判定の有無には影響しない |
 | 62 | function_12cab20 | 12caeec jg → 12cafaf | 真陽性 | 単独 | 2 段で一致。T は本体末尾からのみ |
 | 63 | function_12cab20 | 12caf23 jg → 12caf7d | 保留 | 単独 | 単独判定は「IR の call 戻り値と同一」としたが、機械語の被演算子 `[rbx+0x10]` の rbx は call 12df530 の戻り値 (rsi) と別で、同一性の根拠が合わない。注 3 |
 | 64 | function_12cb680 | 12cb76b jg → 12cb796 | 真陽性 | 単独 | 同じ `call 12f9ed0` の戻り値が count。T は L 末尾からのみ |
@@ -53,10 +54,10 @@
 
 - 集計: 真陽性 25 件 (2 系統か直接確認 10 件: 36・37・38・40・44・45・46・48・49・50。単独 15 件)、偽陽性 0 件、保留 6 件 (39・42・43・47・63・65)。偽陽性率は書かない (母数 288 のうち判定は 31 件のみ)。
 - 注 1: 行 37 は N が 0x40 の定数とされ、jcc は実行時に成立しない可能性が高い。実害は未確認。
-- 注 2: 行 40・41 は、機械語が `[[G]+0x10]` (3 段参照)、IR が `sext(i32 [G])+16` (2 段) で参照経路が一致しない。入口判定が IR に無いことは B・L を直接見て確認した。経路の差は別の lift 欠陥の疑いで、未確定。
+- 注 2: 行 40・41 は、機械語が `mov rcx,[rip+X]` (G = slot X の 64 bit 値) → `mov rcx,[rcx]` (G の指す先) → `mov edi,[rcx+0x10]` と読み、G から数えて 2 段 deref を取る (`[[G]+0x10]`)。IR は `load i32 [K]` (G の下位 32 bit) に +16 を足して 1 回だけ load し、`[G]` の 1 段を欠く (IR 側は 1 段)。X と K は 0x400000 差で、`tools/m11/ldfix/ldmach.py` の規約 (IR 定数 = LVA = VA − 0x400000) どおり同じ slot を指す (行 40・41: X = `0x15E2218`、K = `0x11E2218`)。番地のずれではなく、読み方の段数と幅 (機械語 64 bit・IR i32) の差。これは `tools/m11/ldfix/REPORT_2794.md` の類型 (2 段 deref が 1 段に潰れる。DEFECTS D4 と同型に近いが同一とは未確定) に近い。入口判定が IR に無いことは B・L を直接見て確認した。判定はこの段数の差に依存しない。残る論点は #3564 に追記して追跡する (新規の子は起票しない)。
 - 注 3: 行 63・65 は、同一性の根拠が機械語と IR で一致しないため保留。
-- 未解決: 保留 6 件と単独判定 15 件の 2 系統目の照合。起票先: #3564 (`[M11-N188]`・親 #3499)。
-- 競合解消 run の再実行 (測定 commit `0e7700d53`・main (`feff012eb`) 取り込み後の merge commit・foreground・各 1 回): 素材は `work-m11` の `tools/m11/work/boot_final.ll` (19,787,837 B・sha256 `69c774de…`) と `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。`$RUNNER_TEMP/m11_3571/` に展開した (repo 外・未コミット)。
+- 未解決: 保留 6 件と単独判定 15 件の 2 系統目の照合 (行 41 の A 側記録を含む)、行 37 の N=0x40 の実害 (注 1)、行 40・41 の参照経路差 (注 2)。起票先: いずれも #3564 (`[M11-N188]`・親 #3499)。新規の子は起票しない。
+- 競合解消 run (merge commit `0e7700d53`・main (`feff012eb`) 取り込み後) の再実行 (foreground・各 1 回): 素材は `work-m11` の `tools/m11/work/boot_final.ll` (19,787,837 B・sha256 `69c774de…`) と `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。`$RUNNER_TEMP/m11_3571/` に展開した (repo 外・未コミット)。
 - 実行結果: `scan_guard.py --report` 4.3 s (strict 288)。`strict_evidence.py` 12.0 s (TSV 288 行)。`judge_ctx_3499.py <IR> <TSV> 36 66` rc 0 (31 件)。`judge_ctx.py <IR> <TSV> <PE> 67 98` rc 0 (32 件)。実行前後の load average (1 分値) は 0.43→0.47 (`uptime`)。
 - 行 40・45・46 の『脱出先 T の preds』は本節の記載どおり (各 1 件: `dec_label_pc_127bd27`・`dec_label_pc_12a41ab`・`dec_label_pc_12a4665`)。件数と判定は変えていない。今回の run は dump を作り直しただけで、判定そのものは再判定していない。
 
