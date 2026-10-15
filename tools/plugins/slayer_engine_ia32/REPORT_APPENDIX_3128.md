@@ -37,7 +37,7 @@
 |---|---|
 | 突合 (`python3 diff_runtime.py`) | `[compare] PASS: 128 / 128 件が bit 一致、不一致 0 件`・`[diff_runtime] PASS`・exit 0 (3 回とも同一)。 範囲は §2 の入口 2 本・呼先 9 本 |
 | 非自明性 | native 実行で OBJ 領域が変わった行 63 / 128 (`[effect]`)。 内訳は呼先が書く候補 (`0x10001240`・`0x10001230`・`0x100011d0`・`0x10009310` と `0x10001b40`) の行数 49 + 14 = 63 と一致 (書かない `0x10001ba0`・`0x10001210`・`0x10001b90`・`0x10001ab0` の行は変化なし) |
-| ビルド (n=3) | native gcc 0.04 s、 wasm emcc 5.63–5.76 s。 emsdk 6.0.12 は agent-setup が `toolchain-emsdk` を `/opt/emsdk` に展開したもの (`.github/actions/agent-setup/action.yml`)。 本 PR の再現で `/opt/emsdk/upstream/emscripten/emcc` が 6.0.12 であることを確認 |
+| ビルド (n=3) | native gcc 0.04 s、 wasm emcc 5.63–5.76 s。 emsdk 6.0.12 は agent-setup が `toolchain-emsdk` を `[EMSDK]` に展開したもの (`.github/actions/agent-setup/action.yml`)。 本 PR の再現で `[EMSDK]` の emcc が 6.0.12 であることを確認 |
 | 実行 (n=3) | native 0.001 s、 wasm (node) 0.042 s |
 | load (cpu 4、並列 1) | load1 0.52–0.59 (`diff_runtime.py` の run 直前) |
 | ネガコン (`python3 diff_runtime.py --nega`) | wasm 1 行目の eax の 1 bit を壊す → `[compare] FAIL: 127 / 128 件が bit 一致、不一致 1 件`・`[nega] … ネガコン OK`・exit 0 (判定器は exit 1 で落ちた) |
@@ -79,7 +79,7 @@
 
 ```sh
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64   # tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 extracted/block22434_PE.bin
-# emcc (emsdk 6.0.12) は agent-setup が展開した /opt/emsdk を使う: export PATH=/opt/emsdk/upstream/emscripten:$PATH
+# emcc (emsdk 6.0.12) は agent-setup が展開した [EMSDK] を使う (PATH に [EMSDK] の upstream/emscripten を足す。 `docs/REFERENCES.md` §4)
 python3 tools/plugins/slayer_engine_ia32/lift_text.py          # work/lift_text/ を作る
 python3 tools/plugins/slayer_engine_ia32/runtime_enum.py       # (b)(c) の列挙と検算 → work/runtime_enum.json
 python3 tools/plugins/slayer_engine_ia32/gap_enum.py           # 未 lift 区間の fs:/AF 候補 (分類つき)
