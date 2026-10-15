@@ -9,7 +9,7 @@ REPORT.md §7.8 の全文 (250 行上限のため分割移動)。検証 HEAD = `
 - **起動元 (逆アセンブル・lift C で確認)**: DllMain `0x59c20b` の `call 0x40fa30` (= setjmp `0x40f950` へ jmp) の戻り番地が `0x59c210`。
   longjmp `0x40f9c0` を呼ぶのは `0x40fa40` (関数内 `0x40fa8f`)。`0x40fa40` は jmp_buf を複写し、
   `[0x5aa000]` の値から `eax = (flag != 0) + 1` (1 以上) を作って longjmp する (逆アセンブル `setne al; add eax,1` からの読み)。
-  戻り値が 1 以上なので DllMain の `cmp eax,1` は後段へ分岐する。`0x40fa40` の呼出元は `0x40fbd4`・`0x40fcbd` (lift C の call 行で確認。
+  戻り値が 1 以上なので DllMain の `cmp eax,1` は後段へ分岐する。`0x40fa40` の呼出元は `0x40fbcf`・`0x40fcb8` (訂正: 旧版の `0x40fbd4`・`0x40fcbd` は戻り番地。付録 4263 §1。lift C の call 行で確認。
   そこで flag がどう決まるかは未解析で、longjmp の発生条件は未確定)。
 - **override**: `qfc_ov.c` (`qfc_ov_longjmp`) は FLEngine `fle_ov_longjmp` と同型。`qfc_boot.sh` のみで有効 (`--override 0x40f9c0=qfc_ov_longjmp`)。
 - **root**: 戻り先 `0x59c210` を boot 専用 entries に加えた (`work/boot/entries_boot.json`)。e2e の entries と assert (6,347) は変えない。
