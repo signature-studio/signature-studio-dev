@@ -18,7 +18,7 @@
 - 測定 commit: `34aebb626` (origin/main 取り込み後の merge commit。probe は HEAD で再実行)。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_py322_probe.py`。実測 63.7 秒 (wall)・load 0.15 (起動直前の 1 分平均)・並列 1。出力 `instructions=5022467 hits=12`、`stored 0x125b1c0: n=2`、`stored 0x1262970: n=1`、`stored table: n=2` (§2・§3 と一致)。出力は §1〜§3 の転記元。
 - 既存ツールの確認: `pe_flag_scope_check.py` は 37.3 秒で 3649 の値 (0/12・書込み 18 件) を再現。`pe_callgraph.py callers 0xfff070,0xd1af20` は直接呼出し 0 件。`pe_xref.py 0x125b1c0,0x40fb40,0x1262970` は RIP 参照 0 件。
-- 差分 0 の証跡: 測定 commit (`34aebb626`) 以降に HEAD で変えたのは本 REPORT と DOC_MAP の文書だけ。`git diff 34aebb626 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
+- 差分 0 の証跡: 測定 commit (`34aebb626`) 以降に HEAD で変えたコードは `pe_py322_probe.py` の docstring 1 行 (展開手順の表記。実行ロジックは不変)。`git diff 34aebb626 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は docstring 1 行のみ。
 - 検証範囲: 逆アセンブル・参照列挙・格納値の読取り。wasm・mock の実行は未実施。
 
 ## 1. `0xd1af20` の経路
