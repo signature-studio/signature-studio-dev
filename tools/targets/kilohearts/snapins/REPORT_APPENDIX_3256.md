@@ -1,8 +1,8 @@
 # REPORT_APPENDIX_3256 — KH-48 (#3256) 検証の生出力 (全行)
 
-`REPORT_APPENDIX.md` §12-2 の要約の元になった生出力。測定 commit `d7603d630` (コード変更の最後の commit・以降は docs のみ) で `snapins/scripts/ymm_vocab_check.py 20000 1` と `snapins/scripts/fma_vocab_check.py 20000 1` を 1 回ずつ実行した stdout をそのまま載せる (再現は同コマンド)。
+`REPORT_APPENDIX.md` §12-2 の要約の元になった生出力。測定 commit `0c1345d4f` (main 取り込み merge・コードを変えた最後の commit・以降は docs のみ) で `snapins/scripts/ymm_vocab_check.py 20000 1` と `snapins/scripts/fma_vocab_check.py 20000 1` を 1 回ずつ実行した stdout をそのまま載せる (再現は同コマンド)。
 
-## ymm_vocab_check.py 20000 1 (rc=0・real 1.143 s・load 0.16 0.25 0.12)
+## ymm_vocab_check.py 20000 1 (rc=0・real 1.93 s・実行後 load 0.18 0.22 0.11)
 
 ```text
 [gen_simd] helpers 4, undefined(abort stub) 1 ['void __asm_vmovaps.2(i256,i256)'] approx_tables=none
@@ -39,7 +39,7 @@
 == 判定: 本検証 PASS / ネガコン(a) FAIL / ネガコン(b) FAIL / ネガコン(c) FAIL / ネガコン(d) FAIL / store 形 stub OK -> PASS
 ```
 
-## fma_vocab_check.py 20000 1 (rc=0・real 0.842 s・load 0.18 0.25 0.12)
+## fma_vocab_check.py 20000 1 (rc=0・real 1.90 s・実行後 load 0.25 0.24 0.11)
 
 ```text
 [gen_simd] helpers 7, undefined(abort stub) 0 [] approx_tables=none
@@ -78,5 +78,5 @@
   vfmadd132sd calls=20000 bits=128 mismatch=0
   rc=1 vfmadd213ss mismatch=15804 -> FAIL (期待どおり)
 == 判定: 本検証 PASS (全 bit 不一致 0) / ネガコン(a) FAIL / ネガコン(b) FAIL / ネガコン(c) FAIL -> PASS
-== wall 0.82 秒 (N=20000 語彙 7 件/各)
+== wall 1.87 秒 (N=20000 語彙 7 件/各)
 ```
