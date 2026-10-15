@@ -41,9 +41,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| survey (`m11_e2e.sh`) の前後実測 | 注入が退行を起こさないかは未確認。既定は不変 | 未解決表のまま (再測定のため子を起票しない) |
-| HEAD (`622df694b` 以降) の entry block 制限を通した後の 25 件の件数・`sigfix_slot_nonentry`・注入前後の diff | **HEAD 未測定**。2.1 の 25/25 は eba68fdbe の値。入力 IR `work-m11`・`toolchain-retdec`・`toolchain-emsdk` が本 run の素材に無い | 本 PR の未解決表 (入力 IR が揃った run で再測定する。再測定だけなので子を起票しない) |
+| survey (`m11_e2e.sh`) の前後実測 | 注入が退行を起こさないかは未確認。既定は不変 | #4724 (M11-N220) |
 | `work-m11` の IR に `ir_conditions.json` (ldfix=applied) の記録が無い | `m11_build.sh` が fail-closed で止まる | #4724 (M11-N220) |
-| survey (`m11_e2e.sh`) の前後実測 | 注入が退行を起こさないかは未確認 | #4724 (M11-N220) |
+| HEAD (`622df694b` 以降) の entry block 制限を通した後の 25 件の件数・`sigfix_slot_nonentry`・注入前後の diff | **HEAD 未測定**。2.1 の 25/25 は eba68fdbe の値。入力 IR `work-m11`・`toolchain-retdec`・`toolchain-emsdk` が本 run の素材に無い | #4724 (M11-N220)。HEAD 再測定の項目を同 issue にコメントで追記した |
 
-REPORT_N196 §6 の 25 件の行は、本 PR で「注入経路は実装済み・HEAD 再測定と survey は未実施」に更新済み (`tools/m11/REPORT_N196.md` §6)。
+REPORT_N196 §6 の 25 件の行は、本 PR で「注入経路は実装済み・HEAD 再測定と survey は未実施」に更新済み (`tools/m11/REPORT_N196.md` §6)。その追跡先は #4724 (M11-N220)。
