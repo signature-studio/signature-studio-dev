@@ -32,8 +32,10 @@ grep -v '^| ' "$W/xmm03.log" | sed 's/^/   /'
 echo "== 5/8 .pdata unwind census (CHAININFO / EH handler 名)"
 python3 "$DSP/scripts/mx6_pdata_eh.py" "$PE" "$W/surface_seeds_x64c.json" "$W/surface_one_x64c.json" "$W/pdata_eh.json" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('   PE: pdata=%d chained=%d eh=%d unreadable_uinfo=%d' % (d['pe_total']['pdata_entries'], d['pe_total'].get('chained_entries(CHAININFO)',0), d['pe_total'].get('eh_handler_entries',0), d['pe_total'].get('unreadable_unwind_info',0))); print('   seeds: %s' % d['seeds']); print('   one_round: %s' % d['one_round']); print('   funclets(FH3): %s' % d['funclets_fh3'])"
+python3 "$DSP/scripts/mx41_pdata2_census.py" "$PE" "$W" > /dev/null
+python3 -c "import json,sys; d=json.load(open(sys.argv[1]+'/mx41_pdata2.json')); print('   MX-41 pdata2 census: %s' % d['census_pdata2']); print('   MX-41 pdata1 unreadable=%d class=%s raw_present=%d E8/E9=%d' % (d['unreadable_pdata1'], d['unreadable_by_class'], d['unreadable_raw_present'], d['unreadable_first_byte_E8E9'])); print('   MX-41 independent(pefile): %s' % d['independent_pefile']); print('   MX-41 negctl: break delta=%+d fix delta=%+d' % (d['negctl']['break']['delta'], d['negctl']['fix']['delta']))" "$W"
 
-echo "== 6/8 判定 (期待値: seeds と 1-round の pdata 始点で xmm4/5 入口 livein = 0 / 受入1 の内訳が 17 件)"
+echo "== 6/8 判定 (期待値: seeds と 1-round の pdata 始点で xmm4/5 入口 livein = 0 / 受入1 の内訳が 17 件 / MX-41: pdata 数の維持・読取不能 160 の独立再計算一致・ネガコン ±1)"
 python3 - "$W" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1] + '/vectorcall.json'))
@@ -41,7 +43,19 @@ x = json.load(open(sys.argv[1] + '/xmm03.json'))
 ok = (d['seeds']['vectorcall_livein45_pdata_begin'] == 0 and d['one_round']['vectorcall_livein45_pdata_begin'] == 0
       and d['seeds']['consistency_livein_subset_of_anyref'] and d['one_round']['consistency_livein_subset_of_anyref']
       and x['population'] == 17 and sum(x['counts'].values()) == 17 and x['containment_cfg_P_subset_linear_P'])
-print('   %s' % ('PASS (pdata 始点の vectorcall livein 0 / 整合 OK / 受入1 の内訳 17 = 件数一致・包含 OK)' if ok else 'FAIL'))
+m = json.load(open(sys.argv[1] + '/mx41_pdata2.json'))
+c1, c2, ip, nc = m['census_pdata1'], m['census_pdata2'], m['independent_pefile'], m['negctl']
+ok41 = (c1['pdata_entries'] == 187060 and c1['chained_entries(CHAININFO)'] == 62526 and c1['eh_handler_entries'] == 23293
+        and c1['unreadable_unwind_info'] == 160 and m['unreadable_by_class'] == {'out_of_image': 160}
+        and c2['pdata_entries'] == 509 and c2.get('unreadable_unwind_info', 0) == 0
+        and ip['unreadable_same_set'] and ip['class_pefile'] == m['unreadable_by_class']
+        and ip['class_rows_match'] == m['unreadable_pdata1'] and ip['section_by_rva_none'] == m['unreadable_pdata1']
+        and ip['flag_mismatch_readable'] == 0
+        and nc['break']['delta'] == 1 and nc['break']['row_class_after'] == 'out_of_image'
+        and nc['break']['pefile_class_after'] == 'out_of_image'
+        and nc['fix']['delta'] == -1 and nc['fix']['row_removed'] and nc['fix']['pefile_class_after'] == 'readable')
+ok = ok and ok41
+print('   %s' % ('PASS (pdata 始点の vectorcall livein 0 / 整合 OK / 受入1 の内訳 17 = 件数一致・包含 OK / MX-41: pdata1 数の維持・読取不能 160 は画像外・独立再計算一致・ネガコン ±1)' if ok else 'FAIL'))
 sys.exit(0 if ok else 1)
 PY
 

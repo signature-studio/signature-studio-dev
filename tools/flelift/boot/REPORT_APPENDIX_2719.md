@@ -1,7 +1,7 @@
 # tools/flelift/boot — #2719 (WIN-8) x64c 寛容起動: 942 unit の逐次試行と CreateFruityInstance の観測
 
 > 正本の要約は `tools/flelift/boot/REPORT.md` 冒頭 (5 行目の #2719 案内)。本書は詳細 (工程・結果表・skip 一覧・survey との差・リスク評価)。
-> 測定 commit: **a55cb0d5** (`fle_boot.c` / `fle_boot.mjs` / `build.sh` / `fle6_measure.sh` を変えた最後の commit)。
+> 測定 commit: **181d66ec** (最新の再測定。§11)。初回の測定 commit は a55cb0d5 (§0〜§10 の値)。a55cb0d5 は `fle_boot.c` / `fle_boot.mjs` / `build.sh` / `fle6_measure.sh` を変えた最後の commit だったが、その後この 4 ファイルは 27 commit 変わった。
 > 既知類型との関係: 寛容起動で見えた clobber (呼出し時に units 配列の proc が 0 を返した現象。どの段が 0 になったかは未測) は、#3060 の `f_6a7b70` 広域ゼロ埋めと同じ現象と推定 (未実測の推定)。`docs/DEFECTS.md` D1a〜D23 のどれにも直接は当たらない (推定)。
 
 ## 0. 結論
@@ -9,7 +9,7 @@
 - x64c の寛容起動を足した (`FLE_TOLERANT=1` 寛容 / `FLE_TOLERANT=2` 診断)。**既定 (未指定) の数値は不変** (209 / GetMem 1,890 / FreeMem 776 / 停止 unlifted `0x6a7b70`)。
 - **942 unit を最後まで試行した** (mode 1・mode 2 とも 942)。ただし mode 1 は unit 245 (VA `0x733090`・dispatch 209 番目) の ExitProcess の後、unit 246〜940 の 695 件が呼出し時に proc 0 を返し (clobber)、走れなかった。どの段が 0 になったか (InitContext のポインタ・InitTable・units 配列) は未測 (§3)。
 - mode 2 (診断: 失敗 unit の後で InitContext・InitTable・units 配列・unit 先頭 8B を起動時の値へ戻す) では 942 unit が走り、ok 811 / empty 46 / exit 19 / oob 65 / noproc 1。ただし mode 2 は補修であり、状態の欠落を消すものではない (§6)。
-- **CreateFruityInstance (0x1375990) は入口まで dispatch され、本体内で `oob` trap した** (両 mode とも)。trap 地点は CFI 本体内 (または直接呼出し先) と読めるが未特定。soft (未実装 import) の呼出しは 0 件 (`soft_called` 空) で、API 段 (S12〜S22) への到達は記録上 0。残件は #3077 [WIN-16] (CFI の trap 地点と CS 0x12bd390 の登録経路) に寄せる。
+- **CreateFruityInstance (0x1375990) は入口まで dispatch され、本体内で `oob` trap した** (両 mode とも)。trap 地点は CFI 本体内 (または直接呼出し先) と読めるが未特定。soft (未実装 import) の呼出しは 0 件 (`soft_called` 空) で、API 段 (S12〜S22) への到達は記録上 0。残件は #3969 [WIN-41] (CFI の trap 地点と soft 名の表示) に寄せる。#3077 [WIN-16] は flengine 路線の範囲で部分達成のまま close 済み。
 - 寛容 mode 1 の dispatch は 209 (unit 245 で ExitProcess)。mode 2 は 895 dispatch (試行 942 のうち)。
 
 ## 1. 測定条件
@@ -162,8 +162,8 @@ mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜940 の `clo
 - dispatch リング末尾 4 件 (`fle_ring_at(124..127)`・古い順): mode 1 (`tol`) `0x6a7b70` → `0x6a7b70` → `0x6a7b70` → `0x1375990`。mode 2 (`tol2`) `0x1375170` → `0x13751b0` → `0x13751d0` → `0x1375990`。CFI 呼出し中に記録されたのは末尾の `0x1375990` の 1 件だけ。先頭 3 件は CFI 呼出しより前 (逐次起動の末尾) の記録。
 - trap: 入口の後に間接 dispatch の記録が無いため、trap は `0x1375990` の本体内、または直接呼出し先 (直接 call は dispatch 記録に出ない) で起きたと読める。地点は未特定。
 - API 段 (S12〜S22) の到達: 記録しているのは soft 呼出しだけで、0 件。`RegisterClassW`・`CreateWindowExW` は shimx の実装にも curated にも無く、gen_boot.py の規則で soft スタブになるため、呼出しが有れば `soft_called` に出ていた。実装済み shim (getmem・getproc 等) の呼出しは CFI について計数していない。
-- soft 名の表示: `fle_boot.mjs` の `softSnap`・`soft_called`・`soft_top` は C 文字列のポインタ番号を名前として出す (既存の欠陥。#3077 で直す)。CFI 中の soft 0 件の判定は件数の差分で行うため、この結論は表示に依存しない。
-- trap 地点の特定は #3077 [WIN-16] の範囲。本 issue では観測までに留める。
+- soft 名の表示: `fle_boot.mjs` の `softSnap`・`soft_called`・`soft_top` は C 文字列のポインタ番号を名前として出す (既存の欠陥。#3969 [WIN-41] で直す)。CFI 中の soft 0 件の判定は件数の差分で行うため、この結論は表示に依存しない。
+- trap 地点の特定は #3969 [WIN-41] の範囲。本 issue では観測までに留める。
 
 ## 8. 製品 KPI の前後 (PR 本文の表と同じ値)
 
@@ -181,8 +181,8 @@ mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜940 の `clo
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| CFI (0x1375990) の trap 地点と、CS 0x12bd390 の登録経路 | 最初のウィンドウ未達。S12〜S22 の到達なし | #3077 [WIN-16] (既存・重複起票せず) |
-| soft 名の表示 (`softSnap`・`soft_top`・`soft_called` が C 文字列のポインタ番号を出す。`UTF8ToString` を通していない) | CFI の結論には影響しない (件数差分で判定・CFI 中の soft 0 件)。名前の読み取りは未了 | #3077 [WIN-16] (既存・同じ解析の範囲) |
+| CFI (0x1375990) の trap 地点と、CS 0x12bd390 の登録経路 | 最初のウィンドウ未達。S12〜S22 の到達なし | #3969 [WIN-41] (起票。#3077 [WIN-16] は部分達成で close 済み) |
+| soft 名の表示 (`softSnap`・`soft_top`・`soft_called` が C 文字列のポインタ番号を出す。`UTF8ToString` を通していない) | CFI の結論には影響しない (件数差分で判定・CFI 中の soft 0 件)。名前の読み取りは未了 | #3969 [WIN-41] (起票。#3077 [WIN-16] は部分達成で close 済み) |
 | unit 245 (VA 0x733090) の ExitProcess (RunError 経路) の原因と、`f_6a7b70` の広域ゼロ埋めの範囲 | 寛容起動が 245 で fatal 扱いになる。clobber 695 の原因 | #3060 [FLE-11] (既存) |
 | 補修 (mode 2) の妥当性。戻す範囲の外の欠落 (R1) | mode 2 の ok 811 の確度 | #3060 (受入に追加済み) |
 | x64c の寛容起動レコードを `tools/startup/boot_metric.json` に追加 | 受入 6 (WIN-2 と同一スキーマ) | #3147 [WIN-17] |
@@ -195,3 +195,24 @@ FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FLE_BOOT_RUNS="default" FLE_EXTRA_ROOTS= bash
 ```
 
 結果の JSON: `tools/flelift/boot/results/boot_summary_fle6_tol.json` (mode 1)・`..._tol2.json` (mode 2)・`..._default.json`。`tolerant.units` の各要素は `[i, 種類, VA, GetMem 増分, FreeMem 増分, dispatch(0) 回数]`。
+
+## 11. 再測定 (測定 commit `181d66ec`・mode 1 のみ)
+
+- 測定 commit `181d66ec` は `origin/main` (`abf0981f7`) を取り込んだ後の HEAD。初回 (`a55cb0d5`) から `fle_boot.c`・`fle_boot.mjs`・`build.sh`・`fle6_measure.sh` を含む `tools/flelift` が変わったため、同じ手順で mode 1 だけ測り直した。
+- 素材: fl-win64 を `$ARTIFACTS_DIR/fl-win64.tar.zst` から `tar --zstd -xf` で展開。toolchain-emsdk は上流の `git clone --depth 1` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12` (`tools/m1/flags.sh` の pin と同版) を `$RUNNER_TEMP` に入れた。
+- 実行: `FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0・所要 2 分 4 秒 (gen-A 5 s・lift 48 s・clang plain 57 s (8 shard)・boot tol 15 s)。
+- 工程: lift は functions 29,937 / insns 1,564,587 / unlifted callees 1,720 / imports 688 / traps 0 (§2 と一致)。build plain は mismatch 0 / undefined 0 / dup 0。
+
+| 項目 | 初回 (`a55cb0d5`・§3) | 再測定 (`181d66ec`) |
+|---|--:|--:|
+| 試行 | 942 | 942 |
+| ok / empty / noproc / clobber / exit / oob | 208 / 37 / 1 / 695 / 1 / 0 | 208 / 37 / 1 / 695 / 1 / 0 |
+| dispatch (units_run) | 209 | 209 |
+| 停止 (dispatch 209 番目・unit 245) | `0x733090` exit | `0x733090` exit |
+| GetMem / FreeMem | 2,314 / 1,199 | 2,314 / 1,199 |
+| CreateFruityInstance (0x1375990) | 入口後 `oob` trap・soft 呼出し 0 | 入口後 `oob` trap・soft 呼出し 0 (リング末尾 `0x6a7b70` ×3 → `0x1375990`) |
+
+- 差分: 結果 JSON の `boot`・`outmem`・`log_cap`・`px6bbc20` の 4 キーは、初回の JSON で `null` だった診断フィールドの追加。計数・停止・probe の値は変わらない。
+- `FLEBOOT_IPP_CHECK` は `ok:false` (`ptr_15F34A0` = 0x0)。R5 と同じ既知事項で、寛容起動では判定できない。
+- 結論: 初回の値は `181d66ec` でも再現した。`boot_metric.py` の locator と test の期待値は変えない。record の `commit` は `181d66ec` とする。
+- 差分 0 の証跡: `git diff --stat 181d66ec HEAD -- tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` の出力は空 (本 §11 を含む commit の時点)。

@@ -6,7 +6,7 @@ import { countOpencodeRuns, countRunsByPrio, type ActiveCount } from "./active.t
 import { classify, isStopReport, neededArtsOf, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
-import { addArts, buildLaunchBody, checkRelaunchIntent, defaultArtLine, lowAllowance, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
+import { addArts, buildLaunchBody, checkRelaunchIntent, defaultArtLine, effectivePrioMap, lowAllowance, noPrCooldownMs, planLaunch, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
 import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { haltNotifyDue, haltOverdue, haltReasons, nextHalt, type Halt } from "./halt.ts";
@@ -913,8 +913,9 @@ export class Engine {
     const { rows, children } = classify(snap, input);
     const labels = new Map(snap.issues.map((i) => [i.number, i.labels] as const));
     const title = new Map(snap.issues.map((i) => [i.number, i.title] as const));
+    const prios = this.prioMap();
     const nowMs = this.d.now();
-    const cool = (n: number) => noPrCooldownMs(labels.get(n) ?? [], this.d.cfg.noPrCooldownH);
+    const cool = (n: number) => noPrCooldownMs(prios.get(n) ?? "normal", this.d.cfg.noPrCooldownH);
     const hasLabel = (n: number, l: string) => (labels.get(n) ?? []).includes(l);
     // pm-apply・needs-user-input は着手も再投入もしない (下の HOLD_LABELS の処理で user に置く)。
     const held = (n: number) => (labels.get(n) ?? []).some((l) => HOLD_LABELS.includes(l));
@@ -1015,7 +1016,7 @@ export class Engine {
     const blocksCount = new Map<number, number>();
     const cls = classify(snap, input);
     for (const [k, v] of Object.entries(cls.blocksCount)) blocksCount.set(Number(k), v);
-    const ready = rows.ready.map((n) => ({ n, title: title.get(n) ?? "", blocksCount: blocksCount.get(n) ?? 0, labels: labels.get(n) ?? [] }));
+    const ready = rows.ready.map((n) => ({ n, title: title.get(n) ?? "", blocksCount: blocksCount.get(n) ?? 0, prio: prios.get(n) ?? "normal" }));
     const act = this.activeRuns();
     const active = act.all;
     // 推定の上限が無ければ TARGET のまま (変えない)。推定があれば、上限 + 余裕 (下限 TARGET_MIN、上限 TARGET)。
@@ -1023,10 +1024,10 @@ export class Engine {
     const teff = targetEff(capEst, this.d.cfg.target, this.d.cfg.queueMargin, this.d.cfg.targetMin);
     // prio:low の上限 (LOW_CAP)。着手済み (started)・launch 可能 (ready・relaunch) で blocked でない prio:critical が 1 件以上ある間だけ効く。
     // 数えるのは未完了の run (実行中と待ち)。実行中の run は止めず、新しい low の launch だけを抑える。
-    const activeByPrio = countRunsByPrio(Object.values(this.s.runs), Object.values(this.s.issues));
-    const criticalOpen = [...rows.started.map(([n]) => n), ...rows.ready, ...rows.relaunch.map(([n]) => n)].some((n) => prioOf(labels.get(n) ?? []) === "critical");
+    const activeByPrio = countRunsByPrio(Object.values(this.s.runs), Object.values(this.s.issues).map((i) => ({ title: i.title, prio: prios.get(i.number) ?? "normal" })));
+    const criticalOpen = [...rows.started.map(([n]) => n), ...rows.ready, ...rows.relaunch.map(([n]) => n)].some((n) => prios.get(n) === "critical");
     const lowCap: LowCap = { cap: this.d.cfg.lowCap, running: activeByPrio.low, applied: criticalOpen };
-    const isLow = (n: number) => prioOf(labels.get(n) ?? []) === "low";
+    const isLow = (n: number) => prios.get(n) === "low";
     const sel = planLaunch({ ready, relaunch: rows.relaunch.map(([n]) => n), active, target: teff, batch: this.d.cfg.batch, low: { ...lowCap, isLow } });
     const relMap = new Map(rows.relaunch);
     const picks: Planned[] = [];
@@ -1146,6 +1147,7 @@ export class Engine {
     // prio:low の枠 (LOW_CAP) は、意図の投稿と picks で共有する。意図が先に枠を使えば、picks の low はその分を除く。
     const lowGate = { left: lowAllowance(plan.low_cap) };
     const intent = plan.phase.review_only || plan.stop || plan.blocked ? { halted: false, handled: new Set<number>() } : await this.relaunchIntents(gh, !!live, planned, { rows, unknown, children }, lowGate);
+    const prios = this.prioMap();
     for (const p of intent.halted ? [] : picks) {
       if (intent.handled.has(p.n)) continue;
       let body: string;
@@ -1155,7 +1157,7 @@ export class Engine {
         this.pushLog({ kind: "skip", n: p.n, note: "invalid artifacts line" });
         continue;
       }
-      if (this.isLowIssue(p.n)) {
+      if (prios.get(p.n) === "low") {
         if (lowGate.left <= 0) continue;
         lowGate.left--;
       }
@@ -1222,6 +1224,7 @@ export class Engine {
   ): Promise<{ halted: boolean; handled: Set<number> }> {
     const nowMs = this.d.now();
     const handled = new Set<number>();
+    const prios = this.prioMap();
     const placed = new Map<number, { row: keyof Rows; why: string; openPr: boolean }>();
     for (const row of Object.keys(ctx.rows) as Array<keyof Rows>) {
       for (const x of ctx.rows[row] as unknown[]) {
@@ -1262,14 +1265,14 @@ export class Engine {
         reject(v.reason);
         continue;
       }
-      const gate = this.intentGate(n, placed.get(n), ctx, nowMs);
+      const gate = this.intentGate(n, placed.get(n), ctx, nowMs, prios);
       if (gate.kind === "wait") continue;
       if (gate.kind === "reject") {
         reject(gate.reason);
         continue;
       }
       // prio:low の上限に達していれば、処理済みにせず次の tick に回す (picks と同じ枠)。
-      if (this.isLowIssue(n)) {
+      if (prios.get(n) === "low") {
         if (lowGate.left <= 0) continue;
         lowGate.left--;
       }
@@ -1313,6 +1316,7 @@ export class Engine {
     at: { row: keyof Rows; why: string; openPr: boolean } | undefined,
     ctx: { unknown: Set<number>; children: Record<string, number[]> },
     nowMs: number,
+    prios: Map<number, Prio>,
   ): { kind: "post" } | { kind: "wait" } | { kind: "reject"; reason: string } {
     if (!at) return { kind: "wait" };
     // blocked_by が未同期 (unknown) の間は、ready でも blocked の行に移っているので、先に待つ (確定してから拒否・投稿を決める)。
@@ -1324,7 +1328,7 @@ export class Engine {
     if (labels.includes("oc:stuck") || HOLD_LABELS.some((l) => labels.includes(l))) return { kind: "reject", reason: "user" };
     if ((ctx.children[String(n)] ?? []).length) return { kind: "reject", reason: "stopped" };
     if (labels.includes("oc:no-pr")) {
-      if (nowMs - this.lastAct(n) < noPrCooldownMs(labels, this.d.cfg.noPrCooldownH)) return { kind: "wait" };
+      if (nowMs - this.lastAct(n) < noPrCooldownMs(prios.get(n) ?? "normal", this.d.cfg.noPrCooldownH)) return { kind: "wait" };
       if (this.noPrState(n).count >= NO_PR_MAX_RELAUNCH) return { kind: "reject", reason: "stopped" };
     }
     if (at.row === "stopped" && INTENT_HARD_STOP.includes(at.why)) return { kind: "reject", reason: "stopped" };
@@ -1336,9 +1340,10 @@ export class Engine {
     return Math.max(Date.parse(this.s.launchedAt[String(n)] ?? "") || 0, Date.parse(this.s.botLast[String(n)]?.at ?? "") || 0);
   }
 
-  // prio:low の issue か (LOW_CAP の対象)。
-  private isLowIssue(n: number): boolean {
-    return prioOf(this.s.issues[String(n)]?.labels ?? []) === "low";
+  // 区分の実効値 (launch・LOW_CAP・no-pr の cooldown・/status で同じ値を使う)。親からの継承を含む (#3973)。
+  // closed の親も状態で判定するため、snapshot (open だけ) ではなく s.issues 全体から作る。
+  private prioMap(): Map<number, Prio> {
+    return effectivePrioMap(Object.values(this.s.issues));
   }
 
   async watchdog(gh: Gh | null): Promise<"dispatched" | "would" | "skipped"> {
@@ -1768,7 +1773,8 @@ export class Engine {
       .map((p) => Math.max(0, Math.floor((now - Date.parse(this.s.sig[String(p.number)]?.stop?.at ?? p.updatedAt)) / 60_000)));
     // 着手待ち (ready) を優先の区分で数える (launch は critical を先頭、low を末尾に並べる)。
     const readyByPrio = { critical: 0, normal: 0, low: 0 };
-    for (const n of rows.ready) readyByPrio[prioOf(this.s.issues[String(n)]?.labels ?? [])]++;
+    const prios = this.prioMap();
+    for (const n of rows.ready) readyByPrio[prios.get(n) ?? "normal"]++;
     // oc-pm の直近 1 時間の送信を区分別に数える (pm_dispatch_1h と同じ窓・同じ履歴。prio の無い古い履歴は normal)。
     const pmByPrio: Record<Prio, number> = { critical: 0, normal: 0, low: 0 };
     for (const h of this.pmHistory()) if (now - h.at < 3_600_000) pmByPrio[h.prio ?? "normal"]++;

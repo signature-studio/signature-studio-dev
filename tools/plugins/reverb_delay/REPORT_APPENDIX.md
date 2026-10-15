@@ -158,7 +158,7 @@ bash tools/plugins/reverb_delay/engine_f80_nc.sh "$PWD/tools/plugins/work/reverb
 | 19164 | `Engine_x64.dll` (VA 0x6e6504、長さ 14) | 0x6e632f (関数 0x6e62d0) | 0x6e62d0 → 0x6d59b0 → 0x4407b0 → `call LoadLibraryW` @0x4407db |
 
 - 0x440750 (18999 側) は、引数 `edx=0x8000` を `SetErrorMode` 相当 (0x41d520) で設定し、その間に `LoadLibraryW` を呼ぶ wrapper (0x41d520 の同定と 0x8000 = SEM_NOOPENFILEERRORBOX は SDK の定数からの推定)。 19164 側の 0x4407b0 も同形と推定 (未確認)。
-- **未確定**: `LoadLibraryW` の引数は `obj+0x2a6` (18999 では 0x6dd0fe / 0x6dd0f0 で `UnicodeString` に複写) から来る。 この `+0x2a6` へ書く命令は殻の全 code に見当たらず (読み出しと比較 (0x6dfa30) のみ)、**読み込まれる実パスが `engine_x64.dll` であることは静的に確定できていない**。 参照元 0x6e9940 の `dir + engine_x64.dll` 連結結果は、0x6e9940 のローカル `[rbp+0x26a]` に複写されるだけで LoadLibrary へ届いていない (静的に追えた範囲)。
+- **未確定 → 解決 (§18-7)**: `LoadLibraryW` の引数は `obj+0x2a6` (18999 では 0x6dd0fe / 0x6dd0f0 で `UnicodeString` に複写)。 `+0x2a6` を指す直接の書込み命令は無く、0x6d43fc の `rep movsq` (呼出元フレームのレコードの丸ごと複写) で埋まる。 書込元と読み込まれる DLL 名は §18-7 に記録。
 
 ### 18-4. 候補表と解決名 (shell_bind.py [3][4])
 
@@ -189,7 +189,30 @@ bash tools/plugins/reverb_delay/engine_f80_nc.sh "$PWD/tools/plugins/work/reverb
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `LoadLibraryW` の引数 (`obj+0x2a6`) の書込元が未特定。 読み込まれる実パスが `engine_x64.dll` / `Engine_x64.dll` であることは静的に未確認 | 結合の前提 (読み込む DLL の同一性) | #3625 ([PLG-F4-6])。 確定までは「未確認」とし、`engine_x64.dll` を読む前提で進める |
+| 殻 DLL のフォルダ (`dir`) の実行時の値。 DLL 名 (`engine_x64.dll` / `Engine_x64.dll`) は §18-7 で確定 | 完全な読込パスは実行時にしか決まらない | #201 の差分試験 (出口条件 3)。 確認方法: Wine で `WINEDEBUG=+loaddll` を付けて殻を読み込ませ、engine の読込パスを記録 (未実施) |
+| `obj` (0x6dcb80 の self) の実行時の値。 静的には `.text` 内の定数を指す (§18-7) | 書込先 `obj+0x98` の object が実行時に書込み可能かは未確認 | 同上 (実行時 trace で `obj+0x2a6` の内容を記録) |
 | 殻 ↔ engine の実行時検証 (dispatcher 呼出の戻り値、コールバックの実際の引数) なし | ABI は静的推定 | #201 の差分試験 (出口条件 3) |
 | 19164 の名前走査の仮想メソッド経由の呼出元 (18999 の 0x6dff80 相当) 未確認 | 19164 の解決経路の一部 | 同上 (本 PR の範囲外) |
 | engine → 殻の呼出 (engine が殻のコールバックを呼ぶ箇所) の ABI 未測定 | 双方向の境界の一部 | #523 系 (PLG-F4-2、engine の lift 側) |
+
+### 18-7. obj+0x2a6 の書込元と LoadLibraryW の実引数 (#3625 · 静的解析 · 測定 commit 69ddd3081)
+
+- **結論**: `LoadLibraryW` の引数 `obj+0x2a6` は、呼出元のフレームにある 0x644 バイトのレコード R を `obj+0x98` へ丸ごと複写した結果で、`R+0x20e` (呼出元の `[rbp+0x26a]`) が入る。 書込元は殻の `rep movsq` (18999 0x6d43fc、19164 0x6cd22c)。 `R+0x20e` の中身は `dir + "engine_x64.dll"` (19164 は `Engine_x64.dll`) で、`dir` は殻 DLL 自身のフォルダ。 **読み込まれる DLL 名は両殻で確定**。 フォルダ部分の実値は静的には決まらない (§18-6 の未解決)。
+- **素材・再現**: `fl-win64` のみ (`block18999` / `19000` / `19164` / `19165`)。 各段は `FL_WIN64_DIR=<展開先> python3 tools/plugins/reverb_delay/loadpath_trace.py <block> fn <VA>` で出す (`refs` / `disp` / `calls` / `bytes` も同じ)。 `shell_bind.py 18999 19000` と `19164 19165` は HEAD (69ddd3081) で rc 0・判定 `OK` (19164 は 13.7 秒)。
+
+| 段 | 18999 (Delay 3) | 19164 (Multiband Delay) |
+|---|---|---|
+| (a) 呼出元のレコード R (0x644 B) の確保 | 0x6e9940: `lea rcx,[rbp+0x5c]`・`mov edx,0x644`・`call [rax]` (0x6e9978〜0x6e9988) | 0x6e62d0: 0x6e6308〜0x6e6318 (同形) |
+| (b) engine 名の連結 | `lea r8` 0x6e999f → 0x6e9b44 `engine_x64.dll` → `call 0x410400` (`_UStrCat`) → `[rbp+0x38]` | 0x6e632f → 0x6e6504 `Engine_x64.dll` → `call 0x410400` → `[rbp+0x38]` |
+| (c) `R+0x20e` (= `[rbp+0x26a]`) への複写 | 0x6e99ab `lea rcx,[rbp+0x26a]` → `call 0x432860` (`r8=0x104`) | 0x6e633b `lea rcx,[rbp+0x26a]` → `call 0x432880` (`r8=0x104`) |
+| (d) 殻本体の呼出 (`r9 = R`) | 0x6e9a26 `lea r9,[rbp+0x5c]` → `call 0x6dcb80` (0x6e9a3c) | 0x6e63b6 `lea r9,[rbp+0x5c]` → `call 0x6d59b0` (0x6e63cc) |
+| (e) `obj` への複写 (**書込元**) | 0x6dccbb `call 0x6d42a0` → 0x6d43f0 `lea rdi,[rax+0x98]`・0x6d43f7 `ecx=0xc8`・0x6d43fc `rep movsq`・0x6d43ff `movsd` (計 0x644 B) | 0x6d5aeb `call 0x6cd0d0` → 0x6cd220 `lea rdi,[rax+0x98]`・0x6cd22c `rep movsq`・0x6cd22f `movsd` |
+| (f) `LoadLibraryW` へ | 0x6dd0fe `lea rdx,[obj+0x2a6]` → 0x6dd11c `call 0x440750` → 0x44077b `call LoadLibraryW` | 0x6d5f2e `lea rdx,[obj+0x2a6]` → 0x6d5f4c `call 0x4407b0` → 0x4407db `call LoadLibraryW` |
+
+- **オフセットの対応**: `0x26a − 0x5c = 0x20e`、`0x98 + 0x20e = 0x2a6`。 `0x644 = 0xc8 × 8 + 4`。 (e) は R を先頭から全部複写するので、R のどの領域も `obj+0x98` 以降へ同じ位置で写る。
+- **`dir` の作り方 (両殻同形)**: 18999 では `GetModuleFileNameW([0x745298], …, 0x104)` (0x6d16bc〜0x6d16cd) → `0x4100d0` (WCHAR → UStr) → `0x4324a0` (`ExtractFilePath`: `0x441380` が末尾から区切り集合を検索し、`Copy(s,1,pos+1)` で末尾の `\` を残す) → `0x40edb0` で変数 `0x74f538` へ代入。 19164 は 0x6ca4d0 で同形。 区切り集合は 32 バイトの bitmap (0x4324e4 / 0x432504) で、ビット 92 (`\`) と 58 (`:`) だけが立つ。
+- **HInstance `[0x745298]`**: 両殻で同じ RTL の DllEntry `0x418a10` が `r9d == 1` (DLL_PROCESS_ATTACH) のとき `r8` (= `hinstDLL`) を保存する (0x418a39)。 呼出元 0x6ed490 (DllMain 相当) が `rcx` → `r8`・`edx` → `r9d` に載せ替えて呼んでいることを確認済み。 よって `GetModuleFileNameW` は殻 DLL 自身の絶対パスを返す。
+- **連結と打切り**: `0x410400` は左辺の後ろに右辺を複写する (`dest + len×2`) `_UStrCat`。 `0x432860` / `0x432880` は `0x4327c0` / `0x4327e0` で cap (260 WCHAR) まで複写して NUL 終端する。 殻 DLL のフォルダ長が 246 WCHAR 以上だと末尾の `engine_x64.dll` が切れる (限界)。
+- **`obj` の実体は静的に未確定**: 18999 の `obj` (0x6dcb80 の rcx) は `mov rcx,[0x6dad80]` (0x6e9a12) で読み、その値 `0x6dae48` は `.text` 内 (セクションフラグ 0x60000020 = 読み取り専用) の表を指す。 実行時にそれが書込み可能な object かは確認できない。 ただし (e)(f) の鎖は全て `obj` 相対 (`obj+0x98+0x20e`) なので、`obj` の値によらず「`obj+0x2a6` = `R+0x20e`」は成り立つ。
+- **検証範囲**: 静的な逆アセンブルのみ。 実行 (Wine 等) はしていない。 `dir` の実値、`obj` の実値、LoadLibraryW の成否は範囲外。
+- **測定 commit と差分**: 測定は 69ddd3081 (`loadpath_trace.py` を追加した commit)。 `git diff 69ddd3081 HEAD -- tools/plugins/reverb_delay/shell_bind.py tools/plugins/reverb_delay/loadpath_trace.py` の出力は 0 行。

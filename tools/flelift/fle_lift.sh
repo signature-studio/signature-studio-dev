@@ -2,6 +2,7 @@
 # fle_lift.sh — FLEngine_x64.dll 全体を x64c (flelift fork) で lift → C → emcc → wasm (1 コマンド)。
 #   env: FLE_ENTRIES (default work/fle_entries.json), FLE_OUT (default work/lift), FLE_NAME (default flel)
 #   entries が無ければコミット済み fle_entries.json (M11 closure F 集合 7,421 roots) から生成。
+#   env: EMSDK_ENV (emsdk_env.sh の場所, default は [EMSDK] の emsdk_env.sh)
 #   前提: python3 (capstone, pefile), emsdk 6.0.12
 set -euo pipefail
 FLE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -11,7 +12,9 @@ export FLE_PE="$PE"
 ENT="${FLE_ENTRIES:-$FLE/work/fle_entries.json}"
 OUT="${FLE_OUT:-$FLE/work/lift}"
 NAME="${FLE_NAME:-flel}"
-source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
+EMSDK_SH="${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"
+[ -f "$EMSDK_SH" ] || { echo "[fle_lift] emsdk_env.sh not found: $EMSDK_SH (EMSDK_ENV で指定)" >&2; exit 2; }
+source "$EMSDK_SH" >/dev/null 2>&1
 mkdir -p "$OUT" "$(dirname -- "$ENT")"
 export TMPDIR="$OUT/tmp"; mkdir -p "$TMPDIR"
 [ -f "$ENT" ] || python3 -c "import json; json.dump(json.load(open('$FLE/fle_entries.json')), open('$ENT','w'))"
