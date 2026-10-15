@@ -122,3 +122,57 @@ return np;
 
 - 文字列の書込み (`"he.d"` の 8 バイト) は、上の計装のどれにも映らなかった。`store` 命令・`409c80` の copy のいずれも経由しないことになる。候補は IR の `__asm_rep_movsq_memcpy` (28 箇所)・`__asm_rep_movsb_memcpy` (1 箇所)・`__asm_rep_stosq_memset` (6 箇所) の経路。次の一手として、これらの入口で `dst` が `[WA, WA+32)` と重なる呼出しを記録する (未実施)。
 - 旧 (#3928 補足節) の `[aw]` 件数 3 件は、候補計装で再現した。派生 script は本 PR で commit した (`store_watch_3972.sh`・`copy_watch_3972.py`・`watch_copy_3972.c`)。
+
+### #3972 run 2 の実測 (commit `c39ea4679`・n=1)
+
+- IR: `bash m11_gen_ir2.sh` rc 0 (47 s)。素材 `work-m11`・`work-liftdiff`・`toolchain-emsdk`・`toolchain-retdec`・`fl-win64` (`block00031_PE.bin` のみ `$FL_WIN64_DIR/extracted/` = [WIN64]) を展開。
+- 再現: `bash trap_triage/store_watch_3972.sh rep1` (`M11_FIX_4136A0=1`・unit 158) で `[aw]` 4 件 (`653660` 入口の 0 初期化 `0x10aa1428`・`…1430`・`…1438`・`…1440`)。前回の 3 件から 1 件増えた (監視対象 `0x10aa1440` を含むため。前回は範囲外)。
+- `REP=1` (rep 系 helper 35 箇所の入口計装): unit 158 の `[rp]` は 0 件、`[aw]` は同じ 4 件。結果は halt0。
+- 計装の検証: `REP=1` で `WATCH_ADDR=0x10aa1000` (unit 158) と `WATCH_ADDR=0x10000000` (unit 0) の `[rp]` は 0 件。**既知の書込みで `[rp]` が出ることは未確認** (計装が効くかは未検証)。
+- 未特定: 文字列 `"he.d"` の書込み元。`store` 命令 (54,041 件・ptr 取りこぼし 0) と `409c80` の copy と rep 系 helper の入口のいずれでも、unit 158 の書込みを捕まえていない。残る候補は SSE 系 helper (`__asm_movdqa`・`__asm_movups` 系 等の関数呼出し) の経路。
+- 次の一手: (1) 既知の書込みで `[rp]` が出ることを確かめる計装の検証、(2) SSE 系 helper の入口計装、(3) 書込みが unit 158 の実行中か直前かを切り分ける (`m11_watch_on` の範囲を unit 157 の後から)。
+
+### #3972 run 3: 計装なしの unit 境界サンプリング
+
+- 目的: 計装 (store・copy・rep) に依らず、`0x10aa1428` の 8 バイトが unit の境界でどう変わるかを読むだけで測る。計装 0 の clean build (`M11_FIX_4136A0=1`)。
+- 再現: `cd tools/m11 && bash trap_triage/first_write_3972.sh <tag> 0x10aa1428 158` (前提: `work-m11`・`fl-win64`・`[EMSDK]`・`bash m11_gen_ir2.sh` 済み。出力 `work/probe3972/fw_<tag>.txt`)。
+- 結果 (n=1): unit 0〜157 の境界で値が変わるのは 0 から別の値への一時変化が多数 (unit 43・45・51 ほか)。unit 156 の出口で `3014aa10 3014aa10` に変わり、unit 157 では変化なし、unit 158 の出口 (`halt0` 後) で `0000000000000000`。`"he.d"` (`0x64002e00650068`) は unit 158 の境界では観測されなかった。
+- 解釈: `"he.d"` の書込みは unit 158 の実行中にだけ現れる一時的な値と読める。ただし unit 158 は `halt0` で終わるため、出口の `0` が unit 158 の処理によるか halt 後の後始末かは区別できていない。store 計装も rep 計装も書込みを捕まえていないため、書込み経路は計装の対象外 (未特定)。
+
+### #3972 run 4: call 単位の値変化の検出 (`callchk_3972.sh`)
+
+- 手段: IR の直接 call (`%x = call ... @name(` の形。`llvm.*`・`m11_*` を除く) の直後に `m11_callchk(site)` を入れ、unit 158 の実行だけ、監視番地 `0x10aa1428` の 8 バイトが前回の call から変わったら site を出す (読み取りだけ)。store・copy・rep の計装が映らなかった書込みを、call 境界で拾うための派生。
+- 観測の範囲: 正規表現は `tail call` と間接 call (`call ... %fp(`) に一致しない。手元の 3 行の IR で確認し、直接 call だけが入ることを見た。よって `tail call`・間接 call の直後で起きた書込みは観測外 (call 境界で拾えない書込み)。
+- 限界: 基準値は unit 158 で最初の計装 call が走った時点の値。それより前の書込みは見えない。
+- 再現: `cd tools/m11 && bash trap_triage/callchk_3972.sh <tag>` (前提: `work-m11`・`fl-win64`・`[EMSDK]`・`bash m11_gen_ir2.sh` 済み。出力 `work/probe3972/cc_<tag>.err`・`cc_sites.json`)。
+- 測定 (HEAD `callchk` 追加 commit・同じ `callchk_3972.sh` で計装したビルドを 2 回。各 1 回ずつ = 計 2 行):
+
+| ビルド | 変化の件数 | `"he.d"` (`68 00 65 00 2e 00 64 00`) の出現 |
+|---|---|---|
+| c2 | 7 | 無し |
+| c3 | 5 | 有り (`680065002e006400`・site 10499 `function_414c70` の `call function_4133f0` の直後) |
+
+- 読み: 文字列の 8 バイトは `function_414c70` 内の `call function_4133f0` の直後に現れた (c3)。ただし c2 では現れず、同じ script でも site 番号と観測順が変わる。原因は未確定 (run 間の揺れ、または IR 生成の非決定性)。1 回の観測を書込みの確定とはみなさない。同じ入力から同じ IR が出るかは未確認。
+- 未確定: `4133f0` 自体の内部のどの store / helper が書いたか。`414c70` の入口でも `"he.d"` の出現を再確認していない。
+- 次の一手 (#3972): (1) `4133f0` の入口・出口で同じ監視を入れ、c2/c3 の差 (run 間の揺れ・IR 生成の非決定性) を切り分ける。(2) 書込みの先頭 (`4133f0` の中の helper) を特定する。
+
+### #3972 run 5: 入口計装で `4133f0`・`414c70` を観測 (`entry_3972.sh`)
+
+- 手段: `entry_3972.py` が `function_4133f0` (id=1)・`function_414c70` (id=2) の入口に `m11_wprobe` を入れ、unit 158 の実行だけ引数と監視番地 `0x10aa1428` の 8 バイトを出す (読み取りだけ)。派生 script・計装の C・Python は commit `7f0a63ec3` (`tools/m11/trap_triage/entry_3972.{sh,py,c}`)。
+- 再現: `cd tools/m11 && bash trap_triage/entry_3972.sh <tag>` (前提: `work-m11`・`fl-win64`・`[EMSDK]`・`bash m11_gen_ir2.sh` 済み。出力 `work/probe3972/en_<tag>.err`)。
+- 測定 (commit `6739a2745`・`M11_FIX_4136A0=1`・unit 158・n=2): IR `m11_gen_ir2.sh` rc 0 (54 s)。`ir_conditions.json` は `ldfix=applied` `450560=applied`・`ir_sha256=e48c31d2…` (生成直後。レビュー run の `af3e9e05…` とは一致しない。再生成ごとの sha 差は未切り分け)。2 回とも同じ結果: `[wp] id=2 n=1 a1=10aa1488 a2=64002e00650068 a3=2539c8 watch=680065002e006400`。`id=1` (`4133f0` の入口) は 0 件。unit 158 は `halt0`。
+- callchk (commit `6739a2745`・n=1): `[cc] site=10499 hit=5 old=0000000000000000 new=680065002e006400 -> function_414c70 IR line 121120 call function_4133f0`。
+- 読み: `414c70` の入口で既に監視番地は `"he.d"` (UTF-16LE)。書込みは `414c70` の入口より前 (監視 ON 以前の unit 0〜157 を含む) に書かれていた。`m11_watch_on(1)` の直前の値は記録していないため、書込みが unit 158 の中で起きたとは言えない。`4133f0` の入口には届いていない。
+- 前回 (run 4) の callchk は c3 で site 10499 (`414c70` 内の `call 4133f0`) を指したが、今回の callchk の再実行 (r4a) でも同じ site 10499 が `"he.d"` を出した。ただし entry 計装では `4133f0` の入口が 0 件なので、site 10499 の値変化は `4133f0` の呼出し以前に起きたものを検出した可能性もある (callchk は call 直後に比べるため)。書込み元は `414c70` の入口より前 (監視 ON 以前を含む) と読む。
+- 未確定: `414c70` の呼出し元 (`414c70` を呼ぶ関数) と、入口より前の書込み経路。次の一手: unit 158 の `414c70` 呼出しの直前 (呼出し元の入口) に同じ計装を入れる。
+
+## #5093 (M11-32): [0x64] の書込み元の探索 (部分・未達)
+
+- 測定 commit: `59e21b78f` (probe `probe_5093.mjs` と本節を含む PR の tree。build 対象のコードは `2e3c6d554` と同一: `git diff 2e3c6d554 59e21b78f -- tools/m11` は `probe_5093.mjs` と本付録の追加 35 行だけ)。OFF (既定) の build。IR `ir_sha256=d66e24aa…` (gen 直後)・build 後 `64a0e5dc…`。#3643 の `597757f4…` とは IR が違う (再生成の差。未切り分け)。
+- survey (OFF・n=1): 873 / 21 / 47 / 1 (ok/trap/miss/noproc)・unit 144 は `memory access out of bounds`。#3643 の集計と一致。
+- 順序: unit 0〜143 を順に走らせると unit 114 も trap し、unit 144 の trap は 0〜143 の実行後の状態に依る。unit 144 を単独で走らせると trap しない (probe の順序依存)。
+- unit 144 の trace (順次実行後): `[m11][icall] 0x25c540` → `[m11][UStrAsg] dest=0x10aa13b8 src=0x6c old=0x0` → trap。trap の wasm 関数は `407e20`←`409440`←`412d60`←`4136a0`←`413760`←`414bb0`←`414c70`←`43c4c0`←`653660` (`m11_wasmnames.py`)。
+- `UStrAsg` (C 転記 `function_4133f0`) は `src≠0` かつ `[src-8]≥0` のとき `[src-8]` を +1 する。よって `src=0x6c` なら `[0x64]` 0→1 が期待される。
+- **未解決 (矛盾)**: 上の呼出しの後、`[0x64]` は trap 後も 0 のまま読める (`probe_5093.mjs`)。`UStrAsg` の +1 が実行されていないか、trap が +1 より前で起きているかを切り分けていない。よって「`UStrAsg` が `[0x64]` の書込み元」とは確定できない。
+- `[0x60,0x80)` の store 計装 (IR store・rep/copy) が 0 件だった既存結果と、C 転記の `UStrAsg` 内の書込みの関係は未検証 (C 側の書込みは IR store 計装の対象外)。
+- 次の一手: (1) `function_4133f0` の入口・+1 の直後に `D(0x64)` を読む一時 trace を入れ、+1 が走るかを確かめる (probe 派生はコミットしない)。(2) `src=0x6c` を渡す呼出し元 (`43c4c0`→`414c70`→`414bb0`→`413760`→`4136a0` の経路) の引数を確かめる。

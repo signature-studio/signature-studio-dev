@@ -40,4 +40,9 @@
 | 回転・傾斜の描画 (矩形を外接矩形で近似) | 回転した view の枠・塗りが実際より大きく出る | 未解決の追跡のみ (子は起票しない・受入の範囲外) |
 | 拡大縮小 (`drawBitmap` の dest 幅・高さ・bitmap の scale) | 拡大縮小された view の画像は 1:1 のまま | `[SR-55]` #3422 系の残り (bilinear・拡大縮小) |
 | 線の太さ・アンチエイリアス | 解消済み (main `9d4a6d5c0` を取り込み済み・#4427 は closed) | なし |
-| `count_canvas_noop.py` の入れ子の波括弧 | 計数が不正確 | 別件 (本 issue の範囲外) |
+| `count_canvas_noop.py` の入れ子の波括弧 | 計数が不正確 | 未起票 (`count_canvas_noop` を含む issue は 0 件。起票要否は PM 判断) |
+
+### 1-6. 再測定 (HEAD `021b79922`・SR-62 の merge 後)
+- 測定 commit: `021b79922` (SR-62 #4233 を main 取り込みで含む merge。canvas のコードを変えた最後の commit)。`git diff 021b79922 HEAD -- tools/targets/serum2/gui/canvas` の出力は 0 行。
+- 結果: `check_transform.sh` rc=0 (compile 71/71 fail=0・link rc=0・run rc=0・`origin_px=300 shifted_px=300 expected=300 result=pass`)。所要 31.7 s、load 3.43 → 3.78 (直列実行・開始前に load 1 分平均 1.15 まで待ってから他の 4 本と順に実行)。
+- 素材: toolchain-emsdk は `$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` を展開 (上流 emsdk の取得はしていない)。

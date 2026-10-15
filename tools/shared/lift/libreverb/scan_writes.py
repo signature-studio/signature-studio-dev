@@ -11,6 +11,7 @@ from capstone import Cs, CS_ARCH_X86, CS_MODE_64, CS_OP_MEM
 from capstone.x86 import X86_REG_INVALID
 
 PTR_OFFS = {0xbc + 8 * i for i in range(14)}
+PTR_RANGE = range(0xbc, 0x124 + 8)
 NON_DST = ('cmp', 'test', 'push', 'call', 'jmp', 'bt')
 
 
@@ -30,13 +31,21 @@ def main():
             text_va, text_sz = va, vs
     md = Cs(CS_ARCH_X86, CS_MODE_64)
     md.detail = True
-    qword_hits, other_hits, n_ins = [], [], 0
+    qword_hits, other_hits, idx_hits, lea_hits, n_ins = [], [], [], [], 0
     for ins in md.disasm(bytes(img[text_va:text_va + text_sz]), text_va):
         n_ins += 1
+        if ins.mnemonic == 'lea' and len(ins.operands) == 2 and ins.operands[1].type == CS_OP_MEM:
+            m = ins.operands[1].mem
+            if m.disp in PTR_RANGE and m.index == X86_REG_INVALID:
+                lea_hits.append((ins.address, ins.op_str))
         if ins.mnemonic in NON_DST or not ins.operands:
             continue
         op = ins.operands[0]
-        if op.type != CS_OP_MEM or op.mem.base == X86_REG_INVALID or op.mem.index != X86_REG_INVALID:
+        if op.type != CS_OP_MEM or op.mem.base == X86_REG_INVALID:
+            continue
+        if op.mem.index != X86_REG_INVALID:
+            if op.mem.disp in PTR_RANGE:
+                idx_hits.append((ins.address, ins.mnemonic, ins.op_str, op.size))
             continue
         if op.mem.disp not in PTR_OFFS:
             continue
@@ -49,6 +58,12 @@ def main():
     print('PTR_OTHER_SIZE_WRITES=%d' % len(other_hits))
     for a, m, s, _ in other_hits:
         print('  SZ %#x %s %s' % (a, m, s))
+    print('PTR_INDEXED_WRITES=%d (disp が 0xbc..0x12c の index 付き書き込み。14 本をループで埋める形を含む)' % len(idx_hits))
+    for a, m, s, _ in idx_hits:
+        print('  IX %#x %s %s' % (a, m, s))
+    print('PTR_LEA=%d (0xbc..0x12c への lea。後続で index 付き書き込みの基点になる)' % len(lea_hits))
+    for a, s in lea_hits:
+        print('  LEA %#x lea %s' % (a, s))
 
 
 if __name__ == '__main__':

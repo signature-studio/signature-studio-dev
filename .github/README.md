@@ -134,11 +134,13 @@ aws s3 cp s3://signature-studio-artifacts/artifacts/<prefix>.tar.zst "$HOME/arti
 
 ## 設定
 
-**Variables**: `OC_APP_CLIENT_ID` (必須)、`OC_REVIEW_APP_CLIENT_ID` (任意)、`OC_PM_BOT_LOGIN` (任意。PM 用 App の `/oc` を許可する。未設定なら許可しない)、
+**Variables**: `OC_APP_CLIENT_ID` (必須)、`OC_REVIEW_APP_CLIENT_ID` (任意)、`OC_PM_APP_CLIENT_ID`
+(pm job = PM agent の token を mint する App。oc-pm の run の identity を `oc-pm-for-signature-studio[bot]` にする)、
+`OC_PM_BOT_LOGIN` (任意。PM 用 App の `/oc` を許可する。未設定なら許可しない)、
 `OPENCODE_VERSION` / `OPENCODE_RELEASE_VERSION` / `OPENCODE_INSTALL_SOURCE` (任意)
 
-**Secrets**: `OC_APP_PRIVATE_KEY`、`OC_AUTH_EXPORT`、
-`CF_ACCOUNT_ID` / `CF_R2_ACCESS_KEY_ID` / `CF_R2_SECRET_ACCESS_KEY`
+**Secrets**: `OC_APP_PRIVATE_KEY`、`OC_PM_APP_PRIVATE_KEY` (pm job 用。`OC_PM_APP_CLIENT_ID` と対)、
+`OC_AUTH_EXPORT`、`CF_ACCOUNT_ID` / `CF_R2_ACCESS_KEY_ID` / `CF_R2_SECRET_ACCESS_KEY`
 
 **任意**: `OC_REVIEW_APP_PRIVATE_KEY`。設定がない場合、レビュワーは実装 App と同一
 identity になり **自分自身の PR を approve できない**。このときレビュワーは approve も merge もせず、

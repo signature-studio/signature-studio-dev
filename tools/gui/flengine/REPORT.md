@@ -4,6 +4,7 @@
 **自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **32 種**が shim に到達 (実装済み 31 / fail-fast stub 1 = `LoadImageW`)。
 `CreateWindowExW` は survey で **1 回だけ自然到達**したが、直前の `RegisterClassW` は呼ばれず (`GetClassInfoW` の後に直行)、窓は生成されない (§5-2 の lift 欠陥)。受入条件 1 の意図する「実登録を経た窓生成の自然到達」は未達。
 実 WNDCLASS を JS から指向呼出した場合は `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。
+**#4447 (LD-219)**: 起動の dispatch 数 (`units_dispatched` = 109) を e2e JSON に出すようにした。`a4a620a9^` / `a4a620a9` の前後比較は基準環境 (`fl-win64` の PE あり・IR 再生成) で両側 dispatch 109 = 109 (差 0・基準 109 を再現)。詳細は `REPORT_APPENDIX_4447.md`。
 前回 FAIL だった S2 は、`SystemParametersInfoW` の未対応 action を fail-fast から `FALSE` 返却へ変えて解消した (§5-5)。S2 の判定式は `8a6dcf4b` (main 取り込み済み) で旧式から新式に変更済みで、本 PR は判定式を変えていない (詳細は REPORT_APPENDIX §6i)。S1 の判定式も変えていない。
 再現: `bash tools/gui/flengine/e2e.sh` (gate 12 + ネガコン 5。FAIL なら exit 1)。
 
@@ -183,43 +184,23 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 - `results/probe.json` の `gui_shared_ptr` は実行ごとに変わる値 (ヒープ位置)。判定は範囲チェックのため PASS に影響しない。
 - 前提の補足 (親 e2e): 最初の run は worktree に root の `node_modules` が無く step 5 の `tsc` が rc 127 で落ちた。`pnpm install --frozen-lockfile` 後に ALL PASS。`tools/e2e` の `npm ci` (agent-browser / puppeteer-core) を入れて step 6 を実行。どちらも環境の前提で、コードは変えていない。
 
-### 旧 HEAD の実測 (参考・現 HEAD の値ではない)
+### 旧 HEAD の実測 (参考)
 
-以下の表と箇条書きは旧 HEAD `a927ac87` と `de8d603e` 時点の実測。現 HEAD の実測は上の表を正とする。
-前提: 素材 `fl-win64` ([WIN64] = `$ANALYSIS_DIR/win64` に展開)、`work-m11` (`tools/m11/work/` に展開。e2e は読取のみで、複製 `tools/gui/work/flengine/snap/` 側で使う)、`toolchain-emsdk` ([EMSDK])、`toolchain-retdec` ([RETDEC])、`apt-mingw` (`x86_64-w64-mingw32-gcc`)、Python の pefile・capstone (runner の system python は PEP 668 で pip 不可のため venv を作って PATH の先頭に置いた)。`m11_gen_ir2.sh` を素材の `tools/m11/work/` で 1 回実行して `ir_conditions.json` の `ldfix=applied` を作った。
-
-以下の表は main 取込み前の HEAD `a927ac87` の実測 (参考)。現 HEAD `de8d603e` の実測は上の箇条書きを正とする。
-
-| 回 | rc | 所要 (e2e.sh の done) | load 開始 → 終了 | judge | native selftest (`tools/gui/test`) | pe_image parity / e2e | ネガコン |
-|---|---|---|---|---|---|---|---|
-| 1 | 0 | 211 s | 1.13 1.02 0.60 (終了時) | 12/12 PASS | 433 passed / 0 failed | P1 LB=0・LB=0x10000 PASS、N1〜N3 PASS / pe_image P1・P2・N1・N2 PASS | 5/5 期待どおり FAIL |
-| 2 | 0 | 212 s | 1.06 1.02 0.70 (終了時) | 12/12 PASS | 433 passed / 0 failed | 同上 | 5/5 期待どおり FAIL |
-| 3 | 0 | 212 s | 1.02 1.01 0.77 (終了時) | 12/12 PASS | 433 passed / 0 failed | 同上 | 5/5 期待どおり FAIL |
-
-- 3 回の一致: B1 `units_run 52 (base 52)` / `threw memory access out of bounds (base 同じ)`、L1 undefined/sigmismatch/duplicate `0/0/0`、A1 `177 = 177 (impl 159 / stub 18)`、S1 `871/1/47/23/0 (base 871/1/47/23/0)`、S2 `LoadImageW` のみ fail-fast (ff 1 unit) = soft STUB、R1 first `LoadStringW` (calls=3)、R2 reached 32 (floor 19)、P1 atoms `[-16383, -16382]` / `RegisterClassW=2 CreateWindowExW=3`、P4 hwnd `0x210000e`。
-- parity (`pe_image_parity.py --pe block00031_PE.bin`): `.data` 補正 10,284 件 = m11 `m11_data_gen.py` の 10,284 件 (LB=0 / LB=0x10000 とも一致)。PR 側の旧 off-by-one (`<`) は `c39ca16` で `<=` に直済み (レビュー必須 1)。DIR64 末尾 slot 境界の是正 (#3832) の before/after は [REPORT_APPENDIX_3832.md](REPORT_APPENDIX_3832.md)。
-- 所要は 211–212 s (e2e.sh の done 行)。
-- IR provenance (`results/ir_sha256.txt`): 今回は素材の `boot_final.ll` を `m11_gen_ir2.sh` で作り直した (ldfix=applied)。material `boot_final.ll` = `995351f5…` (旧記録 `69c774de…` は素材そのままの IR の指紋)。`boot_final3.ll` は `010451ad…` (不変)。`m11_build.sh` 後は `boot_final.ll` `2be93e55…`・`boot_final3.ll` `ac64ad01…`。
-- 親 `bash tools/gui/e2e.sh` (受入条件 2): **ALL PASS / rc 0** (HEAD `de8d603e`、1 回・wall 194 s、load 2.37 1.69 1.31 (終了時))。前提 `tools/e2e` の `npm ci` (rc 0)・`pnpm install --frozen-lockfile` (rc 0) を先に実行。初回 run は前提不足 (`tsc`・`agent-browser` 不在) で落ちたため、前提を入れてから再実行した。
-- HEAD `de8d603e` (main `6aa4b397` 取込後) の flengine e2e (n=3): rc 0 / 0 / 0、所要 **215 / 219 / 219 s** (done 行)、judge 12/12 PASS ×3、native selftest 500 passed / 0 failed (main の追加テスト込み)、ネガコン N1〜N5 期待どおり FAIL ×3。
-- `results/probe.json` の `gui_shared_ptr` は実行ごとに変わる値 (ヒープ位置。3 回目の実行の値を残した)。判定は `gui_shared_ptr_ge_0x10000` (範囲チェック) なので PASS には影響しない。
-- `results/*.json` と `IMPORTS.md` は今回の 3 回目の run で再生成。`IMPORTS.md` は `CharLowerW`・`CreatePalette`・`EnumFontFamiliesExW`・`MessageBoxA` が「P2/P3 昇格候補」から外れた (実装済みのため)。
-
-ネガティブコントロール (全て「期待した FAIL 行が出る」まで検査。judge のクラッシュを FAIL 確認と誤認しない。run1 で確認):
-
-| NC | 壊し方 | 結果 |
-|---|---|---|
-| N1 | 到達ログ無し (`--plain`) ビルドの起動を判定 | R1 FAIL, exit 1 |
-| N2 | baseline の units_run 期待値を 23 に | B1 FAIL, exit 1 |
-| N3 | 到達 floor に未到達 API `NoSuchGuiApi` を 1 つ追加 | R2 FAIL (floor 20 / reached 32), exit 1 |
-| N4 | survey の 1 unit を ok→trap に改竄 | S1 FAIL, exit 1 |
-| N5 | `GetDC(NULL)` を元の fail-fast に戻した shim で native selftest | `FAIL-FAST: unimplemented Win32 API: GetDC`, exit 134 |
-
-- 範囲外: 実ブラウザ・Canvas 描画、audio、UI スレッドのスタック量、`gui_reach` の性能影響 (INTEGRATION §4-12 の未計測は継続)。
+旧 HEAD `a927ac87`・`de8d603e` 時点の e2e 実測 (ネガコン表・IR 指紋を含む) は [REPORT_APPENDIX_HISTORY_4645.md](REPORT_APPENDIX_HISTORY_4645.md) に移した (250 行上限。現 HEAD の実測は上の表を正とする)。
 
 ## 6b〜6d・6i (付録へ分割移動)
 
 §6b (#565)・§6c・§6d・§6i (#1442 / GUI-21) の全文は [REPORT_APPENDIX_HISTORY_3832_A.md](REPORT_APPENDIX_HISTORY_3832_A.md) に移した (250 行上限)。
+
+### 6j. issue #4645: EnumDisplayMonitors callback `0x85df70` の icall miss
+
+- 原因と対応: `e2e.sh` が boot5 (`m11_extra_ranges5.txt`) を複製側で lift していなかったため callback が IR に無かった。`e2e.sh` で lift を追加 (元の `tools/m11` は読取のみ)。`judge.py` は無変更。
+- 実測 (boot, 測定 commit `f0235912`): `units_run 110` (旧 109)、`icall_miss 4` (旧 7)、miss 先は `0xfa9390` のみ。`f0235912` の時点では B1 PASS。
+- 測定 commit `5c9a67101` (現 head・main `1c98a13a7` 取り込み後・foreground 1 回・素材 `work-m11`・`toolchain-emsdk`・`toolchain-retdec`・`fl-win64`・apt-mingw を展開): `e2e.sh` rc **1**・`JUDGE FAIL (14/15)`・11 分 46 秒 (`real`)・load 0.92 → 1.23。FAIL は B1 のみ: `GetMem 774 (base 772)`、他は一致 (`units_run 110`・`icall_miss 4`・`threw None`)。ネガコン N1〜N10 は期待どおり FAIL。`icall` の `0x85df70` は miss から消えた。selftest 512 passed / 0 failed。
+- 測定 commit 以降の差分: 測定 commit が現 head (`5c9a67101`) なので、e2e 入力の差分は 0。
+- B1 の GetMem 差 (現 head で再現・決定的): 比較元を `run.mjs --wasm` (`-pthread` の shim 無し base) に変えたため base が 772 になり、GUI (774) と一致しない。同じ `-pthread` base を 3 回測って 772 (決定的)、GUI 側は 2 回とも 774。旧比較元 `m11_run.mjs` (非 pthread) は 774 (2 回) で GUI と一致する。GUI の `--plain` (到達ログ無し) も 774 で、shim の到達ログの有無では変わらない。差の原因 (`-pthread` の base の確保量) は未特定。
+- `judge.py` は `origin/main` と差分 0 (本 PR は変更していない)。B1 の比較元 (`-pthread` の shim 無し base) と `boot_threw` 比較は main `f7f1921fa` (#4420) が入れたもので、本 PR の変更ではない。main の決定は維持し、比較元の決め方は子 #4751 で扱う。
+- survey は本変更で動いていない: `results/survey_soft.json` (隔離版) は `764/1/46/131` で、`f0235912`〜HEAD 不変。`survey_soft_chain.json` は `875/1/46/20` で、`f0235912`〜HEAD 不変。main 側の値 (`872/1/47/22`) との差は main の測定由来。詳細と測定鮮度は [REPORT_APPENDIX_4645.md](REPORT_APPENDIX_4645.md) §3・§4。
 
 ## 7. 未解決
 
@@ -234,7 +215,17 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | survey の順序依存 (非 pthread と pthread で 10 unit が trap↔ok で動く、§5-6) | survey の unit 別結果が build 条件と前 unit の状態に依存する。S1 の比較は同一 build (`--base`) に限る | PM 起票依頼 (m11 survey 隔離の状態汚染。m11 側の件) |
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
 | `tools/m11/m11_e2e.sh` が PE パスを `[ANALYSIS-DIR]` の固定既定値で持つ (`[WIN64]` 経由にしていない)。`m11_gen_ir2.sh` は本 PR で `FL_WIN64_DIR` 参照に変更済み | `m11_e2e.sh` を直接使うと runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `m11_gen_ir2.sh` (FL_WIN64_DIR 経由) を使う | m11_e2e.sh に `FL_WIN64_DIR` 参照を入れる件は PM 起票依頼 (#132 の未解決と同件) |
+| `0xfa9390` の icall miss (boot の残 1 件。#4645 で `0x85df70` は解消) | 影響は未確認 | #4730 (GUI-27、親 #4645) |
+| survey_soft_chain の旧 REPORT 値 (871) と現 JSON 値 (`ok` 875・`trap` 20・`miss` 46・`icall_miss` 46) の不一致 | 既存の不整合。原因は未確認 | #4731 (GUI-28、親 #4645) |
 | 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (433/0 ×3)。HEAD 7d44c033 の 1 回 (500/0) でも再現せず。main 側の #489 系 (headless surface UAF) の merge を含む HEAD での結果。再現率の定量確認は未実施 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
+
+### GUI-25 (#4420): B1 の GetMem 不一致の切り分け
+
+- 切り分け: GetMem の 761 対 760 は shim ではなくビルド条件。比較元 `m11_run.mjs` は非 pthread の wasm、GUI 結合は `-pthread`。同じ `-pthread` の shim 無し base (`run.mjs --wasm m11_base.cjs`) は GetMem 760 (2 回再現)、非 pthread は 761 (2 回再現)。
+- 修正: boot の比較元を `-pthread` の base に揃えた (`e2e.sh` / `judge.py` の `threw` キー名も `boot_threw` に揃えた)。判定条件の変更は B1 の比較先のみ (旧 `base_boot.get('threw')` → 新 `base_boot.get('boot_threw')`)。コミット済み baseline は両キーとも `None` で結果は変わらないが、base が throw する場合は新式が同じ throw を PASS にする (旧式は FAIL)。現 HEAD での判定は #4751 で再測定する。
+- 記録値の変化: main の `results/boot.json` は GetMem 761 (FastMM_GetMem 782)。`696d3f18b` の記録も 761。`309a38d0e` (results のみの記録 commit) で GetMem 760 (FastMM_GetMem 781) に変わった。変わった原因は未確認 (再測定は未実施。本 PR の commit で GUI ビルド入力は変わっていない)。よって「GetMem 760 は変更前後で同じ」とは言えない。
+- 残件: `icall_miss` GUI 7 対 base 6。差分の宛先は `0x85df70` 1 件。これは `EnumDisplayMonitors` の callback (#1096 / #1331 / #1507 / #881 で確定済み)。GUI では `EnumDisplayMonitors` が IMPL のため callback が呼ばれる。子 #4645 で解消する。
+- 測定 (HEAD `696d3f18b`・foreground 1 回): e2e rc 1 / 432 s / judge 14/15 (FAIL は B1 のみ: `icall_miss` 7 対 6)。ネガコン N1〜N10 は期待どおり FAIL。
 
 ## 6e〜6h・6f (付録へ分割移動)
 

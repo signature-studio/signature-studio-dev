@@ -109,6 +109,19 @@ def main():
     check("0x467f40: セル 0x15f1100 へ rcx を格納", bool(store1c0) and store1c0[0].op_str.endswith("], rcx"))
     check("0x467f39: rcx = lea → 0x45a050", 0x45A050 in lea_val.values(), hex(0x45A050))
 
+    # 4b. 0x4096d0 の範囲外経路: bl > 0x1c の ja は表引きを飛ばして 0x40971b へ (bl をそのまま渡す)
+    h = decode(0x409706, 0x40970B)
+    check("0x409709: ja 0x40971b (範囲外は表引きを飛ばし bl をそのまま 0x4096b0 へ)", h[1].mnemonic == "ja" and h[1].op_str == "0x40971b", h[1].op_str)
+
+    # 4c. 0x459ef0 は引数 rcx を読まずに上書きする (0x45c1c0 の間接 call の rcx は使われない)
+    e = decode(0x459EF0, 0x459F01)
+    check("0x459ef0: 0x459f01 まで rcx を読まない", not any("rcx" in x.op_str for x in e))
+    check("0x459f01: 最初の rcx は lea rcx, [rbp+0x28] (上書き)", decode(0x459F01, 0x459F05)[0].op_str.startswith("rcx, "))
+
+    # 4d. 0x45c1c0: 間接 call [0x15f1100] の直後は eax を読まず、続く 0x45c290 の戻り値が eax から格納される
+    f = decode(0x45C1EB, 0x45C1FA)
+    check("0x45c1c0: 間接 call の直後は lea rcx (eax 不使用) → call 0x45c290", f[0].mnemonic == "call" and f[1].mnemonic == "lea" and f[2].op_str == "0x45c290", f[2].op_str)
+
     # 5. 0x7ffdfffb と 0x80020005 の関係 (算術の確認)
     check("0x7ffdfffb = -0x80020005 (mod 2^32): 加算で 0", (0x7FFDFFFB + 0x80020005) & 0xFFFFFFFF == 0)
 

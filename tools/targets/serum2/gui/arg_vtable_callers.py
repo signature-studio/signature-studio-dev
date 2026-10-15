@@ -45,8 +45,11 @@ def cstr(va):
     return data[off:data.index(b"\0", off)].decode(errors="replace")
 
 
+HEAD_WINDOW = 4096
+
+
 def find_head(slot):
-    for k in range(64):
+    for k in range(HEAD_WINDOW):
         h = slot - 8 * k
         col = rq(h - 8)
         if IMG <= col < IMG + 0x10000000:

@@ -14,13 +14,19 @@ uint32_t wc_cov_get(uint32_t i) { return wc_covb[i]; }
 
 #define STUB_RET(v) do { R[RAX] = (uint64_t)(v); R[RSP] += 8; wc_hits++; } while (0)
 
-uint64_t wc_run(uint32_t va, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3) {
+/* a4 は 5 番目の引数 (ms_abi で [rsp+0x28] = STACK_TOP+0x20 に置く)。wc_run5 だけが使う (#4302)。 */
+uint64_t wc_run5(uint32_t va, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4) {
     R[RSP] = STACK_TOP;
+    ST64(STACK_TOP + 0x20, a4);
     R[RCX] = a0; R[RDX] = a1; R[R8] = a2; R[R9] = a3;
     R[RAX] = 0xFEEDFACE5EED0000ULL;
     R[RSP] -= 8; ST64(R[RSP], 0xdead0000ull);
     ott_dispatch(va);
     return R[RAX];
+}
+
+uint64_t wc_run(uint32_t va, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3) {
+    return wc_run5(va, a0, a1, a2, a3, 0);
 }
 
 void wc_reset(void) {
@@ -36,7 +42,26 @@ void wc_reset(void) {
 
 uint64_t wc_hits_get(void) { return wc_hits; }
 
+#ifdef WC_HEAP_LOG
+/* 診断 (WC_HEAP_LOG=1 でビルドし、wc_log_set(1) で有効化): native 側 (wc_native_ref.c) と同形式の [heap] 行を出す (#5162)。 */
+static int wc_logon, wc_heap_n, wc_tag;
+void wc_log_set(int on, int tag) { wc_logon = on; wc_tag = tag; wc_heap_n = 0; }
+#else
+void wc_log_set(int on, int tag) { (void)on; (void)tag; }
+#endif
+
 void imp_HeapAlloc(void) {
+#ifdef WC_HEAP_LOG
+    if (wc_logon) {
+        fprintf(stderr, "[heap] tag=%d n=%d sz=%llu ret=%llx g3f5b80=%x\n", wc_tag, wc_heap_n, (unsigned long long)R[R8],
+                (unsigned long long)(LD64(R[RSP]) - WC_BASE), (unsigned)(LD64(WC_BASE + 0x3f5b80) & 0xffffffffu));
+        for (int i = 0; i < 64; i++) {
+            uint64_t v = LD64(R[RSP] + i * 8);
+            if (v >= WC_BASE && v < WC_BASE + WC_IMG_SIZE) fprintf(stderr, "[stk] tag=%d n=%d +%d %llx\n", wc_tag, wc_heap_n, i * 8, (unsigned long long)(v - WC_BASE));
+        }
+    }
+    wc_heap_n++;
+#endif
     uint64_t n = (R[R8] + 15) & ~15ull;
     if (wc_heap_top + n > WC_ARENA + WC_ARENA_SZ) { STUB_RET(0); return; }
     uint64_t p = wc_heap_top; wc_heap_top += n;

@@ -112,6 +112,54 @@ jobs:
           OC_REPO: ${{ github.repository }}
         run: bash .github/scripts/watchdog.sh
 
+  # fix モード (reviewer の差し戻し・oc-fix) の窓の判定と印の投稿 (#2873)。agent のコードを実行しない job。
+  # base の checkout の scripts だけを動かし、PR の head は checkout しない。GITHUB_TOKEN は pull-requests: write だけ。
+  # 窓の印 (oc-fix-limit / oc-fix-reset) と oc:stuck は、この job の GITHUB_TOKEN で付ける (#2622・#2638)。
+  # implement は needs で結果 (stop) だけを受け取る。fixgate が失敗・cancel されたら implement は走らない (fail-closed)。
+  fixgate:
+    if: >-
+      (github.event_name == 'pull_request_review' &&
+      github.event.review.state == 'changes_requested' &&
+      github.event.review.user.type == 'Bot' &&
+      github.event.review.user.login == 'oc-reviewer-for-signature-studio[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'repository_dispatch' && github.event.action == 'oc-fix')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: opencode-fixgate-${{ github.event.pull_request.number || github.event.client_payload.pr || github.ref }}
+      cancel-in-progress: false
+    permissions:
+      pull-requests: write
+    outputs:
+      stop: ${{ steps.gate.outputs.stop }}
+      reason: ${{ steps.gate.outputs.reason }}
+    steps:
+      # base の ref だけを checkout する (pull_request_review は base.ref、repository_dispatch は既定の branch)。
+      # PR の head は checkout しない。認証情報は残さない。
+      - name: Checkout repository (base only)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'pull_request_review' && github.event.pull_request.base.ref || '' }}
+          persist-credentials: false
+
+      # should_run の判定は implement と同じ script を使う (不正な dispatch で窓の印を付けないため)。
+      - name: Prepare event context
+        id: context
+        shell: bash
+        env:
+          OC_PERMISSION: write
+        run: bash .github/scripts/prepare-event-context.sh
+
+      - name: Window gate (fix-progress gate)
+        id: gate
+        if: steps.context.outputs.should_run == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OC_MARK_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/fix-progress.sh gate
+
   implement:
     # 実装エージェント: issue_comment (/oc) または workflow_dispatch で起動。
     # PR 上の /oc コメントは conflict 解消などの追加作業。
@@ -131,7 +179,9 @@ jobs:
     # 'Bot' であることも併せて見る。変数が未設定 (空) のときは `!= ''` で偽になり、何も許可しない。
     # prepare-event-context.sh が同じ判定を二重に行う (そちらが確定判定)。
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      !cancelled() &&
+      (needs.fixgate.result == 'success' || needs.fixgate.result == 'skipped') &&
+      (github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
       (github.event.comment.author_association == 'COLLABORATOR' ||
       github.event.comment.author_association == 'MEMBER' ||
@@ -145,7 +195,8 @@ jobs:
       github.event.review.user.type == 'Bot' &&
       github.event.review.user.login == 'oc-reviewer-for-signature-studio[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository) ||
-      (github.event_name == 'repository_dispatch' && github.event.action == 'oc-fix')
+      (github.event_name == 'repository_dispatch' && github.event.action == 'oc-fix'))
+    needs: fixgate
     runs-on: ubuntu-latest
     concurrency:
       group: opencode-impl-${{ github.event.pull_request.number || github.event.issue.number || github.event.client_payload.pr || github.ref }}
@@ -275,7 +326,7 @@ jobs:
       # job ごと打ち切られ、無音終了になるため。
       - name: Run OpenCode (implementer)
         id: oc
-        if: steps.context.outputs.should_run == 'true' && steps.fixrec.outputs.stop != 'true'
+        if: steps.context.outputs.should_run == 'true' && steps.fixrec.outputs.stop != 'true' && needs.fixgate.outputs.stop != 'true'
         timeout-minutes: ${{ contains(fromJSON('["pull_request_review","repository_dispatch"]'), github.event_name) && 40 || 58 }}
         uses: ./.github/actions/opencode
         with:
@@ -297,7 +348,7 @@ jobs:
       # retry (write、15 分) が起動して push しうる。!cancelled() は失敗・step の timeout の後には走り、cancel の後には走らない。
       - name: Check the fix progress
         id: progress
-        if: ${{ !cancelled() && steps.context.outputs.should_run == 'true' && contains(fromJSON('["pull_request_review","repository_dispatch"]'), github.event_name) && steps.fixrec.outcome == 'success' && steps.fixrec.outputs.stop != 'true' }}
+        if: ${{ !cancelled() && steps.context.outputs.should_run == 'true' && contains(fromJSON('["pull_request_review","repository_dispatch"]'), github.event_name) && steps.fixrec.outcome == 'success' && steps.fixrec.outputs.stop != 'true' && needs.fixgate.outputs.stop != 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -379,7 +430,7 @@ jobs:
       # ---------------------------------------------------------------------
       - name: Lint the PR (pr-lint.sh)
         id: pr-lint
-        if: ${{ !cancelled() && steps.context.outputs.should_run == 'true' && env.OC_PERMISSION == 'write' && steps.fixrec.outputs.stop != 'true' }}
+        if: ${{ !cancelled() && steps.context.outputs.should_run == 'true' && env.OC_PERMISSION == 'write' && steps.fixrec.outputs.stop != 'true' && needs.fixgate.outputs.stop != 'true' }}
         continue-on-error: true
         timeout-minutes: 5
         shell: bash
@@ -716,8 +767,8 @@ jobs:
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
-          client-id: ${{ vars.OC_APP_CLIENT_ID }}
-          private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.OC_PM_APP_CLIENT_ID }}
+          private-key: ${{ secrets.OC_PM_APP_PRIVATE_KEY }}
           permission-issues: write
           permission-pull-requests: write
 

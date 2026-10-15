@@ -91,12 +91,13 @@ checks() {
   expect "token does not request contents" $?
   ! grep -qE '^    permissions:' "$pm"
   expect "pm job does not widen GITHUB_TOKEN permissions" $?
-  grep -q 'client-id: ${{ vars.OC_APP_CLIENT_ID }}' "$pm" && grep -q 'private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}' "$pm" && ! grep -q 'OC_REVIEW_APP' "$pm"
-  expect "token comes from the implementer App (OC_APP_*)" $?
+  grep -q 'client-id: ${{ vars.OC_PM_APP_CLIENT_ID }}' "$pm" && grep -q 'private-key: ${{ secrets.OC_PM_APP_PRIVATE_KEY }}' "$pm" \
+    && ! grep -q 'OC_REVIEW_APP' "$pm" && ! grep -q 'OC_APP_CLIENT_ID\|OC_APP_PRIVATE_KEY' "$pm"
+  expect "token comes from the PM App (OC_PM_APP_*), not the implementer or the reviewer App" $?
   ! grep -qiE 'CF_|cf-account|cf-r2' "$pm"
   expect "pm job does not reference CF_* (R2) secrets or agent-setup cf-* inputs" $?
-  [ "$(grep -oE 'secrets\.[A-Za-z0-9_]+' "$pm" | sort -u | tr '\n' ' ')" = "secrets.OC_APP_PRIVATE_KEY secrets.OC_AUTH_EXPORT " ]
-  expect "pm job reads only the OC_APP_PRIVATE_KEY and OC_AUTH_EXPORT secrets" $?
+  [ "$(grep -oE 'secrets\.[A-Za-z0-9_]+' "$pm" | sort -u | tr '\n' ' ')" = "secrets.OC_AUTH_EXPORT secrets.OC_PM_APP_PRIVATE_KEY " ]
+  expect "pm job reads only the OC_PM_APP_PRIVATE_KEY and OC_AUTH_EXPORT secrets" $?
   grep -qx "          artifacts: none" "$pm" && grep -qx "          artifacts-required: 'false'" "$pm"
   expect "agent-setup runs with artifacts: none and artifacts-required: 'false'" $?
 
@@ -176,11 +177,15 @@ mutate "R2 artifacts requested" "          artifacts: none=>          artifacts:
 mutate "agent not gated on should_run" "        if: steps.context.outputs.should_run == 'true'=>        if: true" "gated on should_run"
 mutate "rejected dispatch no longer fails" "          exit 1=>          exit 0" "rejected dispatch fails the job"
 mutate "job if: widened to every dispatch" "if: github.event_name == 'repository_dispatch' && github.event.action == 'oc-pm'=>if: github.event_name == 'repository_dispatch'" "pm job if:"
-mutate "App token minted by the reviewer App" "client-id: \${{ vars.OC_APP_CLIENT_ID }}=>client-id: \${{ vars.OC_REVIEW_APP_CLIENT_ID }}" "implementer App"
+mutate "PM App token minted by the reviewer App" "client-id: \${{ vars.OC_PM_APP_CLIENT_ID }}=>client-id: \${{ vars.OC_REVIEW_APP_CLIENT_ID }}" "PM App"
+mutate "PM App token minted by the implementer App" "client-id: \${{ vars.OC_PM_APP_CLIENT_ID }}=>client-id: \${{ vars.OC_APP_CLIENT_ID }}" "PM App"
+mutate "PM App private key replaced by the implementer key" "private-key: \${{ secrets.OC_PM_APP_PRIVATE_KEY }}=>private-key: \${{ secrets.OC_APP_PRIVATE_KEY }}" "OC_PM_APP_PRIVATE_KEY"
 
 # 他の job への影響: implement の if: に oc-pm を足した workflow では失敗する
+# 置換対象は implement job の if: だけに限定する (#3227)。fixgate など他の job の if: にも
+# 同じ `github.event.action == 'oc-fix'` があるため、ファイル先頭からの最初の一致では別 job を壊してしまう。
 m="$TMP/mut-impl.yaml"
-sed "0,/github.event.action == 'oc-fix')/s//github.event.action == 'oc-fix' || github.event.action == 'oc-pm')/" "$WF" > "$m"
+sed "/^  implement:/,/github.event.action == 'oc-fix')/s//github.event.action == 'oc-fix' || github.event.action == 'oc-pm')/" "$WF" > "$m"
 checks "$m" | grep '^FAIL' | grep -q 'job implement'
 expect "negative control: oc-pm added to the implement if: -> FAIL 'job implement'" $?
 

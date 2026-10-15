@@ -10,8 +10,8 @@
 | KH 側の root | `0x18085a730` (formant process, `snapins.json` の `formant`・ns `vocalfilter`) |
 | C4 同一入力 | 同一 seed `0x5F17E4`・N=200・600 call。param 写像は両側の逆アセンブルで確認済み (§2) |
 | L/R (C5) | 600/600 call で bit 一致 (測定値・写像確定後の再測定 §3) |
-| state (C5) | 591/600 call で不一致 (比較窓 `S+0xa0`・先頭付近)。`S+0xca0` は 600/600 不一致。判定は「bit 不一致の確定のみ」(C6) |
-| 意味の同一性 | **未判定**。state 窓の配置が未確定 (§4・#4417 / FA-54) |
+| state (C5) | §3 の旧窓では 591/600 (`S+0xa0`)・600/600 (`S+0xca0`)。§7 で窓を確定して再比較: DF2 は 591/600 不一致 (組 2・3・6・7、相対差 ≤3.4e-9)、ctx 本体は 600/600 一致 (`S+0xca0` の不一致はポインタ値のみ) |
+| 意味の同一性 | **未判定**。bit 不一致の原因 (組 2・3・6・7 の丸め差) が未特定 (§7.3) |
 
 ## §2. param 写像の根拠 (機械語の読み)
 
@@ -96,6 +96,61 @@ state word mismatch [ctx S+0xca0/KH+0xc70]: words=1200 rel>1e-3 (|SC-KH|/|KH|)=1
 ## §5.1 再測定 (本 run)
 
 - 実施 (round 2 の指摘 2 への対応)。素材 `work-liftlib-targets` は `$ARTIFACTS_DIR` に存在した (展開して使用)。写像の読みを直した commit `532617a68` の head で `ks_semantic_vf_scen.sh 200 0x5F17E4` を fma=0/1 で実行し、§3 に測定 commit と `cmp.txt` を書いた。報告値 (L/R 0/600・`S+0xa0` 591/600・`S+0xca0` 600/600) と一致した。写像の読みは変えていないので、数値が変わらないのは想定どおり。
+
+## §7. 後続 (#4417 / FA-54): DF2 状態の対応の確定と窓での再比較
+
+§4 の「state 比較窓の確定」を解いた節。結論は次の表 (実測・測定 commit `faeb66ba4`・§7.2)。
+
+| 項目 | 結果 |
+|---|---|
+| DF2 状態の対応 (機械語) | SC `S+0xa0`・KH `this+0x70` が起点。16 B の f64 ペア 8 組 (0x80 B)。SC 組 i と KH 組 i が同じ位置 (恒等写像)。根拠は §7.1 |
+| 窓 (確定) | `S+0x98` (sr, 8 B)・`S+0xa0`〜`+0x120` (DF2, 0x80 B)・`ctx+0x000`〜`+0x668` (ポインタ以外)。`ctx+0x668`〜`+0x670` は合算バッファのアドレスなので状態として比べない (§7.2) |
+| L/R (C5) | 600/600 call bit 一致 (§3 の再現) |
+| sr (C5) | 600/600 call bit 一致 |
+| DF2 (C5) | 591/600 call で bit 不一致。組 0・1・4・5 は 600/600 一致。組 2・3・6・7 が不一致 (577・565・578・564 call)。最大相対差 3.371e-09 (§7.2) |
+| ctx 本体 (ポインタ以外) (C5) | 600/600 call bit 一致 |
+| 判定 (C6) | bit 不一致の確定のみ。「意味が違う」とは断定しない。組 2・3・6・7 の差の原因は未特定 (§7.3) |
+
+### §7.1 対応の根拠 (機械語の読み + 実測)
+
+- SC (`SlateCore.core_64` `0x1808e1fa0`・`objdump -d -M intel`): `lea/movups/mulpd` の組で `[rsi+0xa0]`〜`[rsi+0x110]` の 8 組 (16 B 単位) を読み書きする。`rsi` は `this` (= `S`)。
+- KH (`HeartCore.core_64` `0x18085a730`・同じ方式): `rax=this+0x70`・`rcx=+0x80`・`rdx=+0x90`・`r8=+0xa0`・`r9=+0xb0`・`r10=+0xc0`・`r11=+0xd0`・`rdi+0xe0` の 8 組 (16 B) を読み書きする。
+- 実測の裏付け (`tools/targets/freshair/ks_vf_state_map.py`): 組 i 同士の bit 一致数の対角が 600 (組 0・1・4・5)。組 2・3・6・7 は対角が 23・35・22・36 で、同じ組の f64 値比較も同じ数 (hex 比較と struct の比較は独立に一致)。組 8 以降 (0x20 組) は両側ともゼロ。別の組との一致 (ずれ) は見つからない。
+- 写像の確からしさ: 組 i の読み書きの位置 (SC `+0xa0+16i`・KH `+0x70+16i`) が一致することを命令の並びで読んだ。組の中身が同じ論理状態かどうかは、命令の読みだけでは確定しない (組 2・3・6・7 の差が残るのはこのため。§7.3)。
+
+### §7.2 窓での再比較 (N=200・seed `0x5F17E4`・600 call・fma=0/1)
+
+- 測定 commit: `faeb66ba4` (コードの最終 commit。REPORT の追記と 2 本の判定スクリプトだけを足した)。実行経路の 6 ファイル (`ks_semantic_vf_scen.sh`・`ks_semantic_vf_kh.c`・`ks_filter_scen_cmp.py`・`lift2/native/native_vocalfilter.c`・`lift2/gen_vf_scen.py`・`lift2/pokes.txt`) は §3 の `532617a68` から `faeb66ba4` まで差分 0 (`git diff 532617a68 faeb66ba4 -- <6 ファイル>` = 0 行)。`lift2/` 全体では `native/native_ctrl.c`・`native/native_stereo.c` が変わっているが、これらは実行経路の外。差分 0 の証跡 (6 ファイル・測定 commit から HEAD まで): `git diff faeb66ba4 HEAD -- tools/targets/freshair/ks_semantic_vf_scen.sh tools/targets/freshair/ks_semantic_vf_kh.c tools/targets/freshair/ks_filter_scen_cmp.py tools/targets/freshair/lift2/native/native_vocalfilter.c tools/targets/freshair/lift2/gen_vf_scen.py tools/targets/freshair/lift2/pokes.txt` の出力は 0 行 (REPORT の追記は測定の対象外)。nproc=4・load 1 分値 0.04〜0.32。
+- 実行: `SC_CORE=<SlateCore.core_64> KH_CORE=<HeartCore.core_64> bash tools/targets/freshair/ks_semantic_vf_scen.sh 200 0x5F17E4 {0,1}`。
+  実測 `real 0.63 s`・`user 0.52〜0.53 s`・EXIT=0 (fma=0/1 とも)。fma=0 と fma=1 の `cmp.txt` は `cmp` でバイト一致。
+- 窓の判定 (`tools/targets/freshair/ks_vf_state_cmp.py`・fma=0/1 とも同じ出力):
+
+```
+calls=600
+sr        S+0x98/KH+0x60        bit mismatch calls=0
+DF2 f64x16 S+0xa0/KH+0x70 (0x80 B) bit mismatch calls=591
+ctx 0x000..0x668 (excl. pointer)  bit mismatch calls=0
+ctx 0x668..0x670 (pointer field)  mismatch calls=600 (harness address, not state)
+per DF2 pair (f64): calls with diff / max |SC-KH|/|KH|
+  pair 0 (S+0xa0 / this+0x70): calls=0 max_rel=0.000e+00
+  pair 1 (S+0xb0 / this+0x80): calls=0 max_rel=0.000e+00
+  pair 2 (S+0xc0 / this+0x90): calls=577 max_rel=2.444e-10
+  pair 3 (S+0xd0 / this+0xa0): calls=565 max_rel=3.371e-09
+  pair 4 (S+0xe0 / this+0xb0): calls=0 max_rel=0.000e+00
+  pair 5 (S+0xf0 / this+0xc0): calls=0 max_rel=0.000e+00
+  pair 6 (S+0x100 / this+0xd0): calls=578 max_rel=1.064e-09
+  pair 7 (S+0x110 / this+0xe0): calls=564 max_rel=5.679e-10
+```
+
+- 「591/600」の数え方: `ks_vf_state_cmp.py` は DF2 の 0x80 B 全体を hex で比べ、差が 1 つでもある call を数える (591 call)。`ks_filter_scen_cmp.py` の 591 は arr 領域 (0x200 B) を hex で比べた call 数で、同じ call 集合を指すとは限らない。組ごとの内訳は `ks_vf_state_cmp.py` の値を使う。
+- ctx の 0x668〜0x670 (600/600 不一致) は、ハーネスが `this+0x12d8` に置く合算バッファのアドレス (`0x200000000` 系の値。`ks_semantic_vf_kh.c` の `SUM_VA`) と、SC 側の対応位置が 0 のままであることによる。状態ではないので窓から外した。
+
+### §7.3 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 組 2・3・6・7 の f64 丸め差 (相対 2.4e-10〜3.4e-9) の原因 (演算順・係数の精度のどちらか) | 591/600 call の bit 不一致の原因が未特定。意味の同一性の判定は未達 (C6: bit 不一致の確定のみ) | 親 #4071 への提案 (本 issue のコメント) |
+| 組 0・1・4・5 と 2・3・6・7 で差が出る条件 (どの係数の経路か) | 上と同じ | 同上 |
 
 ## §6. FA-45 §5 の訂正
 

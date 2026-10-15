@@ -21,7 +21,7 @@
 | wasm の fs 基底 | `rt32_glue.c` の `g_teb[64]` を `ott_fsbase` に入れる (`ott_set_teb`)。 `entry_wasm.mjs` は行ごとに同じ内容を入れる |
 | 出力 | `idx va eax mem(OBJ 128 B) heap(64 B) [teb(64 B)]`。 TEB 欄は入力に欄がある行だけ付く |
 | 入力 | `diff_teb.py` の `gen_scen`。 seed 3905、 入口 3 本 × 64 行 = 192 行。 偶数行は TEB 0 埋め、 奇数行は非 0 |
-| 範囲の制約 | `0x1000a42e` の `a0` と `0x100106a5` の `a0`・`a1` を小さく絞る (`LIM_SIZE`・`a0 < 0x8000`・`a1 < 0x10`)。 `HeapAlloc` の巨大サイズ経路に入ると native の heap モデル (4 KiB の bump 領域) を超えて SIGSEGV するため (§4) |
+| 範囲の制約 | §2 初版では `0x1000a42e` の `a0` 等を絞った (SIGSEGV のため・§4)。 §7 で絞りを外し、 巨大サイズの heap モデルを改修した |
 
 ## 3. 実測 (検証 HEAD `2217f6748`、 n=1 の run + ネガコン。 emsdk 6.0.12 を上流から新規取得して実行)
 
@@ -62,4 +62,11 @@ python3 tools/plugins/slayer_engine_ia32/diff_runtime.py  # 回帰 (exit 0)
 |---|---|---|
 | `0x1001147e`・`0x1001157b`・`0x100115c7`・`0x100116db`・`0x1001178f` の native vs wasm 突合 (文字列系 import `MultiByteToWideChar`・`WideCharToMultiByte`・`LCMapStringA/W`・`GetStringTypeA/W` が native で未実装 (fail-fast)。 #3619・#3946 で native boot の問題も残る) | fs: を含む 8 関数のうち 5 本が未突合。 受入条件の「8 関数」は未達 | [PLG-G2-52] #4356 (親 #3905) |
 | 実 Windows の TEB 実値 | 0 埋め模型と実値の差が出力に出るかは未検証 (Linux では実値を得られない) | #3905 の範囲外 (issue 本文の範囲外に明記) |
-| `HeapAlloc` の巨大サイズ経路 (`a0` が大きい) | native の heap モデルが巨大サイズで落ちる。 この経路の突合は未実施。 実 Windows は失敗 (0) を返すため、 モデルの改修が要る | [PLG-G2-53] #4357 (親 #3905) |
+| `HeapAlloc` の巨大サイズ経路 (`a0` が大きい) | §7 で解消 (モデルを改修し、 入力の範囲制限を外した突合で 192/192 一致)。 | 解消 [PLG-G2-53] #4357 (親 #3905) |
+
+## 7. HeapAlloc 等の巨大サイズ経路 (PLG-G2-53 #4357)
+
+- 測定 commit: `7a2368e4b` (`test(plugins): diff_teb: include small-size heap rows ...`。 コードを変えた最後の commit)。 前段 `da1e36629` で model を改修し、 `diff_teb.py` の `LIM_SIZE` と `a0 < 0x8000`・`a1 < 0x10` の制限を外した。 `7a2368e4b` で 4 行に 1 行だけ小さい `a0` (成功経路) を入れた。
+- モデル: heap・VirtualAlloc のブロック終端が `H32_LIMIT = 0x10E00000` を超えたら 0 を返し `LastError = 8` (ERROR_NOT_ENOUGH_MEMORY)。 bump を進めず既存ブロックも変えない。 `native_entry.c` と `rt32_glue.c` で同じ値・同じ規約。 サイズ計算は 64 bit で行い、 巨大 `sz` の折り返しを防ぐ。 `HeapReAlloc` は新規 alloc 失敗で 0 を返す。
+- 実測 (測定 commit `7a2368e4b`、 n=1): 突合 `python3 diff_teb.py` は `[compare] PASS: 192 / 192 件が bit 一致`、 exit 0。 native・wasm とも eax の内訳は `00000000` 96 件・`00000001` 64 件・`10800008` (成功) 32 件 (SIGSEGV 0)。 ネガコン `--nega` は `FAIL: 191 / 192`・`ネガコン OK`。 回帰 `diff_entry.py` 448/448・`diff_runtime.py` 128/128 PASS。 wasm emcc 9.39 s、 native run 0.008 s、 wasm(node) 0.045 s、 load1 0.58。
+- 残: 実 Windows の失敗値はモデルの仮定 (実機は未測。 Linux では得られない。 issue の範囲外)。

@@ -104,3 +104,58 @@ unit 40 の前後 (u32 の下位 4B) を LB 別に読んだ値 (`M11_TOLERANT_PE
 - 計測 build: `M11_INSTR_412770=1 M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=40,153,158,291,296,304,555,745 bash tools/m11/m11_lb_tolerant_repro.sh <LB> work/<dir>`
 - peek: `M11_TOLERANT_PEEK=<addr,..> M11_TOLERANT_PEEK_UNITS=40 node tools/m11/m11_tolerant.mjs` (build 済みの `work/m11_boot.cjs` を使う。アドレスは LB 分ずらす)
 - 既定 (計測 OFF): `bash tools/m11/m11_lb_tolerant_repro.sh 0 work/head_lb0` と `... 0x10000 work/head_lb10000` → `m11_lb_unit_diff.py` で kind_diff 8 (§3)
+
+## 8. function_4128b0 入口の分岐値の観測 (#4457・受入 1 達成・受入 3 達成・受入 2 未達)
+
+測定 commit: `e60c17037` (番地修正 `6136fda91` を含む head。`M11_INSTR_4128B0` 配線は `bcdf045f7`・計測 env の既定は 0)。素材は `fl-win64`・`work-m11`・`toolchain-emsdk` (`[EMSDK]` 6.0.12)。
+
+- **測定 commit 以降の測定対象コード差分** (`git diff bcdf045f7 424a6373b -- tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/m11_build.sh`。`m11_build.sh` は差分 0):
+  ```diff
+  -    unsigned long long a1 = R(0xfa5008), a2 = R(0x11dadb0), a3 = R(0x11daddc);
+  +    unsigned long long a1 = R(0xfa5008), a2 = R(0x11eadb0), a3 = R(0x11eaddc);
+  +            // #4184 (LD-200): POINT は 8 バイト値渡し (x64 rcx = x | y<<32)。下位 32bit が x、上位が y
+  ```
+  (`m11_ov.c` の番地 2 行と `m11_post.py` の注釈 1 行。`m11_ov.c` の番地修正は既定 OFF の経路を変えない。ON 観測の読み先だけ変わる)
+- 本 PR の `tools/m11` 全体の差分 (23 ファイル・+6379/-27) は main 取り込みを含むため、測定対象の差分ではない。
+- **再測定 (修正後・本 run)**: 測定 commit は `e60c17037` (番地修正 `6136fda91` を含む head)。素材 `work-m11`・`toolchain-emsdk` を展開して build・寛容起動 (942 unit) を実行した (§8-1・§8-2)。
+- **IR の番地確認**: LB=0 の build の IR (`work/m11_fix_on_lb0/boot_final.ll`・post 前) で `inttoptr (i64 16404488)` 5 箇所・`18787760` 2 箇所・`18787804` 1 箇所。LB=0x10000 の IR は +0x10000 (16470024 / 18853296 / 18853340)。番地は正しい。
+- **測定対象のコード差分**: `git diff e60c17037 HEAD -- tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/m11_build.sh` は本節の commit 以降も空 (測定 commit = HEAD のため定義上 0)。`bcdf045f7` からの差分は上記の番地修正と注釈 1 行のみ。
+
+- 観測点: `function_4128b0` の入口 (`m11_post.py` の wrapper + `m11_ov.c` の `m11_4128b0_obs`)。`M11_INSTR_4128B0=1` のときだけ入る。`function_412770` の強定義 (`m11_ov.c`) は観測点にしない (§2)。
+- 番地 (LB=0 の番地): `[0xFA5008]` (16404488 = 0xFA5008)・`[0x11EADB0]` (18787760)・`[0x11EADDC]` (18787804, GetCurrentThreadId 比較の相手)。LB=0x10000 は +0x10000 (16470024 / 18853296 / 18853340)。
+- **修正 (指摘 1)**: 旧版の C 側は `0x11DADB0` / `0x11DADDC` を読んでいた (10 進 `18787760` と 0x10000 ずれ)。§8-1 の旧値はこの誤った番地の読みで、根拠にならない。番地は `m11_ov.c` 1230・1239 行で `0x11EADB0` / `0x11EADDC` に直した。IR での実在は上の「IR の番地確認」で確認済み。
+
+### 8-1 入口の実測 (計測 ON・修正後の番地・head `e60c17037`)
+
+`M11_TOLERANT_ERR=1` で観測行を取得 (未指定だと `[m11][4128b0]` 行は出ない)。
+
+| LB | 観測 unit (入口の 3 値 `[0xFA5008]` `[0x11EADB0]` `[0x11EADDC]`) |
+|---|---|
+| 0 | 8 件: 114・245・279・314 (`0xFA5008`=0x1)・509・647・895 (`0x10251780`)・941。全件 `[0x11EADB0]=0`・`[0x11EADDC]=0` |
+| 0x10000 | 9 件: 40・114・245・279・314 (`0xFB5008`=0x1)・509・647・895 (`0x10251780`)・941。全件 `[0x11FADB0]=0`・`[0x11FADDC]=0` |
+
+- どの観測 unit でも、分岐 2・3 の値は 0。`0x11EADB0` が非 0 になる経路は、この入口では観測されなかった。
+- unit 40 (LB=0x10000) は入口で `[0xFB5008]=0`・分岐 2・3 も 0 だが、trap スタックは `function_4128b0__lifted` → `function_412770` → `m11_throw_dllmain_done` を通る (`M11_TOLERANT_STACK=40`)。IR では `function_412770` の呼出しが 2 箇所 (IR 117917 行: 分岐 2・3 の経路 / 118017 行: `[18852992]` 経路) あり、unit 40 は入口の観測を経ない後者の可能性がある。**未特定** (§8-3)。
+- `GetCurrentThreadId` は shim で 1 を返す (`tid=0x1`)。
+
+### 8-2 観測の副作用・kind 差 (修正後の番地・head `e60c17037`)
+
+| 比較 | kind 差 | 差の unit |
+|---|---|---|
+| 既定 OFF の LB=0 2 回 (run1 vs run2) | 0 | — |
+| 既定 OFF の LB=0 vs LB=0x10000 | 8 | 40・153・158・291・296・304・745・895 (§3 と同一) |
+| 計測 ON の LB=0 vs LB=0x10000 | 4 | 40・153・158・745 |
+| 同 LB 内で OFF vs ON (LB=0) | 3 | 101・304・895 |
+| 同 LB 内で OFF vs ON (LB=0x10000) | 3 | 101・291・296 |
+
+- 既定 OFF の LB=0 2 回は kind 差 0 (再現性あり)。既定 OFF の LB 差 8 件は §3 と同一の unit 集合。
+- 同 LB 内の OFF vs ON の kind 差 3 件は、観測 (ON) が結果を変えていることを示す。原因 (線形メモリ読み・`fprintf`・link の形) は未切り分け。
+- 候補 (未検証): 観測 ON の `fprintf` による shadow stack の汚染。`M11_TRACE_ISOLATE=1` (隔離版) での切り分けは未実施。
+
+### 8-3 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unit 40 (LB=0x10000) の 412770 への進入経路 (IR 117917 行か 118017 行か。入口の観測に出ない理由) | LB 差の原因が未特定 | 親 #3389 (PM 判断) |
+| 同 LB 内の OFF vs ON の kind 差 3 件 (観測の副作用の切り分け: 読みの位置・fprintf・link・`M11_TRACE_ISOLATE=1`) | 入口値を LB 差の根拠に使えない | 親 #3389 (PM 判断) |
+| 既定 OFF の LB 差 kind 差 8 件の原因 | 受入 3 は既定 OFF で不変 (達成) だが、8 件の原因は未特定 | 親 #3389 (PM 判断) |

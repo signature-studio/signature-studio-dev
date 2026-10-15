@@ -13,6 +13,9 @@ SKIPPED = 'skipped (native timeout)'
 # rt/ld_native.c run_case: setitimer(ITIMER_REAL) の初回値 {1, 500000} = 1.5 s (SIGALRM → status timeout)。
 # tests/test_ld154_timing.py が C 側の値と一致することを検査する。
 NATIVE_ITIMER_S = 1.5
+# LD-199 (#4174): 0x5c1030 の fvm arg 0 diff は wasm 側の icall 欠落 (機械語 call [rbx+0x18] が IR に無い) と確定。
+# 候補多重でも fvm を arg 0 に固定して走らせ、diff を mismatch として出す (LD-196 の据え置きは解除)。
+FVM_PIN_ARG = {0x5c1030: 0}
 
 
 def side_timing(r, limit_s, recv_limit_s):
@@ -50,7 +53,8 @@ class Session:
                 raise KeyError('ret_override: %s が sigs.json に無い (名前の typo を疑う)' % name)
             self.sigs[name] = dict(self.sigs[name], ret=rt, tr=True)
         st = json.load(open(W + '/stubs.json'))
-        self.stub_info = {n: {'widths': st.get('widths', {}).get(n, [32] * 4)} for n in st['stubs']}
+        self.stub_info = {n: {'widths': st.get('widths', {}).get(n, [32] * 4),
+                              'slots': st.get('slots', {}).get(n)} for n in st['stubs']}
         self.pe = PE(self.t['pe'])
         self.origin = int(str(self.t.get('wasm_origin', '0x0')), 16)
         self.delta = self.pe.base - self.origin
@@ -252,14 +256,45 @@ class Session:
         fault = None
         for c in cases_done:
             if c.get('pattern') == 's' and c.get('fault'):
-                fault = c['fault']
+                fault = dict(c['fault'], detail=c.get('native_detail', ''))
                 break
         if self.analyzer.is_ret_fragment(va):
             return None, 'ret_fragment'
         cand = cases.fvm_candidates(fault, cases.kinds_of(sig['params']))
+        if va in FVM_PIN_ARG and FVM_PIN_ARG[va] in cand:
+            return [FVM_PIN_ARG[va]], None
         if len(cand) > 1:
-            return None, 'multi_candidate'
+            one = self._fault_base_arg(fault, sig, cand)
+            if one is None and fault and 'rip' in fault:
+                arg = self.analyzer.fault_arg(va, int(fault['rip'], 16))
+                if arg is not None and arg in cand:
+                    one = arg
+            if one is None:
+                return None, 'multi_candidate'
+            return [one], None
         return cand, None
+
+    def _fault_base_arg(self, fault, sig, cand):
+        """LD-195 (#4139): 候補多重のとき、fault 命令のメモリ base レジスタの値 (fault detail) が
+        ちょうど 1 つの候補引数の SMALL[i] と一致すれば、その引数を pointer 候補にする。一致が無い・複数なら None。"""
+        import capstone
+        ins = self.analyzer._dis(int(fault['rip'], 16) - self.pe.base) if fault.get('rip') else None
+        if ins is None:
+            return None
+        mem = [op.mem for op in ins.operands if op.type == capstone.CS_OP_MEM]
+        if not mem or not mem[0].base:
+            return None
+        base = ins.reg_name(mem[0].base)
+        regs = {}
+        for kv in (fault.get('detail') or '').split():
+            if '=' in kv:
+                k, v = kv.split('=', 1)
+                regs[k] = v
+        if base not in regs:
+            return None
+        bv = int(regs[base], 16)
+        hit = [i for i in cand if cases.SMALL[i] == bv]
+        return hit[0] if len(hit) == 1 else None
 
     def _fvm_cases(self, nat, was, va, sig, cases_done, sigs):
         """LD-23 (#975): 全 pattern が未実行 (equal/diff/wasm_trap 無し) の関数で、's' の native fault addr から

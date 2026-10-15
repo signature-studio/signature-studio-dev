@@ -48,18 +48,18 @@ static inline void SetLastError(uint v) { (void)v; }
 /* Win API fail-fast stub (Delay で参照される 21 件)。到達時は abort する (突合で検出)。引数は評価しない
  * (abort で実行が止まるため副作用が観測されない)。意味は実装しない。 */
 static inline longlong kh_api_fail(void) { abort(); return 0; }
-#define HeapAlloc(...) ((void *)kh_api_fail())
+#define HeapAlloc(...) ((longlong)kh_api_fail())
 #define HeapFree(...) ((int)kh_api_fail())
-#define GetCurrentProcess(...) ((void *)kh_api_fail())
+#define GetCurrentProcess(...) ((longlong)kh_api_fail())
 #define IsProcessorFeaturePresent(...) ((int)kh_api_fail())
 #define TerminateProcess(...) ((int)kh_api_fail())
 #define ExitProcess(...) ((void)kh_api_fail())
 #define UnhandledExceptionFilter(...) ((long)kh_api_fail())
 #define SetUnhandledExceptionFilter(...) ((void *)kh_api_fail())
 #define RtlVirtualUnwind(...) ((void *)kh_api_fail())
-#define RtlLookupFunctionEntry(...) ((void *)kh_api_fail())
+#define RtlLookupFunctionEntry(...) ((longlong)kh_api_fail())
 #define RtlCaptureContext(...) ((void)kh_api_fail())
-#define RtlPcToFileHeader(...) ((void *)kh_api_fail())
+#define RtlPcToFileHeader(...) ((longlong)kh_api_fail())
 #define RaiseException(...) ((void)kh_api_fail())
 #define GetProcAddress(...) ((ulonglong)kh_api_fail())
 #define GetModuleHandleW(...) ((longlong)kh_api_fail())

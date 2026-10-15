@@ -6,6 +6,7 @@
  "units_total": 942,
  "units_run": 0,
  "init_count": 0,
+ "units_dispatched": 0,
  "survey": {
   "ok": 764,
   "noproc": 1,
@@ -156,6 +157,8 @@
  "gui_icall_calls": 0,
  "gui_ring_discarded": 0,
  "icall_miss": 0,
+ "icall_miss_uniq": 0,
+ "icall_miss_targets": [],
  "m11_stub_total": 0,
  "m11_stubs": [],
  "probes": {

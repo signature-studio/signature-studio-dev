@@ -11,23 +11,28 @@ import pefile
 
 
 class Image:
-    def __init__(self, path):
+    # _merged の lazy キャッシュ (hasattr で存在を判定するため, ここでは宣言のみで値を入れない)
+    _mg: dict[int, list[tuple[int, int]]]
+    _mg_begin: list[int]
+    _mg_of: dict[int, int]
+
+    def __init__(self, path: str) -> None:
         self.path = path
         self.pe = pefile.PE(path, fast_load=True)
-        self.base = self.pe.OPTIONAL_HEADER.ImageBase
-        self.size = self.pe.OPTIONAL_HEADER.SizeOfImage
-        self.sections = []
+        self.base: int = self.pe.OPTIONAL_HEADER.ImageBase
+        self.size: int = self.pe.OPTIONAL_HEADER.SizeOfImage
+        self.sections: list[tuple[int, int, int, int, str]] = []
         for s in self.pe.sections:
             self.sections.append((s.VirtualAddress, max(s.Misc_VirtualSize, s.SizeOfRawData),
                                   s.PointerToRawData, s.SizeOfRawData,
                                   s.Name.rstrip(b"\0").decode("latin1")))
         with open(path, "rb") as fh:
-            self.raw = fh.read()
-        self._pdata = None
-        self._pd_begin = None
+            self.raw: bytes = fh.read()
+        self._pdata: list[tuple[int, int, int]] | None = None
+        self._pd_begin: list[int] | None = None
 
     # ---- memory image ----------------------------------------------------
-    def read(self, va, n):
+    def read(self, va: int, n: int) -> bytes:
         rva = va - self.base
         out = bytearray(n)
         hdr = self.pe.OPTIONAL_HEADER.SizeOfHeaders
@@ -43,7 +48,7 @@ class Image:
                 out[flo - rva:fhi - rva] = self.raw[roff + (flo - sva):roff + (fhi - sva)]
         return bytes(out)
 
-    def virtual_image(self):
+    def virtual_image(self) -> bytes:
         """SizeOfImage 長の仮想配置イメージ (RVA 添字)。"""
         img = bytearray(self.size)
         hdr = self.pe.OPTIONAL_HEADER.SizeOfHeaders
@@ -53,7 +58,7 @@ class Image:
             img[sva:sva + n] = self.raw[roff:roff + n]
         return bytes(img)
 
-    def section_of(self, va):
+    def section_of(self, va: int) -> str | None:
         rva = va - self.base
         for (sva, vsz, _ro, _rs, nm) in self.sections:
             if sva <= rva < sva + vsz:
@@ -61,14 +66,14 @@ class Image:
         return None
 
     # ---- .pdata -----------------------------------------------------------
-    def _load_pdata(self):
+    def _load_pdata(self) -> None:
         if self._pdata is not None:
             return
         pdata = None
         for (sva, vsz, roff, rsz, nm) in self.sections:
             if nm == ".pdata":
                 pdata = (roff, rsz)
-        ents = []
+        ents: list[tuple[int, int, int]] = []
         if pdata:
             roff, rsz = pdata
             for i in range(rsz // 12):
@@ -80,19 +85,19 @@ class Image:
         self._pdata = ents
         self._pd_begin = [e[0] for e in ents]
 
-    def add_func(self, begin, end):
+    def add_func(self, begin: int, end: int) -> None:
         """.pdata 外の leaf 関数 (unwind 情報なし) を合成エントリとして登録 (SR-4: Serum 2 のフィルタ vtable 実体など)。
         既存 pdata 範囲と重なる登録は ValueError。"""
         self._load_pdata()
-        for (b, e, _u) in self._pdata:
+        for (b, e, _u) in self._pdata or []:
             if b < end and begin < e:
                 raise ValueError("add_func %#x-%#x overlaps pdata %#x-%#x" % (begin, end, b, e))
-        self._pdata = sorted(self._pdata + [(begin, end, -1)])
+        self._pdata = sorted((self._pdata or []) + [(begin, end, -1)])
         self._pd_begin = [e[0] for e in self._pdata]
         if hasattr(self, "_mg"):
             del self._mg
 
-    def _chain_parent(self, u):
+    def _chain_parent(self, u: int) -> tuple[int, int] | None:
         """UNWIND_INFO (RVA u) が CHAININFO なら親 RUNTIME_FUNCTION (begin,end) を返す。"""
         if u < 0:
             return None
@@ -108,17 +113,17 @@ class Image:
         except Exception:
             return None
 
-    def _merged(self):
+    def _merged(self) -> dict[int, list[tuple[int, int]]]:
         """chain 併合した関数範囲 {root_begin: [(b,e), ...]}"""
         if hasattr(self, "_mg"):
             return self._mg
         self._load_pdata()
-        root = {}
-        for (b, e, u) in self._pdata:
+        root: dict[int, int] = {}
+        for (b, e, u) in self._pdata or []:
             p = self._chain_parent(u)
             root[b] = p[0] if p else b
-        groups = {}
-        for (b, e, u) in self._pdata:
+        groups: dict[int, list[tuple[int, int]]] = {}
+        for (b, e, u) in self._pdata or []:
             r = root[b]
             for _ in range(8):
                 r2 = root.get(r, r)
@@ -134,13 +139,14 @@ class Image:
                 self._mg_of[b] = r
         return groups
 
-    def func_at(self, va, merge=True):
+    def func_at(self, va: int, merge: bool = True) -> tuple[int, int] | None:
         """va を含む関数の範囲 (b, e)。merge=True なら chain された pdata を併合 (連続部分のみ)。"""
         self._load_pdata()
-        i = bisect.bisect_right(self._pd_begin, va) - 1
+        pdata = self._pdata or []
+        i = bisect.bisect_right(self._pd_begin or [], va) - 1
         if i < 0:
             return None
-        b, e, _u = self._pdata[i]
+        b, e, _u = pdata[i]
         if not (b <= va < e):
             return None
         if not merge:
@@ -157,16 +163,16 @@ class Image:
                 break
         return (cur_b, cur_e) if cur_b <= va or True else (b, e)
 
-    def pdata_functions(self):
+    def pdata_functions(self) -> list[tuple[int, int]]:
         self._load_pdata()
-        return [(b, e) for (b, e, _u) in self._pdata]
+        return [(b, e) for (b, e, _u) in self._pdata or []]
 
-    def relocs_dir64(self):
+    def relocs_dir64(self) -> list[int]:
         """IMAGE_REL_BASED_DIR64 の RVA 一覧。"""
         d = self.pe.OPTIONAL_HEADER.DATA_DIRECTORY[5]
         if d.VirtualAddress == 0:
             return []
-        out = []
+        out: list[int] = []
         rva, end = d.VirtualAddress, d.VirtualAddress + d.Size
         base = self.read(self.base + rva, d.Size)
         i = 0

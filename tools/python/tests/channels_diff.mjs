@@ -281,9 +281,9 @@ const loopCases = [
   ["L 0 (len 23)", 1, 1, 1, [[2, 1, 23]]],
   ["L 3 (len 72)", 1, 1, 1, [[2, 1, 72]]],
   ["先頭の一致が勝つ (L 3 の後に L 5)", 1, 1, 1, [[2, 1, 72], [2, 1, 120]]],
-  ["L 70 (p >= 64 で L > p と p mod L)", 1, 1, 1, [[2, 1, 1680]]],
+  ["L 70 (p >= 16 で L > p と p mod L)", 1, 1, 1, [[2, 1, 1680]]],
 ];
-// 件数以上 (p >= 64) の base は event 経路。項目を入れて真になる点を含め、loop 分岐の両側で比べる
+// 件数以上 (p >= 16 = GRID_N) の base は event 経路。項目を入れて真になる点を含め、loop 分岐の両側で比べる
 assert.equal(mock.gridItemsProbe(1, 40), 40);
 assert.equal(wasm.gridItemsProbe(1, 40), 40);
 const loopMoved = {};
@@ -297,7 +297,7 @@ for (const [label, row, f49, f54, recs] of loopCases) {
     const b = run(wasm, "channels.getGridBitWithLoop", [2, p]);
     if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ label, p, mock: a, wasm: b });
     if (JSON.stringify(b) !== JSON.stringify(run(wasm, "channels.getGridBit", [2, p]))) moved++;
-    if (p >= 64 && a.ok === true) loopEventTrue++;
+    if (p >= 16 && a.ok === true) loopEventTrue++;
   }
   loopMoved[label] = moved;
 }
@@ -356,7 +356,7 @@ const gridRun = (eng) => {
 };
 for (const eng of [mock, wasm]) {
   assert.equal(eng.gridItemsProbe(1, 0), 0);
-  for (const [, p, a, b] of gridRun(eng)) if (p >= 64) assert.deepEqual([a, b], [{ ok: false }, { ok: false }], `項目無しの件数超え p=${p}`);
+  for (const [, p, a, b] of gridRun(eng)) if (p >= 16) assert.deepEqual([a, b], [{ ok: false }, { ok: false }], `項目無しの件数超え p=${p}`);
 }
 const gridDiffs = [];
 let gridCalls = 0, gridTrue = 0;
@@ -365,7 +365,7 @@ for (const seed of [1, 2, 3, 42, 1234]) for (const n of [1, 5, 40, 256]) {
   assert.equal(wasm.gridItemsProbe(seed, n), n);
   const a = gridRun(mock), b = gridRun(wasm);
   gridCalls += a.length * 2;
-  gridTrue += a.filter(([, p, x, y]) => p >= 64 && (x.ok === true || y.ok === true)).length;
+  gridTrue += a.filter(([, p, x, y]) => p >= 16 && (x.ok === true || y.ok === true)).length;
   if (JSON.stringify(a) !== JSON.stringify(b)) gridDiffs.push({ seed, n, mock: a, wasm: b });
 }
 assert.deepEqual(gridDiffs, [], `件数超え (event 経路) の差分 ${gridDiffs.length} 件`);

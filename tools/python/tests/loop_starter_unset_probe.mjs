@@ -44,9 +44,27 @@ try:
 except BaseException as _e:
     _st = type(_e).__name__ + ': ' + str(_e)[:100]
 print('ROW|load_config|' + _st)
+# load_config を経由しない入口: flrack.rack の属性を直接読む。
+# 属性は PE 上 T_OBJECT_EX (REPORT_PY166)。CPython の __slots__ メンバも T_OBJECT_EX なので、未設定の読出しを wasm 上で実測する。
+# flrack.rack の型そのものは mock (根拠なし): 本物の flrack は FL の native モジュールでこの wasm には無い。
+class _Rack: __slots__ = ('loop_starter_config',)
+flrack.rack = _Rack()
+_st = 'OK'
+try:
+    _v = flrack.rack.loop_starter_config
+except BaseException as _e:
+    _st = type(_e).__name__ + ': ' + str(_e)[:100]
+print('ROW|direct_read_unset|' + _st)
+_st = 'OK'
+try:
+    rack.Rack().load_config()
+except BaseException as _e:
+    _st = type(_e).__name__ + ': ' + str(_e)[:100]
+print('ROW|load_config (flrack.rack=_Rack・mock)|' + _st)
 `);
-const row = lines.join("").split("\n").find((l) => l.startsWith("ROW|"));
+const rows = lines.join("\n").split("\n").filter((l) => l.startsWith("ROW|"));
 console.log("| 呼び出し | 結果 |");
 console.log("|---|---|");
-console.log(`| rack.Rack().load_config() (loop_starter_config 未設定) | ${(row ?? "NO_OUTPUT").split("|")[2]} |`);
+for (const r of rows) console.log(`| ${r.split("|")[1]} (loop_starter_config 未設定) | ${r.split("|")[2]} |`);
+if (rows.length === 0) console.log("| NO_OUTPUT | - |");
 process.exit(0);

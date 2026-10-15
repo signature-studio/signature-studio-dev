@@ -600,7 +600,7 @@ def _x64c_tolerant(src):
         "units.dispatched": "§3 表行の dispatch。ok + failed と一致を検査",
         "units.noproc": "§3 表行の noproc (起動時から proc 0 の unit)",
         "stop": "§0 の停止 (ExitProcess) の VA と dispatch 番号。stop.unit は dispatch 順の 1 始まり (x64c-strict-sequential と同じ)。出典の『unit 245』は InitTable の添字 (0 始まり) で、dispatch 209 番目の unit と同じ",
-        "create_fruity_instance": "§7 の呼出し・リング記録 (fle_run → 0x1375990 の入口 dispatch) による。入口 S12 が下限。本体内の trap 地点は未特定 (#3969 [WIN-41] で扱う。#3077 は flengine 路線の範囲で部分達成のまま close 済みで、x64c の CFI 本体は対象外)。S13 以降は未測",
+        "create_fruity_instance": "§7 の呼出し・リング記録 (fle_run → 0x1375990 の入口 dispatch) による。入口 S12 が下限。trap 連鎖は 0x1375990 → 0x13752f0 → 0x1105350 → 0x5af120 → 0x410320 (最内で oob。測定 commit e3954b032 時点の値・REPORT_APPENDIX_2719 §7・§12-1。現 head での再確認は未了)。受け手 VA は未確定 (#4384)。S13 以降は未測",
         "gui_natural": "§8 KPI 表の soft 計数 (RegisterClassW/CreateWindowExW)。両名は soft スタブになる (§7) ため、同じ計数で代える。名前別の根拠は §9 の soft 名表示が未了のため確かめられず、#3969 [WIN-41] で扱う",
     }
     return _record(
@@ -615,11 +615,12 @@ def _x64c_survey(src):
     src.begin()
     total = src.json_value(X64_BOOT, "boot.units_total")
     covered = src.json_value(X64_SURVEY, "units_covered")
-    ok = src.json_value(X64_SURVEY, "byCls.ok")
-    unlifted = src.json_value(X64_SURVEY, "byCls.unlifted")
-    uncovered = int(total) - int(covered)
-    if int(ok) + int(unlifted) != int(covered):
+    by_cls = src.json_value(X64_SURVEY, "byCls")
+    ok = by_cls.get("ok", 0)
+    unlifted = by_cls.get("unlifted", 0)
+    if sum(int(n) for n in by_cls.values()) != int(covered):
         raise MetricError("x64c survey の内訳が units_covered と合わない")
+    uncovered = int(total) - int(ok) - int(unlifted)
     units = {
         "total": int(total), "ok": int(ok), "skipped": None, "failed": int(unlifted),
         "miss": None, "noproc": None, "dispatched": None, "uncovered": uncovered,
@@ -632,7 +633,7 @@ def _x64c_survey(src):
         "gui_natural": "survey.json に GUI 計数が無い",
         "create_fruity_instance": "survey は DllMain を通さない",
     }
-    derived = {"units.uncovered": "boot_summary_plain の units_total − survey の units_covered"}
+    derived = {"units.uncovered": "boot_summary_plain の units_total − survey の (byCls.ok + byCls.unlifted)。empty / noproc を含む"}
     return _record(
         "x64c-isolated-survey", "x64c", "isolated-survey",
         "x64c 隔離 survey (FLE-5 末 / survey.json)",

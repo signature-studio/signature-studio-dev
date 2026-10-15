@@ -556,7 +556,85 @@ static void run_case(char* line) {
   fflush(stdout);
 }
 
-static char* g_line; static size_t g_linecap;
+/* LD-209 (#4305): native 側の候補別 SNAPSHOT/RESET (ld_wasm.c の ld_w_snapshot/ld_w_reset と同じ mask: 1=stk・2=sta・4=img)。
+ * stk: SNAPSHOT 時の sp より下 [sp-128K, sp-8K) (run_case の scrub 域。RESET の呼出し枠より下の 8K 帯は含めない)。
+ * sta: 実行器の data/bss [__data_start, _end) から、ld_heap 管理変数・ld_blks・入力行 buffer・TRACESET・nrst 自身の管理表 (g_nrst/g_nnrst) の状態を除いた残り。
+ * img: PE image [ld_img, ld_img+SizeOfImage)。 */
+extern char __data_start[], _end[];
+#define NRST_STK_TOP (8u << 10)
+#define NRST_STK_LEN (128u << 10)
+#define NRST_MAX 64
+#define NRST_MMAP 8   /* LD-229 (#4631): anon の rw-p mmap (ヒープ外・stdio buffer 等)。guest の arena・heap・image と stack/brk/file 領域は含めない */
+typedef struct { u8* lo; u64 n; u8* pr; int cat; } nrst_t;
+static nrst_t g_nrst[NRST_MAX]; static int g_nnrst;
+static void nrst_add_mmap(void);
+static char* g_line; static size_t g_linecap;   /* getline の buffer (実行中に realloc される。戻すと解放済みを指す) */
+static void nrst_add(int cat, void* lo, u64 n) {
+  if (!n || g_nnrst >= NRST_MAX) return;
+  nrst_t* r = &g_nrst[g_nnrst++]; r->lo = (u8*)lo; r->n = n; r->cat = cat; r->pr = (u8*)malloc(n); memcpy(r->pr, r->lo, n);
+}
+static void __attribute__((noinline)) nrst_snap(void) {
+  volatile u8 probe = 0;
+  for (int i = 0; i < g_nnrst; i++) free(g_nrst[i].pr);
+  g_nnrst = 0;
+  u8* sp = (u8*)&probe;
+  nrst_add(1, sp - NRST_STK_LEN, NRST_STK_LEN - NRST_STK_TOP);
+  u8* ex[32]; u64 exn[32]; int nx = 0;
+#define NRST_EX(p, n) do { ex[nx] = (u8*)(p); exn[nx] = (n); nx++; } while (0)
+  NRST_EX(&ld_heap_used, sizeof ld_heap_used); NRST_EX(&ld_heap_hw, sizeof ld_heap_hw);
+  NRST_EX(&ld_heap_pristine, sizeof ld_heap_pristine); NRST_EX(&ld_heap_pristine_len, sizeof ld_heap_pristine_len);
+  NRST_EX(&ld_heap_pristine_used, sizeof ld_heap_pristine_used); NRST_EX(&ld_blks, sizeof ld_blks);
+  NRST_EX(&ld_nblk, sizeof ld_nblk);
+  NRST_EX(&ld_arena_pristine, sizeof ld_arena_pristine); NRST_EX(&ld_wr, sizeof ld_wr); NRST_EX(&ld_nwr, sizeof ld_nwr);
+  NRST_EX(&g_line, sizeof g_line); NRST_EX(&g_linecap, sizeof g_linecap);
+  NRST_EX(&g_tr_va, sizeof g_tr_va); NRST_EX(&g_tr_orig, sizeof g_tr_orig);
+  NRST_EX(&g_ntr_set, sizeof g_ntr_set);
+  NRST_EX(&g_nrst, sizeof g_nrst); NRST_EX(&g_nnrst, sizeof g_nnrst);
+  /* 除外区間を番地順に並べて、その間を sta として登録する */
+  for (int i = 1; i < nx; i++) for (int j = i; j > 0 && ex[j] < ex[j - 1]; j--) {
+    u8* t = ex[j]; ex[j] = ex[j - 1]; ex[j - 1] = t; u64 k = exn[j]; exn[j] = exn[j - 1]; exn[j - 1] = k;
+  }
+  u8* cur = (u8*)__data_start;
+  for (int i = 0; i < nx; i++) {
+    if (ex[i] > cur) nrst_add(2, cur, (u64)(ex[i] - cur));
+    if (ex[i] + exn[i] > cur) cur = ex[i] + exn[i];
+  }
+  if ((u8*)_end > cur) nrst_add(2, cur, (u64)((u8*)_end - cur));
+  nrst_add(4, ld_img, g_imgsize);
+  nrst_add_mmap();
+}
+/* LD-229 (#4631): anon の rw-p mapping (libc の mmap 領域・stdio buffer 等) を候補 NRST_MMAP として登録する。
+ * 除外: path 付き (image・stack・[heap]・file 領域)、guest の arena・heap・image、g_file (PE の読込み copy)、
+ * 本表の複製 buffer 自身 (複製が mmap されると自分を戻してしまう)。
+ * 登録後に munmap された領域は reset で戻さない (msync の ENOMEM で判定)。 */
+static void __attribute__((noinline)) nrst_add_mmap(void) {
+  u8* ex[16]; int nx = 0;
+  ex[nx++] = (u8*)ld_arena; ex[nx++] = (u8*)ld_heap; ex[nx++] = ld_img; ex[nx++] = g_file;
+  for (int i = 0; i < g_nnrst && nx < 16; i++) ex[nx++] = g_nrst[i].pr;
+  FILE* f = fopen("/proc/self/maps", "r"); if (!f) return;
+  char line[512];
+  while (fgets(line, sizeof line, f)) {
+    unsigned long lo, hi; char perm[8], path[256] = "";
+    if (sscanf(line, "%lx-%lx %7s %*s %*s %*s %255s", &lo, &hi, perm, path) < 3) continue;
+    if (strcmp(perm, "rw-p") || path[0]) continue;
+    u8* a = (u8*)(uintptr_t)lo; u64 n = (u64)(hi - lo); int skip = 0;
+    for (int k = 0; k < nx; k++) if (ex[k] && ex[k] >= a && ex[k] < a + n) skip = 1;
+    if (skip) continue;
+    if (g_nnrst >= NRST_MAX) { fprintf(stderr, "[ld_native] nrst table full (mmap regions truncated)\n"); break; }
+    nrst_add(NRST_MMAP, a, n);
+  }
+  fclose(f);
+}
+static u64 g_nrst_skip;   /* reset で戻せなかった (munmap 済みの) 区間の数 */
+static u64 nrst_reset(int mask) {
+  u64 diff = 0; g_nrst_skip = 0;
+  for (int i = 0; i < g_nnrst; i++) if (mask & g_nrst[i].cat) {
+    if (g_nrst[i].cat == NRST_MMAP && msync(g_nrst[i].lo, g_nrst[i].n, MS_ASYNC) != 0) { g_nrst_skip++; continue; }
+    for (u64 k = 0; k < g_nrst[i].n; k++) diff += g_nrst[i].lo[k] != g_nrst[i].pr[k];
+    memcpy(g_nrst[i].lo, g_nrst[i].pr, g_nrst[i].n);
+  }
+  return diff;
+}
 int main(int argc, char** argv) {
   if (argc < 2) { fprintf(stderr, "usage: ld_native <pe>\n"); return 2; }
   setvbuf(stdout, NULL, _IOFBF, 1 << 20);
@@ -612,7 +690,9 @@ int main(int argc, char** argv) {
     } else if (!strncmp(l, "WR ", 3)) {
       unsigned long long r, len; if (sscanf(l + 3, "%llx %llx", &r, &len) == 2) ld_add_wr(r, len);
     } else if (!strcmp(l, "SNAPSHOT")) {
-      ld_snapshot(); puts("{\"ready\":true}"); fflush(stdout);
+      ld_snapshot(); nrst_snap(); puts("{\"ready\":true}"); fflush(stdout);
+    } else if (!strncmp(l, "NRESET ", 7)) {   /* LD-209: native の候補別 RESET (mask は wasm の RESET と同じ) */
+      u64 d = nrst_reset(atoi(l + 7)); printf("{\"nreset\":%d,\"diff\":%llu,\"skip\":%llu}\n", atoi(l + 7), (unsigned long long)d, (unsigned long long)g_nrst_skip); fflush(stdout);
     } else if (!strncmp(l, "BLOB ", 5)) {
       char* sp = strchr(l + 5, ' '); if (sp) { *sp = 0; ld_cmd_blob(l + 5, sp + 1); }
     } else if (!strncmp(l, "FIX ", 4)) {

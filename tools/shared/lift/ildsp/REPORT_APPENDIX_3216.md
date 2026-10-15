@@ -5,7 +5,7 @@
 ## 7. WaveformColouring_CreateInstance の x64c lift と native 差分 — T-SH-52 (#3216・部分達成)
 
 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23 に VEX 未対応・jump table 未到達の記述は無い。差分は CreateInstance と slot 0 の範囲で 0 件)。
-測定 commit: `2cff3f50d` (origin/main `c2e5ba01c` の取り込み merge。コードを変えた最後の commit。以降の差分は `.md` のみ・§7-8)。検証起点: `bea685f7` (origin/main。取り込み前の PR 枝の起点)。
+測定 commit (閉包の数値 70 関数・2757 命令): `ce4f51453` (origin/main。閉包を出した入力の commit。以降の差分は §7-8)。測定 commit (wasm 実測 138,754 B・64 case・§7-3): `2cff3f50d` (origin/main `c2e5ba01c` の取り込み merge。この時点の値で、現 head では再測定していない)。
 
 ### 7-1 結論 (1 行)
 closure の入口 70 関数は x64c で C に lift し wasm (138,754 B) にした (C 本体 60 + label 8 + IAT thunk 2)。CreateInstance → slot 0 の native 対 wasm は 64 case で全バイト一致。残りは slot 1–5 の host 前提 (native が null 参照で落ちる。§7-5) と、VEX 3 命令の未対応 (unsup 3 site)。
@@ -23,6 +23,7 @@ FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/ildsp/probe_slots.sh   
 - native 側 (`wc_native_ref.c`): 落ちた case の後に残った SIGALRM を `ualarm(0,0)` で解除する (旧版は解除していなかった)。
 
 ### 7-3 実測 (測定 commit `2cff3f50d`・`lift_wc.sh ok` を 3 回・emcc は `[EMSDK]` の 6.0.12)
+注記: 以下は `2cff3f50d` 時点の値。その後 `lift_wc.sh` を含む lift 側のコードが変わっている (`git diff --stat 2cff3f50d a4ee191c2 -- tools/shared/lift/ildsp/lift_wc.sh` は 22 行)。本 PR は lift 側を変えていないため結論には影響しないが、現 head では再測定していない。
 所要 = `lift_wc.sh ok` の起動から終了までの wall (source・x64c・emcc・native・wasm・差分を含む。小数 2 桁)。実ログ行:
 ```
 [ildsp-wc] ok elapsed=2.71s load start=[0.06 0.28 0.18] end=[0.54 0.38 0.21]
@@ -65,6 +66,28 @@ python3 tools/shared/lift/ildsp/count_unlifted.py "$FL_WIN64_DIR/extracted/block
 - `0x1be16c` は未 lift の島 (`0x1be14e`–`0x1be167`) の中の `jae`・`jbe` の先。島の入口は直接分岐で届かないため、x64c の経路 (直接 call/jmp・認識した jump table) では届かない。
 - 到達した場合の挙動: 直接 call で届けば x64c が必ず lift する。`call reg` 経由で未 lift の先に届けば `ott_unlifted` で止まる (fail-fast。silent ではない)。
 
+### 7-4b 未 lift 非 padding 16 件の到達性 (T-SH-133 / #5072)
+再現: `python3 tools/shared/lift/ildsp/unlifted_reach.py "$FL_WIN64_DIR/extracted/block24360_PE.bin" <closure.json> <lift dir>` (`lift_wc.sh ok` の後)。測定 commit `7c65af9e7` (コードを変えた最後の commit。以降のコード差分 0。`git diff 7c65af9e7 HEAD -- tools/shared/lift/ildsp` の出力は本ファイルの追記のみ (`REPORT_APPENDIX_3216.md | 22 ++`))。実測: rc 0・5.17 s (4 core・load 0.00 0.04 0.01 → 0.08 0.05 0.02)。16 件は `count_unlifted.py` の出力と一致 (closure 2,757・missing 109・非 padding 16)。
+
+| 番地 | 命令 | 判定 | 根拠 (静的) |
+|---|---|---|---|
+| `0x1b8eb1`・`0x1b8eb8`・`0x1b8ebc`・`0x1b8ebf`・`0x1b8ec4`・`0x1b8ec8` (6) | `0x1b8e68` の SEH except 本体 | **例外 path のみ・未確定** | `.pdata` の UNWIND_INFO (EHANDLER。UNWIND の handler `0x1aebb4`) の scope 表: try `0x1b8eaa`–`0x1b8eb1` (`call 0x1be130`)・except target `0x1b8eb1`・filter `0x1ccb00`。直接の分岐元は 0 件 (直前は `jmp 0x1b8ed2`)。`0x1b8eb1` の 4 byte RVA を値として持つ `.rdata` の 2 件 (`0x3f2db0`・`0x3f2db8`・未判定。scope 表の位置は計算していない)。到達は `0x1be130` が例外を送出し、filter が実行を許可した時のみ。filter の戻り値と、送出時の wasm 側の挙動 (`_Unwind_RaiseException` の import 経路) は未確認 |
+| `0x1be14e`・`0x1be156`・`0x1be158`・`0x1be160`・`0x1be162`・`0x1be167`・`0x1be16c` (7) | `ret` (`0x1be14d`) の後の島 | **静的な参照経路なし** (間接 jmp `0x1bd4e9` の実行時宛先で届く可能性は未排除) | 島の入口 `0x1be14e` への直接分岐 0 件、データ参照 (abs8・rva4・rip 相対) 0 件、直前は `ret`。内部の `jae`・`jbe` (`0x1be156`・`0x1be160`) は島の中の `0x1be16c` だけを指す。0x1be16c の `ret` も同じ島の中 |
+| `0x1ac9b8` (1) | `jmp 0x1ac9c0` (alloc への stub) | **静的な参照経路なし** (間接 jmp `0x1bd4e9` の実行時宛先で届く可能性は未排除)・閉包の混入 | 直接の呼出元 109 件はすべて閉包外 (閉包内 0 件)。`0x1ac9b0` は `.pdata` 外で、近似範囲 `0x1ac9b0`–`0x1ac9c0` に入る。閉包へは `0x1ac460` の `jmp 0x1ac9b0` で入る (7-7b) |
+| `0x1bd4b0`・`0x1bd4b7` (2) | `mov [G], rcx`・`ret` | **閉包外の呼出元からのみ・未確定** | 直接の呼出元は `0x1b7da8` の 1 件 (閉包外)。データ参照 0。`G` (0x3f84d0) の書込みは `0x1bd4b0` だけ。閉包内の `0x1bd4e9` (間接 jmp) が `G`・`A` に依存する (下表の注)。 |
+
+- 6 件 (`0x1b8e*`) の扱い: x64c は try 本体の `call 0x1be130` を lift するが、landing pad は直接経路が無いため lift されない。例外が送出される path の差は、この 1 件 (`0x1be130`) が決める。
+- 注 (`0x1bd4e9`): 宛先は `rax = ror(A ^ G, A & 63)` (A = 0x3f5d98・G = 0x3f84d0)。ファイル値 (A = `0x2b992ddfa232`・G = 0) では `rax` は `0xae64b77e88c8000` で、16 件のいずれでもない (画像外。CFG dispatch で止まる)。`A` は `0x1ad0d8` で実行時に書かれるため、宛先は静的に確定しない。
+- jump table 候補: 閉包の間接 jmp `0x1af08b` (`jmp r9`・表 `0x442000`) の k = 0〜16 の値は `0x1af090`–`0x1af0e8` の 17 件のみ。16 件のいずれも含まない (k = 17〜19 は 0)。
+- 判定の限界: 静的に見た参照の種類 (直接分岐・絶対 VA・rva4・rip 相対・SEH scope) の全件走査。間接の計算ジャンプは `0x1bd4e9` の 1 件だけで、宛先は実行時値。
+
+### 7-4c 残り (未解決・起票先)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `0x1be130` が例外を送出するか・filter `0x1ccb00` が許可するか (`0x1b8e68` の except 本体 6 件の到達) | 到達すれば 6 件の lift 欠落が実行に出る。wasm 側の挙動は未確認 | [T-SH-134] #5090 (元の [T-SH-52] #3216 は CLOSED) |
+| 閉包の間接 call/jmp 25 件 (R 内) の宛先 | 閉包から `0x1ac9b8` 等が間接経由で届く可能性。7-7b の「閉包から到達しない」は直接 edge の閉包に限る | [T-SH-134] #5090 |
+| `0x1bd4e9` の宛先 (A の実行時の書込み・G の値) | 残り 2 件 (`0x1bd4b0`・`0x1bd4b7`) と、島 7 件 (`0x1be14e`〜`0x1be16c`) の到達。島 7 件は静的な参照経路なしだが、間接 jmp の実行時宛先で届く可能性は未排除 | [T-SH-65] #3318 (間接 jmp の trap 化) |
+
 ### 7-5 slot 1–5 の観測 (未確定)
 再現: `bash tools/shared/lift/ildsp/probe_slots.sh` (wc_image.py を `WC_CALL_SLOTS=6` で、CreateInstance → slot 0–5 の全呼出を native のみで実行)。
 実測 (`2cff3f50d`): `[native] cases=64 SIGSEGV/SIGBUS=64 SIGALRM=0`・`crashed_cases=64`。全 case で sig=11 addr=0x0。
@@ -85,7 +108,26 @@ python3 tools/shared/lift/ildsp/count_unlifted.py "$FL_WIN64_DIR/extracted/block
 | slot 1–5 の host 前提の確定と、closure 70 関数の native 対 wasm 全バイト差分 | 受入 (2) の残り・gate の範囲 | 子 [T-SH-57] |
 | VEX 3 命令 (vcvtss2sd・vpmovsxdq・vshufps) の x64c 対応 (unsup 3 site) | 受入 (1) の残り。実行到達時は trap | 子 [T-SH-58] |
 | REPORT_CLOSURE.md §4.6 の未解決 (WC 以外の vptr 格納 3 件・helper `0x1aedc0`/`0x1b6f4c` の正常系到達) の native 確定 | 受入 (3) | 子 [T-SH-59] |
-| 未 lift 非 padding 16 件 (直接分岐の先でない 15 + 島の 1。§7-4) の到達性 | closure の完全性 | [T-SH-57] の受入に含める |
+| 未 lift 非 padding 16 件 (直接分岐の先でない 15 + 島の 1。§7-4) の到達性 | closure の完全性 | [T-SH-57] の受入に含める。SEH except 6 件 (`0x1b8eb1`–`0x1b8ec8`) と `0x1ac9b8` は §7-7b で静的に判定済み (残りは ldmxcsr 入力の仮定の確認のみ) |
+
+### 7-7b 未解決の確定 (T-SH-134 / #5090・静的判定)
+再現: `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_closure.py` (既定出力 `tools/shared/work/raw/ildsp_closure.json`) → `python3 tools/shared/lift/ildsp/seh_reach.py "$FL_WIN64_DIR/extracted/block24360_PE.bin" tools/shared/work/raw/ildsp_closure.json`。出力は A〜F 節の計算結果で、判定文は含まない。
+- SEH (`0x1b8e68`): scope table は try `0x1b8eaa–0x1b8eb1` (`call 0x1be130` の 1 命令)・filter `0x1ccb00`・except `0x1b8eb1`。filter の比較値は `0xc0000005`・`0xc000001d` (B 節。filter の戻り値は逆アセンブルで読んでいない)。
+- `0x1be130` は `ldmxcsr` だけの関数。閉包内の `0x1b8e68` 呼出元 (`0x1c34df`・`0x1c3727`・`0x1c37f2`) は `edx = 0xffc0` を渡し、ldmxcsr の予約 bit に影響しない前提が立つ。except 本体 6 件 (`0x1b8eb1`・`0x1b8eb8`・`0x1b8ebc`・`0x1b8ebf`・`0x1b8ec4`・`0x1b8ec8`) は、この前提の下で直接 edge の閉包から到達しない。
+- except 本体 `0x1b8eb1`–`0x1b8ec9` への `call`・`jmp`・`jcc`・rel8 分岐の直接参照は .text 内 0 件 (E 節)。RVA 値としてのデータ参照は `.rdata` の `0x3f2db0`・`0x3f2db8` の 2 件 (F 節。RVA 値 2 件・未判定。scope 表の位置は計算していない)。この 2 件が何の値かは未判定 (未確認)。
+- `0x1ac9b8` (計算結果: D 節・D' 節): 閉包の根から閉包内の直接 edge で到達する命令集合 R は 2,604 命令。`0x1ac9b0` (`jmp 0x1acfe0`) は R に入る。`0x1ac9b8` (`jmp 0x1ac9c0`) は R に入らない。`0x1ac9b8` への直接 call は 109 件あり、全て閉包外 (例: `0x162004` owner `0x161fc0`・`0x16221c` owner `0x1621b1`) からで、閉包内の参照元は 0 件。閉包内の直接 edge は `0x1ac9b8` を指さないため、直接 edge の閉包から到達しない (間接 call/jmp 25 件の宛先は未計算)。`0x1ac9b8` は実行されうる命令 (死んだ断片ではない)。閉包外の呼出元からは実行されうる。
+- 閉包が `0x1ac9b0` を含む経路: `0x1ac460` (`mov edx, 0x228`) → `jmp 0x1ac9b0`。`0x1ac9b0` は `.pdata` の関数先頭ではなく、`ildsp_closure.py` の「次の .pdata 先頭まで」の近似で閉包に入る。
+
+根拠の内訳: ldmxcsr 入力 `ecx = ((~ebx | 0xffff807f) & eax) | (edi & ebx)`。閉包内の呼出では `ebx = 0xffc0` なので、ecx の上位 16 bit = eax (stmxcsr の結果) の上位 16 bit。MXCSR の bit 16–31 は x86 の予約 bit で stmxcsr は 0 を返すため、ldmxcsr の予約 bit 違反 (#GP → 0xc0000005) は閉包内の経路では起きない。except 本体は直接 edge の閉包から到達しない (間接 25 件の宛先は未計算)。
+未確定 (残り): 閉包外の呼出元 `0x1c35ff`・`0x1c36be` (owner `0x1c35c4`) は閉包の外。「どの export からも到達しない」は seh_reach.py では計算していない (未確認)。閉包の定義を変えた場合は、この 2 呼出元の到達を確認し直す (子 [T-SH-57] の範囲)。
 
 ### 7-8 測定後のコード差分 (差分 0 の証跡)
-`git diff 2cff3f50d HEAD -- tools/shared/lift/ildsp tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh tools/shared/scripts ':!*.md'` の出力は空 (測定 commit `2cff3f50d` 以降は `.md` のみ)。
+測定 commit は `ce4f51453` (origin/main。閉包の数値 70 関数・2757 命令を出した入力の commit)。閉包の計算 (`ildsp_closure.py`・`ildsp_survey.py`・`paths.py`) と閉包の数値を変える `.py` は `ce4f51453` 以降で差分 0 (`git diff --stat ce4f51453 HEAD -- tools/shared/scripts/ildsp_closure.py tools/shared/scripts/ildsp_survey.py tools/shared/scripts/paths.py` の出力は空)。
+`git diff --stat ce4f51453 HEAD -- tools/shared/lift/ildsp tools/shared/scripts tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh ':!*.md'` の実出力:
+```
+ tools/shared/lift/ildsp/seh_reach.py      | 184 ++++++++++++++++++++++++++++++
+ tools/shared/lift/ildsp/unlifted_reach.py | 144 +++++++++++++++++++++++
+ 2 files changed, 328 insertions(+)
+```
+差分は本 PR の `seh_reach.py` (解析スクリプト・閉包を変えない) と、main から取り込んだ `unlifted_reach.py` (閉包の入力ではない)。
+なお `2cff3f50d` 以降の差分は main の取り込み (51 files) を含むため、本節の根拠には使わない。

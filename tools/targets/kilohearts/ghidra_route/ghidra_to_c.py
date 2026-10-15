@@ -36,7 +36,7 @@ SNAPINS = {
         # 未関数化 callee (#3108 KH-45・2 件)。FP 例外の報告経路で、Inf 入力 (180fdc6d8 の指数全 1・仮数 0) でのみ到達する。
         # also へ足すと閉包が広がる (§10-7j・§10-7l の前例) ため stub にする。到達時は abort (突合で検出)。
         0x180fd8aac: 'void FUN_180fd8aac() { abort(); }',
-    }, 'also': [0x180fcd690, 0x180fce0d0, 0x180fdc470, 0x180fdc660, 0x180fdc700, 0x180fdfdb0, 0x180fdc6d8]},
+    }, 'also': [0x180fcd690, 0x180fce0d0, 0x180fdc470, 0x180fdc660, 0x180fdc700, 0x180fdfdb0, 0x180fdc6d8, 0x180fb6c0c, 0x180fb6ce0, 0x180fcd690, 0x180fce0d0, 0x180fd1ac4, 0x180fd1b00, 0x180fd1f30, 0x180fd1f84, 0x180fd2c10, 0x180fd2c90, 0x180fd2d38, 0x180fd2f20, 0x180fd3144, 0x180fd4f30, 0x180fd51cc, 0x180fd5bcc, 0x180fd5bf4, 0x180fd5f30, 0x180fd620c, 0x180fd622c, 0x180fd62a8, 0x180fd62c8, 0x180fd8988, 0x180fd89f0, 0x180fd8aac, 0x180fdc470, 0x180fdc660, 0x180fdc6d8, 0x180fdc700, 0x180fdfdb0, 0x180fe2788, 0x180fe27b0, 0x180fe3284, 0x180fe3310, 0x180fe34b0, 0x180fe34e8, 0x180fe3510, 0x180fe3690, 0x180fe3cd0, 0x180fe4020, 0x180fe4394, 0x180fe5c6c, 0x180fe5ef0, 0x180fe5f00, 0x180fe5f0a, 0x181327120, 0x181327314, 0x18132753c]},
     'delay': {'proc': 0x1802ed7f0, 'exports': [0x1802ed7f0], 'stubs': {}, 'also': [0x180005c50, 0x18004cf20, 0x180289ea0, 0x1802ecfc0, 0x1802ed3b0, 0x1802ed490, 0x1802ed550, 0x1802ed640, 0x1802ed790, 0x180f878e0, 0x180f8791c, 0x180f87cac, 0x180f87d40, 0x180f87f24, 0x180f88084, 0x180f880a4, 0x180f880e4, 0x180f88104, 0x180fa8534, 0x180fb5b4c, 0x180fb5bb4, 0x180fb5c20, 0x180fb5c6c, 0x180fb5dd0, 0x180fb5e6c, 0x180fb5f3c, 0x180fb5f5c, 0x180fb5f8c, 0x180fb6bf8, 0x180fb6c0c, 0x180fb6ce0, 0x180fbbfb8, 0x180fbc1f4, 0x180fbde90, 0x180fbdfcc, 0x180fbe018, 0x180fc1920, 0x180fc4590, 0x180fc61dc, 0x180fc61e4, 0x180fc6870, 0x180fc6d70, 0x180fc7468, 0x180fcce40, 0x180fcd400, 0x180fcd690, 0x180fcdbfc, 0x180fcde58, 0x180fce0d0, 0x180fcf904, 0x180fd0898, 0x180fd08d0, 0x180fd099c, 0x180fd0a64, 0x180fd0a98, 0x180fd0ac8, 0x180fd0b50, 0x180fd1540, 0x180fd172c, 0x180fd185c, 0x180fd1ac4, 0x180fd1b00, 0x180fd1b34, 0x180fd1f30, 0x180fd1f84, 0x180fd27a8, 0x180fd2a60, 0x180fd2ba0, 0x180fd2c10, 0x180fd2c90, 0x180fd2d38, 0x180fd2f20, 0x180fd2fcc, 0x180fd3144, 0x180fd320c, 0x180fd4f30, 0x180fd51cc, 0x180fd5250, 0x180fd54cc, 0x180fd5bcc, 0x180fd5bf4, 0x180fd5f04, 0x180fd5f30, 0x180fd620c, 0x180fd622c, 0x180fd62a8, 0x180fd62c8, 0x180fd62dc, 0x180fd6320, 0x180fd648c, 0x180fd6498, 0x180fd662c, 0x180fd66a0, 0x180fd7d94, 0x180fd7f54, 0x180fd8988, 0x180fd89f0, 0x180fd8aac, 0x180fd8bd4, 0x180fd8d08, 0x180fdb6e0, 0x180fdc320, 0x180fdc470, 0x180fdc660, 0x180fdc6d8, 0x180fdc6ec, 0x180fdc700, 0x180fdc714, 0x180fdc7b8, 0x180fdc844, 0x180fdc858, 0x180fdc880, 0x180fdfdb0, 0x180fe027c, 0x180fe2470, 0x180fe24b8, 0x180fe2788, 0x180fe27b0, 0x180fe3284, 0x180fe3310, 0x180fe3488, 0x180fe34b0, 0x180fe34e8, 0x180fe3510, 0x180fe3690, 0x180fe3cd0, 0x180fe4020, 0x180fe4394, 0x180fe5c6c, 0x180fe5dfc, 0x180fe5ef0, 0x180fe5f00, 0x180fe5f0a, 0x180fe5f40, 0x181327120, 0x181327314, 0x181327348, 0x18132753c]},
 }
 STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ルート (snapins/lift/kh_lower.py) の shims/fail-fast stub と同じ扱い)
@@ -141,6 +141,66 @@ typedef union {
     struct { uint8_t _p8[8]; uint64_t _8_8_; };
 } V128A;
 '''
+
+
+# delay の 2 件 (機械語で確定・REPORT_APPENDIX_3835.md)。件数は各 1 件に固定し、外れたら停止する (DELAY_RULES)
+#   LAB_180fd2aab: FUN_180fd2a60 の `call FUN_180fb5c6c` の戻り番地 (機械語の fall-through 先と同じ番地)。
+#                  C の継続は制御の流れで表すので、戻り番地の 8 byte 書込みは同関数の既存行 (0x180fd2ab5) と同形に書く。
+#   PTR__guard_dispatch_icall_1813a1d38: FUN_180fa8534 の CFG 間接呼出し (機械語 0x180fa856a)。
+#                  this = rcx = *param_1 - 8、vtable = *this、呼出先 = vtable[0x40] (rax)、rdx = 呼出し時点の元の param_2。
+#                  param_2 は vtable[0x30] に置き換える (機械語の rbx)。戻り値は使わない (直後で eax=0)。
+DELAY_RULES = [
+    ('LAB_180fd2aab: 戻り番地の書込み', r'\*\(undefined1 \*\*\)\(puVar4 \+ -8\) = &LAB_180fd2aab;',
+     '*(undefined8 *)(puVar4 + -8) = 0x180fd2aab;', 1),
+    ('PTR__guard_dispatch_icall: CFG 間接呼出し',
+     r'param_2 = \*\(byte \*\*\)\(\*\(longlong \*\)\(\*param_1 \+ -8\) \+ 0x30\);\n    \(\*\(code \*\)PTR__guard_dispatch_icall_1813a1d38\)\(\);',
+     '{ longlong kh_this = *param_1 - 8; longlong kh_vt = *(longlong *)kh_this; byte *kh_p2 = param_2; param_2 = *(byte **)(kh_vt + 0x30);\n'
+     '      ((void (*)(longlong, byte *))*(code **)(kh_vt + 0x40))(kh_this, kh_p2); }', 1),
+    # #4685 (KH-108): 型不一致の残り 3 行。機械語で確定 (REPORT_APPENDIX_4685.md)。
+    #   _DAT_18436cd18: FUN_181327120・FUN_181327348 の 8 byte 整数書込み (mov qword [..],rax)。GTYPE で longlong。ポインタ値を整数として書く。
+    #   _UNK_182280e04: FUN_180fc4590 の auVar2 の 12 byte (バイト 4〜15) の定数 (e04 から 12 byte)。memcpy で同じバイト列を写す。
+    ('_DAT_18436cd18 = puVar3 + 0x40: ポインタ値の整数書込み (#4685)', r'_DAT_18436cd18 = puVar3 \+ 0x40;',
+     '_DAT_18436cd18 = (longlong)(puVar3 + 0x40);', 2),
+    ('_UNK_182280e04: 12 byte 代入 (#4685)', r'auVar2\._4_12_ = _UNK_182280e04;',
+     'memcpy(&auVar2._4_12_, gd_182280e04, 12);', 1),
+    # #4900 (KH-132): vcvtpd2dq の結果 (32bit 整数) の下位 lane を int で読む 2 行。機械語で確定 (REPORT_APPENDIX_4900.md)。
+    #   FUN_180fc4590 0x180fc48bc〜48db: movd ecx,xmm4 → and eax,ecx → sub ecx,eax → sar ecx,6 (整数演算)。
+    #   auVar20 は V128 (_0_4_ が float) なので、ビット列を f2u() で読み直す (値変換の (int) にしない。V128 の型は変えない)。
+    ('auVar20._0_4_ & 0x3f: vcvtpd2dq の下位 lane をビット列で読む (#4900)', r'uVar19 = auVar20\._0_4_ & 0x3f;',
+     'uVar19 = f2u(auVar20._0_4_) & 0x3f;', 1),
+    ('auVar20._0_4_ - uVar19: vcvtpd2dq の下位 lane をビット列で読む (#4900)', r'uVar3 = \(int\)\(auVar20\._0_4_ - uVar19\) >> 6;',
+     'uVar3 = (int)(f2u(auVar20._0_4_) - uVar19) >> 6;', 1),
+    # #4838 (KH-119): 代入の pointer⇔整数 5 行。機械語で確定 (REPORT_APPENDIX_3801.md の P6 の現 HEAD 残件)。
+    #   FUN_180f88084・FUN_180f880a4・FUN_180fd2d38: 初期化の 8 byte スロットへ leaq で得た番地を movq で書く。
+    #   値はそのアドレス (&UNK_<va>) のビット列。整数型スロットへ同ビットを明示キャストで書く (数値変換にしない)。
+    #   `&UNK_` 形は tbase 置換 (gt_<base> + off) より前に当てる。
+    ('param_1[1] = &UNK_18227b1f8 (#4838)', r'param_1\[1\] = &UNK_18227b1f8;',
+     'param_1[1] = (longlong)&UNK_18227b1f8;', 1),
+    ('param_1[1] = &UNK_18227b208 (#4838)', r'param_1\[1\] = &UNK_18227b208;',
+     'param_1[1] = (longlong)&UNK_18227b208;', 1),
+    ('*param_1 = &UNK_1813a3e58 (#4838)', r'\*param_1 = &UNK_1813a3e58;',
+     '*param_1 = (longlong)&UNK_1813a3e58;', 1),
+    ('*param_1 = &UNK_1813a4968 (#4838)', r'\*param_1 = &UNK_1813a4968;',
+     '*param_1 = (longlong)&UNK_1813a4968;', 1),
+    ('*param_1 = &UNK_1822849e0 (#4838)', r'\*param_1 = &UNK_1822849e0;',
+     '*param_1 = (longlong)&UNK_1822849e0;', 1),
+    # KH-136 (#4955): FUN_1802ecfc0 (tap_add) の宣言と本体。機械語 0x1802ecfc0〜ecfe6 で確定:
+    #   r8・r9 (param_3・param_4) は addps の 16 byte メモリオペランド。結果は movlps で下位 8 byte (2 lane) だけを書く。
+    #   よって param_3・param_4 は V128 * (float * は誤り)。lane は (float) の数値変換ではなくビット列 (u2f) で読む。
+    ('FUN_1802ecfc0 宣言: 16 byte の V128 * (KH-136)', r'void FUN_1802ecfc0\(longlong param_1,int param_2,float \*param_3,float \*param_4\)',
+     'void FUN_1802ecfc0(longlong param_1,int param_2,V128 *param_3,V128 *param_4)', 1),
+    ('FUN_1802ecfc0 本体 lane 0・1 (param_3): addps の 2 lane (KH-136)',
+     r'CONCAT44\(\(float\)\(\(ulonglong\)uVar1 >> 0x20\) \+ param_3\[1\],\(float\)uVar1 \+ \*param_3\);',
+     'CONCAT44(f2u(u2f((uint)(uVar1 >> 0x20)) + param_3->_4_4_),f2u(u2f((uint)uVar1) + param_3->_0_4_));', 1),
+    ('FUN_1802ecfc0 本体 lane 0・1 (param_4): addps の 2 lane (KH-136)',
+     r'CONCAT44\(\(float\)\(\(ulonglong\)uVar2 >> 0x20\) \+ param_4\[1\],\(float\)uVar2 \+ \*param_4\);',
+     'CONCAT44(f2u(u2f((uint)(uVar2 >> 0x20)) + param_4->_4_4_),f2u(u2f((uint)uVar2) + param_4->_0_4_));', 1),
+    # 呼出元 (delay 1271): uStack_108 (8 byte) と uStack_100 (0 を書いた上位 8 byte) を 1 つの 16 byte 引数にまとめる。
+    #   aauStack_f8 は呼出先が 16 byte (aauStack_f8[0]) を読むので V128 * へ cast する (値は変えない)。
+    ('caller FUN_1802ecfc0: uStack_108/100 を 16 byte 引数に (KH-136)',
+     r'FUN_1802ecfc0\(\*\(undefined8 \*\)\(param_1 \+ 0x198\),uVar22 & 0xffffffff,&uStack_108,aauStack_f8\);',
+     '{ V128 kh_p108; kh_p108._0_8_ = uStack_108; kh_p108._8_8_ = uStack_100; FUN_1802ecfc0(*(undefined8 *)(param_1 + 0x198),uVar22 & 0xffffffff,&kh_p108,(V128 *)aauStack_f8); }', 1),
+]
 
 
 def approx_rcp_table():
@@ -274,6 +334,11 @@ def main():
     if 'lanes' in fixes and re.search(r'undefined1 aauStack_f8 \[11\] \[16\];', alltxt):
         out.append(LANE_F8_HELPER)
     for va, (ty, kind, _) in sorted(gtypes.items()):
+        if ty == 'FNPTR':  # 関数ポインタ slot (#4671): PE の thunk を値として再現せず、到達時 abort の関数を指す
+            out.append('static void FNPTR_%x() { abort(); }' % va)
+            out.append('static void (*fp_%x)() = FNPTR_%x;' % (va, va))
+            out.append('#define %s_%x fp_%x' % (kind, va, va))
+            continue
         d = pe_bytes(pe, va, 16)
         out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
         out.append('#define %s_%x (*(%s*)gd_%x)' % (kind, va, ty, va))
@@ -305,6 +370,7 @@ def main():
     abi_hits = {}
     from patches import V128OPS
     v128_hits = {}
+    delay_hits = {}
     stubs = dict(STUB)
     stubs.update(cfg['stubs'])
     for va in vas:
@@ -319,6 +385,11 @@ def main():
             t = re.sub(r'\b(aauStack_f8\[\d+\]\._4_12_) = (auStack_\w+);', r'memcpy(\1, \2, 12);', t)
             t = re.sub(r'= (aauStack_f8\[\d+\]\._(?:0|4)_4_);', r'= u2f(\1);', t)
             t = re.sub(r'(auVar\d+\._(?:8|12)_4_) = (uVar\d+ & aauStack_f8\[\d+\]\._(?:8|12)_4_);', r'\1 = u2f(\2);', t)
+        if name == 'delay':
+            t = t.replace('func_0x0001802ecfc0(', 'FUN_1802ecfc0(')
+            for nm, rx, rp, _ in DELAY_RULES:
+                t, k = re.subn(rx, rp, t)
+                delay_hits[nm] = delay_hits.get(nm, 0) + k
         t = re.sub(r'\b(in_XMM\d+)\._0_8_\b', r'\1._0_8_d', t)
         t = re.sub(r'\b(maxps|minps|vpand_avx|vpor_avx|vpsubq_avx|vpsubd_avx)\((\w+),_DAT_([0-9a-f]+)\)', r'\1(\2,(*(V128 *)gd_\3))', t)
         if tbase is not None:
@@ -360,6 +431,8 @@ def main():
         assert abi_hits.get(nm) == 1, 'ABI rule hit %s: %s' % (abi_hits.get(nm), nm)
     for nm, _, _, n in V128OPS.get(name, []):
         assert v128_hits.get(nm) == n, 'V128 rule hit %s (want %d): %s' % (v128_hits.get(nm), n, nm)
+    for nm, _, _, n in (DELAY_RULES if name == 'delay' else []):
+        assert delay_hits.get(nm) == n, 'delay rule hit %s (want %d): %s' % (delay_hits.get(nm), n, nm)
     # スタブは本体を decompile していない callee にだけ出す (本体がある VA に出すと宣言が衝突する: FUN_18004cf20・delay)
     for va, s in stubs.items():
         if ('FUN_%x' % va) in alltxt and va not in vas:

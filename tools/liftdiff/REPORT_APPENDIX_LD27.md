@@ -69,11 +69,17 @@ class は `results/m11_typeb_cause.md` の各 case 行の `class=` 欄。件数�
 - 戻り時の rsp 差は全 probe 行で 8 (185 行中、ずれ 0)。ret_rva はすべて 0xc1f3 (呼出元 0x40c1d0 の直後)。
 - 注: probe は L=0x40a3d0 の行に限らず、各 case 内の全 0x40a3d0 呼出しを記録する (185 行)。driver は L の k 回目 (`N` 中の出現順) と照合する。
 
+## R 類の D15 判定 (LD-256 / #5113)
+
+- 生成元 `tests/trace_fullcompare_typeb.py` が R 行ごとに、L または呼出元の機械語にメモリ間接 call があり、IR の call 数 ≤ 直接 call 先数なら `D15`、それ以外は `other` を出す。この判定は `trace_diverge_unreachable.py` §1 (L のみ判定) より広い (呼出元も見る)。件数は `results/m11_typeb_cause.md` の `## R 類の D15 判定` 行が正本。
+- 結果: R 9 行 (xfill=0 5・xfill=1 4) はすべて `other`。D15 候補は 0。
+- ldfix 型は未判定。機械語のメモリ読み数と IR の load 数を比べる試作は、読み方の違い (スタック・spill の除外方法) で 0〜5 件と揺れたため採らなかった。判定基準の定義 (`docs/DEFECTS.md` の ldfix 行) を決めてから再判定する。
+
 ## 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| R 類 (集計行の R 件数) の個別原因 (大域の初期状態・引数オブジェクトの読み) | 型 B 受入条件 1 | #1034 (Refs) |
+| R 類 (集計行の R 件数) の個別原因。D15 では説明できない (9 行とも `other`)。ldfix 型の判定基準が未定 | 型 B 受入条件 1 | #5113 (Refs) |
 | M 類の wasm MXCSR 戻り値 0 の修正効果 (`m11_ov.c` 上書きを liftdiff build に適用したときの一致) | M 類の解消可否 | #1034 (wasm 再ビルドが要る) |
 | X 類の修復 (xmm0 入力の接続・sig の float 引数) | X 類 | 既存 #547 (PLG-F2-4 の ARG pass 接続) |
 | ~~rax の直接計測 (runner の戻り値計装)~~ | 解決: LD-220 (#4466) で計測。下記「rax の直接計測」 | — |

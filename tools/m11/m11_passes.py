@@ -311,8 +311,11 @@ def pass_m2s_fn40fd90_iid(text, report):
     機械語 40fdd4 `cmp r11,[r9]` (r9 = arg2 = IID ポインタ) は IID の先頭 8 バイトを読むが、RetDec の IR は
     `icmp eq i64 %11, %arg2` でポインタ値そのものと比べていた。後半 8 バイト (`[arg2+8]`) は正しく読まれているため、同じ形で先頭も読む。
     この関数の 1 箇所だけを対象にする (他関数の同形比較は対象外)。"""
-    head = 'define weak i64 @function_40fd90('
+    head = 'define i64 @function_40fd90('
     i = text.find(head)
+    if i < 0:
+        head = 'define weak i64 @function_40fd90('
+        i = text.find(head)
     if i < 0:
         stage('M2s', 'function_40fd90 IID compare restore: 0 sites (function absent)')
         report['m2s_fn40fd90_iid'] = 0
@@ -332,6 +335,70 @@ def pass_m2s_fn40fd90_iid(text, report):
         text = text[:i] + body.replace(old, new) + text[j:]
     stage('M2s', 'function_40fd90 IID compare restore: %d sites' % n)
     report['m2s_fn40fd90_iid'] = n
+    return text
+
+
+def pass_m2s_fn41a800_vtable0(text, report):
+    """[M2v] function_41a800 (Delphi interface cast) の vtable[0] 呼出しを復元 (#4011 / WIN-42).
+    機械語 41a83d-41a842: `mov rax,[rsi]; call [rax]; test eax,eax` (rcx=Source, rdx=IID, r8=&out)。
+    RetDec の IR は戻り値の代わりに IID ポインタの下位 32 bit (`trunc arg3`) で判定していたため、非 0 で必ず Halt0 した。
+    この関数の 1 箇所だけを対象にする。既定 OFF (M11_M2V=1 で有効)。"""
+    head = 'define i64 @function_41a800('
+    i = text.find(head)
+    j = text.find('\n}\n', i) if i >= 0 else -1
+    if i < 0 or j < 0:
+        stage('M2v', 'function_41a800 vtable0 restore: 0 sites (function absent)')
+        report['m2v_fn41a800_vtable0'] = 0
+        return text
+    body = text[i:j]
+    old = ('  %4 = ptrtoint ptr %arg3 to i64\n'
+           '  store i64 0, ptr %stack_var_-48, align 8\n'
+           '  %5 = ptrtoint ptr %stack_var_-48 to i64\n'
+           '  %6 = call i64 @function_41a770(i64 %5)\n'
+           '  %7 = trunc i64 %4 to i32\n'
+           '  %8 = icmp eq i32 %7, 0\n')
+    new = ('  %4 = ptrtoint ptr %arg3 to i64\n'
+           '  store i64 0, ptr %stack_var_-48, align 8\n'
+           '  %5 = ptrtoint ptr %stack_var_-48 to i64\n'
+           '  %6 = call i64 @function_41a770(i64 %5)\n'
+           '  %vt0p = inttoptr i64 %arg2 to ptr\n'
+           '  %vt0 = load ptr, ptr %vt0p, align 8\n'
+           '  %vtva = load i64, ptr %vt0, align 8\n'
+           '  %vtret = call i64 @m11_icall(i64 %vtva, i64 %arg2, i64 %4, i64 %6, i64 0, i64 0, i64 0, i64 0, i64 0)\n'
+           '  %7 = trunc i64 %vtret to i32\n'
+           '  %8 = icmp eq i32 %7, 0\n')
+    n = body.count(old)
+    if n == 1:
+        text = text[:i] + body.replace(old, new) + text[j:]
+        if 'declare i64 @m11_icall(' not in text:
+            text = text.replace(head, 'declare i64 @m11_icall(i64, i64, i64, i64, i64, i64, i64, i64, i64)\n' + head, 1)
+    stage('M2v', 'function_41a800 vtable0 restore: %d sites' % n)
+    report['m2v_fn41a800_vtable0'] = n
+    return text
+
+
+def pass_m2v_fn40fcf0_arg1(text, report):
+    """[M2v] function_40fcf0 の function_40fd90 呼出しの第 1 引数を [arg1] (VMT) にする (#4011 段 2).
+    機械語 40fd0b: `mov rcx,[rbx]` (rbx=self) で [self] を渡す。RetDec の IR は self をそのまま渡していたため、
+    function_40fd90 が [rcx-0xc0] を self-0xc0 から読み範囲外へ出た (trap wasm 0x14e5b0)。
+    この呼出し 1 箇所だけを対象にする。既定 OFF (M11_M2V=1 で有効)。"""
+    head = 'define i64 @function_40fcf0('
+    i = text.find(head)
+    j = text.find('\n}\n', i) if i >= 0 else -1
+    if i < 0 or j < 0:
+        stage('M2v', 'function_40fcf0 arg1 VMT: 0 sites (function absent)')
+        report['m2v_fn40fcf0_arg1'] = 0
+        return text
+    body = text[i:j]
+    old = '  %1 = call i64 @function_40fd90(i64 %arg1, i64 %arg2)\n'
+    new = ('  %vmt0p = inttoptr i64 %arg1 to ptr\n'
+           '  %vmt0 = load i64, ptr %vmt0p, align 8\n'
+           '  %1 = call i64 @function_40fd90(i64 %vmt0, i64 %arg2)\n')
+    n = body.count(old)
+    if n == 1:
+        text = text[:i] + body.replace(old, new) + text[j:]
+    stage('M2v', 'function_40fcf0 arg1 VMT: %d sites' % n)
+    report['m2v_fn40fcf0_arg1'] = n
     return text
 
 
@@ -838,6 +905,9 @@ def main():
     text = pass_m2r_fn1046a30(text, report)
     if os.environ.get('M11_M2S') == '1':   # #4012: 既定 OFF (未検証の runtime 確認まで有効化しない)
         text = pass_m2s_fn40fd90_iid(text, report)
+    if os.environ.get('M11_M2V') == '1':   # #4011: 既定 OFF (runtime 確認まで有効化しない)
+        text = pass_m2s_fn41a800_vtable0(text, report)
+        text = pass_m2v_fn40fcf0_arg1(text, report)
     if os.environ.get('M11_M2P') == '1':   # #417: 既定 OFF (有効化すると unit 503 で survey がハング, REPORT 参照)
         text = pass_m2p_dec_inttoptr(text, report)
     text = pass_m2c(text, report)

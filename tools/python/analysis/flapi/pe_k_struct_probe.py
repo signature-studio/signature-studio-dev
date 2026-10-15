@@ -480,8 +480,9 @@ def main():
     def src_of(reg, addr, depth):
         if depth > 3 or reg is None:
             return "depth-limit"
-        seq = [ins for ins in md.disasm(read_va(addr - 600, 616), addr - 600) if ins.address < addr]
-        for ins in reversed(seq[-300:]):
+        start = func_begin(addr) or addr - 4096
+        seq = [ins for ins in md.disasm(read_va(start, addr - start + 16), start) if ins.address < addr]
+        for ins in reversed(seq):
             if ins.mnemonic.startswith(("rep", "movs", "stos")):
                 continue
             ops = ins.operands
@@ -527,14 +528,41 @@ def main():
 
     rep_cls = collections.Counter()
     rep_detail = []
+    rep_site_cls = {}
     for a, mn in rep_sites:
         c = src_of("rdi", a, 0)
+        rep_site_cls[a] = c
         rep_cls[c] += 1
         if "region" in c:
             rep_detail.append((a, mn, c))
     print("rep rdi sources (backward trace): %s" % dict(rep_cls))
     for a, mn, c in rep_detail:
         print("  rep 0x%x %s src=%s" % (a, mn, c))
+
+    print("--- ext D: rep sites with no rdi writer in their function -> direct callers (depth 1, rdi of the call site)")
+    callers_of = collections.defaultdict(list)
+    for a, t in call_imm:
+        callers_of[t].append(a)
+    d_cls = collections.Counter()
+    d_detail = []
+    for a, mn in rep_sites:
+        if "unwritten" not in rep_site_cls[a]:
+            continue
+        fb = func_begin(a)
+        cs = callers_of.get(fb, []) if fb else []
+        if not cs:
+            d_cls["no-direct-caller"] += 1
+            d_detail.append((a, mn, "no-direct-caller"))
+            continue
+        cls_set = sorted({"caller-" + src_of("rdi", ca, 0) for ca in cs})
+        key = "|".join(cls_set)
+        d_cls[key] += 1
+        d_detail.append((a, mn, "callers=%d %s" % (len(cs), key)))
+    print("rep sites unresolved in own function=%d; by caller rdi source: %s" % (
+        sum(d_cls.values()), dict(d_cls)))
+    for a, mn, c in d_detail:
+        if "region" in c:
+            print("  rep 0x%x %s %s" % (a, mn, c))
 
     print("--- ext B: callers of functions that return a region pointer")
     ret_fns = collections.defaultdict(set)

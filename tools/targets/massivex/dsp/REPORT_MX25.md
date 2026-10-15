@@ -133,3 +133,31 @@
 |---|---|---|
 | `pdata_call` の mismatch 117 → mismatch 0 と取りこぼし 0 の確認。内訳: capstone の LOCK 規則 109 件 (宛先レジスタ 80・LOCK 不可命令 29)・objdump 受理 capstone 不正 5 件 (単独デコードで 4 件確認・1 件未特定)・原因未確定 3 件 | 2 | #4068 [MX-44] (子 issue。本 issue から移管) |
 | `pdata_call` を既定にするか (数値は §5.2・§5.3。既定は `any` のまま) | 2 | PM 判断 (#1987 本文 5) |
+
+### 5.6 #4979 の追記 (測定 commit `00c7332c1`・素材の無い run の記録)
+
+- 変更: `mx_closure.py` の先頭ブロック判定を `block_ok` (`insn_sdm_ok` を通す) に置換。`ENTRY=any` の経路は変えない (`leaf_ok` は `pdata_call` でだけ呼ばれる)。`00c7332c1` から PR head までのコード差分は 0。
+- 単体テスト: `python3 dsp/scripts/test_mx_closure_lock.py` → 8 件 OK。
+- 出所の注意: 以下の e2e・negctl・closure の値は PR #5022 作成 run の実測で、REPORT への転記。素材 `plugins-massivex` (`Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca`) は fix run の runner に無く、再実行していない。
+
+**e2e・negctl (測定 commit `00c7332c1`・n=1・PR 作成 run)**
+
+- e2e (`MX_PE=… bash dsp/e2e.sh`): rc 0 / `OK elapsed=28s` / load `0.07 0.30 0.17 → 0.44 0.37 0.20`。
+- negctl (`MX_PE=… bash dsp/negctl.sh`): NC1 `insns=3118 (base 258087) unsup=5 (base 22745)` → FAIL<期待> / NC2 `insns=4575 (base 258087) unsup=285 (base 22745)` → FAIL<期待> / NC3 `insns=31 (base 258087) unsup=0 (base 22745)` → FAIL<期待>。
+- base unsup: 本節の `22,745` と §5.4 の `24,258` が食い違う。測定条件の差か、どちらかが古いかは未確定 (main の再測定が必要・未実施)。
+
+**pdata_call の closure (測定 commit `00c7332c1`・PR 作成 run)**
+
+- 入口 169,974 (§5.2 の旧規則) → 169,752 (本 PR)。旧規則にあって本 PR で落ちた入口 259 件・本 PR で新たに入った入口 37 件。
+- 落ちた入口の先頭命令 (上位): `lock adc` 50・`lock add` 29・`repne movsb` 10・`lock or` 6・`lock inc` 4 など。
+
+**mismatch の未確定事項**
+
+- 本節の取りこぼし 23・過剰 3 は本 PR の値。`mismatch 117` は §5.3 (`a505be525`) の値で、本 PR で再計算した値ではない。取りこぼし 23 + 過剰 3 = 26 は 117 と一致しないため、本 PR の mismatch は未確定。`mx_flow_recheck.py` を素材のある環境で head 再実行して揃える (未実施)。
+- LOCK 規則の効果 (closure 259 件減) と、capstone の LOCK 判定 (mismatch の 109 件) の関係は、再実行まで断定しない。
+- 取りこぼし 5 → 23 (新規に落ちた入口 18 件) は未解決。`pdata_call` は既定ではないため merge は可逆。
+
+**規則の根拠 (未確定)**
+
+- `45 f0 …` (REX 直後の F0) を #UD とする SDM 節は未確認。REX 直後の F3 を「REX が無視される」とする扱いとの整合も未説明。
+- 規則が正しいかは #4981 (MX-51) で判定する。

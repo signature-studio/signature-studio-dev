@@ -32,9 +32,9 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
 - よって rdx (第 2 引数) = **Self** (`0x840b50` の rcx = 呼出し元の rbx)。Self は `0x72db20` で `rbx = rcx` の `TQuickMenuItem` インスタンスとみられる。
 - 対照: `0x840be8` と `0x840c2e` の 0x12acb70 への到達は、`[rbx+0x100]` が 0x12acb70 の値を持つことを要する。その値の書込み先は未確認。
 
-## 3. 未確定 → #4405 [PY-325] (起票先)
+## 3. 未確定 → #4656 [PY-351] (起票先。PY-325 #4405 は closed)
 
-- `0x72db20` の呼出し元: `call [reg + 0xd0]` は 244 箇所あり、そのうち MoveLeftMenu の OnClick を発火する箇所は未同定。
+- `0x72db20` の呼出し元: PY-320 時点の数えでは `call [reg + 0xd0]` は 244 箇所 (PY-348 の全走査は 243 件・§6.1)。そのうち MoveLeftMenu の OnClick を発火する箇所は未同定。
 - `[Self+0x100]` に 0x12acb70 が書き込まれる箇所 (DFM 読込みの TMethod 生成) は未確認。REPORT_PY268 §3 の推定 (`TMethod(Code = 0x12acb70, Data = TFXForm)`) の裏付けは未取得。
 - 動的 (実行) による確認は本 run の範囲外。
 
@@ -51,3 +51,50 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
   - 実測 (HEAD `b27f1942a`): real 23.877 秒・終了 0・PASS 11 / FAIL 0。
 - 既存 probe: `pe_py268_rdx.py` は本 PR で変更していない。同じ素材で HEAD `ec11dfec5` 上で実行: real 24.283 秒・終了 0・検査 PASS 22 件 (集計行「件数 22 / 22」)。
 - 負の対照: `0x840cd0` の `[+0xf0]` 枝は `+0x100` 検出 0 件・`+0xf0` 検出 1 件 (`0x840d1b`) で、検出器が枝を区別する。
+
+## 6. PY-348 (#4603): 0x72db20 の間接呼出し元と MoveLeftMenu の発火箇所
+
+結論: **未達** (受入 1・2 は未達)。0x72db20 の呼出し元の総数と、VMT からの型による絞り込みの不可を確定した。発火箇所の同定は #4656 (PY-351) に残す。
+
+| 受入 | 結果 | 根拠 |
+|---|---|---|
+| 1. 0x72db20 を間接に呼ぶ箇所 (関数と VA) を特定する | **未達**。`call qword ptr [reg+0xd0]` の全走査は 243 件 (§6.1)。0x72db20 を指す VMT 位置は code に無いため、どの呼出しが 0x72db20 に当たるかは静的に絞れない (§6.2) | §6.1・§6.2 |
+| 2. MoveLeftMenu の OnClick を発火する箇所を絞る | **未達** | §6.3 |
+| 3. probe を追加し、`pe_py325_refs.py` 6/6 PASS のままであることを確認する | `pe_py325_refs.py` は PR の base (`cdcd804`) 時点では不在だった。現 main には `171ef59ad` で追加済みで、同じ素材で 6/6 PASS (実測・§6.4)。新 probe `pe_py348_vmt_d0_callers.py` は 4/4 PASS。`pe_py320_fire_site.py` 11/11 PASS | §6.4 |
+
+### 6.1 `call [reg+0xd0]` の全走査
+
+- 件数 243 (レジスタ別: rbx 140・rax 49・rsi 38・rdi 10・r13 5・r14 1)。所属関数 (推定) 136 件。
+- PY-320 §3 の記載は 244 件。本走査は 243 件で、1 件ずれる。差の原因は未解明 (PY-351 で確認する)。
+- 数え方 (probe に assert): `mnemonic=call` かつオペランドが `qword ptr [` で始まり `+ 0xd0]` で終わるもの = 243。
+- 数え方 (probe に assert): `mnemonic=call` かつオペランドに `0xd0` を含み `qword ptr [` で始まらないもの = 即値形 **285**。`mnemonic=jmp` かつオペランドに `0xd0` を含むもの = **283**。いずれも `0xd0ece0` のような即値アドレス・変位の部分一致で、VMT スロットの間接呼出しではない。
+
+### 6.2 型による絞り込みの不可
+
+- TQuickMenuItem (VMT 0x725a58) を指す rip 相対変位は 2 件 (`0x725a02`・`0x725a54`)。どちらも VMT 自身の自己ポインタ位置で、関数の中からの参照は 0 件。
+- TMenuItem (VMT 0x838c10) も同様に 2 件 (`0x838bba`・`0x838c0c`)。
+- 本走査は disp32 の rip 相対変位と即値だけを数えた。`mov [reg], imm64` 形式の VMT 書込みは未検査。そのため「VMT を書く箇所が無い」とは言えない。
+- よって、VMT 参照から「インスタンスの型が TQuickMenuItem である呼出し」を絞る手段は、本走査では見つからなかった。
+
+### 6.3 発火箇所 (未達)
+
+- 0x72db20 の内側で `call 0x840b50` する (§1)。0x840b50 の 0x840be8・0x840c2e から 0x12acb70 を呼ぶ経路 (§2) の前段は、0x72db20 を呼ぶ 243 件のどれから到達するかが未確定。
+- 0x72db20 を呼ぶ候補の絞り込みは、次のどちらかを要する: (a) 動的 (実行中の vtable 呼出し) の確認、(b) `mov [reg], imm64` 形式を含む VMT 書込みの走査による TQuickMenuItem インスタンス生成箇所の特定 (本走査では未実施)。
+- 残課題は #4656 (PY-351) に起票先として残す。
+
+### 6.4 検証
+
+- 新規 probe: `tools/python/analysis/flapi/pe_py348_vmt_d0_callers.py` (4 件 PASS・終了 0)。`FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py348_vmt_d0_callers.py`。
+- 既存 probe: `pe_py320_fire_site.py` 11 件 PASS (終了 0)。
+- 既存 probe: `pe_py325_refs.py` (現 main 版・`171ef59ad`) 6 件 PASS (終了 0)。同じ素材で実行。
+- 素材: `fl-win64.tar.zst` の `block00031_PE.bin` (`$ARTIFACTS_DIR`)。展開 2.9 秒。
+- 測定 commit と実行時間は PR 本文の「検証結果」に記載 (本ファイルには書かない。自己参照を避けるため)。
+
+## 7. PY-351 (#4656): 0x72db20 の VMT 書込み走査と 243/244 の差
+
+結論: 受入 3 (244 と 243 の差) は**説明できた**。受入 1・2 (0x72db20 を呼ぶ箇所の特定と発火箇所の絞り込み) は**未達**。静的な VMT 書込みの走査では、呼出し候補を絞れなかった。
+
+- 差の原因: `call ptr [rdx + rax + 0xd0]` (0xd00111、`qword` 接頭辞なし) が 1 件。PY-348 probe は `qword ptr [` 形だけを数えるため 243 になる。PY-320 §3 の 244 は接頭辞なしを含む数え方。`call qword ptr [rax + rbp*2 + 0xd0]` (0xd062e1) は qword 形に入る。
+- VMT 書込みの全形式の走査 (`analysis/flapi/pe_py351_vmt_writes.py`、3/3 PASS): オペランドに 0x725a58 を持つ命令は 0 件。`.text` 内の 8 バイト絶対 0x725a58 は 2 件 (0x725990 = VMT 先頭の自己ポインタ、0x725b80 = RTTI の classname 直後)。どちらもデータで、VMT を書くコードではない。
+- 0x72db20 の内側の global `[rip+0xec8627]` (= 0x15f6170) は 0x72db42 の 1 箇所だけが書き、読む箇所は無い。クリックされた項目を静的に特定する手がかりにはならない。
+- 残る手段: (a) 実行中の vtable 呼出しの動的確認、(b) TQuickMenuItem の生成経路 (クラス参照変数やコンストラクタ呼出し) の追跡。(b) は本走査の範囲外で、未実施。

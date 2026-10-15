@@ -17,9 +17,21 @@
 #include "wc_layout.h"
 
 static uint64_t hits, heap_top;
+/* HeapAlloc 呼出しの診断 (WC_HEAP_LOG=1・case 0 だけ): tag (0=init, 1=create, 2+k=slot k), n (case 内の通し番号), 要求サイズ, 呼出元 RVA を stderr へ出す。wc_run_wasm.mjs と同一形式 (#5162)。 */
+static int heap_log, heap_n, cur_tag;
 #define HEAP_END (WC_ARENA + WC_ARENA_SZ)
 static uint64_t __attribute__((ms_abi)) st_heapalloc(uint64_t h, uint64_t fl, uint64_t sz) {
     (void)h; (void)fl; hits++;
+    if (heap_log) {
+        fprintf(stderr, "[heap] tag=%d n=%d sz=%llu ret=%llx g3f5b80=%x\n", cur_tag, heap_n, (unsigned long long)sz,
+                (unsigned long long)((uintptr_t)__builtin_return_address(0) - WC_BASE), *(uint32_t *)(WC_BASE + 0x3f5b80));
+        uintptr_t *sp; __asm__ volatile("mov %%rsp, %0" : "=r"(sp));
+        for (int i = 0; i < 64; i++) {
+            uint64_t v = (uint64_t)sp[i];
+            if (v >= WC_BASE && v < WC_BASE + WC_IMG_SIZE) fprintf(stderr, "[stk] tag=%d n=%d +%d %llx\n", cur_tag, heap_n, i * 8, (unsigned long long)(v - WC_BASE));
+        }
+    }
+    heap_n++;
     uint64_t p = heap_top; uint64_t n = (sz + 15) & ~15ull;
     if (p + n > HEAP_END) return 0;
     heap_top += n;
@@ -38,6 +50,7 @@ static uint64_t __attribute__((ms_abi)) st_zero(void) { hits++; return 0; }
 
 typedef uint64_t (__attribute__((ms_abi)) *FN)(void);
 typedef uint64_t (__attribute__((ms_abi)) *FN4)(uint64_t, uint64_t, uint64_t, uint64_t);
+typedef uint64_t (__attribute__((ms_abi)) *FN5)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 #include <setjmp.h>
 static sigjmp_buf jb;
 static volatile sig_atomic_t in_case, n_segv, n_alrm, last_sig;
@@ -142,16 +155,20 @@ int main(int argc, char **argv) {
         memset(arena, 0, WC_ARENA_SZ);
         heap_top = WC_ARENA;
         hits = 0;
+        heap_log = (c == 0 && getenv("WC_HEAP_LOG")); heap_n = 0; cur_tag = 0;
         uint64_t rax = CRASH_MARK;
         in_case = 1;
         if (sigsetjmp(jb, 1) == 0) {
             ualarm(300000, 0);   /* 1 case 300 ms で打ち切り */
             /* CreateInstance → vtable の先頭 WC_CALL_SLOTS 個の slot を順に呼ぶ (rcx = instance, rdx = 作業用バッファ, r8 = r9 = 0)。
              * 戻り値は acc = acc*31 + rax で 1 つにまとめる (wasm 側 wc_run_wasm.mjs と同一の式)。 */
+            if (WC_INIT_RVA) ((FN)(img + WC_INIT_RVA))();
+            cur_tag = 1;
             uint64_t inst = ((FN)(img + WC_ENTRY_RVA))();
             uint64_t acc = inst;
             for (int k = 0; k < WC_CALL_SLOTS; k++) {
-                uint64_t r = ((FN4)(img + WC_SLOT_RVA[k]))(inst, WC_ARENA + 0x8000, 0, 0);
+                cur_tag = 2 + k;
+                uint64_t r = ((FN5)(img + WC_SLOT_RVA[k]))(inst, WC_SLOT_ARGS[k][0], WC_SLOT_ARGS[k][1], WC_SLOT_ARGS[k][2], WC_SLOT_ARGS[k][3]);
                 if ((WC_RET_MASK >> k) & 1) acc = acc * 31 + r;
             }
             rax = acc;

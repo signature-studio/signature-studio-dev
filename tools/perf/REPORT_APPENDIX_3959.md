@@ -68,6 +68,42 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 
 この表の再現スクリプトは repo に無い。本 run では再現していない。**分かったことは「配置の境界ではなく、同一 instance 内での ctor の呼び出し回数に結びつく可能性」まで**。原因 (どのループ・どのテーブルか) は未確定。
 
+## 3b. 子 #4392 の一次切り分け (Node・同期・`tools/perf/p15/ctor_heap_probe.mjs`)
+
+測定 commit: `daea2d06f` (プローブを追加した commit。コードの最後の変更)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb…`) を展開して測定。
+
+| 測定 | 結果 | 出典 |
+|---|---|---|
+| `node node_init_sweep.mjs --m 145,146 --timeout 15000` | M=145 成功 (setup 788 ms)・M=146 timeout | 本 run のローカル出力 |
+| `ctor_heap_probe.mjs 146` 3 run (HEAD) | 3/3 とも 146 回目の ctor 前 (`before_call` 145) で戻らず (25 s で打ち切り) | 本 run のローカル出力 (未 commit) |
+| `ctor_heap_probe.mjs 145` (対照) | 完了 (wall 1 s)・`bytes_per_ctor` 3673793 | 同上 |
+
+観察 (本 run で確認した数値):
+- ctor 1 回で wasm heap の先頭が約 3.67 MB 進む (`bytes_per_ctor` 3673793)。`ctor` は `operator new` (`f_1801a04d0`・`f_1801a7794`) で `0x40000` などを 6〜14 回確保する (commit 済みの根拠: `tools/hostbridge/evidence/ott_ottprocessor_ctor.asm` の 172〜196 行、`MOV ECX,0x40000` / `CALL 0x1801a7794`)。
+- 145 回後の heap 先頭は `0x2ff93020`。次の 3.67 MB の確保範囲が image の data 領域 (`0x301e2000`〜`0x30284124`) と重なる。
+- `ott_data_install` が敷く rdata・data の領域 (`0x301e2000`〜`0x30284124`) は、wasm heap の伸びる範囲と重なる。heap 側の確保は `imp_HeapAlloc` が確保ごとに `memset(0)` する (`tools/ott/rt/ott_cpu.c` 76 行。ただし `HeapAlloc` のゼロ化は確保した領域だけに効く)。
+- heap を 64 MiB ずらすと (`malloc` を先に呼ぶ)、止まる位置が `before_call` index 145 (146 回目) から index 127 (128 回目) へ早まる。index で 18 回早まる。64 MiB ÷ 3.67 MB (`bytes_per_ctor` 3673793 B) ≈ 18.3 回と整合する。Node・1 run のみ・`work/` で実施 (commit 外)。
+
+**未確定 (この節の結論ではない)**: 「heap が data 領域に届いた確保が、data の内容を変えて ctor を戻らなくする」という機構は**仮説**。実測したのは次の 2 点だけ: (a) 145 回目までの ctor では data 領域の hash が不変 (Node・1 run。プローブは commit 外で、コミット済みの再現は未整備)、(b) 146 回目の ctor が戻らないこと (HEAD で 3/3)。146 回目の確保直後に data が変わることの直接確認と、どの関数で戻らなくなるかは未了。
+
+## 3c. 子 #4392 の原因切り分け (Node・同期・`tools/perf/p15/ctor_data_overlap.mjs`)
+
+測定 commit: `95f2351e5` (`ctor_data_overlap.mjs` を追加した commit = コードの最後の変更)。HEAD との差分: `git diff 95f2351e5 HEAD -- tools/perf/p15 tools/ott` は 0 行 (測定コードに差分なし)。`-- tools/perf` は本 REPORT の文言修正 (`docs(perf)` commit 60efc8c36) の 19 行のみ。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を展開して測定。
+本 fix run では素材が展開されず (`$ARTIFACTS_DIR` は `fl-win64` のみ) 再測定していない。下表は実装 run (測定 commit `95f2351e5`) の値。
+
+| 測定 | 結果 |
+|---|---|
+| `node node_init_sweep.mjs --m 145,146 --timeout 15000` (HEAD) | M=145 ok・M=146 timeout (15 s)。`setup_ms` は生ログ (`$RUNNER_TEMP`) のみで commit に無いため載せない |
+| `ctor_data_overlap.mjs 145` ×2 | 2/2 同一: `data_changed_during_ctor_at=-1` (145 回の ctor で data 不変)・heap 起点 `0x1038d528`・1 回目の data 領域への確保 `0x301d3068` (malloc 10 回目, k=9)、その malloc の前後で data hash `b396a36c3521` → `27928e2cfb77` |
+| 対照: `ctor` 145 回後の heap 先頭 | `0x2ff93079` (ctor 1 回あたり約 3.67 MB 進む) |
+
+結論 (測定で確認した範囲):
+- ctor の呼び出し自体は data を書き換えない。145 回までの ctor で data の hash は不変。
+- heap の確保は `GLOBAL_BASE=0x10000000` の静的データの後ろから伸び、約 145 回で image data 領域 (`0x301e2000`〜`0x30284124`) に届く。届いた確保の後で data の内容が変わる。
+- したがって M=146 の無応答は「heap が固定の data 領域に重なった後の、data の書き換えによる ctor の停止」と整合する。**ただし 146 回目の ctor が止まる箇所 (どの関数・どのループ) は未特定**。data 書換え → 停止の因果は直接示していない。
+
+未確定: 146 回目の ctor で止まる関数の特定 (`ott_run` の trace で確認が必要)。修正 (`GLOBAL_BASE` を data 領域より上へ移す、または data の配置を heap と分ける) は lift 全体の再ビルドと harness の object 配置 (`0x31000000` 以降) の変更を伴うため、本 run では行わない。
+
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
@@ -75,4 +111,5 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 | ctor (`0x18011d400`) が同一 instance で 146 回目に戻らない原因 | 上限 145 の意味が未確定。M=146 を通す修正方針が立たない | #4392 [PERF-P26] |
 | Chrome の M=147・149〜151・153〜159 と M=2〜129・131〜144 の成否 (単調性) | 成功最大 145 と失敗最小 146 の範囲外は未確認 | #4392 (コメントで追加) |
 | Node 掃引の再測定と生データの commit (§1) | 掃引の数値が根拠にならない | #4392 (コメントで追加) |
+| §3b の監視プローブ (145 回までの data hash 不変・`next_span_overlaps_data`) が commit 外・再現未整備 | §3b の (a) は再現できない。`ctor_heap_probe.mjs` の 3673848 (`next_span_overlaps_data` の判定定数) と観測 `bytes_per_ctor` 3673793 の 55 B 差は判定に影響しないが、由来は未記録 | #4392 (次の run で commit) |
 | 154 の run の wasm sha が未記録 (§2) | 154 と HEAD の wasm が同一かを示せない。HEAD の 155 測定 (M=145・146) は素材 wasm で再現済み | #4392 (コメントで追加) |

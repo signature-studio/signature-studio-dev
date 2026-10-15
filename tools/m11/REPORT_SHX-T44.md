@@ -50,3 +50,39 @@
 | 修復 OFF/ON の before-after 実測 (`units_run ≥ 18`・`VirtualAlloc` 不発・`MessageBoxA` 不発・ネガコン) と、`docs/DEFECTS.md` D23 の「修復」列 | 修復の受入 | `[SHX-T45]` #4459 |
 | `function_448430` 本体の機械語確認 (2 site)。本 REPORT は callee の読み先のみ確認 | 2 site の判定の裏付け | `[SHX-T45]` #4459 |
 | 真の D23 かどうかの site 単位の確定 (IR 幅による分類は REPORT_SHX-T28 §10 で実施済み) | 修復範囲の決定 | `[SHX-T45]` #4459 |
+
+## 6. 301 site の機械語突合 (REPORT_SHX-T28 §10 の残り・#4189 の再開分)
+
+- 追加: `tools/m11/frame_share/base_check.py` (commit `8222772c9`)。親の prologue を機械語で読んで rbp の entry 基準位置 X (`push` 数と `sub rsp, imm` から計算) を求め、親 IR が callee へ渡す alloca 名が `stack_var_X` と一致するかを site ごとに見る。一致しない site は `base_mismatch`。
+- 判定: `ir_truncated` (base 一致・callee の最大端 E > alloca 幅 S)・`ir_covers` (E ≤ S)・`unmatched` (IR に該当 call が無い)・`no_prologue` (prologue のパターンに合わず未判定)。`base_mismatch` は 0 件。
+- 注: 「IR の `stack_var_N` は entry rsp 基準の N」という対応は §6 の推定 (REPORT_SHX-T28 §6) をそのまま使う。`base_check.py` はこの推定を site 全体に当てはめただけで、推定そのものは未確認。
+- 機械語で確認したのは「親の rbp の位置」と「IR の alloca 名」の一致だけ。call 直前の引数と callee の読み先の site 単位の突合は、`function_448490` の 10 site (§3) だけ行った。残り 291 site は base の一致のみ。
+
+### 実測 (測定 commit `8222772c9`・IR は HEAD で再生成)
+
+| 分類 | site 数 | (親, callee) 組 | 意味 |
+|---|---|---|---|
+| `ir_truncated` | 204 | 70 | base 一致・IR の alloca が callee の触る範囲より小さい (真の D23 の候補) |
+| `ir_covers` | 38 | 3 | base 一致・alloca が範囲を覆う (偽陽性の候補) |
+| `unmatched` | 56 | 19 | IR に該当 call が無く判定不能 |
+| `no_prologue` | 3 | 2 | prologue が取れず判定不能 (`function_517b50`) |
+| 合計 | 301 | 94 | `base_mismatch` 0 |
+
+- `function_448490` の 10 site は全て親の rbp 位置 `-104`・IR の渡し先 `stack_var_-104` (48 B)・callee の必要幅 120 B で `ir_truncated`。
+- `ir_covers` の 38 site の渡し先は `stack_var_-56` (22)・`stack_var_-104` (8)・`stack_var_-72` (8)。
+- `classify.py` の `ir_frame_too_small` 207 は、`base_check.py` の `ir_truncated` 204 と `no_prologue` 3 の合計で、件数は一致する。
+
+### 再現と注意 (実測時に見つかった事項)
+
+- 素材 `work-m11.tar.zst` の `work/boot_final3.ll` (10-10 作成) は、この PR の HEAD の生成経路の IR と一致しない。その IR で `classify.py` を実行すると `ir_frame_too_small` 245・`unmatched` 56・`ir_frame_covers` 0 となり、§10 の 207 / 38 / 56 と合わない。`function_448490` の alloca も `[6 x i64]` ではなく `i64` (8 B) として見える。HEAD で `m11_gen_ir2.sh` と `m11_build.sh` を再実行すると、§10 の値 (207 / 38 / 56・組 72 / 3 / 19) と一致した。素材の IR は古く、§10 の測定には使えない。
+- 手順: `FL_WIN64_DIR=<展開先> bash m11_gen_ir2.sh` → `bash m11_build.sh` → `python3 frame_share/detect.py --ir work/boot_final3.ll --out work/frame_share.json` → `python3 frame_share/classify.py --ir work/boot_final3.ll --sites work/frame_share.json` → `python3 frame_share/base_check.py --ir work/boot_final3.ll --sites work/frame_share.json --out work/base_check.json`。PE は `fl-win64.tar.zst` の `extracted/block00031_PE.bin` (22,227,016 B)。
+- 測定時の 1 分平均 load は 0.2〜0.9 (nproc 4)。
+- 測定 commit から HEAD までのコード差分: `git diff 8222772c9 HEAD -- tools/m11/frame_share tools/m11/ldfix tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh` は 0 行 (測定は HEAD 上で実施。IR 生成・build の経路は 3da603ce6 から変えていない)。
+
+### 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 301 site のうち 291 site の call 直前の引数と callee の読み先の site 単位の機械語突合 (`base_check` は base の一致だけ) | 真の D23 の確定 (`ir_truncated` 204 の中身) | #4189 (open のまま追跡) |
+| `unmatched` 56 site (19 組) と `no_prologue` 3 site (`function_517b50`) の判定 | 修復範囲の決定 | #4189 |
+| 素材の `work-m11` の `boot_final3.ll` が HEAD の生成経路と一致しない件 | 素材の再作成が必要か | #4189 (本節の注) |

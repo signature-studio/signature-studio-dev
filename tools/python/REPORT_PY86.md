@@ -119,3 +119,36 @@
   - 「偶然の一致」は、候補の窓を含む命令を前後 12 バイトから逆引きしても fn を指すオペランドが無いもの (`.text` 内のデータ上の偶然の一致)。A・B の 8 関数は命令参照 0 件で、`jmp`・Jcc・短距離ジャンプ・即値・RIP 相対の参照は無い。
   - 0xbe6040 の命令参照は 2 行出る。実在する参照は `lea rax,[rip+0x21bc]` (0xbe3e7d・7 バイト・次命令 0xbe3e84 + 0x21bc = 0xbe6040) の 1 件。もう 1 行の 0xbe3e7e `lea eax,[rip+0x21bc]` は、0xbe3e7d の命令の途中を読んだ重なりの誤デコードで、スクリプトは重複を除かないため出る。
   - 非整列の 8 バイトポインタ (0xc155ee・0xc1855a・0x60007a・0x81e8b1) は VMT のスロットではない。0xc155ee と 0xc1855a の直後は ShortString (`ReceiveFrom`・`ReceiveMsg`)、0x60007a の直後は `TGraphicControl`。0x81e8b1 の近傍は 8 バイト間隔の関数ポインタ列と `TQuickGraphicControl` の名前。表の所属クラスは未確認 (子 #3337 で確認する)。
+
+## 5. 群 D の受け手の追跡 (#5145・部分)
+
+- 対象: 群 D の 15 関数 (24 サイト)。`analysis/py86_group_d.py <PE.bin> <fn,...> 3 6` で、VMT 外の関数を直接呼出し元へ最大 3 段・各 6 件まで辿る。VMT 所属の関数で止める。各ノードに TPublicChannel の所属を出す。
+- 測定 commit (`py86_group_d.py`): `4a3d1965a` (追加した版。以後の変更なし)。
+
+  ```
+  $ git diff 4a3d1965a HEAD -- tools/python/analysis/py86_group_d.py
+  (出力 0 行)
+  ```
+
+- 実測 (逐次・n=1・load 0.09 / 1 分平均): 33.6 秒。出力 191 ノード・TPublicChannel を含むノード 0 件。
+- 判定できた 2 件 (24 件中):
+  - 0x7cf84f (fn 0x7cf7f0): 直接呼出し元は 0x7cf730 のみ。0x7cf730 は TVectorWheel[81] の VMT の関数で、0x7cf730 の rbx=rcx (Self) がそのまま 0x7cf743 で渡される。受け手は TVectorWheel 系。TPublicChannel は含まない。
+  - 0x86ca85 (fn 0x86ca60): 直接呼出し元は 0x5de830 のみ。0x5de830 は TCustomAction 系 (VMT[23]・10 クラス) の関数で、Self (rbx=rcx は 0x5de835) は 0x5de861 で rdx に入り、0x5de864 の 0x86ca60 に渡る (rcx は 0x5de857 で全域変数から読み直される)。受け手は TCustomAction 系。TPublicChannel は含まない。
+- 未判定 22 件。理由: 直接呼出し元を辿ると、VMT 所属に当たる前に、呼出し元 0 件の関数 (「0 件」の受け手の出所が未確定) で止まる。または深さ 3 の上限で切れる。例: 0x6cb1c0 は 0x6ce5c0 → 0x6cb0b0 (呼出し元 91 件・全て VMT 外) まで。0x820440 は 16 件 (VMT 外)。0x8207b0 は 0x8261a0 → 0x806b70 (呼出し元 0) まで。0x823090・0x61b0d0・0xbe6040 は直接呼出し元 0 件。
+- VMT 所属に当たった呼出し元 (0x73d5c0・0x7cf9b0・0x7e5290・0x7f6f20 の先の 0x6f16d0・0x7e2640・0x7f33a0 ほか) は、いずれも TPublicChannel を含まなかった (`py86_group_d.py` の TPublicChannel 欄)。これは「TPublicChannel を含まない」の確認のみで、未判定 22 件の判定ではない。
+- 未解決: 未判定 22 件 (0x6cb1c0・0x6f12b0・0x80dc50・0x80dcc0・0x820440・0x8207b0・0x823090・0xb8b450・0xbe6040・0xff5aa0・0x1003730・0x1003c20・0x61b0d0 等)。深さ 3 の上限を超える先と、呼出し元 0 件の関数の到達経路。起票先: #5145 (本 issue の続き。以後の run で本 issue のコメントに追記する)。
+## 6. 群 C の受け手 (#5144) — 未達
+
+対象: `0xb35298` (fn `0xb35250`・受け手 `[Self+0x18]`) と `0xb671a2` (fn `0xb67190`・受け手 `[Self+0x7a0]`)。
+`analysis/py5144_groupc.py <PE.bin>` (実行 約 2 秒・n=1・load 未計測) で確認した。
+
+- fn `0xb35250` は VMT `TDBXStreamValue@0xb07378` のスロット関数。fn `0xb67190` は VMT `TGenericPlugin@0xb655c8` のスロット関数。VMT 経由の呼出しだけで、直接 `call rel32` の呼出し元は 0 件 (両 fn)。
+- 両 VMT の .text スロットは 117 件 (`TDBXStreamValue`) と 119 件 (`TGenericPlugin`)。受け手は呼出し元の動的型で決まり、呼出し元までの直接辿りでは決まらない。
+- `TDBXStreamValue` の VMT スロット `[116]` (fn `0xb326f0`) は `[rcx+0x18]` に書くが、rcx が Self かは未確認 (引数の可能性がある)。`TGenericPlugin` 側は書込みを見つけられなかった。
+- 未確定の理由: 書込み元の型 (フィールド `+0x18`・`+0x7a0` の宣言型) を RTTI / フィールド表から引いていない。VMT 即値の 4 バイト検索は誤検出 (データ部) のみで、コンストラクタを特定できなかった。
+- 結論: 群 C の 2 件は**型を確定できなかった**。件数 (受入 2b) の不確定は 27 件のまま (群 C の 2 件は残る)。
+- 次に必要な情報: `TDBXStreamValue` と `TGenericPlugin` のフィールド表 (+0x18・+0x7a0 の宣言型)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 群 C の 2 件の受け手の型 (フィールド宣言型と呼出し元) | 受入 2b の件数 | #5144 (残り) |

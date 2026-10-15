@@ -26,17 +26,19 @@ S "0/6 複製: tools/m11 + tools/shim + tools/shared → $TREE (m11_build.sh の
 rm -rf "$TREE"; mkdir -p "$TREE"; cp -a "$SRC" "$GF_GUI/../shim" "$GF_GUI/../shared" "$GF_GUI/../m2" "$GF_GUI/../m5" "$TREE/"   # m2/m5: m11_lift.sh が ../m2/ir_normalize.py・../m5/ir5_patch.py を呼ぶ
 mkdir -p "$TREE/m6" && cp -a "$GF_GUI/../m6/ottlib.py" "$TREE/m6/"   # m11_wndclass_scan.py は ../m6/ottlib.py を import する
 export GF_M11="$TREE/m11"; M="$GF_M11"
+# boot5 = 間接 call 先の fallback (m11_extra_ranges5.txt。0x85df70 = EnumDisplayMonitors の callback を含む)。素材 work-m11 には無いので複製側で lift する (m11_e2e.sh #132 と同じ)
+[ -f "$M/work/boot5.lift.ll" ] || ( cd "$M" && bash m11_lift.sh m11_extra_ranges5.txt boot5 600 > "$W/res/m11_lift_boot5.log" 2>&1 ) || { S "boot5 lift 失敗 (m11_lift.sh。RETDEC / FL_WIN64_DIR を確認)"; tail -5 "$W/res/m11_lift_boot5.log"; exit 2; }
 ( cd "$M" && bash m11_gen_ir2.sh > "$W/res/m11_gen_ir2.log" 2>&1 ) || { S "m11_gen_ir2.sh 失敗 (複製側で IR 再生成。#680 の ldfix=applied 記録が必要)"; tail -5 "$W/res/m11_gen_ir2.log"; exit 2; }   # main #680: m11_build.sh は ir_conditions.json の ldfix=applied を要求する。素材の旧 IR は使えない
 ( cd "$M" && bash m11_wndseed.sh > "$W/res/m11_wndseed.log" 2>&1 ) || { S "m11_wndseed.sh 失敗 (boot6 lift + 最終 IR。RetDec / PE を確認)"; tail -5 "$W/res/m11_wndseed.log"; exit 2; }   # #565: WNDCLASS 静的実体の WNDPROC 閉包 (boot6) が無いと最終 IR で WNDPROC 8 件が未定義 (W1 FAIL)
 [ -f "$M/work/boot6.lift.ll" ] || { S "前提欠如: boot6.lift.ll が生成されていない (m11_wndseed.sh)"; exit 2; }
 tail -1 "$W/res/m11_wndseed.log" | sed 's/^/[gf_e2e] wndseed: /'
 (cd "$SRC/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/material  /') > "$R/ir_sha256.txt"   # 素材そのままの IR (provenance)
-S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11_survey.mjs (複製側)"
+S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → build.sh --base → run.mjs / run.mjs --survey (複製側)"
 ( cd "$M" && bash m11_build.sh > "$W/res/m11_build.log" 2>&1 ) || { S "m11_build.sh 失敗"; tail -5 "$W/res/m11_build.log"; exit 2; }
 (cd "$M/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/after_m11_build  /') >> "$R/ir_sha256.txt"   # m11_build.sh (qstore/alloca/post) 後の IR
-( cd "$M" && node m11_run.mjs 2>/dev/null | sed -n 's/^M11_RESULT //p' > "$W/res/baseline_boot.json" )
-[ -s "$W/res/baseline_boot.json" ] || { S "baseline 取得失敗"; exit 2; }
-bash "$HERE/build.sh" --base > "$W/res/build_base.log" 2>&1 || { S "build base 失敗"; tail -5 "$W/res/build_base.log"; exit 2; }   # 比較元は GUI と同じ -pthread build (shim 無し)。非 pthread の m11_boot.cjs と比べると 8 unit ぶん順序・ビルド条件差が出る (REPORT §5-6)
+bash "$HERE/build.sh" --base > "$W/res/build_base.log" 2>&1 || { S "build base 失敗"; tail -5 "$W/res/build_base.log"; exit 2; }   # 比較元は GUI と同じ -pthread build (shim 無し)。非 pthread の m11_boot.cjs と比べると boot は GetMem 761 対 760、survey は 8 unit ぶんの差が出る (REPORT §5-6・#4420)
+( cd "$HERE" && node run.mjs --wasm "$W/m11_base.cjs" --out "$W/res/baseline_boot.json" > /dev/null )   # boot の比較元も同じ -pthread build (m11_run.mjs は非 pthread の wasm を見るため GetMem が 1 回多い)
+[ -s "$W/res/baseline_boot.json" ] || { S "baseline boot 取得失敗"; exit 2; }
 ( cd "$HERE" && GF_SURVEY_UNITS="$W/res/baseline_units.json" node run.mjs --survey --wasm "$W/m11_base.cjs" --out "$W/res/baseline_base_survey.json" > /dev/null )
 python3 -c "import json,sys; d=json.load(open(sys.argv[1]))['survey']; json.dump(d, open(sys.argv[2],'w'))" "$W/res/baseline_base_survey.json" "$W/res/baseline_survey.json" 2>/dev/null
 [ -s "$W/res/baseline_survey.json" ] || { S "baseline survey 取得失敗"; exit 2; }

@@ -1,6 +1,6 @@
 # tools/qfclift 付録 4263 — T-SH-107 (#4263): longjmp 0x40f9c0 の発生条件
 
-REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD = `6a9f1c3f0` (origin/main 起点)。
+REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。§1〜§4 (静的解析) の検証 HEAD = `bfbe3f683`。§5.2 (実行時トレース・CALL_A/CALL_B) の測定 HEAD = `cb8904a73` (差し込みを committed 化した commit。lift のコード差分は `e2f4ecabc` と同一)。§5.3 (reason 変更) は測定 HEAD `ea44afd71` のまま (下記 §5.3 に明記)。
 道具: `callers_4263.py` (`.pdata` の関数単位で逆アセンブルし、`call` の呼出元と `rip` 相対参照の書込み元を列挙)。出力は `work/callers_4263.txt` (生成物)。
 
 ## 1. 結論 (静的解析)
@@ -53,17 +53,85 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD
 - **boot の lift 設定は変更しない**。静的な発火条件だけでは override・root の追加先が決まらず、停止点の変化を実測する根拠も無いため。
   経路 B の飛び先 (`0x5d0c80`) の実行時の値と、`[0x5d0cb0]` の書込み元は、実行時のトレースで決める必要がある。
 
-## 5. 未解決
+## 5. 経路 B の flag `byte [0x5d0cb0]` の書込み元 (特定)
+
+- 書込みは `0x40f4eb`: `mov byte ptr [r13+0x30], al` (所属関数 `0x40f430`)。`r13` は `0x40f446` で `0x5d0c80`、`0x40f456` で `0x5d0da8` (`[rbp+0x170] >= 2` のとき)。
+  `0x5d0cb0 = 0x5d0c80 + 0x30` なので、rip 相対の直接 store 0 件は「レコード経由の store」だった。`0x40f4e1`〜`0x40f4eb` で `al = [rbp+0x170] + 1` (= reason + 1)。
+- 読みは `0x40fca8` (`cmp byte [0x5d0cb0], 0`)。非 0 なら `0x40fcb8` で `0x40fa40` を呼ぶ (= 経路 B)。
+- **reason 1 (PROCESS_ATTACH) では flag = 2 (非 0)**。`r13 = 0x5d0c80` のため、静的には `0x40fca8` の検査が非 0 で通り、`0x40fcb8` から `0x40fa40` を呼ぶ形になる。経路 A は arm されない (§1)。実行時の値は §5.2 を参照。
+- 再現: `python3 disasm_range_4263.py block24350_PE.bin 0x40f4e1 0x40f4f0` (道具は `tools/qfclift/disasm_range_4263.py`)。
+
+### 5.2 実行時トレース (boot の DllMain 段・reason 1)
+
+再現: `FL_WIN64_DIR=<展開先> bash qfc_trace_4263.sh` (前提: `qfc_boot.sh` を 1 回実行。測定専用・判定なし。計測 C は `qfc_ov_trace_4263.c`。差し込みは `qfc_trace_4263.sh` 内の Python 注入部)。
+測定 HEAD `cb8904a73` の実出力 (DllMain の 1 段のみ・reason 1):
+
+```
+[trace4263] ENTER f_40f430 flagB=0 recB=0
+[trace4263] ENTER f_40fb80 flagB=2 recB=0x10280948
+[trace4263] CALL_B flagA=0 flagB=2
+[trace4263] ENTER f_40fa40 flagB=2 recB=0x10280948
+[trace4263] longjmp enter buf=0x102807b0 retval=1 caller_ret=0x40fa94 flagB(0x5d0cb0)=0 recB(0x5d0c80)=0 flagA(0x5d0db0)=0 flagAll(0x5aa000)=0
+[ret] DllMain 0x1
+[trap] FontCache_GetStats RuntimeError: Aborted(native code called abort())
+[qfc_trace_4263] ENTER=3 CALL_A=0 CALL_B=1
+```
+
+根拠の件数: `ENTER` = 3 (`f_40f430`・`f_40fb80`・`f_40fa40`)・`CALL_A` = 0・`CALL_B` = 1。`CALL_A` の検査 (`0x40fbcf` の直前) の arm `[0x5d0db0]` = 0。
+注入は `qfc_trace_4263.sh` が lift の `/* 40fbcf: call 0x40fa40 */`・`/* 40fcb8: call 0x40fa40 */` のコメント行の直後へ入れる (1 箇所ずつ `assert count == 1`)。
+
+| 入口 | flag `[0x5d0cb0]` | record `[0x5d0c80]` | 読み |
+|---|---|---|---|
+| `f_40f430` | 0 | 0 | `0x40f4eb` の書込み前 |
+| `f_40fb80` | **2** | 0x10280948 | `0x40f430` が reason+1 = 2 を書いた後 (経路 B の検査の前) |
+| `f_40fa40` | 2 | 同 | 経路 B の呼出し (`0x40fcb8`) の直後 |
+| `qfc_ov_longjmp` | **0** | 0 | `0x40fa40` 先頭の `rep movsq` (`0x40fa6b`) で保存 frame の値 (0) に戻る |
+
+- longjmp の呼出元 (戻り番地) は `0x40fa94` (`0x40fa40` 内)。スタック範囲出力 (`0x400000`〜`0x620000` の全語) に `0x40fcbd` (経路 B の後続) と `0x59c254` (DllMain の setjmp 後の本体スキップ経路) が現れる。ただし範囲が広く過去の残存値を含みうるため、**呼出元を区別する証拠にはならない**。
+- 戻り値 `eax = ([0x5aa000] != 0) + 1` は 1 (`[0x5aa000]` = 0 の入口値)。静的な読みでは DllMain の `cmp eax,1` (`0x59c210`) で本体を飛ばす側 (`0x59c254`) へ進む。`0x59c254` へ進んだことは未確認。
+- longjmp 時点で `[0x5d0cb0]` が 0 に見えるのは、保存 frame の複写による見かけの値と読んでいる (静的な推定。判定は呼出し前の `CALL_B` で行う)。
+- 経路 A と B の区別は、§5.2 の `CALL_A`・`CALL_B` 差し込みで実測した (経路 B のみ発火)。
+- **経路 B の発火 (実測・測定 HEAD `cb8904a73`)**: `0x40fcb8` の call 直前で `flagB=2` を記録 (`CALL_B` = 1 件)。`0x40fbcf` の call 直前 (`CALL_A`) は DllMain 段で 0 件。`[0x5d0db0]` (arm) は 0 (`CALL_A` 行の `flagA=0` は `CALL_B` 行でも同値)。`f_40fa40` の入口は `CALL_B` の直後の 1 回だけ。したがって DllMain (reason 1) で longjmp に入るのは経路 B のみ。
+  - 差し込みは committed の `qfc_trace_4263.sh` 内 (work/ の lift コピーにのみ適用。tools の lift・override は不変)。`0x40fba6` → `0x40fbd4` の分岐は静的な読み (lift の `jne`/`je` の飛び先で確認。実行時の分岐は測っていない)。
+- 別 reason (≥2) と経路 A の挙動は boot (reason 1) では測れないため未解決。
+
+### 5.3 reason を変えた実行 (`QFC_REASON`・測定のみ)
+
+同じ計測版で DllMain の reason だけ変えた結果 (停止点は同じ `FontCache_GetStats`)。**測定 HEAD は `ea44afd71` のまま** (`CALL_A`/`CALL_B` 差し込み前の版。§5.2 の HEAD `cb8904a73` とは別。`QFC_REASON` 変更は committed スクリプトに無いため、再現には測定版の再構成が要る):
+
+| reason | `f_40f430` 入口 | `f_40fb80` 入口 flag | longjmp 入口 retval | DllMain 戻り値 | 備考 |
+|---|---|---|---|---|---|
+| 1 | flag 0 | 2 | 1 | 1 | §5.2 |
+| 2 | flag 0 | 0 | 2 | 0 | `[qfc-soft] MessageBoxA` が出る |
+| 0 | flag 0 | 1 | 1 | 1 | |
+
+- reason 2 では経路 B の flag (`0x40f4eb` で reason+1 = 3) が `f_40fb80` の入口で 0 のため、この時点で `0x40fcb8` の経路 B は見かけ上発火しない。`r13 = 0x5d0da8` (経路 A の record) なので、経路 A の arm (`[0x5d0db0]`) が効くはずだが、`0x40fbcf` の直前の arm・thread id は未測定。
+- 結論 (実測): reason 2 では DllMain の戻り値が 0、longjmp の retval は 2。reason 1 と経路が違う。経路 A が発火したかは未確定 (`0x40fbcf` の直前の `[0x5d0db0]`・`[0x5d0ddc]` を測る必要がある)。
+- 静的な整合: reason 2 の `0x40f4eb` は `[r13+0x30]` (r13 = `0x5d0da8`) に書くため、`[0x5d0cb0]` (= `0x5d0c80+0x30`) は書かれない。実測の flag 0 と合う。
+- 解釈 (未検証): reason 2 の `MessageBoxA` は soft stub の呼出し。soft の 0 返しは実物ではないため、reason 2 の結果を実機の挙動とは読まない。
+
+### 5.1 実測 (boot、HEAD `bfbe3f683` の lift 設定。`qfc_boot.sh`)
+
+- `qfc_boot.sh` (strict / soft) の結果: strict は `MISSING IMPORT LocalAlloc` で DllMain の trap (FAIL)。soft は `DllMain(PROCESS_ATTACH)` が `ok rax=0x1`、続く `FontCache_GetStats` で `call to UNLIFTED function 0 ret=0x57fb09` (FAIL)。
+- 既存の lift 設定 (override `0x40f9c0=qfc_ov_longjmp`・root `0x59c210`) で、経路 B の戻り先は既に入っている。このため新しい override・root の追加は不要。
+- 経路 B の発火条件は §5 で確定し、reason 1 では実行時にも発火することを §5.2 で測定した。停止点 (`FontCache_GetStats`) が経路 B の後の段であるかは推定で、実測からは確定していない。次の停止点は FT 解決 (`0x563000`) の未解決ポインタと推定する (#4296 / #4510 §2)。
+
+## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `byte [0x5d0cb0]` (経路 B の発火条件) の書込み元 | 経路 B が実機で発火するかが不明 | #4263 (本 issue の継続・部分達成) |
-| 経路 A の発火は DllMain reason 1 では起きない (`r13=0x5d0c80`)。reason ≥2 の経路 (boot 未測定) | 別 reason の挙動が不明 | #4263 (継続) |
+| 経路 A の発火は DllMain reason 1 では起きない (実測: `CALL_A` 0 件・arm 0)。reason ≥2 の経路 A (boot 未測定) | 別 reason の挙動が不明 | #4263 (継続) |
 | `ExitProcess(0)` の呼出し元と、`[0x5d0c80]` の boot 時の値 | 偽の停止か否かの判定 | #4262 (T-SH-106) |
 | 呼出元 `0x40946b` (fn `0x409460`) の上位呼出元 | setter へ渡る code の出所 | #4263 (継続) |
 
-## 6. 検証
+## 7. 検証
 
 - 解析: `python3 callers_4263.py <block24350_PE.bin>` (1.8 s)。`.pdata` 関数単位の逆アセンブル。
   依存: `pip install pefile capstone` (Python 3)。表の番地は上記スクリプトの `call` 行 (呼出し命令の VA) で確認した。
-- lift 設定 (`qfc_boot.sh`・`qfc_ov.c`・`qfc_e2e.sh`) は変更していない。e2e は下記の値で確認。
+- lift 設定 (`qfc_boot.sh`・`qfc_ov.c`・`qfc_e2e.sh`) は変更していない。
+- **測定 HEAD `cb8904a73`** (差し込みの committed 化の commit。lift のコード差分は `e2f4ecabc` と同一):
+  - `qfc_e2e.sh`: exit 0・real 130 s・load 1.00 0.96 0.51 (開始時 1.01 0.93 0.43)・functions 6347 / insns 208714 / unsup 0 / unlifted 0 / imports 222・spot `cases 12 equal 12 mismatch 0`・ネガコン 3 本 (none_ssse3 / pmulhrsw / pshufb / phaddw) で FAIL を検出 (`negative control: FAIL detected (OK)` ×3)。
+  - `qfc_boot.sh`: strict FAIL (`MISSING IMPORT LocalAlloc`・DllMain trap)、soft FAIL (DllMain `ok rax=0x1`、`FontCache_GetStats` で `call to UNLIFTED function 0 ret=0x57fb09`)。real 51 s。§5.1 と同じ結果。
+  - `qfc_trace_4263.sh`: `ENTER=3 CALL_A=0 CALL_B=1` (real 20 s)。
+  - コード差分: `git diff e2f4ecabc cb8904a73 -- tools/qfclift` は `qfc_trace_4263.sh` (測定スクリプト) と付録 (REPORT) のみ。lift・override・e2e スクリプトは変わらない。
+  - 素材: `fl-win64.tar.zst` を `$RUNNER_TEMP/win64` に展開 (block24350_PE.bin)。emsdk 6.0.12・freetype 2.7 wasm32 は本 run で構築。

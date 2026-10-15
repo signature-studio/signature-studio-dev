@@ -1,0 +1,41 @@
+name: Title collision
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Detect [AREA-n] collision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OC_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -uo pipefail
+          status=0
+          dups="$(bash .github/scripts/check-title-collision.sh "$ISSUE_NUMBER")" || status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::warning::title collision check could not run for #$ISSUE_NUMBER (exit $status)"
+            exit 0
+          fi
+          [ -n "$dups" ] || { echo "no [AREA-n] collision for #$ISSUE_NUMBER"; exit 0; }
+          {
+            echo "この issue の題名の \`[AREA-n]\` が、先行の issue と重複しています。起票者は番号を振り直してください (自動では変えません)。"
+            echo ""
+            echo "$dups" | sed 's/^/- /'
+            echo ""
+            echo "次の番号は \`docs/WORKFLOW.md\` §3 ① の確認コマンドで求めてください。"
+          } > "$RUNNER_TEMP/collision.md"
+          gh issue comment "$ISSUE_NUMBER" --repo "$OC_REPO" --body-file "$RUNNER_TEMP/collision.md"
+          echo "::warning::title collision for #$ISSUE_NUMBER: $(echo "$dups" | tr '\n' ' ')"

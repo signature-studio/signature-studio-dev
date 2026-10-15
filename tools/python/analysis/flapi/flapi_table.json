@@ -9623,7 +9623,7 @@
        "default": null
       }
      ],
-     "returns": "int"
+     "returns": "None"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,

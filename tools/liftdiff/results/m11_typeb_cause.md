@@ -63,7 +63,7 @@ fn=0x40c1d0 pat=z xfill=0 class=M L_full=0x40a380 typeB_full=B next(native,wasm)
 fn=0xcd1c20 pat=p0 xfill=1 class=R L_full=0xcd1a70 typeB_full=notB next(native,wasm)=('0xcb9eb0', '0x823c30') native=ok wasm=trap
    L_x0(native,wasm)=0xb,0x0 caller=0xcd1c20 call@0xcd1c5a caller_x0(native,wasm)=0x3ff4000000000000,0x0 post=[add rsp, 0x48 ; ret  ; int3  ; int3 ] jcc=-
 fn=0xcd1c20 pat=p0 xfill=0 class=X L_full=0x40c660 typeB_full=B next(native,wasm)=('0x40c660', '0xcb9e00') native=ok wasm=trap
-   L_x0(native,wasm)=0x7ff0000000000000,0x0 caller=0x40c660 call@- caller_x0(native,wasm)=0x7ff0000000000000,0x0 post=[-] jcc=-
+   L_x0(native,wasm)=0x7ff0000000000000,0x0 caller=0x40c660 call@- caller_x0(native,wasm)=0x7ff0000000000000,0x4014000000000000 post=[-] jcc=-
 fn=0xfea1e0 pat=p0 xfill=1 class=X L_full=0x40a3d0 typeB_full=B next(native,wasm)=('0x40c0e0', '0x40a1c0') native=ok wasm=trap
    L_x0(native,wasm)=0x403b000000000000,0x0 caller=0x40c1d0 call@0x40c1ee caller_x0(native,wasm)=0x403b000000000000,0x0 post=[mov ecx, eax ; cmp cx, 0x8000 ; jb 0x40c24c ; movabs rax, 0x8000000000000000] jcc=jb 0x40c24c
 fn=0xfea1e0 pat=p0 xfill=0 class=X L_full=0x40a3d0 typeB_full=B next(native,wasm)=('0x40c0e0', '0x40a1c0') native=ok wasm=trap
@@ -109,9 +109,9 @@ fn=0x40ef40 pat=p1 xfill=1 class=M L_full=0x40a3b0 typeB_full=B next(native,wasm
 fn=0x40ef40 pat=p1 xfill=0 class=M L_full=0x40a3b0 typeB_full=B next(native,wasm)=('0x40a360', '0x40a1c0') native=ok wasm=trap
    L_x0(native,wasm)=0x0,0x0 caller=0x40a2c0 call@0x40a2d1 caller_x0(native,wasm)=0x0,0x0 post=[mov edi, eax ; mov eax, esi ; not eax ; mov ecx, edi] jcc=-
 fn=0xcb9eb0 pat=p0 xfill=1 class=X L_full=0x40c660 typeB_full=B next(native,wasm)=('0xcc32f0', '0x40c1d0') native=ok wasm=trap
-   L_x0(native,wasm)=0x224b,0x0 caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x0 post=[-] jcc=-
+   L_x0(native,wasm)=0x224b,0x220b caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x2207 post=[-] jcc=-
 fn=0xcb9eb0 pat=p0 xfill=0 class=X L_full=0x40c660 typeB_full=B next(native,wasm)=('0xcc32f0', '0x40c1d0') native=ok wasm=trap
-   L_x0(native,wasm)=0x224b,0x0 caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x0 post=[-] jcc=-
+   L_x0(native,wasm)=0x224b,0x220b caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x2207 post=[-] jcc=-
 fn=0x4769f0 pat=z xfill=1 class=X L_full=0x40a3d0 typeB_full=B next(native,wasm)=('0x40c0e0', '0x40a1c0') native=ok wasm=trap
    L_x0(native,wasm)=0x3ff4000000000000,0x0 caller=0x40c1d0 call@0x40c1ee caller_x0(native,wasm)=0x3ff4000000000000,0x0 post=[mov ecx, eax ; cmp cx, 0x8000 ; jb 0x40c24c ; movabs rax, 0x8000000000000000] jcc=jb 0x40c24c
 fn=0x4769f0 pat=z xfill=0 class=R L_full=0x4769f0 typeB_full=notB next(native,wasm)=('-', '0x40ae30') native=ok wasm=trap
@@ -133,7 +133,8 @@ fn=0x6a0760 pat=p01 xfill=1 class=X L_full=0x40a3d0 typeB_full=B next(native,was
 fn=0x6a0760 pat=p01 xfill=0 class=X L_full=0x40a3d0 typeB_full=B next(native,wasm)=('0x40c0e0', '0x40a1c0') native=ok wasm=trap
    L_x0(native,wasm)=0x40d5888000000000,0x0 caller=0x40c1d0 call@0x40c1ee caller_x0(native,wasm)=0x40d5888000000000,0x0 post=[mov ecx, eax ; cmp cx, 0x8000 ; jb 0x40c24c ; movabs rax, 0x8000000000000000] jcc=jb 0x40c24c
 fn=0xcd1a70 pat=p0 xfill=1 class=X L_full=0x40c660 typeB_full=B next(native,wasm)=('0xcc32f0', '0x40c1d0') native=ok wasm=trap
-   L_x0(native,wasm)=0x224b,0x0 caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x0 post=[-] jcc=-
+   L_x0(native,wasm)=0x224b,0x220b caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x2207 post=[-] jcc=-
 fn=0xcd1a70 pat=p0 xfill=0 class=X L_full=0x40c660 typeB_full=B next(native,wasm)=('0xcc32f0', '0x40c1d0') native=ok wasm=trap
-   L_x0(native,wasm)=0x224b,0x0 caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x0 post=[-] jcc=-
+   L_x0(native,wasm)=0x224b,0x220b caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x2207 post=[-] jcc=-
 ## 集計 (xfill, class): [((0, 'M'), 4), ((0, 'R'), 5), ((0, 'X'), 25), ((1, 'M'), 2), ((1, 'R'), 4), ((1, 'X'), 28)]
+## R 類の D15 判定 (xfill, 判定): [((0, 'other'), 5), ((1, 'other'), 4)]
