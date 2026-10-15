@@ -3,7 +3,7 @@
 
   python3 ld126_summarize.py > results/ld126_wasm_state.tsv
 
-行 = sample:800 の chunk 1 の 19 関数 (ld121 と同じ)。列 = 候補ごとの verdict。
+行 = sample:800 の chunk 1 の 18 関数 (shard 1 の 19 関数のうち chunk 1 に含まれる件。ld121 と同じ)。列 = 候補ごとの verdict。
 wasm_restart_ld121 は results/ld121_restart_probe.tsv の wasm 列 (関数ごとに wasm を作り直した参照値)。
 """
 import collections, json, os, sys

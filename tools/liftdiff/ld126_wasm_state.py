@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""LD-126 (#2723): sample:800 (shard 1) の 19 関数の揺れを、wasm 側の持ち越し候補ごとに戻して切り分ける。
+"""LD-126 (#2723): sample:800 (shard 1) の 19 関数のうち chunk 1 に含まれる 18 件の揺れを、wasm 側の持ち越し候補ごとに戻して切り分ける。
 
   python3 ld126_wasm_state.py --reset none --out work/ld126/none.jsonl
   python3 ld126_wasm_state.py --reset stk  --out work/ld126/stk.jsonl
 
 cmd_batch の chunk 1 (sample:800 の 400 件目以降) を 1 組の runner で流す (ld121_restart_probe.py と同じ開始状態)。
---reset は、chunk 1 に含まれる 19 関数の直前に、wasm 側の次の候補だけを SNAPSHOT 時点の内容へ戻す (RESET 行)。
+--reset は、shard 1 の 19 関数のうち chunk 1 に含まれる 18 件の直前に、wasm 側の次の候補だけを SNAPSHOT 時点の内容へ戻す (RESET 行)。
   stk: wasm スタック (と SP)   sta: C 静的変数 (g_heap・g_inbuf・g_arena を除く data/bss)   img: image 全体 (WR 範囲外を含む)
   all: 上の 3 つすべて。none は戻さない (ld121 の none と同じ経路で、ビルドの変更の対照に使う)。
 """

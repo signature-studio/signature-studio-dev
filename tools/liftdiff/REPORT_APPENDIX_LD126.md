@@ -26,7 +26,7 @@
   - `stk`: スタック `[stack_end, stack_base)` と SP (JS 側の `sp_restore`)。
   - `sta`: C 静的変数。`[__global_base, stack_end)` から `g_heap`・`g_inbuf`・`g_arena` を除いた残りの区間 (複数区間)。
   - `img`: image 全体 `[0, imglen)` (WR 範囲を含む。WR は case ごとに既に戻している)。
-- `RESET <mask>` を、chunk 1 の対象 19 関数 (`read_19`・ld121 と同じ) の直前に送る (ld121 の wasm 作り直しと同じ位置)。mask: `stk`=1・`sta`=2・`img`=4・`all`=7 (1+2+4)・`sta_img`=6・`none`=0 (対照)。
+- `RESET <mask>` を、chunk 1 の対象 18 関数 (shard 1 の 19 関数 `read_19` のうち chunk 1 に含まれる件。ld121 と同じ) の直前に送る (ld121 の wasm 作り直しと同じ位置)。mask: `stk`=1・`sta`=2・`img`=4・`all`=7 (1+2+4)・`sta_img`=6・`none`=0 (対照)。
 - 判定は `liftdiff.make_record` の verdict。case の outcome 分布も併記する。
 
 ## 3. 結果 (chunk 1 の 18 対象関数・n=1)
@@ -43,6 +43,7 @@
 - 対照 `none` の outcome 分布は `REPORT_APPENDIX_LD121.md` §3 の `none` (n=1) と完全に一致 (ビルド変更による差は無い)。
 - `sta` の match は `0x4bf600`・`0x50ab90`・`0x7850d0`・`0xb77200`。`img` の match は `0x50ab90` のみ。`sta_img` の match は `sta` と同じ 4 件。
 - 全件の判定は `results/ld126_wasm_state.tsv` (`ld126_summarize.py` で生成。列: 各条件・`wasm_restart_ld121` = ld121 の wasm 列の参照値)。
+- outcome 列の出所: `work/ld126/<条件>.jsonl` の `cases` を数えた値。`work/` は gitignore で repo に無い。repo に残すのは verdict だけ (TSV)。outcome の再現は §7 の手順で `work/ld126/` を作り直す。
 
 ### 3.1 診断: スタック復元の打ち消し (chunk 先頭 306 件・対象 1 件 `0x50ab90`)
 
@@ -59,6 +60,7 @@
 
 ## 4. 読み取り
 
+- `stk`・`all` の outcome 分布は、6 種すべてで `none` と完全に一致する。`RESET` が実際にメモリを戻したことは本測定では確かめていない (戻したバイト数と snapshot との差分の証跡は未取得)。したがって **all = none の一致は未確認**。証跡の取得は #3384 の最初の作業。
 - 持ち越しは**単独の候補では説明できない**。`sta` は 4/18 を戻すが、残り 14 件は戻らない。`all` が `sta_img` の効果を打ち消すのは、候補の単純な和では説明できない (相互作用)。
 - `sta` の対象のうち 3 件 (`0x4bf600`・`0x7850d0`・`0xb77200`) は LD121 で「wasm 先頭 case に高水位外の残存がある 3 関数」と同じ集合。残存と C 静的変数 (heap 高水位の管理変数) の関係は、本測定では未確認 (#3384)。
 - image 単独の効果は 1 件 (`0x50ab90`) で、sta より弱い。`0x50ab90` は sta・img・sta_img・sta_sp の 4 条件で match になるため、この関数の揺れは静的変数と image の両方に関わる可能性がある (未確認)。
@@ -71,8 +73,44 @@
 
 ## 6. 差分と測定の鮮度
 
-- 測定 commit `2bad8864` 以降、`tools/liftdiff/rt`・`tools/liftdiff/ldlib`・`tools/liftdiff/ld126_wasm_state.py`・`tools/liftdiff/ld126_summarize.py` は変えていない (本 PR の追加は REPORT 付録と TSV のみ)。
-- `git diff 2bad8864 HEAD -- tools/liftdiff/rt tools/liftdiff/ldlib tools/liftdiff/ld126_wasm_state.py tools/liftdiff/ld126_summarize.py | wc -l` = 0 (本 PR の commit 時点で確認)。
+- 測定 commit `2bad8864` 以降、`tools/liftdiff/rt`・`tools/liftdiff/ldlib` は変えていない。`git diff 2bad8864 HEAD -- tools/liftdiff/rt tools/liftdiff/ldlib | wc -l` = 0。
+- `ld126_wasm_state.py`・`ld126_summarize.py` は docstring の件数 (19 → 18) だけを変えた。実行経路は変わらないので、再測定は不要。差分の全文 (`git diff 2bad8864 HEAD -- tools/liftdiff/ld126_wasm_state.py tools/liftdiff/ld126_summarize.py`):
+
+```diff
+diff --git a/tools/liftdiff/ld126_summarize.py b/tools/liftdiff/ld126_summarize.py
+index eb37d8bd5..4c1b21f88 100644
+--- a/tools/liftdiff/ld126_summarize.py
++++ b/tools/liftdiff/ld126_summarize.py
+@@ -3,7 +3,7 @@
+ 
+   python3 ld126_summarize.py > results/ld126_wasm_state.tsv
+ 
+-行 = sample:800 の chunk 1 の 19 関数 (ld121 と同じ)。列 = 候補ごとの verdict。
++行 = sample:800 の chunk 1 の 18 関数 (shard 1 の 19 関数のうち chunk 1 に含まれる件。ld121 と同じ)。列 = 候補ごとの verdict。
+ wasm_restart_ld121 は results/ld121_restart_probe.tsv の wasm 列 (関数ごとに wasm を作り直した参照値)。
+ """
+ import collections, json, os, sys
+diff --git a/tools/liftdiff/ld126_wasm_state.py b/tools/liftdiff/ld126_wasm_state.py
+index 8c7cde681..828c2d241 100644
+--- a/tools/liftdiff/ld126_wasm_state.py
++++ b/tools/liftdiff/ld126_wasm_state.py
+@@ -1,11 +1,11 @@
+ #!/usr/bin/env python3
+-"""LD-126 (#2723): sample:800 (shard 1) の 19 関数の揺れを、wasm 側の持ち越し候補ごとに戻して切り分ける。
++"""LD-126 (#2723): sample:800 (shard 1) の 19 関数のうち chunk 1 に含まれる 18 件の揺れを、wasm 側の持ち越し候補ごとに戻して切り分ける。
+ 
+   python3 ld126_wasm_state.py --reset none --out work/ld126/none.jsonl
+   python3 ld126_wasm_state.py --reset stk  --out work/ld126/stk.jsonl
+ 
+ cmd_batch の chunk 1 (sample:800 の 400 件目以降) を 1 組の runner で流す (ld121_restart_probe.py と同じ開始状態)。
+---reset は、chunk 1 に含まれる 19 関数の直前に、wasm 側の次の候補だけを SNAPSHOT 時点の内容へ戻す (RESET 行)。
++--reset は、shard 1 の 19 関数のうち chunk 1 に含まれる 18 件の直前に、wasm 側の次の候補だけを SNAPSHOT 時点の内容へ戻す (RESET 行)。
+   stk: wasm スタック (と SP)   sta: C 静的変数 (g_heap・g_inbuf・g_arena を除く data/bss)   img: image 全体 (WR 範囲外を含む)
+   all: 上の 3 つすべて。none は戻さない (ld121 の none と同じ経路で、ビルドの変更の対照に使う)。
+ """
+```
+
+- 本付録 (REPORT・TSV) の追加は、上の範囲外。
 
 ## 7. 再現
 
@@ -100,5 +138,6 @@ python3 ld126_summarize.py > results/ld126_wasm_state.tsv
 | スタック復元が `sta_img` の効果を打ち消す機構 (スタックのどの範囲・どの読みが効くか) | 候補の相互作用の説明 | #3384 (LD-155) |
 | 候補の n=2 反復 (本付録は n=1) | 結論の再現性 | #3384 (LD-155) |
 | `0x5d19e0` (chunk 0) の両側持ち越しの中身 (native 側を含む) | 受入 (c) | #3385 (LD-156) |
-| `0x959a40` (chunk 1 の shard 4・範囲外) | 範囲の判断 | PM 判断待ち (#2682 の残件) |
-| malloc 領域 (`ld_blks` 等・RESET 対象外) と g_inbuf (入力バッファ) の持ち越し | 候補に含めていない | #3384 の範囲に追記 (未測定) |
+| `0x959a40` (chunk 1 の 18 件に含む。shard 1 の 19 件に入るが、shard 12 の r2〜r4 では mismatch の run 依存・`REPORT_APPENDIX_LD122.md` §3) | 対象 18 件の扱い | PM agent の判断待ち: 0x959a40 を shard 1 の対象 18 件に含めたまま扱うか・既定案: 含めたまま記録し、run 依存の扱いは #2682 の残件とする |
+| malloc 領域 (`ld_blks` 等・RESET 対象外) と g_inbuf (入力バッファ) の持ち越し | 候補に含めていない | #3384 (LD-155) に追記 (未測定) |
+| RESET の効きの証跡 (戻したバイト数・snapshot との差分)。`all` = `none` の一致の切り分け (§4) | all = none の一致が未確認 | #3384 (LD-155) の最初の作業 |
