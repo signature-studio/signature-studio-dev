@@ -37,7 +37,7 @@ static void map_image(const char* path) {
 }
 
 /* native_ref.c と同じ呼出し形: 引数 xmm0 のみ、戻り rax と xmm0 を回収 */
-typedef struct { u64 x0, rax, xmm0; } Frame;
+typedef struct { u64 x0, rax, xmm0, xmm1; } Frame;
 static void call_xmm0(u64 fn, Frame* fr) {
     __asm__ volatile(
         "mov %%rsp, %%r12\n\t"
@@ -48,6 +48,7 @@ static void call_xmm0(u64 fn, Frame* fr) {
         "call *%%rbx\n\t"
         "mov %%rax, 8(%%rdi)\n\t"
         "movq %%xmm0, 16(%%rdi)\n\t"
+        "movq %%xmm1, 24(%%rdi)\n\t"
         "mov %%r12, %%rsp\n\t"
         : "+D"(fr)
         : "b"(fn)
@@ -69,7 +70,9 @@ static double gen(int mode) {
     }
 }
 
-/* FUN_180fdc470 の定義域: native は 0<x<1 で table の外を読んで落ちる (指数 < 0)。負の入力と |x|>=1 のみ突合する。 */
+/* 第 4 引数 fn: 660 (既定・KH-74)・dfdb0 (KH-77)・470 (KH-76)。
+ * dfdb0 は呼出元の ABS 規則に合わせ |x| を入力し、|x| < 1 は除外する (|x| < 1 では table の添字が範囲外になる)。
+ * 470 は native が 0<x<1 で table 外を読んで落ちるため、負の入力と |x|>=1 のみ突合する。 */
 static double gen470(void) {
     for (;;) {
         double x = gen((int)(rnd() % 5));
@@ -78,19 +81,24 @@ static double gen470(void) {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 4) { fprintf(stderr, "usage: %s <HeartCore.core_64> <trials> <seed>\n", argv[0]); return 2; }
+    if (argc < 4) { fprintf(stderr, "usage: %s <HeartCore.core_64> <trials> <seed> [660|dfdb0|470]\n", argv[0]); return 2; }
     map_image(argv[1]);
     long n = atol(argv[2]);
     rs_state = (u64)atoll(argv[3]) * 0x9E3779B97F4A7C15ULL + 1;
-    const u64 fn = 0x180fdc660ULL, fn470 = 0x180fdc470ULL;
-    long mis_rax = 0, mis_x = 0, nan_both = 0, nan_payload = 0;
-    long mis_rax470 = 0, mis_x470 = 0, nan470 = 0;
+    int dfdb0 = argc > 4 && strcmp(argv[4], "dfdb0") == 0;
+    int f470 = argc > 4 && strcmp(argv[4], "470") == 0;
+    const u64 fn = dfdb0 ? 0x180fdfdb0ULL : f470 ? 0x180fdc470ULL : 0x180fdc660ULL;
+    long mis_rax = 0, mis_x = 0, nan_both = 0, nan_payload = 0, skipped = 0;
     for (long t = 0; t < n; t++) {
-        double x = gen((int)(t % 5));
+        double x = f470 ? gen470() : gen((int)(t % 5));
+        if (dfdb0) {
+            x = fabs(x);
+            if (!(x >= 1.0) && !isnan(x)) { skipped++; t--; continue; }
+        }
         Frame fr = { 0 }; memcpy(&fr.x0, &x, 8);
         call_xmm0(fn, &fr);
-        unsigned got = kh_fn_180fdc660(x);
-        double gx = kh_xmm0_180fdc660;
+        unsigned got = dfdb0 ? kh_fn_180fdfdb0(x) : f470 ? kh_fn_180fdc470(x) : kh_fn_180fdc660(x);
+        double gx = dfdb0 ? kh_xmm0_180fdfdb0 : f470 ? kh_xmm0_180fdc470 : kh_xmm0_180fdc660;
         u64 gxb; memcpy(&gxb, &gx, 8);
         if ((u64)got != fr.rax) mis_rax++;
         if (gxb != fr.xmm0) {
@@ -98,24 +106,9 @@ int main(int argc, char** argv) {
             if (isnan(gx) && isnan(nx)) { nan_both++; if (gxb != fr.xmm0) nan_payload++; }
             else mis_x++;
         }
-        double y = gen470();
-        Frame f2 = { 0 }; memcpy(&f2.x0, &y, 8);
-        call_xmm0(fn470, &f2);
-        unsigned g2 = kh_fn_180fdc470(y);
-        double gy = kh_xmm0_180fdc470;
-        u64 gyb; memcpy(&gyb, &gy, 8);
-        if ((u64)g2 != f2.rax) mis_rax470++;
-        if (gyb != f2.xmm0) {
-            double ny; memcpy(&ny, &f2.xmm0, 8);
-            if (isnan(gy) && isnan(ny)) nan470++;
-            else mis_x470++;
-        }
     }
-    printf("xmm0_check 660: trials %ld | rax mismatch %ld | xmm0 mismatch %ld | NaN both (bit differs %ld)\n",
-           n, mis_rax, mis_x, nan_payload);
-    printf("xmm0_check 470: trials %ld | rax mismatch %ld | xmm0 mismatch %ld | NaN both %ld\n",
-           n, mis_rax470, mis_x470, nan470);
-    int ok = (mis_rax == 0 && mis_x == 0 && mis_rax470 == 0 && mis_x470 == 0);
-    printf("kh_xmm0_check RESULT: %s\n", ok ? "PASS" : "FAIL");
-    return ok ? 0 : 1;
+    printf("xmm0_check %s: trials %ld | rax mismatch %ld | xmm0 mismatch %ld | NaN both (bit differs %ld) | skipped %ld\n",
+           f470 ? "470" : dfdb0 ? "dfdb0" : "660", n, mis_rax, mis_x, nan_payload, skipped);
+    printf("kh_xmm0_check RESULT: %s\n", (mis_rax == 0 && mis_x == 0) ? "PASS" : "FAIL");
+    return (mis_rax == 0 && mis_x == 0) ? 0 : 1;
 }

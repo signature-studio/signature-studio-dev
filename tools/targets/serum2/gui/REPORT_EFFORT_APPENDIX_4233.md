@@ -6,7 +6,7 @@
 - `fillLinearGradient`: path の内側の画素ごとに、始点→終点への射影 t (0〜1) から色停止点を線形補間して置く。
 - `fillRadialGradient`: 焦点 (center + originOffset) からの距離 / radius で色停止点を補間する。楕円形の放射は未対応。
 - `drawBitmapNinePartTiled`: `CNinePartTiledDescription::calcRects` で 9 部分の元 rect と先 rect を求め、各部分を 1:1 タイルで置く。拡大縮小と quality は未対応で無視する。
-- `fillRectWithBitmap`: srcRect を左上から繰り返して dstRect を塗る (1:1 タイル)。
+- `fillRectWithBitmap`: srcRect を左上から繰り返して dstRect を塗る (1:1 タイル)。 (注: #4551 (SR-78) で srcRect → dstRect の拡大縮小へ置き換えた。PM 判断待ち。REPORT_EFFORT_APPENDIX_4551.md §1-6)
 - `CanvasGradient` (`canvas_gradient.h`、新規) を追加し、`CanvasPlatformFactory::createGradient` が `nullptr` でなく実体を返すようにした。これが無いと gradient を作れない。
 
 ### 1-2. 測定 commit と検証

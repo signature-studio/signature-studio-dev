@@ -37,10 +37,15 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--native', type=int, choices=[0, 1], required=True)
     ap.add_argument('--reset', choices=sorted(MASK), required=True)
+    ap.add_argument('--native-reset', choices=sorted(MASK), default='none',
+                    help='LD-209 (#4305): native 側の候補単位の戻し (NRESET)。native を作り直さない (--native 0) ときだけ使う')
     ap.add_argument('--out', required=True)
     ap.add_argument('--chunk', type=int, default=400)
     ap.add_argument('--part', type=int, default=0)
     a = ap.parse_args()
+    if a.native_reset != 'none' and a.native:
+        raise SystemExit('--native-reset は --native 0 のときだけ使う (作り直すと native の持ち越しは消える)')
+    nmask = MASK[a.native_reset]
     ns = argparse.Namespace(target=TARGET, state='auto')
     sess = Session(TARGET, shards=1, build=False, trace=True, timeout=10.0, state=liftdiff.state_path(ns))
     irfeats = {} if sess.t.get('clift') else irtool.ir_features(sess.t['ir'], sess.prefix)
@@ -50,7 +55,8 @@ def main():
     part = vas[a.part * a.chunk:(a.part + 1) * a.chunk]
     targets = [v for v in part if v in aud]
     mask = MASK[a.reset]
-    print('[ld156] native=%d reset=%s mask=%d part=%d fns=%d targets=%d' % (a.native, a.reset, mask, a.part, len(part), len(targets)), flush=True)
+    print('[ld156] native=%d reset=%s mask=%d native_reset=%s nmask=%d part=%d fns=%d targets=%d' % (
+        a.native, a.reset, mask, a.native_reset, nmask, a.part, len(part), len(targets)), flush=True)
 
     nat, was = sess.make_runners()
 
@@ -61,23 +67,36 @@ def main():
         nat = n2
         w2.close()
 
+    def ack(r, key):
+        if r is None or ('"%s"' % key) not in r:
+            raise RuntimeError('%s 応答なし (%r)' % (key, r))
+        return json.loads(r)
+
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     out = open(a.out, 'w')
     t0 = time.time()
     try:
         for va in part:
+            ndiff = wdiff = None
             if va in aud:
                 if a.native:
                     restart_native()
+                if nmask:
+                    nat._send('NRESET %d' % nmask)
+                    nat.p.stdin.flush()
+                    ndiff = ack(nat._recv(30.0), 'nreset')['diff']
                 if mask:
                     was._send('RESET %d' % mask)
                     was.p.stdin.flush()
+                    wdiff = ack(was._recv(30.0), 'reset')['diff']
             if va not in aud:
                 sess._run_one(nat, was, va, cases.PATTERN_NAMES, True)
                 continue
             rec = sess._run_one(nat, was, va, cases.PATTERN_NAMES, True)
             v = liftdiff.make_record(sess, rec, irfeats)
-            out.write(json.dumps({'native': a.native, 'reset': a.reset, 'va': hex(va), 'name': rec['name'], 'verdict': v.get('verdict'),
+            out.write(json.dumps({'native': a.native, 'reset': a.reset, 'native_reset': a.native_reset,
+                                  'native_reset_diff': ndiff, 'wasm_reset_diff': wdiff,
+                                  'va': hex(va), 'name': rec['name'], 'verdict': v.get('verdict'),
                                   'cases': [[c.get('pattern'), c.get('outcome'), c.get('native_status'), c.get('wasm_status')]
                                             for c in rec.get('cases', [])]}, default=str) + '\n')
             out.flush()

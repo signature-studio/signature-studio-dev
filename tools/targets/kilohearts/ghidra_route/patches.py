@@ -28,6 +28,9 @@ GTYPE = {
         '181422a10': 'uint',       # minps/movaps・& -(uint)(...) の 4 byte マスク
         '182280bc0': 'longlong',   # cmp r10,qword・(longlong) 比較
         '182280bc8': 'longlong',   # cmp r10,qword・(longlong) 比較
+        # 関数ポインタ slot (#4671 KH-106)。呼出し 44 箇所は全て `call/jmp [rip+slot]` (CFG dispatch) で、呼び先は直前に rax へ入る値で決まる。
+        # slot の PE 初期値は CFG thunk (`jmp [rip+..]`→`jmp rax`) で、データとして使わない。型は `void (*)()` (引数・戻り値は呼出し側で決まる)。
+        '1813a1d40': 'FNPTR',
     },
 }
 # ABI 表 (resonator 残件 emcc 4 件 = param_1 不足 3・引数数不一致 1)。Ghidra が呼出元で引数・戻り値を落としたため、
@@ -70,6 +73,10 @@ ABI = {
         ('stereo FUN_180fdc660 body = kh_fn_180fdc660 (rax と xmm0 を 1 式で出す)', r'return \(int\)\(\(param_1 \* _DAT_18228a860 \+ _DAT_18228a8a0\) - _DAT_18228a8a0\) & 3;', 'return kh_fn_180fdc660(param_1);'),
         ('stereo 82 caller 180fcd690 reads xmm0 of 660 (extraout_Qa_00)', r'uVar4 = FUN_180fdc660\(dVar2\);\n(\s*)dVar2 = extraout_XMM0_Qa_00;', r'uVar4 = FUN_180fdc660(dVar2);\n\1dVar2 = kh_xmm0_180fdc660;'),
         ('stereo 24 caller 180fce0d0 reads xmm0 of 660 (extraout_Qa_00)', r'uVar3 = FUN_180fdc660\(param_1\);\n(\s*)dVar2 = extraout_XMM0_Qa_00;', r'uVar3 = FUN_180fdc660(param_1);\n\1dVar2 = kh_xmm0_180fdc660;'),
+        # KH-77 (#3885): FUN_180fdfdb0 (三角関数の引数縮約・ret 180fdffb6・機械語 132 命令) の戻り xmm0 (縮約値) を kh_xmm0.h の helper で出す。
+        # 呼出元 2 箇所の extraout_XMM0_Qa は kh_xmm0_180fdfdb0 を読む。呼出し (rax 側) は既存の ABS 規則のまま残す。
+        ('stereo 603 caller 180fcd690 reads xmm0 of dfdb0 (extraout_XMM0_Qa)', r'uVar4 = FUN_180fdfdb0\(d2u\(dVar2\)\);\n(\s*)dVar5 = extraout_XMM0_Qa;', r'uVar4 = FUN_180fdfdb0(d2u(dVar2));\n\1dVar5 = kh_xmm0_180fdfdb0;'),
+        ('stereo 769 caller 180fce0d0 reads xmm0 of dfdb0 (extraout_XMM0_Qa)', r'uVar3 = FUN_180fdfdb0\(d2u\(dVar2\)\);\n(\s*)dVar4 = extraout_XMM0_Qa;', r'uVar3 = FUN_180fdfdb0(d2u(dVar2));\n\1dVar4 = kh_xmm0_180fdfdb0;'),
     ],
     # delay (#3800 KH-64): 引数過不足のうち、呼出先 FUN_180fd4f30 (longlong 1 引数) の 22 件 = FUN_180fe3690 13 件・FUN_180fe3310 4 件・FUN_180fe3cd0 5 件。
     #   呼出元の機械語 (180fe3690 の capstone): `mov rcx,[rbx+off]` → `cmp rcx,[global]` → `je` → `call FUN_180fd4f30` (rbx = 入力 param_1)。

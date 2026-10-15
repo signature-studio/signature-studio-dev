@@ -240,6 +240,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 ## 10. CI 期待事項
 
 - **現状の CI**: `.github/workflows/opencode.yaml` (OpenCode セットアップ・検証用)。
+- **typecheck**: `.github/workflows/typecheck.yaml` が変換コアの Tier 1 (liftlib の 12 モジュール。対象の一覧は `mypy.ini` の `files`) を mypy 2.4.0 --strict で検査し、型エラーで赤にする (CI-194、親 #2319)。Tier 2 (p1/base/x64c 系) は未 strict で、baseline と拡大は別 issue。測定値の正本は `tools/liftlib/REPORT_APPENDIX_CI194.md`。ローカル実行は repo ルートで `mypy` (mypy.ini が対象を持つ)。
 - PR では最低限これが緑であること。typecheck / build / `pnpm runtime:e2e` はローカルで実行して結果を REPORT に書く。
 - OpenCode 基盤は 2026-10-12 に main で稼働開始 (PR #282, merge `bec32da`)。PR では review ジョブが OpenCode レビュワーを自動起動し、approve と必要に応じたマージまで実行する (実行実績あり: run 38220632379 / 38228263935)。
 - commit 前に `find <dir> -type f -size +20M` で巨大 blob がないことを確認すること (GitHub の hard limit 対策)。

@@ -1,6 +1,7 @@
 // SR-39 #2107: canvas platform (wasm) の IPlatformGraphicsDevice* 実装。
 // SR-50 #3260: drawRect・clearRect を bitmap へ描く。bitmap は createBitmapContext で結線し、clip は bitmap 境界で保持する。
 // SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap を bitmap へ描く。
+// SR-78 #4551: fillRectWithBitmap の拡大縮小と bilinear、drawBitmapNinePartTiled の 9 部分拡大縮小を入れる。
 // SR-62 #4233: fillLinearGradient・fillRadialGradient・drawBitmapNinePartTiled・fillRectWithBitmap を bitmap へ描く。
 
 #include "canvas_graphicsdevice.h"
@@ -72,6 +73,31 @@ PixelBox pixelBoxOf (const CRect& rect)
 {
 	return {static_cast<int32_t> (std::floor (rect.left)), static_cast<int32_t> (std::floor (rect.top)),
 	        static_cast<int32_t> (std::ceil (rect.right)), static_cast<int32_t> (std::ceil (rect.bottom))};
+}
+
+//------------------------------------------------------------------------
+// 非 premultiplied 画素を α で重み付けして足し合わせる (bilinear の 4 近傍用)。
+struct SampleAccumulator
+{
+	double r {0.};
+	double g {0.};
+	double b {0.};
+	double a {0.};
+
+	void add (const uint8_t* px, double weight)
+	{
+		auto alpha = px[3] / 255. * weight;
+		r += px[0] * alpha;
+		g += px[1] * alpha;
+		b += px[2] * alpha;
+		a += alpha;
+	}
+};
+
+//------------------------------------------------------------------------
+uint8_t toByte (double value)
+{
+	return static_cast<uint8_t> (std::clamp (std::lround (value), 0L, 255L));
 }
 
 //------------------------------------------------------------------------
@@ -465,37 +491,94 @@ const IPlatformGraphicsDeviceContextBitmapExt* CanvasGraphicsDeviceContext::asBi
 }
 
 //------------------------------------------------------------------------
-// 9 分割の各部分を、元画像の対応部分から dest の対応部分へ 1:1 タイルで置く。拡大縮小と quality は未対応で無視する。
+// 9 分割の各部分を fillRectWithBitmap で拡大縮小して描く (部分ごとの src → dst)。
 bool CanvasGraphicsDeviceContext::drawBitmapNinePartTiled (IPlatformBitmap& bitmap, CRect dest,
                                                            const CNinePartTiledDescription& desc,
                                                            double alpha,
                                                            BitmapInterpolationQuality quality) const
 {
-	(void)quality;
 	auto* source = dynamic_cast<CanvasBitmap*> (&bitmap);
 	if (!source)
 		return false;
-	const auto& size = source->getSize ();
-	CRect srcParts[CNinePartTiledDescription::kPartCount];
-	CRect dstParts[CNinePartTiledDescription::kPartCount];
-	desc.calcRects (CRect (0., 0., size.x, size.y), srcParts);
-	desc.calcRects (dest, dstParts);
-	for (auto i = 0; i < static_cast<int> (CNinePartTiledDescription::kPartCount); ++i)
-		tileBitmap (*source, srcParts[i], dstParts[i], alpha);
+	const CRect bitmapBounds (0., 0., source->getSize ().x, source->getSize ().y);
+	CRect srcRects[CNinePartTiledDescription::kPartCount];
+	CRect dstRects[CNinePartTiledDescription::kPartCount];
+	desc.calcRects (bitmapBounds, srcRects);
+	desc.calcRects (dest, dstRects);
+	for (size_t i = 0; i < CNinePartTiledDescription::kPartCount; ++i)
+		fillRectWithBitmap (bitmap, srcRects[i], dstRects[i], alpha, quality);
 	return true;
 }
 
 //------------------------------------------------------------------------
-// srcRect を繰り返して dstRect を塗る (タイル塗り)。拡大縮小は未対応で、quality は無視する。
+// srcRect を dstRect (device 座標は deviceRect) へ引き伸ばして描く。kMedium・kHigh は bilinear、それ以外は最近傍。
+// 画素中心を source 座標へ写す。source の参照範囲は srcRect を bitmap 境界で切ったもの。
 bool CanvasGraphicsDeviceContext::fillRectWithBitmap (IPlatformBitmap& bitmap, CRect srcRect,
                                                       CRect dstRect, double alpha,
                                                       BitmapInterpolationQuality quality) const
 {
-	(void)quality;
 	auto* source = dynamic_cast<CanvasBitmap*> (&bitmap);
-	if (!source)
+	if (!source || srcRect.isEmpty () || dstRect.isEmpty ())
 		return false;
-	tileBitmap (*source, srcRect, dstRect, alpha);
+	const auto& sourceSize = source->getSize ();
+	const auto range = pixelBoxOf (CRect (std::max (srcRect.left, 0.), std::max (srcRect.top, 0.),
+	                                      std::min (srcRect.right, sourceSize.x),
+	                                      std::min (srcRect.bottom, sourceSize.y)));
+	if (range.x0 >= range.x1 || range.y0 >= range.y1)
+		return false;
+	const auto dev = deviceRect (dstRect);
+	if (dev.getWidth () <= 0. || dev.getHeight () <= 0.)
+		return false;
+	const auto box = pixelBoxOf (dev);
+	const auto scaleX = srcRect.getWidth () / dev.getWidth ();
+	const auto scaleY = srcRect.getHeight () / dev.getHeight ();
+	const bool bilinear = quality == BitmapInterpolationQuality::kMedium ||
+	                      quality == BitmapInterpolationQuality::kHigh;
+	const auto clampX = [&] (int32_t x) { return std::clamp (x, range.x0, range.x1 - 1); };
+	const auto clampY = [&] (int32_t y) { return std::clamp (y, range.y0, range.y1 - 1); };
+	const auto pixelOf = [&] (int32_t x, int32_t y) {
+		return source->data () + (static_cast<size_t> (y) * static_cast<size_t> (sourceSize.x) + x) * 4;
+	};
+	for (auto y = box.y0; y < box.y1; ++y)
+	{
+		const auto v = srcRect.top + (y + 0.5 - dev.top) * scaleY;
+		for (auto x = box.x0; x < box.x1; ++x)
+		{
+			auto* dst = pixelAt (x, y);
+			if (!dst)
+				continue;
+			const auto u = srcRect.left + (x + 0.5 - dev.left) * scaleX;
+			SampleAccumulator sample;
+			if (bilinear)
+			{
+				const auto fx = u - 0.5;
+				const auto fy = v - 0.5;
+				const auto x0 = static_cast<int32_t> (std::floor (fx));
+				const auto y0 = static_cast<int32_t> (std::floor (fy));
+				const auto tx = fx - x0;
+				const auto ty = fy - y0;
+				for (int32_t dy = 0; dy < 2; ++dy)
+				{
+					for (int32_t dx = 0; dx < 2; ++dx)
+					{
+						const auto weight = (dx ? tx : 1. - tx) * (dy ? ty : 1. - ty);
+						sample.add (pixelOf (clampX (x0 + dx), clampY (y0 + dy)), weight);
+					}
+				}
+			}
+			else
+			{
+				sample.add (pixelOf (clampX (static_cast<int32_t> (std::floor (u))),
+				                     clampY (static_cast<int32_t> (std::floor (v)))),
+				            1.);
+			}
+			if (sample.a <= 0.)
+				continue;
+			const CColor color (toByte (sample.r / sample.a), toByte (sample.g / sample.a),
+			                    toByte (sample.b / sample.a), toByte (sample.a * 255.));
+			blendRGBA (dst, color, alpha * globalAlpha);
+		}
+	}
 	return true;
 }
 
