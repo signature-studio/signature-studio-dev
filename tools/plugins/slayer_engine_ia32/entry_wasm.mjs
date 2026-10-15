@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 const [, , modPath, imgPath, scenPath, outPath] = process.argv;
 const createModule = createRequire(import.meta.url)(modPath);
 const M = await createModule();
-const IMG_BASE = 0x10000000, OBJ_ADDR = 0x10f80000, OBJ_LEN = 0x80;
+const IMG_BASE = 0x10000000, OBJ_ADDR = 0x10f80000, OBJ_LEN = 0x80, HEAP_ADDR = 0x10800000;
 const img = fs.readFileSync(imgPath);
 M.HEAPU8.set(img, IMG_BASE);
 const lines = fs.readFileSync(scenPath, 'utf8').split('\n').filter((l) => l.trim().length > 0);
@@ -17,6 +17,7 @@ lines.forEach((l, idx) => {
     M.HEAPU8.set(init, OBJ_ADDR);
     const eax = M._ott_call32(va, ecx, a0, a1, a2, a3) >>> 0;
     const mem = Buffer.from(M.HEAPU8.subarray(OBJ_ADDR, OBJ_ADDR + OBJ_LEN)).toString('hex');
-    out.push(`${idx.toString(16).padStart(4, '0')} va=${va.toString(16).padStart(8, '0')} eax=${eax.toString(16).padStart(8, '0')} mem=${mem}`);
+    const heap = Buffer.from(M.HEAPU8.subarray(HEAP_ADDR, HEAP_ADDR + 64)).toString('hex');
+    out.push(`${idx.toString(16).padStart(4, '0')} va=${va.toString(16).padStart(8, '0')} eax=${eax.toString(16).padStart(8, '0')} mem=${mem} heap=${heap}`);
 });
 fs.writeFileSync(outPath, out.join('\n') + '\n');

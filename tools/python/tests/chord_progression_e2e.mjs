@@ -65,7 +65,6 @@ import flcpt
 flrack = types.ModuleType('flrack')
 # flcpt.cpt の 4 メンバは src/flcpt.py (根拠あり: REPORT_PY30 §2)。型名は空の dummy。
 # mock 値 (根拠なし)。import 時に参照される名前だけを満たす。
-flcpt.chordPool = types.SimpleNamespace()
 import json as _json
 _lsc = _json.load(open('/fl/Tools/Chord progression/Notes/genres', encoding='utf-8'))
 _lsc = {'mock': True, 'note': 'mock (根拠なし): FL 実機の loop_starter_config ではない。同梱 drum patterns の genres を流用', 'version': _lsc.get('version'), 'compatible_from': _lsc.get('compatible_from'), 'genres': _lsc.get('genres', {}), 'loops': []}
