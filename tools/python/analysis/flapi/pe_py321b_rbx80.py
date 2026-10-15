@@ -7,7 +7,9 @@
   1. 0x60c220 は rbx = rcx (受信オブジェクト) で、[rbx+0x80] (Code) を呼ぶ (間接呼出し)。
   2. .text 内の 0x410090 の絶対 qword (8 バイト整列) は、RIP 相対オペランドで直接読まれない
      (= 関数ポインタ表を RIP 経由で参照する経路は無い)。
-  3. 0x410090 の絶対 qword の表の 8 バイト整列エントリを disp32 で読む命令は無い。
+  3. 0x410090 の絶対 qword の表の 8 バイト整列エントリを、非分岐命令の operand (即値・disp32・
+     絶対アドレス。RIP 相対は 2 で検査) として読む命令は無い。
+     判定: 非分岐命令の 16 進トークン値が、表エントリの VA、またはその下位 32 bit と一致しない。
 終了 0 = 全 PASS。
 """
 import os
@@ -24,6 +26,7 @@ import pe_callgraph as pc  # noqa: E402
 
 TARGET = 0x410090
 RIP = re.compile(r"\[rip ([+-]) (0x[0-9a-f]+)\]")
+HEX = re.compile(r"0x[0-9a-f]+")
 RESULTS = []
 
 
@@ -71,6 +74,24 @@ def main():
     direct = [t for t in tables if rip_hits.get(t)]
     check("表の 8 バイト整列エントリは RIP 相対で読まれない", not direct,
           f"読まれる表エントリ={[hex(x) for x in direct[:10]]}")
+
+    slot_tokens = {}
+    for t in tables:
+        slot_tokens[t] = t
+        slot_tokens[t & 0xFFFFFFFF] = t
+    hits = []
+    for a, m, o in rows:
+        if m.startswith("j") or m.startswith("loop") or m in ("call", "jrcxz"):
+            continue
+        if RIP.search(o):
+            continue
+        for tok in HEX.findall(o):
+            v = int(tok, 16)
+            if v in slot_tokens:
+                hits.append((hex(a), m, o))
+                break
+    check("表 slot の VA (即値・disp32・絶対アドレス) を読む非分岐命令は無い", not hits,
+          f"件数={len(hits)} 先頭={hits[:5]}")
 
     print()
     print("PASS 件数", sum(RESULTS), "/", len(RESULTS))
