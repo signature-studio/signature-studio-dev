@@ -27,7 +27,10 @@ for L in "$@"; do
     SEC=$(echo "$(date +%s.%N) - $T" | bc)
     RES=$(grep '^FLEBOOT_RESULT' "$LOG" | cut -d' ' -f2- || true)
     IPP=$(grep '^FLEBOOT_IPP_CHECK' "$LOG" | grep -o '"ok":[a-z]*' || echo none)
-    SIG=$(python3 -c 'import json,hashlib,sys; d=json.load(open(sys.argv[1])); print(hashlib.sha256(json.dumps({"boot":d["boot"],"ipp":d["ipp"]},sort_keys=True).encode()).hexdigest()[:16])' "$J")
+    SIG=missing
+    if [ -f "$J" ]; then
+      SIG=$(python3 -c 'import json,hashlib,sys; d=json.load(open(sys.argv[1])); print(hashlib.sha256(json.dumps({"boot":d["boot"],"ipp":d["ipp"]},sort_keys=True).encode()).hexdigest()[:16])' "$J" || echo invalid)
+    fi
     printf '%s\t%s\t%s\t%.3f\t%s\t%s\t%s\t%s\n' "$L" "$WASM_B" "$i" "$SEC" "$rc" "$RES" "$IPP" "$SIG" | tee -a "$TSV"
   done
 done
