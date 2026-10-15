@@ -9,7 +9,7 @@
 - `getEqBandCount` = 3 (VA `0xd63870`)。`ecx=3` を変換スロットに渡すだけ。
 - `getTrackCount` = (ポインタ大域 `0x15e2198` の指す先の dword) − 2 (VA `0xd641d0`)。`trackCount` (`0xd5e8b0`) と同じ読み方。
 - **絶対値は未確定**。大域の実行時値は静的に確定できない。C/mock の 125 は既存の `trackCount` の 127 (`NMIX`) を前提にしている。
-- wasm 版の `mixer_diff.mjs`・`provider_check.mjs` は本 run では未実行 (emsdk 無し)。ネイティブ照合で代替した (下の測定)。
+- wasm 版の `mixer_diff.mjs` は main 取り込み後の HEAD で実行し、差分 0 (下の「再測定」)。`provider_check.mjs` は Python 部 (`dist/flpy.js`・`work/midi.py`) が無く未実行。
 
 ## 手段
 
@@ -63,11 +63,30 @@ getTrackCount                    fn=0xd641d0 flags=0x4 calls=['ind rax->[0x15e42
 - ネガティブコントロール: 一時コピー (リポジトリ外) で `fl_ret_i(c, NMIX - 2)` を `NMIX - 3` に変えると、native `getTrackCount` = **124** で mock (125) と不一致 → `mixer_diff.mjs` なら diff 1 件で FAIL する。
 - driver (`drv.c`): `#include "fl_api.h"` の `main` で `fl_slot ret; memset(&ret,0,sizeof ret); fl_api_call(atoi(argv[1]), NULL, 0, &ret);` を呼び `rc/tag/code/i` を表示。
 
+## 再測定 (main 取り込み後・wasm 版)
+
+- 測定 commit: `6017e8201` (main `03df83be4` の取り込み merge。コードを変えた最後の commit。以後の REPORT 更新 commit はコード範囲の外)。
+- 取り込みで衝突したのは `tools/python/tests/provider_check.mjs` のみ。main の `pe179` (patterns 4 件・#3271) と本 PR の `pe205` (mixer 2 件) を両方残し、件数を `impl 155 / unimpl 280` に更新 (main 153/282 + 本 PR 2 件。合計 435 は不変)。`provider/fl_engine.c`・`host/fl_mock.mjs`・`docs/DOC_MAP.md` は自動マージ。
+- wasm 化: `/opt/emsdk` (emcc 6.0.12) で `bash tools/python/provider/build.sh` → `dist/flprov.wasm` 63,522 B (約 1.2 秒)。
+- load average (測定時): 0.17 (1 分)・0.35 (5 分)。4 core。
+
+| 検証 | 結果 | 所要 |
+|---|---|---|
+| `gen_provider.py --check-handlers provider/fl_engine.c` | ハンドラ 155・rc 0 | - |
+| wasm `tests/mixer_diff.mjs` (mixer 3 関数を含む) | calls 62・diffs 0・PASS | 0.065 s |
+| wasm `tests/patterns_diff.mjs` (main 側 #3271) | calls 25・diffs 0・PASS | 0.053 s |
+| wasm `tests/patterns_group_diff.mjs` (main 側 #3219) | calls 14・diffs 0・PASS | 0.050 s |
+| wasm `tests/provider_check.mjs` の 1 (表整合・件数 155/280)・2 (エラー code)・2b (getBrowserNames) | assert 全通過 (AssertionError 無し) | - |
+| `tests/provider_check.mjs` の 3 (Python 経路) | 未実行。`work/midi.py` が無く ENOENT で停止。`dist/flpy.js` (CPython wasm) も未ビルド | - |
+
+- コード差分 (測定 commit から HEAD まで): `git diff 6017e8201 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` → 出力なし (差分 0)。
+- 測定 commit `699a5fd93` → `6017e8201` の差分は main 由来 (pe179 の provider・mock・テスト) のため、上の再測定が必要だった。
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| wasm 版 `mixer_diff.mjs`・`provider_check.mjs`・`all_tools.mjs` の実行 (emsdk 無し) | 2 関数の wasm 照合は未実施。ネイティブ照合のみ | #3553 |
+| wasm 版 `provider_check.mjs` の 3 (Python 経路: `dist/flpy.js`・`work/midi.py`) と `all_tools.mjs` 48/48 が未実行 | Python 経由の mixer 呼出しと tool 全体の wasm 照合は未確認。mixer 2 関数の wasm 照合 (`mixer_diff.mjs`) は実施済み | #3553 |
 | `*(0x15e2198)` の実行時値 (静的初期値 502 の扱い) | getTrackCount の絶対値 125 は 127 前提 | #3553 |
 | `0x4235f0` の内部 (名前解決) | 呼出し先の名前は PY-152 同定の流用 (本 PR で未読) | #3553 (未解決の再確認) |
 | mixer 件数の表記 (#941・#3493 の旧本文「57」) | flapi 表 75 − C 実装 21 = 54 (旧 19 時点は 56) | #3553 本文を 54 に訂正 |
