@@ -1,0 +1,23 @@
+commit	va	verdict	import_arg_diff
+c9bf76573 (修正後)	0x40c660	match	-
+c9bf76573 (修正後)	0x40c750	match	-
+c9bf76573 (修正後)	0x4256c0	mismatch	import WindowFromPoint arg0 native=0x3 wasm=0x0
+c9bf76573 (修正後)	0x664890	mismatch	-
+c9bf76573 (修正後)	0x6649b0	mismatch	-
+c9bf76573 (修正後)	0x6649c0	mismatch	-
+c9bf76573 (修正後)	0x664a80	mismatch	-
+c9bf76573 (修正後)	0x442a50	mismatch	-
+c9bf76573 (修正後)	0x442b90	mismatch	-
+c9bf76573 (修正後)	0x653c80	mismatch	-
+c9bf76573 (修正後)	0x691dd0	mismatch	-
+80c2576b5 (修正前)	0x40c660	match	-
+80c2576b5 (修正前)	0x40c750	match	-
+80c2576b5 (修正前)	0x4256c0	mismatch	import WindowFromPoint arg0 native=0x3 wasm=0x0
+80c2576b5 (修正前)	0x664890	mismatch	-
+80c2576b5 (修正前)	0x6649b0	mismatch	-
+80c2576b5 (修正前)	0x6649c0	mismatch	-
+80c2576b5 (修正前)	0x664a80	mismatch	-
+80c2576b5 (修正前)	0x442a50	mismatch	-
+80c2576b5 (修正前)	0x442b90	mismatch	-
+80c2576b5 (修正前)	0x653c80	mismatch	-
+80c2576b5 (修正前)	0x691dd0	mismatch	-

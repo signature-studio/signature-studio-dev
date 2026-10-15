@@ -259,7 +259,7 @@ def gen_stubs(ll_path, defined_names, prefix='function_'):
     out = ['#include <stdint.h>', 'typedef unsigned long long u64;',
            'extern u64 ld_stub_x(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5);']
     names, skipped = [], []
-    widths = {}
+    widths, slots = {}, {}
     seen = set()
     structs = struct_table(ll_path)
     with open(ll_path, errors='replace') as f:
@@ -274,12 +274,18 @@ def gen_stubs(ll_path, defined_names, prefix='function_'):
                 continue
             seen.add(nm)
             ps = []
-            for p in split_top(m.group('args')):
+            pslots = []
+            for reg, p in enumerate(split_top(m.group('args'))):
                 t = param_type(p)[0]
                 if t in structs:
+                    # LD-253 (#5032): 8 byte の struct は native で 1 レジスタ (reg) に詰まる。要素 j は
+                    # その下位 (j=0) / 上位 (j=1) 32bit。slot = (reg, シフト量)。
+                    for j in range(len(structs[t])):
+                        pslots.append((reg, 32 * j))
                     ps.extend(structs[t])
                 else:
                     ps.append(t)
+                    pslots.append((reg, 0))
             rt = ret_type(m.group('pre'))
             cps = [ctype(t) for t in ps]
             crt = ctype(rt)
@@ -288,6 +294,7 @@ def gen_stubs(ll_path, defined_names, prefix='function_'):
                 continue
             names.append(nm)
             widths[nm] = [64 if c == 'u64' else 32 for c in cps[:4]]
+            slots[nm] = pslots[:4]
             params = ', '.join('%s a%d' % (c, i) for i, c in enumerate(cps)) or 'void'
             av = []
             for i, c in enumerate(cps[:6]):
@@ -309,6 +316,7 @@ def gen_stubs(ll_path, defined_names, prefix='function_'):
             else:
                 out.append('%s %s(%s) { return (%s)%s; }' % (crt, nm, params, crt, call))
     gen_stubs.widths = widths
+    gen_stubs.slots = slots
     return '\n'.join(out) + '\n', names, skipped
 
 
