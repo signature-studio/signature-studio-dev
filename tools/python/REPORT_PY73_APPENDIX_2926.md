@@ -6,7 +6,7 @@
 
 ## 結論
 
-- **3 フラグの書込み元を全数で確定した**: 書込み命令は flagA 4 件・flagB 12 件・flagC 2 件 (計 18 件。§1)。以前の WIP 記録 (`REPORT_PY73_2926.md`・前 run) と件数・VA が一致した。
+- **3 フラグの書込み元を全数で確定した**: 書込み命令は flagA 4 件・flagB 12 件・flagC 2 件 (計 18 件。§1)。全数走査は `analysis/flapi/pe_straight_writers.py` で 1 コマンド再現できる (§1-2)。削除済みの前 run の WIP 記録 (`git show 8665e7f47:tools/python/REPORT_PY73_2926.md` §2。`ca05c5eef` で削除、PR の差分には現れない) と件数・VA・書く値が一致した。
 - **書込みの到達条件は未確定**: 各書込みが実行時に通るか (呼出し元)、flagB の `bl`・`cl` 由来の値、flagC の `vt+0x60` 仮想呼出し元は決まっていない。したがって 3 フラグの実行時値は未確定 → 子 issue (§4)。
 - **`0x10002a0` (midiNoteOn 本体) の note-on 経路**: 書込み先 (note 単位の状態表 `item+note+0x808`・カウンタ `[*0x5e3a09]`)・channel の扱い・イベント投入 `0x10602e0` の呼出し引数を確定 (§3)。note-off 側 (`0x1000614` 以降) と `0x10602e0` の中身は未読 → 子 issue。
 - **`0x63a730` の副作用は無し** (書込みはスタックのみ。`QueryPerformanceCounter` の値を周波数で割った double を返すだけ。§3-5)。
@@ -14,8 +14,8 @@
 ## 測定
 
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 22,227,016 B。実測 2.7 秒)。`toolchain-retdec` は本件では未使用。
-- 測定 commit: `8665e7f47` (main `f54e7907b` の取り込み merge。`tools/python/analysis` の解析スクリプトは main と同一。解析スクリプトを最後に変えた commit は `6d404849a`)。
-- 差分 0 の証跡: 測定後の本付録 commit から測定 commit までの `git diff 8665e7f47 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (§6 の表に記録)。
+- 測定 commit: `9d76aab3d` (走査スクリプト `pe_straight_writers.py`・`pe_iat_name.py` を追加した commit。クリーン worktree で実行)。下表のうち `pe_xref.py`・`pe_slot_writers.py` の行は `8665e7f47` (main `f54e7907b` の取り込み merge) で測定した。`8665e7f47` から `9d76aab3d` までに既存の解析スクリプトは変わっていない (`git diff --numstat 8665e7f47 9d76aab3d -- tools/python/analysis` は新規 2 件の追加のみ)。
+- 差分 0 の証跡 (本付録の commit 直前に確認): `git diff 9d76aab3d HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (§6 の表に記録)。
 - 実行 (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。並行度は 1〜3):
 
 | 測定 | 結果 | 所要 |
@@ -26,14 +26,15 @@
 | `analysis/flapi/pe_slot_writers.py 15e04a8 0` | loads 54・candidates 19 (偽陽性を含む。§1-2) | 58.1 秒 |
 | `analysis/flapi/pe_slot_writers.py 15e0ff0 0` | loads 102・candidates 22 (同上) | 80.5 秒 |
 | `analysis/flapi/pe_slot_writers.py 15e1890 0` | loads 58・candidates 4 (同上) | 82.1 秒 |
-| 直線区間の全数走査 (一時スクリプト。リポジトリ外・§1-2) | loads 214 (A 54・B 102・C 58)・書込み A 4・B 12・C 2 | 54.9 秒 |
+| `analysis/flapi/pe_straight_writers.py` (既定 3 スロット。§1-2) | loads 214 (A 54・B 102・C 58。RIP 参照数も同じ)・書込み A 4・B 12・C 2 = 18 (旧方式 26) | sweep 63.5〜63.9 秒・wall 63.8〜64.2 秒 (n=3。実行時 load 1 分平均 0.4〜1.0・並列 1) |
+| `analysis/flapi/pe_iat_name.py 423ac0,423ad0,4232e0,423980` | 4 件すべて kernel32 (§3-4・§3-6) | 0.1 秒 (n=1) |
 | `analysis/flapi/pe_xref.py 16baff0,16baff1,13e7628` | hits 0・stores 0 | 81.3 秒 |
 | `analysis/flapi/pe_xref.py 15e04a8,15e0ff0,15e1890` | hits 214・stores 0 | 81.1 秒 |
 | `analysis/flapi/pe_xref.py 15f3308` | hits 7 (読み 6・lea 1)・stores 0 | 58.0 秒 |
 | `analysis/flapi/pe_disasm.py 63a730 30`・`100074c 30` | 逆アセンブル (§3) | 各 1 秒未満 |
 
 - 走査の注: `pe_xref.py`・`pe_slot_writers.py` は main の走査修正 (`9e3f9edc`。64 KiB 境界で命令を読み飛ばさない) を含む版。上の件数はこの版の値。
-- 検証範囲: 逆アセンブルと参照列挙だけ。wasm・mock・C provider の実行は未実施 (コード差分 0)。起動・GUI に関わらないため製品 KPI は対象外。
+- 検証範囲: 逆アセンブルと参照列挙だけ。wasm・mock・C provider の実行は未実施 (provider・host・tests は未変更。解析スクリプトの追加のみ)。起動・GUI に関わらないため製品 KPI は対象外。
 
 ## 1. 3 フラグの書込み元 (確定。HEAD で再測定)
 
@@ -49,7 +50,7 @@
 
 ### 1-2 書込み命令 (18 件)
 
-スロットを `mov reg,[slot]` で読んだ直後の直線区間で、読込みレジスタを基底にした `mov byte ptr [reg], 値` を列挙した。
+スロットを `mov reg,[slot]` で読んだ直後の直線区間で、読込みレジスタを基底にした `mov byte ptr [reg], 値` を列挙した。走査は分岐・call・ret・int で止め、同じ族のレジスタの明示オペランドの書換え・暗黙の書換えでも止める。書込みは `op.access & CS_AC_WRITE` のメモリオペランド (基底が同族・disp 0・index なし)。再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_straight_writers.py` (既定で 3 スロット。出力の `flag=… store=… <- load …` の 18 行が下表と一致し、末尾が `total stores=18`)。
 
 | フラグ | 書込み VA | 書く値 | ロード VA | 備考 |
 |---|---|---|---|---|
@@ -63,13 +64,13 @@
 | B | `0xfefbd3` | 1 | `0xfefbcc` | |
 | B | `0xfefcd7` | 0 | `0xfefcd0` | |
 | B | `0xfff311` | 1 | `0xfff30a` | |
-| B | `0xfff3c3` | `bl` | `0xfff3bc` | 値は未読 (レジスタ値) |
+| B | `0xfff3c3` | `bl` | `0xfff3bc` | 書く値はソースオペランドまで (実行時値は子 #3649) |
 | B | `0x1042e47` | 1 | `0x1042e40` | |
-| B | `0x10440af` | `cl` | `0x10440a3` | 値は未読 (レジスタ値) |
+| B | `0x10440af` | `cl` | `0x10440a3` | 書く値はソースオペランドまで (実行時値は子 #3649) |
 | B | `0x11d6145` | 1 | `0x11d613e` | |
 | B | `0x11d6310` | 0 | `0x11d6309` | |
 | B | `0x11d631f` | 0 | `0x11d6318` | |
-| C | `0x11c761c` | 1 | `0x11c7615` | 関数内 (関数先頭は未算出。WIP 記録では `0x11c75d0` 付近) |
+| C | `0x11c761c` | 1 | `0x11c7615` | 関数内 (関数先頭は未算出。前 run の WIP (`8665e7f47`) では `0x11c75d0` 付近) |
 | C | `0x1262977` | 1 | `0x1262970` | vtable `+0x60` の関数そのもの (呼出しは仮想呼出し) |
 
 - 値 1 の書込みは、そのフラグを非 0 にし、ゲートを偽 (内部 code -2) にする。値 0 は解除。
@@ -78,7 +79,7 @@
 ### 1-3 候補の検証方法と偽陽性
 
 - `pe_slot_writers.py` の既定 disp は 8 で、フラグの byte 書込み (disp 0) を拾えない (候補 0)。disp 0 で走らせると候補 19・22・4 件を得たが、**偽陽性を含む**。ツールは「直近 64 バイト以内のロード」と「書込みの基底レジスタの一致」を見ないため、基底が別レジスタ・間に同じレジスタの再ロードがある候補を拾う (例: `0x11d48b3` の直前 `0x11d48ac` は `mov rax,[0x15e4628]` で rax が別スロットになる)。
-- そこで、スロットのロード 214 件すべてを起点に、分岐・`call`・`ret`・同じレジスタへの別の書換えまでの直線区間 (最大 0x200 バイト) を逆アセンブルして全数で列挙した (一時スクリプト。リポジトリ外・未コミット)。結果は上の 18 件で、WIP 記録 (4・12・2) と一致する。
+- そこで、スロットのロード 214 件すべてを起点に、分岐・`call`・`ret`・同じレジスタへの別の書換えまでの直線区間 (最大 0x200 バイト) を逆アセンブルして全数で列挙した (`analysis/flapi/pe_straight_writers.py`・コミット済み)。結果は上の 18 件 (A 4・B 12・C 2)。旧方式 (暗黙オペランドの regs_write だけで止める) は 26 件 (A 8・B 16・C 2) を出す。明示オペランドの書換え (`mov rax,[別スロット]` 等) で止まらず、その後の `mov byte ptr [rax]` を余分に拾うためで、これが負の対照になる。`call qword ptr [rax]` (0xd6c246) は分岐で走査を止めるため store に数えない。
 - 限界: 直線区間を超える書込み、関数引数で渡ったポインタ経由の書込み、絶対アドレス指定の書込みは見ていない。
 
 ## 2. 3 フラグと実行時値
@@ -113,11 +114,11 @@
 
 ```
 0x100074c mov rax,[*0x5e060d]; movsd xmm0,[rax]; call 0x40c660; mov [rbp+0x108],eax   ; tick = round(double)
-0x1000762 mov rcx,[0x5e189f]; call 0x4232e0                                            ; lock 取得 (API 名は未同定)
+0x1000762 mov rcx,[0x5e189f]; call 0x4232e0                                            ; lock 取得 = kernel32!EnterCriticalSection (thunk `0x4232e0` → IAT `0x1971530`。`pe_iat_name.py`)
 0x100076e mov rax,[0x5e1ba3]; mov rcx,[rax]; edx = tick; r8d = [item+0x9c]+0x4000; r9d = 0x7ffffff0
               [rsp+0x20] = note; [rsp+0x28] = イベント語 [rbp+0x100]; [rsp+0x30] = [rbp+0xf8]
 0x10007b7 call 0x10602e0                                                               ; イベント投入 (中身は未読 → §4)
-0x10007bc mov rcx,[0x5e1845]; call 0x423980                                            ; lock 解放
+0x10007bc mov rcx,[0x5e1845]; call 0x423980                                            ; lock 解放 = kernel32!LeaveCriticalSection (thunk `0x423980` → IAT `0x19715f8`。`pe_iat_name.py`)
 0x10007c8 mov rax,[0x5e3a09]; add dword [rax], 1                                       ; カウンタ +1
 ```
 
@@ -133,10 +134,10 @@
 |---|---|
 | 逆アセンブル | `0x63a730`〜`0x63a76e` (30 命令。`pe_disasm.py 63a730 30`) |
 | 周波数の判定 | `0x63a734`: `cmp qword ptr [0x15f3308], 0`。0 なら `0x63a762` |
-| 時計読み | `lea rcx,[rsp+0x28]`; `call 0x423ac0` (IAT = kernel32 `QueryPerformanceCounter`) |
+| 時計読み | `lea rcx,[rsp+0x28]`; `call 0x423ac0` (thunk `0x423ac0` → IAT `0x19716a8` = kernel32 `QueryPerformanceCounter`。`pe_iat_name.py`) |
 | 戻り値 | 成功 → `xmm0 = (double)tick / (double)freq` (`0x63a74c`〜`0x63a760`)。失敗・周波数 0 → `xmm0 = 0.0` (`0x63a762`。`movsd xmm0,[rip+6]` = `0x63a770` の 8 byte 0) |
 | 書込み | スタック `[rsp+0x28]` のみ。グローバル書込み 0 件 (`pe_xref.py 15f3308` の stores 0) |
-| 周波数の由来 | `0x63ab43`: `lea rcx,[0x15f3308]` → `call 0x423ad0` (IAT = kernel32 `QueryPerformanceFrequency`)。初期化関数内 (入口は未特定) |
+| 周波数の由来 | `0x63ab43`: `lea rcx,[0x15f3308]` → `call 0x423ad0` (thunk `0x423ad0` → IAT `0x19712d0` = kernel32 `QueryPerformanceFrequency`)。初期化関数内 (入口は未特定) |
 
 → `0x63a730` は OS の高精度時計を読むだけ。wrapper 側の書込み値 (REPORT_PY73 §2) は時刻に依存する (コードからの推定。実機未確認)。
 
@@ -150,10 +151,10 @@
 
 ## 5. 受入条件 (#2926) の判定
 
-- [x] flagA・flagB・flagC の書込み元 (命令 VA・書く値) を PE 解析箇所つきで確定し、本付録 §1 に残す。到達条件は子 issue へ移した
+- [x] flagA・flagB・flagC の書込み元 (命令 VA・書く値) を PE 解析箇所つきで確定し、本付録 §1 に残す。到達条件と `bl`・`cl` の実行時値は子 #3649 へ移した (書く値はソースオペランド (`bl`・`cl`) までを確定)
 - [x] `0x10002a0` の note-on 経路 (書込み先・channel の扱い) と `0x63a730` の副作用を PE 解析箇所つきで残す (§3)。note-off 側と `0x10602e0` は子 issue へ移した
 - [x] 推測の状態モデルでは実装しない (provider・mock は未実装)
 
 ## 6. 差分 0 の証跡
 
-- 測定 commit `8665e7f47` から本付録の commit までの `git diff 8665e7f47 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本付録の commit 直前に確認)。
+- 測定 commit `9d76aab3d` から本付録の commit までの `git diff 9d76aab3d HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本付録の commit 直前に確認)。
