@@ -1,7 +1,7 @@
 # tools/plugins/f2 REPORT_APPENDIX_4951 — PLG-F3-45 (#4951): `[0x8bf040]` を書く関数の特定
 
 - 親: #3374 (受入 3 の原文移送)。前提の記録: `REPORT_APPENDIX_3295.md` §3 (書込み元 `rip=0x44569f` の初出)。
-- 測定 commit: 本付録を含む commit (コード変更なし。`unicorn_trace.py`・`write_origin.py` は未変更)。
+- 測定 commit: `0f5bcaa89` (本 PR の基点 = origin/main。コード変更なし。`unicorn_trace.py`・`write_origin.py` は未変更)。
 - 担当 dir: `tools/plugins/f2/` のみ。入力: `$RUNNER_TEMP/fl-win64/extracted/block19148_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 extracted/block19148_PE.bin`、2.5 秒)。
 - 依存: unicorn 2.1.4 / pefile / capstone (`uv venv` で作成、§4)。
 
@@ -46,4 +46,4 @@
 
 ## 5. 鮮度
 
-- 測定 commit: 本付録を含む commit。`git diff <測定 commit> HEAD -- tools/plugins/f2/*.py` は、本付録の commit では空 (`.py` は未変更)。
+- 測定 commit: `0f5bcaa89`。`git diff 0f5bcaa89 HEAD -- tools/plugins/f2/*.py` は空 (`.py` は未変更)。
