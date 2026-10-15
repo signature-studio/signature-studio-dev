@@ -39,4 +39,4 @@
 - 再測定を試みた結果: `$HOME/artifacts` に `fl-win64` のみ。`work-m11` が無いため、`liftdiff_e2e.sh` は [0/4] の単体テスト (`test_compare_ld11` / `test_ld52_machine_sig` / `test_ld179_tagpoint_tr` / `test_ld203_slot_fill`) の後、`missing input: ../m11/work/boot_final3.ll` で止まる。e2e の [1/4] 以降は未実行。
 - 単体: 上記 4 件は PASS (rc=0)。
 - 測定 commit: `acf54ba0e` (コード変更の最後の commit)。
-- `git diff acf54ba0e HEAD -- tools/liftdiff` の出力: 0 行 (差分 0)。
+- `git diff acf54ba0e HEAD -- tools/liftdiff ':!tools/liftdiff/REPORT_APPENDIX_LD203.md'` の出力: 0 行 (コード差分 0)。本 REPORT の追記のみが差分で、これは実測に影響しない文書の変更。
