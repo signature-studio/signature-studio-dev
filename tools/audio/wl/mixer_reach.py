@@ -6,7 +6,7 @@ CS / 待機 / スレッド API の個数が要る。
   1. .pdata で関数範囲を得て、各関数を capstone で線形逆アセンブルする
   2. 直接 call (e8) と関数範囲外への直接 jmp (tail call) を辺にして BFS で到達集合を作る (下限)
   3. 間接 call/jmp の目標を閉世界の候補で置く (上限)。候補 AT = アドレスを取られた関数:
-     (a) 非コード領域 (.data 等) に現れる関数アドレス (vtable・関数ポインタ表を含む)
+     (a) 非コード領域 (.data 等) と .text に現れる関数アドレス (vtable・関数ポインタ表を含む。.text 内の表も対象)
      (b) コード中の rip 相対 lea・即値 mov で作られる関数アドレス
      どちらも生バイト走査で求める (偽陽性は候補を広げる側)。
   4. 参考 (slot): 基底がメモリ読込の [R+d] は、非コード領域の関数ポインタ表 (vtable 候補) の d 番目の
@@ -112,7 +112,7 @@ def addr_refs():
 
 REFS = addr_refs()
 AT = set(r for r in REFS if r in fset)
-for a0, a1 in NONCODE:
+for a0, a1 in NONCODE + [(t0, t1)]:
     for a in range(a0, a1 - 7, 8):
         v = qv(a)
         if v in fset:
