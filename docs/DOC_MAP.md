@@ -313,6 +313,7 @@
 | `tools/m11/REPORT_N2768.md` | ~185 | #2768 (M11-N155): 寛容起動で skip した unit が trap までに heap へ書いた範囲 (72 unit の表)・上位のリスク評価 (推定)・PR #2752 との環境差。heap 範囲の結論は REPORT §0 を参照。集計は `m11_tolerant_heap.py`・測定は `m11_tolerant.mjs` の `M11_HEAP_FROM`/`M11_HEAP_OUT` |
 | `tools/m11/REPORT_N2714.md` | ~150 | #2714 (WIN-3): m11 寛容起動 (tolerant boot) の実測 (942 試行・ok 874・skip 67 の種類別・DllMain 戻り値 1)・skip unit の状態欠落リスク順位 (推定)・既存経路の回帰 (strict 56・survey 872) とネガコン。実装は `m11_tolerant.mjs`・`m11_tolerant_gate.py`・§4-2 の区間内訳は `m11_tolerant_sections.py` |
 | `tools/m11/REPORT_APPENDIX_3188.md` | ~95 | m11 #3188 (親 #3188・子 #3296): LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (REPORT_N403 §8 の全文。main 取り込み後の HEAD での再測定・IR 突合・memcpy 源 NULL の修正の参照・未特定の原因) |
+| `tools/m11/REPORT_N4011.md` | ~75 | m11 #4011 段 2 (`pass_m2v_fn40fcf0_arg1`・gated 既定 OFF): 実測表 (units_run 109→129・icall_miss 7→16・last_unit 114→144・OOB)、測定 commit と差分 0 の証跡、未解決の起票先。REPORT §20 から分割移動 (250 行上限のため) |
 | `tools/m11/REPORT_N134.md` | ~74 | m11 #134 の付録: REPORT §14 (unit 23 の IntToStr 修正・judge の Halt0 分離) と §18 (停止点 unit 101・e2e 期待値の更新・切り分け) の本文 (250 行上限のため分割) |
 | `tools/m11/REPORT_N15.md` | ~16 | m11 REPORT §16 (#490 main HEAD の 4c3baa4 / faee5b6 状態の実測・ネガコン) の付録 (250 行上限のため分割) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` | ~248 | #2770 (LD-129): native 側 0x5ac308 の書込み監視 (`rt/ld_native.c` の `LD_WATCH_ADDR`)。REPORT_1783.md の旧 §8 を 250 行上限のため分割移動した節 (§8.1〜§8.9)。分割後に §8.2・§8.4・§8.6・§8.8 を再測定・改訂したので、測定値と判定の正本は本付録。§8.10 は #3648 の結論 1 行とリンク |
