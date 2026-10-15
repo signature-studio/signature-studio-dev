@@ -69,7 +69,7 @@ T1 ok / T2 ok (修正前参照との差は repmap 18 行のみ・inserts=18 shif
 ### 3.3 SHA 突合の再測定 (`f1ed89eaf`・受入条件 #5060)
 
 - 測定 commit: `f1ed89eaf` (origin/main・`Merge pull request #5059`)。本 PR は REPORT のみを変えるため、PR HEAD までのコード差分は 0 行 (`git diff f1ed89eaf HEAD -- tools/liftlib/liftlib tools/liftlib/tests tools/liftlib/liftlib_e2e.sh tools/liftlib/p1_repmap_census.py` = 0 行)。
-- 参考: `c8316dc7` から `f1ed89eaf` までのコード差分は `tools/liftlib/liftlib` `tests` ほか 25 files・+714/−151 行 (main 取り込みによる。本件の再測定の対象外)。
+- 参考: `c8316dc7` から `f1ed89eaf` までのコード差分は `git diff --shortstat c8316dc7 f1ed89eaf -- tools/liftlib/liftlib tools/liftlib/tests` で 23 files, +608/−151 行 (main 取り込みによる。本件の再測定の対象外)。`-- tools/liftlib` 全体では 35 files, +1267/−206。
 - 実行: `python3 -m liftlib ott --auto none` (cwd=`tools/liftlib`・`EMSDK_DIR` = `toolchain-emsdk` 展開先・`OTT_DLL` = `analysis-ott-binaries` の `OTT_vst2_win64.dll`)。2 回実行し同一結果。実測 wall **12 s** (2 回目・load avg 0.94〜0.95)。
 - 結果:
   - IR 一致: O1 true / O2a・O2b・O2c・O3a・O3b・O4 false (§3.2 と同じ)
