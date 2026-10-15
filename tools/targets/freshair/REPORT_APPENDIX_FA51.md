@@ -8,10 +8,10 @@
 |---|---|
 | SC 側の root | `0x1808e1fa0` (process 本体)。FA-45 が使った `0x1808e1f30` は deleting destructor で process ではなかった (§2) |
 | KH 側の root | `0x18085a730` (formant process, `snapins.json` の `formant`・ns `vocalfilter`) |
-| C4 同一入力 | 同一 seed `0x5F17E4`・N=200・600 call。param 写像は機械語の読みに基づく (§2) |
-| L/R (C5) | **600/600 call で bit 一致** |
-| state (C5) | **591/600 call で不一致** (比較窓 0x80 B の先頭付近の仮数部の下位ビット)。判定は「bit 不一致の確定のみ」(C6) |
-| 意味の同一性 | **未判定**。state 窓の配置が未確定 (§4) |
+| C4 同一入力 | 同一 seed `0x5F17E4`・N=200・600 call。**param 写像は未確定** (SC 側の型の読みが FA-39 と食い違う・§2) |
+| L/R (C5) | 600/600 call で bit 一致 (測定値)。ただし写像が未確定のため、同一性の根拠にしない |
+| state (C5) | 591/600 call で不一致 (比較窓 0x80 B の先頭付近)。判定は「bit 不一致の確定のみ」(C6) |
+| 意味の同一性 | **未判定**。param 写像と state 窓の配置が未確定 (§2・§4) |
 
 ## §2. param 写像の根拠 (機械語の読み)
 
@@ -19,7 +19,9 @@
 - KH `0x18085a730`: `ctx+0x3188` から P を取り、`P+0` (int, type の `&1`)・`P+4` (f32)・`P+8` (f32, Q, `log10f` へ)・`P+0xc` (u8, `&1`)・`P+0x10` (u8, `&1`)・`this+0x60` (sr) を読む。
 - 写像: SC `0x9dc4→KH P+0`・`0x9e0c→P+4`・`0x9e54→P+8`・`0x9e9c→P+0xc`・`0x9ee4→P+0x10`。`this+0x60` ↔ `S+0x98`。
 - 判定ルール: flag は 0/1 のみ書く (SC は非 0 判定、KH は `&1` で読むので、2 以上は両側で一致しない)。
-- 機械語の読みは `objdump -d` の逆アセンブル (SC: `SlateCore.core_64`・KH: `HeartCore.core_64`) による。
+- **未確定 (レビュー指摘 1・#4422 round 1)**: 上の写像は、同じ KH 側 harness の FA-39 (`REPORT_APPENDIX_FA39.md` §2) と食い違う。FA-39 は SC `0x9dc4` を type (int) に、`0x9e0c` を freq に写している (Filter 側の process。VocalFilter 側の型配置は FA-39 とは別と仮定できるが、本付録は根拠を示していない)。本付録の `gen_vf_scen.py` は `0x9dc4` に周波数の float bits を書き、KH の `P+0` (int type) に渡す。この組み合わせでは、type と freq の入れ替わりを否定できない。
+- 本 run では逆アセンブルし直せない: `$ARTIFACTS_DIR` (`fl-win64.tar.zst`) に `SlateCore.core_64`・`HeartCore.core_64` が無い (展開後の全文を検索しても無い)。素材 `work-liftlib-targets` が要る (PR 本文の `oc_artifacts:` 行で依頼)。そのため写像の正誤は未判定のまま残す。
+- 参考 (前回の読み): `objdump -d` の逆アセンブルによる読み (SC: `SlateCore.core_64`・KH: `HeartCore.core_64`)。素材が揃った run で、§2 の表を両側の命令列で再確認する必要がある。
 
 ## §3. 測定 (コミット済み HEAD で再現)
 
@@ -49,9 +51,13 @@
 
 ## §5. 受入条件への対応
 
-- 受入 1 (KH param 写像の機械語読みで確定・根拠): 達成 (§2)。
-- 受入 2 (同一 seed・N=200 の bit 一致の実測 C5): 実施済み。L/R は一致、state は不一致 (§3)。state の判定は窓の確定が前提のため未達。
-- 受入 3 (REPORT_APPENDIX_FA45 の後続節に実測): 本付録に記載 (FA45 は smoke の訂正のみ、§6)。
+- 受入 1 (KH param 写像の機械語読みで確定・根拠): **未達**。写像が FA-39 と食い違い、本 run で逆アセンブルし直せない (§2)。
+- 受入 2 (同一 seed・N=200 の bit 一致の実測 C5): 測定は実施済み (§3、`6e5a837a6`)。L/R 600/600 は一致、state は 591/600 が不一致。写像と state 窓が未確定のため、判定は未達。
+- 受入 3 (実測の記載先): **逸脱**。issue は `REPORT_APPENDIX_FA45.md` の後続節に書くことを求めたが、実測は本付録 (FA51) に置く。FA45 は root の訂正 (§6) のみ。逸脱はこの記述で明記する。
+
+## §5.1 再測定 (本 run)
+
+- 未実施。理由: 素材 `work-liftlib-targets` が `$ARTIFACTS_DIR` に無い (§2)。写像の修正 (レビュー指摘 1) が先で、写像を直した commit の後に `ks_semantic_vf_scen.sh 200 0x5F17E4 0` を再実行して §3 に書く。
 
 ## §6. FA-45 §5 の訂正
 

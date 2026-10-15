@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# SC 側の実機機械語ハーネス (VocalFilter 0x1808e1f30) が小さいシナリオで動くかを確かめる (#3741)。判定はしない (ERR 件数と行数だけ出す)。
+# SC 側の実機機械語ハーネス (VocalFilter 0x1808e1fa0) が小さいシナリオで動くかを確かめる (#3741・#4071)。判定はしない (ERR 件数と行数だけ出す)。
 #   usage: bash tools/targets/freshair/ks_sc_vf_smoke.sh [N=20] [outdir]   (既定: $RUNNER_TEMP/ks_sc_vf_smoke)
+# 注: root は process 本体 0x1808e1fa0 (#4071 で訂正。0x1808e1f30 は deleting destructor)。
 # 手順: mlift の report から iat_slots を作る (build_filter.sh と同じ root・map・pokes)、シナリオを生成、fma=0/1 で native 実行。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; L="$HERE/lift2"
