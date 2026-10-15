@@ -1,10 +1,9 @@
 // 着手を保留している issue の理由と解除見込み (#5110)。観測のみ (launch・dispatch・no-PR 再投入の判断には使わない)。
 // 理由の語は classify.ts の rows の行名と engine.ts の再投入判断の note に対応させる。解除見込みは時間ベースの窓だけ。
 
+import { BOT_COMMENT_WINDOW_H, RUN_WINDOW_H } from "./classify.ts";
+
 const H = 3_600_000;
-// classify.ts の窓: bot コメントは 1.5 時間、launch・run 完了は 3 時間 (recent の判定と同じ値)。
-export const HOLD_BOT_COMMENT_H = 1.5;
-export const HOLD_RUN_WINDOW_H = 3;
 
 export interface HoldTimes {
   botAt?: number;
@@ -26,10 +25,10 @@ export interface Hold {
 export function recentHold(n: number, note: string, t: HoldTimes): Hold {
   const iso = (ms: number | null) => (ms === null ? null : new Date(ms).toISOString());
   const at = (base: number | undefined, h: number) => (base === undefined ? null : base + h * H);
-  if (note.startsWith("bot comment")) return { n, row: "recent", reason: "bot-comment", until: iso(at(t.botAt, HOLD_BOT_COMMENT_H)) };
+  if (note.startsWith("bot comment")) return { n, row: "recent", reason: "bot-comment", until: iso(at(t.botAt, BOT_COMMENT_WINDOW_H)) };
   if (note.startsWith("launch not observed")) return { n, row: "recent", reason: "launch-not-observed", until: null };
-  if (note.startsWith("run finished")) return { n, row: "recent", reason: "run-finished", until: iso(at(t.doneAt, HOLD_RUN_WINDOW_H)) };
-  if (note.startsWith("launched ")) return { n, row: "recent", reason: "launched", until: iso(at(t.launchedAt, HOLD_RUN_WINDOW_H)) };
+  if (note.startsWith("run finished")) return { n, row: "recent", reason: "run-finished", until: iso(at(t.doneAt, RUN_WINDOW_H)) };
+  if (note.startsWith("launched ")) return { n, row: "recent", reason: "launched", until: iso(at(t.launchedAt, RUN_WINDOW_H)) };
   if (note === "oc:no-pr cooldown") return { n, row: "recent", reason: "oc:no-pr cooldown", until: iso(t.lastAct === undefined || t.cooldownMs === undefined ? null : t.lastAct + t.cooldownMs) };
   return { n, row: "recent", reason: "recent", until: null };
 }
