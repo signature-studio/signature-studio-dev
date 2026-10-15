@@ -76,7 +76,7 @@ $ git diff 0dd1d67c8 9692b214a -- tools/python ':!*.md'
 | `node --check` (`host/fl_mock.mjs`・`tests/provider_check.mjs`・`tests/ui_state_diff.mjs`) | 3 件とも OK |
 | provider_check の件数を、テストの `if` 条件式に現れる集合の和集合から再計算 | impl 165・unimpl 270 (総数 435)。同じ方法で HEAD 版 158/277・main 版 162/273 を再現 |
 | mock の直接呼出し (`createMockEngine().call`) | `setBrowserAutoHide(1)` → `isBrowserAutoHide` = true・`setStepEditMode(1)` → `getStepEditMode` = true・`getVersion()` = `""` (mode 4)・mode 9 → `0`・引数 2 個 → code 5 |
-| `EMSDK_ENV=$HOME/emsdk/emsdk_env.sh bash provider/build.sh` (emsdk latest = emcc 6.0.12 を新規 install) | rc 0・警告 0・ハンドラ 165 | 1.43 秒 |
+| `EMSDK_ENV=<emsdk の emsdk_env.sh> bash provider/build.sh` (emsdk latest = emcc 6.0.12 を新規 install) | rc 0・警告 0・ハンドラ 165 | 1.43 秒 |
 | `node tests/ui_state_diff.mjs` | calls 58・diffs 0・PASS | 0.057 秒 |
 | `node tests/provider_check.mjs` | 134 行目の `work/midi.py` が無く rc 1 で停止。それまでの assert (件数 165/270 の 83 行目を含む) は通過。section 3 以降は `dist/flpy.js` が要る | 0.063 秒 |
 | flpy 不要のテスト 20 本 (`ui_diff` `ui_display_diff` `playlist_diff` `mixer_diff` `general_diff` `device_diff` `channels_diff` `patterns_diff` `transport_diff` `arrangement_diff` `screen_diff` `launchmap_diff` `tool_args` `ilmcp_diff` `midi_path_diff` `note_enum_diff` `step_item_diff` `patterns_group_diff` `arrangement_selection_diff`) | 全件 rc 0。`diffs` は全て 0 (例: ui_diff calls 17・playlist_diff 72・channels_diff 214・note_enum_diff 33264) | 未計測 |
