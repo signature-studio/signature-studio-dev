@@ -141,7 +141,7 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 
 **未達と起票先**: 残りの候補多重 60 件 (fvm 非対象。内訳 38 件の理由は未計測) と、equal / wasm_trap への遷移の成立は #4173 (LD-198)。`0x5c1030` の切り分けは #4137 (LD-194)。
 
-**`0x5c1030` の据え置き (PM 判断 R7・LD-196、適用済み)**: fvm の `native_extra_call` 系 diff を持つ `0x5c1030` だけ、mismatch にせず unexec のまま据え置く (`session.FVM_HOLD_VAS`・`fvm_held` を `classify.verdict` で除外)。fvm の件数の増加 (12 → 25) は残す。
+**`0x5c1030` の据え置き (PM 判断 R7・LD-196) は LD-199 (#4174) で解除**: 切り分けの結果、fvm arg 0 の diff は wasm 側の欠陥と確定した (下記 LD-199 節)。`session.FVM_PIN_ARG` で arg 0 に固定して走らせ、diff を mismatch として数える。fvm の件数の増加 (12 → 25) は残す。
 
 - 実装の範囲は `0x5c1030` の 1 件。fvm の `native_extra_call` diff を持つ関数は sample:800 にほかに `0x1024830`・`0x132f6a0` の 2 件あり、main でも mismatch (保存 verdict) のため、規則を一般化すると main の数値が変わる。よって一般化せず関数アドレス指定にした。
 - 据え置き規則を一般化する案 (`native_extra_call` 全件を据え置く) は mismatch 232 になり、PM 判断の既定案 (234) と合わない。採らない。
@@ -158,3 +158,29 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 - 保存された verdict (jsonl の `verdict`) で main と HEAD を関数単位に突き合わせると、遷移 0 件 (match 360・mismatch 234・unexec 206 が一致)。
 - 注: `verdict()` を main の jsonl の `cases` に当て直すと `0x5c1030` が mismatch に見える (235)。main の実行時の保存 verdict は unexec なので、main の値は 234 が正しい。当て直しは fvm の diff を含んだ cases を見るため、保存値と一致しない。
 - 2 回の mismatch 集合は同一 (差 0)。
+
+## LD-199 (#4174): `0x5c1030` の fvm arg 0 diff の切り分けと対象への復帰
+
+- **切り分け (結論: wasm 側の欠陥)**: 機械語 `0x5c1030` は `cmp [rcx+0x28],edx; je` の後、taken 側で `mov rax,rcx; mov rbx,[rcx]; call [rbx+0x18]` (`0x5c1046`) を実行する。IR (`m11/work/boot_final3.ll` の `function_5c1030`) には間接 call が無く、`[arg1]` を rax に読んで返すだけ。`fvm` arg 0 (this ポインタ) で native が `?vmslot3` を呼ぶのは機械語どおりで、wasm が call を落としている。static info の tag `icall_drop [high]` (機械語の間接 call=1・IR=0) と一致する。
+- **対象への復帰**: `session.FVM_PIN_ARG = {0x5c1030: 0}`。`fvm_cand` は候補多重でも、固定した関数は arg 0 だけを返す。`FVM_HOLD_VAS`・`fvm_held` と `classify.verdict` の除外は削除した。
+- **単体テスト**: `tests/test_ld199_fvm_pin.py` (4 件)。固定の規則を外すと FAIL する (変異確認済み)。
+- **測定 commit**: `b3a33a3fa` (コードを変えた最後の commit。以後の `d4b8a5309` はテスト追加、`78ef27d60` は docs のみ)。
+- **測定 (`liftdiff_e2e.sh --m11-only`・`FL_WIN64_DIR` = 展開先の親・`--shards 12 --state auto` 既定)**:
+
+| run | commit | match / mismatch / unexec | e2e | 所要 (`time` 実測) | load (開始 → 終了) |
+|---|---|---|---|---|---|
+| base 2 回目 | `7c226bdb3` (origin/main) | 359 / 236 / 206 | PASS | 201 s | 開始 4.05 (uptime 1 分値・終了後 4.69 は別時点) |
+| HEAD 1 回目 | `b3a33a3fa` | 359 / 237 / 205 | PASS | 196 s | 開始 0.38 → 終了 5.20 |
+| HEAD 2 回目 | `b3a33a3fa` | 359 / 237 / 205 | PASS | 202 s | 開始 4.33 → 終了 4.52 |
+
+- 所要は `time` の real。load は `uptime` の 1 分値 (開始の直前と終了の直後に採取)。HEAD 1 回目の load は runner の他 job の影響を受けた可能性がある (開始 0.38 → 終了 5.20)。
+- base 1 回目 (base 側の別 work での初回測定) は、ログを残していないため本表に含めない。
+
+- **関数単位の遷移 (base と HEAD の jsonl の verdict を突き合わせ)**: `unexec→mismatch` 1 件 (`0x5c1030`) だけ。他の 800 関数は不変。
+- `0x5c1030` の case: fvm が `diff` (`ret` native_rax=0x0・wasm_rax=0x22073000、`calls` native=`?vmslot3` の `native_extra_call`)。他の 11 pattern は `native_fault` のまま。
+- 注: 同一 work を base と HEAD で共有した測定は無効 (出力が互いに上書きされる)。上表は base・HEAD を別 work ディレクトリで測った値。
+- **受入条件 3 の判定**: base (`7c226bdb3`) と HEAD (`b3a33a3fa`) の sample:800 比較で、既存 verdict の変化は `0x5c1030` の 1 件 (意図した変化)。受入 3 は満たす。
+- **受入外 (#4137 (LD-194) で扱う)**: 揺らぎ判定 (base 同士の幅) は本 PR の受入に含まれず、未実施。
+- **起票先**: icall 欠落 (`function_5c1030` の `call [rbx+0x18]` が IR から落ちる原因) の修正は lift 側の作業で、本 PR の範囲外。#4137 (LD-194) へ。
+- **`git diff b3a33a3fa 78ef27d60 --stat -- tools/liftdiff`** の出力: `REPORT_APPENDIX_LD177.md` (+26 / -1)・`tests/test_ld199_fvm_pin.py` (+70)。`d4b8a5309` (テスト追加) と `78ef27d60` (docs のみ) が測定 commit 以降の範囲。`ldlib/` の差分は 0。
+- **main との関係**: 測定 base `7c226bdb3` 以降、main は `tools/liftdiff/ldlib` を変えている (`e46ed6e14`・`dc6a2d08d`・#4874。現 main `2d0357a51`)。本 PR の head は main を取り込んでいないため、本測定は PR head で有効。merge 後の結果は本測定と同一ではない。

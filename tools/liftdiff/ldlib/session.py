@@ -13,8 +13,9 @@ SKIPPED = 'skipped (native timeout)'
 # rt/ld_native.c run_case: setitimer(ITIMER_REAL) の初回値 {1, 500000} = 1.5 s (SIGALRM → status timeout)。
 # tests/test_ld154_timing.py が C 側の値と一致することを検査する。
 NATIVE_ITIMER_S = 1.5
-# LD-196 (PM 判断 R7): fvm の native_extra_call diff を mismatch にせず unexec に据え置く関数 (0x5c1030 のみ)。
-FVM_HOLD_VAS = {0x5c1030}
+# LD-199 (#4174): 0x5c1030 の fvm arg 0 diff は wasm 側の icall 欠落 (機械語 call [rbx+0x18] が IR に無い) と確定。
+# 候補多重でも fvm を arg 0 に固定して走らせ、diff を mismatch として出す (LD-196 の据え置きは解除)。
+FVM_PIN_ARG = {0x5c1030: 0}
 
 
 def side_timing(r, limit_s, recv_limit_s):
@@ -223,9 +224,6 @@ class Session:
             rec['cases'].append(c)
         if not any(c['outcome'] in ('equal', 'diff', 'wasm_trap') for c in rec['cases']):
             fvm, fvm_skip = self._fvm_cases(nat, was, va, sig, rec['cases'], sigs)
-            for c in fvm:
-                if va in FVM_HOLD_VAS and c['outcome'] == 'diff' and (c.get('diffs') or {}).get('calls', {}).get('kind') == 'native_extra_call':
-                    c['fvm_held'] = True   # LD-196 (PM 判断 R7): 0x5c1030 の fvm native_extra_call diff は mismatch にせず unexec に据え置く
             rec['cases'] += fvm
             if fvm_skip:
                 rec['fvm_skip'] = fvm_skip
@@ -263,6 +261,8 @@ class Session:
         if self.analyzer.is_ret_fragment(va):
             return None, 'ret_fragment'
         cand = cases.fvm_candidates(fault, cases.kinds_of(sig['params']))
+        if va in FVM_PIN_ARG and FVM_PIN_ARG[va] in cand:
+            return [FVM_PIN_ARG[va]], None
         if len(cand) > 1:
             one = self._fault_base_arg(fault, sig, cand)
             if one is None and fault and 'rip' in fault:

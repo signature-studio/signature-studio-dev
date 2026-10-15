@@ -19,6 +19,7 @@ import pefile
 PE = os.path.join(os.environ["FL_WIN64_DIR"], "extracted", "block00031_PE.bin")
 CH_VMTS = {0xfe2cf8: "TPublicChannel", 0xfe2fc8: "TPreviewChannel"}
 CH_SLOTS = {0xfe2c30, 0xfe2ed8, 0xfe2f00, 0xfe31a9}
+RESET = 0xfe9090
 RIP = re.compile(r"\[rip ([+-]) (0x[0-9a-f]+)\]")
 CALL = re.compile(r"qword ptr \[(r\w+) \+ 0x118\]")
 
@@ -72,6 +73,18 @@ def main():
         fn = funcs[i] if i >= 0 and funcs[i][0] <= a < funcs[i][1] else None
         h = refs(fn) if fn else []
         print("%x fn=%s refs=%s" % (a, "%x" % fn[0] if fn else "-", ",".join(h) or "-"))
+
+    direct = []
+    for i in range(len(tb) - 5):
+        if tb[i] == 0xE8:
+            d = struct.unpack_from("<i", tb, i + 1)[0]
+            if text_lo + i + 5 + d == RESET:
+                direct.append(text_lo + i)
+    print("direct call sites to reset %x: %s" % (RESET, ",".join("%x" % a for a in direct) or "-"))
+    for a in direct:
+        i = bisect.bisect_right(starts, a) - 1
+        fn = funcs[i] if i >= 0 and funcs[i][0] <= a < funcs[i][1] else None
+        print("  %x in fn=%s" % (a, "%x" % fn[0] if fn else "-"))
 
 
 if __name__ == "__main__":

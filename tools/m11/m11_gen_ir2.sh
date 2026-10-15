@@ -49,6 +49,16 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
   python3 ldfix/ldfix.py work/boot_final.ll work/boot_final.ldfix.ll --pe "$PE" --report work/ldfix_report.json ${LDFIX_ARGS:-}
   mv work/boot_final.ldfix.ll work/boot_final.ll
   python3 m11_cond.py ldfix=applied
+  # #2556 (CI-104): function_450560 の 2 段 deref 復元 (#2502)。ldfix 直後に常設する。機械語 26 命令と突合して fail-closed。
+  #   M11_FIX_450560=0 は適用前の IR を明示的に取る A/B 検証用 (ir_conditions.json 450560=disabled。build は M11_ALLOW_450560_DISABLED=1 でしか通さない)。
+  if [ "${M11_FIX_450560:-1}" = 0 ]; then
+    python3 m11_cond.py 450560=disabled
+    echo "[gen_ir2] M11_FIX_450560=0: fix_450560 を適用しない (ir_conditions.json 450560=disabled; build は M11_ALLOW_450560_DISABLED=1 が要る)" >&2
+  else
+    python3 ldfix/fix_450560.py work/boot_final.ll work/boot_final.450560.ll --pe "$PE"
+    mv work/boot_final.450560.ll work/boot_final.ll
+    python3 m11_cond.py 450560=applied
+  fi
   # ld108 (#2316/#2402, D20): 41a670 の head 解除 store (機械語 `mov rax,[rax]` = [arg1+0]) を lift 段の [arg1+8] の load から直す。
   #   1 関数だけを書き換え、想定と違う IR (仮引数の型・store 行・二重適用) は assert で止める (set -e で fail-closed)。
   #   M11_FIX_LD108=0 は適用前の IR を明示的に取る A/B 検証用 (ldfix/ld108_e2e.sh)。ir_conditions.json に ld108=disabled を残し、build は M11_ALLOW_LD108_DISABLED=1 でしか通さない。
