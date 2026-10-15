@@ -30,17 +30,15 @@ REF_RVAS = (0x1ac9c0, 0x1ad008, 0x1ad028, 0x1acfe8, 0x164740, 0x1a9de0, 0x1a9e10
 
 
 def sweep_insns(md, data, base):
-    """ildsp_survey.sweep と同じ線形走査 (デコードできないバイトは 1 byte 飛ばす)。命令オブジェクトを返す。"""
-    out = []
+    """ildsp_survey.sweep と同じ線形走査 (デコードできないバイトは 1 byte 飛ばす)。命令オブジェクトを 1 件ずつ返す。"""
     off = 0
     while off < len(data):
         got = next(iter(md.disasm(data[off:off + 16], base + off)), None)
         if got is None:
             off += 1
             continue
-        out.append(got)
+        yield got
         off += got.size
-    return out
 
 
 def main():
@@ -182,11 +180,12 @@ def main():
             if (ins.mnemonic.startswith("call") or ins.mnemonic == "jmp") and ins.op_str.startswith("0x") \
                     and int(ins.op_str, 16) - base in callers:
                 callers[int(ins.op_str, 16) - base].append(hex(ins.address - base))
-            for op in ins.operands:
-                if op.type == capstone.x86.X86_OP_MEM and op.mem.base == capstone.x86.X86_REG_RIP:
-                    t = ins.address + ins.size + op.mem.disp - base
-                    if t in rip_refs:
-                        rip_refs[t].append(hex(ins.address - base))
+            if "rip" in ins.op_str:
+                for op in ins.operands:
+                    if op.type == capstone.x86.X86_OP_MEM and op.mem.base == capstone.x86.X86_REG_RIP:
+                        t = ins.address + ins.size + op.mem.disp - base
+                        if t in rip_refs:
+                            rip_refs[t].append(hex(ins.address - base))
 
     # 対象 VA の 8 バイト絶対値 (DIR64 の値 = ImageBase + RVA) を、イメージ全体から探す (レジスタ計算値・4 バイト相対値は対象外)
     abs_refs = {}
