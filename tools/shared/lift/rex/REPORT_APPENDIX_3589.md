@@ -65,7 +65,7 @@ movnti は memset (`f_18001c8f0`・8 箇所) の大ブロック経路にだけ�
   - ok: PASS・比較 223・一致 223・不一致 0 (296 case・native crash 除外 73)・owner 一覧 OK。
   - neg-cmp / neg-ctx / neg-owner: 期待どおり FAIL 検出。
   - movnti: 実装 OK (ott_unsup 0 件)・reach native 境界外 16/16・wasm 完了 0/16 (既知の未達 #4324)・info 4/4 が trap (#3894)。
-- 素材の注記: `/opt/emsdk` が無いため `EMSDK_ENV` で上流 `emsdk install/activate 6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` と同版) を使った。`fl-win64` は `$HOME/artifacts/fl-win64.tar.zst` から展開。`oc_artifacts: fl-win64 toolchain-emsdk` を PR 本文に書いた。
+- 素材の注記: `/opt/emsdk` が無いため `EMSDK_ENV` で上流 `emsdk install/activate 6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` と同版) を使った。`fl-win64` は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` から展開。`oc_artifacts: fl-win64 toolchain-emsdk` を PR 本文に書いた。
 - 今回の case 数 (296 件・比較 223) は §2 の 248 件・比較 175 と一致しない。原因: `gen_cases.py` が 55fe773b2 以降に変わり (成功経路の case を追加。`git diff 55fe773b2 HEAD -- tools/shared/lift/rex/gen_cases.py`)、その後の `native_ref.c` / `crash_class.py` 等も変わった。§2 の数値は 55fe773b2 の入力に対するもので、現 HEAD の入力では再現しない。現 HEAD の値 (296・223) を正とする。
 - lift 差分 (main `59ca0477f` と本 PR の `x64c.py` を同 DLL・同引数で比較): `fle_lifted.c` は movnti 24 行の `ott_unsup` → `ST64` のみ (48 行)。`lift_meta.json` は movnti 24 サイトの `unsup` / `unsup_sites` の削除のみ (他は不変)。
 - memcpy 16 箇所の間接 call 経路: 未起票。`docs/WORKFLOW.md` §3 の規則で、「未解決の追跡」だけの子は起票しない。本付録 §4 と PR 本文の未解決表で追跡する。
