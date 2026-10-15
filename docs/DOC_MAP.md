@@ -213,6 +213,7 @@
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
 | `tools/ott/REPORT.md` | ~185 | junk 根本原因の特定・修復 + native 実機械語 bit-exact 参照 (完走路の正本) |
+| `tools/ott/REPORT_APPENDIX_3125.md` | ~110 | OTT x64c の i_rcr を実機 rcr の規則に直す (#3125): 旧式の 4 誤り・rcr site 6 箇所の lift 差分・実機照合 4004/4004・対照 32/4004・e2e 新旧 PASS |
 | `tools/ott/avx/REPORT.md` | ~190 | OTT-T3: AVX/VEX 命令の lift 対応と FMA 経路の bit-exact 検証 |
 | `tools/ott/crtinit/REPORT.md` | ~180 | OTT-T5: CRT 初期化の等価置換 + override 4 件の実機械語 lift 置換 |
 | `tools/ott/entry/REPORT.md` | ~120 | OTT-T4: x64c lift の入口拡張 (bit 突合) |
