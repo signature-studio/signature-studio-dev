@@ -109,9 +109,13 @@ def main():
                meta=json.load(open(os.path.join(out, 'lift_meta.json'))))
     rows = gap_classify.classify(env)
     json.dump(rows, open(os.path.join(out, 'gap_classes.json'), 'w'), indent=1)
+    gap_classify.selftest()
+    err = gap_classify.check_issue_gap(rows)
+    if err:
+        sys.exit('[gap_classify #4726] FAIL: ' + err)
     cnt = {c: [sum(1 for r in rows if r['cls'] == c), sum(r['size'] for r in rows if r['cls'] == c)] for c in 'abc'}
     print('[classify] (a) %d 区間 %d B / (b) %d 区間 %d B / (c) %d 区間 %d B' % tuple(cnt['a'] + cnt['b'] + cnt['c']))
-    b_roots = {r['fva'] for r in rows if r['cls'] == 'b'} - HOLD_B
+    b_roots = ({r['fva'] for r in rows if r['cls'] == 'b'} | {e for r in rows if r['cls'] == 'b' for e in r['entries']}) - HOLD_B
     print('[classify] (b) の先頭 %d 個を roots に追加 (判定保留 %s を除く): %s' % (
         len(b_roots), ' '.join('0x%x' % x for x in sorted(HOLD_B)), ' '.join('0x%x' % x for x in sorted(b_roots))))
     if b_roots - roots:

@@ -22,6 +22,7 @@ IA32 = False               # --arch ia32 (PE machine 0x14c): PEInfo が設定す
 PTR = 8                    # ポインタ/戻り先幅 (ia32 = 4)
 MACHINE_ARCH = {0x8664: 'x64', 0x14c: 'ia32'}
 VEXCOV = os.environ.get('OTT_VEXCOV') == '1'   # CAB-135 probe: VEX 命令の実行 address 記録 (ott_vexhit)
+INSNTRACE = os.environ.get('OTT_INSNTRACE') == '1'   # LD-185 probe: 命令ごとの実行 VA 記録 (OTT_INSN_HIT・既定 off で出力不変)
 # fake TEB/TLS (CAB-135): image 末尾の未使用領域 (.reloc 終端 0x180307794 以降)。
 # PE image は MAP_ANONYMOUS(wasm も 0 初期化) なので両側とも 0 が読める = 「TLS 未割当」。
 TEB_VA = 0x1803077a0
@@ -371,6 +372,8 @@ class FnLift:
             try:
                 if VEXCOV and strip_prefix(ins.mnemonic).startswith('v'):
                     self.L('OTT_VEXCOV_HIT(%s);' % hx(sh(va)))   # shifted VA (uint32 収容) — JS で RVA に戻す
+                if INSNTRACE:
+                    self.L('OTT_INSN_HIT(%s);' % hx(sh(va)))   # shifted VA (uint32 収容)
                 self.one(ins)
             except Unsup as e:
                 mm = strip_prefix(ins.mnemonic)
