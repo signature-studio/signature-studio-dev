@@ -52,6 +52,14 @@ export interface ProducerStats {
   writes: ProducerWrite[];
 }
 
+/** worklet 側の underrun 通知。recs は underrun 直前の直近 64 quantum の [p, rd, wr, wl, dms] (古い順)。p = run 内位置・rd/wr = out_read/out_write・wl = 0 IDLE / 1 BUFFERING / 2 PLAYING・dms = 前 quantum からの Date.now 差 (ms, 初回 -1) */
+export interface ConsumerUnderrun {
+  p: number;
+  consumed: number;
+  rebuf: number;
+  recs: number[][];
+}
+
 export interface FlAudioShimOptions {
   workletUrl: string;
   /** OPEN 毎にテスト用ダンプ領域を割り当てる (本番は未指定 = ダンプ無し) */
@@ -103,6 +111,7 @@ export class FlAudioShim {
   workletErrors: string[] = [];
   /** clock_jump 1 件ごと (上限 256 件)。ct = AudioContext.currentTime、pn = performance.now() (worklet 側、不可なら -1)、cb = producer の bufferSwitch 通し番号 */
   clockJumpLog: { q: number; d: number; frame: number; prev: number; ms: number; ct: number; pn: number; cb: number }[] = [];
+  underrunLog: ConsumerUnderrun[] = [];
   commandsHandled = 0;
   private refPts: { x: number; y: number }[] = [];
 
@@ -275,14 +284,16 @@ export class FlAudioShim {
       processorOptions: {
         buffer: this.api.getBuffer(),   // fla_open の malloc 後 (= ring 確保後) の最新 SAB
         ctlPtr: this.ctlPtr,
+        ctlSize: FLA_CTL_SIZE,
         layout,
         capture: this.lastCapture,
       },
     });
     node.port.onmessage = (e: MessageEvent) => {
-      const d = e.data as { type: string; message?: string; q?: number; d?: number; frame?: number; prev?: number; ms?: number; ct?: number; pn?: number; cb?: number };
+      const d = e.data as { type: string; message?: string; q?: number; d?: number; frame?: number; prev?: number; ms?: number; ct?: number; pn?: number; cb?: number; p?: number; consumed?: number; rebuf?: number; recs?: number[][] };
       if (d.type === "error") { this.workletErrors.push(d.message ?? "?"); this.log(`worklet error: ${d.message}`); }
       if (d.type === "clock_jump") this.clockJumpLog.push({ q: d.q ?? -1, d: d.d ?? 0, frame: d.frame ?? -1, prev: d.prev ?? -1, ms: d.ms ?? 0, ct: d.ct ?? -1, pn: d.pn ?? -1, cb: d.cb ?? -1 });
+      if (d.type === "underrun_trace") this.underrunLog.push({ p: d.p ?? -1, consumed: d.consumed ?? -1, rebuf: d.rebuf ?? -1, recs: d.recs ?? [] });
     };
     node.connect(ctx.destination);
     this.node = node;
@@ -362,6 +373,11 @@ export class FlAudioShim {
     Atomics.store(i, this.ix("ref_epoch_ms_bits"), this.i64u[0] | 0);
     Atomics.store(i, this.ix("ref_epoch_ms_bits") + 1, this.i64u[1] | 0);
     Atomics.add(i, this.ix("ref_seq"), 1);
+  }
+
+  /** worklet 側の underrun 通知 (先頭 8 件まで・発生順) */
+  consumerStats(): ConsumerUnderrun[] {
+    return this.underrunLog;
   }
 
   /** producer の起床統計 (ctl の wake_hist[6] / wake_count / wait_timeouts) */

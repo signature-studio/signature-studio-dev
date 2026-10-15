@@ -1,103 +1,118 @@
-# freshair 付録 #2739 / FA-38 (#3506): KH Compressor の機械語 harness
+# Fresh Air REPORT §11 付録 (#2739 / FA-34): Gain 以外の snap-in への差分実行の判定基準と振り分け
 
-親 #2739 ([FA-34] Gain 以外への拡大) の子 #3506 の付録。SC 側 Compressor (0x180775220) と KH 側 `compressor::CompressorDsp` (0x1802abc20) の同一入力比較のうち、**KH 側の実機機械語 harness** の結果を置く。
+- 本体: [REPORT.md](REPORT.md) §11-2 ①。Gain の差分実行結果は [REPORT_APPENDIX_FA5.md](REPORT_APPENDIX_FA5.md) §A3・§A3-5。親: #52。
+- 位置づけ: 判定基準 (§1) を実測より先に確定する。基準を当てた振り分け (§3) を残す。基準を変えるときは理由を書いて版を上げる (事後の変更はしない)。
 
-- 結論: KH Compressor process を実機機械語のまま 200 case 実行する harness (`ks_kh_comp_native.c`) は ERR 0/200 で動く (seed 7・11・99 の 3 回)。決定性 (同 seed の 2 回が byte 一致) と感度の負例 (P+0x4 ×2 で 197〜200/200 が変化) を満たす。**SC との bit 比較は未実施** (KH 側 P フィールドの一部が出力に届いていない・未束縛 import の stub 依存があり、判定に使えない。子 #3534 (FA-41))。
-- 測定 commit: `739c90452` (harness コード・作業 dir の分離)。以後の差分は本付録と DOC_MAP の索引行のみ (§5 の確認コマンド参照)。
+## §1. 判定基準 (版 1・実測前に確定)
 
-## 1. 対象 VA の確認 (RTTI)
+| 項目 | 基準 |
+|---|---|
+| C1 対象 | `ks_identity.py` の ID 一致 37 クラス。各クラスの `process_pair` (KH slot 14 と、SC の対応 slot の組) を 1 組とする |
+| C2 除外 (stub) | `min(KH バイト数, SC バイト数) < 64` の組は process 比較の代表にしない |
+| C3 両側ハーネス | 差分実行の対象は、SC 側の実機機械語ハーネス (`lift2/native/native_<x>.c`・`lift/native_gain.c`) と KH 側の登録 (`tools/targets/kilohearts/snapins/snapins.json` の key) の両方がある組だけ。両側が揃うまで「差分実行可」と書かない |
+| C4 同一入力 | 同じ seed の乱数で case を生成し、両側へ同じ値を入れる (`ks_semantic_gain.c` の方式)。param の写像は機械語の読みで対応させたものに限り、根拠を書く |
+| C5 判定 | 同一入力 N=200 case の L・R 出力と処理後 state の bit 一致。許容差は 0 (ulp 許容なし) |
+| C6 読み | 200/200 一致 → 「この入力分布で bit 一致」まで。不一致 → bit 不一致の確定のみ。「意味が違う」とは断定しない (Gain の丸め形の差は §A3-5 のとおり、意味の違いと同じとは限らない) |
+| C7 未実行 | C3 を満たさない組は実行しない。欠けている側のハーネスを理由に書く |
 
-- `tools/targets/kilohearts/scripts/rtti_walk.py` で HeartCore の `.?AVCompressorDsp@compressor@@` の vtable を引いた。**slot 14 = 0x1802abc20**。Gain の `.?AVGainDsp@gain@@` も slot 14 = 0x1804b0380 で、`snapins.json` の proc と一致する。よって slot 14 = process の規約は両者で同じで、issue 本文の VA は正しい。
-- リポジトリ内に `0x1802abc20` の記録は無かった (`snapins.json` に Compressor の登録なし)。本付録が初出。
-- 機械語 (`ks_identity.py` の `disasm` = pdata 関数境界): KH 0x1802abc20 = **1,724 B / 337 命令 / 直接 call 10 本**。SC 0x180775220 = 1,664 B / 333 命令 / 直接 call 10 本 + `call [rax+0x60]` (host 値の取得)。
-- 直接 call 先: 0x180fb6830 / 0x180fbc1f4 / 0x180fc3640 (x2+) / 0x180295f20 / 0x18004cf20 (x3)。0x180fc3640 は pow 系の共通基盤 (SC 側の 0x18103fd60 と同系統と見られる。未確認)。
-- 注: 「ID 一致 37 組の process 候補表」は親 #2739 の作業物で、本 PR の範囲外。origin/main には無い (`git log origin/main -S REPORT_APPENDIX_2739` 0 件。表は `origin/2739-freshair-snapin-diff-criteria` にある)。本付録は参照しない。
+## §2. 振り分け規則
 
-## 2. 引数・state・param の写像 (機械語の読み)
+- `stub`: C2 に該当。
+- `両側`: C3 を満たす。差分実行の対象。
+- `SC のみ` / `KH のみ`: 片側だけのハーネスがある。欠けている側を書く (子 issue の対象は 1 PR あたり最大 3 件まで)。
+- `なし`: 両側とも無い。判定はしない (#52 の残件として扱う)。
 
-KH process の引数: `rcx = this`・`rdx = ctx`・`r8 = aud` (`mov rbx,rcx` @1802abc84 / `mov rdi,rdx` @1802abc81 / `mov rsi,r8` @1802abc7e)。Gain (`ks_semantic_gain.c`) と同じ 3 引数。
+§3 の表は `tools/targets/freshair/ks_candidate_triage.py` が `ident.json` から機械的に作る。
 
-| 参照 | KH の命令 VA | 読み (役割) | harness の置き方 |
-|---|---|---|---|
-| `aud+0` = L・`aud+8` = R・`aud+0x28` = n | @1802ac06d・@1802ac080・@1802abee5 | 入出力の音声 | L/R を n 個。副入力は使わない |
-| 副 entry の `+0x40` < 0 で aud を使う | @1802abec1-@1802abec8 (`js`) | 副入力 (sidechain) の有無 | entry+0x40 = -1 |
-| `ctx+0x3188` = P | @1802abc87 | param block | 0x40 B |
-| `ctx+0x3198` = Q | @1802abc8e | 状態 block (フラグ・係数) | 0x140 B |
-| `ctx+0x31a8` = 副 entry 配列 | @1802abeae | 副入力の参照 | 先頭 1 件のみ |
-| `ctx+0x31b0` = 通知 vector V | @1802ac18d | 通知 id の push 先 | begin +0x60 / end +0x68 / cap +0x70 |
-| `ctx+0x3180` = id | @1802ac194 | 通知 id の基点 | 2000 |
-| `this+0x60` = sample rate | @1802abcf8 (`movss xmm15,[rbx+0x60]`) | 時定数の換算 (`P×sr`) | 44100/48000/96000/22050 |
-| `this+0xc4` = 初回フラグ | @1802abe03 (`cmp byte[rbx+0xc4],1`) | 初期化経路 | 0/1 |
-| `P+0x00` = 時定数 A | @1802abc9a → ×sr @1802abf02 | attack 相当 | lg(-4,0) |
-| `P+0x04` = 時定数 B | @1802abc9f → ×sr @1802abf07 | release 相当 (**出力に効く**・§4) | lg(-3,0.3) |
-| `P+0x08` = mode (int) | @1802abca5 → `cmp 2` @1802abcd0 | モード 0/1/2 | 0..2 |
-| `P+0x10` = 閾値 | @1802abc95 → `ucomiss xmm11,xmm6` @1802ac008・@1802ac110 | 閾値比較 (**出力に効かない**・§4) | RFS(0,2) |
-| `P+0x14` | @1802abca8 (xmm10) → `divss` 系 | 係数 (**出力に効かない**・§4) | 0.1..2 |
-| `P+0x18`・`P+0x20` | 出力 @1802ac1c7・@1802ac22f | 検出値の出力 | 読み出して記録 |
-| `P+0x1c` | 読み @1802ac097・書き @1802ac171 | 状態 (平滑化値) | 0..1 |
-| `P+0x24` (int)・`P+0x28` (int) | @1802abeca・@1802abeb5 | 副 entry の添字・引数 | 0 |
-| `Q+0x68` (float) | @1802abcc2 (rcx=Q)・@1802abda4 | 係数の lerp (`C1+Q68×(C0−C1)`) | 0..1 |
-| `Q+0xfc`・`Q+0xdc`・`Q+0x11c` | @1802ac17d・@1802ac1d4・@1802ac23b | 通知済みフラグ (id+7・+6・+8) | 0/1 |
-| `this+0x60..0xc8` の state | @1802abf68 他 | 処理後 state | 乱数で初期化 |
+## §3. 振り分け結果 (測定 commit `1c94dd299`)
 
-SC との対応 (根拠の候補。未確定): SC 側の state は `S+0x98..0x100` で、KH の `this+0x60..0xc8` と **`S = this + 0x38`** で揃う。初回フラグは KH `this+0xc4` (@1802abe03) と SC `S+0xfc` (`cmp byte[rbx+0xfc],bpl` @180775446) で、差は同じ 0x38。SC 生成器 `lift2/gen_comp_scen.py` の state 書込み先 (0x98..0x100・0xfc) もこの範囲に入る。
+- 再現: `python3 tools/targets/freshair/ks_identity.py <HeartCore.core_64> <SlateCore.core_64> ident.json` → `python3 tools/targets/freshair/ks_candidate_triage.py ident.json` (素材 `work-liftlib-targets`)。
+- 実測 (測定 commit `1c94dd299`・素材 `work-liftlib-targets` を `$ARTIFACTS_DIR` から展開・nproc=4・load 1 分値 0.05〜0.26): `ks_identity.py` 2.78 s・EXIT=0。`ks_candidate_triage.py` の出力は本節の表と **37 行一致** (表の行だけを diff して差分 0)。区分の内訳も一致。同じ表は `f5851bc18`・`691ee7153` でも得られた。実装 run (`c3fef51c7`・2.9 s) では再生成した `ident.json` と表が byte 一致だった (当時の記録)。鮮度: `git diff 1c94dd299 HEAD -- 'tools/targets/freshair/*.py' 'tools/targets/freshair/*.sh' 'tools/targets/freshair/lift/' 'tools/targets/freshair/lift2/' 'tools/targets/kilohearts/snapins/' 'tools/targets/kilohearts/scripts/'` の出力は 0 行 (以後の commit は本 REPORT のみ)。
+- 振り分け表 (クラスは `ident.json` の `process_pair`。KH slot 14 と SC の対応 slot):
 
-P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r8+0x9dc4]` @18077525f・`[r8+0x9e0c]` @180775274) と掛かる時定数で、KH の `P+0x00`・`P+0x04` と使われ方が揃う。`P+0x9e54` (mode) は `cmp 2` で分岐し KH `P+0x08` と揃う。`P+0x9ea8` は `comiss xmm12,[P+0x9ea8]` (@1807753ee) で閾値比較。host 値 (SC `[P+0xa098]` の vtable slot 0x60) は KH に対応する呼び出しが無い。残りの写像と Q フラグの対応 (SC `P+0x9ffb`・`P+0x9fb3`・`P+0xa043` ↔ KH `Q+0xfc`・`Q+0xdc`・`Q+0x11c`) は子 #3534 (FA-41) で確定する。
-
-## 3. harness の仕組みと stub
-
-- `ks_kh_comp_native.c`: PE を base に raw map (`MAP_FIXED_NOREPLACE`)。Gain 版 (`ks_semantic_gain.c`) と同じ方式。
-- **未束縛 import**: 素材の HeartCore は import 379 件の IAT が hint/name RVA のまま。`patch_iat` で `GetLastError` を戻り 0 の stub に、他は戻り 0 かつ呼び出し回数を数える stub に置換した。
-- **実測された未束縛呼び出し** (seed 7): 2 つの call site (呼び出し元 VA は `UNRES` 行に出る) が mode=1 の case で呼ばれた。
-  - `0x180fd3189`: `e8` で thunk `0x180fd81ec` (`jmp [rip+0x3c9175]`) へ。thunk の参照先 `0x1813a1367` は KERNEL32 の FirstThunk (0x13a1178) の 8 B 整列位置から外れ、どの import かは未確定。
-  - `0x180fd31f4`: `call [rip+0x3ce0c7]` = slot `0x1813a12c0` = `KERNEL32!SetLastError` (戻り値は未使用)。
-  - 件数は seed 7 で 67+67 = 134 (mode=1 の case 数と一致)。mode=1 の出力は stub 依存で、比較に使えない (§5)。
-- **初回の ERR**: 最初の版は `GetLastError` の未束縛 slot (`0x13a1790`) を踏んで 67/200 が SIGSEGV (RIP = addr = `0x286e1e0`、hint/name RVA の値へ飛んだ)。stub 化で ERR 0 になった。
-
-## 4. 実測 (commit `739c90452`・`bash tools/targets/freshair/ks_kh_comp.sh 200 <seed>`)
-
-環境: nproc=4、load average (1 分) 0.10〜0.18 (各 run の前後。seed 7 は 0.10、seed 11・99 は 0.18)。実行時間は 200 case の run1 で 0.03 s (seed 7・11・99 とも実測 0.03 s)。
-
-| seed | ERR | 音声が変化した case | 通知 id の総数 | 通知 0 件の case | 未束縛 import 呼び出し | 同 seed 2 回の一致 | 負例 (P+0x4 ×2) で変化した case |
+| クラス | KH VA | SC VA | KH B | SC B | ratio_M | 区分 | 欠けている側 |
 |---|---|---|---|---|---|---|---|
-| 7 | 0/200 | 197 | 294 | 25 | 134 | byte 一致 | 197/200 |
-| 11 | 0/200 | 200 | 292 | 25 | 136 | byte 一致 | 200/200 |
-| 99 | 0/200 | 198 | 293 | 29 | 102 | byte 一致 | 198/200 |
+| Bitcrush | 0x1802747a0 | 0x1806601b0 | 2092 | 1761 | 0.2297 | なし | SC と KH の両方 |
+| Chorus | 0x18027fa70 | 0x1803df070 | 4039 | 907 | 0.1416 | なし | SC と KH の両方 |
+| CombFilter | 0x1802899f0 | 0x1803df070 | 1187 | 907 | 0.2450 | なし | SC と KH の両方 |
+| Compressor | 0x1802abc20 | 0x180775220 | 1724 | 1664 | 0.4358 | SC のみ | KH (snapins.json に key 無し) |
+| Delay | 0x1802ed7f0 | 0x180ba8ad0 | 3291 | 2551 | 0.2027 | KH のみ | SC (実機機械語ハーネス無し) |
+| Disperser | 0x180316480 | 0x180be1500 | 2311 | 3167 | 0.2256 | KH のみ | SC (実機機械語ハーネス無し) |
+| Distortion | 0x1803295b0 | 0x1805b8290 | 4649 | 405 | 0.0795 | なし | SC と KH の両方 |
+| Dualdelay | 0x18033b000 | 0x18086d1f0 | 3962 | 2969 | 0.1637 | なし | SC と KH の両方 |
+| Dynamics | 0x18034f6e0 | 0x1808a4330 | 2093 | 2122 | 0.2528 | なし | SC と KH の両方 |
+| Equalizer | 0x1803f1890 | 0x1806b1180 | 3293 | 2732 | 0.2075 | なし | SC と KH の両方 |
+| Faturator | 0x180452f20 | 0x1803df070 | 3896 | 907 | 0.1574 | なし | SC と KH の両方 |
+| Filter | 0x1804655e0 | 0x180b6f050 | 969 | 818 | 0.3351 | SC のみ | KH (snapins.json に key 無し) |
+| Flanger | 0x18049bb50 | 0x180f7a600 | 6754 | 6368 | 0.1159 | なし | SC と KH の両方 |
+| FrequencyShifter | 0x1804a6a20 | 0x1803df070 | 2776 | 907 | 0.1530 | なし | SC と KH の両方 |
+| Gain | 0x1804b0380 | 0x180afe090 | 609 | 446 | 0.4753 | 両側 | - |
+| Gate | 0x1804c2f50 | 0x1804ce700 | 1703 | 1599 | 0.2425 | KH のみ | SC (実機機械語ハーネス無し) |
+| GraphicEq | 0x18037d210 | 0x180a59700 | 4413 | 3402 | 0.2613 | なし | SC と KH の両方 |
+| Haas | 0x1804d0280 | 0x180498cd0 | 1175 | 981 | 0.3333 | KH のみ | SC (実機機械語ハーネス無し) |
+| HostProxy | 0x180020660 | 0x180c201d0 | 41 | 67 | 0.7500 | stub | - |
+| Ladder | 0x1804d9930 | 0x1803df070 | 620 | 907 | 0.2326 | なし | SC と KH の両方 |
+| Limiter | 0x1804e8500 | 0x18094d9c0 | 1980 | 1588 | 0.3258 | KH のみ | SC (実機機械語ハーネス無し) |
+| Micropass | 0x1807d8a60 | 0x1807f39b0 | 5155 | 3941 | 0.2491 | なし | SC と KH の両方 |
+| Multipass | 0x1805488d0 | 0x180994f40 | 12209 | 4917 | 0.2727 | なし | SC と KH の両方 |
+| PhaseDistortion | 0x18058fac0 | 0x180b373c0 | 10389 | 4693 | 0.0961 | なし | SC と KH の両方 |
+| Phaser | 0x1807270d0 | 0x180a1bef0 | 2172 | 2208 | 0.3141 | KH のみ | SC (実機機械語ハーネス無し) |
+| PitchShift | 0x1807328d0 | 0x18073a480 | 1202 | 1105 | 0.2739 | なし | SC と KH の両方 |
+| QuickEq | 0x18035fb10 | 0x180ac5550 | 1754 | 2090 | 0.1870 | KH のみ | SC (実機機械語ハーネス無し) |
+| Resonator | 0x180743390 | 0x1803df070 | 2020 | 907 | 0.1505 | KH のみ | SC (実機機械語ハーネス無し) |
+| Reverb | 0x1807522d0 | 0x180e5c720 | 1843 | 1665 | 0.3118 | なし | SC と KH の両方 |
+| Reverser | 0x18075c6d0 | 0x1807b0b40 | 1850 | 1566 | 0.2815 | なし | SC と KH の両方 |
+| RingMod | 0x1807680b0 | 0x18050d730 | 1661 | 1485 | 0.2254 | なし | SC と KH の両方 |
+| Stereo | 0x18080d4d0 | 0x1805ee2a0 | 1679 | 1117 | 0.3358 | KH のみ | SC (実機機械語ハーネス無し) |
+| TapeStop | 0x180818bb0 | 0x180546270 | 9 | 9 | 1.0000 | stub | - |
+| TranceGate | 0x18082fe30 | 0x1803df070 | 1147 | 907 | 0.2055 | なし | SC と KH の両方 |
+| TransientShaper | 0x180841140 | 0x18057e150 | 3547 | 2274 | 0.3043 | なし | SC と KH の両方 |
+| Unison | 0x18084dd90 | 0x1803df070 | 2684 | 907 | 0.1427 | なし | SC と KH の両方 |
+| VocalFilter | 0x18085a730 | 0x1808e1f30 | 614 | 109 | 0.1951 | KH のみ | SC (実機機械語ハーネス無し) |
 
-- 「音声が変化した case」= 出力 L/R が入力と byte 違い (process が音声に作用している)。
-- 通知 id: 1 case あたり 0〜3 件 (id+7・+6・+8 の初回のみ)。
+対象 37: KH のみ 10 / SC のみ 2 / stub 2 / なし 22 / 両側 1
 
-**感度の確認 (seed 7・200 case、基準出力との行差分)**:
+表の注記 (表は機械出力のまま。注記は手書き):
 
-| 摂動 | 変化した case | 読み |
-|---|---|---|
-| P+0x00 ×0 | 0 | 出力に届かない |
-| P+0x04 ×2 | 197 | 出力に効く (負例に採用) |
-| P+0x10 ×0 / ×0.5 / ×2 | 0 / 0 / 0 | 出力に届かない |
-| P+0x14 ×0 / ×2 | 0 / 0 | 出力に届かない |
-| P+0x1c ×0 | 20 | 出力に効く |
+- **SC VA `0x1803df070` (907 B) の 8 組** (Chorus・CombFilter・Faturator・FrequencyShifter・Ladder・Resonator・TranceGate・Unison) は、process の対応として成立しない。この VA は制御層から呼ばれる共有関数で、`lift2/build_ctl.sh` の ICALLS と `lift2/build_ctrl.sh` の `--icall` 一覧にも現れる。`ks_identity.py` は「命令数 3 以上の SC slot のうち M 比が最大の slot」を process_pair にするため、この共有関数が候補に選ばれた (ratio_M 0.14〜0.25)。この 8 組の SC 側 process は未特定で、判定基準 C1 の max-ratio 規則では対応が決まらない。規則を直すときは §1 の版を上げ、理由を書く。区分 (なし / KH のみ) はハーネスの有無だけで決まるので、§4 の結論は変わらない。
+- **Gain 行**: 「§A3 で測定済み」は表の機械出力に無い手書きの注記。Gain の差分結果は [REPORT_APPENDIX_FA5.md](REPORT_APPENDIX_FA5.md) §A3 を参照。
 
-`P+0x00`・`P+0x10`・`P+0x14` が 200 case のどれにも効かないのは、(a) 写像の誤り、(b) 当該分岐が本シナリオの入力で到達しない、のどちらか。**SC と比べる前に確定が必要** (子 #3534 (FA-41))。このまま比べると一致は意味を持たない。
+## §4. 差分実行の結論 (C3 を満たす組)
 
-## 5. 検証範囲・限界・確認
+- **両側 (差分実行できる組) は Gain だけ**。Gain の差分は既存の §A3 (同一 200 case で L/R/state の bit 一致 127/200)・§A3-5 (丸め形のモデル)・§A3-6 (機械語の ramp を KH 形に置換した native で 200/200、control は 127/200)。本付録での新規の差分実行は **0 件**。
+- **SC のみ**: Compressor (0x180775220)・Filter (0x180b6f050)。SC 側の harness は動く (§5) が、KH 側の harness と snapins 登録が無いため差分は未実施。子 issue #3506 (Compressor)・#3507 (Filter)。
+- **KH のみ** (10 組): Delay・Disperser・Gate・Haas・Limiter・Phaser・QuickEq・Resonator・Stereo・VocalFilter。KH 側の登録はあるが、SC 側の実機機械語ハーネスが無い。差分の対象外。起票先は #52 の残件。
+- **なし** (22 組): 両側とも無い。判定しない (#52 の残件)。
+- **stub** (2 組): TapeStop (9 B)・HostProxy (KH 41 B)。C2 により除外。
 
-- 検証範囲: KH process の機械語を、本 harness の入力 (§2 の写像・乱数) で 200 case × 3 seed 実行。範囲外: SC との bit 比較、P フィールドの意味の確定、未束縛 import の実体の確定、mode=1 の出力の正しさ。
-- 差分確認: `git diff 739c90452 HEAD -- tools/targets/freshair/ks_kh_comp.sh tools/targets/freshair/ks_kh_comp_native.c` (出力 0 行)。
-- 並列実行の確認 (測定 commit で seed 11・99 を `xargs -P 2` で同時実行。両 script の実行区間が重なり、開始時刻の差 0.30 ms、各 script 全体 0.25 s): 両 SUMMARY と kh_a.txt が直列実行と一致 (seed 11 = 200・292・25・136、seed 99 = 198・293・29・102、byte 一致)。
-- blob 監査: 20 MiB 超の追加なし。`work/` (gitignore) は使用のみ。
+## §5. SC 側ハーネスの smoke (測定 commit `1c94dd299`)
 
-## 6. 未解決
+- 再現: `SC_CORE=<work-liftlib-targets の SlateCore.core_64> bash tools/targets/freshair/ks_sc_native_smoke.sh 20 [outdir]`。mlift の report から `iat_slots` を作り、同じ root・map・pokes で `native_comp` / `native_filter` を fma 0・1 で実行する。判定はしない。emsdk ([EMSDK]) は不要。`lift2/env.sh` は [EMSDK] を無条件に読むため、smoke はそれを `set +e` で読み、読み込みの失敗だけ無視する (`1c94dd299` で修正。それ以前は [EMSDK] の無い runner で無言に exit 1 した)。
+- 実測 (測定 commit `1c94dd299`・2 回実行、nproc=4、load 1 分値 0.05〜0.26。1 回目 4.06 s・2 回目 4.17 s (lift2venv は作成済み。venv を新規に作った `691ee7153` の 1 回目は 9.51 s)。2 回の出力ファイルの md5 が一致、EXIT=0):
+
+| ハーネス | fma | 行数 | ERR |
+|---|---|---|---|
+| Compressor (`native_comp.c`) | 0 | 20 | 0 |
+| Compressor (`native_comp.c`) | 1 | 20 | 0 |
+| Filter (`native_filter.c`) | 0 | 20 | 0 |
+| Filter (`native_filter.c`) | 1 | 20 | 0 |
+
+- 出力: 4 ファイル (`comp_n0`・`comp_n1`・`f_n0`・`f_n1`) の md5 は 2 回の実行で一致。fma 0 と fma 1 の出力も一致した (Compressor `af1c35e5aa66`・Filter `c6500f7db0e9`。このシナリオでは fma の違いが出力に現れていない。判定はしない)。stderr は 4 本とも 0 B。
+- 注: 最初の試行では cwd に `pokes.txt` を置かずに実行し、Compressor が ERR 7/20 になった。`pokes.txt` (CRT 初期化の再現) を `FA_POKES` で渡すと ERR 0。smoke スクリプトは `FA_IAT`・`FA_POKES` を明示する。
+- 限界: これは「SC 側の harness が実機機械語を実行できる」までの確認。出力の値が正しいこと (wasm・KH との一致) は未確認。
+
+## §6. 受入条件への対応
+
+- 受入 1 (判定基準の文書化): §1・§2 を実測より前に commit (`7e7b12f02`)。
+- 受入 2 (ID 一致候補の差分実行、または実行できない理由): 新規の差分実行は 0 件。C3 を満たす組は Gain だけ。Compressor・Filter は SC 側だけ実行可能 (§5) で、KH 側 harness が無いことを理由に子 #3506・#3507 へ分けた。KH のみ 10 組・なし 22 組・stub 2 組は §4 に理由を書いた。
+- 受入 3 (Gain 以外の判定を #52 に返す): Gain 以外は **未判定 (差分 0 件)**。#52 へ返す内容は §4・§7 の表。付録 [REPORT_APPENDIX_FA5.md](REPORT_APPENDIX_FA5.md) §A3-5 からも本節へ導線を置いた。
+
+## §7. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| SC⇄KH 同一入力の bit 一致実測 (旧受入 2) と #52 への判定返し (旧受入 3) | Compressor の判定が未了 | #3534 (FA-41) |
-| `P+0x00`・`P+0x10`・`P+0x14` が出力に届かない原因 (写像か分岐か) | 比較の意味。SC の P 写像の確定 | #3534 (FA-41) |
-| 未束縛 import 2 経路 (mode=1 のみ。`0x1813a1367` の実体) の stub 依存 | mode=1 の出力 | #3534 (FA-41) |
-| ID 一致 37 組の process 候補表 (親 #2739 の作業物。本 PR の範囲外) が main に無い | 本付録は参照しない | 親 #2739 へコメント |
-
-## 7. 再現
-
-```sh
-# 素材: work-liftlib-targets (tools/targets/kilohearts/work/winpkg/HeartCore.core_64)
-bash tools/targets/freshair/ks_kh_comp.sh 200 7   # ERR 0・決定性・負例を判定 (run1 実測 0.03 s)
-```
+| Compressor の KH 側 harness と同一入力の差分 (C4〜C6) | Compressor の意味同一性は未判定 | #3506 |
+| Filter の KH 側 harness と同一入力の差分 (C4〜C6) | Filter の意味同一性は未判定 | #3507 |
+| KH のみ 10 組の SC 側実機ハーネス (Delay・Disperser・Gate・Haas・Limiter・Phaser・QuickEq・Resonator・Stereo・VocalFilter) | 差分の対象が無い | #52 (残件) |
+| なし 22 組 (両側とも無し) | 判定の対象外 | #52 (残件) |
+| Gain の ramp 式 `(1-t)*a + t*b` がソースの意図か (§A3-6 の未解決。機械語の置換による 200/200 は §A3-6 で確認済み) | 「どちらが正しい式か」は未確定。Gain の判定の解釈に残る | #52 (残件) |

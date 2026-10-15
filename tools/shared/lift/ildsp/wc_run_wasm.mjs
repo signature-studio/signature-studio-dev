@@ -38,9 +38,9 @@ for (let c = 0; c < ncase; c++) {
     // CreateInstance → vtable の slot を順に呼ぶ (wc_native_ref.c と同一の順序・引数・式)
     const obj = ex.wc_run(ENTRY, 0n, 0n, 0n, 0n);
     let acc = obj;
-    for (const s of L.slots.slice(0, L.call_slots)) {
+    for (const [k, s] of L.slots.slice(0, L.call_slots).entries()) {
       const r = ex.wc_run(BASE + s, obj, BigInt(ARENA + 0x8000), 0n, 0n);
-      acc = BigInt.asUintN(64, acc * 31n + r);
+      if ((L.ret_mask >> k) & 1) acc = BigInt.asUintN(64, acc * 31n + r);
     }
     rax = acc;
     hits = ex.wc_hits_get();

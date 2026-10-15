@@ -1,7 +1,7 @@
 /* ks_kh_comp_native.c — KH Compressor (HeartCore compressor::CompressorDsp の process 0x1802abc20) を
  * 実機 x86-64 機械語のまま実行する参照ハーネス (FA-38 / #3506)。
  *   ks_kh_comp_native <HeartCore.core_64> <ncases> <seed>  → stdout に 1 case 1 行
- * 入力の写像は HeartCore の機械語の読みで決めた (根拠は REPORT_APPENDIX_2739.md §2):
+ * 入力の写像は HeartCore の機械語の読みで決めた (根拠は REPORT_APPENDIX_FA38.md §2):
  *   process(rcx=this, rdx=ctx, r8=aud)。ctx+0x3188 = P (param 16 B 系の小さい block)、
  *   ctx+0x3198 = Q (フラグ 0xfc/0xdc/0x11c・係数 0x68)、ctx+0x31a8 = 副 entry 配列 (entry+0x40 < 0 で副入力を
  *   使わない)、ctx+0x31b0 = 通知 vector (begin +0x60 / end +0x68 / cap +0x70)、ctx+0x3180 = 通知 id。

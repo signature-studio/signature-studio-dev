@@ -30,7 +30,7 @@ static const fla_layout_entry_t g_layout[] = {
     OFF(silence_frames), OFF(quanta), OFF(in_overruns), OFF(wl_state), OFF(clock_seq), OFF(play_start_frame), OFF(clock_jumps), OFF(clock_jump_frames),
     OFF(out_write), OFF(in_read), OFF(wake_target), OFF(gen), OFF(go), OFF(in_wake_target), OFF(tick_target), OFF(notify_ms), OFF(burst_obs),
     OFF(clock_skip_frames), OFF(clock_dup_frames), OFF(clock_jump_max), OFF(clock_jump_max_q),
-    OFF(clock_first_q), OFF(clock_last_q), OFF(cb_max_q), OFF(wake_hist),
+    OFF(clock_first_q), OFF(clock_last_q), OFF(cb_max_q), OFF(wake_hist), OFF(burst_hist),
     OFF(ref_ctx_time_bits), OFF(ref_epoch_ms_bits), OFF(ref_seq), OFF(out_latency_us), OFF(base_latency_us),
     OFF(cmd_seq), OFF(cmd_op), OFF(cmd_arg), OFF(ack_seq), OFF(ack_status), OFF(ack_res), OFF(ctrl_ready),
     OFF(cb_count), OFF(cb_late), OFF(cb_max_us), OFF(cb_sum_us_lo), OFF(wake_count), OFF(wait_timeouts),
@@ -106,6 +106,10 @@ int fla_open(uint32_t sr, uint32_t out_ch, uint32_t in_ch, uint32_t buffer_frame
      * T >= burst + buffer_frames でないと 1 回の burst で枯渇する (PROTOCOL.md §4) */
     uint64_t need = ((uint64_t)burst * FLA_BURST_PCT / 100 + buffer_frames + buffer_frames - 1) / buffer_frames;
     if (need > depth) depth = (uint32_t)need;
+    if (flags & FLA_F_T_FLOOR) {
+        uint32_t d_floor = (FLA_T_FLOOR_FRAMES + buffer_frames - 1) / buffer_frames;
+        if (depth < d_floor) depth = d_floor;
+    }
     /* depth の固定上限は置かない。制約は ring 容量のみ: 動的 T 拡張 (flasio, 上限 ring-2B) の余地を含め
      * (depth+2)*B <= FLA_MAX_RING が必要。超過はホストを落とさずエラー返却 (呼び側が CreateBuffers エラーに写像) */
     uint64_t t_min = ((uint64_t)depth + 2) * buffer_frames;
@@ -174,6 +178,7 @@ void fla_reset_indexes(void) {
     c->cb_count = c->cb_late = c->cb_max_us = c->cb_sum_us_lo = c->wake_count = c->wait_timeouts = 0;
     c->in_underflows = 0; c->min_fill = 0xffffffffu; c->fill_sum_lo = 0; c->fill_samples = 0;
     memset(c->wake_hist, 0, sizeof c->wake_hist);
+    memset(c->burst_hist, 0, sizeof c->burst_hist);
     c->pw_n = 0;
 }
 
