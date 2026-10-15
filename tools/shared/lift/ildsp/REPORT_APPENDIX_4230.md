@@ -52,6 +52,17 @@ issue 本文の測定 commit `180307dfc` は repo に存在しない。直前の
 - B で発火するのは `--heap-fail-n 1` (1 回だけ失敗) のとき。全件失敗 (`--heap-fail-n` なし) は `0x1ac9c0` の new handler 再試行ループで timeout するため使わない。
 - 前回 (`68bf86737` 時点) の付録にあった「注入なしで slot 1 が約 230 万回発火して timeout」「巨大 rdx で 3 回発火」は、`52cbf1762` の harness では再現しなかった。main 取り込み後に slot 1 の呼出し (`Fn1F`/`Fn2F`) と直接 call 対照が変わったため、旧測定の値は本測定の根拠にしない。旧値の由来 (測定 commit `68bf86737`・`98ff44f13`) は未検証。
 
+## #4289 の追測 (HEAD `7dae9fc7c` 時点・`9e2273a2e` 以降の harness は変更なし)
+- 測定の前提: 測定 commit `9e2273a2e` は main の祖先。`ildsp_native.c` は `52cbf1762` から `origin/main` で `--s0-members`・`--pre-slot` が追加されている (既定の動作は変わらない。`git diff 52cbf1762 HEAD -- tools/shared/scripts` の出力を参照)。`fl-win64` 展開後の `block24360_PE.bin` の sha256 先頭 16 桁は `f4b23b0f93ee9119` (issue と一致)。
+- harness の修正: `ildsp_reach_matrix.sh` が `tools/shared/work/native/` を作らず gcc が失敗していたため、`mkdir` に出力先の親 dir を追加。これ以外の測定 harness は変更していない。
+- matrix (A・B・C) の再現: 付録本文の表と一致 (A `0x1aedf6`・`0x1aee04`・`0x1aee4a`・`0x1b6f6c` 0 件、B slot 1 v0〜v3 で 6 件発火、slot 3 v1〜v3 rc 139)。wall 2.2 s・load average (1 分) 0.72 (開始時)。
+- ASLR 切り分け (slot 1 v0・注入なし・各 6 回): ASLR 有効・`setarch -R` (無効) とも、`hook_hit` は `0x1aa29f`×2 のみ。ASLR の有無で既定入力の発火は変わらない。
+- 入力の探索 (注入なし): slot 2 v0〜v3・slot 3 v0・slot 4 v0・slot 5 v0・`--s0-members`・`--pre-slot 1`・slot 4 + `--newh-zero` の全てで発火 0。
+- 静的解析: `0x1aedf6` の直前は `testb $0x10,(%rdx)`・`je`。helper `0x1aedc0` の直接 caller 8 箇所 (`0x1647da`・`0x1ad022`・`0x1ad042`・`0x1adcad`・`0x1adcd1`・`0x1b006a`・`0x1b056d`・`0x1cc1ae`) は、`rdx` が `.rdata` の定数 (`0x3f3660`・`0x3f3790`・`0x3f3888`・`0x3f36c0` 等) か 0 で、いずれも flag byte の bit 0x10 は 0。
+- 入口の実測 (alloc 失敗注入 B・slot 1 v0/v1): `0x1aedc0` 入口の `rdx=0x1803f3660`・`[rdx]=0x00`。よって `0x1aedf6` は bit 0x10 が立たず発火しない。
+- 強制実験 (probe・repo 外): 入口で `[rdx]` の bit 0x10 を立てると `0x1aedf6` は発火し、飛び先 `0x1cb5e0` を経て `0x1aee04` (RtlPcToFileHeader) に進む。その後は SIGSEGV (rc 139) か timeout で、正常終了はしない。bit を立てる入力は FL 内で作られる経路を特定していない。
+- 結論の更新: 受入 1 (既定入力での決定的な発火条件) は未達。既定入力は ASLR 有効・無効の各 6 回で発火 0。ASLR を除外できたのみで、未初期化値・ヒープ位置は未検証。受入 2 (`0x1aedf6` を真にする入力) は、強制 bit では発火を実測できたが、FL 内で真になる入力は未特定。受入 3 (trap 化か stub 化か) は、到達条件が未確定のため判断しない。
+
 ## 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
