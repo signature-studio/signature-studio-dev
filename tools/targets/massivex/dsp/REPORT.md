@@ -100,7 +100,7 @@ headline の round 2/3 は 1 コマンド e2e では再現できない (規則 3
 (定義: 38,485 ÷ 1,105 = 34.8)。AES/SHA-NI は OpenSSL 静的リンク由来と推定 (MX-1 REPORT §5 実測)。
 旧値 48,612 は x64c の `ac58a8749`・`fe2dc9ed9` より前の値 (現 HEAD で再測定。詳細は massivex REPORT §11.4)。
 
-- 群分けは `e2e.sh` の判定順のまま: `v` 接頭辞判定が先のため vaes 系 224 は AVX に入り、pshufb / palignr / pclmulqdq は「その他」に入る。合計 38,485 は不変 (起票先: 親 #3454 の判断・表示のみ)。
+- 群分けは `e2e.sh` の判定順のまま: `v` 接頭辞判定が先のため vaes 系 224 は AVX に入り、pshufb / palignr / pclmulqdq は「その他」に入る。合計 38,485 は不変 (表示のみ・起票先: #3487 [MX-36])。
 - **vectorcall**: 567 関数の到達 import は COM (`CoCreateFreeThreadedMarshaler` 等) 3 件のみ。
   独自 vectorcall 修飾子は未検出 — ただし x64c は import 修飾子を無視するため**範囲外** (§6 U3)。
 - **MSVC C++ EH**: .pdata の chained 関数が多数 (D11) ゆえ unwind チェインが濃密と推定。未解析 (§6 U4)。
