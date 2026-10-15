@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Prio } from "../src/launch.ts";
-import { selectDispatch, type HistoryEntry, type PmTarget } from "../src/pm.ts";
+import { KIND_LIMITS, selectDispatch, type HistoryEntry, type PmTarget } from "../src/pm.ts";
 import { configuredApp, j, markFresh, REPO, T0, type Call } from "./helpers.ts";
 import { at, commentEv, HUMAN, IMPL, issueEv, outcomeBody, prEv, REVIEWER, send, type Ctx } from "./pm_helpers.ts";
 
@@ -80,9 +80,10 @@ test("(e) ネガコン (hour): 毎時 24 件の上限は、critical でも破ら
   assert.deepEqual(r.skipped, [{ kind: "no_pr", ref: 3466, why: "hour" }]);
 });
 
-test("(e) ネガコン (kind): refs_orphan の 1 日 10 件は、critical でも破らない", () => {
-  const ten = Array.from({ length: 10 }, (_, i) => h("refs_orphan", 500 + i, 120 + i, "normal"));
-  assert.deepEqual(sel([tg("refs_orphan", 900, "critical")], ten).skipped, [{ kind: "refs_orphan", ref: 900, why: "kind" }]);
+test("(e) ネガコン (kind): refs_orphan の 1 日の上限 (KIND_LIMITS.refs_orphan.dayMax) は、critical でも破らない", () => {
+  const max = KIND_LIMITS.refs_orphan!.dayMax;
+  const full = Array.from({ length: max }, (_, i) => h("refs_orphan", 500 + i, 120 + i, "normal"));
+  assert.deepEqual(sel([tg("refs_orphan", 900, "critical")], full).skipped, [{ kind: "refs_orphan", ref: 900, why: "kind" }]);
 });
 
 test("(f) 回帰: prio が無い入力 (全て normal) と、prio の無い古い履歴は、従来の順 (未送信の先・送信済みは古い順・入力順) のまま", () => {
