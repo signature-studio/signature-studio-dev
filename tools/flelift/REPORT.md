@@ -5,6 +5,7 @@
 - **判定: 達成**。FLEngine_x64.dll 全体 (M11 closure 7,421 関数のうち lift 可能 **7,031 関数 / 340,774 命令**) を
   x64c (tools/ott/lift/x64c.py の vendored fork) で lift し、**未対応 site を 1,105 (0.32%) → 0 にした**。
   `bash tools/flelift/fle_e2e.sh` (約 2.7 分) = **PASS**。
+- **Win32 TLS (TlsAlloc・TlsGetValue・TlsSetValue) を Windows 仕様に合わせた** (#4234)。測定と直接確認は `REPORT_APPENDIX.md` §14。
 - **wasm build 成功**: emcc -O0 で **wasm 27.6MB** を生成 (lift 35 秒 + data gen + emcc 28 秒、合計約 60 秒)。
 - **spot 差分検証 (native 実機械語直実行 vs wasm)**: 7 関数 / 16 case のうち **16 case が戻り値・xmm0・
   メモリ書換 (.data/.bss/TEB/scratch/arena) 全て bit 一致** (初版は 14/16。残 2 case は harness の scratch 初期化バグで

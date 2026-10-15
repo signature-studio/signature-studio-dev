@@ -12,6 +12,8 @@
   4. 別名を格納する命令 (`mov [mem], 別名`) と、別名を宛先とする rep movs/stos・memcpy/memmove/memset の
      呼出しを列挙する (bulk copy の宛先が領域かどうか)。
   5. 正の対照: V (0x16bacec) への書込み 3 件 (0xf82b80・0xf82c55・0xf82c5f) と K の読み 2 件 (0xf82a43・0xf82c48) を検出できること。
+  6. (PY-207) rep 文字列の rdi を後ろ向きに深さ 3 まで辿って由来を分類 (ext A)。領域を返す関数 (ret) の呼出し側を
+     同じ方式で追う (ext B)。領域内の直接参照・別名参照を番地ごとに並べる (ext C)。
 
 限界: 別名は同一関数内 (と深さ内の direct call 先) でだけ追う。別名をメモリへ格納した先での再ロードは追わない
 (格納の列挙 (4) で所在を示す)。間接 call の先は追わない。
@@ -462,6 +464,113 @@ def main():
         m = ((op_b >= 0xB8) & (op_b <= 0xBF)) & (val >= LO) & (val < HI)
         imm += int(m.sum())
     print("mov r32, imm32 byte candidates with value in region=%d" % imm)
+
+    def func_begin(va):
+        pd = [s for s in secs if s.Name.rstrip(b"\0") == b".pdata"]
+        n = pd[0].Misc_VirtualSize // 12
+        ent = np.frombuffer(raw[pd[0].PointerToRawData:pd[0].PointerToRawData + 12 * n], dtype="<u4").reshape(n, 3)
+        rva = va - base
+        i = int(np.searchsorted(ent[:, 0], rva, side="right")) - 1
+        if i < 0 or not ent[i, 0] <= rva < ent[i, 1]:
+            return None
+        return base + int(ent[i, 0])
+
+    print("--- ext A: rdi source of rep string sites (backward trace, depth<=3)")
+
+    def src_of(reg, addr, depth):
+        if depth > 3 or reg is None:
+            return "depth-limit"
+        seq = [ins for ins in md.disasm(read_va(addr - 600, 616), addr - 600) if ins.address < addr]
+        for ins in reversed(seq[-300:]):
+            if ins.mnemonic.startswith(("rep", "movs", "stos")):
+                continue
+            ops = ins.operands
+            wr = any(r64(md, r) == reg for r in ins.regs_write) or any(
+                op.type == X86_OP_REG and op.access & CS_AC_WRITE and r64(md, op.reg) == reg for op in ops)
+            if not wr:
+                continue
+            mn = ins.mnemonic
+            if mn == "lea" and ops[1].type == X86_OP_MEM:
+                m = ops[1].mem
+                if m.base == X86_REG_RIP:
+                    t = (ins.address + ins.size + m.disp) & MASK
+                    return "lea-rip-region" if LO <= t < HI else "lea-rip-other"
+                if m.base == 0 and m.index == 0:
+                    return "lea-abs-region" if LO <= m.disp < HI else "lea-abs-other"
+                if m.base in (capstone.x86.X86_REG_RSP, capstone.x86.X86_REG_RBP):
+                    return "lea-stack"
+                b = r64(md, m.base)
+                if b and m.index == 0:
+                    return "lea-reg>" + src_of(b, ins.address, depth + 1)
+                return "lea-indexed"
+            if mn == "mov" and len(ops) == 2 and ops[1].type == X86_OP_REG:
+                s2 = r64(md, ops[1].reg)
+                if s2:
+                    return "mov>" + src_of(s2, ins.address, depth + 1)
+                return "mov-reg-other"
+            if mn == "mov" and len(ops) == 2 and ops[1].type == X86_OP_MEM:
+                m = ops[1].mem
+                if m.base == X86_REG_RIP:
+                    t = (ins.address + ins.size + m.disp) & MASK
+                    return "load-rip-region" if LO <= t < HI else "load-rip-other"
+                if m.base in (capstone.x86.X86_REG_RSP, capstone.x86.X86_REG_RBP):
+                    return "load-stack"
+                return "load-ptr"
+            if mn == "mov" and len(ops) == 2 and ops[1].type == X86_OP_IMM:
+                return "imm-region" if LO <= (ops[1].imm & MASK) < HI else "imm-other"
+            if mn == "pop":
+                return "pop-stack"
+            if mn == "xor":
+                return "zero"
+            return "other:" + mn
+        return "unwritten-300"
+
+    rep_cls = collections.Counter()
+    rep_detail = []
+    for a, mn in rep_sites:
+        c = src_of("rdi", a, 0)
+        rep_cls[c] += 1
+        if "region" in c:
+            rep_detail.append((a, mn, c))
+    print("rep rdi sources (backward trace): %s" % dict(rep_cls))
+    for a, mn, c in rep_detail:
+        print("  rep 0x%x %s src=%s" % (a, mn, c))
+
+    print("--- ext B: callers of functions that return a region pointer")
+    ret_fns = collections.defaultdict(set)
+    for r in returned:
+        if LO <= r[2] < HI:
+            ret_fns[func_begin(r[1])].add(r[2])
+    for fb, vs in sorted(ret_fns.items(), key=lambda kv: kv[0] or 0):
+        print("  ret fn %s returns %s" % ("0x%x" % fb if fb else "None", ",".join("0x%x" % v for v in sorted(vs))))
+    n0, nb0, ne0 = len(access), len(bulk), len(escapes)
+    callers = sorted((a, t) for a, t in call_imm if t in ret_fns)
+    print("direct call sites to these functions=%d" % len(callers))
+    for a, t in callers:
+        for v in sorted(ret_fns[t]):
+            track(next_va(a), {"rax": v}, 0, ("ret", a, v, t))
+    new = access[n0:]
+    print("ret-origin accesses=%d K-covering=%d K-writes=%d region-writes=%d bulk=%d escapes=%d" % (
+        len(new), sum(1 for a in new if covers_k(a[4], a[6])),
+        sum(1 for a in new if covers_k(a[4], a[6]) and a[5]),
+        sum(1 for a in new if a[5] and LO <= a[4] < HI), len(bulk) - nb0, len(escapes) - ne0))
+    for a in new:
+        if LO <= a[4] < HI:
+            print("  ret-origin region access 0x%x %s %s eff=0x%x w=%s caller=0x%x" % (a[1], a[2], a[3], a[4], a[5], a[0][1]))
+    for b in bulk[nb0:]:
+        print("  ret-origin bulk 0x%x %s dst=0x%x caller=0x%x" % (b[1], b[2], b[3], b[0][1]))
+
+    print("--- ext C: region [0x%x,0x%x) accesses by address (d=RIP/abs direct, a=lea alias)" % (LO, HI))
+    lay = collections.defaultdict(set)
+    for d in direct:
+        if d[4] is not None and LO <= d[4] < HI:
+            lay[d[4]].add(("W" if d[3] else "R") + str(d[5]) + "d")
+    for a in access:
+        if LO <= a[4] < HI:
+            lay[a[4]].add(("W" if a[5] else "R") + str(a[6]) + "a")
+    for t in sorted(lay):
+        tag = "K" if t <= K < t + 4 else ("V" if V <= t < V + 4 else ("T" if t == 0x16BACD8 else ""))
+        print("  0x%x %-14s %s" % (t, ",".join(sorted(lay[t])), tag))
     print("sec=%.1f" % (time.time() - t0))
 
 

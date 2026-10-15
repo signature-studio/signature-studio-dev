@@ -181,5 +181,7 @@ extern void (*fle_ff_hook)(const char* kind, uint64_t a);
 /* FLE-2 boot: 間接 dispatch (ott_dispatch) の全呼出を観測する probe (未設定 = 何もしない)。
  * x64c.py が生成する ott_dispatch 冒頭から呼ばれる。VMT 経路/FastMM 入口/unit proc の計数に使う。 */
 extern void (*fle_dispatch_probe)(uint64_t t);
+/* GetProcAddress の結線 hook (未設定 = 0 を返す従来挙動)。hModule = RCX、lpProcName = RDX の値を受け、戻り値を RAX に入れる。 */
+extern uint64_t (*fle_gpa_hook)(uint64_t h, uint64_t nm);
 
 #endif

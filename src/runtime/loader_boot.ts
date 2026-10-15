@@ -76,9 +76,32 @@ export function isChunkedDescriptor(url: string): boolean {
   return url.endsWith(".parts/index.json");
 }
 
-async function openChunked(url: string, onProgress?: (loaded: number, total: number) => void): Promise<{ res: Response; fromCacheApi: boolean }> {
-  const res = await chunkedResponse(url, { onProgress: onProgress ? (p) => onProgress(p.loaded, p.total) : undefined });
-  return { res, fromCacheApi: false };
+/**
+ * chunked の連結 stream を読み、最初の失敗 (sha256 不一致など) を覚えておく。
+ * Chrome は compileStreaming で stream 内の例外を "WebAssembly compilation aborted: Network error…" に包むため、
+ * 呼び出し側は failure() で原因を取り出して投げ直す。
+ */
+async function openChunked(url: string, onProgress?: (loaded: number, total: number) => void): Promise<{ res: Response; failure: () => unknown }> {
+  const chunked = await chunkedResponse(url, { onProgress: onProgress ? (p) => onProgress(p.loaded, p.total) : undefined });
+  const reader = chunked.body!.getReader();
+  let failed: unknown;
+  const guarded = new ReadableStream<Uint8Array>({
+    async pull(ctl) {
+      try {
+        const r = await reader.read();
+        if (r.done) ctl.close();
+        else ctl.enqueue(r.value);
+      } catch (e) {
+        failed = e;
+        ctl.error(e);
+      }
+    },
+    cancel(reason) {
+      return reader.cancel(reason);
+    },
+  }, { highWaterMark: 0 });
+  const res = new Response(guarded, { headers: chunked.headers });
+  return { res, failure: () => failed };
 }
 
 export async function fetchCompile(
@@ -86,10 +109,15 @@ export async function fetchCompile(
   opts: FetchCompileOptions,
 ): Promise<{ module: WebAssembly.Module; resource: ResourceInfo }> {
   if (isChunkedDescriptor(url)) {
-    const { res } = await openChunked(url, opts.onProgress);
-    const module = opts.compile === "streaming"
-      ? await WebAssembly.compileStreaming(res)
-      : await WebAssembly.compile(await res.arrayBuffer());
+    const { res, failure } = await openChunked(url, opts.onProgress);
+    let module: WebAssembly.Module;
+    try {
+      module = opts.compile === "streaming"
+        ? await WebAssembly.compileStreaming(res)
+        : await WebAssembly.compile(await res.arrayBuffer());
+    } catch (e) {
+      throw failure() ?? e;
+    }
     return { module, resource: resourceInfo(url, false) };
   }
   const { res, fromCacheApi } = await openResponse(url, opts.cacheMode);
