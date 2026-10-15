@@ -202,3 +202,41 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 | LB=0 と LB=0x10000 の unit 結果差 8 件 (特に unit 40 の Halt0・unit 745 の oob) の原因 | LB 依存の寛容起動の結果が変わる。silent 誤りの可能性 | 子 issue (本 PR の Closes #3160 の後に起票) |
 | 元の 600 s 打ち切りの原因 (本 snapshot では再現せず) | 報告の根拠が再現しない | 本 issue の §6-3 に記録。再現には lift_pe.sha256 付きの完全な成果物が要る |
 | LB=0 寛容起動の pin (874/67) と snapshot の値 (867/74) の差 | gate 数値の基準が snapshot と不一致 | PM 確認 (`--full` 再生成での再測定が要る) |
+
+## 7. #3229: 8 unit の LB 依存差の切り分け (受入 1: 部分達成 / 受入 2: 未達)
+
+測定主体: 本 PR の作業 runner (2026-10-14/15)。素材は work-m11 (#516 以前の snapshot・`lift_pe.sha256` 無し)・fl-win64 (`block00031_PE.bin` のみ)・`/opt/emsdk`。全再生成は使わず、`m11_lb_tolerant_repro.sh` (gen_ir2 → 画像 → lb_check → build → 寛容起動) を LB ごとに実行した。
+測定 commit: `c0607b7a` (コードを変えた最後の commit。`m11_lb_tolerant_repro.sh` に build 後の `boot_final.ll` の保存を足した版)。`git diff c0607b7a HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` の出力は空。
+
+### 7-1 再現 (実測・本 runner)
+
+| 項目 | LB=0 | LB=0x10000 |
+|---|---|---|
+| 寛容起動 wall (2 回) | 17.66 s / 17.24 s | 20.20 s / 20.35 s |
+| attempted / ok / skipped | 942 / 867 / 74 | 942 / 867 / 74 |
+| kind 差 (`m11_lb_unit_diff.py`) | 8 件 | 同左 |
+
+kind 差の 8 件は §6-2 と一致した (index 40 / 153 / 158 / 291 / 296 / 304 / 555 / 745)。
+
+### 7-2 IR 差分 (build 後の `boot_final.ll`・`m11_lb_ir_fn_diff.py`)
+
+- 比較の段階: `alloca` の拡幅は `m11_build.sh` (96〜100 行) で行われるため、IR は build 後の `work/boot_final.ll` を比べる (build 前で比べると拡幅の有無が差に混ざる。本 PR の途中で一度この取り違えをした)。
+- 関数数 7,422 中、本文が違う関数は **4,023**。LB で全 VA 即値が 0x10000 ずれるため、ほぼ全てが定数シフトによる。関数単位の差は原因の絞り込みに使えない。
+- `function_412770`: 差は 2 行だけ。`inttoptr i64 16404480` → `16470016` (0xFA5000 → 0xFB5000。LB 分のシフトで、期待どおり)。
+- `function_412770` の `__asm_rep_movsq_memcpy(ptr %4, ptr null, i64 37)` は **LB=0 と LB=0x10000 の両方に同じ形で残る**。源が `ptr null` (`[rax]` の load の脱落。issue 本文の疑い) で、LB に依らない別の欠陥。
+- LB 依存の差は IR の中には出ていない。NULL 源の memcpy は wasm の address 0 を読むため、address 0 の中身の違いが unit の結果を変えると推定する (未確認)。裏付け: LB=0x10000 の `work/m11_image.bin` は先頭 0x10000 バイトが全て 0 (実測 nonzero 0)。LB=0 では image が address 0 から置かれ PE ヘッダが address 0 に来る (§5・issue 本文の記述。LB=0 の image は本 runner で未生成)。
+
+### 7-3 修正の判定 (受入 2: 未達)
+
+- LB の直書きは、この IR 差分の範囲では見つからなかった (差は全て LB 分のシフト)。直書きの修正は行っていない。照合文字列の LB 加算は #3160 で修正済み (§6-4)。
+- 候補 `tools/m11/m11_ov.c:194` の icall の `tkey` 換算 (LVA → VA) は未検証。
+- 修正方針 (固定。次の子 issue で実装): NULL 源の memcpy を、(a) lift 段で `[rax]` の load に戻す (issue 本文の仮説)、または (b) address 0 の内容を LB に依らず一定にする。どちらも `m11_lb_unit_diff.py` の差 0 を基準に判定する。
+
+### 7-4 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| NULL 源 memcpy (`function_412770` の `ptr null`) の lift 修正と、unit 差 8 → 0 の確認 | LB 依存の寛容起動の結果 (8 件)。原因の本体 | 子 issue (本 PR で起票。親 #3229) |
+| `m11_ov.c:194` の tkey (LVA → VA) の検証 | 候補のみ・未検証 | 同上 |
+| LB=0 の image の address 0 の中身 (PE ヘッダか) の実測 | 7-2 の推定の裏付け | 同上 |
+| 新類型 (NULL 源 memcpy・load 脱落) の `docs/DEFECTS.md` 行案 | 類型 ID 未付与 | PM |
