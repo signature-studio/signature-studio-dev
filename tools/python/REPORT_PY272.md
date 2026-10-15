@@ -47,7 +47,7 @@
 
 ## 1. 検証
 
-測定 commit: 本 PR の最後のコード commit (`git log -1 -- tools/python/analysis/flapi/pe_py272_probe.py` の hash)。
+測定 commit: `f14ee5553` (probe と本 REPORT を追加した commit)。
 
 - probe: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py272_probe.py` → 27/27 PASS・終了 0。
 - ネガティブ対照: 型 2 の式を型 3 の式と誤認した期待・0x40f540 の cl を 5 と誤認した期待の 2 件は偽として数える (PASS は「誤認が偽」を意味する)。
