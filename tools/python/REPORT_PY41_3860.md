@@ -1,7 +1,7 @@
 # PY-262 (#3860): 戻り値 `[rbp+0x584]` の書込み経路と式 (部分・REPORT_PY41.md の PY-65 節の受入 2 の付録)
 
 親: #2034 (PY-65)。前段: `REPORT_PY41.md` の PY-65 節 (受入 2 は未達)・PY-60 (戻り値の書込みと早期 exit の入辺 9 件)。
-測定 commit: §4 は `a6ce09858` (`analysis/py262_ret584_paths.py` を追加し、§4 の数値を測ったコードの最後の commit)。§9 は `031d81296` (`analysis/py341_ret584_dominators.py` を追加した commit)。`git diff 031d81296 HEAD -- tools/python/analysis/` の出力は空 (0 行・差分 0)。`py65_ret584_reach.py` は main (`ea7f810ca`・`8706f8e89`) で入ったもので、本 PR の commit ではない。
+測定 commit: §4 は `a6ce09858` (`analysis/py262_ret584_paths.py` を追加し、§4 の数値を測ったコードの最後の commit)。§9 は `031d81296` (`analysis/py341_ret584_dominators.py` を追加した commit)。main 取り込み後の HEAD `aca656b8d` で再測定した。測定に使う 5 本 (`py53_dispatch.py`・`py65_ret584_reach.py`・`py262_ret584_paths.py`・`py341_ret584_dominators.py`・`py65_r8d_bits.py`) は `git diff 031d81296 HEAD -- <5 本>` の出力が空 (差分 0)。`git diff 031d81296 HEAD --stat -- tools/python/analysis/` は main 由来の 4 本の追加のみ (`flapi/pe_py183_probe.py`・`flapi/pe_py340_kind1_dispatch.py`・`py235_0xc61250_write.py`・`py342_r8d_ret_cross.py`、計 392 行・測定対象外)。`py65_ret584_reach.py` は main (`ea7f810ca`・`8706f8e89`) で入ったもので、本 PR の commit ではない。
 素材: `oc_artifacts: fl-win64` (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`・`block00031_PE.bin` 22,227,016 B)。
 再現: `python3 tools/python/analysis/py53_dispatch.py <PE> <work/py53>` → `fn=4664 dispatch=13 r8d_tests=174` (本 run で再現)。続けて `python3 tools/python/analysis/py65_ret584_reach.py <work/py53/fn.txt> 0x104cc65`。
 
