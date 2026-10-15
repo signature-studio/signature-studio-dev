@@ -28,6 +28,22 @@ REPORT.md §7.8 の全文 (250 行上限のため分割移動)。検証 HEAD = `
   したがって「DllMain が完走した」とは書かない。strict 版は従来どおり `MISSING IMPORT LocalAlloc` で止まる (変化なし)。
 - 判定: boot の PASS 条件 (3 段 ok・RAX = 1・soft 呼出し 0) は未達のまま (FAIL)。
 
+## 1b. ExitProcess(0) の呼出元と偽の停止の判定 (T-SH-106 / #4262)
+
+- **呼出元 (lift C・逆アセンブル)**: `ExitProcess` の呼出し `call 0x406dc0` は `0x40fcdd` (戻り番地 `0x40fce2`)。関数 `0x40fb80` の中。
+  `0x40fb80` は `0x59c254` (DllMain の `call 0x40fb80`、戻り番地 `0x59c254`) から呼ばれる。
+  `0x40fcdd` の直前は `[0x5aa000]` の値を見る分岐で、`0x40fcb8` の `call 0x40fa40` (= longjmp 呼出し) の戻り番地 `0x40fcbd` から続く経路。
+- **計測 (`qfc_probe_4262.sh`・soft 版・work/probe に別ビルド)**: 実行順は次のとおり。
+  1. `enter 40fb80` (DllMain の `0x59c254` 系の呼出し)
+  2. `longjmp site=40fcb8` (`0x40fa40` → `qfc_ov_longjmp`)
+  3. `enter 59c210 eax=1` (戻り先の継続。DllMain は `eax=1` で `0x59c254` へ進む)
+  4. `pre-ExitProcess site=40fcdd 5aa000=0` → `[fle] ExitProcess(0)`
+- **判定 (偽の停止)**: 3 の継続は正しく進み、DllMain は `eax=1` で `ret` する。その `ret` は lift C では C の `return` で、
+  longjmp を呼んだ古い C フレーム (`0x40fa40` → `0x40fb80`) へ戻る。古いフレームは longjmp の後の行 (`0x40fcbd` 以降) を再開し、
+  `0x40fcdd` で `ExitProcess(0)` に至る。実機の longjmp は戻らないので、この経路は実機に存在しない。
+  よって停止は **偽の停止** (非局所復帰を C の戻りで代用した不整合)。推定ではなく、上の実行順の実測で判定した。
+- **修正 (#4510 で landed)**: 判定は修正前の commit `0515d7ff2`・`fafdec0e2` より前の実測で行った。修正は `qfc_run` の setjmp アンカーで #4510 により main に入った (`REPORT_APPENDIX_4510.md`)。非局所復帰で longjmp を呼んだ C フレームを捨てる修正であり、子 issue #4510 ([T-SH-126]) で扱った。
+
 ## 2. 検証 (HEAD = `08002efca`)
 
 - 測定 commit: `08002efca` (コードを変えた commit)。boot の `qfc_boot.sh` (HEAD) と e2e (HEAD)。
