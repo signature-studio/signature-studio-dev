@@ -9,10 +9,10 @@
 |---|---|
 | 1. 197 入口のそれぞれに IPP API 名か「未同定」 | 197 入口を再現 (線形走査)。**一意の API 名 8 入口** (`ippsRealToCplx_32f` 4・`ippsSet_8u` 2・`ippsConj_32fc` 2)、**API 族の候補集合 26 入口** (dsp の同一本体を共有する export 群、7 群。うち 1 入口 `0x1803e71b0` は偶然一致の候補、§3 注)、**未同定 163 入口** (内訳 §3)。対応表は `data/entries.csv` |
 | 2. 同定 API のうち tools/ipp の実装対応が無いもの | 名付けた入口 34 件のうち、**18 件は候補名が全て fail-soft stub のみ** (`tools/ipp` の PoC 未実装。STRICT でのみ fail-fast)、**16 件は実装済み名と stub 名の混在**、実装済みのみは 0 件。stub 名は 28 (§4 に列挙)。#2613 の受入 2 の文言「対応が無い入口が 1 件でも残るなら、D20 の停止条件に従い理由を報告して停止する (その入口は実装しない)」に従い、本 run ではこれらを実装しない |
-| 3. 関数ポインタ経由の到達が無いことの確認 | **静的確認のみ** (IPPCODE 番地を生成する命令 0・データ中のポインタ 0)。実行トレースは未実施 (この runner に wine 等が無い)。子 #2643 ([T-SH-42]) に移管 |
+| 3. 関数ポインタ経由の到達が無いことの確認 | **静的確認 (§6) + unicorn 実行 (§8)**: 静的に IPPCODE 番地を作る命令 0・データ中のポインタ 0。実行範囲で間接 call/jmp の宛先が IPPCODE 入口に当たるもの 0 件 (実行した間接サイト 75/2,714 のみ)。被覆の拡大は子 #3334 ([T-SH-69]) に移管 |
 | 4. REPORT に測定 commit・再現コマンド・差分 | 本書 §1・§2 |
 | 追記 (#2613 コメント 2026-10-14 16:23) の 1〜3: dispatch 表の飛び先 186 個の同定・2 段目 251 個の同定・初期化スタブと外向き分岐 | **本 PR では扱わない**。原文のまま子 **#2667** ([T-SH-43]) に移管 (§7) |
-| 追記 4: thunk 頭 33 本の到達元 | 静的参照 0 件 (§6)。子 #2643 ([T-SH-42]) の本文に追記して移管 (§7) |
+| 追記 4: thunk 頭 33 本の到達元 | 静的参照 0 件 (§6)。実行で枠を読む命令は 0 件 (§8)。子 #3334 ([T-SH-69]) に移管 (§7) |
 
 ## 1. 対象・素材・測定 commit
 
@@ -135,16 +135,76 @@ stub 名 28 (`implemented_poc = 0`): `ippiResize_8u_C3R`・`ippiResize_8u_C4R`�
 | `.rdata`・`.data`・`.pdata`・`_RDATA`・`IPPDATA` 内の IPPCODE 向き 8 byte 値 | 0 |
 | `.text` の間接 call/jmp | 2,714 (call 2,373・jmp 341。`r10` を使う表分岐の形 59 件 (うち `[r10+rax*8]` 33 件)) |
 
-静的にはどの命令・データも IPPCODE の番地を作らない。間接 call/jmp の宛先の実行時の値は未確認 (§7・子 #2643)。
+静的にはどの命令・データも IPPCODE の番地を作らない。間接 call/jmp の宛先の実行時の値は、実行範囲のみ §8 で確認した (§7・子 #3334)。
 
 ## 7. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 間接 call/jmp (2,714 箇所) の実行時の宛先が IPP に当たらないことの確認 (受入 3) | 静的確認のみ。実行経路は未確認 | 子 #2643 ([T-SH-42]) |
+| 間接 call/jmp (2,714 箇所) の実行時の宛先が IPP に当たらないことの確認 (受入 3) | 実行範囲 75 サイトのみ (§8)。全サイトは未確認 | 子 #3334 ([T-SH-69]) |
 | 追記受入 1〜3 (dispatch 表の飛び先 186 個の同定・2 段目 251 個の IPP 同定・初期化スタブと外向き分岐 33 件) | 未実施。本 PR では扱わない | 子 #2667 ([T-SH-43])。親 #2613 の追記コメント (16:23) の原文を移した |
-| 追記受入 4 (thunk 頭 33 本の到達元) | 静的参照 0 件。実行時の呼出元は未確認 | 子 #2643 ([T-SH-42]) の本文に追記 |
+| 追記受入 4 (thunk 頭 33 本の到達元) | 静的参照 0 件。実行で枠を読む命令は 0 件 (§8) | 子 #3334 ([T-SH-69]) |
 | 未同定 163 入口 (dsp 内部関数と一致 122・照合不能 31・自明本体 10) | API 名が付かない。tools/ipp の実装対応を判定できない | 本 PR 本文の未解決表 (追跡のみ。`Closes #2613` で閉じるため本表が正) |
 | API 族の候補 26 入口 (共有本体) | 一意の API 名に決まらない | 本 PR 本文の未解決表 (同上) |
 | `.pdata` 基準の入口数 181 と issue 本文の 182 | 1 件の定義差 (呼出元の範囲の端の扱い等。未確定) | 本 PR 本文の未解決表 (同上) |
 | stub 名 28 (stub のみ 18 入口・混在 16 入口) | 名付けた入口が tools/ipp で未実装 | 既存 #38 (tools/ipp 親) を起票先とする (本 PR では #38 へコメントしない。PM が判断) |
+
+## 8. 実行時の間接 call/jmp 宛先 (T-SH-42 / #2643・unicorn 実行)
+
+§6 の「実行時の宛先は未確認」を、unicorn による実行で一部埋めた。Windows 実行ではない (runner に wine・qemu 等が無い)。結論は**実行した範囲**に限る。
+
+### 8.1 測定・再現
+
+- 測定 commit: **`2781377b`** (コードと `data/runtime_indirect.csv` を変えた最後の commit)。以降の commit は REPORT のみ。
+- 差分 (測定後のコード範囲): `git diff 2781377b HEAD -- tools/shared/elastique/dyn_trace.py tools/shared/elastique/data/runtime_indirect.csv` → 出力 0 行。
+- 再現した結果: 測定 commit の HEAD で 2 回実行し、`summary.json` は一致、コミット済みの `runtime_indirect.csv` は差分 0。
+- 素材: §1 と同じ `block24357_PE.bin` (sha256 先頭 16 桁 `8551e92209cdd2ce`) を `tools/shared/work/win/elastique_x64.dll` に置く。
+
+```sh
+mkdir -p tools/shared/work/win && cp "$RUNNER_TEMP/fl-win64/extracted/block24357_PE.bin" tools/shared/work/win/elastique_x64.dll
+uv venv tools/shared/work/venv && uv pip install --python tools/shared/work/venv/bin/python unicorn pefile capstone
+tools/shared/work/venv/bin/python tools/shared/elastique/dyn_trace.py   # 実測 (real): 8.2 秒 (user 8.2 秒)。load average 0.16 → 0.29。出力は tools/shared/work/elastique/dyn/ (gitignore)
+```
+
+### 8.2 方法
+
+- 読込: PE を preferred base `0x180000000` に展開。IAT の 79 slot (kernel32 77・WS2_32 2) を `ret` の stub に向ける。`HeapAlloc`・`HeapReAlloc`・`HeapSize` は bump 割当。`ntohl`・`htonl`・`GetModuleHandleW`・`HeapFree`・`GetProcessHeap` は値を返す。他は戻り値 0。
+- 実行順: DllMain (`DLL_PROCESS_ATTACH`) → `ElAllocator_SetFunctions` (host の malloc・free の stub を渡す。引数規約は仮定) → export 14 件 × 2 通り → thunk 頭 33 本 × 2 通り。
+  - `zero`: rcx・rdx・r8・r9 = 0。`scratch`: rcx = 4 KB の書込み可能領域、rdx = その +4 KB、r8 = 44100、r9 = 2。
+- 記録: 命令ごとに、直前が call/jmp (直接・間接とも) なら、次に実行された命令番地を宛先とし、(分岐元, 宛先) を数える。宛先の分類は `ipp_entry` (入口 197・`data/entries.csv`)・`ipp_other`・`text`・`stub:<import>`・`other`。
+- 上限: 1 run あたり 3,000,000 命令。
+
+### 8.3 実測
+
+| 項目 | 値 |
+|---|---|
+| run 数 | 96 (DllMain 1・SetFunctions 1・export 14 × 2・thunk 33 × 2) |
+| run の結果 | returned 70・count_limit 1 (`thunk:0x180001aa0:scratch`)・uc_error 25 (`Unhandled CPU exception` 8・`Invalid memory read/write/fetch` 17)。uc_error は合成引数由来と推定 (未切り分け) |
+| 命令数 (全 run 合計) | 11,406,760 |
+| 分岐 edge (分岐元, 宛先。直接・間接) | 344 |
+| 間接 edge (分岐元, 宛先) | 76 |
+| 実行した間接 call/jmp サイト | **75 / 静的 2,714 (2.8%)** |
+| 間接宛先の種類 | 73 |
+| 間接 edge の宛先の分類 | `text` 58・IAT/host stub 17・`other` 1・**`ipp_entry` 0**・`ipp_other` 0 |
+| 直接 call/jmp で到達した IPPCODE 入口 (distinct) | 23 (例: `0x1803e71b0` 初期化スタブ・`0x1802f8000`・`0x1802f83b8`) |
+| thunk 頭の dispatch `jmp qword ptr [r10 + rax*8]` | 33 サイト全て実行。宛先は全て `.text` (variant 本体) |
+| thunk 頭 33 本の枠 (`.data` の 8 byte 値) を読む命令 | **0** (`slot_readers.csv` 0 行) |
+
+`other` 1 件は `jmp rax` (`0x1802f5f80`) の宛先 `0xfdd000000000300f` で、`Declicker_CreateInstance:scratch` の合成引数により壊れた `rax` の値。実 FL で起きる宛先とは見なさない (未確認)。
+
+### 8.4 受入条件への対応
+
+| 受入 (#2643 の本文) | 結果 |
+|---|---|
+| 間接 call/jmp の実行時宛先を記録 | **部分**: 実行範囲 75 / 2,714 サイト。全サイトは未実行 → 子 #3334 |
+| 記録した宛先のうち IPPCODE 入口 (197) に当たるものが 0 件 | **実行範囲で 0 件**。全体の証明ではない |
+| thunk 頭 33 本の到達元 (#2613 追記 4) | **未観測**。枠を読む命令は 0 件。thunk は harness が直接呼んだ (合成)。→ 子 #3334 |
+| REPORT に測定 commit・再現・差分 | §8.1 |
+
+### 8.5 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 間接サイトの被覆 75 / 2,714 (export の引数規約が不明で、入力を合成している) | 「0 件」の結論が実行範囲に限られる | 子 #3334 (T-SH-69) |
+| thunk 頭 33 本の到達元 (枠を読む命令 0 件) | 実プログラム内の呼出元が未確認 | 子 #3334 (T-SH-69) |
+| uc_error 25 run の原因 | 合成引数の不適合か emulator の未対応かが未切り分け | 子 #3334 (T-SH-69) |

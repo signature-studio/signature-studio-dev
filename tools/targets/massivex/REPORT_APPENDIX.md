@@ -21,58 +21,9 @@
 
 - 所要はいずれも lift キャッシュ有りの値。キャッシュ無し (`7e8445b9` で実測) は `-O1` 78 s。
 
-### 12.2 N5 / N6 の静的確認 (文字列・xref 実測)
+### 12.2・12.2a (N5/N6 静的確認・読み手の追跡) — 分割移動
 
-| 対象 | VA | 文字列 | 直接参照 (RIP / 絶対ポインタ / RVA32) |
-|---|---|---|---|
-| N6 | 0x184ffcf87 | 'Please open Native Access to re-activate.' | abs64 0 / RVA32 0 / RIP は §12.2a 参照 |
-| N6 | 0x184ffcfe8 | 'Please use Native Access to re-activate.' | abs64 0 / RVA32 0 / RIP は §12.2a 参照 |
-| N6 | 0x184ffd03f | 'Please use Native Access to re-activate.' | abs64 0 / **RVA32 1** (raw 0x3c8af47・未分類。下記) / RIP は §12.2a 参照 |
-| N6 | 0x184ffd092 | 'Please use Native Access to re-activate.' | abs64 0 / RVA32 0 / RIP は §12.2a 参照 |
-| N6 | 0x184ffd0d6 | 'Please use Native Access to re-activate.' | abs64 0 / RVA32 0 / RIP は §12.2a 参照 |
-| N6 | 0x184ffd131 | 'Please use Native Access to activate.' | abs64 0 / RVA32 0 / RIP は §12.2a 参照 |
-| N6 候補 (表外) | 0x184ffdb55 | 'Native Access can't be found. You will be forwarded to the download page.' | abs64 0 / RVA32 0 / RIP 未測定 |
-| N5 | 0x18415f411 | 'MXDemoPopup.qml' (UTF-16。QML 資源名の列に並ぶ) | abs64 0 / RVA32 0 / RIP 0 件 (§12.2a・範囲 `[0x18415f411,0x18415f42f)`) |
-| N5 | 0x184879407 | QML property 'demoExpired' | abs64 0 / RVA32 0 / RIP 0 件 (§12.2a) |
-| N5 | 0x1848792b9 | QML property 'demoExpiredChanged' (ASCII。'demoExpired' の探索でも同 VA にヒット) | abs64 0 / RVA32 0 / RIP 0 件 (§12.2a) |
-| N5 | 0x18487941a | QML property 'subscriptionExpired' | abs64 0 / RVA32 0 / RIP 0 件 (§12.2a) |
-
-| N3 文言 | 0x185013ca8 (UTF-16) | 'Subscription expired.' | 関数 **0x18010e4e0** から RIP 参照 (1 件) |
-| N2 文言 | 0x184ffc425 | 'Your serial number is incorrect. Please run ' | 関数 0x181142160 / 0x181143c00 から RIP 参照 (各 1 件) |
-
-- **訂正**: §6・§11.2 の「N3 'Subscription expired.' 0x18010e4e0」は文字列アドレスではない。0x18010e4e0 は文言 0x185013ca8 を参照する**関数** (`.pdata` 登録済み)。文字列の正しい VA は 0x185013ca8。
-- §6 の N5/N6 表の文字列 VA との一致: **未確認**。今回 probe が `.rdata` で実在を確認したのは上表の VA (N6 6 件・N5 4 件) と表外の 0x184ffdb55 だけで、`license/work/mx_strings.json` との照合は行っていない。
-- 旧版の「N6 直接参照 0 件」は、全関数の RIP 相対走査 (§12.2a) で再現しなかった。原因は未調査。「N5 MXDemoPopup の範囲 `[0x18415f411,0x18415f412)`」は UTF-16 を 1 バイトとして扱った誤りで、正しい範囲は `[0x18415f411,0x18415f42f)`。
-- 0x184ffd03f の 4B RVA32 ヒット (raw 0x3c8af47) は `.rdata` 内で、同じ 5 バイト周期の 4B 値列に含まれる。参照元の関数・表の種類は未特定のため、「参照 1 件」とも「参照 0 件」とも断定しない (§12.4)。
-- 旧 refscan の VA 一覧は誤りで、`0x184ffd092` / `0x184ffd0d6` / `0x184ffd131` と demoExpired 系 (`0x184879407`) は**旧 refscan では未検査**だった。上表の「0 件」は今回の新 refscan (`7a39dea0` 以降) での測定値のみを指す。
-
-
-### 12.2a 読み手の追跡 (スクリプト `scripts/mx_xref_fn.py --all`・#1017)
-
-- 素材: `plugins-massivex` (`Native Instruments Massive X v1.7.1.exe`) を本 run で `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py` で抽出。`work/extracted/VST3/Massive X.vst3` = 95,356,824 B / md5 `622993e7…` (PR 本文と一致)。
-- 手順: `.pdata` の全関数 (`begin≠0` かつ `end>begin` の 187,061 件) を capstone で線形逆アセンブルし、RIP 相対メモリオペランドの参照先が範囲 `[lo,hi)` に入るものを列挙。ASCII 範囲は NUL 区切り、N5 `MXDemoPopup.qml` は UTF-16LE の既知長 (30 B)。
-- 注: 本走査は **RIP 相対のみ**。絶対 8B・RVA32 の参照は走査していない。
-- 実行時間: `--all` 2 min 25 s (`cbfcff96` の内容で実行)。
-
-| 範囲 | `[lo,hi)` | 参照元 (関数 @ 命令 VA) |
-|---|---|---|
-| N6-1 | `[0x184ffcf6c,0x184ffcfb0)` | 0x180f95e20 @ 0x180f95f03 / 0x180f95f0d / 0x180f95f18 / 0x180f95f23 (movups 4 件) |
-| N6-2 | `[0x184ffcfb1,0x184ffd010)` | 0x181142370 @ 0x1811424a9 |
-| N6-3 | `[0x184ffd011,0x184ffd067)` | 0x181144570 @ 0x181144699 |
-| N6-4 | `[0x184ffd068,0x184ffd0ba)` | 0x181142370 @ 0x181142426 / 0x181144570 @ 0x1811446c2, 0x18114472f, 0x181144796 / 0x1811453f0 @ 0x181145433 |
-| N6-5 | `[0x184ffd0bb,0x184ffd0fe)` | 0x181144570 @ 0x18114498b |
-| N6-6 | `[0x184ffd0ff,0x184ffd156)` | 0x181142640 @ 0x1811426b2 |
-| N5 MXDemoPopup.qml | `[0x18415f411,0x18415f42f)` | 0 件 |
-| N5 demoExpired | `[0x184879407,0x184879412)` | 0 件 |
-| N5 demoExpiredChanged | `[0x1848792b9,0x1848792cb)` | 0 件 |
-| N5 subscriptionExpired | `[0x18487941a,0x18487942d)` | 0 件 |
-
-- **N6-1 の読み手 (確定)**: 関数 **0x180f95e20** (pdata `[0x180f95e20,0x180f960bf)`) は N6-1 `[0x184ffcf6c,0x184ffcfb0)` のみを読む (`movups` 4 件)。N6 の他 5 範囲は別関数 (上表) で、この関数は読まない。
-  - 呼び出し元は未確定。E8 直接呼び出し 0 件は前版の記録 (本走査は呼び出し元を集計していない)。間接呼び出し経由と推定 [推]。
-- **N6-2〜6 の読み手 (未確定の役割・呼び出し元)**: 関数 0x181142370 / 0x181144570 / 0x181142640 / 0x1811453f0 が読む。役割と呼び出し元は本節の対象外 (#1017 で扱う)。
-- **N5 の読み手 (未特定)**: 4 範囲とも RIP 相対参照 0 件。前版の rel32 候補 (0x1834606c4 / 0x182d0841f) は RIP 相対の走査対象外で、未確定のまま。
-- 検証 HEAD: `b83223e6` (main 取り込み後)。全走査は `mx_xref_fn.py` (`cbfcff96` で最終化) を `b83223e6` で実行した。`d838c825..b83223e6` の差分は main 取り込み (`ea88196e`) と massivex の調査スクリプト・REPORT のみで、e2e 対象コード (`license/e2e.sh`・`scripts/mx_lic_stub.py`・`tools/liftlib/liftlib/passes/base.py`) は `b5969e5a` から変更なし (`git diff --quiet b5969e5a b83223e6 -- <3 ファイル>` が 0)。main 取り込みで変わった `liftlib` の iargs・fp_bind・l1_restore は e2e.sh から呼ばれない。
-- e2e 数値 (`-O0` 5 s / `-O1` 78 s・lift キャッシュ無し / `-O2` 6 s, 11/11 PASS) は作成者の記録 (`b5969e5a` 時点)。本 fix run では `toolchain-retdec` が無く lift を伴う e2e は再測定していない。
+本文は [REPORT_APPENDIX_3154.md](REPORT_APPENDIX_3154.md) §12.2・§12.2a (内容は無変更・250 行上限のため #3154 で移動)。
 
 ### 12.3 未達と起票先
 
@@ -192,21 +143,79 @@
 
 - 素材: `toolchain-retdec` (`$RUNNER_TEMP/rd/retdec`) と `toolchain-emsdk` (`$RUNNER_TEMP/em/emsdk`) を `RETDEC` / `EMSDK` で指定。`license/e2e.sh` 本体は未変更 (`mx_lic_stub.py` も未変更)。
 
-### 12.9 テーブル基準 (E) の総当たり (#1613 [MX-11]・2026-10-14)
+### 12.9 テーブル基準 (E) の総当たり (#1613 [MX-11]・2026-10-14。対照と一貫性は #3154 [MX-34] で再現化)
 
-- 新規スクリプト `license/scripts/mx_table_refs.py` (`--selftest` 付き)。`.text` の RIP 相対 mem 実効先・即値のうち `.rdata`/`.data` に入る VA を表の base 候補 (177,327 件) とし、各 base から先頭 512 個の 4B 符号付き値 d を読んで `base + d` が対象 15 VA (読み手 5 関数 + N5/N6 文字列 10 VA) に一致するかを判定。
-- 自己検査: `--selftest` で既知の表 entry 1 件を検出 → PASS (rc 0)。
-- 測定 commit `a2cbc607` (実 PE md5 `622993e7…`・`load` 0.10 開始時): 所要 2 min 31 s。
+- スクリプト `license/scripts/mx_table_refs.py` (`--selftest`・`--control` 付き)。`.text` の RIP 相対 mem 実効先・即値のうち `.rdata`/`.data` に入る VA を表の base 候補 (177,327 件) とし、各 base から先頭 512 個の 4B 符号付き値 d を読んで `base + d` が対象 15 VA (読み手 5 関数 + N5/N6 文字列 10 VA) に一致するかを判定する。
+- **一貫性 (#3154)**: hit の前後 WINDOW=4 個 (範囲内) の entry のうち、d≠0 で対象と同じセクションを指す割合が 1/2 以上なら OK。d=0 は base 自身を指すため除外し、hit 自体が d=0 なら NG。
+- **対照 (#3154)**: `.rdata` 内のランダム VA 40 件 (seed 3154) を同じ走査・同じ一貫性判定に通す。再現: `python3 license/scripts/mx_table_refs.py --control` (既定の素材パスは `tools/targets/massivex` から実行)。
+- 自己検査: `--selftest` PASS (rc 0)。4 ケース = 一貫 OK 1 件 (既知の表 entry) と一貫 NG 3 件 (周辺が別セクション・周辺が 0 埋め・hit が d=0 の自己参照)。判定 (一貫性) を常に真にする / hit の d=0 ガードを外す / 周辺の 0 除外を外す、の 3 種の mutant で FAIL を確認。
+- 測定 commit `8b2eb41e` (素材 `plugins-massivex` → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work/key key` で `work/key/extracted/VST3/Massive X.vst3` (95,356,824 B、md5 `622993e7…` 一致))。
+- 修正 commit `bf1ad2de` (#3173 round 1): `scan_tables` の `targets`・`sections` を省略可能にし、`mx_dll_table_refs.py` の呼出しを更新。`git diff --stat 8b2eb41e bf1ad2de -- tools/targets/massivex/license/scripts` は 2 files, 17 insertions(+), 3 deletions(-)。コードが変わったため、下表の数値は `8b2eb41e` 時点の値で `bf1ad2de` での再測定は未了 (本 run に素材 `plugins-massivex` が無い)。
+- `bf1ad2de` の検証: `--selftest` PASS (rc 0)、既定経路の検査を外す mutant (`targets = {}`) で FAIL。`mx_dll_table_refs.py` は合成 PE (表 1 件・N6-1 を指す) で `main` と同じ hit 1 件 (rc 0)、修正前 `190c2e20` は `TypeError` で再現。実素材の DLL で hit 4 件を再現する検証は未実施。
 
-| 対象 | (E) hit |
-|---|--:|
-| 読み手 5 関数 (N6-1〜5) | 0 |
-| N6 文字列 0x184ffcf87 / 0x184ffd03f / 0x184ffd092 / 0x184ffd0d6 / 0x184ffd131 | 0 |
-| N6 文字列 0x184ffcfe8 | 1 |
-| N5 MXDemoPopup.qml / demoExpired / subscriptionExpired | 0 |
-| N5 demoExpiredChanged | 2 (同一 base 0x1847f8cb8 の idx 30 / 200) |
+| 測定 (`8b2eb41e`・同一 VM 4 vCPU) | 所要 (wall) | 結果 |
+|---|--:|---|
+| `--selftest` | 0.11 s | PASS (rc 0) |
+| (E) 走査 (既定) | 2 min 32 s | raw 3 件・一貫性 OK 0 件 (rc 0) |
+| 対照 `--control` | 2 min 35 s | raw 70 件・一貫性 OK 5 件 (rc 0) |
 
-- **判定: 実参照ではなく誤検出と判定**。(a) 対照 40 件 (`.rdata` 内ランダム VA) で 1 対象あたり平均 0.05 件のランダム hit があり、実測 3 件 (10 対象) はその水準。(b) hit の周辺 entry を復号すると、`base+d` が前後で `.data`・`.rdata`・セクション外 (`None`) に散り、表として一貫性が無い (`work/tbl_inspect.py` で確認)。
+測定直後の load 1 分平均は 0.55 (開始時の load は未記録)。
+
+| 対象 | (E) raw hit | (E) 一貫性 OK |
+|---|--:|--:|
+| 読み手 5 関数 (N6-1〜5) | 0 | 0 |
+| N6 文字列 0x184ffcf87 / 0x184ffd03f / 0x184ffd092 / 0x184ffd0d6 / 0x184ffd131 | 0 | 0 |
+| N6 文字列 0x184ffcfe8 | 1 | 0 |
+| N5 MXDemoPopup.qml / demoExpired / subscriptionExpired | 0 | 0 |
+| N5 demoExpiredChanged | 2 (同一 base 0x1847f8cb8 の idx 30 / 200) | 0 |
+| **合計 (15 対象)** | **3 (1 対象あたり平均 0.200)** | **0 (平均 0.000)** |
+
+| 対照 (`.rdata` 0x183971000..0x18515e89c のランダム VA 40 件) | raw hit | 一貫性 OK |
+|---|--:|--:|
+| **合計 (40 対象)** | **70 (1 対象あたり平均 1.750)** | **5 (平均 0.125)** |
+| うち control 18 (0x184183474。表の base 自身の 0 埋め領域で d=0 が全件 hit) | 64 | 0 |
+| control 18 を除く (39 対象) | 6 (平均 0.154) | 5 (平均 0.128) |
+
+`--control` の出力 (hit が 1 件以上の対象のみ抜粋 (5 対象: 01・12・18・21・26)。0 件の 35 対象は省略。全行は同コマンドで再現):
+
+```
+対照: .rdata 0x183971000..0x18515e89c 内のランダム VA 40 件 (seed 3154)
+base 候補 (.text 参照・.rdata/.data 内): 177327 件, entries/base = 512
+section .rdata   base 内候補 154842 件 -> hit 70 件
+section .data    base 内候補 9152 件 -> hit 0 件
+
+control 01 0x183cbee7a: 1 件 (一貫性 OK 1 件)
+  base 0x184cbed78 idx 110 entry@0x184cbef30 base 参照元 0x182b2c860 一貫性 OK
+
+control 12 0x184eefc29: 2 件 (一貫性 OK 2 件)
+  base 0x1849ffbe0 idx 244 entry@0x1849fffb0 base 参照元 0x183264417 一貫性 OK
+  base 0x184e4fc20 idx 461 entry@0x184e50354 base 参照元 0x1833b5141 一貫性 OK
+
+control 18 0x184183474: 64 件 (一貫性 OK 0 件)
+  base 0x184183474 idx 36 entry@0x184183504 base 参照元 0x180171310 一貫性 NG
+  base 0x184183474 idx 45 entry@0x184183528 base 参照元 0x180171310 一貫性 NG
+  base 0x184183474 idx 58 entry@0x18418355c base 参照元 0x180171310 一貫性 NG
+  base 0x184183474 idx 60 entry@0x184183564 base 参照元 0x180171310 一貫性 NG
+  base 0x184183474 idx 61 entry@0x184183568 base 参照元 0x180171310 一貫性 NG
+  base 0x184183474 idx 62 entry@0x18418356c base 参照元 0x180171310 一貫性 NG
+  base 0x184183474 idx 69 entry@0x184183588 base 参照元 0x180171310 一貫性 NG
+  base 0x184183474 idx 70 entry@0x18418358c base 参照元 0x180171310 一貫性 NG
+
+control 21 0x184f1146c: 2 件 (一貫性 OK 2 件)
+  base 0x184f111f0 idx 364 entry@0x184f117a0 base 参照元 0x183707e12 一貫性 OK
+  base 0x184f111f8 idx 306 entry@0x184f116c0 base 参照元 0x18370b6c2 一貫性 OK
+
+control 26 0x184063916: 1 件 (一貫性 OK 0 件)
+  base 0x184063910 idx 22 entry@0x184063968 base 参照元 0x1838a64eb 一貫性 NG
+
+合計: 対象 40 件・hit 70 件 (1 対象あたり平均 1.750)・一貫性 OK 5 件 (1 対象あたり平均 0.125)
+```
+
+(E) の hit 行 (既定実行・`8b2eb41e`): `N6 0x184ffcfe8`: `base 0x184e2c7e8 idx 276 entry@0x184e2cc38 base 参照元 0x18193ff4a 一貫性 NG`。`N5 demoExpiredChanged`: `base 0x1847f8cb8 idx 30 / idx 200`・参照元 `0x181a0ae57`・いずれも一貫性 NG。
+
+- **判定: 実参照と判定する根拠は無い (従来の判定を維持)**。(E) の raw hit 3 件は全て一貫性 NG で、対照の一貫性 OK の平均 0.125 (1 対象あたり) を下回る。旧版の数値 (対照 40 件・1 対象あたり平均 0.05 件) は ad hoc 計測で再現できないため、本節の `--control` の値で置き換える。
+- **旧版との差 (経緯)**: 測定 commit `e0c47d2f` (d=0 の周辺を除外しない版) では対照の一貫性 OK が 58 件 (平均 1.450) になった。`control 18` の 0 埋め領域 (d=0 が base 自身を指す) を OK と誤判定していたため、d≠0 の周辺だけを数える版に直して `8b2eb41e` で再測定した。
+- **限界**: 一貫性判定は対照でも 5 件を OK と判定する。OK 判定だけでは表の実在を示せず、本節の判定は「(E) の raw hit が一貫性を満たさない」ことにだけ依拠する。
 - 結論: テーブル基準でも読み手 5 関数と N5 文字列の参照元は**確定しない**。N6 読み手の呼び出し元と N5 の読み手は、直接参照 (§12.7)・絶対/RVA/RIP/自己相対 (§12.8)・テーブル基準 (本節) の 4 系統 + (E) で 0 件。残るのは文字列 index 経由など未走査の間接参照。
 - 差し替え点は未確定のため `license/scripts/mx_lic_stub.py` の RULES は**変更しない** (根拠なしの br_force / store は silent miscompile になる)。受入条件 2 は未達。`acpt_verify_mx2.py` の拡張 (受入条件 4) も未着手。
 
@@ -221,20 +230,9 @@
 - 素材: `plugins-massivex` → `$RUNNER_TEMP/mx`、`toolchain-retdec` → `$RUNNER_TEMP/rd/retdec`、`toolchain-emsdk` → `$RUNNER_TEMP/em/emsdk`。`parse_setup_headers.py` / `extract_massivex.py` で `work/key/extracted/VST3/Massive X.vst3` (95,356,824 B、md5 `622993e7…` 一致)。`work/extracted` は同ディレクトリへの symlink。
 - 注意: 検証途中、`-O1` と `-O2` を並列実行して `license/work/mx_fixed.vst3` を競合させ、`-O2` が PE 修復 assert で rc=1 になった。並列実行の誤りで、スクリプトの不具合ではない。上表は逐次実行・同一 commit での再測定値。
 
-### 12.10 MX-17 (#1857) 着手時の確認と e2e 基準値 (2026-10-14・測定 commit `8ea5d402`)
+### 12.10 MX-17 (#1857) — 分割移動
 
-- 結論: 受入条件 1〜3 は未達 (呼び出し元・差し替え点は未確定)。本 run は受入条件 4 の基準値取得のみ行った。未走査経路の走査は本 run では実施していない。RULES は変更しない。
-- 素材: `plugins-massivex` → `$RUNNER_TEMP/mx`、`parse_setup_headers.py` → `extract_massivex.py <exe> work/key key` で `Massive X.vst3` (95,356,824 B、md5 `622993e7…` 一致。extract の checksum 不一致 125/125 は既知事象)。`toolchain-retdec` → `$RUNNER_TEMP/rd/retdec`、`toolchain-emsdk` → `$RUNNER_TEMP/em/emsdk`。
-- selftest: `mx_table_refs.py --selftest` rc 0、`mx_indirect_refs.py --selftest` rc 0。
-
-| MX_OPT | 所要 (wall) | load (開始) | harness | 結果 | 備考 |
-|---|--:|--:|--:|---|---|
-| `-O0` | 56.8 s | 0.86 | 11/11 | PASS (exit 0) | `license/work` 冷間 (lift 再生成) |
-| `-O1` | 10 s | 1.07 | 11/11 | PASS (exit 0) | lift キャッシュ流用 (温間) |
-| `-O2` | 4 s | 1.30 | 11/11 | PASS (exit 0) | lift キャッシュ流用 (温間) |
-
-- 逐次実行 (`-O0` → `-O1` → `-O2`)。`-O0` の 56.8 s は作業 VM の 4 vCPU・load 0.86 時点の実測。
-- 残件 (受入条件 1〜3): 未走査の「文字列 index 経由の間接参照」と「関数ポインタを埋め込む構造体の `.data` 走査」。`acpt_verify_mx2.py` の N5/N6 機械検証 (受入条件 3) は未着手。残件は子 issue #1900 [MX-24] に分離して追跡する (#1857 は受入 4 のみに範囲を縮めて `Closes #1857`)。
+本文は [REPORT_APPENDIX_3154.md](REPORT_APPENDIX_3154.md) §12.10 (内容は無変更・#3154 で移動)。
 
 ### 12.11 MX-24 (#1900) 残件の確認 (2026-10-14・基点 `46faf265`)
 

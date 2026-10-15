@@ -151,6 +151,7 @@
 - **比較した方式**: (a) VEX 形を SSE 形の `(void)a; (void)b;` へ委譲して `unimpl` から消す (不採用)、(b) 既存 `lift/passes/ir6_pass.py` ([P1]) を lift 鎖に入れる (単独では不足。 19252 の comis 76 箇所中 insert 3 箇所のみ)、(c) `icall_rewrite.py` の comis 経路 (stub + sahf) を plugins 側に移植する (未評価)。
 - **理由**: (a) は flag を反映しないまま stub を消すため、`declares_unimpl` が 0 になっても silent な flag 欠落が検出できなくなる。 `lift/passes/m11_simd2.py` の既存コメントも同じ方針 (「委譲せず stub のまま残す」)。 実測は `tools/plugins/sampler/REPORT_APPENDIX_1582.md` §7b。
 - **影響**: 19252 / 19048 の unimpl に `vcomisd` / `vucomisd` / `vucomiss` が残る。 これを消すには flag 反映の実装が要るため、子 issue に分割した。
+- **続き (#1774・反映方式の決定)**: 採用は次の 2 点。 (1) 同一ブロック内で呼び出し後に読まれる flag は、`lift/passes/vex_comis_flags.py` が呼び出し直後に作る fcmp 由来の CF/ZF/PF (`ir6_pass.py` [P1] と同じ式) へ差し替える。 (2) 差し替えられない呼び出しは残す (helper は stub のまま unimpl に出る。 silent にしない)。 比較した別案: icall の stub+sahf 経路 (`PLUG_ICALL=1`) は 19252 の unimpl を 4→1 にしたが、522 関数中 490 関数の ABI を書き換えて `defines` 551→497・`missing_bytes` 165→4200 に悪化したため不採用。 実測 (機械語の消費命令と IR の参照) は `tools/plugins/sampler/REPORT_APPENDIX_1774.md` §7c。 残りは消費側が flag 名を読まず値比較を読むため、消費条件の再導出が要り、子 [PLG-F3-33] (非 VEX は [PLG-F3-34]) に分割した。
 
 ## D16 — 残 helper `__asm_vmovsd` (store 形) は宛先を定数で埋めず、spill 領域の写像を上流で直す
 
@@ -159,6 +160,7 @@
 - **比較した方式**: (a) `vmovsd` を store 化する (宛先 0 への誤 store で不採用)、(b) B1 の 0 埋めを止める (共有 lift 鎖の全 plugin に影響するため範囲外)、(c) 委譲や abort で unimpl から消す (silent miscompile を隠すため不採用)。
 - **理由**: 機械語は `[rsp+0x20]` への spill で、宛先は定数 0 ではない。 宛先 0 のまま store を作ると誤った番地へ書く。 同じ宛先値は分岐・演算にも使われるため、stub で隠すと誤りが検出できなくなる。 実測は `tools/plugins/dynamics/REPORT_APPENDIX.md` §E。
 - **影響**: 19252 の unimpl に `vmovsd` store が残る (5 件のうち 1 件)。 `emcc -c` は rc 0 のまま。 正しさは未確認。
+- **実装 (2026-10-14, #2017)**: 宛先の読み戻しを B1 の前に値の転送へ置換する (`ir5_patch.py` `forward_vmovsd_store`)。 19252 の unimpl から `vmovsd` store は消えた。 分岐値は entry の xmm0 を B1 が 0 にする入力モデルに依存し、正しさは未確認のまま。 測定は `tools/plugins/dynamics/REPORT_APPENDIX.md` §H。
 
 ## D17 — `movntps` (非テンポラル store) は既存の SSE store 復元 (`lower_asm_store`) に含め、宛先は IR 側から復元する
 

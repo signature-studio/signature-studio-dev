@@ -61,6 +61,8 @@
   "stopped_at_1based": 209
  },
  "survey": null,
+ "tolerant": null,
+ "cfi": null,
  "soft_top": [
   "268448949:21",
   "268437183:7",

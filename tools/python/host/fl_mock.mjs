@@ -15,15 +15,40 @@ const WRONG = (m) => new FlError(m || "Wrong number of function parameters or wr
 // mixer の色の R/B 入替え (REPORT_PY115.md §2)。既定色は FL の .bss 0x15f6774 の初期値 (REPORT_PY118)
 const swapRb = (v) => ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
 const MIX_DEFAULT_COLOR = 0xff636c71;
+// PY-78 (#2581): PE 0x130f3d0 の項目書換え規則 (C provider の step_item_write / step_items_set と同一・REPORT_PY39_2548.md)。項目 = 字段の object
+const clampHi = (v, hi) => (v <= 0 ? 0 : v > hi ? hi : v);
+const newItem = () => ({ d0: 0, w0c: 0, b10: 0, b11: 0, b12: 0, b14: 0, b15: 0, b16: 0, b17: 0 });
+const itemGet = (it, prm) => ({ 0: it.w0c, 1: it.b15, 2: it.b12, 3: it.b10, 4: it.b14, 5: it.b16, 6: it.b17, 7: it.d0, 8: it.b11 })[prm] ?? 0;
+const itemWrite = (it, prm, value, delta) => {
+  switch (prm) {
+    case 0: it.w0c = clampHi(it.w0c + delta, 0x83); break;
+    case 1: it.b15 = clampHi(it.b15 + delta, 0x80); break;
+    case 2: it.b12 = clampHi(it.b12 + delta, 0x80); break;
+    case 3: it.b10 = clampHi(it.b10 + delta, 0xf0); break;
+    case 4: it.b14 = clampHi(it.b14 + delta, 0x80); break;
+    case 5: it.b16 = clampHi(it.b16 + delta, 0xff); break;
+    case 6: it.b17 = clampHi(it.b17 + delta, 0xff); break;
+    case 7: it.d0 = (it.d0 + delta) | 0; break;
+    case 8: it.b11 = value & 0xff; break;
+  }
+};
+const itemsSet = (items, prm, value) => {
+  if (!items.length || prm < 0 || prm > 8) return;
+  const delta = prm === 8 ? value : value - itemGet(items[0], prm);
+  for (const it of items) itemWrite(it, prm, value, delta);
+};
 
 export function createMockEngine() {
   const st = {
     tempo: 130,
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
+    launchPages: 0,
+    uiClosing: false, uiTimeDispMin: false, uiStartOnInput: false, uiLoopRec: false, uiStepEdit: false, uiBrowserAutoHide: false, uiSnapMode: 0,
+    undoPos: 0, undoCount: 0, undoLast: 0, safeEdit: true, projTitle: "", projAuthor: "", projGenre: "",
     selStart: -1, selEnd: -1,
     arrTime: 0,
-    numerator: 4, denominator: 4, undoHistoryPos: 0, undoHistoryCount: 0, undoHistoryLast: 0,
+    numerator: 4, denominator: 4,
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
     selectedChannel: 0,
     channels: [
@@ -88,12 +113,28 @@ export function createMockEngine() {
     "channels.isChannelMuted": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).mute; },
     "channels.isChannelSolo": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).solo; },
     "channels.getChannelColor": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).color; },
+    // PY-101 (#2878): PE 0xd5b420 は position<0 を 0 として返す (エラーにしない)。範囲外は index の -4 のみ (C と同一)
     "channels.getGridBit": (...a) => {
       arity(a, 2, 3);
       ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
       const k = ch(a[0]);
-      if (p < 0 || p >= 64) throw RANGE();
-      return !!k.steps[p];
+      if (p >= 64) throw RANGE();
+      return p >= 0 && !!k.steps[p];
+    },
+    // PY-101 (#2878): PE 0xd5b360 は grid (+0x7ac) 非 null で True。mock の channel は生成時に grid を持つものとして扱い、null 経路は持たない (C と同一)
+    "channels.isGridBitAssigned": (...a) => {
+      arity(a, 1, 2);
+      ix(a[0]); argI(a, 1, 0);
+      ch(a[0]);
+      return true;
+    },
+    // PY-101 (#2878): PE 0xd5bc10 → 0x12d3ff0。loop 分岐は未モデル (G1・G2・行テーブルの意味が未確定・#2932)。base 0x12d3e20 と同じ読出し
+    "channels.getGridBitWithLoop": (...a) => {
+      arity(a, 2, 3);
+      ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
+      const k = ch(a[0]);
+      if (p >= 64) throw RANGE();
+      return p >= 0 && !!k.steps[p];
     },
     // 選択の並びで offset 番目 (負は先頭扱い・仮置き)、超えたら最後の選択。無選択は canBeNone で -1 / 0
     "channels.channelNumber": (...a) => {
@@ -181,6 +222,17 @@ export function createMockEngine() {
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
+    // PY-95 (#2831): 状態 1 つを返すだけの ui ゲッター 9 件 (REPORT_PY95)。初期値は未実測の仮置き (provider/fl_engine.c と同じ)。
+    // isMetronomeEnabled / isPrecountEnabled は general.getUseMetronome / getPrecount と同じ状態を読む
+    "ui.isClosing": (...a) => { arity(a, 0, 0); return st.uiClosing; },
+    "ui.getTimeDispMin": (...a) => { arity(a, 0, 0); return st.uiTimeDispMin; },
+    "ui.isMetronomeEnabled": (...a) => { arity(a, 0, 0); return st.useMetronome; },
+    "ui.isPrecountEnabled": (...a) => { arity(a, 0, 0); return st.precount; },
+    "ui.isStartOnInputEnabled": (...a) => { arity(a, 0, 0); return st.uiStartOnInput; },
+    "ui.isLoopRecEnabled": (...a) => { arity(a, 0, 0); return st.uiLoopRec; },
+    "ui.getStepEditMode": (...a) => { arity(a, 0, 0); return st.uiStepEdit; },
+    "ui.isBrowserAutoHide": (...a) => { arity(a, 0, 0); return st.uiBrowserAutoHide; },
+    "ui.getSnapMode": (...a) => { arity(a, 0, 0); return st.uiSnapMode; },
     // PY-121 (#2982): PE で確定した引数書式 (PyArg fmt) と時間引数の頭打ち (0x7d0)。表示そのものは未モデルで、最後の時間引数だけ st.displayTime に残す
     "ui.crDisplayRect": (...a) => disp(a, 5, 6, 4),
     "ui.miDisplayRect": (...a) => disp(a, 3, 4, 2),
@@ -210,6 +262,16 @@ export function createMockEngine() {
     "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
     "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
+    // PY-94 (#2830): 状態 1 つを返すだけの 7 関数 (REPORT_PY94)。値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "general.getUndoHistoryPos": (...a) => { arity(a, 0, 0); return st.undoPos; },
+    "general.getUndoHistoryCount": (...a) => { arity(a, 0, 0); return st.undoCount; },
+    "general.getUndoHistoryLast": (...a) => { arity(a, 0, 0); return st.undoLast; },
+    "general.safeToEdit": (...a) => { arity(a, 0, 0); return st.safeEdit; },
+    "general.getProjectTitle": (...a) => { arity(a, 0, 0); return st.projTitle; },
+    "general.getProjectAuthor": (...a) => { arity(a, 0, 0); return st.projAuthor; },
+    "general.getProjectGenre": (...a) => { arity(a, 0, 0); return st.projGenre; },
+    // PY-120 (#2984): PE 0xd791b0 は obj.+0x50 の配列 (+0x3c0) の件数を返す。件数は実行時の状態のため仮置き 0 (REPORT_PY120_2984)
+    "launchMapPages.length": (...a) => { arity(a, 0, 0); return st.launchPages; },
     // PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない
     "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
     "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
@@ -231,10 +293,10 @@ export function createMockEngine() {
     "general.setRecPPQ": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 24 || v > 960) throw RANGE("Range error"); st.recPPQ = v; },
     "general.setNumerator": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 1 || v > 16) throw RANGE("Range error"); st.numerator = v; },
     "general.setDenominator": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 2 || v > 16) throw RANGE("Range error"); st.denominator = v; },
-    // undo 3 件は PE 0xd69af0 (共有コールバック) が範囲検査なしに値を書く (kind 0=Pos・1=Count・2=Last)。ゲートは上と同じく仮に真
-    "general.setUndoHistoryPos": (...a) => { arity(a, 1, 1); st.undoHistoryPos = ix(a[0]); },
-    "general.setUndoHistoryCount": (...a) => { arity(a, 1, 1); st.undoHistoryCount = ix(a[0]); },
-    "general.setUndoHistoryLast": (...a) => { arity(a, 1, 1); st.undoHistoryLast = ix(a[0]); },
+    // undo 3 件は PE 0xd69af0 (共有コールバック) が範囲検査なしに値を書く (kind 0=Pos・1=Count・2=Last)。ゲートは上と同じく仮に真。getter と同じ状態を書く
+    "general.setUndoHistoryPos": (...a) => { arity(a, 1, 1); st.undoPos = ix(a[0]); },
+    "general.setUndoHistoryCount": (...a) => { arity(a, 1, 1); st.undoCount = ix(a[0]); },
+    "general.setUndoHistoryLast": (...a) => { arity(a, 1, 1); st.undoLast = ix(a[0]); },
     // PY-121 (#2985): screen 状態の 5 関数 (PE 0xd7c7e0・0xd7c830・0xd7c880・0xd7c8c0・0xd7c740)。初期値は未実測の仮置き (provider/fl_engine.c と同じ)
     "screen.isBlanked": (...a) => { arity(a, 0, 0); return st.screenBlanked; },
     "screen.isUnBlank": (...a) => { arity(a, 0, 0); return st.screenUnBlank; },
@@ -266,5 +328,11 @@ export function createMockEngine() {
       return f(...args.map((a) => (a === null ? undefined : a)));
     },
     implemented: () => Object.keys(impl),
+    stepItemProbe: (prm, value, seed0, seed1) => {
+      const a = newItem(), b = newItem();
+      itemWrite(a, prm, 0, seed0); itemWrite(b, prm, 0, seed1);
+      itemsSet([a, b], prm, value);
+      return itemGet(b, prm);
+    },
   };
 }
