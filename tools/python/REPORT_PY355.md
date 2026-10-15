@@ -13,7 +13,7 @@
 ## 2. 測定条件
 
 - 測定 commit: `9628f3c3b` (`analysis/py355_g11.py` を入れた commit。コードを変えた最後の commit)。main 取り込み前の HEAD は `fe0c406e9` (origin/main 時点)。
-- 素材: `oc_artifacts: fl-win64`。`ls $HOME/artifacts` で `fl-win64.tar.zst` (2.3GB) の実在を確認。`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin'` (2.9 秒)。`work/` は gitignore。
+- 素材: `oc_artifacts: fl-win64`。`ls $ARTIFACTS_DIR` で `fl-win64.tar.zst` (2.3GB) の実在を確認。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin'` (2.9 秒)。`work/` は gitignore。
 - 逆アセンブル: `python3 analysis/py53_dispatch.py work/py64/extracted/block00031_PE.bin work/py53` → `fn=4664 dispatch=13 r8d_tests=174`。
 - 測定時の load average: 0.51 (測定開始時)。
 - 分類の所要時間: `py355_g11.py` 0.12 秒 (`time` の real)。
@@ -58,13 +58,14 @@
 | G2〜G6・G8 の 10 地点 (0x104aba9・0x104ad2e・0x104af7f・0x104b093・0x104b305・0x104b5aa・0x104bebf・0x104bffa・0x104c51a・0x104c56d) と G5 の 0x104b94e の手計算照合 | r9d の G2〜G6・G8 の式が未確認 | #4703 (PY-359・子) |
 | G11 の 55 件の SLOT 葉 (`SLOT[rbp+0x564]`・`SLOT[rbp+0x520]`・`[rbp+0x4e8]` の代入元 など) と `ACC?⚠合流` | G11 の値式が未確定 | #3101 (受入 1 の残り) |
 | `OUT(0xc61250)` の値・0x7a0c20 の vtbl (PY-161 §7) | 0x104a945・0x104cc65 | #3101 (既存) |
+| 0x104a48f の T ポインタ (`*(0x15e44c8)`)・`[rbp+0x564]` (PY-161 受入 3) | 0x104a48f の edx・r8d | #3101 (既存) |
 
 ## 6. 再現
 
 ```
 cd tools/python
 mkdir -p work/py64 work/py53
-tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin'
+tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin'
 python3 analysis/py53_dispatch.py work/py64/extracted/block00031_PE.bin work/py53
 python3 analysis/py355_g11.py work/py53/fn.txt work/g11_kinds.tsv    # 件数 55・exit 0
 ```
