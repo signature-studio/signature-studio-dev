@@ -38,6 +38,7 @@ static uint64_t __attribute__((ms_abi)) st_zero(void) { hits++; return 0; }
 
 typedef uint64_t (__attribute__((ms_abi)) *FN)(void);
 typedef uint64_t (__attribute__((ms_abi)) *FN4)(uint64_t, uint64_t, uint64_t, uint64_t);
+typedef uint64_t (__attribute__((ms_abi)) *FN5)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 #include <setjmp.h>
 static sigjmp_buf jb;
 static volatile sig_atomic_t in_case, n_segv, n_alrm, last_sig;
@@ -148,10 +149,11 @@ int main(int argc, char **argv) {
             ualarm(300000, 0);   /* 1 case 300 ms で打ち切り */
             /* CreateInstance → vtable の先頭 WC_CALL_SLOTS 個の slot を順に呼ぶ (rcx = instance, rdx = 作業用バッファ, r8 = r9 = 0)。
              * 戻り値は acc = acc*31 + rax で 1 つにまとめる (wasm 側 wc_run_wasm.mjs と同一の式)。 */
+            if (WC_INIT_RVA) ((FN)(img + WC_INIT_RVA))();
             uint64_t inst = ((FN)(img + WC_ENTRY_RVA))();
             uint64_t acc = inst;
             for (int k = 0; k < WC_CALL_SLOTS; k++) {
-                uint64_t r = ((FN4)(img + WC_SLOT_RVA[k]))(inst, WC_ARENA + 0x8000, 0, 0);
+                uint64_t r = ((FN5)(img + WC_SLOT_RVA[k]))(inst, WC_SLOT_ARGS[k][0], WC_SLOT_ARGS[k][1], WC_SLOT_ARGS[k][2], WC_SLOT_ARGS[k][3]);
                 if ((WC_RET_MASK >> k) & 1) acc = acc * 31 + r;
             }
             rax = acc;

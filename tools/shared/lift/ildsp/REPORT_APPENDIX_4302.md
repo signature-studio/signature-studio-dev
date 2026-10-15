@@ -102,8 +102,23 @@ slot 3 の引数別の対照 (同一 init・同一 `R8=16`・`S5=出力`):
 | 鍵の初期化 `0x1b7d80` の効果 (復号結果 `call` 先の経路) を `.data` 入力で観測 | 初期化の必要性を実測で示せていない (§4) | #4302 (残件) |
 | 初期化関数列の全体 (CRT か) | 「CRT 相当」の断定ができない | #4302 (残件) |
 
+## 8. 受入 3 の差分 harness (未達・途中結果)
+
+harness を拡張した (`WC_INIT_RVA`・`WC_ARENA_SZ`・`WC_CALL_ARGS` を slot ごとに指定・`wc_run5`)。既定値は従来どおり。
+
+| 設定 | 結果 |
+|---|---|
+| 既定 (`lift_psola.sh ok`・slot 0/2/4/5・`RDX=入力 R8=R9=0`) | PASS=64 FAIL=0 (1.20 s) |
+| init `0x1b7d80` + slot 0〜5・`WC_ARENA_SZ=4 MiB`・probe 規約の引数・閉包 root に `0x17f700`・`0x180830` を追加 | native は 64/64 完走 (SEGV 0)。wasm は slot 1 (`0x1ab680`) で trap (`fd_write` の import 経路) |
+
+- slot 0 は wasm でも完走する (rax=1)。slot 1 の thunk は `this+8` を読んで DSP 本体へ飛ぶ。wasm で `this+8` が native と同じ内部状態かは未確認 (trap のため `res_wasm.bin` が残らない)。
+- lift 側は閉包 243 関数・unsup 0・unlifted 0。init・CreateInstance は wasm でも完走する。
+- よって差分が取れない原因は、閉包の欠落ではなく、wasm 側の実行時状態 (slot 1 の入力 `this` の内部フィールド) と推測する。未確認。
+
+未解決 (受入 3 の残件・#4302 に残す): slot 1 で wasm が trap する原因の特定 (native と wasm の `this` 内部状態の比較)。
+
 ## 7. 検証
 
 - 測定 commit (コードを変えた最後の commit): `e366f3ef9` (`fix(ildsp): slot 3 needs RDX=0; probe adds sequential call row (#4302)`)。素材 `fl-win64` を `work/fl` に展開して実行。
 - `psola_init_probe.sh` (12 実験・RDX=入力の対照 1 件を含む): 3 回実行。各 0.68〜0.70 s・load 0.10・3 回の出力は `cmp` で完全一致。対照行 (`RDX=入力`) のみ落ち、他 11 行は完走 (rc=0)。
-- 差分テスト (`lift_psola.sh`) は未実施 (受入 3)。
+- 差分テスト (`lift_psola.sh ok`): 既定の設定で 64/64 PASS (1.20 s・load 0.51)。受入 3 の slot 1・3 を含む差分は §8 のとおり未達。
