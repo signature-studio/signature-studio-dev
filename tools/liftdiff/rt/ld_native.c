@@ -102,6 +102,7 @@ extern int64_t RegisterClassW(int64_t);
 extern int64_t CreateWindowExW(int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t);
 extern int64_t DefWindowProcW(int64_t, int64_t, int64_t, int64_t);
 extern int64_t SetWindowLongPtrW(int64_t, int64_t, int64_t);
+extern int64_t GetClassInfoW(int64_t, int64_t, int64_t);
 void ld_gui_init(void);
 void ld_gui_dump(FILE* f, const char* cid);
 static int g_gui_on; static FILE* g_gui_fp;
@@ -117,11 +118,12 @@ u64 ld_stub_c(u64 idx, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk) {
   }
   u64 r = ld_stub(n, a0, a1, a2, a3, a4, a5);
 #ifdef LD_GUI_HL
-  if (g_gui_on && (!strcmp(n, "RegisterClassW") || !strcmp(n, "CreateWindowExW") || !strcmp(n, "DefWindowProcW") || !strcmp(n, "SetWindowLongPtrW"))) {
+  if (g_gui_on && (!strcmp(n, "GetClassInfoW") || !strcmp(n, "RegisterClassW") || !strcmp(n, "CreateWindowExW") || !strcmp(n, "DefWindowProcW") || !strcmp(n, "SetWindowLongPtrW"))) {
     u64 ent0 = ld_stub_ent, s[8] = {0};   /* 第5〜12引数は entry+0x28 (wt_rec と同じ) */
     int ci = (int)ld_ncalls - 1;          /* 直前の ld_stub が積んだ記録 (呼出し記録の戻り値も直す) */
     if (!strcmp(n, "CreateWindowExW") && ld_dst_ok(ent0 + 0x28, 64)) memcpy(s, (void*)(uintptr_t)(ent0 + 0x28), 64);
-    if (!strcmp(n, "RegisterClassW")) r = (u64)RegisterClassW((int64_t)a0);
+    if (!strcmp(n, "GetClassInfoW")) r = (u64)GetClassInfoW((int64_t)a0, (int64_t)a1, (int64_t)a2);
+    else if (!strcmp(n, "RegisterClassW")) r = (u64)RegisterClassW((int64_t)a0);
     else if (!strcmp(n, "DefWindowProcW")) r = (u64)DefWindowProcW((int64_t)a0, (int64_t)a1, (int64_t)a2, (int64_t)a3);
     else if (!strcmp(n, "SetWindowLongPtrW")) r = (u64)SetWindowLongPtrW((int64_t)a0, (int64_t)a1, (int64_t)a2);
     else r = (u64)CreateWindowExW((int64_t)a0, (int64_t)a1, (int64_t)a2, (int64_t)a3, (int64_t)s[0], (int64_t)s[1], (int64_t)s[2], (int64_t)s[3],
