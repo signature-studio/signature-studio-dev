@@ -42,7 +42,7 @@ FL_WIN64_DIR=<fl-win64 展開先> ILDSP_WORK=<作業先> bash tools/shared/lift/
 
 - `ildsp_vtable_check.py`: `ALL OK`。
 - `closure_select.py`: `body_insn=324`・`closure functions=67 insn=2609 direct_call_edges=84 direct_jmp_edges=7 unresolved_edges=0`・`indirect_calls=18 indirect_jmps=6`。
-- RetDec 段: `/opt/retdec` が無く、`toolchain-retdec` 素材も無いため、この run では実行できない (`rc=127`)。**RetDec・ir_normalize・gen_helpers の結果は、新しい closure について未測定。** 前回 (`372bbe95`) の `13 functions lifted`・`declare @__asm_*` の種類数 49・`cvttss2si` での停止は旧 closure の値で、無効。
+- RetDec 段: RetDec 本体 (`RETDEC_BIN`) が無く、`toolchain-retdec` 素材も無いため、この run では実行できない (`rc=127`)。**RetDec・ir_normalize・gen_helpers の結果は、新しい closure について未測定。** 前回 (`372bbe95`) の `13 functions lifted`・`declare @__asm_*` の種類数 49・`cvttss2si` での停止は旧 closure の値で、無効。
 - 所要 (lift.sh の RetDec 前段まで): 0.38 秒 (1 回・時間計測のみ)。
 
 ## 4. 未解決
