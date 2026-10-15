@@ -21,7 +21,7 @@
 
 ### B1 (本 run で FAIL)
 
-judge の B1 (`judge.py` 39〜41 行) は boot と baseline の `units_run`・`dllmain_done`・`init_count`・`GetMem`・`FreeMem`・`icall_miss`・`boot_failfast`・`boot_threw` を全て等しさで比べる。判定式は変えていない。
+judge の B1 (`judge.py` 39〜41 行) は boot と baseline の `units_run`・`dllmain_done`・`init_count`・`GetMem`・`FreeMem`・`icall_miss`・`boot_threw` (baseline の `threw` と比較) を等しさで比べ、`boot_failfast` は None であることを要求する。判定式は変えていない。
 
 | 判定項目 | 本 run の boot | 本 run の base | 既存記録 (boot / baseline。committed `results/boot.json` と `results/baseline_boot.json`、測定 commit `c3ee6daa7` の内容) |
 |---|---|---|---|
