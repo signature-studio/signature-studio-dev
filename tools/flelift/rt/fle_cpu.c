@@ -59,7 +59,7 @@ void fle_wwatch(uint64_t a, uint32_t n, const void* src, const char* file, int l
         if (memcmp(oldb, newb, 8) == 0 || nlog >= 5000) continue;
         uint64_t ov, nv; memcpy(&ov, oldb, 8); memcpy(&nv, newb, 8);
         nlog++;
-        fprintf(stderr, "[fle_wwatch] slot=%#llx a=%#llx n=%u old=%#llx new=%#llx at %s:%d\n",
+        fprintf(stderr, "[fle_wwatch] ret=%p slot=%#llx a=%#llx n=%u old=%#llx new=%#llx at %s:%d\n", __builtin_return_address(0),
                 (unsigned long long)w, (unsigned long long)a, n, (unsigned long long)ov, (unsigned long long)nv, file, line);
     }
 }
