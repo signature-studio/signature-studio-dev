@@ -70,43 +70,43 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 
 - **方式**: `pe.Analyzer.fault_arg(va, rip)`。fault rip の命令のメモリ base を、entry から rip 直前まで線形に走査した mov 伝播 (rcx/rdx/r8/r9 の引数由来を追跡。call で全消去、分岐・ret を跨ぐと None) で引数 index に寄せる。`session.fvm_cand` は候補が 2 件以上のとき、その引数が候補に含まれれば候補を 1 つに決めて case を作る。決まらなければ従来どおり `multi_candidate` で対象外。`cases.py` (blob・args) は変更していない。
 - **修正 (commit `1b53c5b86`)**: `fault_arg` は (a) 3000 命令で打ち切ったら `None`、(b) 64bit の reg-reg `mov` 以外で書かれた族 (明示 dst・capstone の暗黙 write・`cmpxchg` の暗黙 rax・部分書き込み) を全て `prov` から外す。
-- **多重候補の内訳 (修正後 `fault_arg`・実測)**: 母集団は測定 HEAD (`e1efecc2f`) の e2e が作った `batch_sample_800.jsonl` で、fvm 以外に equal/diff/wasm_trap 無し・`s` の fault あり・候補 2 件以上の 73 件。表の値は再現コマンドの出力そのもの。
+- **多重候補の内訳 (修正後 `fault_arg`・測定 HEAD `d8d474ab8` の実測)**: 母集団は fvm 以外に equal/diff/wasm_trap 無し・`s` の fault あり・候補 2 件以上の 73 件。表の値は再現コマンドの出力そのもの。
 
   | 分類 | 件数 | 内容 |
   |---|---|---|
   | resolved | 29 | fault base が引数 index に伝播し、その index が候補に含まれる (fvm 救済の対象) |
   | arg_not_candidate | 3 | 伝播できたが、その引数が候補外 |
-  | unresolved_base_not_arg | 33 | 線形追跡で最後まで引数由来でない |
-  | unresolved_jump_before_rip | 5 | rip より前で分岐を跨いだ |
+  | unresolved_base_not_arg | 32 | 線形追跡で最後まで引数由来でない |
+  | unresolved_jump_before_rip | 6 | rip より前で分岐を跨いだ |
   | unresolved_ret_before_rip | 2 | rip より前で ret を跨いだ |
   | ret_fragment | 1 | ret 断片 (`0x4096c0`) |
   | 合計 | 73 | |
 
-  合計 73 = 29 + 3 + 33 + 5 + 2 + 1。
-- **母集団の入力**: 測定 HEAD の e2e が作った `batch_sample_800.jsonl` (fvm case 41 件を含む。gitignore のため commit しない)。sha256 `9e657e40c7ffe0d34c7042c37056d19d26354964ff99c5c9298a5ca5ce61839d`。`work-liftdiff` の artifact 内の同名ファイルは古い版 (fvm case 0 件・sha256 `b219553f…`) なので、入力に使ってはならない。
-- **再現**: `FL_WIN64_DIR=<展開先> python3 tools/liftdiff/ld198_recount.py <測定 HEAD の batch_sample_800.jsonl>` (入力パスは必ず測定 HEAD の jsonl を指定する。artifact の古い版を渡すと 88 になる)。VA 一覧は `VA <分類>:` 行に出る。
-- **古い artifact 由来の 88 件**: `work-liftdiff` の artifact に入っていた `batch_sample_800.jsonl` (Oct 12 生成・sha256 `b219553f…`・fvm case 0 件) は fvm 起動を通していない。その母集団は 88 件 (resolved 32・候補外 4・base 非 arg 42・分岐 7・ret 跨ぎ 2・ret 断片 1)。この 88 は**修正前の古い値**で、現在の表 (73) とは別物。
-- **88 と 73 の差 15 件**: 新規の多重候補は 0 件で、古い母集団にだけある 15 件 (`0x102b430 0x50abe0 0x526f70 0x539670 0x623840 0x6682b0 0x813a70 0x8ce510 0x926f10 0x93e920 0x9773f0 0x97e460 0xcf0a90 0xec3190 0xff5ec0`) は、測定 HEAD の jsonl では多重候補の条件を満たさない (fvm 以外の case の判定が現行と違う)。88 ⊇ 73。fvm 救済の影響ではない。
-- **測定 commit**: `e1efecc2f` (コード差分 0 の HEAD)。`pe.py`・`session.py`・`cases.py` の最後の code commit は `1b53c5b86`。
-- **差分証跡** (WORKFLOW §6): 測定 commit `e1efecc2f` から HEAD までの `tools/liftdiff` の差分は、本節 (`REPORT_APPENDIX_LD177.md`) と `ld198_recount.py` の 2 ファイルだけ。`git diff --stat e1efecc2f HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/liftdiff_e2e.sh` の出力は空 (コード差分 0)。実出力は PR 本文に載せる。
-- **fvm 12 → 41 (+29) の説明**: 新規 fvm 29 件 (`0x10263d0 0x10293b0 0x102b6c0 0x102b750 0x11e7940 0x126e4c0 0x472530 0x47d460 0x4fb160 0x534eb0 0x539e00 0x5c1030 0x64fa70 0x64fc70 0x675010 0x678460 0x681380 0x8cbe40 0x8e7080 0x905af0 0xa96550 0xa96620 0xc3efe0 0xd2b370 0xd2b5b0 0xd2b620 0xd2bb50 0xebbfb0 0xebc1a0`) は resolved 29 件と同一集合 (`resolved==newfvm`)。base で fvm 済みの 12 件は消えていない (lost 0)。
-- **測定**: base `1f12b1b6d` と HEAD `e1efecc2f` で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 1 回ずつ、同一 runner で連続実行 (base と HEAD は別の worktree で実行)。素材 `fl-win64`・`work-m11`・`work-liftdiff` は `$ARTIFACTS_DIR` から展開。`work-m11` は `m11_gen_ir2.sh` で `ir_conditions.json` を作った後 (`ir_sha256` 597757f4…)。emsdk は pin 6.0.12 を上流から取得して `[EMSDK]` に置いた (素材 `toolchain-emsdk` は本 run に無い)。
+  合計 73 = 29 + 3 + 32 + 6 + 2 + 1。
+- **母集団の入力**: 測定 HEAD `d8d474ab8` の e2e が作った `tools/liftdiff/work/m11/batch_sample_800.jsonl` (801 行・fvm case 42 件を含む。gitignore のため commit しない)。sha256 `ba39dada441b26bbb9f00dba1cd868fee1f39ad361bab67ea1d67af1e0b49a8b`。`work-liftdiff` の artifact 内の同名ファイルは古い版 (fvm case 0 件・sha256 `b219553f…`) なので、入力に使ってはならない。
+- **再現**: `FL_WIN64_DIR=<展開先> python3 tools/liftdiff/ld198_recount.py <上記 sha256 の batch_sample_800.jsonl>`。VA 一覧は `VA <分類>:` 行に出る。
+- **古い artifact 由来の 88 件**: `work-liftdiff` の artifact の `batch_sample_800.jsonl` (sha256 `b219553f…`・fvm case 0 件) は fvm 起動を通していない。その母集団の多重候補は 88 件 (resolved 32・候補外 4・base 非 arg 42・分岐 7・ret 跨ぎ 2・ret 断片 1) で、修正前の古い値。現在の表 (73) とは別物。
+- **88 と 73 の差 15 件**: 古い母集団にだけある多重候補 15 件 (`0x102b430 0x50abe0 0x526f70 0x539670 0x623840 0x6682b0 0x813a70 0x8ce510 0x926f10 0x93e920 0x9773f0 0x97e460 0xcf0a90 0xec3190 0xff5ec0`) は、測定 HEAD の jsonl では多重候補の条件を満たさない (fvm 以外の case の判定が現行と違う)。fvm 救済の影響ではない。
+- **測定 commit**: `d8d474ab8` (`git diff --stat d8d474ab8 HEAD -- tools/liftdiff` の出力は空。本節の追記は docs のみ)。
+- **差分証跡** (WORKFLOW §6): `git diff --stat d8d474ab8 HEAD -- tools/liftdiff` の実出力は空 (コード差分 0・REPORT の追記は後述の commit の 1 件のみ)。
+- **fvm 12 → 42 (+30) の説明**: base の fvm は 12 関数 (native_fault 2 / both_fault 8 / diff 2)。HEAD は 42 関数 (native_fault 15 / both_fault 23 / diff 3 / hang 1)。新規 fvm 30 件は `0x10263d0 0x10293b0 0x102b6c0 0x102b750 0x11e7940 0x126e4c0 0x472530 0x47d460 0x4fb160 0x534eb0 0x539e00 0x5c1030 0x64fa70 0x64fc70 0x675010 0x678460 0x681380 0x808700 0x8cbe40 0x8e7080 0x905af0 0xa96550 0xa96620 0xc3efe0 0xd2b370 0xd2b5b0 0xd2b620 0xd2bb50 0xebbfb0 0xebc1a0`。これは resolved 29 件 (recount の一覧) に `0x808700` を加えた 30 件。`0x808700` は recount では ret 跨ぎ (`unresolved_ret_before_rip`) に分類されるが、session の `_fault_base_arg` 経路で fvm が走った (outcome は native_fault)。recount (`fault_arg` のみ) と session (`_fault_base_arg` を含む) の分類は一致しない。base で fvm 済みの 12 件は消えていない (lost 0)。
+- **測定**: base `1f12b1b6d` と HEAD `d8d474ab8` で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 1 回ずつ、同一 runner で連続実行 (base は detached worktree `$RUNNER_TEMP/base_1f12b1b6d`)。素材 `fl-win64`・`work-m11`・`work-liftdiff` は `$ARTIFACTS_DIR` から展開。emsdk は pin 6.0.12 を上流から `/opt/emsdk` に入れた (素材 `toolchain-emsdk` は本 run に無い)。
 
-| run | 所要 (経過秒) | load (uptime 1 分値 開始 → 終了) | match / mismatch / unexec | fvm 関数数 (= fvm case 数) | fvm outcome (native_fault / both_fault / diff / hang) |
-|---|---|---|---|---|---|
-| base `1f12b1b6d` | 194 PASS | 1.17 → 5.40 | 360 / 234 / 206 | 12 | 2 / 8 / 2 / 0 |
-| HEAD `e1efecc2f` | 190 PASS | 5.40 → 4.87 | 360 / 235 / 205 | 41 | 15 / 22 / 3 / 1 |
+| run | commit | 所要 (経過秒) | load (uptime 1 分値 開始 → 終了) | match / mismatch / unexec | fvm 関数数 (= fvm case 数) | fvm outcome (native_fault / both_fault / diff / hang) |
+|---|---|---|---|---|---|---|
+| base | `1f12b1b6d` | 191 PASS | 2.44 → 5.99 | 360 / 234 / 206 (800 関数) | 12 | 2 / 8 / 2 / 0 |
+| HEAD | `d8d474ab8` | 205 PASS | 1.10 → 4.39 | 360 / 235 / 206 (801 行) | 42 | 15 / 23 / 3 / 1 |
 
-- **関数単位の verdict 変化**: 1 件 (`0x5c1030` unexec→mismatch)。他は全関数で不変 (base と HEAD の jsonl を関数 VA で比較した実測)。
-- **fvm の outcome**: HEAD は native_fault 15 / both_fault 22 / diff 3 / hang 1 (計 41)。equal / wasm_trap への遷移は 0 件。
-- **注**: 前回 (`7618e8a56`) の本節の fvm 内訳 (both_fault 23・hang 0) は、今回の測定 (`e1efecc2f`) の値と一致しないため置き換える。
-- **非 fvm case の変化**: `fvm_transitions.py` で `EXISTING_PATTERN_CHANGED` は base のみ 14 関数。fvm の救済で増えた case の影響ではなく、既存 pattern の outcome の変化として記録する。
+- **関数単位の verdict 変化**: base と HEAD の 800 関数の共通集合で、verdict の遷移は 0 件 (`0x5c1030` は base・HEAD とも unexec。`fvm_held` で据え置き)。HEAD の jsonl には `0x691dd0` (mismatch・`callee_divergence`) が 1 件多い。これは `sample:N` の抽出に LD-225 (#4561) の `OBJ_PATTERNS` VA が加わったためで、fvm を含まず、本 PR の変更とは無関係。
+- **fvm の outcome**: HEAD は native_fault 15 / both_fault 23 / diff 3 / hang 1 (計 42)。equal / wasm_trap への遷移は 0 件。
+- **注**: `ld198_recount.py` の分類は、`d8d474ab8` の jsonl では上記の値になる。`e1efecc2f` 時点の値 (resolved 29 / unresolved_base_not_arg 33 / jump 5) とは一部違うため、旧値は置き換える。
+- **非 fvm case の変化**: 未測定。`fvm_transitions.py` の再実行は本 PR では行っていない。
 
 ### 未達 (受入条件)
 
 - 受入 2 (equal / wasm_trap への遷移): 0 件。fvm の救済は native 側が fault で落ちる case を増やしただけで、wasm 側と一致する case は作れていない。
 - 受入 3 (既存 verdict の base 比): 関数単位で 1 件 (`0x5c1030`) のみ変化。揺らぎ判定 (base 同士の幅) は未実施 (同一 base の 2 回目を取っていない)。
-- 残り 44 件 (多重 73 − resolved 29。候補外 3・引数由来に伝播できない 40 (base 非 arg 33 + 分岐 5 + ret 跨ぎ 2)・ret 断片 1): 起票先 #4173 で継続 (本 PR で閉じない)。
+- 残り 44 件 (多重 73 − resolved 29。候補外 3・引数由来に伝播できない 40 (base 非 arg 32 + 分岐 6 + ret 跨ぎ 2)・ret 断片 1): 起票先 #4173 で継続 (本 PR で閉じない)。
 
 ## 12.1.3 LD-195 (#4139): 候補多重の fvm を fault base レジスタ値で一意化する (LD-177 の残り・部分達成)
 
@@ -127,7 +127,7 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 
 どれが件数を占めるかは未確定。切り分けは #4173 (LD-198) で行う。
 
-**sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、4 コアの runner、2 回ずつ)**:
+**sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、4 コアの runner、2 回ずつ)**。以下は LD-195 当時 (`d96bda5fd`・`80e066053`) の過去測定の記録。現 HEAD の値は上の LD-198 節の表を正とする:
 
 | run | commit | match / mismatch / unexec | fvm case (native_fault / both_fault / diff / hang) | fvm 関数数 | e2e |
 |---|---|---|---|---|---|
