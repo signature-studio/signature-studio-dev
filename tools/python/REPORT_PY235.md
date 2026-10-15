@@ -117,7 +117,7 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
 - **確定した式**: `flags & 0x22 == 0` のとき 4 族は store 0 件で 0x104cc65 → ret に届き、戻り値 = value。CFG で固定 4 族の到達集合 (503 VA) に `lea 0x104a924` は無い。
 - **未確定**: `flags & 0x22 != 0` の右辺は engine 状態 (`obj+0x3b8`・`obj+0x3bc`・global) と定数 `0x104ccd8` (= 2^-30) に依存するため、静的な式は閉じられない。これらは code 2 (未実装) のまま。
 - 実装: `host/fl_mock.mjs` の `recPassFamily(e, f)`・`provider/fl_engine.c` の `rec_pass_family(e, f)` (3 番目の引数 flags を読む)。`tests/general_diff.mjs` に固定 4 族の境界を追加 (flags 0x1c・0x1 は `& 0x22 == 0` で成功、0x2・0x20 は code 2)。mock と C の一致を見る差分テストで、戻り値の値そのものは検査しない。
-- 測定 commit: `f5d656a4f` (main 取り込み merge)。本 PR の HEAD は `5cc9d7038` で、`git diff f5d656a4f 5cc9d7038 --stat` は REPORT_PY235.md のみ (コード差分 0)。load avg は測定中 `0.74` (4 コア)。
+- 測定 commit: `f5d656a4f` (main 取り込み merge)。これ以降の commit は REPORT_PY235.md のみ (`git diff f5d656a4f HEAD --stat` が REPORT_PY235.md だけ・コード差分 0)。load avg は測定中 `0.74` (4 コア)。
   - 本 PR の HEAD 前 (`ce6b07dfb`) からの差分は main 側由来で、`fl_engine.c` の `FL_H(...)` が 208→224 (+16)。内訳は PY-246 の `FL_H(ui, up/down/left/right/cut/copy/paste/insert/delete/enter/escape/yes/no/nextWindow/selectWindow)` 15 件と PY-243 の `FL_H(launchMapPages, setMapItemTarget)` 1 件。本 PR の `rec_pass_family` 関連は `FL_H` を増やさない (0 増分)。
   - `bash provider/build.sh`: rc 0。`fl_table.c: 435 関数, ハンドラ 224`。`EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh` (emsdk 6.0.12 を上流から install)。
   - `build_cpython_wasm.sh`: rc 0 (`/tmp/opencode` のコピーで実行。`tools/legal` も同じ場所にコピーして後処理を通した)。`FLPY_SKIP_TABLE=1 build_flpy.sh`: rc 0 (下記補足の一時コピーで実行。出力 `flpy.js` 120442 B・`flpy.wasm` 5923520 B・`flpy.data` 3293169 B、5.9 秒)。
