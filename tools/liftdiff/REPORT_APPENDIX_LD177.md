@@ -164,7 +164,7 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 - **切り分け (結論: wasm 側の欠陥)**: 機械語 `0x5c1030` は `cmp [rcx+0x28],edx; je` の後、taken 側で `mov rax,rcx; mov rbx,[rcx]; call [rbx+0x18]` (`0x5c1046`) を実行する。IR (`m11/work/boot_final3.ll` の `function_5c1030`) には間接 call が無く、`[arg1]` を rax に読んで返すだけ。`fvm` arg 0 (this ポインタ) で native が `?vmslot3` を呼ぶのは機械語どおりで、wasm が call を落としている。static info の tag `icall_drop [high]` (機械語の間接 call=1・IR=0) と一致する。
 - **対象への復帰**: `session.FVM_PIN_ARG = {0x5c1030: 0}`。`fvm_cand` は候補多重でも、固定した関数は arg 0 だけを返す。`FVM_HOLD_VAS`・`fvm_held` と `classify.verdict` の除外は削除した。
 - **単体テスト**: `tests/test_ld199_fvm_pin.py` (4 件)。固定の規則を外すと FAIL する (変異確認済み)。
-- **測定 commit**: `b3a33a3fa` (コードを変えた最後の commit。以後 `d4b8a5309` はテストのみ)。
+- **測定 commit**: `b3a33a3fa` (コードを変えた最後の commit。以後の `d4b8a5309` はテスト追加、`78ef27d60` は docs のみ)。
 - **測定 (`liftdiff_e2e.sh --m11-only`・`FL_WIN64_DIR` = 展開先の親・`--shards 12 --state auto` 既定)**:
 
 | run | commit | match / mismatch / unexec | e2e | 所要 (`time` 実測) | load (開始 → 終了) |
@@ -179,6 +179,8 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 - **関数単位の遷移 (base と HEAD の jsonl の verdict を突き合わせ)**: `unexec→mismatch` 1 件 (`0x5c1030`) だけ。他の 800 関数は不変。
 - `0x5c1030` の case: fvm が `diff` (`ret` native_rax=0x0・wasm_rax=0x22073000、`calls` native=`?vmslot3` の `native_extra_call`)。他の 11 pattern は `native_fault` のまま。
 - 注: 同一 work を base と HEAD で共有した測定は無効 (出力が互いに上書きされる)。上表は base・HEAD を別 work ディレクトリで測った値。
-- **未達 (受入条件 3 の残り)**: 揺らぎ判定 (base 同士の幅) は本 run では未実施。sample:800 の既存 verdict の変化は `0x5c1030` の 1 件 (意図した変化)。
+- **受入条件 3 の判定**: base (`7c226bdb3`) と HEAD (`b3a33a3fa`) の sample:800 比較で、既存 verdict の変化は `0x5c1030` の 1 件 (意図した変化)。受入 3 は満たす。
+- **受入外 (#4137 (LD-194) で扱う)**: 揺らぎ判定 (base 同士の幅) は本 PR の受入に含まれず、未実施。
 - **起票先**: icall 欠落 (`function_5c1030` の `call [rbx+0x18]` が IR から落ちる原因) の修正は lift 側の作業で、本 PR の範囲外。#4137 (LD-194) へ。
-- **`git diff b3a33a3fa HEAD -- tools/liftdiff`** の出力: テストファイル追加のみ (`d4b8a5309`)。`ldlib/` の差分は 0。
+- **`git diff b3a33a3fa 78ef27d60 --stat -- tools/liftdiff`** の出力: `REPORT_APPENDIX_LD177.md` (+26 / -1)・`tests/test_ld199_fvm_pin.py` (+70)。`d4b8a5309` (テスト追加) と `78ef27d60` (docs のみ) が測定 commit 以降の範囲。`ldlib/` の差分は 0。
+- **main との関係**: 測定 base `7c226bdb3` 以降、main は `tools/liftdiff/ldlib` を変えている (`e46ed6e14`・`dc6a2d08d`・#4874。現 main `2d0357a51`)。本 PR の head は main を取り込んでいないため、本測定は PR head で有効。merge 後の結果は本測定と同一ではない。
