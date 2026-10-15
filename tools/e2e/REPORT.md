@@ -212,7 +212,14 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 **素材・環境**: `toolchain-emsdk` は本 run の素材展開先 (素材置き場の取得対象) に無かったため、`e2e.yaml` の Emscripten step と同じ手順 (`emsdk install <tools/m1/flags.sh の pin>` ・ `activate`) で `$RUNNER_TEMP` に入れた。`gen_api.py` は `x86_64-w64-mingw32-gcc` を要する。`build_guest.sh` は mingw が無ければ apt で導入する (`gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev`)。CI の `E2E / local` ジョブは mingw を入れていないため、この導入に依存する。`fl-win64` は使わない。
 **e2e の PNG**: `ctx.shot("gui-guest")` は `e2e.yaml` が `tools/e2e/work/shots` を upload する。#3461 本文の「e2e の PNG を Actions artifact に上げない」とは食い違う。方針は PM 判断 (`pm-decision`)。
 
-**未実施 (子 issue)**: オラクル画素の完全一致とネガコン (a)(b)(c)・`text_wasm_e2e.sh` 回帰 → #3495 (WIN-27)。GUI-REACH trace → #3496 (WIN-28)。`fl-boot` のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
+**未実施 (子 issue)**: オラクル画素の完全一致 → #4312 (WIN-46)・ネガコン (a)(b)(c) → #4313 (WIN-47)。`text_wasm_e2e.sh` 回帰は #3495 の run で PASS (下記 #3495 節)。GUI-REACH trace → #3496 (WIN-28)。`fl-boot` のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
+
+## gui=wasm 検証 (#3495 WIN-27)
+基準 commit `0c6d47405` (origin/main、#3514 取り込み後)。
+- `bash tools/e2e/run.sh --driver both --targets preview,edge-sim` (`EMSDK_ENV` = `toolchain-emsdk` 展開先): **PASS 46 / FAIL 0 / SKIP 6**、wall 63.1 s、rc 0、load 0.20 (開始時)。`gui-guest-boot` は両 target で `frames=1 lit=38400 colors>=7`、`gui-guest-tamper` は `state=error frames=0`、`gui-guest-origin` は PASS。
+- `bash tools/gui/test/text_wasm_e2e.sh` (FreeType 版): **PASS** (rc 0・16.5 s)。前提の `tools/shared/oss/freetype/build.sh` は native / wasm32 / wasm64 のビルドが通った (rc 1 は FL 同梱フォントを参照する検証ステップで、`text_wasm_e2e.sh` の回帰には不要)。結果: 通常経路 readback・screenshot 0 px 差 (fg 3826 px)・metrics 30 行一致、8x8 回帰 0 px 差 (fg 2179 px)、ネガコン N1〜N5 すべて拒否。
+- `tools/gui/e2e` のゲストビルド (`build_guest.sh`): rc 0、`app.wasm` 120870 B → chunked 2 part (64 KiB)。
+- 未実施: 受入 1 (オラクル画素の完全一致) とネガコン (a)(b)(c)。1 run に収まらないと判断し子 issue #4312・#4313 に分割した。
 
 ## ユーザ依頼事項
 1. **公開ホスト名** (例: `studio.<既存ゾーン>`)。案 S の既定は workers.dev (`deploy/README.md` §移行で自前ドメインへ)。
