@@ -222,7 +222,7 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 | `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | 本 PR で DOC_MAP §3 に `REPORT.md`・`REPORT_INDIRECT.md` の 2 行を追記して解消 (REPORT 側の PM 追記は不要) |
 | `ALLOW_UNIMPL` (`rep_stosb_memset` 用の許容) の撤去 | 撤去後も既存 CSV に対する judge は PASS 7/7 (`--skip-lift`)。 stub が戻れば FAIL する | 本 PR で撤去 (main 8d883c3 以降の実測で 7 block とも `declares_unimpl` 0) |
 | lowering (f80→f64) の bit-exact 差分 (3 block) | 通過 ≠ 正しさ。 差分試験の対象外 | #197 にコメント済み (REPORT_LEA.md §7b) |
-| VEX の `vcomisd` / `vucomisd` / `vucomiss` (`__asm_v*comis*`) の flag が未反映 (同一ブロック内の読みのみ反映 #1774。 残りは消費条件が IR に無い) | 2 engine の unimpl に 3 種が残る (4 件)。 stub は 0 返却のため silent な flag 欠落経路 | 子 [PLG-F3-33] (起票)。 非 VEX は [PLG-F3-34] (起票) |
+| VEX の `vcomisd` / `vucomisd` / `vucomiss` (`__asm_v*comis*`) の flag が未反映 (同一ブロック内の読みのみ反映 #1774。 残りは消費条件が IR に無い) | 2 engine の unimpl に VEX の stub が残る (件数・内訳は [REPORT_APPENDIX_3242.md](REPORT_APPENDIX_3242.md) §1・§2)。 stub は 0 返却のため silent な flag 欠落経路 | 子 [PLG-F3-33] #3241 (open)。 非 VEX は [PLG-F3-34] #3242 (本 PR) |
 
 - §7b の実測と方式 (#1582 [PLG-F3-12]・VEX comis/ucomis の flag 方式の検討 2 案) は [REPORT_APPENDIX_1582.md](REPORT_APPENDIX_1582.md) §7b。
 - §7c の実測 (#1774 [PLG-F3-14]: 同一ブロック内の flag 反映 pass・機械語の消費命令と IR の参照・icall 別案の不採用理由) は [REPORT_APPENDIX_1774.md](REPORT_APPENDIX_1774.md) §7c。
