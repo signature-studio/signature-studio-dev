@@ -208,6 +208,8 @@ Issue 本文の「sub-object の vtable」という前提は誤り。CreateInsta
 | IAT 16 件の扱い (GetLastError・HeapAlloc 等) | lift 規模 | 子 [T-SH-52] #3216 |
 | 70 関数の lift・native 全バイト差分・ネガティブコントロール・gate (#2484 の受入条件 2・3) | 本 PR では未実施 | 子 [T-SH-52] #3216 |
 
+- native 確定 (T-SH-59 #3276): 正常系で helper `0x1aedc0`・`0x1b6f4c` は 0 回。例外 path の vptr 格納先はスタック。詳細と実測は `REPORT_APPENDIX_3276.md`。
+
 ### 5-6. 検証
 - 再現 (3 コマンド): `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_closure.py` → `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_wc_dispatch.py` → `python3 tools/shared/scripts/ildsp_wc_dispatch_check.py tools/shared/work/raw/ildsp_wc_dispatch.json <PE>`。
 - 入力: `block24360_PE.bin` (sha256 f4b23b0f…)。`ildsp_closure.py` の WaveformColouring 行 (70 関数・2,757 命令・SIMD 23.8%・間接 19) を再現した。
