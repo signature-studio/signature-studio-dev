@@ -70,7 +70,10 @@ REPORT.md §19 の付録。PR #5109 (`Refs #4011`) の実測・検証記録の�
 | 既定 OFF | 109 | 111 | 7 | 114 (Halt0) | null |
 | `M11_M2V=1 M11_M2S=1` | 129 | 132 | 16 | 144 (`0x65c540`) | `memory access out of bounds` |
 
-- ON の数値は §20 (測定 commit `af6e700c4`・AddRef 無し) の値と一致した。AddRef 無しの ON を HEAD で再測定はしていない。OFF は基準値 (§3) と一致。
+- ON の数値は REPORT_N4011.md §3 (測定 commit `af6e700c4`・AddRef 無し) の値と一致した。AddRef 無しの ON を HEAD で再測定はしていない。OFF は基準値 (§3) と一致。
+- **結論**: AddRef 復元の有無で ON の 4 指標 (units_run 129 / icall_miss 16 / last_unit 144 / OOB) は変わらなかった。パッチの計測上の効果はゼロ。
+- 一致数の未取得: `pass_m2v_fn40fcf0_addref` の一致数 (`stage()` の `function_40fcf0 AddRef restore: N sites`・`report['m2v_fn40fcf0_addref']`) は本 fix run では取得していない。`work-m11` と toolchain が `$ARTIFACTS_DIR` に無く、IR を再生成できないため。置換は N == 1 のときだけ行う (`m11_passes.py`)。N の実値は未確認。
+- 上の一致は「N == 1 で置換されたが効果がなかった」と「N == 0 で置換されなかった」を区別しない。手元で確かめるには `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` で再実行し、stage 出力を §8 に引用する (次の run)。
 - 受入 2 (IR 面): `function_41a800` の判定は `%vtret` (vtable[0] の戻り値) で行われ、`trunc` は `%vtret` に掛かる (`trunc(arg3)` の判定は消えている)。実行上の前進は無い。
 - 再現: `FL_WIN64_DIR` に fl-win64 を展開 (`[WIN64]`・`docs/REFERENCES.md` §4)・`work-m11` を repo 直下へ展開・`[EMSDK]` の `emsdk_env.sh` を source。`m11_gen_ir2.sh` → `m11_build.sh` → `tools/gui/flengine/build.sh` → `boot_halt_probe.mjs` (各 rc 0)。
 - ビルド: `m11_build.sh` rc 0 (signature mismatch 0・undefined 0)。`tools/gui/flengine/build.sh` rc 0 (signature 0・undefined 0・duplicate 0)。
