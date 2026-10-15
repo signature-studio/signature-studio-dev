@@ -101,10 +101,10 @@ kh_stack base 0x39a0
 ## 7. コード差分の確認 (測定 commit からの差分)
 
 ```
-git diff a65a71ed1 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md'
+git diff 091c68915 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md'
 ```
 
-本 commit 時点の出力は 0 行 (コード差分なし)。REPORT 系の追記だけが HEAD までの差分。
+測定 commit `091c68915` から HEAD `e49a091a7` までの差分: 5 ファイル・1,433 行追加 / 21 行削除 (`lic_config.json` +1,306 を含む。main 取り込みで入った)。lift-8 は HEAD で一致 (§8.1)。313 の HEAD 値は未測定 (§8.2・#4670)。
 
 ## 8. #3866 の実測 (D11 の窓化・`rdata_str`)
 
@@ -134,12 +134,14 @@ git diff a65a71ed1 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md
 
 測定 commit: `091c68915` (測定 driver `scripts/kh656_window_measure.py` の追加 commit。コードを変えた最後の commit)。再現: `python3 scripts/kh656_window_measure.py lift8 on|off`。
 
-現行の `lic_config.json` は F lift 1305 件のため、8 件固定版での再現は #4670 で対応する。
+driver は #4670 で LIFT8 の 8 件固定に修正済み (`lic_config.json` の F lift 1305 件は使わない)。
 
 | 条件 | wasm bytes | sha256 | globals |
 |---|---|---|---|
 | lift-8 `rdata_str` 無し | 54,394 | `7ba79e65…8c7707` | 9 |
 | lift-8 `rdata_str` 有り | 54,487 | `3d2bc6fd…e77287` | 10 |
+
+HEAD `e49a091a7` で `lift8 off/on` を再測定: off 54,394 B・`7ba79e65…8c7707`・globals 9 / on 54,487 B・`3d2bc6fd…e77287`・globals 10 (driver `lift8`・`rdata_raw_allow` 付き。測定 commit `091c68915` の値と一致)。
 
 section 単位の内訳: **未測定**。
 
