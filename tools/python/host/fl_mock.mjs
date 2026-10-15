@@ -6,6 +6,17 @@ const F = (v) => ({ t: "D", v });
 // PY-100 (#2879): PE 0xd5b930 の readout (C provider と同一)。構造体 = grid bit が立つ step。param 0..7 の既定値は stub 順、範囲外と param 8 (未モデル) は -1
 const STEP_DEF = [60, 100, 64, 120, 64, 64, 64, 0];
 const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 7 ? -1 : STEP_DEF[prm]);
+// PY-224 (#3628): PE 0x12d3ff0 の loop 分岐 (C provider の grid_bit_loop と同一・REPORT_PY224)。行 T[1] と flag49e・flag54 が立ち、channel i の最初の record (f4 != 0) が L = len / 24 を与えるとき、p < L は base、それ以外は base(p mod L)
+const LOOP_G2 = 24;
+const loopBit = (lp, k, i, p) => {
+  const base = p >= 0 && !!k.steps[p];
+  if (!lp.row || !lp.flag49e || !lp.flag54) return base;
+  const rec = lp.recs.find((r) => r.cid === i && r.f4 !== 0);
+  if (!rec) return base;
+  const L = Math.trunc(rec.len / LOOP_G2);
+  if (L <= 0 || p < L) return base;
+  return !!k.steps[p % L];
+};
 
 class FlError extends Error {
   constructor(msg, code) { super(msg); this.flCode = code; }
@@ -87,6 +98,7 @@ export function createMockEngine() {
     numerator: 4, denominator: 4,
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
     selectedChannel: 0,
+    loop: { row: false, flag49e: false, flag54: false, recs: [] },
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0), pitchN: 2 },
       { name: "Snare", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 2, steps: new Array(64).fill(0), pitchN: 2 },
@@ -166,13 +178,13 @@ export function createMockEngine() {
       ch(a[0]);
       return true;
     },
-    // PY-101 (#2878): PE 0xd5bc10 → 0x12d3ff0。loop 分岐は未モデル (G1・G2・行テーブルの意味が未確定・#2932)。base 0x12d3e20 と同じ読出し
+    // PY-101 (#2878): PE 0xd5bc10 → 0x12d3ff0。件数以上 (p >= 64) の経路は PE 未照合 (#3596)。loop 分岐は PY-224 (#3628) の loopBit
     "channels.getGridBitWithLoop": (...a) => {
       arity(a, 2, 3);
-      ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
-      const k = ch(a[0]);
+      const i = ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
+      const k = ch(i);
       if (p >= 64) throw RANGE();
-      return p >= 0 && !!k.steps[p];
+      return loopBit(st.loop, k, i, p);
     },
     // 選択の並びで offset 番目 (負は先頭扱い・仮置き)、超えたら最後の選択。無選択は canBeNone で -1 / 0
     "channels.channelNumber": (...a) => {
@@ -413,5 +425,9 @@ export function createMockEngine() {
     },
     noteEnumProbe: (seed, n, chan, step, V) => noteEnum(noteGen(seed, n), chan, step, V),
     noteEnumNotes: (notes, chan, step, V) => noteEnum(notes.map(([d0, len, ch]) => ({ ...newItem(), d0, len, ch })), chan, step, V),
+    // PY-224 (#3628): 検査用に loop 行 T[1] を置く。recs は [cid, f4, len] の列 (fl_provider.mjs の setLoop と同じ)
+    setLoop: (row, flag49e, flag54, recs) => {
+      st.loop = { row: !!row, flag49e: !!flag49e, flag54: !!flag54, recs: recs.map(([cid, f4, len]) => ({ cid, f4, len })) };
+    },
   };
 }

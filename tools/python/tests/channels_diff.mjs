@@ -244,8 +244,47 @@ for (const [name, args] of seq) {
   if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ name, args, mock: a, wasm: b });
 }
 
+// PY-224 (#3628): getGridBitWithLoop の loop 分岐 (PE 0x12d3ff0)。行 T[1] は検査用に置く (作成経路は未モデル・PY-223 待ち)。position -1..63 の全点を両側で比べる
+const LOOP_PAT = [1, 0, 0, 1, 0, 1, 0, 0];
+LOOP_PAT.forEach((v, p) => { for (const eng of [mock, wasm]) eng.call("channels.setGridBit", [2, p, v]); });
+const loopCases = [
+  ["行なし", 0, 0, 0, []],
+  ["flag49e 0", 1, 0, 1, [[2, 1, 72]]],
+  ["flag54 0", 1, 1, 0, [[2, 1, 72]]],
+  ["cid 不一致", 1, 1, 1, [[1, 1, 72]]],
+  ["f4 0", 1, 1, 1, [[2, 0, 72]]],
+  ["L 0 (len 23)", 1, 1, 1, [[2, 1, 23]]],
+  ["L 3 (len 72)", 1, 1, 1, [[2, 1, 72]]],
+  ["先頭の一致が勝つ (L 3 の後に L 5)", 1, 1, 1, [[2, 1, 72], [2, 1, 120]]],
+];
+const loopMoved = {};
+for (const [label, row, f49, f54, recs] of loopCases) {
+  mock.setLoop(row, f49, f54, recs);
+  wasm.setLoop(row, f49, f54, recs);
+  let moved = 0;
+  for (let p = -1; p < 64; p++) {
+    const a = run(mock, "channels.getGridBitWithLoop", [2, p]);
+    const b = run(wasm, "channels.getGridBitWithLoop", [2, p]);
+    if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ label, p, mock: a, wasm: b });
+    if (JSON.stringify(b) !== JSON.stringify(run(wasm, "channels.getGridBit", [2, p]))) moved++;
+  }
+  loopMoved[label] = moved;
+}
+mock.setLoop(0, 0, 0, []);
+wasm.setLoop(0, 0, 0, []);
+// 数値の期待: L 3 では p=5 は base(2)=0 (base は 1)、p=6 は base(0)=1 (base は 0)。旧挙動 (loop 分岐なし) なら逆になり FAIL する
+mock.setLoop(1, 1, 1, [[2, 1, 72]]);
+wasm.setLoop(1, 1, 1, [[2, 1, 72]]);
+const loopExpect = [[5, { ok: false }], [6, { ok: true }], [3, { ok: true }], [4, { ok: false }]];
+for (const [p, want] of loopExpect) {
+  assert.deepEqual(run(mock, "channels.getGridBitWithLoop", [2, p]), want, `mock loop p=${p}`);
+  assert.deepEqual(run(wasm, "channels.getGridBitWithLoop", [2, p]), want, `wasm loop p=${p}`);
+}
+mock.setLoop(0, 0, 0, []);
+wasm.setLoop(0, 0, 0, []);
+
 assert.deepEqual(diffs, [], `channels/playlist 差分 ${diffs.length} 件`);
 // ネガティブコントロール: index 範囲外の setChannelPitch は両側とも code 4 (Index out of range) になること (差分 0 が空振りでないことの確認)
 assert.deepEqual(run(mock, "channels.setChannelPitch", [9, 0.5]), { code: 4 });
 assert.deepEqual(run(wasm, "channels.setChannelPitch", [9, 0.5]), { code: 4 });
-console.log(JSON.stringify({ calls: seq.length, diffs: 0, PASS: true }));
+console.log(JSON.stringify({ calls: seq.length, loop_cases: loopCases.length, loop_moved_vs_base: loopMoved, diffs: 0, PASS: true }));

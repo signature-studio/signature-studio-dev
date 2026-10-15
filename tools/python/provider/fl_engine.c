@@ -45,6 +45,11 @@ static int sel_start, sel_end;
 static int64_t disp_time;
 static int64_t arr_time;
 static int scr_blanked, scr_unblank, scr_active;
+/* PY-224 (#3628): getGridBitWithLoop の loop 行 T[G1] (G1 = 1・G2 = 24)。行の作成経路 (0x12da6d0・PY-223) は未モデルで、既定は行なし (.bss の 0)。テストは fl_engine_loop_set / fl_engine_loop_add で置く */
+#define LP_N 8
+#define LP_G2 24
+static int lp_row, lp_flag49e, lp_flag54, lp_n;
+static int64_t lp_cid[LP_N], lp_f4[LP_N], lp_len[LP_N];
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -81,6 +86,7 @@ void fl_engine_reset(void) {
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0;
+    lp_row = lp_flag49e = lp_flag54 = lp_n = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
 int fl_engine_channel_count(void) { return nch; }
@@ -91,6 +97,21 @@ int64_t fl_engine_display_time(void) { return disp_time; }
 int fl_engine_grid_bit(int c, int p) {
     if (c < 0 || c >= nch || p < 0 || p >= NSTEP) return -1;
     return ch[c].steps[p];
+}
+/* 検査用: 行 T[1] の有無・flag49e・flag54 を置き、record を消す。record は fl_engine_loop_add で追加 */
+void fl_engine_loop_set(int row, int flag49e, int flag54) { lp_row = row != 0; lp_flag49e = flag49e != 0; lp_flag54 = flag54 != 0; lp_n = 0; }
+void fl_engine_loop_add(int cid, int f4, int len) { if (lp_n < LP_N) { lp_cid[lp_n] = cid; lp_f4[lp_n] = f4; lp_len[lp_n] = len; lp_n++; } }
+/* PE 0x12d3ff0 の loop 分岐 (REPORT_PY224)。行 T[1] と flag49e・flag54 が非 0 で、channel ci の最初の record (f4 != 0) が L = len / 24 を与えるとき、p < L は base(p)、それ以外は base(p mod L) (1 なら 2・0 なら 0 で、戻り値は bool に写る) */
+static int grid_bit_loop(int ci, int64_t p) {
+    int base = p >= 0 && ch[ci].steps[p];
+    if (!lp_row || !lp_flag49e || !lp_flag54) return base;
+    for (int r = 0; r < lp_n; r++) {
+        if (lp_cid[r] != ci || lp_f4[r] == 0) continue;
+        int64_t L = lp_len[r] / LP_G2;
+        if (L <= 0 || p < L) return base;
+        return ch[ci].steps[p % L] ? 2 : 0;
+    }
+    return base;
 }
 
 #define WRONGN() return fl_err(c, FL_E_WRONG_PARAM, "Wrong number of function parameters or wrong parameter type")
@@ -116,8 +137,8 @@ FL_H(channels, getChannelColor) { CH(0); return fl_ret_i(c, k->color); }
 FL_H(channels, getGridBit) { CH(0); int64_t p = A_INT(1, 0); if (p >= NSTEP) RANGE(); return fl_ret_b(c, p >= 0 && k->steps[p]); }
 /* PE 0xd5b360: grid (+0x7ac) は channel 生成 0xff5aa0 が直接 call する 0xff63f0 で作られ非 null。null の経路 (status 0) は直接 call の範囲では到達しない (間接呼出しは未走査・REPORT_PY101) */
 FL_H(channels, isGridBitAssigned) { CH(0); (void)k; (void)A_INT(1, 0); return fl_ret_b(c, 1); }
-/* PE 0xd5bc10 → 0x12d3ff0: loop 記録の分岐は未モデル (mock に loop 記録が無い)。base 0x12d3e20 と同じ読出し */
-FL_H(channels, getGridBitWithLoop) { CH(0); int64_t p = A_INT(1, 0); if (p >= NSTEP) RANGE(); return fl_ret_b(c, p >= 0 && k->steps[p]); }
+/* PE 0xd5bc10 → 0x12d3ff0: loop 分岐は grid_bit_loop。件数以上 (p >= NSTEP) の経路は PE 未照合 (REPORT_PY101・#3596) */
+FL_H(channels, getGridBitWithLoop) { CH(0); int64_t p = A_INT(1, 0); if (p >= NSTEP) RANGE(); return fl_ret_b(c, grid_bit_loop((int)_i, p)); }
 /* 選択の並びで offset 番目 (0 = 先頭)、超えたら最後の選択。負の offset は先頭扱い (stub に記述なし・仮置き)。無選択は canBeNone で -1 / 0 */
 FL_H(channels, channelNumber) {
     int64_t none = A_INT(0, 0), off = A_INT(1, 0), n = 0, pick = -1;
