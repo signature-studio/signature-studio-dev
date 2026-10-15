@@ -6,7 +6,7 @@
 
 測定 commit: `47574748` (main `49f1a94d` の merge commit。この commit が tools/m11 のコードを最後に変えた commit)。検証 HEAD はこの節を含む最後の commit (下 §7-6 で、測定 commit から HEAD までの tools/m11 コード差分は 0)。測定 runner: Actions runner (load average は未採取)。
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の ID は未付与。NULL 源の memcpy は下 §7-4 の候補で、既存類型との対応は未確認)。
-素材: `fl-win64` (`extracted/block00031_PE.bin` 22,227,016 B を `FL_WIN64_DIR` (`tools/shared/env.sh`) の展開先へ展開・2 s)・`work-m11` (`tools/m11/work/` へ展開・2 s)・`toolchain-emsdk` は展開せず runner 既存の `/opt/emsdk` ([EMSDK]) を使った。`toolchain-retdec`・`work-liftdiff` は使っていない (lift を走らせていない)。
+素材: `fl-win64` (`extracted/block00031_PE.bin` 22,227,016 B を `FL_WIN64_DIR` (`tools/shared/env.sh`) の展開先へ展開・2 s)・`work-m11` (`tools/m11/work/` へ展開・2 s)・`toolchain-emsdk` は展開せず runner 既存の emsdk ([EMSDK]、`docs/REFERENCES.md` §4) を使った。`toolchain-retdec`・`work-liftdiff` は使っていない (lift を走らせていない)。
 `m11_e2e.sh` の全再生成 (指紋検査) は使わず、後段だけ `m11_lb_tolerant_repro.sh` で回した (gen_ir2 → data/image → lb_check → build → `m11_tolerant.mjs`)。
 
 ### 7-0. 再測定の対象 (round 2 の要求への対応)
