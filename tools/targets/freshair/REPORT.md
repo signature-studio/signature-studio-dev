@@ -169,11 +169,11 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 - **1 回の lift で両対象に効く範囲 = 共通基盤のみ** (SC DSP closure の 31.8% / 21,740 B)。snapin ごとの process は SlateCore と HeartCore で別ビルドの機械語で、既存 KH lift (`tools/targets/kilohearts/snapins/`) の IR/wasm を SlateCore に流用することはできない (Gain は SC 側も別途 lift 済み = §5)。
 - ID の一致 (§1) は **製品 ID・クラス名・17/20 slot の vtable 形が同系統** であることまで。実装同一性は本節で「機械語レベルでは同一でない」と確定。
 - **Gain の差分実行 (①)**: 同一入力 200 case で L/R/state が bit 一致 **127/200** (不一致は全て ramp 継続経路 `first=0`、差は 1 ulp 級)。bit 一致しないことを確定したが、原因 (丸め順か入力差か) は未特定。詳細は付録 §A3。
-- **未検証**: ① 残り (Gain 以外の snapin と、ramp 式の丸め順の切り分け)。② `.rdata` 不一致 20 本の分類は 11-3 (一部は未確定)。③ 直接 call のみ追跡 (間接 call は辿らない = closure は下限)。
+- **未検証**: ① 残り (Gain 以外の snapin は [REPORT_APPENDIX_2739.md](REPORT_APPENDIX_2739.md) で判定基準と振り分けまで。差分が実行できるのは Gain だけで、Compressor・Filter は #3506・#3507 へ、残りは #52 の残件。ramp 式の丸め順の切り分けは付録 §A3-4・§A3-5)。② `.rdata` 不一致 20 本の分類は 11-3 (一部は未確定)。③ 直接 call のみ追跡 (間接 call は辿らない = closure は下限)。
 
 ### 11-3. `.rdata` 不一致 20 関数の分類 (`ks_rdata_class.py`)
 
-分類結果: `value` 17 / `ptr` 3 / `count`・`order` 0。`value` 17 件は語単位の切り分け (`ks_rdata_value.py`、§A5) で **配置差では説明できない** (`.rdata` 内を指す RVA 候補の指す 16 B が KH の `.rdata` に存在しない語がある)。RVA 候補 (32 bit 値) が RVA か定数かは未判定のため、この結論は参照先の内容差の下限であり、「意味が違う」の根拠ではない。詳細・未確定事項は付録 [REPORT_APPENDIX_FA5.md](REPORT_APPENDIX_FA5.md) §A2・§A5。
+分類結果: `value` 17 / `ptr` 3 / `count`・`order` 0。`value` 17 件は語単位の切り分け (`ks_rdata_value.py`、[REPORT_APPENDIX_FA5_VALUE.md](REPORT_APPENDIX_FA5_VALUE.md) §A5) で **配置差では説明できない** (`.rdata` 内を指す RVA 候補の指す 16 B が KH の `.rdata` に存在しない語がある)。RVA 候補 (32 bit 値) が RVA か定数かは未判定のため、この結論は参照先の内容差の下限であり、「意味が違う」の根拠ではない。詳細・未確定事項は付録 [REPORT_APPENDIX_FA5.md](REPORT_APPENDIX_FA5.md) §A2、[REPORT_APPENDIX_FA5_VALUE.md](REPORT_APPENDIX_FA5_VALUE.md) §A5。
 
 ## 12. FA-9: 制御層 setter 経路 (0x180c9d700 → 0x180ca1480 → 0x180da6c00) の実経路測定 (#665, Refs #648 #452)
 

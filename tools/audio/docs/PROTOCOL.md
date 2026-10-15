@@ -18,9 +18,9 @@
 - **AudioContext / getUserMedia / WebMIDI は main thread のみ** (worker に AudioContext は無い)。wasm → main は制御ブロック内の **mailbox 同期 RPC** (`cmd_seq`/`ack_seq`、wasm 側 `Atomics.wait`、main 側 `Atomics.waitAsync`)。
 - 時間のマスター = **worklet のサンプルカウンタ** (`dev_frames`, `currentFrame`)。FL 側の位置・時刻はここから導出する (§6)。
 
-## 2. 制御ブロック `fla_ctl_t` (384B, 64B ライン × 6) と ring
+## 2. 制御ブロック `fla_ctl_t` (16904B。先頭 384B は 64B ライン × 6、続けて pw_trace・末尾に burst_hist) と ring
 
-オフセットの単一の真実は `src/flaudio.h`。TS は `src/runtime/audio-layout.ts` に同表を持ち、起動時に wasm の `fla_layout_off(i)` と全 59 項目を照合 (不一致 → throw = fail-fast)。worklet は固定値を持たず `processorOptions.layout` を使う。
+オフセットの単一の真実は `src/flaudio.h`。TS は `src/runtime/audio-layout.ts` に同表を持ち、起動時に wasm の `fla_layout_off(i)` と全 69 項目を照合 (不一致 → throw = fail-fast)。worklet は固定値を持たず `processorOptions.layout` と `processorOptions.ctlSize` (= `FLA_CTL_SIZE`) を使う。
 
 | ライン | 書き手 | 主なフィールド |
 |---|---|---|
@@ -30,6 +30,8 @@
 | 3 (@192) | main | ref_ctx_time_bits, ref_epoch_ms_bits (seqlock), out/base_latency_us |
 | 4 (@256) | wasm↔main | cmd_seq/op/arg[4], ack_seq/status/res[4], ctrl_ready |
 | 5 (@320) | producer | cb_count/late/max_us, wake_count, wait_timeouts, in_underflows, min_fill, wake_hist[6] |
+| 6 (@384〜391) | producer | pw_n (write の通算数)。pw_trace[4096] (@388〜16771) は write ごとに [w, fill, wake_us, done_us] を FLA_PW_N=1024 件のリングで記録 (main 取り込み分) |
+| 末尾 (@16772〜16899) | worklet | burst_hist[32] (128B。連続 process() の 1 run 終了ごとに bin=floor(len/512) を +1。末尾 bin は以上。AU-30 #3151。pw_trace の後ろに置き、main の既存 offset を動かしていない) |
 
 - ring は **planar float32、ch ごとに `ring_frames` (2 の冪, 16384 以上)**。index は 32bit 単調増加 (modular, 差 < 2^31)。fill = `write - read`。SPSC: 出力 ring は producer=wasm / consumer=worklet、入力 ring は逆。**データ書込 → index の seq-cst store** の順で公開 (JS の `Atomics.store` / C の `__atomic_store_n` は同一メモリモデル)。
 - 64bit 値 (dev_frames 等) は 2×32bit を `clock_seq` seqlock で一貫読み。
