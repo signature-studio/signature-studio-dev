@@ -23,7 +23,7 @@
 
 ## 2. 測定 (測定 commit = `0d527f38a`、コード差分の最後の commit)
 
-環境: `uptime` load average 0.28 (開始時)、x86-64 Linux、gcc / clang (`/usr/bin/`)。素材 `plugins-ott`・`analysis-ott-binaries` (`ANALYSIS_DIR=$HOME/analysis`)・`work-m6-ott` を展開して実行。
+環境: `uptime` load average 0.28 (開始時)、x86-64 Linux、gcc / clang (PATH 上の既定)。素材 `analysis-ott-binaries` (`ANALYSIS_DIR` 配下に展開) と `work-m6-ott` を展開して実行。`plugins-ott` は e2e では使わない (DLL は `analysis-ott-binaries` に入る)。
 
 | 測定 | コマンド | 結果 |
 |---|---|---|
@@ -62,5 +62,5 @@
 ```
 python3 tools/ott/lift/rcr_emit_check.py                  # 4004/4004, 警告 0
 python3 tools/ott/lift/rcr_emit_check.py --module <旧 x64c.py>   # 対照: 32/4004 (rc=1)
-ANALYSIS_DIR=$HOME/analysis bash tools/ott/ott_e2e.sh     # PASS (約 20 秒)
+ANALYSIS_DIR=<analysis 展開先> bash tools/ott/ott_e2e.sh  # PASS (約 20 秒)
 ```
