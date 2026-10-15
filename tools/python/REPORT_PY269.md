@@ -1,7 +1,7 @@
 # PY-269 (#3902): TUndoEvent_MovedFXTracks の VMT スロット 1 (0x1021670) の呼出し元と、[rbp+0x30] の所属
 
 親: #3616 (PY-220)。前段: `tools/python/REPORT_PY203.md` §1・§3・§5、`tools/python/REPORT_PY198.md` §2。
-前段の `REPORT_PY220.md` と `analysis/flapi/pe_py220_methods.py` は main にも全 branch にも無い (`git log --all` で 0 件)。本 REPORT は PE の実測だけを根拠にする。
+前段の `REPORT_PY220.md` と `analysis/flapi/pe_py220_methods.py` は main 取り込み (c6a709ef1) で本 branch に入った (PY-220 #3616)。本 REPORT は PE の実測だけを根拠にする。
 既知類型との関係: 該当なし (lift 作業ではない。PE の逆アセンブルによる解析)。
 
 ## 結論
@@ -16,7 +16,7 @@
 
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf ... --wildcards '*block00031_PE.bin'` で `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin` に展開 (2.9 秒、22,227,016 バイト)。
 - 逆アセ: `pe_callgraph.load()` の線形走査 (int3 直後を関数先頭とみなす)。関数 0x1021670 の本体は 0x1021670〜0x1021a3f (`ret` の次が 0x1021a40 の別関数)。
-- 測定 commit: `5c209c731` (probe と `pe_vmt_probe.py` の修正を含む最後のコード commit)。
+- 測定 commit: `c6a709ef1` (main 取り込みの merge commit。probe と `pe_vmt_probe.py` の修正は `5c209c731` から変更なし)。
 
 ## 1. 受入 1: 0x1021670 の呼出し元
 
@@ -46,8 +46,9 @@
 
 ## 3. 検証
 
-- probe: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py269_probe.py` → 11 件 PASS (C1〜C10・C7b)、`summary: ALL PASS`、終了 0。所要 39 秒 (n=1)。1 分 load 0.54。
-- コード差分: `git diff 5c209c731 HEAD -- tools/python/analysis/flapi` の出力は 0 行 (本 REPORT は docs のみ)。
+- probe: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py269_probe.py` → 11 件 PASS (C1〜C10・C7b)、`summary: ALL PASS`、終了 0。所要 36 秒 (n=1)。1 分 load 0.47 (開始前) → 0.75 (終了時)。
+- `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_vmt_probe.py 0x1012f40 0x1021670 --disp 8` → `call [reg + 0x8] (virtual slot 1): 1638`、終了 0。C3 の 1639 件と 1 件ずれる (2 つの逆アセ走査の違い。merge 前から存在。§4)。
+- コード差分: `git diff c6a709ef1 HEAD -- tools/python/analysis/flapi` の出力は 0 行 (本 REPORT は docs のみ)。
 
 ## 4. 未解決 (起票先)
 
@@ -56,3 +57,4 @@
 | 0x101ca60 の生成結果 (0x1021560 の戻り値) の格納先と、0x1019b30 の役割 | 受入 1 (受け手の出どころ) | [PY-275] #3944 |
 | 1639 件の `call [X+8]` のうち、TUndoEvent_MovedFXTracks のインスタンスを受け手にできる箇所 | 受入 1 (呼出し元の確定) | [PY-275] #3944 |
 | `[rbp+0x30]` が 3 要素配列の先頭であること (隣接ローカルの配置) | 受入 2 の「配列の先頭」の記述 (推定) | 本 REPORT §2 の推定。確定は [PY-275] の検証に含める |
+| `pe_vmt_probe.py --disp 8` の 1638 件と `pe_py269_probe.py` C3 の 1639 件の 1 件の差 (両者の逆アセ走査が違う。どちらが正しいかは未確定) | 受入 1 の件数 (1639) の再現性 | 未起票 (PM 判断) |
