@@ -1157,6 +1157,22 @@ void m11_a270_obs(unsigned long long a) {
 }
 #endif
 
+/* #2400 計測専用 (M11_PROBE_2400=1 のときだけ有効): function_e3ef60 の 60a270 呼出し 9 箇所の直前で、呼出し番号 (1..9)・
+ * arg1 (e3ef60 の第 1 引数)・渡す this (IR 上 [arg1+off] のロード値)・edx を stderr に出す。既定 0 では何も入らない。 */
+#ifndef M11_PROBE_2400
+#define M11_PROBE_2400 0
+#endif
+#if M11_PROBE_2400
+static int g_e3ef60_site_n;
+void m11_e3ef60_site_obs(unsigned int site, unsigned long long arg1, unsigned long long th, unsigned int edx) {
+    static const unsigned int pe[10] = {0, 0xe3f0b4, 0xe3f0f7, 0xe3f118, 0xe3f139, 0xe3f15a, 0xe3f178, 0xe3f196, 0xe3f1b4, 0xe3f215};
+    static const unsigned int off[10] = {0, 0x778, 0x7d8, 0x810, 0x840, 0x808, 0x7f0, 0x838, 0x8e8, 0x9c8};
+    if (site >= 1 && site <= 9 && g_e3ef60_site_n++ < 512)
+        fprintf(stderr, "[m11][e3ef60] #%d site=%u pe=0x%x off=0x%x arg1=0x%llx this=0x%llx edx=0x%x\n",
+                g_e3ef60_site_n, site, pe[site], off[site], arg1, th, edx);
+}
+#endif
+
 /* #3325 計測専用 (M11_INSTR_412770=1 のときだけ有効): function_412770 の入口で arg1 と [arg1+0] (u32) を stderr に出す。
  * 線形メモリ外は読まない (address 0 は線形メモリ内なので読む)。既定 0 では何も入らない。 */
 #ifndef M11_INSTR_412770
