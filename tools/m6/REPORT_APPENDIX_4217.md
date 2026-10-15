@@ -32,7 +32,7 @@
 
 - 素材: `plugins-ott.tar.zst` はインストーラのみ。`Install_Xfer_OTT_137.exe` を `7z x` で展開し、`$_13_/OTT_x64.dll` を `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll` に配置 (sha256 `ecd51e05…2378e`)。
 - `m6_scan.py` (`PLUGINS_DIR` 指定) → `tools/m6/work/ott_ranges.txt` 3983 bytes (166 関数)。
-- 実行環境: 4 core / load 0.61。RetDec は `/opt/retdec`。
+- 実行環境: 4 core / load 0.61。RetDec は `[RETDEC]`。
 
 | 実行 | 入力の BIN | 所要 | `work/ott_lift.ll` sha256 |
 |---|---|---|---|
@@ -40,7 +40,7 @@
 | 置換後 (HEAD) 2 回目 | 同上 | (同一 run) | 同上 (`cmp` で 1 回目と一致) |
 | 置換前相当 | 旧 `BIN=` 行の文字列を同じ DLL パスに向けた一時版 | (同一 run) | 同上 (`cmp` で一致) |
 
-- 置換前の literal (`/home/ubuntu/...`) は本 VM に作れない (`/home/ubuntu` 不在・sudo 無し) ため、旧スクリプトをそのまま実行はしていない。上の「置換前相当」は `BIN` 行だけを旧文字列と同じ変数展開先に差し替えた版であり、BIN 以外の差分は HEAD と同一。
+- 置換前の literal (旧スクリプトの既定 literal、`[ANALYSIS-DIR]` 相当) は本 VM に作れない (その親 dir 不在・sudo 無し) ため、旧スクリプトをそのまま実行はしていない。上の「置換前相当」は `BIN` 行だけを旧文字列と同じ変数展開先に差し替えた版であり、BIN 以外の差分は HEAD と同一。
 - 判定: 置換後の `ott_lift.ll` は 2 回の実行と置換前相当版で sha256 が一致。受入条件 2 は満たした。
 
 ## 未解決
