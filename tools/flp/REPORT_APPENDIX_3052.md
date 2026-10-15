@@ -163,7 +163,7 @@ string WAVRenderForm  ascii_hits=6 utf16_hits=0
 | `0xba6162` (関数 `0xba6150` 内の `call 0xba5d10`) | 0 | — | 1 / 16 | 385,000 | 13d61a05 |
 | `0xcef026` (関数 `0xceee30` 内の `call 0xba5d10`) | 4 | — | 1 / 24 | 577,500 | 80a51aa0 |
 
-**20.1 再測定 (HEAD、`S2_TRACE_REG=1`、`S2_PATCH=0xd1dd61|e8ea83e8ff|9090909090`、`Autogun.flp`、1 run ずつ)**: 既定 WFBox=2 と `S2_WFBOX=1` の両方で data SHA は `fe7a0614…` (16-bit・385,000 B・WFBox/DitherBox の RegQuery 0 件)。表の `13d61a05` は再現しなかった。`fe7a0614…` は §19 の `0xba5d10` 置換 (`fe7a061441ea…`) と同じ値で、`0xd1dd61` が同じ経路上にあることと整合する。`13d61a05` との差は未確認 (未解決表)。同じ環境の基準 (WFBox=2、置換なし) は SHA `9e0251eb…`・770,000 B で、§19 の値と一致した。
+**20.1 再測定 (HEAD、`S2_TRACE_REG=1`、`S2_PATCH=0xd1dd61|e8ea83e8ff|9090909090`、`Autogun.flp`、1 run ずつ)**: 既定 WFBox=2 と `S2_WFBOX=1` の両方で data SHA は `fe7a0614…` (16-bit・385,000 B・WFBox/DitherBox の RegQuery 0 件)。表の `13d61a05` は再現しなかった。`fe7a0614…` は §19 の `0xba5d10` 置換 (`fe7a061441ea…`) と同じ値で、`0xd1dd61` が同じ経路上にあることと整合する。`13d61a05` との差は未確認 (未解決表)。同じ環境の基準 (WFBox=2、置換なし) は SHA `9e0251eb…`・770,000 B で、§19 の値と一致した。所要 (`s2_render_probe.sh` の sec): 基準 15 s・置換 (既定 WFBox) 15 s・置換 (WFBox=1) 16 s。run 後の 1 分 load は 1.75 (基準後)・1.89 (置換後)。基準の件数: WFBox の RegQuery 4、DitherBox 2、`WAVRenderForm` の NtOpenKeyEx 31。置換後: 0・0・2。
 
 **20.2 二分探索 (`0xba6150` の直接呼出し 43 箇所)**: 置換した呼出し箇所の集合 → WFBox の RegQuery 件数。前半 22 件 → 4 件、23〜33 件目 → 0 件、23〜28 件目 → 0 件、23〜25 件目 (`0xd1dd61`・`0xd1ddc9`・`0xd1e010`) → 0 件、`0xd1dd61` 単独 → 0 件、`0xd1ddc9` 単独 → 4 件、`0xd1e010` 単独 → 4 件。
 
