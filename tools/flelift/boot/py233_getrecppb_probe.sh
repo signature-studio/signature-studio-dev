@@ -10,7 +10,7 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 FLE="$(cd "$HERE/.." && pwd)"
 source "$HERE/../../shared/env.sh"
-W="$FLE/work/boot"
+W="${FLE_BOOT_WORK:-$FLE/work/boot}"   # 対照 route (root 無し lift) は別 work を指す
 LIFT="$W/lift"
 DBG="$W/lift_dbg"
 SS_EMSDK_ENV="${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"
@@ -26,10 +26,10 @@ FILL_PROBE='{ static int n_; if (n_++ < 16) fprintf(stderr, "[PY233-fill] n=%d d
 rm -rf "$DBG" && cp -r "$LIFT" "$DBG"
 for k in 0 1 2 3 4 5 6 7; do
   # 0xd68d90 は shard 7、0x412a0d (unit 209 停止の call 直前) は shard 2 にある。他 shard では解決されず 0 hit になる。
-  python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0xd68d90,0x412a0d --c "$PROBE" || true
+  python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0xd68d90,0x412a0d,0xd69310,0x13751d0 --c "$PROBE" || true
   python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0x6a7b70 --c "$FILL_PROBE" || true
 done
-echo "[py233] probes: $(grep -c 'PY233' "$DBG"/fle_lifted_s*.c | awk -F: '{s+=$2} END {print s}') (expect 3)"
+echo "[py233] probes: $(grep -c 'PY233' "$DBG"/fle_lifted_s*.c | awk -F: '{s+=$2} END {print s}') (expect 5: 0xd68d90・0x412a0d・0xd69310 (getRecPPB 本体)・0x13751d0 (icall 分岐の関数) + fill 入口。root 無し lift では fill が 0)"
 
 # 書込み監視: 4 セルの値が変わる書込みを出す (STX/STY は fle_cpu.h 側で記録されるため、書込み元 VA は出ない)。
 FLE_LIFT_DIR="$DBG" FLE_LABEL=wwatch FLE_SHARDS=8 \
@@ -37,6 +37,6 @@ FLE_LIFT_DIR="$DBG" FLE_LABEL=wwatch FLE_SHARDS=8 \
   SS_EMSDK_ENV="$SS_EMSDK_ENV" bash "$HERE/build.sh" plain
 
 LOG="$W/run_py233_probe.log"
-FLE_IPP=1 FLE_DIAG_NULLFILL=0 FLE_BOOT_VARIANT=plain node "$HERE/fle_boot.mjs" "$W/fleboot_wwatch.cjs" "$W/py233_probe.json" --boot-only > "$LOG" 2>&1 || true
+FLE_IPP=1 FLE_DIAG_NULLFILL="${FLE_DIAG_NULLFILL:-0}" FLE_BOOT_VARIANT=plain FLE_BOOT_LOG_CAP=268435456 FLE_BOOT_TIME_CAP=300 FLE_BOOT_QUIET_BIN=1 timeout "${FLE_BOOT_TIMEOUT:-600}" node "$HERE/fle_boot.mjs" "$W/fleboot_wwatch.cjs" "$W/py233_probe.json" --boot-only > "$LOG" 2>&1 || true
 echo "[py233] PY233 行: $(grep -c '\[PY233\]' "$LOG" || true) (0xd68d90 入口 = 0 件なら未到達)"
 grep -E '\[PY233|fle_wwatch\]|FLEBOOT_RESULT' "$LOG" | cut -c1-400
