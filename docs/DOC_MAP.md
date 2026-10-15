@@ -209,7 +209,7 @@
 | `tools/m11/REPORT_N87.md` | ~80 | #1373 (M11-N87, 部分達成せず・実値化 0 件): sigfix 0 詰め inherit 1,172 件の呼出元 def 追跡 (基本ブロック到達定義・入口の呼出元再帰・call 越しの引数レジスタ要約)・復元不能 1,172 件 (未分類 0) の理由別内訳・survey ok 872 (退行なし) |
 | `tools/m11/REPORT_N2778.md` | ~74 | #2778 (M11-N157, 部分達成): run・survey の ptrcheck に基準付きゲート (`M11_PTRCHECK_MAX_NEW`・`M11_PTRCHECK_SURVEY_MAX_NEW`・既定は情報出力のみ) を追加。ネガコン (`m11_ptrcheck_negctl.sh`) の実測・survey 未実行の理由・基準を ratchet とした理由 |
 | `tools/m11/REPORT_N3113.md` | 103 | #3113 (M11-N168): 新規範囲内 word の 4 類分類 (A 関数 VA / B 未 remap 疑い / D イメージ由来の LVA コピー / C 他)・分類 B の基準 (run は f3aa9450 で 0 で合格・注入で FAIL)・D の block copy 根拠 (`m11_ptrclass.py`)・survey と `--survey` の negctl 未実行の理由 (wasm が survey 用 export を持たない)・測定 commit からの差分 (§8) |
-| `tools/m11/REPORT_N3325.md` | 100 | #3325 (M11-N181): LB 依存 unit 差 8 件の切り分け。function_412770 の IR 本体は build で未実行 (手書き C 版 `m11_ov.c` が優先)・unit 40 の halt 分岐の入口・trap 関数 (build ごとの wasm 名) |
+| `tools/m11/REPORT_N3325.md` | 106 | #3325 (M11-N181): LB 依存 unit 差 8 件の切り分け。function_412770 の IR 本体は build で未実行 (手書き C 版 `m11_ov.c` が優先)・unit 40 の halt 分岐の入口・trap 関数 (build ごとの wasm 名) |
 | `tools/m11/REPORT_N2768.md` | ~185 | #2768 (M11-N155): 寛容起動で skip した unit が trap までに heap へ書いた範囲 (72 unit の表)・上位のリスク評価 (推定)・PR #2752 との環境差。heap 範囲の結論は REPORT §0 を参照。集計は `m11_tolerant_heap.py`・測定は `m11_tolerant.mjs` の `M11_HEAP_FROM`/`M11_HEAP_OUT` |
 | `tools/m11/REPORT_N2714.md` | ~150 | #2714 (WIN-3): m11 寛容起動 (tolerant boot) の実測 (942 試行・ok 874・skip 67 の種類別・DllMain 戻り値 1)・skip unit の状態欠落リスク順位 (推定)・既存経路の回帰 (strict 56・survey 872) とネガコン。実装は `m11_tolerant.mjs`・`m11_tolerant_gate.py`・§4-2 の区間内訳は `m11_tolerant_sections.py` |
 | `tools/m11/REPORT_N15.md` | ~16 | m11 REPORT §16 (#490 main HEAD の 4c3baa4 / faee5b6 状態の実測・ネガコン) の付録 (250 行上限のため分割) |
