@@ -164,14 +164,14 @@ build は `m11_gen_ir2.sh` と同じ `FL_WIN64_DIR` を付ける (build は IR �
 
 ### 15.1 実装
 
-- `m11_ov.c`: `M11_PROBE_2400=1` のときだけ有効。`m11_e3ef60_obs(site, arg1, this, edx)` が `[m11][e3ef60] #n site=k pe=… off=… arg1=… this=… edx=…` を stderr に出す (512 行で打ち切り)。既定 0 では何も入らない。
+- `m11_ov.c`: `M11_PROBE_2400=1` のときだけ有効。`m11_e3ef60_site_obs(site, arg1, this, edx)` が `[m11][e3ef60] #n site=k pe=… off=… arg1=… this=… edx=…` を stderr に出す (512 行で打ち切り)。既定 0 では何も入らない。
 - `trap_triage/probe2400_ir.py`: `boot_final3.ll` の `function_e3ef60` 内で `call i64 @function_60a270(i64 <this>, i32 <edx>)` の 9 箇所の直前に呼出しを挿入する (番地順 1〜9)。箇所数が 9 でなければ止まる。冪等。
 - `m11_build.sh`: CF に `-DM11_PROBE_2400`、stamp `work/instr_2400.stamp` (値が変わると post 結果と `ov.o` を作り直す)、`M11_PROBE_2400=1` のときだけ probe を呼ぶ。
 
 ### 15.2 静的な 9 箇所との突合 (`REPORT_2373.md` §3)
 
 IR 上の 9 呼出しの this は `[arg1+off]` のロード値で、off は §3 の表と一致する (0x778・0x7d8・0x810・0x840・0x808・0x7f0・0x838・0x8e8・0x9c8)。
-出現順の確認 (`05f228143` の build の `work/boot_final3.ll`、`function_e3ef60` の `m11_e3ef60_obs` 9 呼出しを IR の記述順に並べた):
+出現順の確認 (`05f228143` の build の `work/boot_final3.ll`、`function_e3ef60` の `m11_e3ef60_site_obs` 9 呼出しを IR の記述順に並べた):
 - `this` の `inttoptr (%arg1 + N)` の N は 1912・2008・2064・2112・2056・2032・2104・2280・2504 = 0x778・0x7d8・0x810・0x840・0x808・0x7f0・0x838・0x8e8・0x9c8。C 側の `off` 表と記述順に一致する。
 - IR のブロックラベル `dec_label_pc_e3…` (13 個) は記述順に番地が単調増加する。site 1 は `e3f0a4` のブロック (次は `e3f0c2`)、site 2〜9 は `e3f0db` のブロック (次は `e3f3f3`)。C 側の PE 番地はすべて対応するブロックの範囲 (直前のラベル ≤ PE < 次のラベル) に入る。同一ブロック内は IR の記述順 = 命令順。
 

@@ -9,7 +9,7 @@ IR の署名そのままで定義する. 未知の base は「呼ばれたら st
 
 使い方: python3 m11_simd2.py work/boot_final.ll > work/m11_simd.c  (統計は stderr)
 """
-import re, sys
+import os, re, sys
 from collections import Counter
 
 ll = open(sys.argv[1]).read()
@@ -125,6 +125,9 @@ def gen_body(base, R, A):
     if base in ('ldmxcsr', 'stmxcsr'):
         return ['(void)a;']
     if base.startswith('ucomis') or base.startswith('comis'):
+        # PLUG_COMIS_FLAGS=1: comis_flags.py が flag を反映した呼出しは消え、残った呼出し (flag slot の無い関数) は unimpl に出す (#3242)
+        if os.environ.get('PLUG_COMIS_FLAGS') == '1':
+            return None
         return ['(void)a; (void)b; /* flag は IR 側に未反映 (m6 の ir6 [P1] 相当は未移植; 既知の限界) */']
     if base == 'xgetbv':
         return ['return 0; /* OSXSAVE/AVX を広告しない */']
