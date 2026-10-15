@@ -4,7 +4,7 @@
   python3 scripts/kh656_window_measure.py lift8|set313 on|off
 
   lift8  : 測定 commit 091c68915 の lift 8 件 (LIFT8 に固定。現行 lic_config の lift 集合 (1305 件) は使わない)
-  set313 : 313 集合 = scripts/kh656_set313.json。未 commit (元の集合の源 work/kh656_rounds.json は再現できない・#4670 参照)。
+  set313 : 313 集合 = scripts/kh656_set313.json (commit cd26429ed。閉包 4 ラウンドの new_lift から再生成・#4670 参照)。
            ファイルが無ければ停止する。
 on : rdata_str=True、rdata_raw_allow は modules.F の値 / off : rdata_str=False
 出力は license/work/m4670_<set>_<mode>/ (gitignore)。stat (JSON 1 行) を stdout に出す。
