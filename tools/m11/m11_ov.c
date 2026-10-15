@@ -653,7 +653,7 @@ u64 function_50a830(u64 self, u64 item) {
  * RetDec は 535bf2 末尾の `ret` (VA 0x535c2e) を未定義の function_535c2e への call にし, 535c11 の jl 先 535bf2 を rcx=0 の call にした (#714).
  * 同じ分岐を C で書き、closure 外参照を転記で消す (seed 追加では解けないため). */
 #ifndef M11_FIX_535BF2
-#define M11_FIX_535BF2 0
+#define M11_FIX_535BF2 1
 #endif
 #if M11_FIX_535BF2
 u64 function_535c11(u64 self) {
