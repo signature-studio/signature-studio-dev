@@ -491,6 +491,7 @@
 | `tools/m11/ldfix/REPORT_2688.md` | ~104 | LD-123 (#2688): spill 宛 判定不能 9 site の F3d 適用 IR 再検証。上流 xor 0 の 4 site は OK_LOAD 候補 (本番 IR は未修復・配線は #2834)、残り 5 site は UNDETERMINED |
 | `tools/m11/ldfix/REPORT_3753.md` | ~100 | LD-175 (#3753): spill 宛 UNDETERMINED 5 site のうち 4 site (128d495・dcdeee・c3460e・12900c4) を機械語 2 段 deref と IR 1 段読みのブロック単位の結線で TRUE_DROP に確定。1284dab は子 #3793 (LD-178)。突合 `ld175_site_link.py` |
 | `tools/m11/ldfix/REPORT_2705.md` | ~70 | LD-125 (#2705): spill 宛 `128f9e0` の 12 site の lift 段欠落区間 (`0x1290645`〜`0x129460a`・枝が `0x129460b` へ付け替え) の特定と、`ld125_lift_gap.py` が生成する欠落区間表。判定は UNDETERMINED のまま (根拠は子 issue) |
+| `tools/m11/ldfix/REPORT_5434.md` | ~110 | LD-269 (#5434): 欠落の機構は RetDec の Jump Threading (dump 68→69) と確定。dispatch の定数 7 の下で 12 site は実行経路から外れる (機械語 CFG)。判定は UNDETERMINED のまま。`ld269_pass_trace.py`・`ld269_reach.py` が生成 |
 | `tools/m11/ldfix/REPORT_2679.md` | ~106 | LD-120 (#2679): spill 宛 未判定 `128f9e0` の 12 site を UNDETERMINED と判定 (frame slot `stack_var_-760〜-1336` が IR 本体・RetDec の lift/drc に無い根拠・`ld120_frame_128f9e0.py` が生成・`ld120_controls.py` が対照と F の数値)。欠落の起点 (lift 段の block `0x1290610` の打ち切り) は子 #2705 (LD-125) |
 | `tools/m11/ldfix/REPORT_3752.md` | ~56 | LD-174 (#3752・#2253 子 A): spill 宛 UNDETERMINED の間接 call 2 site (128cad6・128d007) を TRUE_DROP と判定 (IR に memory-indirect call が無い = D15)。`spill178_1161.tsv` の 2 行を再生成 |
 | `tools/m11/ldfix/REPORT_942.md` | 248 | #942 (CI-22) stage4 の memory access out of bounds の切り分け (部分達成)。trap 9 件の unit 別最上位 frame・boot threw の入口・bin 表の観測 (§9)・サイズ→bin 表 (§10 は要約)。§8-3 の全表と §10 の詳細は付録 |
