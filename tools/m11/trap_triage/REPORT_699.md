@@ -107,6 +107,7 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 - G2 の trap 種別 (`M11_SURVEY_STACK=56`): off = `memory access out of bounds` (`function_8c6530`)、fix = `unreachable` (`function_8c5eb0` のガード辺 `_t`)。ネガコン ng = off と同じ (OOB)。
 - 注 (前版との差): 前版 (b') の旧 G2 (unit 56 が ok) は、`rdx.1 := zext(arg2)` の仮定を前提にしていた。本版は ok にならない。改訂後の受入 2 (OOB の消失) で判定する (§3-4)。
 - 前版 (`a2190b26`, `57ea5ada`) の数値とは HEAD が違うため比較しない。
+- **後続 (#3077 後の現版, 測定 commit `6049203d2`, §9)**: fail-fast 辺は `function_410360` の戻り値を返す形になった。よって上表の fix=`unreachable` は当時の版の値。現版の fix は `returned` (`negctl_699.sh` の G2 も `returned` に更新済み)。
 
 ### 3-2. 全 IR 関数の分岐突合走査 (`guard699/scan_guard.py`, HEAD `6948c5b7`)
 
@@ -180,7 +181,7 @@ bash m11_e2e.sh                                        # §3-3
 
 本版でも未解決 (approve 判断に影響しうる):
 - **(i) 件数 >= 1 かつ arg2 下位 byte == 0 の経路の戻り値**: 既存 IR の `dec_label_pc_8c60df` は `ret rax.2` を返す (`rax.2` は `8c6084` で `rax.1` を受ける)。`rax.1` は件数 >= 1 の経路では `8c6066` の `rax.0` (`8c6034`/`8c603f` の結果) か `8ca670` の結果になる。機械語は `8c60df` で `[rbp+0x80]` を返す。よって件数 >= 1 の経路でも IR と機械語の戻り値は食い違いうる。ガード無しでの再現は**未測定**。survey は戻り値を出力しないため、比較手段が無い。**guard の変更対象外 (件数 >= 1) の既存の食い違い。#718 へ起票依頼。**
-- **(ii) 件数 0 ∧ arg2 下位 byte != 0 の経路 (fail-fast)**: 機械語は `8c608d` の vtable 呼出しで値を返す。本版は trap。挙動変更として記録する。この経路が他 unit で到達するかは未確認 (本版の survey では unit 56 の `unreachable` のみ観測)。
+- **(ii) 件数 0 ∧ arg2 下位 byte != 0 の経路 (fail-fast)**: 機械語は `8c608d` の vtable 呼出しで値を返す。本版は trap。挙動変更として記録する。この経路が他 unit で到達するかは未確認 (本版の survey では unit 56 の `unreachable` のみ観測)。**(#3077 後の現版では trap ではなく `function_410360` の戻り値を返す。§9)**
 - **(iii) count = INT_MIN**: 機械語の jg と不一致 (§1)。到達可否は未確認。
 - **RetDec の脱落機構** (CFG 復元か命令翻訳か) の切り分け (§2)。 #718 (`[M11-N35]`)。
 - **strict 候補 405 件の真偽** (偽陽性率を含む)。#718。
@@ -200,3 +201,38 @@ bash m11_e2e.sh                                        # §3-3
 - 範囲: `tools/m11/m11_build.sh` (pass の組込み), `tools/m11/guard699/` (pass と走査), `tools/m11/trap_triage/negctl_699.sh`, 本 REPORT。
 - 範囲外: `m11_ov.c` (変更なし。`8c7710` 転記は #700)。`docs/DEFECTS.md` (PM 判断)。
 - 20 MiB 超の blob: 追加なし。`work/` は gitignore。
+
+## 9. #3077 後の現版の再測定と init 列の解放側 `function_41cd70` (#3246)
+
+測定 commit: `6049203d2` (`negctl_699.sh` の G2 を `returned` に更新した commit)。素材: `fl-win64`・`work-m11` を展開し、`m11_gen_ir2.sh` で `work/ir_conditions.json` を作り直した (rc 0)。
+
+### 9-1. negctl (`bash tools/m11/trap_triage/negctl_699.sh`, HEAD `6049203d2`)
+
+| 項目 | 結果 |
+|---|---|
+| rc / 所要 | rc 0 / 72 秒 (build+survey 3 構成) |
+| load | 0.10 0.49 0.37 → 0.72 0.60 0.41 |
+| unit 56 (off / fix / ng) | trap (OOB `function_8c6530`) / ok (`returned 1`) / trap (OOB) |
+| counts off | ok 872 / trap 22 / miss 47 / noproc 1 |
+| counts fix | ok 873 / trap 21 / miss 47 / noproc 1 |
+| counts ng | ok 872 / trap 22 / miss 47 / noproc 1 |
+| G1 | PASS |
+| G2 | PASS (off=OOB → fix=`returned`) |
+| G3 | PASS (ng vs off: diff n=0) |
+| diff off→fix | n=1 `[(56, 'trap', 'ok')]` |
+| diff off→ng | n=0 |
+
+G2 の期待値を当時の `unreachable` から現版の `returned` に変えた。`unreachable` は #3077 で消えた (fail-fast 辺は `function_410360` の戻り値を返す)。fix で unit 56 が ok になるのは、G2 の条件ではなく観測結果である (§3-4 の「当初条件」は従来どおり未達)。
+
+### 9-2. `function_41cd70` が init 列の 4 番目に入る理由
+
+- 機構: `m11_bounds.py` は `array1` (`0xf768e0`, 942 entry) の各 entry の `(init, final)` の両列を、並び順に `work/inits_text.txt` へ書く。`inits_text.txt` は `m11_passes.py --init-list` が読み、列挙された関数に init prologue counter を入れる。
+- `array1` entry 1 は `(init=0x41ce10, final=0x41cd70)`。`function_41cd70` は entry 1 の **final 列**なので、列挙の 4 番目 (`41ce10` の直後) に入る。init 呼出しではない。
+- 中身 (`boot_final.ll`): `0x11E6A38` のフラグを +1 し、結果が 0 のとき解放本体へ進む。解放本体は `function_41bad0` 等と `function_418f20` を呼び、`function_418f20` は `DeleteCriticalSection(0x11EAF00)` を呼ぶ。`function_41ce10` は同じフラグを −1 し、結果が 0 のとき `function_418e10` (`InitializeCriticalSection(0x11EAF00)`) を呼ぶ。対になる init / final の組。
+- 従来の記録 (`REPORT_APPENDIX_2880.md` の「推定」) は、この対応で確定した。解放の早期実行の有無 (#3077 受入 4 の残り) は、boot が `41cd70` に届く条件の実測で別に確かめる。本節は掲載理由の確定まで。
+
+### 9-3. `410360` の戻り値 (参照)
+
+`function_410360` の vtable 呼出し脱落 (D15 型) は `REPORT_699` 本体 §6 (ii) と `REPORT_APPENDIX_3077.md` §4-1 が正本。本節では変更しない。
+
+未解決 (本 PR の範囲外): 解放の早期実行の有無 (boot の `41cd70` 到達条件)。起票先: #3077 の受入 4 (親 open)。新規の子 issue は起票しない。
