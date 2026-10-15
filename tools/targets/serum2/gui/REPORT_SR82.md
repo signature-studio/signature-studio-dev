@@ -30,7 +30,6 @@
 - ARG 系の所属関数 = 145 個 / 表の slot に現れる = 129 個 (`arg_vtable_callers.py` の値と一致)。
 - 間接 call の候補 (slot × 先頭ごと) = 118,222 件。
 - うち呼出元が SerumController の関数 = 19 件。
-- 参考: `.text` 全体で SC の関数内の `call qword ptr [reg+disp]` = 26 件 (`disp` を問わない)。旧 regex の時点の値であり、現 head での再計数は未実施。
 
 **注:** 測定 commit `6c2b01972` の `arg_vt_indirect.py` は `qword ptr [reg + 0x..]` だけを受けており、capstone 5.0.7 が `[reg]` (disp 0) と `[reg + 8]` (disp 8、10 進出力) を出す呼出を落としていた。旧 commit の値 (113,548 件・SC 12 件) は、この取りこぼしを含む旧値であり、現 head の値ではない。修正 commit `b3607f9df` で正規表現を `[reg]` と `[reg + 10進|0x16進]` の両方に対応させた。
 
