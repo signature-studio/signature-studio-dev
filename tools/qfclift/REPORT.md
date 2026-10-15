@@ -35,7 +35,6 @@
 | `qfc_lift.sh` | lift → emcc の共通関数 (`lift_build` / `wasm_build`)。`qfc_e2e.sh` と `qfc_boot.sh` が source する (処理は同一) |
 | `qfc_boot.sh` / `qfc_boot.mjs` | boot 実行 (§7)。strict / soft の 2 版で DllMain → FontCache_GetStats → FontCache_CleanUp を実行し、判定 JSON を `work/boot/` に出す |
 | `gen_soft_imp.py` / `qfc_imp.c` | rt に無い import を soft stub で埋める生成器 (`gen_soft_imp.py`)。`qfc_imp.c` は `LocalAlloc` / `LocalFree` の実装 |
-| `qfc_direct.mjs` | DllMain を経由せず `FontCache_GetStats` / `FontCache_CleanUp` を直接呼ぶ (§7.9)。`qfc_boot.sh` の lift を流用 |
 
 実行: `FL_WIN64_DIR=<fl-win64 展開先> QFC_PY=<capstone/pefile 入り python> bash tools/qfclift/qfc_e2e.sh`
 boot 実行: `FL_WIN64_DIR=<fl-win64 展開先> QFC_PY=python3 QFC_BOOT_REBUILD=1 bash tools/qfclift/qfc_boot.sh` (§7.2)
@@ -181,9 +180,9 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 | rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない。直接呼出しの計数は §10 | #3411 (T-SH-78) |
 | GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3434 (T-SH-83。#3412 は closed) |
 
-### 7.9 FontCache_GetStats / FontCache_CleanUp の直接呼出し (T-SH-113 / #4296)
+### 7.9 直接呼出し (T-SH-113 / #4296)
 
-結論: `GetStats` は DllMain の init 無しで trap (`[fle] call to UNLIFTED function 0`)。`CleanUp` は strict / soft とも rax = `0x0` (引数 0,0)。測定 commit `c36a9b817`。詳細は `REPORT_APPENDIX_4296.md` が正本。
+`GetStats` は DllMain の init 無しで trap、`CleanUp` は rax=0。測定 commit `c36a9b817`。詳細は `REPORT_APPENDIX_4296.md`。
 
 ### 7.8 longjmp 継続の対応 (T-SH-77 / #3410・部分達成)
 
