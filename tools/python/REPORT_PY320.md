@@ -98,3 +98,18 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
 - VMT 書込みの全形式の走査 (`analysis/flapi/pe_py351_vmt_writes.py`、3/3 PASS): オペランドに 0x725a58 を持つ命令は 0 件。`.text` 内の 8 バイト絶対 0x725a58 は 2 件 (0x725990 = VMT 先頭の自己ポインタ、0x725b80 = RTTI の classname 直後)。どちらもデータで、VMT を書くコードではない。
 - 0x72db20 の内側の global `[rip+0xec8627]` (= 0x15f6170) は 0x72db42 の 1 箇所だけが書き、読む箇所は無い。クリックされた項目を静的に特定する手がかりにはならない。
 - 残る手段: (a) 実行中の vtable 呼出しの動的確認、(b) TQuickMenuItem の生成経路 (クラス参照変数やコンストラクタ呼出し) の追跡。(b) は本走査の範囲外で、未実施。
+
+## 8. #5309 (PY-351b): イメージ全体の VMT 参照走査
+
+親: #5309 (#4907 の残り)。受入 1 (0x72db20 を間接に呼ぶ箇所の特定) と受入 2 (MoveLeftMenu の発火箇所の絞り込み) は**未達**。受入 1 の前段 (VMT 参照の全走査) だけ達成。
+
+- probe: `analysis/flapi/pe_py351b_classref.py` (4 件 PASS)。`pe_py351_vmt_writes.py` が .text に限ったのに対し、本 probe はイメージ全体 (.data・.rdata・.pdata 等) を見る。
+- 結果: 8 バイト絶対 0x725a58 は 0x725990 (VMT 自己ポインタ) と 0x725b80 (RTTI) の 2 件のみ。4 バイト RVA 0x325a58 は 0 件。rip 相対で 0x725a58 を指す命令は 0 件。オペランドに 0x725a58 を持つ命令は 0 件。
+- 含意: TQuickMenuItem の VMT は、コードにもデータにも定数として現れない。インスタンスは実行時に作られるとみられる (クラス参照の値が実行時に設定される形)。そのため「VMT 参照から型を絞る」経路は静的には閉じた。0x72db20 の 243 件の間接呼出しのうちどれが MoveLeftMenu かは、静的には決められない。
+- 残り (次の run で扱う): (a) 実行中の vtable 呼出し (0xd0 の受信型の動的確認)、(b) 実行時のクラス参照値の設定箇所 (初期化で VMT を格納する関数) の追跡。いずれも親 #5309 の本文にチェックリストとして残す。
+- 測定 commit (コードを変えた最後の commit): `8bcf78522` (probe 追加のみ)。
+- 実測 (HEAD `8bcf78522`・素材 fl-win64 の block00031_PE.bin・load 0.86〜):
+  - `pe_py348_vmt_d0_callers.py`: real 31.69 秒・終了 0・PASS 4 / FAIL 0。
+  - `pe_py351_vmt_writes.py`: real 31.02 秒・終了 0・PASS 3 / FAIL 0。
+  - `pe_py325_refs.py`: real 0.11 秒・終了 0・PASS 6 / FAIL 0。
+  - `pe_py351b_classref.py`: real 32.75 秒・終了 0・PASS 4 / FAIL 0。
