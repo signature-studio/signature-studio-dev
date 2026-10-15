@@ -263,19 +263,28 @@ export interface LaunchInput {
 // relaunch は枠 (room・BATCH) を超えても全件出す。枠を ready の件数で頭打ちにする launch_issues.py の式とは、
 // relaunch がある tick で最大 relaunch 件だけ差が出る。
 // picks = (relaunch + ready)[: max(枠, len(relaunch))]。prio:low の上限 (low) に達した分は、枠に入る前に落とす (並びの末尾なので他を遊ばせない)。
-export function planLaunch(input: LaunchInput): { room: number; picks: number[] } {
+// held は着手待ち (ready) で今回は選ばれなかった issue と理由。low-cap = LOW_CAP で落ちた / room・batch = 枠 (TARGET − active)・BATCH で落ちた。
+export function planLaunch(input: LaunchInput): { room: number; picks: number[]; held: { n: number; why: "low-cap" | "room" | "batch" }[] } {
   const target = input.target ?? DEFAULT_TARGET;
   const batch = input.batch ?? DEFAULT_BATCH;
   const room = Math.max(0, target - input.active);
   let left = input.low ? lowAllowance(input.low) : Infinity;
+  const lowDropped = new Set<number>();
   const admit = (n: number): boolean => {
     if (!input.low?.isLow(n)) return true;
-    if (left <= 0) return false;
+    if (left <= 0) {
+      lowDropped.add(n);
+      return false;
+    }
     left--;
     return true;
   };
   const relaunch = input.relaunch.filter(admit);
-  const ready = sortReady(input.ready).map((r) => r.n).filter(admit);
+  const readyOrder = sortReady(input.ready).map((r) => r.n);
+  const ready = readyOrder.filter(admit);
   const frame = Math.min(room, batch, relaunch.length + ready.length);
-  return { room, picks: [...relaunch, ...ready].slice(0, Math.max(frame, relaunch.length)) };
+  const picks = [...relaunch, ...ready].slice(0, Math.max(frame, relaunch.length));
+  const picked = new Set(picks);
+  const held = readyOrder.filter((n) => !picked.has(n)).map((n) => ({ n, why: lowDropped.has(n) ? ("low-cap" as const) : room < batch ? ("room" as const) : ("batch" as const) }));
+  return { room, picks, held };
 }

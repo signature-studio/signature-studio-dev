@@ -31,7 +31,7 @@ import {
 } from "./pm.ts";
 import { RATE_EVAL_GAP_MS, RATE_EVAL_MAX_GAP_MS, RATE_STREAK, RATE_WINDOW_MS, rateHit } from "./ratealert.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
-import { recentHold, stoppedHold, type Hold } from "./holdinfo.ts";
+import { readyHold, recentHold, stoppedHold, type Hold } from "./holdinfo.ts";
 import { redact } from "./redact.ts";
 import type { VmState } from "./vmstate.ts";
 import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type Sample } from "./saturation.ts";
@@ -155,6 +155,8 @@ export interface Plan {
   active_by_prio: Record<Prio, number>;
   // prio:low の上限 (LOW_CAP)。applied は prio:critical が着手済みか launch 可能な間だけ真。
   low_cap: LowCap;
+  // 着手待ち (ready) で今回 launch されない issue と理由 (#5110)。観測のみ。gate (review-only・stuck-ceiling・rate-guard・no-import) で止めているときは全件がその理由。
+  ready_held: { n: number; why: string }[];
 }
 
 interface Meta {
@@ -1046,6 +1048,8 @@ export class Engine {
     // VM の状態を取り込むまでは launch しない (#2343)。取り込んだ launched の時刻は classify が recent に入れる。
     const blocked = this.d.cfg.importRequired && !this.meta.importedAt ? NO_IMPORT : undefined;
     const gated = phase.review_only || !!stop || !!blocked;
+    const gateWhy = phase.review_only ? "review-only" : stop ?? blocked ?? "";
+    const readyHeld = gated ? ready.map((r) => ({ n: r.n, why: gateWhy })) : sel.held.map((h) => ({ n: h.n, why: h.why }));
     for (const n of gated ? [] : sel.picks) {
       const i = issueOf.get(n);
       if (!i) continue;
@@ -1074,6 +1078,7 @@ export class Engine {
       blocked,
       active_by_prio: activeByPrio,
       low_cap: lowCap,
+      ready_held: readyHeld,
     };
     return { rows, plan, picks, unknown, children };
   }
@@ -1811,6 +1816,7 @@ export class Engine {
         cooldownMs: noPrCooldownMs(prios.get(n) ?? "normal", this.d.cfg.noPrCooldownH),
       })),
       ...rows.stopped.map(([n, note]) => stoppedHold(n, note)),
+      ...plan.ready_held.map((h) => readyHold(h.n, h.why, { restReset: this.meta.rest?.reset })),
     ];
     return {
       // デプロイした commit (--var BUILD_COMMIT)。渡していなければ null。反映の確認に使う (README『再デプロイ』手順 5)。
