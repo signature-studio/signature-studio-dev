@@ -336,6 +336,13 @@ for (nm, ret, args) in fns:
             L.append('  %%t%d = trunc i64 %s to i32' % (i, v))
             L.append('  %%c%d = bitcast i32 %%t%d to float' % (i, i))
             cargs.append('float %%c%d' % i)
+        elif t == '%tagPOINT':
+            L.append('  %%px%d = trunc i64 %s to i32' % (i, v))
+            L.append('  %%ps%d = lshr i64 %s, 32' % (i, v))
+            L.append('  %%py%d = trunc i64 %%ps%d to i32' % (i, i))
+            L.append('  %%u%d = insertvalue %%tagPOINT undef, i32 %%px%d, 0' % (i, i))
+            L.append('  %%c%d = insertvalue %%tagPOINT %%u%d, i32 %%py%d, 1' % (i, i, i))
+            cargs.append('%%tagPOINT %%c%d' % i)
         else:
             L.append('  ; unsupported param %s' % t)
             cargs.append('%s zeroinitializer' % t)
