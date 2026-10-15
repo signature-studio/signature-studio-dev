@@ -1,6 +1,6 @@
 # M11 REPORT (#5392 / [M11-N242] / 親 #4890): set_other 非 imm のポインタ経由読込 (ptr_mem) の接続判定
 
-結論: ポインタ経由の読込 122 件 (load_ptr・chain>load_ptr。台帳 mem_ptr 89 + reg 由来 33) を、同じ関数内の同じ `[base+d]` への直線区間の格納で接続判定する分類器 `m11_setother_ptr_class.py` を追加した。実測は **実値化 0 / 復元不能 0 / 未決 122 / 未分類 0**。全件が未決で、接続先は理由別に残る。値を決められた件数は 0 のため、`m11_argrecover_verify.py` での照合対象も 0 件 (該当なし)。IR は変えていない (分類のみ)。
+結論: ポインタ経由の読込 122 件 (reason が `load_ptr` で終わる行。内訳は後述 §2) を、同じ関数内の同じ `[base+d]` への直線区間の格納で接続判定する分類器 `m11_setother_ptr_class.py` を追加した。実測は **実値化 0 / 復元不能 0 / 未決 122 / 未分類 0** (測定 commit `c988679dc`)。全件が未決で、接続先は理由別に残る。値を決められた件数は 0 のため、照合対象も 0 件 (該当なし)。IR は変えていない (分類のみ)。
 
 ## 1. 接続方式 (決めたこと)
 
@@ -20,16 +20,23 @@
 | `ptr_entry` | 区間が関数先頭まで届いた | 未決 |
 | `frame_base` / `no_mem_operand` | 基底が rbp/rsp (別分類器の対象) / 定義命令にメモリ操作数が無い | 未決 |
 
-- 基底の比較は 64bit 族で行う (`eax` と `rax` を同一視)。
-- 判定の単体テストは `test_setother_ptr_class.py` (7 件・PASS)。負例 (別基底・reg 格納・幅違い・呼出し・基底再定義・先頭到達) と正例 (同基底の即値格納)。
+- 基底の比較は 64bit 族で行う。8/16/32bit 名 (`eax`・`cl`・`r8d`・`r8b` など) はすべて対応する 64bit 族へ写す。部分書込みも基底の再定義として扱う (`mov cl, 5` や `mov r8d, 9` を挟んだ読込は `ptr_base_def`)。
+- 判定の単体テストは `test_setother_ptr_class.py` (9 件・PASS)。負例 (別基底・reg 格納・幅違い・呼出し・基底再定義・先頭到達・部分レジスタによる基底再定義 2 件) と正例 (同基底の即値格納)。
 
 ## 2. 測定 (実測)
 
-- 入力: `work-m11` の `boot_final.ll` (sha256 先頭 `69c774ded8aaf717`) と `fl-win64` の `extracted/block00031_PE.bin` (先頭 `b2c64da40921cf26`。REPORT_N174 と同一) から、`m11_post.py` → `m11_argrecover.py` → `m11_setother_nonimm_class.py` で `nonimm_class_rows.json` (349 件) を再生成。台帳の数は REPORT_N174 / N172 と一致 (非 imm 349)。
-- 測定: `python3 m11_setother_ptr_class.py work/sigfix_stats/nonimm_class_rows.json --pe <PE>` (real 0.29 秒・load 1 プロセス単独)。
+- 入力: `work-m11` の `boot_final.ll` (sha256 先頭 `69c774ded8aaf717`) と `fl-win64` の `extracted/block00031_PE.bin` (先頭 `b2c64da40921cf26`。REPORT_N174 と同一)。
+- 中間物の生成 (`tools/m11/` で実行・すべて rc 0・gitignore 対象の `work/sigfix_stats/`):
+  1. `python3 m11_post.py work/boot_final.ll work/sigfix_stats/final3_base.ll --pads work/sigfix_stats/pads.json`
+  2. `python3 m11_argrecover.py work/sigfix_stats/pads.json --pe <PE> --out work/sigfix_stats/fixes.json`
+  3. `python3 m11_setother_ledger_verify.py work/sigfix_stats/fixes.json --pe <PE>` → `match 410`
+  4. `python3 m11_setother_nonimm_class.py work/sigfix_stats/fixes.json --pe <PE> --ir work/boot_final.ll` → `work/sigfix_stats/nonimm_class_rows.json` (`fixes.json` と同じ dir に出力される。`--out` は無い)・非 imm 349 件・`load_ptr` 行 122 件。
+- 注記 (再現性): 手順 1 の出力 sha は `c029ada4…` で、REPORT_N86 / N174 の `ecab191b…` と一致しない。`cb45c284` 時点の `m11_post.py` で同じ入力から実行すると `ecab191b…` になるので、差は `m11_post.py` の `cb45c284` 以降の変更 (`eba68fdbe`・`622df694b` など、#3932 系) に由来する。ただし下流の件数 (`match 410`・非 imm 349・`load_ptr` 122) は REPORT_N174 と一致し、本 PR の 122 件の行単位の判定は旧版と同一だった。
+- 測定 (修正 commit `c988679dc` で実行): `python3 m11_setother_ptr_class.py work/sigfix_stats/nonimm_class_rows.json --pe <PE> --out work/sigfix_stats/ptr_class_rows.json` (real 0.29 秒・load 1 プロセス単独・`nproc` 4・load average 0.56)。
+- 対象 122 件の定義: `nonimm_class_rows.json` のうち、reason が `load_ptr` で終わる行 (`load_ptr` 117・`chain>load_ptr` 2・`stack_match>load_ptr` 2・`call_ret>ret>chain>load_ptr` 1)。この行の kind は set_other 120・stack_set_other 2。
 
 ```
-[ptr-class] 対象 122 件 (load_ptr・chain>load_ptr)
+[ptr-class] 対象 122 件 (load_ptr で終わる reason の行)
   実値化      0
   復元不能     0
   未決       122
@@ -50,7 +57,7 @@
 ## 3. 差分
 
 - 新規: `tools/m11/m11_setother_ptr_class.py`・`tools/m11/test_setother_ptr_class.py`・本 REPORT。既存の分類器・`ldmach.py` は変更していない。
-- 測定 commit: 本 PR の HEAD (分類器を最後に変えた commit)。
+- 測定 commit: `c988679dc` (分類器を最後に変えた commit)。`git diff 42b00e05e c988679dc -- tools/m11/m11_setother_ptr_class.py tools/m11/test_setother_ptr_class.py` の差分は本 PR の修正 (部分レジスタ対応)。
 
 ## 4. 受入条件の判定
 
