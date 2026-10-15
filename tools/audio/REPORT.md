@@ -247,4 +247,4 @@ underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`
 - 再現条件 (負荷・タイミング) は未特定。FAIL は旧 HEAD の 11 run 中 1 件のみで、切り分けは `first_underrun_frame=56576` (producer 遅延か consumer rebuffer か) を起点に行う。追跡 **#863** (AU-15)。
 
 ## 20. AU-15 (#863) 現 HEAD での再試行 (失敗 0 件)
-結論 (AU-15 #4089: underrun 時刻と write 区間の突き合わせ判定を追加。合成 9 件・e2e 20 run 全 PASS。実 underrun 値は未取得。全文 [REPORT_APPENDIX_4089.md](REPORT_APPENDIX_4089.md)): `origin/main` `2f235a0a` で 15 run 全 PASS (無負荷 9 + 負荷下 6)。`origin/main` `63ed695b` で追加 27 run 全 PASS (強負荷 12 本を含む)。全文は [REPORT_APPENDIX_863.md](REPORT_APPENDIX_863.md) §20・§21。
+結論 (AU-15 #4089: underrun 時刻と write 区間の突き合わせ判定を追加。producer の時間軸を epoch に統一。合成 9 件・e2e 10 run 全 PASS。実 underrun 値は 1 件取得 (uo_gap_us=-26075)。全文 [REPORT_APPENDIX_4089.md](REPORT_APPENDIX_4089.md)): `origin/main` `2f235a0a` で 15 run 全 PASS (無負荷 9 + 負荷下 6)。`origin/main` `63ed695b` で追加 27 run 全 PASS (強負荷 12 本を含む)。全文は [REPORT_APPENDIX_863.md](REPORT_APPENDIX_863.md) §20・§21。
