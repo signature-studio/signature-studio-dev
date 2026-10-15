@@ -100,7 +100,7 @@ index 72a788e2c..80d069f06 100644
 
 ## 8. ebp 相対のスタック書込みと空スタック (#4146 PLG-G2-49)
 
-- 測定 commit `2236d7776` (判定器・TARGETS・stk 窓を変えた最後の commit)。 検証 HEAD は同じ。 再現は `cd tools/plugins/slayer_engine_ia32 && python3 x87_fn_diff.py` (+ `--nega`・`--nega-lower`・`--special`・`--special --nega-nan`)。
+- 測定 commit `bd20dd255` (main 取り込みの merge。 判定器・TARGETS・stk 窓・ebp を変えた最後の commit)。 検証 HEAD は同じ。 再現は `cd tools/plugins/slayer_engine_ia32 && python3 x87_fn_diff.py` (+ `--nega`・`--nega-lower`・`--special`・`--special --nega-nan`)。
 - 判定器: 非自明性を「OBJ 窓が変わった」に加え「guest スタックの窓 `[0x10EFEF00, 0x10EFF0E0)` (ebp-0x100..ebp+0xE0) が変わった」も数える。 両 runner は `ebp = 0x10EFF000` (`GUEST_STACK_TOP - 0x1000`。 main の #4088 `e4514bf39` の設定) を置き、窓を事前に 0 にして、`stk=` として出す (native `x87_fn_native.c`・wasm `x87_fn_glue.c`・`x87_fn_entry_wasm.mjs`)。 `ebp=0` では `[ebp-0x90]` が負のアドレスになり native が SIGSEGV するため、呼出し元の frame を模した値にした。
 - 追加した 2 本: `fn_1000b6c1`・`fn_1000b936` (OBJ 窓を書かず、ebp 相対のスタックだけを書く)。 入口で空の ST(0) を読まない (`fstp st(0)` で捨てるだけ) ので underflow に依らない。
 
