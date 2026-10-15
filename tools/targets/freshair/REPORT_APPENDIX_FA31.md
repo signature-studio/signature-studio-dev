@@ -179,5 +179,5 @@ pdata の関数境界ごとに逆アセンブル (capstone) し、E8/E9 の直�
 
 測定:
 - 測定 commit: 本 PR の `fa31_ctor.py` を追加した commit (コードの対象は `lift2/` 内の新規 1 ファイル)。
-- `python3 tools/targets/freshair/lift2/fa31_ctor.py "<SlateCore.core_64>"`: rc=0、出力 22 行 (VT 書込み関数 2・ctor 呼出元 13・`+0xb98`/`+0xba8` のスタック外書込み 115 件の集計)。所要・load は未測定 (静的解析のみで判定には使わない)。
+- `python3 tools/targets/freshair/lift2/fa31_ctor.py "<SlateCore.core_64>"`: rc=0、出力 20 行 (VT 書込み関数 2・ctor 呼出元 13・`+0xb98`/`+0xba8` のスタック外書込み 115 件の集計)。所要・load は未測定 (静的解析のみで判定には使わない)。
 - 製品 KPI: **動かしていない** (静的解析のみ。起動・GUI の挙動は不変)。
