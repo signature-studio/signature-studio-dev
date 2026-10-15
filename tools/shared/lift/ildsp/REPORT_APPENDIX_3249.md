@@ -12,6 +12,8 @@
 
 単独実行の表 (1 プロセス 1 実験・S2 の値。slot 1 は表 7-1、slot 2 v0・v2 の変更範囲はセッションで変わる (注 2)):
 
+> 旧値。この表の rax 列は round 1・2 の旧測定で、slot 2 rdx=0・slot 3 rdx=0・slot 4 と §7.1 が食い違う (slot 2 rdx=0 は `0` ではなく `0x5`、slot 3 rdx=0 は `0x2e` ではなく `0x1801aa390`、slot 4 は `0x35` ではなく `0x1801aa3a0`)。正本は §7.1 の役割表。
+
 | slot | rdx | rc (n=6) | rax (完走時) | 変更範囲 (完走時) | 間接 call 4 件の hook |
 |---|---|---|---|---|---|
 | 1 | 0・1・2・0xe | 0 と 124 が混在 (表 7-1) | wrapper+0x1310 (表 7-1) | 33 range が中心 (表 7-1) | 0 件 (注 3) |
@@ -59,29 +61,9 @@
   4. ASLR 無効 (`setarch x86_64 -R`) と空の環境 (`env -i`) は、S1 (round 1 の実装者測定) のみ。S2・S3 では再測定しておらず、未検証。
 - slot 1 の hang: 単独 (4 rdx × n=6) の件数は S2 10/24・S3 12/24・RV3 8/24、全件の slot 1 v0 は S2 3/6・S3 4/6・RV2 2/6・RV3 2/6。RV1 の単独 slot 1 v0 は 0/4。S1 は 16 回中 9 回。件数はセッションごとに変わり、rdx ごとの偏りも一定しない (1 セッション 6 回では rdx の差は判定できない)。hang は slot 1 の call 内で起きる。原因は未確認。仮説 (未検証): 未初期化値・スタック位置・環境変数長に依存する分岐。負荷の影響は未検証。
 - 全件実行 (同一プロセス・n=6): 表 7-2。slot 3 v0 の rax 0x2e は S2・S3 とも一致。slot 4・5 には届かない。
-- slot 0 (dtor) は §7.2 で実行済み (#4117)。
+- slot 0 (dtor) は §7.3 で実行済み (#4117)。
 
-### 7.2 slot 0 (dtor) の native 実行 (#4117 / T-SH-97)
-- 測定 commit: `19a9c85d2` (ハーネス `ildsp_native.c`: HeapFree を記録・二重解放を検出・`--slot 0 V` で slot 0 を実行。checker は `--create-only` で create のみ照合)。`git diff 19a9c85d2 HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
-- 対象: vtable `0x1803dfcf8` の [0] = RVA `0x1aa2e0` (ファイル offset `0x1a96e0`)。逆アセンブルでは `vptr ← 0x1803df0f8` を書き、6 メンバ (+0x10・+0x18・+0x20・+0x208・+0x258・+0x260) それぞれに `call 0x1abdb0` し、最後に inner (0x2f8) と wrapper (0x10) を解放する形。`0x1abdb0` の中身は未同定 (virtual call の thunk に見えるが未確認)。
-- 実測 (n=6・各プロセス `timeout 15`・rc 0 ×6・load average 0.13〜0.16・4 vCPU):
-
-| 項目 | 値 |
-|---|---|
-| 戻り値 rax | 0x1 (6/6) |
-| HeapFree 呼び出し | 2 件 (6/6): `0x50000320` (inner, 0x2f8) → `0x50000310` (wrapper, 0x10) |
-| 二重解放 | 0 件 (6/6) |
-| 未実装 import 呼び出し | 0 件 (6/6) |
-| 変更範囲 (`changed`) | なし (dtor は inner の 0x2f8 を書き換えない) |
-| 実行前のメンバ | +0x10・+0x18・+0x20・+0x208・+0x258・+0x260 は全て 0 (create 直後) |
-| 所要 | 1 プロセス約 3.5 ms |
-
-- 受入 1 の「解放の対象 (inner・配列)」: 解放された 2 ブロックは inner (0x50000320) と wrapper (0x50000310)。メンバ 6 件は create 直後に全て null のため、非 null メンバを解放する経路は**この測定では通っていない**。子 [T-SH-98] #4154 で扱う。
-- 受入 2: HeapFree を観測する形に直し、2 回・二重解放 0 件を確認。
-- 受入 3: `ildsp_native_check.py` (create のみ) は ALL OK (rc 0)。`--neg` は FAIL (rc 1) のまま。
-- 注: 全件実行 (`ildsp_native <PE>`・slot 1〜5) は、既存の表どおり slot 3 rdx=1 で SIGSEGV (rc 139) する。今回の変更で変わっていない。
-
-#### 7.1 slot の役割表 (#3249 / T-SH-53)
+### 7.1 slot の役割表 (#3249 / T-SH-53)
 - 測定 commit: `3248b5154` (`ildsp_native.c` は slot 1・2 の引数を float で渡すよう修正。`ildsp_native_check.py` ALL OK)。
 - 方法: 同じ PE の逆アセンブル (`objdump -d -M intel`) と、単独実行 (`ildsp_native <PE> --slot K V`・1 プロセス 1 実験・`timeout 15`・各 n=6) を突き合わせる。
 - 添字の注意: `--slot K V` の V は rdx の値ではなく `rdx_list = {0, 1, 2, 0xe}` の添字 (V=0→rdx 0、V=1→rdx 1、V=2→rdx 2、V=3→rdx 0xe)。slot 4 のみ V=0 で、rdx は内部オブジェクト (0x50000320)。
@@ -122,7 +104,7 @@
 | slot 2 v0・v2 の変更範囲がセッションで違う (注 2。原因未確認) | 差分テストの入出力の定義 | 追跡 issue なし (PM 判断: 子の起票要否) |
 | slot 3 (rdx=1・2・0xe) の SIGSEGV (単独 18/18 (S2・S3 とも)。全件は slot 3 v1 で 2〜4/6。原因未確認) | slot 3 の入力の扱い。全件は slot 4・5 に届かない | #4178 [T-SH-101] |
 
-### 7.1 slot 3 (vtable 0x1aa390 → 実体 0x162f90) の引数 (#4116 / T-SH-96)
+### 7.2 slot 3 (vtable 0x1aa390 → 実体 0x162f90) の引数 (#4116 / T-SH-96)
 - 測定 commit: `f06912763` (`ildsp_native.c` に `--s3-bufs` を追加。既定経路は変えていない)。素材 fl-win64 (`26.1.7.5653`)。`git diff f06912763 HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
 - 逆アセンブル (capstone・静的): 呼び出し規約は `(this=rcx, rdx=frames, r8d=channels, r9=入力 float*, [entry+0x28]=出力 float*)`。`rdx ≤ 0` なら即 return (`0x162f92 jle`)。入力は `r15[rbp*4]` (rbp = frame×ch の添字)、出力は `r12[rbp*4]` で、ch=1 のとき出力は 1 点・ch=2 のとき 2 点書く。第 5 引数は `[rsp+0x120]` を関数先頭で `r12` に退避して読む。
 - 内部オブジェクト (`this`=`[w+8]`) の前提 (逆アセンブルから読んだ範囲): `+0x208` (入力 float の base)・`+0x258`・`+0x260` (ring の base)・`+0x10`・`+0x18`・`+0x20` (buffer)・`+0x244` (wrap 長)・`+0x204`・`+0xc4`・`+0x114` (`0x1634xx` の遅延計算で使う)。各フィールドの意味は未確定。
@@ -132,3 +114,23 @@
   - 途中の観測: `+0x244=0` のとき `0x163380` の `[rbx+0x164+idx*4]` 累積ループで hang (rc 124 相当)。`+0x28=0` のとき同じ hang。`+0x28=1` で hang は消えた。
 - 未確定 (受入 1 の残り): slot 3 は `0x16340e` で `[rbx+rcx*4+0xc4]` と `0x16341c` で `[+0x114]` を自分で書いており、呼び出し前に外から与えた値は上書きされる。`0x1634bb` の分母が 0 になる条件 (どの初期化値が要るか) は未確定。rdx=1 の既定経路 (4 引数) は従来どおり rc 139 のままで、checker は ALL OK。
 - 未解決: 引数の意味 (逆アセンブル上の役割) は確定したが、rdx≠0 の SIGSEGV の原因は未確定。`0x16340e` が `+0xc4` を書き換えるため、外から与えた `+0xc4[0]` が 0 のまま残る理由が次の切り分け点。起票先: #4178 [T-SH-101] (本 PR は部分達成のため `Refs #4116`)。
+
+### 7.3 slot 0 (dtor) の native 実行 (#4117 / T-SH-97)
+- 測定 commit: `19a9c85d2` (ハーネス `ildsp_native.c`: HeapFree を記録・二重解放を検出・`--slot 0 V` で slot 0 を実行。checker は `--create-only` で create のみ照合)。`git diff 19a9c85d2 HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
+- 対象: vtable `0x1803dfcf8` の [0] = RVA `0x1aa2e0` (ファイル offset `0x1a96e0`)。逆アセンブルでは `vptr ← 0x1803df0f8` を書き、6 メンバ (+0x10・+0x18・+0x20・+0x208・+0x258・+0x260) それぞれに `call 0x1abdb0` し、最後に inner (0x2f8) と wrapper (0x10) を解放する形。`0x1abdb0` の中身は未同定 (virtual call の thunk に見えるが未確認)。
+- 実測 (n=6・各プロセス `timeout 15`・rc 0 ×6・load average 0.13〜0.16・4 vCPU):
+
+| 項目 | 値 |
+|---|---|
+| 戻り値 rax | 0x1 (6/6) |
+| HeapFree 呼び出し | 2 件 (6/6): `0x50000320` (inner, 0x2f8) → `0x50000310` (wrapper, 0x10) |
+| 二重解放 | 0 件 (6/6) |
+| 未実装 import 呼び出し | 0 件 (6/6) |
+| 変更範囲 (`changed`) | なし (dtor は inner の 0x2f8 を書き換えない) |
+| 実行前のメンバ | +0x10・+0x18・+0x20・+0x208・+0x258・+0x260 は全て 0 (create 直後) |
+| 所要 | 1 プロセス約 3.5 ms |
+
+- 受入 1 の「解放の対象 (inner・配列)」: 解放された 2 ブロックは inner (0x50000320) と wrapper (0x50000310)。メンバ 6 件は create 直後に全て null のため、非 null メンバを解放する経路は**この測定では通っていない**。子 [T-SH-98] #4154 で扱う。
+- 受入 2: HeapFree を観測する形に直し、2 回・二重解放 0 件を確認。
+- 受入 3: `ildsp_native_check.py` (create のみ) は ALL OK (rc 0)。`--neg` は FAIL (rc 1) のまま。
+- 注: 全件実行 (`ildsp_native <PE>`・slot 1〜5) は、既存の表どおり slot 3 rdx=1 で SIGSEGV (rc 139) する。今回の変更で変わっていない。
