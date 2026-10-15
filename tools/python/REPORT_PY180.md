@@ -47,11 +47,11 @@ PE 上で確定した事項 (REPORT_PY172 §1・§2 と同じ):
 
 ## 4. 実装・検証
 
-測定 HEAD: `9facb33bb` (runner・2026-10-15 07:12〜07:18 UTC)。emsdk は `emsdk install 6.0.12` で入れた (`toolchain-emsdk` 素材は本 run に無い。`/opt/emsdk` は取得した emsdk への symlink)。
+測定 HEAD: `9facb33bb` (runner・2026-10-15 07:12〜07:18 UTC)。emsdk は `emsdk install 6.0.12` で入れた (`toolchain-emsdk` 素材は本 run に無い。既定の emsdk 位置には取得した emsdk への symlink を張った。`EMSDK_DIR`・`EMSDK_ENV` で指定可)。
 
 | 検査 | 手順 (コマンド) | 結果 (現 HEAD `9facb33bb`) |
 |---|---|---|
-| 素材 | `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` (`[WIN64]`・`docs/WORKFLOW.md` §11) | rc 0 (9.9 s) |
+| 素材 | `tar --zstd -xf <artifacts>/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` (`[WIN64]`・`docs/WORKFLOW.md` §11) | rc 0 (9.9 s) |
 | 入力 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` | rc 0 |
 | CPython wasm | `bash build_cpython_wasm.sh` | rc 0 (3 分 53 秒・初回ビルド) |
 | flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 (5 s) |
