@@ -31,7 +31,7 @@ PE は `analysis/flapi/pe_disasm.py 12d3ff0 90` の逆アセンブル (`FL_WIN64
 - 測定 commit: `2da8e81d6` (コードを変えた最後の commit。`feat(python): getGridBitWithLoop の loop 分岐 …`)。
 - 検証 HEAD: 本 REPORT の commit。コード範囲の差分 `git diff 2da8e81d6 HEAD -- tools/python/host tools/python/provider tools/python/tests` の出力は 0 行 (本 REPORT の commit は範囲外)。
 - 変更の規模: 5 files・89 insertions・8 deletions (`fl_engine.c`・`fl_mock.mjs`・`fl_provider.mjs`・`build.sh`・`channels_diff.mjs`)。
-- 素材: `fl-win64` を `tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C $RUNNER_TEMP/fl-win64` で全展開 (5.531 秒)。`fetch_inputs.sh` rc 0 (0.562 秒)。`toolchain-emsdk` は展開せず、runner 既存の emsdk (`[EMSDK]`・既定の `EMSDK_ENV`・emcc) を使った。
+- 素材: `fl-win64` を `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C $RUNNER_TEMP/fl-win64` で全展開 (5.531 秒)。`fetch_inputs.sh` rc 0 (0.562 秒)。`toolchain-emsdk` は展開せず、runner 既存の emsdk (`[EMSDK]`・既定の `EMSDK_ENV`・emcc) を使った。
 - flpy: `build_cpython_wasm.sh` rc 0 (4 分 4.965 秒)。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (6.166 秒・`flpy.wasm` 5,924,680 B。REPORT_PY101 と同じサイズ)。
 - 環境: runner 4 core・node v22.23.3。HEAD 測定前の `uptime` の load average 0.25 / 1.15 / 0.79 (03:00:13)。
 
