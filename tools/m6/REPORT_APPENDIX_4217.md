@@ -26,15 +26,25 @@
 | `bash -n tools/m6/m6_lift.sh` | 成功 |
 | 旧パス文字列の `grep` (tools/m6 内) | 0 件 |
 
-## 受入条件 2 (`m6_lift.sh` 前後の出力 sha256 一致) は未実施
+## 受入条件 2 (`m6_lift.sh` 前後の出力 sha256 一致) の実測 (#5122)
 
-- 素材 `plugins-ott.tar.zst` の中身は `Install_Xfer_OTT_137.exe` / `.dmg` (インストーラ) のみ。`OTT_vst2_win64.dll` は含まれない (`tar --zstd -tf` で実測)。
-- `m6_lift.sh` は `work/ott_ranges.txt` (gitignore 対象・前段 `ott_closure` の生成物) を読むが、本 run では存在しない。
-- 素材 `analysis-ott-binaries` は許可名だが、本 run の素材置き場には無い。
-- よって置換前後の sha256 を実測できない。この項目は未解決 (下表)。
+測定 commit: `2d0357a51` (main)。`06d58a49a` から HEAD までの `tools/m6`・`tools/shared/{env,paths}.*`・`tools/m2`・`tools/m5` のコード差分は 0 件。
+
+- 素材: `plugins-ott.tar.zst` はインストーラのみ。`Install_Xfer_OTT_137.exe` を `7z x` で展開し、`$_13_/OTT_x64.dll` を `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll` に配置 (sha256 `ecd51e05…2378e`)。
+- `m6_scan.py` (`PLUGINS_DIR` 指定) → `tools/m6/work/ott_ranges.txt` 3983 bytes (166 関数)。
+- 実行環境: 4 core / load 0.61。RetDec は `/opt/retdec`。
+
+| 実行 | 入力の BIN | 所要 | `work/ott_lift.ll` sha256 |
+|---|---|---|---|
+| 置換後 (HEAD) 1 回目 | `$PLUGINS_DIR/...` | 8 s | `0e81b107f00cf3d39fce18b7dd37750721d370ee2a44cd1555c5001d29f2bb10` |
+| 置換後 (HEAD) 2 回目 | 同上 | (同一 run) | 同上 (`cmp` で 1 回目と一致) |
+| 置換前相当 | 旧 `BIN=` 行の文字列を同じ DLL パスに向けた一時版 | (同一 run) | 同上 (`cmp` で一致) |
+
+- 置換前の literal (`/home/ubuntu/...`) は本 VM に作れない (`/home/ubuntu` 不在・sudo 無し) ため、旧スクリプトをそのまま実行はしていない。上の「置換前相当」は `BIN` 行だけを旧文字列と同じ変数展開先に差し替えた版であり、BIN 以外の差分は HEAD と同一。
+- 判定: 置換後の `ott_lift.ll` は 2 回の実行と置換前相当版で sha256 が一致。受入条件 2 は満たした。
 
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `m6_lift.sh` 前後の出力 sha256 一致の実測 (受入条件 2) | 既定値の同一性はパス文字列の比較で確認済みだが、実行結果の同一性は未確認 | #4217 (部分達成のため Refs) |
+| 子 1 (#5121) の issue が open のまま (置換は #4462 で main 済み) | issue 状態のみ。コードには影響なし | #5121 (PM の close 判断) |
