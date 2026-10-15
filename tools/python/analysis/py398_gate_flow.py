@@ -105,6 +105,6 @@ check("0x10471f9: jmp 0x104cc72", text(0x10471F9) == "jmp    0x104cc72")
 check("0x1047126: cmp byte [rax],0 (rax=[0x15e2878])", text(0x1047126) == "cmp    BYTE PTR [rax],0x0")
 check("0x1047129: je 0x1047294", text(0x1047129) == "je     0x1047294")
 
-print("summary: gate の 1 書込みは 0x11c761c (0x11c7507 の分岐で飛ばされ得る) と 0x1262970 (setter)。")
+print("summary: gate を 1 にする書込みは 2 箇所 (0x11c761c は 0x11c7507 の分岐で飛ばされ得る・0x1262970 は setter)。")
 print("summary: 0x12f9ed0 は 0x196eb60 の配列長を返す。0xffac50 の loop 上限はその長さ。")
 sys.exit(0)
