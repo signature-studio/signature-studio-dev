@@ -1,7 +1,7 @@
 # REPORT_3520 — e2e rc=1 の期待値と実測の不一致 (#3520) の原因特定
 
 **結論 (3 行)**
-- (c) ptrcheck 71005 は **`M11_FIX_50A830=1` の clean build で再現**した値。既定 (clean) は 71001。既定で 71005 が出るのは `work/obj/ov.o` が古い (ON 側の build で作った) 状態のときだけで、**build キャッシュの取り違え**が原因。`M11_FIX_50A830` に stamp が無かった。修正 (`m11_build.sh` の `fix_ov.stamp`) で再現しなくなった。
+- (c) ptrcheck 71005 は **`M11_FIX_50A830=1` の clean build で再現**した値。既定 (clean) は 71001。既定で 71005 が出るのは `work/obj/ov.o` が古い (ON 側の build で作った) 状態のときだけで、**build キャッシュの取り違え**が原因。`M11_FIX_50A830` に stamp が無かった。修正は main の `68b9de191` (#3592・PR #3645 merge `e4c52eadd`) で入った (`work/ov_50a830.stamp`)。本 PR が一度入れた `fix_ov.stamp` は同じ flag の 2 系統目になるため外した。
 - (b) survey exact: 既定の clean 実測は 873、872 は ON 状態 (`M11_FIX_50A830=1`) の値。既定で 872 が出るのも同じ取り違え。pin 872 の出所 (#2714 時の環境) は未切り分けで、survey の ok は環境 (IR・work 状態) で 872〜874 に動く。
 - (a) tolerant 完了数 101 (= 通常起動 units_run 98 + skipped 3): clean・ON・既定のどれでも 101 で、`M11_FIX_*` の切替えでは動かない。pin 56 は #2714 時点の値で、その後の commit で通常起動が unit 57 を超えて進んだ。**進んだ commit は未二分** (未解決)。
 
@@ -13,7 +13,7 @@
 - 素材の lift (`boot0〜4.lift.ll`) は snapshot を使い、`boot5.lift.ll` は `m11_lift.sh m11_extra_ranges5.txt boot5` (RetDec・8 秒) で作った。`m11_image_gen.py` の出力は snapshot の `m11_image.bin` と **バイト一致** (LB=0)。よって snapshot の lift は現 PE 由来と見てよい。
 - IR は `m11_gen_ir2.sh` で作り直した (ldfix・ld108・ld115 applied)。全再生成 (Ghidra CSV・RetDec 4 chunk) は行っていない。`lift_pe.sha256` は手書きしていない。
 - 測定は `m11_e2e.sh` の 97〜111 行 (run・survey・tolerant・judge・gate) と同じ順・同じ環境変数で行った。
-- 測定の base は origin/main `8a852f69a` (修正前の `tools/m11`)。origin/main (`e99fe343c` 時点) では `tools/m11` が 8a852f69a 以降 24 files 変わっている。`m11_build.sh`・`m11_ov.c`・`m11_gen_ir2.sh` は変わっていない。
+- 測定の base は origin/main `8a852f69a` (修正前の `tools/m11`)。origin/main (`e99fe343c` 時点) では `tools/m11` が 8a852f69a 以降 24 files 変わっていた。同時点で `m11_build.sh`・`m11_ov.c`・`m11_gen_ir2.sh` は変わっていなかった。現 origin/main (`60eeccc33`・2026-10-15 確認) では `tools/m11` が 26 files 変わっており、`m11_build.sh` は `68b9de191` (#3592) で変わった (`ov_50a830.stamp` を追加)。`m11_ov.c`・`m11_gen_ir2.sh` は変わっていない。**数値は現 main で再測定していない** (§6)。
 
 ## 2. 実測 (clean = 直前に `work/obj/*.o` を全削除してから build)
 
@@ -36,8 +36,8 @@
 
 ### (c) image_va_words_new 71005 / 上限 71001
 
-- `M11_FIX_50A830=1` の clean build で 71005 が出る (+4 語)。既定 clean は 71001。主根拠は §2 の行 5〜7 (修正後: 既定 71001 → ON 71005 → 既定 71001)。
-- 既定で 71005 が出た条件は、`m11_build.sh` が `M11_FIX_50A830` を stamp で管理しておらず (`M11_FIX_535BF2` は既存の `work/ov_535bf2.stamp` で管理済み)、`work/obj/ov.o` が mtime だけで再利用されることだった (ov.o は `m11_ov.c` の `#if` でこの 2 フラグを切り替える)。ON build の後に既定 build を流すと、既定の測定が ON の ov.o で行われた。
+- `M11_FIX_50A830=1` の clean build で 71005 が出る (+4 語)。既定 clean は 71001。主根拠は §2 の行 5〜7 (a0d9722fe の stamp 入り script: 既定 71001 → ON 71005 → 既定 71001)。
+- 既定で 71005 が出た条件は、`m11_build.sh` が `M11_FIX_50A830` を stamp で管理しておらず (base `8a852f69a` の状態。`M11_FIX_535BF2` は既存の `work/ov_535bf2.stamp` で管理済み。main は `68b9de191` で `work/ov_50a830.stamp` を入れた)、`work/obj/ov.o` が mtime だけで再利用されることだった (ov.o は `m11_ov.c` の `#if` でこの 2 フラグを切り替える)。ON build の後に既定 build を流すと、既定の測定が ON の ov.o で行われた。
 - PR #3485 の表で既定の行も 71005 になっているのは、同じ取り違えで説明できる (推定。その run のログは repo に無い)。
 - 期待値 71001 は既定の値として正しい。gate は正しく動いている。
 
@@ -64,26 +64,37 @@
 | IR 生成が同じ入力で別出力 (`36079b29` と `bcfda317`。hash seed は無関係) | run ptr の基準が IR の状態で変わり得る | #3129 (IR 来歴の記録) に合流 |
 | origin/main の `m11_gen_ir2.sh` は qstore を適用しない (`ir_conditions.json` が `qstore=not-applied`) | 旧 main と IR の内容が違う可能性。未確認 | #3129 (IR 来歴の記録) に合流 |
 | 全再生成 (Ghidra CSV・RetDec 4 chunk) を行っていない | snapshot の lift と全再生成の IR の一致は未確認 | #3122 (全再生成 IR の survey) に合流 |
+| 現 main (`60eeccc33`) で §2 の数値を再測定していない。測定 tree は `a0d9722fe` で、main は `tools/m11` が 26 files 違う (§1) | main の stamp (`68b9de191`) を入れた tree で §2 の値がどう動くかは未確認 | 既存 issue #3520 へのコメント (e2e の再測定は素材 `tools/m11/work`・emsdk・retdec が要るため本 PR の範囲外) |
 
 ## 5. 修正
 
-- `tools/m11/m11_build.sh`: `M11_FIX_535BF2`・`M11_FIX_50A830` の組 (`<535BF2>-<50A830>`) が前回 build と変われば `work/obj/ov.o` を作り直す (`work/fix_ov.stamp`)。既存の instr 系 stamp と同じ書き方。`M11_FIX_535BF2` だけは既存の `work/ov_535bf2.stamp` と重なり、新規は 50A830 の切替え。
-- 既定の値・期待値・C 側の転記内容は変えていない。後続の `fix(m11): report corrections (#3520)` commit は、stamp のコメントの誤記 (535BF2 には stamp が無い、という記述) を直しただけで、挙動は変えていない。
+- 修正は main の `68b9de191` (fix(m11): invalidate ov.o when M11_FIX_50A830 changes (#3592)・PR #3645 merge `e4c52eadd`) で入った。`tools/m11/m11_build.sh` の 254〜255 行で `work/ov_50a830.stamp` を使い、`M11_FIX_50A830` が変わったら `work/obj/ov.o` を作り直す。`M11_FIX_535BF2` は既存の `work/ov_535bf2.stamp` (236〜237 行・252 行) で管理済み。
+- 本 PR は一度、同じ flag を `work/fix_ov.stamp` (組 `<535BF2>-<50A830>`) で管理する修正を入れた (`a0d9722fe`)。main の 2 つの stamp と判定が同じで、同じ flag を 2 系統で管理することになるため、`tools/m11/m11_build.sh` を base `8a852f69a` と同一に戻した (commit `1adfe2039`)。
+- 既定の値・期待値・C 側の転記内容は変えていない。
 
 ## 6. 検証
 
-- 測定 commit: `a0d9722fe` (コード変更を含む最後の commit)。その後のコード差分は `tools/m11/m11_build.sh` のコメント 1 行だけ。非コメント行の差分は 0 行 (§7)。
-- **本 fix run では e2e を再実行していない**。素材 (`tools/m11/work`・emsdk・retdec) が run 上に無く、`fl-win64` の展開だけでは lift・IR・build が再現できないため。§2 の数値は前 session の記録で、再測定していない。
-- stamp 行の分離テスト (`m11_build.sh` の 146〜147 行を切り出して実行。コードは測定 commit と同一): 初回 (stamp 無し) rebuild / 同設定 reuse / 50A830 0→1 rebuild / 同設定 reuse / 535BF2 1→0 (50A830=1) rebuild / 50A830 1→0 (535BF2=0) rebuild。
+- 測定 commit: `a0d9722fe` (測定時の tree。`work/fix_ov.stamp` 入りの `m11_build.sh`)。以後の PR の変更は `m11_build.sh` を base に戻す commit (`1adfe2039`) と本 REPORT の更新だけで、差分は §7。
+- **本 fix run では e2e を再実行していない**。素材 (`tools/m11/work`・emsdk・retdec) が run 上に無く、`fl-win64` の展開だけでは lift・IR・build が再現できないため。§2 の数値は前 session の記録で、現 main (`60eeccc33`) では再測定していない (§4)。
+- stamp 行の分離テスト: main (`60eeccc33`) の `m11_build.sh` の 236〜237 行 (`ov_535bf2.stamp`)・252〜255 行 (`ov_50a830.stamp`) を切り出して `$RUNNER_TEMP` 下で実行 (作業ツリー外)。8 通りすべて期待どおり: 初回 (stamp 無し) REBUILD / 同設定 REUSE / 50A830 0→1 REBUILD / 同設定 REUSE / 50A830 1→0 REBUILD / 535BF2 1→0 REBUILD / 同設定 REUSE / 535BF2 0→1 REBUILD。
+- 負例: 50A830 の 2 行 (254〜255 行) を外すと、50A830 0→1 と 1→0 が REUSE になった (前回 build の `ov.o` を再利用)。main の行がこの取り違えを防いでいる。
 - `m11_e2e.sh` 全体は未実行 (素材 snapshot の全再生成が要り、時間上限に収まらない)。run・survey・tolerant・judge・gate は前 session が個別に実行した (§2)。gate の結果: strict (101 ≠ 56) と survey (873 ≠ 872) は FAIL のまま (期待値は変えていない)。
 
 ## 7. 差分
 
-測定 commit `a0d9722fe` から HEAD までのコード差分は、`m11_build.sh` のコメント 1 行だけ (`git diff a0d9722fe HEAD -- tools/m11/m11_build.sh` の出力):
+測定 commit `a0d9722fe` から HEAD までの `m11_build.sh` の差分 (`git diff a0d9722fe HEAD -- tools/m11/m11_build.sh` の出力。stamp の 3 行 = コメント 1 行・if 1 行・echo 1 行を外した):
 
 ```diff
+@@ -142,9 +142,6 @@ echo "${M11_PROBE_2400:-0}" > work/instr_2400.stamp
+ # #2407: function_e3ef60 観測 probe の ON/OFF で post 結果と ov.o を作り直す (stamp)
+ if [ "$(cat work/instr_e3ef60.stamp 2>/dev/null || echo 0)" != "${M11_INSTR_E3EF60:-0}" ]; then rm -f work/boot_final3.ll work/obj/ov.o; fi
+ echo "${M11_INSTR_E3EF60:-0}" > work/instr_e3ef60.stamp
 -# #3520: M11_FIX_535BF2・M11_FIX_50A830 は m11_ov.c の転記を切り替える。stamp が無いと前回 build の ov.o を再利用し、切替え後の測定が前の設定の値になる
-+# #3520: M11_FIX_50A830 の切替えで ov.o を作り直す (stamp 無しだと前回 build の ov.o を再利用していた)。M11_FIX_535BF2 は下の ov_535bf2.stamp と重なるが、組で記録する
+-if [ "$(cat work/fix_ov.stamp 2>/dev/null || echo none)" != "$M11_FIX_535BF2-$M11_FIX_50A830" ]; then rm -f work/obj/ov.o; fi
+-echo "$M11_FIX_535BF2-$M11_FIX_50A830" > work/fix_ov.stamp
+ S_P134="${M11_PROBE_134:-0}"   # #134: 1 = 計測用 IR probe (8c5eb0 の arg2・R・list; trap_triage/probe134_ir.py) を boot_final3.ll に入れる。既定 0 では入れない
+if [ "$(cat work/instr_134.stamp 2>/dev/null || echo 0)" != "$S_P134" ]; then rm -f work/boot_final3.ll; fi
+echo "$S_P134" > work/instr_134.stamp
 ```
 
-`m11_build.sh` の非コメント行の差分は 0 行 (`git diff -U0 a0d9722fe HEAD -- tools/m11/m11_build.sh | grep -E '^[-+]' | grep -vE '^(\+\+\+|---)' | grep -cvE '^[-+][[:space:]]*#'` が 0)。`tools/m11` の残りの差分は本 REPORT だけ。
+`tools/m11` の残りの差分は本 REPORT だけ。
