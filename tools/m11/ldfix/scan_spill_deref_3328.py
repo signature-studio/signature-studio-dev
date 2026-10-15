@@ -11,7 +11,7 @@ D: 読み直した値を 1 段 deref して引数レジスタ Rb へ入れる �
          argK 自身。REPORT_2555 §3 の 3 件)。演算で Rb が書き換わっただけの候補は EXCL にしない。
   COPY : 取りこぼし検出 (0x7888f0)。`mov Rc, argreg` の複写 (Rc は callee-saved に限る) を alias に入れ、
          D の後 6 命令以内の call が直接呼出し (`call 0x...`) のものだけ。間接呼出し (vtable) を除く。
-  CMP  : 比較側。S→L→D の後、Rb が call の前 (窓内・書換え前) に cmp/test で読まれる。
+  CMP  : 比較側。S→L→D の後、Rb が書換え前 (窓内) に cmp/test で読まれる。call は無くてよい。
 
 使い方: python3 scan_spill_deref_3328.py IR.ll --pe PE.bin --out OUT.json
 """
@@ -20,7 +20,6 @@ import json
 import os
 import re
 import sys
-from collections import Counter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)

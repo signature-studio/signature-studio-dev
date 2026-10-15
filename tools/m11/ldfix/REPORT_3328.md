@@ -30,8 +30,10 @@
 ## 2. 数え方と再現
 
 - 素材: `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin` (`fl-win64.tar.zst` から `tar --zstd -xf ... '*block00031_PE.bin'` で取り出し。fl-win64 26.1.7.5653)。IR は `tools/m11/work/boot_final3.ll` (読込のみ・gitignore)。
+- IR の出所: `work-m11.tar.zst` の `boot_final3.ll` (`tools/m11/work/` に展開。PR 本文の `oc_artifacts: fl-win64 work-m11`)。生成は `tools/plugins/lift/passes/m11_post.py` (boot_final.ll → boot_final3.ll の後処理)。`work-m11` は #516 以前の生成で、現 main の生成手順とは一致しない (`docs/WORKFLOW.md` §11)。
+- IR の sha256: **未記録**。測定 (commit `f602f9354`) の時点で指紋を取っていなかった。本 PR の run では `work-m11` が取得されていないため、指紋を再計算できない。検収 run が `sha256sum tools/m11/work/boot_final3.ll` を取り、下の件数を再現できたら、その指紋をここに追記する。件数が一致しなければ、IR の違いとして扱う。
 - 走査: `python3 tools/m11/ldfix/scan_spill_deref_3328.py tools/m11/work/boot_final3.ll --pe $RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin --out <json>`
-- 出力 (実測): `IR 関数 7421 / .pdata 有り 6969 / CALL 11 関数 13 箇所 / CMP 13 関数 20 箇所 / COPY 49 関数 103 箇所 / EXCL 3 関数 3 箇所` (実行 3.6 s・load average 0.15 / 0.25 / 0.18)。
+- 出力 (実測・IR 入力): `IR 関数 7421 / .pdata 有り 6969 / CALL 11 関数 13 箇所 / CMP 13 関数 20 箇所 / COPY 49 関数 103 箇所 / EXCL 3 関数 3 箇所` (実行 3.6 s・load average 0.15 / 0.25 / 0.18)。
 - 2502 の走査 (`scan_spill_deref_2502.py`・無変更) は同じ PE・IR で 14 関数 / 16 箇所 (再実行で一致)。
 - 測定 commit: `f602f9354` (§7)。
 
@@ -51,9 +53,9 @@
 
 ## 4. 取りこぼし (COPY) の定義と偽陽性の抑え方
 
-- 2502 の `--copy-alias` は 64 関数 / 123 箇所だった。内訳を今回の定義で数え直すと、spill 由来 16 (= CALL 13 + EXCL 3) と copy 由来 107 (直接呼出し 103 + 間接呼出し 4)。
+- 2502 の `--copy-alias` は 64 関数 / 123 箇所だった。spill 由来 16 (= CALL 13 + EXCL 3) を引いた copy 由来 107 のうち、直接呼出しが 103 箇所。残りの間接呼出し 4 箇所は差分 (123 − 16 − 103) で、命令形 (`call [reg...]` など) は測定時に記録しておらず**推定**。
 - 今回の COPY の抑え方と効果 (実測):
-  - 直接呼出しのみ: 間接呼出し (vtable 等) 4 箇所を除外。
+  - 直接呼出しのみ: 推定で間接呼出し 4 箇所を除外 (命令形は未確認。検収 run で IR 入力から確かめる)。
   - 複写先は callee-saved (rbx/rsi/rdi/rbp/r12〜r15) に限る: 今回の 103 箇所は全て callee-saved のため効果 0 (条件は残す)。
   - 再ロード除外 (EXCL): copy 由来は 0 件 (効果 0)。
 - つまり機械的な条件で減ったのは 4 箇所だけ。残り 103 箇所 (49 関数) は正常な間接参照を含みうるが、機械語だけでは区別できない。IR 側の判定が要る (子 #3382 [CI-153])。
@@ -63,7 +65,7 @@
 ## 5. 判定不能の定義と 0x439f90
 
 - **判定不能**: 機械語の 1 箇所 (呼出し・比較) に対応する IR の 1 箇所が、次のどちらかで決まらないもの。(a) IR 側に同じ呼出し先 (callee) の呼出しが機械語の出現件数より少なく、呼出しの順 (k 番目) が対応づけられない、(b) 比較の対応が 1 対 1 に取れない。判定不能は、誤りにも正にも数えない。
-- 0x439f90 (CALL 0x43a0be → call 0x414850): 機械語は 0x414850 を 1 回呼ぶ。IR の `function_439f90` 本体には `@function_414850(` の呼出しが 0 件 (REPORT_2555 §2 の「IR に対応する呼出し無し」と一致)。→ **判定不能**。IR 欠落か機械語の経路の違いかは未確定。
+- 0x439f90 (CALL 0x43a0be → call 0x414850): 機械語は 0x414850 を 1 回呼ぶ。IR の `function_439f90` 本体には `@function_414850(` の呼出しが 0 件 (REPORT_2555 §2 の「IR に対応する呼出し無し」と一致)。→ **判定不能**。IR 欠落か機械語の経路の違いかは未確定。追跡 issue は無い (§8 の未解決表に残す)。
 
 ## 6. 比較側 (CMP) の判定
 
@@ -87,8 +89,16 @@
 
 - 2502 (14 関数 / 16 箇所) → 3328 の CALL 11 関数 / 13 箇所 + EXCL 3 関数 / 3 箇所。除外した 3 件 (0x413c00・0x414c70・0x44f240) は REPORT_2555 §3 の偽陽性と一致。減った 3 件の内訳は再ロードの枠 0x413c5d・0x414cc7・0x44f25b (§3 の表)。
 - 追加されたもの (新 kind): COPY 103 箇所 (49 関数) と CMP 20 箇所 (13 関数)。どちらも 2502 の数字とは別に数える。
-- 測定 commit: `f602f9354` (コードを変えた最後の commit。走査・REPORT・DOC_MAP を同じ commit に入れた)。
-- `git diff f602f9354 HEAD -- tools/m11/ldfix/scan_spill_deref_3328.py tools/m11/ldfix/scan_spill_deref_2502.py | wc -l` → `0` (後続の commit は REPORT のみ)。
+- 測定 commit: `f602f9354` (IR 入力で件数を数えた commit。走査・REPORT・DOC_MAP を同じ commit に入れた)。
+- その後のコード差分は 2 箇所だけ (`unused import` の削除と、CMP の docstring の `call の前` の削除。走査の判定は変えていない)。`git diff f602f9354 HEAD -- tools/m11/ldfix/scan_spill_deref_3328.py tools/m11/ldfix/scan_spill_deref_2502.py` の出力:
+  ```diff
+  -  CMP  : 比較側。S→L→D の後、Rb が call の前 (窓内・書換え前) に cmp/test で読まれる。
+  +  CMP  : 比較側。S→L→D の後、Rb が書換え前 (窓内) に cmp/test で読まれる。call は無くてよい。
+  -from collections import Counter
+  ```
+  (2502 の script は 0 行)
+- 同じ差分の後で、判定の出力が変わらないことを確かめた。仮 IR (`ldmach.Machine(PE).fns` の全 57,816 関数を `define void @function_<VA>(i64 %arg1)` にした `$RUNNER_TEMP/m11_3328/synth.ll`) を、修正前と修正後の script で走査し、出力 JSON を `cmp` で比べた → 一致。件数は CALL 39 関数 67 箇所・EXCL 3 関数 3 箇所・CMP 31 関数 47 箇所・COPY 202 関数 336 箇所 (実行 36 s)。仮 IR の CALL + EXCL は 42 関数 / 70 箇所 (母集団が全 .pdata なので、IR 入力の 14 関数 / 16 箇所とは比較しない)。
+- 仮 IR は IR 入力の代わりにならない。IR 入力 (`work-m11`) での再測定は、本 PR の run では未実施 (素材が無い)。検収 run が §2 の件数を IR 入力で再現するのが正の確認になる。
 
 ## 8. 未解決
 
@@ -96,4 +106,4 @@
 |---|---|---|
 | CMP 13 箇所 (6 関数) の IR 側判定 (§6 の表の最後の行) | 比較側の誤り候補の数 | 子 #3381 [CI-152] |
 | COPY 103 箇所 (49 関数) の IR 側判定。0x7888f0 の残り 2 箇所 (0x78890f・0x78892d) を含む | 複写経由の取りこぼしの数 | 子 #3382 [CI-153] |
-| 0x439f90 の判定不能 (IR に 0x414850 の呼出し無し) の原因 (IR 欠落か経路の違い)。判定不能の定義 (§5) は本 REPORT で確定 | 1 箇所 | 親 #2555 (CI-103) の表 (§2 #4) に残す |
+| 0x439f90 の判定不能 (IR に 0x414850 の呼出し無し) の原因 (IR 欠落か経路の違い)。判定不能の定義 (§5) は本 REPORT で確定 | 1 箇所 | 追跡 issue なし (#2555 は CLOSED のため参照先にしない)。本 PR の未解決表に残す |
