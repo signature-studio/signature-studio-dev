@@ -84,6 +84,8 @@ def byte_refs(raw, secs, base, lo, hi, md):
     verified = {}
     for p, imm, tgt, kind in out:
         for st in range(p - 14, p - 1):
+            if (p, tgt) in verified:
+                break
             code = raw_at(raw, secs, base, st, 16)
             for ins in md.disasm(code, st):
                 if ins.address + ins.size == p + 4 + imm:
@@ -333,16 +335,11 @@ def main():
         return addr + 1
 
     roots = set(lea_roots)
-    for (p, tgt), v in ver.items():
-        if v[1] == "lea" and LO <= tgt < HI:
-            roots.add((v[0], REG64.get(v[2].split(",")[0].strip()), tgt))
     byte_roots = set()
     for (p, tgt), v in ver.items():
         if v[1] == "lea" and LO <= tgt < HI:
             byte_roots.add((v[0], REG64.get(v[2].split(",")[0].strip()), tgt))
-    print("lea roots: linear=%d byte-verified=%d union=%d only_linear=%s only_byte=%s" % (
-        len(set(lea_roots)), len(byte_roots), len(roots),
-        sorted(hex(r[0]) for r in set(lea_roots) - byte_roots), sorted(hex(r[0]) for r in byte_roots - set(lea_roots))))
+    print("lea roots (linear sweep)=%d; byte-verified lea=%d (start-address offsets are not used)" % (len(roots), len(byte_roots)))
     for addr, dst, tgt in sorted(roots, key=lambda r: (r[2], r[0])):
         if dst:
             track(next_va(addr), {dst: tgt}, 0, ("lea", addr, dst, tgt))
