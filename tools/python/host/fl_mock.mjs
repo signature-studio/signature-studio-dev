@@ -130,7 +130,7 @@ export function createMockEngine() {
     launchPages: 0,
     uiClosing: false, uiTimeDispMin: false, uiStartOnInput: false, uiLoopRec: false, uiStepEdit: false, uiBrowserAutoHide: false, uiSnapMode: 0,
     undoPos: 0, undoCount: 0, undoLast: 0, safeEdit: true, projTitle: "", projAuthor: "", projGenre: "",
-    selStart: -1, selEnd: -1,
+    selStart: -1, selEnd: -1, liveAnchor: -1,
     arrTime: 0,
     numerator: 4, denominator: 4,
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
@@ -216,6 +216,12 @@ export function createMockEngine() {
   const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
   // PY-144 (#3043): PE 0xe43d30 の書込み規則。start=x・end=y を置き、x==y なら end=-1、x>y なら入れ替える。selectionClear は (-1,-1) で同じ経路
   const selSet = (x, y) => { st.selStart = x; st.selEnd = y; if (x === y) st.selEnd = -1; else if (x > y) { st.selStart = y; st.selEnd = x; } };
+  // PY-254 (#3796): PE 0xe43ff0 (liveSelection) の a≠0x7fffffff 経路。b==1 なら anchor (≥0 かつ a と異なる) から a までを選択し anchor=-1。それ以外は選択を (-1,-1)。b!=1 は anchor=a。anchor の初期値 -1 は仮置き
+  const liveSel = (a, b) => {
+    const flag = b === 1, anc = st.liveAnchor;
+    if (flag && anc >= 0 && anc !== a) selSet(anc, a); else selSet(-1, -1);
+    st.liveAnchor = flag ? -1 : a;
+  };
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
@@ -492,7 +498,7 @@ export function createMockEngine() {
     "arrangement.currentTime": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return st.arrTime; },
     "arrangement.selectionClear": (...a) => { arity(a, 0, 0); selSet(-1, -1); },
     "arrangement.selectionSet": (...a) => { arity(a, 2, 5); const x = argI(a, 0, 0), y = argI(a, 1, 0); for (let i = 2; i < 5; i++) argI(a, i, 0); selSet(x, y); },
-    "arrangement.liveSelection": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
+    "arrangement.liveSelection": (...a) => { arity(a, 2, 2); liveSel(argI(a, 0, 0), argI(a, 1, 0)); },
     "arrangement.addAutoTimeMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); str(a[1]); },
     "arrangement.jumpToMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
     // PY-143 (#3041): PE 0xd78030 (getMarkerName) と 0xd785a0 (currentTimeHint) の呼出し構造と戻り str は REPORT_PY143 で確定。
