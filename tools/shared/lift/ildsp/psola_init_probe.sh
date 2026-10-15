@@ -29,3 +29,5 @@ run "init slot4"                    $INIT 4 $IN $OUT 16 0
 run "init slot5"                    $INIT 5 $IN $OUT 16 0
 run "init slot3 n=0"                $INIT 3 0 0 $IN $OUT
 run "init slot3 rdx=0 r8=0"         $INIT 3 0 0 16 $OUT
+run "init slot3 rdx=in (対照: 落ちる)" $INIT 3 $IN 16 $IN $OUT
+run "init seq 0-5 (rdx=0, 1 プロセス)" $INIT 0,1,2,3,4,5 0 16 $IN $OUT

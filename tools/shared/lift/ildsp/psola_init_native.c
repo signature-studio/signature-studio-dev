@@ -3,7 +3,8 @@
  * 元の機械語で 1 回実行する native 実行器 (#4302 / T-SH-114)。
  * 順序: INIT (RVA init_rva) → CreateInstance (WC_ENTRY_RVA) → 指定 slot の順に呼ぶ。
  * usage: psola_init_native image_native.bin INIT_RVA K_CSV RDX R8 R9 STACK5
- *   slot 3 は R8 = 要素数・R9 = 入力配列・STACK5 = 出力 (RDX は不使用)。slot 1 は RDX = 入力・R8 = 出力。
+ *   slot 3 は RDX = 0 が必要 (RDX ≠ 0 では R9 の値によらず落ちる)・R8 = 要素数・R9 = 入力配列・STACK5 = 出力。
+ *   slot 1 は RDX = 入力・R8 = 出力。
  *   K_CSV は呼ぶ slot 番号のカンマ区切り (例: 0,1,2,3,4,5)。引数は全 slot 共通 (16 進)。
  * 結果: 各 slot ごとに "RESULT slot=K rax=..." か、crash の sig/addr を標準出力に出す。 */
 #include <stdio.h>
