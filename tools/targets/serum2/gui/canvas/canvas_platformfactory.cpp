@@ -4,6 +4,7 @@
 #include "canvas_bitmap.h"
 #include "canvas_font.h"
 #include "canvas_frame.h"
+#include "canvas_gradient.h"
 #include "canvas_string.h"
 #include "vstgui/lib/platform/iplatformtimer.h"
 #include <chrono>
@@ -125,7 +126,7 @@ CanvasPlatformFactory::DataPackagePtr CanvasPlatformFactory::getClipboard () con
 //------------------------------------------------------------------------
 PlatformGradientPtr CanvasPlatformFactory::createGradient () const noexcept
 {
-	return nullptr;
+	return PlatformGradientPtr (new CanvasGradient ());
 }
 
 //------------------------------------------------------------------------

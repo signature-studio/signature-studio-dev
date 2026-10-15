@@ -81,9 +81,17 @@ static MS void* k_HeapReAlloc(void* h, uint32_t f, void* p, uint64_t sz) {
 static uint32_t g_lasterr;
 static MS uint32_t k_GetLastError(void) { return g_lasterr; }
 static MS void k_SetLastError(uint32_t e) { g_lasterr = e; }
-static MS void k_RaiseException(uint32_t code, uint32_t fl, uint32_t n, const void* a) {
-    (void)fl; (void)n; (void)a;
-    fprintf(stderr, "[ott_native] RaiseException(0x%x) 到達 — fail-fast\n", code); exit(97);
+/* ICALL-103: C++ 例外 (0xe06d7363) の到達位置を記録する。unwind 本体は未実装 (fail-fast のまま)。 */
+static MS void k_RaiseException(uint32_t code, uint32_t fl, uint32_t n, const uint64_t* a) {
+    (void)fl;
+    uint64_t ret = (uint64_t)__builtin_return_address(0);
+    if (code == 0xe06d7363 && n >= 3) {
+        fprintf(stderr, "[ott_native] RaiseException(0xe06d7363) 到達 — fail-fast (unwind 未実装) magic=%#llx obj=%#llx throwinfo=%#llx throw_site_rva=%#llx\n",
+                (unsigned long long)a[0], (unsigned long long)a[1], (unsigned long long)a[2], (unsigned long long)(ret - IMG_BASE));
+    } else {
+        fprintf(stderr, "[ott_native] RaiseException(0x%x) 到達 — fail-fast\n", code);
+    }
+    exit(97);
 }
 static MS int k_QPC(int64_t* v) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); *v = t.tv_sec * 1000000000LL + t.tv_nsec; return 1; }
 static MS int k_QPF(int64_t* v) { *v = 1000000000LL; return 1; }
@@ -107,6 +115,26 @@ static MS void* k_RtlPcToFileHeader(void* pc, void** base) {
     return b;
 }
 
+/* ICALL-100: RtlCaptureContext。x64 CONTEXT (0x4d0 B) の制御部だけを埋める。
+ * 呼び出し元の rip/rsp は呼び出し時のフレームから取る。汎用レジスタ (Rax..R15)・XMM は native 側から
+ * 取れない (ゲストの実レジスタは ott_ms_call の外に無い) ためゼロ。ContextFlags に含まれる範囲だけを意味がある値として扱う。 */
+static MS void k_RtlCaptureContext(uint8_t* ctx) {
+    uint64_t* fp = (uint64_t*)__builtin_frame_address(0);
+    memset(ctx, 0, 0x4d0);
+    *(uint32_t*)(ctx + 0x30) = 0x10001f;      /* ContextFlags = CONTEXT_AMD64 | CONTROL|INTEGER|SEGMENTS|FLOAT|DEBUG_REGISTERS */
+    *(uint32_t*)(ctx + 0x34) = 0x1f80;        /* MxCsr 既定値 */
+    *(uint16_t*)(ctx + 0x38) = 0x33;          /* SegCs (64bit code) */
+    *(uint16_t*)(ctx + 0x42) = 0x2b;          /* SegSs */
+    *(uint32_t*)(ctx + 0x44) = 0x202;         /* EFlags (IF) */
+    *(uint64_t*)(ctx + 0xf8) = fp[1];         /* Rip = 戻り先 */
+    *(uint64_t*)(ctx + 0x98) = (uint64_t)fp + 16; /* Rsp = 呼び出し元の rsp */
+}
+
+/* ICALL-104: SetUnhandledExceptionFilter。前の filter を返し新しい filter を登録する (初期値 NULL)。
+ * UnhandledExceptionFilter 本体は未実装 (fail-fast のまま)。 */
+static void* g_uef;
+static MS void* k_SetUnhandledExceptionFilter(void* f) { void* old = g_uef; g_uef = f; return old; }
+
 typedef struct { const char* n; void* f; } Impl;
 static const Impl IMPL[] = {
     {"GetProcessHeap", k_GetProcessHeap}, {"HeapAlloc", k_HeapAlloc}, {"HeapFree", k_HeapFree},
@@ -121,6 +149,8 @@ static const Impl IMPL[] = {
     {"Sleep", k_Sleep}, {"TlsAlloc", k_TlsAlloc}, {"TlsGetValue", k_TlsGetValue}, {"TlsSetValue", k_TlsSetValue},
     {"FlsGetValue", k_TlsGetValue}, {"FlsSetValue", k_TlsSetValue},
     {"RtlPcToFileHeader", k_RtlPcToFileHeader},
+    {"RtlCaptureContext", k_RtlCaptureContext},
+    {"SetUnhandledExceptionFilter", k_SetUnhandledExceptionFilter},
     {NULL, NULL}};
 
 static MS void missing_import(uint64_t idx) {

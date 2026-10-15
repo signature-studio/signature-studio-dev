@@ -73,6 +73,7 @@ const p134ir = () => {
 const p134hist = [];
 for (let i = 0; i < 942; i++) {
   const va = hex(i);
+  if (process.env.M11_SURVEY_PROGRESS === '1') console.error('[survey][progress] ' + i + ' ' + va + ' t=' + Date.now());
   if (P134) p134hist.push(JSON.stringify(p134obj()));
   snap.set(mod.HEAPU8.subarray(0, img.length));
   mod._m11_va_unit_begin();

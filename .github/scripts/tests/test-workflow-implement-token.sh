@@ -72,8 +72,10 @@ mutate "contents: read added to implement" \
 mutate "github.token passed to the agent step" \
   '/^        id: oc$/ { armed = 1 } armed && !done && /^          GH_TOKEN:/ { print; print "          OC_MARK_TOKEN: ${{ github.token }}"; done = 1; next } { print }' \
   "github.token is read only"
+# 行の特定は implement job の文脈に限定する (#3227)。fixgate など他の job に同じ行があっても、
+# ファイル内で最初に一致する行を書き換えて別の job を壊さないようにする。
 mutate "OC_MARK_TOKEN removed from the record step" \
-  '/^          OC_MARK_TOKEN: \$\{\{ github\.token \}\}$/ && !done { done = 1; next } { print }' \
+  '/^  implement:/ { inj = 1 } /^  [a-z][a-z-]*:/ && !/^  implement:/ { inj = 0 } inj && !done && /^          OC_MARK_TOKEN: \$\{\{ github\.token \}\}$/ { done = 1; next } { print }' \
   "github.token is read only"
 mutate "top-level permissions widened" \
   '/^permissions: \{\}$/ && !done { print "permissions: read-all"; done = 1; next } { print }' \

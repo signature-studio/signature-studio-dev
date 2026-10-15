@@ -15,6 +15,8 @@
   mode=sweep11ffde0  : 0x11ffde0 (受入 1) を ecx の値ごとに単独実行し、戻り値と末尾 VA を出す
   mode=verify        : 0xe4e970 (受入 3) を実行し、オブジェクトのフィールドを変えて予測式と照合する
   mode=word41        : 0x11d06e0 (受入 4) を出力 word の初期値 0/0x60/0x5 で単独実行する
+  mode=g18caller     : 0x1376820 を edx ごとに単独実行し、0x41d8f0 の r9d と G18 書込み (0x41d919) の到達を出す (#4557)
+  mode=p45caller     : 0x11fba90 を [0x6668d0 戻り値]+0x10 ごとに単独実行し、P45 書込み (0x11fc2b3) の到達を出す (#4557)
 """
 import os
 import sys
@@ -246,6 +248,72 @@ def verify_11d06e0():
     return rows
 
 
+def g18caller():
+    """G18 (0x18) の書込み元 0x41d919 の到達条件 (#4557 受入 1)。
+    呼出し元 0x1376820 の第 2 引数 edx が 0x41d8f0 の r9d になる (0x1376870 直前)。edx ごとに 0x1376820 を単独実行する。"""
+    rows = []
+    for v in (0, 1, 2):
+        r = emulate(0x1376820, {'rcx': E.HOST, 'rdx': v, 'r8': 0x18, 'r9': 0},
+                    [(0x1376820, 0x1376893), (0x41d8f0, 0x41d993), (0x412760, 0x412800)],
+                    probes={0x1376870: ['r9d'], 0x41d919: ['r8', 'rbp+0x30:8']})
+        r9 = [vals['r9d'] for va, vals in r['probe'] if va == 0x1376870]
+        w = [vals for va, vals in r['probe'] if va == 0x41d919]
+        rows.append((v, r9, w))
+        print('edx=%d -> 0x41d8f0 r9d=%s | 0x41d919 G18 write=%s | callouts=%s' % (
+            v, r9, w or 'not reached', ','.join(r['callouts']) or '-'))
+    return rows
+
+
+def p45caller():
+    """P45 の書込み元 0x11fc2b3 の到達条件 (#4557 受入 2)。
+    0x11fba90 は 0x6668d0 の戻り値 (rax) の [+0x10] が 0xb で分岐 0x11fbb4f に進む。戻り値は stub (synthetic object)。
+    this の [+0x34a8] <= 0 (0x11fbaef) を満たすよう 0 にする。"""
+    rows = []
+    obj = E.HOST + 0x1000
+    sub = E.HOST + 0x5000
+    for field in (0xb, 0x0):
+        mem = [(obj + 0x3518, (0x77).to_bytes(4, 'little')), (obj + 0x34a8, (0).to_bytes(4, 'little')),
+               (sub + 0x10, field.to_bytes(4, 'little'))]
+        r = emulate(0x11fba90, {'rcx': obj, 'rdx': 0, 'r8': 0, 'r9': 0}, [(0x11fba90, 0x11fc583)],
+                    probes={0x11fbb4f: ['rbp+0x140:8'], 0x11fc2b3: ['rax', 'rbp+0x170:8']},
+                    ret_spec={0x6668d0: sub}, mem_init=mem)
+        w = [vals for va, vals in r['probe'] if va == 0x11fc2b3]
+        rows.append((field, w))
+        print('[0x6668d0 ret]+0x10=0x%x -> P45 write 0x11fc2b3=%s | callouts=%s' % (
+            field, w or 'not reached', ','.join(r['callouts']) or '-'))
+    return rows
+
+
+def g18_caller():
+    """0x41d8f0 (G18 の書込み関数) を r9=1・r9=0 で単独実行し、0x41d919 (mov [G18], rdi) の到達と書込み直前の値を出す (受入 1)。
+    rdi は 0x41d8ff で r8 から複写されるため、観測は r8 (= ID) で行う。"""
+    rows = []
+    for r9 in (1, 0):
+        for ident in (0x18, 0x45, 0x54, 0x56, 0x64, 0x65):
+            r = emulate(0x41d8f0, {'rcx': E.HOST, 'rdx': E.TAG, 'r8': ident, 'r9': r9}, [(0x41d8f0, 0x41d8f0 + 0x200)],
+                        probes={0x41d919: ['r8', 'rcx']}, sent_ret=E.SENT)
+            hit = [vals for va, vals in r['probe'] if va == 0x41d919]
+            print('G18 caller: r9=%d ID=0x%02x 0x41d919 %s rax=0x%x stop=%s' % (
+                r9, ident, ('reached r8=0x%x' % hit[0]['r8']) if hit else 'NOT reached', r['rax'], r['stop']))
+            rows.append((r9, ident, bool(hit)))
+    return rows
+
+
+def p45_caller():
+    """0x11fba90 (P45 の書込み関数) を this=HOST・[this+0x34a8]=0 で単独実行する (受入 1)。
+    0x11fbb4f の分岐 (eax==0xb) に届くには [[rbp+0x140]+0x10] の前提が要る。現状は 0x11fbaef までしか届かず未確定。"""
+    this = E.HOST
+    r = emulate(0x11fba90, {'rcx': this, 'rdx': 0, 'r8': 0x45, 'r9': 0}, [(0x11fba90, 0x11fba90 + 0x1000)],
+                probes={0x11fbaef: ['rcx'], 0x11fbb4f: ['rbp+0x140:8'], 0x11fc2b3: ['rax', 'rbp+0x170:8']},
+                sent_ret=E.SENT, mem_init=[(this + 0x34a8, (0).to_bytes(4, 'little'))])
+    print('P45 caller: rax=0x%x stop=%s 0x11fbaef=%s 0x11fbb4f=%s 0x11fc2b3=%s' % (
+        r['rax'], r['stop'],
+        any(va == 0x11fbaef for va, _ in r['probe']),
+        any(va == 0x11fbb4f for va, _ in r['probe']),
+        any(va == 0x11fc2b3 for va, _ in r['probe'])))
+    return r
+
+
 if __name__ == '__main__':
     mode = sys.argv[1] if len(sys.argv) > 1 else 'disp'
     if mode == 'disp':
@@ -264,5 +332,13 @@ if __name__ == '__main__':
         verify_e4e970()
     elif mode == 'word41':
         verify_11d06e0()
+    elif mode == 'g18caller':
+        g18caller()
+    elif mode == 'p45caller':
+        p45caller()
+    elif mode == 'g18_caller':
+        g18_caller()
+    elif mode == 'p45_caller':
+        p45_caller()
     else:
         raise SystemExit('unknown mode %s' % mode)

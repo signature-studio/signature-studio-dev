@@ -179,8 +179,10 @@ mutate "job if: widened to every dispatch" "if: github.event_name == 'repository
 mutate "App token minted by the reviewer App" "client-id: \${{ vars.OC_APP_CLIENT_ID }}=>client-id: \${{ vars.OC_REVIEW_APP_CLIENT_ID }}" "implementer App"
 
 # 他の job への影響: implement の if: に oc-pm を足した workflow では失敗する
+# 置換対象は implement job の if: だけに限定する (#3227)。fixgate など他の job の if: にも
+# 同じ `github.event.action == 'oc-fix'` があるため、ファイル先頭からの最初の一致では別 job を壊してしまう。
 m="$TMP/mut-impl.yaml"
-sed "0,/github.event.action == 'oc-fix')/s//github.event.action == 'oc-fix' || github.event.action == 'oc-pm')/" "$WF" > "$m"
+sed "/^  implement:/,/github.event.action == 'oc-fix')/s//github.event.action == 'oc-fix' || github.event.action == 'oc-pm')/" "$WF" > "$m"
 checks "$m" | grep '^FAIL' | grep -q 'job implement'
 expect "negative control: oc-pm added to the implement if: -> FAIL 'job implement'" $?
 

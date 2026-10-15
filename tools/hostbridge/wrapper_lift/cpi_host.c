@@ -32,7 +32,9 @@ int cpi_miss(uint64_t t) {
     R[RAX] = CPI_OBJ;
     if (i == 6) {
         uint64_t out = LD64(R[RSP] + 0x30);
-        if (out) ST64(out, CPI_STR);
+        if (out) {
+            for (unsigned k = 0; k < 0x80; k++) ST8(out + k, k < 0x7f ? 'A' + (k % 26) : 0);
+        }
         R[RAX] = 1;
     }
     R[RSP] += 8;
