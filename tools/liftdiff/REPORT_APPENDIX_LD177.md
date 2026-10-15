@@ -76,25 +76,30 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
   |---|---|---|
   | resolved | 29 | fault base が引数 index に伝播し、その index が候補に含まれる (fvm 救済の対象) |
   | arg_not_candidate | 3 | 伝播できたが、その引数が候補外 |
-  | unresolved_base_not_arg | 33 | 線形追跡で最後まで引数由来でない (base レジスタ: rax 16・rbx 13・rdi 5・rcx 5・rdx 1。rcx/rdx の 6 件は途中で書き換えられた) |
+  | unresolved_base_not_arg | 33 | 線形追跡で最後まで引数由来でない |
   | unresolved_jump_before_rip | 5 | rip より前で分岐を跨いだ |
   | unresolved_ret_before_rip | 2 | rip より前で ret を跨いだ |
-  | ret_fragment | 1 | ret 断片 (`0x4096c0`・候補 5 件) |
+  | ret_fragment | 1 | ret 断片 (`0x4096c0`) |
   | 合計 | 73 | |
 
-  合計 73 = 29 + 3 + 33 + 5 + 2 + 1。
-- **測定 commit**: `7618e8a56` (測定時の HEAD)。`pe.py` の code は最後に `1b53c5b86` で変わり、`1b53c5b86`..`7618e8a56` の code 差分は 0 件 (`git diff 1b53c5b86 7618e8a56 -- tools/liftdiff/ldlib tools/liftdiff/liftdiff_e2e.sh` の出力は空)。
-- **差分証跡** (WORKFLOW §6): `git diff 7618e8a56 HEAD -- tools/liftdiff` の出力は本節 (REPORT_APPENDIX_LD177.md) と `tools/liftdiff/ld198_recount.py` (新規・内訳の再現用。`liftdiff_e2e.sh` の経路の外) のみ。測定に使った code (`ldlib/`・`liftdiff.py`・`liftdiff_e2e.sh`) の差分は 0 件。
-- **fvm 12 → 41 (+29) と 29 件の差の説明**: fvm 関数は base 12 → HEAD 41 で、新規 29 件・消えた件数 0 件。新規 29 件は上表の resolved 29 件と一致する (その他の 44 件は fvm 対象外のまま)。
-- **測定**: base `1f12b1b6d` と HEAD `7618e8a56` を同一環境で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 1 回ずつ実行。base 198 s PASS・HEAD 191 s PASS (`LIFTDIFF_E2E PASS`)。素材: `fl-win64`・`work-m11` (`m11_gen_ir2.sh` 実行後の `ir_conditions.json`)・`work-liftdiff`。emsdk は `toolchain-emsdk` の素材が無いため、上流から pin 版 6.0.12 を取得して `[EMSDK]` (`docs/REFERENCES.md`) へ置いた。
+  合計 73 = 29 + 3 + 33 + 5 + 2 + 1。表の値は再現コマンドの出力そのもの。
+- **母集団**: `work/m11/batch_sample_800.jsonl` (測定 HEAD で生成した base の jsonl。fvm 以外の case で equal/diff/wasm_trap が無く、`s` の fault があり、`cases.fvm_candidates` が 2 件以上の関数)。
+  VA 一覧は再現コマンドの出力のとおり (`ld198_recount.py` が `VA <分類>:` 行で出す)。
+- **再現**: `FL_WIN64_DIR=<展開先> python3 tools/liftdiff/ld198_recount.py tools/liftdiff/work/m11/batch_sample_800.jsonl`。
+- **前回値 (88 件) の出所**: `work-liftdiff` の artifact に入っていた古い `batch_sample_800.jsonl` (Oct 12 生成・fvm case 0 件) は、ldlib の fvm 起動を通していない。その母集団に当てると 88 件になる (resolved 32・候補外 4・base 非 arg 42・分岐 7・ret 跨ぎ 2・ret 断片 1)。本節の値は、測定 HEAD で作り直した jsonl に当てた値で、これを正とする。
+- **測定 commit**: `e1efecc2f` (コード差分 0 の HEAD)。`pe.py`・`session.py`・`cases.py` の最後の code commit は `1b53c5b86`。
+- **差分証跡** (WORKFLOW §6): `git diff e1efecc2f HEAD -- tools/liftdiff` の出力は、後続の commit で本節と `ld198_recount.py` の追記だけになる (`ldlib/`・`liftdiff.py`・`liftdiff_e2e.sh` の差分は 0 件)。
+- **fvm 12 → 41 (+29) と 29 件の差の説明**: fvm 関数は base 12 → HEAD 41。新規 29 件と resolved 29 件は同一集合 (`resolved==newfvm`)、消えた件数は 0 件。
+- **測定**: base `1f12b1b6d` と HEAD `e1efecc2f` を同一環境で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 1 回ずつ実行。`work-m11` は `m11_gen_ir2.sh` を実行して `ir_conditions.json` (ldfix applied・`ir_sha256` 597757f4…) を作った後。emsdk は pin 6.0.12 を上流から取得して `/opt/emsdk` に置いた (素材 `toolchain-emsdk` は本 run に無い)。base 2 分 44 秒 PASS・HEAD 2 分 44 秒 PASS (`LIFTDIFF_E2E PASS`)。
 
 | run | match / mismatch / unexec | fvm case (native_fault / both_fault / diff / hang) | fvm 関数数 | 所要 |
 |---|---|---|---|---|
-| base `1f12b1b6d` | 360 / 234 / 206 | 12 (2 / 7 / 2 / 1) | 12 | 198 s PASS |
-| HEAD `7618e8a56` | 360 / 235 / 205 | 41 (15 / 22 / 3 / 1) | 41 | 191 s PASS |
+| base `1f12b1b6d` | 360 / 234 / 206 | 12 (2 / 8 / 2 / 0) | 12 | 2 分 44 秒 PASS |
+| HEAD `e1efecc2f` | 360 / 235 / 205 | 41 (15 / 23 / 3 / 0) | 41 | 2 分 44 秒 PASS |
 
-- **関数単位の verdict 変化**: 1 件 (`0x5c1030` unexec→mismatch)。fvm の `diff` (arg 0・`native_extra_call`) によるもので、LD-177 §12.1.2 で未切り分けとしていた件 (#4137 へ)。
-- **fvm の outcome**: fvm case 41 件 (関数 41 件・各 1 case) の内訳は native_fault 15 / both_fault 22 / diff 3 / hang 1。equal / wasm_trap への遷移は 0 件。
+- **関数単位の verdict 変化**: 1 件 (`0x5c1030` unexec→mismatch)。
+- **fvm の outcome**: fvm case 41 件 (関数 41 件・各 1 case) の内訳は native_fault 15 / both_fault 23 / diff 3。equal / wasm_trap への遷移は 0 件。
+- **注**: 前回 (`7618e8a56`) の表の値 (fvm hang 1・both_fault 22) は今回の `e1efecc2f` の測定と一致しない。前回の表は測定 commit の code で取った値として扱わない。
 - **非 fvm case の変化**: `fvm_transitions.py` で `EXISTING_PATTERN_CHANGED` は base のみ 14 関数。fvm の救済で増えた case の影響ではなく、既存 pattern の outcome の変化として記録する。
 
 ### 未達 (受入条件)

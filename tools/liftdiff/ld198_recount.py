@@ -49,6 +49,21 @@ def main(jsonl):
     for k in sorted(cls):
         print('  %-24s %d' % (k, cls[k]))
     print('合計:', sum(cls.values()))
+    by = collections.defaultdict(list)
+    for va_s, cand, fault in multi:
+        by[classify(an, va_s, cand, fault)].append(va_s)
+    for k in sorted(by):
+        print('VA %s: %s' % (k, ' '.join(sorted(by[k]))))
+
+
+def classify(an, va_s, cand, fault):
+    va = int(va_s, 16)
+    if an.is_ret_fragment(va):
+        return 'ret_fragment'
+    a = an.fault_arg(va, int(fault['rip'], 16))
+    if a is not None:
+        return 'resolved' if a in cand else 'arg_not_candidate'
+    return 'unresolved_' + unresolved_reason(an, va, int(fault['rip'], 16))
 
 
 def unresolved_reason(an, va, rip):
