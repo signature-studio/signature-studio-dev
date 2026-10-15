@@ -57,7 +57,7 @@ if [ -f "$out/draw_ops.js" ]; then
   [ "$run_rc" -eq 0 ] || rc=1
   # 期待する命令数 (SR-55 の 5 件 + SR-61 の 3 件 + SR-62 の 4 件 = 12 件、drawBitmap 含む。SR-78 の拡大縮小 3 件を足して 15 件) が揃わなければ fail (欠けた命令が無判定で通るのを防ぐ)。
   n_ops=$(grep -c '^draw_op ' "$out/run.log")
-  [ "$n_ops" -eq 15 ] || { echo "ops: fail (draw_op lines=$n_ops, expected 15)" | tee -a "$out/summary.txt"; rc=1; }
+  [ "$n_ops" -eq 16 ] || { echo "ops: fail (draw_op lines=$n_ops, expected 16)" | tee -a "$out/summary.txt"; rc=1; }
   while read -r _ name ok nz; do
     n=${nz#nonzero=}
     if [ "$ok" = "rc=1" ] && [ "${n:-0}" -gt 0 ]; then
@@ -88,6 +88,24 @@ if [ -f "$out/draw_ops.js" ]; then
     echo "op fillRectWithBitmap_interp: pass (bilinear_mid=$bil, nearest_mid=$nea)" | tee -a "$out/summary.txt"
   else
     echo "op fillRectWithBitmap_interp: fail (bilinear_mid=${bil:-none}, nearest_mid=${nea:-none})" | tee -a "$out/summary.txt"
+    rc=1
+  fi
+  # SR-77 #4550: 楕円形の放射は横方向に 2 倍伸ばした transformation で、横の広がりが縦のほぼ 2 倍になること (中心行 48・中心列 24 が理想)。
+  ex=$(grep '^ellipse_extent name=fillRadialGradient_ellipse ' "$out/run.log" | sed -E 's/.* x=([0-9]+) y=([0-9]+).*/\1 \2/')
+  ex_x=${ex%% *}; ex_y=${ex##* }
+  if [ "${ex_y:-0}" -gt 0 ] && [ $((ex_x * 10)) -ge $((ex_y * 18)) ] && [ $((ex_x * 10)) -le $((ex_y * 22)) ]; then
+    echo "op fillRadialGradient_ellipse: pass (x=$ex_x y=$ex_y)" | tee -a "$out/summary.txt"
+  else
+    echo "op fillRadialGradient_ellipse: fail (x=${ex_x:-none} y=${ex_y:-none}, want x≈2y)" | tee -a "$out/summary.txt"
+    rc=1
+  fi
+  # SR-77 #4550: alpha 付き停止点 (赤不透明→青透明) の中間 (t=0.5) は、premultiplied 補間で「赤のまま alpha が半分」になる。
+  # 非 premultiplied だと青が混ざる (b>0)。r=255・b=0・a は 120〜136 を要求する。
+  px=$(grep '^draw_pixel name=fillRadialGradient_alpha ' "$out/run.log")
+  if echo "$px" | grep -qE 'r=255 g=0 b=0 a=(1[2-3][0-9])$'; then
+    echo "stop alpha fillRadialGradient: pass ($px)" | tee -a "$out/summary.txt"
+  else
+    echo "stop alpha fillRadialGradient: fail (${px:-none})" | tee -a "$out/summary.txt"
     rc=1
   fi
   # gradient は一様な色で塗られていないこと (異なる色が 2 以上)。nonzero>0 だけでは一色の塗りを通してしまう。

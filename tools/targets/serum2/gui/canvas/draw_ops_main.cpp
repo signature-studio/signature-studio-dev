@@ -133,6 +133,51 @@ int main ()
 		return c.fillRadialGradient (*path, gradient, CPoint (32., 32.), 28., CPoint (0., 0.), false, nullptr);
 	});
 
+	// 楕円形: x を 2 倍に伸ばす transformation を渡す。色は局所座標 (円) で決まるので、device 上では横長の楕円になる。
+	// 停止点の末尾を alpha 0 にして、楕円の外を描かないようにする。中心の行と列に描かれた画素の数で広がりを比べる。
+	{
+		PlatformBitmapPtr bitmap (new CanvasBitmap (kWidth, kHeight));
+		auto* canvasBitmap = static_cast<CanvasBitmap*> (bitmap.get ());
+		auto context = device->createBitmapContext (bitmap);
+		auto* ctx = static_cast<CanvasGraphicsDeviceContext*> (context.get ());
+		ctx->setClipRect (CRect (0, 0, kWidth, kHeight));
+		auto path = ctx->getGraphicsPathFactory ()->createPath (PlatformGraphicsPathFillMode::Winding);
+		path->addRect (CRect (2., 2., 30., 30.));
+		CanvasGradient gradient;
+		gradient.addColorStop ({0., CColor (255, 0, 0, 255)});
+		gradient.addColorStop ({1., CColor (0, 0, 255, 0)});
+		TransformMatrix tm;
+		tm.scale (2., 1.);
+		bool rc = ctx->fillRadialGradient (*path, gradient, CPoint (16., 16.), 12., CPoint (0., 0.), false, &tm);
+		const uint8_t* px = canvasBitmap->data ();
+		auto filled = [&] (uint32_t x, uint32_t y) { return px[(y * kWidth + x) * 4 + 3] != 0; };
+		size_t row = 0;
+		size_t col = 0;
+		for (uint32_t x = 0; x < kWidth; ++x)
+			row += filled (x, 16) ? 1 : 0;
+		for (uint32_t y = 0; y < kHeight; ++y)
+			col += filled (32, y) ? 1 : 0;
+		std::printf ("draw_op name=fillRadialGradient_ellipse rc=%d nonzero=%zu\n", rc ? 1 : 0, countNonZeroPixels (px, byteCount));
+		std::printf ("ellipse_extent name=fillRadialGradient_ellipse x=%zu y=%zu\n", row, col);
+	}
+
+	// alpha 付き停止点: 赤 (不透明) → 青 (透明)。中間色は premultiplied で補間すると赤のまま alpha だけ下がる。非 premultiplied だと青が混ざる。
+	{
+		PlatformBitmapPtr bitmap (new CanvasBitmap (kWidth, kHeight));
+		auto* canvasBitmap = static_cast<CanvasBitmap*> (bitmap.get ());
+		auto context = device->createBitmapContext (bitmap);
+		auto* ctx = static_cast<CanvasGraphicsDeviceContext*> (context.get ());
+		ctx->setClipRect (CRect (0, 0, kWidth, kHeight));
+		auto path = ctx->getGraphicsPathFactory ()->createPath (PlatformGraphicsPathFillMode::Winding);
+		path->addRect (CRect (4., 4., 60., 60.));
+		CanvasGradient gradient;
+		gradient.addColorStop ({0., CColor (255, 0, 0, 255)});
+		gradient.addColorStop ({1., CColor (0, 0, 255, 0)});
+		bool rc = ctx->fillRadialGradient (*path, gradient, CPoint (32., 32.), 28., CPoint (0., 0.), false, nullptr);
+		const uint8_t* px = canvasBitmap->data () + (32 * kWidth + 46) * 4;
+		std::printf ("draw_pixel name=fillRadialGradient_alpha rc=%d r=%d g=%d b=%d a=%d\n", rc ? 1 : 0, px[0], px[1], px[2], px[3]);
+	}
+
 	{
 		auto sourcePtr = makeSource (12, 12);
 		auto* source = static_cast<CanvasBitmap*> (sourcePtr.get ());
