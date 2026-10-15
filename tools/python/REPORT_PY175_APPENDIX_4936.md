@@ -7,10 +7,10 @@
 親: #4149 (PY-306)。前段: §4・§10-2。
 
 - 測定 commit: `ceb5a0ba6` (origin/main 取り込み時点)。コードは変更していない。
-- 差分の証跡 (`docs/WORKFLOW.md` §6): `git diff ceb5a0ba6 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行。
+- 差分の証跡 (`docs/WORKFLOW.md` §6): 実行に使ったファイル `tools/python/analysis/flapi/pe_disasm.py` について `git diff ceb5a0ba6 HEAD -- tools/python/analysis/flapi/pe_disasm.py` = 0 行。範囲外の main 変更は `git diff ceb5a0ba6 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` で 113 行 (`analysis/py264_vptr_scan.py` +86・`analysis/py300_ret_census.py` 変更)。これらは本測定の範囲外 (測定に使っていない)。
 - 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (2.2 秒・22,227,016 バイト)。`FL_WIN64_DIR=<展開先>`。
 - 実行 (全て終了 0): `pe_disasm.py` で `ffac50 200`・`104839c 80`・`10485ec 60`・`104cc20 80`・`10471b0 30`・`1047100 120`・`104caae 12`・`104a9ec 30`・`104cae5 60`・`fe8bb0 14`。各 0.07 秒。
-- load average: 13:20 UTC で 1 分値 0.00。
+- load average: 13:33 UTC で 1 分値 0.22。
 
 ### 12-1. key 8 の al=0 後段 (受入 1)
 
