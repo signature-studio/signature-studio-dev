@@ -19,9 +19,9 @@ usage: reg_call_resolve.py <pe> <target_va_hex> <root_va_hex>
 - 読み出す値は PE ファイル上の初期値。書込み可能な .data の実行時の値は、このスクリプトでは見ていない。
 - 書込みは「同じ base レジスタ・同じ disp の別名」を見ない。memory alias は未考慮。
 - 供給元の分類 (provenance) は従来どおり直線の後ろ向き走査で、経路は見ていない (分類のみ)。
-- `[rsp+disp]` の書込みは、`qword ptr [rsp + disp]` と文字列一致する命令だけを定義とみなす。宛先に `[rsp + disp]` を
-  文字列として含む命令はその経路を未解決にする。スロットと範囲で重なる幅の広い書込み (例: `movups xmmword ptr [rsp + 0x58]`
-  が `[rsp+0x60]` を含む) は見ていないため、そこを通る経路の値が古いままになりうる (未考慮)。
+- `[rsp+disp]` の書込みは、`qword ptr [rsp + disp]` と完全一致する mov 以外の、宛先が `[rsp` を含む命令 (幅の広い書込みを含む)・
+  `push`/`pop`・`rsp` 自体への書込みをすべて kill とみなす (保守的)。ただし kill は範囲の重なりを見ないため、無関係な
+  `[rsp+disp']` への書込みでも経路が未解決になりうる。
 """
 import re
 import struct
@@ -242,7 +242,9 @@ def stack_slot_value(insns, jt, i, disp):
             if len(ops) < 2 or not reg_re.match(ops[1]):
                 return ("kill", None)
             return ("def", resolve(insns, jt, q, ops[1]))
-        if f"[rsp + {disp}]" in ops[0] and w.mnemonic not in NOWRITE and not w.mnemonic.startswith("j"):
+        if w.mnemonic in ("push", "pop") or (ops[0] == "rsp" and w.mnemonic not in NOWRITE):
+            return ("kill", None)
+        if "[rsp" in ops[0] and w.mnemonic not in NOWRITE and not w.mnemonic.startswith("j"):
             return ("kill", None)
         return ("pass", None)
 
