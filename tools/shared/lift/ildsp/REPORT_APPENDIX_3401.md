@@ -121,13 +121,13 @@
 
 ## 9. slot 2 の差分追加と slot 1・3 の native 落ち原因 — T-SH-105 (#4237)
 
-測定 commit: `fcf3b1c03` (コードを変えた最後の commit)。§9-2・§9-3 もこの commit で再測定した。`b53a5ec8f` からの差分は `lift_psola.sh` のコメント 1 行のみ。
+測定 commit: `d4811927d` (コードを変えた最後の commit。main 取り込み `a128c78b6` を含む)。§9-2・§9-3 もこの commit で再測定した。`b53a5ec8f` からの変更は main 取り込み分 (`lift_wc.sh`・`wc_cases.py`・`wc_native_ref.c` ほか、#4303・#4302) と `lift_psola.sh` のコメント・slot 2 の追加。
 
 ### 9-1 結論 (1 行)
 slot 2 を加えて 64/64 PASS (ネガコン FAIL 64/64) し、slot 1・3 は復号鍵 `[0x3f7ad0]` が 0 のため native が 64/64 で落ちるので差分に入れていない (鍵の書込み元は未特定)。
 
 ### 9-2 slot 1〜3 の native 単独呼出し (実測・HEAD・各 64 case・`lift_wc.sh`)
-測定: `fcf3b1c03` (コードは `b53a5ec8f` と同一・§9-5 の注を参照)。`WC_ROOTS` は `lift_psola.sh` と同じ。`WC_CALL_IDX` と `WC_RET_IDX=5` を指定して `lift_wc.sh` を直接呼ぶ。
+測定: `d4811927d` (測定 commit と同じ)。`WC_ROOTS` は `lift_psola.sh` と同じ。`WC_CALL_IDX` と `WC_RET_IDX=5` を指定して `lift_wc.sh` を直接呼ぶ。
 | WC_CALL_IDX | native 結果 | 備考 |
 |---|---|---|
 | `1` (CreateInstance → slot 1) | SIGSEGV/SIGBUS 64/64・addr 0x0 | slot 0 を呼ばない |
@@ -152,16 +152,16 @@ slot 2 を加えて 64/64 PASS (ネガコン FAIL 64/64) し、slot 1・3 は復
 | (2) slot 1–3 を含む呼出し順で native 対 wasm の差分 | **部分**。slot 2 を含む差分は `WC_CALL_IDX="0 2 4 5"` で実施 (64/64・ネガコン 64/64)。slot 1・3 は未達 |
 | (3) .data 入力の変化で分岐の到達を数値に示す | **未達**。差分は従来どおり .data 不変・同一経路 (§8-4 と同じ制限) |
 
-### 9-5 実測 (slot 2 を含む差分・測定 commit `fcf3b1c03`・4 core・1 回)
-測定 commit: `fcf3b1c03` (コードを変えた最後の commit)。`b53a5ec8f` からの差分は `lift_psola.sh` のコメント 1 行のみ (`git diff b53a5ec8f fcf3b1c03 -- tools/shared/lift/ildsp/lift_psola.sh`)。
+### 9-5 実測 (slot 2 を含む差分・測定 commit `d4811927d`・4 core・1 回)
+測定 commit: `d4811927d` (コードを変えた最後の commit。main 取り込み後)。
 | 項目 | 値 |
 |---|---|
-| `lift_psola.sh all` elapsed | 3.51 s (real・rc 0) |
-| 本検査 (ok) | 1.73 s・PASS 64 / FAIL 0 (wasm trap 0・native crash 0・SIGSEGV/SIGBUS 0) |
-| neg-cmp | 1.75 s・FAIL 64 (rc 1・期待どおり)・ALL OK |
+| `lift_psola.sh all` elapsed | 3.55 s (real・rc 0) |
+| 本検査 (ok) | 1.75 s・PASS 64 / FAIL 0 (wasm trap 0・native crash 0・SIGSEGV/SIGBUS 0) |
+| neg-cmp | 1.77 s・FAIL 64 (rc 1・期待どおり)・ALL OK |
 | x64c | 37 関数・1,059 命令・unsup 0 (従来の基準 36・1,046 から slot 2 の 1 関数・13 命令を追加) |
-| wasm | 81,303 B (SizeOfImage 0x447000) |
-| load | 本検査の開始 0.04 0.19 0.24 → 終了 0.04 0.19 0.24 |
+| wasm | 81,451 B (SizeOfImage 0x447000。#4303 の coverage 追加で `fcf3b1c03` の 81,303 B から増えた) |
+| load | 本検査の開始 0.15 0.18 0.20 → 終了 0.15 0.18 0.20 |
 | 環境 | emsdk 6.0.12 (`EMSDK_ENV` は `/tmp/opencode/emsdk` に導入)・fl-win64 は `/tmp/opencode/win64` に展開 |
 
 ### 9-6 未解決
