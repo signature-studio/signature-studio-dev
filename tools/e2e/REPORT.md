@@ -220,9 +220,9 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 - 件数 (HEAD): 到達行 25 (GUI-REACH 23 + GUI-MSG 1 + SUMMARY 1)、`CreateWindowExA`=1・`BeginPaint`=1・`BitBlt`=1・`WM_PAINT`=1。
 - 初回の順序 (生ログ): `RegisterClassA`@1 → `CreateWindowExA`@2 → `DispatchMessageA`@9 → `WM_PAINT`@(GUI-MSG 行) → `BeginPaint`@10 → `BitBlt`@20 → `EndPaint`@21。
 - 測定 commit: `b3a252976` (`feat(gui): gui=wasm reach trace (GUI-REACH) in product-page e2e`)。
-- 実行: `EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/e2e/run.sh --targets preview,edge-sim --driver agent-browser` (開始 08:02 UTC、load average 0.21 / 1 分)。wall 13.5 s (vite build・ゲストの emcc build を含む)、rc 0。**SUMMARY: PASS=23 FAIL=0 SKIP=3**。
+- 実行: `EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/e2e/run.sh --targets preview,edge-sim --driver agent-browser` (開始 08:02 UTC、load average 0.21 / 1 分)。wall 13.5 s (vite build・ゲストの emcc build を含む)、rc 0。**SUMMARY: PASS=23 FAIL=0 SKIP=3**。
 - `gui-guest-boot`: preview 324 ms・edge-sim 430 ms で PASS (`state==='running'`, `frames=1`, `guest='test'`, lit 38400 px, 色 ≥7)。
-- 実行環境: emsdk は素材 `toolchain-emsdk` (`/opt/emsdk`)。mingw-w64 は `build_guest.sh` が apt で導入。
+- 実行環境: emsdk は素材 `toolchain-emsdk` ([EMSDK])。mingw-w64 は `build_guest.sh` が apt で導入。
 
 - **未実施**: 順序検査のネガコン (WM_PAINT 行を消した変種で FAIL することの確認) は本 PR では未実施。`tools/gui/test/reach_order_check.py` の selftest は既存。`text_wasm_e2e.sh` の回帰は未実施 (FreeType wasm32 ビルドが要る)。
 
