@@ -103,33 +103,23 @@ round 6 の失敗の扱い: `kh656_closure.py` は `dropped_i256` に `1813846e0
 | round 5 集合 (§7.1 の round 5 = lift 166) | 166 | 876,174 | 0 | `unlifted callee 0x180138a30` (ok=16 ng=1) |
 | round 6 相当 (+shim memset・313 行は未コミットの `lic_config` 一時変更) | 313 | 1,543,853 | 0 | **`memory access out of bounds` (再現)** |
 
-313 集合は §7.1 の round 6 (build 失敗 `1813846e0`) に memset shim を登録して再 build した集合。round 6 の失敗そのものはこの表には載せていない。313 集合の wasm は REPORT 上の `1,543,901 B` と 48 B 異なる (emcc 環境差)。入口の症状は一致。
+313 集合は §7.1 の round 6 (build 失敗 `1813846e0`) に memset shim を登録して再 build した集合。round 6 の失敗そのものはこの表には載せていない。同じ集合の wasm は §7.6 (`9d491eb4`) で `1,543,901 B` と記録されており、本表の `1,543,853 B` と 48 B 異なる。`19fd9d73` と `9d491eb4` の license/ の tracked コードは差分 0 である。差の原因は記録から切り分けられず、未コミットの一時設定の差か実行環境の差かのいずれか (「環境差」とは断定しない)。入口の症状は一致。
 
-### 7.3 OOB の発生 VA (wasm 関数名: `-g` 版で特定)
+### 7.3 OOB の発生 VA
 
-`emcc -g` (同 `final.ll`・同 flags、名前付き wasm) で入口を実行した stack (313 集合):
+- 発生 VA は native `0x180fa76a8` (wasm `kh_180fa7678`)。呼び出し鎖・trap 命令の対応・逆アセンブルは付録 §2 へ移した。
 
-```
-kh_180ef7fc0 → kh_18012e420 → kh_1801d3b60 → kh_180138750 → kh_180138a30 → kh_180f88394 → kh_180fa7678 (trap)
-```
+### 7.4 原因の判定
 
-- **OOB の発生 VA: `0x180fa7678` (wasm 関数 `kh_180fa7678`)**。この関数は 409 行、store/load 174 件、`@rsp` の書換え 10 件。
-- trap は関数内部の memory 命令 (オフセット未特定)。命令単位の VA は未確定。
-- 入口の `@rsp` は `kh_stack + 65464` (`kh_stack[65536]`)。`kh_stack_ptr()` の base は wasm 内 `0x39a0` (実測)。
-
-### 7.4 原因の判定 (未確定)
-
-- DEFECTS.md の類型 (D1a〜D22) で**該当 ID は未判定**。`D11` (絶対 VA が wasm32 で切り捨て → OOB) と `D17` (ポインタ局所の縮小) が形の上で近いが、本件は trap 命令を未特定のため当てはめできない。
-- 「lift の誤り (silent miscompile) か、メモリ配置・stack の問題か」は**本 run では判定できなかった**。`kh_180fa7678` が 10 箇所で `@rsp` を書換えるため、stack 方向の誤りの可能性が高いが、未確認。
-- 閉包 313 の入口経路は `kh_180fa7678` までで停止する (fail-fast の `unlifted callee` には届かない)。
+- 判定: DEFECTS **D11** (PE 絶対 VA の wasm32 切り捨て → OOB)。loud (trap)。lift の命令変換の誤りではなく、メモリ配置の問題。根拠は付録 §1・§3。
 
 ### 7.5 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `kh_180fa7678` 内の trap 命令 (VA 単位・wasm 命令オフセット) の特定 | 原因 (lift 誤り / 配置) の判定不能 | #1821 継続 |
-| 原因の判定 (silent miscompile か配置/stack か) と DEFECTS 類型 ID | 受入 2 未達 | #1821 継続 |
-| `kh656_closure.py` の `i256_defs()` の誤判定 (memset `1813846e0` を i256 扱い) | 閉包の自動化が round 6 で止まる | #1817 (KH-28) |
+| `.rdata` 等の生 VA ポインタを wasm 線形メモリで参照可能にする (D11 既定修正の拡張) | 313 集合の入口 OOB (原因は確定・解消は未) | #3866 (KH-75) |
+| `0x1813d21e8` の出所と呼び出し経路 (付録 §3) | #3866 受入 2 の 5 件のうち 1 件が未確認 | #3866 (KH-75) |
+| `i256_defs()` の誤判定 (`1813846e0` を i256 扱い) | 閉包の自動化が round 6 で止まる | #1817 (KH-28) |
 | 閉包の収束 (未 lift 40 → 154) | 受入 1 未達 | #1817 (KH-28) |
 
 ### 7.6 trap 命令の特定 (#1821 / KH-29、実測・2 回目 run)
@@ -137,18 +127,14 @@ kh_180ef7fc0 → kh_18012e420 → kh_1801d3b60 → kh_180138750 → kh_180138a30
 測定 commit: `9d491eb4` (main 取り込み後)。コード差分 (REPORT 除く) は本節追加時点で 0 (`lic_config.json` は HEAD に戻した)。
 環境: nproc=4・load average 0.9 (測定時)。`plugins-kilohearts` は `Kilohearts Offline Installer.zip` から `work/winpkg` を再抽出。
 
-- 閉包 313 の再現: `lic_build.py --module F` は shim `1813846e0: memset` を F の `shims` に追加した状態で 1,543,901 B・undefined import 0 (§7.2 と同値)。
+- 閉包 313 の再現: `lic_build.py --module F` は shim `1813846e0: memset` を F の `shims` に追加した状態で 1,543,901 B・undefined import 0 (§7.2 の 1,543,853 B とは 48 B 異なる)。
 - 入口 `function_180ef7fc0` は `memory access out of bounds` で再現 (`kh249_check` ok=16 ng=1)。
-- `emcc -g` 版で trap 位置を取得: `kh_180ef7fc0 → kh_18012e420 → kh_1801d3b60 → kh_180138750 → kh_180138a30 → kh_180f88394 → kh_180fa7678`、trap は `kh_180fa7678` の wasm 命令オフセット `0x1262c` (`i32.load8_u`)。
-- 逆アセンブル (capstone・`HeartCore.core_64`) で VA を一意に対応付け: `0x180fa76a8 cmp byte ptr [rax + rdi], 0` (`0x180fa76a5`〜`0x180fa76ac` の NUL 走査ループ)。`rax = [rcx]` (`0x180fa7699`) が wasm32 線形メモリ外のアドレス。lift IR (`kh_180fa7678` の `@rax + @rdi` の byte load) と命令列は一致 (lift の命令誤りは本ループでは見えない)。
-- 未確定: `rax` の値 (`[rcx]` の内容) の出所。`kh_stack` 内に native VA 形 (`0x18xxxxxxx`) の値は見つからなかった。呼び出し元 `kh_180f88394` の `rcx` 設定 (`[rsp+32]`) を辿る必要がある。
-- DEFECTS 類型: 未判定。`D11` (絶対 VA の wasm32 切り捨て) が形の上で近いが、`rax` の出所が未確認のため当てはめない。
+- trap の wasm 命令オフセット・native VA・逆アセンブル・`[rcx]` の値の出所は付録 §2・§3。
 
-### 7.7 未解決 (起票先付き)
+### 7.7 結論
 
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| (解決・付録) `[rcx]` の値 = `.rdata` 文字列 `"invalid hash bucket count"` の生 VA `0x1813d2203`。配置の問題で DEFECTS **D11** (loud)。詳細は `KH656_REPORT_APPENDIX_1821.md` §1〜§3 | 受入 2 は達成。解消は子 issue (付録 §6) | #1821 |
+- 受入 2 (原因と DEFECTS 類型) は達成: D11 (付録 §1)。解消は子 #3866 (KH-75) (§7.5)。
+- 記録の訂正: 旧 PR 本文・旧付録の「修正前の emcc RSS 上限 kill・`globals.c` 681 MB」は裏付けが無いため撤回 (付録 §4)。
 
 ## 8. 閉包展開の再試行 (#1761 / KH-27、実測)
 
