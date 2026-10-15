@@ -88,15 +88,7 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 - **古い artifact 由来の 88 件**: `work-liftdiff` の artifact に入っていた `batch_sample_800.jsonl` (Oct 12 生成・sha256 `b219553f…`・fvm case 0 件) は fvm 起動を通していない。その母集団は 88 件 (resolved 32・候補外 4・base 非 arg 42・分岐 7・ret 跨ぎ 2・ret 断片 1)。この 88 は**修正前の古い値**で、現在の表 (73) とは別物。
 - **88 と 73 の差 15 件**: 新規の多重候補は 0 件で、古い母集団にだけある 15 件 (`0x102b430 0x50abe0 0x526f70 0x539670 0x623840 0x6682b0 0x813a70 0x8ce510 0x926f10 0x93e920 0x9773f0 0x97e460 0xcf0a90 0xec3190 0xff5ec0`) は、測定 HEAD の jsonl では多重候補の条件を満たさない (fvm 以外の case の判定が現行と違う)。88 ⊇ 73。fvm 救済の影響ではない。
 - **測定 commit**: `e1efecc2f` (コード差分 0 の HEAD)。`pe.py`・`session.py`・`cases.py` の最後の code commit は `1b53c5b86`。
-- **差分証跡** (WORKFLOW §6): `git diff --stat e1efecc2f HEAD -- tools/liftdiff` の実出力は以下 (`ldlib/`・`liftdiff.py`・`liftdiff_e2e.sh` の差分は 0 件)。
-
-  ```
-   tools/liftdiff/REPORT_APPENDIX_LD177.md | 42 +++++++++++++++++++++------------
-   tools/liftdiff/ld198_recount.py         | 15 ++++++++++++
-   2 files changed, 42 insertions(+), 15 deletions(-)
-  ```
-  (この数字は `430e35ed3` 時点の REPORT の実測。以後に REPORT を編集すると `--stat` の行数は変わる。)
-
+- **差分証跡** (WORKFLOW §6): 測定 commit `e1efecc2f` から HEAD までの `tools/liftdiff` の差分は、本節 (`REPORT_APPENDIX_LD177.md`) と `ld198_recount.py` の 2 ファイルだけ。`git diff --stat e1efecc2f HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/liftdiff_e2e.sh` の出力は空 (コード差分 0)。実出力は PR 本文に載せる。
 - **fvm 12 → 41 (+29) の説明**: 新規 fvm 29 件 (`0x10263d0 0x10293b0 0x102b6c0 0x102b750 0x11e7940 0x126e4c0 0x472530 0x47d460 0x4fb160 0x534eb0 0x539e00 0x5c1030 0x64fa70 0x64fc70 0x675010 0x678460 0x681380 0x8cbe40 0x8e7080 0x905af0 0xa96550 0xa96620 0xc3efe0 0xd2b370 0xd2b5b0 0xd2b620 0xd2bb50 0xebbfb0 0xebc1a0`) は resolved 29 件と同一集合 (`resolved==newfvm`)。base で fvm 済みの 12 件は消えていない (lost 0)。
 - **測定**: base `1f12b1b6d` と HEAD `e1efecc2f` で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 1 回ずつ、同一 runner で連続実行 (各 worktree は `/tmp/opencode/ld198-{base,head}`)。素材 `fl-win64`・`work-m11`・`work-liftdiff` は `$ARTIFACTS_DIR` から展開。`work-m11` は `m11_gen_ir2.sh` で `ir_conditions.json` を作った後 (`ir_sha256` 597757f4…)。emsdk は pin 6.0.12 を上流から取得して `/opt/emsdk` に置いた (素材 `toolchain-emsdk` は本 run に無い)。
 
