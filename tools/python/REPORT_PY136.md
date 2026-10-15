@@ -8,7 +8,7 @@
 - 確定したのは **制御フローと戻り値と scr の状態遷移** (`init` で生成・`deInit` で破棄・`setup` の書込み先・`hideMenu`/`menuShowing` の読み書き・dirty の遷移)。
 - **値・引数の意味は未確定**: `init` の a1〜a6、`setup` の L と i1〜i5 は格納先だけ確定し、意味は未確定 (PY-116 の範囲)。scr 未生成の経路は PE で AV (例外を返さない) のため、mock と C は Unspecified error (code 2) を仮置きした。
 - メニュー項目の選択・移動 (`menuItemClick`・`menuNext`・`menuPrev`) は、呼び出す helper の効果が未同定のため **no-op**。
-- 件数 (現 HEAD `e90375414`・`tests/provider_check.mjs`): 実装 178、未実装 257 (functions 435、MCP 静的 60)。本 PR の寄与は 10 件。C のハンドラ数は `gen_provider.py --check-handlers` で 178。
+- 件数 (現 HEAD `657e37a76`・`tests/provider_check.mjs`): 実装 183、未実装 252 (functions 435、MCP 静的 60)。本 PR の寄与は 10 件。C のハンドラ数は `gen_provider.py --check-handlers` で 183。
 
 ## 手段
 
@@ -58,34 +58,34 @@
 
 ## 検証
 
-測定 commit: `e90375414` (コードを変えた最後の commit。main `93202140d` を取り込んだ merge)。以下の表はこの commit のクリーンな作業ツリー (`git status` 空) で、`provider/build.sh` を実行してから測定した。測定の後に足す commit は md (本 REPORT) のみ。
-前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、161 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、3.6 秒)。
-環境: runner 4 core。load average は測定の直前の `uptime` 値: provider_check 2.66、screen_menu_diff 2.45、screen_diff 2.25、all_tools 2.25、ui_browser_diff 0.79、ui_state_diff 0.79。
+測定 commit: `657e37a76` (コードを変えた最後の commit。PR head `99ef72c10` に main `45182bf1b` を取り込んだ merge。競合は `tools/python/provider/fl_engine.c`・`tools/python/tests/provider_check.mjs` の 2 件)。以下の表はこの commit のクリーンな作業ツリー (`git status` 空) で、`provider/build.sh` を実行してから測定した。測定の後に足す commit は md (本 REPORT) のみ。
+前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、247 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.3 秒)。素材 `fl-win64` は `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (5.7 秒) して `FL_WIN64_DIR` に渡した。emsdk は `/opt/emsdk` (`EMSDK_ENV` 既定) を使った。
+環境: runner 4 core。load average は各コマンドの直前の `/proc/loadavg` (1 分値): 0.13〜0.23。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` (`EMSDK_ENV` = emsdk 6.0.12) | rc 0・`fl_table.c: 435 関数, ハンドラ 178` | 0.8 秒 |
-| `node tests/provider_check.mjs` | rc 0・`{"functions":435,"implemented":178,"unimplemented":257,"mcp_static":60,"PASS":true}` | 0.21 秒 |
-| `node tests/screen_menu_diff.mjs` | calls 42、diffs 0、PASS | 0.03 秒 |
-| `node tests/screen_diff.mjs` (回帰) | calls 32、diffs 0、PASS | 0.03 秒 |
-| `node tests/ui_browser_diff.mjs` (main 側の回帰) | ok_calls 8・bad_calls 5、diffs 0、browserOp 3、PASS | 0.04 秒 |
-| `node tests/ui_state_diff.mjs` (main 側の回帰) | calls 58、diffs 0、PASS | 0.04 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・`{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` | 0.96 秒 |
+| `bash provider/build.sh` (`EMSDK_ENV` 既定 = `/opt/emsdk`) | rc 0・`fl_table.c: 435 関数, ハンドラ 183` | 1.1 秒 |
+| `node tests/provider_check.mjs` | rc 0・`{"functions":435,"implemented":183,"unimplemented":252,"mcp_static":60,"PASS":true}` | 0.37 秒 |
+| `node tests/screen_menu_diff.mjs` | calls 42、diffs 0、PASS | 0.05 秒 |
+| `node tests/screen_diff.mjs` (回帰) | calls 32、diffs 0、PASS | 0.05 秒 |
+| `node tests/ui_browser_diff.mjs` (main 側の回帰) | ok_calls 8・bad_calls 5、diffs 0、browserOp 3、PASS | 0.06 秒 |
+| `node tests/ui_state_diff.mjs` (main 側の回帰) | calls 58、diffs 0、PASS | 0.05 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・`{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` | 2.16 秒 |
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5): 現 HEAD で実施。`host/fl_mock.mjs` の `screen.menuShowing` (485 行) から `scrNeed()` を外すと、`node tests/screen_menu_diff.mjs` は `ERR_ASSERTION` で rc 1 (FAIL)。差分は `screen.menuShowing` の 2 呼出し (mock `ok: false`・wasm `code: 2`)。元の内容に戻し (`cmp` 一致)、同じ test を再実行すると calls 42・diffs 0・PASS (rc 0)。
+ネガティブコントロール (`docs/WORKFLOW.md` §5): 測定 commit `657e37a76` で再実施。`host/fl_mock.mjs` の `screen.menuShowing` (515 行) から `scrNeed()` を外すと、`node tests/screen_menu_diff.mjs` は `ERR_ASSERTION` で rc 1 (FAIL)。差分は `screen 初期化・メニュー差分 2 件`。元の内容に戻し (`cmp` 一致)、同じ test を再実行すると calls 42・diffs 0・PASS (rc 0)。
 
 コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外。本 REPORT を含む md のみの commit を後から足しても 0 行のまま):
 
 ```
-$ git diff e90375414 HEAD -- tools/python ':!*.md'
+$ git diff 657e37a76 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
-参考 (旧測定 commit `8588639a2` から `e90375414` までの差分。main 取り込み分を含む。測定の基準は `e90375414`):
+参考 (main 取り込みの差分。PR head `99ef72c10` から測定 commit まで。測定の基準は `657e37a76`):
 
 ```
-$ git diff --stat 8588639a2 e90375414 -- tools/python ':!*.md' | tail -1
- 26 files changed, 2396 insertions(+), 40 deletions(-)
+$ git diff --stat 99ef72c10 657e37a76 -- tools/python ':!*.md' | tail -1
+ 12 files changed, 1291 insertions(+), 18 deletions(-)
 ```
 
 ## 訂正の候補 (未検証)
