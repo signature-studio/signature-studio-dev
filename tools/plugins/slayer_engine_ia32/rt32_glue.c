@@ -14,6 +14,7 @@ static uint32_t h32_top, g_lasterr, g_tls[64];
 static void h32_reset(void) {
     h32_top = H32_BASE; g_lasterr = 0;
     memset(g_tls, 0, sizeof g_tls);
+    memset((void *)(uintptr_t)H32_BASE, 0, 0x1000);
     memset((void *)(uintptr_t)HOST_BASE, 0, HOST_LEN);
 }
 static uint32_t h32_alloc(uint32_t sz) {

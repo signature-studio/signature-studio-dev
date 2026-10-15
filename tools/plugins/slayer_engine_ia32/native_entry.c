@@ -80,6 +80,7 @@ static void copy(u32 d, u32 s, u32 n) {
 static void h32_reset(void) {
     g_top = H32_BASE; g_lasterr = 0;
     for (u32 i = 0; i < 64; i++) g_tls[i] = 0;
+    zero(H32_BASE, 0x1000);
     zero(HOST_BASE, HOST_LEN);
 }
 static u32 h32_alloc(u32 sz) {
