@@ -62,4 +62,4 @@
   - `python3 tools/targets/massivex/dsp/scripts/mx55_callers_fn.py '<展開先>/VST3/Massive X.vst3'`: sites 56 (`xmm2_written` 1 / `livein_passthrough` 6 / `clobbered_by_call` 49)。
 - 再測定の状況: 指摘対応の run (review fix) では `plugins-massivex` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、上の 2 つは再実行していない。上の値は測定 commit の run の記録。
 - E8/E9 の 0 件: 上の 2 スクリプトは `ff /2` の間接 call だけを数える。E8/E9 の rel32 の件数は、この記録からは再確認できない (未了)。
-- 測定 commit から HEAD までのコード差分: `git diff 97d274d5e HEAD -- tools/targets/massivex/dsp/scripts` の出力は付録の commit 時に記録する (本付録の変更は文書のみ)。
+- 測定 commit から HEAD までのコード差分: `git diff 97d274d5e HEAD -- tools/targets/massivex/dsp/scripts` は 0 バイト (出力なし)。`git diff 97d274d5e HEAD -- tools/targets/massivex` は本付録の文書追記のみ。
