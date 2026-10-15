@@ -24,6 +24,9 @@ void cpi_dbg(const char* tag, unsigned long long a, unsigned long long b, unsign
 EOF
 
 sed -e '1i void cpi_dbg(const char*, unsigned long long, unsigned long long, unsigned long long, unsigned long long);' \
+  -e '/\/\* 4079f9: lea rbx/a cpi_dbg("4079f9", R[1], R[2], R[3], R[0]);' \
+  -e '/\/\* 407a23: mov rdx, qword ptr \[rbx + 8\] \*\//a cpi_dbg("407a23", R[1], R[2], R[3], R[0]);' \
+  -e '/\/\* 407a3a: add dword ptr/i cpi_dbg("407a3a", R[1], R[2], R[3], R[0]);' \
   -e '/^void f_41bcf0(void) {/a cpi_dbg("enter41bcf0", R[1], R[2], R[3], R[0]);' \
   -e '/^void f_409070(void) {/a cpi_dbg("enter409070", R[1], R[2], R[3], R[0]);' \
   -e '/^void f_4091c0(void) {/a cpi_dbg("enter4091c0", R[1], R[2], R[3], R[0]);' \
