@@ -563,6 +563,11 @@ FL_H(general, setUndoHistoryLast) { NARGS(1, 1); undo_last = (int)A_INT(0, 0); r
 /* ---- launchMapPages (1 of 12, PY-120 #2984) ---- PE 0xd791b0: obj.+0x50 の配列 (+0x3c0) の件数を返す。件数は仮置き 0 (REPORT_PY120_2984)。
  * obj.+0x50 == 0 の経路 (0xd82c20 に code -7 = "Device not assigned") は未モデル (例外化の述語が実行時値のため) */
 FL_H(launchMapPages, length) { NARGS(0, 0); return fl_ret_i(c, lm_pages); }
+/* ---- launchMapPages (3 of 12, PY-138 #3029) ---- PE init 0xd79020 (sii)・updateMap 0xd79290 (i)・createOverlayMap 0xd7a130 (iiii) は書式と成功時の戻り (定数 = None) を確定。
+ * page 配列への副作用は未確定のため状態を変えない (REPORT_PY138)。setMapItemTarget は戻り型の食い違いが未解決のため未実装 */
+FL_H(launchMapPages, init) { NARGS(3, 3); (void)A_STR(0); (void)A_INT(1, 0); (void)A_INT(2, 0); return fl_ret_none(c); }
+FL_H(launchMapPages, updateMap) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
+FL_H(launchMapPages, createOverlayMap) { NARGS(4, 4); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
 
 /* ---- arrangement (4, PY-96 #2832) ---- PE 0xd786e0/0xd78700/0xd78500 が obj+0xd74/+0xd78 を読み、0xd78720 は 0xe43e80 (両方 >= 0) を bool で返す。初期値 -1 は未実測の仮置き */
 FL_H(arrangement, selectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_start); }
@@ -571,10 +576,11 @@ FL_H(arrangement, liveSelectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_star
 FL_H(arrangement, selectionIsActive) { NARGS(0, 0); return fl_ret_b(c, sel_start >= 0 && sel_end >= 0); }
 /* ---- arrangement (6) ---- PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定。個数は fl_table (stub 由来・必須 2) に合わせた暫定で、
  * jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。currentTime は仮置きの状態 arr_time を返す。
- * 選択・マーカーの 5 件は副作用が未同定のため状態を変えず、引数検査だけ行う (REPORT_PY152) */
+ * 選択の 2 件は sel_set (PE 0xe43d30 の規則・PY-144 #3043) で状態を変える。マーカー・liveSelection・jumpToMarker の 3 件は副作用が未同定のため状態を変えず、引数検査だけ行う (REPORT_PY152) */
+static void sel_set(int x, int y) { sel_start = x; sel_end = y; if (x == y) sel_end = -1; else if (x > y) { sel_start = y; sel_end = x; } }
 FL_H(arrangement, currentTime) { (void)A_INT(0, 0); return fl_ret_i(c, arr_time); }
-FL_H(arrangement, selectionClear) { NARGS(0, 0); return fl_ret_none(c); }
-FL_H(arrangement, selectionSet) { NARGS(2, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(arrangement, selectionClear) { NARGS(0, 0); sel_set(-1, -1); return fl_ret_none(c); }
+FL_H(arrangement, selectionSet) { NARGS(2, 5); int64_t x = A_INT(0, 0), y = A_INT(1, 0); for (int i = 2; i < 5; i++) (void)A_INT(i, 0); sel_set((int)x, (int)y); return fl_ret_none(c); }
 FL_H(arrangement, liveSelection) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 FL_H(arrangement, addAutoTimeMarker) { (void)A_INT(0, 0); (void)A_STR(1); return fl_ret_none(c); }
 FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }

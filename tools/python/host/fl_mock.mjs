@@ -195,6 +195,8 @@ export function createMockEngine() {
   // plugins の値 API の引数は C と同じ順に型検査してから解決する (paramIndex・index・slotIndex・useGlobalIndex・(setParamValue の pickupMode))。o = paramIndex の位置、n = 最大個数
   const plugIn = (a, o, n) => { const q = argI(a, o, 0), i = argI(a, o + 1, 0), s = argI(a, o + 2, -1); for (let k = o + 3; k < n; k++) argI(a, k, 0); return plugPV(i, s, q); };
   const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
+  // PY-144 (#3043): PE 0xe43d30 の書込み規則。start=x・end=y を置き、x==y なら end=-1、x>y なら入れ替える。selectionClear は (-1,-1) で同じ経路
+  const selSet = (x, y) => { st.selStart = x; st.selEnd = y; if (x === y) st.selEnd = -1; else if (x > y) { st.selStart = y; st.selEnd = x; } };
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
@@ -437,6 +439,10 @@ export function createMockEngine() {
     "general.getProjectGenre": (...a) => { arity(a, 0, 0); return st.projGenre; },
     // PY-120 (#2984): PE 0xd791b0 は obj.+0x50 の配列 (+0x3c0) の件数を返す。件数は実行時の状態のため仮置き 0 (REPORT_PY120_2984)
     "launchMapPages.length": (...a) => { arity(a, 0, 0); return st.launchPages; },
+    // PY-138 (#3029): PE init 0xd79020 (書式 sii)・updateMap 0xd79290 (i)・createOverlayMap 0xd7a130 (iiii) は引数書式と成功時の戻り (None) を確定。page 配列への副作用は未確定のため状態を変えない (REPORT_PY138)
+    "launchMapPages.init": (...a) => { arity(a, 3, 3); str(a[0]); argI(a, 1, 0); argI(a, 2, 0); },
+    "launchMapPages.updateMap": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
+    "launchMapPages.createOverlayMap": (...a) => { arity(a, 4, 4); for (let i = 0; i < 4; i++) argI(a, i, 0); },
     // PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない
     "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
     "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
@@ -449,10 +455,10 @@ export function createMockEngine() {
     "arrangement.liveSelectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
     "arrangement.selectionIsActive": (...a) => { arity(a, 0, 0); return st.selStart >= 0 && st.selEnd >= 0; },
     // PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定 (currentTime 'i'・selectionSet 'ii|iii'・liveSelection 'ii'・addAutoTimeMarker 'is'・jumpToMarker 'i|i')。個数は fl_table (必須 2) に合わせた暫定で、jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。
-    // 選択・マーカーの 5 件は副作用が未同定のため状態を変えない。currentTime は仮置きの状態 arrTime (0) を返す (provider/fl_engine.c と同じ)
+    // 選択の 2 件は selSet (PE 0xe43d30 の規則) で selStart/selEnd を変える (PY-144 #3043)。マーカー・liveSelection・jumpToMarker の 3 件は副作用が未同定のため状態を変えない。currentTime は仮置きの状態 arrTime (0) を返す (provider/fl_engine.c と同じ)
     "arrangement.currentTime": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return st.arrTime; },
-    "arrangement.selectionClear": (...a) => { arity(a, 0, 0); },
-    "arrangement.selectionSet": (...a) => { arity(a, 2, 5); for (let i = 0; i < 5; i++) argI(a, i, 0); },
+    "arrangement.selectionClear": (...a) => { arity(a, 0, 0); selSet(-1, -1); },
+    "arrangement.selectionSet": (...a) => { arity(a, 2, 5); const x = argI(a, 0, 0), y = argI(a, 1, 0); for (let i = 2; i < 5; i++) argI(a, i, 0); selSet(x, y); },
     "arrangement.liveSelection": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
     "arrangement.addAutoTimeMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); str(a[1]); },
     "arrangement.jumpToMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
