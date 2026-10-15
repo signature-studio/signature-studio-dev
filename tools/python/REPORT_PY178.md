@@ -16,7 +16,7 @@
 
 ## 測定
 
-- 測定 commit: `e4cc24cd4` (probe に到達条件の検査を足した commit。コードを変えた最後の commit)。`git diff e4cc24cd4 HEAD -- tools/python/analysis` の出力は 0 行 (後続 commit は本 REPORT の文書のみ)。
+- 測定 commit: `e4cc24cd4` (probe に到達条件の検査を足した commit。コードを変えた最後の commit)。`git diff e4cc24cd4 HEAD -- tools/python/analysis/flapi/pe_owner_thread_probe.py tools/python/analysis/flapi/pe_disasm.py tools/python/analysis/flapi/pe_xref.py tools/python/analysis/flapi/pe_callgraph.py tools/python/analysis/flapi/pe_scan_store.py` の出力は 0 行。後続の差分は本 REPORT の文書と main 取り込みの merge (`tools/python/analysis` に main の新規ファイル `py86_*.py`・`pe_chain_stores.py`・`pe_launchmap_entries.py` が増えただけ) で、測定に使ったファイルは変わっていない。
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` の `extracted/block00031_PE.bin` を repo 外 `${RUNNER_TEMP}/fl-win64` に展開 (2.9 秒・終了 0)。依存 `pefile 2024.8.26`・`capstone 5.0.7` は実在を確認。
 - 使用ツール: `pe_owner_thread_probe.py` (本測定)。逆アセの独立確認は capstone の範囲指定ダンプ (repo 外のスクラッチ)。
 - 再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_owner_thread_probe.py` (約 65 秒・`RESULT: PASS`・終了 0)。
@@ -69,7 +69,7 @@
 - 比較の両辺: 左 `[X_T+8]` = ID(T) (2.2・2.3。X_T は T の TLS の X で、その持ち主は T)、右 `[0x15e6080]` = `0x41ce10` を実行したスレッド Q の ID (3)。
 - 同期が成立する ⇔ ID(T) == ID(Q) ⇔ T == Q (生存中のスレッド ID は一意)。`r8=r9=0` なので `0x525f58` の test は必ず 0 (成立) で、判定は ID 比較のみ。
 - **訂正**: 旧版の『T に紐づく worker の ID との比較。T が X の worker 自身なら一致しうる』の読みは誤り。worker かどうかに関わらず、X_T の持ち主は T なので `[X_T+8]` = ID(T)。
-- `setChannelPitch` の経路 (`0xd5a720` callback・`0xd843d0` task 生成) は ID 比較の入力に触れない。入力は呼出しスレッドの TLS だけで決まる。
+- `setChannelPitch` の経路 (`0xd5a720` callback・`0xd843d0` task 生成) は ID 比較の入力に触れない。入力は呼出しスレッドの TLS だけで決まる。**未確認**: `setChannelPitch` から `0xd843d0` への呼出し (レビュー m2。`0xd843d0` → `0x526190` は確認済み)。未解決表 5。
 - 不成立時 (T ≠ Q) の挙動 (`0x525faf` 以降) は未読 → 未解決表 3。
 
 ## 5. 再現スクリプト
