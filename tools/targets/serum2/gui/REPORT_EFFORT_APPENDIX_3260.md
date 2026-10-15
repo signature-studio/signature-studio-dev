@@ -100,7 +100,27 @@
 
 ### 17-9. 測定 commit と差分
 
-- 測定 commit: `560357317` (コードを変えた最後の commit)。
-- 差分 (コード・ベースラインからの規模): `git diff --stat cf2966030 560357317 -- tools/targets/serum2/gui/canvas` → 14 files・460 insertions・42 deletions。
-- 差分 (測定 commit から HEAD まで): `git diff 560357317 HEAD -- tools/targets/serum2/gui/canvas tools/targets/serum2/gui/*.py` の出力は **0 行** (本節の commit は REPORT とドキュメントだけ)。
-- 再現: `cd tools/targets/serum2/gui && bash canvas/check_render_poc.sh && bash canvas/check_canvas_syntax.sh && bash check_wasm_syntax.sh && python3 canvas/count_canvas_noop.py`。前提は `work/vstgui4` と `work/emsdk/upstream/emscripten`。
+- 測定 commit: `995f9fb32` (main 取り込みの merge commit。コードを変えた最後の commit)。main 取り込み前の測定 commit は `560357317` (§17-3 の値)。
+- 差分 (コード・ベースラインからの規模): `git diff --stat cf2966030 560357317 -- tools/targets/serum2/gui/canvas` → 14 files・460 insertions・42 deletions (PR 本体の規模。main 取り込みの差分は含まない)。
+- 差分 (測定 commit から HEAD まで): `git diff 995f9fb32 HEAD -- tools/targets/serum2/gui/canvas tools/targets/serum2/gui/*.py` の出力は **0 行** (本節の commit は REPORT とドキュメントだけ)。
+- 再現: `cd tools/targets/serum2/gui && bash canvas/check_render_poc.sh && bash canvas/check_canvas_syntax.sh && bash check_wasm_syntax.sh && python3 canvas/count_canvas_noop.py`。前提は `work/vstgui4` (vstgui4_14_3 の clone) と `work/emsdk/upstream/emscripten` (`toolchain-emsdk` を `work/` に展開)。
+
+### 17-10. main 取り込み後の再測定 (`995f9fb32`)
+
+- 経緯: main (`e7cff966b`) が #3261 (SR-51) を取り込み、本 PR と競合した。解消は 3 件 (`docs/DOC_MAP.md`・`REPORT_EFFORT.md` は両側の行を残し、`check_canvas_syntax.sh` は `canvas_string.cpp` と vstgui4 の `platformfactory.cpp` を両方検査する)。main 側の `platformfactory.cpp` の WASM 分岐で harness の初期化経路が変わったため、HEAD で再測定した。
+- 測定は `995f9fb32` (作業ツリー clean・`work/` のみ) で行った。load (1 分平均) は render 実行の直前 0.32・全検証の後 0.70。
+
+| 項目 | 値 (`995f9fb32`) |
+|---|---|
+| `check_render_poc.sh` rc / real | 0 / 14.644 s |
+| compile | 71/71 ok (upstream 63/63・canvas・harness の失敗 0・error 行 0)・13928 ms |
+| link | rc=0・未解決 0・479 ms |
+| run | rc=0・95 ms |
+| `bytes` / `nonzero_before` / `control` / `nonzero_after` | 48000 / 0 / 1 / 12000 |
+| `text_px` / `text_width` | 112 / 54 |
+| render 判定 | pass |
+| `check_canvas_syntax.sh` | rc=0 (8/8 errors=0・real 3.325 s) |
+| `check_wasm_syntax.sh` | rc=0 (seed 6 errors=0・real 0.465 s) |
+| `count_canvas_noop.py` | draw 15 (no-op 12・実装 3)・state 14 (no-op 7・実装 7)。§17-5 と同じ |
+
+- §17-3 からの変化は件数だけ: compile 70→71・canvas 構文検査 7→8 (main 側が upstream の `platformfactory.cpp` を検査対象に加えたため)。画素・文字の値は変わらない。
