@@ -13,6 +13,7 @@
 # 前提: FL_WIN64_DIR (fl-win64 展開先) / python3 (capstone, pefile) / SS_EMSDK_ENV (emsdk_env.sh, 既定 /opt/emsdk) / node。
 # 出力: results/boot_summary_fle6.json (shim 有), results/boot_summary_fle6_negctl.json (shim 無)。
 # 生成物は work/boot/ (gitignore)。判定に失敗したら非 0 で終了する。
+# 有界実行 (#672・#3770): FLE_BOOT_SECS=<秒> で各 boot を timeout し、FLE_BOOT_LOG_MB=<MB> で stdout の上限を付ける (未指定は無制限)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 FLE="$(cd "$HERE/.." && pwd)"
@@ -57,11 +58,22 @@ bash "$HERE/build.sh" plain
 elapsed "clang-plain" "$T"
 
 # 判定は exit code で行う (|| true で握り潰さない)。結果 JSON・判定行が無い、または判定 NG なら即失敗する。
+# 有界実行 (#672・#3770): FLE_BOOT_SECS 秒で打ち切る (timeout・rc 124)。FLE_BOOT_LOG_MB MB を超える stdout は書けなくして止める (rc 153)。
+# 未指定は無制限 (従来どおり)。打ち切りは判定 NG と同じく結果 JSON が無いので、ログの要約だけを出して非失敗で返す。
+BOOT_LIM=()
+[ -z "${FLE_BOOT_SECS:-}" ] || BOOT_LIM=(timeout "$FLE_BOOT_SECS")
 # $1=label  $2=out.json  $3=FLE_IPP (1: shim 有 / 0: ネガコン / 2: shim 有 + ippsZero_8u 以外で停止 / 空: 既定)
 run_boot() {
   local log="$W/run_${TAG}_$1.log"
   local rc=0
-  FLE_IPP="$3" FLE_TOLERANT="${4:-0}" FLE_DIAG_NULLFILL="${5:-0}" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
+  ( [ -z "${FLE_BOOT_LOG_MB:-}" ] || ulimit -f $(( FLE_BOOT_LOG_MB * 1024 ))
+    FLE_IPP="$3" FLE_TOLERANT="${4:-0}" FLE_DIAG_NULLFILL="${5:-0}" FLE_BOOT_VARIANT=plain ${BOOT_LIM[@]+"${BOOT_LIM[@]}"} "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only ) > "$log" 2>&1 || rc=$?
+  if [ -n "${FLE_BOOT_SECS:-}${FLE_BOOT_LOG_MB:-}" ] && { [ "$rc" = 124 ] || [ "$rc" = 153 ]; }; then
+    echo "[fle6] $1: 有界実行で打ち切り rc=$rc (FLE_BOOT_SECS=${FLE_BOOT_SECS:-無し} FLE_BOOT_LOG_MB=${FLE_BOOT_LOG_MB:-無し})。結果 JSON は無い ($log, $(stat -c %s "$log") B)"
+    echo "[fle6] $1: unlifted 行 $(grep -c 'unlifted' "$log" || true) 件、[fill6a7b70] 行 $(grep -c '\[fill6a7b70\] #' "$log" || true) 件"
+    grep -m1 'unlifted' "$log" || true
+    return 0
+  fi
   grep 'FLEBOOT_RESULT' "$log" || true
   grep 'FLEBOOT_IPP_CHECK' "$log" || { echo "[fle6] $1: FLEBOOT_IPP_CHECK 行が無い ($log)"; exit 4; }
   [ -s "$2" ] || { echo "[fle6] $1: 結果 JSON が無い ($2)"; exit 4; }

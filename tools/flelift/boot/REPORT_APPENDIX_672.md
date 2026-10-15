@@ -100,3 +100,37 @@ REPORT §7 (旧 165〜167 行):
 ```
 
 訂正 (#672・FLE-12 の実測): 「`f_414ec0` は out = 0 を返す」は誤認で、`f_414ec0` は `UStrCopy` である。`f_653f40` の早期 return は VCL リソース読み出しの失敗ではなく、`dsp_ippv2_x64.dll` の `LoadLibraryW` 失敗 (host shim の欠落) による。`0x15F34A0` = `ippsZero_8u` (`REPORT_APPENDIX_2702.md` §E・§10)。
+
+## 7. #3770: 有界実行で 0x6bbc20 を root 化した診断 route (2026-10-15・HEAD 測定)
+
+- 手順: `FLE_EXTRA_ROOTS=0x6bbc20 FLE_DIAG_NULLFILL=1` (`FLE_BOOT_RUNS="diag_shim diag_negctl"`・`FLE_BOOT_SECS=150`・`FLE_BOOT_LOG_MB=200`)。lift 61 s・clang 8 shard 74 s・link mismatch 0 / undefined 0 / dup 0。`fle6_measure.sh` に opt-in の `FLE_BOOT_SECS` (timeout) と `FLE_BOOT_LOG_MB` (`ulimit -f`) を足した (未指定は従来どおり)。
+- 結果 (n=1・150 s で打ち切り・結果 JSON は無し):
+
+| route | 停止 | GetMem / FreeMem (打ち切り時) | `unlifted` 行 | `MessageBoxW` 'QuickFontCache DLL not found!' | ログ |
+|---|---|--:|--:|---|--:|
+| shim 有 + 診断 + root `0x6bbc20` | 150 s で打ち切り (rc 124) | 2,312 / 1,200 | 0 | あり (行 8117) の後も GETMEM / FREEMEM が続く | 739 KB |
+| ネガコン + 診断 + root `0x6bbc20` | 150 s で打ち切り (rc 124) | 1,889 / 777 | 0 | あり (行 4733) の後も続く | 520 KB |
+
+- 読み取り (実測): root 化すると、§1 の `unlifted 0x6bbc20` の停止は消える。診断 route は 150 s 内に戻らず、GetMem 2,312 は既定経路の最終値 2,314 に近い。打ち切り時の unit 番号は JSON が戻りで書かれるため取れていない (units_run は未取得)。
+- 本 run のログは 1 回目 (#3491 の 1,200 s で 20 GB) より遙かに小さい (150 s で 0.5〜0.7 MB)。反復の 16 byte 列は GETMEM / FREEMEM の `blkdiag` 出力で、20 GB の出力は本 run では再現していない (推定: 時間の長さによる)。
+- `[diag672][nullfill] skip` は 64 件 (表示上限。最後は `#63`・dst `0xfc00000`)。診断 route の fill の戻し件数の総数は出していない (未計測)。
+
+### 7-1. 既定経路の再実測 (変更後の `fle6_measure.sh`・root `0x6a7b70`・診断なし)
+
+| route | units_run | GetMem / FreeMem | `ptr_15F34A0` | 停止 | 判定 |
+|---|--:|--:|---|---|---|
+| shim 有 (`FLE_IPP=1`) | 209 | 2,314 / 1,199 | 0x0 | `MessageBoxA` → exit(0) | rc 3 (IPP 判定 NG = 既知) |
+| ネガコン (`FLE_IPP=0`) | 209 | 1,891 / 776 | 0x0 | 同上 | OK |
+
+- §1 の表 (既定経路) と一致。`fle6_measure.sh` の変更は既定値で従来と同じ経路 (`ulimit` / `timeout` を付けない) を通る。結果: `tools/flelift/boot/results/boot_summary_fle672d*.json`。
+
+### 7-2. #3770 の受入の判定
+
+| 受入 | 判定 | 根拠 |
+|---|---|---|
+| 1. 診断 route で `0x6bbc20` 解消後の units_run と次の停止点 | **未達** (次の停止点は未到達) | 150 s で打ち切り。`unlifted` 0 件・MessageBoxW の後も進む。units は JSON が無く取れない |
+| 2. `0x6c937a` の呼出し回数と矩形の寸法 | **未達** (未計測) | 計数の計装が `fle_boot.c` に無い。`rt/` は変えない方針 |
+| 3. 既定経路の再実測 | 達成 | §7-1 (209 / 2,314 / 1,199・209 / 1,891 / 776) |
+
+- 次の一手 (未解決): 打ち切りの時間を延ばすか、戻り時に部分の JSON を書く (`fle_boot.mjs` の変更) ことで、unit 番号と停止点を取る。どちらも #3770 の範囲 (`Refs #3770`)。
+- 既定経路の `units` 209 は動かしていない (本 PR は計測の補助のみ)。
