@@ -2,11 +2,14 @@
 //   throw Error      -> FAIL
 //   throw new Skip() -> SKIP
 //   return string    -> PASS の詳細
+import { mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import {
   applyRequestRewrite,
   applyResponseHeaders,
   contentTypeFor,
 } from "../../../deploy/lib/policy.mjs";
+import { E2E_DIR } from "./servers.mjs";
 
 export class Skip extends Error {}
 
@@ -320,8 +323,28 @@ export const checks = [
       })()`);
       assert(px.w > 0 && px.h > 0, `canvas サイズ 0: ${px.w}x${px.h}`);
       assert(px.lit > 0 && px.colors >= 2, `テストゲストのフレームが描画されていない: ${JSON.stringify(px)}`);
+      // 到達ログ (GUI-REACH / GUI-MSG 行): 件数と初回の順序を検査し、生ログを work/logs に残す (#3496)
+      const reachLog = await ctx.drv.eval(`(async () => {
+        const g = window.__guiGuest;
+        await Promise.race([g.waitLog('GUI-REACH-SUMMARY'), new Promise((_, rej) => setTimeout(() => rej(new Error('GUI-REACH-SUMMARY が 30s 以内に来ない')), 30000))]);
+        return JSON.stringify(g.logs);
+      })()`);
+      const lines = JSON.parse(reachLog).filter((l) => /GUI-(REACH|MSG)/.test(l));
+      const seq = [];
+      for (const l of lines) {
+        const m = /GUI-REACH \d+ (\S+) \d+ (?:IMPL|STUB) P\S+$/.exec(l) ?? /GUI-MSG (\S+) \d+$/.exec(l);
+        if (m) seq.push(m[1]);
+      }
+      const need = ["RegisterClassA", "CreateWindowExA", "WM_PAINT", "BeginPaint", "BitBlt"];
+      for (const n of need) assert(seq.includes(n), `到達ログに ${n} が無い: ${seq.join(",")}`);
+      const first = need.map((n) => seq.indexOf(n));
+      assert(first.every((v, i) => i === 0 || v > first[i - 1]), `初回の順序が不正 (RegisterClassA<CreateWindowExA<WM_PAINT<BeginPaint... 期待): ${need.map((n, i) => `${n}@${first[i]}`).join(" ")}`);
+      const cnt = (n) => seq.filter((x) => x === n).length;
+      const logDir = path.join(E2E_DIR, "work/logs");
+      mkdirSync(logDir, { recursive: true });
+      writeFileSync(path.join(logDir, "gui-guest-reach.log"), lines.join("\n") + "\n");
       await ctx.shot("gui-guest");
-      return `${st} canvas ${px.w}x${px.h} lit=${px.lit}px colors>=${px.colors}`;
+      return `${st} canvas ${px.w}x${px.h} lit=${px.lit}px colors>=${px.colors} reach: ${lines.length} 行 CreateWindowExA=${cnt("CreateWindowExA")} BeginPaint=${cnt("BeginPaint")} BitBlt=${cnt("BitBlt")} WM_PAINT=${cnt("WM_PAINT")}`;
     },
   },
   {
