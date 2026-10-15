@@ -62,8 +62,8 @@ C 側だけ `ui_time_disp_min = !ui_time_disp_min` を `ui_time_disp_min = ui_ti
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `setStepEditMode` の書込み末端 (`vtbl[0x200]` の先・S の型) | `[S+0x49e]` への書込みは model 上の仮定のまま | 子 issue (PY-130 の未確定を継承) |
+| `setStepEditMode` の書込み末端 (`vtbl[0x200]` の先・S の型) | `[S+0x49e]` への書込みは model 上の仮定のまま | #4051 (PY-294) |
 | `setTimeDispMin` の gate `[[0x15e4790]+8]->vtbl[0x98]` の真偽 | 実行時オブジェクトのため静的に解けず、真と仮定 (PY-119・PY-130 と同じ) | 実機の挙動確認 (PM 判断) |
 | `setTimeDispMin` の toggle 後の `0x1248ac0`・`0x12e2ac0`・`0xfdee80` の副作用 | API からは観測不能 (状態は getter で確認できる) | 未追跡 |
-| `provider_check.mjs` の section 3 以降・`all_tools.mjs` (flpy 経路) | 48/48 の維持は未検証 | CPython wasm (`build_cpython_wasm.sh`) を用意して実行 (PM 判断) |
+| `provider_check.mjs` の section 3 以降・`all_tools.mjs` (flpy 経路) | 48/48 の維持は未検証 | #4052 (PY-295) |
 | stub 説明文の食い違い (`setTimeDispMin` の stub doc "Is time time display set to minutes") | 説明文のみ | 同上 |
