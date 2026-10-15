@@ -13,7 +13,7 @@
 | `0x100052d0` | thiscall (ecx = this・float a0..a2・`ret 0xc`) | 本体は `[ecx+...]` と `[esp+0x10..0x14]` を読む。 leaf (call 無し) | TARGETS (`state_update`) |
 | `0x10005550` | thiscall (同上・`ret 0xc`) | 本体の `call 0x10002ee0` は TARGETS の lift 済み関数 | TARGETS (`state_update`) |
 | `0x1000bf1e` | cdecl (a0 = double、`[ebp+8]`・`[ebp+0xc]` の 8 バイト。 `[ebp+0xe]` はその上位語の一部) | `ret` (引数は caller が捨てる)。 呼出し元 `0x1000bd7b`・`0x1000bd89` は double を `push` 2 つ + `add esp,8` | PROBE (`double1`) |
-| `0x10009bc4` | cdecl (a0 = double) | `ret` のみ。 `call 0x1000b503`・`0x1000b3cb`・`0x1000acd8` は lift 済み | PROBE (`double1`) |
+| `0x10009bc4` | 入力は引数でなく呼出し時の x87 ST(0) (`fistp qword` で読む)。 詳細は REPORT_APPENDIX_4840.md §1 | `call 0x1000b503`・`0x1000b3cb`・`0x1000acd8` は lift 済み | PROBE (現行 harness は空スタックの `generic` 基準線。 double の入力形は REPORT_APPENDIX_4840.md) |
 
 ## 2. 突合の実測 (commit は §4)
 
@@ -27,7 +27,7 @@
 | `0x10009bc4` | 4000 | 0 | eax 0・深さ 0・OBJ 窓変化 0 | ST(0) (float32 と float64) が全行 `nan-num` 4000 (片方が NaN でない) |
 
 - `1000bf1e` は OBJ 窓を書かない関数なので、既存の effect 判定 (非自明性) が 0 件になり FAIL する。 そのため PROBE に置いた。 値の一致は 4000/4000。 非自明性は OBJ 窓の代わりに eax の使用で別に示す必要がある (未実施。 子 #4858 へ移す)。
-- `10009bc4` は ST(0) の不一致が全行。 native と wasm のどちらが NaN かは未確認 (`nan-num` 分類)。 原因は未確定。 子 issue へ移す。
+- `10009bc4` は ST(0) の不一致が全行。 原因と入力形は REPORT_APPENDIX_4840.md (空スタックの入口の読み・double を ST(0) に積むと一致)。
 
 ## 3. 断片 6 本の親入口 (`0x1000c077`)
 

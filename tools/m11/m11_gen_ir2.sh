@@ -99,6 +99,11 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
     python3 ldfix/fix_shx_t40.py work/boot_final.ll work/boot_final.shx40.ll
     mv work/boot_final.shx40.ll work/boot_final.ll
     python3 m11_cond.py shx_t40=applied
+  elif [ "${M11_FIX_SHX_T40:-0}" = 70 ]; then
+    # #4121 (SHX-T42) ネガコン: +0x70 の書込みだけ (+0x4c の初期 store を外す)。
+    python3 ldfix/fix_shx_t40.py work/boot_final.ll work/boot_final.shx40.ll --only-70
+    mv work/boot_final.shx40.ll work/boot_final.ll
+    python3 m11_cond.py shx_t40=applied-70only
   else
     python3 m11_cond.py shx_t40=not-applied
   fi

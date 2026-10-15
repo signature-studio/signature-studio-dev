@@ -811,6 +811,12 @@ static int midi_send(fl_call *c, uint32_t w) {
 }
 /* PY-215 (#3568): PE 0xd75d30 (書式 'I'、引数 1)。-1 は -1 を返す (0xd75dc0)。それ以外は連動表を末尾から走査し、一致が無い・表が空なら status 1 → None (0xd75dce)。device・link の割当は見ない (-6/-7 経路なし)。表の供給元は未確定のため空と仮定 (REPORT_PY215 §3) */
 FL_H(device, getLinkedChannel) { int64_t i = A_INT(0, 0); if (i == -1) return fl_ret_i(c, -1); return fl_ret_none(c); }
+/* PY-4846 (#3568 子 B): PE 0xd75bc0 (getLinkedValue)・0xd75ed0 (getLinkedInfo)・0xd75de0 (getLinkedParamName)・0xd75c40 (getLinkedValueString) の index == -1 経路だけを確定 (REPORT_PY215 §1 の表)。index >= 0 は連動表・helper (0x1051170・0x1050f90・0x104f580・0x1046a30) が未確定のため未実装 */
+#define LINK_UNIMPL(name) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error (not implemented: device." name " index>=0)")
+FL_H(device, getLinkedValue) { int64_t i = A_INT(0, 0); if (i == -1) return fl_ret_d(c, -1.0); LINK_UNIMPL("getLinkedValue"); }
+FL_H(device, getLinkedInfo) { int64_t i = A_INT(0, 0); if (i == -1) return fl_ret_i(c, -1); LINK_UNIMPL("getLinkedInfo"); }
+FL_H(device, getLinkedParamName) { int64_t i = A_INT(0, 0); if (i == -1) return fl_err(c, FL_E_PLUGIN, "Plugin not valid"); LINK_UNIMPL("getLinkedParamName"); }
+FL_H(device, getLinkedValueString) { int64_t i = A_INT(0, 0); if (i == -1) return fl_err(c, FL_E_PLUGIN, "Plugin not valid"); LINK_UNIMPL("getLinkedValueString"); }
 FL_H(device, createRefreshThread) { return fl_ret_none(c); }
 FL_H(device, destroyRefreshThread) { return fl_ret_none(c); }
 FL_H(device, fullRefresh) { return fl_ret_none(c); }
@@ -818,7 +824,7 @@ FL_H(device, getIdleElapsed) { return fl_ret_d(c, idle_elapsed); }
 FL_H(device, isMidiOutAssigned) { return fl_ret_b(c, midi_out_assigned); }
 FL_H(device, getMasterSync) { return fl_ret_b(c, master_sync); }
 FL_H(device, setMasterSync) { master_sync = A_INT(0, 0) == 1; return fl_ret_none(c); }
-/* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。
+/* PE 0xd75120 (書式 "L|i"・第 2 引数の既定 1 は解析前に PE が書く・REPORT_PY231 §1b)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。
    0xfdc8a0 は [sink+0x5c+4*添字] と同じ 32bit 値なら送らず、変わったときだけ送ってテーブルを書く (REPORT_PY231 §1)。
    テーブルの初期値と添字の範囲は未確定 (#3949): 未設定 (-1) を初期値とみなし、範囲外の添字は重複検出せず送る仮置き */
 FL_H(device, forwardMIDICC) {

@@ -1,0 +1,6 @@
+{
+  "tag": "pe4846",
+  "refs": ["#3568", "#4846"],
+  "note": "PE で index == -1 の経路を確定した device 連動 4 件 (getLinkedValue -1.0 / getLinkedInfo -1 / getLinkedParamName・getLinkedValueString status -8)。index >= 0 は未確定の未実装 (REPORT_PY215 §1・PY-4846 #4846)。tests/device_diff.mjs が mock と照合",
+  "functions": ["device.getLinkedValue", "device.getLinkedInfo", "device.getLinkedParamName", "device.getLinkedValueString"]
+}
