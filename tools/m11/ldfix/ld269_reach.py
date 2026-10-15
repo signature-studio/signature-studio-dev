@@ -90,6 +90,8 @@ def main():
                 nostore[b] = a
                 q2.append(b)
     rows.append('dispatch_load_without_store\t%d\t-\tstore を除いても届けば 7 の前提は崩れる' % (0x1290680 in nostore))
+    gap_ins = [a for a in ins if GAP_LO <= a < GAP_HI]
+    rows.append('gap_insns_reached\t%d\tof\t%d\t%x..%x' % (sum(a in seen for a in gap_ins), len(gap_ins), GAP_LO, GAP_HI))
     rows.append('reached_insns\t%d\tof\t%d' % (len(seen), len(ins)))
     with open(OUT, 'w') as fh:
         fh.write('\n'.join(rows) + '\n')
