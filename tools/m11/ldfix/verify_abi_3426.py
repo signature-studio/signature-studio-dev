@@ -296,6 +296,54 @@ def negctl_fixed(src, m):
     return bad
 
 
+C412 = [
+    'i32 0, i32 0, i64 0, i64 0, i64 %14',
+    'i32 %20, i32 %18, i64 0, i64 0, i64 %14',
+    'i32 %c0, i32 %c1, i64 %a2, i64 %a3, i64 %a4',
+]
+HEAD412 = 'define weak i64 @function_412fc0(i32 %arg1, i32 %arg2, i64 %arg3, i64 %arg4, i64 %arg5) local_unnamed_addr {'
+BR412 = 'br i1 %z5, label %dec_label_pc_412fcb, label %dec_label_pc_412fd5'
+LOAD412 = 'load i32, ptr inttoptr (i64 %d to ptr), align 4' % DEFAULT_GLOBAL_VA
+CALL412 = 'i64 %r5, i64 0, i64 %arg3, i64 %arg4, i64 %0, i64 %1, i64 0, i64 0'
+
+
+def check_fixed_412(src):
+    """#4521 (CI-191): 412fc0 を 5 引数 (rcx・rdx・r8・r9・5 番目) にし、5 番目 0 のときの既定値分岐を IR に持つこと。
+    呼出元 3 site の引数列と、41c8c0 への呼出し (rcx = 5 番目/既定値・rdx = 0・r8/r9 素通し・5〜8 番目 = arg1・arg2・0・0) を照合する。"""
+    a = fn_body(src, FN_A)
+    assert a.split('\n', 1)[0] == HEAD412, 'IR 412fc0: 定義が 5 引数でない: %r' % a.split('\n', 1)[0]
+    assert a.count(BR412) == 1, 'IR 412fc0: 5 番目の既定値分岐が無い (br が想定と違う)'
+    assert a.count(LOAD412) == 1, 'IR 412fc0: 既定値の load が 0x%x を指していない' % DEFAULT_GLOBAL_VA
+    assert 'icmp eq i32 %c5, 0' in a, 'IR 412fc0: 分岐の条件が 5 番目 == 0 でない'
+    calls = re.findall(r'call i64 @function_41c8c0\(([^)]*)\)', a)
+    assert calls == [CALL412], 'IR 412fc0: 41c8c0 への呼出し引数が想定と違う: %r' % calls
+    callers = re.findall(r'call i64 @function_412fc0\(([^)]*)\)', src)
+    assert callers == C412, 'IR: 412fc0 の呼出元 3 site の引数列が想定と違う: %r' % callers
+    return 4
+
+
+def negctl_412(src, m):
+    """#4521 のネガティブコントロール: 既定値分岐の改変・呼出元の 5 番目の取り違え。全件拒否されること。"""
+    cases = []
+    cases.append(('N1 412fc0 の既定値分岐を除く (br を無条件に)',
+                  src.replace(BR412, 'br label %dec_label_pc_412fd5', 1)))
+    cases.append(('N2 412fc0 の分岐の向きを反転 (icmp eq → ne)',
+                  src.replace('icmp eq i32 %c5, 0', 'icmp ne i32 %c5, 0', 1)))
+    cases.append(('N3 既定値の global の参照先を改変',
+                  src.replace(LOAD412, LOAD412.replace(str(DEFAULT_GLOBAL_VA), str(DEFAULT_GLOBAL_VA + 8)), 1)))
+    cases.append(('N4 呼出元 1 site の 5 番目を 3 番目へ取り違え',
+                  src.replace(C412[0], 'i32 0, i32 0, i64 %14, i64 0, i64 0', 1)))
+    bad = 0
+    for name, s in cases:
+        assert s != src, name + ': 置換が効いていない (テスト無効)'
+        if _rejects(check_fixed_412, s):
+            print('[verify_abi_3426] %s: 拒否 OK' % name)
+        else:
+            print('[verify_abi_3426] %s: 拒否されなかった (NG)' % name)
+            bad += 1
+    return bad
+
+
 def _rejects(fn, *a):
     try:
         fn(*a)
@@ -311,9 +359,18 @@ def main():
     ap.add_argument('--pe', required=True)
     ap.add_argument('--negctl', action='store_true')
     ap.add_argument('--fixed', action='store_true', help='修復後 IR (#3450) を照合する。既定は修復前 IR (#3426)')
+    ap.add_argument('--fixed412', action='store_true', help='修復後 IR (#4521・412fc0 の 5 引数化) を照合する')
     a = ap.parse_args()
     m = Machine(a.pe)
     src = open(a.ir, errors='replace').read()
+    if a.fixed412:
+        if a.negctl:
+            bad = negctl_412(src, m)
+            print('[verify_abi_3426] ネガティブコントロール (412fc0 修復後): NG %d 件' % bad)
+            sys.exit(1 if bad else 0)
+        n = check_fixed_machine(m) + verify_default_global(m) + check_fixed_412(src)
+        print('[verify_abi_3426] 照合 OK (412fc0 修復後): 機械語・IR で %d 項目 (5 引数化・既定値分岐・呼出元 3 site)' % n)
+        return
     if a.fixed:
         if a.negctl:
             bad = negctl_fixed(src, m)
