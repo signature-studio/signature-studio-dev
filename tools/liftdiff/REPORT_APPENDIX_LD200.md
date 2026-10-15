@@ -1,12 +1,12 @@
 # liftdiff LD-200 (#4184) — `WindowFromPoint` の wasm harness 解決と `4256c0` の判定
 
 > 親: #3862 (LD-179)。前提の付録: `REPORT_APPENDIX_LD52.md` (11 関数 batch)。
-> 測定 commit: `1483d6fd1` (#4441 / LD-218 の再測定。現 head で build と 11 関数 batch を実行した commit)。前回の測定 commit は `318ffa941`。素材: `fl-win64`・`toolchain-emsdk`・`work-m11`・`work-liftdiff` (`$ARTIFACTS_DIR` の 4 件を展開して使用)。
+> 測定 commit: `1483d6fd1` (#4441 / LD-218 の再測定。現 head で build と 11 関数 batch を実行した commit)。前回の測定 commit は `318ffa941`。素材 (測定時): `fl-win64`・`toolchain-emsdk`・`work-m11`・`work-liftdiff`。fix run (レビュー差し戻し対応) の `ARTIFACTS_DIR` には `fl-win64` のみ実在することを `ls` で確認した。残り 3 件は本 run では確認できず、再実行していない。
 
 ## 1. 結論
 
-- `WindowFromPoint` の stub skip を解消した。`origin/main` (`ac51e9316`) では `skipped 1` (`undefined 1`) で、wasm では import が未定義のまま残る。本 PR の現 head では `skipped 0` (`undefined 0`)。
-- `4256c0` は `wasm_trap` でなくなった。`origin/main` では `wasm_trap` (`missing function: WindowFromPoint`)、本 PR では `mismatch` (`import_arg_diff`)。wasm は実行され、判定が出る。
+- `WindowFromPoint` の stub skip を解消した。`origin/main` (`ac51e9316`) では `skipped 1` (`undefined 1`) で、wasm では import が未定義のまま残る (前回測定 `318ffa941` の結果。`origin/main` は今回の run で再測定していない)。本 PR の現 head (`1483d6fd1`) では `skipped 0` (`undefined 0`)。
+- `4256c0` は `wasm_trap` でなくなった。前回測定 (`318ffa941`) の `origin/main` では `wasm_trap` (`missing function: WindowFromPoint`)、本 PR では `mismatch` (`import_arg_diff`)。wasm は実行され、判定が出る。
 - 受入条件の `match` は未達。差分は `WindowFromPoint` の第 1 引数 (x) が wasm で 0 になる件 (§3・§5)。
 - 11 関数 batch の判定は、本 PR の現 head と `origin/main` で `4256c0` 以外が一致する (§3)。
 - `WindowFromPoint` の戻り値の仕様 (`gui_core.c` の `hit_test`) は wasm の harness に入っていない。wasm の `ld_stub` は既定応答 0 を返す (`rt/ld_core.h` の `ld_model_call`)。native も同じ既定応答 0 で、戻り値は一致している。
@@ -23,9 +23,9 @@
 
 ## 3. 実測 (測定 commit `1483d6fd1`・#4441 で再測定)
 
-素材の展開: `fl-win64` → `$HOME/analysis/win64` (`FL_WIN64_DIR`。tarball は `extracted/` と installer を含むので `win64/` に入れ直した)、`work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` (gitignore 対象。commit していない)。`toolchain-emsdk` は agent-setup が `/opt/emsdk` に展開済み。
+素材の展開: `fl-win64` → `[WIN64]` の展開先 (`FL_WIN64_DIR`。tarball は `extracted/` と installer を含むので `win64/` に入れ直した)、`work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` (gitignore 対象。commit していない)。`toolchain-emsdk` は agent-setup が `[EMSDK]` に展開済み。
 
-手順: `FL_WIN64_DIR=$HOME/analysis/win64` → `python3 ldlib/build_wasm.py targets/m11.json --force` → `python3 liftdiff.py batch targets/m11.json --set file:targets/ld52_11.txt --shards 4 --nobuild --out work/ld218_head.jsonl`。
+手順: `FL_WIN64_DIR=[WIN64] の展開先` → `python3 ldlib/build_wasm.py targets/m11.json --force` → `python3 liftdiff.py batch targets/m11.json --set file:targets/ld52_11.txt --shards 4 --nobuild --out work/ld218_head.jsonl`。
 
 build (rc 0・wall 7.7 秒)
 
