@@ -52,7 +52,7 @@
 | `node tests/provider_check.mjs` | §1・§2 の件数 assert (`impl 204`・`unimpl 231`) は通過 (`AssertionError` 0 件)。§3 (`dist/flpy.js` 経路) で `ERR_MODULE_NOT_FOUND` により停止 (**未実行・未解決 #4052**) |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | **未実行**: `dist/flpy.js` が無い (`build_cpython_wasm.sh` が必要・#4052) |
 
-### ネガティブコントロール (merge 後の HEAD で実施)
+### ネガティブコントロール (merge 後の HEAD `f319facbc` で実施)
 
 C 側だけ `ui_time_disp_min = !ui_time_disp_min` を `ui_time_disp_min = ui_time_disp_min` に壊して `provider/build.sh` → `ui_state_diff.mjs` を実行 (`b87af9d82` 上・作業ツリーのみ変更):
 
