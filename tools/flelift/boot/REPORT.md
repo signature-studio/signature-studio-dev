@@ -1,6 +1,6 @@
 # tools/flelift/boot — FLE-2〜FLE-5: x64c lift による FLEngine boot 連鎖 (DllMain → _InitLib → InitUnits)
 
-> 正本: `tools/flelift/boot/REPORT.md`。boot 連鎖 (FLE-2〜FLE-5) の測定値・成果物・引継ぎ。boot_e2e の shard 別 RSS・variant 実測 (#4855・測定 commit `96723a2ed`) は `REPORT_APPENDIX_4855.md`。
+> 正本: `tools/flelift/boot/REPORT.md`。boot 連鎖 (FLE-2〜FLE-5) の測定値・成果物・引継ぎ。boot_e2e の shard 別 RSS・variant 実測 (#4855・測定 commit `96723a2ed`) は `REPORT_APPENDIX_4855.md`。FLE-39 (#5013): `FLE_BOOT_LOG_CAP` 超過は既定経路で `log_cap.hit=bytes` まで計数されるが `boot.threw` は `exit` のまま (cap 有無で同一) → `REPORT_APPENDIX_5013.md`。
 > 行数上限 (250 行, `docs/DOC_MAP.md` §1) 超過のため、ラウンド別の経緯と停止原因の逆引きは
 > `REPORT_APPENDIX.md` に**分割移動**した (内容は削除していない)。#2719 (x64c 寛容起動・942 unit 逐次試行・CreateFruityInstance 観測): 942 試行、CFI は入口 (0x1375990) まで dispatch され、本体内で oob trap (trap 地点は未特定・soft 呼出し 0 件) → `REPORT_APPENDIX_2719.md`。
 
@@ -13,7 +13,7 @@
 - ラウンドごとの詳細 (FLE-2〜FLE-5 の成果・修正 3 件・FLE-4/5 の逆引き 5 段) は `REPORT_APPENDIX.md` §A・§B。**FLE-12 (#3090)**: unit 209 直後の `0x6a7b70` の呼出元は `0x6c7923` ← `0x815920` (`f_815050`)、幅 r8 = 矩形の幅 = 2^20 (即値 `0x4130000000000000` 由来の推定)、修復は未了 (`REPORT_APPENDIX_3090.md`)。
 - **FLE-9 (§9, #2700) の結果**: lift → 8 shard clang (cap 内・計 89 s) → link (mismatch/undefined/dup 0) → boot まで到達。units_run は shim 有・ネガコンとも 209 のまま (停止点: `MessageBoxA` → `exit(0)`)。shim 有の IPP 判定は NG (終了時の 0x15F34A0 は 0。FLE-10 (§10, #2702): shim 有でも units は前進せず 209)。
 - **既定経路の更新 (#672・PM 判断 2026-10-15)**: 既定 (`FLE_IPP` 未指定) = ILT 分岐入力 (mode 3) + 停止点 `0x976da0` の既定 root 化で **units 209 → 895** (ネガコン `FLE_IPP=0` は 209)。詳細と実測は `REPORT_APPENDIX_672.md` §C。
-- **FLE-15 (#3770・診断 route の有界実行)**: 0x6bbc20 root の診断 route は時間上限 300 s で units 209 のまま停止せず (呼出し 6,559,882 回・矩形 (0,0,2^20,2^20))。既定経路 (root 0x6a7b70) は不変。詳細は `REPORT_APPENDIX_3770.md`。
+- **FLE-15 (#3770・診断 route の有界実行)**: 0x6bbc20 root の診断 route は時間上限 300 s で units 209 のまま停止せず (呼出し 6,559,882 回・矩形 (0,0,2^20,2^20))。既定経路 (root 0x6a7b70) は不変。詳細は `REPORT_APPENDIX_3770.md`。FLE-37 (#4983): 既定経路の `FLE_BOOT_LOG_CAP` 無効化を修正 (`REPORT_APPENDIX_4983.md`)。
 - **FLE-16 (#3771)**: `0x6bbc20` を `[obj+0x118]` へ書く命令は `f_6bc010` の `0x6bc1af` (4・8・16 byte の store の監視で実行時 1 件・obj = `0x12d6a090`。1・2 byte の store は未監視)。役割は画素の store/blend 関数の登録 (推定)。呼出しは `f_6c9280` の `0x6c937a`。詳細は `REPORT_APPENDIX_3771.md`。
 - **PERF-P14 (#970)**: boot closure を -O0 / -O2 / -O2 -flto で build・実行 (node n=10)。3 変種の署名は計数と ipp 状態が一致 (出力メモリは未比較)・units 209 据え置き。ネガコン (`FLE_IPP=0`) で署名は変わる。LTO の結論は shim (-O1 固定) を含まない範囲に限る。実測値・範囲は `REPORT_APPENDIX_970.md`。
 

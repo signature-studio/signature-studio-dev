@@ -49,7 +49,7 @@
   }
  ],
  "abi": {
-  "gui_shared_ptr": 271684800,
+  "gui_shared_ptr": 271684992,
   "gui_shared_ptr_ge_0x10000": true,
   "screen_dc": "0x1200015",
   "screen_dc_in_31bit": true
@@ -64,178 +64,190 @@
   },
   {
    "order": 2,
+   "name": "CharLowerBuffW",
+   "calls": 2,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 3,
+   "name": "CharUpperBuffW",
+   "calls": 2,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 4,
    "name": "GetDC",
    "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 3,
+   "order": 5,
    "name": "GetDeviceCaps",
    "calls": 3,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 4,
+   "order": 6,
    "name": "ReleaseDC",
    "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 5,
+   "order": 7,
    "name": "CreatePalette",
    "calls": 1,
    "kind": "IMPL",
    "prio": "2"
   },
   {
-   "order": 6,
+   "order": 8,
    "name": "GetStockObject",
    "calls": 7,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 7,
+   "order": 9,
    "name": "LoadIconW",
    "calls": 2,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 8,
+   "order": 10,
    "name": "RegisterWindowMessageW",
    "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 9,
+   "order": 11,
    "name": "GetSystemMetrics",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 10,
+   "order": 12,
    "name": "FindWindowW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 11,
+   "order": 13,
    "name": "LoadCursorW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 12,
+   "order": 14,
    "name": "LoadImageW",
    "calls": 21,
    "kind": "IMPL",
    "prio": "2"
   },
   {
-   "order": 13,
+   "order": 15,
    "name": "GetKeyboardLayout",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 14,
+   "order": 16,
    "name": "EnumDisplayMonitors",
    "calls": 1,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 15,
+   "order": 17,
    "name": "SystemParametersInfoW",
    "calls": 2,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 16,
+   "order": 18,
    "name": "DeleteObject",
    "calls": 6,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 17,
+   "order": 19,
    "name": "GetIconInfo",
    "calls": 1,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 18,
+   "order": 20,
    "name": "GetObjectW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 19,
+   "order": 21,
    "name": "CharNextW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 20,
+   "order": 22,
    "name": "CharLowerW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "2"
   },
   {
-   "order": 21,
+   "order": 23,
    "name": "GetClassInfoW",
    "calls": 2,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 22,
+   "order": 24,
    "name": "RegisterClassW",
    "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 23,
+   "order": 25,
    "name": "CreateWindowExW",
    "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 24,
+   "order": 26,
    "name": "SetWindowLongPtrW",
    "calls": 3,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 25,
+   "order": 27,
    "name": "UnregisterClassW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
   }
  ],
- "icall_miss": 11,
+ "icall_miss": 8,
  "icall_miss_targets": [
-  "0x457860",
   "0xfa9390",
-  "0x85df70",
   "0x6f705f79"
  ]
 }
