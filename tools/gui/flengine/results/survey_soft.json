@@ -101,7 +101,7 @@
    "order": 12,
    "name": "LoadImageW",
    "calls": 21,
-   "kind": "STUB",
+   "kind": "IMPL",
    "prio": "2"
   },
   {
@@ -252,11 +252,9 @@
    "prio": "2"
   }
  ],
- "reach_summary": "reached=33 impl=32 stub=1",
+ "reach_summary": "reached=33 impl=33 stub=0",
  "failfast_apis": {},
- "softstub_apis": {
-  "LoadImageW": 21
- },
+ "softstub_apis": {},
  "failfast_count": 0,
  "gui_icall_calls": 7,
  "gui_ring_discarded": 0,
