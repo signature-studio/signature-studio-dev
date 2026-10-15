@@ -10,19 +10,20 @@
 - 残り 5 site (1046a30 104c769・104c9e6、1280530 12827e6、c589b0 c5d2df・c5d343) は局所変数 `[rbp+d]` への store 経由で、この根拠の型に当たらない → #3579 [LD-163]。直さない。
 - spill 宛 CELL_COLLAPSED は **37 → 28** (#2794 と同じ。1 対 1 の 9 site が消え、根拠の付いた 4 site は audit 上まだ残る。§4)。修復した IR 上の site は 9 → **13** (1 対 1 の 9 + 根拠の 4)。
 - 修復した cell に残る非 store 消費 (ea7ae0 の `icmp slt` の読み出し 3 本) は 2 段 deref の脱落の疑い (未検証) → #3580 [LD-164]。
-- `fix_d17_e2e.sh` rc=0・突合 PASS・emcc rc=0 (コミット済み HEAD で n=2)。起動 (FLEngine boot) は動かしていない (§6)。
+- `fix_d17_e2e.sh` rc=0・突合 PASS・emcc rc=0 (コミット済み HEAD `3b4df290f` で n=2)。ネガコン 4 (引数位置を 1 つずらす) を e2e に入れた (§5)。起動 (FLEngine boot) は動かしていない (§6)。
 
 ## 1. 測定条件
 
-- 測定 commit: `170bc1639` (コードを変えた最後の commit: `fix(m11): repair spill TRUE_DROP sites by call-argument flow (#2910)`)。起点 `origin/main` = `4868fc52b`。作業 worktree `ws-2910` (branch `2910-spill-equal-read-repair`)。
+- 測定 commit: `3b4df290f` (コードを変えた最後の commit: `fix(m11): require deref chain for callarg and add argi-shift negative control (#2910)`)。起点 `origin/main` = `4868fc52b`。作業 worktree `ws-2910` (branch `2910-spill-equal-read-repair`)。前回の測定 commit は `170bc1639` (round 1 の差し戻し前。round 2 でコードを変えた)。
 - 素材: `work-m11` を `$RUNNER_TEMP/m11work` に展開し、`M11_WORK=<その tools/m11/work>` で指定 (`tools/m11/work/` への展開は行わない)。emcc は runner の `[EMSDK]` (`docs/REFERENCES.md`)。`work-liftdiff` は本 e2e では未使用 (受入の `oc_artifacts` 行には残す)。`work-m11` は #516 以前の snapshot なので、結論はこの IR に限る (`REPORT_1169.md` §1 と同じ)。
 - 実行: `M11_WORK=... TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground)。
-- 実測 (測定 commit `170bc1639`、n=2): real **47.37 s / 47.63 s**、rc **0 / 0**、load average (1 分) 実行前 0.50、終了後 0.90。
+- 実測 (測定 commit `3b4df290f`、n=2): real **48.62 s / 48.37 s**、rc **0 / 0**、load average (1 分) 実行前 0.40 / 0.74、終了後 0.74 / 0.89。TSV `results/spill_repair_2794.tsv` の cmp は 2 回とも一致。
+- 参考 (直前の head `43ea6c521` で同じ e2e を 1 回): real 48.18 s、rc 0。判定条件の追加で時間は増えていない。
 - 基準 (修復前。`origin/main` の script で同じ e2e を 1 回): real 46.50 s、rc 0、load average (1 分) 終了後 0.91。
 - 測定後のコード差分 (測定 commit から HEAD まで。この REPORT を追加する commit 以外は無い):
 
   ```
-  git diff 170bc1639 HEAD -- tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf*.py tools/m11/ldfix/ldmach*.py tools/m11/ldfix/spill37_1169.py tools/m11/ldfix/fix_spill_2794.py tools/m11/ldfix/check_spill_2794.py tools/m11/ldfix/results tools/m11/lb_base.py
+  git diff 3b4df290f HEAD -- tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf*.py tools/m11/ldfix/ldmach*.py tools/m11/ldfix/spill37_1169.py tools/m11/ldfix/fix_spill_2794.py tools/m11/ldfix/check_spill_2794.py tools/m11/ldfix/results tools/m11/lb_base.py
   (空: 差分 0)
   ```
 
@@ -49,11 +50,13 @@
 
 次の 3 条件をすべて満たす site だけを直す (`judge_callarg`)。
 
-1. 機械語: site が `mov dword ptr [rsp+0x20+8j], reg32` (outgoing 引数。argi = 4+j)。直前の rip 読み出し R から site まで分岐・call が無く (3 命令以内)、site の直後 4 命令以内に direct call (callee F)。
+1. 機械語: site が `mov dword ptr [rsp+0x20+8j], reg32` (outgoing 引数。argi = 4+j)。直前の rip 読み出し R (`mov Rr,[rip+X]`) から site まで分岐・call が無く、R と site の間はちょうど 1 命令で `mov Sr32,[Rr]` (disp 0。store のレジスタ Sr は R の値を逆参照して得た値)。site の直後 4 命令以内に direct call (callee F)。
 2. IR: K の `load iN` (N = 32 = 機械語 store 幅) の値 (`sext`/`zext`/`trunc` 1 段まで) が、F の呼び出しの引数 argi (0 始まり) と一致し、その組がちょうど 1 つ。
 3. M = I (機械語の rip 読み出し数 = IR の K の出現数)。M > I (B 分類) は本 issue の範囲外なので除外する。
 
 この型では、R と load の組を「値の流れ」で決めている。1 対 1 ゲート (M = I = 1) とは独立な根拠。
+
+R から store までの連鎖 (`mov Rr,[rip+X]` → `mov Sr32,[Rr]` → `mov [rsp+..],Sr32`) は、round 2 で条件 1 に足した (store のレジスタが R の値の逆参照から来ることを確かめる)。4 site の機械語 (100b8c7→100b8ce→100b8d0、ea7c58→ea7c5f→ea7c61、ea7c8e→ea7c95→ea7c97、ea7cbf→ea7cc6→ea7cc8) はすべてこの連鎖に一致する。連鎖に一致しない callarg 候補は `callarg_no_deref_chain` で見送る。今の e2e の見送り 11 site は、この条件に届く前に上流の条件 (`callarg_site_not_rsp`・`callarg_m_ne_i`・`callarg_width`) で落ちるので、この条件で新たに見送られた site は無い。
 
 ### 2-2. 修復 pass の差分
 
@@ -81,7 +84,7 @@
 | うち TRUE_DROP 24 site の残数 | 24 | 15 (= 見送り 11 + callarg 修復 4。audit 上は残る) |
 | 修復した IR 上の site | - | 13 |
 
-callarg の 4 site は、修復後の audit で CELL_COLLAPSED のまま残る。`audit_lsf_ssa.cell_check` は site ごとでなく **関数 × K** で判定し、同じ K の i32 の const load が 1 本でも残ると CELL_COLLAPSED とする。ea7ae0 の 3 K と 100b890 の K (11e27f0) には、修復していない i32 読み出しが残る (§5、100b890 は %15・%23 の 2 本)。この粒度は本 issue の範囲外で、子 #3580 [LD-164] に移した。
+callarg の 4 site は、修復後の audit で CELL_COLLAPSED のまま残る。`audit_lsf_ssa.cell_check` は site ごとでなく **関数 × K** で判定し、同じ K の i32 の const load が 1 本でも残ると CELL_COLLAPSED とする。ea7ae0 の 3 K と 100b890 の K (11e27f0) には、修復していない i32 読み出しが残る (100b890 は IR の `%15` (`%17 = mul i32 %16, %15`) と `%23` (`%28 = mul i32 %27, %23`) の 2 本。§7)。この粒度は本 issue の範囲外で、子 #3580 [LD-164] に移した。
 
 ## 5. ネガティブコントロール (受入 3)
 
@@ -90,7 +93,7 @@ callarg の 4 site は、修復後の audit で CELL_COLLAPSED のまま残る�
 | N1 (修復を外した audit) | d17 のみの audit を突合に渡す | FAIL C2 (rc=1)。e2e で期待どおり FAIL を確認 |
 | N2 (1 対 1 ゲートを外す) | `--gate none` | 24 件を書き換え (`spill fixed=24 skipped=0`)。e2e で assert |
 | N3 (根拠のみ 1 対 1) | `--gate 1to1` | 9 件 (callarg の 4 件が増えないこと)。e2e で assert |
-| N4 (引数位置を 1 つずらす) | `argi = 5 + ...` のコピーで実行 | 修復 9 件。callarg の 4 件はすべて見送り (`fixed=9 skipped=15`)。根拠の argi が効いている |
+| N4 (引数位置を 1 つずらす) | `fix_d17_e2e.sh` のネガコン 4。`argi = 4 + ` を `argi = 5 + ` に置換したコピー (`$OUT/fix_spill_2794_argi5.py`) を `PYTHONPATH=$HERE:tools/m11` で `--gate both` 実行 | e2e で assert: `spill fixed=9 skipped=15 ` で始まり、callarg の 4 site (100b8d0・ea7c61・ea7c97・ea7cc8) が `callarg_ir_matches=0` で見送られる (該当行 4 件)。根拠の argi が効いている |
 | N5 (M = I 条件を外す) | 条件を外して実行 (作業中の確認) | ff8b60 (B 分類、M=2・I=1) が根拠ありで修復され、計 14 件。M = I を入れる必要 |
 
 ## 6. 検証範囲 / 範囲外
@@ -105,7 +108,7 @@ callarg の 4 site は、修復後の audit で CELL_COLLAPSED のまま残る�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 局所スロット `[rbp+d]` 経由の 5 site (C 分類の残り。§2 #2〜6) | spill 宛 CELL_COLLAPSED の残り 5 (根拠未決) | 子 #3579 [LD-163] |
-| 修復した cell に残る非 store 消費 (ea7ae0 の `icmp slt` の 3 読み出し: IR 461130・461142・461157 ↔ 機械語 ea7e6d・ea7ea0・ea7ed6) の 2 段 deref 脱落の疑い (未検証) | 同じ関数の残存 miscompile の疑い。audit は store 単位で数えないため見えない | 子 #3580 [LD-164] |
+| 修復した cell に残る非 store 消費の 2 段 deref 脱落の疑い (未検証): ea7ae0 の `icmp slt` の 3 読み出し (IR 461130・461142・461157 ↔ 機械語 ea7e6d・ea7ea0・ea7ed6)、100b890 の cell `11e27f0` の i32 読み 2 本 (IR `%15`・`%23`。下流は mul。修復した `%6` と同じ cell) | 同じ関数の残存 miscompile の疑い。audit は store 単位で数えないため見えない | 子 #3580 [LD-164] |
 | audit の判定粒度 (関数 × K) | 修復しても CELL_COLLAPSED の件数が減らない (callarg 4 件) | 子 #3580 [LD-164] |
 | B 分類 6 site (IR の読み出しが機械語より少ない) | 修復しない (M > I) | #2940 [LD-141] (既存) |
 | 判定不能 7 site (UNDETERMINED) | 修復対象外 | #2253 [LD-95] (既存) |
