@@ -124,6 +124,7 @@
 | `tools/qfclift/REPORT_APPENDIX_3410.md` | ~47 | T-SH-77 (#3410) の付録: REPORT §7.8 の全文。longjmp (0x40f9c0) の override (`qfc_ov.c`) と戻り先 root `0x59c210` の切り分け表 (soft 版の停止点は `ExitProcess(0)`・偽の停止の可能性は未検証)・boot / e2e の実測 |
 | `tools/qfclift/REPORT_APPENDIX_3412.md` | ~50 | T-SH-79 (#3412) の付録: REPORT §9 の全文。FT_* 14 本の token 経由呼出 (表・直接呼出との照合・ネガコン)・FreeType wasm32 ビルド (#145 方式)・検証範囲と未解決 |
 | `tools/qfclift/REPORT_APPENDIX_3434.md` | ~35 | T-SH-83 (#3434) の付録: REPORT §11 の全文。`imp_GetProcAddress` → `qfc_gpa` の結線 (hook 形・e2e 実測・boot 停止点)・未解決 |
+| `tools/qfclift/REPORT_APPENDIX_4263.md` | ~90 | T-SH-107 (#4263) の付録: longjmp 0x40f9c0 の呼出元 (`0x40fbcf`・`0x40fcb8`。issue の `0x40fbd4`・`0x40fcbd` は戻り番地)・`[0x5aa000]` の書込み元 (setter `0x40fd10`)・発火経路 A/B の静的解析。解析道具 `callers_4263.py` |
 | `tools/qfclift/REPORT_APPENDIX_4296.md` | ~45 | T-SH-113 (#4296) の付録: REPORT §7.9 の全文。`FontCache_GetStats` / `CleanUp` の直接呼出し (DllMain を通さない) の実測・推定引数・停止点 |
 | `tools/iltools/REPORT.md` | ~66 | T-SH-12 (#154): ILTools_x64.dll の export 閉包 lift gate (閉包 824 関数・unsup 0 / 閉包外の x87 関数 45 本は `x64c --trap` の trap stub・陰性対照 2 本)。全 .pdata 測定 (unsup 1,236 は全て x87) は §3 |
 | `tools/fruityplug/REPORT.md` | ~60 | T-SH-12 (#154): SGv2 の win 対応の検証。classify.py の block24353 (FruityPlug_x64.dll 名) は VERSIONINFO で Maximus と判明し SGv2 の根拠にならない。export 名は 133 本で非一意。mac 素材との突合は未達 |
