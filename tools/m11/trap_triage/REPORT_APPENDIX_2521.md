@@ -73,7 +73,7 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 
 ### 8.6 fix round 1: 再測定 (ON / OFF / probe の unit 別突合)
 
-測定は実測・単発 (n=1)。survey は直列 1 本、1 回 12 s。測定 commit `24a8965bd` (コード差分の最終 commit。基点 `bd4463eaa`)。`git diff 24a8965bd HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は 0 行。IR は本 run で `m11_gen_ir2.sh` を作り直した (`ldfix`・`ld108`・`ld115`・`r8b` = applied)。`m11_build.sh` 後は `qstore=applied`、ir_sha256 `e608b0f3…`。PR 時点の `116d9406…`・REPORT §1 の `6909f85d…`・#3482 本文の `17a98d6e…` のいずれとも異なる。IR の sha が環境ごとに変わる理由は未切り分け。
+測定は実測・単発 (n=1)。survey は直列 1 本、1 回 12 s。測定 commit `62f1345fd` (コード差分の最終 commit。`m11_build.sh` は `a2173a3f3` と同一、`trap_triage/probe_trace.sh` は `24a8965bd` で追加。基点 `bd4463eaa`)。`git diff 62f1345fd HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は 0 行。IR は本 run で `m11_gen_ir2.sh` を作り直した (`ldfix`・`ld108`・`ld115`・`r8b` = applied)。`m11_build.sh` 後は `qstore=applied`、ir_sha256 `e608b0f3…`。PR 時点の `116d9406…`・REPORT §1 の `6909f85d…`・#3482 本文の `17a98d6e…` のいずれとも異なる。IR の sha が環境ごとに変わる理由は未切り分け。
 
 | 条件 | ok / trap / miss (noproc) | unit 144 (0x25c540) | OFF との unit 差 |
 |---|---|---|---|
@@ -87,7 +87,7 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 - trap 経路 (probe 下): unit 144 の trace は ON + probe・OFF + probe とも `[probe_free] arg1=5c hdr=0 [hdr]=865901` (同じ値)。unit 745 は `arg1=10ba240c hdr=ffffffa0 [hdr]=0`。
 - trace 行の件数 (ON + probe): `[probe_list]` 30・`[probe_grow]` 9・`[probe_free]` 2。§8.5 の『list Add 32 件』は PR 時点 IR の値。
 - 判定: 『ON で unit 144 が ok → oob』は本 run では成立しない (OFF でも trap)。trap 経路 (`412d60(0x6c)` → `409440(0x5c)` → `407e20` で `[0]` が範囲外) は probe 下で ON/OFF とも再現した。ON 固有の回帰の有無は、PR 時点の IR と同じ sha を再現できてから判定する (#3592 の受入)。
-- ov.o の注意 (本 fix round で修正): `m11_build.sh` は `M11_FIX_50A830` の切替えで `work/obj/ov.o` を作り直さなかった (stamp 無し)。stamp `work/ov_fix_50a830.stamp` を追加した。上の数値は、対応する ov.o を作り直した後に取った (OFF は `rm work/obj/ov.o` の後、ON は stamp 追加後の再ビルドで `cc m11_ov.c` 1 件を確認)。
+- ov.o の注意: `m11_build.sh` には `M11_FIX_50A830` の切替えで `work/obj/ov.o` を作り直す stamp が無い (同じ修正は #3620・#3645 が持つ。本 PR では重ねない)。stamp 無しでは、ON で作った ov.o を後の OFF build が再利用する (`cc m11_ov.c` 0 件を確認)。上の数値は、各ビルドの前に `rm -f work/obj/ov.o` を実行して取った (各 build の `cc m11_ov.c` は 1 件)。HEAD (`62f1345fd`) で ON+probe・ON・OFF を取り直し、上の表と unit 単位で一致 (差 0)。
 
 GUI (m2): `tools/gui/flengine/build.sh` は `m11_ov.c` を独自の CF で直接コンパイルする。差し戻し時の reviewer 実測 (同じ CF の `cc -E -P`): 基点 `bd4463eaa` と PR head の既定出力は同一 (9132 行・差 0)。`-DM11_PROBE_LIST=1` のみ +6 行 (ネガティブコントロール)。本 run では GUI の e2e は実行していない。
 
@@ -99,13 +99,13 @@ main との関係 (m3): `git merge-tree --write-tree origin/main HEAD` は競合
 mkdir -p "$RUNNER_TEMP/win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/win64" extracted/block00031_PE.bin
 tar --zstd -xf "$ARTIFACTS_DIR/work-m11.tar.zst"
 cd tools/m11 && FL_WIN64_DIR="$RUNNER_TEMP/win64" bash m11_gen_ir2.sh
-cd tools/m11 && FL_WIN64_DIR="$RUNNER_TEMP/win64" M11_FIX_50A830=1 M11_PROBE_LIST=1 bash m11_build.sh
+cd tools/m11 && rm -f work/obj/ov.o && FL_WIN64_DIR="$RUNNER_TEMP/win64" M11_FIX_50A830=1 M11_PROBE_LIST=1 bash m11_build.sh
 cd tools/m11 && M11_SURVEY_DETAIL="$RUNNER_TEMP/detail_on_probe.json" node m11_survey.mjs
 cd tools/m11 && M11_SURVEY_DETAIL="$RUNNER_TEMP/detail_trace.json" bash trap_triage/probe_trace.sh 2> "$RUNNER_TEMP/trace.err" > "$RUNNER_TEMP/trace.out"
 awk '/^\[UNIT\] /{u=$2} /\[probe_(free|list|grow)\]/{print "unit=" u, $0}' "$RUNNER_TEMP/trace.err"
 ```
 
-- OFF / ON の切替え: `cd tools/m11 && FL_WIN64_DIR="$RUNNER_TEMP/win64" bash m11_build.sh` (OFF) または `… M11_FIX_50A830=1 …` (ON) の後、`M11_SURVEY_DETAIL=<path>.json node m11_survey.mjs`。
+- OFF / ON の切替え: `cd tools/m11 && rm -f work/obj/ov.o && FL_WIN64_DIR="$RUNNER_TEMP/win64" bash m11_build.sh` (OFF) または `… M11_FIX_50A830=1 …` (ON) の後、`M11_SURVEY_DETAIL=<path>.json node m11_survey.mjs`。
 - unit 差分: `python3 -c "import json,sys; a=json.load(open(sys.argv[1])); b=json.load(open(sys.argv[2])); print([(x['i'],x['kind'],y['kind']) for x,y in zip(a,b) if x!=y])" A.json B.json`
 - 集計: survey の標準出力 `M11_SURVEY {...}` の `"ok"`・`"trap"`・`"miss"`・`"noproc"`。
 - unit 144 のスタック: `M11_SURVEY_STACK=144 node m11_survey.mjs`。
