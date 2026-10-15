@@ -113,23 +113,54 @@ harness を拡張した (`WC_INIT_RVA`・`WC_ARENA_SZ`・`WC_CALL_ARGS` を slot
 
 未解決 (受入 3 の残件・#4302 に残す): slot 1 で wasm が trap する原因の特定 (native と wasm の `this` 内部状態の比較)。
 
-## 8. 検証
+## 9. slot 1 の wasm trap の原因 (受入 3 の残件・診断)
 
-- 測定 commit: `08fdc1db8` (現 head。コードを変えた最後の commit。前版 `e366f3ef9` からの差分は `tools/shared/lift/ildsp` の 5 files +37/-7 で、既定の差分テストの経路 (`wc_glue.c`・`wc_image.py`・`wc_native_ref.c`・`wc_run_wasm.mjs`・`lift_wc.sh`) を含むため、`e366f3ef9` の値は使わない)。
-- 素材: `fl-win64` の `extracted/block24360_PE.bin` (`work/fl` に展開)、`toolchain-emsdk` は上流 emsdk から 6.0.12 を入れて使った (emcc 6.0.12 を確認)。
-- 既定 `lift_psola.sh ok` (`08fdc1db8`): PASS=64 FAIL=0 wasm trap 0・rc 0・elapsed 2.42 s (emcc 込み)・load 1.23→1.22。
-- `psola_init_probe.sh` (`08fdc1db8`): rc 0・0.547 s (1 回)・load 0.40。§4 の表と一致 (slot 2 の順次呼出し `rax` は環境依存で値は変わるが完走)。
-- 差分 harness の拡張 (§7 の結論): 下のコマンド・`08fdc1db8`・rc 1・elapsed 26.74 s・load 0.76→0.85。native 64/64 完走 (SEGV 0)、wasm traps 64・PASS 0・FAIL 64。WC_ROOTS に `0x1b7d80` を入れない版でも同じく全 case が trap (elapsed 23.88 s)。
-
-再現コマンド (`lift_psola.sh` は `WC_ROOTS`・`WC_CALL_IDX` を固定で export するため、この設定は `lift_wc.sh` を直接呼ぶ。`lift_psola.sh` の既定は変えていない):
+測定 commit: `7ace9f448` (段階 5 の後の診断・差分 harness の実測。§8 の値はこの commit)。再現コマンド (`lift_wc.sh` を直接呼ぶ。`WC_LOG_FD=1` で段階の trap を出す):
 
 ```
 WC_ENTRY_RVA=0x1ab540 WC_VTABLE_RVA=0x3e0030 WC_WORK=ildsp-psola-s8 WC_INIT_RVA=0x1b7d80 WC_ARENA_SZ=0x400000 \
-WC_ROOTS="0x1ab540 0x1ab590 0x1ab690 0x1ab6b0 0x1ab800 0x17f700 0x180830 0x1b7d80" \
+WC_ROOTS="0x1ab540 0x1ab590 0x1ab690 0x1ab6b0 0x1ab800 0x17f700 0x180830 0x1b7d80 0x1ab680 0x1ab6a0 0x112de0 0x115f00" \
 WC_CALL_IDX="0 1 2 3 4 5" WC_RET_IDX="0 2 4 5" \
-WC_CALL_ARGS="IN OUT 16 0;IN OUT 16 0;IN OUT 16 0;0 16 IN OUT;IN OUT 16 0;IN OUT 16 0" \
+WC_CALL_ARGS="IN OUT 16 0;IN OUT 16 0;IN OUT 16 0;0 16 IN OUT;IN OUT 16 0;IN OUT 16 0" WC_LOG_FD=1 \
 FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<emsdk_env.sh> bash tools/shared/lift/ildsp/lift_wc.sh ok
 ```
+
+診断: `wc_run_wasm.mjs` に `WC_LOG_FD=1` を足した (既定は従来どおり throw)。import `fd_write` に来た runtime の `fprintf(stderr)` を出して続行する。
+
+| 段階 | wasm の trap 内容 (slot 1 `0x1ab680`) | 対処 |
+|---|---|---|
+| 1 | `call to UNLIFTED function 0x301ab680` | slot 1・3 (`0x1ab680`・`0x1ab6a0`) を `WC_ROOTS` に入れていなかった |
+| 2 | `call to UNLIFTED function 0x30112de0` | slot 1 の thunk が `[0x3f59a8]` 経由の間接 `jmp` で `0x112de0` へ飛ぶ。`0x112de0` を root に足す |
+| 3 | `UNSUPPORTED instruction: cmpnlepd` | x64c に SSE2 `cmp*pd` (eq/lt/le/nle) が無かった。`cmppd_pred` を登録 (`x64c.py`) |
+| 4 | `call to UNLIFTED function 0x30115f00` | `0x112de0` の閉包がさらに間接 call 先を持つ。`0x115f00` を root に足す |
+| 5 | `UNSUPPORTED instruction: pmuludq` | x64c に `pmuludq` が無かった。`lane()` で追加 (`x64c.py`) |
+
+- 段階 5 の後: unsup 0・unlifted 0・wasm trap 0 (`lift_wc.sh ok` の `WC_ROOTS` に `0x1ab680 0x1ab6a0 0x112de0 0x115f00` を足した版)。
+- ただし差分は全 case FAIL (PASS 0・FAIL 64)。wasm は完走し、差分の中身はポインタ値。
+
+差分の内訳 (case 0 と case 1 で同じ):
+
+| 項目 | native | wasm |
+|---|---|---|
+| `rax` | `0x2a989efd3e63f` | `0xda2e887f5eb0745f` |
+| arena `+0x278` (8 byte) | `0x30599320` | `0x30598de0` |
+| arena の差バイト数 | — | 81137 (`0x278`・`0x2e0`・`0x301`… から始まる) |
+| hits | 24 | 24 |
+
+- 差は heap 上のポインタ値 (下位 32 bit のずれ) が主で、slot 1 が heap に書く内容が native と一致していない。
+- 原因は未特定。heap の規約 (`wc_glue.c`・`wc_native_ref.c` とも bump heap・同じ開始位置) は一致しているので、slot 1 までの呼出し列で heap の確保順が native と違う可能性がある。未確認。
+- `lift_psola.sh ok` (既定・slot 0・2・4・5) は本修正後も PASS=64 FAIL=0 (`WC_ROOTS` は変えていない)。
+
+## 8. 検証
+
+- 測定 commit: `7ace9f448` (コードを変えた最後の commit。以降の commit は文書のみ: `git diff 7ace9f448 HEAD -- tools/shared/lift/ildsp tools/flelift` は REPORT_APPENDIX_4302.md のみ)。`c9c29634a` からの差分は `tools/shared/lift/ildsp/wc_run_wasm.mjs` の 1 行 (診断用 `WC_LOG_FD=1` の `??=`) のみで、その 1 行も測定経路に入るため、以下は `7ace9f448` で測り直した値。
+- 素材: `fl-win64` の `extracted/block24360_PE.bin` (`work/fl` に展開)、emsdk は上流から 6.0.12 を導入して使った (`EMSDK_ENV` で指定)。
+- 既定 `lift_psola.sh ok` (`7ace9f448`): PASS=64 FAIL=0 wasm trap 0・rc 0・elapsed 3.73 s (emcc 込み)・load 1.18→1.25。
+- 差分 harness (`7ace9f448`・§9 の完全なコマンド): rc 1・elapsed 42.03 s・load 1.15→1.90。native 64/64 完走 (SEGV 0)、wasm traps 0・PASS 0・FAIL 64 (差分は `rax`・arena `+0x278`・`.data +0xb80` の 3 箇所)。
+- 過去の測定 (旧 head `08fdc1db8`、x64c 修正の前): `lift_psola.sh ok` 2.42 s・load 1.23→1.22 (PASS=64)。差分 harness は wasm traps 64・PASS 0・FAIL 64 で 26.74 s・load 0.76→0.85 (§9 の段階 1〜5 の修正前)。
+- `psola_init_probe.sh` (`08fdc1db8`): rc 0・0.547 s (1 回)・load 0.40。§4 の表と一致 (slot 2 の順次呼出し `rax` は環境依存で値は変わるが完走)。
+
+再現コマンドは §9 (差分 harness) と下の `lift_psola.sh` の既定。`lift_psola.sh` は `WC_ROOTS`・`WC_CALL_IDX` を固定で export するため、差分 harness は `lift_wc.sh` を直接呼ぶ。`lift_psola.sh` の既定は変えていない。
 
 - `WC_CALL_ARGS` の並びは slot 0〜5 の順 (`RDX R8 R9 S5`)。slot 3 だけ `RDX=0 R8=16 R9=入力 S5=出力` (probe §4 の規約)。
 - `WC_RET_IDX` の slot 2 は、§4 のとおり環境で `rax` が変わる。native と wasm は同じ実行環境で比べるため、今の結果 (trap) には影響しない。ただし差分を PASS にする段階では、slot 2 を戻り値の畳み込みから外すことを検討する。

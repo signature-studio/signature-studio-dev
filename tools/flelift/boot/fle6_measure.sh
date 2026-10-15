@@ -63,7 +63,7 @@ run_boot() {
   local log="$W/run_${TAG}_$1.log"
   local rc=0
   # FLE-15 (#3770): FLE_BOOT_TIMEOUT 秒で打ち切る (時間上限・rc=124)。ログ上限は FLE_BOOT_LOG_CAP (bytes・fle_boot.mjs が JSON に残す)。
-  FLE_IPP="$3" FLE_TOLERANT="${4:-0}" FLE_DIAG_NULLFILL="${5:-0}" FLE_BOOT_LOG_CAP="${6:-0}" FLE_BOOT_VARIANT=plain timeout "${FLE_BOOT_TIMEOUT:-900}" "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
+  FLE_IPP="$3" FLE_TOLERANT="${4:-0}" FLE_DIAG_NULLFILL="${5:-0}" FLE_BOOT_LOG_CAP="${6:-${FLE_BOOT_LOG_CAP:-0}}" FLE_BOOT_VARIANT=plain timeout "${FLE_BOOT_TIMEOUT:-900}" "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
   if [ "$rc" = 124 ]; then echo "[fle6] $1: 時間上限 ${FLE_BOOT_TIMEOUT:-900}s で打ち切り ($log・ログ $(stat -c%s "$log") B)"; FAIL_RC=124; return 0; fi
   grep 'FLEBOOT_RESULT' "$log" || true
   grep 'FLEBOOT_IPP_CHECK' "$log" || { echo "[fle6] $1: FLEBOOT_IPP_CHECK 行が無い ($log)"; exit 4; }
