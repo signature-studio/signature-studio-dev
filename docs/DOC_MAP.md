@@ -237,7 +237,7 @@
 | `tools/m11/REPORT_N54.md` | 108 | #954: xmm を読む callee の IR 署名復元 (opt-in `M11_XMM_ARGS=1`)・34/49 件復元・survey 差 0・全件復元時の退行の二分探索表・`fix_xmm_args.py` の呼出し引数個数検査 |
 | `tools/m11/REPORT_N154.md` | 94 | #2762: arity 不一致 callee の xmm 呼出し引数の復元 (i128 placeholder を float/double へ変換)・復元 39 件・survey 差 0・`function_40c650` の退行による保留 |
 | `tools/m11/REPORT_N1479.md` | 82 | #1479 (M11-2): xmm 引数を読む callee の署名復元 (opt-in `M11_XMM_ARGS=1`) の現 HEAD での unit 別 A/B (942 本・差 0・ok 喪失 0・unit 838/882/885 ok)・判定スクリプト `m11_xmm_ab.sh`・全再生成基準との未対応 |
-| `tools/m11/REPORT_N190.md` | 86 | #3641 (M11-N190): scalar double (`*sd`) の xmm 読み幅を 64 bit に直す (`p0c/k80abi.py`)・survey 差 0 (942 本・ok 872・ok 喪失 0)・枠型が変わる 3 callee・語尾判定の誤り 4 件 (cvtss2sd の源は単精度) の回避・判定検査 `test_k80abi_width.py` |
+| `tools/m11/REPORT_N190.md` | 107 | #3641 (M11-N190): scalar double (`*sd`) の xmm 読み幅を 64 bit に直す (`p0c/k80abi.py`)・packed 整数の `*sd` (pmaxsd 等) は 32 bit のまま・survey 差 0 (942 本・ok 872・ok 喪失 0・3 回実測)・枠型が変わる 3 callee・語尾判定の誤り 4 件 (cvtss2sd の源は単精度) の回避・判定検査 `test_k80abi_width.py` (手動実行のみ) |
 | `tools/m11/REPORT_N55.md` | 74 | #955: sigfix 0 詰め site 1,049 件の liftdiff 差分ハーネス判定 (一致 174 / 不一致 289 / 未到達 586)・判定表 `results/sigfix_zeropad_liftdiff.tsv`・再現 `m11_zeropad_liftdiff.py` |
 | `tools/m11/REPORT_N53.md` | ~49 | #953: sigfix 0 詰め引数の理由別 (why) 内訳・未復元件数 (kind 件数の正本は REPORT_APPENDIX §9)・`M11_SIGFIX_RECOVER=1` の退行検査 (#131 子) |
 | `tools/m11/REPORT_N21.md` | ~35 | M11-N21 (#572): m11_data_gen.py の DIR64 補正境界 off-by-one の全数照合・参照経路・修正・ネガコン・実測 (REPORT §11 は要約のみ) |
