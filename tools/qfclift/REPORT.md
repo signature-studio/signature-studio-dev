@@ -100,3 +100,44 @@ gate は不合格時に exit 1 になることを実運用で確認済み。
   `work/neg_<name>/qfcl.cjs` に対し `$QFC_PY qfc_diff.py --pe <PE> --cjs work/neg_<name>/qfcl.cjs --out work/recheck_neg_<name> --expect-fail`
   の全出力を取得: pmulhrsw equal 3 / mismatch 9、pshufb equal 2 / mismatch 10、phaddw equal 7 / mismatch 5 (3 本とも `native dst changed 10/10`、FAIL detected)。
 - `find tools/qfclift -type f -size +20M -not -path '*/work/*'` → 0 件。生成物は `work/` (gitignore): `work/lift/qfcl.wasm` 15,115,363 B ほか。
+
+## 7. FT_* の GetProcAddress 解決と FreeType wasm32 ビルド (T-SH-79 / #3412)
+
+既知類型との関係 (DEFECTS.md): 該当なし。測定 commit = `9cd31ba6b` (コード最終 commit)。`git diff 9cd31ba6b HEAD -- tools/shared/oss/freetype` の出力は空 (本節は REPORT のみの変更)。
+
+**結論 (部分達成)**: FT_* 14 本の解決経路を実装し、表経由の FreeType 呼出と同一結果であることを native / wasm32 / wasm64 で確認した。
+guest の `imp_GetProcAddress` への結線と FontCache_GetStats / CleanUp の実行は未着手 (子 #3434。DllMain の 0x563000 は #3410・#3411 の後段で未到達)。
+
+### 7.1 経路の選び方
+- guest の間接 call 先は lift VA と IAT pseudo-VA (`IMP_VA_BASE` 系) だけである。FreeType は host の C 関数なので、関数ポインタを guest に渡さない。
+- 採用: `GetProcAddress` が表で解決できる名前にだけ擬似トークン `QFC_GPA_TOK_BASE (0x7F200000) + 表の index` を返す (`qfc_gpa`)。
+  トークンの呼出は `qfc_gpa_call` が表の fn ポインタを型付きに cast して実行する。Win64 の RCX/RDX/R8/R9 と stack の第 5 引数を受け、
+  `long` は LLP64 の 32bit として下位を符号拡張する。戻り値は eax 書込みの規則で上位 0。
+- 同型の先例: `tools/flelift/boot/fle_boot.c` の FLE-6 (`IPP_TOK_BASE` と `ipp_call`)。本節は ippv2 の経路を FT 14 本に広げた形。
+
+### 7.2 FreeType wasm32 ビルド (#145 の採用方式)
+- 手順: `bash tools/shared/oss/freetype/build.sh` (FreeType 2.7、`FORCE_INT64` + `ftgrays_lp64.patch`、wasm64 は無改変 + `-sMEMORY64=1`)。
+- ソース: `freetype-2.7.tar.gz` (savannah, 2,381,403 B) を `tools/shared/work/src/` に展開。`fetch_sources.sh` 全体は使わなかった。
+- emcc: 6.0.12 (`/opt/emsdk` = runner 同梱)。`toolchain-emsdk.tar.zst` は本 run で展開していない (未使用)。wasm64 の node は `/opt/emsdk/node/24.19.0_64bit` (v24.19.0)。
+- 所要: build.sh の configure+make 3 種 = **36.7 s** (real, n=1)。成果: libfreetype.a native 5,722,182 B / wasm32 714,774 B / wasm64 749,072 B。
+- build.sh の末尾のテスト実行は既定の FONT (`analysis-mac-shared` の OpenSans) が無く失敗する (rc=1、ライブラリは生成済み)。
+  テスト用フォントは **DejaVuSans.ttf** (`/usr/share/fonts/truetype/dejavu/`) に差し替えた。
+
+### 7.3 検証 (実測。n=1、load は 2.32 (ビルド時 1 分平均))
+| 検査 | 結果 |
+|---|---|
+| 表経由 (`test_qfc_import.c`) | `table n=14 resolved=14/14 absent_null=4/4`。native == wasm32 == wasm64 (46 行, TOTAL `6e3c628e7e4a12df`) |
+| トークン経由 (`test_qfc_gpa.c`) | `gpa table n=14 tokens=14/14 absent_zero=4/4`。'A' の描画 hash がトークン経由 `5a2005fb24544481` = 直接呼出 `5a2005fb24544481`。native == wasm32 == wasm64 (10 行, TOTAL `b0ce5bb07e6f62ee`) |
+| e2e 全体 `qfc_import_e2e.sh` | rc 0。所要 4.45 s (real, n=1) |
+| ネガコン (引数の marshalling) | `FT_Get_Char_Index` の charcode を a[1]→a[2] にずらした複製: gi=0、TOTAL `0a1ecc28b80292df`、`NG token route != direct call`、**exit 1** (検出) |
+
+### 7.4 検証範囲 / 範囲外
+- 範囲内: 表と token の解決一致、token 経由の 14 関数の呼出の marshalling (DejaVuSans 1 本、サイズ 16、3 字)、wasm32/wasm64 の一致。
+- 範囲外 (未検証): guest の `imp_GetProcAddress` 結線、QuickFontCache の DllMain・FontCache_GetStats・FontCache_CleanUp の実行 (→ #3434)。
+  OpenSans (FL の実フォント) での一致は未確認 (素材 `analysis-mac-shared` 未指定)。
+
+### 7.5 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| guest の `imp_GetProcAddress` への qfc_gpa 結線と FontCache_GetStats / CleanUp の wasm 実行 | #3412 の受入の残り。QFC の boot ハーネスが無い | #3434 (T-SH-83) |
+| DllMain の 0x563000 到達 (setjmp 継続・未実装 import) | 結線の実行確認が未到達 | #3410 / #3411 (既存) |
