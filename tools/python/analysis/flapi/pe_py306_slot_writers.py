@@ -4,7 +4,7 @@
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py306_slot_writers.py <slot VA(16進,カンマ区切り)>
 
 展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin
-出力: slot ごとの 直接書込み件数・lea 件数・初期値 (link VA)。所要 約 65 秒。
+出力: slot ごとの 直接書込み件数・lea 件数・初期値 (link VA)。
 """
 import os
 import sys

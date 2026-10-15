@@ -16,7 +16,7 @@
 
 - 測定 commit: `681b9b3b9` (解析スクリプト `pe_py306_slot_writers.py` を追加した commit)。基点は `origin/main` = `c2f0e7ebf`。
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2,324,302,252 バイト) から `extracted/block00031_PE.bin` (22,227,016 バイト) のみ展開。
-- 走査: `analysis/flapi/pe_py306_slot_writers.py`。`.text` の全命令 (5,183,833 件)、所要 約 65 秒、user 61.7 秒。
+- 走査: `analysis/flapi/pe_py306_slot_writers.py`。`.text` の全命令 (5,183,833 件)。測定 (HEAD `afb4b0218` 上で再実行): real 1m3.367s・user 59.093s・sys 4.267s・load 1 コア。終了 0。
 - 逆アセ: `analysis/flapi/pe_disasm.py` と、解決用の一時 probe (`work/py306/`・gitignore 対象)。
 
 ## 1. 静的初期値 (`.data`)
