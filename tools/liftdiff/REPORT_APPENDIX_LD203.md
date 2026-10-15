@@ -35,7 +35,8 @@
 ## 4. 検証
 
 - 単体: `tests/test_ld203_slot_fill.py` PASS。規則 (`PATCH_BY_VA`) を `""` に変えると rc=1 (ネガコン)。`tests/test_ld52_machine_sig.py` 等の既存テストも `liftdiff_e2e.sh` の [0/4] で PASS。
-- 測定 HEAD: `ad0ca414b` (main 取り込み merge 後の現 head。この commit のコードで e2e と §3 の判定を実行した)。
+- 測定 commit: `ad0ca414b` (main 取り込み merge 後の現 head。この commit のコードで e2e と §3 の判定を実行した)。
+- 測定 commit から HEAD までの差分 (差分 0 の証跡): `git diff ad0ca414b HEAD -- tools/liftdiff ':!tools/liftdiff/REPORT_APPENDIX_LD203.md'` の出力は **0 行**。HEAD で変わったのは本 REPORT の文言だけで、実行されるコードは測定時と同じ。
 - 素材: `fl-win64` と `work-m11` (`$ARTIFACTS_DIR` 実在を確認して展開)。`work-m11` 展開後、`tools/m11/m11_gen_ir2.sh` で `ir_conditions.json` を作った (rc=0・52s)。`toolchain-emsdk` は素材に無かったため、上流から `emsdk install 6.0.12` (`tools/m1/flags.sh` の pin) で `[EMSDK]` に入れた (`emcc --version` = 6.0.12)。
 - 単体 (`[0/4]`): `test_compare_ld11` / `test_ld52_machine_sig` / `test_ld179_tagpoint_tr` / `test_ld203_slot_fill` は PASS。
 - e2e (`bash tools/liftdiff/liftdiff_e2e.sh --m11-only`、HEAD `ad0ca414b`): `LIFTDIFF_E2E PASS`・rc=0・wall 195s・load average (開始時 0.54 / 終了時 5.16、1 分平均)。[4/4] closure 差分 `sample:800`: 関数 800 のうち 一致 361 / 不一致 232 / 実行不能 207 (batch 112s)。
