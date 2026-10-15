@@ -187,5 +187,5 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 - **未確定**: `[0x10aa13f0]` に文字列の中身を書いた書込み元。`0x10aa13f0` の書込みを記録する probe は未実施。この run では、書込み元の追跡 (probe の再 build と unit 144 の再測定) が 60 分内に収まらないと判断した。
 - 149 は `412e40` の a1=0x10aa1418 が最内 (§3)。引数の値 (`a2=2`) は本 REPORT の §2 では照合できていない (§2 に a2 の記録は無い。照合の根拠は未確認)が、trap の直接の引き金 (値の由来) は未確定。
 - 114 は halt0 で、Halt を呼ぶ `412e40` の a2=6 が直前の記録。`412e40` の a2 の上流は未確定。
-- **再現状況 (fix run・14:51Z 時点)**: 上の表は committed HEAD から再現できていない。採取の probe (`probe144.py`・`read144.mjs`) は commit されておらず、`work/p3608/` は checkout に無い (`tools/m11/.gitignore` の `work/` 対象)。IR の再生成には `tools/m11/m11_e2e.sh` (RetDec 全 lift) が要り、本 runner には `/opt/retdec`・`/opt/emsdk` が無い。よって表の値は再検証していない参考値。再現には採取スクリプトの commit と IR 生成環境が要る (未解決表の行を参照)。
+- **再現状況 (fix run・14:51Z 時点)**: 上の表は committed HEAD から再現できていない。採取の probe (`probe144.py`・`read144.mjs`) は commit されておらず、`work/p3608/` は checkout に無い (`tools/m11/.gitignore` の `work/` 対象)。IR の再生成には `tools/m11/m11_e2e.sh` (RetDec 全 lift) が要り、本 runner には RetDec・emsdk の道具 (`docs/REFERENCES.md` の該当エントリ) が無い。よって表の値は再検証していない参考値。再現には採取スクリプトの commit と IR 生成環境が要る (未解決表の行を参照)。
 - 検証起点: `git diff 4e9e1d974 HEAD --stat -- tools/m11/ldfix` は `REPORT_3608.md` の 19 行追加のみ (コード差分 0)。
