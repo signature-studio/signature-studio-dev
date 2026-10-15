@@ -9,25 +9,26 @@
 ## 1. 結論 (実測)
 
 - 4 site を TRUE_DROP に確定: **128d495・dcdeee・c3460e・12900c4**。1284dab は UNDETERMINED のまま (子 #3793)。
-- `results/candidate_verdicts_1161.jsonl` の変更は 5 行のみ (4 行を TRUE_DROP、1 行 (1284dab) は根拠文だけ更新)。他の 113 行は変えていない (`git diff` で確認)。
-- `results/spill178_1161.tsv` (spill 宛 178 site の分類表) の状態件数 (第 5 列):
+- `results/candidate_verdicts_1161.jsonl` の変更は 5 行のみ (4 行を TRUE_DROP、1 行 (1284dab) は根拠文だけ更新)。他の 113 行は変えていない (main 基準の `git diff` で確認)。
+- main 取り込み (merge `14a4a50e0`): main の #3752 (`f592bd2aa`) が 128cad6・128d007 を TRUE_DROP に確定していた。両者は別 site のため、両方の判定を残した (競合解消の方針)。
+- `results/spill178_1161.tsv` (spill 宛 178 site の分類表) の状態件数 (第 5 列。基準は main の `f592bd2aa`):
 
-| 状態 | 変更前 (bb6bdcf41) | 変更後 (91d5c5ca4) |
+| 状態 | 変更前 (main `f592bd2aa`) | 変更後 (`14a4a50e0`) |
 |---|--:|--:|
-| 確定 | 148 | **152** (+4) |
-| 判定不能 | 29 | **25** (-4) |
+| 確定 | 150 | **154** (+4) |
+| 判定不能 | 27 | **23** (-4) |
 | 未判定 | 1 | 1 |
 
-  変わったのは上記 4 行のみ (`diff` で確認。1284dab の行は UNDETERMINED のまま)。
+  本 PR が変えたのは上記 4 行のみ (`git diff f592bd2aa 14a4a50e0 -- tools/m11/ldfix/results` で確認。1284dab の行は UNDETERMINED のまま)。
 
 ## 2. 測定条件
 
-- 測定 commit: `91d5c5ca4` (`fix(m11): resolve 4 spill UNDETERMINED sites by machine-IR block link (#3753)`)。コードと結果を変えた最後の commit。
-  以後の commit は本 REPORT と `docs/DOC_MAP.md` のみ。
-- 差分 0 の証跡 (本 REPORT を書いた時点の HEAD で実行): `git diff 91d5c5ca4 HEAD -- tools/m11/ldfix` の出力は空 (§7)。
+- 測定 commit: `14a4a50e0` (`Merge remote-tracking branch 'origin/main' into 3753-ld175-spill-sites`)。コードと結果を変えた最後の commit。
+  前回の測定 commit は `91d5c5ca4` (main 取り込み前)。以後の commit は本 REPORT (と `docs/DOC_MAP.md`) のみ。
+- 差分 0 の証跡 (本 REPORT を書いた時点の HEAD で実行): §8。
 - 素材: `work-m11` と `work-liftdiff` を `tar --zstd -xf` で展開 (gitignore 対象の `tools/m11/work/`・`tools/liftdiff/work/`)。
   判定は `m11_image.bin`・`boot_final3.ll`・`boot*.drc.config.json` だけを使う。fl-win64 (PE) は使わない。
-- 測定実行: worktree `ws-3753` (branch `3753-ld175-spill-sites`) の HEAD で `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` を前景で 1 回。
+- 測定実行: worktree `ws-3794` (branch `3753-ld175-spill-sites`) の HEAD で `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` を前景で 1 回。
   `M11_WORK`・`LD_WORK` は主 worktree の展開先を指す。`TMPDIR=$RUNNER_TEMP`。
 
 ## 3. 判定の根拠 (site ごと)
@@ -49,11 +50,12 @@ IR は `boot_final3.ll` の行番号 (1 始まり)。消費ブロックは直前
 
 ## 4. 検証
 
-- e2e (測定 commit `91d5c5ca4`・前景 1 回): `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` → **rc 0**・**real 180 s**・load average (uptime 1 分) 0.91 (開始) → 1.01 (終了)。
-  7/7 `spill_classify_1161.py` の出力が `results/spill178_1161.tsv` と一致 (`cmp`)、8/8 (LD-143 修復後 IR の再生成) も一致。
+- e2e (測定 commit `14a4a50e0`・前景 1 回・`TMPDIR=RUNNER_TEMP`): `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` → **rc 0**・**real 104 s**・load average (uptime 1 分) 0.65 (開始) → 1.00 (終了)。
+  `cmp` の一致: 6/7 の `drops_510.tsv`、7/7 `spill_classify_1161.py` の出力が `results/spill178_1161.tsv` と一致、8/8 (LD-143 修復後 IR の再生成) も一致。
+  7/7 の件数: `{'確定': 154, '判定不能': 23, '未判定': 1}`。
   同 e2e の `negctl_510.sh` (NC0〜NC7) は全て出力し、`FAIL` は 0 件 (`grep -c FAIL` = 0)。
-  参考: 同じ内容 (`91d5c5ca4` の内容) を主 worktree で先に 1 回実行 (rc 0・real 179 s)。
-- 突合スクリプト: `python3 tools/m11/ldfix/ld175_site_link.py` (約 2.5 s・素材は work-m11 のみ)。
+  前回測定 (`91d5c5ca4`・main 取り込み前・前景 1 回): rc 0・real 180 s・load 0.91 → 1.01。
+- 突合スクリプト: `python3 tools/m11/ldfix/ld175_site_link.py` (約 1 s・素材は work-m11 のみ。`14a4a50e0` で再実行)。
   出力の要約 (測定 commit):
   - 128d495 / dcdeee / c3460e / 12900c4: `機械語 2 段=True / 機械語の消費ブロックが IR に無い: なし -> TRUE_DROP 候補`
   - 1284dab: `機械語の消費ブロックが IR に無い: 1284dc1 12857c8 1285907 1285a0a 1285dba 1285e8e -> UNDETERMINED`
@@ -93,9 +95,8 @@ bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh         # 7/7・8/8 の TSV 一致を�
 本 REPORT の測定 commit からの差分 (コード・結果の範囲):
 
 ```
-$ git diff 91d5c5ca4 HEAD -- 'tools/m11/ldfix/*.py' 'tools/m11/ldfix/*.sh' tools/m11/ldfix/results | wc -l
+$ git diff 14a4a50e0 HEAD -- 'tools/m11/ldfix/*.py' 'tools/m11/ldfix/*.sh' tools/m11/ldfix/results | wc -l
 0
 ```
 
-測定 commit から HEAD までの変更ファイルは `docs/DOC_MAP.md` (REPORT 索引の 1 行) と本 REPORT の 2 つだけ
-(`git diff --name-only 91d5c5ca4 HEAD`)。
+測定 commit から HEAD までの変更ファイルは本 REPORT の 1 つだけ (`git diff --name-only 14a4a50e0 HEAD`)。
