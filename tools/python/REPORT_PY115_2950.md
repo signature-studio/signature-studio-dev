@@ -5,7 +5,7 @@
 ## 結論
 
 - `mixer.getTrackName(index, maxLen=-1)`: `maxLen > 0` のときだけ切り詰める。長さが maxLen を超えるとき末尾から mask 外の文字を削り、先頭 maxLen 文字へ切る。PE (`0x12be470`) で確定し、C と mock に実装した。非 ASCII (PE は UTF-16) は未確認 (子 #3654)。
-- `channels.soloChannel(index, value=-1, useGlobalIndex=0)`: `value == -1` で反転する (`0xffaa60` の呼出しを PE で確認)。`value ≠ -1` の比較は PE の比較対象 `0xffa940(k,0)` が現在の solo と同定できていない (§2)。C と mock の「現在の solo との比較」は推定で、受入条件から外して子 #3654 に移した。`useGlobalIndex` は型検査のみ (子 #3654)。
+- `channels.soloChannel(index, value=-1, useGlobalIndex=0)`: `value == -1` で反転する (`0xffaa60` の呼出しを PE で確認)。`value ≠ -1` の比較は PE の比較対象 `0xffa940(k,0)` が現在の solo と同定できていない (§2)。C と mock の「現在の solo との比較」は推定のまま実装に残し、受入条件から外した (同定は子 #3654)。`useGlobalIndex` は型検査のみ (子 #3654)。
 - 差分検査 (`channels_diff`・`mixer_diff`) が確かめるのは C≡mock であり、PE≡C ではない。
 - `device.midiOutMsg` の 5 個目 (子 #3655)・`plugins.getParamValueString` の 3 個 (子 #3656) は未実装。1 run で PE 解析と実装の両方を終えられないと判断し、子に分けた。
 
