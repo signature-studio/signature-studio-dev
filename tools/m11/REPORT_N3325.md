@@ -104,3 +104,43 @@ unit 40 の前後 (u32 の下位 4B) を LB 別に読んだ値 (`M11_TOLERANT_PE
 - 計測 build: `M11_INSTR_412770=1 M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=40,153,158,291,296,304,555,745 bash tools/m11/m11_lb_tolerant_repro.sh <LB> work/<dir>`
 - peek: `M11_TOLERANT_PEEK=<addr,..> M11_TOLERANT_PEEK_UNITS=40 node tools/m11/m11_tolerant.mjs` (build 済みの `work/m11_boot.cjs` を使う。アドレスは LB 分ずらす)
 - 既定 (計測 OFF): `bash tools/m11/m11_lb_tolerant_repro.sh 0 work/head_lb0` と `... 0x10000 work/head_lb10000` → `m11_lb_unit_diff.py` で kind_diff 8 (§3)
+
+## 8. function_4128b0 入口の分岐値の観測 (#4457・受入 1 達成・受入 2/3 は未達)
+
+測定 commit: 本 PR の `M11_INSTR_4128B0` 配線 commit (計測 env の既定は 0)。素材は `fl-win64`・`work-m11`・`toolchain-emsdk` (`/opt/emsdk` 6.0.12)。
+
+- 観測点: `function_4128b0` の入口 (`m11_post.py` の wrapper + `m11_ov.c` の `m11_4128b0_obs`)。`M11_INSTR_4128B0=1` のときだけ入る。`function_412770` の強定義 (`m11_ov.c`) は観測点にしない (§2)。
+- 番地 (LB=0 の番地。IR の番地と一致): `[0xFA5008]` (16404488)・`[0x11DADB0]` (18787760)・`[0x11DADDC]` (18787804, GetCurrentThreadId 比較の相手)。LB=0x10000 は +0x10000 (IR で確認: 16470024 / 18853296 / 18853340)。
+
+### 8-1 入口の実測 (計測 ON)
+
+| LB | 観測 unit 数 | unit 40 の入口 `[0xFA5008]` `[0x11DADB0]` `[0x11DADDC]` |
+|---|---|---|
+| 0 | 8 件 (114・245・279・314・509・647・895・941) | 観測されず (unit 40 は入口に来ない) |
+| 0x10000 | 9 件 (40・114・245・279・314・509・647・895・941) | `0x0` `0x0` `0x0` |
+
+- LB=0 の unit 895 では `[0xFA5008]=0x10251790` (非 0)。LB=0x10000 の unit 895 も同じ分岐。
+- LB=0x10000 の unit 40 は入口の 3 値がすべて 0。IR の分岐は `[0x11FADB0] != 0` かつ `GetCurrentThreadId()==[0x11FADDC]` で 412770 へ進むため、入口の時点では 412770 に進まない。unit 40 の halt0 の分岐は入口後の別の値で決まる (未特定)。
+- `GetCurrentThreadId` は shim で 1 を返す。`tid=0x1`。
+
+### 8-2 観測の副作用 (受入 3 の前提が崩れた)
+
+| 比較 | kind 差 | 差の unit |
+|---|---|---|
+| 既定 OFF の LB=0 2 回 (run1 vs run2) | 0 | — |
+| 既定 OFF の LB=0 vs LB=0x10000 | 8 | 40・153・158・291・296・304・745・895 (§3 と同一) |
+| 計測 ON の LB=0 vs LB=0x10000 | 4 | 40・153・158・745 |
+| 同 LB 内で OFF vs ON (LB=0) | 3 | 101・304・895 |
+| 同 LB 内で OFF vs ON (LB=0x10000) | 3 | 101・291・296 |
+
+- 観測 C 関数は `GetCurrentThreadId` を呼ばない形に直したが (呼出し側の宣言の疑い)、ON で同 LB 内の kind 差 3 件は残った。観測 (ON) そのものが unit 101・291・296・304 の結果を変えている。原因 (観測の線形メモリ読みか、追加の `fprintf` か、link 形の変化) は未切り分け。
+- 既定 OFF の build は kind 差 8 件のまま (`final_off0` vs `final_off10000`) で、既定 OFF では挙動は変わらない。
+- したがって §8-1 の入口値は ON build の値であり、ON で結果が変わるため **参考値**。LB 差の特定 (受入 2) の根拠にはしない。
+
+### 8-3 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 観測 ON で unit 101・291・296・304 の結果が変わる原因 (観測の副作用の切り分け: 読みの位置・fprintf・link) | 入口値を LB 差の根拠に使えない | 親 #3389 (PM 判断) |
+| unit 40 (LB=0x10000) の halt0 の分岐 (入口後の 412770 進入条件の値) | LB 差の原因が未特定 | 親 #3389 (PM 判断) |
+| 既定 OFF の kind 差 8 件 (§3) | 受入 3 は既定 OFF で不変 (達成) だが、8 件の原因は未特定 | 親 #3389 (PM 判断) |

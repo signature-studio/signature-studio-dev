@@ -1226,6 +1226,27 @@ void m11_412770_obs(unsigned long long a) {
 }
 #endif
 
+/* #4457 計測専用 (M11_INSTR_4128B0=1 のときだけ有効): function_4128b0 の入口で、412770 (C 版) へ進む分岐の 3 値を stderr に出す。
+ *   [0xFA5008] (分岐 1)・[0x11DADB0] (分岐 2)・GetCurrentThreadId() と [0x11DADDC] (分岐 3, u32)。LB=0 の番地。R() で LB 分ずらす。
+ * 線形メモリ外は読まない。既定 0 では何も入らない。 */
+#ifndef M11_INSTR_4128B0
+#define M11_INSTR_4128B0 0
+#endif
+#if M11_INSTR_4128B0
+static int g_4128b0_n;
+void m11_4128b0_obs(void) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long a1 = R(0xfa5008), a2 = R(0x11dadb0), a3 = R(0x11daddc);
+    unsigned long long v1 = 0, v2 = 0, v3 = 0;
+    if (a1 + 8 <= heap) v1 = *(volatile unsigned long long*)(uintptr_t)a1;
+    if (a2 + 8 <= heap) v2 = *(volatile unsigned long long*)(uintptr_t)a2;
+    if (a3 + 4 <= heap) v3 = *(volatile unsigned int*)(uintptr_t)a3;
+    if (g_4128b0_n++ < 256)
+        fprintf(stderr, "[m11][4128b0] #%d [0x%llx]=0x%llx [0x%llx]=0x%llx [0x%llx]=0x%llx\n",
+                g_4128b0_n, a1, v1, a2, v2, a3, v3);
+}
+#endif
+
 /* #2407 計測専用 (M11_INSTR_E3EF60=1 のときだけ有効): function_e3ef60 (#2373 の unit 895 経路で 60a270 を呼ぶ caller) の入口で
  * arg1 (this = rcx) と [arg1+0] (u64) を stderr に出す。線形メモリ外は読まない (address 0 は線形メモリ内なので読む)。既定 0 では何も入らない。 */
 #ifndef M11_INSTR_E3EF60
