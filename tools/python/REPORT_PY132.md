@@ -111,11 +111,11 @@ main 75c48ab21 基準: 実装 155 → 158 (+3)、未実装 280 → 277 (-3)。`p
 
 ## main 取り込み後の再測定 (競合解消)
 
-main を 2 回取り込んだ。`8c23860cd` の取り込みでは競合 3 件 (`provider/build.sh`・`provider/fl_engine.c`・`tests/provider_check.mjs`)、`1ccf20c6a` の取り込みでは競合 2 件 (`docs/DOC_MAP.md`・`tests/provider_check.mjs`) が出た。解消は両側の追加を残す方針 (`provider_check` の期待値だけ main の数に本 PR の +3 を足した)。測定 commit: `7923bbfe3` (main `1ccf20c6a` を取り込んだ merge。コードを変えた最後の commit)。以後の HEAD のコード差分 `git diff 7923bbfe3 HEAD -- tools/python ':!*.md'` は 0 行。
+main を 3 回取り込んだ。`8c23860cd` の取り込みでは競合 3 件 (`provider/build.sh`・`provider/fl_engine.c`・`tests/provider_check.mjs`)、`1ccf20c6a` の取り込みでは競合 2 件 (`docs/DOC_MAP.md`・`tests/provider_check.mjs`) が出た。解消は両側の追加を残す方針 (`provider_check` の期待値だけ main の数に本 PR の +3 を足した)。`71e64d058` の取り込みは競合なし (変更は `analysis/py137_saveundo_record.py`・REPORT_PY124・DOC_MAP で、provider と本節の検証には入らない)。測定 commit: `359cf28af` (main `71e64d058` を取り込んだ merge。コードを変えた最後の commit)。以後の HEAD のコード差分 `git diff 359cf28af HEAD -- tools/python ':!*.md'` は 0 行。
 
-基準 main `1ccf20c6a`: 実装 165 → 168 (+3)、未実装 270 → 267 (-3)。
+基準 main `71e64d058`: 実装 165 → 168 (+3)、未実装 270 → 267 (-3)。
 
-| コマンド | 結果 (7923bbfe3) |
+| コマンド | 結果 (359cf28af) |
 |---|---|
 | `bash provider/build.sh` (emsdk は `[EMSDK]` の pin 6.0.12 を上流から取得) | rc 0・ハンドラ 168 |
 | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` (CPython wasm は `build_cpython_wasm.sh` で再ビルド済み) | rc 0・5.98 s |
