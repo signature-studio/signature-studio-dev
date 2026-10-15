@@ -49,7 +49,7 @@
 | 判定不能 (未対応命令・flags 等) | 33 | `shl`・`cvtsi2ss`・`cvtsi2sd`・`ucomisd`・`ucomiss`・`mulss`・`neg`・`shr`・`sete`・`jle` 結果 flags など |
 | PASS / FAIL | 0 / 0 | — |
 
-- **差し戻し後の再実行は未実施**: `$ARTIFACTS_DIR` (`/home/runner/artifacts`) には `fl-win64.tar.zst` のみあり、`work-m11` (`nonimm_cfg_rows.json`) が無い。このため 34 件の内訳 (実値化 0 / 未決 1 / 判定不能 33) は差し戻し前の版の実測値で、`call` の flags 修正後の値は未確認。次の回で `oc_artifacts: fl-win64 work-m11` を指定して再実行し、内訳を照合する。
+- **差し戻し後の再実行は未実施**: 素材ディレクトリ ($ARTIFACTS_DIR) には `fl-win64.tar.zst` のみあり、`work-m11` (`nonimm_cfg_rows.json`) が無い。このため 34 件の内訳 (実値化 0 / 未決 1 / 判定不能 33) は差し戻し前の版の実測値で、`call` の flags 修正後の値は未確認。次の回で `oc_artifacts: fl-win64 work-m11` を指定して再実行し、内訳を照合する。
 - 照合器が未決にした 1 件の経路値 (実測・差し戻し前の版): `0x0` と `0x1`。REPORT_N172 §3 の機械語 (1 周目 rbx=0・2 周目 rbx=1) と一致。
 - 実データのネガティブコントロール: 同じ 1 件に claim `0x0` → FAIL (経路で値が違う)。claim `0x1` も同じく FAIL。どちらの claim も経路の値の集合と一致しないため、一致と判定されない。
 
