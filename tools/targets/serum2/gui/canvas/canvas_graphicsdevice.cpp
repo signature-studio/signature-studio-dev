@@ -10,6 +10,7 @@
 #include "canvas_graphicspath.h"
 #include "vstgui/lib/platform/iplatformgradient.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iterator>
 #include <vector>
@@ -239,6 +240,7 @@ void writeRGBA (uint8_t* dst, const CColor& color)
 
 //------------------------------------------------------------------------
 // 色停止点 (位置 0〜1) の間を線形に補間する。stops は空でないこと。
+// 補間は premultiplied の値で行う (Cairo の参照実装と同じ)。alpha が途中で変わる停止点で色が濁らないようにするため。
 CColor gradientColorAt (const GradientColorStopMap& stops, double t)
 {
 	t = std::clamp (t, 0., 1.);
@@ -250,9 +252,20 @@ CColor gradientColorAt (const GradientColorStopMap& stops, double t)
 	auto prev = std::prev (next);
 	auto span = next->first - prev->first;
 	auto f = span > 0. ? (t - prev->first) / span : 0.;
-	auto mix = [f] (uint8_t a, uint8_t b) { return static_cast<uint8_t> (std::lround (a + (b - a) * f)); };
-	return CColor (mix (prev->second.red, next->second.red), mix (prev->second.green, next->second.green),
-	               mix (prev->second.blue, next->second.blue), mix (prev->second.alpha, next->second.alpha));
+	auto premultiplied = [] (const CColor& c) {
+		auto a = c.alpha / 255.;
+		return std::array<double, 4> {c.red * a, c.green * a, c.blue * a, static_cast<double> (c.alpha)};
+	};
+	auto p = premultiplied (prev->second);
+	auto n = premultiplied (next->second);
+	std::array<double, 4> mixed {};
+	for (size_t i = 0; i < 4; ++i)
+		mixed[i] = p[i] + (n[i] - p[i]) * f;
+	auto alpha = mixed[3];
+	if (alpha <= 0.)
+		return CColor (0, 0, 0, 0);
+	auto unpremultiply = [alpha] (double v) { return toByte (v * 255. / alpha); };
+	return CColor (unpremultiply (mixed[0]), unpremultiply (mixed[1]), unpremultiply (mixed[2]), toByte (alpha));
 }
 
 //------------------------------------------------------------------------
@@ -494,7 +507,7 @@ bool CanvasGraphicsDeviceContext::fillLinearGradient (IPlatformGraphicsPath& pat
 }
 
 //------------------------------------------------------------------------
-// originOffset だけ焦点をずらした放射状。色は焦点からの距離 / radius で求める (楕円形の放射は未対応)。
+// originOffset だけ焦点をずらした放射状。色は焦点からの距離 / radius で求める。楕円形は transformation の非等方スケールで作る (色は逆変換後の局所座標で決まるため、device 上では楕円になる)。
 bool CanvasGraphicsDeviceContext::fillRadialGradient (IPlatformGraphicsPath& path,
                                                       const IPlatformGradient& gradient,
                                                       CPoint center, CCoord radius,
@@ -506,7 +519,10 @@ bool CanvasGraphicsDeviceContext::fillRadialGradient (IPlatformGraphicsPath& pat
 		return false;
 	auto focal = CPoint (center.x + originOffset.x, center.y + originOffset.y);
 	fillPathByPixel (path, evenOdd, transformation, [&] (CPoint p, CColor& color) {
-		color = gradientColorAt (stops, std::hypot (p.x - focal.x, p.y - focal.y) / radius);
+		auto t = std::hypot (p.x - focal.x, p.y - focal.y) / radius;
+		if (t > 1.)
+			return false; // 半径の外は描かない (Cairo の参照実装は extend NONE)
+		color = gradientColorAt (stops, t);
 		return true;
 	});
 	return true;
