@@ -2,25 +2,25 @@
 """SR-79 #4610: レジスタ値の間接 call (`call reg`) と `call [rsp+disp]` の宛先を、定義元まで遡って解決する。
 
 手順:
-  1. `call reg` の reg を、直前の命令列を後ろ向きに辿って定義元に当てる。
-     lea rip (コード/データ VA) と、`mov reg, qword ptr [rip+X]` (データ先の値)、
-     `mov reg, [reg2+off]` (reg2 を再帰的に解決し、データ先の値を読む) を解決する。
-     それ以外の定義・呼出し後の値・引数由来の値は未解決とする。
-  2. `call qword ptr [rsp+disp]` は、同じ disp へ直前に書かれた値を解決する。
+  1. `call reg` の reg を、制御フロー (fall-through と direct jmp/jcc の逆辺) を全経路で後ろ向きに辿って定義元に当てる。
+     全経路の定義が同じ値集合に解決できたときだけ解決とする (1 経路でも未解決なら未解決)。
+     lea rip (コード/データ VA)・`mov reg, qword ptr [rip+X]` (データ先の値)・`mov reg, [reg2+off]`
+     (reg2 を再帰的に解決し、データ先の値を読む) を解決する。それ以外の定義・呼出し後の volatile・引数由来は未解決。
+  2. `call qword ptr [rsp+disp]` は、同じ disp へ各経路で直前に書かれた値を解決する。
   3. 解決できた宛先が R (target の direct 逆閉包) に当たるかを見る。
   4. 未解決サイトのうち閉包 C (root から direct call/jmp で到達する関数) 内のものを、
      ポインタの供給元 (vtable 読み・rip 読み・引数/スタック・その他) に分類して出す。
   5. demo bit 関数 (`0x22792` を参照する関数) と C の交わりを出す。
 
 usage: reg_call_resolve.py <pe> <target_va_hex> <root_va_hex>
-限界: 引数由来・呼出し後の volatile レジスタ・スタック引数は未解決として数える。
-`resolve()` は分岐命令 (j*) とラベルを無視し、直前の 1 経路だけを後ろ向きに辿る。分岐の合流点では
-他経路の定義を見ないため、単一の宛先を返す (例: `mov rax, A; jne L; mov rax, B; L: call rax` は B のみ)。
-したがって『解決』の件数には合流を跨いで決めた宛先が含まれる。
-`,` を含まない 1 オペランド命令 (inc/dec/neg/not/cdqe など) は読み飛ばすため、対象レジスタを変えるこれらの命令を
-越えて 1 つ前の定義に届くことがある。
-未解決の供給元の分類は『R の関数アドレスは rip 参照 (lea/mov) か vtable スロット (disp 0x28・0x60) からしか
-コードに現れない』という前提に依存する。この前提はこのスクリプトでは検証していない (未検証)。
+限界:
+- 引数由来・呼出し後の volatile レジスタ・スタック引数は未解決として数える。
+- 間接 jmp (jump table を含む) を持つ関数では、制御フローの逆辺を確定できないため、その関数内の全サイトを未解決とする。
+- 読み出す値は PE ファイル上の初期値。書込み可能な .data の実行時の値は、このスクリプトでは見ていない。
+- 書込みは「同じ base レジスタ・同じ disp の別名」を見ない。memory alias は未考慮。
+- 供給元の分類 (provenance) は従来どおり直線の後ろ向き走査で、経路は見ていない (分類のみ)。
+- `[rsp+disp]` の書込みは、その disp と文字列一致する命令だけを定義とみなす。それ以外で同じ領域に書く命令は
+  その経路を未解決にする (保守的)。
 """
 import re
 import struct
@@ -54,11 +54,26 @@ rip_re = re.compile(r"\[rip ([+-]) (0x[0-9a-f]+)\]")
 mem_re = re.compile(r"^qword ptr \[(r[a-z0-9]+|rsp|rbp)(?: \+ (0x[0-9a-f]+|[0-9]+))?\]$")
 reg_re = re.compile(r"^(r[a-z0-9]+|e[a-z0-9]+)$")
 SKIP = {"cmp", "test", "bt", "ucomiss", "ucomisd", "comiss", "comisd"}
-ALIAS32 = {"e" + x: "r" + x for x in ["ax", "bx", "cx", "dx", "si", "di", "bp", "sp"]}
+NOWRITE = SKIP | {"nop", "push", "endbr64"}
+UNCOND = {"jmp", "ret", "ud2", "int3", "hlt"}
+IMPL = {"cdqe": ("rax",), "cwde": ("rax",), "cdq": ("rdx",), "cqo": ("rdx",),
+        "cpuid": ("rax", "rbx", "rcx", "rdx"), "rdtsc": ("rax", "rdx")}
+FAMILY = {}
+for _x in "abcd":
+    for _n in (f"r{_x}x", f"e{_x}x", f"{_x}x", f"{_x}l", f"{_x}h"):
+        FAMILY[_n] = f"r{_x}x"
+for _x in ("si", "di", "bp", "sp"):
+    for _n in (f"r{_x}", f"e{_x}", _x, f"{_x}l"):
+        FAMILY[_n] = f"r{_x}"
+for _k in range(8, 16):
+    for _n in (f"r{_k}", f"r{_k}d", f"r{_k}w", f"r{_k}b"):
+        FAMILY[_n] = f"r{_k}"
+VOLATILE = {"rax", "rcx", "rdx", "r8", "r9", "r10", "r11"}
+LIMIT = 4000
 
 
-def canon(n):
-    return ALIAS32.get(n, n)
+def fam(n):
+    return FAMILY.get(n, n)
 
 
 def qword_at(va):
@@ -75,69 +90,128 @@ def ripea(ins, src):
     return ins.address + ins.size + int(m.group(2), 16) * (1 if m.group(1) == "+" else -1)
 
 
-VOLATILE = {"rax", "rcx", "rdx", "r8", "r9", "r10", "r11"}
+def writes(w, r):
+    """命令 w が 64-bit レジスタ family r (rax 等) を書くか。部分レジスタ書込みも書きとみなす。"""
+    m = w.mnemonic
+    if m in NOWRITE or m.startswith("j") or m in UNCOND or m == "call":
+        return False
+    if m in IMPL:
+        return r in IMPL[m]
+    if m.startswith("rep"):
+        return r in ("rcx", "rsi", "rdi")
+    if m.startswith("lods"):
+        return r in ("rax", "rsi")
+    ops = [x.strip() for x in w.op_str.split(",")] if w.op_str else []
+    if m in ("mul", "imul", "div", "idiv") and len(ops) == 1:
+        return r in ("rax", "rdx")
+    if m in ("xchg", "xadd", "cmpxchg"):
+        return any(fam(o) == r for o in ops)
+    if not ops:
+        return False
+    return fam(ops[0]) == r
 
 
-def resolve(insns, idx, reg, depth=0):
-    """insns[idx] より前で reg の定義元を探し、値の集合を返す。未解決は None。"""
-    if depth > 3:
+def def_value(insns, jt, q, r, depth):
+    """命令 q が r を書くとき、書かれる値の集合。直接に解決できないものは None。"""
+    w = insns[q]
+    if w.mnemonic not in ("mov", "lea"):
         return None
-    r = canon(reg)
-    for j in range(idx - 1, -1, -1):
-        w = insns[j]
-        if w.mnemonic == "call":
-            if r in VOLATILE:
-                return None
-            continue
-        if w.mnemonic in SKIP or w.mnemonic.startswith("j") or w.mnemonic == "ret":
-            continue
-        if "," not in w.op_str:
-            if w.mnemonic == "pop" and canon(w.op_str) == r:
-                return None
-            continue
-        d, s = [x.strip() for x in w.op_str.split(",", 1)]
-        if canon(d) != r:
-            continue
-        if w.mnemonic == "lea":
-            ea = ripea(w, s)
-            return {ea} if ea is not None else None
-        if w.mnemonic == "mov":
-            if s.startswith("qword ptr") and "rip" in s:
-                ea = ripea(w, s)
-                v = qword_at(ea) if ea is not None else None
-                return {v} if v is not None else None
-            mm = mem_re.match(s)
-            if mm and mm.group(1) not in ("rsp", "rbp"):
-                base = resolve(insns, j, mm.group(1), depth + 1)
-                if not base:
-                    return None
-                off = int(mm.group(2), 0) if mm.group(2) else 0
-                out = set()
-                for b in base:
-                    v = qword_at(b + off)
-                    if v is None:
-                        return None
-                    out.add(v)
-                return out
-            if reg_re.match(s):
-                return resolve(insns, j, s, depth + 1)
+    d, s = [x.strip() for x in w.op_str.split(",", 1)]
+    if d != r:
+        return None
+    if w.mnemonic == "lea":
+        ea = ripea(w, s)
+        return {ea} if ea is not None else None
+    if s.startswith("qword ptr") and "rip" in s:
+        ea = ripea(w, s)
+        v = qword_at(ea) if ea is not None else None
+        return {v} if v is not None else None
+    mm = mem_re.match(s)
+    if mm:
+        if mm.group(1) in ("rsp", "rbp"):
             return None
-        return None
+        base = resolve(insns, jt, q, mm.group(1), depth + 1)
+        if not base:
+            return None
+        off = int(mm.group(2), 0) if mm.group(2) else 0
+        out = set()
+        for b in base:
+            v = qword_at(b + off)
+            if v is None:
+                return None
+            out.add(v)
+        return out
+    if reg_re.match(s):
+        return resolve(insns, jt, q, s, depth + 1)
     return None
 
 
+def preds(insns, jt, q):
+    out = list(jt.get(q, ()))
+    if q > 0 and insns[q - 1].mnemonic not in UNCOND:
+        out.append(q - 1)
+    return out
+
+
+def walk(insns, jt, start, hit):
+    """start より前の全経路を後ろ向きに辿る。hit(q) は ("kill"|"def"|"pass", 値 or None)。
+    どの経路でも定義に届かない (関数入口・呼出し・未解決) なら None。"""
+    stack = preds(insns, jt, start)
+    if not stack:
+        return None
+    seen, out, n = set(), set(), 0
+    while stack:
+        q = stack.pop()
+        if q in seen:
+            continue
+        seen.add(q)
+        n += 1
+        if n > LIMIT:
+            return None
+        kind, val = hit(q)
+        if kind == "kill":
+            return None
+        if kind == "def":
+            if val is None:
+                return None
+            out |= val
+            continue
+        p = preds(insns, jt, q)
+        if not p:
+            return None
+        stack.extend(p)
+    return out or None
+
+
+def resolve(insns, jt, idx, reg, depth=0):
+    """insns[idx] より前の全経路で reg の定義元を探し、値の集合を返す。未解決は None。"""
+    if depth > 3:
+        return None
+    r = fam(reg)
+
+    def hit(q):
+        w = insns[q]
+        if w.mnemonic == "call":
+            return ("kill", None) if r in VOLATILE else ("pass", None)
+        if not writes(w, r):
+            return ("pass", None)
+        return ("def", def_value(insns, jt, q, r, depth))
+
+    return walk(insns, jt, idx, hit)
+
+
 def provenance(insns, i, r):
-    """未解決 call reg の供給元を分類する。"""
+    """未解決 call reg の供給元を分類する (直線の後ろ向き走査。分類のみ)。"""
     for j in range(i - 1, -1, -1):
         w = insns[j]
         if w.mnemonic == "call":
             return "after-call"
         if w.mnemonic in SKIP or w.mnemonic.startswith("j") or "," not in w.op_str:
-            if w.mnemonic == "pop" and canon(w.op_str) == r:
+            if w.mnemonic == "pop" and fam(w.op_str) == r:
                 return "stack-pop"
             continue
         d, s = [x.strip() for x in w.op_str.split(",", 1)]
-        if canon(d) != r:
+        if fam(d) != r:
             continue
         if w.mnemonic == "mov" and mem_re.match(s):
             mm = mem_re.match(s)
@@ -155,22 +229,53 @@ def provenance(insns, i, r):
     return "entry-arg"
 
 
+def stack_slot_value(insns, jt, i, disp):
+    slot = f"qword ptr [rsp + {disp}]"
+
+    def hit(q):
+        w = insns[q]
+        if w.mnemonic == "call":
+            return ("kill", None)
+        ops = [x.strip() for x in w.op_str.split(",", 1)]
+        if w.mnemonic == "mov" and ops[0] == slot:
+            if len(ops) < 2 or not reg_re.match(ops[1]):
+                return ("kill", None)
+            return ("def", resolve(insns, jt, q, ops[1]))
+        if f"[rsp + {disp}]" in ops[0] and w.mnemonic not in NOWRITE and not w.mnemonic.startswith("j"):
+            return ("kill", None)
+        return ("pass", None)
+
+    return walk(insns, jt, i, hit)
+
+
 fwd = defaultdict(set)
 rev = defaultdict(set)
 demo = set()
 sites = Counter()
 resolved_hits = []
 unres = []  # (VA, 所属関数, op, 供給元)
+indirect_fns = 0
 for lo, hi in funcs:
     insns = list(cs.disasm(raw[lo - tb:hi - tb], lo))
-    for ins in insns:
+    addr2i = {ins.address: k for k, ins in enumerate(insns)}
+    jt = defaultdict(list)
+    indirect = False
+    for k, ins in enumerate(insns):
         if "+ 0x22792]" in ins.op_str:
             demo.add(lo)
+        if ins.mnemonic.startswith("j") and ins.op_str.startswith("0x"):
+            t = int(ins.op_str, 16)
+            if t in addr2i:
+                jt[addr2i[t]].append(k)
+        if ins.mnemonic == "jmp" and not ins.op_str.startswith("0x"):
+            indirect = True
         if ins.mnemonic in ("jmp", "call") and ins.op_str.startswith("0x"):
             t = int(ins.op_str, 16)
             if t in sset and t != lo:
                 fwd[lo].add(t)
                 rev[t].add(lo)
+    if indirect:
+        indirect_fns += 1
     for i, ins in enumerate(insns):
         if ins.mnemonic != "call":
             continue
@@ -179,7 +284,7 @@ for lo, hi in funcs:
             continue
         if reg_re.match(op):
             sites["call reg"] += 1
-            tg = resolve(insns, i, op)
+            tg = None if indirect else resolve(insns, jt, i, op)
             if tg:
                 resolved_hits.append((ins.address, lo, tg))
                 for t in tg:
@@ -187,20 +292,12 @@ for lo, hi in funcs:
                         fwd[lo].add(t)
                         rev[t].add(lo)
             else:
-                unres.append((ins.address, lo, op, provenance(insns, i, canon(op))))
+                prov = "indirect-jmp-fn" if indirect else provenance(insns, i, fam(op))
+                unres.append((ins.address, lo, op, prov))
         elif op.startswith("qword ptr [rsp"):
             sites["call [rsp+disp]"] += 1
             m = re.match(r"qword ptr \[rsp \+ (0x[0-9a-f]+)\]", op)
-            tg = None
-            for j in range(i - 1, -1, -1):
-                w = insns[j]
-                if w.mnemonic == "call":
-                    break
-                if w.mnemonic == "mov" and w.op_str.startswith(f"qword ptr [rsp + {m.group(1)}]"):
-                    srcw = w.op_str.split(",", 1)[1].strip()
-                    if reg_re.match(srcw):
-                        tg = resolve(insns, j + 1, srcw)
-                    break
+            tg = None if indirect else stack_slot_value(insns, jt, i, m.group(1))
             if tg:
                 resolved_hits.append((ins.address, lo, tg))
                 for t in tg:
@@ -208,7 +305,8 @@ for lo, hi in funcs:
                         fwd[lo].add(t)
                         rev[t].add(lo)
             else:
-                unres.append((ins.address, lo, op, "stack-arg"))
+                prov = "indirect-jmp-fn" if indirect else "stack-arg"
+                unres.append((ins.address, lo, op, prov))
 
 
 def closure(seed, edges):
@@ -227,6 +325,7 @@ R = closure(target, rev)
 C = closure(root, fwd)
 print(f"R={len(R)} C={len(C)} C∩R={len(C & R)}")
 print("sites: " + " ".join(f"{k}={v}" for k, v in sites.items()) + f" | resolved={len(resolved_hits)} unresolved={len(unres)}")
+print(f"functions with indirect jmp (all sites unresolved): {indirect_fns}")
 hit = [(a, f, t) for a, f, t in resolved_hits if t & R]
 print(f"resolved sites hitting R: {len(hit)}")
 inC = [(a, f, op, p) for a, f, op, p in unres if f in C]
