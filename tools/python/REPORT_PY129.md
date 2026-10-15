@@ -49,12 +49,12 @@
 | `bash build_cpython_wasm.sh` | rc 0 | 3 分 25.5 秒 (205.5 秒) | 未計測 |
 | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 | 4.6 秒 | 未計測 |
 | `bash provider/build.sh` | rc 0・ハンドラ 168 (`fl_table.c`: 関数 435。`a052f7390` で再ビルド) | 未計時 | 未計測 |
-| `node tests/provider_check.mjs` | PASS (functions 435・実装 168・未実装 267・MCP 静的 60) | 0.264 秒 | 0.52 |
-| `node tests/ui_state_diff.mjs` | calls 77・diffs 0・PASS (rc 0)。52 → 77 は main の PY-130 の呼出し (setter・getVersion) の追加 | 0.041 秒 | 0.52 |
-| `node tests/general_diff.mjs` | calls 41・diffs 0・PASS (rc 0) | 0.043 秒 | 0.52 |
-| `node tests/ui_diff.mjs` | calls 17・diffs 0・範囲外既知差分 3・PASS (rc 0) | 0.042 秒 | 0.52 |
-| `node tests/mixer_diff.mjs` | calls 69・diffs 0・PASS (rc 0)。calls 62 → 69 は main 側の `mixer_diff.mjs` の追加 (本 PR の変更ではない) | 0.043 秒 | 0.52 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (rc 0) | 1.239 秒 | 0.56 |
+| `node tests/provider_check.mjs` | PASS (functions 435・実装 168・未実装 267・MCP 静的 60) | 0.276 秒 | 0.21 |
+| `node tests/ui_state_diff.mjs` | calls 77・diffs 0・PASS (rc 0)。52 → 77 は main の PY-130 の呼出し (setter・getVersion) の追加 | 0.043 秒 | 0.21 |
+| `node tests/general_diff.mjs` | calls 41・diffs 0・PASS (rc 0) | 0.042 秒 | 0.21 |
+| `node tests/ui_diff.mjs` | calls 17・diffs 0・範囲外既知差分 3・PASS (rc 0) | 0.043 秒 | 0.21 |
+| `node tests/mixer_diff.mjs` | calls 69・diffs 0・PASS (rc 0)。calls 62 → 69 は main 側の `mixer_diff.mjs` の追加 (本 PR の変更ではない) | 0.044 秒 | 0.21 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (rc 0) | 1.292 秒 | 0.21 |
 
 - `ui_state_diff.mjs` の calls 52 は、通常呼出し (ui ゲッター 14 + getFocused 3 + setter 13 = 30) と引数個数違い (22) の合計。setter 追加分は 19 呼出し (通常 13 + 個数違い 6)。
 - 参考: PY-119 報告の `ui_state_diff` calls 12 は、現在のスクリプトの呼出し列と一致しない (PR 前の列は、ゲッター 17 + 個数違い 16 = 33 件と列から数えた値で、実行して測ったものではない)。PY-119 の件数は古いまま残っている (本 PR では訂正しない)。
