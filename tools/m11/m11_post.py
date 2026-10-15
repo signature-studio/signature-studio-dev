@@ -144,11 +144,21 @@ def sigfix(text, report, pads=None, fixes=None, slots=None):
             cm = re.search(r'call \S+ @(function_[0-9a-f]+)\(', line)
             if cm:
                 ncall[(_c, cm.group(1))] = ncall.get((_c, cm.group(1)), 0) + 1
+    ent_alloca = set()
+    ent_open = False
     for line in text.split('\n'):
         if line.startswith('define '):
             dm = re.search(r'@([\w.$]+)\(', line)
             cur = dm.group(1) if dm else None
             ordn = {}
+            ent_alloca = set()
+            ent_open = True
+        elif ent_open and re.match(r'^\s*(%[\w.$-]+ = )?(br|ret|switch|indirectbr|invoke|resume|unreachable|callbr)\b', line):
+            ent_open = False
+        elif ent_open:
+            am = re.match(r'^\s*(%stack_var_-?\d+) = alloca\b', line)
+            if am:
+                ent_alloca.add(am.group(1))
         m = callre.match(line) if ' call ' in line else None
         if not m:
             out.append(line)
@@ -182,6 +192,10 @@ def sigfix(text, report, pads=None, fixes=None, slots=None):
                 newargs.append('%s %s' % (pt, nv))
             else:
                 sv = slots.get((cur, nm, k, i)) if slots else None
+                if sv is not None and sv not in ent_alloca:
+                    # entry block 内で呼出しより前に定義された alloca だけ使う (それ以外は呼出し箇所を支配せず IR 不正になる)
+                    report['sigfix_slot_nonentry'] = report.get('sigfix_slot_nonentry', 0) + 1
+                    sv = None
                 if sv is not None and (pt == 'ptr' or pt.startswith('i')):
                     if pt == 'ptr':
                         newargs.append('ptr nonnull %s' % sv)

@@ -178,7 +178,8 @@ if [ ! -f work/boot_final3.ll ] || [ "$POST_IN" -nt work/boot_final3.ll ] || [ m
     python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json --pads work/sigfix_pads.json
     FIXES="${M11_SIGFIX_FIXES:-work/sigfix_fixes.json}"
     [ -n "${M11_SIGFIX_FIXES:-}" ] || python3 m11_argrecover.py work/sigfix_pads.json --pe "$PE" --lb "$M11_LB_BASE" --out "$FIXES"
-    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json --fixes "$FIXES"
+    SLOT_ARG=""; [ -n "${M11_SLOT_ROWS:-}" ] && SLOT_ARG="--slots $M11_SLOT_ROWS"
+    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json --fixes "$FIXES" $SLOT_ARG
   else
     SLOT_ARG=""; [ -n "${M11_SLOT_ROWS:-}" ] && SLOT_ARG="--slots $M11_SLOT_ROWS"
     python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json $SLOT_ARG
