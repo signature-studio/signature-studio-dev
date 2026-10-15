@@ -68,6 +68,11 @@ if [ -f "$out/line_width.js" ]; then
   chk "cap_shapes_differ" '[ "${nz[w8_cap_butt]:-0}" -lt "${nz[w8_cap_round]:-0}" ] && [ "${nz[w8_cap_round]:-0}" -lt "${nz[w8_cap_square]:-0}" ]'
   chk "join_shapes_differ" '[ "${nz[w8_join_bevel]:-0}" -lt "${nz[w8_join_round]:-0}" ] && [ "${nz[w8_join_round]:-0}" -lt "${nz[w8_join_miter]:-0}" ]'
   chk "dash_less_than_solid" '[ "${nz[w4_dash]:-0}" -gt 0 ] && [ "${nz[w4_dash]:-0}" -lt "${nz[w4_alias]:-0}" ]'
+  # SR-71 #4469 (AA): AA の cap・join・dash は部分被覆を持つ。AA の cap は butt < round < square、join は bevel < round < miter の順に非ゼロが増える。
+  chk "aa_shapes_partial" '[ "${part[w8_cap_butt_aa]:-0}" -gt 0 ] && [ "${part[w8_cap_round_aa]:-0}" -gt 0 ] && [ "${part[w8_cap_square_aa]:-0}" -gt 0 ] && [ "${part[w8_join_miter_aa]:-0}" -gt 0 ] && [ "${part[w8_join_round_aa]:-0}" -gt 0 ] && [ "${part[w8_join_bevel_aa]:-0}" -gt 0 ] && [ "${part[w4_dash_aa]:-0}" -gt 0 ]'
+  chk "aa_cap_shapes_differ" '[ "${nz[w8_cap_butt_aa]:-0}" -lt "${nz[w8_cap_round_aa]:-0}" ] && [ "${nz[w8_cap_round_aa]:-0}" -lt "${nz[w8_cap_square_aa]:-0}" ]'
+  chk "aa_join_shapes_differ" '[ "${nz[w8_join_bevel_aa]:-0}" -lt "${nz[w8_join_round_aa]:-0}" ] && [ "${nz[w8_join_round_aa]:-0}" -lt "${nz[w8_join_miter_aa]:-0}" ]'
+  chk "aa_dash_less_than_solid" '[ "${nz[w4_dash_aa]:-0}" -gt 0 ] && [ "${nz[w4_dash_aa]:-0}" -lt "${nz[w4_aa]:-0}" ]'
 else
   echo "run: skipped (no line_width.js)" | tee -a "$out/summary.txt"
   rc=1

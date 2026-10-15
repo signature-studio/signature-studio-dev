@@ -6,7 +6,7 @@
 // SR-62 #4233: fillLinearGradient・fillRadialGradient (path の内側を色停止点で塗る) も bitmap へ画素を書く。
 // SR-69 #4428: transformMatrix は点・線・多角形・楕円・矩形・clearRect・bitmap の dest 位置・文字の基準点へ適用する (clipRect は CDrawContext が device 座標で渡すので変換しない)。回転・傾斜は矩形を外接矩形で近似し、拡大縮小は bitmap と文字に掛けない。
 // SR-68 #4427: 線は lineWidth の太さで描く (太さ 1 かつ aliasing は従来の Bresenham)。drawMode の kAntiAliasing は線の被覆率を alpha に掛けて描く。
-// 状態設定は lineWidth・lineStyle (cap・join・破線)・drawMode・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha・transformMatrix を保持し、global state の save/restore は何もしない。
+// 状態設定は lineWidth・lineStyle (cap・join・破線)・drawMode・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha・transformMatrix を保持し、global state の save/restore は何もしない (lineWidth・lineStyle も復元されないため、一度設定すると後続の描画に残る)。
 
 #pragma once
 

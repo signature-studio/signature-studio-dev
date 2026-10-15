@@ -146,5 +146,14 @@ int main ()
 	const CCoord dashes[] = {6., 4.};
 	const CLineStyle dash (CLineStyle::kLineCapButt, CLineStyle::kLineJoinMiter, 0., 2, dashes);
 	run ("w4_dash", 4., CDrawMode (kAliasing), &dash);
+
+	// SR-71 #4469 (AA): 同じ形状を kAntiAliasing で描き、部分被覆の変化を見る (aliasing は部分被覆が構造上 0)。
+	run ("w8_cap_butt_aa", 8., CDrawMode (kAntiAliasing), &capButt);
+	run ("w8_cap_round_aa", 8., CDrawMode (kAntiAliasing), &capRound);
+	run ("w8_cap_square_aa", 8., CDrawMode (kAntiAliasing), &capSquare);
+	run ("w8_join_miter_aa", 8., CDrawMode (kAntiAliasing), &joinMiter, true);
+	run ("w8_join_round_aa", 8., CDrawMode (kAntiAliasing), &joinRound, true);
+	run ("w8_join_bevel_aa", 8., CDrawMode (kAntiAliasing), &joinBevel, true);
+	run ("w4_dash_aa", 4., CDrawMode (kAntiAliasing), &dash);
 	return 0;
 }
