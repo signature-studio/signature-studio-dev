@@ -25,7 +25,7 @@
 | 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (`FL_WIN64_DIR`)。`work-m11`・`work-liftdiff` を `tools/m11/work`・`tools/liftdiff/work` へ展開。`[EMSDK]` (`docs/REFERENCES.md` §4) |
 | build | `gcc ... rt/ld_native.c` と `liftdiff.py build targets/m11.json` (`[build] OK`・`wasm_size` 4460359) |
 | 機 | 4 vCPU・15 GiB。run は直列 (並列にしない) |
-| 所要 (実測) | units r1 04:24:43→04:26:28 (1 分精度)、r2 04:26:28→04:28:11。hybrid h1 `[batch] done 219s`、h2 `done 209s` |
+| 所要 (実測) | units r1 105 s (04:24:43→04:26:28、shell の date 時刻の差)、r2 103 s (04:26:28→04:28:11)。hybrid h1 `[batch] done 219s`、h2 `done 209s` |
 | load (1 分) | units r1 開始 0.90 → 終了 5.49、r2 終了 6.02。hybrid h1 終了 8.93 |
 
 ## 2. 判定と case 単位の突合
