@@ -37,7 +37,8 @@
 | noproc (r=0・導出) | 783 (= 942 − 159) | 1 (= 942 − 941) | −782 |
 | 合計 | 942 | 942 | 0 |
 
-- 注 (survey の母数の訂正): 「base の 783 件は `m11_call_unit` が -1 を返す (テーブル範囲外)」は誤り。-1 を返すのは `i >= D(tbl)` のときだけ (`tools/m11/m11_ov.c`)。units_total は 942 で (raw の stage4 出力 17/942。両変種は同じ `m11_image.bin` を使うので table は同じ)、0〜941 では -1 は返らない。よって 783 件は noproc (r=0)。alloca 版の残り 1 件も noproc と読めるが、noproc を出力していないため**実測では未確認** (次 run で出力する)。「942 件すべてが 0/1/2 に分類される」は取り下げる。
+- 注 (survey の母数の訂正): 「base の 783 件は `m11_call_unit` が -1 を返す (テーブル範囲外)」は誤り。-1 を返すのは `i >= D(tbl)` のときだけ (`tools/m11/m11_ov.c`)。D(tbl)=942 は raw 変種の stage4 出力 (17/942) で確認した。alloca 変種の D(tbl) は表に出力していない (未確認)。0〜941 では -1 は返らないので、raw の 783 件は noproc (r=0)。alloca 版の残り 1 件も noproc と読めるが、noproc を出力していないため**実測では未確認** (次 run で出力する)。「942 件すべてが 0/1/2 に分類される」は取り下げる。
+- 注 (proc の null 分布): noproc の件数は変種間で大きく違う (raw 783・alloca 1)。これは proc の null 分布が変種で変わっていることを示す。proc 欄は実行時 (boot か survey の先行 unit) に書かれる可能性がある (未確認)。
 - 注 (trap 9 → 26・+17 の内訳は**未特定**): per-unit の raw ok/miss/noproc の記録が無いため、増分 +17 が「noproc から新たに trap になった unit」か「既存の ok/miss unit の回帰」かを切り分けられない。VA 一覧も食い違う: 上の「先頭 trap unit」列挙は `0x19f9a0` (unit 87) を含むが、`REPORT_942_APPENDIX.md` の main build の base 26 件には `0x19f9a0` が無い。alloca 版の trap VA 一覧は本測定で保存していないため、どちらが正かは未確認。survey の ok 136→868 は母数の差を含むため、件数の改善とは断定できない。
 
 ## 2. 書込み元の特定 (観測フック)
@@ -78,13 +79,13 @@
 | survey の noproc (r=0) 件数と VA の未出力 (raw 783 件・alloca 1 件)。trap 9 → 26 の内訳 (noproc 由来か既存 unit の回帰か) と unit 87 (0x19f9a0) の残存の食い違い | 測定の母数・受入 1 | #942 (次 run) |
 | ldfix_e2e の入力 (snapshot = qstore・alloca 前) を本番順 (alloca → ldfix → qstore) にするか | 測定の基準 | PM agent の判断待ち (既定案: 現行 (alloca 前) を維持) |
 | F3c 33 → 43 の変化の原因 (原因未調査。main の変更は推定) | 受入 3 | #942 (次 run) |
-| work-m11 の IR と現 main の不一致 | 測定の母体 | 既存 #680 |
+| work-m11 の IR と現 main の不一致 | 測定の母体 | #942 (次 run) |
 
 ## 6. 差分 (`docs/WORKFLOW.md` §6)
 
 - 測定 commit: `10fc87e9` (診断スクリプトを追加した commit。e2e・A/B の実行経路 (`ldfix_e2e.sh`・`stage4.sh`・`survey_stage4.mjs`・`run_stage4.mjs`・`m11_alloca.py`) は変更していない)。
-- 差分 (e2e 経路・A/B 経路): `git diff 10fc87e9 HEAD -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/run_stage4.mjs tools/m11/alloca tools/m11/m11_ov.c | wc -l` → 0 (測定 commit 以降は本 REPORT と PR 本文のみ変更)。
-- main 側: `git diff 8303a813 origin/main -- (同範囲) | wc -l` → 0 (`origin/main` = `c3ee6daa7` で確認)。
+- 差分 (e2e 経路・A/B 経路): `git diff 10fc87e9 HEAD -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/run_stage4.mjs tools/m11/alloca tools/m11/m11_ov.c | wc -l` → 0。測定 commit 以降の commit は docs のみ (`f2a58679` = 本 REPORT の新規作成・DOC_MAP 登録、`dd5806e78` = 本 REPORT の訂正、round 2 の訂正 commit = 本 REPORT と PR 本文)。
+- main 側: `git diff 8303a813 origin/main -- (同範囲) | wc -l` → 0 (`origin/main` = `a5966bbc7` で確認。round 2 の訂正時点で 0)。
 
 ## 7. 再現
 
