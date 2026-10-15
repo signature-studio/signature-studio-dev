@@ -78,7 +78,7 @@ for r in $RUNS; do
     shim)    run_boot shim    "$HERE/results/boot_summary_${TAG}.json"        1 ;;
     negctl)  run_boot negctl  "$HERE/results/boot_summary_${TAG}_negctl.json" 0 ;;
     ipp2)    run_boot ipp2    "$HERE/results/boot_summary_${TAG}_ipp2.json"   2 ;;
-    default) run_boot default "$HERE/results/boot_summary_${TAG}_default.json" "" ;;
+    default) run_boot default "$HERE/results/boot_summary_${TAG}_default.json" "" 0 0 "${FLE_BOOT_LOG_CAP:-0}" ;;   # FLE-39 (#5013): 既定経路の log cap は環境変数で渡す (既定 0 = 無効・従来どおり)
     tol)     run_boot tol     "$HERE/results/boot_summary_${TAG}_tol.json"    1 1 ;;   # 寛容起動 (#2719): shim 有 + 逐次 unit 寛容 + CreateFruityInstance 観測
     tol2)    run_boot tol2    "$HERE/results/boot_summary_${TAG}_tol2.json"   1 2 ;;   # 診断: 失敗 unit の後で InitTable を起動時の値へ戻す (補修。既定ではない)
     # #672 診断: shim 有 + buf=0 の fill を戻す。FLE-15 (#3770): ログ上限 FLE_BOOT_LOG_CAP (既定 256MiB) で有界にする
