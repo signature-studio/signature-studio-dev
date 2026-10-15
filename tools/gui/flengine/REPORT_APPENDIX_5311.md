@@ -11,8 +11,9 @@ REPORT の §7 残件 (`0xfa9390`) の切り分け。判定式は変更してい
 ## 2. InitTable 添字 (静的読解)
 
 - InitTable: RVA `0xf768b0`、count `942`、units 配列 RVA `0xf768e0` (`tools/m11/work/m11_image.bin` の静的読解。再現: [inittable_find.py](inittable_find.py))。
-- proc `0xfa9390` になる添字は全 46 件。boot の初期化範囲 (添字 `0`〜`110`) では **4 件 (`29`・`38`・`39`・`105`)**。
-- boot 実測の `icall_miss 4` と件数は一致する。ただし `units_run 110` との整合 (111 − 4 = 107) は未確認。添字の計数 (`init_count 111`) と skip の計数の対応は、この静的読解だけでは説明できない。
+- proc `0xfa9390` になる添字は全 46 件。boot の初期化範囲 (添字 `0`〜`110`) では **4 件 (`29`・`38`・`39`・`105`)**。これは静的読解の候補であり、実行計数と未照合。
+- boot 実測の `icall_miss 4` は全 icall サイトの合計で、InitUnits ループの skip 件数とは別の計数。両者が同じ値になるかは確認していない。
+- 実測の `units_run 110` と、111 件のループから skip 4 件を引いた 107 との整合も未確認 (付録末尾の未解決を参照)。
 
 ## 3. B1 への寄与 (実測・前 run の記録)
 
@@ -22,7 +23,7 @@ REPORT の §7 残件 (`0xfa9390`) の切り分け。判定式は変更してい
 - B1 の FAIL は `GetMem 774 (base 772)` のみ。寄与は 0。
 - icall 比較は 4 = 4 で PASS。判定式は無変更。
 
-注: 前 run の追記 commit `f864b8b1f` は push されておらず、この clone にも無い。上の値はコメントの実測値を再掲したもの。
+注: 前 run の追記 commit `f864b8b1f` は push されておらず、この clone にも無い。上の値はコメントの実測値を再掲したもの。head `1fc8900b3` での再実行は未実施 (素材 `work-m11`・`toolchain-*`・`apt-mingw` が run の `ARTIFACTS_DIR` に無く、e2e を回せなかった)。したがってこの節は**未再現**であり、§3 は現 head の証拠ではない。
 
 ## 4. 範囲外・未測定
 
