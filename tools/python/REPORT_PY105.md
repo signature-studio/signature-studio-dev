@@ -9,7 +9,8 @@
 - **0x442c00 は『現在時刻 (ローカル) の時刻部分』を返す関数 (確定)**: `GetLocalTime` (kernel32) の結果の時・分・秒・ms を 0x442670 (EncodeTime 相当・推定) で double にする。`liveBlockNumToTime` はこの値を `L` と比べる (wall clock 依存の分岐)。
 - **inc 系 4 件の前後処理 (確定)**: `0x4232e0` は `EnterCriticalSection`、`0x423980` は `LeaveCriticalSection` (kernel32)。4 件とも先頭で Enter、`ret` 前で Leave する。排他は確定。
 - **select mode 5・7〜10 (確定・再確認)**: REPORT_PY91 §4-1 の読みを disassembly で再確認し、5 件とも一致した (§4)。
-- **未確定**: `0x12e7f80` の `+0xd4`・`+0xd6`・cfg `+0x49e` の完全な意味 (§5)、`0x12e3a60` の通知先の名前 (§6)、`0x666780` のキュー名 (§7)、`getLiveBlockColor` の theme object の型 (§8)。
+- **クラス名 (VMT で確定・PY-105 追記)**: 本バイナリは Delphi 製で、オブジェクトの先頭 qword が VMT、VMT-0x88 の ShortString がクラス名。これで 3 つの型が確定した: `0x666780` の obj = `TLFMsgHandler_MW` (§7)、`getLiveBlockColor` の theme = `TEventPanel_AU` (§8)、`0x12e3a60` の G1 = `TChanList` (§6)。
+- **未確定**: `0x12e7f80` の cfg のクラスと `+0xd4`・`+0xd6`・cfg+0x49e の意味 (§5)、`0x12e3a60` の G2 の型と `0x128f9e0` の名前 (§6)、`0x666780` の通知内容と k=0x26 の意味 (§7)、theme の `vtbl[+0x218]` (0xea0a30) の戻り値の意味 (§8)。
 
 ## 1. 時間 ↔ block 変換 (0x1221b30・0x1221aa0)
 
@@ -71,6 +72,7 @@
 - `+0xd4` (track element の byte): 1〜500 のうち `+0xd4 ≠ 0` の最初の track を『anchor』とする (0x12e7fb1〜0x12e7fd2、r13 = anchor の値)。F (`0x12e68a0`) が偽のとき、anchor 側で `+0xd4 ← (k == index)` (0x12e8068〜0x12e8083) (確定)。意味は『直前に操作した track の印』と推定。
 - `+0xd6`: F=真のとき `+0x3c ← bl | (cfg+0x49e ≠ 0 ? +0xd6 : 1)` (0x12e80d7〜0x12e80e8・確定)。F=偽・anchor 無しのとき `+0xd6 ← +0x3c` (0x12e8001〜0x12e8019・確定)。したがって `+0xd6` は『solo 状態の退避先』と推定 (推定)。
 - 区間: `0x12e8210(base, index, flag, &first, &last)` で範囲を得る (0x12e7fe9)。`0x12e8210` の中身は REPORT_PY91 §4 のとおり。
+- **PY-105 追記 (cfg の所属)**: `[0x15e13b8]` は .bss 0x196edd0 を指す。その object の書込みを静的に検出できず、直接参照 16 件は全て読み。よって cfg のクラスは未確定。`[X+0xd98]` の書込みは rbp フレーム内の 2 件 (0x131daa3・0x131dabf) のみで、cfg の格納ではない。cfg+0x49e の読みは 447 件 (汎用で cfg を特定できない)。書込みは `0x737560` の `mov [rbx+0x49e], dl` (0x737574) が 1 件あり、受け手が cfg かは未確定。
 
 ## 6. 0x12e3a60 (select mode 1 の後処理) (確定・名前は推定)
 
@@ -80,31 +82,40 @@
 - `+0xd8` が 1 の場合: `byte [*(G2)+0xa9] ≠ 0` かつ `1 ≤ +0xdc ≤ 500` なら `0x128f9e0(*(G2), +0xdc, r8b)` (0x12e3b41〜0x12e3b8e)。`r8b` は 0x12e3b86 の movzx が読む **同じ 0x12e3b9c** の 1 byte (次命令 0x12e3b8e + 変位 0xe)。
 - 0x12e3b9c は `.text` (READ-ONLY・characteristics 0x60000020) の 1 byte で、値は **0x01** (イメージ内の定数)。実行時に書き換わる値ではないので、この 2 つの `r8b` は定数 0x01 (両方の呼出しで同じ)。
 - 確定は『UI 側への 1 件通知 (0x128f9e0)』まで。`0x128f9e0` の名前と、`r8b` = 定数 0x01 の意味 (通知の種類) は未確定 (§10)。
+- **PY-105 追記 (G1・G2 の型)**: `G1 = [0x15e2218]` は .bss 0x16bafc8 を指す。その object の生成は 0x11be548 (関数 0x11be0a0 内): `call 0x663960` (class-ref slot 0xfe3278 → VMT 0xfe3340 = **`TChanList`**、確定) の戻りを格納する。`0xfe8bb0(list, idx)` は `idx` が 0〜count−1 なら `[[list+8]+idx*8]`、範囲外は 0 (確定。TChanList の要素取得)。`0x11e84a0(src)` は `[[0x3f9d68]]` の件数で src を検査し、`0xfe8bb0([[0x3f9d40]], src)` の戻りの `byte [+0x32d]` を見る (確定。戻り値の型は未確定)。
+- `G2 = [0x15e22d8]` は .bss 0x16bd450 を指すが、その書込みを静的に検出できない (未確定)。よって `0x128f9e0` の第 1 引数 `*(G2)` の型と名前は未確定。`0x128f9e0` は `0x12e3a60` から直接 `call` され (0x12e3b29・0x12e3b8e)、仮想呼出しではない (確定)。
 
 ## 7. 0xbd68e0 と 0x666780 (一部確定)
 
 - `0xbd68e0(k, v)`: `flag[k] ≠ 0` なら `flag[k] ← 0` にして `0x666780([0x16b6e00], 0, k, v)` を呼ぶ (0xbd68e4〜0xbd691d・確定)。`flag` は `0x16b6dcc` (.bss・0xbd68e7 の lea。書込み側の 0xbd68f5 の lea も同じ `0x16b6dcc` を指す) の byte 配列で、実行時値。`0x16b6e00` は 0xbd6901 の mov の読み先 (.bss・実行時値)。REPORT_PY91 の『保留通知のフラッシュ』は、この形から推定。
 - `0x666780(obj, a, b, c)`: `0x666680(obj)` を呼ぶ。`0x666680` は `EnterCriticalSection(obj+0x38)` (0x666688) の後、`[[obj+0x18]+8] ≠ [obj+0x10]` なら その値を返す (Leave しない・0x66669d)。等しいときは `0x666470` を呼び、偽なら `LeaveCriticalSection` して 0 を返し、真なら `[[obj+0x18]+8]` を返す (0x6666a8〜0x6666c4・確定)。戻りが非 0 なら、その要素の +0x10・+0x18・+0x20 に `a`・`b`・`c` を書く (0x6667a6〜0x6667ae・確定)。
-- 結論: `0x666780` は『排他下の通知キューへの 1 件投入』(推定)。キューの名前と、`k=0x26` (38) の意味は未確定 (§10)。
+- 結論: `0x666780` は『排他下の通知キューへの 1 件投入』(推定)。
+- **PY-105 追記 (obj の型)**: `obj = [0x16b6e00]` (.bss) の格納は 0xbd6a28 (関数 0xbd69d0 内): `call 0x6666d0` の戻りを格納する。class-ref slot 0x6661d0 → VMT 0x666298 = **`TLFMsgHandler_MW`** (確定)。よって `0x666780` の obj は `TLFMsgHandler_MW` のインスタンス (確定)。キュー名 (`0x666780` の処理内容) は未確定。
+- **k=0x26 の呼出し元**: `0xbd68e0` の全呼出し 214 件のうち、直前 8 命令の窓で `mov ecx, 0x26` を持つのは 1 件 (0xd567fa)。呼出し元は関数 0xd56770 で、同じ関数内で `call 0x12e7f80` (0xd567ee) も呼ぶ。0xd56770 の所属 VMT は逆引きで見つからず未確定。窓の外の k=0x26 呼出しは未確認。よって k=0x26 の通知内容は未確定。
 
-## 8. getLiveBlockColor の色の出所 (確定・型は未確定)
+## 8. getLiveBlockColor の色の出所 (型と vtbl の入口は確定・戻りの意味は未確定)
 
 `0x100c030(S, b)` (確定):
 1. `vec[b][0]` (= `0x100bb30(S, b<<16)`) が非 0 のとき、`theme = [[[0x15e35c8]] + 0xd2c]` (0x15e35c8 は `.data` の slot・0x100c045 の mov の読み先) を取り、`call [theme.vtbl + 0x218]` (`rcx = theme`、`rdx = vec[b][0]`) の u32 を返す (0x100c045〜0x100c068)。
 2. 0 のとき `S+8` の dword (elem+0x2c、track 色) を返す (0x100c035)。
 
-theme object の型と `vtbl[+0x218]` の実体は未確定 (vtable の書込み元が静的に追えない)。§10。
+**PY-105 追記 (型と vtbl の確定)**:
+- owner = `[0x16ba808]` (`[0x15e35c8]` の指す .bss 変数・実行時値)。theme = `[owner+0xd2c]`。
+- theme の書込み 0xe3493a (関数 0xe343a0 内): `call 0xe9c770` の戻りを `[owner+0xd2c]` に格納する。呼出しの class-ref は slot 0xe2e9f8 → VMT 0xe2eac0 = **`TEventPanel_AU`** (確定)。第 3 引数 (r8) は owner。直後の 0xe34956 で `[theme+0x14c] ← owner` (確定)。よって theme の型は `TEventPanel_AU` (確定)。
+- `vtbl + 0x218` = VMT 0xe2eac0 の slot 0x218 = **0xea0a30** (確定)。0xea0a30 の命令の読み: 要素 (rdx) の +0x13 の bit 0x80 と `[theme+0x398]+0xab8` の bit 比較が一致しない側は `dword [[theme+0x398]+0xaa4] − 0x606060` を返す。一致する側は `0x1190750` が出力ポインタ (rbp+0x20) を作り、それが非 0 なら `[ptr+0x78]` を引数に `0x660a00(…, −20)` の戻り、0 なら `[[rip+0x741ffd]]` の 24 B 要素 (index = `dword [rbp+0x2c]`) の +8 の dword を返す (確定・命令の読み)。戻り値が色そのものかどうかは **推定** (未確定)。
+- `[X+0xd2c]` への書込みはもう 1 件 (0xeeef11・関数 0xeeecd0 内・`[rbx+0xd2c]`、rbx = Self)。この関数で格納される値の型と owner との関係は **未確定** (§10)。
 
 ## 9. 検証
 
-- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を実在確認後、`tar --zstd -xf ... -C $RUNNER_TEMP/fl-win64 extracted`・real 4.3 s)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。
+- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を実在確認後、`tar --zstd -xf ... -C $RUNNER_TEMP/fl-win64 extracted/block00031_PE.bin`・real 2.8 s)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。
 - 再現 (1 コマンド): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/playlist_time_facts.py`。
 - 実測: real 8.217 / 8.169 / 7.960 s (n=3)。`/proc/loadavg` 実行直前 `0.18 0.49 0.31`・`0.25 0.49 0.32`・`0.36 0.51 0.32`。並列 1。
 - 測定 commit (コードを最後に変えた commit): `eb0024a88` (`feat(flapi): extract time-block and critical-section facts (PY-105)`)。以後の差分: 測定に使うコードは `playlist_time_facts.py`・`pe_disasm.py` の 2 本で、`git diff eb0024a88 HEAD -- tools/python/analysis/flapi/playlist_time_facts.py tools/python/analysis/flapi/pe_disasm.py` の出力は 0 行。`analysis/flapi` 全体では main 取り込みで他 PR の新規 2 件 (`pe_mixer_wrappers.py`・`pe_va_read.py`・計 158 行) が増えたが、両スクリプトは import しない (import は os・re・struct・sys・capstone・pefile のみ)。REPORT と DOC_MAP の変更は、この測定の後に入った (番地の訂正・記述の修正)。
 - 逆アセンブルの再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_disasm.py <VA> <命令数>` (本文の VA は全てこれで確認)。
 - 番地の照合 (指摘対応): 本文の `[rip+X]` は全て『次命令の VA + X』で再計算し、pe_disasm.py の命令列の該当行と照合した。所属 section は PE section 表で判定 (`.text` = READ-ONLY、`.data`・`.bss` = WRITE)。本文の番地は全て VA で書く (変位は命令の確認用の併記に限る)。
-- ネガティブコントロール: なし (抽出のみ。`playlist_time_facts.py` は FAIL 判定を持たない)。
-- 範囲外: 実行による検証 (fl-win64 の起動・ランタイム値 `L`・`D` の書換え・theme の実体) は行わない。
+- **PY-105 追記 (VMT によるクラス名の照合)**: 再現 `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/playlist_class_facts.py` (§5〜§8 の VMT・クラス名・呼出し元を出力)。測定 commit `d106e22d0` (`feat(flapi): resolve VMT class names of playlist helper objects (PY-105)`)。実測 real 18.569 / 18.794 / 18.676 s (n=3)、`/proc/loadavg` 実行直前 `0.49 0.34 0.29`・`0.60 0.37 0.30`・`0.72 0.41 0.31`、並列 1。3 回の出力は md5 `0dbfd500` で一致。測定 commit 以後のコード差分: `git diff d106e22d0 HEAD -- tools/python/analysis/flapi/` の出力は 0 行 (以後の変更は REPORT と DOC_MAP のみ)。主要な番地は逆アセンブルで読み直した (0xe34900〜0xe34956・0xe9c770・0xea0a30・0x6666d0)。
+- ネガティブコントロール: なし (抽出のみ。`playlist_time_facts.py`・`playlist_class_facts.py` は FAIL 判定を持たない)。
+- 範囲外: 実行による検証 (fl-win64 の起動・ランタイム値 `L`・`D` の書換え・theme の実行時の実体) は行わない。
 
 ## 10. 未解決 (起票先付き)
 
@@ -112,8 +123,9 @@ theme object の型と `vtbl[+0x218]` の実体は未確定 (vtable の書込み
 |---|---|---|
 | `L` (0x196eca0) の実行時値。`D` (384) が実行時に書き換わるか | `liveBlockNumToTime` の wall clock 分岐が常に真か否か | #2908 (PM 判断) |
 | 時刻 `L` の比較で、wall clock に依存する分岐が実際に効くか | 時刻依存の挙動の有無 | #2908 |
-| `0x12e7f80` の cfg+0x49e・`+0xd4`・`+0xd6` の名前 (§5 の推定) | solo 設定の副作用の名前付け | #2908 |
-| `0x12e3a60` の `0x128f9e0`・`0x11e84a0`・`0xfe8bb0` の名前と引数の意味 (§6) | select の UI 通知の仕様記述 | #2908 |
-| `0x666780` のキュー名と、`k=0x26` の通知内容 (§7) | 保留通知の名前付け | #2908 |
-| `getLiveBlockColor` の theme object の型と `vtbl[+0x218]` の実体 (§8) | 色の出所の型確定 | #2908 |
+| `0x12e7f80` の cfg のクラス・+0xd4・+0xd6・cfg+0x49e の意味 (§5) | solo 設定の副作用の名前付け | #2908 |
+| `0x12e3a60` の G2 (0x15e22d8) の指す型・`0x128f9e0` の名前・`0x11e84a0` の戻り型 (§6) | select の UI 通知の仕様記述 | #2908 |
+| `0x666780` の処理内容 (キュー名)・k=0x26 の呼出し元 0xd56770 の所属 (§7) | 保留通知の名前付け | #2908 |
+| theme の `vtbl[+0x218]` (0xea0a30) の戻り値の意味 (色か・§8) | 色の出所の確定 | #2908 |
+| `[owner+0xd2c]` への書込み 0xeeef11 (関数 0xeeecd0) の格納値の型と owner との関係 (§8) | theme の生成元の一意性 | #2908 |
 | CS slot `0x15e3d40` の実行時の書換え有無 (§3 の 8 箇所は同一 slot を読む) | 4 件が同一 CS であることの実行時の保証 | #2908 |
