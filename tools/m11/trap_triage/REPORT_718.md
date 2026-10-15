@@ -209,6 +209,15 @@
 - 結論: 真陽性 9 (69・70・75・79・85・95・96・97・98)、偽陽性 4 (80・88 を新規、90・92 は前 run)、保留 19。真陽性のうち IR 本文で照合したのは 69・95・96 の 3 件。
 - 測定 commit: `1d04852b0` (origin/main)。判定に使うコード (`tools/m11/guard699/`・`tools/m11/trap_triage/strict_evidence.py`・`judge_ctx.py`) は本 PR で変更していない。scan 288・TSV 288 行を再現。
 
+## 4l. 証拠表の行 67〜74 (#4885・部分達成: 判定 6 件・真陽性 4・偽陽性 0・保留 2)
+
+- 件ごとの表・判定基準・再現・未解決は `REPORT_APPENDIX_4885.md` が正本。本節は結論のみ。
+- 真陽性: 68・71・73・74。偽陽性: 0。保留: 67 (G の読み幅が機械語 qword・IR i32)・72 (jcc の左辺と IR の SSA 同一性が未確定)。
+- 未判定 (本 run の対象外): 行 76〜78・81〜84 (7 件)。#4885 の担当 13 件のうち残り 7 件で、#4885 を open のまま残して継続する。
+- 判定方法: 機械語 (`objdump` の逆アセンブル) の jcc 直前の被演算子の count 源を、IR の同じ load 連鎖 (段数・幅) と突合する。入口判定の有無と脱出先の一致を見る。判定は手で行い、スクリプトでは判定しない (`judge_ctx.py` は文脈ダンプのみ)。
+- 入力: `work-m11` の `boot_final.ll` (sha256 `69c774de…`。`597757f4…` の系統は未使用)・`fl-win64` の `block00031_PE.bin`。scan 288・TSV 288 行を再現。
+- 偽陽性率は母数 288 の判定が終わるまで書かない。
+
 ## 5. 再現
 
 本 PR の再現手段は `guard699/scan_guard.py`・`trap_triage/strict_evidence.py`・`trap_triage/judge_entry_check.py` で、入力は `work-m11` の `boot_final.ll` を要する (`oc_artifacts: fl-win64 work-m11`)。`block00031_PE.bin` は `fl-win64` 素材に入っている。

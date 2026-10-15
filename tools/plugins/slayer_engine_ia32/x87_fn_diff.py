@@ -54,14 +54,28 @@ STK_WIN = 0x1E0
 PROBE = [
     {'va': 0x10009EB5, 'name': 'fn_10009eb5', 'gen': 'generic'},
     {'va': 0x1000B526, 'name': 'fn_1000b526', 'gen': 'generic'},
-    {'va': 0x1000BF60, 'name': 'fn_1000bf60', 'gen': 'generic'},
-    # #4080: double 引数の 2 本 (cdecl・a0 = double)。 1000bf1e は OBJ 窓を書かないので effect 判定が 0 になる (構造は全行一致・float 全行一致)。
-    # 10009bc4 は ST(0) が全行で不一致 (nan-num 4000)。 原因未確定 (付録 §2)。
+    # #4105: 0x1000bf60 は fld tbyte [esp+0x10] (a3..a5) と [esp+4] (a0..a2) の 2 つの f80 を割る。 generic は a5 = 0 のため X の指数が常に 0 (非 normal)。
+    # f80pair は両オペランドを種類 (normal・zero・denorm・unnorm) つきで作り、normal×normal の行を含める。
+    {'va': 0x1000BF60, 'name': 'fn_1000bf60', 'gen': 'f80pair'},
+    # #4080: double 引数の 1 本 (cdecl・a0 = double)。 1000bf1e は OBJ 窓を書かないので effect 判定が 0 になる (構造は全行一致・float 全行一致)。
     {'va': 0x1000BF1E, 'name': 'fn_1000bf1e', 'gen': 'double1'},
-    {'va': 0x10009BC4, 'name': 'fn_10009bc4', 'gen': 'double1'},
+    # #4840: 空スタックで呼ぶ基準線 (ST(0) の入力を積まない)。 入力は X87_PUSH64=1 で測る (付録 REPORT_APPENDIX_4840.md)。
+    # 同じ name を PROBE に 2 つ置くと agg が混ざるため、#4080 の 10009bc4 (double1) 行はここでは外す。
+    {'va': 0x10009BC4, 'name': 'fn_10009bc4', 'gen': 'generic'},
 ]
 if os.environ.get('X87_PROBE'):
     TARGETS = TARGETS + PROBE
+# #4840: double 入力の測定専用 (X87_PUSH64=1)。 呼出し前に double 1 個を x87 に積む (a0 = 下位 dword・a1 = 上位 dword)。
+#   native・glue を -DX87_PUSH64 で作る。 ゲートには入れない (既存の TARGETS の入口状態は変えない)。
+PUSH64 = bool(os.environ.get('X87_PUSH64'))
+if PUSH64:
+    TARGETS = [
+        {'va': 0x10009BC4, 'name': 'fn_10009bc4', 'gen': 'f64'},
+    ]
+    WORK_NAME = 'x87fn_push64'
+else:
+    WORK_NAME = 'x87fn'
+PUSH64_FLAGS = ['-DX87_PUSH64'] if PUSH64 else []
 
 
 def pe_image():
@@ -95,6 +109,11 @@ def gen_rows(seed, n):
                 a = [f32(rng.uniform(-1000, 1000)), rng.randrange(16), 0, 0, 0, 0]
             elif t['gen'] == 'mixed':
                 a = [f32(rng.uniform(-100, 100))] + [rng.randrange(16) for _ in range(5)]
+            elif t['gen'] == 'f80pair':
+                a = f80_args(rng)
+            elif t['gen'] == 'f64':
+                d = struct.unpack('<Q', struct.pack('<d', rng.uniform(-1000, 1000)))[0]
+                a = [d & 0xFFFFFFFF, d >> 32, 0, 0, 0, 0]
             elif t['gen'] == 'double1':
                 d = struct.unpack('<Q', struct.pack('<d', rng.uniform(-100, 100)))[0]
                 a = [d & 0xFFFFFFFF, d >> 32, rng.randrange(16), 0, 0, 0]
@@ -103,6 +122,35 @@ def gen_rows(seed, n):
             line = '%08x %08x %s %s' % (t['va'], OBJ, ' '.join('%08x' % v for v in a), init.hex())
             rows.append((t, line, init))
     return rows
+
+
+F80_KINDS = ['norm', 'norm', 'denorm', 'unnorm', 'zero']
+
+
+def f80_one(rng, kind):
+    """f80 (mantissa 64bit・指数 16bit 符号付き) を (lo32, hi32, se16) で返す。 kind: norm・denorm・unnorm・zero。"""
+    sign = rng.randrange(2)
+    if kind == 'zero':
+        return 0, 0, sign << 15
+    if kind == 'denorm':
+        mant = rng.randrange(1, 1 << 63)
+        return mant & 0xFFFFFFFF, mant >> 32, sign << 15
+    if kind == 'unnorm':
+        mant = rng.randrange(1, 1 << 63)
+        e = rng.randrange(1, 0x7FFE)
+        return mant & 0xFFFFFFFF, mant >> 32, (sign << 15) | e
+    mant = (1 << 63) | rng.randrange(1 << 63)
+    e = rng.randrange(0x3F80, 0x4080)
+    return mant & 0xFFFFFFFF, mant >> 32, (sign << 15) | e
+
+
+def f80_args(rng):
+    """a = [X.lo, X.hi, X.se, Y.lo, Y.hi, Y.se] (X は [esp+0x10] 側 = a3..a5、Y は [esp+4] 側 = a0..a2)。 gen_rows の既定 (a0..a5 の 6 語) を満たす。"""
+    yk = rng.choice(F80_KINDS)
+    xk = rng.choice(F80_KINDS)
+    yl, yh, ys = f80_one(rng, yk)
+    xl, xh, xs = f80_one(rng, xk)
+    return [yl, yh, ys, xl, xh, xs]
 
 
 SPECIAL_F32 = [
@@ -118,6 +166,20 @@ SPECIAL_F32 = [
 ]
 
 
+SPECIAL_F64 = [
+    0x7FF8000000000000,  # qNaN
+    0xFFF8000000000000,  # -qNaN
+    0x7FF0000000000000,  # +inf
+    0xFFF0000000000000,  # -inf
+    0x0000000000000001,  # 最小の正の非正規数
+    0x0000000000000000,  # +0
+    0x8000000000000000,  # -0
+    0x41DFFFFFFFC00000,  # 2^31 - 1 (int32 の上限付近)
+    0xC1E0000000000000,  # -2^31
+    0x41E0000000000000,  # 2^31 (int32 を超える)
+]
+
+
 def gen_special_rows(seed, n):
     """例外的な値 (NaN・±inf・非正規・±0 = 除算の除数) を含む行。 通常行と別の乱数系列を使う (通常行の列は変えない)。
     a0 は SPECIAL_F32 を巡回させて全種を必ず通す。 OBJ 窓の各語は 1/4 で例外値にする (除数の位置を含めるため)。"""
@@ -129,7 +191,10 @@ def gen_special_rows(seed, n):
                      for _ in range(OBJ_WIN // 4)]
             init = b''.join(struct.pack('<I', w) for w in words)
             sp = SPECIAL_F32[i % len(SPECIAL_F32)]
-            if t['gen'] == 'idx_store':
+            if t['gen'] == 'f64':
+                d = SPECIAL_F64[i % len(SPECIAL_F64)] if i % 2 == 0 else struct.unpack('<Q', struct.pack('<d', rng.uniform(-1e12, 1e12)))[0]
+                a = [d & 0xFFFFFFFF, d >> 32, 0, 0, 0, 0]
+            elif t['gen'] == 'idx_store':
                 a = [sp, rng.randrange(16), 0, 0, 0, 0]
             elif t['gen'] == 'double1':
                 d = struct.unpack('<Q', struct.pack('<d', rng.uniform(-100, 100)))[0]
@@ -267,7 +332,7 @@ def compare(nat, act, scen, quiet=False):
     agg = {}
     for t in TARGETS:
         agg[t['name']] = {'rows': 0, 'eq': 0, 'f32_eq': 0, 'eax_bad': 0, 'eax_nan': 0, 'd_bad': 0, 'effect': 0,
-                          'st0': {}, 'st0d': {}, 'mem': {}}
+                          'eaxs': set(), 'st0': {}, 'st0d': {}, 'mem': {}}
     for i, (t, line, init) in enumerate(scen):
         a = agg[t['name']]
         e, w = nat[i], act[i]
@@ -281,6 +346,7 @@ def compare(nat, act, scen, quiet=False):
             a['d_bad'] += 1
         if e['mem'] != init.hex() or e['stk'] != '00' * STK_WIN:
             a['effect'] += 1
+        a['eaxs'].add(e['eax'])
         if e == w:
             a['eq'] += 1
         if e['st0'] == w['st0'] and e['mem'] == w['mem'] and e['stk'] == w['stk'] and e['eax'] == w['eax']:
@@ -296,7 +362,9 @@ def compare(nat, act, scen, quiet=False):
         a = agg[t['name']]
         n = a['rows']
         mixed = sum(a[k].get('nan-num', 0) for k in ('st0', 'st0d', 'mem'))
-        if a['eax_bad'] or a['d_bad'] or a['effect'] == 0 or n == 0 or mixed:
+        # 非自明性: 窓が変わった行があるか、PUSH64 (窓を書かない関数) では戻り値 eax の種類が 2 以上あること。
+        nontrivial = a['effect'] > 0 or (PUSH64 and len(a['eaxs']) >= 2)
+        if a['eax_bad'] or a['d_bad'] or not nontrivial or n == 0 or mixed:
             ok = False
         if quiet:
             continue
@@ -408,6 +476,8 @@ def main():
         for va, (verdict, detail) in classify().items():
             print('[classify] 0x%x %s %s' % (va, verdict, detail))
         sys.exit(0)
+    if PUSH64:
+        WORK = os.path.join(HERE, 'work', WORK_NAME)
     nega = '--nega' in sys.argv
     special = '--special' in sys.argv
     if special:
@@ -456,9 +526,9 @@ def main():
     if not nega:
         t_nat_build = run(['gcc', '-m32', '-O1', '-fno-pic', '-fno-pie', '-fno-stack-protector', '-fcf-protection=none',
                            '-fno-asynchronous-unwind-tables', '-ffreestanding', '-nostdlib', '-static', '-no-pie',
-                           '-o', nat, os.path.join(HERE, 'x87_fn_native.c')], 'native build')
+                           *PUSH64_FLAGS, '-o', nat, os.path.join(HERE, 'x87_fn_native.c')], 'native build')
         t_wasm_build = run(['emcc', '-O1', '-ffp-contract=off', '-fno-fast-math', '-w', '-I', RT,
-                            '-DLIFT_C="%s"' % LIFT, os.path.join(HERE, 'x87_fn_glue.c'), os.path.join(RT, 'ott_cpu.c'),
+                            '-DLIFT_C="%s"' % LIFT, *PUSH64_FLAGS, os.path.join(HERE, 'x87_fn_glue.c'), os.path.join(RT, 'ott_cpu.c'),
                             '-sENVIRONMENT=node', '-sMODULARIZE=1', '-sEXPORT_NAME=createModule', '-sEXIT_RUNTIME=0',
                             '-sEXPORTED_FUNCTIONS=_ott_call32x,_ott_x87_st0,_ott_x87_st0d_hi,_ott_x87_st0d_lo,_ott_x87_depth',
                             '-sEXPORTED_RUNTIME_METHODS=HEAPU8',

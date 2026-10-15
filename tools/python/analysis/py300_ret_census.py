@@ -10,6 +10,7 @@ from collections import deque
 
 EXIT_M1 = 0x104CC72
 RET_N = 0x104CC65
+COPY_FALLTHROUGH = 0x104CC71  # RET_N の複写 (mov [rbp+0x584]) の直後の nop。-1 の出口ではなく、複写値が 0x104cc72 へ落ちる
 HEADS = [
     ("key 0", 0x10476E4), ("key 1", 0x1047934), ("key 2-3", 0x1047B93), ("key 4", 0x1047D75),
     ("key 5", 0x1047EDA), ("key 6", 0x1047FC6), ("key 7", 0x1048134), ("key 8", 0x104839C),
@@ -71,7 +72,7 @@ def main(path):
     print(f"instructions={len(ins)}")
     print("edges into 0x104cc72 (-1 exit):")
     for a in sorted(ins):
-        if EXIT_M1 in succ(ins, nxt, a) and a != EXIT_M1:
+        if EXIT_M1 in succ(ins, nxt, a) and a not in (EXIT_M1, COPY_FALLTHROUGH):
             print(f"  0x{a:x} {ins[a][0]} {ins[a][1]}")
     print("edges into 0x104cc65 (copy n):")
     for a in sorted(ins):
