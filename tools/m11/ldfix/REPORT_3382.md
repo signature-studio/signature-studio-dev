@@ -195,6 +195,39 @@ python3 tools/m11/ldfix/classify_err_cand_4972.py <judge.json> --md <out.md>
 - 再現コマンド: `python3 tools/m11/ldfix/classify_err_cand_4972.py <judge.json> --md <out.md>`。出力の `判定不能: 45` は `保留` 1 件を含む (分類名を ` (` で切るため)。内訳は 判定不能 44 + 保留 1 + 正常 2 = 47。
 - 未解決: 判定不能 44 件と保留 1 件 (0x7372a0 の戻り値の読み) は、窓の外 (呼出し元・呼出し先の引数の意味) まで見る作業が要る。受入条件 1 は部分達成で、残りは #4993 に残す。
 
+## 13. rewrite_argpos の同一 [base] 再ロード修正と再判定 (#5446 / CI-221)
+
+- 欠陥: `rewrite_argpos` は deref 後の `mov rcx,[rbx]` (同じ `[base]` からの再ロード) を書込みとみなし、holding から落としていた。0x44b380 (deref 0x44b392 → 0x44b39d 再ロード → call 0x44b3a2) が REWRITE_NOARG になった原因。
+- 修正: `rewrite_argpos` は `base` を取り、base が変わらず間に store (メモリ書込み)・call が無いあいだは、`[base]` からの再ロードを値の保持として holding に加える。`judge` は rewrite 行で IR の引数が `%argK` の `ptrtoint` (アドレス) だけなら ERR_BARE とする (#5446)。
+- 0x44b380 の逆アセンブル: 0x44b392 `mov rcx,[rbx]` → 0x44b39d `mov rcx,[rbx]` (同じ `*arg1`) → 0x44b3a0 `mov edx,eax` → 0x44b3a2 `call 0x44b2b0`。第 1 引数は `*arg1`。IR は `%2 = ptrtoint ptr %arg1` (アドレス) を渡す。判定は ERR_BARE (誤り候補)。
+
+### 測定
+
+- 測定 commit: `219677f85` (判定器の修正。`judge_copy_3382.py` のみ変更)。修正前は `ff5c67a9d` (main) で測定。
+- 素材: `block00031_PE.bin` (sha256 先頭 `b2c64da4092…`・fl-win64 展開先 `$RUNNER_TEMP/fl-win64`)。IR `tools/m11/work/boot_final3.ll` (sha256 先頭 `010451add514…`)。§1 と同じ指紋。
+- scan: `COPY 49 関数 103 箇所` (§1 と一致・出力は修正前後で同一)。実行 4.5 s・load average 0.11 / 0.47 / 0.29。
+- judge (修正前 `ff5c67a9d`): `ERR_BARE 14 / UNCLEAR 14 / REWRITE_NOARG 5 / ERR_CAND 47 / MISMATCH 13 / OK_ARGK 10` (issue の値と一致)。
+- judge (修正後 `219677f85`): `ERR_BARE 15 / UNCLEAR 14 / REWRITE_NOARG 4 / ERR_CAND 47 / MISMATCH 13 / OK_ARGK 10` (実行 0.4 s 程度)。
+- 変化は 1 件だけ: 0x44b380 (deref 0x44b392 → call 0x44b3a2) REWRITE_NOARG → ERR_BARE (argpos 1・`%2` = ptrtoint `%arg1`)。他の 102 件の verdict と argpos は変わらない (全行を比較)。
+
+### REWRITE_NOARG 5 件の再判定
+
+| 関数 | deref → call | 機械語の deref 後 | 判定 (修正後) | 同型か |
+|---|---|---|---|---|
+| 0x1280250 | 0x12802a6 → 0x12802ba | 0x12802b5 で `mov rcx,[rsi]` の後、`mov dl,1`・call。0x12802a9 で `[rcx+0x496]` に書込みあり | REWRITE_NOARG (据え置き) | 否 (再ロードの間に演算・store) |
+| 0x1280380 | 0x12803f5 → 0x128040f | 0x12803f8 `mov ecx,[rcx+0x500]` (値を計算で上書き) | REWRITE_NOARG (据え置き) | 否 |
+| 0x439f90 | 0x43a0e7 → 0x43a0fa | 0x43a0ea〜0x43a0f7 で `sub/sar/adc/add` により r8 が計算値 | REWRITE_NOARG (据え置き) | 否 |
+| 0x8e5f80 | 0x8e6001 → 0x8e600d | 0x8e6007 `movzx rdx,word ptr [rdx+rax*2-2]` で rdx が上書き | REWRITE_NOARG (据え置き) | 否 |
+| 0x44b380 | 0x44b392 → 0x44b3a2 | 0x44b39d `mov rcx,[rbx]` (同じ `*arg1`) | ERR_BARE (argpos 1) | **同型** (本修正の対象) |
+
+- 「同型」は、deref と同じ `[base]` からの再ロードだけで値が変わらない形。残る 4 件は再ロードの間に演算・store が入るため、値が届かないという判定を維持する。窓の人手確認は未実施 (逆アセンブルの読み。§9 と同じ位置づけ)。
+- 0x44b380 の 2 件目の deref (0x44b39d → 0x44b3a2) は、判定器では UNCLEAR のまま (argpos 1・`%2` は ptrtoint)。同じ行の判定は本修正の対象外 (rewrite 行ではない) のため据え置いた。
+
+### 検証範囲
+
+- 範囲内: `judge_copy_3382.py` の rewrite 行の判定 (6 件)。ptrtoint 規則は rewrite 行にだけ適用した (全行に適用すると 0x43c990・0x4473b0・0x44ed80・0x44edd0 も変わるが、これらは本 issue の範囲外のため除外)。
+- 範囲外: 修復 (#3326)・CMP 側 (#3381)・ERR_CAND 47 件の判定 (#4993)。
+
 ## 12. MISMATCH 13 件の呼出し件数不一致の原因分類 (#5436 / CI-219)
 
 - 対象: `judge_copy_3382.py` の MISMATCH 行 (本 run の再現では 13 件。§9 の argpos 補正後の数。§5 の 14 件は補正前)。分類は `mismatch_5436.py` (`--judge` の JSON と IR・PE から判定)。
