@@ -15,7 +15,7 @@
 
 | 項目 | 定義 |
 |---|---|
-| process VA | `LadderDsp` (`.?AVLadderDsp@ladder@@`) の vtable の slot 14。既存 13 本の `snapins.json` の `proc` が `GainDsp`〜`LimiterDsp` の slot 14 と一致 (`idx [14]`) |
+| process VA | `LadderDsp` (`.?AVLadderDsp@ladder@@`) の vtable の slot 14。既存 13 本の `snapins.json` の `proc` が `GainDsp`〜`LimiterDsp` の slot 14 と一致 (`idx [14]`)。既存の harness の先頭コメントにも同じ対応がある (`tools/targets/kilohearts/license/harness/scen_{gain,clipper,gate,haas,matrix,quickeq}.h`) |
 | roots | `LadderDsp` vtable の slot のうち `SnapinDsp<LadderDspModel>` (`0x1818589f8`) と値が異なるもの (= 独自 override + slot 20)。no-op `0x1800128a0` は除外。計 5 本: `0x1804d9820 0x1804d98b0 0x1804d9930 0x1804d9ba0 0x1804db990` |
 | 閉包 | `x64c.py --closure 1000`。roots から直接 call/jmp (即値先) を辿った関数集合。**間接 call は辿らない** (= root として明示したものだけが閉包に入る) |
 | functions | `lift_meta.json` の `functions` 件数 (IAT thunk・tail 吸収は x64c の仕様どおり関数に数えない) |
@@ -30,6 +30,7 @@
 | ネガコン (root = process のみ) | 2 | 178 | 0 | 0 | 0 |
 
 - 入力: `HeartCore.core_64` 76,642,304 B (sha256 先頭 16 hex `d55ce8b4c0ad7ebe`)。素材 `plugins-kilohearts` の `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/*` → `HeartCore.core_64` (`scripts/extract_installer.sh` の Windows 部分と同じ手順)。
+- `--img 0x180000000`・`--img-size 0x625c000` は上の入力に合わせて `scripts/ladder_x64c_closure.sh` に固定した値。別 build の `KH_CORE` で使う前に、その PE の ImageBase・SizeOfImage を確かめること (スクリプトは検査しない。§5)。
 - 再現実行: 同一 HeartCore で 2 回実行し、閉包 98 / 7,766 / unsup 38 が一致 (1 回目は commit 前の同内容のスクリプト、2 回目は測定 commit `9f02a5b69` の HEAD `4213316bb`)。
 - 所要: x64c 閉包 1 回 約 14 s。スクリプト全体 (rtti_walk + 2 閉包) 約 29 s (load 4 vCPU)。
 - unsup の内訳 (`rcpps` 34 site): 既存 snap-in の rcpps 実機近似 (`snapins/REPORT.md` §13・`scripts/rcpps_probe.c`・`approx_tables.b64`) と同じ型。x64c 側には未実装 = 次の作業の最初の項目。
@@ -45,7 +46,7 @@
 |---|---|
 | 段階順に 1 本ずつ bit-exact (Ladder → Slice EQ → Filter Table) | **未達** (Ladder は閉包測定まで。lift・wasm・native 比較は未実施)。子 #3721 [KH-60] (Ladder)・#3722 [KH-61] (Slice EQ → Filter Table) に移した |
 | ネガコン・数え方の定義・再計算スクリプトを REPORT に書く | 数え方 = §1、ネガコン = §0・§2 (process 1 本の閉包)、再計算 = `scripts/ladder_x64c_closure.sh`。bit-exact 用のネガコン (1 bit 改変の検出) は未実施 |
-| 既存 14 本の `run_all.sh` が不変 | `run_all.sh`・`lift/`・`harness/`・`snapins.json` は本 PR で変更していない (`git diff origin/main -- tools/targets/kilohearts/snapins` が空であることを確認)。`run_all.sh` 本体は未実行 (既存経路に触れていないため) |
+| 既存 14 本の `run_all.sh` が不変 | `run_all.sh`・`lift/`・`harness/`・`scripts/`・`snapins.json` は本 PR で変更していない。確認: `git diff origin/main HEAD -- tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/snapins/harness tools/targets/kilohearts/snapins/scripts tools/targets/kilohearts/snapins/run_all.sh tools/targets/kilohearts/snapins/snapins.json` の出力は 0 行。付録ファイル自身は `snapins/` 直下にあるため、`snapins` 全体の diff は空にならない。`run_all.sh` 本体は未実行 (既存経路に触れていないため) |
 
 ## 5. 次の作業 (未解決)
 
@@ -55,6 +56,7 @@
 | addsubpd 2・vpmovsxdq 1・vshufps 1 の x64c 対応 | 小。同じ子で扱う | #3721 [KH-60] |
 | 間接 call (`[rax+0xa0]` slot 20 / `[rax+0x78]` slot 15) の wasm 側の dispatch 方式 | `this` 依存の vtable 呼び出し。native 比較の scenario で `this` の vtable を実物で組む必要がある (snapins の `scenarios` と同じ型) | #3721 [KH-60] |
 | Ladder scenario・bit-exact 比較・ネガコン (1 bit 改変) | 受入の本体 | #3721 [KH-60] |
+| `ladder_x64c_closure.sh` の `--img`・`--img-size` を PE から読む (または一致を検査する) | 別 build の `KH_CORE` で閉包が黙って狂う。本 PR では見送り: スクリプトを変えると測定 commit 以降のコード差分が 0 でなくなり、再測定が要る。再測定の入力 `plugins-kilohearts` は本 PR の run で取得できない | #3721 [KH-60] (閉包を次に測るときに入れる) |
 | Slice EQ (kpeq) → Filter Table (ksft) の bit-exact 化 | 親 #780 の受入の残り | #3722 [KH-61] |
 
 ## 6. 付録の位置づけ
