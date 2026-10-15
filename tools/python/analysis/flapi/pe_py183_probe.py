@@ -201,6 +201,7 @@ def main():
     format_checks()
     desc_checks()
     typecheck_checks()
+    pct_fmt_checks()
     print(f"summary: {'OK' if not FAILS else str(len(FAILS)) + ' FAIL'}")
     return 1 if FAILS else 0
 
@@ -293,6 +294,29 @@ def typecheck_checks():
     check("T=0xfe2cf8 の基底 (T-0x78 → 0xfe28b0 → 0xfe2978) の 1 段目", qword(0xFE2CF8 - 0x78) == 0xFE28B0 and qword(0xFE28B0) == 0xFE2978)
     check("0x104fa21 call 0x40fe90 → 0x104fa26 test al,al → 0x104fa28 je 0x104fa4b",
           ins_at(0x104FA21).op_str == "0x40fe90" and ins_at(0x104FA28).op_str == "0x104fa4b")
+
+
+def pct_fmt_checks():
+    # PY-311 (#4225): %.2f 経路の呼出し辺と 0x43dd60 の r9 の流れ (丸め規則は未確定)
+    check("0x43ecb5 の %.2f 系 (精度 0x12) が 0x43fce0 を呼ぶ (0x43ece7)", ins_at(0x43ECE7).op_str == "0x43fce0")
+    check("0x43fce0 が 0x43f800 を呼ぶ (0x43fd16)", ins_at(0x43FD16).op_str == "0x43f800")
+    check("0x43f800 が 0x441380 を呼ぶ (0x43f8ee)", ins_at(0x43F8EE).op_str == "0x441380")
+    check("0x441380 が 0x440d30 を呼ぶ (0x4413a2)", ins_at(0x4413A2).op_str == "0x440d30")
+    check("0x440d30 の 10 のべき乗の換算 call 0x40ef40 (0x440e7a)", ins_at(0x440E7A).op_str == "0x40ef40")
+    check("0x440d30 の整数化 call 0x40c660 = cvtsd2si (0x440e7f)", ins_at(0x440E7F).op_str == "0x40c660"
+          and ins_at(0x40C660).mnemonic == "cvtsd2si")
+    check("0x440d30 の桁生成 call 0x440c10 (0x440ec7)", ins_at(0x440EC7).op_str == "0x440c10")
+    check("0x440c10 の 0 埋め call 0x40d210 (0x440c2d)", ins_at(0x440C2D).op_str == "0x40d210")
+    check("0x440c10 の絶対値 call 0x40c660 (0x440c50)", ins_at(0x440C50).op_str == "0x40c660")
+    check("0x43dd60 → 0x43dd90 (0x43dd77)", ins_at(0x43DD77).op_str == "0x43dd90")
+    check("0x43dd90 → 0x43dde0 (0x43dda5)", ins_at(0x43DDA5).op_str == "0x43dde0")
+    check("0x43dde0 → 0x43dc00 (0x43de79)", ins_at(0x43DE79).op_str == "0x43dc00")
+    check("0x43dc00 → 0x43e240 (0x43dc22)", ins_at(0x43DC22).op_str == "0x43e240")
+    check("0x43dde0 が r9 を rbx に保存 (0x43de11 mov rbx, r9)", ins_at(0x43DE11).op_str == "rbx, r9")
+    check("0x43dde0 の 6 番目引数 (rbx) を 0x43dc00 の [rsp+0x28] に渡す (0x43de5c)",
+          ins_at(0x43DE5C).op_str == "qword ptr [rsp + 0x28], rbx")
+    check("0x43e240 は 6 番目の引数を [rbp+0x1c8] で読む (0x43e2db)",
+          ins_at(0x43E2DB).op_str == "ebx, dword ptr [rbp + 0x1c8]")
 
 
 if __name__ == "__main__":
