@@ -3,7 +3,7 @@
 親 #3245 の子。(1) boot の init 1675 (`function_1266a60` → `function_423940` = `InitializeCriticalSection(0x12bd390)`) への到達を計装で実測する。(2) CreateFruityInstance の閉包 (boot7) を IR に取り込み、`cfi_probe.mjs` が `EnterCriticalSection` を越えるかを記録する。
 既知類型との関係: 該当なし (新規の lift 欠陥類型は観測していない)。
 
-## 1. 結論 (測定版: #3245 の head `8bc881c4d` + 本 PR の `6a17a3c47`)
+## 1. 結論 (測定版: #3245 の head `8bc881c4d` + 本 PR の `6a17a3c47`。main 取り込み後の HEAD `99aa1fa6d` でも同じ結論 (§9))
 
 - boot は完走する (`dllmain_done` True・`boot_threw` / `boot_failfast` なし・`units_run` 109・`init_count` 111)。LoadImageW の実装 (#3245) を入れた boot は trap せず DllMain を抜ける。
 - 受入 1 (init 1675 への到達): **届かない**。boot 中に `InitializeCriticalSection(0x12bd390)` が呼ばれない (`CS-INIT` 11 件、`0x12bd390` は 0 件。`CS-DEL` 0 件)。boot は完走するため trap 位置は無い。届かない理由は未特定 (起票先 [WIN-26])。
@@ -92,7 +92,7 @@ boot7 の有無による差: boot の経路は boot7 を含まない既定の IR
 
 - 検証: 測定版 (§3-0) での `cfi_boot7.sh` の完走 1 回 (rc 0)。CS 計装 build と probe の 1 回 (計装は一時版で commit していない)。
 - e2e.sh は未実行。`e2e.sh` は `cfi_probe.mjs` を参照しない (`grep -n cfi_probe tools/gui/flengine/e2e.sh` は 0 件)。
-- main 上の値は測っていない。PR の基点 `9ceb420d4` から main で `tools/m11`・`tools/shim` が 21 ファイル進んでいる。ここに書く数値は 3245 head 上の結論で、main の数値ではない。
+- main 上の値は §9 で測った (main 取り込み後の HEAD `99aa1fa6d`)。§1〜§3 の数値は 3245 head 上の記録で、履歴として残す。
 - 範囲外: init 1675 に届かない原因 (→ [WIN-26])。
 
 ## 8. 未解決
@@ -101,4 +101,53 @@ boot7 の有無による差: boot の経路は boot7 を含まない既定の IR
 |---|---|---|
 | init 1675 (`InitializeCriticalSection(0x12bd390)`) に boot が届かない原因 (受入 1) | CS 0x12bd390 が未登録 → CFI が `EnterCriticalSection` で abort | [WIN-26] (本 PR は `Refs #3353`) |
 | boot7 込みの e2e (JUDGE・S1) は未測定 | 既定の CI は boot7 を含まない | #3354 の merge 後に再測定 (子 issue は起票しない) |
-| main 上の boot・CFI は未測定 | 本結論は 3245 head 上 | #3354 の merge 後に main で再測定 (子 issue は起票しない) |
+| main 上の boot・CFI は未測定 (解消) | §9 で main 取り込み後の HEAD (`99aa1fa6d`) で測定済み。結論は同じ | — |
+
+## 9. main 取り込み後の再測定 (測定 commit `99aa1fa6d`)
+
+- 測定 commit: `99aa1fa6d` (PR の `6a17a3c47` を main `96bbf8870` へ取り込んだ merge)。取り込みで `tools/m11`・`tools/shim`・`tools/gui/flengine/build.sh` が §3 の測定版から変わったため、§3 の測定を取り直した。
+- 再現: §3-0 の手順を、一時 worktree ではなく本 PR の HEAD で行った (手順 3 の素材は同じ・手順 4 は `m11_wndseed.sh`・手順 5 は `cfi_boot7.sh`・手順 6 は `sync.c` に CS 行を入れた一時版で diag build を作り、測定後に元へ戻した。commit していない)。
+
+| 実行 (1 run・同じ組) | 値 |
+|---|---|
+| `m11_wndseed.sh` | 02:03:57 → 02:06:45 UTC (168 秒)・rc 0・`WNDCLASS-CHECK PASS (instances=11, fn wndproc=8, 最終 IR で未定義=0)`・closure 外 WNDPROC の閉包 1212 関数 |
+| `cfi_boot7.sh` | 02:06:50 → 02:11:15 UTC (265 秒)・rc 0・`closure new functions: 1133` |
+| load (`uptime` の 1 分値) | `cfi_boot7.sh` の開始 0.96 → 終了 1.00 (4 core) |
+| CS 計装の diag build + probe | build 02:11:22 UTC 開始・rc 0・probe rc 0 |
+| boot7 無し (比較) | IR 再生成 + diag build 02:11:46 → 02:13:26 UTC・run.mjs rc 0・cfi_probe rc 0 |
+
+### 9-1 boot (boot7 有り・`boot_b7.json`) と boot7 無しの比較
+
+| 項目 | boot7 無し (`boot_pre2.json`) | boot7 有り (`boot_b7.json`) |
+|---|---|---|
+| `dllmain_done` | True | True |
+| `boot_threw` / `boot_failfast` | None / None | None / None |
+| `units_run` / `init_count` | 109 / 111 | 109 / 111 |
+| GUI-REACH | reached 24・IMPL 24・STUB 0 | reached 24・IMPL 24・STUB 0 |
+| `CreateWindowExW` | IMPL 1 回 | IMPL 1 回 |
+| `failfast_count` / `icall_miss` | 0 / 7 | 0 / 7 |
+
+boot の経路は boot7 を含まないため、両者は一致する (§3-1 と同じ結論)。
+
+### 9-2 init 1675 の到達 (CS 計装・受入 1)
+
+- 計装: 診断 build の shim で `InitializeCriticalSectionAndSpinCount` と `DeleteCriticalSection` の呼出しを記録 (§3-2 と同じ)。probe の全 `errs` から `CS-(INIT|DEL|MISS)` を抜いた。
+- 結果: `CS-INIT` 11 件 (`0x12bd390` は 0 件)・`CS-DEL` 0 件・`CS-MISS key=0x12bd390` 1 件。
+- 判定: §3-2 と同じ。init 1675 の `InitializeCriticalSection(0x12bd390)` は boot で呼ばれない。届かない原因は [WIN-26] で扱う。
+
+### 9-3 CreateFruityInstance (`cfi_b7.json`・boot7 込み)
+
+| 項目 | 値 |
+|---|---|
+| `CreateFruityInstance(0xC0, 0xEDE95A, host, &iface)` | returned false・`Aborted(native code called abort())` |
+| 直接の停止 | `[shim] CS-MISS key=0x12bd390` → `shim_unimplemented("EnterCriticalSection (未初期化/未登録)")` |
+| JS スタック (`-g2` 診断 build) | `EnterCriticalSection` ← `function_4232e0` ← `function_1265690` ← `CreateFruityInstance` ← `_CreateFruityInstance` |
+| boot7 無し (`cfi_pre2.json`) | `mod._CreateFruityInstance is not a function` (export 無し) |
+
+判定 (受入 2): §3-3 と同じ。`EnterCriticalSection` を越えない。次の停止点は `EnterCriticalSection(0x12bd390)` の CS-MISS。
+
+### 9-4 検証範囲
+
+- 測定の組は `99aa1fa6d` の tree。`sync.c` は計装後に元へ戻した (`git status` は clean)。
+- `e2e.sh` は未実行 (§7 と同じ)。`e2e.sh` は `cfi_probe.mjs` を参照しない。
+- 測定後の差分: `git diff 99aa1fa6d HEAD -- tools/m11 tools/shim tools/gui/flengine/cfi_boot7.sh tools/gui/flengine/cfi_probe.mjs` の出力は 0 行 (本 commit は REPORT と PR 本文だけ)。
