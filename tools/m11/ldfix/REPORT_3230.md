@@ -43,7 +43,7 @@ IR (`work/boot_final.ll`・`@function_7e45e0`) の 7e48d6 相当:
 ## 5. 差分 (WORKFLOW §6)
 
 - 測定 commit: `32925d7f` (§1 と同じ)。判定器・結果 JSON は本 issue で変更していない。
-- `git diff --stat 32925d7f HEAD -- tools/m11/ldfix` の出力は PR 本文に載せる。
+- `git diff --stat 32925d7f HEAD -- tools/m11/ldfix/audit_frame_store_alias_2211.py tools/m11/ldfix/results/frame_store_verdict_2211.json` は出力なし (0 行)。判定器と結果 JSON は変わっていない。
 
 ## 6. 未解決 (起票先)
 
