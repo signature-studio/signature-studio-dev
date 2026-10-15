@@ -19,6 +19,9 @@ CASES = [
     ('pxor xmm1,xmm1; movaps xmm0,xmm1; ret', b'\x66\x0f\xef\xc9' b'\x0f\x28\xc1' b'\xc3', [1], []),
     ('xorps xmm2,xmm2; addss xmm0,xmm2; ret', b'\x0f\x57\xd2' b'\xf3\x0f\x58\xc2' b'\xc3', [0, 2], [0]),
     ('addss xmm0,xmm3; ret (非ゼロ化の読みは残る)', b'\xf3\x0f\x58\xc3' b'\xc3', [0, 3], [0, 3]),
+    # #3708: 処理済みの合流点 (0x0a) へ後から来る枝で xmm1 の定義が消える。伝播しないと [] になる
+    ('je 合流 (zero: xorps は片枝のみ)', b'\x85\xff\x74\x05\x0f\x57\xc9\xeb\x01\x90\x0f\x28\xc1\xc3', [1], [1]),
+    ('je 合流 (movsd は片枝のみ)', b'\x85\xff\x74\x08\xf2\x0f\x10\x4c\x24\x08\xeb\x01\x90\x0f\x28\xc1\xc3', [1], [1]),
 ]
 
 
