@@ -1031,6 +1031,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_3836.md` | ~70 | #3836 (KH-71): Ghidra の double ビット再解釈 `(ulonglong)dVarN` を `dbitcast` (d2u/u2d) で書換える fix の測定と未解決。Delay の 98 行の所在・emcc 件数・Gain/Haas/Gate の同一性が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3802_DIFF.md` | ~165 | #3802 付録 §⑧ の差分の全文: 測定 commit `6323671e7` → HEAD の `ghidra_route` の `git diff` 出力 (main 取り込み分を含む)。差分の記録であり測定値の正本ではない |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3800.md` | ~66 | KH-64 (#3800): Delay の引数過不足のうち呼出先 FUN_180fd4f30 分の ABI 規則 (部分)。根拠・census・未解決は §10-7u が正本 (残りは子 #3844・#3847) |
+| `tools/targets/kilohearts/REPORT_APPENDIX_4871.md` | ~60 | KH-124 (#4871): Stereo 閉包の FUN_180fd4f30 引数なし呼出 22 件を delay の ABI 規則で書換え (emcc 42 → 20)。根拠・内訳・未解決は §10-7v が正本 (残りは子 #4910・#4911) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3096.md` | ~70 | KH-44 (#3096): `code` 関数ポインタ化で Delay の間接呼出し 21 件を解消 (emcc 577 → 556)・gain/haas/gate の .o 新旧 byte 一致・残件の子 issue 分割。§10-7t の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3071.md` | ~85 | KH-39 (#3071): Stereo の emcc 残件の機械修復 (emcc 39 → 10 件)・ABI 規則 1〜11・rsqrtps 突合・回帰・in_XMM3 の live-in 判定・未解決 1〜5 の全文 (REPORT_APPENDIX §10-7r の分割移動) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3094.md` | ~86 | KH-42 (#3094, 部分): Delay の 128bit ローカル auStack_118/128/138 を V128L に型化する `lanes` 規則。測定値と残件の正本は付録 §10-7u。残件は [KH-67] (#3808)・[KH-68] (#3809) |
