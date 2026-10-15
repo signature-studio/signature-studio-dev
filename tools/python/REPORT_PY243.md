@@ -48,24 +48,24 @@
 
 ## 検証
 
-測定 commit: `9edd0f327` (コードを変えた最後の commit)。環境: runner (4 core、`uptime` 10:04 時点 load average 1.43 1.30 0.64)、node 22.23.3。
+測定 commit: `c9e1620b3` (コードを変えた最後の commit)。環境: runner (4 core、load average 1.32 1.40 0.71)、node 22.23.3、emsdk 6.0.12 (`[EMSDK]`)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `provider/build.sh` | rc 0 (`dist/flprov.wasm` 72,030 B) | 1 回目の計測なし (rc 0) |
-| `build_cpython_wasm.sh` | rc 0 (`work/build-wasm` 新規) | 4 分 8.7 秒 (`real 4m8.708s`) |
-| `FLPY_SKIP_TABLE=1 build_flpy.sh` | rc 0 | 6.09 s |
-| `node tests/provider_check.mjs` | PASS (functions 435 / implemented 206 / unimplemented 229 / mcp_static 60) | 0.367 s |
-| `node tests/launchmap_diff.mjs` | calls 18・diffs 0・PASS | 0.049 s |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true | 2.099 s |
+| `provider/build.sh` | rc 0 (`dist/flprov.wasm` 75,506 B) | 1.193 s |
+| `build_cpython_wasm.sh` | rc 0 (`python.wasm` 5,927,853 B) | 4 分 27.9 秒 (`real 4m27.888s`) |
+| `FLPY_SKIP_TABLE=1 build_flpy.sh` | rc 0 (`flpy.wasm` 5,924,680 B) | 6.11 s |
+| `node tests/provider_check.mjs` | PASS (functions 435 / implemented 228 / unimplemented 207 / mcp_static 60) | 0.360 s |
+| `node tests/launchmap_diff.mjs` | calls 18・diffs 0・PASS | 0.050 s |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true | 2.060 s |
 | 負のコントロール: mock の `setMapItemTarget` の arity を `3,3` から `2,3` に緩める | `launchmap_diff.mjs` が rc 1 (検出)。mock を元に戻して PASS (rc 0) | — |
 
-- `provider_check` の期待値は集合から導出する (手書きの件数は持たない)。前回 PR の 165/270 は main 取り込み後の値のため、本 PR の実測は 206/229。
+- `provider_check` の期待値は集合から導出する (手書きの件数は持たない)。実測の推移: `9edd0f327` (main 取り込み前) で implemented 206 / unimplemented 229、`c9e1620b3` (本 PR HEAD) で 228 / 207。
 
-コード差分 (測定 commit 以降、テスト・mock・C・解析に効く範囲): 最終 HEAD で取った。
+コード差分 (測定 commit 以降、テスト・mock・C・解析に効く範囲): 測定 commit = 最後のコード変更 commit のため、`c9e1620b3` 以降のコード差分はない。
 
 ```
-$ git diff 9edd0f327 HEAD -- tools/python ':!*.md'
+$ git diff c9e1620b3 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
