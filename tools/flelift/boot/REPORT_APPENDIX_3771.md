@@ -1,11 +1,11 @@
-# tools/flelift/boot — FLE-14 (#3771) 付録: 0x6bbc20 を `[obj+0x118]` へ書く命令の動的特定
+# tools/flelift/boot — FLE-16 (#3771) 付録: 0x6bbc20 を `[obj+0x118]` へ書く命令の動的特定
 
 > 親 REPORT: `tools/flelift/boot/REPORT.md` (§0・§1・§5 から参照)。本付録は #3771 の測定の全文。
 > 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23 を照合。書込み元の特定のみで、類型の追加は行わない)。
 
 ## A. 結論
 
-- **書込み命令 = `0x6bc1af`** (`f_6bc010` 内): `mov qword ptr [rcx+0x118], rax`。`rax` は直前の `0x6bc1a8: lea rax,[rip-0x58f]` で `0x6bbc20` (= 0x6bc1af − 0x58f)。実行時に観測した書込みは **1 件** (診断 route・shim 有・停止まで)。
+- **書込み命令 = `0x6bc1af`** (`f_6bc010` 内): `mov qword ptr [rcx+0x118], rax`。`rax` は直前の `0x6bc1a8: lea rax,[rip-0x58f]` で `0x6bbc20` (= 0x6bc1af − 0x58f)。4・8・16 byte の store の監視で観測した書込みは **1 件** (診断 route・shim 有・停止まで。1・2 byte の store は監視していない・§F)。
 - **obj** = `rcx` = `0x12d6a090`。宛先 `0x12d6a1a8` = obj + 0x118 (一致)。
 - **後段の呼出し** = `0x6c937a` (`f_6c9280`) の `call qword ptr [rbx+0x118]`。target `0x6bbc20`、`R1 = R3 = 0x12d6a090` (同じ obj)。その後 unlifted で停止 (既知の停止点)。
 - **戻り番地** (store 時点の `[RSP]`) = `0x6cd5d6`。`f_6bc010` は push なしで入るため、これは `f_6cd520` 内 `0x6cd5d1: call 0x6bc010` の戻り先。
@@ -33,7 +33,7 @@ KPI (起動に関わる PR。`docs/WORKFLOW.md` §7): FLEngine 起動の units_r
 [fleboot][ff] unlifted 0x6bbc20 (call site ret=0x6c9380)
 ```
 
-- 監視の仕組み: `lift` 出力の store 文 (`ST8`〜`ST64`・`STF32/64`・`STX`・`STY`) を、guest VA を添えた監視版マクロに書き換えた copy (`wval_lift.py`、出力先 `work/boot/lift_wv/`) で置換。値 (8 byte・4 byte・16 byte の上位/下位) が監視値に一致した store だけ出す。間接呼出し (`ott_dispatch`) の target が監視値のときは `[wval-call]`。`rt/` と `x64c.py` は変えていない。
+- 監視の仕組み: `lift` 出力の store 文を、guest VA を添えた監視版マクロに書き換えた copy (`wval_lift.py`、出力先 `work/boot/lift_wv/`) で置換。監視するのは 4・8・16 byte の store (`ST32`・`ST64`・`STF32`・`STF64`・`STX`・`STY`) で、値 (4 byte・8 byte・16 byte の上位/下位) が監視値に一致した store だけ出す。`ST8`・`ST16` は値を比較せず素通し (§F)。間接呼出し (`ott_dispatch`) の target が監視値のときは `[wval-call]`。`rt/` と `x64c.py` は変えていない。
 - 既存の `FLE_WWATCH` (#3028) が使えなかった理由: 監視 slot が `rt/fle_cpu.c` の `0x15e1c78`・`0x15e4790` に固定で、任意の宛先 (ここでは obj 依存の `obj+0x118`) を監視できないため。
 - 注釈の対応: 書込みの VA は lift 出力の `/* 6bc1af: mov qword ptr [rcx + 0x118], rax */` の行と一致する (`fle_lifted_s7.c`)。
 - 件数: 監視値への一致 store は 1 件、間接呼出しの一致は 1 件。
@@ -67,7 +67,8 @@ KPI (起動に関わる PR。`docs/WORKFLOW.md` §7): FLEngine 起動の units_r
 
 ## F. 検証範囲と限界
 
-- **範囲内**: 診断 route (`FLE_EXTRA_ROOTS=` + `FLE_DIAG_NULLFILL=1`・`FLE_IPP=1`・plain)。lifted C の store (`ST*`/`STX`/`STY`) と間接呼出し。
+- **範囲内**: 診断 route (`FLE_EXTRA_ROOTS=` + `FLE_DIAG_NULLFILL=1`・`FLE_IPP=1`・plain)。lifted C の 4・8・16 byte の store (`ST32`・`ST64`・`STF32`・`STF64`・`STX`・`STY`) と間接呼出し。「実行時の書込みは 1 件」は、この範囲の store に限った件数。
+- **範囲外 (監視していない)**: 1 byte・2 byte の store (`ST8`・`ST16`)。`WV_ST8`・`WV_ST16` は値の比較なしで `ST8(a, v)`・`ST16(a, v)` に素通しし、`wv_chk_` は `n < 4` で即 return する。
 - **範囲外 (未観測)**: (1) ホスト側 C (`fle_boot.c`・shimx・`rt/fle_glue.c`) からの書込み (memcpy 等) は監視していない。(2) 既定経路 (root `0x6a7b70` 有) での書込みは未測定。(3) `mode` (`[obj+0xc4]`) の値と `[obj+0x70]` の値は未記録 (本文の経路判定は分岐の構造からの推定)。
 - 1 run・n=1 の結果。変動 (min–max) は未測定 (決定的な boot なので、同一 commit の再実行は同値と見る)。ネガコンは監視値を 1 ずらした 1 件で、値への特異性のみを示す。
 
@@ -83,8 +84,8 @@ FL_WIN64_DIR=<fl-win64 展開先> FLE_BOOT_WORK=<work> WVAL_VALUE=0x6bbc21 bash 
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `f_6cd520` の実行時の呼出元 (静的候補: `f_6cd5f0`・`f_6ba1f0`) と `[obj+0xc4]` (mode) の設定元 | `0x6bc1af` の経路の上流。obj の書込み方式の決まり方 | #3491 (親) へコメント |
-| 既定経路での書込みの有無・`[obj+0x70]`・`[obj+0xc4]` の値 | 既定経路の書込み元の確定 (#3491 の受入条件 3 の前提) | #3491 |
-| ホスト側 C の書込みは未監視 | 監視の網羅性 (今回の 1 件は lifted C 側の書込み) | 本付録 F。必要なら #3491 |
-| 静的走査が `0x6bc1a8` の rip 相対 lea を見落とした理由 | 静的解析の信頼性 (#3491 の走査条件) | #3491 |
+| `f_6cd520` の実行時の呼出元 (静的候補: `f_6cd5f0`・`f_6ba1f0`) と `[obj+0xc4]` (mode) の設定元 | `0x6bc1af` の経路の上流。obj の書込み方式の決まり方 | #3868 [FLE-17] |
+| 既定経路での書込みの有無・`[obj+0x70]`・`[obj+0xc4]` の値 | 既定経路の書込み元の確定 | #3868 [FLE-17] |
+| ホスト側 C の書込みは未監視 | 監視の網羅性 (今回の 1 件は lifted C 側の 4・8・16 byte の store) | #3868 [FLE-17] (本付録 F) |
+| 静的走査が `0x6bc1a8` の rip 相対 lea を見落とした理由 | 静的解析の信頼性 (走査条件) | #3868 [FLE-17] |
 | 本修復 (buf = 0 の上流原因) | 範囲外 | #3112 (既存) |

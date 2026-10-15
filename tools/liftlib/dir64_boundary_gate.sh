@@ -7,7 +7,9 @@
 #   bash tools/liftlib/dir64_boundary_gate.sh [PE]     PE 省略時: $FL_WIN64_DIR/extracted/block00031_PE.bin
 set -u
 cd "$(dirname "$0")"
-PE="${1:-${FL_WIN64_DIR:-/home/ubuntu/work/analysis/win64}/extracted/block00031_PE.bin}"
+# shellcheck source=/dev/null
+source ../shared/env.sh   # FL_WIN64_DIR (既定: $ANALYSIS_DIR/win64 = 従来の作業用 VM 既定値)
+PE="${1:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 [ -f "$PE" ] || { echo "[gate] FAIL: PE 無し: $PE"; exit 2; }
 python3 -c 'import pefile' 2>/dev/null || { echo "[gate] FAIL: pefile 無し"; exit 2; }
 T="$(mktemp -d "${TMPDIR:-/tmp}/dir64_gate.XXXXXX")"

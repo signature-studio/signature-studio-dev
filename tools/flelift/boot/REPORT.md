@@ -12,7 +12,8 @@
   **FLE-672 (#672)**: fill (`0x6a7b70`) の buf = 0 の呼出しを戻す診断 (`FLE_DIAG_NULLFILL=1`) で GetMem・undo slot の 0 化が消え、停止点は `unlifted 0x6bbc20` へ移る (units は 209 のまま・§11)。
 - ラウンドごとの詳細 (FLE-2〜FLE-5 の成果・修正 3 件・FLE-4/5 の逆引き 5 段) は `REPORT_APPENDIX.md` §A・§B。**FLE-12 (#3090)**: unit 209 直後の `0x6a7b70` の呼出元は `0x6c7923` ← `0x815920` (`f_815050`)、幅 r8 = 矩形の幅 = 2^20 (即値 `0x4130000000000000` 由来の推定)、修復は未了 (`REPORT_APPENDIX_3090.md`)。
 - **FLE-9 (§9, #2700) の結果**: lift → 8 shard clang (cap 内・計 89 s) → link (mismatch/undefined/dup 0) → boot まで到達。units_run は shim 有・ネガコンとも 209 のまま (停止点: `MessageBoxA` → `exit(0)`)。shim 有の IPP 判定は NG (終了時の 0x15F34A0 は 0。FLE-10 (§10, #2702): shim 有でも units は前進せず 209)。
-- **FLE-14 (#3771)**: `0x6bbc20` を `[obj+0x118]` へ書く命令は `f_6bc010` の `0x6bc1af` (実行時 1 件・obj = `0x12d6a090`)。役割は画素の store/blend 関数の登録 (推定)。呼出しは `f_6c9280` の `0x6c937a`。詳細は `REPORT_APPENDIX_3771.md`。
+- **FLE-15 (#3770・診断 route の有界実行)**: 0x6bbc20 root の診断 route は時間上限 300 s で units 209 のまま停止せず (呼出し 6,559,882 回・矩形 (0,0,2^20,2^20))。既定経路 (root 0x6a7b70) は不変。詳細は `REPORT_APPENDIX_3770.md`。
+- **FLE-16 (#3771)**: `0x6bbc20` を `[obj+0x118]` へ書く命令は `f_6bc010` の `0x6bc1af` (4・8・16 byte の store の監視で実行時 1 件・obj = `0x12d6a090`。1・2 byte の store は未監視)。役割は画素の store/blend 関数の登録 (推定)。呼出しは `f_6c9280` の `0x6c937a`。詳細は `REPORT_APPENDIX_3771.md`。
 - **PERF-P14 (#970)**: boot closure を -O0 / -O2 / -O2 -flto で build・実行 (node n=10)。3 変種の署名は計数と ipp 状態が一致 (出力メモリは未比較)・units 209 据え置き。ネガコン (`FLE_IPP=0`) で署名は変わる。LTO の結論は shim (-O1 固定) を含まない範囲に限る。実測値・範囲は `REPORT_APPENDIX_970.md`。
 
 
@@ -32,7 +33,7 @@
 | `gen_mixed.py` | **関数級 (liftdiff) + unit 級 (boot) verdict を 1 ファイルに混在**させて `liftdiff.py summary` で採点。32MB 超のため JSONL は work/boot/ (gitignore)、採点結果は results/mixed_summary.md |
 | `iterate_roots.sh` / `dbg_u18.mjs` | root 収束ループ (`FLE_ROOT_BLOCKLIST` で root 化禁止 address を除外) / boot 停止点の guest stack 復元 (再ビルド不要) |
 | `dbg_lift.py` | **FLE-5: 任意 guest VA を lift 生成 C の行に埋め込む診断ツール** (`--at 0x8157c1,f_6c7610`)。`/* <VA>: <asm> */` コメントの 1 行対応を利用し `grep -n` で即座に C 行を引き、`fprintf` を挿入して実測する (FLE-4 の `__LINE__` 逆引きを汎用化) |
-| `wval_lift.py` / `wval_measure.sh` | **FLE-14 (#3771): 書込み値の監視** (lift 出力の store 文を監視版に書換えた copy を作り、値 `0x6bbc20` の書込み・間接呼出しを出す。`rt/` は変えない)。付録 `REPORT_APPENDIX_3771.md` |
+| `wval_lift.py` / `wval_measure.sh` | **FLE-16 (#3771): 書込み値の監視** (lift 出力の store 文を監視版に書換えた copy を作り、値 `0x6bbc20` の書込み・間接呼出しを出す。`rt/` は変えない)。付録 `REPORT_APPENDIX_3771.md` |
 | `results/` | boot_summary*.json / survey.json / survey.jsonl / verdict_boot.jsonl |
 
 link 実績 (4 variant 全て): signature mismatch 0 / undefined 0 / duplicate 0。wasm 145.8MB (chk) / 126.1MB (その他) (work/, gitignore)。

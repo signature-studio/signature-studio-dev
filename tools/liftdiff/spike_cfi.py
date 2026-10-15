@@ -81,7 +81,7 @@ def astr(r, base, addr, n=0x200):
 def model_names():
     """rt/ld_core.h の ld_model_call で明示的に応答を決めている import 名 (それ以外は既定の 0 応答)。"""
     txt = open(os.path.join(HERE, 'rt', 'ld_core.h'), encoding='utf-8').read()
-    txt = re.sub(r'    if \(ld_cat_on\(\)\) \{.*?\n    \}\n', '', txt, flags=re.S)   # LD_CATALOG_MO 実験分は既定の応答に含めない
+    txt = re.sub(r'    if \(!ld_cat_blob && ld_cat_on\(\)\) \{.*?\n    \}\n', '', txt, flags=re.S)   # LD_CATALOG_MO 実験分は既定の応答に含めない
     return set(re.findall(r'ld_streq\(n, "([^"]+)"\)', txt))
 
 
@@ -134,14 +134,28 @@ def run_cfi(r, sess):
     }
 
 
+def read_wintrace(path):
+    if not os.path.exists(path):
+        return []
+    return [l.rstrip('\n') for l in open(path) if l.startswith('wt ')]
+
+
 def main():
     target = sys.argv[1] if len(sys.argv) > 1 else 'targets/flelift.json'
     subprocess.run(['gcc', '-O1', '-g', '-Wall', '-Wno-unused-function', '-o', 'work/ld_native',
                     'rt/ld_native.c', 'rt/ld_ms_call.S', '-lm'], check=True)
+    wt_path = os.path.join(HERE, 'work', 'flelift', 'spike_wintrace.txt')
+    os.makedirs(os.path.dirname(wt_path), exist_ok=True)
+    open(wt_path, 'w').close()
+    if os.environ.get('SPIKE_WINTRACE', '1') == '1':   # 0 で窓の記録を切る (既定の実行との比較用)
+        os.environ['LD_WINTRACE_OUT'] = wt_path
     sess = Session(target, shards=1, build=False)
     _, res = boot.build_state(sess, None, mode='hybrid', post=run_cfi)
     d = res['detail']
     spike = d.get('post') or {}
+    wt = read_wintrace(wt_path)
+    spike['wintrace_cfi'] = [l for l in wt if ' case=cfi ' in l]
+    spike['wintrace_boot_n'] = len([l for l in wt if ' case=cfi ' not in l])
     cat = os.environ.get('LD_CATALOG_MO')
     out = os.path.join(sess.t['work'], 'spike_cfi_cat.json' if cat else 'spike_cfi.json')
     for p in spike.get('file_paths') or []:
@@ -155,6 +169,9 @@ def main():
     print('[spike] CreateFruityInstance va=%s status=%s detail=%s' % (spike.get('cfi_va'), spike.get('status'), (spike.get('detail') or '')[:200]))
     print('[spike] ret=%s iface=%s calls=%s (over %s)' % (spike.get('ret'), spike.get('iface'), spike.get('calls_n'), spike.get('calls_over')))
     print('[spike] calls: %s' % ' '.join(str(c) for c in (spike.get('calls_head') or [])))
+    for l in spike['wintrace_cfi']:
+        print('[spike] wintrace %s' % l)
+    print('[spike] wintrace boot 窓の呼出し (cfi 以外の case): %d 件' % spike['wintrace_boot_n'])
     print('[spike] -> %s' % out)
 
 

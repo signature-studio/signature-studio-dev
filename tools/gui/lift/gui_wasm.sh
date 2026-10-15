@@ -27,7 +27,8 @@ SHIM=("$ROOT"/src/gui_platform.c "$ROOT"/src/gui_reach.c "$BUILD"/gui_reach_tab.
 if [ "$VARIANT" = reach ]; then
   mkdir -p "$OUT/obj"; OBJS=()
   for f in "$ROOT"/src/gui_core.c "$ROOT"/src/gui_gdi.c "$BUILD"/gui_stubs.c; do
-    o="$OUT/obj/$(basename "$f" .c).o"; emcc -c "${CFLAGS[@]}" -include "$BUILD/gui_rename.h" "$f" -o "$o"; OBJS+=("$o")
+    RF=(); [ "$(basename "$f")" = gui_core.c ] && RF=(-DGUI_REACH_LOG)   # WM_PAINT 配送の GUI-MSG 行 (#3510)
+    o="$OUT/obj/$(basename "$f" .c).o"; emcc -c "${CFLAGS[@]}" ${RF[@]+"${RF[@]}"} -include "$BUILD/gui_rename.h" "$f" -o "$o"; OBJS+=("$o")
   done
   SHIM+=("$BUILD"/gui_wrap_i64.c "${OBJS[@]}")
 else
