@@ -76,7 +76,7 @@
 
 - 集計: 実装 12 / stub 5 / fail-fast 24 (計 41)。 main 静的 18 件のうち fail-fast は RaiseException の 1 件のみ。
 - **突合で呼ばれたのは 4 件だけ**: 実装の HeapAlloc・VirtualAlloc・HeapReAlloc・LeaveCriticalSection (§4 の計数)。 残りの実装 8 件 (EnterCriticalSection・InitializeCriticalSection・GetLastError・SetLastError・TlsGetValue・TlsSetValue・HeapFree・VirtualFree) と stub 5 件は、 突合で 1 回も呼ばれていない (未通過。 §7)。
-- fail-fast の 24 件は 448 行の実行で 1 件も呼ばれていない (両側とも rc=0)。 呼ばれると weak stub が abort し、 native は exit 9 で終わるため、 rc=0 がその証跡になる。 呼ばれた時点で止まる動作は設計 (weak stub・`n_missing`) による。 **実行での検証は未実施** (§7)。
+- fail-fast の 24 件は 448 行の実行で 1 件も呼ばれていない (両側とも rc=0)。 呼ばれると weak stub が abort し、 native は exit 9 で終わるため、 rc=0 がその証跡になる。 呼ばれた時点で止まる動作は設計 (weak stub・`n_missing`) による。 **実行での検証は未実施** (§7)。 静的な到達 (§8) では、 24 件のうち入口から到達するのは RaiseException の 1 件だけで、 それもゲート経路 (§8) のみ。
 - stub の値はすべて Win32 の実挙動ではなく、 両側で揃えた仮定。 この突合が検証するのは「同じ仮定の下で lift と ia32 規約が一致する」ことだけ。
 
 ## 4. 実測 (測定 commit `dadf4ea18`・n=3)
@@ -117,7 +117,17 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | export main の callback 非 0 経路 (`f_10009f64` → `f_1000a402`。 定数 `0x8298d8` は PE 外の host オブジェクト) | main の CRT 初期化・残りの import の経路が未突合。 0 埋めでは native が null 参照で SIGSEGV するため、 host オブジェクトのモデル化が要る | [PLG-G2-38] #3917 (本 PR で起票) |
-| 突合で未通過の KERNEL32 import 13 件: 実装 8 件 (EnterCriticalSection・InitializeCriticalSection・GetLastError・SetLastError・TlsGetValue・TlsSetValue・HeapFree・VirtualFree) と stub 5 件 (GetCurrentThreadId・GetModuleFileNameA・GetStdHandle・LoadLibraryA・WriteFile) | 既存の入口は 1 回も呼ばない。 実行で未検証で、 方針表の値は両側の仮定が一致することしか示していない | [PLG-G2-39] #3960 (本 PR で起票) |
-| fail-fast の 24 import の実行検証 | 呼ばれた時の止まり方を実行で確認していない (448 行では 1 件も呼ばれない) | [PLG-G2-39] #3960 (本 PR で起票) |
+| 突合で未通過の KERNEL32 import 13 件: 実装 8 件 (EnterCriticalSection・InitializeCriticalSection・GetLastError・SetLastError・TlsGetValue・TlsSetValue・HeapFree・VirtualFree) と stub 5 件 (GetCurrentThreadId・GetModuleFileNameA・GetStdHandle・LoadLibraryA・WriteFile) | 既存の入口は 1 回も呼ばない (§8)。 実行で未検証で、 方針表の値は両側の仮定が一致することしか示していない | [PLG-G2-39] #3960 (Refs・部分達成。 残りは §8 の経路に依存) |
+| fail-fast の 24 import の実行検証 | 呼ばれた時の止まり方を実行で確認していない (448 行では 1 件も呼ばれない)。 静的にも 23 件は入口から到達しない | [PLG-G2-39] #3960 (Refs・部分達成) |
 | `0x100106a5` (SEH: `mov eax, fs:[0]`・`mov fs:[0], esp`) を通る経路 (`0x1000d791` 等) | native に fs 基底が無く fs:[0] への書込みで落ちる。 wasm は `ott_teb_blk` (0 埋め)。 本入口からは外した | [PLG-G2-37] #3905 (fs: TEB を含む 8 関数) |
 | 間接 call 先 (`ott_dispatch`)・sahf の AF・fs: TEB の 0 埋め | #3128 で測定済み (結果は `REPORT_APPENDIX_3128.md`)。 fs: TEB の native 未達は上の `0x100106a5` の行 (子 [PLG-G2-37] #3905) | 測定済み (#3128・CLOSED) |
+
+## 8. 13 件・fail-fast 24 件の到達経路 (#3960・静的解析)
+
+- 測定 commit: 本 PR (`reach_import.py` を追加した commit)。 入力は lift 出力 `work/lift_text/ott_lifted.c` (472 関数・41 import)。 再現: `python3 tools/plugins/slayer_engine_ia32/reach_import.py` (表)・`--check` (入口からゲート無しで到達する import の集合が `HeapAlloc,HeapFree,HeapReAlloc,LeaveCriticalSection,VirtualAlloc` と一致するか)。
+- 静的解析は分岐の条件を見ない上界。 「静的に到達しない」は呼ばれない根拠になるが、 「到達する」は実行で通るとは限らない。
+- **ゲート**: main (`0x10007ca0`) の callback が非 0 を返す経路。 `f_10009f64`・`f_10007f30` を遮断すると、 main から到達する import は 0 件になる。 つまり main の **callback 0 経路は、 本節の 13 件も fail-fast 24 件 (RaiseException を含む) も通らない**。
+- 13 件 (実装・stub): 静的に入口から到達するのは、 ゲート経路でのみ `main` から到達する 8 件 (EnterCriticalSection・InitializeCriticalSection・GetLastError・SetLastError・TlsGetValue・TlsSetValue・HeapFree・VirtualFree) と 5 件 (GetCurrentThreadId・GetModuleFileNameA・GetStdHandle・LoadLibraryA・WriteFile) のいずれも、 harness の入口 (7 本) からは直接の呼出し元 (`f_1001044f`・`f_1001047e`・`f_100121dc`・`f_100100c3`・`f_1001019b`・`f_10012973`・`f_10012c3e`・`f_1000ed9d`・`f_1000f41e`・`f_100112e9`・`f_1000d791`) に到達しない。 これらは `f_1000d791` 等の関数が `f_100106a5` (fs: を使う SEH) を通るため、 native で実行できない (§7 の `0x100106a5` の行)。
+- 直接の呼出し元のうち `f_1000f41e` (4 import) と `f_100112e9` (LoadLibraryA のみ) は、 fs: を使わない候補。 ただし本 run では入口として追加して実行していない (未測定)。 `f_100112e9` は `ott_dispatch` を通るため、 §7 の間接 call 先の行 (#3128) に依存する。
+- fail-fast 24 件: 静的に入口から到達するのは RaiseException の 1 件のみ (ゲート経路)。 残り 23 件は、 どの入口からも到達しない。
+- 結論: **入口の追加だけでは 13 件の実行検証はできない**。 入口から到達させるには、 fs: 経路 (#3905) の native 対応、 または callback 非 0 の経路 (#3917) の host オブジェクトのモデル化が要る。 本 run は、 その依存関係を測定で示すところまでで止める。
