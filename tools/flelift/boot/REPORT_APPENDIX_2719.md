@@ -236,7 +236,7 @@ FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FLE_BOOT_RUNS="default" FLE_EXTRA_ROOTS= bash
 ### 12-1. 現 head での再測定 (測定 commit `e3954b032`・mode 1 のみ)
 
 - 理由: `2ff548657` 以降に `tools/flelift/x64c.py` が変わった (`6db897ce2` movnti・`5ab8ae7f5` vcomiss・haddps・vcvtdq2ps・vpsrld/vpslld・vandps)。lift 結果が変わると計数が動くため、現 head で測り直した。
-- 測定: 上節と同じコマンド (`FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh`) → rc 0・所要 2 分 09 秒 (09:17:14〜09:19:23。lift 49 s・clang plain 59 s・boot tol 15 s)。load 0.8〜1.7。素材は `fl-win64` (`$HOME/artifacts/fl-win64.tar.zst`)・emsdk 6.0.12 (`emsdk activate 6.0.12`)。
+- 測定: 上節と同じコマンド (`FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh`) → rc 0・所要 2 分 09 秒 (09:17:14〜09:19:23。lift 49 s・clang plain 59 s・boot tol 15 s)。load 0.8〜1.7。素材は `fl-win64` (R2 の `fl-win64.tar.zst`)・emsdk 6.0.12 (`emsdk activate 6.0.12`)。
 - 計数 (現 head): dispatch 209・GetMem 2,314 / FreeMem 1,199・ok 208・empty 37・noproc 1・clobber 695・exit 1・停止 `0x733090`。`FLEBOOT_IPP_CHECK` は `ok:false` (`ptr_15F34A0=0x0`・§9 と同じ既知の NG)。計数は §11・§12 と一致。x64c の変更 (movnti・vcomiss 等) は、この closure の計数を動かさなかった。
 - `cfi.stack` (関数名付き): `f_410320` ← `f_5af120` ← `f_1105350` ← `f_13752f0` ← `f_1375990` ← `ott_dispatch` ← `fle_run`。§7 の chain と一致 (`0x1375990 → 0x13752f0 → 0x1105350 → 0x5af120 → 0x410320`)。
 - `outmem` (現 head 1 回): `full` `c9f39e3e…`・`no_cstack` `a6cf4946…`。`stack.base`・`end` は `0x11dbef00`・`0x115bef00` で一致。`full` の値は 12 の非決定性どおり毎回変わるため、この値を正として比べない。
