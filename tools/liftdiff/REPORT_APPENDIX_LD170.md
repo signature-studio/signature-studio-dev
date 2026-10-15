@@ -98,7 +98,7 @@ boot の変化 (928 → 892) の原因を、修正の内訳を 1 つずつ変え
 | 既定 (`stk` 212) | 928/942 / 830 | 928/942 / 830 | 16.1 s |
 
 - 有効化の stderr: 修正前 `仮 proc が上限 256 を超えた` 14 件・修正後 0 件。
-- 測定 commit: 修正を含むコミット (本 PR)。検証起点 `origin/main` `fc48aa8a5`。
+- 測定 commit: `dc6a2d08d` (`LD_VMT_IDX0` 256→1024 の commit。boot の数値はこの commit で測定)。`e46ed6e14` は `PATCH_BY_VA` の番地導出のみで boot・e2e は未再測定。検証起点 `origin/main` `fc48aa8a5`。
 
 ### 8-2. liftdiff e2e (`--m11-only`・sample:800) の前後
 
