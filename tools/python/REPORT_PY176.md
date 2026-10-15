@@ -188,4 +188,16 @@ production 呼出し (dl=0・flag=0) では `key == K` のとき `V ← (dir+1)<
 - probe: `analysis/flapi/pe_py316_p_vtable.py` (10 検査。`lea` 先・vtable・+0x18・+0x20・FNV-1a・id 計算を確認)。
 - 実測 (2026-10-15・GitHub Actions の Linux runner・`fl-win64` の `block00031_PE.bin` を展開して使用): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py316_p_vtable.py` → PASS 10 件・FAIL 0・終了 0・所要 0.09 秒 (`time` の real)。実行直前の load average は 1 分値 0.23・5 分値 0.47 (`uptime`)。
 - ネガティブコントロール: `0x475ba0` の `imul` 即値 `0x1000193` の 3 byte 目を 1 bit 変えた複製 (repo 外の一時領域) で実行 → `FAIL 0x475ba0 は FNV-1a ...`・`summary: 1 FAIL`・終了 1。
-- 未確定として残るもの: `0x478420` の kind 1 分岐の入力 (typeinfo 側の byte) の由来と、Integer 以外の分岐の対応は未検査 (受入の範囲外。起票先: #4559 [PY-340])。
+- 未確定として残るもの: 下の §9 (#4559 / PY-340) で確定した。
+
+## 9. 追加解析 (PY-340 / #4559): `0x478420` の分岐入力と戻り値 P の対応 (PE 実測)
+
+- 経路: 表 `0x13b2c28` の kind 1 行 (VA `0x13b2da8`・flags `0x2`・fn `0x478420`) を `0x479b40` が引く。`0x478420` は `rcx` (typeinfo) から分岐入力 `v = [ti + nameLen + 2]` (1 byte) を読み、3 段の `cmp al,2`・`sub al,2` で分ける。
+- 対応 (命令列 `0x47842f`〜`0x47843f` と `0x478441`〜`0x47845c`): `v ∈ {0,1}` → P0 = `0x13b21e0` (`0x478441`)、`v ∈ {2,3}` → P1 = `0x13b21e8` (`0x47844a`)、`v ∈ {4,5}` → P2 = `0x13b21f0` (`0x478453`)、`v ≥ 6` → `0x409730` を `cl=4` で呼んだ後 0 を返す (`0x47845c`)。
+- 入力 byte の由来: `v` は typeinfo 内の `TOrdType` 相当の値。Delphi の順 (0 ShortInt・1 Byte・2 SmallInt・3 Word・4 Integer・5 Cardinal) で一致する。typeinfo は `.text` (特性 `0x60000020`・WRITE 無し) にあり、実行時に書換えられない。
+- 実測した typeinfo の対応: ShortInt → P0 (v=0)、Byte → P0 (v=1)、SmallInt → P1 (v=2)、Word → P1 (v=3)、Integer → P2 (v=4)、Cardinal → P2 (v=5)、HRESULT → P2 (v=4)、TColor → P2 (v=4)、TCursor → P1 (v=2)、TOleEnum → P2 (v=5)、TFontCharset → P0 (v=1)、TModalResult → P2 (v=4)。
+- P0・P1・P2 は `.data` の静的オブジェクト。先頭 qword はそれぞれ vtable `0x13b2168`・`0x13b2190`・`0x13b21b8` (`.data`)。P への参照は `0x478441`/`0x47844a`/`0x478453` と `0x478b40`/`0x478b49`/`0x478b52` の load のみで、`pe_xref.py` の store は 0 件。
+- probe: `analysis/flapi/pe_py340_kind1_dispatch.py` (26 検査)。
+- 実測 (2026-10-15・GitHub Actions Linux runner・`fl-win64` の `block00031_PE.bin`): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py340_kind1_dispatch.py` → PASS 26・FAIL 0・終了 0・所要 0.09 秒 (`time` real)。直前の load average 1 分値 0.17・5 分値 0.32。
+- ネガティブコントロール: `0x47842f` の `cmp al, 2` の即値を 2 → 3 に変えた複製 (repo 外の `work/py340/neg/`) で実行 → `FAIL 0x478420 の分岐列 ...`・`summary: 1 FAIL`・終了 1。
+- 残件: なし (受入 2 件を満たした)。Integer 以外の P 対応は上の実測 typeinfo 12 件で確認した。全 kind 1 typeinfo の網羅は行っていない。
