@@ -40,13 +40,18 @@ cat probe_out.txt
 echo "relay lines: $(wc -l < trace.log)"
 # 範囲判定は LoadLibrary の基底 (DllMain の PROCESS_ATTACH 行の module=) と PE の SizeOfImage から行う (filter_gpa.py)。
 # DllMain は戻らないことがあるため probe_out の LoadLibrary 行には依存しない。
-QFC_BASE="$(grep -m1 'PE DLL (.*L"QuickFontCache_x64.dll",reason=PROCESS_ATTACH' trace.log | sed -n 's/.*module=\([0-9A-Fa-f]*\) .*/\1/p')"
+QFC_BASE="$(grep -m1 'PE DLL (.*L"QuickFontCache_x64.dll",reason=PROCESS_ATTACH' trace.log | sed -n 's/.*module=\([0-9A-Fa-f]*\) .*/\1/p' || true)"
 [ -n "$QFC_BASE" ] && [ "$QFC_BASE" != "0000000000000000" ] || { echo "PROCESS_ATTACH 行が無い: 範囲判定不可"; exit 1; }
 python3 "$HERE/filter_gpa.py" trace.log QuickFontCache_x64.dll "$QFC_BASE" > qfc_gpa_calls.txt || true
 # 陽性対照: probe.exe (ImageBase 0x140000000) の呼出しを同じ判定器に通す
 python3 "$HERE/filter_gpa.py" trace.log probe.exe 140000000 'GetLastError|CreateVST3Instance|InitDll' > probe_pos_ctrl.txt || true
 python3 "$HERE/filter_gpa.py" trace.log probe.exe 140000000 > probe_pos_all.txt || true
+python3 "$HERE/attrib_gpa.py" trace.log QuickFontCache_x64.dll "$QFC_BASE" > attrib.txt
+python3 "$HERE/static_qfc.py" extracted/block24350_PE.bin > static.txt
 echo "QuickFontCache 内からの GetProcAddress 呼出し (Call): $(wc -l < qfc_gpa_calls.txt) 件"
 echo "  うち FT_* 名: $(grep -c '"FT_' qfc_gpa_calls.txt || true) 件"
-echo "  うち欠落 17 本の名前: $(grep -cFf "$HERE/missing17.txt" qfc_gpa_calls.txt || true) 件"
+echo "  うち名前でない (序数など): $(grep -cvE ',[0-9a-f]+ "[^"]*"\) ret=' qfc_gpa_calls.txt || true) 件"
+echo "  うち欠落 17 本の名前 (引用符付きで完全一致): $(grep -cFf <(sed 's/.*/"&"/' "$HERE/missing17.txt") qfc_gpa_calls.txt || true) 件"
+cat attrib.txt
+cat static.txt
 echo "陽性対照 probe (GetLastError/InitDll/CreateVST3Instance): $(wc -l < probe_pos_ctrl.txt) 件 / probe 全体: $(wc -l < probe_pos_all.txt) 件"
