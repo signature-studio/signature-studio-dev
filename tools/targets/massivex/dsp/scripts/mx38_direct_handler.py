@@ -20,7 +20,7 @@ sys.path.insert(0, __import__('os').path.dirname(__import__('os').path.abspath(_
 import pefile  # noqa: E402
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64  # noqa: E402
 
-from mx6_pdata_eh import CHAIN, EHANDLER, UHANDLER, make_rva_reader, walk_imports  # noqa: E402
+from mx6_pdata_eh import EHANDLER, UHANDLER, make_rva_reader, walk_imports  # noqa: E402
 
 CALL_RIP = re.compile(r'\[rip \+ 0x([0-9a-f]+)\]')
 CALL_DIRECT = re.compile(r'^0x([0-9a-f]+)$')
