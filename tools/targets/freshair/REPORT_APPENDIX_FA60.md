@@ -7,12 +7,12 @@
 
 | クラス | 写像の根拠 (機械語) | 結果 |
 |---|---|---|
-| QuickEq | §2 | **未確定** (レビュー指摘: 検査スクリプトが §2 の表と食い違う。素材無しで再検証できず。表またはスクリプトの誤りを逆アセンブルで確定するまで写像は確定扱いにしない) |
+| QuickEq | §2 | 写像は機械語の読みで対応確認済み (表は逆アセンブルと一致)。**意味ラベル・呼出先の同一性は未確定**のため、4 組の受入条件は未達 |
 | Delay | — | 未確定。KH 側 `this+0x3188` の読み出しを一部だけ確認。SC 側は P+0x9ee4・0x9f38・0x9f74・0x9fbc・0xa004 の 5 件 |
 | Disperser | — | 未確定。KH 側の P 読み出しを自動抽出できず (§4)。SC 側は P+0x9bec・0x9dc4・0x9e0c・0x9e54 を確認 |
 | Phaser | — | 未確定。KH 側 P+0xc・+0x10・+0x14 と SC 側 P+0x9dc4・0x9e18・0x9e54・0x9e9c・0x9ee4 を確認。対応づけは未了 |
 
-**この run で全 4 組の受入条件は満たさなかった** (部分達成。PR は `Refs #4976`)。4 組とも param 写像は未確定のまま §5 に残す。QuickEq の表 (§2) は、検査スクリプトとの食い違いが解消するまで根拠として使わない。
+**全 4 組の受入条件は未達** (部分達成。PR は `Refs #4976`)。QuickEq は写像の対応 (5 組) まで確認したが、意味ラベルと呼出先の同一性が未確定のため、受入の「確定」には届かない。Delay・Disperser・Phaser は §5 に残す。
 
 ## §2. QuickEq の写像 (確定できた範囲)
 
@@ -25,8 +25,9 @@
 | SC `0x180ac5550` | `mov rax,[rcx+0x90]` | 0x9dc4 → `[rsp+0x20]`・0x9e0c → `[rsp+0x28]`・0x9e54 → `[rsp+0x30]` | `call 0x180ad5ce0` |
 | SC | 同上 | 0x9e9c → `xmm2`・0x9ee4 → `xmm3` | 同上 |
 
-- 対応 (表の主張・未検証): KH P+0 ⇄ SC 0x9dc4、KH P+4 ⇄ SC 0x9e0c、KH P+8 ⇄ SC 0x9e54、KH P+0xc ⇄ SC 0x9e9c、KH P+0x10 ⇄ SC 0x9ee4。
-- 既知の不一致 (レビュー指摘): `ks_fa60_quickeq_map.sh` は SC 0x9dc4 の直後に `movss [rsp+0x30], xmm1` を見ており、これは「0x9dc4 → [rsp+0x30]」の読みで、上の表 (0x9dc4 → [rsp+0x20]、0x9e54 → [rsp+0x30]) と食い違う。スクリプトは 0x9e54・[rsp+0x20]・[rsp+0x28]・KH P+0・P+4 の格納を検査していない。どちらが誤りかは逆アセンブルで未確定。
+- 対応 (機械語の読みで確認済み): KH P+0 ⇄ SC 0x9dc4、KH P+4 ⇄ SC 0x9e0c、KH P+8 ⇄ SC 0x9e54、KH P+0xc ⇄ SC 0x9e9c、KH P+0x10 ⇄ SC 0x9ee4。
+- 確認の仕方: 5 組それぞれについて「P の load → 同じ引数 slot (`[rsp+0x20]`/`[rsp+0x28]`/`[rsp+0x30]`) か xmm2/xmm3 への渡し → 同じ `call`」の連鎖を `ks_fa60_quickeq_map.sh` が順に検査する。途中で base (`rax`) と渡す register、slot が書き換わらないことも見る。
+- 過去の食い違い (解消済み): 旧スクリプトは SC 0x9dc4 の直後の `movss [rsp+0x30], xmm1` だけを見ており、0x9e54 の load を見ていなかった。その行は 0x9e54 の load に対応するもので、0x9dc4 の読みではない (表は正しい)。スクリプトを 5 組の連鎖検査に直した (§3)。
 - 限界: 呼出先 (`0x180362700` と `0x180ad5ce0`) が同じ関数かは未確認。引数の対応だけを確定した。P+8 と 0x9e54 は KH が整数 (`movd`)、SC が float (`movss` を経由) として読むので、型の一致は未確認。
 - 意味ラベル (周波数の下端・上端、Q、フラグ) は引数の並びからの推定で、機械語だけでは確定していない。SC の 0x9dc4 は float として渡し、Phaser の読み (`mov ebp,[rcx+0x9dc4]`) では int として使うため、型は関数ごとに違う可能性がある。
 - 差分実行 (C4・C5) は未実施。
@@ -34,9 +35,27 @@
 ## §3. 検証 (測定 commit と再現)
 
 - 再現: `bash tools/targets/freshair/ks_fa60_quickeq_map.sh` (素材 `work-liftlib-targets` を展開したもの)。
-- 測定 commit: 未確定。この fix run では素材を展開できず、スクリプトを実行していない。以前の「14.8 s・EXIT=0」の記録は、この HEAD のスクリプトでは確認できない (レビュー指摘 2)。
-- 検査の既知の限界 (レビュー指摘 1): 上の `need` は 5 組の対応の一部しか検査していない。SC 0x9dc4 の slot の読みは表と食い違う。表とスクリプトの修正は、素材を展開した環境で逆アセンブルにより行い、その後に再実行して EXIT と出力を本節に貼る。
-- 実行結果 (この HEAD・素材無し): `missing core (work-liftlib-targets を展開する)` を出力し EXIT=2 (実測)。写像の検査は行えていない。
+- 測定 commit: `9b329513c` (`ks_fa60_quickeq_map.sh` を 5 組の連鎖検査に直した最後の commit)。この commit の上に REPORT の更新だけを積む。
+- 再現: `bash tools/targets/freshair/ks_fa60_quickeq_map.sh` (素材 `work-liftlib-targets` を展開したもの。`tar --zstd -xf` で `tools/targets/kilohearts/work/winpkg/HeartCore.core_64` と `tools/targets/freshair/work/win` を展開)。
+- 実測 (commit `9b329513c`・素材あり・`work/fa60/run_9b329513c.txt`): real 17.288 s・user 16.669 s・EXIT=0。load 1 分値 0.53 (14:17 時点)。出力:
+
+```
+OK KH P+0: load 18035fbcc (xmm4) -> [rsp+0x20] @18035fbf1 -> call 0x180362700 @18035fc04
+OK KH P+4: load 18035fbd0 (xmm5) -> [rsp+0x28] @18035fbeb -> call 0x180362700 @18035fc04
+OK KH P+8: load 18035fbc7 (xmm1) -> [rsp+0x30] @18035fbe5 -> call 0x180362700 @18035fc04
+OK KH P+0xc: load 18035fbda (xmm2) -> xmm2 @18035fbda -> call 0x180362700 @18035fc04
+OK KH P+0x10: load 18035fbd5 (xmm3) -> xmm3 @18035fbd5 -> call 0x180362700 @18035fc04
+OK SC 0x9dc4: load 180ac55fd (xmm1) -> [rsp+0x20] @180ac560b -> call 0x180ad5ce0 @180ac5611
+OK SC 0x9e0c: load 180ac55df (xmm0) -> [rsp+0x28] @180ac5605 -> call 0x180ad5ce0 @180ac5611
+OK SC 0x9e54: load 180ac55d7 (xmm1) -> [rsp+0x30] @180ac55f7 -> call 0x180ad5ce0 @180ac5611
+OK SC 0x9e9c: load 180ac55ef (xmm2) -> xmm2 @180ac55ef -> call 0x180ad5ce0 @180ac5611
+OK SC 0x9ee4: load 180ac55e7 (xmm3) -> xmm3 @180ac55e7 -> call 0x180ad5ce0 @180ac5611
+OK: QuickEq 写像 5 組の機械語の連鎖を確認 (意味ラベル・呼出先の同一性は未確認)
+EXIT=0
+```
+
+- 旧 (commit `53bb7ce63` のスクリプト・部分検査) の出力は `OK: 部分検査のみ ...`、EXIT=0 だった。新しいスクリプトの判定とは別物なので、写像の根拠には旧出力を使わない。
+- 鮮度: `git diff 9b329513c HEAD -- tools/targets/freshair/*.sh tools/targets/freshair/*.py` の出力は 0 行 (REPORT の更新のみ)。
 - Delay・Disperser・Phaser の逆アセンブルは `work/fa60/` (gitignore) に出した。判定には使っていない。
 
 ## §4. 未確定の理由 (残り 3 組)
@@ -49,7 +68,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| QuickEq の意味ラベル (周波数下端・上端・Q・フラグ) と呼出先 (`0x180362700`・`0x180ad5ce0`) の同一性 | 差分の param 写像の意味が未確定 | #4976 (Refs・残件) |
+| QuickEq の意味ラベル (周波数下端・上端・Q・フラグ) と呼出先 (`0x180362700`・`0x180ad5ce0`) の同一性 (写像の対応は確認済み) | 差分の param 写像の意味が未確定 | #4976 (Refs・残件) |
 | Delay の param 写像 (KH P 読み出しの全件確定) | 差分実行の前提が無い | #4976 (Refs・残件)。同一 scope の #4977 (残件 B) とも重なるため、起票はしていない |
 | Disperser の param 写像 | 差分実行の前提が無い | #4976 (Refs・残件) |
 | Phaser の param 写像 (KH P+0xc〜0x14 と SC 側の対応) | 差分実行の前提が無い | #4976 (Refs・残件) |
