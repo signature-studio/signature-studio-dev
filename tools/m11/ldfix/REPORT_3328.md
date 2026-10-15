@@ -36,7 +36,7 @@
 - 走査: `python3 tools/m11/ldfix/scan_spill_deref_3328.py tools/m11/work/boot_final3.ll --pe $RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin --out <json>`
 - 出力 (実測・IR 入力): `IR 関数 7421 / .pdata 有り 6969 / CALL 11 関数 13 箇所 / CMP 13 関数 20 箇所 / COPY 49 関数 103 箇所 / EXCL 3 関数 3 箇所` (実行 3.6 s・load average 0.15 / 0.25 / 0.18)。fix run で HEAD `250df8f61` を再実行し、同じ件数になった (実行 5.0 s)。
 - 2502 の走査 (`scan_spill_deref_2502.py`・無変更) は同じ PE・IR で 14 関数 / 16 箇所 (再実行で一致)。
-- 測定 commit: `f602f9354` (§7)。
+- 測定 commit: `250df8f61` (§7)。件数は初回に `f602f9354` で数え、IR の指紋を取った `250df8f61` で再測定して一致した。
 
 ## 3. 偽陽性の除外 (EXCL) と負の対照
 
@@ -100,8 +100,8 @@
 
 - 2502 (14 関数 / 16 箇所) → 3328 の CALL 11 関数 / 13 箇所 + EXCL 3 関数 / 3 箇所。除外した 3 件 (0x413c00・0x414c70・0x44f240) は REPORT_2555 §3 の偽陽性と一致。減った 3 件の内訳は再ロードの枠 0x413c5d・0x414cc7・0x44f25b (§3 の表)。
 - 追加されたもの (新 kind): COPY 103 箇所 (49 関数) と CMP 20 箇所 (13 関数)。どちらも 2502 の数字とは別に数える。
-- 測定 commit: `f602f9354` (IR 入力で件数を数えた commit。走査・REPORT・DOC_MAP を同じ commit に入れた)。
-- その後のコード差分は 2 箇所だけ (`unused import` の削除と、CMP の docstring の `call の前` の削除。走査の判定は変えていない)。`git diff f602f9354 HEAD -- tools/m11/ldfix/scan_spill_deref_3328.py tools/m11/ldfix/scan_spill_deref_2502.py` の出力:
+- 測定 commit: `250df8f61` (IR 入力で件数を数えた commit。以後、走査 2 本・ldmach.py・pe_disasm_va.py は変えていない)。`git diff 250df8f61 HEAD -- tools/m11/ldfix/scan_spill_deref_3328.py tools/m11/ldfix/scan_spill_deref_2502.py tools/m11/ldfix/ldmach.py tools/m11/ldfix/pe_disasm_va.py` の出力は 0 行 (差分 0)。
+- 参考: 初回測定 commit `f602f9354` から `250df8f61` までの走査スクリプトの差分 (`unused import` の削除と、CMP の docstring の `call の前` の削除。走査の判定は変えていない)。`git diff f602f9354 250df8f61 -- tools/m11/ldfix/scan_spill_deref_3328.py tools/m11/ldfix/scan_spill_deref_2502.py` の出力:
   ```diff
   -  CMP  : 比較側。S→L→D の後、Rb が call の前 (窓内・書換え前) に cmp/test で読まれる。
   +  CMP  : 比較側。S→L→D の後、Rb が書換え前 (窓内) に cmp/test で読まれる。call は無くてよい。
@@ -115,5 +115,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
+| CMP 判定不能 9 箇所 (4 関数・§6 の表の「判定不能」の行: 0x12f9730 ×2・0x44f2c0 ×2・0x450420・0x4506e0 ×4)。0x450420 は IR の分岐と機械語の分岐が一致しない (§6) | 比較側の誤り候補が増減しうる | 本 PR の未解決表に残す (追跡 issue は立てない。WORKFLOW §3 の「未解決の追跡だけの子は起票しない」) |
 | COPY 103 箇所 (49 関数) の IR 側判定。0x7888f0 の残り 2 箇所 (0x78890f・0x78892d) を含む | 複写経由の取りこぼしの数 | 子 #3382 [CI-153] |
 | 0x439f90 の判定不能 (IR に 0x414850 の呼出し無し) の原因 (IR 欠落か経路の違い)。判定不能の定義 (§5) は本 REPORT で確定 | 1 箇所 | 追跡 issue なし (#2555 は CLOSED のため参照先にしない)。本 PR の未解決表に残す |
