@@ -92,13 +92,31 @@ python3 tests/batch_flips.py <修正前の batch_sample_800.jsonl> <修正後の
 
 ## 8. 測定 commit と HEAD 差分
 
-- 測定 commit (コードを変えた最後の commit): `20fb4ad90` (origin/main を取り込んだ merge commit)。この commit で spike・e2e を再測定した (§9)。
+- 測定 commit (コードを変えた最後の commit): `348b9981c` (既定 off の切替。§10 で測定)。その前の測定は `20fb4ad90` (origin/main 取り込み・stk 修正が既定の時点。§9)。
 - main 取り込み (`20fb4ad90`) で `rt/ld_native.c`・`spike_cfi.py`・`ldlib/*`・`liftdiff_e2e.sh` が変わったため、`3be39188d` の測定値は現 HEAD の値として使わない。
 - `git diff 3be39188d HEAD -- tools/liftdiff/rt tools/liftdiff/spike_cfi.py tools/liftdiff/ldlib tools/liftdiff/liftdiff_e2e.sh` は main 由来の差分 (8 files・139 insertions) を含む。以後の commit は REPORT の文書だけ。
 
-## 9. main 取り込み後の再測定 (HEAD `20fb4ad90`)
+## 9. main 取り込み後の再測定 (HEAD `20fb4ad90`・stk 修正が既定の時点)
 
 - 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)。`work-m11`・`work-liftdiff` を worktree の `tools/m11/work`・`tools/liftdiff/work` に展開。
 - spike (`python3 spike_cfi.py`): units_run=892/942・first_fail=149 (abort rip_rva `0x7ffff789ec0c`・InitCount 145・失敗 15 unit)。CreateFruityInstance は segv (`0xd053a9`)。実時間 10.3 s。
 - e2e (`bash liftdiff_e2e.sh --m11-only`): LIFTDIFF_E2E PASS・一致 360 / 不一致 234 / 実行不能 206。CHECK_INITUNITS PASS。実時間 2 分 44.9 秒。
 - 既定 (stk 修正あり) の spike は 928/942・830 に戻っていない。B2 の条件 (a) (既定 off の切替) または (b) (#3946 の修正を含める) は、本 run では未実装。判断は PM。
+- 注: 本節は stk 修正を既定で入れていた時点の測定 (§10 で既定 off に切替えた後の値に置き換え)。
+
+## 10. 既定 off の切替 (レビュー B2・方針 (a)) と測定 (HEAD `348b9981c`)
+
+- 変更: `rt/ld_ms_call.S` の stk を `#ifdef LD_STK_ENTRY28` で切替える。既定は旧 `212(%rsp)` (従来と同じ)。`spike_cfi.py` は `LD_STK_ENTRY28=1` のときだけ `-DLD_STK_ENTRY28` を付ける。`liftdiff_e2e.sh` も同じ環境変数を読む。
+- 既定 (`LD_STK_ENTRY28` 未設定) = 従来の挙動。spike 928/942・first_fail 830 (§5 の前の値に戻る)。
+- 有効化 (`LD_STK_ENTRY28=1`) = §3〜§9 の修正版。spike 892/942・first_fail 149。
+
+| 測定 | 既定 (`348b9981c`) | 有効化 `LD_STK_ENTRY28=1` (`348b9981c`) |
+|---|---|---|
+| spike (`spike_cfi.py`) units_run / first_fail | 928/942・830 (18 s) | 892/942・149 (14 s) |
+| e2e (`liftdiff_e2e.sh --m11-only`) 1 回目 | PASS・一致 361 / 不一致 233 / 実行不能 206 (190 s) | PASS・一致 361 / 不一致 233 / 実行不能 206 (192 s) |
+| e2e 2 回目 (既定のみ再実行) | PASS・一致 360 / 不一致 234 / 実行不能 206 (192 s) | — |
+
+- e2e の一致数は同条件で 360 と 361 が出た (既定で 1 件の揺らぎ)。spike の値は両回で同一。
+- 作業ツリー (未 commit 版) の e2e は既定・有効化とも 360/234/206 (PASS)。
+- 既定 off の切替で既存の数値 (928/942・830・e2e 360/234/206 付近) を戻した。製品 KPI は既定で従来どおり。
+- 修正 (有効化) の本体の原因 (libc abort 15 unit) は未解決。子 issue #3946 [LD-184]。
