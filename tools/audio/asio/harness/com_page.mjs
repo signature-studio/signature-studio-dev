@@ -68,6 +68,17 @@ window.__done = new Promise((resolveAll, rejectAll) => {
         result.exit = code;
         result.ctx = ctxInfo;
         result.snapshot = shim.snapshot();
+        // 診断計装 (判定基準は変えない): producer の write 時系列 (pw_trace: [w, fill, 起床 µs, 完了 µs] × 件)
+        // と、worklet の burst_hist を結果に残す。pw_n は通算数。
+        {
+          const base = M._fla_ctl_ptr();
+          const u32 = new Uint32Array(M.wasmMemory.buffer, base, 16904 / 4);
+          const n = u32[384 / 4], N = 1024;
+          const trace = [];
+          const first = Math.max(0, n - N);
+          for (let i = first; i < n; i++) { const k = (i % N) * 4 + 388 / 4; trace.push([u32[k], u32[k + 1], u32[k + 2], u32[k + 3]]); }
+          result.pw = { pw_n: n, first_index: first, trace, burst_hist: Array.from(u32.subarray(16772 / 4, 16772 / 4 + 32)) };
+        }
         result.workletErrors = shim.workletErrors;
         result.cfg = cfg;
         if (ver) { result.verify = ver.finish(); result.verify.sr = ctxInfo.sampleRate; }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 測定環境を results/env.json に記録
-cd "$(dirname "$0")/.."; export PATH=/home/ubuntu/.local/share/pnpm/bin:$PATH
+cd "$(dirname "$0")/.."; export PATH=$HOME/.local/share/pnpm/bin:$PATH
 python3 - <<PY > results/env.json
 import json,subprocess,os
 def sh(c): return subprocess.run(c,shell=True,capture_output=True,text=True).stdout.strip()
