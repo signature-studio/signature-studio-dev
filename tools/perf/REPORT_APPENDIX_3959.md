@@ -88,11 +88,12 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 
 ## 3c. 子 #4392 の原因切り分け (Node・同期・`tools/perf/p15/ctor_data_overlap.mjs`)
 
-測定 commit: 本 PR の `ctor_data_overlap.mjs` を追加した commit (コードの最後の変更)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を展開して測定。
+測定 commit: `95f2351e5` (`ctor_data_overlap.mjs` を追加した commit = コードの最後の変更)。HEAD との差分: `git diff 95f2351e5 HEAD -- tools/perf tools/ott` は 0 行 (差分なし)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を展開して測定。
+本 fix run では素材が展開されず (`$ARTIFACTS_DIR` は `fl-win64` のみ) 再測定していない。下表は実装 run (測定 commit `95f2351e5`) の値。
 
 | 測定 | 結果 |
 |---|---|
-| `node node_init_sweep.mjs --m 145,146 --timeout 15000` (HEAD) | M=145 ok (setup 802 ms)・M=146 timeout (15 s) |
+| `node node_init_sweep.mjs --m 145,146 --timeout 15000` (HEAD) | M=145 ok・M=146 timeout (15 s)。`setup_ms` は生ログ (`$RUNNER_TEMP`) のみで commit に無いため載せない |
 | `ctor_data_overlap.mjs 145` ×2 | 2/2 同一: `data_changed_during_ctor_at=-1` (145 回の ctor で data 不変)・heap 起点 `0x1038d528`・1 回目の data 領域への確保 `0x301d3068` (malloc 10 回目, k=9)、その malloc の前後で data hash `b396a36c3521` → `27928e2cfb77` |
 | 対照: `ctor` 145 回後の heap 先頭 | `0x2ff93079` (ctor 1 回あたり約 3.67 MB 進む) |
 
