@@ -218,7 +218,9 @@
 
 ## 8. 測定 commit と差分 (docs/WORKFLOW.md §6)
 
-- 測定 commit = **`d9edb0ad9`** (`feat(massivex): identify scalar-read internal float fn and check classification (MX-55 #5030)`)。
+- 測定 commit = **`4840cc082`** (`feat(massivex): find vtable caller of 0x17b680 and check xmm2 arg (MX-55 #5030)`)。コードを変えた最後の commit (HEAD と同じ)。
+  - 本 run の測定: `mx6_e2e.sh` exit 0・elapsed 59 s・load 0.50 0.56 0.27 → 0.82 0.64 0.31・PASS 32 件。`mx55_callers.py` exit 0 (§9 の呼出元の値)。
+  - 前回 (実装 run・commit `d9edb0ad9`): 同じ `mx6_e2e.sh` で exit 0・elapsed 58 s。
   変更: `scripts/mx55_nonvec_float.py` (新規)・本 REPORT §9。前回の測定 commit = `d106f3c23` (MX-37 #3774)。
 - 測定 (MX-55 実装 run・`mx6_e2e.sh`・MX_PE = 展開 `Massive X.vst3`・md5 `622993e7…` 一致): **exit 0・elapsed 58 s・load 0.24 0.41 0.22 → 0.70 0.51 0.27**。
   mx55 の候補は **14 行 = 一意 13 関数** (§9)。`mx6_e2e.sh` は `mx55` を呼ばないため、mx55 の件数は同じ素材での個別実行の値。
