@@ -57,3 +57,15 @@ movnti は memset (`f_18001c8f0`・8 箇所) の大ブロック経路にだけ�
 - 判定: `movnti_check.py` は「movnti VA で trap」を前提にしているため、16/16 が NG (RESULT FAIL)。受入 2 の `all` はこの点で FAIL のまま。
 - 受入 2 の内訳 (実測): `ok` PASS (exit 0・owner 一覧 OK) / `neg-cmp` FAIL 検出 (期待どおり) / `neg-ctx` FAIL 検出 (期待どおり) / `neg-owner` FAIL 検出 (期待どおり)。
 - 未解決: reach 16 件を arena 内で完了させる入力 (または harness の arena モデル) の決定。子 issue に分ける。
+
+## 付録 (review r1 対応): movnti の gate 期待値 (#4324 既知の未達) と再測定
+
+- 変更: `movnti_check.py` の判定を 2 つに分けた。(1) 実装判定 = `fle_lifted.c` の movnti の `ott_unsup` が 0 件 (#3893。1 件でも残れば FAIL)。(2) reach 16 件 = 既知の未達 (#4324)。reach は「native が arena 外で落ちる」だけを判定し、wasm が movnti 経路を完了したかは判定しない。`movnti` の結果行に 0/16 を既知として出す。`lift_x64c.sh` の `all` は既知の状態で ALL OK になる。期待値を変えた理由: x64c が movnti を ST64 に lift したため、旧判定 (movnti VA で trap) は構造的に成り立たなくなった。解消条件: #4324 で reach 16 件を arena 内で完了させる。解消したら reach 判定を「wasm が完了する」に戻す。
+- 測定 commit: `5a8f48e8f` (`tools/shared/lift/rex/` を変えた最後の commit)。`all` を HEAD で 1 回 (10 s・load 0.09 0.23 0.15 → 0.23 0.25 0.16)。ALL OK。
+  - ok: PASS・比較 223・一致 223・不一致 0 (296 case・native crash 除外 73)・owner 一覧 OK。
+  - neg-cmp / neg-ctx / neg-owner: 期待どおり FAIL 検出。
+  - movnti: 実装 OK (ott_unsup 0 件)・reach native 境界外 16/16・wasm 完了 0/16 (既知の未達 #4324)・info 4/4 が trap (#3894)。
+- 素材の注記: `/opt/emsdk` が無いため `EMSDK_ENV` で上流 `emsdk install/activate 6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` と同版) を使った。`fl-win64` は `$HOME/artifacts/fl-win64.tar.zst` から展開。`oc_artifacts: fl-win64 toolchain-emsdk` を PR 本文に書いた。
+- 今回の case 数 (296 件・比較 223) は §2 の 248 件・比較 175 と一致しない。原因: `gen_cases.py` が 55fe773b2 以降に変わり (成功経路の case を追加。`git diff 55fe773b2 HEAD -- tools/shared/lift/rex/gen_cases.py`)、その後の `native_ref.c` / `crash_class.py` 等も変わった。§2 の数値は 55fe773b2 の入力に対するもので、現 HEAD の入力では再現しない。現 HEAD の値 (296・223) を正とする。
+- lift 差分 (main `59ca0477f` と本 PR の `x64c.py` を同 DLL・同引数で比較): `fle_lifted.c` は movnti 24 行の `ott_unsup` → `ST64` のみ (48 行)。`lift_meta.json` は movnti 24 サイトの `unsup` / `unsup_sites` の削除のみ (他は不変)。
+- memcpy 16 箇所の間接 call 経路: 未起票。`docs/WORKFLOW.md` §3 の規則で、「未解決の追跡」だけの子は起票しない。本付録 §4 と PR 本文の未解決表で追跡する。
