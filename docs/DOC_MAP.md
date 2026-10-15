@@ -565,6 +565,7 @@
 | `tools/e2e/REPORT_APPENDIX_4312.md` | ~20 | e2e #4312 [WIN-46]: `gui-guest-boot` の画素判定を独立オラクル (`tools/gui/golden/gen_golden_text8.py`) と差 0 px で一致させる。オラクルの独立性・ネガコン・実測 (REPORT の gui=wasm 節から導線) |
 | `tools/e2e/REPORT_APPENDIX_3496.md` | ~25 | e2e #3496 [WIN-28]: GUI-REACH trace の機械検査 (件数・初回の順序)。REPORT の gui=wasm 節から分割移動 |
 | `tools/gui/REPORT_APPENDIX_4804.md` | ~20 | gui #4804 [WIN-56]: e2e.sh への step 2d (統計 API 単体 `stats_test.sh`) 組込みの実測 (測定 commit c06575782・差分 0 証跡)、本 run で再現できなかった項目 (RetDec/emsdk/mingw 不在)、子 #4821・#4822 |
+| `tools/gui/REPORT_APPENDIX_4822.md` | ~30 | gui #4822 [WIN-58]: e2e.sh への step 6i (W 版ゲストの wasm 読み戻し sha256 と native の一致・ネガコン 1 px 改竄) 組込みの実測 (測定 commit 0c8989a87・差分 0 証跡)、`flengine/e2e.sh` の前提欠如 (work-m11 素材) と未実行の扱い |
 | `tools/gui/REPORT_APPENDIX_3510.md` | ~60 | gui #3510 [WIN-32]: 到達ログ (GUI-REACH / GUI-MSG) の順序検査 (RegisterClassW < CreateWindowExW < WM_PAINT 配送 < BitBlt・`test/reach_order_check.py`)、native reach 構成 (`native_w_e2e.sh`)、旧 shim のネガコン、e2e.sh の step 2c。250 行上限のため付録 W から分割して別置き |
 | `tools/gui/REPORT_APPENDIX_B.md` | ~28 | gui REPORT §11 (GUI-9 #186 FreeType テキスト) の全文 (250 行上限のため無変更で分割移動)。§13 (GUI-13 #615) の追補 (c4b293d の再確認・RetDec 不在のブロッカー実測) |
 | `tools/gui/REPORT_APPENDIX_C.md` | ~42 | gui REPORT §14 (GUI-7 #183 popup/tooltip・NC・複数矩形・DPI) の全文 (250 行上限のため無変更で分割移動)。§14 内の検証表 (HEAD 63cfe0f / 67d5cb7 / 87c20fc 等) を含む |
