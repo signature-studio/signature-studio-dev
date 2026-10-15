@@ -1,6 +1,6 @@
 # STATUS — 技術進捗の正本
 
-**FL のウィンドウ: 未達 / 最終到達ステップ: S12 (下限。CreateFruityInstance の入口に到達し、本体内で fail-fast。測定 commit `ae963e28` 時点の値で、現 HEAD は未再測定) / 起動指標: [tools/startup/boot_metric.json](tools/startup/boot_metric.json) の `flengine-cfi-probe` (数え方は [tools/startup/REPORT.md](tools/startup/REPORT.md) §8)**
+**FL のウィンドウ: 未達 / 最終到達ステップ: S12 (下限。CreateFruityInstance の入口に到達し、本体内で fail-fast。測定 commit `adad27ad` で再測定) / 起動指標: [tools/startup/boot_metric.json](tools/startup/boot_metric.json) の `flengine-cfi-probe` (数え方は [tools/startup/REPORT.md](tools/startup/REPORT.md) §8)**
 
 本ファイルが**技術進捗**に関する唯一の正本である (チケット状態の正本は issue の open/closed + ラベル + PR の状態。
 分類の表は `docs/WORKFLOW.md` §3。Project V2 の Status は参考)。

@@ -126,7 +126,7 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 
 ### 8-4. 検証
 
-- 単体 (固定 fixture): `python3 tools/startup/test_boot_metric.py` → `Ran 20 tests ... OK`。期待値 (m11 53 / 57 / 0x16fde0、survey 872 / 23 / 46 / 1、gui 52 / 870 / 24、x64c 208 / 209 / 0x816e80、x64c survey 892 / uncovered 47、native 928 / 942 / 830 など) を固定入力で検査する。null の全項目に理由があることも検査する。
+- 単体 (固定 fixture): `python3 tools/startup/test_boot_metric.py` → `Ran 21 tests ... OK`。期待値 (m11 53 / 57 / 0x16fde0、survey 872 / 23 / 46 / 1、gui 52 / 870 / 24、x64c 208 / 209 / 0x816e80、x64c survey 892 / uncovered 47、native 928 / 942 / 830 など) を固定入力で検査する。null の全項目に理由があることも検査する。
 - ネガティブコントロール (いずれも期待どおり `MetricError`): (a) 表行 `de50ffa` を壊す、(b) JSON の `boot.units_run` キーを消す、(c) 出典ファイル `tools/liftdiff/REPORT_LD26.md` を消す、(d) m11 survey の ok を 900 にして合計 942 と食い違わせる、(e) gui REPORT の S1 値 (870 → 871) を JSON と食い違わせる、(f) m11 の非 work ファイルに `CreateFruityInstance` を置く。
 - 実データ: `python3 tools/startup/boot_metric.py --check` → `boot_metric: OK`。
 - 測定 commit → HEAD のファイル差分 (範囲 `tools/m11 tools/gui tools/flelift tools/liftdiff tools/shimx tools/startup/STARTUP.md`、`git diff --shortstat <起点> HEAD -- <範囲>`。範囲は本 PR の変更対象を含まない):
@@ -141,9 +141,9 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 | x64c-strict-sequential (測定 commit 不明) | `ac5d6d46` | 991 files (+136,528 / −2,213) |
 | x64c-isolated-survey (測定 commit 不明) | `12958453` | 983 files (+136,291 / −2,152) |
 | native-ref-hybrid | `2ca85816` | 382 files (+42,129 / −145) |
-| flengine-cfi-probe (範囲は `tools/shim`・`cfi_probe.mjs`) | `ae963e28` | 非 0 (`tools/shim` に差分。内訳は `REPORT_APPENDIX_2880.md` §9-8) |
+| flengine-cfi-probe (範囲は `tools/shim`・`cfi_probe.mjs`) | `adad27ad` (再測定の commit) | 0 (`adad27ad` 以後に差分なし。内訳は `REPORT_APPENDIX_2880.md` §9-8) |
 
-  どの路線も差分は 0 ではない。文書と results は測定 commit 時点の値であり、現 HEAD の実測ではない。再測定は本 issue の範囲外で、要否は §8-5 で PM 判断とする。
+  flengine-cfi-probe 以外の路線は差分が 0 ではない。文書と results は測定 commit 時点の値であり、現 HEAD の実測ではない。flengine-cfi-probe は `adad27ad` で再測定した (§8-6)。他の路線の再測定の要否は本 issue の範囲外で、§8-5 で PM 判断とする。
 - 文書・results の変更有無 (出典 6 ファイル): `git diff --stat 580dd294 4e8bdd8c -- tools/m11/REPORT.md tools/m11/REPORT_APPENDIX_1430.md tools/gui/flengine/results tools/flelift/boot/results tools/flelift/boot/REPORT.md tools/liftdiff/REPORT_LD26.md tools/startup/STARTUP.md` の出力は空 (base 4e8bdd8c までの範囲)。
 
 ### 8-5. 未解決 (起票先付き)
@@ -156,13 +156,12 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 | gui REPORT §5 の「GUI soft は OOB 21 / halt0 8」と `survey_soft.json` の kinds (OOB 16 / halt0→longjmp 7 / unreachable 1、計 24) が食い違う | 本 record は JSON 値 (trap 24) を採用。REPORT 側は未更新 | #174 (OPEN, GUI-3) へ。PM 判断 |
 | m11 の survey は `REPORT.md` §14 (866, `de50ffa`) と `REPORT_APPENDIX_1430.md` (872, `7e149974`) が並存 | JSON は commit が新しい 872 を採用。本体 REPORT は未更新 | PM 判断 (m11 REPORT 更新の依頼) |
 | x64c の測定 commit が出典に無い (boot・survey 両方) | 測定 commit は null。最終更新 commit を測定 commit と読まない | PM 判断 (REPORT に測定 commit を書く依頼) |
-| 再測定の要否: §8-4 の差分はすべて 0 でない | 「現在値」と読むと HEAD の実態とずれる | PM 判断 (本 issue の範囲外) |
+| 再測定の要否: §8-4 の差分 (flengine-cfi-probe 以外) は 0 でない | 「現在値」と読むと HEAD の実態とずれる | PM 判断 (本 issue の範囲外) |
 | `first_wm_paint`・`pixels` (最初の WM_PAINT・画素) は全路線で未測定 | 最初のウィンドウの数値は null | PM 判断 (後続 WIN の issue は未起票) |
 | native hybrid の `first_fail 830` の意味 (失敗か停止か) が REPORT に無い | `units.failed` は null | PM 判断 (liftdiff 担当の issue は未特定) |
 | gui `results/survey_soft.json` は `5f9d7cbd` で 870/24 → 872/22 に更新されたが、gui REPORT §6d・§6i は測定 commit `719f1c43` の 870/24 のまま | `m11-gui-survey` は `719f1c43` 時点の JSON を読む (本 PR で変更)。HEAD の JSON とは食い違う | #174 (OPEN, GUI-3) へ。PM 判断 |
-| flengine-cfi-probe の値は測定 commit `ae963e28` の実測。現 HEAD は `tools/shim` (HeapFree・#2821) に差分があり、再測定していない | record・STATUS 先頭行は `ae963e28` 時点の値。現 HEAD で成り立つかは未確認 (`REPORT_APPENDIX_2880.md` §9-8) | PM 判断 (素材 `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff` の run で再測定するか、#3191 受入 (3) の「最新」を縮める) |
 | 規則 (f) (pr-lint) の対象は #3191 の 4 パス (`tools/m11/REPORT.md`・`tools/flelift/boot/REPORT.md`・`tools/gui/flengine/`・`tools/startup/`)。`boot_metric.json` の出典には `tools/m11/REPORT_N2714.md`・`tools/m11/REPORT_APPENDIX_1430.md`・`tools/liftdiff/REPORT_LD26.md`・`tools/flelift/boot/results/boot_summary_plain.json` もあるが、これらの変更では警告されない | 出典を変えた PR の boot_metric.json 更新漏れを検出しない | PM 判断 (対象の拡張。issue 未起票) |
 
 ### 8-6. flengine 路線の record (`flengine-cfi-probe`)
 
-測定 commit `ae963e28` (出典: `tools/gui/flengine/REPORT_APPENDIX_2880.md` §9-3・`REPORT_APPENDIX.md` §7-4)。`cfi_probe.mjs` が DllMain attach の後に CreateFruityInstance を 1 回呼ぶと、入口 (STARTUP S12) に届き、本体内で EnterCriticalSection の fail-fast (CS `0x12bd390`、登録されていない CS) により `Aborted` する。`last_step: S12` は**下限**で、S13 以降の到達と fail-fast の位置・呼出元 VA は未測定 (#3077 [WIN-16])。fail-fast の API は §7-4 と §9-3 の一致を検査する。現 HEAD では `tools/shim` に差分があり (`REPORT_APPENDIX_2880.md` §9-8)、この record は `ae963e28` 時点の値で、現 HEAD では再測定していない (§8-5 の未解決)。
+測定 commit `adad27ad` (出典: `tools/gui/flengine/REPORT_APPENDIX_2880.md` §9-3・§9-8。`ae963e28` の測定も同じ値・`REPORT_APPENDIX.md` §7-4)。`cfi_probe.mjs` が DllMain attach の後に CreateFruityInstance を 1 回呼ぶと、入口 (STARTUP S12) に届き、本体内で EnterCriticalSection の fail-fast (CS `0x12bd390`、登録されていない CS) により `Aborted` する。`last_step: S12` は**下限**で、S13 以降の到達と fail-fast の位置・呼出元 VA は未測定 (#3077 [WIN-16])。fail-fast の API は §7-4 と §9-3 の一致を検査する。`tools/shim`・`cfi_probe.mjs` は `adad27ad` 以後に変わっていない (`REPORT_APPENDIX_2880.md` §9-8)。

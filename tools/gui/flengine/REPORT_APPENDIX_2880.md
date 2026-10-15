@@ -5,8 +5,8 @@ REPORT_APPENDIX.md §9 の全文 (250 行上限のため分割移動)。外部�
 ## 9. WIN-11 (#2880): EnterCriticalSection の失敗 CS と初期化経路 (部分達成)
 
 既知類型との関係: 該当 DEFECTS 行なし。原因は未確定 (lift 欠陥か init 列の扱いか) のため、類型は追加しない。
-測定 commit: `ae963e28` (コードを変えた最後の commit。shim の診断 1 行のみ)。後続の commit は docs のみ (本節・REPORT_APPENDIX の要約・DOC_MAP)。REPORT.md は変えていない。
-差分の証跡 (WORKFLOW §6): `git diff ae963e28 HEAD -- tools/shim tools/gui/flengine/cfi_probe.mjs` は、測定時点では 0 行だったが、main 取り込み後の HEAD では出力がある (§9-8)。本節の 9-1〜9-7 は `ae963e28` 時点の実測で、現 HEAD の実測ではない。
+測定 commit: `ae963e28` (コードを変えた最後の commit。shim の診断 1 行のみ)。後続の commit は docs のみ (本節・REPORT_APPENDIX の要約・DOC_MAP)。REPORT.md は変えていない。§9-3 は現 HEAD `adad27ad` で再測定した (§9-8)。
+差分の証跡 (WORKFLOW §6): `git diff adad27ad HEAD -- tools/shim tools/gui/flengine/cfi_probe.mjs` は §9-8 に出力を付す。本節の 9-1・9-4〜9-7 は `ae963e28` 時点の実測で、現 HEAD の実測ではない。
 
 ### 9-1. 受入条件の状態 (#2880 の 3 項目)
 
@@ -30,7 +30,7 @@ REPORT_APPENDIX.md §9 の全文 (250 行上限のため分割移動)。外部�
 
 再現の注意: (1) `m11_lift.sh` は ranges を相対パスで渡すと `cd` 後に解決できず、文字列として扱われる。絶対パスで渡す。(2) flengine の build は `x86_64-w64-mingw32-gcc` を要する (`gen_api.py` の arity 表)。今回の oc_artifacts に `apt-mingw` が無かったため、`sudo apt-get install gcc-mingw-w64-x86-64` を手で入れた (agent-setup の apt-mingw と同じパッケージ)。(3) `EMSDK_ENV=（[EMSDK] の emsdk_env.sh）` と `RETDEC=（[RETDEC] の bin/retdec-decompiler）` を環境に入れる。
 
-### 9-3. 実測: CreateFruityInstance の呼出し (`cfi_probe.mjs`・commit `ae963e28`)
+### 9-3. 実測: CreateFruityInstance の呼出し (`cfi_probe.mjs`・commit `adad27ad`)
 
 | 項目 | 結果 |
 |---|---|
@@ -39,7 +39,7 @@ REPORT_APPENDIX.md §9 の全文 (250 行上限のため分割移動)。外部�
 | 最後の shim 行 | `[shim] CS-MISS key=0x12bd390` → `FAIL-FAST: unimplemented Win32 API: EnterCriticalSection (未初期化/未登録)` |
 | GUI-REACH / icall_miss | `LoadStringW` ×3 のみ / 5 (§7-4 と同じ) |
 
-`CS-MISS` の行は本 commit で追加した (失敗時の 1 行のみ。挙動は変えない)。§7-4 の記録は CS のアドレスを出さないため、キーは今回初めて得た。
+表の値は `ae963e28` で測定した値と同じ (§9-8)。`CS-MISS` の行は commit `ae963e28` で追加した (失敗時の 1 行のみ。挙動は変えない)。§7-4 の記録は CS のアドレスを出さないため、キーは `ae963e28` で初めて得た。
 
 ### 9-4. boot 側の測定 (同じ build・一時診断)
 
@@ -87,7 +87,7 @@ IR 指紋 (fix で追記。e2e は再実行していない): 素材展開直後�
 | 呼出元 VA (wasm name section 無し) | 受入 1 の呼出元 VA | 同上 |
 | 解放側 `function_41cd70` が init 列に入る理由 | boot が 41cd70 に届くと `0x11EAF00` を削除する (推定) | 同上 |
 | S1 の差 (§9-6 の 13/14 と 14/14) | 判定の再現性 | PR 本文の未解決表のみ (再測定) |
-| 現 HEAD での `cfi_probe.mjs` の再測定 (shim に差分あり・§9-8) | 9-3 の値が現 HEAD で成り立つかは未確認 | PM 判断 (素材付きの run が要る) |
+| (解消) 現 HEAD での `cfi_probe.mjs` の再測定 | `adad27ad` で再測定し、9-3 と同じ値 (§9-8) | — |
 
 ### 9-8. 差分の証跡と再測定の状況 (#3191 差し戻し)
 
@@ -102,6 +102,19 @@ tools/shim/test/test_main.c | 11 +++++++---
 
 - 差分の中身: `tools/shim/src/heap.c` の HeapFree は、割当てのない p を FALSE・`ERROR_INVALID_FUNCTION` から TRUE・`ERROR_SUCCESS` に変えた (commit `7278e857`・#2821)。`tools/shim/test/test_main.c` は同じ変更の検査。`cfi_probe.mjs` に差分は無い。`tools/shim/src/sync.c` (CS-MISS の出力元) にも差分は無い。
 - cfi_probe の GUI 実行は `tools/shim` を使う (`tools/gui/flengine/e2e.sh` の複製元) ため、9-3 の結果は HeapFree の変更の影響を受け得る。影響の有無は未測定。
-- 再測定しなかった理由: この run で展開された素材は `fl-win64` だけ (`$ARTIFACTS_DIR` に `fl-win64.tar.zst`)。toolchain-emsdk (emcc)・toolchain-retdec・work-m11・work-liftdiff が無いため、9-2 の build (`m11_lift.sh`・`m11_gen_ir2.sh`・`m11_build.sh`・`gui/flengine/build.sh`) を実行できず、現 HEAD で `cfi_probe.mjs` を動かせない。
-- 扱い: 9-3・9-6 の値は `ae963e28` 時点の実測として残す (現 HEAD の値として書かない)。`flengine-cfi-probe` の record の `commit` は `ae963e28` のまま。STATUS 先頭行と REPORT §8-6 は「最新」と書かず、未再測定と明記する。
-- 残り: 素材 `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff` を付けた run で 9-2 の手順を実行し、9-3 と同じ項目を現 HEAD で測定して、本節に測定 commit を付けて追記する。値が変われば `python3 tools/startup/boot_metric.py` で再生成する (手で編集しない)。
+- 差分の証跡 (`ae963e28` → `adad27ad`): `git diff --stat ae963e28 adad27ad -- tools/shim tools/gui/flengine/cfi_probe.mjs` は上の 3 ファイル (61+/7-) と同じ。
+- 再測定 (commit `adad27ad`・#3191 差し戻し round 2): 素材 `fl-win64 toolchain-retdec toolchain-emsdk work-m11` (`work-liftdiff` は未使用)。toolchain は `/opt/` に展開済みのものを使った (`EMSDK_ENV=/opt/emsdk/emsdk_env.sh`・`RETDEC=/opt/retdec/bin/retdec-decompiler`)。fl-win64 は `FL_WIN64_DIR` へ手で展開し、work-m11 は作業ツリーの `tools/m11/work` へ複製した (gitignore)。`apt-mingw` は oc_artifacts に無いため `gcc-mingw-w64-x86-64` を apt で入れた (§9-2 (2))。
+
+| 手順 (`adad27ad`) | 結果 (実測) |
+|---|---|
+| `gf_seed_closure.py --pe $FL_WIN64_DIR/extracted/block00031_PE.bin --ir tools/m11/work/boot_final3.ll --seed 0x1375990` | 3 秒・closure 6,591 / 1,965,676 B・既存 4,520・新規 2,071 / 761,038 B (§9-2 と一致) |
+| `m11_lift.sh <絶対パス>/boot_ranges_cfi.txt boot7 780` | rc 0・3 分 19 秒・`boot7.lift.ll` 222,014 行 |
+| `m11_gen_ir2.sh` | rc 0・1 分 20 秒 |
+| `m11_build.sh` | rc 0・37 秒・signature mismatch 0 / undefined 0 |
+| `gui/flengine/build.sh` | rc 0・28 秒・`m11_gui.cjs` (signature 0 / undefined 0 / duplicate 0) |
+| `node tools/gui/flengine/cfi_probe.mjs` | rc 0・0.5 秒 |
+
+- 結果 (9-3 の表と同じ): boot_enter `unreachable`・`CreateFruityInstance` は `Aborted`・1 ms・iface `0x0`・最後の shim 行 `[shim] CS-MISS key=0x12bd390` → `FAIL-FAST: unimplemented Win32 API: EnterCriticalSection`・GUI-REACH `LoadStringW` ×3・icall_miss 5。値は変わらないので、`boot_metric.py` の再生成は出典の `file_last_commit` だけが変わる。
+- `m11_image.bin` は work-m11 の展開物 (10 月の値) をそのまま使った。`m11_build.sh` はこれを書かない (`m11_e2e.sh` 等が書く)。PE 由来の画像で、boot7 の IR 追加では変わらないと推定する (未確認)。
+- 差分の確認 (WORKFLOW §6): `git diff adad27ad HEAD -- tools/shim tools/gui/flengine/cfi_probe.mjs` の出力は 0 行 (本 PR の最終 commit で確認)。
+- 扱い: 9-3 の表は `adad27ad` の実測 (値は `ae963e28` と同じ)。`flengine-cfi-probe` の record の `commit`・STATUS 先頭行・REPORT §8-6 は `adad27ad` に合わせた。以後、tools/shim か cfi_probe.mjs に差分が出たら再測定する (WORKFLOW §6)。
