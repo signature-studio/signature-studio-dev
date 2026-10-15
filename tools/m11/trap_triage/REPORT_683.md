@@ -220,6 +220,13 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 
   - **HEAD の結果**: 表 A と全セル一致。942 unit の kind は全件不変、**ok 退行 0**。icall sites / targets の差 0。4 対象 unit は 149 = oob / 158 = ok / 280 = oob / 659 = oob (OFF = ON)。kind 以外の差分 unit は 7 (280・291・296・302・304・659・888) で、表 A の測定と同じ一覧。
   - **表 A・表 B の絶対値の読み方**: 上記 survey は work-m11 の lift 断片から作り直した IR での OFF / ON の A/B。絶対値は正の基準ではない (次の survey 基準の注記を参照)。
+- **真因の追跡 (#3444、HEAD `54a943aac` 基点、測定は作業ツリー版)**:
+  - **最初の OOB の位置 (受入条件 1)**: `oob_top.mjs` を 942 unit 順に全件回して再現 (unit 280 / 659 の最上位 frame の wasm offset は `0x21d72a`、`function_6cefb0` (wasm index 4476) 内)。`oob_insn.py` で逆引きした命令は `i32.load offset=0` で、アドレスは `[((local17<<32)>>29) + local15] + 208`。IR では `function_6cefb0` の 270519 行付近の `dec_label_pc_6ceffb` ループ内 `%19 = inttoptr (load(...) + 208)` に対応する。
+  - **trap 時の状態 (実測)**: グローバル `18833344` (`0x11f0000`) の値 `g = 0x10bd4e90`、`[g+8]` (base) = `0`、`[g+16]` (cnt) = `0`。`cnt` は do-while の回数に使われ、`cnt=0` では `rdx` が 0 から 0xFFFFFFFF へ wrap する。ループは `base + rax*8` を読み続け、範囲外に出て trap する (IR の `%16 = base + rax<<32>>29` の読み。実測の trap 命令と整合)。
+  - **g の履歴 (実測、942 unit 順)**: unit 0〜190 は `g = 0`、unit 191 以降は `g = 0x10bd4e90` で固定。`g` を書くのは `function_6cf240` (`store i32 %7`、戻り値 `function_663960`) と `function_6cf270` (`store i32 0`)。`g` が指す構造体の `base`/`cnt` が 0 になる書込み元は未特定。
+  - **受入条件 2 (6cefb0 の第 1・第 2 引数の出どころ)**: 本 trap は `function_6cefb0` の先頭の `g` 読み出し・ループ内で起きており、第 1・第 2 引数 (`%spec.select` / `%storemerge2`) はこのループの後段でしか使われていない。出どころは未特定。
+  - **未完 (起票先)**: `g` が指す構造体の `base`/`cnt` を 0 にする書込み元、RetDec 段の pass 特定、修復と ON/OFF 再測定 (受入条件 3・4) は本 PR の範囲外。
+  - 測定物 (`work/trap_triage/oob_top_all.json`・`probe_tbl.log`) は gitignore 対象で commit しない。
   - **取り込み後の build gate (本 run、HEAD `6b5774526`)**: `m11_build.sh` の gate 部分だけを一時コピーで検査した (emsdk の参照先のみ差替え。リポジトリは未変更)。ir_conditions.json の組合せ 6 通り: S1 全 applied → gate 通過 (後段の指紋検査で停止)。S2 r8b 記録無し → 拒否。S3 ld115 記録無し → 拒否。S4 r8b=disabled (ALLOW 無し) → 拒否。S5 r8b=disabled + `M11_ALLOW_R8B_DISABLED=1` → WARNING で続行。S6 ld115=disabled (ALLOW 無し) → 拒否。r8b と ld115 の 2 つの検査が独立に効くことを確認。
 - **survey の基準 (#1448)**: 本節の survey は、work-m11 の lift 断片から `m11_gen_ir2.sh` で作り直した IR での OFF / ON の A/B である。`docs/WORKFLOW.md` §11 は work-m11 の snapshot を survey の基準にしないと定めるため、ok 873 などの絶対値は正の基準ではなく、OFF と ON の対比としてのみ読む。
 
