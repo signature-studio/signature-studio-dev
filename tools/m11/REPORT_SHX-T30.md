@@ -2,13 +2,15 @@
 
 既知類型との関係: 該当なし (D1a〜D23 のいずれとも違う。新類型 D24 として `docs/DEFECTS.md` に記録。§6)
 
+測定の状態: 本 REPORT の IR・実測・`_t` の記述は、測定 commit `26f90ada` (適用前の IR) に紐づく。`_t` の修復は #3077 (`89bee32d8`) で main に適用済み (§7・§8・§9)。適用後の HEAD での挙動は未測定。
+
 ## 1. 結論
 
-- `function_8c5eb0` の `unreachable` は RetDec の誤変換ではない。**D19 修復 pass `tools/m11/guard699/m11_guard699.py` が挿入した fail-fast ブロック `dec_label_pc_8c5ef5_g699_t` (`call void @llvm.trap()` + `unreachable`)** である。function_8c5eb0 の IR にある `unreachable` はこの 1 箇所だけ。
+- `function_8c5eb0` の `unreachable` は RetDec の誤変換ではない。**D19 修復 pass `tools/m11/guard699/m11_guard699.py` が挿入した fail-fast ブロック `dec_label_pc_8c5ef5_g699_t` (`call void @llvm.trap()` + `unreachable`)** である。適用前の IR (`26f90ada`) で、function_8c5eb0 の IR にある `unreachable` はこの 1 箇所だけ。
 - trap に至る分岐は次の 2 条件の連言: **件数 `i32 [X+0x14]` ≤ 0** (`icmp sle`) かつ **`arg2` の下位 byte ≠ 0**。
 - 機械語では同じ経路は正常に進む。件数 ≤ 0 で本体を飛ばした後、`arg2` 下位 byte ≠ 0 なら、`arg3` ≠ 0 のとき先に `8c6071`〜`8c607f` で `call 0x8ca670(arg3, obj)` を呼び、続けて `8c608d` で `call 0x410360` を呼んでその戻り値を `[rbp+0x80]` に格納し、`8c60df` で返す (§4)。`_t` の fail-fast はこの正常経路を止めている。`m11_guard699.py` の「8c608d の rdx は未確定」という理由は成り立たない。機械語は 8c608d〜8c6094 で呼出し側が rdx を設定せず、`410360` は rdx を読まずに vtable 先へ渡す (§4)。
 - D19・D22・D23 のいずれとも違う。件数 0 のガードは IR に正しく復元されている (§6)。よって新類型 **D24** (修復 pass の fail-fast が正常経路を止める) として `docs/DEFECTS.md` に記録する。
-- 試験 (work 内の IR を直接パッチし、commit していない): `_t` を「`call 410360(obj)` → その戻り値を返す」に置換すると、同じ locale0 対照で unit 57 を越え、`units_run` 53 → 110・`dllmain_done=true` になる (§7)。この置換が正しいのは arg3 == 0 の呼出し経路だけで、arg3 ≠ 0 では `call 8ca670(arg3, obj)` を先に行う必要がある (§4・§7)。修復の適用と以後の実測は親 #2446 の受入 3 に移す。
+- 試験 (work 内の IR を直接パッチし、commit していない): `_t` を「`call 410360(obj)` → その戻り値を返す」に置換すると、同じ locale0 対照で unit 57 を越え、`units_run` 53 → 110・`dllmain_done=true` になる (§7)。この置換が正しいのは arg3 == 0 の呼出し経路だけで、arg3 ≠ 0 では `call 8ca670(arg3, obj)` を先に行う必要がある (§4・§7)。修復は #3077 (`89bee32d8`) で main に適用済み (`_t` は arg3 で分岐し、本 REPORT §4・§7 の形と一致)。残るのは適用後の HEAD での実測だけで、親 #2446 の受入 3 に移す。
 - 未確定: 件数が 0 になる上流 (`function_8c67a0(obj)` の先で list に項目が積まれない理由) は特定していない (§5・§9)。
 
 ## 2. 測定条件
@@ -69,7 +71,7 @@ dec_label_pc_8c5ef5_g699:
 - 件数 ≤ 0 かつ `arg2` 下位 byte ≠ 0 の機械語の挙動は、arg3 == 0 のとき「`410360(obj)` を呼び、その戻り値を返す」、arg3 ≠ 0 のとき「先に `8ca670(arg3, obj)` を呼び、続けて同じ `410360(obj)` の呼出しと返却」。IR の `_t` (trap) はどちらとも違う。`_t` の修復は arg3 で分ける必要がある。
 - 直接 `call 0x8c5eb0` の呼出し元は 111 件 (`E8` rel32 の全走査)。**窓の定義**: 呼出し命令の直前 14 命令で、同じ関数 (`.pdata` の BeginAddress 以降) の中に限る。逆アセンブルは `objdump -d -M intel` の線形列。窓の中で `dl` (`rdx`) と `r8` を明示的に書く最後の命令で判定する (`mov dl, imm` の imm ≠ 0 を dl≠0、`xor edx,edx` を dl=0、`xor r8,r8`・`mov r8, 0` を r8 の定数 0)。窓の外で設定された値は見ていない。結果: dl≠0 が 99 件 (うち r8 が定数 0 が 46 件、定数 0 でない (例: `8d045f` は `mov r8, rsi`) が 53 件)、dl=0 (`xor edx,edx`) が 12 件。定数 0 でない 53 件は arg3 ≠ 0 の経路になりうるが、実行時の値は未確認。`8d03f7`〜`8d03fc` (`mov dl,1`・`xor r8,r8`・`call`) は arg3 == 0 の例。`_t` の修復は arg3 の分岐を含める。
 - **再現**: `python3 tools/m11/m11_t30_callsites.py <block00031_PE.bin>` (素材は fl-win64 の `extracted/block00031_PE.bin`、sha256 `b2c64da4…`)。出力は `direct calls to 0x8c5eb0: 111`・`dl: nz=99 zero=12 none=0 nonconst=0`・`dl nz の r8: zero=46 nonconst=53 none=0` で、本節の値と一致する (2026-10-14 実測)。
-- `m11_guard699.py` の docstring の「8c608d の rdx は未確定」と、`REPORT_699.md` §1 の注釈「機械語 8c608d は vtable 呼出し」は、逆アセンブルと一致しない。修復時に直す (§9)。
+- `m11_guard699.py` の docstring の「8c608d の rdx は未確定」は、逆アセンブルと一致しない。docstring は `a2190b269` で直した。`REPORT_699.md` §1 の注釈「機械語 8c608d は vtable 呼出し」も一致しないが、main に残っている (§9)。
 - `function_8c5eb0` の IR で `unreachable` を含むのは `_t` だけ。`function_8c67a0`・`function_8c7c80`・`function_8c5c90`・`function_8c7450`・`function_410360` などの呼出し先にも `unreachable` は無い。`unreachable` の関数名の走査では、stale IR の 99 件から、新 IR で 100 件に増えたのは `function_8c5eb0` の 1 件 (`_t`) だけ。よって trap は `_t` で発生し、trap の発生は「件数 ≤ 0 かつ flag ≠ 0」の成立と同値。
 
 ## 5. 条件値の出所
@@ -99,12 +101,12 @@ dec_label_pc_8c5ef5_g699_t:
 - 結果: locale0 対照で `units_run=110`・`init_count_var=0`・`dllmain_done=true`・`boot_rc=1`・`threw=null`。unit 57 の trap は消え、DllMain の完了まで進んだ。ftrace は 0 行 (file API には届かない)。
 - この試験は shimx 経路 (`build.sh --trace --soft` → `t27_relink.sh locale0`) で行った。`m11_build.sh` は `boot_final3.ll` を再生成するため、試験 IR を m11 経路の検証には使っていない。
 - 有効範囲: 試験 A の置換は arg3 == 0 の経路 (56fde0 → 8c5eb0) でだけ機械語と一致する。arg3 ≠ 0 では `8c6071`〜`8c607f` の `call 8ca670(arg3, obj)` が抜けるため、この置換を arg3 ≠ 0 の呼出しに使うと機械語と食い違う。
-- 修復案 (未試験・#2446 受入 3 で検証): `_t` を arg3 で分ける。arg3 == 0 のときは試験 A と同じく `call 410360(obj)`・`ret`。arg3 ≠ 0 のときは先に `call 8ca670(arg3, obj)` (`_e` 枝と同じ呼出し) を行い、続けて同じ `call 410360(obj)`・`ret`。
+- 修復案: `_t` を arg3 で分ける。arg3 == 0 のときは試験 A と同じく `call 410360(obj)`・`ret`。arg3 ≠ 0 のときは先に `call 8ca670(arg3, obj)` (`_e` 枝と同じ呼出し) を行い、続けて同じ `call 410360(obj)`・`ret`。この形は #3077 (`89bee32d8`) で `m11_guard699.py` に適用済みで、一致する。試験 A は測定 commit `26f90ada` の IR でのみ行い、適用後の HEAD では行っていない。適用後の HEAD での units_run の実測は #2446 受入 3。
 
 ## 8. 検証の鮮度
 
-- 測定 commit: `26f90ada` (コードを変えた最後の commit)。本 PR はコードを変えない (変更は REPORT_SHX-T30.md・DEFECTS.md・DOC_MAP.md のみ)。差分の確認は `git diff 26f90ada acc12101 -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md'` (出力 0 行)。範囲の終点を固定 hash (`acc12101`・再測定した HEAD) にしたので、merge 後も同じ結果になる。`acc12101` より後に `tools/m11` へ増えたのは再現スクリプト `m11_t30_callsites.py` だけで、`git diff --stat acc12101 HEAD -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md'` で確認できる。最終 HEAD の hash は PR 本文の『検証』に書く。
-- コミット済み HEAD `acc12101` で、IR を元に戻したうえで `build.sh --trace --soft` と `t27_relink.sh` (`locale0`) を再実行し、§3 の baseline (`units_run=17`) と対照 (`units_run=53`・`threw=unreachable`・`total_calls=173`) が再現することを確認した。以後の commit は REPORT の文言だけを変えている。
+- 測定 commit: `26f90ada` (コードを変えた最後の commit)。本 PR は既存の tools/m11 コードを変えない (追加は解析用の再現スクリプト `m11_t30_callsites.py` のみ。変更は REPORT_SHX-T30.md・DEFECTS.md・DOC_MAP.md)。差分の確認は `git diff 26f90ada acc12101 -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md'` (出力 0 行)。範囲の終点を固定 hash (`acc12101`・再測定した HEAD) にしたので、merge 後も同じ結果になる。`acc12101` より後に `tools/m11` へ増えたのは再現スクリプト `m11_t30_callsites.py` だけで、`git diff --stat acc12101 HEAD -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md'` で確認できる。最終 HEAD の hash は PR 本文の『検証』に書く。
+- コミット済み HEAD `acc12101` で、IR を元に戻したうえで `build.sh --trace --soft` と `t27_relink.sh` (`locale0`) を再実行し、§3 の baseline (`units_run=17`) と対照 (`units_run=53`・`threw=unreachable`・`total_calls=173`) が再現することを確認した。以後の PR commit は REPORT の文言と再現スクリプトだけを変えている。ただし main の取り込み (merge `098bf987`) で `tools/m11`・`tools/shimx` に main 側のコード差分が入った (`git diff --numstat 26f90ada 098bf987 -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md' ':!*.md' ':!*/results/*'` は 120 件)。§3・§7 の値は `26f90ada`・`acc12101` のもので、HEAD `098bf987` の値ではない。HEAD での再測定は行っていない (#2446 受入 3)。
 - `work-m11` の IR は stale。本 REPORT の IR は §2 の手順で作り直したもので、指紋の出自は未検証。
 
 ## 9. 未解決 (起票先)
@@ -112,6 +114,6 @@ dec_label_pc_8c5ef5_g699_t:
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 件数 0 の上流 (`function_8c67a0(obj)` の list に項目が積まれない理由。GetLocaleInfoW 0 との因果) | trap の直接の原因 (`_t`) は確定したが、件数 0 を生む根元は未特定 | #2446 (unit 57 の切り分け) にコメント |
-| `_t` の修復 (arg3 で分けた機械語化・§4・§7) の適用と、units_run ≥ 58 の実測 | 現行 IR は unit 57 で止まる | #2446 受入 3 (arg3 ≠ 0 の分岐を含めること) |
-| guard699 の docstring (rdx 未確定) と `REPORT_699.md` §1 の注釈 (vtable 呼出し) の誤り | 次に読む人を誤らせる | 上の修復と同じ作業 (#2446) |
+| `_t` の修復 (arg3 で分けた機械語化・§4・§7) は #3077 (`89bee32d8`) で main に適用済み。適用後の HEAD での units_run ≥ 58 の実測は未実施 | 適用前の IR (`26f90ada`) は unit 57 で止まった。適用後の挙動は未測定 | #2446 受入 3 (arg3 ≠ 0 の分岐を含めること) |
+| `REPORT_699.md` §1 の注釈 (「機械語 8c608d は vtable 呼出し」) の誤り。guard699 の docstring (rdx 未確定) の誤りは `a2190b269` で解消済み | 次に読む人を誤らせる | #2446 (`REPORT_699.md` の注釈の修正) |
 | `m11_e2e.sh` の gate が `survey ok=874 != 期待 872` で rc 1 | 回帰ゲートが落ちる。ld108 修復で値が変わったと推定 (未確認) | PM 判断 (`tools/m11/e2e_expect.env` の更新。本 PR では変えない) |
