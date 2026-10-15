@@ -41,40 +41,47 @@
 
 - `host/fl_mock.mjs`: state に `uiClosing` ほか 7 項目を追加 (既定 `false` / `0`)、`ui.*` 9 件を定義 (`arity(a, 0, 0)`)。`isMetronomeEnabled` / `isPrecountEnabled` は既存の `useMetronome` / `precount` を読む。
 - `provider/fl_engine.c`: 静的変数 7 件 (`ui_closing`・`ui_time_disp_min`・`ui_start_on_input`・`ui_loop_rec`・`ui_step_edit`・`ui_browser_auto_hide`・`ui_snap_mode`) を `fl_engine_reset` で 0 に初期化。`FL_H(ui, ...)` 9 件を `NARGS(0, 0)` 付きで定義。
-- `tests/provider_check.mjs`: `pe95` の集合を追加。実装 83 → 92、未実装 352 → 343 (total 435 は不変)。main 取り込み後 (PY-115 の `mixer.getTrackColor` 1 件、PY-100 の 2 件、PY-119 (#3010) の 6 件、#2985 の screen 5 件 `pe121` を加えた) は 実装 106・未実装 329 (`db86f35b`)。さらに main の PY-119 set (#2977) の `pe119set` 6 件と PY-152 (#2983) の `pe152` 6 件を加えた main (`c98d2c99`) との取り込み後は 実装 118・未実装 317。さらに main の PY-121 (#2982) の `pe121_2982` 6 件を加えた main (`4b81e78a`) との取り込み後は 実装 124・未実装 311。さらに main の PY-96 (#2832) の `pe96` 4 件を加えた `567c7182` との取り込み後は 実装 128・未実装 307。さらに main の PY-125 (#3001) の `pe125` 2 件を加えた `95de1356` との取り込み後は 実装 130・未実装 305。さらに main (`80fb2fd0`。PY-101 (#2878) の `pe101` 2 件・PY-102 (#2883) の `pe102` 1 件などを含む 206 commit) との取り込み後は 実装 133・未実装 302 (§4)。競合は両側の集合を残して解消した (`db86f35b`・`0555b22d`・`3fc85489`・`567c7182`・`95de1356`・`ff3f62e6`)。
+- `tests/provider_check.mjs`: `pe95` の集合を追加。実装 83 → 92、未実装 352 → 343 (total 435 は不変)。main 取り込み後 (PY-115 の `mixer.getTrackColor` 1 件、PY-100 の 2 件、PY-119 (#3010) の 6 件、#2985 の screen 5 件 `pe121` を加えた) は 実装 106・未実装 329 (`db86f35b`)。さらに main の PY-119 set (#2977) の `pe119set` 6 件と PY-152 (#2983) の `pe152` 6 件を加えた main (`c98d2c99`) との取り込み後は 実装 118・未実装 317。さらに main の PY-121 (#2982) の `pe121_2982` 6 件を加えた main (`4b81e78a`) との取り込み後は 実装 124・未実装 311。さらに main の PY-96 (#2832) の `pe96` 4 件を加えた `567c7182` との取り込み後は 実装 128・未実装 307。さらに main の PY-125 (#3001) の `pe125` 2 件を加えた `95de1356` との取り込み後は 実装 130・未実装 305。さらに main (`80fb2fd0`。PY-101 (#2878) の `pe101` 2 件・PY-102 (#2883) の `pe102` 1 件などを含む 206 commit) との取り込み後は 実装 133・未実装 302。さらに main (`a9733bbb`。PY-94 (#2830) の general 状態読出し 7 件 `pe94`) との取り込み後は 実装 140・未実装 295 (§4)。競合は両側の集合を残して解消した (`db86f35b`・`0555b22d`・`3fc85489`・`567c7182`・`95de1356`・`ff3f62e6`・`6e763df4`)。
 - `tests/ui_state_diff.mjs` (新規): 9 件の既定値呼出し (9) と引数過多 (9) の計 18 呼出しを mock と C で照合。main 取り込みで PY-119 (#3010) も同名のファイルを追加したため、両方の検査を 1 本に統合した (add/add の競合の解消)。統合後は PY-119 の 6 件 (`getFocused`・`getFocusedFormID`・`getFocusedFormCaption`・`getFocusedPluginName`・`getHintMsg`・`isInPopupMenu`) を加えて計 33 呼出し。
 
 ## 4. 検証
 
-測定 commit: `ff3f62e6` (`origin/main` (`80fb2fd0`) の取り込み merge。コードを変えた最後の commit)。前回の測定 commit `ef060433` (`95de1356` の取り込み) の後に main が 206 commit 進み、`tools/python` に `pe101` (PY-101 (#2878)、channels の `isGridBitAssigned`・`getGridBitWithLoop` の 2 件) と `pe102` (PY-102 (#2883)、`playlist.muteTrackLock` の 1 件) が入った。取り込みで `tests/provider_check.mjs` が競合し (1 箇所・判定条件と件数 assert)、`pe95` と main の `pe101`・`pe102` の集合を両方残して解消した。`provider_check.mjs` の期待値は 実装 133・未実装 302 (435 は不変)。handlers (`provider/build.sh` の出力) も 133 で一致する。他のファイルは自動マージで衝突なし。
+測定 commit: `6e763df4` (`origin/main` (`a9733bbb`) の取り込み merge。コードを変えた最後の commit)。前回の検証 HEAD `e95e4c71` (`83060945` の取り込み) の後に main が進み (`a9733bbb`)、取り込みで `tools/python` (md 以外) に 7 ファイル・+287/−10 行が入った (main 由来。`git diff --stat e95e4c71 6e763df4 -- tools/python ':!*.md'`)。内訳は PY-94 (#2830) の `pe94` (general の状態読出し 7 件) を含む `host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`・`tests/general_diff.mjs` (+4) と、分析スクリプト 3 件 (`analysis/py167_flr_pyc.py`・`analysis/py68_vmt.py`・`analysis/flapi/pe_flrack_flr_probe.py`)。
 
-測定は `ff3f62e6` の内容で行った。環境: runner 4 core。測定開始時 (23:51 UTC) の load average は 1.67 / 1.61 / 0.80 (`uptime`。直前の CPython wasm のビルドの後)。
+競合は `docs/DOC_MAP.md`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs` の 4 件で、両側の集合・行を残して解消した。`provider_check.mjs` は `pe94` と `pe95` (本 PR) の判定を両方入れ、期待値は 実装 140 (= 133 + `pe94` 7)・未実装 295 (= 302 − 7) (435 は不変)。`handlers` (`provider/build.sh` の出力) も 140 で一致する。
 
-再ビルド: この worktree で新規に実行した。`provider/build.sh` (rc 0、emcc 6.0.12、handlers 133)、`build_cpython_wasm.sh` (rc 0、4 分 04 秒。この runner に CPython wasm が無かったため新規に作った)、`build_flpy.sh` (rc 0、`FLPY_SKIP_TABLE=1` で `flapi_table.json` の再生成を省き、追跡済みの表を使った)、`build_flpy_static.sh` (rc 0)。素材は `fl-win64.tar.zst` から PE (`block00031_PE.bin`) と DATA 4 件 (`block25159`・`block24429`・`block24430`・`block24618`) を `$RUNNER_TEMP/fl-win64/extracted` に展開 (`tar --zstd -xf ... extracted/...`) し、`FL_WIN64_DIR` を向けて `fetch_inputs.sh` で `work/` を作った。`[EMSDK]` (emcc 6.0.12)。`dist/`・`work/` は gitignore。ビルド後も `git status` は差分 0。
+測定は `6e763df4` の内容で行った。環境: runner 4 core。テスト群の直後 (00:08 UTC) の load average は 2.65 / 2.03 / 0.98 (`uptime`)。
 
-| コマンド | 結果 | wall |
-|---|---|---|
-| `node tests/provider_check.mjs` | PASS (435 / 実装 133 / 未実装 302 / MCP 静的 60) | 383 ms |
-| `node tests/ui_state_diff.mjs` | calls 33、diffs 0、PASS | 47 ms |
-| `node tests/general_diff.mjs` | calls 32、diffs 0、PASS | 50 ms |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 51 ms |
-| `node tests/channels_diff.mjs` | calls 170、diffs 0、PASS | 54 ms |
-| `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS | 53 ms |
-| `node tests/screen_diff.mjs` | calls 32、diffs 0、PASS | 54 ms |
-| `node tests/arrangement_diff.mjs` | calls 25、diffs 0、PASS | 49 ms |
-| `node tests/arrangement_selection_diff.mjs` | calls 8、diffs 0、PASS | 49 ms |
-| `node tests/ui_display_diff.mjs` | ok_calls 12・bad_calls 11、diffs 0、PASS | 48 ms |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2278 ms |
-| `node tests/static_check.mjs` | STATIC CHECK OK (flpy_static) | 440 ms |
-| `node tests/fulltext_parity.mjs` | FULLTEXT PARITY OK | 6381 ms |
+再ビルド: この worktree で新規に実行した。`provider/build.sh` (rc 0、emcc 6.0.12、handlers 140)、`build_cpython_wasm.sh` (rc 0、4 分 05 秒)、`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.1 秒)、`build_flpy_static.sh` (rc 0、6.6 秒)。素材は `fl-win64.tar.zst` の PE (`extracted/block00031_PE.bin`) と DATA 4 件 (`block25159`・`block24429`・`block24430`・`block24618`) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64/extracted` に展開し、`fetch_inputs.sh` で `work/` を作った。`[EMSDK]` (emcc 6.0.12) を使用。`dist/`・`work/` は gitignore。ビルド後も `git status` は差分 0。
 
-同じ mock を読む `device_diff` (calls 8・rejects 4・midi_out 5・diffs 0)・`ilmcp_diff` (calls 32・state_checks 9・diffs 0)・`midi_path_diff` (cases 30・diffs 0)・`transport_diff` (calls 7・diffs 0)・`midi_bundled_device` (checks 9・failed 0)・`midi_script` (checks 29・failed 0) も rc 0 で PASS (wall 50・61・50・49・369・853 ms)。
+| コマンド | 結果 | rc | wall |
+|---|---|---|---|
+| `node tests/provider_check.mjs` | PASS (435 / 実装 140 / 未実装 295 / MCP 静的 60) | 0 | 367 ms |
+| `node tests/ui_state_diff.mjs` | calls 33、diffs 0、PASS | 0 | 51 ms |
+| `node tests/general_diff.mjs` | calls 41、diffs 0、PASS | 0 | 57 ms |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0 | 55 ms |
+| `node tests/channels_diff.mjs` | calls 170、diffs 0、PASS | 0 | 54 ms |
+| `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS | 0 | 53 ms |
+| `node tests/screen_diff.mjs` | calls 32、diffs 0、PASS | 0 | 52 ms |
+| `node tests/arrangement_diff.mjs` | calls 25、diffs 0、PASS | 0 | 54 ms |
+| `node tests/arrangement_selection_diff.mjs` | calls 8、diffs 0、PASS | 0 | 54 ms |
+| `node tests/ui_display_diff.mjs` | ok_calls 12・bad_calls 11、diffs 0、PASS | 0 | 51 ms |
+| `node tests/playlist_diff.mjs` | calls 23、diffs 0、mock_state_steps 8、PASS | 0 | 52 ms |
+| `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5、diffs 0、PASS | 0 | 53 ms |
+| `node tests/ilmcp_diff.mjs` | calls 32・state_checks 9、diffs 0、PASS | 0 | 59 ms |
+| `node tests/midi_path_diff.mjs` | cases 30、diffs 0、PASS | 0 | 98 ms |
+| `node tests/transport_diff.mjs` | calls 7、diffs 0、PASS | 0 | 48 ms |
+| `node tests/midi_bundled_device.mjs` | checks 9、failed 0、MIDI BUNDLED OK | 0 | 364 ms |
+| `node tests/midi_script.mjs` | checks 29、failed 0、MIDI SCRIPT OK | 0 | 826 ms |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 0 | 1651 ms |
+| `node tests/static_check.mjs` | STATIC CHECK OK | 0 | 407 ms |
+| `node tests/fulltext_parity.mjs` | FULLTEXT PARITY OK | 0 | 5341 ms |
 
-ネガティブコントロール: 本 commit では再測定していない (`db86f35b` の測定で、`uiClosing` を `true` にすると `ui_state_diff.mjs` が rc 1 で FAIL することを確認済み。既定値は `false` のまま)。
+ネガティブコントロール: `6e763df4` で再測定した。追跡ファイルは変えず、`host/fl_mock.mjs` の `uiClosing` を `true` にした一時コピー (`$RUNNER_TEMP/negctl`) で `tests/ui_state_diff.mjs` を実行 → rc 1。`AssertionError: ui 状態ゲッター差分 1 件` (`ui.isClosing`: mock `ok: true`・C `ok: false`)。既定値は `false` のまま。
 
-C の警告: `gcc -fsyntax-only -Wall -Wextra -I provider provider/fl_engine.c` は 3 件。`origin/main` (`80fb2fd0`) と PR 取り込み前の `e9fcf0bb` の同じファイルも 3 件で同数のため、本 PR が増やした警告は 0 件。
+C の警告: `gcc -fsyntax-only -Wall -Wextra -I provider provider/fl_engine.c` は 3 件 (いずれも既存の `unused variable 'k'`、head は `fl_engine.c:98:83`)。`origin/main` (`a9733bbb`) の同じファイルも 3 件 (`96:83`) で同数のため、本 PR が増やした警告は 0 件。
 
-コード差分 (測定 commit から本 REPORT 更新 commit まで、`tools/python` の .md 以外): `git diff ef060433 HEAD -- tools/python ':!*.md'` の出力は 0 行。
+コード差分 (測定 commit から本 REPORT 更新 commit まで、`tools/python` の .md 以外): `git diff 6e763df4 HEAD -- tools/python ':!*.md'` の出力は 0 行。
 
 ## 5. 保留 (残り 48 件・子 issue へ)
 
@@ -100,4 +107,4 @@ PE の handler VA だけを記録した。引数の意味・戻り値の範囲�
 | `isClosing`・`isMetronomeEnabled`・`isPrecountEnabled`・`isStartOnInputEnabled`・`isLoopRecEnabled` の setter が無い | 読み書きの対応を確かめられず、値は仮置きのまま | 起票なし (未解決の追跡のみ)。どの open 子 issue にも入っていない |
 | 状態 slot の意味 (`0x15e1890`・`0x15e1e40`・`0x15e4ea0`・`0x15e2eb8`・`0x15e4b10`・`0x15e41f8`) | setter 実装時に読み書きの対応を確かめる必要 | `0x15e1e40`・`0x15e2eb8`・`0x15e4b10` は #3007、`0x15e41f8` は #3006。`0x15e1890`・`0x15e4ea0` は起票先なし |
 | 変換 slot `0x15e4280` の先の関数 (bool と int の区別) | 戻り型は stub に従った | 起票なし (PY-87 からの持越し。PE の同定作業のみ) |
-| 残り 48 件 (未実装 302 件のうち ui) | ui の未実装が 48 件残る | #3005 (4)・#3006 (4)・#3007 (4)・#3012 (3)・#3013 (3)・#3014 (3)・#3034/#3035 (旧 #2981 の 27 件) |
+| 残り 48 件 (未実装 295 件のうち ui) | ui の未実装が 48 件残る | #3005 (4)・#3006 (4)・#3007 (4)・#3012 (3)・#3013 (3)・#3014 (3)・#3034/#3035 (旧 #2981 の 27 件) |
