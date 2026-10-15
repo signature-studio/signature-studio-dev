@@ -14,12 +14,24 @@ T0=$(date +%s)
 echo "load: $(cut -d' ' -f1-3 /proc/loadavg)  nproc: $(nproc)"
 mkdir -p work/boot
 source "$QFC/qfc_lift.sh"
+# boot 専用の設定 (e2e の entries・assert は変えない): longjmp (0x40f9c0) を qfc_ov_longjmp に置換し、
+# その戻り先 0x59c210 (DllMain の setjmp 呼出しの戻り番地) を root に加える (FLEngine の 0x1376840 断片と同型)。
+QFC_BOOT_LONGJMP_RET=0x59c210
+python3 - "$QFC_PE" work/boot/entries_boot.json <<'PY'
+import json, subprocess, sys
+pe, out = sys.argv[1], sys.argv[2]
+subprocess.check_call([sys.executable, 'gen_entries.py', pe, out + '.base'], stdout=subprocess.DEVNULL)
+d = json.load(open(out + '.base'))
+d['roots'] = sorted(set(d['roots']) | {0x59c210})
+json.dump(d, open(out, 'w'))
+PY
+export QFC_ENTRIES="$QFC/work/boot/entries_boot.json" QFC_OVERRIDE="0x40f9c0=qfc_ov_longjmp" QFC_EXTRA_C="$QFC/qfc_ov.c"
 if [ ! -f work/boot/lift/lift_meta.json ] || [ -n "${QFC_BOOT_REBUILD:-}" ]; then
   echo "== lift + wasm build =="
   lift_build "$QFC/work/boot/lift" ""
 fi
 python3 gen_soft_imp.py work/boot/lift/lift_meta.json ../flelift/rt work/boot/lift/soft_imp.c qfc_imp.c
-wasm_build "$QFC/work/boot/lift" "$QFC/work/boot/lift/qfcl_soft.cjs" "$QFC/work/boot/lift/soft_imp.c" "$QFC/qfc_imp.c"
+wasm_build "$QFC/work/boot/lift" "$QFC/work/boot/lift/qfcl_soft.cjs" "$QFC/work/boot/lift/soft_imp.c" "$QFC/qfc_imp.c" "$QFC/qfc_ov.c"
 echo "== boot strict (実装済み import のみ) =="
 rc_strict=0
 QFC_CJS="$QFC/work/boot/lift/qfcl.cjs" QFC_OUT="$QFC/work/boot/boot_strict.json" node "$QFC/qfc_boot.mjs" || rc_strict=$?

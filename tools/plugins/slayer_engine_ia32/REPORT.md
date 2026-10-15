@@ -221,6 +221,7 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 ### 9.6 `mov r,[X+8]` → `[r+idx*4]` の形による events[] 候補の列挙 (#894 受入 1 の追加調査・未達)
 
 - 結論 1 行: 候補 5 件はいずれも `events[i]` 読取と判定できず、受入 1 は未達のまま (表・再現・所要・鮮度証跡は [REPORT_APPENDIX_894.md](REPORT_APPENDIX_894.md) §9.6)。
+- 後続 (#3880): 到達解析で読取関数を特定 (`0x10008FA0`・経路は派生 dispatcher `0x10001BF0` の case 25)。 静的のみ・動的未確認。 全文は [REPORT_APPENDIX_3880.md](REPORT_APPENDIX_3880.md)。
 
 ## 10. emcc -c の再測定 (#674 受入 1 の入口, main `5a45be80`)
 

@@ -17,6 +17,7 @@ uint64_t ott_xrip;
 void (*fle_ff_hook)(const char* kind, uint64_t a) = 0;
 /* FLE-2 boot: ott_dispatch probe (未設定 = 何もしない) */
 void (*fle_dispatch_probe)(uint64_t t) = 0;
+uint64_t (*fle_gpa_hook)(uint64_t h, uint64_t nm) = 0;
 
 #define FLE_FF(kind, a) do { if (fle_ff_hook) { fle_ff_hook((kind), (uint64_t)(a)); } } while (0)
 
@@ -191,7 +192,7 @@ void imp_TryEnterCriticalSection(void) { R[RAX] = 1; IMP_RET(); }
 void imp_LoadLibraryExW(void) { R[RAX] = 0; IMP_RET(); }
 void imp_LoadLibraryW(void) { R[RAX] = 0; IMP_RET(); }
 void imp_GetModuleHandleW(void) { R[RAX] = 0x3000; IMP_RET(); }
-void imp_GetProcAddress(void) { R[RAX] = 0; IMP_RET(); }
+void imp_GetProcAddress(void) { R[RAX] = fle_gpa_hook ? fle_gpa_hook(R[RCX], R[RDX]) : 0; IMP_RET(); }
 void imp_FreeLibrary(void) { R[RAX] = 1; IMP_RET(); }
 void imp_GetSystemTimeAsFileTime(void) { ST64(R[RCX], 0); IMP_RET(); }
 void imp_GetSystemInfo(void) { memset((void*)A_(R[RCX]), 0, 40); ST32(R[RCX] + 0x18, 16); ST32(R[RCX] + 0x1c, 4096); IMP_RET(); } /* dwNumberOfProcessors=16, pageSize */
