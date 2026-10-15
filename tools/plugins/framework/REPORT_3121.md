@@ -138,7 +138,7 @@ FL_WIN64_DIR=$D bash tools/plugins/framework/fw_lift.sh                 # 10 分
 python3 tools/plugins/framework/fw_blk_fold_map.py $RUNNER_TEMP/old_fw6.ll tools/plugins/work/fw/fw[0-7].restored.ll --csv $RUNNER_TEMP/fold.csv
 ```
 
-- 素材 (PR 本文の `oc_artifacts:` 行): `fl-win64 toolchain-retdec toolchain-emsdk work-fw-stage1 work-liftlib`。`toolchain-retdec` は `/opt/retdec` (`[RETDEC]`) に展開される。
+- 素材 (PR 本文の `oc_artifacts:` 行): `fl-win64 toolchain-retdec toolchain-emsdk work-fw-stage1 work-liftlib`。`toolchain-retdec` は `[RETDEC]` に展開される (`docs/REFERENCES.md` §4)。
 - §5 は `git archive <commit> tools/icall | tar -x -C <dir>` で版を取り出し、`F.ranges` を複写して `icall_rewrite.py` を同じ引数で実行し、`section +N B` を読む。区間の commit 数は `git rev-list --first-parent --count A..B -- tools/icall`。
 
 ## 9. コード差分 (測定 commit 以降)
