@@ -104,7 +104,59 @@ ERR_BARE 14 件 (deref VA → call VA。`judge_copy_3382.py` の出力): 0x12802
 - 判定の総数 (ERR_CAND 57・UNCLEAR 16・MISMATCH 14・OK_ARGK 2 と、保留 0x78890f) は未判定のまま。子 #4961 [CI-200] に移す。
 - 0x78890f: `show_site_2555.py` の call VA に deref VA を渡すと IR の呼出しが見つからない (call VA は 0x788912)。0x78890f は deref 位置であって呼出し位置ではないため、判定は子 #4961 で行う。
 
-## 9. ERR_CAND 57 件の窓による人手判定 (#4972 / CI-201)
+## 9. rewrite_va の argpos 補正 (#4982 / CI-204)
+
+§3 の「判定器の欠陥」を直した。`rewrite_va` を持つ行は `deref_reg` の argpos ではなく、deref から call までの `mov` 複写で値を運んだ先の引数レジスタの argpos で判定する (`rewrite_argpos`)。値が引数レジスタへ届かない行は `REWRITE_NOARG` (判定不能)。あわせて `closure()` が reg2mem の枠 (alloca への store → load) を追うようにした (0x43adf0 の `%rsi.0.reg2mem` 経由で `%arg3` に届く形)。
+
+- 測定 commit (全件の出力): `f343fa38b`。判定器の差分は `f343fa38b` と `e4ad763c1` の間で 0 行。
+- 本 commit の判定器変更 (`rewrite_argpos` が deref→call の間の call で caller-saved を落とす) は、`rewrite` 行でしか通らない。全件の再測定は未実施 (`work-m11` が無いため)。代わりに、rewrite 行 6 件 (下表の 0x1280250・0x1280380・0x439f90・0x43adf0・0x44b380・0x8e5f80) について、旧・新の `rewrite_argpos` の戻り値が同じことと、その区間に call が無いことを PE の逆アセンブルで実測した。
+- 素材: §1 と同じ (`block00031_PE.bin`・`boot_final3.ll`)。scan は §1 の `scan_spill_deref_3328.py` の出力をそのまま使う (scan 側は未変更)。
+- 再現: `python3 tools/m11/ldfix/judge_copy_3382.py tools/m11/work/boot_final3.ll --pe <PE> --scan <json> --out <json>` → `ERR_BARE 14 / UNCLEAR 14 / REWRITE_NOARG 5 / ERR_CAND 47 / MISMATCH 13 / OK_ARGK 10` (0.39 s・load average 0.16 / 0.27 / 0.15)。
+- 補正前: `ERR_BARE 14 / ERR_CAND 57 / UNCLEAR 16 / MISMATCH 14 / OK_ARGK 2`。
+
+### 変わった行 (14 件・旧→新)
+
+| 関数 | deref → call | callee | rewrite_va | 旧 argpos/判定 | 新 argpos/判定 | 変化の原因 |
+|---|---|---|---|---|---|---|
+| 0x1280250 | 0x12802a6 → 0x12802ba | 0x823c30 | あり | 1 / UNCLEAR | - / REWRITE_NOARG | argpos (届かない) |
+| 0x1280380 | 0x12803f5 → 0x128040f | 0x660a00 | あり | 1 / ERR_CAND | - / REWRITE_NOARG | argpos (届かない) |
+| 0x414370 | 0x4143b3 → 0x4143c2 | 0x409c80 | なし | 1 / ERR_CAND | 1 / OK_ARGK | closure |
+| 0x416db0 | 0x416e3e → 0x416e41 | 0x413540 | なし | 2 / ERR_CAND | 2 / OK_ARGK | closure |
+| 0x439f90 | 0x43a0e7 → 0x43a0fa | 0x409c80 | あり | 3 / MISMATCH | - / REWRITE_NOARG | argpos (届かない) |
+| 0x43adf0 | 0x43ae29 → 0x43ae32 | 0x4399e0 | あり | 1 / ERR_CAND | 2 / OK_ARGK | argpos (1→2) と closure (reg2mem)。IR 無しで分離できず |
+| 0x44b380 | 0x44b392 → 0x44b3a2 | 0x44b2b0 | あり | 1 / UNCLEAR | - / REWRITE_NOARG | argpos (届かない) |
+| 0x44fa30 | 0x44fa61 → 0x44fa6c | 0x44f110 | なし | 2 / ERR_CAND | 2 / OK_ARGK | closure |
+| 0x44fab0 | 0x44fadf → 0x44fafd | 0x44fb40 | なし | 2 / ERR_CAND | 2 / OK_ARGK | closure |
+| 0x65e3c0 | 0x65e3e5 → 0x65e3e8 | 0x414e70 | なし | 2 / ERR_CAND | 2 / OK_ARGK | closure |
+| 0x79da80 | 0x79dac3 → 0x79dac6 | 0x40faa0 | なし | 1 / ERR_CAND | 1 / OK_ARGK | closure |
+| 0x8e5f80 | 0x8e6001 → 0x8e600d | 0x414890 | あり | 2 / OK_ARGK | - / REWRITE_NOARG | argpos (届かない) |
+| 0x9635d0 | 0x963650 → 0x963660 | 0x9648f0 | なし | 2 / ERR_CAND | 2 / OK_ARGK | closure |
+| 0xf552a0 | 0xf55399 → 0xf5539c | 0x12df760 | なし | 1 / ERR_CAND | 1 / OK_ARGK | closure |
+
+- 原因の読み方: `rewrite_va` なしの行は argpos を使わないので、変化は `closure()` の reg2mem 追跡だけによる (8 件)。`rewrite_va` ありの行は argpos の補正が効く (6 件)。0x43adf0 だけは両方が効いている。
+- `REWRITE_NOARG` 判定は閉包を見る前に返るので、closure の変更は影響しない。
+
+### 窓との照合
+
+窓で確認したのは 2 件だけ (#4973 の窓の記録 2026-10-15T13:44Z と、本 run での確認)。
+
+- **窓で確認: 0x43adf0 → OK_ARGK (argpos 2)**: `mov rcx,[rsi]` (0x43ae29) → `mov rdx,rcx` (0x43ae2c) → `mov rcx,rax` (0x43ae2f) で、値は argpos 2 に届く。IR は `%15 = load(%14)`・`%14 = inttoptr %rsi.0.reload`・`%rsi.0.reload` は `store %arg3` の reg2mem 枠で、`%arg3` 由来の load として閉包に入る。値の一致そのものは未確定。
+- **窓で確認: 0x439f90 → REWRITE_NOARG**: 0x43a0e7 の `mov r8,[rbx]` の後、0x43a0ea〜0x43a0f7 で `sub/sar/adc/add` により r8 が計算値になり、その値を 0x43a0fa で渡す。`*argK` そのものではない。窓の「判定不能」と整合する。
+
+逆アセンブルのみ (窓は未確認。値が call へ届かない読みは PE の命令列から出したもの):
+
+- **0x8e5f80 OK_ARGK → REWRITE_NOARG**: 0x8e6001 の `mov rdx,[rbx]` の後、0x8e6007 の `movzx rdx, word ptr [...]` で rdx が上書きされ、0x8e600d の call では逆アセンブル上 rdx に deref の値が届かない。補正前の OK_ARGK は、逆アセンブル上は値が届かないため、一次分類として当てにならない。
+- **0x44b380 UNCLEAR → REWRITE_NOARG**: 0x44b392 の deref 値は 0x44b39d で rcx を再ロードして上書きされ、0x44b3a0 の `mov edx,eax` は別の値。逆アセンブル上は届かない。
+- **0x1280250・0x1280380 → REWRITE_NOARG**: 0x12802b5・0x12803f8 の rewrite で値が計算に入る形。逆アセンブル上は届かない。
+
+変わった 14 件のうち、窓で確認したのは 0x43adf0 と 0x439f90 の 2 件だけ。残る 12 件 (上記 4 件の逆アセンブル読みと、ERR_CAND→OK_ARGK の 8 件 (0x414370・0x416db0・0x44fa30・0x44fab0・0x65e3c0・0x79da80・0x9635d0・0xf552a0)) は窓の判定が未了。OK_ARGK は閉包判定の一次分類であり、一致の確定ではない。
+
+### 数の読み方
+
+- 補正後の `OK_ARGK 10` は、閉包が arg と load を含むという一次分類。窓で確認したのは 0x43adf0 の 1 件だけ。
+- `REWRITE_NOARG 5` は判定不能。誤りとも正しいとも決めない。窓で確認したのは 0x439f90 の 1 件だけ。
+- MISMATCH 13 件 (補正前 14) は、0x439f90 の 1 件が REWRITE_NOARG に移った分。区分 A・B・C の内訳は #4973 の記録の通り。
+## 10. ERR_CAND 57 件の窓による人手判定 (#4972 / CI-201)
 
 - 対象: `judge_copy_3382.py` の ERR_CAND 57 件 (定義閉包に `%argK` が無い)。全 57 件の窓 (`show_site_2555.py --before 6`) を読んだ。
 - 結果: **誤り 0 / 正常な参照 2 / 判定不能 55** (判定不能 = 定数・定数式 18 + 別式 37)。誤りと断定できた件は無い。
