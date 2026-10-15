@@ -459,10 +459,14 @@ static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, 
      * 実測 (CAB-233): (1) INVALID_HANDLE_VALUE (-1) にすると entry が unit 159 の別地点 (0x2690dc) に落ち
      * 906/942 に後退、(2) CreateFileW 仮ハンドル (0x65000001) + ReadFile 失敗 (0) でも unit 830/895/898 の
      * .moe loader (rip 0x4e0fab) は救えない (= ReadFile が実バイトを返せないのが根源)。
-     * (3) 実カタログ供給実験 (win64extracted/block25158_DATA.bin = gettext .mo 先頭 magic 0x950412de, 47,405B を
-     *     CreateFileW→仮 handle + ReadFile で読ませる): magic check (0x4e1a3c) は通るが、catalog iteration loop
-     *     (0x513da9 の VMT 仮想 call Get(i)) から rbp ごと破壊されて戻る (rbp=0x7fff00000000, rdx=.mo の host バッファ)
-     *     → unit 830/895/898 は embodiment 深层の stub ギャップが残る。0 応答で 928/942 が最良。
+     * (3) 旧実験 (実カタログ供給。revert 済みで commit に残らない記録): win64extracted/block25158_DATA.bin (gettext .mo 先頭
+     *     magic 0x950412de, 47,405B) を CreateFileW→仮 handle + ReadFile で読ませた。magic check (0x4e1a3c) は通るが、catalog
+     *     iteration loop (rva 0x513da9 = call *0x18(%rdi)・VMT 仮想 call Get(i)) から rbp ごと破壊されて戻ったとの記録がある
+     *     (rbp=0x7fff00000000)。旧応答の詳細 (SetFilePointer 等) は残っていない。
+     *     → unit 830/895/898 は embodiment 深層の stub ギャップが残る。0 応答で 928/942 が最良。
+     *     WIN-9 (#2760) の LD_CATALOG_MO 分岐 (ld_cat_on) は別の応答 (GetFileAttributesW=0x80・SetFilePointer の size 応答) で
+     *     同じ .mo を供給し、magic 検査の後の範囲検査 (rva 0x17bcd) まで進む。新しい応答で 0x513da9 の rbp 破壊が起きるかは未確認
+     *     (tools/liftdiff/REPORT_WIN7_2718.md §5.3)。
      * 真正ファイル I/O 接続 (System/Languages/LC_MESSAGES/default.moe = block25158) は下流タスクへ。 */
   }
   if (ld_streq(n, "VirtualAlloc")) { if (a0) return a0; return ld_heap_alloc((u32)a1 ? (a1 & 0xffffffffull) : 0x1000, 0x10000, 1); }

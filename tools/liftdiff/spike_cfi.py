@@ -6,6 +6,7 @@
   2. CreateFruityInstance(0xC0, 0xEDE95A, host, &iface) を CASE で 1 回呼ぶ
   3. 戻り値・iface・case の status/detail・呼出し import 列を採る
 出力: work/flelift/spike_cfi.json。既存の bootstate (mode=hybrid) の挙動は変えない (post フックは既定 None)。
+LD_CATALOG_MO 指定時の出力は work/flelift/spike_cfi_cat.json (実カタログ供給の実験・WIN-9 #2760)。
 使い方: python3 spike_cfi.py [targets/flelift.json]   (素材: work-liftdiff・work-m11・fl-win64 / FL_WIN64_DIR)
 """
 import json, os, re, struct, subprocess, sys
