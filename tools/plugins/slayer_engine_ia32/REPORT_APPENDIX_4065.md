@@ -35,9 +35,10 @@
 - `1000b6c1` が読む絶対アドレス `A_(0x10024d50)` の値は未確認。
 - issue 本文が指す `REPORT_APPENDIX_3715.md` は main にも全履歴にも無い。 12 本の一覧の根拠は確認できなかった。
 
-## 3. 検証 (測定 commit 6bd7bd91f・検証 HEAD 6bd7bd91f)
+## 3. 検証 (測定 commit 6bd7bd91f)
 
 測定 commit は `6bd7bd91f` (main `17a3d0796` 取り込み後の head・競合解消 merge)。本節の値はすべてこの commit で測った。
+本節を書いた付録 commit 以降の HEAD との差分は付録 (`REPORT_APPENDIX_4065.md`) のみで、コード差分は 0 (PR 本文の検証 HEAD と差分を参照)。
 harness (`x87_fn_diff.py`) は main 由来の `--classify` 追加 (52 行) を含む版で、PASS・`--nega`・`--nega-lower` もこの版で測った。
 `git diff 32151b62a 6bd7bd91f -- tools/plugins/slayer_engine_ia32/x87_fn_native.c` は空 (exit 7・8 の経路は `32151b62a` に既に入っている)。
 素材は `$RUNNER_TEMP/fl-win64` (fl-win64 の `extracted/block22434_PE.bin`)、emcc は `$RUNNER_TEMP/emsdk-root` (toolchain-emsdk 展開の 6.0.12)。load は各試験の開始時の load1。
