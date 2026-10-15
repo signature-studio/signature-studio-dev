@@ -7,7 +7,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ART="${ARTIFACTS_DIR:-$HOME/artifacts}"
 W="$(git rev-parse --show-toplevel)/work/qfc-table"
-WINE="${WINE_BIN:-/usr/lib/wine/wine64}"
+WINE="${WINE_BIN:-$(dpkg -L wine64 2>/dev/null | grep -m1 '/wine64$')}"
 PROBE_TIMEOUT="${PROBE_TIMEOUT:-120}"
 STUB_RVA=0x1a9100
 mkdir -p "$W/extracted"
