@@ -11,7 +11,7 @@
 - 測定 commit: `52d2a6d29` (`fix(serum2): keep canvas bitmap alive in draw_ops stretch harness (#4551)`)。前回の `201b10a2f` は harness が解放済みポインタを返して二重 delete していたため、測定の根拠にしない (round 1 blocking 1)。この付録を含む commit は REPORT のみ。
 - 前提の素材と取得経路:
   - `toolchain-emsdk` 素材は `$ARTIFACTS_DIR` に無かった (`fl-win64` のみ)。runner にも `/opt/emsdk` は無い。そこで上流 emsdk を `git clone --depth 1` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12` で `work/emsdk` に導入した (emcc 6.0.12)。install 所要は clone 込みで計測対象外。
-  - 導入後、`work/emsdk/upstream/emscripten/.emscripten` が無く em++ が `BINARYEN_ROOT` 不明で失敗したため、`EM_CONFIG=work/emsdk/.emscripten` と `PATH=work/emsdk/upstream/bin` を与えて実行した (`check_draw_ops.sh` の PATH 設定だけでは足りない)。
+  - 導入後、`work/emsdk/upstream/emscripten/.emscripten` が無く em++ が `BINARYEN_ROOT` 不明で失敗したため、`EM_CONFIG` を emsdk ルートの `.emscripten` に、`PATH` に `upstream/bin` を与えて実行した (`check_draw_ops.sh` の PATH 設定だけでは足りない)。
   - `work/vstgui4` (vstgui4_14_3・commit `b1e82355`): `https://github.com/steinbergmedia/vstgui.git` を `git clone --filter=blob:none --no-checkout` し、`git checkout vstgui4_14_3`。
   - `fl-win64` は本 run の検証では使わない (canvas の検証は vstgui の lib と canvas 層のみ)。
 
