@@ -13,7 +13,7 @@
 
 ## 0. 対象と前提
 
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` から `extracted/block00031_PE.bin` (22,227,016 B) を `$RUNNER_TEMP/fl-win64` に展開 (数秒)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` から `extracted/block00031_PE.bin` (22,227,016 B) を `$RUNNER_TEMP/fl-win64` に展開 (数秒)。
 - VA は ImageBase `0x400000` 基準。`0x15e26a0` は `.data` (RVA `0x11e26a0`)、`0x193fa10` は `.bss` (RVA `0x153fa10`)。
 - 検証: `analysis/flapi/pe_py198_probe.py` (14 件 PASS、終了 0)。逆アセ: `pe_disasm.py`・`pe_callgraph.py around/callers`・`pe_rip_refs.py`。
 
@@ -60,7 +60,7 @@
 
 ## 4. 検証
 
-- `FL_WIN64_DIR=/home/runner/work/_temp/fl-win64 python3 tools/python/analysis/flapi/pe_py198_probe.py` → 14/14 PASS、終了 0。
+- `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py198_probe.py` → 14/14 PASS、終了 0。
 - 測定 commit: probe を入れたコミット (本 REPORT より前)。以降のコード差分は下記で確認。
 
 ## 5. 未解決 (起票先)
