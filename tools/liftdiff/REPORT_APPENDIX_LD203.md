@@ -35,9 +35,9 @@
 ## 4. 検証
 
 - 単体: `tests/test_ld203_slot_fill.py` PASS。規則 (`PATCH_BY_VA`) を `""` に変えると rc=1 (ネガコン)。`tests/test_ld52_machine_sig.py` 等の既存テストも `liftdiff_e2e.sh` の [0/4] で PASS。
-- e2e (`liftdiff_e2e.sh --m11-only`): **未実行 (素材 `work-m11` 待ち)。** 実測値 (wall・load) は無い。過去の run の値は、同じ run と確定できないため採用しない。
-- 再測定を試みた結果: 取得済みの素材は `fl-win64` のみ。`work-m11` が無いため、`liftdiff_e2e.sh` は [0/4] の単体テスト (`test_compare_ld11` / `test_ld52_machine_sig` / `test_ld179_tagpoint_tr` / `test_ld203_slot_fill`) の後、`missing input: ../m11/work/boot_final3.ll` で止まる。e2e の [1/4] 以降は未実行。
-- 単体: 上記 4 件は PASS (rc=0)。
-- 測定 commit: `acf54ba0e` (コード変更の最後の commit)。
-- 検証 HEAD `457ee8cc3` (main 取り込み merge)。`git diff acf54ba0e HEAD -- tools/liftdiff ':!tools/liftdiff/REPORT_APPENDIX_LD203.md'` の出力: 161 行。内訳は main 側の変更 (`ldlib/pe.py` +9、`ldlib/session.py` +26/-、`REPORT.md` 1 行、`REPORT_APPENDIX_LD177.md` +67)。本 PR のコード差分は 0。
-- 測定 commit 以降に `tools/liftdiff/ldlib` のコードが変わった (main 由来、`git diff acf54ba0e 7dd604e1d -- tools/liftdiff/ldlib` は 33 行)。`WORKFLOW.md` §6 の免除は差分 0 の場合だけなので、再測定が要る。素材 `work-m11` が無いこの run では実行できず、e2e の [1/4] 以降は未了。PR 本文に `oc_artifacts: fl-win64 work-m11` を入れ、`liftdiff_e2e.sh --m11-only` を完走させて実測値を本節に書く。
+- 測定 HEAD: `ad0ca414b` (main 取り込み merge 後の現 head。この commit のコードで e2e と §3 の判定を実行した)。
+- 素材: `fl-win64` と `work-m11` (`$ARTIFACTS_DIR` 実在を確認して展開)。`work-m11` 展開後、`tools/m11/m11_gen_ir2.sh` で `ir_conditions.json` を作った (rc=0・52s)。`toolchain-emsdk` は素材に無かったため、上流から `emsdk install 6.0.12` (`tools/m1/flags.sh` の pin) で `[EMSDK]` に入れた (`emcc --version` = 6.0.12)。
+- 単体 (`[0/4]`): `test_compare_ld11` / `test_ld52_machine_sig` / `test_ld179_tagpoint_tr` / `test_ld203_slot_fill` は PASS。
+- e2e (`bash tools/liftdiff/liftdiff_e2e.sh --m11-only`、HEAD `ad0ca414b`): `LIFTDIFF_E2E PASS`・rc=0・wall 195s・load average (開始時 0.54 / 終了時 5.16、1 分平均)。[4/4] closure 差分 `sample:800`: 関数 800 のうち 一致 361 / 不一致 232 / 実行不能 207 (batch 112s)。
+- §3 の再確認 (HEAD `ad0ca414b`): `python3 liftdiff.py run targets/m11.json --fn 0x653c80 --args i:0x3,i:0x5,i:0x7` で `verdict=mismatch`、`native=ok wasm=ok`、`calls` は native のみ `?vmslot0` 1 件 (`wasm_len=0`)。§3 の `diff` と同じ判定。`sample:800` の batch には `653c80` が含まれないため、この判定は `run` 単独の結果。
+- コード差分 (測定 commit `acf54ba0e` → 測定 HEAD `ad0ca414b`): `git diff acf54ba0e ad0ca414b -- tools/liftdiff/ldlib` の出力は 78 行 (diff ヘッダ込み。`ldlib/pe.py` +9、`ldlib/session.py` +26/-6。どちらも main 取り込みで入った変更で、`_fvm_cases` の候補判定を含む)。この差分を含む HEAD で e2e と §3 の判定を実行した。本 PR の `tools/liftdiff` 直下の差分 (`REPORT_APPENDIX_LD203.md` を除く) は `git diff acf54ba0e ad0ca414b -- tools/liftdiff ':!tools/liftdiff/REPORT_APPENDIX_LD203.md'` で 161 行。
