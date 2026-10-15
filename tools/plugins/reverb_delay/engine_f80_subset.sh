@@ -12,7 +12,8 @@ B="$1"
 OUT="work/reverb_delay/engine$B${ENGINE_TAG:-}"
 [ -f "$OUT/e.fixcmp.ll" ] || { echo "missing $OUT/e.fixcmp.ll (先に engine_lift.sh を実行)" >&2; exit 2; }
 t0=$(date +%s)
-python3 reverb_delay/engine_f80_stub.py "$OUT/e.fixcmp.ll" "$OUT/e.sub.ll" "$OUT/f80_excluded.tsv" 2> "$OUT/f80_stub.info"
+rm -f "$OUT/e.sub.ll" "$OUT/f80_excluded.tsv"
+python3 reverb_delay/engine_f80_stub.py "$OUT/e.fixcmp.ll" "$OUT/e.sub.ll" "$OUT/f80_excluded.tsv" 2> "$OUT/f80_stub.info" || { echo "engine_f80_stub 失敗: $OUT/f80_stub.info" >&2; exit 2; }
 NEX=$(($(wc -l < "$OUT/f80_excluded.tsv") - 1))
 command -v emcc >/dev/null 2>&1 || source "${EMSDK_ENV:?EMSDK_ENV に emsdk_env.sh を指定する (docs/REFERENCES.md [EMSDK])}" >/dev/null 2>&1
 mkdir -p "$OUT/tmp"

@@ -18,7 +18,10 @@ for chunk in re.split(r'\n(?=define )', src):
             head = lines[0]
             assert head.endswith(' {'), head[:120]
             decl = re.sub(r'^define ', 'declare ', head[:-2]).replace(' dso_local', '')
-            name = re.search(r'@([\w.$]+)\(', decl).group(1)
+            nm = re.search(r'@("[^"]*"|[\w.$]+)\(', decl)
+            if not nm:
+                sys.exit('engine_f80_stub: 関数名を解釈できない: %s' % decl[:120])
+            name = nm.group(1)
             m = re.match(r'function_([0-9a-f]+)$', name)
             va = '0x%s' % m.group(1) if m else 'NA'
             rows.append((name, va))
