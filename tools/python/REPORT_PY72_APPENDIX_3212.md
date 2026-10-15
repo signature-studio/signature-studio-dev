@@ -6,9 +6,9 @@
 
 ### 結論 (最新・第 2 段。詳細は §7)
 
-- 受入 1: O (`[Q+8]`) は `0x125da90` の戻り値。`0x40fb40` が割り当てたヒープ上のオブジェクトで、vptr は PE 上の固定値 `0x125b1c0` (`0x40fb66` の書込み)。O への非 0 書込みは従来どおり 2 箇所 (`0x1263571`・`0x1264145`)。
+- 受入 1: O (`[Q+8]`) は `0x125da90` の戻り値。`0x40fb40` が割り当てたヒープ上のオブジェクトで、vptr は PE 上の固定値 `0x125b1c0` (`0x40fb66` の書込み)。O への非 0 書込みは従来どおり 2 箇所 (`0x1263571`・`0x1264145`)。受入 1 は部分達成 (別名経由の書込みの網羅は未了。§7.4)。
 - 受入 2: vtable `[O+0x98]` の本体は `0x1262b80`。戻り値が偽 (status −2 のまま) になるのは、フラグ A・B・C のいずれかが非 0、または D > 0 のとき (§7.2)。A〜D の値は .bss/.data の実行時状態。
-- 受入 3: 間接先 `*(0x16b8300)` は `0x4235f0` の戻り値で、`[0x1971600]` (.idata の関数ポインタスロット) 経由。X = `[this+0x50]` の this も同じ経路の戻り値。PE だけでは決まらず、実行時にしか決まらない (§7.3)。
+- 受入 3: 間接先 `*(0x16b8300)` は `GetProcAddress(hmod, "PyModule_GetState")` の戻り値。`[0x1971600]` = kernel32!GetProcAddress (import directory)、名前は PE 上で確定。hmod (`[0x16b85c8]`) は実行時の DLL 読込みの結果なので、間接先の実体は実行時にしか決まらない。X = `[this+0x50]` の this も同じ経路の戻り値 (§7.3)。
 
 ### 結論 (前段 PR #3290 時点。履歴として残す)
 
@@ -58,8 +58,8 @@
 ### 5. `0xd5e620` の間接先と `this`
 
 - `0xd5e620(self)`: `mov rax,[0x15e05b8]` (`0xd5e624`)・`call [rax]` (`0xd5e62b`)。rcx (self) は素通し。`[0x15e05b8]` のファイル値は `0x16b8300` (.bss)。間接先は `*(0x16b8300)`。
-- `0x16b8300` への RIP 相対 store は `0xc39831` の 1 件 (`mov [rip+0xa7eac8], rax`)。rax は直前 `0xc3982c` の `call 0x4235f0` (rcx = `[rip+0xa7edbd]` (`0xc39804`)、rdx = `lea 0xc8c` = `0xc404b8`)。init は `0xc395a0` (`pe_callgraph func`)。
-- `0x4235f0` は `rdx>>16` で分岐する表引き (`0x423608`〜`0x423614`)。戻り値は表の内容 (実行時の値) に依存。間接先の確定は実行時に限る (推定)。
+- `0x16b8300` への RIP 相対 store は `0xc39831` の 1 件 (`mov [rip+0xa7eac8], rax`)。rax は直前 `0xc3982c` の `call 0x4235f0` (rcx = `[0x16b85c8]` (`0xc3981e`)、rdx = `0xc3a4b8`)。init は `0xc395a0` (`pe_callgraph func`)。(第 2 段で訂正: 前段の `0xc404b8` は算術の誤り。§7.3)
+- `0x4235f0` は `rdx>>16` で分岐する (`0x423608`〜`0x423614`)。非 0 なら名前引数で `GetProcAddress` を呼ぶ (§7.3)。戻り値は実行時の hmod に依存。
 - `this` は呼出元 `0xd5aa30` の `0xd5e620(self)` 戻り値 `rax` の指す値 (`mov rbx,[rax]`)。
 
 ### 6. `0xd84f30` の判定式 (入力 X = rcx、PE 確定)
@@ -169,22 +169,26 @@ vptr の書込み後に PE 上で到達する書込みの確認: `0x40fb40` は 
 #### 7.3 間接先 `*(0x16b8300)` と判定入力 X (受入 3)
 
 - `0xd5e620(self)`: `mov rax, [0x15e05b8]` (`0xd5e624`) の値は `0x16b8300` (.bss)。`call [rax]` (`0xd5e62b`)。rcx (self) は素通し。間接先 = `*(0x16b8300)`。
-- `0x16b8300` への store は `0xc39831` (`mov [rip+0xa7eac8], rax`) の 1 件。rax は `0xc3982c` の `call 0x4235f0` の戻り値 (rcx は `0xc3981e` の RIP 相対ロード、rdx = `0xc404b8`)。
-- `0x4235f0`: `rdx >> 16` = 0xc4 ≠ 0 のため第 2 分岐 (`0x423629`)。`call 0x4139f0` → `call 0x414000` → `call 0x4235e0(rcx, rax)`。
-- `0x4235e0` は `jmp [0x1971600]`。`0x1971600` は .idata の関数ポインタスロットで、PE 上の値は `0x1573c7c` (.data 内の非テキストのバイト列。名前テーブル (hint + 名前) として読めない)。よって表引きの戻り値 = 間接先は、PE の外 (ローダ・実行時の解決) で決まる。
+- `0x16b8300` への store は `0xc39831` (`mov [rip+0xa7eac8], rax`) の 1 件。rax は `0xc3982c` の `call 0x4235f0` の戻り値。引数は rcx = `[0x16b85c8]` (`0xc3981e` の RIP 相対ロード)、rdx = `0xc3a4b8` (`0xc39825` の `lea`。次の命令 `0xc3982c` + `0xc8c` = `0xc3a4b8`)。
+- `0xc3a4b8` は UTF-16LE の `PyModule_GetState` (`pe_va_read.py` の wstr で確認)。名前引数は PE 上で確定。
+- `0x4235f0`: `rdx >> 16` が 0 なら序数として `0x4235e0(rcx, rdx)` を呼ぶ (`0x42361e`)。非 0 の `0xc3a4b8` は名前側 (`0x423629`): `0x4139f0(&tmp, rdx, 0)` (wchar 列の長さ計算を含む。変換本体は未確認) → `0x414000` (ポインタの取り出し) → `0x4235e0(rcx, ptr)`。
+- `0x4235e0` は `jmp [0x1971600]`。`[0x1971600]` は pefile の import directory で `kernel32.dll!GetProcAddress` (IAT の VA。ImageBase `0x400000` 込み)。IAT のファイル上の値 `0x1573c7c` は RVA で、VA `0x1973c7c` の IMAGE_IMPORT_BY_NAME (hint 2 バイト + `GetProcAddress`、`0x1973c7e` で確認) を指す。`0x1573c7c` を VA として読むと .data の別の値になる (前段の「名前テーブルとして読めない」は誤り)。
+- hmod = `[0x16b85c8]`: PE 上は .bss。書込みは `0xc395ca` (`mov [rip+0xa7eff7], rax`) の非 0 の 1 件と、`0xc3938a` の 0 の 1 件 (`pe_xref.py`)。非 0 の格納元は `0xc395b5` の `call 0x6539e0(rcx = L"Python312" (VA `0xc3a124`), rdx = 0, r8 = L"Python\" (VA `0xc3a144`))` の戻り値。`0x6539e0` の中身 (モジュール読込みの経路) は未確認。
+- よって間接先 = `GetProcAddress(hmod, "PyModule_GetState")` の戻り値。名前は PE で確定し、hmod は実行時の値なので、関数の実体は実行時にしか決まらない。名前は CPython の `PyModule_GetState(PyObject*)` と同じ形と読める (推定。未検証)。
 - X = `[this+0x50]` (`0xd843f0`・`0xd843fc`)。this は `0xd5e620` の戻り値が指す値 (前段 §5)。this が実行時の値なので、X の実体は PE 上では決まらない。X の書込み元 (`0xd843f0` の先) は、this が決まらないため特定の対象にしない。
 
 #### 7.4 未解決 (第 2 段の時点)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 偽条件 A・B・C・D の状態を書く側の確定 (7.2 の候補は未確認) | guard の実行時の真偽 | 起票しない (実行時の状態。PE 静的解析の範囲外) |
-| 7.1 の書込み探索の範囲外 (別名経由の `[Q+8]` 書込み。前段 §2 の制限) | `[Q+8]` の書込みの網羅 | 起票しない (全域の別名解析。PM 判断) |
-| 間接先 `[0x1971600]` の解決先と X の実体 | 実行時の値 | 起票しない (PE 外。実行時の観測が要る) |
+| 偽条件 A・B・C・D の状態を書く側の確定 (7.2 の候補は未確認) | guard の実行時の真偽 | #3212 (本 issue に残す。PE 静的解析の範囲外) |
+| 7.1 の書込み探索の範囲外 (別名経由の `[Q+8]` 書込み。前段 §2 の制限) | `[Q+8]` の書込みの網羅。受入 1 の「間接 store を含む」が部分達成 | #3212 (本 issue に残す) |
+| 間接先の hmod `[0x16b85c8]` (`0x6539e0(L"Python312", …)` の戻り値。格納は `0xc395ca`) と X の実体。確定済み: `[0x1971600]` = kernel32!GetProcAddress、名前 `PyModule_GetState` | `*(0x16b8300)` の実体と X の実行時の値 | #3212 (本 issue に残す。実行時の観測が要る) |
 
 #### 測定 (第 2 段)
 
-- 測定 commit: `e833017d7` (`pe_va_read.py` の追加。以後コードは変更していない)。
+- 測定 commit: `75bac8b5c` (`pe_va_read.py` に UTF-16LE 出力を追加した commit。コードを変えた最後の commit)。前段の probe 追加は `e833017d7`。
 - 展開: 前段と同じ (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin`。22,227,016 B・2.9 秒)。
-- 実測: `FL_WIN64_DIR=$RUNNER_TEMP/fl3212 python3 analysis/flapi/pe_va_read.py <27 VA>` は real 0.033 秒・user 0.022 秒。load average (1 分値) 0.14 → 0.14。出力の値は 7.1〜7.3 の記載と一致。
-- 差分: `git diff e833017d7 HEAD -- tools/python/analysis` の出力は空 (0 行)。
+- 実測: `FL_WIN64_DIR=$RUNNER_TEMP/fl3549 python3 analysis/flapi/pe_va_read.py 0x125b0f8,0x125b1c0,0x125b190,0x125b140,0x13a5c90,0x125b258,0x15e04a8,0x16baff0,0x15e0ff0,0x125b208,0x15e1890,0x13e7628,0x125b220,0x15e30f8,0x15f7190,0x15f72f8,0x16baff1,0x15e05b8,0x16b8300,0x1971600,0x1573c7c,0x1973c7c,0x1973c7e,0x16b85c8,0xc3a4b8,0xc3a124,0xc3a144` (27 VA・§7 の値の一覧) は real 0.036 秒・user 0.022 秒。load average (1 分値) 0.04 → 0.04。出力 27 行。
+- 出力の要点: `0x125b0f8` → `0x125b1c0`、`0x125b258` → `0x1262b80`、`0x15e05b8` → `0x16b8300` (.bss)、`0x1971600` → `0x1573c7c` (RVA)、`0x1973c7e` = `GetProcAddress`、`0xc3a4b8` = `PyModule_GetState`、`0xc3a124` = `Python312`、`0xc3a144` = `Python\`。出力の値は 7.1〜7.3 の記載と一致。
+- 差分: `git diff 75bac8b5c HEAD -- tools/python/analysis` の出力は空 (0 行)。
