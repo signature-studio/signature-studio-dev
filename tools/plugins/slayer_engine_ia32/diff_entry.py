@@ -6,9 +6,11 @@
   python3 diff_entry.py --nega          ネガコン: wasm 側の 1 bit を壊した出力を判定器に通し、FAIL することを確かめる (FAIL 検出で exit 0)
 
 入力: $FL_WIN64_DIR/extracted/block22434_PE.bin (既定 $RUNNER_TEMP/fl-win64)。 出力: work/entry/ (gitignore)。
-入口: ENTRIES 4 本 (下の表)。 各入口は leaf 関数 (import も未 lift の call も無い) で、OBJ 領域への store だけを行う。
-native: native_entry.c (freestanding i386 ELF。 image を VA 0x10000000 に敷設して call)。
-wasm  : lift_text.py の出力 ott_lifted.c + rt/ott_cpu.c + rt32_glue.c を emcc で wasm 化し entry_wasm.mjs で実行。
+入口: ENTRIES 7 本 (下の表)。 leaf 関数 4 本 (#1223: OBJ 領域への store だけ) と、 import を通る 3 本 (#3127: export main の callback 0 経路・
+  tls/heap 系の関数・stdcall の pop を通す関数)。 出力は eax・OBJ 領域 128 B・heap 先頭 64 B (VA 0x10800000)。
+native: native_entry.c (freestanding i386 ELF。 image を VA 0x10000000 に敷設し、 PE import directory から IAT を ia32 model の stub に書き換えて call)。
+wasm  : lift_text.py の出力 ott_lifted.c + rt32_glue.c (ia32 規約の imp_*) + rt/ott_cpu.c を emcc で wasm 化し entry_wasm.mjs で実行。
+        ott_cpu.c の x64 規約の imp_* は --allow-multiple-definition で rt32_glue.c が上書きする。
 """
 import os, random, subprocess, sys, time
 
@@ -29,7 +31,13 @@ ENTRIES = {
     0x10009300: 'thiscall_byte_store',   # mov [ecx+0x15],al (al = a0)
     0x1000d77e: 'ptr_obj_stores',        # mov [a0+0x50],imm32 / mov [a0+0x14],1
     0x10008630: 'ptr_byte_zero',         # mov byte [a1],0
+    0x10007ca0: 'export_main_callback',  # export main: cdecl。 a0 = callback (6 引数で呼ぶ)。 callback が 0 を返す経路のみ (#3127)
+    0x1000e1b7: 'heap_pool_alloc',       # cdecl・引数なし。 HeapAlloc/VirtualAlloc/HeapFree を通る (fs: を使わない。 状態は image の .data に持つ) (#3127)
+    0x1000ea7d: 'stdcall_leave_cs',      # cdecl・a0 = table index (0..63)。 LeaveCriticalSection(table[a0]) を 1 回呼ぶ (stdcall の pop を確認) (#3127)
 }
+# export main の callback 候補 (cdecl・返り値 0 の ret のみの関数)。 stdcall の `ret N` は main の esp 規約と合わないため使わない。
+# 返り値が非 0 の経路 (main が定数 0x8298d8 を host オブジェクトとして f_10009f64 に渡す) は未モデル化のため使わない (REPORT_APPENDIX_3127.md)
+MAIN_CB = [0x10001b10, 0x10001b70]   # xor eax,eax; ret / xor al,al; ret
 
 
 def pe_image():
@@ -45,6 +53,8 @@ def pe_image():
     for s in pe.sections:
         raw = s.get_data()[:s.Misc_VirtualSize or len(s.get_data())]
         img[s.VirtualAddress:s.VirtualAddress + len(raw)] = raw
+    hdr = open(p, 'rb').read(pe.OPTIONAL_HEADER.SizeOfHeaders)
+    img[:len(hdr)] = hdr   # PE ヘッダも VA 0 に敷く (native_entry.c の patch_iat が import directory を読む)
     return bytes(img)
 
 
@@ -59,6 +69,10 @@ def gen_scen(seed, n):
                 a[0] = OBJ
             if kind == 'ptr_byte_zero':
                 a[1] = OBJ + rng.randrange(OBJ_LEN)
+            if kind == 'export_main_callback':
+                a[0] = MAIN_CB[rng.randrange(len(MAIN_CB))]
+            if kind == 'stdcall_leave_cs':
+                a[0] = rng.randrange(64)
             rows.append('%08x %08x %08x %08x %08x %08x %s' % (va, OBJ, a[0], a[1], a[2], a[3], init.hex()))
     return rows
 
@@ -89,7 +103,7 @@ def effect_count(exp_path, scen_rows):
     changed = 0
     for row, line in zip(scen_rows, open(exp_path).read().splitlines()):
         init = row.split()[6]
-        mem = line.split(' mem=')[1]
+        mem = line.split(' mem=')[1].split(' heap=')[0]
         changed += (init != mem)
     return changed
 
@@ -111,7 +125,8 @@ def main():
                        '-o', nat, os.path.join(HERE, 'native_entry.c')], 'native build')
     mjs = os.path.join(WORK, 'wasm_entry.cjs')
     t_wasm_build = run(['emcc', '-O1', '-ffp-contract=off', '-fno-fast-math', '-w', '-I', RT, '-I', HERE,
-                        LIFT, os.path.join(RT, 'ott_cpu.c'), os.path.join(HERE, 'rt32_glue.c'),
+                        os.path.join(HERE, 'rt32_glue.c'), LIFT, os.path.join(RT, 'ott_cpu.c'),
+                        '-Wl,--allow-multiple-definition',   # ott_cpu.c の x64 規約の imp_* を rt32_glue.c (ia32 規約) が先勝ちで上書き
                         '-sENVIRONMENT=node', '-sMODULARIZE=1', '-sEXPORT_NAME=createModule', '-sEXIT_RUNTIME=0',
                         '-sEXPORTED_FUNCTIONS=_ott_call32', '-sEXPORTED_RUNTIME_METHODS=HEAPU8',
                         '-sGLOBAL_BASE=%d' % 0x11000000, '-sSTACK_SIZE=2097152', '-sINITIAL_MEMORY=%d' % 0x14000000,
