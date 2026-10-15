@@ -30,16 +30,22 @@ SEED = 2989
 # va: 入口 VA。 gen: 引数と OBJ 窓の初期値の作り方 (ecx = OBJ)。 どちらも leaf で x87 を含み、import・未 lift の call が無い。
 #   fn_10002ee0: thiscall (ecx = this、float a0、int a1 = 添字 0..15) ret 8。 [ecx+a1*4+0xb0..0x1f4] を読み書きし、ST(0) を残して返る。
 #   fn_10005400: thiscall (ecx = this、float a0..a2) ret 0xc。 fcomp・fnstsw・fdivr を含み、[ecx+0x4fc..0x518] を更新する。 gen が積む a3・a4 (と a5 = 0) は本体が読まない余りの引数。
+#   fn_1000b6c1・fn_1000b936: OBJ 窓を書かず、ebp 相対のスタック (STK_LO..STK_LO+STK_WIN) だけを書く leaf (#4146)。 引数は gen_rows の既定を使う。
+#     どちらも入口で空の ST(0) を読まない (fstp st(0) で捨てるだけ) ので、空スタックの underflow に依らない。
+#   fn_1000b8a2 は TARGETS に入れない (#4146): 入口の fstp TBYTE が空の ST(0) を読み、native は -qNaN 不定値・wasm は 0 を返す (underflow 類型)。
 TARGETS = [
     {'va': 0x10002EE0, 'name': 'fn_10002ee0', 'gen': 'idx_store'},
     {'va': 0x10005400, 'name': 'fn_10005400', 'gen': 'state_update'},
+    {'va': 0x1000B6C1, 'name': 'fn_1000b6c1', 'gen': 'state_update'},
+    {'va': 0x1000B936, 'name': 'fn_1000b936', 'gen': 'state_update'},
     # #3715 (PLG-G2-31): lift 済みの残り leaf x87 関数 (call・間接分岐・未対応命令を含まず、x87 を含む)。
     # 引数の型は関数ごとに分からないので、a0 は float、a1..a5 は 0..15 の整数 (gen 'mixed')。 行数は N_PER_MIXED。
-    # 除外の理由は REPORT_APPENDIX_3715.md §2 (構造不一致・ランナーの異常終了・入口にできない断片・非自明性なしの定数関数)。
+    # 1000b3a2・10001290 は OBJ 窓もスタックも書かず ST(0) だけを返すため、main の非自明性の判定 (effect) を通らず、範囲から外した (REPORT_APPENDIX_3715.md §5)。
     {'va': 0x10005D20, 'name': 'fn_10005d20', 'gen': 'mixed'},
-    {'va': 0x1000B3A2, 'name': 'fn_1000b3a2', 'gen': 'mixed'},
-    {'va': 0x10001290, 'name': 'fn_10001290', 'gen': 'mixed'},
 ]
+# ebp = 0x10F00000 - 0x1000 (x87_fn_native.c・x87_fn_glue.c)。 窓は ebp-0x100 から ebp+0xE0 (旧 ebp 0x10EFFF00 と同じ相対位置)。
+STK_LO = 0x10F00000 - 0x1100
+STK_WIN = 0x1E0
 # #4064: 3 本の測定専用 (X87_PROBE=1 で TARGETS に加える)。 ゲートは通さない: 3 本 (0x10009eb5・0x1000b526 は eax が模型の限界で不一致、0x1000bf60 は ST(0) の NaN・ゼロが不一致)。 付録 §1 を参照。
 PROBE = [
     {'va': 0x10009EB5, 'name': 'fn_10009eb5', 'gen': 'generic'},
@@ -208,7 +214,7 @@ def compare(nat, act, scen, quiet=False):
     ok = True
     agg = {}
     for t in TARGETS:
-        agg[t['name']] = {'rows': 0, 'eq': 0, 'f32_eq': 0, 'eax_bad': 0, 'eax_nan': 0, 'd_bad': 0, 'effect': 0, 'nontrivial': 0,
+        agg[t['name']] = {'rows': 0, 'eq': 0, 'f32_eq': 0, 'eax_bad': 0, 'eax_nan': 0, 'd_bad': 0, 'effect': 0,
                           'st0': {}, 'st0d': {}, 'mem': {}}
     for i, (t, line, init) in enumerate(scen):
         a = agg[t['name']]
@@ -221,26 +227,24 @@ def compare(nat, act, scen, quiet=False):
                 a['eax_bad'] += 1
         if e['d'] != w['d']:
             a['d_bad'] += 1
-        if e['mem'] != init.hex():
+        if e['mem'] != init.hex() or e['stk'] != '00' * STK_WIN:
             a['effect'] += 1
-        if e['mem'] != init.hex() or (e['st0'] != '00000000' and e['st0'] != '80000000'):
-            a['nontrivial'] += 1
         if e == w:
             a['eq'] += 1
-        if e['st0'] == w['st0'] and e['mem'] == w['mem'] and e['eax'] == w['eax']:
+        if e['st0'] == w['st0'] and e['mem'] == w['mem'] and e['stk'] == w['stk'] and e['eax'] == w['eax']:
             a['f32_eq'] += 1
         for key, x, y in (('st0', int(e['st0'], 16), int(w['st0'], 16)),
                           ('st0d', int(e['st0d'], 16), int(w['st0d'], 16))):
             c = dword_class(x, y) if key == 'st0d' else word_class(x, y)
             a[key][c] = a[key].get(c, 0) + 1
-        for x, y in zip(words(e['mem']), words(w['mem'])):
+        for x, y in zip(words(e['mem']) + words(e['stk']), words(w['mem']) + words(w['stk'])):
             c = word_class(x, y)
             a['mem'][c] = a['mem'].get(c, 0) + 1
     for t in TARGETS:
         a = agg[t['name']]
         n = a['rows']
         mixed = sum(a[k].get('nan-num', 0) for k in ('st0', 'st0d', 'mem'))
-        if a['eax_bad'] or a['d_bad'] or a['nontrivial'] == 0 or n == 0 or mixed:
+        if a['eax_bad'] or a['d_bad'] or a['effect'] == 0 or n == 0 or mixed:
             ok = False
         if quiet:
             continue
