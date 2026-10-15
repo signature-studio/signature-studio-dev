@@ -21,6 +21,6 @@ rep('  R[RSP] -= 8; ST64(R[RSP], 0x40fce2ULL); imp_ExitProcess();', '  fprintf(s
 open('work/probe/fle_lifted.c', 'w').write(src)
 PY
 source qfc_lift.sh
-wasm_build "$QFC/work/probe" "$QFC/work/probe/qfcl_soft.cjs" "$QFC/work/probe/soft_imp.c" "$QFC/qfc_imp.c" "$QFC/qfc_ov.c"
+QFC_EXTRA_EXPORTS=_qfc_run wasm_build "$QFC/work/probe" "$QFC/work/probe/qfcl_soft.cjs" "$QFC/work/probe/soft_imp.c" "$QFC/qfc_imp.c" "$QFC/qfc_ov.c"
 sed "s/printErr: (s) => errs.push(String(s))/printErr: (s) => { errs.push(String(s)); console.error(String(s)); }/" qfc_boot.mjs > work/probe/qfc_boot_probe.mjs
 QFC_CJS="$QFC/work/probe/qfcl_soft.cjs" QFC_OUT="$QFC/work/probe/boot_soft.json" timeout 300 node work/probe/qfc_boot_probe.mjs 2>&1 | grep -E "probe|\[fle\]" || true
