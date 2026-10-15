@@ -241,10 +241,10 @@ WaveformColouring closure の入口 70 関数を x64c で C に lift し wasm �
 ## 8. PSOLA_CreateInstance の closure lift と native 差分 — T-SH-75 (#3401・縮小して完了)
 
 ### 結論 (1 行)
-PSOLA の閉包の正本は vtable 経由 (82 関数・4,601 命令・間接 call 18)。その一部 (CreateInstance + slot 0・4・5 = 36 関数・1,046 命令・unsup 0) を x64c で lift し、native 対 wasm は 64 case 全一致 (ネガティブコントロール FAIL 64/64)。slot 1–3 (DSP 本体) は子 [T-SH-81]、x64c の VEX-256 は子 [T-SH-82]、間接 call の到達実測は既存 #3250。
+PSOLA の閉包の正本は vtable 経由 (82 関数・4,601 命令・間接 call 18)。その一部 (CreateInstance + slot 0・4・5 = 36 関数・1,046 命令・unsup 0) を x64c で lift し、native 対 wasm は 64 case 全一致 (ネガティブコントロール FAIL 64/64)。slot 1–3 (DSP 本体) の native 差分は #3427 (残り) → 子 #4237 [T-SH-105]、x64c の VEX-256 は #3428 (T-SH-82・PR #3471 で完了)、間接 call の到達実測は既存 #3250。
 全文 (手順・実測・未解決の表) は `REPORT_APPENDIX_3401.md` §8 が正本 (250 行上限のため分割移動)。HEAD での再実行記録 (T-SH-86 #3469) は `REPORT_APPENDIX_3469.md`。
 
 ## 9. PSOLA_CreateInstance 閉包の x64c lift — T-SH-82 (#3428・部分達成)
 
 ### 結論 (1 行)
-PSOLA 閉包 (CreateInstance + vtable slot 先) の unsup を 2,472 site から 0 にした (ymm 算術・vextractf128 ほか)。命令単位の差分 88 件 PASS、WaveformColouring の回帰 PASS 64/64・PSOLA の `lift_psola.sh` PASS 64/64 (ともに最終 HEAD `39fbdae8a` で実測)。閉包単位の native 差分は子 #3427 [T-SH-81] に分離。 全文 (再現・内訳・差分テストの内訳・実測・未解決) は `REPORT_APPENDIX_3428.md` が正本 (測定 commit `39fbdae8a`・コードを変えた最後の commit `e49bf7c9d`)。
+PSOLA 閉包 (CreateInstance + vtable slot 先) の unsup を 2,472 site から 0 にした (ymm 算術・vextractf128 ほか)。命令単位の差分 88 件 PASS、WaveformColouring の回帰 PASS 64/64・PSOLA の `lift_psola.sh` PASS 64/64 (ともに最終 HEAD `39fbdae8a` で実測)。閉包単位の native 差分は #3427 (残り) → 子 #4237 [T-SH-105] に分離。 全文 (再現・内訳・差分テストの内訳・実測・未解決) は `REPORT_APPENDIX_3428.md` が正本 (測定 commit `39fbdae8a`・コードを変えた最後の commit `e49bf7c9d`)。

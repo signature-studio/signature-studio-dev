@@ -9,7 +9,7 @@
 測定 commit: `9b1902fe5` (コードを変えた最後の commit。main (`52e768489`) 取り込み後の code を全て含む。以降の差分は `.md` のみ・§8-8)。検証起点: `42357b73e` (origin/main)。
 
 ### 8-1 結論 (1 行)
-規模の正本は vtable 経由 closure (82 関数・4,601 命令・間接 call 18)。その一部 (CreateInstance + slot 0・4・5 の到達集合 = 36 関数・1,046 命令・unsup 0) を x64c で C に lift し wasm (80,737 B) にした。native 対 wasm は 64 case で全一致 (ネガティブコントロール FAIL 64/64)。slot 1–3 (DSP 本体へ jmp する thunk) と閉包の残りは未 lift で、子 T-SH-81 に残す。
+規模の正本は vtable 経由 closure (82 関数・4,601 命令・間接 call 18)。その一部 (CreateInstance + slot 0・4・5 の到達集合 = 36 関数・1,046 命令・unsup 0) を x64c で C に lift し wasm (80,737 B) にした。native 対 wasm は 64 case で全一致 (ネガティブコントロール FAIL 64/64)。slot 1–3 (DSP 本体へ jmp する thunk) と閉包の残りは未 lift で、当時は子 T-SH-81 に残した (現在の状態は §8-9)。
 
 ### 8-2 規模の定義 (受入 1)
 - 正本: vtable 経由 closure (`ildsp_closure.py`・`REPORT_CLOSURE.md` §4.2)。理由: §4 で instance の lift 単位を「CreateInstance + vtable slot 先の到達集合」と決めている。`.pdata` 基準 (`REPORT.md` §2: 8 関数・238 命令) は slot 先を含まない下限で、正本にしない。
@@ -42,7 +42,7 @@
 | 7 root (基準 + slot 1–3) | 235 | 60,095 | 2,472 | ymm 語 2,396・他 76 (VEX-128 命令・palignr 12 ほか) |
 
 - DSP 本体の窓 (`0x17f700`・`0x1804b0`・`0x180830` から各 24 KiB) に unsup site は **0 件**。unsup は窓の外、DSP 本体から呼ばれる helper の関数 (unsup の RVA は `0x1945`〜`0x25474b` に散る) にある。よって slot 1・3 の lift の前提は、その helper の ymm と VEX-128 命令の対応 (子 T-SH-82) である。
-- slot 2 は閉包が unsup 0 で、ymm は理由にならない。本 PR では呼んでいない (差分テストは未実施。子 T-SH-81 の受入に含める)。
+- slot 2 は閉包が unsup 0 で、ymm は理由にならない。本 PR では呼んでいない (差分テストは未実施。#3427 (残り) → 子 #4237 [T-SH-105] の受入に含める)。
 - 7 root の閉包 (235 関数・60,095 命令・unsup 2,472) の再現手順:
   ```
   python3 -c 'import json,sys; print(json.dumps({"roots": [0x180000000 + int(x, 16) for x in sys.argv[1:]], "calltgt": []}))' 0x1ab540 0x1ab590 0x1ab680 0x1ab690 0x1ab6a0 0x1ab6b0 0x1ab800 > entries7.json
@@ -74,20 +74,28 @@
 ### 8-6 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| slot 1・3 (DSP 本体 0x17f700・0x180830 と、そこから呼ばれる helper) を含む閉包の lift と native 差分。7 root の unsup は 2,472 site | 受入 (3) の残り (閉包全体の全バイト差分) | 子 [T-SH-81] |
-| x64c の unsup: 閉包全体で ymm 語 2,396 site・VEX-128 ほか 76 site。実装は PR #3471 (`3428-x64c-psola-ymm`) が進行中 | 上の lift の前提。未対応のまま呼ばれると trap になる | 子 [T-SH-82] (#3428) |
-| slot 2 (`0x1ab690` → `0x1804b0`): 閉包は unsup 0 だが、本 PR では差分テストを行っていない | 受入 (3) の残り | 子 [T-SH-81] の受入に含める |
+| slot 1・3 (DSP 本体 0x17f700・0x180830 と、そこから呼ばれる helper) を含む閉包の native 差分。閉包の lift は unsup 0 (§8-9) | 受入 (2)・(3) の残り (閉包全体の全バイト差分) | 子 #4237 [T-SH-105] |
+| x64c の unsup (閉包 ymm 語 2,396 site・VEX-128 ほか 76 site) | 解消 (§8-9)。PR #3471 (`285ab7650`) で main 取り込み済み | #3428 (T-SH-82) は PR #3471 で完了 |
+| slot 2 (`0x1ab690` → `0x1804b0`): 閉包は unsup 0 だが、本 PR では差分テストを行っていない | 受入 (3) の残り | 子 #4237 [T-SH-105] の受入に含める |
 | 間接 call の native 到達実測と扱い (helper `0x1aedc0`・`0x1b6f4c` の 4 件、画像内ポインタ `0x268260`・`0x268268`)。PSOLA の閉包も同じ helper を含む (`REPORT_CLOSURE.md` §4.6) | 受入 (2)。PSOLA の IAT 16 件は stub で lift 済み | 既存 #3250 [T-SH-54] (GPS の同じ helper の実測。PSOLA でも同一アドレス) |
 | x64c の closure (235 関数) と `ildsp_closure.py` の closure (82 関数) の関数集合の差 (重なり 71) | 規模の数値の定義。どちらを使うかで閉包の大きさが変わる | #161 (親・PM 判断) |
-| 差分が 1 経路 (.data 不変・全 case 同一経路) | 分岐網羅の証拠にならない | 子 [T-SH-81] の受入に含める |
+| 差分が 1 経路 (.data 不変・全 case 同一経路) | 分岐網羅の証拠にならない | 子 #4237 [T-SH-105] の受入に含める |
 
 ### 8-7 slot 4・5 の差分テストの位置付け
 - slot 4 (クリア) と slot 5 (`return [+0x98]`) は呼び出しの memory 効果を差分に含める。戻り値は slot 5 だけ畳み込む (§8-4)。slot 4 の戻り値は未検証。
 - slot 5 の `[+0x98]` は CreateInstance が 0 にする領域で、差分の rax は 0 相当の値のみ見ている。0 以外の入力での振る舞いは未検証 (`.data` は run で不変のため、内部 +0x98 は zero のまま)。
 
-### 8-8 測定後のコード差分 (差分 0 の証跡)
+### 8-9 閉包 7 root の再測定と slot 1–3 の差分 (#3427 (残り) → 子 #4237 [T-SH-105])
+- #3428 (PR #3471) の ymm 対応が main に入った後の実測。7 root (基準 + slot 1–3) の閉包は **unsup 0** (§8-3 の 2,472 site が解消)。235 関数・60,095 命令・unlifted callees 0・traps 0・imports 18 (`lift_psola_closure.sh` の lift)。
+- 測定 commit: `c2cc726a2` (コードを変えた最後の commit)。鮮度の根拠: `git diff c2cc726a2 HEAD -- tools/shared/lift/ildsp tools/flelift/x64c.py` は差分 0 (HEAD は `.md` のみ)。
+- 差分 (呼出しは基準と同じ CreateInstance → slot 0 → slot 4 → slot 5): PASS 64 / FAIL 0 (wasm 3,549,536 B・trap 0)。閉包を広げても基準の一致は保たれる。
+- slot 1–3 を差分に入れると、native 側が全 64 case で addr 0 の SIGSEGV になり比較対象が 0 件になる (`wc diff` は PASS 0・excluded 64)。DSP 本体 (0x17f700 ほか) は `this` の内部フィールド (+0xc4・+0xcc・+0x33c・+0x6a0・+0x24・+0x6bc など) を書いてから helper を呼ぶ。null 参照の原因 (未設定の内部ポインタ) は未特定。host 側の事前設定が要る。
+- 未解決 (子 #4237 [T-SH-105] の受入): slot 1–3 の host 前提の確定と、その入力での native 対 wasm 差分。slot 2 の差分は未実施。
+
+### 8-8 測定後のコード差分 (historical: 9b1902fe5 時点の証跡)
 測定 commit `9b1902fe5` 以降に変えたのは本付録・`REPORT.md`・`DOC_MAP.md` (`.md` のみ)。
-`git diff 9b1902fe5 HEAD -- tools/shared/lift/ildsp tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh tools/shared/scripts ':!*.md'` の出力は空 (差分 0)。
+`git diff 9b1902fe5 HEAD -- tools/shared/lift/ildsp tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh tools/shared/scripts ':!*.md'` の出力は `9b1902fe5` 時点では空だった (差分 0)。
+現在の HEAD では #3471 の変更で差分がある (`x64c.py` +130 ほか)。このため現在の鮮度の根拠にはしない。現在の根拠は §8-9。
 測定 commit には main 取り込み (`52e768489`・`ba70aa677` 経由) の code 差分を含む (`tools/flelift/rt/fle_cpu.{c,h}`・`ildsp/lift_wc.sh`・`ildsp/wc_image.py`・`ildsp/closure_select.py` ほか)。経路外かどうかで除外せず、全 code で測定した。
 
 ## 9. slot 2 の差分追加と slot 1・3 の native 落ち原因 — T-SH-105 (#4237)
