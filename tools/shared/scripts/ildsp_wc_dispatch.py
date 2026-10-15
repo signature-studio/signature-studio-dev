@@ -14,6 +14,7 @@ usage: ildsp_wc_dispatch.py [PE] [--closure <json>] [--out <json>]
   4. closure 内の他の vptr 格納 (WC 以外の vtable) の件数と場所 (参考)。格納箇所ごとに 1 件
   5. 他の vptr 格納の関数への直接の call/jmp 元 (exec セクション全走査)
   6. closure の間接 call の内訳 (vcall / IAT / 画像内ポインタ / レジスタ)
+  7. 対象 VA (REF_RVAS: 格納先・呼び出し経路・vcall の解決先) への参照。全画像で RIP 相対の命令参照と 8 バイト絶対値を数える
 """
 import sys, os, json, argparse, struct
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -21,10 +22,25 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, ".."))
 from paths import FL_WIN64_DIR
 import pefile, capstone
-import ildsp_survey as S
 ROOT = os.path.dirname(HERE)
 
 CTOR_RVA = 0x1ac470
+# 格納先の 2 関数 (0x164740・0x1acfe8)、その直接の呼び出し元 (0x1ad008・0x1ad028・0x1ac9c0)、vcall の解決先 (0x1a9de0)・その隣 (0x1a9e10)
+REF_RVAS = (0x1ac9c0, 0x1ad008, 0x1ad028, 0x1acfe8, 0x164740, 0x1a9de0, 0x1a9e10)
+
+
+def sweep_insns(md, data, base):
+    """ildsp_survey.sweep と同じ線形走査 (デコードできないバイトは 1 byte 飛ばす)。命令オブジェクトを返す。"""
+    out = []
+    off = 0
+    while off < len(data):
+        got = next(iter(md.disasm(data[off:off + 16], base + off)), None)
+        if got is None:
+            off += 1
+            continue
+        out.append(got)
+        off += got.size
+    return out
 
 
 def main():
@@ -153,16 +169,38 @@ def main():
                 ind[ins.address] = "レジスタ"
     breakdown = {k: sum(1 for v in ind.values() if v == k) for k in ("vcall", "IAT", "画像内ポインタ", "レジスタ")}
 
-    # 他 vtable 格納の関数 (0x164740 等) と vcall の関数への直接の call/jmp 元。exec セクション全体を線形走査する
+    # 他 vtable 格納の関数 (0x164740 等) と vcall の関数への直接の call/jmp 元。exec セクション全体を線形走査する。
+    # 同じ走査で REF_RVAS への RIP 相対の命令参照も集める
     other_fns = sorted({int(s["fn"], 16) for s in other_vt_sites} | {int(v["fn"], 16) for v in vcalls})
     callers = {f: [] for f in other_fns}
+    rip_refs = {t: [] for t in REF_RVAS}
     for s in pe.sections:
         if not s.Characteristics & 0x20000000:
             continue
         lo = s.VirtualAddress
-        for addr, m, ops in S.sweep(md, bytes(img[lo:lo + s.Misc_VirtualSize]), base + lo):
-            if (m.startswith("call") or m == "jmp") and S.is_direct(ops) and int(ops, 16) - base in callers:
-                callers[int(ops, 16) - base].append(hex(addr - base))
+        for ins in sweep_insns(md, bytes(img[lo:lo + s.Misc_VirtualSize]), base + lo):
+            if (ins.mnemonic.startswith("call") or ins.mnemonic == "jmp") and ins.op_str.startswith("0x") \
+                    and int(ins.op_str, 16) - base in callers:
+                callers[int(ins.op_str, 16) - base].append(hex(ins.address - base))
+            for op in ins.operands:
+                if op.type == capstone.x86.X86_OP_MEM and op.mem.base == capstone.x86.X86_REG_RIP:
+                    t = ins.address + ins.size + op.mem.disp - base
+                    if t in rip_refs:
+                        rip_refs[t].append(hex(ins.address - base))
+
+    # 対象 VA の 8 バイト絶対値 (DIR64 の値 = ImageBase + RVA) を、イメージ全体から探す (レジスタ計算値・4 バイト相対値は対象外)
+    abs_refs = {}
+    for t in REF_RVAS:
+        pat = struct.pack("<Q", base + t)
+        abs_refs[t] = []
+        i = img.find(pat)
+        while i != -1:
+            abs_refs[t].append(i)
+            i = img.find(pat, i + 1)
+
+    def sec_name(off):
+        return next((s.Name.rstrip(b"\0").decode(errors="replace") for s in pe.sections
+                     if s.VirtualAddress <= off < s.VirtualAddress + s.Misc_VirtualSize), "header")
 
     print("# WaveformColouring_CreateInstance の vcall dispatch 解決 (ildsp_wc_dispatch.py)")
     print(f"vtable RVA: {hex(vt_rva)} / CreateInstance: {hex(CTOR_RVA)} / closure 関数数: {len(fns)}")
@@ -183,6 +221,11 @@ def main():
     print("## 間接 call の内訳 (closure 70 関数)")
     print(f"  vcall {breakdown['vcall']} / IAT {breakdown['IAT']} / 画像内ポインタ {breakdown['画像内ポインタ']} / レジスタ {breakdown['レジスタ']} / 計 {sum(breakdown.values())}")
     print("")
+    print("## 対象 VA への参照 (全画像走査: RIP 相対の命令参照と 8 バイト絶対値。レジスタ計算値・4 バイト相対値は対象外)")
+    for t in REF_RVAS:
+        abs_txt = [f"{hex(o)} ({sec_name(o)})" for o in abs_refs[t]]
+        print(f"  fn {hex(t)}: RIP 相対 {len(rip_refs[t])} 件 {rip_refs[t]} / 8 バイト値 {len(abs_refs[t])} 件 {abs_txt}")
+    print("")
     print("## vcall")
     for r in result_vcalls:
         print(f"  site {r['site']} (fn {r['fn']}): call {r['text']} / base {r['base_reg']} <- {r['base_load']} @ {r['base_load_site']}")
@@ -191,7 +234,10 @@ def main():
     out = {"pe": a.pe, "vt_rva": hex(vt_rva), "ctor_rva": hex(CTOR_RVA),
            "stores": stores, "other_vtable_stores": other_vt_sites,
            "direct_callers": {hex(f): callers[f] for f in other_fns},
-           "indirect_breakdown": breakdown, "vcalls": result_vcalls}
+           "indirect_breakdown": breakdown,
+           "refs": {hex(t): {"rip": rip_refs[t], "abs8": [{"rva": hex(o), "section": sec_name(o)} for o in abs_refs[t]]}
+                    for t in REF_RVAS},
+           "vcalls": result_vcalls}
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     with open(a.out, "w") as f:
         json.dump(out, f, indent=1, ensure_ascii=False)
