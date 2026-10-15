@@ -43,6 +43,10 @@ def fix(mm):
     k = n[0]
     return ('%s%%nc1_p%d = inttoptr i64 %%arg2 to ptr\n%s%%nc1_v%d = load i64, ptr %%nc1_p%d, align 8\n%sstore i64 %%nc1_v%d, ptr %s'
             % (mm.group(1), k, mm.group(1), k, k, mm.group(1), k, mm.group(2)))
+# ldfix F3c (#509) は同じ修復を現 IR に入れているため、脱落形に戻してから patch する (戻さないと assert で止まり nc1.json が出ない)
+b, rv = re.subn(r'^(\s*)%(ldfxn\d+)_p = inttoptr i64 %arg2 to ptr\n\s*%\2 = load i64, ptr %\2_p, align 8\n\s*store i64 %\2, (ptr %[\w.$-]+, align 8)$',
+                r'\1store i64 %arg2, \3', b, flags=re.M)
+print('  ldfix 済みの store を脱落形に戻した数:', rv)
 b2 = re.sub(r'^(\s*)store i64 %arg2, ptr (%[\w.$-]+, align 8)$', fix, b, flags=re.M)
 assert n[0] == 2, n
 open(sys.argv[2], 'w').write(t[:m.start()] + b2 + t[e:])
@@ -112,3 +116,7 @@ assert n == 1, n
 open(sys.argv[2], 'w').write(t[:m.start()] + b2 + t[e:])
 PYEOF
 run "$T/nc7.ll" "$IMG" nc7; fns nc7; cellsite nc7 52a750
+
+miss=0
+for k in nc0 nc1 nc2 nc3 nc4 nc5 nc6 nc7; do [ -s "$T/$k.json" ] || { echo "[negctl_510] MISSING: $k.json (評価されていない)"; miss=1; }; done
+exit $miss
