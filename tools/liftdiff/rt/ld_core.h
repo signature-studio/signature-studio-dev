@@ -566,6 +566,7 @@ typedef struct {
   int nargs; char kind[16]; u64 val[16];   /* 位置引数: kind 'i'(int/ptr) 'd'(f64 bits) 'f'(f32 bits) */
   u64 rax;
   int trace, xfill, stkfill, keep, blk, audit;
+  u64 abortret;         /* LD-161 (#3563): native のみ。trace で入る abort helper の VA (例 0x409730)。その入口の状態を保存し、noncontinuable RaiseException で入口の return 状態へ戻す */
   u64 left_n, left_first, left_last;   /* LD-96 (#2258): audit=1 のとき case 開始時に、高水位より外側へ残った heap の非 0 バイト数 */
   int npatch; struct { int region; u64 off; u8 data[64]; int len; } patch[16];
   char abi[16];
@@ -621,6 +622,7 @@ static int ld_parse_case(char* line) {
     else if (!strcmp(t, "abi")) snprintf(ld_case.abi, sizeof ld_case.abi, "%s", v);
     else if (!strcmp(t, "rax")) ld_case.rax = strtoull(v, NULL, 0);
     else if (!strcmp(t, "trace")) ld_case.trace = atoi(v);
+    else if (!strcmp(t, "abortret")) ld_case.abortret = strtoull(v, NULL, 16);
     else if (!strcmp(t, "stkfill")) ld_case.stkfill = (int)strtol(v, NULL, 16);
     else if (!strcmp(t, "keep")) ld_case.keep = atoi(v);
     else if (!strcmp(t, "blk")) ld_case.blk = atoi(v);
