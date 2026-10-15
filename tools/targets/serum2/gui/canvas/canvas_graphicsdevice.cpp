@@ -150,7 +150,7 @@ bool CanvasGraphicsDeviceContext::endDraw () const
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 {
-	plotLine (line.first, line.second, frameColor);
+	plotLine (transformPoint (line.first), transformPoint (line.second), frameColor);
 	return true;
 }
 
@@ -158,7 +158,7 @@ bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 bool CanvasGraphicsDeviceContext::drawLines (const LineList& lines) const
 {
 	for (const auto& line : lines)
-		plotLine (line.first, line.second, frameColor);
+		plotLine (transformPoint (line.first), transformPoint (line.second), frameColor);
 	return true;
 }
 
@@ -168,20 +168,22 @@ bool CanvasGraphicsDeviceContext::drawPolygon (const PointList& polygonPointList
 {
 	if (polygonPointList.size () < 2)
 		return false;
+	auto points = transformPoints (polygonPointList);
 	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
-		fillPolygon (polygonPointList, fillColor);
+		fillPolygon (points, fillColor);
 	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
-		strokePolyline (polygonPointList, true, frameColor);
+		strokePolyline (points, true, frameColor);
 	return true;
 }
 
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawRect (CRect rect, PlatformGraphicsDrawStyle drawStyle) const
 {
+	auto r = deviceRect (rect);
 	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
-		paintRect (rect, fillColor, true);
+		paintRect (r, fillColor, true);
 	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
-		strokeRect (rect, frameColor);
+		strokeRect (r, frameColor);
 	return true;
 }
 
@@ -199,7 +201,7 @@ bool CanvasGraphicsDeviceContext::drawArc (CRect rect, double startAngle1, doubl
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawEllipse (CRect rect, PlatformGraphicsDrawStyle drawStyle) const
 {
-	auto points = ellipsePoints (rect);
+	auto points = transformPoints (ellipsePoints (rect));
 	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
 		fillPolygon (points, fillColor);
 	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
@@ -217,6 +219,7 @@ bool CanvasGraphicsDeviceContext::drawPoint (CPoint point, CColor color) const
 
 //------------------------------------------------------------------------
 // 1:1 で転写する (dest の左上に offset から始まる画素を置く)。拡大縮小と quality は未対応で、quality は無視する。
+// dest の位置だけ transformMatrix で変換する (拡大縮小は掛けない)。
 bool CanvasGraphicsDeviceContext::drawBitmap (IPlatformBitmap& bitmap, CRect dest, CPoint offset,
                                               double alpha, BitmapInterpolationQuality quality) const
 {
@@ -227,7 +230,8 @@ bool CanvasGraphicsDeviceContext::drawBitmap (IPlatformBitmap& bitmap, CRect des
 	const auto& sourceSize = source->getSize ();
 	auto srcWidth = static_cast<int32_t> (sourceSize.x);
 	auto srcHeight = static_cast<int32_t> (sourceSize.y);
-	auto box = pixelBoxOf (dest);
+	auto origin = transformPoint (CPoint (dest.left, dest.top));
+	auto box = pixelBoxOf (CRect (origin.x, origin.y, origin.x + dest.getWidth (), origin.y + dest.getHeight ()));
 	auto srcX0 = static_cast<int32_t> (offset.x);
 	auto srcY0 = static_cast<int32_t> (offset.y);
 	for (auto y = box.y0; y < box.y1; ++y)
@@ -254,7 +258,7 @@ bool CanvasGraphicsDeviceContext::drawBitmap (IPlatformBitmap& bitmap, CRect des
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::clearRect (CRect rect) const
 {
-	paintRect (rect, CColor (0, 0, 0, 0), false);
+	paintRect (deviceRect (rect), CColor (0, 0, 0, 0), false);
 	return true;
 }
 
@@ -359,7 +363,7 @@ void CanvasGraphicsDeviceContext::setGlobalAlpha (double newAlpha) const
 //------------------------------------------------------------------------
 void CanvasGraphicsDeviceContext::setTransformMatrix (const TransformMatrix& tm) const
 {
-	(void)tm;
+	transformMatrix = tm;
 }
 
 //------------------------------------------------------------------------
@@ -642,6 +646,36 @@ void CanvasGraphicsDeviceContext::strokePolyline (const PointList& points, bool 
 		plotLine (points[i], points[i + 1], color);
 	if (closed && points.size () > 2)
 		plotLine (points.back (), points.front (), color);
+}
+
+//------------------------------------------------------------------------
+CPoint CanvasGraphicsDeviceContext::transformPoint (const CPoint& p) const
+{
+	CPoint q (p);
+	transformMatrix.transform (q);
+	return q;
+}
+
+//------------------------------------------------------------------------
+PointList CanvasGraphicsDeviceContext::transformPoints (const PointList& points) const
+{
+	PointList result;
+	result.reserve (points.size ());
+	for (const auto& p : points)
+		result.push_back (transformPoint (p));
+	return result;
+}
+
+//------------------------------------------------------------------------
+// 回転・傾斜があるときは変換後の 4 隅の外接矩形を取る。
+CRect CanvasGraphicsDeviceContext::deviceRect (const CRect& rect) const
+{
+	auto a = transformPoint (CPoint (rect.left, rect.top));
+	auto b = transformPoint (CPoint (rect.right, rect.top));
+	auto c = transformPoint (CPoint (rect.left, rect.bottom));
+	auto d = transformPoint (CPoint (rect.right, rect.bottom));
+	return CRect (std::min ({a.x, b.x, c.x, d.x}), std::min ({a.y, b.y, c.y, d.y}),
+	              std::max ({a.x, b.x, c.x, d.x}), std::max ({a.y, b.y, c.y, d.y}));
 }
 
 //------------------------------------------------------------------------

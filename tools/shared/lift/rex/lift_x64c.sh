@@ -40,7 +40,7 @@ emcc -O1 -ffp-contract=off -fno-fast-math -w -I "$FLE/rt" \
   "$W/lift/fle_lifted.c" "$FLE/rt/fle_cpu.c" "$HERE/rex_glue.c" \
   -sSTANDALONE_WASM=1 -sALLOW_MEMORY_GROWTH=0 -sINITIAL_MEMORY=$((0x31000000)) -sSTACK_SIZE=65536 -sGLOBAL_BASE=268435456 \
   --no-entry -Wl,--no-gc-sections -Wl,--export=rex_run -Wl,--export=rex_reset -Wl,--export=rex_hits_get -Wl,--export=rex_unsup_get \
-  -o "$W/rex.wasm"
+  --profiling-funcs -o "$W/rex.wasm"
 echo "[rex] wasm: $(stat -c %s "$W/rex.wasm") bytes"
 
 gcc -O1 -w -I "$W" -o "$W/native_ref" "$HERE/native_ref.c"

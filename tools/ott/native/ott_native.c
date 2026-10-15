@@ -107,6 +107,21 @@ static MS void* k_RtlPcToFileHeader(void* pc, void** base) {
     return b;
 }
 
+/* ICALL-100: RtlCaptureContext。x64 CONTEXT (0x4d0 B) の制御部だけを埋める。
+ * 呼び出し元の rip/rsp は呼び出し時のフレームから取る。汎用レジスタ (Rax..R15)・XMM は native 側から
+ * 取れない (ゲストの実レジスタは ott_ms_call の外に無い) ためゼロ。ContextFlags に含まれる範囲だけを意味がある値として扱う。 */
+static MS void k_RtlCaptureContext(uint8_t* ctx) {
+    uint64_t* fp = (uint64_t*)__builtin_frame_address(0);
+    memset(ctx, 0, 0x4d0);
+    *(uint32_t*)(ctx + 0x30) = 0x10001f;      /* ContextFlags = CONTEXT_AMD64 | CONTROL|INTEGER|SEGMENTS|FLOAT|DEBUG_REGISTERS */
+    *(uint32_t*)(ctx + 0x34) = 0x1f80;        /* MxCsr 既定値 */
+    *(uint16_t*)(ctx + 0x38) = 0x33;          /* SegCs (64bit code) */
+    *(uint16_t*)(ctx + 0x42) = 0x2b;          /* SegSs */
+    *(uint32_t*)(ctx + 0x44) = 0x202;         /* EFlags (IF) */
+    *(uint64_t*)(ctx + 0xf8) = fp[1];         /* Rip = 戻り先 */
+    *(uint64_t*)(ctx + 0x98) = (uint64_t)fp + 16; /* Rsp = 呼び出し元の rsp */
+}
+
 typedef struct { const char* n; void* f; } Impl;
 static const Impl IMPL[] = {
     {"GetProcessHeap", k_GetProcessHeap}, {"HeapAlloc", k_HeapAlloc}, {"HeapFree", k_HeapFree},
@@ -121,6 +136,7 @@ static const Impl IMPL[] = {
     {"Sleep", k_Sleep}, {"TlsAlloc", k_TlsAlloc}, {"TlsGetValue", k_TlsGetValue}, {"TlsSetValue", k_TlsSetValue},
     {"FlsGetValue", k_TlsGetValue}, {"FlsSetValue", k_TlsSetValue},
     {"RtlPcToFileHeader", k_RtlPcToFileHeader},
+    {"RtlCaptureContext", k_RtlCaptureContext},
     {NULL, NULL}};
 
 static MS void missing_import(uint64_t idx) {
