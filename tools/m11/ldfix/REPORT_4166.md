@@ -28,7 +28,7 @@ head の判定器は main の #4090 修正を含む。その修正の前後で�
 - 関数単位の判定: #2211 の記録 (DROP 3・LIVE-IN 35・UNDETERMINED 10) から、head では DROP 3・LIVE-IN 1・UNDETERMINED 44 になる。34 関数が LIVE-IN → UNDETERMINED (32 件は `glk` が False → True に変わった関数)。
 - 規則 6 の効きは head でも確認できる (`--negctl-noprov` の site 単位の判定が head 本体と 1 件 (`1006ec0 1007021`) だけ異なる)。
 
-## 3. 結果 (head `9881e597b` の判定器)
+## 3. 結果 (測定 commit `c159cf7fe` の判定器)
 
 ### 3.1 関数単位 (受入 2)
 
@@ -71,9 +71,10 @@ ctrl は head 本体 (測定 commit の判定器)。
 
 ### 3.5 差分 (WORKFLOW §6)
 
-- 測定 commit: `9881e597b`。判定器・結果 JSON・ネガティブコントロールはこの commit で生成した。
-- 判定器 `audit_frame_store_alias_2211.py` の `9881e597b` からの差分は 0 行 (判定器のコードは測定 commit から変えていない)。
-- `git diff 9881e597b HEAD -- tools/m11/ldfix` の差分は REPORT と `results/` (判定結果 JSON 4 本) だけ。
+- 測定 commit: `c159cf7fe`。結果 JSON・ネガティブコントロールはこの commit の判定器で再生成した。
+- 判定器 `audit_frame_store_alias_2211.py`・入力 JSON (`audit_undefload_564_full.json`・`f4_564_post.json`)・PE は `c159cf7fe` から HEAD まで変更なし (`git diff c159cf7fe HEAD -- <これらのファイル>` の出力 0 行)。
+- `tools/m11/ldfix` 内の他の差分は main 取り込みで入った他 issue のファイル (`REPORT_3382.md`・`REPORT_3418.md`・`REPORT_4167.md` など) で、本判定の入力・判定器には入らない。
+- 本 PR で変更したのは `REPORT_4166.md`・`results/` 4 本・`docs/DOC_MAP.md` の登録行。
 - main 取り込み (merge `ddae000b2`) 後に同じ判定器で再実行し、`frame_store_verdict_4166.json` と `cmp` 一致。
 
 ## 4. 受入条件の達成状況
