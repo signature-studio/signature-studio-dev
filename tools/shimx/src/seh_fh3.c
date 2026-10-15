@@ -10,6 +10,7 @@
 #define SHX_FH3_CAP_TRY    0x1000u
 #define SHX_FH3_CAP_CATCH  0x100u
 
+/* 4 byte 読みが画像末尾を跨ぐ場合は、範囲外の byte を 0 として読む */
 static uint32_t fh3_rd32(const uint8_t* img, uint32_t img_size, uint32_t rva) {
     uint32_t v = 0;
     for (uint32_t i = 0; i < 4; i++) {

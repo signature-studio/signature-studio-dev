@@ -39,6 +39,22 @@ static void t_walk(void) {
 
     /* 画像外の FuncInfo は棄却 */
     CHECK(shimx_fh3_funclets(img, sizeof img, 0xFF0, out, 16) == -1);
+
+    /* out_cap 超過: try 間で共有する handler RVA {0x500, 0x600} を 2 try × 2 catch で置く。
+     * cap=16 では正確に 2。cap=1 では out は先頭 1 件のみ有効で、戻り値は真の件数 (2) の上界。
+     * 現実装は 3 を返すが、契約は「2 以上で cap (1) を超える」のみを保証する。 */
+    memset(img, 0, sizeof img);
+    put32(img, 0x100, 0x19930520u); put32(img, 0x104, 0); put32(img, 0x108, 0);
+    put32(img, 0x10C, 2); put32(img, 0x110, 0x300);
+    put32(img, 0x30C, 2); put32(img, 0x310, 0x340);
+    put32(img, 0x320, 2); put32(img, 0x324, 0x360);
+    put32(img, 0x340 + 12, 0x500); put32(img, 0x350 + 12, 0x600);
+    put32(img, 0x360 + 12, 0x500); put32(img, 0x370 + 12, 0x600);
+    CHECK(shimx_fh3_funclets(img, sizeof img, 0x100, out, 16) == 2);
+    CHECK(out[0] == 0x500 && out[1] == 0x600);
+    int n1 = shimx_fh3_funclets(img, sizeof img, 0x100, out, 1);
+    CHECK(n1 >= 2);
+    CHECK(out[0] == 0x500);
 }
 
 void run_fh3_tests(void) {
