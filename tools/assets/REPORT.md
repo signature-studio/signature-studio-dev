@@ -180,3 +180,13 @@ PR #638 (規則反映) は merge 済み。検証は PR HEAD `1885bc03` の workt
 - 初回 run (`e2e-run4.log`) でも同じ順序で emscripten-test ALL PASS (`fread/fseek/ftell` で 8.86 MB ファイルの fnv 一致・`write denied`)。
 - 前段の段ごとの exit code (ec06535e・素材 fl-win64 を `$RUNNER_TEMP/fl-win64` に展開して単独実行): mk_manifest 0 / mk_inputs 0 / recover_paths 0 / inventory 0 / strings_scan 0 / classify 0 / 差分検査 0 / ネガコン 1 (期待どおり FAIL を検出。`e2e.sh` は「ネガコンが通ったら FAIL」と判定) / 生成物差分 0。`tsc` も exit 0 (`node_modules` あり)。
 - asset-e2e は未達のまま。k100 (314 MB) の素材化は PM 判断 (§5・§12 参照)。`oc_artifacts` の許可名に k100 を含む素材は無い。
+
+## 環境パス置換 (#3831, 親 #294): /home/ubuntu 直書きを tools/shared 経由へ
+
+- 対象: `tools/assets` (e2e.sh の PATH・bootset/strings_scan.py の WIN/MAC・inventory/inventory.py の `_WIN64`/`MAC_APP`)、`tools/audio/asio/e2e.sh`・`tools/hostbridge/hostbridge.sh` (PATH)、`tools/hostbridge/analysis/reproduce.sh` (素材パスを `FL_WIN64_DIR`/`PLUGINS_DIR` へ)、`tools/perf/build/ott_build.sh` (m6_build.sh を REPO 相対へ)・`tools/perf/report/env.sh` (PATH)、`tools/ott/f7eval/outhash_gate.sh` (`REPO_ROOT` 基準)、`tools/shared/lift/libkio/diff_test.py`・`tools/shared/run_all.sh`。
+- 方式: 既定値の定義は `tools/shared/env.sh` / `paths.py` / `paths.mjs` のまま変えない。Python は `paths` を import、bash は `env.sh` を source。PATH の pnpm は `$HOME/.local/share/pnpm/bin` (既定の解決先は従来と同一)。
+- 受入条件 1: 対象 code の `/home/ubuntu` 参照 → 0 件 (定義元 `env.sh`・`paths.*`・`test_paths.sh` を除く)。
+- 既定値の同一性: env 未設定で `inventory.py` の `MAC_APP` を評価した結果は `origin/main` の従来文字列と一致。
+- `bash tools/shared/test_paths.sh` → PASS default / analysis_dir_only / individual_override / negctl (4/4)。
+- before/after (`tools/assets/e2e.sh`、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、`TMPDIR=$RUNNER_TEMP`、n=1 直列、load 0.19〜0.91): before (`origin/main`) rc=1 15 s、after (`7b7697efa`) rc=1 8 s。両者とも `ALL PASS` の後に `emcc: command not found` で停止し、結果は同一。差分は timing と readahead 実測値のみ。
+- 未達: `tools/assets/e2e.sh` 全体は runner に emsdk (`/opt/emsdk`) が無いため完走しない。emscripten-test 以降は未検証。
