@@ -41,3 +41,28 @@
 ### 未解決 (追跡 **#863**。新規 issue は起票していない)
 
 (a) 実失敗の捕獲 (0 件のため切り分けは未了)。(b) 再現条件の特定 (頻度 5/637)。(c) 目標充填 T を判定行へ出す (連続起床の間隔との比較のため)。(d) 初回 run 仮説 (キャッシュ状態との切り分け)。(e) 通知は 1 processor あたり先頭 8 件まで・直近 64 quantum。2 件目以降の underrun は通知されない (失敗の 1 件目は取れる)。(f) worklet の `trN` (記録リング) は `gen` の変更 (start 毎) でリセットされない。`p` は run ごとに 0 から数え直すため、2 回目以降の start の underrun では直近 64 件と `cw_at_underrun` の末尾 6 件に前 run の `p` が混ざりうる。e2e は 1 page 1 start のため現在の判定には影響しない。対応は `gen` 変更の分岐で `this.trN = 0` を入れること (コード変更のため、差分分の再測定が要る)。worklet のコメントは変えていない (測定 commit のコード差分を 0 に保つため)。(g) underrun 時の診断 (`run()` の underrun 分岐) は render thread で、通知 1 回ごとに最大 64 件の `Array.from` を作って `postMessage` する (1 processor あたり最大 8 回)。PASS 時は 0 件。underrun 時の割り当て・GC・通知の負荷が、後続の underrun の出方を変えうる。対応は事前確保の `Float64Array` へ詰めて 1 回だけ post する形 (コード変更のため再測定が要る)。本 PR では未対応。
+
+## 32 AU-15 (#863) 捕獲試行 (hunt 1 回 115 run 全 PASS・hunt.sh の出力先を起動ごとに分離)
+
+- 測定 commit: `3c735d220` (hunt.sh に PASS run の dev:tone 判定行の保存 `pass_detail.txt` を追加。検証対象の e2e・src・worklet は不変)。その後 `fa2c9b961` で hunt.sh の出力先を起動ごとの `tools/audio/work/hunt/<UTC 開始時刻>/` に分けた。`git diff 3c735d220 HEAD -- tools/audio/integration` は hunt.sh の 2 行の差し替えのみ (`OUT` の定義行と冒頭コメント)。
+- 方法: worktree `ws-863` (origin/main `95814e904` の上)。`node_modules` は main の共有分を symlink。emsdk は runner 既定の導入 (`tools/audio/build.sh` の `EMSDK_ENV` 既定値、emcc 6.0.12)。`TMPDIR=$RUNNER_TEMP bash tools/audio/integration/hunt.sh 400 1380` を foreground (時間上限 1380 s)。
+
+| 区分 | run 数 | 結果 | 備考 |
+|---|---|---|---|
+| hunt (`3c735d220` と同内容の作業ツリー) | 115 | **115/115 PASS・exit 0・FAIL 0** | 1380 s で打ち切り。wall 11〜13 s (12 s が 107 run)・実行直後の 1 分 load は run 1 0.22 / run 3 1.23 / run 115 1.17 |
+| `3c735d220` HEAD の確認 | 5 | 5/5 PASS | `pass_detail.txt` の判定行を確認。`cb_gap_max_ms=11`・`prod_cb_max_us` 34〜54・`pw_gap_max_us` 10215〜11006 |
+| `fa2c9b961` HEAD の確認 | 3 | 3/3 PASS | 出力先が起動ごとの dir に分かれることを確認 |
+
+- 初回 run: run 1 は PASS (13/13・wall 13 s)。hunt 開始前は `node_modules/.vite` が無く、hunt の間に作られた (どの run で作られたかは未確認)。初回 run の失敗は今回は再現しなかった。
+- 115 run の集計 (hunt 中に読んだ値。ファイルは後述の上書きで残っていない): `cb_gap_max_ms` は 10 ms が 23 run・11 ms が 85 run・12 ms が 7 run。判定 1 件あたりの値の範囲は、同じ run の `pass_detail` の結果ではなく計測中の表示から読んだもの。
+- 運用上の欠陥 (修正済み `fa2c9b961`): §27 までの hunt.sh は `tools/audio/work/hunt/` を起動ごとに上書きしていた。本節の 2 回目の確認 (5 run) で、115 run 分の `summary.txt`・`pass_detail.txt` が消えた。`fail_<n>.log` も後続の hunt で同名のものが上書きされうる。修正後は起動ごとに別 dir に残す。
+
+### 読み (観測事実のみ)
+
+- 115 run の 0 件は、通算 率 5/637 (0.78%) の下で 0 件となる確率が約 0.41 (0.9922^115)。0 件は率が下がった根拠にならない。
+- 通算は §31 までの 5 件 / 637 run に本節の 123 run (115 + 5 + 3、全 PASS) を加えて **5 件 / 760 run** (0.66%)。失敗の位置が取れた 4 件は、いずれも `first_err_frame = first_underrun_frame` (56576 が 3 件 (§19・§23・§25 の記録)、56320 が 1 件 (§29))。§30 の 1 件は underrun のみ (39680) で first_err は未取得。
+- 失敗が 0 件のため producer (wasm 出力遅延) と consumer (worklet rebuffer) の切り分けは**未達**。
+
+### 未解決 (追跡 **#863**。新規 issue は起票していない)
+
+(a) 実失敗の捕獲 (通算 0 件・本節 123 run 全 PASS)。(b) 再現条件の特定 (通算 頻度 5/760)。(c) 初回 run 仮説 (通算 5 件は、いずれも各節で最初に走らせた run。ただし節の初回 run でも PASS がある (§28 の初回 1 run など)。本節の初回 run は PASS。キャッシュ状態を分けた実測は未実施)。

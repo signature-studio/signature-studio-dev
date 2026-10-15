@@ -3,7 +3,7 @@
 
   python3 x87_crosscheck.py [mode-dir=main]    # 直前の x87_diff.py の結果 (work/x87/<mode-dir>) を読む
 
-(a) FSW (C0/C2/C3) が違う試行を、含む op で分ける (fld/fstp m80 を含むか・比較 op を含むか)。
+(a) FSW (C0/C2/C3 と TOP。 比較・fxam の直後だけ C1 も) が違う試行を、含む op で分ける (fld/fstp m80 を含むか・比較 op を含むか)。
 (b) slot の不一致の試行を、fst/fstp m32 (ADR 制限 2)・fstp m80 (#2967) を含むかで分ける。
     slot は 1 個 16 byte (lo・hi) なので、語の添字は 2 * slot 番号 (x87_diff_main.h の出力形式)。
 (c) fld m80 の入力の類ごとに、V (ST 値) が不一致の試行を数える。
@@ -34,7 +34,8 @@ for i, (t, a, b) in enumerate(zip(tr, nat, low)):
     m80 = any(o['typ'] in ('e', 'w10') for o, _ in ops)
     fa = a.split(' V ')[0].split()[1:]
     fb = b.split(' V ')[0].split()[1:]
-    if fa != fb:
+    mk = [0x7d00 | (0x0200 if o['cmp'] else 0) for o, _ in ops]
+    if not all((int(p, 16) & m) == (int(q, 16) & m) for p, q, m in zip(fa, fb, mk)):
         fa_cnt['FSW 不一致 (m80 を含む)' if m80 else 'FSW 不一致 (m80 を含まない)'] += 1
         if first is None:
             first = (i, [o['name'] for o, _ in ops], fa, fb)
@@ -51,7 +52,7 @@ for i, (t, a, b) in enumerate(zip(tr, nat, low)):
         if m80:
             sl_cnt['slot 不一致 (m80 を含む)'] += 1
 
-print('[crosscheck] (a) FSW (C0/C2/C3, TOP マスク後) の不一致試行の内訳 (件数)')
+print('[crosscheck] (a) FSW (C0/C2/C3/TOP。 比較・fxam の直後は C1 も) の不一致試行の内訳 (件数)')
 for k in sorted(fa_cnt):
     print('  %s: %d' % (k, fa_cnt[k]))
 if not fa_cnt:

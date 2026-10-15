@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """x87_diff.py: x87 subset の lowering (x64c --arch ia32 → tools/ott/rt/ott_x87.h) と実 x87 の差分試験 (#1099・#2967)。
 
-  python3 x87_diff.py [--n 100000] [--seed 1] [--nega] [--nega80] [--rc] [--rc-arith RC] [--roundtrip]
+  python3 x87_diff.py [--n 100000] [--seed 1] [--nega] [--nega80] [--nega-c1] [--rc] [--rc-arith RC] [--roundtrip] [--skip NAME,...]
 
 - op 表: 機械語 (.byte) を 1 命令ずつ持つ。 native 側はその機械語を実 FPU で実行 (中間値は 80bit)。
   lowered 側は同じ機械語を capstone で decode → x64c の FnLift.one() で C にして実行 (f80 は持たず double)。
@@ -10,6 +10,9 @@
   slot は 16 byte (lo・hi)。 80bit 値は lo = 仮数、hi の下位 16bit = 符号・指数。
 - --nega: lowered 側の `fsub st(i), st(0)` (DC E8+i) を `fsubr` (DC E0+i) に取り違えて FAIL が出ることを確かめる。
 - --nega80: lowered 側の `fstp m80` (DB /7) を `fstp m64` (DD /3) に取り違える (m80 経路のネガティブコントロール・#2967)。
+- --nega-c1: lowered 側の fxam の直後に C1 を反転させ、C1 の比較で FAIL が出ることを確かめる (negative control・#2966)。
+- C1: native では丸めの上向きフラグ等になるため、比べるのは fxam と比較命令 (cmp=True) の直後だけ (ott_x87.h の制限 (6))。
+- --skip: 試行の op 表から指定の名前を外す (寄与の切り分け用。例: --skip fldpi,fldlg2,fldl2e)。 機械語の id は変えない (#2966)。
 - --rc: fldcw で RC を変え、fist/fistp の丸めだけを比べる (算術を含まない試行。ADR の制限 (5))。
 - --rc-arith RC: fldcw で RC を RC (0 nearest / 1 down / 2 up / 3 truncate) に固定し、算術・fst m32 を含む全 op で比べる (#2967)。
   同じ seed の試行は RC の値だけが違うので、RC=0 の結果との差を RC 由来として読む。
@@ -26,7 +29,8 @@ import x64c  # noqa: E402
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32  # noqa: E402
 
 WORK = os.path.join(HERE, 'work', 'x87')
-CMASK = 0x7d00
+CMASK = 0x7d00      # 比べる FSW bit: C3/C2/C0/TOP (C1 は cmp 命令の直後だけ C1BIT で比べる)
+C1BIT = 0x0200
 KINDS = ['d', 'f', 'i', 'q', 'e']
 KIND_W = [4, 2, 2, 2, 2]
 ARITH_NAMES = {'fadd', 'fmul', 'fsub', 'fsubr', 'fdiv', 'fdivr',
@@ -58,7 +62,16 @@ def templates():
           dict(name='fabs', bs=[0xD9, 0xE1], form='none', delta=0, need=1, cmp=False, typ=None),
           dict(name='fld1', bs=[0xD9, 0xE8], form='none', delta=1, need=0, cmp=False, typ=None),
           dict(name='fldz', bs=[0xD9, 0xEE], form='none', delta=1, need=0, cmp=False, typ=None),
-          dict(name='fnstsw', bs=[0xDF, 0xE0], form='none', delta=0, need=0, cmp=False, typ=None)]
+          dict(name='fnstsw', bs=[0xDF, 0xE0], form='none', delta=0, need=0, cmp=False, typ=None),
+          dict(name='ftst', bs=[0xD9, 0xE4], form='none', delta=0, need=1, cmp=True, typ=None),
+          dict(name='fxam', bs=[0xD9, 0xE5], form='none', delta=0, need=1, cmp=True, typ=None),
+          dict(name='fnclex', bs=[0xDB, 0xE2], form='none', delta=0, need=0, cmp=False, typ=None),
+          dict(name='fsqrt', bs=[0xD9, 0xFA], form='none', delta=0, need=1, cmp=False, typ=None),
+          dict(name='frndint', bs=[0xD9, 0xFC], form='none', delta=0, need=1, cmp=False, typ=None),
+          dict(name='fscale', bs=[0xD9, 0xFD], form='none', delta=0, need=2, cmp=False, typ=None),
+          dict(name='fldl2e', bs=[0xD9, 0xEA], form='none', delta=1, need=0, cmp=False, typ=None),
+          dict(name='fldlg2', bs=[0xD9, 0xEC], form='none', delta=1, need=0, cmp=False, typ=None),
+          dict(name='fldpi', bs=[0xD9, 0xEB], form='none', delta=1, need=0, cmp=False, typ=None)]
     # memory (mod=00 rm=[eax]): 算術・比較は入力 slot (f = float32, d = float64)
     for r, name in [(0, 'fadd'), (1, 'fmul'), (2, 'fcom'), (3, 'fcomp'), (4, 'fsub'), (5, 'fsubr'), (6, 'fdiv'), (7, 'fdivr')]:
         T.append(dict(name=name, bs=[0xD8, r << 3], form='mem', delta=-1 if name == 'fcomp' else 0, need=1,
@@ -84,11 +97,15 @@ def templates():
           dict(name='fistp', bs=[0xDB, 0x18], form='mem', delta=-1, need=1, cmp=False, typ='w4'),
           dict(name='fistp', bs=[0xDF, 0x38], form='mem', delta=-1, need=1, cmp=False, typ='w8'),
           dict(name='fnstsw', bs=[0xDD, 0x38], form='mem', delta=0, need=0, cmp=False, typ='w2'),
-          dict(name='fnstcw', bs=[0xD9, 0x38], form='mem', delta=0, need=0, cmp=False, typ='w2')]
+          dict(name='fnstcw', bs=[0xD9, 0x38], form='mem', delta=0, need=0, cmp=False, typ='w2'),
+          dict(name='fiadd', bs=[0xDA, 0x00], form='mem', delta=0, need=1, cmp=False, typ='i'),
+          dict(name='fiadd', bs=[0xDE, 0x00], form='mem', delta=0, need=1, cmp=False, typ='i2'),
+          dict(name='fimul', bs=[0xDA, 0x08], form='mem', delta=0, need=1, cmp=False, typ='i'),
+          dict(name='fimul', bs=[0xDE, 0x08], form='mem', delta=0, need=1, cmp=False, typ='i2')]
     return T
 
 
-RC_NAMES = {'fld', 'fild', 'fld1', 'fldz', 'fst', 'fstp', 'fist', 'fistp', 'fnstcw', 'fnstsw'}
+RC_NAMES = {'fld', 'fild', 'fld1', 'fldz', 'fst', 'fstp', 'fist', 'fistp', 'fnstcw', 'fnstsw', 'frndint'}
 
 
 def slot_key(o):
@@ -119,7 +136,7 @@ def lower_lines(bs):
     return fl.out, ins[0].mnemonic + ' ' + ins[0].op_str
 
 
-def write_inc(insts, nega, nega80, path_n, path_l):
+def write_inc(insts, nega, nega80, path_n, path_l, nega_c1=False):
     x64c.IA32 = True
     x64c.PTR = 4
     with open(path_n, 'w') as fn, open(path_l, 'w') as fl:
@@ -141,6 +158,8 @@ def write_inc(insts, nega, nega80, path_n, path_l):
             fl.write('    case %d: { /* %s */\n' % (o['id'], dis.replace('*/', '* /')))
             for ln in lines:
                 fl.write('  ' + ln + '\n')
+            if nega_c1 and o['name'] == 'fxam':
+                fl.write('  ott_fsw ^= 0x0200u;   /* negative control: C1 (符号) を反転 */\n')
             fl.write('    } break;\n')
         fn.write('  }\n}\n')
         fl.write('  }\n}\n')
@@ -308,7 +327,8 @@ def compare(nat, low, metas):
         Fa, Va, Sa = ta[1:iv_a], ta[iv_a + 1:is_a], ta[is_a + 1:]
         Fb, Vb, Sb = tb[1:iv_b], tb[iv_b + 1:is_b], tb[is_b + 1:]
         st['trials'] += 1
-        fok = Fa == Fb
+        fm = [CMASK | (C1BIT if o['cmp'] else 0) for o, _ in ops]
+        fok = all((int(x, 16) & m) == (int(y, 16) & m) for x, y, m in zip(Fa, Fb, fm))
         for o, sl in ops:   # fnstsw m16 の格納値は PE/C1 等の未モデル化の例外フラグを含むため、CMASK で比べる (ADR 制限 4)
             if o['name'] == 'fnstsw' and o['form'] == 'mem':
                 for S in (Sa, Sb):
@@ -322,7 +342,7 @@ def compare(nat, low, metas):
         for k, (o, _) in enumerate(ops):
             if o['cmp']:
                 st['cmp_ops'] += 1
-                if (int(Fa[k], 16) & 0x4500) == (int(Fb[k], 16) & 0x4500):
+                if (int(Fa[k], 16) & 0x4700) == (int(Fb[k], 16) & 0x4700):
                     st['cmp_match'] += 1
         mx = 0
         for x, y in zip(Va, Vb):
@@ -385,6 +405,8 @@ def main():
     ap.add_argument('--rc', action='store_true', help='fldcw で RC を変え fist/fistp の丸めだけを比べる')
     ap.add_argument('--rc-arith', type=int, choices=(0, 1, 2, 3), default=None,
                     help='fldcw で RC を固定 (0 nearest / 1 down / 2 up / 3 trunc)。 算術・fst m32 を含む全 op で比べる')
+    ap.add_argument('--nega-c1', action='store_true', help='lowered 側の fxam の直後に C1 を反転させる (negative control・#2966)')
+    ap.add_argument('--skip', default='', help='試行の op 表から外す名前 (カンマ区切り。例: fldpi,fldlg2,fldl2e・#2966)')
     ap.add_argument('--roundtrip', action='store_true', help='f80↔f64 変換の往復試験 (--n はクラスごとの件数)')
     ap.add_argument('--skip-build', action='store_true')
     a = ap.parse_args()
@@ -400,14 +422,20 @@ def main():
         tag = 'rcarith%d' % a.rc_arith
     else:
         tag = mode
+    skip = set(x for x in a.skip.split(',') if x)
+    if skip:
+        tag += '_skip'
+    if a.nega_c1:
+        tag = 'nega_c1'
     wd = os.path.join(WORK, tag)
     os.makedirs(wd, exist_ok=True)
     insts = instances(templates())
+    trial_insts = [o for o in insts if o['name'] not in skip]
     inc_n = os.path.join(wd, 'x87_native_ops.inc')
     inc_l = os.path.join(wd, 'x87_lowered_ops.inc')
-    write_inc(insts, a.nega, a.nega80, inc_n, inc_l)
+    write_inc(insts, a.nega, a.nega80, inc_n, inc_l, a.nega_c1)
     bn, bl = build_ref(wd, a.skip_build)
-    lines, metas = gen_trials(insts, a.n, a.seed, mode, a.rc_arith)
+    lines, metas = gen_trials(trial_insts, a.n, a.seed, mode, a.rc_arith)
     tf = os.path.join(wd, 'trials.txt')
     with open(tf, 'w') as f:
         f.write('\n'.join(lines) + '\n')
@@ -433,7 +461,7 @@ def main():
         st['ulp_hist'][0], st['ulp_hist'][1], st['ulp_hist'][2], st['ulp_hist'][3], st['ulp_max']))
     print('[x87_diff] per-value ulp: values %d; 0=%d 1=%d 2=%d >=3=%d' % (
         st['vals'], st['vals_ulp_hist'][0], st['vals_ulp_hist'][1], st['vals_ulp_hist'][2], st['vals_ulp_hist'][3]))
-    print('[x87_diff] compare ops %d, C0/C2/C3 match %d' % (st['cmp_ops'], st['cmp_match']))
+    print('[x87_diff] compare ops %d, C0-C3 match %d' % (st['cmp_ops'], st['cmp_match']))
     print('[x87_diff] FSW(masked) mismatch trials %d, slot mismatch trials %d, ulp cross-check bad %d' % (
         st['f_mismatch_trials'], st['s_mismatch_trials'], st['ulp_step_bad']))
     print('[x87_diff] m80 trials (fld/fstp m80 を含む) %d, bit-identical %d (%.2f%%)' % (
