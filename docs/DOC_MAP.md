@@ -641,6 +641,7 @@
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_3276.md` | ~65 | ildsp WaveformColouring の native 確定 (T-SH-59 #3276)。結論・手順・実測・ネガティブコントロール・未解決の全文 (`REPORT.md` §5-4・§5-5 から参照)。harness は `native_ref_wc.c` (入力は `native_image.py`)。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_CI.md` | ~70 | ildsp GeneralPitchShifter_CreateInstance 単独 closure の RetDec 入力・census・閉包の取りこぼし・ネガティブコントロール (T-SH-62 #3300)。測定値の正本 |
 | `tools/shared/lift/rex/REPORT.md` | ~75 | REX Shared Library (win `block24351_PE.bin`) の export 14 本の閉包測定 (T-SH-11 #153): 関数数・命令数・間接 call・import・`.pdata` 無しの近似。lift は未実施 (#2733・#2734)。測定値の正本。再現は `rex_closure.py` |
+| `tools/shared/lift/rex/REPORT_APPENDIX_2870.md` | ~50 | rex REPORT §9 全文 (T-SH-46 #2870: 成功経路 (戻り値 1 / 3) と arena 書込の一致・落ちる case の分類・未解決) |
 
 ### IPP
 
