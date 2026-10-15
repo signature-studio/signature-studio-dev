@@ -52,6 +52,18 @@ issue #4347 の受入 1 は満たしていない。`Refs #4347` の部分達成�
   - 所要 1 分 35 秒 (実測)、終了 0、load average (1 分値・4 コア) 1.24。PASS 8/8 (`0x410090` の絶対 qword 件数 3532)。
 - 差分の証跡: `git diff 864aca131 HEAD -- tools/python/analysis/flapi` は 0 行 (測定後に probe を変えていない)。
 
+## 4b. 第 3 run: [rbx+0x80] の経路 (否定的結果)
+
+- `0x60c220` は `mov rbx, rcx` (0x60c229) で受信オブジェクトを保持し、`call qword ptr [rbx+0x80]` (0x60c24f) を呼ぶ。`[rbx+0x80]` は VMT では**なく**インスタンス側のメソッドポインタ欄 (Code) と**推定**する (根拠: 未実測。VMT かどうかは 3531 件の所属の確定が必要)。
+- `[+0x80]` へ `qword` を書く命令は 2079 件 (`pe_callgraph.load()` 実測・`pe_py321b_rbx80.py` の走査外の手元の数え上げ)。書込み元の値の供給元は「直前 12 命令内に `0x410090` が即値・disp・絶対アドレス・RIP 相対の形で現れる命令」と定義し、その件数は 0 件 (手元の数え上げ。`0x410090` 自体を RIP 相対で指す命令も 0 件)。
+- 0x410090 の絶対 qword 3532 件 (8 バイト整列 3531 件) を検査した結果:
+  - RIP 相対で読まれるもの 0 件 (`pe_py321b_rbx80.py` の assert 4 で実測)。
+  - 非分岐命令の即値・disp32・絶対アドレスとして表 slot の VA (または下位 32 bit) が現れるもの 0 件 (`pe_py321b_rbx80.py` の assert 5 で実測)。分岐命令は検査対象外。
+- 含意: 0x410090 は静的な表から `[rbx+0x80]` へ写される経路では無いことを、上記の範囲で確認した。書込みは実行時 (オブジェクト生成・プロパティ設定) と見られる。この経路の特定には動的 trace か、3531 件の所属 (VMT かどうか) を別 probe で確定する必要がある。未確定。
+- probe: `tools/python/analysis/flapi/pe_py321b_rbx80.py` (5/5 PASS・終了 0・HEAD `62017c2f8` で実測: 所要 33.5 秒・load average 1.37)。
+- 再検証 (測定 commit `62017c2f8` 以降の HEAD `4ac84ac76` で再実行): `pe_py274_dispatch.py` 8/8 PASS・終了 0・所要 31.5 秒 (load average 0.94)。`pe_py321_upstream.py` 8/8 PASS・終了 0・所要 1 分 47 秒 (load average 1.20〜1.03)。
+- 測定 commit: `62017c2f8` (probe を変えた最後の commit)。差分の証跡: `git diff 62017c2f8 HEAD -- tools/python/analysis/flapi` は 0 行 (以後の commit は REPORT のみ)。
+
 ## 5. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
