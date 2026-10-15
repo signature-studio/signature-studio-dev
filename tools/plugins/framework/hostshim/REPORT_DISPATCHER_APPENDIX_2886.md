@@ -160,7 +160,7 @@ emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90
 ### 7.3 hostshim.c と Phase A
 
 - `hostshim.c` は変更しない。6 ID はどれも値が確定しないため、fail-soft の 0 固定 (0x18・0x45・0x54・0x64・0x65) は残す。0x56 の `g_hs_obj` 応答 (非 NULL) も現状のまま。
-- `hs_e2e.sh` (Phase A) は本 run では実行していない。`hostshim.c` を変えていないので fw_route.cjs の入力は変わらないが、`work-fw-stage1` は `fw_route.cjs`・`fw_flat4_canon3.ll` を含まず、`fw_stage2.sh` の emcc が要る。`/opt/emsdk` が無いため emcc を用意できなかった。必要な素材: `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。
+- `hs_e2e.sh` (Phase A) は本 run では実行していない。`hostshim.c` を変えていないので fw_route.cjs の入力は変わらないが、`work-fw-stage1` は `fw_route.cjs`・`fw_flat4_canon3.ll` を含まず、`fw_stage2.sh` の emcc が要る。`[EMSDK]` (`docs/REFERENCES.md` §4) が無いため emcc を用意できなかった。必要な素材: `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。
 - 受入 2・3 は子 issue へ移す (§7.4)。
 
 ### 7.4 未解決 (起票先)
