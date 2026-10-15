@@ -22,10 +22,10 @@
 
 ## 検証環境
 
-- emsdk 6.0.12 (`/opt/emsdk`)・`toolchain-emsdk` 展開元
-- `fl-win64` (`$HOME/analysis/win64/extracted/block00031_PE.bin` 22,227,016 B)
+- emsdk 6.0.12 (`[EMSDK]`)・`toolchain-emsdk` 展開元
+- `fl-win64` (`[WIN64]` の `extracted/block00031_PE.bin` 22,227,016 B)
 - CPython 3.12.1 wasm: `bash tools/python/build_cpython_wasm.sh` rc 0 (4 分 25 秒、4 コア)
-- 入力: `fetch_inputs.sh` rc 0 (`ANALYSIS_DIR=$HOME/analysis FL_WIN64_DIR=$HOME/analysis/win64`)
+- 入力: `fetch_inputs.sh` rc 0 (`ANALYSIS_DIR` と `FL_WIN64_DIR` に `[WIN64]` の展開先を指定)
 
 ## 本番への影響
 
