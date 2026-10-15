@@ -3,7 +3,7 @@
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない)。 ST(0) の f80→f64 の丸め差は ADR D28 の帰結で、行案は `REPORT_APPENDIX_1099.md` §6 (D24 (案)) にある。 本付録は関数単位の観測のみを足す (`DEFECTS.md` は編集しない)。
 
 - 親 issue: #3715 (PLG-G2-31・親 #2989)。 前付録: `REPORT_APPENDIX_2989.md`。
-- 測定 commit: `d5afb6ae5` (main 取り込み後の HEAD。 試験コード `x87_fn_diff.py` を含む最後の code commit)。 旧測定 commit `30f80f3c9` の実測は、判定器 (`nan-num` 判定・`--special`) が変わったため、本記録の値として使わない (§6 の鮮度の証跡)。
+- 測定 commit: `b3275dc1c` (main (`c5bd6af6e`・#4084 の `--classify` 分岐を含む) 取り込み後の merge commit。 試験コード `x87_fn_diff.py` を含む最後の code commit)。 旧測定 commit `d5afb6ae5` の実測は、main 取り込みで判定器が変わったため、本記録の値として使わない (§6 の鮮度の証跡)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` と乱数 (seed 2989) で生成した試行のみ。
 
 ## 1. 結論
@@ -34,7 +34,7 @@
 - native のバッファを 32MiB から 64MiB に広げた (`IBUF_SZ`・`OBUF_SZ`)。 40 本 × 200 行の入力と出力が 32MiB に収まらないため。
 - 試験ランナーが異常終了したとき native は exit 0 で抜けて出力が欠ける (本 run で確認: `1000c084` の 2 行目以降が出ず、`rc=0`)。 そのため、行数の突合 (`件数 native / wasm / 期待`) が、欠損の検出の役割を果たした。 ランナーの exit 規約は変えていない (この欠陥は §5 で未解決として扱う)。
 
-## 4. 実測 (測定 commit `d5afb6ae5`・HEAD で再現)
+## 4. 実測 (測定 commit `b3275dc1c`・HEAD で再現)
 
 | 関数 | n | 行の全項目が bit 一致 | float32 結果 (ST(0)・OBJ 窓) のみ一致 | ST(0) float64 の一致 / 1ulp / 2ulp / ≥3ulp | eax 不一致 | x87 深さ不一致 | OBJ 窓が変わった行 |
 |---|---:|---:|---:|---|---:|---:|---:|
@@ -45,7 +45,7 @@
 | `10001290` | 200 | 200 (100.00%) | 200 / 200 | 200 / 0 / 0 / 0 | 0 | 0 | 0 |
 
 - OBJ 窓の float32 語 (1,344 B): `10002ee0` 1,344,000 語・`10005400` 1,344,000 語・`10005d20` 67,200 語 = 全語一致。 `1000b3a2`・`10001290` は OBJ 窓を書かず、ST(0) が非ゼロで一致 (本付録では ST(0) の一致で非自明性を示す)。
-- 所要 (1 driver 実行): native build 0.04–0.05 s、emcc 5.86–6.02 s、native 実行 0.165–0.21 s、wasm (node) 0.24–0.28 s。 load1 は 0.28–0.43 (cpu 4)。
+- 所要 (通常・`b3275dc1c`): native build 0.17 s、emcc 20.05 s、native 実行 0.163 s、wasm (node) 0.252 s、load1 1.38。 `--special` (同): native build 0.04 s、emcc 6.91 s、native 実行 0.361 s、wasm (node) 0.389 s、load1 0.99。
 - 再現: 同じ seed で 2 回実行し、`work/x87fn/native_out.txt` の md5 は実行ごとに同一 (ネガコン後の再測定で確認)。
 
 ## 5. ネガコン・未解決
@@ -62,10 +62,10 @@
 | 構造が一致しない 3 本: `10009eb5` (eax が全 200 行不一致。 native `0x4d41`・wasm `0x4800`。 ST(0) は native NaN・wasm 0)・`1000b526` (eax 101 行の不一致。 差は eax の `0x228`/`0x229` で、C1 (`0x200`)・PE (`0x20`)・OE (`0x08`)・IE (`0x01`) の bit。 C0/C2/C3 ではない。 `ott_x87.h` の制限 (6) は C1 だけを扱うので、例外フラグの模型化の範囲かは未確認)・`1000bf60` (eax 4 行の不一致。 原因未確認) | 比較・状態語の lowering の差か判定器の模型の限界かが未確定。 受入の構造一致を満たせない | #4064 (PLG-G2-40) |
 | ST(0) が NaN と −0 で不一致する `1000d6fb` (構造は一致) | 無効演算・0 除算の NaN の扱いの差の可能性 (未確認) | #3716 (PLG-G2-32・例外的な入力) |
 | 試験ランナーが異常終了する 12 本 (native 6 本・wasm 6 本)。 原因は未確定。 wasm 側の `1000b6c1` は `A_(0x10024d50)` (イメージ外の絶対アドレス) を読むことまで確認した。 他は未確認 | ランナーが入力を入れられない。 native は異常終了時も exit 0 で出力が欠ける (§3) | #4065 (PLG-G2-41) |
-| 単独の入口として扱えない断片 10 本 (`add esp, 0x2c` で始まる) | 単独の入口として呼べない。 関数の入口を決める規則が要る | #4066 (PLG-G2-42) |
+| 単独の入口として扱えない断片 10 本 (`add esp, 0x2c` で始まる) | 単独の入口として呼べない。 判定規則は #4084 で main 済み (`x87_fn_diff.py --classify`)。 入口 4 本と断片 6 本の試験は #4080 | #4080 (親 #4066・PLG-G2-42。 #4066 は CLOSED) |
 | 定数関数 11 本 (非自明性なし) | 突合しても情報が無い。 入力の範囲を変えても観測できるかは未確認 | 起票しない (PR 本文の未解決表で扱う。 #3715 の範囲外として縮める) |
-| 超越関数・`frndint`・`fscale`・`fprem` 等 | 対象外 (lift が `ott_unsup` のまま) | PM agent の判断待ち: 起票先。 既定案: 新規の子 issue (#3687 (PLG-G2-29) は CLOSED のため追跡先にしない。 本 PR の子は上限 3 件 (#4064〜#4066) に達しているため PM が起票する) |
-| `fld`/`fstp` m80 の差分試験 | 80bit メモリ経路は未試験 | PM agent の判断待ち: 起票先。 既定案: 新規の子 issue (#2967 (PLG-G2-24) は CLOSED のため追跡先にしない。 上と同じ理由で PM が起票する) |
+| 超越関数・`frndint`・`fscale`・`fprem` 等 | 対象外 (lift が `ott_unsup` のまま) | 対象外 (前段は完了済みの #3687・#2967) |
+| `fld`/`fstp` m80 の差分試験 | 80bit メモリ経路は未試験 | 対象外 (前段は完了済みの #3687・#2967) |
 | f80→f64 の丸め差 (ST(0) の double で 1 ulp 以上。 分布は §4) | float32 結果には伝播しなかった。 方式の帰結 | ADR D28 (方式)。 行案 D24 (案) は `REPORT_APPENDIX_1099.md` §6 |
 
 ## 6. 再現手順
@@ -79,10 +79,10 @@ python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --nega             # ネ
 python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --nega-lower       # ネガコン (b) (exit 0)
 ```
 
-- 鮮度の証跡 (WORKFLOW §6): 旧測定 commit `30f80f3c9` から `d5afb6ae5` までの試験コードの差分は次のとおり (`x87_fn_diff.py` は 80 行変わった: `nan-num` 判定・`--special`・PASS の gate)。 `x87_fn_native.c` は `30f80f3c9..d5afb6ae5` で変更なし (差分 0)。
+- 鮮度の証跡 (WORKFLOW §6): main 取り込み前の測定 commit `d5afb6ae5` から `b3275dc1c` までの試験コードの差分は次のとおり (`x87_fn_diff.py` に `--classify` 分岐を追加した。 #4084 の変更。 `x87_fn_native.c` は差分 0)。 この分岐は全ての実行で評価されるため、本記録の値は `b3275dc1c` で取り直した。
   ```
-  git diff 30f80f3c9 d5afb6ae5 -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c
-  → x87_fn_diff.py | 80 ++++++++++++++++++++++++++-----  (1 file changed, 70 insertions(+), 10 deletions(-))
+  git diff d5afb6ae5 b3275dc1c -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c
+  → x87_fn_diff.py | 52 +++++++++++++++++++++++++  (1 file changed, 52 insertions(+))
   ```
-  よって本記録の実測は差分を含む `d5afb6ae5` で取った値。 以降の commit は REPORT・PR 本文の文書のみ (`git diff d5afb6ae5 HEAD -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c` は差分 0)。
-- `--special` (例外値の入力) の実測 (`d5afb6ae5`・20,000 行): PASS。 bit 一致は `10002ee0` 3,140 / 4,000・`10005400` 3,271 / 4,000・`10005d20` 3,542 / 4,000・`1000b3a2` 3,999 / 4,000・`10001290` 4,000 / 4,000。 構造 (eax・x87 深さ) は全行一致。 ネガコン `--special --nega-nan` (NaN を 1.0 に置換) は nan-num 0 → 1・判定 FAIL で検出。
+  以降の commit は REPORT・PR 本文の文書のみ (`git diff b3275dc1c HEAD -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c` は差分 0)。
+- `--special` (例外値の入力) の実測 (`b3275dc1c`・20,000 行): PASS。 bit 一致は `10002ee0` 3,140 / 4,000・`10005400` 3,271 / 4,000・`10005d20` 3,542 / 4,000・`1000b3a2` 3,999 / 4,000・`10001290` 4,000 / 4,000。 構造 (eax・x87 深さ) は全行一致。 ネガコン `--special --nega-nan` (NaN を 1.0 に置換) は nan-num 0 → 1・判定 FAIL で検出。
