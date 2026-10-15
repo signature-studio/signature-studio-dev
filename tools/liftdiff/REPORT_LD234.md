@@ -66,8 +66,8 @@ step ごとの結果 (run 3 の端末ログより):
 測定 commit `fbb19946c` から PR ブランチ HEAD までの `tools/liftdiff` の差分は、REPORT の追加だけ。コード差分は 0。
 
 ```
-$ git diff fbb19946c fa96a6304 --stat -- tools/liftdiff
- tools/liftdiff/REPORT_LD234.md | 68 insertions(+)
+$ git diff fbb19946c HEAD --stat -- tools/liftdiff
+ tools/liftdiff/REPORT_LD234.md | 81 +++++++++++++++++++++++++++++++++++++++++++++++
 ```
 
 測定値の鮮度はコード差分 0 で、HEAD でも有効。
