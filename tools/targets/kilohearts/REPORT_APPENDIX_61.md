@@ -60,3 +60,19 @@ unsup の内訳 (両ホスト同一):
 | unsup 65 site (rcpps 29・rsqrtps 25 + 語彙 11) の解消 | lift・build が通らない | #3994 [KH-81] |
 | lift・build・wasm・native 比較・1 bit ネガコン | 受入の本体 | #3994 [KH-81] |
 | 閉包が直接 call の辺だけを辿る下界であること | vtable 経由の先は根に入れた slot だけ。CFG / vtable 候補 (`#849`) との統合は未実施 | #3994 [KH-81] |
+
+## 5. #3994 (KH-81): 語彙追加の結果 (unsup 65 → 54)
+
+- 追加した x64c handler (`tools/flelift/x64c.py`): VEX `vcomiss` / `vcvtdq2ps` / `vpsrld`・`vpslld` (imm) / `vandps` (xmm・mem) の経路追加と、legacy `haddps` の新規 handler。差分テスト `tests/x64c_vex_diff.py` に 6 件を追加し 97/97 PASS。
+- 測定 commit: `5ab8ae7f5` (語彙追加。`scripts/host_x64c_closure.sh` は変更なし)。同一スクリプトを `9087f36d2` 時点の x64c で測った値が本付録 §2。
+- 結果 (測定 commit で 1 回、スクリプト全体 57.7 s、測定後 load average 0.67・nproc=4):
+
+| ホスト | 条件 | functions | insns | unsup sites (前 65 → 後) | 残 unsup |
+|---|---|--:|--:|--:|---|
+| Snap Heap | 閉包 | 242 | 18,402 | 65 → **54** | rcpps 29・rsqrtps 25 |
+| Snap Heap | ネガコン | 148 | 11,102 | 65 → 54 | rcpps 29・rsqrtps 25 |
+| Multipass | 閉包 | 251 | 20,764 | 65 → **54** | rcpps 29・rsqrtps 25 |
+| Multipass | ネガコン | 160 | 13,856 | 65 → 54 | rcpps 29・rsqrtps 25 |
+
+- 残 54 site はすべて rcpps / rsqrtps (近似命令)。実機近似表 (`snapins/scripts/approx_tables.b64`) を x64c の runtime に組み込む作業が要るため、本 PR の範囲外 (下の未解決)。
+- 受入 1 (unsup 0) は未達。受入 2〜4 (lift・build・wasm・突合・1 bit ネガコン・既存 14 本 run_all 不変) は未実施。
