@@ -239,6 +239,7 @@
 | `tools/m11/REPORT_SHX-T28.md` | ~125 | #2444 (SHX-T28, 親 #1630): 機械語から親フレーム共有 site を検出する `tools/m11/frame_share/detect.py` の結果 (閉包 7,421 関数で mov 渡し 307 site・D23 信号 301 site・親 63・callee 94)、`function_448490` の親 IR に `[rbp+0x4c]` の初期 store が無い静的観測、修復前 baseline (units_run 17・unit 18 の VirtualAlloc/MessageBoxA)。修復は子 [SHX-T40] |
 | `tools/m11/REPORT_N196.md` | ~90 | #3906 (M11-N196, 親 #3142): set_other 非 imm のスタック slot 読込・frame lea の IR 接続判定 (frame 定数 C と stack_var 対応・分類の件数は REPORT 参照)。load_def の誤判定の修正と負例 (`test_setother_slot_class.py`)。接続の注入と未決の接続先は #3932・#3933。分類器 `m11_setother_slot_class.py` |
 | `tools/m11/REPORT_N171.md` | ~120 | #3134 (M11-N171, 親 #1154): set_other 非 imm 349 件 (reg 123・mem 150・lea 76) の定義探索と 3 値分類 (件数は REPORT 参照)。接続方式の決定と未決の接続先 (#3140・#3141・#3142)。survey は素材欠落で未測定 (#1154)。分類器 `m11_setother_nonimm_class.py` |
+| `tools/m11/REPORT_N172.md` | ~80 | #3140 (M11-N172, 親 #3134): set_other 非 imm reg merge 34 件の CFG 到達定義による判定 (件数は REPORT 参照)。実値化 1 件の機械語照合。未決 33 件の接続先の再割当 (#3141・#3142・#1154)。判定器 `m11_setother_nonimm_cfg.py` |
 | `tools/m11/REPORT_N173.md` | ~151 | #3141 (M11-N173, 親 #3134): set_other 非 imm のうち呼出し戻り値・算術・狭い格納 58 件の判定。戻り値の機械語解析・IR 型幅ゲート (define 行の出所)・測定 (実値化 0 / 未決 58 / 未分類 0)・ネガコン・未解決 (#3140・#3142・#3134)。分類器 `m11_setother_nonimm_class.py` |
 | `tools/m11/REPORT_N174.md` | ~90 | #3142 (M11-N174, 親 #3134・#1154): set_other 非 imm のメモリ読込・lea 256 件の接続方式 (stack_slot・alloca・ptr_mem・gep・global_store) と 3 値分類 (件数は REPORT 参照)。残りは #3906・#3907。分類器 `m11_setother_mem_class.py` |
 | `tools/m11/REPORT_N87.md` | ~80 | #1373 (M11-N87, 部分達成せず・実値化 0 件): sigfix 0 詰め inherit 1,172 件の呼出元 def 追跡 (基本ブロック到達定義・入口の呼出元再帰・call 越しの引数レジスタ要約)・復元不能 1,172 件 (未分類 0) の理由別内訳・survey ok 872 (退行なし) |
@@ -600,6 +601,8 @@
 | `tools/python/REPORT_PY16.md` | ~100 | PY-16 (#654): stubs 既定値 `midi.*` の評価 (eval 撤去・許可式の評価器・検証・ネガコン) の全文 (REPORT.md §15 の分割移動) |
 | `tools/python/REPORT_PY80.md` | 93 | PY-80 (#2633): 静的版 (flpy_static) のサブインタプリタは達成。Memory64 は部分 (validate は node 22.23 で不可・headless Chrome 154 で可、実行検証は未了)。`_PyInterpreterState_GetRefTotal` は FL PE が呼ばない。結論の正本は REPORT の結論表。pthread+GIL は子 #2856 (PY-97)、Memory64 実行は子 #2858 (PY-98) |
 | `tools/python/REPORT_PY27.md` | ~70 | PY-27 (#1138): ui / general / screen / arrangement / launchMapPages の mock 対応状況・`tests/ui_diff.mjs` の結果・保留 150 件 |
+| `tools/python/REPORT_PY206.md` | 125 | PY-206 (#3494): device 系 32 関数のうち PE 確定の 7 関数 (通知 3・状態読出し 3・setMasterSync 1) の VA 表と C/mock 実装。値は仮置き。残り 25 関数は子 issue (本文の未解決表) |
+| `tools/python/REPORT_PY206_APPENDIX.md` | 151 | PY-206 の旧測定節 (`0641856`〜`b3c3dafdd`) を本体から分割移動したもの (削除していない) |
 | `tools/python/REPORT_PY125.md` | ~95 | PY-125 (#3001): dispatch `0xd843d0` の out の写し方・clearLog / dumpScoreLog の戻り値 None (mock/C 差分 0)・`0x11eb5f0` の効果。`0x124c020`・-2 の報告ゲートは未確定 (子 #3045) |
 | `tools/python/REPORT_PY126.md` | ~55 | PY-126 (#3002): processRECEvent の `0xd84740` の呼出し鎖と out の構造 (status・結果 int32) を確定。戻り値の式 (`0x1046a30`) は未確定で mock/C 未実装 (子 PY-235)。解析は `analysis/py126_process_rec_chain.py` |
 | `tools/python/REPORT_PY235.md` | ~90 | PY-235 (#3701): processRECEvent の `0x1046a30` の eventId 族の分岐と戻り値 `[rbp+0x5b8]` の書込み census を CFG で確定。R-other 族の成功経路 (戻り値 = value) を mock/C に実装。gate・固定 4 族・0x70000000 族と index 族は子 PY-251〜253。解析は `analysis/py235_process_rec_families.py` |
@@ -657,7 +660,7 @@
 | `tools/python/REPORT_PY23.md` | ~85 | PY-23 (#1054): `enveditor` (Edison API・仕様は block24447) の実装と Audio scripts 12 本の import/実行検証。数値 oracle 6 本・NEG-d・未解決 |
 | `tools/python/REPORT_PY19.md` | ~57 | PY-19 (#792): `Score.loadScoreFromFile` (仮想 FS・JSON) と `ScriptDialog.DialogParams` (MOCK)・数え方の定義 (母集団 64) と再計算・実測・未解決 |
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
-| `tools/flp/REPORT_APPENDIX_3052.md` | ~190 | flp REPORT §18 全文 (#3052 WFBox/DitherBox 読取り関数の静的調査: 文字列・thunk・直接呼出しの計数、候補と未解決。再現 `s3_regread_xref.py`) と §19 (WFBox の RegQuery が通る汎用ループ `0xba5d10` の関数先頭置換による確認。再現 `s4_bisect.sh`・`s4_xref.py` (既定と `fn`))・§20 (読取り関数 `0xd1da70`・呼出し箇所 `0xd1dd61` を置換試験で確定。書式引数の上流は未確定。再現 `s2_render_probe.sh` の `S2_PATCH`)。250 行上限のため分割移動 |
+| `tools/flp/REPORT_APPENDIX_3052.md` | ~233 | flp REPORT §18 全文 (#3052 WFBox/DitherBox 読取り関数の静的調査: 文字列・thunk・直接呼出しの計数、候補と未解決。再現 `s3_regread_xref.py`) と §19 (WFBox の RegQuery が通る汎用ループ `0xba5d10` の関数先頭置換による確認。再現 `s4_bisect.sh`・`s4_xref.py` (既定と `fn`))・§20 (読取り関数 `0xd1da70`・呼出し箇所 `0xd1dd61` を置換試験で確定。書式引数の上流は未確定。再現 `s2_render_probe.sh` の `S2_PATCH`)。§21 (Autogun の 32-bit 書出しの書き手の切り分け: `0x670fd0` は実行されず、実行される書き手は `0x674620`・`0x674800`。再現 `s5_writer_matrix.sh`)。250 行上限のため分割移動 |
 | `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
 | `tools/plugins/f2/REPORT.md` | ~250 | PLG-F2 eq-filter 11 本: 固有閉包 lift の再現と間接 call 脱落の監査 (#199)、icall 復元の batch_lift 接続と回帰ゲート (#514, §7)、leaf 23 関数の関数単位差分試験の結論 (#515, §8)、xmm 引数復元 pass の結論 (#547, §9)、ldfix の接続 (#613, §10)、0x6f1650 の原因切り分け (#871 部分, §10.1)。§8・§9 の詳細は `REPORT_APPENDIX.md`、§10 (#613) の全文は `REPORT_APPENDIX_613.md`、§10.1 の詳細は `REPORT_APPENDIX_871.md`、§11 (#2726: 残 6 関数の原因・pass on/off の ablation 再定義) は `REPORT_APPENDIX_2726.md` |
 | `tools/plugins/f2/REPORT_APPENDIX.md` | ~241 | f2 REPORT §8 全文 (PLG-F2-3 #515: 23 関数表・ARTIFACT 表・NC 詳細・限界・再現・実測時間) と §9 全文 (PLG-F2-4 #547: xmm 引数復元 pass の実測と未解決)。250 行上限のため無変更で分割移動 |
@@ -809,8 +812,10 @@
 | `tools/targets/massivex/REPORT_APPENDIX_3154.md` | ~71 | Massive X §12.2・§12.2a・§12.10 の分割移動全文 (#3154 MX-34・250 行上限のため・内容無変更) |
 | `tools/targets/massivex/REPORT_APPENDIX_3454.md` | ~24 | Massive X §11.5 (#3454 MX-35) の分割移動全文: dsp unsup 基準の更新と NC3 の base 相対判定。250 行上限のため分割移動・内容無変更 |
 | `tools/targets/massivex/dsp/REPORT.md` | ~220 | Massive X DSP closure 特定と lift 計画 |
-| `tools/targets/massivex/dsp/REPORT_MX6.md` | ~233 | MX-6 (#1123): vectorcall 静的検出・.pdata unwind census・FH3 funclet 一覧と #228 同型判定。MX-39 (#3776) の節は付録 `REPORT_APPENDIX_3776.md` §9 (分割移動)。測定値の正本 |
+| `tools/targets/massivex/dsp/REPORT_MX6.md` | ~200 | MX-6 (#1123): vectorcall 静的検出・.pdata unwind census・FH3 funclet 一覧と #228 同型判定。MX-41 (#3792): 2 本目 .pdata の census と 1 本目の読取不能 160 件の分類 (画像外の UnwindInfoAddress)。MX-39 (#3776) の節は付録 `REPORT_APPENDIX_3776.md` §9 (分割移動)。測定値の正本 |
+| `tools/targets/massivex/dsp/REPORT_APPENDIX_3792.md` | ~170 | MX-41 (#3792): 1 本目 .pdata の読取不能 160 件の全件表 (st / ui / 所属 section / raw / 先頭バイト)。測定値の正本は REPORT_MX6.md §3 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_3776.md` | ~70 | MX-39 (#3776) の分割移動全文 (§9): funclet の深い closure 到達 (BFS 深さ)・E8/E9 候補 4 件の由来・MSVC funclet の取り込み方式 (U4d・U4e)。250 行上限のため分割移動 (§9.6 は 3eefb3bab の再測定を追記) |
+| `tools/targets/massivex/dsp/REPORT_APPENDIX_MX6_HISTORY.md` | ~140 | MX-6 (#1123) の旧測定記録 (0dbf9a54d・51953f46d・fbc9971f の §1・§7 と、62e3aefbe までの main 側 §7 の差分)。REPORT_MX6.md から分割移動 (内容は削除していない)。現行の測定値の正本は REPORT_MX6.md §1・§7 |
 | `tools/targets/massivex/dsp/REPORT_MX33.md` | ~153 | MX-33 (#3032) 受入 1: xmm0〜3 だけの入口 livein 保留 17 件の読み幅による判定 (0 件確定・判定不能 17)・NC 9 件・線形上限。受入 2〜5 は子 issue。測定値の正本 |
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
 | `tools/targets/kilohearts/REPORT_KH19.md` | 70 | KH-19 (#782) ホスト 3 種 (Snap Heap / Multipass / Phase Plant) の vtable 間接 call 込み closure 再計算 (下界・過大評価の参考値・限界) |
@@ -820,6 +825,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_2176.md` | 125 | KH-35 (#2176): 対照 Gain の before 160 関数の AI 判定 (人手検証ではない。`verified` 列は 160 行とも auto のまま。人手確認は #3254)・検算 `gain_manual_check.py` とネガティブコントロール・ROOT 27 行の vtable slot・保持規則の限界。測定値の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3064.md` | ~36 | KH-37 (#3064): 対照 Gain の x64c 閉包 148 と `gain_before_160.tsv` 160 行の数え方の差 12 件 (iat_thunk 2・tail_absorbed 9・SEH 着地点 1) と、`0xfd0995` が SEH の `__except` 着地点である実測 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3065.md` | ~90 | KH-38 (#3065) 対照 Gain before 160 closure の unsup 285 site / 48 種 → 0 (flelift x64c の VEX/FMA/rcr 被覆)。before/after の測定値の正本。再測定 `scripts/lift_closure_x64c.sh`、差分テスト `tools/flelift/tests/x64c_vex_diff.py`、rcr 実機照合 `tools/flelift/tests/rcr_native_check.py` |
+| `tools/targets/kilohearts/REPORT_APPENDIX_3801.md` | ~84 | KH-65 (#3801): Delay の型不一致 187 件の規則。`_DAT_` グローバル 13 件の C 型規則 `GTYPE` (機械語の参照幅で確認) で 187 → 119 (emcc 507 → 439)・Gain/Haas/Gate の `.o` 不変・ネガティブコントロール (NC0/NC1/NC2) は現行値で再測定済み・残件 119 の分類と起票先 (#3837・#3849)。§10-7x の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3075.md` | ~34 | #1216 差し戻し round 4: merge 後 head (`2a17665f`) での Stereo / Delay 再測定 (emcc 12・577 件)・merge 前後の C の cmp・census。§10-7p-3 の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3095.md` | ~158 | KH-43 (#3095): Delay の SIMD 疑似関数 13 種 (25 件) を shim に実装・swi 21 件を fail-fast (abort)・emcc 残件 441 (測定 `ab01412df`・SIMD・swi 0。main 取り込み後の `abee0a1ff` は 463・統合前 `12647936d` は 506)・ホスト x86 intrinsics 突合 (200,000 試行 × 13 種、ネガコン FAIL)・Gain/Haas/Gate 1000/1000・issue 本文の件数訂正 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3802.md` | ~126 | #3802 (KH-66): Delay の DAT_/uRam の型規則・未関数化 callee の fail-fast stub・スタブと本体の衝突の解消。結果と測定は付録 §10-7u が正本。§⑧ は main 取り込み後の状態 |
