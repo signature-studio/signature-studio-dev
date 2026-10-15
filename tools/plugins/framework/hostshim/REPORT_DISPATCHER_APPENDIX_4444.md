@@ -5,17 +5,17 @@
 ## 1. 結論
 
 - `0x15e4790` は `.data` (初期化済み) のスロットで、初期値は `0x141d6b8`。`*(0x141d6b8)` は `0`。この連鎖の先頭は PE 内の初期値では null。
-- `0x15e4790`・`0x141d6b8` を書き換える命令は、fl-win64 の全 313 PE ブロック (`*_PE.bin`) を走査しても見つからなかった。`.text` の rip 相対の書込みは 0 件、`0x141d6b8` を指す qword は `block00031_PE.bin` の `0x15e4790` だけ。
-- 受入 1 の判定: 書込み元 (VA) は静的に確定できない。書込みは (a) PE 外のランタイム、または (b) 計算アドレス経由の間接書込み、のどちらかで、PE 内の VA として列挙できるものは無い。
+- `0x15e4790`・`0x141d6b8` への rip 相対の mov 書込みは、`block00031_PE.bin` の `.text` 1 つだけを走査して 0 件 (`hs_glob_writers.py`・`mov` のみ・`G` 近傍 ±0x40)。他ブロックの `.text`・他の書込み命令 (`add`・`xor`・`xchg`・`cmpxchg` など)・計算アドレス経由は走査していない。データ域は全 313 PE ブロック (`*_PE.bin`) で検索し、`0x141d6b8` を指す qword は `block00031_PE.bin` の `0x15e4790` だけ。
+- 受入 1 の判定: 書込み元 (VA) は静的に確定できない。書込みは (a) PE 外のランタイム、または (b) 計算アドレス経由の間接書込み、のどちらかと考えられるが、上記の範囲の走査では PE 内の書込み VA を列挙できなかった。
 - 受入 2 の判定: `[rbp+0x89f]` の書込み元 `0x1326c34`・`0x1327f9a` は、基準 run の 256 ID のどれにも現れない。8 件を実行させる gate 側の入力は、この基準 run では与えられない。
 - 受入 3 の判定: `hostshim.c` の応答表には反映しない。8 件の値は確定したが、到達させる gate の入力 (null 連鎖の先の値) が未確定で、表に入れても実行されない。Phase A 回帰は未実施 (§5)。
 
 ## 2. 測定条件
 
-- 測定 commit は §1 の末尾 (§2 実測) を参照。基準 run の `hs_disp_emu.py` は `origin/main` `2e3c6d554` でも測り、同じ集計を得た。
+- 測定 commit: `151625a41`。基準 run の `hs_disp_emu.py` は `origin/main` `2e3c6d554` でも測り、同じ集計を得た。
 - 素材: `fl-win64` の `extracted/*_PE.bin` (313 ブロック)。`block00031_PE.bin` (22,227,016 B) が Dispatcher を含む。Python venv に `unicorn 2.1.4`・`pefile`・`capstone 5.0.7`。
-- 実測 (HEAD `151625a41`): 基準 run (全 256 ID・既定・`HS_DISP_PATH=1`) real 72.3 秒、load 0.78 (uptime)。集計は `distinct (rax, path) = 109` / unmapped 61 ID・5,340 件・200 組・197 ページ。`REPORT_DISPATCHER_APPENDIX_4130.md` §1 と一致。`hs_glob_writers.py` は 313 ブロック・`.text` 近傍の書込み 0 件 (同じ結果)。
-- 測定 commit: `151625a41` (`hs_glob_writers.py` 追加。コードを変えた最後の commit)。`git diff 151625a41 HEAD -- 'tools/plugins/framework/hostshim/*.py' '...*.c' '...*.sh'` の出力は 0 行 (その後の commit は REPORT のみ)。
+- 実測 (測定 commit `151625a41`): 基準 run (全 256 ID・既定・`HS_DISP_PATH=1`) real 72.3 秒、load 0.78 (uptime)。集計 (distinct (rax, path)・unmapped・組・ページ) は `REPORT_DISPATCHER_APPENDIX_4130.md` §1 と一致。`hs_glob_writers.py` の結果は §3。
+- コード差分: `git diff 151625a41 HEAD -- 'tools/plugins/framework/hostshim/*.py' '...*.c' '...*.sh'` の出力は 0 行 (`hs_glob_writers.py` 追加が `151625a41`。その後の commit は REPORT のみ)。
 
 ## 3. 受入 1: `0x15e4790` の連鎖
 
@@ -24,9 +24,9 @@
 | `G = 0x15e4790` の section | `.data` | `pefile` の section 範囲 |
 | `*G` | `0x141d6b8` | `block00031_PE.bin` の memory image |
 | `*(*G)` | `0x0` | 同上 (null) |
-| `G` を含む qword (データ域) | `block00031_PE.bin` file+0x11e3190 の `0x141d6b8` が `G` の内容 | 全 PE 走査 |
-| `G` を rip 相対で参照する `.text` 命令 | 0 件 (近傍 ±0x40 の rip 相対 mov 書込みも 0 件) | `hs_glob_writers.py` |
-| 他の PE ブロックで `0x15e4790`・`0x141d6b8` を指す qword | 0 件 (`0x141d6b8` の qword は `block00031_PE.bin` にのみ存在) | `hs_glob_writers.py` |
+| `G` を含む qword (データ域) | `block00031_PE.bin` file+0x11e3190 の `0x141d6b8` が `G` の内容 | 全 313 ブロックの raw 検索 |
+| `G` の近傍 ±0x40 への rip 相対 mov 書込み (`block00031_PE.bin` の `.text` のみ走査) | 0 件 | `hs_glob_writers.py` |
+| 他の PE ブロックで `0x15e4790`・`0x141d6b8` を指す qword | 0 件 (`0x141d6b8` の qword は `block00031_PE.bin` にのみ存在) | `hs_glob_writers.py` (raw 検索) |
 
 未確定 (受入 1 の列挙):
 - `G` の初期化の書込み元: PE 内の VA として列挙できるものは無い。ランタイム (PE 外) で書かれるなら、その書込みは本 PE の範囲に出ない。
