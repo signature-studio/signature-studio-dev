@@ -51,7 +51,7 @@ const pe121 = new Set(["screen.isBlanked", "screen.isUnBlank", "screen.getScreen
 const pe119 = new Set(["ui.getFocused", "ui.getFocusedFormID", "ui.getFocusedFormCaption", "ui.getFocusedPluginName", "ui.getHintMsg", "ui.isInPopupMenu"]);
 // PE で呼出し経路と値の式を確定した ui 読出し 2 件 (REPORT_PY128・PY-128 #3005)。tests/ui_state_diff.mjs が mock と照合
 const pe128 = new Set(["ui.getProgTitle", "ui.getHintValue"]);
-// PE で書込み経路を確定した ui setter 2 件と ui 版 getVersion (REPORT_PY130_3007・PY-130 #3007)。setTimeDispMin は未実装 (保留)。tests/ui_state_diff.mjs が mock と照合
+// PE で書込み経路を確定した ui setter 2 件と ui 版 getVersion (REPORT_PY130_3007・PY-130 #3007)。setTimeDispMin は PY-236 (#3706) で実装 (toggle は奇数回・偶数回ともに ui_state_diff.mjs が mock と照合)
 const pe130 = new Set(["ui.setBrowserAutoHide", "ui.setStepEditMode", "ui.getVersion", "ui.setTimeDispMin"]);
 // PE で範囲判定・書込み先を確認した general setter 6 件 (REPORT_PY119_2977・PY-119 #2977)。tests/general_diff.mjs が mock と照合
 const pe119set = new Set(["general.setRecPPQ", "general.setNumerator", "general.setDenominator", "general.setUndoHistoryPos", "general.setUndoHistoryCount", "general.setUndoHistoryLast"]);

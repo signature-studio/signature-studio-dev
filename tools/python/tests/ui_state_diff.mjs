@@ -33,6 +33,7 @@ const setters = [
   ["ui.setStepEditMode", [1]], ["ui.getStepEditMode", []],
   ["ui.setStepEditMode", [0]], ["ui.getStepEditMode", []],
   ["ui.setTimeDispMin", []], ["ui.getTimeDispMin", []], ["ui.setTimeDispMin", []], ["ui.getTimeDispMin", []],
+  ["ui.setTimeDispMin", []], ["ui.getTimeDispMin", []],
   ["ui.getVersion", []], ["ui.getVersion", [0]], ["ui.getVersion", [3]], ["ui.getVersion", [4]],
   ["ui.getVersion", [6]], ["ui.getVersion", [7]], ["ui.getVersion", [-1]], ["ui.getVersion", [true]],
   ["ui.getVersion", ["x"]],
