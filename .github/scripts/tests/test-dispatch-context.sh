@@ -245,9 +245,10 @@ pm_has '新規 secrets・資格情報を扱う変更だけは `needs-user-input`
 expect "pm.md: a workflow change with new secrets is escalated to the human owner" $?
 ! grep -qF '依頼者' "$HERE/../../prompts/implementer.md" && ! grep -qF '依頼者' "$HERE/../../prompts/reviewer.md"
 expect "implementer.md / reviewer.md: no '依頼者' left (the agent-facing requestor is PM)" $?
-WFSEC="$(sed -n '/^### workflow 変更の運用/,/^## 12/p' "$HERE/../../../docs/WORKFLOW.md")"
-[ -n "$WFSEC" ] && ! printf '%s' "$WFSEC" | grep -qF '依頼者'
-expect "WORKFLOW §11 workflow-change section: no '依頼者' left" $?
+WFSEC="$(sed -n '/^## 11\./,/^## 13\./p' "$HERE/../../../docs/WORKFLOW.md")"
+WFNOREQ="$(sed 's/依頼者指示/-/g' <<< "$WFSEC")"
+[ -n "$WFSEC" ] && ! grep -qF '依頼者' <<< "$WFNOREQ"
+expect "WORKFLOW §11-§12 (whole): no '依頼者' left except 依頼者指示 NNN" $?
 # 10d. needs-user-input の判定 fixture (#3705): 全件が pm.md の表に同じ判定で載る。escalate は 4 種の区分を持ち、decide は区分が none。
 FX="$HERE/../../../infra/pm-worker/test/fixtures/needs_user_input.input.json"
 jq -e '.cases | length > 0' "$FX" > /dev/null 2>&1

@@ -280,9 +280,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
     fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
     作成・検証は `bash tools/plugins/framework/fw_pack_stage1.sh pack` → `artifacts/work-fw-stage1.tar.zst` (`verify` で単独検査も可)。
-    R2 への投入の手順は下の「R2 への投入 (VM 非依存の手順)」。現状は PM が VM 上で行い、VM 退役後の担い手は依頼者とする。
+    R2 への投入の手順は下の「R2 への投入 (VM 非依存の手順)」。現状は PM が VM 上で行い、VM 退役後の担い手は人間オーナーとする。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
-- **R2 への投入 (VM 非依存の手順・#2434)**: 担い手は依頼者 (現状の PM は VM 上で行う。VM 退役後は依頼者が行う)。
+- **R2 への投入 (VM 非依存の手順・#2434)**: 担い手は人間オーナー (現状の PM は VM 上で行う。VM 退役後は人間オーナーが行う)。
   素材の原本の所在は `docs/REFERENCES.md` の「素材の原本と R2 bundle の対応」、投入の頻度は `tools/pm/REPORT.md` §13 が正本。
   1. **権限を昇格**: Cloudflare で R2 の API token の権限を、バケット `signature-studio-artifacts` に限り「Workers R2 Storage Bucket Item Read」から「Read + Write」へ変える。画面上の操作名は `[未確認]`。昇格中は、この token を使う全ての経路が書ける (Actions の `CF_R2_*` が同じ token かは `[未確認]`)。投入は短時間で終える。
   2. **投入**: 梱包した `<name>.tar.zst` を S3 互換 API で置く。大きい object は aws cli が multipart で送る (`tools/plugins/framework/fw_pack_stage1.sh` の注記と同じ形): `aws s3 cp <name>.tar.zst s3://signature-studio-artifacts/artifacts/<name>.tar.zst --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"`。S3 のキーは環境変数で渡し、値を repo・ログ・issue に書かない。
@@ -324,9 +324,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
   応答を終える時は、background で `gh run watch` が 1 本以上走っていること。完了通知を受けたら、
   結果の処理に入る前に、次の watcher を起動し直す。
-- **PM は依頼者の不在 (最大 2 日) を前提とする (依頼者指示 144)**: 依頼者は一度指示すると最低 2 時間、最大 2 日間は不在になり、
-  依頼者の指示がないと進行できない状態はそのまま遅延になる。依頼者の操作が必要な項目は非ブロッキングにする
-  (`needs-user-input` で積み、それを待たずに他の作業を進める)。依頼者の応答を、他の作業の前提条件にしない。
+- **PM は人間オーナーの不在 (最大 2 日) を前提とする (依頼者指示 144)**: 人間オーナーは一度指示すると最低 2 時間、最大 2 日間は不在になり、
+  人間オーナーの指示がないと進行できない状態はそのまま遅延になる。人間オーナーの操作が必要な項目は非ブロッキングにする
+  (`needs-user-input` で積み、それを待たずに他の作業を進める)。人間オーナーの応答を、他の作業の前提条件にしない。
 - **open PR は 2 状態のみ (依頼者指示 119・120・122・123)**: 実装が始まったチケットは merge まで止めない。
   open PR は常に次の **どちらか** であり、「レビューも修正もされていない状態」(IDLE) を 1 秒も作らない。
 
@@ -460,18 +460,18 @@ PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次�
 
 ## 12. 人間オーナー不在時の運用 (needs-user-input・assume-and-proceed)
 
-エージェント向け文脈の「依頼者」は PM を指す (判断: 2026-10-15、指示 151・152、#4476)。PM は全権限と判断責任を持つ。
+エージェント向けの文脈では、人間は「人間オーナー」、判断の担い手は「PM」と書く (判断: 2026-10-15、指示 151・152、#4476)。PM は全権限と判断責任を持つ。
 人間オーナーは最低 2 時間・最大 2 日間不在になりうる。人間オーナーの判断が要る事項 (4 種) は PM が `needs-user-input` で積み、
 他の作業を止めない。規則 R1〜R9 と境界 U1〜U8 の**正本は `.github/prompts/pm.md`** である (本節に複製しない)。
 
 - **書式**: `needs-user-input` を付けた issue の本文先頭に、次の 4 項目を順に書く。
   1. 質問
-  2. 既定案 (依頼者の回答が無いときに採る案)
+  2. 既定案 (人間オーナーの回答が無いときに採る案)
   3. 既定で進むと何が起きるか
   4. 答えを変えたときの戻し方
 - **依存 issue は既定案で進める (assume-and-proceed)**。依存 issue を `blocked_by` にしない。
   依存する側の issue に「仮定で進む」旨をコメントし、既定案のまま実装・PR を進める。
-- **依頼者の回答の検出 (`user_answered`)**: `needs-user-input` の issue に依頼者 (人間) が返したコメントを、
+- **人間オーナーの回答の検出 (`user_answered`)**: `needs-user-input` の issue に人間オーナーが返したコメントを、
   PM agent が読んで反映する。回答は既定案より優先する。値域外 (allowlist 外の素材名など) の部分だけ無視する。
 - **PR 起点の判断待ち (`needs_decision`)**: 対象は `needs-user-input` の issue でなく PR (ref は PR 番号)。reviewer の最新の差し戻し
   (`CHANGES_REQUESTED`) の本文が PM の判断・起票を求めているとき (`review.needs`) に Worker が送る。条件は `infra/pm-worker/src/pm.ts` の `detectPm`。
