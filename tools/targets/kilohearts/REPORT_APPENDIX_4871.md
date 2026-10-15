@@ -9,9 +9,9 @@
 - **測定 commit** (コードを変えた最後の commit): `678386211`。`git diff 678386211 HEAD -- tools/targets/kilohearts/ghidra_route` = 0 行 (本節の commit は REPORT のみ)。
 - **検証起点**: `origin/main` = `fc48aa8a5`。
 
-**素材・環境** (repo 外・`/tmp/opencode/kh124/`)
+**素材・環境** (作業 dir は repo 外)
 - `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip` → `HeartCore.core_64` (76,642,304 B、sha256 先頭 `d55ce8b4`)。
-- [GHIDRA] 12.1.4 (公式 release `ghidra_12.1.4_PUBLIC_20260921.zip`、sha256 先頭 `ddac49f9` 一致)。JDK 21 (`/usr/lib/jvm/temurin-21-jdk-amd64`)。[EMSDK] 6.0.12 (`toolchain-emsdk` を展開)。n=1。
+- [GHIDRA] 12.1.4 (公式 release `ghidra_12.1.4_PUBLIC_20260921.zip`、sha256 先頭 `ddac49f9` 一致)。JDK 21。[EMSDK] 6.0.12 (`toolchain-emsdk` を展開)。n=1。
 
 **閉包 (`closure.py stereo`)**: 49 関数 (also 48)・反復 12・FAIL 0・除外参照 3 件 (`FUN_18004cf20`・IAT thunk `81e4`・`81ec`)。wall 5 分 22 秒。親 #4829 の記録と一致。`FUN_180fd8aac` は閉包に入った (`also`)。
 
