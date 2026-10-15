@@ -16,12 +16,13 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `dda07f5cf` (コードを変えた最後の commit。`feat(liftdiff): ld_native に page 保護を変えない DR 書込み監視 (LD_WATCH_MODE=hw) を追加`)。
-- `git diff --stat dda07f5cf HEAD -- tools/liftdiff tools/m11/trap_triage` の出力 (作成時 HEAD `1bec3fb65`): `3 files changed, 182 insertions(+)` (`REPORT_APPENDIX_2770.md` +5・`REPORT_APPENDIX_3648.md` +93・`tools/m11/trap_triage/hw_watch_3648_check.py` +84)。測定に使ったコードは差分 0: `git diff --stat dda07f5cf HEAD -- tools/liftdiff tools/m11/trap_triage/hw_watch_3648.sh` は空。`hw_watch_3648_check.py` は ca95e5509 で追加した判定スクリプトで、測定 boot には関与しない。
-- ビルド: `tools/liftdiff` で `gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm`。`rt/ld_native.c` 自身の警告は 0 件。`rt/ld_core.h` には gcc 13.3.0 (Ubuntu) で 3 件 (行 144・153・286。#2770 §8.1 の既存警告) 出る。別の gcc 版では件数が変わりうる。
-- 素材: `fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` とした。`work-m11.tar.zst`・`work-liftdiff.tar.zst` は `tools/m11/work/`・`tools/liftdiff/work/` に展開 (`tar --zstd -xf`)。
-- 実行: `tools/m11/trap_triage/hw_watch_3648.sh` (環境は `env -i` で固定。下記 §3)。直列 12 run。所要: 12 run 合計 183 s (1 run 約 15 s)。1 分 load average は開始 0.33・終了 0.97 (`uptime`)。
-- 判定スクリプト: `tools/m11/trap_triage/hw_watch_3648_check.py` (state 比較は `cmp_img_2770.py` と同じ項目)。判定出力 (`work/probe3648/check.txt`) は測定時に保存していなかった (§5 の注記)。
+- 測定 commit: `6fe39c6a8` (main 取込みの merge commit。`origin/main` を merge した後の HEAD で、12 run を取り直した)。旧測定 commit `dda07f5cf` の値は、この取込み後にも同じ数値で再現した (§5)。取込み時に `rt/ld_native.c` (他 PR の MXCSR・signal mask の保存) と `rt/ld_runner.mjs` が変わったため、測定 commit を取り直した。
+- 測定コードの差分 (`dda07f5cf` → `6fe39c6a8`): `git diff --stat dda07f5cf 6fe39c6a8 -- tools/liftdiff/rt/ld_native.c tools/liftdiff/liftdiff.py tools/liftdiff/targets/m11.json tools/m11/trap_triage/hw_watch_3648.sh` で `rt/ld_native.c` と `rt/ld_runner.mjs` のみ変更 (監視の opt-in 経路は変わらず。12 run の数値は旧値と一致)。
+- 測定 commit から HEAD までの差分 (本付録の commit 時点): `git diff --stat 6fe39c6a8 HEAD -- tools/liftdiff tools/m11/trap_triage/hw_watch_3648.sh` は空 (測定コード差分 0)。
+- ビルド: `tools/liftdiff` で `gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm`。`work-liftdiff` 内の古い `work/ld_native` は使わず、毎回ビルドし直した。`rt/ld_native.c` 自身の警告は 0 件。`rt/ld_core.h` には gcc 13.3.0 (Ubuntu) で 3 件 (行 144・153・286。#2770 §8.1 の既存警告) 出る。別の gcc 版では件数が変わりうる。
+- 素材: `fl-win64.tar.zst` を展開し (`extracted/block00031_PE.bin` を確認)、`FL_WIN64_DIR` とした。`work-m11.tar.zst`・`work-liftdiff.tar.zst` は tar 内のリポジトリ相対パスに従い `tools/m11/work/`・`tools/liftdiff/work/` に展開 (`tar --zstd -xf`)。
+- 実行: `tools/m11/trap_triage/hw_watch_3648.sh` (環境は `env -i` で固定。下記 §3)。直列 12 run・foreground。所要: 12 run 合計 185 s (`date +%s` の差。1 run 約 15 s)。1 分 load average (`/proc/loadavg`) は開始 0.26・終了 1.16。
+- 判定スクリプト: `tools/m11/trap_triage/hw_watch_3648_check.py`。出力は `tools/liftdiff/work/probe3648/check.txt` (gitignore) に保存し、全文を §5 に貼った。state 比較は `cmp_img_2770.py` と同じ項目。
 
 ## 2. 方式 (`rt/ld_native.c` の `LD_WATCH_MODE=hw`)
 
@@ -39,7 +40,10 @@
 - シェルの `OLDPWD`・`_` などで環境長が run ごとに変わっていたため、初回の比較 (rsp 不一致) で差が出た。以後の全 run は `env -i PATH=… HOME=… FL_WIN64_DIR=… LD_PIN_CPU=<n>` で環境を固定し、`LD_WATCH_MODE` と `LD_WATCH_ADDR` の長さを対照と揃えた (`hw`/`xx`・`5ac308`/`000000`・`15eac98`/`0000000`・`15eac98`/`15eac98`)。
 - 陰性対照 (比較器の感度): CPU 0 と CPU 2 の監視なし run の比較で 1 byte 差 (`0x11e69bf`: 0 → 2)。CPU 番号 (#2770 §8.9 の既知の byte) で、比較器はこの差を検出する。
 
-## 4. 実測 (測定 commit `dda07f5cf`・全 run 同じ rsp `0x7fffffffd8b0`・units_run 928/942)
+## 4. 実測 (測定 commit `6fe39c6a8`・全 run 同じ rsp `0x7fffffffd900`・units_run 928/942)
+
+- rsp は環境長で決まる (§3)。作成者の環境 (`dda07f5cf` 時) では `0x7fffffffd8b0`、reviewer の再実行環境では `0x7fffffffd8f0`。本 run の値は `0x7fffffffd900`。値が違っても、同じ rsp の組の中の比較結果は変わらない。
+- img の要素数は本 run で 215/215。reviewer の再実行表示は 216/216 だった (環境が違うため。状態比較の結論 `byte_diff=0` は両方で一致)。
 
 | run | CPU | `LD_WATCH_MODE` | `LD_WATCH_ADDR` | 記録 (hw 行 / wp 行) | page faults | state (同 CPU・同 env 長の対照 (F は X6・C と Cp は X7) と比較) |
 |---|---|---|---|---|---|---|
@@ -66,7 +70,35 @@
 - 枠の内訳: page の `addr - va` は 0 が 247 件・-8 が 1 件。hw の dr6 は bit 0 が 247 件・bit 1 が 1 件。
 - RIP の差 (hw − page): +6 が 246 件・+4 が 1 件・+8 が 1 件 (page は書込み命令の先頭、hw は書込み直後)。
 - 当初は DR 1 本 (va のみ) で 247 件だった。page 窓の 248 件の内訳 (va-8 の 1 件) を見て DR1 (va-8) を足し、248 件に合わせた。
-- 判定出力の所在: `hw_watch_3648_check.py` の出力 (`work/probe3648/check.txt`) は測定時に保存しておらず、gitignore 対象の `work/` にも残っていない。素材 (`work-m11`・`work-liftdiff`) も fix 時の run には無く、12 run を再実行できなかった。よって 1:1 一致 248/248 の出典は、測定時の作業記録 (上記の dr6・枠・RIP の内訳) であり、判定出力の全文は本付録に貼れない。再現には §6 の手順で 12 run を取り直す必要がある (`oc_artifacts: fl-win64 work-m11 work-liftdiff`)。
+- 判定出力の全文 (測定 commit `6fe39c6a8`・`tools/liftdiff/work/probe3648/check.txt`。§6 の手順で取った 12 run の出力を `hw_watch_3648_check.py` に通したもの):
+
+```
+== (1) boot 状態の比較 (env -i 固定。rsp・img・heap・detail)
+X6e1-X6e2        rsp=0x7fffffffd900/0x7fffffffd900 byte_diff=0 heap_eq=True state_eq=True detail_eq=True units=928/928 img=215/215 bytes=48484
+X6e1-F6e1        rsp=0x7fffffffd900/0x7fffffffd900 byte_diff=0 heap_eq=True state_eq=True detail_eq=True units=928/928 img=215/215 bytes=48484
+X6e2-F6e2        rsp=0x7fffffffd900/0x7fffffffd900 byte_diff=0 heap_eq=True state_eq=True detail_eq=True units=928/928 img=215/215 bytes=48484
+F6e1-F6e2        rsp=0x7fffffffd900/0x7fffffffd900 byte_diff=0 heap_eq=True state_eq=True detail_eq=True units=928/928 img=215/215 bytes=48484
+X7e-C7e          rsp=0x7fffffffd900/0x7fffffffd900 byte_diff=0 heap_eq=True state_eq=True detail_eq=True units=928/928 img=215/215 bytes=48484
+X7e-C7e2         rsp=0x7fffffffd900/0x7fffffffd900 byte_diff=0 heap_eq=True state_eq=True detail_eq=True units=928/928 img=215/215 bytes=48484
+X7e-Cp7e         rsp=0x7fffffffd900/0x7fffffffd900 byte_diff=0 heap_eq=True state_eq=True detail_eq=True units=928/928 img=215/215 bytes=48484
+C7e-Cp7e         rsp=0x7fffffffd900/0x7fffffffd900 byte_diff=0 heap_eq=True state_eq=True detail_eq=True units=928/928 img=215/215 bytes=48484
+X6c2-F6c2        rsp=0x7fffffffd900/0x7fffffffd900 byte_diff=0 heap_eq=True state_eq=True detail_eq=True units=928/928 img=215/215 bytes=48484
+X7c2-C7c2        rsp=0x7fffffffd900/0x7fffffffd900 byte_diff=0 heap_eq=True state_eq=True detail_eq=True units=928/928 img=215/215 bytes=48484
+X6e1-X6c2        rsp=0x7fffffffd900/0x7fffffffd900 byte_diff=1 heap_eq=True state_eq=False detail_eq=True units=928/928 img=215/215 bytes=48484
+== (2) 陽性対照 C (15eac98): hw 記録と page 記録の 1:1 対応
+hw=248 page=248
+1:1 一致 248/248 (枠・値・chg・0<RIP差<=15)  不一致 []
+dr6 内訳 {2: 1, 1: 247}
+page addr-VA 内訳 {-8: 1, 0: 247}
+RIP 差 (hw - page) 内訳 {4: 1, 8: 1, 6: 246}
+hwsum C7e: ['hwsum hits=248 stops=253 rc=0'] | C7e2: ['hwsum hits=248 stops=253 rc=0'] | Cp7e: ['wpsum faults=726 timeouts=0 alrm_def=0']
+== (3) 監視 F (5ac308) の記録
+F6e1 hw 行 0 | ['hwsum hits=0 stops=5 rc=0']
+F6e2 hw 行 0 | ['hwsum hits=0 stops=5 rc=0']
+F6c2 hw 行 0 | ['hwsum hits=0 stops=5 rc=0']
+```
+
+- 1:1 一致 248/248 の出典は、この全文 (再実行の出力)。作業記録ではない。
 
 ## 6. 再現
 
