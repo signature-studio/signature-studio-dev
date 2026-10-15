@@ -8,7 +8,8 @@
       表の範囲 ±NEAR 以内を指す箇所 (データ中のポインタ)
   (c) 間接 call (`call qword [...]`) を 0x10c7cd0 内で全件列挙し、メモリ operand の形 (base・index・disp) を分類する
   (d) g1 のスロット 0x15e14a8 を rip 相対で読む 42 箇所の使い方 (書込み・比較・コピー) を分類する
-  (e) --dyn: 6 入力で実行された間接 call の、object 先頭値 ([reg]) が表の範囲に入るかを記録する
+  (e) --dyn: 6 入力で実行された間接 call の、object 先頭値 ([reg]) が表の範囲に入るかを記録する。
+      6 入力の実行サイトの和集合から、未実行の静的サイト数 (dyn_union) も出す
 
 usage: python probe_1414_tables.py --dyn --write   (要 FL_WIN64_DIR・venv: tools/startup/license_obs/env.sh)
 出力: results/probe_1414_tables.json (--write 時)
@@ -58,7 +59,9 @@ def text_refs(img, rs):
                 cands.append(('imm', v))
                 if img.base <= v:
                     cands.append(('rva_as_va', v))
-                cands.append(('rva', v + img.base))
+                # rip 相対の disp・直接 call の飛び先 (VA) は RVA ではない
+                if t is None and not ins.op_str.startswith('0x'):
+                    cands.append(('rva', v + img.base))
             for kind, v in cands:
                 name = in_any(v, rs)
                 if name and not ins.mnemonic.startswith('j'):
@@ -131,6 +134,7 @@ def run_dyn(img, rs):
     from run_cases import seed_license
     from probe_1414 import CASES, indirect_sites
     out = []
+    union = set()
     for name, kw, cl in CASES:
         r = Reg()
         seed_license(r, **kw)
@@ -164,11 +168,12 @@ def run_dyn(img, rs):
             e.uc.hook_add(UC_HOOK_CODE, cb, begin=addr, end=addr)
         st = e.run(cl=cl)
         executed = {k: v for k, v in vt.items() if isinstance(v, dict) and v.get('n')}
+        union |= set(executed)
         hits = {k: v for k, v in executed.items() if v.get('vtable_values')}
         out.append({'case': name, 'status': st if st == 'ok' else st[:120], 'sites_seen': len(executed),
                     'sites_with_vtable_in_T': len(hits),
                     'vtable_values_in_T': sorted({x for v in hits.values() for x in v['vtable_values']})})
-    return out
+    return out, union
 
 
 def main():
@@ -197,9 +202,13 @@ def main():
     for k, v in forms.most_common():
         print('  form', k, v)
     if '--dyn' in sys.argv:
-        res['dyn_vtable'] = run_dyn(img, rs)
+        res['dyn_vtable'], union = run_dyn(img, rs)
         for d in res['dyn_vtable']:
             print('DYN', d)
+        static_at = {s['at'] for s in sites}
+        res['dyn_union'] = {'static_sites': len(static_at), 'executed_union': len(static_at & set(union)),
+                            'unexecuted': len(static_at - set(union))}
+        print('DYN union (6 入力の実行サイトの和集合):', res['dyn_union'])
     if '--write' in sys.argv:
         os.makedirs(os.path.join(HERE, 'results'), exist_ok=True)
         with open(os.path.join(HERE, 'results', 'probe_1414_tables.json'), 'w') as f:

@@ -15,76 +15,6 @@
  },
  "text_refs_near": [
   {
-   "at": "0x666acf",
-   "kind": "rva",
-   "value": "0x1379f72",
-   "table": "T2",
-   "insn": "mov rax, qword ptr [rip + 0xf79f72]"
-  },
-  {
-   "at": "0x675131",
-   "kind": "rva",
-   "value": "0x1174321",
-   "table": "T1",
-   "insn": "mov edx, dword ptr [rip + 0xd74321]"
-  },
-  {
-   "at": "0x675269",
-   "kind": "rva",
-   "value": "0x1174250",
-   "table": "T1",
-   "insn": "lea rcx, [rip + 0xd74250]"
-  },
-  {
-   "at": "0x883019",
-   "kind": "rva",
-   "value": "0x11741c0",
-   "table": "T1",
-   "insn": "add dword ptr [rip + 0xd741c0], 1"
-  },
-  {
-   "at": "0x883020",
-   "kind": "rva",
-   "value": "0x11741b9",
-   "table": "T1",
-   "insn": "cmp dword ptr [rip + 0xd741b9], 0"
-  },
-  {
-   "at": "0x883144",
-   "kind": "rva",
-   "value": "0x1174095",
-   "table": "T1",
-   "insn": "sub dword ptr [rip + 0xd74095], 1"
-  },
-  {
-   "at": "0x88314b",
-   "kind": "rva",
-   "value": "0x117408e",
-   "table": "T1",
-   "insn": "cmp dword ptr [rip + 0xd7408e], -1"
-  },
-  {
-   "at": "0xf77e3d",
-   "kind": "rva",
-   "value": "0x1379080",
-   "table": "T2",
-   "insn": "call 0xf79080"
-  },
-  {
-   "at": "0xf78b0a",
-   "kind": "rva",
-   "value": "0x1378b70",
-   "table": "T2",
-   "insn": "call 0xf78b70"
-  },
-  {
-   "at": "0xf7aa6b",
-   "kind": "rva",
-   "value": "0x1379080",
-   "table": "T2",
-   "insn": "call 0xf79080"
-  },
-  {
    "at": "0x1083750",
    "kind": "rip",
    "value": "0x1174310",
@@ -3107,5 +3037,10 @@
    "sites_with_vtable_in_T": 0,
    "vtable_values_in_T": []
   }
- ]
+ ],
+ "dyn_union": {
+  "static_sites": 298,
+  "executed_union": 41,
+  "unexecuted": 257
+ }
 }
