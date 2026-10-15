@@ -247,4 +247,4 @@
 
 ## 12. P2 の p99 (AU-30 #3151)
 
-- **結論**: worklet が連続 `process()` の burst 分布 (`burst_hist`) を公開し、結果 JSON に `burst_p99` を出すようになった。null-sink は全 run PASS (underrun 0)。fake 48k は 1 件 FAIL (未解決・#187)。Firefox の p99 は未配線。 測定 commit・行列・再現手順・未解決の全文は `REPORT_APPENDIX_3151.md` (§12)。
+- **結論**: worklet が連続 `process()` の burst 分布 (`burst_hist`) を公開し、結果 JSON に `burst_p99` を出す。HEAD `b512c1073` の n=3 で fake・null-sink の 18 run 全 PASS (p99: fake 48k 1024・96k 1536、null 48k 1536・96k 3584)。前回 (`8310689a`) の fake 48k rep 1 の underrun 1 と同症状は HEAD では出なかった (原因は未切り分け・#187)。Firefox の p99 は未配線。測定の全文は `REPORT_APPENDIX_3151.md` (§12)。
