@@ -163,8 +163,8 @@ production 呼出し (dl=0・flag=0) では `key == K` のとき `V ← (dir+1)<
 - 通知の転送: `+0x10` = `0xf8e830` は `[this+0x28]` (TMethod code) を、`+0x18` = `0xf8e860` は `[this+0x38]` (TMethod code) を呼ぶ転送 thunk。2 本の TMethod (`[this+0x28]`・`[this+0x38]`) の書込み元は未検査 (未確定の表に移送)。
 - 訂正: 前版の「`0xf808d8` を指す参照は 0 件」は、VMT の VA への直接参照だけを見ていた。実際の参照は class 参照スロット `0xf80810` 経由 (`0xf8cbea`)。
 - P (`0x53de80()`): `0x479b40(cl=1, rdx=typeinfo 候補, r8=4)` を呼ぶ。`0x479b40` は 46 byte 単位の表を引く汎用処理に見える。P の vtable は未確定。
-- probe: `analysis/flapi/pe_py194_t0_vtable.py` (9 検査。VMT・thunk・参照 1 件を確認)。測定 commit (コードを変えた最後の commit): `f89d26627` (probe を追加した commit。以後 probe は変えていない)。測定 HEAD: `f89d26627`。
-- 実測 (2026-10-15・GitHub Actions の Linux runner・素材は `fl-win64` の `block00031_PE.bin` を展開して使用): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py194_t0_vtable.py` → PASS 9 件・FAIL 0・終了 0・所要 3 分 49 秒 (`time` の real。load average (1 分値) 2.23 → 3.00)。
+- probe: `analysis/flapi/pe_py194_t0_vtable.py` (9 検査。VMT・thunk・参照 1 件を確認)。測定 commit (コードを変えた最後の commit): `f89d26627` (probe を追加した commit。以後 probe は変えていない)。測定 HEAD: `a2d20a97d` (main 取り込み後の HEAD)。
+- 実測 (2026-10-15・GitHub Actions の Linux runner・素材は `fl-win64` の `block00031_PE.bin` を展開して使用): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py194_t0_vtable.py` → PASS 9 件・FAIL 0・終了 0・所要 3 分 49 秒 (`time` の real。load average (1 分値) 1.82 → 3.28)。測定 HEAD は `a2d20a97d` (main 取り込み後)。同じ probe を `f89d26627` で測った結果も PASS 9・FAIL 0・所要 3 分 49 秒 (load 2.23 → 3.00)。
 - 以前の測定値 (`time` 2 分 23 秒・load 0.21 → 1.06) は測定 commit の hash が存在しなかったため取り消す。
 
 ### 測定
