@@ -9,6 +9,7 @@
   R3 .text 内の命令の即値 (mov/push/lea) のうち、値が .text を指すもの (10 本)。
   R4 直接 call 先は x64c の closure (再帰降下) で追加。 jump table は jmp の表から読む。
   .text 内の reloc 箇所のうち jump table 以外の値 (86 本) は roots に入れない (入れると data を命令として読む: REPORT_APPENDIX_1098.md §3)。
+  第 2 パス (#2814): 1 回目の未被覆区間を gap_classify.py で (a)(b)(c) に分類し、(b) の先頭だけを roots に加えて再 lift する。
 素材: $FL_WIN64_DIR/extracted/block22434_PE.bin (既定 $RUNNER_TEMP/fl-win64)。 依存: capstone==5.0.7・pefile・emcc (emsdk)。
 """
 import json, os, re, struct, subprocess, sys
@@ -19,6 +20,8 @@ X64C = os.path.join(ROOT, 'tools', 'ott', 'lift', 'x64c.py')
 RT = os.path.join(ROOT, 'tools', 'ott', 'rt')
 WORK = os.path.join(HERE, 'work')
 EXPORT_MAIN = 0x10007CA0
+sys.path.insert(0, HERE)
+import gap_classify
 
 
 def pe_path():
@@ -27,6 +30,35 @@ def pe_path():
     if not os.path.isfile(p):
         sys.exit('[lift_text] FAIL: %s が無い (素材 fl-win64 を展開すること)' % p)
     return p
+
+
+def lift_once(pth, roots, out, tag):
+    ej = os.path.join(WORK, 'entries_text.json')
+    json.dump({'roots': sorted(roots), 'calltgt': []}, open(ej, 'w'))
+    r = subprocess.run([sys.executable, X64C, '--pe', pth, '--entries', ej, '--out', out, '--closure', '999', '--arch', 'ia32'],
+                       capture_output=True, text=True)
+    print(r.stdout.strip()); print(r.stderr.strip()[-400:])
+    if r.returncode != 0:
+        sys.exit('[lift_text] FAIL: x64c rc %d (%s)' % (r.returncode, tag))
+    cc = ['emcc', '-c', '-O1', '-w', '-I', RT, os.path.join(out, 'ott_lifted.c'), '-o', os.path.join(out, 'ott_lifted.o')]
+    r2 = subprocess.run(cc, capture_output=True, text=True)
+    print('[emcc -c] (%s) rc %d, object %d B' % (tag, r2.returncode, os.path.getsize(os.path.join(out, 'ott_lifted.o')) if r2.returncode == 0 else 0))
+    if r2.returncode != 0:
+        print(r2.stderr[-800:]); sys.exit('[lift_text] FAIL: emcc -c')
+
+
+def coverage(img, IMG, T0, text, md, out):
+    src = open(os.path.join(out, 'ott_lifted.c')).read()
+    vas = sorted(set(int(m.group(1), 16) for m in re.finditer(r'/\* ([0-9a-f]+): ', src)))
+    cov = bytearray(text.Misc_VirtualSize)
+    for va in vas:
+        ins = next(md.disasm(img[va - IMG:va - IMG + 16], va, 1), None)
+        if ins is None:
+            sys.exit('[lift_text] FAIL: 命令の起点 0x%x が生バイトで decode できない' % va)
+        for k in range(ins.size):
+            if va - T0 + k < len(cov):
+                cov[va - T0 + k] = 1
+    return vas, cov
 
 
 def main():
@@ -61,30 +93,23 @@ def main():
                 if op.type == X86_OP_IMM and T0 <= op.imm < T1:
                     imm_t.add(op.imm)
     roots |= data_t | imm_t
-    ej = os.path.join(WORK, 'entries_text.json')
-    json.dump({'roots': sorted(roots), 'calltgt': []}, open(ej, 'w'))
     print('[roots] export 1 + .rdata/.data の .text 向き絶対ポインタ %d (distinct) + code 即値 %d (distinct) = %d' % (len(data_t), len(imm_t), len(roots)))
     out = os.path.join(WORK, 'lift_text')
-    r = subprocess.run([sys.executable, X64C, '--pe', pth, '--entries', ej, '--out', out, '--closure', '999', '--arch', 'ia32'],
-                       capture_output=True, text=True)
-    print(r.stdout.strip()); print(r.stderr.strip()[-400:])
-    if r.returncode != 0:
-        sys.exit('[lift_text] FAIL: x64c rc %d' % r.returncode)
-    cc = ['emcc', '-c', '-O1', '-w', '-I', RT, os.path.join(out, 'ott_lifted.c'), '-o', os.path.join(out, 'ott_lifted.o')]
-    r2 = subprocess.run(cc, capture_output=True, text=True)
-    print('[emcc -c] rc %d, object %d B' % (r2.returncode, os.path.getsize(os.path.join(out, 'ott_lifted.o')) if r2.returncode == 0 else 0))
-    if r2.returncode != 0:
-        print(r2.stderr[-800:]); sys.exit('[lift_text] FAIL: emcc -c')
-    src = open(os.path.join(out, 'ott_lifted.c')).read()
-    vas = sorted(set(int(m.group(1), 16) for m in re.finditer(r'/\* ([0-9a-f]+): ', src)))
-    cov = bytearray(text.Misc_VirtualSize)
-    for va in vas:
-        ins = next(md.disasm(img[va - IMG:va - IMG + 16], va, 1), None)
-        if ins is None:
-            sys.exit('[lift_text] FAIL: 命令の起点 0x%x が生バイトで decode できない' % va)
-        for k in range(ins.size):
-            if va - T0 + k < len(cov):
-                cov[va - T0 + k] = 1
+    lift_once(pth, roots, out, 'pass1')
+    vas, cov = coverage(img, IMG, T0, text, md, out)
+    print('[coverage pass1] 命令の起点 %d、被覆 %d / %d B (%.2f%%)' % (len(vas), sum(cov), len(cov), 100.0 * sum(cov) / len(cov)))
+    env = dict(pe=pe, IMG=IMG, T0=T0, TS=text.Misc_VirtualSize, text=text, img=img, md=md, cov=cov,
+               meta=json.load(open(os.path.join(out, 'lift_meta.json'))))
+    rows = gap_classify.classify(env)
+    json.dump(rows, open(os.path.join(out, 'gap_classes.json'), 'w'), indent=1)
+    cnt = {c: [sum(1 for r in rows if r['cls'] == c), sum(r['size'] for r in rows if r['cls'] == c)] for c in 'abc'}
+    print('[classify] (a) %d 区間 %d B / (b) %d 区間 %d B / (c) %d 区間 %d B' % tuple(cnt['a'] + cnt['b'] + cnt['c']))
+    b_roots = {r['va'] for r in rows if r['cls'] == 'b'}
+    print('[classify] (b) の先頭 %d 個を roots に追加: %s' % (len(b_roots), ' '.join('0x%x' % x for x in sorted(b_roots))))
+    if b_roots - roots:
+        roots |= b_roots
+        lift_once(pth, roots, out, 'pass2')
+        vas, cov = coverage(img, IMG, T0, text, md, out)
     meta = json.load(open(os.path.join(out, 'lift_meta.json')))
     print('[coverage] 命令の起点 %d、被覆 %d / %d B (%.2f%%)、未被覆 %d B' % (
         len(vas), sum(cov), len(cov), 100.0 * sum(cov) / len(cov), len(cov) - sum(cov)))

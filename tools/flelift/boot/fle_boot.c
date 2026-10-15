@@ -100,10 +100,11 @@ static void fle_probe_dispatch(u64 t) {
  *       4 = ExitProcess / 5 = MessageBoxW / 6 = GetMem 直後 / 7 = FreeMem 直後 / 8 = GetMem 呼出し直前。
  * proc: site 1・2 は unit の proc VA、3 は memset の長さ、4 は呼出し元、6 は要求サイズ、7 は解放ポインタ。
  * aux: site 3 は memset の dst、6 は GetMem の戻り値 (0 = 失敗)、7 は FastMM の応答 (0 = 成功)。 */
-#define PY_WATCH_N 3
+#define PY_WATCH_N 6
 #define PY_EV_MAX 64
 typedef struct { u32 unit, site, slot, proc; u64 old, nw, aux; } py_ev;   /* 40 B (JS 側の読出しと一致) */
-static const u32 g_py_watch[PY_WATCH_N] = { 0x15e1c78u, 0x15e4790u, 0x16b82e0u };
+/* PY-106 (#2909) の 3 件: 0x15e1140 = 例外型の参照の起点 (.data)、0x16b8488 = PyExc_RuntimeError の束縛 slot、0x16b8250 = Py_NewInterpreterFromConfig の束縛 slot (束縛が走ったかの指標) */
+static const u32 g_py_watch[PY_WATCH_N] = { 0x15e1c78u, 0x15e4790u, 0x16b82e0u, 0x15e1140u, 0x16b8488u, 0x16b8250u };
 static u64 g_py_last[PY_WATCH_N];
 static py_ev g_py_ev[PY_EV_MAX];
 static u32 g_py_ev_n, g_py_ev_over;
@@ -205,11 +206,33 @@ EMSCRIPTEN_KEEPALIVE u32 fle_ipp_site(int i) { return (u32)i < g_ipp_n ? (u32)g_
 EMSCRIPTEN_KEEPALIVE const char* fle_ipp_stop_name(void) { return g_ipp_stop_nm ? g_ipp_stop_nm : ""; }
 EMSCRIPTEN_KEEPALIVE u32 fle_ipp_stop_site(void) { return (u32)g_ipp_stop_site; }
 
+/* FLE-672 診断 (FLE_DIAG_NULLFILL=1・既定無効): fill コールバック 0x6a7b70 は root 無し (unlifted) のとき fle_ff に落ちる。
+ * 面の buf ([this+0x50]、this = R[3]) が 0 の呼出しは dst = 0 起点で image を 4 MiB ずつ 0 埋めする (REPORT_APPENDIX_3090 §1-1)。
+ * buf = 0 の呼出しだけ実行せずに戻す (ret 0)。buf != 0 は従来どおり停止する (計数のみ)。 */
+static int g_diag_nullfill = 0;
+static u32 g_diag_nullfill_skip, g_diag_nullfill_pass;
+EMSCRIPTEN_KEEPALIVE void fle_boot_set_diag_nullfill(int v) { g_diag_nullfill = (v != 0); }
+EMSCRIPTEN_KEEPALIVE u32 fle_diag_skip_n(void) { return g_diag_nullfill_skip; }
+EMSCRIPTEN_KEEPALIVE u32 fle_diag_pass_n(void) { return g_diag_nullfill_pass; }
+static int diag_nullfill_skip(void) {
+    u64 self = R[3];
+    u64 buf = self < 0x36000000ull - 0x58ull ? LD64(self + 0x50) : 1;
+    if (buf) { g_diag_nullfill_pass++; return 0; }
+    if (g_diag_nullfill_skip < 64)
+        fprintf(stderr, "[diag672][nullfill] skip #%u ret=0x%llx dst=0x%llx val=0x%llx cnt=0x%llx this=0x%llx buf=0\n",
+                (unsigned)g_diag_nullfill_skip, (unsigned long long)LD64(R[4]), (unsigned long long)R[1],
+                (unsigned long long)(R[2] & 0xffffffffULL), (unsigned long long)R[8], (unsigned long long)self);
+    g_diag_nullfill_skip++;
+    R[4] += 8; R[0] = 0;
+    return 1;
+}
+
 /* fle_cpu.c の fail-fast を JS 例外化 (survey を 1 インスタンスで継続できるように)。
  * unlifted(0) は m11 の icall-miss (ret 0) 揃えで容忍: retaddr を pop して RAX=0 で dispatch に戻る。 */
 static void fle_ff(const char* kind, u64 a) {
     char buf[160];
     if (!strcmp(kind, "unlifted") && ipp_call(a)) return;
+    if (g_diag_nullfill && !strcmp(kind, "unlifted") && a == 0x6a7b70u && diag_nullfill_skip()) return;
     if (!strcmp(kind, "unlifted") && a == 0) {
         snprintf(buf, sizeof buf, "[fleboot][ff] dispatch(0) -> ret 0 (m11 icall-miss 揃え, call site ret=0x%llx)",
                  (unsigned long long)LD64(R[4]));
