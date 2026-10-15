@@ -1,0 +1,111 @@
+# tools/python REPORT: PY-140 ui 操作 27 関数の作用先 — `0xfdd2c0` の op 別 leaf (#3035, 親 #2981)
+
+> 正本: `REPORT_PY120.md` (27 関数の PE 呼出し契約と保留の表)、`REPORT_PY87.md` (PE 確定の書式・ネガティブコントロール)。本付録は PY-140 の実測のみ。
+> 解析補助: `analysis/flapi/pe_ui_dispatch_probe.py` (op・arg・mode を具体値で与えて、決まる分岐だけを辿る)。
+
+## 結論
+
+- `0xfdd2c0` (UI 側ディスパッチャ) の op 別 leaf を VA 付きで特定した。27 関数のうち **15 関数は、送出する仮想キー (VK)・修飾・回数が PE から確定**した。どの leaf も `0x8186a0` (キー入力列を作って `user32!SendInput` に渡す関数) を呼ぶ。
+- 15 関数の**送出の成否** (leaf に入るか) は、leaf の手前のゲート (`0x60c220`・`0x728f50`・`0xfdeaf0`) と mode の源 (`0xfdd270`) の戻り値で決まり、その値は未確定。よって作用の意味 (FL 側でそのキーが何をするか) は未確定。
+- 12 関数は送出 leaf に到達しない、または別経路で未追跡。`ui.scrollWindow` は `0xd843d0` 経路 (REPORT_PY120 の保留) のまま。
+- mock・C は**未変更** (作用の意味が未確定のため、根拠のない値を入れない。PY-87・PY-120 と同じ方針)。mock/C の実装は子 #3759、ゲートと mode 源は子 #3758、残り 12 関数は子 #3761 に分けた。
+
+## 手段
+
+- 素材: `$HOME/artifacts/fl-win64.tar.zst` を `tar --zstd -xf ... --wildcards '*block00031_PE.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block25159_DATA.bin' '*block24618_DATA.bin'` で展開 (2.8 秒)。`$HOME/artifacts` の実在は展開前に `ls` で確認した。`toolchain-emsdk` は本 PR では使わない (mock/C を変えないため)。
+- 逆アセンブル: `pe_disasm.py fdd2c0 1500` と capstone で `0xfdd2c0`〜`0xfde8ad` (`.pdata` の終端、0x15ed バイト、1269 命令)。
+- 到達解析: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_dispatch_probe.py <op...> --arg <N|-> --mode <N|->`。op (`ecx`)・arg (`edx`)・mode (`r8b`) を具体値で与え、op 由来の `eax` と比較フラグだけを具体値で追う。決まらない分岐 (メモリ・呼出しの戻り値) は両方を辿る。`.data` の定数は読み、`[rip+X]` の 16bit 定数 (修飾子) も PE の静的値で読む。`rcx` の間接テーブル引き (矢印キーの VK) は probe では追わず、テーブル値は手で読んだ (下)。
+- 追加で読んだ値: `0x8186a0` の本体 (`dx` のビットと user32 の thunk)、矢印キーの VK 表、修飾子ワード。
+
+## 0xfdd2c0 の骨格 (PE 根拠)
+
+引数: `ecx`=op (`[rbp+0x40]`)、`edx`=arg (`[rbp+0x44]`)、`r8b`=mode (`[rbp+0x1a0]`)、`r9d`=0xf (`[rbp+0x48]`)。戻り値は `[rbp+0x4c]` (status、`0xfde89e`)。
+
+| VA | 条件・動作 | 結果 |
+|---|---|---|
+| `0xfdd3e9`〜`0xfdd3f3` | `test al, 2` (mode bit 1) が 0 | status -1 で終了 |
+| `0xfdd4ef`〜`0xfdd55b` | mode bit 0x20 と `[rbp+0x1b0]` の条件 → `call 0xfdeaf0(op, arg)` (`0xfdd54e`) | status 5 |
+| `0xfdd560`〜`0xfdd586` | mode bit 4 → `call 0x728f50(op, arg)` (`0xfdd575`) の戻り値 > 0 | status 4 |
+| `0xfdd5bb`〜`0xfdd5e1` | `bl` (`0xfdd4fe`〜の判定) と `[rbp+0x48]` の bit 1/2 で `0x60c220` の呼出しへ進む | — |
+| `0xfdd5f9`〜`0xfdd608` | `call 0x60c220(obj, edx=0x57f, r8=op, r9=arg)` の戻り値 > 0 → status 1 (送出なし) | status 1 |
+| `0xfdd77a`〜`0xfdd782` | `test [rbp+0x48], 8` が 0 なら終了 (r9=0xf は bit 8 を持つ) | — |
+| `0xfdd788`〜 | op による比較の木 (0x3b, 0x1e, 0x0d, 0x0a, 0x02, 0x6a, 0x65 …) で leaf の入口を決める | leaf |
+| `0xfde854` | 送出 leaf の共通の終わり: `mov eax, 8` → `mov [rbp+0x4c], eax` → `0xfdee80` → 戻り | status 8 |
+
+- 送出 leaf の共通形: `mov ecx, <VK>`・`movzx rdx, word ptr [rip+X]` (修飾子)・`mov r8d, 1` (または `arg`)・`call 0x8186a0`。`arg ≤ 0` のとき leaf の手前で `jle 0xfde854` (送出なし)。矢印キー (`0xfde0f0`) だけは `arg` をそのまま `r8d` に入れ、`0x8186a0` が `r8d ≤ 0` で何もしない (`0x8186b6`〜`0x8186b9`)。
+
+## 送出 leaf の意味 `0x8186a0` (PE 根拠)
+
+- 引数: `rcx`=VK (`mov word ptr [rbp+rdx*8+0x28], cx` の形で INPUT 配列に入る)、`rdx`=修飾ビット (`test ax,1`/`2`/`4`)、`r8d`=回数 (`test r8d,r8d; jle 0x818767`)。
+- 修飾ビット: bit 0 (1) → `wVk=0x10` (VK_SHIFT)、bit 1 (2) → `wVk=0x12` (VK_MENU = Alt)、bit 2 (4) → `wVk=0x11` (VK_CONTROL) を押下記録として組む (`0x8186c7`〜`0x818803`)。
+- 呼出し先 (IAT 経由の薄い thunk): `0x425370` → `user32!SendInput` (`jmp qword ptr [rip+0x154baf2]` の IAT 名)、`0x424d50` → `user32!GetKeyState` (修飾キーの状態。`0x8188a2`〜`0x8188c8` で `ecx=0x10/0x11/0x12`)、`0x424b60` → `user32!GetActiveWindow`。
+- よって 15 関数の作用先 (PE 確定) は **OS の仮想キー入力 (SendInput) へ渡すキー列**。FL 側がそのキーをどう処理するかは、この PE だけからは決まらない (子 #3759 で扱う)。
+
+## 27 関数の作用先 (op 別)
+
+凡例: 入口 = `0xfdd788` 以降の比較木が leaf の先頭へ飛ぶ VA。送出 call = `0x8186a0` を呼ぶ VA。VK・修飾・回数は PE の値 (修飾子ワードは `.text` 内の定数、矢印の VK は `.data` の表)。
+
+| 関数 | op | 入口 | 送出 call | VK | 修飾 | 回数 | 判定 |
+|---|---|---|---|---|---|---|---|
+| ui.jog | 0x00 | なし (`0xfdd5f9` の 0x60c220 と `0xfdd678`・`0xfdda37 call 0x1180dd0` の別経路のみ) | なし | — | — | — | 保留 (未追跡) |
+| ui.jog2 | 0x01 | なし (`0xfdd5f9` の 0x60c220 のみ) | なし | — | — | — | 保留 (未追跡) |
+| ui.strip | 0x02 | なし (`0xfdd5f9` の 0x60c220 のみ) | なし | — | — | — | 保留 (未追跡) |
+| ui.stripJog | 0x03 | なし (`0xfdd678`・`0xfdda37 call 0x1180dd0` の別経路) | なし | — | — | — | 保留 (未追跡) |
+| ui.stripHold | 0x04 | なし (`0xfdd5f9` の 0x60c220 のみ) | なし | — | — | — | 保留 (未追跡) |
+| ui.previous | 0x05 | 別経路 (`0xfde3e7 call 0x1180ef0`・`0xfde483`・`0xfde4be`) | なし | — | — | — | 保留 (未追跡) |
+| ui.next | 0x06 | 別経路 (同上) | なし | — | — | — | 保留 (未追跡) |
+| ui.moveJog | 0x08 | なし (`0xfdd5f9` の 0x60c220 のみ) | なし | — | — | — | 保留 (未追跡) |
+| ui.up | 0x28 | `0xfde0f0` | `0xfde110` | 0x26 (VK_UP) | 0 | arg | **PE 確定 (送出キー)** |
+| ui.down | 0x29 | `0xfde0f0` | `0xfde110` | 0x28 (VK_DOWN) | 0 | arg | **PE 確定 (送出キー)** |
+| ui.left | 0x2a | `0xfde0f0` | `0xfde110` | 0x25 (VK_LEFT) | 0 | arg | **PE 確定 (送出キー)** |
+| ui.right | 0x2b | `0xfde0f0` | `0xfde110` | 0x27 (VK_RIGHT) | 0 | arg | **PE 確定 (送出キー)** |
+| ui.horZoom | 0x2c | なし (`0xfdd891`〜`0xfdd8a1` で status 8) | なし | — | — | — | 保留 (送出 leaf 非到達) |
+| ui.verZoom | 0x2d | なし (同上) | なし | — | — | — | 保留 (送出 leaf 非到達) |
+| ui.snapOnOff | 0x30 | 非到達 (`0xfddb7d call 0x12134f0`) | なし | — | — | — | 保留 (未追跡) |
+| ui.cut | 0x32 | `0xfde11a` (arg>0) | `0xfde138` | 0x58 ('X') | 4 (Ctrl) | 1 | **PE 確定 (送出キー)** |
+| ui.copy | 0x33 | `0xfde142` (arg>0) | `0xfde160` | 0x43 ('C') | 4 (Ctrl) | 1 | **PE 確定 (送出キー)** |
+| ui.paste | 0x34 | `0xfde16a` (arg>0) | `0xfde188` | 0x56 ('V') | 4 (Ctrl) | 1 | **PE 確定 (送出キー)** |
+| ui.insert | 0x35 | `0xfde192` (arg>0) | `0xfde1b0` | 0x2d (VK_INSERT) | 0 | 1 | **PE 確定 (送出キー)** |
+| ui.delete | 0x36 | `0xfde1ba` (arg>0) | `0xfde1d8` | 0x2e (VK_DELETE) | 0 | 1 | **PE 確定 (送出キー)** |
+| ui.enter | 0x50 | `0xfde1e2` (arg>0) | `0xfde200` | 0x0d (VK_RETURN) | 0 | 1 | **PE 確定 (送出キー)** |
+| ui.escape | 0x51 | `0xfde20a` (arg>0) | `0xfde228` | 0x1b (VK_ESCAPE) | 0 | 1 | **PE 確定 (送出キー)** |
+| ui.yes | 0x52 | `0xfde232` (arg>0) | `0xfde250` | 0x59 ('Y') | 0 | 1 | **PE 確定 (送出キー)** |
+| ui.no | 0x53 | `0xfde25a` (arg>0) | `0xfde278` | 0x4e ('N') | 0 | 1 | **PE 確定 (送出キー)** |
+| ui.nextWindow | 0x3a | `0xfde087` (arg>0) | `0xfde0a5` | 0x09 (VK_TAB) | 0 | 1 | **PE 確定 (送出キー)** |
+| ui.selectWindow | 0x3b | `0xfde0af` | arg>0: `0xfde0c9` / arg≤0: `0xfde0e6` | 0x09 (VK_TAB) | arg>0: 0 / arg≤0: 1 (Shift) | 1 | **PE 確定 (送出キー)。符号は未確定** |
+| ui.scrollWindow | — | 対象外 (`0xd843d0` 経路) | — | — | — | — | 保留 (REPORT_PY120) |
+
+- 矢印 4 関数の VK は `0xfde0f0` の `mov ecx, dword ptr [rax + rcx*4 - 0xa0]` の表で引く。表の基点 `ptr` は `[0x15e1418]` (`.data`) の静的値 `0x13f1c88`。`op=0x28`〜`0x2b` の 4 要素は `0x26, 0x28, 0x25, 0x27` (`.data` の静的値)。`op=0x2c`・`0x2d` の要素 (`0x13f1c98`・`0x13f1c9c`) は VK ではなく、`0xfdd891` で leaf に入らない。
+- `ui.selectWindow` の shift の符号: PE は `arg>0` で修飾 0 (Tab)、`arg≤0` で Shift+Tab。`REPORT_PY120` の stub は `shift: bool`。`shift=1` が Shift を意味するなら符号が逆になる。判断は子 #3759。
+- 修飾子ワードの静的値 (`.text` 内の定数): `0xfdea12` = 0、`0xfdea14` = 1 (Shift)、`0xfdea16` = 4 (Ctrl)。表の修飾列はこの読み先の値。
+
+## 保留 (PE で確定できなかった点)
+
+- **ゲート**: 送出 leaf の入口に至る前に `0x60c220(obj, 0x57f, op, arg)` の戻り値 (> 0 で status 1) と `0x728f50` (mode bit 4) と `0xfdeaf0` (mode bit 0x20) がある。戻り値の値は未確定。`0x60c220` は `obj` の `vtbl+0x80` に委譲する汎用の問合せ (`0x60c22c`〜`0x60c24f`)。
+- **mode の源**: `0xfdd270` は `0x1542bec` (`.data` の定数表) を `vtbl+0x80` の戻り値で引き、`call 0x81c0a0` の戻り値が 0 のとき `or bl, byte ptr [rip+0xa]` (`0xfdd2a8`、対象 VA `0xfdd2b9`) を行う。表の添字の値域と `0x81c0a0` は未確定。
+- **runtime の状態**: `rsi` (`0xfdd402` の `[rax+0xcc]` と比較する値) やゲート関数の対象 `obj` は runtime の状態。送出の成否はこの状態に依存する。
+
+## 検証
+
+- 測定 commit: `de0dff6a9` (`analysis/flapi/pe_ui_dispatch_probe.py` を最後に変えた commit)。
+- コマンドと結果 (測定 commit `de0dff6a9`、コード変更は本 PR の 1 commit のみ):
+
+| コマンド | 結果 | wall |
+|---|---|---|
+| `python3 -m py_compile analysis/flapi/pe_ui_dispatch_probe.py` | rc 0 | — |
+| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_dispatch_probe.py <26 op> --arg 1 --mode 2` | rc 0。送出 call は 13 VA (`0xfde0a5`・`0xfde0c9`・`0xfde0e6`・`0xfde110`・`0xfde138`〜`0xfde278`) に出た。15 関数の op がこの 13 VA に対応 (矢印 4 → `0xfde110`、selectWindow → 2 VA、他 10 → 1 VA) | 0.17 秒 |
+| 上の出力の修飾子 (`rdx`) | cut/copy/paste = 0x4、selectWindow の arg≤0 = 0x1、他 = 0x0。PE の静的値と一致 | — |
+
+- 差分の証跡 (`docs/WORKFLOW.md` §6): `git diff de0dff6a9 HEAD -- tools/python ':!*.md'` の出力は空であるべき (本 REPORT と `docs/DOC_MAP.md` の commit だけが後に続く)。
+- mock・C (`host/fl_mock.mjs`・`provider/fl_engine.c`) は変えていない。`node tests/provider_check.mjs` と `FL_ENGINE=wasm node tests/all_tools.mjs` は変更がないため本 PR では再測定しない (受入 4・5 は子 #3759 で扱う)。
+- ネガティブコントロール: 実装を入れないため、本 PR では `ui_diff` の差分検査は無い。
+
+## 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| ゲート `0x60c220`・`0x728f50`・`0xfdeaf0` の戻り値と mode の源 (`0xfdd270` の表・`0x81c0a0`・`[0xfdd2b9]`) | 15 関数の送出の成否 | #3758 (PY-245) |
+| 送出キーの mock/C 実装 (15 関数)、ui_diff 差分 0、provider_check・all_tools の期待値 | 受入 3〜5 (mock/C は未実装) | #3759 (PY-246) |
+| `selectWindow` の shift の符号 (PE は arg>0 で修飾 0、stub は `shift: bool`) | 引数契約 | #3759 (PY-246) |
+| jog 系 5・previous/next・moveJog・horZoom/verZoom・snapOnOff の作用先、`ui.scrollWindow` の `0xd843d0` | 12 関数の作用 | #3761 (PY-247) |
+| 戻り値の値と型 (`0x415610` の out+8 既定値・`0x15e4280`・`0xc38bc0`) | 27 関数の戻り値 | #3034 (PY-141) |
