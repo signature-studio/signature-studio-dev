@@ -43,7 +43,7 @@
 - どの mapping・どの変数が持ち越しの実体かは未切り分け。作り直しの両側・`sta` + `mmap` で消えることまでは分かっているが、持ち越しの中身そのものは特定していない。
 - LD-229 §4 と同じく、mapping 単位の切り分け (stdio buffer・malloc 用 mmap 等) は未実施。
 - `none` は今回 n=1。LD-156 の `none` (n=2・mismatch) と合わせると 3 回 mismatch。
-- `both` の r1 と r2 の所要は同一条件で揃えたが、load を各 run で記録していない (上の 0.8〜0.9 は run 中の値)。
+- `both` の r1 と r2 の所要は同一条件で揃えたが、load を各 run で記録していない。
 
 ## 5. 子 issue
 
