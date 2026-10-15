@@ -1,5 +1,7 @@
 /* T-SH-79 (#3412) 検証ハーネス: guest の GetProcAddress 相当 (qfc_gpa) が返す擬似トークンだけで FreeType 2.7 を呼ぶ。
- * (1) 表の 14 本はトークンを返し、表外 4 本は 0 を返すこと、(2) トークン経由の描画結果が直接呼出と一致すること を見る。 */
+ * (1) 表の 14 本はトークンを返し、表外 4 本は 0 を返すこと、(2) トークン経由の描画結果が直接呼出と一致すること、
+ * (3) トークン経由でしか呼ばない 5 本 (FT_Get_Kerning / FT_Attach_File / FT_New_Face / FT_Set_Charmap / FT_Set_Pixel_Sizes) の
+ * 戻り値と出力が直接呼出と一致すること を見る。 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,6 +21,8 @@ static uint64_t fnv(const unsigned char *p, size_t n, uint64_t h) {
   for (size_t i = 0; i < n; i++) { h ^= p[i]; h *= 1099511628211ULL; }
   return h;
 }
+static uint64_t mix(uint64_t h, uint64_t v) { return fnv((const unsigned char *)&v, 8, h); }
+static const char *fam(FT_Face f) { return f->family_name ? f->family_name : ""; }
 
 static uint64_t tok_of(const char *nm) { return qfc_gpa(nm); }
 static uint64_t call(uint64_t tok, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4) {
@@ -75,8 +79,84 @@ int main(int argc, char **argv) {
   FT_Bitmap *db = &face->glyph->bitmap;
   uint64_t directA = fnv(db->buffer, (size_t)abs(db->pitch) * db->rows, 14695981039346656037ULL);
   printf("direct c=A hash=%016llx\n", (unsigned long long)directA);
-  printf("TOTAL %016llx\n", (unsigned long long)total);
   if (directA != tokA) { puts("NG token route != direct call"); return 1; }
+
+  /* (3) トークン経由でしか呼ばない 5 本 (FT_Get_Kerning / FT_Attach_File / FT_New_Face / FT_Set_Charmap / FT_Set_Pixel_Sizes) を
+   * 直接呼出と照合する。引数の並び・ポインタ・long の符号拡張が違えば、戻り値か出力が食い違う。 */
+  int bad = 0;
+  uint64_t t5 = 14695981039346656037ULL;
+  static const unsigned kp[3][2] = { { 'A', 'V' }, { 'T', 'o' }, { 'A', 'A' } };
+  for (unsigned i = 0; i < 3; i++) {
+    FT_UInt l = FT_Get_Char_Index(face, kp[i][0]), r = FT_Get_Char_Index(face, kp[i][1]);
+    FT_Vector kt = { 0, 0 }, kd = { 0, 0 };
+    uint64_t et = call(tok_of("FT_Get_Kerning"), (uint64_t)(uintptr_t)face, l, r, FT_KERNING_DEFAULT, (uint64_t)(uintptr_t)&kt);
+    FT_Error ed = FT_Get_Kerning(face, l, r, FT_KERNING_DEFAULT, &kd);
+    printf("kern %c%c tok rc=%u x=%ld y=%ld dir rc=%d x=%ld y=%ld\n", (int)kp[i][0], (int)kp[i][1], (unsigned)et,
+           (long)kt.x, (long)kt.y, ed, (long)kd.x, (long)kd.y);
+    if (et != (uint64_t)(uint32_t)ed || kt.x != kd.x || kt.y != kd.y) bad = 1;
+    t5 = mix(mix(mix(t5, et), (uint64_t)kt.x), (uint64_t)kt.y);
+  }
+  const char *ap[3] = { argv[1], "/nonexistent/qfc_gpa_probe.ttf", NULL };
+  for (unsigned i = 0; i < 3; i++) {
+    uint64_t et = call(tok_of("FT_Attach_File"), (uint64_t)(uintptr_t)face, (uint64_t)(uintptr_t)ap[i], 0, 0, 0);
+    FT_Error ed = FT_Attach_File(face, ap[i]);
+    printf("attach %u tok rc=%u dir rc=%d\n", i, (unsigned)et, ed);
+    if (et != (uint64_t)(uint32_t)ed) bad = 1;
+    t5 = mix(t5, et);
+  }
+  /* index 0xFFFFFFFF は guest が 32bit の long を書いた値。トークン側は符号拡張して -1 として渡ること。 */
+  const char *np[3] = { argv[1], argv[1], "/nonexistent/qfc_gpa_probe.ttf" };
+  const uint64_t nidx[3] = { 0, 0xFFFFFFFFu, 0 };
+  for (unsigned i = 0; i < 3; i++) {
+    FT_Face ft = NULL, fdv = NULL;
+    uint64_t et = call(tok_of("FT_New_Face"), (uint64_t)(uintptr_t)lib, (uint64_t)(uintptr_t)np[i], nidx[i],
+                       (uint64_t)(uintptr_t)&ft, 0);
+    FT_Error ed = FT_New_Face(lib, np[i], (FT_Long)(int32_t)nidx[i], &fdv);
+    printf("new_face %u tok rc=%u dir rc=%d\n", i, (unsigned)et, ed);
+    if (et != (uint64_t)(uint32_t)ed || (ft == NULL) != (fdv == NULL)) bad = 1;
+    t5 = mix(t5, et);
+    if (ft && fdv) {
+      uint64_t gt = call(tok_of("FT_Get_Char_Index"), (uint64_t)(uintptr_t)ft, 'A', 0, 0, 0);
+      FT_UInt gd = FT_Get_Char_Index(fdv, 'A');
+      int same = ft->num_faces == fdv->num_faces && ft->num_glyphs == fdv->num_glyphs && gt == gd && !strcmp(fam(ft), fam(fdv));
+      printf("  faces=%ld glyphs=%ld family=%s gi=%u same=%d\n", (long)ft->num_faces, (long)ft->num_glyphs, fam(ft),
+             (unsigned)gt, same);
+      if (!same) bad = 1;
+      t5 = mix(mix(mix(t5, (uint64_t)ft->num_faces), (uint64_t)ft->num_glyphs), gt);
+      call(tok_of("FT_Done_Face"), (uint64_t)(uintptr_t)ft, 0, 0, 0, 0);
+      FT_Done_Face(fdv);
+    }
+  }
+  for (int k = 0; k < face->num_charmaps; k++) {
+    FT_CharMap cm = face->charmaps[k];
+    uint64_t et = call(tok_of("FT_Set_Charmap"), (uint64_t)(uintptr_t)face, (uint64_t)(uintptr_t)cm, 0, 0, 0);
+    uint64_t gt = call(tok_of("FT_Get_Char_Index"), (uint64_t)(uintptr_t)face, 'A', 0, 0, 0);
+    FT_Error ed = FT_Set_Charmap(face, cm);
+    FT_UInt gd = FT_Get_Char_Index(face, 'A');
+    printf("charmap %d tok rc=%u gi=%u dir rc=%d gi=%u\n", k, (unsigned)et, (unsigned)gt, ed, gd);
+    if (et != (uint64_t)(uint32_t)ed || gt != gd) bad = 1;
+    t5 = mix(mix(t5, et), gt);
+  }
+  uint64_t pt = call(tok_of("FT_Set_Pixel_Sizes"), (uint64_t)(uintptr_t)face, 12, 12, 0, 0);
+  FT_UInt gpt = (FT_UInt)call(tok_of("FT_Get_Char_Index"), (uint64_t)(uintptr_t)face, 'g', 0, 0, 0);
+  call(tok_of("FT_Load_Glyph"), (uint64_t)(uintptr_t)face, gpt, FT_LOAD_DEFAULT, 0, 0);
+  call(tok_of("FT_Render_Glyph"), (uint64_t)(uintptr_t)face->glyph, FT_RENDER_MODE_NORMAL, 0, 0, 0);
+  FT_Bitmap *pbt = &face->glyph->bitmap;
+  uint64_t hpt = fnv(pbt->buffer, (size_t)abs(pbt->pitch) * pbt->rows, 14695981039346656037ULL);
+  FT_Error pd = FT_Set_Pixel_Sizes(face, 12, 12);
+  FT_UInt gpd = FT_Get_Char_Index(face, 'g');
+  FT_Load_Glyph(face, gpd, FT_LOAD_DEFAULT);
+  FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
+  FT_Bitmap *pbd = &face->glyph->bitmap;
+  uint64_t hpd = fnv(pbd->buffer, (size_t)abs(pbd->pitch) * pbd->rows, 14695981039346656037ULL);
+  printf("pixel_sizes tok rc=%u gi=%u hash=%016llx dir rc=%d gi=%u hash=%016llx\n", (unsigned)pt, (unsigned)gpt,
+         (unsigned long long)hpt, pd, gpd, (unsigned long long)hpd);
+  if (pt != (uint64_t)(uint32_t)pd || gpt != gpd || hpt != hpd) bad = 1;
+  t5 = mix(mix(mix(t5, pt), gpt), hpt);
+
+  total = fnv((unsigned char *)&t5, 8, total);
+  if (bad) { puts("NG token route (5 extra fns) != direct call"); return 1; }
+  printf("TOTAL %016llx\n", (unsigned long long)total);
   call(tok_of("FT_Done_Face"), (uint64_t)(uintptr_t)face, 0, 0, 0, 0);
   call(tok_of("FT_Done_FreeType"), (uint64_t)(uintptr_t)lib, 0, 0, 0, 0);
   free(buf);
