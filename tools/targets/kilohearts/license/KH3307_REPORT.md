@@ -2,7 +2,7 @@
 
 - 親: #709 (KH-14)。前提 #3306 (KH-51, PR #3347 MERGED) と #709 の ymm 語彙 (PR #3315 MERGED) は main に入っている。
 - 素材: `fl-win64` (`HeartCore.core_64` の sha256 一致を確認)・`toolchain-retdec`・`toolchain-emsdk`・`plugins-kilohearts` が素材置き場 (`ARTIFACTS_DIR`) に実在。
-- 測定 commit: `31dafd5c3` (コードを変えた最後の commit)。
+- 測定 commit: `a441a3654` (§3 の (a)(c)(d) はこの commit のコードで測定。以後のコード変更は `31dafd5c3` の 2 行 (no-op) のみ・§4)。
 
 ## 1. 結論
 
@@ -33,6 +33,7 @@ host: nproc=4, Linux, host の clang/gcc (`cc` -O1 -msse2)。
 | positive: pcmpeqd/w・pmovmskb・pshufd (imm 全 256)・vpxor・tzcnt | cases 200000, **mismatch 0** | 0.57 秒 (real) |
 | ネガコン: pcmpeqd の比較を反転 | mismatch 200000 → **FAIL を検出** | 同上 |
 | RESULT | **PASS** (positive=True, negctrl_detected=True) | — |
+| HEAD での再実行 (`kh52_sse_check.py 200000 12345`) | 同じ結果 (positive mismatch 0 / 200000・ネガコン mismatch 200000・PASS) | 下記 |
 
 **(b) module F の試行 (2 関数を `modules.F.lift` に追加、測定後に config は戻した)**
 
@@ -63,8 +64,17 @@ host: nproc=4, Linux, host の clang/gcc (`cc` -O1 -msse2)。
 
 ## 4. 測定 commit と差分
 
-- 測定 commit: `31dafd5c3`。
-- コード差分 (測定 commit → HEAD): `git diff 31dafd5c3 HEAD -- tools/targets/kilohearts/license ':!*.md'` = 0 行 (以降は REPORT の追記のみ)。
+- 測定 commit: `a441a3654` (§3 (a)(c)(d) の測定コード)。
+- コード差分 (測定 commit → HEAD): `git diff a441a3654 HEAD -- tools/targets/kilohearts/license ':!*.md'` の出力 (2 行の追加のみ):
+
+  ```diff
+  +    if b in ('movmskps', 'movmskpd', 'pmovmskb'):
+  +        pass
+  ```
+
+- 根拠: 追加行は `pass` のみで、`body` に代入しないため出力を変えない (no-op)。6 宣言の生成 C を `a441a3654` 版と HEAD 版の `gen_simd.py` で比較し、`cmp` で byte 一致 (1791 B) を確認。
+- (c)(d) は HEAD で再測定していない。素材置き場に `toolchain-emsdk`・`toolchain-retdec`・`plugins-kilohearts` が無いため (`fl-win64` のみ)。
+- 以降の commit は REPORT・PR 本文のみ。
 
 ## 5. 未解決 (起票先)
 
