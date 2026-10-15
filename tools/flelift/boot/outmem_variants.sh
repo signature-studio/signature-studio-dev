@@ -3,6 +3,7 @@
 #   FL_WIN64_DIR=<fl-win64 展開先> SS_EMSDK_ENV=<emsdk_env.sh> FLE_BOOT_WORK=<repo 外の作業 dir> \
 #     bash tools/flelift/boot/outmem_variants.sh build    # gen → lift (無ければ) → plain(-O0) → o2 ∥ o2lto
 #     bash tools/flelift/boot/outmem_variants.sh boot     # 3 変種 boot (FLE_BOOT_N 回) + ネガコン (FLE_IPP=0) → outmem_compare.py
+#     bash tools/flelift/boot/outmem_variants.sh mutant   # 比較器の検出力: dump の複製 1 本の .data 先頭 1 byte を変えて FAIL (rc 1) になることを見る (boot の後)
 # 工程と条件は tools/flelift/boot/fle6_measure.sh (plain = -O0, FLE_SHARDS=8) と variant_boot.sh (FLE_IPP=1) に揃える。
 # 生成物はすべて FLE_BOOT_WORK 下 (repo 外。tools/**/work/ は作業場にしない)。結果 JSON は $W/variant/。
 set -euo pipefail
@@ -60,8 +61,30 @@ do_boot() {
   python3 "$HERE/outmem_compare.py" "$W/variant" --labels plain o2 o2lto --negctl plain_negctl --dump "$W/outmem"
 }
 
+do_mutant() {
+  # 比較器の検出力 (WORKFLOW §5): 複製の dump の .data 先頭 (linear 0x13a5000 = 0x400000 + .data RVA 0xfa5000) の 1 byte を反転し、
+  # image_writable の不一致で FAIL (rc 1) になることを見る。他の dump はリンクのまま (元データは変えない)。
+  M="$W/mutant"; rm -rf "$M"; mkdir -p "$M"
+  for f in "$W/outmem"/*.bin; do ln -s "$f" "$M/"; done
+  rm "$M/outmem_boot_plain_r1.bin"
+  python3 - "$W/outmem/outmem_boot_plain_r1.bin" "$M/outmem_boot_plain_r1.bin" 0x13a5000 <<'PY'
+import hashlib, sys
+src, dst, off = sys.argv[1], sys.argv[2], int(sys.argv[3], 16)
+d = bytearray(open(src, "rb").read())
+b0 = d[off]; before = hashlib.sha256(d).hexdigest()[:16]
+d[off] ^= 0xFF
+after = hashlib.sha256(d).hexdigest()[:16]
+open(dst, "wb").write(d)
+print(f"mutant: offset 0x{off:x} byte 0x{b0:02x}->0x{d[off]:02x} / dump sha256 {before} -> {after}")
+PY
+  R=0; python3 "$HERE/outmem_compare.py" "$W/variant" --labels plain o2 o2lto --negctl plain_negctl --dump "$M" || R=$?
+  echo "[outmem] mutant compare rc=$R (期待 1)"
+  [ "$R" = 1 ]
+}
+
 case "${1:-}" in
-  build) do_build ;;
-  boot)  do_boot ;;
-  *) echo "usage: outmem_variants.sh build|boot"; exit 2 ;;
+  build)  do_build ;;
+  boot)   do_boot ;;
+  mutant) do_mutant ;;
+  *) echo "usage: outmem_variants.sh build|boot|mutant"; exit 2 ;;
 esac

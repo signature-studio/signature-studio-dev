@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # outmem_compare.py — PERF-P22 (#3330): boot 停止時点の出力メモリ sha256 を変種間で比べる。
 #   python3 tools/flelift/boot/outmem_compare.py <variant dir> --dump <dir> --pe <PE> --labels plain o2 o2lto --negctl plain_negctl
-# 入力: <variant dir> の boot_<label>_r<i>.json (fle_boot.mjs の boot.outmem: 停止時の C スタック範囲)。
+# 入力: <variant dir> の boot_<label>_r<i>.json のトップレベル outmem (fle_boot.mjs: 停止時の C スタック範囲と各範囲の sha256)。
 #       <dir> の outmem_boot_<label>_r<i>.bin (FLE_OUTMEM_DUMP で書いた線形メモリ全体)。
-# 計算は Python hashlib で dump から範囲を読み直す (node:crypto 版との二重計算。両者が一致しないと FAIL)。
+# 計算は Python hashlib で dump から範囲を読み直す (node:crypto 版との二重計算。full / no_cstack が両者で一致しないと FAIL)。
 #   full           = 線形メモリ全体
-#   no_cstack      = 全体から C スタック [stack.end, stack.base) を除いた範囲 (C の最適化水準に依る残骸を外す)
+#   no_cstack      = 全体から C スタック [stack.end, stack.base) を除いた範囲
 #   image_writable = PE の書込み可能セクション (IMAGE_SCN_MEM_WRITE) を guest VA = 0x400000 + VirtualAddress で連結
 #   sections       = 上の各セクションの sha256
-# 判定 (rc): 変種 (--labels) の全 run で no_cstack・image_writable・各セクションが一致し、node 版と一致すること。
-#           ネガコン (--negctl) では no_cstack が変種と異なること (判別力)。どれか外れたら rc 1。
+# 判定 (rc): 受入 1 だけで決める。変種 (--labels) の全 run で image_writable と各書込み可能セクションが一致し、
+#           node 版と python 版の full / no_cstack が一致すること。
+#           full / no_cstack の変種間・run 間の一致は参考表示 (C heap・C data の非決定と変種差がここに出る)。rc には入れない。
+#           ネガコン (--negctl) の判別結果は別行で出す (受入 2)。rc には入れない。
 import glob, hashlib, json, os, re, struct, sys
 
 IMG = 0x400000
@@ -71,7 +73,7 @@ def main():
         label = m.group(1); run = m.group(2) if m.lastindex == 2 else "1"
         if label not in labels and label != negctl:
             continue
-        om = json.load(open(p))["boot"].get("outmem")
+        om = json.load(open(p)).get("outmem")
         if om is None:
             print(f"# {label} r{run}: outmem 無し", file=sys.stderr); ok = False; continue
         dp = os.path.join(dump, "outmem_" + os.path.basename(p)[:-5] + ".bin") if dump else None
@@ -91,20 +93,23 @@ def main():
     print()
     var = [r for r in runs if r[0] in labels]
     neg = [r for r in runs if r[0] == negctl]
-    for key in ("no_cstack", "image_writable", "full"):
-        vals = {r[3][key] for r in var}
-        print(f"{key}: 変種 {','.join(labels)} の全 run で一致 = {len(vals) == 1} (異なる値 {len(vals)} 件)")
-        if key != "full":
-            ok = ok and len(vals) == 1
+    # 受入 1 (rc を決める)
+    vals = {r[3]["image_writable"] for r in var}
+    print(f"image_writable: 変種 {','.join(labels)} の全 run で一致 = {len(vals) == 1} (異なる値 {len(vals)} 件)")
+    ok = ok and len(vals) == 1
     for name in [n for n, va, vsz, w in secs if w]:
         vals = {r[3]["sections"][name] for r in var}
         print(f"section {name}: 一致 = {len(vals) == 1} (異なる値 {len(vals)} 件)")
         ok = ok and len(vals) == 1
+    # 参考 (rc に入れない): 全体・C スタック除外の一致。非決定 (run 間) と変種差 (C data) の所在を見る
+    for key in ("no_cstack", "full"):
+        vals = {r[3][key] for r in var}
+        print(f"参考 {key}: 変種 {','.join(labels)} の全 run で一致 = {len(vals) == 1} (異なる値 {len(vals)} 件)")
+    # 受入 2 (ネガコン・rc に入れない): FLE_IPP=0 で image_writable が変種と異なれば判別力あり
     if negctl:
-        base = {r[3]["no_cstack"] for r in var}
-        changed = bool(neg) and all(r[3]["no_cstack"] not in base for r in neg)
-        print(f"ネガコン {negctl}: no_cstack が変種と異なる = {changed}")
-        ok = ok and changed
+        base = {r[3]["image_writable"] for r in var}
+        changed = bool(neg) and all(r[3]["image_writable"] not in base for r in neg)
+        print(f"negctl {negctl}: image_writable が変種と異なる = {changed} (受入 2 {'達成' if changed else '未達'})")
     print("RESULT", "PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)
 

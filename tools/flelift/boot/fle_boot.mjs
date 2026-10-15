@@ -192,7 +192,7 @@ for (let i = 0; i < Number(m._fle_ipp_names()); i++) {
 // (guest stack 復元で確認、dbg_u18.mjs 参照)。unit#18 (0x455790) は未到達。
 boot.stopped_at_1based = boot.units_run;
 
-// PERF-P22 (#3330): boot 停止時点の出力メモリ (wasm 線形メモリ) の sha256。計数・ipp 状態とは別の値。
+// PERF-P22 (#3330): boot 停止時点の出力メモリ (wasm 線形メモリ) の sha256。計数・ipp 状態とは別の値で、summary のトップレベル outmem に出す (boot の外。boot+ipp の署名 (variant_boot.sh) に入れないため)。
 // (a) full = 線形メモリ全体。(b) no_cstack = 全体から emscripten の C スタック [end, base) を除いた範囲
 // (スタックの残骸は C の最適化水準に依る一時値なので、変種間比較からは外す)。
 // (c) PE の書込み可能セクション (IMAGE_SCN_MEM_WRITE) を 1 本ずつ (guest 側の状態そのもの)。
@@ -226,7 +226,6 @@ const outMem = (() => {
     }
     return res;
 })();
-boot.outmem = outMem;
 console.log('FLEBOOT_OUTMEM ' + JSON.stringify({ full: outMem.full, no_cstack: outMem.no_cstack, image_writable: outMem.image_writable, sections: Object.fromEntries(Object.entries(outMem.sections).map(([k, v]) => [k, v.sha256])) }));
 
 // ---------------- CreateFruityInstance 観測 (#2719) ----------------
@@ -304,6 +303,7 @@ const summary = {
     variant: process.env.FLE_BOOT_VARIANT || 'plain',
     wasm_size: (() => { try { return readFileSync(cjs + '.wasm').size; } catch { return null; } })(),
     boot,
+    outmem: outMem,
     survey,
     tolerant: TOLERANT ? { mode: TOL_MODE, started: tol.started, hook_ran: tol.hook_ran, kinds: tol.kinds, skipped_n: tol.skipped.length, restored: tol.restored, skipped: tol.skipped, miss_units: tol.miss_units, units: tol.units } : null,
     cfi,

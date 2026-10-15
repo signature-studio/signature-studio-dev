@@ -6,6 +6,7 @@
 # $W/variant/summary.tsv に追記する。FLE_IPP=1 (shim 有 = fle6_measure.sh と同じ経路)。判定 NG (rc=3) は記録して続行する。
 # 壁時計は %.3f (秒)。集計 (p50 / p90 / min–max) は variant_summary.py (同じ label・run の重複行は最後の行を採用)。
 # 署名 = boot と ipp を JSON 正規化して sha256 の先頭 16 桁 (同一なら変種間で boot の出力が一致)。
+# 線形メモリの sha256 (outmem) はトップレベルに出すので署名に入らない (C heap の run 間非決定を署名に持ち込まないため)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 FLE="$(cd "$HERE/.." && pwd)"
