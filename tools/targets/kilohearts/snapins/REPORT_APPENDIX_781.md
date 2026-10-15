@@ -1,6 +1,6 @@
 # KH-18 (#781): Carve EQ (ksge) の IAT 19 件の扱い (実測)
 
-- 親: #61 (KH-6) / 元 issue: #781 (分割 a)。測定 commit = `fcf3a630` (`snapins/scripts/carve_iat_census.py` を追加した commit。以後この commit の本体は変えていない)。測定起点 = origin/main `8303a813`。
+- 親: #61 (KH-6) / 元 issue: #781 (#61 の分割 c)。測定 commit = `fcf3a630` (`snapins/scripts/carve_iat_census.py` を追加した commit。以後この commit の本体は変えていない)。測定起点 = origin/main `8303a813`。
 - 対象: `GraphicEqDsp` (graphiceq namespace, id ksge)。本付録はその IAT 呼出 site 19 件の扱いだけを書く。closure の数は §0 を見る。
 - 再現手順 (`tools/targets/kilohearts/` で実行。素材は `plugins-kilohearts` (`KH_SRC` に置いた installer の zip)。Windows 側だけ展開する):
 
@@ -34,7 +34,7 @@ python3 snapins/scripts/carve_iat_census.py work/winpkg/HeartCore.core_64 work/c
 判定は次の順に当たった規則で決める: **2 → 4 → 3 → 5**。規則 1 は判定を変えず記録に使う。規則 6 は対の相手の判定に従う。
 
 1. **process 非到達**: 直接辺で process 経路 (slot 14) から到達しない。bit-exact の対象外の記録。ただし到達経路が無いことだけで決めず、下の 2〜5 を全 site に適用する。
-2. **戻り値が分岐に使われる** (成功/失敗・長さ・判定値で `je`/`jne`/`cmp`) → **fail-fast** (stub を選ぶと失敗分岐へ silently 入る)。規則 5 より優先する: IMP_SHIM の値は同じ import の既定値で、この site の分岐の正しさを保証しない。
+2. **戻り値が分岐に使われる** (成功/失敗・長さ・判定値で `je`/`jne`/`cmp`) → **fail-fast** (stub を選ぶと失敗分岐へ silently 入る)。規則 5 より優先する: IMP_SHIM の値は同じ import の既定値で、この site の分岐の正しさを保証しない。戻り値の使われ方を確認できない site も既定で fail-fast とする。
 3. **協調相手の無い同期 primitive** (SRWLock の取得/解放、WakeAllConditionVariable) → **stub (no-op)**。ただし次の 2 条件を両方満たすときだけ: (a) 呼出を含む関数に SleepConditionVariableSRW / WaitForSingleObjectEx が無い、(b) 同じ lock/cv を待つ site が closure 内に無い。(b) は lock/cv の RIP 相対アドレスの一致で確かめる。(b) を確認できない site は stub にせず fail-fast とする (既定。§4)。関数本体の副作用 (TLS 書込 `gs:[0x58]`) は残す。
 4. **待機・協調の一部** → **fail-fast**: SleepConditionVariableSRW / WaitForSingleObjectEx、ReleaseSemaphore、および待機 site と同じ lock/cv を取得・解放する site (待機ループ内の取得/解放を含む)。(b) を満たさないので規則 3 より優先する。
 5. 既存 `IMP_SHIM` に同じ import がある場合は、その値を流用する。ただし規則 2・4・3 に当たらない site に限る (規則 2 の GetLastError は流用しない)。
@@ -64,9 +64,9 @@ python3 snapins/scripts/carve_iat_census.py work/winpkg/HeartCore.core_64 work/c
 | 16 | `0xf87868` | `0x180f8789d` | SleepConditionVariableSRW | 同上 | cv+lock、timeout=`0xffffffff` (INFINITE)。結果は分岐せず状態再判定の loop | fail-fast (規則 4) | abort |
 | 17 | `0xf87868` | `0x180f878d9` | ReleaseSRWLockExclusive (tail jmp) | 同上 | 戻り値未使用 | fail-fast (規則 4、15・16 と対) | abort |
 | 18 | `0xfd7518` | `0x180fd7676` | GetLastError | slot7 → … → `0x49450` → `0x493f0` → `0xfc10d4` → `0xfbf86c` → `0xfc032c` → `0xfd7518` | 戻り値 eax を `cmp eax,0x7a` (ERROR_INSUFFICIENT_BUFFER) で分岐 | **fail-fast** (規則 2。規則 5 の既存値 `rax = 0` は流用しない) | `rax = 0` (既存) |
-| 19 | `0xfdfd00` | `0x180fdfda6` | WideCharToMultiByte (tail jmp) | … → `0xfd7518` → `0xfdfd00` | 戻り値は呼出元 `0xfd7518` へ素通し | fail-fast (規則 2) | abort |
+| 19 | `0xfdfd00` | `0x180fdfda6` | WideCharToMultiByte (tail jmp) | … → `0xfd7518` → `0xfdfd00` | 戻り値は呼出元 `0xfd7518` へ素通し。`0xfd7518` での分岐使用は未確認 | fail-fast (既定。規則 2 の条件は未確認・安全側) | abort |
 
-- 判定の集計: stub 0 / fail-fast 19 (#1〜#11・#15〜#19 は規則 2・4・6 による。#12〜#14 は規則 3 の (b) 未確認による既定) / 実装 0。
+- 判定の集計: stub 0 / fail-fast 19 (#1〜#11・#15〜#18 は規則 2・4・6 による。#12〜#14 は規則 3 の (b) 未確認による既定。#19 は規則 2 の条件が未確認のための既定) / 実装 0。
 - #18 と #19 は `0x49450` (#1〜#4 の文言生成) を経由する経路にある。`0x49450` 内で #1 (fail-fast) が先に呼ばれるかは本測定では確かめていない。#18 の 0 が正しい側かも、native 実行が無いため確かめていない。確かめるまで #18 は stub にしない。
 
 ## 3. process 経路と間接 call (下限見積の範囲)
