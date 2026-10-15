@@ -165,3 +165,41 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
   2. `emcc -c` rc 0 → 現 HEAD で rc 0 (維持)。 ただし変更は無いので本 run の寄与ではない。
   3. 方式の選定と B1 内訳の測定 → **達成** (本節)。 共有鎖への影響の測定 → **未達** (#2017)。
   4. `function_180019c20` の分岐値 = spill 読み戻し値の IR 確認 → **未達** (#2017)。
+
+## H. [PLG-F3-18] #2017: store 形 `__asm_vmovsd` の宛先読み戻しを値の転送へ置換 (V0・D16 の実装)
+
+- 測定 commit: **db8de292** (コード変更の最後の commit: `tools/plugins/lift/passes/ir5_patch.py` の `forward_vmovsd_store`・`test_forward_vmovsd.py`)。 差分確認: `git diff db8de292 HEAD -- tools/plugins/lift tools/plugins/dynamics ':!*.md'` は 0 行 (本節の追記は文書のみ)。
+- 測定: `TMPDIR=$RUNNER_TEMP bash tools/plugins/dynamics/engine_lift.sh 19252 900` と `… 19048 900` を foreground で単独実行。 load average (1 分) 0.27 → 0.48 (19252)・0.48 → 0.88 (19048)。 wall 17 s (19252)・88 s (19048)。
+
+| 項目 | origin/main (56778a14) | db8de292 |
+|---|---|---|
+| 19252 summary (`summary.csv`) | `19252,522,0,551,0,4,0,0,0,13,…` | `19252,522,0,551,0,3,0,0,0,12,…` |
+| 19252 unimpl | vcomisd・**vmovsd(i64,i128)**・vucomisd・vucomiss (4) | vcomisd・vucomisd・vucomiss (3) |
+| 19252 `emcc -c` (final / fixcmp 後) | rc 0 / rc 0 | rc 0 / rc 0 |
+| 19252 B1 の 0 埋め (同一 norm0 入力の A/B) | 579 件 | 576 件 (エントリの旧値 load 3 件が不要になった分) |
+| 19048 summary | `19048,1658,0,1712,0,4,1,2,0,49,…` | `19048,1658,0,1712,0,4,1,2,0,49,…` (同一) |
+
+### H-1. 方式
+
+- RetDec は `vmovsd [mem], xmm` を `__asm_vmovsd(i64 old, i128 v)` で出し、`old` は宛先 alloca からの `load` である。 19252 では `[rsp+0x20]`・`[rsp+0x30]`・`[rsp+0x40]` の 3 本が同じ `%1` に併合され、`%1` への store が無い。 そのため B1 が `old` を 0 に置換し、宛先の情報が消えていた (§E・§F の経路の続き)。
+- 採用 (V0・B1 の前): store より後で支配される `old` の use を `trunc i128 %v to i64` に置換し、store 呼出を消す。 支配されない use は残り、B1 が従来どおり 0 にする。 本関数では支配されない use は 0 件だった。 置換は store ごとに、その store のブロックから支配される範囲に限る。
+- 採らなかった方式: (a) 宛先 alloca に store を残す: 読み戻しは entry の `old` load のままで、store は読まれない (D15 の no-op と同じ)。 (b) 宛先 0 のまま store: D16 のとおり誤番地への書込み。 (c) B1 の 0 埋めを止める: 全 plugin の lift に影響する。
+
+### H-2. 分岐値と spill 読み戻しの一致 (IR で確認)
+
+- 機械語 ↔ IR (`!insn.addr` を介し capstone で照合): `%10` を使う命令のうち `[rsp+0x20]` を指すものは 6 件 (store 0x18001a861 を含む)、`%9` は `[rsp+0x30]` の 7 件 (store 0x18001a867 を含む)、`%8` は `[rsp+0x40]` の store 0x18001aa9f のみ。 3 つの store の宛先と読み戻しのスロットが一致する。
+- 0x18001a861 のブロックの先行は entry だけ (`; preds = %dec_label_pc_180019c20`)。 entry から store までに xmm0 は書かれないため、store 時点の xmm0 は `%7` (entry の値) で、読み戻しは `trunc(%7)` になる。
+- 転送後の IR: `switch i64 %vmovsd_fwd_10` (`function_180019c20` 内の行 788)・`switch i64 %vmovsd_fwd_9` (行 1277)。 転送された use 行は関数内 59 行 (store ごとの置換行の延べ数は V0 報告の 61)。 関数内に `%8`・`%9`・`%10` の残りは 0。
+- 未解決: `%7` (entry の xmm0) は B1 が 0 に置換する (入力 xmm の 0 固定。既存の決定論化規則)。 そのため分岐値は、この lift の入力モデルでは 0 に固定される。 実機の入力と一致するかは未確認 (D16 と同じ)。
+
+### H-3. 共有 lift 鎖への影響
+
+- 19252 の全 551 関数 (同一 norm0 入力) で基準版と db8de292 の ir5 出力を比べると、差分は `function_180019c20` の 1 関数だけ (差分 130 行)。
+- 19048 (同系統 engine) は store 形を含まず、ir5 出力は基準版とバイト一致 (`cmp`)。
+- 手元の全 `.ll` (`tools/**`・gitignore 対象の work を含む) を走査すると、`call void @__asm_vmovsd(i64 %` は 19252 の `e.drc.ll`・`e.norm0.ll` 以外に 0 件。 他 plugin の lift 出力は変わらない見込み。 ただし他 plugin を RetDec で再 lift した実測は未実施 (手元に入力が無い)。
+- 単体テスト: `tools/plugins/lift/passes/test_forward_vmovsd.py` PASS (正例: 支配される use だけ置換され、支配されない use は残る / 負例: 宛先 alloca に store があれば変更なし)。 既存の `test_movntps_store.py`・`test_fold_const_ops.py`・`test_ir5_constexpr.py`・`tools/m11/test_a7_uselistorder.py` も PASS。
+
+### H-4. 判定と未解決
+
+- 受入条件 1 (unimpl から `__asm_vmovsd` が消える): 達成 (19252)。 2 (`emcc -c` rc 0): 達成。 3 (方式の選定と共有鎖の影響測定): 達成 (方式 V0・H-3)。 4 (分岐値 = spill 読み戻しの IR 確認): 達成 (H-2)。 ただし H-2 の未解決 (入力 xmm の 0 固定) は残る。
+- 未解決 (起票先): B1 の入力 xmm 0 固定の是非 (共有 lift 鎖の全 plugin の測定が前提のため、本 issue の範囲外。 PM 判断・未起票)。 他 plugin で store 形の `__asm_vmovsd` が出る入力の RetDec 再 lift 実測 (手元に入力が無い。 次の plugin lift run で確認)。

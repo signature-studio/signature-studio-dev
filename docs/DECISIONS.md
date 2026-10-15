@@ -159,6 +159,7 @@
 - **比較した方式**: (a) `vmovsd` を store 化する (宛先 0 への誤 store で不採用)、(b) B1 の 0 埋めを止める (共有 lift 鎖の全 plugin に影響するため範囲外)、(c) 委譲や abort で unimpl から消す (silent miscompile を隠すため不採用)。
 - **理由**: 機械語は `[rsp+0x20]` への spill で、宛先は定数 0 ではない。 宛先 0 のまま store を作ると誤った番地へ書く。 同じ宛先値は分岐・演算にも使われるため、stub で隠すと誤りが検出できなくなる。 実測は `tools/plugins/dynamics/REPORT_APPENDIX.md` §E。
 - **影響**: 19252 の unimpl に `vmovsd` store が残る (5 件のうち 1 件)。 `emcc -c` は rc 0 のまま。 正しさは未確認。
+- **実装 (2026-10-14, #2017)**: 宛先の読み戻しを B1 の前に値の転送へ置換する (`ir5_patch.py` `forward_vmovsd_store`)。 19252 の unimpl から `vmovsd` store は消えた。 分岐値は entry の xmm0 を B1 が 0 にする入力モデルに依存し、正しさは未確認のまま。 測定は `tools/plugins/dynamics/REPORT_APPENDIX.md` §H。
 
 ## D17 — `movntps` (非テンポラル store) は既存の SSE store 復元 (`lower_asm_store`) に含め、宛先は IR 側から復元する
 
