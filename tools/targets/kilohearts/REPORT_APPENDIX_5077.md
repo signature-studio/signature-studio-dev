@@ -18,7 +18,10 @@
 2. `classify_ulonglong.py` で、C 行に `(ulonglong)dVarN` を含む行を抜き、同じ行の変数トークンの機械語を次の規則で判定する。**行の全命令 (Jcc・CALL を除く) がビット/論理/整数シフト・ロード系なら「ビット再解釈」。1 つでも数値演算 (`CVT*`・`*SD`・`*PD` の算術・`VFMADD*`・`UCOMISD` 等) があれば、または判定できる命令が無ければ「要確認」。**
 3. 要確認の行は `objdump -d -M intel` の前後の機械語で確認する (下の注)。
 
-既知の制約: 対応づけは p-code op の seqnum に依存する。1 行の中に複数の演算がある場合 (外側の float 演算の命令が出る場合) は、トークンの機械語が式の別の部分になりうる。実際に確認できた誤対応は 1 件 (`180fc4590` 252: `(ulonglong)dVar12 | _DAT_182280c30` に `XOR RAX,RAX` (ゼロ化イディオム) が当たり、`dVar12` を読んでいない)。この 1 件は規則の結果によらず要確認に移した。他の誤対応は未検出だが、全 98 行の独立な二重確認は未実施。
+既知の制約: 対応づけは p-code op の seqnum に依存する。1 行の中に複数の演算がある場合 (外側の float 演算の命令が出る場合) は、トークンの機械語が式の別の部分になりうる。
+- 照合 (5077-6 の再測定): 98 行に含まれる `(ulonglong)dVarN` の出現 107 個について、p-code op の種別を見た。`CAST` (再解釈) が 103 個。非 `CAST` は 4 個で、`180fc4590` 361 (`FLOAT_SUB`)・`180fc6870` 85・91 (`FLOAT2FLOAT`)・`180fcd400` 39 (`FLOAT_MULT`) の 4 行だけ。この 4 行はどれも規則で既に要確認。
+- 実際に誤りと確認したのは 1 件: `180fc4590` 252 (`(ulonglong)dVar12 | _DAT_182280c30` に `XOR RAX,RAX` (ゼロ化イディオム) が当たり、`dVar12` を読んでいない。同じ命令に `dVar15` も当たっている)。`kind_of` の規則で要確認に移した。
+- 残りの 103 個の機械語は p-code 種別だけで照合した。命令ごとの objdump との突合 (`objdump -d -M intel` で当該アドレスの読み先を確認) は未実施。
 
 #### 5077-4. 分類表 (98 行・関数別の C 行番号)
 分類 `ビット再解釈` は、同行の全命令 (Jcc・CALL を除く) がビット系の行。`要確認` は数値演算を含む行、ビット系の命令が無い行、対応づけ誤りの行。
@@ -138,10 +141,12 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 要確認 14 行 (上の注) の機械語の確定。数値演算を含む行 (`CVT*`・`SUBSD`・`VFMADD*`・`MULSD` 等) の扱い | 規則の根拠が 14 行分不足。数値変換かどうかは未確定 | #5077 に残す (`Refs #5077`) |
-| decompile と `MapLines.java` の再実行による対応づけの再測定 | `plugins-kilohearts` が本 run の `$ARTIFACTS_DIR` に無く、`tokens.tsv` を再生成できない。対応づけ誤り 1 件 (252) の他にも誤対応がある可能性 | #5077 に残す (`oc_artifacts: plugins-kilohearts` を付けた次 run で再実行) |
+| 103 個の `CAST` 対応について、命令ごとの objdump 突合 | p-code 種別の照合のみ。命令レベルの誤対応は未検出 (252 以外) のまま未確認 | #5077 に残す |
 | `dbitcast` 規則の適用と Delay の 1000 trial 突合 | 分類結果を規則に反映していない | #3836 (受入 2) と #3073 [KH-41] |
 
 #### 5077-6. 検証
-- 測定 commit: `143f481db` (コード変更 commit = 分類規則の前版)。`143f481db` → head の差分は、`dc1fd4b9a` で `5077-6` の測定 commit 表記を直した REPORT の 1 行のみ (コード差 0)。
-- 本 run (分類規則の修正): `classify_ulonglong.py` の判定を「全命令がビット系」規則に変えた。`tokens.tsv` は素材 `plugins-kilohearts` が無く再生成できなかったため、表の「対応する機械語」列に同じ規則 (`kind_of`) を当てて再判定した。結果: 98 行中、ビット再解釈 84・要確認 14 (前版 93・5 から、規則変更で 8 行を要確認へ、対応づけ誤り 1 行 (252) を要確認へ)。`classify_ulonglong.py` の実行 (decompile 出力からの生成) は素材再取得後の次 run で行う。
-- 再現手順: (1) 上記 `DecompEach` (8 関数) → `out/<va>.c`、(2) `MapLines.java` (`-postScript MapLines.java <dir> <va…>`) → `tokens.tsv`、(3) `python3 tools/targets/kilohearts/ghidra_route/classify_ulonglong.py tokens.tsv out` で表を出す。
+- 再測定 (本 run・素材 `plugins-kilohearts` を `$ARTIFACTS_DIR` から展開): `plugins-kilohearts.tar.zst` (7.6 GB・`tar --zstd -xf` 28 s) → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B)。Ghidra 12.1.4 は GitHub release から取得 (sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)、JDK 21。
+- decompile: `DecompEach.java` で 8/8 OK (`analyzeHeadless` wall 25.0 s)。`MapLines.java` で `tokens.tsv` 1,183 行を生成 (wall 18.3 s)。
+- 分類: `classify_ulonglong.py` の `main()` を `kind_of()` 呼び出しに変えた (`any` 判定を廃止)。`kind_of` に同一レジスタ同士の XOR (ゼロ化イディオム) を要確認とする規則を追加。実行結果は 98 行、ビット再解釈 84・要確認 14。表の「分類」列 98 行と `kind_of` の出力が一致 (差は 252 の機械語列の注記のみ)。
+- 対応づけの照合: 上記 5077-3 の既知の制約の通り (`CAST` 103・非 `CAST` 4 (すべて要確認)・誤対応 1 (252))。
+- 測定 commit: 本 run の HEAD (`classify_ulonglong.py` の修正 commit)。前版 `143f481db` → `dc1fd4b9a` は REPORT 1 行、`dc1fd4b9a` → `bcfcfb4c6` は分類規則 (`classify_ulonglong.py`) と REPORT。

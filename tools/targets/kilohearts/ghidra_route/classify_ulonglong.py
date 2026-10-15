@@ -13,9 +13,15 @@ CTRL = re.compile(r'^(J[A-Z]+|CALL)')
 CAST = re.compile(r'\(ulonglong\)dVar\d+')
 
 
+ZERO = re.compile(r'^XOR\s+(\w+),\s*\1$')
+
+
 def kind_of(insn):
     # 制御命令 (Jcc・CALL) は判定の根拠にしない。残りの全命令がビット/論理系なら「ビット再解釈」、
     # 1 つでも数値演算 (CVT*・*SD・*PD の算術・VFMADD*・UCOMISD 等) があれば、または残りが無ければ「要確認」。
+    # 同一レジスタ同士の XOR (ゼロ化イディオム) は元の値を読まないので対応づけが誤りになる → 要確認。
+    if any(ZERO.match(x) for x in insn if x):
+        return '要確認'
     ops = [x.split()[0] for x in insn if x and not CTRL.match(x.split()[0])]
     return 'ビット再解釈' if ops and all(BIT.match(o) for o in ops) else '要確認'
 
@@ -37,7 +43,7 @@ def main():
                 continue
             n += 1
             insn = sorted(set(x[1].strip() for x in tok.get(('FUN_' + fn, i), []) if 'dVar' in x[0]))
-            kind = 'ビット再解釈' if any(BIT.match(x.split()[0]) for x in insn if x) else '要確認'
+            kind = kind_of(insn)
             code = s.strip()[:120].replace('|', '\\|')
             print(f"| {fn} | {i} | `{code}` | {', '.join(insn).replace('|', chr(92) + '|')} | {kind} |")
     print(f'<!-- rows={n} -->', file=sys.stderr)
