@@ -37,4 +37,6 @@
 
 ## 5. 検証 (規則 6)
 
-- 測定 commit: `68c6cbb75`＋本 PR のコード変更 (計装)。`git diff 68c6cbb75 HEAD -- tools/audio/asio/harness` の出力は本 PR の計装だけ。
+- 測定 commit: `1622a5648` (計装を入れた最後の commit)。同一 HEAD で build.sh 直後に `com_ramp_b256_d2` を 3 回: 3/3 PASS (underrun 0・silence 0・min_fill 896・T 1536・write 間隔の最大 14.4 ms)。load 0.28 (開始) → 0.90 (終了)。
+- `git diff 68c6cbb75 1622a5648 -- tools/audio/asio/harness` の差分は `com_page.mjs` の計装 11 行のみ (判定ロジックは未変更)。
+- 全 e2e (`bash tools/audio/asio/e2e.sh`) は本 run では未実行 (時間上限のため)。`com_ramp_b256_d2` の単独測定のみ。
