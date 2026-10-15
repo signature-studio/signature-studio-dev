@@ -16,7 +16,7 @@
 
 ## 測定
 
-- 測定 commit: `09d6e4b84` (`origin/main`)。本 PR はアナリシス・コードを変更していない (追加は REPORT のみ)。
+- 測定 commit: `6b7ca07b4` (コードを変えた最後の commit)。本 PR はアナリシス・コードを変更していない (追加は REPORT のみ)。`git diff 6b7ca07b4 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行。
 - 素材: `fl-win64.tar.zst` の `block00031_PE.bin` (22,227,016 byte) を `$RUNNER_TEMP/fl/extracted` に展開 (`tar --zstd -xf ... extracted/block00031_PE.bin`)。
 - 逆アセ (`analysis/flapi/pe_disasm.py`、`FL_WIN64_DIR=$RUNNER_TEMP/fl`): `0x1050f90` 200 命令・`0xffac50` 60 命令・`0xffaea0` 80 命令・`0x12f9ed0` 80 命令・`0x12f9ec0` 30 命令・`0xf824b0` 45 命令・`0x1051c90` 45 命令・`0x10469f0` 40 命令。全て終了 0。
 - 定数 (`pe_rip_consts.py 0xffac50 40`): slot `0xffacd8` を解決。f32 の表示は `-107372944.0` だが、マスクは byte として使われるので、バイトの実値 `32` を採る。
@@ -38,5 +38,5 @@
 
 ## 解けなかったこと (子 issue へ)
 
-- `0xf823f0`・`0x40c660`・`0x661450`・`0x10469f0` の係数の具体値 (n → n1 → n2 の式の確定)。
-- key 8 の書込み条件とマスク `0x32` の対応 (`0xffac50` の id 1・4・5 の意味づけ)。
+- `0xf823f0`・`0x40c660`・`0x661450`・`0x10469f0` の係数の具体値 (n → n1 → n2 の式の確定)。→ #4181 (PY-307)
+- key 8 の書込み条件とマスク `0x32` の対応 (`0xffac50` の id 1・4・5 の意味づけ)。→ #4182 (PY-308)
