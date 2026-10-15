@@ -1,14 +1,14 @@
 # tools/python REPORT: PY-233 general.getRecPPB の切替先の実行時値 (#3690, 親 #3003)
 
 > 前段: `tools/python/REPORT_PY121.md` (PE 静的解析で切替式 `0xd68d90` を確定)・`tools/flelift/boot/REPORT.md` §9-§11 (boot 停止点 unit 209)・`tools/python/REPORT_APPENDIX_PY123.md` §2 (fill `f_6a7b70` の 0 化)。
-> 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23 とは照合していない。fill の 0 化の類型判定は #3112 に任せる。類型 ID は付けない)。
+> 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D25 と照合。lift の翻訳欠陥 (D1a〜D23・D25) の症状とは一致を確認できなかった。D20・D21 (load・引数の値の化け) も候補として見たが、buf=0 の呼出しという本件の観測とは一致を示せない。fill が buf=0 で呼ばれる上流の判定は #3112 に任せる。類型 ID は付けない)。
 
 ## 結論
 
 - **受入 1 (入口の値): 未取得。** 切替関数 `0xd68d90` の入口観測点は、shim 経路の boot (units 209 → exit) で 0 件。呼出元は `f_d69310` (getRecPPB 本体 = Python 側の API ハンドラ) と `f_13751d0` の icall 分岐 case の 2 箇所で、boot はどちらにも入らなかった。
 - **受入 2 (取得できない場合): 記録した。** 到達範囲と必要な変更は §3。
 - **停止点の値 (参考)**: unit 209 の後の `0x412a0d` (exit 直前) で `[0x15e4558]=0`・`[0x15e35c8]=0`・`[0x16ba7f0]=0`・`[0x16ba808]=0`。切替の両経路とも X=0 (null)。この値は実行時の正しい値ではない (次の項目)。
-- **原因 (実測)**: unit 209 の fill `f_6a7b70` の呼出し 6 回目 (dst=`0x1400000`・4 MiB) の 16 バイト書込みが、`.data` の P (`0x15e4558`)・Q (`0x15e35c8`) を 0 にする (書込み監視で 2 件)。fill の入口 (6 回目) ではまだ PE 初期値 (`0x16ba7f0`・`0x16ba808`) だった。
+- **原因 (推定)**: 実測したのは、unit 209 の fill `f_6a7b70` の呼出し 6 回目 (dst=`0x1400000`・4 MiB) の範囲内で、P (`0x15e4558`)・Q (`0x15e35c8`) への 16 バイト書込みが各 1 件起き、0 になったことまで (書込み監視で 2 件)。fill の入口 (6 回目) ではまだ PE 初期値 (`0x16ba7f0`・`0x16ba808`) だった。書込み元 VA は出ないため、fill が書込み元であることは推定。
 - **切替条件**: 確定できず。PE 静的の式 (`P≠0` なら `X=[P]`、`P=0` なら `X=[Q]`・REPORT_PY121 §「getRecPPB の切替」) はそのまま。実行時の入力を得るには fill の呼出元の修復 (#3112) が前提。
 - mock・C provider は変えない (実装数・未実装数の変化 0)。
 
@@ -24,7 +24,7 @@
 - PE 初期値 (pefile で `.data` の raw を読む): `0x15e4558`→`0x16ba7f0`、`0x15e35c8`→`0x16ba808`。`.bss` の `0x16ba7f0`・`0x16ba808` は raw 無し (0)。
 - 敷設: `fle_boot_enter` の初回で `fle_data_install` が `.data` (`0x13a5000`〜`0x15e5008`) を敷設する。6 回目の fill 入口で値が PE 初期値と一致したことから、敷設は効いている。
 - 0 化の源: fill の 6 回目 (dst `0x1400000`・4 MiB → `0x1400000`〜`0x1800000`) が P・Q を含む。fill の 6 回は 0x0〜0x1800000 を覆う (`REPORT_APPENDIX_PY123.md` §2 の静的記録と一致。本 REPORT は入口の引数を実測した)。
-- 診断 `FLE_DIAG_NULLFILL=1` (buf=0 の fill を戻す) を付けても、同じ 2 件の 0 化が残った。この診断は dst=0 の呼出しだけを対象にし、dst≠0 の 2〜6 回目は止めないため。
+- **fill → 0 化の対照は未実施**: 診断 `FLE_DIAG_NULLFILL=1` (buf = `[this+0x50]` = 0 の fill を戻す) は、fill が root 無し (unlifted) のときだけ効く (`fle_boot.c:268`)。本 probe は既定の root 有り lift (`FLE_EXTRA_ROOTS=0x6a7b70`) で、`FLE_DIAG_NULLFILL=0` を指定しているため、診断は no-op。よって上の 0 化は対照の結果ではない。既存の記録 (`tools/flelift/boot/REPORT.md` §11) では root 無し lift で診断を付けると GetMem・undo slot の 0 化が消えており、P・Q について同じ対照を取る作業は §未解決に置く。
 
 ## 2. 手段 (再現)
 
@@ -62,4 +62,5 @@ bash tools/flelift/boot/py233_getrecppb_probe.sh   # 観測点 3 つ + FLE_WWATC
 | fill `f_6a7b70` の呼出元 (buf=0 から 4 MiB ずつ 6 回の 0 化) の判定と修復。`.data` の P・Q を 0 にする | 切替の実測ができない。boot 連鎖の silent miscompile の疑い | #3112 [FLE-13] (既存・OPEN) |
 | 修復後の次の blocker `unlifted 0x6bbc20` | 最初のウィンドウ未達 | #3491 [FLE-14] (既存) |
 | getRecPPB (`0xd68d90`) の呼出元が boot に入るか (Python API 経由のみか、icall 分岐 `f_13751d0` か) | 到達しなければ boot では値を取れない | #3003 (親・PY-127) に本 REPORT の結論を返す |
-| 書込み監視 (STX) の書込み元 VA が出ない (`fle_cpu.h:79`) | 書込み元は fill の呼出し順と入口の値からの推定 | 本 PR の範囲外 (必要なら PM 判断で子 issue) |
+| 書込み監視 (STX) の書込み元 VA が出ない (`fle_cpu.h:79`)。書込み元は fill の呼出し順と入口の値からの推定 | P・Q の書込み元 (fill か) が未確定。0 化の機構が決まらない | #3112 [FLE-13] (既存・OPEN) へコメント済み: 書込み元 VA の特定 (書込み元 PC の記録) を修復範囲に含める |
+| fill → P・Q の 0 化の対照 (root 無し lift + `FLE_DIAG_NULLFILL=1` で P・Q が残るか。§1) | 対照が無く、fill の 0 化を実測と言えない | #3112 [FLE-13] (既存・OPEN) へコメント済み: root 無し lift で同じ観測を取る |
