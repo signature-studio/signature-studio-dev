@@ -378,6 +378,10 @@ export function createMockEngine() {
     "general.getProjectGenre": (...a) => { arity(a, 0, 0); return st.projGenre; },
     // PY-120 (#2984): PE 0xd791b0 は obj.+0x50 の配列 (+0x3c0) の件数を返す。件数は実行時の状態のため仮置き 0 (REPORT_PY120_2984)
     "launchMapPages.length": (...a) => { arity(a, 0, 0); return st.launchPages; },
+    // PY-138 (#3029): PE init 0xd79020 (書式 sii)・updateMap 0xd79290 (i)・createOverlayMap 0xd7a130 (iiii) は引数書式と成功時の戻り (None) を確定。page 配列への副作用は未確定のため状態を変えない (REPORT_PY138)
+    "launchMapPages.init": (...a) => { arity(a, 3, 3); str(a[0]); argI(a, 1, 0); argI(a, 2, 0); },
+    "launchMapPages.updateMap": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
+    "launchMapPages.createOverlayMap": (...a) => { arity(a, 4, 4); for (let i = 0; i < 4; i++) argI(a, i, 0); },
     // PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない
     "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
     "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
