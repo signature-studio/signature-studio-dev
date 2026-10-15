@@ -73,3 +73,15 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 - seed 有 + RECV + SELF=`0x5ac338` (B): A と同じ stack・同じ threw。`self` を渡しても、chain は `rcx` を global から再読込するため結果は変わらない。
 - 所見 (静的・生成器の出力を走査): `0x976410` は窓 `w_4420` (`0x976400`・96 B) に入るため、敷設後は前版の PE 値 `0x9764d8` になる。`0x9764a8` (PE 値 `0x40f960`)・`0x5ac308` は敷設する memcpy に入らず、harness では 0 のまま。前版の「`f_976b60` の `rcx` は `0x976410` から来る」は、コードの静的な読みで実行時値は未計測。`f_410320` の `rax` が 0 となり `LD64(0xffffffffffffffd0)` で oob する、は推定 (`rcx`・`rax` の実行時値は未計測。推定)。
 - 未解決 (起票先: #5337 に残す): (1) `0x976410` の敷設後の実行時値を probe で確定する (静的には `0x9764d8`)。(2) `fle_data_install` が覆わない `0x9764a8`・`0x5ac308` (いずれも `.text` 内) の敷設方法を決める。(3) 実機の loader が充填する値は未確認 (起票先: #5337。#4384 は CLOSED)。
+- 訂正 (§14 で実測): 上の (2) の「敷設されない」は誤り。`fle_textwin_install` が `.text` 全域 (`0x401000`〜) を敷設するので、`0x5ac308`・`0x976410` は敷設直後に正しい値 (`0x40f960`・`0x9764d8`) になる。以後の問題は「敷設後に 0 になる」ことで、§14 で `0x5ac308`・`0x976410` は確認した。`0x9764a8` は未計測。
+
+## 14. 受け手 slot の消失の所在 (#5337・測定 commit `9b8a0426c`・mode tol・寛容起動)
+
+- 測定: `FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_SLOTS=0x5ac308ull,0x976410ull" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0・所要 3 分 39 秒 (lift 82 s・clang plain 101 s・boot tol 26 s)。load 0.96〜2.05。
+- 計数 (診断 knob 下): dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob`・exit 0。§11・§12-1 と一致 (診断は計数を変えない)。
+- 敷設直後・初期化直後の値 (probe): `0x5ac308=0x40f960`・`0x976410=0x9764d8` (`fle_textwin_install`・`fle_init` の後で、どちらも PE 静的値と一致)。
+- 消失の時点: `fle_wwatch` の監視で、両 slot は **同じ 1 回の 16B 書込み** で 0 になる (`old=0x40f960 new=0` と `old=0x9764d8 new=0`)。書込みは unit 245 (ExitProcess) の後、unit 246 の直前。寛容ループの各 unit 前の検査で、最初に `0x5ac308=0` となるのが unit 246 (`[slot-zero]`)。前回 §3・§12 の clobber 695 件 (unit 246〜940) の開始点と一致する。
+- 書込み元: 戻り番地 `0x2ec1d8d` (wasm 内の code 位置)。code section の関数本体の範囲で引くと code 位置 `11254` (範囲 `0x2ec1d5f`〜`0x2ec1dbd`) に入る。name section の index は import (36 件) を含むため、この code 位置の名前は `f_134cad0` と読めるが確定ではない (推定)。書込み命令は `STX` (16B の store・`fle_cpu.h:79`)。
+- 既定経路 (root 無し・`FLE_EXTRA_LDF` 付き・`9b8a0426c^` と `9b8a0426c` で同一): dispatch 895 / GetMem 3,680 / FreeMem 1,499 / exit。この値は前回 REPORT の 209 (root 有・既定 root 無し) と条件が異なる。既定の数値は変えていない (`9b8a0426c^` で同じ値を再現)。
+- 所見: 受け手 slot の消失は、既知の clobber (unit 246〜) と同じ時点・同じ経路。受け手の実行時 VA (`0x40f960` が正しい値) は、書込みを止めれば取れる見込み。ただし書込みを止める処理 (clobber の原因) はまだ特定していない。
+- 未解決 (起票先: #5337 に残す): (1) 書込み元の関数 `f_134cad0` の実行時の名前と役割 (推定の段階)。(2) clobber を起こす unit 245 の後の処理 (#3060 の `f_6a7b70` 広域ゼロ埋めと同じ現象かは未確認)。(3) 実機の loader が充填する値 (#4384 は CLOSED)。
