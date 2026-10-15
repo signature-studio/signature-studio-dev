@@ -163,6 +163,20 @@ DELAY_RULES = [
      '_DAT_18436cd18 = (longlong)(puVar3 + 0x40);', 2),
     ('_UNK_182280e04: 12 byte 代入 (#4685)', r'auVar2\._4_12_ = _UNK_182280e04;',
      'memcpy(&auVar2._4_12_, gd_182280e04, 12);', 1),
+    # #4838 (KH-119): 代入の pointer⇔整数 5 行。機械語で確定 (REPORT_APPENDIX_3801.md の P6 の現 HEAD 残件)。
+    #   FUN_180f88084・FUN_180f880a4・FUN_180fd2d38: 初期化の 8 byte スロットへ leaq で得た番地を movq で書く。
+    #   値はそのアドレス (&UNK_<va>) のビット列。整数型スロットへ同ビットを明示キャストで書く (数値変換にしない)。
+    #   `&UNK_` 形は tbase 置換 (gt_<base> + off) より前に当てる。
+    ('param_1[1] = &UNK_18227b1f8 (#4838)', r'param_1\[1\] = &UNK_18227b1f8;',
+     'param_1[1] = (longlong)&UNK_18227b1f8;', 1),
+    ('param_1[1] = &UNK_18227b208 (#4838)', r'param_1\[1\] = &UNK_18227b208;',
+     'param_1[1] = (longlong)&UNK_18227b208;', 1),
+    ('*param_1 = &UNK_1813a3e58 (#4838)', r'\*param_1 = &UNK_1813a3e58;',
+     '*param_1 = (longlong)&UNK_1813a3e58;', 1),
+    ('*param_1 = &UNK_1813a4968 (#4838)', r'\*param_1 = &UNK_1813a4968;',
+     '*param_1 = (longlong)&UNK_1813a4968;', 1),
+    ('*param_1 = &UNK_1822849e0 (#4838)', r'\*param_1 = &UNK_1822849e0;',
+     '*param_1 = (longlong)&UNK_1822849e0;', 1),
 ]
 
 
