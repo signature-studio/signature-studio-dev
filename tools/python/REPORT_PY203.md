@@ -142,7 +142,7 @@
 
 ### 6.4 COPY 7・AMBIG 8 の終端 (`analysis/flapi/pe_py368_terminal.py`・#5409)
 
-測定 commit: `760faf2d1` (スクリプトを追加した commit)。同じ commit で 2 回実行し、TSV は一致 (終了 0・rows=7・39.4 秒)。`git diff 760faf2d1 HEAD -- tools/python/analysis/flapi` は 0 行。
+測定 commit: `760faf2d1` (スクリプトを追加した commit)。HEAD (main 取り込み後の merge commit) で 2 回実行し、TSV は一致 (終了 0・rows=7・34.1 秒・34.3 秒)。依存先 (`pe_py368_terminal.py`・`pe_py368_copy_ambig.py`・`pe_py203_edx_sites.py`・`pe_py273_base.py`) は `git diff 760faf2d1 HEAD` が 0 行。`pe_py273_globals.py` のみ main 側の `c44281a3e` で変わったが、本スクリプトは import しない。
 
 対象は 6.3 の終端 7 箇所 (スロット `[rbp+X]` の直前 store と、AMBIG の合流元)。
 
