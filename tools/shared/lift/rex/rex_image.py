@@ -62,7 +62,7 @@ data = next(s for s in pe.sections if s.Name.rstrip(b'\0') == b'.data')
 # 0x1380: mov rax,[rip+disp] (7 バイト)。REX の ctx (this) 取得点。次命令 RVA 0x1387 + disp
 ctx_rva = 0x1380 + 7 + 0x48a81
 assert data.VirtualAddress <= ctx_rva < data.VirtualAddress + data.Misc_VirtualSize
-lay = {'base': BASE, 'img_size': SIZE, 'arena': 0x30100000, 'arena_sz': 0x10000,
+lay = {'base': BASE, 'img_size': SIZE, 'arena': 0x30100000, 'arena_sz': int(os.environ.get('REX_ARENA_SZ', '0x10000'), 0),
        'ctx_rva': ctx_rva, 'data_rva': data.VirtualAddress, 'data_sz': data.Misc_VirtualSize,
        'exp_creator_rva': exports['REXGetCreatorInfo'], 'exp_info_rva': exports['REXGetInfo'], 'iat': {}}
 for name, tag in IMPORTS_NATIVE.items():

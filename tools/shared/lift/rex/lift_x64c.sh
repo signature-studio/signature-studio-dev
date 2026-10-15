@@ -9,7 +9,7 @@
 #   neg-ctx : 入力のネガティブコントロール (wasm 側だけ ctx 大域を 0 にする)。
 #   neg-owner: 配信物一覧の突合のネガティブコントロール (owner/rex_glue.c を追加してから突合する)。
 #   movnti  : movnti (閉包内 24 箇所) を含む経路への到達の実測 (gen_movnti.py・movnti_check.py。T-SH-90 / #3589)。
-#             実装判定 = movnti の ott_unsup が 0 件 (#3893)。reach 16 件は既知の未達 (#4324 で解消。期待値は 0/16 を既知として扱う)。
+#             実装判定 = movnti の ott_unsup が 0 件 (#3893)。reach 16 件は arena 0x80000 で完了することを判定 (#4324)。
 #   neg-*   : FAIL を検出したら exit 0 / PASS してしまったら exit 1。all = ok + 全 neg-* + movnti。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -33,6 +33,7 @@ python3 -c "import json; json.dump({'roots': [0x1800011c0, 0x180001130], 'calltg
 rm -rf "$W/lift"
 python3 "$FLE/x64c.py" --pe "$DLL" --entries "$W/entries.json" --out "$W/lift" --closure 99 \
   --img 0x180000000 --shift 0x150000000 --img-size 0x6a000 --impbase 0x1D80000
+if [ "$MODE" = movnti ]; then export REX_ARENA_SZ=0x80000; fi   # reach (a1 < 0x80000) を arena 内で完了させる (#4324)。他モードは 0x10000 のまま
 python3 "$HERE/rex_image.py" "$DLL" "$W"
 if [ "$MODE" = movnti ]; then python3 "$HERE/gen_movnti.py" "$W/cases.bin"; else python3 "$HERE/gen_cases.py" "$W/cases.bin" 200; fi
 
