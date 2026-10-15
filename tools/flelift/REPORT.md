@@ -247,4 +247,4 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 
 ## 12. #3603 (CI-169): 直下 3 本の VM 既定の絶対パス ([ANALYSIS-DIR]) の置換
 
-- **結論: 達成**。`fle_nat.py`・`fle_diff.py`・`probe_d9_disp.py` の既定値は `tools/shared/paths.py` の `FL_WIN64_DIR` 経由 (3 本で VM 既定の絶対パス 0 件)。`fle_e2e.sh` は変更前後とも PASS。実測値・測定 commit・差分 0 の証跡は `REPORT_APPENDIX.md` §12 が正本。
+- **結論: 達成**。`fle_nat.py`・`fle_diff.py`・`probe_d9_disp.py` の既定値は `tools/shared/paths.py` の `FL_WIN64_DIR` 経由 (3 本で VM 既定の絶対パス 0 件)。`fle_e2e.sh` は変更前後・main 取り込み後とも PASS。実測値・測定 commit・差分 0 の証跡は `REPORT_APPENDIX.md` §12 が正本。

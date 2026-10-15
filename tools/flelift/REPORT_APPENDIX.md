@@ -124,7 +124,24 @@ load average: after 完了時 0.97、HEAD 完了時 1.00 (before は未採取)�
 
 ネガティブコントロール: `FL_WIN64_DIR` に存在しない dir を指定して `probe_d9_disp.py` を実行 → rc=1 (指定 dir の PE を開けず `FileNotFoundError`)。変数が経路に効いていることの確認。
 
-差分 0 の証跡: `git diff fcc0ea6b5 HEAD -- tools/flelift/fle_nat.py tools/flelift/fle_diff.py tools/flelift/probe_d9_disp.py tools/flelift/fle_e2e.sh tools/flelift/fle_lift.sh` の出力は 0 行 (測定 commit = HEAD 時点)。
+差分 0 の証跡: `git diff fcc0ea6b5 7ce6ea369 -- tools/flelift/fle_nat.py tools/flelift/fle_diff.py tools/flelift/probe_d9_disp.py tools/flelift/fle_e2e.sh tools/flelift/fle_lift.sh` の出力は 0 行 (main 取り込み後の測定 commit 時点)。
+
+### 12.1 main 取り込み後の再測定 (競合解消)
+
+- 測定 commit: `7ce6ea369` (`origin/main` を merge した commit。PR 側の変更は足していない)。
+- e2e 経路の差分: `git diff fcc0ea6b5 7ce6ea369 -- tools/flelift/fle_e2e.sh tools/flelift/fle_lift.sh tools/flelift/fle_diff.py tools/flelift/probe_d9_disp.py tools/flelift/fle_nat.py tools/flelift/fle_entries.json tools/shared/env.sh tools/shared/paths.py tools/shared/scripts` は 0 行。main 側で変わったのは `tools/flelift/boot/`・`tools/shared/lift/rex/`・REPORT 類で、`fle_e2e.sh` の呼出し先には入らない。
+
+| 項目 | 値 |
+|---|---|
+| 環境 | Actions runner (4 vCPU)。`fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (7.1 秒) し `FL_WIN64_DIR` で指定。emsdk は runner 既設の `/opt/emsdk` |
+| load average | 開始 0.56 → 完了 1.02 |
+| 総所要 (real) | 1 分 37.1 秒 |
+| 判定 | `[fle_e2e] PASS` (rc=0) |
+| lift | 7,018 関数 / 340,761 命令 / unsup 0 / unlifted callees 0 |
+| spot diff | 7 関数 / 16 case / equal 16 |
+| D9 | rip-rel 136,333 site / mismatch 0 |
+| 静的検査 | `bash tools/shared/test_paths.sh`: default・analysis_dir_only・individual_override・negctl の 4 件 PASS |
+| 追跡ファイル | e2e 後の `git status --short` は空 (`results/` は HEAD と同一) |
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
