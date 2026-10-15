@@ -100,7 +100,7 @@
 
 ## 9. slot 2 の差分追加と slot 1・3 の native 落ち原因 — T-SH-105 (#4237)
 
-測定 commit: `d7a1b641e` (コードを変えた最後の commit。`lift_psola.sh` の差分)。検証起点: `e0ee551a2` (origin/main)。
+測定 commit: `b53a5ec8f` (コードを変えた最後の commit。`lift_psola.sh` の差分と、main 取り込みで入った `ildsp_native.c`・`fle_cpu.c`・`lift_psola_closure.sh` の差分を含む)。`d7a1b641e` からの差分は main 取り込み分のみ。§9-2 の単独呼出しの表は `d7a1b641e` 時点の実測 (`ildsp_native.c` の取り込み前)。
 
 ### 9-1 結論 (1 行)
 slot 2 を差分に加えて 64/64 PASS (ネガコン FAIL 64/64)。slot 1・3 は復号鍵 `[0x3f7ad0]` が file 上で 0 のため native が落ち、鍵の初期化は未特定で差分には入れていない。
@@ -129,14 +129,16 @@ slot 1・3 の thunk は `rcx = [this+8]` を読んでから DSP 本体へ jmp �
 | (2) slot 1–3 を含む呼出し順で native 対 wasm の差分 | **部分**。slot 2 を含む差分は `WC_CALL_IDX="0 2 4 5"` で実施 (64/64・ネガコン 64/64)。slot 1・3 は未達 |
 | (3) .data 入力の変化で分岐の到達を数値に示す | **未達**。差分は従来どおり .data 不変・同一経路 (§8-4 と同じ制限) |
 
-### 9-5 実測 (slot 2 を含む差分・worktree `4237-psola-slot2-diff`・4 core)
+### 9-5 実測 (slot 2 を含む差分・測定 commit `b53a5ec8f`・4 core・1 回)
 | 項目 | 値 |
 |---|---|
-| `lift_psola.sh all` elapsed | 3.44 s (real) |
-| 本検査 (ok) | 1.70 s・PASS 64 / FAIL 0 (wasm trap 0・native crash 0) |
-| neg-cmp | 1.71 s・FAIL 64 (rc 1・期待どおり)・ALL OK |
+| `lift_psola.sh all` elapsed | 3.02 s (real・rc 0) |
+| 本検査 (ok) | 1.57 s・PASS 64 / FAIL 0 (wasm trap 0・native crash 0・SIGSEGV/SIGBUS 0) |
+| neg-cmp | 1.42 s・FAIL 64 (rc 1・期待どおり)・ALL OK |
 | x64c | 37 関数・1,059 命令・unsup 0 (従来の基準 36・1,046 から slot 2 の 1 関数・13 命令を追加) |
-| load | 開始 1.19 0.77 0.47 → 終了 1.17 0.78 0.47 |
+| wasm | 81,303 B (SizeOfImage 0x447000) |
+| load | 本検査の開始 1.10 0.71 0.36 → 終了 1.10 0.72 0.36 |
+| 環境 | emsdk 6.0.12 (`EMSDK_ENV` は `/tmp/opencode/emsdk` に導入)・fl-win64 は `/tmp/opencode/win64` に展開 |
 
 ### 9-6 未解決
 | 未解決 | 影響 | 起票先 |
