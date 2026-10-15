@@ -9,8 +9,10 @@ usage:
   gen_golden_w.py compare <actual.ppm>            期待画像と画素比較。差 0 で exit 0・差ありで exit 1
   gen_golden_w.py compare <actual.ppm> --tamper   ネガコン: 期待画像の 1 画素を改竄して比較 (exit 1 になること)
   gen_golden_w.py emit <out.ppm> [--tamper]       期待画像を P6 で書き出す (e2e.mjs の W 版モードが読む)
+  gen_golden_w.py stats <native_w_run.log> [--tamper]
+                                                  native_w_run の surface 行 (gui_hl_stats) を期待統計と照合 (WIN-57)
 """
-import os, re, sys
+import hashlib, os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 W, H = 320, 200
 TEXT, TX, TY = "Wide Text 42", 12, 100
@@ -62,7 +64,37 @@ def write_ppm(path, img):
         f.write(bytes(c for row in img for px in row for c in px))
 
 
+def expected_stats(tamper=False):
+    img = oracle(tamper)
+    px = [c for row in img for c in row]
+    data = bytes(x for c in px for x in c)
+    return {"w": W, "h": H, "bg": "%02x%02x%02x" % BG, "nonbg": sum(1 for c in px if c != BG),
+            "colors": len(set(px)), "sha256": hashlib.sha256(data).hexdigest()}
+
+
+def check_stats(log_path, tamper=False):
+    line = None
+    for ln in open(log_path, encoding="utf-8", errors="replace"):
+        if ln.startswith("[native_w_run] surface "):
+            line = ln
+    if line is None:
+        print("[golden_w] stats: surface 行が無い"); return 1
+    got = dict(re.findall(r"(\w+)=(\S+)", line))
+    exp = expected_stats(tamper)
+    keys = ["w", "h", "bg", "nonbg", "colors", "sha256"]
+    bad = [k for k in keys if str(exp[k]) != got.get(k)]
+    if not bad:
+        print("[golden_w] STATS MATCH (w=%s h=%s bg=%s nonbg=%s colors=%s sha256=%s)%s" % (
+            exp["w"], exp["h"], exp["bg"], exp["nonbg"], exp["colors"], exp["sha256"], " [tamper]" if tamper else ""))
+        return 0
+    print("[golden_w] STATS MISMATCH (%s)%s" % (", ".join("%s: got %s want %s" % (k, got.get(k), exp[k]) for k in bad),
+                                               " [tamper]" if tamper else ""))
+    return 1
+
+
 def main():
+    if len(sys.argv) >= 3 and sys.argv[1] == "stats":
+        return check_stats(sys.argv[2], "--tamper" in sys.argv[3:])
     if len(sys.argv) >= 3 and sys.argv[1] == "emit":
         tamper = "--tamper" in sys.argv[3:]
         write_ppm(sys.argv[2], oracle(tamper))

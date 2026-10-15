@@ -74,6 +74,7 @@ int main(int argc, char** argv) {
     run_cbtrans_tests(mt);       fprintf(stderr, "[shimx-test] cbtrans OK\n");
     run_midi_tests(mt);          fprintf(stderr, "[shimx-test] midi OK\n");
     run_seh_tests();             fprintf(stderr, "[shimx-test] seh OK\n");
+    run_fh3_tests();             fprintf(stderr, "[shimx-test] fh3 OK\n");
     run_absent_path_tests();     fprintf(stderr, "[shimx-test] absent-path OK\n");
     printf("[shimx-test] ALL PASS (build=%s)\n", build);
     return 0;

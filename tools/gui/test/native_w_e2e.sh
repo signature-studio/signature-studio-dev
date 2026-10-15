@@ -39,6 +39,11 @@ python3 "$ROOT/golden/gen_golden_w.py" compare "$BUILD/w_actual.ppm"
 tamper_log="$(python3 "$ROOT/golden/gen_golden_w.py" compare "$BUILD/w_actual.ppm" --tamper || true)"
 echo "$tamper_log"
 grep -q '^\[golden_w\] MISMATCH' <<< "$tamper_log" || { echo "[native_w_e2e] FAIL: ネガコン (改竄オラクル) が MISMATCH を出さなかった (例外・終了コードだけでは判定しない)" >&2; exit 1; }
+# W 版ゲストの最終 surface の統計 (gui_hl_stats: w/h/bg/nonbg/colors/sha256) を独立オラクルの期待統計と照合する (WIN-57)。ネガコン: 改竄オラクルで STATS MISMATCH
+python3 "$ROOT/golden/gen_golden_w.py" stats "$BUILD/native_w_run.log"
+stats_tamper="$(python3 "$ROOT/golden/gen_golden_w.py" stats "$BUILD/native_w_run.log" --tamper || true)"
+echo "$stats_tamper"
+grep -q '^\[golden_w\] STATS MISMATCH' <<< "$stats_tamper" || { echo "[native_w_e2e] FAIL: 統計のネガコン (改竄オラクル) が STATS MISMATCH を出さなかった" >&2; exit 1; }
 # 到達ログの順序検査 (RegisterClassW < CreateWindowExW < WM_PAINT 配送 < BitBlt)。検査自体は合成ログで先に確かめる (#3510)
 python3 "$HERE/reach_order_check.py" --selftest
 python3 "$HERE/reach_order_check.py" "$BUILD/native_w_run.log"
