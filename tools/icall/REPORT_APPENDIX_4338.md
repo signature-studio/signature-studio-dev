@@ -61,7 +61,14 @@ bash tools/icall/diff/fa_sweep.sh 8 60       # funcs 131 ...
  1 file changed, 16 insertions(+)
 ```
 
-鮮度の証跡 (`git diff 945cf6010 HEAD -- tools/ott`): 測定 commit 以降の差分は `ContextFlags` のコメントに `DEBUG_REGISTERS` を追記した 1 行だけ (値・処理は不変)。
+鮮度の証跡 (`git diff 945cf6010 b3b756750 -- tools/ott`)。測定 commit 以降の差分は `ContextFlags` のコメントに `DEBUG_REGISTERS` を追記した 1 行だけ (値・処理は不変):
+
+```
+-    *(uint32_t*)(ctx + 0x30) = 0x10001f;      /* ContextFlags = CONTEXT_AMD64 | CONTROL|INTEGER|SEGMENTS|FLOAT */
++    *(uint32_t*)(ctx + 0x30) = 0x10001f;      /* ContextFlags = CONTEXT_AMD64 | CONTROL|INTEGER|SEGMENTS|FLOAT|DEBUG_REGISTERS */
+```
+
+ tools/ott/native/ott_native.c | 2 +-
 `build.sh` と同じフラグ (`gcc -O1 -g -fPIC -shared`・`ms_call.S` 同梱) で測定 commit 版と HEAD 版の `libottnative.so` を作り、`objdump -d` の逆アセンブルを比較した。差はファイル名の見出し行だけ (コード部は同一)。`cmp` のバイナリ差は DWARF の comp_dir (ビルドディレクトリ) によるもので、コード差分ではない。
 
 ## 5. 未解決
