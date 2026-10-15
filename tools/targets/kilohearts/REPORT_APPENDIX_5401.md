@@ -2,7 +2,7 @@
 
 親の受入 (残り件数の一括規則化) は 1 run に収まらないため、呼出しを 1 件ずつ確定する (規則 1 件 = 呼出し 1 件・件数 1 を assert)。
 
-**結論**: `ABI['delay']` に規則 1 件 (`FUN_180fe3510`) を追加。現 head `26bc08453` での Delay の emcc error は **288** (引数数不一致 70・lanes 併用)。規則 1 件の寄与は fb4b67659 で 79 → 78 (下表)。main 由来の #4889・#5384 の規則が残りの減少分。
+**結論**: `ABI['delay']` に規則 1 件 (`FUN_180fe3510`) を追加。現 head `26bc08453` での Delay の emcc error は **288** (引数数不一致 70・lanes 併用)。`fb4b67659` (規則あり) の census は 78。規則なしの同一 commit での比較は未測定 (規則 1 件の単独寄与は未確定)。
 
 **測定 commit**: `26bc08453` (main 取り込み後の現 head。`tools/targets/kilohearts/ghidra_route` を変える最後の commit)。
 **鮮度の証跡**: `git diff 26bc08453 HEAD -- tools/targets/kilohearts/ghidra_route` = 差分 0 (本付録の commit は付録だけを変える)。
@@ -34,5 +34,5 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 残りの引数数不一致 70 件の規則化 (本 PR は 1 件) | Delay の emcc 不通過 (wasm 不成立) | #5401 (Refs・残りは親 issue の本文に追記) |
+| 残りの引数数不一致 70 件の規則化 (本 PR は 1 件・現 head の census) | Delay の emcc 不通過 (wasm 不成立) | #5401 (Refs・残りは親 issue の本文に追記) |
 | Delay の数値未検証 | emcc 通過だけでは値の正しさは言えない | #3073 [KH-41] |
