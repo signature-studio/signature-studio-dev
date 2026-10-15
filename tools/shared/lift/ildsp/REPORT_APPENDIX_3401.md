@@ -100,44 +100,47 @@
 
 ## 9. slot 2 の差分追加と slot 1・3 の native 落ち原因 — T-SH-105 (#4237)
 
-測定 commit: `b53a5ec8f` (コードを変えた最後の commit。`lift_psola.sh` の差分と、main 取り込みで入った `ildsp_native.c`・`fle_cpu.c`・`lift_psola_closure.sh` の差分を含む)。`d7a1b641e` からの差分は main 取り込み分のみ。§9-2 の単独呼出しの表は `d7a1b641e` 時点の実測 (`ildsp_native.c` の取り込み前)。
+測定 commit: `b53a5ec8f` (コードを変えた最後の commit。`lift_psola.sh` の差分と、main 取り込みで入った `ildsp_native.c`・`fle_cpu.c`・`lift_psola_closure.sh` の差分を含む)。`d7a1b641e` からの差分は main 取り込み分のみ。§9-2・§9-3 は `e50124848` (HEAD) で再測定した。
 
 ### 9-1 結論 (1 行)
-slot 2 を差分に加えて 64/64 PASS (ネガコン FAIL 64/64)。slot 1・3 は復号鍵 `[0x3f7ad0]` が file 上で 0 のため native が落ち、鍵の初期化は未特定で差分には入れていない。
+slot 2 を加えて 64/64 PASS (ネガコン FAIL 64/64) し、slot 1・3 は復号鍵 `[0x3f7ad0]` が 0 のため native が 64/64 で落ちるので差分に入れていない (鍵の書込み元は未特定)。
 
-### 9-2 slot 1〜3 の native 単独呼出し (実測・各 4 case・同一 harness)
+### 9-2 slot 1〜3 の native 単独呼出し (実測・HEAD・各 64 case・`lift_wc.sh`)
+測定: `e50124848` (コードは `b53a5ec8f` と同一・`git diff b53a5ec8f HEAD -- tools/shared/` は 0 バイト)。`WC_ROOTS` は `lift_psola.sh` と同じ。`WC_CALL_IDX` と `WC_RET_IDX=5` を指定して呼ぶ。
 | WC_CALL_IDX | native 結果 | 備考 |
 |---|---|---|
-| `1` (CreateInstance → slot 1) | SIGSEGV 4/4・addr 0x0 | slot 0 を呼ばない |
-| `2` (CreateInstance → slot 2) | PASS 4/4 (落ちない) | 単独でも成立 |
-| `3` (CreateInstance → slot 3) | SIGSEGV 4/4・addr 0x0 | |
-| `1 4 5` | SIGSEGV 4/4 | |
-| `0 1 4 5` | SIGSEGV 4/4 | slot 0 (dtor) の後でも同じ |
+| `1` (CreateInstance → slot 1) | SIGSEGV/SIGBUS 64/64・addr 0x0 | slot 0 を呼ばない |
+| `2` (CreateInstance → slot 2) | PASS 64/64 (落ちない・wasm 差分 PASS 64/64) | 単独でも成立 |
+| `3` (CreateInstance → slot 3) | SIGSEGV/SIGBUS 64/64・addr 0x0 | |
+| `1 4 5` | SIGSEGV/SIGBUS 64/64 | |
+| `0 1 4 5` | SIGSEGV/SIGBUS 64/64 | slot 0 (dtor) の後でも同じ |
 
-slot 1・3 の thunk は `rcx = [this+8]` を読んでから DSP 本体へ jmp する (`0x17f700`・`0x180830`)。DSP 本体より先に、呼ばれる helper が落ちる。
+注: `lift_psola.sh` は `WC_CALL_IDX` を無条件に上書きするため、上の表は `lift_wc.sh` を直接呼んで得た。`lift_psola.sh` 経由では別の slot 集合になる。
 
 ### 9-3 落ち箇所の特定 (slot 1 単独・RIP を実測)
-- SIGSEGV ハンドラの複製 (`ildsp-probe` 作業用・repo 外へ置かない) で、落ちた時点の RIP・レジスタを取った: `rip=0x1cb5e0` (`jmp rax`)・`rax=0x0ae64b77e88c8000` 相当の非正規値・戻り番地 `0x1b6f72`。
-- 戻り番地の `0x1b6f72` は関数 `0x1b6f4c` の内部。この関数は (a) `0x1b6f88` で値 `rbx = [0x3f5d98] ^ [0x3f7ad0]` を `ror rbx, cl` で復号、(b) `movabs r10, 0xd1ed0fdf1cd32070` を置き、(c) `call [rip+0xb12f6]` (RVA `0x268268`・値 `0x1801cb600`) を呼ぶ。`0x1801cb600` は `0x1cb600` の `jmp [rip+…]` で、`0x1cb5e0 (jmp rax)` とは別経路。
-- file 上の鍵 `[0x3f7ad0]` は 0。よって復号結果が 0 になり、`jmp rax` が addr 0 を踏む。
-- 注: `0x1b6f4c` を直接呼ぶ call は画像内に見つからなかった (`0x1b6f4c` の参照は間接経由)。鍵 `0x3f7ad0` を参照する命令は静的走査で見つからなかった (rip 相対の解析が粗い)。鍵の初期化箇所は未特定。
+- SIGSEGV 時の RIP は `rip=0x1cb5e0` (`jmp rax`)・`rax=0xae64b77e88c8000` (HEAD で 64/64 同一)。計測は `lift_wc` の native harness の複製 (`ildsp-probe` 作業用・repo 外へ置かない)。
+- `rax` の値は `0x1b6f4c` の復号結果と一致する。`0x1b6f4c` の (a) `0x1b6f88` は `rbx = ror([0x3f5d98] ^ [0x3f7ad0], cl)` を計算する。`[0x3f5d98] = 0x2b992ddfa232`・`[0x3f7ad0] = 0` (ロード後の image)・`cl = 50` から `ror = 0xae64b77e88c8000`。よって鍵が 0 のとき復号結果が不正なポインタになり、`jmp rax` が addr 0 を踏む。(b) `movabs r10, 0xd1ed0fdf1cd32070` を置き、(c) `call [rip+0xb12f6]` (RVA `0x268268`) を呼ぶ。
+- 直接 call: `0x1b6f4c` を直接呼ぶ E8 call は画像内に 4 箇所ある (`0x1ac9ce`・`0x1b9049`・`0x1b9c45`・`0x1c20a9`。`objdump -D` で確認。rel32 の解決先は `0x1b6f4c`)。ハーネスの direct hook 表 (`ildsp_native.c`) は同じ 4 箇所を trace している。
+- 鍵 `0x3f7ad0` の参照: `0x1b6fa2` (`xor rbx, [0x3f7ad0]`・読み) と `0x1b6f44` (`mov [0x3f7ad0], rcx; ret`・書き) の 2 箇所。`objdump` の RIP 相対コメントで確認。`0x1b6f44` は関数として存在するが、画像内に直接の call/jmp は無く、絶対アドレスの参照も無い。書き込みの呼出し元は未特定。
+- 未確認 (旧記述から取り下げ): 旧 §9-3 の thunk の `rcx = [this+8]` 読みは、`0x17f700` の逆アセンブルで確認できなかった。戻り番地 `0x1b6f72` も HEAD の `lift_wc` 側では再確認していない。
 
 ### 9-4 受入の達成状況 (issue #4237)
 | 受入 | 状態 |
 |---|---|
-| (1) slot 1・3 の host 前提 (`this` の内部フィールド・未設定ポインタ) を特定し差分の入力に決める | **部分**。落ち箇所 (`0x1b6f4c` の復号鍵 `0x3f7ad0` が 0) まで特定。鍵を設定する host 初期化は未特定。入力には決めていない |
+| (1) slot 1・3 の host 前提 (`this` の内部フィールド・未設定ポインタ) を特定し差分の入力に決める | **部分**。落ち箇所 (`0x1b6f4c` の復号鍵 `0x3f7ad0` が 0 → 復号結果が不正ポインタ) まで HEAD で特定。鍵を書く `0x1b6f44` の呼出し元は未特定。入力には決めていない |
 | (2) slot 1–3 を含む呼出し順で native 対 wasm の差分 | **部分**。slot 2 を含む差分は `WC_CALL_IDX="0 2 4 5"` で実施 (64/64・ネガコン 64/64)。slot 1・3 は未達 |
 | (3) .data 入力の変化で分岐の到達を数値に示す | **未達**。差分は従来どおり .data 不変・同一経路 (§8-4 と同じ制限) |
 
-### 9-5 実測 (slot 2 を含む差分・測定 commit `b53a5ec8f`・4 core・1 回)
+### 9-5 実測 (slot 2 を含む差分・測定 commit は下記・4 core・1 回)
+測定 commit: コードを変えた最後の commit `b53a5ec8f`。その後の `e50124848` は `lift_psola.sh` の**コメント 1 行だけ**を変えた (`git diff b53a5ec8f HEAD -- tools/shared/lift/ildsp/lift_psola.sh` は comment 行のみ)。本表は `e50124848` の作業ツリーで取り直した値。
 | 項目 | 値 |
 |---|---|
-| `lift_psola.sh all` elapsed | 3.02 s (real・rc 0) |
-| 本検査 (ok) | 1.57 s・PASS 64 / FAIL 0 (wasm trap 0・native crash 0・SIGSEGV/SIGBUS 0) |
-| neg-cmp | 1.42 s・FAIL 64 (rc 1・期待どおり)・ALL OK |
+| `lift_psola.sh all` elapsed | 3.53 s (real・rc 0。`b53a5ec8f` 時点の同コマンドは 3.02 s) |
+| 本検査 (ok) | 1.74 s・PASS 64 / FAIL 0 (wasm trap 0・native crash 0・SIGSEGV/SIGBUS 0) |
+| neg-cmp | 1.76 s・FAIL 64 (rc 1・期待どおり)・ALL OK |
 | x64c | 37 関数・1,059 命令・unsup 0 (従来の基準 36・1,046 から slot 2 の 1 関数・13 命令を追加) |
 | wasm | 81,303 B (SizeOfImage 0x447000) |
-| load | 本検査の開始 1.10 0.71 0.36 → 終了 1.10 0.72 0.36 |
+| load | 本検査の開始 0.03 0.28 0.27 → 終了 0.03 0.28 0.27 |
 | 環境 | emsdk 6.0.12 (`EMSDK_ENV` は `/tmp/opencode/emsdk` に導入)・fl-win64 は `/tmp/opencode/win64` に展開 |
 
 ### 9-6 未解決
