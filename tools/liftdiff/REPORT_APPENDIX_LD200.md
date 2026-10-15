@@ -39,11 +39,12 @@
 ## 4. 測定 commit と差分
 
 - 測定 commit: `5dc9ac0a0` (本 PR のコードを変えた最後の commit)。§3 の数値はこの commit で測ったもの。
-- `git diff 5dc9ac0a0 HEAD -- tools/liftdiff tools/m11 ':!*.md'` は **72 ファイル・+21537/-65 行** (現 head `6335a1e56` = main `71953e2e1` の取り込み merge で実測)。差分 0 ではない。内訳は main 取り込み (`7bae8537a` ほか) で入った LD-179・LD-39 系・frame_share・ldfix など (`tools/liftdiff/ldlib/pe.py`・`session.py`・`tools/m11/*.py`・`tools/m11/ldfix/*`・`tools/m11/frame_share/*` ほか)。
+- `git diff 5dc9ac0a0 HEAD -- tools/liftdiff tools/m11 ':!*.md'` は **72 ファイル・+21537/-65 行** (現 head `04a334ff2` で実測)。差分 0 ではない。内訳は main 取り込み (`7bae8537a` ほか) で入った LD-179・LD-39 系・frame_share・ldfix など (`tools/liftdiff/ldlib/pe.py`・`session.py`・`tools/m11/*.py`・`tools/m11/ldfix/*`・`tools/m11/frame_share/*` ほか)。
 - 本 PR の変更が実行経路に入るのは `tools/m11/m11_post.py` の `%tagPOINT` 分岐の変数名のみ (`lo/sh/hi/p` → `px/ps/py/u`。生成する命令列は同一)。`tools/liftdiff/ldlib/cases.py` の `MACHINE_ENTRY` は main 取り込みで 6 エントリが増え、`0x4256c0` の行は両側の統合 (`['i64']`)。この増分が §3 の数値に入るかは再測定まで不明。
 - HEAD での再測定は未実施。build に emsdk (`[EMSDK]`)・`tools/m11/work/boot_final3.ll` (素材 `toolchain-emsdk`・`work-m11`) が要るが、この run の `$ARTIFACTS_DIR` には `fl-win64` しか無い (`tools/m11/work/`・`tools/liftdiff/work/`・RETDEC (`[RETDEC]`)・`emcc` も無し)。再測定は子 #4441 ([LD-218]) で、素材を揃えた次の run で行う。
 - 2026-10-15 (round 5) に再確認: `$ARTIFACTS_DIR` は `fl-win64` のみ (`toolchain-emsdk`・`work-m11`・`work-liftdiff`・`toolchain-retdec` は無い)。現 head での build・11 関数 batch は実行不能。§3 の数値は測定 commit `5dc9ac0a0` のまま。
-- 現 head `5c4f3a33b` の `tests/test_ld200_struct_stub.py` は素材不要で OK (rc 0)。
+- 現 head `04a334ff2` の `tests/test_ld200_struct_stub.py` は素材不要で OK (rc 0)。
+- 2026-10-15 (round 8) に再確認: `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ。`tools/m11/work/`・`tools/liftdiff/work/`・`/opt/retdec/bin`・`emcc` は無い。現 head の build・batch は実行不能。§3 の数値は測定 commit `5dc9ac0a0` のまま。PR 本文に `oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff` を足したので、素材を取得できる run で #4441 の再測定を行う。
 
 ## 5. 未解決 (起票先)
 
