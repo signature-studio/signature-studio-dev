@@ -130,7 +130,7 @@ class Slicer:
             i -= 1
         if res is None:
             res = f"{fam}_in"
-        for j in range(i + 1, pos):
+        for j in range(i + 1, pos + 1):
             if self.order[j] in self.targets:
                 res = res + f" ⚠合流@{self.order[j]:#x}"
                 break
