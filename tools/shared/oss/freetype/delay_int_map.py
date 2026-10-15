@@ -46,6 +46,7 @@ def main(path):
             attr, dll_rva, hmod, iat, int_rva, bound, unload, stamp = struct.unpack_from('<8I', b, o + 32 * d)
             if not dll_rva:
                 break
+            assert attr & 1, 'VA ベースの delay 記述子 (grAttrs bit0 = 0) は未対応'
             dll = cstr(r2o(dll_rva))
             print('== desc[%d] pidd=VA %#x attrs=%#x DLL=%s rvaIAT=%#x rvaINT=%#x rvaBound=%#x stamp=%#x' % (
                 d, image_base + dly_rva + 32 * d, attr, dll, iat, int_rva, bound, stamp))
