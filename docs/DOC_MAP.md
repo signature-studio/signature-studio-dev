@@ -112,6 +112,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_4004.md` | ~80 | FLE-18 (#4004): 既定経路の dispatch(0) (0x67264b の target 0)・呼出時の `[0x15e0a48]` の実測 (既定 / shim の call-time 表)・0x6b91e8 の第 2 呼出点。REPORT §10 の「唯一の呼出し点」の訂正 |
 | `tools/flelift/boot/REPORT_APPENDIX_3868.md` | ~90 | FLE-17 (#3868) の付録: `0x6bbc20` の書込み経路の上流 (実行時の呼出し連鎖・既定 route の書込み・静的走査 (rip 相対 lea)・監視の範囲)。REPORT_APPENDIX_3771 §A の後続 |
 | `tools/flelift/boot/REPORT_APPENDIX_3771.md` | ~150 | FLE-16 (#3771) の付録: `0x6bbc20` を `[obj+0x118]` へ書く命令 `f_6bc010` @ `0x6bc1af` の動的特定 (監視版 lift の実測・呼出し連鎖・ネガコン・再現)。REPORT §0 から参照 |
+| `tools/flelift/boot/REPORT_APPENDIX_4384.md` | ~40 | #4384 (WIN-49): CFI 経路の値の観測 (REPORT_APPENDIX_2719 §13 から移動)。受け手 VA は未取得・再現なし |
 | `tools/flelift/boot/REPORT_APPENDIX_4287.md` | ~75 | FLE-22 (#4287) の付録: `f_6cd520` の mode (`obj+0xc4`) の設定元 (store 監視・既定経路の比較・未解決)。付録 3771 の監視を拡張 |
 | `tools/flelift/boot/REPORT_APPENDIX_3330.md` | ~160 | PERF-P22 (#3330) の付録: boot 停止時点の線形メモリの sha256 (全体・C スタック除く・PE 書込み可能セクション) を 3 変種 × 2 run とネガコンで比較した実測値と差分の所在。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_3090.md` | ~80 | FLE-12 (#3090) の詳細: 0x6a7b70 への dispatch の呼出元 (0x6c7923 ← 0x815920)・幅 r8 の源 (即値 2^20 由来の推定)・未修復の理由・0x15F34A0 書込み元の未了。REPORT §0 から参照 |
