@@ -26,7 +26,8 @@ SS_EMSDK_ENV="${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"  # emsdk_env.sh は EMSD
 export FLE_EXTRA_ROOTS="${FLE_EXTRA_ROOTS-0x6a7b70}"
 TAG="${FLE_BOOT_TAG:-fle6}"   # results/ の出力名の接頭 (既定 fle6 = 従来の名前)
 RUNS="${FLE_BOOT_RUNS:-shim negctl ipp2}"   # shim=FLE_IPP=1 / negctl=FLE_IPP=0 / ipp2=FLE_IPP=2 / default=FLE_IPP 未指定
-# diag_shim / diag_negctl (#672): FLE_DIAG_NULLFILL=1 (root 無しの fill で buf=0 の呼出しを戻す診断)。root 無しの lift で測る (FLE_EXTRA_ROOTS=)。
+# diag_shim / diag_negctl (#672): FLE_DIAG_NULLFILL=1 (buf=0 の fill を戻す診断)。lift 条件は FLE_EXTRA_ROOTS で指定する (未指定は既定 root 0x6a7b70)。
+#   付録 672 §1 の測定は FLE_EXTRA_ROOTS= (root 無し)、付録 3770 §2 の測定は FLE_EXTRA_ROOTS=0x6bbc20。
 # lifted C は N 本 (fle_lifted_s<k>.c) に分けて並列 clang する (FLE-9, #2700)。1 にすると単一 TU (cap 11000MB で打ち切り)。
 export FLE_SHARDS="${FLE_SHARDS:-8}"
 export TMPDIR="$W/tmp"
