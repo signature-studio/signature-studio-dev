@@ -60,7 +60,7 @@
 
 ### 17-5. no-op 計数の変化 (`canvas/count_canvas_noop.py`)
 
-| 区分 | ベースライン cf2966030 | 本 PR (`560357317`) |
+| 区分 | ベースライン cf2966030 | 本 PR (取り込み前 `560357317`。取り込み後 `995f9fb32` も同じ値) |
 |---|---|---|
 | 描画命令 (`draw*`・`clearRect`・`fill*`・`drawString`) | 15 (no-op 15・実装 0) | 15 (no-op **12**・実装 **3**: `drawRect`・`clearRect`・`drawString`) |
 | 状態設定 (`set*`・`save*`・`restore*`) | 13 (no-op 7・実装 6) | 14 (no-op 7・実装 7: `setUTF8String` 追加) |
