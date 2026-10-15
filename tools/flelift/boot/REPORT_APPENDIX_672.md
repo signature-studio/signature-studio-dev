@@ -49,7 +49,7 @@ lift は 2 回 (root 有 = `FLE_EXTRA_ROOTS=0x6a7b70` (既定 `work/boot`)、roo
 ## 5. 再現
 
 ```sh
-# 素材: fl-win64 toolchain-emsdk (SS_EMSDK_ENV=/opt/emsdk/emsdk_env.sh)。FL_WIN64_DIR=<展開先>
+# 素材: fl-win64 toolchain-emsdk (SS_EMSDK_ENV = [EMSDK] の emsdk_env.sh)。FL_WIN64_DIR=<展開先>
 FL_WIN64_DIR=... FLE_EXTRA_ROOTS= FLE_BOOT_WORK=$PWD/tools/flelift/work/boot_nr FLE_BOOT_TAG=fle672nr \
   FLE_BOOT_RUNS="default diag_shim diag_negctl" bash tools/flelift/boot/fle6_measure.sh   # 約 4 分 (lift 80 s + clang 100 s + boot)
 FL_WIN64_DIR=... FLE_BOOT_TAG=fle672 FLE_BOOT_RUNS="shim negctl" bash tools/flelift/boot/fle6_measure.sh   # root 有 (既定経路)
