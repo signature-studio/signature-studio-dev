@@ -191,7 +191,7 @@ def analyze(md, code, va, end_va, read_abs):
         anyref |= (rd | wr) & 0x30
     return {'insns': n, 'livein': livein, 'live_at': live_at[:8], 'anyref': anyref,
             'unknown_flow': unknown, 'jt_resolved': jt_resolved, 'call_args': call_args,
-            'undef_reads03': undef03, 'cfg': (insns, succ)}
+            'undef_reads03': undef03, 'cfg': (insns, succ), 'must': must}
 
 
 def bits(m):

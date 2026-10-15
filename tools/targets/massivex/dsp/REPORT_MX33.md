@@ -173,6 +173,8 @@
 - 残件の未解決: 間接 call 先の引数幅 (解析外)・`vcvtsd2ss` 規則 (0x11830)・`movddup` 後の上位追跡 (0x7dce90 等)。いずれも本 issue 範囲の追加実装が要る。
 - `follow()` の A 理由は分類結果を変えない。`classify_fn` は merge の A 理由を記録するように変えた (件数 scalar 1 / 128 bit 0 / 判定不能 16 は不変)。
 
+- 受入 2〜4 (U3d・U3e・U3g) の感度測定 (#4989): 付録 `REPORT_APPENDIX_4989.md` (結論は同付録 §0)。
+
 ## 7. 既知類型との関係
 
 - `docs/DEFECTS.md` の D1a〜D23 (lift の silent miscompile 類型) と `tools/icall/REPORT.md` §4 の D1〜D13 (ICALL 系) は別体系で、本件は解析モデルの問題 (merge と複写の扱い)。
@@ -246,7 +248,7 @@
 | G が pdata 始点 | 0 |
 
 - 段の合計: 2,657 = 821 + 1,453 + 383 (到達可能 = 定義済み + call 除外 + 未定義)。383 = 42 + 315 + 26 (未定義の内訳)。
-- 件数の差 (appendix の 47 との差): `REPORT_APPENDIX_4989.md` と `mx4989_probe.py` は main に無く、`origin/4989-massivex-xmm-merge-call` (commit `2fc5debe2`・`3146df45d`・`601a3ecc7`・`c0209641a`) にある。appendix の 47 (pdata 始点)・193 (全 F) は probe の `u3e` の値。本 run では `plugins-massivex` が無く PE が無いため、47 も 193 も再現していない。抽出方法の違い (コードの読みによる。件数は未測定):
+- 件数の差 (appendix の 47 との差): `REPORT_APPENDIX_4989.md` と `mx4989_probe.py` は main に無く、`origin/4989-massivex-xmm-merge-call` (commit `2fc5debe2`・`3146df45d`・`601a3ecc7`・`c0209641a`) にある。appendix の 47 (pdata 始点)・193 (全 F) は probe の `u3e` の値。`70b4b84db` の `mx4989_probe.py` (`plugins-massivex` の PE) で 193 (pdata 始点 47) を再現した。抽出方法の違い (コードの読みによる):
   1. 母集団: probe は seeds と one_round の行を対象にし、本 script は seeds の pdata 始点 566 のみ。
   2. F の入口 livein: probe は F の `livein45` = 0 で絞る。本 script は絞らない (注 a)。
   3. call 前段: probe は除外しない。本 script は除外する。
