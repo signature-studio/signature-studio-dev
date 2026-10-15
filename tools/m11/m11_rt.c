@@ -289,7 +289,8 @@ EMSCRIPTEN_KEEPALIVE double m11_p2780_get(int k, int f) { return (k >= 0 && f >=
  * 状態は呼出しごとのスタック上の volatile 変数に置く (store・load の命令は残る)。
  * 静的領域の大きさは元と同じ (g_pad_nd_h 8B・g_pad_nd_bss 16392B) なので、後続の配置と heap 開始位置は動かさない。 */
 static unsigned long long g_pad_nd_h __attribute__((used)) = 1469598103934665603ULL;
-static unsigned char g_pad_nd_bss[16392] __attribute__((used));
+static unsigned long long g_pad_nd_n __attribute__((used));   /* g_dest_n と同じ 8B */
+static unsigned long long g_pad_nd_rec[2048] __attribute__((used));   /* g_rec_* 4 本分 (16B 整列は g_rec_st と同じ) */
 void m11_dest_obs(unsigned long long dest) {
     volatile unsigned long long dh = 1469598103934665603ULL, dn = 0, rst = 0, rlen = 0, rrc = 0, rh = 0;
     unsigned long long v = *(volatile unsigned long long*)(uintptr_t)dest;

@@ -37,7 +37,7 @@ measure() {
   local undef; undef=$(grep -c 'undefined symbol' work/link.log || true)
   local dpos; dpos=$(llvm-nm -n work/obj/rt.o 2>/dev/null | grep ' g_dest_h$' | awk '{print $1}')
   # #2212: リンク後の実アドレス (wasm 上の VA)。map の .data 内で各シンボルの行を拾う
-  local laddr; laddr=$(grep -E '(g_dest_h|g_rec_st|g_rec_len|g_rec_rc|g_rec_h|g_pad_pre|g_pad_post|g_dest_n|g_pad_nd_h|g_pad_nd_bss)$' "$OUT/map_$tag.txt" 2>/dev/null | awk '{printf "%s@%s ", $NF, $1}')
+  local laddr; laddr=$(grep -E '(g_dest_h|g_rec_st|g_rec_len|g_rec_rc|g_rec_h|g_pad_pre|g_pad_post|g_dest_n|g_pad_nd_n|g_pad_nd_h|g_pad_nd_rec)$' "$OUT/map_$tag.txt" 2>/dev/null | awk '{printf "%s@%s ", $NF, $1}')
   # #2275: 静的領域の終端 (.data・.bss の VA と大きさ)。heap は静的領域の後ろから始まるので、終端の移動を heap 開始位置の移動の代理にする
   local secs; secs=$(awk '$4 == ".data" || $4 == ".bss" {printf "%s=%s+%s ", $4, $1, $3}' "$OUT/map_$tag.txt" 2>/dev/null)
   echo "[split_1952][addr] $tag ${laddr:-none} [sec] ${secs:-none}" >> "$OUT/addr.txt"
