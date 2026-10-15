@@ -152,6 +152,7 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 | (解消) C 版 (m11_ov.c) と IR 版 (ir414_fix.py) の相互検算 | — | #764 で実施。§9 (5000 case で C 版・IR 版とも機械語と差 0) |
 | gate ON が survey で効果を持たない理由 (C 版の 2 版が同じ結果) | 本 gate の存在意義 | #683 の継続 |
 | `work-m11` が #516/#680 以前の生成物で `ir_conditions.json` 無し (そのままでは build 不可) | 素材の更新 | #729 (survey 測定基準の残課題。work-m11 の R2 再投入を含む) |
+| 280・659 の `6cefb0` 内 OOB (第 3 引数の修復 `fix_r8b815050` 後も残る。§8.1) | 4 対象 unit のうち 2 unit が oob のまま。因果仮説 (引数の ptr 化が原因) は 280/659 で否定 | #3444 |
 
 ### 8.1 #878: 815e10 系 (6cefb0 ← 815050 ← 815e10) の突合と分類
 
@@ -190,3 +191,18 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
   - 後段 (`m11_gen_ir2.sh` の lift 段): `boot1.lift.ll` 118467 行も同じ `ptr nonnull %stack_var_-255`。`m2/ir_normalize.py` と `m5/ir5_patch.py` の該当 call 引数は変えていない (lift 段でも既に alloca)。よって置換は RetDec 段 (`drc`) までに起きていると読め (RetDec 内の pass は未特定)、`m2`/`m5` は除外する。
   - 同じ callee の他 2 call (`0x8208e1` / `0x826406`) は `NULL` を渡す (`drc.ll` 129687 / 134183)。`0x8158f8` だけが alloca アドレスになる。
   - 未確認のまま: RetDec 内のどの型推定 (引数型の推定か、`r8b` の型付けか) が置換を行ったか。修復と 942 unit survey 再測定、因果。これらは親 #1293 (`[M11-N80]`) で扱う (#1081・#878 とも同じ chain を追跡中のため、本 run では新規 issue を起票しない)。
+- **修復と survey (#1448、測定 commit `5c43ea98a`)**:
+  - **修復**: `tools/m11/ldfix/fix_r8b815050.py` (`m11_gen_ir2.sh` の ldfix 後段。既定 ON、`M11_FIX_R8B=0` で外す)。`function_815050` の `call @function_6cefb0(i64 %250, i64 %250, ptr nonnull %stack_var_-255)` の第 3 引数を `ptr inttoptr (i64 1 to ptr)` に置換する。機械語の前提 (`8158f5: mov r8b,1`・`8158f8: call 0x6cefb0`・`6cf021: cmp byte ptr [rcx+0x496], r8b`) を capstone で検査し、IR の想定外は assert で止める。
+  - **根拠 (機械語)**: `r8` は `81550a: lea r8,[rbp+0x1c8]` の後に call (`4255d0` ほか) が挟まり、`8158f5` の直前では呼出しで壊れた値になる (Win64 の揮発性レジスタ)。`6cefb0` は第 3 引数を IR で `icmp slt i64 %0, %29` と `trunc i64 %0 to i8` (`%0 = ptrtoint %arg3`) にしか使わず、機械語も `cmp byte ptr [rcx+0x496], r8b` (8bit 比較) だけ。よって値 1 は機械語の振る舞いと一致する。RetDec 段のどの pass が alloca に置換したかは**未特定** (推定のみ)。
+  - **測定**: `bash tools/m11/trap_triage/neg_1448.sh` (修復 ON / OFF で IR を `m11_gen_ir2.sh` から作り直し、build、942 unit survey)。素材 `work-m11` は再生成 IR (`ldfix=applied`・`ld108=applied`)。gen+build 49 s / survey 7 s / load 0.8 前後。同じ commit で 2 回測定し、結果は一致した (作業ツリー版と `5c43ea98a` で同一)。
+
+| 構成 (942 unit) | ok | oob | halt0 | miss | noproc | trap |
+|---|--:|--:|--:|--:|--:|--:|
+| OFF (修復なし, A) | 873 | 14 | 7 | 47 | 1 | 21 |
+| ON (修復あり, B, 既定) | 873 | 14 | 7 | 47 | 1 | 21 |
+
+  - **遷移 (A → B)**: 942 unit の kind は全件不変。**ok 退行 0**。icall sites / targets の差 0。
+  - **4 対象 unit**: 149 = oob / 158 = ok / 280 = oob / 659 = oob (OFF = ON)。
+  - **kind 以外の差分 7 unit** (`survey_diff.py`): 280・659 は ON で `va_mb` の項目が出ない (OFF は 120.8 / 21.3 MB)。trap の `msg` は両方とも "memory access out of bounds" で、最上位 frame は `function_6cefb0 ← 815050 ← 815e10` のまま。291・296・302・304・888 は ok のままで、`[m11][VA-big]` の記録上の live 量が ON で約 64 MB (888 は約 85 MB) 少ない。
+  - **結論**: 修復は機械語の値と一致し、kind の退行は 0。しかし 280・659 の `6cefb0` 内 OOB は修復の有無で変わらない。よって「第 3 引数の ptr 化が 6cefb0 の OOB の原因」という因果仮説は 280・659 では成立しない。真因は子 #3444 (6cefb0 内で最初に起きる OOB の場所と、第 1・第 2 引数 (size) の出どころ)。
+  - **鮮度**: 測定 commit `5c43ea98a` から HEAD までのコード差分 `git diff 5c43ea98a HEAD -- tools/m11/ldfix tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/trap_triage/neg_1448.sh` の出力は 0 行 (本 REPORT の追記だけが後の変更)。
