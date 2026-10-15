@@ -3,7 +3,8 @@
 // SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap (1:1 転写) も bitmap へ画素を書く。
 // SR-62 #4233: fillLinearGradient・fillRadialGradient (path の内側を色停止点で塗る)・drawBitmapNinePartTiled (9 分割を各部分で 1:1 タイル)・fillRectWithBitmap (タイル塗り) も bitmap へ画素を書く。
 // 他の描画命令 (drawArc・drawPoint・drawGraphicsPath) は no-op で false を返す。
-// 状態設定は lineWidth (1px 固定で描く)・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha だけ値を保持し、他 (lineStyle・drawMode・transformMatrix・global state の save/restore) は何もしない。
+// SR-68 #4427: 線は lineWidth の太さで描く (太さ 1 かつ aliasing は従来の Bresenham)。drawMode の kAntiAliasing は線の被覆率を alpha に掛けて描く。
+// 状態設定は lineWidth・drawMode・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha だけ値を保持し、他 (lineStyle・transformMatrix・global state の save/restore) は何もしない。
 
 #pragma once
 
@@ -99,6 +100,7 @@ private:
 	void paintRect (const CRect& rect, const CColor& color, bool blend) const;
 	void strokeRect (const CRect& rect, const CColor& color) const;
 	void plotLine (CPoint from, CPoint to, const CColor& color) const;
+	void plotThickLine (CPoint from, CPoint to, const CColor& color) const;
 	void fillPolygon (const PointList& points, const CColor& color) const;
 	void strokePolyline (const PointList& points, bool closed, const CColor& color) const;
 	CRect clipWithinBitmap (CRect clip) const;
@@ -112,6 +114,7 @@ private:
 	mutable CColor fillColor {};
 	mutable CColor frameColor {};
 	mutable CCoord lineWidth {1.};
+	mutable CDrawMode drawMode {};
 	mutable CRect clipRect {};
 };
 

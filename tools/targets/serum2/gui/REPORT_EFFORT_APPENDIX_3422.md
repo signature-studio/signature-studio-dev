@@ -42,3 +42,37 @@
 | drawPoint | 点が描かれない (受入条件の範囲外だが no-op) | 子 issue へ同梱 |
 | 拡大縮小・quality の bilinear | drawBitmap は 1:1 のみ | 子 issue へ同梱 |
 | `count_canvas_noop.py` の入れ子の波括弧 | 計数が不正確 | 別件 (本 issue の範囲外) |
+
+## 2. 2026-10-15 run (#4427 / SR-68): canvas の線の太さ・アンチエイリアス
+
+### 2-1. 実装
+- `setLineWidth` の値と `setDrawMode` の値を保持し、`plotLine` が参照する。
+- 太さ 1 かつ aliasing は従来の Bresenham (既存の `draw_ops` の測定値は不変)。それ以外は `plotThickLine`: 画素中心から線分までの距離で被覆を求め、半幅以内を塗る。`kAntiAliasing` は境界の 1 px を線形に薄めて alpha に掛ける。
+- 判定 harness: `canvas/line_width_main.cpp` (検証専用)、判定 `canvas/check_line_width.sh` (新規)。線 (4.5, 8.5)→(58.5, 40.5) を 64x64 に描く。
+
+### 2-2. 実測 (変更前 = `origin/main` 基準 / 変更後 = 測定 commit `9d4a6d5c0`)
+
+| ケース | 変更前 nonzero / partial / full | 変更後 nonzero / partial / full |
+|---|---|---|
+| w1 aliasing | 55 / 0 / 55 | 55 / 0 / 55 |
+| w4 aliasing | 55 / 0 / 55 (太さ無視) | **263** / 0 / 263 |
+| w1 AA | 55 / 0 / 55 (AA 無視) | **127** / 124 / 3 |
+| w4 AA | 55 / 0 / 55 (太さ・AA 無視) | **335** / 136 / 199 |
+
+- partial = 0 < alpha < 255 の画素数 (AA の証拠)。
+- 判定 (`check_line_width.sh`): 変更後 rc=0 (4 項目 pass: 太い線の画素が多い / aliasing に部分被覆なし / AA に部分被覆あり / AA の画素が aliasing より多い)。変更前は rc=1 (太さ・AA が効かない)。
+- 既存判定 `check_draw_ops.sh` 変更後も rc=0 (drawLine 49・drawLines 26・drawPolygon 607・drawEllipse 2472・drawBitmap 64、従来どおり)。
+- 描画基盤の回帰: `check_render_poc.sh` rc=0 (render pass: nonzero_after=12000 text_px=112)、`check_canvas_syntax.sh` rc=0。
+
+### 2-3. 測定条件と所要
+- 測定 commit: `9d4a6d5c0` (コードを変えた最後の commit)。
+- `check_line_width.sh` real 26.19 s (変更後)、変更前 25.58 s。load (開始時) 2.16。
+- `check_draw_ops.sh` real 27.60 s (変更後・初回の canvas 再コンパイル込み)。
+- review 対応後の HEAD: `git diff 9d4a6d5c0 HEAD -- tools/targets/serum2/gui/canvas` は file mode の変更 (`check_line_width.sh` 100644 → 100755) のみ。コードの内容差分は 0。実行権限の付与だけなので、再測定は行っていない。
+
+### 2-4. 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 線端の形状 (cap・join)・破線 (`setLineStyle`) | 太い線の角が丸まる。破線は no-op | 子 #4469 (SR-71) |
+| AA の被覆は線形近似 (厳密な面積被覆ではない) | 画素値は実機と一致しない可能性 | 子 #4470 (SR-72) |
+| 閉じた polyline の角で AA の境界 1 px が二重に alpha 合成される (未測定) | 角が濃くなる。harness に角のケースは未追加 | 子 #4470 (SR-72) |

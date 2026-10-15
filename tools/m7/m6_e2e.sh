@@ -92,9 +92,9 @@ echo "[e2e] signature mismatch: $N_MISMATCH 種 (期待 0)"
 echo "[e2e] undefined symbol: $N_UNDEF 種 (期待 57)  | function_18*: $N_FN_UNDEF / __asm_*: $N_ASM_UNDEF / Win/CRT API: $N_API_UNDEF"
 # (b) helper 3 重照合
 python3 m6_simd_check.py work/ott_memfix1.ll msimd6.c > "$M7/work/simd_check_e2e.log" || true
-read -r SIMD_BAD_A SIMD_BAD_B < <(python3 - <<'PYEOF'
-import re
-t = open("/home/ubuntu/work/webstudio/tools/m7/work/simd_check_e2e.log").read()
+read -r SIMD_BAD_A SIMD_BAD_B < <(python3 - "$M7/work/simd_check_e2e.log" <<'PYEOF'
+import re, sys
+t = open(sys.argv[1]).read()
 m = re.search(r'decl def mismatch:\s*(\d+)\s*/\s*callsite mismatch:\s*(\d+)', t)
 print(m.group(1), m.group(2))
 PYEOF

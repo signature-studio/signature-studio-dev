@@ -23,7 +23,7 @@ import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_IMM
 from unicorn import (Uc, UcError, UC_ARCH_X86, UC_MODE_64, UC_PROT_ALL, UC_PROT_READ, UC_PROT_WRITE,
-                     UC_HOOK_CODE, UC_HOOK_MEM_READ)
+                     UC_HOOK_CODE, UC_HOOK_MEM_READ, UC_HOOK_MEM_INVALID)
 from unicorn.x86_const import (UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8,
                                UC_X86_REG_R9, UC_X86_REG_RSP, UC_X86_REG_RIP)
 
@@ -39,7 +39,7 @@ STACK_TOP = 0x30100000
 STACK_SIZE = 0x100000
 SENT = 0x20000000
 SCRATCH = 0x40000000
-SCRATCH_SIZE = 0x100000
+SCRATCH_SIZE = int(os.environ.get('DYN_SCRATCH_SIZE', '0x100000'), 0)
 POOL = 0x50000000
 POOL_SIZE = 0x4000000
 COUNT = int(os.environ.get('DYN_COUNT', '3000000'))
@@ -216,6 +216,25 @@ def main():
         return 'other'
 
     runs = []
+    fault = {}
+
+    def on_invalid(u, access, addr, size, value, ud):
+        fault['addr'] = addr
+        return False
+
+    uc.hook_add(UC_HOOK_MEM_INVALID, on_invalid)
+
+    def stack_ret(u):
+        rsp = u.reg_read(UC_X86_REG_RSP)
+        out = []
+        for i in range(0, 0x400, 8):
+            try:
+                v = struct.unpack('<Q', bytes(u.mem_read(rsp + i, 8)))[0]
+            except UcError:
+                break
+            if ib <= v < ib + isz and v not in out:
+                out.append(v)
+        return ['%#x' % v for v in out[:6]]
 
     def run(label, entry, args, group='base', count=COUNT):
         run_label[0] = label
@@ -233,7 +252,9 @@ def main():
             uc.emu_start(entry, SENT, count=count)
         except UcError as e:
             rip = uc.reg_read(UC_X86_REG_RIP)
-            status = 'uc_error:%s' % e
+            addr = fault.pop('addr', None)
+            status = 'uc_error:%s rip=%#x addr=%s stk=%s' % (
+                e, rip, '-' if addr is None else '%#x' % addr, ','.join(stack_ret(uc)))
             if last[0] is not None:
                 p = last[0]
                 last[0] = None
