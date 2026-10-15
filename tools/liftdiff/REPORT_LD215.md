@@ -14,7 +14,7 @@
 ## 2. 方法 (再現)
 
 - 入力: `FL_WIN64_DIR` の PE `extracted/block00031_PE.bin` (fl-win64 素材を `$RUNNER_TEMP/fl-win64` に展開)。
-- スクリプト: `tests/ld215_retprop.py` (測定 commit `2216acab7` で追加)。
+- スクリプト: `tests/ld215_retprop.py` (初版 `2216acab7`。`cand` 列に未確定 0 件の条件を入れたのは測定 commit `dbfe14b1b`)。
   - 呼出し元: E8 rel32 走査で call 命令を集め、target が一致したものだけを数える (LD-212 と同じ)。call 直後から最大 `--budget` (既定 400) 命令・経路数で打ち切る。`xor r,r` は読みから除外する。
   - 呼出し先: entry から全経路を辿り、ret 到達時点で書かれたレジスタの積 (must) と和 (may) を取る。呼出し先の `call` は clobber のみ (定義とは数えない)。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/liftdiff/tests/ld215_retprop.py <PE> --tsv work/ld215_probe.tsv`。
@@ -66,6 +66,6 @@
 
 ## 6. 測定 commit からの差分
 
-- 測定 commit: `2216acab7` (feat commit。判定器 `tests/ld215_retprop.py` と REPORT の初版)。§2・§3 の実測値はこの commit から変わっていない。
-- 後続の commit で変わったのは、`edf7bec31` (DOC_MAP 登録。`tools/liftdiff` の外)、`a27d3420c` と fix commit の REPORT の文言・件数の説明だけ。判定器と §3 の表の数値は変えていない。
-- `git diff --stat 2216acab7 HEAD -- tools/liftdiff` は REPORT_LD215.md のみ。既存の liftdiff の挙動 (e2e・`targets/m11.json`・`ldlib`) には触れていない。
+- 測定 commit: `dbfe14b1b` (判定器 `tests/ld215_retprop.py` の `cand` 列に未確定 0 件の条件を入れた commit。コードを変えた最後の commit)。
+- `dbfe14b1b` で変えたのは判定器の `cand` 列 (未確定が 1 件でもある関数は候補を空にする) と、REPORT の再現手順・repo 外パスの表記。§3 の表の数値は `2216acab7` から変えていない (表は `cand` 列に依らない)。
+- `git diff 2216acab7 dbfe14b1b -- tools/liftdiff` は判定器 1 ファイルと REPORT_LD215.md のみ。既存の liftdiff の挙動 (e2e・`targets/m11.json`・`ldlib`) には触れていない。
