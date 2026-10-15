@@ -123,15 +123,16 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 - 測定 commit: `82c802c7b` (`ci_census.py`・`ci_lift.sh` を変えた最後の commit)。
 - 期待値 (x86 から数えた件数・§7-1 と一致): movups 3・movntps 8・movaps 7・movapd 1。
 - 正常系 (`ci_lift.sh`・rc 0・ALL OK): 復元前の `store i128` 8 → 復元後 19 (movups/movntps の 11 件が増える。movaps/movapd は sext の store を置き換えるだけで件数は変わらない)。helper 呼び出しは census の検査で期待値 3/8/7/1 と一致し、復元後に 0 件。
-- 実行: `FL_WIN64_DIR=<fl-win64> RETDEC_BIN=<retdec> bash tools/shared/lift/ildsp/ci_lift.sh` (commit `82c802c7b`・4 core・n=3)。
+- 実行: `FL_WIN64_DIR=<fl-win64> RETDEC_BIN=<retdec> bash tools/shared/lift/ildsp/ci_lift.sh` (測定 commit `82c802c7b`・再測定 HEAD `106137f5b`・4 core・n=3)。素材は `fl-win64` と `toolchain-retdec` を `$RUNNER_TEMP` に展開した (`RETDEC_BIN` は `retdec/bin/retdec-decompiler`)。
   | 項目 | 値 |
   |---|---|
-  | 実行時間 (`date` で計測) | 2.271 / 2.275 / 2.282 s |
-  | load (実行前の 1 分平均) | 0.40 (`uptime`) |
+  | 実行時間 (`date` で計測) | 1.597 / 2.325 / 1.697 s |
+  | load (1 分平均・実行前 / 実行後) | 0.94 / 1.10 (`uptime`) |
   | 3 回の stdout | `cmp` で 3 回とも一致。rc 0・ALL OK |
-  | 生成物 (`ci.rs.ll`・`ci_helpers.c`) | §7-2 の md5 と同一 (値は §7-2 のみに記載) |
-- NC3 は §7-3 の表を参照 (commit `82c802c7b`・rc 1)。
-- 再測定の状態: レビュー round 1 の再実測 (`toolchain-retdec` を含む素材での正常系・NC3) は、素材が揃わなかったため未実施。PR 本文の未解決表に記載。
+  | 生成物 (`ci.rs.ll`・`ci_helpers.c`) | §7-2 の md5 と一致 (値は §7-2 のみに記載) |
+- NC3 は §7-3 の表を参照。HEAD `106137f5b` で再現: `store i128` 18・期待 19・rc 1。
+- 再測定の状態: round 1 の再実測 (`toolchain-retdec` を含む素材での正常系・NC3) は HEAD `106137f5b` で実施済み (上の表と §7-3 の NC3)。
+- コード差分: `git diff 82c802c7b HEAD -- tools/shared/lift/ildsp tools/shared/lift/libreverb ':!*.md'` は空 (差分 0)。よって再測定値は測定 commit のコードに対する値として有効。
 
 ### 7-4. 既知の制約
 - 0x1aefa9 の書き込み先は、RetDec の alloca 経由 (`bitcast i64* %rcx to i128*`) の load である。`store i64 %arg1, i64* %rcx` が関数入口の 1 回だけであることを確認して `%arg1` を値として使った。書き込み直前まで rcx に他の store が無い形なので、この 1 箇所だけに当てはまる。pass は、その形以外では exit 1 で止まる。
