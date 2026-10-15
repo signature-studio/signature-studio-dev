@@ -4,7 +4,7 @@
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py390_probe.py
 
 REPORT_PY390.md §1 で読んだ分岐を、命令と call 先の assert で固定する。assert が落ちたら PE が変わっている。
-展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先>
+展開: tar --zstd -xf <artifacts>/fl-win64.tar.zst -C <展開先>
 """
 import os
 import sys
