@@ -6,7 +6,8 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 T="$HERE/.."
 W="$HERE/work/route"; mkdir -p "$W/tmp"
-OTT_DLL="${ANALYSIS_DIR:-/home/ubuntu/work/analysis}/plugins/ott/binaries/OTT_vst2_win64.dll"
+source "$T/shared/env.sh"
+OTT_DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 # 1. F = 実行された関数 (x64c native coverage = lift_meta) + RetDec closure(m6) の直接 call/tail-jmp 推移閉包
 if [ ! -f "$T/ott/work/lift/lift_meta.json" ]; then echo "[route] tools/ott/work/lift/lift_meta.json が無い: bash tools/ott/ott_e2e.sh を先に実行" >&2; exit 2; fi
