@@ -8,7 +8,7 @@
 出力: work/flelift/spike_cfi.json。既存の bootstate (mode=hybrid) の挙動は変えない (post フックは既定 None)。
 使い方: python3 spike_cfi.py [targets/flelift.json]   (素材: work-liftdiff・work-m11・fl-win64 / FL_WIN64_DIR)
 """
-import json, os, struct, subprocess, sys
+import json, os, re, struct, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -49,6 +49,48 @@ def poke(r, tok, hexs):
     return r._recv(20.0)
 
 
+FILE_IMPORTS = ('CreateFileW', 'FindFirstFileW', 'GetFileAttributesW', 'SetFilePointer', 'ReadFile')
+
+
+def wstr(r, heap_abs, heap_size, addr, n=0x200):
+    """native の絶対アドレス (heap 内) の UTF-16 文字列を PEEK で読む。heap 外や読めないときは None。"""
+    off = addr - heap_abs
+    if not (0 <= off < heap_size - n):
+        return None
+    r._send('PEEK h:0x%x %d' % (off, n))
+    r.p.stdin.flush()
+    hx = r._recv(20.0)
+    if not hx:
+        return None
+    return bytes.fromhex(hx).decode('utf-16le', 'replace').split('\x00')[0]
+
+
+def astr(r, base, addr, n=0x200):
+    """イメージ内 (DLL の VA) の ANSI 文字列を PEEK で読む (MessageBoxA の text/caption 用)。"""
+    if addr < base or addr - base >= 0x2000000:
+        return None
+    r._send('PEEK i:0x%x %d' % (addr - base, n))
+    r.p.stdin.flush()
+    hx = r._recv(20.0)
+    if not hx:
+        return None
+    return bytes.fromhex(hx).split(b'\x00')[0].decode('latin-1')
+
+
+def model_names():
+    """rt/ld_core.h の ld_model_call で明示的に応答を決めている import 名 (それ以外は既定の 0 応答)。"""
+    txt = open(os.path.join(HERE, 'rt', 'ld_core.h'), encoding='utf-8').read()
+    return set(re.findall(r'ld_streq\(n, "([^"]+)"\)', txt))
+
+
+def import_table(calls, names):
+    rows = []
+    for i, c in enumerate(calls):
+        rows.append({'i': i, 'n': c.get('n'), 'a': c.get('a', [])[:4], 'r': c.get('r'),
+                     'kind': 'model' if c.get('n') in names else 'stub0'})
+    return rows
+
+
 def run_cfi(r, sess):
     base = sess.pe.base
     pe = sess.pe.pe
@@ -69,6 +111,14 @@ def run_cfi(r, sess):
     res = r.run_cases([line], ['cfi'])[0]
     iface = boot._peek_u64(r, 'h:0x%x' % (hoff + 0x200))
     calls = res.get('calls') or []
+    paths = []
+    msgs = []
+    for c in calls:
+        if c.get('n') in FILE_IMPORTS and c.get('a'):
+            s = wstr(r, heap_abs, sess.lay['heap_size'], int(c['a'][0], 16))
+            paths.append({'n': c['n'], 'a0': c['a'][0], 'path': s})
+        if c.get('n', '').endswith('MessageBoxA') and c.get('a'):
+            msgs.append({'text': astr(r, base, int(c['a'][1], 16)), 'caption': astr(r, base, int(c['a'][2], 16))})
     return {
         'cfi_rva': '%#x' % cfi_rva, 'cfi_va': '%#x' % (base + cfi_rva),
         'heap_abs': '%#x' % heap_abs, 'heap_size': sess.lay['heap_size'], 'host_heap_off': '%#x' % hoff,
@@ -78,6 +128,7 @@ def run_cfi(r, sess):
         'calls_n': len(calls), 'calls_over': res.get('calls_over'),
         'calls_head': [c.get('n') for c in calls[:CALL_HEAD]],
         'calls_full': calls, 'raw_keys': sorted(res.keys()),
+        'import_table': import_table(calls, model_names()), 'file_paths': paths, 'messageboxes': msgs,
     }
 
 
@@ -89,7 +140,12 @@ def main():
     _, res = boot.build_state(sess, None, mode='hybrid', post=run_cfi)
     d = res['detail']
     spike = d.get('post') or {}
-    out = os.path.join(sess.t['work'], 'spike_cfi.json')
+    cat = os.environ.get('LD_CATALOG_MO')
+    out = os.path.join(sess.t['work'], 'spike_cfi_cat.json' if cat else 'spike_cfi.json')
+    for p in spike.get('file_paths') or []:
+        print('[spike] file %s a0=%s path=%r' % (p['n'], p['a0'], p['path']))
+    for m in spike.get('messageboxes') or []:
+        print('[spike] MessageBoxA text=%r caption=%r' % (m['text'], m['caption']))
     json.dump({'boot': {k: res[k] for k in ('units_run', 'units_total', 'first_fail', 'mode')},
                'entry_status': d.get('entry_status'), 'entry_detail': d.get('entry_detail'),
                'fails_head': d.get('fails_head'), 'cfi': spike}, open(out, 'w'), indent=1)

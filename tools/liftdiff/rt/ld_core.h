@@ -241,6 +241,27 @@ static u64 ld_heap_alloc(u64 size, u64 align, int zero) {
 }
 static int ld_streq(const char* a, const char* b) { return strcmp(a, b) == 0; }
 
+/* WIN-9 (#2760): LD_CATALOG_MO=<.mo の path> 指定時だけ、*.moe の属性・open・seek・read を実カタログで応答する (実験).
+ * 未指定と wasm (__EMSCRIPTEN__) は従来の応答のまま。既定の 0 応答では size 0 → 確保 NULL → rip 0x4e0fab の null 読み
+ * (tools/liftdiff/REPORT_WIN7_2718.md §1.2)。 */
+#define LD_CAT_H 0x65000001ull
+static u8* ld_cat_buf; static u64 ld_cat_len, ld_cat_pos; static int ld_cat_tried;
+static int ld_cat_on(void) {
+#ifndef __EMSCRIPTEN__
+  if (!ld_cat_tried) {
+    const char* p = getenv("LD_CATALOG_MO"); FILE* f = p ? fopen(p, "rb") : NULL; long l = 0;
+    ld_cat_tried = 1;
+    if (f) {
+      fseek(f, 0, SEEK_END); l = ftell(f); fseek(f, 0, SEEK_SET);
+      if (l > 0) { ld_cat_buf = (u8*)malloc((size_t)l); if (ld_cat_buf && fread(ld_cat_buf, 1, (size_t)l, f) == (size_t)l) ld_cat_len = (u64)l; else { free(ld_cat_buf); ld_cat_buf = NULL; } }
+      fclose(f);
+    }
+  }
+#endif
+  return ld_cat_buf != NULL;
+}
+static int ld_cat_path(u64 a) { char nm[160]; u64 l = ld_read_strW(a, nm, sizeof nm); return l >= 4 && strcmp(nm + l - 4, ".moe") == 0; }
+
 /* name = import 名 (kernel32 等の区別はしない), a[] = 位置引数 (ms64 先頭 4 つ) */
 static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5) {
   (void)a4; (void)a5;   /* 第5/6引数: 6引数 API (MultiByteToWideChar 等) が CAB-233 で使用 */
@@ -298,6 +319,24 @@ static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, 
       if (n[strlen(n) - 1] == 'A') { if (a1 && a2 && ld_dst_ok(a1, l + 2)) { u64 nn = l < a2 - 1 ? l : a2 - 1; memcpy((void*)(uintptr_t)a1, s, nn); ((char*)(uintptr_t)a1)[nn] = 0; return nn; } return 0; }
       if (a1 && a2 && ld_dst_ok(a1, l * 2 + 2)) { u64 nn = l < a2 - 1 ? l : a2 - 1; for (u64 k = 0; k < nn; k++) ((uint16_t*)(uintptr_t)a1)[k] = (uint16_t)s[k]; ((uint16_t*)(uintptr_t)a1)[nn] = 0; return nn; }
       return 0;
+    }
+    if (ld_cat_on()) {   /* WIN-9 (#2760) 実験: LD_CATALOG_MO 指定時のみ */
+      if (ld_streq(n, "GetFileAttributesW") && ld_cat_path(a0)) return 0x80;   /* FILE_ATTRIBUTE_NORMAL */
+      if (ld_streq(n, "CreateFileW") && ld_cat_path(a0)) { ld_cat_pos = 0; return LD_CAT_H; }
+      if (ld_streq(n, "SetFilePointer") && (u32)a0 == (u32)LD_CAT_H) {
+        u32 m = (u32)a3; u64 np = m == 0 ? (u64)(int64_t)(int32_t)a1 : m == 1 ? ld_cat_pos + (u64)(int64_t)(int32_t)a1 : ld_cat_len + (u64)(int64_t)(int32_t)a1;
+        ld_cat_pos = np;
+        if (a2 && ld_dst_ok(a2, 4)) *(u32*)(uintptr_t)a2 = 0;
+        return (u32)np;
+      }
+      if (ld_streq(n, "ReadFile") && (u32)a0 == (u32)LD_CAT_H) {
+        u64 k = ld_cat_pos < ld_cat_len ? ld_cat_len - ld_cat_pos : 0;
+        if (k > (u32)a2) k = (u32)a2;
+        if (a1 && k && ld_dst_ok(a1, k)) memcpy((void*)(uintptr_t)a1, ld_cat_buf + ld_cat_pos, k);
+        ld_cat_pos += k;
+        if (a3 && ld_dst_ok(a3, 4)) *(u32*)(uintptr_t)a3 = (u32)k;
+        return 1;
+      }
     }
     if (ld_streq(n, "GetFileAttributesW") || ld_streq(n, "GetFileAttributesA")) return (u64)-1;   /* FILE NOT FOUND */
     if (ld_streq(n, "GetFileAttributesExW") || ld_streq(n, "GetFileAttributesExA")) {
