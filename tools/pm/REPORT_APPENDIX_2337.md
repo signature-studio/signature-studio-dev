@@ -30,7 +30,7 @@
 
 ### 16-3. Refs のみの判定の差 (指標と refs_orphan・未統一)
 
-同じ本文に 2 つの判定を当てた結果。`refsOnlyBody` は指標 `refs_only_merge_rate_24h` (`src/webhook.ts`・#2335)、`refsOnlyNumbers` は refs_orphan (`src/refs.ts`)。指標の値を変えるかは PM 判断のため、本 PR では統一しない。追跡は #2623 ([CI-115])。
+同じ本文に 2 つの判定を当てた結果。`refsOnlyBody` は指標 `refs_only_merge_rate_24h` (`src/webhook.ts`・#2335)、`refsOnlyNumbers` は refs_orphan (`src/refs.ts`)。指標の値を変えるかは PM 判断のため、本 PR では統一しない。追跡は #2623 ([CI-115])。(#2623 で統一済み。以下の表は統一前の記録。統一後の実測は [`REPORT_APPENDIX_2623.md`](REPORT_APPENDIX_2623.md))
 
 | 入力 | 指標 (`refsOnlyBody`) | refs_orphan (`refsOnlyNumbers`) |
 |---|---|---|
