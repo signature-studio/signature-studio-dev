@@ -16,7 +16,6 @@
 - **FLE-16 (#3771)**: `0x6bbc20` を `[obj+0x118]` へ書く命令は `f_6bc010` の `0x6bc1af` (4・8・16 byte の store の監視で実行時 1 件・obj = `0x12d6a090`。1・2 byte の store は未監視)。役割は画素の store/blend 関数の登録 (推定)。呼出しは `f_6c9280` の `0x6c937a`。詳細は `REPORT_APPENDIX_3771.md`。
 - **PERF-P14 (#970)**: boot closure を -O0 / -O2 / -O2 -flto で build・実行 (node n=10)。3 変種の署名は計数と ipp 状態が一致 (出力メモリは未比較)・units 209 据え置き。ネガコン (`FLE_IPP=0`) で署名は変わる。LTO の結論は shim (-O1 固定) を含まない範囲に限る。実測値・範囲は `REPORT_APPENDIX_970.md`。
 
-
 ## 1. 成果物 (tools/flelift/boot/)
 
 | パス | 役割 |
