@@ -1,16 +1,16 @@
 # tools/python REPORT: PY-139 launchMapPages のイベント処理 3 件の PE 契約 (#3030・親 #2984)
 
-> 正本: `tools/python/REPORT_PY120.md` (PE 確定の手順・`0xd82c20` の code 表)、`tools/python/REPORT_PY120_2984.md` (12 件の PyMethodDef・`length` の確定)。本付録は PY-139 の実測のみ。
+> 正本: `tools/python/REPORT_PY119_2977.md` (`0xd82c20` の status → Python 例外の表)、`tools/python/REPORT_PY120_2984.md` (12 件の PyMethodDef・`length` の確定)。本付録は PY-139 の実測のみ。
 > 前提 PR #3039 (PY-120) は merge 済み (2026-10-15T00:37Z)。前回 run の停止理由 (前提未 merge) は解消している。
 
 既知類型との関係: 該当なし (PE の読取りのみ。lift・IR の変換は行っていない。`docs/DEFECTS.md`・`tools/icall/REPORT.md` の類型とは照合していない)
 
 ## 結論
 
-- 3 件 (`processMapItem`・`releaseMapItem`・`checkMapForHiddenItem`) の**呼出し契約** (引数の書式・型・既定・戻り型・失敗経路の code) は PE から確定した。VA は下の各節。
+- 3 件 (`processMapItem`・`releaseMapItem`・`checkMapForHiddenItem`) の**呼出し契約** (引数の書式・型・既定・失敗経路の status) は PE から確定した。戻り型は「`0xd82c20(status)` の戻り値をそのまま返す」まで確定。None として返す根拠 (正の status の経路) は未確定 (§1・§2)。VA は下の各節。
 - **作用先は未確定**。3 件とも、実際の状態変更は engine の `obj.+0x50` (mgr) の vtable 経由で行われ、その slot (`+0x10`・`+0x18`・`+0x30`) の実体を読んでいない。mgr の class と vtable は未同定。作用先が決まらないため、**mock・C の実装は見送った** (根拠のない値を入れない。PY-87・PY-120 と同じ方針)。
-- 受入 2 (mock と C の差分 0)・受入 3 (`provider_check` の期待値) は未達。残りは子 issue に移した (下の未解決表)。
-- 受入 4 (`all_tools` 48/48) は HEAD で維持を確認した (コードを変えていないため、main と同じ結果)。
+- mock と C の差分 0・`provider_check` の期待値は本 issue の範囲外として #3772 に移した (下の未解決表)。
+- `FL_ENGINE=wasm node tests/all_tools.mjs` は 48/48 ok (下の実行結果)。コードを変えていないため、測定 commit と同じ結果。
 - 共通ディスパッチャ `0xd843d0` は、引数 6 個とコールバックを要求オブジェクトに格納する経路まで確定した。投入・待機・status の書き戻しは未読。
 
 ## 手段
@@ -24,7 +24,7 @@
 ## 共通: 外側の呼出し規約 (3 件とも同じ形)
 
 - 出力の型記述子 `0xd81740` (`PyCallSynchronizedResult`) の `0x415610` 初期化 → `obj = [0xd7a6d0(self)]` → PyArg 解析 (`call qword ptr [rax]` の slot) → 失敗 (rc ≤ 0) は rc をそのまま `0xd82c20(rc)` に渡して返す。
-- `0xd82c20(status)` の code 表は `REPORT_PY120.md` §参考 (本付録で再掲しない)。本付録で使う行は `-2` (Operation unsafe at current time) と `-7` (Device not assigned)。
+- `0xd82c20(status)` の status → 例外の表は `REPORT_PY119_2977.md` の「status → Python 例外 (`0xd82c20`)」節 (本付録で再掲しない)。本付録で使う行は `-2` (Operation unsafe at current time) と `-7` (Device not assigned)。
 - 型記述子 `0xfd5518` (releaseMapItem と `0xd79970` が参照) と `0xd81740` (それ以外) の区別は、PE 上の参照先の違いとして確定。
 
 ### 0xd843d0 (共通ディスパッチャ) — 確定した範囲
@@ -35,11 +35,11 @@
 |---|---|
 | 0xd843dd〜0xd843e6 | `rbx=obj`・`rsi=out`・`rdi=cb`・`r13=r9` |
 | 0xd843e9 | `*out = -2` (`out+0` qword)。既定は「実行不可」 |
-| 0xd843f0〜0xd84403 | `mgr=[obj+0x50]` が非 0 かつ `0xd84f30(mgr)` が真なら 0xd84500 へ (**未読**)。`0xd84f30` は `mgr` の `+0x2d8`・`+0x3b8`・`+0x2da`・`+0x2d9`・`+0x410` の各 byte フラグを読む述語 (未同定) |
+| 0xd843f0〜0xd84403 | `mgr=[obj+0x50]`。mgr が 0 なら 0xd84409 へ (`0xd843f7 je`)。非 0 なら `0xd84f30(mgr)` を呼び、戻り `al` が偽 (0) なら 0xd84500 へ (`0xd84403 je`)、真なら 0xd84409 へ進む。よって mgr が非 0 かつ `0xd84f30(mgr)` が偽なら 0xd84500 (**未読**)、mgr が 0 または真なら 0xd84409 (格納経路)。`0xd84f30` は `mgr` の `+0x2d8`・`+0x3b8`・`+0x2da`・`+0x2d9`・`+0x410` の各 byte フラグを読む述語 (未同定) |
 | 0xd84409〜0xd84415 | `0xd841e0(…, dl=1, r8=obj)` で要求オブジェクトを得て `rbx` に入れる (`0xd841e0` の中身は未読) |
 | 0xd8441d〜0xd84446 | `[rbx+0x48]=r13` (0x4133f0 経由)、`[rbx+0x18..0x40]` = arg5..arg10 (6 個の qword) |
 | 0xd8446b | `[rbx+0x58]=cb` (コールバック登録) |
-| 0xd84471〜0xd8447a | arg11 (byte) が 1 なら `call [0x15e3ef8]` (スロットの実体は未同定) |
+| 0xd84471〜0xd8447a | arg11 (byte) が非 0 なら `call [0x15e3ef8]` (`cmp byte ptr [rbp+0xb0], 0`・`je 0xd84486`。スロットの実体は未同定) |
 | 以降 | 投入・待機・`out+0` への書き戻しは**未読** (保留) |
 
 - 要求オブジェクトの `+0x8` に `obj` が入るかは未確認 (0xd84412 で `r8=obj` を `0xd841e0` に渡すだけ)。下のコールバックは `ctx+0x8` を obj として読む。
@@ -93,14 +93,14 @@
 ### 測定 commit と差分の証跡
 
 - 測定 commit: `1cb3ac477` (origin/main)。本 PR はコードを変えない (`tools/python/` の `.md` と `docs/DOC_MAP.md` のみ)。
-- 差分 0 の証跡 (`docs/WORKFLOW.md` §6): 下の出力を最終 HEAD で取る (コミット後に記入)。
+- 差分 0 の証跡 (`docs/WORKFLOW.md` §6): 検証時の HEAD は `d9b759ff2` (本 REPORT の訂正前の commit)。以下は同 HEAD で取得した確定値。
 
 ```
-$ git diff 1cb3ac477 HEAD -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis/flapi
-(空)   ← コミット後に再取得
+$ git diff 1cb3ac477 d9b759ff2 -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis/flapi
+(空・0 バイト)
 ```
 
-### 実行結果 (HEAD = 測定 commit、素材 fl-win64 の展開先 `$RUNNER_TEMP/fl-win64-3030`)
+### 実行結果 (測定 commit 1cb3ac477。コード差分 0 の d9b759ff2 と同内容。素材 fl-win64 の展開先 `$RUNNER_TEMP/fl-win64-3030`)
 
 | コマンド | 結果 | wall |
 |---|---|---|
