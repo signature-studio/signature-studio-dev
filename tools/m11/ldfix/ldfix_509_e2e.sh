@@ -61,6 +61,13 @@ print('[diff] report キーの差 (f3c 以外): %s' % [k for k in sorted(set(a) 
 print('[diff] F3c 関数: 旧 %d → 新 %d (旧の全てを含む: %s)' % (a['f3c_fns'], b['f3c_fns'], set(a['f3c_vas']) <= set(b['f3c_vas'])))
 print('[diff] f3c_no_store (block-local 門): 旧 %s 新 %s / F3c-fn 門 stores %s / F3c-use 置換行 %s' % (a.get('f3c_no_store'), b.get('f3c_no_store'), b.get('f3c_fn_stores'), b.get('f3c_use_replaced')))
 PYEOF
+"$PY" - "$OUT/new.ll" <<'PYEOF' || { echo "[ldfix_509_e2e] c40420 に修復 load が残っている (#4421: 間接 call を含むため置換しない)" >&2; FAIL=1; }
+import re, sys
+t = open(sys.argv[1], errors='replace').read()
+m = re.search(r'^define [^\n]*@function_c40420\(.*?\n}\n', t, re.M | re.S)
+assert m and not re.search(r'ldfx[nu]\d+', m.group(0))
+print('[c40420] 新版 IR に修復 load 無し (#4421)')
+PYEOF
 
 step "3/7 audit_lsf.py (store 形 + 消費者形): 修復前 / 旧版 / 新版"
 for k in pre prev new; do
@@ -107,9 +114,9 @@ for k in prev nc_store nc_use; do
   "$PY" "$HERE/audit_lsf.py" "$F" "$IMG" "$CFG" > "$OUT/nc_$k.txt" || { echo "[ldfix_509_e2e] NC:$k の audit 失敗: $OUT/nc_$k.txt" >&2; NCFAIL=1; }
   echo "[NC:$k] $(grep -o '"suspect_fns": [0-9]*, "suspect_sites": [0-9]*' "$OUT/nc_$k.txt" || echo 'store 形 SUSPECT 0') / $(grep '^SUSPECT_VAS' "$OUT/nc_$k.txt" | cut -c1-120) / use 形(pure): $(grep '^SUSPECT_USE_VAS' "$OUT/nc_$k.txt" | awk '{print NF-1}') 関数 (1063090 を含む: $(grep '^SUSPECT_USE_VAS' "$OUT/nc_$k.txt" | grep -c ' 1063090'))"
 done
-# 期待値: 旧版 (修復前相当) は store/use とも SUSPECT 0。戻した NC は各 1 件を検出する (検出できないなら NC として無効)
-grep -q '^SUSPECT_VAS 806740' "$OUT/nc_nc_store.txt" && grep -q '^SUSPECT_USE_VAS.* 1063090' "$OUT/nc_nc_use.txt" && ! grep -q '^SUSPECT_VAS [0-9]' "$OUT/nc_prev.txt" \
-  || { echo "[ldfix_509_e2e] NC の期待値 (store 806740 / use 1063090 を検出・旧版は store 0) を満たさない" >&2; NCFAIL=1; }
+# 期待値: 旧版 (修復を外した版) は store 形 806740 を検出する (REPORT_509 §4.5)。戻した NC はそれぞれ 806740 (store) / 1063090 (use) を検出する (検出できないなら NC として無効)
+grep -q '^SUSPECT_VAS.* 806740' "$OUT/nc_prev.txt" && grep -q '^SUSPECT_VAS 806740' "$OUT/nc_nc_store.txt" && grep -q '^SUSPECT_USE_VAS.* 1063090' "$OUT/nc_nc_use.txt" \
+  || { echo "[ldfix_509_e2e] NC の期待値 (旧版 store 806740 / nc_store 806740 / nc_use 1063090 を検出) を満たさない" >&2; NCFAIL=1; }
 
 step "6/7 survey 前後 (wasm 再ビルド) と動的到達"
 B="$OUT/build"; mkdir -p "$B/tools"; cp -a "$REPO/tools/shim" "$REPO/tools/shared" "$B/tools/"; cp -a "$REPO/tools/m11" "$B/tools/m11_src"; rm -rf "$B/tools/m11_src/work"; mv "$B/tools/m11_src" "$B/tools/m11"; cp -a "$W" "$B/tools/m11/work"

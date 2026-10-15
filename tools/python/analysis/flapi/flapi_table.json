@@ -7960,7 +7960,7 @@
     }
    },
    "setTimeDispMin": {
-    "doc": "Is time time display set to minutes",
+    "doc": "Toggles whether the song position panel is displaying time or bar and beat",
     "sig": {
      "params": [],
      "returns": "None"
