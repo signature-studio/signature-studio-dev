@@ -246,5 +246,5 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| CreatePlugInstance の完走 (host object の再構成)・起動経路 (LoadLibrary → GetProcAddress) からの到達 | 完走・Dispatcher 実行は未検証 | #2653 (HB-H46) |
-| block23676 の入場 (VA 0x86a970) | build のみ検証 | #2653 (HB-H46) |
+| CreatePlugInstance の完走・起動経路 (LoadLibrary → GetProcAddress) からの到達・bit 判定 | 完走は未検証。host 再構成と停止点 (`f_409b70`) は #2653 で実測 (`REPORT_APPENDIX_2653.md`) | #3597 (HB-H51) |
+| block23676 の入場 (VA 0x86a970) | #2653 で入場を実測 (`entered=true`・測定 commit `e702caa14`) | 解決 (#2653) |
