@@ -28,7 +28,7 @@ ott 原版からの差分 (FLEngine 実測 1,105 未対応 site = 0.32% の解�
   - dispatch に IAT pseudo-VA 経路を追加: data 側で IAT slot に IMP_VA_BASE+idx を敷設し,
     `mov rax,[iat]; call rax` 形の間接呼出を imp 呼出に解決
 
-usage: x64c.py --pe DLL --entries entries.json --out out_dir [--closure N] [--override VA=CNAME]
+usage: x64c.py --pe DLL --entries entries.json --out out_dir [--closure N] [--override VA=CNAME] [--trap VA]
                [--img 0x400000] [--shift 0] [--img-size 0x18c0000] [--impbase 0x1D80000] [--cfg-rax]
 """
 import sys, json, struct, argparse, bisect, collections, os, shutil, contextlib
@@ -1709,6 +1709,7 @@ def main():
     ap.add_argument('--out', required=True)
     ap.add_argument('--closure', type=int, default=0, help='未 lift の直接 call 先を再帰的に追加 (深さ)')
     ap.add_argument('--override', action='append', default=[], help='VA=CNAME: その関数 body を C 実装に置換')
+    ap.add_argument('--trap', action='append', default=[], help='VA: lift せず、呼ばれたら ott_unsup で必ず abort する trap stub にする (閉包外の x87 関数用。複数指定可)')
     ap.add_argument('--img', type=lambda x: int(x, 0), default=0x400000)
     ap.add_argument('--shift', type=lambda x: int(x, 0), default=0)
     ap.add_argument('--img-size', type=lambda x: int(x, 0), default=0x18c0000)
@@ -1722,6 +1723,8 @@ def main():
     pe.cfg_rax = a.cfg_rax
     cfg = json.load(open(a.entries))
     entries = set(IMG + r for r in cfg.get('calltgt', [])) | set(cfg.get('roots', []))
+    traps = {int(x, 16) for x in a.trap}
+    entries -= traps
     md = Cs(CS_ARCH_X86, CS_MODE_64); md.detail = True
     thunks = {}
 
@@ -1752,7 +1755,7 @@ def main():
             if e not in overrides:
                 f.descend()
             for t in f.calls:
-                if t not in known and t not in thunks:
+                if t not in known and t not in thunks and t not in traps:
                     nm = thunk_name(t)
                     if nm:
                         thunks[t] = nm
@@ -1796,6 +1799,8 @@ def main():
             textrefs |= f.textrefs
             jt_ranges |= set(f.jt_ranges)
             del f
+        for t in sorted(traps):
+            bfs[0].write('void f_%x(void) { ott_unsup(%s, "trap stub (x64c --trap): not lifted, outside the export closure"); }\n' % (t, hx(t)))
     used_imps = sorted(used_imps)
     slots = sorted(pe.iat)                       # IAT slot VA (DLL 宣言順でなく VA 順で固定)
     imp_names = [pe.iat[s] for s in slots]
@@ -1807,7 +1812,7 @@ def main():
                 fh.write('void imp_%s(void);\n' % nm)
             for c in sorted(set(overrides.values())):
                 fh.write('void %s(void);\n' % c)
-            for e in sorted(done):
+            for e in sorted(done) + sorted(traps):
                 fh.write('void f_%x(void);\n' % e)
             with open(body_paths[k]) as bf:
                 shutil.copyfileobj(bf, fh)
@@ -1817,7 +1822,7 @@ def main():
             # (FLE-2: 冒頭に optional probe hook — boot 側で計数/トレースする。未設定なら何もしない)
             fh.write('void ott_dispatch(uint64_t t) {\n')
             fh.write('  if (fle_dispatch_probe) fle_dispatch_probe(t);\n  switch (t) {\n')
-            for e in sorted(done):
+            for e in sorted(done) + sorted(traps):
                 fh.write('  case %s: f_%x(); return;\n' % (hx(sh(e)), e))
             for tv2 in sorted(thunks):
                 fh.write('  case %s: imp_%s(); return;\n' % (hx(sh(tv2)), thunks[tv2]))
@@ -1842,10 +1847,11 @@ def main():
             'iat_map': iat_names, 'impbase': a.impbase,
             'ninsn': ninsn,
             'textrefs': sorted(textrefs),
-            'jt_ranges': sorted(jt_ranges)}
+            'jt_ranges': sorted(jt_ranges),
+            'traps': sorted('%x' % t for t in traps)}
     json.dump(meta, open(os.path.join(out, 'lift_meta.json'), 'w'), indent=1)
-    print('[flelift.x64c] functions %d, insns %d, unsup %s, unlifted callees %d, imports %d' % (
-        len(done), meta['ninsn'], dict(unsup) or '{}', len(unl), len(used_imps)))
+    print('[flelift.x64c] functions %d, insns %d, unsup %s, unlifted callees %d, imports %d, traps %d' % (
+        len(done), meta['ninsn'], dict(unsup) or '{}', len(unl), len(used_imps), len(traps)))
 
 
 if __name__ == '__main__':
