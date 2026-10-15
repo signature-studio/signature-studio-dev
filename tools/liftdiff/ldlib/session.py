@@ -264,6 +264,10 @@ class Session:
         cand = cases.fvm_candidates(fault, cases.kinds_of(sig['params']))
         if len(cand) > 1:
             one = self._fault_base_arg(fault, sig, cand)
+            if one is None and fault and 'rip' in fault:
+                arg = self.analyzer.fault_arg(va, int(fault['rip'], 16))
+                if arg is not None and arg in cand:
+                    one = arg
             if one is None:
                 return None, 'multi_candidate'
             return [one], None

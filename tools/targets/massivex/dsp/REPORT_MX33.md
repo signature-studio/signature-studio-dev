@@ -157,8 +157,21 @@
 | 複写 (`movaps` / `vmovaps` の転送先の後続が未確定) | 8 | 行 1・3〜9 | #3774 の残件 |
 | merge (`vcvtsi2ss` / `vcvtsi2sd` の上位の後続が未確定) | 8 | 行 2・11〜17 | #3774 の残件 |
 
-- 9 件の内訳 (call/ret 境界・merge 後続なし・ambiguous) は、この表からは裏付けられないため記載しない。
-  PE が無く `mx33_xmm03.py` を再実行できないため、理由ごとの細分は未確定 (PE 再実行で確定する)。
+理由ごと (PE 再実行 `mx33_xmm03.py` の `reads` の理由文字列による実測・本 PR で記録):
+
+| 型 | 理由 | 件数 | RVA |
+|---|---|--:|---|
+| 複写 | call 境界で追跡中の値が引数として渡りうる (間接 `call qword ptr [...]` を含む) | 6 | 0xccc0・0x105e0・0x1108c0・0x110960・0x1109b0・0x110a30 |
+| 複写 | ret で xmm0 戻り値として渡る | 1 | 0x17b4e0 |
+| 複写 | 3 オペランド `vcvtsd2ss` の下位 64 bit 読みを曖昧 (A) と扱う (規則の当てはめ要確認) | 1 | 0x11830 |
+| merge | 上位保持の宛先が `vmovaps`/`vmovups` 等で部分書込される (`zeroupper` を含む) | 2 | 0x7d38d0・0x7d3b10 |
+| merge | 上位の読みが `movddup` (下位 64 bit のみ読む shuffle・証拠にしない) | 2 | 0x7dce90・0x7ddc90 |
+| merge | CFG 後続に幅の証拠なし | 2 | 0x7dcb60・0x7dd960 |
+| merge | ret で xmm0 戻り値として渡る | 1 | 0x118d8b0 |
+| merge | call 境界 (引数として渡りうる) | 1 | 0xef60 |
+
+- 残件の未解決: 間接 call 先の引数幅 (解析外)・`vcvtsd2ss` 規則 (0x11830)・`movddup` 後の上位追跡 (0x7dce90 等)。いずれも本 issue 範囲の追加実装が要る。
+- `follow()` の A 理由は分類結果を変えない。`classify_fn` は merge の A 理由を記録するように変えた (件数 scalar 1 / 128 bit 0 / 判定不能 16 は不変)。
 
 ## 7. 既知類型との関係
 
@@ -168,7 +181,7 @@
 
 ## 8. 測定 commit と差分 (docs/WORKFLOW.md §6)
 
-- 測定 commit = **`1083467fe`** (`feat(massivex): follow copy/merge destinations for xmm0-3 classification (MX-37 #3774)`)。前版 = `d9a2b7ec2` (MX-33 #3032)。
+- 測定 commit = **`d106f3c23`** (`fix(massivex): record merge follow-up reasons for xmm0-3 undetermined (MX-37 #3774)`)。前版 = `1083467fe` (`feat(massivex): follow copy/merge destinations ... (MX-37 #3774)`、PR #4620)。
   変更 (#3774): `scripts/mx33_xmm03.py` (複写先・merge 上位の後続追跡 `follow()`・NC 6 件追加)・`scripts/mx6_vectorcall.py` (`analyze()` の返り値に `cfg` を追加・JSON には出さない)。
 - commit `1083467fe` 自身の変更は上記 2 ファイルのみ (`mx6_e2e.sh` は commit `1083467fe` では未変更)。
   ただし `git diff d9a2b7ec2 1083467fe -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は 3 ファイル (+154/−20 行) で、`mx6_e2e.sh` の 37 行は main 取り込み (他 PR の変更) による差分。
