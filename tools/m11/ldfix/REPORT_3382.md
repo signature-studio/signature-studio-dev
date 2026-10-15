@@ -77,3 +77,29 @@ ERR_BARE 14 件 (deref VA → call VA。`judge_copy_3382.py` の出力): 0x12802
 - 範囲内: COPY 103 箇所の一次分類と、0x7888f0 の 3 箇所の窓での確認。
 - 範囲外: 全 103 箇所の人手判定、修復、ldfix_e2e の実測。
 - 測定 commit: この PR の最後のコード commit。`judge_copy_3382.py` は本 PR で追加した。
+
+## 8. ERR_BARE の窓による確認 (#4211 / CI-186)
+
+`show_site_2555.py` の窓で、ERR_BARE 14 件のうち今回 11 件 (0x1280250・0x1280380・0x40fcf0・0x41c0a0・0x41c780・0x4504e0・0x5b03a0・0x79da80 の 3 箇所・0x44f440) を読んだ。残り 3 件は既存の窓 (§2 の 0x41c650・0x7888f0 0x78892d、REPORT_2555 §2 の 0x788954) で確認済み。各窓で機械語の deref 元 (entry の `mov rbx,rcx`・`mov rsi,rdx` で保持した引数) が、IR の呼出しに裸の引数として渡っているかを見た。
+
+| 関数 | deref → call | 機械語 | IR の該当引数 | 判定 |
+|---|---|---|---|---|
+| 0x1280250 | 0x1280271 → 0x1280274 (`1280170`・argpos 2) | `*arg2` (`mov rdx,[rsi]`・rsi=arg2) | `%arg2` | 誤り (窓) |
+| 0x1280380 | 0x12803a1 → 0x12803a4 (`1280170`・argpos 2) | `*arg2` (`mov rdx,[rsi]`) | `%arg2` | 誤り (窓) |
+| 0x40fcf0 | 0x40fd0b → 0x40fd11 (`40fd90`・argpos 1) | `*arg1` (`mov rcx,[rbx]`) | `%arg1` | 誤り (窓) |
+| 0x41c0a0 | 0x41c0b2 → 0x41c0bc (`40fee0`・argpos 1) | `*arg1` (`mov rcx,[rbx]`) | `%arg1` | 誤り (窓)。IR の 2 番目の引数は定数 `inttoptr 6712`。機械語の `rdx` は `[rip-…]` の load で、値の一致は窓だけでは確かめられない (未確認) |
+| 0x41c780 | 0x41c7b5 → 0x41c7b8 (`414850`・argpos 1) | `*arg1` (`mov rcx,[rbx]`) | `%arg1` | 誤り (窓) |
+| 0x4504e0 | 0x45050d → 0x450510 (`414850`・argpos 1) | `*arg1` (`mov rcx,[rbx]`) | `%arg2` | 誤り (窓)。judge は argK=1 で ERR_BARE。IR は別の引数 `%arg2` を裸で渡す |
+| 0x5b03a0 | 0x5b040f → 0x5b0412 (`414850`・argpos 1・k=2) | `*arg2` (`mov rcx,[rsi]`・rsi=arg2) | `%arg3` | 誤り (窓)。IR は `%arg3` を裸で渡す |
+| 0x79da80 | 0x79da9e → 0x79dab4 (`6edf50`・argpos 1) | `*arg2` (`mov rcx,[rsi]`) | `%arg2` | 誤り (窓) |
+| 0x79da80 | 0x79dab9 → 0x79dabe (`6ed370`・argpos 1) | `*arg2` (`mov rcx,[rsi]`) | `%arg2` | 誤り (窓) |
+| 0x79da80 | 0x79dc23 → 0x79dc32 (`6eeaf0`・argpos 1・k=2) | `*arg2` (`mov rcx,[rsi]`) | `%arg2` | 誤り (窓) |
+| 0x44f440 | 0x44f501 → 0x44f50f (`414da0`・argpos 3) | `*arg1` (`mov r8,[rbx]`) | `%arg1` | 誤り (窓) |
+| 0x41c650 | 0x41c685 → 0x41c688 (`414850`・argpos 1) | `*arg1` | `%arg1` | 誤り (§2 で確認済み) |
+| 0x7888f0 | 0x78892d・0x788954 | `*arg1` | `%arg2` | 誤り (§2・REPORT_2555 §2 で確認済み) |
+
+- 0x79da80 の `rsi` は entry の `mov rsi,rdx` (= arg2) から、窓の範囲では再代入が見えないことを確かめた (400 命令前までの窓)。
+- 0x4504e0 と 0x5b03a0 は、機械語の deref 元 (`*arg1`・`*arg2`) と IR の裸の引数 (`%arg2`・`%arg3`) が一致しない。judge の argK と窓の読みが同じ向きかは、呼出し先の引数の並びを個別に確かめる必要があり、今回は誤り候補として残す。
+- rewrite_va を持つ 6 件 (§3) は未判定。0x1280250・0x1280380 の rewrite_va 行はこの表に含まない (別の deref 行)。
+- 判定の総数 (ERR_CAND 57・UNCLEAR 16・MISMATCH 14・OK_ARGK 2 と、保留 0x78890f) は未判定のまま。子 #4961 [CI-200] に移す。
+- 0x78890f: `show_site_2555.py` の call VA に deref VA を渡すと IR の呼出しが見つからない (call VA は 0x788912)。0x78890f は deref 位置であって呼出し位置ではないため、判定は子 #4961 で行う。
