@@ -12,7 +12,7 @@
 
 ## 2. 測定条件
 
-- 測定 commit: `2fa0d85c5` (判定器の `--negctl-noglk` 追加と結果 JSON。以降のコード変更なし)。作業ツリーは `2fa0d85c5` と同一。
+- 測定 commit: `2fa0d85c5` (判定器の `--negctl-noglk` 追加と結果 JSON)。以降の変更は §5 のとおり。測定経路には差分がない。
 - 入力: `results/audit_undefload_564_full.json`・`results/f4_564_post.json` (#4204 と同じ)。
 - PE: `[WIN64]` の `extracted/block00031_PE.bin` (sha256 先頭 16 桁 `b2c64da40921cf26`、#4204 と同じ)。
 - 実行: `python3 audit_frame_store_alias_2211.py PE audit.json f4.json OUT [--negctl-noglk]`。実測 (`date` 差, n=1): 対照 0.29 秒・`--negctl-noglk` 0.27 秒・`--negctl-glk` 0.29 秒、いずれも rc 0。load average 0.34→0.34 (4 vCPU)。
@@ -43,8 +43,11 @@
 ## 5. 差分 (WORKFLOW §6)
 
 - 測定 commit: `2fa0d85c5`。
-- 測定 commit から HEAD までのコード差分: なし (本 REPORT と `REPORT_4204.md` の更新は docs のみ)。
-- `git diff 2fa0d85c5 HEAD -- tools/m11/ldfix` の出力: `REPORT_4330.md` と `REPORT_4204.md` の追加・更新のみ。判定器は変わらない。
+- `git diff --stat 2fa0d85c5 HEAD -- tools/m11/ldfix` の実差分 (main 取り込みの #4421 由来を含む):
+  - `ldfix.py` (+14)・`ldfix_509_e2e.sh` (+7)・`test_f3c_indirect_4421.py` (+51)・`REPORT_1325.md` (+6/-1)
+  - `REPORT_4330.md`・`REPORT_4204.md` (docs のみ)
+- これらは `audit_frame_store_alias_2211.py` の実行経路に入らない。この判定器は `ldmach.py` と `audit_frame_store_verdict.py` だけを import し、`ldfix.py` を参照しない。入力 JSON (`results/audit_undefload_564_full.json`・`results/f4_564_post.json`) と `ldmach.py`・`audit_frame_store_verdict.py`・`audit_frame_store_alias_2211.py` は `2fa0d85c5` から HEAD まで差分 0 (`git diff --stat` 出力 0 行)。
+- よって測定値は有効。判定器の挙動は `2fa0d85c5` と同一。
 
 ## 6. 未解決 (起票先)
 
