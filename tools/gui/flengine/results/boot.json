@@ -184,6 +184,12 @@
  "gui_icall_calls": 6,
  "gui_ring_discarded": 0,
  "icall_miss": 7,
+ "icall_miss_uniq": 3,
+ "icall_miss_targets": [
+  "0x457860",
+  "0xfa9390",
+  "0x85df70"
+ ],
  "m11_stub_total": 67,
  "m11_stubs": [
   "GetLocaleInfoW:59",
@@ -194,9 +200,9 @@
   "GetCurrentThread:1"
  ],
  "probes": {
-  "GetMem": 761,
+  "GetMem": 760,
   "FreeMem": 24,
-  "FastMM_GetMem(407a50)": 782,
+  "FastMM_GetMem(407a50)": 781,
   "FastMM_FreeMem(407e20)": 24,
   "InitUnits": 0,
   "Halt0": 1,
