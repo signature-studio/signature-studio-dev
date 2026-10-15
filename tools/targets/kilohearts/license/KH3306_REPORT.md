@@ -2,7 +2,7 @@
 
 - 担当 dir: `tools/targets/kilohearts/license/` (親 #709 KH-14・後続 #3307 KH-52)
 - 既知類型との関係 (DEFECTS.md / icall §4): **該当 ID なし (新類型候補)**。`@xmmN` (i128) と `@ymmN` (i256) が別グローバルで、VEX-128 の書込みが ymm の下位を更新しないため、後続の `load i256 @ymmN` が古い値を読む。silent miscompile (loud failure ではない)。行案は §8。
-- 測定 commit: `0145b3414` (コード変更の最後の commit。差し戻し対応で `ec895fa7a` (wrapper の ymm 宣言) と `0145b3414` (identity 検査) を追加。前回の測定 commit は `ca83f24e`)
+- 測定 commit: `df5005a7b` (main 取り込みの merge commit。コードを変えた最後の commit。§3-5 で再測定)。前回の測定 commit は `0145b3414` (差し戻し対応)、その前は `ca83f24e`
 
 ## 0. 結論 (先出し)
 
@@ -106,6 +106,18 @@ ymm を参照しないモジュールは `ymm_on` が偽で、出力は従来コ
 
 vzeroupper の undef 規則を個別に外す対照は未実施 (undef の実行時値に依存して判定が揺れるため、静的検査 `ymm_store_undef_lt16` = 0 で代える)。
 
+### 3-5. main 取り込み後の再測定 (測定 commit `df5005a7b`)
+
+main (`e59ca23b9`) を取り込んだ後の HEAD で §3-1・§3-3 を再実行。比較元は main の `e59ca23b9` (旧比較元 `64fd760` は main の #709 より前のため使わない)。逐次・nproc 4・load average (1 分) 0.43 (実行直前)。
+
+| 検証 | 結果 | 所要 (wall) |
+|---|---|---|
+| `python3 scripts/ymm_sync_check.py` | `RESULT PASS` (on = `OK xmm2=12345779` rc 0 / off = `MISMATCH bits=3` rc 1 / one = `clang -c` 受理 rc 0) | 0.34 秒 |
+| `bash scripts/lowered_identity.sh e59ca23b9` | module A/B/E/F の lowered.ll・mod.wasm すべて IDENTICAL・rc 0。sha256 は §3-3 の表と同じ (F = `7ba79e65…7707`・54,394 B) | 18.8 秒 |
+
+- 取り込みで入った main 側の差分は `gen_simd.py` (+67) と `scripts/kh709_ymm_check.py` (+158) (main の #709)。`lift/kh_lower.py` は PR 側の版と同一 (`git diff aeafbcc48 df5005a7b -- lift/kh_lower.py` 0 行)。
+- main の kh_lower 宣言 (#709: `k<16` かつ使用のとき `@ymmN` を宣言) は、PR 側の宣言 (`k<32` かつ使用、または `ymm_on` のとき `k<16`) の部分集合。競合はこの 1 箇所で、PR 側の版を採った。
+
 ## 4. 検証範囲 / 範囲外
 
 - 範囲内: kh_lower の同期規則、合成 3 関数の実行、実機 2 関数 stage-0 からの kh_lower 出力と clang の受理、module A/B/E/F の lowered.ll 一致、module F の wasm sha256。
@@ -123,11 +135,12 @@ python3 lic_build.py --module F            # wasm sha256 = 7ba79e65…7707 (素�
 
 ## 6. 測定 commit と差分 (docs/WORKFLOW.md §6)
 
-- 測定 commit `0145b3414`。本 REPORT の commit 以降の HEAD までのコード差分 (`lift`・`scripts` の範囲): 下記で確認。
+- 測定 commit `df5005a7b` (§3-5)。本 REPORT の commit 以降の HEAD までのコード差分 (`lift`・`scripts` の範囲): 下記で確認。
+- 前回の測定 commit `0145b3414` からの差分 (`git diff --stat 0145b3414 df5005a7b -- …lift …scripts`): `lift/gen_simd.py` 67 行・`scripts/kh709_ymm_check.py` 158 行 (どちらも main の #709 の取り込み。PR 側の変更は 0 行)。
 - 前回の測定 commit `ca83f24e` からの差分 (`git diff --stat ca83f24e 0145b3414 -- …lift …scripts`): `lift/kh_lower.py` 3 行 (宣言の修正)、`scripts/ymm_sync_check.py` 15 行 (one 追加)、`scripts/lowered_identity.sh` 34 行 (新規)。差し戻し対応 (§0) の範囲。
 
 ```
-git diff 0145b3414 HEAD -- tools/targets/kilohearts/license/lift tools/targets/kilohearts/license/scripts
+git diff df5005a7b HEAD -- tools/targets/kilohearts/license/lift tools/targets/kilohearts/license/scripts
 (出力 0 行)
 ```
 
