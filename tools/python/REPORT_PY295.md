@@ -52,5 +52,5 @@ cd tools/python && FL_ENGINE=wasm node tests/all_tools.mjs && node tests/provide
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| emsdk の zlib port の取得 URL (GitHub タグ) が 404。Actions の `build_flpy.sh` は §2 の手作業なしでは通らない | flpy 経路を新しい runner で作れない [PY-298] #4082 |
+| emsdk の zlib port の取得 URL (GitHub タグ) が 404。Actions の `build_flpy.sh` は §2 の手作業なしでは通らない | flpy 経路を新しい runner で作れない | [PY-298] #4082 |
 | `FL_MAC_DIR` 無し (mac dylib 無し)。`midi_script_callbacks_in_binary` は既存値 27 件を引き継いだ | `flapi_table.json` の mac 由来の値は更新されていない (本測定の PASS には影響しない) | 起票しない (既知の運用。本 REPORT の §1 に記録のみ) |
