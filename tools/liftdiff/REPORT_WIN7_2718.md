@@ -172,7 +172,7 @@ KPI は PR 本文の表を参照 (`docs/WORKFLOW.md` §7)。
 
 ## 6. WIN-34 (#3557): 窓 import の呼出元 VA・引数の trace (部分達成。画素統計は子 issue へ)
 
-測定 commit: `913063ebe` (コード変更の最後の commit)。再測定を省く根拠 (`docs/WORKFLOW.md` §6): `git diff 913063ebe HEAD -- tools/liftdiff/rt tools/liftdiff/spike_cfi.py tools/liftdiff/ldlib` の出力は空 (この節の commit は REPORT_WIN7_2718.md のみ)。
+測定 commit: `913063ebe` (WIN-34 の実装の最後の commit。§6.1〜§6.6 はこの時点の実測)。main (`c2324dea6`) を取り込んだ後の再測定は §6.7 (測定 commit `33ddb3f45`)。
 再現: `cd tools/liftdiff && FL_WIN64_DIR=<fl-win64 展開先> python3 spike_cfi.py targets/flelift.json` (`SPIKE_WINTRACE=0` で窓の記録を切る)。
 素材: fl-win64・toolchain-emsdk・work-m11・work-liftdiff。実行環境: GitHub Actions runner (4 CPU)、`uptime` の load average 0.33 (e2e 直前)。
 
@@ -240,3 +240,25 @@ KPI は PR 本文の表を参照 (`docs/WORKFLOW.md` §7)。
 | headless host への接続と surface 画素統計 (受入 2)。PNG は作らない (受け渡し: PM 判断待ち) | 可視窓の画素は未取得。前提は `.mo` 読込み後の止まりの解消 (#3556) | 子 issue [WIN-35] (依存: #3556) |
 | stk 位置 (entry+28 ≠ 第5引数 entry+40) | MultiByteToWideChar/WideCharToMultiByte の a4/a5 が誤り得る | 子 issue [LD-170] |
 | 呼出元 rva 0x12a8c3 の関数名 | 未同定 (推定: Classes.AllocateHWnd) | 追跡のみ (PR 本文の未解決表に記載) |
+
+### 6.7 main 取り込み後の再測定 (merge `33ddb3f45`・競合解消)
+
+main の取り込みで `rt/ld_native.c`・`rt/ld_core.h`・`spike_cfi.py`・`ldlib/` に main 側の変更 (WIN-9 #2760) が入り、§6.1〜§6.4 の測定 commit `913063ebe` とはコードが変わった。取り込み後の HEAD で spike と e2e を再実行した。
+
+- 測定 commit: `33ddb3f45` (main `c2324dea6` の merge。コードを変えた最後の commit)。
+- 測定後の差分: `git diff 33ddb3f45 HEAD -- tools/liftdiff/rt tools/liftdiff/spike_cfi.py tools/liftdiff/ldlib tools/liftdiff/liftdiff_e2e.sh` の出力は空。`git diff --name-only 33ddb3f45 HEAD -- tools/liftdiff` の出力は本ファイル (REPORT_WIN7_2718.md) の 1 件だけ (コード差分 0)。
+- 環境: GitHub Actions runner (4 CPU)。load average は spike 1 回目の直前 0.73、e2e の直前 0.72、e2e の終了直後 6.22 (e2e の並列実行による)。
+
+| 項目 | 結果 (`33ddb3f45`) |
+|---|---|
+| spike: units_run / first_fail | 928/942・830 (2 回とも同一) |
+| spike: CreateFruityInstance | segv rip_rva `0x4e0fab`・呼出し import 35 件・`calls_over` 0 (2 回とも同一) |
+| spike: 窓 import の呼出元 VA | GetClassInfoW `0x52a825`・RegisterClassW `0x52a85e`・CreateWindowExW `0x52a8c3` (§6.1 と一致) |
+| spike 2 回の差 | rsp/rbp/rsi/s1 など stack アドレスのみ。rip・status・calls・窓の記録行は一致 |
+| spike 実行時間 (real, 1 回目) | 18.7 s |
+| e2e `bash liftdiff_e2e.sh --m11-only` | `LIFTDIFF_E2E PASS` (rc 0)・real 3m07.4s |
+| e2e 内の `CHECK_INITUNITS` | PASS (hybrid `units_run=928/942 first_fail=830`) |
+| e2e 内の UNIT18 の 3 項目 (`_UStrAsg`・`Move(409c80)`・`4123c0`) | 3 件 PASS |
+| e2e sample:800 | 一致 360 / 不一致 234 / 実行不能 206 (§6.4 の基準 360/234/206 と同一) |
+
+e2e は 1 run。sample:800 の揺れは §6.4 と同じく n=1 で評価しない。`CreateWindowExW` の窓は戻り 0 の stub のため作られず、KPI (最初のウィンドウ・dispatch 数・通過 unit 数) は §6.5 と同じ。
