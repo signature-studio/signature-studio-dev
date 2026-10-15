@@ -517,6 +517,8 @@ export function createMockEngine() {
     // PY-172 (#3219): PE 0xd67000 は件数 (配列 null で 0)、0xd67030 は索引 [0, 件数-1] の外を status -4。件数 0 は仮置き (provider/fl_engine.c の PGRP_N と同じ)
     "patterns.getPatternGroupCount": (...a) => { arity(a, 0, 0); return PGRP_N; },
     "patterns.getPatternGroupName": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i < 0 || i >= PGRP_N) throw RANGE(); return ""; },
+    // PY-180 (#3278): .data の初期値 -1 (番兵)。書込み元は未特定 (REPORT_PY180)
+    "patterns.getActivePatternGroup": (...a) => { arity(a, 0, 0); return -1; },
     "patterns.patternCount": (...a) => { arity(a, 0, 0); return PAT_N; },
     "patterns.patternNumber": (...a) => { arity(a, 0, 0); return PAT_NUMBER; },
     "patterns.isPatternDefault": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i < 1 || i > PAT_N) throw RANGE(); return false; },

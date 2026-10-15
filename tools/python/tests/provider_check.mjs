@@ -77,7 +77,7 @@ const pe143 = new Set(["arrangement.getMarkerName", "arrangement.currentTimeHint
 // PE 0xd5ec60 で取得式を確定した 1 関数 (REPORT_PY115 §2・PY-115 #2951)
 const pe115 = new Set(["mixer.getTrackColor"]);
 // PE で件数と索引範囲を確定した patterns グループ 2 件 (REPORT_PY172・PY-172 #3219)。件数は仮置き 0、tests/patterns_group_diff.mjs が mock と照合
-const pe172 = new Set(["patterns.getPatternGroupCount", "patterns.getPatternGroupName"]);
+const pe172 = new Set(["patterns.getPatternGroupCount", "patterns.getPatternGroupName", "patterns.getActivePatternGroup"]);
 // PE で device の通知 3 件 (vtbl 呼出し・戻り None)・状態読出し 3 件・設定 1 件を確認した 7 関数 (REPORT_PY206・PY-206 #3494)。idle/midi-out の値は未実測の仮置き、tests/device_diff.mjs が mock と照合
 const pe206 = new Set(["device.createRefreshThread", "device.destroyRefreshThread", "device.fullRefresh", "device.getIdleElapsed", "device.isMidiOutAssigned", "device.getMasterSync", "device.setMasterSync"]);
 // PE で確定した mixer 2 関数 (REPORT_PY205・PY-205 #3493)。getTrackCount = trackCount − 2、getEqBandCount = 3。tests/mixer_diff.mjs が mock と照合
@@ -95,7 +95,7 @@ for (const id of ids) {
   notImpl ? unimpl++ : impl++;
 }
 // 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 引数書式・範囲 5 (pe40・#1529) + PE 確定 1 (pe102・#2883) + stub 確定 6 (stub41) + PE 確定 2 (pe101) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 7 (pe94・#2830) + PE 確定 9 (pe95・#2831) + PE 確定 4 (pe96・#2832) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + ui PE 確定 6 (pe119・#2980) + ui setter・getVersion 3 件 (pe130・#3007) + general PE 確定 6 (pe119set・#2977) + arrangement PE 呼出し 6 (pe152・#2983) + arrangement PE 戻り str 2 (pe143・#3041) + ui 表示・メニュー 6 (pe121_2982・#2982) + general PE 確定 2 (pe125・#3001) + general PE 確定 1 (pe235・#3701) + launchMapPages PE 確定 1 (pe120・#2984) + launchMapPages 書式・戻り 3 件 (pe138・#3029) + channels PE 判定順 1 (pe76・#2563) + patterns グループ 2 (pe172・#3219) + PY61 確定 7 (pl61・#2027) + device PE 確定 7 (pe206・#3494) + patterns 数え・選択 4 (pe179・#3271) + mixer PE 確定 2 (pe205・#3493) + ui ブラウザ 3 件 (pe132・#3013) + ui PE 確定 2 (pe133・#3014) + ui PE 確定 2 (pe128・#3005) + screen 初期化・メニュー 10 (pe136・#3025)
-assert.equal(impl, 195); assert.equal(unimpl, 240);
+assert.equal(impl, 196); assert.equal(unimpl, 239);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);
