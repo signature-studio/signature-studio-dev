@@ -69,13 +69,22 @@ static double gen(int mode) {
     }
 }
 
+/* FUN_180fdc470 の定義域: native は 0<x<1 で table の外を読んで落ちる (指数 < 0)。負の入力と |x|>=1 のみ突合する。 */
+static double gen470(void) {
+    for (;;) {
+        double x = gen((int)(rnd() % 5));
+        if (x == x && (x < 0.0 || fabs(x) >= 1.0) && x != 0.0) return x;
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc < 4) { fprintf(stderr, "usage: %s <HeartCore.core_64> <trials> <seed>\n", argv[0]); return 2; }
     map_image(argv[1]);
     long n = atol(argv[2]);
     rs_state = (u64)atoll(argv[3]) * 0x9E3779B97F4A7C15ULL + 1;
-    const u64 fn = 0x180fdc660ULL;
+    const u64 fn = 0x180fdc660ULL, fn470 = 0x180fdc470ULL;
     long mis_rax = 0, mis_x = 0, nan_both = 0, nan_payload = 0;
+    long mis_rax470 = 0, mis_x470 = 0, nan470 = 0;
     for (long t = 0; t < n; t++) {
         double x = gen((int)(t % 5));
         Frame fr = { 0 }; memcpy(&fr.x0, &x, 8);
@@ -89,9 +98,24 @@ int main(int argc, char** argv) {
             if (isnan(gx) && isnan(nx)) { nan_both++; if (gxb != fr.xmm0) nan_payload++; }
             else mis_x++;
         }
+        double y = gen470();
+        Frame f2 = { 0 }; memcpy(&f2.x0, &y, 8);
+        call_xmm0(fn470, &f2);
+        unsigned g2 = kh_fn_180fdc470(y);
+        double gy = kh_xmm0_180fdc470;
+        u64 gyb; memcpy(&gyb, &gy, 8);
+        if ((u64)g2 != f2.rax) mis_rax470++;
+        if (gyb != f2.xmm0) {
+            double ny; memcpy(&ny, &f2.xmm0, 8);
+            if (isnan(gy) && isnan(ny)) nan470++;
+            else mis_x470++;
+        }
     }
-    printf("xmm0_check: trials %ld | rax mismatch %ld | xmm0 mismatch %ld | NaN both (bit differs %ld)\n",
+    printf("xmm0_check 660: trials %ld | rax mismatch %ld | xmm0 mismatch %ld | NaN both (bit differs %ld)\n",
            n, mis_rax, mis_x, nan_payload);
-    printf("kh_xmm0_check RESULT: %s\n", (mis_rax == 0 && mis_x == 0) ? "PASS" : "FAIL");
-    return (mis_rax == 0 && mis_x == 0) ? 0 : 1;
+    printf("xmm0_check 470: trials %ld | rax mismatch %ld | xmm0 mismatch %ld | NaN both %ld\n",
+           n, mis_rax470, mis_x470, nan470);
+    int ok = (mis_rax == 0 && mis_x == 0 && mis_rax470 == 0 && mis_x470 == 0);
+    printf("kh_xmm0_check RESULT: %s\n", ok ? "PASS" : "FAIL");
+    return ok ? 0 : 1;
 }
