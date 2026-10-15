@@ -8,7 +8,7 @@
 | クラス | SC 側ハーネス | smoke (fma 0/1, 各 20 case) | 残件 |
 |---|---|---|---|
 | VocalFilter (SC 0x1808e1f30) | `lift2/native/native_vocalfilter.c` 作成 | ERR 0・20 行 × 2 | KH 側との同一入力の差分 (C4〜C6) は未実施 |
-| Stereo (SC 0x1805ee2a0) | 未コミット (下記 §3) | ERR 20/20 (SIGSEGV) | 子 issue: P+0x9f88 の初期化を特定してから再実行 |
+| Stereo (SC 0x1805ee2a0) | 作成せず (`native_stereo.c` は試行のみで未コミット・§3) | ERR 20/20 (SIGSEGV) | 子 issue: P+0x9f88 の初期化を特定してから再実行 |
 | Resonator | 未作成 | 未実行 | 子 issue: SC 側 process の特定 (共有関数 0x1803df070 の呼出元照合) |
 
 ## §2. 材料の確認 (測定 commit は §5)
@@ -23,7 +23,7 @@
 
 - 試行: `native_stereo.c` (`native_filter.c` の方式を複製し VA だけ差替え) で `gen_sc_smoke_scen.py` の 20 case を実行。fma 0・1 とも 20/20 が ERR。`FA_DBG=1` で `sig=11 rip=0x1805ee0d1 addr=0x30`。
 - 原因の見立て (未確定): `0x1805ee0d1` は `mov rdx, [rcx+8]` で、直前の `mov rcx, [rcx+0x9f88]` が 0。`stereo.ll` の 2532・2933 行も同じ `P+0x9f88` を読む。Filter・VocalFilter の P には `+0x9f88` の初期化が無い (`pokes.txt` に無い)。Stereo 固有の初期化が必要と推定。
-- 本 PR では `native_stereo.c` をコミットしない (通らないハーネスを残さない)。子 issue が出発点にする。
+- 本 PR では `native_stereo.c` をコミットしない (通らないハーネスを残さない)。子 issue (#4046) が出発点にする。
 
 ## §4. Resonator: SC 側 process 未特定
 
