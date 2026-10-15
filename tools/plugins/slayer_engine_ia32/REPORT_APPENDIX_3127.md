@@ -3,12 +3,12 @@
 - 親 REPORT: `tools/plugins/slayer_engine_ia32/REPORT.md` §13 (結論 1 行)。 本付録が測定値の正本。 前提の harness は #1223 (`REPORT_APPENDIX_1223.md`)。
 - 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない。 本件は実行結果の突合と import の ABI モデル)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` (sha256 `84b64c43…de724a9`)。
-- 測定 commit: `c0898cc7a` (コードを変えた最後の commit)。 そこから HEAD までのコード差分は本付録と REPORT の文書のみ (§6 の鮮度証跡)。
+- 測定 commit: `a24895242` (コードを変えた最後の commit)。 そこから HEAD までのコード差分は本付録と REPORT の文書のみ (§6 の鮮度証跡)。
 
 ## 1. 結論と範囲
 
 - export `main` (0x10007ca0) を入口に加え、 native と wasm の eax・OBJ 領域 128 B・heap 先頭 64 B を bit 単位で突合した (448 / 448 一致)。 ネガコン (wasm 出力の 1 bit を壊す) は 447 / 448 で FAIL を検出。
-- **範囲は縮めた**: main の callback が **0 を返す経路のみ**。 callback が非 0 を返すと main は定数 `0x8298d8` を `f_10009f64` に渡す。 これは PE の外の host オブジェクトで、 0 埋めでは連結 list の null 参照になり native が SIGSEGV する (wasm は linear memory の 0 を読んで続行するため分岐する)。 この経路は未モデル化で、 子 [PLG-G2-38] に移した (§7)。
+- **範囲は縮めた**: main の callback が **0 を返す経路のみ**。 callback が非 0 を返すと main は定数 `0x8298d8` を `f_10009f64` に渡す。 これは PE の外の host オブジェクトで、 0 埋めでは連結 list の null 参照になり native が SIGSEGV する (wasm は linear memory の 0 を読んで続行するため分岐する)。 この経路は未モデル化で、 子 [PLG-G2-38] #3917 に移した (§7)。
 - issue 本文の「CRT import 38 種」は pass1 (`REPORT_APPENDIX_1098.md` §2) の数。 現在の lift (#2814 の pass2 後) は **41 件**。 いずれも KERNEL32.dll の import (PE の import directory に CRT の DLL は無い)。 §3 の表は 41 件すべて。
 
 ## 2. 入口と方式
@@ -21,7 +21,7 @@
 | native import | `native_entry.c` が PE の import directory を読み、 IAT slot を ia32 model の stdcall stub に書き換える。 表に無い名前は `n_missing` (exit 9 = fail-fast) |
 | wasm import | `rt32_glue.c` に ia32 規約 (引数は `esp+4〜`、 callee が pop) の `imp_*` を置く。 表に無い名前は x64c の weak stub (`ott_missing_import` で abort = fail-fast) |
 | 規約の衝突 | `rt/ott_cpu.c` の `imp_HeapAlloc`・`imp_HeapFree`・`imp_GetLastError`・`imp_SetLastError`・`imp_EnterCriticalSection`・`imp_LeaveCriticalSection` は x64 規約 (`R[RCX]`・`IMP_RET` = +8)。 ia32 では誤る。 wasm の link を `rt32_glue.c` 先・`--allow-multiple-definition` にして先勝ちで上書きする (`ott_cpu.c` は変更しない) |
-| 共有の状態 | 毎行 reset: heap 先頭 0x10800000 (bump・8 B 境界・ヘッダ 8 B に size)、 host 領域 0x00828000〜0x00838000 (0 埋め)、 LastError・TLS 64 slot |
+| 共有の状態 | 毎行 reset: heap 先頭 4 KiB (0x10800000〜、 0 埋め)・bump の先頭 0x10800000 (bump・8 B 境界・ヘッダ 8 B に size)、 host 領域 0x00828000〜0x00838000 (0 埋め)、 LastError・TLS 64 slot |
 | 出力 | `idx va eax mem(OBJ 128 B) heap(64 B)`。 native と wasm の書式を揃えた |
 | PE ヘッダ | `image.bin` に SizeOfHeaders 分のヘッダを敷く (import directory を native が読むため。 #3127 で追加) |
 
@@ -77,19 +77,19 @@
 - fail-fast の 24 件は、 本付録の入口では呼ばれない。 呼ばれた時点で止まることは設計 (weak stub・`n_missing`) による。 **実行での検証は未実施**。
 - stub の値はすべて Win32 の実挙動ではなく、 両側で揃えた仮定。 この突合が検証するのは「同じ仮定の下で lift と ia32 規約が一致する」ことだけ。
 
-## 4. 実測 (測定 commit `c0898cc7a`・n=3)
+## 4. 実測 (測定 commit `a24895242`・n=3)
 
 | 項目 | 値 |
 |---|---|
 | 突合 (`python3 diff_entry.py`) | `[compare] PASS: 448 / 448 件が bit 一致、不一致 0 件`・`[diff_entry] PASS`・exit 0 (3 回とも同一) |
-| 非自明性 | native 実行で OBJ 領域が変わった行 256 / 448 (leaf 4 本の 256 行。 main・heap・LeaveCS の行は OBJ を変えない)。 heap 先頭 64 B は main 以外の行で非 0 (例: `1000e1b7` は `eax=10800008` を返し、 heap に書かれる) |
+| 非自明性 | native 実行で OBJ 領域が変わった行 256 / 448 (leaf 4 本の 256 行。 main・heap・LeaveCS の行は OBJ を変えない)。 heap 先頭 64 B が非 0 なのは `1000e1b7` の 64 行のみ (毎行の reset で heap 先頭 4 KiB を 0 に戻すため、 他の入口の行に前行の残りは出ない)。 `1000e1b7` は `eax=10800008` などの heap アドレスを返す |
 | 戻り値の内訳 | `10007ca0` (main) は全 64 行で eax=0 (callback 0 経路)。 `1000e1b7` は eax が heap のアドレス (`10800008`・`1080001c`・…) |
-| ビルド (min–max) | native build 0.06 s、 wasm emcc 5.75–5.77 s |
-| 実行 (min–max) | native 0.033 s、 wasm (node) 0.056–0.060 s |
-| load1 (run 直前、 3 回) | 0.31・0.41・0.46 |
+| ビルド (min–max) | native build 0.06 s、 wasm emcc 5.70–5.79 s |
+| 実行 (min–max) | native 0.034–0.048 s、 wasm (node) 0.058–0.076 s |
+| load1 (run 直前、 3 回) | 0.39・0.44・0.48 |
 | 件数 | 入口 7 本 × 64 = 448 行 (期待値と一致) |
 
-## 5. ネガティブコントロール (測定 commit `c0898cc7a`)
+## 5. ネガティブコントロール (測定 commit `a24895242`)
 
 - `python3 diff_entry.py --nega`: wasm 出力の 1 行目 (leaf `10001b40`) の eax の 1 bit を壊す → `[compare] FAIL: 447 / 448 件が bit 一致、不一致 1 件` → `[nega] 1 bit 壊した出力を検出 (FAIL, exit 1)。 ネガコン OK`・exit 0。
 - ネガコンは leaf の 1 行で行う (既存の仕組みのまま)。 import を通る行でも同じ判定器を通るため、 判定器の効き自体は変わらない。
@@ -104,14 +104,14 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py    # 突合 (exit 0)
 python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 ```
 
-- 鮮度: 測定後に変えたのは本付録と REPORT の文書のみ。 `git diff c0898cc7a HEAD -- tools/plugins/slayer_engine_ia32 tools/ott/rt tools/ott/lift` の出力は 0 行 (PR 本文の『検証 HEAD』欄が正)。
+- 鮮度: 測定後に変えたのは本付録と REPORT の文書のみ。 `git diff a24895242 HEAD -- tools/plugins/slayer_engine_ia32 tools/ott/rt tools/ott/lift` の出力は 0 行 (PR 本文の『検証 HEAD』欄が正)。
 - 補足: `lift_text.py` の結果は `imports 41`・`functions 472` (pass2)。 pass1 の `38` は REPORT_APPENDIX_1098 §2 の値。
 
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| export main の callback 非 0 経路 (`f_10009f64` → `f_1000a402`。 定数 `0x8298d8` は PE 外の host オブジェクト) | main の CRT 初期化・残りの import の経路が未突合。 0 埋めでは native が null 参照で SIGSEGV するため、 host オブジェクトのモデル化が要る | [PLG-G2-38] 子 (本 PR で起票) |
+| export main の callback 非 0 経路 (`f_10009f64` → `f_1000a402`。 定数 `0x8298d8` は PE 外の host オブジェクト) | main の CRT 初期化・残りの import の経路が未突合。 0 埋めでは native が null 参照で SIGSEGV するため、 host オブジェクトのモデル化が要る | [PLG-G2-38] #3917 (本 PR で起票) |
 | `0x100106a5` (SEH: `mov eax, fs:[0]`・`mov fs:[0], esp`) を通る経路 (`0x1000d791` 等) | native に fs 基底が無く fs:[0] への書込みで落ちる。 wasm は `ott_teb_blk` (0 埋め)。 本入口からは外した | [PLG-G2-37] #3905 (fs: TEB を含む 8 関数) |
 | fail-fast の 24 import の実行検証 | 呼ばれた時の止まり方を実行で確認していない | 本 PR の範囲外 (入口が要求した時に実装・検証する) |
 | 間接 call 先 (`ott_dispatch`)・sahf の AF・fs: TEB の 0 埋め | #1223 から継続 (leaf 外の実行時の論点) | [PLG-G2-27] #3128 |
