@@ -14,7 +14,7 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | 基底 `origin/main` da6ff541b。コード変更は `tools/flelift/boot/wval_lift.py`・`wval_measure.sh`・`wval_scan_3868.py` のみ (rt/・x64c.py・lift/build 経路は不変)。HEAD の測定 commit は最終節 H |
+| 測定 commit | 基底 `origin/main` e3f55dc40 (rebase 後の基底)。コード変更は `tools/flelift/boot/wval_lift.py`・`wval_measure.sh`・`wval_scan_3868.py` のみ (rt/・x64c.py・lift/build 経路は不変)。HEAD の測定 commit は最終節 H |
 | 既定 route | `FL_WIN64_DIR=<fl-win64> FLE_BOOT_WORK=<work> FLE_BOOT_TAG=def FLE_BOOT_RUNS=default bash tools/flelift/boot/fle6_measure.sh` → units_run **209** / stopped_at 209 / `boot_threw: exit` / getmem **1891** / freemem **776** / ipp_ok なし (exit 1) |
 | 診断 route (ベースライン) | `FLE_EXTRA_ROOTS= FLE_BOOT_RUNS=diag_shim fle6_measure.sh` → units_run **209** / `unlifted 0x6bbc20` / getmem 2314 / freemem 1200 |
 | 監視版 (診断 route) | `wval_measure.sh` → units_run **209** / 停止点 同じ / getmem 2314 / freemem 1200 (差 0) |
@@ -58,9 +58,9 @@ KPI (起動に関わる PR): FLEngine 起動の units_run は **前 209 / 後 20
 
 ## H. 測定 commit と差分
 
-- 測定 commit (コードを変えた最後の commit): `a29a998f8`。以後の commit は REPORT・DOC_MAP のみ。
-- 既定 route の監視版 (表 B の行) は、ST8/ST16 の値比較を入れる前の `wval_lift.py` で測った (store `0x6bc1af` の 8 byte 一致の結果は同じ。narrow store の件数は未測定)。診断 route の全表は `a29a998f8` で再測定済み。
-- `git diff a29a998f8 HEAD -- tools/flelift/boot/wval_lift.py tools/flelift/boot/wval_measure.sh tools/flelift/boot/wval_scan_3868.py` は出力なし (差分 0)。
+- 測定 commit (コードを変えた最後の commit): `ea21f4f5b`。以後の commit は REPORT・DOC_MAP のみ。
+- 既定 route の監視版 (表 B の行) は、ST8/ST16 の値比較を入れる前の `wval_lift.py` で測った (store `0x6bc1af` の 8 byte 一致の結果は同じ。narrow store の件数は未測定)。診断 route の全表は `ea21f4f5b` で再測定済み。
+- `git diff ea21f4f5b HEAD -- tools/flelift/boot/wval_lift.py tools/flelift/boot/wval_measure.sh tools/flelift/boot/wval_scan_3868.py` は出力なし (差分 0)。
 - 1 run・n=1。決定的な boot のため同一 commit の再実行は同値と見る。
 
 ## G. 再現
