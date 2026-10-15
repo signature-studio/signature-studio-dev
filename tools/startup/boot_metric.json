@@ -612,13 +612,13 @@
           "file": "tools/flelift/boot/REPORT.md",
           "locator": "md:### 4-1. /^\\| plain \\| [^|]*\\| \\*\\*209 dispatch\\*\\* / oob \\(`f_([0-9a-f]+)`\\)/",
           "measured_commit": null,
-          "file_last_commit": "e3614ab3"
+          "file_last_commit": "432fe870"
         },
         {
           "file": "tools/flelift/boot",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "e3614ab3"
+          "file_last_commit": "432fe870"
         },
         {
           "file": "tools/startup/STARTUP.md",
