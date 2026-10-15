@@ -130,7 +130,7 @@ export function createMockEngine() {
     launchPages: 0,
     uiClosing: false, uiTimeDispMin: false, uiStartOnInput: false, uiLoopRec: false, uiStepEdit: false, uiBrowserAutoHide: false, uiSnapMode: 0,
     undoPos: 0, undoCount: 0, undoLast: 0, safeEdit: true, projTitle: "", projAuthor: "", projGenre: "",
-    selStart: -1, selEnd: -1,
+    selStart: -1, selEnd: -1, liveAnchor: -1,
     arrTime: 0,
     numerator: 4, denominator: 4,
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
@@ -154,6 +154,7 @@ export function createMockEngine() {
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
     prScripts: {},
     midiOut: [],
+    idleElapsed: 0, midiOutAssigned: false, masterSync: false,
     // PY-227 (#3655): device 割当 (false で -7)・送出先 (false で -6)。既定は両方あり (provider/fl_engine.c と同じ)
     devAssigned: true,
     linkAssigned: true,
@@ -216,6 +217,12 @@ export function createMockEngine() {
   const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
   // PY-144 (#3043): PE 0xe43d30 の書込み規則。start=x・end=y を置き、x==y なら end=-1、x>y なら入れ替える。selectionClear は (-1,-1) で同じ経路
   const selSet = (x, y) => { st.selStart = x; st.selEnd = y; if (x === y) st.selEnd = -1; else if (x > y) { st.selStart = y; st.selEnd = x; } };
+  // PY-254 (#3796): PE 0xe43ff0 (liveSelection) の a≠0x7fffffff 経路。b==1 なら anchor (≥0 かつ a と異なる) から a までを選択し anchor=-1。それ以外は選択を (-1,-1)。b!=1 は anchor=a。anchor の初期値 -1 は仮置き
+  const liveSel = (a, b) => {
+    const flag = b === 1, anc = st.liveAnchor;
+    if (flag && anc >= 0 && anc !== a) selSet(anc, a); else selSet(-1, -1);
+    st.liveAnchor = flag ? -1 : a;
+  };
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
@@ -492,7 +499,7 @@ export function createMockEngine() {
     "arrangement.currentTime": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return st.arrTime; },
     "arrangement.selectionClear": (...a) => { arity(a, 0, 0); selSet(-1, -1); },
     "arrangement.selectionSet": (...a) => { arity(a, 2, 5); const x = argI(a, 0, 0), y = argI(a, 1, 0); for (let i = 2; i < 5; i++) argI(a, i, 0); selSet(x, y); },
-    "arrangement.liveSelection": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
+    "arrangement.liveSelection": (...a) => { arity(a, 2, 2); liveSel(argI(a, 0, 0), argI(a, 1, 0)); },
     "arrangement.addAutoTimeMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); str(a[1]); },
     "arrangement.jumpToMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
     // PY-143 (#3041): PE 0xd78030 (getMarkerName) と 0xd785a0 (currentTimeHint) の呼出し構造と戻り str は REPORT_PY143 で確定。
@@ -554,6 +561,16 @@ export function createMockEngine() {
       const word = ch >= 0 ? (((ch & 0xf) | msg) + (d1 << 8) + (d2 << 16) + (a4 << 24)) >>> 0 : msg >>> 0;
       st.midiOut.push({ api: "midiOutMsg", args: a, word });
     },
+    // PY-206 (#3494): PE 0xd75f40・0xd75f80・0xd75fc0 は assigned 機器 (obj.+0x50) の vtbl 先を呼び、戻り status 0 で None を返す (REPORT_PY206)。vtbl 先の効果は未読のため状態を持たない
+    "device.createRefreshThread": (...a) => { arity(a, 0, 0); },
+    "device.destroyRefreshThread": (...a) => { arity(a, 0, 0); },
+    "device.fullRefresh": (...a) => { arity(a, 0, 0); },
+    // PY-206: PE 0xd76980 (float32 obj.+0x3d0)・0xd75a40 (bool)・0xd76b80 (bool byte +0x48) の状態読出し。初期値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "device.getIdleElapsed": (...a) => { arity(a, 0, 0); return st.idleElapsed; },
+    "device.isMidiOutAssigned": (...a) => { arity(a, 0, 0); return st.midiOutAssigned; },
+    "device.getMasterSync": (...a) => { arity(a, 0, 0); return st.masterSync; },
+    // PY-206: PE 0xd76a60 の setter callback 0xd769c0 は obj.+0x50 の機器の [+0x7c]+0x48 に (value == 1) を書く (getMasterSync と同じ byte)。述語 P は真と仮定 (REPORT_PY125 と同じ仮定)
+    "device.setMasterSync": (...a) => { arity(a, 1, 1); st.masterSync = argI(a, 0, 0) === 1; },
     ...createIlmcp(st, {
       RANGE,
       INVALID: (m) => new FlError(m, 1),
