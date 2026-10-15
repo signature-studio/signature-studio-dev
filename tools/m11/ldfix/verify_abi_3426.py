@@ -297,8 +297,8 @@ def negctl_fixed(src, m):
 
 
 C412 = [
-    'i32 0, i32 0, i64 %arg2, i64 %ldfx4522_r9a, i64 %14',
-    'i32 %20, i32 %18, i64 %arg2, i64 %ldfx4522_r9b, i64 %14',
+    'i32 0, i32 0, i64 0, i64 0, i64 %14',
+    'i32 %20, i32 %18, i64 0, i64 0, i64 %14',
     'i32 %c0, i32 %c1, i64 %a2, i64 %a3, i64 %a4',
 ]
 HEAD412 = 'define weak i64 @function_412fc0(i32 %arg1, i32 %arg2, i64 %arg3, i64 %arg4, i64 %arg5) local_unnamed_addr {'
