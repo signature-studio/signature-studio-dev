@@ -47,10 +47,10 @@ null 経路 (`dec_label_pc_c409ec.critedge`) の `-24` は `*arg4 == 0` の分�
 
 ## 5. e2e 実測 (`ldfix_e2e.sh`)
 
-測定 commit: **`4e6478372`** (コードを変えた最後の commit)。
+測定 commit: **`408ca6232`** (コードを変えた最後の commit。docstring のみの変更で、挙動は `4e6478372` と同一)。
 
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh`
-- 所要 **38.6 s**・rc=0。load average 実行前 `0.26 0.33 0.26`、実行後 `0.77 0.45 0.30` (4 vCPU)。
+- 所要 **39.1 s**・rc=0。load average 実行前 `0.08 0.29 0.26`、実行後 `0.49 0.37 0.29` (4 vCPU)。(`4e6478372` での測定は 38.6 s)
 - step 1f の出力: `fix_site_3418: machine checks 13 ok (2 sites), IR edits 5 applied`。
 - judge: `STAGE4_JUDGE {"pass": true, "stage_base": 4, "stage_fix": 4, "getmem_base": 16, "getmem_fix": 16, "survey_ok_base": 136, "survey_ok_fix": 136}` → **PASS**。
 - stage4 の wasm_size: base 6025478 → fix 6025723 (+245 B)。
@@ -63,7 +63,7 @@ null 経路 (`dec_label_pc_c409ec.critedge`) の `-24` は `*arg4 == 0` の分�
 - 範囲内: 2 箇所の IR 修復・機械照合 13 件・NC 3 種・step 1f の配線・ldfix_e2e の完走 (4e6478372) と 1f の A/B。
 - 範囲外: 0xc40770 の分類器上の `MISMATCH` (分類器の対応規則。#2555 の定義)、stage4 の `memory access out of bounds` の原因 (#942 系、従来どおり)。
 - `--batch` (liftdiff closure 全数) は未実行。
-- 測定 commit `4e6478372` から HEAD までのコード差分 (`git diff 4e6478372 HEAD -- tools/m11/ldfix ':(exclude)*.md'`) は **0 行**。
+- 測定 commit `408ca6232` から HEAD までのコード差分 (`git diff 4e6478372 HEAD -- tools/m11/ldfix ':(exclude)*.md'`) は **0 行**。
 
 ## 7. 再現
 
