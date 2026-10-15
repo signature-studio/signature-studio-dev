@@ -154,6 +154,7 @@ export function createMockEngine() {
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
     prScripts: {},
     midiOut: [],
+    idleElapsed: 0, midiOutAssigned: false, masterSync: false,
     // PY-227 (#3655): device 割当 (false で -7)・送出先 (false で -6)。既定は両方あり (provider/fl_engine.c と同じ)
     devAssigned: true,
     linkAssigned: true,
@@ -556,6 +557,16 @@ export function createMockEngine() {
     },
     // PY-215 (#3568): PE 0xd75d30 と同じ (-1 → -1、連動表が空の index ≥ 0 → None)。表の供給元は仮置き (空)。device・link の割当は見ない
     "device.getLinkedChannel": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) return -1; return undefined; },
+    // PY-206 (#3494): PE 0xd75f40・0xd75f80・0xd75fc0 は assigned 機器 (obj.+0x50) の vtbl 先を呼び、戻り status 0 で None を返す (REPORT_PY206)。vtbl 先の効果は未読のため状態を持たない
+    "device.createRefreshThread": (...a) => { arity(a, 0, 0); },
+    "device.destroyRefreshThread": (...a) => { arity(a, 0, 0); },
+    "device.fullRefresh": (...a) => { arity(a, 0, 0); },
+    // PY-206: PE 0xd76980 (float32 obj.+0x3d0)・0xd75a40 (bool)・0xd76b80 (bool byte +0x48) の状態読出し。初期値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "device.getIdleElapsed": (...a) => { arity(a, 0, 0); return st.idleElapsed; },
+    "device.isMidiOutAssigned": (...a) => { arity(a, 0, 0); return st.midiOutAssigned; },
+    "device.getMasterSync": (...a) => { arity(a, 0, 0); return st.masterSync; },
+    // PY-206: PE 0xd76a60 の setter callback 0xd769c0 は obj.+0x50 の機器の [+0x7c]+0x48 に (value == 1) を書く (getMasterSync と同じ byte)。述語 P は真と仮定 (REPORT_PY125 と同じ仮定)
+    "device.setMasterSync": (...a) => { arity(a, 1, 1); st.masterSync = argI(a, 0, 0) === 1; },
     ...createIlmcp(st, {
       RANGE,
       INVALID: (m) => new FlError(m, 1),
