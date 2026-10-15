@@ -623,6 +623,7 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2814.md` | ~106 | Slayer_Engine.dll (block22434) の未被覆 `.text` 区間の 3 類分類 (#2814)・(b) 5 区間の追加 lift・`std`/`shld`/DF の試験・判定保留 2 区間。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/GAP_CLASSES_2814.md` | ~243 | 未被覆 `.text` 239 区間の分類表 (自動生成: `gap_classify.py --json ... --md`)。 人手編集禁止 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1099.md` | 116 | x87 subset の ia32 lowering (#1099、測定 commit `ce0f0872`)。 実 x87 との差分試験 (`x87_diff.py`)・ネガコン・lift の before/after・x64 回帰。 測定値の正本 |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2966.md` | ~96 | x87 の整数・比較・状態・定数・丸め命令の ia32 lowering (#2966 PLG-G2-23 の部分達成、測定 commit `f29c59648`)。 差分試験 (`x87_diff.py` の op 表・RC)・定数の寄与・lift の before/after・x64 回帰。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1223.md` | ~54 | Slayer_Engine.dll (block22434) の native vs wasm 差分試験 (#1223 PLG-G2-11): leaf 関数 4 本の eax と OBJ 領域の bit 突合・ネガコン。 測定値の正本 (REPORT §13 の付録) |
 | `tools/plugins/slayer_engine_ia32/MARSHAL.md` | ~80 | 殻 (x64) ↔ Slayer_Engine.dll (ia32) の VST2 構造体 marshal 表の仕様 (#674 受入 3)。測定値は REPORT.md §9 |
 | `tools/shared/REPORT.md` | ~212 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC。win freetype.dll = 2.4.10 確定 (#145, §3.1) |
