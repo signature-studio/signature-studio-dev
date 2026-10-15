@@ -95,7 +95,7 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 |---|---|---|
 | 異なる plugin (OTT + Fresh Air) を 1 Memory に畳む際の emcc 静的データ・heap の衝突と、node での署名一致 (本計測は同一 OTT の M 個 = 同一 binary の別 state)。Fresh Air は lift 時に画像窓を分けた (§8) | 畳み込みは未検証。異なる plugin を同居させる場合は未検証 | #3680 [PERF-P23] (#2963 から分割) |
 | AudioWorklet 上の M=130 の instantiate・署名一致 | 解消 (本 PR): §7 で 130/130 一致・instantiate 失敗なし | なし (§7 で解消) |
-| AudioWorklet 上の instantiate 上限 (M=130 を超える M) | 成功最大 M=145、失敗最小 M=146 (無応答、各 3 run)。原因は未切り分け (§9) | #3959 [PERF-P25] (親 #2988) |
+| AudioWorklet 上の instantiate 上限 (M=130 を超える M) | 測定点の範囲で成功最大 M=145、失敗最小 M=146 (無応答、各 3 run)。147 以上と M=2〜129・131〜144 は未測で単調性は未確認。原因は未切り分け (§9) | #3959 [PERF-P25] (親 #2988) |
 | setup 時間 (M=130 で 790〜999 ms、Dedicated Worker・§3) | 起動時の一括 instantiate/setup の遅延。pre-warm の設計が必要 | REPORT_P8 §11 (pre-warm) と同じ経路 |
 
 ## 5. 再現
@@ -218,18 +218,18 @@ bash tools/perf/p20/fa_negctl.sh                                       # NC-2
 
 受入条件の「§7 に追記」は、main の §8 が PERF-P20 に使われたため本節 (§9) に置いた。
 
-**結論**: AudioWorklet 上で 1 instance (Memory 1 本) に畳めた OTT obj は **M=145 まで** (初期化・署名とも 3 run 全て成功、署名 145/145 一致)。**M=146 は 3 run 全て無応答** (`Error: eval timeout`、30 s。1 run は 150 s でも戻らない)。原因は未切り分け (子 #3959)。
+**結論**: AudioWorklet 上で 1 instance (Memory 1 本) に畳んだ OTT obj は、測定点の範囲で **M=145 が成功・M=146 が失敗** (初期化・署名とも M=145 は 3 run 全て成功、署名 145/145 一致)。**M=146 は 3 run 全て無応答** (`Error: eval timeout`、30 s。1 run は 150 s でも戻らない)。単調性は未確認 (147 以上と M=2〜129・131〜144 は未測)。原因は未切り分け (子 #3959)。
 
 | 項目 | 結果 (Chrome 154.0.8037.97・EPYC 7763) |
 |---|---|
-| 成功最大 M / 失敗最小 M | 145 (3/3 成功) / 146 (3/3 無応答) |
+| 成功最大 M / 失敗最小 M | 145 (3/3 成功) / 146 (3/3 無応答)。定義: 測定点 M ∈ {1, 130, 145, 146, 148, 152, 160} の中で成功した最大 M・失敗した最小 M (測定点外は含まない) |
 | 二分探索 (各点 3 run) | 145 成功 → 152・148・146 失敗。M=160 も 3/3 失敗。147・149〜151・153〜159 は未測 |
 | 署名 | M=145: 145/145 一致 (`6b1696f0`、3 run)。M=130: 130/130 一致 (3 run) |
-| setup_ms | M=130: 774〜797 ms (3 値)。M=145: 799〜868 ms (6 値。初期化 3 + 署名 3) |
+| setup_ms | M=130: 756〜802 ms (6 値。署名の run 774・781・797 と、同じ setup ループのネガティブ制御の run 756・789・802)。M=145: 799〜868 ms (6 値。初期化 3 + 署名 3) |
 | ネガティブコントロール | obj 0 の入力振幅を 0.5→0.25。M=1: 0/1 一致、M=130: 129/130 一致 (3 run とも `sig_ok=false`) |
-| 旧測定 (Chrome 155.0.8059.39・EPYC 9V45) | 成功 M=1 (setup 17〜22 ms)・M=130 (3 run、setup 446〜495 ms)、署名 130/130、ネガ M=130 129/130。M=160・176・192・256・288・320・352 は 3 run とも無応答 (timeout 値は未記録) |
+| 旧測定 (Chrome 155.0.8059.39・EPYC 9V45) | 成功 M=1 (setup 17〜22 ms)・M=130 (3 run、setup 446〜495 ms)、署名 130/130、ネガ M=130 129/130。M=160・176・192・256・288・320・352 は 3 run とも無応答 (timeout 値は未記録)。生データ: `results/worklet_init_limit.jsonl`・`worklet_sig.jsonl`・`worklet_negctl.jsonl` (測定 `e4d2d1799`)、HEAD 再現 `rerun_20261015_worklet_{init,negctl,sig}.jsonl` (検証 HEAD `d064d219d`。`git diff --stat e4d2d1799 d064d219d -- tools/perf/p15` は 3 ファイル 5 行の追加のみ) |
 
-- **測定 commit**: `c412b8937` (`chrome_worklet.mjs` に `timeout_ms` を行へ記録。測定コードの変更はこの commit だけ)。生データ: `results/worklet_range_{init,sig,negctl,long}.jsonl` (初期化 15 行・署名 6 行・ネガ 6 行・M=146 の 150 s 試行 1 行)。
+- **測定 commit**: `c412b8937` (`chrome_worklet.mjs` に `timeout_ms` を行へ記録。測定コードの変更はこの commit だけ)。生データ: `results/worklet_range_{init,sig,negctl,long}.jsonl` (初期化 15 行・署名 6 行・ネガ 6 行・M=146 の 150 s 試行 1 行)。測定 commit から検証 HEAD までの差分 (`git diff --stat c412b8937 HEAD -- tools/perf/p15 tools/perf/harness tools/ott`) は `results/` の 4 ファイル・28 行の追加のみ。
 - **環境**: Chrome 154.0.8037.97 (headless=new)、CPU AMD EPYC 7763 (4 vCPU)、素材 `work-m6-ott` (`tools/ott/work/lift/ottl.{wasm,cjs}`、gitignore)。旧測定と版・CPU が違うため、setup 値は直接比べない。
 - **setup_ms の定義**: `shared_worklet.js` の `t0` (instantiate・`__wasm_call_ctors`・`ott_data_install` の後) から、全 obj の ctor・setParam 19 個・resume・入力設定までの所要 (`Date.now()`、1 ms 分解能)。
 - **無応答**: 処理が戻らず例外も届かない。150 s でも戻らない (M=146) ので、遅いだけの失敗ではない。obj 基底 `0x31000000 + i×0x40000` が IN0 (`0x34000000`) に届くのは M≈192 で、146 の境界は配置の境界ではない。原因は未確認 (#3959)。
