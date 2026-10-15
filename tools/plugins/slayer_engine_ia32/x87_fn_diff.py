@@ -42,6 +42,10 @@ TARGETS = [
     # 引数の型は関数ごとに分からないので、a0 は float、a1..a5 は 0..15 の整数 (gen 'mixed')。 行数は N_PER_MIXED。
     # 1000b3a2・10001290 は OBJ 窓もスタックも書かず ST(0) だけを返すため、main の非自明性の判定 (effect) を通らず、範囲から外した (REPORT_APPENDIX_3715.md §5)。
     {'va': 0x10005D20, 'name': 'fn_10005d20', 'gen': 'mixed'},
+    # #4080 (PLG-G2-43): 独立入口 (direct call 先) のうち突合が通る 2 本。 thiscall (ecx = this、float a0..a2、ret 0xc)。
+    # 100052d0・10005550 の float64 差は 1 ulp (f80→f64。 D28)。 float32 と構造は全行一致。
+    {'va': 0x100052D0, 'name': 'fn_100052d0', 'gen': 'state_update'},
+    {'va': 0x10005550, 'name': 'fn_10005550', 'gen': 'state_update'},
 ]
 # ebp = 0x10F00000 - 0x1000 (x87_fn_native.c・x87_fn_glue.c)。 窓は ebp-0x100 から ebp+0xE0 (旧 ebp 0x10EFFF00 と同じ相対位置)。
 STK_LO = 0x10F00000 - 0x1100
@@ -51,6 +55,10 @@ PROBE = [
     {'va': 0x10009EB5, 'name': 'fn_10009eb5', 'gen': 'generic'},
     {'va': 0x1000B526, 'name': 'fn_1000b526', 'gen': 'generic'},
     {'va': 0x1000BF60, 'name': 'fn_1000bf60', 'gen': 'generic'},
+    # #4080: double 引数の 2 本 (cdecl・a0 = double)。 1000bf1e は OBJ 窓を書かないので effect 判定が 0 になる (構造は全行一致・float 全行一致)。
+    # 10009bc4 は ST(0) が全行で不一致 (nan-num 4000)。 原因未確定 (付録 §2)。
+    {'va': 0x1000BF1E, 'name': 'fn_1000bf1e', 'gen': 'double1'},
+    {'va': 0x10009BC4, 'name': 'fn_10009bc4', 'gen': 'double1'},
 ]
 if os.environ.get('X87_PROBE'):
     TARGETS = TARGETS + PROBE
@@ -87,6 +95,9 @@ def gen_rows(seed, n):
                 a = [f32(rng.uniform(-1000, 1000)), rng.randrange(16), 0, 0, 0, 0]
             elif t['gen'] == 'mixed':
                 a = [f32(rng.uniform(-100, 100))] + [rng.randrange(16) for _ in range(5)]
+            elif t['gen'] == 'double1':
+                d = struct.unpack('<Q', struct.pack('<d', rng.uniform(-100, 100)))[0]
+                a = [d & 0xFFFFFFFF, d >> 32, rng.randrange(16), 0, 0, 0]
             else:
                 a = [f32(rng.uniform(-100, 100)) for _ in range(5)] + [0]
             line = '%08x %08x %s %s' % (t['va'], OBJ, ' '.join('%08x' % v for v in a), init.hex())
@@ -120,6 +131,9 @@ def gen_special_rows(seed, n):
             sp = SPECIAL_F32[i % len(SPECIAL_F32)]
             if t['gen'] == 'idx_store':
                 a = [sp, rng.randrange(16), 0, 0, 0, 0]
+            elif t['gen'] == 'double1':
+                d = struct.unpack('<Q', struct.pack('<d', rng.uniform(-100, 100)))[0]
+                a = [d & 0xFFFFFFFF, d >> 32, rng.randrange(16), 0, 0, 0]
             else:
                 a = [sp] + [rng.choice(SPECIAL_F32) if rng.random() < 0.5 else f32(rng.uniform(-100, 100))
                             for _ in range(2)] + [f32(rng.uniform(-100, 100)) for _ in range(2)] + [0]
