@@ -1,11 +1,11 @@
 entry_call   blocks=844    call_hit=844    jmp_hit=93     ptr_hit=66    
 entry_rip    blocks=464    call_hit=0      jmp_hit=0      ptr_hit=8     
-branch_only  blocks=44     call_hit=0      jmp_hit=44     ptr_hit=5     
-unref        blocks=15102  call_hit=7      jmp_hit=5      ptr_hit=0     
+branch_only  blocks=49     call_hit=1      jmp_hit=49     ptr_hit=5     
+unref        blocks=36     call_hit=5      jmp_hit=0      ptr_hit=0     
 data         blocks=5      call_hit=0      jmp_hit=0      ptr_hit=5     
 ALL          blocks=20467 call_hit=851 jmp_hit=142 ptr_hit=4092
 NEG_CONTROL  (start+1) call_hit=1 jmp_hit=0 ptr_hit=0
-unref/data blocks with ANY byte-scan or ptr hit: 16
+unref/data blocks with ANY byte-scan or ptr hit: 10
 unref blocks hit only by data pointer: 3928 bytes=83235
   of which in a consecutive pointer run (table-like, >=2 adjacent qwords): 3928 bytes=83235
    0x180002e60 21
