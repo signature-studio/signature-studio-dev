@@ -6,7 +6,7 @@
 
 - PY-119 で保留した ui の setter 4 件のうち、**3 件** (`ui.setHintMsg` / `ui.setFocused` / `ui.setSnapMode`) は呼出し経路 (書込み先の呼出し・引数の変換・戻り型) を PE で確定し、mock と C provider に実装した。実装の戻り値は None。**状態は持たない (仮置き)**。書込んだ値を後で読み出す経路は未確定のため、setter は値を記録しない。
 - 残り **1 件** `ui.snapMode` は保留 (`0xfdd2c0` の意味が未同定)。実装しない。
-- mock と C の差分は 0 (`tests/ui_state_diff.mjs` calls 102・diffs 0・PASS、検証 HEAD `5e92b8104`)。`tests/provider_check.mjs` は functions 435・実装 199 / 未実装 236 (main 取り込み後の `5e92b8104`。本 PR の pe129 3 件に、main 側の pe133・pe235・pe136・pe128・pe206・pe215 などの判定行を残した)。`FL_ENGINE=wasm tests/all_tools.mjs` は 48/48 ok を維持 (host_calls 37,425)。
+- mock と C の差分は 0 (`tests/ui_state_diff.mjs` calls 102・diffs 0・PASS、検証 HEAD `e4a7903b1`)。`tests/provider_check.mjs` は functions 435・実装 206 / 未実装 229 (main 取り込み後の `e4a7903b1`。本 PR の pe129 3 件に、main 側の pe133・pe235・pe136・pe135・pe128・pe206・pe215 などの判定行を残した)。`FL_ENGINE=wasm tests/all_tools.mjs` は 48/48 ok を維持 (host_calls 37,425)。
 - 未確定の点 (setter の状態モデル・setSnapMode の範囲外・snapMode) は子 issue **#3719 ([PY-242])** に分けた。
 
 ## 手段
@@ -39,41 +39,43 @@
 
 ## 検証
 
-測定 commit: `5e92b8104` (tools/python のコードを変えた最後の commit。origin/main `dd3b0a062` の取り込み merge。競合は `tests/provider_check.mjs` の 1 件)。検証 HEAD は `5e92b8104` で、以下の全件をこの HEAD で再実行した。ネガティブコントロールも `5e92b8104` で再実行した (`host/fl_mock.mjs` は main 取り込みで変わっていたため)。
+測定 commit: `e4a7903b1` (tools/python のコードを変えた最後の commit。origin/main `57c01b91b` の取り込み merge `9f3779cc7` と件数の修正 `e4a7903b1`。競合は `tests/provider_check.mjs` の 1 件ずつ)。検証 HEAD は `e4a7903b1` で、以下の全件をこの HEAD で再実行した (CPython のみ例外: 下の注)。ネガティブコントロールも `e4a7903b1` で再実行した。
 
 環境: runner 4 core。`load` は `/proc/loadavg` の 1 分平均 (テスト行はループ開始時に読んだ値)。`fl-win64.tar.zst` を `[FL-WIN64]` の展開先 (`$FL_WIN64_DIR`) に全展開し (`FL_WIN64_DIR`)、`fetch_inputs.sh` で `work/` に配置した。`toolchain-emsdk.tar.zst` は `[EMSDK]` の展開先に展開したが、`[EMSDK]` の版 (`releases-6e9f6885…-64bit`) が展開物と同一だったため、ビルドは `EMSDK_DIR=[EMSDK]` で行った。
 
 | コマンド | 測定 commit | 結果 | wall | load |
 |---|---|---|---|---|
-| `bash build_cpython_wasm.sh` | `5e92b8104` | rc 0 (`python.wasm` 5,927,853 バイト・増分ビルド) | 204 秒 | 終了時 2.12 |
-| `FL_WIN64_DIR=<展開先> bash build_flpy.sh` | `5e92b8104` | rc 0 (`flpy.wasm` 5,925,204 バイト) | 5 秒 | 未計測 |
-| `bash provider/build.sh` | `5e92b8104` | rc 0・fl_table.c 関数 435・ハンドラ 199 | 1.35 秒 | 未計測 |
-| `node tests/provider_check.mjs` | `5e92b8104` | PASS (functions 435・implemented 199・unimplemented 236・mcp_static 60) | 0.27 秒 | 0.94 |
-| `node tests/ui_state_diff.mjs` | `5e92b8104` | calls 102・diffs 0・PASS | 0.04 秒 | 0.48 |
-| `node tests/general_diff.mjs` | `5e92b8104` | calls 52・diffs 0・PASS | 0.04 秒 | 0.48 |
-| `node tests/ui_diff.mjs` | `5e92b8104` | calls 17・diffs 0・範囲外既知差分 3・PASS | 0.04 秒 | 0.48 |
-| `node tests/mixer_diff.mjs` | `5e92b8104` | calls 69・diffs 0・PASS | 0.04 秒 | 0.48 |
-| `node tests/arrangement_diff.mjs` | `5e92b8104` | calls 39・state 10・stateDiffs 0・PASS | 0.05 秒 | 0.48 |
-| `node tests/device_diff.mjs` | `5e92b8104` | calls 21・link_calls 9・rejects 13・midi_out 11・diffs 0・PASS | 0.04 秒 | 0.48 |
-| `node tests/channels_diff.mjs` | `5e92b8104` | calls 238・loop_cases 9・grid_calls 1200・diffs 0・grid_diffs 0・PASS | 0.06 秒 | 0.48 |
-| `node tests/playlist_diff.mjs` | `5e92b8104` | calls 72・diffs 0・PASS | 0.04 秒 | 0.48 |
-| `node tests/screen_menu_diff.mjs` | `5e92b8104` | calls 42・diffs 0・PASS | 0.05 秒 | 0.48 |
-| `node tests/ui_editor_diff.mjs` | `5e92b8104` | ok 6・bad 8・diffs 0・PASS | 0.04 秒 | 0.48 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | `5e92b8104` | 48/48 ok・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 1.27 秒 | 0.94 |
+| `bash build_cpython_wasm.sh` | `5e92b8104` (注) | rc 0 (`python.wasm` 5,927,853 バイト) | 204 秒 | 終了時 2.12 |
+| `FL_WIN64_DIR=<展開先> bash build_flpy.sh` | `e4a7903b1` | rc 0 (`flpy.wasm` 5,925,204 バイト) | 5 秒 | 未計測 |
+| `bash provider/build.sh` | `e4a7903b1` | rc 0・fl_table 関数 435・ハンドラ 206 | 0.90 秒 | 0.10 |
+| `node tests/provider_check.mjs` | `e4a7903b1` | PASS (functions 435・implemented 206・unimplemented 229・mcp_static 60) | 0.27 秒 | 0.35 |
+| `node tests/ui_state_diff.mjs` | `e4a7903b1` | calls 102・diffs 0・PASS | 0.04 秒 | 0.35 |
+| `node tests/general_diff.mjs` | `e4a7903b1` | calls 52・diffs 0・PASS | 0.04 秒 | 0.35 |
+| `node tests/ui_diff.mjs` | `e4a7903b1` | calls 17・diffs 0・範囲外既知差分 3・PASS | 0.04 秒 | 0.35 |
+| `node tests/mixer_diff.mjs` | `e4a7903b1` | calls 69・diffs 0・PASS | 0.04 秒 | 0.35 |
+| `node tests/arrangement_diff.mjs` | `e4a7903b1` | calls 39・state 10・stateDiffs 0・PASS | 0.04 秒 | 0.35 |
+| `node tests/device_diff.mjs` | `e4a7903b1` | calls 21・link_calls 9・rejects 13・midi_out 11・diffs 0・PASS | 0.04 秒 | 0.35 |
+| `node tests/channels_diff.mjs` | `e4a7903b1` | calls 238・loop_cases 9・diffs 0・PASS | 0.06 秒 | 0.35 |
+| `node tests/playlist_diff.mjs` | `e4a7903b1` | calls 72・diffs 0・PASS | 0.04 秒 | 0.35 |
+| `node tests/screen_menu_diff.mjs` | `e4a7903b1` | calls 42・diffs 0・PASS | 0.04 秒 | 0.35 |
+| `node tests/ui_editor_diff.mjs` | `e4a7903b1` | ok 6・bad 8・diffs 0・PASS | 0.04 秒 | 0.35 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | `e4a7903b1` | 48/48 ok・host_calls 37,425・callback_roundtrip true | 1.26 秒 | 0.35 |
+
+注: `build_cpython_wasm.sh` は `5e92b8104` で実行した。以後 `build_cpython_wasm.sh`・`build_flpy.sh`・`src/`・`provider/build.sh`・`gen_provider.py`・`analysis/flapi` は変えていない (`git diff --stat 5e92b8104 HEAD` で 0 行)。`flpy.wasm` は `e4a7903b1` で再ビルドし rc 0。
 
 - `ui_state_diff.mjs` の calls 102 は、通常呼出し・引数個数違い・型違いを合わせた件数 (スクリプトの `calls` と `arity` の合計)。PY-119 報告の calls 12 は現在の呼出し列と一致しない。PY-119 の件数は古いまま残っている (本 PR では訂正しない)。
-- ネガティブコントロール (`5e92b8104`): `host/fl_mock.mjs` の `ui.setSnapMode` (447 行) の引数個数検査 `arity(a, 1, 1)` を `arity(a, 1, 2)` に変えると、`node tests/ui_state_diff.mjs` は rc 1 (FAIL)。元に戻すと calls 102・diffs 0・PASS (rc 0)。元に戻した後の `git diff -- tools/python/host/fl_mock.mjs` は空。`provider/*.wasm` は変えていない (mock のみの変更)。
+- ネガティブコントロール (`e4a7903b1`): `host/fl_mock.mjs` の `ui.setSnapMode` (447 行) の引数個数検査 `arity(a, 1, 1)` を `arity(a, 1, 2)` に変えると、`node tests/ui_state_diff.mjs` は rc 1 (FAIL)。元に戻すと calls 102・diffs 0・PASS (rc 0)。元に戻した後の `git diff -- tools/python/host/fl_mock.mjs` は空。`provider/*.wasm` は変えていない (mock のみの変更)。
 
 ## コード差分
 
 - `host/fl_mock.mjs`: `ui.setHintMsg` (文字列検査)・`ui.setFocused` / `ui.setSnapMode` (整数検査) を PY-119 の ui 行の直後に追加。状態は持たない。
 - `provider/fl_engine.c`: 同じ 3 関数を `FL_H(ui, ...)` で追加 (`NARGS(1, 1)` と `A_STR(0)` / `A_INT(0, 0)`、戻り `fl_ret_none`)。
-- `tests/provider_check.mjs`: `pe129` の Set (3 件) と実装判定への追加。main 取り込みで入った判定行 (pe133・pe235・pe136 など) は両方残し、件数 assert は 199 / 236 (競合解消後)。
+- `tests/provider_check.mjs`: `pe129` の Set (3 件) と実装判定への追加。main 取り込みで入った判定行 (pe133・pe235・pe136 など) は両方残し、件数 assert は 206 / 229 (main 取り込み後)。
 - `tests/ui_state_diff.mjs`: setter の呼出し列を追加 (通常 15 件。`setFocused(null)`・`setSnapMode(null)` は None の試験)・引数個数違い 6 件)。
 - `analysis/flapi/pe_handler_probe.py`: VA 指定 (`0x...`) で任意の VA を逆アセンブルできるようにした。名前指定の動作は変えていない。
 
 ```
-$ git diff 5e92b8104 HEAD -- tools/python ':!*.md'
+$ git diff 5e92b8104 HEAD -- tools/python/build_cpython_wasm.sh tools/python/build_flpy.sh tools/python/src tools/python/provider/build.sh tools/python/provider/gen_provider.py tools/python/analysis/flapi
 (空。差分 0 行)
 ```
 
