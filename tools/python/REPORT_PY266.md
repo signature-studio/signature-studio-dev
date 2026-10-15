@@ -13,8 +13,8 @@
 
 ## 測定
 
-- 測定 commit: 本 PR の最終コード commit (下の「測定の記録」)。`git diff <測定 commit> HEAD -- tools/python/analysis tools/python/REPORT_PY266.md` の出力は測定後に確認する。
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` (`oc_artifacts: fl-win64`)。展開: `tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C tools/python/work/py266 --wildcards '*_PE.bin'` (3.2 秒・313 block)。展開先は gitignore (`tools/python/work/`)。
+- 測定 commit: `f7ce3a151` (下の「測定の記録」)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (`oc_artifacts: fl-win64`)。展開: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C tools/python/work/py266 --wildcards '*_PE.bin'` (3.2 秒・313 block)。展開先は gitignore (`tools/python/work/`)。
 - 走査: `analysis/py266_flag_writers.py` (全 PE・`.text` の生バイト列で disp 0x497〜0x49e の 4 byte を探し、直前 15 byte から復号して memory operand の disp が一致する命令だけ採る。線形走査はしない)。所属関数は x64 の `.pdata` (RUNTIME_FUNCTION)。
 - 検査 (PASS): `FL_WIN64_DIR=$PWD/work/py266 python3 analysis/py266_flag_writers.py` → rc 0・所要 (下の「測定の記録」)。
 - ネガティブコントロール: `--mutate` (既知の書込み `0x737574` `mov byte ptr [rbx+0x49e], dl` の disp の 1 bit を反転したメモリ上の複製で走査) → `mutate PASS at 0x737574` (= その命令が write として出ない)・rc 0。検出器は既知の書込みを落とすことができる。
@@ -73,8 +73,8 @@ block00031 以外の 21 件 (byte 17・word 3・xmmword 1)。disp は同じ 0x49
 
 ```
 cd tools/python
-tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C work/py266 --wildcards '*_PE.bin'
-FL_WIN64_DIR=$PWD/work/py266 python3 analysis/py266_flag_writers.py > work/py266/scan.tsv   # 約 2 分 13 秒・rc 0
+tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C work/py266 --wildcards '*_PE.bin'
+FL_WIN64_DIR=$PWD/work/py266 python3 analysis/py266_flag_writers.py > work/py266/scan.tsv   # 実測 130.0 秒・rc 0
 FL_WIN64_DIR=$PWD/work/py266 python3 analysis/py266_flag_writers.py --mutate               # mutate PASS・rc 0
 awk -F'\t' '$3=="disp=0x49e"' work/py266/scan.tsv                                            # 直接書込み 24 件
 FL_WIN64_DIR=$PWD/work/py266 python3 analysis/flapi/pe_callgraph.py callers 0x737560         # 直接呼出し元 3 件
@@ -82,7 +82,11 @@ FL_WIN64_DIR=$PWD/work/py266 python3 analysis/flapi/pe_callgraph.py callers 0x73
 
 ## 測定の記録
 
-- 測定 commit: 測定 1・2 の commit 欄を参照 (本節の下に記録)。コードを変えた最後の commit は `analysis/py266_flag_writers.py` を入れた commit。
+- 測定 commit: `f7ce3a151` (コードを変えた最後の commit。`analysis/py266_flag_writers.py` と本 REPORT を入れた commit)。
+- 測定 1 (commit `f7ce3a151`・n=1): `analysis/py266_flag_writers.py` → rc 0・実時間 130.0 秒・user 129.4 秒・負荷 (実行後) `0.94 0.73 0.70`・並列数 1 (4 コア)。出力は `counts {'write': 2569, 'addr': 1145, 'read': 18343, 'rip': 853}`。
+- 測定 2 (同 commit・再現・n=2): 出力を測定 1 と `cmp` で比較し一致 (`SAME_OUTPUT`)。実時間 130.0 秒・user 129.4 秒・負荷 `0.32 0.56 0.65` → 実行後 `0.94 0.73 0.70`。
+- ネガティブコントロール (commit `f7ce3a151`): `--mutate` → `mutate PASS at 0x737574 rc 0`。
+- `git diff f7ce3a151 HEAD -- tools/python/analysis tools/python/REPORT_PY223.md` の出力は本 REPORT の commit 以降で 0 行 (コードの差分は無い)。
 
 ## 未解決 (起票先付き)
 
