@@ -599,6 +599,7 @@
 | `tools/audio/REPORT_APPENDIX_3323.md` | ~30 | AU-37 (#3323) Firefox の burst p99 の測定全文 (REPORT_AU2_CI.md §12 の付録)。測定 commit `db0a788fe`・Firefox 行列 n=3 の表・既存 PASS 判定の不変 |
 | `tools/audio/REPORT_APPENDIX_3151.md` | ~107 | AU-30 (#3151) P2 burst p99 の測定全文 (REPORT_AU2_CI.md §12 から分割移動。250 行上限のため)。測定 commit `e403fd7a` (§12-1)・`8310689a` (§12-3)・`fb5a0d69` (§12-4)・行列・再現手順の正本 |
 | `tools/audio/REPORT_APPENDIX_3168.md` | ~85 | AU-33 (#3168) Firefox 行列の OS 別 sink 判定と 3 シナリオ化の検証全文 (REPORT_AU2_CI.md §11 から分割移動。250 行上限のため)。測定範囲と issue 指定範囲の差分内訳・9aa9239b の ubuntu 再現 9/9 PASS・HEAD c89f18db の再測定 9/9 PASS (§G)・NC・Safari の理由と代替・Win/mac の未検証 |
+| `tools/audio/REPORT_APPENDIX_4297.md` | ~70 | AU-46 (#4297) burst_gate_test.mjs ほか node テスト 2 本の CI 配線 (`tools/pm/test_audio_burst_gate.py` を scripts-test の glob で実行・`.github/` は無変更)。配線方式の判断・同層の扱い・実測・ネガティブコントロールの全文。測定 commit は PR 本文に記載 |
 | `tools/audio/REPORT_APPENDIX_4089.md` | ~10 | AU-15 (#4089) underrun 時刻と producer write 区間の突き合わせ判定の全文 (合成 9 件・e2e 10 run の実測。REPORT.md §20 の結論から参照。250 行上限のため)。測定 commit `45a37a83c` |
 | `tools/audio/REPORT_APPENDIX_863.md` | ~20 | AU-15 (#863) 現 HEAD (`2f235a0a`) での再試行 15 run 全 PASS の全文 (REPORT.md §20 から分割移動。250 行上限のため)。§19 (旧 HEAD の失敗 1 件) は REPORT.md 本体 |
 | `tools/audio/REPORT_APPENDIX_863_287655cf.md` | ~30 | AU-15 (#863) 旧 §30 の全文 (測定 commit `287655cf`・write 記録の初回 31 run 全 PASS)。REPORT_APPENDIX_863.md §30 から分割移動 (250 行上限のため)。現行の §30 (`89b10538`) が正本 |
