@@ -13,7 +13,8 @@ const cfg = {
 };
 if (cfg.probe0) FlAudioShim.prototype.probeBurst = async () => 0;   // 診断用: burst 探査を無効化 → 初期 depth は baseLatency 由来 (512 → depth 4)
 const logEl = document.getElementById("log");
-const log = (s) => { logEl.textContent += s + "\n"; console.log(s); };
+const shimLines = [];
+const log = (s) => { logEl.textContent += s + "\n"; console.log(s); if (/\[audio-shim\]/.test(s)) shimLines.push(s); };
 
 window.__done = new Promise((resolveAll, rejectAll) => {
   let shim = null, ver = null;
@@ -79,6 +80,8 @@ window.__done = new Promise((resolveAll, rejectAll) => {
           for (let i = first; i < n; i++) { const k = (i % N) * 4 + 388 / 4; trace.push([u32[k], u32[k + 1], u32[k + 2], u32[k + 3]]); }
           result.pw = { pw_n: n, first_index: first, trace, burst_hist: Array.from(u32.subarray(16772 / 4, 16772 / 4 + 32)) };
         }
+        // probed_burst (shim の OPEN 行) を結果に残す。判定には使わない。
+        result.shim_open = shimLines.filter((s) => /OPEN |burst probe/.test(s));
         result.workletErrors = shim.workletErrors;
         result.cfg = cfg;
         if (ver) { result.verify = ver.finish(); result.verify.sr = ctxInfo.sampleRate; }
