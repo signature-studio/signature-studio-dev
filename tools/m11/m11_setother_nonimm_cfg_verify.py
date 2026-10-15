@@ -254,6 +254,33 @@ def run(insns, probe, fam):
                 fl = None
                 i += 1
                 continue
+            if mn in ('cdq', 'cqo') and not ops:
+                w = 64 if mn == 'cqo' else 32
+                a = get(st, 'rax' if w == 64 else 'eax')
+                st['rdx'] = None if a is None else (msk(w) if (a >> (w - 1)) & 1 else 0)
+                i += 1
+                continue
+            if mn == 'idiv' and ops and (ops[0] in REG and REG[ops[0]][1] == 32 or '[' in ops[0]):
+                d = get(st, ops[0]) if ops[0] in REG else None
+                ax = get(st, 'eax')
+                dx = get(st, 'edx')
+                if d is None or ax is None or dx is None:
+                    st['rax'] = None
+                    st['rdx'] = None
+                else:
+                    n = ((dx << 32) | ax) - ((1 << 64) if (dx >> 31) & 1 else 0)
+                    dv = d - (1 << 32) if (d >> 31) & 1 else d
+                    if dv == 0:
+                        raise Unsup('idiv 0 除算 (#DE)')
+                    q = abs(n) // abs(dv) * (1 if (n < 0) == (dv < 0) else -1)
+                    r = n - q * dv
+                    if not -(1 << 31) <= q < (1 << 31):
+                        raise Unsup('idiv 商のオーバーフロー (#DE)')
+                    put(st, 'eax', q & msk(32))
+                    put(st, 'edx', r & msk(32))
+                fl = None
+                i += 1
+                continue
             if mn == 'neg' and ops and ops[0] in REG:
                 w = REG[ops[0]][1]
                 a = get(st, ops[0])
@@ -367,6 +394,20 @@ def selftest():
         ('S9 ネガティブ (0x10)', 'bb030000006bdb050fb6d3c3', 3, 'rdx', 0x10, 'FAIL'),
         ('S10 not ebx (0→0xff 下位 8bit)', 'bb00000000f7d30fb6d3c3', 3, 'rdx', 0xff, 'PASS'),
         ('S10 ネガティブ (0x00)', 'bb00000000f7d30fb6d3c3', 3, 'rdx', 0x0, 'FAIL'),
+        ('C1 cdq eax=-1 → edx=0xffffffff', 'b8ffffffff99c3', 2, 'rdx', 0xffffffff, 'PASS'),
+        ('C1 ネガティブ (0x0)', 'b8ffffffff99c3', 2, 'rdx', 0x0, 'FAIL'),
+        ('C2 cdq eax=1 → edx=0', 'b801000000' '99' 'c3', 2, 'rdx', 0x0, 'PASS'),
+        ('C2 ネガティブ (0xffffffff)', 'b801000000' '99' 'c3', 2, 'rdx', 0xffffffff, 'FAIL'),
+        ('C3 cqo rax=-1 → rdx=-1', '48c7c0ffffffff' '4899' 'c3', 2, 'rdx', 0xffffffffffffffff, 'PASS'),
+        ('C3 ネガティブ (0xffffffff)', '48c7c0ffffffff' '4899' 'c3', 2, 'rdx', 0xffffffff, 'FAIL'),
+        ('C4 cdq で eax 未知 → 判定不能', 'e800000000' '99' 'c3', 2, 'rdx', None, '判定不能'),
+        ('D1 idiv: -7/2 → 余り -1 (edx)', 'b8f9ffffff' '99' 'bb02000000' 'f7fb' 'c3', 4, 'rdx', 0xffffffff, 'PASS'),
+        ('D1 ネガティブ (余り 1 と誤る)', 'b8f9ffffff' '99' 'bb02000000' 'f7fb' 'c3', 4, 'rdx', 0x1, 'FAIL'),
+        ('D2 idiv: 7/2 → 余り 1', 'b807000000' '99' 'bb02000000' 'f7fb' 'c3', 4, 'rdx', 0x1, 'PASS'),
+        ('D2 ネガティブ (余り 0)', 'b807000000' '99' 'bb02000000' 'f7fb' 'c3', 4, 'rdx', 0x0, 'FAIL'),
+        ('D3 idiv 除数が未知 → 判定不能', 'b807000000' '99' 'e800000000' 'f7f9' 'c3', 5, 'rdx', None, '判定不能'),
+        ('D4 idiv 除数 0 → 判定不能', 'b807000000' '99' 'bb00000000' 'f7fb' 'c3', 5, 'rdx', None, '判定不能'),
+        ('D5 idiv メモリ除数 → 商・余りは未知', 'b807000000' '99' '8b0d00000000' 'f77900' 'c3', 4, 'rdx', None, '判定不能'),
     ]
     bad = 0
     for name, hx, probe, fam, claim, expect in cases:
@@ -379,13 +420,13 @@ def selftest():
     return bad
 
 
-def real(rows_path, pe):
+def real(rows_path, pe, all_rows=False):
     sys.path.insert(0, os.path.join(HERE, 'ldfix'))
     sys.path.insert(0, HERE)
     import ldmach
     import m11_argrecover as AR
-    rows = [r for r in json.load(open(rows_path)) if r['class'] == '実値化']
-    print('[verify] 実値化 行 %d 件' % len(rows))
+    rows = [r for r in json.load(open(rows_path)) if all_rows or r['class'] == '実値化']
+    print('[verify] 対象 %d 件 (all=%s)' % (len(rows), all_rows))
     if not rows:
         return 0
     mach = ldmach.Machine(pe)
@@ -396,7 +437,8 @@ def real(rows_path, pe):
         insns = AR.Fn(mach, cva).ins
         calls = [i for i, x in enumerate(insns) if x.mnemonic == 'call' and x.op_str.startswith('0x')
                  and int(x.op_str, 0) == tva]
-        got, det = verify(insns, calls[r['k']], r['fam'], int(r['value'], 0))
+        claim = None if r.get('value') is None else int(r['value'], 0)
+        got, det = verify(insns, calls[r['k']], r['fam'], claim)
         cnt[got] += 1
         print('[verify] %s -> %s pos %d: %s %s' % (r['caller'], r['callee'], r['pos'], got, det))
     print('[verify] 集計 ' + ' '.join('%s %d' % (k, v) for k, v in sorted(cnt.items())))
@@ -408,9 +450,10 @@ if __name__ == '__main__':
     ap.add_argument('rows', nargs='?')
     ap.add_argument('--pe')
     ap.add_argument('--selftest', action='store_true')
+    ap.add_argument('--all', action='store_true', help='class によらず全行を照合する (claim なし)')
     a = ap.parse_args()
     if a.selftest:
         sys.exit(1 if selftest() else 0)
     if not a.rows or not a.pe:
         ap.error('ROWS と --pe を指定する (合成検査は --selftest)')
-    sys.exit(1 if real(a.rows, a.pe) else 0)
+    sys.exit(1 if real(a.rows, a.pe, a.all) else 0)
