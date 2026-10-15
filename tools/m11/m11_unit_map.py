@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""#3122: 基準 (7e149974 全再生成 IR) の unit 別 survey と本 A/B (main・同一 IR 内の既定 0 / opt-in 1) の unit 別 survey を対応付ける.
+"""#3122: 基準 (7e149974 全再生成 IR) の unit 別 survey と本 A/B (main・同一 lift 入力の既定 0 / opt-in 1、IR は別 sha) の unit 別 survey を対応付ける.
 使い方: python3 m11_unit_map.py BASE.json ARM0.json ARM1.json
-出力: 状態別件数, 基準と arm0 の unit 別差, arm0 と arm1 の unit 別差. 基準の件数が ok 872 / trap 23 / miss 46 / noproc 1 でなければ終了 1.
+出力: 状態別件数, 基準と arm0 の unit 別差, arm0 と arm1 の unit 別差. unit 番号は 0 始まりの添字. 基準の件数が ok 872 / trap 23 / miss 46 / noproc 1 でなければ終了 1.
 """
 import json
 import sys
