@@ -235,14 +235,9 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 | `tools/icall` の既定値置換と代表 e2e | 本節の範囲外 (flelift 直下のみ検証) | #3604 |
 | m11 ほか残り area と ott/m11 の代表 e2e | 親 #294 の残り | #294 |
 
-## 12. x64c の addsubpd / vpmovsxdq / vshufps 追加の実測 (#3721)
+## 12. x64c の addsubpd / vpmovsxdq / vshufps 追加 (#3721)
 
-- 測定 commit: `a9d238a14` (閉包・ネガコン・差分テストの PR 作成時の実測)。
-- 閉包 (`KH_CORE=<HeartCore.core_64> OUT=<work/> bash tools/targets/kilohearts/scripts/ladder_x64c_closure.sh`・real 27.546 s): 改変前 functions 98 / insns 7,766 / unsup 38 (rcpps 34・addsubpd 2・vpmovsxdq 1・vshufps 1) / imports 17 / traps 0。改変後 unsup **34** (rcpps 34 のみ)。HeartCore sha256 先頭 16 hex `d55ce8b4c0ad7ebe` (76,642,304 B)。
-- ネガコン (roots = process slot 14 のみ): functions 2 / insns 178 / unsup 0 (不変)。
-- 差分テスト `python3 tools/flelift/tests/x64c_vex_diff.py`: pass 91 / fail 0 (rc 0)。
-- addsubpd ネガコン (加減を入れ替え): `FAIL addsubpd xmm1, xmm2`・pass 90 / fail 1 (rc 1)。改変後に退避コピーから戻し、`cmp` で一致を確認してから再実行 (pass 91 / fail 0)。
-- 再実行の範囲: fix モード (`ws-4056` worktree・commit 後の HEAD) では差分テストとネガコンのみ再実行。閉包 e2e は `plugins-kilohearts` 由来の `HeartCore.core_64` が `fl-win64` に無く再実行していない (上記は a9d238a14 の値)。
+- 結論: 閉包 unsup 38 → 34 (rcpps のみ残存)。実測は `REPORT_APPENDIX.md` §15 (分割移動・削除なし)。
 
 ## 13. x64c の rcpps / vrcpps 実装 (#4054・閉包 unsup 34 → 0)
 
