@@ -159,10 +159,13 @@ index 72a788e2c..80d069f06 100644
 - 測定 commit `a4f7e12f0` (`x87_fn_diff.py` の `WASM_TIER` 固定を入れた最後のコード commit)。 `python3 x87_fn_diff.py --special` (exit 0、wall 19.5 s、load1 0.46)。 通常モード・`--nega`・`--special --nega-nan` も同じ commit で exit 0 (ネガコン検出)。
 - 揺れの再現 (修正前、tier 未固定): 同じ `scen.txt` の先頭 8,000 行を同じ wasm・同じ image で 6 回実行すると、出力の md5 が 5 種に割れた (6 回中 2 回は一致)。 揺れは行単位で、同じ行が `ffc00000` と `7fc00001` を返す。 数値 (非 NaN) の差は 0 件。
 - 切り分け (先頭からの接頭辞ではなく、単独の probe で ops ごとに確認した):
-  - 単項・変換 (f32→f64 promote、f64→f32 demote、neg、×1、+0): 1 NaN 入力では Liftoff と TurboFan で一致 (`work/nanprobe/probe.c`、33 行)。 LDF32 と `(float)` 変換は源ではない。
-  - 両オペランドが NaN の `add`・`mul` (f32): 20 件の不一致はすべて NaN どうし。 Liftoff と TurboFan で返す NaN の入力が違う (`probe2.c`、`sub` は一致)。 f64 の add・mul でも同じ (`probe3.c`、6 行で差)。
+  - probe の原本: `probes/nanprobe/probe_tier.mjs` (追跡対象・依存なし。wasm のバイト列を直接組み立てる)。 実行: `node --liftoff-only probes/nanprobe/probe_tier.mjs > liftoff.txt` と `node --no-liftoff probes/nanprobe/probe_tier.mjs > turbofan.txt` の後に `diff liftoff.txt turbofan.txt` (emcc 不要。node 22.23.3 で実測)。
+  - 実測 (`probe_tier.mjs`・入力は float32 の 8 値 (NaN 5 種 = qNaN・-qNaN・sNaN・ペイロード違い・0xffffffff、1.0、±0) の全組、f32 add/sub/mul/div と f64 add/sub/mul、promote・demote・neg): 出力 467 行、Liftoff と TurboFan で 72 行が違う。 違いは f32_add・f32_mul・f64_add・f64_mul の 18 行ずつで、すべて両オペランドが NaN の行 (NaN 以外の入力を含む行は 0 件)。 `sub`・`div`・単項・変換は両 tier で一致。 LDF32 と `(float)` 変換は源ではない。
+  - 6 回の再現: 同じ probe を `--liftoff-only` で 6 回実行すると md5 `5c49732b…` が 6/6 同一。 `--no-liftoff` でも 3/3 同一 (md5 `1e471b8b…`、Liftoff とは別の値)。
   - 結論: 源は V8 の tier 切替で、NaN×NaN の返す NaN の選び方が tier で違う。 wasm の NaN の符号・ペイロードは仕様で未規定。
-- 固定の確認 (受入の「同じ入力で 6 回以上」): 全 20,000 行の run を `--liftoff-only` で 6 回 (単独の node 実行) すると、6 回すべて同じ md5 (`23fc7196…`)。 `--no-liftoff` でも 6/6 同一 (`5254ee…` は別の tier の値)。 両 tier は NaN ビットだけが違い、native 対 liftoff の NaN 以外の差は 0 件 (8,000 行で確認)。 harness の `wasm_out.txt` は chunk 分割の結果で、行番号を除くと単独 run と一致 (0 行差)。
+- 固定の確認 (受入の「同じ入力で 6 回以上」): 全 20,000 行の run を `--liftoff-only` で 6 回 (単独の node 実行) すると、6 回すべて同じ md5 (`23fc7196…`)。 `--no-liftoff` でも 6/6 同一 (`5254ee…` は別の tier の値)。
+  - 入力の出所: `scen.txt`・`image.bin` は `x87_fn_diff.py --special` が seed 2989 と素材 `block22434_PE.bin` (`FL_WIN64_DIR`、`fl-win64` の `extracted/`) から毎回生成する (`work/x87fn_special/`、gitignore)。 生成は決定的で、同じ素材・同じ seed なら同じ `scen.txt` になる。 `wasm_out.txt` の md5 `23fc7196…` は測定時の `work/` 上の出力で、`toolchain-emsdk` (emcc) が無いこの fix run では再実行できていない。 再現手順は `x87_fn_diff.py --special` を実行し、その `work/x87fn_special/wasm_out.txt` を 6 回取り直す。
+  - fix run での再確認: 20,000 行の md5 の再取得は未実施 (wasm 側の lift に emcc が要り、この runner には無い)。 代わりに同じ tier 固定の効果を単独 probe で 6 回測定した (上の probe の項)。 両 tier は NaN ビットだけが違い、native 対 liftoff の NaN 以外の差は 0 件 (8,000 行で確認)。 harness の `wasm_out.txt` は chunk 分割の結果で、行番号を除くと単独 run と一致 (0 行差)。
 - 修正前後の判定への影響: 判定 (PASS・構造・nan-num 0) は変わらない。 mismatch 分類の件数は run ごとに揺れた。 固定後の基準値 (`a4f7e12f0`、2 回とも一致): `fn_10002ee0` NaN どうし 858・f80 2 行、`fn_10005400` NaN どうし 701・f80 28 行、`fn_10005d20` NaN どうし 458。
 - 後段への伝播 (固定後の wasm 対 native。 NaN どうしの差のみ。 非 NaN の差は全関数 0 件):
   - `fn_10005400`: `eax` の NaN どうし 622 行。 OBJ 窓の NaN どうし 4,134 語 (うち `[0x508..0x518)` の範囲は 1,948 語)。
