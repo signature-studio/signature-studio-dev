@@ -702,7 +702,7 @@ def _flengine_cfi(src):
         "stop.va": "呼出元 VA は未特定 (wasm name section 無し・#3077 [WIN-16])",
     }
     derived = {
-        "create_fruity_instance.last_step": "STARTUP の S12 行 (0x1375990 冒頭) = CreateFruityInstance の入口。到達の下限。S13 以降は未測定 (fail-fast の位置は #3077 で未特定)",
+        "create_fruity_instance.last_step": "STARTUP の S12 行 (0x1375990 冒頭) = CreateFruityInstance の入口。到達の下限。S13 以降は未測定 (fail-fast の位置は #3077 で未特定)。寛容起動の観測では harness が self (rcx) を 0 で呼ぶため、0x410320 の間接 call [rax-0x30] が oob する (受け手 VA は未取得・実機の呼出し元は未特定。REPORT_APPENDIX_2719 §12)",
         "gui_natural": "GUI-REACH (§9-3) は LoadStringW のみ。RegisterClassW・CreateWindowExW は一覧に無いので 0",
         "stop": "CS-MISS 行の key (cs) と FAIL-FAST 行の API (api)。§7-4 と照合",
     }
