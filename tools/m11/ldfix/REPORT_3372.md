@@ -4,20 +4,19 @@
 
 ## 0. 結論
 
-- REPORT_2555 §2 の誤り 13 箇所のうち **3 箇所を site 単位で直した**: function_44f040 (表 #5)・function_47cf10 (表 #14)・function_6074b0 (表 #15)。
+- REPORT_2555 §2 の誤り 13 箇所のうち、本 issue の範囲で **3 箇所を site 単位で直した**: function_44f040 (表 #5)・function_47cf10 (表 #14)・function_6074b0 (表 #15)。
   書き換えは `fix_site_3372.py` (新規)。機械語 8 + 8 + 4 = **20 命令を capstone で照合**し、一致しなければ止める。IR は書き換える行が 1 件ずつ在るときだけ書く。
-- `ldfix_e2e.sh` に step 1d (本 pass) を配線し、**最終コード (測定 commit `dd8894202`) で完走**した (rc=0)。
-  stage4 は base / fix とも同じ到達段 (4/6)・同じ trap (`memory access out of bounds`)。survey は 22 項目が base と一致
-  (差分は trap の IR 行番号のキーだけ。§5)。**観測上の変化は無し**。wasm サイズは +199 B。
+  - 「3 箇所を修復」は **base IR (`boot_final3.ll`) 上の数**。このうち 0x6074b0 と 0x44f040 の (a) は `ldfix.py` (F1 系) が既に直す (`%ldfxu24`・`%ldfxu14`) ので、`fix_site_3372.py` はその形を据え置く。e2e の fix 側で新たに入るのは **0x44f040 の (b)(c) と 0x47cf10 の 3 件だけ**。
+- `ldfix_e2e.sh` に step 1d (本 pass) を配線した。**測定は測定 commit `dd8894202` のコードで完走した (rc=0)**。
+  stage4 は base / fix とも同じ到達段 (4/6)・同じ trap (`memory access out of bounds`)。survey は 22 項目が base と一致 (差分は trap の IR 行番号のキーだけ。§5)。**観測上の変化は無し**。wasm サイズは +199 B。
+- **HEAD `60cb4d886` は未測定** (§5b)。main 取り込み後の `ldfix_e2e.sh` は step 1c に main の `fix_site_3326.py` を持つ (測定 commit には無い)。素材 (`work-m11`・`toolchain-emsdk` 等) がこの run に無く、HEAD の e2e は step 0 で止まった (rc=1)。
 - 一次分類 (`verify_deref_sites_2555.py`・17 行): base は OTHER 9 / ADDR 5 / MISMATCH 2 / SCAN_MISS 1、修復後は **LOAD 3** を加え OTHER 7 / ADDR 4 / MISMATCH 2 / SCAN_MISS 1。
-- **未修復 (子 issue へ)**: 0x413340・0x44fb40 は #3416 [CI-154]、0x450420・0x4506e0・0x7888f0 は #3417 [CI-155] (#3326 の成果が main に無い分。§1)、0x47b4a0・0xc40770 (複雑型) は #3418 [CI-156] (§6)。
+- 残りの誤り箇所の現状: 0x413340・0x44fb40・0x450420・0x4506e0・0x7888f0 は main の #3326 (PR #3400・main `bb4443c19`) で修復済み (step 1c)。0x413340 の 3 番目引数の判定は #3416 [CI-154] (CLOSED) で済み、その修復は #3426 [CI-157] (OPEN)。0x47b4a0・0xc40770 (複雑型) は #3418 [CI-156] (OPEN)。
 
-## 1. 前提の確認 (#3326 の成果が main に無い)
+## 1. 前提の確認 (#3326 の成果の取り込み)
 
-- 本 issue の本文は「#3326 で 0x413340・0x44fb40・0x450420・0x4506e0・0x7888f0 の 5 箇所が `tools/m11/ldfix/fix_site_3326.py` で直った」と書く。
-- 確認: `origin/main` (a5966bbc7) に `fix_site_3326.py` は無い (`git ls-tree -r --name-only origin/main | grep 3326` → 0 件)。
-  `git log --all --grep=3326` / `--grep=CI-148` → 0 件。#3326 の PR は見つからず、issue #3326 は OPEN。
-- よって、この 5 箇所は main の HEAD で**未修復**として扱う。子 issue で引き取る (受入 4 の 0x413340 の判定も同じ子 #3416 に移す)。
+- 測定時 (測定 commit `dd8894202`): `origin/main` (a5966bbc7) に `fix_site_3326.py` は無かった (`git ls-tree -r --name-only origin/main | grep 3326` → 0 件)。このため 0x413340・0x44fb40・0x450420・0x4506e0・0x7888f0 を未修復として扱い、子 issue へ移した。
+- 現在: #3326 は PR #3400 (main `bb4443c19`) で merge 済み。`ldfix_e2e.sh` の step 1c が `fix_site_3326.py` を呼ぶ。5 箇所の修復は `tools/m11/ldfix/REPORT_3326.md` §0 に記録されている。
 - 表に無い **0x6074b0 (表 #15)** は #3372 の本文の一覧に入っていなかったので、本 PR に含めた (§2.3)。
 
 ## 2. 修復の内容 (`fix_site_3372.py`)
@@ -55,7 +54,7 @@ base IR: `%0 = call 4256c0(i64 %arg1)`。修復: `%a1g = load [arg1]` を入れ�
 
 - 機械照合: 各サイトの命令 (VA・mnemonic・operand) を capstone の出力と完全一致で照合する (計 20 件: 44f040 8 件・47cf10 8 件・6074b0 4 件)。
   ISA の表記は `ldmach.Machine.disasm_fn` の出力に合わせた (例: `mov rcx, qword ptr [rsp + 0x60]`)。
-- 実行 (base 入力 `boot_final3.ll`):
+- 実行 (base 入力 `boot_final3.ll`・測定 commit `dd8894202`):
 
 | 制御 | 操作 | 結果 (終了コード・例外) |
 |---|---|---|
@@ -80,11 +79,12 @@ base IR: `%0 = call 4256c0(i64 %arg1)`。修復: `%a1g = load [arg1]` を入れ�
   (`verify_3372_final.json` の `verdict` と `ir_arg` を確認)。
 - 一次分類は「機械的な振り分け」であり最終判定ではない (REPORT_2555 §5)。最終判定は、本 REPORT の §2 の窓読みによる。
 
-## 5. ldfix_e2e の実測 (step 1d を配線した最終コード)
+## 5. ldfix_e2e の実測 (測定 commit `dd8894202` のコード)
 
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` (step 1d は本 PR で追加)。
-- 測定 commit: **`dd8894202`** (コードを変えた最後の commit。`fix_site_3372.py` と `ldfix_e2e.sh` を含む)。
+- 測定 commit: **`dd8894202`** (コードを変えた最後の commit。`fix_site_3372.py` と `ldfix_e2e.sh` を含む)。**main の `fix_site_3326.py` (step 1c) は含まない pipeline** である。
 - 実測 (測定 commit `dd8894202` の HEAD で 1 回。`date -u +%s.%N` で計時): wall **47.5 s**・rc=0。実行前の load average `0.35 0.50 0.41` (1/5/15 分)、実行後 `0.72 0.58 0.44` (4 vCPU)。
+- 入力 IR: `tools/m11/work/boot_final3.ll` (`work-m11` の展開物)。**sha256 は測定時に記録していなかった**。この run では IR が無く計算できない。HEAD 再測定の run で `sha256sum tools/m11/work/boot_final3.ll` の全文を §5 に書く。(別 REPORT の `tools/m11/REPORT_SHX-T27.md` は work-m11 の boot_final3.ll を接頭辞 `010451ad…` で記録しているが、その時点の記録で、本測定の入力と同一かは未確認。)
 
 | 項目 | base (修復前) | fix (修復後) | 判定 |
 |---|---|---|---|
@@ -103,21 +103,29 @@ base IR: `%0 = call 4256c0(i64 %arg1)`。修復: `%a1g = load [arg1]` を入れ�
   本 PR の変更の意味は「機械語と IR の一致を 3 箇所で取り戻した」ことに限る。stage4 の trap の原因の切り分けは別件 (#942 系)。
 - 修復の作用を e2e で見る経路: step 1d の出力 `work/ldfix_fixed.ll` の 44f040 (`%ldfxu14`・`%a1e`)・47cf10 (`%a1f`)。emcc -c の構文検証 (step 2) は通った。
 
+### 5b. HEAD `60cb4d886` での試行 (未測定)
+
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` (`60cb4d886` の worktree)。
+- 結果: **rc=1**。`[ldfix_e2e] FAILED: tools/m11/work/boot_final3.ll 無し (bash tools/m11/m11_e2e.sh を先に)`。step 0 で止まり、step 1 以降は走っていない。
+- 理由: runner の `$ARTIFACTS_DIR` には `fl-win64.tar.zst` だけがあった (`ls` で確認)。`work-m11`・`work-liftdiff`・`toolchain-emsdk`・`toolchain-retdec` は、PR 本文に `oc_artifacts:` 行が無かったため取得されていない。`/opt/emsdk`・`/opt/retdec` も無い (IR を作る `m11_e2e.sh --full` は RetDec が要る)。
+- 対応: PR 本文に `oc_artifacts: fl-win64 work-m11 work-liftdiff toolchain-emsdk toolchain-retdec` を入れた。次の review run は本文の行から素材を取得する (`prepare-event-context.sh`)。HEAD での再測定はその run で行う。
+- HEAD で差分がある箇所 (測定 commit から HEAD まで): `tools/m11/ldfix/ldfix_e2e.sh` の 4 行追加・1 行削除 (§8 の diff)。`fix_site_3372.py` は差分 0 行。stage4・survey が HEAD でどう変わるかは未測定。
+
 ## 6. 判定表 (REPORT_2555 §2) の更新
 
-| 表 # | 関数 | 判定 (REPORT_2555) | 本 PR |
+| 表 # | 関数 | 判定 (REPORT_2555) | 本 PR・現状 |
 |---|---|---|---|
-| 1 | 0x413340 | 誤り | 未修復 → #3416 [CI-154] |
+| 1 | 0x413340 | 誤り | main の #3326 で修復済み (step 1c)。3 番目引数の判定は #3416 [CI-154] (CLOSED)、その修復は #3426 [CI-157] (OPEN) |
 | 5 | 0x44f040 | 誤り | **修復** (§2.1) |
-| 7 | 0x44fb40 | 誤り | 未修復 → #3416 [CI-154] |
-| 8 | 0x450420 | 誤り | 未修復 → #3417 [CI-155] |
+| 7 | 0x44fb40 | 誤り | main の #3326 で修復済み (step 1c) |
+| 8 | 0x450420 | 誤り | main の #3326 で修復済み (step 1c) |
 | 9〜11 | 0x450560 (3 箇所) | 誤り | 修復済 (#2502 `fix_450560.py`) |
-| 12 | 0x4506e0 | 誤り | 未修復 → #3417 [CI-155] |
-| 13 | 0x47b4a0 | 誤り | 未修復 → #3418 [CI-156] (複雑型) |
+| 12 | 0x4506e0 | 誤り | main の #3326 で修復済み (step 1c) |
+| 13 | 0x47b4a0 | 誤り | 未修復 → #3418 [CI-156] (OPEN・複雑型) |
 | 14 | 0x47cf10 | 誤り | **修復** (§2.2) |
-| 15 | 0x6074b0 | 誤り | **修復** (§2.3・表の一覧に無かった分) |
-| 16 | 0xc40770 | 誤り (非 null 経路) | 未修復 → #3418 [CI-156] (複雑型) |
-| + | 0x7888f0 | 誤り (取りこぼし) | 未修復 → #3417 [CI-155] |
+| 15 | 0x6074b0 | 誤り | **修復** (§2.3・表の一覧に無かった分。ldfix.py の `%ldfxu24` と同形なら据え置き) |
+| 16 | 0xc40770 | 誤り (非 null 経路) | 未修復 → #3418 [CI-156] (OPEN・複雑型) |
+| + | 0x7888f0 | 誤り (取りこぼし) | main の #3326 で修復済み (step 1c) |
 | — | 0x413c00・0x414c70・0x44f240 | 偽陽性 3 | 変更なし (走査定義の課題。REPORT_2555 §3) |
 | — | 0x439f90 | 判定不能 1 | 変更なし |
 
@@ -125,25 +133,40 @@ base IR: `%0 = call 4256c0(i64 %arg1)`。修復: `%a1g = load [arg1]` を入れ�
 
 | 受入条件 (#3372 本文) | 状態 |
 |---|---|
-| 残り 4 箇所 (0x44f040・0x47b4a0・0x47cf10・0xc40770) の機械照合付き IR 修復 | **一部**: 0x44f040・0x47cf10 を修復。0x47b4a0・0xc40770 は #3418 [CI-156] |
+| 残り 4 箇所 (0x44f040・0x47b4a0・0x47cf10・0xc40770) の機械照合付き IR 修復 | **一部**: 0x44f040・0x47cf10 を修復。0x47b4a0・0xc40770 は #3418 [CI-156] (OPEN) |
 | ネガティブコントロール (二重適用・機械照合の改変・IR base 形の不一致) | **達成** (§3) |
-| `ldfix_e2e.sh` の stage4・survey の実測 (測定 commit を REPORT に書く) | **達成** (§5。測定 commit `dd8894202`) |
-| 0x413340 の 3 番目引数の判定 | **未達** → #3416 [CI-154] |
+| `ldfix_e2e.sh` の stage4・survey の実測 (測定 commit を REPORT に書く) | **測定 commit `dd8894202` で達成** (§5)。HEAD `60cb4d886` での再測定は素材が無く未実施 (§5b) |
+| 0x413340 の 3 番目引数の判定 | 判定は #3416 [CI-154] (CLOSED・COMPLETED)。修復の判断は #3426 [CI-157] (OPEN) へ |
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x413340・0x44fb40・0x450420・0x4506e0・0x7888f0 の site 修復 (#3326 の成果が main に無い分。0x413340 の 3 番目引数の判定を含む) | 同類型の誤り 5 箇所 (REPORT_2555 表 #1・#7・#8・#12・+) | #3416 [CI-154] (0x413340・0x44fb40)・#3417 [CI-155] (0x450420・0x4506e0・0x7888f0) (本 PR から起票) |
-| 0x47b4a0・0xc40770 の site 修復 (複雑型: 比較・GEP・非 null 経路) | 同類型の誤り 2 箇所 | #3418 [CI-156] (本 PR から起票) |
+| 0x413340 の 3 番目引数 (呼出先 0x412fc0 の IR が機械語と不一致) の修復 | 同類型の疑い 1 箇所 (値の取り違え) | #3426 [CI-157] (OPEN) |
+| 0x47b4a0・0xc40770 (複雑型: 比較・GEP・非 null 経路) の site 修復 | 同類型の誤り 2 箇所 | #3418 [CI-156] (OPEN) |
+| HEAD `60cb4d886` での `ldfix_e2e.sh` 再測定 (§5b) | 測定 commit と HEAD の差分 (main の step 1c `fix_site_3326.py`) が未検証 | 起票しない (次の review run で再測定。PR 本文の `oc_artifacts:` 行を追加済み) |
 | stage4 の `memory access out of bounds` (dllmain・survey の oob 8 件) の原因 | 観測上の trap が残る。本 PR の 3 箇所とは無関係と確認 | #942 (既存) |
 | 走査の偽陽性 3 件・判定不能 1 件・取りこぼし定義 | 候補数の正しさ | #3328 [CI-149] (既存) |
 
+- 完了済み (参考): 0x413340・0x44fb40・0x450420・0x4506e0・0x7888f0 の修復は main の #3326 (PR #3400)。子 #3416・#3417 は CLOSED (COMPLETED)。
+
 ## 8. 検証範囲・git diff 証跡
 
-- 範囲内: 表 #5・#14・#15 の 3 箇所の IR 修復、機械照合 20 件、NC 4 種、ldfix_e2e (step 1d 込み) の 1 回完走、一次分類 17 行。
+- 範囲内: 表 #5・#14・#15 の 3 箇所の IR 修復、機械照合 20 件、NC 4 種、ldfix_e2e (step 1d 込み) の 1 回完走 (測定 commit `dd8894202`)、一次分類 17 行。
 - 範囲外: 他の誤り箇所 (§6 の未修復)、stage4 の trap の原因、走査定義の変更、liftdiff batch (`--batch` は未実行)。
-- 測定 commit: `dd8894202` (コード差分の最終 commit)。
-  `git diff dd8894202 HEAD -- tools/m11/ldfix/fix_site_3372.py tools/m11/ldfix/ldfix_e2e.sh` の出力は、本 REPORT の commit 時点で空 (差分 0)。
-- 素材: `fl-win64` は `extracted/block00031_PE.bin` (22,227,016 B) のみ展開。`work-m11` は main の `tools/m11/work/` (読込のみ・複製)。`toolchain-emsdk` は runner の emsdk (`emsdk_env.sh`) を使用。
+- 測定 commit: `dd8894202` (測定に使った pipeline。main の `fix_site_3326.py` は含まない)。
+- HEAD `60cb4d886` は未測定 (§5b)。測定 commit から HEAD までの差分:
+  - `git diff dd8894202 60cb4d886 -- tools/m11/ldfix/fix_site_3372.py` → 0 行 (変更なし)。
+  - `git diff dd8894202 60cb4d886 -- tools/m11/ldfix/ldfix_e2e.sh` → 下の diff (4 行追加・1 行削除。step 1c に main の `fix_site_3326.py` が入り、本 pass は 1d に置かれた)。
+
+  ```diff
+  -step "1c/5 function_44f040 の *arg1 読出し脱落 (#3372・機械語照合付き): work/ldfix_fixed.ll を上書き"
+  +step "1c/5 同類型の site 単位修復 (#3326・機械語照合付き): work/ldfix_fixed.ll を上書き"
+  +python3 "$HERE/fix_site_3326.py" "$HERE/work/ldfix_fixed.ll" "$HERE/work/ldfix_fixed_site.ll" --pe "$PE" || fail "fix_site_3326.py"
+  +mv "$HERE/work/ldfix_fixed_site.ll" "$HERE/work/ldfix_fixed.ll"
+  +step "1d/5 function_44f040 / 47cf10 / 6074b0 の *arg1 読出し脱落 (#3372・機械語照合付き): work/ldfix_fixed.ll を上書き"
+  ```
+
+- 機械照合の HEAD 側: `fix_site_3372.py` は測定 commit から変わっていない。機械照合 20 件は、レビュー run が `fl-win64` の `block00031_PE.bin` で HEAD 相当の script に対して再現した (レビュー結果の記録)。
+- 素材: `fl-win64` は `extracted/block00031_PE.bin` (22,227,016 B) のみ展開。測定 commit では `work-m11` を main の `tools/m11/work/` から読んだ (読込のみ・複製)。`toolchain-emsdk` は runner の emsdk (`emsdk_env.sh`) を使用。HEAD 試行 (§5b) では `work-m11` も emsdk も無かった。
 - 作業物 (`tools/m11/ldfix/work/`・`tools/m11/work/`) は gitignore 対象で commit しない。
 
 ## 9. 再現
