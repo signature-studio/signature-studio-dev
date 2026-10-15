@@ -1,4 +1,4 @@
-# tools/python REPORT: PY-129 ui setter 4 件の PE 呼出し経路と C provider 実装 (#3006, 親 #2980 PY-119, 子 #3719 PY-242)
+# tools/python REPORT: PY-129 ui setter 4 件の PE 呼出し経路と C provider 実装 (#3006, 子 #3719 PY-242。前段 PY-119)
 
 > 正本: `tools/python/REPORT_PY119.md` (保留 12 件の一覧と VA)。本 run の根拠は PE `block00031_PE.bin` の逆アセンブル (VA 付き)。
 
@@ -11,7 +11,7 @@
 
 ## 手段
 
-- ハンドラ探索と逆アセンブル: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (展開済み) の `block00031_PE.bin` を `analysis/flapi/pe_handler_probe.py` で読み、entry・fn VA を得た。逆アセンブルは repo 外の補助スクリプト (非コミット) で、RIP 相対の絶対アドレスは `次命令 + disp` で求めた。
+- ハンドラ探索と逆アセンブル: `tools/python/analysis/flapi/pe_handler_probe.py` (入力は `$FL_WIN64_DIR/extracted/block00031_PE.bin`。取り出し: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'`)。entry・fn VA は名前指定で得た (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_handler_probe.py setHintMsg setFocused setSnapMode snapMode`)。cb と共通経路は VA 指定で ret まで逆アセンブルした (`... pe_handler_probe.py 0xd6b700 0xd843d0`。VA 指定は本 PR で追加: `c2ee73c93`)。RIP 相対の絶対アドレスは `次命令 + disp` で求めた。
 - 形式・戻り型: 公開 stub (`analysis/flapi/flapi_table.json` の `sig.returns` / `kwsig.fmt`)。`flapi_table.json` の既存エントリ (`ui.setHintMsg` = `s`・`ui.setFocused` / `ui.setSnapMode` = `i`、np 1) と PE の PyArg 書式は一致した。
 - 共通経路 `0xd6fd10` (self → object) と `0xd843d0` (書込みの投入):
   - `0xd843d0(obj, &ret, cb, value, ...)`: 第 1 引数 obj の +0x50 sub-object が非 null かつ `0xd84f30(sub)` が偽なら何もしない (status -2 = 未適用)。それ以外は node を作り (`0xd841e0`)、value・stack 引数・cb (node+0x58) を格納して `0x526190` で投入する。`0xd84290` が node+0x58 の cb を呼ぶ。戻り status は node+0x60 (-2 = 未適用 / -4 = 途中 / 0 = 適用)。
@@ -27,7 +27,7 @@
 | `ui.setFocused` | 0x151b788 | 0xd6ce50 | VARARGS `i` (flags 1) | `0xd6fd10` → `0xd843d0(obj, &ret, cb=0xd6cdf0, i)`。cb は `G→+8→vtbl[0x98]()` が真なら `G→+0x54` の sub-object の `vtbl[0x38](i を 1 byte に切り詰めた値)` | sub-object (`G→+0x54`) の vtbl 0x38 (getFocused の vtbl 0x28 と対。意味は未確定) | int → byte | None | None (状態なし) |
 | `ui.setSnapMode` | 0x151b448 | 0xd6b7b0 | VARARGS `i` (flags 1) | `0xd6fd10` → `0xd843d0(obj, &ret, cb=0xd6b700, i)`。cb は gate `G→+8→vtbl[0x98]()` が真で、かつ `i ∈ 0..15` かつ 16bit マスク `0xd6b7a0` (値 0x7fff) のビット i が立つ場合のみ、`*([0x15e2eb8])+0xb18` の object の `vtbl[0x1f0](0x7a0d50(obj, i), 1)` を呼ぶ | `[0x15e2eb8]→+0xb18` の object | int | None | None (状態なし) |
 
-- 有効域: `setSnapMode` は **i ∈ 0..14** (マスク 0x7fff)。範囲外・gate 偽では書込みは無く、status は -2 のまま。
+- 有効域と status: `setSnapMode` の cb (`0xd6b700`) は、gate 偽なら status -2 のまま何もしない。gate 真なら status を -4 にしてから範囲検査 (`cmp eax, 0xf`・マスク `0x7fff` のビット i) に入り、i ∈ 0..14 で bit が立つときだけ書込み (`vtbl[0x1f0]`) を行い、status を 0 にする。i ∉ 0..14 (i = 15 を含む) では書込みをせず、status は -4 のまま終わる (逆アセンブル: `-2` を書く d6b709 → gate 通過で `-4` を書く d6b72f → 範囲検査が偽なら d6b75f から終了)。
 - 3 関数とも PE の戻り値は None (戻り値の格納は共通経路の `&ret` で、Python には返さない)。
 - 実装の仮置き: mock と C は型検査 (引数個数 1・setHintMsg は文字列・setFocused / setSnapMode は整数 (bool 可・None は 0)) のみ行い、状態を変えない。範囲外の挙動は実装していない (有効域チェックはしない)。
 
@@ -39,37 +39,38 @@
 
 ## 検証
 
-測定 commit: `ec8e7f897` (コードを変えた最後の commit。`origin/main` (1ccf20c6a) の取り込み merge。衝突はなく、main 側の `host/fl_mock.mjs`・`provider/fl_engine.c` (PY-111) は自動 merge)。その前の取り込み `a052f7390` (origin/main abb5fbf9d) の衝突 4 件 (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`・`tests/ui_state_diff.mjs`) と、`72ae6d066` (origin/main 8c23860cd) の衝突 2 件 (`docs/DOC_MAP.md`・`tests/provider_check.mjs`) は、いずれも PR 側と main 側の両方を残して解消した。`build_cpython_wasm.sh` の測定は `72ae6d066` の時点 (以降の差分は provider・host・tests・REPORT_PY111 のみで CPython の入力に無い)。以降の commit は `tools/python/REPORT_PY129.md` のみ。
+測定 commit: `c2ee73c93` (コードを変えた最後の commit。解析補助 `analysis/flapi/pe_handler_probe.py` に VA 指定を追加しただけで、`git diff ec8e7f897 c2ee73c93 -- tools/python ':!*.md'` は当該ファイルのみ。e2e の入力 (provider・host・tests) は `ec8e7f897` と同一)。`ec8e7f897` は `origin/main` (1ccf20c6a) の取り込み merge で、その前の取り込み `a052f7390` (origin/main abb5fbf9d) の衝突 4 件 (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`・`tests/ui_state_diff.mjs`) と、`72ae6d066` (origin/main 8c23860cd) の衝突 2 件 (`docs/DOC_MAP.md`・`tests/provider_check.mjs`) は、いずれも PR 側と main 側の両方を残して解消した。`build_cpython_wasm.sh` の初回計測は `72ae6d066` の時点 (以降の差分は provider・host・tests・REPORT のみで CPython の入力に無い)。`c2ee73c93` 以降は REPORT のみ。`origin/main` は測定時点で 71e64d058 まで進んだが、`git merge-tree` で衝突 0 件を確認し、取り込みは行っていない。
 
-環境: runner 4 core。`load` は各コマンドの終了直後の `/proc/loadavg` (1 分平均)。`fl-win64` は `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` に指定。`toolchain-emsdk` は本 run の素材に無かったため、emsdk を pin 6.0.12 で `$RUNNER_TEMP/emsdk` に導入し、`[EMSDK]` (`docs/REFERENCES.md`) の位置に symlink した (`emcc --version` 6.0.12)。
+環境: runner 4 core。`load` は各コマンドの終了直後の `/proc/loadavg` (1 分平均)。`toolchain-emsdk` は本 run の素材に無いため、上流から導入した: `git clone --depth 1 https://github.com/emscripten-core/emsdk.git $RUNNER_TEMP/emsdk` → `cd $RUNNER_TEMP/emsdk && ./emsdk install 6.0.12 && ./emsdk activate 6.0.12` (`emcc --version` = 6.0.12。`tools/shim/REPORT.md` と同じ経路)。`build_cpython_wasm.sh` と `build_flpy.sh` は `[EMSDK]` (`docs/REFERENCES.md`) の位置を直接 source するため、そこへ `$RUNNER_TEMP/emsdk` を symlink した。`provider/build.sh` は `EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh` で指定。`fl-win64` は `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin' '*block25159_DATA.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block24618_DATA.bin'` で必要分だけ展開し、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` で `work/` に配置した。
 
-| コマンド | 結果 | wall | load |
+| コマンド (`c2ee73c93`) | 結果 | wall | load |
 |---|---|---|---|
 | `bash fetch_inputs.sh` | rc 0 (`work/` に MCPTools.pyc・midi.py・utils.py・device script を配置) | 未計時 | — |
-| `bash build_cpython_wasm.sh` | rc 0 | 3 分 25.5 秒 (205.5 秒) | 未計測 |
-| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 | 4.6 秒 | 未計測 |
-| `bash provider/build.sh` | rc 0・ハンドラ 168 (`fl_table.c`: 関数 435。`a052f7390` で再ビルド) | 未計時 | 未計測 |
-| `node tests/provider_check.mjs` | PASS (functions 435・実装 168・未実装 267・MCP 静的 60) | 0.276 秒 | 0.21 |
-| `node tests/ui_state_diff.mjs` | calls 77・diffs 0・PASS (rc 0)。52 → 77 は main の PY-130 の呼出し (setter・getVersion) の追加 | 0.043 秒 | 0.21 |
-| `node tests/general_diff.mjs` | calls 41・diffs 0・PASS (rc 0) | 0.042 秒 | 0.21 |
-| `node tests/ui_diff.mjs` | calls 17・diffs 0・範囲外既知差分 3・PASS (rc 0) | 0.043 秒 | 0.21 |
-| `node tests/mixer_diff.mjs` | calls 69・diffs 0・PASS (rc 0)。calls 62 → 69 は main 側の `mixer_diff.mjs` の追加 (本 PR の変更ではない) | 0.044 秒 | 0.21 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (rc 0) | 1.292 秒 | 0.21 |
+| `bash build_cpython_wasm.sh` | rc 0 (初回は `72ae6d066` 時点で 3 分 25.5 秒 = 205.5 秒。今回は native build 済みの増分 129 秒) | 129 秒 (増分) | 2.77 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 | 4.9 秒 | 0.83 |
+| `bash provider/build.sh` | rc 0・ハンドラ 168 (`fl_table.c`: 関数 435) | 0.9 秒 | 0.56 |
+| `node tests/provider_check.mjs` | PASS (functions 435・実装 168・未実装 267・MCP 静的 60) | 0.292 秒 | 0.83 |
+| `node tests/ui_state_diff.mjs` | calls 77・diffs 0・PASS (rc 0) | 0.044 秒 | 0.83 |
+| `node tests/general_diff.mjs` | calls 41・diffs 0・PASS (rc 0) | 0.045 秒 | 0.83 |
+| `node tests/ui_diff.mjs` | calls 17・diffs 0・範囲外既知差分 3・PASS (rc 0) | 0.046 秒 | 0.83 |
+| `node tests/mixer_diff.mjs` | calls 69・diffs 0・PASS (rc 0) | 0.048 秒 | 0.83 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (rc 0) | 1.477 秒 | 0.83 |
 
-- `ui_state_diff.mjs` の calls 52 は、通常呼出し (ui ゲッター 14 + getFocused 3 + setter 13 = 30) と引数個数違い (22) の合計。setter 追加分は 19 呼出し (通常 13 + 個数違い 6)。
+- `ui_state_diff.mjs` の calls 77 の内訳 (ここが正本): 通常呼出し 49 = ui ゲッター 14 + getFocused 3 + setter 3 件 13 (setHintMsg 4・setFocused 4・setSnapMode 5) + PY-130 分 19 (setBrowserAutoHide 6・setStepEditMode 4・getVersion 9)。引数個数違い 28 = ゲッター 14 + getFocused 2 + setter 3 件 6 + PY-130 分 6 (setBrowserAutoHide 2・setStepEditMode 2・getVersion 2)。PR 前 (main 取り込み前) の 52 (通常 30 + 個数違い 22) に、main の PY-130 分 25 (通常 19 + 個数違い 6) を足した数。
 - 参考: PY-119 報告の `ui_state_diff` calls 12 は、現在のスクリプトの呼出し列と一致しない (PR 前の列は、ゲッター 17 + 個数違い 16 = 33 件と列から数えた値で、実行して測ったものではない)。PY-119 の件数は古いまま残っている (本 PR では訂正しない)。
 
-ネガティブコントロール: `host/fl_mock.mjs` の `ui.setSnapMode` の引数個数検査 (382 行) を `arity(a, 1, 1)` から `arity(a, 1, 2)` に変えると、`node tests/ui_state_diff.mjs` は `ui 状態ゲッター差分 1 件` で rc 1 (FAIL)。元に戻すと calls 52・diffs 0・PASS (rc 0)。元に戻した後の `git diff -- tools/python/host/fl_mock.mjs` は空。`provider/*.wasm` は変えていない (mock のみの変更)。
+ネガティブコントロール (`c2ee73c93`): `host/fl_mock.mjs` の `ui.setSnapMode` の引数個数検査 (現在 384 行: `arity(a, 1, 1)`) を `arity(a, 1, 2)` に変えると、`node tests/ui_state_diff.mjs` は `ui 状態ゲッター差分 1 件` で rc 1 (FAIL)。元に戻すと calls 77・diffs 0・PASS (rc 0)。元に戻した後の `git diff -- tools/python/host/fl_mock.mjs` は空。`provider/*.wasm` は変えていない (mock のみの変更)。
 
 ## コード差分
 
 - `host/fl_mock.mjs`: `ui.setHintMsg` (文字列検査)・`ui.setFocused` / `ui.setSnapMode` (整数検査) を PY-119 の ui 行の直後に追加。状態は持たない。
 - `provider/fl_engine.c`: 同じ 3 関数を `FL_H(ui, ...)` で追加 (`NARGS(1, 1)` と `A_STR(0)` / `A_INT(0, 0)`、戻り `fl_ret_none`)。
-- `tests/provider_check.mjs`: `pe129` の Set (3 件) と実装判定への追加、件数 assert は 168 / 267 (PR の pe129 3 件を加えて 158 / 277。main 取り込み分として `pl61` (PY-61・7 件) と `pe130` (PY-130・3 件) を判定行に両方残した結果)。
+- `tests/provider_check.mjs`: `pe129` の Set (3 件) と実装判定への追加、件数 assert は 168 / 267 (PR の pe129 3 件を加えて 158 / 277 ... main 取り込み分として `pl61` (PY-61・7 件) と `pe130` (PY-130・3 件) を判定行に両方残した結果)。
 - `tests/ui_state_diff.mjs`: setter の呼出し列 (通常 13・引数個数違い 6) を追加。
+- `analysis/flapi/pe_handler_probe.py`: VA 指定 (`0x...`) で任意の VA を逆アセンブルできるようにした。名前指定の動作は変えていない。
 
 ```
-$ git diff ec8e7f897 HEAD -- tools/python ':!*.md'
+$ git diff c2ee73c93 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
@@ -78,6 +79,6 @@ $ git diff ec8e7f897 HEAD -- tools/python ':!*.md'
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | setHintMsg / setFocused / setSnapMode の状態モデル (値を持たない。書込んだ値の読出し経路は未確定: getHintMsg の `[0x15e2eb8]→+0xbe8` と `0x11f16b0` の `+0x858` 系が同じ object か、getFocused の sub-object の読出し) | 書いた値を後で読めない。mock と C は getHintMsg / getFocused / getSnapMode を初期値で返す | 子 #3719 (PY-242) |
-| setSnapMode の範囲外 (i ∉ 0..14・gate 偽) の挙動 (status -2 のまま。Python 側の戻り変換 `0xd82c20` が未確認) | 範囲外で例外になるかが未確認。mock と C は範囲検査せず None を返す | 子 #3719 (PY-242) |
+| setSnapMode の範囲外 (i ∉ 0..14)。gate 真では status -4 のまま書込み無し (`0xd6b75f`)。gate 偽は -2 のまま | 範囲外の status (-4) を Python 側の戻り変換 `0xd82c20` が例外・値のどれにするかが未確認。mock と C は範囲検査せず None を返す | 子 #3719 (PY-242) |
 | snapMode (`0xfdd2c0` id 0x31) の意味・戻り型 | `ui.snapMode` は未実装 (Unspecified error) | 子 #3719 (PY-242) |
-| 実装 3 件の値 (None・状態なし) は実機測定していない | 実機の戻り挙動は未確認 | 親 #2831 の残件として追跡 |
+| 実装 3 件の値 (None・状態なし) は実機測定していない | 実機の戻り挙動は未確認 | 子 #3719 (PY-242) |
