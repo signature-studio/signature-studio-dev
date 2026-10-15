@@ -2,6 +2,7 @@
 
 > 親 #976 (LD-24) の子。分割の正本は [`REPORT_LD24.md`](REPORT_LD24.md) §3。
 > 既知類型との関係: 該当なし (lift の silent miscompile ではなく、case 生成と署名型の問題)。
+> 後続: 本節の『推定』は [`REPORT_LD158.md`](REPORT_LD158.md) (LD-158 / #3470) で動的実測に置き換えた (xmm0 戻り 8 関数の署名修正を含む)。
 
 ## 1. 結論
 

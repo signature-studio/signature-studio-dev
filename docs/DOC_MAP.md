@@ -139,6 +139,9 @@
 | `tools/liftdiff/REPORT_LD39.md` | ~75 | liftdiff LD-39 (#1194) 節 (途中報告): i128 / %tagPOINT の 11 関数の振り分けと機械語入口の実測。i128 の渡し方は 2 候補とも未決。case 生成・runner は未実装 |
 | `tools/liftdiff/REPORT_APPENDIX_LD53.md` | ~120 | liftdiff LD-53 (#1546) 節: i128 引数の呼出し側全件 (命令境界の線形走査) と呼び先の判定。(a)/(b) は 691dd0 を含め棄却 (§7)。IR 型誤りの修正は #1479 (§7.4) |
 | `tools/liftdiff/tests/ld39_abi_dump.py` | ~80 | LD-39 (#1194) の ABI 入口ダンプ: 11 関数の PE 先頭命令列を capstone で並べ、jmp thunk の IAT 先を解決する。ABI は断定せず、判定は REPORT_LD39.md で人が行う |
+| `tools/liftdiff/REPORT_LD158.md` | ~190 | liftdiff LD-158 (#3470) 節: ret=i128 39 関数の実戻りレジスタの動的実測 (rax / rdx / xmm0 の書換え) と、xmm0 戻り 8 関数の署名 double 化 (`ret_override`・m11_tr_ 経由)。判定不能 11 と併存 20 は LD-162 (#3572) へ |
+| `tools/liftdiff/tests/ld158_ret_probe.py` | ~110 | LD-158 (#3470) の動的プローブ: i128 戻り関数を 11 pattern × xfill {1,0} で native 実行し、戻り後 rax / rdx / xmm0 の書換えを記録 (`work/ld158_probe.json`)。`--names` で陰性対照の関数を指定できる |
+| `tools/liftdiff/tests/ld158_summarize.py` | ~70 | LD-158 (#3470) の集計: 動的分類・静的 dsm 判定 (窓 3 / 8) の件数と、`ret_override` と動的 xmm0 のみ集合の一致を出す (`work/ld158_table.tsv`) |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
 | `tools/icall/REPORT_APPENDIX.md` | 242 | icall REPORT §10.1 (#530 OTT 回帰再実行)・§11 (ICALL-6 #361)・§12 (#229 FLEngine 分割 lift・§12.1 ICALL-9 #847)・§14 (ICALL-16 #1023 stack 引数の実測。REPORT §12 から分割移動)・§15 (#851 の結論 1 行)・§16 (#852 FLEngine jump table) の全文 (250 行上限のため分割移動) |
 | `tools/icall/REPORT_APPENDIX_1014.md` | 104 | icall #1014 (ICALL-15): FLEngine 2 関数の落ち 366 site のブロック単位 before / after 分類 (全て消失・別関数への移動 0)。stub を含むブロックは SCCP で stub を失い、Jump Threading で消える。受入条件 3 (修正と kept 実測) は未達で #1014 に継続。測定値の正本 (段ごとの stub 数は `REPORT_APPENDIX.md` §12.1 が正本) |
