@@ -211,9 +211,7 @@ index 0a04d40d..09735bef 100644
 | 線型 sweep は不正命令ごとに `data[off:]` を複製する (O(n²)・`sweep` の注記) | 不正命令が多い区間で遅くなる。今回の gap 5.84 MB では stats 全体 35.3 秒 | 未起票 (限界の注記のみ・PM 判断) |
 
 §9 の後の commit (引数の未使用の削除 `index_ins`・docstring の注記) の同値確認: 測定 commit `0fc7d986` と HEAD の `m11_argrecover.py` で `build_index` / `build_mod` の出力 (`callers` 23,407 キー・`taken` 3,492・`mod` 57,816 件) を JSON 化して比較し、byte 一致 (sha256 `1d62c0ca…` 両者)。PE は `fl-win64` の `block00031_PE.bin` (sha256 `b2c64da4…`)。stats 全体と e2e は work-m11 が無いため、この commit では再実行していない。
-
 測定 commit から HEAD までのコード差分 (`git diff 0fc7d986 HEAD -- tools/m11/m11_argrecover.py`):
-
 ```diff
 @@ -302,8 +302,8 @@ class Defchain:
              self.bl[va] = Blocks(fn) if fn.ins else None
