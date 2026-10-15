@@ -85,7 +85,7 @@ kh_stack base 0x39a0
 ## 5. 再現手順
 
 1. 素材展開 (`tools/targets/kilohearts/`): `KH_UI_WORK=$PWD/work bash ui_eval/extract_core.sh` (sha256 検証あり・約 27 s)。
-2. 閉包 4 ラウンド (license/): `python3 scripts/kh656_closure.py --rounds 4` (約 93 s)。終了時の F の `lift` は 314 件 (`1813846e0` を含む)。
+2. 閉包 4 ラウンド (license/): `python3 scripts/kh656_closure.py --rounds 4` (約 93 s)。終了時の F の `lift` は 314 件 (`1813846e0` を含む)。**#4272 の再測定では 4 ラウンドで収束せず `FAIL` (lift 8→42→80→166)。§8.4 参照。**
 3. 313 集合 (検証用の**未コミット**設定): F の `lift` から `1813846e0` を外し、`shims` に `"1813846e0": "memset"` を追加 (§7.1 と同じ構成。#1817 の方針に従いコミットしない)。
 4. `python3 lic_build.py --module F` → `node kh249_check.mjs` (入口 `memory access out of bounds`) → `node scripts/kh29_stack_probe.cjs`。
 5. 検証後、`lic_config.json` は HEAD に戻す (本 PR では設定を変えない)。
@@ -123,9 +123,65 @@ git diff a65a71ed1 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md
 
 - 受入 1: 入口の `memory access out of bounds` は消えた。次に現れる trap は未 lift callee `0x180fc61dc` (`kh249_check.mjs` の `NG 入口実行が最初の未 lift callee 0x180112a30 に到達しない` の理由に表示される)。`0x180fc61dc` の lift は本 issue の範囲外 (#4254)。
 - 受入 2: 付録 §3 の 5 件 (`0x1813a493a` "string too long"・`0x1813a9c7c` "vector too long"・`0x1813d21e8` "unordered_map/set too long"・`0x1813d2203` "invalid hash bucket count"・`0x1813d3b6c` "map/set too long") は全て `.rdata` の文字列で、全て窓化された。`0x1813d21e8` の出所は `kh_18011feb0`・`kh_18012a280`・`kh_180138750` の `store ... @rcx` (§3)。
-- 受入 3 (未達・子 #4272 へ移管): lift-8 の sha は `7ba79e65…` から `3d2bc6fd…` へ変わる (+93 B、実測)。`globals.c` の件数は on 側で 10 件。off 側の件数と、sha 差分の内訳 (窓の追加・文字列 VA の置換の別) は未測定。本 run では `plugins-kilohearts`・`toolchain-retdec`・`toolchain-emsdk` が実行環境に無く、再測定できなかった。
+- 受入 3 (#4272 で測定): 下表 §8.1〜§8.3。sha 変化の原因は文字列窓 (`rdata_str`) と、測定 commit 後に入った `gen_simd.py` の変更 (#3307) の 2 つで、切り分け済み。
 - 受入 4: ネガコン済み (上表)。`rdata_str` を外すと入口は OOB に戻る。
 
 **kh249_check の前提**: `product_index.json` は `KH_SRC=<素材の展開先>` で `scripts/kh249_product_index.py` を走らせて生成する (素材の所在は既定 `~/ダウンロード`)。
 
 測定 commit から HEAD までのコード差分 (`git diff 56254af13 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md'`) は本 commit 時点で 0 行。
+
+### 8.1 #4272: lift-8 の sha 差分の内訳 (実測)
+
+測定 commit: `091c68915` (測定 driver `scripts/kh656_window_measure.py` の追加 commit。コードを変えた最後の commit)。再現: `python3 scripts/kh656_window_measure.py lift8 on|off`。
+
+| 条件 | wasm bytes | sha256 | globals |
+|---|---|---|---|
+| lift-8 `rdata_str` 無し | 54,394 | `7ba79e65…8c7707` | 9 |
+| lift-8 `rdata_str` 有り | 54,487 | `3d2bc6fd…e77287` | 10 |
+
+差分 +93 B のセクション別内訳 (実測。wasm section ごとのバイト数):
+
+| section | off | on | 差 |
+|---|---|---|---|
+| 6 (global) | 520 | 729 | +209 |
+| 7 (export) | 1,383 | 1,406 | +23 |
+| 10 (code) | 50,025 | 50,025 | 0 (長さ同一。内容は不一致・差の位置は未特定) |
+| 11 (data) | 2,460 | 2,524 | +64 |
+
+section 単位の合計は +93 B と一致する。文字列窓 `global_var_1813d47fe` (64 B の `.rdata` 文字列 `Snapin Das Kleine Krokodil`) が data に +64、export に名前 1 件 (+23)。`final.ll` の差分は宣言 1 行と、`store i64 ptrtoint(@global_var_1813d47fe)` の 1 箇所だけ。global section の +209 の内訳は未測定。
+
+### 8.2 #4272: 313 集合の on/off と raw_va の値 store (実測)
+
+313 集合: F の初期 lift 8 件 + `kh656_rounds.json` の new_lift (全 4 ラウンド) − `1813846e0` (memset shim)。`kh656_closure.py` は 4 ラウンドで収束せず `FAIL` (lift 8→42→80→166 の途中)。313 はその記録から復元した (lift 件数の記録と一致)。
+
+| 条件 | wasm bytes | sha256 | globals |
+|---|---|---|---|
+| 313 `rdata_str` 無し | 1,543,976 | `422c129f…81a8e3` | 82 |
+| 313 `rdata_str` 有り | 1,547,172 | `1f9ad82f…39590f` | 116 |
+
+- `raw_va` の値 store (`store i64 <9 桁以上の即値>`): off 2,606 行 → on 2,522 行。消えた値は 34 種類・84 行 (全て `.rdata` の文字列 VA)、追加は 0 件。文字列以外の値 store は変わらない。
+- よって「文字列窓化で `raw_va` の値 store が変わらない」は**偽**。変わるのは文字列 VA を指す store の 84 行だけで、vtable・関数ポインタの値は変わらない (受入 3 の答え)。
+- `11 (data)` の差は文字列窓の追加 (`global_var_*` 116 件 vs 82 件) による。
+
+### 8.3 #4272: sha 変化の原因の切り分け (`gen_simd.py` の影響)
+
+`rdata_str` 以外に、測定 commit `56254af13` から HEAD までで 313 の sha を動かす変更があった: `lift/gen_simd.py` (+12 行、SSE 語彙 `pcmpeqd`・`pcmpeqw`・`pmovmskb`・`tzcnt` の追加、#3307 KH-52 `a441a3654`)。
+
+| 条件 | commit | wasm bytes | sha256 |
+|---|---|---|---|
+| 313 `rdata_str` 有り | `56254af13` (REPORT 測定 commit) | 1,547,049 | `68936e80…42e1e` (REPORT 値と一致) |
+| 313 `rdata_str` 無し | `56254af13` | 1,543,853 | `8935ad14…287c6e` (REPORT 値と一致) |
+| 313 `rdata_str` 有り | HEAD `091c68915` | 1,547,172 | `1f9ad82f…39590f` |
+| 313 `rdata_str` 無し | HEAD `091c68915` | 1,543,976 | `422c129f…81a8e3` |
+| 313 `rdata_str` 有り | HEAD の `gen_simd.py` だけ `56254af13` 版に戻す | 1,547,049 | `68936e80…42e1e` (`56254af13` と一致) |
+
+- したがって 313 の sha 変化 (`68936e80` → `1f9ad82f`、+123 B) は `gen_simd.py` (#3307) が原因。`rdata_str` の窓化は両 commit で同じ差 (+3,196 B 相当の文字列窓込み) を持つ。
+- 本 REPORT の §3 の 313 値 (`56254af13`) は再現済み。以後の 313 比較は HEAD の値を使う。
+- lift-8 の `56254af13` での値は未測定。HEAD の lift-8 の値は §8.1 (`gen_simd.py` の影響の有無は未確認)。
+
+### 8.4 #4272: 検証の範囲と未解決
+
+- 受入 1〜4 を満たす (§8.1 が受入 1・2、§8.2 が受入 3、§5 の手順と §8.2 の再現で受入 4)。推定の文言は残していない。
+- `kh656_closure.py --rounds 4` は収束せず `FAIL` になる (`lic_config.json` の F ブロックを書き換えた状態で終わるため、測定後は HEAD に戻した)。収束の再確認は本 issue の範囲外。
+- lift-8 の `56254af13` での値は未測定 (`gen_simd.py` の影響が lift-8 に無いことの確認。影響は 313 と同じ経路なので、必要なら別途)。
+- 閉包の 4 ラウンド不収束は #1817 (KH-28) の範囲。
