@@ -208,9 +208,29 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 - ネガティブコントロールは今回は再実行していない。device 関数 (PY-206 の 7 関数) の C / mock 実装は `b3c3dafdd` から変わっていない (差分は main 由来の mixer・playlist・ui の関数のみ)。
 - 負荷: load average は未計測。各検査は単発の直列実行。
 
+## 再測定 (競合解消 round 8・測定 commit `a2ecafa0b`・main `512b09ffa` 取り込み後)
+
+- 測定 commit: `a2ecafa0b` (`origin/main` (`512b09ffa`) を merge した commit。前節 `e814e9d20` の後に main へ入った `general.processRECEvent` (PY-235・#3701) の mock / C 実装と `general_diff.mjs` の追加分を取り込んだ)。競合は `tests/provider_check.mjs` の 1 箇所 (判定 `if` と件数 assert)。main 側の `pe235` (1 件) を PR 側 `pe206` (7 件) と併存させ、件数を **183** 実装・**252** 未実装にした (`fl_table.c` のハンドラ数 183 と一致)。`provider/fl_engine.c`・`host/fl_mock.mjs` は自動 merge。device 関数の C / mock 実装は round 6b から変わっていない。コードを変えた最後の commit。
+- 測定 commit から HEAD までのコード差分: `git diff a2ecafa0b HEAD -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (本節を書いた commit は `tools/python/REPORT_PY206.md` だけを変える)。
+- 素材・入力: round 7 と同じ (`fl-win64` 全展開・`fetch_inputs.sh` rc 0・`[EMSDK]`・`FLPY_SKIP_TABLE=1`)。`build_cpython_wasm.sh` は round 7 の成果物を再利用。
+
+| 検査 | 結果 | rc |
+|---|---|---|
+| `bash provider/build.sh` | `fl_table.c: 435 関数, ハンドラ 183` | 0 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | flpy.js / flpy.wasm 生成 (6 秒) | 0 |
+| `node tests/provider_check.mjs` (§3 flpy 段を含む) | functions 435・**implemented 183**・unimplemented 252・mcp_static 60・PASS | 0 |
+| `node tests/*_diff.mjs` (22 本・device_diff を含む) | 全て **diffs 0**・PASS (各 0〜1 秒) | 0 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | **48/48 ok**・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 0 |
+| `node tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425 | 0 |
+| `node tests/midi_script.mjs` / `node tests/ilmcp_e2e.mjs` | MIDI SCRIPT OK (checks 29・failed []) / PASS | 0 |
+| `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 node tests/pyscript_e2e.mjs` | **72 PASS・fail 0** | 0 |
+
+- ネガティブコントロールは round 6b (`b3c3dafdd`) の値を引き継ぎ、今回は再実行していない (device 関数の C / mock は変わっていない)。
+- 負荷: load average は未計測。各検査は単発の直列実行。
+
 ## 検証範囲 / 範囲外
 
-- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (測定 commit `e814e9d20` で 435 = 実装 182 + 未実装 253)。
+- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (測定 commit `a2ecafa0b` で 435 = 実装 183 + 未実装 252)。
 - 範囲外 (未確定のまま残す): 実 FLEngine 上の状態値 (idle・midi-out・master sync の初期値)、通知 3 件の vtbl 先の効果、`setMasterSync` の述語 P 偽 (-2) の発生条件、`0x1366e00`・`0xfd7170`・`0xfd7240` の効果、-6/-7 の実発生。
 - KPI: device API は起動・GUI に関わらないため、起動 KPI (`tools/flelift/boot/REPORT.md`) は動かしていない。
 
