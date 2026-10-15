@@ -122,5 +122,5 @@ M11_WORK=<同> bash tools/m11/ldfix/fix_d17_e2e.sh
 ## 12. 再現 (コマンドの詳細)
 
 - 対応表: `M11_WORK=… python3 tools/m11/ldfix/origin_b_2940.py` (0.6 秒)。
-- e2e: `M11_WORK=… bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground、約 48 秒)。
+- e2e: `M11_WORK=… bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground、HEAD で 47.2 秒・§9-1)。
 - 素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff`。
