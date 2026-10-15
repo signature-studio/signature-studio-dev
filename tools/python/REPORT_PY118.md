@@ -88,7 +88,7 @@
 ## 8. #3059 (PY-202): 実行時の既定色と wrapper 範囲判定の PE 静的解析 (追記)
 
 受入条件 1 と 3 の下限 (idx < 0) を本節で確定した。上限 (N−1 の実行時値と 127〜501 の区間) は #3553 へ移した (§9)。受入条件 2 と 4 は子 issue に移した (§9)。
-測定 commit (コードを変えた最後の commit): `359ba1159` (`fix(python): getTrackColor の idx < 0 を PE 0xd5ec60 に合わせ int 0 にし、idx ≥ 127 は RANGE のまま [PY-202]`)。
+測定 commit (コードを変えた最後の commit): `32662af4d` (`test(python): mixer_diff の範囲外コメントを idx ≥ 127 の RANGE に合わせる [PY-202]`)。直前のコード変更は `359ba1159` (`fix(python): getTrackColor の idx < 0 を PE 0xd5ec60 に合わせ int 0 にし、idx ≥ 127 は RANGE のまま [PY-202]`)。
 
 ### 8.1 結論
 
@@ -114,20 +114,21 @@
 | 0x789530 の呼出し元 | `0x111d882` (`0x111d7e0` 内) | `0x111d7e0` は PE 内に直接参照が無い (間接呼出し)。設定 XML の読込み `0x111b930` は推定 (拡張子 ".xml" の比較は UTF-16 からの推定) |
 | 0x770830 の呼出し元 | `0x111d87a` (`0x111d7e0` 内)・`0x11be297` (`0x11be0a0` 内) | `0x11be0a0` ← `0x1375220` ← `0x1376545` ← export `CreateFruityInstance` (`0x1375990`) |
 
-### 8.3 実測 (コミット済み HEAD `359ba1159`)
+### 8.3 実測 (コミット済み HEAD `32662af4d`・測定 commit)
 
-- 環境: runner。測定直前の `uptime` は `load average: 0.57, 0.40, 0.17` (04:28:26)。emsdk は `toolchain-emsdk` を `tar --zstd -xf` で `$RUNNER_TEMP/emsdk-art` に展開 (3.5 秒)。`fl-win64` は使わない (provider の build と mock・wasm の比較だけ)。
+- 環境: runner。build 直前の `uptime` は `load average: 0.43, 0.49, 0.23` (04:40:25)。emsdk は `toolchain-emsdk` (`$HOME/artifacts`) を `tar --zstd -xf` で `$RUNNER_TEMP/emsdk-art` に展開。`fl-win64` は使わない (provider の build と mock・wasm の比較だけ)。
+- 初回 build (`32662af4d`): real 10.089 s、警告 0。下表は同じ HEAD での再実行。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `EMSDK_ENV=$RUNNER_TEMP/emsdk-art/emsdk/emsdk_env.sh bash provider/build.sh` | rc 0、警告 0。fl_engine.c 変更直後の初回は real 15.282 s。HEAD での再実行は real 1.075 s (emcc のキャッシュ有り)。`dist/flprov.wasm` は 04:28:27 に更新 | 1.075 s |
-| `node tests/mixer_diff.mjs` | `{"calls":69,"diffs":0,"PASS":true}` | 0.053 s |
-| `node tests/channels_diff.mjs` | `{"calls":238,"diffs":0,"grid_calls":1200,"grid_true":30,"grid_diffs":0,"PASS":true}` | 0.068 s |
-| `node tests/provider_check.mjs` | rc 1。行 134 (flpy 部の入力 `work/midi.py`) で ENOENT。それ以前の assert (件数 165・270 を含む) は通過。前回と同じ未解決 (#3804) | — |
+| `EMSDK_ENV=$RUNNER_TEMP/emsdk-art/emsdk/emsdk_env.sh bash provider/build.sh` | rc 0、警告 0 (grep 0 件)。`dist/flprov.wasm` を更新 | 0.702 s (emcc のキャッシュ有り) |
+| `node tests/mixer_diff.mjs` | `{"calls":69,"diffs":0,"PASS":true}` | 0.042 s |
+| `node tests/channels_diff.mjs` | `{"calls":238,"diffs":0,"grid_calls":1200,"grid_true":30,"grid_diffs":0,"PASS":true}` | 0.052 s |
+| `node tests/provider_check.mjs` | rc 1。`tests/provider_check.mjs:134` (flpy 部の入力 `work/midi.py`) で ENOENT。それ以前の assert は通過。前回と同じ未解決 (#3804) | — |
 
-- **ネガティブコントロール** (HEAD で再実行): mock の `getTrackColor` を旧版 (`const t = tr(i)`、idx < 0 も RANGE) に戻すと `mixer_diff` は `AssertionError` (actual `{ code: 4 }`)、rc 1。修正版に戻し (`cmp` で一致を確認)、`{"calls":69,"diffs":0,"PASS":true}` を再確認。
-- **範囲の照合** (mock と wasm、idx −1〜502。一時 script を `$RUNNER_TEMP` に置き、リポジトリには残さない): `{"range":[-1,502],"diffs":0,"segments":{"int0":[[-1,-1]],"color":[[0,126]],"code4":[[127,502]]}}`。mock と wasm は一致。idx 127〜502 は両方 code 4 (PE は 127〜501 を範囲内とみる・§8.1)。
-- **差分**: `git diff 359ba1159 HEAD -- tools/python` の出力は、本 REPORT を commit する前の HEAD で 0 行。本 REPORT の commit 後は `REPORT_PY118.md` だけになる (`:(exclude)*.md` で 0 行)。
+- **ネガティブコントロール** (HEAD で実行): mock の `getTrackColor` から `if (i < 0) return 0;` を外すと `mixer_diff` は `AssertionError` (actual `{ code: 4 }`、expected `{ ok: 0 }`)、rc 1。`git show HEAD:` で元に戻し、`cmp` で一致を確認してから `{"calls":69,"diffs":0,"PASS":true}` を再確認。
+- **範囲の照合** (mock と wasm、idx −1〜502。一時 script を `$RUNNER_TEMP` に置き、リポジトリには残さない): `{"range":[-1,502],"diffs":0,"segments":{"int0":[[-1,-1]],"color":[[0,126]],"code4":[[127,502]]}}`。mock と wasm は一致。idx 127〜501 は両方 code 4 で、PE は 127〜501 を範囲内とみる (§8.1)。502 は PE では N=502 のとき範囲外 (`jg`) となり int 0 を返すが、C/mock は code 4 のまま。この食い違いは上限の未解決として §9 (#3553) に含む。
+- **差分**: `git diff 32662af4d HEAD -- tools/python ':(exclude)*.md'` の出力は 0 行 (本 REPORT の commit 前の HEAD で確認)。本 REPORT の commit 後は `REPORT_PY118.md` だけになる。直前のコード変更 (`359ba1159`) からの `tools/python` の差分は `tests/mixer_diff.mjs` の注記コメント 1 行 (`32662af4d`)。挙動は変えていない。
 
 ### 8.4 変更の範囲
 
