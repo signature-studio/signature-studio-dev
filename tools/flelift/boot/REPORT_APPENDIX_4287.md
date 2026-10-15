@@ -65,3 +65,20 @@ FL_WIN64_DIR=<fl-win64 展開先> FLE_BOOT_WORK=<work> WVAL_OBJWATCH=1 bash tool
 - `fle_ov_getmem` の戻り時の実測 (`fle_boot.c` の `[wobj-getmem]`、obj を含む確保のみ出力): `p=0x12d6a090 size=320 obj+0xc4=0`。`size=70` の行は `+0xc4` が確保領域の外なので参照値にならない。
 - 判断: obj の mode の 0 は、lifted の store ではなく **host の getmem (FastMM) が返した領域の初期値** に由来する見込み。ただし「FastMM が 0 埋めしたのか、解放済みの 0 の領域の再利用か」は、確保前の値を測っていないため未確定。
 - 受入条件 1 (設定元の VA) は、lifted コード内の VA としては特定できない (設定元はホスト側の getmem)。部分達成。
+
+## G. 追補 (FLE-22 3 回目): 解放・再確保の前後の値
+
+- 前提の修正: main が進んで obj は `0x12d7a090` (前回の `0x12d6a090` から変化)。診断の固定値と `wval_lift.py --fixobj` の既定値を `0x12d7a090` に合わせた。
+- 追跡表 (`BLKDIAG_MAX`=768) は序盤で飽和し、以降の解放は `NOT TRACKED` になる。このため解放の判定は表に依らず、obj を含みうる近傍 (`fp <= obj < fp+0x1000`) の解放で記録する (`[wobj-free]`)。
+- 結果 (commit `d8420c54d`・diag_shim):
+  - `[wobj-free] p=0x12d7a090 obj+0xc4=0` が 3 回 (seq 2297・2307・2308)。解放時点で obj+0xc4 は常に 0。
+  - 再確保 `[wobj-getmem] p=0x12d7a090 size=320 obj+0xc4=0 freed_before=1 freed_val=0`。解放済み領域の再利用である。
+  - 以降 `[wobj] va=0x6bc010 ... v=0` の 1 件のみ (lifted の store は 0 を書く 1 件のみ)。
+- 既定経路 (root 0x6a7b70 有・`WVAL_IPP= WVAL_NULLFILL=0`) でも同じ連鎖。`boot_threw: exit`・`px6bbc20.calls_all` 0。
+- 結論: obj+0xc4 の 0 は、解放時点の値が既に 0 の領域を再利用した結果。**0 がどこで最初に書かれたか (最初の確保時の 0 埋めか、ホスト C の書込みか) は、解放・確保の区間の観測では特定できない**。最初の確保 (解放より前) の値は本測定の対象外。
+- KPI: FLEngine 起動 units 前 209 / 後 209 (baseline・既定)。最初のウィンドウ: 無し。既定の build・lift 経路は変えていない (診断は boot/ 内・`[wobj-*]` 出力時のみ)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 最初の確保時の obj+0xc4 の値 (0 埋めか未初期化の 0 か) | 受入条件 1 の確定 | #4287 |
+| 既定経路で boot が `exit` で止まる原因 (IPP 判定 NG) | 既定経路の比較 | #3868 |
