@@ -193,7 +193,7 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 - `MX_OPT=-O0` の初回 exit 1 は、`858fbfcd` での 3 回連続でも再現せず (上表 3 行とも exit 0)。`d0eddb92` の 3 回と合わせ計 6 回連続 PASS。原因は引き続き未確定 (上記の記録と同じ)。
 
 - dsp の値は `dsp/REPORT.md` と §2/§3 に一致 (258,087 / 48,612)。別の値は残していない。
-- clen は §11.2 のとおり未実施。
+- clen 回帰 (クリーン HEAD) は §11.4 で実施。本表は測定 HEAD `858fbfcd` の値で、現 HEAD の値は §11.4。
 
 ### 11.2 未解決 (起票先付き)
 
@@ -202,10 +202,9 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 | `MX_OPT=-O0` の初回 exit 1 (`patch site 0x18115dec2` assert)。原因未確定 | e2e の再現性 (計 6 回中 1 回のみ) | #266 (コメントで追跡) |
 | 展開物の installer 内 checksum 0/125 一致 (実機 installer との同一性は未照合) | 「実バイナリに対する回帰」の判定 | #266 |
 
-- **clen 回帰 (未実施)**: clen の対象を特定できなかった。
-  - #266 本文・親 #245 のいずれにも clen の記述は無く、対象未特定。起票先 #880 (OPEN)。
-  - massivex 配下に clen を検証する script は無い (`clen` は serum2 の `sr3_cut.py` のみ)。
-  - 対象確定と実施は別 issue に切り出す。起票先: #880 (OPEN)。
+- **clen 回帰 (実施・§11.4)**: 対象は #880 本文の PM 判断 (R8・可逆) で、クリーン HEAD 検証の `dsp/e2e.sh` と `dsp/negctl.sh` (3 件) に確定。
+  - #266 コメント (2026-10-11) の受入条件「回帰 (MX-3 dsp/e2e.sh・negctl 3 件・clen HEAD)」が根拠。#266・#245 の本文に clen の記述は無い。
+  - massivex 配下に clen の検証 script は無い (`clen` は serum2 の `sr3_cut.py` のみ)。新規 script は作らず既存の 2 本を使った。
 - **MX2-3 (N5 demo UI 抑制 / N6 文言)**: 未実装。起票先: #830。
 - **MX-3b 本体 (U1 process slot 同定 / U2・U5 closure 厳密化 / U3 vectorcall・U4 C++ EH)**: 未着手。起票先: #266。
 
@@ -215,6 +214,25 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 - `e2e.sh` の retdec / emsdk は `RETDEC` / `EMSDK` 環境変数で上書き可能。既定は REFERENCES `[RETDEC]` / `[EMSDK]` (配下の `[OPT-TOOLS]`)。
 - `pefile` / `capstone` / `numpy` を pip 導入して実行する。
 - fresh checkout で `license/work/` `dsp/work/` が無くても動くよう、両 `e2e.sh` の先頭で `mkdir -p` している。
+
+### 11.4 clen 回帰 (クリーン HEAD) — 2026-10-15 実測 (#880)
+
+- 測定 commit = `44a7f4465` (main)。検証 worktree は `git worktree add --detach $RUNNER_TEMP/wt_verify_880 44a7f4465` で展開し、`MX_PE` で素材の `Massive X.vst3` を指定した。
+- 差分 0 の証跡: `git diff 44a7f4465 HEAD -- tools/targets/massivex ':!tools/targets/massivex/REPORT.md'` の出力は空。
+- 素材: `plugins-massivex` のみ。`$RUNNER_TEMP/mx` に展開 (exe 1,870,391,792 B) → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key`。`Massive X.vst3` = 95,356,824 B、md5 `622993e7…` (§11.1 と一致)。md5-ok 0/125 は既知事象。
+
+| 項目 (測定 commit `44a7f4465`) | 結果 | 所要 | load (開始→終了, 1 分値) |
+|---|---|---|---|
+| `dsp/e2e.sh` | exit 0 (PASS) / insns 258,087 / unsup_sites 38,485 / e8e9_targets 594,978 | 24 s | 0.61→0.82 |
+| `dsp/negctl.sh` NC1 (root→dummy) | insns 3,118 / unsup 5 (base 38,485) → FAIL<期待> | 8 s (NC1〜NC3 計) | 0.54→0.61 |
+| NC2 (root→export 4) | insns 4,575 / unsup 561 → FAIL<期待> | — | — |
+| NC3 (root→0x180000001) | insns 31 / unsup 0 → FAIL<期待> | — | — |
+
+- 判定: e2e は PASS。NC1〜NC3 は期待どおり FAIL (壊した入力で unsup が base より減る)。
+- §11.1・dsp/REPORT.md の unsup_sites 48,612 との差 (−10,127): `858fbfcd` 以後に x64c が VEX/FMA/rcr (`ac58a8749`) と Agg2D の 6 語彙 (`fe2dc9ed9`) を覆った分。`insns` と `e8e9_targets` は変わらない (`git log --oneline 858fbfcd..44a7f4465 -- tools/flelift/x64c.py`)。
+- 未解決 (起票先 #3454 [MX-35]):
+  - NC3 の判定閾値が固定値 `< 48612` のまま (base は 38,485)。dummy 入力では FAIL<期待> になるが、閾値が base と連動せず、他の入力で判定を誤りうる。
+  - `dsp/REPORT.md` §0・§3 の 48,612 は旧値。現 HEAD の値は本節。
 
 ## 12. MX2-3 (N5 / N6) 実測 — 2026-10-13 (#830)
 

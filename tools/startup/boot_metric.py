@@ -97,12 +97,13 @@ class MetricError(Exception):
 def git_commit(root, rel):
     try:
         out = subprocess.run(
-            ["git", "-C", str(root), "log", "-1", "--format=%h", "--", rel],
+            ["git", "-C", str(root), "log", "-1", "--format=%H", "--", rel],
             capture_output=True, text=True, check=True,
         ).stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         out = ""
-    return out or None
+    # %h の省略長は clone の object 数で変わるため、8 桁に固定して再算出結果を環境に依存させない
+    return out[:8] or None
 
 
 def git_show(root, commit, rel):
