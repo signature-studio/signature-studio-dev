@@ -131,6 +131,7 @@ g1 の dword (`0x14f852c`) を rip 相対で直接指す命令は 0 件 (既知)
 - 6 入力 (`probe_1414.CASES`) の unicorn code hook: 0x10d3a30・0x11fc770・0xc4dba0・0xd18130・0xed7c00 は 6 入力とも未到達 (hit 0)。到達したのは 0x10c7cd0 の entry (6 入力とも 1 回) のみ。
 - 0x10d3a30 の入口 (条件 1) の実機経路は未特定。0xed7c00 は直接呼出し 0 件のため、関数ポインタ経由と推定 (未確認)。
 - 静的 `probe_1414_tables.py` の再現 (本 PR で再測定): 間接 call 298・動的 `dyn_union` 41・未実行 257・vtable hit 0 (6 入力)。前回の値と一致。
+- 再測定 (測定 commit: `837e2034b` = コードを変えた最後の commit。検証 HEAD: `fa53f686a`): `probe_1414_callers.py --dyn --write` 57.7 秒 (e4df3d7ec)・58 秒 (fa53f686a)・rc 0・load average 1 分値 0.16 → 0.31。出力 JSON は commit 済みのものと一致。`git diff 837e2034b HEAD -- tools/startup/license_obs ':!*.md'` は空 (0 行)。
 - 受入 1 (0x11cb000 / 0x10d50d0 の起動元) は未達。表 T1/T2 の基底を指す参照は静的に 0 件 (§5 と同じ)。6 入力では 0x10c7cd0 の間接 call が表を引かない。
 - 未実行 257 件の入力条件は、本探索では特定していない (6 入力の seed からは未到達)。
 
