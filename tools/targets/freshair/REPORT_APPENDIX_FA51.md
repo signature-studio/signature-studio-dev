@@ -99,7 +99,7 @@ state word mismatch [ctx S+0xca0/KH+0xc70]: words=1200 rel>1e-3 (|SC-KH|/|KH|)=1
 
 ## §7. 後続 (#4417 / FA-54): DF2 状態の対応の確定と窓での再比較
 
-§4 の「state 比較窓の確定」を解いた節。結論は次の表 (実測・測定 commit `c32364a0d`)。
+§4 の「state 比較窓の確定」を解いた節。結論は次の表 (実測・測定 commit `faeb66ba4`・§7.2)。
 
 | 項目 | 結果 |
 |---|---|
@@ -120,7 +120,7 @@ state word mismatch [ctx S+0xca0/KH+0xc70]: words=1200 rel>1e-3 (|SC-KH|/|KH|)=1
 
 ### §7.2 窓での再比較 (N=200・seed `0x5F17E4`・600 call・fma=0/1)
 
-- 測定 commit: `faeb66ba4` (コードの最終 commit。REPORT の追記と 2 本の判定スクリプトだけを足した)。実行コード (`ks_semantic_vf_scen.sh`・`ks_semantic_vf_kh.c`・`ks_filter_scen_cmp.py`・`lift2/`) は §3 の `532617a68` から変えていない。差分 0 の証跡 (コードのみ): `git diff faeb66ba4 HEAD -- 'tools/targets/freshair/*.sh' 'tools/targets/freshair/*.c' 'tools/targets/freshair/*.py' 'tools/targets/freshair/lift2/'` の出力は 0 行 (REPORT の追記は測定の対象外)。nproc=4・load 1 分値 0.04〜0.32。
+- 測定 commit: `faeb66ba4` (コードの最終 commit。REPORT の追記と 2 本の判定スクリプトだけを足した)。実行経路の 6 ファイル (`ks_semantic_vf_scen.sh`・`ks_semantic_vf_kh.c`・`ks_filter_scen_cmp.py`・`lift2/native/native_vocalfilter.c`・`lift2/gen_vf_scen.py`・`lift2/pokes.txt`) は §3 の `532617a68` から `faeb66ba4` まで差分 0 (`git diff 532617a68 faeb66ba4 -- <6 ファイル>` = 0 行)。`lift2/` 全体では `native/native_ctrl.c`・`native/native_stereo.c` が変わっているが、これらは実行経路の外。差分 0 の証跡 (6 ファイル・測定 commit から HEAD まで): `git diff faeb66ba4 HEAD -- tools/targets/freshair/ks_semantic_vf_scen.sh tools/targets/freshair/ks_semantic_vf_kh.c tools/targets/freshair/ks_filter_scen_cmp.py tools/targets/freshair/lift2/native/native_vocalfilter.c tools/targets/freshair/lift2/gen_vf_scen.py tools/targets/freshair/lift2/pokes.txt` の出力は 0 行 (REPORT の追記は測定の対象外)。nproc=4・load 1 分値 0.04〜0.32。
 - 実行: `SC_CORE=<SlateCore.core_64> KH_CORE=<HeartCore.core_64> bash tools/targets/freshair/ks_semantic_vf_scen.sh 200 0x5F17E4 {0,1}`。
   実測 `real 0.63 s`・`user 0.52〜0.53 s`・EXIT=0 (fma=0/1 とも)。fma=0 と fma=1 の `cmp.txt` は `cmp` でバイト一致。
 - 窓の判定 (`tools/targets/freshair/ks_vf_state_cmp.py`・fma=0/1 とも同じ出力):
