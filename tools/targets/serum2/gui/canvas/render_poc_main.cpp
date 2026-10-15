@@ -1,7 +1,6 @@
 // SR-36 #2065: CTextLabel のみの canvas 描画 harness (wasm)。検証専用で製品には入らない。
-// 描画経路: CanvasPlatformFactory → CTextLabel → CDrawContext (canvas の graphics device context) → CViewContainer::draw。
-// 注意: CanvasGraphicsDevice::createBitmapContext は引数の bitmap を使わず、描画命令は false を返すため、
-// 描画経路は bitmap に書き込まない。after の画素数は構造上 0 になる (成功扱いにしない)。
+// 描画経路: CanvasPlatformFactory → CTextLabel → CDrawContext (createBitmapContext で bitmap に結線された context) → CViewContainer::draw。
+// SR-50 #3260: 描画命令 (drawRect・clearRect・drawString) は bitmap へ画素を書く。after は描画後の非ゼロ画素数 (黒背景を含む)。文字の証拠は text_px (文字色の画素数)。
 // control は計数ロジックの陽性対照 (bitmap へ 1 画素を直接書いたときに 1 と数えること) で、描画の証拠ではない。
 
 #include "canvas_bitmap.h"
@@ -29,6 +28,18 @@ size_t countNonZeroPixels (const uint8_t* rgba, size_t byteCount)
 	return n;
 }
 
+// 文字色 (白・不透明) の画素数。CTextLabel の既定は黒背景 (drawRect) なので、非ゼロ画素数には背景も入る。文字だけの証拠にする。
+size_t countTextPixels (const uint8_t* rgba, size_t byteCount)
+{
+	size_t n = 0;
+	for (size_t i = 0; i < byteCount; i += 4)
+	{
+		if (rgba[i] == 255 && rgba[i + 1] == 255 && rgba[i + 2] == 255 && rgba[i + 3] == 255)
+			++n;
+	}
+	return n;
+}
+
 } // namespace
 
 int main ()
@@ -38,15 +49,16 @@ int main ()
 	init (nullptr);
 	const size_t byteCount = static_cast<size_t> (kWidth) * kHeight * 4;
 
-	CanvasBitmap bitmap (kWidth, kHeight);
-	const size_t before = countNonZeroPixels (bitmap.data (), byteCount);
+	auto* canvasBitmap = new CanvasBitmap (kWidth, kHeight);
+	PlatformBitmapPtr bitmap (canvasBitmap);
+	const size_t before = countNonZeroPixels (canvasBitmap->data (), byteCount);
 
-	bitmap.data () [0] = 255;
-	const size_t control = countNonZeroPixels (bitmap.data (), byteCount);
-	bitmap.data () [0] = 0;
+	canvasBitmap->data () [0] = 255;
+	const size_t control = countNonZeroPixels (canvasBitmap->data (), byteCount);
+	canvasBitmap->data () [0] = 0;
 
 	auto device = std::make_shared<CanvasGraphicsDevice> ();
-	auto deviceContext = std::make_shared<CanvasGraphicsDeviceContext> (device);
+	auto deviceContext = device->createBitmapContext (bitmap);
 	CDrawContext drawContext (deviceContext, CRect (0, 0, kWidth, kHeight), 1.);
 
 	auto* container = new CViewContainer (CRect (0, 0, kWidth, kHeight));
@@ -57,10 +69,11 @@ int main ()
 	container->draw (&drawContext);
 	drawContext.endDraw ();
 
-	const size_t after = countNonZeroPixels (bitmap.data (), byteCount);
+	const size_t after = countNonZeroPixels (canvasBitmap->data (), byteCount);
+	const size_t textPixels = countTextPixels (canvasBitmap->data (), byteCount);
 	drawContext.setFont (label->getFont ());
 	const CCoord textWidth = drawContext.getStringWidth (label->getText ().data ());
-	std::printf ("render_poc size=%ux%u bytes=%zu nonzero_before=%zu control=%zu nonzero_after=%zu text=%s text_width=%g\n",
-	             kWidth, kHeight, byteCount, before, control, after, label->getText ().data (), textWidth);
+	std::printf ("render_poc size=%ux%u bytes=%zu nonzero_before=%zu control=%zu nonzero_after=%zu text=%s text_width=%g text_px=%zu\n",
+	             kWidth, kHeight, byteCount, before, control, after, label->getText ().data (), textWidth, textPixels);
 	return 0;
 }

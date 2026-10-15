@@ -5,9 +5,12 @@
 
 ## 0. 結論 (先出し)
 
-- **判定: 部分達成 (lift + wasm build + 2 関数の native 一致まで。boot/実行は未着手)**。#154 の受入範囲
+- **boot (#3289 / T-SH-60): DllMain(PROCESS_ATTACH) の wasm 実行は FAIL** (§7)。strict (実装済み import のみ) は kernel32 `LocalAlloc` で停止。
+  `LocalAlloc` を実装し、残りの未実装 import を soft stub に置き換えても、setjmp 系の戻り先 `0x59c210` (関数の途中) へ longjmp して UNLIFTED で停止。
+  FreeType の FT_* 結合はこの停止より後段のため未到達。**InitDll は QuickFontCache の export ではない** (§7.1)。
+- **判定: 部分達成 (lift + wasm build + 2 関数の native 一致まで。boot は §7 の停止点の測定まで)**。#154 の受入範囲
   (QuickFontCache → ILTools → FruityPlug) のうち **QuickFontCache の lift 層だけ**を完了。ILTools / FruityPlug(SGv2) は未着手 (§5)。
-  よって PR は `Refs #154` (Closes しない)。
+  #154 は ILTools / FruityPlug が残るため閉じない (`Refs #154`)。本 PR (boot 測定) の Closes は #3289 のみ。
 - `QuickFontCache_x64.dll` = `block24350_PE.bin` (PE32+, 2,067,968 B, ImageBase 0x400000, SizeOfImage 0x20e000)。
   export 10 本 (`CreateVST3Instance`/`FontCache_AcquireFont`/`InitSharedPython` ほか)。
 - **`.pdata` 全 6,347 関数を roots にして lift: 6,347 関数 / 208,714 命令 / unsup 0 / unlifted callees 0 / import 222 名**
@@ -28,8 +31,12 @@
 | `gen_entries.py` | `.pdata` RUNTIME_FUNCTION 開始 VA → entries JSON (6,347 roots) |
 | `x64c_qfc.py` | flelift/x64c.py に SSSE3 handler を monkeypatch して main() 実行。`QFC_NEGCTL=` でネガコン用に handler を壊す |
 | `qfc_diff.py` / `qfc_natdrv.c` / `qfc_wasm_runner.mjs` | native (flelift の `fle_native.c` を #include) vs wasm 差分。`--expect-fail` でネガコン判定 |
+| `qfc_lift.sh` | lift → emcc の共通関数 (`lift_build` / `wasm_build`)。`qfc_e2e.sh` と `qfc_boot.sh` が source する (処理は同一) |
+| `qfc_boot.sh` / `qfc_boot.mjs` | boot 実行 (§7)。strict / soft の 2 版で DllMain → FontCache_GetStats → FontCache_CleanUp を実行し、判定 JSON を `work/boot/` に出す |
+| `gen_soft_imp.py` / `qfc_imp.c` | rt に無い import を soft stub で埋める生成器 (`gen_soft_imp.py`)。`qfc_imp.c` は `LocalAlloc` / `LocalFree` の実装 |
 
 実行: `FL_WIN64_DIR=<fl-win64 展開先> QFC_PY=<capstone/pefile 入り python> bash tools/qfclift/qfc_e2e.sh`
+boot 実行: `FL_WIN64_DIR=<fl-win64 展開先> QFC_PY=python3 QFC_BOOT_REBUILD=1 bash tools/qfclift/qfc_boot.sh` (§7.2)
 
 ## 2. SSSE3 handler (x64c に無かった 3 命令)
 
@@ -70,7 +77,7 @@ gate は不合格時に exit 1 になることを実運用で確認済み。
 |---|---|---|
 | ILTools_x64.dll 未 lift。PE は特定済: `block24347_PE.bin` (PE export 名 `ILTools_x64.dll`, 3,662,336 B, SizeOfImage 0x394000, .pdata 11,747 関数, export 7 本)。同じ `gen_entries.py` + `x64c_qfc.py` で着手可能 (img-size 0x394000 を指定) | #154 の第 2 段 | #154 (継続) |
 | FruityPlug_x64.dll (SGv2) 未 lift。`extracted/` の PE export 名が `FruityPlug_x64.dll` の PE は 133 本 (`Fruityplug_x64.dll` 表記 1 本含む。大半は export 3 本 = CreatePlugInstance + dbk 2 本、最大 7,600,128 B)。**プラグイン毎に別バイナリで、SGv2 本体の一意特定は未了** (issue 本文の「CreatePlugInstance export 一致による推定」の通り、共有 lib ではなく個別プラグイン DLL の可能性が高い = 推定) | #154 の第 3 段・対象定義の見直し要 | #154 (継続・PM 判断) |
-| QFC の boot (InitDll → FontCache_*) 実行・unit 級検証未着手 | lift が実行時に正しいかは未確認 | #154 (継続) / FreeType 部は T-SH-01 |
+| QFC の boot (DllMain → FontCache_*) が wasm で完走しない (§7)。FT_* 結合は未到達 | lift が実行時に正しいかは未確認 | #3410 (戻り先 0x59c210) / #3411 (未実装 import) / #3412 (FT 結線と FontCache_*) |
 | 残り 6,345 関数の差分検証が無い (ランダム関数 diff / liftdiff 採点) | silent miscompile 残存の可能性 | #154 (継続)。liftdiff 採点は #129 系 |
 | wasm 15.1 MB が `work/` のみ (配信/ロード方式未決) | 統合時のサイズ・ロード時間 | #154 (継続) |
 | `qfc_e2e.sh` の negctl 行が `tail -3` で件数行を隠す (旧版の「2/12」誤記の原因) | 件数の目視誤読。PASS/FAIL の gate 判定 (exit code) には影響しない | #154 (継続・次の qfclift 改修で表示のみ修正) |
@@ -101,21 +108,121 @@ gate は不合格時に exit 1 になることを実運用で確認済み。
   の全出力を取得: pmulhrsw equal 3 / mismatch 9、pshufb equal 2 / mismatch 10、phaddw equal 7 / mismatch 5 (3 本とも `native dst changed 10/10`、FAIL detected)。
 - `find tools/qfclift -type f -size +20M -not -path '*/work/*'` → 0 件。生成物は `work/` (gitignore): `work/lift/qfcl.wasm` 15,115,363 B ほか。
 
-## 7. FT_* の GetProcAddress 解決と FreeType wasm32 ビルド (T-SH-79 / #3412)
+## 7. boot 実行の測定 (T-SH-60 / #3289)
+
+既知類型との関係 (docs/DEFECTS.md): 該当なし (DEFECTS は stage-0 / RetDec 系の類型。x64c の setjmp/longjmp 継続は別事象)。
+FLEngine boot の同型 (longjmp の `--override` と断片 entry) を参照 (`tools/flelift/boot/fle_boot.c` 489〜504 行、`boot_e2e.sh`)。
+
+### 7.1 対象の読み替え
+
+- QuickFontCache の export は 10 本 (§0)。`InitDll` は**含まれない** (pefile で ImageBase `0x400000` の export 表を確認)。
+- `InitDll` は `CreateVST3Instance` (VA `0x58a200`) が `LoadLibraryW(<.vst3 のパス>)` の後に `GetProcAddress("InitDll")` で呼ぶ、**VST3 モジュール側**の関数 (`tools/hostbridge/nfo/REPORT_APPENDIX_A.md` の `CreateVST3Instance` 節)。QFC に InitDll が無い根拠は export 表 (上の 10 本に無い) のみ。
+- QFC 自身の初期化は PE entry = DllMain (`AddressOfEntryPoint` RVA `0x19c1f0` → VA `0x59c1f0`)。**本測定は DllMain(PROCESS_ATTACH) を boot の起点とした** (読み替えは PM 判断の範囲。受入の「InitDll」は DllMain と読んだ)。
+
+### 7.2 手順 (再現)
+
+`FL_WIN64_DIR=<fl-win64 展開先> QFC_PY=python3 bash tools/qfclift/qfc_boot.sh` (`QFC_BOOT_REBUILD=1` で lift から作り直す)。
+
+1. lift: `qfc_lift.sh` の `lift_build` (qfc_e2e.sh と同一の x64c・emcc 設定)。
+2. **strict**: rt (`tools/flelift/rt`) の実装済み import だけで wasm を作って実行。
+3. **soft**: rt と `qfc_imp.c` に無い import を `gen_soft_imp.py` の soft stub (呼出しを stderr に記録し 0 を返す) で埋めて実行。`qfc_imp.c` は `LocalAlloc` / `LocalFree` のみ (calloc。戻り値は実物と同じ規約)。
+4. 各版の段: `DllMain(hinst=0x400000, DLL_PROCESS_ATTACH, 0)` → `FontCache_GetStats(buf)` → `FontCache_CleanUp()`。1 段でも trap したら以降は実行しない。
+5. 判定 (`qfc_boot.mjs`): **PASS = 3 段 ok かつ DllMain の RAX = 1 かつ soft 呼出し 0 件**。soft 呼出しが 1 件以上なら SOFT 扱い (PASS にしない。exit 1)。停止理由 `stopped_by` は stderr の最後の `[fle]` 行 (無ければ trap の文字列)。
+
+soft stub の戻り値は実物ではないため、PASS の根拠にしない。
+
+### 7.3 結果 (HEAD `1fd48d2ce`・n=3。各 run は lift + emcc×2 + 実行×2 を含む)
+
+| 版 | 段 | 停止点 (JSON の `stopped_by`) | soft 呼出し | 判定 |
+|---|---|---|---|---|
+| strict | DllMain | `[fle] MISSING IMPORT LocalAlloc` (rt に実装なし) | 0 | FAIL |
+| soft | DllMain | `[fle] call to UNLIFTED function 0x59c210 ret=0` | 0 | FAIL |
+
+- 3 run (`QFC_BOOT_REBUILD=1 bash tools/qfclift/qfc_boot.sh`・逐次・foreground・nproc 4)。3 run とも判定 JSON は表と同一:
+
+| run | real (script 計測) | load 開始 | load 終了 |
+|---|---|---|---|
+| B1 | 26 s | 0.39 0.30 0.12 | 0.60 0.35 0.15 |
+| B2 | 26 s | 0.49 0.35 0.15 | 0.73 0.41 0.18 |
+| B3 | 26 s | 0.73 0.41 0.18 | 0.84 0.47 0.21 |
+
+- **min–max (n=3): real 26–26 s** (script は秒単位で計測)。前回の n=1 (HEAD `f1dc143e5`) の 44.94 s・レビュー側の 50.5 s との差は未切り分け (同一 HEAD の 3 回は一致)。
+- import 集計 (`gen_soft_imp.py` の出力): 使用 222 件 / rt 実装 58 件 + `qfc_imp.c` 2 件 = 実装済み 60 件 / soft stub 162 件。
+- 計数の動作確認 (HEAD `f1dc143e5` での試行。`qfc_imp.c` を渡さない版): `LocalAlloc` が soft 化された状態で DllMain の停止までに soft 呼出し **2 件** (`LocalAlloc`・`MessageBoxA`) を記録し、同じ `0x59c210` で停止した。この試行は commit に含まない (`gen_soft_imp.py` の引数から `qfc_imp.c` を外して再現できる)。
+
+### 7.4 停止点の解析 (逆アセンブル・capstone による実測)
+
+- DllMain (VA `0x59c1f0`) の `0x59c20b`: `call 0x40fa30`。`0x40fa30` は `lea rcx,[rcx+0x38]; jmp 0x40f950`。
+- `0x40f950` は rcx に戻り番地・rsp・rbx/rbp/rsi/rdi/r12〜r15・xmm6〜15 を保存する **setjmp 相当** (lift 版 `f_40f950` は `ret` が C の return になり、正常に戻る)。
+- `0x40f9c0` は保存値を復元し `jmp qword ptr [rcx]` で保存先へ戻る **longjmp 相当**。lift 版は `ott_dispatch(LD64(rcx))`。
+- 保存された戻り番地 `0x59c210` は DllMain の `call` の直後 (関数の途中)。x64c の dispatch は関数先頭だけを受けるため、`UNLIFTED` で停止する。
+- 未切り分け: longjmp を起動する呼出し元と条件 (`0x40fa40` 系の経路。strict の `LocalAlloc` 停止と soft 版の `MessageBoxA` 呼出しとの関係も未確定)。
+
+### 7.5 FreeType (FT_* 14 本) の結合: 未到達
+
+- DllMain 内で FT 解決 (`0x563000`) に入る前に停止する。`imp_GetProcAddress` は rt で常に 0 を返す (`tools/flelift/rt/fle_cpu.c` 156 行)。
+- #3263 の実測 (Wine + 無改変 DllMain): QFC 範囲の GetProcAddress 950 件のうち FT_* 14 件 (戻り値は stub の NULL)。この経路は本測定では通っていない。
+- FreeType 2.7 の wasm32 ビルド (`tools/shared/oss/freetype/build.sh`、#145 採用方式) は未実施。`qfc_import.c` の表 (14 本) は既存のまま。
+
+### 7.6 検証範囲 / 範囲外
+
+- 範囲内: strict / soft の 2 版で DllMain の停止点を再現 (HEAD `1fd48d2ce` で n=3、`f1dc143e5` で 1 回、`qfc_imp.c` を渡さない試行で 1 回。いずれも同じ停止点)。
+- 範囲外 (主張しない): `FontCache_GetStats` / `FontCache_CleanUp` は未実行 (DllMain 失敗のため到達しない。引数仕様は REPORT に無い)。FT_* 結合。残り 162 import の挙動。DllMain 以外の export。
+
+### 7.7 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 戻り先 `0x59c210` (setjmp/longjmp 継続) の lift 対応 (FLEngine 同型の override と断片 entry) と longjmp の起動元の特定 | DllMain が完走しない | #3410 (T-SH-77) |
+| rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない | #3411 (T-SH-78) |
+| GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3412 (T-SH-79) |
+
+## 8. 検証実行・再現 (§7 の追加分・実測)
+
+- 測定 commit: e2e の E1〜E3 は **`f1dc143e5`** (コードを変えた commit。`qfc_lift.sh` の切り出しと `qfc_boot.*` 追加・`qfc_e2e.sh` の関数の source 化)。
+  検証 HEAD = **`1fd48d2ce`** (`b5fa0f2f3`: `qfc_boot.mjs` の 1 行 + main 取り込み merge)。e2e の H1〜H3 と boot の B1〜B3 はこの HEAD で測定。
+- `git diff f1dc143e5 HEAD -- tools/qfclift ':(exclude)*.md'` の出力は下記の 1 行 (`qfc_boot.mjs` のみ。e2e は読まない)。`git diff f1dc143e5 HEAD -- tools/flelift tools/liftlib tools/shared/env.sh` は 0 行 (lift の依存)。
+
+```diff
+-  stopped_at: stop ? stop.name : null, stopped_by: stop ? (stop.stderr[0] || stop.trap) : null,
++  stopped_at: stop ? stop.name : null, stopped_by: stop ? (stop.stderr.at(-1) || stop.trap) : null,
+```
+
+- e2e (`qfc_e2e.sh`、逐次・foreground)。H 行は `date +%s.%N` の差、E 行は `/usr/bin/time`:
+
+| run | HEAD | 結果 | real | load 開始 | load 終了 |
+|---|---|---|---|---|---|
+| H1 | `1fd48d2ce` | PASS (exit 0) | 66.43 s | 0.65 0.45 0.20 | 0.89 0.56 0.26 |
+| H2 | `1fd48d2ce` | PASS (exit 0) | 67.37 s | 0.83 0.56 0.26 | 0.94 0.65 0.31 |
+| H3 | `1fd48d2ce` | PASS (exit 0) | 67.82 s | 0.94 0.65 0.31 | 0.98 0.72 0.37 |
+| E1 | `f1dc143e5` | PASS (exit 0) | 116.87 s | 0.10 0.23 0.17 | 0.87 0.48 0.28 |
+| E2 | `f1dc143e5` | PASS (exit 0) | 116.97 s | 0.74 0.47 0.27 | 1.14 0.72 0.39 |
+| E3 | `f1dc143e5` | PASS (exit 0) | 116.70 s | 1.14 0.72 0.39 | 1.02 0.82 0.47 |
+
+- **min–max (HEAD `1fd48d2ce`、n=3、全 PASS): real 66.43–67.82 s**。load 開始 0.65–0.94。
+- min–max (HEAD `f1dc143e5`、n=3、全 PASS): real 116.70–116.97 s。前回測定 (`5c7a48a`、§6 の P1〜P3: 196.08–196.70 s) との差は未切り分け。
+- 参考 (min–max に含めない):
+  - レビュー側 (oc-reviewer) の独立再実行 (HEAD `6c22d26aa`・n=1): PASS real 129.5 s (load 開始 0.63)。
+  - 3 つの値域 (66 s 台 / 116 s 台 / 129 s・196 s) の差は未切り分け。同一 HEAD の H1〜H3 は 1.4 s の範囲に収まっており、runner の負荷差の可能性がある (同一機での再測は未実施)。
+- e2e の内容は §3 と同一: functions 6,347 / unsup 0 / unlifted 0 / spot diff 12/12 equal (H1〜H3 とも) / ネガコン 3 本 (pmulhrsw・pshufb・phaddw) すべて FAIL 検出 (H1〜H3 とも)。
+- boot (`qfc_boot.sh`、HEAD `1fd48d2ce`、n=3): §7.3 の通り (real 26–26 s、判定は 3 run とも FAIL)。
+- `find tools/qfclift -type f -size +20M -not -path '*/work/*'` → 0 件。生成物は `work/` (gitignore)。
+
+## 9. FT_* の GetProcAddress 解決と FreeType wasm32 ビルド (T-SH-79 / #3412)
 
 既知類型との関係 (DEFECTS.md): 該当なし。測定 commit = `c9767a62f` (コード最終 commit。`test_qfc_gpa.c` に token 経由の残り 5 本の照合を追加)。`git diff c9767a62f HEAD -- tools/shared/oss/freetype` の出力は空 (本節は REPORT のみの変更)。
 
 **結論 (部分達成)**: FT_* 14 本の解決経路を実装し、token 経由で 14 本すべての呼出を直接呼出と照合して native / wasm32 / wasm64 で同一結果であることを確認した。
 guest の `imp_GetProcAddress` への結線と FontCache_GetStats / CleanUp の実行は未着手 (子 #3434。DllMain の 0x563000 は #3410・#3411 の後段で未到達)。
 
-### 7.1 経路の選び方
+### 9.1 経路の選び方
 - guest の間接 call 先は lift VA と IAT pseudo-VA (`IMP_VA_BASE` 系) だけである。FreeType は host の C 関数なので、関数ポインタを guest に渡さない。
 - 採用: `GetProcAddress` が表で解決できる名前にだけ擬似トークン `QFC_GPA_TOK_BASE (0x7F200000) + 表の index` を返す (`qfc_gpa`)。
   トークンの呼出は `qfc_gpa_call` が表の fn ポインタを型付きに cast して実行する。Win64 の RCX/RDX/R8/R9 と stack の第 5 引数を受け、
   `long` は LLP64 の 32bit として下位を符号拡張する。戻り値は eax 書込みの規則で上位 0。
 - 同型の先例: `tools/flelift/boot/fle_boot.c` の FLE-6 (`IPP_TOK_BASE` と `ipp_call`)。本節は ippv2 の経路を FT 14 本に広げた形。
 
-### 7.2 FreeType wasm32 ビルド (#145 の採用方式)
+### 9.2 FreeType wasm32 ビルド (#145 の採用方式)
 - 手順: `bash tools/shared/oss/freetype/build.sh` (FreeType 2.7、`FORCE_INT64` + `ftgrays_lp64.patch`、wasm64 は無改変 + `-sMEMORY64=1`)。
 - ソース: `freetype-2.7.tar.gz` (savannah, 2,381,403 B) を `tools/shared/work/src/` に展開。`fetch_sources.sh` 全体は使わなかった。
 - emcc: 6.0.12 (`[EMSDK]` = runner 同梱)。`toolchain-emsdk.tar.zst` は本 run で展開していない (未使用)。wasm64 の node は `[EMSDK]` 配下の node (v24.19.0)。
@@ -125,7 +232,7 @@ guest の `imp_GetProcAddress` への結線と FontCache_GetStats / CleanUp の�
 - build.sh の末尾のテスト実行は既定の FONT (`analysis-mac-shared` の OpenSans) が無く失敗する (rc=1、ライブラリは生成済み)。
   テスト用フォントは **DejaVuSans.ttf** (fonts-dejavu 同梱。e2e には `$FONT` として渡す) に差し替えた。
 
-### 7.3 検証 (実測。n=1、e2e 実行時 load 0.23 → 0.30)
+### 9.3 検証 (実測。n=1、e2e 実行時 load 0.23 → 0.30)
 | 検査 | 結果 |
 |---|---|
 | 表経由 (`test_qfc_import.c`) | `table n=14 resolved=14/14 absent_null=4/4`。native == wasm32 == wasm64 (46 行, TOTAL `6e3c628e7e4a12df`) |
@@ -134,16 +241,16 @@ guest の `imp_GetProcAddress` への結線と FontCache_GetStats / CleanUp の�
 | e2e 全体 `qfc_import_e2e.sh` (DejaVuSans) | rc 0。所要 5.05 s (real, n=1) |
 | ネガコン 1 (既存。引数の marshalling) | `FT_Get_Char_Index` の charcode を a[1]→a[2] にずらした複製: gi=0 (3 字とも)、`NG token route != direct call`、**exit 1** (検出)。照合で先に止まるため TOTAL 行は出ない |
 | ネガコン 2 (新規。5 本) | `FT_Get_Kerning` の left / right を入れ替えた複製 (native): (T,o) が x=0 (直接 -128)、`NG token route (5 extra fns) != direct call`、**exit 1** (検出) |
-| ネガコン 3 (新規。`long` 符号拡張) | `FT_New_Face` で 32bit の `long` 符号拡張を外した複製 (native): index 0xFFFFFFFF の結果が変わらず、**検出されない** (§7.4) |
+| ネガコン 3 (新規。`long` 符号拡張) | `FT_New_Face` で 32bit の `long` 符号拡張を外した複製 (native): index 0xFFFFFFFF の結果が変わらず、**検出されない** (§9.4) |
 
-### 7.4 検証範囲 / 範囲外
+### 9.4 検証範囲 / 範囲外
 - 範囲内: 表と token の解決一致 (14/14、表外 4/4)、token 経由の 14 関数すべての呼出の marshalling (DejaVuSans 1 本、サイズ 16、3 字。5 本は戻り値・出力を直接呼出と照合)、wasm32/wasm64 の一致。
 - 範囲外 (未検証):
   - 負の `face_index` による `long` 符号拡張 (FT_New_Face の index -1)。単一フェースの TrueType では FreeType が index を無視するため区別できず、複数フェースの TTC も環境に無い。本 PR の経路 (index 0) には影響しない。Win64 の `long` は 32bit で、wasm32 (long 32bit) では切り詰めの結果が同じ。
   - guest の `imp_GetProcAddress` 結線、QuickFontCache の DllMain・FontCache_GetStats・FontCache_CleanUp の実行 (→ #3434)。
   - OpenSans (FL の実フォント) での一致は未確認 (素材 `analysis-mac-shared` 未指定)。
 
-### 7.5 未解決
+### 9.5 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | guest の `imp_GetProcAddress` への qfc_gpa 結線と FontCache_GetStats / CleanUp の wasm 実行 | #3412 の受入の残り。QFC の boot ハーネスが無い | #3434 (T-SH-83) |
