@@ -25,7 +25,7 @@
 ## 手段
 
 - 素材: `fl-win64` (`$ARTIFACTS_DIR`・`tar --zstd -xf` で 7.5 秒で展開)。`toolchain-emsdk` は `EMSDK_DIR` (既定) に存在 (`docs/REFERENCES.md` §4 の `[EMSDK]`)。
-- `build_cpython_wasm.sh` (rc 0・約 4 分)、`fetch_inputs.sh` (stubs 取得)、`build_flpy.sh` (rc 0)。
+- `build_cpython_wasm.sh` (rc 0・06:03:13 UTC に完了)、`fetch_inputs.sh` (stubs 取得)、`build_flpy.sh` (rc 0)。
 - `extract_pyc_blocks.py` (pyc 40・pyscript 2・drum_patterns 1)。
 - 同 probe の出力は `work/` 配下 (gitignore)。
 
