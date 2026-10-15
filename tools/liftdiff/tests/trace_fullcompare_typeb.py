@@ -89,6 +89,15 @@ def r_kind(L, caller, ir_by_fn, mach):
     return 'other'
 
 
+def ldfix_kind(L, caller, lsf_suspects):
+    """R 類の ldfix 型判定: L または呼出元が m11 ldfix 検出器 (audit_lsf.py の SUSPECT_VAS / SUSPECT_USE_VAS / SUSPECT_DISP_VAS)
+    に出ていれば 'ldfix'、それ以外は 'none'。検出器の出力は main 側で一度だけ作って渡す。"""
+    for v in (L, caller):
+        if v is not None and ('%x' % v) in lsf_suspects:
+            return 'ldfix'
+    return 'none'
+
+
 def call_site(caller, L):
     """caller の本体で L への直接 call 命令の番地 (最初の 1 件) と、その後の最初の jcc と分岐先を返す。"""
     if caller is None:
@@ -142,6 +151,18 @@ def mach(va):
 
 IRS = load_ir(IR_PATH)
 rkinds = collections.Counter()
+LDFIX_IMG = os.environ.get('LD_M11_IMAGE') or os.path.join(ROOT, '../m11/work/m11_image.bin')
+LDFIX_CFG = os.environ.get('LD_M11_CFG') or os.path.join(ROOT, '../m11/work/boot*.drc.config.json')
+LDFIX_JSON = os.path.join(os.environ.get('TMPDIR') or '/tmp', 'typeb_ldfix_audit.json')
+LSF_SUSPECTS = set()
+if os.path.exists(IR_PATH):
+    import subprocess  # noqa: E402
+    audit = os.path.join(ROOT, '../m11/ldfix/audit_lsf.py')
+    subprocess.run([sys.executable, audit, IR_PATH, LDFIX_IMG, LDFIX_CFG, '--json', LDFIX_JSON, '--pe', os.environ['LD_M11_PE']],
+                   check=True, stdout=subprocess.DEVNULL)
+    au = json.load(open(LDFIX_JSON))
+    LSF_SUSPECTS = set(au['suspects']) | set(au['suspects_use']) | set(au.get('suspects_disp', {}))
+ldfix_kinds = collections.Counter()
 items = []
 for line in open(batch):
     r = json.loads(line)
@@ -211,6 +232,7 @@ try:
             if cls == 'R':
                 rk = r_kind(Lf, caller, IRS, mach)
                 rkinds[(1 if xf else 0, rk)] += 1
+                ldfix_kinds[(1 if xf else 0, ldfix_kind(Lf, caller, LSF_SUSPECTS))] += 1
             if Lf == 0x40a3d0 and RP:
                 k = N[:i + 1].count(0x40a3d0) - 1   # L の entry が、trace 上で何回目の 0x40a3d0 呼出しか
                 if k >= len(RL):
@@ -239,6 +261,7 @@ try:
                 ('%s %s' % jcc) if jcc else '-'))
     print('## 集計 (xfill, class): %s' % sorted(collections.Counter((int(x), c) for x, c, _, _ in rows).items()))
     print('## R 類の D15 判定 (xfill, 判定): %s' % sorted(rkinds.items()))
+    print('## R 類の ldfix 判定 (xfill, 判定): %s' % sorted(ldfix_kinds.items()))
     if RP:
         print('## rax 直接計測 (LD-220): %s' % sorted(rp_stat.items()))
 finally:
