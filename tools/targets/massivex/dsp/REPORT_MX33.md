@@ -217,7 +217,7 @@
 | G が pdata 始点 | 0 |
 
 - 段の合計: 2,657 = 821 + 1,453 + 383 (到達可能 = 定義済み + call 除外 + 未定義)。383 = 42 + 315 + 26 (未定義の内訳)。
-- 件数の差 (appendix の 47 との差): `REPORT_APPENDIX_4989.md` と `mx4989_probe.py` は main に無く、`origin/4989-massivex-xmm-merge-call` (commit `2fc5debe2`・`3146df45d`・`601a3ecc7`・`c0209641a`) にある。appendix の 47 (pdata 始点)・193 (全 F) は probe の `u3e` の値。本 run では `plugins-massivex` が無く PE が無いため、47 も 193 も再現していない。抽出方法の違い (コードの読みによる。件数は未測定):
+- 件数の差 (appendix の 47 との差): `REPORT_APPENDIX_4989.md` と `mx4989_probe.py` は main に無く、`origin/4989-massivex-xmm-merge-call` (commit `2fc5debe2`・`3146df45d`・`601a3ecc7`・`c0209641a`) にある。appendix の 47 (pdata 始点)・193 (全 F) は probe の `u3e` の値。`70b4b84db` の `mx4989_probe.py` (`plugins-massivex` の PE) で 193 (pdata 始点 47) を再現した。抽出方法の違い (コードの読みによる):
   1. 母集団: probe は seeds と one_round の行を対象にし、本 script は seeds の pdata 始点 566 のみ。
   2. F の入口 livein: probe は F の `livein45` = 0 で絞る。本 script は絞らない (注 a)。
   3. call 前段: probe は除外しない。本 script は除外する。
