@@ -1,0 +1,6 @@
+{
+  "tag": "pe39",
+  "refs": ["#2499"],
+  "note": "PE 解析で意味論を確定した関数 (REPORT_PY69・PY-69 #2499)。channels.setChannelPitch は未確定のため含めない",
+  "functions": ["channels.selectOneChannel"]
+}

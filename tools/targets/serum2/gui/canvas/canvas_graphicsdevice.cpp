@@ -1,15 +1,36 @@
 // SR-39 #2107: canvas platform (wasm) の IPlatformGraphicsDevice* 実装。
 // SR-50 #3260: drawRect・clearRect を bitmap へ描く。bitmap は createBitmapContext で結線し、clip は bitmap 境界で保持する。
+// SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap を bitmap へ描く。
 
 #include "canvas_graphicsdevice.h"
 #include "canvas_bitmap.h"
 #include "canvas_graphicspath.h"
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace VSTGUI {
 
 namespace {
+
+//------------------------------------------------------------------------
+// 楕円は外接矩形の内接多角形で近似する。辺の数は外周の大きさに比例させ、上限を置く。
+PointList ellipsePoints (const CRect& rect)
+{
+	auto cx = (rect.left + rect.right) / 2.;
+	auto cy = (rect.top + rect.bottom) / 2.;
+	auto rx = (rect.right - rect.left) / 2.;
+	auto ry = (rect.bottom - rect.top) / 2.;
+	auto count = static_cast<int32_t> (std::clamp (2. * (rx + ry), 16., 1024.));
+	PointList points;
+	points.reserve (static_cast<size_t> (count));
+	for (int32_t i = 0; i < count; ++i)
+	{
+		auto rad = 2. * M_PI * i / count;
+		points.push_back (CPoint (cx + rx * std::cos (rad), cy + ry * std::sin (rad)));
+	}
+	return points;
+}
 
 //------------------------------------------------------------------------
 struct PixelBox
@@ -108,24 +129,29 @@ bool CanvasGraphicsDeviceContext::endDraw () const
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 {
-	(void)line;
-	return false;
+	plotLine (line.first, line.second, frameColor);
+	return true;
 }
 
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawLines (const LineList& lines) const
 {
-	(void)lines;
-	return false;
+	for (const auto& line : lines)
+		plotLine (line.first, line.second, frameColor);
+	return true;
 }
 
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawPolygon (const PointList& polygonPointList,
                                                PlatformGraphicsDrawStyle drawStyle) const
 {
-	(void)polygonPointList;
-	(void)drawStyle;
-	return false;
+	if (polygonPointList.size () < 2)
+		return false;
+	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
+		fillPolygon (polygonPointList, fillColor);
+	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
+		strokePolyline (polygonPointList, true, frameColor);
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -152,9 +178,12 @@ bool CanvasGraphicsDeviceContext::drawArc (CRect rect, double startAngle1, doubl
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawEllipse (CRect rect, PlatformGraphicsDrawStyle drawStyle) const
 {
-	(void)rect;
-	(void)drawStyle;
-	return false;
+	auto points = ellipsePoints (rect);
+	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
+		fillPolygon (points, fillColor);
+	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
+		strokePolyline (points, true, frameColor);
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -166,15 +195,39 @@ bool CanvasGraphicsDeviceContext::drawPoint (CPoint point, CColor color) const
 }
 
 //------------------------------------------------------------------------
+// 1:1 で転写する (dest の左上に offset から始まる画素を置く)。拡大縮小と quality は未対応で、quality は無視する。
 bool CanvasGraphicsDeviceContext::drawBitmap (IPlatformBitmap& bitmap, CRect dest, CPoint offset,
                                               double alpha, BitmapInterpolationQuality quality) const
 {
-	(void)bitmap;
-	(void)dest;
-	(void)offset;
-	(void)alpha;
 	(void)quality;
-	return false;
+	auto* source = dynamic_cast<CanvasBitmap*> (&bitmap);
+	if (!source)
+		return false;
+	const auto& sourceSize = source->getSize ();
+	auto srcWidth = static_cast<int32_t> (sourceSize.x);
+	auto srcHeight = static_cast<int32_t> (sourceSize.y);
+	auto box = pixelBoxOf (dest);
+	auto srcX0 = static_cast<int32_t> (offset.x);
+	auto srcY0 = static_cast<int32_t> (offset.y);
+	for (auto y = box.y0; y < box.y1; ++y)
+	{
+		for (auto x = box.x0; x < box.x1; ++x)
+		{
+			auto sx = srcX0 + (x - box.x0);
+			auto sy = srcY0 + (y - box.y0);
+			if (sx < 0 || sy < 0 || sx >= srcWidth || sy >= srcHeight)
+				continue;
+			const uint8_t* src = source->data () + (static_cast<size_t> (sy) * srcWidth + sx) * 4;
+			if (src[3] == 0)
+				continue;
+			auto* dst = pixelAt (x, y);
+			if (!dst)
+				continue;
+			const CColor color (src[0], src[1], src[2], src[3]);
+			blendRGBA (dst, color, alpha * globalAlpha);
+		}
+	}
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -371,6 +424,85 @@ void CanvasGraphicsDeviceContext::strokeRect (const CRect& rect, const CColor& c
 	paintRect (CRect (rect.left, rect.bottom - 1., rect.right, rect.bottom), color, true);
 	paintRect (CRect (rect.left, rect.top + 1., rect.left + 1., rect.bottom - 1.), color, true);
 	paintRect (CRect (rect.right - 1., rect.top + 1., rect.right, rect.bottom - 1.), color, true);
+}
+
+//------------------------------------------------------------------------
+// 1 px の Bresenham 線。端点は四捨五入して画素に置く。
+void CanvasGraphicsDeviceContext::plotLine (CPoint from, CPoint to, const CColor& color) const
+{
+	auto x0 = static_cast<int32_t> (std::lround (from.x));
+	auto y0 = static_cast<int32_t> (std::lround (from.y));
+	auto x1 = static_cast<int32_t> (std::lround (to.x));
+	auto y1 = static_cast<int32_t> (std::lround (to.y));
+	auto dx = std::abs (x1 - x0);
+	auto dy = -std::abs (y1 - y0);
+	auto sx = x0 < x1 ? 1 : -1;
+	auto sy = y0 < y1 ? 1 : -1;
+	auto err = dx + dy;
+	while (true)
+	{
+		blendPixel (x0, y0, color);
+		if (x0 == x1 && y0 == y1)
+			break;
+		auto e2 = 2 * err;
+		if (e2 >= dy)
+		{
+			err += dy;
+			x0 += sx;
+		}
+		if (e2 <= dx)
+		{
+			err += dx;
+			y0 += sy;
+		}
+	}
+}
+
+//------------------------------------------------------------------------
+// 画素中心 (y + 0.5) で偶奇則の走査線塗りを行う。辺は閉じているものとして扱う。
+void CanvasGraphicsDeviceContext::fillPolygon (const PointList& points, const CColor& color) const
+{
+	if (points.size () < 3)
+		return;
+	double minY = points[0].y;
+	double maxY = points[0].y;
+	for (const auto& p : points)
+	{
+		minY = std::min (minY, p.y);
+		maxY = std::max (maxY, p.y);
+	}
+	std::vector<double> crossings;
+	for (auto y = static_cast<int32_t> (std::floor (minY)); y < static_cast<int32_t> (std::ceil (maxY)); ++y)
+	{
+		auto yc = y + 0.5;
+		crossings.clear ();
+		for (size_t i = 0, j = points.size () - 1; i < points.size (); j = i++)
+		{
+			const auto& a = points[j];
+			const auto& b = points[i];
+			if ((a.y <= yc) == (b.y <= yc))
+				continue;
+			crossings.push_back (a.x + (yc - a.y) * (b.x - a.x) / (b.y - a.y));
+		}
+		std::sort (crossings.begin (), crossings.end ());
+		for (size_t k = 0; k + 1 < crossings.size (); k += 2)
+		{
+			auto xStart = static_cast<int32_t> (std::ceil (crossings[k] - 0.5));
+			auto xEnd = static_cast<int32_t> (std::ceil (crossings[k + 1] - 0.5));
+			for (auto x = xStart; x < xEnd; ++x)
+				blendPixel (x, y, color);
+		}
+	}
+}
+
+//------------------------------------------------------------------------
+void CanvasGraphicsDeviceContext::strokePolyline (const PointList& points, bool closed,
+                                                  const CColor& color) const
+{
+	for (size_t i = 0; i + 1 < points.size (); ++i)
+		plotLine (points[i], points[i + 1], color);
+	if (closed && points.size () > 2)
+		plotLine (points.back (), points.front (), color);
 }
 
 //------------------------------------------------------------------------

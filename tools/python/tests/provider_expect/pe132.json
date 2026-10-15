@@ -1,0 +1,6 @@
+{
+  "tag": "pe132",
+  "refs": ["#3013"],
+  "note": "PE で書式 (toggleBrowserNode '|i'・selectBrowserMenuItem / previewBrowserMenuItem NOARGS) を確認した ui ブラウザ 3 件 (REPORT_PY132・PY-132 #3013)。tests/ui_browser_diff.mjs が mock と照合",
+  "functions": ["ui.toggleBrowserNode", "ui.selectBrowserMenuItem", "ui.previewBrowserMenuItem"]
+}
