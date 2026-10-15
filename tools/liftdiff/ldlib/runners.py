@@ -61,10 +61,11 @@ class Runner:
         except Exception:
             pass
 
-    def run_cases(self, lines, ids, chunk=16):
+    def run_cases(self, lines, ids, chunk=1):
         """lines: CASE 行 (プレフィクスなし)。戻り値: [結果 dict]。ハング/クラッシュは status=hang/crash の dict。
         badjson (壊れた応答行) はランナ再起動 + 1 回だけ再試行する (モジュール状態の汚染に対応、CAB-232)。
-        各結果には `_elapsed_s` (直前の応答または chunk 送信からその応答までの秒。応答が来なかった case は recv 待ちの秒) を付ける。"""
+        各結果には `_elapsed_s` (直前の応答または送信からその応答までの秒。応答が来なかった case は recv 待ちの秒) を付ける。
+        chunk=1 (既定): 1 件ずつ送って応答を待つ。chunk>1 だと先行 case の応答がパイプに溜まり、待ち時間が隣の case に計上される。"""
         out = []
         i = 0
         while i < len(lines):
