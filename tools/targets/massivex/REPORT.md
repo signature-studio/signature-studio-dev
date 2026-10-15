@@ -192,7 +192,7 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 
 - `MX_OPT=-O0` の初回 exit 1 は、`858fbfcd` での 3 回連続でも再現せず (上表 3 行とも exit 0)。`d0eddb92` の 3 回と合わせ計 6 回連続 PASS。原因は引き続き未確定 (上記の記録と同じ)。
 
-- dsp の値は `dsp/REPORT.md` と §2/§3 に一致 (258,087 / 48,612)。別の値は残していない。
+- dsp の値 (258,087 / 48,612) は 858fbfcd 時点の測定で、その時点の `dsp/REPORT.md` と §2/§3 に一致 (別の値は残していない)。現 HEAD の値 (258,087 / 38,485) は §11.5 を正本とする。
 - clen 回帰 (クリーン HEAD) は §11.4 で実施。本表は測定 HEAD `858fbfcd` の値で、現 HEAD の値は §11.4。
 
 ### 11.2 未解決 (起票先付き)
@@ -232,7 +232,16 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 - §11.1・dsp/REPORT.md の unsup_sites 48,612 との差 (−10,127): `858fbfcd` 以後に x64c が VEX/FMA/rcr (`ac58a8749`) と Agg2D の 6 語彙 (`fe2dc9ed9`) を覆った分。`insns` と `e8e9_targets` は変わらない (`git log --oneline 858fbfcd..44a7f4465 -- tools/flelift/x64c.py`)。
 - 未解決 (起票先 #3454 [MX-35]):
   - NC3 の判定閾値が固定値 `< 48612` のまま (base は 38,485)。dummy 入力では FAIL<期待> になるが、閾値が base と連動せず、他の入力で判定を誤りうる。
-  - `dsp/REPORT.md` §0・§3 の 48,612 は旧値。現 HEAD の値は本節。
+  - `dsp/REPORT.md` §0・§3 の群別内訳は MX-36 (#3487) で修正後の値に更新 (§11.6)。
+
+### 11.5 dsp unsup 基準の更新と NC3 の相対判定 (#3454・2026-10-15 実測)
+
+- 結論: unsup 基準は 48,612 → **38,485 site / 264 種** (測定 commit `458405518`)。NC3 は base unsup 比較に変更し、NC1〜NC3 は期待どおり FAIL。実測表・群別内訳・未解決は [REPORT_APPENDIX_3454.md](REPORT_APPENDIX_3454.md) (250 行上限のため分割移動)。
+
+### 11.6 dsp 群分けの修正 (MX-36 / #3487・2026-10-15 実測)
+
+- 測定 commit = `7dea72c55` (コード変更の最後の commit)。`dsp/e2e.sh` 修正前 (`8ea8d42b8`): exit 0・28 s・load 0.53→0.72・AVX 37,630 / AES 224 / other 558 → 修正後: exit 0・28 s・load 0.30→0.58・**AVX 37,406 / AES 499 / other 507 / x87 73 (合計 38,485)**。`dsp/negctl.sh` NC1〜3 は unsup 5 / 561 / 0 で FAIL<期待> (11 s)。素材 `Massive X.vst3` md5 `622993e7…` 一致。
+- 受入 (#3487): mnemonic 判定・pclmulqdq/pshufb/palignr 51 site が AES/SHA-NI へ・vaes 224 site が AES/SHA-NI へ・群別合計 = unsup_sites (38,485) を満たす。検算 `dsp/scripts/mx36_group_check.py` の実出力は未記録 (実測 lift_meta.json が入力)。未解決: 非 v 接頭の `kmovw`/`kmovd` 8 site は other のまま・mnemonic 別内訳は未記録 (いずれも表示のみ・合計に影響なし。起票先: PR 本文の未解決表。子 issue は起票しない)。
 
 ## 12. MX2-3 (N5 / N6) 実測 — 2026-10-13 (#830)
 

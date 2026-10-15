@@ -184,3 +184,64 @@ CSV の key 数は startup REPORT の 46 (31/5/10) に対し本集計は 47 (33/
 | 製品 `src/` の startup への vreg 結線 (wasm の製品バンドル組込みと、製品 UI の入口への配置) | 製品ユーザは取込を使えない | 子 issue (#116 の issue コメント参照) |
 | 取込の取消し UI。取込済みの値のうち seed 外のキーは HKCU に残る | 取消しは profile 削除でしかできない | 子 issue (同上) |
 | 取込が 0x10c7cd0 の本検証を通るか (gradeChar > 0x40) | ライセンス判定への効果は未確認 | #785 (ST-T16 子-1) |
+
+## 13. #2793 (ST-T21) 製品ページへの .reg 取込入口・取消し (2026-10-15)
+
+**結論**: 製品ページ (`index.html`) に `?license=import` で開く取込入口を置いた。取込・不正拒否・MachineGuid 設定・再読込保持に加え、取消し (既定の登録済み placeholder へ戻す) を製品 bundle 上の headless Chrome で確認した。既定ページには入口も vreg も載らない。**FLEngine の起動経路は vreg を読まない** (取込値は IndexedDB に保存されるだけで、FL 本体の登録判定には届いていない。残りは `[ST-T22]` へ起票)。
+
+**設計**
+- `src/runtime/license_import_panel.ts`: 製品側の入口 (DOM は `ui/import.html` と同じ操作・ID は `license-*`)。`src/index.ts` が `?license=import` のときだけ `import()` する。vreg wasm (200KB) と seed は `license_import_panel` chunk (252 KB) にだけ入り、既定の `index` chunk (60 KB) には vreg の痕跡が 0 件 (`grep` 実測)。
+- `js/license_import.mjs` `revertUserReg()`: 取込バイト列 (`<profile>#user-reg`) を消し、プロファイル記録を消して開き直す。取込が無ければ何もせず `false`。MachineGuid は保持する。
+- **プロファイル記録ごと作り直す理由**: vreg は HKCU 全体を保存する。`#user-reg` だけを消すと、取込由来の seed 外の値 (`Software\Image-Line\E2E-Import\Marker` 等) が HKCU の永続値に残る。ネガティブコントロール (記録の削除を外す) で、この残存を e2e が検出することを確認済み (下表)。
+- `src/runtime/vreg_modules.d.ts`: vreg の JS / wasm の型宣言 (実装の正本は `tools/startup/vreg/js/*.mjs`)。
+
+**実測 (測定 commit `0d5eaf3d6`・コードを変えた最後の commit。初版は `d04ba8206`、差し戻し round 1 の修正で `0d5eaf3d6` に更新)**
+
+| 項目 | 結果 |
+|---|---|
+| 実行 | `RUNTIME_TMP=<一時ディレクトリ> bash tools/startup/vreg/vreg.sh` (`build/` を生成した状態) |
+| 所要 / exit / load | 31.8 s / 0 / vreg.sh 直後の uptime 1 分平均 0.72 |
+| C 単体 / shimx 既存 (st・mt・M4) / symcheck | ALL PASS / ALL PASS ×3 / vreg 要求 38 シンボルを shimx reg.c が全て定義 (公開 45) |
+| node テスト | **25 / 25 PASS** (既存 24 + `revertUserReg` 1) |
+| Chrome `e2e_chrome.mjs` (既存) | PASS (Chrome/154.0.8037.97) |
+| Chrome `e2e_import_ui.mjs` (既存・ui/import.html) | PASS (Chrome/154.0.8037.97) |
+| Chrome `e2e_product_import.mjs` (新規・製品 bundle) | **PASS** (Chrome/154.0.8037.97。既定ページに入口なし → 製品ページで 初回 placeholder → 取込(external) → 不正拒否 → MachineGuid 設定 → reload 保持 → 取消し → reload で既定のまま) |
+| ネガティブコントロール (記録の削除を外す) | `d04ba8206` で実施: `e2e_product_import.mjs` が FAIL: `AssertionError … actual: true, expected: false` (取消し後の Marker 残存を検出)。元に戻して PASS を再確認。テストは round 1 で不変のため再実施しない |
+| 製品 bundle (`vite build`・生成物あり) | `license_import_panel` 252.03 kB (gzip 56.62) / `index` 60.25 kB (gzip 24.12)。`index` の vreg 痕跡 0 |
+
+測定後のコード差分: `git diff 0d5eaf3d6 HEAD -- src tools/startup/vreg vite.config.ts ':!tools/startup/vreg/REPORT.md'` の出力は 0 行 (本節の追記は REPORT のみ)。
+
+**差し戻し round 1 (2026-10-15): 生成物なしの checkout で vite build が落ちる件**
+- 原因: `src/runtime/license_import_panel.ts` が `tools/startup/vreg/build/vreg_wasm.mjs` (gitignore の生成物) を静的 import しており、生成しない checkout (E2E local job) では `UNRESOLVED_IMPORT` で `vite build` が落ちた。`pnpm build`・`deploy/probe/probe.sh` も同じ設定を使うため同様に落ちた。
+- 対応: `vite.config.ts` の `vregWasmOptional()`。生成物が無いときだけ `createModule` を「未生成」を投げるスタブに差し替え、build 時に警告を出す。生成物があれば実物を使う。build のコマンドは変えていない (emsdk を要求しない)。
+- 実測 (コミット `0d5eaf3d6` の作業ツリー・`build/` の有無を切替えて確認):
+
+| 項目 | 結果 |
+|---|---|
+| `tsc --noEmit` | rc 0 |
+| `vite build` (生成物なし) | rc 0。警告 `vreg wasm 未生成` 1 件。`index` 60.16 kB / `license_import_panel` (スタブ) 131.41 kB |
+| `bash tools/e2e/run.sh --driver both --targets preview,edge-sim` (生成物なし = CI の E2E local 相当) | **rc 0** / 12.8 s / **PASS=34 FAIL=0 SKIP=6** |
+| 同上 (生成物あり) | rc 0 / 16.3 s / PASS=34 FAIL=0 SKIP=6 |
+| `pnpm runtime:e2e` (下記) | rc 0 / 4.0 s / **ALL OK** |
+
+- `pnpm runtime:e2e` の内訳: `prod/build_pthread.sh` (emcc 6.0.12) が mt-boot (`fl-mt.wasm` 69,388 B) を作り stage した (`mt-boot.6b2bc0cd3633.wasm`・`mt-boot.9139617a1fdd.mjs`)。stage のスキップは 4 件: `m1-hello` (`tools/m1/build/wasm_elf.wasm` 無し。`m1.sh` は retdec-decompiler 不在で FAIL)、`m6-ott`・`m10-ott`・`m11-boot` (いずれも wasm 素材無し)。結果: crossOriginIsolated OK / mt-boot 4 thread × 1M atomic add == 4,000,000 / pump 全 MOUSEMOVE 2000 受信 (loss 0) / WM_TIMER 4 回 / Atomics.wait 1259 回。
+- 直接 import の理由: 既存の startup glue (`tools/startup/glue/host/glue_host.ts` の RegBridge) は node 専用で製品 bundle に入らず、製品から vreg を呼ぶ既存経路が無い。vreg の正本 (`build/`・`js/`・`data/`) を複製せず同じファイルを参照するため、`src/` から直接 import した (`src/` → `tools/` の前例は無い)。
+
+**範囲と限界**
+- 取込入口は query (`?license=import`) のみ。メニューからは開けない。
+- 取込値は profile `default` の IndexedDB に保存されるが、**FLEngine の起動経路 (`src/runtime` の worker) は vreg を呼ばない**。`tools/startup/glue/host/glue_host.ts` の RegBridge は node 実行専用で、製品 bundle には入っていない。→ `[ST-T22]` (起票先)。
+- 取込が FLEngine の登録判定 (0x10c7cd0 → byte[0x14f84a8]) を通るかは未確認 (#785)。
+- 製品の起動 (FLEngine boot) は**動かしていない** (fl-win64 は未展開・未実行)。KPI (dispatch 数・通過 unit 数・最初のウィンドウ) は測っていない。既定ページの起動経路は変更していない。
+- 既存の runtime e2e (`pnpm runtime:e2e`) は round 1 で実行した (上記)。mt-boot のみ実行し、M1/M6/M10/M11 は素材が無く skip。
+- ui/import.html (standalone) に取消しは無い (製品側のみ)。
+- vite build は `FL_WIN64_DIR` 未指定で THIRD_PARTY_NOTICES 不完全 (15 件) の既存警告を出す。本変更の依存ではない。
+
+**差し戻し round 2 (2026-10-15)**: `tools/e2e/run.sh` (配備入力 `tools/e2e/work/dist` の作成元) が vite build の前に `build.sh module` を呼ぶ。`build.sh` は `EMSDK_ENV` を読む (CI の設定値)。`deploy/RUNBOOK.md` §1(a) に同 1 行。`registry.json` の `ignoreLicensePaths` に取込入口のソースを追加 (notices check PASS・`notices.test.mjs` 52 pass・0 fail)。
+測定 commit `5767a2dfd` (生成物を消した状態から・`EMSDK_ENV` に emsdk の `emsdk_env.sh` を指定)。`git diff 5767a2dfd HEAD -- src tools/startup/vreg tools/e2e tools/legal vite.config.ts deploy/RUNBOOK.md ':!tools/startup/vreg/REPORT.md'` は 0 行。
+
+| 項目 | 結果 |
+|---|---|
+| `bash tools/e2e/run.sh --driver both --targets preview,edge-sim` (CI と同じ) | rc 0 / 20 s / PASS=34 FAIL=0 SKIP=6 |
+| `bash tools/startup/vreg/vreg.sh` | rc 0 / 24 s / node 25/25・C/shimx/M4 ALL PASS・Chrome 3 本 PASS (`e2e_product_import` 含む) |
+| `pnpm runtime:e2e` | rc 0 / 5 s / ALL OK (skip: m1-hello・m6/m10/m11 は素材無し) |
+| 製品 bundle | 生成物あり: `license_import_panel` 252.03 kB。なし (`pnpm build` 相当): スタブ 131.41 kB・警告 1 件・rc 0 |
