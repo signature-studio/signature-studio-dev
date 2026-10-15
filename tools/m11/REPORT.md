@@ -248,3 +248,42 @@ judge: stage 6 は Halt0/longjmp 無し・全 942 unit 実行・skip 0・DllMain
 
 ## 17. #748 [M11-N41]: 652500 の 1 段 deref 復元 (gate 付き, 既定 0, 部分達成)
 unit 149 は OFF/ON とも oob のまま。ON で kind が変わるのは unit 895 (halt0 → oob) の 1 件のみ (N748 の再測定で訂正)。既定 0 のまま。測定値・未解決・起票先は [REPORT_N748.md](REPORT_N748.md)。
+
+## 18. #134 [M11-N5]: main `93307cc6a` の停止点 (unit 101 = VA 0x5de960 の 535c11 OOB) と e2e 期待値の更新 (部分達成)
+
+測定 commit: `93307cc6a` (origin/main、コードは変更していない)。`git diff 93307cc6a HEAD -- tools/m11/*.sh tools/m11/*.c tools/m11/*.py tools/m11/*.mjs` = 0 行。変更は `e2e_expect.env` (期待値 2 行) と本節のみ。
+素材: `fl-win64` (`extracted/block00031_PE.bin` のみ・sha256 `b2c64da4…`)、`work-m11` (→ `tools/m11/work/`)、toolchain は `/opt` の既存。`work/lift_pe.sha256` を手で書き `m11_gen_ir2.sh` で IR のみ再生成 (`ir_sha256` `36079b29…822a6a`。`--full` は未実施)。
+
+### 実測 (`bash tools/m11/m11_e2e.sh`, 4 vCPU, n=2 (期待値変更前後の run で同一値), 所要 71.2 s / 開始時 load 0.89)
+| 項目 | 値 |
+|---|---|
+| 通常起動 | units_run 98 / skipped 3 (完了 101) / total 942。icall ok 391 miss 3。Halt0 0 |
+| 通常起動の停止 | trap "memory access out of bounds" @ `function_535c11` ← `4fad10` ← `4fb910` ← `5de960` (unit index 101, VA 0x5de960) |
+| stage | 4/6 (5・6 未達) |
+| survey | ok 873 / noproc 1 / miss 46 / trap 22 (oom 0) / clobber 0 |
+| 寛容起動 | attempted 942 / ok 875 / skipped 66 (miss 46, halt0 7, oob 13) |
+
+前回 (`750340fc`、#134 コメント): 停止は unit 56 (`function_8c5eb0` unreachable)、survey 871/24。停止が unit 56 → 101 に進んだ原因 (main 側の複数の変更の合成) は未特定。
+
+### 期待値の更新 (`e2e_expect.env`・ファイル内の m3 手順)
+| 変数 | 変更前 | 変更後 | 根拠 |
+|---|---|---|---|
+| `M11_EXPECT_STRICT_DONE` | 56 | 101 | 通常起動の完了数 = units_run + skipped = 98 + 3 |
+| `M11_EXPECT_SURVEY_OK_EXACT` | 872 | 873 | survey ok 実測 873 |
+
+上限は変えていない: `M11_EXPECT_PTR_NEW_MAX` 69359 に対し実測 69668 (全件 run) で ptrcheck ゲートが不合格 (e2e は rc=1)。増分 +309 の内訳 (完了 unit 増に伴う正当な書込みか、未 remap の VA 語か) は未分析のため、上限は据え置いた。
+
+### 停止点の切り分け
+- `535c11` の `self` は 4fad10 が `535240(%42)` で得た R (`535b30` が `[R+8] = %42` を格納)。`535c11` は `[[R+8]+8]` を読むため、`%42` (4fad10 の table 項目 `[item+8]`) が線形メモリ外の値。
+- `535240` の `ptrtoint 1003752` は `[rip+disp]` の値 (PE 上で `0x4f50e8`、linear `0xf50e8`) と一致し、誤りではない。
+- `M11_FIX_535BF2=1` (#714 の `535c11`/`535bf2` 転記) でも停止は同じ unit・同じ trap。`535c11` の lift 形ではなく入力 `%42` が原因。
+- 125.3 MB (131399680 B = 0x7d50000) の VirtualAlloc は unit 95 (0x5d2680) と unit 101 (0x5de960) の init 経路で発生 (`M11_VA_BIGTRACE=1`、呼出元 `4fb1f0`→`500570`→`534b40`→`410320` 周辺)。寛容起動では unit 101 は ok で、同じ要求を含む。要求元のサイズ算出の正否は未確認。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unit 101 (`5de960`) の `4fad10` が読む table 項目 `[item+8]` (`%42`) の出所 (上流 unit の書込み) | stage 5/6 未達 (101/942) | #134 (継続。PM 判断で子 issue 化) |
+| 125 MB VirtualAlloc の要求元 (unit 95・101) のサイズ算出が誤 lift か | 上記 §1 の「巨大要求は誤 lift の疑い」と同じ | 同上 |
+| `M11_EXPECT_PTR_NEW_MAX` 69359 と実測 69668 の差の分析 | e2e rc=1 (ptrcheck) | PM 判断 |
+| FL_* 初期化 API 呼出し・skip 3 (0xfa9390) | stage 6 の前提 | #134 (継続) |
+
+KPI (m11 = RetDec 路線の boot 部分起動): 通過 unit 101 (strict)・stage 4/6。FLEngine の最初のウィンドウ: 動かしていない (GUI なし、MessageBox 0 件)。
