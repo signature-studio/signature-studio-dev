@@ -106,3 +106,24 @@ python3 tools/plugins/f2/xmm_slot_probe.py "$FL_WIN64_DIR/extracted/block18982_P
 - 0x6b0ef0 の呼出し元は解析していない。xmm1 と rdx のどちらが意味を持つかは未確定 (#2850)。
 - 残る 1 case の不一致 (V1 の 7/8) の入力を trace で直接確認していない。
 - 測定は 1 回ずつ (V0・V1 とも `leaf_diff` は 1 回)。再現性の回数測定は未実施。
+
+## 8. #2850 (PLG-F2-9): fix_xmm_args の xmm 入力 slot を CFG 解析へ置換
+
+- 変更: `tools/plugins/lift/passes/fix_xmm_args.py` の slot 集合を `liftdiff/ldlib/pe.py` Analyzer (CFG 上で全経路に定義の無い xmm 読み) に変えた。幅 (32/64) は従来どおり `k80abi.scan_function` の `xmm_width` を使い、CFG だけで見つかった slot は幅不明として `width_unknown` で skip する。CFG が打ち切られた関数は `cfg_truncated` で skip する。
+- `tools/plugins/f2/xmm_slot_probe.py` の列: (a0) k80abi (修正前の線形順) / (a) pass の slot (CFG) / (b) pe.py 直接。
+- 測定: 変更前は `origin/main` 01f1b7e51 の作業ツリー、変更後は本 PR の commit (変更内容は同一)。`f2_step1.sh` (前提 work/・V0 lift・閉包統計) は両方で同じ実行を使った (8 分 24 秒、rc 0)。lift (`PLUG_XMMARG=1 PLUG_LDFIX=1 PLUG_ICALL=0`、11 block) は両方 rc 0 (43.9 秒)。`leaf_diff.sh` の `LEAF_DIFF elapsed` は変更前 **143 秒**、変更後 **137 秒** (どちらも rc 0)。
+
+| 関数 (block) | 変更前 (V1-old) | 変更後 (V1-new) |
+|---|---|---|
+| 0x6b0ef0 (18982) | fixed: `i64,i64,double %in.xmm2` (部分復元) | skip: `slot_occupied(xmm1, IR params=2)` |
+| 0x6ca5c0 (19013) | fixed: 同上 (部分復元) | skip: `slot_occupied(xmm1, IR params=2)` |
+| 0x6bfec0 (18975) | fixed | fixed (変化なし) |
+| 0x6c9b60 (18975) | fixed | fixed (変化なし) |
+| 0x6f1650 (19059) | fixed | fixed (変化なし) |
+| 0x6c8c90 (19005) | skip: `slot_occupied(xmm3, IR params=4)` | 同じ (変化なし) |
+| 0x6cc2e0 (19006) | skip: `slot_occupied(xmm3, IR params=4)` | 同じ (変化なし) |
+
+- 全 11 block の集計 (fixed / skipped): 変更前 **23 / 48**、変更後 **21 / 41**。変わった skip 理由は、`partial_slots` の recovered 集合の変化 (0x6c86b0) と `slot_occupied` 集合の縮小 (0x6c15c0 ほか) が中心。`fixed` の増減は 0x6b0ef0・0x6ca5c0 の 2 件のみ。
+- 回帰: 23 関数の最終判定は変更前 **一致 15 / 不一致 8 / 実行不能 0**、変更後も **一致 15 / 不一致 8 / 実行不能 0** (`leaf_report.md`)。
+- 0x6b0ef0 の (a0) は `xmm2`、(a) と (b) は `xmm1,xmm2,xmm3` で、修正により不一致は解消 (`xmm_slot_probe.py`)。
+- 未実行: `nc_leaf.py` の未検出 0 の確認 (本 run の時間内に実行できず)。XMMARG 単独 arm (`PLUG_XMMARG=1 PLUG_LDFIX=0`) と LDFIX 単独の A/B は未測定。V1 の ldfix 適用件数 (変更前の V1 lift の `*.ldfix.json`。ldfix は本 PR で変えていない): block 18982・19005・19006・19013 で f2 系が各 1 件、19005・19006 では f3c も各 1 件。
