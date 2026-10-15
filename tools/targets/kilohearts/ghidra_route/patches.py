@@ -112,11 +112,10 @@ ABI = {
         ('delay 6996 FUN_180fe3cd0 rcx=param_1[2]', r'(if \(param_1\[2\] != _DAT_182989690\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(param_1[2]);'),
         ('delay 6999 FUN_180fe3cd0 rcx=param_1[0xb]', r'(if \(param_1\[0xb\] != _DAT_1829896d8\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(param_1[0xb]);'),
         ('delay 7002 FUN_180fe3cd0 rcx=param_1[0xc]', r'(if \(param_1\[0xc\] != _DAT_1829896e0\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(param_1[0xc]);'),
-        # #4835 (KH-118): 引数数不一致 (too few) の呼出し 2 件。呼出元の機械語で rcx の源を確定 (rcx = rbx = 入口の param_1)。
-        #   180fbbfb8: mov rbx,rcx (180fbbfdb) → call FUN_180fbdfcc (180fbbfde)。直線で rbx 不変。
-        #   180fcdbfc: mov rbx,rcx (180fcdc1f) → call FUN_180fbde90 (180fcdc22)。直線で rbx 不変。
+        # #4835 (KH-118): 引数数不一致 (too few) の呼出し 1 件。呼出元の機械語で rcx の源を確定 (rcx = rbx = 入口の param_1)。
+        #   180fbbfb8: mov rbx,rcx (180fbbfdb) → call FUN_180fbdfcc (180fbbfde)。直線で rbx 不変。callee 宣言 short FUN_180fbdfcc(short *) は REPORT_APPENDIX_4835.md。
+        #   180fcdbfc → FUN_180fbde90 は callee の生成宣言が未確認のため規則にしない (REPORT_APPENDIX_4835.md)。
         ('delay 2666 FUN_180fbbfb8 rcx=param_1 (FUN_180fbdfcc)', r'sVar1 = (?:func_0x000|FUN_)180fbdfcc\(\);', 'sVar1 = FUN_180fbdfcc((short *)param_1);'),
-        ('delay 4329 FUN_180fcdbfc rcx=param_1 (FUN_180fbde90)', r'sVar1 = (?:func_0x000|FUN_)180fbde90\(\);', 'sVar1 = FUN_180fbde90((short *)param_1);'),
     ],
 }
 # V128 演算 (#3108 KH-45): Ghidra は x86 の `mul r64` (rdx:rax = rax × r64) と 128bit 加算 (add/adc) を、128bit ベクタの
