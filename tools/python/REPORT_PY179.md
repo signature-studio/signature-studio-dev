@@ -31,7 +31,7 @@ REPORT_PY100 の表「`patternNumber()` (0xd64d20 が読む slot) `0x15e4018` �
 
 | コマンド | 結果 | wall / load |
 |---|---|---|
-| `bash tools/python/provider/build.sh` (`/opt/emsdk`・emcc) | rc 0。`fl_table.c: 435 関数, ハンドラ 148` (実装数 148 と一致) | 2.26 秒 (user 1.64 秒・sys 0.31 秒) |
+| `bash tools/python/provider/build.sh` (emcc は `[EMSDK]`) | rc 0。`fl_table.c: 435 関数, ハンドラ 148` (実装数 148 と一致) | 2.26 秒 (user 1.64 秒・sys 0.31 秒) |
 | `node tests/patterns_diff.mjs` (新規・25 呼出し: 戻り値・範囲・個数・型) | `{"calls":25,"diffs":0,"PASS":true}` rc 0 | 実測は同 run 内 (wasm 初期化含む) |
 | `node tests/patterns_group_diff.mjs` (PY-172 の回帰) | `{"calls":14,"diffs":0,"PASS":true}` rc 0 | 同上 |
 | ネガティブコントロール: `fl_engine.c` の `PAT_N` を 998 に壊して build → `patterns_diff.mjs` | rc 1・`patterns 数え・選択系 差分 2 件` (patternCount と isPatternDefault(999)) | 同上 |
@@ -46,7 +46,7 @@ REPORT_PY100 の表「`patternNumber()` (0xd64d20 が読む slot) `0x15e4018` �
 ## 4. 再現
 
 ```
-bash tools/python/provider/build.sh                       # rc 0 (EMSDK_ENV 既定 /opt/emsdk)
+bash tools/python/provider/build.sh                       # rc 0 (EMSDK_ENV 既定は [EMSDK] の emsdk_env.sh)
 cd tools/python && node tests/patterns_diff.mjs           # {"calls":25,"diffs":0,"PASS":true}
 cd tools/python && node tests/patterns_group_diff.mjs     # {"calls":14,"diffs":0,"PASS":true}
 FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_pattern_probe.py   # rc 0 (REPORT_PY173 §7)
