@@ -55,11 +55,13 @@
 
 - 解析の再現: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py204_cell_writes.py --check` (14 項目)。
   `--dump <TSV>` で事象の一覧、`--method window` で窓法の検算、`--negctl-nokill` で kill を外した場合 (N1)。
-- 測定 commit: `f7489f0f8` (解析 script の最後のコード変更)。以降のコード差分: `git diff f7489f0f8 HEAD -- tools/python/analysis/flapi/pe_py204_cell_writes.py` は空 (0 行)。
-  同ディレクトリの `pe_k_struct_probe.py` (main 取り込みで入った #3443 の解析・469 行) はこの解析が使わないので、差分の範囲に含めない。
+- 測定 commit: `f7489f0f8` (解析 script の最後のコード変更)。以降のコード差分: `git diff f7489f0f8 HEAD -- tools/python/analysis/flapi/pe_py204_cell_writes.py` は空 (0 行)。script の import は capstone・pefile だけで、リポジトリ内のモジュールに依存しない。
+  `git diff --stat f7489f0f8 HEAD -- tools/python/analysis` は `17 files changed, 1980 insertions(+)` (main 取り込みで入った他 PY の解析スクリプト。この解析は参照しない)。
+  main 取り込み後の HEAD `5166774b6` で `--check` を再実行した (下の実測時間)。
 - 直前の script 変更 (`git diff ee18182d9 f7489f0f8`・51 行追加 6 行削除): C5・C8 の表題の修正、`passed-other` の記録、`cfg_from` (callee 検査用) の切出し、C10〜C12 の追加。`window_explore` は変更していない。
 - 実測時間 (1 プロセス・単一スレッド。4 core。実行中の loadavg は未採取で、uptime の 1 分平均は 0.3〜1.0):
   - `--check`: 172.6 s (C11 の判定を直す前の 1 回目の値。13/14 で、C11 だけが FAIL)。14/14 の時間は `f7489f0f8` の段階では未採取 (`--dump` と並行して走ったため)。HEAD `a0f25d5ff` で単独に再実行: 14/14 PASS・97.5 s (real 1m37.5s・実行開始時 loadavg 0.20・`fl-win64` の `block00031_PE.bin`)
+  - HEAD `5166774b6` (main 取り込み後・単独実行): 14/14 PASS・186.1 s (real 3m06.1s・実行開始時 loadavg 0.34・同じ `block00031_PE.bin`)。`a0f25d5ff` の 97.5 s との差の原因は未確認 (script は同一。実行環境の差と推定)
   - `--dump`: 86.8 s (`truncated=0`)
   - `--method window`: 85.0 s (`truncated=0`)
   - 比較: `pe_rip_refs.py 15e26a0` は 34.2 s (同じ `.text` の線形走査。`ee18182d9` で採取。本 PR で変更していない)
