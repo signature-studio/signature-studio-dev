@@ -66,6 +66,9 @@ static void init_chan(Chan *c, const char *name, const char *plugin, double vol,
     for (int q = 0; q < NPARAM; q++) c->pv[q] = params[q].v;
 }
 
+/* PY-117 (#2959): 試験用。準備判定 (general.safeToEdit) の値を設定する */
+void fl_engine_set_safe_edit(int v) { safe_edit = v ? 1 : 0; }
+
 void fl_engine_reset(void) {
     nch = 3;
     grid_n = 0;
@@ -495,9 +498,10 @@ FL_H(playlist, getLiveTriggerMode) { PL(0); return fl_ret_i(c, p->trig_mode); }
 FL_H(playlist, getLivePosSnap) { PL(0); return fl_ret_i(c, p->pos_snap); }
 FL_H(playlist, getLiveTrigSnap) { PL(0); return fl_ret_i(c, p->trig_snap); }
 /* 表 (gen/fl_table.c・main #2927 で kwsig 'i|i' に合わせ value 引数が入った)。REPORT_PY61 §3 確定: value -1 (省略を含む) は反転、それ以外は下位 1 byte を lock に書く。
- * 準備判定 (-2) は未モデル (常に準備済み) */
-/* PY-102 (#2883): binary 0xd56510 に従う。index 1..500 の外は RANGE (-4)、value -1 は反転、他は下位 1 byte を書く。準備判定 (call [rax+0x98]) は未モデル (常に準備済み) */
-FL_H(playlist, muteTrackLock) { PL(0); int64_t v = A_INT(1, -1); p->lock = v == -1 ? !p->lock : (uint8_t)v; return fl_ret_none(c); }
+ * 準備判定 (-2) は PY-117 (#2959) で muteTrackLock に入れた */
+/* PY-102 (#2883): binary 0xd56510 に従う。index 1..500 の外は RANGE (-4)、value -1 は反転、他は下位 1 byte を書く。
+   PY-117 (#2959): 準備判定 (call [rax+0x98] = general.safeToEdit と同じ式) が偽なら、範囲検査より先に UNSAFE (-2) */
+FL_H(playlist, muteTrackLock) { int64_t v = A_INT(1, -1); if (!safe_edit) return fl_err(c, FL_E_UNSAFE, "Operation unsafe at current time"); PL(0); p->lock = v == -1 ? !p->lock : (uint8_t)v; return fl_ret_none(c); }
 #define WN(a) int64_t _w = A_INT((a), 0); if (_w < 0 || _w >= NWIN) RANGE()
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }

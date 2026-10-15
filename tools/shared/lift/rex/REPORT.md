@@ -211,7 +211,7 @@ python3 tools/shared/lift/rex/importers.py <fl-win64 展開先> --json OUT.json 
 
 ## 9. 成功経路 (戻り値 1 / 3) と書込の一致 — T-SH-46 (#2870, 部分達成)
 
-結論: 成功経路 (戻り値 1 / 3) に入る入力を追加し、比較対象に成功経路を含めた。arena 書込は元の機械語と全件一致。`.data` の一致・落ちる case の分類・movnti は未解決。測定 commit `80c5ff7a`。数値・未解決は付録 `REPORT_APPENDIX_2870.md` の §9.1・§9.3・§9.4 が正本 (§9 全文)。
+結論: 成功経路 (戻り値 1 / 3) に入る入力を追加し、比較対象に成功経路を含めた。arena 書込は元の機械語と全件一致。`.data` の一致・movnti は未解決。落ちる 73 件は全件分類した (T-SH-89・#3588。付録 `REPORT_APPENDIX_3588.md`)。測定 commit `80c5ff7a`。数値・未解決は付録 `REPORT_APPENDIX_2870.md` の §9.1・§9.3・§9.4 が正本 (§9 全文)。
 
 ## 10. 所有者限定 tier の side module 分離とビルドフラグ除外 — T-SH-47 (#2896)
 

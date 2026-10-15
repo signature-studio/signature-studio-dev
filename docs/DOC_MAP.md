@@ -279,6 +279,7 @@
 | `tools/m11/trap_triage/REPORT_714.md` | ~246 | #714: OOB 呼出し鎖・計測器の影響・実値採取の再試行 (§12〜§13)。#1602 r4 の要約は末尾。全文は `REPORT_APPENDIX_1602.md` |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3499.md` | ~60 | #3499: REPORT_718 §4j (証拠表の行 36〜66 の件ごとの判定・根拠・注・未解決) の全文。250 行上限のため分割移動。判定ツールは `judge_ctx_3499.py` |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3564.md` | ~70 | #3564: strict 候補の残り (証拠表の行 36〜66 の保留 6・単独 15) の件ごと判定 (真陽性 12・偽陽性 1・保留 8)。REPORT_718 §4i の全文・判定補助 `judge_src.py`・機械語側のネガティブコントロール `negctl_3564.py` (付録 §7) |
+| `tools/m11/trap_triage/REPORT_APPENDIX_3502.md` | ~85 | #3502: 証拠表の行 67〜98 の保留 30 件の件ごと再判定 (真陽性 9・偽陽性 4・保留 19・判定基準・照合範囲・未解決)。REPORT_718 §4k の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` | ~56 | #3498 (PR #3567): strict 候補の証拠表 行 4〜35 (32 件) の件ごとの表・判定規則・未解決 (REPORT_718 §4h の全文。REPORT_718.md の 250 行上限のため分割移動)。判定は保留 32 (真陽性 0・偽陽性 0) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2773.md` | ~70 | #2773 (2 回目): REPORT_679 §10 の全文。unit 101 の周回の根本原因 (4fa210 の件数 0 ガード脱落・D19 同型)・修復の測定表・原典突合・未解決 |
@@ -595,6 +596,7 @@
 | `tools/python/REPORT_PY205.md` | 92 | PY-205 (#3493): mixer.getTrackCount (`*(*0x15e2198)` の dword − 2) と getEqBandCount (3) の PE 確定。大域は qword ポインタ・変換スロット 0x15e4280 (REPORT_PY152 §42 流用)。ネイティブ C と mock の照合 0 件差・ネガティブコントロール (−3 で 124)。絶対値 125 は実行時値未確定。wasm 版は未実行 (#3553) |
 | `tools/python/REPORT_PY172.md` | 89 | PY-172 (#3219): patterns グループ系 4 関数の PE 確定 (件数・群名・群の索引は 0 始まり・索引 -1 の意味は未確定)。getPatternGroupCount / getPatternGroupName を件数 0 の仮置きで C・mock に実装 (差分 0)。残り 2 件は子 #3278 (PY-180) |
 | `tools/python/REPORT_PY120.md` | 120 | PY-120 (#2981): ui の操作・キー・ジョグ・編集 27 関数の PE 呼出し契約 (書式・既定値・op code・経路)。PE 確定 0 件 (作用先・戻り値の値が未確定) で保留。0xd81740 は関数ではなく型記述子、0x15e1e58 は PyArg_ParseTuple スロットと訂正。mock/C 差分 0 (実装なし) |
+| `tools/python/REPORT_PY117.md` | ~80 | PY-117 (#2959): muteTrackLock の準備判定 (VMT[0x98] = 0x1262b80・真偽条件) の確定と、偽のとき -2 (FL_E_UNSAFE) の C・mock 実装。ガードの実行時値は未測 |
 | `tools/python/REPORT_PY141.md` | 115 | PY-141 (#3034): ui 操作 27 関数の戻り値の値と型・selectWindow の引数型。0x415610 は out+8 に作用しない。out+8 の書込みは経路で違う (0xd84680 経路は PE の直接 store なし・0xd843d0 経路は 0xd844c6 で `[obj+0x10]`)。成功時の値は PE から未確定。0xc38bc0 = Py_None・0x15e4280 = PyLong_FromLong (int)。selectWindow の引数は C int (`i`) が正。検算は `analysis/flapi/pe_py141_probe.py` |
 | `tools/python/REPORT_PY140.md` | 111 | PY-140 (#3035): `0xfdd2c0` (UI 側ディスパッチャ) の op 別 leaf を VA 付きで特定。27 関数のうち 15 関数は送出する仮想キー (VK・修飾・回数) が PE 確定 (`0x8186a0` → user32 SendInput)。送出の成否のゲート (`0x60c220`・`0x728f50`・`0xfdeaf0`) と mode の源は未確定で子 #3758。mock/C は未変更 (子 #3759)。残り 12 関数は子 #3761 |
 | `tools/python/REPORT_PY119.md` | ~87 | PY-119 (#2980): ui の状態・フォーカス・文字列ゲッター 6 件 (getFocused / getFocusedFormID / getFocusedFormCaption / getFocusedPluginName / getHintMsg / isInPopupMenu) の PE 根拠・mock/C 差分 0・値は仮置き。保留 12 件は #3005・#3006・#3007 |
@@ -716,6 +718,7 @@
 | `tools/shared/lift/rex/REPORT_APPENDIX_2870.md` | ~50 | rex REPORT §9 全文 (T-SH-46 #2870: 成功経路 (戻り値 1 / 3) と arena 書込の一致・落ちる case の分類・未解決) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2896.md` | ~41 | rex REPORT §10 の旧版全文 (T-SH-47 #2896: REX_SIDE フラグと owner/rex_side.wasm の旧測定 (測定 commit `105733875`・133 件版)。最新は REPORT §10) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2969.md` | ~45 | rex REPORT の付録 (T-SH-48 #2969: 中核閉包 (REXCreate / REXGetInfoFromBuffer / REXRenderSlice) の owner tier 配置と REX_SIDE 除外の実測。測定 commit `9593fe1c1`) |
+| `tools/shared/lift/rex/REPORT_APPENDIX_3588.md` | ~75 | rex REPORT の付録 (T-SH-89 #3588: 元の機械語が落ちる 73 件の分類 (fault 命令・レジスタ・入力による切り分け)・ネガコン・未解決。測定 commit `54b2272b0`) |
 
 ### IPP
 
