@@ -132,7 +132,7 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 - 所要 (整数秒・`time` と `date` 差分): provider build 1.1 秒・cpython 152.6 秒・flpy 3.7 秒・`device_diff` / `provider_check` / `mixer_diff` / `patterns_diff` / `channels_diff` / `playlist_diff` 各 0 秒・all_tools wasm 1 秒・all_tools mock 1 秒。load average は測定開始直前の `uptime` 1 点のみ (1 分平均 1.21・5 分平均 1.28、n=1)。
 - 広めの確認 (同 HEAD・flpy 込み、`tests/*.mjs` 53 本のうち 40 本を実行。各 120 秒上限): rc 0 が 33 本 (上表の 7 本と、`arrangement_diff`・`arrangement_selection_diff`・`general_diff`・`ilmcp_diff`・`launchmap_diff`・`midi_path_diff`・`note_enum_diff`・`patterns_group_diff`・`screen_diff`・`step_item_diff`・`transport_diff`・`ui_diff`・`ui_display_diff`・`ui_state_diff`・`tool_args`・`sig_arity_probe`・`sab_wake_diag`・`midi_path_split`・`midi_rpc_split`・`smoke_direct`・`ilmcp_e2e`・`midi_bundled_device`・`midi_script`・`pyscript_e2e` (72/72 PASS)・`pyscript_scenarios`・`browser_check`)。rc 1 が 7 本: `chord_progression_call_probe`・`chord_progression_e2e` (`work/fl_extract/` 無し)、`static_check`・`fulltext_parity`・`static_browser_check` (`dist/flpy_static*.js` 未ビルド)、`mcp_ui_check`・`midi_ui_check` (`vite` 未導入)。未実行 13 本 (`dump_builtins`・`flpianoroll_dialog_load_e2e`・`midi_event_bench`・`poc_mcp`・`pyscript_browser`・`rtt_bench`・`static64_browser_probe`・`static_bench`・`static_midi_bench`・`static_mt_check`・`static_subinterp_browser`・`static_subinterp_probe`・`subinterp_probe`) はベンチ・probe・static ビルド物を要し、本節では実行していない。
 
-## 再測定 (競合解消 round 6・測定 commit `939a49ad5`・main `40d3a788d` 取り込み後)
+## 再測定 (競合解消 round 6・測定 commit `939a49ad5`・main `40d3a788d` 取り込み後・件数は次節で更新)
 
 - 測定 commit: `939a49ad5` (`origin/main` (`40d3a788d`) を merge した commit。前回 `17969a203` の後に main へ入った ui ブラウザ 3 関数 (`pe132`・#3013)・launchMapPages 書式・戻り 3 関数 (`pe138`・#3029) を取り込んだ)。競合は 2 ファイル: `provider/fl_engine.c` (reset の初期化行。main 側 `browser_op = 0` と PR 側 `idle_elapsed`・`midi_out_assigned`・`master_sync` の両方を残した) と `tests/provider_check.mjs` (実装判定 `if`・件数 assert・注記。`pe132`・`pe138`・`pe206` を union にし、件数を **178** 実装・**257** 未実装にした)。`host/fl_mock.mjs` は自動 merge。コードを変えた最後の commit。
 - 測定 commit から HEAD までのコード差分: `git diff 939a49ad5 HEAD -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (本節を書いた commit は `tools/python/REPORT_PY206.md` と PR 本文だけを変える)。
@@ -159,9 +159,36 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 - 所要 (`time` 実測・整数秒は `date` 差分): fetch_inputs 0.631 秒・provider build 0.974 秒・cpython 154.97 秒・flpy 3.998 秒・provider_check 0.239 秒・all_tools wasm 1 秒・all_tools mock 1 秒。load average は測定中の `uptime` 1 点 (1 分平均 1.31・n=1)。
 - 範囲の限定: 上表は `939a49ad5` で実行した範囲。round 5 (`17969a203`) の広めの確認 (53 本のうち 40 本) は今回は再実行していない (`screen_diff`・`transport_diff`・`step_item_diff`・`note_enum_diff` 等は未実行)。
 
+## 再測定 (競合解消 round 6b・測定 commit `b3c3dafdd`・main `45182bf1b` 取り込み後)
+
+- 測定 commit: `b3c3dafdd` (`origin/main` (`45182bf1b`) を merge した commit。前節 `939a49ad5` の後に main へ入った arrangement の `pe143` (2 関数・#3041) と `arrangement_diff.mjs` の追加分を取り込んだ)。競合は `tests/provider_check.mjs` の 1 箇所 (判定 `if` と件数 assert・注記)。`pe143` を PR 側 `pe206` と併存させ、件数を **180** 実装・**255** 未実装にした。`provider/fl_engine.c`・`host/fl_mock.mjs` は自動 merge。コードを変えた最後の commit。
+- 測定 commit から HEAD までのコード差分: `git diff b3c3dafdd HEAD -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (本節を書いた commit は `tools/python/REPORT_PY206.md` と PR 本文だけを変える)。
+- 素材: 前節と同じ (`fl-win64` を `$RUNNER_TEMP/fl-win64` に展開・`fetch_inputs.sh` rc 0・emsdk は既定の `EMSDK_ENV` の既存配置)。
+- cpython: `build_cpython_wasm.sh` は既存の成果物を検出し、再ビルドせずに終了 (1 秒・rc 0)。成果物は前節の測定で作られたもの (ログの `source sha256:d01ec6a33bc1` が前節と同じ)。
+
+| 検査 | 結果 | rc |
+|---|---|---|
+| `bash provider/build.sh` | `fl_table.c: 435 関数, ハンドラ 180` | 0 |
+| `bash build_cpython_wasm.sh` | 既存成果物を使用 (1 秒) | 0 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | flpy.js / flpy.wasm 生成 (3 秒) | 0 |
+| `node tests/provider_check.mjs` (§3 flpy 段を含む) | functions 435・**implemented 180**・unimplemented 255・mcp_static 60・PASS | 0 |
+| `node tests/device_diff.mjs` | calls 21・link_calls 6・rejects 10・midi_out 10・midi_words 8・link_codes [ok,7,6,6,7,ok]・**diffs 0**・PASS | 0 |
+| `node tests/mixer_diff.mjs` / `patterns_diff.mjs` / `patterns_group_diff.mjs` | calls 69 / 25 / 14・**diffs 0**・PASS | 0 |
+| `node tests/channels_diff.mjs` / `playlist_diff.mjs` | calls 238 / 72・**diffs 0**・PASS | 0 |
+| `node tests/ui_browser_diff.mjs` / `ui_diff.mjs` / `ui_display_diff.mjs` / `ui_state_diff.mjs` | ok 8・bad 5 / calls 17 / ok 12・bad 11 / calls 58・**diffs 0**・PASS | 0 |
+| `node tests/launchmap_diff.mjs` / `arrangement_diff.mjs` / `general_diff.mjs` | calls 15 / 39 / 41・**diffs 0**・PASS | 0 |
+| `node tests/plugins_diff.mjs` / `midi_path_diff.mjs` | calls 56 / cases 30・**diffs 0**・PASS | 0 |
+| `node tests/midi_script.mjs` / `ilmcp_e2e.mjs` / `pyscript_e2e.mjs` | MIDI SCRIPT OK (checks 29・failed []) / PASS / 72 件 PASS | 0 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | **48/48 ok**・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 0 |
+| `node tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425 | 0 |
+
+- ネガティブコントロール (HEAD `b3c3dafdd`。`host/fl_mock.mjs` を退避してから変異を入れ、戻して `cmp` で一致、`git status` の差分 0 を確認。対象は文字列で指定): (a) `getMasterSync` の `return st.masterSync;` を `return true;` → **`device 差分 2 件`**・rc 1。(b) `setMasterSync` の `st.masterSync = argI(a, 0, 0) === 1;` を `st.masterSync = false;` → **`device 差分 1 件`**・rc 1。戻した後の `device_diff` は diffs 0・rc 0。
+- 所要 (`date` 差分・整数秒): cpython 1 秒 (既存成果物の検出のみ)・flpy 3 秒。他の検査は各 120 秒上限内で完了。load average は未計測。
+- 範囲: 上表は `b3c3dafdd` で実行した範囲。round 5 の広めの確認 (53 本のうち 40 本) は今回は再実行していない。
+
 ## 検証範囲 / 範囲外
 
-- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (測定 commit `939a49ad5` で 435 = 実装 178 + 未実装 257)。
+- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (測定 commit `b3c3dafdd` で 435 = 実装 180 + 未実装 255)。
 - 範囲外 (未確定のまま残す): 実 FLEngine 上の状態値 (idle・midi-out・master sync の初期値)、通知 3 件の vtbl 先の効果、`setMasterSync` の述語 P 偽 (-2) の発生条件、`0x1366e00`・`0xfd7170`・`0xfd7240` の効果、-6/-7 の実発生。
 - KPI: device API は起動・GUI に関わらないため、起動 KPI (`tools/flelift/boot/REPORT.md`) は動かしていない。
 
