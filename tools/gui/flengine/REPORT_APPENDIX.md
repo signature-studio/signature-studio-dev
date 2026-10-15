@@ -226,6 +226,22 @@ exit 0・`pass: true` (`node tools/gui/flengine/open_trace_posctl.mjs`)。lifted
 
 未解決: 実 FL の起動 trace の採取 (CreateFruityInstance 経路で CreateFileW に到達する実測) は [WIN-15] #2965。
 
+### 8-8. 既存 gate の回帰確認 (`bash tools/gui/flengine/e2e.sh`・WIN-14)
+
+測定: 測定 commit `b26633d5` のコードを、`3caac380f` (差分は本 REPORT のみ) の worktree で実行。比較元は `origin/main` (`4425f2983`) を同じ環境で実行。
+
+| 項目 | `3caac380f` (本 PR) | `4425f2983` (main) |
+|---|---|---|
+| 所要 | 362 s (開始 load 0.13 0.29 0.19・終了 1.05 0.85 0.49・nproc 4) | 361 s (開始 load 0.82 0.81 0.48・終了 1.07 1.03 0.70・nproc 4) |
+| judge | 13/14 (S1 FAIL のみ) | 13/14 (S1 FAIL のみ) |
+| S1 (soft) | `873/1/47/21/0` (base `871/1/47/23/0`) | 同じ (`873/1/47/21/0`・base `871/1/47/23/0`) |
+| B1・R1・R2・P1〜P5・W1・A1・L1・S2 | PASS | PASS |
+| ネガコン N1〜N9 | 9 件すべて期待どおり FAIL | 同じ |
+| selftest | `512 passed, 0 failed` | 同じ行 (判定行の全体が一致) |
+| pe_image parity | PASS | PASS |
+
+判定: 判定行とネガコン行の全文が両者で一致 (diff 0)。S1 FAIL は main でも同じ出力で、本 PR による新規の失敗は無い。exit 1 は main と同じ理由 (S1)。REPORT §8-4 の記録 (S1 `870/1/47/24/0`) とは数値が違う。この素材 (`work-m11` 展開直後) は §8-4 の boot7 あり構成と違うため。S1 の数値の違いは本 PR の範囲外 (既存)。
+
 ## 9. WIN-11 (#2880): EnterCriticalSection の失敗 CS と初期化経路 (部分達成)
 
 結論: fail-fast の CS は `0x12bd390` (実測・動的引数)。呼出元 VA と boot の trap 地点は未特定 (子 issue #3077 [WIN-16])。測定 commit `ae963e28`。実測と未解決の全文は [REPORT_APPENDIX_2880.md](REPORT_APPENDIX_2880.md)。
