@@ -53,6 +53,8 @@ V1 の lift で ldfix が適用された件数 (`*.ldfix.json`) は記録して�
 | 0x6b0ef0 (18982) | 引数の割当て | fixed: `i64 %arg1, i64 %arg2, double %in.xmm2` (xmm2 のみ) | 部分復元。§3 (子 #2850) |
 | 0x6ca5c0 (19013) | 引数の割当て | fixed: 同上 | 同上 |
 
+注: 上表は 26f90ada 時点の値。0x6bfec0・0x6c9b60 は 01f1b7e51 の pass では fixed (§8-2)。差の原因は未切り分け。
+
 ## 3. 0x6b0ef0・0x6ca5c0: 引数が値として届かない原因
 
 - 2 つの機械語解析の食い違い (`tools/plugins/f2/xmm_slot_probe.py`、block18982 / block19013):
@@ -107,23 +109,69 @@ python3 tools/plugins/f2/xmm_slot_probe.py "$FL_WIN64_DIR/extracted/block18982_P
 - 残る 1 case の不一致 (V1 の 7/8) の入力を trace で直接確認していない。
 - 測定は 1 回ずつ (V0・V1 とも `leaf_diff` は 1 回)。再現性の回数測定は未実施。
 
-## 8. #2850 (PLG-F2-9): fix_xmm_args の xmm 入力 slot を CFG 解析へ置換
+## 8. #2850 (PLG-F2-9): fix_xmm_args の xmm 入力 slot を CFG 解析へ置換 (修正 commit で再測定)
 
-- 変更: `tools/plugins/lift/passes/fix_xmm_args.py` の slot 集合を `liftdiff/ldlib/pe.py` Analyzer (CFG 上で全経路に定義の無い xmm 読み) に変えた。幅 (32/64) は従来どおり `k80abi.scan_function` の `xmm_width` を使い、CFG だけで見つかった slot は幅不明として `width_unknown` で skip する。CFG が打ち切られた関数は `cfg_truncated` で skip する。
-- `tools/plugins/f2/xmm_slot_probe.py` の列: (a0) k80abi (修正前の線形順) / (a) pass の slot (CFG) / (b) pe.py 直接。
-- 測定: 変更前は `origin/main` 01f1b7e51 の作業ツリー、変更後は本 PR の commit (変更内容は同一)。`f2_step1.sh` (前提 work/・V0 lift・閉包統計) は両方で同じ実行を使った (8 分 24 秒、rc 0)。lift (`PLUG_XMMARG=1 PLUG_LDFIX=1 PLUG_ICALL=0`、11 block) は両方 rc 0 (43.9 秒)。`leaf_diff.sh` の `LEAF_DIFF elapsed` は変更前 **143 秒**、変更後 **137 秒** (どちらも rc 0)。
+- 変更 (commit `b4db2dcdb` で CFG 化、`2eadbacd7` でゼロ化イディオムの除外を追加):
+  - `liftdiff/ldlib/pe.py` `Analyzer.analyze(va, zero_idiom=False)`: 既定 False は従来どおり。`fix_xmm_args.cfg_xmm_slots` だけ True にし、xmm の同一レジスタ読み (`xorps`/`xorpd`/`pxor`/`xor`/`subsd`/`subss`/`subps` の `r,r`) を入力から除く (k80abi L163-170 と同じ集合)。合成テスト: `tools/liftdiff/tests/test_pe_zero_idiom.py`。
+  - `fix_xmm_args.py`: `if xs and trunc` (旧: `if trunc` が先)。xs が空の関数は、旧 pass と同じく skipped に入れない。
+- 測定 commit: **`2eadbacd7`** (コードを変えた最後の commit)。clean worktree (`ws-3621`、branch `2850-plg-f2-9-xmm-cfg-slot`、`git status` 0 件)。`git diff 2eadbacd7 HEAD -- tools/liftdiff tools/plugins/lift tools/plugins/p0c tools/plugins/f2 ':!*.md'` の出力は 0 行 (本 commit は REPORT のみ)。
+- 測定 (各 1 回。§7 と同じ注記: 再現性の回数測定は未実施):
+  - 前提 `f2_step1.sh` rc 0 (**576 秒**)。V1 lift (`PLUG_XMMARG=1 PLUG_LDFIX=1 PLUG_ICALL=0`、11 block): rc 0 ×11 (**47.5 秒**)。
+  - `leaf_diff.sh`: rc 0、`LEAF_DIFF elapsed 146 s` (load 0.83)、最終判定 **一致 15 / 不一致 8 / 実行不能 0** (変更前の 2 回の数値 (§8 旧) と同じ判定)。
+  - `xmm_slot_probe.py` (block18982 0x6b0ef0、block19013 0x6ca5c0): (a0) k80abi = `xmm2`、(a) pass = `xmm1,xmm2,xmm3`、(b) pe.py 素 = `xmm1,xmm2,xmm3`。(a) と (b) は定義上ゼロ化除外分だけ異なる関係で、差し替えの正しさの証拠ではない (根拠は下の lift 結果)。
+  - `nc_leaf.py`: 下の「未実施」を参照。
+- before の作り方: 旧 pass (`01f1b7e51` の `fix_xmm_args.py`) を、同じ入力 (`work/batch/<b>/p.ldfix.ll`、V1 lift の LDFIX 出力) に当てて `report` を作った。after は V1 lift の `p.xa.json`。入力は両者で同一。
 
-| 関数 (block) | 変更前 (V1-old) | 変更後 (V1-new) |
-|---|---|---|
-| 0x6b0ef0 (18982) | fixed: `i64,i64,double %in.xmm2` (部分復元) | skip: `slot_occupied(xmm1, IR params=2)` |
-| 0x6ca5c0 (19013) | fixed: 同上 (部分復元) | skip: `slot_occupied(xmm1, IR params=2)` |
-| 0x6bfec0 (18975) | fixed | fixed (変化なし) |
-| 0x6c9b60 (18975) | fixed | fixed (変化なし) |
-| 0x6f1650 (19059) | fixed | fixed (変化なし) |
-| 0x6c8c90 (19005) | skip: `slot_occupied(xmm3, IR params=4)` | 同じ (変化なし) |
-| 0x6cc2e0 (19006) | skip: `slot_occupied(xmm3, IR params=4)` | 同じ (変化なし) |
+### 8-1. 全体の集計
 
-- 全 11 block の集計 (fixed / skipped): 変更前 **23 / 48**、変更後 **21 / 41**。変わった skip 理由は、`partial_slots` の recovered 集合の変化 (0x6c86b0) と `slot_occupied` 集合の縮小 (0x6c15c0 ほか) が中心。`fixed` の増減は 0x6b0ef0・0x6ca5c0 の 2 件のみ。
-- 回帰: 23 関数の最終判定は変更前 **一致 15 / 不一致 8 / 実行不能 0**、変更後も **一致 15 / 不一致 8 / 実行不能 0** (`leaf_report.md`)。
-- 0x6b0ef0 の (a0) は `xmm2`、(a) と (b) は `xmm1,xmm2,xmm3` で、修正により不一致は解消 (`xmm_slot_probe.py`)。
-- 未実行: `nc_leaf.py` の未検出 0 の確認 (本 run の時間内に実行できず)。XMMARG 単独 arm (`PLUG_XMMARG=1 PLUG_LDFIX=0`) と LDFIX 単独の A/B は未測定。V1 の ldfix 適用件数 (変更前の V1 lift の `*.ldfix.json`。ldfix は本 PR で変えていない): block 18982・19005・19006・19013 で f2 系が各 1 件、19005・19006 では f3c も各 1 件。
+| | 変更前 (01f1b7e51 の pass) | 変更後 (2eadbacd7) |
+|---|--:|--:|
+| fixed / skipped (11 block) | 23 / 48 | 21 / 41 |
+
+fixed + skipped は 71 → 62 (9 件減)。減った 9 件は次の 8-2 の「消えた」行。
+
+### 8-2. 状態が変わった関数 (11 block 全件、17 行)
+
+| 関数 (block) | 変更前 | 変更後 | 理由 |
+|---|---|---|---|
+| 0x6b0ef0 (18982) | fixed (`xmm2` のみ部分復元) | skip `slot_occupied(xmm1, IR params=2)` | 目的どおり。CFG の入力は `xmm1,xmm2,xmm3` (xmm1 は IR 位置 1 = `%arg2` と衝突) |
+| 0x6ca5c0 (19013) | fixed (同上) | skip `slot_occupied(xmm1, IR params=2)` | 同上 |
+| 0x6c15c0 (18975) | skip `slot_occupied(xmm0,xmm1,xmm2)` | skip `slot_occupied(xmm1,xmm2)` | `xmm0` が CFG の入力から消えた (全経路で先に定義される。k80abi の線形順による偽の読み) |
+| 0x6c5560 (19145) | skip `slot_occupied(xmm0,xmm1,xmm2)` | skip `slot_occupied(xmm1,xmm2)` | 同上 |
+| 0x6ce370 (19058) | skip `slot_occupied(xmm0,xmm3)` | skip `slot_occupied(xmm3)` | 同上 |
+| 0x6c86b0 (19005) | skip `partial_slots(recovered=xmm2, machine=xmm1,xmm2)` | skip `partial_slots(recovered=xmm1, machine=xmm1,xmm2)` | slot 集合は同じ。`recovered` だけ変わった。原因は未切り分け (旧 pass は機械語の発見順、新は昇順で slot を渡すため、placeholder の対応が変わった可能性。未確認) |
+| 0x6c54c0 (19145) | skip `partial_slots(recovered=xmm0, machine=xmm0..3)` | skip `no_placeholder` | `xmm0` が入力から消え、接続できた唯一の placeholder が無くなった |
+| 0x6cd980 (18953) | skip `slot_occupied(xmm0, IR params=2)` | (対象外) | CFG に `xmm0` の読みが無い (線形順の偽の読み)。xs が空になり記録しない |
+| 0x6cda50 (18953) | skip `slot_occupied(xmm0, IR params=3)` | (対象外) | 同上 |
+| 0x6cf020 (18953) | skip `slot_occupied(xmm0, IR params=1)` | (対象外) | 同上 |
+| 0x6cfa40 (18953) | skip `slot_occupied(xmm0, IR params=4)` | (対象外) | 同上 |
+| 0x6c2610 (18975) | skip `slot_occupied(xmm0, IR params=4)` | (対象外) | 同上 |
+| 0x6c35b0 (18975) | skip `slot_occupied(xmm0, IR params=1)` | (対象外) | 同上 |
+| 0x6c6fb0 (18975) | skip `slot_occupied(xmm0, IR params=1)` | (対象外) | 同上 |
+| 0x741630 (18979) | skip `slot_occupied(xmm0, IR params=4)` | (対象外) | 同上 |
+| 0x6f16e0 (19059) | skip `slot_occupied(xmm0, IR params=4)` | (対象外) | 同上 |
+
+- 「(対象外)」: 変更後は CFG の入力が空 (xs 空) で、旧 pass と同じく記録しない。9 件 (上の 9 行) が 8-1 の減少分。
+- 状態が変わらなかった関数: 0x6bfec0・0x6c9b60 (18975) は before・after とも fixed。0x6c8c90 (19005)・0x6cc2e0 (19006) は `slot_occupied(xmm3, IR params=4)` のまま。
+- `cfg_truncated` で skip された関数: 0 件 (11 block)。
+- §2 の 0x6bfec0・0x6c9b60 の `no_placeholder` は 26f90ada 時点の値。01f1b7e51 の pass では fixed (上の表と同じ入力で確認)。26f90ada と 01f1b7e51 の間に main で入った p0c・ldfix の変更 (例: `dabf01a96` LD-134、`16c37b3d8` p0c ucomi) が差の候補だが、どの commit が効いたかは切り分けていない。
+
+### 8-3. block18982 の全 pdata 関数 (11,671 件、36 秒)
+
+`k80abi` (線形順) = a0、pe.py 素 = raw、pe.py ゼロ化除外 = zi。
+
+| 比較 | 件数 |
+|---|--:|
+| raw と k80abi が不一致 (修正前の食い違い) | 56 |
+| zi と k80abi が不一致 (修正後) | 39 |
+| raw と zi が不一致 (ゼロ化除外で変わった関数) | 20 |
+| zi だけが余分な slot を持つ (修正後) | 6 (修正前は raw で 23) |
+| k80abi だけが slot を持つ (修正前後で変わらず。線形順の偽の読み) | 33 |
+
+修正で、pe.py だけが余分な slot を持つ関数は 23 → 6 に減った。残る 6 件の原因は未切り分け。
+
+### 8-4. 未実施・未解決
+
+- `nc_leaf.py` (受入 4、未検出 0): 本 run で実行していない (下の追記を参照)。
+- XMMARG 単独 arm (`PLUG_XMMARG=1 PLUG_LDFIX=0`) と LDFIX 単独の A/B: 未測定 (§5 の起票先のまま)。
+- `REPORT_APPENDIX_2726.md` §8 の状態変化 (8-2) の原因は、`recovered` の変化 (0x6c86b0) と 0x6c54c0 の `no_placeholder` を除いて、機械的に確認したもの (slot 集合の差から導いた)。placeholder 接続の内部までは追っていない。
