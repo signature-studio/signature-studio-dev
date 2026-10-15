@@ -20,6 +20,7 @@
 | 対象 11 関数の i128 位置 entry_arg | base は除外で 0 件。修正後も 0 件 (偽の不一致なし) |
 | sample:800 判定 | 一致 359 / 不一致 236 / 実行不能 206。base と同一 (判定の変化 0 件) |
 | sample:800 case の outcome/diffs 差 | base vs 修正 13〜14 件。同一コードの再実行どうし (run1 vs run2) でも 12 件 → 実行ゆらぎの範囲 |
+| 測定 commit から HEAD までのコード差分 | `git diff 0bc4b9a39 HEAD -- tools/liftdiff/ldlib tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh tools/liftdiff/rt tools/liftdiff/targets` の出力は 0 行 (空)。後続 commit `a18ed674a`・`bfd445319` は REPORT と DOC_MAP のみ |
 
 ### 2.1 対象 11 関数の内訳 (修正後)
 
@@ -37,7 +38,8 @@
 | 6649c0 | mismatch | float pos 0 (native `0x3fc00000` / wasm `0x0`)。i128 ではない |
 | 664a80 | mismatch | diff (base も同じ) |
 
-判定: 11 関数の verdict は base と同一。i128 位置の偽の不一致は消えた。残る entry_arg は i64・float の位置で、本 issue の範囲外 (親 #4195 で扱う)。
+判定: 11 関数の verdict は base と同一。i128 位置の偽の不一致は消えた。残る entry_arg は i64・float の位置・ret 差で、本 issue の範囲外。
+残る 8 件の追跡先: 親 #4195 は CLOSED のため使わない。PM agent の判断待ち (既定案: PM が新規子 issue を起票)。関連の open issue として #4199 (LD-202 の型 B 残件) があるが、対象の一致は未確認。
 
 ## 3. 再現
 
