@@ -79,7 +79,7 @@ faulting 値の起源は、群 B・D・E・G・H が **harness の引数由来**
 - thunk 内 `60000800` `mov ecx,idx` → `60000805` `mov rax,missing_import` → `6000080f` `call rax`。ここで rsp=`…95d8` のまま `call` して `missing_import` 入口 `55e7f26aaa34` の rsp=`…95d0` (16n・誤り)。
 - `missing_import` 内の `movaps` (`slot_trace+0x296f`) が 16 バイト整列を要求して落ちる (`fprintf` より前のため `MISSING IMPORT` が出ない)。
 - `make_thunk` は `sub $8,%rsp` を欠く。`REPORT_APPENDIX_2083.md` が `KERNEL32!RtlPcToFileHeader` の thunk で整列がずれると記録した件と同じ経路。
-- 修正案の確認 (リポジトリ外の一時コピー。`ott_native.c` の `call rax` の直前に `sub $8,%rsp` を入れた版): `1803b3fc0`・`1803b5b60` は `MISSING IMPORT RtlPcToFileHeader — fail-fast` (rc=99)、`18103d218` は `MISSING IMPORT RtlCaptureContext — fail-fast` (rc=99) に変わり、`movaps` の fatal (rc=95) は消えた。修正は harness 側 (`tools/ott/native/ott_native.c`) で本 PR の範囲外のため、子 issue に分けた (§4)。
+- 修正案の確認 (リポジトリ外の一時コピー。`ott_native.c` の `call rax` の直前に `sub $8,%rsp` を入れた版): `1803b3fc0`・`1803b5b60` は `MISSING IMPORT RtlPcToFileHeader — fail-fast` (rc=99)、`18103d218` は `MISSING IMPORT RtlCaptureContext — fail-fast` (rc=99) に変わり、`movaps` の fatal (rc=95) は消えた。実測はこの 3 件のみ。群 I の残り 6 件は未測定 (#3235 の受入で測る)。修正は harness 側 (`tools/ott/native/ott_native.c`) で本 PR の範囲外のため、子 #3235 に分けた (§4)。
 
 ### 2.7 群 C: `SLOT_ENC_INIT` の値は guest の初期化と一致
 
@@ -117,14 +117,16 @@ objdump -d --start-address=0x1803dfc10 --stop-address=0x1803dfc50 "$FA"
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `make_thunk` の `call rax` の整列 (`sub $8,%rsp` の欠落)。直すと群 I の 9 件は `MISSING IMPORT` の `exit(99)` に変わり、harness の rc 分布 (`rc=95`) が変わる | 群 I の fatal の除去。既定の計測値 (2231 §2.2) が変わる | 子 issue (本 PR で起票。番号は PR 本文・issue コメント参照) |
-| 群 E の第 5 引数の残値 0x400 の出所 (どの harness 呼出しの残りか)。単歩トレースは FP 例外の fail-fast で入口から取れない | 群 E の起源の詳細 (値の由来は harness 引数と確定済み) | PM 判断 (未起票) |
-| 群 C の上流: `0x18105650c` が実機の起動経路で先に走るか。harness は closure 単関数実行のため走らせない | 群 C の fast-fail が実機でも到達するかの判定 | PM 判断 (未起票) |
-| `0x1813073f0`・`0x1813072b0` の書込み元の呼出し経路 (静的な直接呼出しなし) | §2.7 の 12 slot 中 2 件の判定 | PM 判断 (未起票) |
+| `make_thunk` の `call rax` の整列 (`sub $8,%rsp` の欠落)。直すと群 I の fatal (rc=95) が `MISSING IMPORT` の `exit(99)` に変わり、harness の rc 分布が変わる。実測は §2.6 の 3 件 (`1803b3fc0`・`1803b5b60`・`18103d218`)。群 I の残り 6 件は未測定 | 群 I の fatal の除去。既定の計測値 (2231 §2.2) が変わる | #3235 (ICALL-88) |
+| 群 E の第 5 引数の残値 0x400 の出所 (どの harness 呼出しの残りか)。単歩トレースは FP 例外の fail-fast で入口から取れない | 群 E の起源の詳細 (値の由来は harness 引数と確定済み) | 本 PR の未解決表のみ (追跡。子は起票しない) |
+| 群 C の上流: `0x18105650c` が実機の起動経路で先に走るか。harness は closure 単関数実行のため走らせない | 群 C の fast-fail が実機でも到達するかの判定 | 本 PR の未解決表のみ (追跡。子は起票しない) |
+| `0x1813073f0`・`0x1813072b0` の書込み元の呼出し経路 (静的な直接呼出しなし) | §2.7 の 12 slot 中 2 件の判定 | 本 PR の未解決表のみ (追跡。子は起票しない) |
+| `slot_trace.c` 56 行の新規比較 `g[REG_RIP] == g_trace_fn + 1` の `-Wsign-compare` 警告。`(uint64_t)` のキャストで消えるが、測定 commit 以降のコード差分になり HEAD での再測定が要るため今回は入れない (機械語はキャストの有無で同一。§5) | 警告のみ。動作は不変 | 本 PR の未解決表のみ (追跡。子は起票しない) |
 
 ## 5. 検証
 
 - 測定 commit: `d36f86d9` (`tools/icall/diff/slot_trace.c` の最後のコード変更)。§2.1 の再現はこの commit の tree で実行した。
-- 検証 HEAD: `a8731bec` (本付録を含む commit)。
+- 検証 HEAD: PR 本文の「検証 HEAD」行の commit (本付録の修正を含む最新 commit)。commit 自身の hash はその commit に書けないため、PR 本文を正とする。
 - `git diff --stat 573a4697 HEAD -- tools/icall/diff tools/ott` (#2247 の着手元 main からの計測対象の差分): `1 file changed, 51 insertions(+), 1 deletion(-)` (`slot_trace.c` のみ)。
-- `git diff d36f86d9 a8731bec -- tools/icall/diff tools/ott` の出力: 空 (差分 0)。`git diff --stat d36f86d9 a8731bec` は `docs/DOC_MAP.md`・`tools/icall/REPORT.md`・`tools/icall/REPORT_APPENDIX_2247.md` の 3 件 (本付録と索引のみ)。
+- `git diff d36f86d9 <検証 HEAD> -- tools/icall/diff tools/ott` の出力: 空 (差分 0)。`git diff --stat d36f86d9 <検証 HEAD>` は `docs/DOC_MAP.md`・`tools/icall/REPORT.md`・`tools/icall/REPORT_APPENDIX_2247.md` の 3 件 (docs のみ)。
+- `slot_trace.c` の `(uint64_t)` キャスト版との比較: `gcc -O1 -g -Wall -Wextra -c` で両版をビルドし `objdump -d` (先頭のアドレスを除く) を比べると 1832 行が一致。警告は元版の 56 行・84 行 (既存行) で出て、キャスト版は 84 行だけになる。検証は一時ディレクトリで行い、リポジトリには書いていない。キャストは上の理由で本 PR には入れない (§4)。
