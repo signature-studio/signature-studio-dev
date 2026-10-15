@@ -89,7 +89,7 @@
 | ret_slot | kernel 数 (80) | census ok | 内訳 |
 |---|---:|---:|---|
 | rax | 13 | 12 | — |
-| none | 23 | 14 | rax・xmm0 を書かない 17 (ok 8) / store を持つ 6 (ok 6) |
+| none | 23 | 14 | rax・xmm0 を書かない kernel の内訳: store なし 17 (ok 8) / store あり 6 (ok 6) |
 | unknown | 43 | 41 | rax と xmm0 を両方書く 38 (ok 36) / xmm0 を書き store を持つ 5 (ok 5) |
 | xmm0 | 1 | 1 | 0x5e12b0 |
 
