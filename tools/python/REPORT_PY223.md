@@ -111,3 +111,16 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate      
 | 受入 1 の残り: `0xed4b70` を呼ぶ receiver の vptr (`0xed0c28` のセル `0xed0b60` からの格納経路) の書込み元。`0x11b2ac0` の呼出し側を含む | 呼出し箇所の絞り込み (`[reg+0x198]` 24 件は静的材料が無いと推定。`[reg+0x120]` 114 件が残る) | #3888 (PY-264) |
 | 受入 2: `0x12d3ff0` の loop 分岐で `obj = qword [T + G1*192]` が非 0 になる条件 (`0xed4b70` の `[rbp+0x40]` 分岐と引数)。G1 の書込み元 (`0x12d9629`・セル `0x15e4018` 経由) | loop 分岐の入力 (PY-229 #3659 の前提) | #3889 (PY-265) |
 | 受入 3: flag `byte [[[0x15e14a0]]+0x7e0+0x49e]` の書込み元 (`0x15e14a0` の RIP 相対参照 439 件) | flag の値 | #3890 (PY-266) |
+
+## PY-265 (#3889): obj の書込み箇所と G1 の書込み元 (部分達成)
+
+- 測定 commit: 解析スクリプト `analysis/py265_g1_writers.py` の追加 commit (PR 本文の HEAD。`git diff <測定 commit> HEAD -- tools/python` の出力は 0 行)。素材 `$ARTIFACTS_DIR/fl-win64.tar.zst` (`oc_artifacts: fl-win64`) の `block00031` を `work/py265/` に展開 (2.9 秒)。
+- 結論 (受入 2 の一部): G1 (`0x15d51a0`) への書込みは、RIP 相対 1 件 (`0x12d9629`・関数 `0x12d94f0`。`.pdata` の境界と一致) と、セル `0x15e4018` 経由の候補 12 件 (直線の近似で、目視未確認)。`0x12d94f0` の直接 call 元は `0xed2c96`・`0x1004db5` の 2 件。
+- 結論 (受入 1 の一部): `0xed4b70` は `0x12da6d0` を `dl=1` で直接 call (`0xed4c6a`) し、戻り値 `al==2` で loop を抜ける。`0x12da6d0` は T 行 (`0x193fd00`・`0x193fd08`) の行 (stride 24) へ、`0xfe8bb0` の戻り値を基点に書く。
+- 訂正: issue の `store 0x12da89` は `0x12daa89` (`mov qword ptr [rcx+rdx*8], rax`・基底 `0x193fd08`) の桁落ち。`0x12da89f` は vcall (`call qword ptr [rsi+0x40]`) で store ではない。
+- 未確定 (未解決): `obj` (`[T + G1*192]`) が非 0 になる分岐 (`0x12da6d0` の `[rbp+0x33]`・`0x12d3ff0` の loop 分岐) と、`[rbp+0x40]` の供給元。`0x12d3ff0` の中の T 参照 (`0x12d4013`・`0x12d4030`) は読み取り側で、書込みの確定は未了。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| obj が非 0 になる分岐の確定 (`0x12da6d0` の `[rbp+0x33]`・`0x12d3ff0`・`[rbp+0x40]` の供給元) | PY-229 (#3659) の前提 | #3889 (PY-265) を Refs のまま残す |
+| セル `0x15e4018` 経由の 12 候補の目視確認 (reg 追跡は直線近似) | G1 書込み元の完全列挙 | #3889 |
