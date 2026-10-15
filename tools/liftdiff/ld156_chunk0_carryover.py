@@ -41,7 +41,7 @@ def main():
     ap.add_argument('--native-reset', choices=sorted(NMASK), default='none',
                     help='LD-209 (#4305): native 側の候補単位の戻し (NRESET)。native を作り直さない (--native 0) ときだけ使う')
     ap.add_argument('--wasm-restart', type=int, choices=[0, 1], default=0,
-                    help='LD-268 (#5268): 1 で対象関数の直前に wasm runner も作り直す (--native 1 と合わせると both 条件)。wasm の RESET と併用しない')
+                    help='LD-261 (#5268): 1 で対象関数の直前に wasm runner も作り直す (--native 1 と合わせると both 条件)。wasm の RESET と併用しない')
     ap.add_argument('--out', required=True)
     ap.add_argument('--chunk', type=int, default=400)
     ap.add_argument('--part', type=int, default=0)
