@@ -192,7 +192,7 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 
 **ネガコン (d) の原因同定**: ブラウザの `error` は `WebAssembly compilation aborted: Network error: Failed to read from a ReadableStream.` (Chrome が stream 内の例外を包む)。同じ改竄 descriptor を node で `chunkedStream` に通すと `ChunkIntegrityError: part の sha256 不一致` (正常版は 120669 B を読み切る)。page 側に原因文言を出すのは #3497。ブラウザ側の文言は任意の stream 失敗 (404 など) でも同じなので、`gui-guest-tamper` が確かめるのは「compile が中断され `state=error`・`frames=0`」までで、sha256 不一致の同定は node 側の結果に依る。
 
-**素材・環境**: `toolchain-emsdk` は本 run の `$HOME/artifacts` に無かったため、`e2e.yaml` の Emscripten step と同じ手順 (`emsdk install <tools/m1/flags.sh の pin>` ・ `activate`) で `$RUNNER_TEMP` に入れた。`gen_api.py` は `x86_64-w64-mingw32-gcc` を要する。`build_guest.sh` は mingw が無ければ apt で導入する (`gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev`)。CI の `E2E / local` ジョブは mingw を入れていないため、この導入に依存する。`fl-win64` は使わない。
+**素材・環境**: `toolchain-emsdk` は本 run の素材展開先 (素材置き場の取得対象) に無かったため、`e2e.yaml` の Emscripten step と同じ手順 (`emsdk install <tools/m1/flags.sh の pin>` ・ `activate`) で `$RUNNER_TEMP` に入れた。`gen_api.py` は `x86_64-w64-mingw32-gcc` を要する。`build_guest.sh` は mingw が無ければ apt で導入する (`gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev`)。CI の `E2E / local` ジョブは mingw を入れていないため、この導入に依存する。`fl-win64` は使わない。
 **e2e の PNG**: `ctx.shot("gui-guest")` は `e2e.yaml` が `tools/e2e/work/shots` を upload する。#3461 本文の「e2e の PNG を Actions artifact に上げない」とは食い違う。方針は PM 判断 (`pm-decision`)。
 
 **未実施 (子 issue)**: オラクル画素の完全一致とネガコン (a)(b)(c)・`text_wasm_e2e.sh` 回帰 → #3495 (WIN-27)。GUI-REACH trace → #3496 (WIN-28)。`fl-boot` のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
