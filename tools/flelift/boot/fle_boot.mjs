@@ -319,8 +319,17 @@ if (TOLERANT) {
         const seed = [[0x1104e30, 0x1104ef8], [0x5ac270, 0x5ac338]];
         for (const [slot, val] of seed) { const dv = new DataView(m.HEAPU8.buffer); console.error('[cfi-seed] before ' + slot.toString(16) + '=0x' + dv.getBigUint64(slot, true).toString(16) + ' ac308=0x' + dv.getBigUint64(0x5ac308, true).toString(16)); dv.setBigUint64(slot, BigInt(val), true); }
     }
+    // #5337: FLE_CFI_RECV=1 のとき受け手 slot 0x5ac308 を PE の静的値 0x40f960 (file off 0x1ab708) へ戻す。
+    // fle_data_install の 96 B 窓はこの slot を含まないため、boot 中は 0 のまま。
+    // FLE_CFI_SELF=<VA> のとき fle_run の第 1 引数 (rcx = self) をその値にする。既定は 0。
+    if (process.env.FLE_CFI_RECV === '1') {
+        const dv = new DataView(m.HEAPU8.buffer);
+        console.error('[cfi-recv] before ac308=0x' + dv.getBigUint64(0x5ac308, true).toString(16));
+        dv.setBigUint64(0x5ac308, 0x40f960n, true);
+    }
+    const CFI_SELF = process.env.FLE_CFI_SELF ? BigInt(process.env.FLE_CFI_SELF) : 0n;
     let cr = null, cerr = null;
-    try { cr = m._fle_run(CFI_VA, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n); } catch (e) { cerr = e; }
+    try { cr = m._fle_run(CFI_VA, CFI_SELF, 0n, 0n, 0n, 0n, 0n, 0n, 0n); } catch (e) { cerr = e; }
     m.__emscripten_stack_restore(cstk0); m._fle_rsp_set(rsp0);
     const s1 = softSnap(), called = [];
     for (const [nm, c] of s1) { const d = c - (s0.get(nm) || 0); if (d > 0) called.push([nm, d]); }
