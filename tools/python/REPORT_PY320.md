@@ -34,7 +34,7 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
 
 ## 3. 未確定 → #4656 [PY-351] (起票先。PY-325 #4405 は closed)
 
-- `0x72db20` の呼出し元: `call [reg + 0xd0]` は 244 箇所あり、そのうち MoveLeftMenu の OnClick を発火する箇所は未同定。
+- `0x72db20` の呼出し元: PY-320 時点の数えでは `call [reg + 0xd0]` は 244 箇所 (PY-348 の全走査は 243 件・§6.1)。そのうち MoveLeftMenu の OnClick を発火する箇所は未同定。
 - `[Self+0x100]` に 0x12acb70 が書き込まれる箇所 (DFM 読込みの TMethod 生成) は未確認。REPORT_PY268 §3 の推定 (`TMethod(Code = 0x12acb70, Data = TFXForm)`) の裏付けは未取得。
 - 動的 (実行) による確認は本 run の範囲外。
 
