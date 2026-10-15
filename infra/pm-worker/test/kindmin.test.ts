@@ -2,14 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { configuredApp, j, markFresh, T0, type Call } from "./helpers.ts";
 import { HUMAN, IMPL, IMPL_BOT, at, commentEv, issueEv, outcomeBody, prEv, send, type Ctx } from "./pm_helpers.ts";
+import type { Prio } from "../src/launch.ts";
 import { KIND_LIMITS, KIND_MIN_PER_HOUR, PM_LIMITS, selectDispatch, type HistoryEntry, type PmTarget } from "../src/pm.ts";
 
 // 毎時の最低配分 (#3704)。selectDispatch は純関数なので、時刻と履歴を直接渡して検証する。
 const NOW = T0;
 const MIN = 60_000;
-const tg = (kind: string, ref: number): PmTarget => ({ kind: kind as PmTarget["kind"], ref, at: "2026-10-14T12:00:00Z" });
+const tg = (kind: string, ref: number, prio: Prio = "normal"): PmTarget => ({ kind: kind as PmTarget["kind"], ref, at: "2026-10-14T12:00:00Z", prio });
 // detectPm と同じ並び (kind の順 → ref の昇順) で作る
-const seq = (kind: string, from: number, n: number): PmTarget[] => Array.from({ length: n }, (_, i) => tg(kind, from + i));
+const seq = (kind: string, from: number, n: number, prio: Prio = "normal"): PmTarget[] => Array.from({ length: n }, (_, i) => tg(kind, from + i, prio));
 const count = (xs: PmTarget[], kind: string): number => xs.filter((x) => x.kind === kind).length;
 
 test("(a) 本日の実測の再現: 未送信の needs_decision 5・no_pr 40・refs_orphan 60、履歴なし → refs_orphan がちょうど 3 件 (修正前は 0 件)", () => {
@@ -84,6 +85,18 @@ test("(f) 最低配分の設定: refs_orphan は毎時 3 件。1 日の上限は
   assert.equal(KIND_MIN_PER_HOUR.refs_orphan, 3);
   assert.equal(KIND_LIMITS.refs_orphan?.dayMax, 72);
   assert.equal(KIND_LIMITS.refs_orphan?.dupMs, 24 * 3_600_000, "同じ N に 24 時間 1 回は変えない");
+});
+
+test("(g) 区分順と予約の両立: prio:critical の no_pr 30 件が先に送られ、normal の refs_orphan の 3 件は残る。入力の並びが逆でも同じ (区分が先頭キー)", () => {
+  const crit = seq("no_pr", 100, 30, "critical");
+  const norm = seq("refs_orphan", 500, 60);
+  for (const targets of [[...crit, ...norm], [...norm, ...crit]]) {
+    const { send: sent } = selectDispatch(NOW, targets, []);
+    assert.equal(sent.length, PM_LIMITS.hourMax);
+    assert.equal(count(sent, "refs_orphan"), 3, "予約の 3 件は残る");
+    assert.equal(count(sent, "no_pr"), 21);
+    assert.ok(sent.slice(0, 21).every((x) => x.kind === "no_pr"), "critical の no_pr が先に送られる");
+  }
 });
 
 // ---------------------------------------------------------------- engine (検出から送信まで)
