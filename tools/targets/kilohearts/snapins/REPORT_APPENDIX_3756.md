@@ -1,0 +1,45 @@
+# REPORT_APPENDIX_3756 — KH-62 (#3756): phaser/delay/limiter/khbase の globals.c 過大の原因と修正
+
+親 `REPORT.md` の付録。測定 commit は本ファイルを含む PR の `gen_globals.py` 修正 commit (コードを変えた最後の commit)。
+環境: GitHub Actions runner (RAM 15,989MB・swap 3,071MB・nproc 4)。素材 `fl-win64` `plugins-kilohearts` (Windows 側 zip のみ展開) `toolchain-retdec` `toolchain-emsdk` を使用。
+
+## 1. 原因 (確定)
+
+`lift/gen_globals.py` の `rd(va, n)` は、VA を PE のセクションに写して `n` バイトを返す。`.data` は `Misc_VirtualSize` (BSS 込み 28MB) に対し `SizeOfRawData` が 1.8MB しかなく、RVA `0x40f7300` 以降はファイルに実体が無い (ゼロ初期化)。
+このとき `avail = min(n, raw_end - o)` が負になり、`b'\0' * (n - avail)` が **宣言長 `n` を超える 0 埋め** を返していた。`n - avail` は約 2,400 万 (`[64]` の宣言に 2,400 万要素) になる。
+
+- 支配的な global: `.data` 上の 19 件 (宣言 64・192・256・940 B。すべて値 0) が `globals.c` を 960MB まで膨らませた。`globals.c` の全量 (960.6MB / 960.7MB) がこの 19 件で、残り 161 件は正常 (合計 26KB)。
+- `final.ll` 1.46MB・`final.ll` の宣言数 180 は正常。膨張は emcc 入力の `globals.c` だけ。
+- delay / khbase の `rdata_window` 8192 経路でも同じ 0 埋め膨張が起きていた (delay は 25 件、`globals.c` 1.26GB)。
+
+## 2. 修正
+
+`snapins/lift/gen_globals.py` の 1 行: `avail = max(0, min(n, ...))`。`avail` を 0 未満にしない。0 埋めは `n - avail` で `n` バイトに収まる。BSS の実体はゼロなので、値は従来どおり 0 (ファイル上に実体が無い領域の値は 0 で不変)。
+`license/` 側の `gen_globals` 呼び出しは変更していない (`license/lic_build.py` も同じ `snapins/lift/gen_globals.py` を使う経路の確認は §5 の未解決表)。
+
+## 3. 実測 (修正後・`--path s0 --trials 200 --seed 1`・同一 runner)
+
+| 入力 | rc | globals.c (B) | 宣言と要素数の不一致 | emcc peak (MB) | cap 11000MB 超過 | wasm (B) | compare |
+|---|---|---|---|---|---|---|---|
+| phaser (修正前) | 1 | 960,709,664 | 19 件 | 11,235 (kill) | Y | — | 未実行 |
+| phaser (修正後) | 0 | 85,336 | 0 | 93 | N | 345,242 | **bit-exact 200/200**・calls 1100/1100 |
+| limiter (修正後) | 0 | — | 0 | 129 | N | 438,192 | **bit-exact 200/200**・calls 1100/1100 |
+| khbase (修正後) | 0 | — | 0 | 116 | N | 1,314,232 | **bit-exact 200/200**・calls 10500/10500 |
+| delay (修正後) | 0 | 8,424,740 | 0 | 273 | N | 3,602,885 | **155/200 (FAIL)**・calls 1188/1299 |
+
+delay の `globals.c` は修正前 1,263,683,900 B (`--window 8192` で生成・宣言 `[64]` が 25 件で要素過大) → 修正後 8,424,740 B。
+修正前後の有効部分を比べると、**366 global すべてで宣言長 n バイトの内容が一致** (差分 0)。変わったのは宣言長を超えていた余分な 0 埋めだけ。
+delay の FAIL は fn `1802ed7f0` の exact-region diff (trial 5/19/25/27/31 の 5 件、`@self+0x148`・`@tap+0x228`・`@tap+0x230`)。globals の有効内容が同じなので、FAIL の原因は「要素過大の宣言 (25 件) を emcc が受けた振る舞い」の差か、別経路かは未確定。修正前の wasm を emcc で作ると 10 分超のため、本 run では確定できなかった (未解決 §5)。
+
+## 4. 受入条件の判定
+
+- [x] 4 本の `globals.c` が大きい原因を確定し、byte 数と支配する global を書いた (§1・§3)。
+- [x] 4 本が cap 内 (11000MB) で emcc を完了する (4 本とも peak 93〜273MB)。
+- [ ] 同じ入力の compare が bit-exact 200/200 のまま: phaser・limiter・khbase は 200/200。**delay は 155/200 で未達** (§3・§5)。
+
+## 5. 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| delay の compare FAIL 155/200 (fn `1802ed7f0` exact-region diff)。修正前の wasm の compare は emcc 10 分超のため未取得 | delay の wasm は bit-exact 不成立。修正前の基準との比較は未確定 | [KH-90] = #4096 |
+| `license/lic_build.py` 経路 (module F 等) の再測定 | 同じ `gen_globals.py` を使うため出力は変わる。本 PR では未測定 | [KH-90] = #4096 に含める |
