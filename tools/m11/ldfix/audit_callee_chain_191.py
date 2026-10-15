@@ -49,16 +49,38 @@ def global_value(m, va):
     return int.from_bytes(raw, 'little')
 
 
+def iat_names(m):
+    """IAT slot RVA -> 'dll!name' (pefile の import 表から)。"""
+    import pefile
+    m.pef.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_IMPORT']])
+    names = {}
+    for ent in getattr(m.pef, 'DIRECTORY_ENTRY_IMPORT', []):
+        dll = ent.dll.decode('latin1')
+        for imp in ent.imports:
+            nm = imp.name.decode('latin1') if imp.name else 'ordinal%d' % imp.ordinal
+            names['%x' % (imp.address - m.base)] = '%s!%s' % (dll, nm)
+    return names
+
+
 def describe(m, va):
     seq = m.disasm_fn(va) or []
     rec = dict(va='%x' % va, n_ins=len(seq))
     if not seq:
+        raw = m.read(va - m.base, 6)
+        if len(raw) == 6 and raw[:2] == b'\xff\x25':
+            tgt = va + 6 + int.from_bytes(raw[2:6], 'little', signed=True)
+            slot = '%x' % (tgt - m.base)
+            rec['IAT_THUNK'] = True
+            rec['iat_slot_rva'] = slot
+            rec['import'] = m.iat.get(slot)
+            return rec
         rec['note'] = 'NO_FUNCTION_BOUNDARY'
         return rec
     if len(seq) >= 1 and seq[0].mnemonic == 'jmp' and 'rip' in seq[0].op_str:
         tgt = rip_target(m.cs, seq[0])
         rec['IAT_THUNK'] = True
         rec['iat_slot_rva'] = '%x' % (tgt - m.base)
+        rec['import'] = m.iat.get(rec['iat_slot_rva'])
         return rec
     calls = []
     for x in seq:
@@ -89,6 +111,7 @@ def describe(m, va):
 def main():
     pe, out = sys.argv[1], sys.argv[2]
     m = Machine(pe)
+    m.iat = iat_names(m)
     rows = []
     for fn, call_at, callee in SITES:
         row = dict(fn=fn, call_at='%x' % call_at)

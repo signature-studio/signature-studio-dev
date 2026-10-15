@@ -42,7 +42,9 @@
    "callee": {
     "va": "423d20",
     "n_ins": 0,
-    "note": "NO_FUNCTION_BOUNDARY"
+    "IAT_THUNK": true,
+    "iat_slot_rva": "1571508",
+    "import": "kernel32.dll!VirtualQuery"
    }
   },
   {
@@ -92,7 +94,9 @@
    "callee": {
     "va": "424300",
     "n_ins": 0,
-    "note": "NO_FUNCTION_BOUNDARY"
+    "IAT_THUNK": true,
+    "iat_slot_rva": "15719a0",
+    "import": "gdi32.dll!GetSystemPaletteEntries"
    }
   }
  ]
