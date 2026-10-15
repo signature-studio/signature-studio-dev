@@ -246,3 +246,4 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 ## 16. 2026-10-14 run (#2065 / SR-36): canvas 描画の試行
 - 結論: **未達 (画素計数は計測不能: 描画先が未結線)**。CTextLabel のみの harness は wasm でコンパイル・リンク・実行まで通る。描画未達の根拠は、描画命令 15 件の静的 no-op 計数と、文字列経路 (`createString` が nullptr、`text_width=-1`) の 2 点。`nonzero_after` は構造上 0 のため根拠にしない。XferOnOffButton は範囲外 (阻害要因のみ記録)。
 - 詳細・実測・測定 commit (`39f3702d`)・子 issue (#3260〜#3262): 付録 `REPORT_EFFORT_APPENDIX_2065.md` (本節の全文)。
+- 続き (2026-10-15 run / #3260 SR-50): 文字列・矩形描画・drawString・bitmap 結線を実装し、render 判定 pass。詳細・測定値は付録 `REPORT_EFFORT_APPENDIX_3260.md` §17 (正本)。
