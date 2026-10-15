@@ -80,6 +80,7 @@ export function createIlmcp(st, { RANGE, INVALID, makeChannel, nMixer, nSlots = 
       if (!Number.isInteger(slot) || slot < 0 || slot >= nSlots) throw RANGE();
       if (plugin !== "" && !find(plugin, "effect")) throw INVALID(`Unknown effect plugin: ${plugin}`);
       st.mixer[track].slots[slot] = plugin;
+      st.mixer[track].spv[slot] = st.params.map((p) => p.v);
       return true;
     },
     "ilmcp.storePRScript": (name, source) => {
