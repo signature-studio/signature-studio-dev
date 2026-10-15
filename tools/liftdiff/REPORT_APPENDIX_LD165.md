@@ -22,7 +22,7 @@
 | 入力 | `targets/m11.json --set sample:800 --shards 12 --nobuild` |
 | units state | `--state auto` = `work/m11/boot_state.json` (`bootstate targets/m11.json --nobuild`・`units_run=22/942`・`precondition ok=False`。LD-42 の既存状態) |
 | hybrid state | `--state work/m11/boot_state_hybrid.json` (`bootstate --mode hybrid --nobuild`・`units_run=928/942`・`first_fail=830`・`precondition ok=True`) |
-| 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (`FL_WIN64_DIR`)。`work-m11`・`work-liftdiff` を `tools/m11/work`・`tools/liftdiff/work` へ展開。`[EMSDK]` は `/opt/emsdk` |
+| 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (`FL_WIN64_DIR`)。`work-m11`・`work-liftdiff` を `tools/m11/work`・`tools/liftdiff/work` へ展開。`[EMSDK]` (`docs/REFERENCES.md` §4) |
 | build | `gcc ... rt/ld_native.c` と `liftdiff.py build targets/m11.json` (`[build] OK`・`wasm_size` 4460359) |
 | 機 | 4 vCPU・15 GiB。run は直列 (並列にしない) |
 | 所要 (実測) | units r1 04:24:43→04:26:28 (1 分精度)、r2 04:26:28→04:28:11。hybrid h1 `[batch] done 219s`、h2 `done 209s` |
