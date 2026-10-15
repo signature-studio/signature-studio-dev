@@ -10,7 +10,7 @@
 - **受入条件 1〜3 は未達。** boot は unit 209 (1-based) で止まる。停止点は `MessageBoxA` (lpText 空・自動 IDOK) → `exit(0)` (call site `0x412a12`) で、既存の記録 (`tools/flelift/boot/REPORT.md` §9・§10、`REPORT_APPENDIX_2702.md` §D) と一致する (§2-4)。停止の直前に GetMem(0x74) が FastMM への dispatch で 0 を返し、`fle_ov_getmem` の失敗経路 (`f_409730` = Error) に入る。停止時点の undo 系 global は 0 になっており、起動直後の pos/count・安全判定 VA・singleton の値として使えない。
 - **0 化の位置.** 監視 slot `0x15e1c78`・`0x15e4790` は `fle_run` 直前には PE の値 (`0x16bb068`・`0x141d6b8`) を持つ。0 になるのは **unit 209 の中**。unit 1〜208 の unit 境界・memset・FastMM の GetMem/FreeMem では変化しない。最初に 0 を観測したのは **GetMem(0x74) 呼出し直前 (site 8・GETMEM seq 2312)**。その前の検査点 (site 5・6・7) では非 0 だった (§2-2)。
 - **QuickFontCache は停止点ではない。** `[fleboot][MessageBoxW] text='QuickFontCache DLL not found!'` は shim 有の stderr 8117 行 (GETMEM seq 1849 の直前) に 1 回出るが、boot はその後も GetMem を続けて進む。停止は末尾の `MessageBoxA` である (§2-4)。前版 (本 PR の初版) の「MessageBoxW → GetMem 失敗 → exit」は途中の MessageBoxW を停止点と取り違えた記述で、本版で訂正した。
-- 書込みは直接の `mov [rip+slot], reg` ではない (`pe_xref` の書込み 0 件と整合)。書込み命令そのものは未特定 (§2-3)。
+- 書込みは直接の `mov [rip+slot], reg` ではない (`pe_xref` の書込み 0 件と整合)。3 回目 run で、書込み命令は fill コールバック `f_6a7b70` の `movdqu` と特定した (§2-5。前 run までの未特定は §2-3)。fill の幅の源は #3090 で追う。
 - singleton `0x16b82e0` は boot 中ずっと 0 (PE 上も 0 で、変化なし)。
 - したがって boot 停止点の値は実 FL の起動直後の状態ではない。起動直後の状態を測るには、unit 209 の停止経路 (GetMem(0x74) の失敗) を越える boot が要る (§5)。
 
@@ -120,6 +120,31 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 - 前版 (本 PR の初版) の「`MessageBoxW` (QuickFontCache) → GetMem(0x74) 失敗 → exit」は誤り。MessageBoxW は途中の呼出しで、停止の順序は `GETMEM seq 2312 → icall-miss (ret 0) → Error → MessageBoxA '' → exit(0)`。#3060 [FLE-11] (2026-10-14 21:56Z) は、呼出元 (`f_4127d0` の `0x412886`・呼出元 `f_4128b0`) と lpText の源 (`.data` のテンプレート `Runtime error     at 0000000000000000`。`f_6a7b70` の広域ゼロ埋めで消失) を確定した。残り (ゼロ埋めの呼出元と幅) は子 #3090 [FLE-12] に分けられている (§5)。
 - 0 化 (site 8) と icall-miss (`dispatch(0)` の ret 0) の因果は未確認。
 
+## 2-5. 0 化の命令の特定 (3 回目・測定 commit `009855d26`)
+
+計測: `rt/fle_cpu.h` の ST8〜STF64・STX・STY に、`FLE_WWATCH` 定義時だけ働く書込みフックを入れた (既定は無効)。`fle_cpu.c` の `fle_wwatch` は、監視 slot (`0x15e1c78`・`0x15e4790`) に重なる書込みのうち値が変わるものだけ `__FILE__:__LINE__` 付きで出す。`build.sh` は `FLE_EXTRA_CCF=-DFLE_WWATCH` で有効化する。
+
+```
+[fle_wwatch] slot=0x15e1c78 a=0x15e1c70 n=16 old=0x16bb068 new=0 at .../rt/fle_cpu.h:78
+[fle_wwatch] slot=0x15e4790 a=0x15e4790 n=16 old=0x141d6b8 new=0 at .../rt/fle_cpu.h:78
+```
+
+- 2 件とも 16 バイト書込み (STX/STY 系)。`__LINE__` が inline 関数の中 (fle_cpu.h:78) を指すため、呼出元は次の 2 点で対応づけた。
+- 直前の `[fill6a7b70]` 行 (fill コールバック `0x6a7b70` の dispatch 時の引数) は 6 件だけ。呼出し #5 が `dst=0x1400000`・`val=0x0`・`cnt=0x100000` (DWORD 個数 = 4 MiB)。#0〜#4 は dst=0x0 から 0x400000 刻みで、6 回で guest 0x0〜0x1800000 を 0 にする (PE image の VA 0x400000 以降を含む)。hit は #5 だけ (`old≠new` の書込みは #5 内の 2 件)。
+- 命令 (lift 出力 `work/boot/lift/fle_lifted_s1.c` の `f_6a7b70`・VA コメントを読む): `movd xmm0, edx` で値を 4 バイトずつ広げ、`r8` (DWORD 個数 >> 4) 回、rcx から 0x40 刻みで 4 本の `movdqu` を書く。
+
+| VA | 命令 | 監視 slot との対応 |
+|---|---|---|
+| `0x6a7b84` | `movdqu xmmword ptr [rcx], xmm0` | (対象外) |
+| `0x6a7b88` | `movdqu xmmword ptr [rcx + 0x10], xmm0` | `0x15e4790` (a=`0x15e4790`) |
+| `0x6a7b8d` | `movdqu xmmword ptr [rcx + 0x20], xmm0` | (対象外) |
+| `0x6a7b92` | `movdqu xmmword ptr [rcx + 0x30], xmm0` | `0x15e1c78` (a=`0x15e1c70`) |
+
+- 対応の根拠 (算術・直接観測ではない): dst=`0x1400000` は 0x40 の倍数で、rcx は 0x40 刻みに進む。`0x15e1c70 − 0x1400000 = 0x1E1C70` は mod 0x40 で `0x30` → VA `0x6a7b92`。`0x15e4790 − 0x1400000 = 0x1E4790` は mod 0x40 で `0x10` → VA `0x6a7b88`。
+- 結論: **0 化を行う命令は `f_6a7b70` の `movdqu` (VA `0x6a7b88`・`0x6a7b92`)**。前 run の「間接書込み・未特定」は、fill 関数の 16 バイト書込みで解消した (前 run の §2-3 の窓 `f_412c90` の外)。
+- 残り: fill の幅 (`r8` = 0x100000 DWORD) と rect (w=h=1048576) の源は、呼出元 `0x815920` (callerRbp の +0x214/+0x218) で、未確定。#3090 [FLE-12] が追う。0 化と unit 209 の icall-miss・exit の因果は未確認 (§2-4)。
+- 本 run の KPI: units_run 209 / 942 (変更前と同じ)。最初のウィンドウ無し。`FLE_WWATCH` は計測用の既定無効フックで、既定ビルドの挙動は変えない (既定ビルドは本 run で再実行していない)。
+
 ## 3. 解釈 (今回の範囲)
 
 - boot 停止点の 0 は、停止直前の GetMem(0x74) の失敗経路 (Error → exit) の区間で起きる。正常な起動の途中ではない。
@@ -145,7 +170,8 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | unit 209 の停止直前の GetMem(0x74): FastMM への dispatch が icall-miss (`dispatch(0)` ret 0) で NULL になる経路 | 停止 (Error → exit) の原因。lift 由来の silent miscompile か、実機でも起きるかが不明。0 化との因果も未確認 | #3060 にコメントで記録 (受入条件は未追記) |
-| slot `0x15e1c78`・`0x15e4790` を 0 にする命令 (間接書込み) の特定 | 0 化の原因が不明。`f_412c90` の中には書込みが無く、呼出元 (§2-3 の 6 件と間接 call `0x41037d`) は未確認 | #3028 に残す (次 run。`f_412c90` の呼出元の窓を逆アセンブルし、slot への間接書込みを探す) |
+| slot `0x15e1c78`・`0x15e4790` を 0 にする命令 | **特定済み (§2-5)**: fill `f_6a7b70` の `movdqu` (VA `0x6a7b88`・`0x6a7b92`)。受入 1〜3 は、この fill を越えるまで測れない | #3028 (次 run は fill の幅の源を追う) |
+| fill `0x6a7b70` の幅 (`r8` = 0x100000 DWORD) と rect (w=h=1048576) の源 (呼出元 `0x815920` の callerRbp +0x214/+0x218) | 4 MiB × 6 回の 0 埋めの原因。guest 0x0〜0x1800000 を 0 にする | #3090 [FLE-12] (親 #3060) |
 | 安全判定述語の VA・singleton の中身 | `restoreUndoLevel` の分岐・戻り値の判定ができない | #3028 (上の 2 件が解消した後に測る) |
 | boot が unit 209 で止まる。停止点の呼出元と text 源は #3060 FLE-11 で確定済み。残りはゼロ埋めの呼出元と幅 | 起動直後の状態に届かない | #3090 [FLE-12] (親 #3060) |
 | shim 有の IPP 判定 NG (`ok:false`) | 本測定の shim 有の判定が通らない (変更前から) | #3060 (呼出時の `[0x15e0a48]`・`0x15F34A0` の登録経路。`REPORT_APPENDIX_2702.md` の未解決表から移送。#2702 は CLOSED) |
@@ -156,7 +182,8 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 - 差分 (WORKFLOW §6): `git diff f57b7dff HEAD -- tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` の出力は **空 (差分 0)**。`git diff b1b95f97 f57b7dff` (main 取り込みの分) はコードを変えるため、再測定で置き換えた。
 - 範囲内: boot の unit 単位の変化点 (shim 有・ネガコンの 2 条件、各 1 回・`f57b7dff`)。開始時の値 (site 0)・unit 209 の GetMem(0x74) 呼出し直前の値 (site 8)・停止点 (site 4・`MessageBoxA`)。停止点の stderr 行 (§2-4)。
 - 範囲外: 起動直後 (停止経路を抜けた後)。安全判定の実体。singleton の中身。0 化を行う命令の特定。
-- 未実施: `provider/build.sh` (emcc)・`node tests/general_diff.mjs`・`node tests/provider_check.mjs`・`FL_ENGINE=wasm node tests/all_tools.mjs` (実装が無いため走らせていない)。
+- 3 回目 (§2-5): 測定 commit **`009855d26`** (`FLE_WWATCH` 追加の commit。コードを変えた最後の commit)。同 commit で再現 (build 1 分 13 秒・boot 18 秒・load 開始時 `0.59 0.48 0.20`)。shim 有の units_run 209/942・停止 `MessageBoxA`→exit(0) は前 run と同じ。差分: `git diff 009855d26 HEAD -- tools/flelift` は、本 PR の最後の commit までで空 (REPORT のみ変更)。
+- 未実施: `provider/build.sh` (emcc)・`node tests/general_diff.mjs`・`node tests/provider_check.mjs`・`FL_ENGINE=wasm node tests/all_tools.mjs` (実装が無いため走らせていない)・既定ビルド (`FLE_EXTRA_CCF` 無し) の再実行。
 
 ## 7. 再現
 
