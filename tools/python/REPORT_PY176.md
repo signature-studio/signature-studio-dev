@@ -188,4 +188,4 @@ production 呼出し (dl=0・flag=0) では `key == K` のとき `V ← (dir+1)<
 - probe: `analysis/flapi/pe_py316_p_vtable.py` (10 検査。`lea` 先・vtable・+0x18・+0x20・FNV-1a・id 計算を確認)。
 - 実測 (2026-10-15・GitHub Actions の Linux runner・`fl-win64` の `block00031_PE.bin` を展開して使用): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py316_p_vtable.py` → PASS 10 件・FAIL 0・終了 0・所要 0.09 秒 (`time` の real)。実行直前の load average は 1 分値 0.23・5 分値 0.47 (`uptime`)。
 - ネガティブコントロール: `0x475ba0` の `imul` 即値 `0x1000193` の 3 byte 目を 1 bit 変えた複製 (repo 外の一時領域) で実行 → `FAIL 0x475ba0 は FNV-1a ...`・`summary: 1 FAIL`・終了 1。
-- 未確定として残るもの: `0x478420` の kind 1 分岐の入力 (typeinfo 側の byte) の由来と、Integer 以外の分岐の対応は未検査 (受入の範囲外)。
+- 未確定として残るもの: `0x478420` の kind 1 分岐の入力 (typeinfo 側の byte) の由来と、Integer 以外の分岐の対応は未検査 (受入の範囲外。起票先: #4559 [PY-340])。
