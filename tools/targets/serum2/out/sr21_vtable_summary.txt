@@ -1,0 +1,51 @@
+COL signature==1 candidates (slot-1 pointer into .rdata/.data): 3633
+vtables (COL pSelf verified): 3633
+distinct members: 9504
+member location pdata_start	5473
+member location gap_start	3936
+member location gap_mid	95
+member location pdata_inner	0
+member location other	0
+## gap_start members by block class: class / blocks / vt-member blocks / bytes
+entry_call	844	59	3363
+entry_rip	464	7	82
+branch_only	49	5	197
+table_ptr	3928	3850	81373
+ptr_single	80	11	743
+unref	36	0	0
+data	5	4	97
+control: non-padding block starts +8 that hit a member	5	expected by chance	4.85
+## OSS-namespace members outside the cut windows (cut_library -)
+4	ZLSingleFDLConvolve::?0??prepareImpulse::V<lambda_1>::?$_Func_impl_no_alloc
+3	ZLFIRConvolve::?0??prepareImpulse::V<lambda_1>::?$_Func_impl_no_alloc
+3	ZLDualFDLConvolve::?0??prepareImpulse::V<lambda_1>::?$_Func_impl_no_alloc
+3	mu::ParserBase::D::?$change_dec_sep
+2	ZLFIRConvolve
+1	nlohmann::json_abi_v3_12_0::detail::type_error
+1	ZLDualFDLConvolve
+## rtti class of gap members (top 25)
+232	std::U_Unforced::V?$_Binder::?$_Func_impl_no_alloc
+52	SerumController
+26	VSTGUI::CDataBrowser
+26	VSTGUI::COptionMenu
+19	ProxyParameter
+18	VSTGUI::CAutoAnimation
+17	SerumDSP::?1??createParams::GlobalTuningParam
+17	NoteGridController
+15	Steinberg::Vst::EditController
+15	AutomationLaneController
+15	ClipPlayerAutomationLaneController
+14	SerumDSP
+14	ArpNoteGridController
+13	VSTGUI::CSearchTextEdit
+13	SerumEditor
+13	ClipPlayerNoteGridController
+13	ArpAutomationLaneController
+10	VSTGUI::CKnobBase
+9	ClipPlayerPianoRollController
+9	MultiLineTextEdit
+8	Steinberg::WinPlatformTimer
+8	Steinberg::Vst::AudioEffect
+8	VSTGUI::CDataBrowserHeader
+8	VSTGUI::CCheckBox
+8	VSTGUI::CKnob
