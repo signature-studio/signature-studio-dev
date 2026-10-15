@@ -71,9 +71,30 @@ main (`5fae94c61`) を merge して競合 (`tests/provider_check.mjs` の実装�
 - 測定 commit `dc65d9857` から HEAD までのコード差分: `git diff dc65d9857 HEAD -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (本節の追記は REPORT のみ)。
 - 前回測定 (`0641856`) から `dc65d9857` までのコード差分 (main 取り込み分、4 ファイル・+81/-3): `host/fl_mock.mjs` +7・`provider/fl_engine.c` +9・`tests/patterns_diff.mjs` +60・`tests/provider_check.mjs` (実装集合と期待件数)。
 
+## main 再取り込み後の再測定 (測定 commit `342d8ce92`)
+
+main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の merge 後に main へ入った PY-205 (mixer 2 関数・`tests/mixer_diff.mjs`) と channels grid bit (PY-101/112) を取り込んだ。競合は `tests/provider_check.mjs` の 1 ファイル 2 箇所のみ: 実装集合の定義 (device の `pe206` と mixer の `pe205` を両方残す) と、実装判定 `if` と件数 assert。件数は device 7 + mixer 2 を加えて **162/273** (計 435)。`fl_engine.c`・`fl_mock.mjs` は自動 merge。
+
+| 検査 | 結果 | rc |
+|---|---|---|
+| `bash provider/build.sh` | `fl_table.c: 435 関数, ハンドラ 162` | 0 |
+| `bash build_cpython_wasm.sh` (fresh worktree・`work/` 無し) | 163 秒 | 0 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | flpy.js / flpy.wasm 生成 | 0 |
+| `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` | work/midi.py・utils.py・MCPTools.pyc 配置 | 0 |
+| `node tests/provider_check.mjs` | functions 435・**implemented 162**・unimplemented 273・PASS | 0 |
+| `node tests/device_diff.mjs` | calls 18・rejects 10・midi_out 5・**diffs 0**・PASS | 0 |
+| `node tests/mixer_diff.mjs` | calls 62・**diffs 0**・PASS | 0 |
+| `node tests/patterns_diff.mjs` | calls 25・**diffs 0**・PASS | 0 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | **48/48 ok**・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 0 |
+| `node tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425 | 0 |
+
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`・8 秒・rc 0)。emsdk は `/opt/emsdk` (emcc 6.0.12)。
+- 所要 (整数秒・`date` 差分。provider build は `time` 実測 0.87 秒): cpython 163・flpy 4・provider_check 0・device_diff 0・mixer_diff 0・patterns_diff 0・all_tools wasm 1・all_tools mock 1。load average は測定中 1.27〜1.99 (`uptime`、n=3)。
+- 前回測定 (`dc65d9857`) から `342d8ce92` までのコード差分 (main 取り込み分): `git diff --stat dc65d9857 342d8ce92 -- tools/python/host tools/python/provider tools/python/tests` は 4 ファイル (+28/-16)。`fl_mock.mjs`・`fl_engine.c` の差分は channels grid bit と mixer 2 関数で、device 関数の実装行は差分 0。device のネガティブコントロール (冒頭の検証節) は本節では未再実施。
+
 ## 検証範囲 / 範囲外
 
-- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (435 = 実装 160 + 未実装 275)。
+- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (435 = 実装 162 + 未実装 273)。
 - 範囲外 (未確定のまま残す): 実 FLEngine 上の状態値 (idle・midi-out・master sync の初期値)、通知 3 件の vtbl 先の効果、`setMasterSync` の述語 P 偽 (-2) の発生条件、`0x1366e00`・`0xfd7170`・`0xfd7240` の効果、-6/-7 の実発生。
 - KPI: device API は起動・GUI に関わらないため、起動 KPI (`tools/flelift/boot/REPORT.md`) は動かしていない。
 
