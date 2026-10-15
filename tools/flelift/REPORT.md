@@ -248,4 +248,4 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 - rcpps ネガコン `python3 tools/flelift/tests/x64c_vex_diff.py --neg-rcp=0` (表 entry 0 を 1 bit 改変した C を生成): `FAIL rcpps xmm1, xmm2`・`FAIL vrcpps xmm1, xmm2`・pass 92 / fail 2 (rc 1)。
 - 生成 C の構文: `gcc -fsyntax-only fle_lifted.c` rc 0 (閉包 1,006,164 B)。
 - 近似表の出所: `tools/targets/kilohearts/snapins/scripts/approx_tables.b64` (gen_simd.py の `kh_rcp_exact` と同一表・同一式)。表は rcpps を含む生成 C の先頭にだけ入る。
-- 素材: `plugins-kilohearts` の `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` から `HeartCore.core_64` (76,642,304 B) を取り出した (REPORT_KH19D の手順)。
+- 素材の取り出し: `plugins-kilohearts` → `HeartCore.core_64` (76,642,304 B)。手順は `tools/targets/kilohearts/REPORT_KH19D.md`。
