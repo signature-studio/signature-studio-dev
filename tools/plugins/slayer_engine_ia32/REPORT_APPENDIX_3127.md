@@ -3,7 +3,7 @@
 - 親 REPORT: `tools/plugins/slayer_engine_ia32/REPORT.md` §13 (結論 1 行)。 本付録が測定値の正本。 前提の harness は #1223 (`REPORT_APPENDIX_1223.md`)。
 - 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない。 本件は実行結果の突合と import の ABI モデル)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` (sha256 `84b64c43…de724a9`)。
-- 測定 commit: `dadf4ea18` (main `1cda538f5` の取り込み後。 コードを変えた最後の commit)。 そこから HEAD (`6c5e25f46`、PR 先頭 `6cda37e84` の取り込み) までの測定範囲のコード差分は 0 行 (§6 の鮮度証跡)。
+- 測定 commit: `23cf2c56a` (検証 HEAD。 main `71953e2e1` の取り込み後)。 旧測定 `dadf4ea18`・`6c5e25f46` の値は §4 に残す。 §6 に鮮度の範囲。
 
 ## 1. 結論と範囲
 
@@ -79,21 +79,22 @@
 - fail-fast の 24 件は 448 行の実行で 1 件も呼ばれていない (両側とも rc=0)。 呼ばれると weak stub が abort し、 native は exit 9 で終わるため、 rc=0 がその証跡になる。 呼ばれた時点で止まる動作は設計 (weak stub・`n_missing`) による。 **実行での検証は未実施** (§7)。 静的な到達 (§8) では、 24 件のうち入口から到達するのは RaiseException の 1 件だけで、 それもゲート経路 (§8) のみ。
 - stub の値はすべて Win32 の実挙動ではなく、 両側で揃えた仮定。 この突合が検証するのは「同じ仮定の下で lift と ia32 規約が一致する」ことだけ。
 
-## 4. 実測 (測定 commit `60b13d4b8`・n=3。 `dadf4ea18` と `6c5e25f46` の値は下の行)
+## 4. 実測 (測定 commit `23cf2c56a`・n=3。 前回の値は下の行)
 
 | 項目 | 値 |
 |---|---|
 | 突合 (`python3 diff_entry.py`) | `[compare] PASS: 448 / 448 件が bit 一致、不一致 0 件`・`[diff_entry] PASS`・exit 0 (3 回とも同一) |
-| HEAD `60b13d4b8` の再測定 (n=3) | build: native 0.06 s・wasm emcc 7.71・7.91・7.89 s。 run: native 0.035・0.035・0.036 s・wasm (node) 0.062・0.057・0.055 s。 load1 (run 直前) 0.71・0.63・0.60。 `--nega`: 447 / 448・FAIL・exit 1 (OK)。 `--check`: PASS (exit 0) |
-| 突合の再実行の出力 (`6c5e25f46`・n=3) | build: native 0.05–0.06 s・wasm emcc 7.03–7.14 s。 run: native 0.031–0.035 s・wasm (node) 0.049–0.053 s。 load1 (run 直前) 0.16・0.23・0.35 |
+| HEAD `23cf2c56a` の再測定 (n=3) | build: native 0.07 s・wasm emcc 7.88・8.03・7.98 s。 run: native 0.035・0.039・0.035 s・wasm (node) 0.058・0.054・0.060 s。 load1 (run 直前) 0.33・0.32・0.36。 `--nega`: 447 / 448・FAIL・exit 1 (OK)。 `--check`: PASS (exit 0) |
+| 前回の HEAD `60b13d4b8` (n=3) | build: native 0.06 s・wasm emcc 7.71・7.91・7.89 s。 run: native 0.035・0.035・0.036 s・wasm (node) 0.062・0.057・0.055 s。 load1 0.71・0.63・0.60。 main 取り込み前の値 |
+| 旧測定 `6c5e25f46` (n=3・main 取り込み前) の突合の再実行の出力 | build: native 0.05–0.06 s・wasm emcc 7.03–7.14 s。 run: native 0.031–0.035 s・wasm (node) 0.049–0.053 s。 load1 (run 直前) 0.16・0.23・0.35 |
 | ネガティブコントロール (`--nega`) | `[compare] FAIL: 447 / 448 件が bit 一致、不一致 1 件`・`[nega] 1 bit 壊した出力を検出 (FAIL, exit 1)。 ネガコン OK`・exit 0 (方法は §5) |
 | import 呼出し数 (wasm 側・計数用の一時ビルド・`6c5e25f46`) | HeapAlloc 64・HeapReAlloc 4・VirtualAlloc 64・LeaveCriticalSection 64・HeapFree 0。 合計 196 件 (`grep '^IMP ' stderr \| sort \| uniq -c` の実出力)。 `dadf4ea18` の計数と一致 |
 | 計数の方式 | 一時コピー (`git archive`) の `rt32_glue.c` の `imp_*` 入口と `ott_call32` に stderr 出力 (`ROW`・`IMP`) を入れ、 行ごとに数えた。 計数なしのビルドと出力 (`wasm_out.txt`) は `cmp` で一致。 リポジトリにはコードを入れていない。 上の 4 名以外の import は 0 件 |
 | 非自明性 | native 実行で OBJ 領域が変わった行 256 / 448 (leaf 4 本の 256 行。 main・heap・LeaveCS の行は OBJ を変えない)。 heap 先頭 64 B が非 0 なのは `1000e1b7` の 64 行のみ (毎行の reset で heap 先頭 4 KiB を 0 に戻すため、 他の入口の行に前行の残りは出ない)。 `1000e1b7` は `eax=108004f4` などの heap アドレスを返す |
 | 戻り値の内訳 | `10007ca0` (main) は 64 行とも eax=0 (callback 0 経路)。 `1000ea7d` (LeaveCriticalSection) は 64 行とも eax=0。 `1000e1b7` は eax が heap のアドレス (`108004f4`・`108004e0`・…) |
-| ビルド (min–max, n=3・`6c5e25f46`) | native build 0.05–0.06 s、 wasm emcc 7.03–7.14 s |
-| 実行 (min–max, n=3・`6c5e25f46`) | native 0.031–0.035 s、 wasm (node) 0.049–0.053 s |
-| load1 (run 直前、 n=3・`6c5e25f46`) | 0.16・0.23・0.35 |
+| ビルド (min–max, n=3・旧測定 `6c5e25f46`) | native build 0.05–0.06 s、 wasm emcc 7.03–7.14 s |
+| 実行 (min–max, n=3・旧測定 `6c5e25f46`) | native 0.031–0.035 s、 wasm (node) 0.049–0.053 s |
+| load1 (run 直前、 n=3・旧測定 `6c5e25f46`) | 0.16・0.23・0.35 |
 | 件数 | 入口 7 本 × 64 = 448 行 (期待値と一致) |
 
 ## 5. ネガティブコントロール (測定 commit `dadf4ea18`)
@@ -111,7 +112,10 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py    # 突合 (exit 0)
 python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 ```
 
-- 鮮度: 測定 commit は `dadf4ea18` (コードを変えた最後の commit)。 そこから `6cda37e84` (PR 先頭) までの `git diff dadf4ea18 6cda37e84 -- tools/plugins/slayer_engine_ia32/{diff_entry.py,native_entry.c,rt32_glue.c,entry_wasm.mjs,lift_text.py} tools/ott/rt tools/ott/lift` は 159 行 (挿入 159・削除 5。 `git diff --numstat` の内訳: `tools/ott/lift/x64c.py` +17/-1、 `tools/ott/rt/ott_x87.h` +142/-4。 main の取り込みで入った x87 の変更)。 ハーネス側 (`tools/plugins/slayer_engine_ia32/` の 5 ファイル) は 0 行。 検証 HEAD (`540246c20`・main 取り込み後) は `origin/main` と上の範囲で 0 行 (`git diff origin/main HEAD -- <同じ範囲>`)。 HEAD での突合は 448 / 448 PASS (§4)。
+- 鮮度: 検証 HEAD `23cf2c56a` (main `71953e2e1` 取り込み後)。 ハーネスの範囲は `diff_entry.py`・`native_entry.c`・`rt32_glue.c`・`entry_wasm.mjs`・`lift_text.py`・`tools/ott/rt`・`tools/ott/lift`。
+  - `git diff --numstat HEAD origin/main -- <同じ範囲>` は 0 行。 main の取り込みで、ハーネスの 4 ファイルに `c71986f10` (fs: TEB、#3905) の変更が入った。 その取り込み後の HEAD で §4 を測り直した。
+  - 測定 commit `dadf4ea18` (付録の旧測定) から HEAD までの範囲の差分は `git diff --numstat dadf4ea18 HEAD -- <同じ範囲>` で挿入 193・削除 7。 内訳: `tools/ott/lift/x64c.py` +17/-1、 `tools/ott/rt/ott_x87.h` +142/-4 (main 由来の x87 の変更)、 `diff_entry.py` +1/-1、 `entry_wasm.mjs` +7/-1、 `native_entry.c` +21/-0、 `rt32_glue.c` +5/-0 (`c71986f10` の fs: TEB 由来)。
+  - HEAD での突合は 448 / 448 PASS (§4)。
 - 補足: `lift_text.py` の結果は `imports 41`・`functions 472` (pass2)。 pass1 の `38` は REPORT_APPENDIX_1098 §2 の値。
 
 ## 7. 未解決
@@ -126,8 +130,8 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 
 ## 8. 13 件・fail-fast 24 件の到達経路 (#3960・静的解析)
 
-- 測定 commit: `6c5e25f46` (`reach_import.py` の commit)。 入力は lift 出力 `work/lift_text/ott_lifted.c` (472 関数・41 import)。
-- 再現 (`60b13d4b8` で実測): `python3 tools/plugins/slayer_engine_ia32/reach_import.py` (表)・`--paths` (入口から各 import までの最短経路)・`--check` (期待集合との照合)。 `FL_WIN64_DIR` は `block22434_PE.bin` を含むディレクトリ。
+- 測定 commit: `23cf2c56a` (検証 HEAD。 `reach_import.py` の最後の変更は `6c5e25f46`)。 入力は lift 出力 `work/lift_text/ott_lifted.c` (472 関数・41 import)。
+- 再現 (`23cf2c56a` で実測): `python3 tools/plugins/slayer_engine_ia32/reach_import.py` (表)・`--paths` (入口から各 import までの最短経路)・`--check` (期待集合との照合)。 `FL_WIN64_DIR` は `block22434_PE.bin` を含むディレクトリ。
 - 表 (`reach_import.py` の実出力・41 件)。 「入口から静的到達」は diff_entry.py の 7 入口からの静的な到達、 「ゲート無し」は main の callback 0 経路 (ゲート `f_10009f64`・`f_10007f30` を通らない) での到達。
 
 | import | 呼出し元の数 | 入口から静的到達 | ゲート無しで到達 |
@@ -180,7 +184,7 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 - `HeapFree` の分岐: `f_1000e1b7` は `VirtualAlloc` の戻り値を `edi` (`xor edi, edi` で 0) と比べ、 等しいとき (失敗扱い) にだけ `imp_HeapFree` を呼ぶ。 harness の `imp_VirtualAlloc` は常に bump で成功するため、 実行では 0 件 (計数の表)。 静的な上界では到達するが、 実行では通らない。
 - 静的解析は分岐の条件を見ない上界。 「静的に到達しない」は呼ばれない根拠になるが、 「到達する」は実行で通るとは限らない。
 - **ゲート**: main (`0x10007ca0`) の callback が非 0 を返す経路。 `f_10009f64`・`f_10007f30` を遮断すると、 main から到達する import は 0 件になる。 つまり main の **callback 0 経路は、 本節の 13 件も fail-fast 24 件 (RaiseException を含む) も通らない**。
-- 13 件 (実装・stub) の経路 (`--paths`・`6c5e25f46` の実出力):
+- 13 件 (実装・stub) の経路 (`--paths`・`23cf2c56a` の実出力):
   - ゲート無しで入口から静的に到達するのは `HeapFree` の 1 件 (`f_1000e1b7` が直接呼ぶ。 上記の失敗分岐)。 実行では 0 件。
   - 残り 12 件は `--paths` で「ゲート無し: なし」。 入口からの最短経路はすべてゲート `f_10009f64` または `f_10007f30` を通る (例: EnterCriticalSection は `f_10007ca0 > f_10009f64 > f_1000a402 > f_1000a42e > f_1000ea1c`、 GetLastError は `f_10007ca0 > f_10007f30 > ... > f_1000d791`)。
   - 直接の呼出し元 `f_1000f41e` (GetModuleFileNameA・GetStdHandle・LoadLibraryA・WriteFile の経路) と `f_100112e9` (LoadLibraryA の経路) は、 ゲート経路で入口から到達する。 旧記述の「fs: を使わない候補として入口に足す」は、 ゲートを通る経路では実行できないので成り立たない。
