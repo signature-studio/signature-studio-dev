@@ -187,7 +187,7 @@ def main():
     def closure(entries):
         seen, order, stack = {}, [], list(entries)
         n_ins = simd = dcalls = 0
-        ind_calls, ind_jmps, dsites, franges = [], [], [], {}
+        ind_calls, ind_jmps, dsites, djsites, franges = [], [], [], [], {}
         while stack:
             ent = stack.pop()
             b, ranges, ins, mode = body(ent)
@@ -212,6 +212,7 @@ def main():
                     if direct(i):
                         t = int(i.op_str, 16)
                         if t not in own:
+                            djsites.append([hex(i.address), hex(t)])
                             stack.append(t)
                     else:
                         ind_jmps.append({"site": hex(i.address), "in_func": hex(b), "op": i.op_str, **ind_info(i)})
@@ -221,6 +222,7 @@ def main():
             "function_starts": [{"start": hex(x), "mode": seen[x],
                                  "ranges": [[hex(p), hex(q)] for p, q in franges[x]]} for x in sorted(order)],
             "direct_call_sites": sorted(dsites),
+            "direct_jmp_sites": sorted(djsites),
             "instructions": n_ins, "simd": simd, "direct_calls": dcalls,
             "indirect_calls": sorted(ind_calls, key=lambda d: int(d["site"], 16)),
             "indirect_jmps": sorted(ind_jmps, key=lambda d: int(d["site"], 16)),

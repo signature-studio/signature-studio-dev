@@ -48,7 +48,7 @@ def main():
                     if tgt in targets:
                         kind = "store" if i == 0 and ins.mnemonic == "mov" else "load"
                         hits.append((ins.address, kind, ins.mnemonic, ins.op_str, tgt))
-            off = end + 1 if end > off else off + 1
+            off = end if end > off else off + 1
     for addr, kind, mn, ops, tgt in hits:
         print(f"0x{addr:x} {kind:5s} {mn} {ops} -> 0x{tgt:x}")
     stores = sum(1 for h in hits if h[1] == "store")

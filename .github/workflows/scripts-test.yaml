@@ -10,6 +10,7 @@ on:
     paths:
       - '.github/scripts/**'
       - '.github/actions/**'
+      - '.github/prompts/**'
       - '.github/workflows/opencode.yaml'
       - '.github/workflows/scripts-test.yaml'
       - 'tools/pm/**'
