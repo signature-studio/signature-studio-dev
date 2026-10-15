@@ -112,12 +112,12 @@ FL_H(channels, isChannelSelected) { CH(0); return fl_ret_b(c, k->sel); }
 FL_H(channels, isChannelMuted) { CH(0); return fl_ret_b(c, k->mute); }
 FL_H(channels, isChannelSolo) { CH(0); return fl_ret_b(c, k->solo); }
 FL_H(channels, getChannelColor) { CH(0); return fl_ret_i(c, k->color); }
-/* PE 0xd5b420: 0x12d3e20 は position<0 で 0 を返す (エラーにしない)。範囲外は index の -4 のみ。p>=NSTEP の経路は PE 未照合 (REPORT_PY101) */
-FL_H(channels, getGridBit) { CH(0); int64_t p = A_INT(1, 0); if (p >= NSTEP) RANGE(); return fl_ret_b(c, p >= 0 && k->steps[p]); }
+/* PE 0xd5b420: 0x12d3e20 は position<0 で 0 を返す。0xd5b420 は position の範囲検査を持たず、件数以上は event 経路 (0x12d16a0・0x12df210) の値を返す (エラーにしない)。event は未モデルのため 0 (REPORT_PY112) */
+FL_H(channels, getGridBit) { CH(0); int64_t p = A_INT(1, 0); return fl_ret_b(c, p >= 0 && p < NSTEP && k->steps[p]); }
 /* PE 0xd5b360: grid (+0x7ac) は channel 生成 0xff5aa0 が直接 call する 0xff63f0 で作られ非 null。null の経路 (status 0) は直接 call の範囲では到達しない (間接呼出しは未走査・REPORT_PY101) */
 FL_H(channels, isGridBitAssigned) { CH(0); (void)k; (void)A_INT(1, 0); return fl_ret_b(c, 1); }
-/* PE 0xd5bc10 → 0x12d3ff0: loop 記録の分岐は未モデル (mock に loop 記録が無い)。base 0x12d3e20 と同じ読出し */
-FL_H(channels, getGridBitWithLoop) { CH(0); int64_t p = A_INT(1, 0); if (p >= NSTEP) RANGE(); return fl_ret_b(c, p >= 0 && k->steps[p]); }
+/* PE 0xd5bc10 → 0x12d3ff0: loop 記録の分岐は未モデル (行テーブル T は .bss で起動直後は 0・REPORT_PY112)。base 0x12d3e20 と同じ読出し。件数以上は getGridBit と同じく 0 */
+FL_H(channels, getGridBitWithLoop) { CH(0); int64_t p = A_INT(1, 0); return fl_ret_b(c, p >= 0 && p < NSTEP && k->steps[p]); }
 /* 選択の並びで offset 番目 (0 = 先頭)、超えたら最後の選択。負の offset は先頭扱い (stub に記述なし・仮置き)。無選択は canBeNone で -1 / 0 */
 FL_H(channels, channelNumber) {
     int64_t none = A_INT(0, 0), off = A_INT(1, 0), n = 0, pick = -1;
@@ -324,12 +324,16 @@ int fl_engine_note_enum_probe(int seed, int n, int chan, int step, int V) {
 }
 int *fl_engine_note_enum_out(void) { return note_probe_out; }
 
-/* ---- mixer (19) ---- */
+/* ---- mixer (21) ---- */
 /* 色の R/B 入替え (PY-115 / REPORT_PY115.md §2)。格納は入替え + alpha 0xff、取得は入替えを再度通して alpha 0xff。 */
 /* 既定色 (フラグ無し track) は FL の .bss 0x15f6774 の初期値 (init 0x770ba6・REPORT_PY118) */
 #define MIX_DEFAULT_COLOR 0xff636c71u
 static uint32_t fl_swap_rb(uint32_t v) { return ((v & 0xff) << 16) | (v & 0xff00) | ((v >> 16) & 0xff); }
 FL_H(mixer, trackCount) { return fl_ret_i(c, NMIX); }
+/* PE 0xd641d0: ポインタ大域 0x15e2198 を読み、その指す先の dword − 2 を変換スロット 0x15e4280 に渡す (trackCount と同じ読み方・REPORT_PY205) */
+FL_H(mixer, getTrackCount) { return fl_ret_i(c, NMIX - 2); }
+/* PE 0xd63870: ecx=3 を変換スロット 0x15e4280 (PyLong_FromLong・REPORT_PY152 §42) に渡すのみ (REPORT_PY205) */
+FL_H(mixer, getEqBandCount) { return fl_ret_i(c, 3); }
 FL_H(mixer, getTrackName) { MX(0); return fl_ret_s(c, t->name); }
 FL_H(mixer, setTrackName) { MX(0); const char *s = A_STR(1); set_name(t->name, s); return fl_ret_none(c); }
 FL_H(mixer, getTrackVolume) { MX(0); int64_t m = A_INT(1, 0); return fl_ret_d(c, m ? db(t->vol, 0.8) : t->vol); }
