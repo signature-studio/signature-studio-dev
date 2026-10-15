@@ -18,7 +18,7 @@
 | 入力 | `targets/m11.json`・`--set sample:800`・`--shards 12`・`--nobuild` (build は `liftdiff.py build targets/m11.json`: `[build] OK`・`wasm_size` 4463245) |
 | units state | `--state auto` (`work/m11/boot_state.json`) |
 | hybrid state | `work/m11/boot_state_hybrid.json` (`bootstate --mode hybrid --nobuild`: `units_run=928/942`・`first_fail=830`・`precondition ok=True`。LD-182 と一致) |
-| 素材 | `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)。`work-m11` → `tools/m11/work/`・`work-liftdiff` → `tools/liftdiff/work/` (展開)。`toolchain-emsdk` は `/opt/emsdk` を使用 |
+| 素材 | `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)。`work-m11` → `tools/m11/work/`・`work-liftdiff` → `tools/liftdiff/work/` (展開)。`toolchain-emsdk` は `[EMSDK]` (`docs/REFERENCES.md` §4) を使用 |
 | 機 | 4 vCPU・15 GiB。run は直列 |
 | limits | native ITIMER 1.5 s (recv 10.0 s)・wasm vm 1.000 s (recv 10.0 s) (`[batch] limits` 行) |
 | 負荷 | `tests/ld183_order_load.py --load 4` が `sh -c 'while :; do :; done'` を 4 本起動し、batch 後に `Popen.kill()` (PID 指定) で止めた。止めたことは `pgrep` で 0 件を確認 |
