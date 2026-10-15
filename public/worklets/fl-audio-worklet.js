@@ -24,7 +24,7 @@ class FlShimProcessor extends AudioWorkletProcessor {
     this.L = o.layout;
     this.buffer = o.buffer;
     this.ctlPtr = o.ctlPtr;
-    this.i32 = new Int32Array(this.buffer, this.ctlPtr, 128);
+    this.i32 = new Int32Array(this.buffer, this.ctlPtr, o.ctlSize >> 2);
     this.ix = {};
     for (const k of Object.keys(this.L)) this.ix[k] = this.L[k] >> 2;
     this.f64 = new Float64Array(1);
