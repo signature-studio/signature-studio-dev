@@ -40,7 +40,15 @@ crash 65 のうち stderr で分類した 9 関数 (変更前) 以外の内訳 (
 ## 5. fa_sweep 実測
 
 `bash tools/icall/diff/fa_sweep.sh 8 60`。測定は未 commit の作業ツリーで行った (測定 tree は `ee2883ab8` + 本 PR の未 commit 変更)。両方とも `funcs 131` の集計が同一。
-**注: コミット済み HEAD (`b64cb3ae3`) での再測定は未実施**。素材 (`plugins-freshair`・`work-icall`) が本 run に無く、`tools/icall/work/` と `tools/targets/freshair/work/` が存在しないため。再測定は次の run で行う (未解決表の子 issue の素材指定と同じ)。
+**注: コミット済み HEAD での再測定は未実施**。素材 (`plugins-freshair`・`work-icall`・`work-liftlib-targets`) が fix run (`pull_request_review`) に展開されておらず、`tools/icall/work/` と `tools/targets/freshair/work/` が存在しないため。`fa_sweep.sh` は `tools/icall/work/rt_freshair-core/map.json` を必要とする。次の run で素材を指定して再測定し、その測定値で本節の表を置き換える。
+
+コード差分 (測定 commit `ee2883ab8` から HEAD まで。`git diff ee2883ab8 HEAD -- tools/ott/native tools/icall`):
+
+```
+ tools/icall/REPORT_APPENDIX_1922.md | 60 +++++++++++++++++++++++++++++++++++++
+ tools/ott/native/ott_native.c       |  8 +++++
+ 2 files changed, 68 insertions(+)
+```
 
 | 項目 | 変更前 | 変更後 | 差分 |
 |---|---|---|---|
