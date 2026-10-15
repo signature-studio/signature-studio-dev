@@ -58,9 +58,9 @@ def main():
     out = os.path.join(HERE, 'results/ld125_lift_gap_128f9e0.tsv')
     rows = ['section\tstart\tend\tir_label_start\tmachine_leaders_inside\twhere']
     print('[ld125] lift labels %d / machine leaders %d / stages: %s'
-          % (len(lift_labs), len(leaders), ', '.join('%s=%d' % (p, stage[p][0]) for p in STAGES)))
+          % (len(lift_labs), len(leaders), ', '.join('%s=%d' % (p, len(stage[p][1])) for p in STAGES)))
     for p in STAGES:
-        print('[ld125] %s label %d' % (p, len(stage[p][1])))
+        print('[ld125] %s label %d, same set as lift: %s' % (p, len(stage[p][1]), stage[p][1] == lift_labs))
     for a, b, n in gaps:
         rows.append('gap\t%x\t%x\t%x\t%d\t' % (a, b, a, n))
         print('[ld125] gap %x..%x (IR label %x の block が次の label まで続き、機械 leader %d 件を含む)' % (a, b, a, n))
