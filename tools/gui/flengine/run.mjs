@@ -93,6 +93,7 @@ const result = {
   mode: survey ? 'survey' : 'boot',
   dllmain_done: dllmainDone, boot_threw: bootThrew, boot_failfast: bootFailfast,
   units_total: num(mod._m11_units_total), units_run: num(mod._m11_units_run), init_count: num(mod._m11_init_count),
+  units_dispatched: num(mod._m11_units_run),   // 製品 KPI の dispatch 数 = dispatch した unit 数 (tools/flelift/boot/fle_boot.mjs の定義と同じ。m11_ov.c の g_units_run)
   survey: survey ? { ...res, kinds, failfast_units: ffUnits } : null,
   reach, reach_summary: sum && sum.replace(/^.*GUI-REACH-SUMMARY /, ''),
   failfast_apis: failfast, softstub_apis: softstub, failfast_count: num(mod._gf_failfast_count),
