@@ -45,11 +45,12 @@ m = json.load(open(W + '/lift_seeds/lift_meta.json'))
 u = m['unsup']
 g = collections.Counter()
 for k, v in u.items():
-    if k.startswith('v') or 'zmm' in k:
-        grp = 'AVX(VEX/EVEX)'
-    elif k.startswith(('aes', 'vaes', 'sha256')) or k in ('pclmulqdq', 'pshufb', 'palignr'):
+    mn = k.split(':', 1)[0]    # key = mnemonic:mnemonic (x64c.py の key = mnemonic + ':' + 理由)
+    if mn.startswith(('aes', 'vaes', 'sha256')) or mn in ('pclmulqdq', 'pshufb', 'palignr'):
         grp = 'AES/SHA-NI'
-    elif k[0] == 'f':
+    elif mn.startswith('v'):
+        grp = 'AVX(VEX/EVEX)'
+    elif mn[0] == 'f':
         grp = 'x87'
     else:
         grp = 'other'

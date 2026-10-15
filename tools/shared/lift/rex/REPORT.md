@@ -209,16 +209,20 @@ python3 tools/shared/lift/rex/importers.py <fl-win64 展開先> --json OUT.json 
 ### 8.8 測定後のコード差分 (差分 0 の証跡)
 `git diff 5fe86502 HEAD -- tools/shared/lift/rex tools/flelift tools/shared/env.sh ':(exclude)*.md'` の出力: 行数 0 (0 = コード差分なし)。HEAD は本 REPORT を含む commit。
 
-## 9. 所有者限定 tier の side module 分離とビルドフラグ除外 — T-SH-47 (#2896)
+## 9. 成功経路 (戻り値 1 / 3) と書込の一致 — T-SH-46 (#2870, 部分達成)
+
+結論: 成功経路 (戻り値 1 / 3) に入る入力を追加し、比較対象に成功経路を含めた。arena 書込は元の機械語と全件一致。`.data` の一致・落ちる case の分類・movnti は未解決。測定 commit `80c5ff7a`。数値・未解決は付録 `REPORT_APPENDIX_2870.md` の §9.1・§9.3・§9.4 が正本 (§9 全文)。
+
+## 10. 所有者限定 tier の side module 分離とビルドフラグ除外 — T-SH-47 (#2896)
 
 測定 commit: `105733875` (`tools/shared/lift/rex/` の最後のコード変更)。以降の差分は本 REPORT のみ。既知類型との関係: 該当なし (配信物の分離とフラグのみ。本検査の不一致 0)。
 
-### 9.1 結論と方法
-- **結論 (1 行)**: 部分。REX の standalone wasm を所有者限定 tier の `owner/rex_side.wasm` に複製し、`REX_SIDE=0` で `owner/` から除外できるようにした。`REX_SIDE=1`・`0` の両方で `lift_x64c.sh all` が ALL OK。**SIDE_MODULE 形式 (dlopen 形) は未達** (§9.3 (a)・子 #3630)。**公開 tier への結線は未実施** (§9.3 (b))。
-- フラグ `REX_SIDE` (既定 `1`、0/1 以外は exit 2)。`1` = 配信物 `$W/owner/` に `rex_side.wasm` (`rex.wasm` の複製。`cmp` で一致確認)。`0` = 空。`$W` = `tools/shared/work/lift/rex` (gitignore)。glue (`rex_glue.c`・`fle_cpu.c`) は wasm に静的に入るため別ファイルにしない。`rex.wasm` は両フラグとも `$W` 直下に生成される (`REX_SIDE=0` でも残る)。フラグが切り替えるのは `owner/` への複製だけで、§9.1 の「分離」と §9.3 の「組み込みを切り替える単位」はこの範囲に限る。
+### 10.1 結論と方法
+- **結論 (1 行)**: 部分。REX の standalone wasm を所有者限定 tier の `owner/rex_side.wasm` に複製し、`REX_SIDE=0` で `owner/` から除外できるようにした。`REX_SIDE=1`・`0` の両方で `lift_x64c.sh all` が ALL OK。**SIDE_MODULE 形式 (dlopen 形) は未達** (§10.3 (a)・子 #3630)。**公開 tier への結線は未実施** (§10.3 (b))。
+- フラグ `REX_SIDE` (既定 `1`、0/1 以外は exit 2)。`1` = 配信物 `$W/owner/` に `rex_side.wasm` (`rex.wasm` の複製。`cmp` で一致確認)。`0` = 空。`$W` = `tools/shared/work/lift/rex` (gitignore)。glue (`rex_glue.c`・`fle_cpu.c`) は wasm に静的に入るため別ファイルにしない。`rex.wasm` は両フラグとも `$W` 直下に生成される (`REX_SIDE=0` でも残る)。フラグが切り替えるのは `owner/` への複製だけで、§10.1 の「分離」と §10.3 の「組み込みを切り替える単位」はこの範囲に限る。
 - `ok`: 本検査 PASS 後に `rm -rf "$W/owner"` して作り直し、`owner_list.txt` (`cd "$W" && find owner -type f | sort`) を期待値と突合 (`1` で `owner/rex_side.wasm` の 1 行、`0` で 0 行。`0` では `*rex*`・`*glue*`・`*.c` も 0 件)。不一致は rc=1。`neg-owner` は `ok` と同じ配信物に `owner/rex_glue.c` (ダミー) を足して突合し、FAIL を検出すれば exit 0。判定後はダミーを消して `ok` と同じ状態に戻す。`all` = `ok neg-cmp neg-ctx neg-owner`。
 
-### 9.2 実測 (測定 commit `105733875`・各フラグで `all` を 3 回。n=3)
+### 10.2 実測 (測定 commit `105733875`・各フラグで `all` を 3 回。n=3)
 | 項目 | `REX_SIDE=1` | `REX_SIDE=0` |
 |---|---|---|
 | `all` の wall (`time` の real) / rc | 8.95–9.25 s / 0 (3 回) | 8.87–8.99 s / 0 (3 回) |
@@ -231,8 +235,8 @@ python3 tools/shared/lift/rex/importers.py <fl-win64 展開先> --json OUT.json 
 | neg-owner (一覧突合) | `owner/rex_glue.c owner/rex_side.wasm` ≠ 期待 → FAIL (期待どおり) | `owner/rex_glue.c` ≠ 期待 (空) → FAIL (期待どおり) |
 | 直前の HEAD `03d3291a0` (コード差分 0) で `all` を 1 回再実行 | rc 0・ALL OK・wall 7.02 s・本検査 133/133 一致 | rc 0・ALL OK・wall 7.21 s・本検査 133/133 一致 |
 
-### 9.3 検証範囲 / 範囲外 / 未解決
-- 検証した: 2 フラグ × 3 回の `all` (本検査・配信物の一覧・`cmp`・sha256・ネガコン 3 種)。独立検算は §9.4 の 1 行 (`hashlib` で `owner/` の一覧とハッシュを再計算し、`sha256sum` と照合)。
+### 10.3 検証範囲 / 範囲外 / 未解決
+- 検証した: 2 フラグ × 3 回の `all` (本検査・配信物の一覧・`cmp`・sha256・ネガコン 3 種)。独立検算は §10.4 の 1 行 (`hashlib` で `owner/` の一覧とハッシュを再計算し、`sha256sum` と照合)。
 - 受入 1 は**部分**: 範囲外・未達は次のとおり。`owner/rex_side.wasm` は `-sSTANDALONE_WASM=1 --no-entry` でビルドした `rex.wasm` の同一バイト複製で、side module 形式ではない。(a) `-sSIDE_MODULE=2` の dlopen 形は作っていない (固定 VA 0x30000000 の画像と global 配置の再配置を要する)。(b) 公開 tier の配信 (`deploy/`・release guard) への結線は無い。(c) 配信側の host (組み込み先) は未実装。本検査の範囲 (§7.5) は変えていない。
 
 | 未解決 | 影響 | 起票先 |
@@ -240,9 +244,9 @@ python3 tools/shared/lift/rex/importers.py <fl-win64 展開先> --json OUT.json 
 | (a) dlopen 形 (`-sSIDE_MODULE=2`・固定 VA・global 再配置)、(c) 組み込み先 host の実装 | side module の形式と結線が未決。`rex_side.wasm` を読む経路が無い | 子 #3630 [T-SH-91] (PM agent の判断待ち。既定案は現状の standalone 複製) |
 | (b) 公開 tier の配信 (`deploy/`・release guard の deny-list) への結線 | `REX_SIDE=1` の配信物が公開 tier に載る経路は塞がれていない | PM (#2896 本文の「範囲外の PM 作業」・D11) |
 
-### 9.4 再現
+### 10.4 再現
 - `FL_WIN64_DIR=<fl-win64 展開先> REX_SIDE=1 bash tools/shared/lift/rex/lift_x64c.sh all` (`REX_SIDE=0` も同じ)。配信物の確認は `cd tools/shared/work/lift/rex && find owner -type f | sort && sha256sum rex.wasm owner/rex_side.wasm`。
 - 独立検算 (一覧とハッシュを python で再計算): `cd tools/shared/work/lift/rex && python3 -c "import hashlib,pathlib; [print(hashlib.sha256(p.read_bytes()).hexdigest(), p) for p in sorted(pathlib.Path('owner').rglob('*')) if p.is_file()]"`。`REX_SIDE=1` では `owner/rex_side.wasm` 1 行に `76dce05e…` が出れば一致。
 
-### 9.5 測定後のコード差分 (差分 0 の証跡)
+### 10.5 測定後のコード差分 (差分 0 の証跡)
 `git diff 105733875 HEAD -- tools/shared/lift/rex tools/flelift tools/shared/env.sh ':(exclude)*.md'` の出力: 行数 0 (0 = コード差分なし)。HEAD は本 REPORT を含む commit (commit 2 は `845592bbc`)。

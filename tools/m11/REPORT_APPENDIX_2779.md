@@ -1,0 +1,125 @@
+# M11 REPORT_N403 §9 の付録 (#2779・本 runner の参考値)
+
+自動生成ではない。REPORT_N403.md §9 の全文を 250 行上限のため分割移動した (内容は削除していない。Git 履歴に残る)。節番号 §7.x は分割前の番号のまま (REPORT_N403.md では main 側の #3229 節が §7 のため、本節は §9 に置いた)。
+
+## 7. 本 runner の参考値 (#2779・LB=0 / 0x10000 の後段・指紋検査を迂回)
+
+測定日 2026-10-14。素材 fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11 (#516 以前の snapshot)。toolchain は runner 同梱の [EMSDK]・[RETDEC] (`docs/REFERENCES.md`)。
+**以下の数値は受入の根拠ではなく参考値である。** `m11_e2e.sh` の lift 成果物の PE 指紋検査 (`work/lift_pe.sha256`・WORKFLOW §11) を `M11_SKIP_LIFT_FP=1` で迂回して後段だけを回した。素材 work-m11 には生成時の PE 指紋 (`lift_pe.sha256`・`ir_conditions.json`) が無く、lift 成果物が現 PE に対応することは確認できていない。全再生成は `functions_dll.csv` (Ghidra の中間物) を要し、本 run の時間内に収まらないため行っていない。
+測定 commit: `d890c724` (コードを変えた最後の commit。以降の差分は本 REPORT のみ。§7.5)。
+製品 KPI (`tools/flelift/boot/REPORT.md`) は本節で測っていない。
+
+### 7.0 解消後の再測定 (`bd5daf9d` 時点の旧 head の参考値。最新は §7.8)
+
+main 取り込み後 (merge `c277b9ff`・REPORT 分割 `bd5daf9d`) の再測定。`tools/m11` の PR 差分は main と 0 (§7.4)。素材 `fl-win64`・`work-m11` を展開 (`tools/m11/work/`)。toolchain は runner の既存 [EMSDK]・[RETDEC] を使用 (artifact の再展開はしていない)。node v22.23.3 (`m11_e2e.sh` の前提は v26 で、v26 は未確認)。nproc 4。
+
+| 条件 | 結果 | rc | wall | load (前 → 後 1/5/15 分) |
+|---|---|---|---|---|
+| LB=0 | units_run 53・survey ok 872 / noproc 1 / miss 46 / trap 23・寛容 ok 874 / skipped 67・gate と negctl OK・ir_sha256 `39e97946…` | 0 | 192 s | 0.43 0.55 0.30 → 0.99 0.79 0.45 |
+| LB=0x10000 | gen_ir2・lb_check・build OK・units_run 37 (Halt0 早期)・survey ok 869 / noproc 1 / miss 46 / trap 26 (abort 2・unresolved function_535c2e 2)・寛容起動の出力 0 バイト (M11_TOLERANT 行無し → gate FAIL)・ir_sha256 `d8738edd…` | 1 | 708 s | 0.65 0.72 0.44 → 1.01 1.00 0.78 |
+
+ptrcheck: LB=0x10000 は run 69,099 / 69,359・survey 70,945 / 71,001 (gate pass)。LB=0 は rc 0 で gate 合格 (ptrcheck JSON は LB=0x10000 の run で上書きされ、LB=0 の数値は未記録)。
+units_run・survey・trap・ir_sha256 は §7.1 (HEAD `d890c724`) と一致する。e2e 経路 (IR `d8738edd…`) の寛容起動の出力空は §7.1 と同じ。repro 経路 (IR `ecbd43c1…`・REPORT §6) は、`bd5daf9d` の HEAD では完走し (§7.7)、`39acaf9db` の HEAD では 600 s で打ち切られ (§7.8)、`079a1a33c` の HEAD では完走した (§7.8)。2 つの経路で IR の指紋が違う (§7.2)。#3160 は CLOSED のまま (再オープンしない・PM 判断)。
+
+### 7.1 測定 (HEAD `d890c724`・参考値)
+
+再現 (リポジトリ root。`FL_WIN64_DIR` に `extracted/block00031_PE.bin`、`tools/m11/work/` に work-m11 を展開してから実行):
+
+```
+M11_SKIP_LIFT_FP=1 M11_LB_BASE=0 bash tools/m11/m11_e2e.sh
+M11_SKIP_LIFT_FP=1 M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh
+```
+
+`M11_SKIP_LIFT_FP` は `tools/m11/m11_e2e.sh` の指紋検査だけを外すオプションで、未設定なら従来どおり検査する。実行時は `WARNING ... 参考値` の行が出る。
+
+| 条件 | 結果 | rc | wall | load (開始前 → 終了直後、1/5/15 分) |
+|---|---|---|---|---|
+| LB=0 | units_run 53・survey ok 872 / noproc 1 / miss 46 / trap 23・寛容 ok 874 / skipped 67・gate と negctl OK・ir_sha256 `39e97946…` (修正前と同一) | 0 | 2 m 53 s | 0.19 0.30 0.15 → 1.00 0.63 0.31 |
+| LB=0x10000 | gen_ir2・lb_check・build OK。units_run 37 (Halt0 早期)・survey ok 869 / noproc 1 / miss 46 / trap 26。e2e 経路 (`M11_SKIP_LIFT_FP=1 m11_e2e.sh`・IR `d8738edd…`) では寛容起動が 600 s の `timeout` で打ち切られ出力空 (M11_TOLERANT 行無し → gate FAIL)。repro 経路 (IR `ecbd43c1…`) では測定時点で完走 (§7.2) | 1 | 11 m 38 s | 0.73 0.60 0.31 → 1.00 0.98 0.70 |
+
+nproc は 4。load は各 run の前後の `/proc/loadavg`。LB=0 と LB=0x10000 は同じ `work/` を共有するため逐次に測った。
+
+ptrcheck (`ptrcheck.gate`。`image_va_words_new` / 上限):
+
+| 条件 | run (通常起動) | survey (unit 実行後) |
+|---|---|---|
+| LB=0 | 69,359 / 69,359 (pass) | 71,001 / 71,001 (pass) |
+| LB=0x10000 | 69,099 / 69,359 (pass) | 70,945 / 71,001 (pass) |
+
+ptrcheck JSON の `ok` (生フラグ) は両条件で false。判定は `gate.pass`。LB=0x10000 側の ptrcheck はこの参考値で確認した (ただし上限は fresh 再生成の基準値で、迂回した素材との比較は参考)。
+
+### 7.2 #403 との比較 (参考値どうしの比較)
+
+| 項目 | #403 (引用) LB=0 | 本節 LB=0 | #403 (引用) LB=0x10000 | 本節 LB=0x10000 |
+|---|---|---|---|---|
+| units_run | 53 | 53 | 37 | 37 |
+| survey ok / noproc / miss / trap | 870 / 1 / 46 / 25 | 872 / 1 / 46 / 23 | 868 / 1 / 46 / 27 | 869 / 1 / 46 / 26 |
+| 通常起動の終了 | OOB | trap unreachable (function_8c5eb0) | Halt0 早期 | Halt0 早期 |
+
+units_run と LB=0x10000 の Halt0 早期は #403 と一致、survey は ±2 のずれ。受入 2 (「変わらない」) は未達。原因は未確定。候補は (a) boot5 (素材に `boot5.lift.ll` が無く、本節は RetDec で lift し直した)、(b) ld108 (#2316。#403 より後)。切り分けは子 #3161。
+
+IR の指紋 (2 つの経路で違う): e2e 経路 (`M11_SKIP_LIFT_FP=1 m11_e2e.sh`) の LB=0x10000 IR は `d8738edd…`、repro 経路 (`m11_lb_tolerant_repro.sh 0x10000`・§6) の IR は `ecbd43c1…`。どちらが正規かは未確定。`--full` で作る IR との照合を #3161 で行って決める。`ecbd43c1…` は `bd5daf9d` 時点の値。`079a1a33c` の repro の IR は `a980859c…` (§7.8)。
+
+### 7.3 前 round の測定 (参考。旧 commit・同じ迂回)
+
+| 条件 | 結果 | rc | wall |
+|---|---|---|---|
+| LB=0 (`94dea77f`) | units_run 53・survey ok 872 / noproc 1 / miss 46 / trap 23・寛容 ok 874 / skipped 67 | 0 | 1 m 58 s |
+| LB=0 (`6566443d`) | 上と同一 (ir_sha256 `39e97946…`) | 0 | 1 m 21 s |
+| LB=0x10000 (`94dea77f`) | gen_ir2 が `fix_ld108` の assert で停止 (即値不一致) | 1 | 0 m 31 s |
+| LB=0x10000 (ld108 のみ修正・**未コミットの診断**) | build が `fix912` で停止 (`対象行が無い`) | 1 | 0 m 52 s |
+| LB=0x10000 (`51b20449`) | gen_ir2・build OK。units_run 37・survey ok 869 / trap 26。寛容起動が 600 s で打ち切り | 1 | 11 m 10 s |
+
+### 7.4 修正 (本 PR の commit は main 取り込み時に main 側へ置換)
+
+`ldfix/fix_ld108.py` の head 即値 `16404608` (LB=0 の LVA 0xfa5080) と `fix912/m11_fix912.py` の VMT 即値 `994072` (0xf2b18) は LB=0 専用の固定文字列だった。LB=0x10000 の IR では +0x10000 の即値になるため、既定経路の `M11_LB_BASE=0x10000 m11_e2e.sh` は gen_ir2 で止まっていた。本 PR (`51b20449`・`d890c724`) は両者を `tools/m11/lb_base.py` の `LB` を import して直した。同じ修正が main に `fb735704` (#3160) で入っていたため、`origin/main` の merge で競合した。解消は main 側の版を採った (`tools/m11/ldfix/fix_ld108.py`・`tools/m11/fix912/m11_fix912.py` は `origin/main` と差 0)。両版の即値は LB=0 で同一 (`16404608`・`994072`)、LB=0x10000 で同一 (`16470144`・`1059608`)。LB=0 の e2e の IR 指紋 (`39e97946…`) は修正前と同一。
+
+### 7.5 測定 commit から HEAD までの差分
+
+コードの差分は無い (測定 commit `d890c724` → 当時の HEAD は本 REPORT のみ)。確認: `git diff d890c724 HEAD -- tools/m11 ':!tools/m11/REPORT_N403.md'` (出力 0 バイト)。現 HEAD の鮮度は §7.8 の確認 (`39acaf9db` → 現 head) を正とする。
+修正の差分: `git diff 94dea77f d890c724 -- tools/m11/fix912 tools/m11/ldfix tools/m11/m11_e2e.sh`。
+
+### 7.6 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 全再生成経路 (`functions_dll.csv`・`lift_pe.sha256` 無し) で `m11_e2e.sh` 1 コマンドが通らない。§7 の値は指紋検査の迂回に依存 | 受入 1 (実測の根拠) 未達。lift 成果物と PE の対応は未確認 | #3161 (指紋込みの実測は #3161 で行う。#3172 は CLOSED・main に merge 済み) |
+| e2e 経路 (`M11_SKIP_LIFT_FP=1 m11_e2e.sh`・IR `d8738edd…`) では LB=0x10000 の寛容起動が 600 s で打ち切られ出力が空 (§7.1)。repro 経路は `bd5daf9d` で完走 (§7.7)、`39acaf9db` で 600 s 打ち切り、`079a1a33c` で完走 (§7.8)。同じコードで結果が一定しない (1 回ずつの測定) | この e2e 経路の LB=0x10000 は rc=1。repro 経路の打ち切りの原因と再現性は未確認 | #3160 は CLOSED のまま (再オープンしない・PM 判断)。IR の照合は #3161 |
+| #403 との数値差 (survey ±2)・LB=0 の停止理由 (OOB → unreachable)・LB=0x10000 の Halt0 早期 | 受入 2 (変わらない) 未達 | #3161 |
+
+### 7.7 repro 経路の LB=0x10000 再実行 (参考値・e2e 経路とは別)
+
+repro 経路の再実行。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/m11_lb_tolerant_repro.sh 0x10000 work/repro_lb10000` を 1 回だけ実行した (`m11_e2e.sh` は走らせていない。`M11_SKIP_LIFT_FP` は使っていない)。素材は `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B) だけを展開し、`work-m11` を `tools/m11/work/` に展開した。toolchain は runner の既存 [EMSDK]・[RETDEC] (素材 `toolchain-*` は展開していない)。nproc 4。node v22.23.3。
+
+| 項目 | 結果 |
+|---|---|
+| rc | 0 (gen_ir2 → data/image → lb_check → build → 寛容起動の全体) |
+| wall | script 全体 1 m 11.5 s。寛容起動の wall_ms 10,885 |
+| load (開始前 → 終了直後、1/5/15 分) | 0.12 0.37 0.20 → 0.76 0.52 0.27 |
+| ir_sha256 | `ecbd43c1…` (`work/ir_conditions.json`・ldfix applied。§7.2 の repro 経路の IR と一致) |
+| units | attempted 942 = units_total 942 |
+| ok / noproc / miss / skipped | 867 / 1 / 47 / 74 (skipped の内訳: oob 16・halt0 8・abort 2・unreachable 1・miss 47) |
+| ptrcheck.gate | pass (`M11_PTRCHECK_MAX_NEW` 未設定で `gated` false)。image_va_words_new 71,987 (LB=0 は 72,042・§6-5) |
+| lb_check | PASS |
+
+unit 数 (942・ok 867・noproc 1・miss 47・skipped 74) は §6 の LB=0x10000 の値と一致する。寛容起動の wall は §6 の 20 s 台と別の run で、条件が違うため比較しない。
+この run は e2e 経路の打ち切り (600 s) を再現する試行ではない。e2e 経路 (IR `d8738edd…`) と repro 経路 (IR `ecbd43c1…`) の違いは §7.2 のとおり未確定。
+
+測定 commit: `bd5daf9d` (コードを変えた最後の commit)。実行時の HEAD は `6f2b712ff` (当時の HEAD。docs のみの差分)。現 HEAD の鮮度は §7.8 の確認を正とする。
+確認: `git diff bd5daf9d HEAD -- tools/m11 ':!tools/m11/REPORT*'` の出力は 0 バイト。e2e の再測定はしない。`bd5daf9d` の数値 (§7.0) は参考値のまま。
+
+### 7.8 main 取り込み後の再測定 (測定 HEAD `39acaf9db`・repro は `079a1a33c` で再実行・参考値・指紋検査迂回)
+
+main (`554303875`) を取り込んだ HEAD で再測定した。`tools/m11` の main 側の変更 (`bd5daf9d` 以降 54 files) を含むため、§7.0〜§7.7 の数値は HEAD では再現しない。素材 `fl-win64`・`work-m11`・`work-liftdiff` を展開 (`tools/m11/work/`)。toolchain は runner の既存 [EMSDK]・[RETDEC]。node v22.23.3。nproc 4。
+
+| 条件 | 結果 | rc | wall | load (前 → 後 1/5/15 分) |
+|---|---|---|---|---|
+| LB=0 e2e (`M11_SKIP_LIFT_FP=1 M11_LB_BASE=0 bash m11_e2e.sh`) | gen_ir2・lb_check・build OK。strict: units_run 98 + skipped 3 = 完了 101 (pin 56)・survey ok 873 (pin 872)・full ptrcheck new 69,668 > max 69,359 (FAIL)・寛容起動 ok 875 / skipped 66 / noproc 1 (gate の寛容起動部は通過) | 1 (gate FAIL) | 129 s | 0.88 0.58 0.28 → 1.06 0.76 0.39 |
+| LB=0x10000 repro (`m11_lb_tolerant_repro.sh 0x10000 work/repro_lb10000_3162`・HEAD `39acaf9db`) | gen_ir2 OK・lb_check PASS (errors 0)・build OK・寛容起動 rc 124 (600 s で打ち切り・出力 0 バイト)。units・ptrcheck gate・ir_sha256 は取得なし (寛容起動が打ち切られたため。この run の出力は本 PR の作業ツリーに無い) | 0 (スクリプトの終了コード。寛容起動の成否ではない) | 659 s | 0.33 0.60 0.36 → 1.00 0.97 0.71 |
+| LB=0x10000 repro (同上・HEAD `079a1a33c`。code は `39acaf9db` と同一) | gen_ir2 OK・lb_check PASS (errors 0)・build OK・寛容起動 完走 (wall_ms 15,543・M11_TOLERANT 行あり)。units 942 = ok 868 + noproc 1 + skipped 73 (うち miss 47・halt0 8・oob 16・abort 2)・ptrcheck gate pass (`gated` false・image_va_words_new 71,987)・ir_sha256 `a980859c…` (`ir_conditions.json` と `boot_final.ll` の sha256 が一致) | 0 (スクリプトの終了コード・寛容起動 rc 0) | 1 m 28 s | 未記録 (終了後の 1 点のみ) |
+
+- LB=0 の gate FAIL 3 点 (strict 完了数 101 ≠ 56・survey ok 873 ≠ 872・ptrcheck new 69,668 > 69,359) は pin (`tools/m11/e2e_expect.env`・`m11_tolerant_gate.py`) と main の現状の不一致。PR の差分は `m11_e2e.sh` の `M11_SKIP_LIFT_FP` 分岐だけで、未設定時は従来と同じ経路。main 単体の同条件の実測は未実施 (未確認)。
+- LB=0x10000: 同じコード (`39acaf9db`・`079a1a33c`) の repro の 1 回ずつの結果が違う。前者は寛容起動が 600 s で打ち切られ、後者は 15.5 s で完走した。1 回ずつしか測っていないため再現性は未確認。打ち切りの原因は未特定 (gen_ir2 には main の `fix_src412770` (#3296) が適用されているが、この変更との関係は未確認)。`bd5daf9d` (§7.7) は 10.9 s で完走。
+- `079a1a33c` の repro の IR (`a980859c…`) は §7.7 の `ecbd43c1…` と違う。`ir_conditions.json` には `ld115: applied` が出ている。units も §7.7 (ok 867 / skipped 74) と ok 868 / skipped 73 で 1 件違う。IR が違うため、§7.7 との比較は参考。
+- `m11_lb_tolerant_repro.sh` は末尾が `grep | cut` のため、寛容起動が rc 124 でもスクリプトの終了コードは 0 になる (main 既存の挙動。本 PR の差分ではない)。表の rc は、この終了コードである。
+- 受入 (ld108・fix912 の LB 修正により LB=0x10000 の gen_ir2・lb_check・build が通る) は `079a1a33c` の repro でも満たす (build OK・lb_check PASS)。寛容起動の打ち切りの原因は未特定で、#3160 を再オープンするかは PM 判断 (#3160 は CLOSED のまま)。

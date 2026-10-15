@@ -42,12 +42,13 @@ emcc -O1 -ffp-contract=off -fno-fast-math -w -I "$FLE/rt" \
 echo "[rex] wasm: $(stat -c %s "$W/rex.wasm") bytes"
 
 gcc -O1 -w -I "$W" -o "$W/native_ref" "$HERE/native_ref.c"
-timeout 300 "$W/native_ref" "$W/image_native.bin" "$W/cases.bin" "$W/res_native.bin"
+timeout 300 "$W/native_ref" "$W/image_native.bin" "$W/cases.bin" "$W/res_native.bin" 2> "$W/native_stderr.txt"; cat "$W/native_stderr.txt" >&2
 
 if [ "$MODE" = neg-ctx ]; then REX_NEG=ctx timeout 300 node "$HERE/run_wasm.mjs" "$W"; else timeout 300 node "$HERE/run_wasm.mjs" "$W"; fi
 set +e
 if [ "$MODE" = neg-cmp ]; then python3 "$HERE/diff_test.py" "$W" --mutate-wasm; RC=$?; else python3 "$HERE/diff_test.py" "$W"; RC=$?; fi
 set -e
+python3 "$HERE/crash_class.py" "$W" "$W/native_stderr.txt"
 T1=$(date +%s)
 echo "[rex] $MODE elapsed=$((T1-T0))s load start=[$L0] end=[$(cut -d' ' -f1-3 /proc/loadavg)]"
 if [ "$MODE" = ok ] || [ "$MODE" = neg-owner ]; then
