@@ -161,7 +161,7 @@ base IR: `%0 = call 4256c0(i64 %arg1)`。修復: `%a1g = load [arg1]` を入れ�
 
 - 範囲内: 表 #5・#14・#15 の 3 箇所の IR 修復、機械照合 21 件、NC 4 種、ldfix_e2e (step 1d 込み) の HEAD `f87d3389e` での完走 (§5.1)、前回の測定 commit `dd8894202` での完走 (§5.2)、一次分類 17 行 (§4)。
 - 範囲外: 他の誤り箇所 (§6 の未修復)、stage4 の trap の原因、走査定義の変更、liftdiff batch (`--batch` は未実行)。
-- 測定 commit: **`f87d3389e`** (コードを変えた最後の commit)。測定 commit から、この文書を含む HEAD までのコード差分は 0 行 (`git diff f87d3389e HEAD -- tools/m11/ldfix` の出力は空)。
+- 測定 commit: **`f87d3389e`** (コードを変えた最後の commit)。測定 commit から HEAD までのコード差分は 0 行 (`git diff f87d3389e HEAD -- tools/m11/ldfix ':(exclude)*.md'` の出力は空)。差分は本 REPORT (`REPORT_3372.md`) だけ。
 - 前回の測定 commit `dd8894202` から測定 commit `f87d3389e` までの差分 (`git diff dd8894202 f87d3389e -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/fix_site_3372.py`):
   - `fix_site_3372.py` … 1 行追加 (機械照合 `(0x44f0f0, 'mov', 'r8, r9')`。§2.1 の 44ec40 第 3 引数の経路を機械照合する)。
   - `ldfix_e2e.sh` … 4 行追加・1 行削除 (step 1c に main の `fix_site_3326.py` が入り、本 pass は 1d に置かれた)。
