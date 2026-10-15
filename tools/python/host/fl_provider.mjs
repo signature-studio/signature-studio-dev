@@ -90,6 +90,7 @@ export async function createWasmEngine({ flprovUrl, ids }) {
       for (const [cid, f4, len] of recs) if (!M._fl_engine_loop_add(cid, f4, len)) throw new Error("loop record 超過 (上限 8)");
     },
     displayTime: () => Number(M._fl_engine_display_time()),
+    browserOp: () => M._fl_engine_browser_op(),
     stepItemProbe: (prm, v, s0, s1) => M._fl_engine_step_item_probe(prm, v, s0, s1),
     gridItemsProbe: (seed, n) => M._fl_engine_grid_items_probe(seed, n),
     noteEnumProbe: (seed, n, chan, step, V) => {
