@@ -4,14 +4,14 @@
 
 ## 0. 結論
 
-※ §0〜§4 の数値は測定 commit `87208313b` 時点のコードの参考値。HEAD (`76c3e2a22`) では再測定していない (測定経路に 90 行の差分がある。§6)。
+※ §0〜§4 の数値は HEAD (`e6c940834`) で再測定し、`87208313b` 時点の値と一致した (§6)。
 
 - **項目 2 (段別 A/B・達成)**: 元の 9 件のうち 53・87・138 は **qstore だけで消える** (ldfix の後に qstore だけを足すと 9→6)。158 は **qstore と alloca の両方が要る** (qstore だけ (c4) も、qstore を外した prod fix (l_no_qstore・alloca あり) も残る)。17 は alloca、56 は guard699 で消える。**ld108・ld115・src412770 は 9 件の集合も本番順の 22 件の集合も変えない** (累積 A/B と leave-one-out の両方で確認。unit 番号の照合は §1-3)。
 - **項目 3 (r8b を含む本番順の判定・達成)**: r8b (`fix_r8b815050.py`・main の `m11_gen_ir2.sh` の既定) を含めても、件数 (survey ok/miss/trap) は r8b 無しと同じ。fix・base とも 872/47/22。fix と base の差は unit 895 (OOB → halt0) の 1 件だけ。r8b は unit 280・659 の trap を消さない (最内 frame は同じ callee `function_6cefb0`。呼出し位置の offset だけが変わる)。
 - **項目 4 (F3c 33→43 の出所・達成)**: commit `f63b5953d` (`fix(ldfix): repair first-deref-not-entry uses dominated by the deref block (refs #1325)`) で F3c 関数が 33 → 43 に増えた。同じ入力 `boot_final3.ll` で、親 (`f63b5953d^`) は 33、この commit は 43 (§4)。
 - **項目 1 (trap 144・149・114 の引き金・未達)**: unit 別の最内 frame と段ごとの変化までを記録した。引き金 (最内 IR 関数の入力値・書込み元) は未特定。PR は部分達成 (`Refs #3608`)。残りは #3608 で続行。
 
-## 1. 測定 (参考値・測定 commit `87208313b`・HEAD 未再測定 (§6))
+## 1. 測定 (測定 commit `e6c940834`・HEAD 再測定済み・`87208313b` と一致 (§6))
 
 測定コマンド (すべて `export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP`。各 run 後の load average は 1.9 以下 (4 コア・uptime 実測)。各変種は単独で完走)。
 
@@ -132,11 +132,11 @@
 |---|---|---|
 | trap 144 (最内 `function_44aeb0` の入力値・書込み元)・149 (`function_412e40`)・114 (Halt 呼出し元) の unit 単位の引き金 | 項目 1 (受入 1 の残り) | #3608 (open のまま・部分達成) |
 | ldfix の F3a 2・F3c 43 のうち件数に反映されなかった修復 (反映は unit 895 の 1 件) の理由 | 項目 3 の理由 | #3608 |
-| §8 の引数採取 (probe144.py・read144.mjs) が未 commit で、committed HEAD から再現できない。IR の正の素材 `work-m11` (`tools/m11/work/boot_final3.ll`) が本 run の `oc_artifacts` に無く、`--full` の再生成は Ghidra (`functions_dll.csv`) が本 runner に無い | §8 の全数値の根拠 (受入 1) | #3608 (採取スクリプトの commit と IR 生成環境が要る) |
+| §8 の引数採取 (probe144.py・read144.mjs) が未 commit で、committed HEAD から再現できない。`--full` の IR 再生成は Ghidra (`functions_dll.csv`) が要るが、本 runner に Ghidra は無い (`work-m11` の展開で `boot_final3.ll` は使える) | §8 の全数値の根拠 (受入 1) | #3608 (採取スクリプトの commit と Ghidra 付き IR 生成環境が要る) |
 
 ## 6. 測定 commit と差分 (`docs/WORKFLOW.md` §6)
 
-- 測定 commit (§1〜§4 の数値のコード): `87208313b`。`40d3a788d` は §1 の元の測定 (`prod_order_3608.sh` の内容は `87208313b` と同一)。
+- 測定 commit (§1〜§4 の数値のコード): `e6c940834` (HEAD で再測定)。`87208313b` は同じ数値を出した前 run の測定 commit、`40d3a788d` は §1 の元の測定 (`prod_order_3608.sh` の内容は `87208313b` と同一)。
 - 測定経路 (`git diff 40d3a788d origin/main -- <path>` は 0 行。`fix_450560.py`〜`fix_abi_3450.py` は `ldfix_e2e.sh` の前段で使う):
 
 ```
@@ -144,7 +144,12 @@ git diff 40d3a788d origin/main -- tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_4
 ```
 
 - 上の範囲の差分は 0 行 (`... | wc -l` → 0)。よって `origin/main` 取り込み後の再測定は不要 (`docs/WORKFLOW.md` §6)。
-- §1 の全変種・§1-3 の数値は `87208313b` 時点のコードの測定。同じ経路 (上の一覧) について、`git diff 87208313b HEAD --numstat` は 5 ファイル・90 行追加・7 行削除 (`ldfix/ldfix.py` 44 追加・3 削除、`ldfix/ldfix_e2e.sh` 6 追加、`ldfix/fix_site_3372.py` 3 追加・1 削除、`m11_build.sh` 14 追加・3 削除、`m11_gen_ir2.sh` 23 追加)。これは main 取り込みで入った、実行されるコードの差分。HEAD での再測定は未実施 (本 run の `oc_artifacts` に `work-m11` が無く、`tools/m11/work/boot_final3.ll` が無いため `ldfix_e2e.sh` が rc 1 で止まる。`toolchain-retdec`・`toolchain-emsdk`・`fl-win64` は `$ARTIFACTS_DIR` に実在し、展開で `retdec/bin/retdec-decompiler`・`emsdk/emsdk_env.sh` を確認済み)。よって §1〜§4 は HEAD 上の確認済みの値ではない。
+- §1 の全変種・§1-3 の数値は、測定 commit `87208313b` で得た値と、HEAD `e6c940834` での再測定 (下記) が一致する。同じ経路 (上の一覧) について `git diff 87208313b HEAD --numstat` は 5 ファイル・90 行追加・7 行削除 (`ldfix/ldfix.py` 44 追加・3 削除、`ldfix/ldfix_e2e.sh` 6 追加、`ldfix/fix_site_3372.py` 3 追加・1 削除、`m11_build.sh` 14 追加・3 削除、`m11_gen_ir2.sh` 23 追加)。
+- HEAD `e6c940834` での再測定 (本 run・`$ARTIFACTS_DIR` の `work-m11.tar.zst` と `fl-win64.tar.zst` を展開。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`TMPDIR=$RUNNER_TEMP`):
+  - `ldfix_e2e.sh`: rc 0・所要 71.9 秒 (実測 wall)・load 0.78 → 1.16・判定 PASS。stage4 到達 4/6 (base/fix)・survey ok 136 / miss 14 / trap 9 (base/fix)。`STAGE4_JUDGE` の `pass: true`。
+  - `prod_order_3608.sh` (HEAD): c0 (ldfix のみ) 136/14/9 (OOB・halt0 = 8・1・units_run 17)。c4_qstore 139/14/6。c5_alloca 871/47/23。h_nor8b (prod fix) 872/47/22。full_r8b 872/47/22。base_r8b 872/47/22。いずれも §1 の表と一致。c0 は実測 13.1 秒。
+  - trap 集合も §1-1 と一致 (c0: 17・53・56・87・114・138・144・149・158。prod fix: 114・144・149 など 22 件)。
+- 上の測定 commit `e6c940834` から HEAD までのコード差分は 0 (REPORT 本文のみ)。`git diff e6c940834 HEAD -- tools/m11` の出力は空。
 - `origin/main` (`91ed96332`) と `40d3a788d` の差分は、REPORT・新規の別系統スクリプト (`ld175_site_link.py`・`trap_triage/slot653660_exp.py`)・`tools/shared/lift/rex` (x64c 系) のみ。
 
 ## 7. 再現
@@ -174,6 +179,6 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 ## 8. trap 144・149・114 の引き金 (受入 1・部分) — 未再現のため測定値は撤回
 
 - 前の run で採取した entry 引数の表 (144 の `a1`・149 の `a2` など) は撤回した。採取に使った probe (`probe144.py`・`read144.mjs`) は commit されておらず (`work/` 内・gitignore)、committed HEAD から再現できない。撤回前の本節は commit `1c0911297` の `tools/m11/ldfix/REPORT_3608.md` §8 に残る。ここには値も読みも書かない。
-- `ldfix_e2e.sh`・`prod_order_3608.sh` の rc・所要時間・件数の主張も撤回した。本 run では未実行。理由: 再測定の入力 `tools/m11/work/boot_final3.ll` は `work-m11` 素材の展開先で、本 run の `oc_artifacts` に無いため無い。`--full` で IR を作り直すには Ghidra (`functions_dll.csv`) も要り、本 runner には Ghidra が無い。`$ARTIFACTS_DIR` には `fl-win64.tar.zst`・`toolchain-retdec.tar.zst` (`[RETDEC]`)・`toolchain-emsdk.tar.zst` (`[EMSDK]`) が実在し、展開で `retdec/bin/retdec-decompiler`・`emsdk/emsdk_env.sh` を確認済み。不足は `work-m11` (と `--full` の Ghidra)。`FL_WIN64_DIR` は未設定 (`fl-win64` の展開で用意できる)。§1〜§6 の測定値は従来どおり測定 commit `40d3a788d`・`87208313b` に基づく (§6)。
+- `ldfix_e2e.sh`・`prod_order_3608.sh` の rc・件数は、HEAD `e6c940834` で再実行して一致を確認した (§6)。素材: `$ARTIFACTS_DIR` に `fl-win64.tar.zst`・`work-m11.tar.zst`・`toolchain-retdec.tar.zst`・`toolchain-emsdk.tar.zst` が実在する。`toolchain-retdec` の `retdec/bin/retdec-decompiler`・`toolchain-emsdk` の `emsdk/emsdk_env.sh` は `tar --zstd -tf` で実物の存在を確認した (展開はしていない)。`work-m11` は展開して `tools/m11/work/boot_final3.ll` (21.8 MB) を確認し、`fl-win64` は `block00031_PE.bin` のみ展開して使った。Ghidra は本 runner に無く、`--full` の IR 再生成はしていない。
 - 未確定 (受入 1 の残り): 144 の `function_44aeb0` が受ける値の書込み元、149 の `function_412e40` の引数の上流、114 の Halt 呼出し元。採取は採取スクリプトを committed な場所に置き、IR 生成環境が揃ってから行う。
 - 検証起点: `git diff 4e9e1d974 HEAD --numstat -- tools/m11/ldfix` の出力は `tools/m11/ldfix/REPORT_3608.md` のみで、コード差分は 0 (数値は PR 本文に書く)。
