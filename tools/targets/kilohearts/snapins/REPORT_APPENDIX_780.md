@@ -40,13 +40,20 @@
 - 測定 commit: `9f02a5b69` (`scripts/ladder_x64c_closure.sh` を追加した commit)。この commit の HEAD で再実行し、§2 と同じ値 (98 / 7,766 / unsup 38 / ネガコン 2 関数 / 178 命令) を得た。
 - 測定 commit から HEAD までのコード差分: `git diff 9f02a5b69 HEAD -- tools/targets/kilohearts/scripts tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/snapins/harness tools/targets/kilohearts/snapins/scripts tools/targets/kilohearts/snapins/run_all.sh tools/targets/kilohearts/snapins/snapins.json` の出力は 0 行 (本付録と `docs/DOC_MAP.md` の登録行のみが後続 commit で増える)。
 
+## 3b. 681e2e811 時点の再測定 (未実施)
+
+- 本 PR の HEAD (`681e2e811`) で閉包を再測定していない。入力の `plugins-kilohearts` (HeartCore.core_64) が本 run の `$ARTIFACTS_DIR` に無く (`fl-win64.tar.zst` のみ)、`fl-win64` の中にも `HeartCore` は無い。
+- 従って、この付録の §0・§2 の「unsup 38」は `9f02a5b69` の値で、**681e2e811 では一致しない可能性が高い**。`x64c.py` は 681e2e811 で `addsubpd` (`i_addsubpd`)・`vshufps`・`vpmovsxdq`・`rcpps` (`i_rcpps`) を持つ (`9f02a5b69` には無い。main 取り込み由来)。`git diff 9f02a5b69 681e2e811 -- tools/flelift/x64c.py` が測定ずれの原因。
+- 681e2e811 の unsup 件数・閉包 98 / 7,766 の再確認は、`plugins-kilohearts` を `oc_artifacts` で取得できる run で行う。それまで本付録の数値は `9f02a5b69` の値として読むこと。
+- `build.py ladder --path s0` の wasm 574,270 B は本 PR の run で再現していない (`/opt/retdec` と `/opt/emsdk` も無い)。「通過」の主張は取り下げる。
+
 ## 4. 未実施・未達 (受入条件との対応)
 
 | 受入 | 状態 |
 |---|---|
 | 段階順に 1 本ずつ bit-exact (Ladder → Slice EQ → Filter Table) | **未達** (Ladder は閉包測定まで。lift・wasm・native 比較は未実施)。子 #3721 [KH-60] (Ladder)・#3722 [KH-61] (Slice EQ → Filter Table) に移した |
 | ネガコン・数え方の定義・再計算スクリプトを REPORT に書く | 数え方 = §1、ネガコン = §0・§2 (process 1 本の閉包)、再計算 = `scripts/ladder_x64c_closure.sh`。bit-exact 用のネガコン (1 bit 改変の検出) は未実施 |
-| 既存 14 本の `run_all.sh` が不変 | `run_all.sh`・`lift/`・`harness/`・`scripts/`・`snapins.json` は本 PR で変更していない。確認: `git diff origin/main HEAD -- tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/snapins/harness tools/targets/kilohearts/snapins/scripts tools/targets/kilohearts/snapins/run_all.sh tools/targets/kilohearts/snapins/snapins.json` の出力は 0 行。付録ファイル自身は `snapins/` 直下にあるため、`snapins` 全体の diff は空にならない。`run_all.sh` 本体は未実行 (既存経路に触れていないため) |
+| 既存 14 本の `run_all.sh` が不変 | `snapins.json` の既存 14 エントリは main と同値 (`ladder` 行の追加のみ)。`lift/gen_simd.py` に addsubpd を 4 行追加。`run_all.sh` 本体は未実行 (`ladder` の scenario が無く、既存 14 本の bit-exact 実測は本 PR では行っていない) |
 
 ## 5. 次の作業 (未解決)
 

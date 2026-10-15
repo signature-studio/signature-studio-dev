@@ -329,7 +329,8 @@
    "180fbdd78": "dint"
   }
  },
- "phaser": {
+
+  "phaser": {
   "ns": "phaser",
   "cls": "PhaserDsp",
   "id": "ksph",
@@ -458,7 +459,7 @@
   },
   "rdata_est": true
  },
- "delay": {
+  "delay": {
   "ns": "delay",
   "cls": "DelayDsp",
   "id": "ksdl",
@@ -649,16 +650,11 @@
     "ret": "void"
    },
    "180fcce40": {
-    "params": [
-     "double"
-    ],
+    "params": ["double"],
     "ret": "double"
    },
    "180fc4590": {
-    "params": [
-     "double",
-     "double"
-    ],
+    "params": ["double", "double"],
     "ret": "double"
    }
   },
@@ -879,7 +875,7 @@
    "1813846e0": "memset"
   }
  },
- "limiter": {
+  "limiter": {
   "ns": "limiter",
   "cls": "LimiterDsp",
   "id": "kslt",
