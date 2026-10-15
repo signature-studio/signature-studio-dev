@@ -30,7 +30,9 @@ for k in 0 1 2 3 4 5 6 7; do
   python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0x1245ac0 --c "$(probe PY5215-1245AC0)" || true
   python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0x12d0cc0 --c "$(probe PY5215-CTL)" || true
 done
-echo "[py5215] probe 挿入行数: $(grep -c 'PY5215' "$DBG"/fle_lifted_s*.c | awk -F: '{s+=$2} END {print s}') (期待 6: G・SEL・E70800・D89C70・1245AC0・CTL 各 1)"
+INS=$(grep -c 'PY5215' "$DBG"/fle_lifted_s*.c | awk -F: '{s+=$2} END {print s}')
+echo "[py5215] probe 挿入行数: $INS (期待 6: G・SEL・E70800・D89C70・1245AC0・CTL 各 1)"
+[ "$INS" = 6 ] || { echo "[py5215] probe 挿入数が 6 でない。観測点の未到達と区別できないので停止する"; exit 3; }
 
 FLE_LIFT_DIR="$DBG" FLE_LABEL=e5215 FLE_SHARDS=8 SS_EMSDK_ENV="$SS_EMSDK_ENV" bash "$HERE/build.sh" plain
 

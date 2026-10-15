@@ -30,17 +30,20 @@ probe の場所: lift 出力 (`work/boot/lift`) に `dbg_lift.py` で入口の p
 | `0x1245ac0` (`0xe70800` の呼出元 2 の関数) | 0 | 未到達 |
 | `0x12d0cc0` (制御・PY-4877 で発火済み) | 1 | probe 機構は動作 |
 
-boot の結果 (4 回の実行の範囲):
+boot の結果 (5 回の実行):
 
-| 実行 | 結果 |
-|---|---|
-| 制御のみ (build `e5215c`・G/SEL 入り) | units 895/942・`exit`・CTL 1 件 |
-| E70800 入り (build `e5215d`) | units 895/942・`exit`・CTL 1 件 |
-| 呼出元 2 と 3 入り (build `e5215e`) | units 895/942・`exit`・CTL 1 件 |
-| 再現スクリプト `py5215_g_init_probe.sh` (committed HEAD・全観測点入り・1 回目) | units 895/942・**`oob memory access out of bounds`**・CTL 1 件 |
-| 同 (committed HEAD・2 回目) | units 895/942・`exit`・CTL 1 件・全観測点 0 件 |
+| 実行 | G | SEL | E70800 | D89C70 | 1245AC0 | CTL | 結果 |
+|---|---|---|---|---|---|---|---|
+| 制御のみ (build `e5215c`・G/SEL 入り) | 未記録 | 未記録 | —  | — | — | 1 | units 895/942・`exit` |
+| E70800 入り (build `e5215d`) | 未記録 | 未記録 | 未記録 | — | — | 1 | units 895/942・`exit` |
+| 呼出元 2 と 3 入り (build `e5215e`) | 未記録 | 未記録 | 未記録 | 未記録 | 未記録 | 1 | units 895/942・`exit` |
+| 再現スクリプト `py5215_g_init_probe.sh` (committed HEAD・全観測点入り・1 回目) | 未記録 | 未記録 | 未記録 | 未記録 | 未記録 | 1 | units 895/942・**`oob memory access out of bounds`** |
+| 同 (committed HEAD・2 回目) | 0 | 0 | 0 | 0 | 0 | 1 | units 895/942・`exit` |
 
-終わり方は 1 回目だけ `oob` で、他は `exit`。停止点 (units 895) は同じ。`oob` と `exit` のどちらが既定かは切り分けていない。判定 (未到達) は全 5 回で同じ。
+「未記録」は、その実行の stderr ログを保存していないため数えられなかった行。「—」は、その build に観測点を入れていないこと。`e5215c`〜`e5215e` の build は手で作ったもので、コミットされたスクリプトでは再現できない。
+
+終わり方は 1 回目だけ `oob` で、他は `exit`。停止点 (units 895) は同じ。`oob` と `exit` のどちらが既定かは切り分けていない。
+判定 (未到達) の全観測点の記録が揃っているのは committed HEAD の 2 回目だけ (全 0 件)。他の行は CTL の発火数 (全行 1) しか記録していないため、「全 5 回で同じ」とは言えない。
 
 ## 4. 未解決
 
@@ -63,10 +66,10 @@ FL_WIN64_DIR=<fl-win64 展開先> SS_EMSDK_ENV=<emsdk_env.sh> bash tools/flelift
 
 ## 6. 検証
 
-測定 commit: 本 PR の commit (`tools/flelift/boot/py5215_g_init_probe.sh` の追加)。この commit は測定の再現に使ったもので、以後の差分は無い。
+測定 commit: `242418d70` (probe 追加 = `tools/flelift/boot/py5215_g_init_probe.sh` の追加)。`9dbad80b1` は文書のみ (`REPORT_APPENDIX_5215.md` の emsdk 参照 1 行の修正) で、実行されるコードの差分は無い。`git diff 242418d70 HEAD -- tools/flelift` は文書 1 行のみ。
 
 | 項目 | 実測 |
 |---|---|
-| `fle6_measure.sh` (`FLE_BOOT_RUNS=default`) | rc 0・lift 81 s・clang plain 98 s・boot default 9 s・units 895/942 (`REPORT.md` §6 と一致) |
+| `fle6_measure.sh` (`FLE_BOOT_RUNS=default`) | rc 0・lift 81 s・clang plain 98 s・boot default 9 s・units 895/942 (`REPORT.md` §0 行 15 と §13 の units 895 と一致) |
 | 静的 PE 解析 (`0xe38870` の呼出元) | 1 箇所 (`0xe7081d`)・その関数の呼出元 2 箇所 (§2) |
-| `py5215_g_init_probe.sh` (committed HEAD・2 回目) | rc 0・CTL=1 G=0 SEL=0 E70800=0 D89C70=0 1245AC0=0・実行 1 m 44.3 s (real)・load は実行前 2.43 (fle6 の boot の値) |
+| `py5215_g_init_probe.sh` (committed HEAD・2 回目) | スクリプトの終了コード 0 は boot の成否を示さない (`node ... \|\| true` で常に 0)。観測 CTL=1 G=0 SEL=0 E70800=0 D89C70=0 1245AC0=0・実行 1 m 44.3 s (real)・load は実行前 2.43 (fle6 の boot の値) |
