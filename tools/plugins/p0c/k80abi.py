@@ -71,11 +71,12 @@ RAXF = {x86.X86_REG_RAX, x86.X86_REG_EAX, x86.X86_REG_AX, x86.X86_REG_AL, x86.X8
 
 def xmm_read_width(m):
     """xmm 入力 (read-before-write) の読み幅 (bit)。scalar double (*sd: addsd・sqrtsd 等) は 64、scalar single (*ss) は 32 (#3641)。
+    packed 整数の *sd (pmaxsd・pminsd、VEX の vpmaxsd 等) は語尾が sd でも 128 bit 演算なので 64 にしない (32)。
     cvt 系は変換元の幅で決める: cvtsd2ss・cvtsd2si・cvttsd2si は 64、cvtss2sd・cvtss2si は 32。
     cvtsi2sd・cvtsi2ss は xmm が宛先 (源は GPR) なので従来どおり 32。"""
     if m.startswith('cvt'):
         return 64 if 'sd2' in m else 32
-    if m.endswith('sd') or m.startswith(('movq', 'movsd', 'movapd', 'movupd')):
+    if (m.endswith('sd') and not m.lstrip('v').startswith('p')) or m.startswith(('movq', 'movsd', 'movapd', 'movupd')):
         return 64
     return 32
 
