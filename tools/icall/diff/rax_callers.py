@@ -5,7 +5,9 @@
 import os, re, sys
 import capstone, pefile
 from capstone import x86
-DLL = os.path.join(os.environ.get('PLUGINS_DIR') or os.path.join(os.environ.get('ANALYSIS_DIR', '/home/ubuntu/work/analysis'), 'plugins'), 'ott', 'binaries', 'OTT_vst2_win64.dll')
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
+from paths import PLUGINS_DIR
+DLL = os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
 pe = pefile.PE(DLL)
 base = pe.OPTIONAL_HEADER.ImageBase
 md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
