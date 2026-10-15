@@ -1,6 +1,6 @@
 # M11 LB 依存 unit 差 8 件の切り分け (#3325・親 #3296・祖父 #3229)
 
-測定主体: 本 PR の作業 runner (2026-10-15 UTC)。素材は `fl-win64` (`extracted/block00031_PE.bin` 22,227,016 B のみ展開)・`tools/m11/work/` (work-m11 展開済み・lift 成果物あり)・`/opt/emsdk` (toolchain-emsdk 既存)。
+測定主体: 本 PR の作業 runner (2026-10-15 UTC)。素材は `fl-win64` (`extracted/block00031_PE.bin` 22,227,016 B のみ展開)・`tools/m11/work/` (work-m11 展開済み・lift 成果物あり)・`[EMSDK]` (toolchain-emsdk 既存・`docs/REFERENCES.md`)。
 測定 commit: `d6b7b27c` (コードを変えた最後の commit。計測 env の既定は 0)。`git diff d6b7b27c HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` の出力は空。
 既知類型との関係: 該当なし (類型の新規候補は §5)。
 
