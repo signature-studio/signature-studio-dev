@@ -96,7 +96,26 @@ sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実�
 | `4256c0` (%tagPOINT) は実機 batch で mismatch (`wasm_trap`: `Aborted(missing function: WindowFromPoint)`・11/11 件)。wasm 側の `WindowFromPoint` の stub が無く `abort` する。入口型 (`MACHINE_ENTRY` `['i64']`・main 側 #3862) と `m11_tr_` の POINT 値の組立ては単体テスト PASS。stub の追加は本 PR の範囲外 | 不一致 1 | #3862 ([LD-179]) |
 | 6 件 (`442a50` `442b90` `664890` `6649b0` `6649c0` `664a80`) は入口型を確定 (§1) したが、IR の呼出し側の引数落ち (`xor i64 0, 0` placeholder) と呼び先 entry の欠落で不一致 (§2.1)。IR 側の修正が要る | 不一致 6 | #4193 ([LD-201]・#3863 の子) |
 | `653c80` `691dd0` の native segv。原因は LD-181 で機械語から特定 (691dd0: 確保のビン読み rdx=0、653c80: 間接 call の null slot)。判定に入る case は未作成 | 実行不能 2 | #4200 ([LD-203])。原因と結論は `REPORT_APPENDIX_LD181.md` §2 |
-| `irtool.instrument` の i128 入口記録は LD-181 で下位 64bit に修正済み (sample:800 の判定差 0 件)。`cmp_trace` の i128 位置の除外は残存 | 比較の信頼性 | #4195 ([LD-202])。結論は `REPORT_APPENDIX_LD181.md` §3 |
+| `irtool.instrument` の i128 入口記録は LD-181 で下位 64bit に修正済み (sample:800 の判定差 0 件)。`cmp_trace` の i128 位置の除外は残存 | 比較の信頼性 | `REPORT_APPENDIX_LD181.md` §3 の結論を参照。除外の撤去は下の行 (#4975) |
+| `cmp_trace` の i128 除外の撤去 (LD-202・#4195 から移送)。除外を外すと対象 11 関数すべてが偽の不一致 (原因は記録経路。§4.1) | 比較の信頼性 (i128 の 11 関数) | #4975 ([LD-248])。`irtool.instrument` の入口記録で、`double` 型の i128 引数を x0 (xmm0) に載せる修正が要る |
+| sample:800 の件数の合計が 800 にならない (§4.1 の測定 `537c4cb6e` の 359/236/206 は合計 801) | 測定値の整合 | 本 REPORT (§4.1)。再測定が要る。素材 (`work-m11`・toolchain) が本 run に無く、再取得できない |
+
+### 4.1 LD-202 (#4195) の除外撤去の実測 (測定 commit `537c4cb6e`)
+
+- 測定 commit: `537c4cb6e` (コード差分 `git diff 8a61b584f 537c4cb6e -- tools/liftdiff/ldlib tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh` = 0 行。差分は REPORT のみ)。除外撤去版は `52a40fee7`。
+- 測定の取り方: 実装 run (#4195) の測定を PR 本文から REPORT へ移した。fix run では再測定していない (`fl-win64` のみ展開可能で、`work-m11`・toolchain は `$ARTIFACTS_DIR` に無い)。移送のため値は未再確認。
+
+| 項目 | コマンド | rc | 所要 | 結果 |
+|---|---|---|---|---|
+| `liftdiff_e2e.sh --m11-only` (測定 `537c4cb6e`) | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` | 0 | 201 s | `LIFTDIFF_E2E PASS`・`CHECK_INITUNITS PASS`。sample:800 一致 359 / 不一致 236 / 実行不能 206 (合計 801 = 不整合・§4 の表) |
+| 同一素材での基準 `8a61b584f` | 同上 | 0 | 206 s | `LIFTDIFF_E2E PASS`。一致 359 / 不一致 236 / 実行不能 206 |
+| 除外撤去版 `52a40fee7` | 同上 | 0 | 203 s | `LIFTDIFF_E2E PASS`。一致 359 / 不一致 236 / 実行不能 206。基準との判定差 0 件 |
+| 対象 11 関数 (除外撤去版) | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 liftdiff.py batch targets/m11.json --set file:targets/ld52_11.txt --shards 4 --nobuild --state auto` | — | — | 11/11 mismatch (`entry_arg` 9・`entry_va` 1・trace 差分なし 1) |
+
+- 除外撤去版 `52a40fee7` と基準 `8a61b584f` の sample:800 の判定差は 0 件。除外撤去は判定を変えないが、対象 11 関数はすべて偽の不一致になる。
+- 原因: `irtool.instrument` は i128 引数を `%ld.0 = trunc i128 %arg1 to i64` として整数側 (`A[0]`) に載せる。機械語の入口型は `double` (xmm0) で、`ld_trace` の x0 は 0 のまま。例 `40c660`: native xmm0 `0x3ff8000000000000` (1.5)、wasm `0x0`。`691dd0` は入口 PC 自体が違う (`entry_va` native `0x409410`・wasm `0x40f9e0`)。
+- REPORT 既存値 (§3 の `d6595d4ed` の 360 / 234 / 206・合計 800) と `537c4cb6e` の 359 / 236 / 206 (合計 801) は、一致 −1・不一致 +2 の差。原因は断定していない。合計が 800 にならないため、PR 本文の転記誤りの可能性もある。再測定で確かめる必要がある (表の「不整合」)。
+- 単体: `python3 tools/liftdiff/tests/test_ld52_machine_sig.py` と `python3 tools/liftdiff/tests/test_ld181_i128_entry.py` は `537c4cb6e` で PASS。
 
 ## 5. 検証
 

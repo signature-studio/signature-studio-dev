@@ -22,6 +22,8 @@ WORK = os.path.join(HERE, 'work', 'x87fn')
 LIFT = os.path.join(HERE, 'work', 'lift_text', 'ott_lifted.c')
 IMG_BASE = 0x10000000
 OBJ = 0x10F80000
+# #4147: ecx 相対の読みを持つ関数の基底。 窓 (ECX_HI..+0x540) は image の外・16MB 内 (ecx+0x821700 < 0x11000000)。 ecx 基底のゼロ埋め領域。
+ECX_HI = 0x10700000
 OBJ_WIN = 0x540
 N_PER_TARGET = 4000
 N_PER_MIXED = 200
@@ -63,8 +65,16 @@ PROBE = [
     # 同じ name を PROBE に 2 つ置くと agg が混ざるため、#4080 の 10009bc4 (double1) 行はここでは外す。
     {'va': 0x10009BC4, 'name': 'fn_10009bc4', 'gen': 'generic'},
 ]
+# #4147 (PLG-G2-50): ecx 相対の読みが 0x80174〜0x821700 に及ぶ関数。 ecx = OBJ (0x10F80000) では 16MB の窓の外に出て native が segfault した (rc 139)。
+# ecx を ECX_HI に置くと segfault は消える。 ただし判定 (非自明性 = OBJ 窓が変わること) は通らない: 書込みが窓の外 (0x10003fe0・0x100051f0)・
+# 窓を読むだけ (0x1000a95a) のため。 測定専用 (X87_PROBE=1)。 0x100085a0・0x100096d0 は窓の中身をポインタとして辿り、0x1000ba05 は edx 経由の引数のため、入力の設計が別に要る (子 issue)。
+PROBE_ECX = [
+    {'va': 0x10003FE0, 'name': 'fn_10003fe0', 'gen': 'mixed', 'ecx': ECX_HI},
+    {'va': 0x100051F0, 'name': 'fn_100051f0', 'gen': 'mixed', 'ecx': ECX_HI},
+    {'va': 0x1000A95A, 'name': 'fn_1000a95a', 'gen': 'ptr_win', 'ecx': ECX_HI},
+]
 if os.environ.get('X87_PROBE'):
-    TARGETS = TARGETS + PROBE
+    TARGETS = TARGETS + PROBE + PROBE_ECX
 # #4840: double 入力の測定専用 (X87_PUSH64=1)。 呼出し前に double 1 個を x87 に積む (a0 = 下位 dword・a1 = 上位 dword)。
 #   native・glue を -DX87_PUSH64 で作る。 ゲートには入れない (既存の TARGETS の入口状態は変えない)。
 PUSH64 = bool(os.environ.get('X87_PUSH64'))
@@ -76,6 +86,8 @@ if PUSH64:
 else:
     WORK_NAME = 'x87fn'
 PUSH64_FLAGS = ['-DX87_PUSH64'] if PUSH64 else []
+for _t in TARGETS:
+    _t.setdefault('ecx', OBJ)
 
 
 def pe_image():
@@ -109,6 +121,8 @@ def gen_rows(seed, n):
                 a = [f32(rng.uniform(-1000, 1000)), rng.randrange(16), 0, 0, 0, 0]
             elif t['gen'] == 'mixed':
                 a = [f32(rng.uniform(-100, 100))] + [rng.randrange(16) for _ in range(5)]
+            elif t['gen'] == 'ptr_win':
+                a = [t['ecx']] + [0] * 5
             elif t['gen'] == 'f80pair':
                 a = f80_args(rng)
             elif t['gen'] == 'f64':
@@ -119,7 +133,7 @@ def gen_rows(seed, n):
                 a = [d & 0xFFFFFFFF, d >> 32, rng.randrange(16), 0, 0, 0]
             else:
                 a = [f32(rng.uniform(-100, 100)) for _ in range(5)] + [0]
-            line = '%08x %08x %s %s' % (t['va'], OBJ, ' '.join('%08x' % v for v in a), init.hex())
+            line = '%08x %08x %s %s' % (t['va'], t['ecx'], ' '.join('%08x' % v for v in a), init.hex())
             rows.append((t, line, init))
     return rows
 
@@ -202,7 +216,7 @@ def gen_special_rows(seed, n):
             else:
                 a = [sp] + [rng.choice(SPECIAL_F32) if rng.random() < 0.5 else f32(rng.uniform(-100, 100))
                             for _ in range(2)] + [f32(rng.uniform(-100, 100)) for _ in range(2)] + [0]
-            line = '%08x %08x %s %s' % (t['va'], OBJ, ' '.join('%08x' % v for v in a), init.hex())
+            line = '%08x %08x %s %s' % (t['va'], t['ecx'], ' '.join('%08x' % v for v in a), init.hex())
             rows.append((t, line, init))
     return rows
 
