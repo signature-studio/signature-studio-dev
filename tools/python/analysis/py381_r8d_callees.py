@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PY-381 (#5295): r8d mask 0x4 の tail 到達側の呼出し先の中身を読む (実機不要)。
 
-  python3 analysis/py381_r8d_callees.py <PE.bin> <work/py4769/r8d_single.tsv> <outdir> [--negctl]
+  python3 analysis/py381_r8d_callees.py <PE.bin> <work/py4769/r8d_single.tsv> <outdir> [--negctl] [--appendix=<path.md>]
 
 入力: py4769 の TSV。mask 0x4 かつ tail 到達側の calls 列から、直接呼出し先 VA を集める。
 各呼出し先 VA から、分岐の両辺を辿る (有界: 4096 命令・ret で止める)。集計:
@@ -12,7 +12,8 @@
   ret       : ret に届くか / unbounded : 上限で打ち切ったか
 検算: 辿った全命令について capstone と objdump -D (intel) の (mnemonic, 正規化した被演算子) を照合する。
 負の対照 (--negctl): 照合の 1 件を故意に壊し、mismatch が出ることを確かめる。
-出力: <outdir>/callees.tsv (呼出し先ごとの 1 行)
+出力: <outdir>/callees.tsv (呼出し先ごとの 1 行)・<outdir>/sides.tsv (判定の側ごと)・--appendix 指定時は Markdown 表
+間接 jmp (レジスタ先・メモリ先) は辿れないため、indirect_jmps 列に数えて明示する (黙って打ち切らない)。
 """
 import csv
 import os
@@ -57,10 +58,10 @@ def norm(mn, ops):
 
 
 def walk(md, start, raw, entry):
-    """capstone で entry から分岐の両辺を辿る。返り値: {va: (mn, ops, size)}, ret, unbounded, indirect_calls"""
+    """capstone で entry から分岐の両辺を辿る。返り値: {va: (mn, ops, size)}, ret, unbounded, indirect_calls, indirect_jmps"""
     seen, stack, ins = set(), [entry], {}
     ret = unbounded = False
-    ind = 0
+    ind = ind_j = 0
     while stack:
         a = stack.pop()
         if a in seen:
@@ -91,13 +92,15 @@ def walk(md, start, raw, entry):
         if mn == "jmp":
             if re.fullmatch(r"0x[0-9a-f]+", i.op_str.strip()):
                 stack.append(int(i.op_str, 16))
+            else:
+                ind_j += 1
             continue
         if mn.startswith("j"):
             stack.append(int(i.op_str, 16))
             stack.append(nxt)
             continue
         stack.append(nxt)
-    return ins, ret, unbounded, ind
+    return ins, ret, unbounded, ind, ind_j
 
 
 def load_objdump_range(pe_path, start, vas):
@@ -156,9 +159,35 @@ def classify(mem):
     return "oth"
 
 
+def write_appendix(path, sides, per):
+    """判定 (側ごと) の表と、呼出し先ごとの表を Markdown で書く。値はすべて per (解析結果) から作る。"""
+    lines = ["| 判定 VA | mask | 側 | 呼出し先 (直接) | グローバル書込み命令 VA | 間接 call |",
+             "|---|---|---|---|---|---|"]
+    for site, side, entry, cs in sides:
+        gva, ind = set(), 0
+        for c in cs:
+            ins, _, _, ic, _ = per[c]
+            ind += ic
+            for a in ins:
+                mn, ops, _ = ins[a]
+                w = write_target(mn, ops)
+                if w and classify(w) == "abs":
+                    gva.add(a)
+        lines.append(f"| {site} | 0x4 | {side} | {len(cs)} | {' '.join(f'{a:#x}' for a in sorted(gva)) or '-'} | {ind} |")
+    lines += ["", "| 呼出し先 | 命令数 | ret | 未読 (上限打切) | 間接 call | 間接 jmp | 基底レジスタ経由の書込み命令数 |",
+              "|---|---|---|---|---|---|---|"]
+    for t in sorted(per):
+        ins, ret, unb, ind, ind_j = per[t]
+        wo = sum(1 for a in ins if (w := write_target(ins[a][0], ins[a][1])) and classify(w) == "oth")
+        lines.append(f"| {t:#x} | {len(ins)} | {'到達' if ret else '未到達'} | {'はい' if unb else 'いいえ'} | {ind} | {ind_j} | {wo} |")
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     negctl = "--negctl" in sys.argv
+    appendix = next((a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--appendix=")), None)
     pe_path, tsv_path, outdir = args[0], args[1], args[2]
     start, raw = load_pe(pe_path)
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
@@ -183,12 +212,12 @@ def main():
     all_vas = set()
     per = {}
     for t in sorted(targets):
-        ins, ret, unb, ind = walk(md, start, raw, t)
-        per[t] = (ins, ret, unb, ind)
+        ins, ret, unb, ind, ind_j = walk(md, start, raw, t)
+        per[t] = (ins, ret, unb, ind, ind_j)
         all_vas |= set(ins)
     ob = load_objdump_range(pe_path, start, all_vas)
     for t in sorted(targets):
-        ins, ret, unb, ind = per[t]
+        ins, ret, unb, ind, ind_j = per[t]
         w5, wa, wo, calls = [], [], [], []
         for a in sorted(ins):
             mn, ops, _ = ins[a]
@@ -206,13 +235,13 @@ def main():
             if mn == "call":
                 calls.append(f"{a:#x}:{ops}")
         rows.append([
-            f"{t:#x}", len(ins), "T" if ret else "F", "T" if unb else "F", ind,
+            f"{t:#x}", len(ins), "T" if ret else "F", "T" if unb else "F", ind, ind_j,
             len(w5), ";".join(w5) or "-", len(wa), ";".join(wa) or "-", len(wo), ";".join(wo[:4]) or "-",
             ";".join(calls) or "-",
         ])
 
     os.makedirs(outdir, exist_ok=True)
-    head = ["callee", "insns", "ret", "unbounded", "indirect_calls", "writes5b8", "writes5b8_va",
+    head = ["callee", "insns", "ret", "unbounded", "indirect_calls", "indirect_jmps", "writes5b8", "writes5b8_va",
             "writes_abs", "writes_abs_va", "writes_oth", "writes_oth_head", "calls"]
     with open(os.path.join(outdir, "callees.tsv"), "w") as f:
         f.write("\t".join(head) + "\n")
@@ -234,6 +263,8 @@ def main():
         f.write("site\tside\tentry\tcallees\twrites5b8_in_callees\n")
         for r in side_rows:
             f.write("\t".join(str(x) for x in r) + "\n")
+    if appendix:
+        write_appendix(appendix, sides, per)
     print(f"callees={len(targets)} insns_checked={checked} mismatch={mismatch}")
     if negctl:
         print("negctl: 1 件を故意に壊した (mismatch>=1 が期待値)")
