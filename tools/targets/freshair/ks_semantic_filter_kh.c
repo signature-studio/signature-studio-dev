@@ -3,7 +3,9 @@
  * 呼び出し形は ks_semantic_gain.c の KH 側と同じ: process(this=rcx, ctx=rdx, aud=r8)。
  * 読み (objdump の逆アセンブル、tools/targets/freshair/REPORT_APPENDIX_FA39.md §2):
  *   aud : L/R の float ポインタ @0/@8、n @0x28 (int)
- *   ctx : P = *(ctx+0x3188)。P+0 mode (int)、P+4 (float, xmm3)、P+8 (float)、P+0xc (float)、P+0x10 (int, 2 倍して渡す)
+ *   ctx : P = *(ctx+0x3188)。P+0 type (int, 0..7)、P+4 freq (float, xmm3)、P+8 Q (float)、P+0xc gain (float)、
+ *         P+0x10 order (int, 2 倍して渡す)。SC の同じ呼び出し位置 (0x180b6f0f2・0x180b6f1a3) は
+ *         P+0x9dc4 type / P+0x9e0c freq / P+0x9e54 Q / P+0x9e9c gain / P+0x9ee4 order を渡す (tools/targets/freshair/REPORT_APPENDIX_FA39.md §2)
  *   this: this+0x60 (float, n/this+0x60 を時間加算に使う → 基準値 48000 とする)、this+0x12d8 (合算バッファ。
  *         0x1802ff250 が ptr+0x28 から書くので、0x28 + 4*n 以上の確保が要る)
  * 出力: case ごとに 1 行。"C<i> n=.. mode=.. ..." 形式の入力、続けて L・R・this[0x60..0x12e0) を hex で出す。
@@ -69,13 +71,16 @@ typedef struct {
     float L[MAXN], R[MAXN];
 } Case;
 
+static float LG(float lo, float hi) { return powf(10.0f, RF(lo, hi)); }
+
 static void gen(Case* c) {
+    static const int ord[6] = {0, 1, 1, 2, 3, 4};
     c->n = 1 + (int)(R32() % MAXN);
-    c->mode = (int)(R32() & 1);
-    c->pn = (int)(R32() % 5);
-    c->a = (R32() % 5 == 0) ? RFS(-4, 4) : RF(0, 1);
-    c->b = RFS(-4, 4);
-    c->c = RFS(0, 3);
+    c->mode = (int)(R32() % 8);
+    c->pn = ord[R32() % 6];
+    c->a = LG(1.3f, 4.3f);
+    c->b = LG(-1, 1);
+    c->c = LG(-1, 1);
     for (int i = 0; i < c->n; i++) { c->L[i] = RFS(-1, 1); c->R[i] = RFS(-1, 1); }
 }
 
