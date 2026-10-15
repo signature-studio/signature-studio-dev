@@ -19,6 +19,7 @@
 
 - 規則は `&UNK_<va>` 形で当てる。`tbase` 置換 (`gt_<base> + off`) は `DELAY_RULES` の後に走るため、`gt_` 形では当たらない (初版でこれを見落として件数 assert が 0 で止まった)。
 - 件数は 5 規則とも 1 件に固定した。
+- 確認の範囲: 上の表は**書込み先の機械語** (leaq + movq) で規則を確定した。issue #4838 の受入「同ビットの明示キャストで足りるか」の確認 (**呼出元の機械語**で 1 件ずつ) は**未実施**。この run には `plugins-kilohearts` 素材が無く、呼出元を読めなかったため。子 issue #4894 [KH-129] で行う (§④)。
 
 ## ③. 測定
 
@@ -42,7 +43,7 @@
 ### ③-2. 測定 commit 以降の差分
 
 - `git diff --stat 7309b3825 HEAD -- tools/targets/kilohearts/ghidra_route` = 0 行 (本 PR の REPORT・DOC_MAP のみ)。
-- `git diff --stat origin/main HEAD -- tools/targets/kilohearts/ghidra_route` = `ghidra_to_c.py` 14 行追加 (本 PR の 5 規則)。
+- `git diff --stat e1071546e HEAD -- tools/targets/kilohearts/ghidra_route` = `ghidra_to_c.py` 14 行追加 (本 PR の 5 規則)。基点は測定時の base `e1071546e`。
 
 ## ④. 未解決
 
@@ -51,3 +52,4 @@
 | 引数の pointer⇔整数 86 件 | Delay の wasm 化が未完 | #3837 [KH-72] (既存 open) |
 | void 代入 7 件 | 同上 | #4672 [KH-107] (既存 open) |
 | Delay の突合 1000 trial | emcc が通らないため未実施 | #3073 [KH-41] (既存) |
+| 代入 pointer⇔整数 5 行の呼出元機械語での確認 (issue #4838 受入 1 の残り) | 同ビット明示キャストの妥当性が呼出元で未確認 | #4894 [KH-129] (新規) |
