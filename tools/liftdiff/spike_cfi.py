@@ -80,6 +80,7 @@ def astr(r, base, addr, n=0x200):
 def model_names():
     """rt/ld_core.h の ld_model_call で明示的に応答を決めている import 名 (それ以外は既定の 0 応答)。"""
     txt = open(os.path.join(HERE, 'rt', 'ld_core.h'), encoding='utf-8').read()
+    txt = re.sub(r'    if \(ld_cat_on\(\)\) \{.*?\n    \}\n', '', txt, flags=re.S)   # LD_CATALOG_MO 実験分は既定の応答に含めない
     return set(re.findall(r'ld_streq\(n, "([^"]+)"\)', txt))
 
 
