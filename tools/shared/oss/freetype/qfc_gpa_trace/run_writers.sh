@@ -5,7 +5,7 @@
 # 再現: bash tools/shared/oss/freetype/qfc_gpa_trace/run_writers.sh
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ART="${ARTIFACTS_DIR:-$HOME/artifacts}"
+ART="${ARTIFACTS_DIR:?ARTIFACTS_DIR に素材の置き場を設定する}"
 W="$(git rev-parse --show-toplevel)/work/qfc/writers"
 mkdir -p "$W/extracted"
 cd "$W"
