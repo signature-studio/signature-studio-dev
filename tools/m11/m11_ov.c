@@ -653,7 +653,7 @@ u64 function_50a830(u64 self, u64 item) {
  * RetDec は 535bf2 末尾の `ret` (VA 0x535c2e) を未定義の function_535c2e への call にし, 535c11 の jl 先 535bf2 を rcx=0 の call にした (#714).
  * 同じ分岐を C で書き、closure 外参照を転記で消す (seed 追加では解けないため). */
 #ifndef M11_FIX_535BF2
-#define M11_FIX_535BF2 0
+#define M11_FIX_535BF2 1
 #endif
 #if M11_FIX_535BF2
 u64 function_535c11(u64 self) {
@@ -1154,6 +1154,22 @@ void m11_a270_obs(unsigned long long a) {
     if (a + 0xaa <= heap) f = *(volatile unsigned char*)(uintptr_t)(a + 0xa9);
     if (g_a270_n++ < 16)
         fprintf(stderr, "[m11][a270] #%d this=0x%llx [this]=0x%llx [this+a9]=%llu\n", g_a270_n, a, w0, f);
+}
+#endif
+
+/* #2400 計測専用 (M11_PROBE_2400=1 のときだけ有効): function_e3ef60 の 60a270 呼出し 9 箇所の直前で、呼出し番号 (1..9)・
+ * arg1 (e3ef60 の第 1 引数)・渡す this (IR 上 [arg1+off] のロード値)・edx を stderr に出す。既定 0 では何も入らない。 */
+#ifndef M11_PROBE_2400
+#define M11_PROBE_2400 0
+#endif
+#if M11_PROBE_2400
+static int g_e3ef60_site_n;
+void m11_e3ef60_site_obs(unsigned int site, unsigned long long arg1, unsigned long long th, unsigned int edx) {
+    static const unsigned int pe[10] = {0, 0xe3f0b4, 0xe3f0f7, 0xe3f118, 0xe3f139, 0xe3f15a, 0xe3f178, 0xe3f196, 0xe3f1b4, 0xe3f215};
+    static const unsigned int off[10] = {0, 0x778, 0x7d8, 0x810, 0x840, 0x808, 0x7f0, 0x838, 0x8e8, 0x9c8};
+    if (site >= 1 && site <= 9 && g_e3ef60_site_n++ < 512)
+        fprintf(stderr, "[m11][e3ef60] #%d site=%u pe=0x%x off=0x%x arg1=0x%llx this=0x%llx edx=0x%x\n",
+                g_e3ef60_site_n, site, pe[site], off[site], arg1, th, edx);
 }
 #endif
 
