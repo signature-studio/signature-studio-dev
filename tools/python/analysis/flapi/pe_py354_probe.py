@@ -99,6 +99,26 @@ def main():
     suspicious = [i for i in st if re.search(r"\+ 0x8\]|\+ 8\]", i.op_str.split(", ")[0])]
     check(not suspicious, f"0x415610 (末尾 0x4158b2) の store 先に +8 のオフセットは無い (実測 {[i.op_str for i in suspicious]})")
 
+    # 3b. 0x415610 の書込み先の全件列挙: フレーム ([rbp + disp]) 以外の store は 0x4157b9 と stosq の 3 箇所だけ
+    WRITE = ("mov", "stos", "add", "sub", "and", "or", "xor", "inc", "dec", "movups", "movdqu", "movaps", "movq")
+    dests = []
+    for i in ins:
+        if not i.mnemonic.startswith(WRITE):
+            continue
+        d = i.op_str.split(", ")[0]
+        if "[" in d and not re.fullmatch(r"(?:qword|dword|byte|word|xmmword) ptr \[rbp \+ 0x[0-9a-f]+\]", d):
+            dests.append((i.address, i.op_str))
+    expect = [(0x4157B9, "qword ptr [rax], 0"),
+              (0x4157C8, "qword ptr [rdi], rax"), (0x4157CA, "qword ptr [rdi], rax"), (0x4157CC, "qword ptr [rdi], rax")]
+    check(sorted(dests) == sorted(expect),
+          f"0x415610 の非フレーム store は 0x4157b9 (qword [rax]=0) と 0x4157c8〜cc (stosq ×3) の 4 命令だけ (実測 {[hex(a) + ' ' + o for a, o in dests]})")
+    base8 = {i.address: i.mnemonic + " " + i.op_str for i in ins if i.address in (0x4157B5, 0x4157C2)}
+    check(base8.get(0x4157B5) == "mov rax, qword ptr [rbp + 0x38]" and base8.get(0x4157C2) == "mov rdi, qword ptr [rbp + 0x38]",
+          "0x415610 の 0x4157b9 (rax) と stosq (rdi) の基底は [rbp+0x38] (= out + FldOffset)")
+    je = [i for i in ins if i.address == 0x415792]
+    check(len(je) == 1 and je[0].mnemonic == "je" and je[0].op_str == "0x4157c2",
+          "0x415610 の stosq (0x4157c2) は 0x415792 の je (kind-12 == 0) からだけ入る (kind 10/11 は 0x4157b5 の 8 バイト)")
+
     # 4. 0xd843d0 の out+8 への store は 0xd844c6 の 1 箇所
     ins = dis(0xD843D0, 0xD84510)
     out8 = [i for i in ins if i.mnemonic == "mov" and i.op_str.split(", ")[0] == "qword ptr [rsi + 8]"]
