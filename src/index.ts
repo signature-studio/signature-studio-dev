@@ -4,6 +4,7 @@ import { createImportForwarder } from "./runtime/imports";
 import { instantiateWasm } from "./runtime/loader";
 import { mountRuntimePanel } from "./runtime/boot_ui";
 import { mountGuiRenderSelfTest, mountGuiSelfTest } from "./runtime/gui_boot";
+import { mountGuiGuest } from "./runtime/gui_guest";
 import { installWebstudioContract } from "./runtime/webstudio_state";
 import { installFlMcp, mountMcpPanel } from "./runtime/mcp_panel";
 import { installFlMidi, mountMidiPanel } from "./runtime/midi_script";
@@ -29,7 +30,10 @@ if (!crossOriginIsolated) {
 const target: FrameTarget | null = setupCanvas("screen");
 
 // 起動確認用: 黒画面に 1 枚テストフレームを blit する (putImageData 経路の疎通確認)
-if (target && target.width > 0 && target.height > 0) {
+// gui=wasm (ゲスト結線) では #screen に縞を描かない (fl-boot の画素検査を縞で空振りさせないため)
+const runtimeParams = new URLSearchParams(location.search);
+const guiWasm = runtimeParams.get("gui") === "wasm";
+if (!guiWasm && target && target.width > 0 && target.height > 0) {
   const frame = new Uint8ClampedArray(target.width * target.height * 4);
   // 中央に灰色の縞を数本 (putImageData 疎通の可視化)
   const y0 = (target.height / 4) | 0;
@@ -138,7 +142,6 @@ startBtn.addEventListener("click", async () => {
 // ランタイム (Worker 実行基盤) — /?runtime=<id|all>&cache=…&compile=…&pump=1 で起動
 // 詳細: tools/runtime/DESIGN.md
 // ---------------------------------------------------------------------------
-const runtimeParams = new URLSearchParams(location.search);
 if (runtimeParams.has("runtime")) {
   void mountRuntimePanel(runtimeParams);
 }
@@ -147,6 +150,8 @@ if (runtimeParams.get("gui") === "selftest") {
   void mountGuiSelfTest(runtimeParams);
 } else if (runtimeParams.get("gui") === "render-selftest") {
   void mountGuiRenderSelfTest(runtimeParams);
+} else if (guiWasm) {
+  void mountGuiGuest(runtimeParams, webstudio);
 }
 
 // ---------------------------------------------------------------------------
