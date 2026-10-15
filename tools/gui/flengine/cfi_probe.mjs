@@ -19,7 +19,7 @@ mod.HEAPU8.set(fs.readFileSync(M11 + '/work/m11_image.bin'), 0);
 const out = { wasm: path.basename(wasmCjs), boot: null, host: null, call: null, reach: [], errs_tail: [] };
 const sp0 = mod._emscripten_stack_get_current();
 try { mod._m11_boot_enter(0n, 1n); out.boot = { ok: true }; }
-catch (e) { out.boot = { ok: !!(e && e.m11_dllmain_done !== undefined), err: ((e && e.message) || String(e)).split('\n')[0] }; }
+catch (e) { out.boot = { ok: !!(e && e.m11_dllmain_done !== undefined), err: ((e && e.message) || String(e)).split('\n')[0], stack: String(e && e.stack).split("\n").slice(0, 16) }; }
 mod.__emscripten_stack_restore(sp0);
 const dv = () => new DataView(mod.HEAPU8.buffer);
 // THostInstance: vtable (dummy, 0x40 B) / version=1 / flags / parent hwnd=0 / "FL Studio" (ANSI, NUL) / cmdline buffer 0x8000 B
@@ -40,7 +40,7 @@ try {
   out.call = { returned: true, ret: Number(BigInt.asIntN(64, r)), ms: Date.now() - t0 };
 } catch (e) {
   mod.__emscripten_stack_restore(sp1);
-  out.call = { returned: false, err: ((e && e.message) || String(e)).split('\n')[0], failfast: !!(e && e.gui_failfast), ms: Date.now() - t0 };
+  out.call = { returned: false, err: ((e && e.message) || String(e)).split('\n')[0], failfast: !!(e && e.gui_failfast), ms: Date.now() - t0, stack: String(e && e.stack).split("\n").slice(0, 16) };
 }
 out.iface = '0x' + dv().getBigUint64(iface, true).toString(16);
 mod._gui_reach_dump();
