@@ -36,9 +36,14 @@ GUI-REACH 21 BitBlt 1 IMPL P0
 ## 差分 (測定 commit から HEAD まで)
 `git diff 383e9462a HEAD -- tools/gui/lift tools/gui/test tools/gui/golden tools/gui/src tools/gui/e2e` の出力は 0 行 (本付録と REPORT の索引を入れた commit は文書だけ)。
 
+## wasm 側の順序検査 (#4803)
+`test/wasm_w_e2e.sh` の W 版ゲストを `gui_wasm.sh … reach` で作り (画素・読み戻しの検査は不変)、`E2E_MODE=w` が `GUI-REACH`・`GUI-MSG` 行を `build/e2e/w_reach.log` に保存して `reach_order_check.py` に通す。
+- 測定 commit `2d81f2810` (コミット済み HEAD)・load 0.82〜0.89: `bash tools/gui/test/wasm_w_e2e.sh` rc 0・28.8 s。EXACT MATCH (0/64,000 px)・読み戻し sha256 `6f809bdf…` が native と MATCH・スクリーンショット EXACT MATCH・順序検査 PASS (32 件の到達行)・ネガコン (1 px 改竄) MISMATCH・rc 1。
+- 差分 (測定 commit から HEAD まで): 0 行 (測定 commit が HEAD)。
+
 ## 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `tools/gui/e2e.sh` の 1 本通し (step 4 以降の wasm 段) | emsdk の素材 (`toolchain-emsdk`) が本 run に無い。wasm の GUI-MSG 行も未実測 | #3510 (`oc_artifacts` に `toolchain-emsdk` を足して再投入) |
+| `tools/gui/e2e.sh` の 1 本通し (step 4 以降の wasm 段) | `wasm_w_e2e.sh` と順序検査は #4803 で実測。`e2e.sh` 全体の通しは未実測 | #3510 |
 | `tools/gui/flengine/e2e.sh` の回帰確認 | `tools/m11/work` (work-m11 素材) と emsdk が無く、前提欠如 (exit 2) で止まる。shim の変更は `GUI_REACH_LOG` 付きの時だけ効く (flengine の build は付けない) | #3510 (同上) |
 | native_w_run の PASS 行と ExitProcess の `exit()` の競合 (#3508 から続く既存の構造) | 主スレッドの PASS 行より先に app スレッドが exit すると PASS 行が欠ける。3/3 では起きていない | PM 判断 (本 PR の範囲外) |
