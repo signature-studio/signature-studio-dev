@@ -403,6 +403,9 @@ static void calc_nc(Wnd *w, int ww_, int wh_) {
 static int g_send_depth;
 static I64 call_proc(Wnd *w, uint32_t msg, U64 wp, I64 lp) {
   g_send_depth++;
+#ifdef GUI_REACH_LOG
+  if (msg == WM_PAINT) gui_reach_paint();   /* SendMessage/DispatchMessage 両経路の WM_PAINT 配送 (順序検査用; #3510) */
+#endif
   I64 r = gui_call4(w->wndproc, (I64)w->h, (I64)msg, (I64)wp, lp);
   g_send_depth--;
   return r;
