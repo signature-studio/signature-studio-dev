@@ -14,7 +14,7 @@
 
 ## 1. 測定条件
 
-- 測定 commit: PR 本文の「測定 commit」行 (`hs_val_probe.py` を変えた最後の commit。基点は main `e16513904`)。
+- 測定 commit: `f2d120aa7` (`hs_val_probe.py` を変えた最後の commit。基点は main `e16513904`)。
 - 素材: `fl-win64` の `extracted/block00031_PE.bin` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` 6.7 秒 real)。
 - Python: `$RUNNER_TEMP/hsvenv` (`unicorn 2.1.4` / `pefile` / `capstone 5.0.7`)。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 $RUNNER_TEMP/hsvenv/bin/python hs_val_probe.py g18caller` / `p45caller`。
@@ -58,7 +58,7 @@
 
 - `hostshim.c` は変更していない。
 - Phase A `hs_e2e.sh` は実行できなかった: `work-fw-stage1` (stage-1 の 12 ファイル) を展開したが、`hs_e2e.sh` の前提 (`fw_flat4_canon3.ll` ほか。`fw_stage2.sh` の出力) は無い。`work-fw-stage1` には含まれない。
-- 変更は `hs_val_probe.py` のみ (33 行追加・既存関数の変更なし)。`hs_val_probe.py` を呼ぶ e2e 経路は無い (grep 済み)。`git diff 98458ac56 HEAD -- tools/plugins/framework/hostshim ':!*.md'` は `hs_val_probe.py` の 33 行のみ。
+- 変更は `hs_val_probe.py` のみ (main 基点からの累積で 34 行追加・0 行削除。既存関数の変更なし。`g18_caller` の r9=0 試行は測定 commit `f2d120aa7` で追加)。`hs_val_probe.py` を呼ぶ e2e 経路は無い (grep 済み)。`git diff 98458ac56 HEAD -- tools/plugins/framework/hostshim ':!*.md'` は `hs_val_probe.py` のみ。
 
 ## 5. 未解決 (起票先)
 
