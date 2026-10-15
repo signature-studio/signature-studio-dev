@@ -26,26 +26,32 @@ ENTRY_NEW = (ENTRY_ANCHOR +
              '  store i32 1, ptr %fx40len, align 4\n')
 
 
-def patch(fn):
+ENTRY_NEW_70ONLY = (ENTRY_ANCHOR +
+                    '  %fx40home = getelementptr i8, ptr %stack_var_-104, i64 112\n'
+                    '  store i64 %arg1, ptr %fx40home, align 8\n')
+
+
+def patch(fn, only70=False):
     assert fn.startswith(DEF_HEAD), 'function_448490 の仮引数が想定と違う'
     assert 'fx40' not in fn, '適用済み (二重適用)'
     n = len(ALLOCA_RE.findall(fn))
     assert n == 1, 'object の alloca 行が 1 件でない: %d' % n
     assert fn.count(ENTRY_ANCHOR) == 1, 'entry の anchor 行が 1 件でない: %d' % fn.count(ENTRY_ANCHOR)
     fn = ALLOCA_RE.sub(ALLOCA_NEW, fn)
-    fn = fn.replace(ENTRY_ANCHOR, ENTRY_NEW)
+    fn = fn.replace(ENTRY_ANCHOR, ENTRY_NEW_70ONLY if only70 else ENTRY_NEW)
     return fn
 
 
 def main():
+    only70 = len(sys.argv) > 3 and sys.argv[3] == '--only-70'
     src = open(sys.argv[1], errors='replace').read()
     fns = list(FN.finditer(src))
     assert len(fns) == 1, 'function_448490 の定義が 1 件でない: %d' % len(fns)
     f = fns[0].group(0)
-    out = src[:fns[0].start()] + patch(f) + src[fns[0].end():]
+    out = src[:fns[0].start()] + patch(f, only70) + src[fns[0].end():]
     assert out != src
     open(sys.argv[2], 'w').write(out)
-    print('[fix_shx_t40] function_448490: object 拡幅 (120 B)・+0x70 に arg1・+0x4c に初期 1 (実験)')
+    print('[fix_shx_t40] function_448490: object 拡幅 (120 B)・+0x70 に arg1' + ('' if only70 else '・+0x4c に初期 1') + ' (実験)')
 
 
 if __name__ == '__main__':

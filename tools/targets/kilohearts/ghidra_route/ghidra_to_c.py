@@ -36,7 +36,7 @@ SNAPINS = {
         # 未関数化 callee (#3108 KH-45・2 件)。FP 例外の報告経路で、Inf 入力 (180fdc6d8 の指数全 1・仮数 0) でのみ到達する。
         # also へ足すと閉包が広がる (§10-7j・§10-7l の前例) ため stub にする。到達時は abort (突合で検出)。
         0x180fd8aac: 'void FUN_180fd8aac() { abort(); }',
-    }, 'also': [0x180fcd690, 0x180fce0d0, 0x180fdc470, 0x180fdc660, 0x180fdc700, 0x180fdfdb0, 0x180fdc6d8]},
+    }, 'also': [0x180fcd690, 0x180fce0d0, 0x180fdc470, 0x180fdc660, 0x180fdc700, 0x180fdfdb0, 0x180fdc6d8, 0x180fb6c0c, 0x180fb6ce0, 0x180fcd690, 0x180fce0d0, 0x180fd1ac4, 0x180fd1b00, 0x180fd1f30, 0x180fd1f84, 0x180fd2c10, 0x180fd2c90, 0x180fd2d38, 0x180fd2f20, 0x180fd3144, 0x180fd4f30, 0x180fd51cc, 0x180fd5bcc, 0x180fd5bf4, 0x180fd5f30, 0x180fd620c, 0x180fd622c, 0x180fd62a8, 0x180fd62c8, 0x180fd8988, 0x180fd89f0, 0x180fd8aac, 0x180fdc470, 0x180fdc660, 0x180fdc6d8, 0x180fdc700, 0x180fdfdb0, 0x180fe2788, 0x180fe27b0, 0x180fe3284, 0x180fe3310, 0x180fe34b0, 0x180fe34e8, 0x180fe3510, 0x180fe3690, 0x180fe3cd0, 0x180fe4020, 0x180fe4394, 0x180fe5c6c, 0x180fe5ef0, 0x180fe5f00, 0x180fe5f0a, 0x181327120, 0x181327314, 0x18132753c]},
     'delay': {'proc': 0x1802ed7f0, 'exports': [0x1802ed7f0], 'stubs': {}, 'also': [0x180005c50, 0x18004cf20, 0x180289ea0, 0x1802ecfc0, 0x1802ed3b0, 0x1802ed490, 0x1802ed550, 0x1802ed640, 0x1802ed790, 0x180f878e0, 0x180f8791c, 0x180f87cac, 0x180f87d40, 0x180f87f24, 0x180f88084, 0x180f880a4, 0x180f880e4, 0x180f88104, 0x180fa8534, 0x180fb5b4c, 0x180fb5bb4, 0x180fb5c20, 0x180fb5c6c, 0x180fb5dd0, 0x180fb5e6c, 0x180fb5f3c, 0x180fb5f5c, 0x180fb5f8c, 0x180fb6bf8, 0x180fb6c0c, 0x180fb6ce0, 0x180fbbfb8, 0x180fbc1f4, 0x180fbde90, 0x180fbdfcc, 0x180fbe018, 0x180fc1920, 0x180fc4590, 0x180fc61dc, 0x180fc61e4, 0x180fc6870, 0x180fc6d70, 0x180fc7468, 0x180fcce40, 0x180fcd400, 0x180fcd690, 0x180fcdbfc, 0x180fcde58, 0x180fce0d0, 0x180fcf904, 0x180fd0898, 0x180fd08d0, 0x180fd099c, 0x180fd0a64, 0x180fd0a98, 0x180fd0ac8, 0x180fd0b50, 0x180fd1540, 0x180fd172c, 0x180fd185c, 0x180fd1ac4, 0x180fd1b00, 0x180fd1b34, 0x180fd1f30, 0x180fd1f84, 0x180fd27a8, 0x180fd2a60, 0x180fd2ba0, 0x180fd2c10, 0x180fd2c90, 0x180fd2d38, 0x180fd2f20, 0x180fd2fcc, 0x180fd3144, 0x180fd320c, 0x180fd4f30, 0x180fd51cc, 0x180fd5250, 0x180fd54cc, 0x180fd5bcc, 0x180fd5bf4, 0x180fd5f04, 0x180fd5f30, 0x180fd620c, 0x180fd622c, 0x180fd62a8, 0x180fd62c8, 0x180fd62dc, 0x180fd6320, 0x180fd648c, 0x180fd6498, 0x180fd662c, 0x180fd66a0, 0x180fd7d94, 0x180fd7f54, 0x180fd8988, 0x180fd89f0, 0x180fd8aac, 0x180fd8bd4, 0x180fd8d08, 0x180fdb6e0, 0x180fdc320, 0x180fdc470, 0x180fdc660, 0x180fdc6d8, 0x180fdc6ec, 0x180fdc700, 0x180fdc714, 0x180fdc7b8, 0x180fdc844, 0x180fdc858, 0x180fdc880, 0x180fdfdb0, 0x180fe027c, 0x180fe2470, 0x180fe24b8, 0x180fe2788, 0x180fe27b0, 0x180fe3284, 0x180fe3310, 0x180fe3488, 0x180fe34b0, 0x180fe34e8, 0x180fe3510, 0x180fe3690, 0x180fe3cd0, 0x180fe4020, 0x180fe4394, 0x180fe5c6c, 0x180fe5dfc, 0x180fe5ef0, 0x180fe5f00, 0x180fe5f0a, 0x180fe5f40, 0x181327120, 0x181327314, 0x181327348, 0x18132753c]},
 }
 STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ルート (snapins/lift/kh_lower.py) の shims/fail-fast stub と同じ扱い)
@@ -163,6 +163,20 @@ DELAY_RULES = [
      '_DAT_18436cd18 = (longlong)(puVar3 + 0x40);', 2),
     ('_UNK_182280e04: 12 byte 代入 (#4685)', r'auVar2\._4_12_ = _UNK_182280e04;',
      'memcpy(&auVar2._4_12_, gd_182280e04, 12);', 1),
+    # #4838 (KH-119): 代入の pointer⇔整数 5 行。機械語で確定 (REPORT_APPENDIX_3801.md の P6 の現 HEAD 残件)。
+    #   FUN_180f88084・FUN_180f880a4・FUN_180fd2d38: 初期化の 8 byte スロットへ leaq で得た番地を movq で書く。
+    #   値はそのアドレス (&UNK_<va>) のビット列。整数型スロットへ同ビットを明示キャストで書く (数値変換にしない)。
+    #   `&UNK_` 形は tbase 置換 (gt_<base> + off) より前に当てる。
+    ('param_1[1] = &UNK_18227b1f8 (#4838)', r'param_1\[1\] = &UNK_18227b1f8;',
+     'param_1[1] = (longlong)&UNK_18227b1f8;', 1),
+    ('param_1[1] = &UNK_18227b208 (#4838)', r'param_1\[1\] = &UNK_18227b208;',
+     'param_1[1] = (longlong)&UNK_18227b208;', 1),
+    ('*param_1 = &UNK_1813a3e58 (#4838)', r'\*param_1 = &UNK_1813a3e58;',
+     '*param_1 = (longlong)&UNK_1813a3e58;', 1),
+    ('*param_1 = &UNK_1813a4968 (#4838)', r'\*param_1 = &UNK_1813a4968;',
+     '*param_1 = (longlong)&UNK_1813a4968;', 1),
+    ('*param_1 = &UNK_1822849e0 (#4838)', r'\*param_1 = &UNK_1822849e0;',
+     '*param_1 = (longlong)&UNK_1822849e0;', 1),
 ]
 
 

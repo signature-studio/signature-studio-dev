@@ -68,7 +68,7 @@ const rejectDiffs = rejects.map(([name, args]) => ({ name, args, wasm: run(wasm,
   .filter((r) => r.wasm.code !== 5);
 
 // PY-227: device 割当 [dev, link] を変えて -7 (device 無し)・-6 (送出先無し) を通す。PE 0xd747f0 は device を見てから送出先を見る (channel によらず先に判定)。
-// PY-231: forwardMIDICC (PE 0xd748e0) も同じ判定順。
+// PY-231: forwardMIDICC も midiOutMsg と同じ判定順と仮置き (REPORT_PY231 §1b)。
 const linkSeq = [
   [[1, 1], ["device.midiOutMsg", [0x90, 1, 60, 100]]],
   [[0, 1], ["device.midiOutMsg", [0x90, 1, 60, 100]]],
@@ -149,7 +149,7 @@ if (dedupWasmCount !== dedupExpectWords.length) diffs.push({ state: "dedup wasm 
 if (dedupMockWords.length !== dedupExpectWords.length) diffs.push({ state: "dedup mock count", expect: dedupExpectWords.length, mock: dedupMockWords.length });
 diffs.push(...dedupDiffs.map((d) => ({ dedup: true, ...d })));
 
-// PY-276 追補 (review): 割当判定は重複判定より前 (PE 0xd748e0 は -7 → -6 → 0xfdc8a0)。
+// PY-276 追補 (review): 割当判定は重複判定より前 (midiOutNewMsg 0xd748e0 の -7 → -6 → 0xfdc8a0 を見た順。forwardMIDICC の判定順は仮置き・REPORT_PY231 §1b)。
 // V を送った後に未割当で同じ添字・値を呼ぶと -7 (送らない)、割当に戻して同じ V を呼ぶと重複で送られない。
 const assignDedupSeq = [
   [[1, 1], ["device.forwardMIDICC", [0x44, 5]], "ok"],
@@ -192,6 +192,25 @@ for (const [dev, link] of [[1, 1], [0, 0]]) {
 }
 const linkedExpect = [-1, null, null, -1, null, null];
 if (JSON.stringify(linkedRes) !== JSON.stringify(linkedExpect)) diffs.push({ state: "linked channel expect", expect: linkedExpect, wasm: linkedRes });
+
+// PY-4846 (#3568 子 B): getLinkedValue・getLinkedInfo・getLinkedParamName・getLinkedValueString。index -1 の経路だけ PE 確定 (REPORT_PY215 §1)。index >= 0 は未確定の未実装 error (mock と C で同じ code)
+const linkedNames = ["device.getLinkedValue", "device.getLinkedInfo", "device.getLinkedParamName", "device.getLinkedValueString"];
+const linkedNameRes = {};
+for (const name of linkedNames) {
+  for (const idx of [-1, 0]) {
+    const a = run(mock, name, [idx]);
+    const b = run(wasm, name, [idx]);
+    linkedNameRes[`${name}(${idx})`] = "code" in b ? `code ${b.code}` : b.ok;
+    if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ name, args: [idx], mock: a, wasm: b });
+  }
+}
+const linkedNameExpect = {
+  "device.getLinkedValue(-1)": -1, "device.getLinkedValue(0)": "code 2",
+  "device.getLinkedInfo(-1)": -1, "device.getLinkedInfo(0)": "code 2",
+  "device.getLinkedParamName(-1)": "code 8", "device.getLinkedParamName(0)": "code 2",
+  "device.getLinkedValueString(-1)": "code 8", "device.getLinkedValueString(0)": "code 2",
+};
+if (JSON.stringify(linkedNameRes) !== JSON.stringify(linkedNameExpect)) diffs.push({ state: "linked name expect", expect: linkedNameExpect, wasm: linkedNameRes });
 
 assert.deepEqual(diffs, [], `device 差分 ${diffs.length} 件`);
 assert.deepEqual(rejectDiffs, [], `署名違反が code 5 で拒否されない ${rejectDiffs.length} 件`);
