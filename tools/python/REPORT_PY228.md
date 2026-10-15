@@ -14,7 +14,7 @@
 | 項目 | 値 |
 |---|---|
 | 測定 commit (コードを最後に変えた commit) | `656d01e7d` (`Merge remote-tracking branch 'origin/main' into 3656-plugins-getparamvaluestring`。main `1ccf20c6a` を取り込んだ merge)。取り込みで `tools/python/host/fl_mock.mjs` が衝突 (§6)。取り込み後に全項目を再測定。前回の測定 commit は `6ee6d1401` (main `dadf1884b` の取り込み。round 2 の前) |
-| 素材 | `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (real 5.570 s)。emsdk は `/opt/emsdk` (runner 同梱。`EMSDK_DIR` の既定値)。`toolchain-emsdk` は展開していない |
+| 素材 | `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (real 5.570 s)。emsdk は runner 同梱のもの (`EMSDK_DIR` の既定値) を使い、`toolchain-emsdk` は展開していない |
 | 入力 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/python/fetch_inputs.sh` (midi.py・utils.py・fl-stubs を取得。real 0.417 s)。`build_flpy.sh` は stubs を要するため、これを先に実行する |
 | flpy | `bash tools/python/build_cpython_wasm.sh` (native + wasm の CPython 3.12.1。rc 0・real 4 m 08 s)、`FL_WIN64_DIR=… bash tools/python/build_flpy.sh` (rc 0・real 7.092 s。`dist/flpy.{js,wasm,data}`)。`analysis/flapi` の追跡物は再生成後も差分なし |
 | build (provider) | `bash tools/python/provider/build.sh`。rc 0。警告 0 |
