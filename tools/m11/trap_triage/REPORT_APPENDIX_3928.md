@@ -166,6 +166,16 @@ return np;
 - 前回 (run 4) の callchk は c3 で site 10499 (`414c70` 内の `call 4133f0`) を指したが、今回の callchk の再実行 (r4a) でも同じ site 10499 が `"he.d"` を出した。ただし entry 計装では `4133f0` の入口が 0 件なので、site 10499 の値変化は `4133f0` の呼出し以前に起きたものを検出した可能性もある (callchk は call 直後に比べるため)。書込み元は `414c70` の入口より前 (監視 ON 以前を含む) と読む。
 - 未確定: `414c70` の呼出し元 (`414c70` を呼ぶ関数) と、入口より前の書込み経路。次の一手: unit 158 の `414c70` 呼出しの直前 (呼出し元の入口) に同じ計装を入れる。
 
+### #3972 run 6: 呼出し元の入口・出口の監視 (`edge_3972.sh`)
+
+- 手段: `edge_3972.py` が `function_43c4c0`・`function_414bb0`・`function_414c70` の入口 (alloca 群の直後) と各 `ret` 直前に `m11_eprobe` を入れ、監視番地の値が変わった点だけを出す (読み取りだけ)。派生は `tools/m11/trap_triage/edge_3972.{sh,py,c}`。
+- 再現: `cd tools/m11 && bash trap_triage/edge_3972.sh <tag>` (前提: `work-m11`・`fl-win64`・`[EMSDK]`・`bash m11_gen_ir2.sh` 済み。出力 `work/probe3972/ed_<tag>.err`・`ed_sites.json`)。
+- 測定 (n=1・`M11_FIX_4136A0=1`・unit 158): 同じ worktree で `callchk_3972.sh` (r6a) と `edge_3972.sh` (r6e) を続けて実行。
+  - r6a (callchk): `[cc] site=10499 hit=5 old=0000000000000000 new=680065002e006400 -> function_414c70 IR line 121120 call function_4133f0`。直前の変化は site 10396 (`413760` の `call 4136a0`)。
+  - r6e (edge): 変化点 3 件 (`414bb0` 入口 `0x43c964`・`414bb0` ret `0x2539b0`・`43c4c0` 入口 `0x265c90`)。**`"he.d"` は出ない**。unit 158 は `halt0`。
+- 読み: 計装 (入口・出口の読み取り) で観測が変わり、r6a で見えた `"he.d"` が r6e では出なかった。書込みの位置は確定していない。`414c70` の入口 (r6e の計装では `414c70` の入口の値変化は無し) とも食い違うため、計装ごとに IR の配置が変わって観測が動くと推定する (未確認)。
+- 結論: 書込み元は未特定。`callchk` の `"he.d"` 検出は計装ごとに再現しない (n=1 の揺れ)。次の一手として、揺れを生む IR の差 (計装の挿入で変わる値・alloca の位置) を切り分けるか、wasm を計装なしで動かせる別の観測 (メモリ dump) に移す必要がある。
+
 ## #5093 (M11-32): [0x64] の書込み元の探索 (部分・未達)
 
 - 測定 commit: `59e21b78f` (probe `probe_5093.mjs` と本節を含む PR の tree。build 対象のコードは `2e3c6d554` と同一: `git diff 2e3c6d554 59e21b78f -- tools/m11` は `probe_5093.mjs` と本付録の追加 35 行だけ)。OFF (既定) の build。IR `ir_sha256=d66e24aa…` (gen 直後)・build 後 `64a0e5dc…`。#3643 の `597757f4…` とは IR が違う (再生成の差。未切り分け)。
