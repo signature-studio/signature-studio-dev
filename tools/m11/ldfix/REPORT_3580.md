@@ -17,7 +17,8 @@
 - 基準 (main のまま): rc=1 (step 4 の `cmp` で FAIL、real 25.73 s)。
 - 修正後: rc=0、real 45.04 s、load average (1 分) 実行後 0.71。
 - 修正後の件数: spill 宛 CELL_COLLAPSED 37 → 28、修復 13 (1 対 1 の 9 + callarg の 4)、TRUE_DROP 30 (#3753 の反映で 24 → 30。見送り 17)。修復件数は REPORT_2910 §3 と同じ。
-- 測定 commit: コードを変えた最後の commit (本 PR の commit hash は push 後に §4 へ記録)。
+- 測定 commit: `56620ad3f` (コードを変えた最後の commit: `fix(m11): regenerate spill37/spill_repair TSV after #3753 and sync e2e counts (refs #3580)`)。REPORT 追加の commit はコードを変えない。
+- 測定後の差分 (測定 commit から HEAD まで): 空 (差分 0)。
 
 ## 2. icmp 3 読み出しの機械語と IR の対応 (受入 1)
 
