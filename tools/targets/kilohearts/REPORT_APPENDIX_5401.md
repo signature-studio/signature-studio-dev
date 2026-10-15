@@ -6,7 +6,9 @@
 
 **issue 本文との差**: 本文は「残り 71 件」だが、`main` (`06db17776`) の census は 79 件 (`FUN_180fbc1f4` 2 件 (1101・1107) を含む)。`FUN_180fbc1f4` の規則は #4889 (PR #5397・open・main に未取り込み) にあり、本 PR では入れない (重複を避ける)。
 
-**測定 commit**: 本節の規則を含む commit (本 PR の最後のコード変更)。`git diff <測定 commit> HEAD -- tools/targets/kilohearts/ghidra_route` は本 PR 内で 0 行の見込み (commit 後に記録)。
+**測定 commit**: `fb4b67659` (census の数値はこの commit で測定)。
+**検証 HEAD**: `c273227e1` (`fb4b67659` に origin/main を merge)。HEAD での census 再測定は **未実施** (素材 `plugins-kilohearts`・`toolchain-emsdk`・Ghidra が `$ARTIFACTS_DIR` に無い)。
+**未測定の差分**: `git diff fb4b67659 c273227e1 -- tools/targets/kilohearts/ghidra_route` は 10 行追加 (main 由来の #4889 の `FUN_180fbc1f4` 規則・delay 1082/1088 の呼出し置換と宣言変更)。Delay の C 出力を変えるため、下表と残件内訳の件数は **現 head では未確定**。
 **検証起点** (baseline): origin/main `06db17776`。
 
 **規則 1 件 (`patches.py` の `ABI['delay']`・件数 1 を assert・通過)**
@@ -15,7 +17,7 @@
 |---|---|---|
 | 180fd2f20 (C 5129 行) | `FUN_180fe3510()` (宣言 `void (longlong param_1)`) | 180fd2f2a `mov rdi,rcx` → 180fd2f30 `mov rcx,[rcx+0x90]` → 180fd2f37 `test rcx,rcx` → 180fd2f3c `call 180fe3510`。rcx = `[param_1+0x90]`。callee 入口 `test rcx,rcx`・`[rcx+0x10]` で rcx を読む |
 
-**census (`gtype_census.sh` 相当・FX = `bitcast,intload,stackpair,assoc,concat,gtype,lanes`・n=1)**
+**census (`gtype_census.sh` 相当・FX = `bitcast,intload,stackpair,assoc,concat,gtype,lanes`・n=1)・測定 commit `fb4b67659` の値 (現 head 未測定)**
 
 | 区分 | `main` 06db17776 | 本 PR |
 |---|---|---|
