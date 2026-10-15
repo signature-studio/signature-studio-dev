@@ -82,3 +82,59 @@
 ## 7. 再現・次の一手
 
 - 次の一手: (a) 表 `0x852d70` の 17 組の書込み先 (対の残り) を、各 pair を単独で `-t` と `-w` で実行して確認する (呼出し元とは別の作業)。(b) DllMain の `rax=0` の原因: `[0x300ffdec]` (= DllMain の `[rbp+0x17c]`) を `-w` で追う。(c) 表を実行する経路の候補 (DllMain の後続・host の別呼出し) を unicorn で順に試す。
+
+## 8. 2 回目の測定 (測定 commit 959e608f): DllMain (attach) の初期化列と harness の制約
+
+- 測定 commit: **959e608f** (`unicorn_trace.py` の最後のコード変更)。前回の測定 commit 914297eb からの道具の差分は `git diff 914297eb HEAD -- tools/plugins/f2/unicorn_trace.py` (5bb4b9aa・959e608f で追加: `-R` 読取り監視、`-V` の LocalAlloc 対応、`-S` の LoadStringW と GetLocalTime)。
+- 本節の鮮度: `git diff 959e608f HEAD -- tools/plugins/f2/*.py` は、本節を含む commit の時点で出力なし (§8.6)。
+
+### 8.1 結論 (先出し)
+
+1. **DllMain (`0x8525f0`) は setjmp/longjmp で戻り値を決める**。`0x411930` は setjmp 相当 (`[rcx]` に jmp_buf を保存して 0 を返す)、`0x4118c0` は longjmp (`rsp` と `[rcx]` を復元して `jmp`)、`0x411940` は jmp_buf の複写と longjmp。DllMain は `r = setjmp` の値から `r <= 1` を返す。harness で DllMain が `rax=0` で戻るのは、attach 中に longjmp (値 2) が起きたため (§8.3)。
+2. **原因 (1) は harness の stub**: kernel32!LocalAlloc が 0 を返すと、`0x411a80` に `rcx=0xe2`・`rdx=0x298` で入り (M2 で測定。その前段の `0x41bd70`・`0x411c30` は未測定)、致命エラーとして longjmp する。`-V` で LocalAlloc も pool から返すと、この `0xe2` の経路は消える (M2 → M3)。ただし M3 では `0x411a80` が `rcx=0xcb` で入る経路が残り、M6 で 0xcb の致命から longjmp `0x4118c0` まで確認した。`-V` を付けても DllMain は依然 `rax=0x0` で戻る。
+3. **attach の初期化列**: `0x411330` (mode = reason = 1) は callback `[0x86b190]` (`0x41bea0`) の後、`0x411290` で記述子 `0x852680` の `+8` (列の先頭 `0x8526b0`) を走査する。ループは `[0x852680]` (= 0x180) 回、読む要素は `list[2i]` (偶数番目)。奇数番目 (`list[2i+1]`) は `0x4111f0` が逆順に呼ぶ。つまり列は (init, destroy) の対。`0x852e30` (偶数 240 番目) = `0x5e0340` (init、`[0x8cd068]` に格納)、`0x852e38` (奇数 241 番目) = `0x5e01d0` (destroy) と対応する。
+4. **Delphi の例外の順序 (M6)**: 列の 19 件目 `0x44e8e0` の中で、`LCMapStringW` (rcx=`0x409`) → `GetLastError` → `RaiseException(0xeedfade)` が出る。戻り 0 のまま続行し、同じ並びがもう 1 回出る (計 2 回)。20 件目 `0x44f4c0` → 21 件目 `0x45c760` が入り、そこでも `RaiseException` が 1 回出る (計 3 回)。その後に `0x411c10` (rcx=`0xcb`) → `0x411a80` → longjmp `0x4118c0` (rdx=2) で DllMain が 0 で戻る。直前の原因として名指しするのは LCMapStringW → GetLastError の側。`GetLocaleInfoW` は 19 件目の中で 20 回以上先に呼ばれる (道具の総数 59 件) ので、直前の原因にはしない。`0xeedfade` は Delphi の例外コード。`LoadStringW` uID `0xffcf` の文面 ("A call to an OS function failed") から、PE は Delphi 製と見られる。harness は SEH を配送できないため、戻り 0 のまま進む。
+5. **表は CreatePlugInstance 単独では読まれない**: 受入 2 の文言どおりの `0x83efb0 -H -V -p 0x409090` は表の参照 0 (M1)。`[0x8cd068]` の初期化は host の attach (DllMain) の列に依存する。よって受入 2 は、DllMain の初期化列を harness で最後まで通すことが前提になる。
+6. **前回の「表の参照元 0 件」との関係**: 表そのもの (`0x852d70`) を指すポインタは PE に無い。列の先頭 `0x8526b0` は記述子 `0x852680` の `+8` (qword `0x852688`) に格納され、DllMain が `lea rdx,[rip+0x51]` (= `0x852680`) で記述子を渡す。前回の `table_refs.py` の 0 件は、この間接参照を見ていないことで説明できる。
+
+### 8.2 測定 (測定 commit 959e608f、逐次、負荷 1 分値 0.34)
+
+| 実行 (`$T tools/plugins/f2/unicorn_trace.py $PE ...`) | 結果 | wall |
+|---|---|--:|
+| M1 `0x83efb0 -H -V -p 0x409090 -t 0x411a80 -t 0x411940 -t 0x411bb8 -q 0x8cd068 -w 0x8cd068:0x8cd070` (受入 2 の文言どおり) | `UC_ERR_INSN_INVALID rip=0x50138d06`。`0x411a80`・`0x411940`・`0x411bb8` の入場 0。`[0x8cd068]` 0 → 0 | 1.78 s |
+| M2 変更前の道具 (`origin/main` 7c85004e 版)・`0x8525f0 -H -V -p 0x409090 -r rdx=1 -t 0x411a80 -t 0x411940` | `0x411a80` が `rcx=0xe2 rdx=0x298` で入場 → `0x411940` → `status ... rax=0x0` | 1.73 s |
+| M3 `0x8525f0 -H -V -p 0x409090 -r rdx=1 -t 0x411290 -t 0x411a80 -t 0x5e0340 -q 0x8cd068 -R 0x852680:0x852e89` | `0x411290` 入場 1。`0x411a80` は `rcx=0xcb` で入場 (LocalAlloc は pool で成功)。`rax=0x0`。`[0x8cd068]` 0 → 0。読取り: `rip=0x4112d0` が 21 回 (列の走査、先頭 `0x8526b0`)、`rip=0x411211` が 1 回 (記述子の `+8`、先頭 `0x852688`) | 1.85 s |
+| M4 `0x8525f0 -H -V -S -p 0x409090 -r rdx=1 -t 0x5e0340 -t 0x411a80 -q 0x8cd068 -w 0x8cd068:0x8cd070` | `rsrc strings: 376`。`0x411a80` (`rcx=0xcb`)。`rax=0x0`。`0x5e0340` の入場 0。`[0x8cd068]` 0 → 0。stub 件数: LoadStringW 75・GetLocalTime 64・RaiseException 3 (`-S` なしでは 131) | 1.84 s |
+| M5 `0x83efb0 -H -V -S -p 0x409090 -p 0x8525f0:rdx=1 -t 0x5e0340 -t 0x411a80 -q 0x8cd068` | `UC_ERR_INSN_INVALID rip=0x50348ce9`。`0x5e0340` の入場 0。`[0x8cd068]` 0 → 0 | 1.90 s |
+| M6 `0x8525f0 -H -V -S -p 0x409090 -r rdx=1` に `-t` を列の呼出し先 (`0x86b108` を含む)・`0x411c10`・`0x411a80`・`0x4118c0`・stub 4 件 (`0x100018f0` LCMapStringW・`0x100014d0` GetLastError・`0x100015e0` RaiseException・`0x10001a40` GetLocaleInfoW) に付けた | trace の発生順は §8.1 #4 のとおり。`status: returned to sentinel rax=0x0`。`[0x8cd068]` 0 → 0。stub 件数: RaiseException 3・GetLocaleInfoW 59・LCMapStringW 2・GetLastError 2 | 1.245 s |
+
+- 列の走査の内訳 (21 件)。PE の静的読み (§8.5 の P) で得る: `list[2i]` (k = 0, 2, …, 40 の qword) は `0x41d630, 0x41bc60, 0x41f8a0, 0x420370, 0x4203d0, 0x423d00, 0x4243f0, 0x424b10, 0x424b40, 0x424b60, 0x424e20, 0x4254e0, 0x42b8a0, 0x42bd80, 0x86b108, 0x432db0, 0x445790, 0x44d1e0, 0x44e8e0, 0x44f4c0, 0x45c760`。k = 28 (`0x86b108`) は呼ばれない (M6 の trace に出ない) が、件数には数える。M6 の trace で呼ばれた 20 件の発生順は、この並びと一致する。19 件目が k = 36 (`0x44e8e0`)、21 件目が k = 40 (`0x45c760`)。`0x5e0340` は `list[240]` (i = 120) で、21 件目 (i = 20) で longjmp の経路に入るため届かない。
+- 対照: M1 は `trace` 行が 0 件 (CreatePlugInstance 単独では attach の経路に入らない)。M3 は `trace` 行が 2 件 (`0x411290`・`0x411a80`) で、道具の `-t` が機能している。
+
+### 8.3 受入への含意と未解決
+
+- 受入 2 (`0x83efb0` が `0x411a80` に届く) は、文言どおりのコマンド (M1) では未達のまま。DllMain の列を通さないと `[0x8cd068]` は 0 で、`0x411a80` にも届かない。受入の前提 (`-p 0x8525f0:rdx=1` を加えるか、列を通すか) を PM 判断に上げる。
+- 受入 3・4 は受入 2 が前提のため未達。
+- 未解決 (子 issue に移す):
+  - Win32 stub の実値化: `GetLocaleInfoW`・`LCMapStringW`・`GetLastError` (いずれも stub が 0 を返した後に `RaiseException` が出る)。
+  - Delphi の例外 (`RaiseException(0xeedfade)`) の harness 側の扱い (SEH 配送、または例外時の戻り先の決定)。
+  - 列の 240 件目 (`0x5e0340`) まで走らせ、`[0x8cd068]` の最終値と書込み元を確定する。
+
+### 8.4 前回からの道具の変更 (commit 5bb4b9aa・959e608f)
+
+- `-R lo:hi`: 読取り監視。読んだ命令 (rip) ごとの件数と先頭アドレスを出す (`unicorn_trace.py` の末尾)。
+- `-V`: `kernel32!LocalAlloc` も `VirtualAlloc` と同じ pool の領域を返す (size = rdx)。既定 (`-V` なし) の挙動は変わらない。ただし `-V` を付けた既存の実行 (DllMain 系) の結果は変わる (M2 → M3)。
+- `-S`: `user32!LoadStringW` を PE の `.rsrc` (RT_STRING、376 件) から返す。`kernel32!GetLocalTime` は 2026-10-14 (水曜) を書く。既定ではオフ。
+
+### 8.5 再現
+
+- 準備: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" extracted/block19148_PE.bin` (WORKFLOW §11)。`PE=$RUNNER_TEMP/fl-win64/extracted/block19148_PE.bin`、`T=$RUNNER_TEMP/f2venv/bin/python` (依存は §6 の venv)。リポジトリ直下で実行する。
+- M1: `$T tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -H -V -p 0x409090 -t 0x411a80 -t 0x411940 -t 0x411bb8 -q 0x8cd068 -w 0x8cd068:0x8cd070 -m 2000000`
+- M3: `$T tools/plugins/f2/unicorn_trace.py $PE 0x8525f0 -H -V -p 0x409090 -r rdx=1 -t 0x411290 -t 0x411a80 -t 0x5e0340 -q 0x8cd068 -R 0x852680:0x852e89 -m 2000000`
+- M4: `$T tools/plugins/f2/unicorn_trace.py $PE 0x8525f0 -H -V -S -p 0x409090 -r rdx=1 -t 0x5e0340 -t 0x411a80 -q 0x8cd068 -w 0x8cd068:0x8cd070 -m 2000000`
+- M6 (§8.1 #4 の順序。stub の番地は pefile で import の並び `0x10000000 + 16k` から引いた値): `$T tools/plugins/f2/unicorn_trace.py $PE 0x8525f0 -H -V -S -p 0x409090 -r rdx=1 -t 0x411290 -t 0x41d630 -t 0x41bc60 -t 0x41f8a0 -t 0x420370 -t 0x4203d0 -t 0x423d00 -t 0x4243f0 -t 0x424b10 -t 0x424b40 -t 0x424b60 -t 0x424e20 -t 0x4254e0 -t 0x42b8a0 -t 0x42bd80 -t 0x86b108 -t 0x432db0 -t 0x445790 -t 0x44d1e0 -t 0x44e8e0 -t 0x100018f0 -t 0x100014d0 -t 0x100015e0 -t 0x44f4c0 -t 0x45c760 -t 0x10001a40 -t 0x411c10 -t 0x411a80 -t 0x4118c0 -q 0x8cd068 -w 0x8cd068:0x8cd070 -m 2000000`
+- P (列の 21 件の静的読み): `$T -c "import pefile,struct,sys; pe=pefile.PE(sys.argv[1]); ib=pe.OPTIONAL_HEADER.ImageBase; img=pe.get_memory_mapped_image(); print([hex(struct.unpack_from('<Q',img,0x8526b0-ib+8*k)[0]) for k in range(0,41,2)])" $PE`
+
+### 8.6 鮮度
+
+- `git diff 959e608f HEAD -- tools/plugins/f2/*.py` は、本節を含む commit で出力なし (本 PR のコード変更は測定 commit より前に完了)。

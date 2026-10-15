@@ -93,14 +93,16 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
 
 ## CI 化 (#66, `tools/e2e/ci/e2e.yaml.proposed` → `.github/workflows/e2e.yaml`)
 
+2026-10-15 に PR #3292 で配置済み。以下は経緯。
+
 **配置の制約**: Actions の GitHub App には `workflows` 権限が無く、`.github/workflows/` への push は拒否された
 (`refusing to allow a GitHub App to create or update workflow ... without workflows permission`、実測 1 回)。
-そのため workflow 本体は `tools/e2e/ci/e2e.yaml.proposed` に置いた。有効化は `git mv tools/e2e/ci/e2e.yaml.proposed .github/workflows/e2e.yaml` を
-`workflows` 権限のあるユーザ/PM が行う (actionlint 1.7.7 で配置後の内容を検査済み = エラー 0)。
+そのため workflow 本体は当初 `tools/e2e/ci/e2e.yaml.proposed` に置いた。`workflows` 権限のあるユーザ/PM が `.github/workflows/e2e.yaml` へ移し
+(actionlint 1.7.7 で配置後の内容を検査済み = エラー 0)、`.proposed` は PR #3292 で削除した (Git 履歴に残る)。
 
 既知類型との関係: 該当なし (lift/IR 系ではない)。検証起点: `origin/main` 2847625。
 
-- `local` ジョブ: PR / main push (src・vite 設定・tools/e2e・deploy/config 等の path のみ) / 手動で
+- `local` ジョブ: PR / main push (src・vite 設定・tools/e2e・deploy/config 等の path のみ。tools/audio・tools/legal/notices・tools/m1/flags.sh は未登録 = #3335) / 手動で
   `run.sh --driver both --targets preview,edge-sim`。結果 JSON・スクリーンショット・ログを artifact (14 日)、表を job summary に出す
   (`tools/e2e/suite/summary.mjs`)。
 - `remote` ジョブ: 週次 (月曜 03:17 UTC) / 手動 (`remote=true`) で `run.sh --url "$E2E_URL" --driver both`。
@@ -117,14 +119,24 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
   `shell: bash` 明示の根拠: `bash -e -c 'false 2>&1 | tee /dev/null'` は exit 0、`bash -eo pipefail -c` は exit 1。同じ COEP 除去 run (edge-sim のみ) を
   `-e` のみ (pipefail 無し) で流すと exit 0 (= step が緑のまま FAIL を握り潰す) ことも確認。`shell:` 無指定の `run` は
   `bash -e {0}` で実行されるため、両 E2E step に `shell: bash` (= `bash --noprofile --norc -eo pipefail {0}`) を明示した。
-- 範囲外: GitHub Actions 上での workflow 実行結果 (workflow は `.proposed` のため PR の check では実行されない。`.github/workflows/e2e.yaml` へ配置後に確認)、実 URL への `--url` (Access 保護下の実 token での実行は未実施 =
-  `E2E_URL` と secrets の登録はユーザ操作)。
+- 範囲外: 実 URL への `--url` (Access 保護下の実 token での実行は未実施 = `E2E_URL` と secrets の登録はユーザ操作。残件は #3303 [E2E-9])。Actions 上の local ジョブは下の適用節で確認済み。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| workflow の `.github/workflows/e2e.yaml` への配置 (workflows 権限が必要) | 配置まで CI は動かない | #66 へコメント (PM/ユーザ作業) |
-| repo variable `E2E_URL` と secrets `E2E_ACCESS_CLIENT_ID/SECRET` の登録 | 週次 remote ジョブは登録まで skip | 本 issue (#66) へコメント (ユーザ/PM 作業。token secret は `deploy/work/secrets/` にしか無い) |
-| 実 URL に対する週次ジョブの初回実績 | remote の PASS 未確認 | #66 (登録後に `gh workflow run e2e.yaml -f remote=true`) |
+| repo variable `E2E_URL` と secrets `E2E_ACCESS_CLIENT_ID/SECRET` の登録 | 週次 remote ジョブは登録まで skip | #3302 [E2E-8] (PM/ユーザ作業。token secret は `deploy/work/secrets/` にしか無い) |
+| 実 URL に対する週次ジョブの初回実績 | remote の PASS 未確認 | #3303 [E2E-9] (登録後に `gh workflow run e2e.yaml -f remote=true`) |
+| path filter (`on.pull_request.paths`・`on.push.paths`) に `tools/audio/**`・`tools/legal/notices/**`・`tools/m1/flags.sh` が無い | これだけを変えた PR では workflow が起動せず、merge 前に E2E で検証されない | #3335 [E2E-10] (PM / 依頼者が依頼コメントの diff を適用。#3292 の merge 後) |
+
+### 適用 (#66。PM が PAT で `.github/workflows/e2e.yaml` へ配置。検証起点 `origin/main` `7c85004e` に本 PR を載せたクリーン worktree・node v24.19.0・Chrome 154.0.8037.97・emsdk 6.0.12 (`[EMSDK]`))
+
+- Actions 結果 (PR #3292 head `4c89a7b0`): run 38659352731 (`E2E / local` success・job 70 s (00:19:24 → 00:20:34Z)、`E2E / remote` skipped = `vars.E2E_URL` 未登録)。
+- Actions 結果 (PR #3292 head `75131c60`): Actions run 38658202074 (head 75131c60・job local success・SUMMARY PASS=34 FAIL=0 SKIP=6・emsdk install 26 s・job 所要 72 s・n=1)。`E2E / local` (job 116172905176、00:07:39 → 00:08:51Z)。runner は Ubuntu 24.04.5・Chrome 154.0.8037.97・node v26.10.0・pnpm 12.10.1。remote ジョブは `vars.E2E_URL` 未登録のため skip。
+- 測定 commit = `75131c60`。`git diff 75131c60 HEAD -- src public tools/e2e tools/audio tools/m1 deploy/config deploy/lib ':(exclude)tools/e2e/REPORT.md' ':(exclude)tools/e2e/ci'` は 0 行 (実行パスに差分なし。以後の差分は本 REPORT・`deploy/README.md`・`.proposed` の削除のみ)。
+- 停止報告 (2026-10-14 17:24Z) の diff を `git apply` で適用した (140 行・新規 1 ファイル)。`.proposed` は PR #3292 の fix で削除した (適用後は `.github/workflows/e2e.yaml` が正)。
+- 差分からの変更 2 点: (1) remote ジョブの `if` に `&& vars.E2E_URL != ''` を足した (PM 判断。実デプロイ #36 の後に `E2E_URL` と secrets を登録するまで、週次でも skip)。(2) local ジョブに emsdk の install step を足した (下記)。
+- local ジョブと同じ `bash tools/e2e/run.sh --driver both --targets preview,edge-sim`: exit 0・**PASS=34 FAIL=0 SKIP=6**・12.2 s (build 込み・n=1)。SKIP 6 = `fl-boot` (FL 未統合) 4 + `edge-policy` の preview 側 (strict 限定) 2。
+- emcc が無い環境の再現: 同じコマンドを `EMSDK_ENV=/nonexistent/emsdk_env.sh` で実行すると exit 1・`[audio] emcc not found` (`run.sh` → `tools/audio/integration/stage_app.sh` → `tools/audio/build.sh`)。`ubuntu-latest` (Ubuntu 24.04 image 20261004.327.1) の Readme に Emscripten の記載は無いため、(2) の step (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` を `emsdk install`、`EMSDK_ENV` で `build.sh` に渡す) を足した。同じ方式の `emsdk install 6.0.12` は「FL 起動契約 (#65)」節の #2744 の再測定で 28 s だった。
+- (2) の step は Actions run 38658202074 で成功 (上記)。この sandbox では実行できなかった (python の `urlopen` が `CERTIFICATE_VERIFY_FAILED`。環境固有)。remote ジョブは未実行 (`E2E_URL` と secrets が無い)。
 
 ## 839 E2E-5: dummy-worklet 参照の差し替え後の再測定 (#839・#1010)
 `/worklets/dummy-worklet.js` の参照を `/worklets/fl-audio-worklet.js` へ差し替えた後 (commit `8e27b776` → 修正 commit は PR head を参照)、
