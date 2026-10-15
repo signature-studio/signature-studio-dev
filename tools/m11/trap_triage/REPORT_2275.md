@@ -141,7 +141,7 @@
 ## 10. HEAD (`e3dc956f9`) の再測定 (実施)
 
 - 測定 commit (HEAD の値): `e3dc956f9` = origin/main `517b95da3` を取り込んだ merge (`b9164699e` の上)。競合は `tools/m11/m11_build.sh` の CF 行 1 箇所で、origin/main の `-DM11_PROBE_2400` と本ブランチの `-DM11_RT_NODATA_BODY` を両方残して解消した。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (5.8 秒)。`work-m11` を `tools/m11/work/` に展開 (2.5 秒)。`toolchain-retdec`・`toolchain-emsdk` の tarball は展開せず、`/opt/retdec`・`/opt/emsdk` (既存) を使った (m11_build.sh が `/opt/emsdk` を固定で読むため)。
+- 素材: `fl-win64` を `[WIN64]` の展開先 (`FL_WIN64_DIR`) に展開 (5.8 秒)。`work-m11` を `tools/m11/work/` に展開 (2.5 秒)。`toolchain-retdec`・`toolchain-emsdk` の tarball は展開せず、`[RETDEC]`・`[EMSDK]` (既存) を使った (m11_build.sh が `[EMSDK]` を固定で読むため)。
 - IR 再生成 `m11_gen_ir2.sh`: rc=0・50.4 秒。ldfix 行: `F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=46 errors=0` (§2 と同じ)。`ld108=applied`・`ld115=applied`。
 - repro: `bash tools/m11/trap_triage/repro_1952_rt_mech.sh 3 A_default C_noren NODATA_BODY` (rc=0・5 分 39.7 秒) と `... 1 R0_rtOFF NODATA PRE64 PRE4096` (rc=0・2 分 19.3 秒)。直列・foreground。測定終了時の load average 1 分平均 1.00 (4 vCPU)。
 
