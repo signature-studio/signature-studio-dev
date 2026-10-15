@@ -38,7 +38,7 @@ for i in range(16):
     FAM[f"xmm{i}"] = f"xmm{i}"
 
 CALLER_SAVED = {"a", "c", "d", "r8", "r9", "r10", "r11"} | {f"xmm{i}" for i in range(6)}
-MOVLIKE = {"mov", "movzx", "movsx", "movsxd", "movsd", "movq", "movd", "movss", "cvtss2sd", "cvtsd2ss"}
+MOVLIKE = {"mov", "movabs", "movzx", "movsx", "movsxd", "movsd", "movq", "movd", "movss", "cvtss2sd", "cvtsd2ss"}
 ARITH = {"imul", "shl", "shr", "sar", "and", "or", "xor", "neg", "not", "inc", "dec", "sal"}
 FLOATOP = {"mulsd": "*", "addsd": "+", "subsd": "-", "divsd": "/"}
 WRITE_FIRST = MOVLIKE | ARITH | FLOATOP.keys() | {"add", "sub", "lea", "cvtsi2sd", "cvttsd2si", "cvtsd2si"}
