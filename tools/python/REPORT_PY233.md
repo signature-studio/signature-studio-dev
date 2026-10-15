@@ -5,7 +5,7 @@
 
 ## 結論
 
-- **受入 1 (入口の値): 未取得。** 切替関数 `0xd68d90` の入口観測点は、shim 経路の boot (units 209 → exit) で 0 件。呼出元は `f_d69310` (getRecPPB 本体 = Python 側の API ハンドラ) と `f_13751d0` の icall 分岐 case の 2 箇所で、boot はどちらにも入らなかった。
+- **受入 1 (入口の値): 未取得。** 切替関数 `0xd68d90` の入口観測点は、shim 経路の boot (units 209 → exit) で 0 件。2026-10-15 の再測定 (§5・main `321f1620e`) でも、root 有り・root 無し (対照) のどちらでも 0 件。呼出元は `f_d69310` (getRecPPB 本体 = Python 側の API ハンドラ) と `f_13751d0` の icall 分岐 case の 2 箇所で、boot はどちらにも入らなかった。
 - **受入 2 (取得できない場合): 記録した。** 到達範囲と必要な変更は §3。
 - **停止点の値 (参考)**: unit 209 の後の `0x412a0d` (exit 直前) で `[0x15e4558]=0`・`[0x15e35c8]=0`・`[0x16ba7f0]=0`・`[0x16ba808]=0`。切替の両経路とも X=0 (null)。この値は実行時の正しい値ではない (次の項目)。
 - **原因 (推定)**: 実測したのは、unit 209 の fill `f_6a7b70` の呼出し 6 回目 (dst=`0x1400000`・4 MiB) の範囲内で、P (`0x15e4558`)・Q (`0x15e35c8`) への 16 バイト書込みが各 1 件起き、0 になったことまで (書込み監視で 2 件)。fill の入口 (6 回目) ではまだ PE 初期値 (`0x16ba7f0`・`0x16ba808`) だった。書込み元 VA は出ないため、fill が書込み元であることは推定。
@@ -64,3 +64,60 @@ bash tools/flelift/boot/py233_getrecppb_probe.sh   # 観測点 3 つ + FLE_WWATC
 | getRecPPB (`0xd68d90`) の呼出元が boot に入るか (Python API 経由のみか、icall 分岐 `f_13751d0` か) | 到達しなければ boot では値を取れない | #3003 (親・PY-127) に本 REPORT の結論を返す |
 | 書込み監視 (STX) の書込み元 VA が出ない (`fle_cpu.h:79`)。書込み元は fill の呼出し順と入口の値からの推定 | P・Q の書込み元 (fill か) が未確定。0 化の機構が決まらない | #3112 [FLE-13] (既存・OPEN) へコメント済み: 書込み元 VA の特定 (書込み元 PC の記録) を修復範囲に含める |
 | fill → P・Q の 0 化の対照 (root 無し lift + `FLE_DIAG_NULLFILL=1` で P・Q が残るか。§1) | 対照が無く、fill の 0 化を実測と言えない | #3112 [FLE-13] (既存・OPEN) へコメント済み: root 無し lift で同じ観測を取る |
+
+## 5. 再測定と対照 (2026-10-15・main `321f1620e`・測定 commit `d677564bc`)
+
+§1〜§4 (commit `d5d8336c3`) の後に main が進んだため、同じ観測を取り直した。#3112 が依頼した対照 (root 無し lift + `FLE_DIAG_NULLFILL=1`) も測った。
+
+### 5.1 結論
+
+- **受入 1 (入口の値): 未取得 (再確認)。** `0xd68d90` (切替)・`0xd69310` (`general.getRecPPB` 本体)・`0x13751d0` (icall 分岐の関数) の入口は、root 有り・root 無し (対照) のどちらでも 0 件。boot は unit 209 の先で止まり、`general.getRecPPB` の呼出し側に届かない。
+- **対照 (#3112 の依頼): 実施。** root 無し lift + `FLE_DIAG_NULLFILL=1` で fill (`0x6a7b70`) を戻すと、P・Q への書込みは 0 件 (`fle_wwatch` 0 件)。root 有り route で見た P・Q の 0 化は、fill の buf=0 呼出しに由来すると推定する (5.3)。
+- **切替条件: 未確定。** 入口に届かないため、実行時の P・Q・X の値は取れない。
+
+### 5.2 測定 (`fle6_measure.sh` と `py233_getrecppb_probe.sh`・4 コア)
+
+| 項目 | root 有り (shim・既定) | root 無し + NULLFILL=1 (対照) |
+|---|---|---|
+| units_run / 停止 | 209 / `exit` (`0x412a0d`) | 209 / `unlifted 0x6bbc20` |
+| GetMem / FreeMem | 2,314 / 1,199 | 2,314 / 1,200 |
+| IPP 判定 | NG (ptr `0x0`・rc=3・既知) | OK (ptr `0x7f10001c`) |
+| fill `0x6a7b70` | 6 回 (dst `0x0`〜`0x1400000`・4 MiB 刻み) | 戻し (buf=0 の skip 計数 1,048,576) |
+| P・Q への書込み (`FLE_WWATCH`) | 2 件 (`0x15e35c8`: `0x16ba808`→0・`0x15e4558`: `0x16ba7f0`→0) | 0 件 |
+| `0xd68d90` / `0xd69310` / `0x13751d0` | 0 / 0 / 0 | 0 / 0 / 0 |
+| 停止点 `0x412a0d` の P・Q・X | 0・0・0・0・X=0 | 未到達 |
+| `0x6bbc20` (画素ストア) | 0 件 | 1 件 (site `0x6c9380`・矩形 (0,0,2^20,2^20)) |
+
+工程 (実測・fle6 の段階時間): root 有り: gen-A 7 s・lift 83 s・clang 117 s・boot 25 s (計 3 分 52 秒)。probe: 2 分 13 秒。対照: lift 81 s・clang 97 s・boot 22 s (計 3 分 27 秒)。対照の probe: 2 分 08 秒。load は 0.5〜2.3。
+
+### 5.3 解釈 (推定を含む)
+
+- **P・Q の 0 化の経路 (推定)**: fill の buf=0 呼出しは dst を 0 から 4 MiB 刻みで進めて書くため、`.data` (`0x13a5000`〜`0x15e5008`) を含む範囲へ書き込む。native では dst=0 付近は未マップで AV すると推定される (#3112 と同じ見立て。未検証)。したがって root 有り route の停止点の 0 は、native の実行時の値ではない。
+- **対照の残り**: fill を戻すと P・Q は残る (書込みが無い)。ただし同じ route は `0x6bbc20` (未 lift) で止まり、切替の入口に届かない。
+- **未解明**: fill の呼出し回数が root 有り 6 回・対照 1,048,576 回 (skip 計数) と大きく違う。root 有りで fill の後に boot の流れが変わる理由は未確認 (#3112)。
+
+### 5.4 到達範囲と必要な変更 (受入 2 の更新)
+
+- 切替の入口へ至るには、boot の unit 209 の先で (a) buf=0 の fill の上流の修復 (#3112)、(b) `0x6bbc20` の先の進行 (#3770・#3771 で範囲を確認済み)、(c) `general.getRecPPB` (Python API のハンドラ・`REPORT_PY121`) を boot の後段から呼ぶ route が要る。(c) は未実装で、本 PR の範囲外。
+- (c) は子 issue **#3987** [PY-289] に移した (親 #3690 の受入 1・3 も同じ子に移す)。
+
+### 5.5 KPI (起動)
+
+- 前後 (root 有り・main): units 209 → 209 (不変)。最初のウィンドウ: 無し (`MessageBoxA` → `exit(0)` at `0x412a0d`)。
+- 本 PR は既定経路の build・boot 結果を変えない (観測 script の変更のみ)。対照 route は `FLE_DIAG_NULLFILL=1` の診断で、既定経路ではない。
+
+### 5.6 検証
+
+- 測定 commit: `d677564bc` (probe の変更。以後のコード差分は REPORT のみ)。
+- 再現: `FL_WIN64_DIR`・`SS_EMSDK_ENV` を設定して、`FLE_BOOT_RUNS=shim FLE_BOOT_TAG=py233 bash tools/flelift/boot/fle6_measure.sh` → `bash tools/flelift/boot/py233_getrecppb_probe.sh`。対照は `FLE_EXTRA_ROOTS= FLE_BOOT_WORK=<work>/boot_rootless FLE_BOOT_RUNS=diag_shim FLE_BOOT_TAG=py233rl bash tools/flelift/boot/fle6_measure.sh` → `FLE_BOOT_WORK=<work>/boot_rootless FLE_DIAG_NULLFILL=1 bash tools/flelift/boot/py233_getrecppb_probe.sh`。
+- 結果 JSON: `tools/flelift/boot/results/boot_summary_py233.json`・`boot_summary_py233rl_diag_shim.json` (絶対パスを含まない)。
+- `fle_e2e.sh` は未実行 (既定経路の build・boot を変えないため)。
+
+### 5.7 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 切替入口 `0xd68d90` の実行時の値 (受入 1・3) | 切替条件が決まらない | 子 issue #3987 [PY-289] (本 PR で起票) |
+| buf=0 の fill の上流 (P・Q の 0 化) | 停止点の 0 は実行時の値ではない | #3112 [FLE-13] (open) |
+| fill の呼出し回数の差 (6 回 / 1,048,576 回) | 対照の解釈 | #3112 |
+| STX の書込み元 PC の記録 (fill か) | 0 化の機構が推定のまま | #3112 |
