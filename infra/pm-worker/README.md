@@ -161,7 +161,7 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `open_issues_delta_24h` | 現在の open issue 数から、24 時間前以前で最も新しい 1 時間ごとの点 (`meta/openHist`、最大 48 点) の数を引いた差。点が無い (履歴が 24 時間分に満たない) ときは `null`。同期が古い間と一覧を打ち切った間は点を残さない |
 | `pm_dispatch_1h` | 直近 1 時間の `oc-pm` の送信数 (dry-run の would を含む。`pmHistory` と同じ live / dry-run の別) |
 | `pm_dispatch_cap` | `oc-pm` の毎時上限 (`PM_LIMITS.hourMax` = 24)。`pm_dispatch_1h` がこの値に達しているときは上限で見送りが出る |
-| `pm_dispatch_1h_by_kind` | 直近 1 時間の `oc-pm` の送信数を kind 別に (`DETECTED_KINDS` の全キーを 0 から数える。合計は `pm_dispatch_1h` と同じ)。最低配分 (`KIND_MIN_PER_HOUR`) が効いたかを見る (#3704) |
+| `pm_dispatch_1h_by_kind` | 直近 1 時間の `oc-pm` の送信数を kind 別に (`DETECTED_KINDS` の全キーを 0 から数える。`pmHistory()` の全件を kind 別に数えるので、digest / launch-halt の通知 (`DIGEST_KIND` = `digest`) の送信もキー `digest` として現れる。全キーの合計は `pm_dispatch_1h` と同じ)。最低配分 (`KIND_MIN_PER_HOUR`) が効いたかを見る (#3704) |
 | `pm_skipped_hour_24h` | 直近 24 時間に毎時上限で見送った件数 (`pmDispatch` の見送りの対象ごと、と `haltNotify` の見送りを tick ごとに数えた回数)。見送りには、他の kind の最低配分のために枠を残した分 (`reserve`) を含む (#3704)。時刻と件数を `meta` に持ち、24 時間で prune する (`pruneHistory` と同じ窓)。live / dry-run は分ける |
 | `launch_halted` | launch を止めている区間 `{reason, since}` (止まっていなければ `null`)。`reason` は先頭の理由、`since` は止まり始めた時刻。詳細は下の『launch の停止と通知』 (#2795) |
 | `launch_halted_overdue` | 15 分以上止まり、着手待ち (`ready`) と空き枠 (`room`) がある間は `true` (#2795) |
