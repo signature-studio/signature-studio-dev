@@ -142,15 +142,15 @@
 - 閉じた線の点が 2 つのとき閉じない (従来どおり)。
 
 ### 4-2. 測定 commit と検証
-- 測定 commit: `d96f5ecff` (統合 merge。コードを変えた最後の commit)。
-- 判定: `check_line_width.sh` (8 項目) / `check_draw_ops.sh` / `check_render_poc.sh` / `check_canvas_syntax.sh`。
+- 測定 commit: `14753d025` (AA 判定の追加と harness のケース追加。コードを変えた最後の commit)。HEAD 側の追加は REPORT のみ。
+- 判定: `check_line_width.sh` (12 項目) / `check_draw_ops.sh` / `check_render_poc.sh` / `check_canvas_syntax.sh`。
 
-| 検証 | 結果 | 所要 (real) | load (全検証の後に読んだ uptime 1 分平均) |
+| 検証 | 結果 | 所要 (real) | load (全検証の後に読んだ 1 分平均) |
 |---|---|---|---|
-| `check_line_width.sh` | rc=0 (8 項目 pass) | 21.81 s | 0.81 |
-| `check_draw_ops.sh` | rc=0 | 21.54 s | 0.81 |
-| `check_render_poc.sh` | rc=0 (nonzero_after=12000 text_px=112) | 21.46 s | 0.81 |
-| `check_canvas_syntax.sh` | rc=0 (4 ファイル errors=0) | 4.91 s | 0.81 |
+| `check_line_width.sh` | rc=0 (12 項目 pass) | 16.96 s | 2.07〜2.90 (各検証の直後) |
+| `check_draw_ops.sh` | rc=0 (5 op の nonzero は main と一致) | 16.73 s | 同上 |
+| `check_render_poc.sh` | rc=0 (nonzero_after=12000 text_px=112) | 16.63 s | 同上 |
+| `check_canvas_syntax.sh` | rc=0 (platformfactory.cpp errors=0) | 3.90 s | 同上 |
 
 - 素材: `toolchain-emsdk` を `work/emsdk` へ展開 (`em++` 利用)、vstgui は `steinbergmedia/vstgui` の tag `vstgui4_14_3` を `work/vstgui4` へ clone。`work/` は gitignore。
 
@@ -169,9 +169,18 @@
 | w8 join round | 1141 / 0 / 1141 |
 | w8 join miter | 1184 / 0 / 1184 |
 | w4 dash 6/4 | 154 / 0 / 154 |
+| w8 cap butt (AA) | 575 / 144 / 431 |
+| w8 cap round (AA) | 635 / 160 / 475 |
+| w8 cap square (AA) | 644 / 157 / 487 |
+| w8 join bevel (AA) | 1204 / 264 / 940 |
+| w8 join round (AA) | 1242 / 276 / 966 |
+| w8 join miter (AA) | 1279 / 286 / 993 |
+| w4 dash 6/4 (AA) | 227 / 134 / 93 |
 
+- AA の部分被覆は cap・join・dash の全形状で正 (aliasing は 0)。AA の非ゼロ数の順序は aliasing と同じ (cap butt < round < square、join bevel < round < miter)。破線 AA (227) は solid AA の w4 (321) より少ない。
 - `check_draw_ops.sh` の既存値は main と一致: drawLine 49・drawLines 26・drawPolygon 607・drawEllipse 2472・drawBitmap 64。
-- 判定: `corner_no_double_blend` (over=0) pass・`cap_shapes_differ` pass・`join_shapes_differ` pass・`dash_less_than_solid` pass。既存 4 項目も pass。
+- 判定: `corner_no_double_blend` (over=0) pass・`cap_shapes_differ` pass・`join_shapes_differ` pass・`dash_less_than_solid` pass。AA 側は `aa_shapes_partial`・`aa_cap_shapes_differ`・`aa_join_shapes_differ`・`aa_dash_less_than_solid` が pass。既存 4 項目も pass。
+- 見込みの差: AA の cap・join・dash は solid との差が出ている (部分被覆 0 ではない)。ただし部分被覆の値は 4x4 標本法の近似で、実機 VSTGUI との一致は未測定 (§4-4)。
 - 注意: 角の参照値は線分の和集合の被覆 (§3 と同じ 4x4 標本法)。実機 VSTGUI の画素との一致は測っていない。
 
 ### 4-4. 未解決
@@ -179,4 +188,5 @@
 |---|---|---|
 | miter の先端が幅の 4 倍を超えるときは bevel に落とす (VSTGUI の miterlimit 既定値との一致は未測定) | 鋭い角の形が実機と異なる可能性 | 未起票 (PR 本文の表に残す) |
 | 破線の on/off の端 (cap の扱い) は実機と未照合 | 破線の端の画素が実機と 1 px ずれる可能性 | 未起票 (PR 本文の表に残す) |
+| `setLineStyle` の cap・join・破線は save/restore の対象外で、一度設定すると後続の描画に残る (lineWidth と同じ扱い) | 設定後の別の線が意図せず破線・太い cap になる可能性 | 未起票 (PR 本文の表に残す) |
 | 楕円・多数の線の wasm 実行時間は未測定 (§3-5 の native 計測は旧方式) | 描画の重さ | §3 の未解決を継続 |
