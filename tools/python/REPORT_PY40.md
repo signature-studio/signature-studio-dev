@@ -173,7 +173,7 @@ C (`provider/fl_engine.c`) と mock (`host/fl_mock.mjs`) は同じ順序で引�
 - 測定 commit: `946da7fd3` (`origin/main` (`a5966bbc7`) の取り込み merge。コードを変えた最後の commit)。前の測定 commit は `37abd37e` (main `41623210` の取り込み)。PY-40 の対象は `provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`。
 - 競合 (3 回目の取り込み。PR ブランチが main に遅れたため): `tests/provider_check.mjs` の判定列と件数だけ。判定列は本 PR の `pe40` と main の `pe94`・`pe95`・`pe120` (PY-120 #2984、`launchMapPages.length`) をすべて残した。件数は main の 141 (implemented、pe120 を含む) + 本 PR の 5 = **146** (implemented)、未実装 289。`handler 146` (provider build) と一致する。
 - 差分確認: `git diff 946da7fd3 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (以後の変更は REPORT のみ)。`git diff 37abd37e 946da7fd3 -- tools/python/host/fl_mock.mjs tools/python/provider/fl_engine.c` の focusEditor 行は 0 件。
-- 環境: 4 コア。素材 fl-win64 から `extracted/block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` の 4 件を展開 (`tar --zstd -xf` の `--wildcards`)。emsdk は runner の既存 `/opt/emsdk` (`emsdk_env.sh`) を使った。R2 の `toolchain-emsdk.tar.zst` は ARTIFACTS_DIR に実在したが展開していない。CPython 3.12.1 wasm (`build_cpython_wasm.sh`・rc 0・3 分 30 秒) と flpy (`FLPY_SKIP_TABLE=1 build_flpy.sh`・rc 0・4.7 秒) は本 run で作成した。`fetch_inputs.sh` (`FL_WIN64_DIR` 指定) は rc 0。
+- 環境: 4 コア。素材 fl-win64 から `extracted/block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` の 4 件を展開 (`tar --zstd -xf` の `--wildcards`)。emsdk は runner の既存導入 (`[EMSDK]`) を使った。R2 の `toolchain-emsdk.tar.zst` は ARTIFACTS_DIR に実在したが展開していない。CPython 3.12.1 wasm (`build_cpython_wasm.sh`・rc 0・3 分 30 秒) と flpy (`FLPY_SKIP_TABLE=1 build_flpy.sh`・rc 0・4.7 秒) は本 run で作成した。`fetch_inputs.sh` (`FL_WIN64_DIR` 指定) は rc 0。
 
 | 検証 | 結果 (実測) |
 |---|---|
