@@ -1,8 +1,8 @@
 # REPORT_APPENDIX_3256 — KH-48 (#3256) 検証の生出力 (全行)
 
-`REPORT_APPENDIX.md` §12-2 の要約表の元になった生出力。測定 commit `38c3bcd4` (HEAD と同一コード) で `snapins/scripts/ymm_vocab_check.py 20000 1` と `snapins/scripts/fma_vocab_check.py 20000 1` を 1 回ずつ実行した stdout をそのまま載せる (再現は同コマンド)。
+`REPORT_APPENDIX.md` §12-2 の要約の元になった生出力。測定 commit `d7603d630` (コード変更の最後の commit・以降は docs のみ) で `snapins/scripts/ymm_vocab_check.py 20000 1` と `snapins/scripts/fma_vocab_check.py 20000 1` を 1 回ずつ実行した stdout をそのまま載せる (再現は同コマンド)。
 
-## ymm_vocab_check.py 20000 1 (rc=0・wall 1.17 s・load 0.47 0.38 0.28)
+## ymm_vocab_check.py 20000 1 (rc=0・real 1.143 s・load 0.16 0.25 0.12)
 
 ```text
 [gen_simd] helpers 4, undefined(abort stub) 1 ['void __asm_vmovaps.2(i256,i256)'] approx_tables=none
@@ -39,54 +39,44 @@
 == 判定: 本検証 PASS / ネガコン(a) FAIL / ネガコン(b) FAIL / ネガコン(c) FAIL / ネガコン(d) FAIL / store 形 stub OK -> PASS
 ```
 
-## fma_vocab_check.py 20000 1 (rc=0・wall 1.14 s・load 0.19 0.32 0.26)
+## fma_vocab_check.py 20000 1 (rc=0・real 0.842 s・load 0.18 0.25 0.12)
 
 ```text
 [gen_simd] helpers 7, undefined(abort stub) 0 [] approx_tables=none
 == 本検証 (生成 C 実装 vs ホスト FMA3・128bit 全 bit・NaN 含む) n=20000 seed=1
-  vfmadd213sd calls=20000 bits=128 mismatch=0 nan_only=0
-  vfmadd213ss calls=20000 bits=128 mismatch=0 nan_only=0
-  vfmsub213ss calls=20000 bits=128 mismatch=0 nan_only=0
-  vfmadd231sd calls=20000 bits=128 mismatch=0 nan_only=0
-  vfmadd231ss calls=20000 bits=128 mismatch=0 nan_only=0
-  vfnmadd231sd calls=20000 bits=128 mismatch=0 nan_only=0
-    NANPAYLOAD vfmadd132sd i=39 d0=fff8000000000000 s2=cd07710bc8e17cc9 s3=7ff0000000000001 got0=fff8000000000000 want0=7ff8000000000001
-    NANPAYLOAD vfmadd132sd i=155 d0=7ff0000000000001 s2=4579a5a633bf62f9 s3=7ff8000000000000 got0=7ff8000000000001 want0=7ff8000000000000
-  vfmadd132sd calls=20000 bits=128 mismatch=31 nan_only=31
+  vfmadd213sd calls=20000 bits=128 mismatch=0
+  vfmadd213ss calls=20000 bits=128 mismatch=0
+  vfmsub213ss calls=20000 bits=128 mismatch=0
+  vfmadd231sd calls=20000 bits=128 mismatch=0
+  vfmadd231ss calls=20000 bits=128 mismatch=0
+  vfnmadd231sd calls=20000 bits=128 mismatch=0
+  vfmadd132sd calls=20000 bits=128 mismatch=0
 == ネガコン (a) 語彙定義なし (リンクが通らなければ FAIL)
   link rc=1 -> FAIL (期待どおり)
 == ネガコン (b) vfmadd213ss の fmaf を単精度 2 段丸め x*y+z に改変 (不一致 > 0 で FAIL)
-  vfmadd213sd calls=20000 bits=128 mismatch=0 nan_only=0
+  vfmadd213sd calls=20000 bits=128 mismatch=0
     MISMATCH vfmadd213ss i=9 d0=00000000b82cf9b0 s2=00000000475f857a s3=000000003f000000 got0=00000000bfee0f60 want0=00000000bfee0f61
     MISMATCH vfmadd213ss i=79 d0=0000000044a7ec93 s2=00000000c4f7bd14 s3=000000003d4e09cc got0=00000000ca228149 want0=00000000ca228148
     MISMATCH vfmadd213ss i=81 d0=000000004438ed30 s2=00000000423577ac s3=00000000408b0968 got0=0000000047031a7d want0=0000000047031a7e
-    NANPAYLOAD vfmadd213ss i=233 d0=000000007fc00000 s2=000000007f800001 s3=00000000bf800000 got0=000000007fc00000 want0=000000007fc00001
-    NANPAYLOAD vfmadd213ss i=356 d0=000000007f800001 s2=000000007fc00000 s3=00000000c2aeb621 got0=000000007fc00001 want0=000000007fc00000
-  vfmadd213ss calls=20000 bits=128 mismatch=604 nan_only=45
-  vfmsub213ss calls=20000 bits=128 mismatch=0 nan_only=0
-  vfmadd231sd calls=20000 bits=128 mismatch=0 nan_only=0
-  vfmadd231ss calls=20000 bits=128 mismatch=0 nan_only=0
-  vfnmadd231sd calls=20000 bits=128 mismatch=0 nan_only=0
-    NANPAYLOAD vfmadd132sd i=39 d0=fff8000000000000 s2=cd07710bc8e17cc9 s3=7ff0000000000001 got0=fff8000000000000 want0=7ff8000000000001
-    NANPAYLOAD vfmadd132sd i=155 d0=7ff0000000000001 s2=4579a5a633bf62f9 s3=7ff8000000000000 got0=7ff8000000000001 want0=7ff8000000000000
-  vfmadd132sd calls=20000 bits=128 mismatch=31 nan_only=31
-  rc=1 vfmadd213ss mismatch=(604, 45) -> FAIL (期待どおり)
+  vfmadd213ss calls=20000 bits=128 mismatch=604
+  vfmsub213ss calls=20000 bits=128 mismatch=0
+  vfmadd231sd calls=20000 bits=128 mismatch=0
+  vfmadd231ss calls=20000 bits=128 mismatch=0
+  vfnmadd231sd calls=20000 bits=128 mismatch=0
+  vfmadd132sd calls=20000 bits=128 mismatch=0
+  rc=1 vfmadd213ss mismatch=604 -> FAIL (期待どおり)
 == ネガコン (c) vfmadd213ss の被演算子順を 231 形 fmaf(s2, s3, d) に改変 (不一致 > 0 で FAIL)
-  vfmadd213sd calls=20000 bits=128 mismatch=0 nan_only=0
+  vfmadd213sd calls=20000 bits=128 mismatch=0
     MISMATCH vfmadd213ss i=3 d0=000000003f76d4a2 s2=000000004319b8b7 s3=00000000bd48e9b5 got0=00000000c0d26eb5 want0=0000000043142a9f
     MISMATCH vfmadd213ss i=4 d0=0000000040490fdb s2=00000000a56c27b8 s3=00000000c97e958d got0=0000000040490fdb want0=00000000c97e958d
     MISMATCH vfmadd213ss i=5 d0=000000003d3a58a8 s2=00000000435ca855 s3=00000000e9c1f44d got0=00000000eda72d7b want0=00000000e9c1f44d
-    NANPAYLOAD vfmadd213ss i=544 d0=000000007f800001 s2=000000009439e5b7 s3=00000000ffc00000 got0=00000000ffc00000 want0=000000007fc00001
-    NANPAYLOAD vfmadd213ss i=1164 d0=000000007f800001 s2=0000000040490fdb s3=000000007fc00000 got0=000000007fc00000 want0=000000007fc00001
-  vfmadd213ss calls=20000 bits=128 mismatch=15804 nan_only=38
-  vfmsub213ss calls=20000 bits=128 mismatch=0 nan_only=0
-  vfmadd231sd calls=20000 bits=128 mismatch=0 nan_only=0
-  vfmadd231ss calls=20000 bits=128 mismatch=0 nan_only=0
-  vfnmadd231sd calls=20000 bits=128 mismatch=0 nan_only=0
-    NANPAYLOAD vfmadd132sd i=39 d0=fff8000000000000 s2=cd07710bc8e17cc9 s3=7ff0000000000001 got0=fff8000000000000 want0=7ff8000000000001
-    NANPAYLOAD vfmadd132sd i=155 d0=7ff0000000000001 s2=4579a5a633bf62f9 s3=7ff8000000000000 got0=7ff8000000000001 want0=7ff8000000000000
-  vfmadd132sd calls=20000 bits=128 mismatch=31 nan_only=31
-  rc=1 vfmadd213ss mismatch=(15804, 38) -> FAIL (期待どおり)
-== 判定: 本検証 PASS (非 NaN bit 不一致 0 / NaN payload のみの差 31 件) / ネガコン(a) FAIL / ネガコン(b) FAIL / ネガコン(c) FAIL -> PASS
-== wall 1.19 秒 (N=20000 語彙 7 件/各)
+  vfmadd213ss calls=20000 bits=128 mismatch=15804
+  vfmsub213ss calls=20000 bits=128 mismatch=0
+  vfmadd231sd calls=20000 bits=128 mismatch=0
+  vfmadd231ss calls=20000 bits=128 mismatch=0
+  vfnmadd231sd calls=20000 bits=128 mismatch=0
+  vfmadd132sd calls=20000 bits=128 mismatch=0
+  rc=1 vfmadd213ss mismatch=15804 -> FAIL (期待どおり)
+== 判定: 本検証 PASS (全 bit 不一致 0) / ネガコン(a) FAIL / ネガコン(b) FAIL / ネガコン(c) FAIL -> PASS
+== wall 0.82 秒 (N=20000 語彙 7 件/各)
 ```
