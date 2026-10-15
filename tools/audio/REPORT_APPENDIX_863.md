@@ -207,3 +207,43 @@
 ### 未解決 (追跡 **#863**)
 
 (a) 起床後〜書き込みの区間の計測 (wasm の変更が要る。新規 issue は起票していない)。(b) 再現条件の特定 (負荷・タイミングとも相関は見えていない)。(c) 初回 run 仮説の検証 (キャッシュ状態を分けた実測)。
+
+## 30 AU-15 (#863) producer の write 単位の記録を ctl に追加 (測定 commit `89b10538`)
+
+- 変更: `287655cf` で `flasio.c` の `thread_fn` が write ごとに `[w (書き込み開始 frame), fill, 起床µs, 完了µs]` を `fla_ctl_t.pw_trace` へ記録 (TS は `producerStats().writes`)。`89b10538` で窓を 256 → **1024 件**に拡大 (`FLA_PW_N`・`FLA_CTL_SIZE` 4488 → 16776。gcc で `sizeof` = 16776・`offsetof(pw_trace)` = 388 を実測)。旧窓 (256 件) は既知の失敗位置を覆わなかった (レビュー指摘)。
+- `pwInfo` (`e2e.mjs`): 窓より前は `out_of_window`、窓内に直前の write が無いものは `none`、write 0 件は `no_writes`。差分は u32 の剰余 `(b - a) >>> 0` で取る。ネガティブコントロール 4 通り: `node tools/audio/integration/pwinfo_negctl.mjs` (`e2e.mjs` の `pwInfo` を抜き出し、通算 1500 件の合成 write を流す)。出力:
+
+```
+窓より前 (失敗 56576、窓先頭 w=121856)
+  pw_n=1500 pw_w_step=256 pw_lat_max_us=30 pw_gap_max_us=10000 pw_at_underrun=[out_of_window]
+窓の内側 (失敗 256100、k=1000 の write の直後)
+  pw_n=1500 pw_w_step=256 pw_lat_max_us=30 pw_gap_max_us=10000 pw_at_underrun=[255488/256/9980000/9980030,255744/256/9990000/9990030,256000/256/10000000/10000030,256256/256/10010000/10010030]
+窓の外側 (失敗 384050、最新 write w=383744 より後)
+  pw_n=1500 pw_w_step=256 pw_lat_max_us=30 pw_gap_max_us=10000 pw_at_underrun=[383232/256/14970000/14970030,383488/256/14980000/14980030,383744/256/14990000/14990030]
+writes 空 (pw_n=0)
+  pw_n=0 pw_w_step=none pw_lat_max_us=none pw_gap_max_us=none pw_at_underrun=[no_writes]
+```
+
+- 測定 commit: `89b10538` (コードを変えた最後の commit)。`git diff 89b10538 38bbeed0 -- tools/audio/src tools/audio/integration src/runtime` は 0 行。本修正 (`38bbeed0` の後の commit) はコードを変えず、本ファイル・新規付録 `REPORT_APPENDIX_863_287655cf.md`・`docs/DOC_MAP.md` だけを変える。
+- 素材: 測定時の run の `$ARTIFACTS_DIR` に `toolchain-emsdk` が無く、pin の emcc 6.0.12 を `emsdk install 6.0.12` で上流から導入した。検収時の `$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` の `upstream/emscripten/emscripten-version.txt` は `"6.0.12"` で、`tools/m1/flags.sh` の pin と一致。バイナリの同一性は未確認。
+- 測定: `bash tools/audio/integration/e2e.sh` (foreground・`TMPDIR=$RUNNER_TEMP`)。
+
+| 区分 | run 数 | 結果 | 判定行 (dev:tone) |
+|---|---|---|---|
+| 1 回目 (導入直後・e2e.sh 全体 44.9 s) | 1 | **FAIL・exit 1** (11/13。dev:tone・dev:underruns) | `first_underrun_frame=39680` `pw_n=560` |
+| 2〜9 回目 (上限・停止条件なし) | 8 | 8/8 PASS・exit 0 (e2e.sh 10〜11 s) | `pw_n` 575〜579・`pw_lat_max_us` 35〜400・`pw_gap_max_us` 10105〜12065 |
+
+- 失敗 run の `pw_at_underrun` (窓内で捕獲): `[39168/768/2715608877/2715608883, 39424/512/2715618903/2715699147, 39680/0/2715699153/2715699163, 39936/256/2715699163/2715699167]`。判定行 (`loc` 全文) は REPORT にも保存先にも残っていない。`first_err_frame`・`prod_cb_max_us` は未取得。
+- 読み: w=39424 の起床→完了 (`tw`→`td`) は **80,244 µs** (直前の起床間隔 10,026 µs の約 8 倍)。完了時刻は `do_buffer` の後で取るため、`fla_in_read`・memset・bufferSwitch 本体・`fla_out_write` と、スレッド停止の全部を含む。次の write `w=39680` は充填 0 で起床しており、この停止の間に underrun になった。
+- **撤回**: 旧版の「同 run の `cb_max_us` の最大 40 µs」は出典を示せないため撤回する。`cb_max_us` は `do_buffer` で `t0` (`fla_in_read`・memset の後) から bufferSwitch 本体の終わりまでを測り、`fla_out_write` は含まない。よって 80 ms の内訳 (bufferSwitch 本体・本体の外の `fla_in_read`/memset/`fla_out_write`・スレッド停止) は未確定。
+- PASS の 8 run: 起床→完了の最大 35〜400 µs、起床間隔の最大 10.1〜12.1 ms。旧 287655cf の 31 run の値は [REPORT_APPENDIX_863_287655cf.md](REPORT_APPENDIX_863_287655cf.md) を参照。
+- `pw_trace` の読み取り: `producerStats()` は `verify` から呼ばれ、e2e は再生中に polling する。`pw_n` が窓 (1024) を超えるまでは、読む slot と書く slot が重ならない。一周後は読み取り中の上書きが起きうる (`thread_fn` は plain store で公開順序を取らない)。診断用として許容し、判定条件には使わない。
+
+### 通算
+
+- 旧 `287655cf` の 31 run (全 PASS) と本節の 9 run を加え、§19〜§29 の 4 件 / 520 run に対して **5 件 / 560 run** (0.89%)。
+- 2 測定の間の `src` 差分は `flaudio.h` の定数 2 行のみ (`git diff 287655cf 89b10538 --stat -- tools/audio/src` = `flaudio.h | 4 ++--`、`FLA_PW_N` 256→1024・`FLA_CTL_SIZE` 4488→16776)。`flasio.c` は不変で、窓と ctl サイズの違いは pw_* の保持範囲にだけ効く。
+
+### 未解決 (追跡 **#863**。新規 issue は起票していない)
+
+(a) consumer (worklet) の quantum 時刻との突き合わせ (worklet 側に時刻を残す変更が要る)。(b) 再現条件の特定 (頻度 5/560)。(c) 目標充填 T を判定行へ出す。(d) 失敗 run の 80 ms 停止の内訳 (段ごとの計測が要る)。(e) 初回 run 仮説 (導入直後の 1 回目): キャッシュ状態との切り分けは未実施。
