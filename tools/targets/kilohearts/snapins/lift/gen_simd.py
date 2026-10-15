@@ -372,6 +372,31 @@ def gen(name, ret, params):
     return body
 
 
+V256_OPS = {'vaddps': 'fadd', 'vsubps': 'fsub', 'vmulps': 'fmul'}
+
+
+def gen256(name, ret, params):
+    """VEX.256 (ymm) の packed single 語彙 (8 lane f32) を LLVM IR 定義として返す。None = 未対応。
+    C に i256 の正体型が無いため C ではなく IR で定義する (呼出側と ABI を揃える)。
+    引数順は VEX 3 operand 形と同じ (a0 = src1, a1 = src2) で、lane 0 = bit [31:0]。"""
+    b = base_of(name)
+    ptys = [p.split()[0] for p in params]
+    if b not in V256_OPS or ret != 'i256' or ptys != ['i256', 'i256']:
+        return None
+    return ('define i256 @%s(i256 %%a0, i256 %%a1) {\n'
+            '  %%x = bitcast i256 %%a0 to <8 x float>\n'
+            '  %%y = bitcast i256 %%a1 to <8 x float>\n'
+            '  %%r = %s <8 x float> %%x, %%y\n'
+            '  %%o = bitcast <8 x float> %%r to i256\n'
+            '  ret i256 %%o\n}') % (name, V256_OPS[b])
+
+
+def stub256(name, ret, params):
+    """未対応の i256 宣言は abort() スタブ (SSE の未対応と同じ扱い)。呼ばれたら abort する。"""
+    sig = ', '.join('%s %%a%d' % (p.split()[0], i) for i, p in enumerate(params))
+    return 'define %s @%s(%s) {\n  call void @abort()\n  unreachable\n}' % (ret, name, sig)
+
+
 APPROX_TABLE_HELPERS = r'''/* 実機 (AMD Ryzen 9 9950X) の rcpps / rsqrtps 近似表 (extract_approx_tables.py が実機から抽出・検証)。
  * 構造: エントリ = (e=127 基準の mantissa field, 下位 23bit)。rcp = mantissa>>11 の索引、
  *       rsq_odd / rsq_even = rsqrtps の入力 exponent field が奇/偶 (偶は √2 因子で別表)。
@@ -405,12 +430,22 @@ def main():
     seen = set()
     out = [HEAD]
     approx_needed = set()
+    ll_out = []
     for line in open(src):
         m = DECL.match(line)
         if not m or m.group(2) in seen:
             continue
         ret, name, ps = m.group(1), m.group(2), split_params(m.group(3))
         seen.add(name)
+        if 'i256' in [ret] + [p.split()[0] for p in ps]:
+            ir = gen256(name, ret, ps)
+            if ir is None:
+                rep['undefined'].append('%s %s(%s)' % (ret, name, ','.join(p.split()[0] for p in ps)))
+                ir = stub256(name, ret, ps)
+            else:
+                rep['generated'].append('%s %s(%s)' % (ret, name, ','.join(p.split()[0] for p in ps)))
+            ll_out.append(ir)
+            continue
         ptys = [p.split()[0] for p in ps]
         sig = '%s %s(%s)' % (CT[ret], name, ', '.join('%s a%d' % (CT[t], i) for i, t in enumerate(ptys)) or 'void')
         body = gen(name, ret, ps)
@@ -438,6 +473,11 @@ def main():
         except Exception as e:                                      # pragma: no cover
             print('[gen_simd] WARN approx tables unavailable (%s) -> IEEE fallback' % e)
     open(dst, 'w').write('\n'.join(out) + '\n')
+    ll_dst = dst + '.i256.ll'
+    if ll_out:
+        open(ll_dst, 'w').write('\n'.join(['declare void @abort()'] + ll_out) + '\n')
+    elif os.path.exists(ll_dst):
+        os.remove(ll_dst)
     if len(sys.argv) > 4 and sys.argv[3] == '--report':
         json.dump(rep, open(sys.argv[4], 'w'), indent=1)
     print('[gen_simd] helpers %d, undefined(abort stub) %d %s approx_tables=%s'
