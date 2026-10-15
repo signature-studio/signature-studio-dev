@@ -32,7 +32,7 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 - 1 回目: 1 関数ずつ・並列 4・`timeout 60` で 540 秒 (`timeout` で打ち切り) 実行。結果行 651 件 (ok 647・fail 4)。
 - 2 回目: 1 回目で結果行が無かった 3,905 件 (= 4,556 − 651 結果行) を入力とした。入力リストは保存していないため、件数は 1 回目の結果行数からの算出 (実測ではない)。420 秒 (`timeout` で打ち切り) で実行。結果行 514 件 (ok 499・fail 15)。
 - 合計: 結果行 1,165 件 (`0x18002dac0` は両回で fail のため 1 件重複)。一意の 1,164 件のうち **成功 1,146・失敗 18** (`data/retdec_lift_4284.csv`)。
-- 失敗 18 件の再実行 (本 PR の HEAD で実測・並列 4・`RETDEC` を指定): 61 秒。内訳は rc=1 14 件・rc=124 (60 秒 timeout) 1 件・rc=137 (SIGKILL・原因未確認) 3 件。CSV の status には `fail rc=N` を記録した (旧記載の rc=124 2 件は、この再実行と一致しなかったため訂正)。
+- 失敗 18 件の再実行 (並列 4・`RETDEC` を指定): 61 秒 (旧記載。本 run では再測定できず、時間は §5 で「未計測」)。内訳は rc=1 14 件・rc=124 (60 秒 timeout) 1 件・rc=137 (SIGKILL・原因未確認) 3 件。CSV の status には `fail rc=N` を記録した (旧記載の rc=124 2 件は、この再実行と一致しなかったため訂正)。
 - 実測の load average は 4 並列で 3.9〜4.1 (4 コア・`uptime`)。1 関数あたりの時間は計測していない (合計の所要時間のみ)。
 
 ## 2.5 D5 (x64c 主役) との比較
@@ -53,24 +53,28 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 
 ## 4. 未解決
 
-## 5. 失敗 18 件の分類・件数の出典 (T-SH-120 / #5179)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 未実施 3,392 件 (4,556 − 1,164) の lift | 受入条件 (4,556 件) 未達。RetDec の 1 プロセス 60 秒上限と 1 run の時間内では完了不可 | 親 #4363 (open・既存) |
+| 失敗 18 件 (decoder の `Should not be possible.`・メモリ・timeout) | 完全な lift にならない | 親 #4363 (open・既存)。§5 の分類を参照 |
+| `ipp_entries.py` の 1,956 (pefile) と生 `.pdata` の 5,475 の差 | REPORT.md の件数が生 PE と合わない | 出典は §5 で確定済み (`REPORT.md` の件数修正は本 PR の REPORT.md 1 行) |
+| lift 出力の意味検証 (D15 `jmp [mem]`・D11・D14) | lift の正しさは未確認 | 親 #4363 (open・既存) |
 
-測定 commit: 本 PR の commit (`scripts/elastique_fail_classify.py` を追加)。再現: `python3 tools/shared/elastique/scripts/elastique_fail_classify.py tools/shared/work/win/elastique_x64.dll tools/shared/elastique/data/retdec_lift_4284.csv`。
+## 5. 失敗 18 件の分類・件数の出典 (T-SH-141 / #5179)
+
+測定 commit: `cddf68a89` (`scripts/elastique_fail_classify.py` を追加した commit。計測のコードは同一で、後続の fix commit は docstring の ID 修正と REPORT の文言修正のみ)。
+再現: `python3 tools/shared/elastique/scripts/elastique_fail_classify.py tools/shared/work/win/elastique_x64.dll tools/shared/elastique/data/retdec_lift_4284.csv`
+(入力 DLL は `fl-win64` の `block24357_PE.bin` を `tools/shared/work/win/elastique_x64.dll` に複製。sha256 先頭 16 桁 `8551e92209cdd2ce`)。
 
 | 項目 | 実測 |
 |---|---|
-| 再実行 (`main` の HEAD `2a3b9c9f9`・並列 4・`timeout 60`) | 61 秒 (wall)。rc=1 14・rc=124 1・rc=137 3 で §2 と一致 |
-| 単独実行 (exact range・1 関数ずつ) | rc=1 の 14 件は各 0.7 秒台・RSS 約 151 MB で `capstone2llvmir: Should not be possible.`。rc=124 の 4 件 (`0x180018fe0`・`0x18001fb40`・`0x180026520`・`0x18002dac0`) は 60 秒で打ち切り、RSS 約 7.5 GB (計測できた 3 件) |
-| rc=137 の見方 | 4 件が並列 4 で同時に約 7.5 GB を使うと 16 GB の runner で SIGKILL されうる (単独では rc=124)。仮説で、OOM と断定はしていない (dmesg 不可) |
-| rc=1 の 14 件の共通点 | 全件に EVEX マスク付き `vpshufd` / `vshufi32x4` (`{k}`) がある。同じ命令を含む関数は成功 1,146 件 (`ok`) の中に 0 件。関連は確認したが、因果は未切り分け (capstone2llvmir の入力を絞る実験は未実施) |
+| 件数 (本 run で `cddf68a89` のスクリプトを実行) | 生 `.pdata` 5,475・`.text` 内 4,556・pefile 1,956 |
+| fail 行の内訳 (CSV の `status`) | 計 18 件・互いに素: rc=1 14 件・rc=124 1 件 (`0x18001fb40`)・rc=137 3 件 (`0x180018fe0`・`0x180026520`・`0x18002dac0`) |
+| rc=1 14 件と EVEX マスク付き命令 | 14 件全件に `vpshufd` / `vshufi32x4` (`{k}`) がある。ok 1,146 件のうち同命令を含むものは 0 件。因果は未切り分け (capstone2llvmir の入力を絞る実験は未実施) |
+| rc=124・137 の 4 件と EVEX マスク付き命令 | 4 件とも同命令は無い (スクリプトで確認)。原因は未確認 |
+| 再実行の時間・load・RSS (並列 4・`timeout 60`、単独実行) | **未計測**。本 run の環境に RetDec 本体が無く、`toolchain-retdec` も素材 `fl-win64` の取得に含まれていないため再実行できなかった。§2 の旧記載の時間は本節では再現していない |
+| rc=137 の原因 | 未確認 (OOM と断定しない。dmesg 不可) |
 | 件数の出典 | 生 `.pdata` 5,475 スロット・`.text` 内 4,556・pefile 1,956。pefile の 1,956 は生スロットの先頭 1,956 件 (file 順) の接頭辞。pefile に無い 3,519 件 = `.text` 内 2,600 件 + IPPCODE 919 件 |
 | pefile が 1,956 で止まる原因 | pefile の `parse_exceptions_directory` が `Unknown UNWIND_CODE at 0x4a6038` の警告で打ち切る (`pe._PE__warnings` で確認)。以後の RUNTIME_FUNCTION は読まれない |
 
 注: 本節の CSV は `main` の `data/retdec_lift_4284.csv` (1,164 件・fail 18)。`origin/4363-retdec-pdata-rest` は未 merge で 3,364 件・fail 89 (rc=1 85・124 1・137 3) まで進んでいる。その 89 件は本節の対象外 (未確認)。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 未実施 3,392 件 (4,556 − 1,164) の lift | 受入条件 (4,556 件) 未達。RetDec の 1 プロセス 60 秒上限と 1 run の時間内では完了不可 | 子 issue (本 PR の issue 内に記載) |
-| 失敗 18 件 (decoder の `Should not be possible.`・メモリ・timeout) | 完全な lift にならない | 子 issue |
-| `ipp_entries.py` の 1,956 (pefile) と生 `.pdata` の 5,475 の差 | REPORT.md の件数が生 PE と合わない | 子 issue (件数の出典修正) |
-| lift 出力の意味検証 (D15 `jmp [mem]`・D11・D14) | lift の正しさは未確認 | 子 issue |

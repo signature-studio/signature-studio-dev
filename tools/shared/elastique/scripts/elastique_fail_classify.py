@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""élastique の RetDec 1 関数 lift の失敗 (data/retdec_lift_4284.csv の fail 行) を分類し、pdata 件数の出典を揃える (T-SH-120 / #5179)。
+"""élastique の RetDec 1 関数 lift の失敗 (data/retdec_lift_4284.csv の fail 行) を分類し、pdata 件数の出典を揃える (T-SH-141 / #5179)。
 
 使い方: python3 elastique_fail_classify.py <dll> <retdec_lift_4284.csv>
 出力: 件数の出典 (生 .pdata・.text 内・pefile)、fail 行の rc 内訳、各 fail 関数の EVEX マスク付き vpshufd/vshufi32x4 の有無。
