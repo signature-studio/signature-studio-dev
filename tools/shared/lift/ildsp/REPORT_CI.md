@@ -65,7 +65,7 @@ closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | IAT 10 種の stub 化の方針 (C 実装か wasm import)。直接 call のサンク 2 種 (0x1b932c・0x1b9334) と末尾 jmp の 2 種 (0x1bb426・0x1bb47a) を含む | wasm 化 | [T-SH-65] #3318 |
-| SSE helper 8 種 (`__asm_`) の C 実装 | wasm 化 | 解消: §7 (#4229) |
+| SSE helper 8 種 (`__asm_`) の C 実装 (解消は §7。5 種は #4229 で C 実装済み) | wasm 化 | [T-SH-65] #3318 |
 | 間接 call 4 件の trap 化 (ac 4) | 正常系の到達 | [T-SH-65] #3318 (到達実測は #3250) |
 | 閉包の取りこぼし: 直接 jcc 先 function_1801aef40 (§2-2 (a))。閉包規則を変えるか。変えれば 36/961 が変わり再測定 | 範囲・wasm 化の意味 | [T-SH-65] #3318 |
 | 計算ジャンプ表の経路 (n = 1〜16) が IR で `ret` になる (§2-2 (b))。表を解く経路を IR に戻すか、欠落を受入として扱うかを決める。census は検出しないので検出器も対象 | 1〜16 バイトの書き込みの欠落 (silent) | [T-SH-65] #3318 |
@@ -126,7 +126,8 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 ### 7-5. 未解決 (起票先)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| census に store の検査を入れる (受入条件 3 の「census か差分で FAIL」の census 側)。現状は復元 pass の件数検査だけ | store 欠落の検出器が 1 つだけ | #4229 の残り (下の子 issue) |
-| 0x1aefa9 の `%arg1` 解決は「入口 store が 1 回だけ」の前提。一般の形は未対応 (pass が exit 1 で止まる) | 別の CreateInstance 形に当たると止まる | #3318 |
+| census に store の検査を入れる (受入条件 3 の「census か差分で FAIL」の census 側)。現状は復元 pass の件数検査だけ。#4229 本文から外し、原文のまま子 [T-SH-112] #4293 に移した | store 欠落の検出器が 1 つだけ | [T-SH-112] #4293 |
+| 0x1aefa9 の `%arg1` 解決は「入口 store が 1 回だけ」の前提。一般の形は未対応 (pass が exit 1 で止まる) | 別の CreateInstance 形に当たると止まる | [T-SH-65] #3318 |
+| `movapd` の helper 分岐は実装したが、復元後 IR に `movapd` が無く生成 0 件。テストと NC は無い | 実行されない分岐 (未検証) | [T-SH-65] #3318 |
 | 差分 (native と wasm の全バイト比較・gate) | 復元の意味論が未検証 | [T-SH-66] #3320 |
 | IAT stub・閉包の取りこぼし・emcc | wasm 化 | [T-SH-65] #3318 |
