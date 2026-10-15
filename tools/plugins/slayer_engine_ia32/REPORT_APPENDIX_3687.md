@@ -14,24 +14,26 @@
 - **x64 の生成 C は不変**: `x64_regress_1099.py <origin/main の tools/ott> 8` で `same 8/8`。
 - **命令単体の一致 (`x87_trans_direct.c`、n=200,000 × seed 1・2)**:
   - fprem 完全剰余 (e<64) 100%・部分剰余 (e≥64、d∈[64,255]) 100%。 値も FSW (C0〜C3) も一致。
-  - fsin: |a|≤π/4 99.80%、π/4<|a|≤2^10 98.27%、|a|≤2^20 11.3%、2^20<|a|<2^63 0.09%。 **大きい引数で一致が落ちる** (§5)。
-  - f2xm1 (|x|≤1) 66.2% (ulp は 0・1・2 のみ)。 定義域外 (1<|x|≤8) 0%。
+  - fsin: |a|≤π/4 99.80%、π/4<|a|≤2^10 98.27%、|a|≤2^20 11.3%、2^20<|a|<2^63 0.09%。 **大きい引数で一致が落ちる** (§5)。 生成 C は |a|≤π/4 の外を fail-fast にする (§2)。
+  - f2xm1 (|x|≤1) 66.2% (ulp は 0・1・2 のみ)。 定義域外 (1<|x|≤8) 0%。 生成 C は |x|≤1 の外を fail-fast にする (§2)。
   - fyl2x (x>0) 73.5% (ulp 0・1)。 x≤0 (NaN・−inf 経路) 100%。
-- **差分試験 (`x87_diff.py`、10 万試行、seed 1)**: op 表は 83 template・251 instance (従来 78・246)。 主試行 bit 一致 **93,985 (93.98%)**。 従来 op 表の再現 (`--skip` で新 5 命令を外す) は **96,510 (96.51%)** で、従来の REPORT_APPENDIX_2966 §3 の値と一致。
-- **ネガティブコントロール (`--nega-trig`: fyl2x の log2 を自然対数に取り違える)**: 93,985 → **93,894 (−91)** で検出。
+- **差分試験 (`x87_diff.py`、10 万試行、seed 1)**: op 表は 83 template・251 instance (従来 78・246)。 主試行 bit 一致 **93,984 (93.98%)** (変更前の HEAD `7b5c75b3f` でも 93,984 で、本 PR の変更による差はない)。 定義域外の fsin/fcos/f2xm1 呼び出しは 6,415 件 (計算を続けて比べる。 製品ビルドでは fail-fast)。 従来 op 表の再現 (`--skip` で新 5 命令を外す) は **96,510 (96.51%)** で、従来の REPORT_APPENDIX_2966 §3 の値と一致。
+- **ネガティブコントロール (`--nega-trig`: fyl2x の log2 を自然対数に取り違える)**: 93,984 → **93,893 (−91)** で検出。
 - **fscale の指数域外 (受入 4、§4)**: f80 では有限・f64 では無限になる結果が 200,000 件中 **21,036 件 (seed 1)・20,804 件 (seed 2)**。 f64 出力は両方 inf で一致して見えるため、bit 一致は 100% と出る (§4 の注)。
 
 ## 2. lowering
 
 | 命令 | 生成 C (x64c `ia32_only`) | runtime (`tools/ott/rt/ott_x87.h`) | 注 |
 |---|---|---|---|
-| `fsin` `fcos` | `x87_trig(0)` / `x87_trig(1)` | `x87_trig`: 有限で \|ST0\|<2^63 は sin/cos・C2=0。 有限で 2^63 以上は ST0 不変・C2=1。 ±inf は C2=0 で default NaN | ±inf の C2=0 は native 実測 (§5) |
-| `f2xm1` | `x87_f2xm1()` | `expm1(x·ln2)`。 ln2 は hi/lo に分ける | 定義域 \|x\|≤1 |
+| `fsin` `fcos` | `x87_trig_at(0|1, addr)` → `x87_trig` | 定義域 \|ST0\|≤π/4 の外 (有限・<2^63) は `ott_unsup` (fail-fast・runtime)。 `x87_trig`: 有限で \|ST0\|≥2^63 は ST0 不変・C2=1。 ±inf は C2=0 で default NaN | 定義域の上限は PM 判断待ち (既定案 π/4)。 ≥2^63 と ±inf は native 実測 (§5) |
+| `f2xm1` | `x87_f2xm1_at(addr)` → `x87_f2xm1` | 定義域 \|x\|≤1 の外は `ott_unsup` (fail-fast・runtime)。 `expm1(x·ln2)`。 ln2 は hi/lo に分ける | 静的 unsup にしない (pass1 の unsup 0 を保つ) |
 | `fyl2x` | `x87_fyl2x()` | `ST1 = ST1·log2(ST0)` を計算して pop。 ST0<0 は default NaN。 NaN は伝播 | |
 | `fprem` | `x87_fprem()` | 完全: 商の |Q| mod 8 を C0(Q2)・C3(Q1)・C1(Q0)。 部分 (e≥64): C2=1・商のビット 0・除数を `2^(32·(floor(e/32)−1))` 倍して `fmod` | 部分の s は native 実測 (§5)。 ST1=0 か ST0=inf は default NaN |
 
 - default NaN は `x87_indef()` (負の quiet NaN・f80 の `0xFFFF C000…` に対応)。
 - C1 は fprem の商ビットだけ模型化。 trig・f2xm1・fyl2x の C1 (丸め方向) は未模型化 (ADR D28 制限 6 と同じ)。
+- 定義域外は計算値を返さない。 生成 C の入口 (`x87_trig_at`・`x87_f2xm1_at`) が `ott_unsup` で停止する (runtime の fail-fast。 静的 unsup ではない)。 差分試験だけ `-DOTT_X87_DOMAIN_SOFT` で計算を続け、定義域外の呼び出し数 (主試行 6,415 件) を別に出す。
+- 停止の確認 (gcc で `ott_x87.h` を直接実行): fsin 0.5 は値を返し、fsin 0.9・1.0・3.0・1e4 は `[ott] UNSUPPORTED instruction` で停止。 f2xm1 0.5 は値、f2xm1 3 は停止。
 - 試験の FSW 比較で、native 側は `fninit` で試行ごとに初期化する (x87_diff は既存、 x87_trans_direct は命令ごと)。 native の FSW は持ち越されるため、初期化しないと未定義の C0/C3 が前の命令から混ざる (§5)。
 
 ## 3. 命令単体の実測 (`x87_trans_direct.c`)
@@ -40,7 +42,7 @@
 
 | 類 (n = 200,000) | seed 1 一致 | seed 2 一致 | ulp 0/1/2/≥3 (seed 1) | FSW 不一致 (seed 1) |
 |---|---:|---:|---|---:|
-| fsin \|a\|≤π/4 | 99.80% | 99.82% | 199,604/396/0/0 | 0 |
+| fsin \|a\|≤π/4 (定義域内・生成 C が計算) | 99.80% | 99.82% | 199,604/396/0/0 | 0 |
 | fsin π/4<\|a\|≤2^10 | 98.27% | 98.28% | 196,540/3,086/146/228 | 0 |
 | fsin \|a\|≤2^20 | 11.29% | 11.30% | 22,583/30,567/22,675/124,175 | 0 |
 | fsin 2^20<\|a\|<2^63 | 0.09% | — | 174/321/345/199,160 | 0 |
@@ -66,15 +68,15 @@
 
 | 試験 | bit 一致 | FSW 不一致 試行 (うち m80 なし) | 命令別の一致 (一致/含む試行) |
 |---|---:|---:|---|
-| 主 (seed 1) | 93,985 (93.98%) | 166 (45) | fsin 2,750/3,531 (77.9%)・fcos 2,670/3,426 (77.9%)・f2xm1 1,971/3,492 (56.4%)・fyl2x 396/444 (89.2%)・fprem 346/432 (80.1%)・fscale 389/419 (92.8%) |
+| 主 (seed 1) | 93,984 (93.98%) | 166 (45) | fsin 2,750/3,531 (77.9%)・fcos 2,670/3,426 (77.9%)・f2xm1 1,971/3,492 (56.4%)・fyl2x 396/444 (89.2%)・fprem 346/432 (80.1%)・fscale 389/419 (92.8%) |
 | 主 (seed 2) | 94,111 (94.11%) | — | — |
 | 従来 op 表 (`--skip` 5 命令) | 96,510 (96.51%) | 77 (0) | 従来 REPORT_APPENDIX_2966 §3 の値と一致 (試行列が同じ) |
-| ネガコン `--nega-trig` (fyl2x を自然対数に取り違え) | 93,894 (93.89%) | 166 (45) | fyl2x 305/444 (主は 396/444)。 主との差 −91 件 |
+| ネガコン `--nega-trig` (fyl2x を自然対数に取り違え) | 93,893 (93.89%) | 166 (45) | fyl2x 305/444 (主は 396/444)。 主との差 −91 件 |
 | `--no-e` (m80 と 80bit 格納を外す) | 95,252 (95.25%) | 76 (76) | fsin 2,887/3,635・fcos 2,818/3,578・f2xm1 1,932/3,490・fyl2x 418/461・fprem 333/412・fscale 363/391 |
 | `--only` fscale 系 | 98,107 (98.11%) | 0 | fscale 5,277/5,376 |
 
 - m80 を含む試行 (主): 14,149 件中 12,148 件 (85.86%)。 従来 op 表は 14,269 中 12,525 (87.78%)。
-- 主の FSW 不一致の最初の op: fxam 54・ftst 30・fcom 25・fcomp 20・fprem 15・fcos 11・fsin 8・fcompp 3。 比較命令が 129 件を占める。
+- 主の FSW 不一致の最初の op: fxam 54・ftst 30・fcom 25・fcomp 20・fprem 15・fcos 11・fsin 8・fcompp 3。 比較命令 (fcom・fcomp・ftst・fxam の和 129 件。 fcompp の 3 件は含まない) が 129 件を占める。
 - 注: fscale の指数域外は f64 出力では両方 inf で一致して見える (§3 の 21,036 件)。 f80 のまま比べる出力を持たないので、この harness では f80 の差を直接は測れない。
 
 ## 5. 読み方・原因の見立て
@@ -94,11 +96,11 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| fsin/fcos の大引数 (\|a\|>π/4) の x87 還元 (66 bit π) を模型化していない。 一致は 98.3% 以下・\|a\|>2^10 で 11% 以下 (§3) | 大きい引数の fsin/fcos の値が native と違う (1〜数百 ulp) | PM 判断 (子 issue の候補。 本 PR では起票しない: 受入条件の範囲外) |
+| fsin/fcos の大引数 (\|a\|>π/4) の x87 還元 (66 bit π) を模型化していない。 一致は 98.3% 以下・\|a\|>2^10 で 11% 以下 (§3)。 本 PR は \|a\|>π/4 を fail-fast にする | 定義域外は停止する (無言の誤値は出さない)。 定義域内 (≤π/4) の一致は 99.8% | PM agent の判断待ち: fsin/fcos の計算域の上限・既定案: π/4 (子 issue の候補。 本 PR では起票しない) |
 | f2xm1 (\|x\|≤1) の 1 ulp 級の差 (一致 66%)・fyl2x (x>0) の 1 ulp 級の差 (一致 73%) | 差分試験の一致率を下げる。 原因未確認 (§5) | 本 PR の未解決 (原因の特定は未実施) |
-| f2xm1 の定義域外 (1<\|x\|≤8、一致 0%) | SDM で未定義。 FL の呼び出しが定義域内か未確認 | PM 判断 |
-| 非 m80 の FSW 不一致 45 件 (no-e 76 件) | 1 ulp 級の差の伝播と推定 (§5)。 比較・fprem の商ビット | PM 判断 (原因未確認) |
-| fscale の「f80 有限・f64 無限」21,036 件 (seed 1) | f64 出力では見えない (§4)。 f80 出力の harness が要る | 本 PR で件数のみ実測。 harness の拡張は PM 判断 |
+| f2xm1 の定義域外 (1<\|x\|≤8、一致 0%) | 定義域外は fail-fast (本 PR)。 FL の呼び出しが定義域内か未確認 | PM agent の判断待ち: f2xm1 の計算域の確認・既定案: \|x\|≤1 (本 PR の既定) |
+| 非 m80 の FSW 不一致 45 件 (no-e 76 件) | 1 ulp 級の差の伝播と推定 (§5)。 比較・fprem の商ビット | PM agent の判断待ち: 非 m80 の FSW 不一致の原因の調査を子 issue にするか・既定案: 起票しない (PM 判断まで未解決表に残す) |
+| fscale の「f80 有限・f64 無限」21,036 件 (seed 1) | f64 出力では見えない (§4)。 f80 出力の harness が要る | PM agent の判断待ち: fscale の harness を f80 出力に拡張するか・既定案: 拡張しない (件数のみ本 PR で実測) |
 | x87 fnsave・frstor・fnstenv・fldenv (4 件) | lift の unsup 4 件が残る | [PLG-G2-30] (#3688) |
 | C1 の丸め方向 (trig・f2xm1・fyl2x・fst m32 等の直後) | FSW の C1 を比べる箇所では違う | `ott_x87.h` 制限 (6)・ADR D28 制限 6・#3749 (既存) |
 
@@ -118,5 +120,5 @@ mkdir -p $RUNNER_TEMP/before && git archive origin/main tools/ott | tar -x -C $R
 python3 x64_regress_1099.py $RUNNER_TEMP/before 8         # §1 (same 8/8)
 ```
 
-- 差分確認 (測定 commit 以降のコード差分): `git diff 7694f4bdd HEAD -- tools/ott tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_trans_direct.c tools/plugins/slayer_engine_ia32/lift_text.py tools/plugins/slayer_engine_ia32/x64_regress_1099.py` の出力は `x87_diff.py` の docstring だけ (`7ab16078d`。 usage 行の書き換えと説明 3 行の追加。 動作は変わらないので再測定は不要)。 lowering・runtime・試験本体の差分は 0 行。
+- 差分確認 (測定 commit 以降のコード差分): 定義域判定 (fail-fast) の追加により、`tools/ott` の runtime・生成 C と差分試験の lowered 側にコード差分が入った。 差分試験の主試行の値 (93,984) は変更前後で同じ。 `git diff 7694f4bdd HEAD -- tools/ott tools/plugins/slayer_engine_ia32` の範囲を §8 に記録する。
 - 大物: `find tools/plugins/slayer_engine_ia32 -type f -size +20M -not -path '*/work/*'` は 0 件。 生成物は `work/` (gitignore)。

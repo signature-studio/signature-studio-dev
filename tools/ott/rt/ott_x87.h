@@ -132,6 +132,26 @@ static inline void x87_f2xm1(void) {
     x87_set(0, expm1(x * 0.693147180559945286226764 + x * 2.319046813846299558e-17));
 }
 
+/* 生成 C の入口 (x64c が呼ぶ)。 検証した定義域の外は計算値を返さず fail-fast (ott_unsup) する。
+ * 定義域外の数値は x87_trig / x87_f2xm1 (数値核) だけが持つ。 差分試験 (OTT_X87_DOMAIN_SOFT) は定義域外の呼び出しを数えて計算を続ける。 */
+#ifdef OTT_X87_DOMAIN_SOFT
+extern unsigned long ott_x87_dom_hits;
+#define X87_DOM_FAIL(addr, what) (ott_x87_dom_hits++)
+#else
+#define X87_DOM_FAIL(addr, what) ott_unsup((addr), (what))
+#endif
+#define X87_TRIG_DOM 0.7853981633974483   /* fsin/fcos の計算域 |ST0| <= pi/4 (定義域の上限は PM 判断待ち・既定案) */
+static inline void x87_trig_at(int cosine, uint64_t addr) {
+    double v = x87_st(0);
+    if (isfinite(v) && fabs(v) > X87_TRIG_DOM && fabs(v) < 9223372036854775808.0)
+        X87_DOM_FAIL(addr, "fsin/fcos: |arg| > pi/4 outside the verified domain (66-bit pi reduction not modeled)");
+    x87_trig(cosine);
+}
+static inline void x87_f2xm1_at(uint64_t addr) {
+    if (fabs(x87_st(0)) > 1.0) X87_DOM_FAIL(addr, "f2xm1: |arg| > 1 outside the verified domain");
+    x87_f2xm1();
+}
+
 /* FYL2X: ST(1) = ST(1) * log2(ST(0)) を計算してから pop。 ST(0) < 0 は default NaN */
 static inline void x87_fyl2x(void) {
     double x = x87_st(0), y = x87_st(1), r;

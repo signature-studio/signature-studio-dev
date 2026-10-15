@@ -395,8 +395,8 @@ def build_ref(wd, skip_build):
         src_n = os.path.join(HERE, 'x87_diff_native.c')
         src_l = os.path.join(HERE, 'x87_diff_lowered.c')
         subprocess.run(['gcc', '-O1', '-w', '-I', wd, '-o', bn, src_n, '-lm'], check=True)
-        subprocess.run(['gcc', '-O1', '-w', '-I', RT, '-I', wd, '-o', bl, src_l, os.path.join(RT, 'ott_cpu.c'), '-lm'],
-                       check=True)
+        subprocess.run(['gcc', '-O1', '-w', '-DOTT_X87_DOMAIN_SOFT', '-I', RT, '-I', wd, '-o', bl, src_l,
+                        os.path.join(RT, 'ott_cpu.c'), '-lm'], check=True)
     return bn, bl
 
 
