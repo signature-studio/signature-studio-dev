@@ -24,8 +24,8 @@ ELASTIQUE_DLL="$RUNNER_TEMP/fl-win64/extracted/block24357_PE.bin" DSP_IPP_DLL="$
 ```
 
 - 測定 commit: **`b7695367b`** (`ipp_target_ident.py` を追加した commit。以後このファイルは変えていない)。
-- 差分 (測定後のコード範囲): `git diff b7695367b HEAD -- tools/shared/elastique/ipp_target_ident.py` → 0 行。測定後に変えたのは本 REPORT (`tools/shared/elastique/REPORT_3420.md`) と `docs/DOC_MAP.md` の索引 1 行だけ (文書)。
-- 実測 (real): **51.22 s** (user 51.01 s)・load average (1 分) 0.33 → 0.71。HEAD で再実行した出力は、初回の出力と全行一致した。
+- 差分 (測定後のコード範囲): `git diff b7695367b HEAD -- tools/shared/elastique/ipp_target_ident.py tools/shared/elastique/ipp_entries.py tools/shared/elastique/data/entries.csv tools/ipp/data/ipp_matrix.csv` → 0 行。測定後に変えたのは、別スクリプト `ipp_target_nc.py` の追加 (§2 の NC・`4f857daa3`)、本 REPORT、`docs/DOC_MAP.md` の索引、main の取り込み (`ca6389458`) だけ。取り込みは測定対象に差分を入れていない。
+- 実測 (real): **51.22 s** (user 51.01 s)・load average (1 分) 0.33 → 0.71。最終 HEAD (`e45fb623f`) で再実行: real **50.16 s** (user 49.92 s)・load average 0.13 → 0.62。どちらの出力も §3 と全 25 行が一致した。
 - 出力は標準出力のみ。`tools/shared/work/` は使わない。
 - **ネガティブコントロール** (判定器が 1 命令の変化に反応することの確認): `ipp_target_nc.py` (測定 commit **`4f857daa3`**。`ipp_target_ident.py` は変えていない)。
   - 再現: `ELASTIQUE_DLL=... DSP_IPP_DLL=... python3 tools/shared/elastique/ipp_target_nc.py` (ファイルは書かない)。
