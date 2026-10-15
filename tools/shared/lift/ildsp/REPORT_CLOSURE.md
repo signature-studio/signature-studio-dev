@@ -107,6 +107,8 @@ IAT 名の内訳 (件数):
 - vcall `call [reg+disp]`: Transmitter 60 件、LimiterLite 5・TransientLooper 5 件ほか。WaveformColouring の 1 件は `0x1a9e2b: call qword ptr [rax+0x18]` (関数 `0x1a9e10`)。
 - `call reg`: Shimmer 4 件、LowFreqEnhancer・StereoEnhancer・TransientLooper 各 2 件、LimiterLite・Limiter 各 1 件。
 
+間接 call 4 件の到達 (T-SH-103 / #4230): 正の対照つきの実測は `REPORT_APPENDIX_4230.md`。`0x1b6ea0` が 0 を返すのは HeapAlloc 失敗か巨大サイズのときだけで、alloc 失敗注入で slot 1 の 4 件 (`0x1aedf6` を除く) が発火。既定入力での発火は非決定的で、扱いは未決。
+
 ### 5. 起票 (子 issue)
 | 子 | 対象 | 規模 (本節の数値) |
 |---|---|---|
