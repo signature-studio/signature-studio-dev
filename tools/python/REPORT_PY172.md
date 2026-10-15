@@ -1,7 +1,7 @@
 # PY-172 (#3219): patterns グループ系 4 関数の PE 解析と C/mock 実装 (2 件)
 
 親: #1804 (PY-48)。既知類型との関係: 該当なし (lift 作業ではない)。
-測定対象の commit: `51e3a96c` (main 取り込みの merge。コードを変えた最後の commit)。
+測定対象の commit: `6b8dc5a9d` (main (`a5966bbc7`) 取り込みの merge。競合解消を含む。コードを変えた最後の commit)。
 
 ## 結論
 
@@ -64,28 +64,33 @@ REPORT_PY42 は「署名の不一致 3 件 (getPatternGroupName・getPatternsInG
 
 ## 6. 測定
 
-測定 commit: `51e3a96c` (main (`2453c67c`) を merge。競合は `tools/python/host/fl_mock.mjs`・`tools/python/tests/provider_check.mjs` の 2 件で、両側の追加を残した。provider_check の件数は main 側 140 / 295 に PR の pe172 の +2 / −2 = **142 / 293**)。前回の測定 (`235f9cca`・`37e37e00`) は置き換えた。CPython 系 (`build_cpython_wasm.sh`・`src/`・`fetch_inputs.sh`・`build_flpy.sh`) は main 取り込みで差分 0 のため、既存の CPython wasm を使い、provider と flpy だけ再リンクした。
+測定 commit: `6b8dc5a9d` (main (`a5966bbc7`) を merge。競合は `tools/python/tests/provider_check.mjs` の 1 件。main 側の `pe120` (launchMapPages.length・実装 +1) と PR 側の `pe172` (+2) の両方を残した。件数は main 側 141 / 294 に pe172 の +2 / −2 を足して **143 / 292**)。前回の測定 (`51e3a96c`・`235f9cca`・`37e37e00`) は置き換えた。`work/` は gitignore 対象のため worktree に無く、`fetch_inputs.sh` と `build_cpython_wasm.sh` を再実行した。flpy と provider は測定 commit の tree で再リンクした。
 
 | 検査 | 手順 (コマンド) | 結果 |
 |---|---|---|
-| 素材 | `tar --zstd -xf fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` | rc 0・5.98 秒。`toolchain-emsdk` は R2 素材に無かったため、上流 `emscripten-core/emsdk` の tag `6.0.12` を `./emsdk install 6.0.12` (date 差 25 秒) と `./emsdk activate 6.0.12` で取得し [EMSDK] に置いた |
-| 入力 | `FL_WIN64_DIR=<展開先> bash fetch_inputs.sh` | rc 0 |
-| CPython wasm | `bash build_cpython_wasm.sh` | rc 0・254 秒 (wall) |
-| flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0・6 秒 |
-| ビルド (provider・flpy。測定 commit) | `bash provider/build.sh`・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0・1 秒・6 秒 (`51e3a96c` の tree) |
-| all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・2 秒・**48/48 ok** (`soft_error` 0・`raised` 0・`no_args` 0・`host_calls` 37425・`callback_roundtrip` true) |
-| provider_check (Python 型節を含む通常版) | `node tests/provider_check.mjs` | rc 0・1 秒・PASS。`functions` 435・実装 **142** / 未実装 **293** (MCP 60) |
+| 素材 | `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` (展開前に `$ARTIFACTS_DIR` の実在を ls で確認) | rc 0・5.7 秒 |
+| emsdk | runner 既設の `/opt/emsdk` (`source /opt/emsdk/emsdk_env.sh`) | `emcc --version` = 6.0.12 (`tools/m1/flags.sh` の pin と一致)。`toolchain-emsdk` 素材は展開していない |
+| 入力 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` | rc 0・0.4 秒 |
+| CPython wasm | `bash build_cpython_wasm.sh` | rc 0・wall 4 分 10 秒 |
+| flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0・6.1 秒 |
+| provider ビルド | `bash provider/build.sh` | rc 0・1.3 秒。`fl_table.c`: 435 関数・ハンドラ **143** |
+| all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・2.2 秒・**48/48 ok** (`soft_error` 0・`raised` 0・`no_args` 0・`host_calls` 37425・`callback_roundtrip` true) |
+| provider_check (Python 型節を含む通常版) | `node tests/provider_check.mjs` | rc 0・0.5 秒・PASS。`functions` 435・実装 **143** / 未実装 **292** (MCP 60) |
 | 差分検査 | `node tests/patterns_group_diff.mjs` | rc 0・14 呼出し・diffs 0・PASS |
 | 差分検査 | `node tests/general_diff.mjs` | rc 0・41 呼出し・diffs 0・PASS |
-| mock 差分 (flpy 不要の 15 本) | `node tests/<name>.mjs` (arrangement_diff・arrangement_selection_diff・channels_diff・device_diff・ilmcp_diff・midi_path_diff・mixer_diff・playlist_diff・screen_diff・tool_args・transport_diff・ui_diff・ui_display_diff・ui_state_diff・step_item_diff) | 全て rc 0・diffs 0 (呼出し数: channels 170・ui_state 33・step_item 5929 ほか。tool_args は標準出力なし・rc 0) |
+| 差分検査 (main 由来の追加) | `node tests/launchmap_diff.mjs`・`ilmcp_e2e.mjs`・`midi_bundled_device.mjs`・`midi_script.mjs` | 全て rc 0。launchmap_diff 3 呼出し・diffs 0・PASS。ilmcp_e2e PASS。midi_bundled_device OK。midi_script OK |
+| mock 差分 (flpy 不要の 15 本) | `node tests/<name>.mjs` (arrangement_diff・arrangement_selection_diff・channels_diff・device_diff・ilmcp_diff・midi_path_diff・mixer_diff・playlist_diff・screen_diff・tool_args・transport_diff・ui_diff・ui_display_diff・ui_state_diff・step_item_diff) | 全て rc 0・diffs 0 (呼出し数: arrangement 25・channels 170・ui_state 33・step_item 5929 ほか。tool_args は標準出力なし・rc 0) |
+| 未実行 | `node tests/chord_progression_e2e.mjs` | rc 1。テスト本体に入る前に `work/fl_extract/` が無いことで止まる (FL の Python 展開物が本 run の素材に無い前提不足。この merge の差分とは無関係) |
+
+測定時の load average は 2.2〜2.5 (`uptime`)。
 
 コード差分の確認 (差分 0 の証跡):
 
 ```
-git diff 51e3a96c HEAD -- tools/python/provider tools/python/host tools/python/tests
+git diff 6b8dc5a9d HEAD -- tools/python/provider tools/python/host tools/python/tests
 ```
 
-この commit 以降の docs は REPORT のみ。出力は 0 行。
+この commit 以降の変更は REPORT のみ。出力は 0 行。
 
 ## 検証範囲 / 範囲外
 
