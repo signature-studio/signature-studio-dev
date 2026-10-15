@@ -12,7 +12,7 @@
 ## 2. 測定条件
 
 - 測定 commit: `786c0144` (PR #3238 の HEAD。検出器を追加した `e0ff2fa0` の後に、main 取り込み merge `871e59d3` と文書の訂正が入った版)。ブランチ `2444-shx-t28-nested-frame`、worktree `ws-3238`。main の共有ツリーは触っていない。
-- 素材 (本 run の `$ARTIFACTS_DIR`): `work-m11.tar.zst` を worktree に展開 (`tools/m11/work/`・gitignore)。PE は `fl-win64.tar.zst` の `extracted/block00031_PE.bin` (22,227,016 B、sha256 `b2c64da4…9f9496d`・前版の記録と一致)。`/opt/emsdk` は runner に既存で `m11_build.sh` が使う。`toolchain-retdec` は使っていない (lift を再実行していない。下の boot5 の注)。
+- 素材 (本 run の `$ARTIFACTS_DIR`): `work-m11.tar.zst` を worktree に展開 (`tools/m11/work/`・gitignore)。PE は `fl-win64.tar.zst` の `extracted/block00031_PE.bin` (22,227,016 B、sha256 `b2c64da4…9f9496d`・前版の記録と一致)。emsdk (`[EMSDK]`) は runner に既存で `m11_build.sh` が使う。`toolchain-retdec` は使っていない (lift を再実行していない。下の boot5 の注)。
 - IR の作り直し: `bash tools/m11/m11_gen_ir2.sh` (非 `--full`。`m11_e2e.sh` は通していない。lift は素材の `boot0〜4.lift.ll` を使う)。46 s・`[gen_ir2] OK: work/boot_final.ll (490735 行)`・`ldfix=applied`・`ld108=applied` (`work/ir_conditions.json`)。続けて `bash tools/m11/m11_build.sh` 22 s・`[m11build] OK … signature mismatch: 0, undefined symbol: 0`。`work/boot_final3.ll` は `m11_build.sh` が `m11_post.py` で作り直した。
 - lift 元の指紋: 素材の tar に `work/lift_pe.sha256` は無い (`tar -t` で確認)。lift 元 (`boot0〜4.lift.ll`) を生成した PE との一致は**確認不能** (記録が無い)。間接確認として、`m11_image_gen.py` で本 PE から再生成した `work/m11_image.bin` の sha256 (`2d10d692…eb`) は素材の `m11_image.bin` と一致した (画像の生成元は本 PE と同じ)。
 - `m11_data.c`: 素材のものは旧版の `m11_data_gen.py` の出力 (LB_BASE の注記が無い) だったため、HEAD の生成器 (`python3 tools/m11/m11_data_gen.py <PE>`) で作り直し、`m11_build.sh` と shimx の `m11_data.o` を再コンパイルした。旧 data.c で作った場合も、作り直した後も、結果は §7 と同じだった。
