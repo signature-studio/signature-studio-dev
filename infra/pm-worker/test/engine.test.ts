@@ -426,7 +426,7 @@ test("artifact の再投入: 凡例 (『素材不足』の語) を外した run-
   assert.equal(pickArt(p, 84), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk plugins-serum2");
 });
 
-test("artifact の再投入: 報告が停止報告 (STOP_RE) でなければ、素材が挙がっていても再投入しない", async () => {
+test("artifact の再投入: 報告が停止報告 (先頭行の見出し『## 停止報告』) でなければ、素材が挙がっていても再投入しない", async () => {
   const ctx = await configuredApp({ live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
   await seed(ctx, 85, { labels: ["oc:no-pr"] });
   await send(ctx.app, "issue_comment", commentPayload(85, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
