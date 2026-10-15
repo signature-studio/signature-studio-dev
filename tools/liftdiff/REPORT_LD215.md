@@ -18,7 +18,8 @@
   - 呼出し元: E8 rel32 走査で call 命令を集め、target が一致したものだけを数える (LD-212 と同じ)。call 直後から最大 `--budget` (既定 400) 命令・経路数で打ち切る。`xor r,r` は読みから除外する。
   - 呼出し先: entry から全経路を辿り、ret 到達時点で書かれたレジスタの積 (must) と和 (may) を取る。呼出し先の `call` は clobber のみ (定義とは数えない)。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/liftdiff/tests/ld215_retprop.py <PE> --tsv work/ld215_probe.tsv`。
-- 所要時間: 実測 **0.38 秒** (load 0.3 秒・同じ素材で 2 回再現)。
+- `cand` 列 (TSV の `cand`・出力の『候補』行) は §1 の判定基準どおり、rax / rdx / xmm0 に『未確定』が 1 件でもある関数は空にする。判定器の出力で候補が出るのは `6ed480`・`40c420`・`40f210` の 3 件で、§1 と一致する。
+- 所要時間: 実測 **0.30 秒** (wall。素材 fl-win64 の PE・同じ素材で実行した 1 回目の値)。
 
 ## 3. 実測 (`ld215_retprop.py` の出力・素材 fl-win64 26.1.7.5653)
 
@@ -61,7 +62,7 @@
 |---|---|---|
 | 20 関数のうち残り 17 関数の戻りレジスタが未確定 (判定基準を満たさない) | `ret_override` を追加できない。受入条件 1・2 は未達 | #4666 (LD-233) |
 | 候補 3 件 (`6ed480`・`40c420`・`40f210`) の型 (double / float) が未確定。`6ed480` は LD-158 が『区別不能』で対象外にしていた | 1 件でも誤った型を焼き込むと危険 | #4666 (LD-233) |
-| e2e `--m11-only` の全件 PASS の確認。実装 run (10:31〜10:47Z) の Actions ジョブログは取得できず (ジョブは `review` 等のみ残存)、fix run のシェル記録にも `LIFTDIFF_E2E PASS` の実行出力は無い。`[0/4]`〜`[3b/4]` の PASS も `[4/4]` の完了も、この PR の中では確認できていない。素材 `work-m11`・`toolchain-emsdk`・`work-liftdiff` は `$HOME/artifacts` に無く (fl-win64 のみ) 再実行もできない | 本 PR は `targets/m11.json` を変えていないため既存の挙動は変わらない。ただし e2e の結果は未確認 | #4667 (LD-234) |
+| e2e `--m11-only` の全件 PASS の確認。実装 run (10:31〜10:47Z) の Actions ジョブログは取得できず (ジョブは `review` 等のみ残存)、fix run のシェル記録にも `LIFTDIFF_E2E PASS` の実行出力は無い。`[0/4]`〜`[3b/4]` の PASS も `[4/4]` の完了も、この PR の中では確認できていない。素材 `work-m11`・`toolchain-emsdk`・`work-liftdiff` は素材の保管先に無く (fl-win64 のみ。素材の扱いは `docs/REFERENCES.md`) 再実行もできない | 本 PR は `targets/m11.json` を変えていないため既存の挙動は変わらない。ただし e2e の結果は未確認 | #4667 (LD-234) |
 
 ## 6. 測定 commit からの差分
 

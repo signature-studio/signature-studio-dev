@@ -10,6 +10,7 @@
       『読まれる』『上書きされる (全経路)』『ret まで素通し (戻り値として伝播)』『未確定』のどれかに分類する。
 
 判定: 関数 F の戻りレジスタ候補 = must-def(F) ∩ 『読まれる』を 1 件以上の呼出し元が持つもの。
+  ただし rax / rdx / xmm0 のいずれかに『未確定』が 1 件でもある呼出し元群は候補なし (呼出し元の全経路が決まらないため)。
 限界: 間接分岐・未知の call で打ち切るため未確定が残る。経路数は budget で打ち切る。
 """
 import argparse
@@ -230,7 +231,8 @@ def main():
                 if mn[k]:
                     use[k]['mn'][mn[k]] = use[k]['mn'].get(mn[k], 0) + 1
         rd_n = {k: use[k]['read'] for k in REGS}
-        cand = sorted(k for k in REGS if ok and k in must and rd_n[k] > 0)
+        unk_n = sum(use[k]['unknown'] for k in REGS)
+        cand = sorted(k for k in REGS if ok and k in must and rd_n[k] > 0) if unk_n == 0 else []
         rows.append((name, ok, must, may, len(hits[va]), use, cand))
         print('== %s  callee_ok=%s must=%s may=%s  calls=%d' % (
             name, ok, sorted(must) if ok else '-', sorted(may) if ok else '-', len(hits[va])))
@@ -238,7 +240,7 @@ def main():
             print('   %-5s read=%d dead=%d pass=%d unknown=%d  最初の読み: %s' % (
                 k, use[k]['read'], use[k]['dead'], use[k]['pass'], use[k]['unknown'],
                 ' '.join('%s:%d' % kv for kv in sorted(use[k]['mn'].items(), key=lambda x: -x[1])) or '-'))
-        print('   候補 (必ず書かれ かつ 読まれる) = %s' % (','.join(cand) or '-'))
+        print('   候補 (必ず書かれ かつ 読まれる、未確定 0 件の呼出し元群のみ) = %s' % (','.join(cand) or '-'))
     if a.tsv:
         os.makedirs(os.path.dirname(os.path.abspath(a.tsv)), exist_ok=True)
         with open(a.tsv, 'w') as f:
