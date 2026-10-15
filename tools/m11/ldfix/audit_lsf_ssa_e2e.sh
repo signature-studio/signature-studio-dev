@@ -6,7 +6,8 @@
 #   4/7 dyn_xcheck.py (liftdiff の動的差分 batch_closure.jsonl との突合 = 動的方式の感度/被覆)
 #   5/7 tally_510.py (results/manual_verdicts_510.jsonl の目視判定との突合・最終集計)
 #   6/7 ネガティブコントロール (negctl_510.sh)
-#   7/7 spill_classify_1161.py (LD-35 spill 宛 178 site の分類表と脱落関数の和集合・results/ と一致)
+#   7/8 spill_classify_1161.py (LD-35 spill 宛 178 site の分類表と脱落関数の和集合・results/ と一致)
+#   8/8 fix_spill_deep_2987.py (LD-143: ddf630 の CELL_DEEP TRUE_DROP 2 cell の IR 修復) の後で audit と spill_classify_1161.py を再実行し、修復後も results/spill178_1161.tsv と一致
 # 使い方: bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh     環境変数: M11_WORK (既定 tools/m11/work) / LD_WORK (既定 tools/liftdiff/work) / PY
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -44,3 +45,9 @@ M11_WORK="$W" PY="$PY" bash "$HERE/negctl_510.sh"
 step "7/7 spill_classify_1161.py (LD-35)"
 "$PY" "$HERE/spill_classify_1161.py" "$OUT/ssa.json" "$OUT/spill178_1161.tsv"
 cmp "$OUT/spill178_1161.tsv" "$HERE/results/spill178_1161.tsv" && echo "[spill178_1161.tsv] results/ と一致"
+
+step "8/8 fix_spill_deep_2987.py (LD-143 修復後 IR の audit と spill178 再生成)"
+"$PY" "$HERE/fix_spill_deep_2987.py" "$IR" "$OUT/ssa.json" "$IMG" "$CFG" "$OUT/boot_final3.ld143.ll" --verdicts "$HERE/results/candidate_verdicts_2921.jsonl" --report "$OUT/ld143_fix.json"
+"$PY" "$HERE/audit_lsf_ssa.py" "$OUT/boot_final3.ld143.ll" "$IMG" "$CFG" --json "$OUT/ssa_ld143.json" >/dev/null
+"$PY" "$HERE/spill_classify_1161.py" "$OUT/ssa_ld143.json" "$OUT/spill178_ld143.tsv" >/dev/null
+cmp "$OUT/spill178_ld143.tsv" "$HERE/results/spill178_1161.tsv" && echo "[spill178 (修復後 IR)] results/spill178_1161.tsv と一致"
