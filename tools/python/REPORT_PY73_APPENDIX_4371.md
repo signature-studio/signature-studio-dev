@@ -16,10 +16,10 @@
 
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin`。実測 2.9 秒)。
 - 測定 commit: `34aebb626` (origin/main 取り込み後の merge commit。probe は HEAD で再実行)。
-- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_py322_probe.py`。実測 63.7 秒 (wall)・load 0.15 (起動直前の 1 分平均)・並列 1。出力 `instructions=5022467 hits=12`、`stored 0x125b1c0: n=2`、`stored 0x1262970: n=1`、`stored table: n=2` (§2・§3 の転記元と一致)。
+- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_py322_probe.py`。測定 commit `34aebb626` で 63.7 秒 (wall)・load 0.15 (並列 1)。検証 HEAD `b45fd5432` (main 取り込み後) で再実行: 66.4 秒 (real)・user 65.9 秒・load 0.81 (実行直前 0.18)・並列 1。出力 `instructions=5022467 hits=12`、`stored 0x125b1c0: n=2`、`stored 0x1262970: n=1`、`stored table: n=2` (§2・§3 の転記元と一致)。
 - 既存ツールの再現: `pe_flag_scope_check.py` は 37.3 秒で 3649・3965 の値 (0/12・書込み 18 件) を再現。`pe_callgraph.py callers 0xfff070,0xd1af20` は直接呼出し 0 件。`pe_xref.py 0x125b1c0,0x40fb40,0x1262970` は RIP 参照 0 件。
 - 本付録の追加測定: `pe_callgraph.py callers 0xd16080,0xd160e0,0xd16150` は 37.0 秒 (real)・user 36.3 秒・load 0.68・並列 1。3 関数とも直接呼出し元 0 件。
-- 実行コードの差分 0 (docstring 1 行のみ): 測定 commit 以降の `git diff 34aebb626 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は `pe_py322_probe.py` の docstring 1 行だけ (展開手順の表記。実行ロジックは不変)。
+- 実行コードの差分 0 (docstring 1 行のみ): 測定 commit 以降の `git diff 34aebb626 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の変更は `pe_py322_probe.py` の docstring 1 行 (展開手順の表記。実行ロジックは不変) と、main 取り込みで入った `flapi/flapi_table.json`・`flapi/pe_py183_probe.py`・`flapi_table.py` の 3 ファイルだけ。後者 3 件は本測定の鎖 (probe・`pe_callgraph.py`・`pe_flag_scope_check.py`・`pe_xref.py`) から import されない (確認済み)。
 - 検証範囲: 逆アセンブル・参照列挙・格納値の読取り。wasm・mock の実行は未実施。
 
 ## 1. `0xd1af20` の構造体経由の経路 (3965 §2 の続き)
