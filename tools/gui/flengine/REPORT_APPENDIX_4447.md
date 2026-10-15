@@ -16,7 +16,7 @@
 - 測定 commit: `9bfcc26a3` (`feat(gui): report units_dispatched`)。コード差分は `tools/gui/flengine/run.mjs` の 1 行だけ。
 - 旧表の問題: 「`a4a620a9` (HEAD `9bfcc26a3`)」側は HEAD の `tools/shim/src/heap.c` (blob `01bfe4b01`) をそのまま使った。`a4a620a9` の blob は `45ba1484e` で、`01bfe4b01` には後続の `7278e8571` (fix(shim): report HeapFree like the native reference, #2821) が入る。つまり旧表の比較は `cde475fbc` と `01bfe4b01` の比較で、issue #4447 の受入 (`a4a620a9^` と `a4a620a9`) とは一致しない。
 - 必要な再測定: `a4a620a9^` 側は `cde475fbc`、`a4a620a9` 側は `45ba1484e` を `tools/shim/src/heap.c` に入れ、同一 HEAD で `build.sh` → `run.mjs` を実行する。
-- 再測定を止めた理由: `tools/m11/work` (work-m11) が無く、`emcc`・`retdec-decompiler`・`x86_64-w64-mingw32-gcc` が PATH に無い。`$HOME/artifacts` は `fl-win64.tar.zst` のみ。必要な素材は `work-m11 toolchain-emsdk toolchain-retdec apt-mingw` (PR 本文の `oc_artifacts:` 行で指定)。
+- 再測定を止めた理由: `tools/m11/work` (work-m11) が無く、`emcc`・`retdec-decompiler`・`x86_64-w64-mingw32-gcc` が PATH に無い。素材の展開先 (artifacts ディレクトリ) には `fl-win64` の tar.zst のみ。必要な素材は `work-m11 toolchain-emsdk toolchain-retdec apt-mingw` (PR 本文の `oc_artifacts:` 行で指定)。
 
 旧表 (参考。受入根拠ではない):
 
