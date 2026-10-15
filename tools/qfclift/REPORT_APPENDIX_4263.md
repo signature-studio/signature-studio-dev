@@ -53,16 +53,29 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD
 - **boot の lift 設定は変更しない**。静的な発火条件だけでは override・root の追加先が決まらず、停止点の変化を実測する根拠も無いため。
   経路 B の飛び先 (`0x5d0c80`) の実行時の値と、`[0x5d0cb0]` の書込み元は、実行時のトレースで決める必要がある。
 
-## 5. 未解決
+## 5. 経路 B の flag `byte [0x5d0cb0]` の書込み元 (特定)
+
+- 書込みは `0x40f4eb`: `mov byte ptr [r13+0x30], al` (所属関数 `0x40f430`)。`r13` は `0x40f446` で `0x5d0c80`、`0x40f456` で `0x5d0da8` (`[rbp+0x170] >= 2` のとき)。
+  `0x5d0cb0 = 0x5d0c80 + 0x30` なので、rip 相対の直接 store 0 件は「レコード経由の store」だった。`0x40f4e1`〜`0x40f4eb` で `al = [rbp+0x170] + 1` (= reason + 1)。
+- 読みは `0x40fca8` (`cmp byte [0x5d0cb0], 0`)。非 0 なら `0x40fcb8` で `0x40fa40` を呼ぶ (= 経路 B)。
+- **reason 1 (PROCESS_ATTACH) では flag = 2 (非 0)**。`r13 = 0x5d0c80` のため、経路 B は DllMain 本体 (`0x419dc0`) の後に必ず発火する。経路 A は arm されない (§1)。
+- 再現: `python3 disasm_range_4263.py block24350_PE.bin 0x40f4e1 0x40f4f0` (道具は `tools/qfclift/disasm_range_4263.py`)。
+
+### 5.1 実測 (boot、HEAD `bfbe3f683` の lift 設定。`qfc_boot.sh`)
+
+- `qfc_boot.sh` (strict / soft) の結果: strict は `MISSING IMPORT LocalAlloc` で DllMain の trap (FAIL)。soft は `DllMain(PROCESS_ATTACH)` が `ok rax=0x1`、続く `FontCache_GetStats` で `call to UNLIFTED function 0 ret=0x57fb09` (FAIL)。
+- 既存の lift 設定 (override `0x40f9c0=qfc_ov_longjmp`・root `0x59c210`) で、経路 B の戻り先は既に入っている。このため新しい override・root の追加は不要。
+- 経路 B の発火条件は §5 で確定した。停止点 (`FontCache_GetStats`) は経路 B の後の段であり、経路 B 自体の不具合ではない。次の停止点は FT 解決 (`0x563000`) の未解決ポインタ (#4296 / #4510 §2)。
+
+## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `byte [0x5d0cb0]` (経路 B の発火条件) の書込み元 | 経路 B が実機で発火するかが不明 | #4263 (本 issue の継続・部分達成) |
 | 経路 A の発火は DllMain reason 1 では起きない (`r13=0x5d0c80`)。reason ≥2 の経路 (boot 未測定) | 別 reason の挙動が不明 | #4263 (継続) |
 | `ExitProcess(0)` の呼出し元と、`[0x5d0c80]` の boot 時の値 | 偽の停止か否かの判定 | #4262 (T-SH-106) |
 | 呼出元 `0x40946b` (fn `0x409460`) の上位呼出元 | setter へ渡る code の出所 | #4263 (継続) |
 
-## 6. 検証
+## 7. 検証
 
 - 解析: `python3 callers_4263.py <block24350_PE.bin>` (1.8 s)。`.pdata` 関数単位の逆アセンブル。
   依存: `pip install pefile capstone` (Python 3)。表の番地は上記スクリプトの `call` 行 (呼出し命令の VA) で確認した。
