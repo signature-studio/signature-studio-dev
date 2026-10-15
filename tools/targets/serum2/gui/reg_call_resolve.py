@@ -15,7 +15,8 @@
 usage: reg_call_resolve.py <pe> <target_va_hex> <root_va_hex>
 限界:
 - 引数由来・呼出し後の volatile レジスタ・スタック引数は未解決として数える。
-- 間接 jmp (jump table を含む) を持つ関数では、制御フローの逆辺を確定できないため、その関数内の全サイトを未解決とする。
+- 間接 jmp を持つ関数では、制御フローの逆辺を確定できないため、その関数内の全サイトを未解決とする。
+  ただし型が合う jump table (`jump_table_targets`) の遷移先は逆辺として扱う。他の間接 jmp (pop 後の末尾呼出し等) は未解決のまま。
 - 読み出す値は PE ファイル上の初期値。書込み可能な .data の実行時の値は、このスクリプトでは見ていない。
 - 書込みは「同じ base レジスタ・同じ disp の別名」を見ない。memory alias は未考慮。
 - 供給元の分類 (provenance) は従来どおり直線の後ろ向き走査で、経路は見ていない (分類のみ)。
@@ -147,6 +148,65 @@ def def_value(insns, jt, q, r, depth):
     return None
 
 
+JT_MOV = re.compile(r"^(\w+), dword ptr \[(\w+) \+ (\w+)\*4\]$")
+JT_CMP = re.compile(r"^(\w+), (0x[0-9a-f]+|[0-9]+)$")
+ZX32 = {f"r{x}x": f"e{x}x" for x in "abcd"}
+ZX32.update({f"r{x}": f"e{x}" for x in ("si", "di", "bp", "sp")})
+ZX32.update({f"r{k}": f"r{k}d" for k in range(8, 16)})
+
+
+def dword_at(va):
+    for base, sraw in secs:
+        if base <= va and va + 4 <= base + len(sraw):
+            return struct.unpack_from("<i", sraw, va - base)[0]
+    return None
+
+
+def jump_table_targets(insns, k, addr2i):
+    """`jmp R` が jump table (lea B,[rip+X]; cmp I,N; ja; movsxd R,[B+I*4]; add R,B; jmp R) なら、
+    表の N+1 項の遷移先 (関数内の命令 VA) を返す。型に合わない・遷移先が関数内にない場合は None。"""
+    if k < 3 or insns[k - 1].mnemonic != "add":
+        return None
+    ops = [x.strip() for x in insns[k - 1].op_str.split(",")]
+    if len(ops) != 2 or fam(ops[0]) != fam(insns[k].op_str):
+        return None
+    mv = insns[k - 2]
+    m = JT_MOV.match(mv.op_str)
+    if mv.mnemonic != "movsxd" or not m or fam(m.group(1)) != fam(ops[0]) or fam(m.group(2)) != fam(ops[1]):
+        return None
+    idx = fam(m.group(3))
+    base = fam(m.group(2))
+    lea = None
+    for q in range(k - 3, max(-1, k - 12), -1):
+        if writes(insns[q], base):
+            if insns[q].mnemonic == "lea" and ripea(insns[q], insns[q].op_str.split(",", 1)[1].strip()) is not None:
+                lea = insns[q]
+            break
+    if lea is None:
+        return None
+    cmp_i = None
+    for q in range(k - 3, max(-1, k - 14), -1):
+        w = insns[q]
+        if w.mnemonic == "cmp":
+            c = JT_CMP.match(w.op_str)
+            if c and fam(c.group(1)) == idx and q + 1 < len(insns) and insns[q + 1].mnemonic == "ja":
+                cmp_i = int(c.group(2), 0)
+                break
+        if writes(w, idx) and not (w.mnemonic == "mov" and w.op_str == f"{ZX32[idx]}, {ZX32[idx]}"):
+            break
+    if cmp_i is None:
+        return None
+    tb_va = ripea(lea, lea.op_str.split(",", 1)[1].strip())
+    out = []
+    for e in range(cmp_i + 1):
+        v = dword_at(tb_va + 4 * e)
+        t = None if v is None else tb_va + v
+        if t is None or t not in addr2i:
+            return None
+        out.append(t)
+    return out
+
+
 def preds(insns, jt, q):
     out = list(jt.get(q, ()))
     if q > 0 and insns[q - 1].mnemonic not in UNCOND:
@@ -258,6 +318,7 @@ sites = Counter()
 resolved_hits = []
 unres = []  # (VA, 所属関数, op, 供給元)
 indirect_fns = 0
+jt_resolved = 0
 for lo, hi in funcs:
     insns = list(cs.disasm(raw[lo - tb:hi - tb], lo))
     addr2i = {ins.address: k for k, ins in enumerate(insns)}
@@ -271,7 +332,13 @@ for lo, hi in funcs:
             if t in addr2i:
                 jt[addr2i[t]].append(k)
         if ins.mnemonic == "jmp" and not ins.op_str.startswith("0x"):
-            indirect = True
+            tgs = jump_table_targets(insns, k, addr2i)
+            if tgs is None:
+                indirect = True
+            else:
+                for t in tgs:
+                    jt[addr2i[t]].append(k)
+                jt_resolved += 1
         if ins.mnemonic in ("jmp", "call") and ins.op_str.startswith("0x"):
             t = int(ins.op_str, 16)
             if t in sset and t != lo:
@@ -328,6 +395,7 @@ R = closure(target, rev)
 C = closure(root, fwd)
 print(f"R={len(R)} C={len(C)} C∩R={len(C & R)}")
 print("sites: " + " ".join(f"{k}={v}" for k, v in sites.items()) + f" | resolved={len(resolved_hits)} unresolved={len(unres)}")
+print(f"jump-table jmp resolved: {jt_resolved}")
 print(f"functions with indirect jmp (all sites unresolved): {indirect_fns}")
 hit = [(a, f, t) for a, f, t in resolved_hits if t & R]
 print(f"resolved sites hitting R: {len(hit)}")
