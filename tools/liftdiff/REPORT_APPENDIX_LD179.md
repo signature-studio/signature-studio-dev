@@ -2,7 +2,7 @@
 
 > 親: #1528 (LD-52)。対象: `4256c0` (`ptr (%tagPOINT)`・import thunk・本体は user32 `WindowFromPoint`)。
 > 測定 commit: `edd566a96` (コードを変えた最後の commit)。`edd566a96` から HEAD までのコード差分は §4。
-> 素材: `fl-win64` (`$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`)・`work-m11`・`work-liftdiff`・`toolchain-emsdk` (`/opt/emsdk` 6.0.12)。
+> 素材: `fl-win64` (`[WIN64]` の `extracted/block00031_PE.bin`)・`work-m11`・`work-liftdiff`・`toolchain-emsdk` (`[EMSDK]` 6.0.12)。
 
 ## 1. 変更
 
