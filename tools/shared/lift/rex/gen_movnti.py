@@ -7,7 +7,7 @@ movnti は memset (f_18001c8f0・8 箇所) の大きいブロック経路にだ�
 movnti に入り、その唯一の呼出し元 (f_18001bde8) は count = 0x40 固定なので入力では到達しない (REPORT_APPENDIX_3589.md)。
 
 case 形式は gen_cases.py と同じ (native_ref.c / run_wasm.mjs が読む)。期待 (reach / info) は OUT と同じ dir の movnti_expect.json に書く。
-  reach   : a1 in [0x70000, 0x80000)。wasm は movnti の VA で trap する想定。native は arena 外へ書いて落ちる想定。
+  reach   : a1 in [0x70000, 0x80000)。a2 = arena 先頭。arena は layout.json の arena_sz (movnti モードは 0x80000・#4324)。完了を期待する。
   sweep   : a1 を [0x10000, 0x80000) で振る (a2 = arena 先頭)。movnti に入ったときは movnti の VA で trap する。入らないときは movnti 以外の
             OOB (VA 0) で trap するが、trap 位置は未特定 (wasm の線形メモリは arena より広く、arena 越境の store だけでは説明できない)。判定: movnti に入る ⇔ a1 ≥ 0x70000 (T-SH-94)。
 reach / sweep は fn=0 (REXGetCreatorInfo)。木の検索の直後に memset を呼ぶため、入力だけで memset に届く。fn=1 は memset の前の node 参照で落ちるため使わない。
@@ -16,7 +16,7 @@ usage: gen_movnti.py OUT
 import json, os, random, struct, sys
 
 ARENA = 0x30100000
-ARENA_SZ = 0x10000
+ARENA_SZ = json.load(open(os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'layout.json')))['arena_sz']
 CTX_OFF = 0x8000
 NODE = ARENA + 0xC100
 N_REACH = 16
@@ -59,8 +59,36 @@ def case(kind, fn, a1, a2=None):
     expect.append({'kind': kind, 'fn': fn, 'a1': a1})
 
 
+# reach: 木の検索を通すため、gen_cases.py の SUCC1 と同じ構造 (根 key = key_of(a0) = OBJ・OBJ+0x688 = B・B+0x62c = 0) を置く。
+# a2 = arena 先頭、a1 = reach 範囲。memset が 0x80000 の arena 内で完了する (#4324)。
+OBJ = ARENA + 0xC200
+B_ = ARENA + 0x9800
+S_ = ARENA + 0x9000
+Z_ = ARENA + 0xA800
+LK = ARENA + 0xAF00
+
+
+def reach_case(a1):
+    arena = bytearray(ARENA_SZ)
+    for base in (OBJ, S_, B_, Z_):
+        for k in range(0, 0x700, 4):
+            struct.pack_into('<I', arena, base - ARENA + k, 1)
+    struct.pack_into('<I', arena, B_ + 0x62c - ARENA, 0)
+    struct.pack_into('<QQQ', arena, NODE - ARENA, 0, 0, OBJ)  # 検索キー key_of(a0) = OBJ と一致させる (key_of は対合)
+    struct.pack_into('<Q', arena, OBJ + 0x630 - ARENA, S_)
+    struct.pack_into('<Q', arena, OBJ + 0x690 - ARENA, B_)
+    struct.pack_into('<Q', arena, OBJ + 0x20 - ARENA, Z_)
+    struct.pack_into('<Q', arena, OBJ + 0x688 - ARENA, 0)
+    struct.pack_into('<Q', arena, CTX_OFF + 0x20, NODE)
+    struct.pack_into('<Q', arena, CTX_OFF + 8, LK)
+    struct.pack_into('<Q', arena, LK - ARENA, 0x10)
+    arena[0x10000:0x70000] = b'\x01' * (0x70000 - 0x10000)  # memset(arena, 0, a1) が走った証拠: 走らなければ非ゼロが残る (#4324)
+    out.append(struct.pack('<IIQQQQQ', 0, 0, key_of(OBJ), a1, ARENA, 0, ARENA + CTX_OFF) + bytes(arena))
+    expect.append({'kind': 'reach', 'fn': 0, 'a1': a1})
+
+
 for i in range(N_REACH):
-    case('reach', 0, rnd.randrange(0x70000, 0x80000))
+    reach_case(rnd.randrange(0x70000, 0x80000))
 for a1 in SWEEP:
     case('sweep', 0, a1, a2=ARENA)
 
