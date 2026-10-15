@@ -29,7 +29,7 @@
 
 - 有効域と status: `setSnapMode` の cb (`0xd6b700`) は、gate 偽なら status -2 のまま何もしない。gate 真なら status を -4 にしてから範囲検査 (`cmp eax, 0xf`・マスク `0x7fff` のビット i) に入り、i ∈ 0..14 で bit が立つときだけ書込み (`vtbl[0x1f0]`) を行い、status を 0 にする。i ∉ 0..14 (i = 15 を含む) では書込みをせず、status は -4 のまま終わる (逆アセンブル: `-2` を書く d6b709 → gate 通過で `-4` を書く d6b72f → 範囲検査が偽なら d6b75f から終了)。
 - 3 関数とも PE の戻り値は None (戻り値の格納は共通経路の `&ret` で、Python には返さない)。
-- 実装の仮置き: mock と C は型検査 (引数個数 1・setHintMsg は文字列・setFocused / setSnapMode は整数 (bool 可・None は 0)) のみ行い、状態を変えない。範囲外の挙動は実装していない (有効域チェックはしない)。
+- 実装の仮置き: mock と C は型検査 (引数個数 1・setHintMsg は文字列・setFocused / setSnapMode は整数 (bool 可)) のみ行い。None は mock・C とも例外なく None を返すことを `ui_state_diff` で固定した (None を 0 として扱うかは未確認)、状態を変えない。範囲外の挙動は実装していない (有効域チェックはしない)。
 
 ## 保留 1 件 `ui.snapMode` (子 #3719)
 
