@@ -97,6 +97,33 @@ def main():
     for k, v in refs.items():
         print('  %s: %d 件 %s' % (k, len(v), ' '.join(sorted(set(v))[:8])))
     res['refs'] = {k: sorted(set(v)) for k, v in refs.items()}
+    print('(d) KH process の呼出先と SC 側の r 列比較 (数値を潰した比較・上位 5)')
+    cal = sorted({int(i.op_str, 16) for i in kins if i.mnemonic == 'call' and i.op_str.startswith('0x')})
+    res['callees'] = []
+    for t in cal:
+        cins, _ = kh.disasm(t)
+        cr = kh.norm(cins)[1]
+        print('  KH callee 0x%x insn=%d' % (t, len(cins)))
+        best = []
+        for rva in sc.starts:
+            size = sc.fn[rva] - rva
+            if size < 100 or size > 3000:
+                continue
+            try:
+                code = sc.rva_bytes(rva, size)
+            except StopIteration:
+                continue
+            x = list(md.disasm(code, sc.base + rva))
+            if not x:
+                continue
+            sm = difflib.SequenceMatcher(None, cr, sc.norm(x)[1], autojunk=False)
+            if sm.real_quick_ratio() < 0.5 or sm.quick_ratio() < 0.5:
+                continue
+            best.append((round(sm.ratio(), 4), hex(sc.base + rva), len(x)))
+        best.sort(reverse=True)
+        for r, va, n in best[:5]:
+            print('    %.4f %s n=%d' % (r, va, n))
+        res['callees'].append({'kh': hex(t), 'top': [{'r': r, 'va': va, 'ninsn': n} for r, va, n in best[:5]]})
     if out:
         json.dump(res, open(out, 'w'), indent=1)
 
