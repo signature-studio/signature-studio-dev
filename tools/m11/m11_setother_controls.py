@@ -143,6 +143,14 @@ def main():
         print('  %s %-40s → %s %s %s' % ('ok ' if ok else 'NG ', name, cls, why, val))
     print('[controls] rip 相対 %d/3 一致' % n_ok)
 
+    # 部分レジスタへの書込み: movzx ax,cl は上位 16 bit が既知の値を残すため、戻り値を決めず未決 (partial_ext)。
+    part = 0x3800
+    g = load({part: bytes.fromhex('b800003412' 'b955000000' '660fb6c1' 'c3')}, 'define i64 @function_0(i64 %a)\n', {'site_detail': []})
+    cls, why, val, _ = g['ret_value'](part, 'rax')
+    ok = cls == '未決' and 'partial_ext' in why and val is None
+    bad += not ok
+    print('  %s 部分レジスタ movzx ax,cl (上位既知) → %s %s %s (期待 未決 partial_ext)' % ('ok ' if ok else 'NG ', cls, why, val))
+
     # 既知の限界 M1: 間接 jmp (jmp rcx) の後ろの ret を直前の定数の続きとして扱う (偽の定数)。未修正。
     m1 = 0x3000
     g = load({m1: bytes.fromhex('ffe1' 'b807000000' 'c3')}, 'define i64 @function_0(i64 %a)\n', {'site_detail': []})
