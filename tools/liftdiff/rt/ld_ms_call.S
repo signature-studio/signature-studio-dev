@@ -76,6 +76,8 @@ ld_stub_common:
     movq %r8,%rcx
     movq %r9,%r8
     leaq 212(%rsp),%r9           # &MS 第5引数 ([entry_rsp+0x28]; 第6引数は +8) — ゲスト stack への書込はしない
+    leaq 184(%rsp),%rax          # entry rsp (= [rsp] が呼出元の戻り番地)。wintrace 専用 (既定の応答は変えない)
+    movq %rax,ld_stub_ent(%rip)
     call ld_stub_c
     movups 0(%rsp),%xmm6
     movups 16(%rsp),%xmm7

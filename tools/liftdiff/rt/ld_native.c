@@ -31,6 +31,48 @@ static u8* g_thunks;
 #define MAX_IMP 4096
 static char* g_impname[MAX_IMP];
 static int g_nimp;
+u64 ld_stub_ent;   /* ld_ms_call.S が stub 入口の rsp を入れる ([rsp] = 呼出元の戻り番地) */
+
+/* WIN-34 (#3557): env LD_WINTRACE_OUT=<path> で、窓まわりの import (RegisterClassW・GetClassInfoW・CreateWindowExW) の
+ * 呼出元 VA・引数・戻り値を 1 呼出し 1 行で <path> へ追記する (既定は無効。応答は変えない)。 */
+static const char* g_wt_path; static FILE* g_wt_fp; static int g_wt_init;
+static int wt_on(const char* n) {
+  if (!g_wt_init) { g_wt_init = 1; g_wt_path = getenv("LD_WINTRACE_OUT"); if (g_wt_path && *g_wt_path) g_wt_fp = fopen(g_wt_path, "a"); }
+  if (!g_wt_fp) return 0;
+  return !strcmp(n, "CreateWindowExW") || !strcmp(n, "RegisterClassW") || !strcmp(n, "GetClassInfoW");
+}
+static void wt_str(u64 p, char* out, int max) {
+  if (!p) { snprintf(out, max, "null"); return; }
+  if (p < 0x10000) { snprintf(out, max, "atom:0x%llx", (unsigned long long)p); return; }
+  if (!ld_dst_ok(p, 2)) { snprintf(out, max, "bad:0x%llx", (unsigned long long)p); return; }
+  ld_read_strW(p, out, max);
+}
+static void wt_rec(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk, u64 r) {
+  u64 ent = ld_stub_ent, ret = 0, s[8] = {0};
+  if (ld_dst_ok(ent, 8)) memcpy(&ret, (void*)(uintptr_t)ent, 8);
+  char c1[160], c2[160];
+  fprintf(g_wt_fp, "wt case=%s fn=%s ret_va=0x%llx ret_rva=0x%llx stk_minus_entry=%lld ", ld_case.id, n,
+          (unsigned long long)ret, (unsigned long long)(ret - g_imgbase), (long long)((u64)(uintptr_t)stk - ent));
+  if (!strcmp(n, "CreateWindowExW")) {   /* ms64: 第5〜12引数は entry+0x28 から (shadow 0x20 + 戻り番地 8) */
+    if (ld_dst_ok(ent + 0x28, 64)) memcpy(s, (void*)(uintptr_t)(ent + 0x28), 64);
+    wt_str(a1, c1, sizeof c1); wt_str(a2, c2, sizeof c2);
+    fprintf(g_wt_fp, "ex=0x%llx class=\"%s\" wname=\"%s\" style=0x%llx x=0x%llx y=0x%llx w=0x%llx h=0x%llx parent=0x%llx menu=0x%llx inst=0x%llx param=0x%llx r=0x%llx\n",
+            (unsigned long long)a0, c1, c2, (unsigned long long)a3, (unsigned long long)s[0], (unsigned long long)s[1],
+            (unsigned long long)s[2], (unsigned long long)s[3], (unsigned long long)s[4], (unsigned long long)s[5],
+            (unsigned long long)s[6], (unsigned long long)s[7], (unsigned long long)r);
+  } else if (!strcmp(n, "RegisterClassW")) {   /* WNDCLASSW: style@0 lpfnWndProc@8 hInstance@24 lpszClassName@64 */
+    u32 style = 0; u64 wp = 0, hi = 0, cn = 0;
+    if (ld_dst_ok(a0, 72)) { memcpy(&style, (void*)(uintptr_t)a0, 4); memcpy(&wp, (void*)(uintptr_t)(a0 + 8), 8);
+      memcpy(&hi, (void*)(uintptr_t)(a0 + 24), 8); memcpy(&cn, (void*)(uintptr_t)(a0 + 64), 8); }
+    wt_str(cn, c1, sizeof c1);
+    fprintf(g_wt_fp, "style=0x%x wndproc_rva=0x%llx hinst=0x%llx class=\"%s\" r=0x%llx\n", style,
+            (unsigned long long)(wp - g_imgbase), (unsigned long long)hi, c1, (unsigned long long)r);
+  } else {
+    wt_str(a1, c1, sizeof c1);
+    fprintf(g_wt_fp, "class=\"%s\" r=0x%llx\n", c1, (unsigned long long)r);
+  }
+  fflush(g_wt_fp);
+}
 
 u64 ld_stub_c(u64 idx, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk) {
   const char* n = "?bad";
@@ -40,7 +82,9 @@ u64 ld_stub_c(u64 idx, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk) {
   if (stk && (strcmp(n, "MultiByteToWideChar") == 0 || strcmp(n, "WideCharToMultiByte") == 0)) {
     a4 = stk[0]; a5 = stk[1];                          /* MS 第5/6引数 (6引数 API のみ読む) */
   }
-  return ld_stub(n, a0, a1, a2, a3, a4, a5);
+  u64 r = ld_stub(n, a0, a1, a2, a3, a4, a5);
+  if (wt_on(n)) wt_rec(n, a0, a1, a2, a3, stk, r);
+  return r;
 }
 
 /* CAB-233: 仮 proc の実行可能 thunk (LD_FAKEPROC_BASE 固定番地 = wasm 側の値と同一)。

@@ -81,14 +81,28 @@ def run_cfi(r, sess):
     }
 
 
+def read_wintrace(path):
+    if not os.path.exists(path):
+        return []
+    return [l.rstrip('\n') for l in open(path) if l.startswith('wt ')]
+
+
 def main():
     target = sys.argv[1] if len(sys.argv) > 1 else 'targets/flelift.json'
     subprocess.run(['gcc', '-O1', '-g', '-Wall', '-Wno-unused-function', '-o', 'work/ld_native',
                     'rt/ld_native.c', 'rt/ld_ms_call.S', '-lm'], check=True)
+    wt_path = os.path.join(HERE, 'work', 'flelift', 'spike_wintrace.txt')
+    os.makedirs(os.path.dirname(wt_path), exist_ok=True)
+    open(wt_path, 'w').close()
+    if os.environ.get('SPIKE_WINTRACE', '1') == '1':   # 0 で窓の記録を切る (既定の実行との比較用)
+        os.environ['LD_WINTRACE_OUT'] = wt_path
     sess = Session(target, shards=1, build=False)
     _, res = boot.build_state(sess, None, mode='hybrid', post=run_cfi)
     d = res['detail']
     spike = d.get('post') or {}
+    wt = read_wintrace(wt_path)
+    spike['wintrace_cfi'] = [l for l in wt if ' case=cfi ' in l]
+    spike['wintrace_boot_n'] = len([l for l in wt if ' case=cfi ' not in l])
     out = os.path.join(sess.t['work'], 'spike_cfi.json')
     json.dump({'boot': {k: res[k] for k in ('units_run', 'units_total', 'first_fail', 'mode')},
                'entry_status': d.get('entry_status'), 'entry_detail': d.get('entry_detail'),
@@ -97,6 +111,9 @@ def main():
     print('[spike] CreateFruityInstance va=%s status=%s detail=%s' % (spike.get('cfi_va'), spike.get('status'), (spike.get('detail') or '')[:200]))
     print('[spike] ret=%s iface=%s calls=%s (over %s)' % (spike.get('ret'), spike.get('iface'), spike.get('calls_n'), spike.get('calls_over')))
     print('[spike] calls: %s' % ' '.join(str(c) for c in (spike.get('calls_head') or [])))
+    for l in spike['wintrace_cfi']:
+        print('[spike] wintrace %s' % l)
+    print('[spike] wintrace boot 窓の呼出し (cfi 以外の case): %d 件' % spike['wintrace_boot_n'])
     print('[spike] -> %s' % out)
 
 
