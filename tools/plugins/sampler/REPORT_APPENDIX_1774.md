@@ -21,7 +21,7 @@
 | 19048 | 9 | 0 | 0 (sites=0) | 0 (sites=0) | 未測定 | 未測定 |
 
   - 19252 の残り 10 件 (flag 参照の差し替え外) と 19048 の残り 9 件の内訳 (`xblk` と `other` の件数) は未測定。 子 [PLG-F3-33] の前提なので、次の再測定で埋める。
-- **変更前 (base) との比較は未了**。 本 run では base の summary を取れなかった (`/opt/retdec` と emsdk が runner に無く、素材は `fl-win64` のみ)。 既存の基準行 `tools/plugins/sampler/REPORT_APPENDIX_1834.md` 24 行 (測定 commit `425d40c8`) の 19252 は `19252,522,0,551,1,5,1,0,1,16,2,165,0,29,549,0` で、列 6 (unimpl) が 5 → 4 と異なる。 main 側の変更か本 pass の影響かは切り分けていない。 よって「変更前と同一」とは書けない。 19048 は sites=0 で pass が IR を変えない (差し替えも挿入もしない) ため、summary の比較は省略する。
+- **変更前 (base) との比較は未了**。 本 run では base の summary を取れなかった (RetDec・emsdk が runner に無く、素材は `fl-win64` のみ)。 既存の基準行 `tools/plugins/sampler/REPORT_APPENDIX_1834.md` 24 行 (測定 commit `425d40c8`) の 19252 は `19252,522,0,551,1,5,1,0,1,16,2,165,0,29,549,0` で、列 6 (unimpl) が 5 → 4 と異なる。 main 側の変更か本 pass の影響かは切り分けていない。 よって「変更前と同一」とは書けない。 19048 は sites=0 で pass が IR を変えない (差し替えも挿入もしない) ため、summary の比較は省略する。
 - **測定の鮮度 (未了)**: `8168426f` の後に lift 経路のコード変更が 2 件ある。 `625be6bb` (テスト追加。 実行経路の外) と `16a8af8f` (fail-open 修正。 実行コードの変更)。 `docs/WORKFLOW.md` §6 により後者は再測定が要るが、本 run では実施できなかった。 差分 (`git diff --stat 8168426f HEAD -- tools/plugins/lift tools/plugins/sampler/engine_lift.sh`):
 
 ```
