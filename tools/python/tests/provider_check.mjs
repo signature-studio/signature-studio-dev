@@ -47,12 +47,14 @@ const pe235 = new Set(["general.processRECEvent"]);
 const pe96 = new Set(["arrangement.selectionStart", "arrangement.selectionEnd", "arrangement.liveSelectionStart", "arrangement.selectionIsActive"]);
 // PE で screen 状態読出し・書込みと確認した 5 関数 (REPORT_PY121_2985・PY-121 #2985)。値は未実測の仮置き、tests/screen_diff.mjs が mock と照合
 const pe121 = new Set(["screen.isBlanked", "screen.isUnBlank", "screen.getScreenActiveCounter", "screen.setScreenActiveCounter", "screen.unBlank"]);
+// PE で引数書式を確定した描画・メーター系 6 件と blank 1 件 (REPORT_PY135・PY-135 #3022)。描画は状態を持たず、blank は isBlanked を書く。tests/screen_diff.mjs が mock と照合
+const pe135 = new Set(["screen.addMeter", "screen.displayBar", "screen.fillRect", "screen.drawRect", "screen.drawText", "screen.eraseRect", "screen.blank"]);
 // PE で呼出し経路を確定した ui ゲッター 6 件 (REPORT_PY119・PY-119 #2980)。値は未実測の仮置き、tests/ui_state_diff.mjs が mock と照合
 const pe119 = new Set(["ui.getFocused", "ui.getFocusedFormID", "ui.getFocusedFormCaption", "ui.getFocusedPluginName", "ui.getHintMsg", "ui.isInPopupMenu"]);
 // PE で呼出し経路と値の式を確定した ui 読出し 2 件 (REPORT_PY128・PY-128 #3005)。tests/ui_state_diff.mjs が mock と照合
 const pe128 = new Set(["ui.getProgTitle", "ui.getHintValue"]);
-// PE で書込み経路を確定した ui setter 2 件と ui 版 getVersion (REPORT_PY130_3007・PY-130 #3007)。setTimeDispMin は未実装 (保留)。tests/ui_state_diff.mjs が mock と照合
-const pe130 = new Set(["ui.setBrowserAutoHide", "ui.setStepEditMode", "ui.getVersion"]);
+// PE で書込み経路を確定した ui setter 2 件と ui 版 getVersion (REPORT_PY130_3007・PY-130 #3007)。setTimeDispMin は PY-236 (#3706) で実装 (toggle は奇数回・偶数回ともに ui_state_diff.mjs が mock と照合)
+const pe130 = new Set(["ui.setBrowserAutoHide", "ui.setStepEditMode", "ui.getVersion", "ui.setTimeDispMin"]);
 // PE で範囲判定・書込み先を確認した general setter 6 件 (REPORT_PY119_2977・PY-119 #2977)。tests/general_diff.mjs が mock と照合
 const pe119set = new Set(["general.setRecPPQ", "general.setNumerator", "general.setDenominator", "general.setUndoHistoryPos", "general.setUndoHistoryCount", "general.setUndoHistoryLast"]);
 // stub 確定 2 関数 (REPORT_PY41_1514 追補 #2805・PY-89)。PE 0xd5bd60 / 0xd5bcd0 で範囲検査と戻り field を確認
@@ -84,18 +86,20 @@ const pe206 = new Set(["device.createRefreshThread", "device.destroyRefreshThrea
 const pe205 = new Set(["mixer.getTrackCount", "mixer.getEqBandCount"]);
 // PE 静的状態から導いた仮置きの patterns 数え・選択系 4 件 (REPORT_PY179・PY-179 #3271)。tests/patterns_diff.mjs が mock と照合
 const pe179 = new Set(["patterns.patternCount", "patterns.patternNumber", "patterns.isPatternDefault", "patterns.isPatternSelected"]);
+// PE 0xd75d30 で -1 の戻り値と status 経路を確定した device 連動 1 件 (REPORT_PY215・PY-215 #3568)。連動表は空と仮定、tests/device_diff.mjs が mock と照合
+const pe215 = new Set(["device.getLinkedChannel"]);
 // PY-136 (#3025): screen 初期化・メニュー系 10 件 (PE 0xd7aa40 ほか。REPORT_PY136)。scr 未生成の経路は仮置き、tests/screen_menu_diff.mjs が mock と照合
 const pe136 = new Set(["screen.init", "screen.setup", "screen.update", "screen.deInit", "screen.keepDisplayActive", "screen.hideMenu", "screen.menuShowing", "screen.menuItemClick", "screen.menuNext", "screen.menuPrev"]);
 let impl = 0, unimpl = 0;
 for (const id of ids) {
   const r = direct(id, ...Array(40).fill(null).slice(0, 0));
   const notImpl = r.err?.startsWith("Unspecified error (not implemented:");
-  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || pe40.has(id) || pe76.has(id) || stub41.has(id) || pe101.has(id) || pe100.has(id) || stub89.has(id) || pe87.has(id) || pe94.has(id) || pe95.has(id) || pe96.has(id) || pe115.has(id) || pe121.has(id) || pe119.has(id) || pe130.has(id) || pe132.has(id) || pe119set.has(id) || pe152.has(id) || pe143.has(id) || pe121_2982.has(id) || pe102.has(id) || pe125.has(id) || pe172.has(id) || pe120.has(id) || pe138.has(id) || pe179.has(id) || pe205.has(id) || pl61.has(id) || pe206.has(id) || pe133.has(id) || pe235.has(id) || pe128.has(id) || pe136.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
+  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || pe40.has(id) || pe76.has(id) || stub41.has(id) || pe101.has(id) || pe100.has(id) || stub89.has(id) || pe87.has(id) || pe94.has(id) || pe95.has(id) || pe96.has(id) || pe115.has(id) || pe121.has(id) || pe119.has(id) || pe130.has(id) || pe132.has(id) || pe119set.has(id) || pe152.has(id) || pe143.has(id) || pe121_2982.has(id) || pe102.has(id) || pe125.has(id) || pe172.has(id) || pe120.has(id) || pe138.has(id) || pe179.has(id) || pe205.has(id) || pl61.has(id) || pe206.has(id) || pe215.has(id) || pe133.has(id) || pe235.has(id) || pe128.has(id) || pe136.has(id) || pe135.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
   else assert.ok(notImpl, `${id} は未実装のはず`);
   notImpl ? unimpl++ : impl++;
 }
-// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 引数書式・範囲 5 (pe40・#1529) + PE 確定 1 (pe102・#2883) + stub 確定 6 (stub41) + PE 確定 2 (pe101) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 7 (pe94・#2830) + PE 確定 9 (pe95・#2831) + PE 確定 4 (pe96・#2832) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + ui PE 確定 6 (pe119・#2980) + ui setter・getVersion 3 件 (pe130・#3007) + general PE 確定 6 (pe119set・#2977) + arrangement PE 呼出し 6 (pe152・#2983) + arrangement PE 戻り str 2 (pe143・#3041) + ui 表示・メニュー 6 (pe121_2982・#2982) + general PE 確定 2 (pe125・#3001) + general PE 確定 1 (pe235・#3701) + launchMapPages PE 確定 1 (pe120・#2984) + launchMapPages 書式・戻り 3 件 (pe138・#3029) + channels PE 判定順 1 (pe76・#2563) + patterns グループ 2 (pe172・#3219) + PY61 確定 7 (pl61・#2027) + device PE 確定 7 (pe206・#3494) + patterns 数え・選択 4 (pe179・#3271) + mixer PE 確定 2 (pe205・#3493) + ui ブラウザ 3 件 (pe132・#3013) + ui PE 確定 2 (pe133・#3014) + ui PE 確定 2 (pe128・#3005) + screen 初期化・メニュー 10 (pe136・#3025)
-assert.equal(impl, 195); assert.equal(unimpl, 240);
+// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 引数書式・範囲 5 (pe40・#1529) + PE 確定 1 (pe102・#2883) + stub 確定 6 (stub41) + PE 確定 2 (pe101) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 7 (pe94・#2830) + PE 確定 9 (pe95・#2831) + PE 確定 4 (pe96・#2832) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + ui PE 確定 6 (pe119・#2980) + ui setter・getVersion 3 件 (pe130・#3007) + setTimeDispMin 1 件 (#3706) + general PE 確定 6 (pe119set・#2977) + arrangement PE 呼出し 6 (pe152・#2983) + arrangement PE 戻り str 2 (pe143・#3041) + ui 表示・メニュー 6 (pe121_2982・#2982) + general PE 確定 2 (pe125・#3001) + general PE 確定 1 (pe235・#3701) + launchMapPages PE 確定 1 (pe120・#2984) + launchMapPages 書式・戻り 3 件 (pe138・#3029) + channels PE 判定順 1 (pe76・#2563) + patterns グループ 2 (pe172・#3219) + PY61 確定 7 (pl61・#2027) + device PE 確定 7 (pe206・#3494) + device 連動 1 (pe215・#3568) + patterns 数え・選択 4 (pe179・#3271) + mixer PE 確定 2 (pe205・#3493) + ui ブラウザ 3 件 (pe132・#3013) + ui PE 確定 2 (pe133・#3014) + ui PE 確定 2 (pe128・#3005) + screen 初期化・メニュー 10 (pe136・#3025) + screen 描画・メーター 7 (pe135・#3022)
+assert.equal(impl, 204); assert.equal(unimpl, 231);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);

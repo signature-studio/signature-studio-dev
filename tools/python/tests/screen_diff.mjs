@@ -29,11 +29,22 @@ const seq = [
   ["screen.unBlank", [1]], ["screen.isUnBlank", []],
   ["screen.unBlank", [0]], ["screen.isUnBlank", []],
   ["screen.unBlank", [2]], ["screen.isUnBlank", []],
+  // PY-135 (#3022): blank は isBlanked (scr+0x1d0) を書き、真→偽の解除で activeCounter を scr+0x1dc (仮置き 0) から戻す
+  ["screen.blank", [1, 0]], ["screen.isBlanked", []], ["screen.blank", [1, 5]], ["screen.isBlanked", []],
+  ["screen.setScreenActiveCounter", [7]], ["screen.blank", [0, 0]], ["screen.isBlanked", []], ["screen.getScreenActiveCounter", []],
+  ["screen.blank", [2, 0]], ["screen.isBlanked", []],
+  // 描画・メーター系 6 件は状態を持たず None を返す
+  ["screen.fillRect", [0, 0, 10, 10, 255]], ["screen.drawRect", [1, 2, 3, 4, 5]], ["screen.eraseRect", [1, 2, 3, 4]],
+  ["screen.addMeter", [0, 1, 2, 3]], ["screen.addMeter", [0, 1, 2, 3, 4]], ["screen.displayBar", [0, 1, "bar", 0.5, 3]],
+  ["screen.drawText", [0, "txt", 1, 2, 3, 4]], ["screen.drawText", [0, "txt", 1, 2, 3, true]],
 ];
 // 引数個数違い: mock と C は共に code 5 (Wrong number of parameters)
 const arity = [
   ["screen.isBlanked", [1]], ["screen.getScreenActiveCounter", [0]],
   ["screen.unBlank", []], ["screen.setScreenActiveCounter", []],
+  ["screen.fillRect", [1, 2, 3, 4]], ["screen.drawRect", [1, 2, 3, 4, 5, 6]], ["screen.eraseRect", [1, 2, 3, 4, 5]],
+  ["screen.addMeter", [1, 2, 3]], ["screen.addMeter", [1, 2, 3, 4, 5, 6]], ["screen.displayBar", [0, 1, "x", 0.5]],
+  ["screen.drawText", [1, "a", 1, 2, 3]], ["screen.blank", [1]],
 ];
 // 引数の型違い (C の fl_a_int / type_ok と同じ): bool は int として受理 (true → 1)、float と str は code 5 で状態を変えない。
 // 結果が状態に依存するので、初期状態の新しいエンジン 2 つで順に流し、期待値 (上の表) も直接確かめる
@@ -44,6 +55,21 @@ const typed = [
   [["screen.getScreenActiveCounter", []], { ok: 0 }],
   [["screen.setScreenActiveCounter", [true]], { ok: null }], [["screen.getScreenActiveCounter", []], { ok: 1 }],
   [["screen.unBlank", [false]], { ok: null }], [["screen.isUnBlank", []], { ok: false }],
+  // PY-135: 描画系の型違い (i は int・bool のみ、s は str のみ、d は int・bool・float)。None は既定値扱い
+  [["screen.fillRect", [1, 2, 3, 4, 1.5]], { code: 5 }], [["screen.fillRect", ["1", 2, 3, 4, 5]], { code: 5 }],
+  [["screen.fillRect", [1, 2, 3, 4, 5]], { ok: null }], [["screen.addMeter", [0, 1, 2, 3, "4"]], { code: 5 }],
+  [["screen.displayBar", [0, 1, 2, 0.5, 3]], { code: 5 }], [["screen.displayBar", [0, 1, "x", "y", 3]], { code: 5 }],
+  [["screen.displayBar", [0, 1, "x", 1, 3]], { ok: null }], [["screen.drawText", [0, 1, 1, 2, 3, 4]], { code: 5 }],
+  [["screen.drawText", [0, "t", 1, 2, 3, 4.5]], { code: 5 }], [["screen.drawText", [0, "t", 1, 2, 3, 4]], { ok: null }],
+  [["screen.blank", [1.5, 0]], { code: 5 }], [["screen.blank", ["1", 0]], { code: 5 }],
+  [["screen.blank", [true, 0]], { ok: null }], [["screen.isBlanked", []], { ok: true }],
+  // PY-135 (#3022 round 1): addMeter の成功経路 (rc>0・scr≠0) は PE 0xd7d9e0 で isUnBlank を真にし、activeCounter を scr+0x1dc (仮置き 0) にする。解析失敗 (rc≤0) は状態を変えない
+  [["screen.setScreenActiveCounter", [8]], { ok: null }], [["screen.getScreenActiveCounter", []], { ok: 9 }], [["screen.isUnBlank", []], { ok: false }],
+  [["screen.addMeter", [0, 1, 2, 3]], { ok: null }], [["screen.isUnBlank", []], { ok: true }], [["screen.getScreenActiveCounter", []], { ok: 0 }],
+  [["screen.unBlank", [0]], { ok: null }], [["screen.setScreenActiveCounter", [5]], { ok: null }],
+  [["screen.addMeter", [0, 1, 2, "3"]], { code: 5 }], [["screen.addMeter", [0, 1, 2, 3, 4, 5]], { code: 5 }],
+  [["screen.isUnBlank", []], { ok: false }], [["screen.getScreenActiveCounter", []], { ok: 5 }],
+  [["screen.addMeter", [0, 1, 2, 3, 4]], { ok: null }], [["screen.isUnBlank", []], { ok: true }], [["screen.getScreenActiveCounter", []], { ok: 0 }],
 ];
 
 const diffs = [];

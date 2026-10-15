@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # tools/shared e2e: 分類 + IPP 実測インベントリ + OSS wasm 再ビルド PoC 3 本 + プロプラ lift PoC を一括再現
-#   bash tools/shared/run_all.sh [--skip-oss]    (所要 ~6 分; 素材は /home/ubuntu/work/analysis 配下を読むのみ)
+#   bash tools/shared/run_all.sh [--skip-oss]    (素材は FL_WIN64_DIR / PLUGINS_DIR を読むのみ; 既定値は tools/shared/env.sh)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; cd "$HERE"
+# shellcheck source=/dev/null
+source "$HERE/env.sh"
 step() { echo; echo "=== $* ==="; }
 step "1/6 カタログ (win PE 313 本 / mac Mach-O 222 本) + strings"
 python3 scripts/win_catalog.py; python3 scripts/mac_catalog.py; bash scripts/dump_strings.sh
 step "2/6 IPP 実測: win/mac ローダ表 + 直接参照 + 静的 IPP + 独立検証 (capstone)"
 python3 scripts/ipp_win_all.py; python3 scripts/ipp_mac_scan.py; python3 scripts/ipp_static_mac.py
-python3 scripts/ipp_win_validate.py /home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin work/ipp_validate_flengine.json | head -3
+python3 scripts/ipp_win_validate.py "$FL_WIN64_DIR/extracted/block00031_PE.bin" work/ipp_validate_flengine.json | head -3
 python3 scripts/ipp_mac_validate.py
 step "3/6 SIMD/命令統計 (llvm-objdump, 並列)"
 mkdir -p work/simd

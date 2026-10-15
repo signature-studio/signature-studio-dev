@@ -81,7 +81,9 @@
 
 - **両側 (差分実行できる組) は Gain だけ**。Gain の差分は既存の §A3 (同一 200 case で L/R/state の bit 一致 127/200)・§A3-5 (丸め形のモデル)・§A3-6 (機械語の ramp を KH 形に置換した native で 200/200、control は 127/200)。本付録での新規の差分実行は **0 件**。
 - **SC のみ**: Compressor (0x180775220)・Filter (0x180b6f050)。SC 側の harness は動く (§5) が、KH 側の harness と snapins 登録が無いため差分は未実施。子 issue #3506 (Compressor)・#3507 (Filter)。
-- **KH のみ** (10 組): Delay・Disperser・Gate・Haas・Limiter・Phaser・QuickEq・Resonator・Stereo・VocalFilter。KH 側の登録はあるが、SC 側の実機機械語ハーネスが無い。差分の対象外。起票先は #52 の残件。
+- **KH のみ** (10 組): Delay・Disperser・Gate・Haas・Limiter・Phaser・QuickEq・Resonator・Stereo・VocalFilter。KH 側の登録はある。差分の対象外。
+  - Delay・Disperser・Phaser・QuickEq (4 組): #3740 (FA-44) で SC 側の実機機械語ハーネスを作り、fma 0/1 の smoke で ERR 0・20 行を確認した ([REPORT_APPENDIX_FA44.md](REPORT_APPENDIX_FA44.md) §1・§3)。param の写像が未確定のため差分実行は未実施。起票先は #4053 (子, 親 #3740)。
+  - Gate・Haas・Limiter・Resonator・Stereo・VocalFilter (6 組): SC 側の実機ハーネスが無い。起票先は #52 の残件。
 - **なし** (22 組): 両側とも無い。判定しない (#52 の残件)。
 - **stub** (2 組): TapeStop (9 B)・HostProxy (KH 41 B)。C2 により除外。
 
@@ -113,6 +115,7 @@
 |---|---|---|
 | Compressor の KH 側 harness と同一入力の差分 (C4〜C6) | Compressor の意味同一性は未判定 | #3506 |
 | Filter の KH 側 harness と同一入力の差分 (C4〜C6) | Filter の意味同一性は未判定 | #3507 |
-| KH のみ 10 組の SC 側実機ハーネス (Delay・Disperser・Gate・Haas・Limiter・Phaser・QuickEq・Resonator・Stereo・VocalFilter) | 差分の対象が無い | #52 (残件) |
+| KH のみ 10 組のうち Delay・Disperser・Phaser・QuickEq (4 組) の param 写像 (C4) と差分実行 (C5)。SC 側のハーネス smoke は FA-44 で済み (§4) | 差分の対象が無い (param 未確定) | #4053 (子, 親 #3740) |
+| KH のみ 10 組のうち Gate・Haas・Limiter・Resonator・Stereo・VocalFilter (6 組) の SC 側実機ハーネス | 差分の対象が無い | #52 (残件) |
 | なし 22 組 (両側とも無し) | 判定の対象外 | #52 (残件) |
 | Gain の ramp 式 `(1-t)*a + t*b` がソースの意図か (§A3-6 の未解決。機械語の置換による 200/200 は §A3-6 で確認済み) | 「どちらが正しい式か」は未確定。Gain の判定の解釈に残る | #52 (残件) |
