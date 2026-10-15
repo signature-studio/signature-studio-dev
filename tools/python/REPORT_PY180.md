@@ -70,7 +70,7 @@ $ git diff --stat 3c0d1bf47 9facb33bb -- tools/python/provider tools/python/host
  8 files changed, 134 insertions(+), 9 deletions(-)
 ```
 
-`main` 取り込みで増えた分 (`provider_check` の実装数 196→204 は main 側の他 PR の実装を含む) も、現 HEAD の実測値で置き換えた。
+旧 REPORT の 196/239 は `3c0d1bf47` 時点の値。現 HEAD の実測 204/231 で置き換えた。main 単独の 203/232 は watchdog (PR コメント) の報告値で、本 run では測っていない。
 
 ## 検証範囲 / 範囲外
 
