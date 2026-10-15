@@ -62,7 +62,8 @@ sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実�
 |---|---|---|
 | `4256c0` (%tagPOINT) の POINT 値が `m11_tr_` で渡らない (`tools/m11/m11_post.py` の生成が `zeroinitializer` を渡す)。`MACHINE_ENTRY` に入れられない | 実行不能 1 | #3862 ([LD-179]) |
 | 残り 6 件 (`442a50` `442b90` `664890` `6649b0` `6649c0` `664a80`) の入口型を機械語で確定していない | 実行不能 6 | #3863 ([LD-180]) |
-| `653c80` `691dd0` の native segv (691dd0 は rcx のオブジェクト内容、653c80 は fault addr 未記録)。`irtool.instrument` が IR の i128 入口を `0` と記録する (callee の入口比較の偽陽性の源。sample:800 への影響は未測定) | 実行不能 2・比較の信頼性 | #3864 ([LD-181]) |
+| `653c80` `691dd0` の native segv。原因は LD-181 で機械語から特定 (691dd0: 確保のビン読み rdx=0、653c80: 間接 call の null slot)。判定に入る case は未作成 | 実行不能 2 | #4200 ([LD-203])。原因と結論は `REPORT_APPENDIX_LD181.md` §2 |
+| `irtool.instrument` の i128 入口記録は LD-181 で下位 64bit に修正済み (sample:800 の判定差 0 件)。`cmp_trace` の i128 位置の除外は残存 | 比較の信頼性 | #4195 ([LD-202])。結論は `REPORT_APPENDIX_LD181.md` §3 |
 
 ## 5. 検証
 
