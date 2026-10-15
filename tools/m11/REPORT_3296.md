@@ -49,7 +49,7 @@
 
 ### 5-1 測定 commit 以降の差分
 
-`git diff --stat 3b6651de HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` (HEAD = `cb394b5e`):
+`git diff --stat 3b6651de HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` (コードの HEAD = `cb394b5e`。この後に REPORT_3296.md と DOC_MAP.md のみを変えた):
 
 ```
  tools/m11/ldfix/fix_src412770.py   |  2 +-
