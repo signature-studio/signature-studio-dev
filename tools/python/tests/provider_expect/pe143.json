@@ -1,0 +1,6 @@
+{
+  "tag": "pe143",
+  "refs": ["#3041"],
+  "note": "PE の呼出し構造と戻り str を確定した arrangement 2 件 (REPORT_PY143・PY-143 #3041)。マーカー表は件数 0 の仮置き、currentTimeHint の BBT 分解は未同定",
+  "functions": ["arrangement.getMarkerName", "arrangement.currentTimeHint"]
+}

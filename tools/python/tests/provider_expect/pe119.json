@@ -1,0 +1,6 @@
+{
+  "tag": "pe119",
+  "refs": ["#2980"],
+  "note": "PE で呼出し経路を確定した ui ゲッター 6 件 (REPORT_PY119・PY-119 #2980)。値は未実測の仮置き、tests/ui_state_diff.mjs が mock と照合",
+  "functions": ["ui.getFocused", "ui.getFocusedFormID", "ui.getFocusedFormCaption", "ui.getFocusedPluginName", "ui.getHintMsg", "ui.isInPopupMenu"]
+}
