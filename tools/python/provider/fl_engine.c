@@ -20,7 +20,7 @@
 
 typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; int64_t pitch_n; } Chan;
 typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
-typedef struct { char name[NAME]; int64_t color; uint8_t lock; } Pl;
+typedef struct { char name[NAME]; int64_t color; uint8_t lock; double act; int loop, trig_mode, pos_snap, trig_snap; } Pl;
 
 static Chan ch[NCH_MAX];
 static int nch;
@@ -74,7 +74,7 @@ void fl_engine_reset(void) {
         mx[i].vol = 0.8; mx[i].sel = (i == 0);
         if (i) { mx[i].act[0] = 1; mx[i].lvl[0] = 1.0; }
     }
-    for (int i = 0; i < NPL; i++) { snprintf(pl[i].name, NAME, "Track %d", i + 1); pl[i].color = 0x485156; pl[i].lock = 0; }
+    for (int i = 0; i < NPL; i++) { memset(&pl[i], 0, sizeof pl[i]); snprintf(pl[i].name, NAME, "Track %d", i + 1); pl[i].color = 0x485156; }
     memset(win, 0, sizeof win);
     win[0] = win[2] = win[4] = 1;
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
@@ -457,6 +457,17 @@ FL_H(playlist, getTrackName) {
 FL_H(playlist, setTrackName) { PL(0); const char *s = A_STR(1); set_name(p->name, s); return fl_ret_none(c); }
 /* FL の格納式 (setTrackColor 0xd55f30 → 0x12e5d80): R/B を入替えて 0xffffff で切る。getTrackColor の逆変換 */
 FL_H(playlist, setTrackColor) { PL(0); uint32_t u = (uint32_t)A_INT(1, 0); p->color = (int64_t)((((u & 0xff) << 16) | (u & 0xff00) | ((u >> 16) & 0xff)) & 0xffffff); return fl_ret_none(c); }
+/* PY-62 (#2027): REPORT_PY61 §2 で型・範囲 code (index 1..500 外は -4) を確定した 8 関数。
+ * 既定値 (lock 0・act 0・各 live mode 0) は実機未測定の仮置き。getTrackColor は setTrackColor (PY-113) の逆変換 */
+FL_H(playlist, getTrackColor) { PL(0); uint32_t u = (uint32_t)p->color; return fl_ret_i(c, (int64_t)(((u & 0xff) << 16) | (u & 0xff00) | ((u >> 16) & 0xff) | 0xff000000u)); }
+FL_H(playlist, isTrackMuteLock) { PL(0); return fl_ret_b(c, p->lock != 0); }
+FL_H(playlist, getTrackActivityLevelVis) { PL(0); return fl_ret_d(c, p->act); }
+FL_H(playlist, getLiveLoopMode) { PL(0); return fl_ret_i(c, p->loop); }
+FL_H(playlist, getLiveTriggerMode) { PL(0); return fl_ret_i(c, p->trig_mode); }
+FL_H(playlist, getLivePosSnap) { PL(0); return fl_ret_i(c, p->pos_snap); }
+FL_H(playlist, getLiveTrigSnap) { PL(0); return fl_ret_i(c, p->trig_snap); }
+/* 表 (gen/fl_table.c・main #2927 で kwsig 'i|i' に合わせ value 引数が入った)。REPORT_PY61 §3 確定: value -1 (省略を含む) は反転、それ以外は下位 1 byte を lock に書く。
+ * 準備判定 (-2) は未モデル (常に準備済み) */
 /* PY-102 (#2883): binary 0xd56510 に従う。index 1..500 の外は RANGE (-4)、value -1 は反転、他は下位 1 byte を書く。準備判定 (call [rax+0x98]) は未モデル (常に準備済み) */
 FL_H(playlist, muteTrackLock) { PL(0); int64_t v = A_INT(1, -1); p->lock = v == -1 ? !p->lock : (uint8_t)v; return fl_ret_none(c); }
 #define WN(a) int64_t _w = A_INT((a), 0); if (_w < 0 || _w >= NWIN) RANGE()
