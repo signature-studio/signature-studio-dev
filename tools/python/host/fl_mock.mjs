@@ -10,11 +10,25 @@ const STEP_V = 24;
 const STEP_DEF = [60, 100, 64, 120, 64, 128, 128, 0, 0];
 const PARAM_DEFAULT = [0.5, 0.2, 0.8];
 const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 8 ? -1 : prm === 7 ? pos * STEP_V : STEP_DEF[prm]);
+// PY-224 (#3628): PE 0x12d3ff0 の loop 分岐 (C provider の grid_bit_loop と同一・REPORT_PY224)。行 T[1] と flag49e・flag54 が立ち、channel i の最初の record (f4 != 0) が L = len / 24 を与えるとき、p < L は base、それ以外は base(p mod L)
+const LOOP_G2 = 24;
+const LOOP_MAX = 8;
+const loopBit = (st, i, k, p) => {
+  p |= 0;
+  const base = gridBit(st, i, k, p);
+  if (!st.loop.row || !st.loop.flag49e || !st.loop.flag54) return base;
+  const rec = st.loop.recs.find((r) => r.cid === i && r.f4 !== 0);
+  if (!rec) return base;
+  const L = Math.trunc(rec.len / LOOP_G2);
+  if (L <= 0 || p < L) return base;
+  return gridBit(st, i, k, p % L);
+};
 
 class FlError extends Error {
   constructor(msg, code) { super(msg); this.flCode = code; }
 }
 const RANGE = (m) => new FlError(m || "Index out of range", 4);
+const UNSAFE = () => new FlError("Operation unsafe at current time", 3);
 // PY-76 (#2563): cvtsd2si (64bit・最近接偶数丸め)。範囲外と inf は 0x8000000000000000 (INT64_MIN) (REPORT_PY72 §callback unit 2)
 const cvtSi64 = (x) => {
   if (!(x >= -(2 ** 63) && x < 2 ** 63)) return -(2 ** 63);
@@ -119,6 +133,7 @@ export function createMockEngine() {
     numerator: 4, denominator: 4,
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
     selectedChannel: 0,
+    loop: { row: false, flag49e: false, flag54: false, recs: [] },
     gridItems: [],
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0), pitchN: 2, pv: [...PARAM_DEFAULT] },
@@ -195,6 +210,8 @@ export function createMockEngine() {
   // plugins の値 API の引数は C と同じ順に型検査してから解決する (paramIndex・index・slotIndex・useGlobalIndex・(setParamValue の pickupMode))。o = paramIndex の位置、n = 最大個数
   const plugIn = (a, o, n) => { const q = argI(a, o, 0), i = argI(a, o + 1, 0), s = argI(a, o + 2, -1); for (let k = o + 3; k < n; k++) argI(a, k, 0); return plugPV(i, s, q); };
   const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
+  // PY-144 (#3043): PE 0xe43d30 の書込み規則。start=x・end=y を置き、x==y なら end=-1、x>y なら入れ替える。selectionClear は (-1,-1) で同じ経路
+  const selSet = (x, y) => { st.selStart = x; st.selEnd = y; if (x === y) st.selEnd = -1; else if (x > y) { st.selStart = y; st.selEnd = x; } };
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
@@ -237,12 +254,12 @@ export function createMockEngine() {
       ch(a[0]);
       return true;
     },
-    // PY-101 (#2878): PE 0xd5bc10 → 0x12d3ff0。loop 分岐は未モデル (行テーブル T の生成元が未確定・REPORT_PY112)。base 0x12d3e20 と同じ読出し。件数以上は getGridBit と同じ (PY-218・gridBit)
+    // PY-101 (#2878) / PY-112 (#2932): PE 0xd5bc10 → 0x12d3ff0。base は gridBit (件数以上は event 経路・PY-218)。loop 分岐は PY-224 (#3628) の loopBit
     "channels.getGridBitWithLoop": (...a) => {
       arity(a, 2, 3);
       const index = ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
       const k = ch(index);
-      return gridBit(st, index, k, p);
+      return loopBit(st, index, k, p);
     },
     // 選択の並びで offset 番目 (負は先頭扱い・仮置き)、超えたら最後の選択。無選択は canBeNone で -1 / 0
     "channels.channelNumber": (...a) => {
@@ -373,7 +390,7 @@ export function createMockEngine() {
     "playlist.getLiveTrigSnap": (...a) => { arity(a, 1, 1); return pl(a[0]).trigSnap; },
     // 表の引数数は 1〜2 (C と同一・main #2927)。value -1 (省略を含む) は反転、それ以外は下位 1 byte を設定 (REPORT_PY61 §3)。準備判定 (-2) は未モデル
     // PY-102 (#2883): value 検査 (argI) を index の範囲検査より先に行う。C の dispatch は型を先に見るため (code 5 が先)
-    "playlist.muteTrackLock": (...a) => { arity(a, 1, 2); const v = argI(a, 1, -1); const t = pl(a[0]); t.lock = v === -1 ? (t.lock ? 0 : 1) : v & 0xff; },
+    "playlist.muteTrackLock": (...a) => { arity(a, 1, 2); const v = argI(a, 1, -1); if (!st.safeEdit) throw UNSAFE(); const t = pl(a[0]); t.lock = v === -1 ? (t.lock ? 0 : 1) : v & 0xff; },
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
@@ -447,6 +464,10 @@ export function createMockEngine() {
     "general.getProjectGenre": (...a) => { arity(a, 0, 0); return st.projGenre; },
     // PY-120 (#2984): PE 0xd791b0 は obj.+0x50 の配列 (+0x3c0) の件数を返す。件数は実行時の状態のため仮置き 0 (REPORT_PY120_2984)
     "launchMapPages.length": (...a) => { arity(a, 0, 0); return st.launchPages; },
+    // PY-138 (#3029): PE init 0xd79020 (書式 sii)・updateMap 0xd79290 (i)・createOverlayMap 0xd7a130 (iiii) は引数書式と成功時の戻り (None) を確定。page 配列への副作用は未確定のため状態を変えない (REPORT_PY138)
+    "launchMapPages.init": (...a) => { arity(a, 3, 3); str(a[0]); argI(a, 1, 0); argI(a, 2, 0); },
+    "launchMapPages.updateMap": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
+    "launchMapPages.createOverlayMap": (...a) => { arity(a, 4, 4); for (let i = 0; i < 4; i++) argI(a, i, 0); },
     // PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない
     "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
     "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
@@ -457,13 +478,23 @@ export function createMockEngine() {
     "arrangement.liveSelectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
     "arrangement.selectionIsActive": (...a) => { arity(a, 0, 0); return st.selStart >= 0 && st.selEnd >= 0; },
     // PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定 (currentTime 'i'・selectionSet 'ii|iii'・liveSelection 'ii'・addAutoTimeMarker 'is'・jumpToMarker 'i|i')。個数は fl_table (必須 2) に合わせた暫定で、jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。
-    // 選択・マーカーの 5 件は副作用が未同定のため状態を変えない。currentTime は仮置きの状態 arrTime (0) を返す (provider/fl_engine.c と同じ)
+    // 選択の 2 件は selSet (PE 0xe43d30 の規則) で selStart/selEnd を変える (PY-144 #3043)。マーカー・liveSelection・jumpToMarker の 3 件は副作用が未同定のため状態を変えない。currentTime は仮置きの状態 arrTime (0) を返す (provider/fl_engine.c と同じ)
     "arrangement.currentTime": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return st.arrTime; },
-    "arrangement.selectionClear": (...a) => { arity(a, 0, 0); },
-    "arrangement.selectionSet": (...a) => { arity(a, 2, 5); for (let i = 0; i < 5; i++) argI(a, i, 0); },
+    "arrangement.selectionClear": (...a) => { arity(a, 0, 0); selSet(-1, -1); },
+    "arrangement.selectionSet": (...a) => { arity(a, 2, 5); const x = argI(a, 0, 0), y = argI(a, 1, 0); for (let i = 2; i < 5; i++) argI(a, i, 0); selSet(x, y); },
     "arrangement.liveSelection": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
     "arrangement.addAutoTimeMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); str(a[1]); },
     "arrangement.jumpToMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
+    // PY-143 (#3041): PE 0xd78030 (getMarkerName) と 0xd785a0 (currentTimeHint) の呼出し構造と戻り str は REPORT_PY143 で確定。
+    // マーカー表は件数 0 の仮置き (addAutoTimeMarker の副作用は未同定で登録しない)。範囲外は空文字 (PE 0x1063810 の範囲外経路)。
+    // currentTimeHint の BBT 分解 (PE 0x1312080) は未同定のため、PPQ 96・4 拍子の仮置きで bar:beat:tick を返す (provider/fl_engine.c と同じ)。
+    "arrangement.getMarkerName": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return ""; },
+    "arrangement.currentTimeHint": (...a) => {
+      arity(a, 2, 4); argI(a, 0, 0); const t = argI(a, 1, 0); argI(a, 2, st.recPPQ);
+      const zeroBased = argI(a, 3, 0) === 1, per = 4 * 96;
+      const bar = Math.trunc(t / per), beat = Math.trunc((t % per) / 96), tick = t % 96;
+      return `${bar + (zeroBased ? 0 : 1)}:${beat + (zeroBased ? 0 : 1)}:${tick}`;
+    },
     // PY-172 (#3219): PE 0xd67000 は件数 (配列 null で 0)、0xd67030 は索引 [0, 件数-1] の外を status -4。件数 0 は仮置き (provider/fl_engine.c の PGRP_N と同じ)
     "patterns.getPatternGroupCount": (...a) => { arity(a, 0, 0); return PGRP_N; },
     "patterns.getPatternGroupName": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i < 0 || i >= PGRP_N) throw RANGE(); return ""; },
@@ -517,6 +548,7 @@ export function createMockEngine() {
       return f(...args.map((a) => (a === null ? undefined : a)));
     },
     implemented: () => Object.keys(impl),
+    setSafeEdit: (v) => { st.safeEdit = !!v; },
     stepItemProbe: (prm, value, seed0, seed1) => {
       const a = newItem(), b = newItem();
       itemWrite(a, prm, 0, seed0); itemWrite(b, prm, 0, seed1);
@@ -525,6 +557,11 @@ export function createMockEngine() {
     },
     noteEnumProbe: (seed, n, chan, step, V) => noteEnum(noteGen(seed, n), chan, step, V),
     noteEnumNotes: (notes, chan, step, V) => noteEnum(notes.map(([d0, len, ch]) => ({ ...newItem(), d0, len, ch })), chan, step, V),
+    // PY-224 (#3628): 検査用に loop 行 T[1] を置く。recs は [cid, f4, len] の列 (fl_provider.mjs の setLoop と同じ)
+    setLoop: (row, flag49e, flag54, recs) => {
+      if (recs.length > LOOP_MAX) throw new Error("loop record 超過 (上限 8)");
+      st.loop = { row: !!row, flag49e: !!flag49e, flag54: !!flag54, recs: recs.map(([cid, f4, len]) => ({ cid, f4, len })) };
+    },
     gridItemsProbe: (seed, n) => { st.gridItems = gridGen(seed, n); return st.gridItems.length; },
   };
 }
