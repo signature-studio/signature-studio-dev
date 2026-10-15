@@ -10,7 +10,7 @@
 |---|---|
 | 構成 | **VST3 のみが実体** (Win x64 / mac universal)。VST2・32bit・WinARM64・CLAP なし。AU/AAX は VST3 を dlopen する薄いラッパ |
 | フレームワーク | VST3 SDK 3.7.12 + **VSTGUI4 (Direct2D/DirectComposition)**。JUCE ではない。DSP は Xfer 独自 (osc 7種/フィルタ18クラス/FX 十数系) |
-| コード規模 | Win .text **10.59 MB / `.pdata` 登録関数 33,791 (Ghidra 33,792)** (+ `.pdata` 外にもコード約 318KB, §4.1)。OTT (.text 1.97MB, DSP 20KB) の約5倍・DSP は推定 **1.5〜2.5 MB** (OTT の 75〜125 倍) |
+| コード規模 | Win .text **10.59 MB / `.pdata` 登録関数 33,791 (Ghidra 33,792)** (+ `.pdata` 外のブロックの内訳・訂正は REPORT_SR21.md §0)。OTT (.text 1.97MB, DSP 20KB) の約5倍・DSP は推定 **1.5〜2.5 MB** (OTT の 75〜125 倍) |
 | SIMD | **SSE2 スカラ主体**。packed 演算 9,483 命令/1,072 関数、AVX/FMA は 19+37 関数のみ (配置が CRT/libm 域, 推定)。AVX-512 無し |
 | パッカー/難読化 | **無し** (標準セクション, `.pdata` 範囲の逆アセンブル網羅 100.00%, EP は標準 CRT, アンチデバッグ無し)。.rdata の高エントロピー領域 (4.4MiB) は zlib 圧縮の事前計算 float テーブルと実証 |
 | **認証** | **有り (blocker 候補)**: Xfer アカウントのブラウザ認可 + Machine ID + オフライン license ファイル。未認可は demo 版 (UI overlay)。ネット通信 (WININET/ソケット) を含む |
@@ -53,7 +53,7 @@
 | mac `Serum2.aaxplugin` | AAX ラッパ | universal | 642,640 (+Eden 100,896) | - | AAX 2.0.24 |
 
 - VST3 クラス (moduleinfo.json): `Serum 2` (Instrument|Synth) と `Serum 2 FX` (Fx) の各 Component + Controller の計 4 CID (processor/controller 分離型)。SDK 表記 `VST 3.7.12`。
-- **推奨 lift 対象 = Win x64 `Serum2.vst3`**: MS x64 ABI・`.pdata` で関数境界の大半が確定 (OTT と同条件。ただし `.pdata` 外に leaf 関数等のコード約 318KB, §4.1)・RTTI/vtable 残存。mac は strip 済で情報量で劣る (arm64 slice は lifter 前提外)。
+- **推奨 lift 対象 = Win x64 `Serum2.vst3`**: MS x64 ABI・`.pdata` で関数境界の大半が確定 (OTT と同条件。ただし `.pdata` 外に leaf 関数等のコード (内訳は REPORT_SR21.md §0))・RTTI/vtable 残存。mac は strip 済で情報量で劣る (arm64 slice は lifter 前提外)。
 - Win .rsrc 126KB の entropy 7.99 は **zstd 圧縮の UI 記述 `DATA/SERUM2.UIDESC`** (125,234B → 2,093,822B の VSTGUI uidesc JSON, 123 template)。パッカーではない。
 
 ## 3. フレームワーク判定
@@ -78,7 +78,7 @@
 
 | 指標 | 値 |
 |---|---|
-| .text / 関数 (pdata) / Ghidra 関数 | 10,593,334 B / 33,791 / 33,792 (`-noanalysis`+pdata 生成で 1 分)。**`.pdata` 外**: 関数間の隙間 463,748 B のうちブロック 318KB (61,895 命令・ret 5,096・スカラ/packed FP 演算 1,252。leaf 関数や分割ブロックと推定, 検収の再計測) は上記関数数・census に含まれない。ただし NOP のみのパディングを含むため実コードとしては過大 (訂正は `REPORT_SR21.md` §0。非パディングの命令は 46,834 = `out/sr21_summary.txt` の TOTAL_blocks_incl_padding の insns・`REPORT_SR21.md` §1) |
+| .text / 関数 (pdata) / Ghidra 関数 | 10,593,334 B / 33,791 / 33,792 (`-noanalysis`+pdata 生成で 1 分)。**`.pdata` 外**: 関数間の隙間 463,748 B のうちブロック 318KB (61,895 命令・ret 5,096・スカラ/packed FP 演算 1,252。leaf 関数や分割ブロックと推定, 検収の再計測) は上記関数数・census に含まれない。ただし NOP のみのパディングを含むため実コードとしては過大 (訂正は `REPORT_SR21.md` §0。非パディングの命令は 46,834 = `out/sr21_summary.txt` の TOTAL_blocks_incl_padding の insns。padding ブロックは 0 命令として集計し、61,895 との差 15,061 は padding ブロック数 (各 1 命令・`out/sr3_gap_blocks.tsv` と `out/sr21_classify.tsv` の突合)・`REPORT_SR21.md` §1) |
 | 関数サイズ | 中央値 82B, p90 577B, p99 3,473B, 最大 115,265B (SQLite parser 系と推定), >4KB 235 本, >16KB 24 本 |
 | 命令 / call | 2,515,362 / 159,199 (call_mem 29,999 = 仮想呼び出し/IAT) |
 | SSE スカラ FP 演算 (ss/sd) | 51,535 命令 (xmm 操作で mnemonic が ss/sd 終わりのもの。ucomis*/comis*/cmp*s* 比較と scalar FMA を含み、加減乗除・sqrt・min/max のみでは 39,283。**double (sd) 主体**: mulsd 8,381 / addsd 8,175 / mulss 6,187) |
@@ -227,7 +227,7 @@ GHIDRA=1 bash tools/targets/serum2/scripts/run_all.sh   # +Ghidra 全自動解�
 - **ネガティブコントロール**: 同じ SQLite リテラル集合で zstd 窓 (209 関数) 内の参照元 = **0**。同サイズの index 窓を ±1〜3 倍ずらした 6 通りも全て **0 関数**。
 - **muParser は弱い**: upstream v2.3.2 リテラル 84 個のうち参照されるもの 26、参照元 8 関数中の窓内は **2** (0x18091ad70・0x18099a6d0。25.0%)。窓外 6 関数 (0x1809e3240/0x1809eb7b0/0x1809ef030/0x1809ef7b0/0x180a0a3e0/0x180a0f3f0, 計 1,343 B) は `acos`/`log2`/`sinh`/`sqrt`/`log10` の関数名を参照する 32〜306 B の関数で、muParser 本体窓 (0x18091ace0–0x18092741d) の外にある。窓は組込み関数の登録側を含まず不足の可能性が高い → 拡張は SR-4 前に動的トレースで確定。
 - **偽の版文字列を除外**: `2.1.4`/`2.1.3` (0xfd3379/0xfd3547) は直前後が `Env 4`/`CC 73: Sound Controller 4` の Serum 独自テーブルで、muParser 版ではない。muParser の版は**確定不能** (§11.5。2.2.0〜2.2.4 が未取得のため完全突合できず。v2.3.2 リテラルの突合は窓内 2 関数のみで版の識別力なし。v2.2.5 も窓内 2 関数で同様 (先頭一致に限定する前の予備測定))。
-- **`.pdata` 外コード整理 (`out/sr3_gap_blocks.tsv`)**: `.text` の `.pdata` 隙間 29,354 区間 / 463,748 B から、0xCC/0x90/0x00 パディング 145,350 B を除き **20,467 ブロック / 318,398 B / 61,895 命令 / ret 5,096** (§4.1 の旧値 318KB・ret 5,096 と一致)。clean decode 20,459 ブロック / 318,167 B。ブロック先頭を direct call/jmp/jcc/lea が指すもの (`.pdata` 側参照のみ) = **1,352 ブロック / 101,257 B**。残りは SR-21 で分類し直した (NOP のみのパディングを含む。`REPORT_SR21.md` §0)。cut 窓内: sqlite 48・muparser 120・libsfz 37・zl_convolver 10・nlohmann 2 (計 217 ブロック / 2,280 B)、窓外 20,250 ブロック / 316,118 B。
+- **`.pdata` 外コード整理 (`out/sr3_gap_blocks.tsv`)**: `.text` の `.pdata` 隙間 29,354 区間 / 463,748 B から、0xCC/0x90/0x00 パディング 145,350 B を除き **20,467 ブロック / 318,398 B / 61,895 命令 / ret 5,096** (§4.1 の 318KB はパディング込みの値。ret 5,096 はパディングを含まない)。clean decode 20,459 ブロック / 318,167 B。ブロック先頭を direct call/jmp/jcc/lea が指すもの (`.pdata` 側参照のみ) = **1,352 ブロック / 101,257 B**。残りは SR-21 で分類し直した (NOP のみのパディングを含む。`REPORT_SR21.md` §0)。cut 窓内: sqlite 48・muparser 120・libsfz 37・zl_convolver 10・nlohmann 2 (計 217 ブロック / 2,280 B)、窓外 20,250 ブロック / 316,118 B。
 - 範囲外: 実機/wasm での挙動一致・upstream の再ビルド品との関数単位の一致確認・mac 版。
 
 ### 11.4 wasm 再ビルド手順 (方針。#19 [T-SH-18] と共有・未実行)
