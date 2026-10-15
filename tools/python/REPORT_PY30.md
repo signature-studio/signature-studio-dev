@@ -145,6 +145,7 @@ node tests/chord_progression_call_probe.mjs                   # 呼べた 3/9
 | `ChordAlternative` の属性 | — | 未確定 | 本 run で未調査 | 未実装 |
 
 - `getAlternative` の範囲上限 `7` は `cmp dword ptr [rbp+0x2c], 7` (0xd2eb82) で確認。
+- 注記 (mock の挙動): `src/flcpt.py` の `ChordMarker._alternatives` に要素を入れる経路は無い (要素は PE 側が `self+0x64` に入れる想定)。そのため mock では `getAlternative` は常に None を返す。0〜7 の範囲で要素を返すのは PE 実体の動作であり、mock 側では再現していない。
 - `pyc` 側の使い方 (`util.pyc` `refresh_alternatives`・`get_alternatives` 等が `alternativeCount` と `getAlternative` を読む) と整合する。
 
 ### 7.2 実測 (変更前 = HEAD `32e6f8b46` / 変更後 = 本 PR の commit)
@@ -163,6 +164,6 @@ node tests/chord_progression_call_probe.mjs                   # 呼べた 3/9
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ChordMarker の `time`・`length`・`name` の所属確定と実装 | text_to_chord・get_chord_root・reset が呼べない。probe 3/9 のまま | #3175 (本 issue の残り・子に分割) |
-| `ChordAlternative` の属性 (`name`・`note_classes`・`extensions`・`locked`) | `getAlternative` の戻り値を読む先が空。text_to_chord は `locked` で止まる | #3175 (残り) |
+| ChordMarker の `time`・`length`・`name` の所属確定と実装 | text_to_chord・get_chord_root・reset が呼べない。probe 3/9 のまま | #4024 (PY-293) |
+| `ChordAlternative` の属性 (`name`・`note_classes`・`extensions`・`locked`) | `getAlternative` の戻り値を読む先が空。text_to_chord は `locked` で止まる | #4024 (PY-293) |
 | 範囲外の None 戻り値 (`0xc38bc0`) | 推定のまま (§2.3) | #3034 (PY-141) 既存 |
