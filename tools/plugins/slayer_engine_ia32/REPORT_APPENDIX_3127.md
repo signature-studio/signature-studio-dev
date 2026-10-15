@@ -110,7 +110,7 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py    # 突合 (exit 0)
 python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 ```
 
-- 鮮度: 測定 commit は `dadf4ea18` (コードを変えた最後の commit)。 そこから `6cda37e84` (PR 先頭) までの `git diff dadf4ea18 6cda37e84 -- tools/plugins/slayer_engine_ia32/{diff_entry.py,native_entry.c,rt32_glue.c,entry_wasm.mjs,lift_text.py} tools/ott/rt tools/ott/lift` は 159 行 (`tools/ott/lift/x64c.py` 18 行・`tools/ott/rt/ott_x87.h` 146 行。 main の取り込みで入った x87 の変更)。 ハーネス側 (`tools/plugins/slayer_engine_ia32/` の 5 ファイル) は 0 行。 `6cda37e84` から HEAD `6c5e25f46` までは 0 行 (`git diff 6cda37e84 HEAD -- <同じ範囲>`)。 HEAD での突合は 448 / 448 PASS (§4) で、 x87 の変更は本件の 448 行の結果を変えなかった。
+- 鮮度: 測定 commit は `dadf4ea18` (コードを変えた最後の commit)。 そこから `6cda37e84` (PR 先頭) までの `git diff dadf4ea18 6cda37e84 -- tools/plugins/slayer_engine_ia32/{diff_entry.py,native_entry.c,rt32_glue.c,entry_wasm.mjs,lift_text.py} tools/ott/rt tools/ott/lift` は 159 行 (`tools/ott/lift/x64c.py` 18 行・`tools/ott/rt/ott_x87.h` 146 行。 main の取り込みで入った x87 の変更)。 ハーネス側 (`tools/plugins/slayer_engine_ia32/` の 5 ファイル) は 0 行。 検証 HEAD (`540246c20`・main 取り込み後) は `origin/main` と上の範囲で 0 行 (`git diff origin/main HEAD -- <同じ範囲>`)。 HEAD での突合は 448 / 448 PASS (§4)。
 - 補足: `lift_text.py` の結果は `imports 41`・`functions 472` (pass2)。 pass1 の `38` は REPORT_APPENDIX_1098 §2 の値。
 
 ## 7. 未解決
