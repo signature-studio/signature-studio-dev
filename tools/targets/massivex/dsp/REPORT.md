@@ -1,6 +1,6 @@
 # Massive X DSP closure 特定と lift 計画 (MX-3 / CAB-263)
 
-- **REPORT 行数**: 246 行 (上限 250 行・docs/DOC_MAP.md §1)
+- **REPORT 行数**: 248 行 (上限 250 行・docs/DOC_MAP.md §1)
 
 - 解析日: 2026-10-11 / 担当: `tools/targets/massivex/dsp/` (大物は `work/`, gitignore 済)
 - 素材: `work/extracted/VST3/Massive X.vst3` (95,356,824 B, md5 622993e76565f49c094063a2b717d6ca)
@@ -19,7 +19,7 @@
    **round 1 で 3,227 / round 2 で 45,611 / round 3 で 320,877** と発散し .text ほぼ全体に接続 (§2)。
    起票時の「process 起点 closure 100〜300 関数」は**成立しない** (推定)。
 2. **x64c 未対応語彙は VST3 面だけで 38,485 site / 264 種** (FLEngine 全体は 1,105 site)。
-   内訳: **AVX (VEX/EVEX) 37,630 (97.8%)**、AES/SHA-NI 224、x87 演算 73、その他 558 (実測 §3・測定 commit `458405518`)。
+   内訳 (MX-36 修正後): **AVX (VEX/EVEX) 37,406**、**AES/SHA-NI 499** (vaes 224 を含む)、x87 演算 73、その他 507 (実測 §3・測定 commit `7dea72c55`)。
    FLEngine closure が SSE2 中心だったのに対し Massive X は **AVX2/AVX-512 + x87 演算**を伴う。
 3. **.pdata は信頼できない (D11)**: 186,960 関数 / 58,062,780 B (.text の 96.4%) しか載っておらず、
    直接 call の **99.6% (592,497 / 594,978 unique target) が非 begin を指す**。
@@ -90,17 +90,18 @@ headline の round 2/3 は 1 コマンド e2e では再現できない (規則 3
 
 | 群 | site | 内訳 (上位) |
 |---|--:|---|
-| **AVX (VEX/EVEX)** | **37,630** | vmulps 6,614 / vaddps 4,342 / vbroadcastss 3,871 / vpslld 1,667 / vblendvps 1,561 / vinsertps 1,400 / vsubps 1,223 / vpaddd 1,179 / vpsrld 1,177 / vaesenc·vaesdec 等 224 / **zmm 系 20** (vmovups 13 / vpaddq 5 / vmovaps 2) |
-| AES / SHA-NI | 224 | sha256rnds2 64 / aesenc 52 / aesdec 52 / sha256msg1 24 / sha256msg2 24 / aesenclast·aesdeclast 8 |
+| **AVX (VEX/EVEX)** | **37,406** | vmulps 6,614 / vaddps 4,342 / vbroadcastss 3,871 / vpslld 1,667 / vblendvps 1,561 / vinsertps 1,400 / vsubps 1,223 / vpaddd 1,179 / vpsrld 1,177 / **zmm 系 20** (vmovups 13 / vpaddq 5 / vmovaps 2) |
+| AES / SHA-NI | 499 | vaesenc 104 / vaesdec 104 / sha256rnds2 64 / aesenc 52 / aesdec 52 / pshufb 24 / palignr 24 / sha256msg1 24 / sha256msg2 24 · 他 (vaesenclast·vaesdeclast 16 / aesenclast·aesdeclast 8 / pclmulqdq 3) |
 | x87 **演算** | 73 | fmul 8 / fisttp 8 / fadd 3 / fild 6 / fdiv 2 / fcmovnb 2 … |
-| その他 | 558 | mulx 49 / adcx 44 / out 41 / tzcnt 39 / repz ret 37 / adox 32 / in 31 / pshufb 24 / palignr 24 / int1 22 / cli 19 / retf 18 / enter 17 … |
+| その他 | 507 | mulx 49 / adcx 44 / out 41 / tzcnt 39 / repz ret 37 / adox 32 / in 31 / int1 22 / cli 19 / retf 18 / enter 17 … |
 
 比較 (CAB-226 実績): FLEngine lift 集合 7,031 関数 / 340,774 命令 / 未対応 **1,105 site (0.32%)**
 → x64c 拡張で 0。**Massive X の VST3 面だけで 38,485 = FLEngine 全体の 34.8 倍**
 (定義: 38,485 ÷ 1,105 = 34.8)。AES/SHA-NI は OpenSSL 静的リンク由来と推定 (MX-1 REPORT §5 実測)。
 旧値 48,612 は x64c の `ac58a8749`・`fe2dc9ed9` より前の値 (現 HEAD で再測定。詳細は massivex `REPORT_APPENDIX_3454.md`)。
 
-- 群分けは `e2e.sh` の判定順のまま: `v` 接頭辞判定が先のため vaes 系 224 は AVX に入り、pshufb / palignr / pclmulqdq は「その他」に入る。合計 38,485 は不変 (表示のみ・起票先: #3487 [MX-36])。
+- 群分けは key の mnemonic 部で判定し AES/SHA-NI を AVX より先に判定する (MX-36 / #3487・測定 commit `7dea72c55`)。修正前は vaes 224 が AVX、pshufb/palignr/pclmulqdq 51 が other に入っていた (合計 38,485 は不変)。負例 (旧判定を同じ入力へ): AVX 37,630 / AES 224 / other 558。
+- 検算 (別アルゴリズム・明示 mnemonic 集合): `python3 dsp/scripts/mx36_group_check.py dsp/work/lift_seeds/lift_meta.json` が新判定の群別行と一致。zmm 系 20 site は全て v 接頭辞で AVX。非 v の `kmovw`/`kmovd` 8 site は other のまま (群の定義は変えていない)。
 - **vectorcall**: 567 関数の到達 import は COM (`CoCreateFreeThreadedMarshaler` 等) 3 件のみ。
   独自 vectorcall 修飾子は未検出 — ただし x64c は import 修飾子を無視するため**範囲外** (§6 U3)。
 - **MSVC C++ EH**: .pdata の chained 関数が多数 (D11) ゆえ unwind チェインが濃密と推定。未解析 (§6 U4)。
@@ -207,6 +208,7 @@ tools/targets/massivex/dsp/
 ├── REPORT.md / e2e.sh (1 コマンド) / negctl.sh (NC 3 件 FAIL)
 └── scripts/  mx_rtti.py, mx_entry_surface.py, mx_recount.py, mx_cg.py, mx_closure.py, mx_roots.py
               + acpt_recount_np.py / acpt_verify_mx3.py   (検収 agent の別実装)
+              + mx36_group_check.py                       (MX-36 群分けの検算・旧判定の負例)
     MX-2 側: license/scripts/acpt_verify_mx2.py            (12 点 IR 検証)
     work/   (gitignore 済・48 MB)
 
