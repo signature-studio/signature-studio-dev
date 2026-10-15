@@ -225,7 +225,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 
 - **結論**: 既定 (mode 3) の survey は補修 (`InitTable` を PKG へ戻す) ありで 942 件を判定 (ok 895 / empty 46 / noproc 1)。補修なしは `InitTable == 0` で不成立。補修が判定を変えるかは未切り分け (#4901)。受入 2 (旧 mode 0 との差) は #4901。
 - 測定 commit: `a64aa3aab` (コードを変えた最後の commit。main 取り込み `db771b431` 後の HEAD)。差分 0 の証跡: `git diff a64aa3aab HEAD -- tools/flelift/boot` の出力 0 行。
-- 素材: `fl-win64` (`$HOME/artifacts`)・emsdk 6.0.12 (上流から取得・`/tmp/opencode/emsdk`)。`FL_WIN64_DIR=/tmp/opencode/fl`。
+- 素材: `fl-win64` (`FL_WIN64_DIR` に展開)・emsdk 6.0.12 (`[EMSDK]` を上流から取得して `SS_EMSDK_ENV` で指定)。
 
 | 項目 | 結果 (HEAD `a64aa3aab`) |
 |---|---|
