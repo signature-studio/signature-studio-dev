@@ -11,7 +11,7 @@
 ## 2. 測定の組
 
 - 測定 commit: `9a5767521` (origin/main)。本 PR の変更はツール 1 本 (`tools/gui/flengine/boot_halt_probe.mjs`) と REPORT のみで、boot の経路は変えていない。
-- 素材: fl-win64 (`extracted/block00031_PE.bin`)・work-m11 (boot0〜4 の lift と m11 の既存 work)・toolchain-retdec (`RETDEC`)・toolchain-emsdk (`/opt/emsdk`)。
+- 素材: fl-win64 (`extracted/block00031_PE.bin`)・work-m11 (boot0〜4 の lift と m11 の既存 work)・toolchain-retdec (`RETDEC`)・toolchain-emsdk (`[EMSDK]`)。
 - 再生成の手順 (work-m11 の IR は boot5・boot6 を含まないため、現 main で作り直した。すべて `tools/` の既存スクリプト):
   1. `bash tools/m11/m11_lift.sh m11_extra_ranges5.txt boot5 600` (9.8 秒・ir5 OK 2686 行)
   2. `bash tools/m11/m11_wndseed.sh` (boot6 lift・閉包 1212 関数・gen_ir2・WNDCLASS-CHECK PASS・3 分 35 秒)
