@@ -1011,6 +1011,7 @@
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_3792.md` | ~170 | MX-41 (#3792): 1 本目 .pdata の読取不能 160 件の全件表 (st / ui / 所属 section / raw / 先頭バイト)。測定値の正本は REPORT_MX6.md §3 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_3776.md` | ~70 | MX-39 (#3776) の分割移動全文 (§9): funclet の深い closure 到達 (BFS 深さ)・E8/E9 候補 4 件の由来・MSVC funclet の取り込み方式 (U4d・U4e)。250 行上限のため分割移動 (§9.6 は 3eefb3bab の再測定を追記) |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_MX6_HISTORY.md` | ~140 | MX-6 (#1123) の旧測定記録 (0dbf9a54d・51953f46d・fbc9971f の §1・§7 と、62e3aefbe までの main 側 §7 の差分)。REPORT_MX6.md から分割移動 (内容は削除していない)。現行の測定値の正本は REPORT_MX6.md §1・§7 |
+| `tools/targets/massivex/dsp/REPORT_APPENDIX_4161.md` | ~70 | MX-45 (#4161) 受入 1・4: `shimx_fh3_funclets` の C 移植の実測 (実 PE 全数一致 13,002・不一致 0・測定 commit `e1c5152ac`)・out_cap 超過時の戻り値の契約 (上界であり正確でない)・`.text` 差分 0 の確認。受入 2・3 は #4928 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_4192.md` | ~130 | MX-47 (#4192): .text 外の FH3 funclet 候補 211 件の由来 (誤読・root から除外。画像外 208 / .data 3)・FH3 棄却 355 件の内訳 (大半は読取不能の FuncInfo 339 件、上限は 9 件のみ。REPORT_APPENDIX_3776 §9.2 の記述を訂正)・U4g/U4h/U4i の確認 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_4198.md` | ~43 | MX-50 (#4198) 親 18 件の RUNTIME_FUNCTION 解決 (部分・未達)。親 18 件の所在の再現が REPORT_MX5 と一致せず、UNWIND_INFO の読み方の疑いは未確定。e2e・negctl は素材 `plugins-massivex` 不足で未実施 |
 | `tools/targets/massivex/dsp/REPORT_MX15.md` | ~50 | MX-15 (#1810): MX-12 残件 490 件 (0 件 458・2 件以上 32) の失敗理由の内訳と、MX-10 親 18 件の母集団。読み方の規則・親の解決は子 issue (MX-49・MX-50)。測定値の正本 |
