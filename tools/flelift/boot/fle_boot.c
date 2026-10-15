@@ -114,7 +114,7 @@ static u32 g_py_ev_n, g_py_ev_over;
 typedef struct { u32 unit, pos, count, pad; u64 mgr, safe_g, safe_obj, f98, f88, sing; } py_snap;   /* 64 B (JS 側の読出しと一致) */
 #define PY_TRACE_MAX 32
 static py_snap g_py_snap_last, g_py_snap_trace[PY_TRACE_MAX];
-static u32 g_py_snap_trace_n;
+static u32 g_py_snap_trace_n, g_py_snap_over;
 static int py_snap_same(const py_snap* a, const py_snap* b) {
     return a->mgr == b->mgr && a->pos == b->pos && a->count == b->count && a->safe_g == b->safe_g &&
            a->safe_obj == b->safe_obj && a->f98 == b->f98 && a->f88 == b->f88 && a->sing == b->sing;
@@ -131,8 +131,10 @@ static void py_snap_undo(void) {
     s.f88 = s.safe_obj ? LD64(s.safe_obj + 0x88) : 0;
     s.sing = LD64(0x16b82e0u);
     g_py_snap_last = s;
-    if (g_py_snap_trace_n == 0 || (g_py_snap_trace_n < PY_TRACE_MAX && !py_snap_same(&s, &g_py_snap_trace[g_py_snap_trace_n - 1])))
-        g_py_snap_trace[g_py_snap_trace_n++] = s;
+    if (g_py_snap_trace_n == 0 || !py_snap_same(&s, &g_py_snap_trace[g_py_snap_trace_n - 1])) {
+        if (g_py_snap_trace_n < PY_TRACE_MAX) g_py_snap_trace[g_py_snap_trace_n++] = s;
+        else g_py_snap_over = 1;
+    }
 }
 static void py_watch_snap(void) {
     py_snap_undo();
@@ -162,6 +164,7 @@ EMSCRIPTEN_KEEPALIVE int fle_py_ev_over(void) { return (int)g_py_ev_over; }
 EMSCRIPTEN_KEEPALIVE unsigned fle_py_snap_last_ptr(void) { return (unsigned)(uintptr_t)&g_py_snap_last; }
 EMSCRIPTEN_KEEPALIVE unsigned fle_py_snap_trace_ptr(void) { return (unsigned)(uintptr_t)g_py_snap_trace; }
 EMSCRIPTEN_KEEPALIVE int fle_py_snap_trace_n(void) { return (int)g_py_snap_trace_n; }
+EMSCRIPTEN_KEEPALIVE int fle_py_snap_trace_over(void) { return (int)g_py_snap_over; }
 /* strict variant は link 構成として fail-fast 化 (-DFLEBOOT_STRICT=1)。実行時切替も可。 */
 #if FLEBOOT_STRICT
 unsigned char fle_g_strict = 1;

@@ -180,7 +180,7 @@ const pySnap = (() => {
     const n = Number(m._fle_py_snap_trace_n()), p = Number(m._fle_py_snap_trace_ptr());
     const trace = [];
     for (let i = 0; i < n; i++) trace.push(rd(p + 64 * i));
-    return { last, trace };
+    return { last, trace, over: Number(m._fle_py_snap_trace_over()) };
 })();
 boot.py_snap = pySnap;
 console.log('FLEBOOT_PY201 ' + JSON.stringify(pySnap));
