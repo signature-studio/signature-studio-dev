@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """x87_diff.py: x87 subset の lowering (x64c --arch ia32 → tools/ott/rt/ott_x87.h) と実 x87 の差分試験 (#1099・#2967)。
 
-  python3 x87_diff.py [--n 100000] [--seed 1] [--nega] [--nega80] [--nega-c1] [--rc] [--rc-arith RC] [--roundtrip] [--skip NAME,...]
+  python3 x87_diff.py [--n 100000] [--seed 1] [--nega] [--nega80] [--nega-c1] [--nega-trig] [--rc] [--rc-arith RC] [--roundtrip] [--skip NAME,...] [--only NAME,...] [--no-e]
 
 - op 表: 機械語 (.byte) を 1 命令ずつ持つ。 native 側はその機械語を実 FPU で実行 (中間値は 80bit)。
   lowered 側は同じ機械語を capstone で decode → x64c の FnLift.one() で C にして実行 (f80 は持たず double)。
@@ -16,7 +16,10 @@
 - --rc: fldcw で RC を変え、fist/fistp の丸めだけを比べる (算術を含まない試行。ADR の制限 (5))。
 - --rc-arith RC: fldcw で RC を RC (0 nearest / 1 down / 2 up / 3 truncate) に固定し、算術・fst m32 を含む全 op で比べる (#2967)。
   同じ seed の試行は RC の値だけが違うので、RC=0 の結果との差を RC 由来として読む。
+- --nega-trig: lowered 側の fyl2x を log2 でなく自然対数にする (negative control・超越 #3687)。
+- --only: 試行の op 表をこの名前だけにする (例: fld,fld1,fscale)。 --no-e: 入力を d/f/i/q だけにし、m80 の命令を外す (f80 の入力丸めを除く)。
 - --roundtrip: f80↔f64 変換 (ott_x87.h の x87_f80_to_f64 / x87_f64_to_f80) の往復試験。 参照は実 x87 (x87_f80_rt.c)。
+- 命令単体 (fsin/fcos/f2xm1/fyl2x/fprem/fscale の 1 命令ずつ・定義域の類ごと) は x87_trans_direct.c (#3687)。
 生成物は work/x87/ (gitignore 対象)。 依存: gcc・capstone・x64c (tools/ott/lift)。
 """
 import argparse, math, os, random, struct, subprocess, sys, time
