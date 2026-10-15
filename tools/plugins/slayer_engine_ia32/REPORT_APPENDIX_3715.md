@@ -3,7 +3,7 @@
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない)。 ST(0) の f80→f64 の丸め差は ADR D28 の帰結で、行案は `REPORT_APPENDIX_1099.md` §6 (D24 (案)) にある。 本付録は関数単位の観測のみを足す (`DEFECTS.md` は編集しない)。
 
 - 親 issue: #3715 (PLG-G2-31・親 #2989)。 前付録: `REPORT_APPENDIX_2989.md`。
-- 測定 commit: `30f80f3c9` (`test(ott): fix x87 leaf differential harness comment (#3715)`)。 試験のコードを含む最後の commit。 この commit の実行は `51f558081` と挙動が同一 (後の commit はコメント 1 行の修正のみ)。
+- 測定 commit: `d5afb6ae5` (main 取り込み後の HEAD。 試験コード `x87_fn_diff.py` を含む最後の code commit)。 旧測定 commit `30f80f3c9` の実測は、判定器 (`nan-num` 判定・`--special`) が変わったため、本記録の値として使わない (§6 の鮮度の証跡)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` と乱数 (seed 2989) で生成した試行のみ。
 
 ## 1. 結論
@@ -34,7 +34,7 @@
 - native のバッファを 32MiB から 64MiB に広げた (`IBUF_SZ`・`OBUF_SZ`)。 40 本 × 200 行の入力と出力が 32MiB に収まらないため。
 - 試験ランナーが異常終了したとき native は exit 0 で抜けて出力が欠ける (本 run で確認: `1000c084` の 2 行目以降が出ず、`rc=0`)。 そのため、行数の突合 (`件数 native / wasm / 期待`) が、欠損の検出の役割を果たした。 ランナーの exit 規約は変えていない (この欠陥は §5 で未解決として扱う)。
 
-## 4. 実測 (測定 commit `30f80f3c9`・HEAD で再現)
+## 4. 実測 (測定 commit `d5afb6ae5`・HEAD で再現)
 
 | 関数 | n | 行の全項目が bit 一致 | float32 結果 (ST(0)・OBJ 窓) のみ一致 | ST(0) float64 の一致 / 1ulp / 2ulp / ≥3ulp | eax 不一致 | x87 深さ不一致 | OBJ 窓が変わった行 |
 |---|---:|---:|---:|---|---:|---:|---:|
@@ -52,7 +52,7 @@
 
 ネガコン (HEAD で実行。 exit 0 = 検出):
 
-- (a) 判定器: wasm 側の bit 一致行 (行 0) の ST(0) の最下位 bit を反転 → bit 一致 `7695 → 7694` (`python3 x87_fn_diff.py --nega`)。
+- (a) 判定器: wasm 側の bit 一致行 (行 0) の ST(0) の最下位 bit を反転 → bit 一致 `7895 → 7894` (`python3 x87_fn_diff.py --nega`)。
 - (b) 意味の誤り: `f_10002ee0` の最初の `fsubp` の SUB→SUBR を取り違えると float32 結果が一致しない行 `4,000 / 4,000` (`python3 x87_fn_diff.py --nega-lower`)。
 
 未解決 (起票先は PR 本文の表を正とする):
@@ -64,8 +64,8 @@
 | 試験ランナーが異常終了する 12 本 (native 6 本・wasm 6 本)。 原因は未確定。 wasm 側の `1000b6c1` は `A_(0x10024d50)` (イメージ外の絶対アドレス) を読むことまで確認した。 他は未確認 | ランナーが入力を入れられない。 native は異常終了時も exit 0 で出力が欠ける (§3) | #4065 (PLG-G2-41) |
 | 単独の入口として扱えない断片 10 本 (`add esp, 0x2c` で始まる) | 単独の入口として呼べない。 関数の入口を決める規則が要る | #4066 (PLG-G2-42) |
 | 定数関数 11 本 (非自明性なし) | 突合しても情報が無い。 入力の範囲を変えても観測できるかは未確認 | 起票しない (PR 本文の未解決表で扱う。 #3715 の範囲外として縮める) |
-| 超越関数・`frndint`・`fscale`・`fprem` 等 | 対象外 (lift が `ott_unsup` のまま) | #3687 (PLG-G2-29) |
-| `fld`/`fstp` m80 の差分試験 | 80bit メモリ経路は未試験 | #2967 (PLG-G2-24) |
+| 超越関数・`frndint`・`fscale`・`fprem` 等 | 対象外 (lift が `ott_unsup` のまま) | PM agent の判断待ち: 起票先。 既定案: 新規の子 issue (#3687 (PLG-G2-29) は CLOSED のため追跡先にしない。 本 PR の子は上限 3 件 (#4064〜#4066) に達しているため PM が起票する) |
+| `fld`/`fstp` m80 の差分試験 | 80bit メモリ経路は未試験 | PM agent の判断待ち: 起票先。 既定案: 新規の子 issue (#2967 (PLG-G2-24) は CLOSED のため追跡先にしない。 上と同じ理由で PM が起票する) |
 | f80→f64 の丸め差 (ST(0) の double で 1 ulp 以上。 分布は §4) | float32 結果には伝播しなかった。 方式の帰結 | ADR D28 (方式)。 行案 D24 (案) は `REPORT_APPENDIX_1099.md` §6 |
 
 ## 6. 再現手順
@@ -79,4 +79,10 @@ python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --nega             # ネ
 python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --nega-lower       # ネガコン (b) (exit 0)
 ```
 
-- 鮮度の証跡 (WORKFLOW §6): 測定 commit `30f80f3c9` の後の変更は無い。 `51f558081` 以降の差分 (試験コードの追加分) は次のとおり。 `git diff 43cabef4c HEAD -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c` の出力は PR 本文に載せる。
+- 鮮度の証跡 (WORKFLOW §6): 旧測定 commit `30f80f3c9` から `d5afb6ae5` までの試験コードの差分は次のとおり (`x87_fn_diff.py` は 80 行変わった: `nan-num` 判定・`--special`・PASS の gate)。 `x87_fn_native.c` は `30f80f3c9..d5afb6ae5` で変更なし (差分 0)。
+  ```
+  git diff 30f80f3c9 d5afb6ae5 -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c
+  → x87_fn_diff.py | 80 ++++++++++++++++++++++++++-----  (1 file changed, 70 insertions(+), 10 deletions(-))
+  ```
+  よって本記録の実測は差分を含む `d5afb6ae5` で取った値。 以降の commit は REPORT・PR 本文の文書のみ (`git diff d5afb6ae5 HEAD -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c` は差分 0)。
+- `--special` (例外値の入力) の実測 (`d5afb6ae5`・20,000 行): PASS。 bit 一致は `10002ee0` 3,140 / 4,000・`10005400` 3,271 / 4,000・`10005d20` 3,542 / 4,000・`1000b3a2` 3,999 / 4,000・`10001290` 4,000 / 4,000。 構造 (eax・x87 深さ) は全行一致。 ネガコン `--special --nega-nan` (NaN を 1.0 に置換) は nan-num 0 → 1・判定 FAIL で検出。
