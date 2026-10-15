@@ -923,6 +923,7 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4923.md` | ~50 | `0x1000ba05` の引数 edx の形 (指す先の 8 B の double・Inf/NaN 分岐) と、edx に有効な番地を渡した native・wasm の 2000 行突合 (#4923 PLG-G2-68)。 既存 harness の edx=0 は変えず、プローブの複製で測定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4105.md` | ~60 | `0x1000bf60` の ST(0) の NaN・ゼロの食い違いの分類 (#4105 PLG-G2-47): 非 normal オペランド (denorm・unnorm) で模型の限界 (例外処理)、normal 系は一致。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4840.md` | ~70 | `0x10009bc4` の ST(0) 全行不一致の原因 (#4840 PLG-G2-65): 引数でなく呼出し時の x87 ST(0) を読む関数で、空スタックの読み (underflow) による。 double を積むと 4,000 行 bit 一致。 TARGETS に入れない理由と未解決。 測定値の正本 |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_5046.md` | ~90 | x87 の例外フラグ (IE/DE/ZE/OE/UE/PE/SF) と C1 の native 突合 (#5046 PLG-G2-70): 模型のみの bit 0 件、native のみの bit は模型の限界 (#4103)。 `x87_flags_diff.c` の測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4185.md` | ~60 | `0x10009eb5` の ST(0) の NaN の原因 (#4185 PLG-G2-51): `frndint` ではなく空スタックの読み (underflow) による。 仮説の検証 (一時変更・コミットせず) と未解決。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/MARSHAL.md` | ~80 | 殻 (x64) ↔ Slayer_Engine.dll (ia32) の VST2 構造体 marshal 表の仕様 (#674 受入 3)。測定値は REPORT.md §9 |
 | `tools/shared/REPORT.md` | ~212 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC。win freetype.dll = 2.4.10 確定 (#145, §3.1) |
