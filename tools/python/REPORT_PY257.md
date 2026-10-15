@@ -212,10 +212,10 @@ python3 analysis/py257_r8d_bits.py work/py65/extracted/block00031_PE.bin work/py
 
 - 解析器: `analysis/py381_r8d_callees.py` (前段: `analysis/py4769_r8d_single.py` の TSV)。素材 `fl-win64` の `block00031_PE.bin`。
 - 対象: mask 0x4 の 54 側 (tail 到達側・全件)。呼出し先のうち中身を逆アセンブルで読めた 3 件を既知とした。
-  - `0xf82850` (VA。本体 `push rbp` (`0xf82850`) から `ret` (`0xf82db8`) まで objdump で読んだ): `al` を返す関数 (`movzx eax, byte [rbp+0x2b]` で返す)。本体の直接の書込みは `[rbp+0x2b]`・`[rbp+0x2c]`・`[rbp+0x2e]` (スタック上)。`[rbp+0x2b]` の bool は `0xf8d580` へ値として渡し、`[rbp+0x2b]` のアドレスは `0xf8d730` へ `r8` で、`[rbp+0x24]` のアドレスは `0xb777c0`(VA `0xf783c0`) へ渡す。呼出し先の `0xf8d730`・`0xf8d580`・`0xf783c0` は**未読**のため、それらが `[rbp+0x5b8]` や他の global へ書くかは未確認。
+  - `0xf82850` (VA。本体 `push rbp` (`0xf82850`) から `ret` (`0xf829b8`) まで objdump で読んだ): `al` を返す関数 (`movzx rax, byte [rbp+0x2b]` で返す)。本体の直接の書込みは `[rbp+0x2b]`・`[rbp+0x2c]`・`[rbp+0x2e]` (スタック上)。本体の呼出しは `call 0x4232e0` (`0xf82883`・`0xf8298d`)・`call 0xf8d730` (`0xf82892`)・`call 0x423980` (`0xf8289e`・`0xf829a6`)・`call 0xf783c0` (`0xf8297b`)・`call 0xf8d580` (`0xf8299d`)。`[rbp+0x2b]` の bool は `0xf8d580` へ `r8` で値として渡し、`[rbp+0x2b]` のアドレスは `0xf8d730` へ、`[rbp+0x24]` のアドレスは `0xb777c0`(VA `0xf783c0`) へ渡す。呼出し先の `0x4232e0`・`0x423980`・`0xf8d730`・`0xf8d580`・`0xf783c0` は**未読**のため、それらが `[rbp+0x5b8]` や他の global へ書くかは未確認。
   - `0xfdeef0` (VA。`or dword ptr [rip+0x6dbf86], 0x200`・命令長 10): 書込み先は `0xfdeef0+10+0x6dbf86 = 0x16bae80`。固定ビットを立てるだけ (`ret`)。
   - `0xfdef00` (VA。`or dword ptr [rip+0x6dbf76], 0x1000`・命令長 10): 書込み先は `0xfdef00+10+0x6dbf76 = 0x16bae80`。固定ビットを立てるだけ (`ret`)。
-  - 2 件は同じ dword `0x16bae80` を立てる。同じ dword を指す RIP 相対命令は `block00031_PE.bin` に 20 件あり (読み書き含む・objdump 全逆アセンブル)、`0xfdeef0`・`0xfdef00` はその一部。
+  - 2 件は同じ dword `0x16bae80` を立てる。同じ dword を RIP 相対で指す命令は `block00031_PE.bin` の objdump 全逆アセンブル (`# 0x16bae80` で終わる行) で 20 件 (書込み 18 件: `or` 17・`mov` の store 1、読み 2 件: `mov` の load 1・`cmp` 1)。`0xfdeef0`・`0xfdef00` はその書込みの一部。
 - 判定 `0x104785c` (mask 0x4 の `je`・VA `0x104785c`。taken で落ち側の入口 `0x104a9ec`): 落ち側の入口から、`[0x320]>0` かつ `[0x51e]==0` のとき、次のゲートを読む (VA つき)。
   - 入口 `0x104a9ec` の後、`[0x320]>0` (`0x104aa19`〜) と `[0x51e]==0` (`0x104aa27`) を通ると、`[0x5c0]` のゲートを読む (`0x104aa3a`〜`0x104aa59`)。`test 1` (`0x104aa3a`) が 0 なら `0x104aa4e` へ。`test 1` が立ち `test 0x20` (`0x104aa47`) が 0 なら `je 0x104aa5f` で共通ブロックへ直行する。それ以外は `test 0x3c0` (`0x104aa54`) を読み、0 なら `je 0x104beae` (tail)、非 0 なら共通ブロックへ進む。
   - ゲートを通ると VA `0x104aa5f` の共通ブロックに入る。ここで `call 0xf82850` (`0x104aa6f`)、`test al,al; je 0x104aa7d` (`0x104aa74`・`0x104aa76`)。`al != 0` のときだけ `call 0xfdeef0` (`0x104aa78`)。その後は**al の値に関係なく** `call 0xfdef00` (`0x104aa7d`) を呼ぶ。
@@ -244,4 +244,4 @@ python3 analysis/py257_r8d_bits.py work/py65/extracted/block00031_PE.bin work/py
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 単独ビット (0x4・0x10・0x14・0x10000・0x8000 ほか) の立ち/落ちの作用。両側の到達集合がほぼ一致し、呼出し先の中身が必要 | r8d 判定の作用が確定しない | 子 #5295 (PY-4905)・#2034 (PY-65) は閉じているため追跡は #5295 |
-| 0x4 の tail 到達側 54 側の呼出し先のうち未確認の分 (`0x605020`・`0x414bb0`・`0x414da0`・`0x11f16b0`・`0x11f22f0` ほか。`0xf82850` の呼出し先 `0xf8d730`・`0xf8d580`・`0xf783c0` を含む) | 呼出し先が書くかどうかで作用が変わる | 子 #5295 (PY-4905) |
+| 0x4 の tail 到達側 54 側の呼出し先のうち未確認の分 (`0x605020`・`0x414bb0`・`0x414da0`・`0x11f16b0`・`0x11f22f0` ほか。`0xf82850` の呼出し先 `0x4232e0`・`0x423980`・`0xf8d730`・`0xf8d580`・`0xf783c0` を含む) | 呼出し先が書くかどうかで作用が変わる | 子 #5295 (PY-4905) |
