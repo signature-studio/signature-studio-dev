@@ -45,9 +45,9 @@ crash 65 のうち stderr で分類した 9 関数 (変更前) 以外の内訳 (
 コード差分 (測定 commit `ee2883ab8` から HEAD まで。`git diff ee2883ab8 HEAD -- tools/ott/native tools/icall`):
 
 ```
- tools/icall/REPORT_APPENDIX_1922.md | 60 +++++++++++++++++++++++++++++++++++++
+ tools/icall/REPORT_APPENDIX_1922.md | 68 +++++++++++++++++++++++++++++++++++++
  tools/ott/native/ott_native.c       |  8 +++++
- 2 files changed, 68 insertions(+)
+ 2 files changed, 76 insertions(+)
 ```
 
 | 項目 | 変更前 | 変更後 | 差分 |
