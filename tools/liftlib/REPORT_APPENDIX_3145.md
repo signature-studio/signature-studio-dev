@@ -14,8 +14,8 @@
 
 ## 1. 環境 (実測)
 
-- `$ARTIFACTS_DIR` の 3 素材を展開: `work-m6-ott` → worktree 直下 (`tools/m6/work/`・`tools/m10/work/` ほか)、`analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (`OTT_vst2_win64.dll`)、`toolchain-emsdk` → `$HOME/emsdk/` (`emcc` 有り)。
-- 実行: `EMSDK_DIR=$HOME/emsdk OTT_DLL=$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll python3 -m liftlib ott --auto none`。
+- `$ARTIFACTS_DIR` の 3 素材を展開: `work-m6-ott` → worktree 直下 (`tools/m6/work/`・`tools/m10/work/` ほか)、`analysis-ott-binaries` → `[ANALYSIS-PLUGINS]` の `ott/binaries/` (`OTT_vst2_win64.dll`)、`toolchain-emsdk` → `[EMSDK]` 相当の展開先 (`emcc` 有り)。
+- 実行: `EMSDK_DIR=<展開先> OTT_DLL=<ott/binaries の DLL> python3 -m liftlib ott --auto none` (`env.py` の環境変数)。
 - `work-liftlib-targets` は無し (T4・T6 が未検証。§3)。
 
 ## 2. 切り分けの結果 (実測)
