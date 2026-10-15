@@ -2,6 +2,7 @@
 # P20 (#2963): Fresh Air GainDsp::process (SlateCore 0x180afe090) を flelift の x64c で lift し、emcc で wasm (単独 instance) にする。
 #   usage: bash tools/perf/p20/build_fa_gain.sh
 #   入力: tools/targets/freshair/work/win/ (bash tools/targets/freshair/fetch.sh の展開物。FA_DL で plugins-freshair の展開先を指定)
+#   emcc: PATH に無ければ EMSDK (docs/REFERENCES.md §4 の [EMSDK] の展開先) の emsdk_env.sh を読む
 #   出力: tools/perf/p20/work/fa/fa.cjs・fa.wasm (gitignore の work/。commit しない)
 #   手順は tools/targets/kilohearts/scripts/build_closure_x64c.sh と同じ (IMG/SHIFT のみ FA の値)。
 set -euo pipefail
@@ -17,7 +18,7 @@ SHIFT=0x17E000000
 SIZE=0x2319000
 GAIN_VA=0x180afe090
 [ -f "$CORE" ] || { echo "[build_fa_gain] 入力が無い: $CORE (bash tools/targets/freshair/fetch.sh を先に)" >&2; exit 2; }
-if ! command -v emcc >/dev/null 2>&1; then source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; fi
+if ! command -v emcc >/dev/null 2>&1 && [ -n "${EMSDK:-}" ]; then source "$EMSDK/emsdk_env.sh" >/dev/null 2>&1; fi
 mkdir -p "$LIFT"
 python3 -c "import json,sys; json.dump({'roots': [int(sys.argv[1], 16)]}, open(sys.argv[2], 'w'))" "$GAIN_VA" "$OUT/entries.json"
 python3 "$FLE/x64c.py" --pe "$CORE" --entries "$OUT/entries.json" --out "$LIFT" --closure 60 \

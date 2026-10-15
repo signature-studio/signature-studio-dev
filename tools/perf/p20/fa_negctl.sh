@@ -9,7 +9,7 @@ SRC="$HERE/work/fa"
 DST="$HERE/work/fa_neg"
 RT="$ROOT/tools/flelift/rt"
 [ -f "$SRC/lift/fle_lifted.c" ] || { echo "[fa_negctl] 前提が無い: $SRC/lift (build_fa_gain.sh を先に)" >&2; exit 2; }
-if ! command -v emcc >/dev/null 2>&1; then source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; fi
+if ! command -v emcc >/dev/null 2>&1 && [ -n "${EMSDK:-}" ]; then source "$EMSDK/emsdk_env.sh" >/dev/null 2>&1; fi
 rm -rf "$DST" && mkdir -p "$DST" && cp -r "$SRC/lift" "$DST/"
 LN=$(grep -n '180afe195: addss xmm0, xmm1' "$DST/lift/fle_lifted.c" | cut -d: -f1)
 LN=$((LN + 1))
