@@ -35,6 +35,12 @@ IR の指紋: 基準 `boot_final.ll` `7e66d79d…`、main の IR `64812d03…`�
 * 従って unit 56 の差は、IR の差 (ld108・ld115・r8b の影響) と build の差 (7e149974 以後の build 変更) のどちらか、または両方による。切り分けは未実施。
 * 同一 IR 内の既定 (0) と opt-in (1) の unit 別差は 0 件 (survey JSON が一致)。
 
+### コード差分
+
+* 測定 commit `40d3a788d` から HEAD までのコード差分 (`git diff --stat 40d3a788d HEAD -- 'tools/m11/*.py' 'tools/m11/*.sh' 'tools/m11/*.mjs' 'tools/m11/*.c' 'tools/m11/*.h' 'tools/m11/*.env'`):
+  `tools/m11/m11_unit_map.py | 29 +++` (1 file, 29 insertions)。測定に使った build・survey・IR のコードは変更していない。
+* 基準 `7e149974` から本 A/B の commit `40d3a788d` までの差 (`git diff --stat 7e149974 40d3a788d -- 'tools/m11/*.sh' 'tools/m11/*.mjs'`): 104 files, 4985 insertions, 134 deletions。unit 56 の差の候補はここに含まれる。
+
 ### 検証
 
 | 検証 | 結果 |
