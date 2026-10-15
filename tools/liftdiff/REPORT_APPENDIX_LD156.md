@@ -105,3 +105,22 @@ A	tools/liftdiff/results/ld156_raw/stk_r1.jsonl
 ```
 
 - main 側との関係: `origin/main` は本 PR の merge base より 230 commit 先。`session.py` は main で fvm の候補多重・ret 断片の対象外化 (LD-177) により変わっている。`git merge-tree` で衝突 0 件。main は取り込んでいない。
+
+## 8. n=2 の追測定 (受入条件 1 の残り・`0x5d19e0`)
+
+測定 commit: `41d4ea2a5` (origin/main の取り込み時点)。`rt/`・`ld156_chunk0_carryover.py`・`ldlib/` は測定前後で変更していない。wasm は `build_wasm.build(force=True)` で `rt/ld_wasm.c` から作り直した (9.5 s・`sig_mismatch` 0・`undefined` 0)。素材は `fl-win64`・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を `$ARTIFACTS_DIR` から展開して確認した。機は 4 vCPU・各バッチ 4 本並列 (load 3.3〜3.6)。1 回 161〜183 s。
+
+| native | wasm RESET | r1 | r2 | case equal (r1/r2) |
+|---|---|---|---|---|
+| 0 | none | mismatch | mismatch | 0/11 · 0/11 |
+| 0 | stk | mismatch | mismatch | 0/11 · 0/11 |
+| 0 | sta | mismatch | mismatch | 0/11 · 0/11 |
+| 0 | all | mismatch | mismatch | 0/11 · 0/11 |
+| 1 | none | mismatch | mismatch | 0/11 · 0/11 |
+| 1 | sta | **match** | **match** | 11/11 · 11/11 |
+
+- 生データ: `results/ld156_n2_carryover.tsv` (12 行)。`wasm_reset_diff` は sta 35 万 B 台・stk/all 5.7 億 B 台 (stk/all の値は RESET 応答の `diff` をそのまま記録した)。
+- `native=0` の `stk`・`sta`・`all` は n=2 で揃った。§3 の n=1 の注記は、この追測定で解消した。
+- `native=1, sta` の match は n=2 で再現した。`native=1, none` は n=2 で mismatch。
+- 未実施: LD-121 の both 条件 (wasm も作り直す) を本 driver で流す経路は無い。`native=1, sta` と LD-121 both の同値性は未確認。`RESET` の効きの証跡 (戻したバイト数と snapshot との差分) は取っていない (§4)。
+- 測定 commit 以降のコード差分: `git diff 41d4ea2a5 HEAD -- tools/liftdiff/rt tools/liftdiff/ld156_chunk0_carryover.py tools/liftdiff/ldlib` は 0 行 (本付録と TSV の追加のみ)。
