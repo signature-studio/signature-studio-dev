@@ -5,8 +5,8 @@
 ## 1. 結論
 
 - 受入 1 (入口の `rcx`・`rdx`・`dl` の再現): **達成**。`cfi_entry_probe.py` で生成 C の work コピーに probe を入れ、§13 の値を再現した (§2)。
-- 受入 2 (間接 call の受け手 VA): **実行時の値を取得 (受け手は 0x0)**。`f_410320` の `call [rax-0x30]` の target は、seed 後の実行で `rax=0x5ac338`・`target=0x0` (`[icall]` ログ)。受け手の slot `0x5ac308` は、呼出し前の live memory が `0x0` (`[cfi-seed]` ログ)。PE ファイル上の `0x40f960` は、loader の充填が無い harness では現れない。
-- 受入の判定: 受け手の VA は実行時に `0x0` と取れた。ただし実機で `0x5ac308` に入る値は未確認 (実機の loader 側の充填は本 harness の対象外)。したがって「実機の受け手」は未特定のまま。
+- 受入 2 (間接 call の受け手 VA): **部分達成** (残りは #5337)。受け手 slot `0x5ac308` の正しい値は `0x40f960` (PE 静的値)。`fle_textwin_install`・`fle_init` の直後は `0x40f960` になる (§14、`FLE_WWATCH` 診断下で確認)。`f_410320` の `call [rax-0x30]` の受け手 slot は、unit 245 (ExitProcess) の後・unit 246 の直前の 16B 書込み (戻り番地 `0x2ec1d8d`) で 0 になる。seed 後の `[icall]` の target `0x0` (§4) は、この消失の後の値を見ている。
+- 受入の判定: 受け手の正しい VA (`0x40f960`) は確定した。ただし、CFI 呼出しの時点まで値を保つ経路は未解決 (書込み元 `f_134cad0` は推定、消失を止める処理は未特定)。実機の loader が `0x5ac308` に入れる値も未確認。いずれも #5337 に残す。
 - 原因の要点: `CreateFruityInstance` (`0x1375990`) は DLL の export で、実機の `self` は host が渡す。`f_13752f0`・`f_1105350` は `rcx` を固定の global slot (`0x1104e30`・`0x5ac270`) から再読込するため、harness の `rcx=0` は chain の `self` にならない。
 
 ## 2. 入口の記録 (受入 1)
