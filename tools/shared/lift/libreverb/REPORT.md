@@ -117,7 +117,7 @@ ildsp の規模測定 (命令数・call 数・export closure 表) と未解決�
   静的走査でも `[reg+0xbc+8i]` 形の qword 書き込みは 0 件 (`mov word [rax+0xbc]` の 2 件は 16 bit 書き込みで別物)。
 - `0x27c0` (RVA 0x27c0–0x2853) は遅延線 2 本を `this+0x290`・`0x298` に作るコンストラクタで、`0x1000` を 2 回呼ぶ。`0x27c0` は直接 call の呼び出し元が無く (間接 call の経路は未確認)、`[rbx+0x10]` に vptr `0x5dbec` を書くため、この object の ctor かどうかは未確定。
 - 未特定: 14 本を埋めるのは、ctor より後に呼ばれる別の entry (ホストの初期化など) と見られる。entry の候補は未列挙。
-- 全 `.text` 走査 (`scan_writes.py`・測定 commit は下記の HEAD): 90,226 命令のうち `[reg+0xbc+8i]` (i=0..13) を書き先にする命令は qword 0 件。dword 27 件は `0xd4`〜`0x104` の `sub …,1` と `mov …,eax` (カウンタ更新で、ポインタ代入ではない)。word 2 件 (0x3f09b・0x3f19b) は `0xbc` の 16 bit 書き込み。
+- 全 `.text` 走査 (`scan_writes.py`・測定 commit `cb82259bf`): 90,226 命令のうち `[reg+0xbc+8i]` (i=0..13) を書き先にする命令は qword 0 件。dword 27 件は `0xd4`〜`0x104` の `sub …,1` と `mov …,eax` (カウンタ更新で、ポインタ代入ではない)。word 2 件 (0x3f09b・0x3f19b) は `0xbc` の 16 bit 書き込み。
 - export は 3 件 (`CreateReverbInstance` 0x3fa0・`Process_Fruity_32FM_32FS` 0x1b80・`Process_UF_32FM_32FS` 0x2790)。14 本を埋める entry は、この 3 件の外 (内部関数・ホストが直接呼ぶ別経路) にあると見られるが、未特定。
 - 観測の限界: 観測は `this` 直下の書き込みだけを見る。14 本を別オブジェクトや間接的な経路で書くなら、`this` 直下の観測では見えない。
 
