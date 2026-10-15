@@ -90,10 +90,10 @@ headline の round 2/3 は 1 コマンド e2e では再現できない (規則 3
 
 | 群 | site | 内訳 (上位) |
 |---|--:|---|
-| **AVX (VEX/EVEX)** | **37,406** | vmulps 6,614 / vaddps 4,342 / vbroadcastss 3,871 / vpslld 1,667 / vblendvps 1,561 / vinsertps 1,400 / vsubps 1,223 / vpaddd 1,179 / vpsrld 1,177 / **zmm 系 20** (vmovups 13 / vpaddq 5 / vmovaps 2) |
-| AES / SHA-NI | 499 | vaesenc 104 / vaesdec 104 / sha256rnds2 64 / aesenc 52 / aesdec 52 / pshufb 24 / palignr 24 / sha256msg1 24 / sha256msg2 24 · 他 (vaesenclast·vaesdeclast 16 / aesenclast·aesdeclast 8 / pclmulqdq 3) |
+| **AVX (VEX/EVEX)** | **37,406** | 修正前 37,630 − vaes 224 (AES/SHA-NI へ移動) |
+| AES / SHA-NI | 499 | 非 v 接頭の aes/sha256 224 + vaes 224 (修正前 AVX から) + pshufb/palignr/pclmulqdq 51 (修正前 その他 から) |
 | x87 **演算** | 73 | fmul 8 / fisttp 8 / fadd 3 / fild 6 / fdiv 2 / fcmovnb 2 … |
-| その他 | 507 | mulx 49 / adcx 44 / out 41 / tzcnt 39 / repz ret 37 / adox 32 / in 31 / int1 22 / cli 19 / retf 18 / enter 17 … |
+| その他 | 507 | 修正前 558 − 51 (pshufb/palignr/pclmulqdq を AES/SHA-NI へ移動) |
 
 比較 (CAB-226 実績): FLEngine lift 集合 7,031 関数 / 340,774 命令 / 未対応 **1,105 site (0.32%)**
 → x64c 拡張で 0。**Massive X の VST3 面だけで 38,485 = FLEngine 全体の 34.8 倍**
@@ -101,7 +101,8 @@ headline の round 2/3 は 1 コマンド e2e では再現できない (規則 3
 旧値 48,612 は x64c の `ac58a8749`・`fe2dc9ed9` より前の値 (現 HEAD で再測定。詳細は massivex `REPORT_APPENDIX_3454.md`)。
 
 - 群分けは key の mnemonic 部で判定し AES/SHA-NI を AVX より先に判定する (MX-36 / #3487・測定 commit `7dea72c55`)。修正前は vaes 224 が AVX、pshufb/palignr/pclmulqdq 51 が other に入っていた (合計 38,485 は不変)。負例 (旧判定を同じ入力へ): AVX 37,630 / AES 224 / other 558。
-- 検算 (別アルゴリズム・明示 mnemonic 集合): `python3 dsp/scripts/mx36_group_check.py dsp/work/lift_seeds/lift_meta.json` が新判定の群別行と一致。zmm 系 20 site は全て v 接頭辞で AVX。非 v の `kmovw`/`kmovd` 8 site は other のまま (群の定義は変えていない)。
+- 出典: `e2e.sh` step 3/5 が出力するのは群合計のみで、mnemonic 別の内訳は本 REPORT の測定では記録していない (素材 plugins-massivex を取得できず再取得不可・未解決)。移動量 (224 / 51) は群合計の差分から算出する。修正前の群別値 (AVX 37,630 / AES 224 / その他 558) は `458405518` の実測 ([REPORT_APPENDIX_3454.md](../REPORT_APPENDIX_3454.md) §11.5)。
+- 検算: `python3 dsp/scripts/mx36_group_check.py dsp/work/lift_seeds/lift_meta.json` (明示 mnemonic 集合) の実出力は本 PR で未記録。接頭辞規則との食い違いは同スクリプトが NOTE で列挙する。非 v の `kmovw`/`kmovd` 8 site は other のまま (群の定義は変えていない)。
 - **vectorcall**: 567 関数の到達 import は COM (`CoCreateFreeThreadedMarshaler` 等) 3 件のみ。
   独自 vectorcall 修飾子は未検出 — ただし x64c は import 修飾子を無視するため**範囲外** (§6 U3)。
 - **MSVC C++ EH**: .pdata の chained 関数が多数 (D11) ゆえ unwind チェインが濃密と推定。未解析 (§6 U4)。

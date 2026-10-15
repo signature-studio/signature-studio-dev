@@ -241,7 +241,7 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 ### 11.6 dsp 群分けの修正 (MX-36 / #3487・2026-10-15 実測)
 
 - 測定 commit = `7dea72c55` (コード変更の最後の commit)。`dsp/e2e.sh` 修正前 (`8ea8d42b8`): exit 0・28 s・load 0.53→0.72・AVX 37,630 / AES 224 / other 558 → 修正後: exit 0・28 s・load 0.30→0.58・**AVX 37,406 / AES 499 / other 507 / x87 73 (合計 38,485)**。`dsp/negctl.sh` NC1〜3 は unsup 5 / 561 / 0 で FAIL<期待> (11 s)。素材 `Massive X.vst3` md5 `622993e7…` 一致。
-- 受入 (#3487): mnemonic 判定・pclmulqdq/pshufb/palignr 51 site が AES/SHA-NI へ・vaes 224 site が AES/SHA-NI へ・群別合計 = unsup_sites (38,485) を満たす。検算 `dsp/scripts/mx36_group_check.py` (明示 mnemonic 集合) が一致。未解決: 非 v 接頭の `kmovw`/`kmovd` 8 site は other のまま (表示のみ・合計に影響なし。起票先: PR 本文の未解決表。子 issue は起票しない)。
+- 受入 (#3487): mnemonic 判定・pclmulqdq/pshufb/palignr 51 site が AES/SHA-NI へ・vaes 224 site が AES/SHA-NI へ・群別合計 = unsup_sites (38,485) を満たす。検算 `dsp/scripts/mx36_group_check.py` の実出力は未記録 (実測 lift_meta.json が入力)。未解決: 非 v 接頭の `kmovw`/`kmovd` 8 site は other のまま・mnemonic 別内訳は未記録 (いずれも表示のみ・合計に影響なし。起票先: PR 本文の未解決表。子 issue は起票しない)。
 
 ## 12. MX2-3 (N5 / N6) 実測 — 2026-10-13 (#830)
 
