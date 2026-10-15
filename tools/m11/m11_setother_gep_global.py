@@ -10,16 +10,56 @@ global_store (書込可能グローバル VA を読む 3 件):
 gep (lea [reg+d] の 17 件):
   対象は基底 reg の SSA 値に対する GEP。基底 SSA の特定は未実装のため 未決 (base_ssa_unmapped)。
 
-使い方: python3 m11_setother_gep_global.py mem_class_rows.json --ir final3_base.ll --out gep_global_rows.json
+global_store の PE 側確認 (--pe を渡したとき・#4906 / M11-N229):
+  対象 VA を読む命令の走査で、PE コード内の書込み経路を全関数から数える。
+  (a) rip 相対の書込み (mov [rip+d], r) (b) lea で VA を作る (c) 即値に VA を持つ (d) .data 内の絶対ポインタ。
+  4 経路とも 0 件なら pe_no_direct_store。ただし計算で作ったポインタ経由の書込みは見えない (区分は未決のまま)。
+
+使い方: python3 m11_setother_gep_global.py mem_class_rows.json --ir final3_base.ll --out gep_global_rows.json [--pe PE]
 """
-import argparse, collections, json, re
+import argparse, collections, json, os, re, struct, sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, 'ldfix'))
 
 ap = argparse.ArgumentParser()
 ap.add_argument('rows'); ap.add_argument('--ir', required=True); ap.add_argument('--out', required=True)
+ap.add_argument('--pe', default=None)
 a = ap.parse_args()
 rows = json.load(open(a.rows))
 ir = open(a.ir).read().split('\n')
 TARGET = [r for r in rows if r['conn'] in ('gep', 'global_store')]
+
+
+def pe_direct_stores(pe_path, targets):
+    """PE 全関数の走査 (キャッシュ無し・1 パス)。targets (VA の集合) への 4 経路の件数を返す。"""
+    import ldmach, pefile
+    m = ldmach.Machine(pe_path)
+    hits = {t: collections.Counter() for t in targets}
+    for va, (rva, size) in list(m.fns.items()):
+        for x in m.cs.disasm(m.read(rva, size), va):
+            for o in ldmach.memops_of(m.cs, x) or []:
+                r = o.get('rip_rva')
+                if r in hits and o.get('write'):
+                    hits[r]['rip_store'] += 1
+            if x.mnemonic == 'lea' and 'rip +' in x.op_str:
+                t = x.address + x.size + int(re.search(r'rip \+ (0x[0-9a-f]+|\d+)', x.op_str).group(1), 0)
+                if t in hits:
+                    hits[t]['lea'] += 1
+            for o in x.operands:
+                if o.type == 2 and o.imm in hits:
+                    hits[o.imm]['imm'] += 1
+    pe = pefile.PE(pe_path, fast_load=True)
+    ib = pe.OPTIONAL_HEADER.ImageBase
+    for t in targets:
+        ab = struct.pack('<Q', ib + t)
+        for s in pe.sections:
+            d = s.get_data()
+            i = d.find(ab)
+            while i != -1:
+                hits[t]['abs_ptr'] += 1
+                i = d.find(ab, i + 1)
+    return hits
 
 
 def store_count(va):
@@ -47,6 +87,9 @@ def store_count(va):
 
 out = []
 cache = {}
+gvas = {int(r['def'], 16) + 7 + int(re.search(r'\[rip \+ (0x[0-9a-f]+|\d+)\]', r['def_insn']).group(1), 0)
+        for r in TARGET if r['conn'] == 'global_store'}
+pe_hits = pe_direct_stores(a.pe, gvas) if a.pe and gvas else {}
 for r in TARGET:
     x = dict(r)
     if r['conn'] == 'global_store':
@@ -57,6 +100,9 @@ for r in TARGET:
         x['target_va'] = hex(va)
         x['store_count'] = n
         x['store_fns'] = fns[:5]
+        if a.pe:
+            c = pe_hits.get(va, collections.Counter())
+            x['pe_hits'] = {k: c.get(k, 0) for k in ('rip_store', 'lea', 'imm', 'abs_ptr')}
         if n == 0:
             x.update({'class': '未決', 'why': 'no_store_in_ir'})
         else:
