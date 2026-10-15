@@ -18,8 +18,8 @@ import pefile
 ENTRIES = 2048
 EXTRAS = (4, 5, 6, 8)
 N5 = {
-    "N5 demoExpired 0x184862d19": 0x184862D19,
-    "N5 demoExpiredChanged 0x184862e67": 0x184862E67,
+    "N5 demoExpiredChanged 0x184862d19": 0x184862D19,
+    "N5 demoExpired 0x184862e67": 0x184862E67,
     "N5 subscriptionExpired 0x184862e7a": 0x184862E7A,
     "N5 UTF16 MXDemoPopup 0x18414cd91": 0x18414CD91,
 }
@@ -155,7 +155,6 @@ def table_hits(bases, sec_va, sec_raw, targets, entries=ENTRIES):
     cand = [b for b in bases if sec_va <= b and b + 4 * entries <= sec_va + len(arr)]
     ba = np.array(cand, dtype=np.int64)
     for label, width, dt in kinds:
-        span = width * entries
         for c0 in range(0, len(ba), 2048):
             bb = ba[c0: c0 + 2048]
             off = bb - sec_va
@@ -172,7 +171,6 @@ def table_hits(bases, sec_va, sec_raw, targets, entries=ENTRIES):
             hit = tv[pos] == sums
             for r, c in zip(*np.nonzero(hit)):
                 out.append((int(tv[pos[r, c]]), int(bb[r]), label, int(c), int(bb[r]) + width * int(c), cand_site(bases, int(bb[r]))))
-        del span
     return out, len(cand)
 
 
