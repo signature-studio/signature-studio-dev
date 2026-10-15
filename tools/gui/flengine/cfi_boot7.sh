@@ -27,10 +27,12 @@ python3 "$HERE/gf_seed_closure.py" --pe "$PE" --ir "$M/work/boot_final3.ll" --se
 sed -e "s#^HERE=.*#HERE=$HERE; source \"\$HERE/env.sh\"#" -e 's/-g1/-g2/g' "$HERE/build.sh" > "$D/build_g2.sh"
 GF_W="$D/w" bash "$D/build_g2.sh" > "$R/cfi_build_g2.log" 2>&1 || { S "診断 build に失敗 ($R/cfi_build_g2.log)"; exit 2; }
 WASM="$D/w/m11_gui.cjs"
-# 6. boot 実行 (run.mjs) と cfi_probe (boot の失敗スタックも出力に入る)
-node "$HERE/run.mjs" --wasm "$WASM" --out "$R/boot_b7.json" > /dev/null 2>&1
-node "$HERE/cfi_probe.mjs" --wasm "$WASM" --out "$R/cfi_b7.json" > /dev/null 2>&1
-python3 - "$R" <<'PY'
+# 6. boot 実行 (run.mjs) と cfi_probe (boot の失敗スタックも出力に入る)。run.mjs は停止点の有無によらず exit 0 のため、出力 JSON の有無で判定する
+rm -f "$R/boot_b7.json" "$R/cfi_b7.json"
+node "$HERE/run.mjs" --wasm "$WASM" --out "$R/boot_b7.json" > "$R/boot_b7.log" 2>&1 || { S "run.mjs が失敗 ($R/boot_b7.log)"; exit 2; }
+node "$HERE/cfi_probe.mjs" --wasm "$WASM" --out "$R/cfi_b7.json" > "$R/cfi_b7.log" 2>&1 || { S "cfi_probe.mjs が失敗 ($R/cfi_b7.log)"; exit 2; }
+[ -s "$R/boot_b7.json" ] && [ -s "$R/cfi_b7.json" ] || { S "出力 JSON が無い (boot_b7.json / cfi_b7.json)"; exit 2; }
+python3 - "$R" <<'PY' || { S "結果 JSON の読取に失敗"; exit 2; }
 import json, sys
 r = sys.argv[1]
 b = json.load(open(r + '/boot_b7.json'))
