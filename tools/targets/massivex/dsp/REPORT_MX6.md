@@ -149,7 +149,7 @@
 | U3c | 1-round の root 3,226 のうち解析できない 118 件 (先頭命令のデコード 0 件) の由来 | 118 件は vectorcall 判定の対象外 (陰性の結果は 3,108 関数の範囲に限る) | [MX-37] (#3774) |
 | U4a | FH4 (`__CxxFrameHandler4`・符号化 FuncInfo) の funclet 未解析 (1 本目 .pdata 全体 2,542 entry・入口 1 / 1-round 5)。固定部は §8 で復号済み、可変長整数・table 中身が未了 | FH4 の landing pad が一覧に入らない | [MX-42] (#3807・親 #3791) |
 | U4b | 1 本目の読取不能 160 件の由来 (UnwindInfoAddress が画像外・E8 始まり 148 件)。配布 PE の改変か展開の誤りかは未確定 (§3・`REPORT_APPENDIX_3792.md`)。2 本目の census は MX-41 で済 | 1 本目 .pdata 全体の chained / EH 数値は 160 件を除いた下界 | [MX-38] (#3775) |
-| U4c | IAT 外の handler (direct) 6,354 件 (1 本目 .pdata 全体) の同定 | 別 handler の EH 構造が未確認 | [MX-38] (#3775) |
+| U4c | IAT 外の handler (direct) 6,354 件 (1 本目 .pdata 全体) の同定。構造は測定済み: 相異なる handler 番地は 214 件・うち 2 番地で 6,018 件 (`scripts/mx38_direct_handler.py`)。2 番地の先頭の direct call 先 (`0x29b993f`・`0x2b9bc90`) は、どちらも .pdata の関数入口ではなく含む関数の内側。命令境界の判定は `0x29b993f` が一致・`0x2b9bc90` が不一致 (含む関数の先頭からの線形走査。未確定) | 別 handler の EH 構造が未確認 | [MX-38] (#3775) |
 | U4f | census から除外した行 36 件 (1 本目 33 = st==0 9・e≤st 23・同じ st の重複 1、2 本目 3 = st==0 2・e≤st 1) の由来と、同じ st の重複 1 組 (st `0x039373E0`) の選択 | 1 本目の EH 件数 23,293 は重複の選択に依存 (±1)。除外行は census の母数に入らない | [MX-38] (#3775) |
 | U4d | funclet を指す E8/E9 一致候補 4 件の由来 (命令境界を確認して、どの関数から来るか) と、深い closure での到達 | #228 同型の判定を closure 拡張で確定できない | **`REPORT_APPENDIX_3776.md` §9 で測定済み (MX-39 #3776)** |
 | U4e | funclet の x64c closure への取り込み (#228 の landing pad 方式を MSVC に当てる実装) | 同型の欠陥が lift 出力に現れる (未修復) | **受入 1 (root 追加・36,240 件 lift) は [MX-43] (#3838) で実測 (`REPORT_APPENDIX_3776.md` §9.7)。SjLj runtime は [MX-45] (#4161)、通し一致は [MX-46] (#4162)** |
