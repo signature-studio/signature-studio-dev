@@ -101,7 +101,7 @@ python3 tests/batch_flips.py <修正前の batch_sample_800.jsonl> <修正後の
 - 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)。`work-m11`・`work-liftdiff` を worktree の `tools/m11/work`・`tools/liftdiff/work` に展開。
 - spike (`python3 spike_cfi.py`): units_run=892/942・first_fail=149 (abort rip_rva `0x7ffff789ec0c`・InitCount 145・失敗 15 unit)。CreateFruityInstance は segv (`0xd053a9`)。実時間 10.3 s。
 - e2e (`bash liftdiff_e2e.sh --m11-only`): LIFTDIFF_E2E PASS・一致 360 / 不一致 234 / 実行不能 206。CHECK_INITUNITS PASS。実時間 2 分 44.9 秒。
-- 既定 (stk 修正あり) の spike は 928/942・830 に戻っていない。B2 の条件 (a) (既定 off の切替) または (b) (#3946 の修正を含める) は、本 run では未実装。判断は PM。
+- 当時の値 (既定が on の時点): 既定 (stk 修正あり) の spike は 928/942・830 に戻っていなかった。B2 の条件 (a) (既定 off の切替) または (b) (#3946 の修正を含める) は、本節の時点では未実装。判断は PM。現在の既定 (off) の値は §10。
 - 注: 本節は stk 修正を既定で入れていた時点の測定 (§10 で既定 off に切替えた後の値に置き換え)。
 
 ## 10. 既定 off の切替 (レビュー B2・方針 (a)) と測定 (HEAD `348b9981c`)
