@@ -44,3 +44,27 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 | `tools/m11/m11_build.sh` → `work/obj/ov.o` (m11 mainline) | `function_535bf2` / `function_535c11` の C 転記が入る | 本 PR の目的。m11 側の実測は §8.1 |
 | `tools/gui/flengine/build.sh` (`m11_ov.c` を `$CF` で直接コンパイル) | 修正前は GUI の `m11_gui.cjs` にも入っていた | `CF` に `-DM11_FIX_535BF2=0` を足し、従来値 (0) に固定 (本 PR の修正 commit)。照合: `clang -E -P` の出力で、変更前 (`44a7f4465`) と修正後 HEAD の `m11_ov.c` は 1704 行で一致。修正前の `CF` を HEAD に当てると 17 行が増える (ネガコン)。GUI の e2e は再実行していない (素材 `work-m11` が本 run に無い)。GUI の実測値は `tools/gui/flengine/REPORT.md` §6j |
 | `tools/m11/alloca/e2e.sh` (既定の `m11_build.sh` を使う) | 既定変更の影響を受ける | 未実行 (§8.3 の未解決) |
+
+### 8.5 #3482: unit 144 の trap の直接原因 (計測)
+
+測定 commit `aa04b5352` (`tools/m11/m11_ov.c` に `M11_PROBE_LIST` (既定 0) の計測 probe を追加。既定ビルドは変わらない)。基点 `bd4463eaa` (origin/main)。IR は `m11_gen_ir2.sh` で作り直し (ir_sha256 `116d9406…`・`r8b=applied`)。素材 fl-win64・work-m11・toolchain-retdec は `$RUNNER_TEMP` と worktree に展開。直列 1 本。
+
+| 条件 | 環境変数 | survey ok / trap / miss | 基準 (OFF) との unit 差 |
+|---|---|---|---|
+| 既定 OFF | 未指定 | 873 / 22 / 46 | — |
+| ON | `M11_FIX_50A830=1` | 872 / 23 / 46 | 1 件: unit 144 (`0x25c540`) ok → oob |
+| OFF + probe | `M11_PROBE_LIST=1` | 874 / 21 / 46 | probe が挙動を変える (unit 153 が変化。計測値として使わない) |
+| ON + probe | `M11_FIX_50A830=1 M11_PROBE_LIST=1` | 872 / 23 / 46 | 計測の trace 用 |
+
+- e2e (既定): rc=1 (既知: tolerant 通常起動 101 ≠ 期待 56、survey ok 873 ≠ 期待 872)。`m11_e2e.sh` の所要 約 73 s (IR 再生成 51 s を除く)。load average は 0.42〜0.48。
+- trap の経路: `function_407e20` は `[arg1-8]` (hdr) が 0 のとき `[0]` (wasm アドレス 0) を次の block として読む。`[0]` が範囲外なら trap する。
+- unit 144 で `function_412d60` (参照解放: `[arg1]=0`、`[arg1-8]` を減算、0 なら `function_409440(arg1-16)`) に渡る `arg1` = `0x6c`。解放される値は `0x5c` (ポインタでない)。`[0x54]` (= hdr) は OFF/ON とも 0。
+- 差は `[0]` の内容だけ: OFF = `0x10bd4c01` / ON = `0x865901` (`409440(0x5c)` の `[hdr]` の値)。OFF の `[0]` は lift 版 `function_50a830` が nil の FItems (items=0) に `Q(0 + cnt*8) = item` で書いた残骸と推定 (unit 114 の Add が `[0]` へ書く)。ON では list が Grow されるため、この残骸は残らない。ON の `[0]` の書込み元は**未特定**。
+- unit 144 自身には list 操作が無い (`[probe_list]` 0 件)。範囲外の値が list Add で入る経路は無い (ON の Add 32 件はすべて範囲内の item)。
+- ON で unit 745 も `409440(0x10ba240c)` (8 byte 境界外) を解放するが、hdr = `0xffffffa0` の経路で trap しない。
+- `function_47b260` (REPORT_2408 §7.3 の同型): IR に Grow (`47a3e0`) は残っており、欠けているのは Notify (`[rbx+0x20]` 呼出し、既定 0)。nil FItems の経路とは別物と判断 (未測定)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| ON の `[0]` (= 0x865901) の書込み元と、unit 144 が `412d60(0x6c)` に至る nil 読みの元 (どの list・配列が nil のまま読まれるか) | 既定 ON 不可 (survey ok −1) | 子 issue (本 PR の issue コメントに番号) |
+| 既定 ON 化と e2e 期待値 (tolerant 101 ≠ 56、survey 872/873) | e2e rc=1 | PM 判断 (§8.3 の既存未解決) |
