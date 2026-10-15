@@ -84,7 +84,7 @@
 ## 6. 4 回目 run (#2887 再開): X+0x48 の vptr の書込み元を走査 (`pe_vptr_stores.py`)
 
 測定:
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に `*block00031_PE.bin` のみ展開 (実測 2.9 秒)。load average 0.55 (run 開始時)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に `*block00031_PE.bin` のみ展開 (実測 1.6 秒)。load average 0.18〜0.82 (測定中)。
 - 測定 commit (コードを変えた最後の commit): `0b9527969` (`pe_vptr_stores.py` の修正: オペランドが qword の `mov` だけを数える・`push reg` で lea の追跡を消さない)。`git diff 0b9527969 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
 - `pe_vptr_stores.py 48` → hits 0・38.0 秒 (命令 5,022,467)。修正前 (`7e286e275`) も hits 0 だった。
 - 陽性対照 `pe_vptr_stores.py 0` → hits 1: `0x44a86e` `mov [rax], rcx` (V = `0x13acb88` (`.data`)、slot+0x20 = `0x44a820`、slot+8 = `0x44a720`)・37.5 秒。修正後も同じ 1 件。
@@ -95,7 +95,7 @@
 - PE の `.rdata` は 0x45 バイトのみ。vtable 形の表は `.data` (0x13a5000〜0x15e5008) に置かれる (陽性対照の V)。
 - `lea reg,[rip+V]` の 8 命令以内に `mov qword ptr [reg2+0x48], reg` で V を格納する箇所は 0 件。X+0x48 (`ref`) の vptr はこの形では書かれない。
 - X の生成 `0x132e7a0`: `X = 0x410320(ctx, dl)` → `0x13315a0(X, 0, [rbp+0x88], &args)` (第 3 引数は呼出し元の r9 を 0x132e7cc で `[rbp+0x88]` に退避した値。0x132e7f2 で r8 に入れる) → `[X+0x40] ← [rbp+0x80]` (呼出し元の r8。0x132e806〜0x132e80d)。`[X+0x48]` の書込みは無い。
-- `0x410320` は `mov rax,rcx` の後に `call [rax-0x30]` (`dl ≥ 0` のとき。`rcx = ctx`) を行う。ctx を表の基底として直接使う。`ctx = 0xfe3340` は `.text` 内のデータで、命令列ではない: 先頭の qword `0x663c90`・`0x663c60` は関数 VA (`0x663c90` は `push rsi` で始まる)、0xfe3357 と 0xfe336a に ASCII `TChanList` を含む。VMT 様の表と見られる (根拠は上の 2 点。表全体の形は未確定)。
+- `0x410320` は `mov rax,rcx` の後に `call [rax-0x30]` (`dl ≥ 0` のとき。`rcx = ctx`) を行う。ctx を表の基底として直接使う。`ctx = 0xfe3340` は `.text` 内のデータで、命令列ではない: 先頭の qword `0x663c90`・`0x663c60` は関数 VA (`0x663c90` は `push rsi` で始まる)、0xfe3357 と 0xfe336a に ASCII `TChanList` を含む。VMT 様の表と見られる (根拠: 先頭が関数 VA の並びで、`call [rax-0x30]` が ctx を基底に直接使う。表全体の形は未確定)。
 - `[ctx-0x30]` (0xfe3310) の qword は `0x40f960` (`push rbx; sub rsp,0x20; mov rbx,rcx; ...`)。`0x410320` の戻り値 (X) を返す関数と見られる。その本体の走査は未了。X+0x48 の vptr の書込み元も、この先に無いかは未確認。
 - 初版の誤検出: `[rbp+0x48]`・`[rsp+0x48]` (フレーム slot) と `.text` 内の lea 先 (関数の機械語) を拾った。基底レジスタの除外と `is_vtable` (先頭 qword が実行可能 section の VA) で除いた。
 
