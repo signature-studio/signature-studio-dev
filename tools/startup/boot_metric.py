@@ -616,9 +616,9 @@ def _x64c_survey(src):
     total = src.json_value(X64_BOOT, "boot.units_total")
     covered = src.json_value(X64_SURVEY, "units_covered")
     by_cls = src.json_value(X64_SURVEY, "byCls")
-    ok = by_cls.get("ok")
-    unlifted = by_cls.get("unlifted")
-    if ok is None or unlifted is None or sum(int(n) for n in by_cls.values()) != int(covered):
+    ok = by_cls.get("ok", 0)
+    unlifted = by_cls.get("unlifted", 0)
+    if sum(int(n) for n in by_cls.values()) != int(covered):
         raise MetricError("x64c survey の内訳が units_covered と合わない")
     uncovered = int(total) - int(ok) - int(unlifted)
     units = {

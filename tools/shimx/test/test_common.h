@@ -35,6 +35,7 @@ static inline int wstr_eq(const WCHAR* w, const char* s) { return strcmp(U8(w), 
 static inline double now_ms(void) { return emscripten_get_now(); }
 
 void run_core_tests(int multithread);
+void run_fh3_tests(void);
 void run_sys_tests(void);
 void run_ole_shell_tests(void);
 void run_link_tests(int multithread);

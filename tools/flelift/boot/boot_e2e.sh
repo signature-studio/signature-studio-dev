@@ -25,16 +25,19 @@ set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
 NODE="$(command -v node || echo ~/.local/share/pnpm/bin/node)"
 
 LIFT="$W/lift"
+# FLE_SHARDS>1 (既定 8): lifted C を fle_lifted_s<k>.c に分け、1 TU あたりの clang RSS を cap 内に収める (#4855)。
+SHARDS="${FLE_SHARDS:-8}"
+LIFTED_MARK="$LIFT/fle_lifted.c"; [ "$SHARDS" -gt 1 ] && LIFTED_MARK="$LIFT/fle_lifted_s0.c"
 # ---- 1. 生成 phase A: entries + .text 窓 (meta 不要) ----
 python3 "$HERE/gen_boot.py" --pe "$PE" --out "$W"
 
 # ---- 2. lift (boot 用 entries: +entry_point 0x1376820, +longjmp 断片 0x1376840, +override) ----
-if [ ! -f "$LIFT/fle_lifted.c" ] || [ "$FAST" = 0 ] || [ "$W/fle_entries_boot.json" -nt "$LIFT/fle_lifted.c" ]; then
-  echo "[boot_e2e] lift (x64c) ..."
+if [ ! -f "$LIFTED_MARK" ] || [ "$FAST" = 0 ] || [ "$W/fle_entries_boot.json" -nt "$LIFTED_MARK" ]; then
+  echo "[boot_e2e] lift (x64c, shards=$SHARDS) ..."
   # closure 既定 2 (FLE-2 実測: closure 0 = 16 unit / closure 2 = 40 unit。20,479 → 29,415 関数)。
   # FLE_LIFT_CLOSURE=0 で旧既定に戻せる。
   python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$LIFT" --closure ${FLE_LIFT_CLOSURE:-2} \
-    --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000 \
+    --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000 --shards "$SHARDS" \
     --override 0x4126f0=fle_ov_longjmp --override 0x409410=fle_ov_getmem \
     --override 0x409440=fle_ov_freemem --override 0x4120c0=fle_ov_initunits
   python3 "$FLE/fle_data_gen.py" "$PE" "$LIFT/fle_data.c" "$LIFT/lift_meta.json"
@@ -54,7 +57,7 @@ if [ ! -f "$W/obj/.sx_done" ] || [ "$SX/src/shimx.h" -nt "$W/obj/.sx_done" ]; th
 fi
 
 CCF="-O0 -w -Wno-error=int-conversion -Wno-implicit-function-declaration -g1"
-CAP_MB="${FLE_CC_RSS_CAP_MB:-11000}"
+CAP_MB="${FLE_CC_RSS_CAP_MB:-$([ "$SHARDS" -gt 1 ] && echo 5000 || echo 11000)}"
 cc() { # cc <src> <obj> [flags...]  (emcc -c は RSS 上限付き。超過は非 0 で止める)
   local src="$1" obj="$2"; shift 2
   if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
@@ -74,7 +77,18 @@ BUILD() { # BUILD <variant> <bridge.c> [extra emcc flags...] [-- nosx]
   for a in "$@"; do if [ "$a" = "--nosx" ]; then nosx=1; else args+=("$a"); fi; done
   local CHKF=""
   if [ "$v" = "chk" ]; then CHKF="-DFLE_CHK"; fi
-  cc "$LIFT/fle_lifted.c"  "$W/obj/${v}_lifted.o"  $CCF $CHKF -I"$FLE/rt" -I"$HERE"
+  local LIFTED_OBJS="$W/obj/${v}_lifted.o"
+  if [ "$SHARDS" -gt 1 ]; then
+    # shard は xargs -P (既定 3) で並列 clang。各 shard は cap 付き cc (超過は exit 1 で全体を止める)。
+    cc_shard() { cc "$LIFT/fle_lifted_s$1.c" "$W/obj/${2}_lifted_s$1.o" $CCF $CHKF -I"$FLE/rt" -I"$HERE"; }
+    export -f cc cc_shard
+    export W HERE FLE LIFT CAP_MB CCF CHKF
+    seq 0 $((SHARDS - 1)) | xargs -P "${FLE_CC_JOBS:-3}" -I{} bash -c "cc_shard {} $v"
+    LIFTED_OBJS=""
+    for k in $(seq 0 $((SHARDS - 1))); do LIFTED_OBJS="$LIFTED_OBJS $W/obj/${v}_lifted_s$k.o"; done
+  else
+    cc "$LIFT/fle_lifted.c"  "$W/obj/${v}_lifted.o"  $CCF $CHKF -I"$FLE/rt" -I"$HERE"
+  fi
   cc "$LIFT/fle_data.c"    "$W/obj/${v}_data.o"    $CCF $CHKF -I"$FLE/rt"
   cc "$FLE/rt/fle_cpu.c"   "$W/obj/${v}_cpu.o"     $CCF $CHKF -I"$FLE/rt" $CPUDEFS
   cc "$FLE/rt/fle_glue.c"  "$W/obj/${v}_glue.o"    $CCF $CHKF -I"$FLE/rt"
@@ -82,9 +96,9 @@ BUILD() { # BUILD <variant> <bridge.c> [extra emcc flags...] [-- nosx]
   cc "$W/fle_textwin.c"    "$W/obj/${v}_tw.o"      $CCF $CHKF -I"$FLE/rt" -I"$HERE"
   cc "$HERE/fle_boot.c"    "$W/obj/${v}_boot.o"    $CCF $CHKF -I"$FLE/rt" -I"$HERE" -I"$SX/src" \
      -DFLEBOOT_STRICT=$([ "$v" = strict ] && echo 1 || echo 0) -DFLEBOOT_NOSX=$([ "$v" = nosx ] && echo 1 || echo 0)
-  local OBJS="$W/obj/${v}_lifted.o $W/obj/${v}_data.o $W/obj/${v}_cpu.o $W/obj/${v}_glue.o $W/obj/${v}_bridge.o $W/obj/${v}_tw.o $W/obj/${v}_boot.o"
+  local OBJS="$LIFTED_OBJS $W/obj/${v}_data.o $W/obj/${v}_cpu.o $W/obj/${v}_glue.o $W/obj/${v}_bridge.o $W/obj/${v}_tw.o $W/obj/${v}_boot.o"
   [ $nosx = 1 ] || OBJS="$OBJS $W/obj/sx_*.o"
-  local EXPORTS=_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_fle_boot_set_nullpage,_fle_boot_set_blkdiag,_fle_blkdiag_stat,_fle_boot_set_ipp,_fle_boot_set_diag_nullfill,_fle_diag_skip_n,_fle_diag_pass_n,_fle_px_stat,_fle_ipp_total,_fle_ipp_names,_fle_ipp_name,_fle_ipp_count
+  local EXPORTS=_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_fle_boot_set_nullpage,_fle_boot_set_blkdiag,_fle_blkdiag_stat,_fle_boot_set_ipp,_fle_boot_set_diag_nullfill,_fle_diag_skip_n,_fle_diag_pass_n,_fle_px_stat,_fle_ipp_total,_fle_ipp_names,_fle_ipp_name,_fle_ipp_count,_emscripten_stack_get_base,_emscripten_stack_get_end
   [ $nosx = 1 ] || EXPORTS="$EXPORTS,_shimx_set_trace,_shimx_init"
   emcc $OBJS -o "$W/fleboot_$v.cjs.tmp" \
     -O0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 \

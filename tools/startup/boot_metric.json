@@ -70,7 +70,7 @@
           "file": "tools/m11",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "d7c4f781"
+          "file_last_commit": "189d9580"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -149,7 +149,7 @@
           "file": "tools/m11",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "d7c4f781"
+          "file_last_commit": "189d9580"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -612,13 +612,13 @@
           "file": "tools/flelift/boot/REPORT.md",
           "locator": "md:### 4-1. /^\\| plain \\| [^|]*\\| \\*\\*209 dispatch\\*\\* / oob \\(`f_([0-9a-f]+)`\\)/",
           "measured_commit": null,
-          "file_last_commit": "6558a6f0"
+          "file_last_commit": "432fe870"
         },
         {
           "file": "tools/flelift/boot",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "6558a6f0"
+          "file_last_commit": "432fe870"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -751,9 +751,9 @@
       "commit": null,
       "units": {
         "total": 942,
-        "ok": 892,
+        "ok": 895,
         "skipped": null,
-        "failed": 3,
+        "failed": 0,
         "miss": null,
         "noproc": null,
         "dispatched": null,
@@ -792,13 +792,13 @@
           "file": "tools/flelift/boot/results/survey.json",
           "locator": "json:units_covered",
           "measured_commit": null,
-          "file_last_commit": "30df8948"
+          "file_last_commit": "e3614ab3"
         },
         {
           "file": "tools/flelift/boot/results/survey.json",
           "locator": "json:byCls",
           "measured_commit": null,
-          "file_last_commit": "30df8948"
+          "file_last_commit": "e3614ab3"
         }
       ]
     },
