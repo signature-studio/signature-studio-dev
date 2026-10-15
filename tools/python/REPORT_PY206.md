@@ -53,9 +53,27 @@
 - **ネガティブコントロール** (1 件を壊して FAIL すること。作業ツリーの写し・base `e5c96411e` 上で実施): (a) mock の `getMasterSync` を `return true` → `device 差分 1 件`・exit 1 (`device.getMasterSync` の値の不一致)。(b) mock の `setMasterSync` を `st.masterSync = false` → `device 差分 1 件`・exit 1。本体 (壊していない版) は diffs 0・exit 0。
 - 追加の確認: `git status` で作業ツリーに残る変更は本 PR の 4 ファイル (+ `REPORT_PY206.md` と `docs/DOC_MAP.md`) のみ。`package.json`・`pnpm-lock.yaml` は runner 側の既存差分で commit に含めない。
 
+## 競合解消後の再測定 (測定 commit `dc65d9857`)
+
+main (`5fae94c61`) を merge して競合 (`tests/provider_check.mjs` の実装集合と期待件数) を解消した後に再測定した。main 側の patterns 4 関数 (PY-179・#3271) と合算し、期待値は **160/275** (`fl_table.c` ハンドラ 160)。前節の `0641856` の値は merge 前の値として残す。
+
+| 検査 | 結果 | rc |
+|---|---|---|
+| `bash provider/build.sh` | `fl_table.c: 435 関数, ハンドラ 160` | 0 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` (CPython は `build_cpython_wasm.sh`、3 分 47 秒。flpy の入力 `src/`・flapi 表は main と差分 0) | flpy.js / flpy.wasm 生成 | 0 |
+| `node tests/device_diff.mjs` | calls 18・rejects 10・midi_out 5・**diffs 0**・PASS | 0 |
+| `node tests/provider_check.mjs` | functions 435・**implemented 160**・unimplemented 275・PASS | 0 |
+| `node tests/patterns_diff.mjs` (main 側) | calls 25・**diffs 0**・PASS | 0 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | **48/48 ok**・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 0 |
+| `node tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425 | 0 |
+
+- 所要 (`date` 差分・整数秒): device_diff 0・provider_check 1・patterns_diff 0・all_tools wasm 1・all_tools mock 1。load average は測定中 2.75〜3.05 (`uptime`、n=1)。
+- 測定 commit `dc65d9857` から HEAD までのコード差分: `git diff dc65d9857 HEAD -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (本節の追記は REPORT のみ)。
+- 前回測定 (`0641856`) から `dc65d9857` までのコード差分 (main 取り込み分、4 ファイル・+81/-3): `host/fl_mock.mjs` +7・`provider/fl_engine.c` +9・`tests/patterns_diff.mjs` +60・`tests/provider_check.mjs` (実装集合と期待件数)。
+
 ## 検証範囲 / 範囲外
 
-- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (435 = 実装 156 + 未実装 279)。
+- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (435 = 実装 160 + 未実装 275)。
 - 範囲外 (未確定のまま残す): 実 FLEngine 上の状態値 (idle・midi-out・master sync の初期値)、通知 3 件の vtbl 先の効果、`setMasterSync` の述語 P 偽 (-2) の発生条件、`0x1366e00`・`0xfd7170`・`0xfd7240` の効果、-6/-7 の実発生。
 - KPI: device API は起動・GUI に関わらないため、起動 KPI (`tools/flelift/boot/REPORT.md`) は動かしていない。
 
