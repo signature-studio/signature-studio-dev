@@ -126,26 +126,16 @@ python3 tools/m11/trap_triage/compare_kinds_2672.py tools/m11/work/trap_triage/b
 
 ## 9. PR #4664 (round 1 の差し戻し対応) の追記
 
-### 9.1 本節の数値の出所 (再測定していない)
+### 9.1 本節の結論 (数値は未測定)
 
-- 下記の数値は PR #4664 の作成者が実行し PR 本文に書いた値。本 run では再測定していない。`$ARTIFACTS_DIR` に `fl-win64` だけがあり、`work-m11`・`toolchain-emsdk` が無いため。
-- 測定 commit: PR 本文は「本 PR の commit」とだけ書き、完全 SHA を記録していない。`c05f4b16` (§2〜§8 の測定) とは別の測定。
-- 基準 survey の base: PR 本文が「現 main」とした `654aabbd5`。現 origin/main は `325cf6a4d` (本 run で fetch)。
-
-| 項目 | 値 (PR 作成者の測定) | §2 (c05f4b16) との関係 |
-|---|---|---|
-| 基準 survey (`654aabbd5`) | `ok 873 / miss 47 / halt0 7 / oob 14 / noproc 1` | §2.1 (`ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1`) と build が違い、一致しない |
-| 計装版の hook (`store_ptr`) | `$fimport$34`、59,375 件 | §1 の `$fimport$32` と違う (build で import 番号が変わる) |
-| 本番 (`OLD=0x1029e5d8`、942 unit) | hit 0 | §2.4 の hit 1 (unit 477) と違う |
-| 陽性対照 (`OLD=0`、unit 0,1) | hit 0 | §2.3 の hit 5 を再現できない |
-
-- 陽性対照が 0 件なので、計装の検出 (hook の引数・`mem` の参照・store id の割当て) が現 build で機能しているかは未確認。§2.3 の「検出機構が動く」の結論は c05f4b16 の build に限られる。
-- `store_sites_2672.py` の修正 (本 PR) の単体確認: 合成 wat (import `$fimport$34`・呼出し 1 件) で `n_ids 1 / n_dup_ids 0 / sites {133950: func 7, line 4, bytes 4, offset 48}`。修正前の版は同じ入力で 0 件。import が 0 件の wat では `sys.exit` で止まる (件数検査)。
-- `store_sites_2891.py` と重複する理由: 2891 版は import 1 件を前提に `sys.exit` で検査する一般化版。2672 版は REPORT §1 の単発の再現手順の入力 (`store_sites_2672.py`) として残す。2 版の出力は同じ入力で一致 (`sites`・`exports` が同一)。
+- 本節の実測値 (基準 survey・計装版の hook 数・本番・陽性対照) は **HEAD では未測定 (#2706)**。round 1 までの PR 本文にあった数値は、測定 commit の完全 SHA も実行コマンドも特定できないため、本 REPORT からは外した。`$ARTIFACTS_DIR` には `fl-win64` だけがあり、`work-m11`・`toolchain-emsdk` が無いため再測定できなかった。
+- 基準 base の判定: `654aabbd5` は origin/main (`325cf6a4d`) の祖先 (`git merge-base --is-ancestor` = 真)。origin/main までは 110 commit。
+- `store_sites_2672.py` の単体確認 (本 PR の修正のみ、測定値ではない): 合成 wat (`work/2706/synth_store_ptr.wat`・import `$fimport$34`・呼出し 1 件) で `n_ids 1 / n_dup_ids 0 / sites {133950: func 7, line 4, bytes 4, offset 48}`。import 0 件の wat (`work/2706/synth_noimport.wat`) では `store_ptr の import が 1 件でない: 0` で `exit 1`。
+- `store_sites_2891.py` と重複する理由: 2891 版は import 1 件を前提に `sys.exit` で検査する一般化版。2672 版は REPORT §1 の単発の再現手順の入力 (`store_sites_2672.py`) として残す。
 
 ### 9.2 HEAD で再測定が必要な理由
 
-- 測定 commit `c05f4b16` から現 HEAD (`5252bd0fc`) までの、実行される build・survey のコードの差分 (`git diff --stat c05f4b16 HEAD -- tools/m11/m11_ov.c tools/m11/m11_build.sh tools/m11/m11_gen_ir2.sh tools/m11/m11_rt.c tools/m11/trap_triage/survey_units.mjs`):
+- 測定 commit `c05f4b16` から本節の直前 HEAD (`52e0e0655`) までの、実行される build・survey のコードの差分 (`git diff --stat c05f4b16 HEAD -- tools/m11/m11_ov.c tools/m11/m11_build.sh tools/m11/m11_gen_ir2.sh tools/m11/m11_rt.c tools/m11/trap_triage/survey_units.mjs`):
 
 ```
  5 files changed, 355 insertions(+), 13 deletions(-)
