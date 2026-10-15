@@ -115,7 +115,7 @@ velocity による選択 (`0x122227e`〜`0x12223b9`、K∈{0,2} のみ。S+0xa0 
 
 ## 8. 検証
 
-- 素材: `fl-win64` (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 --wildcards '*block00031_PE.bin'`)。
+- 素材: `fl-win64` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 --wildcards '*block00031_PE.bin'`)。
 - 測定 commit (コードを最後に変えた commit): `44f02645c` (`feat(flapi): verify live clip trigger and zone facts (PY-104)`)。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/playlist_live_clip_facts.py`。全 expectation が OK で終了 (exit 0)。主な出力: `0x1222b80` = 0x05 → K ∈ {0, 2}、`0x1222b70` = -1.0、`0x1222bb4` = -1.0 (refresh の定数)、`0x100b95a` (mode≥2 の戻り) など。
 - 実測 (n=3、`/usr/bin/time`): real 0.06 s / user 0.04〜0.05 s / sys 0.01〜0.02 s。実行直前の load average `0.02 0.10 0.13` (`/proc/loadavg`)、nproc 4、並列 1。
