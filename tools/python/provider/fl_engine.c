@@ -679,17 +679,22 @@ FL_H(screen, menuPrev) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
 FL_H(device, isAssigned) { return fl_ret_b(c, 1); }
 FL_H(device, setHasMeters) { return fl_ret_none(c); }
-FL_H(device, forwardMIDICC) { (void)A_INT(0, 0); (void)A_INT(1, 1); midi_out_n++; return fl_ret_none(c); }
-/* PE 0xd747f0 (書式 i|iiii)。device 無し → -7、送出先無し → -6 (channel によらず先に判定)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
-FL_H(device, midiOutMsg) {
-    int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);
+/* PE 0xd747f0 (midiOutMsg) と PE 0xd748e0 (forwardMIDICC) の共通判定: device 無し → -7、送出先無し → -6 (送出の前に判定)。通ったら word を送出として記録する */
+static int midi_send(fl_call *c, uint32_t w) {
     if (!dev_assigned) return fl_err(c, FL_E_DEVICE, "Device not assigned");
     if (!link_assigned) return fl_err(c, FL_E_LINKED_DEVICE, "Linked device not assigned");
-    uint32_t w = (uint32_t)msg;
-    if (ch >= 0) w = ((uint32_t)(ch & 0xf) | w) + ((uint32_t)d1 << 8) + ((uint32_t)d2 << 16) + ((uint32_t)a4 << 24);
     midi_out_n++;
     if (midi_word_n < NMIDI) midi_words[midi_word_n++] = w;
     return fl_ret_none(c);
+}
+/* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。値の変化検出は未実装 (REPORT_PY231 §4) */
+FL_H(device, forwardMIDICC) { int64_t msg = A_INT(0, 0); (void)A_INT(1, 1); return midi_send(c, (uint32_t)msg); }
+/* PE 0xd747f0 (書式 i|iiii)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
+FL_H(device, midiOutMsg) {
+    int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);
+    uint32_t w = (uint32_t)msg;
+    if (ch >= 0) w = ((uint32_t)(ch & 0xf) | w) + ((uint32_t)d1 << 8) + ((uint32_t)d2 << 16) + ((uint32_t)a4 << 24);
+    return midi_send(c, w);
 }
 
 /* ---- plugins (7) ---- (引数順: paramIndex 系は先頭、index/slotIndex/useGlobalIndex が後続) */
