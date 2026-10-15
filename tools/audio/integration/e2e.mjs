@@ -91,6 +91,12 @@ try {
       rec(tag("tone"), v.max_abs_err < 1e-5 && Math.abs(v.rms - 0.5 / Math.SQRT2) < 0.005 && v.zero_runs_ge16 === 0,
         `frames=${v.covered_frames} sr=${v.sampleRate} max_err=${v.max_abs_err.toExponential(2)} rms=${v.rms.toFixed(4)} (理論 0.3536) zero_runs=${v.zero_runs_ge16} peak=${v.peak.toFixed(3)} ${loc}`);
       rec(tag("underruns"), v.underruns === 0, `underruns=${v.underruns} ${loc}`);
+      // 時間軸の検査 (underrun 有無に依らず毎 run): producer の最終 write 完了 (pw_trace done_us, epoch µs 下 32bit) と
+      // page の Date.now() (worklet の underrun 記録 hdr[7] と同じ式 (Date.now()*1000)|0) の差は、producer が生きていれば 0 以上 1 s 未満
+      const lastDone = v.producer.writes.at(-1)?.done_us;
+      const nowLow = await page.evaluate("(Date.now() * 1000) | 0");
+      const ageUs = lastDone === undefined ? -1 : (nowLow - lastDone) >>> 0;
+      rec(tag("axis-epoch"), lastDone !== undefined && ageUs < 1_000_000, `producer_done_us=${lastDone} page_now_us=${nowLow >>> 0} age_us=${ageUs}`);
       // N1: 期待周波数をずらした照合 (サンプルレートを 1% ずらす) は FAIL するはず
       const bad = await page.evaluate("window.__audio.verifyShifted(1.01)");
       rec(tag("neg1-shifted-rate"), bad.max_abs_err > 1e-3, `sr×1.01 で max_err=${bad.max_abs_err.toExponential(2)} (>1e-3 で検出)`);

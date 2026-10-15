@@ -14,8 +14,7 @@ const fn = new Function(`return ${m[0]
   .replace(/^export function/, "function")
   .replace(/\(underrunUs: number, writes: \{[^)]*\}\[\]\)/, "(underrunUs, writes)")
   .replace(/: UnderrunWriteOverlap \| null/, "")
-  .replace(/let best: UnderrunWriteOverlap \| null/, "let best")
-  .replace(/const toWake = /g, "const toWake = ")}`)();
+  .replace(/let best: UnderrunWriteOverlap \| null/, "let best")}`)();
 
 let fail = 0;
 const check = (name, ok, detail) => { if (!ok) fail++; console.log(`${ok ? "PASS" : "FAIL"} ${name}: ${detail}`); };
