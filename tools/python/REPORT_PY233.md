@@ -29,7 +29,7 @@
 ## 2. 手段 (再現)
 
 ```sh
-bash tools/flelift/boot/fle6_measure.sh   # 前提: FL_WIN64_DIR (fl-win64 展開先)・/opt/emsdk。shim 経路のみは FLE_BOOT_RUNS=shim FLE_BOOT_TAG=py233
+bash tools/flelift/boot/fle6_measure.sh   # 前提: FL_WIN64_DIR (fl-win64 展開先)・SS_EMSDK_ENV ([EMSDK])。shim 経路のみは FLE_BOOT_RUNS=shim FLE_BOOT_TAG=py233
 bash tools/flelift/boot/py233_getrecppb_probe.sh   # 観測点 3 つ + FLE_WWATCH (4 セル) の variant を作って boot
 ```
 

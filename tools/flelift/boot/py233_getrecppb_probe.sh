@@ -5,7 +5,7 @@
 #
 #   bash tools/flelift/boot/py233_getrecppb_probe.sh      # 前提: 先に fle6_measure.sh で work/boot/lift を作る
 #
-# 前提: FL_WIN64_DIR (fl-win64 展開先) / /opt/emsdk (SS_EMSDK_ENV) / node。出力は work/boot/ (gitignore)。
+# 前提: FL_WIN64_DIR (fl-win64 展開先) / SS_EMSDK_ENV (emsdk_env.sh。エントリ ID は docs/REFERENCES.md の [EMSDK]) / node。出力は work/boot/ (gitignore)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 FLE="$(cd "$HERE/.." && pwd)"
