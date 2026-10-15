@@ -34,10 +34,10 @@ struct bp {
 
 static uint8_t *img, *stubs;
 static volatile int g_slot;
-static char iat_name[MAXIAT][96];
+static char iat_name[MAXIAT + 1][96];
 static uint32_t iat_rva[MAXIAT];
 static int n_iat;
-static int iat_hits[MAXIAT];
+static int iat_hits[MAXIAT + 1];
 static struct bp bps[NBP] = {
   {0x1ac4b4, "store vptr (WC instance, rcx=instance)"},
   {0x1ac9c0, "alloc entry (rcx=size)"},
@@ -63,14 +63,6 @@ static int heap_calls;
 static uint64_t exc_args[4];
 static uint64_t exc_code;
 static uint64_t last_ret;
-
-static int find_iat(const char *suffix) {
-  for (int i = 0; i < n_iat; i++) {
-    size_t n = strlen(iat_name[i]), m = strlen(suffix);
-    if (n >= m && !strcmp(iat_name[i] + n - m, suffix)) return i;
-  }
-  return -1;
-}
 
 static uint64_t __attribute__((ms_abi)) dispatch(uint64_t a, uint64_t b, uint64_t c, uint64_t d) {
   int s = g_slot;
@@ -210,14 +202,15 @@ int main(int argc, char **argv) {
   FILE *ft = fopen(argv[2], "r");
   if (!ft) { perror("iat"); return 2; }
   char line[256];
-  while (n_iat < MAXIAT && fgets(line, sizeof line, ft)) {
+  while (fgets(line, sizeof line, ft)) {
     unsigned rva; char nm[96];
     if (sscanf(line, "%x %95s", &rva, nm) != 2) continue;
+    if (n_iat == MAXIAT) { fprintf(stderr, "iat: more than %d imports\n", MAXIAT); return 2; }
     iat_rva[n_iat] = rva; snprintf(iat_name[n_iat], sizeof iat_name[0], "%s", nm); n_iat++;
   }
   fclose(ft);
 
-  stubs = mmap(NULL, 4096, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  stubs = mmap(NULL, (MAXIAT + 1) * STUB_SZ, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (stubs == MAP_FAILED) { perror("mmap stubs"); return 2; }
   if ((uintptr_t)&g_slot > 0x7fffffffUL) { fprintf(stderr, "g_slot above 2 GiB\n"); return 2; }
   strcpy(iat_name[n_iat], "harness!new_handler");
