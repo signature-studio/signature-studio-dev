@@ -281,7 +281,41 @@ EMSCRIPTEN_KEEPALIVE double m11_p2780_get(int k, int f) { return (k >= 0 && f >=
 #ifndef M11_RT_NODATA
 #define M11_RT_NODATA 0
 #endif
-#if M11_RT_NODATA
+#ifndef M11_RT_NODATA_BODY
+#define M11_RT_NODATA_BODY 0
+#endif
+#if M11_RT_NODATA_BODY
+/* #2275 (既定 0): m11_dest_obs の本体 (dest の読出し・指紋の更新・rec の store) は残し、名前付きの静的状態 (g_dest_h・g_dest_n・g_rec_*) を外す。
+ * 状態は呼出しごとのスタック上の volatile 変数に置く (store・load の命令は残る)。
+ * 静的領域の大きさは元と同じ (g_pad_nd_h 8B・g_pad_nd_bss 16392B) なので、後続の配置と heap 開始位置は動かさない。 */
+static unsigned long long g_pad_nd_h __attribute__((used)) = 1469598103934665603ULL;
+static unsigned char g_pad_nd_bss[16392] __attribute__((used));
+void m11_dest_obs(unsigned long long dest) {
+    volatile unsigned long long dh = 1469598103934665603ULL, dn = 0, rst = 0, rlen = 0, rrc = 0, rh = 0;
+    unsigned long long v = *(volatile unsigned long long*)(uintptr_t)dest;
+    dh = (dh ^ v) * 1099511628211ULL; dn = dn + 1;
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long h = 1469598103934665603ULL, len = 0, rc = 0, st = 0;
+    if (v == 0) st = 0;
+    else if (v < 8 || v + 4 > heap) st = 2;
+    else {
+        len = *(volatile unsigned int*)(uintptr_t)(v - 4);
+        rc = *(volatile unsigned int*)(uintptr_t)(v - 8);
+        if (len > (1ull << 24) || v + len * 2 > heap) st = 2;
+        else {
+            for (unsigned long long j = 0; j < len * 2; j++)
+                h = (h ^ *(volatile unsigned char*)(uintptr_t)(v + j)) * 1099511628211ULL;
+            st = 1;
+        }
+    }
+    rst = st; rlen = len; rrc = rc; rh = h;
+    (void)dh; (void)dn; (void)rst; (void)rlen; (void)rrc; (void)rh;
+}
+EMSCRIPTEN_KEEPALIVE double m11_dest_rec(int k, int field) { (void)k; (void)field; return -1.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_n(void) { return 0.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hhi(void) { return 0.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hlo(void) { return 0.0; }
+#elif M11_RT_NODATA
 void m11_dest_obs(unsigned long long dest) { (void)*(volatile unsigned long long*)(uintptr_t)dest; }
 EMSCRIPTEN_KEEPALIVE double m11_dest_rec(int k, int field) { (void)k; (void)field; return -1.0; }
 EMSCRIPTEN_KEEPALIVE double m11_dest_obs_n(void) { return 0.0; }

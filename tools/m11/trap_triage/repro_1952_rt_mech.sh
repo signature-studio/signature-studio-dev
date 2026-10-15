@@ -9,7 +9,8 @@
 #   POST64    : C + 後ろに 64B (g_dest_h より後ろの配置は動かず、rt.o 全体の量だけ増える)
 #   POST4096  : C + 後ろに 4096B
 #   EMPTY     : C + m11_dest_obs の本体だけ空 (関数・静的データは残す)
-#   NODATA    : C + 関数 m11_dest_obs は残し、静的データ (g_dest_h・g_rec_*・g_dest_n) を無くす (#2212 の対照)
+#   NODATA    : C + 関数 m11_dest_obs は残し、静的データ (g_dest_h・g_rec_*・g_dest_n) を無くす (#2212 の対照。本体の書込みも消す)
+#   NODATA_BODY: C + 関数本体の書込み (指紋・rec の store) は残し、静的データを無くす。状態はスタック上の変数へ、静的領域の大きさは pad で保つ (#2275)
 # 直列・単発。判定は表示のみ。出力は work/split_1952/ (gitignore)。
 # #2212: 各構成のリンク map を map_<tag>.txt に残し、g_dest_h・g_rec_*・pad の実アドレス (wasm 上) を表に出す。
 # 前提: work/ が m11_gen_ir2.sh 生成済み、FL_WIN64_DIR 設定済み、[EMSDK] 配置済み (docs/REFERENCES.md)。
@@ -36,8 +37,10 @@ measure() {
   local undef; undef=$(grep -c 'undefined symbol' work/link.log || true)
   local dpos; dpos=$(llvm-nm -n work/obj/rt.o 2>/dev/null | grep ' g_dest_h$' | awk '{print $1}')
   # #2212: リンク後の実アドレス (wasm 上の VA)。map の .data 内で各シンボルの行を拾う
-  local laddr; laddr=$(grep -E '(g_dest_h|g_rec_st|g_rec_len|g_rec_rc|g_rec_h|g_pad_pre|g_pad_post|g_dest_n)$' "$OUT/map_$tag.txt" 2>/dev/null | awk '{printf "%s@%s ", $NF, $1}')
-  echo "[split_1952][addr] $tag ${laddr:-none}" >> "$OUT/addr.txt"
+  local laddr; laddr=$(grep -E '(g_dest_h|g_rec_st|g_rec_len|g_rec_rc|g_rec_h|g_pad_pre|g_pad_post|g_dest_n|g_pad_nd_h|g_pad_nd_bss)$' "$OUT/map_$tag.txt" 2>/dev/null | awk '{printf "%s@%s ", $NF, $1}')
+  # #2275: 静的領域の終端 (.data・.bss の VA と大きさ)。heap は静的領域の後ろから始まるので、終端の移動を heap 開始位置の移動の代理にする
+  local secs; secs=$(awk '$4 == ".data" || $4 == ".bss" {printf "%s=%s+%s ", $4, $1, $3}' "$OUT/map_$tag.txt" 2>/dev/null)
+  echo "[split_1952][addr] $tag ${laddr:-none} [sec] ${secs:-none}" >> "$OUT/addr.txt"
   env "$@" timeout 300 node m11_survey.mjs > "$OUT/survey_$tag.out" 2>/dev/null; local rc=$?
   if [ "$rc" -ne 0 ]; then echo "[split_1952] survey $tag FAILED (rc=$rc)"; FAIL=1; return; fi
   python3 - "$OUT/survey_$tag.out" "$label" "$rep" "$ir_md5" "$undef" "${dpos:-none}" <<'PY' || FAIL=1
@@ -64,6 +67,7 @@ for rep in $(seq 1 "$N"); do
   measure "$rep" POST4096 $BASE M11_RT_PADPOST=4096 >> "$TABLE"
   measure "$rep" EMPTY $BASE M11_RT_EMPTY=1 >> "$TABLE"
   measure "$rep" NODATA $BASE M11_RT_NODATA=1 >> "$TABLE"
+  measure "$rep" NODATA_BODY $BASE M11_RT_NODATA_BODY=1 >> "$TABLE"
 done
 echo "構成	回	boot_final3.ll md5	undefined symbol	g_dest_h offset	ok	trap	clobber	getmem	fastmm_getmem_impl"
 cat "$TABLE"
