@@ -65,6 +65,7 @@ OBJ = ARENA + 0xC200
 B_ = ARENA + 0x9800
 S_ = ARENA + 0x9000
 Z_ = ARENA + 0xA800
+LK = ARENA + 0xAF00
 
 
 def reach_case(a1):
@@ -79,6 +80,8 @@ def reach_case(a1):
     struct.pack_into('<Q', arena, OBJ + 0x20 - ARENA, Z_)
     struct.pack_into('<Q', arena, OBJ + 0x688 - ARENA, 0)
     struct.pack_into('<Q', arena, CTX_OFF + 0x20, NODE)
+    struct.pack_into('<Q', arena, CTX_OFF + 8, LK)
+    struct.pack_into('<Q', arena, LK - ARENA, 0x10)
     out.append(struct.pack('<IIQQQQQ', 0, 0, key_of(OBJ), a1, ARENA, 0, ARENA + CTX_OFF) + bytes(arena))
     expect.append({'kind': 'reach', 'fn': 0, 'a1': a1})
 
