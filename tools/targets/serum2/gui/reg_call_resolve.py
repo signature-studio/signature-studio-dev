@@ -242,7 +242,9 @@ def stack_slot_value(insns, jt, i, disp):
             if len(ops) < 2 or not reg_re.match(ops[1]):
                 return ("kill", None)
             return ("def", resolve(insns, jt, q, ops[1]))
-        if f"[rsp + {disp}]" in ops[0] and w.mnemonic not in NOWRITE and not w.mnemonic.startswith("j"):
+        if w.mnemonic in ("push", "pop") or (ops[0] == "rsp" and w.mnemonic not in NOWRITE):
+            return ("kill", None)
+        if "[rsp" in ops[0] and w.mnemonic not in NOWRITE and not w.mnemonic.startswith("j"):
             return ("kill", None)
         return ("pass", None)
 
