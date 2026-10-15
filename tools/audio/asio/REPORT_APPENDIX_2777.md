@@ -137,4 +137,5 @@ git diff --numstat 6b095da2 3a687abd -- tools/audio
   - 結論: 床は初期 T を上げるが、producer の書き込み停止そのものを消してはいない。直接経路の特定は子 issue **[AU-40]** に移す。
 - 再現手順 (`tools/audio/asio/` で実行): `bash build.sh` → `node harness/run_com.mjs --quick --only com_ramp_b256_d2 --out work/meas/x.json` (負荷下は事前に `yes > /dev/null` を 4 本起動し、終了後に `kill <PID>`)。`work/meas/` は gitignore 対象で、集計は JSON の `results[0].result` を読んだ。
 
+- 全 e2e (HEAD `3800bf501`・コード差分 0): `bash tools/audio/asio/e2e.sh` (soak 120 s 込み) → **rc 0・node check 126/126・4/4 PASS・203.7 秒** (開始 load 0.02)。`com_ramp_b256_d2` は underrun 0・silence 0・ramp 0/241024。この 1 回の PASS は頻度の根拠にしない (§7 の表が根拠)。
 - 検証 (規則 6): 測定 commit `c0fb6e074` から HEAD までのコード差分 `git diff c0fb6e074 HEAD -- tools/audio ':!*.md'` の出力は空 (本 PR は md のみ)。
