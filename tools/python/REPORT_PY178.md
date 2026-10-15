@@ -4,7 +4,7 @@
 
 ## 結論 (先出し)
 
-- **(1) 同期比較の基準値 `*(0x15e4f18)` の指す dword: 格納位置と初期化 store は確定。** スロット `0x15e4f18` (`.data`) の生値は `0x15e6080` (`.data` に DIR64 再配置あり) で、指す先は `.bss` の VA `0x15e6080` (RVA `0x11e6080`)。この dword への store は PE 全体で **1 件**: `0x41cee9 mov dword ptr [rip+0x11c9191], eax`。直前の `0x41cee4 call 0x406f90` は `jmp [IAT]` で、IAT は `GetCurrentThreadId` (`0x19714f0`)。よって dword の値は **初期化を実行したスレッドの ID**。store は `0x41ce10` (once ガード付きの初期化関数) の中。**未確定**: `0x41ce10` の呼出し元が PE 上に無く (E8 直接 call 0 件・RIP 相対参照 0 件・絶対ポインタ 0 件)、どのスレッドが実行するかは静的に決まらない。
+- **(1) 同期比較の基準値 `*(0x15e4f18)` の指す dword: 格納位置と初期化 store は確定。** スロット `0x15e4f18` (`.data`) の生値は `0x15e6080` (`.data` に DIR64 再配置あり) で、指す先は `.bss` の VA `0x15e6080` (RVA `0x11e6080`)。この dword への store は PE 全体で **1 件**: `0x41cee9 mov dword ptr [rip+0x11c9191], eax`。直前の `0x41cee4 call 0x406f90` は `jmp [IAT]` で、IAT は `GetCurrentThreadId` (`0x19714f0`)。よって dword の値は **初期化を実行したスレッドの ID**。store は `0x41ce10` (初期化ガード付きの関数。ガードの型は未確定) の中。**未確定**: `0x41ce10` の呼出し元が PE 上に無く (E8 直接 call 0 件・RIP 相対参照 0 件・絶対ポインタ 0 件)、どのスレッドが実行するかは静的に決まらない。
 - **(2) `X` (`0x525940()` の戻り値) の `[X+8]`: CreateThread の `lpThreadId` (作られた worker スレッドの ID) で、呼出し元スレッドの ID ではない。** `[X+8]` は `0x5254eb`/`0x5254b8` の `lea rax,[rax+8]` で取った `&X+8` を 6 番目の引数として `0x412b50` (CreateThread wrapper) に渡して書かれる。`0x412bc6 call 0x406f80` は `jmp [IAT]` = `CreateThread`。スレッド関数は `0x5251b0` で、引数は X。worker は起動時に自スレッドの TLS `+0x238` に X を入れる (`0x5251ca`)。
 - **(3) setChannelPitch 呼出しでの同期入力: 静的に決まるのは「比較式」だけで、入力値は呼出しスレッドの TLS で決まる。** `0xd843d0` → `0x526190` (item = {owner=this, fn=`0xd84290`, ctx=task}) → `0x525ec0(sched, &item, r8=0, r9=0)`。`r8=r9=0` なので `(r8b & r9b)==0` は常に成立し、同期条件は `[X_T+8] == dword(0x15e6080)` の 1 つだけ。`X_T = *(TLS_T+0x238)` は呼出しスレッド T の X で、T 自身の ID ではなく **T に紐づく worker の ID** との比較になる。T が X の worker 自身なら一致しうる。どのスレッドが呼出すかは実行時の値で、PE からは決まらない。
 
@@ -16,7 +16,7 @@
 
 ## 測定
 
-- 測定 commit: `cf29660` (`origin/main` 起点の worktree `ws-3268` の HEAD)。既存の解析ツール 4 件 (`pe_disasm.py`・`pe_xref.py`・`pe_callgraph.py`・`pe_scan_store.py`) は `git diff cf29660 HEAD` の出力 0 行 (変更なし)。`tools/python/analysis` の差分は新規追加の `pe_owner_thread_probe.py` (追加のみ) だけ。
+- 測定 commit: `9af21e811` (再現スクリプト `pe_owner_thread_probe.py` を追加した、コードを変えた最後の commit)。既存の解析ツール 4 件 (`pe_disasm.py`・`pe_xref.py`・`pe_callgraph.py`・`pe_scan_store.py`) と probe は、`git diff 9af21e811 HEAD -- tools/python/analysis` の出力 0 行 (後続 commit は文書のみ)。
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB) の `extracted/block00031_PE.bin` を repo 外 `${RUNNER_TEMP}/fl-win64` に展開 (2.8 秒・終了 0)。依存 `pefile 2024.8.26`・`capstone 5.0.7` は実在を確認。
 - 所要: 開始 00:35:09 UTC → 解析完了 00:48:39 UTC (約 14 分。草稿 commit 00:47:53)。load average (1 分値): 開始 0.34 (00:35:09)、終了 0.18 (00:48:39)。probe の実行は 00:44:21〜00:45:26 (load 0.41→0.80)。
 - 使用ツール: `pe_disasm.py` (逆アセ)・`pe_xref.py` (RIP 参照の全走査 3 回、各 62 秒)・`pe_callgraph.py callers` (直接 E8 の呼出し元)。すべて終了 0。
@@ -55,7 +55,7 @@
 - スロットの RIP 参照は 23 件すべて load (`pe_xref.py`)、store 0。スロットは静的初期値のまま。
 - dword `0x15e6080` の RIP 参照 (`pe_xref.py 0x15e6080`): **store 1 件**、load 0 件。`0x41cee9 mov dword ptr [rip+0x11c9191], eax`。
 - `0x41cee4 call 0x406f90` → `0x406f90` は `jmp [0x19714f0]` = `GetCurrentThreadId` (IAT 照合済み)。値は 0x41ce10 を実行するスレッドの ID。
-- `0x41ce10` は once ガード (`sub dword [rip+0x11c9c18],1`・`cmp dword [rip+0x11c9c11],-1`) を持つ初期化関数。直接 E8 の呼出し元 0 件、RIP 相対の参照 0 件 (`pe_xref.py 0x41ce10`)、`.data`/`.rdata`/`.idata`/`.didata` の絶対ポインタ 0 件。よって呼出し元は間接経路 (E9 jmp・関数ポインタの動的格納) と推定。**未確定**。
+- `0x41ce10` は初期化ガード (`sub dword [rip+0x11c9c18],1`・`cmp dword [rip+0x11c9c11],-1`。once 型か再入防止かは未確定) を持つ関数。直接 E8 の呼出し元 0 件、RIP 相対の参照 0 件 (`pe_xref.py 0x41ce10`)、`.data`/`.rdata`/`.idata`/`.didata` の絶対ポインタ 0 件。よって呼出し元は間接経路 (E9 jmp・関数ポインタの動的格納) と推定。**未確定**。
 
 ## 4. 同期が成立する条件 (受入 3 の詳細)
 
