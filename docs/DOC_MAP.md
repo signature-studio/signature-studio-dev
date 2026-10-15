@@ -170,7 +170,8 @@
 | `tools/liftdiff/REPORT_LD39.md` | ~75 | liftdiff LD-39 (#1194) 節 (途中報告): i128 / %tagPOINT の 11 関数の振り分けと機械語入口の実測。i128 の渡し方は 2 候補とも未決。case 生成・runner は未実装 |
 | `tools/liftdiff/REPORT_APPENDIX_LD53.md` | ~120 | liftdiff LD-53 (#1546) 節: i128 引数の呼出し側全件 (命令境界の線形走査) と呼び先の判定。(a)/(b) は 691dd0 を含め棄却 (§7)。IR 型誤りの修正は #1479 (§7.4) |
 | `tools/liftdiff/REPORT_APPENDIX_LD211.md` | ~60 | liftdiff LD-211 (#4378) 節: ret=i128 の判定不能 11 関数のうち 6 件を this 疑似オブジェクト (blob=vmt) で native 実行可能にした実測 (戻りレジスタは未確定)。残 5 件は LD-213 (#4423) |
-| `tools/liftdiff/REPORT_APPENDIX_LD203.md` | ~40 | liftdiff LD-203 (#4200): 653c80 の間接 call slot (RVA 0x11f3480) を仮 proc で埋め判定に入れる (`ldlib/cases.py` PATCH_BY_VA)。691dd0 は有効オブジェクトでも小サイズ確保のビンで segv (未達・子 issue) |
+| `tools/liftdiff/REPORT_APPENDIX_LD203.md` | ~40 | liftdiff LD-203 (#4200): 653c80 の間接 call slot (RVA 0x11f3480) を仮 proc で埋め判定に入れる (`ldlib/cases.py` PATCH_BY_VA)。691dd0 は有効オブジェクトでも小サイズ確保のビンで segv (未達・子 issue) → LD-207 で vtable 付き rcx・flag=0 の投入で判定に入る |
+| `tools/liftdiff/REPORT_APPENDIX_LD207.md` | ~60 | liftdiff LD-207 (#4264): 691dd0 を VMT 付き rcx・r8=0 (`OBJ_PATTERNS` の vmo) で投入し判定に入れた (`diff`)。sample:800 の集合には入らない (単発 run の実測) |
 | `tools/liftdiff/REPORT_APPENDIX_LD179.md` | ~60 | liftdiff LD-179 (#3862): `m11_tr_` の `%tagPOINT` 引数を a0 から組む (`m11_post.py`)。4256c0 は実行に入り、判定は `wasm_trap` (user32 `WindowFromPoint` 未実装、子 #4184 [LD-200])。11 関数 batch・sample:800 の実測 |
 | `tools/liftdiff/REPORT_APPENDIX_LD52.md` | ~70 | liftdiff LD-52 (#1528) 節: i128 引数・%tagPOINT の機械語入口型 (`cases.MACHINE_ENTRY`・wsig) による case 投入の方式と、対象 11 関数の実行可能件数の実測 (§2)。未解決の起票先は #3862〜#3864 (§4) |
 | `tools/liftdiff/tests/ld157_batch_diff.py` | ~80 | LD-157 (#3423) の突合: 同じ batch の 2 回の jsonl を関数単位で比べ、判定の変化・case の変化を、同じ chunk・shard で先行した関数の差分 (chain) と自分の case の wasm 打切り (own) に分ける |
