@@ -5,7 +5,7 @@
 
 ## 0. 結論 (先出し)
 
-- **Ladder の process は `LadderDsp` の vtable slot 14 = `0x1804d9930` (620 B)**。slot 14 が process であることは、既存 13 本 (`snapins.json` の `proc`、Gain〜Limiter) すべてで同じ index と一致することを確認して決めた。
+- **Ladder の process は `LadderDsp` の vtable slot 14 = `0x1804d9930` (624 B)**。slot 14 が process であることは、既存 13 本 (`snapins.json` の `proc`、Gain〜Limiter) すべてで同じ index と一致することを確認して決めた。
 - process は `this` の vtable を**間接 call** で呼ぶ: `call [rax+0xa0]` (slot 20 = `0x1804d9ba0`) と `call [rax+0x78]` (slot 15 = `0x1804d9820`)。`LadderDsp` が独自に override する slot は `0, 7, 14, 15, 20` の 5 本 (slot 20 は base `SnapinDsp<LadderDspModel>` に無い独自 slot)。
 - flelift `x64c` で **5 root** の閉包 = **98 関数 / 7,766 命令** (`--closure 1000`)。unsup は測定 commit `9f02a5b69` では **4 種 38 site** (`rcpps` 34・`addsubpd` 2・`vpmovsxdq` 1・`vshufps` 1)、`f9da4f150` では **0** (§3c)。IAT import 17 種。trap 0。
 - **ネガコン**: root を process 1 本にすると閉包は **2 関数 / 178 命令** で unsup 0。間接 call の先 (slot 15・20) を根に入れないと Ladder の DSP 本体は閉包に入らない。
@@ -59,9 +59,10 @@
 
 ## 3d. self / ctx のレイアウト (機械語からの集計・#5326 / KH-150)
 
-- 測定 commit: `858dc0e1c` (script の変更は本 commit の後の修正 commit で入れる。`git diff 858dc0e1c HEAD -- tools/targets/kilohearts/scripts` で差分を確認する)。
+- 測定 commit: `858dc0e1c` (§3d の表を書いた commit。script の process 末端は `0x1804d9b9c`)。修正 commit `67b2a3a8c` で末端を `0x1804d9ba0` に直した。`git diff 858dc0e1c 67b2a3a8c -- tools/targets/kilohearts/scripts` の差分は range end の 1 行のみ。
+- 再測定 commit: `67b2a3a8c` (census を実行した commit。以降の修正 commit は REPORT のみで script は変えない)。`git diff 67b2a3a8c HEAD -- tools/targets/kilohearts/scripts` は空。
 - 再現: `python3 scripts/ladder_layout_census.py <HeartCore.core_64> [out.json]` (入力は §2 と同一の HeartCore。sha256 先頭 16 hex `d55ce8b4c0ad7ebe`)。逆アセンブラは capstone 5.0.7。
-- 素材: 本 run では `HeartCore.core_64` が無く (`fl-win64` 素材に含まれない)、census を再実行していない。§3d の表はこの再実行で確認するまで未検証。
+- 素材: 再測定 commit で `plugins-kilohearts` (`oc_artifacts`) を展開し、`HeartCore.core_64` 76,642,304 B・sha256 先頭 16 hex `d55ce8b4c0ad7ebe` (§2 と同一) を確認してから実行した。標準出力は §3d-4。§3d の表はこの出力と照合済み。
 - 範囲: process `[0x1804d9930, 0x1804d9ba0)` (624 B)・slot 15 `[0x1804d9820, 0x1804d98b0)` (144 B)・slot 20 `[0x1804d9ba0, 0x1804db990)` (7,664 B。x64c の関数境界 = 次の関数 `0x1804db990` まで)。
 - 方法: メモリオペランドを直線走査し、`rcx` (this)・`rdx` (ctx) 由来のレジスタを追う。分岐は無視する簡易集計。**`[rdx+0x3188]` は ctx の model 参照として扱う**。
 - 型は命令の幅からの推定 (`movss`=f32・`movd`/`mov dword`=i32・`movzx byte`/`mov byte`=u8・`movaps`/`movups`=v128)。**enum 名・フラグ意味は未確定**。
@@ -104,9 +105,9 @@
 
 ### 3d-4. 集計の生データ
 
-- 出力 (全行): `scripts/ladder_layout_census.py` の標準出力。3d-1〜3d-3 は、その出力のうち上表に写した行だけ。
-- register の対応: script の seed は `rcx`=self・`rdx`=ctx だけ。§3d-2 の `rsi`=this・§3d-3 の `rbx`=this・`r15`=ctx は script の seed に無く、prologue の `mov reg, rcx/rdx` 複写を script が追跡しているかは未確認 (census 未実行)。この対応を確かめるまで、§3d-2・§3d-3 の register は手で読んだ値として扱う。
-- 標準出力の grep 結果 (role 別の行数・先頭オフセット) は、census 再実行の後に貼る。
+- 出力: 再測定 commit `67b2a3a8c` で `scripts/ladder_layout_census.py` を実行 (exit 0・所要 0.1 s)。全 71 行 (process slot14 6 行・slot15 14 行・slot20 51 行)。3d-1〜3d-3 の表は、この出力のうち上表に写した行だけ。
+- role 別の行数・先頭オフセット: process slot14 = self 4 行 (先頭 `+0x0`)・ctx.model 2 行 (先頭 `+0x10`)。slot15 = self 14 行 (先頭 `+0x4c4`)。slot20 = self 47 行 (先頭 `+0x60`)・ctx.model 4 行 (先頭 `+0x0`)。
+- register の対応: script は `rcx`=self・`rdx`=ctx だけを seed する。script は `mov reg,reg` の複写を追跡する。slot 15 の `rsi`=this は `1804d9825 mov rsi,rcx`、slot 20 の `rbx`=this・`r15`=ctx は `1804d9c14 mov rbx,rcx`・`1804d9c11 mov r15,rdx` で、census 出力で確認済み。process の `rdi`=this は `1804d9940 mov rdi,rcx`、ctx.model は `1804d9943 mov rax,[rdx+0x3188]` 由来。
 - `self`・`ctx.model` の列は、関数の入口の `rcx`/`rdx` 由来で追った結果。分岐は見ない。
 
 ## 4. 未実施・未達 (受入条件との対応)
