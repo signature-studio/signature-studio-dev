@@ -123,6 +123,8 @@ CNT31(cnt_d8c4f0, sv_d8c4f0, p_d8c4f0, n_d8c4f0)
 CNT31(cnt_d8ae60, sv_d8ae60, p_d8ae60, n_d8ae60)
 CNT31(cnt_e15030, sv_e15030, p_e15030, n_e15030)
 CNT31(cnt_e12f20, sv_e12f20, p_e12f20, n_e12f20)
+CNT31(cnt_d8d700, sv_d8d700, p_d8d700, n_d8d700)
+CNT31(cnt_d8c140, sv_d8c140, p_d8c140, n_d8c140)
 typedef void (__attribute__((ms_abi)) *set9_t)(void*, int, float, void*);
 static unsigned char g_sv_set[12]; static unsigned char* g_p_set;
 static void __attribute__((ms_abi)) set9_probe(void* C, int id, float v, void* key) {
@@ -252,6 +254,8 @@ int main(int argc, char** argv) {
         p_d8ae60 = im + (0x180d8ae60ULL - 0x180000000ULL); patch12(p_d8ae60, (const void*)&cnt_d8ae60, sv_d8ae60);
         p_e15030 = im + (0x180e15030ULL - 0x180000000ULL); patch12(p_e15030, (const void*)&cnt_e15030, sv_e15030);
         p_e12f20 = im + (0x180e12f20ULL - 0x180000000ULL); patch12(p_e12f20, (const void*)&cnt_e12f20, sv_e12f20);
+        p_d8d700 = im + (0x180d8d700ULL - 0x180000000ULL); patch12(p_d8d700, (const void*)&cnt_d8d700, sv_d8d700);
+        p_d8c140 = im + (0x180d8c140ULL - 0x180000000ULL); patch12(p_d8c140, (const void*)&cnt_d8c140, sv_d8c140);
     }
     volatile int* fma = (int*)0x1813070f8ULL;
     int fma_v = argc > 3 ? atoi(argv[3]) : 0;
@@ -265,6 +269,18 @@ int main(int argc, char** argv) {
         unsigned char *F, *M, *Ck[8], *Wk[8], *Pk[8], *Qk[8], *blk[8], *Rgk[8], *Rbk[8];
         build_tree(im, &F, &M, Ck, Wk, Pk, Qk, blk, Rgk, Rbk, vcap);
         unsigned char* ctx = gr_alloc(0x100);
+        /* FA-42 (#3718): FA_UI31=1 は UI 入口 popup slot 5 (0x180d8c0b0) を harness から 1 回呼ぶ (診断・既定 OFF)。
+         * popup 入力: [P+0xb48]=1, [P+0xbb8]=非 NULL。rdx は 0x180d215e0 のゲート対象 (先頭 byte が非0 なら通過) として G を渡す。 */
+        if (getenv("FA_UI31")) {
+            unsigned char* P = gr_alloc(0x1000); unsigned char* PB = gr_alloc(0x100); unsigned char* G = gr_alloc(0x40);
+            P[0xb48] = 1; W64(P, 0xbb8, PB); W64(P, 0xbc0, PB); G[0] = 1;
+            fprintf(stderr, "UI31 S%d call slot5 P=%p G=%p\n", sidx, (void*)P, (void*)G);
+            g_in_guard = 1; int us = sigsetjmp(g_jb, 1);
+            if (us == 0) ((void* (__attribute__((ms_abi)) *)(void*, void*, void*, void*))0x180d8c0b0ULL)(P, G, NULL, NULL);
+            g_in_guard = 0;
+            fprintf(stderr, "UI31 S%d %s rip=%llx addr=%llx\n", sidx, us ? "FAULT" : "returned",
+                    (unsigned long long)g_fault_rip, (unsigned long long)g_fault_addr);
+        }
         for (int i = 0; i < 8; i++) g_trCk[i] = Ck[i];
         if (getenv("FA_OUT0")) for (int i = 0; i < 8; i++) fprintf(stderr, "CK%d=%p\n", i, (void*)Ck[i]);
         g_trSidx = sidx;
@@ -352,7 +368,7 @@ int main(int argc, char** argv) {
         fflush(stdout);
     }
     if (abi_viol || guard_viol_total) fprintf(stderr, "ABI violations=%d guard violations=%d\n", abi_viol, guard_viol_total);
-    if (getenv("FA_CTL31")) fprintf(stderr, "CTL31 summary: caa820=%d ca7db0=%d e13590=%d d8c4f0=%d d8ae60=%d e15030=%d e12f20=%d\n",
-                                    g_caa_n, g_lb_n, g_e13_n, n_d8c4f0, n_d8ae60, n_e15030, n_e12f20);
+    if (getenv("FA_CTL31")) fprintf(stderr, "CTL31 summary: caa820=%d ca7db0=%d e13590=%d d8c4f0=%d d8ae60=%d e15030=%d e12f20=%d d8d700=%d d8c140=%d\n",
+                                    g_caa_n, g_lb_n, g_e13_n, n_d8c4f0, n_d8ae60, n_e15030, n_e12f20, n_d8d700, n_d8c140);
     return (abi_viol || guard_viol_total) ? 3 : 0;
 }

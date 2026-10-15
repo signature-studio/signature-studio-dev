@@ -111,3 +111,19 @@ REPORT §11 の付録。指定の見出しは `## 10.` だが、既存の PERF-P
 - **出力 9 件**: `work/lift/` の `fle_lifted.c`・`fle_data.c`・`lift_meta.json`・`flel.wasm`・`flel.cjs`、`work/verdict.jsonl`・`work/verdict_summary.json`、追跡の `results/verdict_flelift.jsonl`・`results/verdict_summary.json`。
 - **負の確認**: `EMSDK_ENV=<存在しない path>` で `fle_lift.sh`・`fle_e2e.sh` とも rc=2 とメッセージを出す。`fle_e2e.sh` が `EMSDK_ENV` で指定された `emsdk_env.sh` を source した後も、`EMSDK_ENV` の値が子の `fle_lift.sh` へ届くことを `bash -c` で確認 (`emsdk_env.sh` が `EMSDK_ENV` を書き換えないため、値は指定どおり)。
 - **範囲外**: `fle_lto.sh` は `[EMSDK]` を直接 source したまま (e2e・lift の経路外で、本 issue の受入の対象外)。
+
+## 13. REPORT §6 未解決・限界 (分割移動)
+
+
+1. **[解消済 CAB-232] 0x6a7990 (MMX RGB 乗算) の dst 1-3 block が byte 単位で不一致** (16 case 中 2 case) — 原因は lift ではなく wasm 側 harness の scratch 初期化 no-op。以下は初版時の記述:r戻り値・xmm0・他の
+   メモリは一致。packuswb/pmulhuw の primitive 単位は実機 probe で式を確認済みゆえ、ループ内の状態伝搬
+   (eax leftover の `shl eax,16` 経由引継ぎ等) の差と推定。再現: `python3 fle_diff.py` (harness 完備)。
+   → CAB-232/233 の liftdiff 本格採点で原因特定を推奨。
+2. **D12 (Delphi landing pad, 879 site)** は未対応 — CAB-227 の範囲。SEH/例外経路に入る関数は fail-fast。
+3. x87 は制御命令のみのモデル (x87_cw/x87_sw)。FLEngine lift 集合に x87 演算は出現しないことを確認済みだが、
+   集合外関数には x87 演算が残る。ldmxcsr/stmxcsr は値の退避のみ (FTZ/DAZ 等の演算反映は未実装)。
+4. cpuid/rdtsc/xgetbv は固定値モデル (CPUID leaf1 = 0x178bfbff/1, XCR0 = 7)。CPU 特性分岐は SSE2 側に寄る。
+5. .text は原則 data 敷設せず jump table 窓 (1) + rip-rel textref 窓 (3,225) のみ。.text をデータとして
+   読む経路が他にあれば fail-fast で顕在化する。
+6. FastMM boot (`_InitLib` 8 引数含む unit init 連鎖) は未実施 — M11 (CAB-5) の領域。本 ticket は lift 基盤。
+7. native spot diff は single-thread 前提 (lock 系非 atomic)。

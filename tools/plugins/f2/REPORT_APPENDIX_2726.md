@@ -83,7 +83,7 @@ V1 の lift で ldfix が適用された件数 (`*.ldfix.json`) は記録して�
 | 呼出し元の xmm 値 (closure 内の call site で 0 を渡す) | closure 内の呼出しで float 値が失われる | #2762 (open。M11 の同種課題 `call_arity_mismatch` の xmm 呼出し側引数。2026-10-14 に f2 の事例を追記)。PR #2907 (`Closes #2762`、ready、base main) が `fix_xmm_args.py` を変更する。#2907 の merge で #2762 が閉じたら、起票先を付け替える |
 | XMMARG 単独 arm の一次採点と V1 の ldfix 適用件数 (B1 の数値の帰属) | 受入 5 の数値の帰属 | 未起票 (再測定のみ。PR 本文の未解決表に記載) |
 | 同一 commit (26f90ada) での LDFIX 単独の対照 (`PLUG_XMMARG=1` のまま `PLUG_LDFIX=0/1` の A/B)。#613 の A/B (commit 1af46f06、17/6/0) が現行で再現しない原因の切り分け (1af46f06→26f90ada の間に ldfix.py 8 件・lift_ranges.sh 7 件・fix_xmm_args.py 1 件の変更あり) | 受入 3 (LDFIX の効果) の根拠が無い。現行では LDFIX 単独の効果を判定していない | 未起票 (再測定のみ。PR 本文の未解決表に記載) |
-| `liftdiff/ldlib/pe.py` `Analyzer.analyze` の到達判定: 処理済みの節点へ後続の枝の定義の交わりを伝播しない (`seen` L106-111・伝播 L210-217)。合流点の xmm 読みを取り逃がす (再現 2 件は子 issue に記載) | block18982 の全 pdata で修正前後の slot 差 0 件 (§8-3 の測定と同じ入力)。`arity_x` の利用先 (`classify.py`・`leaf_report.py`) に影響し得る | #3708 [PLG-F2-10] |
+| (解消) `liftdiff/ldlib/pe.py` `Analyzer.analyze` の到達判定: 処理済みの節点へ後続の枝の定義の交わりを伝播しない | 解消 (#3708。§9 に測定。block18982 の全 pdata で修正前後の slot 差 0 件、23 関数の判定は不変) | #3708 [PLG-F2-10] (本 PR で閉じる) |
 
 ## 6. 再現
 
@@ -184,3 +184,19 @@ fixed + skipped は 71 → 62 (9 件減)。減った 9 件は次の 8-2 の「�
 - `nc_leaf.py` (受入 4): 実行済み (上の「測定」項目を参照)。未検出 0。
 - XMMARG 単独 arm (`PLUG_XMMARG=1 PLUG_LDFIX=0`) と LDFIX 単独の A/B: 未測定 (§5 の未解決。再測定のみのため子 issue は起票しない)。
 - `REPORT_APPENDIX_2726.md` §8 の状態変化 (8-2) の原因は、`recovered` の変化 (0x6c86b0) と 0x6c54c0 の `no_placeholder` を除いて、機械的に確認したもの (slot 集合の差から導いた)。placeholder 接続の内部までは追っていない。
+
+## 9. #3708 (PLG-F2-10): pe.py の合流点の定義伝播
+
+- 原因: `liftdiff/ldlib/pe.py` `Analyzer.analyze` は節点を 1 回だけ処理していた (`seen`)。後から来る枝で定義の交わりが縮んでも処理済みの後続節点へ伝播せず、合流点の xmm 読みを取り逃がしていた。
+- 修正: 定義の交わりが縮んだ節点だけ再処理する (`done` で最後に処理した定義集合と比較)。特徴カウンタは初回だけ数える。`defined_in` は交わりでしか縮まないため停止する。
+- 再現 (修正前 `origin/main`): zero_idiom=True・既定とも `xmm_slots=[]` (期待 `[1]`)。修正後は両方 `[1]`。
+- 合成テスト: `tools/liftdiff/tests/test_pe_zero_idiom.py` に 2 件追加 → `OK: 5 cases`。旧 `pe.py` では新規ケースが `AssertionError` で落ちることを確認 (`zero_idiom` 側の assert が `je 合流 (zero: xorps は片枝のみ)` で発火)。
+- 測定 commit: **`b3d83511f`** (コードを変えた最後の commit)。`git diff b3d83511f HEAD -- tools/liftdiff tools/plugins/lift tools/plugins/p0c tools/plugins/f2 ':!*.md'` の出力は 0 行 (以後は REPORT のみ)。
+- block18982 の全 pdata (11,671 件、修正前 `origin/main` の `pe.py` と修正後を同一入力で比較、48.4 秒)。raw (既定) と zi (zero_idiom=True) の両方で、slot 集合・`arity_x`・`arity_gpr`・`ins`/`icall`/`ijmp`/`fpcmp`/`simdint`/`repstr`/`calls`/`stack_args`・`truncated` の差 **0 件**。`truncated` は両版とも 3 件 (§8-3 と同じ)。
+  - 注: §8-3 の「23 → 6」は修正前 `pe.py` (現行 main の raw) と `k80abi` の比較で、本測定 (修正前後の pe.py の差) とは別の数値。
+- `arity_x` の利用先 (`liftdiff/ldlib/classify.py` L79、`f2/leaf_report.py` L69) は、上の全 pdata で `arity_x` が変わらないため出力差分 0。
+- 回帰 (測定 commit `b3d83511f`、同 HEAD):
+  - `f2_step1.sh` rc 0 (9 分 29 秒、05:51:27〜06:00:55 UTC)。
+  - `leaf_diff.sh` rc 0 (`LEAF_DIFF elapsed 144 s`、06:00:57〜06:03:22 UTC)。最終判定 23 関数: **一致 15 / 不一致 8 / 実行不能 0** (受入 3 の期待値どおり)。
+  - `nc_leaf.py` rc 0 (06:03:39〜06:06:40 UTC、181 秒)。store_drop 4/4、load_drop 11/11、offset_shift 11/11 検出、**未検出 0**、unexec 0。
+- 未解決: 無し (本 issue の範囲内)。`fix_xmm_args.py` の挙動は本 issue の範囲外 (変更なし)。

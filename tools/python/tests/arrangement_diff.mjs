@@ -66,6 +66,12 @@ const seq = [
   [["arrangement.selectionSet", [-1, 4, true, false, 0]], -1, 4],
   [["arrangement.selectionSet", [5, -1]], -1, 5],
   [["arrangement.selectionClear", []], -1, -1],
+  // PY-254 (#3796): liveSelection の規則。b==0 は anchor=a、b==1 は anchor (≥0・a と異なる) から a までを選択し anchor=-1
+  [["arrangement.liveSelection", [5, 0]], -1, -1],
+  [["arrangement.liveSelection", [9, 1]], 5, 9],
+  [["arrangement.liveSelection", [2, 1]], -1, -1],
+  [["arrangement.liveSelection", [3, 0]], -1, -1],
+  [["arrangement.liveSelection", [1, 1]], 1, 3],
 ];
 const stateDiffs = [];
 for (const [[name, args], start, end] of seq) {
