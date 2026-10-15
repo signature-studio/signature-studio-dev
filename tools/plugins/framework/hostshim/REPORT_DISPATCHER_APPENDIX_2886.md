@@ -93,7 +93,7 @@ emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90
 - 変更 (commit `2dca40dd`): 格納元が `0x41d110` 戻り値 + `0x2a8` の 3 ID (0x07・0x1c・0x4e) を `g_hs_obj` (非 NULL) 応答に追加 (`case` 3 行)。他の応答は不変。
 - 格納元の種別と現応答表の対応 (2dca40dd 時点):
   - 非 NULL (obj): 0x07・0x0e・0x1c・0x1d・0x3d・0x4e (TLS+0x2a8)・0x2e・0x47・0x56 (ポインタ・deref 系の既定)。
-  - 0 固定: 0x01・0x13・0x18・0x26・0x41・0x45・0x46・0x54・0x64・0x65 (整数・bool・グローバル値。実値は未確定 = [PLG-P0b-28] の範囲)。
+  - 0 固定: 0x01・0x13・0x18・0x26・0x41・0x45・0x46・0x54・0x64・0x65 (整数・bool・グローバル値。実値は未確定 = [PLG-P0b-36]・[PLG-P0b-37] の範囲 (#3652・#3653))。
   - 注意: 非 NULL 応答は `0x41d110` の戻り値 (TLS 要素) ではなく obj を返す。非 NULL 性のみ一致させた。
 - Phase A (`hs_e2e.sh` の framework smoke): `[fw] Phase A (framework smoke): Halt0/RestoreContext dispatch=38 ff=0` → **PASS** (測定 commit `7ec1bdb8`・§6)。
   `hs_e2e.sh` の Phase A は `$WFW/fw_route.cjs` を使う。その `fw_route.cjs` は `fw_stage2.sh` の 17 番 (emcc・205 行) が `hostshim/hostshim.c` をリンクして作るため、**hostshim.c の変更は Phase A の入力に入る**。応答表の変更 (0x07・0x1c・0x4e) を含む測定 commit `7ec1bdb8` の `hostshim.c` で `fw_route.cjs` を作り直し、Phase A PASS を確認した。
@@ -106,7 +106,8 @@ emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90
 |---|---|---|
 | 仮想呼出し出口のうち A 群 (3 ID)・C 群 (11 ID) の応答値、B 群の状態格納 (0〜4) の実行時条件 | 受入 2 | [PLG-P0b-27] (#2944) |
 | 未実行格納のうち受け手の実値に依存する 11 件 (§3.4) | 受入 2 | [PLG-P0b-27] (#2944) |
-| 整数・bool 格納元の実値 (0x01・0x13・0x18・0x26・0x41・0x45・0x46・0x54・0x64・0x65 と call 先 `0x11ffde0`・`0x9636a0`・`0xe4e970`・`0xed6780`・`0x11d06e0`、`0x86c900`・`0x75b3d0` の戻り値の意味論) | 受入 1 の値・受入 3 の表 | [PLG-P0b-28] (#2945) |
+| 整数・bool 格納元の実値 (0x01・0x13・0x26・0x41・0x46 と call 先 `0x11ffde0`・`0x9636a0`→`0x9635d0`・`0xe4e970`・`0xed6780`・`0x11d06e0` の戻り値の実値。供給元は §7 で分類済み) | 受入 1 の値・応答表 | [PLG-P0b-36] (#3652) |
+| グローバル・フィールドの実値 (0x18・0x45・0x54・0x56・0x64・0x65) と `hostshim.c` 応答表の更新・Phase A 回帰 | 応答表 | [PLG-P0b-37] (#3653) |
 | 0x40fe90 以外の 81 callee の個別の影響 (未測定。全 82 VA = 1 の集合の結果は main 付録 B-2)。202 件の応答 0 と未収載 ID の応答 0 は callee 戻り値 0 の仮定の上 | 受入 2 の 202 件・未収載 ID の応答 0 | 親 #2886 (PM 判断。再測定だけのため子は起票しない) |
 | 分岐条件が未解析の未実行格納 24 件と、基準で実行され変更で失う格納 3 件 (§3.4) | 受入 1・3 | 親 #2886 (PM 判断。解析だけのため子は起票しない) |
 | Phase B の OOB | Phase B の PASS | #2911 (既存) |
@@ -128,3 +129,18 @@ emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90
 - wasm サイズ: 15,063,373 B。`fw_stage2.sh` の注記にある HEAD 実測 15,061,227 B と 2,146 B 異なる。既定はサイズを照合しない (`FW_SIZE` 未指定) ため FAIL にはならない。差の原因は未確認 (測定ツリーの絶対パスの影響の可能性)。
 - 全 256 ID・`0x40fe90`=1・`hs_store_cov.py` は本節では再実行していない。コードは `470a8f15`・`7ec1bdb8` で同一 (`git diff 470a8f15 7ec1bdb8 -- '*.py' '*.c' '*.sh'` は 0 行。`7ec1bdb8` から HEAD までも 0 行) のため、§1・§3.4 の測定値 (`470a8f15` で再測定した値) をそのまま引き継ぐ。
 - `hs_resp_src.py` は `hs_disp_emu.py` を import する。本節で測定した `7ec1bdb8` の `hs_disp_emu.py` は main 取り込み後のもの (e1515204)。
+
+## 7. 受入 2 (#2945): 0x2e・0x47 の call 先の戻り値の意味論
+
+- 測定 commit: `ee3776119` (`hs_callee_sem.py` を追加した commit。コードを変えた最後の commit)。`git diff ee3776119 HEAD -- '*.py' '*.c' '*.sh'` の出力は 0 行 (以降は本節の REPORT のみ)。
+- 検証: `FL_WIN64_DIR=<展開先> PYTHONPATH=<capstone 5.0.7・pefile の lib> python3 hs_callee_sem.py` を `ee3776119` の worktree で実行 → 12 件 OK・exit 0。素材は `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
+- `hostshim.c`・Phase A/B は未変更のため再実行していない (応答表を変えないため。表の更新は [PLG-P0b-37] #3653)。
+
+| 格納 VA | ID | call 先 | 機械語 (VA) | 戻り値の型 | 戻り値の供給元 | 判定 |
+|---|---|---|---|---|---|---|
+| `0x1321c10` | 0x47 | `0x75b3d0` | 0x1321bfd〜0x1321c07 で rcx = `[[[rip+0x2c2b8c]]]+0x30` (オブジェクト)。0x75b3d0 は `mov rax,[rcx+0x28]; ret` (0x75b3d0・0x75b3d4) | qword | 受け手オブジェクトの `+0x28` フィールド (副作用なし) | 意味論確定。値は受け手の状態依存で未確定 |
+| `0x1320de8` | 0x2e | `0x86c900` | 0x86c900: `[rbx+0x1d0]` が非 0 なら 0x86c929 で `call [rbx+0x1d0]` (rdx=&out)。out が 0 かつ `[rbx+0xa4]` が非 0 なら 0x86c947 で `0x617920([rbx+0xa4])` の戻り値を out に格納 (0x86c94c)。戻り値は out (0x86c950) | qword | コールバックが out に書いた値、または `0x617920` の戻り値 = `[[rbx+0xa4]+0x45c]` (0x617920 は 0x61792b で 0x6178e0 を呼んだ後、0x617930 で `mov rax,[rbx+0x45c]`) | 意味論確定 (ポインタ幅の値)。値は受け手の状態依存で未確定 |
+
+- 結論: 0x2e・0x47 の格納値はいずれも qword で、受け手オブジェクトの状態に依存する。現応答表の `g_hs_obj` (非 NULL) は値の近似であり、0 を返し得るかは未確定。応答表は変えない。
+- 0x2e の rcx (`[[rip+0x2c2318]]`) は §2 の記述 (0x1320dd9〜0x1320de0) を引き継いだ。本節では未検証 (`hs_callee_sem.py` は call 先と格納だけを検証する)。
+- 残りの受入 (格納元 5 callee の実値 → [PLG-P0b-36] #3652、グローバル・フィールドの実値と応答表の更新と Phase A 回帰 → [PLG-P0b-37] #3653) は本 PR の範囲外。
