@@ -34,7 +34,7 @@
 - 測定 commit から HEAD までの差分: `git diff ca1f38304 HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` は **4 行** (`ghidra_route/patches.py` +4。main 取り込みで入った #4835 の ABI 規則 `delay 2666 FUN_180fbbfb8 rcx=param_1 (FUN_180fbdfcc)`)。`name == 'delay'` の変換に効くため、この差分の分を下表の census は含む。
 - 測定 HEAD: `bb49a5ec0` (下表は HEAD で再測定した実測値)。基準: `origin/main` `7103cff33`。
 - 測定 commit `ca1f38304` を同じ道具で取り直すと census は 416 (下の参考行を参照)。
-- 素材: `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`、76,642,304 B。sha256 `d55ce8b4…`)。`toolchain-emsdk` (`/opt/emsdk`、emcc 6.0.12)。Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致・JDK 21)。
+- 素材: `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`、76,642,304 B。sha256 `d55ce8b4…`)。`toolchain-emsdk` (`[EMSDK]`、emcc 6.0.12)。Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致・JDK 21)。
 - decompile: `gtype_census.sh` の lift 集合で DecompEach (151 件 OK)。
 - 変換: `ghidra_to_c.py delay … --fix bitcast,intload,stackpair,assoc,concat`。emcc: `emcc -c -ferror-limit=0`。基準は `git archive origin/main` の `ghidra_route`・`snapins/lift`・`snapins/scripts/approx_tables.b64` の変換器 (同じ decompile 出力を入力)。
 
