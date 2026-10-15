@@ -79,6 +79,10 @@ const seq = [
   ["mixer.setCurrentTempo", [150000]],
   ["mixer.getCurrentTempo", [0]],
   ["mixer.getCurrentTempo", [1]],
+  // PE 確定 (REPORT_PY205): getTrackCount = trackCount − 2・getEqBandCount = 3
+  ["mixer.trackCount", []],
+  ["mixer.getTrackCount", []],
+  ["mixer.getEqBandCount", []],
   // 範囲外 index は両者とも code 4 (RANGE)
   ["mixer.getTrackName", [127]],
   ["mixer.getTrackColor", [127]],
