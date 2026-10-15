@@ -6,7 +6,10 @@ vtable head を rip 相対で指す箇所 (ctor 候補) を出す。
 限界: 間接 call の宛先は解決しない。C の外へ出る間接 call は「宛先未解決」として数える (非到達の証明にはならない)。
   --disp <hex>: [reg+disp] の間接 call のうち disp が一致する箇所を C 内で列挙し、受信レジスタの定義元を出す。
   --offset <hex>: そのオブジェクト offset を [reg+off] で読む/書く命令を全 .text から列挙する (demo bit 0x22792 の参照関数との対照つき)。
-usage: slot_reach.py <pe> <root_va_hex> [--target <va_hex>]... [--vtable-head <va_hex>]... [--offset <hex>]... [--disp <hex>]...
+  --drop-edge <from_hex>:<to_hex>: direct 辺 from→to を閉包の計算から外す (ネガティブコントロール用。辺を 1 本落として到達が消えることを見る)。
+完全性の出力: 閉包の BFS 深さ・pdata で覆われない .text のバイト数・関数開始点でない direct call/jmp の件数 (関数内 jmp / 他関数の途中 / pdata 外)。
+  閉包 C は、関数開始点への direct call/jmp だけで作る。開始点でない宛先は閉包に入れず、件数として出す (未解決)。
+usage: slot_reach.py <pe> <root_va_hex> [--target <va_hex>]... [--vtable-head <va_hex>]... [--offset <hex>]... [--disp <hex>]... [--drop-edge <from_hex>:<to_hex>]...
 """
 import bisect
 import re
@@ -24,6 +27,7 @@ targets = []
 heads = []
 offsets = []
 disps = []
+drop_edges = []
 i = 2
 while i < len(args):
     if args[i] == "--target":
@@ -34,6 +38,9 @@ while i < len(args):
         offsets.append(int(args[i + 1], 16))
     elif args[i] == "--disp":
         disps.append(int(args[i + 1], 16))
+    elif args[i] == "--drop-edge":
+        a, b = args[i + 1].split(":")
+        drop_edges.append((int(a, 16), int(b, 16)))
     else:
         raise SystemExit(f"unknown arg {args[i]}")
     i += 2
@@ -97,6 +104,7 @@ ind = defaultdict(list)  # f -> [(va, kind, reg, disp, op, src)]
 rip_refs = defaultdict(list)  # 参照先 VA -> [(命令 VA, 所属関数)]
 off_hits = defaultdict(list)  # offset -> [(va, 関数, W/R, 命令)]
 demo_fns = set()
+nonstart = {"local": [], "mid": [], "outside": []}  # 開始点でない direct call/jmp: (命令 VA, 所属関数, 宛先[, 種別])
 for lo, hi in funcs:
     ins_list = list(md.disasm(code[lo - t_base:hi - t_base], lo))
     for idx, ins in enumerate(ins_list):
@@ -116,9 +124,16 @@ for lo, hi in funcs:
                 tgt = int(ins.op_str, 16)
             except ValueError:
                 continue
-            if tgt in start_set and tgt != lo:
-                fwd[lo].add(tgt)
-                rev[tgt].add(lo)
+            if tgt in start_set:
+                if tgt != lo:
+                    fwd[lo].add(tgt)
+                    rev[tgt].add(lo)
+            elif lo <= tgt < hi:
+                nonstart["local"].append((ins.address, lo, tgt))
+            elif func_range(tgt) is not None:
+                nonstart["mid"].append((ins.address, lo, tgt))
+            else:
+                nonstart["outside"].append((ins.address, lo, tgt))
             continue
         if ins.mnemonic != "call":
             continue
@@ -168,8 +183,52 @@ def closure(seeds, edges):
     return seen
 
 
+for a, b in drop_edges:
+    print(f"drop-edge {a:#x} -> {b:#x}: existed={b in fwd.get(a, set())}")
+    fwd[a].discard(b)
+    rev[b].discard(a)
+
 C = closure([root], fwd)
 print(f"root {root:#x}: direct closure C = {len(C)} funcs (call / tail jmp to function starts)")
+
+dist = {root: 0}
+q = deque([root])
+while q:
+    f = q.popleft()
+    for g in fwd.get(f, ()):
+        if g not in dist:
+            dist[g] = dist[f] + 1
+            q.append(g)
+depth_hist = Counter(dist.values())
+dmax = max(dist.values())
+print(f"  BFS depth from root: max {dmax} (funcs at depth {dmax}: {depth_hist[dmax]}; reached {len(dist)} == C: {set(dist) == C})")
+print("  depth histogram: " + " ".join(f"{d}:{depth_hist[d]}" for d in sorted(depth_hist)))
+
+ivs = sorted((max(lo, t_base), min(hi, t_end)) for lo, hi in funcs if min(hi, t_end) > max(lo, t_base))
+covered = 0
+gaps = []
+cur = t_base
+for lo, hi in ivs:
+    if lo > cur:
+        gaps.append((cur, lo))
+    if hi > cur:
+        covered += hi - max(lo, cur)
+        cur = hi
+if cur < t_end:
+    gaps.append((cur, t_end))
+gap_bytes = t_end - t_base - covered
+print(f"pdata coverage: .text {t_end - t_base} B, covered {covered} B, uncovered {gap_bytes} B in {len(gaps)} gaps (largest {max((e - s for s, e in gaps), default=0)} B)")
+gap_starts = []
+for g0, g1 in gaps:
+    for ins in md.disasm(code[g0 - t_base:g1 - t_base], g0):
+        if ins.mnemonic in ("call", "jmp") and ins.op_str.startswith("0x"):
+            try:
+                tgt = int(ins.op_str, 16)
+            except ValueError:
+                continue
+            if tgt in start_set:
+                gap_starts.append((ins.address, tgt))
+print(f"  direct call/jmp inside uncovered bytes (linear scan, reference only) to function starts: {len(gap_starts)} (dest in C: {sum(1 for a, t in gap_starts if t in C)})")
 for t in targets:
     if t not in C:
         print(f"  target {t:#x}: not in C")
@@ -230,6 +289,16 @@ for va_f in sorted(C):
 total88 = sum(1 for f in funcs for va, kind, reg, disp, op, src in ind.get(f[0], ()) if kind == "mem" and disp == 0x88)
 in_c88 = sum(1 for f in C for va, kind, reg, disp, op, src in ind.get(f, ()) if kind == "mem" and disp == 0x88)
 print(f"call [reg+0x88] sites: whole .text {total88}, in C {in_c88}")
+
+print(f"direct call/jmp to a non-start address (not in C; not counted as edges): whole .text: "
+      f"inside own function {len(nonstart['local'])}, into another function's body {len(nonstart['mid'])}, "
+      f"outside any pdata function {len(nonstart['outside'])}")
+for kind in ("mid", "outside"):
+    hits = [(a, lo, tgt) for a, lo, tgt in nonstart[kind] if lo in C]
+    print(f"  {kind} from C: {len(hits)}")
+    for a, lo, tgt in hits[:20]:
+        print(f"    {a:#x} in {lo:#x} -> {tgt:#x}")
+print(f"  local (inside own function) from C: {sum(1 for a, lo, tgt in nonstart['local'] if lo in C)}")
 
 rd = sec(b".rdata")
 rraw = rd.get_data()
