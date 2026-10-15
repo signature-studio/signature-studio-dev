@@ -27,12 +27,12 @@
 
 - `0x180c97e17` (`call [rax+0x10]`): VA コメント直後が `store volatile ... @_asm_program_counter` → `br label %dec_label_pc_180c97e1a`。call 行なし。
 - `0x180c97e38` (`call [rax+0x20]`)・`0x180c97e56` (`call [rax+8]`)・`0x180c97e71` (`call [rax+0x20]`): VA コメント直後の store の後に call 行なし (次の VA コメントへ直行)。
-- decode 直後 IR の非 intrinsic な `call` は 11 行 (`function_*` への直接 call) で、`[rax+...]` 型の間接 call は 1 つも残らない。
+- 実行 1 の decode 直後 IR 全体で、非 intrinsic な `call` 命令は 11 行 (`function_*` への直接 call)。`[rax+...]` 型の間接 call は 1 つも残らない。
 - `declare void @__pseudo_call(i64)` は宣言のみで、本体の使用は decode 段の出力に無い。
 
 ### 数え方の注意
 
-- `0x180c97e00-0x180c97e80` の "call" 11 件は、すべて `llvm.ctpop` (パリティ intrinsic)。間接 call の数え方に使わない。`fa_call_trace.py` は intrinsic を除外する。
+- 別の集合 (上の 11 行とは対象が違う): `0x180c97e00-0x180c97e80` のアドレス範囲にある `call` 命令 11 件は、すべて `llvm.ctpop` (パリティ intrinsic)。上の 11 行 (非 intrinsic) には含まれない。間接 call の数え方に使わない。`fa_call_trace.py` は intrinsic を除外する。
 
 ## 2. 段の切り分け
 
