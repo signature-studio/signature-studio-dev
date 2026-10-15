@@ -58,3 +58,21 @@ REPORT.md §19 の付録。PR #5109 (`Refs #4011`) の実測・検証記録の�
 2. `M11_M2S=1` 単独を測り、組合せの寄与を分ける。
 3. `M11_M2V=1` を外して OOB が出ないことを示すネガティブコントロールを取る。
 4. 受入 1 は、miss 0 のまま `last_unit.index0 > 114` になった時だけ issue 完了の判定に進める。
+
+## 8. #5359: AddRef `call [rax+8]` (`40fd3a`) の gated 復元 (`pass_m2v_fn40fcf0_addref`)
+
+- 変更: `m11_passes.py` に `pass_m2v_fn40fcf0_addref` を追加 (既定 OFF・`M11_M2V=1` の gate の内側)。`function_40fcf0` の `[rdi]` 非 0 枝で `[this]` の vtable[1] を `m11_icall` で `this` 付きに呼ぶ。
+- 突合 (機械語): `40fd31: mov rax,[rdi]` / `40fd34: mov rcx,rax` / `40fd37: mov rax,[rax]` / `40fd3a: call [rax+8]` (`tools/m11/work/boot0.drc.dsm`)。IR では `%arg3` への store の後の呼出しが欠けていた。
+- 測定 commit: `a3ff91355` (コード差分の最終 commit)。`git diff a3ff91355 HEAD -- tools/m11 ':!tools/m11/REPORT*.md'` の出力: 0 行。
+
+| 構成 (HEAD `a3ff91355`) | units_run | init | icall_miss | last_unit | threw |
+|---|---|---|---|---|---|
+| 既定 OFF | 109 | 111 | 7 | 114 (Halt0) | null |
+| `M11_M2V=1 M11_M2S=1` | 129 | 132 | 16 | 144 (`0x65c540`) | `memory access out of bounds` |
+
+- ON の数値は §20 (測定 commit `af6e700c4`・AddRef 無し) の値と一致した。AddRef 無しの ON を HEAD で再測定はしていない。OFF は基準値 (§3) と一致。
+- 受入 2 (IR 面): `function_41a800` の判定は `%vtret` (vtable[0] の戻り値) で行われ、`trunc` は `%vtret` に掛かる (`trunc(arg3)` の判定は消えている)。実行上の前進は無い。
+- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (fl-win64 展開)・`work-m11` を repo 直下へ展開・`/opt/emsdk` を source。`m11_gen_ir2.sh` → `m11_build.sh` → `tools/gui/flengine/build.sh` → `boot_halt_probe.mjs` (各 rc 0)。
+- ビルド: `m11_build.sh` rc 0 (signature mismatch 0・undefined 0)。`tools/gui/flengine/build.sh` rc 0 (signature 0・undefined 0・duplicate 0)。
+- 所要 (実測・HEAD `a3ff91355` の ON 実行): `m11_gen_ir2.sh` 49.85 秒 / `m11_build.sh` 23.33 秒 / `flengine/build.sh` 21.85 秒 / probe 0.72 秒。load は run の runner 上で計測していない (未計測)。
+- 未解決: ON の OOB (unit 144) は残る。AddRef 復元では OOB は解消しなかった。受入 2 は IR 面のみ確認で、runtime の判定経路は未実測。未特定の OOB・miss 3 件の由来・`M11_M2S` 単独・ネガコンは #4011 (親) の残件。
