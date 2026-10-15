@@ -20,6 +20,9 @@ const USER_JS = [
   'user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);',
 ].join("\n") + "\n";
 
+// FIREFOX 環境変数が無いときの実行ファイル (OS 別の既定インストール先)。Linux は PATH の firefox
+const FIREFOX_BIN = { win32: "C:\\Program Files\\Mozilla Firefox\\firefox.exe", darwin: "/Applications/Firefox.app/Contents/MacOS/firefox" }[process.platform] ?? "firefox";
+
 const freePort = () => new Promise((ok, ng) => {
   const s = net.createServer();
   s.on("error", ng);
@@ -32,7 +35,7 @@ export async function withFirefox({ root, page, flags = [], log = () => {} }, fn
   fs.writeFileSync(path.join(prof, "user.js"), USER_JS);
   const bidiPort = await freePort();
   const args = ["--headless", "--no-remote", "--profile", prof, "--remote-debugging-port", String(bidiPort), ...flags, "about:blank"];
-  const cp = spawn(process.env.FIREFOX ?? "firefox", args, { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, MOZ_HEADLESS: "1" } });
+  const cp = spawn(process.env.FIREFOX ?? FIREFOX_BIN, args, { stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, MOZ_HEADLESS: "1" } });
   let errbuf = "";
   let onListen = () => {};
   const listening = new Promise((ok, ng) => {

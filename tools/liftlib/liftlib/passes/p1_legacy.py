@@ -99,7 +99,17 @@ def legacy_p1(text, quiet=True):
         inserts[idx] = (opx, repl)
     stats['inserted'] = len(inserts)
     stats['hits'] = dict(hits)
-    # apply
+    # repmap は挿入前の行番号 j で登録されているため, 挿入前の原行 lines[j] に適用してから挿入する (#3067)。
+    # 旧名は % 無し (cf.N)・新名は % 付き (%pcNcf) なので, 旧名は % 付き・後続文字の境界付きで置換する。
+    repmap = {}
+    for (idx, repl) in inserts.values():
+        for (j, old, new) in repl:
+            repmap.setdefault(j, []).append((old, new))
+    for j, repls in sorted(repmap.items()):
+        ln = lines[j]
+        for (old, new) in repls:
+            ln = re.sub(r'%' + re.escape(old) + r'(?![\w.\-])', lambda _m, n=new: n, ln, count=1)
+        lines[j] = ln
     out = []
     for i, l in enumerate(lines):
         if i in inserts:
@@ -108,13 +118,22 @@ def legacy_p1(text, quiet=True):
             out.append(l)
         else:
             out.append(l)
-    repmap = {}
-    for (idx, repl) in inserts.values():
-        for (j, old, new) in repl:
-            repmap.setdefault(j, []).append((old, new))
-    for j, repls in sorted(repmap.items()):
-        ln = out[j]
-        for (old, new) in repls:
-            ln = ln.replace(old, new, 1)
-        out[j] = ln
     return '\n'.join(out), stats
+
+
+PC_TAG_RE = re.compile(r"%pc(\d+)([a-z]+\d*)\b")
+
+
+def canon_tags(text):
+    """legacy_p1 の一時名 `%pc<入力行 index><接尾>` を出現順の番号 `%pc<k><接尾>` へ改名する (全単射の α 変換)。
+
+    行 index は入力の空行数に依るため、#1664 (A7 の空行除去) で名前だけが変わる (分岐・命令の内容は不変)。
+    IR 一致ゲート (ott.same) はこの改名だけを無視する。検査は tests/test_unit.py T26。
+    """
+    seen = {}
+
+    def rep(m):
+        k = seen.setdefault(m.group(1), len(seen))
+        return "%%pc%d%s" % (k, m.group(2))
+
+    return PC_TAG_RE.sub(rep, text)

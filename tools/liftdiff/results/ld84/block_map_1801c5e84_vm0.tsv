@@ -3,26 +3,17 @@ k	wasm_block	native_block	match	native_insn_n	native_first_rva	native_last_rva	l
 1	1801c5eb8	1801c5eb8	=	2	1c5eb8	1c5ebb	call 0x1801c0b6c	1720f2028	1720f3000
 2	1801c0b6c	1801c0b6c	=	2	1c0b6c	1c0b6f	je 0x1801c0ba8	1720f2028	1720f3000
 3	1801c0b71	1801c0b71	=	8	1c0b71	1c0b8a	jne 0x1801c0ba3	1	0
-4	1801c0b8c	1801c0ba8	!	1	1c0ba8	1c0ba8	ret	1	0
-5	1801bafb0	1801c5eb8	!	2	1c5eb8	1c5ebb	call 0x1801c0b6c	1	0
-6	1801c20c8	1801c0b6c	!	2	1c0b6c	1c0b6f	je 0x1801c0ba8	1	0
-7	1801c2109	1801c0ba8	!	1	1c0ba8	1c0ba8	ret	1	0
-8	1801c3dc8	1801c5eb8	!	2	1c5eb8	1c5ebb	call 0x1801c0b6c	1	0
-9	1801c38c8	1801c0b6c	!	2	1c0b6c	1c0b6f	je 0x1801c0ba8	1	0
-10	1801c3a81	1801c0ba8	!	1	1c0ba8	1c0ba8	ret	1	0
-11	1801c3e00	1801c5eb8	!	2	1c5eb8	1c5ebb	call 0x1801c0b6c	1	0
-12	1801c3e0e	1801c0b6c	!	2	1c0b6c	1c0b6f	je 0x1801c0ba8	1	0
+4	1801c0ba8	1801c0ba8	=	1	1c0ba8	1c0ba8	ret	1	0
+5	1801c5eb8	1801c5eb8	=	2	1c5eb8	1c5ebb	call 0x1801c0b6c	1	0
+6	1801c0b6c	1801c0b6c	=	2	1c0b6c	1c0b6f	je 0x1801c0ba8	1	0
+7	1801c0ba8	1801c0ba8	=	1	1c0ba8	1c0ba8	ret	1	0
+8	1801c5eb8	1801c5eb8	=	2	1c5eb8	1c5ebb	call 0x1801c0b6c	1	0
+9	1801c0b6c	1801c0b6c	=	2	1c0b6c	1c0b6f	je 0x1801c0ba8	1	0
+10	1801c0ba8	1801c0ba8	=	1	1c0ba8	1c0ba8	ret	1	0
+11	1801c5eb8	1801c5eb8	=	2	1c5eb8	1c5ebb	call 0x1801c0b6c	1	0
+12	1801c0b6c	1801c0b6c	=	2	1c0b6c	1c0b6f	je 0x1801c0ba8	1	0
 13	1801c0ba8	1801c0ba8	=	1	1c0ba8	1c0ba8	ret	1	0
 14	1801c5eb8	1801c5eb8	=	2	1c5eb8	1c5ebb	call 0x1801c0b6c	1	0
 15	1801c0b6c	1801c0b6c	=	2	1c0b6c	1c0b6f	je 0x1801c0ba8	1	0
 16	1801c0ba8	1801c0ba8	=	1	1c0ba8	1c0ba8	ret	1	0
-17	1801c5eb8	1801c5ecc	!	5	1c5ecc	1c5edb	ret	1	0
-18	1801c0b6c	-	!	0	-	-	-	-	-
-19	1801c0ba8	-	!	0	-	-	-	-	-
-20	1801c5eb8	-	!	0	-	-	-	-	-
-21	1801c0b6c	-	!	0	-	-	-	-	-
-22	1801c0ba8	-	!	0	-	-	-	-	-
-23	1801c5eb8	-	!	0	-	-	-	-	-
-24	1801c0b6c	-	!	0	-	-	-	-	-
-25	1801c0ba8	-	!	0	-	-	-	-	-
-26	1801c5ecc	-	!	0	-	-	-	-	-
+17	1801c5ecc	1801c5ecc	=	5	1c5ecc	1c5edb	ret	1	0

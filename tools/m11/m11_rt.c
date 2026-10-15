@@ -252,6 +252,15 @@ void m11_p134_put(unsigned int f, unsigned long long v) {
 }
 EMSCRIPTEN_KEEPALIVE double m11_p134_n(void) { return (double)g_p134_n; }
 EMSCRIPTEN_KEEPALIVE double m11_p134_get(int k, int f) { return (k >= 0 && f >= 0 && f < 4) ? (double)g_p134[k % M11_P134_N][f] : -1.0; }
+/* #2780 (計測専用; M11_PROBE_2780=1 の IR probe (trap_triage/probe2780_ir.py) からだけ呼ばれる): function_4473f0 の記録 (tag, 値) を 256 件の環状配列に残す */
+#define M11_P2780_N 256
+static unsigned long long g_p2780[M11_P2780_N][2];
+static unsigned long long g_p2780_n;
+void m11_p2780_put(unsigned int f, unsigned long long v) {
+    g_p2780[g_p2780_n % M11_P2780_N][0] = f; g_p2780[g_p2780_n % M11_P2780_N][1] = v; g_p2780_n++;
+}
+EMSCRIPTEN_KEEPALIVE double m11_p2780_n(void) { return (double)g_p2780_n; }
+EMSCRIPTEN_KEEPALIVE double m11_p2780_get(int k, int f) { return (k >= 0 && f >= 0 && f < 2) ? (double)g_p2780[k % M11_P2780_N][f] : -1.0; }
 /* #944 (計測専用; M11_INSTR_413060=1 のときだけ有効): function_413060 呼出し後の dest の値を畳んだ指紋 (OFF/ON/ネガコンの比較用)。
  * M11_NEG_413060=1 のときだけ dest に +0x40 を書く既知変更 (b) を入れる。既定 build には含めない */
 #ifndef M11_INSTR_413060

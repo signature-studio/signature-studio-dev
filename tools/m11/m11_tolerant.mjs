@@ -8,7 +8,8 @@ import { ptrPre, ptrCheck } from './m11_ptrcheck.mjs';
 const M11 = new URL('./', import.meta.url).pathname.replace(/\/$/, '');
 const m2 = await import(M11 + '/work/m11_boot.cjs');
 const errs = [];
-const mod = await m2.default({ printErr: (s) => { errs.push(String(s)); } });
+let curUnit = -1;   // #3325: M11_TOLERANT_ERR=1 のとき [m11] の観測行に unit 番号を付ける
+const mod = await m2.default({ printErr: (s) => { errs.push(String(s)); if (process.env.M11_TOLERANT_ERR && /^\[m11\]/.test(String(s))) console.error('[unit ' + curUnit + '] ' + s); } });
 const img = fs.readFileSync(M11 + '/work/m11_image.bin');
 mod.HEAPU8.set(img, 0);
 const ptrPreSet = ptrPre(mod, img.length);
@@ -18,6 +19,8 @@ const snap = new Uint8Array(img.length);
 const heapFrom = process.env.M11_HEAP_FROM;   // #2768: 寛容起動の記録 JSON (M11_TOLERANT_OUT の出力). その skipped unit だけ heap 全体の差分を取る (既定 off)
 const heapSet = heapFrom ? new Set(JSON.parse(fs.readFileSync(heapFrom, 'utf8')).skipped.map((s) => s.i)) : null;
 const heapRec = [];
+const peekAddrs = (process.env.M11_TOLERANT_PEEK || '').split(',').filter(Boolean).map(Number);   // #3325: 計測用 (既定 off). unit 前後の u32 を読む
+const peekUnits = process.env.M11_TOLERANT_PEEK_UNITS ? new Set(process.env.M11_TOLERANT_PEEK_UNITS.split(',').map(Number)) : null;
 let hbuf = null, hLen = 0;
 const units = [];                  // 全 unit: [i, va, kind, va_bytes, getmem, freemem, oom, clobber]
 const skipped = [];                // 失敗 unit (skip): 種類・メッセージ・image 差分の範囲
@@ -58,17 +61,21 @@ mod.m11_tolerant_run = () => {   // C の function_4120c0 (g_tolerant) から呼
   const va0 = count ? mod._m11_unit_va(0) : 0, vaL = count ? mod._m11_unit_va(count - 1) : 0;
   const intact = () => mod._m11_unit_va(0) === va0 && (!count || mod._m11_unit_va(count - 1) === vaL);
   for (let i = 0; i < count; i++) {
-    started++;
+    started++; curUnit = i;
     const va = mod.HEAPU32[(base + i * 16) >>> 2];   // strict と同じく units は起動時の 1 度だけ読む. proc の下位 32bit = VA
     snap.set(mod.HEAPU8.subarray(0, img.length));
     const hOn = heapSet !== null && heapSet.has(i);
     if (hOn) { const L = mod.HEAPU8.length; if (!hbuf || hbuf.length < L) hbuf = new Uint8Array(L); hbuf.set(mod.HEAPU8); hLen = L; }
+    const peekHit = peekUnits !== null && peekUnits.has(i);
+    if (peekHit) console.error('[peek] unit ' + i + ' before: ' + peekAddrs.map((a) => a + '=' + mod.HEAPU32[a >>> 2]).join(' '));
     mod._m11_va_unit_begin();
     const oom0 = Number(mod._m11_va_oom()), vaUsed0 = Number(mod._m11_va_used());
     const gm0 = Number(mod._m11_probe_count(0)), fm0 = Number(mod._m11_probe_count(1));
     let r = null, err = null;
     try { r = mod._m11_call_unit_at(base, i); } catch (e) { err = e; }
+    if (err && process.env.M11_TOLERANT_STACK && process.env.M11_TOLERANT_STACK.split(',').includes(String(i))) console.error('[tolerant][stack] unit ' + i + ' va=0x' + va.toString(16) + ': ' + ((err && err.stack) || err));   // #3325: 計測用 (既定 off)
     mod.__emscripten_stack_restore(sp0);
+    if (peekHit) console.error('[peek] unit ' + i + ' after: ' + peekAddrs.map((a) => a + '=' + mod.HEAPU32[a >>> 2]).join(' ') + ' kind=' + (err ? (err.m11_dllmain_done !== undefined ? 'halt0' : 'err') : r));
     const oom = Number(mod._m11_va_oom()) > oom0;
     const clob = !intact();
     if (clob) clobber++;

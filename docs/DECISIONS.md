@@ -130,11 +130,12 @@
 
 ## D13 — liftdiff の既定 batch 状態は units のまま据え置く (hybrid への切替は根拠待ち)
 
-- **状態**: 保留 (2026-10-13, issue #1248 [LD-42]。子 issue #1464 [LD-50] で判断)
+- **状態**: 採用 (2026-10-13 保留、2026-10-15 issue #1464 [LD-50] で据え置きを確定。hybrid への切替は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §8.2 の条件が揃うまで行わない)
 - **決定**: `liftdiff_e2e.sh` [4/4] の既定 batch 状態は `units` のまま変えない。InitTable 充足の `hybrid` は `--state` で明示したときだけ使う。
-- **比較した方式**: (a) 既定を hybrid に切替 (InitUnits が実際に走り、空振り一致が 0 件になる)、(b) units のまま据え置き (採用・保留)。
+- **比較した方式**: (a) 既定を hybrid に切替 (InitUnits が実際に走り、空振り一致が 0 件になる)、(b) units のまま据え置き (採用)。(a) は不採用: hybrid の InitUnits は native 側が 11/11 で segv し (子 #3349 LD-153)、TLS の実経路 (flag=1) の充足も未確認 (同)、件数が負荷で揺れる (子 #3350 LD-154)。
 - **理由**: hybrid にすると sample:800 の判定が変わる (件数は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §1・§3)。どちらが正しいかは関数ごとの差分根拠が無いと決まらないため、根拠無しに基準値を動かさない。units の InitUnits 空振り一致は `check_initunits.py` で検出済み (LD-25) で、この検出は hybrid 側でのみ成立する。
 - **影響**: 既定 batch の一致数は「InitUnits が呼ばれない状態での一致」である (件数の測定値は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §1)。この数値を外部へ「実行初期化済みの一致」として出さない。
+- **追記 (2026-10-15, LD-50)**: 遷移 68 件の表 (`REPORT_APPENDIX_LD42.md` §6) で、units 一致 → hybrid 差分の 25 件は全件の主因が callee_divergence で、どちらが誤りかを関数ごとに決められなかった。根拠は §6・§7 (TLS)・§8 (件数の揺れ)。
 
 ## D14 — スカラー FMA3 (vfmadd/vfmsub/vfnmadd/vfnmsub の sd 形) は ヘッダの式 + IR 引数順で実装する
 
@@ -151,6 +152,7 @@
 - **比較した方式**: (a) VEX 形を SSE 形の `(void)a; (void)b;` へ委譲して `unimpl` から消す (不採用)、(b) 既存 `lift/passes/ir6_pass.py` ([P1]) を lift 鎖に入れる (単独では不足。 19252 の comis 76 箇所中 insert 3 箇所のみ)、(c) `icall_rewrite.py` の comis 経路 (stub + sahf) を plugins 側に移植する (未評価)。
 - **理由**: (a) は flag を反映しないまま stub を消すため、`declares_unimpl` が 0 になっても silent な flag 欠落が検出できなくなる。 `lift/passes/m11_simd2.py` の既存コメントも同じ方針 (「委譲せず stub のまま残す」)。 実測は `tools/plugins/sampler/REPORT_APPENDIX_1582.md` §7b。
 - **影響**: 19252 / 19048 の unimpl に `vcomisd` / `vucomisd` / `vucomiss` が残る。 これを消すには flag 反映の実装が要るため、子 issue に分割した。
+- **続き (#1774・反映方式の決定)**: 採用は次の 2 点。 (1) 同一ブロック内で呼び出し後に読まれる flag は、`lift/passes/vex_comis_flags.py` が呼び出し直後に作る fcmp 由来の CF/ZF/PF (`ir6_pass.py` [P1] と同じ式) へ差し替える。 (2) 差し替えられない呼び出しは残す (helper は stub のまま unimpl に出る。 silent にしない)。 比較した別案: icall の stub+sahf 経路 (`PLUG_ICALL=1`) は 19252 の unimpl を 4→1 にしたが、522 関数中 490 関数の ABI を書き換えて `defines` 551→497・`missing_bytes` 165→4200 に悪化したため不採用。 実測 (機械語の消費命令と IR の参照) は `tools/plugins/sampler/REPORT_APPENDIX_1774.md` §7c。 残りは消費側が flag 名を読まず値比較を読むため、消費条件の再導出が要り、子 [PLG-F3-33] (非 VEX は [PLG-F3-34]) に分割した。
 
 ## D16 — 残 helper `__asm_vmovsd` (store 形) は宛先を定数で埋めず、spill 領域の写像を上流で直す
 
@@ -159,6 +161,7 @@
 - **比較した方式**: (a) `vmovsd` を store 化する (宛先 0 への誤 store で不採用)、(b) B1 の 0 埋めを止める (共有 lift 鎖の全 plugin に影響するため範囲外)、(c) 委譲や abort で unimpl から消す (silent miscompile を隠すため不採用)。
 - **理由**: 機械語は `[rsp+0x20]` への spill で、宛先は定数 0 ではない。 宛先 0 のまま store を作ると誤った番地へ書く。 同じ宛先値は分岐・演算にも使われるため、stub で隠すと誤りが検出できなくなる。 実測は `tools/plugins/dynamics/REPORT_APPENDIX.md` §E。
 - **影響**: 19252 の unimpl に `vmovsd` store が残る (5 件のうち 1 件)。 `emcc -c` は rc 0 のまま。 正しさは未確認。
+- **実装 (2026-10-14, #2017)**: 宛先の読み戻しを B1 の前に値の転送へ置換する (`ir5_patch.py` `forward_vmovsd_store`)。 19252 の unimpl から `vmovsd` store は消えた。 分岐値は entry の xmm0 を B1 が 0 にする入力モデルに依存し、正しさは未確認のまま。 測定は `tools/plugins/dynamics/REPORT_APPENDIX.md` §H。
 
 ## D17 — `movntps` (非テンポラル store) は既存の SSE store 復元 (`lower_asm_store`) に含め、宛先は IR 側から復元する
 
@@ -268,3 +271,12 @@
   - 緊急 merge の Admin bypass の設定の有無は変わりうるため、本書には書かない (確認の手順は `docs/WORKFLOW.md` §2)。PM が設定を確かめるまで bypass は使えないものとして書く。
   - ロールバックは `enforcement` を `disabled` にする (`docs/WORKFLOW.md` §2)。
   - 測定値は `tools/pm/REPORT_2648.md` が正本。
+
+## D28 — ia32 の x87 は f80 を持たず、スタック要素を double で lower する (f80→f64)
+
+- **状態**: 採用 (2026-10-14, issue #1099 [PLG-G2-9]。親 #1098 の x87 unsup の扱い)
+- **決定**: x64c の ia32 経路の x87 subset は、ST(i) とメモリ経由の値を `double` で持つ (runtime は `tools/ott/rt/ott_x87.h`)。 f80 は `fld`/`fstp` の m80 変換 (10 B ↔ double) でだけ扱う。 subset 外の x87 命令は従来どおり `ott_unsup`。 x64 の生成 C は変えない。
+- **比較した方式**: (a) soft-float80 を実装して f80 を持つ、(b) RetDec 路線 (`tools/plugins/p0c/REPORT.md`) で f80 を扱う。 (c) 採用: f80→f64 (f80 を持たない)。
+- **理由**: `tools/plugins/p0c/REPORT.md` §3 の実測で、f32 入出力系は差分が無く、f64 出力の差分は 1 ulp 級に限られ、整数の x87 (fild/fistp) は i64 保持で正確だった。 soft-float80 は不要と判断。 subset の差分試験 (native と lowered の比較) の結果は `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1099.md` §1・§3 が正本。
+- **制限**: (1) 精度制御 PC は模型化しない (f64 固定)。 (2) `fst m32` の丸めは C の cast (nearest) 固定。 (3) `fild m64` で |v|>2^53 は丸まる。 (4) スタック over/underflow と x87 例外は模型化しない (`fwait` は no-op、FSW の例外フラグ・C1 は持たない)。 (5) RC (FCW bits 10-11) は `fist`/`fistp` の丸めにだけ適用する (算術と `fst m32` には効かない)。
+- **影響**: ia32 の x87 unsup は減った (残りは超越関数・`frndint`・`fscale`・`fprem` 等。付録 §8・§9)。 f80→f64 の精度差は `docs/DEFECTS.md` の新規類型の候補 (行案は付録 §6)。 `docs/DEFECTS.md` は編集しない (PM 判断 R8。精度差は本 ADR の帰結として付録 §6 に記録)。

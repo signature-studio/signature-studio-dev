@@ -1,0 +1,41 @@
+# 配置先: .github/workflows/notices.yaml (GitHub App に `workflows` 権限が無いと agent は push できないため、
+# 権限のある人が `cp tools/legal/notices/ci/notices.yaml .github/workflows/notices.yaml` で有効化する。#86 のコメント参照)
+name: Notices
+
+# THIRD_PARTY_NOTICES (LGL-3, #86): 記録なしの同梱 OSS を検出して失敗させる CI。
+# 素材 (FL / plugins) は不要。registry / 再ビルド記録 / repo 内ライセンスファイルの整合と単体テストだけを見る。
+# FL 同梱表記を含む完全な NOTICES の生成は素材のある環境 (NOTICES_STRICT=1 pnpm build) で行い、
+# deploy/scripts/05-stage.mjs のゲートが不完全な NOTICES を拒否する。
+on:
+  pull_request:
+    paths:
+      - "tools/legal/notices/**"
+      - "tools/shared/oss/**"
+      - "tools/python/build_cpython_wasm.sh"
+      - "tools/ipp/shim/fft/**"
+      - "deploy/scripts/05-stage.mjs"
+      - "vite.config.ts"
+      - ".github/workflows/notices.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/legal/notices/**"
+      - "tools/shared/oss/**"
+      - "tools/python/build_cpython_wasm.sh"
+      - "tools/ipp/shim/fft/**"
+
+permissions:
+  contents: read
+
+jobs:
+  notices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: node version (runner 同梱の node を使う。import.meta.dirname のため 20.11 以上)
+        run: node --version
+      - name: unit tests
+        run: node --test tools/legal/notices/notices.test.mjs
+      - name: registry / records check (記録なしの同梱 OSS は失敗)
+        run: node tools/legal/notices/cli.mjs check

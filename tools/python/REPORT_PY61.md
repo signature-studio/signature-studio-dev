@@ -84,7 +84,7 @@
 
 | 呼び出し先 | 確定事項 (根拠 VA) | 未確定 (#2809) |
 |---|---|---|
-| `0xd82c20` (status → PyObject) | 直接呼び出し。status 0: 保留例外の判定 `call [0x860485 のグローバル]` (0xd82c3c) が非 0 なら NULL (0xd82c4a)、0 なら None (`0xc38bc0`, 0xd82c5c)。status ≥ 0 は None。status < 0: 報告判定 `call [rax+0x88]` (0xd82c7e) が 0 なら None (0xd82dd0)。非 0 なら文言の分岐 (0xd82c8f〜0xd82d96) → `0x4135e0` で文字列を組む → `0x414000` (c_str) → 例外投入 1 本 (0xd82dc6)。 | 投入関数 `[rbx]` の正体、例外型 (§4-2) |
+| `0xd82c20` (status → PyObject) | 直接呼び出し。status 0: 保留例外の判定 `call [0x860485 のグローバル]` (0xd82c3c) が非 0 なら NULL (0xd82c4a)、0 なら None (`0xc38bc0`, 0xd82c5c)。status ≥ 0 は None。status < 0: 報告判定 `call [rax+0x88]` (0xd82c7e) が 0 なら None (0xd82dd0)。非 0 なら文言の分岐 (0xd82c8f〜0xd82d96) → `0x4135e0` で文字列を組む → `0x414000` (c_str) → 例外投入 1 本 (0xd82dc6)。 | 投入関数 `[rbx]` の正体、例外型 (§4-2)。報告判定 `call [rax+0x88]` (0xd82c7e) の意味 (global `0x15e4790` の `+8` オブジェクトの vtbl+0x88。この判定の結果で文言付き例外と None が分かれる。PY-124 #2999 `REPORT_PY124.md` §3 で確認) |
 | `0xd843d0` (job 投入) | 第 2 引数 `rdx` は結果構造体: `*rdx = -2` を初期値 (0xd843e9)。job を `0xd841e0` で確保し、引数 6 本 (`[rbp+0x80..0xa8]`) を job+0x18〜0x40 へ、第 3 引数 `r8` (コア) を job+0x58 へ入れる (0xd84429〜0xd8446b)。`0x526190` で実行。終了後 `*rdx = [job+0x60]` (status, 0xd844d7〜0xd844db)。 | `0x526190` の実行方式、`0xd841e0` の確保 |
 | `0x12e1a20` (track 表の先頭) | 4 命令: `g_table[g_index]` を返す (`mov rax,[rip+..]; movsxd rcx,[rip+..]; mov rax,[rax+rcx*8]; ret`, 0x12e1a20〜0x12e1a32)。全 track 関数が `imul rcx, 0x45` 後の `[rax+rcx*4+off]` で要素 (0x114 B) を読む。 | 表の名前 (推定: track 表) |
 | `0x12e68a0` (範囲の走査) | `0x12e8210` で範囲 (first/last) を出力させ、`[first..last]` の要素の +0x3c byte を調べる (0x12e68ea)。`isTrackSolo` (0xd566f0) とコア 0xd56770 がこの戻り al を使う。 | solo 判定の定義 (どの条件で真か)、`0x12e8210` |

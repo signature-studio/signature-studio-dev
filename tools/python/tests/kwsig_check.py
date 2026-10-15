@@ -44,7 +44,7 @@ for m, fs in t["modules"].items():
             fmt_by_flags[ks["flags"]] = fmt_by_flags.get(ks["flags"], 0) + 1
 print(f"functions={n_fn} with_fmt={n_fmt} {sorted(fmt_by_flags.items())} with_kwlist={n_kw} dup_kwlist={dup_kwlists}")
 assert n_fn == 435 and n_kw == 103
-assert fmt_by_flags == {1: 200, 3: 103} and n_fmt == 303
+assert fmt_by_flags == {1: 201, 3: 103} and n_fmt == 304  # flags=1 の 201 件目は plugins.getPresetCount (kw 形式・PY-116 #2952)
 assert dup_kwlists == ["arrangement.selectionSet"]
 
 fl_api.install(os.path.join(ROOT, "analysis/flapi/flapi_table.json"))
@@ -175,11 +175,12 @@ for m, fs in t["modules"].items():
                 else:
                     known.add(f"{m}.{n}")
 print(f"legacy bind が通った kw 呼出し {n_cmp} 件のうち新も同結果 {n_same}、差 {sorted(known)}")
-assert known == {"channels.getChannelVolume", "channels.getStepParam", "channels.setChannelPitch", "channels.soloChannel",
-                 "device.forwardMIDICC", "general.saveUndo", "mixer.automateEvent", "mixer.getEventIDName",
-                 "mixer.getTrackVolume", "plugins.getColor", "plugins.getParamValueString"}, known
+assert known == {"channels.getChannelVolume", "channels.setChannelPitch", "device.forwardMIDICC", "general.saveUndo",
+                 "mixer.automateEvent", "mixer.getEventIDName", "mixer.getTrackVolume"}, known
 # PY-70 (#2500): stub の positional-only 引数 (`/`) を table に反映したため、署名を得た 15 関数が比較対象に入った (+5 件、全て同結果・差は増えない)
-assert (n_cmp, n_same) == (229, 213), (n_cmp, n_same)
+# PY-102 (#2927): sig を PE の個数へ正規化したため、旧比較の基準 (table の sig) と PE の書式が一致する 4 関数 (channels.getStepParam・
+# channels.soloChannel・plugins.getColor・plugins.getParamValueString) は差が出なくなった。残る差は kwlist の既定値の引き継ぎ (a) の 7 関数
+assert (n_cmp, n_same) == (231, 223), (n_cmp, n_same)
 
 # (9) kwlist の重複名 (arrangement.selectionSet は ['selStart','selStart','selectNotes',...]; バイナリ由来)
 #     最初の出現だけを kw で束縛し、2 つ目以降は位置専用 (kw では埋まらない)
@@ -195,10 +196,10 @@ expect(TypeError, arr.selectionSet, 1, 2, selStart=5)
 # (10) stubs 既定値の評価器 (_default_value)。eval は使わず許可した式だけを評価する。midi.* の値は利用者の midi から実行時に取る。
 EXPECTED_NAMES = {"midi.PIM_None", "midi.GT_All", "midi.LB_Status_Default", "midi.EKRes", "midi.MaxInt",
                   "midi.ST_Int", "midi.PME_System", "midi.REC_None", "midi.GC_BackgroundColor", "midi.FPN_Param"}
-# (a) 全数列挙: sig の既定値のうち midi. を含むもの = 20 関数・21 引数・名前 10 種 (固定値)
+# (a) 全数列挙: sig の既定値のうち midi. を含むもの = 19 関数・20 引数・名前 10 種 (固定値。PY-102 で plugins.getParamValueString の PIM_None が消えた)
 midi_args = [(m, n, p["name"], p["default"]) for m, fs in t["modules"].items() for n, e in fs.items() if e.get("sig")
              for p in e["sig"]["params"] if p["default"] is not None and "midi." in p["default"]]
-assert len(midi_args) == 21 and len({(m, n) for m, n, _, _ in midi_args}) == 20, midi_args
+assert len(midi_args) == 20 and len({(m, n) for m, n, _, _ in midi_args}) == 19, midi_args
 assert {d for _, _, _, d in midi_args} == EXPECTED_NAMES, {d for _, _, _, d in midi_args}
 # (b) 正の検証: 偽の midi (値は任意) を sys.modules に入れると、既定値がその値で host へ渡る
 FAKE = {nm.split(".")[1]: 9000 + i for i, nm in enumerate(sorted(EXPECTED_NAMES))}
@@ -223,7 +224,8 @@ assert last() == (1, FAKE["MaxInt"], 1), last()
 for fs in t["modules"].values():
     for e in fs.values():
         for p in e["sig"]["params"] if e.get("sig") else []:
-            if p["default"] is not None and "midi." not in p["default"]:
+            # PE_OPTIONAL は PE が省略可能とするが既定値不明の印 (analysis/flapi_table.py pe_arity)。式ではないので対象外
+            if p["default"] is not None and "midi." not in p["default"] and p["default"] != "PE_OPTIONAL":
                 a, b = fl_api._default_value(p["default"]), eval(p["default"], {})
                 assert type(a) is type(b) and a == b, (p["default"], a, b)
 # (c) 参考 (repo のコードは通らない。Python の eval の挙動の確認のみ): midi を渡さない eval は NameError。PR #463 の bind が落ちた原因
@@ -236,4 +238,25 @@ for bad in ["__import__('os')", "midi.NoSuch", "open", "'x'"]:
 # (e) 静的ガード: 本番コードに eval( の呼出しを残さない
 src = open(os.path.join(ROOT, "src", "fl_api.py"), encoding="utf-8").read()
 assert re.search(r"\beval\s*\(", src) is None, "src/fl_api.py に eval( が残っている"
+# (11) PY-116 (#2952): wrapper が PyArg_Parse* に渡す非 0 の出力ポインタ数 (outs) と、書式が消費する数 (ptrs) の照合。
+#      不一致は screen.addTextLine (siiii) と screen.addMeter (iiii|i) の 2 件だけで、どちらも wrapper が書式より 1 個多く渡す (REPORT_PY116.md §2)。
+#      plugins.getPresetCount は flags=1 だが kw 形式 (PyArg_ParseTupleAndKeywords 相当) で呼ぶ唯一の VARARGS 関数で、書式 i|ii・出力 3 個・kwlist を持つ。
+kwt = json.load(open(os.path.join(ROOT, "analysis/flapi/flapi_kwargs.json")))
+outs_n, outs_bad = 0, []
+for m, fs in kwt["modules"].items():
+    for n, e in fs.items():
+        if e["fmt"] is None:
+            continue
+        outs_n += 1
+        if e["outs"] != e["ptrs"]:
+            outs_bad.append(f"{m}.{n}:{e['ptrs']}/{e['outs']}")
+print(f"書式とポインタ数の照合 {outs_n} 件・不一致 {sorted(outs_bad)}")
+assert outs_n == 304 and sorted(outs_bad) == ["screen.addMeter:5/6", "screen.addTextLine:5/6"], (outs_n, outs_bad)
+no_fmt_outs = sorted(f"{m}.{n}:{e['flags']}/{e['outs']}" for m, fs in kwt["modules"].items() for n, e in fs.items()
+                     if e["fmt"] is None and e["outs"])
+print(f"書式無し かつ 出力ポインタ >0: {len(no_fmt_outs)} 件 {no_fmt_outs}")
+assert no_fmt_outs == [], no_fmt_outs  # 照合から黙って外れる関数を作らない (件数と名前を固定)
+g = kwt["modules"]["plugins"]["getPresetCount"]
+assert (g["flags"], g["fmt"], g["outs"], g["kwlist"]) == (1, "i|ii", 3, ["index", "slotIndex", "useGlobalIndex"]), g
+assert "kwlist" not in t["modules"]["plugins"]["getPresetCount"]["kwsig"]  # flags=1 は kwlist を kwsig に載せない (kwargs は拒否のまま)
 print("kwsig_check: OK")

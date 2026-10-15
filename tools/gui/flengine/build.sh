@@ -18,7 +18,8 @@ for f in boot_final.ll boot_final3.ll boot_final3_sigs.h m11_simd.c m11_fnstubs.
 done
 M11_LB_BASE="${M11_LB_BASE:-0}"
 M11_OV_CLASSCREATE="${M11_OV_CLASSCREATE:-0}"   # m11_build.sh と同じ -D を揃える (m11_ov.c の既定も 0)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -pthread -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE"
+# M11_FIX_535BF2 は m11_ov.c の既定が 1 (#2521)。GUI の実測 (tools/gui/flengine/REPORT.md) は lift 版 (0) で取った値なので 0 に固定する
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -pthread -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_FIX_535BF2=0"
 cc() { local src="$1" obj="$2"; shift 2
   if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then echo "[gf] cc $(basename "$src")"; emcc -c "$src" -o "$obj" "$@"; fi; }
 
@@ -63,6 +64,7 @@ echo "[gf] strong 重複定義シンボル: $(grep -c . "$W/gen/dups.txt" || tru
 # 5. リンク
 EXPORTS=$(sed -n 's/^EXPORTS=//p' "$M/m11_build.sh" | head -1),_malloc,_free
 if [ $BASE = 0 ]; then EXPORTS="$EXPORTS,_gui_shared_ptr,_gui_shared_size,_gui_reach_dump,_gui_reach_json,_gui_reach_distinct,_gui_reach_calls,_gf_icall_count,_gf_thunk_count,_gf_ring_discarded,_gf_failfast_count,_gf_soft_stub_count"; fi
+if grep -q '^define [^@]*@CreateFruityInstance(' "$MW/boot_final.ll"; then EXPORTS="$EXPORTS,_CreateFruityInstance"; fi   # boot7 取込済み (#2715) の IR のみ
 GUI_OBJS=$(ls "$W"/gui/*.o 2>/dev/null || true)
 if [ $BASE = 1 ]; then rm -f "$W/obj/glue.o" "$W/obj/gf_thunks.o"; fi   # 前回の GUI 結合 build の残骸を比較元に混ぜない
 emcc "$W"/obj/*.o $GUI_OBJS -o "$W/$OUT.cjs.tmp" \

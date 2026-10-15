@@ -22,6 +22,9 @@
     `mov edi,[rcx]` が `xor i64 0,0` に化けた site を「ブロック内の zero-disp load が 1 本・
     IR の xor i64 0,0 が 1 本・機械語に自己 xor 無し・load 先ベースが argN と解決」の
     厳密条件が揃ったときだけ復元する。
+  F3d 入口の型タグ読みの復元 (LD-127 #2745・既定無効、`--passes f3d` で有効):
+    入口ブロックの `movzx r16, word ptr [argN]` (VARIANT の型タグ読み) が `xor i64 0,0` に化けた site を
+    `load i16` + zext に戻す。入口 xor のうち trunc i16 / and で使われるものが 1 本のときだけ。
 
   F4 frame_read_dropped (escape 済み stack_var 内部の read, #564 / function_52a7f0):
     `cmp [rbp+0x70], rcx` の被 read は callee (GetClassInfoW) が書く escape 済み `%stack_var_-96` の +8 だが、RetDec が
@@ -1061,6 +1064,95 @@ def fix_f3b(fn, mach, rep, ctr):
     return fixed
 
 
+# ---------------------------------------------------------------------------
+# F3d: 入口の型タグ読み (movzx word [argN]) の xor i64 0,0 化の復元 (LD-127 #2745)
+# ---------------------------------------------------------------------------
+
+def fix_f3d(fn, mach, rep, ctr):
+    """入口ブロックの 16 bit 型タグ読み `movzx r, word ptr [B]` (B は argN に解決) が
+    `xor i64 0,0` に化けた site を load に戻す。lift 段 (boot0.lift.ll) で入った置換が F3b
+    (mov 限定・入口 xor 1 本限定) の外に残るため、型タグ読みの形に限った別 pass にする。
+    厳密条件 (全て満たすときだけ): 入口ブロック (VA == fn.va) の機械語に movzx word の zero-disp
+    load が 1 本 (rsp/rbp 基底は除外)・IR の入口ブロックの xor i64 0,0 のうち結果が
+    `trunc i64 %x to i16` か `and i64 %x, <imm>` で使われるものがちょうど 1 本・B が argN に解決。
+    """
+    lines = fn.body.split('\n')
+    blocks = fn.blocks()
+    cum = 0
+    ent = None
+    for (bva, ls) in blocks:
+        if bva == fn.va and ent is None:
+            ent = (cum, cum + len(ls), ls)
+        cum += len(ls)
+    if ent is None:
+        return 0
+    ia, ib, ls = ent
+    mblk, _ins = fn_mach_blocks(mach, fn.va, [b for (b, _l) in blocks if b is not None])
+    if mblk is None:
+        return 0
+    mins = mblk.get(fn.va, [])
+    tags = []
+    for ins in mins:
+        if ins.mnemonic != 'movzx' or len(ins.operands) != 2:
+            continue
+        o0, o1 = ins.operands
+        if o0.type != 1 or o1.type != 3 or o1.size != 2:
+            continue
+        if o1.mem.index or o1.mem.disp or not o1.mem.base:
+            continue
+        if mach.cs.reg_name(o1.mem.base) in ('rsp', 'rbp'):
+            continue
+        tags.append((mach.cs.reg_name(o1.mem.base), ins))
+    if len(tags) != 1:
+        return 0
+    rB, insL = tags[0]
+    argn = base_resolves_to_arg(mach, mins, rB, prologue_homes(mach), mins.index(insL) + 1)
+    if argn is None:
+        rep['f3d_base_unresolved'] = rep.get('f3d_base_unresolved', 0) + 1
+        return 0
+    blk_text = '\n'.join(lines[ia:ib])
+    if re.search(r'load [i0-9]+, ptr %%arg%d(?![\w.$-])' % argn, blk_text):
+        rep['f3d_load_present'] = rep.get('f3d_load_present', 0) + 1
+        return 0
+    cands = []
+    for k, l in enumerate(ls):
+        m = XOR0_RE.match(l)
+        if not m:
+            continue
+        x = re.escape(m.group(2))
+        if re.search(r'= trunc i64 %s to i16\s*$' % x, blk_text, re.M) or re.search(r'= and i64 %s, ' % x, blk_text):
+            cands.append((ia + k, m))
+    if len(cands) != 1:
+        rep['f3d_ambiguous'] = rep.get('f3d_ambiguous', 0) + 1
+        return 0
+    xi, xm = cands[0]
+    xname = xm.group(2)
+    hd = re.match(r'^define [^@]*@function_[0-9a-f]+\(([^)]*)\)', fn.body)
+    ps = [p.strip().split() for p in hd.group(1).split(',') if p.strip()] if hd else []
+    if len(ps) < argn or len(ps[argn - 1]) < 1:
+        rep['f3d_arg_missing'] = rep.get('f3d_arg_missing', 0) + 1
+        return 0
+    pty = ps[argn - 1][0]
+    aptr = '%%arg%d' % argn if pty == 'ptr' else None
+    pre = []
+    ctr[0] += 1
+    if aptr is None:
+        nm0 = 'ldfxt%d' % ctr[0]
+        pre = ['  %%%s_p = inttoptr %s %%arg%d to ptr' % (nm0, pty, argn)]
+        aptr = '%%%s_p' % nm0
+    nm = 'ldfxt%d' % ctr[0]
+    edit = pre + ['  %%%s = load i16, ptr %s, align 2' % (nm, aptr),
+                  '  %s = zext i16 %%%s to i64' % (xname, nm)]
+    out = []
+    for i, l in enumerate(lines):
+        if i == xi:
+            out.extend(edit)
+        else:
+            out.append(l)
+    fn.body = '\n'.join(out)
+    return 1
+
+
 def find_loop_slot(fn, lines, blk_meta, blk_va, rD):
     """rD レジスタ対応の reg2mem slot のうち、このブロックに store が無く、
     このブロックを pred に持つ (loop header の) ブロックで reload されるもの。"""
@@ -1582,6 +1674,74 @@ def fix_f3c_fn(fn, fv, rep, ctr):
     return 1
 
 
+def ir_succ(blocks):
+    """IR の行ブロック列 → 後続ブロックの index 列。終端命令 (br/switch/ret/unreachable) のラベル参照で結ぶ。終端が無い block は次へ落ちる"""
+    name2idx = {}
+    for k, ls in enumerate(blocks):
+        m = re.match(r'^([\w.$-]+):', ls[0]) if ls else None
+        if m:
+            name2idx[m.group(1)] = k
+    succ = []
+    for k, ls in enumerate(blocks):
+        term = None
+        for l in ls:
+            if re.match(r'^\s*(br|switch|ret|unreachable|indirectbr)\b', l):
+                term = l
+        if term is None:
+            succ.append([k + 1] if k + 1 < len(blocks) else [])
+        elif re.match(r'^\s*(ret|unreachable)\b', term):
+            succ.append([])
+        else:
+            succ.append(sorted({name2idx[x] for x in re.findall(r'label %([\w.$-]+)', term) if x in name2idx}))
+    return succ
+
+
+def ir_dominators(succ):
+    """entry = 0 からの支配集合 (反復データフロー)。dom[x] = x を支配する block の index 集合 (x 自身を含む)"""
+    n = len(succ)
+    pred = [[] for _ in range(n)]
+    for a in range(n):
+        for b in succ[a]:
+            pred[b].append(a)
+    dom = [set(range(n)) for _ in range(n)]
+    dom[0] = {0}
+    changed = True
+    while changed:
+        changed = False
+        for x in range(1, n):
+            if not pred[x]:
+                continue
+            new = set.intersection(*[dom[p] for p in pred[x]]) | {x}
+            if new != dom[x]:
+                dom[x] = new
+                changed = True
+    return dom
+
+
+def f3c_use_dom_at(fn, fv, first, rep_idx):
+    """機械語の最初の deref (entry 外) の IR ブロック B が、置換対象の全使用 rep_idx (行 index) を支配するなら、B の先頭 (label の直後) の行 index を返す。
+    B が無い・phi を含む・支配されない使用がある場合は None。修復 load を B の先頭へ置く根拠 (#1325)"""
+    lead = _f3c_leaders(fv.ins)
+    bstart = max([x for x in lead if x <= first], default=None)
+    blocks = fn.blocks()
+    starts, off = [], 0
+    for _bva, ls in blocks:
+        starts.append(off)
+        off += len(ls)
+    cands = [k for k, (bva, _ls) in enumerate(blocks) if bva == bstart]
+    if bstart is None or not cands:
+        return None
+    bi = cands[0]
+    if any(re.match(r'^\s*%[\w.$-]+ = phi ', l) for l in blocks[bi][1]):
+        return None
+    dom = ir_dominators(ir_succ([ls for _bva, ls in blocks]))
+    for k in rep_idx:
+        bk = max(j for j in range(len(blocks)) if starts[j] <= k)
+        if bi not in dom[bk]:
+            return None
+    return starts[bi] + 1
+
+
 ctr_f3cu = [0]             # fix_f3c_use 専用 counter
 
 
@@ -1607,7 +1767,7 @@ def fix_f3c_use(fn, fv, rep, ctr):
         derefs = [u for u in uses if u[0] == 'deref' and u[2] == n and u[4] == 'arg']
         first = min(u[1] for u in derefs)
         raws = [u for u in uses if u[0] == 'raw' and u[2] == n]
-        if first not in blk0 or not all(u[3] == 64 for u in derefs) or any(u[1] > first for u in raws):
+        if not all(u[3] == 64 for u in derefs) or any(u[1] > first for u in raws):
             continue
         ptrarg = pty.get(n, 'i64') != 'i64'
         argre = re.compile(r'(?<![\w.$-])%arg' + str(n) + r'(?![\w.$-])')
@@ -1629,16 +1789,23 @@ def fix_f3c_use(fn, fv, rep, ctr):
         rep_idx = idx[keep:]
         if not rep_idx:
             continue
-        entry_end = next((k for k in range(2, len(lines)) if re.match(r'^[\w.$-]+:', lines[k])), len(lines))
-        if rep_idx[0] >= entry_end:
-            rep['f3c_use_not_entry'] = rep.get('f3c_use_not_entry', 0) + 1
-            continue
-        if keep == 0:
-            at = 2
-            while at < len(lines) and re.match(r'^\s*%[\w.$-]+ = alloca ', lines[at]):
-                at += 1
+        if first in blk0:
+            entry_end = next((k for k in range(2, len(lines)) if re.match(r'^[\w.$-]+:', lines[k])), len(lines))
+            if rep_idx[0] >= entry_end:
+                rep['f3c_use_not_entry'] = rep.get('f3c_use_not_entry', 0) + 1
+                continue
+            if keep == 0:
+                at = 2
+                while at < len(lines) and re.match(r'^\s*%[\w.$-]+ = alloca ', lines[at]):
+                    at += 1
+            else:
+                at = rep_idx[0]
         else:
-            at = rep_idx[0]
+            at = f3c_use_dom_at(fn, fv, first, rep_idx)
+            if at is None:
+                rep['f3c_use_not_dom'] = rep.get('f3c_use_not_dom', 0) + 1
+                continue
+            rep['f3c_use_dom'] = rep.get('f3c_use_dom', 0) + 1
         ctr[0] += 1
         nm = 'ldfxu%d' % ctr[0]
         for k in rep_idx:
@@ -1871,7 +2038,7 @@ def main():
     ap.add_argument('--report')
     ap.add_argument('--only', help='カンマ区切りの VA (16進) のみ修復')
     ap.add_argument('--dry-run', action='store_true')
-    ap.add_argument('--passes', help='カンマ区切りで pass を限定 (f1,f1v,f2,f3a,f3b,f3c,f4)。既に ldfix 済みの IR へ F3c だけを重ねる用 (#509)')
+    ap.add_argument('--passes', help='カンマ区切りで pass を限定 (f1,f1v,f2,f3a,f3b,f3c,f3d,f4)。既に ldfix 済みの IR へ F3c だけを重ねる用 (#509)。F3d は既定で無効 (--passes f3d で有効化・LD-127 #2745)')
     ap.add_argument('--f4-no-consumer', action='store_true', help='F4 の consumer 復元 (and i1) だけ外す (ネガコン, #564)')
     ap.add_argument('--no-f4', action='store_true', help='F4 (#564) を無効化 (ネガコン / 旧出力との差分確認)')
     a = ap.parse_args()
@@ -1884,10 +2051,11 @@ def main():
         F3C_ARITY[int(m.group('name')[len('function_'):], 16)] = len([x for x in m.group('args').split(',') if x.strip()])
     rep = collections.OrderedDict()
     ctr = [0]
-    counts = collections.OrderedDict((k, 0) for k in ('f1', 'f1v', 'f2', 'f3a', 'f3b', 'f3c', 'f4'))
-    fn_lists = collections.OrderedDict((k, []) for k in ('f1', 'f1v', 'f2', 'f3a', 'f3b', 'f3c', 'f4'))
+    counts = collections.OrderedDict((k, 0) for k in ('f1', 'f1v', 'f2', 'f3a', 'f3b', 'f3c', 'f3d', 'f4'))
+    fn_lists = collections.OrderedDict((k, []) for k in ('f1', 'f1v', 'f2', 'f3a', 'f3b', 'f3c', 'f3d', 'f4'))
     ctr_f1v = [0]               # F1v は専用 counter (F1〜F3 の SSA 名採番を不変に保つ)
     ctr_f4 = [0]                # F4 も専用 counter
+    ctr_f3d = [0]               # F3d も専用 counter
     out_parts = []
     last = 0
     nfn = 0
@@ -1904,12 +2072,14 @@ def main():
             mach.cover(va, max(blk_vas))
         fv = FnMach(mach, va, blk_vas)
         try:
-            for tag, func in (('f1', fix_f1), ('f1v', fix_f1v), ('f2', fix_f2), ('f3a', fix_f3a), ('f3b', fix_f3b), ('f3c', fix_f3c), ('f4', fix_f4)):
+            for tag, func in (('f1', fix_f1), ('f1v', fix_f1v), ('f2', fix_f2), ('f3a', fix_f3a), ('f3b', fix_f3b), ('f3c', fix_f3c), ('f3d', fix_f3d), ('f4', fix_f4)):
                 if passes is not None and tag not in passes:
                     continue
                 if tag == 'f4' and a.no_f4:
                     continue
-                c = ctr_f1v if tag == 'f1v' else ctr_f4 if tag == 'f4' else ctr
+                if tag == 'f3d' and passes is None:
+                    continue
+                c = ctr_f1v if tag == 'f1v' else ctr_f4 if tag == 'f4' else ctr_f3d if tag == 'f3d' else ctr
                 if func(fn, fv, rep, c):
                     counts[tag] += 1
                     fn_lists[tag].append('%x' % va)
@@ -1923,8 +2093,8 @@ def main():
     for k in counts:
         rep[k + '_fns'] = counts[k]
         rep[k + '_vas'] = fn_lists[k]
-    log('F1(load_dropped)=%d F1v(variant)=%d F2(spill_slot)=%d F3a(old-value)=%d F3b(count-load)=%d F3c(store-arg)=%d F4(frame-read)=%d (errors=%d)'
-        % (counts['f1'], counts['f1v'], counts['f2'], counts['f3a'], counts['f3b'], counts['f3c'], counts['f4'], rep.get('errors', 0)))
+    log('F1(load_dropped)=%d F1v(variant)=%d F2(spill_slot)=%d F3a(old-value)=%d F3b(count-load)=%d F3c(store-arg)=%d F3d(type-tag)=%d F4(frame-read)=%d (errors=%d)'
+        % (counts['f1'], counts['f1v'], counts['f2'], counts['f3a'], counts['f3b'], counts['f3c'], counts['f3d'], counts['f4'], rep.get('errors', 0)))
     if not a.dry_run:
         open(a.outfile, 'w').write(result := ''.join(out_parts))
     if a.report:

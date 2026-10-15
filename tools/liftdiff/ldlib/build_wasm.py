@@ -45,6 +45,14 @@ def newer(a, b):
     return not os.path.exists(b) or os.path.getmtime(a) > os.path.getmtime(b)
 
 
+def ensure_native():
+    """work/ld_native を rt/ の現版で作り直す。古い実行器は仮 proc の thunk を敷けず、fvm の全 case が segv する (#3088)。"""
+    out = os.path.join(ROOT, 'work', 'ld_native')
+    srcs = [os.path.join(ROOT, 'rt', f) for f in ('ld_native.c', 'ld_ms_call.S', 'ld_core.h')]
+    if any(newer(s, out) for s in srcs):
+        sh(['gcc', '-O1', '-g', '-Wall', '-Wno-unused-function', '-o', out, srcs[0], srcs[1], '-lm'])
+
+
 def build(t, force=False):
     if t.get('clift'):
         from ldlib import clift
@@ -61,9 +69,11 @@ def build(t, force=False):
     sigs = json.load(open(sigs_p))
     defined = {k for k, v in sigs.items() if v['defined']}
     ir2 = W + '/ir_instr.ll'
+    if t.get('site_trace') and not t.get('block_trace'):
+        raise SystemExit('[build] site_trace には block_trace が必要 (site の VA は block 入口の記録で決まる): %s' % t.get('name'))
     if force or newer(ir, ir2):
         t0 = time.time()
-        n = irtool.instrument(ir, ir2, t.get('fn_prefix', 'function_'), blocks=bool(t.get('block_trace')))
+        n = irtool.instrument(ir, ir2, t.get('fn_prefix', 'function_'), blocks=bool(t.get('block_trace')), sites=bool(t.get('site_trace')))
         print('[build] instrumented %d functions (%.1fs)' % (n, time.time() - t0))
     extra_objs = []
     extra_defined = set()
@@ -130,7 +140,7 @@ def build(t, force=False):
         cc(simd_c, W + '/obj/simd.o')
     out = W + '/ld_wasm.cjs'
     if force or any(newer(o, out) for o in objs):
-        exports = '_ld_w_inbuf,_ld_w_layout,_ld_w_init,_ld_w_add_wr,_ld_w_snapshot,_ld_w_blob,_ld_w_fix,_ld_w_case_begin,_ld_w_fn,_ld_w_arg,_ld_w_arg_kind,_ld_w_nargs,_ld_w_case_end,_ld_w_state,_emscripten_stack_get_current,__emscripten_stack_restore,_malloc,_free'
+        exports = '_ld_w_inbuf,_ld_w_layout,_ld_w_init,_ld_w_add_wr,_ld_w_snapshot,_ld_w_reset,_ld_w_blob,_ld_w_fix,_ld_w_case_begin,_ld_w_fn,_ld_w_arg,_ld_w_arg_kind,_ld_w_nargs,_ld_w_case_end,_ld_w_state,_emscripten_stack_get_current,__emscripten_stack_restore,_malloc,_free'
         gb = t.get('global_base', 0x10000000)
         mem = t.get('initial_memory', 0x16000000)
         for e in t.get('init_exports', []):

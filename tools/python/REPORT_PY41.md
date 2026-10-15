@@ -184,10 +184,10 @@
 | isChannelMuted | 0xd59790 | bool | `mute` を返す |
 | isChannelSolo | 0xd59a80 | bool | `solo` を返す |
 | getChannelColor | 0xd594b0 | int | `color` をそのまま返す (stub: 0x--BBGGRR) |
-| getGridBit | 0xd5b420 | bool | `steps[position]` を返す (0..63 外は code 4) |
+| getGridBit | 0xd5b420 | bool | `steps[position]` を返す (position ≥ 64 は code 4。position < 0 は 0 を返す: #2878 で訂正、`REPORT_PY101.md`) |
 | channelNumber | 0xd58f80 | int | 選択の並びで offset 番目 (0 = 先頭)、超えたら最後の選択。無選択は canBeNone で -1 / 0 |
 
-- 範囲外 code: 4 関数 (isChannelMuted・isChannelSolo・getChannelColor・getGridBit) は channels 共通の `CH` 検査 (code 4 "Index out of range")。PE で `-4` を確認したのは `selectOneChannel` のみ (REPORT_PY69)。この 4 関数は PE 未確認。`channelNumber` は index 引数が無いため範囲外 code を持たず、offset 超過は最後の選択を返す。
+- 範囲外 code: 4 関数 (isChannelMuted・isChannelSolo・getChannelColor・getGridBit) は channels 共通の `CH` 検査 (code 4 "Index out of range")。PE で `-4` を確認したのは `selectOneChannel` のみ (REPORT_PY69)。この 4 関数は PE 未確認。ただし getGridBit の position < 0 は PE で 0 を返すと確認し、本節の code 4 を #2878 で訂正した (`REPORT_PY101.md`・position ≥ 64 は PE 未照合)。`channelNumber` は index 引数が無いため範囲外 code を持たず、offset 超過は最後の選択を返す。
 - 仮置き (stub に記述なし): `getGridBit` の position 範囲は `setGridBit` と同じ 0..63。`channelNumber` の負の offset は先頭扱い。useGlobalIndex は未モデル (グループ無し・既存関数と同じ扱い)。
 - PM agent の判断待ち: getGridBit の position は必須か (PE fmt `i|ii` は任意、stub と生成表は必須)・既定案: stub 準拠 (現実装)。
 
@@ -203,46 +203,7 @@
 - 作業用ビルド (`dist/`・`work/` は gitignore): `build_cpython_wasm.sh` 3 分 41 秒 (4 core)、`FLPY_SKIP_TABLE=1 build_flpy.sh` 5.2 s。load average は測定時 1.4〜1.5。
 - コード差分: `git diff fde09f94 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (測定後の commit は本 REPORT のみ)。
 
-## PY-64 (#2033): 分岐先 6 件の読む値・書く値・`[rbp+0x5b8]` 式 (実測・逆アセンブル)
+## PY-64 (#2033): 分岐先 6 件の読む値・書く値・`[rbp+0x5b8]` 式 (要約)
 
-親: #1911 (PY-53)。前段: #1982 (PY-60)。既知類型との関係: 該当なし (逆アセンブルの読解のみ)。
-
-## 結論 (部分達成)
-
-- 分岐先 4 件 (0x104caae・0x104c2a6・0x104c64f・0x104c919) は、共通後半 0x104caae の手前の読む値・書く値・`[rbp+0x5b8]` の式を VA つきで確定。
-- 残り 2 件 (0x1047497・0x104aa87) は `[rbp+0x5b8]` 書込み箇所 (55 件・15 件) の列挙まで。式は未読 (PY-88 に移管)。
-- 検算: jcc/jmp 614 辺の制御フロー照合 (objdump 対 capstone) は mismatch 0。式の別算法照合は未実施。
-
-## 測定
-
-- 素材を `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin'` で展開 (2.3 秒)。展開先は `work/py64/extracted/block00031_PE.bin`。
-- `analysis/py53_dispatch.py work/py64/extracted/block00031_PE.bin work/py53` → 4,664 命令・`work/py53/fn.txt`。`analysis/py60_objdump_check.py` → 614 辺 一致 614・不一致 0 (exit 0)。
-- `analysis/py64_branch_regions.py work/py53/fn.txt` → 到達命令数 (0x1047497 2556・0x104aa87 1284。両者で 141 命令が重なる) と書込み 76 件 (重複込み。0x1047497 55・0x104aa87 15・他 3 件は各 2)。一意な書込みは 71 件 (重なる 5 件は 1 件と数える)。関数全体の直接書込みは 74 件。
-
-## 分岐先ごとの式 (入口 `[rbp+0x5b8]` = edx、0x1046d6b)
-
-- 共通: r8d は `[rbp+0x5c0]`。F = `P.0x3b8 + rint(K · [rbp+0x5b8] · (P.0x3bc − P.0x3b8))`。`rint` は `call 0x40c660` (`cvtsd2si`・最近接偶数)、K = 2^-30 (VA 0x104ccd8)。F は r8d&0x20 のときだけ適用する。
-- 0x104c2a6 (ecx=0x40000000): P = `*(*(0x15e2eb8)+0x9e0)`。(a) F (0x104c311)。(b) r8d&1=0 かつ r8d&2≠0 で `[rbp+0x5b8] = dword[*(0x15e36d8)]` (0x104c3f0)。r8d&1 では `dword[*(0x15e36d8)] = [rbp+0x5b8]` (0x104c335) と `dword[*(0x15e2110)] = [rbp+0x2cc]` (0x104c3ca) を書く。
-- 0x104c64f (ecx=0x40000002): P = `*(*(0x15e2eb8)+0xb28)`。(a) F (0x104c6ba)。(b) r8d&1=0 かつ r8d&2≠0 で `[rbp+0x5b8] = dword[*(0x15e2c50)]` (0x104c769)。r8d&1 では `dword[*(0x15e2c50)] = [rbp+0x5b8]` (0x104c6ea) と `[*(0x15e2218)]` の各要素の `vtbl[0x128]` 呼出し。
-- 0x104c919 (ecx=0x40000005): P = `*(*(0x15e2eb8)+0x778)`。(a) F (0x104c984)。(b) r8d&1=0 または `byte[0x15e3500]≠0` で r8d&2≠0 なら `[rbp+0x5b8] = dword[*(0x15e28c8)]` (0x104c9e6)。r8d&1 かつ `byte[0x15e3500]=0` かつ `byte[*(0x15e2900)+0x3c]=0` なら `dword[*(0x15e28c8)] = [rbp+0x5b8]` (0x104c9c0)。
-- 0x104caae (ecx の既定値): `[rbp+0x5b8]` は書かない。共通後半で `[rbp+0x5b8]` を読んで `call 0x12df2a0` の引数 (r9d) にする (条件: `[rbp+0x52f]≠0` かつ r8d&0x40)。
-- 共通の出口: `[rbp+0x584] = [rbp+0x5b8]` (0x104cc6b)。早期 exit は `[rbp+0x584] = -1` のまま 0x104cc72 へ飛ぶ。
-
-## 未了 (2 件)
-
-| 分岐先 | 入る ecx | 到達命令数 | `[rbp+0x5b8]` 書込み | -1 exit への分岐元 |
-|---|---|---|---|---|
-| 0x1047497 | [0, 0x10000000) | 2556 (0x104aa87 と 141 命令が重なる) | 55 件 | 0x10474b9・0x104846a・0x104847b・0x10495f6・0x1049621・0x104a7ba・0x104a7d0 |
-| 0x104aa87 | [0x70000000, 0xf0000000) (2 区間の和: [0x80000000, 0xf0000000) と [0x70000000, 0x80000000)) | 1284 (0x1047497 と 141 命令が重なる) | 15 件 | 0x104a7ba・0x104a7d0 |
-
-書込み箇所の VA と直前命令は `analysis/py64_branch_regions.py` の出力が正本。各式の読む値・書く値は未読。書込み件数は直接 `mov dword ptr [rbp+0x5b8], reg` の列挙で、一意な書込みは 71 件。
-間接書込みは列挙に含まれない: 0x104a924 `lea r8,[rbp+0x5b8]` → `call 0xc61250` の 0xc6129a `mov dword ptr [rdi], eax` (0xc62db0 の戻り値の下位 1 byte が非 0 のとき書く)。この箇所は 0x1047497 と 0x104aa87 の到達範囲に含まれ、確定 4 件の到達範囲には含まれない。
-
-## 受入条件・未解決
-
-- (1) 6 件の読む値・書く値・式の VA つき確定: 部分達成 (4/6)。(2) mismatch 0 の検算: 部分達成 (制御フローのみ)。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 0x1047497 (55 件) と 0x104aa87 (15 件) の書込み式・読む値・書く値 | ecx ∈ [0, 0x10000000) と [0x70000000, 0xf0000000) 経路の戻り値 | PY-88 (子) |
-| 4 件の式の別算法照合 | 式の確定の検算 | PY-88 (子) |
+- 分岐先 4 件 (0x104caae・0x104c2a6・0x104c64f・0x104c919) の共通後半の手前の式は確定。全文は `REPORT_PY41_APPENDIX.md` の PY-64 節 (250 行上限のため分割移動)。
+- 残り 0x1047497・0x104aa87 の `[rbp+0x5b8]` 書込み 65 件の式は PY-88 (#2788) で機械スライスし、部分達成。未解決は子 #2874 (PY-99) に移管。全文は `REPORT_PY41_APPENDIX.md` の PY-88 節。

@@ -10,7 +10,9 @@
   "--enable-libxvid"
  ],
  "ignoreLicensePaths": [
-  "tools/startup/license_obs/license_obs.sh"
+  "tools/startup/license_obs/license_obs.sh",
+  "tools/startup/vreg/js/license_import.mjs",
+  "tools/startup/vreg/test/license_import.test.mjs"
  ],
  "flTexts": [
   {

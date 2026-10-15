@@ -118,7 +118,7 @@
 
 - 対照 (§10.3 の 3b581236) と同じ失敗形 (Phase B OOB・rec=7・1 項目)。1 回測定 (n=1)。
 - 表示行 (`[fw][ov] hooks[...]`・`[fw][tls] ...`) の追加は dispatch 数を変えない (smoke の dispatch=38 は維持)。
-- 測定 commit `4c00ec24` の framework コードは、表示行を入れた `86b6bdc2` の親 `9f403c97` に対して表示行のみ (`git diff 9f403c97 4c00ec24 -- tools/plugins/framework ':!*.md'`: `fw_boot.c` +3 と `fw_rt.c` の trace 行)。基点 `9f403c97` から `origin/main` (fix round 5 の取得時点 `064af0d8`) までに framework の 5 ファイルが変わった: `fw_smoke_check.py` (+42/-10)・`hostshim/hs_irfix.py` (+64)・`hostshim/hs_plug.c` (+17・`hs_fw_init_tls`・#2571)・`fw_269_verify.sh`・`fw_pack_stage1.sh` (各 1 行のコメント)。本 PR はこれを取り込んでいない。merge 後の挙動は未測定 (REPORT_2115.md §9・起票先 #2115)。
+- 測定 commit `4c00ec24` の framework コードは、表示行を入れた `86b6bdc2` の親 `9f403c97` に対して表示行のみ (`git diff 9f403c97 4c00ec24 -- tools/plugins/framework ':!*.md'`: `fw_boot.c` +3 と `fw_rt.c` の trace 行)。基点 `9f403c97` から `origin/main` (fix round 5 の取得時点 `064af0d8`) までに framework の 5 ファイルが変わった: `fw_smoke_check.py` (+42/-10)・`hostshim/hs_irfix.py` (+64)・`hostshim/hs_plug.c` (+17・`hs_fw_init_tls`・#2571)・`fw_269_verify.sh`・`fw_pack_stage1.sh` (各 1 行のコメント)。（fix round 5 時点の記述。現基点 `bbb07d80` は `origin/main` と framework 同一のため取り込み済み・§12.3。`fw_smoke_check.py` の判定は REPORT_2115.md §9 の表と §12.3 を参照・起票先 #2115）。
 - 測定後の実行コード差分 (fix round 6・commit `058c2049`・`fw_rt.c` の表示カウンタを分離): `git diff 4c00ec24 058c2049 -- tools/plugins/framework ':!*.md'` の出力は次の 23 行。LocalAlloc の trace は `g_local_trace`、TLS 関数の trace は `g_tls_trace` で数える。戻り値と分岐は変わらない (表示のみ)。
 
 ```diff
@@ -162,3 +162,51 @@ index 1ae5159c..641239e2 100644
 - 受入 2 は未達。戻り値の内容は次の形で確定した: getter は、`[0x7162d8]` が 1 なら `TlsGetValue(idx)`、0 なら `g_tls_slots[idx]` を返し、どちらも `0x4180d0` が確保した 0x288 byte の per-thread block を指す。`return 0` 注釈は、この block の代わりに 0 を返す。
 - Phase B は、基点 `9f403c97` では framework 初期化を通らない (`hs_plug.c` `hs_e2e_run` → `CreatePlugInstance`)。TLS 値を正しくしても OOB は消えず、block の内容 (`+568`) の native 初期化元が次の壁。main では #2571 (PR #2595) が TLS 初期化 (`hs_fw_init_tls`) を入れたが、`REPORT_2571.md` §3 では初期化ありでも OOB が残る。残る OOB の起票先は #2115 (継続)。
 - 注釈の変更 (E3) は Phase B の失敗形を変えるだけで、E2E は PASS にならない (E3 の実測は §11.5)。E1 は未コミットのため判定に使わない。採用はしない。
+
+## 12. 0x4181e0 / 0x4180d0 の注釈を native の TLS block 意味に置換 (受入 2・測定 commit eeb6babf)
+
+### 12.1 結論
+
+- 戻り値の確定: `0x4181e0` (TLS getter) は per-thread block (0x288 byte・`0x4180d0` が `LocalAlloc(0x40, 0x288)` で確保) を返す。呼出元は戻り値を `[BLK+0x80]` (RETSLOT) から読む (`fw0.restored.ll` の `call i64 @function_4181e0()` 直後の `load i64 9048192`) ため、注釈は RETSLOT にも store する。
+- `+568` と `+520` の関係: 呼出元ごとに、`[BLK+0x80]` (RETSLOT) の値を基底にして読む field が異なる。native `0x4e5f50` (call site `0x4e5f59`) は `+568` を読む。lift の `fw0.restored.ll:2361` (`function_407200` = native `0x407200`・call site `0x407204`) は `+520` を読む。どちらも同じ 0x288 byte の block 内の別 field で、矛盾しない。
+- 注釈: `0x4180d0` を native の意味 (`LocalAlloc(64, 648)`・`TlsSetValue([0x6d6e70], blk)`) に置換。`0x4181e0` の `return 0` stub を、native の分岐 (`TlsGetValue` → 0 なら `0x4180d0` → `TlsGetValue` → なお 0 なら `[0x7162d0]`) に置換。
+- 副次修正 (`fw_rt.c`・3512fa97): `LocalAlloc` / `GlobalAlloc` の `LMEM/GMEM_ZEROINIT` (0x40) を `HEAP_ZERO_MEMORY` (0x08) に変換する。従来は値が違うため 0 埋めされていなかった。Phase B への寄与は分離できていない (§12.4)。
+- Phase A は回帰なし (`dispatch=38 ff=0`・`framework init` の戻り値は `0x0` → `0x118b6668`)。Phase B は OOB のまま (`rec=7`・E2E FAIL 1 項目)。残課題は子 issue #2911 (`[PLG-P0b-26]`)。
+
+### 12.2 根拠
+
+- `0x4181e0` の native 分岐は REPORT_2115 §2・§11.2。`0x4180a0` の size 引数は lift で `ptrtoint @683` に折り畳まれる (§11.3)。`0x4180d0` の注釈では定数 648 を直接渡して回避する。
+- `flag [0x7162d8]==0` の分岐 (`gs:[0x58]` 直読) は `TlsGetValue` で近似した (推定。Phase A/B は `_StartLib` / `hs_fw_init_tls` で flag=1)。
+
+### 12.3 実測 (n=1・`hs_e2e.sh --fresh`・nproc 4)
+
+| 条件 | commit | Phase A | Phase B | 所要 (real) | load average (開始 → 終了) |
+|---|---|---|---|---|---|
+| 対照: 現注釈 (`0x4181e0` `return 0`) | bbb07d80 | dispatch=38 ff=0 | OOB・`rec=7`・FAIL 1 項目。失敗位置 `0x40d807` (0) ↔ `0x4e5fa6` (0) | 117.6 s | 2.11 1.88 0.93 → 1.18 1.60 0.94 |
+| V1 (参考・作業ツリー・未 commit・判定に不使用): `0x4180d0` のみ置換・`0x4181e0` stub を外す | bbb07d80 + 変更 | dispatch=38 ff=0 | OOB・`rec=7`。`0x4e5fa6` の target `0x6572432000000000` (文字列断片) ×5 | 119.9 s | 0.44 1.30 0.88 → 1.17 1.25 0.92 |
+| V2 (参考・未 commit・判定に不使用): V1 + ZEROINIT 修正 | bbb07d80 + 変更 | dispatch=38 ff=0 | V1 と同形 (target `0x6572432000000000` ×5) | 118.5 s | 0.59 1.01 0.87 → 0.94 1.00 0.89 |
+| **HEAD: V2 + `0x4181e0` を native TLS getter に置換 (RETSLOT store)** | **eeb6babf** | **dispatch=38 ff=0** | **OOB・`rec=7`・FAIL 1 項目。`0x4e5fa6` (0x1712) ↔ `0x40d807` (0)** | **118.0 s** | **0.77 0.85 0.85 → 0.97 0.90 0.87** |
+
+- 受入 3 の「ネガティブコントロール」は、上の表の「対照: 現注釈 (`0x4181e0` `return 0`)」行 (測定基点 bbb07d80) を指す。
+- HEAD の `framework init`: `0x418120 -> rax=0x118b6668, [0x6d6e70]=0x1, [0x7162d8]=1`。`TlsGetValue(1) -> 0x118b6668` (per-thread block 0x288 の先頭)。
+- `fw_stage2.sh` (HEAD・fw_route の wasm を消して emcc から再ビルド): rc 1・`SMOKE PASS` (dispatch=38 units_done=0 va=1 heap=1 ff=0)・24.2 秒・load 0.49 0.80 0.83 → 0.84 0.86 0.85。`fw_smoke_check.py` は `runerr 1 (期待 0)`・`init_reach 16 (期待 288)` で FAIL (rc=1)。対照 (bbb07d80・全段 5 分 54.7 秒・load 0.25 0.45 0.23 (開始)) でも同じ FAIL で、既存の状態 (#2510)。
+- 測定後のコード差分: `git diff eeb6babf HEAD -- tools/plugins/framework ':!*.md'` は 0 行 (本 REPORT の追記のみ)。
+- 測定基点: `bbb07d80` (PR の merge-base) は `origin/main` と framework 同一 (`git diff bbb07d80 origin/main -- tools/plugins/framework` は 0 行)。PR の実行コード差分は `bbb07d80` → HEAD で `fw_hostfix.py`・`fw_rt.c` の 2 ファイルのみ (`git diff bbb07d80 HEAD -- tools/plugins/framework ':!*.md'`)。
+- `0x4180d0` の戻り値: 注釈版は `sext(TlsSetValue の i1)` で、成功 `-1`・`LocalAlloc` 失敗 `0`。native の戻り値は未確認。lift の呼出元 (`fw0.restored.ll:7224`・`fw5.restored.ll:8160`・`r2.restored.ll:25494`・`25576`) は戻り値を後続で参照しない (SSA 参照 0 件) ため、戻り値の差は影響しない。
+- 注釈の失敗経路 (未対応・逆アセンブル確認 `fl-win64` の `block18983_PE.bin`): native の `0x4180d0` は、`[0x6d6e70] == -1` (`0x4180e0`) と `LocalAlloc` 失敗 (`0x4180a0` の戻り値 0・`0x4180fa`) で `0x40e420(ecx=0xe2)` を呼んでから戻る。注釈版はこの呼出しを持たず、`LocalAlloc` 失敗で 0 を返すだけ。成功経路の値には影響しない (§12.5)。
+
+### 12.4 残る課題と判定
+
+- 受入 2 (注釈の修正と Phase B の変化の実測): 達成。`0x4181e0` の戻り値は per-thread block で確定し、注釈を修正した。Phase A は回帰なし。Phase B の変化 (失敗位置の target `0 → 0x1712`) を実測。
+- Phase B の PASS は未達 (子 issue #2911)。
+- `ZEROINIT` 修正の単独効果は未分離 (V1・V2 は未 commit の参考測定のため判定に使わない)。native 意味に合わせた修正として残す。
+- n=1 のみ。所要の min–max (n≥3) は未取得 (#2911 の受入 3)。
+
+### 12.5 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| Phase B OOB (`0x40d807` target 0 ↔ `0x4e5fa6` target `0x1712`) | E2E PASS 不可 | #2911 `[PLG-P0b-26]` |
+| r3 系の引数付き呼出 (8 件) と 0 引数定義の不一致 | 引数規約 | #2911 (受入 4) |
+| `fw_smoke_check.py` FAIL (`runerr=1`・`init_reach=16`・main の既存) | fw_stage2 の rc | #2510 (OPEN) |
+| `0x4180d0` 注釈の失敗経路の省略: native は `[0x6d6e70]==-1` と `LocalAlloc` 失敗で `0x40e420(ecx=0xe2)` を呼んでから戻る (§12.3 の逆アセンブル)。注釈版は呼ばない | 失敗経路のみ。成功経路の値と §12.3 の測定には影響しない。`0x40e420` の副作用は未確認 | #2911 (注意) |

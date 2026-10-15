@@ -254,7 +254,11 @@ void InitializeCriticalSection(PCRITICAL_SECTION cs) {
 
 void EnterCriticalSection(PCRITICAL_SECTION cs) {
     ShimCSEntry* e = cs_entry(cs, 0);
-    if (!e) { shim_unimplemented("EnterCriticalSection (未初期化/未登録)"); return; }
+    if (!e) {
+        fprintf(stderr, "[shim] CS-MISS key=0x%x\n", (unsigned)(uintptr_t)cs);
+        shim_unimplemented("EnterCriticalSection (未初期化/未登録)");
+        return;
+    }
 #if defined(__EMSCRIPTEN_PTHREADS__)
     if (pthread_mutex_lock(&e->mtx) != 0) {
         shim_unimplemented("EnterCriticalSection (lock 失敗)");

@@ -30,6 +30,7 @@ SNAPINS = {
     'gate': {'proc': 0x1804c2f50, 'exports': [0x1804c2f50], 'stubs': {}, 'also': [0x180295f20, 0x180020e70]},
     'resonator': {'proc': 0x180743390, 'exports': [0x180743390], 'stubs': {}, 'also': [0x180fbc1f4, 0x180fbbfb8, 0x180fbdfcc, 0x180fbe018, 0x180fcf904, 0x180fd54cc, 0x180fd62dc, 0x180fd6320, 0x180fb6ce0, 0x180fd648c, 0x180fbdef4, 0x180fe5dfc, 0x180fd6498, 0x180fd662c, 0x180fe5f40, 0x180fd3144]},
     'stereo': {'proc': 0x18080d4d0, 'exports': [0x18080d4d0], 'stubs': {}, 'also': [0x180fcd690, 0x180fce0d0, 0x180fdc470, 0x180fdc660, 0x180fdc700, 0x180fdfdb0, 0x180fdc6d8]},
+    'delay': {'proc': 0x1802ed7f0, 'exports': [0x1802ed7f0], 'stubs': {}, 'also': [0x180005c50, 0x18004cf20, 0x180289ea0, 0x1802ecfc0, 0x1802ed3b0, 0x1802ed490, 0x1802ed550, 0x1802ed640, 0x1802ed790, 0x180f878e0, 0x180f8791c, 0x180f87cac, 0x180f87d40, 0x180f87f24, 0x180f88084, 0x180f880a4, 0x180f880e4, 0x180f88104, 0x180fa8534, 0x180fb5b4c, 0x180fb5bb4, 0x180fb5c20, 0x180fb5c6c, 0x180fb5dd0, 0x180fb5e6c, 0x180fb5f3c, 0x180fb5f5c, 0x180fb5f8c, 0x180fb6bf8, 0x180fb6c0c, 0x180fb6ce0, 0x180fbbfb8, 0x180fbc1f4, 0x180fbde90, 0x180fbdfcc, 0x180fbe018, 0x180fc1920, 0x180fc4590, 0x180fc61dc, 0x180fc61e4, 0x180fc6870, 0x180fc6d70, 0x180fc7468, 0x180fcce40, 0x180fcd400, 0x180fcd690, 0x180fcdbfc, 0x180fcde58, 0x180fce0d0, 0x180fcf904, 0x180fd0898, 0x180fd08d0, 0x180fd099c, 0x180fd0a64, 0x180fd0a98, 0x180fd0ac8, 0x180fd0b50, 0x180fd1540, 0x180fd172c, 0x180fd185c, 0x180fd1ac4, 0x180fd1b00, 0x180fd1b34, 0x180fd1f30, 0x180fd1f84, 0x180fd27a8, 0x180fd2a60, 0x180fd2ba0, 0x180fd2c10, 0x180fd2c90, 0x180fd2d38, 0x180fd2f20, 0x180fd2fcc, 0x180fd3144, 0x180fd320c, 0x180fd4f30, 0x180fd51cc, 0x180fd5250, 0x180fd54cc, 0x180fd5bcc, 0x180fd5bf4, 0x180fd5f04, 0x180fd5f30, 0x180fd620c, 0x180fd622c, 0x180fd62a8, 0x180fd62c8, 0x180fd62dc, 0x180fd6320, 0x180fd648c, 0x180fd6498, 0x180fd662c, 0x180fd66a0, 0x180fd7d94, 0x180fd7f54, 0x180fd8988, 0x180fd89f0, 0x180fd8aac, 0x180fd8bd4, 0x180fd8d08, 0x180fdb6e0, 0x180fdc320, 0x180fdc470, 0x180fdc660, 0x180fdc6d8, 0x180fdc6ec, 0x180fdc700, 0x180fdc714, 0x180fdc7b8, 0x180fdc844, 0x180fdc858, 0x180fdc880, 0x180fdfdb0, 0x180fe027c, 0x180fe2470, 0x180fe24b8, 0x180fe2788, 0x180fe27b0, 0x180fe3284, 0x180fe3310, 0x180fe3488, 0x180fe34b0, 0x180fe34e8, 0x180fe3510, 0x180fe3690, 0x180fe3cd0, 0x180fe4020, 0x180fe4394, 0x180fe5c6c, 0x180fe5dfc, 0x180fe5ef0, 0x180fe5f00, 0x180fe5f0a, 0x180fe5f40, 0x181327120, 0x181327314, 0x181327348, 0x18132753c]},
 }
 STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ルート (snapins/lift/kh_lower.py) の shims/fail-fast stub と同じ扱い)
     0x181384040: 'void* FUN_181384040(void* d, const void* s, ulonglong n) { return memmove(d, s, (size_t)n); }',
@@ -53,12 +54,38 @@ static inline uint32_t kh_rcp_exact(uint32_t x) {
     int t = 253 - (int)e;
     return t <= 0 ? s : (s | ((uint32_t)t << 23) | kh_at_rcp[(x >> 11) & 0xfffu]);
 }
-static inline V128 rcpps(undefined1 dst[16], V128 src) {
-    V128 r; (void)dst;
+#define rcpps(dst, src) kh_rcpps(src)  /* dst は未使用 (Ghidra の 1 引数目)。値を捨てる */
+static inline V128 kh_rcpps(V128 src) {
+    V128 r;
     for (int i = 0; i < 4; i++) {
         uint32_t x, w;
         memcpy(&x, src.b + 4 * i, 4);
         w = kh_rcp_exact(x);
+        memcpy(r.b + 4 * i, &w, 4);
+    }
+    return r;
+}
+'''
+
+
+RSQRTPS_HELPER = r'''/* rsqrtps 2 引数形 rsqrtps(dest, src): 実機の近似表 (snapins/lift/gen_simd.py の kh_rsqrt_exact と同一表・同一指数則)。 */
+static const uint32_t kh_at_rsq_odd[4096] = %s;
+static const uint32_t kh_at_rsq_even[4096] = %s;
+static inline uint32_t kh_rsqrt_exact(uint32_t x) {
+    uint32_t s = x & 0x80000000u, e = (x >> 23) & 0xff, man = x & 0x7fffffu;
+    if (e == 0) return s | 0x7f800000u;
+    if (e == 0xff) return man ? (s | 0x7f800000u | (man | 0x400000u)) : (s ? 0xffc00000u : 0u);
+    if (s) return 0xffc00000u;
+    return (((uint32_t)(190 - (int)((e + 1) >> 1)) << 23) | ((e & 1) ? kh_at_rsq_odd[(x >> 11) & 0xfffu]
+                                                                    : kh_at_rsq_even[(x >> 11) & 0xfffu]));
+}
+#define rsqrtps(dst, src) kh_rsqrtps(src)  /* dst は未使用 (Ghidra の 1 引数目)。値を捨てる */
+static inline V128 kh_rsqrtps(V128 src) {
+    V128 r;
+    for (int i = 0; i < 4; i++) {
+        uint32_t x, w;
+        memcpy(&x, src.b + 4 * i, 4);
+        w = kh_rsqrt_exact(x);
         memcpy(r.b + 4 * i, &w, 4);
     }
     return r;
@@ -73,9 +100,26 @@ def approx_rcp_table():
     return gen_simd.load_approx_tables()['rcp']
 
 
+def approx_rsq_tables():
+    """同 approx_tables.b64 の rsq_odd / rsq_even 表 (各 4096 entry) を (odd, even) の C 配列リテラルで返す。"""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapins', 'lift'))
+    import gen_simd
+    t = gen_simd.load_approx_tables()
+    return t['rsq_odd'], t['rsq_even']
+
+
 def pe_bytes(pe, va, n):
     rva = va - pe.OPTIONAL_HEADER.ImageBase
     return pe.get_data(rva, n)
+
+
+THUNK_HDR = re.compile(r'^([\w \*]+?\s*\n?\s*)thunk_FUN_([0-9a-f]+)(\([^;{}]*\)\s*\n\s*\{)', re.S | re.M)
+
+
+def rewrite_thunks(t, va):
+    """関数 va の本文 (コメント除去済み): 定義ヘッダの thunk_FUN_<X> は FUN_<va>、本体の呼出 thunk_FUN_<X> は飛び先の FUN_<X> (jmp thunk なので同じ動作)。"""
+    t = THUNK_HDR.sub(lambda m: m.group(1) + 'FUN_%x' % va + m.group(3), t, count=1)
+    return re.sub(r'\bthunk_FUN_([0-9a-f]+)\b', r'FUN_\1', t)
 
 
 def infer_type(lines, sym):
@@ -106,6 +150,10 @@ def main():
     rc_bad = [l for l in alltxt.split('\n') if 'rcpps(' in l and not re.match(r'^\s*\w+ = rcpps\(\w+,\s*\w+\);\s*$', l)]
     if rc_bad:
         raise SystemExit('rcpps の非代入形を検出 (停止): ' + ' | '.join(rc_bad[:3]))
+    # rsqrtps も同じく代入形だけを許す (rsqrtps(D, S) の戻り値を捨てる形は停止)
+    rs_bad = [l for l in alltxt.split('\n') if 'rsqrtps(' in l and not re.match(r'^\s*\w+ = rsqrtps\(\w+,\s*\w+\);\s*$', l)]
+    if rs_bad:
+        raise SystemExit('rsqrtps の非代入形を検出 (停止): ' + ' | '.join(rs_bad[:3]))
     # --- グローバル
     gl = {}
     for m in re.finditer(r'\b(_DAT|_UNK)_([0-9a-f]{8,9})\b', alltxt):
@@ -118,6 +166,8 @@ def main():
     out = ['#include "ghidra_shim.h"', '/* 自動生成: ghidra_to_c.py %s (fix=%s) */' % (name, ','.join(sorted(f for f in fixes if f)) or 'none')]
     if 'rcpps(' in alltxt:
         out.append(RCPPS_HELPER % approx_rcp_table())
+    if 'rsqrtps(' in alltxt:
+        out.append(RSQRTPS_HELPER % approx_rsq_tables())
     for va, (ty, kind, _) in sorted(gtypes.items()):
         d = pe_bytes(pe, va, 16)
         out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
@@ -138,10 +188,15 @@ def main():
     for va in vas:
         t = src[va]
         t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
+        t = rewrite_thunks(t, va)
         t = re.sub(r'undefined1 (auVar\d+) \[16\];', r'V128 \1;', t)
+        t = re.sub(r'undefined1 (in_XMM\d+) \[16\];', r'V128 \1;', t)
+        t = re.sub(r'\b(in_XMM\d+)\._0_8_\b', r'\1._0_8_d', t)
+        t = re.sub(r'\bmaxps\((\w+),_DAT_([0-9a-f]+)\)', r'maxps(\1,(*(V128 *)gd_\2))', t)
         if tbase is not None:
             t = re.sub(r'&UNK_([0-9a-f]{8,9})\b', lambda m: '((unsigned char*)gt_%x + 0x%x)' % (tbase, int(m.group(1), 16) - tbase), t)
         t = re.sub(r'\*\(undefined1 \(\*\) \[16\]\)\((.*?)\) = (auVar\d+) << 0x20;', r'v128_store_shl32((void*)(\1), \2);', t)
+        t = re.sub(r'\*\(undefined1 \(\*\) ?\[16\]\)', r'*(V128 *)', t)
         if 'bitcast' in fixes:
             t = re.sub(r'\(float\)\(\(uint\)(\(.*?\)) & (_DAT_[0-9a-f]+|uVar\d+)\)', r'u2f(f2u\1 & \2)', t)
             t = re.sub(r'\(float\)\((\*\(uint \*\)\(.*?\)) & (uVar\d+)\)', r'u2f(\1 & \2)', t)

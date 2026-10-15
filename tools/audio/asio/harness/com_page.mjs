@@ -9,7 +9,9 @@ const cfg = {
   buf: +(q.get("buf") ?? 256),
   secs: +(q.get("secs") ?? 5),
   sr: +(q.get("sr") ?? 48000),
+  probe0: q.get("probe0") === "1",
 };
+if (cfg.probe0) FlAudioShim.prototype.probeBurst = async () => 0;   // 診断用: burst 探査を無効化 → 初期 depth は baseLatency 由来 (512 → depth 4)
 const logEl = document.getElementById("log");
 const log = (s) => { logEl.textContent += s + "\n"; console.log(s); };
 

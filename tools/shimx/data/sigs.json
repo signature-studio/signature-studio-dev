@@ -4970,6 +4970,12 @@
 ],
 "ret": "void"
 },
+"shimx_set_file_close_hook": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
 "shimx_set_intptr_limit": {
 "params": [
 "i32"

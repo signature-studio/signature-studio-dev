@@ -119,6 +119,9 @@
 
 - PR を出す前に `bash .github/scripts/pr-lint.sh --base origin/main --head HEAD --body-file <PR 本文ファイル>` を実行し、
   出力された違反 (REPORT 行数・repo 外パス・Closes と未達の整合・oc_artifacts の値域・DOC_MAP 未登録) を直してから push する。
+- launch を止め得る変更 (`infra/pm-worker/` の停止条件・既定値・launch の経路。#2795) を含む PR は、PR 本文に『本番への影響』を書く。deploy 後に launch が止まるか、止まる条件 (`launch_halted.reason`)、既定のままで止まるかを書く。
+- 既定値を変えるときは、本番に既にある状態 (VM の取り込み済みか・既存の変数) での挙動を書く。止まり得るなら、deploy の判断を依頼者に任せ、止まった状態の見方 (`/status` の `launch_halted`・`launch_halted_overdue`) を本文に添える。
+- 停止の規則は、規則を壊すと落ちるテストを同じ PR に入れる (`infra/pm-worker` は `npm run test:mutation`)。
 - 最終回答に: コミット hash・PR URL・e2e 実測結果・未解決 (起票先付き) を含めること。
 - **最終回答と同じ内容を、必ず `gh issue comment <N>` で起点の issue に投稿すること** (完了・停止・
   失敗のいずれでも)。最終回答は run の外からは読めない。投稿が無い run は「結果不明」として

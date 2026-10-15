@@ -196,6 +196,34 @@ GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow �
 
 鮮度 (`docs/WORKFLOW.md` §6): `git diff d3dd60c4 HEAD -- tools/legal/notices tools/gui/test/fonts.tsv tools/gui/test/fetch_fonts.sh ':!tools/legal/notices/REPORT.md'` の出力は空 (0 行)。検証 HEAD は本 REPORT 更新 commit。
 
+### main の `check` 失敗の修正 (#935・workflow 配線の前提。検証起点 `7c85004e` + `registry.json` 2 行・クリーン worktree・素材なし)
+
+- 原因: #116 (`39465297`) が追加した `tools/startup/vreg/js/license_import.mjs` と `tools/startup/vreg/test/license_import.test.mjs` が、ライセンスファイル名の正規表現 (`REL_LICENSE_NAME`) に名前だけ一致し、「記録なしの同梱 OSS」と誤検出された (`license_obs.sh` と同じ型。OSS のライセンス文ではなく vreg の .reg 取り込みスクリプトとテスト)。`notices.test.mjs` の 2 件 (実 registry の整合・CLI の check) と `cli.mjs check` が main で赤になっていた。workflow を配線するとこの赤が PR の job に出るため、同じ PR で `ignoreLicensePaths` に 2 ファイルを登録した (正規表現は変えない)。
+
+| 項目 (n=3。min–max) | 修正前 `7c85004e` | 修正後 |
+|---|---|---|
+| `node --test tools/legal/notices/notices.test.mjs` | 55 tests / 50 pass / 2 fail / 3 skipped (n=1) | 55 tests / 52 pass / 0 fail / 3 skipped・254–262 ms |
+| `node tools/legal/notices/cli.mjs check` | exit 1・FAIL (2 件) | exit 0・PASS components=22 (bundled 20) records=12 fonts=129 artifacts=0 |
+
+- 検出力の確認 (NEG。`NOTICES_REGISTRY` に `/tmp/opencode` の複製 registry を渡す。リポジトリの registry は触らない): `ignoreLicensePaths` を空にすると `check` は exit 1 (FAIL 3 件: `license_obs.sh`・`license_import.mjs`・`license_import.test.mjs`)。`ffmpeg` の `coveredBy` を空にすると exit 1 (`tools/shared/oss/ffmpeg/build.sh: OSS 再ビルドスクリプトが registry の coveredBy に無い`)。登録を足しても未登録の検出は落ちていない。
+
+## Notices job の起動条件 (LGL-11, #3301。測定 commit `c3ee6daa7`・ws-3301 worktree)
+
+- 問題: `.github/workflows/notices.yaml` の `paths` は限られた項目のみ。検査 (`checkRegistry`) は `git ls-files` の全追跡ファイルを見るため、filter の外へ LICENSE 系を足す PR では job が起動せず検出されない (NEG 参照)。
+- 案: `paths` を外す (`pull_request` / `push` とも)。適用後の全文は `ci/notices.yaml`、現行からの `diff -u` は `ci/notices.patch` (`git apply --check` が通り、適用結果が全文と `cmp` で一致)。
+- 広げる案 (`**/LICENSE*` 等) を採らない理由: GitHub の paths は大文字小文字を区別する。`REL_LICENSE_NAME` (`/i`) に合わせるには角括弧で大小を並べる必要があり、削除 (`coveredBy` / `vendored.path` の欠落) は glob で拾えない。job は実測 6–11 s のため、全 PR で走らせても代償が小さい。
+
+| 項目 | 実測 | 定義 |
+|---|---|---|
+| 変更前の job 所要 (現行 workflow の実 run、n=6) | 6–11 s (run 38657541441・38658177351・38658975069・38660228913・38660600528・38661053885) | `actions/runs/<id>/jobs` の started_at → completed_at |
+| `node --test tools/legal/notices/notices.test.mjs` (n=3) | 52 pass / 0 fail / 3 skipped・363–424 ms・load 0.10 | job の steps と同じコマンド |
+| `node tools/legal/notices/cli.mjs check` (n=3) | PASS components=22 (bundled 20) records=12 fonts=129・50–53 ms | 同上 |
+| NEG: 旧 filter の外 (`tools/gap/zz/LICENSE`・`tools/gap/zz/License.txt`) を `git add` した worktree で `check` | exit 1・FAIL 2 件 (`記録なしの同梱 OSS`) | 旧 filter の 7 項目はどれにも一致せず、job は起動しない |
+| 増加分 | `paths` 無しでは、旧 filter で起動しなかった PR にも job が 1 回ずつ増える (1 回あたり 6–11 s)。steps は不変 | 変更後の実 run は PM の適用後に測る (未測定) |
+
+- 差分: `git diff c3ee6daa7 HEAD -- tools/legal/notices ':!tools/legal/notices/REPORT.md'` は `ci/` のみ (`lib.mjs`・`cli.mjs`・`notices.test.mjs`・`registry.json` は差分 0)。
+- 適用: `.github/workflows/` は agent が push できない (`docs/WORKFLOW.md` §11 (c))。PM が PR 本文の手順で `ci/notices.patch` を適用する。
+
 ## 範囲 / 範囲外
 
 検証範囲: 既存 05-stage 呼び出し元の回帰 (`pnpm release-guard:test`・`chunked.test.mjs`)・fl-win64 素材 (FL 同梱表記 15 本・ファイル一覧)・emsdk 6.0.12 で実行した上記 7 本の build.sh・`vite build`・`05-stage.mjs`。
@@ -205,7 +233,7 @@ GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow �
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 1. Actions job を有効化できていない (App に `workflows` 権限なし) | CI 上の自動失敗は未稼働。ローカル/`05-stage` ゲートは稼働 | 新規 `[CI-n]` (親 [CI-1] #284): 権限のある人が `cp tools/legal/notices/ci/notices.yaml .github/workflows/notices.yaml`。#86 にコメント済 |
+| 1. ~~Actions job を有効化できていない~~ → #935 で `.github/workflows/notices.yaml` を配線 (PM が PAT で適用。merge 後の初回の job 実行結果は未確認) | merge 前は CI 上の自動失敗が未稼働。ローカル/`05-stage` ゲートは稼働 | #935 (親 [CI-1] #284) |
 | 2. mac `Shared/Artwork/Fonts` の OFL 本文 (12 family) を NOTICES に反映していない (win の一覧のみ。win で本文があるのは Cuprum / Francois One の 2 つ) | OFL 本文のあるフォントも「出所未確認」に入る | LGL-6 (一次文書の補完取得) に mac 素材付きで依頼 |
 | 3. plugins-* 由来の同梱 OSS (OTT の Roboto Condensed (Apache-2.0)・zlib 1.2.3 等) は registry 未登録 | plugin wasm を同梱するとき NOTICES から漏れる | 新規子チケット案 `[LGL-3b]` (素材 `plugins-ott` 等が必要) |
 | 4. 記録は build.sh のスナップショットで、引数を変えて再実行しないと食い違うのを自動検出しない | 記録と実ビルドの乖離 | #86 のフォローアップ (build.sh の sha256 を記録して stale 検出する案。再実行コストとのトレードオフ) |
@@ -213,3 +241,4 @@ GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow �
 | 6. `oss/ffmpeg`・`oss/lame` (PoC ハーネス) と `oss/ilsvg` は record を書かない (配布用の `sidemod` が書く。ilsvg は `bundled=false`) | ilsvg を同梱化するとき記録が必要 | [T-SH-18] #19 にコメント |
 | 7. LGPL §6(b) の「適切な共有ライブラリ機構」に side module が当たるかは未確定 | NOTICES の案内文は事実記述のみ | LGL-4 #87 (既出) |
 | 8. `guard.test.mjs` #6 が `randomBytes` 依存で不安定 (上記 791/20000)。本 PR は未修正 | `pnpm release-guard:test` が偶発的に 11/12 になる | 新規 `[LGL-n]` (LGL-2 の test fix: 固定バイト列にする)。PM が起票 |
+| 9. `ci/notices.patch` (paths 撤去) は未適用。適用後の実 run (job の発火・所要) は未確認 | 適用まで filter の外の LICENSE 追加を検出しない | #3395 [LGL-12] (親 #3301。PM が適用して実 run を確認) |

@@ -189,11 +189,47 @@ OVERRIDES = {
   store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
   ret i64 0
 }''',
-    # 0x4181e0: 0x4e5f50 が戻り値 ([BLK+0x80]) を +568 で deref する (hs_dbg 実測: 0x4181e0 →
-    # 0x4e5f50 直後に trap)。戻り値が fold 由来のため「該当なし」= 0 で fail-soft。
-    0x4181e0: '''define i64 @function_4181e0() local_unnamed_addr {
-  store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
+    # 0x4180d0: TLS block の確保 (native 実測: blk = LocalAlloc(0x40, 0x288)・0x288 = 0x4180c0 の
+    # 定数 648。blk != 0 なら TlsSetValue([0x6d6e70], blk))。lift 本体は 0x4180a0 へ渡す size が
+    # ptrtoint @683 (0x10000880) に折り畳まれて壊れるため置換する (REPORT_2115_APPENDIX §11.3)。
+    # 0x4181e0 (TLS getter) の戻り値はこの block。0x4e5f50 が +568 を読むため 0x288 byte が要る。
+    0x4180d0: '''define i64 @function_4180d0() local_unnamed_addr {
+  %blk = call ptr @LocalAlloc(i32 64, i32 648)
+  %isnull = icmp eq ptr %blk, null
+  br i1 %isnull, label %fail, label %set
+set:
+  %idx = load i32, ptr inttoptr (i64 7171696 to ptr), align 4
+  %ok = call i1 @TlsSetValue(i32 %idx, ptr %blk)
+  %r = sext i1 %ok to i64
+  store i64 %r, ptr inttoptr (i64 @RETSLOT@ to ptr), align 8
+  ret i64 %r
+fail:
+  store i64 0, ptr inttoptr (i64 @RETSLOT@ to ptr), align 8
   ret i64 0
+}''',
+    # 0x4181e0: TLS getter (native 実測・REPORT_2115 §2)。TlsGetValue(idx) が非 0 ならそれ、0 なら
+    # 0x4180d0 で block を作り直して再取得し、なお 0 なら [0x7162d0]。呼出元は戻り値を [BLK+0x80] から
+    # 読む (fw0 の load 9048192) ため RETSLOT にも store する (lift 本体は store しない)。
+    # native の flag [0x7162d8]==0 分岐 (gs:[0x58] 直読) は TlsGetValue で近似 (推定。Phase A/B は flag=1)。
+    0x4181e0: '''define i64 @function_4181e0() local_unnamed_addr {
+entry:
+  %idx = load i32, ptr inttoptr (i64 7171696 to ptr), align 4
+  %v1 = call ptr @TlsGetValue(i32 %idx)
+  %p1 = ptrtoint ptr %v1 to i64
+  %z1 = icmp eq i64 %p1, 0
+  br i1 %z1, label %retry, label %done
+retry:
+  call i64 @function_4180d0()
+  %v2 = call ptr @TlsGetValue(i32 %idx)
+  %p2 = ptrtoint ptr %v2 to i64
+  %z2 = icmp eq i64 %p2, 0
+  %fb = load i64, ptr inttoptr (i64 7430864 to ptr), align 8
+  %r = select i1 %z2, i64 %fb, i64 %p2
+  br label %done
+done:
+  %res = phi i64 [ %p1, %entry ], [ %r, %retry ]
+  store i64 %res, ptr inttoptr (i64 @RETSLOT@ to ptr), align 8
+  ret i64 %res
 }''',
     # 0x40e720: `ClearWideString(var S)` (native 0x40e720 実測: S[0]!=0 なら refcount--
     # して 0 に達したら FreeMem。rcx は var アドレス)。lift では S が scratch 畳み込みで

@@ -51,7 +51,7 @@ Win64 `OPENFILENAMEW` (NT4 版 136 B / 2000 版 152 B) を解釈し、title / �
 選択ファイルは host が Emscripten FS の**ステージング** `C:\Users\webstudio\Documents\WebImport` (= POSIX `/c/Users/webstudio/Documents/WebImport`、`shimx_path_to_posix` で算出) へ書き出し、FL へは Win パスで返す (単一=フルパス、複数=`dir\0name\0…\0\0`、`nFileOffset`/`nFileExtension`/`lpstrFileTitle` 設定、バッファ不足は先頭 WORD に必要数 + `FNERR_BUFFERTOOSMALL`)。
 複数選択の組立 (`file_dialog()`): 作業バッファ `w[]` は `GUI_HC_OUT + 700` 要素 (dir ≤ 600 + host 応答 < `GUI_HC_OUT` B。UTF-16 の単位数は UTF-8 のバイト数を超えない)。`fd_put()` は `u8_to_u16x` の打ち切り報告を見て、収まらなければ**切り詰めた断片を返さず** FALSE + `CDERR_INITIALIZATION` (`GetLastError`=111) にする。
 名前は最大 64 件 (`FD_NAMES_MAX`): 65 件目以降を黙って捨てず、同じく FALSE + `CDERR_INITIALIZATION` を返す (撤廃は §6)。
-save は FL が書き終えた POSIX ファイルを `HostCallBridge.flushSaves()` が選択済み handle へ反映する (反映契機の自動結線は未実装 → §6)。
+save は FL が閉じた POSIX ファイル (書込み handle の CloseHandle) を `HostCallBridge` が選択済み handle へ反映する (#958 で自動化。手動の `flushSaves()` も残す。§11)。
 
 ### 3.5 Drag&Drop
 shimx に実体を追加: `DragAcceptFiles` (受付窓表) / `DragQueryFileW` / `DragQueryPoint` / `DragFinish` / HDROP (`DROPFILES` ブロック) 生成 `shimx_hdrop_create`。
@@ -119,7 +119,7 @@ shimx の生成物 (`BACKLOG.md` / `inventory.md` / `data/*` / `exports.txt`) �
 |---|---|---|
 | 実ブラウザ (Chrome) での `showOpenFilePicker` / `showSaveFilePicker` / `window.open` e2e が未実施。これらは transient user activation (約 5 秒) を要し、FL の操作が入力イベントから遅れると picker が SecurityError → FALSE (`CDERR_INITIALIZATION`) になり得る | 受入条件「Web 実装経由で動く」の実機確認 | 新規子チケット [GUI-9] (`tools/gui/e2e` の CDP ドライバでユーザ操作付き e2e) — 親 #13 / M-Integration |
 | `RegisterDragDrop` 経路: guest の `IDropTarget` 呼出し橋と CF_HDROP の `IDataObject` は #1388 [SHX-T23] で実装 (node + mock まで。実 FL guest は未検証、詳細 `REPORT_SHX-T23.md`) | FL が OLE D&D のみ使う場合の実機可否は未確認 | #1178 [SHX-T21] / #177 [SHX-T9] |
-| save の反映契機: `flushSaves()` は手動呼出。FL の `CloseHandle` 等への自動結線が無い | 保存したファイルが実ファイルへ出ない | 新規子チケット [SHX-T13] (pathreg の flush 契機 #169 と整合) |
+| save の反映契機: CloseHandle 契機の自動化は #958 で完了 (node harness のみ)。本番起動 glue への結線と再読み込み後の復元は未了 | 実機で保存が反映されない | #134 (前提) → [SHX-T38] #3131 |
 | `gui_shimx_attach()` と `HostCallBridge.start()` を呼ぶ起動 glue が未結線 (`tools/m11/shimx_link` / 起動 glue 側) | 実 FL 結線ビルドで MsgWait の handle 待ちが 5 ms poll 縮退、ダイアログが host 未接続で FALSE | #177 [SHX-T9] (実機検証) にコメント |
 | 実 FL guest との結合は未実施。MsgWait の `HANDLE` 配列の要素幅は、shimx が `HANDLE = size_t` (wasm32 で 4 B)、lift 側が 8 B 要素で組む可能性があり**整合は未検証** | handle 配列の読み違い (未確認) | #177 [SHX-T9] にコメント (実 guest でのみ検証可能) |
 | OFN の `lpfnHook` / `lpTemplateName` (`OFN_ENABLEHOOK` / `OFN_ENABLETEMPLATE` / `OFN_ENABLETEMPLATEHANDLE`) は **fail-fast で明示** (`file_dialog()` 入口。`selftest_fd.inc` で検査、§8) | hook 付き呼出しは abort する (黙って無視しない) | 対応は必要時に別 issue |
@@ -233,3 +233,7 @@ bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 - 実 FL guest との結合は未実施 (§6 の既存項目)。
 - browser_e2e.mjs には negative control を入れていない (node 版の NC1/NC2 相当は未実装)。
 - 実 FL の `ShellExecute` / `GetOpenFileName` 呼出の順序・タイミングは未検証 (§6 の SHX-T9 / SHX-T12 側)。
+
+## 11. save 反映契機の自動結線 (SHX-T15 #958)
+
+書込み file の CloseHandle を契機に、保存待ちの先を host が実体へ反映する (node harness で検証)。検証表・設計・限界は `REPORT_SHX-T15.md`。本番起動経路への結線と再読み込み後の復元は未了 → [SHX-T38] #3131。

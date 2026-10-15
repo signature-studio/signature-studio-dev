@@ -102,7 +102,7 @@ native 入口 = 実行トレース (`results/ld57/insn_<fn>_<pat>.txt`) の命�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| HeapFree 応答の契約差 (`ld_core.h:430` の固定 1 と `tools/shim/src/heap.c` の検査) | 1c5e84・1c621c・1c682c・1c69cc の分岐差、u16 の wasm trap。これより後の block の対応は未検証 | #2821 (LD-133、親 #2193) |
+| HeapFree 応答の契約差 (`ld_core.h:430` の固定 1 と `tools/shim/src/heap.c` の検査) | 1c5e84・1c621c・1c682c・1c69cc の分岐差、u16 の wasm trap。これより後の block の対応は未検証 | 解消 (#3049 後の再測定は `REPORT_APPENDIX_LD133.md`。block 列は全件一致)。残る outcome 差は同付録 §4 |
 | 命令単位の wasm trace | native `1c0b6f`・`1c0b82` の wasm 側の位置を命令単位で示せない (LD-68 §5 の残り) | #2192 (LD-83) |
 | LD-57 付録の「vm0 は rcx=0 で早期 return」 | 誤記 (本付録の結論で訂正)。LD-57 本文は未修正 | 文言修正のみのため子は起票せず、本 PR の付録に訂正を残す |
 | 実機 Windows の HeapFree 戻り値 (割当て外ポインタ) | 応答モデルを決める根拠が未検証 | #2821 (LD-133) の受入で、根拠を示すか未検証として残す |

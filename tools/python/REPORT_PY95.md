@@ -1,0 +1,110 @@
+# tools/python REPORT: PY-95 ui 状態ゲッター 9 件の PE 確定と C provider 実装 (#2831, 親 #2738, 残りの子 #2981・#2982・#3005・#3006・#3007)
+
+既知類型との関係: 該当なし (lift 作業ではない。flapi 関数の PE 確定と provider 実装)。前段: `tools/python/REPORT_PY87.md` (general 4 件・同じ手順)。
+
+## 結論
+
+- ui の未実装 69 関数のうち **9 件** (`isClosing`・`isMetronomeEnabled`・`isPrecountEnabled`・`isStartOnInputEnabled`・`isLoopRecEnabled`・`getTimeDispMin`・`getStepEditMode`・`isBrowserAutoHide`・`getSnapMode`) を PE で確定し、mock と C provider に実装した。mock と C の差分は 0 (`tests/ui_state_diff.mjs`。本 PR 単独は 18 呼出し、main 取り込み後は PY-119 の 6 件と統合して 33 呼出し)。
+- 9 件はいずれも「状態 1 つを読んで変換 slot `0x15e4280` に渡すだけ」で、副作用・分岐は無い。bool 8 件と int 1 件 (`getSnapMode`)。型は公開 stub の `returns` に従う。
+- **値は未確定 (仮置き)**。全て既定値 (`false` / `0`) の固定で、実機の値は未実測。setter の所在は §6 のとおり、一部しか子 issue に無い。
+- `isMetronomeEnabled` / `isPrecountEnabled` は、PY-87 の `general.getUseMetronome` / `general.getPrecount` と同じ状態 (同じ slot) を読む。C では同じ変数 (`use_metronome`・`precount`) を参照する。mock と C の一致は既定値と引数過多だけで確かめた。状態を変えた時の対応は未確認 (setter が無いため)。
+- main の #3010 (PY-119) が ui ゲッター 6 件を実装し、#2980 は閉じた。main の PY-121 (#2982) が ui 表示・メニュー 6 件を実装した。残りの ui 未実装は **48 件** (#3005・#3006・#3007 の 12 件 (旧 #2980 の残り)、#3012・#3013・#3014 の 9 件 (旧 #2982 の残り)、旧 #2981 の 27 件 (#3034・#3035 で保留))。各 handler の VA は §5。
+
+## 1. 手段
+
+- 素材: `fl-win64.tar.zst` から `extracted/block00031_PE.bin` (関数探索) と DATA block 4 件 (`block25159`・`block24429`・`block24430`・`block24618`、`fetch_inputs.sh` 用) を `$RUNNER_TEMP/fl-win64/extracted/` に展開。emsdk は runner に無かったため、`tools/m1/flags.sh` の pin (6.0.12) を `emsdk install 6.0.12` と `activate 6.0.12` で入れ、`[EMSDK]` (`docs/REFERENCES.md`) の既定位置へ symlink して使った (§4)。
+- ハンドラ探索: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前...>`。PyMethodDef の entry VA と関数先頭 VA (`fn`) を得て、先頭 40 命令を出す。
+- 参照の同定: 各命令の `[rip + disp]` は「次命令の VA + disp」で絶対 VA にした。変換 slot は `call qword ptr [rax]` の直前の `mov rax, [rip+...]` の絶対 VA。
+- 戻り型: 公開 stub (`analysis/flapi/flapi_table.json` の `sig.returns`)。
+
+## 2. 確定した 9 件 (PE 根拠)
+
+各関数は `flags=4` (METH_NOARGS)。`sub rsp` → 状態を読む → 変換 slot `0x15e4280` を呼ぶ → `ret` のみ。C = 状態ポインタ slot の内容 (読み取る番地)。
+
+| 関数 | entry | fn (VA) | 状態の読み方 | 変換 slot | stub の戻り型 |
+|---|---|---|---|---|---|
+| `ui.isClosing` | 0x151b5e8 | 0xd6c230 | slot 0x15e1890 → `byte [C]` | 0x15e4280 | bool |
+| `ui.getTimeDispMin` | 0x151b728 | 0xd6cc40 | slot 0x15e1e40 → `byte [C]` | 0x15e4280 | bool |
+| `ui.isMetronomeEnabled` | 0x151b8a8 | 0xd6d6d0 | slot 0x15e1498 → `byte [C]` (= general.getUseMetronome の状態) | 0x15e4280 | bool |
+| `ui.isPrecountEnabled` | 0x151b8e8 | 0xd6d710 | slot 0x15e0c08 → `byte [C]` (= general.getPrecount の状態) | 0x15e4280 | bool |
+| `ui.isStartOnInputEnabled` | 0x151b8c8 | 0xd6d6f0 | slot 0x15e4ea0 → `byte [C]` | 0x15e4280 | bool |
+| `ui.isLoopRecEnabled` | 0x151b908 | 0xd6d730 | slot 0x15e2eb8 → C、`O=[C]`、`S=[O+0xa00]`、`byte [S+0x49e]` | 0x15e4280 | bool |
+| `ui.getStepEditMode` | 0x151bae8 | 0xd6f0c0 | slot 0x15e2eb8 → C、`O=[C]`、`S=[O+0xab8]`、`byte [S+0x49e]` | 0x15e4280 | bool |
+| `ui.isBrowserAutoHide` | 0x151ba88 | 0xd6ed40 | slot 0x15e4b10 → C、`O=[C]`、`byte [O+0x8c4]` | 0x15e4280 | bool |
+| `ui.getSnapMode` | 0x151b428 | 0xd6b6e0 | slot 0x15e41f8 → `dword [C]` | 0x15e4280 | int |
+
+- 変換 slot `0x15e4280` は bool 8 件と int 1 件で共通 (PY-87 と同じ観察)。PE からは bool と int を区別できず、型は stub に従う。変換先の関数の同定は未了。
+- `isLoopRecEnabled` と `getStepEditMode` は同じ slot `0x15e2eb8` を起点にし、`+0xa00` と `+0xab8` で別の sub-object を読む。sub-object の名前は未同定。
+- 9 件の読み先 (slot の指す状態) の意味 (例: `0x15e1890` が「閉じている」の状態か) は未確定。値の意味は仮置きで、setter の同定で確かめる (§6)。
+
+## 3. 実装
+
+- `host/fl_mock.mjs`: state に `uiClosing` ほか 7 項目を追加 (既定 `false` / `0`)、`ui.*` 9 件を定義 (`arity(a, 0, 0)`)。`isMetronomeEnabled` / `isPrecountEnabled` は既存の `useMetronome` / `precount` を読む。
+- `provider/fl_engine.c`: 静的変数 7 件 (`ui_closing`・`ui_time_disp_min`・`ui_start_on_input`・`ui_loop_rec`・`ui_step_edit`・`ui_browser_auto_hide`・`ui_snap_mode`) を `fl_engine_reset` で 0 に初期化。`FL_H(ui, ...)` 9 件を `NARGS(0, 0)` 付きで定義。
+- `tests/provider_check.mjs`: `pe95` の集合を追加。実装 83 → 92、未実装 352 → 343 (total 435 は不変)。main 取り込み後 (PY-115 の `mixer.getTrackColor` 1 件、PY-100 の 2 件、PY-119 (#3010) の 6 件、#2985 の screen 5 件 `pe121` を加えた) は 実装 106・未実装 329 (`db86f35b`)。さらに main の PY-119 set (#2977) の `pe119set` 6 件と PY-152 (#2983) の `pe152` 6 件を加えた main (`c98d2c99`) との取り込み後は 実装 118・未実装 317。さらに main の PY-121 (#2982) の `pe121_2982` 6 件を加えた main (`4b81e78a`) との取り込み後は 実装 124・未実装 311。さらに main の PY-96 (#2832) の `pe96` 4 件を加えた `567c7182` との取り込み後は 実装 128・未実装 307。さらに main の PY-125 (#3001) の `pe125` 2 件を加えた `95de1356` との取り込み後は 実装 130・未実装 305。さらに main (`80fb2fd0`。PY-101 (#2878) の `pe101` 2 件・PY-102 (#2883) の `pe102` 1 件などを含む 206 commit) との取り込み後は 実装 133・未実装 302。さらに main (`a9733bbb`。PY-94 (#2830) の general 状態読出し 7 件 `pe94`) との取り込み後は 実装 140・未実装 295 (§4)。競合は両側の集合を残して解消した (`db86f35b`・`0555b22d`・`3fc85489`・`567c7182`・`95de1356`・`ff3f62e6`・`6e763df4`)。
+- `tests/ui_state_diff.mjs` (新規): 9 件の既定値呼出し (9) と引数過多 (9) の計 18 呼出しを mock と C で照合。main 取り込みで PY-119 (#3010) も同名のファイルを追加したため、両方の検査を 1 本に統合した (add/add の競合の解消)。統合後は PY-119 の 6 件 (`getFocused`・`getFocusedFormID`・`getFocusedFormCaption`・`getFocusedPluginName`・`getHintMsg`・`isInPopupMenu`) を加えて計 33 呼出し。
+
+## 4. 検証
+
+測定 commit: `6e763df4` (`origin/main` (`a9733bbb`) の取り込み merge。コードを変えた最後の commit)。前回の検証 HEAD `e95e4c71` (`83060945` の取り込み) の後に main が進み (`a9733bbb`)、取り込みで `tools/python` (md 以外) に 7 ファイル・+287/−10 行が入った (main 由来。`git diff --stat e95e4c71 6e763df4 -- tools/python ':!*.md'`)。内訳は PY-94 (#2830) の `pe94` (general の状態読出し 7 件) を含む `host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`・`tests/general_diff.mjs` (+4) と、分析スクリプト 3 件 (`analysis/py167_flr_pyc.py`・`analysis/py68_vmt.py`・`analysis/flapi/pe_flrack_flr_probe.py`)。
+
+競合は `docs/DOC_MAP.md`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs` の 4 件で、両側の集合・行を残して解消した。`provider_check.mjs` は `pe94` と `pe95` (本 PR) の判定を両方入れ、期待値は 実装 140 (= 133 + `pe94` 7)・未実装 295 (= 302 − 7) (435 は不変)。`handlers` (`provider/build.sh` の出力) も 140 で一致する。
+
+測定は `6e763df4` の内容で行った。環境: runner 4 core。テスト群の直後 (00:08 UTC) の load average は 2.65 / 2.03 / 0.98 (`uptime`)。
+
+再ビルド: この worktree で新規に実行した。`provider/build.sh` (rc 0、emcc 6.0.12、handlers 140)、`build_cpython_wasm.sh` (rc 0、4 分 05 秒)、`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.1 秒)、`build_flpy_static.sh` (rc 0、6.6 秒)。素材は `fl-win64.tar.zst` の PE (`extracted/block00031_PE.bin`) と DATA 4 件 (`block25159`・`block24429`・`block24430`・`block24618`) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64/extracted` に展開し、`fetch_inputs.sh` で `work/` を作った。`[EMSDK]` (emcc 6.0.12) を使用。`dist/`・`work/` は gitignore。ビルド後も `git status` は差分 0。
+
+| コマンド | 結果 | rc | wall |
+|---|---|---|---|
+| `node tests/provider_check.mjs` | PASS (435 / 実装 140 / 未実装 295 / MCP 静的 60) | 0 | 367 ms |
+| `node tests/ui_state_diff.mjs` | calls 33、diffs 0、PASS | 0 | 51 ms |
+| `node tests/general_diff.mjs` | calls 41、diffs 0、PASS | 0 | 57 ms |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0 | 55 ms |
+| `node tests/channels_diff.mjs` | calls 170、diffs 0、PASS | 0 | 54 ms |
+| `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS | 0 | 53 ms |
+| `node tests/screen_diff.mjs` | calls 32、diffs 0、PASS | 0 | 52 ms |
+| `node tests/arrangement_diff.mjs` | calls 25、diffs 0、PASS | 0 | 54 ms |
+| `node tests/arrangement_selection_diff.mjs` | calls 8、diffs 0、PASS | 0 | 54 ms |
+| `node tests/ui_display_diff.mjs` | ok_calls 12・bad_calls 11、diffs 0、PASS | 0 | 51 ms |
+| `node tests/playlist_diff.mjs` | calls 23、diffs 0、mock_state_steps 8、PASS | 0 | 52 ms |
+| `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5、diffs 0、PASS | 0 | 53 ms |
+| `node tests/ilmcp_diff.mjs` | calls 32・state_checks 9、diffs 0、PASS | 0 | 59 ms |
+| `node tests/midi_path_diff.mjs` | cases 30、diffs 0、PASS | 0 | 98 ms |
+| `node tests/transport_diff.mjs` | calls 7、diffs 0、PASS | 0 | 48 ms |
+| `node tests/midi_bundled_device.mjs` | checks 9、failed 0、MIDI BUNDLED OK | 0 | 364 ms |
+| `node tests/midi_script.mjs` | checks 29、failed 0、MIDI SCRIPT OK | 0 | 826 ms |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 0 | 1651 ms |
+| `node tests/static_check.mjs` | STATIC CHECK OK | 0 | 407 ms |
+| `node tests/fulltext_parity.mjs` | FULLTEXT PARITY OK | 0 | 5341 ms |
+
+ネガティブコントロール: `6e763df4` で再測定した。追跡ファイルは変えず、`host/fl_mock.mjs` の `uiClosing` を `true` にした一時コピー (`$RUNNER_TEMP/negctl`) で `tests/ui_state_diff.mjs` を実行 → rc 1。`AssertionError: ui 状態ゲッター差分 1 件` (`ui.isClosing`: mock `ok: true`・C `ok: false`)。既定値は `false` のまま。
+
+C の警告: `gcc -fsyntax-only -Wall -Wextra -I provider provider/fl_engine.c` は 3 件 (いずれも既存の `unused variable 'k'`、head は `fl_engine.c:98:83`)。`origin/main` (`a9733bbb`) の同じファイルも 3 件 (`96:83`) で同数のため、本 PR が増やした警告は 0 件。
+
+コード差分 (測定 commit から本 REPORT 更新 commit まで、`tools/python` の .md 以外): `git diff 6e763df4 HEAD -- tools/python ':!*.md'` の出力は 0 行。
+
+## 5. 保留 (残り 48 件・子 issue へ)
+
+PE の handler VA だけを記録した。引数の意味・戻り値の範囲・作用先は未解析。#2980 は #3010 (PY-119) で 6 件を実装して閉じ、残り 12 件は #3005・#3006・#3007 に分けられた (`tools/python/REPORT_PY119.md` の保留表)。
+
+| 子 issue | 関数 (fn VA) | 手掛かり |
+|---|---|---|
+| #3005 (PY-128) 読出し 4 件 (旧 #2980 の残り) | `getFocusedNodeCaption` 0xd6e470・`getFocusedNodeFileType` 0xd6e400・`getHintValue` 0xd6cb60・`getProgTitle` 0xd6c250 | `0x11f1a70`・`0x41c420` の引数規約 |
+| #3006 (PY-129) setter・snap 4 件 (旧 #2980 の残り) | `setHintMsg` 0xd6c5b0・`setFocused` 0xd6ce50・`setSnapMode` 0xd6b7b0・`snapMode` 0xd6b8d0 | `0xd6fd10` → `0xd843d0` の書込み経路。`0xd84680` の意味 |
+| #3007 (PY-130) bool setter・getVersion 4 件 (旧 #2980 の残り) | `setBrowserAutoHide` 0xd6ee00・`setStepEditMode` 0xd6f170・`setTimeDispMin` 0xd6ccb0・`getVersion` (ui) 0xd6c2f0 | 本体は未逆アセンブル。`getVersion` は mode で分岐する |
+| #2981 (PY-150) 操作・キー・ジョグ・編集 27 件 | `jog` 0xd6a960・`jog2` 0xd6aa50・`strip` 0xd6ab40・`stripJog` 0xd6ac30・`stripHold` 0xd6ad20・`previous` 0xd6ae10・`next` 0xd6aed0・`moveJog` 0xd6af90・`up` 0xd6b080・`down` 0xd6b170・`left` 0xd6b260・`right` 0xd6b350・`horZoom` 0xd6b440・`verZoom` 0xd6b530・`snapOnOff` 0xd6b620・`cut` 0xd6b9c0・`copy` 0xd6ba80・`paste` 0xd6bb40・`insert` 0xd6bc00・`delete` 0xd6bcc0・`enter` 0xd6bd80・`escape` 0xd6be40・`yes` 0xd6bf00・`no` 0xd6bfc0・`nextWindow` 0xd6c080・`selectWindow` 0xd6c140・`scrollWindow` 0xd6d300 | 同形の 40〜41 命令。`call 0x415610`・`call 0xd6fd10` (object 取得) の後に、引数解析 (`call [0x15e1e58]`・書式 'i' など) を行い、`call 0xd84680` (作用) を呼ぶ。戻り値の int は `0x15e4280` へ。`jog` で確認 (`scrollWindow` だけ `0xd84680` を呼ばない)。PR #3018 で PE 契約の解析と保留記録が merge 済み |
+| #2982 (PY-151) ブラウザ・メニュー・表示・ダイアログ 15 件 | `navigateBrowser` 0xd6dad0・`navigateBrowserMenu` 0xd6dad0 (同じ fn)・`navigateBrowserTabs` 0xd6ded0・`toggleBrowserNode` 0xd6dcd0・`selectBrowserMenuItem` 0xd6e170・`previewBrowserMenuItem` 0xd6e330・`closeAllMenu` 0xd6d7c0・`closeActivePopupMenu` 0xd6d8e0・`crDisplayRect` 0xd6e860・`miDisplayRect` 0xd6ea40・`miDisplayDockRect` 0xd6ebf0・`showNotification` 0xd6c8b0・`launchAudioEditor` 0xd6d540・`openEventEditor` 0xd6ef80・`showPicker` 0xd6f2e0 | 表示矩形は int 引数の順序と単位の同定が先 |
+
+- 上の表の VA は `pe_handler_probe.py` の出力 (ui の PyMethodDef 範囲 0x151b2xx〜0x151bbxx) を正とする。`left`・`right` の 2 件の probe 出力は別モジュールの同名エントリも含むため、ui 側の entry だけを採った。
+- `0xd81740` は呼出しではなく、`mov rdx, [rip+...]` で読む data 参照 (jog など)。#2981 では、`0xd84680` の作用先と、引数解析の slot `0x15e1e58` の役割を先に同定する。
+- #2982 の行は main の PY-121 (#2982) 取り込み後も表のまま。実装済みの 6 件 (`crDisplayRect`・`miDisplayRect`・`miDisplayDockRect`・`showNotification`・`closeAllMenu`・`closeActivePopupMenu`) を除いた残り 9 件が #3012・#3013・#3014 (`tools/python/REPORT_PY121_2982.md`)。
+
+## 6. 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 9 件の値は既定値の仮置き (未実測) | 実機と値が違う可能性。下流の値を信用しない | 起票なし (未解決の追跡のみ)。setter の所在: `getTimeDispMin`・`getStepEditMode`・`isBrowserAutoHide` は #3007 (`setTimeDispMin`・`setStepEditMode`・`setBrowserAutoHide`)、`getSnapMode` は #3006 (`setSnapMode`) |
+| `isClosing`・`isMetronomeEnabled`・`isPrecountEnabled`・`isStartOnInputEnabled`・`isLoopRecEnabled` の setter が無い | 読み書きの対応を確かめられず、値は仮置きのまま | 起票なし (未解決の追跡のみ)。どの open 子 issue にも入っていない |
+| 状態 slot の意味 (`0x15e1890`・`0x15e1e40`・`0x15e4ea0`・`0x15e2eb8`・`0x15e4b10`・`0x15e41f8`) | setter 実装時に読み書きの対応を確かめる必要 | `0x15e1e40`・`0x15e2eb8`・`0x15e4b10` は #3007、`0x15e41f8` は #3006。`0x15e1890`・`0x15e4ea0` は起票先なし |
+| 変換 slot `0x15e4280` の先の関数 (bool と int の区別) | 戻り型は stub に従った | 起票なし (PY-87 からの持越し。PE の同定作業のみ) |
+| 残り 48 件 (未実装 295 件のうち ui) | ui の未実装が 48 件残る | #3005 (4)・#3006 (4)・#3007 (4)・#3012 (3)・#3013 (3)・#3014 (3)・#3034/#3035 (旧 #2981 の 27 件) |

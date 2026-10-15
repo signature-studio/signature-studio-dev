@@ -10,7 +10,7 @@
        %v.q = load i64, i64* @cookie
        %v   = trunc i64 %v.q to i32        ; 既存の i32 利用 (下位 bit: urem 64 等) は従来どおり
    に置換し、`%w = sext i32 %v to i64` は `%w = add i64 %v.q, 0` (64bit 値そのもの) に置換する。
-   global の宣言型は i64 とし、初期値は仮値 0x2b992ddfa232 とする (出所未確認・PE 読み取り未実施、#2302 で確定。REPORT_APPENDIX_2280 §3)。
+   global の宣言型は i64 とし、初期値は SlateCore.core_64 の .data 実値 0x2b992ddfa232 とする (VA 0x18125eaa8 の 8byte を #2302 で PE から読み取って確認。REPORT_APPENDIX_2302 §2)。
    出力: JSON 1 行 {"cookie_global": N, "loads_fixed": M, "sext_fixed": K}。
 """
 import json, re, sys

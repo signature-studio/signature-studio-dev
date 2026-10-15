@@ -1,0 +1,80 @@
+dll,api,iat_va,refs_pdata,refs_call,refs_jmp,refs_data,thunks,callers_pdata,refs_bytes,reached_from_exports,category,wasm_policy,note
+WS2_32.dll,ord14,0x1803e8270,2,2,0,0,0,2,2,0,J バイトオーダ変換,ntohl = bswap32,WS2_32 序数 14 (ntohl)。
+WS2_32.dll,ord8,0x1803e8278,3,3,0,0,0,1,3,0,J バイトオーダ変換,htonl = bswap32,WS2_32 序数 8 (htonl)。
+KERNEL32.dll,HeapReAlloc,0x1803e8000,2,2,0,0,0,2,2,0,A メモリ,realloc。ただし flags 0x10 (HEAP_REALLOC_IN_PLACE_ONLY) は同位置で伸ばせなければ NULL,flags は xor 0 (0x1802d8c41) と edx = rax+0xf で 0x10 (0x1802da416・rax = 1)
+KERNEL32.dll,WriteConsoleW,0x1803e8008,2,2,0,0,0,1,2,0,F ファイル・コンソール (host 無し),失敗を返す,CONOUT$ 経路
+KERNEL32.dll,CreateFileW,0x1803e8010,2,2,0,0,0,2,2,0,F ファイル・コンソール (host 無し),INVALID_HANDLE_VALUE を返す,文字列 CONOUT$ (出力先)。export 非到達
+KERNEL32.dll,CloseHandle,0x1803e8018,4,4,0,0,0,4,4,0,F ファイル・コンソール (host 無し),成功 (1) を返す,
+KERNEL32.dll,EnterCriticalSection,0x1803e8020,3,2,1,0,3,3,6,0,B 同期・イベント (単一スレッド),no-op,CreateThread 無し (単一スレッド)
+KERNEL32.dll,LeaveCriticalSection,0x1803e8028,3,2,1,0,3,3,6,0,B 同期・イベント (単一スレッド),no-op,
+KERNEL32.dll,InitializeCriticalSectionAndSpinCount,0x1803e8030,3,3,0,0,0,3,3,0,B 同期・イベント (単一スレッド),no-op (0 を返す),
+KERNEL32.dll,DeleteCriticalSection,0x1803e8038,6,6,0,0,0,6,6,0,B 同期・イベント (単一スレッド),no-op,
+KERNEL32.dll,SetEvent,0x1803e8040,1,1,0,0,0,1,1,0,B 同期・イベント (単一スレッド),成功 (1) を返す,
+KERNEL32.dll,ResetEvent,0x1803e8048,1,0,1,0,0,1,1,0,B 同期・イベント (単一スレッド),成功 (1) を返す,
+KERNEL32.dll,WaitForSingleObjectEx,0x1803e8050,1,1,0,0,0,1,1,0,B 同期・イベント (単一スレッド),WAIT_OBJECT_0 を返す (要確認),戻り値の分岐は未確認
+KERNEL32.dll,CreateEventW,0x1803e8058,1,1,0,0,0,1,1,0,B 同期・イベント (単一スレッド),固定の偽ハンドル,export 非到達
+KERNEL32.dll,GetModuleHandleW,0x1803e8060,3,3,0,0,0,2,3,0,E 動的ロード (常に失敗),NULL を返す,CRT の任意 API 探索。文字列 kernel32.dll・api-ms-win-core-synch-l1-2-0.dll
+KERNEL32.dll,GetProcAddress,0x1803e8068,5,5,0,0,0,4,5,0,E 動的ロード (常に失敗),NULL を返す,探索名 SleepConditionVariableCS・CorExitProcess 等。失敗後の経路は要確認
+KERNEL32.dll,QueryPerformanceCounter,0x1803e8070,1,1,0,0,0,1,1,0,H 時刻・性能カウンタ,決定的な値 (要確認)。DSP 出力に影響しないことを確認,
+KERNEL32.dll,GetCurrentProcessId,0x1803e8078,1,1,0,0,0,1,1,0,G プロセス・エラー状態,固定値,
+KERNEL32.dll,GetCurrentThreadId,0x1803e8080,1,1,0,0,0,1,1,0,G プロセス・エラー状態,固定値,
+KERNEL32.dll,GetSystemTimeAsFileTime,0x1803e8088,1,1,0,0,0,1,1,0,H 時刻・性能カウンタ,決定的な値 (要確認),
+KERNEL32.dll,InitializeSListHead,0x1803e8090,0,0,0,0,1,0,1,0,B 同期・イベント (単一スレッド),先頭を 0 に初期化,thunk 1 本・呼出し 0 件 (未使用)
+KERNEL32.dll,RtlCaptureContext,0x1803e8098,4,4,0,0,0,4,4,2,D 例外・unwind (SEH 無し),trap (SEH 経路は wasm に無い),export 到達
+KERNEL32.dll,RtlLookupFunctionEntry,0x1803e80a0,5,5,0,0,0,5,5,2,D 例外・unwind (SEH 無し),trap,export 到達
+KERNEL32.dll,RtlVirtualUnwind,0x1803e80a8,4,4,0,0,0,4,4,2,D 例外・unwind (SEH 無し),trap,export 到達
+KERNEL32.dll,IsDebuggerPresent,0x1803e80b0,2,2,0,0,0,2,2,1,D 例外・unwind (SEH 無し),0 を返す,export 到達
+KERNEL32.dll,UnhandledExceptionFilter,0x1803e80b8,3,3,0,0,0,3,3,2,D 例外・unwind (SEH 無し),0 を返す,export 到達
+KERNEL32.dll,SetUnhandledExceptionFilter,0x1803e80c0,3,3,0,0,0,3,3,2,D 例外・unwind (SEH 無し),NULL を返す (登録のみ),export 到達
+KERNEL32.dll,GetStartupInfoW,0x1803e80c8,1,1,0,0,0,1,1,0,G プロセス・エラー状態,0 埋め,
+KERNEL32.dll,IsProcessorFeaturePresent,0x1803e80d0,5,5,0,0,0,5,5,3,I CPU・コードページ・文字列,0 を返す (baseline 経路)。CPU 機能の値は要確認,引数 ecx = 0x17 固定。export 到達
+KERNEL32.dll,GetCurrentProcess,0x1803e80d8,3,3,0,0,0,3,3,2,G プロセス・エラー状態,擬似ハンドル (-1),export 到達
+KERNEL32.dll,TerminateProcess,0x1803e80e0,3,1,2,0,0,3,3,2,G プロセス・エラー状態,trap (終了の表明),export 到達
+KERNEL32.dll,RtlUnwindEx,0x1803e80e8,3,3,0,0,0,3,3,0,D 例外・unwind (SEH 無し),trap,export 非到達
+KERNEL32.dll,RtlPcToFileHeader,0x1803e80f0,3,3,0,0,0,3,3,2,D 例外・unwind (SEH 無し),NULL を返す,export 到達
+KERNEL32.dll,InterlockedFlushSList,0x1803e80f8,1,1,0,0,0,1,1,0,B 同期・イベント (単一スレッド),0 を返す,
+KERNEL32.dll,RaiseException,0x1803e8100,4,4,0,0,0,4,4,2,D 例外・unwind (SEH 無し),trap (fail-closed),ecx = 0xE06D7363 (C++ 例外) を設定するのは関数 0x1802caea8 内 (0x1802caf32)
+KERNEL32.dll,GetLastError,0x1803e8108,24,24,0,0,0,23,24,5,G プロセス・エラー状態,エラー状態の保持 (wasm 内の変数),export 到達
+KERNEL32.dll,SetLastError,0x1803e8110,6,6,0,0,0,6,6,4,G プロセス・エラー状態,同上,export 到達
+KERNEL32.dll,EncodePointer,0x1803e8118,2,2,0,0,0,2,2,0,G プロセス・エラー状態,恒等写像,
+KERNEL32.dll,TlsAlloc,0x1803e8120,1,0,1,0,0,1,1,0,C TLS/FLS (インスタンス内の表),インスタンス内の表 (TlsAlloc/Get/Set/Free),
+KERNEL32.dll,TlsGetValue,0x1803e8128,1,0,1,0,0,1,1,0,C TLS/FLS (インスタンス内の表),同上,
+KERNEL32.dll,TlsSetValue,0x1803e8130,1,1,0,0,0,1,1,0,C TLS/FLS (インスタンス内の表),同上,
+KERNEL32.dll,TlsFree,0x1803e8138,1,0,1,0,0,1,1,0,C TLS/FLS (インスタンス内の表),同上,
+KERNEL32.dll,FreeLibrary,0x1803e8140,4,4,0,0,0,4,4,0,E 動的ロード (常に失敗),成功 (1) を返す,
+KERNEL32.dll,LoadLibraryExW,0x1803e8148,4,4,0,0,0,2,4,0,E 動的ロード (常に失敗),NULL を返す,api-ms-/ext-ms- の解決 (API セット)
+KERNEL32.dll,ExitProcess,0x1803e8150,1,1,0,0,0,1,1,0,G プロセス・エラー状態,trap (終了の表明),引数 ebx
+KERNEL32.dll,GetModuleHandleExW,0x1803e8158,1,1,0,0,0,1,1,0,E 動的ロード (常に失敗),NULL を返す,文字列 mscoree.dll (CorExitProcess 探索)
+KERNEL32.dll,GetModuleFileNameW,0x1803e8160,1,1,0,0,0,1,1,0,E 動的ロード (常に失敗),0 を返す,
+KERNEL32.dll,HeapFree,0x1803e8168,1,1,0,0,0,1,1,1,A メモリ,free,flags 0
+KERNEL32.dll,HeapAlloc,0x1803e8170,2,2,0,0,0,2,2,1,A メモリ,malloc (flags & 8 なら calloc),flags は xor 0 / mov 8
+KERNEL32.dll,HeapSize,0x1803e8178,2,1,1,0,0,2,2,0,A メモリ,サイズ表 (malloc_usable_size 相当),flags 0
+KERNEL32.dll,HeapQueryInformation,0x1803e8180,1,1,0,0,0,1,1,0,A メモリ,固定値,
+KERNEL32.dll,FindClose,0x1803e8188,2,2,0,0,0,1,2,0,F ファイル・コンソール (host 無し),成功 (1) を返す,
+KERNEL32.dll,FindFirstFileExW,0x1803e8190,1,1,0,0,0,1,1,0,F ファイル・コンソール (host 無し),INVALID_HANDLE_VALUE を返す,
+KERNEL32.dll,FindNextFileW,0x1803e8198,1,1,0,0,0,1,1,0,F ファイル・コンソール (host 無し),0 を返す,
+KERNEL32.dll,IsValidCodePage,0x1803e81a0,1,1,0,0,0,1,1,0,I CPU・コードページ・文字列,固定値,
+KERNEL32.dll,GetACP,0x1803e81a8,1,1,0,0,0,1,1,0,I CPU・コードページ・文字列,固定値,
+KERNEL32.dll,GetOEMCP,0x1803e81b0,1,1,0,0,0,1,1,0,I CPU・コードページ・文字列,固定値,
+KERNEL32.dll,GetCPInfo,0x1803e81b8,2,2,0,0,0,2,2,0,I CPU・コードページ・文字列,固定値,
+KERNEL32.dll,GetCommandLineA,0x1803e81c0,1,1,0,0,0,1,1,0,G プロセス・エラー状態,空文字列,
+KERNEL32.dll,GetCommandLineW,0x1803e81c8,1,1,0,0,0,1,1,0,G プロセス・エラー状態,空文字列,
+KERNEL32.dll,MultiByteToWideChar,0x1803e81d0,0,0,0,0,1,0,1,0,I CPU・コードページ・文字列,UTF-8/ASCII の最小実装,thunk 1 本・呼出し 0 件 (未使用)
+KERNEL32.dll,WideCharToMultiByte,0x1803e81d8,1,0,1,0,0,1,1,0,I CPU・コードページ・文字列,同上,
+KERNEL32.dll,GetEnvironmentStringsW,0x1803e81e0,1,1,0,0,0,1,1,0,G プロセス・エラー状態,空の環境ブロック,
+KERNEL32.dll,FreeEnvironmentStringsW,0x1803e81e8,2,2,0,0,0,1,2,0,G プロセス・エラー状態,成功 (1) を返す,
+KERNEL32.dll,FlsAlloc,0x1803e81f0,0,0,0,0,1,1,1,0,C TLS/FLS (インスタンス内の表),同上 (FLS),thunk のみ (pdata 外)。呼出元 1 関数
+KERNEL32.dll,FlsGetValue,0x1803e81f8,0,0,0,0,1,5,1,1,C TLS/FLS (インスタンス内の表),同上 (FLS),thunk のみ (pdata 外)。export 到達
+KERNEL32.dll,FlsSetValue,0x1803e8200,0,0,0,0,1,5,1,1,C TLS/FLS (インスタンス内の表),同上 (FLS),thunk のみ (pdata 外)。export 到達
+KERNEL32.dll,FlsFree,0x1803e8208,0,0,0,0,1,1,1,0,C TLS/FLS (インスタンス内の表),同上 (FLS),thunk のみ (pdata 外)
+KERNEL32.dll,LCMapStringW,0x1803e8210,1,1,0,0,0,1,1,0,I CPU・コードページ・文字列,入力をそのまま返す,
+KERNEL32.dll,GetProcessHeap,0x1803e8218,1,1,0,0,0,1,1,0,A メモリ,非 NULL の固定ハンドル,
+KERNEL32.dll,GetStdHandle,0x1803e8220,1,1,0,0,0,1,1,0,F ファイル・コンソール (host 無し),NULL を返す,
+KERNEL32.dll,GetFileType,0x1803e8228,2,2,0,0,0,2,2,0,F ファイル・コンソール (host 無し),0 を返す,
+KERNEL32.dll,GetStringTypeW,0x1803e8230,1,1,0,0,0,1,1,0,I CPU・コードページ・文字列,固定値,
+KERNEL32.dll,SetStdHandle,0x1803e8238,1,1,0,0,0,1,1,0,F ファイル・コンソール (host 無し),成功 (1) を返す,
+KERNEL32.dll,FlushFileBuffers,0x1803e8240,1,1,0,0,0,1,1,0,F ファイル・コンソール (host 無し),成功 (1) を返す,
+KERNEL32.dll,WriteFile,0x1803e8248,6,6,0,0,0,5,6,0,F ファイル・コンソール (host 無し),失敗を返す,
+KERNEL32.dll,GetConsoleOutputCP,0x1803e8250,1,1,0,0,0,1,1,0,F ファイル・コンソール (host 無し),固定値,
+KERNEL32.dll,GetConsoleMode,0x1803e8258,1,1,0,0,0,1,1,0,F ファイル・コンソール (host 無し),0 を返す,
+KERNEL32.dll,SetFilePointerEx,0x1803e8260,1,1,0,0,0,1,1,0,F ファイル・コンソール (host 無し),失敗を返す,

@@ -35,6 +35,8 @@
 | fail-fast (未 lift、呼ばれると停止) | 34 | 0x180005000 0x180005c30 0x180005c50 0x18000caf0 0x18000f590 0x180021490 0x1800219b0 0x180021d40 0x1800448e0 0x1800541b0 0x18006ac50 0x18006c040 0x18010b6c0 **0x180112a30 (入口経路の先頭)** 0x18012e420 0x18012fba0 0x180130560 0x18013b9e0 0x18013c9c0 0x18024b2e0 0x1803965a0 0x180396b00 0x180396f40 0x18065bbd0 0x180c433b0 0x180c44b50 0x180c44d20 0x180c44d30 0x180c44d50 0x180c47b50 0x180ef8ef0 0x180ef92b0 0x180ef9b70 0x180fb5f5c |
 | **合計 (未 lift 扱い)** | **40** | (元 41 − lift 追加 2 + 新規出現 1 `18000caf0`) |
 
+注 (#709 で追記): 上表の「AVX2 (lift 不可)」「gen_simd 未対応」は基底 `8303a813` 時点の語彙による分類。#709 で gen_simd に ymm 整数語彙 (vpcmpeqb/w/d・vpmovmskb・vinsertf128) が加わり、2 件は i256 経路で emit されるようになった (ただし SSE 語彙不足で abort スタブとなり未 lift のまま。`KH709_REPORT.md` §3)。
+
 注: `0x180021490` (key_init) と `0x1800219b0` (apply_key) は module A/E で C stub の seam (`lic_config.json` の stubs) として扱われている。module F では lift も stub もされず fail-fast。F の経路で実際に到達するかは未確認。
 
 ## 3. 実測 (コミット HEAD で実行。環境: nproc=4)

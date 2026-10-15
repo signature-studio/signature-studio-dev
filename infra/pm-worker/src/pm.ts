@@ -44,8 +44,8 @@ export interface HistoryEntry {
   at: number;
 }
 
-// 抑止の上限 (同じ (kind, ref) は 60 分に 1 回、全体で 1 時間に 12 起動、同じ ref に 24 時間で 3 回)。
-export const PM_LIMITS = { dupMs: 60 * 60_000, hourMs: 3_600_000, hourMax: 12, dayMs: 24 * 3_600_000, refDayMax: 3 };
+// 抑止の上限 (同じ (kind, ref) は 60 分に 1 回、全体で 1 時間に 24 起動、同じ ref に 24 時間で 3 回)。
+export const PM_LIMITS = { dupMs: 60 * 60_000, hourMs: 3_600_000, hourMax: 24, dayMs: 24 * 3_600_000, refDayMax: 3 };
 // 種類ごとの上限 (PM_LIMITS に加えて効く)。refs_orphan は同じ N に 24 時間 1 回、1 日 10 件まで。
 export const KIND_LIMITS: Partial<Record<DetectedKind, { dupMs: number; dayMax: number }>> = {
   refs_orphan: { dupMs: 24 * 3_600_000, dayMax: 10 },
@@ -65,6 +65,8 @@ export interface DetectOpts {
   bots: string[];
   // Worker が oc:no-pr の issue を再投入した回数 (relaunch バケットの np:<n>)
   npCount: (n: number) => number;
+  // 新しい素材の無い artifact で、unknown の枠 (再投入 1 回) を使い切ったか、再投入の上限に達したか (#3185。engine が数える。無ければ偽)
+  artSpent?: (n: number) => boolean;
 }
 
 const t = (s: string | undefined): number => (s ? Date.parse(s) : NaN);
@@ -92,8 +94,10 @@ export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
     const oc = sig.outcome;
     if (i.labels.includes(NO_PR_LABEL) && !i.labels.some((l) => HOLD_LABELS.includes(l)) && oc && !answeredAfter(sig.pmAt, oc.at)) {
       // split / stop は即。unknown は、Worker が再投入した後の run (outcome が最新の launch より後) でも終わった場合だけ。
+      // artifact は、新しい素材が無く unknown の枠を使い切った (または上限に達した) 後の run でも終わった場合だけ (新しい素材がある分は Worker が足して 1 回再投入する)。
       const relaunched = o.npCount(i.number) >= 1 && t(oc.at) > t(s.launchedAt[k]);
-      if (oc.reason === "split" || oc.reason === "stop" || (oc.reason === "unknown" && relaunched)) {
+      const artDone = oc.reason === "artifact" && !!o.artSpent?.(i.number);
+      if (oc.reason === "split" || oc.reason === "stop" || (relaunched && (oc.reason === "unknown" || artDone))) {
         out.push({ kind: "no_pr", ref: i.number, at: oc.at });
       }
     }
@@ -165,4 +169,10 @@ export function selectDispatch(
   return { send, skipped };
 }
 
-export const pruneHistory = (now: number, h: HistoryEntry[]): HistoryEntry[] => h.filter((x) => now - x.at < PM_LIMITS.dayMs);
+export const pruneHistory = <T extends { at: number }>(now: number, h: T[]): T[] => h.filter((x) => now - x.at < PM_LIMITS.dayMs);
+
+// 毎時上限 (hourMax) で見送った件数。tick ごとに 1 件 (時刻と件数)。pruneHistory と同じ 24 時間の窓で捨てる (#3462)。
+export interface SkipEntry {
+  at: number;
+  n: number;
+}

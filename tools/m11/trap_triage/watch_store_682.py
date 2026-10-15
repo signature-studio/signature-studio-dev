@@ -52,6 +52,19 @@ def value_i32(vs, sid, ind, out_lines):
     return '0'
 
 lines = open(src_path).read().split('\n')
+# #2769: ALLOCA_SKIP=1 のとき、alloca で作ったスタックスロットを直接指す store を計装しない (既定 0)。
+#   スロットのアドレスを ptrtoint で外に出すと、空の hook でも lift 済み関数の終了条件が変わり無限 loop になった (REPORT_1783 §8)。
+#   スタックの配置 (shadow stack) が 0x1ac308 と重ならないことは未確認 (REPORT_1783 §8.3・§8.5)。ALLOCA_SKIP=1 の結果は、この前提が成り立つ場合にだけ取りこぼしが無い。
+ALLOCA_SKIP = os.environ.get('ALLOCA_SKIP') == '1'
+ALLOCAS = {}
+_cur = None
+for _l in lines:
+    _m = DEF.match(_l)
+    if _m:
+        _cur = _m.group(1)
+    _a = re.match(r'^\s*%([-a-zA-Z$._0-9]+) = alloca', _l)
+    if _a and _cur:
+        ALLOCAS.setdefault(_cur, set()).add(_a.group(1))
 out_lines = []
 sites = {}
 fn = '?'
@@ -68,6 +81,9 @@ for ln, line in enumerate(lines, 1):
         continue
     sm = STORE.match(line)
     if not sm:
+        skipped += 1
+        continue
+    if ALLOCA_SKIP and sm.group(4).startswith('%') and sm.group(4)[1:] in ALLOCAS.get(fn, ()):
         skipped += 1
         continue
     ind, addr = sm.group(1), sm.group(4)

@@ -748,6 +748,154 @@ class FnLift:
     def i_wait(self, ins, ops):
         self.ia32_only('wait')   # fwait: 未処理 x87 例外の模型を持たないため no-op
 
+    # ---- x87 (ia32 のみ。runtime は tools/ott/rt/ott_x87.h。スタック要素は double = f80→f64 lowering) ----
+    X87_BIN = {'fadd': 0, 'fmul': 1, 'fsub': 2, 'fsubr': 3, 'fdiv': 4, 'fdivr': 5}
+
+    def x87_idx(self, ins, op):
+        if op.type != X86_OP_REG:
+            raise Unsup('x87 operand')
+        nm = ins.reg_name(op.reg)
+        if nm == 'st':
+            return 0
+        if nm.startswith('st(') and nm.endswith(')'):
+            return int(nm[3:-1])
+        raise Unsup('x87 reg ' + nm)
+
+    def x87_mem_val(self, ins, op, m):
+        if op.size == 4:
+            return 'LDF32(%s)' % self.ea(ins, op)
+        if op.size == 8:
+            return 'LDF64(%s)' % self.ea(ins, op)
+        raise Unsup(m)
+
+    def x87_arith(self, ins, ops, m):
+        self.ia32_only(m)
+        base = m[:-1] if m.endswith('p') and m[:-1] in self.X87_BIN else m
+        if base not in self.X87_BIN:
+            raise Unsup(m)
+        pop = 1 if base != m else 0
+        op = self.X87_BIN[base]
+        if len(ops) == 1 and ops[0].type == X86_OP_MEM:   # ST(0) op= m32/m64
+            if pop:
+                raise Unsup(m)
+            return self.L('x87_arith(%d, 0, %s, 0);' % (op, self.x87_mem_val(ins, ops[0], m)))
+        if len(ops) == 1:
+            i = self.x87_idx(ins, ops[0])
+            if pop:   # DE 形: ST(i) op= ST(0) して pop (fsubp st(i) = ST(i) - ST(0))
+                return self.L('x87_arith(%d, %d, x87_st(0), 1);' % (op, i))
+            return self.L('x87_arith(%d, 0, x87_st(%d), 0);' % (op, i))   # D8 形: ST(0) op= ST(i)
+        if len(ops) == 2:   # DC/DE 形: ST(i) op= ST(0) (オペランドは Intel 記法の dst, src)
+            di = self.x87_idx(ins, ops[0])
+            si = self.x87_idx(ins, ops[1])
+            return self.L('x87_arith(%d, %d, x87_st(%d), %d);' % (op, di, si, pop))
+        raise Unsup(m)
+
+    def i_fadd(self, ins, ops): self.x87_arith(ins, ops, ins.mnemonic)
+    i_faddp = i_fmul = i_fmulp = i_fsub = i_fsubp = i_fsubr = i_fsubrp = i_fdiv = i_fdivp = i_fdivr = i_fdivrp = i_fadd
+
+    def i_fld(self, ins, ops):
+        self.ia32_only('fld')
+        o = ops[0]
+        if o.type == X86_OP_MEM:
+            if o.size == 10:
+                return self.L('x87_push(x87_f80_to_f64((const uint8_t*)A_(%s)));' % self.ea(ins, o))
+            return self.L('x87_push(%s);' % self.x87_mem_val(ins, o, 'fld'))
+        self.L('x87_push(x87_st(%d));' % self.x87_idx(ins, o))
+
+    def x87_store(self, ins, ops, m):
+        self.ia32_only(m)
+        o = ops[0]
+        if o.type == X86_OP_MEM:
+            if o.size == 4:
+                self.L('STF32(%s, x87_st(0));' % self.ea(ins, o))
+            elif o.size == 8:
+                self.L('STF64(%s, x87_st(0));' % self.ea(ins, o))
+            elif o.size == 10:
+                self.L('x87_f64_to_f80(x87_st(0), (uint8_t*)A_(%s));' % self.ea(ins, o))
+            else:
+                raise Unsup(m)
+        else:
+            self.L('x87_set(%d, x87_st(0));' % self.x87_idx(ins, o))
+        if m == 'fstp':
+            self.L('x87_pop();')
+
+    def i_fst(self, ins, ops): self.x87_store(ins, ops, 'fst')
+    def i_fstp(self, ins, ops): self.x87_store(ins, ops, 'fstp')
+
+    def i_fild(self, ins, ops):
+        self.ia32_only('fild')
+        o = ops[0]
+        if o.type != X86_OP_MEM:
+            raise Unsup('fild')
+        t = {2: 'int16_t', 4: 'int32_t', 8: 'int64_t'}.get(o.size)
+        if t is None:
+            raise Unsup('fild')
+        self.L('x87_push((double)(%s)LD%d(%s));' % (t, o.size * 8, self.ea(ins, o)))
+
+    def x87_fist(self, ins, ops, m):
+        self.ia32_only(m)
+        o = ops[0]
+        if o.type != X86_OP_MEM:
+            raise Unsup(m)
+        fn = {2: 'x87_fist16', 4: 'x87_fist32', 8: 'x87_fist64'}.get(o.size)
+        if fn is None or (o.size == 8 and m == 'fist'):
+            raise Unsup(m)
+        self.L('ST%d(%s, %s(x87_st(0)));' % (o.size * 8, self.ea(ins, o), fn))
+        if m == 'fistp':
+            self.L('x87_pop();')
+
+    def i_fist(self, ins, ops): self.x87_fist(ins, ops, 'fist')
+    def i_fistp(self, ins, ops): self.x87_fist(ins, ops, 'fistp')
+
+    def i_fld1(self, ins, ops): self.ia32_only('fld1'); self.L('x87_push(1.0);')
+    def i_fldz(self, ins, ops): self.ia32_only('fldz'); self.L('x87_push(0.0);')
+    def i_fchs(self, ins, ops): self.ia32_only('fchs'); self.L('x87_set(0, -x87_st(0));')
+    def i_fabs(self, ins, ops): self.ia32_only('fabs'); self.L('x87_set(0, fabs(x87_st(0)));')
+
+    def i_fxch(self, ins, ops):
+        self.ia32_only('fxch')
+        i = self.x87_idx(ins, ops[-1]) if ops else 1   # capstone は fxch st(i) を (st(0), st(i)) の 2 operand で返す
+        self.L('{ double t_ = x87_st(0); x87_set(0, x87_st(%d)); x87_set(%d, t_); }' % (i, i))
+
+    def x87_cmp(self, ins, ops, m):
+        self.ia32_only(m)
+        o = ops[0]
+        if o.type == X86_OP_MEM:
+            b = self.x87_mem_val(ins, o, m)
+        else:
+            b = 'x87_st(%d)' % self.x87_idx(ins, o)
+        self.L('x87_fcom(x87_st(0), %s);' % b)
+        if m == 'fcomp':
+            self.L('x87_pop();')
+
+    def i_fcom(self, ins, ops): self.x87_cmp(ins, ops, 'fcom')
+    def i_fcomp(self, ins, ops): self.x87_cmp(ins, ops, 'fcomp')
+
+    def i_fcompp(self, ins, ops):
+        self.ia32_only('fcompp')
+        self.L('x87_fcom(x87_st(0), x87_st(1)); x87_pop(); x87_pop();')
+
+    def i_fnstsw(self, ins, ops):
+        self.ia32_only('fnstsw')
+        o = ops[0]
+        if o.type == X86_OP_REG:
+            return self.L('R[RAX] = (R[RAX] & ~0xffffULL) | x87_fsw();')
+        if o.type != X86_OP_MEM or o.size != 2:
+            raise Unsup('fnstsw')
+        self.L('ST16(%s, x87_fsw());' % self.ea(ins, o))
+
+    def i_fnstcw(self, ins, ops):
+        self.ia32_only('fnstcw')
+        if ops[0].type != X86_OP_MEM or ops[0].size != 2:
+            raise Unsup('fnstcw')
+        self.L('ST16(%s, ott_fcw);' % self.ea(ins, ops[0]))
+
+    def i_fldcw(self, ins, ops):
+        self.ia32_only('fldcw')
+        if ops[0].type != X86_OP_MEM or ops[0].size != 2:
+            raise Unsup('fldcw')
+        self.L('ott_fcw = LD16(%s);' % self.ea(ins, ops[0]))
+
     def i_movsd(self, ins, ops):
         d, s = ops
         if IA32 and d.type == X86_OP_MEM and s.type == X86_OP_MEM:   # ia32 の非 rep movsd (文字列)
@@ -1640,6 +1788,8 @@ def main():
     used_imps = sorted(used_imps)
     with open(os.path.join(out, 'ott_lifted.c'), 'w') as fh:
         fh.write('#include "ott_cpu.h"\n')
+        if IA32:
+            fh.write('#include "ott_x87.h"\n')
         if RELOC:
             fh.write('extern uint64_t ott_gbase;\n')
         for nm in used_imps:

@@ -653,7 +653,7 @@ u64 function_50a830(u64 self, u64 item) {
  * RetDec は 535bf2 末尾の `ret` (VA 0x535c2e) を未定義の function_535c2e への call にし, 535c11 の jl 先 535bf2 を rcx=0 の call にした (#714).
  * 同じ分岐を C で書き、closure 外参照を転記で消す (seed 追加では解けないため). */
 #ifndef M11_FIX_535BF2
-#define M11_FIX_535BF2 0
+#define M11_FIX_535BF2 1
 #endif
 #if M11_FIX_535BF2
 u64 function_535c11(u64 self) {
@@ -1030,6 +1030,32 @@ static u64 tr_9b4b00(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
 
 #endif /* M11_OV_CLASSCREATE */
 
+/* #2203 計測専用 (M11_PRINT_DEST_2118=1 のときだけ有効・読取りのみ): j=12 の function_412c20 呼出し前後に、
+ * 2 区間 (0xfa5108-0xfa5c68・0x11e69b0-0x11e6b98) の FNV-1a 指紋と 0x11e6a2c の 4B 値を stderr に出す。
+ * ON (下の function_413060) と OFF (lift 版; trap_triage/dest_2203.py が IR に同名の呼出しを入れる) で同じ書式を使う。 */
+#if M11_PRINT_DEST_2118
+static u64 fnv_range_2203(u64 lo, u64 hi) {
+    u64 h = 0xcbf29ce484222325ull;
+    for (u64 a = lo; a < hi; a++) { h ^= *(volatile unsigned char*)(uintptr_t)a; h *= 0x100000001b3ull; }
+    return h;
+}
+void m11_pd2118_in(unsigned long long dest, unsigned long long len) {
+    fprintf(stderr, "[d413060] dest=%llx len=%llu A=%016llx B=%016llx w=%08x\n", dest, len,
+            fnv_range_2203(0xfa5108ull, 0xfa5c68ull), fnv_range_2203(0x11e69b0ull, 0x11e6b98ull),
+            *(volatile unsigned int*)(uintptr_t)0x11e6a2cull);
+}
+void m11_pd2118_pre(unsigned long long len) {
+    fprintf(stderr, "[r2118] pre len=%llu A=%016llx B=%016llx w=%08x\n", len,
+            fnv_range_2203(0xfa5108ull, 0xfa5c68ull), fnv_range_2203(0x11e69b0ull, 0x11e6b98ull),
+            *(volatile unsigned int*)(uintptr_t)0x11e6a2cull);
+}
+void m11_pd2118_post(void) {
+    fprintf(stderr, "[r2118] post A=%016llx B=%016llx w=%08x\n",
+            fnv_range_2203(0xfa5108ull, 0xfa5c68ull), fnv_range_2203(0x11e69b0ull, 0x11e6b98ull),
+            *(volatile unsigned int*)(uintptr_t)0x11e6a2cull);
+}
+#endif
+
 #ifndef M11_OV_413060
 #define M11_OV_413060 0
 #endif
@@ -1052,7 +1078,7 @@ void m11_dest_obs(unsigned long long dest);
 #endif
 unsigned long long function_413060(unsigned long long dest, void* src, unsigned long long len) {
 #if M11_PRINT_DEST_2118
-    fprintf(stderr, "[d413060] dest=%llx len=%llu\n", dest, len);
+    m11_pd2118_in(dest, len);
 #endif
 #if M11_INSTR_413060
     m11_probe(8);
@@ -1060,7 +1086,13 @@ unsigned long long function_413060(unsigned long long dest, void* src, unsigned 
     u64 old = Q(dest);
     int n = (int)len;
     if (n > 0) {
+#if M11_PRINT_DEST_2118
+        m11_pd2118_pre(len & 0xffffffffull);
+#endif
         u64 p = function_412c20(len & 0xffffffffull);
+#if M11_PRINT_DEST_2118
+        m11_pd2118_post();
+#endif
         Q(dest) = p;
         if (src) function_409c80((u64)(uintptr_t)src, p, (u64)(long long)(int)((unsigned)n * 2u));
     } else {
@@ -1122,6 +1154,54 @@ void m11_a270_obs(unsigned long long a) {
     if (a + 0xaa <= heap) f = *(volatile unsigned char*)(uintptr_t)(a + 0xa9);
     if (g_a270_n++ < 16)
         fprintf(stderr, "[m11][a270] #%d this=0x%llx [this]=0x%llx [this+a9]=%llu\n", g_a270_n, a, w0, f);
+}
+#endif
+
+/* #2400 計測専用 (M11_PROBE_2400=1 のときだけ有効): function_e3ef60 の 60a270 呼出し 9 箇所の直前で、呼出し番号 (1..9)・
+ * arg1 (e3ef60 の第 1 引数)・渡す this (IR 上 [arg1+off] のロード値)・edx を stderr に出す。既定 0 では何も入らない。 */
+#ifndef M11_PROBE_2400
+#define M11_PROBE_2400 0
+#endif
+#if M11_PROBE_2400
+static int g_e3ef60_site_n;
+void m11_e3ef60_site_obs(unsigned int site, unsigned long long arg1, unsigned long long th, unsigned int edx) {
+    static const unsigned int pe[10] = {0, 0xe3f0b4, 0xe3f0f7, 0xe3f118, 0xe3f139, 0xe3f15a, 0xe3f178, 0xe3f196, 0xe3f1b4, 0xe3f215};
+    static const unsigned int off[10] = {0, 0x778, 0x7d8, 0x810, 0x840, 0x808, 0x7f0, 0x838, 0x8e8, 0x9c8};
+    if (site >= 1 && site <= 9 && g_e3ef60_site_n++ < 512)
+        fprintf(stderr, "[m11][e3ef60] #%d site=%u pe=0x%x off=0x%x arg1=0x%llx this=0x%llx edx=0x%x\n",
+                g_e3ef60_site_n, site, pe[site], off[site], arg1, th, edx);
+}
+#endif
+
+/* #3325 計測専用 (M11_INSTR_412770=1 のときだけ有効): function_412770 の入口で arg1 と [arg1+0] (u32) を stderr に出す。
+ * 線形メモリ外は読まない (address 0 は線形メモリ内なので読む)。既定 0 では何も入らない。 */
+#ifndef M11_INSTR_412770
+#define M11_INSTR_412770 0
+#endif
+#if M11_INSTR_412770
+static int g_412770_n;
+void m11_412770_obs(unsigned long long a) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long v = 0;
+    if (a + 4 <= heap) v = *(volatile unsigned int*)(uintptr_t)a;
+    if (g_412770_n++ < 64)
+        fprintf(stderr, "[m11][412770] #%d arg1=0x%llx [arg1]=0x%llx\n", g_412770_n, a, v);
+}
+#endif
+
+/* #2407 計測専用 (M11_INSTR_E3EF60=1 のときだけ有効): function_e3ef60 (#2373 の unit 895 経路で 60a270 を呼ぶ caller) の入口で
+ * arg1 (this = rcx) と [arg1+0] (u64) を stderr に出す。線形メモリ外は読まない (address 0 は線形メモリ内なので読む)。既定 0 では何も入らない。 */
+#ifndef M11_INSTR_E3EF60
+#define M11_INSTR_E3EF60 0
+#endif
+#if M11_INSTR_E3EF60
+static int g_e3ef60_n;
+void m11_e3ef60_obs(unsigned long long a) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long w0 = 0;
+    if (a + 8 <= heap) w0 = *(volatile unsigned long long*)(uintptr_t)a;
+    if (g_e3ef60_n++ < 64)
+        fprintf(stderr, "[m11][e3ef60] #%d arg1=0x%llx [arg1]=0x%llx\n", g_e3ef60_n, a, w0);
 }
 #endif
 

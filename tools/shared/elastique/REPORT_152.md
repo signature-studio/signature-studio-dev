@@ -19,7 +19,7 @@
 | IPPCODE の外部依存 | **0 ではない**。線形走査で外向き直接分岐 33 件 (イメージ外 32 = 誤デコードとみなす / `.text` 1 = 初期化スタブ `0x1803e71b0` 内の `call` (`0x1803e71b6`) → `0x1800010a0`)。pdata 関数内だけを数えると 0 (測定方法は §1.3) |
 | 入口集合は閉じているか | **閉じていない (静的に示せない)**。thunk 頭 33 本は、直接 call/jmp・RIP 相対・即値では参照されない。8 バイト値としての参照は枠の中身 (`.data` 33 件・`.reloc` DIR64 と同じ) だけ (§2.4)。到達元は実行時計算の経路と推定 (未確定) |
 | D20 の停止条件 | 未発動 (置換不能の根拠は見つからない)。ただし dispatch 層の `.text` の 1 段目の飛び先 186 個と、その本体の直接分岐先 251 個 (2 段目。1 段目と重複しないもの・関数内の位置を含む。関数先頭は 87 個) の IPP API 同定は未了 → #2667 |
-| 完了範囲 | 測定と置換可否の一次判定まで。RetDec lift と side module ビルドは未着手 → 子 T-SH-43 (入口同定・#2667) / T-SH-41 (lift + side module・#2614) |
+| 完了範囲 | 測定と置換可否の一次判定まで。dispatch 飛び先の IPP 同定は T-SH-43 (#2667・§8)。RetDec lift と side module ビルドは未着手 → T-SH-41 (lift + side module・#2614) |
 
 ## 1. 測定
 
@@ -152,4 +152,64 @@ thunk `0x180001830` (枠 `0x1804afca0`・表 `0x1804afca8`):
 - 陰性対照 (1 件を壊して FAIL することの確認・dcd3e7df で実施): リポジトリ外 `$RUNNER_TEMP/ex/neg/` に DLL のコピーを作り、thunk 0 (`0x180001800`) の `jmp *(%r10,%rax,8)` (`41 ff 24 c2`・ファイル offset `0xc1e`) を `jmp %rax` + `nop nop` (`ff e0 90 90`) に置き換えた。`elastique_dispatch.py` にこのコピーを渡すと **rc=1・`AssertionError: 0x180001810`** (thunk 形の assert で停止)、標準出力 0 バイト (出力を書く前に停止)。参考 (前版 `a27c04e5` で確認): 同じ箇所を 4 バイト NOP にした場合は `IndexError` で rc=1 (assert ではなく例外で落ちる。FAIL の結果は同じ)。
 - thunk パターン照合 (`call` → `movsxd` → `lea` → `jmp [r10+rax*8]`) は、本物の DLL の 33 箇所すべてで assert を通過した (rc=0)。
 - 自己検査フラグ `summary.A_dispatch.record_layout_null_slot6_all_zero` は `false` になる。33 本の表の `B+6` (表の先頭 + 48) が全て 0 かを見るフラグで、最後の 1 本 (`0x1801bad00`) の `B+6` が `0x1801bb1c0` (非 0) のため (§2.1)。期待どおりの値で、欠陥ではない。
-- 範囲外: 2 段目以降の関数の意味 (IPP の API 名)・thunk 頭の実行時到達・mac 版・`0x1802f8030` が `[rdx]` へ書くか (callee 経由の索引値域) は未検証。
+- 範囲外: 2 段目以降の関数の意味 (IPP の API 名)・thunk 頭の実行時到達・mac 版・`0x1802f8030` が `[rdx]` へ書くか (callee 経由の索引値域) は未検証。(`0x1802f8030` は §8.3 で検査済み。残りは §8.5)
+
+## 8. T-SH-43 (#2667): dispatch 飛び先と初期化スタブの IPP 同定
+
+測定 commit: `02aca7e5` (`scripts/elastique_dispatch_ident.py` の呼出しガードと `data/dispatch_targets.csv` の再生成。以後 scripts・data の変更なし)。前版 `e64d258f` の呼出しガードは呼出先の名前の和集合しか見ておらず、名前の無い呼出先を含む本体に名付けを残していた (差し戻し round 1 の指摘)。入力 `dispatch.json` は `scripts/elastique_dispatch.py` (測定 commit `dcd3e7df`) の出力。
+
+```sh
+FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/shared/elastique/scripts/elastique_dispatch.py
+FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/shared/elastique/scripts/elastique_dispatch_ident.py
+```
+
+素材: `fl-win64` の `extracted/block24357_PE.bin` を `tools/shared/work/win/elastique_x64.dll` に複製、照合先は `extracted/block24356_PE.bin` (dsp_ippv2_x64)。依存は capstone・pefile。
+
+### 8.1 方法
+
+- 照合は #2613 (`ipp_entries.py`) と同じ。thunk を 4 段まで追い、正規化命令列 (分岐先・RIP 相対変位を伏せる) の SHA-1 の**完全一致**だけを根拠にする。名前は dsp export が 12 段以内で到達する本体の集合。近似比は使わない。
+- **呼出しガード (本節で追加)**: 正規化は呼出先を `T` に伏せるため、呼出しを含む本体の一致は形の一致で、呼出先の同一性を示さない。実測でも 11 命令の Sqrt 系ラッパーが 6 スロットで同名に一致した。そこで呼出しを含む本体は、**全呼出先が IPPCODE で、各呼出先が #2613 で名付けられ (`entries.csv` の names が空でない)、その呼出先の名前が照合の名前と 1 つ以上重なる場合だけ**名付ける (呼出先ごとに判定。コードは `guard()`)。それ以外は `class = shape_only` (形のみ一致・未同定扱い。`names` は候補)。呼出しを含まない本体の完全一致はそのまま採る。陽性対照と stub・索引書込み関数の判定も同じ `guard()` を通す。
+- 呼出先ごとの判定と、「全呼出先が名前を持つ」かつ「呼出先の名前の和集合が照合の名前と重なる」判定は、CSV 437 行の全てで結果が同じ (差 0 件。CSV の `ipp_callees`・`names` からの再計算)。
+- 出力 `data/dispatch_targets.csv` は 1 行 1 飛び先 (437 行)。`label` が最終の表示 (API 名・族候補・未同定)。
+
+### 8.2 結果 (受入 1・2)
+
+| 段 | 飛び先 (distinct) | 一意 API 名 | 族候補 (未同定扱い) | 形のみ一致 (未同定) | 照合不能 (未同定) | 自明本体 (未同定) |
+|---|---|---|---|---|---|---|
+| 1 段目 (表の飛び先) | 186 | 7 | 2 | 118 | 58 | 1 |
+| 2 段目 (1 段目の本体の直接 call/jmp 先) | 251 | 2 | 3 | 13 | 222 | 11 |
+
+- 一意名 (全て呼出しを含まない完全一致・本体 77〜147 トークン):
+  - `ippsPhase_32fc`: 1 段目 6 飛び先 (`0x180005900`・`0x180005ae0`・`0x180005cc0`・`0x180005ea0`・`0x180006080`・`0x180006260`)
+  - `ippsThreshold_GTVal_32f_I`: 1 段目 `0x1800067a0`
+  - `ippsRealToCplx_32f`: 2 段目 `0x18000df60`・`0x18000e5c0`
+- 族候補 (名前が決まらない。候補集合は CSV の `names`): 1 段目 2 (`0x18000d520`・`0x18000de80` = {`ippsFFTFwd_RToCCS_32f`・`ippsFFTFwd_RToPack_32f`・`ippsFFTFwd_RToPerm_32f`・`ippsFFTInv_CCSToR_32f`・`ippsFFTInv_PackToR_32f`・`ippsFFTInv_PermToR_32f` の 6 名。本体 11 トークン・呼出しなし)、2 段目 3 (`0x18000ec20`・`0x18000ec60`・`0x18000eca0` = {`ippsFFTInit_R_32f`・`ippsFFTInit_R_64f`・`ippsZero_16s`・`ippsZero_32f`・`ippsZero_32s`・`ippsZero_64f`・`ippsZero_64s`・`ippsZero_8u` の 8 名。呼出先 2 件はいずれも名付けられ、呼出先ごとの重なりを満たす)。
+- 族候補から外れたもの: `0x180001e40`・`0x180001ec0`・`0x180001f40`・`0x180001fc0` (前版の族候補 {`ippsRealToCplx_16s`・`ippsRealToCplx_32f`}) は、呼出先 3 件のうち 2 件が未命名 (例 `0x1802f8f10`・`0x1802f9000`) のため形のみ一致へ落ちた。`ippsRealToCplx_16s` は族候補の名前から消えた。
+- IPPCODE 直接 call を持つ 59 件 (1 段目) からは**一意名は 0 件**。内訳は族候補 0・形のみ一致 43・照合不能 16 (前版は族候補 4・形のみ一致 39・照合不能 16)。
+- 名前の distinct 数 (族候補の名前を含むものと、一意名だけのもの。前版の「合計 35」は前者の数え方を含んでいた):
+  - 197 側 (#2613): 行は一意 8 (名前 distinct 3 = `ippsConj_32fc`・`ippsRealToCplx_32f`・`ippsSet_8u`)・族候補 26。族候補の名前を含む distinct は 33。
+  - dispatch 側 (本節): 一意名 3 (`ippsPhase_32fc`・`ippsThreshold_GTVal_32f_I`・`ippsRealToCplx_32f`)。族候補の名前を含む distinct は 17。
+  - 一意名だけの和集合は 5 名 (`ippsConj_32fc`・`ippsRealToCplx_32f`・`ippsSet_8u`・`ippsPhase_32fc`・`ippsThreshold_GTVal_32f_I`)。新規に加わるのは 2 名 (`ippsPhase_32fc`・`ippsThreshold_GTVal_32f_I`)。
+
+### 8.3 初期化スタブと外向き分岐 (受入 3)
+
+- `0x1803e71b0` (IPPCODE・10 命令・`push×4; call 0x1800010a0; pop×4; ret`): 形は dsp の `0x1839810` と一致し、#2613 の `ippiResize_8u_C3R`・`C4R` の族候補になる (REPORT.md §3 注の偶然一致)。ただし呼出先 `0x1800010a0` (.text) と dsp 側の呼出先の同一性は示せない。**IPP API 名は付けない (未同定・glue)**。`data/entries.csv` の当該行は #2613 の正本として変えず、本節の判定で名付けから外す。
+  - 判定 (`guard()` 後): class = `shape_only`、names = {`ippiResize_8u_C3R`・`ippiResize_8u_C4R`} (match = `exact_final`)。呼出先 `0x1800010a0` は .text で IPPCODE ではないため、ガードで未同定。
+- `0x1800010a0` (.text・0x80 B・索引を書く関数): `0x180001000`・`0x180001080`・`0x1800015a0` (CPU 判定)・IPPCODE の `0x1802f83b8` を呼ぶ。形は同じく ippiResize 族と一致するが、呼出しガードで `shape_only` → 未同定 (élastique 固有の dispatch 処理)。判定 (`guard()` 後): class = `shape_only`、names = {`ippiResize_8u_C3R`・`ippiResize_8u_C4R`} (match = `exact_final`)、呼出先 {`0x180001000`・`0x180001080`・`0x1800015a0` (.text)・`0x1802f83b8` (IPPCODE)} は IPPCODE 以外を含むため未同定。
+- IPPCODE → 外向きの直接分岐 (線形走査 33 件): イメージ外 32 (§1.3 のとおりデータの誤デコード)・`.text` 1 件 = `0x1803e71b6` → `0x1800010a0`。扱い: この 1 件は glue から索引書込み関数への呼出しで、IPP 節と .text は双方向に結ばれたまま。IPPCODE だけを置換しても `0x1800010a0` → `0x1802f83b8` (.text → IPPCODE) と索引書込みが残るため、side module の置換単位は IPPCODE 単独にできない (D20 の判断材料)。
+- `0x1802f8030` (§6 の未検査項目): 本体は `mov rax, 1; ret` で、memory への store を持たない。`0x180001120` → `0x1802f8030` の経路で `[rdx]` へ書く項目は閉じた (この callee に限る)。
+
+### 8.4 検証
+
+- 陽性対照: `0x1802f8db0` (#2613 の一意名 `ippsRealToCplx_32f`) は `identified` を返す。呼出しを持たないためガードの対象外 (標準出力に記録)。
+- 再現性: 測定 commit `02aca7e5` の HEAD で 3 回再実行 (dispatch は `dcd3e7df` の出力を入力)。標準出力は 3 回とも同一、`data/dispatch_targets.csv` は 3 回とも commit 版と `cmp` 一致。実行時間 (real): 30.2 s / 30.2 s / 30.1 s (開始時の load 1 分 0.21 / 0.52 / 0.71)。修正前の 1 回実行は 29.9 s (`705c560d` の HEAD。scripts は `e64d258f` と同一、同じ環境)。
+- 修正の差分: `git diff e64d258f 02aca7e5 -- tools/shared/elastique/data` は CSV の 4 行の差し替え (diff 上は削除 4・追加 4)。対象は 1 段目の 4 飛び先 `0x180001e40`・`0x180001ec0`・`0x180001f40`・`0x180001fc0` の class・label のみ。
+- 差分: `git diff 02aca7e5 HEAD -- tools/shared/elastique/scripts tools/shared/elastique/data` の出力は 0 行 (本節の commit 時点)。
+
+### 8.5 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 形のみ一致 131 件 (1 段目 118・2 段目 13): 呼出先が未同定または .text のため、名前を確定できない | 名付けの件数は過小。候補名は CSV `names` | 未起票 (PM 判断。#2613 の未同定 163 と同じ扱い) |
+| 2 段目の未同定 222 件 (呼出先を含む本体の照合不能を含む) | IPP 相当の同定が過小 | 未起票 (同上) |
+| 索引書込み関数 `0x1800010a0` の呼出先 (`0x180001000`・`0x180001080`) の同定 | 索引の CPU 判定経路の全体像が未確定 | 未起票 |

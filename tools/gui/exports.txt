@@ -216,6 +216,7 @@ LoadCursorA
 LoadCursorW
 LoadIconA
 LoadIconW
+LoadImageW
 LoadKeyboardLayoutW
 LoadStringW
 LockWindowUpdate

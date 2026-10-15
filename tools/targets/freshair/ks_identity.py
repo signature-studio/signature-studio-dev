@@ -162,7 +162,7 @@ def main(kh_path, sc_path, out):
                 r['exact_' + lvl] = a[2][k] == b[2][k]
             r.update(kh_slot=i, sc_slot=j, kh_va=ks[i], sc_va=ss[j], kh_ninsn=a[0], sc_ninsn=b[0], kh_bytes=a[1], sc_bytes=b[1])
             return r
-        # SlateCore 側は全 slot から M 比が最大の slot を process 候補にする (固定 slot 12 は process でないクラスがある)
+        # SlateCore 側は命令数 3 以上の slot のうち M 比が最大の slot を process 候補にする (固定 slot 12 は process でないクラスがある)
         cands = [(cmp(14, j), j) for j in range(len(sf)) if sf[j][0] >= 3]
         cands = [c for c, _ in cands if c]
         proc = max(cands, key=lambda c: (c['ratio_M'], c['ratio_E'])) if cands else None

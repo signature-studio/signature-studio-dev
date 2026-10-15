@@ -48,6 +48,8 @@ void shx_unlock(void) { shx_mutex_unlock(&g_big); }
 volatile uint32_t g_shx_sig_seq = 0;
 static void (*g_notify_hook)(void);
 void shimx_set_notify_hook(void (*fn)(void)) { g_notify_hook = fn; }   /* #172: GUI メッセージ待ち (MsgWait*) を kernel object の状態変化で起こす */
+static void (*g_file_close_hook)(const char *);
+void shimx_set_file_close_hook(void (*fn)(const char *)) { g_file_close_hook = fn; }   /* #958: 書込み用 file handle の CloseHandle で posix path を渡す (save 反映の契機) */
 void shx_notify(void) {
     __atomic_add_fetch(&g_shx_sig_seq, 1u, __ATOMIC_SEQ_CST);
     shx_futex_wake(&g_shx_sig_seq, 0x7fffffff);
@@ -214,6 +216,7 @@ BOOL CloseHandle(HANDLE h) {
     g_tab[(h >> 2) - 1] = NULL;
     g_open--;
     shx_unlock();
+    if (g_file_close_hook && o->type == OBJ_FILE && o->path && (o->access & (GENERIC_WRITE | GENERIC_ALL))) g_file_close_hook(o->path);
     shx_unref(o);
     shx_set_last_error(ERROR_SUCCESS);
     return TRUE;

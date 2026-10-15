@@ -10,13 +10,15 @@
   - .text: 原則不要 (コードは C 化済み) だが jump table 等「データとして読まれる窓」だけ敷設
     (lift_meta.json の jt_ranges + textrefs)。
 
-usage: fle_data_gen.py PE out.c lift_meta.json
+usage: fle_data_gen.py PE out.c lift_meta.json [shift]
+    shift (省略時 0) は x64c の --shift と同値。VA を wasm 上の番地へ写す (敷設先 = VA - shift)。
 """
 import sys, struct, pefile, json
 
 pe = pefile.PE(sys.argv[1])
 img = bytearray(pe.get_memory_mapped_image())
 IMG = pe.OPTIONAL_HEADER.ImageBase
+SHIFT = int(sys.argv[4], 0) if len(sys.argv) > 4 else 0   # x64c --shift と同じ (敷設先 = IMG + RVA - SHIFT)
 meta = json.load(open(sys.argv[3]))
 impbase = int(meta.get('impbase', 0x1D80000))
 
@@ -42,7 +44,8 @@ for a in meta.get('textrefs', []):
     wins.append((a - IMG - 16, 96))
 # vtable (#1936/#2005): RIP 相対参照が無く jt_ranges にも入らないため、窓を明示的に足す
 for a, n in [(0x42f670, 0x30)]:
-    wins.append((a - IMG, n))
+    if IMG <= a < IMG + pe.OPTIONAL_HEADER.SizeOfImage:   # FLEngine 固有の VA。他の image では範囲外になるので足さない
+        wins.append((a - IMG, n))
 
 out = ['#include <stdint.h>\n#include <string.h>\n']
 for k, (rva, n) in enumerate(sorted(set(wins))):
@@ -55,10 +58,10 @@ for n, va, vs, raw in secs:
 
 out.append('void fle_data_install(void) {\n')
 for k, (rva, n) in enumerate(sorted(set(wins))):
-    out.append('  memcpy((void*)0x%xu, w_%d, %du);\n' % (IMG + rva, k, n))
+    out.append('  memcpy((void*)0x%xu, w_%d, %du);\n' % (IMG + rva - SHIFT, k, n))
 for n, va, vs, raw in secs:
     ln = min(vs, raw) if raw else vs
-    out.append('  memcpy((void*)0x%xu, d_%s, %du);\n' % (IMG + va, n.strip('.').lstrip('_'), ln))
+    out.append('  memcpy((void*)0x%xu, d_%s, %du);\n' % (IMG + va - SHIFT, n.strip('.').lstrip('_'), ln))
 out.append('}\n')
 open(sys.argv[2], 'w').write(''.join(out))
 tot = sum(min(vs, raw) if raw else vs for _, _, vs, raw in secs) + sum(n for _, n in set(wins))

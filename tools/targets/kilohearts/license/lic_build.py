@@ -147,11 +147,12 @@ def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=N
     exports = ['_function_' + k for k in sig] + ['_malloc', '_free', '_kh_stack_ptr']
     if emcc_extra_exports:
         exports += emcc_extra_exports
+    extra_ll = (' ' + P('simd.c.i256.ll')) if os.path.exists(P('simd.c.i256.ll')) else ''
     r, dt = sh('emcc -w %s -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=96MB -sENVIRONMENT=node -sMODULARIZE=1 '
                '-sEXPORT_NAME=KhLic -sERROR_ON_UNDEFINED_SYMBOLS=0 --no-entry -sEXPORTED_FUNCTIONS=%s '
-               '-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAP64 -Wl,--no-gc-sections -I%s/lift %s %s %s %s%s -o %s' % (
+               '-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAP64 -Wl,--no-gc-sections -I%s/lift %s %s %s %s%s%s -o %s' % (
                    emcc_opt, ','.join(exports), ROOT, P('final.ll'), P('simd.c'), P('globals.c'), P('stubs.c'),
-                   (' ' + P('lowered.ll.icall.c')) if os.path.exists(P('lowered.ll.icall.c')) else '', P('mod.cjs')),
+                   (' ' + P('lowered.ll.icall.c')) if os.path.exists(P('lowered.ll.icall.c')) else '', extra_ll, P('mod.cjs')),
                log=P('emcc.log'))
     stat['icall'] = os.path.exists(P('lowered.ll.icall.c'))
     stat['emcc_sec'] = round(dt, 1)

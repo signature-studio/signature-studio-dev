@@ -85,7 +85,7 @@
 
 所要 (`time`、n=1、並列数 1、wineprefix 新規作成を含む): S1 probe 全体 (インストール木の組立 + 起動 120 s) real 7 m 42 s (user 1 m 21 s / sys 4 m 20 s)。load average (1 / 5 / 15 分): 開始 0.36 / 0.25 / 0.11、終了 1.02 / 0.90 / 0.50。
 
-**S2 (部分)**: `bash tools/flp/s2_render_probe.sh Autogun.flp 3` (`Data/System/Render tests/Autogun.flp`、render 2.0 s の 1 本) を commit `8be0756f` で、S1 と同じ wineprefix 上で連続 3 回実行。各 run の前に block から FL64.exe / FLEngine_x64.dll を取り直し、G03 パッチを当てる。
+**S2 (部分)**: `bash tools/flp/s2_render_probe.sh Autogun.flp 3` (`Data/System/Render tests/Autogun.flp`、render 2.0 s の 1 本) を commit `8be0756f` で、S1 と同じ wineprefix 上で連続 3 回実行。`8be0756f` の script は WFBox を書かず既定は 16-bit だった。現行 HEAD で同じ条件にするには `S2_WFBOX=0 bash tools/flp/s2_render_probe.sh Autogun.flp 3` と前置する (現行の既定 `WFBox`=2 では 32-bit。§17.4)。各 run の前に block から FL64.exe / FLEngine_x64.dll を取り直し、G03 パッチを当てる。
 
 | run | rc | 所要 | 形式 | data バイト | data SHA-256 (64 桁) |
 |--:|--:|--:|---|--:|---|
@@ -111,13 +111,13 @@
 | T2 | T1 の値を 0 に戻す + `Software\Image-Line\FL Studio 26\General` / `LastExportedFormats`=4 | 0 | 16 bit | 同一 |
 | T3 | `Software\Image-Line\FL Studio 26\General` / `LastExportedFormats`=16 | 0 | 16 bit | 同一 |
 
-- 再現例: `S2_REG=$'Software\\Image-Line\\FL Studio 26\\General|LastExportedFormats|16' bash tools/flp/s2_render_probe.sh Autogun.flp 1`。
+- 再現例 (既定 `WFBox`=2 の現行 script では `S2_WFBOX=0` を前置して 16-bit に戻す。§17.3 E2): `S2_WFBOX=0 S2_REG=$'Software\\Image-Line\\FL Studio 26\\General|LastExportedFormats|16' bash tools/flp/s2_render_probe.sh Autogun.flp 1`。
 - キーの位置: `LastExportedFormats` は `tools/startup/REGISTRY.csv` の `Software\Image-Line\FL Studio 26\General` (既定 8)。`DS_32BitBufBox` は FLEngine_x64.dll 内の UI 部品名 (`DSPanel` 付近) を確認しただけで、登録先の `Devices\Audio output` は推定 (`Sample rate` と同じ音声出力の鍵)。
 - 注: 前回 run では T3 の後の `user.reg` で `LastExportedFormats` が `"8"` に戻っていた。FL が終了時に書き戻すため、起動時に 4 / 16 を読んでいない可能性がある (未確定。本 run では未確認)。
 - **未達**: 目標の **32-bit float** が出ない。`WAV bit depth`=2・3、`Export WAV`=2 でも 16-bit のまま。`/E`・`/O` を付けても WAV は出るが 16-bit、`/F` を付けると WAV は出ない。ビット深度を決める経路は未特定。
 - 再現の注意: `wine64 reg add` の直後に FL64.exe を起動すると rc 231 で即終了する。`wineserver -k` で止めると正常に戻る (`s2_render_probe.sh` に反映済み)。
 
-**差分 0 の証跡** (`docs/WORKFLOW.md` §6): `git diff 8be0756f HEAD -- tools/flp/s1_g03_patch.py tools/flp/s2_render_probe.sh tools/flp/s1_wine_probe.sh tools/startup tools/assets` の出力は空 (0 行)。本節を含む REPORT_APPENDIX.md の commit だけが HEAD の差分。
+**差分の証跡** (`docs/WORKFLOW.md` §6): `git diff 8be0756f HEAD -- tools/flp/s1_g03_patch.py tools/flp/s1_wine_probe.sh` の出力は空 (0 行)。元の指定 (`tools/flp/s2_render_probe.sh`・`tools/startup`・`tools/assets` を含む) は HEAD では空ではない。前者は `0fb80be1` の WFBox 既定行 (§17.5)、後者は 8be0756f 以降に 8 commit の変更があるため。
 
 **未解決**
 
@@ -127,3 +127,102 @@
 | SHA が run 間で変わる (`363fb7aa68bea2d5614c97b84b68803432f77b87041802cdde97134e16dbcf2b` (f6bce8c1)・`13d61a057ac2f6a6920b409e8b5693293ec7f3a43b5688eae139e64b0c3c6299` (8be0756f)。`d3d0e4f9` の SHA は 64 桁の記録なし)。原因未特定 | 決定性は同一 run 内の 3 回一致まで。別 run・別環境での一致は未確認 | #113 に継続コメント |
 | Render tests 82 本 + Demo 3 本の全数書き出しと、sha256・メトリクス JSON の commit (S3) | S3 は未着手 | #2546 (子、親 #113) |
 | 書き出し WAV の内容 (音色・レベル) の妥当性は未確認。T5 の C/D 閾値の校正には使えない | #106 の閾値確定が未着手 | #106 |
+
+## 16. #2546 (L-13): `/R` の書き出し形式 (32-bit float) の経路調査
+
+測定 commit: **`aafd1c76`** (`tools/flp/s2_render_probe.sh` と `tools/flp/s2_imm_patch.py` を変えた最後のコード commit)。環境: Ubuntu 24.04、wine64 9.0 (`/usr/lib/wine/wine64`)、xvfb-run、`nproc`=4。素材 `fl-win64` は `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (25,165 block)、インストール木は 25,131 件 (`recover_paths` 経由、組立 3 m 02 s)。
+
+**結論: 受入 1 (48 kHz / 32-bit float) は未達。** 試したすべての `/R` 書き出しが 48 kHz / **16-bit** (fmt 1・2 ch) のままだった。経路は未特定で、子 #3052・#3053 に切り出した。
+
+**16.1 実測** (`S2_WFBOX=0 bash tools/flp/s2_render_probe.sh Autogun.flp 1`、各 run は同一 HEAD。SHA-256 は data チャンク。現行 script の既定 `WFBox`=2 では 32-bit になるため `S2_WFBOX=0` を付けて再現する。鍵を 0 にした結果は鍵なしと同じ 16-bit (§17.3 E0・E2))
+
+| 試行 | 変えたもの | rc | 所要 | 形式 | data SHA-256 (先頭 8 桁) |
+|---|---|--:|--:|---|---|
+| B | 無変更 (n=3) | 0 | 15 / 14 / 15 s | 16-bit | `2e067272` ×3 (同一) |
+| T | `S2_TRACE_REG=1` (`WINEDEBUG=+reg`) | 0 | 15 s | 16-bit | `2e067272` |
+| P1 | `FLEngine_x64.dll` VA `0xef6d4b` の `movzbq 0xe18(%rax),%rcx` を `mov $1,%ecx` に置換 | 0 | 14 s | 16-bit | `2e067272` |
+| P2 | VA `0xa64b66` の書式即値 0 → 1 | 0 | 14 s | 16-bit | `2e067272` |
+| P3 | VA `0x6725e1` の書式即値 0 → 1 | 0 | 15 s | 16-bit | `2e067272` |
+| P4 | VA `0x6725e1` の書式即値 0 → 2 | 0 | 13 s | 16-bit | `2e067272` |
+| P5 | VA `0x67240d` の書式即値 0 → 1 | 0 | 14 s | 16-bit | `2e067272` |
+| P6 | VA `0x67240d` の書式即値 0 → 2 | 0 | 14 s | 16-bit | `2e067272` |
+
+- 同一入力 3 回 (B) の SHA-256 は一致 (`2e067272…`)。本 run の値は §15 の `13d61a05…` と異なる (run・環境差。§15 の表と同じ扱い)。
+- P1〜P6 の入力行 (`S2_PATCH`): 実行時の行は記録が残っていない (リポジトリと #2546 のコメントに無い)。下記は表の VA と書換え内容から組み直した行で、**再実行は未実施**。`s2_imm_patch.py` を素材 `block00031_PE.bin` (FLEngine_x64.dll) のコピーに当てると期待バイトが一致し (exit 0)、逆アセンブルは `movzbq 0xe18(%rax),%rcx` → `mov $0x1,%ecx`、`movb $0x0,0x28(%rsp)` → `movb $0x1,…` / `$0x2` になる。
+
+```
+P1: S2_WFBOX=0 S2_PATCH=$'ef6d4b|480fb688180e0000|b9010000000f1f00' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+P2: S2_WFBOX=0 S2_PATCH=$'a64b66|c644242800|c644242801' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+P3: S2_WFBOX=0 S2_PATCH=$'6725e1|c644242800|c644242801' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+P4: S2_WFBOX=0 S2_PATCH=$'6725e1|c644242800|c644242802' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+P5: S2_WFBOX=0 S2_PATCH=$'67240d|c644242800|c644242801' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+P6: S2_WFBOX=0 S2_PATCH=$'67240d|c644242800|c644242802' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+```
+- 前段 (変更前の probe、`S2_REG` で `Software\Image-Line\FL Studio 26\General\Render` に `WAV bit depth`=0/1/2/3・`Export WAV`=1・`Dither`=0 を書いた 4 試行。現行 script で再現するには `S2_WFBOX=0` を付ける): すべて 16-bit。`user.reg` には値が残る (`"WAV bit depth"="3"`)。`/R` がこの値を読んだかは未測定 (16.2)。
+
+**16.2 トレース** (T、開かれたレジストリキー 759 種。抽出するのは `NtOpenKeyEx` の鍵名だけ): `General\Render` を単一の相対名で開く記録は **0 件**。開かれたのは `General\WAVRenderForm` (30 回) と `General\WAVRenderForm (mixer)` (1 回) など。`Render` 単独・`General` 直下からの open は未確認。`General` を開いてから `Render` を相対名で開く経路は、`General\Render` の文字列検索では見えない。`WAV bit depth`・`Export WAV` の値の読出しは未測定 (probe は値名を抽出しない)。鍵名は末尾の `"` を含む (`sed` が行末の `"` を除かない。件数には影響しない。次の再測定で直す)。このため `RenderOptions.load` (VA `0xeec630`) を `/R` が通るかは、本測定からは判定できない。
+
+**16.3 静的所見** (`FLEngine_x64.dll`、ImageBase `0x400000` 込みの VA。`objdump -d` と目視、未確定の推定を含む)
+- `RenderOptions.load` の `WAV bit depth` (VA `0xeec933`): 読込ヘルパ `0xeec5d0` が `[0,2]` に丸めて `obj+0xe18` (1 byte) に格納。構築側 `0xedff36` の `movb $0x2,0xe18(%rcx)` が既定値 2。
+- `RenderOptions.load` の呼出し元 wrapper は `0xee6a20` (VA `0xee6a2c` で load)。`/R` からの直接の呼出しは見つからなかった。
+- `0xef6d4b` は `obj+0xe18` を読み、フラグ `0x45`・`0x46` に変換して `0xef6e2d` (`0x672580`) 等へ渡す (P1 で変えても出力は不変)。
+- `RIFF` / `fmt ` を書くのは VA `0x670fd0` だけ (`0x671082`・`0x67111c`)。書式引数 `0x178` が 1 のとき fmt を `0x674e10` で書き (`bits=0x18`)、それ以外は汎用 sample writer。
+- `0x670fd0` の直接の呼出し元: `0x672130` (書式は 6 番目の引数)、`0x672390` (書式 0 の即値は VA `0x67240d` = P5・P6)、`0xa64b6b` (書式 0 の即値は VA `0xa64b66` = P2)。`0x672130` の呼出し元は `0x672580` (書式 = `r8b`。`0xef6e2d` から `0x45` を渡す)、`0x6725c0` (書式 0 の即値は VA `0x6725e1` = P3・P4)、ほか 8 箇所。`0x672390` の呼出し元は wrapper `0x696a60` と `0x11e9704`。
+- 32-bit float (fmt タグ 3) を書くコードは、上記の範囲では確認できなかった。
+
+**16.4 解釈と次の一手**: 本測定から言えるのは次まで。(1) `General\Render` を単一の相対名で開く記録は無い (16.2)。(2) P1〜P6 と S2_REG の 4 試行 (16.1 前段) では出力は変わらなかった (すべて 16-bit)。(3) 出力が変わることを確かめる正の対照は無い。よって「保存された書式は使われない」「即値は通らない」とは結論しない。次は `/R` のコマンドライン処理から書出し関数までを追う (#3052)。
+
+**差分の証跡** (`docs/WORKFLOW.md` §6): `git diff aafd1c76 HEAD -- tools/flp/s2_imm_patch.py tools/startup tools/assets` の出力は空 (0 行)。`tools/flp/s2_render_probe.sh` だけは `0fb80be1` で既定の WFBox 書込みが入ったため空ではない (§17.5)。16-bit の対照 (`S2_WFBOX=0`) は §17.4 で同じ SHA (`13d61a05`) を再確認した。
+
+**未解決**
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `/R` の 32-bit float 経路 (書式を決める値・関数) が未特定 | 受入 1 未達 | #3052 ([L-14]) |
+| Render tests 82 本 + Demo 3 本の全数書き出しと sha256・メトリクス JSON の commit | 未着手。16-bit では受入 2 を満たさない | #3053 ([L-15]、依存は #3052) |
+| `/R` が `RenderOptions` の保存値を読むかは未確定 (`General\Render` の単一相対名は 0 件。`Render` 単独・`General` 直下は未確認) | 設定経由で形式を切り替えられるかを判定できない | #3052 |
+| `Render` 単独・`General` 直下からの open と、`WAV bit depth`・`Export WAV` の値の読出しが未測定 (probe は `NtOpenKeyEx` の鍵名だけ抽出) | `RenderOptions.load` を `/R` が通るかを判定できない | #3052 |
+| P1〜P6 の入力行は未記録。§16.1 の行は組み直しで、未再実行 | §16.1 の P1〜P6 の結果は組み直した行では確認していない | #3052 |
+| data SHA-256 が run・環境で変わる (`2e067272` 本 run / `13d61a05` §15) | 決定性は同一 run 内 3 回一致まで | #2546 にコメント済み (issuecomment-6178890982) |
+
+## 17. #3052 `/R` WAV 書き出しを 32-bit float にする経路 (WAVRenderForm)
+
+測定 commit: **`0fb80be1`** (`tools/flp/s2_render_probe.sh` を変えた最後のコード commit)。§16 (#2546) が `General\Render` を調べて「未特定」とした後の続き。§16.2 が開かれたと記録した `General\WAVRenderForm` の値を読んだところ、書式が決まった。
+
+**結論**: `HKCU\Software\Image-Line\FL Studio 26\General\WAVRenderForm` の値 **`WFBox`** = `2` で `/R` の書き出しが 48 kHz / **32-bit float (fmt 3)** になる。`WFBox` = `0` は 16-bit、`1` は 24-bit (実測)。値 **`DitherBox`** = `0` で dither off (`1` にすると 16-bit の data が変わる)。
+
+**17.1 環境・手順**: 素材は `tar --zstd -xf` で `$RUNNER_TEMP` 直下に出るため `$RUNNER_TEMP/fl-win64/` へ移した。`sudo apt-get update` の後 `sudo apt-get install -y wine64 xvfb` (update 前は mirror の 404)。wine-9.0 (`/usr/lib/wine/wine64`)。S1: `bash tools/flp/s1_wine_probe.sh` real 7 m 41.9 s、`S1 rc=124`、`blocks with path 25164 / 25165`。`WINEDEBUG=-all` のため MSGBOX / native-load は未計測。
+
+**17.2 trace と所見**: 変更前の script で `WINEDEBUG=+reg bash tools/flp/s2_render_probe.sh Autogun.flp 1` (現行の `S2_TRACE_REG=1` と同じ設定。real 17.8 s、rc 0、16-bit、SHA `13d61a05...c6299` で §15 と一致)。`NtQueryValueKey` を鍵名に解決して集計した。
+- `General\WAVRenderForm` は既定では鍵が無い (`NtOpenKeyEx` が nil)。鍵が無いと既定値 (16-bit、dither off) になる。
+- `FLEngine_x64.dll` の `TWAVRenderForm` のコンポーネント名に `WFBox` (VA `0xd1339d`)、`DitherBox` (VA `0xd133ed`)、`QualityBox`、`FormatBox`、`WAVBox` がある。
+- `LastExportedFormats` は起動時に 1 回読まれ、終了時に `8` が書かれる。§15 の 4 / 16 で形式は変わらず、ビット深度には関与しないと判断 (推定)。`Devices\Audio output` は `Sample rate` / `Buffer length (DS)` / `Device name` のみ読まれる。
+- 読取り元の関数は未特定。`fmt ` を書く関数 (§16.3) の書式引数の供給元も未特定。
+
+**17.3 実測 (同一入力 `Autogun.flp`、各 1 run、rc 0)**
+
+| 試行 | 設定 | fmt | bit | data B | data SHA-256 |
+|---|---|--:|--:|--:|---|
+| E0 | 鍵なし (既定) | 1 | 16 | 385,000 | `13d61a05...c6299` |
+| E1 | `WFBox`=2, `DitherBox`=0 | 3 | 32 float | 770,000 | `aa3253b9...668d6` |
+| E2 | `WFBox`=0, `DitherBox`=0 | 1 | 16 | 385,000 | `13d61a05...c6299` |
+| E3 | `WFBox`=1, `DitherBox`=0 | 1 | 24 | 577,500 | `80a51aa0...bb15e8` |
+| E4 | `WFBox`=0, `DitherBox`=1 | 1 | 16 | 385,000 | `e881960b...ccb4ad` |
+
+E1〜E4 は script 変更前に `S2_REG` で 1 件ずつ設定した。E2 は E0 と同一 SHA、つまり `DitherBox`=0 は鍵なしの既定と同じ。
+
+**17.4 測定 commit `0fb80be1` での検証**
+- `bash tools/flp/s2_render_probe.sh Autogun.flp 3` (既定 `WFBox`=2、`DitherBox`=0): run 1 / 2 / 3 とも rc 0、fmt 3 / 2ch / 48000 Hz / 32 bit、data 770,000 B、SHA-256 `aa3253b9...668d6` (3 回一致)。
+- 対照 16-bit: `S2_WFBOX=0 bash tools/flp/s2_render_probe.sh Autogun.flp 1` → 16-bit、`13d61a05...c6299`。
+- 対照 dither: `S2_WFBOX=0` + `S2_REG=…WAVRenderForm|DitherBox|1` → 16-bit、`e881960b...ccb4ad`。
+
+**17.5 差分の証跡**: `git diff 0fb80be1 HEAD -- tools/flp/s2_imm_patch.py tools/flp/s1_g03_patch.py tools/flp/s1_wine_probe.sh tools/startup tools/assets` の出力は 0 行。`tools/flp/s2_render_probe.sh` の差分は注釈行 (行 8 の例への `S2_WFBOX=0` 追記) のみで、実行行は変わっていない (再測定は不要)。
+
+**未解決**
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `WFBox` / `DitherBox` の読取り元の関数 (VA) と、書式引数の供給元の特定 | 書式の根拠は挙動の実測のみで、機械語の裏付けなし | #3052 |
+| 別 wineprefix・別ホスト・別 run での SHA 一致は未確認 (3 回一致は同一 prefix 内のみ) | 決定性は同一 prefix 内まで | #3052 |
+| Render tests 全数の書き出しと sha256 / メトリクス JSON (S3) | 未着手 | #3053 (依存は #3052) |
+| S1 の MSGBOX / native-load 件数を本 run で再計測していない (`WINEDEBUG=-all`) | S2 の前提は §15 の値に依存 | #3052 (#113 は CLOSED) |

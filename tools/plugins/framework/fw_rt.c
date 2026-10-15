@@ -104,13 +104,14 @@ long long fw_call_cur(uint32_t va) {
 
 /* ---- Local 系, Global 系メモリ API (RetDec が IAT thunk を名前解決して直接 call する) ---- */
 static int g_local_trace = 0;
-void *LocalAlloc(unsigned flags, unsigned bytes) { void *r = HeapAlloc(0, flags, bytes); if (g_local_trace++ < 16) fprintf(stderr, "[fw][tls] LocalAlloc(0x%x, 0x%x) -> 0x%llx\n", flags, bytes, (unsigned long long)(uintptr_t)r); return r; }
+/* LMEM/GMEM_ZEROINIT (0x40) は HEAP_ZERO_MEMORY (0x8) に変換する (値が違うため素通しすると 0 埋めされない) */
+void *LocalAlloc(unsigned flags, unsigned bytes) { void *r = HeapAlloc(0, (flags & 0x40) ? 8 : 0, bytes); if (g_local_trace++ < 16) fprintf(stderr, "[fw][tls] LocalAlloc(0x%x, 0x%x) -> 0x%llx\n", flags, bytes, (unsigned long long)(uintptr_t)r); return r; }
 void *LocalReAlloc(void *p, unsigned bytes, unsigned flags) { (void)flags; return HeapReAlloc(0, 0, p, bytes); }
 void *LocalFree(void *p) { HeapFree(0, 0, p); return p; }
 void *LocalLock(void *p) { return p; }
 int LocalUnlock(void *p) { (void)p; return 1; }
 unsigned LocalSize(void *p) { (void)p; return 0; }
-void *GlobalAlloc(unsigned flags, unsigned bytes) { return HeapAlloc(0, flags, bytes); }
+void *GlobalAlloc(unsigned flags, unsigned bytes) { return HeapAlloc(0, (flags & 0x40) ? 8 : 0, bytes); }
 void *GlobalReAlloc(void *p, unsigned bytes, unsigned flags) { (void)flags; return HeapReAlloc(0, 0, p, bytes); }
 void *GlobalFree(void *p) { HeapFree(0, 0, p); return p; }
 void *GlobalLock(void *p) { return p; }
