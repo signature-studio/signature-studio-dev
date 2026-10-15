@@ -8,8 +8,29 @@ from .runners import Runner, ROOT, env
 
 REPO = build_wasm.REPO
 TIMEOUT_STATUSES = ('timeout', 'hang', 'crash')
-# rt/ld_native.c run_case: setitimer(ITIMER_REAL) の初回値 {1, 500000} = 1.5 s (SIGALRM → status timeout)
+# native timeout で wasm を実行しなかった case の placeholder の detail (wasm_status は hang のまま)
+SKIPPED = 'skipped (native timeout)'
+# rt/ld_native.c run_case: setitimer(ITIMER_REAL) の初回値 {1, 500000} = 1.5 s (SIGALRM → status timeout)。
+# tests/test_ld154_timing.py が C 側の値と一致することを検査する。
 NATIVE_ITIMER_S = 1.5
+
+
+def side_timing(r, limit_s, recv_limit_s):
+    """1 側 (native / wasm) の timing。
+    limit_s は runner が自分の上限で timeout を返した case (status timeout) だけに付ける。
+    recv_limit_s は応答待ちの期限切れ (cause deadline) だけに付ける。EOF・プロセス終了の case には上限を付けない
+    (そのとき判定を決めたのは上限ではないため)。skipped は wasm を実行していない (elapsed_s None)。"""
+    if r.get('detail') == SKIPPED:
+        return {'status': 'skipped', 'elapsed_s': None}
+    t = {'status': r.get('status'), 'elapsed_s': r.get('_elapsed_s')}
+    if r.get('status') == 'timeout':
+        t['cause'] = 'runner_timeout'
+        t['limit_s'] = limit_s
+    elif r.get('_cause'):
+        t['cause'] = r['_cause']
+        if r['_cause'] == 'deadline':
+            t['recv_limit_s'] = recv_limit_s
+    return t
 
 
 class Session:
@@ -105,12 +126,12 @@ class Session:
 
     def _mark_timing(self, c, n, w):
         """timeout/hang/crash を含む case に、判定に使った上限秒数と実測秒を `timing` として付ける (通常の case には付けない)。
-        wasm の elapsed_s が None の場合は native timeout の後で wasm を実行しなかった (skipped)。"""
+        side_timing の規則に従う (上限は判定を決めた場合だけ、wasm の skipped は status skipped)。"""
         if n.get('status') not in TIMEOUT_STATUSES and w.get('status') not in TIMEOUT_STATUSES:
             return
         nat_recv, was_recv = self.recv_limits()
-        c['timing'] = {'native': {'status': n.get('status'), 'elapsed_s': n.get('_elapsed_s'), 'limit_s': NATIVE_ITIMER_S, 'recv_limit_s': nat_recv},
-                       'wasm': {'status': w.get('status'), 'elapsed_s': w.get('_elapsed_s'), 'limit_s': self.wasm_timeout_ms / 1000.0, 'recv_limit_s': was_recv}}
+        c['timing'] = {'native': side_timing(n, NATIVE_ITIMER_S, nat_recv),
+                       'wasm': side_timing(w, self.wasm_timeout_ms / 1000.0, was_recv)}
 
     def thunks(self):
         """import thunk (先頭が jmp [rip+IAT]) の VA 集合: lift 側では import 直呼びになるため entry トレース比較から除外"""
@@ -173,7 +194,7 @@ class Session:
         ids = ['%x:%s' % (va, p) for p in patterns]
         rn = nat.run_cases(lines, ids)
         keep = [i for i, n in enumerate(rn) if n.get('status') not in ('timeout', 'hang', 'crash')]
-        rw = [{'id': ids[i], 'status': 'hang', 'detail': 'skipped (native timeout)', 'calls': [], 'mem': []} for i in range(len(lines))]
+        rw = [{'id': ids[i], 'status': 'hang', 'detail': SKIPPED, 'calls': [], 'mem': []} for i in range(len(lines))]
         if keep:
             for i, w in zip(keep, was.run_cases([lines[i] for i in keep], [ids[i] for i in keep])):
                 rw[i] = w
@@ -206,8 +227,13 @@ class Session:
                     elif len(a) == 2 and a[0].get('status') != a[1].get('status'):
                         c['wasm_uninit_dependent'] = True
                     if any(x.get('status') in TIMEOUT_STATUSES for x in a):
-                        c['refine_timing'] = {'statuses': [x.get('status') for x in a], 'elapsed_s': [x.get('_elapsed_s') for x in a],
-                                              'limit_s': self.wasm_timeout_ms / 1000.0, 'recv_limit_s': self.recv_limits()[1]}
+                        rt = {'statuses': [x.get('status') for x in a], 'elapsed_s': [x.get('_elapsed_s') for x in a],
+                              'causes': [x.get('_cause') for x in a]}
+                        if any(x.get('status') == 'timeout' for x in a):
+                            rt['limit_s'] = self.wasm_timeout_ms / 1000.0
+                        if any(x.get('_cause') == 'deadline' for x in a):
+                            rt['recv_limit_s'] = self.recv_limits()[1]
+                        c['refine_timing'] = rt
         return rec
 
     def _fvm_cases(self, nat, was, va, sig, cases_done):
@@ -225,7 +251,7 @@ class Session:
         ids = ['%x:fvm%d' % (va, i) for i in cand]
         rn = nat.run_cases(lines, ids)
         keep = [i for i, n in enumerate(rn) if n.get('status') not in ('timeout', 'hang', 'crash')]
-        rw = [{'id': ids[i], 'status': 'hang', 'detail': 'skipped (native timeout)', 'calls': [], 'mem': []} for i in range(len(lines))]
+        rw = [{'id': ids[i], 'status': 'hang', 'detail': SKIPPED, 'calls': [], 'mem': []} for i in range(len(lines))]
         if keep:
             for i, w in zip(keep, was.run_cases([lines[i] for i in keep], [ids[i] for i in keep])):
                 rw[i] = w

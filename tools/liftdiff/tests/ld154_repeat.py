@@ -49,8 +49,10 @@ def timing_summary(d):
                 continue
             for side in ('native', 'wasm'):
                 s = t[side]['status']
+                if t[side].get('cause'):
+                    s = '%s/%s' % (s, t[side]['cause'])
                 cnt[(side, s)] += 1
-                if s in ('timeout', 'hang', 'crash') and t[side]['elapsed_s'] is not None:
+                if t[side]['status'] in ('timeout', 'hang', 'crash') and t[side]['elapsed_s'] is not None:
                     el[(side, s)].append(t[side]['elapsed_s'])
     return cnt, el
 
@@ -68,7 +70,7 @@ def pair(a_path, b_path, rows):
             if k[1] != 'ok':
                 e = el.get(k, [])
                 rng = '%.3f..%.3f s' % (min(e), max(e)) if e else '-'
-                print('      %-6s %-8s %5d  elapsed %s' % (k[0], k[1], cnt[k], rng))
+                print('      %-6s %-24s %5d  elapsed %s' % (k[0], k[1], cnt[k], rng))
     vas = sorted(set(a) | set(b))
     trans = collections.Counter()
     changed = []

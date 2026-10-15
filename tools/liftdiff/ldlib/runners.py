@@ -35,8 +35,10 @@ class Runner:
         self.p.stdin.write((line + '\n').encode())
 
     def _recv(self, timeout):
+        """応答 1 行を返す。None を返したときは self.why に理由を置く: deadline (期限切れ)・eof (stdout が閉じた)・exited (プロセス終了)。"""
         fd = self.p.stdout.fileno()
         end = time.time() + timeout
+        self.why = None
         while True:
             i = self.buf.find(b'\n')
             if i >= 0:
@@ -44,14 +46,17 @@ class Runner:
                 return line.decode(errors='replace')
             rem = end - time.time()
             if rem <= 0:
+                self.why = 'deadline'
                 return None
             r, _, _ = select.select([fd], [], [], min(rem, 1.0))
             if r:
                 d = os.read(fd, 1 << 20)
                 if not d:
+                    self.why = 'eof'
                     return None
                 self.buf += d
             elif self.p.poll() is not None:
+                self.why = 'exited'
                 return None
 
     def kill(self):
@@ -65,6 +70,7 @@ class Runner:
         """lines: CASE 行 (プレフィクスなし)。戻り値: [結果 dict]。ハング/クラッシュは status=hang/crash の dict。
         badjson (壊れた応答行) はランナ再起動 + 1 回だけ再試行する (モジュール状態の汚染に対応、CAB-232)。
         各結果には `_elapsed_s` (直前の応答または送信からその応答までの秒。応答が来なかった case は recv 待ちの秒) を付ける。
+        応答が来なかった case (hang/crash) には `_cause` (deadline: 応答待ちの期限切れ / eof: stdout が閉じた / exited: プロセス終了) を付ける。
         chunk=1 (既定): 1 件ずつ送って応答を待つ。chunk>1 だと先行 case の応答がパイプに溜まり、待ち時間が隣の case に計上される。"""
         out = []
         i = 0
@@ -80,11 +86,13 @@ class Runner:
             bad = []
             waited = None
             t_prev = time.monotonic()
+            why = None
             for k, l in enumerate(part):
                 r = self._recv(self.timeout)
                 now = time.monotonic()
                 if r is None:
                     waited = round(now - t_prev, 3)
+                    why = self.why
                     break
                 el = round(now - t_prev, 3)
                 t_prev = now
@@ -101,7 +109,7 @@ class Runner:
                 k = len(got)
                 alive = self.p.poll() is None
                 out.append({'id': ids[i + k], 'status': 'hang' if alive else 'crash', 'detail': 'runner %s' % self.name,
-                            'calls': [], 'mem': [], '_elapsed_s': waited})
+                            'calls': [], 'mem': [], '_elapsed_s': waited, '_cause': why})
                 self.kill()
                 self.restarts += 1
                 self.start()
