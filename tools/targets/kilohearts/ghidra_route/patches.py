@@ -150,6 +150,7 @@ ABI = {
         # #4889 (KH-128): FUN_180fbc1f4 の入力は xmm0 (float)、戻り値も xmm0 (float)。呼出元 FUN_1802ed7f0 の 2 件 (1082・1088) は
         #   1802ede08〜ede29: xmm6 = fVar26*48*[p+0x3188+0x24] の後、1802ede18 `jae` (X>=0) で 1802eded3 (×-0.16609640419483185) → 1802edede call (C 1082)、
         #   X<0 は 1802ede21 (×+0.16609640419483185) → 1802ede2c call (C 1088)。movaps xmm0,xmm6 の後に call。rcx は設定しない。
+        #   未確定 (#5402): 符号分岐の比較対象 xmm0 = 0.0 を示す命令と VA は未確認 (plugins-kilohearts 無しで逆アセンブル不可)。±0.166 の符号はこの前提の読みで入れている。
         #   callee 本体は xmm0 を movss [rsp+8] で読む (180fbc1f4)。よって宣言は float (float)、本体は bits 変換なしで fVar4 = param_1、戻り値は fVar4。
         ('delay 1082 FUN_180fbc1f4 arg xmm0 = X*(-0.166) (1802ede18 jae -> 1802eded3)', r'(0\.0 <= fVar26 \* _DAT_1814dd30c \* \*\(float \*\)\(\*\(longlong \*\)\(param_2 \+ 0x3188\) \+ 0x24\)\) \{\n\s*)fVar33 = \(float\)FUN_180fbc1f4\(\);', r'\1fVar33 = (float)FUN_180fbc1f4(fVar26 * _DAT_1814dd30c * *(float *)(*(longlong *)(param_2 + 0x3188) + 0x24) * -0.16609640419483185f);'),
         ('delay 1088 FUN_180fbc1f4 arg xmm0 = X*(+0.166) (1802ede21, X<0)', r'(dVar32 = _DAT_18147d368;\n  \}\n  else \{\n\s*)fVar33 = \(float\)FUN_180fbc1f4\(\);', r'\1fVar33 = (float)FUN_180fbc1f4(fVar26 * _DAT_1814dd30c * *(float *)(*(longlong *)(param_2 + 0x3188) + 0x24) * 0.16609640419483185f);'),
