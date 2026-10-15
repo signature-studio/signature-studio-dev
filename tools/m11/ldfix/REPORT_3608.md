@@ -132,7 +132,7 @@
 |---|---|---|
 | trap 144 (最内 `function_44aeb0` の入力値・書込み元)・149 (`function_412e40`)・114 (Halt 呼出し元) の unit 単位の引き金 | 項目 1 (受入 1 の残り) | #3608 (open のまま・部分達成) |
 | ldfix の F3a 2・F3c 43 のうち件数に反映されなかった修復 (反映は unit 895 の 1 件) の理由 | 項目 3 の理由 | #3608 |
-| §8 の引数採取 (probe144.py・read144.mjs) が未 commit で、committed HEAD から再現できない。IR 生成に RetDec 全 lift が要り、本 runner に無い | §8 の全数値の根拠 (受入 1) | #3608 (採取スクリプトの commit と IR 生成環境が要る) |
+| §8 の引数採取 (probe144.py・read144.mjs) が未 commit で、committed HEAD から再現できない。IR の正の素材 `work-m11` (`tools/m11/work/boot_final3.ll`) が本 run の `oc_artifacts` に無く、`--full` の再生成は Ghidra (`functions_dll.csv`) が本 runner に無い | §8 の全数値の根拠 (受入 1) | #3608 (採取スクリプトの commit と IR 生成環境が要る) |
 
 ## 6. 測定 commit と差分 (`docs/WORKFLOW.md` §6)
 
@@ -144,7 +144,7 @@ git diff 40d3a788d origin/main -- tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_4
 ```
 
 - 上の範囲の差分は 0 行 (`... | wc -l` → 0)。よって `origin/main` 取り込み後の再測定は不要 (`docs/WORKFLOW.md` §6)。
-- §1 の全変種・§1-3 の数値は `87208313b` 時点のコードの測定。同じ経路 (上の一覧) について、`git diff 87208313b HEAD --numstat` は 5 ファイル・90 行追加・7 行削除 (`ldfix/ldfix.py` 44 追加・3 削除、`ldfix/ldfix_e2e.sh` 6 追加、`ldfix/fix_site_3372.py` 3 追加・1 削除、`m11_build.sh` 14 追加・3 削除、`m11_gen_ir2.sh` 23 追加)。これは main 取り込みで入った、実行されるコードの差分。HEAD での再測定は未実施 (§8 と同じく本 runner に RetDec・emsdk が無い)。よって §1〜§4 は HEAD 上の確認済みの値ではない。
+- §1 の全変種・§1-3 の数値は `87208313b` 時点のコードの測定。同じ経路 (上の一覧) について、`git diff 87208313b HEAD --numstat` は 5 ファイル・90 行追加・7 行削除 (`ldfix/ldfix.py` 44 追加・3 削除、`ldfix/ldfix_e2e.sh` 6 追加、`ldfix/fix_site_3372.py` 3 追加・1 削除、`m11_build.sh` 14 追加・3 削除、`m11_gen_ir2.sh` 23 追加)。これは main 取り込みで入った、実行されるコードの差分。HEAD での再測定は未実施 (本 run の `oc_artifacts` に `work-m11` が無く、`tools/m11/work/boot_final3.ll` が無いため `ldfix_e2e.sh` が rc 1 で止まる。`toolchain-retdec`・`toolchain-emsdk`・`fl-win64` は `$ARTIFACTS_DIR` に実在し、展開で `retdec/bin/retdec-decompiler`・`emsdk/emsdk_env.sh` を確認済み)。よって §1〜§4 は HEAD 上の確認済みの値ではない。
 - `origin/main` (`91ed96332`) と `40d3a788d` の差分は、REPORT・新規の別系統スクリプト (`ld175_site_link.py`・`trap_triage/slot653660_exp.py`)・`tools/shared/lift/rex` (x64c 系) のみ。
 
 ## 7. 再現
@@ -174,6 +174,6 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 ## 8. trap 144・149・114 の引き金 (受入 1・部分) — 未再現のため測定値は撤回
 
 - 前の run で採取した entry 引数の表 (144 の `a1`・149 の `a2` など) は撤回した。採取に使った probe (`probe144.py`・`read144.mjs`) は commit されておらず (`work/` 内・gitignore)、committed HEAD から再現できない。撤回前の本節は commit `1c0911297` の `tools/m11/ldfix/REPORT_3608.md` §8 に残る。ここには値も読みも書かない。
-- `ldfix_e2e.sh`・`prod_order_3608.sh` の rc・所要時間・件数の主張も撤回した。本 run では未実行。理由: IR の生成 (`tools/m11/m11_e2e.sh`) に RetDec・emsdk・PE 素材が要る。本 runner の `$ARTIFACTS_DIR` には `fl-win64.tar.zst` (`[WIN64]` の素材) はあるが未展開 (`FL_WIN64_DIR` は未設定)。`toolchain-retdec` (`[RETDEC]`)・`toolchain-emsdk` (`[EMSDK]`) は無い。不足は後者 2 つ。§1〜§6 の測定値は従来どおり測定 commit `40d3a788d`・`87208313b` に基づく (§6)。
+- `ldfix_e2e.sh`・`prod_order_3608.sh` の rc・所要時間・件数の主張も撤回した。本 run では未実行。理由: 再測定の入力 `tools/m11/work/boot_final3.ll` は `work-m11` 素材の展開先で、本 run の `oc_artifacts` に無いため無い。`--full` で IR を作り直すには Ghidra (`functions_dll.csv`) も要り、本 runner には Ghidra が無い。`$ARTIFACTS_DIR` には `fl-win64.tar.zst`・`toolchain-retdec.tar.zst` (`[RETDEC]`)・`toolchain-emsdk.tar.zst` (`[EMSDK]`) が実在し、展開で `retdec/bin/retdec-decompiler`・`emsdk/emsdk_env.sh` を確認済み。不足は `work-m11` (と `--full` の Ghidra)。`FL_WIN64_DIR` は未設定 (`fl-win64` の展開で用意できる)。§1〜§6 の測定値は従来どおり測定 commit `40d3a788d`・`87208313b` に基づく (§6)。
 - 未確定 (受入 1 の残り): 144 の `function_44aeb0` が受ける値の書込み元、149 の `function_412e40` の引数の上流、114 の Halt 呼出し元。採取は採取スクリプトを committed な場所に置き、IR 生成環境が揃ってから行う。
 - 検証起点: `git diff 4e9e1d974 HEAD --numstat -- tools/m11/ldfix` の出力は `tools/m11/ldfix/REPORT_3608.md` のみで、コード差分は 0 (数値は PR 本文に書く)。
