@@ -54,7 +54,9 @@ STK_WIN = 0x1E0
 PROBE = [
     {'va': 0x10009EB5, 'name': 'fn_10009eb5', 'gen': 'generic'},
     {'va': 0x1000B526, 'name': 'fn_1000b526', 'gen': 'generic'},
-    {'va': 0x1000BF60, 'name': 'fn_1000bf60', 'gen': 'generic'},
+    # #4105: 0x1000bf60 は fld tbyte [esp+0x10] (a3..a5) と [esp+4] (a0..a2) の 2 つの f80 を割る。 generic は a5 = 0 のため X の指数が常に 0 (非 normal)。
+    # f80pair は両オペランドを種類 (normal・zero・denorm・unnorm) つきで作り、normal×normal の行を含める。
+    {'va': 0x1000BF60, 'name': 'fn_1000bf60', 'gen': 'f80pair'},
     # #4080: double 引数の 1 本 (cdecl・a0 = double)。 1000bf1e は OBJ 窓を書かないので effect 判定が 0 になる (構造は全行一致・float 全行一致)。
     {'va': 0x1000BF1E, 'name': 'fn_1000bf1e', 'gen': 'double1'},
     # #4840: 空スタックで呼ぶ基準線 (ST(0) の入力を積まない)。 入力は X87_PUSH64=1 で測る (付録 REPORT_APPENDIX_4840.md)。
@@ -107,6 +109,8 @@ def gen_rows(seed, n):
                 a = [f32(rng.uniform(-1000, 1000)), rng.randrange(16), 0, 0, 0, 0]
             elif t['gen'] == 'mixed':
                 a = [f32(rng.uniform(-100, 100))] + [rng.randrange(16) for _ in range(5)]
+            elif t['gen'] == 'f80pair':
+                a = f80_args(rng)
             elif t['gen'] == 'f64':
                 d = struct.unpack('<Q', struct.pack('<d', rng.uniform(-1000, 1000)))[0]
                 a = [d & 0xFFFFFFFF, d >> 32, 0, 0, 0, 0]
@@ -118,6 +122,35 @@ def gen_rows(seed, n):
             line = '%08x %08x %s %s' % (t['va'], OBJ, ' '.join('%08x' % v for v in a), init.hex())
             rows.append((t, line, init))
     return rows
+
+
+F80_KINDS = ['norm', 'norm', 'denorm', 'unnorm', 'zero']
+
+
+def f80_one(rng, kind):
+    """f80 (mantissa 64bit・指数 16bit 符号付き) を (lo32, hi32, se16) で返す。 kind: norm・denorm・unnorm・zero。"""
+    sign = rng.randrange(2)
+    if kind == 'zero':
+        return 0, 0, sign << 15
+    if kind == 'denorm':
+        mant = rng.randrange(1, 1 << 63)
+        return mant & 0xFFFFFFFF, mant >> 32, sign << 15
+    if kind == 'unnorm':
+        mant = rng.randrange(1, 1 << 63)
+        e = rng.randrange(1, 0x7FFE)
+        return mant & 0xFFFFFFFF, mant >> 32, (sign << 15) | e
+    mant = (1 << 63) | rng.randrange(1 << 63)
+    e = rng.randrange(0x3F80, 0x4080)
+    return mant & 0xFFFFFFFF, mant >> 32, (sign << 15) | e
+
+
+def f80_args(rng):
+    """a = [X.lo, X.hi, X.se, Y.lo, Y.hi, Y.se] (X は [esp+0x10] 側 = a3..a5、Y は [esp+4] 側 = a0..a2)。 gen_rows の既定 (a0..a5 の 6 語) を満たす。"""
+    yk = rng.choice(F80_KINDS)
+    xk = rng.choice(F80_KINDS)
+    yl, yh, ys = f80_one(rng, yk)
+    xl, xh, xs = f80_one(rng, xk)
+    return [yl, yh, ys, xl, xh, xs]
 
 
 SPECIAL_F32 = [
