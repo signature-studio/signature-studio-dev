@@ -7,7 +7,7 @@
 
 - **前提の訂正**: `exit` は unit 895 の中では起きない。`units_run=895` は「dispatch した unit 数」で、添字は i=0〜940 (dispatch 895・empty 46・noproc 1 = 942)。最後に dispatch した unit は **i=940** (VA `0x13751d0`)。exit の呼出し点は `0x412a0d` (戻り先 `0x412a12`・ログの `call_site=0x412a12` による)。`InitUnits` (`f_4120c0`) が全 unit を回り終えた後に exit が起きたことは、ログの順序 (最後の `[unit] i=940` の後に exit) からのみ言える。静的な根拠は未確定: 今回の逆アセンブル (32 ビット・64 ビット) では命令境界が揃わず、`0x412a0d` の呼出し元と `f_4128b0`・`f_4120c0` の関数境界を確定できなかった (#5028)。
 - **判定 (ExitProcess(0))**: **exit code 0 を確認。正常/異常は未確定**。exit code は `0x412a07` で `[0x13a5000]` を読んだ値で、読む時点の値が 0 (`[fleboot][exit] code=0`)。ただし exit 時点の 0 は「途中でエラーが無かった」の証拠ではない。`f_412770` (§3) が終了処理で 0 を書くため、途中の非 0 書込みは exit 時点では見えない。
-- **未確定の理由**: `f_4128b0` が ExitProcess に至る枝の条件 `[0x15eac80]`・`[0x15e6068]` の exit 直前の値と、`f_4096b0` の 4 呼出し元 (§3) の実行有無を測っていない。この 2 つが無いと、exit が通った枝 (正常の枝か後始末の枝か) を判定できない。
+- **未確定の理由**: `f_4128b0` が ExitProcess に至る枝の条件 `[0x15eac80]`・`[0x15e6068]` の exit 直前の値は測った (§6・全て 0)。`f_4096b0` の 4 呼出し元 (§3) のうち `0x412acf` は boot 中に実行されなかった (§6.1 陰性)。残りの 3 呼出し元 (`0x409553`・`0x409722`・`0x40c841`) は実行有無を未測定。この 3 件が無いと、exit が通った枝 (正常の枝か後始末の枝か) を判定できない。
 - **未測定の子 issue**: #5028 (`[FLE-40]`・親 #4984)。#4970 の未判定項目には「正常終了」の判定を返さない。
 
 ## 2. 測定
@@ -43,7 +43,7 @@
 ## 4. boot 中の値 (dynamic)
 
 - unit 境界の `[0x13a5000]` は 895 行すべて `0x0` (i=0〜940)。測定したのは unit 境界だけで、unit の途中の値は見ていない。
-- exit 直前の終了処理 (`f_412770`) が 0 を書くため、途中の非 0 は exit 時点では見えない。非 0 の有無は `f_4096b0` の 4 呼出し元への probe で測る必要がある (未実施)。
+- exit 直前の終了処理 (`f_412770`) が 0 を書くため、途中の非 0 は exit 時点では見えない。非 0 の有無は `f_4096b0` の 4 呼出し元への probe で測る必要がある。`0x412acf` は §6.1 で陰性。残り 3 件は未実施。
 
 ## 5. unit 境界 (dispatch 末尾 20 件)
 
@@ -76,13 +76,13 @@
 
 ## 6. #5028: exit 枝の判定 (diagnostic probe)
 
-- **結論 (lift C の読みによる。実機照合は未実施)**: exit 直前の分岐条件は `[0x15eac80]=0`・`[0x15e6068]=0`・`[0x13a5000]=0` (実測ログ `[EXITBR-412a0d]`)。エラー番号を書く `f_412a40` は boot 中に入っていない (`[EXITBR-412a40]` 0 件)。ただし `f_4096b0` の 4 呼出し元のうち `0x412acf` は probe できず、全件の実行有無は未確定。
+- **結論 (lift C の読みによる。実機照合は未実施)**: exit 直前の分岐条件は `[0x15eac80]=0`・`[0x15e6068]=0`・`[0x13a5000]=0` (実測ログ `[EXITBR-412a0d]`)。エラー番号を書く `f_412a40` は boot 中に入っていない (`[EXITBR-412a40]` 0 件)。`f_4096b0` の 4 呼出し元のうち `0x412acf` は boot 中に実行されなかった (§6.1)。残り 3 呼出し元 (`0x409553`・`0x409722`・`0x40c841`) の実行有無は未確定。
 - 測定 commit: `916de996d` (コードを変えた最後の commit。以降 `tools/flelift/boot` の差分 0)。経路: 既定 (mode 3・補修あり・`FLE_EXTRA_ROOTS` 既定)。
 - 実行: `FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk 6.0.12> bash tools/flelift/boot/exit_branch_probe.sh` (`fle6_measure.sh` で作った `work/boot/lift` を再利用し、`work/boot/lift_exitbranch` にだけ probe を入れる)。
   - 結果: `units_run=895`・`stopped_at=895`・`exit=1`・`[fleboot][exit] code=0 call_site=0x412a12`・IPP `ok`・probe 込みでも既定と同じ停止点。
   - 所要 1 分 52 秒 (実測・`measure_load` 相当の 1 秒サンプリング)。load 1 分平均の最大 2.55。
   - 既定 (`fle6_measure.sh`・probe なし) の同 commit 再測定: 所要 3 分 5 秒・load 最大 2.79・units 895・stopped 895・exit・IPP ok。
-- probe 着床 (`dbg_lift.py`): 7 件中 6 件が着床。`0x412a0d`→`f_4128b0`, `0x4128b0`→`f_4128b0`, `0x4096b0`→`f_4096b0`, `0x412a40`→`f_412a40`, `0x409722`→`f_4096d0`, `0x409553`→`f_4094f0`, `0x40c841`→`f_40c820`。`0x412acf` は未着床 (下の §6.1)。
+- probe 着床 (`dbg_lift.py`): 7 件中 6 件が着床。`0x412a0d`→`f_4128b0`, `0x4128b0`→`f_4128b0`, `0x4096b0`→`f_4096b0`, `0x412a40`→`f_412a40`, `0x409722`→`f_4096d0`, `0x409553`→`f_4094f0`, `0x40c841`→`f_40c820`。`0x412acf` は既定 root の lift には無く、`FLE_EXTRA_ROOTS` 経路で着床した (§6.1)。
 - ログ行 (判定根拠・実測ログそのまま):
   ```
   [EXITBR-4128b0] ret=1376884
@@ -95,12 +95,36 @@
   - `0x412a07: mov ecx, [0x13a5000]` / `0x412a0d: call ExitProcess` — `ExitProcess` の呼出し。その戻り番地が `0x412a12`。
   - よって `call_site=0x412a12` は `ExitProcess` の戻り番地で、分岐先 `0x412a12` とは同じ番地を指す。exit 直前の条件が `[0x15eac80]=0` なので、ジャンプは取られず `0x412a0d` で exit が呼ばれた。
 - `f_4128b0` の入口は boot 中 1 回 (戻り番地 `0x1376884`)。
-- §6.1 `0x412acf` が probe できない理由: lift 出力の `0x412a82`〜`0x412adf` に命令行が 1 つも無い (`grep '/\* 412a(82-df):'` 0 件)。`0x412a81: ret` の後の区間で、x64c の lift 対象外。probe 挿入箇所が無いため、この呼出し元だけ実行有無は測れない。
+- §6.1 `0x412acf` の lift 条件: 既定 root の lift 出力には `0x412a82`〜`0x412adf` の命令行が無い (`grep '/\* 412a(82-df):'` 0 件)。`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` の lift では入る。probe は後者の経路で行った。
+
+### 6.1 `0x412acf` の呼出し元 (FLE-46・#5443)
+
+- **静的**: `0x412a82`〜`0x412adf` は `int3` パディングで、実体は関数 `f_412a90` (`0x412a90`〜`0x412ada`)。`0x412acf` は `call 0x4096b0` (`ecx=0xd9`)。
+- **lift 条件**: 既定 root には `f_412a90` が無く、lift 出力に `0x412a82`〜`0x412adf` が出ていなかった (`x64c --closure 2` の既定 root からの到達不可)。`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` で root に足すと、`f_412a90` と `0x412acf` の `call` が lift 出力に入る (`fle_lifted_s0.c`)。既定ビルドは不変。
+- **到達性 (PE 全体・実測)**: 検索は `pefile` で実行セクション (`IMAGE_SCN_MEM_EXECUTE`) を走査し、`E8` (call rel32) / `E9` (jmp rel32) の移動先を `0x412a90` と比較した (`block00031_PE.bin`・`PointerToRawData` からの `E8`/`E9` 1 バイト走査)。再現は `fl-win64` の `extracted/block00031_PE.bin` を入力にこの走査を行う。結果は `E8` が `0x412b24` の 1 件、`E9` は 0 件。`0x412b24` は `0x412b20: jmp 0x412b2f` の直後にあり、この `jmp` で飛び越えられるため実行経路に載らない (死んだコード)。`imm32` の絶対アドレス (`0x412a90`) は 0 件。`.pdata` (例外テーブル) に RVA `0x12a90` (VA `0x412a90`) の 4 バイトが 1 件 (file offset `0x1279390`) あるが、これは `RUNTIME_FUNCTION.BeginAddress` で、呼出し参照ではない。
+- **probe 結果** (`tools/flelift/boot/fle46_412acf_probe.sh`・陽性対照 `0x412a0d` 込み・`FLE_IPP=3`・`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90`・測定 commit `35dbc7734`):
+  - 着床: `probes: 3 (expect 3)` (`0x412acf`・`0x412a90`・`0x412a0d` の各 1 件。`work/boot/lift_fle46/fle_lifted_s0.c` に 2 件・`s3.c` に 1 件)。
+  - boot 中のログ (`work/boot/run_fle46_probe.log`・gitignore・要約はここ):
+    ```
+    [EXITBR-caller] site=412a0d n=1 (control)
+    FLEBOOT_RESULT {"units_run":895,"units_total":942,"stopped_at":895,"boot_threw":"exit",...}
+    ```
+  - `site=412a90` (f_412a90 入口) と `site=412acf` は **0 件**。陽性対照 `site=412a0d` は 1 件で発火している。
+  - JSON: `results/boot_summary_fle46x_default.json` = `FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` の run (probe ログと同一 boot)。`results/boot_summary_fle6def_default.json` = 既定 root の run。`boot_summary_fle46_default.json` は旧 `5e9d18bf6` の run で、本測定では使わない。
+- **判定**: `0x412acf` は boot 中に実行されなかった (陰性)。`f_4096b0` の 4 呼出し元のうち `0x412acf` は除外。残りは `0x409553`・`0x409722`・`0x40c841`。この判定は FLE_EXTRA_ROOTS 経路の probe によるもので、既定 root の lift (`exit_branch_probe.sh`) では `0x412acf` を probe できない (上の「lift 条件」)。
+- **結果の返却先**: 上の結果を親 #4970 の未判定項目 (exit 枝) に返す (#5443 の受入条件)。
+- **測定 (実測・測定 commit `35dbc7734`・HEAD と同一)**:
+  - 既定 root (`fle6_measure.sh`・`FLE_BOOT_RUNS=default`・`FLE_BOOT_TAG=fle6def`): units 895・stopped 895・exit・rc 0・IPP ok。工程 lift 76 s・clang-plain 76 s・boot 10 s・load 最大 1.99。JSON: `boot_summary_fle6def_default.json`。
+  - `FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` (`FLE_BOOT_TAG=fle46x`): units 895・exit・IPP ok・rc 0。工程 lift 76 s・clang-plain 89 s・boot 10 s・load 最大 1.80。JSON: `boot_summary_fle46x_default.json`。
+  - probe 版 (`fle46_412acf_probe.sh`・`work/boot/lift` を再利用): probe 3 件着床・units 895・exit・IPP ok。スクリプト全体 93 s (clang-fle46 + boot 込み・実測 21:27:31〜21:29:04)。
+  - 注: `boot_summary_fle46_default.json` は旧測定 (`5e9d18bf6`) のファイルで、今回の run の値ではない。
 
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 「エラー番号 0・後始末無し」の枝が実機 (Windows) の意味どおりか未照合 | 枝の判定は lift C の読みによる。実機照合が無いと「正常終了」とは断定できない | #4970 |
-| 呼出し元 `0x412acf` の lift 出力が無い (`0x412a82`〜`0x412adf` に命令行が無い・§6.1) | 4 呼出し元の全件を probe できていない (`f_4096b0` 入口 0 件で実行は否定できる) | #5028 の子 (#4970 配下) |
+| `f_4096b0` の呼出し元 `0x409553`・`0x409722`・`0x40c841` のどれが boot で実行されたか (`0x412acf` は §6.1 で陰性・解決済み) | 途中のエラー経路の有無。exit 枝の正常/異常判定の入力 | #4970 (親・未判定項目へ返却) |
 | 外側の関数の先頭と、`0x412a0d` に至る上位の呼出し経路 (m1) | exit の呼出し位置の静的根拠が閉じない | #4970 |
+
+結果の返却先: `0x412acf` の判定 (§6.1・陰性) を親 #4970 の未判定項目に返す (#5443 の受入条件)。残り 3 呼出し元は #4970 の未判定項目として残す。
