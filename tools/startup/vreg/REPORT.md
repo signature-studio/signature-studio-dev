@@ -184,3 +184,38 @@ CSV の key 数は startup REPORT の 46 (31/5/10) に対し本集計は 47 (33/
 | 製品 `src/` の startup への vreg 結線 (wasm の製品バンドル組込みと、製品 UI の入口への配置) | 製品ユーザは取込を使えない | 子 issue (#116 の issue コメント参照) |
 | 取込の取消し UI。取込済みの値のうち seed 外のキーは HKCU に残る | 取消しは profile 削除でしかできない | 子 issue (同上) |
 | 取込が 0x10c7cd0 の本検証を通るか (gradeChar > 0x40) | ライセンス判定への効果は未確認 | #785 (ST-T16 子-1) |
+
+## 13. #2793 (ST-T21) 製品ページへの .reg 取込入口・取消し (2026-10-15)
+
+**結論**: 製品ページ (`index.html`) に `?license=import` で開く取込入口を置いた。取込・不正拒否・MachineGuid 設定・再読込保持に加え、取消し (既定の登録済み placeholder へ戻す) を製品 bundle 上の headless Chrome で確認した。既定ページには入口も vreg も載らない。**FLEngine の起動経路は vreg を読まない** (取込値は IndexedDB に保存されるだけで、FL 本体の登録判定には届いていない。残りは `[ST-T22]` へ起票)。
+
+**設計**
+- `src/runtime/license_import_panel.ts`: 製品側の入口 (DOM は `ui/import.html` と同じ操作・ID は `license-*`)。`src/index.ts` が `?license=import` のときだけ `import()` する。vreg wasm (200KB) と seed は `license_import_panel` chunk (252 KB) にだけ入り、既定の `index` chunk (60 KB) には vreg の痕跡が 0 件 (`grep` 実測)。
+- `js/license_import.mjs` `revertUserReg()`: 取込バイト列 (`<profile>#user-reg`) を消し、プロファイル記録を消して開き直す。取込が無ければ何もせず `false`。MachineGuid は保持する。
+- **プロファイル記録ごと作り直す理由**: vreg は HKCU 全体を保存する。`#user-reg` だけを消すと、取込由来の seed 外の値 (`Software\Image-Line\E2E-Import\Marker` 等) が HKCU の永続値に残る。ネガティブコントロール (記録の削除を外す) で、この残存を e2e が検出することを確認済み (下表)。
+- `src/runtime/vreg_modules.d.ts`: vreg の JS / wasm の型宣言 (実装の正本は `tools/startup/vreg/js/*.mjs`)。
+
+**実測 (測定 commit `d04ba8206`・コードを変えた最後の commit)**
+
+| 項目 | 結果 |
+|---|---|
+| 実行 | `RUNTIME_TMP=/home/runner/work/_temp bash tools/startup/vreg/vreg.sh` |
+| 所要 / exit / load (実行直前の uptime: 1 分 0.03・5 分 0.25・15 分 0.20) | 17 s / 0 / 0.03 |
+| C 単体 / shimx 既存 (st・mt・M4) / symcheck | ALL PASS / ALL PASS ×3 / vreg 要求 38 シンボルを shimx reg.c が全て定義 (公開 45) |
+| node テスト | **25 / 25 PASS** (既存 24 + `revertUserReg` 1) |
+| Chrome `e2e_chrome.mjs` (既存) | PASS |
+| Chrome `e2e_import_ui.mjs` (既存・ui/import.html) | PASS |
+| Chrome `e2e_product_import.mjs` (新規・製品 bundle) | **PASS** (Chrome 155。既定ページに入口なし → 製品ページで 初回 placeholder → 取込(external) → 不正拒否 → MachineGuid 設定 → reload 保持 → 取消し → reload で既定のまま。所要 3.1 s) |
+| ネガティブコントロール (記録の削除を外す) | `e2e_product_import.mjs` が FAIL: `AssertionError … actual: true, expected: false` (取消し後の Marker 残存を検出)。元に戻して PASS を再確認 |
+| 製品 bundle (`vite build`) | `license_import_panel` 252.03 kB (gzip 56.62) / `index` 60.25 kB (gzip 24.12)。`index` の vreg 痕跡 0 |
+
+測定後のコード差分: `git diff d04ba8206 HEAD -- src tools/startup/vreg ':!tools/startup/vreg/REPORT.md'` の出力は 0 行 (本節の追記は REPORT のみ)。
+
+**範囲と限界**
+- 取込入口は query (`?license=import`) のみ。メニューからは開けない。
+- 取込値は profile `default` の IndexedDB に保存されるが、**FLEngine の起動経路 (`src/runtime` の worker) は vreg を呼ばない**。`tools/startup/glue/host/glue_host.ts` の RegBridge は node 実行専用で、製品 bundle には入っていない。→ `[ST-T22]` (起票先)。
+- 取込が FLEngine の登録判定 (0x10c7cd0 → byte[0x14f84a8]) を通るかは未確認 (#785)。
+- 製品の起動 (FLEngine boot) は**動かしていない** (fl-win64 は未展開・未実行)。KPI (dispatch 数・通過 unit 数・最初のウィンドウ) は測っていない。既定ページの起動経路は変更していない。
+- 既存の runtime e2e (`pnpm runtime:e2e`) は `tools/runtime/work/wasm` (stage 済み wasm) が無いため**未実行**。
+- ui/import.html (standalone) に取消しは無い (製品側のみ)。
+- vite build は `FL_WIN64_DIR` 未指定で THIRD_PARTY_NOTICES 不完全 (15 件) の既存警告を出す。本変更の依存ではない。
