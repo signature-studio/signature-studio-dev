@@ -16,7 +16,7 @@
 
 ## 1. 測定条件
 
-- 素材: `fl-win64` ([WIN64]・`FL_WIN64_DIR`)・`toolchain-emsdk` ([EMSDK]・`/opt/emsdk`)・`work-m11` (`tools/m11/work/`)・`work-liftdiff` (`tools/liftdiff/work/`)。`$ARTIFACTS_DIR` に 4 件とも実在を確認して展開した。
+- 素材: `fl-win64` ([WIN64]・`FL_WIN64_DIR`)・`toolchain-emsdk` ([EMSDK])・`work-m11` (`tools/m11/work/`)・`work-liftdiff` (`tools/liftdiff/work/`)。`$ARTIFACTS_DIR` に 4 件とも実在を確認して展開した。
 - wasm は `build_wasm.build(t, force=True)` で作り直した (`wasm_size` 4464468・`sig_mismatch` 0・`undefined` 0)。修正前の 4464346 とは差がある (`rt/` の変更による)。
 - 対象は chunk 0 の `0x5d19e0` 1 件 (`sample:800` の 0〜399 件目)。全条件 `native=0` (native は作り直さない)。
 - 機: 4 vCPU。各測定は 1 本ずつ foreground で実行 (1 回約 152 秒)。実行中の load は 0.8〜1.5。
