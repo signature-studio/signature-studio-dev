@@ -34,7 +34,7 @@
 | check | 内容 |
 |---|---|
 | headers-isolation | `/` と worklet が COOP `same-origin` / COEP `require-corp` |
-| edge-policy | (edge-sim / 実 URL) CORP・Cache-Control・Content-Type・br 圧縮・index rewrite・R2 同様の素の 404 を `edge-policy.json` と突合 |
+| edge-policy | (edge-sim / 実 URL) CORP・Cache-Control・Content-Type・br 圧縮・index rewrite・R2 同様の素の 404 を `edge-policy.json` と突合。`/index.html` は edge-sim で 200、実 URL で `307 -> /` (#3526) |
 | page-load | ページ起動、title、ハーネスの起動表示 |
 | cross-origin-isolated | `crossOriginIsolated===true`、`new SharedArrayBuffer()` 生成可、secure context |
 | wasm-load | アプリ内 smoke (`add(40,2)=42`) + `WebAssembly.instantiateStreaming(fetch('/__e2e__/add.wasm'))` で MIME `application/wasm` を検査 |
@@ -137,6 +137,23 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
 - local ジョブと同じ `bash tools/e2e/run.sh --driver both --targets preview,edge-sim`: exit 0・**PASS=34 FAIL=0 SKIP=6**・12.2 s (build 込み・n=1)。SKIP 6 = `fl-boot` (FL 未統合) 4 + `edge-policy` の preview 側 (strict 限定) 2。
 - emcc が無い環境の再現: 同じコマンドを `EMSDK_ENV=/nonexistent/emsdk_env.sh` で実行すると exit 1・`[audio] emcc not found` (`run.sh` → `tools/audio/integration/stage_app.sh` → `tools/audio/build.sh`)。`ubuntu-latest` (Ubuntu 24.04 image 20261004.327.1) の Readme に Emscripten の記載は無いため、(2) の step (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` を `emsdk install`、`EMSDK_ENV` で `build.sh` に渡す) を足した。同じ方式の `emsdk install 6.0.12` は「FL 起動契約 (#65)」節の #2744 の再測定で 28 s だった。
 - (2) の step は Actions run 38658202074 で成功 (上記)。この sandbox では実行できなかった (python の `urlopen` が `CERTIFICATE_VERIFY_FAILED`。環境固有)。remote ジョブは未実行 (`E2E_URL` と secrets が無い)。
+
+## remote edge-policy: /index.html の 307 -> / (#3526)
+- 実機 (Workers Static Assets、既定 `html_handling: auto-trailing-slash`) は `/index.html` を `307 -> /` で返す (`deploy/EDGE-SIM.md` §A-2)。旧 `checks.mjs` は 3xx を Access ログイン扱いで例外にしていたため、remote (strict) の `edge-policy` が FAIL していた。
+- 修正 (`tools/e2e/suite/checks.mjs`): `url` ターゲットの `/index.html` だけ `redirect: "manual"` で取得し、`assertIndexHtmlRedirect` で `status === 307` かつ `Location` が origin の `/` であることを assert。Access のログイン 302 は 307 でないため FAIL のまま。edge-sim の `/index.html` は従来どおり 200 + policy ヘッダ。
+- 単体: `node --test tools/e2e/edge_policy.test.mjs` = **4 テスト PASS** (307 の相対・絶対 Location は PASS、302・Location `/index`・Location 無しは FAIL)。
+- 実機相当の再現 (コミットしないモック): `/index.html` だけ 307 -> `/` を返し、他は edge-sim と同じ policy で配信するサーバを立て、`E2E_URL` に向けて `tools/e2e` 内で `node suite/run.mjs --targets url --driver agent-browser`。
+  - 修正前 (origin/main の checks.mjs): edge-policy **FAIL** `/index.html: リダイレクト 307 -> / (...)` (issue の症状を再現)。
+  - 修正後: edge-policy **PASS** `probes=5 br=null /index.html=307->/`。url 全体 **PASS=9 FAIL=0 SKIP=1** (fl-boot)、rc 0、3 s、load 1.68 → 1.54 (n=1)。
+  - ネガティブコントロール (COEP キーを除いた policy を `EDGE_POLICY_FILE` で与える): **PASS=5 FAIL=4 SKIP=1**、rc 1。FAIL は headers-isolation・cross-origin-isolated・audioworklet・console-clean (edge-sim の従来測定と同じ 4 check)。
+- edge-sim (ローカル、CI の local ジョブと同じ `bash tools/e2e/run.sh --driver both --targets preview,edge-sim`): **PASS=34 FAIL=0 SKIP=6**、rc 0、13 s (build 込み)、load 1.31 → 1.68 (n=1)。edge-policy (edge-sim) は 2 driver とも PASS `probes=5 br=br`。
+- edge-sim のネガティブコントロール (COEP 除去、`EDGE_POLICY_FILE=… E2E_SKIP_BUILD=1 bash tools/e2e/run.sh --driver both --targets edge-sim`): **PASS=10 FAIL=8 SKIP=2**、rc 1 (4 check × 2 driver。従来どおり)。
+- 単体テスト・e2e の測定はすべて commit 済み HEAD (コード変更の commit) で実施。測定 commit = `955892848`。`git diff 955892848 HEAD -- tools/e2e/suite tools/e2e/edge_policy.test.mjs deploy/lib deploy/config src` の出力は **0 行** (以後の差分は本 REPORT と `deploy/` の docs のみ)。
+- 注意: 本 REPORT §実測結果の `url (ローカル edge-sim を --url で指定)` 行は、本変更後は再現しない (url ターゲットの `/index.html` は 307 を要求するため、200 を返すホストは FAIL する)。ローカル edge-sim は `--targets edge-sim` で検証する。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実 URL (`E2E_URL`) に対する `gh workflow run e2e.yaml -f remote=true` の結果記録 (#3526 受入 3) | remote の PASS 実績が未確認 | #3303 [E2E-9] (前提 #3302 [E2E-8]: repo variable と secrets の登録は依頼者作業) |
 
 ## 839 E2E-5: dummy-worklet 参照の差し替え後の再測定 (#839・#1010)
 `/worklets/dummy-worklet.js` の参照を `/worklets/fl-audio-worklet.js` へ差し替えた後 (commit `8e27b776` → 修正 commit は PR head を参照)、
