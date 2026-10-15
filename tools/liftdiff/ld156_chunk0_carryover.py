@@ -21,6 +21,7 @@ TSV = os.path.join(HERE, 'results', 'ld58_m11_sample800_shards_t1.tsv')
 TARGET = os.path.join(HERE, 'targets', 'm11.json')
 MASK = {'none': 0, 'stk': 1, 'sta': 2, 'img': 4, 'all': 7}
 NMASK = dict(MASK, mmap=8, sta_mmap=10, all_mmap=15)   # LD-229 (#4631): native 側の候補。mmap = anon rw-p mapping (ヒープ外)
+# LD-268 (#5268): NRST_MMAP の領域を 1 つずつ戻す。--native-reset-one k は k 番目 (0 始まり) だけを戻す。
 
 
 def read_19():
@@ -40,6 +41,10 @@ def main():
     ap.add_argument('--reset', choices=sorted(MASK), required=True)
     ap.add_argument('--native-reset', choices=sorted(NMASK), default='none',
                     help='LD-209 (#4305): native 側の候補単位の戻し (NRESET)。native を作り直さない (--native 0) ときだけ使う')
+    ap.add_argument('--native-reset-one', type=int, default=-1,
+                    help='LD-268 (#5268): NRST_MMAP の k 番目 (0 始まり) の領域だけを戻す (NRESETI)。--native 0・--native-reset none と併用')
+    ap.add_argument('--native-reset-except', type=int, default=-1,
+                    help='LD-268 (#5268): NRST_MMAP の k 番目 (0 始まり) 以外を戻す (NRESETX)。--native 0・--native-reset none と併用')
     ap.add_argument('--wasm-restart', type=int, choices=[0, 1], default=0,
                     help='LD-261 (#5268): 1 で対象関数の直前に wasm runner も作り直す (--native 1 と合わせると both 条件)。wasm の RESET と併用しない')
     ap.add_argument('--out', required=True)
@@ -50,6 +55,10 @@ def main():
         raise SystemExit('--native-reset は --native 0 のときだけ使う (作り直すと native の持ち越しは消える)')
     if a.wasm_restart and a.reset != 'none':
         raise SystemExit('--wasm-restart は --reset none のときだけ使う (作り直しと RESET を重ねない)')
+    if a.native_reset_one >= 0 and (a.native or a.native_reset != 'none'):
+        raise SystemExit('--native-reset-one は --native 0 --native-reset none のときだけ使う')
+    if a.native_reset_except >= 0 and (a.native or a.native_reset != 'none' or a.native_reset_one >= 0):
+        raise SystemExit('--native-reset-except は --native 0 --native-reset none のときだけ使う')
     nmask = NMASK[a.native_reset]
     ns = argparse.Namespace(target=TARGET, state='auto')
     sess = Session(TARGET, shards=1, build=False, trace=True, timeout=10.0, state=liftdiff.state_path(ns))
@@ -89,11 +98,23 @@ def main():
     t0 = time.time()
     try:
         for va in part:
-            ndiff = wdiff = None
+            ndiff = wdiff = nskip = None
             if va in aud:
                 if a.native or a.wasm_restart:
                     restart_runners()
-                if nmask:
+                if a.native_reset_one >= 0:
+                    nat._send('NRESETI %d' % a.native_reset_one)
+                    nat.p.stdin.flush()
+                    ack_r = ack(nat._recv(30.0), 'nreseti')
+                    ndiff = ack_r['diff']
+                    nskip = ack_r['skip']
+                elif a.native_reset_except >= 0:
+                    nat._send('NRESETX %d' % a.native_reset_except)
+                    nat.p.stdin.flush()
+                    ack_r = ack(nat._recv(30.0), 'nresetx')
+                    ndiff = ack_r['diff']
+                    nskip = ack_r['skip']
+                elif nmask:
                     nat._send('NRESET %d' % nmask)
                     nat.p.stdin.flush()
                     ndiff = ack(nat._recv(30.0), 'nreset')['diff']
@@ -107,7 +128,8 @@ def main():
             rec = sess._run_one(nat, was, va, cases.PATTERN_NAMES, True)
             v = liftdiff.make_record(sess, rec, irfeats)
             out.write(json.dumps({'native': a.native, 'wasm_restart': a.wasm_restart, 'reset': a.reset, 'native_reset': a.native_reset,
-                                  'native_reset_diff': ndiff, 'wasm_reset_diff': wdiff,
+                                  'native_reset_one': a.native_reset_one, 'native_reset_except': a.native_reset_except,
+                                  'native_reset_diff': ndiff, 'native_reset_skip': nskip, 'wasm_reset_diff': wdiff,
                                   'va': hex(va), 'name': rec['name'], 'verdict': v.get('verdict'),
                                   'cases': [[c.get('pattern'), c.get('outcome'), c.get('native_status'), c.get('wasm_status')]
                                             for c in rec.get('cases', [])]}, default=str) + '\n')

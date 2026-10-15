@@ -210,11 +210,12 @@ python3 analysis/py257_r8d_bits.py work/py65/extracted/block00031_PE.bin work/py
 
 ### 8.1 呼出し先の中身 (#4776・PY-381)
 
-- 解析器: `analysis/py381_r8d_callees.py` (main 版・#5298 で merge 済み)。前段は `analysis/py4769_r8d_single.py` の TSV。
+- 解析器: `analysis/py381_r8d_callees.py` (main 版・#5298 で merge 済み)。前段は `analysis/py4769_r8d_single.py` の TSV。付録の先頭 (生成元・再現・検算値) を解析器が書くように変えた commit は `5accd2632`。その後 main を取り込んだ merge commit `103b9056e` で再測定した (main 側の変更は `flapi/` 配下の別解析器のみで、`analysis/py381_r8d_callees.py`・`py4769`・`py53` は変わらない)。測定 commit は `103b9056e`。`git diff 103b9056e HEAD -- tools/python/analysis` の出力は本 REPORT の commit 時点で 0 行。
 - 測定値の正本は `REPORT_APPENDIX_5295.md` (解析器 `--appendix` の出力) と §8.2 の #5295 追記。本節には件数・検算値を書かない。
 - 本節で確定した範囲 (判定の説明):
   - `0xfdeef0` (`or dword ptr [rip+0x6dbf86], 0x200`) と `0xfdef00` (`or dword ptr [rip+0x6dbf76], 0x1000`): どちらも書込み先は `0x16bae80` の dword。固定ビットを立てるだけで `ret` に届く。
   - `0xf82850`: `al` を返す関数 (`movzx rax, byte [rbp+0x2b]` で返す)。その呼出し先のうち `0x4232e0`・`0x423980` は `jmp qword ptr [rip+...]` の間接 jmp で、飛び先は未読 (#5295 の未解決)。`0xf8d730`・`0xf8d580`・`0xf783c0` の中身は #5295 追記の範囲。
+- 判定ごとの差分と書込み先の内訳は、付録 `REPORT_APPENDIX_5295.md` の 2 つの表 (解析器の出力) を正本とする。落ち側だけが呼ぶ呼出し先の有無と、立ち側だけの呼出し先の件数・書込み先は、その表から読む。
 - 判定 `0x104785c` (mask 0x4 の `je`・VA `0x104785c`。taken で落ち側の入口 `0x104a9ec`) の経路:
   - 入口 `0x104a9ec` の後、`[0x320]>0` (`0x104aa19`〜) と `[0x51e]==0` (`0x104aa27`) を通ると、`[0x5c0]` のゲートを読む (`0x104aa3a`〜`0x104aa59`)。`test 1` (`0x104aa3a`) が 0 なら `0x104aa4e` へ。`test 1` が立ち `test 0x20` (`0x104aa47`) が 0 なら `je 0x104aa5f` (`0x104aa4c`) で共通ブロックへ直行する。それ以外は `test 0x3c0` (`0x104aa54`) を読み、0 なら `je 0x104caae` (`0x104aa59`・tail)、非 0 なら共通ブロックへ進む。
   - ゲートを通ると VA `0x104aa5f` の共通ブロックに入る。`call 0xf82850` (`0x104aa6f`)、`test al,al; je 0x104aa7d` (`0x104aa74`・`0x104aa76`)。`al != 0` のときだけ `call 0xfdeef0` (`0x104aa78`)。その後は**al の値に関係なく** `call 0xfdef00` (`0x104aa7d`) を呼ぶ。

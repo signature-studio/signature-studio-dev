@@ -916,9 +916,9 @@ export class Engine {
   //  2. open な子を持つ親 issue は着手対象から外す。
   //  3. ラベル oc:no-pr の issue は『PR を出さずに終わった』run の後。cooldown が過ぎるまで recent、過ぎたら再着手してよい
   //     (上限 NO_PR_MAX_RELAUNCH 回。超えたら stopped で人の判断に回す)。oc:stuck は user (人の判断待ち) に置く。
-  plan(): { rows: Rows; plan: Plan; picks: Planned[]; unknown: Set<number>; children: Record<string, number[]> } {
+  plan(): { rows: Rows; plan: Plan; picks: Planned[]; unknown: Set<number>; children: Record<string, number[]>; stopBasis: Map<number, string> } {
     const { snap, input, unknown } = this.snapshot();
-    const { rows, children } = classify(snap, input);
+    const { rows, children, stopBasis } = classify(snap, input);
     const labels = new Map(snap.issues.map((i) => [i.number, i.labels] as const));
     const title = new Map(snap.issues.map((i) => [i.number, i.title] as const));
     const prios = this.prioMap();
@@ -983,7 +983,10 @@ export class Engine {
         npPick.set(n, pick);
       } else if (from === "ready") {
         if (recent) moveTo(n, "ready", () => rows.recent.push([n, note]));
-        else moveTo(n, "ready", () => rows.stopped.push([n, note]));
+        else moveTo(n, "ready", () => {
+          rows.stopped.push([n, note]);
+          stopBasis.set(n, `run-outcome reason=${reason}`);
+        });
       }
     };
 
@@ -995,7 +998,10 @@ export class Engine {
       else if (hasLabel(n, "oc:no-pr") && !held(n)) noPr(n, "ready");
     }
     for (const [n] of [...rows.relaunch]) {
-      if ((children[String(n)] ?? []).length || hasLabel(n, "oc:stuck")) moveTo(n, "relaunch", () => rows.stopped.push([n, "parent/stuck"]));
+      if ((children[String(n)] ?? []).length || hasLabel(n, "oc:stuck")) moveTo(n, "relaunch", () => {
+        rows.stopped.push([n, "parent/stuck"]);
+        stopBasis.set(n, "親の子あり または oc:stuck");
+      });
     }
     // 親 (open な子を持つ) で、分類上 started / stopped / recent に入っているものは、そのままにする (着手対象ではないため)。
     for (const [n] of [...rows.stopped]) {
@@ -1018,7 +1024,10 @@ export class Engine {
     // (runner の shutdown では record-run-outcome.sh が走らない) ので、cooldown や再投入の枠には載せず stopped に置き、PM agent (oc-pm の no_pr) に回す。
     for (const [n, c] of this.killedIssues()) {
       const from = (["ready", "relaunch", "recent"] as const).find((r) => (rows[r] as unknown[]).some((x) => (Array.isArray(x) ? x[0] : x) === n));
-      if (from) moveTo(n, from, () => rows.stopped.push([n, `killed x${c}`]));
+      if (from) moveTo(n, from, () => {
+        rows.stopped.push([n, `killed x${c}`]);
+        stopBasis.set(n, "実装 run の連続打ち切り (kill)");
+      });
     }
 
     const blocksCount = new Map<number, number>();
@@ -1082,7 +1091,7 @@ export class Engine {
       low_cap: lowCap,
       ready_held: readyHeld,
     };
-    return { rows, plan, picks, unknown, children };
+    return { rows, plan, picks, unknown, children, stopBasis };
   }
 
   // ---------------------------------------------------------------- 実行
@@ -1752,7 +1761,7 @@ export class Engine {
 
   // 集計だけを返す (本文・タイトルは含めない。issue 番号は公開 repo の情報)。
   status(extra: Record<string, unknown> = {}): Record<string, unknown> {
-    const { rows, plan } = this.plan();
+    const { rows, plan, stopBasis } = this.plan();
     const c = (k: keyof Rows) => rows[k].length;
     const open = Object.values(this.s.issues).filter((i) => i.state === "open").length;
     const detected = this.detectPmTargets();
@@ -1817,7 +1826,7 @@ export class Engine {
         lastAct: this.lastAct(n) || undefined,
         cooldownMs: noPrCooldownMs(prios.get(n) ?? "normal", this.d.cfg.noPrCooldownH),
       })),
-      ...rows.stopped.map(([n, note]) => stoppedHold(n, note)),
+      ...rows.stopped.map(([n, note]) => stoppedHold(n, note, stopBasis.get(n))),
       ...plan.ready_held.map((h) => readyHold(h.n, h.why, { restReset: this.meta.rest?.reset })),
     ];
     return {

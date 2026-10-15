@@ -158,6 +158,16 @@ ABI = {
         ('delay 3909 FUN_180fc6d70 uVar25 = FUN_180fdc844 (xmm0 = float 入力)', r'(if \(\(\(uint\)fVar22 & 0x7f800000\) == 0x7f800000\) \{\n\s*)uVar25 = (?:func_0x000|FUN_)180fdc844\(\);', r'\1uVar25 = FUN_180fdc844(f2u(fVar22));'),
         ('delay 4042 FUN_180fcce40 dVar2 = FUN_180fdc858 (xmm0 = param_1)', r'(if \(\(ulonglong\)_DAT_1822828a0 <= \(ulonglong\)dVar2\) \{\n\s*dVar2 = \(double\))(?:func_0x000|FUN_)180fdc858\(\);', r'\1FUN_180fdc858(d2u(param_1));'),
         ('delay 4136 FUN_180fcce40 dVar2 = FUN_180fdc858 (xmm0 = param_1)', r'\n  dVar2 = \(double\)(?:func_0x000|FUN_)180fdc858\(\);\n  return dVar2;', '\n  dVar2 = (double)FUN_180fdc858(d2u(param_1));\n  return dVar2;'),
+        # #4889 (KH-128): FUN_180fbc1f4 の入力は xmm0 (float)、戻り値も xmm0 (float)。呼出元 FUN_1802ed7f0 の 2 件 (1082・1088) は
+        #   1802ede08〜ede29: xmm6 = fVar26*48*[p+0x3188+0x24] の後、1802ede18 `jae` (X>=0) で 1802eded3 (×-0.16609640419483185) → 1802edede call (C 1082)、
+        #   X<0 は 1802ede21 (×+0.16609640419483185) → 1802ede2c call (C 1088)。movaps xmm0,xmm6 の後に call。rcx は設定しない。
+        #   未確定 (#5402): 符号分岐の比較対象 xmm0 = 0.0 を示す命令と VA は未確認 (plugins-kilohearts 無しで逆アセンブル不可)。±0.166 の符号はこの前提の読みで入れている。
+        #   callee 本体は xmm0 を movss [rsp+8] で読む (180fbc1f4)。よって宣言は float (float)、本体は bits 変換なしで fVar4 = param_1、戻り値は fVar4。
+        ('delay 1082 FUN_180fbc1f4 arg xmm0 = X*(-0.166) (1802ede18 jae -> 1802eded3)', r'(0\.0 <= fVar26 \* _DAT_1814dd30c \* \*\(float \*\)\(\*\(longlong \*\)\(param_2 \+ 0x3188\) \+ 0x24\)\) \{\n\s*)fVar33 = \(float\)FUN_180fbc1f4\(\);', r'\1fVar33 = (float)FUN_180fbc1f4(fVar26 * _DAT_1814dd30c * *(float *)(*(longlong *)(param_2 + 0x3188) + 0x24) * -0.16609640419483185f);'),
+        ('delay 1088 FUN_180fbc1f4 arg xmm0 = X*(+0.166) (1802ede21, X<0)', r'(dVar32 = _DAT_18147d368;\n  \}\n  else \{\n\s*)fVar33 = \(float\)FUN_180fbc1f4\(\);', r'\1fVar33 = (float)FUN_180fbc1f4(fVar26 * _DAT_1814dd30c * *(float *)(*(longlong *)(param_2 + 0x3188) + 0x24) * 0.16609640419483185f);'),
+        ('delay FUN_180fbc1f4 decl float(float)', r'undefined8 FUN_180fbc1f4\(undefined8 param_1\)', 'float FUN_180fbc1f4(float param_1)'),
+        ('delay FUN_180fbc1f4 input = xmm0 float bits (fVar4 = param_1)', r'uVar3 = \(undefined4\)\(\(ulonglong\)param_1 >> 0x20\);\n  fVar4 = \(float\)param_1;', 'fVar4 = param_1;'),
+        ('delay FUN_180fbc1f4 return = xmm0 float (fVar4)', r'(FUN_180fbbfb8\(afStackX_8,_DAT_1813a9da0,iVar2\);\n    uVar3 = 0;\n    fVar4 = afStackX_8\[0\];\n  \}\n  )return CONCAT44\(uVar3,f2u\(fVar4\)\);', r'\1return fVar4;'),
     ],
 }
 # stereo 閉包 (#4871 KH-124) も、同じ 3 呼出元 (FUN_180fe3690・FUN_180fe3310・FUN_180fe3cd0。VA と機械語が delay と同一) を含む。
