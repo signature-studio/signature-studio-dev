@@ -46,4 +46,23 @@ ABI = {
         ('stereo 186 FUN_180fcd690 2nd arg xmm1 unset (placeholder 0.0)', r'dVar12 = \(double\)FUN_180fcd690\(dVar12\);', 'dVar12 = (double)FUN_180fcd690(dVar12, 0.0);'),
         ('stereo 567 FUN_180fdc660 arg double = param_1 bits (movq xmm0,r9 180fce528; ulonglong uVar1 を数値変換しない)', r'uVar3 = (?:func_0x000|FUN_)180fdc660\(uVar1\);', 'uVar3 = FUN_180fdc660(param_1);'),
     ],
+    # delay (#3800 KH-64): 引数なし呼出 'too few' のうち FUN_180fe3690 の 13 件 (呼出先 FUN_180fd4f30 = longlong 1 引数)。
+    #   呼出元の機械語 (180fe3690 の capstone): `mov rcx,[rbx+off]` → `cmp rcx,[global]` → `je` → `call FUN_180fd4f30` (rbx = 入力 param_1)。
+    #   rcx = *(param_1 + off)。off は C の条件式の添字と一致 (0x18〜0x48・0x68〜0x90 の 13 個、番地順 = C 行順)。
+    #   規則 1 件 = 呼出し 1 件 (件数 1 を assert)。残りの 95 件は REPORT_APPENDIX_3800.md の分類を参照。
+    'delay': [
+        ('delay 6939 FUN_180fe3690 rcx=[param_1+0x18]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x18\) != _DAT_182989698\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x18));'),
+        ('delay 6942 FUN_180fe3690 rcx=[param_1+0x20]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x20\) != _DAT_1829896a0\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x20));'),
+        ('delay 6945 FUN_180fe3690 rcx=[param_1+0x28]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x28\) != _DAT_1829896a8\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x28));'),
+        ('delay 6948 FUN_180fe3690 rcx=[param_1+0x30]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x30\) != _DAT_1829896b0\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x30));'),
+        ('delay 6951 FUN_180fe3690 rcx=[param_1+0x38]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x38\) != _DAT_1829896b8\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x38));'),
+        ('delay 6954 FUN_180fe3690 rcx=[param_1+0x40]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x40\) != _DAT_1829896c0\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x40));'),
+        ('delay 6957 FUN_180fe3690 rcx=[param_1+0x48]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x48\) != _DAT_1829896c8\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x48));'),
+        ('delay 6960 FUN_180fe3690 rcx=[param_1+0x68]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x68\) != _DAT_1829896e8\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x68));'),
+        ('delay 6963 FUN_180fe3690 rcx=[param_1+0x70]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x70\) != _DAT_1829896f0\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x70));'),
+        ('delay 6966 FUN_180fe3690 rcx=[param_1+0x78]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x78\) != _DAT_1829896f8\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x78));'),
+        ('delay 6969 FUN_180fe3690 rcx=[param_1+0x80]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x80\) != _DAT_182989700\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x80));'),
+        ('delay 6972 FUN_180fe3690 rcx=[param_1+0x88]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x88\) != _DAT_182989708\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x88));'),
+        ('delay 6975 FUN_180fe3690 rcx=[param_1+0x90]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x90\) != _DAT_182989710\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x90));'),
+    ],
 }
