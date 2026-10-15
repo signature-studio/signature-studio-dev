@@ -85,3 +85,4 @@
 | Halt0 を起こした例外の種別と発生箇所 (unit 114 `function_623840` → `function_41a800` 以降・VirtualAlloc 125 MB と GetMem の関係) | init 1675 (CS 登録) に届かない。CFI は `CS-MISS` のまま | [WIN-39] (子 issue・親 #3478) |
 | 停止解消後の unit 882 (`function_1266a60`) の到達と CS 登録 (`CS-INIT 0x12bd390`) | 未測定 | [WIN-39] の受入 |
 | `units_run` 110 と 109 の差 (再生成 IR) | 測定の同一性の説明が未了 | 本 PR の §4 (未確認) |
+| `init_count` 111 と init 列の行番号 (`inits_text.txt`) の対応 | 未測定 (本測定は停止 unit の trace だけを記録し、`init_count` の増分を init 列へ対応づけていない)。`init_count` は IR の init prologue で増える別カウンタ (`tools/m11/m11_rt.c:148-158`) で、停止 unit (index0 114) の添字とは別の数え方。111・1675 の関係は未確認。停止位置の特定 (unit 114) には不要 | [WIN-39] #3748 (受入 1 の残り) |
