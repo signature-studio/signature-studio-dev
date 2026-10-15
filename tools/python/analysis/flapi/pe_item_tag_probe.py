@@ -4,8 +4,10 @@
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_item_tag_probe.py
 
 検査するのは次の 2 種だけ (命令の存在検査と大域スロットの値検査):
-- 命令: 0xf8ca50 の 3 分岐 (high16 == 0xfff・top10 == 0xff)・0x11e83d0 の L1 走査 (+0x2f8 比較)・
-  0x11e8280 の L2 走査 (+0x32c 比較・+0x794 の読出し)・大域 P (0x15e26a0) の書込み 2 箇所と読出し 1 箇所。
+- 命令: 0xf8ca50 の 3 分岐 (high16 == 0xfff・top10 == 0xff)・L1 の添字 ([item+8] >> 22 - 1、0xf8ca6b〜0xf8ca71)・
+  L2 の戻り値の負値判定 (jl)・0xf8c9d0 の同じ箇所・0x11e83d0 の L1 走査 (+0x2f8 比較)・
+  0x11e8280 の L2 走査 (+0x32c 比較・+0x794 の読出し・n ≥ 1 で edi が一致ごとに更新される箇所)・
+  大域 P (0x15e26a0) の書込み 2 箇所と読出し 1 箇所。
 - 大域: L1 スロット 0x15e2218・L2 スロット 0x15e0128・P スロット 0x15e26a0 の .data 上の初期値 (ポインタ先)。
 検査しない: 分岐の意味づけ (L1 が global channel 列・+0x2f8 が MIDI 入力ポート) と、P の書込み値の出どころ。
 不一致が 1 つでもあれば終了 1。
@@ -30,6 +32,16 @@ INSNS = [
     (0xF8CAA8, "mov ebx, dword ptr [rax]"),
     (0xF8CA79, "call 0x11e83d0"),
     (0xF8CA8A, "call 0x11e8280"),
+    (0xF8CA6B, "mov ecx, dword ptr [rcx + 8]"),
+    (0xF8CA6E, "shr ecx, 0x16"),
+    (0xF8CA71, "sub ecx, 1"),
+    (0xF8CA91, "jl 0xf8caaa"),
+    (0xF8C9E7, "mov ecx, dword ptr [rcx + 8]"),
+    (0xF8C9EA, "shr ecx, 0x16"),
+    (0xF8C9ED, "sub ecx, 1"),
+    (0xF8CA0D, "jl 0xf8ca1c"),
+    (0x11E82D5, "mov edi, r13d"),
+    (0x11E82DD, "jl 0x11e82ec"),
     (0x11E83E4, "mov rcx, qword ptr [rip + 0x3f9e2d]"),
     (0x11E8415, "cmp dword ptr [rax + 0x2f8], ebx"),
     (0x11E8299, "mov rcx, qword ptr [rip + 0x3f7e88]"),
