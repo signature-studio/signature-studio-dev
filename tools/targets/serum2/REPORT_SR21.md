@@ -14,6 +14,7 @@
 - **未確定 4,049 ブロック / 86,240 B**: `table_ptr` 3,928 / `ptr_single` 80 / `unref` 36 / `data` 5。lift 入口に使わない (§5)。
 - **パディング 15,061 ブロック / 130,736 B** (NOP のみ) + ブロック間 19,444 run / 145,350 B。コードではないので lift 入力に含めない。
 - cut 表 (`out/sr3_cut_table.tsv`) は変えない。gap ブロックと cut 関数の重なりは 0 件 (§3)。
+- **SR-21b (RTTI vtable 照合, §7)**: `table_ptr` 3,928 件の 3,850 件 (98.0%) は MSVC x64 RTTI の vtable メンバー (関数入口)。未確定は 184 ブロック (vtable 外)。vtable メンバーは `.pdata` 外に 4,031 件 (先頭 3,936・途中 95)。OSS 名のメンバーは cut 窓の外に 17 件。
 
 ## 1. 分類 (`out/sr21_summary.txt`・`out/sr21_classify.tsv`)
 
@@ -66,8 +67,9 @@ capstone を使わず、生バイト列の E8/E9/0F8x 走査と .rdata/.data の
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 未確定 4,049 ブロック (86,240 B) の関数性。静的には到達未確認 | lift 入口として使えない。動的に到達した場合の扱いは §5 | #75 (動的トレース) |
-| `table_ptr` 3,928 件 (83,235 B) が vtable/関数ポインタ表由来か (RTTI 照合未実施) | 間接呼出の入口候補の根拠が推定のまま | #75 と #71 (SR-3) |
+| 未確定 184 ブロック (vtable 外。`table_ptr` 78・`ptr_single` 69・`unref` 36・`data` 1) の関数性。静的には到達未確認 | lift 入口として使えない。動的に到達した場合の扱いは §5 | #75 (動的トレース) |
+| vtable メンバーの入口化 (§7)。cut 表・§5 の入口表は未改訂 | 強入口への反映は未実施 | #71 (次段) |
+| vtable メンバー中の OSS 名 17 件 (ZL convolver 13・muParser 3・nlohmann 1) が cut 窓の外 (§7.4) | 除外漏れ (安全側: lift 側に残るだけ) | #71 (cut 表の窓拡張) |
 | 分割 (strict) 49 件のうち 5 件はポインタ一致も持つ | 分割と表の根拠が重なる。分類順で `branch_only` 優先 | #71 |
 | `unref` の生 E8 一致 5 件 (命令境界未確認) | 未確定の中に呼出されるものが残る可能性 | #75 |
 | cut 窓内の非パディング隣接 53 ブロック (cut 表に未登録) | 除外漏れ (安全側: lift 側に残るだけ) | #71 (cut 表の窓拡張) |
@@ -96,5 +98,80 @@ capstone を使わず、生バイト列の E8/E9/0F8x 走査と .rdata/.data の
 
 ```
 git diff a327e9bd1 HEAD -- tools/targets/serum2/scripts tools/targets/serum2/out
+(出力 0 行)
+```
+
+## 7. RTTI vtable 照合 (SR-21b / `table_ptr` の由来)
+
+測定 commit: **`58af49731`** (`scripts/sr21_vtable.py`・`scripts/sr21_run.sh`・`out/sr21_vtable*`)。入力は §3 と同じ `Serum2_win64.vst3` (sha256 `501e7bb3…5283`) と `out/sr21_classify.tsv`。
+
+方式 (MSVC x64 RTTI): 8 バイト境界で、直前のスロット (vtable[-1]) が Complete Object Locator (COL) を指し、COL の signature == 1 かつ pSelf (COL+0x14、RVA) が COL 自身の RVA と一致するものを vtable とする。メンバーは、その後に続く `.text` を指す 8 バイト値の連続。クラス名は COL の pTypeDescriptor (COL+0x0C) → TypeDescriptor の名前 (+0x10) を分解したもの。
+
+### 7.1 結果 (実測。`out/sr21_vtable_summary.txt`)
+
+| 項目 | 値 |
+|---|---:|
+| COL signature == 1 の候補 (スロット -1 が `.rdata`/`.data` の COL を指す) | 3,633 (全件で pSelf 一致) |
+| vtable | 3,633 |
+| メンバー (異なる VA) | 9,504 |
+
+メンバーの所在:
+
+| 所在 | メンバー |
+|---|---:|
+| `.pdata` 関数入口 | 5,473 |
+| gap ブロックの先頭 | 3,936 |
+| gap ブロックの途中 | 95 |
+| `.pdata` 内部 (入口でない) | 0 |
+| その他 | 0 |
+
+gap ブロック (非パディング 5,406) の区分別。「vt 先頭」は先頭がメンバーのブロック:
+
+| 区分 (§1) | ブロック | vt 先頭 |
+|---|---:|---:|
+| `entry_call` | 844 | 59 |
+| `entry_rip` | 464 | 7 |
+| `branch_only` | 49 | 5 |
+| `table_ptr` | 3,928 | 3,850 |
+| `ptr_single` | 80 | 11 |
+| `unref` | 36 | 0 |
+| `data` | 5 | 4 |
+
+### 7.2 対照
+
+- ブロック先頭 +8 がメンバーに当たった数: **5**。期待値 (ランダム一致) は 5,406 × 9,504 / `.text` 10,593,792 B = **4.85**。対照は偶然一致の水準。
+- vt 先頭でない未確定: `table_ptr` 78・`ptr_single` 69・`unref` 36・`data` 1 = **184 ブロック**。
+
+### 7.3 解釈 (推定を含む)
+
+- vtable メンバーは vtable 経由で呼ばれる関数入口である (定義上)。gap 上の入口は **4,031** (先頭 3,936 + 途中 95)。いずれも `.pdata` に無い。SR-21 §5 の「強」入口に加える根拠になる (cut 表は変えない。§7.5)。
+- 途中の 95 件は、直前の 1 バイトが単独の `0xCC` (51)・`ret` (28)・その他 (16) で、2 連続 `0xCC` の区切り規則では分割されない。lift 単位をブロックにするなら、この 95 件で分割が要る。
+- `data` 区分の 4 件は vtable メンバー。デコード失敗で `data` と判定したものは関数であり、区分が誤判定している。
+- 名前の粗い分類 (正規表現。4,031 件): VSTGUI 497・Steinberg::Vst 等 108・`std::` (`_Func_impl_no_alloc` のラムダ) 290・Serum 本体のクラス (`SerumController`・`ProxyParameter` 等) 672・OSS 名 18・その他 2,446。VSTGUI と Steinberg の SDK は SR-3 の OSS 一覧に無い。framework 判定 (§3) の範囲で未整理。
+
+### 7.4 OSS 名のメンバー (cut 窓の外)
+
+OSS 名のメンバーは 18 件。うち 17 件が cut 窓の外。
+
+- ZL convolver (`ZLFIRConvolve`・`ZLSingleFDLConvolve`・`ZLDualFDLConvolve`): 13 件 (窓外)
+- muParser (`mu::ParserBase::D::change_dec_sep`): 3 件 (窓外)
+- nlohmann (`nlohmann::json_abi_v3_12_0::detail::type_error`): 1 件 (窓外)
+
+窓内の 1 件は `ZLSingleFDLConvolve` (タグ `zl_convolver`)。
+
+### 7.5 判定と #71 への影響
+
+- §4 の「`table_ptr` 3,928 件が vtable 由来か未照合」は、98.0% (3,850 件) が vtable メンバーと確定。残り 78 件は未確定のまま。
+- cut 表 (`out/sr3_cut_table.tsv`、1,510 関数) は変えていない (§5-1 のまま)。vtable 由来の入口と窓外の OSS 17 件を cut と lift 入口に反映するのは次段 (#71)。
+
+### 7.6 再現・検証
+
+- 手順: 素材展開 (`tar --zstd -xf $ARTIFACTS_DIR/plugins-serum2.tar.zst Install_Xfer_Serum2_2.1.5.exe` → `$RUNNER_TEMP/serum2/`) → `PY=python3 bash scripts/sr3_run.sh` → `PY=python3 bash scripts/sr21_run.sh` (SR-21b は同スクリプトに組込み)。
+- 実測 (測定 commit `58af49731`、worktree `ws-71`): `sr3_run.sh` 33.4 秒・rc 0・cut 1,510 関数 / 1,464,181 B を再現。`sr21_run.sh` rc 0・`sr21_vtable.py` 単体 1.3 秒 (real)。
+- 既存の `out/sr21_*` は差分 0。新規は `sr21_vtable.tsv` (3,633 行)・`sr21_vtable_hits.tsv` (4,031 行)・`sr21_vtable_summary.txt` の 3 件。
+- 測定 commit からの差分: `git diff 58af49731 HEAD -- tools/targets/serum2/scripts tools/targets/serum2/out` の出力は 0 行 (本節は REPORT のみの commit)。
+
+```
+git diff 58af49731 HEAD -- tools/targets/serum2/scripts tools/targets/serum2/out
 (出力 0 行)
 ```
