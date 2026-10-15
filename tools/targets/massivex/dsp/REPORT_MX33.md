@@ -230,4 +230,4 @@
 ### 7.3 再現
 
 - `python3 scripts/mx54_u3e.py "<Massive X.vst3>" <surface_seeds_x64c.json> <out.json>` (実測 5.7 s・load は e2e と同程度)。
-- 素材の展開: `tar --zstd -xf $HOME/artifacts/plugins-massivex.tar.zst` → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key`。
+- 素材の展開: `plugins-massivex` (素材名の正本は `docs/WORKFLOW.md` §11) を `tar --zstd -xf` で展開 → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key`。
