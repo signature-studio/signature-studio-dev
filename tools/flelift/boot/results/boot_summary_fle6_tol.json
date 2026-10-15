@@ -185,8 +185,8 @@
    "base": "0x11dbef00",
    "end": "0x115bef00"
   },
-  "full": "a80d276d9ded9270ec9ecd7ffdc06477986c5f56fdea5edcec18ba5cc1641868",
-  "no_cstack": "1cfc7c5de3d1d1feba4bee049d61e5f0a181da58bd6e940b87c424ebc273c05e",
+  "full": "e8ab4502c19e84cb4ef771f3b3e9860c7c932d855e26849732762438f12f12a2",
+  "no_cstack": "b5284150d05346b0bdffe8ba85ee7a3fbea82c09591481119f08cf3ede47f69b",
   "sections": {}
  },
  "survey": null,
@@ -12630,6 +12630,7 @@
    "cls": "oob",
    "msg": "memory access out of bounds"
   },
+  "stack": "RuntimeError: memory access out of bounds\n    at fleboot_plain.cjs.wasm.f_410320 (wasm://wasm/fleboot_plain.cjs.wasm-1e8cfd96:wasm-function[15065]:0x31a6c1c)\n    at fleboot_plain.cjs.wasm.f_5af120 (wasm://wasm/fleboot_plain.cjs.wasm-1e8cfd96:wasm-function[8132]:0x1b29c5d)\n    at fleboot_plain.cjs.wasm.f_1105350 (wasm://wasm/fleboot_plain.cjs.wasm-1e8cfd96:wasm-function[18490]:0x3d8417d)\n    at fleboot_plain.cjs.wasm.f_13752f0 (wasm://wasm/fleboot_plain.cjs.wasm-1e8cfd96:wasm-function[7534]:0x19bc5bc)\n    at fleboot_plain.cjs.wasm.f_1375990 (wasm://wasm/fleboot_plain.cjs.wasm-1e8cfd96:wasm-function[22530]:0x4be547c)\n    at fleboot_plain.cjs.wasm.ott_dispatch (wasm://wasm/fleboot_plain.cjs.wasm-1e8cfd96:wasm-function[42]:0xc35ee)\n    at fleboot_plain.cjs.wasm.fle_run (wasm://wasm/fleboot_plain.cjs.wasm-1e8cfd96:wasm-function[30034]:0x65bc9b5)\n    at Object._fle_run (/home/runner/work/signature-studio-dev/ws-3969/tools/flelift/work/boot/fleboot_plain.cjs:543:12)\n    at file:///home/runner/work/signature-studio-dev/ws-3969/tools/flelift/boot/fle_boot.mjs:308:18",
   "longjmp": 0,
   "exit": 0,
   "last_dispatch": [

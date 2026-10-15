@@ -9,7 +9,7 @@
 - x64c の寛容起動を足した (`FLE_TOLERANT=1` 寛容 / `FLE_TOLERANT=2` 診断)。**既定 (未指定) の数値は不変** (209 / GetMem 1,890 / FreeMem 776 / 停止 unlifted `0x6a7b70`)。
 - **942 unit を最後まで試行した** (mode 1・mode 2 とも 942)。ただし mode 1 は unit 245 (VA `0x733090`・dispatch 209 番目) の ExitProcess の後、unit 246〜940 の 695 件が呼出し時に proc 0 を返し (clobber)、走れなかった。どの段が 0 になったか (InitContext のポインタ・InitTable・units 配列) は未測 (§3)。
 - mode 2 (診断: 失敗 unit の後で InitContext・InitTable・units 配列・unit 先頭 8B を起動時の値へ戻す) では 942 unit が走り、ok 811 / empty 46 / exit 19 / oob 65 / noproc 1。ただし mode 2 は補修であり、状態の欠落を消すものではない (§6)。
-- **CreateFruityInstance (0x1375990) は入口まで dispatch され、本体内で `oob` trap した** (両 mode とも)。trap 地点は CFI 本体内 (または直接呼出し先) と読めるが未特定。soft (未実装 import) の呼出しは 0 件 (`soft_called` 空) で、API 段 (S12〜S22) への到達は記録上 0。残件は #3969 [WIN-41] (CFI の trap 地点と soft 名の表示) に寄せる。#3077 [WIN-16] は flengine 路線の範囲で部分達成のまま close 済み。
+- **CreateFruityInstance (0x1375990) は入口まで dispatch され、本体内で `oob` trap した** (両 mode とも)。trap 地点は最内 `0x410320` まで特定 (§7)。soft (未実装 import) の呼出しは 0 件 (`soft_called` 空) で、API 段 (S12〜S22) への到達は記録上 0。残件は受け手の特定と S13 以降への到達 (#4384 [WIN-49])。#3077 [WIN-16] は flengine 路線の範囲で部分達成のまま close 済み。
 - 寛容 mode 1 の dispatch は 209 (unit 245 で ExitProcess)。mode 2 は 895 dispatch (試行 942 のうち)。
 
 ## 1. 測定条件
@@ -163,8 +163,10 @@ mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜940 の `clo
 - trap: 入口の後に間接 dispatch の記録が無いため、trap は `0x1375990` の本体内、または直接呼出し先 (直接 call は dispatch 記録に出ない) で起きたと読める。地点は未特定。
 - API 段 (S12〜S22) の到達: 記録しているのは soft 呼出しだけで、0 件。`RegisterClassW`・`CreateWindowExW` は shimx の実装にも curated にも無く、gen_boot.py の規則で soft スタブになるため、呼出しが有れば `soft_called` に出ていた。実装済み shim (getmem・getproc 等) の呼出しは CFI について計数していない。
 - soft 名の表示: `fle_boot.mjs` の `softSnap`・`soft_called`・`soft_top` は C 文字列のポインタ番号を名前として出す (既存の欠陥。#3969 [WIN-41] で直す)。CFI 中の soft 0 件の判定は件数の差分で行うため、この結論は表示に依存しない。
-- trap 地点 (#3969 [WIN-41]・測定は `UTF8ToString` 修正後の HEAD で実施。`cfi.stack` の診断フィールドは後から足したため、結果 JSON の既存 `cfi` には無い。計数は変わらず。スタックは mode 1 でだけ取った。mode 2 は末尾 dispatch が同じ `0x1375990` で oob だったことだけ確認): wasm の関数名を出す `-g --profiling-funcs` で再 link (`tools/flelift/work/boot/tm/`・gitignore) し、`fle_boot.mjs` の `cfi.stack` (例外スタック) で読んだ。呼出し chain は `0x1375990` → `0x13752f0` → `0x1105350` → `0x5af120` → `0x410320` (最内で oob)。`0x410320` は dl=1 のとき `call [rax-0x30]` の間接 call を行う関数 (`REPORT_APPENDIX_3652.md` §3.2 の記述。同じ VA の関数と推定)。つまり trap は CFI 本体の直接呼出し先の中、メモリ間接 call の受け手の段で起きている。受け手の vtable 実体は未確定。
-- 注: 既定の `-O0` のまま名前を出すため `-g --profiling-funcs` を足して link したもので、`fleboot_plain.cjs.wasm` の関数 index とは一致しない (別 wasm)。VA は関数名 (`f_<VA>`) で読む。
+- trap 地点 (#3969 [WIN-41]・測定は `UTF8ToString` 修正後の HEAD で実施。mode 1 の `cfi.stack` を関数名付きで取った): 呼出し chain は `0x1375990` → `0x13752f0` → `0x1105350` → `0x5af120` → `0x410320` (最内で oob)。`0x410320` は dl=1 のとき `call [rax-0x30]` の間接 call を行う関数 (`tools/plugins/framework/hostshim/REPORT_DISPATCHER_APPENDIX_3652.md` §3.2 の記述。同じ binary の同じ VA の関数と推定。推定のまま。同じ VA を指すことは `fl-win64` の同一 PE 由来であることで担保する)。trap は CFI 本体の直接呼出し先の中、メモリ間接 call の受け手の段で起きている。受け手の vtable 実体は未確定 (#4384)。
+- `cfi.stack` の出し方と既存 JSON に出なかった理由: `fle_boot.mjs` の `cfi.stack` は 74277e85b で入った。`boot_summary_fle6_tol.json` / `_tol2.json` は 74277e85b より前の出力で、`stack` キーを含まない。`results/boot_summary_fle6_tol.json` は本節の再測定 (下記) で `stack` 入りに差し替えた。`tol2` の結果は差し替えていない (`stack` は無いまま)。
+- 再現 (関数名付き link): `FLE_EXTRA_LDF="-g --profiling-funcs"` を付けて `build.sh` を再 link する (`FLE_EXTRA_LDF` は 2ff548657 で追加。既定は空で、既存の link 行は変わらない)。手順は次のとおり。`FL_WIN64_DIR=<fl-win64 展開先> SS_EMSDK_ENV=<emsdk_env.sh> FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh`。出力は `tools/flelift/work/boot/fleboot_plain.cjs` (gitignore) で、`fle_boot.mjs` の `cfi.stack` に `f_<VA>` の名前が出る。`-g` を外した wasm では同じ chain が `wasm-function[15065]` の index でだけ出るため、VA の対応には名前付きの link が要る。
+- 注: 名前付き link の wasm と既定 wasm は関数 index が一致しない (別 wasm)。VA は関数名 (`f_<VA>`) で読む。
 - soft 名の表示 (#3969 [WIN-41] の 2 件目): `fle_boot.mjs` の `softSnap`・`softs` で `m.UTF8ToString` を通すよう直した。`soft_top` に `LoadImageW:21`・`GetStockObject:7`・`RegisterClassW:1`・`CreateWindowExW:1` など名前で出ることを 2 mode で確認 (`boot_summary_fle6_tol.json`・`..._tol2.json`)。CFI 呼出し中の `soft_called` は 0 件 (変わらず)。
 
 ## 8. 製品 KPI の前後 (PR 本文の表と同じ値)
@@ -183,8 +185,8 @@ mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜940 の `clo
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| CFI (0x1375990) の trap 地点: 最内 `0x410320` まで特定。受け手の vtable 実体 (間接 call 先) は未確定 | 最初のウィンドウ未達。S12〜S22 の到達なし | #3969 [WIN-41] (部分達成。残りは子 issue へ) |
-| `boot_metric.py` の S1 locator (`tools/startup/boot_metric.py` 464 行) が、#3832 で REPORT から移した `測定 commit ・judge ・S1` 文言を探して失敗する。main でも同じ失敗 | `boot_metric.json` を再生成できない (`--check` も失敗)。§7 の文言反映は未反映 | 子 issue (#3969 から起票・番号は PR 本文) |
+| CFI (0x1375990) の trap 地点: 最内 `0x410320` まで特定。受け手の vtable 実体 (間接 call 先) は未確定 | 最初のウィンドウ未達。S12〜S22 の到達なし | #4384 [WIN-49] (受け手の特定と S13 以降への到達) |
+| `boot_metric.py` の S1 locator (`tools/startup/boot_metric.py` 464 行) が、#3832 で REPORT から移した `測定 commit ・judge ・S1` 文言を探して失敗する。main でも同じ失敗 | `boot_metric.json` を再生成できない (`--check` も失敗)。§7 の文言反映は未反映 | #4381 [WIN-48] |
 | soft 名の表示 | 解決済み (`UTF8ToString` を通した) | - |
 | unit 245 (VA 0x733090) の ExitProcess (RunError 経路) の原因と、`f_6a7b70` の広域ゼロ埋めの範囲 | 寛容起動が 245 で fatal 扱いになる。clobber 695 の原因 | #3060 [FLE-11] (既存) |
 | 補修 (mode 2) の妥当性。戻す範囲の外の欠落 (R1) | mode 2 の ok 811 の確度 | #3060 (受入に追加済み) |
@@ -219,3 +221,14 @@ FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FLE_BOOT_RUNS="default" FLE_EXTRA_ROOTS= bash
 - `FLEBOOT_IPP_CHECK` は `ok:false` (`ptr_15F34A0` = 0x0)。R5 と同じ既知事項で、寛容起動では判定できない。
 - 結論: 初回の値は `181d66ec` でも再現した。`boot_metric.py` の locator と test の期待値は変えない。record の `commit` は `181d66ec` とする。
 - 差分 0 の証跡: `git diff --stat 181d66ec HEAD -- tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` の出力は空 (本 §11 を含む commit の時点)。
+
+## 12. 関数名付き再測定と outmem の値 (測定 commit `2ff548657`・mode 1 のみ)
+
+- 測定: `FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0・所要 3 分 36 秒 (lift・clang plain 101 s・boot tol 26 s)。load は 1.8〜2.0。
+- 計数は §11 と一致: dispatch 209・GetMem 2,314 / FreeMem 1,199・ok 208 / empty 37 / noproc 1 / clobber 695 / exit 1・停止 `0x733090`。CFI は `oob`・longjmp 0・exit 0。
+- `cfi.stack` (関数名付き): `f_410320` ← `f_5af120` ← `f_1105350` ← `f_13752f0` ← `f_1375990` ← `ott_dispatch` ← `fle_run`。§7 の chain と一致。
+- `outmem` の値の変化 (指摘への説明): 前回 (`boot_summary_fle6_tol.json` の旧値) は `full` `a80d276d…`・`no_cstack` `1cfc7c5d…`、本測定は `full` `e8ab4502…`・`no_cstack` `b5284150…`。`stack.base`・`stack.end` は `0x11dbef00`・`0x115bef00` で旧値と同じ。
+- 同じ build を 3 回続けて測ると `full` は毎回変わった (`fa8debd3…`・`3d81d091…`・`cd1d6c6b…`)。`stack` は 3 回とも同じ。よって `full` の sha256 は測定ごとの非決定的な値で、同じ sha256 を期待する比較には使えない。
+- 差分の由来: 本節の link は `FLE_EXTRA_LDF="-g --profiling-funcs"` を付けた。`-g` を外した wasm (`FLE_EXTRA_LDF` 無し・`FLE_SHARDS=8`) の 1 回の測定でも `full` は `cd1d6c6b…` で、本節とも前回とも一致しなかった (1 回だけの確認)。よって link フラグだけが原因とは言えない。原因は未特定 (推定: wasm 線形メモリの未初期化領域の内容が、実行ごとに異なる)。
+- 結論: `outmem.full`・`no_cstack` の sha256 は、同一の build でも一致しない。前回の「一致」は件数の一致 (dispatch・GetMem・ok など) を指し、sha256 の一致は主張しない。`stack` の境界値は一致する。
+- 差分 0 の証跡: 本節のみの追加。コード (`fle_boot.mjs`・`fle_boot.c`・`build.sh`・`fle6_measure.sh`) は `FLE_EXTRA_LDF` の追加 (`2ff548657`) 以外に変えていない。
