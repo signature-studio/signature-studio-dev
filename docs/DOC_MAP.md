@@ -478,6 +478,7 @@
 | `tools/python/REPORT_PY61.md` | ~130 | PY-61 (#2026): playlist 未読 26 関数の引数・戻り値の型・範囲 code を VA 付きで確定。`-4` ↔ `RANGE` は文言で対応 (数値は非対応)。操作コアと残り helper は子 #2809 (PY-91) |
 | `tools/python/REPORT_PY113.md` | ~100 | PY-113 (#2943): playlist.setTrackColor の格納式を VA 付きで確定 (R/B 入替え + `0xffffff` で `+0x2c` へ)。getTrackColor との食い違いの原因 (C 側の素通し格納) と修正。テスト期待値は子 #2949 (PY-114)、mixer 側は子 #2951 (PY-115) |
 | `tools/python/REPORT_PY91.md` | 181 | PY-91 (#2809): playlist 操作系 inc 4 件の更新式・getLive 系の状態 helper・書式 5 件を VA 付きで確定。trigger・zone のコア本体、時間変換、solo/select の副作用、例外型は子 #2906・#2908・#2909 |
+| `tools/python/REPORT_PY105.md` | 119 | PY-105 (#2908): 時間 ↔ block 変換・0x442c00 (時刻)・inc 系の排他・select mode 5・7〜10 を VA 付きで確定。cfg・+0xd4/+0xd6・UI 通知名・theme 型は未確定 (#2908 に残す)。解析は `analysis/flapi/playlist_time_facts.py` |
 | `tools/python/REPORT_PY106.md` | 101 | PY-106 (#2909): RANGE (-4) の例外型の参照チェーン (sink 0xd82daf → `PyErr_SetString([[[0x15e1140]]])`・束縛名 `PyExc_RuntimeError`・静的) と repo の RANGE → IndexError の照合 (不一致)。boot 停止時の実測 (束縛は未到達・chain は unit 209 で 0 化)。実行時の型名は未達 (#2909) |
 | `tools/python/REPORT_PY124.md` | 88 | PY-124 (#2999): general.saveUndo の書式 `si\|i`・kwlist・既定値 updateHistory=1・戻り値 None・準備不可 -2 (文言付き例外か None かは未確定の報告判定に依存)・核の job 配置を VA 付きで確定。履歴 record の本体 (`0x101b780`・`0x1016ca0`) は子 `[PY-137]` (#3026) へ |
 | `tools/python/REPORT_PY30.md` | 132 | PY-30 (#1327): flcpt.cpt の CPT 4 メンバ (addChordMarker・getChordMarker・clearChordMarkers・chordMarkerCount) の引数書式・int 戻り値・要素返却を FLEngine PE の表とハンドラから確定し `src/flcpt.py` に実装。None 戻り値は推定 (#3034)。probe の呼べた数は 3/9 のまま (残りは子 #3174〜#3176) |
