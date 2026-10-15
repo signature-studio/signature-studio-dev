@@ -71,7 +71,7 @@ commit `9810d96fd` で `BACKLOG.md`・`data/coverage.json`・`inventory.md` を�
 
 差分 (commit 前の HEAD 比): 3 件 (23 行追加・22 行削除)。内訳は `coverage.json` の `shimx_hooks` 69→79、`inventory.md` の運用フック列挙 (`shimx_drop_invoke` 等 10 本の追加)、`midi_conv.c` の新規分類 (BACKLOG の midi 系 API の所属 `net.c` → `midi_conv.c`)。
 
-測定 commit は `9810d96fd` (コードを変えた最後の commit。変更は生成物 3 件のみ)。素材は `$HOME/artifacts` の `toolchain-emsdk`・`work-m11`・`work-m6-ott` を展開して使用。`/opt/emsdk` は sudo で展開後 `chown runner` (展開直後は cache の書込が root で止まった)。
+測定 commit は `9810d96fd` (コードを変えた最後の commit。変更は生成物 3 件のみ)。素材は `toolchain-emsdk`・`work-m11`・`work-m6-ott` を展開して使用 (展開先は `docs/REFERENCES.md` §4)。`[EMSDK]` は sudo で展開後 `chown runner` (展開直後は cache の書込が root で止まった)。
 
 | run | commit | rc | 所要 | load (1 分平均) | 生成物 3 件の差分 |
 |---|---|---|---|---|---|
