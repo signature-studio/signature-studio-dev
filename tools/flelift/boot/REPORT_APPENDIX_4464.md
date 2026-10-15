@@ -5,8 +5,8 @@
 ## 1. 結論
 
 - 受入 1 (入口の `rcx`・`rdx`・`dl` の再現): **達成**。`cfi_entry_probe.py` で生成 C の work コピーに probe を入れ、§13 の値を再現した (§2)。
-- 受入 2 (間接 call の受け手 VA): **実行時の値を取得 (受け手は 0x0)**。`f_410320` の `call [rax-0x30]` の target は、seed 後の実行で `rax=0x5ac338`・`target=0x0` (`[icall]` ログ)。受け手の slot `0x5ac308` は、呼出し前の live memory が `0x0` (`[cfi-seed]` ログ)。PE ファイル上の `0x40f960` は、loader の充填が無い harness では現れない。
-- 受入の判定: 受け手の VA は実行時に `0x0` と取れた。ただし実機で `0x5ac308` に入る値は未確認 (実機の loader 側の充填は本 harness の対象外)。したがって「実機の受け手」は未特定のまま。
+- 受入 2 (間接 call の受け手 VA): **部分達成** (残りは #5337)。受け手 slot `0x5ac308` の正しい値は `0x40f960` (PE 静的値)。`fle_textwin_install`・`fle_init` の直後は `0x40f960` になる (§14、`FLE_WWATCH` 診断下で確認)。`f_410320` の `call [rax-0x30]` の受け手 slot は、unit 245 (ExitProcess) の後・unit 246 の直前の 16B 書込み (戻り番地 `0x2ec1d8d`) で 0 になる。seed 後の `[icall]` の target `0x0` (§4) は、この消失の後の値を見ている。
+- 受入の判定: 受け手の正しい VA (`0x40f960`) は確定した。ただし、CFI 呼出しの時点まで値を保つ経路は未解決 (書込み元 `f_134cad0` は推定、消失を止める処理は未特定)。実機の loader が `0x5ac308` に入れる値も未確認。いずれも #5337 に残す。
 - 原因の要点: `CreateFruityInstance` (`0x1375990`) は DLL の export で、実機の `self` は host が渡す。`f_13752f0`・`f_1105350` は `rcx` を固定の global slot (`0x1104e30`・`0x5ac270`) から再読込するため、harness の `rcx=0` は chain の `self` にならない。
 
 ## 2. 入口の記録 (受入 1)
@@ -73,3 +73,15 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 - seed 有 + RECV + SELF=`0x5ac338` (B): A と同じ stack・同じ threw。`self` を渡しても、chain は `rcx` を global から再読込するため結果は変わらない。
 - 所見 (静的・生成器の出力を走査): `0x976410` は窓 `w_4420` (`0x976400`・96 B) に入るため、敷設後は前版の PE 値 `0x9764d8` になる。`0x9764a8` (PE 値 `0x40f960`)・`0x5ac308` は敷設する memcpy に入らず、harness では 0 のまま。前版の「`f_976b60` の `rcx` は `0x976410` から来る」は、コードの静的な読みで実行時値は未計測。`f_410320` の `rax` が 0 となり `LD64(0xffffffffffffffd0)` で oob する、は推定 (`rcx`・`rax` の実行時値は未計測。推定)。
 - 未解決 (起票先: #5337 に残す): (1) `0x976410` の敷設後の実行時値を probe で確定する (静的には `0x9764d8`)。(2) `fle_data_install` が覆わない `0x9764a8`・`0x5ac308` (いずれも `.text` 内) の敷設方法を決める。(3) 実機の loader が充填する値は未確認 (起票先: #5337。#4384 は CLOSED)。
+- 訂正 (§14 で実測): 上の (2) の「敷設されない」は誤り。`fle_textwin_install` が `.text` 全域 (`0x401000`〜) を敷設するので、`0x5ac308`・`0x976410` は敷設直後に正しい値 (`0x40f960`・`0x9764d8`) になる。以後の問題は「敷設後に 0 になる」ことで、§14 で `0x5ac308`・`0x976410` は確認した。`0x9764a8` は未計測。
+
+## 14. 受け手 slot の消失の所在 (#5337・測定 commit `9b8a0426c`・mode tol・寛容起動)
+
+- 測定: `FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_SLOTS=0x5ac308ull,0x976410ull" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0・所要 3 分 39 秒 (lift 82 s・clang plain 101 s・boot tol 26 s)。load 0.96〜2.05。
+- 計数 (診断 knob 下): dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob`・exit 0。§11・§12-1 と一致 (診断は計数を変えない)。
+- 敷設直後・初期化直後の値 (probe): `0x5ac308=0x40f960`・`0x976410=0x9764d8` (`fle_textwin_install`・`fle_init` の後で、どちらも PE 静的値と一致)。
+- 消失の時点: `fle_wwatch` の監視で、両 slot は **同じ 1 回の 16B 書込み** で 0 になる (`old=0x40f960 new=0` と `old=0x9764d8 new=0`)。書込みは unit 245 (ExitProcess) の後、unit 246 の直前。寛容ループの各 unit 前の検査で、最初に `0x5ac308=0` となるのが unit 246 (`[slot-zero]`)。前回 §3・§12 の clobber 695 件 (unit 246〜940) の開始点と一致する。
+- 書込み元: 戻り番地 `0x2ec1d8d` (wasm 内の code 位置)。code section の関数本体の範囲で引くと code 位置 `11254` (範囲 `0x2ec1d5f`〜`0x2ec1dbd`) に入る。name section の index は import (36 件) を含むため、この code 位置の名前は `f_134cad0` と読めるが確定ではない (推定)。書込み命令は `STX` (16B の store・`fle_cpu.h:79`)。
+- 既定経路 (root 無し・`FLE_EXTRA_LDF` 付き・`9b8a0426c^` と `9b8a0426c` で同一): dispatch 895 / GetMem 3,680 / FreeMem 1,499 / exit。この値は前回 REPORT の 209 (root 有・既定 root 無し) と条件が異なる。既定の数値は変えていない (`9b8a0426c^` で同じ値を再現)。
+- 所見: 受け手 slot の消失は、既知の clobber (unit 246〜) と同じ時点・同じ経路。受け手の実行時 VA (`0x40f960` が正しい値) は、書込みを止めれば取れる見込み。ただし書込みを止める処理 (clobber の原因) はまだ特定していない。
+- 未解決 (起票先: #5337 に残す): (1) 書込み元の関数 `f_134cad0` の実行時の名前と役割 (推定の段階)。(2) clobber を起こす unit 245 の後の処理 (#3060 の `f_6a7b70` 広域ゼロ埋めと同じ現象かは未確認)。(3) 実機の loader が充填する値 (#4384 は CLOSED)。
