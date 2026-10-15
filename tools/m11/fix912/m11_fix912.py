@@ -15,12 +15,10 @@ import json
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lb_base import VA_TO_LVA  # noqa: E402  (#3188: VMT の LVA は M11_LB_BASE で動く。LB=0 では 994072)
-
-VMT_LVA = 0x4F2B18 + VA_TO_LVA
-OLD = '%%39 = call i64 @function_4fa070(ptr nonnull inttoptr (i64 %d to ptr), i64 %%37, ptr %%38)' % VMT_LVA
-NEW = '%%39 = call i64 @function_4fa070(ptr nonnull inttoptr (i64 %d to ptr), i64 1, ptr %%38)' % VMT_LVA
+LB = int(os.environ.get('M11_LB_BASE', '0'), 0)   # #222: VMT 定数の LVA = 994072 + LB_BASE (IR の VA→LVA remap と同じ)
+VMT = 'ptr nonnull inttoptr (i64 %d to ptr)' % (994072 + LB)
+OLD = '%39 = call i64 @function_4fa070(' + VMT + ', i64 %37, ptr %38)'
+NEW = '%39 = call i64 @function_4fa070(' + VMT + ', i64 1, ptr %38)'
 
 
 def main():

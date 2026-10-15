@@ -137,21 +137,87 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 - 次の一手 (未着手): `function_412770` と `function_411d20` の IR で、Halt を呼ぶ条件の比較に使われる定数・ポインタを取り、
   LB=0 と LB=0x10000 の `boot_final.ll` の該当箇所を diff する。`m11_remap_count.py` の未 remap 即値 (§3) と突合する。
 
-## 6. #3188: LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (本 runner で実測)
+## 6. #3160 の再測定: LB=0x10000 の寛容起動は 600 s で打ち切られず、LB 依存の unit 差は 8 件
+
+既知類型との関係: 該当なし (新しい候補: LB 直書きの定数を持つ IR 修復 pass が LB≠0 で不適用になる。類型 ID は未付与)。
+測定主体: 本 PR の作業 runner (2026-10-14)。素材は work-m11 (#516 以前の snapshot)・fl-win64・toolchain-emsdk (`[EMSDK]`)。
+`m11_e2e.sh` の全再生成は使わず、lift 成果物 (boot0〜4.lift.ll) から後段 (gen_ir2 → 画像 → lb_check → build → 寛容起動) を実行する (`tools/m11/m11_lb_tolerant_repro.sh`)。
+測定 commit: `17b078a1` (コードを変えた最後の commit。直前の `9a00a57c` で測った値も同じ)。`git diff 17b078a1 HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` の出力は空 (差分 0)。
+
+### 6-1 LB 別の結果 (`bash tools/m11/m11_lb_tolerant_repro.sh 0 work/repro_lb0` / `... 0x10000 work/repro_lb10000`)
+
+| 項目 | LB=0 | LB=0x10000 |
+|---|---|---|
+| 寛容起動 wall (timeout 600) | 16.8–17.0 s (n=3) | 20.2–20.5 s (n=4) |
+| attempted / ok / noproc / miss / skipped | 942 / 867 / 1 / 47 / 74 | 942 / 867 / 1 / 47 / 74 |
+| skipped の内訳 | oob 19・halt0 7・unreachable 1 | oob 16・halt0 8・abort 2・unreachable 1 |
+| hook_ran (InitUnits 本体の呼出し) | true (1 回) | true (1 回) |
+| lb_check (静的検査) | PASS | PASS |
+
+LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (16.8 s)。LB=0x10000: `17b078a1` の repro (20.25 s)・`9a00a57c` の repro (20.2 s)・`var_A` (20.5 s)・`fixed` (20.5 s)。
+再実行は unit 別の記録 (942 件) が一致した (`m11_lb_unit_diff.py` の差 0)。
+
+### 6-2 LB=0 と LB=0x10000 の unit 結果差 (`python3 tools/m11/m11_lb_unit_diff.py tools/m11/work/repro_lb0/tolerant_units.json tools/m11/work/repro_lb10000/tolerant_units.json`・kind 差 8)
+
+| index | VA (LB=0 側) | LB=0 | LB=0x10000 | §2 の表 (引用) |
+|---|---|---|---|---|
+| 40 | 0x105bd0 | ok | halt0 | 一致 |
+| 153 | 0x265b90 | ok | oob | 一致 |
+| 158 | 0x26d1a0 | ok | oob | 一致 |
+| 745 | 0xabb3b0 | oob | ok | 一致 |
+| 291 | 0x432660 | oob | ok | §2 に無し (新規) |
+| 296 | 0x446130 | oob | ok | §2 に無し (新規) |
+| 304 | 0x483140 | oob | abort | §2 に無し (新規) |
+| 555 | 0x7f2500 | oob | abort | §2 に無し (新規) |
+
+- §2 の 4 件は再現した。§5 の「食い違いは 4 件のみ」は引用元の記録での値で、本測定では 8 件。
+- 陽性対照 (差が出ること) は LB=0 と LB=0x10000 の比較 (差 8)。陰性対照 (同一 LB の再実行) は差 0。
+
+### 6-3 候補の切り分け (寛容起動の打ち切り)
+
+- ハング・無限ループ: 再現せず。942 試行が全て 20 s 以内に完了 (`attempted` = `units_total` = 942)。
+- InitUnits の再入: 再現せず。`hook_ran` は 1 回。`attempted` は 942 で、二重起動の痕跡なし。Halt0 (dllmain 経由) は 8 件を skip として処理。
+- 未 remap の image VA 即値 (§3): 件数は LB 間で同じ (`m11_remap_count.py`: LB=0 IR も LB=0x10000 IR も `unremapped` 4,364)。件数の差は 6-2 の原因ではない。
+- 元の報告 (`M11_LB_BASE=0x10000` で 600 s 打ち切り) は、この snapshot とこの commit では再現しなかった。元の打ち切りの原因は未特定。
+
+### 6-4 e2e 経路を止めていた LB 直書き (本 PR で修正)
+
+- `ldfix/fix_ld108.py` (#2402): 照合文字列が LB=0 の LVA `0xFA5080` (16404608) を直書きしていた。LB=0x10000 の IR では head が 16470144 に remap されており、修正前は `m11_gen_ir2.sh` が `store 行が想定と違う` の assert で止まった (gen_ir2 rc=1 を実測)。
+- `fix912/m11_fix912.py` (#912): VMT 定数 `994072` (0xF2D18) も同じ。LB=0x10000 の IR では `1059608`。修正前は `m11_build.sh` が `[fix912] FAIL: 対象行が無い (before=0 after=0)` で止まった (実測)。
+- 修正: どちらも `M11_LB_BASE` を加算して照合する。LB=0 の照合文字列は旧値と一致 (`HEAD_ST`・`OLD`・`NEW` を LB=0 で確認)。
+- ld108 を外した版 (`M11_FIX_LD108=0 M11_ALLOW_LD108_DISABLED=1`) の寛容起動も、unit 結果は fixed 版と差 0。この unit 集合では ld108 の適用は結果を変えない。
+
+### 6-5 未確認・限界
+
+- lift 成果物 (boot0〜4.lift.ll) が fl-win64 の PE から作られたことは未確認。work-m11 に `work/lift_pe.sha256` が無く、§5 のような手書きの指紋は使っていない。
+- LB=0 の寛容起動は ok 867 / skipped 74 で、`m11_tolerant_gate.py` の pin (ok 874 / skipped 67) と一致しない。snapshot の IR と pin の基準 (`--full` 再生成) が違うと推定 (未確認)。
+- `m11_e2e.sh` の全経路 (`M11_LB_BASE=0x10000 bash m11_e2e.sh`) は未実行 (全再生成に入るため)。
+- 寛容起動の `ptrcheck` はゲート未設定 (`M11_PTRCHECK_MAX_NEW` 無し)。`image_va_words_new` は LB=0x10000 で 71987、LB=0 で 72042。
+- 再現手順: `bash tools/m11/m11_lb_tolerant_repro.sh <LB> <出力>` (要 `FL_WIN64_DIR`・work-m11)。ネガティブ対照の具体例: 修正前の commit `e9881327` で LB=0x10000 の gen_ir2 は止まる (6-4)。
+
+### 6-6 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| LB=0 と LB=0x10000 の unit 結果差 8 件 (特に unit 40 の Halt0・unit 745 の oob) の原因 | LB 依存の寛容起動の結果が変わる。silent 誤りの可能性 | 子 issue (本 PR の Closes #3160 の後に起票) |
+| 元の 600 s 打ち切りの原因 (本 snapshot では再現せず) | 報告の根拠が再現しない | 本 issue の §6-3 に記録。再現には lift_pe.sha256 付きの完全な成果物が要る |
+| LB=0 寛容起動の pin (874/67) と snapshot の値 (867/74) の差 | gate 数値の基準が snapshot と不一致 | PM 確認 (`--full` 再生成での再測定が要る) |
+
+## 7. #3188: LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (本 runner で実測)
 
 測定 commit: `6a20f8b1` (コード差分の最終 commit。1d9e2037 から PATH 行の削除だけ・再測定済み)。測定 runner: Actions (4 vCPU・RAM 15 GiB)。load average は未採取。
-既知類型との関係: 該当なし (`docs/DEFECTS.md` の ID は未付与。NULL 源の memcpy は下 §6-3 の候補で、既存類型との対応は未確認)。
+既知類型との関係: 該当なし (`docs/DEFECTS.md` の ID は未付与。NULL 源の memcpy は下 §7-3 の候補で、既存類型との対応は未確認)。
 素材: `fl-win64` (`block00031_PE.bin` 22,227,016 B、展開 2.2 s)・`work-m11` (展開 2 s。`lift_pe.sha256` 無し)。
 `m11_e2e.sh` の全再生成 (指紋検査) は使わず、後段だけ `m11_lb_tolerant_repro.sh` で回した (gen_ir2 → data/image → lb_check → build → `m11_tolerant.mjs`)。
 `toolchain-emsdk` は展開せず runner 既存の emsdk ([EMSDK]、`docs/REFERENCES.md` §4) を使った。`toolchain-retdec`・`work-liftdiff` は使っていない (lift を走らせていない)。
 
-### 6-1. 再現スクリプト (新規・issue の指定どおり)
+### 7-1. 再現スクリプト (新規・issue の指定どおり)
 
 - `tools/m11/m11_lb_tolerant_repro.sh <LB> <出力先>`: 後段だけの再現。出力は `tools/m11/<出力先>/` (`tolerant_units.json`・`boot_final.ll`・ログ)。
 - `tools/m11/m11_lb_unit_diff.py A.json B.json`: unit の index 単位で kind を突合 (VA は LB でずれるので比べない)。差 0 件で exit 0。
 - `tools/m11/m11_lb_ir_fn_diff.py A.ll B.ll function_X ...`: 関数本体の行差分と、整数定数の変化量 (LB=0x10000 側 − LB=0 側) を出す。
 
-### 6-2. 修正 (受入 2 の前段: LB 直書きの IR 書換え pass が LB=0x10000 で止まる)
+### 7-2. 修正 (受入 2 の前段: LB 直書きの IR 書換え pass が LB=0x10000 で止まる)
 
 修正前 (HEAD `24be607a`) は `M11_LB_BASE=0x10000` の IR も wasm も作れなかった (fail-closed)。原因は LB=0 の定数の直書き 2 件:
 
@@ -160,9 +226,9 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 | `ldfix/fix_ld108.py` (D20) | head 変数の store 先 `i64 16404608` (LB=0 の LVA = VA 0x13A5080) | gen_ir2 が `store 行が想定と違う` で停止 (IR の定数は 16470144 = +0x10000) | `HEAD_VA + VA_TO_LVA` |
 | `fix912/m11_fix912.py` (#912) | VMT 参照 `i64 994072` (LB=0 の LVA = VA 0x4F2B18) | m11_build.sh が `対象行が無い (before=0 after=0)` で停止 (mode off でも検査する) | `0x4F2B18 + VA_TO_LVA` |
 
-LB=0 の出力は不変: 修正前 (23:30 の実行) と修正後 (23:36・worktree の 23:41 の実行) で寛容起動の集計が同一 (下 §6-3 の表の LB=0 行)。
+LB=0 の出力は不変: 修正前 (23:30 の実行) と修正後 (23:36・worktree の 23:41 の実行) で寛容起動の集計が同一 (下 §7-3 の表の LB=0 行)。
 
-### 6-3. 寛容起動の結果 (修正後・同一 HEAD で 2 回ずつ)
+### 7-3. 寛容起動の結果 (修正後・同一 HEAD で 2 回ずつ)
 
 | 条件 | units | ok | noproc | miss | skipped (oob / halt0 / unreachable / abort) | repro 所要 (wall) |
 |---|---|---|---|---|---|---|
@@ -173,7 +239,7 @@ LB=0 の出力は不変: 修正前 (23:30 の実行) と修正後 (23:36・workt
 - ネガティブコントロール (決定性): LB=0 の 2 回 (main 側 23:36 と worktree 側 23:41) の突合は kind 差 0。差 8 件は実行の揺れではない。
 - **issue の「現 HEAD で 8 件」は、修正前の HEAD では再現しなかった** (LB=0x10000 の IR が作れない)。修正後に初めて測れた。
 
-### 6-4. 原因の切り分け (途中。未特定)
+### 7-4. 原因の切り分け (途中。未特定)
 
 - **IR の再配置の漏れは見つからなかった** (`m11_lb_ir_fn_diff.py`): 関数 412770・4128b0・411d20・412e40・412c20・535c11 で、LB 由来の定数は全て +0x10000 (412c20 は 1 行のみ差・+65536)。構造 (行数) は同一で、0 でも +0x10000 でもない変化は無い。
 - **image 側**: 線形 0 の NULL 領域は LB=0 で PE ヘッダ (`4d 5a 50 00 …`)、LB=0x10000 で全 0 (`lb_check` の `null_region_nonzero_bytes` = 0)。NULL を読む箇所の値が LB で変わる。
@@ -182,9 +248,9 @@ LB=0 の出力は不変: 修正前 (23:30 の実行) と修正後 (23:36・workt
 - **未検証の候補 (C 側)**: `m11_ov.c:194` の icall の `tkey = target + (0x400000 - M11_LB_BASE)` (LVA → VA 換算。VA 形式の target は fallback あり)。
 - **未特定**: unit 153・158 (LB=0x10000 で OOB の読み先)、291・296・304・555・745 (LB=0 側の OOB。wasm 関数 `function_535c11`・`function_407e20__lifted`)、304・555 の abort の呼出元 (記録は最内の `abort` だけ)。
 
-### 6-5. 検証範囲と限界
+### 7-5. 検証範囲と限界
 
 - 範囲: 寛容起動 (`m11_tolerant.mjs`) の unit 別結果のみ。strict (`m11_run.mjs`)・survey・`m11_e2e.sh` の gate は未実行 (指紋検査を迂回しないため)。
 - LB=0 の既存 gate (`e2e_expect.env`) への影響は未確認。修正は LB=0 の文字列を変えない (`VA_TO_LVA = 0` で同じ定数) が、gate の再実行は未了。
 - 回数: 修正後の実行は LB=0 が 2 回 (main 側 23:36・worktree 23:41)、LB=0x10000 が 3 回 (main 側 23:35・23:38、worktree 23:42)。突合の kind 差は全て 8 件・同じ unit。
-- 未解決 (起票先は PR 本文の表): 8 件の原因特定 (上 §6-4 の未特定) → 子 issue。memcpy 源 NULL の lift 欠陥 (§6-4) → 同じ子 issue。
+- 未解決 (起票先は PR 本文の表): 8 件の原因特定 (上 §7-4 の未特定) → 子 issue。memcpy 源 NULL の lift 欠陥 (§7-4) → 同じ子 issue。
