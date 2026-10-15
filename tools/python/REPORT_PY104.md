@@ -136,7 +136,7 @@ velocity による選択 (`0x122227e`〜`0x12223b9`、K∈{0,2} のみ。S+0xa0 
 - 再測定 (修正後 HEAD `b184a77c3`、`/usr/bin/time`、n=3): real 0.08 s / user 0.06 s / sys 0.01〜0.02 s。実行直前の load average `0.02 0.14 0.08`、nproc 4、並列 1。全 expectation OK (exit 0)。
 - 逆アセンブル (手動): 0x1221bc0〜0x1222b69 (全体)・0x1222b90・0x100b890・0x100b970・0xd2a550・0xd2a3c0・0x12df530・0xd84f70・0xfdc630・0x420980・0x420b00・0xe5abd0・0x737020 を `pe_disasm.py` で読んだ。実行による検証はしていない。差し戻し修正時に 0x12223bf〜0x12224a9・0x1222200〜0x122221a・0x1222300〜0x122231b・0x1222b90・0xd84f70・0x100bb90 を再読した。
 
-- #3624 追補の実測: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_rip_refs.py 15f4658,15f61a8` (1 バイトずつ復号の全セクション走査、n=3、`/usr/bin/time`): real 18.98〜19.11 s / user 18.96〜19.09 s。実行直前の load average `0.65 0.33 0.17`、nproc 4、並列 1。ヒット 41 件 (0x736ff4〜0x741753)。
+- #3624 追補の実測: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_rip_refs.py 0x15f4658 0x15f61a8` (既存スクリプト。.text 線形走査、n=3、`/usr/bin/time`): real 18.98〜19.11 s / user 18.96〜19.09 s。実行直前の load average `0.65 0.33 0.17`、nproc 4、並列 1。`0x15f61a8` のヒットは 41 件 (0x736ff4〜0x741753)。
 
 ## 9. 参照
 
