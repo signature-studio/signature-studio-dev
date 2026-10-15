@@ -77,3 +77,56 @@ item の field と clamp (`0x130f5f8`〜`0x130f68c` で確認):
 
 - [x] 呼出し経路・status 表・範囲外 code (`-4`)・param 3〜8 の副作用を PE 解析箇所つきで REPORT に残す (#2548 の受入 1 を、この範囲に縮小した)。param 0〜2 の書込み・item 列挙・述語の型は未確定のまま残す。
 - 移管: 元の受入 2 (`provider/fl_engine.c`・`host/fl_mock.mjs` の実装)・受入 3 (`tests/channels_diff.mjs` の diffs 0)・受入 4 (`FL_ENGINE=wasm node tests/all_tools.mjs` 48/48) と、未解決 3 件 (param 0〜2 の書込み分岐、item 列挙と `G1`・`G2`、述語の型) は子 issue #2581 (`[PY-78]`・親: #2548) へ。
+
+## PY-78 追補 (#2581): 項目書換え規則 (param 0〜8) の確定と provider / mock 実装
+
+- 測定: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py 0x130f3d0 330`・`0x130f200 130` (各 1 回・終了 0)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` (2.9 秒)。
+- 測定 commit: `add61c2c` (実装の最後の commit)。
+
+### 呼出し (PE 実測)
+
+`0x130f740` (`[G]` の値を step に乗じる) → `0x130f3d0(chanId, patNum, step', param, value)`。`0x130f3d0` は `0x130f200` で項目 list を作り、list が空なら何もしない (`0x130f6fd`)。以下は list が非空のとき。
+
+- delta: param 0〜7 は `value - (list[0] の字段)` (`0x130f41f`〜`0x130f4e4`)。param 8 は delta = value。それ以外は書換えなし (`ebx = 0` で `0x130f68f` へ)。
+- 書換え: 全項目 `list[i]` (`0x130f4f6`〜`0x130f699`) に規則を適用する。
+
+| param | 字段 (項目の +off) | 型 | 書換え | 分岐 (PE) |
+|---|---|---|---|---|
+| 0 | +0xc | word (符号付き) | += delta・clamp [0, 0x83] | 0x130f582 |
+| 1 | +0x15 | byte | += delta・clamp [0, 0x80] | 0x130f5aa |
+| 2 | +0x12 | byte | += delta・clamp [0, 0x80] | 0x130f5d1 |
+| 3 | +0x10 | byte | += delta・clamp [0, 0xf0] | 0x130f5f8 |
+| 4 | +0x14 | byte | += delta・clamp [0, 0x80] | 0x130f61c |
+| 5 | +0x16 | byte | += delta・clamp [0, 0xff] | 0x130f640 |
+| 6 | +0x17 | byte | += delta・clamp [0, 0xff] | 0x130f664 |
+| 7 | +0x0 | dword | += delta (clamp なし)。delta ≠ 0 のとき `0x12df760` を呼ぶ (`0x130f6a0`。呼出し先は未読) | 0x130f688 |
+| 8 | +0x11 | byte | 代入 = value の低 8 bit (delta を使わない) | 0x130f68c |
+
+clamp は `v <= 0 → 0`、`v > hi → hi` (`0x130f58c`〜`0x130f59c` 等の形)。書換え後に `[global]≠0` で `0xe39560`、`[global+0xa9]≠0` で `0x1307760` を呼ぶ (`0x130f6cb`〜`0x130f6fc`。実体は未読・未モデル)。
+
+### 換算用の値 (旧節の G1・G2 の訂正)
+
+RIP 相対の参照先 (次命令アドレス + disp) を計算し直すと、`0x130f744` (step 乗算)・`0x130f2f5` (step 加算)・`0x130f313` (idiv の除数)・`0x130f323` (imul の乗数)・`0x130f339` (start 加算) は**すべて同じ slot `0x15e25f8`** を読み、その指す int (offset 0) を使う。旧節の「G2 (`0x2d32ce`) は item 位置の idiv 換算」は誤り (idiv の除数は同じ slot の値で、G2 は乗数)。値の意味と書込み元は子 PY-185 (#3310)。
+
+### 項目列挙 `0x130f200` (構造。意味は未確定)
+
+- 引数: rcx = 出力 list・edx = chanId・r8d = patNum・r9d = step'。list は `0x418190` で初期化する。
+- channel: `[[0x15e2218]]` の件数 `[obj+0x10]` を走査し、`0xfe8bb0(obj, i)` の `[+0x794] == chanId` となる i を取る。見つからない・範囲外は空 list (`0x130f3b0`)。
+- pattern: 0 ≤ patNum ≤ 998 (`0x3e6`) で、`[[0x15e2aa0] + patNum*192 + 0x28]` が非 null。
+- note: `0x12df320(pattern, &cursor, step' + V)` を戻り値 0 まで反復。各 note で `start = (note[0] / V) * V`、`end = max(0x105f2e0(note), start + V - 1)` を求め、`start <= step' < end` かつ `word [note+6] == chanId` のとき `0x417fc0` で list に push する。
+
+未確定: `0x12df320`・`0x105f2e0`・`0x417fc0`・`0xfe8bb0` の実体、note 構造体の字段 (長さを含む)、V の意味 (→ #3309・#3310)。
+
+### 述語・登録 (未確定。#3311)
+
+callback `0xd5ce00` の `[vtable+0x98]`、早期 return の述語 `0xd84f30` (ctx+0x50)、負 status の例外判定 `[vtable+0x88]`、`0x526190` が登録した組を呼ぶ機構、`0x12df760`・`0xe39560`・`0x1307760` の実体。
+
+### 実装と検証 (commit `add61c2c`)
+
+- `provider/fl_engine.c`: `StepItem` (字段位置は上表)・`step_item_write`・`step_items_set`・検査用の読出し口 `fl_engine_step_item_probe` (`provider/build.sh` の export に追加)。`channels.setStepParameterByIndex` の handler はまだ無い (未接続。#3311)。
+- `host/fl_mock.mjs`: 同じ規則 (`itemWrite`・`itemsSet`) と `stepItemProbe`。`host/fl_provider.mjs` に `stepItemProbe` を追加。
+- `tests/step_item_diff.mjs` (新規): PE 実測の要点を手計算で 5 件固定し、param -1〜9 × 値 11 通り × 種 7×7 の 5929 呼出しを mock と C で照合。
+- 実測: `node tests/step_item_diff.mjs` → `{"calls":5929,"spot":5,"diffs":0,"PASS":true}`。`node tests/channels_diff.mjs` → `{"calls":170,"diffs":0,"PASS":true}` (既存挙動は不変)。
+- 規則を崩すと落ちることの確認: param 3 の clamp を `0xf0` から `0xf1` に変えて build すると `step_item_diff` が AssertionError で落ち、戻すと PASS した。
+- 差分 0 の確認: `git diff add61c2c HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0` (本節以降の変更は本 REPORT だけ)。
+- `FL_ENGINE=wasm node tests/all_tools.mjs`: 未実行。CPython 3.12.1 の wasm build (`build_cpython_wasm.sh`) と `fetch_inputs.sh` の入力が worktree に無く、本 run では回らなかった。本 commit は dispatch 表と既存 handler を変えない (追加は export 1 件と内部関数のみ)。

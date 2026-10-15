@@ -31,6 +31,7 @@ fix_i32_ptr_arg.py      [P-T2]  opt-in (--func): 本体で inttoptr として使
 fix_icmp_ptr.py         [P-E1]  `icmp P ptr %a, %b` の i64 被演算子 → inttoptr (PLG-F6-2 #545。 旧 distortion/engine_fixcmp.py)
 fix_avx256.py  [P-A1]  i256 (ymm) の __asm_v*ps / vextractf128 / VEX store 形 helper を IR 命令へ lower (#535)
 comis_flags.py  [PLG-F3-34] #3242  非 VEX comis/ucomis の flag (CF/ZF/PF) を slot を持つ関数で IR へ反映 (fcmp → store・呼出し削除)。 回帰は test_comis_flags.py
+vex_comis_flags.py [PLG-F3-14] VEX の vcomis/vucomis の flag (CF/ZF/PF) を同一ブロック内の flag 読み出しへ fcmp 由来の値で反映 (#1774。 呼び出しは残す)
 #
 # 変更したコピー (PLG-F6-2 #545)
 ir5_patch.py: [P-F1] fold_const_ops が畳めない外側の式の内側を読み飛ばす欠陥 (E5) / [P-F2] lift_residual_constexpr が bitcast 除去だけの行変更を捨てる欠陥 (E2)。 回帰テスト test_ir5_constexpr.py (修復前 e64ef6f を NC に使う)
