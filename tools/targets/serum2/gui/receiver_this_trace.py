@@ -331,6 +331,7 @@ def value(fn, pos, reg, strict):
                 return ("stackslot", info, k)
             s, src = sp
             if strict and not fn.dominated(s, k):
+                mark_nodom(fn, k, s)
                 return ("nodom", None, s)
             pos, reg = s, src
             continue
