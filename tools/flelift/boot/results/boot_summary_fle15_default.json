@@ -171,16 +171,53 @@
  "outmem": {
   "mem_bytes": 905969664,
   "stack": {
-   "base": "0x11dbbb40",
-   "end": "0x115bbb40"
+   "base": "0x11dbbbc0",
+   "end": "0x115bbbc0"
   },
-  "full": "2ac26595c414b44b3a6cb0a39597b0d8b5206aae8d2ea1240d3b7a96f56a5ba9",
-  "no_cstack": "cc77e9b6b6f1b00b2939860b29bc37d7b99649d0a6f19eba38c4926f499f7a65",
+  "full": "a6f4b85ce6e84c49835aba7a07dc9f1eb7b3514bc19308ee97a1e88c1b60da0e",
+  "no_cstack": "9d31a1533dedf0f4a765a9af87edd11eb193dd89be20e107030cbe7e9693268e",
   "sections": {}
  },
  "survey": null,
  "tolerant": null,
  "cfi": null,
+ "log_cap": {
+  "cap": 0,
+  "time_cap_s": 0,
+  "quiet_bin": false,
+  "bytes": 0,
+  "lines": 0,
+  "bin_lines": 0,
+  "bin_bytes": 0,
+  "hit": null,
+  "elapsed_ms": null,
+  "head": [],
+  "tail": []
+ },
+ "px6bbc20": {
+  "calls_all": 0,
+  "calls_site_6c9380": 0,
+  "first_rect_x0_y0_x1_y1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "last_rect_x0_y0_x1_y1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "rect_changes": 0,
+  "x_min_max_y_min_max": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "calls_other_ret": 0
+ },
  "soft_top": [
   "268448949:21",
   "268437183:7",
