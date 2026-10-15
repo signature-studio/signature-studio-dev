@@ -58,7 +58,7 @@ timeout 系の件数だけ run 間で 2 件違う (304 → 306、関数 70 → 7
 ## 5. 差分 (測定 commit から HEAD まで)
 
 測定 commit `fbb19946c` から HEAD までの `tools/liftdiff` のコードの差分は 0 (追加は本 REPORT `tools/liftdiff/REPORT_LD234.md` だけ)。
-したがって測定値は HEAD でも有効で、再測定は要らない。
+コード差分 0 のため、測定値の鮮度は HEAD でも有効。ただし受入の「単独 run で 2 回」は未達 (§6)。この鮮度の判断は、2 回目の測定の代わりにはならない。
 
 ## 6. 未解決
 
