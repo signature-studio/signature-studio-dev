@@ -56,6 +56,10 @@ GPR_ALIAS = {}
 for i, grp in enumerate(ARG_GPR):
     for r in grp:
         GPR_ALIAS[r] = i
+GPR_ALIAS_FULL = {}
+for grp in ARG_GPR:
+    for r in grp:
+        GPR_ALIAS_FULL[r] = grp[0]
 XMM_ARG = {X.X86_REG_XMM0: 0, X.X86_REG_XMM1: 1, X.X86_REG_XMM2: 2, X.X86_REG_XMM3: 3}
 FPCMP = {X.X86_INS_COMISD, X.X86_INS_COMISS, X.X86_INS_UCOMISD, X.X86_INS_UCOMISS, X.X86_INS_VCOMISD, X.X86_INS_VCOMISS, X.X86_INS_VUCOMISD, X.X86_INS_VUCOMISS}
 ZERO_IDIOM = {'xorps', 'xorpd', 'pxor', 'xor', 'subsd', 'subss', 'subps'}
@@ -88,6 +92,38 @@ class Analyzer:
             return False
         b = self._dis(rva + a.size)
         return b is not None and a.mnemonic == 'add' and a.op_str.startswith('rsp,') and b.mnemonic == 'ret'
+
+    def fault_arg(self, va, rip):
+        """fault rip の命令のメモリ base を、entry から線形に mov 伝播した引数 index (0..3 = rcx/rdx/r8/r9) を返す (#4173)。
+        伝播できない (分岐・ret を跨ぐ・base が引数由来でない) なら None。"""
+        base = self.pe.base
+        ins = self._dis(rip - base)
+        if ins is None:
+            return None
+        mem = [o for o in ins.operands if o.type == capstone.CS_OP_MEM and o.mem.base]
+        if not mem:
+            return None
+        prov = {grp[0]: k for k, grp in enumerate(ARG_GPR)}
+        r, end, n = va - base, rip - base, 0
+        while r < end and n < 3000:
+            i = self._dis(r)
+            if i is None or i.group(capstone.CS_GRP_RET) or i.group(capstone.CS_GRP_JUMP):
+                return None
+            n += 1
+            if i.group(capstone.CS_GRP_CALL):
+                prov.clear()
+            else:
+                ops = i.operands
+                if i.mnemonic == 'mov' and len(ops) == 2 and ops[0].type == capstone.CS_OP_REG and ops[1].type == capstone.CS_OP_REG:
+                    dst, src = GPR_ALIAS_FULL.get(ops[0].reg, ops[0].reg), GPR_ALIAS_FULL.get(ops[1].reg, ops[1].reg)
+                    if src in prov:
+                        prov[dst] = prov[src]
+                    else:
+                        prov.pop(dst, None)
+                elif ops and ops[0].type == capstone.CS_OP_REG and i.mnemonic not in ('cmp', 'test'):
+                    prov.pop(GPR_ALIAS_FULL.get(ops[0].reg, ops[0].reg), None)
+            r += i.size
+        return prov.get(GPR_ALIAS_FULL.get(mem[0].mem.base, mem[0].mem.base))
 
     def analyze(self, va, max_ins=3000, zero_idiom=False):
         """VA の関数を制御フロー追跡し特徴を返す。zero_idiom=True なら xmm の同一レジスタ読みを
