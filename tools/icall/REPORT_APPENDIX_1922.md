@@ -41,7 +41,7 @@ crash 65 のうち stderr で分類した 9 関数 (変更前) 以外の内訳 (
 
 測定 commit: `3d397cb4153dca5e8fc146991d6e102442381255` (コードを変えた最後の commit は `5eac5707a`。以降の `32540cc02`・`3d397cb41`・`e78c7c25e` は本付録のみの変更で、`tools/ott/native` の差分は 0)。
 素材は fix run で `fl-win64`・`plugins-freshair`・`work-icall`・`work-liftlib-targets` を展開し、`tools/targets/freshair/fetch.sh` を実行した。
-`/opt/emsdk` は runner に無かったため、`tools/m1/flags.sh` の pin `6.0.12` を上流から `emsdk install 6.0.12` で導入し、`/opt/emsdk` へ向けた (`fa_route_build.sh` の固定パス)。`fa_route_build.sh` は OK (`fa_route.cjs` 生成)。
+`[EMSDK]` (runner に無かったため) は、`tools/m1/flags.sh` の pin `6.0.12` を上流から `emsdk install 6.0.12` で導入し、`[EMSDK]` のパスへ向けた (`fa_route_build.sh` の固定パス)。`fa_route_build.sh` は OK (`fa_route.cjs` 生成)。
 
 手順と実測 (HEAD `3d397cb4`):
 
