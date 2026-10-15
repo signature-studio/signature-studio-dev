@@ -71,7 +71,7 @@ closure 6 の未 lift は `1801c6a04` の 1 件 (呼出し元 `1801c6a2c`)。clo
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| x64c 出力の計装 (opt-in 既定 off の `ld_insn`) と計装 wasm での vm0・u16 の命令 VA 列 | 受入 2 の動的部分。命令単位の trace が無い | #3988 (LD-185) |
+| x64c 出力の計装 (opt-in 既定 off の `OTT_INSN_HIT`) と計装 wasm での vm0・u16 の命令 VA 列 | 実装済み (§9)。計装 wasm の `ret` と native の rax の照合は未実施 | #3988 (LD-185・本 PR で完了) |
 | 既定 build との 12 case 差 0 (liftdiff harness の x64c 対応)・未 lift callee `1801c6a04` | 受入 3。harness が x64c の wasm を入力に取れるかは未確認 | #3990 (LD-186・依存 #3988) |
 
 ## 6. 測定 commit と差分
@@ -102,3 +102,51 @@ closure 6 の未 lift は `1801c6a04` の 1 件 (呼出し元 `1801c6a2c`)。clo
   - 生成した TSV と commit 済みの `insn_map_6fn.tsv` は `cmp` で一致 (941 行・28 関数)。手編集の 2 行を含め、生成物と一致する。
 - 測定 commit `9bbbd6c15` の worktree で同じ入力を lift したところ、`ott_lifted.c` の sha256 は同じ `6b6e896b...`。この環境の生成物は測定 commit と同一である。
 - REPORT §1 の旧値 `3eeb9fe0...` は、この環境で再現しなかったため削除した。その原因 (当時の入力 DLL・環境の違い) は特定できていない。
+
+## 9. LD-185 (#3988) x64c の命令単位 trace 計装 (opt-in)
+
+- 実装: `tools/ott/lift/x64c.py` に `OTT_INSNTRACE=1` を追加。各命令の直前に `OTT_INSN_HIT(<shifted VA>);` を出す (既定 off では何も出さない)。runtime は `tools/ott/rt/ott_cpu.c` の `ott_insnhit` (`-DOTT_INSNTRACE` のみ本体あり)。記録は `0x35a00000` に `[u32 count][u32 cap=0x40000][u32 va...]` で書く。`0x35a00000`〜`0x35b00000` は既存の `0x34000000`・`0x35c00000`・`0x35e00000`・`0x35f00000` と重ならない。書込みは volatile・件数上限付き。
+- 測定 commit: `ac529158f` (計装コード・ハーネス・検証スクリプトを入れた最後の commit)。
+- 検証: `bash tools/liftdiff/results/ld185/ld185_verify.sh` (`LD185_OUT` 既定 `$RUNNER_TEMP/ld185`、`PLUGINS_DIR` は `tools/shared/env.sh` の既定)。所要 4.9 s (`real`、HEAD `ac529158f`)。入力 DLL は §1 と同じ `ecd51e05…`。
+
+### 9.1 受入 1: 既定 off の出力
+
+- 既定 off の `ott_lifted.c` の sha256 は `6b6e896bd519ccf41524d91247b2b48be6b5987c73973d178a7df6517686c826`。main (`21fb46e35`) の `ld131_lift.sh` 出力と `cmp` でバイト一致。
+- 受入条件の基準値 `3eeb9fe0…` は現環境で再現しない (§8 と同じ)。本 PR では基準を `6b6e896b…` に読み替えて一致を示す。`3eeb9fe0…` を正にする根拠は無い。
+
+### 9.2 受入 2: 6 root の計装ビルド
+
+- 計装 on の lift: `[x64c] functions 28, insns 941, unsup {}, unlifted callees 1, imports 11`。`OTT_INSN_HIT` は 941 件 (命令ごと 1 件)。
+- emcc (`lift_build.sh` と同じ std フラグ + `-DOTT_INSNTRACE`) でビルドが通る。`ottl_insn.wasm` 616787 B。
+
+### 9.3 受入 3: 計装 wasm で 1801c5e84 の vm0・u16 を 1 回ずつ
+
+- 実行: `node tools/liftdiff/results/ld185/ld185_trace.mjs <ottl_insn.cjs> <out.json>`。`ott_run` で `1801c5e84` を呼ぶ。引数は `cases.py` の `vm0` (arena+0x1000 に VMT fixup) / `u16` (arena+0x1000 に UnicodeString ヘッダ) と同じ配置。
+- 命令 VA 列の件数: vm0 56、u16 76。ret は両方 `1` (native の rax との照合は未実施)。
+- 1801c0b6f (je) と 1801c0b82 (call) の位置 (`ld185_summarize.py`。je 直後の VA が `1801c0ba8` なら成立、`1801c0b71` なら不成立):
+
+| pattern | 命令 index | je 1801c0b6f | 結果 | call 1801c0b82 |
+|---|---|---|---|---|
+| vm0 | 17 | next 1801c0b71 | not-taken | index 23 |
+| vm0 | 36 | next 1801c0ba8 | taken | - |
+| vm0 | 45 | next 1801c0ba8 | taken | - |
+| u16 | 17 | next 1801c0b71 | not-taken | index 23 |
+| u16 | 36 | next 1801c0b71 | not-taken | index 42 |
+| u16 | 55 | next 1801c0b71 | not-taken | index 61 |
+
+- 注: vm0 の 2 回目以降の je は `1c0b6c` の分岐 (`1c5eb8 → 1c0b6c` のループ) で、u16 と成立の仕方が違う。LD-136 (`REPORT_APPENDIX_LD136.md`) は case 単位の site 集計で、本節は 1 回実行の命令列なので件数の比較はしない。
+- 未確認: 計装 wasm の `ret` と native の rax の照合、LD-83 の site 記録との突合。計装 wasm の結果の妥当性 (native と同一の分岐か) は、次の子 issue で native trace と突き合わせて確かめる。
+
+### 9.4 測定 commit と差分
+
+- 測定 commit `ac529158f`。`git diff 21fb46e35 ac529158f -- tools/ott tools/liftdiff/results/ld185` の出力 (6 files, 154 insertions):
+
+```
+ tools/liftdiff/results/ld185/ld185_summarize.py | 34 +++++++++++++++++
+ tools/liftdiff/results/ld185/ld185_trace.mjs    | 49 +++++++++++++++++++++++++
+ tools/liftdiff/results/ld185/ld185_verify.sh    | 44 ++++++++++++++++++++++
+ tools/ott/lift/x64c.py                          |  3 ++
+ tools/ott/rt/ott_cpu.c                          | 16 ++++++++
+ tools/ott/rt/ott_cpu.h                          |  8 ++++
+ 6 files changed, 154 insertions(+)
+```

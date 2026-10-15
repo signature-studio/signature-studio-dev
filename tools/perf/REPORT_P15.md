@@ -180,7 +180,7 @@ node tools/perf/p15/chrome_worklet.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3 
 
 ## 8. 第 2 plugin (Fresh Air GainDsp) の x64c lift と単独 instance の署名 (PERF-P20 / #2963)
 
-**結論**: Fresh Air の `gain::GainDsp::process` (SlateCore `0x180afe090`) を x64c で lift し emcc で wasm 化した。単独 instance の署名は node で `5e5287b5` (400 シナリオ・3 回一致)。同じシナリオで実機機械語 (ms_abi 直接実行) と突き合わせ、**400/400 シナリオ一致**。異なる plugin 2 種の **1 Memory への畳み込みは未実施** で、残りは子 issue #3680 [PERF-P23] に移した。
+**結論**: Fresh Air の `gain::GainDsp::process` (SlateCore `0x180afe090`) を x64c で lift し emcc で wasm 化した。単独 instance の署名は node で `5e5287b5` (400 シナリオ・3 回一致)。同じシナリオで実機機械語 (ms_abi 直接実行) と突き合わせ、**400/400 シナリオ一致**。異なる plugin 2 種の **1 Memory への畳み込みは未実施** で、残りは子 issue #3680 [PERF-P23] に移した。impbase 分離と fa_ 改名の再 lift は §8 の付録 `tools/perf/REPORT_APPENDIX_4732.md` (#4732)。
 
 | 項目 | 結果 (実測) |
 |---|---|

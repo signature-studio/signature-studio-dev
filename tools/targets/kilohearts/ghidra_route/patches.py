@@ -28,6 +28,10 @@ GTYPE = {
         '181422a10': 'uint',       # minps/movaps・& -(uint)(...) の 4 byte マスク
         '182280bc0': 'longlong',   # cmp r10,qword・(longlong) 比較
         '182280bc8': 'longlong',   # cmp r10,qword・(longlong) 比較
+        '184162118': 'ulonglong',  # xor qword (180fd1b1a)・uint64 として読む (qword 幅)
+        '184162a88': 'ulonglong',  # xor qword (180fe2496)・mov qword 書込 (180fe24f6)
+        '184162a98': 'ulonglong',  # xor qword (180fe2791・180fe27bc)・mov qword 書込 (180fe27a8)
+        '182989380': 'ulonglong',  # mov qword (180fd1b0e・180fe248a 等)・& 0x3f と ^ の被演算子
         # 関数ポインタ slot (#4671 KH-106)。呼出し 44 箇所は全て `call/jmp [rip+slot]` (CFG dispatch) で、呼び先は直前に rax へ入る値で決まる。
         # slot の PE 初期値は CFG thunk (`jmp [rip+..]`→`jmp rax`) で、データとして使わない。型は `void (*)()` (引数・戻り値は呼出し側で決まる)。
         '1813a1d40': 'FNPTR',
