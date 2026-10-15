@@ -46,7 +46,24 @@ REPORT §10 は「終了時の `[0x15e0a48]` は shim 有で 0」と記したが
 - units_run: 前 209 → 後 209 (差 0)。
 - 最初のウィンドウ: 未到達 (停止点は unit 209 の後の `MessageBoxA` → `exit(0)`、REPORT §10 と同じ)。
 
-## 6. 再現
+## 6. 測定 commit と HEAD の差分 (lift 出力の一致)
+
+測定 commit `3c16e6fcc` から HEAD `469490b60` までの `tools/flelift/` の差分は `x64c.py` (VEX 語彙の追加・movnti 等) と `tests/x64c_vex_diff.py` のみ。`fle_boot.c` の差分は 0 行。
+`x64c.py` の差分が boot closure の lift 出力を変えないことを、両 commit で同じ入力 (`gen_boot.py`・`FLE_EXTRA_ROOTS=0x6a7b70`・`x64c.py` の引数は `fle6_measure.sh` と同じ) から lift して確かめた。
+
+| 項目 | 測定 commit `3c16e6fcc` | HEAD `469490b60` |
+|---|---|---|
+| `fle_entries_boot.json` | 同一 | 同一 |
+| `fle_lifted_s0.c`〜`s7.c` (8 shard) | 全て byte 一致 (`cmp`) | 同左 |
+| `lift_meta.json` | 同一 | 同一 |
+| 全 shard 合計 | 161,689,300 B | 同左 |
+
+`s0.c` の sha256 先頭は両方 `3bbad183e5856933f33e`、`lift_meta.json` は `a5297b964d7641bf465f`。
+したがって lift 出力は変わらず、既存の測定 (units 209 / GetMem 1,890 / FreeMem 776 / shim 2,313 / 0x15f34a0) は HEAD の実行コードに対しても有効とみなす。
+(注: 最初の HEAD の gen は `FLE_EXTRA_ROOTS` を外して実行し entries が一致しなかったが、入力の指定ミスで、コードの差分ではない。同じ環境で取り直して一致を確認した。)
+emsdk は runner に無いため boot の再実行はしていない (lift までの一致のみ確認)。
+
+## 7. 再現
 
 ```sh
 FL_WIN64_DIR=<[WIN64] の展開先> FLE_EXTRA_ROOTS= FLE_BOOT_RUNS="default shim" FLE_BOOT_TAG=fle4004 \
