@@ -96,6 +96,14 @@ def main():
     print('  ' + r.stdout.strip())
     ok_main = ok_restore and r.returncode == 0 and 'mismatch=0' in r.stdout
 
+    # 接尾辞なし (RetDec の実宣言 `void @__asm_vmovaps(i256, i256)` と同形) も同じ復元・同じ突合
+    restored2, rep2 = run_pass(DRIVER_TYPED.replace('@__asm_vmovaps.2', '@__asm_vmovaps'))
+    ok_nosuf = ('call void @__asm_vmovaps' not in restored2 and
+                'store i256 %val, ptr %pd, align 1' in to_opaque(restored2) and rep2.get('vmovaps256') == 1)
+    r2 = sh([build_exe('harness_nosuf', restored2), str(n), str(seed)])
+    print('== 本検証 (接尾辞なし @__asm_vmovaps) 復元 IR: %s / %s' % ('store 1 件 (call なし)' if ok_nosuf else 'NG', r2.stdout.strip()))
+    ok_main = ok_main and ok_nosuf and r2.returncode == 0 and 'mismatch=0' in r2.stdout
+
     # ネガコン (a): pass を外す → 呼出が残り、abort スタブへ落ちて FAIL
     print('== ネガコン (a) pass を外す (呼出が残り abort スタブで FAIL)')
     exe_a = build_exe('harness_nopass', DRIVER_TYPED + ABORT_STUB)
