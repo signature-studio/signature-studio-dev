@@ -7,6 +7,9 @@
     (f2d → C の演算 → d2f、ott_x87.h と同じ経路) で実行し、結果の差を数える。
  2. 突合の行 (work/x87fn_special/native_out.txt と wasm_out.txt) で NaN どうしの差を、入力の NaN・inf・0 の有無
     で分類する。 eax と ST(0) の両方を数える。 NaN と数値の混在は別に数える (0 でなければ判定は FAIL)。
+
+注意 (#4756): wasm 側の出力は同じ入力でも実行ごとに NaN の符号が変わる (非決定)。 分類の件数は実行ごとに揺れる。
+ 件数を根拠にする前に、同じ入力で複数回実行して揃うかを確かめること。
 """
 import collections, os, subprocess, tempfile
 
