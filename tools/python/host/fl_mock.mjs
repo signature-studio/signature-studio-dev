@@ -8,14 +8,15 @@ const STEP_DEF = [60, 100, 64, 120, 64, 64, 64, 0];
 const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 7 ? -1 : STEP_DEF[prm]);
 // PY-224 (#3628): PE 0x12d3ff0 の loop 分岐 (C provider の grid_bit_loop と同一・REPORT_PY224)。行 T[1] と flag49e・flag54 が立ち、channel i の最初の record (f4 != 0) が L = len / 24 を与えるとき、p < L は base、それ以外は base(p mod L)
 const LOOP_G2 = 24;
-const loopBit = (lp, k, i, p) => {
-  const base = p >= 0 && !!k.steps[p];
-  if (!lp.row || !lp.flag49e || !lp.flag54) return base;
-  const rec = lp.recs.find((r) => r.cid === i && r.f4 !== 0);
+const loopBit = (st, i, k, p) => {
+  p |= 0;
+  const base = gridBit(st, i, k, p);
+  if (!st.loop.row || !st.loop.flag49e || !st.loop.flag54) return base;
+  const rec = st.loop.recs.find((r) => r.cid === i && r.f4 !== 0);
   if (!rec) return base;
   const L = Math.trunc(rec.len / LOOP_G2);
   if (L <= 0 || p < L) return base;
-  return !!k.steps[p % L];
+  return gridBit(st, i, k, p % L);
 };
 
 class FlError extends Error {
@@ -84,6 +85,34 @@ const noteEnum = (arr, chan, step, V) => {
   }
   return out;
 };
+// PY-218 (#3596): 件数超え (position >= 64) の event 経路 PE 0x12d3e20 (REPORT_PY218.md)。閾値は (position+1)*V、V = 24 (PE [0x15e25f8]・REPORT_APPENDIX_3310)。32bit 演算 (PE の imul/add と同じ)
+const GRID_V = 24;
+const gridGen = (seed, n) => {
+  let s = seed >>> 0;
+  const next = () => { s = (Math.imul(s, 1103515245) + 12345) >>> 0; return s >>> 16; };
+  const arr = Array.from({ length: Math.min(Math.max(n, 0), 256) }, () => {
+    const d0 = (next() % 2000) - 200;
+    const ch = next() % 4;
+    const flag = next() & 0xff;
+    return { d0, ch, flag };
+  });
+  return arr.sort((a, b) => a.d0 - b.d0);
+};
+const gridEvent = (items, index, p) => {
+  const lo = Math.imul(p, GRID_V) | 0, hi = (lo + GRID_V) | 0;
+  let cur = 0;
+  while (cur < items.length && items[cur].d0 < lo) cur++;
+  for (; cur < items.length && items[cur].d0 < hi; cur++) {
+    if (items[cur].ch === index && !(items[cur].flag & 0x20)) return true;
+  }
+  return false;
+};
+const gridBit = (st, index, k, p) => {
+  p |= 0;
+  if (p < 0) return false;
+  if (p >= 64) return gridEvent(st.gridItems, index, p);
+  return !!k.steps[p];
+};
 
 export function createMockEngine() {
   const st = {
@@ -99,6 +128,7 @@ export function createMockEngine() {
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
     selectedChannel: 0,
     loop: { row: false, flag49e: false, flag54: false, recs: [] },
+    gridItems: [],
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0), pitchN: 2 },
       { name: "Snare", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 2, steps: new Array(64).fill(0), pitchN: 2 },
@@ -163,12 +193,12 @@ export function createMockEngine() {
     "channels.isChannelMuted": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).mute; },
     "channels.isChannelSolo": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).solo; },
     "channels.getChannelColor": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).color; },
-    // PY-101 (#2878) / PY-112 (#2932): PE 0xd5b420 は position の範囲検査を持たない。position<0 は 0、件数以上は event 経路の値 (mock は event 未モデルのため false) (C と同一)
+    // PY-101 (#2878) / PY-112 (#2932): PE 0xd5b420 は position の範囲検査を持たない。position<0 は 0、件数以上は event 経路 (PY-218・gridBit)
     "channels.getGridBit": (...a) => {
       arity(a, 2, 3);
-      ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
-      const k = ch(a[0]);
-      return p >= 0 && p < 64 && !!k.steps[p];
+      const index = ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
+      const k = ch(index);
+      return gridBit(st, index, k, p);
     },
     // PY-101 (#2878): PE 0xd5b360 は grid (+0x7ac) 非 null で True。mock の channel は生成時に grid を持つものとして扱い、null 経路は持たない (C と同一)
     "channels.isGridBitAssigned": (...a) => {
@@ -177,12 +207,12 @@ export function createMockEngine() {
       ch(a[0]);
       return true;
     },
-    // PY-101 (#2878) / PY-112 (#2932): PE 0xd5bc10 → 0x12d3ff0。件数以上 (p >= 64) は getGridBit と同じく false (#3601)。loop 分岐は PY-224 (#3628) の loopBit。件数以上の event 経路は未モデル (#3596)
+    // PY-101 (#2878) / PY-112 (#2932): PE 0xd5bc10 → 0x12d3ff0。base は gridBit (件数以上は event 経路・PY-218)。loop 分岐は PY-224 (#3628) の loopBit
     "channels.getGridBitWithLoop": (...a) => {
       arity(a, 2, 3);
-      const i = ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
-      const k = ch(i);
-      return p >= 0 && p < 64 && loopBit(st.loop, k, i, p);
+      const index = ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
+      const k = ch(index);
+      return loopBit(st, index, k, p);
     },
     // 選択の並びで offset 番目 (負は先頭扱い・仮置き)、超えたら最後の選択。無選択は canBeNone で -1 / 0
     "channels.channelNumber": (...a) => {
@@ -427,5 +457,6 @@ export function createMockEngine() {
     setLoop: (row, flag49e, flag54, recs) => {
       st.loop = { row: !!row, flag49e: !!flag49e, flag54: !!flag54, recs: recs.map(([cid, f4, len]) => ({ cid, f4, len })) };
     },
+    gridItemsProbe: (seed, n) => { st.gridItems = gridGen(seed, n); return st.gridItems.length; },
   };
 }
