@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const W = process.argv[2];
 const NEG = process.env.WC_NEG || "";
 const COV = process.env.WC_COV === "1";
+const HEAPLOG = process.env.WC_HEAP_LOG === "1";
 const covChunks = [];
 const L = JSON.parse(readFileSync(`${W}/layout.json`, "utf8"));
 const BASE = L.base, ARENA = L.arena, ARENA_SZ = L.arena_sz, DATA = BASE + L.data_rva, DATA_SZ = L.data_sz;
@@ -50,17 +51,21 @@ for (let c = 0; c < ncase; c++) {
   mem.set(data, DATA);
   mem.fill(0, ARENA, ARENA + ARENA_SZ);
   ex.wc_reset();
+  const heapLog = HEAPLOG && c === 0;
   let rax, hits;
   try {
     // (init) → CreateInstance → vtable の slot を順に呼ぶ (wc_native_ref.c と同一の順序・引数・式)
+    if (heapLog) ex.wc_log_set(1, 0);
     if (L.init_rva) ex.wc_run(BASE + L.init_rva, 0n, 0n, 0n, 0n);
     if (process.env.WC_TRACE === "1") console.error(`[run_wasm] trace case=${c} stage=init-done`);
+    if (heapLog) ex.wc_log_set(1, 1);
     const obj = ex.wc_run(ENTRY, 0n, 0n, 0n, 0n);
     if (process.env.WC_TRACE === "1") console.error(`[run_wasm] trace case=${c} stage=create-done obj=${obj.toString(16)}`);
     let acc = obj;
     for (const [k, s] of L.slots.slice(0, L.call_slots).entries()) {
       const [a1, a2, a3, a4] = L.call_args[k].map((v) => BigInt(v));
       if (process.env.WC_TRACE === "1") console.error(`[run_wasm] trace case=${c} slot=${k} rva=${s.toString(16)} args=${[obj, a1, a2, a3, a4].map((v) => v.toString(16)).join(",")}`);
+      if (heapLog) ex.wc_log_set(1, 2 + k);
       const r = ex.wc_run5(BASE + s, obj, a1, a2, a3, a4);
       if (process.env.WC_TRACE === "1") console.error(`[run_wasm] trace case=${c} slot=${k} done rax=${r.toString(16)}`);
       if ((L.ret_mask >> k) & 1) acc = BigInt.asUintN(64, acc * 31n + r);
