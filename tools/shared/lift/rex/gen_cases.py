@@ -13,6 +13,8 @@ case 形式 (little endian, native_ref.c と run_wasm.mjs が同じ規約で読�
 成功経路の case (末尾 SUCC 件・REXGetCreatorInfo のみ・seed 2870): 木の根 (ctx+0x20) のノード key = OBJ (アリーナ内)、
   key_of(a0) = OBJ となる a0 (key_of は対合)。OBJ+0x688 = B (0 なら 0x12a50 が偽で戻り値 3)。B の +0x28/+0x50/+0x78 = 0 (SSO の文字列を
   0x12ed0 が読む)。a1 は 0x500 以上 (0x12ed0 の書込に進む)。a2 は N バイトが arena 内に収まる位置。戻り値 1 (書込あり) と 3 を得る。
+成功経路の case (末尾 SUCC1 件・REXGetInfo のみ・seed 3587): 0x2080 の O = key_of(a0) = OBJ。O の S = O+0x630・B = O+0x690 を
+  dword 1 で埋め、B+0x62c = 0 (0x4500 が 1 を返す)。戻り値 1 (arena 書込あり) を得る。.data への書込は出ない (REPORT_APPENDIX_3587.md)。
 usage: gen_cases.py OUT [N]
 """
 import random, struct, sys
@@ -24,6 +26,7 @@ NODE = ARENA + 0xC100
 OBJ = ARENA + 0xC200
 OBJ_B = ARENA + 0xC300
 SUCC = 48
+SUCC1 = 48
 rnd = random.Random(2733)
 N = int(sys.argv[2]) if len(sys.argv) > 2 else 200
 out = []
@@ -83,6 +86,34 @@ for i in range(SUCC):
     a2 = ARENA + 8 * rnd2.randrange(0, 0xE000 // 8)
     out.append(struct.pack('<IIQQQQQ', 0, 0, a0, a1, a2, 0, ARENA + CTX_OFF) + bytes(arena))
 
+# REXGetInfo (fn=1) の成功経路 (戻り値 1)。木の key = key_of(a0) = OBJ (0x2080 の O)。O の構造 (S = O+0x630, B = O+0x690) は
+# dword 1 で埋め、ポインタ項目だけ有効なアドレスへ向ける。B+0x62c = 0 で 0x4500 が 1 を返す。S+4 は 0x21a1 の jump table の値
+# (8..0x20)。a1 >= 0x20 (0x2080 の出力長)、a2 は a1 バイトが arena 内に収まる位置。
+LK = ARENA + 0xAF00
+S_ = ARENA + 0x9000
+B_ = ARENA + 0x9800
+Z_ = ARENA + 0xA800
+SWITCH = (1, 8, 9, 0x10, 0x14, 0x16, 0x18, 0x20)
+rnd3 = random.Random(3587)
+A0_1 = key_of(OBJ)
+for i in range(SUCC1):
+    arena = bytearray(ARENA_SZ)
+    for base in (OBJ, S_, B_, Z_):
+        for k in range(0, 0x700, 4):
+            struct.pack_into('<I', arena, base - ARENA + k, 1)
+    struct.pack_into('<I', arena, B_ + 0x62c - ARENA, 0)
+    struct.pack_into('<I', arena, S_ + 4 - ARENA, rnd3.choice(SWITCH))
+    struct.pack_into('<Q', arena, NODE + 0x10 - ARENA, OBJ)
+    struct.pack_into('<Q', arena, CTX_OFF + 0x20, NODE)
+    struct.pack_into('<Q', arena, CTX_OFF + 8, LK)
+    struct.pack_into('<Q', arena, LK - ARENA, 0x10)
+    struct.pack_into('<Q', arena, OBJ + 0x630 - ARENA, S_)
+    struct.pack_into('<Q', arena, OBJ + 0x690 - ARENA, B_)
+    struct.pack_into('<Q', arena, OBJ + 0x20 - ARENA, Z_)
+    a1 = rnd3.choice([0x20, 0x23, 0x24, 0x100, 0x7FF])
+    a2 = ARENA + 8 * rnd3.randrange(0, (ARENA_SZ - a1) // 8)
+    out.append(struct.pack('<IIQQQQQ', 1, 0, A0_1, a1, a2, 0, ARENA + CTX_OFF) + bytes(arena))
+
 out[0:0] = [struct.pack('<I', len(out))]
 open(sys.argv[1], 'wb').write(b''.join(out))
-print('[gen_cases] N=%d (通常 %d + 成功経路 %d) -> %s' % (len(out) - 1, N, SUCC, sys.argv[1]))
+print('[gen_cases] N=%d (通常 %d + 成功経路 %d + fn=1 成功経路 %d) -> %s' % (len(out) - 1, N, SUCC, SUCC1, sys.argv[1]))
