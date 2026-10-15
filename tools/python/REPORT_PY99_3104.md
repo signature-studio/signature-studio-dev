@@ -198,8 +198,8 @@
 
 ## 入口レジスタ葉 c_in・d_in・r8_in の呼出し側 (#4494 / PY-334)
 
-測定 commit: `a870588b5` (main を merge した後の最後のコード commit。`py99_closure.py` は #4332 の `--negctl drop-part` 追加を含む。`py334_entry_source.py` の PyArg 7 件の assert 追加を含む)。`git diff a870588b5 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
-素材: `fl-win64` の `block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin'`・2.9 秒)。`analysis/py53_dispatch.py` → `fn=4664 dispatch=13 r8d_tests=174`。
+測定 commit: `27463195a` (main `4f3c0ad46` を merge した後の tree。merge 由来で `analysis/flapi/pe_py316_p_vtable.py`・`analysis/py264_cell_callers.py` が main から入ったため、merge commit を測定 commit とする。`py99_closure.py`・`py334_entry_source.py` は main 側で変更なし)。`git diff 27463195a HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
+素材: `fl-win64` の `block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst -C work/py334 --wildcards '*block00031_PE.bin'`・1.5 秒)。`analysis/py53_dispatch.py` → `fn=4664 dispatch=13 r8d_tests=174`。
 
 ### 結論 (受入 1・2・3 の判定)
 
@@ -208,15 +208,15 @@
 - 厳格判定の閉じた書込み: **0/49 のまま** (増減 0)。残る葉が入口のレジスタ値だけの書込みは **49/49** (#4266 の合流の閉包で `0x104bffa` の `⚠合流` が消えた後の値)。
 - 検算: 算法 A と B の mismatch **0** (49 件)。negctl `--negctl drop-pred` は mismatch **17**・exit 1 (維持)。
 
-### 実測 (commit `a870588b5`・load average 0.10 (09:53))
+### 実測 (commit `27463195a`・load average 0.07 (09:58))
 
-素材: `fl-win64` の `extracted/block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin'`・1.7 秒)。入力は `analysis/py53_dispatch.py <PE> work/py53` で作った `work/py53/fn.txt`。
+素材: `fl-win64` の `extracted/block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst -C work/py334 --wildcards '*block00031_PE.bin'`・1.5 秒)。入力は `analysis/py53_dispatch.py work/py334/extracted/block00031_PE.bin work/py53` (0.06 秒) で作った `work/py53/fn.txt`。
 
 | 実行 | 結果 | exit | 所要 (real) |
 |---|---|---|---|
-| `analysis/py99_closure.py work/py53/fn.txt` | `_in` だけの書込み 49/49・閉じた書込み (B) 0/49・(A) 0/49・mismatch 0 | 0 | 0.51 秒 |
-| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred` | mismatch 17 | 1 | 0.62 秒 |
-| `FL_WIN64_DIR=<展開先> analysis/py334_entry_source.py` | 呼出し鎖 22 命令・全件 ok | 0 | 0.08 秒 |
+| `analysis/py99_closure.py work/py53/fn.txt` | `_in` だけの書込み 49/49・閉じた書込み (B) 0/49・(A) 0/49・mismatch 0 | 0 | 0.387 秒 |
+| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred` | mismatch 17 | 1 | 0.502 秒 |
+| `FL_WIN64_DIR=work/py334 analysis/py334_entry_source.py` | 呼出し鎖 22 命令・全件 ok | 0 | 0.056 秒 |
 
 ### 限界
 
