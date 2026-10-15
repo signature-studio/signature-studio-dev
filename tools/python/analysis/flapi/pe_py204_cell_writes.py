@@ -8,7 +8,7 @@
   mov reg,reg / mov reg,[rbp|rsp+d] / lea / add・sub imm で P+k を伝播し、rbp・rsp 基準のフレーム slot に退避した値も追う。
   ret まで (または P を持つ状態が消えるまで) 辿る。P+k を指すメモリ書込みを store として記録する。
 - 分類: store 先が P+k+disp で 0x193fa10..0x193fa13 と重なれば HIT、重ならなければ OFF、index レジスタを含めば IDX。
-- 検出できないもの (記録して数える): P を引数 (rcx/rdx/r8/r9) や stack 引数で渡す call (passed)、P を RIP 以外の
+- 検出できないもの (記録して数える): P を引数 (rcx/rdx/r8/r9) や stack 引数で渡す call (passed)、P を ABI 外のレジスタ (rax 等) に残したまま call/jmp する箇所 (passed-other)、P を RIP 以外の
   記憶へ退避する (escape)、間接 jmp (indirect)、STEP_CAP で打ち切った起点 (truncated)。
 - --method window: 検算用の別アルゴリズム。起点から線形に 40 命令だけ見て、P を持つ base 経由の書込みを数える
   (分岐・call の戻りを無視する近似)。cfg の HIT/OFF/IDX の集合が window の結果を含むかを確かめる。
@@ -112,6 +112,25 @@ def rip_loads(target):
     return out
 
 
+def abs_refs(values):
+    """.text 全体で、base 無しの絶対 disp・即値として values を持つ命令の VA を列挙する。"""
+    out = []
+    va = TEXT_LO
+    while va < TEXT_HI:
+        off = file_off(va)
+        ins = next(MD.disasm(RAW[off:off + 16], va), None)
+        if ins is None:
+            va += 1
+            continue
+        for op in ins.operands:
+            if op.type == X86_OP_MEM and op.mem.base == 0 and op.mem.disp in values:
+                out.append(ins.address)
+            if op.type == X86_OP_IMM and op.imm in values:
+                out.append(ins.address)
+        va += ins.size
+    return out
+
+
 def succ(va, st, ev):
     """命令 va を通した後の (次 va, 状態) 列を返す。ev に事象を積む。st は {key: k} (key は reg 名 か ('M', base, d))。"""
     ins = ins_at(va)
@@ -127,6 +146,9 @@ def succ(va, st, ev):
         args = tuple(r for r in ARG_REGS if r in st)
         if args:
             ev.add(("passed", va, ins.op_str, tx, args))
+        others = tuple(sorted(k for k in st if isinstance(k, str) and k not in ARG_REGS))
+        if others:
+            ev.add(("passed-other", va, ins.op_str, tx, others))
         if any(isinstance(k, tuple) and k[1] == "rsp" for k in st):
             ev.add(("passed-stack", va, ins.op_str, tx, ""))
         new = {k: v for k, v in st.items() if k not in CALLER_SAVED and not (isinstance(k, tuple) and k[1] == "rsp")}
@@ -136,6 +158,9 @@ def succ(va, st, ev):
             args = tuple(r for r in ARG_REGS if r in st)
             if args:
                 ev.add(("passed", va, ins.op_str, tx + " (tail)", args))
+            others = tuple(sorted(k for k in st if isinstance(k, str) and k not in ARG_REGS))
+            if others:
+                ev.add(("passed-other", va, ins.op_str, tx + " (tail)", others))
             return [(ops[0].imm, st)]
         ev.add(("indirect", va, ins.op_str, tx, ""))
         return []
@@ -210,10 +235,10 @@ def succ(va, st, ev):
     return [(nxt, new)] if new else []
 
 
-def cfg_explore(load):
-    reg = fam(load, load.operands[0].reg)
+def cfg_from(start, reg):
+    """start の命令から、reg が P (k=0) を持つ状態で cfg を辿る。"""
     ev = set()
-    work = [(load.address + load.size, {reg: 0})]
+    work = [(start, {reg: 0})]
     seen = set()
     steps = 0
     truncated = False
@@ -231,6 +256,10 @@ def cfg_explore(load):
             break
         work.extend(succ(va, st, ev))
     return ev, steps, truncated
+
+
+def cfg_explore(load):
+    return cfg_from(load.address + load.size, fam(load, load.operands[0].reg))
 
 
 def window_explore(load):
@@ -379,7 +408,7 @@ def check():
     chk("C3 HIT は全て 4 byte・offset 0 の完全一致 (分類 HIT)", all(c == "HIT" for _, c in hits))
     chk("C4 P+k の OFF・索引付き IDX の書込みは 0 件", not [1 for _, _, cl in st if cl in ("OFF", "IDX", "PIDX")])
     k = summary(res)
-    chk("C5 call へ P が渡る箇所は 1 件 (0x12a586d → 0x1182d30)、その callee は先頭で rcx を再ロードして読まない",
+    chk("C5 ABI 引数レジスタ (rcx/rdx/r8/r9) へ P が渡る call は 1 件 (0x12a586d → 0x1182d30)、その callee は先頭で rcx を再ロードして読まない",
         sorted(hex(e[1]) for ld, ev, _, _ in res for e in ev if e[0] == "passed") == ["0x12a586d"])
     chk("C6 escape (P を RIP 相対・非フレームの記憶へ格納) と indirect jmp は 0 件",
         not k.get("escape") and not k.get("indirect"))
@@ -387,7 +416,7 @@ def check():
     bases = sorted({(hex(v), t, b) for v, t, b, _, _ in rw})
     chk("C7 0x12a4390 の到達可能な書込みに P 由来の基底は無い (rdx 基底は heap 配列・rbx/rbp はフレーム)",
         len(rw) == 5 and all(b in ("rbp", "rbx", "rdx") for _, _, b, _, _ in rw), str(bases))
-    chk("C8 0x12a44a6 の [rbp+0x40] へ入る値は call 0x409410 (2008 B 確保) の戻り値",
+    chk("C8 0x12a44a6 の [rbp+0x40] へ入る値は call 0x409410 の戻り値 (呼出しの並びだけを確認)",
         text(ins_at(0x12A449C)) == "mov ecx, 0x7d8" and text(ins_at(0x12A44A1)) == "call 0x409410"
         and text(ins_at(0x12A44A6)) == "mov qword ptr [rbp + 0x40], rax")
     chk("C9 f8ca50 (ii): tag = [rcx+0x10]>>22 == 0xff のときだけ [P] を読む",
@@ -395,6 +424,22 @@ def check():
         and text(ins_at(0xF8CA9F)) == "jne 0xf8caaa" and text(ins_at(0xF8CAA1)).startswith("mov rax, qword ptr [rip")
         and rip_target(ins_at(0xF8CAA1)) == CELL and text(ins_at(0xF8CA5D)) == "shr edx, 0x10"
         and text(ins_at(0xF8CA60)) == "cmp edx, 0xfff" and text(ins_at(0xF8CA66)) == "jne 0xf8ca97")
+    pso = [e for ld, ev, _, _ in res for e in ev if e[0] == "passed-other"]
+    pso_sites = {e[1] for e in pso}
+    pso_tgts = {ins_at(va).operands[0].imm for va in pso_sites}
+    chk("C10 ABI 引数外のレジスタ (rax のみ) に P が残ったまま call/jmp する箇所は 107 件 (呼出し先 41 種)",
+        len(pso_sites) == 107 and len(pso_tgts) == 41 and all(e[4] == ("rax",) for e in pso),
+        f"sites={len(pso_sites)} targets={len(pso_tgts)}")
+    cal = {t: cfg_from(t, "rax") for t in sorted(pso_tgts)}
+    cal_ev = sum(1 for v in cal.values() for e in v[0] if e[0] != "passed-other")
+    cal_po = sum(1 for v in cal.values() for e in v[0] if e[0] == "passed-other")
+    cal_trunc = sum(1 for v in cal.values() if v[2])
+    chk("C11 rax に P を受ける呼出し先 41 種の内部 (depth 1 の cfg) で P の読込み・書込み・引数渡し・escape・indirect・spill は 0 件 (depth 2 への受渡し passed-other は範囲外)",
+        cal_ev == 0 and cal_trunc == 0 and len(cal) == 41,
+        f"events_excl_passed_other={cal_ev} passed_other_depth2={cal_po} truncated={cal_trunc} steps={sum(v[1] for v in cal.values())}")
+    absr = abs_refs({CELL, CUR})
+    chk("C12 絶対アドレス (base 無しの disp・即値) による 0x15e26a0・0x193fa10 の参照は 0 件",
+        not absr, str([hex(v) for v in absr][:5]))
     global KILL
     KILL_SAVE = KILL
     KILL = False
