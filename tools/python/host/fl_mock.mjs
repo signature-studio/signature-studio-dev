@@ -7,6 +7,7 @@ const F = (v) => ({ t: "D", v });
 // PY-111 (#2929): note の生成経路の PE 値 (C provider と同一)。param 5/6 = 128・param 7 = step × 24 (V 静的)・param 8 = 0
 // PY-228 (#3656): plugin パラメータの既定値 (インスタンスごとの値 pv / spv の初期値。provider/fl_engine.c の params[] と同じ)
 const STEP_V = 24;
+const FCC_N = 16; // PY-276 (#3949): forwardMIDICC の添字範囲 (provider/fl_engine.c の FCC_N と同じ仮置き)
 const STEP_DEF = [60, 100, 64, 120, 64, 128, 128, 0, 0];
 const PARAM_DEFAULT = [0.5, 0.2, 0.8];
 const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 8 ? -1 : prm === 7 ? pos * STEP_V : prm === 1 ? (k.vel?.[pos] ?? STEP_DEF[1]) : STEP_DEF[prm]);
@@ -158,6 +159,8 @@ export function createMockEngine() {
     // PY-227 (#3655): device 割当 (false で -7)・送出先 (false で -6)。既定は両方あり (provider/fl_engine.c と同じ)
     devAssigned: true,
     linkAssigned: true,
+    // PY-276 (#3949): forwardMIDICC の添字ごとの最後の送った値 (-1 は未設定)。範囲は C と同じ FCC_N
+    fccLast: Array.from({ length: FCC_N }, () => -1),
     log: [],
   };
   // channels / playlist の index は整数のみ (C provider の A_INT と同じ: 文字列・None・非整数は code 5)、範囲外は code 4
@@ -519,6 +522,8 @@ export function createMockEngine() {
     // PY-172 (#3219): PE 0xd67000 は件数 (配列 null で 0)、0xd67030 は索引 [0, 件数-1] の外を status -4。件数 0 は仮置き (provider/fl_engine.c の PGRP_N と同じ)
     "patterns.getPatternGroupCount": (...a) => { arity(a, 0, 0); return PGRP_N; },
     "patterns.getPatternGroupName": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i < 0 || i >= PGRP_N) throw RANGE(); return ""; },
+    // PY-180 (#3278): .data の初期値 -1 (番兵)。書込み元は未特定 (REPORT_PY180)
+    "patterns.getActivePatternGroup": (...a) => { arity(a, 0, 0); return -1; },
     "patterns.patternCount": (...a) => { arity(a, 0, 0); return PAT_N; },
     "patterns.patternNumber": (...a) => { arity(a, 0, 0); return PAT_NUMBER; },
     "patterns.isPatternDefault": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i < 1 || i > PAT_N) throw RANGE(); return false; },
@@ -562,9 +567,16 @@ export function createMockEngine() {
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
     // PY-231 (#3671): PE 0xd748e0 (書式 ii)。判定順は midiOutMsg と同じ (-7 → -6)。送るのは第 1 引数の word。mode は stub 名 (PE の kwlist 名は forwardTo・REPORT_PY231 §1)
-    "device.forwardMIDICC": (message, mode = 1) => {
+    // PY-276 (#3949): PE 0xfdc8a0 は添字の値が変わったときだけ送る。C (fl_engine.c) と同じく未設定 (-1) から始め、範囲外の添字は重複検出せず送る
+    // message 欠落は C の既定 0 と同じ (JS の TypeError にしない)
+    "device.forwardMIDICC": (message = 0, mode = 1) => {
       if (!st.devAssigned) throw new FlError("Device not assigned", 7);
       if (!st.linkAssigned) throw new FlError("Linked device not assigned", 6);
+      const w = Number(BigInt.asUintN(32, BigInt(message)));
+      const i = ix(mode);
+      if (i < 0 || i >= FCC_N) { st.midiOut.push({ api: "forwardMIDICC", message, mode }); return; }
+      if (st.fccLast[i] === w) return;
+      st.fccLast[i] = w;
       st.midiOut.push({ api: "forwardMIDICC", message, mode });
     },
     // PY-227 (#3655): PE 0xd747f0 と同じ順 (引数 → -7 → -6)。channel ≤ -1 は message の下位 32bit、channel ≥ 0 は arg4 を bit 24–31 に入れた word を記録する

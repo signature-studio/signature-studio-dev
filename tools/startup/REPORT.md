@@ -173,3 +173,14 @@ x64c 寛容起動 (`x64c-tolerant-sequential`) は mode 1 (`FLE_TOLERANT=1`・�
 ### 8-6. flengine 路線の record (`flengine-cfi-probe`)
 
 測定 commit `adad27ad` (出典: `tools/gui/flengine/REPORT_APPENDIX_2880.md` §9-3・§9-8。`ae963e28` の測定も同じ値・`REPORT_APPENDIX.md` §7-4)。`cfi_probe.mjs` が DllMain attach の後に CreateFruityInstance を 1 回呼ぶと、入口 (STARTUP S12) に届き、本体内で EnterCriticalSection の fail-fast (CS `0x12bd390`、登録されていない CS) により `Aborted` する。`last_step: S12` は**下限**で、S13 以降の到達と fail-fast の位置・呼出元 VA は未測定 (#3077 [WIN-16])。fail-fast の API は §7-4 と §9-3 の一致を検査する。`tools/shim`・`cfi_probe.mjs` は `adad27ad` 以後に変わっていない (`REPORT_APPENDIX_2880.md` §9-8)。
+
+### 8-7. #3963 [WIN-40]: `boot_metric.py --check` の停止の修復 (測定 commit `8ffa5436e`)
+
+- 止まっていた段: issue の `de50ffa` (`tools/m11/REPORT_N134.md` §14) は通過していた。止まっていたのは `m11-gui-survey` の出典 `tools/gui/flengine/REPORT.md` の judge/S1 行で、`e6f7b153f` (#3832 の付録分割) で `REPORT_APPENDIX_HISTORY_3832_A.md` へ移動していた。参照先を移動先に変えた (`GUI_HISTORY_3832`)。値は変えていない (`719f1c43`・S1 `870/1/47/24/0`)。
+- 再生成 (`boot_metric.json`) の差分: 出典パスと `file_last_commit` のみ。`measured_commit` と数値は不変。
+- 単体テスト: `python3 -m unittest tools/startup/test_boot_metric.py` → 28 tests OK (fixture の出典も移動先に合わせた)。
+- ネガティブコントロール (`MetricError`、exit 1):
+  - (a) `tools/m11/REPORT_N134.md` の表行 `de50ffa` を `xxxxxxx` に置換 → 「一意に一致しない (0 件)」
+  - (b) `tools/gui/flengine/REPORT_APPENDIX_HISTORY_3832_A.md` の S1 `870/1/47/24/0` を `871/…` に置換 → 「gui survey の JSON と REPORT の S1 値が食い違う」
+  - 戻した後は `--check` が exit 0。
+- 未解決: `REPORT.md` 本体 (`m11` の `de50ffa` 表行・GUI の judge 行) は未更新 (§8-5 の既存の未解決表で追跡)。
