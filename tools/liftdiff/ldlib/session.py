@@ -184,6 +184,7 @@ class Session:
         name = self.fn_name(va)
         sig = self.sigs.get(name)
         rec = {'va': hex(va), 'name': name, 'sig': sig}
+        patterns = list(patterns) + [p[0] for p in cases.OBJ_PATTERNS.get(va, [])]
         if not sig or not sig['defined']:
             rec['verdict'] = 'unexec'; rec['reason'] = 'no_wasm_definition'
             return rec
