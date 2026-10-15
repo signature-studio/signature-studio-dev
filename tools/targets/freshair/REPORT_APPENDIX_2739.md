@@ -24,10 +24,10 @@
 
 §3 の表は `tools/targets/freshair/ks_candidate_triage.py` が `ident.json` から機械的に作る。
 
-## §3. 振り分け結果 (測定 commit `691ee7153`)
+## §3. 振り分け結果 (測定 commit `f5851bc18`)
 
 - 再現: `python3 tools/targets/freshair/ks_identity.py <HeartCore.core_64> <SlateCore.core_64> ident.json` → `python3 tools/targets/freshair/ks_candidate_triage.py ident.json` (素材 `work-liftlib-targets`)。
-- 実測 (測定 commit `691ee7153`・素材 `work-liftlib-targets` を `$ARTIFACTS_DIR` から展開・nproc=4・load 1 分値 0.35): `ks_identity.py` 2.8 s・EXIT=0。`ks_candidate_triage.py` の出力は本節の表と **37 行一致** (表の行だけを diff して差分 0)。区分の内訳も一致。実装 run (`c3fef51c7`・2.9 s) では再生成した `ident.json` と表が byte 一致だった (当時の記録)。鮮度: `git diff 691ee7153 HEAD -- 'tools/targets/freshair/*.py' 'tools/targets/freshair/*.sh' 'tools/targets/freshair/lift/' 'tools/targets/freshair/lift2/' 'tools/targets/kilohearts/snapins/' 'tools/targets/kilohearts/scripts/'` の出力は 0 行 (以後の commit は本 REPORT のみ)。
+- 実測 (測定 commit `f5851bc18`・素材 `work-liftlib-targets` を `$ARTIFACTS_DIR` から展開・nproc=4・load 1 分値 0.18): `ks_identity.py` 2.72 s・EXIT=0。`ks_candidate_triage.py` の出力は本節の表と **37 行一致** (表の行だけを diff して差分 0)。区分の内訳も一致。取り込み前の `691ee7153` でも同じ表だった。実装 run (`c3fef51c7`・2.9 s) では再生成した `ident.json` と表が byte 一致だった (当時の記録)。鮮度: `git diff f5851bc18 HEAD -- 'tools/targets/freshair/*.py' 'tools/targets/freshair/*.sh' 'tools/targets/freshair/lift/' 'tools/targets/freshair/lift2/' 'tools/targets/kilohearts/snapins/' 'tools/targets/kilohearts/scripts/'` の出力は 0 行 (以後の commit は本 REPORT のみ)。
 - 振り分け表 (クラスは `ident.json` の `process_pair`。KH slot 14 と SC の対応 slot):
 
 | クラス | KH VA | SC VA | KH B | SC B | ratio_M | 区分 | 欠けている側 |
@@ -85,10 +85,10 @@
 - **なし** (22 組): 両側とも無い。判定しない (#52 の残件)。
 - **stub** (2 組): TapeStop (9 B)・HostProxy (KH 41 B)。C2 により除外。
 
-## §5. SC 側ハーネスの smoke (測定 commit `691ee7153`)
+## §5. SC 側ハーネスの smoke (測定 commit `f5851bc18`)
 
 - 再現: `SC_CORE=<work-liftlib-targets の SlateCore.core_64> bash tools/targets/freshair/ks_sc_native_smoke.sh 20 [outdir]`。mlift の report から `iat_slots` を作り、同じ root・map・pokes で `native_comp` / `native_filter` を fma 0・1 で実行する。判定はしない。emsdk は不要 (`lift2/env.sh` は `/opt/emsdk` があるときだけ読む。`691ee7153` で修正。それ以前は emsdk の無い runner で無言に exit 1 した)。
-- 実測 (測定 commit `691ee7153`・2 回実行、nproc=4、load 1 分値 0.24〜0.33。1 回目 9.51 s は lift2venv の作成を含む、2 回目 4.40 s。2 回の出力ファイルの md5 が一致、EXIT=0):
+- 実測 (測定 commit `f5851bc18`・2 回実行、nproc=4、load 1 分値 0.04〜0.24。1 回目 4.25 s・2 回目 4.20 s (lift2venv は作成済み。初回の venv 作成を含む 9.51 s は `691ee7153` での 1 回目の値)。2 回の出力ファイルの md5 が一致、EXIT=0):
 
 | ハーネス | fma | 行数 | ERR |
 |---|---|---|---|
