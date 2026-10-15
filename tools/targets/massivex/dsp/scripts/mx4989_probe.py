@@ -17,8 +17,6 @@ import capstone
 import pefile
 from capstone import x86
 
-from capstone import x86
-
 from mx6_vectorcall import analyze, bits, effects, _regidx
 from mx33_xmm03 import follow, upper_flow_dst
 
