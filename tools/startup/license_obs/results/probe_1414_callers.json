@@ -1,0 +1,99 @@
+{
+ "0x10d3a30": {
+  "direct_callers": [
+   {
+    "at": "0x10cf498",
+    "func": "0x10c7cd0"
+   },
+   {
+    "at": "0x11fd457",
+    "func": "0x11fc770"
+   },
+   {
+    "at": "0x11fe627",
+    "func": "0x11fc770"
+   }
+  ],
+  "n": 3
+ },
+ "0x11fc770": {
+  "direct_callers": [
+   {
+    "at": "0xc4e49e",
+    "func": "0xc4dba0"
+   },
+   {
+    "at": "0xd1a996",
+    "func": "0xd18130"
+   },
+   {
+    "at": "0xed7c32",
+    "func": "0xed7c00"
+   }
+  ],
+  "n": 3
+ },
+ "callers_of_0x11fc770_callers": {
+  "0xc4dba0": [
+   {
+    "at": "0xc4f32e",
+    "func": "0xc4ecf0"
+   }
+  ],
+  "0xd18130": [
+   {
+    "at": "0xd1d656",
+    "func": "0xd1d3d0"
+   },
+   {
+    "at": "0xd1f026",
+    "func": "0xd1efd0"
+   }
+  ],
+  "0xed7c00": []
+ },
+ "dyn": [
+  {
+   "case": "A1 ILRegKey 無し cl=0",
+   "status": "ok",
+   "hits": {
+    "0x10c7cd0": 1
+   }
+  },
+  {
+   "case": "A2 ILRegKey 無し cl=1",
+   "status": "ok",
+   "hits": {
+    "0x10c7cd0": 1
+   }
+  },
+  {
+   "case": "B1 vreg seed cl=0",
+   "status": "ok",
+   "hits": {
+    "0x10c7cd0": 1
+   }
+  },
+  {
+   "case": "B2 vreg seed cl=1",
+   "status": "ok",
+   "hits": {
+    "0x10c7cd0": 1
+   }
+  },
+  {
+   "case": "D2 空 ILRegKey cl=1",
+   "status": "ok",
+   "hits": {
+    "0x10c7cd0": 1
+   }
+  },
+  {
+   "case": "D1 非正規 128 文字 cl=1",
+   "status": "ok",
+   "hits": {
+    "0x10c7cd0": 1
+   }
+  }
+ ]
+}
