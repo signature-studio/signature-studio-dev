@@ -70,12 +70,12 @@ venv/bin/python $P/arg_vt_indirect.py Serum2_win64.vst3 trace.tsv --tsv vt_ind.t
 | `arg_vt_indirect.py` (旧 commit・取りこぼしあり) | 1 | 31.61 | 0.73 | `9b4cb2ff` |
 | `arg_vt_indirect.py` (旧 commit・取りこぼしあり) | 2 | 31.74 | 0.91 | `9b4cb2ff` |
 
-- 修正後の再測定は未実施。理由: 再測定には `plugins-serum2` 素材が必要だが、`$ARTIFACTS_DIR` (`fl-win64.tar.zst` のみ) に無く、`Serum2_win64.vst3` の実体もこの run のどこにも無い。再測定は素材を用意した run で行う (未解決 (e))。
+- 修正後の再測定は未実施。理由: 再測定には `plugins-serum2` 素材が必要だが、`$ARTIFACTS_DIR` (`fl-win64.tar.zst` のみ) に無く、`Serum2_win64.vst3` の実体もこの run のどこにも無い。再測定は素材を用意した run で行う (未解決 (e))。この fix run は PR 本文に `oc_artifacts` 行が無く、`plugins-serum2` の取得は試行していない (取得失敗の確認は無い)。
 - `receiver_this_trace.py` の TSV md5 は未記録 (§3 の不一致の検証は本 run では行っていない)。
 
 ### 鮮度の証跡 (`docs/WORKFLOW.md` §6)
 
-- 測定 commit `6c2b01972` から HEAD までのコード差分: `git diff 6c2b01972 HEAD -- 'tools/targets/serum2/gui/*.py'` は、REPORT の追記のみで 0 行 (本 PR の変更はこの REPORT と `arg_vt_indirect.py` の commit のみ)。
+- 測定 commit `6c2b01972` から HEAD (`b3607f9df`) までのコード差分: `git diff 6c2b01972 b3607f9df -- 'tools/targets/serum2/gui/*.py'` は `arg_vt_indirect.py` の 6 行 (commit `b3607f9df`・正規表現と disp の整数化)。したがって §5 の表の値 (`9b4cb2ff`・113,548 件・12 件) は旧 regex の値であり、現 head の `arg_vt_indirect.py` の値ではない。修正後の値は未測定 (下記 (e))。
 
 ## 6. 未解決 (起票先)
 
