@@ -1,4 +1,4 @@
-# PY-226 (#4674): mixer.getTrackName の非 ASCII 切詰めを PE (UTF-16) で確定し、C・mock に反映する
+# PY-352 (#4674): mixer.getTrackName の非 ASCII 切詰めを PE (UTF-16) で確定し、C・mock に反映する
 
 親: #3654 (PY-226 の受入 3 を子 #4674 へ移した)。前段: `tools/python/REPORT_PY115_2950.md` (`maxLen` の ASCII 版)。既知類型: 該当なし (lift 作業ではない。文字列の符号化の不一致)。
 
@@ -46,6 +46,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `build_flpy.sh` が `source emsdk_env.sh` の後に `EMSDK_DIR` を参照して `set -u` で落ちる | flpy 経由の `provider_check`・`all_tools` が再実行できない | 起票先 未定 (PM 判断) |
-| `screen.drawText` の個数検査 (`sig_arity_probe` が max=6 を code 5 で拒否) | main でも同じ 1 件。本 PR の対象外 | 起票先 未定 (PM 判断) |
+| `build_flpy.sh` が `source emsdk_env.sh` の後に `EMSDK_DIR` を参照して `set -u` で落ちる | flpy 経由の `provider_check`・`all_tools` が再実行できない | #4698 (PY-357) |
+| `screen.drawText` の個数検査 (`sig_arity_probe` が max=6 を code 5 で拒否) | main でも同じ 1 件。本 PR の対象外 | #4699 (PY-358) |
 | `channels.soloChannel` の `value`・`useGlobalIndex` | 従来どおり | #4460 |
