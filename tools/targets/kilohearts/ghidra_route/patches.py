@@ -17,7 +17,7 @@ GTYPE = {
     'delay': {
         '182280be0': 'ulonglong',  # cmp/mov qword・Ghidra: (ulonglong)dVar12 との & 比較
         '182280c10': 'ulonglong',  # mov qword・0x000fffffffffffff (double 仮数マスク)
-        '182280c30': 'ulonglong',  # and/or qword・0x800 (& の 64bit 項)
+        '182280c30': 'ulonglong',  # and/or qword・0x0008000000000000 (bit 51) (& の 64bit 項)
         '182280c68': 'ulonglong',  # mov qword・>> の被演算子 (64bit シフト)
         '182280c70': 'ulonglong',  # mov qword・>> の被演算子 (64bit シフト)
         '182280ce0': 'ulonglong',  # cmp/mov qword・0x7ff0000000000000 との | (ulonglong)

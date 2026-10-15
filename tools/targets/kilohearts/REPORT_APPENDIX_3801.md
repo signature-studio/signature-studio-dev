@@ -4,7 +4,7 @@
 
 #### 10-7x. #3801 (KH-65): Delay の型不一致 — `_DAT_<va>` グローバルの型規則 13 件 (部分・187 → 119)
 - 結論: 型不一致 187 件のうち **68 件** を、整数マスクとして使われる `_DAT_<va>` グローバル 13 件の C 型規則 (`patches.py` の `GTYPE`・`ghidra_to_c.py --fix gtype`) で解消した。残り **119 件** は分類し、子 issue #3837 [KH-72] (pointer⇔整数 87 件) と #3849 [KH-73] (32 件) へ移した。Delay の型不一致 0 件は未達。Gain/Haas/Gate の `.o` は 3 本とも不変。
-- 測定 commit (コードを変えた最後の commit): `bd1b7a297` (規則 `4f9eb85a9`・再現スクリプト `gtype_census.sh` の追加)。`git diff bd1b7a297 HEAD -- tools/targets/kilohearts/ghidra_route` の出力: 0 行 (本 commit 時点・本付録だけの commit)。
+- 測定 commit (コードを変えた最後の commit): `bd1b7a297` (規則 `4f9eb85a9`・再現スクリプト `gtype_census.sh` の追加)。`git diff bd1b7a297 HEAD -- tools/targets/kilohearts/ghidra_route` の出力は `patches.py` のコメント 1 行だけ (`182280c30` の `0x800` → `0x0008000000000000 (bit 51)`)。`ast.dump` の比較でコードは不変のため、再測定は不要。
 - 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B、手展開)・`toolchain-emsdk` (emcc 6.0.12)・Ghidra 12.1.4 (zip sha256 `ddac49f9…d2db` 一致、repo 外)・JDK 21 (temurin 21.0.12.1)。すべて repo 外の `_temp` で作業。n=1。
 
 **census (`emcc -c -ferror-limit=0`・`emcc_census.py`・排他的)**
@@ -17,9 +17,9 @@
 - 注: `REPORT_APPENDIX_3075.md` の 577 件は `code` 間接呼出し 21 件を含む旧 shim (`typedef void code;`) の値。#3096 の `26b003692` (`REPORT_APPENDIX_3096.md` §10-7t) で shim を直して 556 件になり、上の origin/main 行はその値。本付録の HEAD と同じ shim で比べた。
 - decompile: 151 関数 (delay lift 141 ∪ stereo lift 8 ∪ gain 1・haas 5・gate 3、昇順・10 進引数) → **151/151 OK** (`summary.tsv`、analyzeHeadless wall 32.1 s)。
 
-**規則 13 件 (`GTYPE`)**。根拠は実機 `HeartCore.core_64` の逆アセンブル (capstone。151 関数の先頭から 6 KiB の線形逆アセンブルで、グローバルへの RIP 相対参照の命令と幅を数えた。件数は参照の数で重複あり)。
+**規則 13 件 (`GTYPE`)**。根拠は実機 `HeartCore.core_64` の逆アセンブル (初版は capstone、件数の再計数は objdump)。件数の集計: 単位 = グローバルを RIP 相対で参照する命令 (命令アドレスで重複除去)・分母 = 起点 151 関数 (`snapins/snapins.json` の delay・stereo の lift 値 + `gtype_census.sh` の gain/haas/gate の 9 VA) それぞれの先頭から 0x1800 バイトの窓・除外 = 窓の外の命令。再計数コマンド: `for s in <起点>; do objdump -d -M intel --no-show-raw-insn --start-address=$s --stop-address=$((s+0x1800)) HeartCore.core_64; done | grep -E '^ +[0-9a-f]+:.*# 0x(182280be0|182280c10|182280c30|182280c68|182280c70|182280ce0|182281e70|182282780|18141d060|1813d1a80|181422a10|182280bc0|182280bc8)$' | sort -u | grep -oE '# 0x[0-9a-f]+$' | sort | uniq -c`。初版の『件数は参照の数で重複あり』は窓ごとの和で、`1813d1a80` は 27・`18141d060` は 46 だった (同じ命令が複数の関数の窓に入るため)。重複除去の値は `1813d1a80` 11・`18141d060` 14 (xorps 12・movsd 2)。他の 11 行は窓の和と重複除去が一致した。
 
-| VA | C 型 | 参照命令と幅 (件数) | PE 上の 8 byte | Ghidra の使い方 (C の式の例) |
+| VA | C 型 | 参照命令と幅 (件数) | PE 上の 8 byte (メモリ順の 16 進) | Ghidra の使い方 (C の式の例) |
 |---|---|---|---|---|
 | `182280be0` | `ulonglong` | cmp/mov qword (54) | `000000000000f07f` (0x7ff0000000000000) | `(_DAT & (ulonglong)dVar12) == _DAT` |
 | `182280c10` | `ulonglong` | mov qword (18) | `ffffffffffff0f00` (0x000fffffffffffff) | `_DAT & (ulonglong)dVar9` |
@@ -29,8 +29,8 @@
 | `182280ce0` | `ulonglong` | cmp/mov qword (4) | `000000000000f07f` | `_DAT \| (ulonglong)dStack_88` |
 | `182281e70` | `ulonglong` | mov qword (2) | `0000000000000000` | `_DAT \| (ulonglong)dStack_88` |
 | `182282780` | `ulonglong` | andpd xmm・下位 8 byte (1) | `ffffffffffffff7f` (0x7fffffffffffffff) | `(ulonglong)param_1 & _DAT` |
-| `18141d060` | `ulonglong` | xorps・下位 8 byte (46 のうち) | `0000000000000080` (0x8000000000000000) | `SUB84(…) ^ _DAT` |
-| `1813d1a80` | `uint` | xorps/pxor/movaps・下位 4 byte (27) | `0000008000000080` (下位 4 byte = 0x80000000) | `(uint)fVar26 ^ _DAT` |
+| `18141d060` | `ulonglong` | xorps・movsd・下位 8 byte (14: xorps 12・movsd 2) | `0000000000000080` (0x8000000000000000) | `SUB84(…) ^ _DAT` |
+| `1813d1a80` | `uint` | xorps/pxor/movaps・下位 4 byte (11) | `0000008000000080` (下位 4 byte = 0x80000000) | `(uint)fVar26 ^ _DAT` |
 | `181422a10` | `uint` | minps/movaps・下位 4 byte (8) | `0000803f0000803f` (下位 4 byte = 1.0f) | `_DAT & -(uint)(… == 0.0)` |
 | `182280bc0` | `longlong` | cmp r10,qword (4) | `000000000000e043` | `_DAT < (longlong)(…)` |
 | `182280bc8` | `longlong` | cmp r10,qword (2) | `000000000000003c` | `(longlong)(…) < _DAT` |
