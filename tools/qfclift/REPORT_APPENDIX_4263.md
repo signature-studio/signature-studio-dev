@@ -78,6 +78,21 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD
 - よって静的解析の「経路 B は flag 2 で発火」は実行時にも成り立つ。longjmp 時点で `[0x5d0cb0]` が 0 に見えるのは、保存 frame の複写による見かけの値。発火の判定は `0x40fca8` (入口 2) で行われる。
 - 別 reason (≥2) と経路 A の挙動は boot (reason 1) では測れないため未解決。
 
+### 5.3 reason を変えた実行 (`QFC_REASON`・測定のみ)
+
+同じ計測版で DllMain の reason だけ変えた結果 (停止点は同じ `FontCache_GetStats`):
+
+| reason | `f_40f430` 入口 | `f_40fb80` 入口 flag | longjmp 入口 retval | DllMain 戻り値 | 備考 |
+|---|---|---|---|---|---|
+| 1 | flag 0 | 2 | 1 | 1 | §5.2 |
+| 2 | flag 0 | 0 | 2 | 0 | `[qfc-soft] MessageBoxA` が出る |
+| 0 | flag 0 | 1 | 1 | 1 | |
+
+- reason 2 では経路 B の flag (`0x40f4eb` で reason+1 = 3) が `f_40fb80` の入口で 0 のため、この時点で `0x40fcb8` の経路 B は見かけ上発火しない。`r13 = 0x5d0da8` (経路 A の record) なので、経路 A の arm (`[0x5d0db0]`) が効くはずだが、`0x40fbcf` の直前の arm・thread id は未測定。
+- 結論 (実測): reason 2 では DllMain の戻り値が 0、longjmp の retval は 2。reason 1 と経路が違う。経路 A が発火したかは未確定 (`0x40fbcf` の直前の `[0x5d0db0]`・`[0x5d0ddc]` を測る必要がある)。
+- 静的な整合: reason 2 の `0x40f4eb` は `[r13+0x30]` (r13 = `0x5d0da8`) に書くため、`[0x5d0cb0]` (= `0x5d0c80+0x30`) は書かれない。実測の flag 0 と合う。
+- 解釈 (未検証): reason 2 の `MessageBoxA` は soft stub の呼出し。soft の 0 返しは実物ではないため、reason 2 の結果を実機の挙動とは読まない。
+
 ### 5.1 実測 (boot、HEAD `bfbe3f683` の lift 設定。`qfc_boot.sh`)
 
 - `qfc_boot.sh` (strict / soft) の結果: strict は `MISSING IMPORT LocalAlloc` で DllMain の trap (FAIL)。soft は `DllMain(PROCESS_ATTACH)` が `ok rax=0x1`、続く `FontCache_GetStats` で `call to UNLIFTED function 0 ret=0x57fb09` (FAIL)。
