@@ -29,7 +29,6 @@ store 基底の値の出どころを `alias_evidence_4167.py` で機械的に追
 | c3b340 | UNDETERMINED (BARRIER(ALIAS_FRAME_PTR)) | `c3b3f5` (ALIAS_FRAME_PTR。#2211 版では LEAK_STORE) | 未判定のまま |
 
 - ネガティブコントロール (受入 4): 現 HEAD の `--negctl-glk` (全関数の漏出を強制 True) は、関数判定・site 判定とも通常実行と**同一** (関数 `DROP 3・LIVE-IN 1・UNDETERMINED 44`、site 51 件の判定が全て一致)。判定を変えないので、判定器が漏出規則に依存していることの確認にはならない。`--negctl-nosync` も関数判定は同一で、site 判定のみ 8 件が変わる。#2211 の「壊す 1 と一致」は現 HEAD では成り立たないため削除する。ネガコンとして判定を変えるのは `--negctl-nosync` のみ。
-- 追加の実験 (`work/` の作業用コピーで判定器を変更して実行。コミットしない): 694c80 の `695163`・c3b340 の `c3b3f5` を、LEAK_STORE の判定 (`glk` 分岐) から外すと、関数判定は変わらず (`UNDETERMINED 44`)。694c80 の site 6951c8 の barrier は `695163` から同じ関数の別の pointer store `69514e mov [rax+0x8c], rcx` (LEAK_STORE) に移る。c3b340 の site c3b46f の barrier は `c3b3f5` のまま (ALIAS_FRAME_PTR のため、漏出の規則を外しても打ち切られる)。判定を変えるには、store 基底の provenance 規則を判定器に入れる必要がある。
 
 ## 4. 残る理由 (DROP / LIVE-IN にできない理由)
 
@@ -40,8 +39,8 @@ store 基底の値の出どころを `alias_evidence_4167.py` で機械的に追
 ## 5. 差分 (WORKFLOW §6)
 
 - 測定 commit: `64eea9eac` (判定器・結果 JSON・ネガコンの実行はこの commit で行った)。
-- `git diff fbd89e0d7 64eea9eac -- tools/m11/ldfix` は 12 ファイル・5059 行の追加 (うち判定器 `audit_frame_store_alias_2211.py` は 14 行追加・10 行削除)。これは main 取り込み (#4090 ほか) による差分で、本 PR の変更ではない。本 PR で判定器は変えていない。
-- 本 PR の追加は `REPORT_4167.md`・`alias_evidence_4167.py`・`results/alias_evidence_4167.json` の 3 ファイル (247 行) のみ。
+- `git diff fbd89e0d7 64eea9eac -- tools/m11/ldfix` は 12 ファイル・5059 行の追加・24 行の削除 (うち判定器 `audit_frame_store_alias_2211.py` は 14 行追加・10 行削除)。これは main 取り込み (#4090 ほか) による差分で、本 PR の変更ではない。本 PR で判定器は変えていない。
+- 本 PR の追加は `REPORT_4167.md` (51 行)・`alias_evidence_4167.py` (103 行)・`results/alias_evidence_4167.json` (95 行) の 3 ファイル・249 行の追加のみ。
 
 ## 6. 未解決 (起票先)
 
