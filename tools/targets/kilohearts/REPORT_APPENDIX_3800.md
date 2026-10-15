@@ -9,11 +9,11 @@
   - 受入 1 (108 件の規則化): **部分 (22/108)**。残り 86 件は子 issue に分割 (下表)。
   - 受入 2 (引数数不一致 0 件): **未達** (86 件)。
   - 受入 3 (Gain/Haas/Gate の生成物が変わらない): **達成** (下の cmp)。
-  - 受入 4 (repo 外で測定): **達成** (`$RUNNER_TEMP/kh64`。`work/` を作っていない)。
+  - 受入 4 (repo 外で測定): **達成** (repo 外の作業ディレクトリ。`work/` を作っていない)。
 - **数値の扱い**: emcc 通過は値の正しさを示さない。Delay の wasm はまだ成立せず、1000 trial は未実施 (#3073 [KH-41] が担当・open)。
 - **測定 commit** (コードを変えた最後の commit): `288494e23`。`git diff 288494e23 HEAD -- tools/targets/kilohearts/ghidra_route` の出力は 0 行 (本節の commit は ghidra_route を変えない)。
 - **検証起点** (baseline): `091e4a7b6` (origin/main 取得時点)。`git diff --stat 091e4a7b6 288494e23 -- tools/targets/kilohearts/ghidra_route` = `patches.py` 1 file・30 insertions (commit `9b376531e` 19 行 + `288494e23` 11 行)。
-- **環境** (repo 外): 素材 `plugins-kilohearts` の Installer zip → `payload.dat` → `windows.zip` → `winpkg/HeartCore.core_64` (76,642,304 B)。[GHIDRA] 12.1.4 (zip sha256 `ddac49f9…d2db` 一致)・JDK 21 (temurin-21)・[EMSDK] (`/opt/emsdk`)。n=1。
+- **環境** (repo 外): 素材 `plugins-kilohearts` の Installer zip → `payload.dat` → `windows.zip` → `winpkg/HeartCore.core_64` (76,642,304 B)。[GHIDRA] 12.1.4 (zip sha256 `ddac49f9…d2db` 一致)・JDK 21 (temurin-21)・[EMSDK]。n=1。
 - **decompile**: `DecompEach.java` で 149 関数 (delay・gain・haas・gate・stereo の exports + also の和集合) → **149/149 OK**。
 - **再現コマンド** (repo 外の作業コピーで実行): `python3 ghidra_to_c.py <name> <out> <ghidra_out> <core> --fix bitcast,intload,stackpair,assoc,concat` → `emcc -c -ferror-limit=0 -I ghidra_route <name>.c` → `emcc_census.py emcc.log`。
 
