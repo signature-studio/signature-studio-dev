@@ -6,7 +6,7 @@
 
 - boot が init 1675 に届かないのは、**`InitUnits` (`function_4120c0`) が unit 114 (0 起算) の Init 実行中に Halt0 に入り、残りの unit を実行せずに抜けるため**。停止 unit の Init は `function_623840` (VA `0x623840`)。init 1675 は `function_1266a60` で、unit 882 (0 起算) の Init (FInit は `function_12669a0`・1676) に当たる。unit 882 は停止より後なので呼ばれない。
 - `dllmain_done True` は **InitUnits の完走ではない**。InitUnits は trace の `[m11][unit 115/942]` (index0 114) の Init 中に Halt0 に入り、残りの unit を実行せずに抜けた (`function_412770` → JS 例外 `m11_dllmain_done` による脱出)。ここで「111/942 unit で中断」とは書かない: `init_count` 111 は別カウンタ (`tools/m11/m11_rt.c:148-158`) で、停止位置は trace の unit 番号で示す。`tools/m11/m11_ov.c:445` の「DllMain attach 完走」は Halt0 を DllMain の完了として扱う設計上の呼び名で、本 REPORT の「完走ではない」とは別の意味 (コードの注釈は本 PR で変えていない)。REPORT_APPENDIX_3353 §1・§3-1・§9-1 の「boot は完走する」は誤り (§5 で訂正)。
-- Halt0 の直接条件は §3-3 (`[0x11f7110] != 0` と第 3 引数 `0x8494fc` の非 0)。実機で同じ経路が Halt しないかは**未判定**。子 issue に起票 (§7)。
+- Halt0 の判定は §3-3: obj (`[0x11f7110]`) の vtable[0] 呼出し (`call [obj]`) の戻り値 `eax != 0`。`eax` の決定元は未確定 (vtable[0] は QueryInterface 相当ではない・§3-4)。実機で同じ経路が Halt しないかは**未判定**。子 #3748 の受入で詰める (§7)。
 
 ## 2. 測定の組
 
@@ -52,7 +52,7 @@
 - 停止 unit の呼出し鎖の要所は `function_8494c0` (`VA 0x8494c0`)。機械語: `mov qword [rbx],0`・`call 0x849480`・`mov rdx,[rip+0xdadc2e]` (= グローバル `0x11f7110`)・`lea r8,[rip+0x13]` (= `0x8494fc`・非 0 の定数)・`call 0x41a800`。
 - `function_41a800` (IR `dec_label_pc_41a800`・機械語 `0x41a800` を capstone で確認): Delphi の interface cast の形。第 2 引数 (obj) が非 0 のとき `call [obj]` (vtable[0] = QueryInterface 相当) を第 3 引数 (IID 相当の `0x8494fc`) で呼び、戻り値 `eax != 0` なら `mov cl,0x17; call 0x4096d0` (RunError 23 相当・Halt)。`eax == 0` なら成功。`0x8494fc` はコード領域内 (`ret` の直後) を指す。実機でも同じ IID を読むかは未検証。
 - グローバル `0x11f7110` は `function_849480` が書く。`[0x11f7110] == 0` のときだけ `function_8495c0(0x446b00, 1)` の結果 (非 0 なら +72) を格納する。`function_8495c0` は通常 obj を返す。
-- よって、この unit で `[0x11f7110] != 0` になった時点で Halt は必然になる。実機で同じ経路が Halt しないなら、(a) グローバルが実機では 0 のまま (書込み側の差)、または (b) `function_41a800` の分岐の読みが誤り (lift 欠陥) のどちらか。**未判定**。子 #3748 の受入 1 で切り分ける。
+- よって、この unit の Halt は obj の vtable[0] 呼出しの戻り値 `eax` で決まる。`[0x11f7110]` (obj) は入力で、非 0 なら `call [obj]` が呼ばれるだけ。`eax` の決定元は未確定 (§3-4)。実機で同じ経路が Halt しないなら、(a) 実機では obj の書込み側 (`function_849480`・`function_8495c0`) が違う、(b) vtable[0] の戻り値が実機と違う (lift 欠陥の可能性を含む) のどちらか。**未判定**。子 #3748 の受入 1 で切り分ける。
 
 ### 3-4. Halt 時点のメモリ (停止後に wasm メモリを読んだ実測・`vt.mjs` 相当の一回限りの読取り)
 
@@ -85,4 +85,4 @@
 | Halt0 を起こした例外の種別と発生箇所 (unit 114 `function_623840` → `function_41a800` 以降・VirtualAlloc 125 MB と GetMem の関係) | init 1675 (CS 登録) に届かない。CFI は `CS-MISS` のまま | [WIN-39] (子 issue・親 #3478) |
 | 停止解消後の unit 882 (`function_1266a60`) の到達と CS 登録 (`CS-INIT 0x12bd390`) | 未測定 | [WIN-39] の受入 |
 | `units_run` 110 と 109 の差 (再生成 IR) | 測定の同一性の説明が未了 | 本 PR の §4 (未確認) |
-| `init_count` 111 と init 列の行番号 (`inits_text.txt`) の対応 | 未測定 (本測定は停止 unit の trace だけを記録し、`init_count` の増分を init 列へ対応づけていない)。`init_count` は IR の init prologue で増える別カウンタ (`tools/m11/m11_rt.c:148-158`) で、停止 unit (index0 114) の添字とは別の数え方。111・1675 の関係は未確認。停止位置の特定 (unit 114) には不要 | [WIN-39] #3748 (受入 1 の残り) |
+| `init_count` 111 と init 列の行番号 (`inits_text.txt`) の対応 | 未測定 (本測定は停止 unit の trace だけを記録し、`init_count` の増分を init 列へ対応づけていない)。`init_count` は IR の init prologue で増える別カウンタ (`tools/m11/m11_rt.c:148-158`) で、停止 unit (index0 114) の添字とは別の数え方。111・1675 の関係は未確認。停止位置の特定 (unit 114) には不要 | [WIN-39] #3748 (受入 1 の残り・#3748 へのコメントで追記) |
