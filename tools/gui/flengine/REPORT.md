@@ -237,6 +237,14 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | `tools/m11/m11_e2e.sh` が PE パスを `[ANALYSIS-DIR]` の固定既定値で持つ (`[WIN64]` 経由にしていない)。`m11_gen_ir2.sh` は本 PR で `FL_WIN64_DIR` 参照に変更済み | `m11_e2e.sh` を直接使うと runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `m11_gen_ir2.sh` (FL_WIN64_DIR 経由) を使う | m11_e2e.sh に `FL_WIN64_DIR` 参照を入れる件は PM 起票依頼 (#132 の未解決と同件) |
 | 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (433/0 ×3)。HEAD 7d44c033 の 1 回 (500/0) でも再現せず。main 側の #489 系 (headless surface UAF) の merge を含む HEAD での結果。再現率の定量確認は未実施 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
 
+### GUI-25 (#4420): B1 の GetMem 不一致の切り分け
+
+- 切り分け: GetMem の 761 対 760 は shim ではなくビルド条件。比較元 `m11_run.mjs` は非 pthread の wasm、GUI 結合は `-pthread`。同じ `-pthread` の shim 無し base (`run.mjs --wasm m11_base.cjs`) は GetMem 760 (2 回再現)、非 pthread は 761 (2 回再現)。
+- 修正: boot の比較元を `-pthread` の base に揃えた (`e2e.sh` / `judge.py` の `threw` キー名も `boot_threw` に揃えた。判定条件は緩めていない)。
+- 記録値の変化: main の `results/boot.json` は GetMem 761 (FastMM_GetMem 782)。`696d3f18b` の記録も 761。`309a38d0e` (results のみの記録 commit) で GetMem 760 (FastMM_GetMem 781) に変わった。変わった原因は未確認 (再測定は未実施。本 PR の commit で GUI ビルド入力は変わっていない)。よって「GetMem 760 は変更前後で同じ」とは言えない。
+- 残件: `icall_miss` GUI 7 対 base 6。差分の宛先は `0x85df70` 1 件。これは `EnumDisplayMonitors` の callback (#1096 / #1331 / #1507 / #881 で確定済み)。GUI では `EnumDisplayMonitors` が IMPL のため callback が呼ばれる。子 #4645 で解消する。
+- 測定 (HEAD `696d3f18b`・foreground 1 回): e2e rc 1 / 432 s / judge 14/15 (FAIL は B1 のみ: `icall_miss` 7 対 6)。ネガコン N1〜N10 は期待どおり FAIL。
+
 ## 6e〜6h・6f (付録へ分割移動)
 
 §6e・§6f・§6g・§6h の全文は [REPORT_APPENDIX_HISTORY_3832_B.md](REPORT_APPENDIX_HISTORY_3832_B.md) に移した (250 行上限)。
