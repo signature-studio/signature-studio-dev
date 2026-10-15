@@ -92,6 +92,14 @@ extern unsigned long long function_5c0e70(unsigned long long);
 extern unsigned long long function_481790(void* rcx, unsigned long long dl);
 static u64 tr_40f960(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_40f960(a0); }
 static u64 tr_41c160(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_41c160(a0); }
+/* 41c180 QueryInterface 本体 (#4011): `sub rsp,0x28; call 40fcf0; test al,al; je 41c191; xor eax,eax; jmp; mov eax,0x80004002`.
+ * vtable[0] thunk 4467ac (`add rcx,-0x48; jmp 41c180`) の先。IR に定義が無いため C 転記で持つ。 */
+u64 function_40fcf0(u64, u64, u64);
+static u64 tr_41c180(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) {
+    u64 r = function_40fcf0(a0, a1, a2);
+    return (u8)r ? 0 : 0x80004002u;
+}
+static u64 tr_4467ac(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return tr_41c180(a0 - 0x48, a1, a2, a3, a4, a5, a6, a7); }
 static u64 tr_5c0e70(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_5c0e70(a0); }
 static u64 tr_ret0(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return 0; }
 /* closure 外の既定 IEqualityComparer<pointer-size ordinal> のメソッド (#483): 479b00 Equals = `cmp rdx,r8; sete al`,
@@ -136,6 +144,8 @@ static m11_tr_t disp_find(u32 va) {
     switch (va) {
     case 0x40f960: return tr_40f960;
     case 0x41c160: return tr_41c160;
+    case 0x41c180: return tr_41c180;
+    case 0x4467ac: return tr_4467ac;
     case 0x5c0e70: return tr_5c0e70;   /* 5c03d0 の node 差替え通知の実体 (#482) */
     case 0x5c04a0: return tr_ret0;   /* `ret` 1 命令 (キャッシュ node 解放フックの既定実体) */
     case 0x478420: return tr_478420;
@@ -1223,6 +1233,27 @@ void m11_412770_obs(unsigned long long a) {
     if (a + 4 <= heap) v = *(volatile unsigned int*)(uintptr_t)a;
     if (g_412770_n++ < 64)
         fprintf(stderr, "[m11][412770] #%d arg1=0x%llx [arg1]=0x%llx\n", g_412770_n, a, v);
+}
+#endif
+
+/* #4457 計測専用 (M11_INSTR_4128B0=1 のときだけ有効): function_4128b0 の入口で、412770 (C 版) へ進む分岐の 3 値を stderr に出す。
+ *   [0xFA5008] (分岐 1)・[0x11EADB0] (分岐 2)・GetCurrentThreadId() と [0x11EADDC] (分岐 3, u32)。LB=0 の番地。R() で LB 分ずらす。
+ * 線形メモリ外は読まない。既定 0 では何も入らない。 */
+#ifndef M11_INSTR_4128B0
+#define M11_INSTR_4128B0 0
+#endif
+#if M11_INSTR_4128B0
+static int g_4128b0_n;
+void m11_4128b0_obs(void) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long a1 = R(0xfa5008), a2 = R(0x11eadb0), a3 = R(0x11eaddc);
+    unsigned long long v1 = 0, v2 = 0, v3 = 0;
+    if (a1 + 8 <= heap) v1 = *(volatile unsigned long long*)(uintptr_t)a1;
+    if (a2 + 8 <= heap) v2 = *(volatile unsigned long long*)(uintptr_t)a2;
+    if (a3 + 4 <= heap) v3 = *(volatile unsigned int*)(uintptr_t)a3;
+    if (g_4128b0_n++ < 256)
+        fprintf(stderr, "[m11][4128b0] #%d [0x%llx]=0x%llx [0x%llx]=0x%llx [0x%llx]=0x%llx\n",
+                g_4128b0_n, a1, v1, a2, v2, a3, v3);
 }
 #endif
 

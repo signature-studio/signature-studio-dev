@@ -62,6 +62,8 @@ if [ -f "$out/line_width.js" ]; then
   chk "alias_no_partial" '[ "${part[w1_alias]:-1}" -eq 0 ] && [ "${part[w4_alias]:-1}" -eq 0 ]'
   chk "aa_has_partial" '[ "${part[w1_aa]:-0}" -gt 0 ] && [ "${part[w4_aa]:-0}" -gt 0 ]'
   chk "aa_more_pixels" '[ "${nz[w4_aa]:-0}" -gt "${nz[w4_alias]:-0}" ]'
+  corner_over=$(grep '^corner_join ' "$out/run.log" | sed -n 's/.* over=\([0-9]*\).*/\1/p')
+  chk "corner_no_double_blend" '[ -n "$corner_over" ] && [ "$corner_over" -eq 0 ]'
 else
   echo "run: skipped (no line_width.js)" | tee -a "$out/summary.txt"
   rc=1
