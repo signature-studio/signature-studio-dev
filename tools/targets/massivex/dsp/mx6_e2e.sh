@@ -48,8 +48,11 @@ c1, c2, ip, nc = m['census_pdata1'], m['census_pdata2'], m['independent_pefile']
 ok41 = (c1['pdata_entries'] == 187060 and c1['chained_entries(CHAININFO)'] == 62526 and c1['eh_handler_entries'] == 23293
         and c1['unreadable_unwind_info'] == 160 and m['unreadable_by_class'] == {'out_of_image': 160}
         and c2['pdata_entries'] == 509 and c2.get('unreadable_unwind_info', 0) == 0
-        and ip['unreadable_same_set'] and ip['flag_mismatch_readable'] == 0
-        and nc['break']['delta'] == 1 and nc['fix']['delta'] == -1)
+        and ip['unreadable_same_set'] and ip['class_pefile'] == m['unreadable_by_class']
+        and ip['class_rows_match'] == m['unreadable_pdata1'] and ip['flag_mismatch_readable'] == 0
+        and nc['break']['delta'] == 1 and nc['break']['row_class_after'] == 'out_of_image'
+        and nc['break']['pefile_class_after'] == 'out_of_image'
+        and nc['fix']['delta'] == -1 and nc['fix']['row_removed'] and nc['fix']['pefile_class_after'] == 'readable')
 ok = ok and ok41
 print('   %s' % ('PASS (pdata 始点の vectorcall livein 0 / 整合 OK / 受入1 の内訳 17 = 件数一致・包含 OK / MX-41: pdata1 数の維持・読取不能 160 は画像外・独立再計算一致・ネガコン ±1)' if ok else 'FAIL'))
 sys.exit(0 if ok else 1)

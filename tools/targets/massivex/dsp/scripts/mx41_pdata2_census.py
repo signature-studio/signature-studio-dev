@@ -4,11 +4,14 @@
 - .pdata は 2 本ある。2 本目は raw 6,144 B のみ実データで、VirtualSize (158,952 B) が .xdata の VA 範囲と重なる。
   読取は mx6_pdata_eh.make_rva_reader と同じく raw を持つ section を優先する。
 - DATA_DIRECTORY[EXCEPTION] が指すのは 1 本目だけ (2 本目は例外テーブルとして登録されていない)。
-- 読取不能の分類: UnwindInfoAddress の RVA が (a) SizeOfImage 以上 (out_of_image)・(b) どの section にも入らない (no_section)・
-  (c) VirtualSize の zero 埋め部分だけ (zero_only) のいずれか。各行に所属 section・raw 有無・先頭バイトを書く。
-- 独立再計算: pefile の get_section_by_rva / get_offset_from_rva (section 解決を pefile に任せる) で、
-  同じ読取不能の集合と flags を再計算して照合する。
-- ネガティブコントロール: 1 件の UnwindInfoAddress を壊す (読める値 → 画像外) / 直す (読取不能 → 隣の読める値) で件数が +1 / -1 になることを数値で示す。
+- 読取不能の分類 (reader と pefile の両方で行ごとに求め、一致を json に出す):
+  out_of_image (UnwindInfoAddress >= SizeOfImage)・no_section (画像内で section の範囲に入らない)・
+  zero_fill (VirtualSize の zero 埋め部分)・raw_zero (raw の内側で 4 バイトが 0)。
+- 独立再計算: pefile の get_section_by_rva / get_offset_from_rva で同じ分類を求め、読取不能の集合・分類・
+  読める行の flags を reader の結果と照合する。
+- ネガティブコントロール: 分類 (unreadable_rows) に入力 (st -> (e, ui)) を渡し、入力を書き換えて再分類する。
+  読める 1 件の ui を画像外の値に壊す (件数 +1 を期待) / 読取不能 1 件の ui を隣の読める値に直す (件数 -1 を期待)。
+  delta は再分類の件数から求める (期待値を式に入れない)。
 
 usage: mx41_pdata2_census.py <pe> <out_dir>
 出力: <out_dir>/mx41_pdata2.json・<out_dir>/mx41_unreadable.tsv (repo 外の作業先を指定する)
@@ -23,6 +26,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pefile  # noqa: E402
 
 from mx6_pdata_eh import CHAIN, EHANDLER, UHANDLER, make_rva_reader, walk_imports  # noqa: E402
+
+NEG_BROKEN_UI = 0x49500DE8  # ネガティブコントロールで壊す先 (画像外の値)
 
 
 def read_ui(rd, ui):
@@ -68,6 +73,23 @@ def census(rd, iat, ents):
     return dict(c)
 
 
+def reader_class(where, soi, ui):
+    if ui >= soi:
+        return 'out_of_image'
+    hits = where(ui)
+    if not hits:
+        return 'no_section'
+    return 'raw_zero' if any(h.endswith(':raw') for h in hits) else 'zero_fill'
+
+
+def unreadable_rows(rd, ents, where, soi):
+    rows = []
+    for st, (e, ui) in sorted(ents.items()):
+        if read_ui(rd, ui) is None:
+            rows.append({'st': st, 'e': e, 'ui': ui, 'class': reader_class(where, soi, ui)})
+    return rows
+
+
 def main(pe_path, out_dir):
     pe = pefile.PE(pe_path, fast_load=False)
     data = open(pe_path, 'rb').read()
@@ -87,6 +109,20 @@ def main(pe_path, out_dir):
                 out.append('%s:%s' % (name, 'raw' if rva - va < rs else 'zero'))
         return out
 
+    def pef_cls(ui):
+        """pefile の section 解決で分類を返す。読めた場合は (readable or raw_zero, 4 バイト)。"""
+        if ui >= soi:
+            return 'out_of_image', None
+        s = pe.get_section_by_rva(ui)
+        if s is None:
+            return 'no_section', None
+        off_in = ui - s.VirtualAddress
+        if off_in >= s.SizeOfRawData:
+            return 'zero_fill', None
+        off = pe.get_offset_from_rva(ui)
+        b = data[off:off + min(4, s.SizeOfRawData - off_in)].ljust(4, b'\0')
+        return ('raw_zero' if b == b'\0\0\0\0' else 'readable'), b
+
     ents1 = entries_of(p1)
     ents2 = entries_of(p2)
     res = {
@@ -101,21 +137,14 @@ def main(pe_path, out_dir):
     }
 
     unr = []
-    for st, (e, ui) in sorted(ents1.items()):
-        if read_ui(rd, ui) is not None:
-            continue
+    for r in unreadable_rows(rd, ents1, where, soi):
+        st, ui = r['st'], r['ui']
         hits = where(ui)
-        if ui >= soi:
-            cls = 'out_of_image'
-        elif not hits:
-            cls = 'no_section'
-        else:
-            cls = 'zero_only'
         try:
             code = data[pe.get_offset_from_rva(st)]
         except Exception:
             code = None
-        unr.append({'st': st, 'e': e, 'ui': ui, 'class': cls, 'sec': ','.join(hits) or '-',
+        unr.append({'st': st, 'e': r['e'], 'ui': ui, 'class': r['class'], 'sec': ','.join(hits) or '-',
                     'raw_present': any(h.endswith(':raw') for h in hits),
                     'ui_bytes': ui.to_bytes(4, 'little').hex(),
                     'ui_first': '%02x' % (ui & 0xff), 'st_code0': None if code is None else '%02x' % code})
@@ -134,60 +163,52 @@ def main(pe_path, out_dir):
                 r['st'], r['e'], r['ui'], r['class'], r['sec'], r['raw_present'],
                 r['ui_bytes'], r['ui_first'], r['st_code0']))
 
-    # 独立再計算: pefile の section 解決 (get_section_by_rva / get_offset_from_rva) で同じ判定を再計算する
-    def pef_ui(ui):
-        if pe.get_section_by_rva(ui) is None:
-            return None
-        try:
-            off = pe.get_offset_from_rva(ui)
-        except Exception:
-            return None
-        return data[off:off + 4]
-
-    def pef_info(ui):
-        b = pef_ui(ui)
-        if b is None or b == b'\0\0\0\0' or len(b) < 4:
-            return None
-        return b[0] >> 3
-
-    pef_unr = set(st for st, (e, ui) in ents1.items() if pef_info(ui) is None)
-    rd_unr = set(r['st'] for r in unr)
+    # 独立再計算 (pefile): 読取不能の集合・行ごとの分類・読める行の flags を reader と照合する
+    rd_cls = {r['st']: r['class'] for r in unr}
+    pef = {st: pef_cls(ui) for st, (e, ui) in ents1.items()}
+    pef_unr = {st: c for st, (c, b) in pef.items() if c != 'readable'}
+    flag_diff = []
+    for st, (e, ui) in ents1.items():
+        if st in rd_cls:
+            continue
+        c, b = pef[st]
+        a = read_ui(rd, ui)[0]
+        if c != 'readable' or (a & (CHAIN | EHANDLER | UHANDLER)) != ((b[0] >> 3) & (CHAIN | EHANDLER | UHANDLER)):
+            flag_diff.append((st, ui))
     res['independent_pefile'] = {
         'unreadable_pefile': len(pef_unr),
-        'unreadable_same_set': pef_unr == rd_unr,
-        'unreadable_only_pefile': len(pef_unr - rd_unr),
-        'unreadable_only_reader': len(rd_unr - pef_unr),
+        'unreadable_same_set': set(pef_unr) == set(rd_cls),
+        'unreadable_only_pefile': len(set(pef_unr) - set(rd_cls)),
+        'unreadable_only_reader': len(set(rd_cls) - set(pef_unr)),
+        'class_pefile': dict(collections.Counter(pef_unr.values())),
+        'class_rows_match': sum(1 for st in rd_cls if pef_unr.get(st) == rd_cls[st]),
+        'flag_mismatch_readable': len(flag_diff),
+        'flag_mismatch_in_pdata2_vs_range': sum(
+            1 for st, ui in flag_diff if p2.VirtualAddress <= ui < p2.VirtualAddress + p2.Misc_VirtualSize),
     }
-    diff_flags = []
-    for st, (e, ui) in ents1.items():
-        if st in rd_unr:
-            continue
-        a = read_ui(rd, ui)[0]
-        b = pef_info(ui)
-        if b is None or (a & (CHAIN | EHANDLER | UHANDLER)) != (b & (CHAIN | EHANDLER | UHANDLER)):
-            diff_flags.append((st, ui))
-    res['independent_pefile']['flag_mismatch_readable'] = len(diff_flags)
-    res['independent_pefile']['flag_mismatch_in_pdata2_vs_range'] = sum(
-        1 for st, ui in diff_flags if p2.VirtualAddress <= ui < p2.VirtualAddress + p2.Misc_VirtualSize)
 
-    # ネガティブコントロール (1 件を壊す / 直す)
-    base = len(rd_unr)
+    # ネガティブコントロール: 入力を書き換えて再分類し、件数の変化を測る
+    base = len(unr)
     victim = next(st for st, (e, ui) in sorted(ents1.items())
-                  if st not in rd_unr and not (read_ui(rd, ui)[0] & (CHAIN | EHANDLER | UHANDLER)))
-    v_ui = ents1[victim][1]
-    broken_ui = unr[0]['ui']
-    after_break = base + (1 if read_ui(rd, broken_ui) is None else 0)
-    broken_cls = 'out_of_image' if broken_ui >= soi else 'other'
+                  if st not in rd_cls and not (read_ui(rd, ui)[0] & (CHAIN | EHANDLER | UHANDLER)))
+    ents_b = dict(ents1)
+    ents_b[victim] = (ents1[victim][0], NEG_BROKEN_UI)
+    rows_b = unreadable_rows(rd, ents_b, where, soi)
     bad = unr[0]
-    fixed_ui = [ui for st, (e, ui) in sorted(ents1.items())
-                if st < bad['st'] and read_ui(rd, ui) is not None][-1]
-    after_fix = base - (1 if read_ui(rd, fixed_ui) is not None else 0)
+    fixed_ui = [ui for st, (e, ui) in sorted(ents1.items()) if st < bad['st'] and read_ui(rd, ui) is not None][-1]
+    ents_f = dict(ents1)
+    ents_f[bad['st']] = (bad['e'], fixed_ui)
+    rows_f = unreadable_rows(rd, ents_f, where, soi)
     res['negctl'] = {
         'base_unreadable': base,
-        'break': {'st': '%08x' % victim, 'ui_before': '%08x' % v_ui, 'ui_after': '%08x' % broken_ui,
-                  'class_after': broken_cls, 'unreadable_after': after_break, 'delta': after_break - base},
+        'break': {'st': '%08x' % victim, 'ui_before': '%08x' % ents1[victim][1],
+                  'ui_after': '%08x' % NEG_BROKEN_UI, 'pefile_class_after': pef_cls(NEG_BROKEN_UI)[0],
+                  'row_class_after': next((r['class'] for r in rows_b if r['st'] == victim), None),
+                  'unreadable_after': len(rows_b), 'delta': len(rows_b) - base},
         'fix': {'st': '%08x' % bad['st'], 'ui_before': '%08x' % bad['ui'], 'ui_after': '%08x' % fixed_ui,
-                'unreadable_after': after_fix, 'delta': after_fix - base},
+                'pefile_class_after': pef_cls(fixed_ui)[0],
+                'row_removed': all(r['st'] != bad['st'] for r in rows_f),
+                'unreadable_after': len(rows_f), 'delta': len(rows_f) - base},
     }
     with open(os.path.join(out_dir, 'mx41_pdata2.json'), 'w') as f:
         json.dump(res, f, indent=1, ensure_ascii=False)
