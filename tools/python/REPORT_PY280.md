@@ -48,7 +48,7 @@ issue 本文の『33 個の const peNNN』は概数。実測は上の 31 集合 
 | 検証 | コマンド | 結果 |
 |---|---|---|
 | provider ビルド | `bash tools/python/provider/build.sh` | rc 0 (取り込み後 HEAD でも rc 0) |
-| 前提の素材 | `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` | 7 s・`extracted/block00031_PE.bin` 実在 |
+| 前提の素材 | `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` | 7 s・`extracted/block00031_PE.bin` 実在 |
 | 入力配置 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` | 1.2 s (`work/` に midi.py・utils.py・MCPTools.pyc) |
 | CPython wasm | `bash build_cpython_wasm.sh` | 3 min 20 s・成果物 (`libpython3.12.a`・`python.wasm`) 生成 |
 | flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | 4.7 s・rc 0。追跡済みの `flapi_table.json` を使い、表は再生成していない (`git status` 差分 0) |
