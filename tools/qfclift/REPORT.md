@@ -228,17 +228,18 @@ guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行�
 
 ## 10. DllMain 経路の import 呼出し計数 (T-SH-78 / #3411)
 
-測定 commit = `55615e160`。全文 (呼出し回数の表・未解決の詳細) は `REPORT_APPENDIX_3411.md`。
-結論: 直接呼出し `imp_<名>();` で計数された import は 5 件 (`GetCurrentThreadId`・`TlsAlloc`・`LocalAlloc`・`TlsSetValue`・`TlsGetValue`、各 1 回)。すべて rt または `qfc_imp.c` に既存。
-間接経由 (`imp_by_index` → `imp_tab[k]()`) は未計数のため、DllMain 経路で実際に呼ばれる import の全数は未確定。停止点は `0x59c210` (UNLIFTED)。
+測定 commit = `5c79daa2b` (HEAD の計数版 `qfc_count.sh` を実行した commit)。全文 (呼出し回数の表・未解決の詳細) は `REPORT_APPENDIX_3411.md`。
+結論: 直接呼出し `imp_<名>();` で計数された import は 6 件 (`GetCurrentThreadId`・`TlsAlloc`・`LocalAlloc`・`TlsSetValue`・`TlsGetValue`・`ExitProcess`、各 1 回)。すべて rt または `qfc_imp.c` に既存。
+間接経由 (`imp_by_index` → `imp_tab[k]()`) は未計数のため、DllMain 経路で実際に呼ばれる import の全数は未確定。停止点は `ExitProcess(0)` (偽の停止かどうかは #4262 で未確定)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `0x59c210` (setjmp/longjmp 継続) の lift 対応と longjmp の起動元 | DllMain が完走しない | #3410 (T-SH-77) |
-| 間接経由の import 呼出しが未計数 | DllMain 経路の全数が不明 | #3410 (T-SH-77) |
-| rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る | #4234 (T-SH-104) |
+| 停止点 `ExitProcess(0)` が偽の停止か (longjmp 継続後の進行) | DllMain が完走したか不明 | #4262 (T-SH-106) |
+| longjmp (0x40f9c0) の発生条件と戻り先 `0x59c210` の lift 対応 | 停止点の解釈 | #4263 (T-SH-107) |
+| 間接経由の import 呼出しが未計数 | DllMain 経路の全数が不明 | #4374 (T-SH-121) |
+| rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る | #4375 (T-SH-122) |
 | `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | #4280 (T-SH-108) |
-| `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #3412 の子 #3434 |
+| `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #4296 (T-SH-113) |
 
 ## 11. guest imp_GetProcAddress の結線 (T-SH-83 / #3434)
 
