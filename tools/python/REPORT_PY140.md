@@ -14,7 +14,7 @@
 
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf ... --wildcards '*block00031_PE.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block25159_DATA.bin' '*block24618_DATA.bin'` で展開 (2.8 秒)。`$ARTIFACTS_DIR` の実在は展開前に `ls` で確認した。`toolchain-emsdk` は本 PR では使わない (mock/C を変えないため)。
 - 逆アセンブル: `pe_disasm.py fdd2c0 1500` と capstone で `0xfdd2c0`〜`0xfde8ad` (`.pdata` の終端、0x15ed バイト、1269 命令)。
-- 到達解析: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_dispatch_probe.py <op...> --arg <N|-> --mode <N|->`。op (`ecx`)・arg (`edx`)・mode (`r8b`) を具体値で与え、op 由来の `eax` と比較フラグだけを具体値で追う。決まらない分岐 (メモリ・呼出しの戻り値) は両方を辿る。`.data` の定数は読み、`[rip+X]` の 16bit 定数 (修飾子) も PE の静的値で読む。`rcx` の間接テーブル引き (矢印キーの VK) は probe では追わず、テーブル値は手で読んだ (下)。
+- 到達解析: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_dispatch_probe.py <op...> --arg <N|-> --mode <N|->`。op (`ecx`)・arg (`edx`)・mode (`r8b`) を具体値で与え、op 由来の `eax` と比較フラグだけを具体値で追う。フラグ (ZF/SF/CF/OF) は演算幅 (8/16/32bit) から求める。決まらない分岐 (メモリ・呼出しの戻り値) は両方を辿る。`.data` の定数は読み、`[rip+X]` の 16bit 定数 (修飾子) も PE の静的値で読む。`rcx` の間接テーブル引き (矢印キーの VK) は probe では追わず、テーブル値は手で読んだ (下)。
 - 追加で読んだ値: `0x8186a0` の本体 (`dx` のビットと user32 の thunk)、矢印キーの VK 表、修飾子ワード。
 
 ## 0xfdd2c0 の骨格 (PE 根拠)
@@ -87,16 +87,17 @@
 
 ## 検証
 
-- 測定 commit: `de0dff6a9` (`analysis/flapi/pe_ui_dispatch_probe.py` を最後に変えた commit)。
-- コマンドと結果 (測定 commit `de0dff6a9`、コード変更は本 PR の 1 commit のみ):
+- 測定 commit: `ca104e569` (`analysis/flapi/pe_ui_dispatch_probe.py` を最後に変えた commit)。旧版の `cond()` は `test` 後の符号付き分岐 (`jle`・`jg` など) を判定できず両方を辿っていたため、到達しない経路 (selectWindow の Shift 経路など) を出していた。ca104e569 でフラグを演算幅から求めるように直した。
+- コマンドと結果 (測定 commit `ca104e569`、以降のコード変更は無し):
 
 | コマンド | 結果 | wall |
 |---|---|---|
 | `python3 -m py_compile analysis/flapi/pe_ui_dispatch_probe.py` | rc 0 | — |
-| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_dispatch_probe.py <26 op> --arg 1 --mode 2` | rc 0。送出 call は 13 VA (`0xfde0a5`・`0xfde0c9`・`0xfde0e6`・`0xfde110`・`0xfde138`〜`0xfde278`) に出た。15 関数の op がこの 13 VA に対応 (矢印 4 → `0xfde110`、selectWindow → 2 VA、他 10 → 1 VA) | 0.17 秒 |
-| 上の出力の修飾子 (`rdx`) | cut/copy/paste = 0x4、selectWindow の arg≤0 = 0x1、他 = 0x0。PE の静的値と一致 | — |
+| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_dispatch_probe.py <26 op> --arg 1 --mode 2` | rc 0。送出 call (`0x8186a0` を呼ぶ VA) は 12 VA。矢印 4 op → `0xfde110`、nextWindow → `0xfde0a5`、selectWindow → `0xfde0c9` (rdx=0x0) の 1 VA、cut・copy・paste・insert・delete・enter・escape・yes・no → 各 1 VA。`0xfde0e6` (selectWindow の Shift 経路) は出ない | 0.19 秒 |
+| 同 `--arg 0 --mode 2` | rc 0。送出 call は 2 VA。`0xfde110` (矢印 4 op。`r8d ≤ 0` のため `0x8186a0` は何もしない) と `0xfde0e6` (selectWindow・rdx=0x1)。arg>0 で送出する 10 op (nextWindow と cut〜no) と `0xfde0c9` は出ない | 0.18 秒 |
 
-- 差分の証跡 (`docs/WORKFLOW.md` §6): `git diff de0dff6a9 HEAD -- tools/python ':!*.md'` の出力は空であるべき (本 REPORT と `docs/DOC_MAP.md` の commit だけが後に続く)。
+- 修飾子 (`rdx`) の値: 上の出力では cut/copy/paste = 0x4、selectWindow の arg≤0 = 0x1、他 = 0x0。PE の静的値と一致。
+- 差分の証跡 (`docs/WORKFLOW.md` §6): `git diff ca104e569 HEAD -- tools/python ':!*.md'` の出力は 0 byte (本 REPORT の commit だけが後に続く)。
 - mock・C (`host/fl_mock.mjs`・`provider/fl_engine.c`) は変えていない。`node tests/provider_check.mjs` と `FL_ENGINE=wasm node tests/all_tools.mjs` は変更がないため本 PR では再測定しない (受入 4・5 は子 #3759 で扱う)。
 - ネガティブコントロール: 実装を入れないため、本 PR では `ui_diff` の差分検査は無い。
 
