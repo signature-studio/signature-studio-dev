@@ -15,12 +15,12 @@
 ## 測定
 
 - 基点: `origin/main` = `c2324dea6`。測定 commit: `8b1f484cc` (解析スクリプト `pe_py225_disp_scan.py` を追加した commit。この後の commit は本 REPORT と DOC_MAP のみ)。差分の証跡: `git diff 8b1f484cc HEAD -- tools/python/analysis tools/python/host tools/python/provider tools/python/tests` は 0 行 (本 REPORT の commit は範囲外)。
-- 素材: `fl-win64` を `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` で全展開 (5.444 秒)。`extracted/block00031_PE.bin` (22,227,016 B)。`toolchain-emsdk` は `provider/build.sh` の前提として存在を確認 (`$HOME/artifacts/toolchain-emsdk.tar.zst`)。
+- 素材: `fl-win64` を `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先>` で全展開 (5.444 秒)。`extracted/block00031_PE.bin` (22,227,016 B)。`toolchain-emsdk` は `provider/build.sh` の前提として存在を確認 (`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst`)。
 - 環境: runner 4 core、node v22.23.3。
 
 | 検査 | コマンド | 結果 | 所要 |
 |---|---|---|---|
-| 展開 | `tar --zstd -xf ... -C $RUNNER_TEMP/fl-win64` | rc 0 | 5.444 秒 |
+| 展開 | `tar --zstd -xf ... -C <展開先>` | rc 0 | 5.444 秒 |
 | `0x22fc` の全 .text 走査 | `FL_WIN64_DIR=... python3 tools/python/analysis/flapi/pe_py225_disp_scan.py 22fc` | store 0 件・lea 2 件・その他 5 件 | 26.494 秒 |
 | provider ビルド | `bash tools/python/provider/build.sh` | rc 0 | 数秒 |
 | channels 差分 | `cd tools/python && node tests/channels_diff.mjs` | `{"calls":214,"diffs":0,"PASS":true}` | 1 秒未満 |
@@ -62,7 +62,7 @@
 
 ## 再現
 
-- 展開: `tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'`。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。
+- 展開: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "<展開先>" --wildcards '*block00031_PE.bin'`。`FL_WIN64_DIR=<展開先>`。
 - 走査: `python3 tools/python/analysis/flapi/pe_py225_disp_scan.py 22fc` (26.5 秒)。
 - 逆アセンブル: `pe_disasm.py 12d09e0 50`・`1186300 60`・`417fc0 90`・`417b70 45`・`4180f0 40`・`12d3e20 40`。
 - 静的値: `pe_va_read.py 15e27f0,15e1c70,15d89c8,15d898c,15e2218`。
