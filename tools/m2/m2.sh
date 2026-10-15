@@ -22,7 +22,8 @@ set -euo pipefail
 
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 WORK="$HERE/work"
-DL_FALLBACK=/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin
+source "$HERE/../shared/env.sh"
+DL_FALLBACK="$FL_WIN64_DIR/extracted/block00031_PE.bin"
 SLICE="$WORK/FLEngine_x86_64.dylib"
 
 log() { echo "[M2] $*"; }
@@ -79,7 +80,7 @@ fi
 # -----------------------------------------------------------------
 # 4) shim inventory (libwinbridge / mac slice / win DLL の import/export)
 # -----------------------------------------------------------------
-WINBRIDGE="/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Shared/libwinbridge_x64.dylib"
+WINBRIDGE="$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Shared/libwinbridge_x64.dylib"
 [ -f "$WORK/libwinbridge_x64.dylib" ] || cp "$WINBRIDGE" "$WORK/libwinbridge_x64.dylib"
 
 python3 "$HERE/shim_inventory.py" \

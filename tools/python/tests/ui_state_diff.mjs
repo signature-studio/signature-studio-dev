@@ -32,6 +32,8 @@ const setters = [
   ["ui.setBrowserAutoHide", [true]], ["ui.isBrowserAutoHide", []],
   ["ui.setStepEditMode", [1]], ["ui.getStepEditMode", []],
   ["ui.setStepEditMode", [0]], ["ui.getStepEditMode", []],
+  ["ui.setTimeDispMin", []], ["ui.getTimeDispMin", []], ["ui.setTimeDispMin", []], ["ui.getTimeDispMin", []],
+  ["ui.setTimeDispMin", []], ["ui.getTimeDispMin", []],
   ["ui.getVersion", []], ["ui.getVersion", [0]], ["ui.getVersion", [3]], ["ui.getVersion", [4]],
   ["ui.getVersion", [6]], ["ui.getVersion", [7]], ["ui.getVersion", [-1]], ["ui.getVersion", [true]],
   ["ui.getVersion", ["x"]],
@@ -57,7 +59,7 @@ const arity = [
   ["ui.getHintValue", []], ["ui.getHintValue", [1]], ["ui.getHintValue", [1, 2, 3]],
   ["ui.getHintValue", ["x", 1]], ["ui.getHintValue", [1.5, 2]], ["ui.getHintValue", [1, null]], ["ui.getHintValue", [null, 2]],
   ["ui.setBrowserAutoHide", []], ["ui.setBrowserAutoHide", [1, 2]], ["ui.setStepEditMode", []], ["ui.setStepEditMode", [1, 2]],
-  ["ui.getVersion", [0, 1]], ["ui.getVersion", [1, 2]],
+  ["ui.getVersion", [0, 1]], ["ui.getVersion", [1, 2]], ["ui.setTimeDispMin", [1]],
 ];
 
 const diffs = [];

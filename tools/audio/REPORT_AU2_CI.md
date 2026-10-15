@@ -152,7 +152,7 @@
 | ~~Firefox 行列 (PulseAudio null-sink × 48k/96k)~~ | ~~`tools/audio/harness` が Chrome CDP 専用~~ → 解消 (§9・AU-23 #2540) | — |
 | OPEN 較正 burst と run 中 burst のずれで grows が残る (係数は 125 維持・§5-5) | 96k null で grows 0〜3 回・underrun 0 (§5-5 の再測定)。係数の変更では解消しない | **[AU-28]** #3051 |
 | ~~30 分ソーク (null-sink, 48k B=256)~~ | ~~10 分 PASS のみ~~ → 解消 (§5-2 の 30 分 PASS) | — |
-| ~~P2 burst の p99~~ | ~~worklet が最大値しか公開しない~~ → 解消 (§12・AU-30 #3151: `burst_hist` を公開し結果 JSON に `burst_p99`)。Firefox 側は未配線 | [AU-37] #3323 (Firefox の p99) |
+| ~~P2 burst の p99~~ | ~~worklet が最大値しか公開しない~~ → 解消 (§12・AU-30 #3151: `burst_hist` を公開し結果 JSON に `burst_p99`)。Firefox の p99 も解消 (§12・AU-37 #3323 付録 `REPORT_APPENDIX_3323.md`) | — |
 | Windows / macOS runner (任意・受入 4) の P1〜P4 の実測 | workflow は差分化のみ (§10。適用も初回 dispatch も未実施)。Windows / macOS の値は無い | [AU-32] #3164 (本 PR で close。適用は PM が PR 本文の差分で行う) |
 | Safari の P1〜P4 の実測と WebDriver BiDi 対応 | 経路は追加済み (§10)。macOS 実測と BiDi 判定は未実施 | [AU-36] (子 #3207) |
 | `asio_ramp_b128_d2` quick FAIL (§2) | 本 run では再実行していない。原因未切り分け | #187 |
@@ -247,4 +247,4 @@
 
 ## 12. P2 の p99 (AU-30 #3151)
 
-- **結論**: worklet が連続 `process()` の burst 分布 (`burst_hist`) を公開し、結果 JSON に `burst_p99` を出す。測定 commit `fb5a0d69` の n=3 行列 (`results/au30_p99_r3/`) で、null-sink は 9/9 PASS、fake は 8/9 PASS。fake 48k の rep 1 だけ underrun 1 で FAIL (`e403fd7a`・`8310689a` と同じ rep。原因は未切り分け・本 PR の未解決表で追跡)。p99 (bin 上端): fake 48k 1024・96k 1536、null 48k 1536・96k 3584。Firefox の p99 は未配線 ([AU-37] #3323)。測定の全文は `REPORT_APPENDIX_3151.md` (§12)。
+- **結論**: worklet が連続 `process()` の burst 分布 (`burst_hist`) を公開し、結果 JSON に `burst_p99` を出す。測定 commit `fb5a0d69` の n=3 行列 (`results/au30_p99_r3/`) で、null-sink は 9/9 PASS、fake は 8/9 PASS。fake 48k の rep 1 だけ underrun 1 で FAIL (`e403fd7a`・`8310689a` と同じ rep。原因は未切り分け・本 PR の未解決表で追跡)。p99 (bin 上端): fake 48k 1024・96k 1536、null 48k 1536・96k 3584。Firefox の p99 は AU-37 (#3323) で配線し、Firefox 行列 n=3 で 9/9 PASS (測定 commit `db0a788fe`・p99 48k 1536 f / 96k 2048 f。全文は `REPORT_APPENDIX_3323.md`)。測定の全文は `REPORT_APPENDIX_3151.md` (§12)。
