@@ -5,7 +5,7 @@ import { guiResponse } from "./gui.ts";
 
 export { PmDO };
 
-const FORWARD = new Set(["issues", "issue_comment", "issue_dependencies", "pull_request", "pull_request_review", "workflow_run"]);
+const FORWARD = new Set(["issues", "issue_comment", "issue_dependencies", "sub_issues", "pull_request", "pull_request_review", "workflow_run"]);
 const PUBLIC_PATHS = new Set(["/webhook", "/setup", "/setup/callback", "/status"]);
 // 管理用の経路と、その HTTP メソッド (#2339 resync・#2343 import/export)。
 const ADMIN_METHOD: Record<string, string> = { "/admin/resync": "POST", "/admin/import": "POST", "/admin/export": "GET" };

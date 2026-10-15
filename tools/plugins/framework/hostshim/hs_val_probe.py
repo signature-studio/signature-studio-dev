@@ -42,6 +42,13 @@ DISP_PROBES = {
     0x131c40c: ['rcx', 'rdx', 'r8', 'r9', 'rdx*:4', 'r8*:4'],            # call 0xe4e970 (受入 3)
     0x1321be8: ['rcx', 'rdx', 'r8', 'r9'],                                # call 0xed6780 (受入 3)
     0x1321a1b: ['rcx', 'rdx', 'r8', 'r9', 'rbp+0x111c:2', 'rbp+0x111a:2'],  # call 0x11d06e0 (受入 4)
+    # #3986: REPORT_DISPATCHER_APPENDIX_3673.md §2 の書込み元 VA (書込み直前の値)
+    0x41d919: ['rdi', 'r8', 'rbp+0x30:8'],                                 # G18 = rdi (0x18)
+    0x11fc2b3: ['rax', 'rbp+0x170:8'],                                     # P45 = rax (0x45)
+    0x9dec3f: ['rax', 'rcx', 'rdx'],                                       # P56 = rax (0x56)
+    0x13226dd: ['rbp+0x1880:4'],                                           # 0x54 の index
+    0x1322a07: ['rbp+0x1880:4'],                                           # 0x65 の経路 (値の観測)
+    0x1322b47: ['rbp+0x109c:4', 'rbp+0x1168:8'],                           # 0x65 の movsxd 直前
 }
 
 
@@ -147,8 +154,11 @@ def emulate(entry, regs, allowed, probes=None, ret_spec=None, stop_at=None, mem_
 def disp_probe(ids):
     """Dispatcher を ID ごとに実行し、観測点の値と到達を出す。"""
     rows = {}
+    lo, hi = E.FN_LO, E.FN_HI
+    if os.environ.get('HS_ALLOW_LO') and os.environ.get('HS_ALLOW_HI'):
+        lo, hi = int(os.environ['HS_ALLOW_LO'], 0), int(os.environ['HS_ALLOW_HI'], 0)
     for ident in ids:
-        r = emulate(E.DISP, {'rcx': E.HOST, 'rdx': E.TAG, 'r8': ident, 'r9': 0}, [(E.FN_LO, E.FN_HI)],
+        r = emulate(E.DISP, {'rcx': E.HOST, 'rdx': E.TAG, 'r8': ident, 'r9': 0}, [(lo, hi)],
                     probes=DISP_PROBES, sent_ret=E.SENT, fill=FILL)
         rows[ident] = r
         hits = [(va, vals) for va, vals in r['probe']]
