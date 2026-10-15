@@ -477,24 +477,17 @@ void CanvasGraphicsDeviceContext::strokeRect (const CRect& rect, const CColor& c
 }
 
 //------------------------------------------------------------------------
-// 太さ 1 かつ aliasing は 1 px の Bresenham 線 (端点は四捨五入して画素に置く)。それ以外は線分の和集合で被覆を求める。
+// 画素ごとに標本点 (AA は 4x4・aliasing は 1 点) の bit mask を bbox 上に持ち、線分ごとに、その線分の bbox を半幅 +1 で広げた範囲だけ標本を立てる。
+// 最後に被覆 (立った標本の割合) を alpha に掛けて 1 回だけ合成する。接合部で辺が重なっても二重に合成しない。
+// 太さ 1 かつ aliasing は Bresenham の画素を立てる (頂点の画素も 1 回だけ合成する)。
 void CanvasGraphicsDeviceContext::plotLines (const PointList& points, bool closed, const CColor& color) const
 {
 	if (points.size () < 2)
 		return;
 	const auto segmentCount = closed ? points.size () : points.size () - 1;
-	if (lineWidth <= 1. && !drawMode.antiAliasing ())
-	{
-		for (size_t i = 0; i < segmentCount; ++i)
-			forEachBresenhamPixel (points[i], points[(i + 1) % points.size ()],
-			                       [&] (int32_t x, int32_t y) { blendPixel (x, y, color); });
-		return;
-	}
-	// 線分の和集合の被覆を画素ごとに 1 回だけ求め、alpha に掛けて 1 回だけ合成する。
-	// 接合部 (角) で辺が重なっても二重に合成しない。aliasing は標本点の内外、AA は 4x4 標本の被覆率。
+	const bool bresenham = lineWidth <= 1. && !drawMode.antiAliasing ();
 	const auto half = std::max (lineWidth, 1.) / 2.;
-	const bool antiAliasing = drawMode.antiAliasing ();
-	const int sub = antiAliasing ? 4 : 1;
+	const int sub = drawMode.antiAliasing () ? 4 : 1;
 	CRect bounds (points[0].x, points[0].y, points[0].x, points[0].y);
 	for (const auto& p : points)
 	{
@@ -506,34 +499,69 @@ void CanvasGraphicsDeviceContext::plotLines (const PointList& points, bool close
 	bounds.inset (-half - 1., -half - 1.);
 	auto box = pixelBoxOf (bounds);
 	auto clip = pixelBoxOf (clipRect);
-	for (auto y = std::max (box.y0, clip.y0); y < std::min (box.y1, clip.y1); ++y)
+	box.x0 = std::max (box.x0, clip.x0);
+	box.y0 = std::max (box.y0, clip.y0);
+	box.x1 = std::min (box.x1, clip.x1);
+	box.y1 = std::min (box.y1, clip.y1);
+	if (box.x0 >= box.x1 || box.y0 >= box.y1)
+		return;
+	const auto width = static_cast<size_t> (box.x1 - box.x0);
+	const uint16_t fullMask = static_cast<uint16_t> ((1u << (sub * sub)) - 1u);
+	std::vector<uint16_t> covered (width * static_cast<size_t> (box.y1 - box.y0), 0);
+	auto cover = [&] (int32_t x, int32_t y) -> uint16_t& {
+		return covered[static_cast<size_t> (y - box.y0) * width + static_cast<size_t> (x - box.x0)];
+	};
+	for (size_t i = 0; i < segmentCount; ++i)
 	{
-		for (auto x = std::max (box.x0, clip.x0); x < std::min (box.x1, clip.x1); ++x)
+		const auto& from = points[i];
+		const auto& to = points[(i + 1) % points.size ()];
+		if (bresenham)
 		{
-			int hits = 0;
-			for (int sy = 0; sy < sub; ++sy)
+			forEachBresenhamPixel (from, to, [&] (int32_t x, int32_t y) {
+				if (x >= box.x0 && x < box.x1 && y >= box.y0 && y < box.y1)
+					cover (x, y) = 1;
+			});
+			continue;
+		}
+		// 半幅以内の標本点は線分の bbox を半幅 +1 で広げた範囲に必ず入る。それ以外は走査しない。
+		CRect segment (std::min (from.x, to.x), std::min (from.y, to.y), std::max (from.x, to.x),
+		               std::max (from.y, to.y));
+		segment.inset (-half - 1., -half - 1.);
+		auto segBox = pixelBoxOf (segment);
+		for (auto y = std::max (segBox.y0, box.y0); y < std::min (segBox.y1, box.y1); ++y)
+		{
+			for (auto x = std::max (segBox.x0, box.x0); x < std::min (segBox.x1, box.x1); ++x)
 			{
-				for (int sx = 0; sx < sub; ++sx)
+				auto& bits = cover (x, y);
+				if (bits == fullMask)
+					continue;
+				for (int sy = 0; sy < sub; ++sy)
 				{
-					const auto px = x + (sx + 0.5) / sub;
-					const auto py = y + (sy + 0.5) / sub;
-					for (size_t i = 0; i < segmentCount; ++i)
+					for (int sx = 0; sx < sub; ++sx)
 					{
-						const auto& from = points[i];
-						const auto& to = points[(i + 1) % points.size ()];
+						const auto px = x + (sx + 0.5) / sub;
+						const auto py = y + (sy + 0.5) / sub;
 						if (distanceToSegment (px, py, from, to) <= half)
-						{
-							++hits;
-							break;
-						}
+							bits |= static_cast<uint16_t> (1u << (sy * sub + sx));
 					}
 				}
 			}
-			if (hits == 0)
+		}
+	}
+	for (auto y = box.y0; y < box.y1; ++y)
+	{
+		for (auto x = box.x0; x < box.x1; ++x)
+		{
+			const uint16_t bits = cover (x, y);
+			if (bits == 0)
 				continue;
-			const auto coverage = hits / double (sub * sub);
-			if (auto* dst = pixelAt (x, y))
-				blendRGBA (dst, color, globalAlpha * coverage);
+			auto* dst = pixelAt (x, y);
+			if (!dst)
+				continue;
+			int hits = 0;
+			for (int b = 0; b < sub * sub; ++b)
+				hits += (bits >> b) & 1;
+			blendRGBA (dst, color, globalAlpha * (hits / double (sub * sub)));
 		}
 	}
 }

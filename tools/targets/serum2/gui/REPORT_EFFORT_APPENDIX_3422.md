@@ -87,12 +87,27 @@
 - `plotLines (points, closed, color)` に一本化 (`drawLine`・`drawLines`・`drawPolygon`・`drawEllipse` の輪郭が通る)。
 - 画素ごとに「線分の和集合」の被覆を 1 回だけ求め、`blendRGBA` を 1 回だけ呼ぶ。角で辺が重なっても二重合成しない。
 - 被覆: aliasing (太さ 1 を含む) は画素中心 1 点の内外 (0/1)。`kAntiAliasing` は画素を 4x4 に分けた標本点の割合 (面積被覆の近似・16 段階)。
-- 太さ 1 かつ aliasing は従来どおり Bresenham (`forEachBresenhamPixel`)。判定の旧値と一致する。
+- 太さ 1 かつ aliasing は従来どおり Bresenham (`forEachBresenhamPixel`)。判定の旧値と一致する。ただし画素は bit mask に立てるだけで、閉じた polyline の頂点の画素も辺ごとに二重合成せず、1 回だけ合成する (半透明色でも二重に濃くならない)。
+- 計算量: 画素ごとの bit mask は線分の bbox を半幅 +1 で広げた範囲だけを走査する (線分ごとに全画素を見ない)。全標本が立った画素は以降の標本計算を省く。
 
 ### 3-3. 判定
 - `check_line_width.sh` に角のケースを追加 (`corner_tri_w4_aa`: 頂点 (8.5,50.5)・(32.5,10.5)・(56.5,50.5)、w4 AA の閉じた三角形)。参照値は同じ標本法で「線分の和集合の被覆」を直接求めた値。判定 `corner_no_double_blend` は `over` (参照値より alpha が 1 を超えて濃い画素数) = 0 を要求。
 - 変更前 (本体 = `origin/main` `d355f2a71`・判定は本 commit の新版): `corner_join over=105 maxdiff=64` → `corner_no_double_blend: fail`。
 - 変更後 (測定 commit `66f9d8acd`): `corner_join over=0 maxdiff=0` → pass。rc=0。
+- 注意: 参照値は実装と同じ 4x4 標本法・同じ距離関数で作っている。判定の意味は「和集合を 1 回だけ合成したか」のみ。実機 VSTGUI の画素との一致は測っていない。
+- review 対応 (本 commit 後): 同じ判定 (`corner_join over=0 maxdiff=0`) を native (`g++`・vstgui4_14_3・emsdk 無し) で再確認した。
+
+### 3-5. 計算量の実測 (review 対応・native)
+- 測定: `g++` で `canvas_graphicsdevice.cpp` を旧 (`66f9d8acd^`) と新 (HEAD) で各々ビルドし、同じ bench (`drawEllipse`・`Stroked`・AA・太さ 4 (d200 は 1 px 太さも)) を 1 回あたり平均で計った。`check_line_width.sh` の emsdk は無いので wasm の値ではない。
+- 結果 (1 回あたり ms):
+
+| ケース | 旧 -O0 | 新 -O0 | 旧 -O2 | 新 -O2 |
+|---|---|---|---|---|
+| 楕円 d200 w4 AA | 1.47 | 7.83 | 0.59 | 2.68 |
+| 楕円 d400 w4 AA | 2.99 | 16.22 | 1.16 | 4.89 |
+| 楕円 d200 w1 AA | 0.51 | 4.03 | 0.19 | 1.34 |
+
+- 判断: 新方式は旧方式の約 4.5 倍 (-O2)。reviewer の「全辺を画素ごとに見る」最悪 (約 2.6 億回) にはならない (辺 bbox 走査で抑えている)。ただし楕円の描画は旧より重くなるため、wasm の実機での時間は未測定。画面に多数の楕円を描く場面では再測定が要る。未解決として残す。
 
 | ケース | 変更前 nonzero / partial / full | 変更後 nonzero / partial / full |
 |---|---|---|
