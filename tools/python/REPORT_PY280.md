@@ -49,7 +49,7 @@ issue 本文の『33 個の const peNNN』は概数。移行時の実測は 31 �
 | 検証 | コマンド | 結果 (現 head `780159860`) |
 |---|---|---|
 | provider ビルド | `bash tools/python/provider/build.sh` | rc 0 |
-| 素材 | `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` / `toolchain-emsdk.tar.zst` を `$RUNNER_TEMP/emsdk-x` | fl-win64 8.5 s・emsdk 3.7 s |
+| 素材 | `fl-win64`・`toolchain-emsdk` の `.tar.zst` を `tar --zstd -xf` で展開 (展開先は runner の一時 dir) | fl-win64 8.5 s・emsdk 3.7 s |
 | 入力配置 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` | rc 0 |
 | CPython wasm | `EMSDK=$RUNNER_TEMP/emsdk-x/emsdk bash build_cpython_wasm.sh` | rc 0。直前の commit で同じ成果物が既にあり増分扱いのため 1 s。clean ビルドの時間は**本測定では未取得** (前回 3 min 20 s は別 commit の clean 測定) |
 | flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 (4 s) |
