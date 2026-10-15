@@ -83,4 +83,20 @@ python3 snapins/scripts/carve_iat_census.py work/winpkg/HeartCore.core_64 work/c
 - #12〜#14 の lock/cv が #16 の SleepConditionVariableSRW と同一かは未確認 (規則 3 の前提 (b))。確認するには `plugins-kilohearts` 素材で census を再実行し、#12〜#14 と #16 の lock/cv の RIP 相対アドレスを比べる必要がある。(b) を確認できた site だけ stub にできる。同一なら規則 4 により fail-fast のまま。
 - slot 7・13 の呼出順 (scenario で set/prepare が呼ばれるか) の確定 → 子 issue。呼ばれるなら slot 7 の協調を単一スレッドの同期実行に置換する (実装判定の追加) か、harness の呼出を避ける設計を決める。
 - 判定 (fail-fast 19 件) と現行 `IMP_SHIM` の整合 (18 件は abort で一致。GetLastError の既存 `rax = 0` を fail-fast に合わせる件)、反映で既存 14 本の出力が変わらないことの確認 → 子 issue。
-- `carve_iat_census.py` の `PROCESS_ROOT = 0x37d210` は固定 VA。vtable JSON から GraphicEqDsp の slot 14 を引く照合は未実装 (入力が変わると古い値を黙って使う)。本 run はスクリプトを再実行できない (素材なし) ため未変更。
+- `carve_iat_census.py` の `PROCESS_ROOT = 0x37d210` は固定 VA。vtable JSON から GraphicEqDsp の slot 14 を引く照合は未実装 (入力が変わると古い値を黙って使う)。→ §5 で実装 (KH-123)。
+
+## 5. KH-123 (#4864): 再測定・vtable 照合・lock/cv 同一性
+
+- 測定 commit = `29252657c` (`carve_iat_census.py` に vtable 照合を入れた commit)。素材 = `plugins-kilohearts` の `Kilohearts Offline Installer.zip` の Windows 側 (`payload.dat` → `windows.zip/*` → `winpkg/`)。手順は §0 と同じ (`rtti_walk` → `callgraph` (4 proc) → `closures` → `carve_iat_census`)。
+- 結果 (`29252657c`・load average 0.28 / 4 CPU): closure 142 funcs・IAT 19 sites (§0 と一致)。`PROCESS_ROOT` 照合 `vtable check ok: slot14=0x37d210` (slot 7 = `0x37c980`・slot 13 = `0x37cbe0` も JSON から引けた)。不一致なら exit。census 所要 0.43 s。
+- process 直接 closure 145 関数の内訳: unique 側 25 関数の IAT 0 件。**infra 側 120 関数の名前付き IAT は 51 件** (census `process_iat_infra`)。これは名前付き import の下限であり、census の 51 件を全件とは読まない。`callgraph.pkl` の `iat` 合計 60 件 = 名前付き 51 件 + CFG 間接 9 件 (下記)。
+- **CFG 間接 9 件の先は未確定**: `call/jmp qword ptr [rip+…]` の先が `0x1813a1d38` (`GuardCFDispatchFunctionPointer`) など `.data` の関数ポインタで、静的に先が決まらない。`0xfa8534`・`0xfb5e6c`・`0xfc7468`・`0xfd08d0`・`0xfd0ac8`・`0xfd172c`・`0xfd1ac4`・`0xfd1b34`・`0xfd7f54` (CFG 経由の間接 call)。census は名前付き import に解決できないため対象外。先が IAT かどうかは未検証 (起票先: #4896 の `[icall]` 追跡の範囲)。
+- **#12〜#14 と #16 の lock/cv は同一** (規則 3 の (b) 不成立を確認): `0xf877fc` の lock は `lea` 先 `0x184161948`、cv は `0x184161940`。`0xf87868` の待機ループ内の lock も `0x184161948`、`SleepConditionVariableSRW` の cv も `0x184161940` (`lea rdx`・`lea rcx` の RIP 相対で確認)。よって規則 4 (待機の一部) により **fail-fast のまま**。stub 化は行わない (判定は §2 のとおり変えない)。
+- 受入条件の判定:
+  - [x] 測定 commit と差分の記録 (本節)。
+  - [x] `PROCESS_ROOT` の vtable 照合 (`carve_iat_census.py`・§5 結果)。
+  - [x] process 経路の IAT 件数の再測定 (unique 0・infra 側 51 名前付き + CFG 間接 9)、共通基盤 120 関数の集計 (本節)。
+  - [x] #12〜#14 と #16 の同一性確認 (本節)。
+  - [ ] slot 7・13 が native scenario で呼ばれるか → **未確定**。`tools/targets/kilohearts/snapins/harness/scenarios*.c` に graphiceq (ksge) の scenario が無い。子 issue (KH-130) で harness に scenario を足して確定する。
+  - [ ] `0xfe2508` 等の間接 call の先の `[icall]` 追跡 → **未確定**。`0xfe2508` (CRT atexit runner) の間接 call は `call r8`・`call rdx` (レジスタ) で、静的に先が決まらない。子 issue (KH-131) で実行時 trace (icall) から先を取る。
+- 未解決 (起票先は PR 本文の表): slot 7・13 の呼出確定 → KH-130、間接 call の追跡 (`0xfe2508` 等・CFG 間接 9 件を含む) → KH-131 (#4896)。

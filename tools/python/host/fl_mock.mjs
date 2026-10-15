@@ -590,7 +590,7 @@ export function createMockEngine() {
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
-    // PY-231 (#3671): PE 0xd748e0 (書式 ii)。判定順は midiOutMsg と同じ (-7 → -6)。送るのは第 1 引数の word。mode は stub 名 (PE の kwlist 名は forwardTo・REPORT_PY231 §1)
+    // PY-231 (#3671): PE 0xd75120 (書式 "L|i"・既定 1 は PE が書く)。判定順 (-7 → -6) は midiOutMsg と同じ判定順と仮置き (REPORT_PY231 §1b)。送るのは第 1 引数の word。mode は stub 名 (PE の kwlist 名は forwardTo・REPORT_PY231 §1)
     // PY-276 (#3949): PE 0xfdc8a0 は添字の値が変わったときだけ送る。C (fl_engine.c) と同じく未設定 (-1) から始め、範囲外の添字は重複検出せず送る
     // message 欠落は C の既定 0 と同じ (JS の TypeError にしない)
     "device.forwardMIDICC": (message = 0, mode = 1) => {
@@ -613,6 +613,11 @@ export function createMockEngine() {
     },
     // PY-215 (#3568): PE 0xd75d30 と同じ (-1 → -1、連動表が空の index ≥ 0 → None)。表の供給元は仮置き (空)。device・link の割当は見ない
     "device.getLinkedChannel": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) return -1; return undefined; },
+    // PY-4846 (#3568 子 B): index == -1 の経路だけ PE 確定 (REPORT_PY215 §1)。index >= 0 は未確定のため C provider と同じ未実装 error (code 2)
+    "device.getLinkedValue": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) return -1; throw new FlError("Unspecified error (not implemented: device.getLinkedValue index>=0)", 2); },
+    "device.getLinkedInfo": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) return -1; throw new FlError("Unspecified error (not implemented: device.getLinkedInfo index>=0)", 2); },
+    "device.getLinkedParamName": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) throw new FlError("Plugin not valid", 8); throw new FlError("Unspecified error (not implemented: device.getLinkedParamName index>=0)", 2); },
+    "device.getLinkedValueString": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) throw new FlError("Plugin not valid", 8); throw new FlError("Unspecified error (not implemented: device.getLinkedValueString index>=0)", 2); },
     // PY-206 (#3494): PE 0xd75f40・0xd75f80・0xd75fc0 は assigned 機器 (obj.+0x50) の vtbl 先を呼び、戻り status 0 で None を返す (REPORT_PY206)。vtbl 先の効果は未読のため状態を持たない
     "device.createRefreshThread": (...a) => { arity(a, 0, 0); },
     "device.destroyRefreshThread": (...a) => { arity(a, 0, 0); },

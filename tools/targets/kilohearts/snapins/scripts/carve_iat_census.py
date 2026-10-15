@@ -65,29 +65,52 @@ def main(core, cgp, setp, vtp, out):
     md = capstone.Cs(CS_ARCH_X86, CS_MODE_64)
     md.detail = True
 
-    # 関数ごとに [rip+disp] call/jmp を集める
-    sites = []
-    for f in sorted(funcs):
-        size = res[f]['size']
-        off = pe.get_offset_from_rva(f)
-        code = data[off:off + size]
-        ins = list(md.disasm(code, base + f))
-        for k, i in enumerate(ins):
-            if i.mnemonic not in ('call', 'jmp'):
+    def reach(rs):
+        seen, st = set(), list(rs)
+        while st:
+            f = st.pop()
+            if f in seen or f not in res:
                 continue
-            if '[rip' not in i.op_str:
-                continue
-            tgt_slot = i.address + i.size + i.disp
-            name = imps.get(tgt_slot)
-            if name is None:
-                continue
-            before = [fmt(x) for x in ins[max(0, k - 6):k]]
-            after = [fmt(x) for x in ins[k + 1:k + 4]]
-            sites.append(dict(func=f'{f:#x}', site=f'{i.address:#x}', kind=i.mnemonic, slot=f'{tgt_slot:#x}',
-                              import_name=name, before=before, after=after))
+            seen.add(f)
+            st.extend(res[f]['calls'])
+            st.extend(res[f]['jmps'])
+        return seen
+
+    # vtable JSON から GraphicEqDsp の slot 7・13・14 を引き、固定 VA (PROCESS_ROOT 等) と照合する
+    vt = json.load(open(vtp))
+    gslots = [int(s, 16) - base for s in vt['.?AVGraphicEqDsp@graphiceq@@'][0]['slots']]
+    if gslots[14] != PROCESS_ROOT:
+        sys.exit(f'PROCESS_ROOT mismatch: vtable slot14={gslots[14]:#x} != {PROCESS_ROOT:#x}')
+    print(f'vtable check ok: GraphicEqDsp slot7={gslots[7]:#x} slot13={gslots[13]:#x} slot14={gslots[14]:#x}')
+    proc_all = reach([gslots[14]])
+
+    # 関数ごとに [rip+disp] call/jmp を集める (closure 本体と process 直接 closure の infra 側)
+    def scan(fs):
+        found = []
+        for f in sorted(fs):
+            size = res[f]['size']
+            off = pe.get_offset_from_rva(f)
+            code = data[off:off + size]
+            ins = list(md.disasm(code, base + f))
+            for k, i in enumerate(ins):
+                if i.mnemonic not in ('call', 'jmp'):
+                    continue
+                if '[rip' not in i.op_str:
+                    continue
+                tgt_slot = i.address + i.size + i.disp
+                name = imps.get(tgt_slot)
+                if name is None:
+                    continue
+                before = [fmt(x) for x in ins[max(0, k - 6):k]]
+                after = [fmt(x) for x in ins[k + 1:k + 4]]
+                found.append(dict(func=f'{f:#x}', site=f'{i.address:#x}', kind=i.mnemonic, slot=f'{tgt_slot:#x}',
+                                  import_name=name, before=before, after=after))
+        return found
+
+    sites = scan(funcs)
+    proc_iat = scan(proc_all - fset)
 
     # 各 site の関数が到達する root (vtable slot) の数と class 名
-    vt = json.load(open(vtp))
     roots = collections.defaultdict(list)
     for k, lst in vt.items():
         rest = k[4:]
@@ -103,24 +126,11 @@ def main(core, cgp, setp, vtp, out):
             for s in v['slots']:
                 roots[parts[0]].append(int(s, 16) - base)
 
-    def reach(rs):
-        seen, st = set(), list(rs)
-        while st:
-            f = st.pop()
-            if f in seen or f not in res:
-                continue
-            seen.add(f)
-            st.extend(res[f]['calls'])
-            st.extend(res[f]['jmps'])
-        return seen
-
     reach_by_root = {}
     for cls, rs in roots.items():
         for r in set(rs):
             reach_by_root[(cls, r)] = reach([r]) & fset
-    proc_all = reach([PROCESS_ROOT])
     proc = proc_all & fset
-    proc_iat = [s for s in sites if int(s['func'], 16) in proc_all]
     for s in sites:
         f = int(s['func'], 16)
         hit = sorted({f'{c}@{r:#x}' for (c, r), st in reach_by_root.items() if f in st})
@@ -130,7 +140,9 @@ def main(core, cgp, setp, vtp, out):
 
     summary = collections.Counter(s['import_name'] for s in sites)
     print(f'closure funcs={len(funcs)} IAT call sites={len(sites)}')
-    print(f'process root {PROCESS_ROOT:#x}: direct closure {len(proc_all)} funcs (unique 集合内 {len(proc)}), IAT sites in it = {len(proc_iat)}')
+    print(f'process root {PROCESS_ROOT:#x}: direct closure {len(proc_all)} funcs (unique 集合内 {len(proc)}), '
+          f'IAT sites in unique = {sum(1 for s in sites if int(s["func"], 16) in proc)}, '
+          f'IAT sites in infra side ({len(proc_all - fset)} funcs) = {len(proc_iat)}')
     for name, n in summary.most_common():
         print(f'  {n:2d}  {name}')
     for n, s in enumerate(sites, 1):
@@ -140,7 +152,7 @@ def main(core, cgp, setp, vtp, out):
         for b in s['before']:
             print(f'      < {b}')
         print(f"      > {' | '.join(s['after'])}")
-    json.dump(dict(closure_funcs=len(funcs), sites=sites), open(out, 'w'), indent=1, ensure_ascii=False)
+    json.dump(dict(closure_funcs=len(funcs), sites=sites, process_iat_infra=proc_iat), open(out, 'w'), indent=1, ensure_ascii=False)
 
 
 if __name__ == '__main__':
