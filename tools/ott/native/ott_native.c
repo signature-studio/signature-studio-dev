@@ -130,6 +130,11 @@ static MS void k_RtlCaptureContext(uint8_t* ctx) {
     *(uint64_t*)(ctx + 0x98) = (uint64_t)fp + 16; /* Rsp = 呼び出し元の rsp */
 }
 
+/* ICALL-104: SetUnhandledExceptionFilter。前の filter を返し新しい filter を登録する (初期値 NULL)。
+ * UnhandledExceptionFilter 本体は未実装 (fail-fast のまま)。 */
+static void* g_uef;
+static MS void* k_SetUnhandledExceptionFilter(void* f) { void* old = g_uef; g_uef = f; return old; }
+
 typedef struct { const char* n; void* f; } Impl;
 static const Impl IMPL[] = {
     {"GetProcessHeap", k_GetProcessHeap}, {"HeapAlloc", k_HeapAlloc}, {"HeapFree", k_HeapFree},
@@ -145,6 +150,7 @@ static const Impl IMPL[] = {
     {"FlsGetValue", k_TlsGetValue}, {"FlsSetValue", k_TlsSetValue},
     {"RtlPcToFileHeader", k_RtlPcToFileHeader},
     {"RtlCaptureContext", k_RtlCaptureContext},
+    {"SetUnhandledExceptionFilter", k_SetUnhandledExceptionFilter},
     {NULL, NULL}};
 
 static MS void missing_import(uint64_t idx) {
