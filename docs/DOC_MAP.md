@@ -271,6 +271,7 @@
 | `tools/m11/trap_triage/REPORT.md` | ~228 | M11 survey trap の個別原因切り分け (#130)・halt0 20 の原因 (#417)・OOB 分類 (#419、§8.2 = 旧 tree の実測。現 main の ON/OFF 比較は REPORT_595) |
 | `tools/m11/trap_triage/REPORT_2212.md` | ~115 | #2212: rt.o の静的データ配置 (`g_dest_h`・`g_rec_*`・pad) と関数有無の対照 (NODATA 2012・PRE/POST の 2006・既定 2008)・リンク後の実アドレス・n=3 の決定性 (生値 `table_2212.tsv`・`addr_2212.txt`)・再現 `repro_1952_rt_mech.sh` |
 | `tools/m11/trap_triage/REPORT_714.md` | ~246 | #714: OOB 呼出し鎖・計測器の影響・実値採取の再試行 (§12〜§13)。#1602 r4 の要約は末尾。全文は `REPORT_APPENDIX_1602.md` |
+| `tools/m11/trap_triage/REPORT_APPENDIX_3564.md` | ~70 | #3564: strict 候補の残り (証拠表の行 36〜66 の保留 6・単独 15) の件ごと判定 (真陽性 12・偽陽性 1・保留 8)。REPORT_718 §4i の全文・判定補助 `judge_src.py`・機械語側のネガティブコントロール `negctl_3564.py` (付録 §7) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` | ~56 | #3498 (PR #3567): strict 候補の証拠表 行 4〜35 (32 件) の件ごとの表・判定規則・未解決 (REPORT_718 §4h の全文。REPORT_718.md の 250 行上限のため分割移動)。判定は保留 32 (真陽性 0・偽陽性 0) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2773.md` | ~70 | #2773 (2 回目): REPORT_679 §10 の全文。unit 101 の周回の根本原因 (4fa210 の件数 0 ガード脱落・D19 同型)・修復の測定表・原典突合・未解決 |
@@ -355,6 +356,7 @@
 | `tools/m11/ldfix/REPORT_3328.md` | ~100 | CI-149 (#3328): スピル引数 deref の走査定義 (CALL・EXCL・COPY・CMP の kind 分け、偽陽性の再ロード除外、判定不能の定義)。件数と判定は本 REPORT §0・§6。未判定は子 #3381 [CI-152]・#3382 [CI-153] |
 | `tools/m11/ldfix/REPORT_3326.md` | ~110 | CI-148 (#3326): 誤り 13 箇所 (DEFECTS D4) のうち単純型 5 箇所を機械照合 22 命令付きの site 単位 IR 修復 `fix_site_3326.py` で直す (既存 pass で直る 4 箇所を除く)。ネガティブコントロール 4/4 拒否。`ldfix_e2e.sh` の stage4・survey は base と一致 (変化なし・OOB は両方に残る)。複雑型 4 箇所と 0x413340 の 3 番目引数は子 #3372 (CI-151) |
 | `tools/m11/ldfix/REPORT_2660.md` | ~70 | LD-119 (#2660): spill 宛 判定不能 9 site を再検証。4 site は上流 `xor i64 0,0` (型タグ読みの置換) が作る死んだ辺に依存するため TRUE_DROP を取り下げ、判定不能のまま (`ir_reach_2660.py` で到達性を検査)。脱落関数の和集合は 72 (未確定・#1161 残) |
+| `tools/m11/ldfix/REPORT_3528.md` | ~86 | LD-160 (#3528): F3d 対象関数の機械語・IR 突合 (突合ツール `f3d_crosscheck_3528.py`・negative control `f3d_negctl_3528.sh`・単体テスト `test_f3d_slots_3528.py`)、audit の HEAD / F3d 比較、既定化は見送り (理由と条件は §4)。測定値は本ファイルが正本 |
 | `tools/m11/ldfix/REPORT_2388.md` | ~75 | LD-109 (#2388): cf3790 の spill 宛 未判定 15 site を全て OK_LOAD と判定 (機械語・IR の行を `ld109_cf3790_verify.py` が照合して生成)・slot 名の式の独立確認 (#2389 と同じ `stack_var_(disp-0x1d8)`)・基底が上流の脱落値由来で汚染される注意。静的突合のみ |
 | `tools/m11/ldfix/REPORT_3426.md` | ~95 | CI-157 (#3426・親 #3416): `0x412fc0` の呼出規約の機械語↔IR 対応表 (5 番目引数の既定値分岐・レジスタ引数 rcx〜r9 の欠落・スタック部は一致) と D5 系の分類 (D7 は非該当)。検査器 `verify_abi_3426.py` (NC 5/5 拒否)。修復は子 #3450 (CI-163)・#3451 (CI-164) |
 | `tools/m11/ldfix/REPORT_3450.md` | ~100 | CI-163 (#3450・親 #3426): `function_41c8c0` (WideCharToMultiByte の薄いラッパ) を 8 引数化し、呼出元 4 site を機械語の rcx〜r9 と照合して接続。e2e 実測 (stage4・survey 不変)・DEFECTS D26 の行案 |
