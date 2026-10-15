@@ -340,6 +340,7 @@
 | `tools/m11/ldfix/REPORT_2396.md` | ~120 | LD-111 (#2396): `audit_lsf_disp.py` の変位形を `audit_lsf.py` に統合 (既存 3 判定は byte 不変、SUSPECT_DISP_VAS を並べて出力)。残 SUSPECT 3 件 (6677a0・d237e0・de1da0) を機械語 `movs` の列挙漏れ (誤検出) と確定し、列挙を拡張して 4 → 1 件 (41a670 のみ、修復後 0)。独立算法 `triage_ld111.py` の突合と NC 5 本 |
 | `tools/m11/ldfix/REPORT_2438.md` | ~106 | LD-114 (#2438): #2264 §8.3 から移管された spill 宛 未判定 12 site の消費者分類 (OK_LOAD 5・UNDETERMINED 7)。入口の memory 読みの `xor i64 0, 0` (新類型候補・3009 関数) を記録 |
 | `tools/m11/ldfix/REPORT_2921.md` | ~77 | LD-138 (#2921): `ddf630` の spill 宛 未判定 4 site (ddf6b5・ddf6c6・ddff5a・de0bfe) を機械語と IR の段数で TRUE_DROP と分類。判定根拠は `results/candidate_verdicts_2921.jsonl`、再現は `ld138_ddf630_dis.py` |
+| `tools/m11/ldfix/REPORT_2987.md` | ~80 | LD-143 (#2987): ddf630 の CELL_DEEP TRUE_DROP 4 site の IR 修復 (`fix_spill_deep_2987.py`、1 段 load 2 本に 2 段目の deref)。修復前後で spill 確定・脱落和集合は不変。2 段目の値 `[V]` の確認は未解決 |
 | `tools/m11/ldfix/REPORT_2922.md` | ~65 | LD-139 (#2922): #2838 の残り 12cb680 の 3 site (12cb8e1 判定不能 → 再分類・12cba4d・12cbab4 未判定) を TRUE_DROP に分類 (消費者 = 間接 call 先のコールバックの読み、IR 脱落)。脱落関数の和集合は REPORT §1 の実測値。動的 callback 経路と書き戻しは未解決 (PM) |
 | `tools/m11/ldfix/REPORT_2838.md` | ~50 | LD-135 (#2838): #2245 の群 B 残りのうち 466af0 の 3 site (2 段参照の 1 段脱落) を TRUE_DROP に分類。残り 9 site は #2921・#2922・#2923 (LD-138〜140) に起票 (範囲縮小) |
 | `tools/m11/ldfix/REPORT_2923.md` | ~42 | LD-140 (#2923): spill 宛 1046a30 の 2 site を再判定。10479c7 は判定不能 (OK_LOAD は撤回。IR 側の確認は #2958)、1047556 は段数は一致するが cell 番地が VA 表記 (22946304) の VA 漏れの疑いで判定不能のまま (修復は #2958 (LD-142))。上流 X の段数は未確認 |
