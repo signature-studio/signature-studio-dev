@@ -221,6 +221,13 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 §6b (#565)・§6c・§6d・§6i (#1442 / GUI-21) の全文は [REPORT_APPENDIX_HISTORY_3832_A.md](REPORT_APPENDIX_HISTORY_3832_A.md) に移した (250 行上限)。
 
+### 6j. issue #4645: EnumDisplayMonitors callback `0x85df70` の icall miss
+
+- 原因: `0x85df70` は `m11_extra_ranges5.txt` (boot5, #132) の範囲だが、素材 `work-m11` に `boot5.lift.ll` が無く、`e2e.sh` も boot5 を lift していなかった。そのため callback が IR に無く `m11_icall` が miss していた。
+- 対応: `e2e.sh` が複製側 (`$TREE/m11`) で `m11_lift.sh m11_extra_ranges5.txt boot5` を実行するようにした (`m11_e2e.sh` #132 と同じ。元の `tools/m11` は読取のみ)。`judge.py` は無変更。
+- 実測 (boot): baseline / GUI とも `units_run 110` (旧 109)、`icall_miss 4` (旧 7)、miss 先は `0xfa9390` のみ (`0x85df70`・`0x457860` が解消)。B1 PASS。
+- 注意: 解消は boot 経路で確認。survey の値 (`ok/noproc/miss/trap` = 764/1/46/131) は HEAD の committed 値と同じで、本変更では動いていない。旧 REPORT の 871 との差は既存の不整合 (未解決に記載)。
+
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
@@ -234,6 +241,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | survey の順序依存 (非 pthread と pthread で 10 unit が trap↔ok で動く、§5-6) | survey の unit 別結果が build 条件と前 unit の状態に依存する。S1 の比較は同一 build (`--base`) に限る | PM 起票依頼 (m11 survey 隔離の状態汚染。m11 側の件) |
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
 | `tools/m11/m11_e2e.sh` が PE パスを `[ANALYSIS-DIR]` の固定既定値で持つ (`[WIN64]` 経由にしていない)。`m11_gen_ir2.sh` は本 PR で `FL_WIN64_DIR` 参照に変更済み | `m11_e2e.sh` を直接使うと runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `m11_gen_ir2.sh` (FL_WIN64_DIR 経由) を使う | m11_e2e.sh に `FL_WIN64_DIR` 参照を入れる件は PM 起票依頼 (#132 の未解決と同件) |
+| `0xfa9390` の icall miss (boot の残 1 件。#4645 で `0x85df70` は解消) | 影響は未確認 | PM 起票依頼 |
 | 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (433/0 ×3)。HEAD 7d44c033 の 1 回 (500/0) でも再現せず。main 側の #489 系 (headless surface UAF) の merge を含む HEAD での結果。再現率の定量確認は未実施 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
 
 ## 6e〜6h・6f (付録へ分割移動)
