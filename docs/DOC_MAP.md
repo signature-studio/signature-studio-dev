@@ -432,7 +432,7 @@
 | `tools/python/REPORT_PY67.md` | 242 | PY-67 (#2159, 部分・未達): `0x196eba0` (g) への書込み元を `0x86a4e1` (関数 `0x86a470`) と特定。PY-71 (#2501, §5): g の値 P の型 (TGraphEditorForm) と `0xffe370` の所属 (TPublicChannel) を特定 (値は REPORT_PY71.md)。受入条件 2b・3・4 は子 #2701 |
 | `tools/python/REPORT_PY67_2159.md` | ~100 | PY-67 (#2159) 3 回目: 受入 3 (`0xec60ae` の対象) を TPlugListForm (非 chan) と確定し除外。受入 4 (`0x8ed012` の Self の出所) は呼出し元 5 件を列挙し未確定。残りは子 #2701 |
 | `tools/python/REPORT_PY71.md` | ~95 | PY-71 (#2501, 完了単位 1・2a): VMT (RTTI) の配置を 3 クラスで検証 (ネガティブコントロール 6/6 NG)。受入 1 (P = TGraphEditorForm・非 chan。全親鎖を実測)・2a (`0xffe370` = TPublicChannel のスロット 52、親 TChannel) を確定。2b (`call [reg+0x1a0]` 37 件の受け手)・3・4 は子 #2701 へ移した |
-| `tools/python/REPORT_PY86.md` | ~90 | PY-86 (#2701, 部分): call [reg+0x1a0] の受け手の分類 (受入 2b の一部)。残りは子 #3337・#3338。測定値は REPORT_PY86.md が正本 |
+| `tools/python/REPORT_PY86.md` | ~120 | PY-86 (#2701, 部分): call [reg+0x1a0] の受け手の分類 (受入 2b の一部)。残りは子 #3337・#3338。測定値は REPORT_PY86.md が正本 |
 | `tools/python/REPORT_PY116.md` | 105 | PY-116 (#2952): flapi 表の kwlist 無し引数 (flags=1) の書式を wrapper の出力ポインタ数と照合 (304 件中 302 件一致。`screen.addTextLine`・`screen.addMeter` の 6 個目は解析されない余剰で、表の個数 5 は正)。`plugins.getPresetCount` は kw 形式の唯一の flags=1 として書式 `i\|ii` を照合 (表の kwsig 1 件のみ変更)。名前の新規確定 0 件 (未確定 42 位置は `arg{i}` のまま) |
 | `tools/python/REPORT_PY123.md` | 177 | PY-123 (#3028, 未達): undo 管理 global `0x15e1c78`・安全判定 global `0x15e4790` は unit 209 の停止直前 (GetMem(0x74) の FastMM dispatch が icall-miss → Error → `MessageBoxA ''` → `exit(0)`) で 0 になる。GetMem 呼出し直前までに絞り込み済み。0 にする命令と受入 1〜3 は未特定。停止点の stderr 行は §2-4 |
 | `tools/python/REPORT_PY12.md` | ~46 | PY-12 (#587): `_flhost` の per-module state 化・サブインタプリタ採用判断の実測 (REPORT.md の PY-12 節の全文。250 行上限のため分離) |
