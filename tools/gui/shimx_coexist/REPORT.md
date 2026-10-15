@@ -240,7 +240,7 @@ bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 
 ## 12. SHBrowseForFolder の gui 側 fail-fast 検査 (SHX-T34 #2917)
 
-`bash tools/gui/test/shbrowse_failfast.sh` (gui 全 obj と shimx 全 obj を同一 wasm にリンク。probe が `GetProcAddress(shell32.dll, "SHBrowseForFolderA/W")` を呼ぶ。IR は fixture (declare 177)。測定 commit `503be2e75`、`git diff 503be2e75 HEAD -- tools/gui` は 0 件)。3 回実行で全て `pass=5 fail=0`、所要 9.698 / 9.655 / 9.674 s (load1 0.21–0.43)。
+`bash tools/gui/test/shbrowse_failfast.sh` (gui 全 obj と shimx 全 obj を同一 wasm にリンク。probe が `GetProcAddress(shell32.dll, "SHBrowseForFolderA/W")` を呼ぶ。IR は fixture (declare 177)。測定 commit `503be2e75`、`git diff 503be2e75 HEAD -- tools/gui ':!tools/gui/shimx_coexist/REPORT.md'` は 0 行)。3 回実行で全て `pass=5 fail=0`、所要 9.698 / 9.655 / 9.674 s (load1 0.21–0.43)。
 
 | 検査 | 結果 |
 |---|---|
