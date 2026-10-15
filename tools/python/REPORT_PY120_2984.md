@@ -145,7 +145,7 @@ main (`a9733bbb`) を取り込んだ merge `c49cf5f7`。競合は 3 ファイル
 | `python3 analysis/flapi/pe_launchmap_entries.py` | 12/12 OK | 0.09 |
 | 負のコントロール: `host/fl_mock.mjs` の `launchPages` を 1 にして `launchmap_diff.mjs` | rc 1・`launchMapPages 差分 1 件` で検出。0 へ戻して再実行 rc 0 (diffs 0) | 0.05 |
 
-- 未再測定: `static_subinterp_browser` (flpy_static64・MEMORY64=1) と 64 bit の CPython・static のビルド (`build_cpython_wasm64.sh`・`FLPY_MEMORY64=1 build_flpy_static.sh`)。時間枠に入らなかった。前回 (再測定 (4)) の FAIL (既知 #2918) は本測定の根拠にしない。
+- 未再測定 (c49cf5f7 では未実行。現 head での値は無い): 64 bit の CPython と static のビルド (`build_cpython_wasm64.sh`・`FLPY_MEMORY64=1 build_flpy_static.sh`)、`static_subinterp_browser` (flpy_static64・MEMORY64=1)。時間枠に入らなかった。測定 commit `71005b39` の FAIL (既知 #2918) は現 head の根拠にならない。起票先は下の未解決表。
 - コード差分 (測定 commit `c49cf5f7` から HEAD まで、テスト・mock・C・解析に効く範囲): 下の出力を最終 HEAD で取った (REPORT と付録の変更のみ)。
 
 ```
@@ -160,5 +160,6 @@ $ git diff c49cf5f7 HEAD -- tools/python/host tools/python/provider tools/python
 | 残り 11 件の PE 確定 (索引付き読出し 4・状態変更 4・イベント処理 3) | `launchMapPages` の 11/12 が未実装 (provider の未実装扱い) | #3027 (PY-156)・#3029 (PY-138)・#3030 (PY-139) |
 | `length` の件数ヘッダ `[arr-8]` の意味 (件数か容量か)・未初期化経路 (code -7 の例外化の述語)・実行時初期値 (mock・C の 0 は仮置き。provider_check の実装 1 件はこの仮置き値) | 件数の意味は推定。未初期化時の挙動は未モデル。mock・C の値が実機と違う可能性 | #3029 (PY-138) |
 | `0xd843d0` の同一性 (本件と #3001 PY-125 の dispatch) | 下位関数の二重確定の可能性 | #3029・#3030 (未確認) |
-| `static_subinterp_browser` (flpy_static64・MEMORY64=1) の FAIL 1 件 (150 回の反復で wasm メモリが +14.8 MB 増える) | 長時間の反復で wasm メモリが増える。本 PR の前から同値 (`REPORT_PY109.md`) | #2918 (既存・PY-108) |
+| `static_subinterp_browser` (flpy_static64・MEMORY64=1) の FAIL 1 件 (測定 commit `71005b39`・150 回の反復で wasm メモリが +14.8 MB 増える。c49cf5f7 では未再測定) | 長時間の反復で wasm メモリが増える。本 PR の前から同値 (`REPORT_PY109.md`) | #2918 (既存・PY-108) |
+| 64 bit CPython・flpy_static64 の再測定 (c49cf5f7 で未実行。`71005b39` の FAIL は現 head の根拠にならない) | 64 bit 側の現 head での結果が無い。受入条件 4 件は c49cf5f7 の実測で満たす (64 bit 側は受入条件に含まない) | 既存 #2918 へのコメント (flpy_static64)・親 #2984 への提案 (64 bit CPython。再測定だけの子は作らない) |
 | `static_check` の単発 FAIL (過去測定 (付録) の 12 回中 1 回・FAIL 行は未採取)。今回の 1 回は OK | 原因未特定。再発時に比べられる一次情報が無い | 親 #2984 への提案 (既存の該当 issue は無い。再発時に FAIL 行を採取して #2984 にコメントする。新規子は作らない) |
