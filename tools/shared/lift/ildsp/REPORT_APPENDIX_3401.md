@@ -1,0 +1,72 @@
+# ildsp REPORT 付録: PSOLA_CreateInstance の closure lift と native 差分 (#3401)
+
+`REPORT.md` §8 の全文 (250 行上限のため分割移動の形で置く)。手順・実測・未解決の正本はこのファイル。
+親: #161 (T-SH-15)。前例: `REPORT_APPENDIX_3216.md` (WaveformColouring、同じ harness)。
+
+## 8. PSOLA_CreateInstance の closure lift と native 差分 — T-SH-75 (#3401・縮小して完了)
+
+既知類型との関係: 該当なし (差分は CreateInstance・slot 0・4・5 の範囲で 0 件。`docs/DEFECTS.md` の新しい類型は確認していない)。
+測定 commit: `b897cb883` (コードを変えた最後の commit。以降の差分は `.md` のみ・§8-8)。検証起点: `42357b73e` (origin/main)。
+
+### 8-1 結論 (1 行)
+規模の正本は vtable 経由 closure (82 関数・4,601 命令・間接 call 18)。その一部 (CreateInstance + slot 0・4・5 の到達集合 = 36 関数・1,046 命令・unsup 0) を x64c で C に lift し wasm (80,737 B) にした。native 対 wasm は 64 case で全一致 (ネガティブコントロール FAIL 64/64)。slot 1–3 (DSP 本体) と閉包の残りは未 lift で、子 T-SH-81 に残す。
+
+### 8-2 規模の定義 (受入 1)
+- 正本: vtable 経由 closure (`ildsp_closure.py`・`REPORT_CLOSURE.md` §4.2)。理由: §4 で instance の lift 単位を「CreateInstance + vtable slot 先の到達集合」と決めている。`.pdata` 基準 (`REPORT.md` §2: 8 関数・238 命令) は slot 先を含まない下限で、正本にしない。
+- PSOLA の確定値 (測定 commit で再実行・`REPORT_CLOSURE.md` §4.2 と一致):
+
+| 項目 | 値 |
+|---|---:|
+| vtable (RVA) | 0x3e0030・6 slot (thunk 3) |
+| 関数数 (`.pdata` 無し) | 82 (29) |
+| 命令数 | 4,601 |
+| SIMD 比 | 21.4% |
+| 直接 call / 間接 call | 201 / 18 (IAT 16・画像内関数ポインタ 2・vcall 0・call reg 0) |
+| CreateInstance 単体 (entry-only) | 36 関数・961 命令 |
+
+- slot の役割 (逆アセ確認): slot 0 = 0x1ab590 (dtor 相当。内部オブジェクトを解放)、slot 1–3 = thunk (`mov rcx,[rcx+8]; jmp`) で先は 0x17f700・0x1804b0・0x180830 (DSP 本体)、slot 4 = 0x1ab6b0 (内部状態のクリア・戻り値は ABI 上未定義)、slot 5 = 0x1ab800 (`mov rax,[rcx+8]; mov eax,[rax+0x98]; ret` = 内部 +0x98 を返す)。
+- 注 (未解決): x64c の closure (`--closure 99`・7 root) は 235 関数・60,095 命令で、82 関数とは 71 関数しか重ならない (x64c のみ 164・82 のみ 11。後者には 0x17f700・0x1804b0・0x180830 を含む)。規模の定義が 2 種類ある状態は残る (§8-6)。
+
+### 8-3 lift (受入 3 の縮小範囲)
+- root: CreateInstance 0x1ab540・slot 0 0x1ab590・slot 4 0x1ab6b0・slot 5 0x1ab800 (`lift_psola.sh` の `WC_ROOTS`)。
+- x64c: 36 関数・1,046 命令・**unsup 0**・unlifted callees 0・traps 0・imports 10 (EnterCriticalSection・FlsGetValue・FlsSetValue・GetLastError・HeapAlloc・HeapFree・LeaveCriticalSection・RaiseException・RtlPcToFileHeader・SetLastError)。
+- wasm: 80,737 B (emcc 6.0.12 `-O1`)。
+- 閉包全体 (7 root・`--closure 99`) の unsup は **2,472 site** で、内訳は ymm 系 2,396 (vmulpd 639・vaddpd 633・vsubpd 633・vextractf128 396 ほか) と、それ以外 76 (vcvtsi2sd 14・palignr 12・div 6 ほか)。slot 1–3 の DSP 本体が ymm を使うため、その lift は x64c の VEX-256 対応 (子 T-SH-82) が前提。
+
+### 8-4 差分テスト (受入 3・4)
+- 方式: `lift_psola.sh` (`lift_wc.sh` の harness を環境変数で差し替え。既定値の WC は変えていない)。CreateInstance → slot 0 → slot 4 → slot 5 の順に呼ぶ (`WC_CALL_IDX="0 4 5"`)。
+- 戻り値 rax の畳み込みは CreateInstance と slot 5 だけ (`WC_RET_IDX="5"`)。理由: slot 4 の戻り値は ABI 上未定義で、最後に読んだ値か呼出し前の rax が残る。native (C 側の残り値) と wasm (`wc_run` の設定値) で一致しないため、畳み込むと harness の未定義動作を比べることになる。実測では slot 4 を畳み込むと全 64 case が rax で FAIL した (memory 差分は一致)。
+- 比較: rax・import stub の呼出回数・heap (arena 64 KiB)・.data 全体 (`wc_diff_test.py`)。
+- 実測 (`b897cb883`・3 回とも同じ): 差分 `PASS=64 FAIL=0 excluded(native crash)=0`・wasm trap 0。
+- ネガティブコントロール `neg-cmp` (wasm 結果の arena 先頭 1 bit 反転): `FAIL=64` (3 回とも・期待どおり)。`all` は ALL OK。
+- 観測の範囲: 64 case は同一経路 (rax は 1 種 `0x5d9b00000`・import stub 呼出 4 回・arena の sha256 は 1 種で全 case 非ゼロ)。.data は run で一度も変化しない (0 case)。よって 64 PASS は「入力 .data に依存しない 1 経路の一致」であり、分岐の網羅ではない (`REPORT_APPENDIX_3216.md` §7-6 と同じ制限)。
+
+### 8-5 実測 (測定 commit `b897cb883`・4 core)
+| 項目 | 1 回目 | 2 回目 | 3 回目 |
+|---|---:|---:|---:|
+| `lift_psola.sh ok` elapsed | 1.37 s | 1.37 s | 1.52 s |
+| `lift_psola.sh neg-cmp` elapsed | 1.38 s | 1.38 s | 1.40 s |
+| load (ok 開始時) | 0.50 0.43 0.23 | 0.50 0.43 0.23 | 0.54 0.44 0.23 |
+| 差分 | PASS 64 / FAIL 0 | PASS 64 / FAIL 0 | PASS 64 / FAIL 0 |
+| neg-cmp | FAIL 64 (rc 1・期待) | FAIL 64 (rc 1・期待) | FAIL 64 (rc 1・期待) |
+
+- 回帰 (WC): `lift_wc.sh ok` は同じ commit で PASS 64/64・elapsed 2.01 s (`harness` 変更後も既定値のまま)。
+- 再現 (PSOLA): `FL_WIN64_DIR=<展開先> EMSDK_ENV=<toolchain-emsdk 展開先>/emsdk/emsdk_env.sh bash tools/shared/lift/ildsp/lift_psola.sh all`
+- closure 数値: `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_closure.py` (PSOLA 行が §8-2 の表)。
+
+### 8-6 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| slot 1–3 (DSP 本体 0x17f700・0x1804b0・0x180830) と閉包の残りの lift と native 差分 | 受入 (3) の残り (閉包全体の全バイト差分) | 子 [T-SH-81] |
+| x64c の VEX-256 (ymm) 算術 (closure 全体で 2,472 unsup site・うち ymm 2,396) | 上の lift の前提。未対応のまま呼ばれると trap になる | 子 [T-SH-82] |
+| 間接 call の native 到達実測と扱い (helper `0x1aedc0`・`0x1b6f4c` の 4 件、画像内ポインタ `0x268260`・`0x268268`)。PSOLA の閉包も同じ helper を含む (`REPORT_CLOSURE.md` §4.6) | 受入 (2)。PSOLA の IAT 16 件は stub で lift 済み | 既存 #3250 [T-SH-54] (GPS の同じ helper の実測。PSOLA でも同一アドレス) |
+| x64c の closure (235 関数) と `ildsp_closure.py` の closure (82 関数) の関数集合の差 (重なり 71) | 規模の数値の定義。どちらを使うかで閉包の大きさが変わる | #161 (親・PM 判断) |
+| 差分が 1 経路 (.data 不変・全 case 同一経路) | 分岐網羅の証拠にならない | 子 [T-SH-81] の受入に含める |
+
+### 8-7 slot 4・5 の差分テストの位置付け
+- slot 4 (クリア) と slot 5 (`return [+0x98]`) は呼び出しの memory 効果を差分に含める。戻り値は slot 5 だけ畳み込む (§8-4)。slot 4 の戻り値は未検証。
+- slot 5 の `[+0x98]` は CreateInstance が 0 にする領域で、差分の rax は 0 相当の値のみ見ている。0 以外の入力での振る舞いは未検証 (`.data` は run で不変のため、内部 +0x98 は zero のまま)。
+
+### 8-8 測定後のコード差分 (差分 0 の証跡)
+測定 commit `b897cb883` 以降に変えたのは本付録と `REPORT.md`・`DOC_MAP.md` (`.md` のみ)。
+`git diff b897cb883 HEAD -- tools/shared/lift/ildsp tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh tools/shared/scripts ':!*.md'` の出力は空 (差分 0)。
