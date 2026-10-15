@@ -6,11 +6,11 @@
 - 0x161fc0 単独の閉包 (67 関数・2,609 命令) の間接 call 18 件・間接 jmp 6 件 = **24 箇所**。issue 本文の 4 件 (0x1aedf6・0x1aee04・0x1aee4a・0x1b6f6c) はこの閉包に含まれる。
 - **IAT 21 件** (call 16・jmp 5) は、宛先が **静的に確定**する (KERNEL32 の import 名)。スロットは import directory の IAT 項で、`.rdata` (読み取り専用) にあり、コード内に書き込み命令が 0 件。
 - **CFG/XFG dispatch 経由の 3 件** (call 2 : 0x1aedf6・0x1b6f6c、jmp 1 : 0x1bd4e9) は、**trap 化する**。スロットはローダが CFG/XFG の検査を入れる dispatch ポインタで、既定値の先は `jmp rax`。宛先は実行時の `rax` で、静的には決まらない (§3)。
-- issue が参照する `REPORT_LIFT.md` と `closure_select.py` は repo に無い。閉包は `ildsp_vtable.py --seed 0x161fc0` で再計算した (閉包規則は REPORT_CLOSURE.md §4.1 と同じ)。
+- issue が参照する `REPORT_LIFT.md` と `closure_select.py` は repo に無い。閉包は `ildsp_vtable.py --seed 0x161fc0` で再計算した (規則は §1-2。REPORT_CLOSURE.md §4.1 の規則とは結果が違う)。
 
 ## 1. 測定
-- 測定 commit: `a99604b1a` (コードを変えた最後の commit。`ildsp_vtable.py` の `--seed` と import 名の修正、`ildsp_indirect_resolve.py` の新設)。
-- 以降のコード差分: `git diff a99604b1a HEAD -- tools/shared/scripts` は空 (本付録と REPORT_CLOSURE.md・DOC_MAP.md の追記のみ)。
+- 測定 commit: `bcab87302` (コードを変えた最後の commit。`ildsp_vtable.py` の `--seed` と import 名の修正・`ildsp_indirect_resolve.py` の新設は `a99604b1a`、rip 相対の変位の取り方の修正は `bcab87302`)。
+- 以降のコード差分: `git diff bcab87302 HEAD -- tools/shared/scripts` の出力は空 (本付録と REPORT_CLOSURE.md・DOC_MAP.md の追記のみ)。
 - 素材: `fl-win64` の `extracted/block24360_PE.bin` (sha256 `f4b23b0f…`、既知値と一致)。展開先は `$RUNNER_TEMP/fl-win64`。
 - 再現:
   ```
@@ -18,10 +18,24 @@
   python3 tools/shared/scripts/ildsp_vtable_check.py tools/shared/work/raw/ildsp_vtable.json
   python3 tools/shared/scripts/ildsp_indirect_resolve.py tools/shared/work/raw/ildsp_vtable.json
   ```
-- 実測 (HEAD `a99604b1a`・3 回・4 vCPU・load 0.06〜0.20):
-  - `ildsp_vtable.py --seed` 0.24 s × 3。closure[seed 0x161fc0] = 67 関数・2,609 命令・SIMD 440・直接 call 150・間接 call 18・間接 jmp 6。JSON は 3 回とも `cmp` 一致。
-  - `ildsp_vtable_check.py` = `ALL OK`。
-  - `ildsp_indirect_resolve.py` 3.2 s × 3。出力は 3 回とも `cmp` 一致。summary = IAT 21・ptr 3。
+- 実測 (HEAD `bcab87302`・3 回・load average 0.18〜0.45):
+  - `ildsp_vtable.py --seed` 0.23 s × 3。closure[seed 0x161fc0] = 67 関数・2,609 命令・SIMD 440・直接 call 150・間接 call 18・間接 jmp 6。stdout と JSON は 3 回とも `cmp` 一致。
+  - `ildsp_vtable_check.py` = `ALL OK` (rc 0)。
+  - `ildsp_indirect_resolve.py` 7.9 s × 3。出力は 3 回とも `cmp` 一致。summary = IAT 21・ptr 3・writes=0 は 24 箇所すべて。修正前 (`e5f5e4b49`) の出力とも `cmp` 一致。
+- 変位の修正 (`bcab87302`): 旧版は rip 相対の変位を命令末尾の 4 byte から読んでいた。即値付きの命令では誤る (`48 c7 05 10 00 00 00 05 00 00 00` = `mov qword ptr [rip+0x10], 5` は 0x1010 を返す。正しくは 0x101b)。capstone の `mem.disp` に変えた。実 PE の結果は変わらない (上の cmp 一致)。
+
+### 1-2. 閉包の規則と REPORT_CLOSURE.md §4.1 との差
+- 本付録が使った規則: `ildsp_vtable.py` の `closure()` (`--seed` の閉包は `closure([seed])`。`closure_with_slots` と同じ関数)。
+  - `.pdata` の chained チャンク (UNWIND_INFO の CHAININFO) は親 (primary) の関数にまとめる。
+  - `.pdata` に無い先は、線形走査で `ret` または無条件 jmp の直後が int3 になる所までを範囲とする (mode=scan)。
+  - 直接 call の先を辿る。直接 jmp は、同じ関数の全チャンクの外への飛び先だけを辿る。
+- REPORT_CLOSURE.md §4.1 の `ildsp_closure.py` の規則 (チャンクを別々に扱う・`.pdata` に無い先は次の `.pdata` 先頭までを範囲にする) を同じ seed に当てると、**38 関数・1,136 命令・間接 call 10 件**になる (一時スクリプト・非コミット。`ildsp_closure.py` は変更していない)。CreateInstance 単独は 36 関数 (REPORT_CLOSURE §4.2 と一致)。
+- 差の 29 関数の原因 (一時スクリプトで確認):
+  1. **chained チャンク (27 関数)**: 0x161fc0 は `.pdata` で `[0x161fc0, 0x1621b1)` (primary) と `[0x1621b1, 0x16275c)` (chained) に分かれる。§4.1 の規則は関数の `.pdata` 範囲を 1 つしか見ないため、chained 側の call (0x162713 → 0x1c9280、0x16226f → 0x1ca564) を辿らず、そこから先の関数を取りこぼす。チャンクを primary にまとめて §4.1 の規則を当てると 65 関数になる。
+  2. **`.pdata` に無い関数の範囲 (2 関数)**: 0x1bd4b8 は §4.1 の規則では次の `.pdata` 先頭 0x1bd4f0 までになり、その外の call (0x1bd50d → 0x1bd6ac、0x1bd516 → 0x1bd6a0) を取りこぼす。int3 走査 (0x1bd531 まで) では取れる。
+  - 命令数の差 (1,136 と 2,609) は範囲の定義の違いによる。内訳は未確認。
+- 0x1bd4b8 への経路は、chained 側の call (0x161fc0 内の 0x162713 → 0x1c9280 → 0x1cadd0 → 0x1cade4 → 0x1c35c4 → 0x1c34a0 → 0x1bd4b8) の 1 本 (幅優先探索で見つけた経路。他の経路の有無は未確認)。このため **0x1bd4e9 (0x1bd4b8 内の jmp) は、§4.1 の規則では閉包の外になる**。0x1bd4e9 の trap 挿入先は、閉包の規則で変わる (§4 の未解決)。
+- 18/6 の間接 call・jmp の数は、issue #3346 の本文と、#3299 が参照する `closure_with_slots` の規則に合う。
 
 ## 2. 24 箇所の一覧
 | 種別 | 呼出し元 (site・関数) | スロット | 宛先の確定 | 扱い |
@@ -58,18 +72,19 @@
 - 共通: スロット `0x268260` は load config の `GuardCFDispatchFunctionPointer`、`0x268268` は `GuardXFGDispatchFunctionPointer` (`.rdata`・再配置あり)。ファイル上の値は `0x1cb5e0` (`jmp rax`) と `0x1cb600` (`jmp [0x268260]`)。`.rdata` に書き込む命令は無い。したがって宛先は、スロットの値ではなく **`rax` の実行時値**で決まる。
 - 1. **0x1aedf6** (helper 0x1aedc0): `mov rcx,[rcx]; sub rcx,8; mov rax,[rcx]; mov rax,[rax+0x40]` の後に `call [0x268260]`。`rax` は引数 `rcx` から辿るオブジェクトの vtable の index 8 (`[rax+0x40]`)。オブジェクトは実行時の値。
 - 2. **0x1b6f6c** (関数 0x1b6f4c): `call 0x1b6f88` の戻り値 `rax` を `test rax,rax; je` の後も変えずに、`movabs r10,…` (XFG の型ハッシュと見られる・推定)、`mov rcx,rbx` を経て `call [0x268268]`。`rax` は実行時の戻り値。
-- 3. **0x1bd4e9** (関数 0x1bd4b8・tail jmp): `rax = ror(zext(A32) ^ G, A & 0x3f)` (A = 0x3f5d98・G = 0x3f84d0 は `.data`)。
+- 3. **0x1bd4e9** (関数 0x1bd4b8・tail jmp): `rax = ror(A ^ G, A & 0x3f)` (A = 0x3f5d98・G = 0x3f84d0 は `.data`)。逆アセンブルは `mov rdx, qword ptr [A]` (64 bit)・`xor rdx, qword ptr [G]`・`mov ecx, edx; and ecx, 0x3f; ror rdx, cl` で、回転数は A の下位 6 bit。
   - A は `0x1ad0d8: mov [A], rax` で書かれる (コード内の唯一の書込み)。
   - G は `0x1bd4b0: mov [G], rcx` で書かれる (ファイル値 0・呼出し元の `rcx` が入る)。
   - 両方とも実行時の値で、宛先は実行時に決まる。
 
-判断: 3 件は**静的確定しない**ので trap 化する。lift 出力では、各箇所の先頭で非 0 終了する TRAP を置く (実装は下の未解決)。[T-SH-65] #3318 の受入 3 は 0x1aedf6・0x1b6f6c を trap 化すると明記しており、本判断と一致する。0x1bd4e9 は 0x161fc0 閉包の lift ([T-SH-61] #3299) の TRAP gate に入れる。
+判断: 3 件は**静的確定しない**ので trap 化する。lift 出力では、各箇所の先頭で非 0 終了する TRAP を置く (実装は下の未解決)。[T-SH-65] #3318 の受入 3 は 4 件 (0x1aedf6・0x1aee04・0x1aee4a・0x1b6f6c) の trap を求める。本判断と一致するのは 0x1aedf6・0x1b6f6c のみ。0x1aee04・0x1aee4a は本付録で IAT 静的 (trap 対象外) とするため、#3318 の受入 3 の文言の修正が要る (PM 判断。既定案: IAT stub 側の受入 2 で扱い、受入 3 から外す)。0x1bd4e9 は 0x161fc0 閉包の lift ([T-SH-61] #3299) の TRAP gate に入れる。挿入先は閉包の規則で変わる (§1-2)。
 
 ## 4. 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 0x1aedf6・0x1b6f6c の trap 挿入 (lift 出力と非 0 終了 gate) | 到達時に止まる検査が無い (受入 2 の残り) | [T-SH-65] #3318 (受入 3 に既存) |
-| 0x1bd4e9 の trap 挿入 | 同上 (0x161fc0 の lift 出力が無いため未実施) | [T-SH-61] #3299 (TRAP gate に既存) |
+| 0x1bd4e9 の trap 挿入 | 同上 (0x161fc0 の lift 出力が無いため未実施)。閉包の規則で 0x1bd4b8 が入るか変わる (§1-2)。既定は本付録の規則 (chained チャンクをまとめる) | [T-SH-61] #3299 (TRAP gate に既存。挿入先は PM 判断) |
+| #3318 の受入 3 の文言 (4 件のうち 0x1aee04・0x1aee4a は本付録で IAT 静的のため、trap 対象から外す) | 受入 3 と本付録の判断が食い違う | [T-SH-65] #3318 (PM 判断。既定案: 受入 2 で扱い、受入 3 から外す) |
 | IAT 21 件の stub 方針 (C 実装か trap か) | 静的に同定できても lift 上の扱いは未定 | [T-SH-65] #3318 (受入 2 に既存) |
 | 4 件 (0x1aedf6・0x1aee04・0x1aee4a・0x1b6f6c) の到達条件 | 到達しない根拠ではない (完走実験で 0 件) | [T-SH-54] #3250 |
 | 線形走査の不復号区間 (`.text` 69 byte・`IPPCODE` 1,624 byte) | 書込み 0 件の判定は、この区間に書込み命令が隠れていないことを仮定する | 追跡 issue なし (PM 判断) |
