@@ -153,3 +153,77 @@
 
 - 4 行とも §14.3 (測定 commit `a28a8e30`) と集計・unit 895 の値が一致した。現 head でも `60a270` の `this = 0` (null)、`[this] = 0xc343f0` で、受入条件 2 (部分達成) の結論は変わらない。
 - 測定 commit `8963d89b` から本 REPORT を含む commit までのコード差分: `git diff 8963d89b HEAD -- tools/m11/m11_rt.c tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_post.py` は 0 (docs のみ)。
+
+## 15. 10 回目の run: `e3ef60` の 60a270 呼出し 9 箇所の `this` 観測 (#2400, 親 #2373)
+
+既知類型との関係: 該当なし (計測 hook の追加のみ。新規の欠陥類型は無い)。
+
+測定 commit: `aeb6ceb71` (コードを変えた最後の commit。`tools/m11/m11_ov.c`・`tools/m11/m11_build.sh`・`tools/m11/trap_triage/probe2400_ir.py`)。起点は `origin/main` `f44264ebe`。
+素材: `fl-win64` を `$RUNNER_TEMP/fl-win64`、`work-m11`・`work-liftdiff` を worktree 直下に展開 (`toolchain-*` は agent-setup が `/opt` に展開済み)。`m11_gen_ir2.sh` rc=0 (41.0 s)。load average は測定中 0.6〜0.7。
+
+### 15.1 実装
+
+- `m11_ov.c`: `M11_PROBE_2400=1` のときだけ有効。`m11_e3ef60_obs(site, arg1, this, edx)` が `[m11][e3ef60] #n site=k pe=… off=… arg1=… this=… edx=…` を stderr に出す (512 行で打ち切り)。既定 0 では何も入らない。
+- `trap_triage/probe2400_ir.py`: `boot_final3.ll` の `function_e3ef60` 内で `call i64 @function_60a270(i64 <this>, i32 <edx>)` の 9 箇所の直前に呼出しを挿入する (番地順 1〜9)。箇所数が 9 でなければ止まる。冪等。
+- `m11_build.sh`: CF に `-DM11_PROBE_2400`、stamp `work/instr_2400.stamp` (値が変わると post 結果と `ov.o` を作り直す)、`M11_PROBE_2400=1` のときだけ probe を呼ぶ。
+
+### 15.2 静的な 9 箇所との突合 (`REPORT_2373.md` §3)
+
+IR 上の 9 呼出しの this は `[arg1+off]` のロード値で、off は §3 の表と一致する (0x778・0x7d8・0x810・0x840・0x808・0x7f0・0x838・0x8e8・0x9c8)。
+
+### 15.3 測定 (`aeb6ceb71`・`SV_RAW=1 node trap_triage/survey_units.mjs`・全て rc=0)
+
+| build | survey 集計 | 備考 |
+|---|---|---|
+| 既定 (`M11_PROBE_2400` 未設定) | `ok 873 / halt0 7 / miss 47 / oob 14 / noproc 1` (10.4 s) | `origin/main` `f44264ebe` と同一 (§15.4) |
+| `M11_PROBE_2400=1` | `ok 871 / halt0 7 / miss 47 / oob 16 / noproc 1` | 既定との分類差は unit 304・555 (ok→oob) の 2 件 |
+| `M11_PROBE_2400=1 M11_INSTR_60A270=1 M11_INSTR_40FFE0=1` | `ok 873 / halt0 7 / miss 47 / oob 14 / noproc 1` | 既定との分類差 0 |
+
+unit 895 (既定・3 build とも `halt0`。frames は `function_60a270` ← `function_e3ef60` ← `function_12d0f80` ← … で同一)。`e3ef60` の arg1 は全呼出しで `0x12ba808`。
+
+| 呼出し | PE | off | this (= `[arg1+off]`) | edx | 60a270 → 40ffe0 (観測) |
+|--:|---|--:|--:|--:|---|
+| 1 | `e3f0b4` | 0x778 | **0x0** | 0 | 観測なし |
+| 2 | `e3f0f7` | 0x7d8 | **0x0** | 0 | 観測なし |
+| 3 | `e3f118` | 0x810 | **0x0** | 0 | 観測なし |
+| 4 | `e3f139` | 0x840 | 0x10bba000 | 0 | 観測なし |
+| 5 | `e3f15a` | 0x808 | **0x0** | 0 | 観測なし |
+| 6 | `e3f178` | 0x7f0 | **0x0** | **1** | `40ffe0` arg1=0 → trap (Halt0) |
+| 7〜9 | `e3f196`・`e3f1b4`・`e3f215` | — | 未到達 | — | — |
+
+- 3 build で `60a270` の観測 (`[m11][a270]` #1〜#6) も順序どおり (`this`・`[this]` = `0xc343f0` は 1,2,3,5,6、4 は `this=0x10bba000`・`[this]=0`)。`40ffe0` の観測は 1 件だけで、site 6 の 60a270 の中で起きた。
+- site 6 と site 7 の間に関数呼出しは IR に無い。trap は site 6 の呼出しの中で起きたと読める。
+- this=0 の呼出しは 5 件 (1・2・3・5・6) あるが、`40ffe0` に入ったのは site 6 の 1 件だけ。site 6 だけ edx=1 で、edx=0 の 4 件は `40ffe0` に入らなかった。60a270 の分岐 (edx と this のどちらが効くか) は機械語で未確認。
+- `this=0` は arg1 のフィールド (+0x778・+0x7d8・+0x810・+0x808・+0x7f0) の値が 0 であることと同じ。フィールドが 0 になる書込み元は未特定。
+
+### 15.4 既定 build の同一性 (基準値の移動)
+
+- 受入の「既定 build が 870 / 16」は現 main では成り立たない。870/16 は #882 時点 (`8963d89b`) の値で、main はその後に m11 の変更が入り (#2439・#2502・#2773・#3325 など)、既定 build は `873 / 14` になっている。
+- 本 PR の既定挙動が変わらないことは、`origin/main` `f44264ebe` の clean worktree で既定 build と survey を取って確認した。`tools/m11/work/boot_final3.ll` の sha256 が一致 (`a415baa4…`)、`m11_boot.cjs.wasm` の sha256 が一致 (`42ae28e1…`)、942 unit の survey 結果が一致 (frames に出る JS のソースパス `ws-2400` と `ws-2400-base` の違いを除く)。
+
+### 15.5 受入条件
+
+1. `e3ef60` の 9 呼出しのうち this=0 を渡す呼出し: **達成** (5 件: `e3f0b4`・`e3f0f7`・`e3f118`・`e3f15a`・`e3f178`。trap に至るのは `e3f178` の 1 件、§15.3)。
+2. 既定 0 の計測専用 probe で、this と arg1・フィールドを観測: **達成** (`M11_PROBE_2400`)。
+3. 既定 build の survey が 870 / 16: **文言どおりは未達** (基準が 873 / 14 に移動)。既定 build が `origin/main` と同一であることで代替 (§15.4)。この項目は issue 本文から外した。
+4. REPORT_882_APPENDIX に観測結果: **達成** (本節)。
+
+### 15.6 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `e3ef60` の arg1 (`0x12ba808`) のフィールド +0x778・+0x7d8・+0x810・+0x808・+0x7f0 が 0 である理由 (書込み元。上位 caller `12d0f80` 以降を含む) | null `this` の出所 | #2373 (親 #882) |
+| `60a270` が `40ffe0` に入る条件 (edx=1 と this=0 のどちらが効くか。機械語の分岐は未確認) | 受入 2 系 (`40ffe0` の arg1=0 の経路) | #2373 (親 #882) |
+| 既定 build の基準値 (870 / 16 → 873 / 14) の更新 | 受入文言の基準 | PM 判断 |
+| probe 組合せで unit 304・555 の分類が動く (`M11_PROBE_2400=1` 単独で ok→oob) | 計測 hook が分類を変える | #1602 (`[M11-N105]`) |
+
+### 15.7 再現
+
+```
+cd tools/m11 && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash m11_gen_ir2.sh
+M11_PROBE_2400=1 bash m11_build.sh
+rm -f work/e3ef60_err.log; SV_RAW=1 SV_ERR_LOG=$PWD/work/e3ef60_err.log node trap_triage/survey_units.mjs work/m_on.json
+grep '^unit 895 \[m11\]\[e3ef60\]' work/e3ef60_err.log
+```
+
+- 測定 commit `aeb6ceb71` から本 REPORT を含む commit までのコード差分: `git diff aeb6ceb71 HEAD -- tools/m11/m11_rt.c tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/trap_triage/probe2400_ir.py` は 0 (docs のみ)。
