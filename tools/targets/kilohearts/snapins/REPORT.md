@@ -156,7 +156,7 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 |---|---|---|
 | 14 snap-in のハッシュ不変 (run_all.sh) 未実行 | 構造上は不変 (推論)・実測なし | #3259 (KH-49) |
 | ~~vmovaps (1 引数) と vfmadd 系 xmm 7 語彙の語彙・bit-exact~~ → **解決** (§12-2: vmovaps 20,000 call mismatch 0 / FMA 7 語彙 128bit 全 bit (NaN 含む) mismatch 0) | 解決済み | #3256 (KH-48) |
-| vmovaps の **store 形** (`declare void @__asm_vmovaps(i256, i256)`・メモリ書込みが IR に現れない) は定義せず abort スタブのまま | 定義すると store が黙って消える。census は ymm 40 件を load/store で分けていない | 子 issue (親 #3256 から起票予定) |
+| vmovaps の **store 形** (`declare void @__asm_vmovaps(i256, i256)`・メモリ書込みが IR に現れない) は定義せず abort スタブのまま | 定義すると store が黙って消える。census は ymm 40 件を load/store で分けていない | #3358 (KH-54) |
 | ymm 語彙を snap-in の lift へ接続 (kh_lower の 256-bit 表現・Convolver/Filter Table) | 難 snap-in は未 lift | #709 (KH-14) |
 
 ## 13. KH-6 第 2 弾 (CAB-258 続, 2026-10-11) — rcpps/rsqrtps 実機近似表で Resonator/Stereo/Delay が bit-exact 化
