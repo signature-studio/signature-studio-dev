@@ -86,7 +86,7 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 
 既知類型との関係: 該当なし (lift・逆アセンブル・IR pass は触らない。既存 REPORT と results からの算出のみ)。
 
-**結論 (測定 commit 時点の値)**: 「起動」の数え方は 5 通り (17 / 52 / 53・56 / 209 / 928) あり、いずれも別の量を指す。`tools/startup/boot_metric.json` (`boot_metric/v1`) に、路線 (m11 / x64c / native-ref) とモード別のレコードとして載せた。m11 / x64c の DllMain 連鎖の record では、最終到達ステップは S09 (DllMain 内の unit 初期化まで)、CreateFruityInstance (S11) 未到達。この 2 点は harness の構造による (§8-3)。flengine 路線の record (`flengine-cfi-probe`) では CreateFruityInstance の入口 (S12) まで到達する (測定 commit `ae963e28` 時点。現 HEAD は未再測定。§8-6)。`docs/STATUS.md` 先頭の 1 行がこの結論を指す。
+**結論 (測定 commit 時点の値)**: 「起動」の数え方は 5 通り (17 / 52 / 53・56 / 209 / 928) あり、いずれも別の量を指す。`tools/startup/boot_metric.json` (`boot_metric/v1`) に、路線 (m11 / x64c / native-ref) とモード別のレコードとして載せた。m11 と x64c strict の DllMain 連鎖の record では、最終到達ステップは S09 (DllMain 内の unit 初期化まで)、CreateFruityInstance (S11) 未到達。この 2 点は harness の構造による (§8-3)。x64c 寛容起動 (`x64c-tolerant-sequential`・mode 1) は `fle_run` から CreateFruityInstance の入口 (S12) を直接 dispatch しているため `reached: true`・`last_step: S12` (下限) で、この判定は当たらない。flengine 路線の record (`flengine-cfi-probe`) では CreateFruityInstance の入口 (S12) まで到達する (測定 commit `ae963e28` 時点。現 HEAD は未再測定。§8-6)。`docs/STATUS.md` 先頭の 1 行がこの結論を指す。
 
 ### 8-1. 5 通りの数え方 → スキーマのフィールド対応
 
@@ -94,7 +94,7 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 |---|---|---|---|---|
 | 17 | m11 通常起動の完了 unit | `tools/m11/REPORT.md` §1 表 (#132 以前の旧値が表に残存) | 対応なし | 旧値。現行は 53 |
 | 52 | m11 + GUI shim 結合版の units_run | `tools/gui/flengine/results/boot.json` | `m11-gui-tolerant`.units.ok | 現行 |
-| 53 / 56 | m11 通常起動の units_run (実行 53) / 完了 (実行 53 + skip 3) | `tools/m11/REPORT.md` §14 の `de50ffa` 行と skip 内訳 | `m11-tolerant-sequential`.units.ok (53)、units.ok + units.skipped (56 = 完了。派生) | 現行 |
+| 53 / 56 | m11 通常起動の units_run (実行 53) / 完了 (実行 53 + skip 3) | `tools/m11/REPORT_N134.md` §14 (#134 で `REPORT.md` から分割移動) の `de50ffa` 行と skip 内訳 | `m11-tolerant-sequential`.units.ok (53)、units.ok + units.skipped (56 = 完了。派生) | 現行 |
 | 209 | x64c boot の dispatch (完走 208) | `tools/flelift/boot/results/boot_summary_plain.json` | `x64c-strict-sequential`.units.dispatched (209)、units.ok (208 = dispatched − failed) | 現行 |
 | 928 | native 実機械語の hybrid の units_run (wasm ではない) | `tools/liftdiff/REPORT_LD26.md` §1 (測定 commit `2ca85816`) | `native-ref-hybrid`.units.ok (928)、units.total (942) | 参照値 |
 | 872 | m11 隔離 survey の ok | `tools/m11/REPORT_APPENDIX_1430.md` (測定 commit `7e149974`) | `m11-isolated-survey`.units.ok | 現行 (`de50ffa` の §14 の 866 より新しい commit) |
@@ -109,10 +109,13 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 | m11-gui-tolerant | `703b4857` (gui REPORT の見出し「本節を正とする」。boot.json の値はこの commit と一致を `git show` で確認) | 52 | 1 (boot_threw) | — | — |
 | m11-gui-survey | `719f1c43` (gui REPORT §6i。S1 値と survey_soft.json が一致) | 870 | 24 (trap) | — | — (miss 47・noproc 1) |
 | x64c-strict-sequential | 記載なし (最終更新 commit `ac5d6d46`) | 208 | 1 | 209 | 209 / 0x816e80 / oob |
+| x64c-tolerant-sequential | 181d66ec (REPORT_APPENDIX_2719 §11 の再測定。初回 a55cb0d5 と同じ値) | 208 | 1 (exit。skip 696 = exit 1 + clobber 695) | 209 | 209 / 0x733090 / exit |
 | x64c-isolated-survey | 記載なし (最終更新 commit `12958453`) | 892 | 3 (unlifted) | — | — (uncovered 47) |
 | native-ref-hybrid | `2ca85816` (liftdiff の測定 commit 行) | 928 (total 942) | — (first_fail 830) | — | — |
 
 `gui_natural` (RegisterClassW / CreateWindowExW の自然到達回数): boot (`m11-gui-tolerant`) は 0 / 0、隔離 survey (`m11-gui-survey`) は 2 / 2。`probes`: x64c boot は GetMem 1886・FreeMem 776 (JSON 値)。`first_wm_paint`・`pixels` は全レコード null (未測定。理由は null_reasons)。
+
+x64c 寛容起動 (`x64c-tolerant-sequential`) は mode 1 (`FLE_TOLERANT=1`・補修なし) のみ記録する。mode 2 (`FLE_TOLERANT=2`) は InitContext・InitTable 等を復元する補修を含む診断のため記録しない。probes は GetMem 2,314・FreeMem 1,199、gui は 0 / 0。レコードの値は `tools/flelift/boot/REPORT_APPENDIX_2719.md` §11 (測定 commit `181d66ec`・この PR で再測定) の転記。再測定の素材は fl-win64 と toolchain-emsdk 6.0.12 (上流から取得)、`FLE_BOOT_RUNS=tol`。
 
 ### 8-3. 算出の仕組み
 
@@ -126,8 +129,8 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 
 ### 8-4. 検証
 
-- 単体 (固定 fixture): `python3 tools/startup/test_boot_metric.py` → `Ran 21 tests ... OK`。期待値 (m11 53 / 57 / 0x16fde0、survey 872 / 23 / 46 / 1、gui 52 / 870 / 24、x64c 208 / 209 / 0x816e80、x64c survey 892 / uncovered 47、native 928 / 942 / 830 など) を固定入力で検査する。null の全項目に理由があることも検査する。
-- ネガティブコントロール (いずれも期待どおり `MetricError`): (a) 表行 `de50ffa` を壊す、(b) JSON の `boot.units_run` キーを消す、(c) 出典ファイル `tools/liftdiff/REPORT_LD26.md` を消す、(d) m11 survey の ok を 900 にして合計 942 と食い違わせる、(e) gui REPORT の S1 値 (870 → 871) を JSON と食い違わせる、(f) m11 の非 work ファイルに `CreateFruityInstance` を置く。
+- 単体 (固定 fixture): `python3 tools/startup/test_boot_metric.py` → `Ran 28 tests ... OK`。期待値 (m11 53 / 57 / 0x16fde0、survey 872 / 23 / 46 / 1、gui 52 / 870 / 24、x64c 208 / 209 / 0x816e80、x64c 寛容 mode 1 208 / 696 / 1 / 209 / 0x733090、x64c survey 892 / uncovered 47、native 928 / 942 / 830 など) を固定入力で検査する。null の全項目に理由があることも検査する。
+- ネガティブコントロール (いずれも期待どおり `MetricError`): (a) 表行 `de50ffa` を壊す、(b) JSON の `boot.units_run` キーを消す、(c) 出典ファイル `tools/liftdiff/REPORT_LD26.md` を消す、(d) m11 survey の ok を 900 にして合計 942 と食い違わせる、(e) gui REPORT の S1 値 (870 → 871) を JSON と食い違わせる、(f) m11 の非 work ファイルに `CreateFruityInstance` を置く。x64c 寛容 mode 1 では表行の ok・skip 件数・停止行・呼出し行・出典欠落・GUI 計数の 6 件を置き換え、いずれも `MetricError` で止まる。
 - 実データ: `python3 tools/startup/boot_metric.py --check` → `boot_metric: OK`。
 - 測定 commit → HEAD のファイル差分 (範囲 `tools/m11 tools/gui tools/flelift tools/liftdiff tools/shimx tools/startup/STARTUP.md`、`git diff --shortstat <起点> HEAD -- <範囲>`。範囲は本 PR の変更対象を含まない):
 
@@ -146,6 +149,8 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
   flengine-cfi-probe 以外の路線は差分が 0 ではない。文書と results は測定 commit 時点の値であり、現 HEAD の実測ではない。flengine-cfi-probe は `adad27ad` で再測定した (§8-6)。他の路線の再測定の要否は本 issue の範囲外で、§8-5 で PM 判断とする。
 - 文書・results の変更有無 (出典 6 ファイル): `git diff --stat 580dd294 4e8bdd8c -- tools/m11/REPORT.md tools/m11/REPORT_APPENDIX_1430.md tools/gui/flengine/results tools/flelift/boot/results tools/flelift/boot/REPORT.md tools/liftdiff/REPORT_LD26.md tools/startup/STARTUP.md` の出力は空 (base 4e8bdd8c までの範囲)。
 
+- x64c 寛容起動 (`x64c-tolerant-sequential`) の出典は測定 commit `181d66ec` (この PR で mode 1 を再測定。`REPORT_APPENDIX_2719.md` §11) で測った。`git diff --stat 181d66ec HEAD -- tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` の出力は空 (差分 0)。初回の `a55cb0d5` から同じ 4 ファイルは 27 commit 変わっていたが、再測定で件数・停止位置・GetMem/FreeMem が初回と一致した。
+
 ### 8-5. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
@@ -160,7 +165,10 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 | `first_wm_paint`・`pixels` (最初の WM_PAINT・画素) は全路線で未測定 | 最初のウィンドウの数値は null | PM 判断 (後続 WIN の issue は未起票) |
 | native hybrid の `first_fail 830` の意味 (失敗か停止か) が REPORT に無い | `units.failed` は null | PM 判断 (liftdiff 担当の issue は未特定) |
 | gui `results/survey_soft.json` は `5f9d7cbd` で 870/24 → 872/22 に更新されたが、gui REPORT §6d・§6i は測定 commit `719f1c43` の 870/24 のまま | `m11-gui-survey` は `719f1c43` 時点の JSON を読む (本 PR で変更)。HEAD の JSON とは食い違う | #174 (OPEN, GUI-3) へ。PM 判断 |
-| 規則 (f) (pr-lint) の対象は #3191 の 4 パス (`tools/m11/REPORT.md`・`tools/flelift/boot/REPORT.md`・`tools/gui/flengine/`・`tools/startup/`)。`boot_metric.json` の出典には `tools/m11/REPORT_N2714.md`・`tools/m11/REPORT_APPENDIX_1430.md`・`tools/liftdiff/REPORT_LD26.md`・`tools/flelift/boot/results/boot_summary_plain.json` もあるが、これらの変更では警告されない | 出典を変えた PR の boot_metric.json 更新漏れを検出しない | PM 判断 (対象の拡張。issue 未起票) |
+| 規則 (f) (pr-lint) の対象は #3191 の 4 パス (`tools/m11/REPORT.md`・`tools/flelift/boot/REPORT.md`・`tools/gui/flengine/`・`tools/startup/`)。`boot_metric.json` の出典には `tools/m11/REPORT_N2714.md`・`tools/m11/REPORT_APPENDIX_1430.md`・`tools/liftdiff/REPORT_LD26.md`・`tools/flelift/boot/results/boot_summary_plain.json`・`tools/m11/REPORT_N134.md`・`tools/flelift/boot/REPORT_APPENDIX_2719.md` もあるが、これらの変更では警告されない | 出典を変えた PR の boot_metric.json 更新漏れを検出しない | PM 判断 (対象の拡張。issue 未起票) |
+| x64c 寛容 mode 1 の clobber 695 (unit 246〜940 が呼出し時に proc 0 を返す) の原因と `f_6a7b70` の広域ゼロ埋め | 寛容 mode 1 は unit 246 以降を走らせていないため、ok 208 は 942 unit の完走の値ではない | #3060 [FLE-11] (既存) |
+| x64c 寛容起動の CFI 本体内の trap 地点と soft 名の表示 (`fle_boot.mjs` の `softSnap`・`soft_top`・`soft_called` が C 文字列のポインタ番号を出す) | `create_fruity_instance` は S12 が下限。S13 以降は未測。`gui_natural` 0 / 0 は soft スタブの計数で代えており、名前別の根拠は出典から確かめられない (件数 0 は CFI 中の件数の差分で判定) | #3969 [WIN-41] (#3077 [WIN-16] は部分達成で close 済み・残件は子 issue へ。x64c 路線の CFI 本体は #3077 の範囲外) |
+| (解消) x64c の出典ハーネス 4 ファイルが測定 commit `a55cb0d5` 後に 27 commit 変更されていた | 再測定 `181d66ec` (§8-2・§8-4) で件数・停止・probe が初回と一致。差分 0 | なし (解消) |
 
 ### 8-6. flengine 路線の record (`flengine-cfi-probe`)
 

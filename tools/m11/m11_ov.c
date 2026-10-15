@@ -408,6 +408,26 @@ unsigned long long function_412d60(unsigned long long dest, unsigned long long u
     return dest;
 }
 
+#ifndef M11_FIX_4136A0
+#define M11_FIX_4136A0 0
+#endif
+/* function_4136a0  VA 0x4136a0  (UniqueString 系: s = 文字列変数のアドレス (PPointer)) (#3928)
+ * lift 版は `mov rax,[s]` (= *s) の 1 段 deref を落とし, s を文字列ポインタとして refcnt (p-8)・長さ (p-4)・copy 元に使った (412d60 と同型).
+ * 骨格: p=*s; p==0 → 0; refcnt(p-8)==1 → p; np=412c20(len); 409c80(p, np, 2*len); 412d60(s) (*s:=0 と旧 p の解放); *s=np; 戻り = np.
+ * 既定 OFF (M11_FIX_4136A0=0) は lift 版 (IR) を使う. */
+#if M11_FIX_4136A0
+u64 function_4136a0(u64 s) {
+    u64 p = Q(s);
+    if (p == 0) return 0;
+    if (D(p - 8) == 1) return p;
+    u64 np = function_412c20((u64)D(p - 4));
+    function_409c80(p, np, (u64)(long long)(int)(D(p - 4) * 2u));
+    function_412d60(s, 0);
+    Q(s) = np;
+    return np;
+}
+#endif
+
 /* function_418190  VA 0x418190  (System._LStrArrayClr/_DynArrayClear 系: dest=PPointer, rdx=type info)
  * 同上: `mov rsi,[rbx]` の旧値読出しが落ちている. refcnt は old-0xc (int32), length は old-8.
  *   old=*dest; old!=nil → *dest=0; refcnt(old-0xc)>0 → --refcnt==0 なら

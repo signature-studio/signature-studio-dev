@@ -1,6 +1,6 @@
 // PM agent (oc-pm) を起こすべき終端状態の検出と、送信の抑止。どちらも純関数 (時刻・保管先は呼び出し側が渡す)。
 // 検出に LLM は使わない。自由文は解析しない: ラベル・マーカー・番号の正規表現だけ (needs.ts・refs.ts)。issue / PR の自由文は payload に入れない。
-import { PRIO_RANK, prioOf, type Prio } from "./launch.ts";
+import { effectivePrioMap, PRIO_RANK, prioOf, type Prio } from "./launch.ts";
 import { parentNumbers } from "./refs.ts";
 import { ASSOC_OK, hasOpenPr, KILLED_STOP_AT, NEEDS_USER_LABEL, type PmState, type PrState } from "./webhook.ts";
 
@@ -37,7 +37,7 @@ export interface PmTarget {
   ref: number;
   // 検出の根拠になった時刻 (停止コメント・outcome・review・ユーザーのコメント)
   at: string;
-  // 優先の区分 (launch の prioOf と同じ規則)。送る順の先頭のキー (selectDispatch)。
+  // 優先の区分 (launch の effectivePrioMap と同じ規則。親からの継承を含む)。送る順の先頭のキー (selectDispatch)。
   prio: Prio;
 }
 
@@ -83,22 +83,23 @@ const t = (s: string | undefined): number => (s ? Date.parse(s) : NaN);
 // PM 応答が根拠より後にあるか (厳密に後。同時刻は応答とみなさない)
 const answeredAfter = (pmAt: string | undefined, at: string): boolean => !!pmAt && t(pmAt) > t(at);
 
-// PR 起点の区分: PR 自体のラベルと、PR が指す issue のラベルの高い方 (critical > normal > low)。指す issue は、ブランチ名の先頭の番号・Closes/Refs・本文の #N。
+// PR 起点の区分: PR 自体のラベルと、PR が指す issue の区分 (effectivePrioMap。親からの継承を含む) の高い方 (critical > normal > low)。指す issue は、ブランチ名の先頭の番号・Closes/Refs・本文の #N。
 // 引けない issue は数えない (PR 自体のラベルも無ければ normal)。
-const prPrio = (s: PmState, p: PrState): Prio => {
+const prPrio = (s: PmState, p: PrState, prios: Map<number, Prio>): Prio => {
   const head = /^(\d+)-/.exec(p.ref);
   const nums = [...(head ? [Number(head[1])] : []), ...(p.closes ?? []), ...(p.mentions ?? [])];
-  const linked = nums.flatMap((n) => (s.issues[String(n)] ? [prioOf(s.issues[String(n)].labels)] : []));
+  const linked = nums.flatMap((n) => (s.issues[String(n)] ? [prios.get(n) ?? "normal"] : []));
   return [prioOf(p.labels ?? []), ...linked].reduce((a, b) => (PRIO_RANK[b] < PRIO_RANK[a] ? b : a));
 };
 
 export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
   const out: PmTarget[] = [];
+  const prios = effectivePrioMap(Object.values(s.issues));
   for (const p of Object.values(s.prs)) {
     if (p.state !== "open" || !authorAllowed(p, o.bots)) continue;
     const sig = s.sig[String(p.number)];
     if (!sig) continue;
-    const prio = prPrio(s, p);
+    const prio = prPrio(s, p, prios);
     if (p.labels?.includes(STUCK_LABEL) && sig.stop && sig.stop.intent !== null && !answeredAfter(sig.pmAt, sig.stop.at)) {
       out.push({ kind: "stuck", ref: p.number, at: sig.stop.at, prio });
     }
@@ -112,7 +113,7 @@ export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
     const sig = s.sig[k];
     if (!sig) continue;
     const oc = sig.outcome;
-    const prio = prioOf(i.labels);
+    const prio = prios.get(i.number) ?? "normal";
     if (i.labels.includes(NO_PR_LABEL) && !i.labels.some((l) => HOLD_LABELS.includes(l)) && oc && !answeredAfter(sig.pmAt, oc.at)) {
       // split / stop は即。unknown は、Worker が再投入した後の run (outcome が最新の launch より後) でも終わった場合だけ。
       // artifact は、新しい素材が無く unknown の枠を使い切った (または上限に達した) 後の run でも終わった場合だけ (新しい素材がある分は Worker が足して 1 回再投入する)。
@@ -149,7 +150,7 @@ export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
       const parent = s.issues[String(n)];
       if (orphans.has(n) || !parent || parent.state !== "open" || parents.has(n) || !authorAllowed(parent, o.bots)) continue;
       orphans.add(n);
-      out.push({ kind: "refs_orphan", ref: n, at: p.updatedAt, prio: prioOf(parent.labels) });
+      out.push({ kind: "refs_orphan", ref: n, at: p.updatedAt, prio: prios.get(n) ?? "normal" });
     }
   }
   const rank = (k: string): number => (DETECTED_KINDS as readonly string[]).indexOf(k);
