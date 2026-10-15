@@ -80,7 +80,7 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 - 部分集合に残る `x86_fp80` は `__frontend_reg_load.fpr` / `__frontend_reg_store.fpr` の宣言 2 行のみで、呼出は 0 件。 定義本体に f80 は残らない。
 - 実測時間: 19000 lift 108 s (`83e92e2c1`、再実行。 前回 `42357b73e` は 107 s)。 19165 lift 386 s (wall 6 分 36 秒、`42357b73e`)。 部分集合の `emcc -c` は 19000 が 2 s、19165 が 6 s (python 込み)。 load は未測定。
 - **注意**: 除外した関数は外部宣言になるため、部分集合の挙動は元の engine と無関係。 正しさ・精度・f80 の扱いは未検証 (到達性のみ)。 19000 の既存 `PLUG_F80_LOWER=1` (精度低下あり) とは別経路。
-- **再現手順**: `bash tools/plugins/reverb_delay/engine_lift.sh 19000 800` → `bash tools/plugins/reverb_delay/engine_f80_subset.sh 19000`。 19165 は `python3 tools/plugins/reverb_delay/avx_bad_ranges.py 19165` の出力 (絶対パス) を `--exclude-ranges` に渡し、`ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges <絶対パス>" ENGINE_TAG=_noipp_nobad bash tools/plugins/reverb_delay/engine_lift.sh 19165 900` → `ENGINE_TAG=_noipp_nobad bash tools/plugins/reverb_delay/engine_f80_subset.sh 19165`。
+- **再現手順**: `bash tools/plugins/reverb_delay/engine_lift.sh 19000 800` → `bash tools/plugins/reverb_delay/engine_f80_subset.sh 19000`。 19165 は `python3 tools/plugins/reverb_delay/avx_bad_ranges.py 19165` の出力 (絶対パス) を `--exclude-ranges` に渡し、`ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges <絶対パス>" ENGINE_TAG=_noipp_nobad bash tools/plugins/reverb_delay/engine_lift.sh 19165 900` → `ENGINE_TAG=_noipp_nobad bash tools/plugins/reverb_delay/engine_f80_subset.sh 19165`。 `emcc` が PATH に無いときは `EMSDK_ENV` に `[EMSDK]` (`docs/REFERENCES.md`) の `emsdk_env.sh` を指定する。
 
 ### 受入条件への対応 (#523・本節)
 
