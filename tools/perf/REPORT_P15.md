@@ -192,10 +192,10 @@ node tools/perf/p15/chrome_worklet.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3 
 | 差分 (native) | `fa_native_diff.py` seed 64030: 400/400 一致、比較バッファ 2,800、差分 0、native crash 0、wasm trap 0。seed 7 も 400/400 一致 |
 | NC-1 (入力) | wasm 側だけ seed 64031 のシナリオを流す: 0/400 一致 (400 mismatch) |
 | NC-2 (wasm の 1 命令) | lift C の 1 命令 (`0x180afe195` `addss`→減算、`fle_lifted.c` 行 550) を壊す: 214/400 一致、**186 mismatch**、署名 `5e5287b5`→`5cb40d4b` |
-| 所要 | build 7.36 s (real)、差分 1 本 9.2 s (native 実行 + node) |
+| 所要 | build 7.40 s (real)、差分 1 本 9.2 s (native 実行 + node) |
 
-- 測定 commit: `cfe67bba7` (コードを最後に変えた commit。`git diff cfe67bba7 HEAD -- tools/perf/p20` の出力は空。本節の追記は `tools/perf/REPORT_P15.md` だけ)。測定時の load average 0.44 (1 分)、CPU は runner の 4 vCPU。
-- 環境: node v22.23.3、emcc は `/opt/emsdk` (`toolchain-emsdk`)、素材 `plugins-freshair`。
+- 測定 commit: `e0d62359c` (コードを最後に変えた commit。`git diff e0d62359c HEAD -- tools/perf/p20` の出力は空。本節の追記は `tools/perf/REPORT_P15.md` だけ)。測定時の load average 0.08 (1 分)、CPU は runner の 4 vCPU。
+- 環境: node v22.23.3、emcc は `[EMSDK]` (`toolchain-emsdk`。`EMSDK` に設定して読ませる。`docs/REFERENCES.md` §4)、素材 `plugins-freshair`。
 - 既知類型との関係: 本 lift は x64c (RetDec 非依存)。RetDec 由来の修復 (P1・F7・F2) は適用していない。silent miscompile は差分 harness で検出する。NC-2 で検出力を確認した。
 - 差分 harness の入力: 仕様は `tools/liftlib/specs/fa_gain.json` (vars・buffers) をそのまま使う (`liftlib.harness.spec.build`)。署名 harness (`fa_gain_sig.mjs`) は同じ分布の値を再現し、L/R は一様 [-1, 1] (仕様の sample 定義は使っていない)。署名値は回帰用の ID であり、正しさは差分 harness が担う。
 
