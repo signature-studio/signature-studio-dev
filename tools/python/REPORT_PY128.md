@@ -32,9 +32,9 @@
 
 ## 検証
 
-測定 commit: `4e8e1dac7` (コードを変えた最後の commit。`origin/main` (`b6e93d6ac`) の取り込み merge の 3 回目)。
+測定 commit: `20fef1b35` (コードを変えた最後の commit。`origin/main` (`93202140d`) の取り込み merge の 4 回目)。
 
-main 取り込みは 3 回あった。1 回目 (`bb6bdcf41` → `43b9e5614`): `fl_mock.mjs`・`fl_engine.c`・`provider_check.mjs`・`ui_state_diff.mjs` が衝突。2 回目 (`1d04852b0` → `a440164c4`): main に PY-132 (#3013) の `pe132` (ui ブラウザ 3 件) が入り、`provider_check.mjs` が衝突。3 回目 (`b6e93d6ac` → `4e8e1dac7`): 競合なし (main 側の `fl_engine.c`・`fl_mock.mjs`・`ilmcp.mjs`・`plugins_diff.mjs` (PY-228) 等)。衝突はいずれも main 側の追加 (PY-130・#3007 / PY-132・#3013) と本 PR (PY-128) の追加なので両方を残した。`provider_check` の期待値は main 168 / 267 から本 PR の 2 件を足して 170 / 265 (3 回目の取り込み後も同じ)。以降の変更は `REPORT_PY128.md` のみ (md)。
+main 取り込みは 4 回あった。1 回目 (`bb6bdcf41` → `43b9e5614`): `fl_mock.mjs`・`fl_engine.c`・`provider_check.mjs`・`ui_state_diff.mjs` が衝突。2 回目 (`1d04852b0` → `a440164c4`): main に PY-132 (#3013) の `pe132` (ui ブラウザ 3 件) が入り、`provider_check.mjs` が衝突。3 回目 (`b6e93d6ac` → `4e8e1dac7`): 競合なし (main 側の `fl_engine.c`・`fl_mock.mjs`・`ilmcp.mjs`・`plugins_diff.mjs` (PY-228) 等)。4 回目 (`93202140d` → `20fef1b35`): 競合なし (main 側の `static64_growth` 系テストの追加のみ。provider・mock・検証テストの本体は変わらない)。衝突はいずれも main 側の追加 (PY-130・#3007 / PY-132・#3013) と本 PR (PY-128) の追加なので両方を残した。`provider_check` の期待値は main 168 / 267 から本 PR の 2 件を足して 170 / 265 (3 回目・4 回目の取り込み後も同じ)。以降の変更は `REPORT_PY128.md` のみ (md)。
 
 環境: runner 4 core、load average 0.20 (04:16:17)。`FL_WIN64_DIR` は素材 `artifacts/fl-win64.tar.zst` (R2 由来) を `$RUNNER_TEMP/fl-win64` に `tar --zstd -xf` で展開 (5.6 秒。`extracted/block00031_PE.bin` を含む)。`toolchain-emsdk` は展開せず [EMSDK] (既存。`docs/REFERENCES.md`) を使用。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、250 秒。初回のみ)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6 秒。初回のみ)。CPython と flpy は main 取り込み後も再ビルドしていない (`src/flpy.c` は main 側で変わっていない)。
 
@@ -49,12 +49,14 @@ main 取り込みで変わった隣接の差分テスト (wall は `channels_dif
 
 mock と C の値 (同一): `getProgTitle()` = `FL Studio 2026`、`getHintValue(50,100)` = `50%`、`(-1,100)` = `-1%`、`(1,8)` = `12%` (12.5 は偶数側)、`(5,0)` と `(0,0)` = `-9223372036854775808%`、`(2147483647,1)` = `-100%` (int32 折返し)、`(None,1)` = code 5。
 
-ネガティブコントロール (`4e8e1dac7` で再測定): `host/fl_mock.mjs` 415 行の係数 `100` を `10` に変えると `node tests/ui_state_diff.mjs` は `ui 状態ゲッター差分 9 件` で rc 1 (FAIL)。元に戻すと calls 81・diffs 0・PASS。
+ネガティブコントロール (`20fef1b35` で再測定): `host/fl_mock.mjs` 415 行の係数 `100` を `10` に変えると `node tests/ui_state_diff.mjs` は `ui 状態ゲッター差分 9 件` で rc 1 (FAIL)。元に戻すと calls 81・diffs 0・PASS。
+
+wall 列は `4e8e1dac7` での計測 (4 回目の取り込みは `static64_growth` 系のテスト追加のみで、表の 4 コマンドの入力は変わらない)。
 
 コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 4e8e1dac7 HEAD -- tools/python ':!*.md'
+$ git diff 20fef1b35 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
