@@ -183,17 +183,36 @@ REPORT §7 (旧 165〜167 行):
 | ILT 分岐入力 (FLE_IPP=3) | なし | 851 | `unlifted 0x976da0` | 3,139 / 1,490 | 64 |
 | ILT 分岐入力 + 0x976da0 root | `0x976da0` | **895** | `oob memory access out of bounds` | — | 64 |
 
-- 0x976da0 を root 化すると、停止点は unit 851 → 895 に進み、`unlifted` は消える。次の停止は `oob memory access out of bounds` (ログに発生箇所は無い・未特定)。
-- **既定経路は不変** (209 → 209)。よって受入 2『既定経路で units_run > 209』は**未達**。root 化は `FLE_EXTRA_ROOTS` の opt-in で、既定 (`fle6` の root 0x6a7b70 のみ) には入っていない。
+- 0x976da0 を root 化すると、停止点は unit 851 → 895 に進み、`unlifted` は消える。
+- **訂正 (2026-10-15 再測定・§C-2)**: 次の停止は `oob memory access out of bounds` と書いたが、同じ構成 (ILT + root `0x976da0`) を新規 lift で測ると `exit` (code 0) で止まり、`oob` は再現しなかった。下の『既定経路は不変』も誤りで、既定経路は `boot_roots.json` の `0x976da0` 追加後に 209 → 895 になっている (§C)。
+- ~~**既定経路は不変** (209 → 209)。よって受入 2『既定経路で units_run > 209』は**未達**。root 化は `FLE_EXTRA_ROOTS` の opt-in で、既定 (`fle6` の root 0x6a7b70 のみ) には入っていない。~~ → 訂正: 既定経路は boot_roots 追加後 895 (§C-1・§C-2 で再現)。受入 2 は達成。
 
 ### B-8 未解決 (起票先付き・本 PR)
 
+訂正 (§C-2): 下表の『既定経路で units_run > 209 (受入 2)』『子 #4286 (FLE-22)』は、既定経路が 895 に達した (§C) ことで不要になった。受入 2 は達成済み。『oob』行は再現しなかった (§C-2) ので、下表の更新版を使う。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 既定経路で units_run > 209 (受入 2) | 製品 KPI の既定経路は 209 のまま | 子 #4286 (FLE-22) |
-| 0x976da0 の root 化を既定 root に入れるか | 既定経路の units を 895 に上げられるが、既定 lift の範囲変更 | PM 判断 |
-| 次の停止 `oob memory access out of bounds` (unit 895・発生箇所未特定) | 最初のウィンドウ未達 | 本 issue の次段 (子 issue は PM 判断) |
-| 0x976c80 の vtable 格納を lift の間接 callee 解析で拾う方式 | 同種の thunk が他にもある可能性 | 未起票 (PM 判断) |
+| 0x976da0 の root 化 (既定 root) の survey 破裂の有無 (`survey_drive.sh` 未実施) | 既定の survey 942 unit の functional 判定 | #4783 [FLE-25] |
+| unit 895 の `exit` (code 0) が正常終了か (MessageBoxW 不在の影響か) | 最初のウィンドウ未達 | #4782 [FLE-24] |
+| ILTools の native 読込の成否 (mode 3 の入力の正しさ・推定のまま) | 既定経路 895 の前提 | #4783 [FLE-25] |
+| B-7 の `oob` 再現の不一致 (旧 run の build・lift の差の原因) | 再現性 | 再現せず (§C-2)。原因不明のまま記録 |
+| 0x976c80 の vtable 格納を lift の間接 callee 解析で拾う方式 | 同種の thunk が他にもある可能性 | PM 判断 (未起票) |
+
+### C-2 再測定 (2026-10-15・HEAD 再 lift・toolchain-emsdk 6.0.12 上流 install)
+
+- 素材: `fl-win64` は取得済み。`toolchain-emsdk` は `$ARTIFACTS_DIR` に無かったため、上流 `emsdk install 6.0.12` (`tools/m1/flags.sh` の pin と同版) で代替した。
+- 測定 commit: `dec8fa928` (コードを変えた最後の commit)。`git diff dec8fa928 HEAD -- tools/flelift/boot` は空。
+
+| route | 追加 root | units_run | 停止 (boot_threw) | getmem / freemem | IPP 判定 | 結果 JSON |
+|---|---|--:|---|--:|---|---|
+| 既定 (`FLE_EXTRA_ROOTS` 未指定・mode 3) | 0x6a7b70 + boot_roots (0x976da0) | **895** | `exit` (code 0) | 3,680 / 1,499 | ok (ptr=0x7f10001c) | `results/boot_summary_fle672rerun_default.json` |
+| ネガコン (`FLE_IPP=0`) | 同上 | **209** | `exit` (code 0) | 1,891 / 776 | ok (ptr=0) | `results/boot_summary_fle672rerun_negctl.json` |
+| B-7 構成 (ILT + `FLE_EXTRA_ROOTS=0x6a7b70,0x976da0`) | 同上 | **895** | `exit` (code 0) | 3,680 / 1,499 | ok (ptr=0x7f10001c) | `results/boot_summary_fle672b7rerun_ilt.json` |
+
+- 停止点: 既定 (と B-7 構成) とも unit 895 の後に `exit` (code 0・call site `0x412a12`)。`oob memory access out of bounds` は **どの構成でも再現しなかった**。B-7 の旧 `oob` run は再現できず、原因は未切り分け (旧 run の build・lift の差の可能性)。
+- 所要 (実測): lift 81 s・clang plain (8 shard) 100 s (既定) / 83 s (B-7)・boot default 10 s・boot negctl 26 s。load 1.1〜2.2 (4 vCPU)。
+- 結論: 既定経路 209 → 895 は新規 lift で再現した。受入 2 (既定経路 > 209) は満たす。`oob` は再現しないため、本 PR は `Closes #672` のままとする。`exit` (code 0) が正常終了か (最初のウィンドウ未達) は未解決。
 
 ## §C. 既定経路の更新 (2026-10-15・PM 判断 1・2 の実装)
 
