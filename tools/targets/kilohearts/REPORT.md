@@ -96,7 +96,7 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 | 14-24 | Trance Gate, Phaser, Reverb, Limiter, Chorus, Ensemble, Dynamics, Dual Delay, Tape Stop, Freq Shifter, Delay | 2.8〜5.9K | 358〜1033 | 10〜28 | 0〜63 | 中位 |
 | 25-35 | Transient Shaper(IAT 6), Bitcrush, Ring Mod, Compactor, Flanger, Shaper, Shaper Table, Distortion, Convolver(AVX 346), Filter, Pitch Shifter | 3.2〜10.8K | 606〜2222 | 14〜27 | 0〜346 | SIMD 量大 (Convolver の VEX-256/AVX 346 は畳込み kernel と推定) |
 | 36-41 | Phase Dist., Nonlinear Filter(IAT 6), Faturator, Ladder, Slice EQ, Filter Table | 7.8〜19.2K | 1413〜2804 | 16〜43 | 0〜427 | 重い (固有コード大・SIMD 多) |
-| 42 | Carve EQ | 50,109 | 2,032 | 41 | 145 | 127 関数・IAT 19 (用途と扱いは `snapins/REPORT_APPENDIX_781.md`) |
+| 42 | Carve EQ | 50,109 | 2,032 | 41 | 145 | 固有 127 関数 (`own_funcs`・固有 B と同集合) / unique 142 関数 (`unique_funcs`・census 対象)・IAT 19 (用途と扱いは `snapins/REPORT_APPENDIX_781.md`) |
 | 43-45 | Snap Heap / Multipass / Phase Plant | 50K/64K/153K | 3.3K/4.4K/15.4K | 46/48/62 | 145〜177 | ホスト/シンセ。最難 |
 
 ## 5. 認証 blocker の切り分け (DSP 側)
