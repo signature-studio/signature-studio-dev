@@ -44,6 +44,7 @@ function putStr(s, extra = []) {
 }
 const sp_get = mod._emscripten_stack_get_current;
 const sp_restore = mod.__emscripten_stack_restore || exp.emscripten_stack_restore || mod._emscripten_stack_restore;
+let spSnap = 0;   // LD-126: SNAPSHOT 時の SP (RESET で戻す)
 
 const dv = new DataView(new ArrayBuffer(8));
 const toF64 = (b) => { dv.setBigUint64(0, BigInt.asUintN(64, b), true); return dv.getFloat64(0, true); };
@@ -129,7 +130,11 @@ for await (const l of rl) {
     const [a, b] = l.slice(3).split(' ');
     mod._ld_w_add_wr(BigInt('0x' + a), BigInt('0x' + b));
   } else if (l === 'SNAPSHOT') {
-    mod._ld_w_snapshot(); out('{"ready":true}');
+    mod._ld_w_snapshot(img.length); spSnap = mod._emscripten_stack_get_current(); out('{"ready":true}');
+  } else if (l.startsWith('RESET ')) {
+    const m = Number(l.slice(6));
+    if (m & 9) sp_restore(spSnap);   // 1 (stk) と 8 (sp) のどちらでも SP を戻す
+    mod._ld_w_reset(m);
   } else if (l.startsWith('BLOB ')) {
     const k = l.indexOf(' ', 5); putStr(l.slice(5, k), [l.slice(k + 1)]); mod._ld_w_blob();
   } else if (l.startsWith('FIX ')) {
