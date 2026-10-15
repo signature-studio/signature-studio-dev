@@ -225,3 +225,7 @@ python3 tools/liftdiff/tests/ld39_abi_dump.py "$P" "$RUNNER_TEMP/empty.ll" > wor
 ## 8. LD-53 (#1546) 追記
 
 呼出し側の全件確認と投入形の判定 (達成)。全文は `REPORT_APPENDIX_LD53.md`。結論: (a)/(b) を `691dd0` について棄却し (付録 §7)、投入形は機械語の入口どおりとした。大半 (10 関数) は IR の `i128` 型が誤りの疑いが強い。
+
+## 9. LD-52 (#1528) 追記
+
+i128 引数の機械語入口型による case 投入と実行可能件数の実測。`40c660` `40c750` の 2 関数が native/wasm で一致 (11/11 パターン)。全文は `REPORT_APPENDIX_LD52.md`。
