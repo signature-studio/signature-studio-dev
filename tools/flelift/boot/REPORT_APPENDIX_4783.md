@@ -5,7 +5,7 @@
 ## §D. 既定変更の影響の実測 (#4783・受入 1〜3)
 
 > 測定 commit: `b60025c7d` (本 PR の HEAD・`origin/main` `02a31c7cd` 取り込み後・分割移動後)。
-> 素材: `fl-win64` (`flstudio_win64_26.1.7.5653`)・`toolchain-emsdk` 6.0.12 (上流 `emsdk install 6.0.12`。`/opt/emsdk` は runner に無い)。lift は `fle6_measure.sh` の経路で `FLE_EXTRA_ROOTS=` (root 無し)、clang は `FLE_SHARDS=8`。
+> 素材: `fl-win64` (`flstudio_win64_26.1.7.5653`)・`toolchain-emsdk` 6.0.12 (上流 `emsdk install 6.0.12`・`[EMSDK]` の既定位置は runner に無い)。lift は `fle6_measure.sh` の経路で `FLE_EXTRA_ROOTS=` (root 無し)、clang は `FLE_SHARDS=8`。
 > 実測環境: 4 vCPU・load 0.6〜2.0。各 run n = 1。
 > 注: 旧版の本節 (測定 commit `8aa9c0289`・mode 0 を既定とした値) は head で再測定した値に置き換えた。`FLE_IPP` 未指定の既定は main 側 (#672) で mode 3 になっているため、既定経路の値は mode 3 で書く。
 
