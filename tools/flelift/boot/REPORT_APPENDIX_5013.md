@@ -21,6 +21,8 @@
 | `FLEBOOT_RESULT` | `units_run 895` / `units_total 942` / `boot_threw "exit"` / `log_cap {hit: bytes, bytes: 932930, lines: 14429, elapsed_ms: 648}` / `getmem 3680` / `freemem 1499` / `longjmp 1` / `exit 1` / `ipp_total 67` |
 | ログ | `$RUNNER_TEMP/fle39/w_cap/run_fle39cap_default.log` (933,819 B)。repo 外 (`$RUNNER_TEMP` 配下) で、成果物として保存していない (受入条件 2 の「ログの成果物 path」は、保存対象外のためこの path を記録するに留める) |
 
+- 検証 HEAD `07fc75632` での再測定 (main 取り込み後・`FLE_BOOT_RUNS=default`・`FLE_BOOT_LOG_CAP=4096`・素材 `fl-win64` と emsdk 6.0.12 を上流から取得): 所要 3 分 05 秒 (lift 78 s・clang-plain 91 s・boot 10 s)。load は lift 完了時 1.06・clang-plain 完了時 1.84・boot 開始 1.84 (4 vCPU・`fle6_measure.sh` のログの値)。`units_run 895`・`boot_threw exit`・`log_cap.hit bytes` (635 ms)・`getmem 3680`/`freemem 1499`・IPP ok (`ptr_15F34A0=0x7f10001c`)。rc 0。結果 JSON: `tools/flelift/boot/results/boot_summary_fle39fix_default.json`。
+
 ## 3. 対照 (cap あり / なし の直接比較・`fle_boot.mjs` 単体)
 
 `fleboot_plain.cjs` (同じビルド) を `fle_boot.mjs` で直接実行 (`FLE_IPP=` 既定 3・`FLE_TOLERANT=0`・`FLE_DIAG_NULLFILL=0`・`--boot-only`)。
