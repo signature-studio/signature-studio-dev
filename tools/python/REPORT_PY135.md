@@ -75,7 +75,7 @@
 
 測定 commit: `ec3da771b` (`Merge remote-tracking branch 'origin/main' into 3022-py135-screen-draw-pe`。main `d5681415e` を取り込んだ merge。コードを変えた最後の commit)。以下は同じ commit のクリーンな作業ツリーで実行した。前回の測定 (`d40d9af26`、main `e13f1efd2` 取り込み。172/263)・`524693988` (merge 前。169/266)・round 0 の測定 (`a60dccce8`、addMeter の遷移を含まない) は無効であり、本節が新しい測定。
 
-環境: runner 4 core。emsdk は `/opt/emsdk` の 6.0.12 (`tools/m1/flags.sh` の pin と一致。runner に既存)。`toolchain-emsdk` の素材 (`$HOME/artifacts/toolchain-emsdk.tar.zst`) は展開していない。fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (7.3 秒)、`FL_WIN64_DIR` はその展開先。`fetch_inputs.sh` は `FL_WIN64_DIR` を指定して rc 0 (`work/midi.py`・`utils.py`・`MCPTools.pyc` を配置)。前提生成物: `build_cpython_wasm.sh` (rc 0、wall 2 分 42 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0。wall は未計測)。main の取り込みで衝突したのは `provider/fl_engine.c` (`fl_engine_reset` の初期化行。PR 側 `scr_dflt`・main 側 `browser_op`) と `tests/provider_check.mjs` (条件行と件数) だけで、両方の変更を残した (件数は 175/260)。測定時の load average (1 分値): 0.85 → 0.85。
+環境: runner 4 core。emsdk は `[EMSDK]` の 6.0.12 (`tools/m1/flags.sh` の pin と一致。runner に既存)。`toolchain-emsdk` の素材 (`$HOME/artifacts/toolchain-emsdk.tar.zst`) は展開していない。fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (7.3 秒)、`FL_WIN64_DIR` はその展開先。`fetch_inputs.sh` は `FL_WIN64_DIR` を指定して rc 0 (`work/midi.py`・`utils.py`・`MCPTools.pyc` を配置)。前提生成物: `build_cpython_wasm.sh` (rc 0、wall 2 分 42 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0。wall は未計測)。main の取り込みで衝突したのは `provider/fl_engine.c` (`fl_engine_reset` の初期化行。PR 側 `scr_dflt`・main 側 `browser_op`) と `tests/provider_check.mjs` (条件行と件数) だけで、両方の変更を残した (件数は 175/260)。測定時の load average (1 分値): 0.85 → 0.85。
 
 | コマンド | 結果 | wall |
 |---|---|---|
