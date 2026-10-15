@@ -53,13 +53,17 @@
 - 規則の置き場: 型の上書きなので ABI 表ではなく `patches.py` の `GTYPE` (型表)。`ghidra_to_c.py --fix gtype` を付けたときだけ効く (既定は OFF)。規則が使われなければ `assert` で停止する (下の NC2)。
 - 限界: 幅 (4 byte か 8 byte か) は emcc では検出できない (下の NC1)。幅の根拠は上の逆アセンブル表が担う。C 本体の数値 (Delay の native 突合) は未実施 (#3073 [KH-41])。`181422a10` の `uint` は 16 byte の 1 lane の値だけを C が表す (他 lane は census の対象外)。`181422a10` の 8 件 = delay 4 + gate 4。『整数マスク』と言える範囲は、delay 関数の 6 KiB 窓内の 4 参照 (`andps`・ビット演算) だけ。窓の外の delay 参照は未確認。gate 側の 4 参照は float 算術 (`look`・検収で確認) で、gate は GTYPE の対象外 (gate.c は不変)。残りの範囲の確認は #3849 で規則を決めるときに行う。
 
-**ネガティブコントロール・未再測定 (`bd1b7a297` 時点の値)**。`fe5fa8215` では再実行していない。取り込み後の基準は 556 → 507 に変わっているため、下の表の『合計』は現行の基準と比べられない。現行の再測定は未了 (本 run は Ghidra 未配置・素材 `plugins-kilohearts` 未展開のため、上限内に完了できなかった)。次回は `fe5fa8215` 以降の HEAD で、NC0 = `FX=bitcast,intload,stackpair,assoc,concat` (基準 507)、NC1・NC2 を再実行する (未解決表の起票先)。
+**ネガティブコントロール (現行の再測定・測定 commit `fe5fa8215`・census 入力は HEAD と同じ)**。素材: `plugins-kilohearts` → Installer zip → payload.dat → windows.zip/1ccb1df8c8f10745 → `HeartCore.core_64` (76,642,304 B)。Ghidra 12.1.4 は `docs/REFERENCES.md` の取得元 (`ghidra_12.1.4_PUBLIC_20260921.zip`・sha256 `ddac49f9…d2db` 一致) から取得。JDK 21 (`temurin-21`) で実行。デコンパイル 151/151 OK。各検査は `ghidra_route/` を複製した作業コピーで行い、repo 内のファイルは変えていない。
 
-| 検査 | 結果 (`bd1b7a297`・未再測定) |
+| 検査 | 結果 (現行・`fe5fa8215` の census 入力) |
 |---|---|
-| NC0: `--fix gtype` を外す | 型不一致 187・合計 556 (規則の効果 = 68 件) |
-| NC1: `182280c10` を `uint` と誤記 | 合計 488・型不一致 119 のまま (**emcc は幅の誤りを検出しない**。幅の根拠は逆アセンブル表) |
-| NC2: 存在しない VA `1` を登録 | `AssertionError: gtype rule not used (global not in delay): 1` (exit 1) |
+| 基準 (NC0 相当): `FX=bitcast,intload,stackpair,assoc,concat` (`--fix gtype` を外す) | 合計 **507**・型不一致 **187** (`delay` の `emcc` error 行 507) |
+| 正の基準: `FX=…,gtype` (規則あり) | 合計 **439**・型不一致 **119** (規則の効果 = 68 件) |
+| NC1: `182280c10` を `uint` と誤記 | 合計 **439**・型不一致 **119** (件数は正の基準と同じ。`delay.c` の内容は正の基準と異なる (`diff` で差あり)。**emcc は幅の誤りを検出しない**。幅の根拠は逆アセンブル表) |
+| NC2: 存在しない VA `1` を登録 | `AssertionError: gtype rule not used (global not in delay): 1` (exit **1**) |
+
+- 基点 census の再現: 現行の `gtype_census.sh` は `$HERE` (作業ツリーの `ghidra_route`) 固定で、第 2 引数は `.o` 比較にしか使わない。よって基点 (規則なし) は『`FX` から `gtype` を外す』行で、作業ツリーの `ghidra_route` を使って再現する (507・187)。`origin/main` 側の `ghidra_route` で回した census (529・187 と記されていた値) は再現していない (未測定。`origin/main` を取り込むと基準が変わるため、取り込み時に §6 で再測定する)。
+- 旧表 (`bd1b7a297` 時点の 556・488) は、取り込み前の値として上の『census・取り込み前の値』節に残す。現行の値は本表。
 
 **Gain/Haas/Gate の `.o` 不変**: 旧 converter (`ffb17f14d`) と HEAD の converter で生成した C の本体 (2 行目のヘッダ comment を除く) は 3 本とも差分 0 行。`emcc -c` の `.o` は `cmp` で一致 (gain 1,435 B・haas 3,217 B・gate 3,756 B)。`gtype_census.sh` の第 2 引数で同じ比較を再現できる。
 
