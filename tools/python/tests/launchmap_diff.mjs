@@ -20,9 +20,20 @@ const run = (eng, name, args) => {
   }
 };
 
-const calls = [["launchMapPages.length", []]];
+// PY-138 (#3029): init (sii)・updateMap (i)・createOverlayMap (iiii) は成功時 None。副作用は未確定のため length は変わらない
+const calls = [
+  ["launchMapPages.length", []],
+  ["launchMapPages.init", ["main", 640, 480]], ["launchMapPages.updateMap", [-1]], ["launchMapPages.updateMap", [3]],
+  ["launchMapPages.createOverlayMap", [1, 2, 3, 4]], ["launchMapPages.length", []],
+];
 // 引数個数違い (NOARGS の関数に引数を渡す): mock と C は共に code 5 (Wrong number of parameters)
-const arity = [["launchMapPages.length", [1]], ["launchMapPages.length", [0]]];
+// 引数型違い・個数違い (PyArg 書式 sii・i・iiii と同じ): 共に code 5
+const arity = [
+  ["launchMapPages.length", [1]], ["launchMapPages.length", [0]],
+  ["launchMapPages.init", ["main", 640]], ["launchMapPages.init", [1, 640, 480]], ["launchMapPages.init", ["main", 640, 480, 1]],
+  ["launchMapPages.updateMap", []], ["launchMapPages.updateMap", ["x"]],
+  ["launchMapPages.createOverlayMap", [1, 2, 3]], ["launchMapPages.createOverlayMap", [1, 2, 3, "x"]],
+];
 
 const diffs = [];
 for (const [name, args] of [...calls, ...arity]) {
