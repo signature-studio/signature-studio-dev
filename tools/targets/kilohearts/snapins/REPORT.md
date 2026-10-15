@@ -142,7 +142,7 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 - **xmm FMA (`vf*`) 計 27 件** (Ladder 11 / Filter Table 6 / Slice EQ 10 = 上表の `vf*` 行の合計)。
 - **語彙の対象 (f354504c の census 結果に基づく・PM 判断 2026-10-13 に従う)**: census で `vblend*` / `vperm*` は 0 件と確定したため、#779 の語彙追加対象から外し、**ymm (`vaddps` / `vmulps` / `vsubps` / `vmovaps`・Convolver と Filter Table のみ) と vfmadd 系 (xmm・scalar) に絞る**。
 - **lift 対応 (#3256 で追加)**: `gen_simd.py` の `gen256` が ymm の vaddps / vsubps / vmulps (3 引数) と vmovaps (1 引数) を IR で定義する (void の store 形は stub のまま)。vfmadd 系 xmm は `gen()` の declare 駆動で C 化し、bit-exact 検証は [REPORT_APPENDIX.md §12-2](REPORT_APPENDIX.md)。vfmadd の ymm 形は census 0 件。
-- **受入条件の残り**: 既存 14 snap-in のハッシュ不変 (#3259)・store 形の lift (下表)。語彙の bit-exact とネガコンは §12-2 で実施。**2026-10-14 に #779 を縮小 (§12-1)**。後続: #709 (KH-14) は #779 完了後に着手 (PM が `blocked_by` 登録済み)。
+- **受入条件の残り**: 既存 14 snap-in のハッシュ不変 (#3259・結果は [REPORT_APPENDIX_3259.md](REPORT_APPENDIX_3259.md): B=80fb2fd00 と H=origin/main で emcc 前 5 項目は 14 本すべて一致、wasm は 10 本一致・phaser/delay/limiter/khbase の 4 本は emcc RSS cap 超過で未測定 (#3756))・store 形の lift (下表)。語彙の bit-exact とネガコンは §12-2 で実施。**2026-10-14 に #779 を縮小 (§12-1)**。後続: #709 (KH-14) は #779 完了後に着手 (PM が `blocked_by` 登録済み)。
 
 ### 12-1. ymm 語彙 vaddps / vsubps / vmulps の実装と単体検証 (#779 第 2 弾)
 
