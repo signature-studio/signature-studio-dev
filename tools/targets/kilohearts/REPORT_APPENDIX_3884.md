@@ -5,7 +5,7 @@
 #### 結論
 
 - `FUN_180fdc470` の ret (180fdc65b) の xmm0 (縮約値) と rax (四分象限) を機械語の式で `kh_fn_180fdc470` として C 化し、native (`HeartCore.core_64`) と bit 一致を取った (測定 commit `99b367fc0`・正のみ 0<x<1 は未突合)。
-- **HEAD (main 取り込み後) の再突合は、この run では未実施**。素材 `plugins-kilohearts` が `$HOME/artifacts` に無く、`HeartCore.core_64` を得られなかったため。PR 本文の `oc_artifacts: fl-win64 plugins-kilohearts toolchain-emsdk` で再実行する。
+- **HEAD (main 取り込み後) の再突合は、この run では未実施**。この run には素材 `plugins-kilohearts` が無く、`HeartCore.core_64` を得られなかったため。PR 本文の `oc_artifacts: fl-win64 plugins-kilohearts toolchain-emsdk` で再実行する。
 
 #### 測定 1: 測定 commit `99b367fc0` (実装者の実測)
 
