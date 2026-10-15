@@ -25,7 +25,7 @@
 
 ### 20.3 検証 (測定 commit `14731ce2c`・origin/main 起点の worktree `ws-3439`・`work/` 無しから)
 
-素材: `fl-win64` (`extracted/block18983_PE.bin`)。RetDec は `/opt/retdec` (`lift_ranges.sh` の既定)。llvm-as・clang は `/usr/lib/llvm-18/bin`。
+素材: `fl-win64` (`extracted/block18983_PE.bin`)。RetDec は `[RETDEC]` (`lift_ranges.sh` の既定。`docs/REFERENCES.md`)。llvm-as・clang は llvm-18 を PATH に置いた。
 
 | コマンド | rc | 所要 | 開始 load (1 分値) | 結果 |
 |---|---:|---:|---:|---|
