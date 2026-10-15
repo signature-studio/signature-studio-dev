@@ -47,7 +47,7 @@ PE 上で確定した事項 (REPORT_PY172 §1・§2 と同じ):
 
 ## 4. 実装・検証
 
-測定 HEAD: `6a7d2634e` (runner・2026-10-15 07:49〜07:56 UTC。main 取り込み merge の後で、`9facb33bb` から `6a7d2634e` までの `tools/python/{provider,host,tests}` 差分 (11 insertions / 5 deletions) を含む)。emsdk は `emsdk install 6.0.12` で入れ、`/opt/emsdk` に symlink を張った (`toolchain-emsdk` 素材は本 run に無い。`EMSDK_DIR`・`EMSDK_ENV` で指定可)。
+測定 HEAD: `6a7d2634e` (runner・2026-10-15 07:49〜07:56 UTC。main 取り込み merge の後で、`9facb33bb` から `6a7d2634e` までの `tools/python/{provider,host,tests}` 差分 (11 insertions / 5 deletions) を含む)。emsdk は `emsdk install 6.0.12` で入れ、既定の emsdk 位置 (`EMSDK_DIR` の既定値) に symlink を張った (`toolchain-emsdk` 素材は本 run に無い。`EMSDK_DIR`・`EMSDK_ENV` で指定可)。
 
 | 検査 | 手順 (コマンド) | 結果 (測定 HEAD `6a7d2634e`) |
 |---|---|---|
