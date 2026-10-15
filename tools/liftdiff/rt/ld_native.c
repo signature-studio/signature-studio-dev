@@ -161,7 +161,7 @@ static void step_end(void) {
 
 /* LD-129 (#2770): VA への書込み監視。env LD_WATCH_ADDR=<VA hex>・LD_WATCH_OUT=<path> で有効 (既定は無効)。
  * 監視 page を PROT_READ|PROT_EXEC にし、書込みの SIGSEGV で書込み命令の RIP・書込み先を採る。
- * TF で書込み 1 命令だけ実行させてから page を戻す (書込みはそのまま行われ、結果は変わらない)。
+ * TF で書込み 1 命令だけ実行させてから page を戻す (書込みはそのまま行う。結果が変わらないことは未確認。REPORT_APPENDIX_2770.md §8.4)。
  * 記録は書込み先の開始アドレスが va-15..va+7 にあるもの (書込み幅 16 以下を想定)。重ならない書込みも含む superset で、取りこぼしは無い。
  * TF の待ち (g_wp_pend) の間は SIGALRM を block する (timeout で page が RWX のまま残るのを防ぐ)。
  * LD_STEP_N・trace と同時には使わない。 */
