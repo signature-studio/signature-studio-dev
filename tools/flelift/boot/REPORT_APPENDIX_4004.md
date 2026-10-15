@@ -48,9 +48,9 @@ REPORT §10 は「終了時の `[0x15e0a48]` は shim 有で 0」と記したが
 ## 6. 再現
 
 ```sh
-FL_WIN64_DIR=$HOME/analysis/win64 FLE_EXTRA_ROOTS= FLE_BOOT_RUNS="default shim" FLE_BOOT_TAG=fle4004 \
+FL_WIN64_DIR=<[WIN64] の展開先> FLE_EXTRA_ROOTS= FLE_BOOT_RUNS="default shim" FLE_BOOT_TAG=fle4004 \
   FLE_BOOT_WORK=<repo>/tools/flelift/work/boot4004 bash tools/flelift/boot/fle6_measure.sh
 grep -a '\[slot\]' tools/flelift/work/boot4004/run_fle4004_*.log
 ```
 
-素材: `oc_artifacts: fl-win64 toolchain-emsdk` (fl-win64 は `$HOME/analysis/win64` に展開)。
+素材: `oc_artifacts: fl-win64 toolchain-emsdk` (fl-win64 は `[WIN64]` の展開先に展開)。
