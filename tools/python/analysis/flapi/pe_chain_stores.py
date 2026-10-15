@@ -8,8 +8,8 @@
 - タグ: `QS` = Q スロットの VA (`mov r,[G]` の直後)、`QO` = Q の値 (`mov r,[QS]` または `mov r,[QS-ptr]`)、
   `QO+d` = Q 本体 + d の VA (`lea`)、`O` = `[Q+disp]` の値。
 - 出力: (a) 同一関数内で `[QO+disp] ← X` の書込み (X が imm 0 か否か)、(b) `[QO+disp]` の読出し、
-  (c) rcx に QO を載せて直接 call した先で `mov [rcx+disp], X` を行う箇所 (先頭 40 命令・rcx が
-  書き換わるまで)。(c) の範囲は直接 E8 の call 先のみ。
+  (c) rcx に QO を載せて直接 call した先で `mov [rcx+disp], X` を行う箇所 (先頭 CALLEE_WINDOW×16 =
+  640 バイト・rcx が書き換わるまで・ret/jmp/call で止まる)。(c) の範囲は直接 E8 の call 先のみ。
 - 走査は線形。ret・jmp で全タグを消し、call で caller-saved (rax,rcx,rdx,r8-r11) を消す。
   分岐の合流は考慮しない (タグは保守的に残るため、候補は手で逆アセして確定する)。
 
@@ -52,6 +52,7 @@ def canon(name):
 
 def rip_target(ins, op):
     return ins.address + ins.size + op.mem.disp
+
 
 def step(ins, tags, rows, callee_refs, g_va, q_slot, disp_want):
     ops = ins.operands
