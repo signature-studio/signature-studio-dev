@@ -70,14 +70,14 @@
 
 - [ ] 1. A 経路 getter: 部分達成。入口 (`0x1331340`)・既定 `G`・`G` の生成・`X` の初期化は PE 確定。bit1 の表は `sub` のクラス未確定のため未達。
 - [ ] 2. lo・hi・cur の表: 本 run では未着手 (共通経路は REPORT_PY73 §9-6 の記録のまま)。switch 本体は #2033・#2034 の範囲。
-- [x] 3. `0x664090` の挿入と件数更新、`O` の初期化元: 確定 (§1 と前回の記録)。`O` の件数増加元は `0x664090` の外にあり、§2 の未解決に残す。
+- [ ] 3. `0x664090` の挿入と件数更新、`O` の初期化元: 挿入と初期化元は確定 (§1 と前回の記録)。件数増加元は未確定 (`0x664090` の外にあり、§2 の未解決に残す)。
 - [x] 4. 推測の初期値では実装しない: 遵守 (provider・mock・tests の変更 0)。
 
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `sub` (= `ref.vt[+0x20](ref)` の戻り値) のクラス・`sub.vt[+8](0x1a)` の本体 (`[ref]` の書込み元・`ref` の vtable の `+0x20` 本体・`ctx.vt[-0x30]` の先を含む) | A 経路の bit1 (float 型か) が決まらない | #2887 (再開時) |
+| `sub` (= `ref.vt[+0x20](ref)` の戻り値) のクラス・`sub.vt[+8](0x1a)` の本体 (`[ref]` の書込み元・`ref` の vtable の `+0x20` 本体・`[ctx-0x30]` (= `0x40f960`) の本体を含む) | A 経路の bit1 (float 型か) が決まらない | #2887 (再開時) |
 | `0x1046a30` の mode 0x20 (lo・hi)・mode 2 (cur) の switch 本体 | incEventValue の lo・hi・cur が決まらない | #2033 (PY-64)・#2034 (PY-65) |
 | O (`[0x16bafc8]`) の件数 `[+0x10]` の増加元 (レジスタ経由の書込み) | O の中身の増え方 | #2887 (再開時) |
 
@@ -85,18 +85,20 @@
 
 測定:
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に `*block00031_PE.bin` のみ展開 (実測 2.9 秒)。load average 0.55 (run 開始時)。
-- 測定 commit (コードを変えた最後の commit): `7e286e275` (`pe_vptr_stores.py` の追加 `7dc42feb7` の docstring 修正)。`git diff 7e286e275 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
-- `pe_vptr_stores.py 48` → hits 0・70.1 秒 (命令 5,022,467)。`7e286e275` で再現 (初回 69.7 秒)。
-- 陽性対照 `pe_vptr_stores.py 0` → hits 1: `0x44a86e` `mov [rax], rcx` (V = `0x13acb88` (`.data`)、slot+0x20 = `0x44a820`、slot+8 = `0x44a720`)・69.9 秒。
+- 測定 commit (コードを変えた最後の commit): `0b9527969` (`pe_vptr_stores.py` の修正: オペランドが qword の `mov` だけを数える・`push reg` で lea の追跡を消さない)。`git diff 0b9527969 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
+- `pe_vptr_stores.py 48` → hits 0・38.0 秒 (命令 5,022,467)。修正前 (`7e286e275`) も hits 0 だった。
+- 陽性対照 `pe_vptr_stores.py 0` → hits 1: `0x44a86e` `mov [rax], rcx` (V = `0x13acb88` (`.data`)、slot+0x20 = `0x44a820`、slot+8 = `0x44a720`)・37.5 秒。修正後も同じ 1 件。
 - 補助 (逆アセンブル): `pe_disasm.py 132e7a0 70`・`410320 40`。`pe_scan_store.py 0x48 qword` の出力は大半が `[rbp+0x48]`・`[rsp+0x48]` (フレーム slot) だった。
+- 検証範囲: 格納先は `[reg+0x48]` の形のみ (index 無し・rbp/rsp/rip 基底を除く)。追跡は直線区間 (call・ret・jmp で打ち切り)・8 命令の窓内・`mov reg,reg` による複写は追わない・暗黙に書換える命令 (cdq・mul 等) は見ない。0 件は、この範囲で `lea` → `mov qword ptr [reg+0x48], reg` の直接形が無いことだけを示す。
 
 結果:
 - PE の `.rdata` は 0x45 バイトのみ。vtable 形の表は `.data` (0x13a5000〜0x15e5008) に置かれる (陽性対照の V)。
 - `lea reg,[rip+V]` の 8 命令以内に `mov qword ptr [reg2+0x48], reg` で V を格納する箇所は 0 件。X+0x48 (`ref`) の vptr はこの形では書かれない。
-- X の生成 `0x132e7a0`: `X = 0x410320(ctx, dl)` → `0x13315a0(X, 0, r8, &args)` → `[X+0x40] ← r8` (0x132e80d)。`[X+0x48]` の書込みは無い。
-- `0x410320` は `rax = ctx`・`call [rax-0x30]` (`dl ≥ 0` のとき) の 1 命令。`ctx = 0xfe3340` は `.text` 内のコード (vtable ではない)。X を作るのは `[ctx-0x30]` の間接呼出し先と見られるが、その値と関数本体は未読。X+0x48 の vptr の書込み元も、その先に無いかは未確認。
+- X の生成 `0x132e7a0`: `X = 0x410320(ctx, dl)` → `0x13315a0(X, 0, [rbp+0x88], &args)` (第 3 引数は呼出し元の r9 を 0x132e7cc で `[rbp+0x88]` に退避した値。0x132e7f2 で r8 に入れる) → `[X+0x40] ← [rbp+0x80]` (呼出し元の r8。0x132e806〜0x132e80d)。`[X+0x48]` の書込みは無い。
+- `0x410320` は `mov rax,rcx` の後に `call [rax-0x30]` (`dl ≥ 0` のとき。`rcx = ctx`) を行う。ctx を表の基底として直接使う。`ctx = 0xfe3340` は `.text` 内のデータで、命令列ではない: 先頭の qword `0x663c90`・`0x663c60` は関数 VA (`0x663c90` は `push rsi` で始まる)、0xfe3357 と 0xfe336a に ASCII `TChanList` を含む。VMT 様の表と見られる (根拠は上の 2 点。表全体の形は未確定)。
+- `[ctx-0x30]` (0xfe3310) の qword は `0x40f960` (`push rbx; sub rsp,0x20; mov rbx,rcx; ...`)。`0x410320` の戻り値 (X) を返す関数と見られる。その本体の走査は未了。X+0x48 の vptr の書込み元も、この先に無いかは未確認。
 - 初版の誤検出: `[rbp+0x48]`・`[rsp+0x48]` (フレーム slot) と `.text` 内の lea 先 (関数の機械語) を拾った。基底レジスタの除外と `is_vtable` (先頭 qword が実行可能 section の VA) で除いた。
 
 判定と未解決:
-- 受入条件 1 (bit1): 未達のまま。`sub` のクラスは X の factory (`[ctx-0x30]`) の先で決まる見込み。次の run は `0xfe3310` の値と、その関数の本体から始める。
+- 受入条件 1 (bit1): 未達のまま。`sub` のクラスは X の作り方 (`[ctx-0x30]` = `0x40f960` の本体) で決まる見込み。次の run は `0x40f960` の本体から始める。
 - 受入条件 3 (O の件数増加元): 未達のまま (§2 と同じ)。
