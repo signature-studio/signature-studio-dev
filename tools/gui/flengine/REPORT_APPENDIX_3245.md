@@ -49,7 +49,7 @@
 
 ## 5. cfi_probe.mjs (受入条件 4)
 
-- head で再実行 (`node tools/gui/flengine/cfi_probe.mjs --out tools/gui/flengine/results/cfi_probe_3245.json`): `boot = {ok: true}` (`dllmain_done`)、`call = {returned: false, err: "mod._CreateFruityInstance is not a function"}`。`EnterCriticalSection` には届かない。
+- head で再実行 (`node tools/gui/flengine/cfi_probe.mjs --out tools/gui/flengine/results/cfi_probe_3245.json`): `boot = {ok: true}` (`dllmain_done`)、`call = {returned: false, err: "mod._CreateFruityInstance is not a function"}`。`EnterCriticalSection` には届かない。`boot.err` が `[object Object]` なのは、boot の例外が Error でなく `String(e)` で整形されるため (`cfi_probe.mjs` 22 行目)。判断には影響しない。整形は未修正で #3353 で扱う。
 - 停止点: `_CreateFruityInstance` が export されていない。現素材の `boot_final.ll` / `boot_final3.ll` に `@CreateFruityInstance` の定義が無い (head で grep 0 件)。e2e.sh は IR に定義がある時だけ export する。
 - 次の停止点: boot7 (CreateFruityInstance の closure 取込, WIN-4 #2715) を含む IR の再生成 (素材側)。#3353 で扱う。
 
