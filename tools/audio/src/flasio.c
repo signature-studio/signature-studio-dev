@@ -149,7 +149,7 @@ ASIOError flasio_create_buffers(ASIOBufferInfo *infos, ASIOLong n, ASIOLong buff
     }
     if (nOut == 0) nOut = 1;                    /* 出力ゼロ指定でも ring は 1ch 必要 */
     A.B = (uint32_t)bufferSize; A.nOut = nOut; A.nIn = nIn; A.cb = *cb;
-    int orc = fla_open((uint32_t)A.sr, (uint32_t)nOut, (uint32_t)nIn, A.B, A.depth, FLA_F_DECLICK | (A.hint << 8));
+    int orc = fla_open((uint32_t)A.sr, (uint32_t)nOut, (uint32_t)nIn, A.B, A.depth, FLA_F_DECLICK | FLA_F_T_FLOOR | (A.hint << 8));
     if (orc == FLA_E_BURST_TOO_LARGE) return ASE_NoMemory;   /* FL: "Couldn't create the streaming ASIO buffer." (ホストは落とさない) */
     if (orc != 0) return ASE_NotPresent;
     A.depth = fla_ctl()->depth;                 /* burst に合わせて自動拡張された実効 depth */

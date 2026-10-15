@@ -33,7 +33,9 @@ enum { FLA_WL_IDLE = 0, FLA_WL_BUFFERING = 1, FLA_WL_PLAYING = 2 };
 enum { FLA_EV_SUSPENDED = 1u << 0, FLA_EV_CLOSED = 1u << 1, FLA_EV_RATE_CHANGED = 1u << 2, FLA_EV_RESUMED = 1u << 3,
        FLA_EV_INPUT_CHANGED = 1u << 4 /* 入力デバイスの喪失/切替 (ASIO kAsioResetRequest の元) */ };
 /* ctl.flags */
-enum { FLA_F_DECLICK = 1u << 0, FLA_F_INPUT = 1u << 1 };
+enum { FLA_F_DECLICK = 1u << 0, FLA_F_INPUT = 1u << 1,
+       FLA_F_T_FLOOR = 1u << 2 /* 初期 T >= FLA_T_FLOOR_FRAMES (burst 探査に依らない下限) */ };
+#define FLA_T_FLOOR_FRAMES 1536u
 
 /* コマンド (wasm → main thread JS)。FLEngine 側は AudioContext/MIDI/getUserMedia に触れられない
  * (worker に AudioContext は無い) ため、制御面は全て main thread に委譲する。 */
@@ -150,7 +152,8 @@ uintptr_t  fla_ctl_ptr(void);
 int  fla_cmd(uint32_t op, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t res[4], uint32_t timeout_ms);
 /* ring 確保 + ctl 初期化。成功 0。失敗は負値 (abort しない):
  *   -1 = RPC 失敗/タイムアウト, FLA_E_BURST_TOO_LARGE = OPEN 較正 burst が大きすぎ ring に収まらない
- *   ((depth+2)*B > FLA_MAX_RING。depth は burst から自動算出し固定上限なし。AudioContext は閉じて CLOSED に戻す) */
+ *   ((depth+2)*B > FLA_MAX_RING。depth は burst から自動算出し固定上限なし。AudioContext は閉じて CLOSED に戻す)
+ *   flags の FLA_F_T_FLOOR を立てると、初期 T を FLA_T_FLOOR_FRAMES 以上に上げる (burst 探査の結果に依らない下限) */
 #define FLA_E_BURST_TOO_LARGE (-100)
 #define FLA_E_NO_PANEL (-3)   /* CONTROL_PANEL の ack_status: main に UI が登録されていない */
 int  fla_open(uint32_t sr, uint32_t out_ch, uint32_t in_ch, uint32_t buffer_frames, uint32_t depth, uint32_t flags);
