@@ -92,7 +92,7 @@
 
 ## 9. slot 2 の差分追加と slot 1・3 の native 落ち原因 — T-SH-105 (#4237)
 
-測定 commit: 本 PR の最後の code commit (`git log -1 -- tools/shared/lift/ildsp/lift_psola.sh`)。検証起点: `e0ee551a2` (origin/main)。
+測定 commit: `d7a1b641e` (コードを変えた最後の commit。`lift_psola.sh` の差分)。検証起点: `e0ee551a2` (origin/main)。
 
 ### 9-1 結論 (1 行)
 slot 2 (`0x1ab690` → `0x1804b0`) を差分の呼出しに加えた (`WC_CALL_IDX="0 2 4 5"`・64/64 PASS・ネガコン FAIL 64/64)。slot 1・3 は native で `addr 0x0` の SIGSEGV になり、原因は `0x1b6f4c` の間接呼出しの復号鍵 (RVA `0x3f7ad0`) が file 上で 0 であることまで特定した。鍵を設定する host 初期化は未特定のため、slot 1・3 は差分に入れていない。
@@ -133,5 +133,5 @@ slot 1・3 の thunk は `rcx = [this+8]` を読んでから DSP 本体へ jmp �
 ### 9-6 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| slot 1・3 の復号鍵 `[0x3f7ad0]` を設定する host 初期化の特定 | 受入 (1)(2) の残り。slot 1・3 を差分に入れられない | 子 issue (本 run で起票) |
-| `.data` 入力の変化による分岐の数値化 | 受入 (3) | 子 issue (同上) |
+| slot 1・3 の復号鍵 `[0x3f7ad0]` を設定する host 初期化の特定 | 受入 (1)(2) の残り。slot 1・3 を差分に入れられない | #4302 [T-SH-114] |
+| `.data` 入力の変化による分岐の数値化 | 受入 (3) | #4303 [T-SH-115] |
