@@ -80,6 +80,12 @@ def seq(b, first, second, gap=4):
                for i, (m, op, _) in enumerate(b))
 
 
+def writes_memory(ins, op):
+    # capstone は cmpxchg・fst*・fist* のメモリ書込みを READ と返すため、助記で補う
+    text = (ins.mnemonic + " " + ins.op_str).replace("lock ", "", 1)
+    return bool(op.access & capstone.CS_AC_WRITE) or text.startswith(("cmpxchg", "fst", "fist"))
+
+
 def sweep_writes_to(raw, base, secs, targets):
     text = [s for s in secs if s.Name.rstrip(b"\0") == b".text"][0]
     va0 = base + text.VirtualAddress
@@ -93,8 +99,7 @@ def sweep_writes_to(raw, base, secs, targets):
             for op in ins.operands:
                 if op.type == capstone.x86.X86_OP_MEM and op.mem.base == capstone.x86.X86_REG_RIP:
                     t = ins.address + ins.size + op.mem.disp
-                    if t in targets and ins.mnemonic in ("mov", "add", "sub", "inc", "dec", "and", "or", "xor") \
-                            and ins.operands[0].type == capstone.x86.X86_OP_MEM:
+                    if t in targets and writes_memory(ins, op):
                         hits.append((ins.address, t))
             i += ins.size
             break
