@@ -1,5 +1,7 @@
 # M11 REPORT (#3141 / [M11-N173] / 親 #3134): set_other 非 imm のうち呼出し戻り値・算術・狭い格納 58 件の接続判定
 
+既知類型との関係: 該当なし (DEFECTS.md の D21 = 呼出し引数の出元の機械語↔IR 突合 と近縁だが、本 PR は分類のみで IR を変えず、D21 の修復 `m11_fix912.py` に触れない)。
+
 結論: REPORT_N171 §3 の 58 件 (call_ret 19 + chain>call_ret 6 + arith 7 + chain>arith 9 + stack_narrow 17) を、
 戻り値の機械語解析・算術の両辺評価・IR 型幅ゲートで判定し直した。測定 commit `0ed00d057` の実測は
 **実値化 0 / 復元不能 0 / 未決 58 / 未分類 0**。判定方法は 3 つとも入れて動作を確認した (§5 の正の対照 5/5・ネガコン 6 件)。
@@ -33,7 +35,8 @@
   3. `python3 m11_argrecover_verify.py work/sigfix_stats/fixes.json --pe $PE` → `match 33 / mismatch 0`・rc 0 (set_const の既存 33 件は不変)。
   4. `python3 m11_setother_nonimm_class.py work/sigfix_stats/fixes.json --pe $PE --ir work/boot_final.ll` →
      `実値化 0 / 復元不能 0 / 未決 349`。非 imm 349 件の全体でも未分類 0。
-- 58 件 (REPORT_N171 §3 の対象) の判定 (測定 commit の出力を、基準の分類器 (origin/main `68eb512cd`・`0ed00d057` の親) と行単位で突き合わせた):
+  5. (追加の一括再現) `python3 m11_setother_repro.py work/sigfix_stats/fixes.json --pe $PE` → 下の突合 (基準との行単位)・対象外 291 件の理由差分・§4 の分布を 1 度に出す。
+- 58 件 (REPORT_N171 §3 の対象) の判定 (測定 commit の出力を、基準の分類器 (origin/main `68eb512cd`・`0ed00d057` の親) と行単位で突き合わせた。突合は手順 5 の `m11_setother_repro.py` が行う。下表は測定 commit `0ed00d057` の前 run の実測で、本 HEAD での突合の再実行は素材待ち (§8)):
 
 | REPORT_N171 の理由 | 件数 | 新しい判定 (HEAD) | 区分 |
 |---|---|---|---|
@@ -77,7 +80,7 @@ IR 型は `work/boot_final.ll` の callee の define 行 (仮引数 pos 番目)�
 
 ## 4. 戻り値解析の観測 (直接 call の callee 202 件)
 
-全 matched 台帳の直接 call の callee 202 件に `ret_value` を適用した (`work/sigfix_stats/ret_control.py`・実 PE・測定 commit):
+全 matched 台帳の直接 call の callee 202 件に `ret_value` を適用した (測定 commit `0ed00d057`・前 run の実測。再現は `m11_setother_repro.py` の §4 出力。本 HEAD では素材待ちで未再実行 (§8)):
 
 | ret_value の終端 | 件数 | 意味 |
 |---|---|---|
@@ -99,11 +102,16 @@ IR 型は `work/boot_final.ll` の callee の define 行 (仮引数 pos 番目)�
 
 ## 5. 検算・ネガティブコントロール・正の対照
 
-- **正の対照 (合成機械語 5 件・`work/sigfix_stats/pos_control.py`)**: `mov eax,5; ret`→5、`xor eax,eax; ret`→0、
-  `mov eax,5; mov ecx,3; add eax,ecx; ret`→8、`mov eax,5; shl eax,4; ret`→80、`call B(mov eax,9); ret`→9 (B は `mov eax,9; ret`)。
-  **5/5 が実値化 (ret_const) で一致**。判定器は既知の定数を正しく出す。実 PE で定数が 0 件なのは判定器の見落としではなく、§4 の合流点での停止が主因。
-- **ネガティブコントロール (型幅ゲート)**: `function_6ee750` の arg5 の IR 型を `i64`→`i8` に書き換えたコピー (`work/sigfix_stats/ir_negctl.ll`) で再判定。
-  `stack_narrow_ir64_st8` の 6 行が `stack_match>load_global` に変わり、他は不変 (`negctl changed rows: 6`)。ゲートが判定を動かしていることを確認した。
+- **対照検査 (素材不要・本 HEAD で実行済み)**: `python3 m11_setother_controls.py` (終了コード 0)。機械語は手で符号化し、期待値は手計算 (分類器の出力とは独立)。
+  - **正の対照 7/7**: `mov eax,5; ret`→5、`xor eax,eax; ret`→0、`mov eax,5; mov ecx,3; add eax,ecx; ret`→8、`mov eax,5; shl eax,4; ret`→80、
+    `mov eax,5; add eax,-1; ret`→4、`mov eax,5; xor eax,15; ret`→10、`call B (mov eax,9; ret); ret`→9。いずれも `ret_value` の出力は `実値化 ret_const`。
+    実 PE で定数が 0 件なのは判定器の見落としではなく、§4 の合流点での停止が主因。
+  - **ネガ対照 2/2 (型幅ゲート)**: 呼出元は `mov al,[rip+…]; mov [rsp+0x20],al; call`。台帳 1 行 (pos 4) を main 経路で判定し、callee の IR define 行の型だけを変える (ファイルは読まず、スクリプト内で define 行を作る)。
+    `i64` (IR 幅 64 ≠ 格納幅 8) → `stack_narrow_ir64_st8`、`i8` (一致) → `stack_match>load_global`。ゲートが判定を動かすことを確認した。
+  - **既知の限界 M1**: `jmp rcx; mov eax,7; ret` → `実値化 ret_const 7` (偽の定数になりうる。§8)。
+- **M2 (理由語)**: ret 自身が合流先のとき (`k == s`) は理由語が `ret>merge_at_call` になる。合流先は ret の直前ではなく ret 自身なので、`merge` が正確。区分 (未決) は変わらない。改名は分類器の変更で再測定を伴うため §8 で扱う。
+- **型幅の出所の確認 (§3)**: 次の 1 行は、8 callee の define 行が 2 つの IR で一致するかを見る (素材 work-m11 が要る。本 HEAD では未実行)。
+  `diff <(grep -E '^define[^@]*@function_(6ee750|773990|6be960|775da0|677fb0|699ca0|de1da0|de2280)\(' work/boot_final.ll) <(grep -E '^define[^@]*@function_(6ee750|773990|6be960|775da0|677fb0|699ca0|de1da0|de2280)\(' work/sigfix_stats/final3_base.ll) && echo 一致`
 - **独立検算 (別アルゴリズム)**: `m11_argrecover_verify.py` は op_str の文字列だけで set_const の 33 件を照合 (`match 33 / mismatch 0`)。
   新しい判定で実値化が 0 件のため、この照合の対象は増えない (受入 3 は「該当なし」)。
 - **型幅の出所の検算**: §3 の 8 callee の define 行を `boot_final.ll` と `final3_base.ll` で比較 (全件一致)。
@@ -120,7 +128,8 @@ IR 型は `work/boot_final.ll` の callee の define 行 (仮引数 pos 番目)�
 ## 7. 測定 commit と差分
 
 - 測定 commit: `0ed00d057` (分類器の変更。この commit で §2 の数値を測った)。以後のこの REPORT の commit は md のみ。
-- `git diff 0ed00d057 HEAD -- tools/m11 ':(exclude)*.md'` の出力: 0 行 (差分 0)。
+- 分類器 (`m11_setother_nonimm_class.py`) の差分: `git diff 0ed00d057 HEAD -- tools/m11/m11_setother_nonimm_class.py` の出力は 0 行 (分類器は変えていない。測定 commit の数値はそのまま有効)。
+- HEAD で追加したのは対照検査 `m11_setother_controls.py`・再現 `m11_setother_repro.py` の 2 本だけ (どちらも分類器を変えない)。`git diff 0ed00d057 HEAD -- tools/m11 ':(exclude)*.md'` の出力はこの 2 本に限られる。
 - 変更 commit の範囲 (`git diff 68eb512cd 0ed00d057 -- tools/m11`): `m11_setother_nonimm_class.py` のみ。
 
 ## 8. 未解決
@@ -133,3 +142,7 @@ IR 型は `work/boot_final.ll` の callee の define 行 (仮引数 pos 番目)�
 | 間接 call の戻り値 (202 callee 中 12 件・本 58 件中 4 件) | 呼出し戻り値が未決 | #3134 (親。vtable 解決の要否は PM 判断) |
 | survey (受入 ok ≥ 870): `functions_dll.csv`・`lift_pe.sha256` の素材欠落で未測定 | survey 退行は未判定 | #1154 |
 | 実値化した件の IR への接続 (判定を IR の引数値へ反映する処理) は未実装。本 PR は分類のみ | 0 詰めの非 imm 引数は未保証のまま | #3134 (親。実装の子は PM 判断) |
+| 算術 16 件の IR への接続方式は未決定 (本 PR では決めていない) | 算術 16 件は未決のまま | #3142 ([M11-N174]) |
+| M1: 間接 jmp (jump table) の先の ret を、直前の定数の続きとして扱う (`jmp rcx; mov eax,7; ret` → 実値化 7 を対照で確認) | 本 PR の実測は実値化 0 件で数値は変わらない。IR へ接続する段階で偽の定数になりうる | #3140 ([M11-N172]。分類器の変更は再測定と併せて行う) |
+| M2: ret 自身が合流先のとき理由語が `ret>merge_at_call` (正しくは `merge`) | 理由語の読み違い (区分は未決のまま変わらない) | #3140 (同上) |
+| 本 HEAD の実 PE 数値 (手順 5 の突合・§3 の型幅の確認・§4 の分布) の再実行 | 素材 work-m11 が本 run に無く、表は測定 commit `0ed00d057` の前 run の実測 | #3141 (本 PR。次の review run で `oc_artifacts: fl-win64 work-m11` により再実行) |
