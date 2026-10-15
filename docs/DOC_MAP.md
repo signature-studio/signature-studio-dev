@@ -464,6 +464,7 @@
 | `tools/python/REPORT_PY163.md` | 97 | PY-163 (#3135): PY-88 の VCALL 3 件の呼出し先・引数・戻り値式 (CFG 到達定義による式。呼出し先は実行時データで未確定)。結果は `REPORT_PY163.md` §1・§3〜§5。解析は `analysis/py163_vcall.py` |
 | `tools/python/REPORT_PY167.md` | 83 | PY-167 (#3181): `flrack.flr` は PE に無く (NUL 終端 `flr` 0 件)・pyc も読まない。Chord progression の `flr` は `rack.py` の `flr = Rack()` (module global・推定)。mock 2 行の実態照合。解析は `analysis/flapi/pe_flrack_flr_probe.py`・`analysis/py167_flr_pyc.py` |
 | `tools/python/REPORT_PY211.md` | 133 | PY-211 (#3539): patterns の jumpToPattern・movePattern・findFirstNextEmptyPat の委譲先本体 (VA 付き)・範囲外の暫定決定 (1..999 の外は no-op)・index 基準 (1 始まり・movePattern は相対量)。前段 REPORT_PY208 の番地・要素幅・flags の訂正。副作用本体は #3558 |
+| `tools/python/REPORT_PY223.md` | 77 | PY-223 (#3627): 0xed4b70 (0x12da6d0 の唯一の呼出し元) の所在 (関数ポインタ表 0xed0bb0 の添字 51)・vtable 候補 (スロット 0x198 / 0x120) と仮想 call の件数・flag 参照関数。receiver の vptr の書込み元と obj・flag の条件は未確定 (#3627 続き)。解析スクリプト `analysis/py223_indirect_callers.py` |
 | `tools/python/REPORT_PY56.md` | ~70 | PY-56 (#1934): playlist 38 関数のうち `selectTool` (書式 `i`)・`scrollTo` (書式 `iiii`) の引数確定。残り 36 関数は子 #1971 (PY-57) |
 | `tools/python/REPORT_PY57.md` | ~75 | PY-57 (#1971): playlist 残り 36 関数のうち 8 件の逆アセンブル骨格 (戻り値・範囲 code は未確定)。未読 26 件は #2026 (PY-61) |
 | `tools/python/REPORT_PY61.md` | ~130 | PY-61 (#2026): playlist 未読 26 関数の引数・戻り値の型・範囲 code を VA 付きで確定。`-4` ↔ `RANGE` は文言で対応 (数値は非対応)。操作コアと残り helper は子 #2809 (PY-91) |
