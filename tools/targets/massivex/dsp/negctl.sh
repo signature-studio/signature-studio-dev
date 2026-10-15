@@ -2,7 +2,7 @@
 # MX-3 ネガティブコントロール (規則 41): 意図的に壊して FAIL/差分を確認する。
 #   NC1: root を「dummy 関数 (ret のみ)」に差し替え → closure が 567 未満になること
 #   NC2: RTTI class フィルタ (FAMILY_EXACT) を外す → root 数が 4 (export のみ) に落ちること
-#   NC3: x64c probe の対象をダミーに差し替え → unsup site が 0 になること
+#   NC3: x64c probe の root を不正 VA 1 個に差し替え → unsup site が base unsup を下回ること
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 BASE="$(cd "$HERE/.." && pwd)"; DSP="$BASE/dsp"; W="$DSP/work"
@@ -55,12 +55,12 @@ print("   NC2 insns=%d (base %d) unsup=%d (base %d) -> %s"
          'FAIL<期待>' if sum(m['unsup'].values()) < sum(b['unsup'].values()) else 'PASS<異常>'))
 PY
 
-echo "=== NC3: pdata 境界を壊す (section を .data にすげ替え -> 関数数 0) ==="
+echo "=== NC3: root を不正 VA 0x180000001 に置換 (unsup が base unsup を下回ること) ==="
 python3 - "$W" <<'PY'
 import json, sys
 W = sys.argv[1]
 d = json.load(open(W + '/surface.json'))
-# ダミー: pdata が空なら entry_surface は seeds=0 で unsup も 0 になる -> FAIL 確認
+# ダミー: 不正 VA 1 個の root では lift 対象が base (全 root) より小さくなり unsup も base 未満 -> FAIL 確認
 json.dump({'roots': [0x180000001], 'calltgt': []}, open(W + '/e_nc3.json', 'w'))
 print("   NC3 roots -> 1 (VA 0x180000001 = .text 外/不正)")
 PY
@@ -71,11 +71,12 @@ python3 - "$W" <<'PY'
 import json, os, sys
 W = sys.argv[1]
 p = W + '/lift_nc3/lift_meta.json'
+b = json.load(open(W + '/lift_seeds/lift_meta.json'))
 if os.path.exists(p):
     m = json.load(open(p))
-    print("   NC3 insns=%d unsup=%d -> %s"
-          % (m['ninsn'], sum(m['unsup'].values()),
-             'FAIL<期待>' if sum(m['unsup'].values()) < 48612 else 'PASS<異常>'))
+    print("   NC3 insns=%d (base %d) unsup=%d (base %d) -> %s"
+          % (m['ninsn'], b['ninsn'], sum(m['unsup'].values()), sum(b['unsup'].values()),
+             'FAIL<期待>' if sum(m['unsup'].values()) < sum(b['unsup'].values()) else 'PASS<異常>'))
 else:
     print("   NC3 lift_meta 無し = lift 失敗 (期待どおり FAIL 相当)")
 PY

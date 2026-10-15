@@ -74,6 +74,55 @@ static void* __attribute__((ms_abi)) ca1480_probe(void* C, void* out, void* key)
               fprintf(stderr, "FA9OBJ S%d out0_is_Z=%d obj=%llx obj+0x10=%llx\n", g_trSidx, isZ, (unsigned long long)o0, (unsigned long long)o16); }
     return r;
 }
+/* FA-31 (#2207): FA_CTL31=1 は controller 側の挿入候補 0x180caa820 (this=controller, [this+0xa8] を lookup し node を作る) の
+ * 呼出回数と、呼出後の [this+0xa8] 木のノード数を記録する。既定 OFF。ノード数は header=this+0xa8, head=[header+8], root=[head+8]。 */
+typedef void* (__attribute__((ms_abi)) *caa820_t)(void*, void*, void*);
+static unsigned char g_sv_caa[12]; static unsigned char* g_p_caa; static int g_caa_n;
+static int tree_nodes(unsigned char* node, unsigned char* head, int depth) {
+    if (!node || node == head || node[0x19] || depth > 64) return 0;
+    uint64_t l, r; memcpy(&l, node, 8); memcpy(&r, node + 0x10, 8);
+    return 1 + tree_nodes((unsigned char*)(uintptr_t)l, head, depth + 1) + tree_nodes((unsigned char*)(uintptr_t)r, head, depth + 1);
+}
+static void* __attribute__((ms_abi)) caa820_probe(void* T, void* out, void* key) {
+    unsigned char tmp[12]; memcpy(tmp, g_sv_caa, 12); memcpy(g_p_caa, tmp, 12);
+    uint32_t k = 0xffffffffu; if (key) { uint16_t k16; memcpy(&k16, key, 2); k = k16; }
+    g_caa_n++;
+    void* r = ((caa820_t)(g_p_caa))(T, out, key);
+    patch12(g_p_caa, (const void*)&caa820_probe, g_sv_caa);
+    unsigned char* head = NULL; uint64_t hp; memcpy(&hp, (char*)T + 0xb0, 8); head = (unsigned char*)(uintptr_t)hp;
+    uint64_t rp = 0; if (head) memcpy(&rp, head + 8, 8);
+    fprintf(stderr, "CAA31 S%d n=%d T=%p key=%u ret=%p tree=%d\n", g_trSidx, g_caa_n, T, k, r,
+            head ? tree_nodes((unsigned char*)(uintptr_t)rp, head, 0) : -1);
+    return r;
+}
+/* FA-31: 陽性対照 (0x180ca7db0 = map lower_bound。map 経路で必ず呼ばれる) と、仮想関数 0x180e13590 の呼出回数 */
+static unsigned char g_sv_lb[12]; static unsigned char* g_p_lb; static int g_lb_n;
+static void* __attribute__((ms_abi)) lb_probe(void* H, void* out, void* key) {
+    unsigned char tmp[12]; memcpy(tmp, g_sv_lb, 12); memcpy(g_p_lb, tmp, 12);
+    g_lb_n++;
+    void* r = ((caa820_t)(g_p_lb))(H, out, key);
+    patch12(g_p_lb, (const void*)&lb_probe, g_sv_lb);
+    return r;
+}
+static unsigned char g_sv_e13[12]; static unsigned char* g_p_e13; static int g_e13_n;
+static void* __attribute__((ms_abi)) e13_probe(void* a, void* b, float c) {
+    unsigned char tmp[12]; memcpy(tmp, g_sv_e13, 12); memcpy(g_p_e13, tmp, 12);
+    g_e13_n++; fprintf(stderr, "E13_31 S%d n=%d\n", g_trSidx, g_e13_n);
+    void* r = ((void* (__attribute__((ms_abi)) *)(void*, void*, float))(g_p_e13))(a, b, c);
+    patch12(g_p_e13, (const void*)&e13_probe, g_sv_e13);
+    return r;
+}
+/* FA-31: 上流の呼出回数だけを数える汎用 probe (引数はポインタ 4 個まで転送。float 引数は扱わない) */
+#define CNT31(NAME, SV, PTR, CNT) \
+static unsigned char SV[12]; static unsigned char* PTR; static int CNT; \
+static void* __attribute__((ms_abi)) NAME(void* a, void* b, void* c, void* d) { \
+    unsigned char tmp[12]; memcpy(tmp, SV, 12); memcpy(PTR, tmp, 12); CNT++; \
+    void* r = ((void* (__attribute__((ms_abi)) *)(void*, void*, void*, void*))(PTR))(a, b, c, d); \
+    patch12(PTR, (const void*)&NAME, SV); return r; }
+CNT31(cnt_d8c4f0, sv_d8c4f0, p_d8c4f0, n_d8c4f0)
+CNT31(cnt_d8ae60, sv_d8ae60, p_d8ae60, n_d8ae60)
+CNT31(cnt_e15030, sv_e15030, p_e15030, n_e15030)
+CNT31(cnt_e12f20, sv_e12f20, p_e12f20, n_e12f20)
 typedef void (__attribute__((ms_abi)) *set9_t)(void*, int, float, void*);
 static unsigned char g_sv_set[12]; static unsigned char* g_p_set;
 static void __attribute__((ms_abi)) set9_probe(void* C, int id, float v, void* key) {
@@ -195,6 +244,15 @@ int main(int argc, char** argv) {
         g_p_ca = im + (0x180ca1480ULL - 0x180000000ULL); g_p_da = im + (0x180da6c00ULL - 0x180000000ULL);
         patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca); patch12(g_p_da, (const void*)&da6c00_probe, g_sv_da);
     }
+    if (getenv("FA_CTL31")) {
+        g_p_caa = im + (0x180caa820ULL - 0x180000000ULL); patch12(g_p_caa, (const void*)&caa820_probe, g_sv_caa);
+        g_p_lb = im + (0x180ca7db0ULL - 0x180000000ULL); patch12(g_p_lb, (const void*)&lb_probe, g_sv_lb);
+        g_p_e13 = im + (0x180e13590ULL - 0x180000000ULL); patch12(g_p_e13, (const void*)&e13_probe, g_sv_e13);
+        p_d8c4f0 = im + (0x180d8c4f0ULL - 0x180000000ULL); patch12(p_d8c4f0, (const void*)&cnt_d8c4f0, sv_d8c4f0);
+        p_d8ae60 = im + (0x180d8ae60ULL - 0x180000000ULL); patch12(p_d8ae60, (const void*)&cnt_d8ae60, sv_d8ae60);
+        p_e15030 = im + (0x180e15030ULL - 0x180000000ULL); patch12(p_e15030, (const void*)&cnt_e15030, sv_e15030);
+        p_e12f20 = im + (0x180e12f20ULL - 0x180000000ULL); patch12(p_e12f20, (const void*)&cnt_e12f20, sv_e12f20);
+    }
     volatile int* fma = (int*)0x1813070f8ULL;
     int fma_v = argc > 3 ? atoi(argv[3]) : 0;
     proc_t fn = (proc_t)PROCESS;
@@ -294,5 +352,7 @@ int main(int argc, char** argv) {
         fflush(stdout);
     }
     if (abi_viol || guard_viol_total) fprintf(stderr, "ABI violations=%d guard violations=%d\n", abi_viol, guard_viol_total);
+    if (getenv("FA_CTL31")) fprintf(stderr, "CTL31 summary: caa820=%d ca7db0=%d e13590=%d d8c4f0=%d d8ae60=%d e15030=%d e12f20=%d\n",
+                                    g_caa_n, g_lb_n, g_e13_n, n_d8c4f0, n_d8ae60, n_e15030, n_e12f20);
     return (abi_viol || guard_viol_total) ? 3 : 0;
 }

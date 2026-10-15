@@ -1022,22 +1022,22 @@ wd
 logged 'client_payload\[ref\]=60'
 expect "ネガコン: records by others are not counted (only the 2 by the reviewer bot count)" $?
 
-# 38. 1 時間に 12 件まで。12 件済みなら次は送らない (ネガコン)。11 件なら送る
+# 38. 1 時間に 24 件まで。24 件済みなら次は送らない (ネガコン)。23 件なら送る
 reset
 pm_base
-m=(); for i in $(seq 900 911); do m+=("$(mk "$i" 600)"); done
+m=(); for i in $(seq 900 923); do m+=("$(mk "$i" 600)"); done
 ledger "$(IFS=,; echo "${m[*]}")"
 wd
-not_logged 'dispatches' && grep -q 'deferred (reached 12 in the last hour)' "$TMP/out"
-expect "12 dispatches in the last hour -> no dispatch (deferred)" $?
+not_logged 'dispatches' && grep -q 'deferred (reached 24 in the last hour)' "$TMP/out"
+expect "24 dispatches in the last hour -> no dispatch (deferred)" $?
 
 reset
 pm_base
-m=(); for i in $(seq 900 910); do m+=("$(mk "$i" 600)"); done
+m=(); for i in $(seq 900 922); do m+=("$(mk "$i" 600)"); done
 ledger "$(IFS=,; echo "${m[*]}")"
 wd
 logged 'client_payload\[ref\]=60'
-expect "11 dispatches in the last hour -> still dispatched" $?
+expect "23 dispatches in the last hour -> still dispatched" $?
 
 # 39. 1 回の点検で送るのは 3 件まで。17 件の停止 PR を DRY=1 で点検すると 3 件だけ計画され、何も送らない
 reset

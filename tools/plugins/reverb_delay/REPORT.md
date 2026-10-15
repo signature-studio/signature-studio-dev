@@ -20,7 +20,7 @@
 5. **SIMD kernel 依存は 5 本、うち 4 本 (Convolver / Delay 2 / Delay Bank / Reeverb 2) の閉包が #331 ([P0c-7]) 未解決の 0x5dee90 / 0x5df040 を呼ぶ** (§4)。 Delay 3 / Reeverb / LuxeVerb / Multiband Delay の殻は閉包内 kernel 呼出 0 site。
 6. **Convolver の FFT は IPP 経由ではない (静的調査)**: IPP 関数ポインタ 420 変数のうち DLL 全体で参照する関数は Convolver 5 / LuxeVerb 4 / 他 7 本 0 で、名前は Move / Zero / Add / MulC のみ。 FFT 系 (`fft`/`dft`/`conv`/`corr`) の参照は 0。 → #38 ([IPP-10]) 側の FFT 代替は Convolver に不要と推定 (§6、範囲は§6 の但し書き)。
 7. **T3 の C++ engine 2 本は `emcc -c` 未通過**: Delay 3 engine (19000) は RetDec 完走だが IR 型エラー (E1 → E4) で止まる。 **Multiband Delay engine (19165) は RetDec が `.text` の 78/2,078 関数で落ちる (`Should not be possible.`) ため IR が出ない。** 78 関数を除いても E6 / E1 / zext 定数式で止まる。
-   78 関数は AVX2/AVX-512 命令 (`vpermpd` / `vpermd` / `vpexpandd` / `vshufi32x4` / `valignd`) を含み、残り 2,000 関数は 1 本も含まない (§7)。 さらに 272 関数 / 513,403 B は静的リンクされた Intel IPP (`IPPCODE` section)。
+   78 関数は AVX2/AVX-512 命令 (`vpermpd` / `vpermd` / `vpexpandd` / `vshufi32x4` / `valignd`) を含み、残り 2,000 関数は 1 本も含まない (§7)。 さらに `IPPCODE` section は静的リンクされた Intel IPP (数値と呼出元の切り分けは `REPORT_APPENDIX_3445.md` §1)。
 
 ## 1. 閉包 lift 結果 (Delphi 殻 9 本)
 
@@ -158,7 +158,7 @@ frontier = 閉包から呼ぶ framework 関数 (P0a の共有 wasm 側)。 vcall
   `engine_bisect.py` の二分探索 (349 試行) で、**単独で RetDec を落とす関数が 78/2,078 (286,914 B / 1,904,499 B)** と特定した。 `bisect_census.py` の命令比較: `vpermpd` (64 関数)・`vpermd` (56)・`vpexpandd` (22)・`vshufi32x4` (4)・`valignd` (2) のいずれかを含む関数は
   落ちる 78 関数では **78/78**、落ちない 2,000 関数では **0/2,000**。 相関であり、単一命令での因果確認は未実施 (RetDec の capstone2llvmir が AVX2 permute / AVX-512 を未変換と推定)。
 - **78 関数と `IPPCODE` を除いた 2,000 関数 (1,617,585 B)** で再 lift (`ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges work/reverb_delay/bisect19165.out" ENGINE_TAG=_noipp_nobad bash reverb_delay/engine_lift.sh 19165`、1 回のみ実測 367 s): RetDec と pass 鎖は `final.ll` (505,860 行・define 2,608・`.pdata` で define 無し 2 関数 (445 B)・range 内部の別 define 608) まで進むが、(a) 鎖の最終段 `m11_simd2.py` が `IndexError: string index out of range` (`'abc'[i]` に 4 個以上の引数型が来る = 4 引数以上の `__asm_*` helper と推定) で rc 1 (**E6**)、(b) `emcc -c` は E1 (`'%arg3' defined with type 'i64' but expected 'ptr'`) → `engine_fixcmp.py` 4 operand 後に `zext constexprs are no longer supported` (#506 の E2 と同型)、(c) `x86_fp80` 関数 6。 つまり E5 を回避しても engine は更に 3 類型で止まる。
-- 19165 の `IPPCODE` section は 272 関数 / 513,403 B (`.text` は 2,078 関数 / 1,904,499 B)。 IPP の static link と推定 (関数名は未解析)。 殻との結合は解析済み (LoadLibrary + 名前引きの GetProcAddress、§18・#3446)。
+- 19165 の `IPPCODE` section の関数数・呼出元の切り分けは `REPORT_APPENDIX_3445.md` (#3445) §1 が正本。 IPP の static link と推定 (関数名は未解析)。 殻との結合は解析済み (LoadLibrary + 名前引きの GetProcAddress、§18・#3446)。 殻からの直接参照は PE 上に無い。
 - 以上は到達性の実測で、engine の正しさは何も示していない。
 
 ## 8. 検証 (コミット済み HEAD・4 core / 15 GiB の Actions runner)

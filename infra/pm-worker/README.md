@@ -160,6 +160,8 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `refs_only_merge_rate_24h` | `{merged, refs_only, rate}`: 直近 24 時間に merge された PR の件数 (`merged`) と、そのうち本文が『Refs のみ』 (`refsOnlyNumbers`・`src/refs.ts`。`Closes` / `Fixes` / `Resolves` の系が 1 つでもあれば数えない。`Closes:#N`・`Closes owner/repo#N` も閉じ方として数える。`Refs #N`・`Refs:#N` は数え、`Refs owner/repo#N` と 8 桁の番号は数えない) の件数 (`refs_only`) と率。0 件なら `rate` は `null`。merge 済み PR の『Refs のみ』は merge 時点の本文から取った真偽値だけを持つ (本文は保存しない)。導入前に merge された PR は、次の全体同期 (6 時間以内) で埋まる |
 | `open_issues_delta_24h` | 現在の open issue 数から、24 時間前以前で最も新しい 1 時間ごとの点 (`meta/openHist`、最大 48 点) の数を引いた差。点が無い (履歴が 24 時間分に満たない) ときは `null`。同期が古い間と一覧を打ち切った間は点を残さない |
 | `pm_dispatch_1h` | 直近 1 時間の `oc-pm` の送信数 (dry-run の would を含む。`pmHistory` と同じ live / dry-run の別) |
+| `pm_dispatch_cap` | `oc-pm` の毎時上限 (`PM_LIMITS.hourMax` = 24)。`pm_dispatch_1h` がこの値に達しているときは上限で見送りが出る |
+| `pm_skipped_hour_24h` | 直近 24 時間に毎時上限で見送った件数 (`pmDispatch` の見送りの対象ごと、と `haltNotify` の見送りを tick ごとに数えた回数)。時刻と件数を `meta` に持ち、24 時間で prune する (`pruneHistory` と同じ窓)。live / dry-run は分ける |
 | `launch_halted` | launch を止めている区間 `{reason, since}` (止まっていなければ `null`)。`reason` は先頭の理由、`since` は止まり始めた時刻。詳細は下の『launch の停止と通知』 (#2795) |
 | `launch_halted_overdue` | 15 分以上止まり、着手待ち (`ready`) と空き枠 (`room`) がある間は `true` (#2795) |
 
@@ -504,7 +506,7 @@ Workers Builds (Cloudflare 側に repo を接続し、main への merge で自�
 - install 段は上の 2 点 (npm 指定と lockfile の無さ) で失敗していた (#2585)。以後の結果は、commit の check run `Workers Builds: signature-studio-pm` で見る (見方は『Workers Builds の接続と運用』の『運用』)。
 - **pnpm 12 の release-age (`minimumReleaseAge` = 1440 分)**: 公開から 24 時間未満の版は既定で install を拒否する。その版 (一覧は付録 §2) を含む lock は、その版のうち最も新しいものの公開から 24 時間が過ぎるまで、既定設定の `pnpm install --frozen-lockfile` が失敗する。公開時刻・違反の内訳・範囲を下げた経緯と再現の結果は [`tools/pm/REPORT_APPENDIX_2653.md`](../../tools/pm/REPORT_APPENDIX_2653.md)。
   - 除外しない理由: `minimumReleaseAgeExclude` や `--config.minimum-release-age=0` で通すと、公開直後の版が Workers Builds の token (権限が広い) で入る。このポリシーが防ぐ侵害の入口になるので、ポリシーは変えない。
-  - `pnpm add` は既定設定でも、違反版を `minimumReleaseAgeExclude` に自動で書き足す (付録 §3 c。追跡 #3342)。`pnpm add` の後は `pnpm-workspace.yaml` の差分を確かめる。
+  - `pnpm add` は既定設定 (`minimumReleaseAgeStrict` なし) では、違反版を `minimumReleaseAgeExclude` に自動で書き足す (付録 §3 c)。`pnpm-workspace.yaml` の `minimumReleaseAgeStrict: true` でその書き足しを止め、違反版の `pnpm add` は既定では失敗する。`--config.minimum-release-age=0` を付けた CLI の経路は残り、その lock は cutoff までは既定設定の install で落ちる (付録 §8・#3342)。この設定を外すときは、`pnpm add` の後に `pnpm-workspace.yaml` の差分を確かめる。
   - 版の選び方: `pnpm view <pkg> time --json` で公開時刻を見て、24 時間以上たつ最新版を範囲に書く。lock に古い版が残ると範囲を書き換えても残るので、`pnpm remove <pkg>` の後に `pnpm add -D <pkg>@^<版>` で解決し直す。推移的な依存 (miniflare・workerd) も同じ確認の対象。
   - install の結果は、commit の check run で見る (『Workers Builds の接続と運用』の『運用』)。
 
