@@ -13,7 +13,7 @@ for a in "$@"; do
     *) echo "unknown option: $a (see --help)" >&2; exit 2 ;;
   esac
 done
-export PATH="/home/ubuntu/.local/share/pnpm/bin:$PATH"
+export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 command -v node >/dev/null || { echo "node not found" >&2; exit 1; }
 
 echo "[iasio] 1/2 node check (COM 面)"

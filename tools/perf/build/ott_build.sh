@@ -28,9 +28,9 @@ for s in "${SRCS[@]}"; do
 done
 for p in "${PIDS[@]}"; do wait "$p"; done
 
-FULL_EXPORTS=$(python3 - <<'PY'
-import re
-src=open('/home/ubuntu/work/webstudio/tools/m6/m6_build.sh').read()
+FULL_EXPORTS=$(python3 - "$HERE/../../m6/m6_build.sh" <<'PY'
+import re, sys
+src=open(sys.argv[1]).read()
 print(re.search(r'-sEXPORTED_FUNCTIONS=(\S+)', src).group(1))
 PY
 )
