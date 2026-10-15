@@ -1,6 +1,6 @@
 # ildsp REPORT 付録: CreateInstance の間接 call 4 件の到達実測 (#3250・T-SH-54)
 
-親: #2528 (T-SH-38)。本 issue: #3250 (T-SH-54)。結論は `REPORT_CLOSURE.md` §4.4、本付録は測定の正本。
+親: #2528 (T-SH-38)。本 issue: #3250 (T-SH-54)。結論は `REPORT_CLOSURE.md` §4.5、本付録は測定の正本。
 子: #4230 (到達条件と helper 入口の正の対照)。
 
 ### 7.1a 間接 call 4 件の到達 (#3250 / T-SH-54・部分達成)
