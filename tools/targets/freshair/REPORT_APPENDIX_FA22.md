@@ -29,6 +29,7 @@ setter `0x180c9d700` 内の間接 call で落ちる。本付録は**機械語の
 
 - `ca1480_probe` の出力: `FA9CA S900..S907 eq=1 kc=1 k0=0 path=map ret=out out0=0 out1=0 found=1` (8/8)。
 - probe は `found` を `out+0x10` の非 0 で判定する。setter が読む `out[0]` (= `out0`) は 0 のまま。`found` の定義と `out[0]` の関係は未照合。
+  - 訂正 (§9.2 で確認): `found` は `out[0]!=0` で定義する。上の `out+0x10` 判定は誤り。
 - probe 併用時は `rip=555555558b9b` (PIE 内, `FA_BT`) で落ち、PE の `0x180c9d7xx` とは対応しない。probe の trampoline 経由の fault は本付録の根拠に使わない。
 
 ## 4. wasm 側 (`ctrl_harness.mjs`, `FA_NODE1=1`, `FA_DBG=1`)
@@ -64,7 +65,7 @@ setter `0x180c9d700` 内の間接 call で落ちる。本付録は**機械語の
 
 ## 9. FA-52 (#4223): si_addr 不一致の原因と out[0]・found・node Z の対応
 
-測定 commit: `f5160903f` (origin/main, worktree `ws-4223`)。以下は HEAD で取り直した実測。コード変更は無く、測定 commit から HEAD までのコード差分は 0。
+測定 commit: `f5160903f` (origin/main, worktree `ws-4223`)。以下の実測はこの commit で取った。`f5160903f` から HEAD までの `tools/targets/freshair` のコード差分は 0 (REPORT のみ)。probe 無しの 2 回目 (`out[0]`) は HEAD で未測定 (素材 `plugins-freshair` が実行環境に無い)。
 
 ### 9.1 si_addr=0 と rcx=a5a5… の不一致 (受入 1: 解消)
 
@@ -81,21 +82,22 @@ setter `0x180c9d700` 内の間接 call で落ちる。本付録は**機械語の
 
 | 条件 | 呼出 | C | out[0] | found |
 |---|---|---|---|---|
-| probe 無し (`FA_OUT0=1 FA_NODE1=1`, 前回実測 `63d53758b`) | 2 回目 | C=Z | `Z+0x2b0` (8/8) | (probe 無し) |
-| `fa32_node1.sh` C 行 (HEAD) | 2 回目 | C==Z 8/8 | `out0==C+0x2b0` 8/8 | – |
+| probe 無し (`FA_OUT0=1 FA_NODE1=1`) | 2 回目 | 未測定 | 未測定 | (probe 無し) |
+| `fa32_node1.sh` C 行 (HEAD, **`FA_PROBE9=1` 併用**) | 2 回目 | C==Z 8/8 | `out0==C+0x2b0` 8/8 | – |
 | `FA_NODE1 FA_SET9 FA_PROBE9 FA_P9GUARD` (HEAD `f5160903f`, S900〜S906 同形) | 1 回目 (map 経路) | C=C0 | 0 | 0 |
 | 同 | 2 回目 (nokey 経路) | C=Z (S900: `0x555947237750`) | `Z+0x2b0` (S900: `out0-C=0x2b0`) | 1 |
 
-- `out[0]=Z+0x2b0` は `C+0x2b0` (`0x180ca1651`) の式どおり。node Z 自身の値ではない。`[out0+0x10]=Z+0x2c0` が poison と一致し、ERR の直接原因になる。
+- probe 下の 2 回目 (C 行, HEAD) では `out[0]=C+0x2b0` (`0x180ca1651`) で、node Z 自身の値ではない。`[out0+0x10]=Z+0x2c0` が poison と一致し、ERR の直接原因になる。
+- probe 無しの `out[0]=Z+0x2b0` (旧測定 `63d53758b`) は HEAD では未測定。表の値は再測定できるまで根拠に使わない。
 - `found` は `out[0]!=0` で定義する (§8 の `out+0x10` 判定は誤り)。1 回目 0・2 回目 1。
-- 1 回目 (map) と 2 回目 (nokey) の両方で `out0` を観測できたのは probe 有り (`FA_P9GUARD`) の実測のみ。probe 無しの表 (C=Z・`Z+0x2b0` 8/8) と probe 下の 2 回目の値は同じ式 (`C+0x2b0`) に一致する。
+- 1 回目 (map) と 2 回目 (nokey) の両方で `out0` を観測できたのは probe 有り (`FA_P9GUARD`) の実測のみ。
 
 ### 9.3 測定 (受入 3)
 
 測定 commit: `f5160903f`。
 - `bash tools/targets/freshair/lift2/run_fa9.sh`: wall 39 s (`build_ctrl.sh` を内部で実行した時間を含む)、load 0.53→0.82、**GATE PASS**。(a) base ERR=0・ca1480=72・path=map・eq=1・found=0・da6c00=0 / (b) alt ERR=8/8 / (b-wasm) ERR=8/8 / (c) pert 差分 395 トークン・差分 0 呼出。
 - `bash tools/targets/freshair/lift2/run_ctrl.sh 2 5` (run_fa9 内で実行): wall 3 s、load 0.82 付近、**BIT-EXACT 15/15** (fma0・fma1)、rc=0。
-- 素材: `plugins-freshair` を `$RUNNER_TEMP/plugins-freshair` に展開し `FA_DL=... fetch.sh` (factory .epf 8 本)。`fl-win64` は未使用。`toolchain-emsdk` / `toolchain-retdec` は runner 既存の `/opt/emsdk`・`/opt/retdec/bin` を使用 (展開せず)。
+- 素材: `plugins-freshair` を `$RUNNER_TEMP/plugins-freshair` に展開し `FA_DL=... fetch.sh` (factory .epf 8 本)。`fl-win64` は未使用。`toolchain-emsdk` / `toolchain-retdec` は runner 既存の `[EMSDK]`・`[RETDEC]` を使用 (展開せず)。
 
 ### 9.4 残り
 
