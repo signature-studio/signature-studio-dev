@@ -338,7 +338,12 @@ int main(int argc, char** argv) {
   if (argc < 2) { fprintf(stderr, "usage: ld_native <pe>\n"); return 2; }
   setvbuf(stdout, NULL, _IOFBF, 1 << 20);
   const char* pin = getenv("LD_PIN_CPU");   /* #2770: boot 状態は実行 CPU 番号に依存する (§8.9)。比較時は env で CPU を固定する */
-  if (pin && *pin) { cpu_set_t cs; CPU_ZERO(&cs); CPU_SET(atoi(pin), &cs); if (sched_setaffinity(0, sizeof cs, &cs)) { perror("LD_PIN_CPU"); return 6; } }
+  if (pin && *pin) {
+    char* end = NULL; long cpu = strtol(pin, &end, 10);
+    if (*end || cpu < 0 || cpu >= CPU_SETSIZE) { fprintf(stderr, "usage: LD_PIN_CPU=<0..%d>\n", CPU_SETSIZE - 1); return 2; }
+    cpu_set_t cs; CPU_ZERO(&cs); CPU_SET((int)cpu, &cs);
+    if (sched_setaffinity(0, sizeof cs, &cs)) { perror("LD_PIN_CPU"); return 6; }
+  }
   if (load_pe(argv[1])) return 3;
   install_signals();
   wp_arm();
