@@ -140,5 +140,5 @@ PE の読解 (`tools/python/analysis/py41_disasm.py` で逆アセンブル):
 
 - この版の C・mock・テストは `origin/main` (`0c6550546`) と同一。`git diff origin/main HEAD -- tools/python/provider tools/python/host tools/python/tests` は空で、本 PR の差分は本ファイルの追補だけ。
 - `python3 tools/python/provider/gen_provider.py --check-handlers tools/python/provider/fl_engine.c` は rc 0 (`fl_table.c: 435 関数, ハンドラ 176`。main の `provider_check` の implemented 176 と一致)。emcc を使わない検査。
-- 再測定はしていない。`toolchain-emsdk` が展開されず (`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ・`/opt/emsdk` 無し)、`provider/build.sh` (emcc)・`provider_check`・`channels_diff`・`all_tools` (wasm) を実行できなかった。本版の wasm 検証は `oc_artifacts: fl-win64 toolchain-emsdk` を付けた再実行で行う。
+- 再測定はしていない。`toolchain-emsdk` が展開されず (`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ・EMSDK_ENV の emsdk 無し)、`provider/build.sh` (emcc)・`provider_check`・`channels_diff`・`all_tools` (wasm) を実行できなかった。本版の wasm 検証は `oc_artifacts: fl-win64 toolchain-emsdk` を付けた再実行で行う。
 - 撤回前の版 (`b5cad202a`) の測定値 (channels_diff・負の対照・all_tools) は 3 関数を含む版の結果で、現在の版には当てはまらない。履歴は `git show b5cad202a:tools/python/REPORT_PY41_1514.md` に残る。
