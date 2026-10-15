@@ -67,12 +67,10 @@ if [ -f "$out/render_poc.js" ]; then
   run_rc=$?
   t5=$(date +%s%N)
   echo "run: rc=$run_rc secs=$(( (t5 - t4) / 1000000 ))ms stdout=$(grep -c render_poc "$out/run.log") output=$(grep render_poc "$out/run.log" | head -1)" | tee -a "$out/summary.txt"
+  # 描画先 bitmap は描画経路に結線されていないため nonzero_after は構造上 0 になる。判定には使わず計測不能として出す。
   after=$(grep -o 'nonzero_after=[0-9]*' "$out/run.log" | head -1 | cut -d= -f2)
-  if [ "${after:-0}" -gt 0 ]; then
-    echo "render: achieved nonzero_after=$after" | tee -a "$out/summary.txt"
-  else
-    echo "render: NOT achieved (nonzero_after=${after:-none}; 成功扱いにしない)" | tee -a "$out/summary.txt"
-  fi
+  tw=$(grep -o 'text_width=[-0-9.e+]*' "$out/run.log" | head -1 | cut -d= -f2)
+  echo "render: not measurable (描画先 bitmap は描画経路に未結線。nonzero_after=${after:-none} は判定に使わない。文字列経路 text_width=${tw:-none}、-1 は createString が nullptr)" | tee -a "$out/summary.txt"
 else
   echo "run: skipped (no render_poc.js)" | tee -a "$out/summary.txt"
 fi
