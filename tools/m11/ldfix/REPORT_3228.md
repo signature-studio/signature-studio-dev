@@ -61,15 +61,15 @@
 ### 3.4 差分 (WORKFLOW §6)
 
 - 測定 commit: `028bbd9fb`。
-- `git diff 028bbd9fb HEAD -- tools/m11/ldfix` は REPORT_3228 の追加だけ (PR 本文の検証結果に出力を載せる)。
+- `git diff 028bbd9fb HEAD -- tools/m11/ldfix` は REPORT_3228.md と結果 JSON 2 本 (`frame_store_callee_3228.json`・`negctl_callee_3228_transparent.json`) の追加だけ (PR 本文の検証結果に出力を載せる)。
 
 ## 4. 未達の受入条件 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 1006fb6 の間接 call `[rax+0x30]` の呼び出し先の特定 | 1006ec0 が UNDETERMINED | #3228 (本 issue の残件) |
-| 呼び出し先が call を含む 3 site (1354784・44178f・454637) の再帰的追跡 | 1354630・441730・454090 が UNDETERMINED | #3228 (本 issue の残件) |
-| 関数境界が取れない 2 site (44892d → 423d20・5c4e43 → 424300) の関数境界の確認 | 4488f0・5c4dc0 が UNDETERMINED | #3228 (本 issue の残件) |
-| 判定根拠 (呼び出し先の store 命令) の REPORT 化 | 受入 3 が未達 | #3228 (本 issue の残件) |
+| 1006fb6 の間接 call `[rax+0x30]` の呼び出し先の特定 | 1006ec0 が UNDETERMINED | #4086 [LD-191] |
+| 呼び出し先が call を含む 3 site (1354784・44178f・454637) の再帰的追跡 | 1354630・441730・454090 が UNDETERMINED | #4086 [LD-191] |
+| 関数境界が取れない 2 site (44892d → 423d20・5c4e43 → 424300) の関数境界の確認 | 4488f0・5c4dc0 が UNDETERMINED | #4086 [LD-191] |
+| 呼び出し先の store 命令の REPORT 化 (call 命令・打ち切り理由は §3.2 で記録済み) | 呼び出し先の判定根拠が未記録 (受入 3 の残り) | #4086 [LD-191] |
 
 受入 2 (DROP / LIVE-IN / UNDETERMINED の再判定) は未達。6 site の判定は 2211 から変わらない。
