@@ -84,7 +84,7 @@
 ## 6. 差分 (`docs/WORKFLOW.md` §6)
 
 - 測定 commit: `10fc87e9` (診断スクリプトを追加した commit。e2e・A/B の実行経路 (`ldfix_e2e.sh`・`stage4.sh`・`survey_stage4.mjs`・`run_stage4.mjs`・`m11_alloca.py`) は変更していない)。
-- 差分 (e2e 経路・A/B 経路): `git diff 10fc87e9 HEAD -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/run_stage4.mjs tools/m11/alloca tools/m11/m11_ov.c | wc -l` → 0。測定 commit 以降の commit は docs のみ (`f2a58679` = 本 REPORT の新規作成・DOC_MAP 登録、`dd5806e78` = 本 REPORT の訂正、round 2 の訂正 commit = 本 REPORT と PR 本文)。
+- 差分 (e2e 経路・A/B 経路): `git diff 10fc87e9 HEAD -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/run_stage4.mjs tools/m11/alloca tools/m11/m11_ov.c | wc -l` → 0。測定 commit 以降の commit は docs のみ (`f2a58679` = 本 REPORT の新規作成・DOC_MAP 登録、`dd5806e78` = 本 REPORT の訂正、round 2 以降の訂正 commit = 変更先は本 REPORT と DOC_MAP のみ)。
 - main 側: `git diff 8303a813 origin/main -- (同範囲) | wc -l` → 0 (`origin/main` = `a5966bbc7` で確認。round 2 の訂正時点で 0)。
 
 ## 7. 再現
