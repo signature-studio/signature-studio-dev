@@ -153,7 +153,7 @@ loader 自体 (`default.moe`・rva `0x4e0fab`) の同定は `tools/liftdiff/REPO
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `.mo` 供給後の範囲検査 (rva `0x17bcd`) の値の出所と、`rep movsq` (rva `0x12a25`) の NULL コピー元の同定。S12〜S22 の対応表 | 窓の生成に届かない | #3556 ([WIN-33]) |
-| `CreateWindowExW` の呼出元 VA (trace 無し)、surface の画素統計 (headless host) | #2760 の受入 2・3 未達 | #3557 ([WIN-34]) |
+| surface の画素統計 (headless host 接続)。`CreateWindowExW` の呼出元 VA は付録 §6.1 で解消 (#3557 [WIN-34]) | #2760 の受入 2・3 未達 | 子 issue [WIN-35] (#3618・依存 #3556) |
 | 本 PR の応答で rva `0x513da9` の rbp 破壊が起きるか (命令単位 trace)。旧記録との整合 | 旧記録の再現可否が未確定。本 fix run では素材不足で未実行 | #2760 (次の review run で `LD_STEP_N`・`LD_STEP_OUT` により確認。子は起票しない) |
 | 実行時間・sample:800 の load average と並列数 (測定時に未記録)・sample:800 の揺れ (n=1) | §5.1・§5.6 の所要と揺れを比較に使えない | #2760 (再測定時に記録。子は起票しない) |
 
@@ -169,3 +169,12 @@ KPI は PR 本文の表を参照 (`docs/WORKFLOW.md` §7)。
 - `tools/liftdiff/spike_cfi.py`: docstring に `LD_CATALOG_MO` 指定時の出力名 (`spike_cfi_cat.json`) を 1 行足した。
 
 確認 (本 fix run・素材 fl-win64 のみで実行可能な範囲): `gcc -E -P rt/ld_native.c` の前処理結果が変更前後で一致 (コメントを除いた結果)。`spike_cfi.py` は docstring 以外の AST が変更前後で一致。実行結果に影響する部分は変わらないため、§5.1・§5.6 の測定値は測定 commit のまま扱い、再測定はしていない。素材 (work-m11・work-liftdiff) が揃う次の review run で同じ spike を再実行して確認する (§5.7)。
+
+## 6. WIN-34 (#3557): 窓 import の呼出元 VA・引数の trace (部分達成。画素統計は子 issue へ)
+
+全文 (§6.1〜§6.7・実測値・未解決) は [`REPORT_APPENDIX_3557.md`](REPORT_APPENDIX_3557.md)。結論:
+
+- 窓 import (`GetClassInfoW`・`RegisterClassW`・`CreateWindowExW`) の呼出元 VA と引数を記録した。既定の応答は変えない。窓の class は隠し窓 `TPUtilWindow`。
+- 既定の起動の挙動は変わらない (dispatch 数・segv の位置・import 数は main 取り込み前後で一致)。
+- 測定 commit は `913063ebe` (§6.1〜§6.6)。main 取り込み後は `cfc0071d9` で再測定した (付録 §6.7・spike 2 回と e2e 2 回とも PASS)。
+- 未解決: 画素統計は子 issue [WIN-35] (#3618・依存 #3556)。stk 位置の不一致は [LD-170] (#3619)。

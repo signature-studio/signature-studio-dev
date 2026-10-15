@@ -25,8 +25,12 @@ python3 - "$EXT" "$INST" "$WORK/win_paths.json" <<'EOF'
 import json, os, shutil, sys
 ext, inst, wp = sys.argv[1:4]
 d = json.load(open(wp))
+blocks = {}
+for f in os.listdir(ext):
+    if f.startswith('block') and '_' in f:
+        blocks.setdefault(f[len('block'):f.index('_')], f)
 for idx, paths in d.items():
-    src = next((os.path.join(ext, f) for f in os.listdir(ext) if f.startswith('block' + idx + '_')), None)
+    src = os.path.join(ext, blocks[idx]) if idx in blocks else None
     if not src or not paths or not paths[0].startswith('$INSTDIR\\'):
         continue
     dst = os.path.join(inst, paths[0][len('$INSTDIR\\'):].replace('\\', '/'))

@@ -1,0 +1,138 @@
+{
+ "name": "resonator",
+ "funcs": [
+  "0x180743390",
+  "0x180fb6c0c",
+  "0x180fb6ce0",
+  "0x180fbbfb8",
+  "0x180fbc1f4",
+  "0x180fbdef4",
+  "0x180fbdfcc",
+  "0x180fbe018",
+  "0x180fcf904",
+  "0x180fd1ac4",
+  "0x180fd1b00",
+  "0x180fd1f30",
+  "0x180fd1f84",
+  "0x180fd2c10",
+  "0x180fd2c90",
+  "0x180fd2d38",
+  "0x180fd2f20",
+  "0x180fd3144",
+  "0x180fd4f30",
+  "0x180fd51cc",
+  "0x180fd54cc",
+  "0x180fd62dc",
+  "0x180fd6320",
+  "0x180fd648c",
+  "0x180fd6498",
+  "0x180fd662c",
+  "0x180fe3284",
+  "0x180fe3310",
+  "0x180fe34b0",
+  "0x180fe34e8",
+  "0x180fe3510",
+  "0x180fe3690",
+  "0x180fe3cd0",
+  "0x180fe4020",
+  "0x180fe4394",
+  "0x180fe5c6c",
+  "0x180fe5dfc",
+  "0x180fe5f40"
+ ],
+ "also": [
+  "0x180fb6c0c",
+  "0x180fb6ce0",
+  "0x180fbbfb8",
+  "0x180fbc1f4",
+  "0x180fbdef4",
+  "0x180fbdfcc",
+  "0x180fbe018",
+  "0x180fcf904",
+  "0x180fd1ac4",
+  "0x180fd1b00",
+  "0x180fd1f30",
+  "0x180fd1f84",
+  "0x180fd2c10",
+  "0x180fd2c90",
+  "0x180fd2d38",
+  "0x180fd2f20",
+  "0x180fd3144",
+  "0x180fd4f30",
+  "0x180fd51cc",
+  "0x180fd54cc",
+  "0x180fd62dc",
+  "0x180fd6320",
+  "0x180fd648c",
+  "0x180fd6498",
+  "0x180fd662c",
+  "0x180fe3284",
+  "0x180fe3310",
+  "0x180fe34b0",
+  "0x180fe34e8",
+  "0x180fe3510",
+  "0x180fe3690",
+  "0x180fe3cd0",
+  "0x180fe4020",
+  "0x180fe4394",
+  "0x180fe5c6c",
+  "0x180fe5dfc",
+  "0x180fe5f40"
+ ],
+ "failed": [],
+ "excluded_refs": [
+  "0x180fd81e4",
+  "0x180fd81ec"
+ ],
+ "iterations": 8,
+ "per_iter": [
+  {
+   "iter": 1,
+   "decompiled": 17,
+   "new_callees": 3,
+   "ghidra_rc": 0
+  },
+  {
+   "iter": 2,
+   "decompiled": 3,
+   "new_callees": 5,
+   "ghidra_rc": 0
+  },
+  {
+   "iter": 3,
+   "decompiled": 5,
+   "new_callees": 4,
+   "ghidra_rc": 0
+  },
+  {
+   "iter": 4,
+   "decompiled": 4,
+   "new_callees": 3,
+   "ghidra_rc": 0
+  },
+  {
+   "iter": 5,
+   "decompiled": 3,
+   "new_callees": 4,
+   "ghidra_rc": 0
+  },
+  {
+   "iter": 6,
+   "decompiled": 4,
+   "new_callees": 1,
+   "ghidra_rc": 0
+  },
+  {
+   "iter": 7,
+   "decompiled": 1,
+   "new_callees": 1,
+   "ghidra_rc": 0
+  },
+  {
+   "iter": 8,
+   "decompiled": 1,
+   "new_callees": 0,
+   "ghidra_rc": 0
+  }
+ ]
+}

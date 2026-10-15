@@ -16,10 +16,12 @@
 #define NSTEP 64
 #define NWIN 64
 #define NAME 96
+#define NPARAM 3
 #define ROOT_NAME "Plugin database"
 
-typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; int64_t pitch_n; } Chan;
-typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
+/* pv / spv: plugin パラメータの値 (インスタンスごと。channel の generator と mixer track の insert slot)。PY-228 (#3656) */
+typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; int64_t pitch_n; double pv[NPARAM]; } Chan;
+typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; double spv[NSLOT][NPARAM]; int act[NMIX]; double lvl[NMIX]; } Mix;
 typedef struct { char name[NAME]; int64_t color; uint8_t lock; double act; int loop, trig_mode, pos_snap, trig_snap; } Pl;
 
 static Chan ch[NCH_MAX];
@@ -39,8 +41,6 @@ static uint32_t midi_words[NMIDI];
 static int midi_word_n, dev_assigned, link_assigned;
 static int sel_chan;
 static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"Resonance", 0.2}, {"Gain", 0.8}};
-static double pvals[3];
-#define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
 static int lm_pages;
 static int ui_closing, ui_time_disp_min, ui_start_on_input, ui_loop_rec, ui_step_edit, ui_browser_auto_hide, ui_snap_mode;
@@ -48,6 +48,7 @@ static int undo_pos, undo_count, undo_last, safe_edit;
 static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
 static int sel_start, sel_end;
 static int64_t disp_time;
+static int browser_op;
 static int64_t arr_time;
 static int scr_blanked, scr_unblank, scr_active;
 
@@ -57,6 +58,7 @@ static void init_chan(Chan *c, const char *name, const char *plugin, double vol,
     set_name(c->name, name); set_name(c->plugin, plugin);
     c->vol = vol; c->pan = pan; c->sel = sel; c->fx = fx; c->color = color;
     c->pitch_n = 2; /* N の既定 2: reset 0xfe9090 (REPORT_PY72 §PY-77 受入 E)。chan との同一性は未確定 */
+    for (int q = 0; q < NPARAM; q++) c->pv[q] = params[q].v;
 }
 
 void fl_engine_reset(void) {
@@ -72,11 +74,11 @@ void fl_engine_reset(void) {
         else snprintf(mx[i].name, NAME, "Insert %d", i);
         mx[i].vol = 0.8; mx[i].sel = (i == 0);
         if (i) { mx[i].act[0] = 1; mx[i].lvl[0] = 1.0; }
+        for (int s = 0; s < NSLOT; s++) for (int q = 0; q < NPARAM; q++) mx[i].spv[s][q] = params[q].v;
     }
     for (int i = 0; i < NPL; i++) { memset(&pl[i], 0, sizeof pl[i]); snprintf(pl[i].name, NAME, "Track %d", i + 1); pl[i].color = 0x485156; }
     memset(win, 0, sizeof win);
     win[0] = win[2] = win[4] = 1;
-    for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
     lm_pages = 0;
@@ -86,7 +88,7 @@ void fl_engine_reset(void) {
     sel_start = -1; sel_end = -1;
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
-    dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0;
+    dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
     midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -99,6 +101,8 @@ int64_t fl_engine_midi_word(int i) { return i < 0 || i >= midi_word_n ? -1 : (in
 void fl_engine_set_device_link(int dev, int link) { dev_assigned = dev != 0; link_assigned = link != 0; }
 /* 検査用の読出し口: 最後に作用先へ渡した時間引数 (頭打ち後)。tests/ui_display_diff.mjs が mock と照合 */
 int64_t fl_engine_display_time(void) { return disp_time; }
+/* 検査用の読出し口: 最後に要求した browser ノードの開閉の分岐 (0 なし・1 切替 (-1)・2 閉じる (0)・3 開く (1))。tests/ui_browser_diff.mjs が mock と照合 */
+int fl_engine_browser_op(void) { return browser_op; }
 /* 検査用の読出し口: チャンネル c のステップ p (範囲外は -1)。tests/midi_path_diff.mjs が副作用を比べる */
 int fl_engine_grid_bit(int c, int p) {
     if (c < 0 || c >= nch || p < 0 || p >= NSTEP) return -1;
@@ -497,6 +501,11 @@ FL_H(ui, miDisplayDockRect) { NARGS(4, 4); int64_t v[4]; for (int i = 0; i < 4; 
 FL_H(ui, showNotification) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(ui, closeAllMenu) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(ui, closeActivePopupMenu) { NARGS(0, 0); return fl_ret_none(c); }
+/* PY-132 (#3013): PE 0xd6dcd0 (toggleBrowserNode '|i'・既定 -1)。作用先 0xa89690 は値 -1/0/1 で 0xa26190・0xa07d00(0)・0xa07d00(1) に分岐し、他の値は何もしない (分岐のみ。ノード状態は未モデル) */
+FL_H(ui, toggleBrowserNode) { NARGS(0, 1); int64_t v = A_INT(0, -1); browser_op = v == -1 ? 1 : v == 0 ? 2 : v == 1 ? 3 : 0; return fl_ret_none(c); }
+/* PE 0xd6e170 (selectBrowserMenuItem)・0xd6e330 (previewBrowserMenuItem): NOARGS。作用 (0xfdd2c0 のキー送出) は未モデル */
+FL_H(ui, selectBrowserMenuItem) { NARGS(0, 0); return fl_ret_none(c); }
+FL_H(ui, previewBrowserMenuItem) { NARGS(0, 0); return fl_ret_none(c); }
 /* PY-119 (#2980): PE 0xd6cd80 / 0xd6ca80 / 0xd6c9d0 / 0xd6cab0 / 0xd6c4c0 / 0xd6d6b0 は呼出し経路を確定 (REPORT_PY119)。値は未実測の仮置き */
 FL_H(ui, getFocused) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_b(c, 0); }
 FL_H(ui, getFocusedFormID) { NARGS(0, 0); return fl_ret_i(c, 0); }
@@ -550,10 +559,11 @@ FL_H(arrangement, liveSelectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_star
 FL_H(arrangement, selectionIsActive) { NARGS(0, 0); return fl_ret_b(c, sel_start >= 0 && sel_end >= 0); }
 /* ---- arrangement (6) ---- PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定。個数は fl_table (stub 由来・必須 2) に合わせた暫定で、
  * jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。currentTime は仮置きの状態 arr_time を返す。
- * 選択・マーカーの 5 件は副作用が未同定のため状態を変えず、引数検査だけ行う (REPORT_PY152) */
+ * 選択の 2 件は sel_set (PE 0xe43d30 の規則・PY-144 #3043) で状態を変える。マーカー・liveSelection・jumpToMarker の 3 件は副作用が未同定のため状態を変えず、引数検査だけ行う (REPORT_PY152) */
+static void sel_set(int x, int y) { sel_start = x; sel_end = y; if (x == y) sel_end = -1; else if (x > y) { sel_start = y; sel_end = x; } }
 FL_H(arrangement, currentTime) { (void)A_INT(0, 0); return fl_ret_i(c, arr_time); }
-FL_H(arrangement, selectionClear) { NARGS(0, 0); return fl_ret_none(c); }
-FL_H(arrangement, selectionSet) { NARGS(2, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(arrangement, selectionClear) { NARGS(0, 0); sel_set(-1, -1); return fl_ret_none(c); }
+FL_H(arrangement, selectionSet) { NARGS(2, 5); int64_t x = A_INT(0, 0), y = A_INT(1, 0); for (int i = 2; i < 5; i++) (void)A_INT(i, 0); sel_set((int)x, (int)y); return fl_ret_none(c); }
 FL_H(arrangement, liveSelection) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 FL_H(arrangement, addAutoTimeMarker) { (void)A_INT(0, 0); (void)A_STR(1); return fl_ret_none(c); }
 FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
@@ -623,11 +633,40 @@ FL_H(plugins, getPluginName) {
     return fl_ret_s(c, mx[i].slots[s]);
 }
 FL_H(plugins, getParamCount) { return fl_ret_i(c, NPARAM); }
-#define PP(a) int64_t _q = A_INT((a), 0); if (_q < 0 || _q >= NPARAM) RANGE()
 FL_H(plugins, getParamName) { int64_t q = A_INT(0, 0); return fl_ret_s(c, (q >= 0 && q < NPARAM) ? params[q].n : ""); }
-FL_H(plugins, getParamValue) { PP(0); return fl_ret_d(c, pvals[_q]); }
-FL_H(plugins, getParamValueString) { PP(0); char b[48]; snprintf(b, sizeof b, "%.1f %%", pvals[_q] * 100); return fl_ret_s(c, b); }
-FL_H(plugins, setParamValue) { double v = A_DBL(0, 0); int64_t q = A_INT(1, 0); if (q < 0 || q >= NPARAM) RANGE(); pvals[q] = v; return fl_ret_none(c); }
+/* PY-228 (#3656): getParamValue / getParamValueString / setParamValue の解決 (PE 0xd7fda0・0xd7f940・0xd80160 と同じ順)。
+ * slot == -1: index は channel (0x1005730)。slot >= 0: index は mixer track [0, NMIX)、slot は [0, NSLOT)、空 slot は code 8 (0x132f780)。
+ * paramIndex は [0, count) (count = [obj+0x68] = NPARAM)。useGlobalIndex は group 配列 A/B (0x1005730 の dl) の選択だが、
+ * group 無しの model では両方とも identity (REPORT_PY228)。 */
+static int pinst(fl_call *c, int64_t index, int64_t slot, int64_t q, double **out) {
+    if (slot == -1) {
+        if (index < 0 || index >= nch) return fl_err(c, FL_E_RANGE, "Index out of range");
+        if (q < 0 || q >= NPARAM) return fl_err(c, FL_E_RANGE, "Index out of range");
+        *out = &ch[index].pv[q];
+        return 0;
+    }
+    if (index < 0 || index >= NMIX || slot < 0 || slot >= NSLOT) return fl_err(c, FL_E_RANGE, "Index out of range");
+    if (!mx[index].slots[slot][0]) return fl_err(c, FL_E_PLUGIN, "Plugin not valid");
+    if (q < 0 || q >= NPARAM) return fl_err(c, FL_E_RANGE, "Index out of range");
+    *out = &mx[index].spv[slot][q];
+    return 0;
+}
+FL_H(plugins, getParamValue) {
+    int64_t q = A_INT(0, 0), i = A_INT(1, 0), s = A_INT(2, -1); (void)A_INT(3, 0);
+    double *v; int r = pinst(c, i, s, q, &v); if (r) return r;
+    return fl_ret_d(c, *v);
+}
+FL_H(plugins, getParamValueString) {
+    int64_t q = A_INT(0, 0), i = A_INT(1, 0), s = A_INT(2, -1); (void)A_INT(3, 0);
+    double *v; int r = pinst(c, i, s, q, &v); if (r) return r;
+    char b[48]; snprintf(b, sizeof b, "%.1f %%", *v * 100); return fl_ret_s(c, b);
+}
+FL_H(plugins, setParamValue) {
+    double x = A_DBL(0, 0);
+    int64_t q = A_INT(1, 0), i = A_INT(2, 0), s = A_INT(3, -1); (void)A_INT(4, 0); (void)A_INT(5, 0);
+    double *v; int r = pinst(c, i, s, q, &v); if (r) return r;
+    *v = x; return fl_ret_none(c);
+}
 
 /* ---- ilmcp (8) ---- host/ilmcp.mjs と同じ意味論 (エラー code・木の並び・検証)。
  * 木・プラグイン名・highlight 名は gen/ilmcp_data.h (analysis/ilmcp の JSON から生成)。 */
@@ -741,7 +780,9 @@ FL_H(ilmcp, addEffect) {
     const char *pn = A_STR(0); int64_t t = A_INT(1, 0), s = A_INT(2, 0);
     if (t < 0 || t >= NMIX || s < 0 || s >= NSLOT) RANGE();
     if (pn[0] && !plugin_kind_ok(pn, "effect")) return fl_err_fmt(c, FL_E_INVALID_VALUE, "Unknown effect plugin: ", pn);
-    set_name(mx[t].slots[s], pn); return fl_ret_b(c, 1);
+    set_name(mx[t].slots[s], pn);
+    for (int q = 0; q < NPARAM; q++) mx[t].spv[s][q] = params[q].v;
+    return fl_ret_b(c, 1);
 }
 FL_H(ilmcp, storePRScript) {
     NARGS(2, 2);
