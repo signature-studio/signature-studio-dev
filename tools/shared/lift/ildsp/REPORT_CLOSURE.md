@@ -131,43 +131,57 @@ IAT 名の内訳 (件数):
 |---|---|---|
 | 画像内関数ポインタ `0x268260` (→ 0x1cb5e0) と `0x268268` (→ 0x1cb600) の先の中身と、例外送出 path か否か | 10 export 全ての closure に含まれる。trap 化か stub 化かの判断 | [T-SH-36] #2483 の初手 |
 | IAT 呼び出し (GetLastError 等 8〜68 件/instance) の扱い | instance ごとの lift 規模 | 各子 issue |
-| 各 slot が Process / Reset / dtor のどれか (host の呼び方) | 差分テストの入出力の定義 | [T-SH-38] #2528 (GPS で確定し流用) |
+| 各 slot が Process / Reset / dtor のどれか (host の呼び方) | 差分テストの入出力の定義 | [T-SH-53] #3249 (GPS で確定し流用) |
 | vcall の先 (Transmitter 60 件・WaveformColouring `0x1a9e2b`) | Transmitter の lift 規模、WaveformColouring の lift | [T-SH-37] #2484 (`0x1a9e2b`)。Transmitter は未起票 → #161 |
 | `.pdata` の無い先の範囲の近似 (次の `.pdata` 先頭まで) | 命令数は上限側に偏りうる | #161 |
 | 残り 8 instance の lift | #161 後半 | #161 (子を順次起票) |
 | GPS CreateInstance 単体の命令数: 本節 961 命令 (closure の和集合)、`REPORT.md` §4-5 は 924 命令 (同じ 36 関数)。計算規則の差の有無は未確認 | §4.2 と §4-5 のどちらを正にするか | #161 (PM 判断) |
 | REPORT.md §1 の SIMD 比 30.7% の出典 | 旧 REPORT 値の再現 | #161 |
 
-### 7. CreateInstance の native 実行 (#2528 / T-SH-38・部分達成)
-- 測定 commit: `8f643a8c` (ハーネス `tools/shared/scripts/ildsp_native.c`・照合 `ildsp_native_check.py`)。`b0aa27b3` からの変更は、stdout の行バッファ化、呼び出し前の `call` 行 (実験ごとの wrapper を出す)、checker の timeout 処理のみ。`git diff 8f643a8c HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
+### 7. CreateInstance の native 実行 (#2528 / T-SH-38・受入 1・4 を満たして `Closes`。受入 2 → #3249、受入 3 → #3250)
+- 測定 commit: `8f643a8c` (ハーネス `tools/shared/scripts/ildsp_native.c`・照合 `ildsp_native_check.py`)。`b0aa27b3` からの変更は、stdout の行バッファ化、呼び出し前の `call` 行 (実験ごとの wrapper を出す)、checker の timeout 処理のみ。`git diff 8f643a8c HEAD -- tools/shared/scripts` の出力は空 (差分 0)。round 2 の再測定は、同じコードの HEAD `551da801` からビルドした `ildsp_native` で行った。
 - 方式: `block24360_PE.bin` を ImageBase 0x180000000 に VA 通りに敷設 (`ott_native.c` と同じ方式、MAP_FIXED_NOREPLACE)。IAT 73 件のうち 7 件 (GetProcessHeap・HeapAlloc・HeapFree・GetLastError・SetLastError・RtlPcToFileHeader・RaiseException) を ms_abi の C 関数で実装し、残りは名前を記録して 0 を返す thunk (実行時に呼ばれた件数を出力)。HeapAlloc は 0x50000000 から bump で確保 (0 埋め)。`CreateInstance` は MS x64 の関数ポインタで直接呼ぶ。CRT の DllMain・TLS・SEH は走らせない。
-- 実行形: **単独** = `ildsp_native <PE> --slot K V` (1 プロセス 1 実験。create の後に slot を 1 回呼ぶ)。**全件** = `ildsp_native <PE>` (同一プロセスで slot 1〜5 を順に呼ぶ。実験ごとに create を呼び直すので、ヒープの確保位置が進む)。下の表は単独実行の値。全件実行との違いは注に分けた。
+- 実行形: **単独** = `ildsp_native <PE> --slot K V` (1 プロセス 1 実験。create の後に slot を 1 回呼ぶ)。**全件** = `ildsp_native <PE>` (同一プロセスで slot 1〜5 を順に呼ぶ。実験ごとに create を呼び直すので、ヒープの確保位置が進む)。
 - 照合 (create のみ・`--slot 0 0`): wrapper 0x50000000 → vptr `0x1803dfcf8` (= vtable VA、一致)。`ildsp_native_check.py` は ALL OK (rc 0)。ネガティブコントロール (`--neg-lea`): vptr `0x1803dfd00`、`--neg` は FAIL (rc 1)。
-- 単独実行の表 (4 巡 = 1 巡目 + rep1〜3。各巡で 14 件を 1 プロセスずつ実行。ASLR 有効・既定の環境変数。rc は 4 巡の内訳):
+- 測定条件 (round 2・本表の値): ASLR 有効・既定の環境変数・load average 0.2〜1.5 (4 vCPU の runner)。各プロセスは `timeout 15` で囲み、rc 124 = 15 秒で timeout (hang)、rc 139 = SIGSEGV。単独 14 件を各 n=6 (計 84 プロセス)、全件を n=6。
 
-| slot | rdx | rc (4 巡) | rax | 変更範囲 (内部オブジェクト) | 間接 call 4 件の hook |
+単独実行の表 (1 プロセス 1 実験・n=6):
+
+| slot | rdx | rc (n=6) | rax (完走時) | 変更範囲 (完走時) | 間接 call 4 件の hook |
 |---|---|---|---|---|---|
-| 1 | 0 | 0 / 0 / 124 / 124 | wrapper+0x1310 | 34 range | 0 件 (完走時) |
-| 1 | 1 | 0 / 124 / 0 / 124 | wrapper+0x1310 | 33 range | 0 件 (完走時) |
-| 1 | 2 | 0 / 124 / 0 / 124 | wrapper+0x1310 | 33 range | 0 件 (完走時) |
-| 1 | 0xe | 0 / 124 / 124 / 124 | wrapper+0x1310 (完走時) | 33 range (完走時) | 0 件 (完走時) |
-| 2 | 0 | 0 (4 巡) | 0 | `[0x31+1, 0x6e+2]` (2 range) | 0 件 |
-| 2 | 1 | 0 (4 巡) | 0 | なし | 0 件 |
-| 2 | 2 | 0 (4 巡) | 2 | `[0x35+1]` | 0 件 |
-| 2 | 0xe | 0 (4 巡) | 0 | なし | 0 件 |
-| 3 | 0 | 0 (4 巡) | 0x2e | なし | 0 件 |
-| 3 | 1 | 139 (4 巡・約 0.2 s) | call 内で SIGSEGV | — | — |
-| 3 | 2 | 139 (4 巡・約 0.2 s) | call 内で SIGSEGV | — | — |
-| 3 | 0xe | 139 (4 巡・約 0.2 s) | call 内で SIGSEGV | — | — |
-| 4 | 内部オブジェクト (0x50000320) | 0 (4 巡) | 0x35 | なし | 0 件 |
-| 5 | 0 | 0 (4 巡) | 0 | なし | 0 件 |
+| 1 | 0 | 0 ×5・124 ×1 | 0x50001620 (5/5) | 33 range ×4・34 range ×1 (2 種) | 0 件 |
+| 1 | 1 | 0 ×5・124 ×1 | 0x50001620 (5/5) | 33 range ×4・34 range ×1 (2 種) | 0 件 |
+| 1 | 2 | 0 ×3・124 ×3 | 0x50001620 (3/3) | 33 range ×3 (1 種) | 0 件 |
+| 1 | 0xe | 0 ×1・124 ×5 | 0x50001620 (1/1) | 33 range ×1 (1 種) | 0 件 |
+| 2 | 0 | 0 ×6 | 0 | `[0x31+1, 0x6e+2]` 6/6 (2 range) | 0 件 |
+| 2 | 1 | 0 ×6 | 0 | なし 6/6 | 0 件 |
+| 2 | 2 | 0 ×6 | 2 | `[0x35+1]` 6/6 (1 range) | 0 件 |
+| 2 | 0xe | 0 ×6 | 0 | なし 6/6 | 0 件 |
+| 3 | 0 | 0 ×6 | 0x2e | なし 6/6 | 0 件 |
+| 3 | 1 | 139 ×6 | call 内で SIGSEGV | — | — |
+| 3 | 2 | 139 ×6 | call 内で SIGSEGV | — | — |
+| 3 | 0xe | 139 ×6 | call 内で SIGSEGV | — | — |
+| 4 | 内部オブジェクト (0x50000320) | 0 ×6 | 0x35 | なし 6/6 | 0 件 |
+| 5 | 0 | 0 ×6 | 0 | なし 6/6 | 0 件 |
 
-- 全件実行 (同一プロセス・3 回): 3 回とも `call k=3 variant=1 rdx=0x1` の内部で SIGSEGV (rc 139)。slot 3 v1 以降と slot 4・5 には届かない。slot 1 の 4 件は 3 回とも完走 (hang 0/3)。rax は 4 件とも wrapper+0x1310。slot 2 v0 の変更範囲は `[0x31+1, 0x6e+2]` で単独と同じ。slot 3 v0 の rax は 0x2e。
-- 注 (旧版の記述の訂正。上の表が正):
-  1. 旧版の「slot 1 の rax は rdx ごとに異なる」は誤り。rax は呼び出し時の wrapper から +0x1310 のヒープ内位置で、rdx に依らない。絶対値が違うのは、全件実行では実験ごとに create を呼び直し wrapper の確保位置が進むため (単独実行の slot 1 は 2 回目の create の wrapper 0x50000310 を使い、rax=0x50001620)。
-  2. 旧版の「slot 2 rdx=0 の内部オブジェクトの 3 range (`[0x30+1, 0x32+1, 0x6e+2]`)」は、今回の全件 (3 回)・単独 (4 巡) のどれでも再現しなかった。今回は 2 range `[0x31+1, 0x6e+2]`。レビュー時の単独 `[0x31+2, 0x6e+2]` も再現せず (差は 1 バイト)。ASLR 無効 (`setarch x86_64 -R`) と空の環境 (`env -i`) でも `[0x31+1, 0x6e+2]`。差の原因は未確認。
-  3. 旧版の「slot 3 rdx=0 の rax は host 側 (0x56…)」は再現せず、今回は 0x2e (単独 4 巡・全件 3 回で一致)。
-- slot 1 の hang (単独実行・15 秒で timeout): 単独 slot 1 の 16 回 (4 巡 × 4 rdx) のうち 9 回が timeout (rc 124)。完走時は 4 ms。rdx による偏りは見えない (v0 2/4・v1 2/4・v2 2/4・v3 3/4)。レビュー時の 0/4 とは食い違う。環境で変わる: ASLR 無効で 6/6 が hang、空の環境 (`env -i`) で 6 回中 1 回が hang。全件実行 (slot 1 v0 を含む) では hang しなかった (0/3)。測定中の負荷は 2 vCPU で load average 0.9 前後 (1 分平均・`uptime`)。負荷・素材展開直後の影響は未検証。hang の位置と原因は未確認。
-- 間接 call 4 件: 完走したすべての実行で hook 命中 0 件・IAT stub 呼び出し 0 件。0 件は「この実験の範囲で到達しなかった」の意味で、到達しない根拠ではない。どの入力が helper 0x1aedc0 / 0x1b6f4c に入るかは未確定。
+- 全件実行 (同一プロセス・n=6): rc 124 が 3 回 (slot 1 v0 の call 内で hang)、rc 139 が 3 回 (slot 3 v1 の call 内で SIGSEGV)。slot 4・5 には届かない。完走した slot の値: slot 2 v0 `[0x31+1, 0x6e+2]` 3/3・slot 2 v2 `[0x35+1]` 3/3・slot 3 v0 rax 0x2e 3/3。全件の slot 1 v0 は、完走 3 回の rax が wrapper+0x1350・+0x1310・+0x166aa0 (range 数 34・34・29) で、単独と一致しない (注 1)。
+- レビュー側の再現 (PR #3210 の review。別環境。本 round では再現していない): 単独 slot 1 v0 hang 0/4、slot 2 v0 `[0x6e+2]` 8/8、slot 2 v2 `changed=[]` 2/2 (単独 1・全件 1)、全件 slot 2 v0 `[0x30+4, 0x6e+2]` 2/2、全件 slot 1 v0 hang 2/6・slot 3 v1 SIGSEGV 4/6。
+- 注:
+  1. slot 1 の rax: round 1 の「単独・全件とも rax は wrapper+0x1310」は、全件では成り立たない。単独 14 件の完走はすべて wrapper+0x1310 (0x50001620) だが、全件の完走 3 件は wrapper+0x1350・+0x1310・+0x166aa0。slot 1 の内部確保量が実行ごとに違う可能性があるが、未確認。
+  2. slot 2 v0 の変更範囲: round 1 の 3 range (`[0x30+1, 0x32+1, 0x6e+2]`)・レビュー時の単独 `[0x31+2, 0x6e+2]` は、round 2 では再現しなかった (単独 6/6・全件 3/3 で `[0x31+1, 0x6e+2]`)。レビュー環境では `[0x6e+2]` (単独 8/8) と `[0x30+4, 0x6e+2]` (全件 2/2) だった。環境差の原因は未確認。
+  3. 間接 call 4 件: 単独の完走 56 件 (slot 1 14・slot 2 24・slot 3 v0 6・slot 4 6・slot 5 6) と全件の完走経路で hook 0 件。0 件は「この実験の範囲で到達しなかった」の意味で、到達しない根拠ではない。どの入力が helper 0x1aedc0 / 0x1b6f4c に入るかは未確定。
+  4. ASLR 無効 (`setarch x86_64 -R`) と空の環境 (`env -i`) は、round 1 の実装者測定 (ASLR 無効 6/6 hang、`env -i` 6 回中 1 回 hang、変更範囲は `[0x31+1, 0x6e+2]`) のみ。round 2 では再測定しておらず、review も再現していない (未検証)。
+- slot 1 の hang: 単独 24 回中 10 回 (rdx ごと 1/6・1/6・3/6・5/6)、全件 6 回中 3 回。round 1 は 16 回中 9 回で、通算は 40 回中 19 回。レビュー側の 0/4 (単独) とは食い違う。hang の位置は未特定。仮説 (未検証): 未初期化値・スタック位置・環境変数長に依存する分岐。負荷の影響は未検証。
 - 未実施: slot 0 (dtor・解放を伴う)。
-- 未解決 (受入条件 2・3 は未達): slot 1–3・5 の役割 (呼び出し規約の確定が要る)・間接 call 4 件の到達条件・slot 1 の hang の原因・slot 3 (rdx=1・2・0xe) の segfault の原因・slot 2 の変更範囲の旧測定との差。起票先: 本 issue #2528 を `Refs` で残す。
+
+未解決 (受入 1・4 の範囲外):
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| slot 1–3・5 の役割 (どの method か・引数の意味。呼び出し規約) | 受入 2 | [T-SH-53] #3249 |
+| 間接 call 4 件 (0x1aedf6・0x1aee04・0x1aee4a・0x1b6f6c) の到達条件と扱い | 受入 3 | [T-SH-54] #3250 |
+| slot 0 (dtor) は未実行 | 受入 2 の一部 | [T-SH-53] #3249 |
+| slot 1 の hang (単独 10/24・全件 3/6。原因未確認) | slot 1 の結果を単独で採れない | 追跡 issue なし (PM 判断: 子の起票要否) |
+| slot 3 (rdx=1・2・0xe) の SIGSEGV (単独 18/18・全件 3/3。原因未確認) | slot 3 の入力の扱い。全件は slot 4・5 に届かない | 追跡 issue なし (PM 判断: 子の起票要否) |
+| slot 2 v0 の変更範囲の環境差 (実装者環境 `[0x31+1, 0x6e+2]`、レビュー環境 `[0x6e+2]`・`[0x30+4, 0x6e+2]`。原因未確認) | 差分テストの入出力の定義 | 追跡 issue なし (PM 判断: 子の起票要否) |
+| slot 1 の全件での rax・変更範囲のばらつき (注 1) | slot 1 の出力の定義 | 追跡 issue なし (PM 判断: 子の起票要否) |
