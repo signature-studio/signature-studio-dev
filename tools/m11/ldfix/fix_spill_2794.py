@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
-"""fix_spill_2794.py — spill 宛 TRUE_DROP の修復 pass (#2794 / LD-130)。
+"""fix_spill_2794.py — spill 宛 TRUE_DROP の修復 pass (#2794 / LD-130。#2910 / LD-137 で根拠の 2 本目を追加)。
 
-対象は audit_lsf_ssa.py の spill 宛 (frame=True) CELL_COLLAPSED のうち、次の 3 条件をすべて満たす site だけ。
-  機械語  : 関数内で rip セル X に触れる命令が ちょうど 1 つ (site の `mov rA,[rip+X]`)。他の参照があれば 1 対 1 が決まらない
-  IR      : 関数内で `i64 K to ptr` の出現が ちょうど 1 つで、それが `load iN, ptr inttoptr (K)` (N は整数幅。ptr の load は対象外)
-  幅      : IR の load 幅 N = 機械語 store の幅 w (1003c20 のように IR が i32 で機械語が 64 bit の site は対象外)
+対象は audit_lsf_ssa.py の spill 宛 (frame=True) CELL_COLLAPSED のうち、判定 TSV で TRUE_DROP の site。
+各 site は次のどちらかの根拠を持つ場合だけ直す (gate)。
+  1to1    : 関数内で rip セル X に触れる機械語命令が ちょうど 1 つ (site の `mov reg,[rip+X]`) で、
+            IR の `i64 K to ptr` の出現も ちょうど 1 つ。さらに、その IR load の幅 N = 機械語 store の幅 w。
+  callarg : (#2910) 機械語で、site が `mov dword ptr [rsp+0x20+8j], reg32` (outgoing 引数 argi = 4+j 番目) の store で、
+            その直前の rip 読み出し R から site まで分岐・call が無く、site の直後 (4 命令以内) の direct call が
+            callee F。IR では F の呼び出しの引数 argi (0 始まり) が、K の load の値 (sext/zext 1 段まで) に一致し、
+            その組が 1 つだけ。幅 N = w = 4。
+            根拠の無い site (ローカル変数 [rbp+d] へ流れる等) はこの gate では直さない。
 修復は fix_d17.py と同じ 2 段分割: `%v = load iN, ptr inttoptr K` を
    %cellps.K = load ptr, ptr inttoptr K    (セル内容 = 変数のアドレス)
    %v = load iN, ptr %cellps.K              (その先を読む = 機械語の 2 段目の deref)
 に置き換える。store の有無は要らない (spill 宛は IR に store が無いことがあるが、直すのは K の load だけ)。
 
 入力: 修復前 IR / audit_lsf_ssa.py の --json 出力 (site の cell 情報) / 機械語 (IMG・CFG)。
-使い方: python3 fix_spill_2794.py IN.ll AUDIT.json IMG CFG OUT.ll --report OUT.json [--gate none]
-  --gate none: 1 対 1 の判定を外す (ネガティブコントロール用。修復件数が増えることを確かめる)
+使い方: python3 fix_spill_2794.py IN.ll AUDIT.json IMG CFG OUT.ll --tsv SPILL37.tsv --report OUT.json [--gate both]
+  --gate both (既定) : 1to1 か callarg の根拠がある site を直す
+  --gate 1to1        : 1to1 の根拠だけ (#2794 の 9 site に相当)
+  --gate none        : 判定を外す (ネガティブコントロール用。修復件数が増えることを確かめる)
 """
 import argparse
 import collections
@@ -28,7 +35,7 @@ import audit_lsf as A  # noqa: E402
 import capstone  # noqa: E402
 
 DEF_RE = re.compile(r'^define [^\n]*@function_([0-9a-f]+)\(', re.M)
-INT_W = re.compile(r'^i(\d+)$')
+LOAD_RE = r'^(\s*)(%%\S+) = load (i(\d+)), ptr inttoptr \(i64 %d to ptr\)([^\n]*)$'
 
 
 def spill_targets(audit, allow):
@@ -52,8 +59,8 @@ def true_drop_set(tsv_path):
 
 
 def rip_touches(mach, va, body):
-    """関数 va の機械語で rip 相対メモリオペランドを持つ命令 -> {X: [(命令アドレス, mnemonic, 先頭オペランドが reg か)]} (X = 絶対アドレス)。
-    命令集合は audit_lsf_ssa.py と同じ (audit_lsf.descend: IR ラベルを root にした再帰降下)"""
+    """関数 va の機械語で rip 相対メモリオペランドを持つ命令 -> ({X: [(命令アドレス, mnemonic, 先頭オペランドが reg か)]}, 命令列)。
+    X = 絶対アドレス。命令集合は audit_lsf_ssa.py と同じ (audit_lsf.descend: IR ラベルを root にした再帰降下)"""
     labels = [int(x, 16) for x in re.findall(r'^dec_label_pc_([0-9a-f]+)[:.]', body, re.M)]
     ins = A.descend(mach, va, labels) or []
     out = collections.defaultdict(list)
@@ -62,29 +69,113 @@ def rip_touches(mach, va, body):
             if o.type == capstone.CS_OP_MEM and o.mem.base and mach.cs.reg_name(o.mem.base) == 'rip':
                 reg_load = i.mnemonic == 'mov' and i.operands[0].type == capstone.CS_OP_REG
                 out[i.address + i.size + o.mem.disp].append((i.address, i.mnemonic, reg_load))
+    return out, ins
+
+
+def judge_1to1(body, site, touches):
+    """1to1 の根拠。→ (ok, reason, IR の結果名)。機械語側は X を読む命令が 1 つで、それが `mov reg,[rip+X]` であること"""
+    addr, K, X, w = site
+    refs = touches.get(X, [])
+    if len(refs) != 1:
+        return False, 'machine_refs=%d' % len(refs), None
+    if not refs[0][2]:
+        return False, 'machine_ref_not_reg_load', None
+    occ = re.findall(r'i64 %d to ptr\b' % K, body)
+    if len(occ) != 1:
+        return False, 'ir_refs=%d' % len(occ), None
+    m = re.search(LOAD_RE % K, body, re.M)
+    if not m:
+        return False, 'ir_not_intload', None
+    n = int(m.group(4))
+    if n != w:
+        return False, 'width IR=i%d machine=%d' % (n, w), None
+    return True, 'ok', m.group(2)
+
+
+def split_args(s):
+    """call の引数列 (括弧の内側の文字列) を最上位の ', ' で割る"""
+    out, depth, cur = [], 0, ''
+    for ch in s:
+        if ch == '(':
+            depth += 1
+        elif ch == ')':
+            depth -= 1
+        if ch == ',' and depth == 0:
+            out.append(cur.strip())
+            cur = ''
+        else:
+            cur += ch
+    if cur.strip():
+        out.append(cur.strip())
     return out
 
 
-def judge_one(body, site, touches, gate):
-    """1 site の判定 -> (ok: bool, reason: str)。機械語側は X を読む命令が 1 つで、それが `mov reg,[rip+X]` であること"""
-    addr, K, X, w = site
-    if gate == 'none':
-        return True, 'gate-off'
-    refs = touches.get(X, [])
-    if len(refs) != 1:
-        return False, 'machine_refs=%d' % len(refs)
-    if not refs[0][2]:
-        return False, 'machine_ref_not_reg_load'
-    occ = re.findall(r'i64 %d to ptr\b' % K, body)
-    if len(occ) != 1:
-        return False, 'ir_refs=%d' % len(occ)
-    m = re.search(r'^(\s*)(%\S+) = load (i(\d+)), ptr inttoptr \(i64 ' + str(K) + r' to ptr\)([^\n]*)$', body, re.M)
-    if not m:
-        return False, 'ir_not_intload'
-    n = int(m.group(4))
-    if n != w:
-        return False, 'width IR=i%d machine=%d' % (n, w)
-    return True, 'ok'
+def judge_callarg(mach, body, site, ins, m_refs, i_refs):
+    """callarg の根拠。→ (ok, reason, IR の結果名, 根拠の要約)。M = I (機械語の読み出し数と IR の K の出現数が一致) を必須にする
+    (M > I は B 分類の欠落の疑いで、本 issue の範囲外)"""
+    addr, K, X, w = int(site[0], 16), site[1], site[2], site[3]
+    if w != 32:
+        return False, 'callarg_width=%d' % w, None, None
+    if m_refs != i_refs:
+        return False, 'callarg_m_ne_i=%d/%d' % (m_refs, i_refs), None, None
+    by_addr = {i.address: i for i in ins}
+    st = by_addr.get(addr)
+    if st is None or st.mnemonic != 'mov' or len(st.operands) != 2:
+        return False, 'callarg_site_not_mov', None, None
+    d0, d1 = st.operands
+    if d0.type != capstone.CS_OP_MEM or d1.type != capstone.CS_OP_REG:
+        return False, 'callarg_site_not_reg_store', None, None
+    if mach.cs.reg_name(d0.mem.base) != 'rsp' or d0.mem.index:
+        return False, 'callarg_site_not_rsp', None, None
+    disp = d0.mem.disp
+    if disp < 0x20 or (disp - 0x20) % 8:
+        return False, 'callarg_site_not_stack_arg', None, None
+    argi = 4 + (disp - 0x20) // 8
+    reads = sorted(t[0] for t in ins_reads(mach, X, ins) if t[0] < addr)
+    if not reads:
+        return False, 'callarg_no_prior_read', None, None
+    r = reads[-1]
+    between = [i for i in ins if r < i.address < addr]
+    if len(between) > 3 or any(i.mnemonic in ('call', 'ret', 'jmp') or i.mnemonic.startswith('j') for i in between):
+        return False, 'callarg_read_not_straight', None, None
+    nxt = [i for i in ins if i.address > addr][:4]
+    call = None
+    for i in nxt:
+        if i.mnemonic == 'call':
+            call = i
+            break
+        if i.mnemonic in ('jmp', 'ret') or i.mnemonic.startswith('j'):
+            break
+    if call is None or not call.operands or call.operands[0].type != capstone.CS_OP_IMM:
+        return False, 'callarg_no_direct_call', None, None
+    callee = 'function_%x' % call.operands[0].imm
+    names = []
+    for lm in re.finditer(LOAD_RE % K, body, re.M):
+        if int(lm.group(4)) != w:
+            continue
+        srcs = {lm.group(2)}
+        for hop in re.finditer(r'^\s*(%\S+) = (?:sext|zext|trunc) i\d+ (%\S+) to i\d+', body, re.M):
+            if hop.group(2) in srcs:
+                srcs.add(hop.group(1))
+        for cm in re.finditer(r'^\s*%\S+ = call [^@\n]*@' + callee + r'\((.*)\)[^\n]*$', body, re.M):
+            args = split_args(cm.group(1))
+            if len(args) > argi and args[argi].split()[-1] in srcs:
+                names.append(lm.group(2))
+    names = sorted(set(names))
+    if len(names) != 1:
+        return False, 'callarg_ir_matches=%d' % len(names), None, None
+    return True, 'ok', names[0], 'read=%x call=%s argi=%d' % (r, callee, argi)
+
+
+def ins_reads(mach, X, ins):
+    """命令列のうち、rip 相対で X に触れる命令 -> [(命令アドレス, mnemonic, 先頭が reg の load か)]"""
+    out = []
+    for i in ins:
+        for o in i.operands:
+            if o.type == capstone.CS_OP_MEM and o.mem.base and mach.cs.reg_name(o.mem.base) == 'rip':
+                if i.address + i.size + o.mem.disp == X:
+                    out.append((i.address, i.mnemonic, i.mnemonic == 'mov' and i.operands[0].type == capstone.CS_OP_REG))
+    return out
 
 
 def fix_text(ir, mach, audit, allow, gate):
@@ -98,27 +189,40 @@ def fix_text(ir, mach, audit, allow, gate):
             continue
         end = ir.index('\n}', m.end()) + 2
         body = ir[m.start():end]
-        touches = rip_touches(mach, int(va, 16), body)
+        touches, ins = rip_touches(mach, int(va, 16), body)
         new = body
         for site in tg[va]:
             addr, K, X, w = site
             m_refs = len(touches.get(X, []))
             i_refs = len(re.findall(r'i64 ' + str(K) + r' to ptr\b', new))
-            ok, why = judge_one(new, site, touches, gate)
+            ev, name = None, None
+            if gate == 'none':
+                ok, why = True, 'gate-off'
+            else:
+                ok, why, name = judge_1to1(new, site, touches) if gate in ('both', '1to1') else (False, 'gate-1to1-off', None)
+                if ok:
+                    ev = '1to1'
+                elif gate == 'both':
+                    ok, why, name, detail = judge_callarg(mach, new, site, ins, m_refs, i_refs)
+                    if ok:
+                        ev = 'callarg:' + detail
             if not ok:
                 skipped.append(dict(fn=va, site=addr, K='%x' % K, why=why, m=m_refs, i=i_refs))
                 continue
-            pat = re.compile(r'^(\s*)(%\S+) = load (i\d+), ptr inttoptr \(i64 ' + str(K) + r' to ptr\)([^\n]*)$', re.M)
-            mm = pat.search(new)
+            pat = LOAD_RE % K if name is None else r'^(\s*)(%s) = load (i(\d+)), ptr inttoptr \(i64 %d to ptr\)([^\n]*)$' % (re.escape(name), K)
+            mm = re.search(pat, new, re.M)
             if mm is None:
                 skipped.append(dict(fn=va, site=addr, K='%x' % K, why='ir_not_intload_at_apply', m=m_refs, i=i_refs))
                 continue
-            ind, name, ty, rest = mm.group(1), mm.group(2), mm.group(3), mm.group(4)
+            ind, nm, ty, rest = mm.group(1), mm.group(2), mm.group(3), mm.group(5)
             p = '%%cellps.%x' % K
+            if re.search(re.escape(p) + r'(?![\w.])', new):
+                p = '%%cellps.%x.%s' % (K, nm.lstrip('%'))
             rep = (ind + p + ' = load ptr, ptr inttoptr (i64 ' + str(K) + ' to ptr)' + rest + '\n'
-                   + ind + name + ' = load ' + ty + ', ptr ' + p + rest)
+                   + ind + nm + ' = load ' + ty + ', ptr ' + p + rest)
             new = new[:mm.start()] + rep + new[mm.end():]
-            fixed.append(dict(fn=va, site=addr, K='%x' % K, X='%x' % X, ty=ty, w=w, m=m_refs, i=i_refs))
+            fixed.append(dict(fn=va, site=addr, K='%x' % K, X='%x' % X, ty=ty, w=w, m=m_refs, i=i_refs,
+                              ev=ev or '1to1', ir_name=nm))
         if new != body:
             parts.append(ir[last:m.start()])
             parts.append(new)
@@ -136,7 +240,7 @@ def main():
     ap.add_argument('outfile')
     ap.add_argument('--tsv', required=True, help='spill37_1169.tsv (判定。TRUE_DROP だけを対象にする)')
     ap.add_argument('--report')
-    ap.add_argument('--gate', choices=['1to1', 'none'], default='1to1')
+    ap.add_argument('--gate', choices=['both', '1to1', 'none'], default='both')
     a = ap.parse_args()
     audit = json.load(open(a.audit))
     ir = open(a.infile, errors='replace').read()
@@ -145,6 +249,9 @@ def main():
     open(a.outfile, 'w').write(out)
     rep = dict(gate=a.gate, fixed=fixed, skipped=skipped)
     print('spill fixed=%d skipped=%d fixed_fns=%d' % (len(fixed), len(skipped), len({x['fn'] for x in fixed})))
+    for x in fixed:
+        if x['ev'] != '1to1':
+            print('  fixed %s %s K=%s %s' % (x['fn'], x['site'], x['K'], x['ev']))
     for x in skipped:
         print('  skip %s %s K=%s %s' % (x['fn'], x['site'], x['K'], x['why']))
     if a.report:
