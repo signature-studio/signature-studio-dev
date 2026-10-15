@@ -13,8 +13,9 @@ typedef void *(__attribute__((ms_abi)) *CRI)(void *);
 typedef void (__attribute__((ms_abi)) *FF)(void *, const float *, float *, uint32_t);
 #define NL 14
 #define PTR0 0xbc
-static void *__attribute__((ms_abi)) my_HeapAlloc(void *h, uint32_t fl, size_t n) { (void)h; (void)fl; return calloc(1, n ? n : 1); }
-static int __attribute__((ms_abi)) my_HeapFree(void *h, uint32_t fl, void *p) { (void)h; (void)fl; free(p); return 1; }
+static int n_alloc, n_free;
+static void *__attribute__((ms_abi)) my_HeapAlloc(void *h, uint32_t fl, size_t n) { (void)h; (void)fl; n_alloc++; return calloc(1, n ? n : 1); }
+static int __attribute__((ms_abi)) my_HeapFree(void *h, uint32_t fl, void *p) { (void)h; (void)fl; n_free++; free(p); return 1; }
 int main(int argc, char **argv) {
   if (argc != 4) { fprintf(stderr, "usage: inst_probe image.bin create_rva fruity_rva\n"); return 2; }
   FILE *fi = fopen(argv[1], "rb"); if (!fi) return 2;
@@ -25,6 +26,7 @@ int main(int argc, char **argv) {
   *(void **)(img + 0x60138) = (void *)my_HeapFree;    // KERNEL32 HeapFree の IAT slot
   uint8_t *obj = ((CRI)(img + strtoul(argv[2], 0, 16)))(NULL);
   printf("CREATE_NONNULL=%d\n", obj != NULL);
+  printf("HEAPALLOC_CALLS=%d HEAPFREE_CALLS=%d\n", n_alloc, n_free);
   if (!obj) return 1;
   uint64_t vt; memcpy(&vt, obj, 8);
   printf("VPTR_RVA=%#lx\n", (unsigned long)((uint8_t *)vt - img));
