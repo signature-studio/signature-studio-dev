@@ -21,8 +21,13 @@ MODE (第 4 引数・既定 linear):
            (jump table) の先は追わず、テーブル窓は decode しない (未解決件数 indirect_unres)。
 
 ENTRY (第 5 引数・既定 any): any = 新入口を制限しない (従来)。pdata = 新入口を .pdata begin に限る (MX-25)。
+  pdata_call = (MX-29・flow 専用) 新入口は (a) .pdata begin、または (b) 直接 call rel32 の目標で
+           .text 内・thunk 外・文字列窓の外、かつ入口から最初の ret / jmp まで (最大 32 命令) を
+           不正命令なしでデコードできるもの。jmp / jcc の目標は (a) の場合だけ入口にする。
+           文字列窓 (印字可能 ASCII 8 字以上 + NUL、または UTF-16LE 8 字以上 + U+0000。
+           .pdata 関数と重なるものは窓にしない) は flow の code から除外する。
 
-usage: mx_closure.py <pe> <rtti_vtables.json> <out_prefix> [linear|flow] [any|pdata]
+usage: mx_closure.py <pe> <rtti_vtables.json> <out_prefix> [linear|flow] [any|pdata|pdata_call]
 """
 import sys, json, pickle, bisect, re, collections, struct
 import pefile, capstone
@@ -62,6 +67,40 @@ def main(path, vtp, outp):
             fsz[st] = e - st
     begins = sorted(fsz)
 
+    def pd_overlap(s, e):
+        i = bisect.bisect_right(begins, s) - 1
+        if i >= 0 and begins[i] + fsz[begins[i]] > s:
+            return True
+        j = bisect.bisect_left(begins, s)
+        return j < len(begins) and begins[j] < e
+
+    # ---- 文字列窓 (MX-29): 印字可能 ASCII (\t\r\n と 0x20-0x7e) 8 字以上 + NUL、
+    #      または UTF-16LE の同文字 8 字以上 + U+0000。.pdata 関数と重なるものは窓にしない。
+    PRN = rb'\t\r\n\x20-\x7e'
+    tx = data[t_raw: t_raw + t.Misc_VirtualSize]
+    raw_w = sorted((m.start(), m.end()) for pat in (rb'[%s]{8,}\x00' % PRN,
+                                                    rb'(?:[%s]\x00){8,}\x00\x00' % PRN)
+                   for m in re.finditer(pat, tx))
+    mrg = []
+    for s, e in raw_w:
+        if mrg and s <= mrg[-1][1]:
+            mrg[-1][1] = max(mrg[-1][1], e)
+        else:
+            mrg.append([s, e])
+    WINS = []
+    n_pd_drop = 0
+    for s, e in mrg:
+        if pd_overlap(t_lo + s, t_lo + e):
+            n_pd_drop += 1
+        else:
+            WINS.append((t_lo + s, t_lo + e))
+    WS = [w[0] for w in WINS]
+    WIN_ON = ENTRY == 'pdata_call'
+
+    def inwin(r):
+        i = bisect.bisect_right(WS, r) - 1
+        return i if i >= 0 and r < WINS[i][1] else -1
+
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 
     # ---- seeds
@@ -83,14 +122,18 @@ def main(path, vtp, outp):
         seeds |= v
 
     def flow(e, fb):
-        work, ins, cs = [e], set(), set()
+        work, ins, cs, cl = [e], set(), set(), set()
         nb = ni = un = 0
+        wh = set()
         while work:
             a = work.pop()
             try:
                 for ea, iz, mn, ops in md.disasm_lite(data[off(a):off(a) + 4096], base + a):
                     r = ea - base
                     if r in ins or not (e <= r < fb):
+                        break
+                    if WIN_ON and inwin(r) >= 0:
+                        wh.add(inwin(r))
                         break
                     ins.add(r)
                     nb += iz
@@ -102,6 +145,7 @@ def main(path, vtp, outp):
                             tg = int(ops, 16) - base
                             if t_lo <= tg < t_hi and not (THUNK_LO <= tg < THUNK_HI):
                                 cs.add(tg)
+                                cl.add(tg)
                         continue
                     if mn.startswith('j'):
                         if not ops.startswith('0x'):
@@ -116,14 +160,44 @@ def main(path, vtp, outp):
                             break
             except capstone.CsError:
                 pass
-        return cs, nb, ni, un
+        return cs, cl, nb, ni, un, wh
+
+    def first_block_ok(tg):
+        # 入口から最初の ret / jmp まで (最大 32 命令) を不正命令なしでデコードできるか。
+        # capstone は不正命令で出力を止めるので、ret / jmp に達せず止まったら不正。
+        n = 0
+        try:
+            for ea, iz, mn, ops in md.disasm_lite(data[off(tg):off(tg) + 480], base + tg):
+                n += 1
+                if 'ret' in mn.split() or 'jmp' in mn.split() or n >= 32:
+                    return True
+        except capstone.CsError:
+            return False
+        return False
+
+    LEAF = {}
+
+    def leaf_ok(tg):
+        if tg not in LEAF:
+            if inwin(tg) >= 0:
+                LEAF[tg] = 'win'
+            else:
+                LEAF[tg] = 'ok' if first_block_ok(tg) else 'bad'
+        return LEAF[tg] == 'ok'
 
     # ---- recursive descent over entry points only
-    def admit(tg):
-        # ENTRY=pdata: 新入口は .pdata 関数先頭 (begin) に限る。any: 従来どおり (既定)。
-        return ENTRY != 'pdata' or tg in fsz
+    def admit(tg, call):
+        # any: 従来どおり (既定)。pdata: 新入口は .pdata 関数先頭 (begin) に限る (MX-25)。
+        # pdata_call: begin、または直接 call の目標で leaf_ok のもの (MX-29)。
+        if ENTRY == 'any' or tg in fsz:
+            return True
+        if ENTRY == 'pdata' or not call:
+            return False
+        return leaf_ok(tg)
     entries = set(seeds)
     callees = {}
+    callall = {}
+    WH = set()
     rounds = 0
     rlog = []
     while True:
@@ -154,12 +228,14 @@ def main(path, vtp, outp):
                 continue
             st['linear'] += sz
             if MODE == 'flow':
-                cs, nb, ni, un = flow(e, e + sz)
+                cs, cl, nb, ni, un, wh = flow(e, e + sz)
                 st['reached'] += nb
                 st['insn'] += ni
                 st['unres'] += un
-                callees[e] = sorted(cs)
-                new |= {tg for tg in cs if tg not in entries and admit(tg)}
+                WH.update(wh)
+                callall[e] = sorted(cl)
+                callees[e] = sorted(tg for tg in cs if admit(tg, tg in cl))
+                new |= {tg for tg in callees[e] if tg not in entries}
                 continue
             cs = set()
             try:
@@ -170,7 +246,7 @@ def main(path, vtp, outp):
                             continue
                         if t_lo <= tg < t_hi:
                             cs.add(tg)
-                            if tg not in entries and admit(tg):
+                            if tg not in entries and admit(tg, True):
                                 new.add(tg)
             except capstone.CsError:
                 pass
@@ -195,7 +271,13 @@ def main(path, vtp, outp):
             stk.extend(callees.get(f, ()))
         return seen
 
-    out = {'pe': path, 'mode': MODE, 'rounds_log': rlog,
+    out = {'pe': path, 'mode': MODE, 'entry': ENTRY, 'rounds_log': rlog,
+           'string_windows': {
+               'raw_matches': len(raw_w), 'merged': len(mrg), 'pdata_overlap_dropped': n_pd_drop,
+               'kept': len(WINS), 'kept_bytes': sum(e - s for s, e in WINS),
+               'flow_hit_windows': len(WH),
+               'top20_by_len': [[hex(s), e - s] for s, e in sorted(WINS, key=lambda w: -(w[1] - w[0]))[:20]]},
+           'leaf': dict(collections.Counter(LEAF.values())),
            'base': hex(base), 'image_size': hex(pe.OPTIONAL_HEADER.SizeOfImage),
            'pdata_funcs': len(fsz), 'pdata_bytes': sum(fsz.values()), 'text_size': t.Misc_VirtualSize,
            'n_family_slots': sum(len(v) for v in fam.values()),
@@ -220,7 +302,7 @@ def main(path, vtp, outp):
     json.dump(out, open(outp + '.json', 'w'), indent=1)
     pickle.dump({'entries': sorted(entries), 'callees': callees, 'fsz': fsz, 'base': base,
                  'seeds': sorted(seeds), 'fam': {k: sorted(v) for k, v in fam.items()},
-                 'EXPORTS': EXPORTS},
+                 'EXPORTS': EXPORTS, 'callall': callall, 'windows': WINS, 'entry': ENTRY},
                 open(outp + '_sets.pkl', 'wb'), protocol=4)
     json.dump({'roots': [hex(base + x) for x in sorted(entries)]},
               open(outp + '_x64c_entries.json', 'w'), indent=1)
@@ -231,5 +313,6 @@ if __name__ == '__main__':
     MODE = sys.argv[4] if len(sys.argv) > 4 else 'linear'
     ENTRY = sys.argv[5] if len(sys.argv) > 5 else 'any'
     assert MODE in ('linear', 'flow'), MODE
-    assert ENTRY in ('any', 'pdata'), ENTRY
+    assert ENTRY in ('any', 'pdata', 'pdata_call'), ENTRY
+    assert ENTRY != 'pdata_call' or MODE == 'flow', 'pdata_call は flow 専用'
     main(sys.argv[1], sys.argv[2], sys.argv[3])

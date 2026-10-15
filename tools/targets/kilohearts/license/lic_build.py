@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(ROOT, 'scripts'))
 CORE = os.path.join(KILO, 'work', 'winpkg', 'HeartCore.core_64')
 EMSDK = '/opt/emsdk/emsdk_env.sh'
 CFG = json.load(open(os.path.join(ROOT, 'lic_config.json')))
+RSS_CAP = os.path.abspath(os.path.join(ROOT, '..', '..', '..', 'flelift', 'boot', 'rss_cap.py'))
 
 
 def sh(cmd, log=None, check=True):
@@ -39,6 +40,22 @@ def sh(cmd, log=None, check=True):
         print(r.stdout[-2000:], r.stderr[-3000:])
         raise SystemExit('FAILED: ' + cmd[:200])
     return r, time.time() - t
+
+
+def emcc_capped(name, cmd, log, rss_log):
+    """emcc を rss_cap.py 経由で走らせ、ピーク RSS (MB) を返す。上限は KH_EMCC_RSS_CAP_MB (既定 11000)。
+    超過時は emcc の子孫 PID だけ kill され、非 0 で終わる"""
+    cap = int(os.environ.get('KH_EMCC_RSS_CAP_MB', '11000'))
+    r, dt = sh('python3 %s --cap-mb %d --interval 0.5 --log %s -- %s' % (RSS_CAP, cap, rss_log, cmd), log=log, check=False)
+    m = re.search(r'peak_rss=(\d+)MB', r.stderr)
+    peak = int(m.group(1)) if m else -1
+    if 'KILLED(cap)' in r.stderr:
+        print('[build] emcc RSS cap 超過: %s peak=%dMB (cap=%dMB)' % (name, peak, cap))
+        raise SystemExit(1)
+    if r.returncode:
+        print(r.stdout[-2000:], r.stderr[-3000:])
+        raise SystemExit('FAILED: emcc ' + name)
+    return r, dt, peak
 
 
 def capture_stage0(rstr, dst, base):
@@ -148,14 +165,15 @@ def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=N
     if emcc_extra_exports:
         exports += emcc_extra_exports
     extra_ll = (' ' + P('simd.c.i256.ll')) if os.path.exists(P('simd.c.i256.ll')) else ''
-    r, dt = sh('emcc -w %s -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=96MB -sENVIRONMENT=node -sMODULARIZE=1 '
-               '-sEXPORT_NAME=KhLic -sERROR_ON_UNDEFINED_SYMBOLS=0 --no-entry -sEXPORTED_FUNCTIONS=%s '
-               '-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAP64 -Wl,--no-gc-sections -I%s/lift %s %s %s %s%s%s -o %s' % (
-                   emcc_opt, ','.join(exports), ROOT, P('final.ll'), P('simd.c'), P('globals.c'), P('stubs.c'),
-                   (' ' + P('lowered.ll.icall.c')) if os.path.exists(P('lowered.ll.icall.c')) else '', extra_ll, P('mod.cjs')),
-               log=P('emcc.log'))
+    r, dt, peak = emcc_capped(tag, 'emcc -w %s -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=96MB -sENVIRONMENT=node -sMODULARIZE=1 '
+                              '-sEXPORT_NAME=KhLic -sERROR_ON_UNDEFINED_SYMBOLS=0 --no-entry -sEXPORTED_FUNCTIONS=%s '
+                              '-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAP32,HEAP64 -Wl,--no-gc-sections -I%s/lift %s %s %s %s%s%s -o %s' % (
+                                  emcc_opt, ','.join(exports), ROOT, P('final.ll'), P('simd.c'), P('globals.c'), P('stubs.c'),
+                                  (' ' + P('lowered.ll.icall.c')) if os.path.exists(P('lowered.ll.icall.c')) else '', extra_ll, P('mod.cjs')),
+                              P('emcc.log'), P('emcc_rss.log'))
     stat['icall'] = os.path.exists(P('lowered.ll.icall.c'))
     stat['emcc_sec'] = round(dt, 1)
+    stat['emcc_peak_rss_mb'] = peak
     stat['wasm_bytes'] = os.path.getsize(P('mod.wasm'))
     stat['wasm_sha256'] = hashlib.sha256(open(P('mod.wasm'), 'rb').read()).hexdigest()
     r, _ = sh('node -e "const m=new WebAssembly.Module(require(\'fs\').readFileSync(\'%s\'));console.log(JSON.stringify(WebAssembly.Module.imports(m).filter(i=>i.kind===\'function\').map(i=>i.module+\'.\'+i.name)))"' % P('mod.wasm'))

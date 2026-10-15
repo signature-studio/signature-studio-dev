@@ -73,6 +73,41 @@ def is_slot_store(read_va, addr):
     return ins is not None and ins.mnemonic in ('mov', 'or') and ins.op_str.startswith('qword ptr ' + SLOT_STR + ',')
 
 
+FN_LO, FN_HI = 0x13173a0, 0x1330000
+READ_VA = 0x1328a38
+
+
+def reach(read_va, start, limit=40000):
+    """start から Dispatcher 内の静的 CFG を辿る (fall-through・jcc・jmp は直接分岐のみ・call は戻ると仮定)。
+    到達 VA の数・[rbp+0x11a0] 格納 VA の一覧・応答読み出し 0x1328a38 への到達を返す。間接 jmp・ret・関数外で止まる。"""
+    seen, stack, stores, read, exits = set(), [start], [], False, []
+    while stack and len(seen) < limit:
+        a = stack.pop()
+        if a in seen or not (FN_LO <= a < FN_HI):
+            continue
+        ins = ins_at(read_va, a)
+        if ins is None:
+            continue
+        seen.add(a)
+        if is_slot_store(read_va, a):
+            stores.append(a)
+        if a == READ_VA:
+            read = True
+        if ins.mnemonic == 'ret':
+            exits.append(a)
+            continue
+        if ins.mnemonic == 'jmp':
+            if ins.op_str.startswith('0x'):
+                stack.append(int(ins.op_str, 16))
+            else:
+                exits.append(a)
+            continue
+        if ins.mnemonic.startswith('j') and ins.op_str.startswith('0x'):
+            stack.append(int(ins.op_str, 16))
+        stack.append(a + ins.size)
+    return len(seen), stores, read, exits
+
+
 def run_id(ident, pe, base, size, sections, read_va):
     r = E.run_one(ident, pe, base, size, sections)
     path = r['path'] or []
@@ -93,12 +128,17 @@ def run_id(ident, pe, base, size, sections, read_va):
 
 
 def main():
-    ids = [int(a, 0) for a in sys.argv[1:]] or STORE19 + EXIT27
     pe_data = open(E.PE_PATH, 'rb').read()
     pe, base, size = E.load_image(pe_data)
     sections = [(base + s.VirtualAddress, s.get_data()) for s in pe.sections]
     sections.insert(0, (base, pe_data[:pe.OPTIONAL_HEADER.SizeOfHeaders]))
     read_va = make_reader(pe, base)
+    if sys.argv[1:2] == ['reach']:
+        for a in [int(x, 0) for x in sys.argv[2:]]:
+            n, stores, read, exits = reach(read_va, a)
+            print('START=0x%x reached=%d read_0x1328a38=%s stores=%s exits=%s' % (a, n, read, ','.join('0x%x' % s for s in stores) or '-', ','.join('0x%x' % x for x in exits[:6]) or '-'))
+        return
+    ids = [int(a, 0) for a in sys.argv[1:]] or STORE19 + EXIT27
     for ident in ids:
         o = run_id(ident, pe, base, size, sections, read_va)
         print('ID=0x%02x rax=0x%x path=%d stop=%s stores=%d' % (ident, o['rax'], o['path_len'], o['stop'], o['store_count']))

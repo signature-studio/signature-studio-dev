@@ -48,6 +48,7 @@ static int undo_pos, undo_count, undo_last, safe_edit;
 static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
 static int sel_start, sel_end;
 static int64_t disp_time;
+static int browser_op;
 static int64_t arr_time;
 static int scr_blanked, scr_unblank, scr_active;
 
@@ -86,7 +87,7 @@ void fl_engine_reset(void) {
     sel_start = -1; sel_end = -1;
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
-    dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0;
+    dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
     midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -99,6 +100,8 @@ int64_t fl_engine_midi_word(int i) { return i < 0 || i >= midi_word_n ? -1 : (in
 void fl_engine_set_device_link(int dev, int link) { dev_assigned = dev != 0; link_assigned = link != 0; }
 /* 検査用の読出し口: 最後に作用先へ渡した時間引数 (頭打ち後)。tests/ui_display_diff.mjs が mock と照合 */
 int64_t fl_engine_display_time(void) { return disp_time; }
+/* 検査用の読出し口: 最後に要求した browser ノードの開閉の分岐 (0 なし・1 切替 (-1)・2 閉じる (0)・3 開く (1))。tests/ui_browser_diff.mjs が mock と照合 */
+int fl_engine_browser_op(void) { return browser_op; }
 /* 検査用の読出し口: チャンネル c のステップ p (範囲外は -1)。tests/midi_path_diff.mjs が副作用を比べる */
 int fl_engine_grid_bit(int c, int p) {
     if (c < 0 || c >= nch || p < 0 || p >= NSTEP) return -1;
@@ -501,6 +504,11 @@ FL_H(ui, closeActivePopupMenu) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(ui, showPicker) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, -1); return fl_ret_none(c); }
 /* PE 0xd6ef80 (openEventEditor 'Ii|i'): 型と個数は fl_table の 'iib' (2..3) が検査する。作用先 (0xe34450) は未モデル。戻り None (PE の 0xd82c20 に status 0 を渡す経路) */
 FL_H(ui, openEventEditor) { return fl_ret_none(c); }
+/* PY-132 (#3013): PE 0xd6dcd0 (toggleBrowserNode '|i'・既定 -1)。作用先 0xa89690 は値 -1/0/1 で 0xa26190・0xa07d00(0)・0xa07d00(1) に分岐し、他の値は何もしない (分岐のみ。ノード状態は未モデル) */
+FL_H(ui, toggleBrowserNode) { NARGS(0, 1); int64_t v = A_INT(0, -1); browser_op = v == -1 ? 1 : v == 0 ? 2 : v == 1 ? 3 : 0; return fl_ret_none(c); }
+/* PE 0xd6e170 (selectBrowserMenuItem)・0xd6e330 (previewBrowserMenuItem): NOARGS。作用 (0xfdd2c0 のキー送出) は未モデル */
+FL_H(ui, selectBrowserMenuItem) { NARGS(0, 0); return fl_ret_none(c); }
+FL_H(ui, previewBrowserMenuItem) { NARGS(0, 0); return fl_ret_none(c); }
 /* PY-119 (#2980): PE 0xd6cd80 / 0xd6ca80 / 0xd6c9d0 / 0xd6cab0 / 0xd6c4c0 / 0xd6d6b0 は呼出し経路を確定 (REPORT_PY119)。値は未実測の仮置き */
 FL_H(ui, getFocused) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_b(c, 0); }
 FL_H(ui, getFocusedFormID) { NARGS(0, 0); return fl_ret_i(c, 0); }
