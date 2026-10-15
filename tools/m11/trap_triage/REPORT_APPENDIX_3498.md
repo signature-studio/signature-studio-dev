@@ -12,6 +12,7 @@
 - 再生成した証拠表: strict 288 件 (`scan_guard.py --report`・`strict_evidence.py`)。`judge_entry_check.py <IR> strict_evidence.tsv 4 35` は 32 行を出した。`judge_ctx.py 4 35` で行 4〜35 の文脈 (機械語・B・L・T・preds) を出し、L の icmp は `judge_dump.py 4 35` の出力で全件を確認した。
 - 実測 (本 fix run・foreground・1 回ずつ): `scan_guard.py --report` 3.4 s・rc 0。`strict_evidence.py` 7.5 s・rc 0・TSV 288 行。`judge_entry_check.py 4 35` rc 0・32 行。`judge_ctx.py 4 35` rc 0・2,190 行 (96,627 B)。`judge_dump.py 4 35` rc 0・160 行。load average (1 分値) は終了時 0.06 (`/proc/loadavg`)。
 - 競合解消後の再実行 (`origin/main` `0c6550546` の取り込み後の merge commit `5e68c526c`・同じ入力・foreground・1 回): `scan_guard.py --report` rc 0・strict 288。`strict_evidence.py` rc 0・TSV 288 行。`judge_entry_check.py 4 35` rc 0・32 行。`judge_ctx.py 4 35` rc 0・2,190 行 (96,627 B)。`judge_dump.py 4 35` rc 0・160 行。上の `git diff 1d04852b0 HEAD` は merge 後も 0 行。
+- 行 4〜35 の (c) 欄の再確認 (コードは `1d04852b0` から変えていない・同じ入力・foreground・1 回): `judge_dump.py 4 35` rc 0・160 行、`judge_ctx.py 4 35` rc 0・2,190 行 (96,627 B)。L の icmp の被演算子は、`judge_dump.py` の出力と IR の L block (`function_*` の `dec_label_pc_<L>`) を読んで書いた。TSV は同じ手順で再生成し 288 行。
 
 ### 判定規則 (件ごと。0978196e8 版の文言をそのまま使う。(a)〜(c) を真陽性の必要条件として明記する)
 
@@ -21,12 +22,10 @@
 4. 真陽性 = (c) が成り立ち、かつ入口から脱出先への直接の経路が IR に無い。偽陽性 = (b) と同じ値の同等判定が IR 側にある。保留 = (a)(b)(c) のどれかを REPORT に書けない。
   - 真陽性は (a)(b)(c) を REPORT に書けた行だけに付ける。
 
-### 本 run での補足
+### 補足
 
-- 差し戻し対応 (fix): 行 4・27・29 を真陽性から保留へ、行 18 を保留から真陽性へ変えた。行 17 は真陽性のまま、(b) と (c) を書き直した。行 17・18 の (b) は、機械語の store/load と IR の store/load の対応で確認した (下の注 2)。
 - 「入口の (b) の判定」の数え方: ループ本体へ入るか脱出するかを、B→L の初回に決める判定 (test-first) を数える。(b) を引数に取る関数の戻り値の判定 (`function_fe8bb0`・`function_100bb30` の境界判定) も数える (下の注 4)。ループ本体の後で次回の要否を決める末尾判定 (do-while の末尾) は、初回の本体実行を止めないので数えない。
 - 右辺 (境界) の同一性は (a)(b)(c) の要件に含めない (規則は左辺 (b) と入口の判定の有無で決まる)。右辺の段数・アドレスの食い違いは注 1・注 3 に書く。
-- 判定は subagent 4 本 (行 4〜11・12〜19・20〜27・28〜35) の一次判定を、私が ctx で再確認して決めた。
 - 注意: 真陽性は構造の判定。境界の値 (count ≤ 0) が実行時に到達するかは測っていない。`docs/DEFECTS.md` の類型への対応は PM 判断。
 
 ### 件ごとの判定
@@ -44,25 +43,25 @@
 | 12 | function_1050f90 | 10510cf → 105112e | 真陽性 | r13d=0。`cmp r13d, eax`・jg (右辺 [G+0x10]−1) | B: `store i64 0 → r13.2` → L の lo | B に icmp 無し。L の `icmp ugt %82, %arg1` は読んだ値との比較 | 注 1 |
 | 13 | function_1060950 | 1060973 → 10609d8 | 真陽性 | r13d=0。`cmp r13d, r14d`・jg (r14d=[rbx+0x14]−1) | B: `store i64 0 → r13.0` | B の icmp `%6` は arg2 と arg3 の比較 (別値)。L に icmp 無し (L の br は `%6` を使う) | 右辺は latch の `%24` と対応する見込みだが未確定 |
 | 14 | function_10609f0 | 1060a06 → 1060a25 | 真陽性 | esi=0 (eax→esi)。`cmp esi, edi`・jg (edi=[rbx+0x14]−1) | B: `store i64 0 → rsi.0` → L の添字 | L の icmp `%14` は本体後の計数判定 (`rdi−1 == 0`) | |
-| 15 | function_1060d20 | 1060d3d → 1060d65 | 真陽性 | esi=0。`cmp esi, edi`・jg (edi=[rbx+0x14]−1) | B: `store i64 0 → rsi.0` | L の icmp は本体後 (subagent) | |
-| 16 | function_10624d0 | 10624f1 → 106262a | 真陽性 | ebx=0。`cmp ebx, edi`・jg (edi=[rcx+0x14]−1) | B: `store i64 0 → rbx.0` | L の icmp は添字と無関係 (subagent) | T は rax.1 を読むが B は初期化しない |
+| 15 | function_1060d20 | 1060d3d → 1060d65 | 真陽性 | esi=0。`cmp esi, edi`・jg (edi=[rbx+0x14]−1) | B: `store i64 0 → rsi.0` | L の `%10 = icmp sgt i8 %9, -1` の被演算子は、要素の基底 `%6` (= `function_12df530(arg1, rsi.0)`) から読んだ byte フィールド `%9` (+19)。rsi.0 は要素の添字としてのみ現れ、比較の被演算子ではない | |
+| 16 | function_10624d0 | 10624f1 → 106262a | 真陽性 | ebx=0。`cmp ebx, edi`・jg (edi=[rcx+0x14]−1) | B: `store i64 0 → rbx.0` | L の `%9 = icmp ugt i32 %7, 268435455` の被演算子は、要素の基底 `%4` (= `function_12df530(arg1, rbx.0)`) から読んだ i32 フィールド `%7` (+4) と定数 0x0FFFFFFF。rbx.0 は要素の添字としてのみ現れ、比較の被演算子ではない | T は rax.1 を読むが B は初期化しない |
 | 17 | function_10c7cd0 | 10c8d17 → 10c8d6b | 真陽性 | [rbp+0x780]=0 (`mov [rbp+0x780], eax`・eax=0)。`cmp [rbp+0x780], esi`・jg (右 esi=[rbp+0x774]−1) | B: `store i32 0 → stack_var_-17800.1`。機械語の本体 10c8d55 `add [rbp+0x780], 1` ↔ IR L の `%127 = add -17800.1.reload, 1` と `store %127 → -17800.1` | B に icmp 無し。L の icmp は本体の後の末尾判定 `%exitcond184 = icmp eq %127, 64` (固定 64 回。count N は使わない)。L に呼び出しは無い | 注 2 |
-| 18 | function_10c7cd0 | 10c8dc4 → 10c8e18 | 真陽性 | [rbp+0x780]=0 (`mov [rbp+0x780], eax`・eax=0 (10c8dad))。`cmp [rbp+0x780], ebx`・jg (右 ebx=[rbp+0x76c]−1) | B: `store i32 0 → stack_var_-17800.2`。機械語 10c8e02 `add [rbp+0x780], 1` ↔ IR L の `%146 = add -17800.2.reload, 1` と `store %146 → -17800.2` | B に icmp 無し。L の icmp は本体の後の末尾の count-down 判定 `%153 = icmp eq %152, 0` (`%150` = rbx.2 − 1)。(b) の判定は無い。B の前の判定 (preds の `icmp ult %106, 64`・`icmp eq %119, 0`) は count 側で (b) ではない | 注 2 |
+| 18 | function_10c7cd0 | 10c8dc4 → 10c8e18 | 真陽性 | [rbp+0x780]=0 (`mov [rbp+0x780], eax`・eax=0 (10c8dad))。`cmp [rbp+0x780], ebx`・jg (右 ebx=[rbp+0x76c]−1) | B: `store i32 0 → stack_var_-17800.2`。機械語 10c8e02 `add [rbp+0x780], 1` ↔ IR L の `%146 = add -17800.2.reload, 1` と `store %146 → -17800.2` | B に icmp 無し。L の icmp は本体の後の末尾の count-down 判定 `%153 = icmp eq %152, 0` (`%150` = rbx.2 − 1)。(b) の判定は無い。B の前の判定 (preds の `%107 = icmp ult i32 %106, 64`・`%120 = icmp eq i32 %119, 0` (`%119` = `%108` − 1、`%108` = `%106` / 64)) は count 側で (b) ではない | 注 2 |
 | 19 | function_1185da0 | 1185dfe → 1185e7d | 真陽性 | ebx=0。`cmp ebx, r13d`・jg (右 r13d=[G2+0x10]−1) | B: `store i64 0 → rbx.0` | B に icmp 無し。L の icmp はバイト判定 | 注 1 |
 | 20 | function_1185e90 | 1185eea → 1185fd6 | 真陽性 | ecx=0 (xor)。`cmp ecx, r14d`・jg (r14d=n−1) | B: `store i32 0 → stack_var_-44.0` → L の添字 (第 2 引数) | L の icmp `%40` はフィールド値どうしの比較 (本 run で確認) | 注 3 |
-| 21 | function_11862e0 | 1186323 → 11863bd | 真陽性 | esi=0 (eax→esi)。`jg` | B: `store i64 0 → rsi.0` → L の添字 | B に icmp 無し。L の icmp は添字と無関係 (subagent) | |
-| 22 | function_1189310 | 11893a0 → 11893dc | 真陽性 | ebx=0 (ecx→ebx)。`jg` | B: `store i64 0 → rbx.0` → L の添字 | L の icmp は本体後の末尾判定 (subagent) | |
+| 21 | function_11862e0 | 1186323 → 11863bd | 真陽性 | esi=0 (eax→esi)。`jg` | B: `store i64 0 → rsi.0` → L の添字 | B に icmp 無し。L の `%24 = icmp eq i64 %23, 0` の被演算子 `%23` は、`function_fe8bb0(%13, rsi.0)` の戻り値 `%14` の +1964 の i64 フィールド。rsi.0 は fe8bb0 の引数としてのみ現れ、比較の被演算子ではない | |
+| 22 | function_1189310 | 11893a0 → 11893dc | 真陽性 | ebx=0 (ecx→ebx)。`jg` | B: `store i64 0 → rbx.0` → L の添字 | L の `%37 = icmp eq i32 %36, 0` は末尾判定。被演算子 `%36` は `%35` (= rdi.0 − 1) の下位 32 bit で、計数器 rdi.0 の減算。rbx.0 は `%33` (= rbx.0 + 1、添字の増分) にだけ現れ、比較の被演算子ではない | |
 | 23 | function_1192da0 | 1192dc9 → 1192e08 | 真陽性 | ebx=0 (eax→ebx)。`jg` | B: `store i64 0 → rbx.0` → L | B に icmp 無し。L の `%19 = icmp eq %18, 0` の被演算子 `%18` は、添字 rbx.0 で読んだ要素 (`%15`) のフィールド。(b) 自体との比較ではなく、範囲判定でもない (`function_fe8bb0` を経由しない) | |
 | 24 | function_11c9930 | 11c99af → 11c9a17 | **保留** | ebx=0 (eax→ebx)。機械語の L 本体で ebx を添字に使う | B は添字 0 を store しない (n を rdi.0 に入れるだけ)。L は rdi の計数のみで添字の SSA が無い | 形式上は無し | (b) を結べない。子 issue |
 | 25 | function_11e6e20 | 11e6e60 → 11e6ef5 | 真陽性 | ebx=0 (ecx→ebx)。`jg` | B: `store i64 0 → rbx.0` → L の添字 | B に icmp 無し。L の `%34 = icmp ugt %23, %33` の被演算子は、添字 b と b+1 の要素から読んだフィールドの和 (`%23`・`%33`)。(b) 自体の比較は無い | |
-| 26 | function_11e7860 | 11e788b → 11e7907 | 真陽性 | esi=0 (eax→esi)。`jg` | B: `store i64 0 → rsi.0` → L の添字 | L の icmp は末尾の計数判定 (subagent) | |
+| 26 | function_11e7860 | 11e788b → 11e7907 | 真陽性 | esi=0 (eax→esi)。`jg` | B: `store i64 0 → rsi.0` → L の添字 | L の `%40 = icmp eq i32 %39, 0` は末尾の計数判定。被演算子 `%39` は `%38` (= r13.0 − 1) の下位 32 bit。rsi.0 は `function_fe8bb0(%12, rsi.0)` の引数としてのみ現れ、比較の被演算子ではない | |
 | 27 | function_11e7fa0 | 11e7fbd → 11e802b | **保留** | ebx=0 (eax→ebx)。`cmp ebx, esi`・jg (右 esi=[[G]+0x10]−1、2 段 deref) | B: `store i64 0 → rbx.0` → L の添字 | 入口に (b) の境界判定がある。L の `%8 = icmp eq %7, 0` は `function_fe8bb0(%6, rbx.0)` の戻り値の判定で、fe8bb0 は (b) が `[arg1+16]−1` を超える・負のとき 0 を返す。IR の境界は 1 段 deref (`load i32 [G']`) の件数で、機械語の 2 段 deref と同じ境界かは未確認 | 注 4 |
 | 28 | function_11e8280 | 11e82b1 → 11e82ec | 真陽性 | r13d=0 (eax→r13d)。`jg` (右辺 [[G]+0x10]−1) | B: `store i64 0 → r13.0` → L の添字 | L の icmp `%11 = eq i8 %10, 0` はバイト判定 (本 run で確認) | 注 1・注 3 |
 | 29 | function_11e84a0 | 11e8505 → 11e8541 | **保留** | esi=0 (eax→esi)。`jg` (右辺 [[G]+0x10]−1) | B: `store i64 0 → rsi.0` → L の添字 | 入口に (b) の判定がある。L の `%24 = icmp eq i64 %rsi.0.reload, %9` (`%9 = zext i32 %arg1`) が `%29` を経て L の br を決める (本体に入るか脱出するかの test-first)。%9 が機械語の右辺 (`[[G]+0x10]−1`) と同じ値かは未確認 | 注 1・注 3・注 4 |
-| 30 | function_1221840 | 122193e → 122196f | 真陽性 | ebx=0 (eax→ebx)。`jg` (右辺 [rcx+0x14]−1) | B: `store i64 0 → rbx.0` → L の添字 | L の icmp `slt %48, %49` は添字と無関係 (subagent) | |
-| 31 | function_1221840 | 122199b → 1221a3f | 真陽性 | ebx=0。`jg` (右辺 [rcx+0x14]−1) | B: `store i64 0 → rbx.1` → L の添字 | L の icmp `%77` はポインタどうしの比較 (subagent) | |
-| 32 | function_1221bc0 | 122251f → 122272f | 真陽性 | ecx=0 (eax から spill)。`jg` (右辺 r13d=[rsi+0x14]−1) | B: `store i32 0 → stack_var_-108.2` → L の添字 | B の icmp は arg3 のフラグ判定 (無関係)。L の icmp は本体判定 (subagent) | |
-| 33 | function_1223020 | 12230df → 122330f | 真陽性 | ecx=0 (spill)。`jg` (右辺 r13d=[rcx+0x14]−1) | B: `store i32 0 → stack_var_-68.0` → L の添字 | L の icmp `ult %46, stack_var_-60.0` は添字と無関係 (subagent) | |
+| 30 | function_1221840 | 122193e → 122196f | 真陽性 | ebx=0 (eax→ebx)。`jg` (右辺 [rcx+0x14]−1) | B: `store i64 0 → rbx.0` → L の添字 | L の `%50 = icmp slt i32 %48, %49` の被演算子は、添字 rbx.0 で読んだ要素の i32 `%48` (`function_12df530(%30, rbx.0)` の戻り値が指す値) と、定数アドレス `18743584` の i32 `%49`。rbx.0 は要素の添字としてのみ現れる | |
+| 31 | function_1221840 | 122199b → 1221a3f | 真陽性 | ebx=0。`jg` (右辺 [rcx+0x14]−1) | B: `store i64 0 → rbx.1` → L の添字 | L の `%77 = icmp eq i64 %75, %76` の被演算子は、添字 rbx.1 で読んだ要素由来の 2 つの値。`%75` = `%68` − `%71` (`%68` は `function_1064980(%64, …)` が `stack_var_-64` に書いた値を変換したもの、`%64` = `function_12df530(%30, rbx.1)`)。`%76` は `%63` (同じ `function_12df530(%30, rbx.1)`) の +8 の i32 フィールドの sext。rbx.1 は添字としてのみ現れる | |
+| 32 | function_1221bc0 | 122251f → 122272f | 真陽性 | ecx=0 (eax から spill)。`jg` (右辺 r13d=[rsi+0x14]−1) | B: `store i32 0 → stack_var_-108.2` → L の添字 | B の icmp は arg3 のフラグ判定 (無関係)。L の `%427 = icmp slt i64 %426, %423` の被演算子は、添字 `stack_var_-108.2` (= (b)) で読んだ要素の i32 フィールド `%426` (sext) と、`stack_var_-92.2` の zext `%423`。(b) は添字 (`%421`) としてのみ現れ、比較の被演算子ではない | |
+| 33 | function_1223020 | 12230df → 122330f | 真陽性 | ecx=0 (spill)。`jg` (右辺 r13d=[rcx+0x14]−1) | B: `store i32 0 → stack_var_-68.0` → L の添字 | L の `%47 = icmp ult i32 %46, stack_var_-60.0` の被演算子は、添字 `stack_var_-68.0` (= (b)) で読んだ要素の i32 フィールド `%46` と、別の stack 変数 `stack_var_-60.0`。(b) は添字 (`%43`) としてのみ現れる | |
 | 34 | function_1251590 | 1251621 → 12516a2 | 真陽性 | eax=0 (r10d=0)。`jg` (右辺 edi=ebx−1) | B: `store i64 0 → rax.1` → L の要素番地の添字 | L の icmp `%40 = eq %39, %.reload` は要素値と鍵の比較 (本 run で確認) | 右辺 ebx の供給元は未確認 |
 | 35 | function_1251590 | 1251728 → 12517db | 真陽性 | ebx=0 (eax→ebx)。`jg` (右辺 esi=[X]−1) | B: `store i64 0 → rbx.1` → L の添字 | B に icmp 無し。P の icmp は別オブジェクトの件数 | 注 1・注 3 |
 
@@ -75,6 +74,6 @@
 
 ## 未解決 (起票先)
 
-- 保留 5 件 (行 4・10・24・27・29): (b) の特定、または入口の判定が機械語の右辺と同じ値かの確認が要る。行 10 は B に 0 の store が無く、L が下向き計数だけなので、機械語の配列アクセスの対応を探す。行 24 は L の添字 SSA の出所を探す。行 4・27・29 は IR の境界・同値判定の対象 (`function_100bb30`・`function_fe8bb0` の件数、`%9`) と機械語の右辺の段数を揃えて確かめる。起票先: #3854 (`[M11-N195]`・親 #3498)。行 18 は本 PR で (b) を確定して真陽性にしたため #3854 の対象から外れる。行 4・27・29 は #3854 の本文に無いので、同 issue へのコメントで追加する。
+- 保留 5 件 (行 4・10・24・27・29): (b) の特定、または入口の判定が機械語の右辺と同じ値かの確認が要る。行 10 は B に 0 の store が無く、L が下向き計数だけなので、機械語の配列アクセスの対応を探す。行 24 は L の添字 SSA の出所を探す。行 4・27・29 は IR の境界・同値判定の対象 (`function_100bb30`・`function_fe8bb0` の件数、`%9`) と機械語の右辺の段数を揃えて確かめる。起票先: #3854 (`[M11-N195]`・親 #3498)。行 18 は本 PR で (b) を確定して真陽性にしたため #3854 の対象から外した。行 4・27・29 は #3854 の本文の受入条件に追加した。
 - 真陽性 27 件の境界値の実行到達性 (count ≤ 0 が実行時に起きるか): 未検証。
 - 注 1・注 3 の境界アドレス・段数の食い違い: 別件として要確認 (判定に使っていない)。
