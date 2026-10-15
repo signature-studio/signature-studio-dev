@@ -15,7 +15,7 @@
 
 ## 2. 表の走査 (受入 3)
 
-`python3 tools/icall/diff/index_table_scan.py <SlateCore.core_64>` の出力 (`a` は表の添字 `(p − 0x1810df738) / 4`、符号付き)。
+`python3 tools/icall/diff/index_table_scan.py <SlateCore.core_64>` の出力 (`a` は表の添字 `(p − 0x1810df738) / 4`、符号付き)。対象は実機 `SlateCore.core_64` (plugins-freshair の `Fresh Air.Win.zip` 内)。測定 commit `5ad199ad7` (走査スクリプトを最後に変えた commit)。`0c8c2b289` 版の出力と完全一致。
 
 | section | VA | 一致 | a の範囲 | 備考 |
 |---|---|---|---|---|
@@ -28,9 +28,16 @@
 - 読取専用の `.rdata` と、その後ろの `.pdata`〜`.reloc` では、5 slot に届く値は 1 つも無い。表の全長を決めなくても、この区間の添字からは届かない。
 - `.data` の一致 0 件は file 上の初期値の話で、実行時の書込みは未確認。gap (zero-fill) は file に値が無いので、実行時の値に依る。
 
-### 2.1 ネガティブコントロール (合成 PE・実機ではない)
+### 2.1 ネガティブコントロール (実機と合成 PE)
 
-実機の `SlateCore.core_64` は本 run で使えない (§6 の未解決)。代わりに `bash tools/icall/diff/index_table_scan_selftest.sh` が、表の a=3 (p=`0x1810df744`) に値を置いた合成 PE (`.rdata` 1 section) を走査する。rc=0・4 件 PASS。
+- **実機 (`SlateCore.core_64`・測定 commit `5ad199ad7`)**: 表の a=3 (p=`0x1810df744`・file offset `0x10de544`・元の値 2) の 1 dword だけを 87,069 (`0x1541d`) に書き換えた作業コピー (`$RUNNER_TEMP` に置く) を走査した。書換えは 3 バイト (`02 00 00 00` → `1d 54 01 00`) で、`cmp` の差分はそれだけ。
+
+| 対象 (実機) | `.rdata` の一致 | 該当行 |
+|---|---|---|
+| 元の binary (a=3 の値 2) | 0 | — |
+| 書換え copy (a=3 の値 87,069) | 1 | `p=0x1810df744 v=87,069 a=3 site=180703b7c` |
+
+- **合成 PE** (`bash tools/icall/diff/index_table_scan_selftest.sh`・測定 commit `8eb54c2ea`・rc=0・4 件 PASS): 表の a=3 (p=`0x1810df744`) に値を置いた `.rdata` 1 section の PE を走査する。
 
 | 件 | a=3 に置いた値 | 結果 (`.rdata` の行) |
 |---|---|---|
@@ -54,7 +61,7 @@
 
 ## 5. 動的 (元の受入 1 の試行と、受入 1 の baseline)
 
-- baseline (受入 1): `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh`。測定 commit `512b09ff` (`origin/main`)。結果は §1 のとおり (n=1)。所要時間と load average は n=1 のため書かない (WORKFLOW §5。再測定は素材が無く不可)。`tools/icall/work/slot_trace_enc.txt` の ACC 35 件のうち、4 命令 (`180703913`・`180703b7c`・`1806dbe61`・`1806f7431`) の RIP は 0 件。既知 12 のうち hit 3 は `0x1813068f8`・`0x1813073f0`・`0x181307418` で、前付録と一致。
+- baseline (受入 1): `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh`。測定 commit `512b09ff` (`origin/main`)。結果は §1 のとおり (n=1)。所要時間と load average は n=1 のため書かない (WORKFLOW §5)。測定 commit `512b09ff` から HEAD までの対象差分は 0 行 (§7) のため、本 fix run では再測定していない。`tools/icall/work/slot_trace_enc.txt` の ACC 35 件のうち、4 命令 (`180703913`・`180703b7c`・`1806dbe61`・`1806f7431`) の RIP は 0 件。既知 12 のうち hit 3 は `0x1813068f8`・`0x1813073f0`・`0x181307418` で、前付録と一致。
 - 直接 entry (`tools/icall/work/slot_trace <FA> <fn>`): `180703880` は `180cbb940` で fatal (`addr=0x4c`・引数 struct が無い)。`1806dbc10`・`1806f71e0` は rc 0 で ACC 0 件 (既定の heap 引数では `[rsi+0xb58]` が mode==2 にならず、float の分岐に入らない)。3 関数とも closure 131 の `map.json` には無い。
 - 結論: 動的に 4 命令の添字を採取した事実は無い。0 件は「到達しない」の証明ではない。引数を与えた直接 entry と、int3 を使わない採取方法が要る (§6 の #3940)。
 
@@ -65,14 +72,14 @@
 | 4 命令の動的最大添字 (元の受入 1)。int3 は closure の挙動を変えるため不採用。直接 entry には引数 struct が要る | 届く添字との差が未記録 | #3940 (ICALL-91) |
 | `0x180702f50` の返す dword の値域 (`[rsp+0x24]` の書込み元)。表の `.text` 一致 46 件 (a < −28,494) と zero-fill gap (a ∈ [442,162, 567,858)) の判定 | `180703b7c` の届き判定が gap と負側で未確定 | #3941 (ICALL-92) |
 | `180cbb930` の直接・間接呼出し先が `r13` を保存すること | `180703913` の到達判定の前提 | #3941 (ICALL-92) |
-| 実機 `SlateCore.core_64` での再実行 (走査・objdump・baseline) と、実機のネガティブコントロール (`.rdata` の 1 dword を a の範囲内の 87,069 に書き換えて 一致=1、元に戻して 一致=0)。§2.1 は合成 PE での代替 | 実機の検出力と、§2 の実機値の再現が本 run では未確認 (素材 `plugins-freshair`・`work-icall` が本 run に無い) | #3941 (ICALL-92)。同じ素材で実施 |
 
 ## 7. 検証
 
-- 測定 commit: `512b09ff` (`origin/main`)。baseline (§1 受入 1) の測定対象の差分: `git diff 512b09ff HEAD -- tools/icall/diff/slot_trace.sh tools/icall/diff/slot_trace.c tools/ott tools/targets/freshair` は 0 行。
-- `index_table_scan.py`: 実機の走査 (§2 の表・9,071,232 dword) は PR 作成時の版 (`0c8c2b289`) で得た値。その後の変更は未使用変数の削除のみで、合成 PE の出力は一致 (§2.1)。実機での再実行は本 run で不可 (§6)。
-- 合成 PE の負の対照: `bash tools/icall/diff/index_table_scan_selftest.sh` rc=0 (4 件 PASS・§2.1)。
-- `objdump -d -M intel`: 4,553,159 行 (前付録と一致)。本 run では再実行していない (素材不足)。
+- baseline (§1 受入 1): 測定 commit `512b09ff` (`origin/main`)。測定対象の差分 `git diff 512b09ff HEAD -- tools/icall/diff/slot_trace.sh tools/icall/diff/slot_trace.c tools/ott tools/targets/freshair` は 0 行。差分 0 行のため本 fix run では再実行していない。
+- `index_table_scan.py` (実機): 測定 commit `5ad199ad7` (このファイルを最後に変えた commit)。実機の走査 (§2 の表・9,071,232 dword) を `5ad199ad7` で再実行し、`0c8c2b289` 版の出力と `diff` 0 行。5ad199ad7 の変更は未使用変数の削除 1 行 (`git diff 0c8c2b289 5ad199ad7 -- tools/icall/diff/index_table_scan.py`)。`git diff 5ad199ad7 HEAD -- tools/icall/diff/index_table_scan.py` は 0 行。
+- 実機のネガティブコントロール: §2.1 (元の binary は `.rdata` 一致 0、書換え copy は一致 1)。
+- 合成 PE の負の対照: 測定 commit `8eb54c2ea` で `bash tools/icall/diff/index_table_scan_selftest.sh` rc=0 (4 件 PASS・§2.1)。`disp` を 8 ずらす変異で rc=1。
+- `objdump -d -M intel` (実機 `SlateCore.core_64`): 4,553,159 行。本 fix run で再実行し、前付録と一致。
 
 ## 8. 再現
 
