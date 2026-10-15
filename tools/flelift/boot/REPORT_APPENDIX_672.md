@@ -194,3 +194,24 @@ REPORT §7 (旧 165〜167 行):
 | 0x976da0 の root 化を既定 root に入れるか | 既定経路の units を 895 に上げられるが、既定 lift の範囲変更 | PM 判断 |
 | 次の停止 `oob memory access out of bounds` (unit 895・発生箇所未特定) | 最初のウィンドウ未達 | 本 issue の次段 (子 issue は PM 判断) |
 | 0x976c80 の vtable 格納を lift の間接 callee 解析で拾う方式 | 同種の thunk が他にもある可能性 | 未起票 (PM 判断) |
+
+## §C. 既定経路の更新 (2026-10-15・PM 判断 1・2 の実装)
+
+- **判断 1 (ILT 分岐入力の既定化)**: `fle_boot.mjs` の `FLE_IPP` 未指定・空を mode 3 (旧 `FLE_IPP=3` と同じ ILTools 擬似モジュール) にした。`FLE_IPP=0` (ネガコン) と `1` / `2` は変えていない。ILTools の native 読込成功は**推定のまま** (未実測)。
+- **判断 2 (0x976da0 の既定 root 化)**: `boot_roots.json` に `0x976da0` を追加 (`FLE_EXTRA_ROOTS` の一時指定ではなく既定の root)。survey 破裂の有無は未確認 (前例 0x6a7b70 は破裂)。
+- **既定 root**: `fle6_measure.sh` の既定 (`FLE_EXTRA_ROOTS` 未指定) は `0x6a7b70` を足す。既定経路 = `0x6a7b70` (従来) + `boot_roots.json` の `0x976da0` (本変更)。
+
+### C-1 実測 (n=1・既定 route・同一 lift・clang plain 1 本)
+
+| route | `FLE_IPP` | root | units_run | GetMem / FreeMem | IPP 判定 | 停止 (boot_threw) |
+|---|--:|---|--:|--:|---|---|
+| 既定 (本変更) | 未指定 (→3) | 0x6a7b70 + boot_roots (0x976da0) | **895** | 3,680 / 1,499 | ok (ptr=0x7f10001c) | `exit` @0x412a12 |
+| ネガコン | 0 | 0x6a7b70 + boot_roots (0x976da0) | **209** | 1,891 / 776 | ok (ptr=0) | `exit` @0x412a12 |
+| 参考: 既定 (root 無し `FLE_EXTRA_ROOTS=`) | 未指定 (→3) | boot_roots (0x976da0) | 895 | 3,680 / 1,499 | ok | `exit` |
+| 参考: ネガコン (root 無し) | 0 | boot_roots (0x976da0) | 209 | 1,890 / 776 | ok | `unlifted` 0x6a7b70 |
+
+- 製品 KPI (既定経路・起動): units **209 → 895**。最初のウィンドウ: 未達 (停止は `exit` (code 0)。`MessageBoxW` 系の表示は本 run の範囲外)。
+- ネガコン (`FLE_IPP=0`) は 209 のまま。既定化の効果は ILT 分岐入力 (IPP mode 3) によるもので、root 0x976da0 単独の効果は未測定。
+- B-8 の予測 (`oob memory access out of bounds`) とは異なる。B-7 の `oob` run は `FLE_EXTRA_ROOTS=0x6a7b70,0x976da0` で、既定 (同じ root・mode 3) では `exit` だった。B-7 と本 run の差は未切り分け (lift の再生成・build の差の可能性)。
+- 所要 (実測): lift 81 s・clang plain (8 shard) 99〜102 s・boot default 9 s・boot negctl 10〜25 s。load 1.0〜1.95 (4 vCPU)。
+- 未解決: 既定 root 化の survey 破裂 (`survey_drive.sh` 未実施)・unit 895 の `exit` が正常終了か (MessageBoxW 不在の影響か) は未特定。
