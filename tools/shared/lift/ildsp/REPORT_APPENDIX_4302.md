@@ -113,6 +113,34 @@ harness を拡張した (`WC_INIT_RVA`・`WC_ARENA_SZ`・`WC_CALL_ARGS` を slot
 
 未解決 (受入 3 の残件・#4302 に残す): slot 1 で wasm が trap する原因の特定 (native と wasm の `this` 内部状態の比較)。
 
+## 9. slot 1 の wasm trap の原因 (受入 3 の残件・診断)
+
+診断: `wc_run_wasm.mjs` に `WC_LOG_FD=1` を足した (既定は従来どおり throw)。import `fd_write` に来た runtime の `fprintf(stderr)` を出して続行する。
+
+| 段階 | wasm の trap 内容 (slot 1 `0x1ab680`) | 対処 |
+|---|---|---|
+| 1 | `call to UNLIFTED function 0x301ab680` | slot 1・3 (`0x1ab680`・`0x1ab6a0`) を `WC_ROOTS` に入れていなかった |
+| 2 | `call to UNLIFTED function 0x30112de0` | slot 1 の thunk が `[0x3f59a8]` 経由の間接 `jmp` で `0x112de0` へ飛ぶ。`0x112de0` を root に足す |
+| 3 | `UNSUPPORTED instruction: cmpnlepd` | x64c に SSE2 `cmp*pd` (eq/lt/le/nle) が無かった。`cmppd_pred` を登録 (`x64c.py`) |
+| 4 | `call to UNLIFTED function 0x30115f00` | `0x112de0` の閉包がさらに間接 call 先を持つ。`0x115f00` を root に足す |
+| 5 | `UNSUPPORTED instruction: pmuludq` | x64c に `pmuludq` が無かった。`lane()` で追加 (`x64c.py`) |
+
+- 段階 5 の後: unsup 0・unlifted 0・wasm trap 0 (`lift_wc.sh ok` の `WC_ROOTS` に `0x1ab680 0x1ab6a0 0x112de0 0x115f00` を足した版)。
+- ただし差分は全 case FAIL (PASS 0・FAIL 64)。wasm は完走し、差分の中身はポインタ値。
+
+差分の内訳 (case 0 と case 1 で同じ):
+
+| 項目 | native | wasm |
+|---|---|---|
+| `rax` | `0x2a989efd3e63f` | `0xda2e887f5eb0745f` |
+| arena `+0x278` (8 byte) | `0x30599320` | `0x30598de0` |
+| arena の差バイト数 | — | 81137 (`0x278`・`0x2e0`・`0x301`… から始まる) |
+| hits | 24 | 24 |
+
+- 差は heap 上のポインタ値 (下位 32 bit のずれ) が主で、slot 1 が heap に書く内容が native と一致していない。
+- 原因は未特定。heap の規約 (`wc_glue.c`・`wc_native_ref.c` とも bump heap・同じ開始位置) は一致しているので、slot 1 までの呼出し列で heap の確保順が native と違う可能性がある。未確認。
+- `lift_psola.sh ok` (既定・slot 0・2・4・5) は本修正後も PASS=64 FAIL=0 (`WC_ROOTS` は変えていない)。
+
 ## 8. 検証
 
 - 測定 commit: `08fdc1db8` (現 head。コードを変えた最後の commit。前版 `e366f3ef9` からの差分は `tools/shared/lift/ildsp` の 5 files +37/-7 で、既定の差分テストの経路 (`wc_glue.c`・`wc_image.py`・`wc_native_ref.c`・`wc_run_wasm.mjs`・`lift_wc.sh`) を含むため、`e366f3ef9` の値は使わない)。
