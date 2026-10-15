@@ -135,7 +135,7 @@ callback `0xd5ce00` の `[vtable+0x98]`、早期 return の述語 `0xd84f30` (ct
 ## PY-184 追補 (#3309): 項目列挙 (PE 0x130f200) の未確定関数と note 構造体の確定
 
 - 親: #2581 (PY-78)。本節の範囲は未確定の 4 関数と note 構造体の確定、note 列挙の判定式の mock / C 照合。V (PE の量子 `[0x15e25f8]`) の値と意味は子 PY-185 (#3310) で、本節では引数として扱う。
-- 測定 (PE 逆アセンブル): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>` (各 1 回・終了 0)。展開: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (2.8 秒)。命令数: 0x12df320 = 90・0x105f2e0 = 60・0x417fc0 = 70・0xfe8bb0 = 50・0x130f200 = 130・0x417b70 = 45・0x418190 = 30。
+- 測定 (PE 逆アセンブル): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>` (各 1 回・終了 0)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (2.8 秒)。命令数: 0x12df320 = 90・0x105f2e0 = 60・0x417fc0 = 70・0xfe8bb0 = 50・0x130f200 = 130・0x417b70 = 45・0x418190 = 30。
 
 ### 関数の実体 (PE 実測)
 
