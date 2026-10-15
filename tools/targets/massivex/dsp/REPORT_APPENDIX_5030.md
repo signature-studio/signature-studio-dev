@@ -35,3 +35,19 @@
   `classify_fn` で scalar だが、いずれも直接 call 0 件で引数の出所を確かめていない。判定の正しさの確認は MX-37 の残件に残す。
 - **import 名**: VST3 の import (318 件) に libm/CRT の float 関数 (sin・cos・exp・pow・sqrt 等) は無い (再確認)。
   よって同定は内部の関数のみ。
+
+## 2 回目 (残件の分類・`scripts/mx55_callers_fn.py`)
+
+- 方法: `call [reg+0x100]` の 56 件 (disp 一致) を、所属関数 (`.pdata` の始点から) の先頭から呼出し直前まで読み、
+  call/ret を跨いで xmm2 が有効かを見る。`.pdata` は `pefile` が例外ディレクトリを読めないため (DATA_DIRECTORY[3] を直接読む)。
+  判定は線形 (分岐の合流を見ない)。
+- 分類 (56 件):
+  - `xmm2_written` **1 件**: `0x18017b4af` (関数 `0x18017b460`)。call 直前に xmm2 を書く。
+  - `livein_passthrough` **6 件**: 関数入口の xmm2 がそのまま届く (呼出元の引数が通過)。関数: `0x180198700`・`0x1801e47c0`・`0x1801ef4b0`・`0x1801f36a0`・`0x1803bef80`・`0x18104aea0`。呼出元の引数は未追跡。
+  - `clobbered_by_call` **49 件**: 関数内で先に call があり、その後 xmm2 を書いていない (Win64 では xmm0-5 は揮発)。線形判定のため、分岐で call を経由しない経路の可能性は残る。
+- `0x18017b460` の位置: `.rdata` の IInstrument 系 vtable (`0x1841836a8`) の index 30 に登録。直接 E8 は 0 件。
+  その `this` (rcx → rbx) から `[this+0x100]` を呼ぶ (slot 32 は両 vtable とも `0x17b680`)。
+  rbx の動的型は未確定 (IInstrument を実装する他クラスの vtable は見ていない)。
+- **結論 (受入 3)**: 未達。`0x17b680` に xmm2 を渡す呼出しは **1 件の仮想呼出 (`0x18017b4af`) でのみ支持される**。
+  ただし (a) `0x18017b460` の呼出元、(b) `livein_passthrough` の 6 関数の呼出元、(c) `clobbered_by_call` の線形判定の穴、を見ていない。
+  よって「非 vectorcall の確定」はしていない。残件は #5030 に残す。
