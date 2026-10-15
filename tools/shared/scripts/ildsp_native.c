@@ -43,6 +43,14 @@ static Hook g_hooks[] = {
     {0x1b6f6c, "0x1b6f4c -> [0x268268] (画像内ポインタ 0x1cb600)", 0, 1, 0, 0},
     {0x1ac9ce, "0x1ac9c0 -> call 0x1b6f4c (正の対照: new handler 経路)", 2, 0, 0, 0},
     {0x1aedc0, "helper 0x1aedc0 入口 (正の対照)", 2, 0, 0, 0},
+    /* 直接 call の正の対照 (kind 1・main #4241 の 12 箇所から 0x1ac9ce を除く。0x1ac9ce は kind 2 の単歩で同じ call を覆う) */
+    {0x1aa29f, "ctl direct -> 0x1ac9c0 (CreateInstance 先頭・必ず実行)", 1, 0, 0, 0},
+    {0x1647da, "ctl direct -> 0x1aedc0", 1, 0, 0, 0}, {0x1ad022, "ctl direct -> 0x1aedc0", 1, 0, 0, 0},
+    {0x1ad042, "ctl direct -> 0x1aedc0", 1, 0, 0, 0}, {0x1adcad, "ctl direct -> 0x1aedc0", 1, 0, 0, 0},
+    {0x1adcd1, "ctl direct -> 0x1aedc0", 1, 0, 0, 0}, {0x1b006a, "ctl direct -> 0x1aedc0", 1, 0, 0, 0},
+    {0x1b056d, "ctl direct -> 0x1aedc0", 1, 0, 0, 0}, {0x1cc1ae, "ctl direct -> 0x1aedc0", 1, 0, 0, 0},
+    {0x1b9049, "ctl direct -> 0x1b6f4c", 1, 0, 0, 0}, {0x1b9c45, "ctl direct -> 0x1b6f4c", 1, 0, 0, 0},
+    {0x1c20a9, "ctl direct -> 0x1b6f4c", 1, 0, 0, 0},
 };
 #define NHOOK (sizeof g_hooks / sizeof g_hooks[0])
 static uint64_t g_step_site; static int g_stepping;
@@ -237,6 +245,8 @@ static int load_pe(const char* path) {
 
 typedef MS uint64_t (*Fn0)(void);
 typedef MS uint64_t (*Fn4)(uint64_t, uint64_t, uint64_t, uint64_t);
+typedef MS uint64_t (*Fn1F)(uint64_t, float);                          /* slot 1: 2 番目の引数が xmm1 (float) */
+typedef MS uint64_t (*Fn2F)(uint64_t, uint64_t, float);                /* slot 2: rdx = index, xmm2 = float */
 typedef MS uint64_t (*Fn5)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
 static void dump_changed(const uint8_t* a, const uint8_t* b, size_t n) {
@@ -353,7 +363,9 @@ int main(int argc, char** argv) {
                 printf("s3_out first=%f,%f last=%f\n", obuf[0], obuf[1], obuf[(rdx * ch) - 1]);
             } else {
                 g_alloc_seq = 0; g_fail_n = 0; g_fail_from = fail_from; g_fail_cnt = fail_cnt;
-                rax = ((Fn4)fn)(w, rdx, 0, 0);
+                if (k == 1) rax = ((Fn1F)fn)(w, 1.0f);
+                else if (k == 2) rax = ((Fn2F)fn)(w, rdx, 1.0f);
+                else rax = ((Fn4)fn)(w, rdx, 0, 0);
                 g_fail_from = -1;
                 if (fail_from >= 0) printf("heap_fail_from=%lld heap_fail_n=%lld heap_fail_calls=%llu allocs=%llu\n", (long long)fail_from,
                                            (long long)fail_cnt, (unsigned long long)g_fail_n, (unsigned long long)g_alloc_seq);

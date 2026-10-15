@@ -1,0 +1,6 @@
+{
+  "tag": "pe121",
+  "refs": ["#2985"],
+  "note": "PE で screen 状態読出し・書込みと確認した 5 関数 (REPORT_PY121_2985・PY-121 #2985)。値は未実測の仮置き、tests/screen_diff.mjs が mock と照合",
+  "functions": ["screen.isBlanked", "screen.isUnBlank", "screen.getScreenActiveCounter", "screen.setScreenActiveCounter", "screen.unBlank"]
+}

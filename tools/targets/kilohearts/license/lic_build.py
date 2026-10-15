@@ -100,7 +100,7 @@ def decl_named_imports(txt):
     return re.sub(r'(?m)^declare void @llvm\.trap\(\)$', lambda m: '\n'.join(add) + '\n' + m.group(0), txt, count=1)
 
 
-def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=None, emcc_extra_exports=None, raw_va=False, volatile_ret=False, emcc_opt='-O1'):
+def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=None, emcc_extra_exports=None, raw_va=False, volatile_ret=False, emcc_opt='-O1', rdata_str=False):
     """lift → (stub pass) → normalize → helper 生成 → emcc。stat dict を返す"""
     W = tag_dir
     os.makedirs(W, exist_ok=True)
@@ -126,7 +126,7 @@ def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=N
     jts = json.dumps(jt or {})
     r, _ = sh("python3 %s/lift/kh_lower.py %s %s --core %s --lift %s --abi '%s' --jt '%s'%s%s" % (
         ROOT, s0, P('lowered.ll'), CORE, ','.join('%x' % v for v in sorted(vas)), abi, jts,
-        ' --raw-va' if raw_va else '', ' --volatile-ret' if volatile_ret else ''))
+        ' --raw-va' if raw_va else '', ' --volatile-ret' if volatile_ret else '') + (' --rdata-str' if rdata_str else ''))
     stat['passes'] = r.stdout.strip()
     sh('python3 %s/lift/ir_normalize.py %s %s' % (ROOT, P('lowered.ll'), P('n1.ll')))
     if apply_stub:
@@ -201,7 +201,8 @@ def main():
                      apply_stub=True, module=a.module, abi=mod.get('abi'),
                      shims=mod.get('shims'), raw_va=mod.get('raw_va', False),
                      volatile_ret=mod.get('volatile_ret', False),
-                     emcc_opt=mod.get('emcc_opt', '-O1'))
+                     emcc_opt=mod.get('emcc_opt', '-O1'),
+                     rdata_str=mod.get('rdata_str', False))
         print(json.dumps({k: v for k, v in stat.items() if k != 'ranges'}, ensure_ascii=False))
         return
 
