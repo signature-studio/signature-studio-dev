@@ -96,7 +96,7 @@ venv/bin/python $P/arg_vtable_callers.py Serum2_win64.vst3 trace.tsv --cats vptr
 
 ### 鮮度の証跡 (`docs/WORKFLOW.md` §6)
 
-- 測定 commit `ea3ffa68d` → 現 head `28a4d95ec` の差分 (REPORT の修正のみ):
+- 測定 commit `ea3ffa68d` → 鮮度記述を書いた時点の head `28a4d95ec` の差分 (REPORT の修正のみ。過去時点の記録):
 - `git diff --stat ea3ffa68d 28a4d95ec -- tools/targets/serum2/gui` の出力:
 
 ```
@@ -106,6 +106,7 @@ venv/bin/python $P/arg_vtable_callers.py Serum2_win64.vst3 trace.tsv --cats vptr
 
 - `git diff --stat ea3ffa68d 28a4d95ec -- 'tools/targets/serum2/gui/*.py'` の出力: 0 行。
 - `git log --oneline ea3ffa68d..28a4d95ec -- 'tools/targets/serum2/gui/*.py'` の出力: 0 行。
+- 最終 HEAD (この REPORT を含む commit) の確認: `git diff --stat ea3ffa68d HEAD -- 'tools/targets/serum2/gui/*.py'` は 0 行 (commit hash は REPORT 内に書けないため省略)。
 - 結論: 測定に使ったコードは変わっていないので、再測定は不要。変更は REPORT のみ。
 
 ### 未再現 (入力 PE 不在)
