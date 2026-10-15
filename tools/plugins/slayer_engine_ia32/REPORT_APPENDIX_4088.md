@@ -3,7 +3,8 @@
 既知類型との関係: 該当なし。 x87 の stack underflow は `ott_x87.h` の制限 (4) の範囲 (`REPORT.md` §13) で、類型の追加は行わない (`DEFECTS.md` は編集しない)。
 
 - 親 REPORT: `tools/plugins/slayer_engine_ia32/REPORT.md` §13。 本付録が測定値の正本。
-- 測定 commit: `f16bc64d4` (main 取り込み後の HEAD。 `x87_fn_glue.c`・`x87_fn_native.c` の `ebp` 設定は `e4514bf39` で入った)。 検証 HEAD は同じ `f16bc64d4`。 §2 の数値はすべてこの commit の実測。
+- 測定 commit: `cb4762d72` (main 取り込みの merge。 `x87_fn_diff.py` の最後のコード変更を含む commit)。 `x87_fn_glue.c`・`x87_fn_native.c` の `ebp` 設定は `e4514bf39` で入った。 §2 の数値はすべてこの commit の実測。
+- 検証 HEAD: 本付録を含む PR 末尾の commit (PR 本文の「検証」節に記載)。 測定 commit から検証 HEAD までの、この dir のコード差分 (`*.md` を除く) は 0 行。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` と乱数 (seed 2989) で生成した試行のみ。
 
 ## 1. 結論
@@ -16,15 +17,15 @@
 - 既存 2 本の判定は変わらない。 harness の変更 (`ebp` の初期化・§4) を入れた後も、既存 2 本の数字は変更前と一致した。
 - ネガコン 2 種は HEAD で検出 (§2)。
 
-## 2. 実測 (測定 commit `f16bc64d4`・各試験は単独実行)
+## 2. 実測 (測定 commit `cb4762d72`・各試験は単独実行・`lift_text.py` 後に実施)
 
 | 試験 | 結果 | exit | wall | build (native / wasm emcc) | run (native / wasm node) | load1 (run 前) |
 |---|---|---|---|---|---|---|
-| `python3 x87_fn_diff.py` (TARGETS 2 本・4,000 行ずつ) | 構造 (eax・x87 深さ) 全行一致。 `0x10002ee0` 3,890/4,000 bit 一致 (float32 は 4,000/4,000)、`0x10005400` 3,405/4,000 bit 一致 (float32 は 4,000/4,000) | 0 (PASS) | 5.16 s | 0.03 s / 3.59 s | 0.203 s / 0.148 s | 0.56 |
-| `--nega` | bit 一致 7,295 → 7,294 (ST(0) の最下位 bit を反転)。 ネガコン OK | 0 | 1.17 s | (同上の build 経路) | — | 0.71 |
-| `--nega-lower` | `fn_10002ee0` の float32 結果が一致しない行 4,000 / 4,000。 演算の取り違えを検出。 ネガコン OK | 0 | 4.73 s | — | — | 0.55 |
+| `python3 x87_fn_diff.py` (TARGETS 2 本・4,000 行ずつ) | 構造 (eax・x87 深さ) 全行一致。 `0x10002ee0` 3,890/4,000 bit 一致 (float32 は 4,000/4,000)、`0x10005400` 3,405/4,000 bit 一致 (float32 は 4,000/4,000) | 0 (PASS) | 5.46 s | 0.03 s / 3.71 s | 0.104 s / 0.184 s | 0.29 |
+| `--nega` | bit 一致 7,295 → 7,294 (ST(0) の最下位 bit を反転)。 ネガコン OK | 0 | 1.15 s | (同上) | — | — |
+| `--nega-lower` | `fn_10002ee0` の float32 結果が一致しない行 4,000 / 4,000。 演算の取り違えを検出。 ネガコン OK | 0 | 4.65 s | — | — | — |
 
-測定の注記: 通常実行は 2 回 (wall 5.55 s・5.16 s) 行い、いずれも PASS。 `--nega` を並列実行した 1 回は出力ファイルの競合で失敗したため、結果から除き、単独で取り直した。
+測定の注記: `--nega` を `x87_fn_diff.py` の通常実行と並列に走らせた試行は、出力ファイル (`work/x87fn/`) の競合で失敗したため採らず、単独で取り直した。 同じ commit で `lift_text.py` は exit 0 (`emcc` 6.0.12 を PATH に置いた状態)。
 
 ## 3. 残り 12 本の試行 (#4065 の一覧)
 
