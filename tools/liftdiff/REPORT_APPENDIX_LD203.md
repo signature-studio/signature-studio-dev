@@ -39,4 +39,5 @@
 - 再測定を試みた結果: 取得済みの素材は `fl-win64` のみ。`work-m11` が無いため、`liftdiff_e2e.sh` は [0/4] の単体テスト (`test_compare_ld11` / `test_ld52_machine_sig` / `test_ld179_tagpoint_tr` / `test_ld203_slot_fill`) の後、`missing input: ../m11/work/boot_final3.ll` で止まる。e2e の [1/4] 以降は未実行。
 - 単体: 上記 4 件は PASS (rc=0)。
 - 測定 commit: `acf54ba0e` (コード変更の最後の commit)。
-- `git diff acf54ba0e HEAD -- tools/liftdiff ':!tools/liftdiff/REPORT_APPENDIX_LD203.md'` の出力: 0 行 (コード差分 0)。本 REPORT の追記のみが差分で、これは実測に影響しない文書の変更。
+- 検証 HEAD `457ee8cc3` (main 取り込み merge)。`git diff acf54ba0e HEAD -- tools/liftdiff ':!tools/liftdiff/REPORT_APPENDIX_LD203.md'` の出力: 161 行。内訳は main 側の変更 (`ldlib/pe.py` +9、`ldlib/session.py` +26/-、`REPORT.md` 1 行、`REPORT_APPENDIX_LD177.md` +67)。本 PR のコード差分は 0。
+- 測定 commit 以降に `tools/liftdiff` のコードが変わった (main 由来) ため、本来は再測定が要る。ただし素材 `work-m11` が無く再測定できないため、e2e の [1/4] 以降の検証は未了。この点を PR の未解決に載せる。
