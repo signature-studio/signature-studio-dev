@@ -232,7 +232,7 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
    NC3 insns=31 (base 258087) unsup=0 (base 38485) -> FAIL<期待>
 ```
 
-- 群別 (e2e 出力): AVX 37,630 / AES·SHA-NI 224 / x87 73 / その他 558 (合計 38,485)。同 commit を ws-3454 で再実行 (22 s・exit 0) し、総数と種別内訳が一致。
+- 群別 (e2e 出力): AVX 37,630 / AES·SHA-NI 224 / x87 73 / その他 558 (合計 38,485)。同 commit を ws-3454 で再実行 (22 s・exit 0) し、総数 (38,485 / 264 種) と群別内訳が初回と一致 (初回の種別表は未保存)。
 - 旧値 48,612 は x64c の `ac58a8749`・`fe2dc9ed9` より前の値 (両 commit は HEAD の祖先)。
 - 差分証跡: `git diff 458405518 HEAD -- tools/targets/massivex/dsp ':!*.md'` = **0 行** (コミット B は .md のみ)。
 - 未解決 (起票先: 親 #3454): e2e の群分けは vaes 系 224 を AVX に、pshufb / palignr / pclmulqdq を「その他」に入れる (表示のみ・合計不変)。
