@@ -319,8 +319,8 @@ export function createMockEngine() {
     "mixer.getTrackPan": (i) => F(tr(i).pan),
     "mixer.setTrackPan": (i, v) => { tr(i).pan = v; },
     "mixer.setTrackColor": (i, c) => { const t = tr(i); t.color = (swapRb(c) | 0xff000000) >>> 0; t.colorSet = true; },
-    // PE 0xd5ec60: 範囲外は例外でなく int 0 (警告は初回のみ。mock は表示しない)
-    "mixer.getTrackColor": (i) => { const t = st.mixer[i]; if (!t) return 0; return (swapRb(t.colorSet ? t.color : swapRb(MIX_DEFAULT_COLOR)) | 0xff000000) >>> 0; },
+    // PE 0xd5ec60: idx < 0 は例外でなく int 0 (警告は初回のみ。mock は表示しない)。idx ≥ 127 は RANGE (C と同じ)
+    "mixer.getTrackColor": (i) => { if (i < 0) return 0; const t = tr(i); return (swapRb(t.colorSet ? t.color : swapRb(MIX_DEFAULT_COLOR)) | 0xff000000) >>> 0; },
     "mixer.isTrackSelected": (i) => tr(i).sel,
     "mixer.muteTrack": (i, v) => { tr(i).mute = tog(tr(i).mute, v); },
     "mixer.soloTrack": (i) => { tr(i).solo = !tr(i).solo; },
