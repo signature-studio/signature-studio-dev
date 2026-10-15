@@ -39,6 +39,11 @@ echo "[ildsp-wc] unsup sites: $(python3 -c "import json; print(len(json.load(ope
 
 python3 "$HERE/wc_image.py" "$DLL" "$W"
 python3 "$HERE/wc_cases.py" "$W" "${WC_CASES:-64}"
+COVX=""
+if [ "${WC_COV:-0}" = 1 ]; then
+  python3 "$HERE/wc_cov_inject.py" "$W"
+  COVX="-Wl,--export=wc_cov -Wl,--export=wc_cov_get"
+fi
 
 # runtime (fle_cpu.c) の既定 import は host malloc を使い、ポインタ値が native と一致しない。
 # wc_glue.c が定義する imp_* だけ runtime 側を改名してから別オブジェクトにし、決定的 bump heap の定義を使う。
@@ -47,16 +52,21 @@ emcc -c -O1 -ffp-contract=off -fno-fast-math -w -I "$FLE/rt" $RT_RENAME "$FLE/rt
 emcc -O1 -ffp-contract=off -fno-fast-math -w -I "$FLE/rt" -I "$W" \
   "$W/lift/fle_lifted.c" "$W/fle_cpu_rt.o" "$HERE/wc_glue.c" \
   -sSTANDALONE_WASM=1 -sALLOW_MEMORY_GROWTH=0 -sINITIAL_MEMORY=$((0x31000000)) -sSTACK_SIZE=65536 -sGLOBAL_BASE=268435456 \
-  --no-entry -Wl,--no-gc-sections -Wl,--export=wc_run -Wl,--export=wc_reset -Wl,--export=wc_hits_get \
+  --no-entry -Wl,--no-gc-sections -Wl,--export=wc_run -Wl,--export=wc_reset -Wl,--export=wc_hits_get $COVX \
   -o "$W/wc.wasm"
 echo "[ildsp-wc] wasm: $(stat -c %s "$W/wc.wasm") bytes"
 
 gcc -O1 -w -I "$W" -o "$W/native_ref" "$HERE/wc_native_ref.c"
-timeout 300 "$W/native_ref" "$W/image_native.bin" "$W/cases.bin" "$W/res_native.bin"
+if [ "${WC_COV:-0}" = 1 ]; then
+  WC_COV_OUT="$W/res_cov_native.bin" WC_COV_BLOCKS="$W/blocks.txt" timeout 300 "$W/native_ref" "$W/image_native.bin" "$W/cases.bin" "$W/res_native.bin"
+else
+  timeout 300 "$W/native_ref" "$W/image_native.bin" "$W/cases.bin" "$W/res_native.bin"
+fi
 
 if [ "$MODE" = neg-cmp ]; then WC_NEG=arena timeout 300 node "$HERE/wc_run_wasm.mjs" "$W"; else timeout 300 node "$HERE/wc_run_wasm.mjs" "$W"; fi
 set +e
 python3 "$HERE/wc_diff_test.py" "$W"; RC=$?
+if [ "${WC_COV:-0}" = 1 ]; then python3 "$HERE/wc_cov_diff.py" "$W" || RC=$?; fi
 set -e
 T1=$(date +%s.%N)
 echo "[ildsp-wc] $MODE elapsed=$(awk -v a="$T0" -v b="$T1" 'BEGIN{printf "%.2f", b-a}')s load start=[$L0] end=[$(cut -d' ' -f1-3 /proc/loadavg)]"
