@@ -1,0 +1,103 @@
+{
+ "sites": [
+  {
+   "fn": "1006ec0",
+   "call_at": "1006fa9",
+   "indirect_call_in_site": "call qword ptr [rax + 0x30]"
+  },
+  {
+   "fn": "1354630",
+   "call_at": "135477f",
+   "callee": {
+    "va": "12b0020",
+    "n_ins": 13,
+    "calls": [
+     {
+      "at": "12b0045",
+      "op": "call qword ptr [rbx + 0x28]"
+     }
+    ],
+    "first_store": null
+   }
+  },
+  {
+   "fn": "441730",
+   "call_at": "44177b",
+   "callee": {
+    "va": "441530",
+    "n_ins": 16,
+    "calls": [
+     {
+      "at": "441546",
+      "op": "call 0x441500",
+      "direct": "441500"
+     }
+    ],
+    "first_store": null
+   }
+  },
+  {
+   "fn": "4488f0",
+   "call_at": "448928",
+   "callee": {
+    "va": "423d20",
+    "n_ins": 0,
+    "IAT_THUNK": true,
+    "iat_slot_rva": "1571508",
+    "import": "kernel32.dll!VirtualQuery"
+   }
+  },
+  {
+   "fn": "454090",
+   "call_at": "454524",
+   "callee": {
+    "va": "41c820",
+    "n_ins": 42,
+    "calls": [
+     {
+      "at": "41c85d",
+      "op": "call qword ptr [rip + 0xf8882d]",
+      "indirect_global": "13a5090",
+      "global_value_in_pe": "0"
+     },
+     {
+      "at": "41c875",
+      "op": "call 0x418be0",
+      "direct": "418be0"
+     },
+     {
+      "at": "41c88a",
+      "op": "call 0x407030",
+      "direct": "407030"
+     },
+     {
+      "at": "41c899",
+      "op": "call 0x413060",
+      "direct": "413060"
+     },
+     {
+      "at": "41c8a7",
+      "op": "call 0x4148e0",
+      "direct": "4148e0"
+     }
+    ],
+    "first_store": {
+     "at": "41c823",
+     "op": "mov byte ptr [rsp - 0x20], 0",
+     "branch_before": false
+    }
+   }
+  },
+  {
+   "fn": "5c4dc0",
+   "call_at": "5c4e3e",
+   "callee": {
+    "va": "424300",
+    "n_ins": 0,
+    "IAT_THUNK": true,
+    "iat_slot_rva": "15719a0",
+    "import": "gdi32.dll!GetSystemPaletteEntries"
+   }
+  }
+ ]
+}
