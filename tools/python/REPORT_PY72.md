@@ -223,9 +223,9 @@ rbx = callback の第 1 引数 (ctx)。ctx のフィールドは使い方から�
 
 ### 測定
 
-- 測定 commit: `80fb2fd0` (`origin/main`。本 run でコードは変更していない。本 PR は本ファイルだけ)。`git diff 80fb2fd0 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
-- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (2.9 秒。`block00031_PE.bin` は 22,227,016 バイト)。
-- 実行: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <N>` (VA は `1046a30 1500`・`f8ecd0 1500`・`f8eb10 1500`・`f8ea80 1500`・`f8e3c0 400`・`f824b0 1500`・`1051720 1500`・`104cf90 260`・`1051c90 1500`・`f81ce0 1500`・`1051d20 330`・`f82a10 260`・`f82c20 200`・`10469f0 40`・`104a9ec 14`・`104aa87 12`・`104cc72 12`)、`pe_rip_consts.py 10469f0 10`・`pe_rip_consts.py 1047d75 40`。全て終了 0・Traceback 0 件。1 呼び出し約 0.1 秒。load average (1 分値) 0.01。
+- 測定 commit: `653d1603` (`origin/main` (`c6eca3e1`) を取り込んだ PR HEAD。取り込み前の測定 commit `80fb2fd0` からは解析コードが変わったため、本 HEAD で再測定した。`git diff 80fb2fd0 653d1603 -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 413 行)。本 run でコードは変更していない。本 PR は本ファイルだけ。`git diff 653d1603 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
+- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (2.8 秒。`block00031_PE.bin` は 22,227,016 バイト)。
+- 実行: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <N>` (VA は `1046a30 1500`・`f8ecd0 1500`・`f8eb10 1500`・`f8ea80 1500`・`f8e3c0 400`・`f824b0 1500`・`1051720 1500`・`104cf90 260`・`1051c90 1500`・`f81ce0 1500`・`1051d20 330`・`f82a10 260`・`f82c20 200`・`10469f0 40`・`104a9ec 14`・`104aa87 12`・`104cc72 12`)、`pe_rip_consts.py 10469f0 10`・`pe_rip_consts.py 1047d75 40`。計 19 呼び出し (`pe_disasm.py` 17 + `pe_rip_consts.py` 2)、全て終了 0・Traceback 0 件。1 呼び出し 0.08〜0.09 秒 (合計 1.64 秒)。load average (1 分値) 0.92 (開始時 00:06 UTC)。出力は `tools/python/work/meas/` (gitignore)。
 
 ### 結論
 
