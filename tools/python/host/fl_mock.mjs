@@ -5,8 +5,10 @@ import { createIlmcp } from "./ilmcp.mjs";
 const F = (v) => ({ t: "D", v });
 // PY-100 (#2879): PE 0xd5b930 の readout (C provider と同一)。構造体 = grid bit が立つ step。範囲外は -1
 // PY-111 (#2929): note の生成経路の PE 値 (C provider と同一)。param 5/6 = 128・param 7 = step × 24 (V 静的)・param 8 = 0
+// PY-228 (#3656): plugin パラメータの既定値 (インスタンスごとの値 pv / spv の初期値。provider/fl_engine.c の params[] と同じ)
 const STEP_V = 24;
 const STEP_DEF = [60, 100, 64, 120, 64, 128, 128, 0, 0];
+const PARAM_DEFAULT = [0.5, 0.2, 0.8];
 const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 8 ? -1 : prm === 7 ? pos * STEP_V : STEP_DEF[prm]);
 
 class FlError extends Error {
@@ -121,17 +123,18 @@ export function createMockEngine() {
     selectedChannel: 0,
     gridItems: [],
     channels: [
-      { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0), pitchN: 2 },
-      { name: "Snare", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 2, steps: new Array(64).fill(0), pitchN: 2 },
-      { name: "3x Osc", plugin: "3x Osc", vol: 0.5, pan: 0.25, mute: false, solo: false, color: 0x7C5A6B, sel: false, fx: 0, steps: new Array(64).fill(0), pitchN: 2 },
+      { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0), pitchN: 2, pv: [...PARAM_DEFAULT] },
+      { name: "Snare", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 2, steps: new Array(64).fill(0), pitchN: 2, pv: [...PARAM_DEFAULT] },
+      { name: "3x Osc", plugin: "3x Osc", vol: 0.5, pan: 0.25, mute: false, solo: false, color: 0x7C5A6B, sel: false, fx: 0, steps: new Array(64).fill(0), pitchN: 2, pv: [...PARAM_DEFAULT] },
     ],
     mixer: Array.from({ length: 127 }, (_, i) => ({
       name: i === 0 ? "Master" : i === 125 ? "Current" : `Insert ${i}`, vol: 0.8, pan: 0, mute: false, solo: false,
-      color: 0, colorSet: false, sel: i === 0, slots: [], routes: i === 0 ? {} : { 0: 1.0 },
+      color: 0, colorSet: false, sel: i === 0, slots: [], spv: [], routes: i === 0 ? {} : { 0: 1.0 },
     })),
     playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156, lock: 0, act: 0, loop: 0, trigMode: 0, posSnap: 0, trigSnap: 0 })),
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
     displayTime: 0,
+    browserOp: 0,
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
     prScripts: {},
     midiOut: [],
@@ -146,6 +149,21 @@ export function createMockEngine() {
   const ch = (i) => { i = ix(i); if (!st.channels[i]) throw RANGE(); return st.channels[i]; };
   const pl = (i) => { i = ix(i); if (i < 1 || i > st.playlist.length) throw RANGE(); return st.playlist[i - 1]; };
   const tr = (i) => { if (!st.mixer[i]) throw RANGE(); return st.mixer[i]; };
+  // PY-228 (#3656): plugin パラメータの解決 (provider/fl_engine.c の pinst と同じ順)。slot -1 は channel、slot >= 0 は mixer track の insert slot。
+  // 範囲外は code 4、空 slot は code 8 (Plugin not valid)、paramIndex は [0, 既定値の件数)。
+  const plugPV = (i, slot, p) => {
+    let pv;
+    if (slot === -1) pv = ch(i).pv;
+    else {
+      const t = tr(ix(i));
+      if (slot < 0 || slot >= 10) throw RANGE();
+      if (!t.slots[slot]) throw new FlError("Plugin not valid", 8);
+      pv = t.spv[slot];
+    }
+    p = ix(p);
+    if (p < 0 || p >= pv.length) throw RANGE();
+    return [pv, p];
+  };
   const tog = (cur, v) => (v === undefined || v === -1 ? !cur : !!v);
   // PE 0x12be470 (maxLen > 0 のみ): 長さが maxLen を超えるとき末尾から mask 外の文字 (母音・記号・空白) を削り、先頭 maxLen 文字へ切る (C provider の track_name_fit と同一・ASCII 前提)
   const KEEP = new Set("0123456789BCDFGHJKLMNPQRSTVWXYZ");
@@ -172,6 +190,10 @@ export function createMockEngine() {
   const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
   // float 引数 (fl_a_dbl と同じ: None は 0、bool・整数・実数は可、他は code 5)。PE の書式 'f' は float32 に丸める
   const argF = (a, i) => { const v = a[i]; if (i >= a.length || v === undefined) return 0; if (typeof v === "boolean") return +v; if (typeof v === "number") return Math.fround(v); throw WRONG(); };
+  // fl_a_dbl と同じ (plugins.setParamValue の値): None は 0、bool・実数は可 (丸めない)、他は code 5
+  const argD = (a, i) => { const v = a[i]; if (i >= a.length || v === undefined) return 0; if (typeof v === "boolean") return +v; if (typeof v === "number") return v; throw WRONG(); };
+  // plugins の値 API の引数は C と同じ順に型検査してから解決する (paramIndex・index・slotIndex・useGlobalIndex・(setParamValue の pickupMode))。o = paramIndex の位置、n = 最大個数
+  const plugIn = (a, o, n) => { const q = argI(a, o, 0), i = argI(a, o + 1, 0), s = argI(a, o + 2, -1); for (let k = o + 3; k < n; k++) argI(a, k, 0); return plugPV(i, s, q); };
   const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
 
   const impl = {
@@ -373,6 +395,11 @@ export function createMockEngine() {
     "ui.showNotification": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
     "ui.closeAllMenu": (...a) => { arity(a, 0, 0); },
     "ui.closeActivePopupMenu": (...a) => { arity(a, 0, 0); },
+    // PY-132 (#3013): toggleBrowserNode は PE の書式 '|i' (既定 -1)。値 -1/0/1 の分岐 (0xa89690 → 0xa26190 / 0xa07d00) だけを st.browserOp に残す (1 切替・2 閉じる・3 開く・0 なし)。
+    // selectBrowserMenuItem・previewBrowserMenuItem は NOARGS。作用 (0xfdd2c0 のキー送出) は未モデル
+    "ui.toggleBrowserNode": (...a) => { arity(a, 0, 1); const v = argI(a, 0, -1); st.browserOp = v === -1 ? 1 : v === 0 ? 2 : v === 1 ? 3 : 0; },
+    "ui.selectBrowserMenuItem": (...a) => { arity(a, 0, 0); },
+    "ui.previewBrowserMenuItem": (...a) => { arity(a, 0, 0); },
     // PY-119 (#2980): PE で呼出し経路を確定した ui ゲッター 6 件 (REPORT_PY119)。値は未実測の仮置き (provider/fl_engine.c と同じ)
     "ui.getFocused": (...a) => { arity(a, 1, 1); ix(a[0]); return false; },
     "ui.getFocusedFormID": (...a) => { arity(a, 0, 0); return 0; },
@@ -389,9 +416,9 @@ export function createMockEngine() {
     "plugins.getPluginName": (i, slot = -1, userName) => (slot < 0 ? ch(i).plugin : (tr(i).slots[slot] ?? "")),
     "plugins.getParamCount": () => st.params.length,
     "plugins.getParamName": (p) => st.params[p]?.name ?? "",
-    "plugins.getParamValue": (p) => F(st.params[p].v),
-    "plugins.getParamValueString": (p) => `${(st.params[p].v * 100).toFixed(1)} %`,
-    "plugins.setParamValue": (v, p) => { st.params[p].v = v; },
+    "plugins.getParamValue": (...a) => { arity(a, 2, 4); const [pv, q] = plugIn(a, 0, 4); return F(pv[q]); },
+    "plugins.getParamValueString": (...a) => { arity(a, 2, 4); const [pv, q] = plugIn(a, 0, 4); return `${(pv[q] * 100).toFixed(1)} %`; },
+    "plugins.setParamValue": (...a) => { arity(a, 3, 6); const x = argD(a, 0); const [pv, q] = plugIn(a, 1, 6); pv[q] = x; },
     // MIDI scripting (PY-6): device script が使う device.* の最小模擬。forwardMIDICC / midiOutMsg は呼出しを st.midiOut に記録する
     // general.getVersion = MIDI scripting API バージョン (int)。実機値は未実測のため固定のモック値 (同梱 script は print するだけ)
     "general.getVersion": (...a) => { arity(a, 0, 0); return st.scriptingVersion ?? 1; },
@@ -465,7 +492,7 @@ export function createMockEngine() {
     ...createIlmcp(st, {
       RANGE,
       INVALID: (m) => new FlError(m, 1),
-      makeChannel: (plugin) => ({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0), pitchN: 2 }),
+      makeChannel: (plugin) => ({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0), pitchN: 2, pv: [...PARAM_DEFAULT] }),
       nMixer: st.mixer.length,
     }),
   };
