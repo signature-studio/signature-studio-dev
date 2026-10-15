@@ -5,6 +5,8 @@ import { createIlmcp } from "./ilmcp.mjs";
 const F = (v) => ({ t: "D", v });
 // PY-100 (#2879): PE 0xd5b930 の readout (C provider と同一)。構造体 = grid bit が立つ step。param 0..7 の既定値は stub 順、範囲外と param 8 (未モデル) は -1
 const STEP_DEF = [60, 100, 64, 120, 64, 64, 64, 0];
+// PY-228 (#3656): plugin パラメータの既定値 (インスタンスごとの値 pv / spv の初期値。provider/fl_engine.c の params[] と同じ)
+const PARAM_DEFAULT = [0.5, 0.2, 0.8];
 const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 7 ? -1 : STEP_DEF[prm]);
 
 class FlError extends Error {
@@ -117,13 +119,13 @@ export function createMockEngine() {
     selectedChannel: 0,
     gridItems: [],
     channels: [
-      { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0), pitchN: 2 },
-      { name: "Snare", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 2, steps: new Array(64).fill(0), pitchN: 2 },
-      { name: "3x Osc", plugin: "3x Osc", vol: 0.5, pan: 0.25, mute: false, solo: false, color: 0x7C5A6B, sel: false, fx: 0, steps: new Array(64).fill(0), pitchN: 2 },
+      { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0), pitchN: 2, pv: [...PARAM_DEFAULT] },
+      { name: "Snare", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 2, steps: new Array(64).fill(0), pitchN: 2, pv: [...PARAM_DEFAULT] },
+      { name: "3x Osc", plugin: "3x Osc", vol: 0.5, pan: 0.25, mute: false, solo: false, color: 0x7C5A6B, sel: false, fx: 0, steps: new Array(64).fill(0), pitchN: 2, pv: [...PARAM_DEFAULT] },
     ],
     mixer: Array.from({ length: 127 }, (_, i) => ({
       name: i === 0 ? "Master" : i === 125 ? "Current" : `Insert ${i}`, vol: 0.8, pan: 0, mute: false, solo: false,
-      color: 0, colorSet: false, sel: i === 0, slots: [], routes: i === 0 ? {} : { 0: 1.0 },
+      color: 0, colorSet: false, sel: i === 0, slots: [], spv: [], routes: i === 0 ? {} : { 0: 1.0 },
     })),
     playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156, lock: 0 })),
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
@@ -139,6 +141,21 @@ export function createMockEngine() {
   const ch = (i) => { i = ix(i); if (!st.channels[i]) throw RANGE(); return st.channels[i]; };
   const pl = (i) => { i = ix(i); if (i < 1 || i > st.playlist.length) throw RANGE(); return st.playlist[i - 1]; };
   const tr = (i) => { if (!st.mixer[i]) throw RANGE(); return st.mixer[i]; };
+  // PY-228 (#3656): plugin パラメータの解決 (provider/fl_engine.c の pinst と同じ順)。slot -1 は channel、slot >= 0 は mixer track の insert slot。
+  // 範囲外は code 4、空 slot は code 8 (Plugin not valid)、paramIndex は [0, 既定値の件数)。
+  const plugPV = (i, slot, p) => {
+    let pv;
+    if (slot === -1) pv = ch(i).pv;
+    else {
+      const t = tr(ix(i));
+      if (slot < 0 || slot >= 10) throw RANGE();
+      if (!t.slots[slot]) throw new FlError("Plugin not valid", 8);
+      pv = t.spv[slot];
+    }
+    p = ix(p);
+    if (p < 0 || p >= pv.length) throw RANGE();
+    return [pv, p];
+  };
   const tog = (cur, v) => (v === undefined || v === -1 ? !cur : !!v);
   // fl_provider の引数検査 (fl_dispatch.c type_ok / fl_a_int) と同じ: None は既定値、bool と整数のみ可、他は code 5
   const argI = (a, i, def) => {
@@ -348,9 +365,9 @@ export function createMockEngine() {
     "plugins.getPluginName": (i, slot = -1, userName) => (slot < 0 ? ch(i).plugin : (tr(i).slots[slot] ?? "")),
     "plugins.getParamCount": () => st.params.length,
     "plugins.getParamName": (p) => st.params[p]?.name ?? "",
-    "plugins.getParamValue": (p) => F(st.params[p].v),
-    "plugins.getParamValueString": (p) => `${(st.params[p].v * 100).toFixed(1)} %`,
-    "plugins.setParamValue": (v, p) => { st.params[p].v = v; },
+    "plugins.getParamValue": (...a) => { arity(a, 2, 4); const [pv, q] = plugPV(a[1], ix(a[2] ?? -1), a[0]); return F(pv[q]); },
+    "plugins.getParamValueString": (...a) => { arity(a, 2, 4); const [pv, q] = plugPV(a[1], ix(a[2] ?? -1), a[0]); return `${(pv[q] * 100).toFixed(1)} %`; },
+    "plugins.setParamValue": (...a) => { arity(a, 3, 6); const [pv, q] = plugPV(a[2], ix(a[3] ?? -1), a[1]); pv[q] = a[0]; },
     // MIDI scripting (PY-6): device script が使う device.* の最小模擬。forwardMIDICC / midiOutMsg は呼出しを st.midiOut に記録する
     // general.getVersion = MIDI scripting API バージョン (int)。実機値は未実測のため固定のモック値 (同梱 script は print するだけ)
     "general.getVersion": (...a) => { arity(a, 0, 0); return st.scriptingVersion ?? 1; },
@@ -415,7 +432,7 @@ export function createMockEngine() {
     ...createIlmcp(st, {
       RANGE,
       INVALID: (m) => new FlError(m, 1),
-      makeChannel: (plugin) => ({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0), pitchN: 2 }),
+      makeChannel: (plugin) => ({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0), pitchN: 2, pv: [...PARAM_DEFAULT] }),
       nMixer: st.mixer.length,
     }),
   };
