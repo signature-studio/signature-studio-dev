@@ -47,7 +47,7 @@ RetDec が BLK slot を `constant` にするかは、**BLK の各 slot のバイ
 
 | 受入 | 状態 | 根拠 |
 |---|---|---|
-| 1. RetDec が BLK slot を constant にする機構を、最小の再現で特定する (受入 5) | **部分** | 最小再現は §3 (`fw_blk_const_repro.sh`・n=3 で一致)。constant 化は BLK の値の内容に依存し、属性・セクションには依らないことまで。RetDec 内部の判定条件は未確定 |
+| 1. RetDec が BLK slot を constant にする機構を、最小の再現で特定する (受入 5) | **部分** | 最小再現は §3 (`fw_blk_const_repro.sh`・1 回の実測)。constant 化は BLK の値の内容に依ると読めること。WRITE 属性の影響は未検証 (§4)。RetDec 内部の判定条件は未確定 |
 
 ## 6. 未解決 (起票先付き)
 
@@ -70,6 +70,6 @@ RETDEC_BIN=<retdec-decompiler のパス> bash tools/plugins/framework/fw_blk_con
 git diff 96b26019e HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md'
 ```
 
-結果 (本 PR の HEAD `5adf545fe` 時点・出力 0 行。修正 commit 後の HEAD でも同じ確認を行う):
+結果 (検証 HEAD `ce5e7dc61` 時点で出力 0 行。最終 HEAD での結果は PR 本文の検証欄に記載):
 
 （出力なし・0 行）
