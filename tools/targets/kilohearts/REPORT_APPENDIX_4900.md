@@ -25,8 +25,8 @@ sar   ecx,0x6         ; 整数の算術右シフト
 
 - 測定 commit (コードを変えた最後の commit): `86abf8a79`。
 - 基準: `origin/main` = `ef51996d0` (同じ `gtype_census.sh`・同じ素材)。
-- 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`)・`toolchain-emsdk` (`/opt/emsdk`)・Ghidra 12.1.4 (zip sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)・JDK 21。すべて `$RUNNER_TEMP/kh` (repo 外)。n=1。
-- 実行: `bash tools/targets/kilohearts/ghidra_route/gtype_census.sh $RUNNER_TEMP/kh` (既定 FX)。decompile 151/151 OK。
+- 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`)・`toolchain-emsdk` ([EMSDK])・Ghidra 12.1.4 (zip sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)・JDK 21。作業ディレクトリは CI の一時領域 (repo 外・作業 dir 名 `kh`)。n=1。
+- 実行: `bash tools/targets/kilohearts/ghidra_route/gtype_census.sh <作業 dir>` (既定 FX)。decompile 151/151 OK。
 - 所要 (real): 基準 56.6 s・PR 46.1 s。load (1 分平均): 基準 1.19・PR 0.61。
 
 | 項目 | 基準 `ef51996d0` | PR `86abf8a79` |
