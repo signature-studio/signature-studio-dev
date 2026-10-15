@@ -15,7 +15,7 @@
 - 関数ポインタ経由の到達: .text と IPPCODE の lea rip 相対で IPPCODE を指す箇所・.text の間接 call/jmp・
   .rdata/.data 中の IPPCODE 向き 8 byte 値を数え、入口集合との差を出す (静的確認。実行トレースではない)。
 - direct_calls の範囲: .text の関数は pdata の End まで、IPPCODE (pdata 無し) は次の既知の関数先頭
-  (IPPCODE 内の rel32 call 着地点) まで、かつ SPAN_IPP バイトまで。範囲が取れないときだけ ret で止める。
+  (.text・IPPCODE の rel32 call 着地点と pdata 先頭) まで、かつ SPAN_IPP バイトまで。範囲が取れないときだけ ret で止める。
 """
 import bisect
 import collections
@@ -180,7 +180,7 @@ def pdata_end(img, rva):
 
 
 def fn_span(img, rva):
-    """rva の関数の終端 (RVA・排他)。pdata に入る関数は pdata の End。IPPCODE (pdata 無し) は次の既知の関数先頭 (IPPCODE 内の call 着地点) と SPAN_IPP・節の終端のうち最小。それ以外は None (範囲を取れない)。"""
+    """rva の関数の終端 (RVA・排他)。pdata に入る関数は pdata の End。IPPCODE (pdata 無し) は次の既知の関数先頭 (.text・IPPCODE の rel32 call 着地点と pdata 先頭) と SPAN_IPP・節の終端のうち最小。それ以外は None (範囲を取れない)。"""
     end = pdata_end(img, rva)
     if end is not None:
         return end
@@ -212,11 +212,13 @@ def direct_calls(img, md, rva, maxins=MAXINS):
 
 
 def span_tail(img, md, rva, end):
-    """範囲 [rva, end) の最後の命令の mnemonic (関数の終端で切れていれば ret・jmp・nop/int3 のパディングになる)。"""
+    """範囲 [rva, end) を復号した最後の命令 (mnemonic) と、その終端が範囲の終端 end に一致するか (命令境界)。"""
     last = None
     for ins in md.disasm(img['mem'][rva:end], img['base'] + rva):
         last = ins
-    return last.mnemonic if last else None
+    if last is None:
+        return None, False
+    return last.mnemonic, last.address - img['base'] + last.size == end
 
 
 def reach(img, md, roots, depth=3):
@@ -286,7 +288,7 @@ def indirect_scan(elq, md, entries):
                         lea_ipp_src.append((rva, t))
             if ins.mnemonic in ('call', 'jmp') and not ins.op_str.startswith('0x'):
                 (ind_sites if in_text else ind_ipp_sites).append((rva, ins.mnemonic, ins.op_str))
-            if in_text and not ins.mnemonic.startswith('j') and ins.mnemonic != 'call':
+            if not ins.mnemonic.startswith(('j', 'loop', 'call', 'xbegin')):
                 for h in re.findall(r'0x[0-9a-f]{6,}', ins.op_str):
                     v = int(h, 16) - base
                     if elq['ipp_lo'] <= v < elq['ipp_hi']:
@@ -366,16 +368,21 @@ def main():
     reached = reach(dsp, md, roots, depth=REACH_DEPTH)
     span_kind = collections.Counter()
     tails = collections.defaultdict(collections.Counter)
+    bound = collections.Counter()
     for f in reached:
         end = fn_span(dsp, f)
         kind = 'pdata' if pdata_end(dsp, f) is not None else (
             'IPPCODE 次の先頭まで' if end is not None else 'ret まで (範囲なし)')
         span_kind[kind] += 1
         if end is not None:
-            tails[kind][span_tail(dsp, md, f, end)] += 1
+            mn, on_boundary = span_tail(dsp, md, f, end)
+            tails[kind][mn] += 1
+            cut = 'SPAN_IPP 打ち切り' if end - f == SPAN_IPP else '次の先頭'
+            bound[f'{kind} / {cut} / 命令境界一致={on_boundary}'] += 1
             span_kind[kind + ' SPAN_IPP 打ち切り'] += end - f == SPAN_IPP
     print(f'direct_calls の範囲 (到達集合 {len(reached)} 本体): {dict(span_kind)}')
     print(f'範囲の最後の命令 (mnemonic): {({k: dict(v.most_common(6)) for k, v in tails.items()})}')
+    print(f'範囲の終端と最後に復号した命令の終端の一致: {dict(bound)}')
     dsp_hits = rel_targets(dsp, md)
     origin = collections.defaultdict(set)
     depth_of = {}
@@ -448,7 +455,7 @@ def main():
     lea_t, lea_ipp_src, ind, ind_ipp, data_ptrs, imm_ipp = indirect_scan(elq, md, entries)
     ind_pat = collections.Counter(re.sub(r'\s+', ' ', o) if 'r10 + rax*8' not in o else 'table[r10+rax*8]' for _, _, o in ind)
     print(f'間接 call/jmp の形: {dict(ind_pat.most_common(12))}')
-    print(f'即値・変位に IPPCODE 番地を含む命令 (.text): {len(imm_ipp)}')
+    print(f'即値・変位に IPPCODE 番地を含む命令 (.text と IPPCODE、分岐を除く): {len(imm_ipp)}')
     neg = negative_control(elq, dsp, md, rows_entries=entries)
     eset = set(entries)
     lea_ipp_dst = {d for _, d in lea_ipp_src}
