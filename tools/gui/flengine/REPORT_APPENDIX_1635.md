@@ -41,7 +41,7 @@
 git diff 33585cb01 HEAD -- tools/gui tools/m11 tools/shim tools/shared ':!*.md' ':!tools/gui/flengine/results'
 ```
 
-出力: 0 行 (本 commit は本 REPORT・`results/`・PR 本文の修正だけ)。
+出力 (測定 commit `33585cb01` → HEAD `98de2fbbf`): `tools/gui/flengine/e2e.sh` の 24 行目のコメント 1 行のみ (実行されない。再測定は不要)。
 
 ### 2-1. 過去の e2e (`7f54678a7`・B1 修正前・foreground・1 回)
 
