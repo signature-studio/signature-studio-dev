@@ -1,6 +1,6 @@
 # tools/flelift/boot — FLE-2〜FLE-5: x64c lift による FLEngine boot 連鎖 (DllMain → _InitLib → InitUnits)
 
-> 正本: `tools/flelift/boot/REPORT.md`。boot 連鎖 (FLE-2〜FLE-5) の測定値・成果物・引継ぎ。boot_e2e の shard 別 RSS・variant 実測 (#4855・測定 commit `96723a2ed`) は `REPORT_APPENDIX_4855.md`。
+> 正本: `tools/flelift/boot/REPORT.md`。boot 連鎖 (FLE-2〜FLE-5) の測定値・成果物・引継ぎ。boot_e2e の shard 別 RSS・variant 実測 (#4855・測定 commit `96723a2ed`) は `REPORT_APPENDIX_4855.md`。FLE-39 (#5013): `FLE_BOOT_LOG_CAP` 超過は既定経路で `log_cap.hit=bytes` まで計数されるが `boot.threw` は `exit` のまま (cap 有無で同一) → `REPORT_APPENDIX_5013.md`。
 > 行数上限 (250 行, `docs/DOC_MAP.md` §1) 超過のため、ラウンド別の経緯と停止原因の逆引きは
 > `REPORT_APPENDIX.md` に**分割移動**した (内容は削除していない)。#2719 (x64c 寛容起動・942 unit 逐次試行・CreateFruityInstance 観測): 942 試行、CFI は入口 (0x1375990) まで dispatch され、本体内で oob trap (trap 地点は未特定・soft 呼出し 0 件) → `REPORT_APPENDIX_2719.md`。
 
