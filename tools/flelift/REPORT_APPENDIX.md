@@ -90,3 +90,24 @@ REPORT §11 の付録。指定の見出しは `## 10.` だが、既存の PERF-P
 - 範囲内: `tools/flelift` 直下の 3 本と `fle_e2e.sh` (素材 `fl-win64` + emsdk 6.0.12)。
 - 範囲外 (親 #294 の残り): `tools/flelift/boot`・`tools/icall` (#3604)・`tools/ott`・m11。
 - 仕様差: `ANALYSIS_DIR` を設定した場合のみ既定が `$ANALYSIS_DIR/win64` になる (旧 3 本は `ANALYSIS_DIR` を見ていなかった)。両方未設定の既定は従来と同一。
+
+## 12. #3661 (CI-173): `EMSDK_ENV` で emsdk を指定し、素材 `toolchain-emsdk` で e2e before / after
+
+- **変更**: `fle_e2e.sh`・`fle_lift.sh` は `EMSDK_ENV` で `emsdk_env.sh` の場所を指定する (既定 `/opt/emsdk/emsdk_env.sh` = `[EMSDK]`。未設定時の挙動は従来どおり)。ファイルが無ければ rc=2 で止まる。`fle_e2e.sh` は `emsdk_env.sh` の source 後に `EMSDK_ENV` を再 export する。`emsdk_env.sh` は source 時に `EMSDK_ENV` を unset するため、子の `fle_lift.sh` へ渡すのに必要。測定 commit `a85ca628d`。
+- **素材**: `fl-win64` と `toolchain-emsdk` を `$RUNNER_TEMP` に展開 (`toolchain-emsdk` の最上位は `emsdk/`)。素材の emcc は 6.0.12 (commit `5488e0871d46`)。runner の `/opt/emsdk` と同一 commit。
+- **素材が実際に使われたこと**: 素材版 run の間に、素材側 `upstream/emscripten/cache` の 1,729 ファイルが更新され、`/opt/emsdk` 側の更新は 0 件 (mtime 比較)。
+
+| 項目 | before (`512b09ffa`・既定 `[EMSDK]`) | after 既定 (`a85ca628d`・未設定) | after 素材 (`a85ca628d`・`EMSDK_ENV`=素材) |
+|---|--:|--:|--:|
+| 所要 (s) | 121 | 120 | 128 |
+| load average (1 分) 開始 → 終了 | 0.82 → 1.00 | 0.47 → 0.93 | 0.79 → 1.18 |
+| 終了コード / 結果行 | rc=0 / `[fle_e2e] PASS` | rc=0 / PASS | rc=0 / PASS |
+| lift 所要 (ログ) | lift 15 s、emcc 31 s、合計 46 s | lift 15 s、emcc 32 s、合計 47 s | lift 15 s、emcc 41 s、合計 56 s |
+| lift | 7,018 関数 / 340,761 命令 / unsup 0 / unlifted callee 0 | 同左 | 同左 |
+| spot diff | 7 関数 / 16 case / equal 16 | 同左 | 同左 |
+| D9 | rip-rel 136,333 site / mismatch 0 | 同左 | 同左 |
+| 出力 9 件の sha256 | 基準 | before と全件一致 | before と全件一致 |
+
+- **出力 9 件**: `work/lift/` の `fle_lifted.c`・`fle_data.c`・`lift_meta.json`・`flel.wasm`・`flel.cjs`、`work/verdict.jsonl`・`work/verdict_summary.json`、追跡の `results/verdict_flelift.jsonl`・`results/verdict_summary.json`。
+- **負の確認**: `EMSDK_ENV=<存在しない path>` で `fle_lift.sh`・`fle_e2e.sh` とも rc=2 とメッセージを出す。`EMSDK_ENV` が `emsdk_env.sh` の source を跨いで子プロセスへ届くことを `bash -c` で確認。
+- **範囲外**: `fle_lto.sh` は `/opt/emsdk` を直接 source したまま (e2e・lift の経路外で、本 issue の受入の対象外)。
