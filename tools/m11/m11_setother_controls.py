@@ -3,8 +3,9 @@
 
 素材 (work-m11・fl-win64) を使わず、合成機械語と合成 IR で分類器を動かす。
   正の対照 (7 件) : 戻り値の定数 (ret_value) が既知の値に一致するか (実値化)。
-  ネガ対照 (2 件) : 狭い格納の型幅ゲート。IR の define 行の型だけを i64 → i8 に書き換え、
+  ネガ対照 (3 件) : 狭い格納の型幅ゲート。IR の define 行の型だけを i64 → i8 に書き換え、
                     台帳 1 行 → trace_slot の main 経路で判定が変わるか。
+                    格納幅が SIZE に無い (movups xmmword) は狭い格納に入れず stack_width_other になるか。
   既知の限界 (M1) : 間接 jmp の先の ret。現状の出力を記録する (未修正・偽の定数になりうる)。
 使い方: python3 m11_setother_controls.py   (終了コード 0 = 正の対照・ネガ対照が全て期待どおり)
 """
@@ -90,7 +91,15 @@ def main():
         bad += not ok
         got = rows[0]['reason'] if rows else None
         print('  %s IR 型 %-3s → %s (期待 %s)' % ('ok ' if ok else 'NG ', ty, got, why_want))
-    print('[controls] ネガ対照 %d/2 一致' % n_ok)
+    code3 = bytes.fromhex('0f11442420') + call_rel(caller + 5, callee) + b'\xc3'
+    ir3 = 'define i64 @function_%x(i64 %%a1, i64 %%a2, i64 %%a3, i64 %%a4, i64 %%a5) {\n  ret i64 0\n}\n' % callee
+    rows = load({caller: code3, callee: b'\xc3'}, ir3, fixes)['rows']
+    ok = len(rows) == 1 and rows[0]['reason'] == 'stack_width_other' and rows[0]['class'] == '未決'
+    n_ok += ok
+    bad += not ok
+    got = rows[0]['reason'] if rows else None
+    print('  %s 格納幅が SIZE に無い (movups xmmword ptr [rsp+0x20]) → %s (期待 stack_width_other)' % ('ok ' if ok else 'NG ', got))
+    print('[controls] ネガ対照 %d/3 一致' % n_ok)
 
     # 既知の限界 M1: 間接 jmp (jmp rcx) の後ろの ret を直前の定数の続きとして扱う (偽の定数)。未修正。
     m1 = 0x3000

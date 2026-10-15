@@ -19,6 +19,7 @@ IR は変更しない (分類のみ)。
              call_ret_indirect: 間接 call (callee 不明)。arith[dst|src]: reg 右辺の加減論理演算は旧値と右辺の両方を辿る。
              stack_narrow_ir<W>_st<S>: 狭い格納 (S<64) で IR 仮引数型幅 W と格納幅 S が不一致 (上位は旧スロット値)。
              stack_match>X: W == S のとき格納元を辿った終端 X。
+             stack_width_other: 格納幅が SIZE に無い (xmmword 等)。狭い格納には入れない。
              chain>X: 符号・零拡張 (movzx/movsx/movsxd reg)・即値の加減論理演算 (add/sub/and/or r32|r64, imm) の
              旧値をたどった先の終端 X が未決 (復元不能なら復元不能)
 
@@ -307,6 +308,8 @@ class Ctx:
                     return ('未決', 'stack_other:' + x.mnemonic, None, at)
                 parts = dst.split()
                 size = SIZE.get(parts[0]) if parts else None
+                if size is None:
+                    return ('未決', 'stack_width_other', None, at)
                 if size == 64 and IMM.match(src):
                     return ('実値化', 'mov_imm', imm_val(src) & M64, at)
                 if size == 64 and reg_of(src) and reg_of(src)[1] == 64:
