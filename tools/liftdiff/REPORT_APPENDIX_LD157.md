@@ -72,7 +72,7 @@ case-level changes 8 functions
   - ① **負荷による wasm vm timeout** (1 秒)。`rt/ld_runner.mjs` は `status=timeout` を返すだけでランナを再起動しない。r1/r2 で case の wasm status が変わったことは sig から分かるが、その case が vm timeout・無応答・native skip の合成 hang のどれかは jsonl が無く未確定。
   - ② **shard 内の wasm 状態の持ち越し**。`ldlib/session.py::run_functions` は shard 内で同じ wasm instance を関数をまたいで使う。`_run_one` の `with_refine` (l1/l2 の追加実行) と `_fvm_cases` の追加 case も同じ instance を使う。
   - ③ **runner の再起動**。`ldlib/runners.py::run_cases` は、応答が timeout (`self.timeout`、既定 10 秒) 内に返らないとき (hang/crash)、と応答行が壊れていたとき (badjson、再起動して 1 回再試行) に runner を再起動する。`start()` は init と SNAPSHOT を再送するので、boot 状態に戻る。再起動の回数は jsonl に残らない。
-  - ④ **native の timeout 後の残留**。native は SIGALRM で case を `timeout` にし、同じプロセスで次の case を続ける (`rt/ld_native.c`)。166 行付近のコメントは watch 機能 (`LD_WATCH_ADDR`、既定は無効) の page 残留に関するもので、既定の batch に効くかは未確認。
+  - ④ **native の timeout 後の残留**。native は SIGALRM (やその他の fault) の後、`siglongjmp` で case のループへ戻り、同じプロセスで次の case を続ける (`rt/ld_native.c:241`)。case の途中の書込みは巻き戻らない。166 行付近のコメントは watch 機能 (`LD_WATCH_ADDR`、既定は無効) の page 残留に関するもので、既定の batch に効くかは未確認。
 - 次に確かめること (未実施): batch の jsonl を保存し、`tests/ld157_batch_diff.py` の 3 種の件数を出す。①と③は jsonl の wasm status の内訳と、再起動の回数の記録で分けられる。
 
 ## 5. 持ち越しの仕組み (コードの読み)
