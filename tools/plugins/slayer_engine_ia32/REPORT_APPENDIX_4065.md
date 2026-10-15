@@ -37,8 +37,8 @@
 
 ## 3. 検証 (測定 commit ec2c7dc29・検証 HEAD は同 commit)
 
-測定 commit は `ec2c7dc29` (コードを変えた最後の commit = 現 HEAD の main 取り込み merge)。
-`git diff 32151b62a ec2c7dc29 -- tools/plugins/slayer_engine_ia32/x87_fn_native.c` は空 (受入 2 のコードは 32151b62a と同一)。
+測定 commit は `ec2c7dc29` (コードを変えた最後の commit)。検証 HEAD は `b268070f6` (main 取り込み後・harness コードの差分 0 を `git diff ec2c7dc29 b268070f6 -- tools/plugins/slayer_engine_ia32 ':!*REPORT_APPENDIX*'` で確認し、同 HEAD で再測定)。
+`git diff 32151b62a b268070f6 -- tools/plugins/slayer_engine_ia32/x87_fn_native.c` は空 (exit 7・8 の経路は `32151b62a` に既に入っている)。
 素材は `$RUNNER_TEMP/fl-win64` (fl-win64 を展開)、emcc は toolchain-emsdk 展開の 6.0.12。load は各試験の開始時。
 
 | 試験 | 結果 | 所要 |
