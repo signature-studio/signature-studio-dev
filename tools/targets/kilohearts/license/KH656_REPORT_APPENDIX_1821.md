@@ -161,17 +161,19 @@ section 単位の内訳 (#4547 実測。HEAD で `lift8 off/on` を再生成し�
   - export されていない 30 関数は name section 無しでは VA が引けない。対応は下の #5164 の表で実測する。
 - **sha 差の原因の切り分け**: 窓の追加 (data の +0x40 ずれと global の値の移動) が code の即値を動かし、それが 93 B の大半を作る。文字列 VA の置換 (raw_va の値 store 84 行) とは別経路。
 
-**name section 付きビルドでの対応 (#5164・PR 作成 run の値。表は未生成・未再現)**: `python3 scripts/kh5164_name_map.py` (測定 commit `ffc8840a9`・`emcc -g2` で name section を出す。`-sEMIT_NAME_SECTION` は内部設定で指定できない)。PR 作成 run の報告では on/off とも code 本体は name 無し build と一致 (関数 96)。wasm 56,278 B (off・`7d799b40…`) / 56,371 B (on・`deb15155…`)。差分 71 関数・3,771 B。**全 71 件の対応表 (code_idx・name・VA・off_B・diff_B) は未生成**。`emcc`・`toolchain-emsdk`・`toolchain-retdec`・`plugins-kilohearts` が必要で、差分レビュー run の素材には無かった。表は `scripts/kh5164_name_map.py` の出力で採る (次 run で `oc_artifacts` 指定して生成する)。
+**name section 付きビルドでの対応 (#5164・実測)**: `python3 scripts/kh5164_name_map.py` (`emcc -g2` で name section を出す。`-sEMIT_NAME_SECTION` は内部設定で指定できない)。on/off とも code 本体は name 無し build と一致 (関数 96)。wasm 56,278 B (off・`7d799b40…`) / 56,371 B (on・`deb15155…`)。差分 71 関数・3,771 B。全 71 行の対応表 (code_idx・name・VA・LIFT8・off_B・diff_B) は付録 `KH656_REPORT_APPENDIX_5164.md` (測定 commit `ffc8840a9`)。
 
 | 区分 | 関数数 | 差分 B |
 |---|---|---|
-| VA あり: `kh_<VA>` 7 件 (名前 section で VA が引けたとされる。`LIFT8` 8 件との対応は未確認) | 7 | 2,653 |
+| VA あり: `kh_<VA>` 7 件 (name section の名前から VA を実測で引いた。VA は LIFT8 の 8 件から `180054bd0` を除いた 7 件と一致) | 7 | 2,653 |
 | VA あり: `function_<VA>` (export 名) | 41 | 692 |
-| VA なし: runtime・libc (`emscripten_builtin_*`・`dlmalloc` 系・`sbrk`・`kh_stack_ptr`・`kh_icall` 等) | 23 | 426 |
+| VA なし: runtime・libc・生成補助 (`emscripten_builtin_*`・`dlmalloc` 系・`sbrk`・`kh_stack_ptr`・`kh_icall` 等) | 23 | 426 |
 | 合計 | 71 | 3,771 |
 
-- 旧「未対応 30 関数 (3,079 B)」は、`kh_<VA>` 7 件 (2,653 B) と VA なし 23 件 (426 B) の合計。`kh_<VA>` 7 件は VA が引けた。
-- VA なし 23 件は lift の出力ではなく runtime 由来で、VA を持たない。受入 3 の「未対応の残りを明記する」はこの 23 件 (426 B) で満たす。
+- `sum(diff_B)` = 3,771 B と一致。`sum(off_B)` = 48,363 B。
+- 旧「未対応 30 関数 (3,079 B)」は、`kh_<VA>` 7 件 (2,653 B) と VA なし 23 件 (426 B) の合計。
+- LIFT8 の 8 VA のうち `180054bd0` は `kh_` 名を持たず `function_180054bd0` のみ。7 VA は `kh_` と `function_` の 2 行が同じ VA で並ぶ (別の code index・別の body。同一元関数かは未確認)。
+- VA なし 23 件は lift の出力ではなく runtime・生成補助由来で、VA を持たない。
 
 ### 8.2 #4272: 313 集合の on/off と raw_va の値 store (測定 commit `091c68915` 時点の値。HEAD は未測定 (集合の定義元 `work/kh656_rounds.json` が repo に無い))
 
@@ -207,7 +209,7 @@ section 単位の内訳 (#4547 実測。HEAD で `lift8 off/on` を再生成し�
 ### 8.4 #4272: 検証の範囲と未解決
 
 - 受入 1: lift-8 の off 側 globals (9 件) を記録 (§8.1)。
-- 受入 2: #4547 で測定 (§8.1)。section 内訳・global の寄与 (窓 6 B + 並べ替え 0 B)・code の差の位置 (71 関数・即値のみ) を実測。export されていない 30 関数の VA 対応表は #5164 で未生成 (§8.1)。区分別の集計のみ。
+- 受入 2: #4547 で測定 (§8.1)。section 内訳・global の寄与 (窓 6 B + 並べ替え 0 B)・code の差の位置 (71 関数・即値のみ) を実測。export されていない 30 関数の VA 対応は #5164 で実測し、全 71 行の表を `KH656_REPORT_APPENDIX_5164.md` に置いた (§8.1)。
 - 受入 3: 313 で `raw_va` の値 store の比較 (§8.2)。文字列 VA の 84 行だけが変わる。
 - 受入 4: 未測定の箇所は本文に未測定と明記した。未測定の範囲: lift-8 の `56254af13` での値 (`gen_simd.py` の lift-8 への影響の有無)・sha 差の section 内訳。結論に使うのは測定 commit `091c68915` 時点の値だけ (HEAD `e71682521` での再測定は未実施)。
 - `kh656_closure.py --rounds 4` は収束せず `FAIL` になる (`lic_config.json` の F ブロックを書き換えた状態で終わるため、測定後は HEAD に戻した)。収束の再確認は本 issue の範囲外。
