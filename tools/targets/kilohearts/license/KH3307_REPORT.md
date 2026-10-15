@@ -2,7 +2,7 @@
 
 - 親: #709 (KH-14)。前提 #3306 (KH-51, PR #3347 MERGED) と #709 の ymm 語彙 (PR #3315 MERGED) は main に入っている。
 - 素材: `fl-win64` (`HeartCore.core_64` の sha256 一致を確認)・`toolchain-retdec`・`toolchain-emsdk`・`plugins-kilohearts` が `$HOME/artifacts` に実在。
-- 測定 commit: `a441a3654` (コードを変えた最後の commit)。
+- 測定 commit: `31dafd5c3` (コードを変えた最後の commit)。
 
 ## 1. 結論
 
@@ -63,8 +63,8 @@ host: nproc=4, Linux, host の clang/gcc (`cc` -O1 -msse2)。
 
 ## 4. 測定 commit と差分
 
-- 測定 commit: `a441a3654`。
-- コード差分 (測定 commit → HEAD): 0 行 (REPORT 追記のみの commit は含めない)。
+- 測定 commit: `31dafd5c3`。
+- コード差分 (測定 commit → HEAD): `git diff 31dafd5c3 HEAD -- tools/targets/kilohearts/license ':!*.md'` = 0 行 (以降は REPORT の追記のみ)。
 
 ## 5. 未解決 (起票先)
 
