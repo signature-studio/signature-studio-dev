@@ -49,6 +49,10 @@ FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FLE_BOOT_WORK=$RUNNER_TEMP/fle4983/w_cap FLE_
 
 units 895 は REPORT §0 の既定経路の値 (`REPORT_APPENDIX_672.md` §C) と一致する。
 
+### 2-1b. コミット済み HEAD `7b4b8f68f` での再測定
+
+同じ指定 (`FLE_BOOT_TAG=fle4983head`) で再実行。`log_cap` = `{hit: "bytes", bytes: 932930, lines: 14429, elapsed_ms: 328}`、units 895・GetMem 3,680 / FreeMem 1,499・`exit`・IPP OK は 2-1 と同値。所要: lift 50 s・clang-plain 60 s・boot default 5 s・全体 real 121.0 s (load 1.00〜1.65・4 vCPU)。`git diff 1c98a13a7 HEAD -- tools/flelift/boot/fle6_measure.sh` は 1 行 (本修正)。
+
 ### 2-2. 規則の確認: 修正前の式 `${6:-0}` に戻す
 
 同じ `FLE_BOOT_LOG_CAP=4096` を指定し、`run_boot` の式だけを修正前 (`FLE_BOOT_LOG_CAP="${6:-0}"`) に戻した一時スクリプトで `default` を実行 (結果ファイルは残さない)。
