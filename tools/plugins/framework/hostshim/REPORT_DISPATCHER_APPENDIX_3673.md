@@ -89,7 +89,7 @@
 - 「0 件」の根拠 (ネガティブコントロール): 未実施。代わりに、既知の到達 0x1318730 が全 6 ID で観測されている (計装が動いている証拠)。
 - 読み: Dispatcher を単独で実行しても、6 ID の格納元 (G18・P45・P56) の書込みには到達しない。書込みは Dispatcher の呼出し元側の経路 (0x41d8f0・0x11fba90・0x9de2c0 の呼出し) で行われる。
   0x13226dd・0x1322a07 の `[rbp+0x1880]` と 0x1322b47 の `[rbp+0x109c]` の値はいずれも 0。0x1322b47 の `[rbp+0x1168]` は 0x54534154 (TAG)。
-- 結論: 6 ID の実行時の値は**未確定**のまま。応答表は変えない。次は呼出し元 (0x41d8f0 等) からの経路での計装 (子 `[PLG-P0b-47]`)。
+- 結論: 6 ID の実行時の値は**未確定**のまま。応答表は変えない。次は呼出し元 (0x41d8f0 等) からの経路での計装 (#4385 ([PLG-P0b-47]) → 結果は `REPORT_DISPATCHER_APPENDIX_4385.md`)。
 - e2e との関係: `hs_val_probe.py` を呼ぶスクリプトは無い (`tools` 配下の `*.sh`・`*.mjs`・`*.cjs`・`*.js`・`*.ts`・`*.yml`・`*.json` を検索して 0 件)。`hs_e2e.sh`・`fw_stage2.sh` の経路は変わらない。
 - Phase A・`fw_stage2.sh` の HEAD `2b07b909b` での再実行: **未実施**。本 run の素材は `fl-win64` のみで、`fw_stage2.sh` と `hs_e2e.sh` が要る `work-fw-stage1` (`tools/plugins/work/fw/`) が無いため (`fw_stage2.sh` は `cd` で失敗・rc=1)。直近の実測は測定 commit `fe58ff465` (§4)。`fe58ff465` 以降に `hostshim.c`・`hs_e2e.sh`・`fw_route.cjs`・`fw_stage2.sh` の変更は無い (`git diff --stat fe58ff465 HEAD` で 0 件)。
 
