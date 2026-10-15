@@ -67,7 +67,7 @@ def main(pe_path, reach_json, out_json):
     hi = lo + max(tx.Misc_VirtualSize, tx.SizeOfRawData)
     cand = sorted(fl_all - flow_hit)
     roots = [x for x in cand if lo <= x < hi]
-    json.dump({'roots': [hex(base + x) for x in roots], 'calltgt': []}, open(out_json, 'w'), indent=1)
+    json.dump({'roots': [base + x for x in roots], 'calltgt': []}, open(out_json, 'w'), indent=1)
     print('universe=%d flow_reached=%d unreached=%d in_text=%d out_of_text_dropped=%d' % (
         len(fl_all), len(flow_hit), len(cand), len(roots), len(cand) - len(roots)))
 
