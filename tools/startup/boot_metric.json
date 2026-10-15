@@ -301,7 +301,7 @@
           "file": "tools/gui/flengine",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "5c4d8320"
+          "file_last_commit": "f690a72e"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -424,7 +424,7 @@
       "route": "flengine",
       "mode": "cfi-probe",
       "build": "flengine boot7 + cfi_probe (DllMain attach の後に CreateFruityInstance を 1 回呼ぶ・REPORT_APPENDIX_2880 §9-3)",
-      "commit": "ae963e28",
+      "commit": "adad27ad",
       "units": {
         "total": null,
         "ok": null,
@@ -477,20 +477,20 @@
         {
           "file": "tools/gui/flengine/REPORT_APPENDIX_2880.md",
           "locator": "md:### 9-3. /`cfi_probe\\.mjs`・commit `([0-9a-f]{8})`/",
-          "measured_commit": "ae963e28",
-          "file_last_commit": "5c4d8320"
+          "measured_commit": "adad27ad",
+          "file_last_commit": "f690a72e"
         },
         {
           "file": "tools/gui/flengine/REPORT_APPENDIX_2880.md",
           "locator": "md:### 9-3. /^\\| `CreateFruityInstance\\(0xC0, 0xEDE95A, host, &iface\\)` \\| `(Aborted)`/",
-          "measured_commit": "ae963e28",
-          "file_last_commit": "5c4d8320"
+          "measured_commit": "adad27ad",
+          "file_last_commit": "f690a72e"
         },
         {
           "file": "tools/gui/flengine/REPORT_APPENDIX_2880.md",
           "locator": "md:### 9-3. /`\\[shim\\] CS-MISS key=0x([0-9a-f]+)` → `FAIL-FAST: unimplemented Win32 API: (\\w+) /",
-          "measured_commit": "ae963e28",
-          "file_last_commit": "5c4d8320"
+          "measured_commit": "adad27ad",
+          "file_last_commit": "f690a72e"
         },
         {
           "file": "tools/gui/flengine/REPORT_APPENDIX.md",
@@ -507,8 +507,8 @@
         {
           "file": "tools/gui/flengine/REPORT_APPENDIX_2880.md",
           "locator": "md:### 9-3. /\\| GUI-REACH / icall_miss \\| `(\\w+)` ×3 のみ / \\d+/",
-          "measured_commit": "ae963e28",
-          "file_last_commit": "5c4d8320"
+          "measured_commit": "adad27ad",
+          "file_last_commit": "f690a72e"
         },
         {
           "file": "tools/gui/flengine/cfi_probe.mjs",
