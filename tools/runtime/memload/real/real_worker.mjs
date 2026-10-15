@@ -1,6 +1,7 @@
 // RT-6 実 loader 試験 (#125): PluginPool (src/runtime/memory_budget.ts) を hostbridge の loader に接続する Worker。
 // loader = host_vst2.wasm + 共有 hb_bridge.mjs の HostBridge (LoadLibraryW / FreeLibrary)。lowbase 版 OTT (DLL 1 本 = 1 Memory, initial 24 MiB) を
 // PluginPool 経由で pin / unpin / LRU 追い出しする。判定は run_real.mjs 側。
+// 予算は main から渡される SAB カウンタで数える (RT-13 #2519)。カウンタは main の予約分 (mainHold) も含む。counter が null なら per-thread (合算しない)。
 import { ModuleTable, HostBridge, EmscriptenGuest } from "./hb_bridge.mjs";
 import { PluginPool, MemoryBudget, DEFAULT_PLUGIN_CAPACITY } from "./memory_budget.js";
 
@@ -13,7 +14,7 @@ function fillIn(f) {
   for (let i = 0; i < HALF; i++) { f[i] = Math.fround(Math.sin(i * 0.05) * 0.7 + Math.sin(i * 0.011) * 0.3); f[HALF + i] = Math.fround(Math.cos(i * 0.13) * 0.5); }
 }
 
-async function runCase(mode) {
+async function runCase(mode, counter, mainHold) {
   const cap = mode === "neg_cap" ? 130 : DEFAULT_PLUGIN_CAPACITY;
   const free = mode !== "neg_nofree";
   const ottF = await loadFactory("ott_hb.cjs");
@@ -36,8 +37,8 @@ async function runCase(mode) {
   const inB = x.host_alloc(2 * HALF * 4), outB = x.host_alloc(2 * HALF * 4), inA = x.host_alloc(16), outA = x.host_alloc(16);
   { const d = new DataView(x.memory.buffer); d.setBigUint64(inA, BigInt(inB), true); d.setBigUint64(inA + 8, BigInt(inB + HALF * 4), true); d.setBigUint64(outA, BigInt(outB), true); d.setBigUint64(outA + 8, BigInt(outB + HALF * 4), true); }
 
-  const budget = new MemoryBudget(cap);
-  const R = { mode, cap, free, loads: 0, pins: 0, err: null, atLoad: null, evictions: 0, peakInUse: 0, peakSize: 0, hashMismatch: 0, handleMismatch: 0, refHash: null };
+  const budget = new MemoryBudget(cap, counter ?? undefined);
+  const R = { mode, cap, free, mainHold, shared: !!counter, loads: 0, pins: 0, err: null, atLoad: null, evictions: 0, peakInUse: 0, peakSize: 0, hashMismatch: 0, handleMismatch: 0, inUseMismatch: 0, refHash: null };
   const pool = new PluginPool(budget, async (id) => {
     const k = Number(id.slice(1)); const d = descs[k];
     R.loads++;
@@ -67,6 +68,7 @@ async function runCase(mode) {
       if (R.refHash === null) R.refHash = hash; else if (hash !== R.refHash) R.hashMismatch++;
     } else if (x.host_get_param(eff, 0) !== Math.fround(0.5)) R.paramMismatch = (R.paramMismatch ?? 0) + 1;
     R.peakInUse = Math.max(R.peakInUse, budget.inUse); R.peakSize = Math.max(R.peakSize, pool.size);
+    if (budget.inUse !== (R.shared ? R.mainHold : 0) + pool.size) R.inUseMismatch++;
     if (held) held.push(h); else h.unpin();
   };
 
@@ -98,8 +100,8 @@ async function runCase(mode) {
 }
 
 self.onmessage = async (ev) => {
-  const { mode } = ev.data;
+  const { mode, counter, mainHold } = ev.data;
   let R;
-  try { R = await runCase(mode); } catch (e) { R = { mode, err: { name: e?.name, message: String(e?.message ?? e).slice(0, 160) }, fatal: true }; }
+  try { R = await runCase(mode, counter, mainHold); } catch (e) { R = { mode, err: { name: e?.name, message: String(e?.message ?? e).slice(0, 160) }, fatal: true }; }
   postMessage(R);
 };
