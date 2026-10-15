@@ -6,7 +6,7 @@
 ## 結論
 
 - 7 件すべての entry・fn VA・PyArg 書式 (個数・型の並び) を PE から確定した。書式は `analysis/flapi/flapi_kwargs.json` の `fmt` と一致した。
-- **`blank` (0xd7c600) は isBlanked と activeCounter の効果を確定した**: 第 1 引数が 1 なら `isBlanked` (`scr+0x1d0`) を真に書く。真→偽の解除では `scr+0x1cc ← scr+0x1dc` (activeCounter の復元) を行う。`scr+0x1dc` の初期値は未実測のため仮置き 0。偽の経路の `0xd7e330` 呼出し (`[scr+0x1c4]` 側。観測対象を変えるかは未確定) は mock/C に含めていない (未解決 (d))。
+- **`blank` (0xd7c600) は isBlanked と activeCounter の効果を確定した** (`0xd7e330` のループが観測対象を変えるかは未確定。未解決 (d)): 第 1 引数が 1 なら `isBlanked` (`scr+0x1d0`) を真に書く。真→偽の解除では `scr+0x1cc ← scr+0x1dc` (activeCounter の復元) を行う。`scr+0x1dc` の初期値は未実測のため仮置き 0。偽の経路の `0xd7e330` 呼出し (`[scr+0x1c4]` 側。観測対象を変えるかは未確定) は mock/C に含めていない (未解決 (d))。
 - **`addMeter` (0xd7ada0) は観測できる状態を変える (PE で確定。round 1 で追加)**: 書式解析が成功 (rc>0) し `scr≠0` のとき `0xd7d9e0` が呼ばれ、その分岐なしの経路で `isUnBlank` (`scr+0x1d1`) を真に、`activeCounter` (`scr+0x1cc`) を `scr+0x1dc` (仮置き 0) にする。mock と C はこの遷移を持ち、`tests/screen_diff.mjs` の期待値で検査する。
 - **残り 5 件** (`displayBar`・`fillRect`・`drawRect`・`drawText`・`eraseRect`) は、**API から観測できる状態を変えないと推定**する。根拠は本体と dispatch callback の先頭 1200 命令に `scr+0x1c?`・`+0x1d?` への直接の書込みが無かったことだけで、本体の全経路と下位呼出しは未確認 (未解決 (a)〜(d))。mock と C は引数検査と None だけを模す (`arrangement.selectionSet` 等と同じ扱い)。描画の引数の意味 (矩形の書式 x/y/w/h か l/t/r/b か) は保留。
 - 実装・未実装の件数は main (`09d6e4b84`) の 196/239 (main の `tests/provider_check.mjs` の期待値。PY-235 の `general.processRECEvent` と PY-136 の screen 初期化・メニュー 10 件などを含む) → **203/232** (`fl_table.c` 435 関数。本 PR の 7 件を加えた。`provider/build.sh` のハンドラ 203 と一致)。`tests/screen_diff.mjs` は 87 呼出しで mock と C の差分 0、期待値の不一致 0。
@@ -39,9 +39,9 @@
 0xd7d124  cmp sil, byte [rbx+0x1d0]    ; sil = 新しい状態 (a0==1)
 0xd7d12b  je  → return                  ; 同じなら何もしない
 0xd7d130  test sil,sil ; je 0xd7d13c
-0xd7d135  call 0xd52790(scr)            ; 真: 描画 (効果は観測できない)
+0xd7d135  call 0xd52790(scr)            ; 真: 描画 (効果は未確認)
 0xd7d13c  mov eax,[rbx+0x1dc]; mov [rbx+0x1cc],eax   ; 偽 (解除): activeCounter ← scr+0x1dc
-0xd7d185  call 0xd7e330(...)            ; 偽: `[scr+0x1c4]` の要素ごとに呼ぶループの一部と読める (0xd7d182 mov r8d,edi で a1 を渡す。未追試・効果は未確定)
+0xd7d185  call 0xd7e330(...)            ; 偽: `[scr+0x1c4]` の要素ごとに呼ぶループの一部と読める (0xd7d182 mov r8d,edi で a1 を渡す。未追試・効果は未確認)
 0xd7d198  mov byte [rbx+0x1d0], sil     ; isBlanked を書く
 ```
 
