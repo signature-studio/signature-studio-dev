@@ -16,7 +16,7 @@ if (isMainThread) {
   const ncase = readFileSync(`${W}/cases.bin`).readUInt32LE(0);
   const REC = 16 + L.arena_sz + L.data_sz;
   const recs = new Array(ncase).fill(null);
-  const trapLines = [], timeoutLines = [];
+  const trapLines = [], trapKinds = [], timeoutLines = [];
   let traps = 0;
 
   const runFrom = (start) => new Promise((resolve, reject) => {
@@ -37,7 +37,7 @@ if (isMainThread) {
       } else if (m.type === "done") {
         clearTimeout(timer);
         recs[m.c] = Buffer.from(m.rec);
-        if (m.trap !== null) { traps++; trapLines.push(`${m.c} ${m.trap}`); }
+        if (m.trap !== null) { traps++; trapLines.push(`${m.c} ${m.trap}`); trapKinds.push(`${m.c} ${m.kind}`); }
       } else if (m.type === "end") {
         finish(resolve, ncase);
       }
@@ -53,6 +53,7 @@ if (isMainThread) {
   if (missing >= 0) throw new Error(`run_wasm: case ${missing} の結果が無い`);
   writeFileSync(`${W}/res_wasm.bin`, Buffer.concat(recs));
   writeFileSync(`${W}/trap.txt`, trapLines.map((l) => l + "\n").join(""));
+  writeFileSync(`${W}/trap_kind.txt`, trapKinds.map((l) => l + "\n").join(""));   // 種類 (VA が 0 の trap の原因。境界外・未対応命令など)
   writeFileSync(`${W}/timeout.txt`, timeoutLines.map((l) => l + "\n").join(""));
   console.log(`[run_wasm] cases=${ncase} traps=${traps} timeouts=${timeoutLines.length} neg=${NEG || "none"}`);
 } else {
@@ -100,12 +101,13 @@ if (isMainThread) {
     mem.set(arena, ARENA);
     mdv.setBigUint64(CTX, neg === "ctx" ? 0n : ctx, true);
     ex.rex_reset();
-    let rax, hits, trap = null;
+    let rax, hits, trap = null, kind = "";
     try {
       rax = ex.rex_run(EXP[fn], a0, a1, a2, a3);
       hits = ex.rex_hits_get();
     } catch (e) {
-      trap = ex.rex_unsup_get().toString(16);   // trap した case と未対応命令の VA (movnti_check.py が読む)
+      trap = ex.rex_unsup_get().toString(16);   // trap した case と未対応命令の VA (movnti_check.py が読む)。境界外等の wasm trap は 0
+      kind = String(e && e.message).replace(/\s+/g, " ");
       rax = 0xdeadn; hits = 0xdeadn;
     }
     const head = Buffer.alloc(16);
@@ -113,7 +115,7 @@ if (isMainThread) {
     head.writeBigUInt64LE(BigInt(hits), 8);
     const m2 = new Uint8Array(ex.memory.buffer);
     const rec = Buffer.concat([head, Buffer.from(m2.slice(ARENA, ARENA + ARENA_SZ)), Buffer.from(m2.slice(DATA, DATA + DATA_SZ))]);
-    parentPort.postMessage({ type: "done", c, rec, trap });
+    parentPort.postMessage({ type: "done", c, rec, trap, kind });
   }
   parentPort.postMessage({ type: "end" });
 }
