@@ -19,8 +19,9 @@ usage: reg_call_resolve.py <pe> <target_va_hex> <root_va_hex>
 - 読み出す値は PE ファイル上の初期値。書込み可能な .data の実行時の値は、このスクリプトでは見ていない。
 - 書込みは「同じ base レジスタ・同じ disp の別名」を見ない。memory alias は未考慮。
 - 供給元の分類 (provenance) は従来どおり直線の後ろ向き走査で、経路は見ていない (分類のみ)。
-- `[rsp+disp]` の書込みは、その disp と文字列一致する命令だけを定義とみなす。それ以外で同じ領域に書く命令は
-  その経路を未解決にする (保守的)。
+- `[rsp+disp]` の書込みは、`qword ptr [rsp + disp]` と文字列一致する命令だけを定義とみなす。宛先に `[rsp + disp]` を
+  文字列として含む命令はその経路を未解決にする。スロットと範囲で重なる幅の広い書込み (例: `movups xmmword ptr [rsp + 0x58]`
+  が `[rsp+0x60]` を含む) は見ていないため、そこを通る経路の値が古いままになりうる (未考慮)。
 """
 import re
 import struct

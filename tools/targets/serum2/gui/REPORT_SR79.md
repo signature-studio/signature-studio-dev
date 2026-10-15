@@ -3,19 +3,19 @@
 - 日付: 2026-10-15 / 親: #4484 (SR-76) / 前段: `REPORT_SR76.md` §5 (a)・§4 / 対象: `0x1803573f0` (`+0x20408` の書込元)
 - 範囲: 静的解析のみ。実 VSTGUI 上の動的確認は範囲外。FLEngine 起動・GUI は**動かしていない** (製品 KPI は測っていない)。
 - 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3` (x86_64-win)。sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` (REPORT_SR76 §1 と一致)。作業用 dir はリポジトリ外。
-- 測定 commit (解析に使ったコード): `d7d352b84` (`reg_call_resolve.py` の追加 commit)。本 PR の後続 commit はコードを変えず、docstring と本 REPORT の限界記述だけを変えた (§1.1)。
+- 測定 commit (解析に使ったコード): `bcf0a20a3` (全経路版の `reg_call_resolve.py` の最後の解析ロジック変更)。後続の `e133faa04` は REPORT のみ。後続の修正 commit は docstring の限界記述だけを変え、解析ロジックは変えていない (§1.4)。
 
 ## 0. 結論
 
 | 受入条件 | 判定 |
 |---|---|
-| 1. `call reg`・`call [rsp+disp]` の宛先を定義元まで遡って解決する (解決不能は未解決として数える) | **部分達成**。`call reg` 1058 件・`call [rsp+disp]` 10 件 (計 1068 サイト) のうち 120 件を解決、948 件は未解決。解決した 120 件の宛先はいずれも R (`0x1803573f0` の direct 逆閉包 8 関数) に当たらない |
-| 2. 1 の結果を含めて、setState 閉包 `0x1800c2b50`・getState 閉包 `0x1800c6090` と demo bit 関数 (`0x22792` を参照する関数) との交わりを示す | **部分達成**。C∩R = 0 (setState・getState とも)。demo bit 関数 2 件 (`0x1800c2b50`・`0x1800c6090`) は根そのもので、閉包との交わりは根自身のみ (demo∩C = 1)。C 内の未解決サイトは setState 28 件・getState 25 件あり、『交わり 0』はこれらを含めた完全な結論ではない (§3) |
+| 1. `call reg`・`call [rsp+disp]` の宛先を定義元まで遡って解決する (解決不能は未解決として数える) | **部分達成**。`call reg` 1058 件・`call [rsp+disp]` 10 件 (計 1068 サイト) のうち 98 件を解決、970 件は未解決 (全経路版・§1.2)。解決した 98 件の宛先はいずれも R (`0x1803573f0` の direct 逆閉包 8 関数) に当たらない |
+| 2. 1 の結果を含めて、setState 閉包 `0x1800c2b50`・getState 閉包 `0x1800c6090` と demo bit 関数 (`0x22792` を参照する関数) との交わりを示す | **部分達成**。C∩R = 0 (setState・getState とも)。demo bit 関数 2 件 (`0x1800c2b50`・`0x1800c6090`) は根そのもので、閉包との交わりは根自身のみ (demo∩C = 1)。C 内の未解決サイトは setState 28 件・getState 25 件あり、『交わり 0』はこれらを含めた完全な結論ではない (§3)。幅の広いスタック書込みの kill 漏れ (§1.4) も未考慮 |
 | 3. REPORT に測定 commit と再現手順 | **達成** (§1・§5) |
 
 **このため、本 REPORT は『R への経路が無い』とは主張しない。** 解決できた範囲と、未解決が残る範囲を分けて示す。
 
-注: 下表・§1 の『解決 120』は前版 (`d7d352b84`)。全経路化後の最新値は §1.2 (`bcf0a20a3`・解決 98 / 未解決 970)。解決のうち R に当たる数はどちらも 0。
+現行の測定値は §1.2 (全経路版・`bcf0a20a3`) が正本。§1 の md5 と所要時間は前版 (`d7d352b84`) の実測で、比較用に残す。
 
 ## 1. 再現手順と実測
 
@@ -66,6 +66,13 @@ venv/bin/python $P/reg_call_resolve.py Serum2_win64.vst3 0x1803573f0 0x1800c6090
 - 間接 jmp を含む関数は 1128 件 (うち jump table の `jmp rdx` が 1137 箇所)。これらの関数の全サイトを未解決に数えた。jump table を解読すれば、この分の解決が戻る可能性がある (未了)。
 - 結論は変わらない: 解決したどの宛先も R に当たらない。『C∩R = 0』は、未解決 948 → 970 サイトを含めた完全な結論ではない。
 
+### 1.4 スタック書込みの kill 規則の限界 (未対応・再測定が要る)
+
+- `[rsp+disp]` の kill は、宛先に `[rsp + disp]` を文字列として含む命令だけ。範囲で重なる幅の広い書込み (例: `movups xmmword ptr [rsp + 0x58], xmm0` が `[rsp+0x60]` を含む) は kill されず、古い値を解決したままになりうる。
+- したがって `call [rsp+disp]` の解決のうち、幅の広い書込みを通る経路のものは誤りうる。解決 98 件中の該当数は未確認。現行の結論 (解決した宛先は R に当たらない) を過信しない。
+- 修正は、宛先の memory operand が `[rsp` を含み exact slot でない命令をすべて kill とすること。`plugins-serum2` の素材が要るため、本 PR では未対応 (測定は未実施)。
+- 解析コードは変えていないため、§1.2 の測定値 (md5 を含む) はこの commit で変わらない。
+
 ### 1.3 残作業 (#4610 継続)
 
 - jump table (`jmp rdx` 1137 箇所・`jmp [rax+disp]` 他) の解読で逆辺を確定し、間接 jmp 関数の分の解決を戻す。
@@ -79,12 +86,12 @@ venv/bin/python $P/reg_call_resolve.py Serum2_win64.vst3 0x1803573f0 0x1800c6090
 | R (`0x1803573f0` の direct 逆閉包) | 8 | 8 |
 | C (root から direct call/jmp で到達する関数) | 854 | 291 |
 | C∩R | 0 | 0 |
-| サイト (call reg 1058・call [rsp+disp] 10) の解決 | 120 解決・948 未解決 | 同左 |
+| サイト (call reg 1058・call [rsp+disp] 10) の解決 | 98 解決・970 未解決 (§1.2) | 同左 |
 | 解決サイトのうち宛先が R に当たる数 | 0 | 0 |
 | C 内の未解決サイト (関数数) | 28 (13) | 25 (7) |
 | demo bit 関数 ∩ C | 1 (根自身) | 1 (根自身) |
 
-解決ロジックは `reg_call_resolve.py` の `resolve()`。`mov reg, [rip+X]`・`lea rip`・`mov reg, [reg2+off]` を後ろ向きに辿り、呼出しを跨ぐ場合は volatile レジスタ (rax/rcx/rdx/r8-r11) だけ未解決にする。`call [rsp+disp]` は同じ disp への直前の `mov` から辿る。
+解決ロジックは `reg_call_resolve.py` の `resolve()` (全経路版)。制御フローの全経路 (fall-through と direct jmp/jcc の逆辺) を後ろ向きに辿り、全経路が同じ値集合に解決したときだけ解決とする。`lea rip`・`mov reg, [rip+X]`・`mov reg, [reg2+off]` を解決し、呼出しを跨ぐ場合は volatile レジスタ (rax/rcx/rdx/r8-r11) だけ未解決にする。`call [rsp+disp]` は、同じ disp への各経路の直前の `mov` から辿る (kill 規則は §1.4)。
 
 ## 3. 未解決の内訳 (C 内)
 
@@ -115,7 +122,7 @@ venv/bin/python $P/reg_call_resolve.py Serum2_win64.vst3 0x1803573f0 0x1800c6090
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (a) `call reg`・`call [rsp+disp]` の 948 サイト (全体)。解決は 120 サイトのみ | 受入 1・2 の『交わり 0』は未解決サイトを含めた完全な結論ではない | #4610 (本 issue を継続) |
+| (a) `call reg`・`call [rsp+disp]` の 970 サイト (全体)。解決は 98 サイトのみ (§1.2) | 受入 1・2 の『交わり 0』は未解決サイトを含めた完全な結論ではない | #4610 (本 issue を継続) |
 | (b) C 内の未解決 28 (setState)・25 (getState) サイトの供給元。`load[reg+other]`・`after-call`・`stack-arg` の個別解決 | 受入 2 の『C∩R = 0』が、これらのサイトを通る経路を除外できていない | #4610 (本 issue を継続) |
 | (c) `load[reg+other]` の disp が vptr のスロット途中 (MI・別 vtable) を指す場合に R へ届くか | R の vtable 形状 (1 vtable の先頭か途中か) の検証が未了 | #4610 (本 issue を継続) |
 | (d) demo bit 関数が .text で 2 件 (根のみ) しかない。`0x22792` の読出しは別経路 (オブジェクト経由の間接読出し) の可能性 (REPORT_SR76 §5(b) と同じ) | 『demo∩C』の意味が根自身だけになる | #4610 (本 issue を継続) |
