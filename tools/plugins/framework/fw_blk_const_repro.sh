@@ -55,6 +55,16 @@ def byte_set(i, val):
 for i in range(8):
     out('b18_%d_00' % i, byte_set(i, 0x00))
     out('b18_%d_ff' % i, byte_set(i, 0xff))
+# #5165: slot 0x08・0x10 (8 byte) の 1 byte ずつを 0 / 0xff に変えた variant。
+def byte_set_at(slot, i, val):
+    b = bytearray(src)
+    b[off + slot + i] = val
+    return b
+
+for slot in (0x08, 0x10):
+    for i in range(8):
+        out('b%02x_%d_00' % (slot, i), byte_set_at(slot, i, 0x00))
+        out('b%02x_%d_ff' % (slot, i), byte_set_at(slot, i, 0xff))
 # "24 00" (0x18 の先頭 2 byte) を同時に 0 にした variant。
 b = bytearray(src)
 b[off + 0x18:off + 0x1a] = b'\x00\x00'
@@ -65,7 +75,7 @@ PY
 
 REPS="${REPS:-1}"
 printf '%-10s %-4s %-14s %-10s\n' variant rep const_globals blk_loads
-for v in base zero nop only08 only18 $(ls "$W" | sed -n 's/^\(b18_[0-9a-z_]*\)\.dll$/\1/p'); do
+for v in base zero nop only08 only18 $(ls "$W" | sed -n 's/^\(b[0-9a-f][0-9a-f]_[0-9a-z_]*\)\.dll$/\1/p'); do
   for r in $(seq 1 "$REPS"); do
     rm -f "$v.ll"
     timeout 200 "$RETDEC_BIN" "$v.dll" -o "$v.c" \
