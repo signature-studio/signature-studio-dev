@@ -11,6 +11,7 @@ InitUnits は InitTable (RVA 0x11eac90 の参照先) と InitCount (0x11eac98) �
 判定: 両 state で InitUnits の 11 pattern を実行し、
   - EMPTY = equal かつ 呼出列・書込みが両側 0 件 (比較情報なし)
   - hybrid で EMPTY が 1 件でもあれば FAIL (exit 1)
+  - hybrid で native_status が ok でない (segv 等) が 1 件でもあれば FAIL (exit 1) (LD-153)
 units の EMPTY 件数は空振りの実測として出力する (defect の記録であり FAIL 条件ではない)。
 
 使い方: FL_WIN64_DIR=... python3 tests/check_initunits.py [--json out.json]
@@ -80,20 +81,22 @@ def main():
         pc = boot.precondition(st)
         rows = run_state(path)
         empty = sum(1 for r in rows if r['empty'])
+        native_ng = sum(1 for r in rows if r['native_status'] != 'ok')
         summary[mode] = {
             'precondition': pc,
             'patterns': len(rows),
             'outcomes': {o: sum(1 for r in rows if r['outcome'] == o) for o in {r['outcome'] for r in rows}},
             'empty_match': empty,
+            'native_not_ok': native_ng,
             'rows': rows,
         }
-        print('[%s] precondition=%s patterns=%d empty_match=%d outcomes=%s' % (mode, pc, len(rows), empty, summary[mode]['outcomes']))
+        print('[%s] precondition=%s patterns=%d empty_match=%d native_not_ok=%d outcomes=%s' % (mode, pc, len(rows), empty, native_ng, summary[mode]['outcomes']))
         for r in rows:
             print('  %-7s %-12s native=%s wasm=%s calls=%d/%d mem=%d/%d%s' % (
                 r['pattern'], r['outcome'], r['native_status'], r['wasm_status'],
                 r['native_calls'], r['wasm_calls'], r['native_mem'], r['wasm_mem'],
                 '  [EMPTY]' if r['empty'] else ''))
-        if mode == 'hybrid' and empty:
+        if mode == 'hybrid' and (empty or native_ng):
             fail = True
     if out:
         json.dump(summary, open(out, 'w'), ensure_ascii=False, indent=1)
