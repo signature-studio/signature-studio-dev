@@ -570,6 +570,18 @@ FL_H(general, getProjectGenre) { NARGS(0, 0); return fl_ret_s(c, proj_genre); }
 /* PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない */
 FL_H(general, clearLog) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(general, dumpScoreLog) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
+/* PY-235 (#3701): 成功経路 (gate 0 を仮定) は戻り値 = value (int32)。family の定義は host/fl_mock.mjs の recPassFamily と同一 (REPORT_PY235) */
+static int rec_pass_family(uint32_t e) {
+    return (e & 0xffff) != 8 && ((e >= 0x10000000u && e < 0x40000000u) || (e >= 0x40000003u && e <= 0x40000004u) || (e > 0x40000005u && e < 0x70000000u) || e >= 0xf0000000u);
+}
+FL_H(general, processRECEvent) {
+    NARGS(3, 3);
+    uint32_t e = (uint32_t)A_INT(0, 0);
+    int64_t v = A_INT(1, 0);
+    (void)A_INT(2, 0);
+    if (!rec_pass_family(e)) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error (not implemented: general.processRECEvent)");
+    return fl_ret_i(c, (int32_t)v);
+}
 /* PY-119 (#2977): PE 0xd69350/0xd694e0/0xd69670 は範囲外で status -3 (Range error)。ゲートは未確定のため真と仮定 (REPORT_PY119_2977) */
 static int numerator = 4, denominator = 4;
 FL_H(general, setRecPPQ) { NARGS(1, 1); int64_t v = A_INT(0, 0); if (v < 24 || v > 960) RANGE_MSG("Range error"); rec_ppq = (int)v; return fl_ret_none(c); }
