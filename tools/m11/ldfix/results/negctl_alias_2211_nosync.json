@@ -1,0 +1,1265 @@
+{
+ "functions": 48,
+ "by_verdict": {
+  "UNDETERMINED": 17,
+  "LIVE-IN": 28,
+  "DROP": 3
+ },
+ "site_by_verdict": {
+  "UNDETERMINED": 18,
+  "LIVE-IN": 29,
+  "DROP": 3,
+  "PTR_READ": 1
+ },
+ "negctl_glk": false,
+ "verdict": {
+  "1006ec0": "UNDETERMINED",
+  "103aa50": "LIVE-IN",
+  "10628a0": "DROP",
+  "11e6e20": "LIVE-IN",
+  "129df10": "UNDETERMINED",
+  "12cb2e0": "LIVE-IN",
+  "13105d0": "DROP",
+  "1354630": "UNDETERMINED",
+  "4078c0": "LIVE-IN",
+  "412160": "LIVE-IN",
+  "418b40": "LIVE-IN",
+  "441730": "UNDETERMINED",
+  "4488f0": "UNDETERMINED",
+  "454090": "UNDETERMINED",
+  "45c170": "UNDETERMINED",
+  "45cda0": "UNDETERMINED",
+  "45d8b0": "LIVE-IN",
+  "45db40": "UNDETERMINED",
+  "45dc20": "LIVE-IN",
+  "5c4dc0": "UNDETERMINED",
+  "5cb210": "UNDETERMINED",
+  "639c70": "LIVE-IN",
+  "694c80": "UNDETERMINED",
+  "695640": "LIVE-IN",
+  "6c01a0": "UNDETERMINED",
+  "6c7610": "LIVE-IN",
+  "6c7ca0": "LIVE-IN",
+  "6ca580": "LIVE-IN",
+  "6ca6c0": "LIVE-IN",
+  "6ced00": "LIVE-IN",
+  "7e45e0": "UNDETERMINED",
+  "808930": "LIVE-IN",
+  "808c80": "LIVE-IN",
+  "81bfd0": "UNDETERMINED",
+  "81c0d0": "LIVE-IN",
+  "820d60": "LIVE-IN",
+  "824020": "LIVE-IN",
+  "864f80": "LIVE-IN",
+  "867220": "UNDETERMINED",
+  "92ea90": "LIVE-IN",
+  "bf8b40": "LIVE-IN",
+  "c38bd0": "DROP",
+  "c3b340": "UNDETERMINED",
+  "c9cf70": "LIVE-IN",
+  "da5400": "LIVE-IN",
+  "da5510": "LIVE-IN",
+  "e8fba0": "LIVE-IN",
+  "f61710": "LIVE-IN"
+ },
+ "fn_info": {
+  "1006ec0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 96,
+   "glk": true,
+   "leak": "1006ec8 mov qword ptr [rbp + 0x40], rcx [STORE_PTR]",
+   "derived": [
+    "rcx"
+   ],
+   "sync": null
+  },
+  "103aa50": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 227,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "10628a0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 13,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "11e6e20": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 144,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "129df10": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 435,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "12cb2e0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 95,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "13105d0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 223,
+   "glk": true,
+   "leak": "13105de mov qword ptr [rbp + 0x80], rcx [STORE_PTR]",
+   "derived": [
+    "rbx",
+    "rcx",
+    "rdx",
+    "xmm0"
+   ],
+   "sync": null
+  },
+  "1354630": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 320,
+   "glk": true,
+   "leak": "13546f9 mov qword ptr [rbp + 0x188], rbp [STORE_PTR]",
+   "derived": [],
+   "sync": null
+  },
+  "4078c0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 113,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "412160": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 79,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "418b40": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 14,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "441730": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 105,
+   "glk": true,
+   "leak": "441738 mov qword ptr [rbp + 0x28], rbp [STORE_PTR]",
+   "derived": [
+    "rcx"
+   ],
+   "sync": null
+  },
+  "4488f0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 105,
+   "glk": true,
+   "leak": "4488fe mov qword ptr [rbp + 0x38], rcx [STORE_PTR]",
+   "derived": [
+    "rcx"
+   ],
+   "sync": null
+  },
+  "454090": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 380,
+   "glk": true,
+   "leak": "45409b mov qword ptr [rbp + 0x38], rbp [STORE_PTR]",
+   "derived": [
+    "rcx"
+   ],
+   "sync": null
+  },
+  "45c170": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 23,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "45cda0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 45,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "45d8b0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 141,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "45db40": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 24,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "45dc20": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 33,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "5c4dc0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 69,
+   "glk": true,
+   "leak": "5c4dcb mov qword ptr [rbp + 0x28], rbp [STORE_PTR]",
+   "derived": [],
+   "sync": null
+  },
+  "5cb210": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 463,
+   "glk": true,
+   "leak": "5cb21e mov qword ptr [rbp + 0x68], rbp [STORE_PTR]",
+   "derived": [],
+   "sync": null
+  },
+  "639c70": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 22,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "694c80": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 261,
+   "glk": true,
+   "leak": "694c94 mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
+   "derived": [],
+   "sync": null
+  },
+  "695640": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 103,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "6c01a0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 93,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "6c7610": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 331,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "6c7ca0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 84,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "6ca580": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 91,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "6ca6c0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 70,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "6ced00": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 10,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "7e45e0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 547,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "808930": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 90,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "808c80": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 17,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "81bfd0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 33,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "81c0d0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 35,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "820d60": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 40,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "824020": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 39,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "864f80": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 10,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "867220": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 16,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "92ea90": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 29,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "bf8b40": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 194,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "c38bd0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 83,
+   "glk": true,
+   "leak": "c38beb mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
+   "derived": [],
+   "sync": null
+  },
+  "c3b340": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 144,
+   "glk": true,
+   "leak": "c3b364 mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
+   "derived": [],
+   "sync": null
+  },
+  "c9cf70": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 29,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "da5400": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 29,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "da5510": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 29,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "e8fba0": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 54,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  },
+  "f61710": {
+   "escaped": true,
+   "ijmp": false,
+   "n_ins": 338,
+   "glk": false,
+   "leak": null,
+   "derived": [],
+   "sync": null
+  }
+ },
+ "sites": [
+  {
+   "fn": "1006ec0",
+   "ty": "i32",
+   "addr": "1006fb6",
+   "mnem": "cmp dword ptr [rbp + 0x2c], 1",
+   "slot": "rbp+0x2c",
+   "outcomes": [
+    "ENTRY_AFTER_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "1006ec0",
+   "ty": "i8",
+   "addr": "1007021",
+   "mnem": "cmp byte ptr [rbp + 0x2b], 0",
+   "slot": "rbp+0x2b",
+   "outcomes": [
+    "BARRIER:LEAK_STORE",
+    "ENTRY_AFTER_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(LEAK_STORE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "1006fe8 mov qword ptr [rax + 0x64], 0 [LEAK_STORE]"
+   ]
+  },
+  {
+   "fn": "103aa50",
+   "ty": "i32",
+   "addr": "103ab59",
+   "mnem": "add r14d, dword ptr [rbp + 0x38]",
+   "slot": "rbp+0x38",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "10628a0",
+   "ty": "i16",
+   "addr": "10628c0",
+   "mnem": "movzx rax, word ptr [rbp + 0x4e]",
+   "slot": "rbp+0x4e",
+   "outcomes": [
+    "STORE"
+   ],
+   "verdict": "DROP",
+   "why": "ALL_PATHS_STORE",
+   "store_addrs": [
+    "10628bc mov word ptr [rbp + 0x4e], ax"
+   ],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "11e6e20",
+   "ty": "i32",
+   "addr": "11e6fdb",
+   "mnem": "movss xmm0, dword ptr [rbp + 0x108]",
+   "slot": "rbp+0x108",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "129df10",
+   "ty": "i32",
+   "addr": "129e1d6",
+   "mnem": "sub esi, dword ptr [rbp + 0x88]",
+   "slot": "rbp+0x88",
+   "outcomes": [
+    "BARRIER:MIXED_BASE",
+    "ENTRY"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(MIXED_BASE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "129e5f8 mov dword ptr [rsp + 0x20], eax [MIXED_BASE]"
+   ]
+  },
+  {
+   "fn": "12cb2e0",
+   "ty": "i32",
+   "addr": "12cb416",
+   "mnem": "mov r8d, dword ptr [rsp + 0x28]",
+   "slot": "rsp+0x28",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "13105d0",
+   "ty": "i32",
+   "addr": "1310837",
+   "mnem": "add eax, dword ptr [rbp + 0x48]",
+   "slot": "rbp+0x48",
+   "outcomes": [
+    "STORE"
+   ],
+   "verdict": "DROP",
+   "why": "ALL_PATHS_STORE",
+   "store_addrs": [
+    "1310826 mov qword ptr [rbp + 0x44], rax"
+   ],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "1354630",
+   "ty": "i16",
+   "addr": "1354784",
+   "mnem": "cmp word ptr [rbp + 0x1d2], 1",
+   "slot": "rbp+0x1d2",
+   "outcomes": [
+    "BARRIER:MIXED_BASE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(MIXED_BASE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "1354745 mov qword ptr [rsp + 0x20], rax [MIXED_BASE]"
+   ]
+  },
+  {
+   "fn": "4078c0",
+   "ty": "i64",
+   "addr": "40792b",
+   "mnem": "and qword ptr [rbp + 0x38], 0xffffffffffff0000",
+   "slot": "rbp+0x38",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "4078c0",
+   "ty": "i32",
+   "addr": "40791e",
+   "mnem": "cmp dword ptr [rbp + 0x40], 0x10000",
+   "slot": "rbp+0x40",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "412160",
+   "ty": "i32",
+   "addr": "41217d",
+   "mnem": "cmp dword ptr [rbp + 0x170], 2",
+   "slot": "rbp+0x170",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "418b40",
+   "ty": "i32",
+   "addr": "418b57",
+   "mnem": "cmp dword ptr [rbp + 0x40], 0x1000",
+   "slot": "rbp+0x40",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "441730",
+   "ty": "i16",
+   "addr": "44178f",
+   "mnem": "cmp word ptr [rbp + 0x6e], 0",
+   "slot": "rbp+0x6e",
+   "outcomes": [
+    "ENTRY_AFTER_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "4488f0",
+   "ty": "i32",
+   "addr": "44892d",
+   "mnem": "cmp dword ptr [rbp + 0xd8], 0x1000",
+   "slot": "rbp+0xd8",
+   "outcomes": [
+    "ENTRY_AFTER_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "454090",
+   "ty": "i8",
+   "addr": "454637",
+   "mnem": "cmp byte ptr [rbp + 0x16e], 1",
+   "slot": "rbp+0x16e",
+   "outcomes": [
+    "BARRIER:MIXED_BASE",
+    "ENTRY_AFTER_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(MIXED_BASE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "4544d4 mov qword ptr [rsp + 0x28], rax [MIXED_BASE]",
+    "45447b mov qword ptr [rsp + 0x28], rax [MIXED_BASE]",
+    "454438 mov qword ptr [rsp + 0x28], rax [MIXED_BASE]",
+    "4543c8 mov qword ptr [rsp + 0x28], rax [MIXED_BASE]"
+   ]
+  },
+  {
+   "fn": "45c170",
+   "ty": "i32",
+   "addr": "45c1b5",
+   "mnem": "mov eax, dword ptr [rbp + 0x40]",
+   "slot": "rbp+0x40",
+   "outcomes": [
+    "BARRIER:MIXED_BASE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(MIXED_BASE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "45c195 mov word ptr [rsp + 0x20], 3 [MIXED_BASE]"
+   ]
+  },
+  {
+   "fn": "45cda0",
+   "ty": "i32",
+   "addr": "45cdd9",
+   "mnem": "movsxd rax, dword ptr [rbp + 0x40]",
+   "slot": "rbp+0x40",
+   "outcomes": [
+    "BARRIER:MIXED_BASE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(MIXED_BASE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "45cdc5 mov word ptr [rsp + 0x20], 3 [MIXED_BASE]"
+   ]
+  },
+  {
+   "fn": "45d8b0",
+   "ty": "i16",
+   "addr": "45da5b",
+   "mnem": "cmp word ptr [rbp + 0x3e], 0",
+   "slot": "rbp+0x3e",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "45db40",
+   "ty": "i16",
+   "addr": "45db85",
+   "mnem": "cmp word ptr [rbp + 0x40], 0",
+   "slot": "rbp+0x40",
+   "outcomes": [
+    "BARRIER:MIXED_BASE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(MIXED_BASE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "45db65 mov word ptr [rsp + 0x20], 0xb [MIXED_BASE]"
+   ]
+  },
+  {
+   "fn": "45dc20",
+   "ty": "i16",
+   "addr": "45dc69",
+   "mnem": "cmp word ptr [rbp + 0x28], 0",
+   "slot": "rbp+0x28",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "5c4dc0",
+   "ty": "i32",
+   "addr": "5c4e43",
+   "mnem": "cmp dword ptr [rbp + 0x58], 0xc0c0c0",
+   "slot": "rbp+0x58",
+   "outcomes": [
+    "ENTRY_AFTER_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "5cb210",
+   "ty": "i64",
+   "addr": "5cb4aa",
+   "mnem": "cmp qword ptr [rbp + 0xc0], 0",
+   "slot": "rbp+0xc0",
+   "outcomes": [
+    "BARRIER:LEAK_STORE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(LEAK_STORE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "5cb47d mov dword ptr [rax + 8], ecx [LEAK_STORE]"
+   ]
+  },
+  {
+   "fn": "639c70",
+   "ty": "i32",
+   "addr": "639c83",
+   "mnem": "mov eax, dword ptr [rsp + 0x2c]",
+   "slot": "rsp+0x2c",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "694c80",
+   "ty": "i64",
+   "addr": "6951c8",
+   "mnem": "movsd xmm1, qword ptr [rbp + 0xe8]",
+   "slot": "rbp+0xe8",
+   "outcomes": [
+    "BARRIER:LEAK_STORE",
+    "STORE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(LEAK_STORE)",
+   "store_addrs": [
+    "694c9f movsd qword ptr [rbp + 0xe8], xmm1"
+   ],
+   "barrier_addrs": [
+    "695163 mov qword ptr [rax + 0x94], rcx [LEAK_STORE]"
+   ]
+  },
+  {
+   "fn": "695640",
+   "ty": "i64",
+   "addr": "6956f9",
+   "mnem": "cmp qword ptr [rbp + 0x38], 0",
+   "slot": "rbp+0x38",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "6c01a0",
+   "ty": "i128",
+   "addr": "6c0207",
+   "mnem": "mov r9d, dword ptr [rbp + 0x44]",
+   "slot": "rbp+0x44",
+   "outcomes": [
+    "BARRIER:MIXED_BASE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(MIXED_BASE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "6c01e8 mov qword ptr [rsp + 0x20], rax [MIXED_BASE]"
+   ]
+  },
+  {
+   "fn": "6c7610",
+   "ty": "i128",
+   "addr": "6c7665",
+   "mnem": "mov ecx, dword ptr [rbp + 0x44]",
+   "slot": "rbp+0x44",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "6c7ca0",
+   "ty": "i128",
+   "addr": "6c7ccc",
+   "mnem": "mov edx, dword ptr [rbp + 0x84]",
+   "slot": "rbp+0x84",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "6ca580",
+   "ty": "i128",
+   "addr": "6ca5c2",
+   "mnem": "add dword ptr [rbp + 0x64], eax",
+   "slot": "rbp+0x64",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "6ca6c0",
+   "ty": "i128",
+   "addr": "6ca702",
+   "mnem": "add dword ptr [rbp + 0x64], eax",
+   "slot": "rbp+0x64",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "6ced00",
+   "ty": "i32",
+   "addr": "6ced14",
+   "mnem": "mov eax, dword ptr [rbp + 0x28]",
+   "slot": "rbp+0x28",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "7e45e0",
+   "ty": "i32",
+   "addr": "7e48d6",
+   "mnem": "cvtsi2ss xmm0, dword ptr [rbp + 0x6c]",
+   "slot": "rbp+0x6c",
+   "outcomes": [
+    "ENTRY",
+    "STORE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "MIXED_OR_UNREACHABLE",
+   "store_addrs": [
+    "7e4659 mov dword ptr [rbp + 0x6c], eax"
+   ],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "7e45e0",
+   "ty": "i32",
+   "addr": "7e47b6",
+   "mnem": "sub eax, dword ptr [rcx + 0x4dc]",
+   "verdict": "PTR_READ"
+  },
+  {
+   "fn": "808930",
+   "ty": "i32",
+   "addr": "80896d",
+   "mnem": "cmp dword ptr [rbp + 0x5c], 3",
+   "slot": "rbp+0x5c",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "808c80",
+   "ty": "i32",
+   "addr": "808ca4",
+   "mnem": "cmp dword ptr [rbp + 0x2c], 3",
+   "slot": "rbp+0x2c",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "81bfd0",
+   "ty": "i32",
+   "addr": "81bff3",
+   "mnem": "mov eax, dword ptr [rsp + 0x2c]",
+   "slot": "rsp+0x2c",
+   "outcomes": [
+    "BARRIER:MIXED_BASE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(MIXED_BASE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "81bfdd mov dword ptr [rsp + 0x28], 0x18 [MIXED_BASE]"
+   ]
+  },
+  {
+   "fn": "81c0d0",
+   "ty": "i32",
+   "addr": "81c118",
+   "mnem": "mov eax, dword ptr [rbp + 0x2c]",
+   "slot": "rbp+0x2c",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "820d60",
+   "ty": "i32",
+   "addr": "820dba",
+   "mnem": "add dword ptr [rbp + 0x30], ecx",
+   "slot": "rbp+0x30",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "824020",
+   "ty": "i32",
+   "addr": "824069",
+   "mnem": "add dword ptr [rbp + 0x30], eax",
+   "slot": "rbp+0x30",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "864f80",
+   "ty": "i32",
+   "addr": "864f94",
+   "mnem": "sub eax, dword ptr [rbp + 0x20]",
+   "slot": "rbp+0x20",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "867220",
+   "ty": "i32",
+   "addr": "867245",
+   "mnem": "cmp dword ptr [rsp + 0x2c], 0",
+   "slot": "rsp+0x2c",
+   "outcomes": [
+    "BARRIER:MIXED_BASE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(MIXED_BASE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "867229 mov dword ptr [rsp + 0x28], eax [MIXED_BASE]"
+   ]
+  },
+  {
+   "fn": "92ea90",
+   "ty": "i64",
+   "addr": "92eaaf",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "slot": "rsp+0x48",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "bf8b40",
+   "ty": "i32",
+   "addr": "bf8b68",
+   "mnem": "mov eax, dword ptr [rbp + 0xac]",
+   "slot": "rbp+0xac",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "c38bd0",
+   "ty": "i64",
+   "addr": "c38c08",
+   "mnem": "cmp qword ptr [rbp + 0x78], 0",
+   "slot": "rbp+0x78",
+   "outcomes": [
+    "STORE"
+   ],
+   "verdict": "DROP",
+   "why": "ALL_PATHS_STORE",
+   "store_addrs": [
+    "c38c04 mov qword ptr [rbp + 0x78], rax"
+   ],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "c3b340",
+   "ty": "i32",
+   "addr": "c3b46f",
+   "mnem": "cmp dword ptr [rbp + 0x60], 0",
+   "slot": "rbp+0x60",
+   "outcomes": [
+    "BARRIER:LEAK_STORE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(LEAK_STORE)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "c3b3f5 mov byte ptr [rcx + 0x20], al [LEAK_STORE]"
+   ]
+  },
+  {
+   "fn": "c9cf70",
+   "ty": "i64",
+   "addr": "c9cf8f",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "slot": "rsp+0x48",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "da5400",
+   "ty": "i64",
+   "addr": "da541f",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "slot": "rsp+0x48",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "da5510",
+   "ty": "i64",
+   "addr": "da552f",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "slot": "rsp+0x48",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "e8fba0",
+   "ty": "i32",
+   "addr": "e8fc08",
+   "mnem": "sub dword ptr [rbp + 0x48], ecx",
+   "slot": "rbp+0x48",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "f61710",
+   "ty": "i32",
+   "addr": "f61ce6",
+   "mnem": "mov r8d, dword ptr [rbp + 0x94]",
+   "slot": "rbp+0x94",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  }
+ ]
+}
