@@ -16,7 +16,6 @@
 - 測定 commit: `0ca4a1903` (`feat(python): getGridBit の件数超えを event 経路 (PE 0x12d3e20) で写す (PY-218, #3596)`。コードを変えた最後の commit)。基点は `origin/main` = `6e7d1e59b`。
 - 検証 HEAD: 本 REPORT の commit。`git diff 0ca4a1903 HEAD -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis` は 0 行 (本 REPORT は範囲外)。
 - 環境: runner 4 core。素材: `fl-win64` を `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C $RUNNER_TEMP/fl-win64` で全展開 (5.6 秒)。`fetch_inputs.sh` rc 0。`build_cpython_wasm.sh` rc 0 (4 分 7.5 秒)。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (5.9 秒)。
-- 作業ツリーに元からあった `package.json`・`pnpm-lock.yaml` の未コミット変更には触れていない (runner 側の既存の変更。本 PR に含めない)。
 
 | 検査 (0ca4a1903) | コマンド | 結果 | 所要 |
 |---|---|---|---|
@@ -32,7 +31,7 @@
   - mock の flag 判定 (`!(flag & 0x20)`) を外す → `channels_diff` は `件数超え (event 経路) の差分 7 件` の AssertionError で rc 1 (FAIL)。戻すと PASS。
   - C の flag 判定を外して provider を再ビルド → 同じく `差分 7 件` で rc 1 (FAIL)。戻して再ビルドすると PASS。
   - mock の閾値 `hi = lo + V` を `lo + 2V` にする → `差分 8 件` で rc 1 (FAIL)。戻すと PASS。
-- 測定後、作業ツリーを元に戻し、`git diff 0ca4a1903 -- tools/python` の出力が空 (`tools/python/work` は gitignore 外の symlink で、commit していない) であることを確認した。
+- 測定後、作業ツリーを元に戻し、`git diff 0ca4a1903 -- tools/python` の出力が空であることを確認した。
 
 ## PE 解析 (FL_WIN64_DIR の `extracted/block00031_PE.bin`)
 
@@ -89,13 +88,13 @@ return 0
 | 件数 `[grid+0x22fc]-8` の値 (64 か) と生成経路 | 件数超えの境界。64 以外なら event 経路と steps の境界が変わる | 子 #3651 (`[PY-225]`) |
 | `V` の実行時の既定値 (静的 24 の後の書込み) | 閾値 `(position+1)*V` の実値 | `tools/python/REPORT_APPENDIX_3310.md` の #3311 (既存) |
 | `G1` の実行時の書込み元 | pattern 行の番号 (mock は 1 固定) | `tools/python/REPORT_PY179.md` の #3536 (既存) |
-| 項目の実体 (pattern 1 の note 列) と mock の `gridItems` の対応 | probe で項目を入れるのは検査用。実際の項目の作られ方は未確認 | 親 #2932 (PY-112) |
-| `getGridBitWithLoop` の件数超え (`0x12d3ff0` 側の経路) | loop 版の件数超えは base と同じ経路と仮定 | 親 #2932 (PY-112) |
-| channel 一致の前提 (表の添字 = channel 添字) | 別 channel への誤一致の可能性 | 子 #3651 の検証範囲 |
+| 項目の実体 (pattern 1 の note 列) と mock の `gridItems` の対応 | probe で項目を入れるのは検査用。実際の項目の作られ方は未確認 | #3651 (`[PY-225]`・コメントで追記) |
+| `getGridBitWithLoop` の件数超え (`0x12d3ff0` 側の経路) | loop 版の件数超えは base と同じ経路と仮定 | #3595 (`[PY-217]`・コメントで追記) |
+| channel 一致の前提 (表の添字 = channel 添字) | 別 channel への誤一致の可能性 | #3651 (`[PY-225]`・コメントで追記) |
 
 ## 範囲外
 
-- `getGridBitWithLoop` の loop 分岐 (`0x12d3ff0`) は PY-112 の範囲 (#2932)。
+- `getGridBitWithLoop` の loop 分岐 (`0x12d3ff0`) は子 #3595 (`[PY-217]`) の範囲。
 - `setGridBit` の件数検査は未照合。
 
 ## 再現
