@@ -60,10 +60,10 @@ null 経路 (`dec_label_pc_c409ec.critedge`) の `-24` は `*arg4 == 0` の分�
 
 ## 6. 検証範囲
 
-- 範囲内: 2 箇所の IR 修復・機械照合 13 件・NC 3 種・step 1f の配線・ldfix_e2e の完走 (4e6478372) と 1f の A/B。
+- 範囲内: 2 箇所の IR 修復・機械照合 13 件・NC 3 種・step 1f の配線・ldfix_e2e の完走 (408ca6232) と 1f の A/B。
 - 範囲外: 0xc40770 の分類器上の `MISMATCH` (分類器の対応規則。#2555 の定義)、stage4 の `memory access out of bounds` の原因 (#942 系、従来どおり)。
 - `--batch` (liftdiff closure 全数) は未実行。
-- 測定 commit `408ca6232` から HEAD までのコード差分 (`git diff 4e6478372 HEAD -- tools/m11/ldfix ':(exclude)*.md'`) は **0 行**。
+- 測定 commit `408ca6232` から HEAD までのコード差分 (`git diff 408ca6232 HEAD -- tools/m11/ldfix ':(exclude)*.md'`) は **0 行**。
 
 ## 7. 再現
 
