@@ -2,7 +2,7 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `9881e597b` (現 head。main の #4090 `lea` 伝播を含む判定器)。この commit の判定器で `results/frame_store_verdict_4166.json` と negctl 3 種を再生成した。同じ判定器で 2 回実行し `cmp` 一致 (byte 同一)。
+- 測定 commit: `c159cf7fe` (結果 JSON と negctl 3 種を現 head の判定器で再生成した commit)。判定器 (`audit_frame_store_alias_2211.py`) は `9881e597b` (main の #4090 `lea` 伝播を含む) から 0 行しか変えていない。同じ判定器で 2 回実行し `cmp` 一致 (byte 同一)。
 - 判定器の由来: `b1b8aee45` (main, #4090) が `frame_derived` に `lea` の派生を、`leak_sites` に全件返却を入れた。#4166 の branch 独自の判定器変更は規則 6 (`nonframe_store_addrs` 側) だけ。
 - 入力: `results/audit_undefload_564_full.json`・`results/f4_564_post.json` (#2211 と同じ)。
 - PE: fl-win64 の `extracted/block00031_PE.bin` (sha256 先頭 16 桁 `b2c64da40921cf26`、#2211 と同じ)。
