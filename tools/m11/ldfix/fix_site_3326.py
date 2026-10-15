@@ -10,6 +10,7 @@ IR の該当引数が `%argK` (または `%argK` の trunc / ptrtoint / `%0` = p
      完全一致しなければ assert で止める)。
   2. IR 照合: 対象行が base 形 (1 件だけ一致) のときだけ書き換える。適用済みの IR は拒否する (二重適用の防止)。
   3. 書き換え: 呼出しの直前に argK の 1 段 load を置き、引数をその値に差し替える (機械語の deref 位置と一致)。
+     仮引数が ptr 型の関数 (0x4506e0・0x7888f0) は inttoptr を挟まず `load i64, ptr %argK` とする。
 
 範囲外 (本ファイルでは直さない): 0x44f040・0x47b4a0・0x47cf10・0xc40770 (比較・GEP・null 経路の複雑型。子 issue)、
 0x450560 (fix_450560.py が直す)、0x6074b0 (ldfix.py の既存 pass が直す)、0x413340 の 3 番目引数 (別類型の疑い)。
@@ -64,8 +65,7 @@ SITES = [
                   (0x450739, 'mov', 'rdx, qword ptr [rax]'),
                   (0x45073c, 'call', '0x4133f0')],
          old='%19 = call i64 @function_4133f0(i64 %0, i64 %0)',
-         new=['%ldfx3326d_p = inttoptr i64 %arg1 to ptr',
-              '%ldfx3326d = load i64, ptr %ldfx3326d_p, align 8',
+         new=['%ldfx3326d = load i64, ptr %arg1, align 8',
               '%19 = call i64 @function_4133f0(i64 %0, i64 %ldfx3326d)']),
     dict(name='0x7888f0 -> 0x4133f0 (rbx 複写経由の arg1 -> argpos 2, k=1)', fn=0x7888f0, call_va=0x788957,
          machine=[(0x7888fb, 'mov', 'rbx, rcx'),
@@ -74,8 +74,7 @@ SITES = [
                   (0x788954, 'mov', 'rdx, qword ptr [rbx]'),
                   (0x788957, 'call', '0x4133f0')],
          old='%16 = call i64 @function_4133f0(i64 %arg2, i64 %arg2)',
-         new=['%ldfx3326e_p = inttoptr i64 %arg1 to ptr',
-              '%ldfx3326e = load i64, ptr %ldfx3326e_p, align 8',
+         new=['%ldfx3326e = load i64, ptr %arg1, align 8',
               '%16 = call i64 @function_4133f0(i64 %arg2, i64 %ldfx3326e)']),
 ]
 
