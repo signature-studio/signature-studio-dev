@@ -86,7 +86,7 @@
 | W 版ゲストの API 呼出し | `CreateWindowExW` `RegisterClassW` `PeekMessageW` `DispatchMessageW` `DefWindowProcW` ほか W 接尾辞のみ。`*A(` は 0 件 | `grep -oE '\b[A-Za-z]+A\(' build/lift_w/lifted.c` |
 | 既存 PE への影響 | `gui_app.c` `gui_app_ff.c` `gui_nc_app.c` `pe_image_app.c` の 4 PE で、`origin/main` の `gui_lift_post.py` と本 PR の `lifted.c` は sha256 一致 (差 0)。`L"` も `u"` も 0 件、復元 VA 0 件 | 同じ `retdec.c` に両版の後処理を適用して比較 |
 
-測定に使った RetDec は素材 `toolchain-retdec` (v5.0・commit `53e55b4b`) を `$RUNNER_TEMP` に展開したもの。`/opt/retdec` の版と一致。
+測定に使った RetDec は素材 `toolchain-retdec` (v5.0・commit `53e55b4b`) を `$RUNNER_TEMP` に展開したもの。[RETDEC] (`docs/REFERENCES.md`) の版と一致。
 
 ### RetDec 欠陥の行案 (`docs/DEFECTS.md` 形式・直接編集は PM 判断)
 | ID | 担当 | 区分 | 症状 | 原因 | 検出信号 | 検出器 | 修復 |
