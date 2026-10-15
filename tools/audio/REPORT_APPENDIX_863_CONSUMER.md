@@ -45,7 +45,7 @@
 ## 32 AU-15 (#863) 捕獲試行 (hunt 1 回 115 run 全 PASS・hunt.sh の出力先を起動ごとに分離)
 
 - 測定 commit: `3c735d220` (hunt.sh に PASS run の dev:tone 判定行の保存 `pass_detail.txt` を追加。検証対象の e2e・src・worklet は不変)。その後 `fa2c9b961` で hunt.sh の出力先を起動ごとの `tools/audio/work/hunt/<UTC 開始時刻>/` に分けた。`git diff 3c735d220 HEAD -- tools/audio/integration` は hunt.sh の 2 行の差し替えのみ (`OUT` の定義行と冒頭コメント)。
-- 方法: worktree `ws-863` (origin/main `95814e904` の上)。`node_modules` は main の共有分を symlink。素材 toolchain-emsdk (`/opt/emsdk/emsdk_env.sh`、emcc 6.0.12)。`TMPDIR=$RUNNER_TEMP bash tools/audio/integration/hunt.sh 400 1380` を foreground (時間上限 1380 s)。
+- 方法: worktree `ws-863` (origin/main `95814e904` の上)。`node_modules` は main の共有分を symlink。emsdk は runner 既定の導入 (`tools/audio/build.sh` の `EMSDK_ENV` 既定値、emcc 6.0.12)。`TMPDIR=$RUNNER_TEMP bash tools/audio/integration/hunt.sh 400 1380` を foreground (時間上限 1380 s)。
 
 | 区分 | run 数 | 結果 | 備考 |
 |---|---|---|---|
