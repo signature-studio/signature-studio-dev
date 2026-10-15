@@ -12,7 +12,7 @@ REPORT.md §7.8 の全文 (250 行上限のため分割移動)。検証 HEAD = `
   戻り値が 1 以上なので DllMain の `cmp eax,1` は後段へ分岐する。`0x40fa40` の呼出元は `0x40fbd4`・`0x40fcbd` (lift C の call 行で確認。
   そこで flag がどう決まるかは未解析で、longjmp の発生条件は未確定)。
 - **override**: `qfc_ov.c` (`qfc_ov_longjmp`) は FLEngine `fle_ov_longjmp` と同型。`qfc_boot.sh` のみで有効 (`--override 0x40f9c0=qfc_ov_longjmp`)。
-- **root**: 戻り先 `0x59c210` を boot 専用 entries に加えた (`work/boot/entries_boot.json`)。e2e の entries と assert (6,347) は変えない。boot の lift は 6,348 関数。
+- **root**: 戻り先 `0x59c210` を boot 専用 entries に加えた (`work/boot/entries_boot.json`)。e2e の entries と assert (6,347) は変えない。
 
 切り分け (boot の soft 版、同一 HEAD 系統。各 1 回):
 
