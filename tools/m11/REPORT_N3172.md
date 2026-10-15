@@ -58,12 +58,28 @@ Ghidra ログ: `DumpFunctions: 59009 functions`、image base `00400000`。
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 通常起動の停止 (`function_8c5eb0` の unreachable・stage 4 で停止) | stage 5/6 未達 | #132 (既存の継続先) |
-| 寛容起動の skipped 67 (miss 46・unreachable 1・halt0 7・oob 13) | 寛容経路の数値の意味は未確定 | #3160 |
+| 寛容起動の skipped 67 (miss 46・unreachable 1・halt0 7・oob 13) | 寛容経路の数値の意味は未確定 | #3229 (#3160 は CLOSED のため差し替え) |
 | LB=0x10000 の数値差 | 範囲外 (issue 本文の除外) | #3161 |
-| ptrcheck 分類 | 範囲外 (issue 本文の除外) | #3113 |
-| 同一 head の `--full` 2 回目 (IR `ir_sha256` の実行間一致) | 受入外。今回は n=1 | #1664 |
+| ptrcheck 分類 | 範囲外 (issue 本文の除外) | #3129 (#3113 は CLOSED のため差し替え) |
+| 同一 head の `--full` 2 回目 (IR `ir_sha256` の実行間一致) | 受入外。今回は n=1 | #2577 (#1664 は CLOSED のため差し替え) |
+| 修正後 HEAD (`29cdb2ab`) の `--full` 再測定 (§11) | 差し戻しの再測定が未実施。修正後の script の数値はまだ無い | open の起票先なし。本 PR の merge 前に PM が再投入 |
 | work-m11 の R2 への再投入 | 範囲外 (WORKFLOW §11 の依頼者の担当) | 依頼者 (PM) |
 
 ## 9. 本番影響・KPI
 - 起動・GUI の挙動は変えていない (変更は m11 の全再生成で使う CSV の作成経路のみ)。起動 KPI は §5 の通り修正前と同じ (stage 4・units_run 53・survey ok 872)。`infra/pm-worker` には触れない。
 - `tools/m11/REPORT.md` は 250 行上限のため変更していない (本ファイルが正)。
+
+## 10. 差し戻し対応 (fix commit `29cdb2ab`・round 1)
+- blocking 1 (CSV の PE 非照合): `m11_ghidra_dll.sh` は `functions_dll.csv.pe_sha256` (sidecar) が現 PE の sha256 と一致する時だけ CSV を再利用する。不一致・sidecar 無しは旧 CSV を `functions_dll.csv.stale` に退避して作り直す。分岐の確認 (Ghidra を回さず `GHIDRA_HOME=/nonexistent` で止めた): A 指紋一致 → 既存で rc 0 / B 指紋不一致 → 退避し fail-closed rc 1 / C sidecar 無し → 退避し fail-closed rc 1。
+- blocking 2 (project 名): 変数 `GPROJ=ghproj_dll` に統一し、`$GPROJ.gpr`・`$GPROJ.rep` を開始時と終了時に削除 (旧 `ghproj` は存在しない名前だった)。CSV と sidecar を消して 2 回続けて実行 (Ghidra 12.1.4 単体・PE `b2c64da4…496d`):
+  - run 1: rc 0・10 分 18 秒・59,010 行・sha256 `90d1bbac…5a11`
+  - run 2: rc 0・9 分 44 秒・59,010 行・sha256 `90d1bbac…5a11`
+  - どちらの後も `tools/m2/work/ghidra_dll/` に `ghproj_dll.gpr`・`ghproj_dll.rep` は残らない (`ls` で確認)。
+- blocking 3 (closed の起票先): §8 の表を open の issue に差し替え (#3160・#3113・#1664 は CLOSED)。
+- blocking 4 (DOC_MAP 行): 測定値を消し、結論 1 行 + リンクに縮小。行数は実値に直す。
+- minor (JDK 21 の絶対パス): `docs/REFERENCES.md` §1 のローカルツール表に `[JDK21]` を追加。script の既定値はこの ID を参照する。
+
+## 11. 未実施: 修正後 HEAD の `--full` 再測定
+- **未実施**。理由: 本 runner に `/opt/emsdk`・`/opt/retdec`・`/opt/ghidra` が無い (`command -v emcc` / `retdec-decompiler` も無し)。emsdk 6.0.12 と RetDec v5.0 の導入に加えて全再生成 (約 21 分) が、差し戻し run の上限 (40 分) に収まらない。
+- §3〜§6 の数値は修正前の script (`de8a34d5`) の実測。修正後の script (`29cdb2ab`) では測っていない。修正後の script の検証は §10 (分岐・Ghidra 単体の 2 回) のみ。
+- 対応: emsdk・RetDec 入りの runner で `bash tools/m11/m11_e2e.sh --full` を fresh (`functions_dll.csv`・`lift_pe.sha256` 無し) で再投入し、本節と §3 の測定 commit・数値を更新する。merge はその後。
