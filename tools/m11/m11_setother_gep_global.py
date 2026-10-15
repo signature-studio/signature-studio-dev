@@ -10,16 +10,74 @@ global_store (書込可能グローバル VA を読む 3 件):
 gep (lea [reg+d] の 17 件):
   対象は基底 reg の SSA 値に対する GEP。基底 SSA の特定は未実装のため 未決 (base_ssa_unmapped)。
 
-使い方: python3 m11_setother_gep_global.py mem_class_rows.json --ir final3_base.ll --out gep_global_rows.json
+gep の基底 reg (--pe 指定時): lea 直前の基底 reg の到達定義を機械語で後ろ向きに辿る (#4905 / M11-N228)。
+  mov reg, imm (または xor)                : 実値化 (base_const)
+  call の戻り値 (呼出し先が揮発族 reg を書く): 復元不能 (base_call_ret)
+  merge・分岐・stack slot 読込・ポインタ読込 : 未決 (base_merge / base_branch / base_stack_slot / base_ptr_load)
+  定義が見つからない                        : 未決 (base_entry)
+--pe を外すと従来どおり 未決 (base_ssa_unmapped)。
+
+使い方: python3 m11_setother_gep_global.py mem_class_rows.json --ir final3_base.ll --out gep_global_rows.json [--pe PE]
 """
-import argparse, collections, json, re
+import argparse, collections, json, os, re, sys
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, 'ldfix'))
+sys.path.insert(0, HERE)
+import capstone
+import ldmach
+import m11_argrecover as AR
 
 ap = argparse.ArgumentParser()
 ap.add_argument('rows'); ap.add_argument('--ir', required=True); ap.add_argument('--out', required=True)
+ap.add_argument('--pe', default=None)
 a = ap.parse_args()
 rows = json.load(open(a.rows))
 ir = open(a.ir).read().split('\n')
 TARGET = [r for r in rows if r['conn'] in ('gep', 'global_store')]
+VOLATILE = {'rcx', 'rdx', 'r8', 'r9', 'rax', 'r10', 'r11'}
+IMM = re.compile(r'-?(0x[0-9a-f]+|\d+)')
+_mach = ldmach.Machine(a.pe) if a.pe else None
+_fn = {}
+
+
+def fn(va):
+    if va not in _fn:
+        _fn[va] = AR.Fn(_mach, va)
+    return _fn[va]
+
+
+def gep_base(r):
+    """lea [base+d] の base reg の到達定義を後ろ向きに辿って (区分, 理由) を返す。"""
+    cf = fn(int(r['caller'].split('_')[1], 16))
+    li = next((i for i, x in enumerate(cf.ins) if x.address == int(r['def'], 16)), None)
+    if li is None:
+        return '未決', 'lea_not_found'
+    m = re.search(r'\[(\w+)', cf.ins[li].op_str)
+    base = m.group(1)
+    tg = {x.operands[0].imm for x in cf.ins if x.mnemonic.startswith('j') and x.operands and x.operands[0].type == capstone.CS_OP_IMM}
+    j = li - 1
+    while j >= 0:
+        if cf.ins[j + 1].address in tg:
+            return '未決', 'base_merge'
+        x = cf.ins[j]
+        if x.mnemonic == 'call':
+            if base in VOLATILE:
+                return '復元不能', 'base_call_ret'
+            j -= 1
+            continue
+        if x.mnemonic in ('ret', 'jmp'):
+            return '未決', 'base_branch'
+        if base in cf.rw(x)[1]:
+            dst, src = [p.strip() for p in x.op_str.split(',', 1)] if ',' in x.op_str else (x.op_str.strip(), '')
+            if x.mnemonic == 'mov' and IMM.fullmatch(src):
+                return '実値化', 'base_const'
+            if x.mnemonic == 'mov' and re.search(r'\[(rbp|rsp)', src):
+                return '未決', 'base_stack_slot'
+            if x.mnemonic == 'mov' and '[' in src:
+                return '未決', 'base_ptr_load'
+            return '未決', 'base_other:' + x.mnemonic
+        j -= 1
+    return '未決', 'base_entry'
 
 
 def store_count(va):
@@ -61,6 +119,8 @@ for r in TARGET:
             x.update({'class': '未決', 'why': 'no_store_in_ir'})
         else:
             x.update({'class': '未決', 'why': 'store_value_unchecked'})
+    elif a.pe:
+        x['class'], x['why'] = gep_base(r)
     else:
         x.update({'class': '未決', 'why': 'base_ssa_unmapped'})
     out.append(x)
