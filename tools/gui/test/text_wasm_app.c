@@ -29,7 +29,7 @@ static int64_t wndproc(int64_t h, int64_t m, int64_t w, int64_t l) {
     text_scene_draw(g_memdc, 0);
     BitBlt(ps.hdc, 0, 0, W, H, g_memdc, 0, 0, SRCCOPY);
     EndPaint(h, PTR(&ps));
-    static int done; if (!done) { done = 1; text_scene_metrics(g_memdc, emit_tm, NULL); gui_log("text: done"); }
+    static int done; if (!done) { done = 1; text_scene_metrics(g_memdc, emit_tm, NULL); gui_log("text: done"); gui_reach_dump(); }
     return 0;
   }
   if (m == WM_DESTROY) { PostQuitMessage(0); return 0; }
