@@ -2,7 +2,7 @@
 
 親: #2760 (WIN-7 系)。前提 spike: [`REPORT_WIN7_2718.md`](REPORT_WIN7_2718.md) (#2718)。手順の正本は `win33_catalog.sh` / `win33_trace.py` (本 PR)。
 
-測定 commit: `b01598aa2` (コードを変えた最後の commit。`origin/main` (`09b96c12f`) を取り込んだ merge。本 REPORT の数値は全てこの commit で実測した。§9)。HEAD は本文書の commit で、`git diff b01598aa2 HEAD -- tools/liftdiff ':(exclude)*.md'` の出力は空 (コード差分 0。`docs/WORKFLOW.md` §6)。旧測定 commit `fa8ec63d9`・`7080aca8a` の値は §9 の対応表に残す。
+測定 commit: `b01598aa2` (コードを変えた最後の commit。`origin/main` (`09b96c12f`) を取り込んだ merge。本 REPORT の数値は全てこの commit で実測した。§9)。HEAD は本文書の commit (`f354667be`) とその後の main 取り込み merge (`f492169f7`) で、`git diff b01598aa2 HEAD -- tools/liftdiff ':(exclude)*.md'` の出力は空 (コード差分 0。`docs/WORKFLOW.md` §6)。旧測定 commit `fa8ec63d9`・`7080aca8a` の値は §9 の対応表に残す。
 既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなく、harness の stub 応答と停止の扱い。新規の類型候補は §7)。
 再現コマンド: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/liftdiff/win33_catalog.sh` (2 分 04 秒・4 spike/trace 実行)。e2e: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/liftdiff/liftdiff_e2e.sh --m11-only` (2 分 56 秒)。
 素材: fl-win64・work-m11・work-liftdiff・toolchain-emsdk (`[EMSDK]`)。`tools/liftdiff/work/` `tools/m11/work/` は work-liftdiff・work-m11 を展開した (gitignore 対象の検証スナップショット。commit しない)。
