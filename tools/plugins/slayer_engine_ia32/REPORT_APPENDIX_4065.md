@@ -35,18 +35,19 @@
 - `1000b6c1` が読む絶対アドレス `A_(0x10024d50)` の値は未確認。
 - issue 本文が指す `REPORT_APPENDIX_3715.md` は main にも全履歴にも無い。 12 本の一覧の根拠は確認できなかった。
 
-## 3. 検証 (測定 commit ec2c7dc29・検証 HEAD は同 commit)
+## 3. 検証 (測定 commit 6bd7bd91f・検証 HEAD 6bd7bd91f)
 
-測定 commit は `ec2c7dc29` (コードを変えた最後の commit)。検証 HEAD は `b268070f6` (main 取り込み後・harness コードの差分 0 を `git diff ec2c7dc29 b268070f6 -- tools/plugins/slayer_engine_ia32 ':!*REPORT_APPENDIX*'` で確認し、同 HEAD で再測定)。
-`git diff 32151b62a b268070f6 -- tools/plugins/slayer_engine_ia32/x87_fn_native.c` は空 (exit 7・8 の経路は `32151b62a` に既に入っている)。
-素材は `$RUNNER_TEMP/fl-win64` (fl-win64 を展開)、emcc は toolchain-emsdk 展開の 6.0.12。load は各試験の開始時。
+測定 commit は `6bd7bd91f` (main `17a3d0796` 取り込み後の head・競合解消 merge)。本節の値はすべてこの commit で測った。
+harness (`x87_fn_diff.py`) は main 由来の `--classify` 追加 (52 行) を含む版で、PASS・`--nega`・`--nega-lower` もこの版で測った。
+`git diff 32151b62a 6bd7bd91f -- tools/plugins/slayer_engine_ia32/x87_fn_native.c` は空 (exit 7・8 の経路は `32151b62a` に既に入っている)。
+素材は `$RUNNER_TEMP/fl-win64` (fl-win64 の `extracted/block22434_PE.bin`)、emcc は `$RUNNER_TEMP/emsdk-root` (toolchain-emsdk 展開の 6.0.12)。load は各試験の開始時の load1。
 
 | 試験 | 結果 | 所要 |
 |---|---|---|
-| `lift_text.py` (block22434) | rc 0 | 12.77 s |
-| `x87_fn_diff.py` | PASS。 fn_10002ee0 bit 一致 3890/4000・fn_10005400 bit 一致 3405/4000。 構造 (eax・x87 深さ) 不一致 0 | build native 0.17 s・wasm emcc 15.19 s・run native 0.123 s・wasm 0.170 s・load1 0.91 (試験全体 real 17.28 s) |
-| `x87_fn_diff.py --nega` | 1 bit 反転を検出 (7295 → 7294)・ネガコン OK (rc 0) | - |
-| `x87_fn_diff.py --nega-lower` | fn_10002ee0 で 4000/4000 行の float32 不一致を検出・ネガコン OK (rc 0) | - |
+| `lift_text.py` (block22434) | rc 0・object 1162447 B・被覆 62320 / 73002 B (85.37%) | real 17.228 s (user 16.316 s・sys 0.910 s) |
+| `x87_fn_diff.py` | PASS。 fn_10002ee0 bit 一致 3890/4000・fn_10005400 bit 一致 3405/4000。 構造 (eax・x87 深さ) 不一致 0 | build native 0.17 s・wasm emcc 20.13 s・run native 0.159 s・wasm 0.239 s・load1 1.29 (試験全体 real 22.732 s) |
+| `x87_fn_diff.py --nega` | 1 bit 反転を検出 (7295 → 7294)・ネガコン OK (rc 0) | real 2.060 s |
+| `x87_fn_diff.py --nega-lower` | fn_10002ee0 で 4000/4000 行の float32 不一致を検出・ネガコン OK (rc 0) | real 8.706 s |
 | 合成入力 (短い行 `abc`) | rc 7 | - |
 | 合成入力 (出力先の open 失敗: 存在しないディレクトリ) | rc 6 (`sc3(1, 6)`・出力 open の経路) | - |
 | 合成入力 (出力先 `/dev/full` へ write: ENOSPC) | rc 8 (`sc3(1, 8)`・`sc3(4)` の戻り値 w ≤ 0 の経路) | - |
