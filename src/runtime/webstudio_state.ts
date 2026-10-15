@@ -9,10 +9,14 @@
  */
 export type WebstudioState = "booting" | "running" | "error";
 
+/** 載せているゲストの種別。"test" は FL でない検証用 wasm (fl-boot は PASS させない: D5) */
+export type WebstudioGuest = "fl" | "test";
+
 export type WebstudioContract = {
   state: WebstudioState;
   frames: number;
   error?: string;
+  guest?: WebstudioGuest;
 };
 
 export type WebstudioController = {
@@ -21,6 +25,8 @@ export type WebstudioController = {
   reportFrame(n?: number): void;
   /** frames の絶対値で報告する (GuiHost.frames をそのまま渡す用)。減少は無視する */
   setFrames(total: number): void;
+  /** 載せているゲストの種別を記録する (起動時に 1 回) */
+  setGuest(guest: WebstudioGuest): void;
   /** 終端状態 error へ遷移する。最初のエラーだけ保持する */
   fail(e: unknown): void;
 };
@@ -39,6 +45,9 @@ export function createWebstudioController(): WebstudioController {
       setFrames(contract.frames + n);
     },
     setFrames,
+    setGuest(guest) {
+      contract.guest = guest;
+    },
     fail(e) {
       if (contract.state === "error") return;
       contract.state = "error";

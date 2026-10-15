@@ -250,6 +250,8 @@ export const checks = [
       const st = await ctx.drv.eval(`JSON.stringify(window.__webstudio ?? null)`);
       assert(ok, `FL が 180s 以内に running にならない: ${st}`);
       const s = JSON.parse(st);
+      // D5: テストゲスト (guest: "test") では FL の起動として PASS させない
+      assertEq(s.guest, "fl", `ゲスト種別 (テストゲストでは fl-boot を PASS させない: ${st})`);
       assertEq(s.state, "running", `state (${st})`);
       assert(typeof s.frames === "number" && s.frames > 0, `GUI フレーム 0: ${st}`);
       // 画素検査: 転送済みフレームが canvas に載っている (全面単色でない)。
@@ -272,6 +274,59 @@ export const checks = [
       assert(px.lit > 0 && px.colors >= 2, `FL フレームが canvas に描画されていない: ${JSON.stringify(px)}`);
       await ctx.shot("fl");
       return `${st} canvas ${px.w}x${px.h} lit=${px.lit}px colors>=${px.colors}`;
+    },
+  },
+  {
+    id: "gui-guest-boot",
+    title: "製品ページ gui=wasm: テストゲスト (chunked・FL 以外) が GuiHost 経由で GUI canvas に描画 (state==='running' && frames>0)",
+    async run(ctx) {
+      const q = "/?gui=wasm&glue=/__e2e__/gui-guest/app.js&app=/__e2e__/gui-guest/app.wasm.parts/index.json";
+      await ctx.drv.open(new URL(q, ctx.url).href);
+      const ok = await ctx.drv.waitFn(
+        `window.__webstudio?.state === 'running' || window.__webstudio?.state === 'error'`,
+        180000,
+      );
+      const st = await ctx.drv.eval(`JSON.stringify(window.__webstudio ?? null)`);
+      assert(ok, `テストゲストが 180s 以内に running にならない: ${st}`);
+      const s = JSON.parse(st);
+      assertEq(s.state, "running", `state (${st})`);
+      assertEq(s.guest, "test", `guest (${st})`);
+      assert(typeof s.frames === "number" && s.frames > 0, `GUI フレーム 0: ${st}`);
+      // 画素検査: GuiHost の readback (worker 側の canvas 内容) を読み、全面単色でないことを見る
+      const px = await ctx.drv.eval(`(async () => {
+        const r = await window.__guiGuest.readback();
+        const seen = new Set(); let lit = 0;
+        for (let i = 0; i < r.data.length; i += 4) {
+          if (r.data[i] | r.data[i+1] | r.data[i+2]) lit++;
+          if (seen.size < 8) seen.add((r.data[i] << 16) | (r.data[i+1] << 8) | r.data[i+2]);
+        }
+        return { w: r.width, h: r.height, lit, colors: seen.size };
+      })()`);
+      assert(px.w > 0 && px.h > 0, `canvas サイズ 0: ${px.w}x${px.h}`);
+      assert(px.lit > 0 && px.colors >= 2, `テストゲストのフレームが描画されていない: ${JSON.stringify(px)}`);
+      await ctx.shot("gui-guest");
+      return `${st} canvas ${px.w}x${px.h} lit=${px.lit}px colors>=${px.colors}`;
+    },
+  },
+  {
+    id: "gui-guest-tamper",
+    title: "ネガコン (gui=wasm): chunked の part 1 バイト改竄は sha256 検証で停止 (state=error・running にならない)",
+    async run(ctx) {
+      const q = "/?gui=wasm&glue=/__e2e__/gui-guest/app.js&app=/__e2e__/gui-guest/tampered/app.wasm.parts/index.json";
+      await ctx.drv.open(new URL(q, ctx.url).href);
+      const ok = await ctx.drv.waitFn(
+        `window.__webstudio?.state === 'running' || window.__webstudio?.state === 'error'`,
+        60000,
+      );
+      const st = await ctx.drv.eval(`JSON.stringify(window.__webstudio ?? null)`);
+      assert(ok, `改竄ゲストの判定が 60s 以内に出ない: ${st}`);
+      const s = JSON.parse(st);
+      assertEq(s.state, "error", `改竄 part が error にならない: ${st}`);
+      // Chrome は compileStreaming で stream の中身の例外 (sha256 不一致の ChunkIntegrityError) を包む。原因の文言は見えない。
+      // 原因の同定は chunked.mjs 側の単体テスト (deploy/client/chunked.test.mjs) と同じ改竄 descriptor を node で読んだ結果 (REPORT)。
+      assert(/WebAssembly compilation aborted/.test(s.error ?? ""), `error が compile 中断ではない: ${st}`);
+      assertEq(s.frames, 0, `改竄ゲストで frames が進んだ: ${st}`);
+      return st;
     },
   },
 ];
