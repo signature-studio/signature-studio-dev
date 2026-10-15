@@ -7,7 +7,7 @@
 - **受入 1 (arg4 を word へ)**: C・mock は `channel ≥ 0` のとき `(channel & 0xf | message) + data1<<8 + data2<<16 + arg4<<24` を送る。`channel ≤ -1` は message だけを送る。旧 C は arg4 (index 4) を読まず、data1・data2 の既定値を -1 としていた (PE の既定は 0)。両方直した。
 - **受入 2 (word 列)**: 送った word を C 側は `fl_engine_midi_word(i)`、mock は `st.midiOut[].word` で出す。`tests/device_diff.mjs` で両者の列が一致し、手計算の期待値 8 件とも一致する。
 - **受入 3 (-7・-6)**: device 無し → -7、送出先無し → -6 を、channel によらず送出の前に判定する (PE の順)。両側で code 7・6 を返し、送出件数と word は増えない。
-- **受入 4**: `node tests/device_diff.mjs` が差分 0 で PASS (コミット済み HEAD で 3 回実測)。
+- **受入 4**: `node tests/device_diff.mjs` が差分 0 で PASS (main 取り込み後の HEAD `812614b19` で 3 回実測)。
 - 範囲外: forwardMIDICC の -7・-6 (#3671)、`device.isAssigned` の PE 意味論 (#2950)、flpy (CPython wasm) 依存の 3 検査は本 run では未実行 (§4)。
 
 ## 1. PE の逆アセンブル (midiOutMsg ハンドラ 0xd747f0)
@@ -39,18 +39,19 @@
 
 ## 3. 検証
 
-- 実装 commit: `856af3459` (コードを変えた最後の commit。完全 hash `856af345940a65bf8d3f90bd3505843de64e1117`)。REPORT の追記はこの後の docs commit。
-- 差分 (コード 3 ディレクトリ): `git diff 856af3459 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (差分 0)。
+- 実装 commit: `856af3459` (PY-227 の実装)。main 取り込みの merge commit `812614b19` (コードを変えた最後の commit)。衝突は `provider/build.sh` の `EXPORTED_FUNCTIONS` 1 行だけで、PY-227 の 3 関数と main の `_fl_engine_grid_items_probe` を両方残した。REPORT の追記はこの後の docs commit。
+- 差分 (コード 3 ディレクトリ): `git diff 812614b19 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (差分 0)。main 取り込み前の `856af3459` からは 5 ファイル・+115/-13 (main 側の変更 (PY-218 ほか) と衝突解消の `build.sh` 1 行)。
 - 再現 (HEAD・素材 `fl-win64`・`toolchain-emsdk`):
   ```
   FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/python/fetch_inputs.sh
   EMSDK_ENV=$RUNNER_TEMP/toolchain/emsdk/emsdk_env.sh bash tools/python/provider/build.sh
   node tools/python/tests/device_diff.mjs    (cd tools/python)
   ```
-- 結果 (HEAD・n=3): rc=0 ×3、所要 0.047〜0.050 s (壁時計)、load average (実行前) 0.11 / 0.24 / 0.14。出力: `calls 11・link_calls 6・rejects 4・midi_out 10・link_codes ["ok",7,6,6,7,"ok"]・diffs 0・PASS true`。
+- 結果 (HEAD `812614b19`・n=3): rc=0 ×3、所要 49〜51 ms (壁時計)、load average (実行前) 0.64 / 0.52 / 0.27。出力: `calls 11・link_calls 6・rejects 4・midi_out 10・link_codes ["ok",7,6,6,7,"ok"]・diffs 0・PASS true`。
+- 同じ HEAD で、取り込んだ main 側の変更が通る他の検査も実行した: `channels_diff` (PASS・calls 214・grid_calls 1200・grid_true 30・grid_diffs 0)、`note_enum_diff` (PASS・calls 33264・nonempty 5869)、`step_item_diff` (PASS・calls 5929)、`midi_path_diff` (PASS・cases 30・lit_steps 160)。`midi_rpc_split` は rc=1 (`dist/flpy.js` が無く起動できない・§4)。
 - 送った word 列 (hex・C と mock で一致): `00643c90, 000000b0, 097f01b2, 7f643c91, 000000b0, 9b412dff, 00643c91, 097f01b2`。期待値は式の手計算 (例: `0x90|1 + 60<<8 + 100<<16 + 127<<24 = 0x7f643c91`)。
 
-ネガティブコントロール (1 件を壊して FAIL を確認し、戻して PASS を確認):
+ネガティブコントロール (1 件を壊して FAIL を確認し、戻して PASS を確認。表は `856af3459` で実施。main 取り込み後の HEAD `812614b19` では mock の arg4 shift を 24 → 16 にした 1 件だけ再実行し、rc=1 (`device 差分 1 件`)・戻して `diffs 0・PASS true`):
 
 | 壊した箇所 | 結果 (rc) | 検出した差分 |
 |---|---|---|
@@ -70,7 +71,7 @@
 | `device.isAssigned` の PE 意味論 | mock・C は常に true で、-7 の状態 (devAssigned) と独立。本体は未逆アセンブル | #2950 |
 | 32bit 外の整数の扱い | C は int64 の下位 32bit、mock は ToInt32 で切る。PE の 'i' 変換の範囲外 (OverflowError 相当) は未確認 | #2950 |
 | 引数名 (kwlist 無し) | 名前は message・channel・data1・data2・arg4 のまま (stub 由来) | #2952 (PY-116) |
-| `provider_check.mjs`・`midi_script.mjs`・`midi_bundled_device.mjs` 未実行 | `dist/flpy.js` (CPython wasm) が無く起動できない。本 run は flpy を build していない | #2950 (親の受入の `provider_check` を含む) |
+| `provider_check.mjs`・`midi_script.mjs`・`midi_bundled_device.mjs`・`midi_rpc_split.mjs` 未実行 | `dist/flpy.js` (CPython wasm) が無く起動できない (`midi_rpc_split` は ERR_MODULE_NOT_FOUND)。本 run は flpy を build していない | #2950 (親の受入の `provider_check` を含む) |
 
 `DEFECTS.md` の行案: 旧 C の既定値 (data1・data2 = -1) と arg4 の読み捨ては provider の表の誤りで、lift の類型ではない。行案は作らない (PM 判断)。
 
