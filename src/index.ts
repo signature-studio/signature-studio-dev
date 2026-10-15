@@ -153,6 +153,10 @@ if (runtimeParams.get("gui") === "selftest") {
 } else if (guiWasm) {
   void mountGuiGuest(runtimeParams, webstudio);
 }
+// .reg 取込入口 (vreg #116 / #2793)。vreg (wasm・JS) は動的 import で、?license=import のときだけ読む
+if (runtimeParams.get("license") === "import") {
+  void import("./runtime/license_import_panel").then((m) => m.mountLicenseImport());
+}
 
 // ---------------------------------------------------------------------------
 // MCP JSON-RPC (PY-4 #77) — devtools: window.flMcp / UI: /?mcp=1
