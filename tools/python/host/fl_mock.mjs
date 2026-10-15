@@ -464,6 +464,8 @@ export function createMockEngine() {
       const word = ch >= 0 ? (((ch & 0xf) | msg) + (d1 << 8) + (d2 << 16) + (a4 << 24)) >>> 0 : msg >>> 0;
       st.midiOut.push({ api: "midiOutMsg", args: a, word });
     },
+    // PY-215 (#3568): PE 0xd75d30 と同じ (-1 → -1、連動表が空の index ≥ 0 → None)。表の供給元は仮置き (空)。device・link の割当は見ない
+    "device.getLinkedChannel": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) return -1; return undefined; },
     ...createIlmcp(st, {
       RANGE,
       INVALID: (m) => new FlError(m, 1),

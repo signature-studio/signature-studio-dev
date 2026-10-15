@@ -42,6 +42,9 @@ const rejects = [
   ["device.forwardMIDICC", [1, "x"]],
   ["device.midiOutMsg", [0xB0, 2, 1, 127, 9, 9]],
   ["device.midiOutMsg", [0xB0, "x"]],
+  ["device.getLinkedChannel", []],
+  ["device.getLinkedChannel", [1, 2]],
+  ["device.getLinkedChannel", ["x"]],
 ];
 const rejectDiffs = rejects.map(([name, args]) => ({ name, args, wasm: run(wasm, name, args) }))
   .filter((r) => r.wasm.code !== 5);
@@ -87,10 +90,28 @@ if (JSON.stringify(mockWords) !== JSON.stringify(wasmWords)) diffs.push({ state:
 if (JSON.stringify(wasmWords) !== JSON.stringify(expectWords)) diffs.push({ state: "midi word expect", expect: expectWords, wasm: wasmWords });
 if (JSON.stringify(linkCodes) !== JSON.stringify(linkExpectCodes)) diffs.push({ state: "link codes", expect: linkExpectCodes, wasm: linkCodes });
 
+// PY-215 (#3568): getLinkedChannel (PE 0xd75d30)。-6/-7 の経路が無いので割当 [dev, link] の両方 (assigned・unassigned) で同じ戻り値。-1 → -1、連動表が空の index ≥ 0 → None (仮置き)
+const linkedIdx = [-1, 0, 7];
+const linkedRes = [];
+for (const [dev, link] of [[1, 1], [0, 0]]) {
+  mock.state.devAssigned = !!dev;
+  mock.state.linkAssigned = !!link;
+  wasm.setDeviceLink(dev, link);
+  for (const idx of linkedIdx) {
+    const name = "device.getLinkedChannel", args = [idx];
+    const a = run(mock, name, args);
+    const b = run(wasm, name, args);
+    linkedRes.push("code" in b ? `code ${b.code}` : b.ok);
+    if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ name, args, dev, link, mock: a, wasm: b });
+  }
+}
+const linkedExpect = [-1, null, null, -1, null, null];
+if (JSON.stringify(linkedRes) !== JSON.stringify(linkedExpect)) diffs.push({ state: "linked channel expect", expect: linkedExpect, wasm: linkedRes });
+
 assert.deepEqual(diffs, [], `device 差分 ${diffs.length} 件`);
 assert.deepEqual(rejectDiffs, [], `署名違反が code 5 で拒否されない ${rejectDiffs.length} 件`);
 console.log(JSON.stringify({
   calls: seq.length, link_calls: linkSeq.length, rejects: rejects.length, midi_out: wasmOut,
-  midi_words: wasmWords.map((w) => w.toString(16).padStart(8, "0")), link_codes: linkCodes,
+  midi_words: wasmWords.map((w) => w.toString(16).padStart(8, "0")), link_codes: linkCodes, linked_channel: linkedRes,
   diffs: 0, PASS: true,
 }));
