@@ -25,7 +25,7 @@
 | `missing function` の件数 | 0 件 |
 | `libottnative.so` | `tools/ott/native/build.sh` で先にビルド (0.4 s) |
 
-### 修正前との比較 (同じ sweep の既定入力 = 131 関数、測定 commit `e9a8ff66b` 相当)
+### 修正前との比較 (同じ sweep の既定入力 = 131 関数、`FA_MAP` 無し・`fa_ranges_1633.txt`。この行は本 run の実測で、測定 commit は `e9a8ff66b`〜`181e26ebd` のどれでも既定入力の挙動は同じ (`git diff e9a8ff66b 181e26ebd -- tools/icall` は `FA_MAP` の追加と範囲ファイルの追加のみ))
 
 | 区分 | 修正前 (131 関数) | 修正後 (142 関数・`181e26ebd`) |
 |---|---|---|
@@ -40,18 +40,19 @@
 
 | VA | 結果 | 分類 |
 |---|---|---|
-| 0x1803dee20 | 値の不一致 (8/8) | 本 issue の範囲外 (`REPORT_APPENDIX_1633.md` §4 の値の不一致と同類) |
-| 0x180da4030 | 値の不一致 (8/8) | 同上 |
-| 0x180c8b280 | bit 一致 6・`memory access out of bounds` 2 | 別原因 (#1852 の範囲) |
-| 0x181057b38 | `memory access out of bounds` 8 | 別原因 (#1852 の範囲) |
+| 0x1803dee20 | 値の不一致 (8/8) | 本 issue の範囲外。追跡先 #4348 (ICALL-101) |
+| 0x180da4030 | 値の不一致 (8/8) | 正の確定は既存の #4291 (ICALL-98) |
+| 0x180c8b280 | bit 一致 6・`memory access out of bounds` 2 | 別原因。追跡先 #4349 (ICALL-102) |
+| 0x181057b38 | `memory access out of bounds` 8 | 別原因。追跡先 #4349 (ICALL-102) |
 
 ## 3. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 15 件中 10 件 (0x1803b5546・0x18040ca0d・0x1808299a6・0x180829caa・0x180c98030・0x180c982ca・0x180c995ac・0x180ca1651・0x180da6084・0x180da6850) が after 段で `func_map` に入らない。before dsm では直前が `data inside code section` と出る | 範囲には入るが関数として lift されず、呼び出し元の sweep で `missing function` の余地が残る (現測定では 0 件) | #4328 (ICALL-99) |
-| 0x1803dee20・0x180da4030 の値の不一致 (各 8/8) | bit 一致を妨げる | 既存の値の不一致の扱い (#1633 付録 §4) に従う。新規起票せず、#1886 へのコメントで残件として明記 |
-| 0x180c8b280・0x181057b38 の out-of-bounds | 別原因 | #1852 (ICALL-44) |
+| 0x1803dee20 の値の不一致 (8/8) | bit 一致を妨げる | #4348 (ICALL-101) |
+| 0x180da4030 の値の不一致 (8/8) | bit 一致を妨げる | #4291 (ICALL-98) |
+| 0x180c8b280・0x181057b38 の out-of-bounds | 別原因 | #4349 (ICALL-102) |
 
 ## 4. 再現
 
@@ -64,3 +65,21 @@ FA_MAP=tools/icall/work/rt_freshair-4271/map.json bash tools/icall/diff/fa_sweep
 ```
 
 前提: `plugins-freshair` を `fetch.sh` で展開済み、`toolchain-retdec`・`toolchain-emsdk`・`work-icall`・`work-liftlib` が有る。
+
+## 5. 測定 commit 以降の差分 (受入条件 3)
+
+測定 commit: `181e26ebd` (コードを変えた最後の commit)。その後の REPORT 更新は `85a29daea` (付録の追加) と、本 fix の commit。
+
+`git diff 181e26ebd HEAD -- tools/icall` の stat (`85a29daea` 時点):
+
+```
+ tools/icall/REPORT_APPENDIX_4271.md | 66 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
+```
+
+- 差分の 66 行はすべて本付録自身 (`REPORT_APPENDIX_4271.md`) の追加。付録の本文を diff として貼ると、貼った時点で付録自身の内容がずれるため、stat で代えた。
+- `tools/icall` のコード差分 (`fa_ranges_4271.txt`・`fa_route_build.sh`・`diff/fa_sweep.sh`) は `git diff 181e26ebd HEAD -- tools/icall/fa_ranges_4271.txt tools/icall/fa_route_build.sh tools/icall/diff/fa_sweep.sh` が 0 行。測定の入力は変わっていない。
+
+## 6. 既知の注意 (未対応)
+
+- `fa_ranges_4271.txt` に重複・重なる範囲がある (例: `0x180c9d700-0x180c9d880` と `0x180c9d880-0x180c9da15`、`0x180da68a8-0x180da68b3` と `0x180da6850-0x180da68b3`)。測定入力を変えないために今回は整理していない。範囲の整理は #4328 (ICALL-99) で、入力を変える測定と同時に行う。
