@@ -1,7 +1,7 @@
 # PY-172 (#3219): patterns グループ系 4 関数の PE 解析と C/mock 実装 (2 件)
 
 親: #1804 (PY-48)。既知類型との関係: 該当なし (lift 作業ではない)。
-測定対象の commit: `235f9cca` (main 取り込みの merge。コードを変えた最後の commit)。
+測定対象の commit: `51e3a96c` (main 取り込みの merge。コードを変えた最後の commit)。
 
 ## 結論
 
@@ -64,7 +64,7 @@ REPORT_PY42 は「署名の不一致 3 件 (getPatternGroupName・getPatternsInG
 
 ## 6. 測定
 
-測定 commit: `235f9cca` (コードは `87dda507` と同一。作業 tree は `87dda507` で測定した)。main 取り込みで provider・mock・テストの差分が入ったため、前回測定 (`37e37e00`) は置き換えた。flpy (CPython wasm を含む) は本測定で再ビルドした。
+測定 commit: `51e3a96c` (main (`2453c67c`) を merge。競合は `tools/python/host/fl_mock.mjs`・`tools/python/tests/provider_check.mjs` の 2 件で、両側の追加を残した。provider_check の件数は main 側 140 / 295 に PR の pe172 の +2 / −2 = **142 / 293**)。前回の測定 (`235f9cca`・`37e37e00`) は置き換えた。CPython 系 (`build_cpython_wasm.sh`・`src/`・`fetch_inputs.sh`・`build_flpy.sh`) は main 取り込みで差分 0 のため、既存の CPython wasm を使い、provider と flpy だけ再リンクした。
 
 | 検査 | 手順 (コマンド) | 結果 |
 |---|---|---|
@@ -72,17 +72,17 @@ REPORT_PY42 は「署名の不一致 3 件 (getPatternGroupName・getPatternsInG
 | 入力 | `FL_WIN64_DIR=<展開先> bash fetch_inputs.sh` | rc 0 |
 | CPython wasm | `bash build_cpython_wasm.sh` | rc 0・254 秒 (wall) |
 | flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0・6 秒 |
-| ビルド (provider) | `bash provider/build.sh` | rc 0・1 秒 |
-| all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・2 秒・**48/48 ok** (`soft_error` 0・`raised` 0・`no_args` 0・`host_calls` 37425・`callback_roundtrip` true)。load 1 分値 2.60 → 2.87 |
-| provider_check (Python 型節を含む通常版) | `node tests/provider_check.mjs` | rc 0・1 秒・PASS。実装 133 / 未実装 302 (MCP 60)。PR の寄与は pe172 の +2 |
+| ビルド (provider・flpy。測定 commit) | `bash provider/build.sh`・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0・1 秒・6 秒 (`51e3a96c` の tree) |
+| all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・2 秒・**48/48 ok** (`soft_error` 0・`raised` 0・`no_args` 0・`host_calls` 37425・`callback_roundtrip` true) |
+| provider_check (Python 型節を含む通常版) | `node tests/provider_check.mjs` | rc 0・1 秒・PASS。`functions` 435・実装 **142** / 未実装 **293** (MCP 60) |
 | 差分検査 | `node tests/patterns_group_diff.mjs` | rc 0・14 呼出し・diffs 0・PASS |
 | 差分検査 | `node tests/general_diff.mjs` | rc 0・41 呼出し・diffs 0・PASS |
-| mock 差分 (flpy 不要の 14 本) | `node tests/<name>.mjs` (arrangement_diff・arrangement_selection_diff・channels_diff・device_diff・ilmcp_diff・midi_path_diff・mixer_diff・playlist_diff・screen_diff・tool_args・transport_diff・ui_diff・ui_display_diff・ui_state_diff) | 全て rc 0・diffs 0 (tool_args は標準出力なし・rc 0) |
+| mock 差分 (flpy 不要の 15 本) | `node tests/<name>.mjs` (arrangement_diff・arrangement_selection_diff・channels_diff・device_diff・ilmcp_diff・midi_path_diff・mixer_diff・playlist_diff・screen_diff・tool_args・transport_diff・ui_diff・ui_display_diff・ui_state_diff・step_item_diff) | 全て rc 0・diffs 0 (呼出し数: channels 170・ui_state 33・step_item 5929 ほか。tool_args は標準出力なし・rc 0) |
 
 コード差分の確認 (差分 0 の証跡):
 
 ```
-git diff 235f9cca HEAD -- tools/python/provider tools/python/host tools/python/tests
+git diff 51e3a96c HEAD -- tools/python/provider tools/python/host tools/python/tests
 ```
 
 この commit 以降の docs は REPORT のみ。出力は 0 行。
