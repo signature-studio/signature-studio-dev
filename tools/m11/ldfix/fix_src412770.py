@@ -3,7 +3,7 @@
 
 機械語 412790〜412796: `mov rsi,[rax]; mov rdi,rax; mov ecx,0x25; rep movsq` (rax = rcx = arg1、変位 0)。
 源 rsi は [arg1+0] の**値** (1 段 deref) で、lift 段 (boot0.lift.ll) はこの load を脱落させ源を `ptr null` にしている。
-NULL 源は wasm の address 0 を読むため、address 0 の中身 (LB=0 は PE ヘッダ・LB=0x10000 は 0 埋め) で unit 結果が LB 依存になる。
+NULL 源は wasm の address 0 を読む。address 0 の中身と unit 結果の LB 依存の関係は未確認 (REPORT_3296.md §4)。
 本 pass は `call @__asm_rep_movsq_memcpy(ptr %4, ptr null, i64 37)` の 1 行だけを、`load i64 [arg1+0]` の結果を inttoptr した源に置換する。
 想定と違う入力は assert で止める (第 1 仮引数が ptr %arg1 でない / 対象行が 1 件でない / 適用済み (二重適用) など。fail-closed)。
 
