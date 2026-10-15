@@ -5,17 +5,21 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `d82a36b04` (`tools/m11/trap_triage/judge_ctx.py` を追加した commit)。
-  - `git diff d82a36b04 HEAD -- tools/m11/guard699 tools/m11/ldfix tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py tools/m11/trap_triage/judge_ctx.py` = **0 行** (測定後にコードを変えていない)。
-- 基準 commit: `origin/main` = `e5c96411e`。
+- 測定 commit: `ae969d754` (`origin/main` `e80effec4` の取り込み merge。判定スクリプトは `judge_ctx_3492.py`)。
+  - 前回の測定は `d82a36b04` (判定を件ごとに出す `judge_ctx.py` を追加した commit)。main 取り込みで `tools/m11/ldfix/` が変わり、同名の `judge_ctx.py` が main 側にもあったため、本 PR の判定スクリプトを `judge_ctx_3492.py` に改名した。再測定は `ae969d754` で行った。
+  - `git diff d82a36b04 HEAD -- tools/m11/ldfix/ldmach.py tools/m11/guard699 tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py` = **0 行** (判定に使うモジュールは d82a36b04 と同一)。`judge_ctx_3492.py` は d82a36b04 の `judge_ctx.py` と docstring の 1 行 (使い方の行の名前) のみ異なる。
+  - `git diff ae969d754 HEAD -- tools/m11/guard699 tools/m11/ldfix tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py tools/m11/trap_triage/judge_ctx_3492.py` = 測定 commit 以降の差分 (この REPORT の更新 commit 後に実行。0 行)。
+- 基準 commit: `origin/main` = `e80effec4` (取り込み時点)。
 - 入力 (`tools/m11/work/`・gitignore。`oc_artifacts: fl-win64 work-m11` で取得):
   - `boot_final.ll` 19,787,837 B・sha256 `69c774ded8aaf717…` (REPORT_718 §4a と一致)。
-  - `block00031_PE.bin` 22,227,016 B (`fl-win64`・`extracted/`)。
-- 生成 (本 run):
-  - `python3 tools/m11/guard699/scan_guard.py tools/m11/work/boot_final.ll --pe <PE> --report tools/m11/work/strict3492.json` → strict **288**・4.1 s。
-  - positive control: `function_8c5eb0` の `8c5f18 jg → 8c6066` (#699) が strict に入る (✓)。
-  - `python3 tools/m11/trap_triage/strict_evidence.py ... --out tools/m11/work/strict_evidence_3492.tsv` → TSV **288 行** (ヘッダ除く)・12.0 s。
-- 環境: `uptime` の load average 0.14 0.08 0.11 (判定後の時点)。判定は subagent 6 本の並列 (各 8 件)。
+  - `block00031_PE.bin` 22,227,016 B・sha256 `b2c64da40921cf26…` (`fl-win64` の `extracted/`)。
+- 生成 (本 run、`ae969d754`):
+  - `python3 tools/m11/guard699/scan_guard.py tools/m11/work/boot_final.ll --pe <PE> --report tools/m11/work/strict3492.json` → strict **288**・4.7 s。
+  - positive control: `function_8c5eb0` の `8c5f18 jg → 8c6066` (#699) が strict に入る (✓。TSV に `8c5f18` の行あり)。
+  - `python3 tools/m11/trap_triage/strict_evidence.py ... --out tools/m11/work/strict_evidence_3492.tsv` → TSV **288 行** (ヘッダ除く)・14.9 s。
+  - `judge_ctx_3492.py ... --lo 241 --hi 288` → 48 行・4.6 s・rc 0。
+  - 機械照合: §4 の 48 行 (関数・jcc・T) と TSV 行 241〜288 を照合 → **不一致 0**。
+- 環境: load average (1 分値) 開始 0.16、判定ダンプ後 0.25。判定は subagent 6 本の並列 (各 8 件)。
 
 ## 2. 判定規則
 
@@ -28,7 +32,7 @@
 - **保留**: SSA を遡りきれない、または値の由来が IR で確定できない。推測で TP/FP にしない。
 - レジスタ名の一致だけは根拠にしない。機械語の初期値 (`xor eax,eax` → `mov ebx,eax` など) と IR の初期値 (`store i64 0`) と更新 (`+1`・`-1`) の両方を照合する。
 
-判定材料は `tools/m11/trap_triage/judge_ctx.py` が出す (行ごとに、jcc 直前 10 命令・CMP 被演算子・B の IR・L の IR・L への分岐元・T への IR 分岐・比較レジスタの reg2mem 参照行)。判定はしない。
+判定材料は `tools/m11/trap_triage/judge_ctx_3492.py` が出す (行ごとに、jcc 直前 10 命令・CMP 被演算子・B の IR・L の IR・L への分岐元・T への IR 分岐・比較レジスタの reg2mem 参照行)。判定はしない。
 
 ## 3. 結果
 
@@ -59,7 +63,7 @@
 | 252 | function_e92440 | e92467 jg → e924a4 | TP | X=edi=0、Y=r14d=N−1。L 頭の判定は別のフラグ |
 | 253 | function_ea77c0 | ea77fc jg → ea7821 | TP | X=edi=0、Y=r14d=M−1。L (tail と同一) に M 判定無し |
 | 254 | function_ea7ae0 | ea7d46 jg → ea7e45 | TP | X=ebx=0、Y=r13d=M−1。L 頭は配列要素の比較のみ |
-| 255 | function_ea8a80 | ea8af0 jg → ea8bd4 | **FP** | 入口 ea8a80 に `icmp slt N,1 → ret(-1)` (N≤0 で脱出) がある。guard は N≥1 の経路でのみ到達し、そこで 0 > N−1 は恒偽。前提は §5 |
+| 255 | function_ea8a80 | ea8af0 jg → ea8bd4 | **FP** | 入口 ea8a9f `cmp [arg1+20],0; jle ea8be8` (IR の `icmp slt N,1 → ret(-1)`)。入口から guard までの 2 本の call は N を書かない (ea8aad `function_1060d20`・ea8ad9 の間接 call = `ippsZero_8u(rbp+0x30, 0x120)`)。guard は N≥1 でのみ届き 0 > N−1 は恒偽。§5 |
 | 256 | function_ec2150 | ec2210 jg → ec24de | TP | X=ecx=0、Y=edi=K−1。入口・L に K 判定無し。参照段数の不一致は §6 |
 | 257 | function_ec3190 | ec31f5 jg → ec3242 | TP | X=esi=0、Y=r14d=N−1。B→L 入口に N 判定無し |
 | 258 | function_ec3190 | ec32d6 jg → ec32ff | TP | X=esi=0、Y=ecx=N−1。入口判定無し |
@@ -96,14 +100,18 @@
 
 ## 5. 偽陽性 2 件の根拠
 
-- **行 255 (`function_ea8a80`)**: 機械語の guard は `cmp esi(=0), r14d(=N−1); jg` で、N≤0 のとき T=ea8bd4 へ飛ぶ。IR の入口 ea8a80 には `%2 = load [arg1+20]`・`%3 = icmp slt N,1`・`br %3 → ret(-1)` (ea8be8) がある。同じ値・同じ条件の判定が、guard より前に IR に存在する。
-  - 検算: guard に到達するのは N≥1 の経路だけで、そこでは 0 > N−1 が恒偽。
-  - 前提 (未確定): guard の N は入口判定の後 (`call function_1060d20(arg1)` の後) に再読込される。`function_1060d20` 本体は `[arg1+20]` を読むだけで、書くのは `[arg1+72]` のみ (確認済み)。内部で呼ぶ `function_12df530` の副作用は**未確認**。ここが崩れると TP になる。 → #3574 の受入条件に入れた。
+- **行 255 (`function_ea8a80`)**: 機械語の guard は `cmp esi(=0), r14d(=N−1); jg` (ea8af0) で、N≤0 のとき T=ea8bd4 へ飛ぶ。入口 ea8a9f は `cmp dword [arg1+20], 0; jle ea8be8` で、N≤0 のとき同じ脱出 (ea8be8) へ行く (IR の入口 `icmp slt N,1 → ret(-1)` に対応)。guard に届くのは N≥1 の経路だけ。
+  - 入口 (ea8a9f) から guard (ea8af0) までの call は 2 本 (命令列を全件確認):
+    1. ea8aad `call 0x1060d20(arg1)`。本体の store は `[arg1+72]` のみ、内部の `function_12df530` に store は無い (前回の確認どおり)。
+    2. ea8ad9 `call qword ptr [rax]`。`mov rax,[rip+0x737f6f]` (ea8ad2) は VA **0x15E0A48** (`.data`) を読み、その値 **0x15F34A0** (`.bss`) が呼び先の格納先。`.text` の rip 相対参照は、呼び先の束縛 `0x653f40` の `lea rdx,[0x15F34A0]` (6542eb) だけで、他に 0x15F34A0 への書込みは無い (ポインタ経由の書込みは未走査)。束縛 `0x653dd0` は `GetProcAddress` の結果を `*rdx` へ格納し、名前は `lea r8,[0x6577d8]` の UTF-16LE 文字列 **`ippsZero_8u`** (モジュール `dsp_ippv2.dll`・`0x6572dc`)。よって呼び先は `ippsZero_8u(pDst=rbp+0x30, len=0x120)` で、フレーム内の 288 バイト `[rbp+0x30, rbp+0x150)` を 0 で埋める (IPP の公開 API 仕様)。この範囲は `[rbp+0x28]` (arg1 の保存先) と `[arg1+20]` を含まない。arg1 は呼び出し元が渡した既存のオブジェクトで、この関数のフレームを指さない。
+  - 結論: guard までに `[arg1+20]` は変わらない。N ≥ 1 のため r14d = N−1 ≥ 0、`0 > r14d` は恒偽で、T へは飛ばない。IR の入口判定と同じ値・同じ条件の判定があり、機械語の jg は成立しない (FP (a)・(b) の両方に当たる)。
+  - T 側の効果: 仮に T が成立する (前提の N 不変が崩れる) 場合、ea8bd4 は edi=0 (ea8adb) のため `jl ea8be5` で `eax=-1` を返し、ea8be8 へ抜ける。戻り値 -1 と後続の効果は入口 exit と同じ。ただし T 経路は ea8aad と ea8ad9 の call を済ませており、入口 exit は済ませていない。この差は前提が崩れたときだけ生じる。
+  - 残る未照合: `ippsZero_8u` の公開仕様 (pDst から len バイトを 0 で埋める) と `dsp_ippv2.dll` 本体の挙動。素材 `fl-win64` に `dsp_ippv2.dll` は含まれず、本 run では照合できなかった。 → #3574 の受入条件に残す。
 - **行 261 (`function_ec35f0`)**: 機械語は `mov eax,1` (ec364d) の後に `mov ebx,eax` (ebx=1)、`r14 = setge + 999` (999 または 1000)、`cmp ebx, r14d; jg ec380c`。1 > r14d は恒偽で、jcc は一度も成立しない。IR に T への脱出が無いのは挙動差を生まない。判定の型は「同じ判定が IR にある」ではなく「機械語の guard が恒偽」(FP の (b))。
 
 ## 6. 所見 (判定の外)
 
-- **参照段数の不一致 (行 256・278・279)**: 機械語は `mov rcx,[G]; mov rcx,[rcx]; mov edi,[rcx+0x10]` (qword 逆参照 2 段) で N を読む。IR は `%0 = load i32 [G]` (G の下位 32bit) → `load i32 [sext(%0)+16]` の 1 段で、`mem64[P1]` の逆参照が IR に無い。IR の N は機械語の N と別の値になりうる。TP の判定 (入口判定の欠落) は変わらないが、値そのものの誤りの有無と件数は未測定。起票先: #1187 (件ごとの真偽・偽陽性率の既存親) へのコメントで提案する (DEFECTS 行案は PM 判断)。
+- **参照段数の不一致 (行 256・278・279)**: 機械語は `mov rcx,[G]; mov rcx,[rcx]; mov edi,[rcx+0x10]` (qword 逆参照 2 段) で N を読む。IR は `%0 = load i32 [G]` (G の下位 32bit) → `load i32 [sext(%0)+16]` の 1 段で、`mem64[P1]` の逆参照が IR に無い。IR の N は機械語の N と別の値になりうる。TP の判定 (入口判定の欠落) は変わらないが、値そのものの誤りの有無と件数は未測定。起票先: #1187 (件ごとの真偽・偽陽性率の既存親) へのコメント (提案。投稿は PR #3578 のコメントに URL を記載)。DEFECTS 行案は PM 判断。
 - **間接 call (行 270・271)**: 比較値の由来が間接 call の戻り値。IR に対応する call が無く、lift で call が落ちている可能性がある。判定は #3574。
 - **行 241 と 242 の意味**: N=0 のとき、機械語は本体を飛ばすが IR は本体を 1 回実行し、末尾の `rdi-1 = −1` (trunc 32bit) で後方へ続く。TP の根拠はこの挙動差ではなく、入口判定の欠落そのもの。
 
@@ -113,15 +121,16 @@
 cd tools/m11
 python3 guard699/scan_guard.py work/boot_final.ll --pe <block00031_PE.bin> --report work/strict3492.json
 python3 trap_triage/strict_evidence.py work/boot_final.ll --pe <block00031_PE.bin> --report work/strict3492.json --out work/strict_evidence_3492.tsv
-python3 trap_triage/judge_ctx.py work/boot_final.ll --pe <block00031_PE.bin> --tsv work/strict_evidence_3492.tsv --lo 241 --hi 288
+python3 trap_triage/judge_ctx_3492.py work/boot_final.ll --pe <block00031_PE.bin> --tsv work/strict_evidence_3492.tsv --lo 241 --hi 288
 ```
 
-- 同じ commit (`d82a36b04`) で、行 241〜248 の出力が判定に使った `ctx` と一致することを確認 (`cmp`)。
+- 判定に使うモジュール (`ldmach.py`・`guard699/`・`strict_evidence.py`・`judge_dump.py`) は d82a36b04 から差分 0 行 (§1)。出力は d82a36b04 の判定時と同じ入力・同じ関数で出る。
 - ネガティブコントロール: strict 288 件の中に positive control `8c5f18` があり、検出器は既知の真陽性を拾う。
 
 ## 8. 検証範囲と限界
 
 - 件ごとの判定は subagent 6 本の SSA 追跡 (各 8 件)。lead は次を読み直して照合した: 行 241・242 (機械語と IR の全体)、行 255 (入口ブロックと `function_1060d20`)、行 256・278・279 (機械語の逆参照段数)、行 261 (`mov eax,1` と `setge`)。
+- 行 255 の間接 call の同定 (slot → 束縛 → 名前) は、`ldmach.Machine` と pefile で PE を直読して行った (スクリプトは commit していない。§5 の番地で再現できる)。`ippsZero_8u` の仕様と `dsp_ippv2.dll` 本体は未照合 (§5)。
 - 別アルゴリズムの検算 (IR の被演算子を機械的に再計算する突合) は未実施。判定の誤りを見つける検収は reviewer に任せる。
 - 「B は無条件 br・B に icmp が無い」は TSV の `ir_block_cond=0` と BLK-icmp の空で機械的に確認した (48 件とも `ir_block_cond=0`)。
 
@@ -130,12 +139,12 @@ python3 trap_triage/judge_ctx.py work/boot_final.ll --pe <block00031_PE.bin> --t
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 行 270・271 の判定 (間接 call の戻り値) | 2 件が保留 | #3574 |
-| 行 255 の FP 前提 (`function_12df530` の副作用) | FP 判定の確度 | #3574 |
+| 行 255 の呼び先 `ippsZero_8u` の仕様照合 (`dsp_ippv2.dll` 本体は素材に無い) | FP 判定の確度 (書込み範囲は機械語で確定済み) | #3574 |
 | 参照段数の不一致 (行 256・278・279 ほか。IR 1 段・機械 2 段) の件数と、値の誤り | 値の誤りの有無は未測定。TP 判定には影響しない | #1187 へのコメント (提案) |
 | 行 194〜240 (#1655 の残り) | 288 件中 46 件を判定、残り 194〜240 は未判定 | #1655 (既存) |
 
 ## 10. 範囲
 
-- 変更: `tools/m11/trap_triage/judge_ctx.py` (新規・判定材料の出力のみ)、`tools/m11/trap_triage/REPORT_3492.md` (新規)、`docs/DOC_MAP.md` (登録)。
-- 変更しない: `tools/m11/guard699/`・`tools/m11/ldfix/`・`strict_evidence.py`・`judge_dump.py`・RetDec 本体・`m11_ov.c`。
+- 変更: `tools/m11/trap_triage/judge_ctx_3492.py` (新規・判定材料の出力のみ。main の `judge_ctx.py` (#3502) と同名のため改名)、`tools/m11/trap_triage/REPORT_3492.md` (新規)、`docs/DOC_MAP.md` (登録)。main 取り込みの merge commit `ae969d754` を含む。
+- 変更しない: `tools/m11/guard699/`・`tools/m11/ldfix/ldmach.py`・`strict_evidence.py`・`judge_dump.py`・`judge_ctx.py` (main 側の #3502 の版)・RetDec 本体・`m11_ov.c`。
 - 20 MiB 超の blob: なし。`tools/m11/work/` は gitignore (commit しない)。
