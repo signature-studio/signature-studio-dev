@@ -1,7 +1,7 @@
 # PY-262 (#3860): 戻り値 `[rbp+0x584]` の書込み経路と式 (部分・REPORT_PY41.md の PY-65 節の受入 2 の付録)
 
 親: #2034 (PY-65)。前段: `REPORT_PY41.md` の PY-65 節 (受入 2 は未達)・PY-60 (戻り値の書込みと早期 exit の入辺 9 件)。
-測定 commit: `a6ce09858` (`analysis/py262_ret584_paths.py` を追加し、§4 の数値を測ったコードの最後の commit)。`git diff a6ce09858 HEAD -- tools/python/analysis/` の出力は空 (0 行・差分 0)。`py65_ret584_reach.py` は main (`ea7f810ca`・`8706f8e89`) で入ったもので、本 PR の commit ではない。
+測定 commit: §4 は `a6ce09858` (`analysis/py262_ret584_paths.py` を追加し、§4 の数値を測ったコードの最後の commit)。§9 は `e2ca0fc4d` (`analysis/py341_ret584_dominators.py` の docstring 修正 commit・`031d81296` で追加した後の最後のコード変更)。main 取り込み後の HEAD で再測定した。測定に使う 5 本 (`py53_dispatch.py`・`py65_ret584_reach.py`・`py262_ret584_paths.py`・`py341_ret584_dominators.py`・`py65_r8d_bits.py`) は `git diff 031d81296 HEAD -- <5 本>` の出力が空 (差分 0)。`git diff 031d81296 HEAD --stat -- tools/python/analysis/` は main 由来の 4 本の追加のみ (`flapi/pe_py183_probe.py`・`flapi/pe_py340_kind1_dispatch.py`・`py235_0xc61250_write.py`・`py342_r8d_ret_cross.py`、計 392 行・測定対象外)。`py65_ret584_reach.py` は main (`ea7f810ca`・`8706f8e89`) で入ったもので、本 PR の commit ではない。
 素材: `oc_artifacts: fl-win64` (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`・`block00031_PE.bin` 22,227,016 B)。
 再現: `python3 tools/python/analysis/py53_dispatch.py <PE> <work/py53>` → `fn=4664 dispatch=13 r8d_tests=174` (本 run で再現)。続けて `python3 tools/python/analysis/py65_ret584_reach.py <work/py53/fn.txt> 0x104cc65`。
 
@@ -55,7 +55,7 @@
 
 ## 5. 未確定 (受入 1・3 の残り)
 
-- **受入 1 (分岐ごとの式・経路条件 + 書く値)** は部分達成。§4 の代表経路の条件は機械的に出せたが、書込みごとの全経路の式 (どの jcc の立ち/落ちの組合せで至るか) と書く値の式は未確定。
+- **受入 1 (分岐ごとの式・経路条件 + 書く値)** は部分達成。§4 の代表経路の条件は機械的に出せた。§9 で、書込みごとに「必ず通る分岐」(必要条件) を支配関係で確定した。書込みごとの全経路の式 (十分条件の組合せ) と書く値の式は未確定 (§9)。
 - 72/74 の切り分けは §3 で確定 (戻り値に届かない 2 件は上書きされる)。
 - **受入 3 (判定の行き先と戻り値分岐の突合)** は §7 で実施 (PY-342)。
   `py65_r8d_bits.py` の objdump 照合 (174 件 mismatch 0) は判定の取り直しの一致であり、本節の突合とは別物。
@@ -106,3 +106,17 @@
 | `py342_r8d_ret_cross.py` | 判定 174・mismatch 0・入る 174 |
 | `py342_r8d_ret_cross.py --negctl` | 不一致 1 件 (検出) |
 | 所要 | wall=0.16s・maxrss=54,280 KB (`py53` → `py65` → `py342` の 1 回・測定 commit `37b08a9d7`・load 0.07) |
+
+## 9. 書込みごとの必須分岐 (PY-341・#4574・受入 1 の部分)
+
+測定: `analysis/py341_ret584_dominators.py` (支配関係・1 秒未満)。入力は `py53_dispatch.py` の `fn.txt` (fn=4664・writes_total=74・reachable=74 を本 run で再現)。72 件の VA は `py65_ret584_reach.py` の出力と一致 (72/72)。
+
+- **全経路の列挙は打ち切り**。単純パスを後ろ向きに列挙すると、74 件中 73 件が上限 2000 経路に達した (残り 1 件は入口書込みで経路 1 本・条件なし)。614 個の jcc を持つ CFG では全経路数が指数的に増えるため、この方式では全経路の式は求まらない。
+- **確定したのは必須分岐 (必要条件)**。辺 `d→s` を外すと入口から書込みへ届かない jcc の辺を、支配関係で求めた。71 件 (書込み 1 件は入口直後のため該当なし) で、件あたり 3〜16 本・計 780 本。
+- **全 71 件に共通する必須分岐は 1 本**: `0x1046d8d jne(落ち) after [0x1046d8a cmp byte ptr [rax], 0]`。`jne` が飛ばない側 (`[rax]` が 0) へ進む辺が、書込みに至る必須の辺。`jne` が立つ側 (`[rax]` が 0 でない) は早期 exit (0x104cc72) 側へ行く。
+- 必須分岐の数の分布: 最小 3 (0x104a9c7)・最大 16 (0x1047f9c)。
+- 書く値の式の出どころは 72 件の表 (付録 `REPORT_APPENDIX_PY341.md`)。内訳は §2 の分類と一致 (call 0x10469f0 が 7・add ecx, eax が 24・構造体フィールド読みが 30・vtbl 呼出しが 3・call 0x40c660 が 4・bool が 3・入口 1)。
+
+**未確定**: 十分条件 (どの jcc の組合せで実際に書込みに至るか) と、書く値の式 (`add ecx, eax` の `ecx` と `eax` の由来・構造体フィールドの値) は未確定。必須分岐だけでは「どの経路で書かれるか」は決まらない。
+
+**依頼の残り (次 run)**: 十分条件は、経路の全列挙をやめ、書込みごとに「その書込みへ至る分岐の組合せ」を記号的に求める方式が要る (例: 分岐条件を `cmp`/`test` の式として束ね、書込みの支配域ごとに畳み込む)。これは本 run の範囲を超えるため、PY-341 の残りとして起票先を #4574 に残す。
