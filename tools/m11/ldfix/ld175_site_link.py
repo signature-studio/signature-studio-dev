@@ -92,7 +92,7 @@ def main():
         for n in range(start_n, len(body)):
             if n > start_n and body[n].startswith('dec_label_pc_'):
                 break
-            mq = re.match(r'\s+(%[\w.\-]+) = load (\S+), ptr inttoptr \(i64 ' + str(k) + r' to ptr\)', body[n])
+            mq = re.match(r'\s+(%[\w.\-]+) = load (i\d+), ptr inttoptr \(i64 ' + str(k) + r' to ptr\)', body[n])
             if mq:
                 q = mq.group(1)
                 print('  IR ブロック %x の 1 段セル読み: 行 %d `%s`' % (sb, st + n + 1, body[n].strip()))
