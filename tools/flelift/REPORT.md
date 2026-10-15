@@ -229,3 +229,15 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 
 - **判定**: wasm サイズと emcc 時間は実測で確定 (-O0 27.6 MB / -O2 13.7 MB / -O2 -flto 11.1 MB)。出力は 3 variant で一致 (署名 `533e70fd7efebaa0`)。実行時間の LTO 効果は 2 関数の微小測定では判定できず、closure 全体は未測 (boot 連鎖の lift が RAM 上限、#918)。
 - 詳細 (表・測定条件): `REPORT_APPENDIX.md` §10
+
+## 11. 環境パス置換 (#294 / #3603): flelift 直下 3 本の既定値を `tools/shared` 経由へ
+
+- **結論**: `fle_nat.py`・`fle_diff.py`・`probe_d9_disp.py` の従来の既定 (`[WIN64]` の既定) を `tools/shared/paths.py` の `FL_WIN64_DIR` 経由へ置換。`FLE_PE` → `FL_WIN64_DIR` の優先順は不変。lift/IR に触れないため既知類型 (`docs/DEFECTS.md`) は該当なし。
+- **e2e (`fle_e2e.sh`、素材 `fl-win64` + `toolchain-emsdk`)**: before (03df83be4) / after (C1) とも PASS。所要 158 s / 157 s。lift 7,018 関数・unsup 0、spot diff equal 16/16、D9 mismatch 0。出力物の sha256 は全件一致、ログは作業パス以外一致。
+- **仕様差**: `ANALYSIS_DIR` を設定した場合のみ既定が `$ANALYSIS_DIR/win64` になる (従来は無視)。両方未設定の既定は従来どおり。
+- 変更表・測定条件・静的検証・ネガティブ制御・検算: `REPORT_APPENDIX.md` §11。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `tools/icall` の既定値置換と代表 e2e | 本節の範囲外 (flelift 直下のみ検証) | #3604 |
+| m11 ほか残り area と ott/m11 の代表 e2e | 親 #294 の残り | #294 |
