@@ -28,7 +28,7 @@
 
 `TMPDIR=$RUNNER_TEMP M11_WORK=<work-m11 展開先> LD_WORK=<work-liftdiff 展開先> bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` の実測:
 
-- 実行: real 2m57.6s・load 0.22 → 0.97・rc=0・7/7 完走 + step 8 完走。
+- 測定 commit `740289e98` (コードを変えた最後の commit。HEAD と同じ)。実行: real 3m00.4s・load 1.10 (11:30:57 時点の uptime)・rc=0・7/7 完走 + step 8 完走。
 - `[spill178_1161.tsv] results/ と一致`・`[spill178 (修復後 IR)] results/spill178_1161.tsv と一致`。
 - 集計: spill 宛 unk site 178 / 71 関数。確定 154 / 判定不能 23 / 未判定 1。`10479c7` の判定不能は既存 (REPORT_2958)。
 
