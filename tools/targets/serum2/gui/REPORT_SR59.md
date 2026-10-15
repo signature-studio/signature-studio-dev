@@ -25,7 +25,11 @@ ARG の型を確定するには、F を呼ぶ側の引数を見る作業が要�
 
 ## 2. 分類結果 (測定 commit `ea3ffa68d`・候補単位)
 
+**注: §2 の件数は本 run で再現していない (未再現)。** 入力 PE (`plugins-serum2`) が無く、再集計を実行していない。以下は前 run の記録で、「参考」として読むこと。TSV の行と `arg_vtable_callers.py` の関数表を join する手順は本 REPORT に無く、件数の数え方は検証されていない。
+
 ### 2a. ARG 系 (受入 1)
+
+参考・未再現 (呼出単位の内訳。前 run の記録):
 
 | 分類 (F の入口が載る表の RTTI) | ARG 240 | ARG-CHILD 68 |
 |---|---|---|
@@ -36,12 +40,14 @@ ARG の型を確定するには、F を呼ぶ側の引数を見る作業が要�
 | 表の先頭が見つからない (未確認・§3) | 1 | 0 |
 | **SerumController** | **0** | **0** |
 
-- 関数単位 (ARG 系の所属関数 145 個): データ表に現れる 129 個・現れない 16 個。SerumController の表に現れる関数は 0 個。
-- 単位: 240・68・67・191 は呼出 (`receiver_this_trace.py` の TSV の行) の数で、関数の数ではない (関数は ARG 系 145 個)。
-- 未記録: 表の列への集計 (TSV 行と `arg_vtable_callers.py` の関数表の join) を行うスクリプトは本 PR に無い。F が複数の RTTI の表に載る場合 (`n_tables` ≥ 2) に、その行をどの分類に数えたかは本 REPORT に記録していない。この数え方は再現できていない。join の手順は本 run では書いていない (入力 PE が無く、実行して確かめられないため)。
-- 読み方: 226 件は「所属関数の this が XferViewCreator」を示すだけで、ARG の型ではない。ARG 240 件・ARG-CHILD 68 件は、すべて「確定 0 件・未確定 308 件」。
+- 関数単位 (ARG 系の所属関数 145 個) の前 run の記録: データ表に現れる 129 個・現れない 16 個・SerumController の表に現れる関数 0 個。これも未再現。
+- 単位: 240・68・67・191 は呼出 (`receiver_this_trace.py` の TSV の行) の数で、関数の数ではない。
+- 未記録: TSV 行と `arg_vtable_callers.py` の関数表の join、および `n_tables` ≥ 2 の行の数え方は、本 REPORT にも本 PR にも無い。前 run の内訳がどの数え方で出たかも検証していない。
+- 読み方: 「XferViewCreator」の件数は、所属関数の this がその RTTI の表に載ることを示すだけで、ARG の型ではない。ARG 240 件・ARG-CHILD 68 件は、いずれも「確定 0 件・未確定」。
 
 ### 2b. THIS 系 (受入 2)
+
+参考・未再現 (前 run の記録。§2 の注を参照):
 
 | 分類 | THIS 67 | THIS-CHILD 191 |
 |---|---|---|
@@ -90,16 +96,16 @@ venv/bin/python $P/arg_vtable_callers.py Serum2_win64.vst3 trace.tsv --cats vptr
 
 ### 鮮度の証跡 (`docs/WORKFLOW.md` §6)
 
-- 測定 commit `ea3ffa68d` → `3ba9939e6` (レビュー対象の head) の差分。本 commit での REPORT の追記は、PR 本文に最終 HEAD の差分を別途添付する。
-- `git diff --stat ea3ffa68d 3ba9939e6 -- tools/targets/serum2/gui` の出力:
+- 測定 commit `ea3ffa68d` → 現 head `16bcab6ef` の差分 (REPORT の修正のみ):
+- `git diff --stat ea3ffa68d 16bcab6ef -- tools/targets/serum2/gui` の出力:
 
 ```
- tools/targets/serum2/gui/REPORT_SR59.md | 96 +++++++++++++++++++++++++++++++++
- 1 file changed, 96 insertions(+)
+ tools/targets/serum2/gui/REPORT_SR59.md | 116 ++++++++++++++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
 ```
 
-- code 範囲 (`*.py`) の差分: `git diff --stat ea3ffa68d 3ba9939e6 -- 'tools/targets/serum2/gui/*.py'` は出力 0 行。`git log --oneline ea3ffa68d..3ba9939e6 -- 'tools/targets/serum2/gui/*.py'` も 0 行。
-- 結論: 測定に使ったコードは変わっていないので、再測定は不要。この REPORT の修正 commit は `*.py` を変えない (REPORT のみ)。最終 HEAD の差分は PR コメントに添付する。
+- code 範囲 (`*.py`): `git diff --stat ea3ffa68d 16bcab6ef -- 'tools/targets/serum2/gui/*.py'` は出力 0 行。`git log --oneline ea3ffa68d..16bcab6ef -- 'tools/targets/serum2/gui/*.py'` も 0 行。
+- 結論: 測定に使ったコードは変わっていないので、再測定は不要。変更は REPORT のみ。
 
 ### 未再現 (入力 PE 不在)
 
