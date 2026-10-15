@@ -66,14 +66,71 @@ static u32 g_survey;
 #define PROBE_RING 128
 static u32 g_ring[PROBE_RING]; static u32 g_ring_n;
 static u32 g_n_dispatch, g_n_disp_getmem, g_n_disp_freemem, g_n_disp_realloc, g_n_disp0;
+/* FLE-12 (#3090): fill コールバック 0x6a7b70 への dispatch を全件記録する (呼出元 VA = 戻りアドレス・
+ * rcx=dst・edx=値・r8=DWORD 個数)。dispatch の冒頭で呼ばれるため、呼出し時点の guest 引数を読める。 */
+#define FILL_LOG_MAX 200
+static u32 g_fill_n;
 static void fle_probe_dispatch(u64 t) {
     g_n_dispatch++;
+    if (t == 0x6a7b70u && g_fill_n < FILL_LOG_MAX) {
+        /* f_6c7610 の frame (rbp=R[5]): push 5 本 + sub rsp,0x50 のため戻りアドレス = [rbp+0x78]、矩形 = [rbp+0x40..0x50) */
+        fprintf(stderr, "[fill6a7b70] #%u ret=0x%llx dst=0x%llx val=0x%llx cnt=0x%llx caller=0x%llx this=0x%llx rect=%d,%d,%d,%d\n",
+                (unsigned)g_fill_n, (unsigned long long)LD64(R[4]), (unsigned long long)R[1],
+                (unsigned long long)(R[2] & 0xffffffffULL), (unsigned long long)R[8],
+                (unsigned long long)LD64(R[5] + 0x78), (unsigned long long)R[3], (int)LD32(R[5] + 0x40),
+                (int)LD32(R[5] + 0x44), (int)LD32(R[5] + 0x48), (int)LD32(R[5] + 0x4c));
+        if (g_fill_n == 0) {
+            /* 呼出元 f_815050 の frame の保存 rbp = [f_6c7610 の rbp + 0x70] */
+            u64 cb = LD64(R[5] + 0x70);
+            fprintf(stderr, "[fill6a7b70-src] callerRbp=0x%llx w=%d h=%d spi_left=%d sm13=%d sm14=%d\n",
+                    (unsigned long long)cb, (int)LD32(cb + 0x214), (int)LD32(cb + 0x218), (int)LD32(cb + 0x1c8),
+                    (int)LD32(0x15f6f60ULL), (int)LD32(0x15f6f64ULL));
+        }
+        g_fill_n++;
+    }
     if (t == 0x407a50u) g_n_disp_getmem++;
     else if (t == 0x407e20u) g_n_disp_freemem++;
     else if (t == 0x408040u) g_n_disp_realloc++;
     else if (t == 0) { g_n_disp0++; return; }
     g_ring[g_ring_n % PROBE_RING] = (u32)t; g_ring_n++;
 }
+/* PY-123 (#3028): undo 系 global の 0 化を unit 単位で追う (計測のみ・挙動は変えない)。
+ * 監視 slot の値が変わったときだけ記録する。unit = g_units_run (1-based・0 は InitUnits 前)。
+ * site: 0 = fle_run 直前 (snap) / 1 = unit dispatch 直前 / 2 = unit dispatch 直後 / 3 = memset 直後 /
+ *       4 = ExitProcess / 5 = MessageBoxW / 6 = GetMem 直後 / 7 = FreeMem 直後 / 8 = GetMem 呼出し直前。
+ * proc: site 1・2 は unit の proc VA、3 は memset の長さ、4 は呼出し元、6 は要求サイズ、7 は解放ポインタ。
+ * aux: site 3 は memset の dst、6 は GetMem の戻り値 (0 = 失敗)、7 は FastMM の応答 (0 = 成功)。 */
+#define PY_WATCH_N 3
+#define PY_EV_MAX 64
+typedef struct { u32 unit, site, slot, proc; u64 old, nw, aux; } py_ev;   /* 40 B (JS 側の読出しと一致) */
+static const u32 g_py_watch[PY_WATCH_N] = { 0x15e1c78u, 0x15e4790u, 0x16b82e0u };
+static u64 g_py_last[PY_WATCH_N];
+static py_ev g_py_ev[PY_EV_MAX];
+static u32 g_py_ev_n, g_py_ev_over;
+static void py_watch_snap(void) {
+    for (u32 k = 0; k < PY_WATCH_N; k++) {
+        g_py_last[k] = LD64(g_py_watch[k]);
+        if (g_py_ev_n < PY_EV_MAX) {
+            py_ev* e = &g_py_ev[g_py_ev_n++];
+            e->unit = 0; e->site = 0; e->slot = g_py_watch[k]; e->proc = 0; e->old = 0; e->nw = g_py_last[k]; e->aux = 0;
+        }
+    }
+}
+static void py_watch(u32 site, u32 proc, u64 aux) {
+    for (u32 k = 0; k < PY_WATCH_N; k++) {
+        u64 v = LD64(g_py_watch[k]);
+        if (v == g_py_last[k]) continue;
+        if (g_py_ev_n < PY_EV_MAX) {
+            py_ev* e = &g_py_ev[g_py_ev_n++];
+            e->unit = g_units_run; e->site = site; e->slot = g_py_watch[k]; e->proc = proc;
+            e->old = g_py_last[k]; e->nw = v; e->aux = aux;
+        } else g_py_ev_over++;
+        g_py_last[k] = v;
+    }
+}
+EMSCRIPTEN_KEEPALIVE unsigned fle_py_ev_ptr(void) { return (unsigned)(uintptr_t)g_py_ev; }
+EMSCRIPTEN_KEEPALIVE int fle_py_ev_n(void) { return (int)g_py_ev_n; }
+EMSCRIPTEN_KEEPALIVE int fle_py_ev_over(void) { return (int)g_py_ev_over; }
 /* strict variant は link 構成として fail-fast 化 (-DFLEBOOT_STRICT=1)。実行時切替も可。 */
 #if FLEBOOT_STRICT
 unsigned char fle_g_strict = 1;
@@ -204,6 +261,8 @@ void imp_EnumSystemLocalesW(void) {
 void imp_ExitProcess(void) {
     g_n_exit++;
     fprintf(stderr, "[fleboot][exit] code=%u call_site=0x%llx\n", (unsigned)(R[1] & 0xffffffff), (unsigned long long)LD64(R[4]));
+    py_watch(4, (u32)LD64(R[4]), R[1] & 0xffffffffu);
+    for (int i = 0; i < 40; i++) { u64 v = LD64(R[4] + 8ull * i); if (v >= 0x401000ull && v < 0x13a44b0ull) fprintf(stderr, "[py123][exit-stack] +%d 0x%llx\n", i, (unsigned long long)v); }
     fle_throw_kind((long)(intptr_t)"exit", (long)(R[1] & 0xffffffff));
 }
 void imp_TerminateProcess(void) { g_n_exit++; fle_throw_kind((long)(intptr_t)"exit", 3); }
@@ -221,6 +280,7 @@ void imp_LoadStringW(void) {   /* gui_compat.c と同一: buf[0]=0 を書かな�
 void imp_memset(void) {        /* CRT 実体 (soft 0 返却だと意味破壊) */
     u64 dst = R[1]; u32 c = R[2] & 0xff; u64 n = R[3];
     if (n) memset((void*)(uintptr_t)dst, (int)c, n);
+    py_watch(3, (u32)n, dst);
     R[4] += 8; R[0] = dst;
 }
 void imp_MessageBoxA(void) {
@@ -232,6 +292,7 @@ void imp_MessageBoxW(void) {
     char t[256]; int i;
     for (i = 0; w && w[i] && i < 255; i++) t[i] = w[i] < 128 ? (char)w[i] : '?'; t[i] = 0;
     fprintf(stderr, "[fleboot][MessageBoxW] text='%s' (自動 IDOK)\n", t);
+    py_watch(5, (u32)LD64(R[4]), 0);
     R[4] += 8; R[0] = 1;
 }
 void imp_RaiseException(void) {  /* Delphi SEH raise → JS 例外化 (boot/survey を継続させる) */
@@ -458,10 +519,12 @@ void fle_ov_getmem(void) {
         u32 gsz = (u32)R[1], gret = (u32)LD64(R[4]);
         fle_blk_getmem_pre(gsz, gret);              /* diag: canary 検証 + 記録 */
         u64 t_ = LD64(MM_TABLE);
+        py_watch(8, gsz, 0);
         R[4] -= 8; ST64(R[4], 0x409424ull);
         ott_dispatch(t_);
         R[4] += 8;                                  /* 拙い push/pop 釣合 (下記注記) */
         u64 p = R[0];
+        py_watch(6, gsz, p);
         fle_blk_getmem_post((u32)p, gsz);
         if (!p) { R[1] = (R[1] & ~0xffull) | 1; R[4] -= 8; ST64(R[4], 0x409433ull); f_409730(); }
         R[3] = save_rbx; R[0] = p;
@@ -488,6 +551,7 @@ void fle_ov_freemem(void) {
         ott_dispatch(t_);
         R[4] += 8;                                  /* 拙い push/pop 釣合 (下記注記) */
         u32 ok = R[0] & 0xffffffff;
+        py_watch(7, fp, ok);
         fle_blk_free_post(fp, ok, fret);         /* diag: FastMM 応答 (0=成功) */
         if (ok) { R[1] = (R[1] & ~0xffull) | 2; R[4] -= 8; ST64(R[4], 0x409461ull); f_409730(); }
         R[3] = save_rbx; R[0] = ok;
@@ -495,6 +559,27 @@ void fle_ov_freemem(void) {
     }
     R[3] = save_rbx; R[0] = 0;
 }
+
+/* 寛容起動 (#2719, WIN-3 相当): g_tolerant=1 のとき InitUnits は JS の逐次ループ (fle_boot.mjs) に渡す.
+ * JS 側が unit ごとに try/catch で隔離し、失敗は skipped と記録して次へ進む。既定 (0) の挙動は変えない。 */
+static int g_tolerant = 0;
+EMSCRIPTEN_KEEPALIVE void fle_boot_set_tolerant(int v) { g_tolerant = (v != 0); }
+EM_JS(void, fle_tolerant_hook, (), { Module.fle_tolerant_run(); });
+/* InitUnits の 1 周 (unit i) と同じ手順。戻り 0 = proc NULL / 1 = [proc]==0 (empty) / 2 = 実行。trap は JS 例外で抜ける */
+EMSCRIPTEN_KEEPALIVE int fle_call_unit_at(int i) {
+    u64 tbl = LD64(INITCTX_TABLE);
+    u64 proc = LD64(LD64(tbl + 8) + 16ull * (u64)(u32)i);
+    ST32(INITCTX_COUNT, (u32)i + 1);
+    if (!proc) return 0;
+    if (LD64(proc) == 0) { g_units_empty++; return 1; }
+    g_units_run++;
+    R[4] -= 8; ST64(R[4], 0x412129ull);
+    R[1] = 0; R[2] = 0; R[8] = 0; R[9] = 0;
+    ott_dispatch(proc);
+    return 2;
+}
+EMSCRIPTEN_KEEPALIVE u32 fle_rsp_get(void) { return (u32)R[4]; }
+EMSCRIPTEN_KEEPALIVE void fle_rsp_set(u32 v) { R[4] = v; }
 
 /* f_4120c0 = System.InitUnits — boot: 計数つき unit 連鎖 / survey: total のみ設定して戻る */
 void fle_ov_initunits(void) {
@@ -504,15 +589,18 @@ void fle_ov_initunits(void) {
     u64 units = LD64(tbl + 8);
     g_units_total = count;
     if (g_survey) return;
+    if (g_tolerant) { fle_tolerant_hook(); return; }
     for (u32 i = 0; i < count; i++) {
         u64 proc = LD64(units + 16ull * i);
         ST32(INITCTX_COUNT, i + 1);
         if (!proc) continue;
         if (LD64(proc) == 0) { g_units_empty++; continue; }   /* 実機と同じ [proc]!=0 check (.text 窓) */
         g_units_run++;
+        py_watch(1, (u32)proc, 0);
         R[4] -= 8; ST64(R[4], 0x412129ull);   /* 実機の call [rbp+0x38] (0x412126, 3B) の復帰点 */
         R[1] = 0; R[2] = 0; R[8] = 0; R[9] = 0;
         ott_dispatch(proc);
+        py_watch(2, (u32)proc, 0);
     }
 }
 
@@ -599,6 +687,8 @@ EMSCRIPTEN_KEEPALIVE void fle_boot_enter(int survey) {
     g_survey = (u32)survey;
     g_units_run = g_units_total = g_units_empty = 0;
     g_n_getmem = g_n_freemem = g_n_longjmp = g_n_exit = 0;
+    g_py_ev_n = g_py_ev_over = 0;
+    py_watch_snap();
     g_boot_stage = 1;
     /* DllMain(hinst=0, DLL_PROCESS_ATTACH=1, reserved=0) — m11_boot_enter(0,1) と同一条件 */
     fle_run(ENTRY_VA, 0, 1, 0, 0, 0, 0, 0, 0);

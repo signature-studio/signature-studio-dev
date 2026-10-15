@@ -21,8 +21,10 @@ export function createMockEngine() {
     tempo: 130,
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
+    undoPos: 0, undoCount: 0, undoLast: 0, safeEdit: true, projTitle: "", projAuthor: "", projGenre: "",
+    selStart: -1, selEnd: -1,
     arrTime: 0,
-    numerator: 4, denominator: 4, undoHistoryPos: 0, undoHistoryCount: 0, undoHistoryLast: 0,
+    numerator: 4, denominator: 4,
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
     selectedChannel: 0,
     channels: [
@@ -34,7 +36,7 @@ export function createMockEngine() {
       name: i === 0 ? "Master" : i === 125 ? "Current" : `Insert ${i}`, vol: 0.8, pan: 0, mute: false, solo: false,
       color: 0, colorSet: false, sel: i === 0, slots: [], routes: i === 0 ? {} : { 0: 1.0 },
     })),
-    playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156 })),
+    playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156, lock: 0 })),
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
     displayTime: 0,
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
@@ -87,12 +89,28 @@ export function createMockEngine() {
     "channels.isChannelMuted": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).mute; },
     "channels.isChannelSolo": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).solo; },
     "channels.getChannelColor": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).color; },
+    // PY-101 (#2878): PE 0xd5b420 は position<0 を 0 として返す (エラーにしない)。範囲外は index の -4 のみ (C と同一)
     "channels.getGridBit": (...a) => {
       arity(a, 2, 3);
       ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
       const k = ch(a[0]);
-      if (p < 0 || p >= 64) throw RANGE();
-      return !!k.steps[p];
+      if (p >= 64) throw RANGE();
+      return p >= 0 && !!k.steps[p];
+    },
+    // PY-101 (#2878): PE 0xd5b360 は grid (+0x7ac) 非 null で True。mock の channel は生成時に grid を持つものとして扱い、null 経路は持たない (C と同一)
+    "channels.isGridBitAssigned": (...a) => {
+      arity(a, 1, 2);
+      ix(a[0]); argI(a, 1, 0);
+      ch(a[0]);
+      return true;
+    },
+    // PY-101 (#2878): PE 0xd5bc10 → 0x12d3ff0。loop 分岐は未モデル (G1・G2・行テーブルの意味が未確定・#2932)。base 0x12d3e20 と同じ読出し
+    "channels.getGridBitWithLoop": (...a) => {
+      arity(a, 2, 3);
+      ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
+      const k = ch(a[0]);
+      if (p >= 64) throw RANGE();
+      return p >= 0 && !!k.steps[p];
     },
     // 選択の並びで offset 番目 (負は先頭扱い・仮置き)、超えたら最後の選択。無選択は canBeNone で -1 / 0
     "channels.channelNumber": (...a) => {
@@ -175,6 +193,8 @@ export function createMockEngine() {
     "playlist.getTrackName": (i) => { i = ix(i); return st.playlist[i - 1]?.name ?? ""; }, // 範囲外は空文字 (C と同じ)
     "playlist.setTrackName": (i, n) => { pl(i).name = str(n); },
     "playlist.setTrackColor": (i, c) => { pl(i).color = (((c & 0xff) << 16) | (c & 0xff00) | ((c >>> 16) & 0xff)) & 0xffffff; }, // FL の格納式 (C と同じ)
+    // PY-102 (#2883): value 検査 (argI) を index の範囲検査より先に行う。C の dispatch は型を先に見るため (code 5 が先)
+    "playlist.muteTrackLock": (...a) => { arity(a, 1, 2); const v = argI(a, 1, -1); const t = pl(a[0]); t.lock = v === -1 ? (t.lock ? 0 : 1) : v & 0xff; },
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
@@ -207,6 +227,23 @@ export function createMockEngine() {
     "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
     "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
+    // PY-94 (#2830): 状態 1 つを返すだけの 7 関数 (REPORT_PY94)。値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "general.getUndoHistoryPos": (...a) => { arity(a, 0, 0); return st.undoPos; },
+    "general.getUndoHistoryCount": (...a) => { arity(a, 0, 0); return st.undoCount; },
+    "general.getUndoHistoryLast": (...a) => { arity(a, 0, 0); return st.undoLast; },
+    "general.safeToEdit": (...a) => { arity(a, 0, 0); return st.safeEdit; },
+    "general.getProjectTitle": (...a) => { arity(a, 0, 0); return st.projTitle; },
+    "general.getProjectAuthor": (...a) => { arity(a, 0, 0); return st.projAuthor; },
+    "general.getProjectGenre": (...a) => { arity(a, 0, 0); return st.projGenre; },
+    // PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない
+    "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
+    "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
+    // PY-96 (#2832): 選択範囲の読出し 4 件。PE 0xd786e0/0xd78700/0xd78500 は obj+0xd74 (start)・obj+0xd78 (end) を読み、
+    // 0xd78720 は 0xe43e80 (start>=0 かつ end>=0) を bool で返す。未選択は負値。初期値 -1 は未実測の仮置き (provider/fl_engine.c と同じ)
+    "arrangement.selectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
+    "arrangement.selectionEnd": (...a) => { arity(a, 0, 0); return st.selEnd; },
+    "arrangement.liveSelectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
+    "arrangement.selectionIsActive": (...a) => { arity(a, 0, 0); return st.selStart >= 0 && st.selEnd >= 0; },
     // PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定 (currentTime 'i'・selectionSet 'ii|iii'・liveSelection 'ii'・addAutoTimeMarker 'is'・jumpToMarker 'i|i')。個数は fl_table (必須 2) に合わせた暫定で、jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。
     // 選択・マーカーの 5 件は副作用が未同定のため状態を変えない。currentTime は仮置きの状態 arrTime (0) を返す (provider/fl_engine.c と同じ)
     "arrangement.currentTime": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return st.arrTime; },
@@ -219,10 +256,10 @@ export function createMockEngine() {
     "general.setRecPPQ": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 24 || v > 960) throw RANGE("Range error"); st.recPPQ = v; },
     "general.setNumerator": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 1 || v > 16) throw RANGE("Range error"); st.numerator = v; },
     "general.setDenominator": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 2 || v > 16) throw RANGE("Range error"); st.denominator = v; },
-    // undo 3 件は PE 0xd69af0 (共有コールバック) が範囲検査なしに値を書く (kind 0=Pos・1=Count・2=Last)。ゲートは上と同じく仮に真
-    "general.setUndoHistoryPos": (...a) => { arity(a, 1, 1); st.undoHistoryPos = ix(a[0]); },
-    "general.setUndoHistoryCount": (...a) => { arity(a, 1, 1); st.undoHistoryCount = ix(a[0]); },
-    "general.setUndoHistoryLast": (...a) => { arity(a, 1, 1); st.undoHistoryLast = ix(a[0]); },
+    // undo 3 件は PE 0xd69af0 (共有コールバック) が範囲検査なしに値を書く (kind 0=Pos・1=Count・2=Last)。ゲートは上と同じく仮に真。getter と同じ状態を書く
+    "general.setUndoHistoryPos": (...a) => { arity(a, 1, 1); st.undoPos = ix(a[0]); },
+    "general.setUndoHistoryCount": (...a) => { arity(a, 1, 1); st.undoCount = ix(a[0]); },
+    "general.setUndoHistoryLast": (...a) => { arity(a, 1, 1); st.undoLast = ix(a[0]); },
     // PY-121 (#2985): screen 状態の 5 関数 (PE 0xd7c7e0・0xd7c830・0xd7c880・0xd7c8c0・0xd7c740)。初期値は未実測の仮置き (provider/fl_engine.c と同じ)
     "screen.isBlanked": (...a) => { arity(a, 0, 0); return st.screenBlanked; },
     "screen.isUnBlank": (...a) => { arity(a, 0, 0); return st.screenUnBlank; },

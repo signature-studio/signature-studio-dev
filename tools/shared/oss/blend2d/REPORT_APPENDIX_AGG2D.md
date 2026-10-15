@@ -72,3 +72,104 @@ slot の対応 (block24339 の種別 × block24356 の種別, 件数):
 |---|---|---|
 | loader の呼び出し元 (getter 経由の消費側) の特定 | FL 描画経路の画素比較 (受入条件 (b)) の起点 | #146 |
 | 145 block の loader が同型か | 呼び出し元の候補数 | #146 |
+
+## 15. CFG rax-in (`--cfg-rax`) と #3065 取り込み後の閉包 50 (REPORT_AGG2D.md §15 の測定値)
+
+> 測定 commit: `bbf86210` (`--cfg-rax` を入れたコード commit)。base = `origin/main` `80c4e81b` (#3065 取り込み後)。
+> `git diff 80c4e81b bbf86210 -- tools/flelift/x64c.py tools/shared/oss/blend2d/` = 変更 3 ファイル (x64c.py +14/-1, agg2d_cfg_rax.py 新規, agg2d_lift_probe.py +18)。
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_cfg_rax.py` (0.4 s) と `agg2d_lift_probe.py` (5.5 s)。出力は `tools/shared/work/` (gitignore)。
+> 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (5.6 s)。`toolchain-emsdk` は未使用。
+
+### 15.1 CFG 間接 call / jmp の全数 (`.text` 全体)
+
+| 項目 | 値 | 根拠 |
+|---|---|---|
+| CFG スロット / thunk | `0x1801b7308` / `0x1801b5b90` (bytes `ffe0` = `jmp rax`) | load config・PE |
+| `call [slot]` / `jmp [slot]` | 42 / 14 (計 56) | `agg2d_cfg_rax.py` (ff 15/25 のバイト走査 + capstone で再確認) |
+| 負例 (slot + 8) | 0 件 | 同スクリプト (0 件でなければ rc=1) |
+| 命令境界が揃った直前窓 (≥4 命令) | 43 / 56 | 直前 96 B の逆同期 |
+| rax の最後の定義 (call 42 件 / jmp 14 件) | call: mov reg,mem 17・mov reg,reg 14・call 戻り値 9・ror 2 / jmp: 窓内に定義無し 9・同期不可 3・add 1・call 戻り値 1 | 同 (明示 operand の書き込みで判定。capstone の `regs_write` は暗黙の書き込みしか返さないので使わない) |
+| 定義と site の間に分岐・ret | 23 / 56 | 同 |
+
+読み: rax の定義は実行時値 (メモリ load・レジスタ・戻り値・計算) で、定数追跡では閉じない (§7 と同じ結論)。rax-in は rax の値をそのまま dispatch すれば足り、定義元の解決は要らない。窓外で定義される 9 件 (jmp の「窓内に定義無し」) と、分岐を跨ぐ 23 件は静的には確かめられていない。
+
+### 15.2 x64c 閉包 50 (Agg2D vtable 79 root) の CFG 規則と未対応 (#3065 後)
+
+| 項目 | 既定 (`--cfg-rax` 無し) | `--cfg-rax` |
+|---|---|---|
+| 関数 / 命令 | 221 / 27,684 | 221 / 27,684 |
+| CFG の dispatch (`LD64(slot)` を経由) | 8 (直接形 6 + レジスタ経由形 2) | 2 (レジスタ経由形のみ) |
+| `ott_dispatch(R[RAX])` (rax-in) | 0 | 6 (jmp 4 + call 2) |
+| 未対応 site / mnemonic | 13 / 6 | 13 / 6 (CFG だけを変えるため同じ) |
+| 未 lift の直接 call | 0 | 0 |
+
+- 未対応 13 site の内訳 (閉包 50): `vsubsd` (d==s2) 5・`cmpneqpd` 2・`vdivsd` (d==s2) 2・`vxorps` 2・`vpsrldq` 1・`vcvttpd2dq` 1。`int 0x29` (fail-fast) は意図的な abort で unsup には数えていない。
+- #3065 (`origin/main` へ取り込み済み) の前の測定 (REPORT §9、`53b584d8` 時点) は未対応 363 site / 33 mnemonic。#3065 の VEX/FMA 対応で 13 site / 6 mnemonic に減った。
+- `vsubsd`・`vdivsd` の未対応は `d == s2` の場合のみ (3 オペランド形の宛先と第 2 ソースが同じ)。他の VEX スカラー形は #3065 で対応済み。
+
+### 15.3 既定の出力は変わらない (byte 一致)・構文
+
+| 項目 | 結果 |
+|---|---|
+| 既定 (`--cfg-rax` 無し) の閉包 50 の `fle_lifted.c` / `lift_meta.json` | `80c4e81b` の x64c.py と **byte 一致** (`cmp`。`$RUNNER_TEMP/x64c_base.py` で再生成) |
+| 既定版・`--cfg-rax` 版の生成 C の構文 | `gcc -fsyntax-only -w -I tools/flelift/rt` rc=0 (両方) |
+| ネガティブコントロール | probe の辞書検査 (既知値 `0x180009ea0` 表に有り・thunk `0x1801b5b90` 表に無し) は従来どおり `True` / `False` |
+
+### 15.4 未検証・未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 生成 C の実行 (rax-in が実機の target と一致するか・dispatch 表に載るか) | 受入 (b) の画素比較の前提。未検証のまま `--cfg-rax` を既定にできない | #146 (harness 待ち) |
+| レジスタ経由 CFG 形 (`mov reg,[slot]; call reg`) 2 site は ON でも `LD64(slot)` のまま | 2 site が thunk を dispatch して silent に抜ける恐れ | 子 issue (T-SH-51) |
+| `--cfg-rax` の既定化 | FLEngine の lift 出力が変わる → boot KPI の前後比較が要る (未実施) | 子 issue (T-SH-51) |
+| 未対応 13 site (6 mnemonic) | 閉包 50 の lift の残り (到達は未確認。ott_unsup は到達時のみ abort) | 子 issue (T-SH-50) |
+
+## 16. x64c の未対応 6 mnemonic の被覆 (#3138、閉包 50 の unsup 13 site)
+
+> 測定 commit: `5fc307db` (`origin/main` `6cfa2e8a` を取り込んだ merge commit。コードを変えた最後の commit)。`git diff 5fc307db HEAD -- tools/flelift tools/shared/oss/blend2d ':(exclude)*.md'` の出力は 0 行 (以後の変更は REPORT の文言のみ)。取り込み前の実装 commit は `fe2dc9ed` (`feat(flelift): cover the 6 unsup mnemonics of the Agg2D closure in x64c`)。下の「変更後 = `fe2dc9ed`」の表と差分試験の本文は取り込み前の値で、統合後の値は「統合後の再測定」の節を参照。
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_lift_probe.py [出力 JSON]` (約 4 秒)。差分試験: `python3 tools/flelift/tests/x64c_vex_diff.py` (約 2 秒、GNU as / gcc が必要)。
+
+**閉包別の lift 結果** (取り込み前の値。変更前 = `8d8d0e6a`、変更後 = `fe2dc9ed`。`agg2d_lift_probe.py` の `depths`)
+
+| 閉包 | funcs | insns | unsup_sites 前 → 後 | unsup_mnemonics 前 → 後 | unlifted_callees 前 → 後 |
+|---|---|---|---|---|---|
+| 0 | 79 | 4,265 | 0 → 0 | 0 → 0 | 107 → 107 |
+| 1 | 110 | 9,007 | 4 → 0 | 2 → 0 | 36 → 36 |
+| 3 | 168 | 22,681 | 13 → 0 | 6 → 0 | 26 → 26 |
+| 50 | 221 | 27,684 | **13 → 0** | 6 → 0 | 0 → 0 |
+
+funcs・insns・unlifted は変更前後で同一 (受入条件 (1) 達成)。probe の CFG 間接 call のネガティブコントロールは両方で通過 (既知 slot は dispatch 表に載り、未知値は載らない)。
+
+**mnemonic 別の被覆 (閉包 50)**
+
+| mnemonic | 形 | 変更前 site | 変更後 | 実装 |
+|---|---|---|---|---|
+| vsubsd | d==s2、s1≠d | 5 | 0 | `vex3()` の d==s2 tmp 経路 (`s1 - s2`。下位 lane のみ、上位 lane は s1 から、YL 0 化) |
+| vdivsd | d==s2、s1≠d | 2 | 0 | 同上 (`s1 / s2`) |
+| vxorps | 3-op | 2 | 0 | `VEX3` に `xorps` を追加 |
+| cmpneqpd | 2-op | 2 | 0 | `cmppd_pred(4)` (NEQ_UQ。NaN 比較は真) |
+| vpsrldq | 3-op (imm) | 1 | 0 | `vex_leg()` の 3-op 形 (バイトシフト、YL 0 化) |
+| vcvttpd2dq | 2-op | 1 | 0 | `VEX2` に `cvttpd2dq` を追加 |
+| 合計 | | 13 | 0 | |
+
+**差分試験** (`tools/flelift/tests/x64c_vex_diff.py`): **44 PASS / 0 FAIL**。既存 35 件は変更なし、新規 9 件を末尾に追加。新規の内訳は vsubsd (d==s2) 1、vdivsd (d==s2) 1、vsubss (d==s2) 1、vdivss (d==s2) 1、vxorps 1、vcvttpd2dq 1、cmpneqpd 2 (NaN 比較・非 NaN 比較)、vpsrldq 1。期待値は Python で Intel SDM の意味から計算し、x64c の C 出力は参照しない。
+
+**ネガティブコントロール**: tmp 経路の被演算子の順を入れ替え (`a_ op b_` → `b_ op a_`) ると **FAIL 4 件** (vsubsd・vdivsd・vsubss・vdivss) になり、元に戻すと 44/44 PASS (`git diff` で復元を確認)。途中の経緯: 初版では vdivsd のオペランドが乱数で一致して入れ替えても PASS したため、prep で X4 = 2.0・X6 = 7.0 に固定した。同様に ss 系は NICE 値の下位 32bit が 0 のため、単精度用の prep (下位 32bit に値を置く) を追加した。
+
+**C 出力の差分** (閉包 50 の `fle_lifted.c`): 変更前 58,903 行 → 変更後 58,914 行。`diff` の変更は **13 行 (`ott_unsup` の 13 site) を 24 行 (新 handler) に置換する hunk のみ**で、他の行は変化しない。内訳: vsubsd 5 site × 2 行、vdivsd 2 × 2、vxorps 2 × 2、vpsrldq 1 × 2、vcvttpd2dq 1 × 2、cmpneqpd 2 × 1 (計 24 行)。閉包 0・1・3 の C 出力の diff は取っていない (unsup 表は上の通り)。
+
+**FLEngine の lift 出力** (受入条件 (3)、取り込み前の値。統合後は下の再測定): `block00031_PE.bin` を `--closure 0`、entries は `tools/flelift/fle_entries.json`、引数は `fle_lift.sh` と同じ (emcc は省略)。変更前は `origin/main` の `x64c.py` を一時ディレクトリに置いて実行。両方 **7,018 関数 / 340,761 命令 / unsup {} / unlifted 0 / import 354**。`fle_lifted.c` と `lift_meta.json` は `cmp` で**バイト一致** (差分 0)。FLEngine の lift には今回の変更が効く unsup 箇所が無く、出力は変わらない。lift 所要は各 19 秒。
+
+**統合後の再測定** (測定 commit `5fc307db` = `origin/main` `6cfa2e8a` を取り込んだ merge commit)。取り込みで `fe2dc9ed` からの x64c.py・blend2d 側のコード差分が入ったため (`--cfg-rax` 既定 OFF、rcr の docstring)、上の表は取り込み前の値として残し、以下で測り直した。`git diff 5fc307db HEAD -- tools/flelift tools/shared/oss/blend2d ':(exclude)*.md'` = 0 行。
+
+| 閉包 | funcs / insns (両側同一) | unsup_sites origin/main → 5fc307db | unsup_mnemonics | unlifted_callees |
+|---|---|---|---|---|
+| 0 | 79 / 4,265 | 0 → 0 | 0 → 0 | 107 → 107 |
+| 1 | 110 / 9,007 | 4 → 0 | 2 → 0 | 36 → 36 |
+| 3 | 168 / 22,681 | 13 → 0 | 6 → 0 | 26 → 26 |
+| 50 | 221 / 27,684 | 13 → 0 | 6 → 0 | 0 → 0 |
+
+- 閉包プローブ (`agg2d_lift_probe.py`、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`) は 5fc307db で exit 0。CFG のネガティブコントロール (`control`: 既知 slot 値 True・未知値 False) は両側で同じ。`--cfg-rax` の閉包 50 は rax_in_dispatch_sites=6 で両側同一。
+- 閉包 50 の `fle_lifted.c`: origin/main 58,903 行 → 5fc307db 58,914 行。`diff` は 13 行の削除と 24 行の追加 (上の本文と同じ)。
+- FLEngine (`block00031_PE.bin`、`--closure 0 --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000`、entries は `tools/flelift/fle_entries.json`): 両側とも **7,018 関数 / 340,761 命令 / unsup {} / unlifted 0 / import 354**、lift 所要 18 秒 (両側 `SECONDS`)。`fle_lifted.c` (745,214 行) と `lift_meta.json` は `cmp` で**バイト一致**。
+- 差分試験 `tools/flelift/tests/x64c_vex_diff.py`: 5fc307db で **44 PASS / 0 FAIL**。`tools/flelift/tests/rcr_native_check.py` (取り込みで入った側の試験): 4004 / 4004 pass。

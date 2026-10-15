@@ -20,7 +20,7 @@
 
 typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; } Chan;
 typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
-typedef struct { char name[NAME]; int64_t color; } Pl;
+typedef struct { char name[NAME]; int64_t color; uint8_t lock; } Pl;
 
 static Chan ch[NCH_MAX];
 static int nch;
@@ -37,6 +37,9 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static double pvals[3];
 #define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
+static int undo_pos, undo_count, undo_last, safe_edit;
+static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
+static int sel_start, sel_end;
 static int64_t disp_time;
 static int64_t arr_time;
 static int scr_blanked, scr_unblank, scr_active;
@@ -61,12 +64,15 @@ void fl_engine_reset(void) {
         mx[i].vol = 0.8; mx[i].sel = (i == 0);
         if (i) { mx[i].act[0] = 1; mx[i].lvl[0] = 1.0; }
     }
-    for (int i = 0; i < NPL; i++) { snprintf(pl[i].name, NAME, "Track %d", i + 1); pl[i].color = 0x485156; }
+    for (int i = 0; i < NPL; i++) { snprintf(pl[i].name, NAME, "Track %d", i + 1); pl[i].color = 0x485156; pl[i].lock = 0; }
     memset(win, 0, sizeof win);
     win[0] = win[2] = win[4] = 1;
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
+    undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
+    set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
+    sel_start = -1; sel_end = -1;
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0;
@@ -101,7 +107,12 @@ FL_H(channels, isChannelSelected) { CH(0); return fl_ret_b(c, k->sel); }
 FL_H(channels, isChannelMuted) { CH(0); return fl_ret_b(c, k->mute); }
 FL_H(channels, isChannelSolo) { CH(0); return fl_ret_b(c, k->solo); }
 FL_H(channels, getChannelColor) { CH(0); return fl_ret_i(c, k->color); }
-FL_H(channels, getGridBit) { CH(0); int64_t p = A_INT(1, 0); if (p < 0 || p >= NSTEP) RANGE(); return fl_ret_b(c, k->steps[p]); }
+/* PE 0xd5b420: 0x12d3e20 は position<0 で 0 を返す (エラーにしない)。範囲外は index の -4 のみ。p>=NSTEP の経路は PE 未照合 (REPORT_PY101) */
+FL_H(channels, getGridBit) { CH(0); int64_t p = A_INT(1, 0); if (p >= NSTEP) RANGE(); return fl_ret_b(c, p >= 0 && k->steps[p]); }
+/* PE 0xd5b360: grid (+0x7ac) は channel 生成 0xff5aa0 が直接 call する 0xff63f0 で作られ非 null。null の経路 (status 0) は直接 call の範囲では到達しない (間接呼出しは未走査・REPORT_PY101) */
+FL_H(channels, isGridBitAssigned) { CH(0); (void)k; (void)A_INT(1, 0); return fl_ret_b(c, 1); }
+/* PE 0xd5bc10 → 0x12d3ff0: loop 記録の分岐は未モデル (mock に loop 記録が無い)。base 0x12d3e20 と同じ読出し */
+FL_H(channels, getGridBitWithLoop) { CH(0); int64_t p = A_INT(1, 0); if (p >= NSTEP) RANGE(); return fl_ret_b(c, p >= 0 && k->steps[p]); }
 /* 選択の並びで offset 番目 (0 = 先頭)、超えたら最後の選択。負の offset は先頭扱い (stub に記述なし・仮置き)。無選択は canBeNone で -1 / 0 */
 FL_H(channels, channelNumber) {
     int64_t none = A_INT(0, 0), off = A_INT(1, 0), n = 0, pick = -1;
@@ -246,6 +257,8 @@ FL_H(playlist, getTrackName) {
 FL_H(playlist, setTrackName) { PL(0); const char *s = A_STR(1); set_name(p->name, s); return fl_ret_none(c); }
 /* FL の格納式 (setTrackColor 0xd55f30 → 0x12e5d80): R/B を入替えて 0xffffff で切る。getTrackColor の逆変換 */
 FL_H(playlist, setTrackColor) { PL(0); uint32_t u = (uint32_t)A_INT(1, 0); p->color = (int64_t)((((u & 0xff) << 16) | (u & 0xff00) | ((u >> 16) & 0xff)) & 0xffffff); return fl_ret_none(c); }
+/* PY-102 (#2883): binary 0xd56510 に従う。index 1..500 の外は RANGE (-4)、value -1 は反転、他は下位 1 byte を書く。準備判定 (call [rax+0x98]) は未モデル (常に準備済み) */
+FL_H(playlist, muteTrackLock) { PL(0); int64_t v = A_INT(1, -1); p->lock = v == -1 ? !p->lock : (uint8_t)v; return fl_ret_none(c); }
 #define WN(a) int64_t _w = A_INT((a), 0); if (_w < 0 || _w >= NWIN) RANGE()
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }
@@ -275,17 +288,33 @@ FL_H(general, getChangedFlag) { NARGS(0, 0); return fl_ret_i(c, changed_flag); }
 FL_H(general, getUseMetronome) { NARGS(0, 0); return fl_ret_b(c, use_metronome); }
 FL_H(general, getPrecount) { NARGS(0, 0); return fl_ret_b(c, precount); }
 FL_H(general, getRecPPQ) { NARGS(0, 0); return fl_ret_i(c, rec_ppq); }
+/* PY-94 (#2830): PE 0xd69a90/0xd69ab0/0xd69ad0 は状態の dword 1 つを読んで 0x15e4280 に渡す。0xd6a2c0 は vtbl[0x98] の bool。
+   0xd6a2f0/0xd6a3a0/0xd6a450 は project 物 (*(G)+0x10) の vtbl 0x20/0x28/0x30 から文字列を得る。値は未実測の仮置き (REPORT_PY94) */
+FL_H(general, getUndoHistoryPos) { NARGS(0, 0); return fl_ret_i(c, undo_pos); }
+FL_H(general, getUndoHistoryCount) { NARGS(0, 0); return fl_ret_i(c, undo_count); }
+FL_H(general, getUndoHistoryLast) { NARGS(0, 0); return fl_ret_i(c, undo_last); }
+FL_H(general, safeToEdit) { NARGS(0, 0); return fl_ret_b(c, safe_edit); }
+FL_H(general, getProjectTitle) { NARGS(0, 0); return fl_ret_s(c, proj_title); }
+FL_H(general, getProjectAuthor) { NARGS(0, 0); return fl_ret_s(c, proj_author); }
+FL_H(general, getProjectGenre) { NARGS(0, 0); return fl_ret_s(c, proj_genre); }
+/* PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない */
+FL_H(general, clearLog) { NARGS(0, 0); return fl_ret_none(c); }
+FL_H(general, dumpScoreLog) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 /* PY-119 (#2977): PE 0xd69350/0xd694e0/0xd69670 は範囲外で status -3 (Range error)。ゲートは未確定のため真と仮定 (REPORT_PY119_2977) */
 static int numerator = 4, denominator = 4;
 FL_H(general, setRecPPQ) { NARGS(1, 1); int64_t v = A_INT(0, 0); if (v < 24 || v > 960) RANGE_MSG("Range error"); rec_ppq = (int)v; return fl_ret_none(c); }
 FL_H(general, setNumerator) { NARGS(1, 1); int64_t v = A_INT(0, 0); if (v < 1 || v > 16) RANGE_MSG("Range error"); numerator = (int)v; return fl_ret_none(c); }
 FL_H(general, setDenominator) { NARGS(1, 1); int64_t v = A_INT(0, 0); if (v < 2 || v > 16) RANGE_MSG("Range error"); denominator = (int)v; return fl_ret_none(c); }
-/* undo 3 件: PE 0xd69af0 は範囲検査なし (kind 0=Pos → +0x1c, 1=Count → +0x24, 2=Last → +0x20) */
-static int undo_pos, undo_count, undo_last;
+/* undo 3 件: PE 0xd69af0 は範囲検査なし (kind 0=Pos → +0x1c, 1=Count → +0x24, 2=Last → +0x20)。getter と同じ変数に書く */
 FL_H(general, setUndoHistoryPos) { NARGS(1, 1); undo_pos = (int)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(general, setUndoHistoryCount) { NARGS(1, 1); undo_count = (int)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(general, setUndoHistoryLast) { NARGS(1, 1); undo_last = (int)A_INT(0, 0); return fl_ret_none(c); }
 
+/* ---- arrangement (4, PY-96 #2832) ---- PE 0xd786e0/0xd78700/0xd78500 が obj+0xd74/+0xd78 を読み、0xd78720 は 0xe43e80 (両方 >= 0) を bool で返す。初期値 -1 は未実測の仮置き */
+FL_H(arrangement, selectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_start); }
+FL_H(arrangement, selectionEnd) { NARGS(0, 0); return fl_ret_i(c, sel_end); }
+FL_H(arrangement, liveSelectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_start); }
+FL_H(arrangement, selectionIsActive) { NARGS(0, 0); return fl_ret_b(c, sel_start >= 0 && sel_end >= 0); }
 /* ---- arrangement (6) ---- PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定。個数は fl_table (stub 由来・必須 2) に合わせた暫定で、
  * jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。currentTime は仮置きの状態 arr_time を返す。
  * 選択・マーカーの 5 件は副作用が未同定のため状態を変えず、引数検査だけ行う (REPORT_PY152) */

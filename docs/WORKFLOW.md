@@ -146,7 +146,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 2. 同一チケット / 同一 dir に open PR (`started`) か稼働中の実装 run があれば**着手せず報告**。
 3. lift / 逆アセ / IR pass / ハーネス系は `docs/DEFECTS.md` を先に読み、REPORT 冒頭に
    「既知類型との関係: 該当 ID / 該当なし」を 1 行書く。
-   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D23 と `tools/icall/REPORT.md` §4 の D1〜D13 は
+   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D25 (D24 は無い) と `tools/icall/REPORT.md` §4 の D1〜D13 は
    **別体系**。参照時は `(DEFECTS.md)` / `(icall §4)` を必ず併記。
 4. **担当 dir 以外の未コミット変更は他担当の WIP**: 触らない・commit に含めない・stash/checkout/clean しない。
 5. ユーザへ追加アーティファクトを依頼する前に必ず検証する (`docs/REFERENCES.md` `[DOWNLOADS]` と
@@ -366,8 +366,10 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     ラベルを外すと再開し、次の差し戻しから数え直す (停止前の件数を持ち越さない)。停止コメントの無いラベル (手動付与・reopen 失敗) は
     数える起点が無く全期間を数えるため、外すと即座に再停止しうる (扱いは #719 で決める)。
   - **起動主体は完全一致**: fix を起動する reviewer (`oc-reviewer-for-signature-studio[bot]`、`user.type == 'Bot'`) と、
-    停止コメント・完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
+    完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
     (前方一致だと別名のアカウントでも write 権限の fix が起動し、停止コメントを偽装して数え直しもできてしまう)。
+    停止コメント (`oc-fix-limit`) の作者は job の GITHUB_TOKEN = `github-actions[bot]` だけ (型 `Bot` も見る。#2622・#2639)。
+    PM Worker (`infra/pm-worker` の `MARK_LOGIN`) と oc-pm の文脈 (`prepare-event-context.sh`) も同じ作者で見る。
   - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fix / verify / reopen) と `test-watchdog.sh` (watchdog の判定と操作)
     と `test-dispatch-context.sh` (dispatch・投稿者の入力検証) と `test-run-outcome.sh` (implement 終了時の記録・review の打ち切りの再起動) を、fake gh で `.github/workflows/scripts-test.yaml` が `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の
     変更ごとに実行する。
@@ -410,8 +412,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     issue にラベル `oc:no-pr` と構造化コメント `<!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> [cause=rate_limit] run=<run id> -->` を残す。`cause=rate_limit` は、opencode の JSONL の error 行に率制限 (`rate_limit_error`・HTTP 429) があったときだけ付く (`detect-rate-limit.sh`。text 行の語は数えない。annotation `oc-rate-limit` も出る。#2344)。
     率制限を検知したときは `notify-rate-limit.sh` が、直近 30 分に `cause=rate_limit` の run が 5 件以上かつ完了した opencode の run の 30% 以上なら、ラベル `oc:rate-limit` の issue に通知する (open があればコメント (60 分に 1 回)、無ければ `[CI] 率制限: ...` を起票 (6 時間に 1 件))。`OC_MODEL_ID` は自動で変えない (切替は指示 126 の範囲で PM が行う。#2346)。
     PM Worker はコメント本文を解析せず、**ラベルとマーカー**で扱う。`oc:no-pr` は、次の run が PR を出す (または issue が close・明示的な状態になる) と、この script が外す。
-    `state:*` ラベルは作らない。reason は agent の最終回答の語彙で決める (`tools/pm/launch_issues.py` の `stop_re`・`NEED_RE` と同じ。優先順 artifact > blocked > split > stop):
-    `artifact` 素材不足・`blocked` 依存 issue・前提 PR 未 merge・`split` 1 run に収まらない・`stop` 判断待ち/停止報告/着手不可・`unknown` 上のどれでもない (着手報告のみ・run の失敗)。
+    `state:*` ラベルは作らない。reason は agent の最終回答の語彙で決める。分類規則の正本は `.github/scripts/run-outcome-reason.sh` (`tools/pm/launch_issues.py` の `stop_re`・`NEED_RE` と同じ語彙。優先順 artifact > blocked > split > stop。#3184):
+    `artifact` 素材不足・`blocked` 依存 issue・前提 PR 未 merge・`split` 1 run に収まらない・`stop` 判断待ち/停止報告/着手不可・`unknown` 上のどれでもない (着手報告のみ・run の失敗・判定できない停止)。
+    `artifact` は、allowlist の素材名が、句 (。 、 ； で区切った節) の中で『無い・足りない・不足・必要・未配置・未展開』と肯定の文脈で挙がるときだけ。『素材』『oc_artifacts』の語だけでは数えず、素材名の無い『素材不足』も数えない。否定 (『不足は無い』『不足なし』『必要ではない』) は数えず、`oc_artifacts` を含む節の『必要』は次の run への指定として数えない (『無い』『足りない』は数える)。
     コメント本文に起動コマンド (行頭の `/oc`) は書かない (自分のコメントで implement を起動しないため)。
   - **review の打ち切り** (`review-recover.sh`、`review-recover` job): review job が runner の打ち切り (job の annotation が `shutdown signal`・`exit code 143`・
     `exceeded the maximum execution time`) で cancelled になると、job 内の verify step は走らない (#1420: 同じ head で 7 回連続)。新しい runner の

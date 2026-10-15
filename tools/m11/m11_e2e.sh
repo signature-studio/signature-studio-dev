@@ -91,6 +91,7 @@ if python3 -c 'import pefile' 2>/dev/null; then  # #222: LB_BASE 適用の静的
   must "lb_check (M11_LB_BASE=${M11_LB_BASE:-0})" python3 lb_check.py "$PE" work/m11_image.bin "${M11_LB_BASE:-0}"
 fi
 must "build (emcc 増分)" bash m11_build.sh
+must "ptrclass (#3113 分類 B の定数集合)" python3 m11_ptrclass.py "work/boot_final.ll" --pe "$PE"
 
 if [ ! -f work/m11_boot.cjs.wasm ]; then
   step "wasm 未生成: build ログ ($LOG) 末尾"; tail -15 "$LOG"
@@ -98,9 +99,9 @@ if [ ! -f work/m11_boot.cjs.wasm ]; then
 fi
 
 step "実行 A: 通常起動 (DllMain attach → InitUnits ループ)"
-M11_TRACE=$TRACE M11_PTRCHECK_MAX_NEW="${M11_EXPECT_PTR_NEW_MAX:-}" timeout 300 node m11_run.mjs > work/e2e_full.out 2>&1; rc_run=$?
+M11_TRACE=$TRACE M11_PTRCHECK_MAX_NEW="${M11_EXPECT_PTR_NEW_MAX:-}" M11_PTRCHECK_UNREMAP_MAX="${M11_EXPECT_PTR_UNREMAP_MAX:-}" timeout 300 node m11_run.mjs > work/e2e_full.out 2>&1; rc_run=$?
 step "実行 B: unit survey (942 unit を try/catch 隔離)"
-M11_PTRCHECK_SURVEY_MAX_NEW="${M11_EXPECT_PTR_SURVEY_NEW_MAX:-}" timeout 600 node m11_survey.mjs > work/e2e_survey.out 2>&1; rc_survey=$?
+M11_PTRCHECK_SURVEY_MAX_NEW="${M11_EXPECT_PTR_SURVEY_NEW_MAX:-}" M11_PTRCHECK_SURVEY_UNREMAP_MAX="${M11_EXPECT_PTR_SURVEY_UNREMAP_MAX:-}" timeout 600 node m11_survey.mjs > work/e2e_survey.out 2>&1; rc_survey=$?
 step "実行 C: 寛容起動 (InitUnits を逐次 942 unit・失敗 unit は skipped として続行; #2714)"
 M11_TOLERANT_OUT=work/tolerant_units.json timeout 600 node m11_tolerant.mjs > work/e2e_tolerant.out 2>&1 || true
 

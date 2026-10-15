@@ -10,7 +10,7 @@
                             [--size 14828623]
 
 判定基準 (#2425 で再定義。旧 `dispatch=38` は InitUnits 完走の証拠にならないため外した):
-  * runerr = `[fw][MessageBoxA] Error: Runtime N at ADDR` (RunError) の件数。0 が正常
+  * runerr = `[fw][MessageBoxA] Error: Runtime [error ]N at ADDR` (RunError) の件数。0 が正常
   * ff = `fw_ff_count()` (fail-fast 到達件数・0 が正常)
   * init_reach = InitTable (fw_image.bin の VA 0x6c1460・16 byte/entry・先頭が Init) の Init 値のうち、
     最初の RunError より前に `[dispatch]` の target として現れた最大 unit idx。
@@ -30,7 +30,7 @@ import sys
 PASS_RE = re.compile(
     r'^\[fw\] SMOKE PASS \([^)]*\): dispatch=(\d+) units_done=(-?\d+) va=(\d+) heap=(\d+) ff=(\d+)')
 FAIL_RE = re.compile(r'^\[fw\] SMOKE FAIL: (.*)$')
-RUNERR_RE = re.compile(r'^\[fw\]\[MessageBoxA\] Error: Runtime (\d+) at ([0-9a-fA-F]+)')
+RUNERR_RE = re.compile(r'^\[fw\]\[MessageBoxA\] Error: Runtime (?:error )?(\d+) at ([0-9a-fA-F]+)')
 DISPATCH_RE = re.compile(r'^\[dispatch\] site=0x[0-9a-fA-F]+ -> target=(0x[0-9a-fA-F]+)')
 DEF_EXPECT = {'runerr': 0, 'ff': 0, 'init_reach': 288}
 INFO_KEYS = ('dispatch', 'units_done', 'va', 'heap')

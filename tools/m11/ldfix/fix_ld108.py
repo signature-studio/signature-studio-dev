@@ -13,15 +13,12 @@ import os
 import re
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lb_base import LB  # noqa: E402
-
 FN = re.compile(r'^define [^\n]*@function_41a670\(.*?\n}\n', re.M | re.S)
 DEF = re.compile(r'^define [^\n]*@function_41a670\(([^)]*)\)', re.M)
 ARG1 = re.compile(r'i64(?: [a-z_]+)* %arg1')
 BLK = re.compile(r'^dec_label_pc_41a69c:[^\n]*\n(.*?)(?=^dec_label_pc_|\Z)', re.M | re.S)
-# head 即値は LVA (= RVA + LB)。LB=0 は 0xfa5080、LB=0x10000 は 0xfb5080 (#2779: 固定値だと LB=0x10000 で assert する)
-HEAD_ST = 'store i64 %2, ptr inttoptr (i64 ' + str(16404608 + LB) + ' to ptr), align 8'
+LB = int(os.environ.get('M11_LB_BASE', '0'), 0)   # #222: head の LVA = 0xFA5080 + LB_BASE (IR の VA→LVA remap と同じ)
+HEAD_ST = 'store i64 %%2, ptr inttoptr (i64 %d to ptr), align 8' % (16404608 + LB)
 RAX_ST = 'store i64 %2, ptr %rax.0.reg2mem'
 
 

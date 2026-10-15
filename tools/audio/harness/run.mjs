@@ -1,12 +1,23 @@
 // シナリオ行列ランナー: 1 つの headless Chrome で全シナリオを順に実行し、結果 JSON と判定を出力する。
-// 使い方: node harness/run.mjs [--quick] [--only name,name] [--out results/results.json]
+// 使い方: node harness/run.mjs [--quick] [--only name,name] [--out results/results.json] [--browser chrome|edge|safari]
 //        node harness/run.mjs --soak30   # 30 分ソークのみ (AU-10)
+//        --browser safari: safaridriver (WebDriver classic) で測る (AU-35 #3193)。macOS では既定出力が BlackHole 2ch でなければ終了 2
 import { withChrome } from "./chrome.mjs";
+import { withSafari } from "./safari.mjs";
 import path from "node:path"; import fs from "node:fs"; import os from "node:os"; import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const quick = args.includes("--quick");
+const browser = args.includes("--browser") ? args[args.indexOf("--browser") + 1] : "chrome";
+if (!["chrome", "edge", "safari"].includes(browser)) { console.error("--browser には chrome / edge / safari のいずれかを指定してください"); process.exit(2); }
+const withBrowser = browser === "safari" ? withSafari : withChrome;
+// 既定出力の名前 (macOS = CoreAudio の既定出力 / Linux = PulseAudio の既定 sink)。それ以外の OS では測らない (null)
+const defaultOutput = () => {
+  const cmd = process.platform === "darwin" ? ["SwitchAudioSource", ["-t", "output", "-c"]] : process.platform === "linux" ? ["pactl", ["get-default-sink"]] : null;
+  if (!cmd) return null;
+  try { return execFileSync(cmd[0], cmd[1], { encoding: "utf8", timeout: 5000 }).trim(); } catch (e) { return "ERR " + e.message; }
+};
 const only = args.includes("--only") ? args[args.indexOf("--only") + 1].split(",") : null;
 const S = (full, q) => (quick ? q : full);
 // AU-10 (#191): 長時間ソーク。既定の全シナリオ実行には含めない (--soak30 / --soak <秒> 指定時のみ、そのシナリオだけを実行する)。
@@ -159,12 +170,14 @@ if (soakSecs > 0) {
     expect: all(underrunFree, rampExact, covered, wall, noWorkletErr) });
 }
 const sel = scenarios.filter((s) => !only || only.includes(s.name));
+const outDev = defaultOutput();
+if (process.platform === "darwin" && outDev !== "BlackHole 2ch") { console.error(`既定出力が BlackHole 2ch ではない (${outDev})。SwitchAudioSource -s "BlackHole 2ch" で切り替えてから実行してください`); process.exit(2); }
 const loadStart = os.loadavg(), tStart = Date.now();
 const results = [];
 let failed = 0;
 const busy = Array.from({ length: busyN }, () => spawn("sh", ["-c", "while :; do :; done"], { stdio: "ignore" }));
 process.on("exit", () => { for (const p of busy) p.kill(); });
-await withChrome({ root: path.join(here, "../build/web"), page: "index.html?" + sel[0].q, log: () => {} }, async (cdp) => {
+await withBrowser({ root: path.join(here, "../build/web"), page: "index.html?" + sel[0].q, log: () => {} }, async (cdp) => {
   let first = true;
   for (const sc of sel) {
     if (!first) await cdp.navigate("index.html?" + sc.q);
@@ -181,7 +194,7 @@ await withChrome({ root: path.join(here, "../build/web"), page: "index.html?" + 
     const st = r?.stats ?? {};
     if (r && (r.aborted || r.codes)) { console.log(`${ok ? "PASS" : "FAIL"} ${sc.name.padEnd(28)} ${msg}`); continue; }
     console.log(`${ok ? "PASS" : "FAIL"} ${sc.name.padEnd(28)} ${msg}` +
-      (r ? `\n       clock_jump_log=${(r.clockJumpLog ?? []).map((e) => `q${e.q}:${e.d > 0 ? "+" : ""}${e.d}@f${e.frame}`).join(" ") || "-"}\n       cb=${st.cb_count ?? st.fills} late=${st.cb_late ?? "-"} cb_max=${st.cb_max_us ?? st.fill_max_us}us burst=${st.burst_obs ?? "-"} T=${st.T ?? "-"} (${st.T ? (st.T * 1000 / r.sr).toFixed(1) : "-"}ms) lat_changes=${st.latency_changes ?? "-"} wake_hist=${JSON.stringify(st.wake_hist)} ` +
+      (r ? `\n       clock_jump_log=${(r.clockJumpLog ?? []).map((e) => `q${e.q}:${e.d > 0 ? "+" : ""}${e.d}@f${e.frame} ct=${e.ct.toFixed(4)}s pn=${e.pn.toFixed(1)}ms cb=${e.cb}`).join("\n         ") || "-"}\n       cb=${st.cb_count ?? st.fills} late=${st.cb_late ?? "-"} cb_max=${st.cb_max_us ?? st.fill_max_us}us burst=${st.burst_obs ?? "-"} T=${st.T ?? "-"} (${st.T ? (st.T * 1000 / r.sr).toFixed(1) : "-"}ms) lat_changes=${st.latency_changes ?? "-"} wake_hist=${JSON.stringify(st.wake_hist)} ` +
         `dev_fill[min/avg/max]=${r.verify?.device_fill?.min}/${r.verify?.device_fill?.avg?.toFixed(0)}/${r.verify?.device_fill?.max} ` +
         `jumps=${r.snapshot?.clock_jumps}/${r.snapshot?.clock_jump_frames}f (skip=${r.snapshot?.clock_skip_frames}f dup=${r.snapshot?.clock_dup_frames}f max=${r.snapshot?.clock_jump_max}f@q${r.snapshot?.clock_jump_max_q} first=${dq(r.snapshot?.clock_first_q)} last=${dq(r.snapshot?.clock_last_q)}) cb_max_q=${r.snapshot?.cb_max_q ?? "-"} lat(in/out)=${r.reported?.lat_in ?? "-"}/${r.reported?.lat_out ?? "-"} clock=${r.clock?.rate_hz?.toFixed(1) ?? "-"}Hz` : ""));
   }
@@ -197,6 +210,6 @@ if (only && fs.existsSync(outFile)) {   // 部分再実行: 既存結果へ名�
 for (const x of results) x.ran_at = new Date().toISOString();
 const hostInfo = { load_start: loadStart, load_end: os.loadavg(), wall_s: (Date.now() - tStart) / 1000, nproc: os.cpus().length };
 console.log(`host: load avg start=${loadStart.map((v) => v.toFixed(2))} end=${hostInfo.load_end.map((v) => v.toFixed(2))} wall=${hostInfo.wall_s.toFixed(1)}s nproc=${hostInfo.nproc}`);
-fs.writeFileSync(outFile, JSON.stringify({ date: new Date().toISOString(), quick, chrome: "headless google-chrome 154", note: "ran_at は部分再実行時のシナリオ単位時刻", host: hostInfo, results: merged }, null, 1));
+fs.writeFileSync(outFile, JSON.stringify({ date: new Date().toISOString(), quick, browser, chrome: browser === "safari" ? null : "headless google-chrome 154", default_output: outDev, note: "ran_at は部分再実行時のシナリオ単位時刻", host: hostInfo, results: merged }, null, 1));
 console.log(`\n${results.length - failed}/${results.length} PASS -> ${outFile}${only ? " (部分実行: 既存結果へマージ)" : ""}`);
 process.exit(failed ? 1 : 0);

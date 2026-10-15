@@ -3,7 +3,7 @@
 //   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
 import { AUTO_CLOSE_MAX, AUTO_CLOSE_RETRY_MS, AUTO_CLOSE_WOULD_MS, closeComment, detectRuleA, type CloseTarget } from "./autoclose.ts";
 import { countOpencodeRuns, countRunsByPrio, type ActiveCount } from "./active.ts";
-import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
+import { classify, isStopReport, neededArtsOf, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
 import { addArts, buildLaunchBody, checkRelaunchIntent, defaultArtLine, lowAllowance, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
@@ -111,6 +111,8 @@ export interface Planned {
   np?: NoPrReason;
   // np が blocked のとき、再着手の根拠にした blocked の報告 (run-outcome) の時刻。同じ報告では 2 回目を出さない。
   reportAt?: string;
+  // 新しい素材の無い artifact を unknown の枠で再投入したとき (#3185)。本文に『前回の停止の理由を再確認』の行を足す。
+  recheck?: boolean;
 }
 
 type NoPrReason = "artifact" | "unknown" | "blocked";
@@ -378,6 +380,7 @@ export class Engine {
       botLogin: this.d.cfg.botLogin,
       pmLogins: this.pmLogins(),
       reviewerLogin: this.d.cfg.reviewerLogin,
+      markLogin: this.d.cfg.markLogin,
       repo: this.d.cfg.repo,
     });
     if (r.status === 202) this.meta.lastWebhookAt = this.d.now();
@@ -470,7 +473,7 @@ export class Engine {
   // 戻り値は、DO の内容が実際に変わった entity の数 (reconcile の食い違いの計数に使う)。
   private applyAll(event: (typeof WEBHOOK_EVENTS)[number], payload: unknown): number {
     if (event === "issue_comment") this.noteOc(payload);
-    const next = applyEvent(this.s, event, payload as any, this.d.cfg.botLogin, this.pmLogins(), this.d.cfg.reviewerLogin);
+    const next = applyEvent(this.s, event, payload as any, this.d.cfg.botLogin, this.pmLogins(), this.d.cfg.reviewerLogin, this.d.cfg.markLogin);
     if (next === this.s) return 0;
     const changed = countChanged(this.s, next);
     persistDiff(this.s, next, this.d.store);
@@ -644,10 +647,11 @@ export class Engine {
     const R = this.d.cfg.repo;
     let diff = 0;
     // 一覧は 1 回に数千件になるので、状態に使うコメント (bot・reviewer と PM) 以外は本文を持たない。reviewer は webhook 経路と同じマーカーを読むため含める。
+    // 停止印の作者 (markLogin) も同じ理由で含める。型 (user.type) は webhook 経路と同じ判定 (停止印は型 Bot を要る) のため残す (#2639)。
     // 人の /oc は本文で『着手であって応答ではない』と判定する (webhook.ts の answered) ので、/oc で始まる本文だけは残す。
-    const mine = new Set([this.d.cfg.botLogin, this.d.cfg.reviewerLogin, ...this.pmLogins()]);
+    const mine = new Set([this.d.cfg.botLogin, this.d.cfg.reviewerLogin, this.d.cfg.markLogin, ...this.pmLogins()]);
     const keepBody = (c: any) => mine.has(c.user?.login) || /^\/oc\b/m.test(c.body ?? "");
-    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, author_association: c.author_association, body: keepBody(c) ? c.body : "" });
+    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login, type: c.user?.type }, author_association: c.author_association, body: keepBody(c) ? c.body : "" });
     const cs = this.note(
       "comments",
       await gh.list<any>(
@@ -846,6 +850,14 @@ export class Engine {
     return { count: 0, unknown: 0, artifact: 0, art: null, ...this.d.store.get<NoPrCount>("relaunch", `np:${n}`) };
   }
 
+  // 報告の新しい素材 (#3185): 直前の報告 (botReport) の素材名 (allowlist 内) のうち、直近の再投入の行 (無ければ既定の行) に無いもの。無ければ null。
+  // 報告が無い (古い保存値) は素材名が取れないので null。停止報告かどうかは見ない (呼び出し側が見る)。
+  private artExtra(n: number): string | null {
+    const i = this.s.issues[String(n)];
+    const base = this.noPrState(n).art ?? defaultArtLine(this.s.pmArt[String(n)]?.line, i?.artLine, i?.title ?? "", i?.labels ?? []);
+    return addArts(base, neededArtsOf(this.s.botReport[String(n)]?.body ?? ""));
+  }
+
   // opencode.yaml の未完了の run の計数 (active.ts)。room の基準は all。
   activeRuns(): ActiveCount {
     return countOpencodeRuns(Object.values(this.s.runs));
@@ -916,16 +928,19 @@ export class Engine {
     };
 
     // oc:no-pr の issue は、最後の oc-run-outcome の reason で再着手を決める (PR を出さずに終わった run の後だけ)。
-    //  unknown: cooldown の後に 1 回だけ。artifact: 前回の oc_artifacts に無い allowlist 内の素材を足して 1 回 (足す素材が無ければ再投入しない)。
+    //  unknown: cooldown の後に 1 回だけ。artifact: 前回の oc_artifacts に無い allowlist 内の素材を足して 1 回。
+    //    足す素材が無い artifact (#3185) は unknown と同じ扱い: cooldown の後に 1 回だけ (unknown の枠を使い、素材は前回の行のまま。本文に再確認の行を足す)。
+    //    その再投入の後も素材なしで終われば、no_pr として PM agent (detectPm) に回す (detectPmTargets の artSpent)。
     //  blocked: blocker が 0 になった後に、その報告につき 1 回だけ (blocker が open の間は blocked の行に置かれ、ここには来ない)。
     //    同じ報告で一度再着手したら、blocker が再び付いて解除されても再着手しない (新しい報告が出るまで stopped に残る)。
     //  stop・split は PM agent (detectPm) に回す。
-    const npPick = new Map<number, { art: string; np: NoPrReason; reportAt?: string }>();
+    const npPick = new Map<number, { art: string; np: NoPrReason; reportAt?: string; recheck?: boolean }>();
     const noPr = (n: number, from: "ready" | "stopped"): void => {
       const outcome = this.s.sig[String(n)]?.outcome;
       const reason = outcome?.reason ?? "unknown";
       const c = this.noPrState(n);
-      let pick: { art: string; np: NoPrReason; reportAt?: string } | null = null;
+      const extra = reason === "artifact" ? this.artExtra(n) : null;
+      let pick: { art: string; np: NoPrReason; reportAt?: string; recheck?: boolean } | null = null;
       let recent = false;
       let note = reason;
       if (reason === "stop" || reason === "split") {
@@ -938,15 +953,18 @@ export class Engine {
       } else if (reason === "blocked") {
         if (outcome?.at && c.blocked === outcome.at) note = "oc:no-pr blocked 再着手済み";
         else pick = { art: c.art ?? baseArt(n), np: "blocked", reportAt: outcome?.at };
+      } else if (extra !== null) {
+        // 報告に新しい素材がある。素材を足して 1 回だけ。停止報告のときだけ (報告の素材名を読む)。
+        const rep = snap.bot_report[String(n)];
+        if (c.artifact === 0 && isStopReport(rep?.head ?? "")) pick = { art: extra, np: "artifact" };
+        else note = c.artifact === 0 ? "artifact: 停止報告でない" : `oc:no-pr ${reason} 再投入済み`;
       } else if (reason === "unknown" && c.unknown === 0) {
         pick = { art: baseArt(n), np: "unknown" };
-      } else if (reason === "artifact" && c.artifact === 0) {
-        // 素材を足すのは、直前の報告が停止報告のときだけ (報告の素材名を読む)。報告が無い (古い保存値) は新しい素材なし。
-        const rep = snap.bot_report[String(n)];
-        const stop = isStopReport(rep?.head ?? "");
-        const line = stop ? addArts(c.art ?? baseArt(n), neededArts(n, input)) : null;
-        if (line) pick = { art: line, np: "artifact" };
-        else note = !rep || stop ? "artifact: 新しい素材なし" : "artifact: 停止報告でない";
+      } else if (reason === "artifact" && c.unknown === 0) {
+        // 新しい素材の無い artifact (報告が無い古い保存値を含む)。unknown の枠で 1 回。素材は前回の行 (無ければ既定) のまま。
+        pick = { art: c.art ?? baseArt(n), np: "unknown", recheck: true };
+      } else if (reason === "artifact") {
+        note = "artifact: 新しい素材なし";
       } else {
         note = `oc:no-pr ${reason} 再投入済み`;
       }
@@ -1031,7 +1049,7 @@ export class Engine {
       const cand = relMap.get(n) ?? np?.art ?? dflt;
       // 素材行は allowlist を通ったものだけを使う。通らなければ既定 (PM の行 → 本文の行 → 推定) に落とす。
       const art = validateArtLine(cand) ? cand : dflt;
-      picks.push({ n, art, relaunch: relMap.has(n), np: np?.np, reportAt: np?.reportAt });
+      picks.push({ n, art, relaunch: relMap.has(n), np: np?.np, reportAt: np?.reportAt, ...(np?.recheck ? { recheck: true } : {}) });
     }
     const plan: Plan = {
       at: iso(nowMs),
@@ -1131,7 +1149,7 @@ export class Engine {
       if (intent.handled.has(p.n)) continue;
       let body: string;
       try {
-        body = buildLaunchBody(p.art);
+        body = buildLaunchBody(p.art, undefined, !!p.recheck);
       } catch {
         this.pushLog({ kind: "skip", n: p.n, note: "invalid artifacts line" });
         continue;
@@ -1355,6 +1373,8 @@ export class Engine {
     return detectPm(this.s, {
       bots: this.d.cfg.pmTargetBots,
       npCount: (n) => this.d.store.get<{ count: number }>("relaunch", `np:${n}`)?.count ?? 0,
+      // 新しい素材の無い artifact は、unknown の枠 (再投入 1 回) を使い切るか、再投入の上限に達したら oc-pm に回す (#3185)。
+      artSpent: (n) => this.artExtra(n) === null && (this.noPrState(n).unknown >= 1 || this.noPrState(n).count >= NO_PR_MAX_RELAUNCH),
     });
   }
 

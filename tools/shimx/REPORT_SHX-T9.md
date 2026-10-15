@@ -189,6 +189,7 @@
   4. 含意: slot が fallback の `0x457860` のまま非 0 だと、ゲートを通って VarBstrFromBool 呼出し (icall-miss) に入る。slot が本物の `VarBstrFromBool` で埋まった場合の経路は未測定 (#1607 の範囲)。
 - **未達 (受入条件 1・2・3 の残り)**: (a) `function_457c70` の呼出し元の wasm PC は未記録 (IR site で代替。#2491 で site ID を追加)。起票: #2593 (`[SHX-T9k]`)。(b) baseline の比較は、現行 `m11_ov.c` で `m11_boot.cjs` を再生成して初めて成立する。再生成には `m11_gen_ir2.sh` (`ir_conditions.json`・fl-win64・pefile/capstone) が要り、本 run では完了していない。起票: #2489 (`[SHX-T9h]`)。
 - 追補 (SHX-T9j #2533): 現行 `m11_ov.c` で再生成した baseline と shimx `--trace --soft --fix` の unit 23 GetLastError を実測。経路は両版とも `ret=2`・icall-miss `0x457860`。GetLastError は baseline 0 / shimx 126。詳細と旧値との差は `tools/shimx/REPORT_SHX-T9j.md`。
+- 追補 (SHX-T39 #3149): 0xf960 の後の分岐条件 (`function_467c40` の slot ゲート `Q(Q(0x15E3AF0)) != 0`、値 `0x457860`) を IR 行つきで特定。両版とも同じ非 0 側に入る。詳細は `tools/shimx/REPORT_SHX-T39.md`。
 
 #### 3.3.5 呼出し元 site と戻り値の実測 (SHX-T9i #2491)
 

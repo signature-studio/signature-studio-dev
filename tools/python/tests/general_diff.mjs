@@ -24,11 +24,20 @@ const calls = [
   ["general.getChangedFlag", []], ["general.getUseMetronome", []],
   ["general.getPrecount", []], ["general.getRecPPQ", []],
   ["general.getVersion", []],
+  // PY-94 (#2830): 状態読出し 7 件 (REPORT_PY94)
+  ["general.getUndoHistoryPos", []], ["general.getUndoHistoryCount", []], ["general.getUndoHistoryLast", []],
+  ["general.safeToEdit", []], ["general.getProjectTitle", []], ["general.getProjectAuthor", []], ["general.getProjectGenre", []],
+  // PY-125 (#3001): 戻り値 None。dumpScoreLog は time (必須 int) と silent (任意 int)
+  ["general.clearLog", []], ["general.dumpScoreLog", [0]], ["general.dumpScoreLog", [-7, 1]],
 ];
 // 引数個数違い (NOARGS の関数に引数を渡す): mock と C は共に code 5 (Wrong number of parameters)
 const arity = [
   ["general.getChangedFlag", [1]], ["general.getUseMetronome", [0]],
   ["general.getPrecount", [1]], ["general.getRecPPQ", [0]],
+  ["general.safeToEdit", [1]], ["general.getProjectTitle", [0]],
+  // PY-125: 個数違い・型違い (code 5)
+  ["general.clearLog", [1]], ["general.dumpScoreLog", []], ["general.dumpScoreLog", [0, 1, 2]],
+  ["general.dumpScoreLog", ["x"]],
   ["general.setRecPPQ", [24]], ["general.setRecPPQ", [960]], ["general.setRecPPQ", [23]], ["general.setRecPPQ", [961]],
   ["general.setNumerator", [1]], ["general.setNumerator", [16]], ["general.setNumerator", [0]], ["general.setNumerator", [17]],
   ["general.setDenominator", [2]], ["general.setDenominator", [16]], ["general.setDenominator", [1]], ["general.setDenominator", [17]],
