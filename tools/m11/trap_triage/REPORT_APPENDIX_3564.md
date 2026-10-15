@@ -4,8 +4,8 @@
 
 ## 1. 測定と入力
 
-- 測定 commit: `4517825a2` (origin/main)。`git diff 03df83be4 4517825a2 -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行。本 PR は `tools/m11/trap_triage/judge_src.py` (新規) と本付録・REPORT_718 §4h・DOC_MAP の行を足すだけ。
-- 入力 (本 run で実測): `work-m11` の `boot_final.ll` (19,787,837 B・sha256 `69c774de…`)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。`scan_guard.py --report` で fn 6969・jcc 25618・dropped 1380・strict 288 (§3 と一致)、`strict_evidence.py` で TSV 288 行。TSV と strict.json は `tools/m11/work/judge_3564/` (gitignore・未コミット)。
+- 測定 commit: `6d12e53f1` (`judge_src.py` を追加した commit。判定に使ったコードの正本)。`git diff 6d12e53f1 HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行。`judge_src.py` は `6d12e53f1` で追加されたもので、以後の差分は docstring の 1 行 (REPORT_718 §4h → §4i) だけ。`4517825a2` 以前の判定コードも同一 (`git diff 03df83be4 4517825a2 -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行)。本 PR は `tools/m11/trap_triage/judge_src.py` (新規)・`negctl_3564.py` (新規) と本付録・REPORT_718 §4i・DOC_MAP の行を足すだけ。
+- 入力 (`435960297` での実測。本 run は `boot_final.ll` が `$ARTIFACTS_DIR` に無く IR 側を再実行していない): `work-m11` の `boot_final.ll` (19,787,837 B・sha256 `69c774de…`)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。`scan_guard.py --report` で fn 6969・jcc 25618・dropped 1380・strict 288 (§3 と一致)、`strict_evidence.py` で TSV 288 行。TSV と strict.json は `tools/m11/work/judge_3564/` (gitignore・未コミット)。
 - 対象: 保留 6 件 (行 39・42・43・47・63・65) と単独 15 件 (行 41・51〜62・64・66)。#3499 の 10 件 (行 36〜38・40・44〜46・48〜50) は PR #3571 (未 merge) の判定で、本付録の対象外。
 
 ## 2. 判定方法
@@ -65,7 +65,25 @@ python3 tools/m11/trap_triage/strict_evidence.py <IR> --pe <PE> --report strict.
 python3 tools/m11/trap_triage/judge_src.py <IR> function_12b5450 --pe <PE> --jcc 12b5479 --n 10
 python3 tools/m11/trap_triage/judge_src.py <IR> function_12b5450 12b54af 12b5482 --mx 12
 python3 tools/m11/trap_triage/judge_src.py <IR> function_1280530 --pe <PE> --jcc 1285e80 --n 6
+python3 tools/m11/trap_triage/negctl_3564.py <PE>
 ```
 
 - 検証範囲: 行 39〜66 の 21 件の IR ブロックと機械語の命令列。到達性 (count = 0 が実行時に起きるか) は範囲外で、真陽性は構造判定。
+- 判定は work-m11 の IR に限る (現 main の `m11_e2e.sh --full` 出力では未確認。`docs/WORKFLOW.md` §11 は work-m11 を survey の基準に使わないとする)。
 - `guard699/`・`ldfix/`・`m11_ov.c`・RetDec 本体は変更していない。
+
+## 7. ネガティブコントロール (機械語側・本 run で実測)
+
+- 測定: `negctl_3564.py` を commit `dd5faa039` で実行 (`fl-win64` の `block00031_PE.bin`・22,227,016 B)。機械語は PE から直接逆アセンブルして count 源 (G・オフセット・幅・段数) を抽出し、§3 の記録値 (IR 側) と照合する。
+- IR 側は `boot_final.ll` が無いため再取得していない。照合の相手は §3 の記録値 (`435960297` の判定の転記)。本節が示すのは「照合器が 1 項目のずれで不一致を出すこと」で、IR 側の正しさは示さない。
+- 抽出・照合 (出力の要約。全文は `python3 negctl_3564.py <PE>` の標準出力):
+
+| 行 | 抽出 (機械語) | 記録 (IR 側) | 照合 | 1 項目ずつ壊した結果 (G/callee+8・オフセット 0x10⇄0x14・幅 32→16・段数+1) |
+|---|---|---|---|---|
+| 51 | G `0x12bd510`・+0x10・32・段数 2 | 同じ | 一致 | 4 件すべて不一致 (val・off・width・stages) |
+| 56 | G `0x153fc08`・+0x14・32・段数 2 | 同じ | 一致 | 4 件すべて不一致 (val・off・width・stages) |
+| 64 | call `0x12f9ed0`・オフセット無し・32・段数 1 | 同じ | 一致 | 3 件不一致 (val・width・stages)。オフセットは対象外 |
+| 41 | G `0x11e2218`・+0x10・32・**段数 3** | 段数 2 | **不一致 (stages)** | 実際の段数の不一致。§3 の保留理由 (段数) と一致 |
+
+- 結果: 壊した 11 件 (対象外 1 件を除く) はすべて不一致 (FAIL)。件 41 は壊さなくても段数の不一致が出る (§3 の保留理由と同じ)。
+- 件 64 の経路: `12cb758: call 0x12f9ed0` → `12cb75f: mov ebx, eax` (count) → `12cb766: cmp eax, ebx` → `12cb76b: jg`。抽出は `mov ebx, eax` の元である `call` を取る。抽出規則は `negctl_3564.py` の `count_src` が正本。
