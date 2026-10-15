@@ -28,7 +28,7 @@
 
 #### 5362-4. 測定 (実測・n=1)
 - **測定 commit: `f4c9be58f`** (本 PR の旧 HEAD)。main 取り込み後の HEAD `313a504d0` でも delay の生成 C は `f4c9be58f` と byte 一致 (`cmp`) で、emcc 行数も同じ 409。`git diff f4c9be58f 313a504d0 -- tools/targets/kilohearts/ghidra_route` は 0 行。
-- 測定環境: 素材 `plugins-kilohearts` (HeartCore.core_64 76,642,304 B) と `toolchain-emsdk` (emcc 6.0.12)、[GHIDRA] 12.1.4 (sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)、JDK 21 (`temurin-21`)。作業領域は runner の `$RUNNER_TEMP` (repo 外)。
+- 測定環境: 素材 `plugins-kilohearts` (HeartCore.core_64 76,642,304 B) と `toolchain-emsdk` (emcc 6.0.12)、[GHIDRA] 12.1.4 (sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)、openjdk 17 (runner 既定・`analyzeHeadless` が通った。JDK 21 指定の検証はしていない)。作業領域は runner の `$RUNNER_TEMP` (repo 外)。
 - decompile: `DecompEach.java` で Delay 139 関数 (proc + also) すべて OK・Gain/Haas/Gate の 10 関数すべて OK。
 - emcc (`emcc -c -ferror-limit=0 -I ghidra_route delay.c`): 実測 16.2 s・error 行 **409** (規則なしの `origin/main` 相当の生成では 415)。
 
