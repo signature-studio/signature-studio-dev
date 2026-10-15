@@ -1981,7 +1981,7 @@ def main():
     for k, name in enumerate(names):
         with open(os.path.join(out, name), 'w') as fh:
             fh.write('#include "fle_cpu.h"\n')
-            if approx_used and k == 0:
+            if approx_used:
                 fh.write(approx_rcp_decl())
             for nm in used_imps:
                 fh.write('void imp_%s(void);\n' % nm)
