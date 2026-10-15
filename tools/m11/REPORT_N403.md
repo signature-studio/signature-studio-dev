@@ -202,6 +202,7 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 | LB=0 と LB=0x10000 の unit 結果差 8 件 (特に unit 40 の Halt0・unit 745 の oob) の原因 | LB 依存の寛容起動の結果が変わる。silent 誤りの可能性 | 子 issue (本 PR の Closes #3160 の後に起票) |
 | 元の 600 s 打ち切りの原因 (本 snapshot では再現せず) | 報告の根拠が再現しない | 本 issue の §6-3 に記録。再現には lift_pe.sha256 付きの完全な成果物が要る |
 | LB=0 寛容起動の pin (874/67) と snapshot の値 (867/74) の差 | gate 数値の基準が snapshot と不一致 | PM 確認 (`--full` 再生成での再測定が要る) |
+
 ## 7. 本 runner の参考値 (#2779・LB=0 / 0x10000 の後段・指紋検査を迂回)
 
 参考値のみ (受入の根拠ではない)。`m11_e2e.sh` の指紋検査 (`work/lift_pe.sha256`) を `M11_SKIP_LIFT_FP=1` で迂回した後段の測定。測定値・再現・未解決は付録 `tools/m11/REPORT_APPENDIX_2779.md` が正本 (250 行上限のため分割移動)。

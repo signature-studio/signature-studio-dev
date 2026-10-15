@@ -19,7 +19,7 @@ main 取り込み後 (merge `c277b9ff`・REPORT 分割 `bd5daf9d`) の再測定�
 | LB=0x10000 | gen_ir2・lb_check・build OK・units_run 37 (Halt0 早期)・survey ok 869 / noproc 1 / miss 46 / trap 26 (abort 2・unresolved function_535c2e 2)・寛容起動の出力 0 バイト (M11_TOLERANT 行無し → gate FAIL)・ir_sha256 `d8738edd…` | 1 | 708 s | 0.65 0.72 0.44 → 1.01 1.00 0.78 |
 
 ptrcheck: LB=0x10000 は run 69,099 / 69,359・survey 70,945 / 71,001 (gate pass)。LB=0 は rc 0 で gate 合格 (ptrcheck JSON は LB=0x10000 の run で上書きされ、LB=0 の数値は未記録)。
-units_run・survey・trap・ir_sha256 は §7.1 (HEAD `d890c724`) と一致する。寛容起動の LB=0x10000 の出力空は §7.1 と同じで、#3160 (CLOSED) の再現記録 (REPORT §6) とは食い違う。
+units_run・survey・trap・ir_sha256 は §7.1 (HEAD `d890c724`) と一致する。e2e 経路 (IR `d8738edd…`) の寛容起動の出力空は §7.1 と同じ。repro 経路 (IR `ecbd43c1…`・REPORT §6) では完走しており、2 つの経路で IR の指紋が違う (§7.2)。#3160 は CLOSED のまま (再オープンしない・PM 判断)。
 
 ### 7.1 測定 (HEAD `d890c724`・参考値)
 
@@ -35,7 +35,7 @@ M11_SKIP_LIFT_FP=1 M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh
 | 条件 | 結果 | rc | wall | load (開始前 → 終了直後、1/5/15 分) |
 |---|---|---|---|---|
 | LB=0 | units_run 53・survey ok 872 / noproc 1 / miss 46 / trap 23・寛容 ok 874 / skipped 67・gate と negctl OK・ir_sha256 `39e97946…` (修正前と同一) | 0 | 2 m 53 s | 0.19 0.30 0.15 → 1.00 0.63 0.31 |
-| LB=0x10000 | gen_ir2・lb_check・build OK。units_run 37 (Halt0 早期)・survey ok 869 / noproc 1 / miss 46 / trap 26。寛容起動は 600 s の `timeout` で打ち切られ出力空 (M11_TOLERANT 行無し → gate FAIL)・ir_sha256 `d8738edd…` | 1 | 11 m 38 s | 0.73 0.60 0.31 → 1.00 0.98 0.70 |
+| LB=0x10000 | gen_ir2・lb_check・build OK。units_run 37 (Halt0 早期)・survey ok 869 / noproc 1 / miss 46 / trap 26。e2e 経路 (`M11_SKIP_LIFT_FP=1 m11_e2e.sh`・IR `d8738edd…`) では寛容起動が 600 s の `timeout` で打ち切られ出力空 (M11_TOLERANT 行無し → gate FAIL)。repro 経路 (IR `ecbd43c1…`) では完走 (§7.2) | 1 | 11 m 38 s | 0.73 0.60 0.31 → 1.00 0.98 0.70 |
 
 nproc は 4。load は各 run の前後の `/proc/loadavg`。LB=0 と LB=0x10000 は同じ `work/` を共有するため逐次に測った。
 
@@ -57,6 +57,8 @@ ptrcheck JSON の `ok` (生フラグ) は両条件で false。判定は `gate.pa
 | 通常起動の終了 | OOB | trap unreachable (function_8c5eb0) | Halt0 早期 | Halt0 早期 |
 
 units_run と LB=0x10000 の Halt0 早期は #403 と一致、survey は ±2 のずれ。受入 2 (「変わらない」) は未達。原因は未確定。候補は (a) boot5 (素材に `boot5.lift.ll` が無く、本節は RetDec で lift し直した)、(b) ld108 (#2316。#403 より後)。切り分けは子 #3161。
+
+IR の指紋 (2 つの経路で違う): e2e 経路 (`M11_SKIP_LIFT_FP=1 m11_e2e.sh`) の LB=0x10000 IR は `d8738edd…`、repro 経路 (`m11_lb_tolerant_repro.sh 0x10000`・§6) の IR は `ecbd43c1…`。どちらが正規かは未確定。`--full` で作る IR との照合を #3161 で行って決める。
 
 ### 7.3 前 round の測定 (参考。旧 commit・同じ迂回)
 
@@ -82,5 +84,5 @@ units_run と LB=0x10000 の Halt0 早期は #403 と一致、survey は ±2 の
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 全再生成経路 (`functions_dll.csv`・`lift_pe.sha256` 無し) で `m11_e2e.sh` 1 コマンドが通らない。§7 の値は指紋検査の迂回に依存 | 受入 1 (実測の根拠) 未達。lift 成果物と PE の対応は未確認 | #3172 (`work-m11` の更新・#728 以降の再生成) |
-| LB=0x10000 の寛容起動が 600 s で打ち切られ出力が空 | LB=0x10000 の e2e rc=1 | #3160 |
+| e2e 経路 (`M11_SKIP_LIFT_FP=1 m11_e2e.sh`・IR `d8738edd…`) では LB=0x10000 の寛容起動が 600 s で打ち切られ出力が空。repro 経路 (IR `ecbd43c1…`) では完走 (§6) | この e2e 経路の LB=0x10000 は rc=1 | #3160 は CLOSED のまま (再オープンしない・PM 判断)。IR の照合は #3161 |
 | #403 との数値差 (survey ±2)・LB=0 の停止理由 (OOB → unreachable)・LB=0x10000 の Halt0 早期 | 受入 2 (変わらない) 未達 | #3161 |
