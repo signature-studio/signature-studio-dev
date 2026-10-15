@@ -8,7 +8,8 @@
 #   neg-cmp : 比較器のネガティブコントロール (wasm 結果の 1 バイトを反転)。
 #   neg-ctx : 入力のネガティブコントロール (wasm 側だけ ctx 大域を 0 にする)。
 #   neg-owner: 配信物一覧の突合のネガティブコントロール (owner/rex_glue.c を追加してから突合する)。
-#   neg-*   : FAIL を検出したら exit 0 / PASS してしまったら exit 1。all = ok + 全 neg-*。
+#   movnti  : movnti (閉包内 24 箇所) を含む経路への到達の実測 (gen_movnti.py・movnti_check.py。T-SH-90 / #3589)。
+#   neg-*   : FAIL を検出したら exit 0 / PASS してしまったら exit 1。all = ok + 全 neg-* + movnti。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$HERE/../.."
@@ -18,8 +19,8 @@ MODE="${1:-ok}"
 REX_SIDE="${REX_SIDE:-1}"
 case "$REX_SIDE" in 0|1) ;; *) echo "[rex] REX_SIDE は 0 か 1 (got: $REX_SIDE)"; exit 2 ;; esac
 if [ "$MODE" = all ]; then
-  for m in ok neg-cmp neg-ctx neg-owner; do bash "$0" "$m" || exit 1; done
-  echo "[rex] ALL OK (本検査 PASS + ネガコン 3 件 (neg-cmp・neg-ctx・neg-owner) が期待通り FAIL)"; exit 0
+  for m in ok neg-cmp neg-ctx neg-owner movnti; do bash "$0" "$m" || exit 1; done
+  echo "[rex] ALL OK (本検査 PASS + ネガコン 3 件 (neg-cmp・neg-ctx・neg-owner) が期待通り FAIL + movnti 到達の判定 PASS)"; exit 0
 fi
 DLL="${REX_DLL:-$FL_WIN64_DIR/extracted/block24351_PE.bin}"
 [ -f "$DLL" ] || { echo "[rex] DLL not found: $DLL (FL_WIN64_DIR=${FL_WIN64_DIR:-})"; exit 2; }
@@ -32,19 +33,24 @@ rm -rf "$W/lift"
 python3 "$FLE/x64c.py" --pe "$DLL" --entries "$W/entries.json" --out "$W/lift" --closure 99 \
   --img 0x180000000 --shift 0x150000000 --img-size 0x6a000 --impbase 0x1D80000
 python3 "$HERE/rex_image.py" "$DLL" "$W"
-python3 "$HERE/gen_cases.py" "$W/cases.bin" 200
+if [ "$MODE" = movnti ]; then python3 "$HERE/gen_movnti.py" "$W/cases.bin"; else python3 "$HERE/gen_cases.py" "$W/cases.bin" 200; fi
 
 emcc -O1 -ffp-contract=off -fno-fast-math -w -I "$FLE/rt" \
   "$W/lift/fle_lifted.c" "$FLE/rt/fle_cpu.c" "$HERE/rex_glue.c" \
   -sSTANDALONE_WASM=1 -sALLOW_MEMORY_GROWTH=0 -sINITIAL_MEMORY=$((0x31000000)) -sSTACK_SIZE=65536 -sGLOBAL_BASE=268435456 \
-  --no-entry -Wl,--no-gc-sections -Wl,--export=rex_run -Wl,--export=rex_reset -Wl,--export=rex_hits_get \
+  --no-entry -Wl,--no-gc-sections -Wl,--export=rex_run -Wl,--export=rex_reset -Wl,--export=rex_hits_get -Wl,--export=rex_unsup_get \
   -o "$W/rex.wasm"
 echo "[rex] wasm: $(stat -c %s "$W/rex.wasm") bytes"
 
 gcc -O1 -w -I "$W" -o "$W/native_ref" "$HERE/native_ref.c"
 timeout 300 "$W/native_ref" "$W/image_native.bin" "$W/cases.bin" "$W/res_native.bin" 2> "$W/native_stderr.txt"; cat "$W/native_stderr.txt" >&2
 
-if [ "$MODE" = neg-ctx ]; then REX_NEG=ctx timeout 300 node "$HERE/run_wasm.mjs" "$W"; else timeout 300 node "$HERE/run_wasm.mjs" "$W"; fi
+if [ "$MODE" = neg-ctx ]; then REX_NEG=ctx timeout 300 node "$HERE/run_wasm.mjs" "$W"; elif [ "$MODE" = movnti ]; then REX_RUN_CRASHED=1 timeout 300 node "$HERE/run_wasm.mjs" "$W"; else timeout 300 node "$HERE/run_wasm.mjs" "$W"; fi
+if [ "$MODE" = movnti ]; then
+  set +e; python3 "$HERE/movnti_check.py" "$W"; RC=$?; set -e
+  echo "[rex] movnti elapsed=$(( $(date +%s) - T0 ))s load start=[$L0] end=[$(cut -d' ' -f1-3 /proc/loadavg)]"
+  exit $RC
+fi
 set +e
 if [ "$MODE" = neg-cmp ]; then python3 "$HERE/diff_test.py" "$W" --mutate-wasm; RC=$?; else python3 "$HERE/diff_test.py" "$W"; RC=$?; fi
 set -e
