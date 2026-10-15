@@ -26,6 +26,7 @@ SS_EMSDK_ENV="${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"  # emsdk_env.sh は EMSD
 export FLE_EXTRA_ROOTS="${FLE_EXTRA_ROOTS-0x6a7b70}"
 TAG="${FLE_BOOT_TAG:-fle6}"   # results/ の出力名の接頭 (既定 fle6 = 従来の名前)
 RUNS="${FLE_BOOT_RUNS:-shim negctl ipp2}"   # shim=FLE_IPP=1 / negctl=FLE_IPP=0 / ipp2=FLE_IPP=2 / default=FLE_IPP 未指定
+# diag_shim / diag_negctl (#672): FLE_DIAG_NULLFILL=1 (root 無しの fill で buf=0 の呼出しを戻す診断)。root 無しの lift で測る (FLE_EXTRA_ROOTS=)。
 # lifted C は N 本 (fle_lifted_s<k>.c) に分けて並列 clang する (FLE-9, #2700)。1 にすると単一 TU (cap 11000MB で打ち切り)。
 export FLE_SHARDS="${FLE_SHARDS:-8}"
 export TMPDIR="$W/tmp"
@@ -60,7 +61,7 @@ elapsed "clang-plain" "$T"
 run_boot() {
   local log="$W/run_${TAG}_$1.log"
   local rc=0
-  FLE_IPP="$3" FLE_TOLERANT="${4:-0}" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
+  FLE_IPP="$3" FLE_TOLERANT="${4:-0}" FLE_DIAG_NULLFILL="${5:-0}" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
   grep 'FLEBOOT_RESULT' "$log" || true
   grep 'FLEBOOT_IPP_CHECK' "$log" || { echo "[fle6] $1: FLEBOOT_IPP_CHECK 行が無い ($log)"; exit 4; }
   [ -s "$2" ] || { echo "[fle6] $1: 結果 JSON が無い ($2)"; exit 4; }
@@ -77,6 +78,8 @@ for r in $RUNS; do
     default) run_boot default "$HERE/results/boot_summary_${TAG}_default.json" "" ;;
     tol)     run_boot tol     "$HERE/results/boot_summary_${TAG}_tol.json"    1 1 ;;   # 寛容起動 (#2719): shim 有 + 逐次 unit 寛容 + CreateFruityInstance 観測
     tol2)    run_boot tol2    "$HERE/results/boot_summary_${TAG}_tol2.json"   1 2 ;;   # 診断: 失敗 unit の後で InitTable を起動時の値へ戻す (補修。既定ではない)
+    diag_shim)   run_boot diag_shim   "$HERE/results/boot_summary_${TAG}_diag_shim.json"   1 0 1 ;;   # #672 診断: shim 有 + buf=0 の fill を戻す
+    diag_negctl) run_boot diag_negctl "$HERE/results/boot_summary_${TAG}_diag_negctl.json" 0 0 1 ;;   # #672 診断: ネガコン + buf=0 の fill を戻す
     *) echo "[fle6] unknown run: $r"; exit 2 ;;
   esac
   elapsed "boot $r" "$T"
