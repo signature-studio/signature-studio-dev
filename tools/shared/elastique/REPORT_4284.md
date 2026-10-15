@@ -32,7 +32,7 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 - 1 回目: 1 関数ずつ・並列 4・`timeout 60` で 540 秒 (`timeout` で打ち切り) 実行。結果行 651 件 (ok 647・fail 4)。
 - 2 回目: 1 回目で結果行が無かった 3,905 件 (= 4,556 − 651 結果行) を入力とした。入力リストは保存していないため、件数は 1 回目の結果行数からの算出 (実測ではない)。420 秒 (`timeout` で打ち切り) で実行。結果行 514 件 (ok 499・fail 15)。
 - 合計: 結果行 1,165 件 (`0x18002dac0` は両回で fail のため 1 件重複)。一意の 1,164 件のうち **成功 1,146・失敗 18** (`data/retdec_lift_4284.csv`)。
-- 失敗 18 件の再実行 (並列 4・`RETDEC` を指定): 61 秒 (旧記載。本 run では再測定できず、時間は §5 で「未計測」)。内訳は rc=1 14 件・rc=124 (60 秒 timeout) 1 件・rc=137 (SIGKILL・原因未確認) 3 件。CSV の status には `fail rc=N` を記録した (旧記載の rc=124 2 件は、この再実行と一致しなかったため訂正)。
+- 失敗 18 件の再実行 (並列 4・`RETDEC` を指定): 61 秒 (旧記載。本 run では未再現・再測定できず、時間は §5 で「未計測」)。内訳は rc=1 14 件・rc=124 (60 秒 timeout) 1 件・rc=137 (SIGKILL・原因未確認) 3 件。CSV の status には `fail rc=N` を記録した (旧記載の rc=124 2 件は、この再実行と一致しなかったため訂正)。
 - 実測の load average は 4 並列で 3.9〜4.1 (4 コア・`uptime`)。1 関数あたりの時間は計測していない (合計の所要時間のみ)。
 
 ## 2.5 D5 (x64c 主役) との比較
@@ -59,6 +59,9 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 | 失敗 18 件 (decoder の `Should not be possible.`・メモリ・timeout) | 完全な lift にならない | 親 #4363 (open・既存)。§5 の分類を参照 |
 | `ipp_entries.py` の 1,956 (pefile) と生 `.pdata` の 5,475 の差 | REPORT.md の件数が生 PE と合わない | 出典は §5 で確定済み (`REPORT.md` の件数修正は本 PR の REPORT.md 1 行) |
 | lift 出力の意味検証 (D15 `jmp [mem]`・D11・D14) | lift の正しさは未確認 | 親 #4363 (open・既存) |
+| rc=1 の因果 (EVEX マスク付き `vpshufd`・`vshufi32x4` の切り分け) | 原因未確定 (相関のみ) | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
+| rc=124 / rc=137 の原因 (メモリ・時間) | 原因未確定 | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
+| pefile の `Unknown UNWIND_CODE` の原因 | pefile 側の原因は未調査 (件数の出典は確定) | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
 
 ## 5. 失敗 18 件の分類・件数の出典 (T-SH-141 / #5179)
 
@@ -75,6 +78,6 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 | 再実行の時間・load・RSS (並列 4・`timeout 60`、単独実行) | **未計測**。本 run の環境に RetDec 本体が無く、`toolchain-retdec` も素材 `fl-win64` の取得に含まれていないため再実行できなかった。§2 の旧記載の時間は本節では再現していない |
 | rc=137 の原因 | 未確認 (OOM と断定しない。dmesg 不可) |
 | 件数の出典 | 生 `.pdata` 5,475 スロット・`.text` 内 4,556・pefile 1,956。pefile の 1,956 は生スロットの先頭 1,956 件 (file 順) の接頭辞。pefile に無い 3,519 件 = `.text` 内 2,600 件 + IPPCODE 919 件 |
-| pefile が 1,956 で止まる原因 | pefile の `parse_exceptions_directory` が `Unknown UNWIND_CODE at 0x4a6038` の警告で打ち切る (`pe._PE__warnings` で確認)。以後の RUNTIME_FUNCTION は読まれない |
+| pefile が 1,956 で止まる原因 | pefile の `parse_exceptions_directory` が `Unknown UNWIND_CODE at 0x4a6038` の警告で打ち切る。以後の RUNTIME_FUNCTION は読まれない。確認 (本 run で実行): `pe = pefile.PE(dll, fast_load=True)`・`pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]])`・`pe._PE__warnings` → `['Unknown UNWIND_CODE at 0x4a6038']`、`len(pe.DIRECTORY_ENTRY_EXCEPTION)` → 1956 (pefile 2024.8.26) |
 
 注: 本節の CSV は `main` の `data/retdec_lift_4284.csv` (1,164 件・fail 18)。`origin/4363-retdec-pdata-rest` は未 merge で 3,364 件・fail 89 (rc=1 85・124 1・137 3) まで進んでいる。その 89 件は本節の対象外 (未確認)。
