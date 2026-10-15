@@ -88,10 +88,11 @@ ABI = {
     #   rcx = *(param_1 + off)。off は C の条件式の添字と一致 (0x18〜0x48・0x68〜0x90 の 13 個、番地順 = C 行順)。
     #   FUN_180fe3310: 直線部 6779・6783 は `mov rcx,[rbx+0xf0]`・`[rbx+0xe8]`。ループ部 6801・6805 は `mov rcx,[rdi]`・`[rdi-8]` (rdi = puVar6、
     #   ループ末 `add rdi,0x20` まで不変)。FUN_180fe3cd0: `mov rcx,[rcx]` (= *param_1)・`[rbx+8]`・`[rbx+0x10]`・`[rbx+0x58]`・`[rbx+0x60]` (= param_1[1]・[2]・[0xb]・[0xc])。
+    #   FUN_180fcf904 の 2 件 (2667・2760): 宣言は undefined4 (bit 列)。float 式をそのまま渡すと C が数値変換するので f2u() で包み bit を渡す (resonator の float 宣言とは逆)。
     #   規則 1 件 = 呼出し 1 件 (件数 1 を assert)。残り 86 件は REPORT_APPENDIX_3800.md の分類を参照。
     'delay': [
-        ('delay 2667 FUN_180fbbfb8 xmm0 = param_2 (FUN_180fcf904 float arg)', r'sVar2 = (?:func_0x000|FUN_)180fcf904\(\);', 'sVar2 = FUN_180fcf904(param_2);'),
-        ('delay 2760 FUN_180fbc1f4 xmm0 = input float (afStackX_8 source)', r'sVar1 = (?:func_0x000|FUN_)180fcf904\(\);', 'sVar1 = FUN_180fcf904(fVar4);'),
+        ('delay 2667 FUN_180fbbfb8 xmm0 = param_2 bits (FUN_180fcf904 undefined4 arg)', r'sVar2 = (?:func_0x000|FUN_)180fcf904\(\);', 'sVar2 = FUN_180fcf904(f2u(param_2));'),
+        ('delay 2760 FUN_180fbc1f4 xmm0 = input float bits (afStackX_8 source)', r'sVar1 = (?:func_0x000|FUN_)180fcf904\(\);', 'sVar1 = FUN_180fcf904(f2u(fVar4));'),
         ('delay 6939 FUN_180fe3690 rcx=[param_1+0x18]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x18\) != _DAT_182989698\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x18));'),
         ('delay 6942 FUN_180fe3690 rcx=[param_1+0x20]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x20\) != _DAT_1829896a0\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x20));'),
         ('delay 6945 FUN_180fe3690 rcx=[param_1+0x28]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x28\) != _DAT_1829896a8\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x28));'),
