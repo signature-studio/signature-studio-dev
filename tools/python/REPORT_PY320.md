@@ -51,3 +51,39 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
   - 実測 (HEAD `b27f1942a`): real 23.877 秒・終了 0・PASS 11 / FAIL 0。
 - 既存 probe: `pe_py268_rdx.py` は本 PR で変更していない。同じ素材で HEAD `ec11dfec5` 上で実行: real 24.283 秒・終了 0・検査 PASS 22 件 (集計行「件数 22 / 22」)。
 - 負の対照: `0x840cd0` の `[+0xf0]` 枝は `+0x100` 検出 0 件・`+0xf0` 検出 1 件 (`0x840d1b`) で、検出器が枝を区別する。
+
+## 6. PY-348 (#4603): 0x72db20 の間接呼出し元と MoveLeftMenu の発火箇所
+
+結論: **未達** (受入 1・2 は未達)。0x72db20 の呼出し元の総数と、VMT からの型による絞り込みの不可を確定した。発火箇所の同定は #4405 (PY-325) に残す。
+
+| 受入 | 結果 | 根拠 |
+|---|---|---|
+| 1. 0x72db20 を間接に呼ぶ箇所 (関数と VA) を特定する | **未達**。`call qword ptr [reg+0xd0]` の全走査は 243 件 (§6.1)。0x72db20 を指す VMT 位置は code に無いため、どの呼出しが 0x72db20 に当たるかは静的に絞れない (§6.2) | §6.1・§6.2 |
+| 2. MoveLeftMenu の OnClick を発火する箇所を絞る | **未達** | §6.3 |
+| 3. probe を追加し、`pe_py325_refs.py` 6/6 PASS のままであることを確認する | `pe_py325_refs.py` は main に存在しない (issue の前提と不一致)。代わりに `pe_py348_vmt_d0_callers.py` (2 件 PASS) を追加し、既存 `pe_py320_fire_site.py` 11/11 PASS を再確認 | §6.4 |
+
+### 6.1 `call [reg+0xd0]` の全走査
+
+- 件数 243 (レジスタ別: rbx 140・rax 49・rsi 38・rdi 10・r13 5・r14 1)。所属関数 (推定) 136 件。
+- PY-320 §3 の記載は 244 件。本走査は 243 件で、1 件ずれる。差の原因は未解明 (`call` の表記 `qword ptr [reg + 0xd0]` 以外の形を数えていない可能性)。
+- `call` の即値形 (283 件) と `jmp` (283 件) は、0xd0 を含むが VMT スロットの間接呼出しではない (即値・アドレス)。
+
+### 6.2 型による絞り込みの不可
+
+- TQuickMenuItem (VMT 0x725a58) を指す rip 相対変位は 2 件 (`0x725a02`・`0x725a54`)。どちらも VMT 自身の自己ポインタ位置で、関数の中からの参照は 0 件。
+- TMenuItem (VMT 0x838c10) も同様に 2 件 (`0x838bba`・`0x838c0c`)。
+- 本走査は disp32 の rip 相対変位と即値だけを数えた。`mov [reg], imm64` 形式の VMT 書込みは未検査。そのため「VMT を書く箇所が無い」とは言えない。
+- よって、VMT 参照から「インスタンスの型が TQuickMenuItem である呼出し」を絞る手段は、本走査では見つからなかった。
+
+### 6.3 発火箇所 (未達)
+
+- 0x72db20 の内側で `call 0x840b50` する (§1)。0x840b50 の 0x840be8・0x840c2e から 0x12acb70 を呼ぶ経路 (§2) の前段は、0x72db20 を呼ぶ 243 件のどれから到達するかが未確定。
+- 0x72db20 を呼ぶ候補の絞り込みは、次のどちらかを要する: (a) 動的 (実行中の vtable 呼出し) の確認、(b) `mov [reg], imm64` 形式を含む VMT 書込みの走査による TQuickMenuItem インスタンス生成箇所の特定 (本走査では未実施)。
+- 残課題は #4405 (PY-325) に起票先として残す。
+
+### 6.4 検証
+
+- 新規 probe: `tools/python/analysis/flapi/pe_py348_vmt_d0_callers.py` (2 件 PASS・終了 0)。`FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py348_vmt_d0_callers.py`。
+- 既存 probe: `pe_py320_fire_site.py` 11 件 PASS (終了 0)。
+- 素材: `fl-win64.tar.zst` の `block00031_PE.bin` (`$ARTIFACTS_DIR`)。展開 2.8 秒。
+- 測定 commit: 本 PR の最後のコード commit。実行時間: `pe_py348_vmt_d0_callers.py` 41.1 秒、`pe_py320_fire_site.py` 42.0 秒 (同一 worktree・同一素材で実測)。
