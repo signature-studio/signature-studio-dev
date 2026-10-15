@@ -236,7 +236,7 @@ GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0・42 命令・直接 call / 間�
 
 ### 結論 (1 行)
 WaveformColouring closure の入口 70 関数を x64c で C に lift し wasm にした。CreateInstance → slot 0 の native 対 wasm は 64 case で全バイト一致 (ネガティブコントロール FAIL 64/64)。slot 1–5 の host 前提と VEX 3 命令の未対応は子 T-SH-57・58・59 に残す。
-全文 (手順・実測・未解決の表) は `REPORT_APPENDIX_3216.md` §7 が正本 (250 行上限のため分割移動)。
+全文 (手順・実測・未解決の表) は `REPORT_APPENDIX_3216.md` §7 が正本 (250 行上限のため分割移動)。slot 1–5 の host 前提 (slot 1・4 は出力先ポインタが null で落ちる。呼出側の実値は未確認) は `REPORT_APPENDIX_4169.md` が正本 (#4169)。
 
 ## 8. PSOLA_CreateInstance の closure lift と native 差分 — T-SH-75 (#3401・縮小して完了)
 
