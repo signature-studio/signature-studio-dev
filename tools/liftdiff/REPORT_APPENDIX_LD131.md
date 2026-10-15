@@ -21,7 +21,7 @@
   - 結果: `[x64c] functions 28, insns 941, unsup {}, unlifted callees 1, imports 11`。wall 0.67 s (`real`)。
   - 同一入力 2 回: `ott_lifted.c` の sha256 は両回 `3eeb9fe0c6cc213ca0d170d992a991b26b733c99a0ccd2199b1b33eab885f827` で一致。TSV も `cmp` で一致。
 - 表の生成: `python3 tools/liftdiff/results/ld131/insn_va_map.py <ott_lifted.c> --out tools/liftdiff/results/ld131/insn_map_6fn.tsv` → 941 行 (28 関数)。
-- 単体テスト: `python3 tools/liftdiff/tests/test_insn_va_map.py` → 6 件 OK。ネガコン (import 呼出しの正規表現を `imp2_` に崩す) → `test_import_call` が FAIL (rc 1)。
+- 単体テスト: `python3 tools/liftdiff/tests/test_insn_va_map.py` → 8 件 OK (a26cd568f。round 1 で 2 件追加、§7)。ネガコン (import 呼出しの正規表現を `imp2_` に崩す) → `test_import_call` が FAIL (rc 1)。
 
 ### closure の比較 (6 root・同じ入力)
 
@@ -75,5 +75,17 @@ closure 6 の未 lift は `1801c6a04` の 1 件 (呼出し元 `1801c6a2c`)。clo
 ## 6. 測定 commit と差分
 
 - 測定 commit: `9bbbd6c15`。
-- `git diff 9bbbd6c15 HEAD -- tools/liftdiff/results/ld131 tools/liftdiff/tests/test_insn_va_map.py tools/ott/lift tools/shared/env.sh` の出力: 0 行 (本付録の commit は REPORT だけを変える)。
+- `git diff 9bbbd6c15 HEAD -- tools/liftdiff/results/ld131 tools/liftdiff/tests/test_insn_va_map.py tools/ott/lift tools/shared/env.sh` の要約 (HEAD = `a26cd568f`): 3 ファイル、19 行追加・4 行削除。
+  - `tools/liftdiff/results/ld131/insn_va_map.py` (+9/-1): `return;` の後の注記無し文を畳まない。`jmp` 注記で kind `call` の行を `jmp` にする。
+  - `tools/liftdiff/results/ld131/insn_map_6fn.tsv` (2 行): `1801c682c 1801c699d` の kind `call`→`jmp`、`1801ce3f0 1801ce3f6` の `call 1801ab1d0` を削除。
+  - `tools/liftdiff/tests/test_insn_va_map.py` (+10)。
+  - `tools/ott/lift`・`tools/shared/env.sh` は差分なし。
+- **差分は 0 ではない。** よって下記の再測定が要る。TSV の 2 行は `ld131_lift.sh` で再生成していない (素材 `plugins-ott` / `analysis-ott-binaries` が無い)。再測定 (生成 TSV と現 TSV の `cmp`・`ott_lifted.c` の sha256) は未実施。
 - 起動・GUI に関わらないため、製品 KPI (FLEngine 起動 dispatch 数・通過 unit 数・最初のウィンドウ) は書かない。
+
+## 7. round 1 の修正 (レビュー指摘への対応)
+
+- 指摘 (ret の kind・tail jmp の kind): `ret` 行に `call 1801ab1d0` が付いていた原因は、`parse()` が `return;` の後の注記無し文を直前の命令に畳んでいたこと。`return;` を含む行で収集を止めるよう修正した。`1801c682c` の `jmp` は `f_X(); return;` の形で kind `call` になっていたため、注記が `jmp` なら kind `jmp` にした。
+- 単体テストを 2 件追加 (`test_ret_does_not_absorb_following_unannotated_stmt`・`test_tail_jmp_as_call_stmt_is_jmp`)。計 8 件 OK。
+- TSV の 2 行は手で直した (修正後の規則と同じ値)。再生成での照合は未実施 (§6)。
+- 確認: `awk -F'\t' 'NR>1 && $4=="call" && $3 !~ /^call/'` → 0 行。TSV は 941 行・28 関数で、件数は変わらない。
