@@ -167,6 +167,7 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `pm_skipped_hour_24h` | 直近 24 時間に毎時上限で見送った件数 (`pmDispatch` の見送りの対象ごと、と `haltNotify` の見送りを tick ごとに数えた回数)。見送りには、他の kind の最低配分のために枠を残した分 (`reserve`) を含む (#3704)。時刻と件数を `meta` に持ち、24 時間で prune する (`pruneHistory` と同じ窓)。live / dry-run は分ける |
 | `launch_halted` | launch を止めている区間 `{reason, since}` (止まっていなければ `null`)。`reason` は先頭の理由、`since` は止まり始めた時刻。詳細は下の『launch の停止と通知』 (#2795) |
 | `launch_halted_overdue` | 15 分以上止まり、着手待ち (`ready`) と空き枠 (`room`) がある間は `true` (#2795) |
+| `launch_holds` | 着手待ち (`ready`) でない issue (`recent`・`stopped`) の配列 `[{n, row, reason, until}]`。`row` は `recent` か `stopped`、`reason` は理由 (`bot-comment`・`launched`・`run-finished`・`launch-not-observed`・`oc:no-pr cooldown`・`oc:no-pr`・`split`・`stop`・`killed`・`artifact` など)。`until` は時間の窓で解ける見込み (ISO)。bot コメントは 1.5 時間後、launch・run 完了は 3 時間後、`oc:no-pr cooldown` は `lastAct` + cooldown (critical は半分)。時間で解けない (PM・人の判断待ち・観測待ち) ものは `null`。観測のみで、launch・dispatch の判断には使わない (#5110) |
 
 **rate-guard**: `rest_remaining` が 1,500 未満の間は launch を止める (`launch_stop: "rate-guard"`)。1,499 で止まり、1,500 で継続する。未観測 (`null`) は止めない。
 reconcile の読み取りと watchdog の dispatch は続く。launch の途中でも、投稿の応答で残量が下がれば残りを投稿しない。遷移 (on/off) のときだけログに 1 行残す。

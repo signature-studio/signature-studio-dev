@@ -6,6 +6,10 @@ import type { LaunchState } from "./launchobs.ts";
 import { parentOf } from "./refs.ts";
 import { DIGEST_ROLLING_RE, OC_HOLD_LABEL } from "./pm.ts";
 
+// recent の窓 (時間)。holdinfo.ts の解除見込みも同じ値を使う (#5110)。
+export const BOT_COMMENT_WINDOW_H = 1.5;
+export const RUN_WINDOW_H = 3;
+
 export interface SnapIssue {
   number: number;
   title: string;
@@ -255,9 +259,9 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
         rows.stopped.push([n, "launch-unobserved"]);
       } else if (isLaunched && ls === "launched" && !reported) {
         rows.recent.push([n, `launch not observed yet (${fmt1(ageH(launchedAt) * 60)} min)`]);
-      } else if (isLaunched && doneAt !== undefined && ageH(doneAt) < 3 && !reported) {
+      } else if (isLaunched && doneAt !== undefined && ageH(doneAt) < RUN_WINDOW_H && !reported) {
         rows.recent.push([n, `run finished ${fmt1(ageH(doneAt))}h ago`]);
-      } else if (isLaunched && doneAt === undefined && ls !== "launched" && ageH(launchedAt) < 3 && !reported) {
+      } else if (isLaunched && doneAt === undefined && ls !== "launched" && ageH(launchedAt) < RUN_WINDOW_H && !reported) {
         rows.recent.push([n, `launched ${fmt1(ageH(launchedAt))}h ago`]);
       } else if (bl && reported && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);
@@ -267,7 +271,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
         if (!cand && material && newArts(rep?.art, base).length) cand = rep?.art ?? null;
         if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
         else rows.stopped.push([n, head90(bl.head)]);
-      } else if (bl && ageH(bl.at) < 1.5) {
+      } else if (bl && ageH(bl.at) < BOT_COMMENT_WINDOW_H) {
         rows.recent.push([n, `bot comment ${fmt1(ageH(bl.at))}h ago`]);
       } else if (bl && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);

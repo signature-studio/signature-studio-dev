@@ -31,6 +31,7 @@ import {
 } from "./pm.ts";
 import { RATE_EVAL_GAP_MS, RATE_EVAL_MAX_GAP_MS, RATE_STREAK, RATE_WINDOW_MS, rateHit } from "./ratealert.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
+import { recentHold, stoppedHold, type Hold } from "./holdinfo.ts";
 import { redact } from "./redact.ts";
 import type { VmState } from "./vmstate.ts";
 import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type Sample } from "./saturation.ts";
@@ -1798,12 +1799,27 @@ export class Engine {
     // launch を止めている条件 (#2795)。止めていなければ launch_halted は null。since は保存した区間の起点 (無ければ今)。
     const haltedReasons = haltReasons({ noImport: !!plan.blocked, stop: plan.stop, reviewOnly: plan.phase.review_only, stale: !this.fresh() });
     const haltedSince = haltedReasons.length ? (this.meta.halt?.since ?? iso(now)) : undefined;
+    // 保留中の issue ごとの理由と解除見込み (#5110)。行は plan の rows をそのまま見る。着手判断には使わない。
+    const doneAtOfIssue = new Map<number, string>();
+    for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) if (v.state === "observed" && v.doneAt !== undefined) doneAtOfIssue.set(Number(k), v.doneAt);
+    const holds: Hold[] = [
+      ...rows.recent.map(([n, note]) => recentHold(n, note, {
+        botAt: Date.parse(this.s.botLast[String(n)]?.at ?? "") || undefined,
+        launchedAt: Date.parse(this.s.launchedAt[String(n)] ?? "") || undefined,
+        doneAt: Date.parse(doneAtOfIssue.get(n) ?? "") || undefined,
+        lastAct: this.lastAct(n) || undefined,
+        cooldownMs: noPrCooldownMs(prios.get(n) ?? "normal", this.d.cfg.noPrCooldownH),
+      })),
+      ...rows.stopped.map(([n, note]) => stoppedHold(n, note)),
+    ];
     return {
       // デプロイした commit (--var BUILD_COMMIT)。渡していなければ null。反映の確認に使う (README『再デプロイ』手順 5)。
       build: this.d.cfg.build,
       // 止まっている理由 (先頭が主な理由) と止まり始めた時刻。15 分以上止まり、着手待ち (ready) と空き枠 (room) がある間は launch_halted_overdue が true。
       launch_halted: haltedSince ? { reason: haltedReasons[0], since: haltedSince } : null,
       launch_halted_overdue: haltOverdue(haltedSince, now, c("ready"), plan.room),
+      // 着手待ちでない issue (recent・stopped) の理由と解除見込み (#5110)。until は時間の窓で解ける見込み (ISO)。null は時間では解けない (PM・人の判断待ち・観測待ち)。
+      launch_holds: holds,
       // mode は両方の経路が live のときだけ "live" (pm_gate.sh は mode=live を『VM の command を止めてよい』と読む)。
       // 片方だけ live のときは "partial"。個別の状態は mode_launch / mode_dispatch。
       mode: this.launchLive() && this.dispatchLive() ? "live" : this.launchLive() || this.dispatchLive() ? "partial" : "dry-run",
