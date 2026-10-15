@@ -4,9 +4,11 @@
 
 ## 0. 結論
 
+§0 の結論は再現 chain (§1〜§8) に限る。本番 `m11_build.sh` 全体では通常起動が完走せず、threw の原因の結論は支持されない (§9.0・#3646)。
+
 - 本 REPORT の「本番の IR 生成順」は、測定 commit `c9d365465` の `m11_gen_ir2.sh` の段 (ldfix → ld108 → ld115 → src412770 → qstore → alloca → guard699 → guard4fa210) を指し、`fix_r8b815050.py` を含まない chain。main では `5c43ea98a` (#1448) で r8b が後から入り既定で適用されるため、r8b を含む判定は #3608 (項目 3) に残す。
-- ldfix_e2e の入力 (snapshot `boot_final3.ll`) は本番の IR 生成順より前にある。本番の後段 (qstore → alloca → guard699 → guard4fa210) と ld108・ld115・src412770 を snapshot に当てると、**通常 boot は完走する** (units_run 17 → 109・threw なし・`DllMain attach 完走` の Halt0 経路で終了)。
-- 同じ順で ldfix 無し (base) と ldfix 有り (fix) を比べると、boot は両方とも完走し結果は同じ。**boot threw は ldfix 起因ではなく、既存の欠陥 (unit 17 の alloca 縮退・unit 56 の D19・unit 87 の refcount 系) が本番の修復を経ていない snapshot に残っていたため**。
+- ldfix_e2e の入力 (snapshot `boot_final3.ll`) は本番の IR 生成順より前にある。本番の後段 (qstore → alloca → guard699 → guard4fa210) と ld108・ld115・src412770 を snapshot に当てると、**通常 boot は完走する** (units_run 17 → 109・threw なし・`DllMain attach 完走` の Halt0 経路で終了)。(再現 chain の結論)
+- 同じ順で ldfix 無し (base) と ldfix 有り (fix) を比べると、boot は両方とも完走し結果は同じ。**boot threw は ldfix 起因ではなく、既存の欠陥 (unit 17 の alloca 縮退・unit 56 の D19・unit 87 の refcount 系) が本番の修復を経ていない snapshot に残っていたため**。(再現 chain の結論。本番全体では §9 のとおり完走せず、この原因の結論は支持されない)
 - unit 56 (VA 0x16fde0) の原因: `8c5eb0` の入口ガード (`cmp idx, count-1; jg`) が IR から脱落し、件数 0 で本体が 2 回回る。2 回目に基底 0 + 8 の要素番地 `0x8` を読み、`0x670067` (UTF-16 "gg") を `function_8c6530` に渡して trap。guard699 で消える。
 - 本番順の survey は trap 22 件 (OOB 14・halt0 8)。元の 9 件のうち 17・53・56・87・138・158 は trap 一覧から消え、144・149 (OOB) と 114 (halt0) が残る。ldfix の効果は unit 895 の 1 件 (OOB → halt0) のみ (r8b を含まない chain での判定。§1 の注)。
 
@@ -133,7 +135,7 @@ S4_NAME=probe_alloca S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/
 
 - 本番経路 (`m11_gen_ir2.sh` → `m11_build.sh` → `m11_run.mjs`) では、**base も fix も通常起動は完走しない**。どちらも InitUnits の 98 本目 (units_run 98) で `memory access out of bounds` の trap (最内 `function_535c11`・呼出し元 `function_4fad10` ← `function_4fb910` ← `function_5de960`)。DllMain は `dllmain_done=false`。
 - **判定: 不一致**。§0 の「通常 boot は完走 (units 109・Halt0)」は本番全体では再現しない。threw は既存欠陥の未適用が原因という §0 の結論も、本番 build に既存の修復 (ldfix 系・qstore・alloca・guard699・guard4fa210) が全て入った状態で threw が残るため、支持されない。
-- ldfix の有無は通常起動の到達 unit を変えない (fix 98 = base 98)。survey の ok は fix 873 / base 870。
+- ldfix 系 (ldfix・ld108・ld115・r8b) の有無は通常起動の到達 unit を変えない (fix 98 = base 98)。`M11_LDFIX=0` は `m11_gen_ir2.sh` の elif 分岐ごと ld108・ld115・r8b も外す。survey の ok は fix 873 / base 870。
 - 原因の切り分けは未実施。argrecover (`M11_SIGFIX_RECOVER=1`) と C 上書き OFF (`M11_FIX_535BF2=0`) は、いずれも trap 位置と到達 unit を変えなかった (各 1 回・base の IR)。
 
 ### 9.1 測定
@@ -146,10 +148,11 @@ S4_NAME=probe_alloca S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/
 | 変種 | IR の記録 (`ir_conditions.json`) | 通常起動 (run A) | survey (run B) | 寛容起動 (run C) | e2e rc | judge rc | 所要 (実測) |
 |---|---|---|---|---|---|---|---|
 | **fix** (既定) | ldfix・qstore・ld108・ld115・r8b = applied | units 98・threw OOB @ `function_535c11`・dllmain_done false | ok 873 / miss 46 / trap 22 (halt0 7・OOB 15) / noproc 1 (合計 942) | attempted 942・ok 875・skipped 66 | 1 (run A の trap) | 0 | 188 秒 (05:02:46→05:05:54) |
-| **base** (ldfix 無し) | ldfix = disabled・ld108・ld115・r8b = not-applied・qstore = applied | 同左 (units 98・同じ trap) | ok 870 / miss 46 / trap 25 / noproc 1 | attempted 942・ok 872・skipped 69 | 1 (run A の trap と survey 完全一致 873 の不一致) | 0 | 83 秒 (05:08:11→05:09:34) |
-| base + argrecover (`M11_SIGFIX_RECOVER=1`) | 同 base | 同左 (units 98・同じ trap) | ok 870 / trap 25 | ok 872 | — | — | 122 秒 (05:12:19→05:14:19) |
+| **base** (ldfix 系を外す: ldfix・ld108・ld115・r8b) | ldfix = disabled・ld108・ld115・r8b = not-applied・qstore = applied | 同左 (units 98・同じ trap) | ok 870 / miss 46 / trap 25 / noproc 1 | attempted 942・ok 872・skipped 69 | 1 (run A の trap と survey 完全一致 873 の不一致) | 0 | 83 秒 (05:08:11→05:09:34) |
+| base + argrecover (`M11_SIGFIX_RECOVER=1`) | 同 base | 同左 (units 98・同じ trap) | ok 870 / trap 25 | ok 872 | — | — | 120 秒 (05:12:19→05:14:19) |
 | base + C 上書き OFF (`M11_FIX_535BF2=0`) | 同 base | 同左 (units 98・同じ trap) | ok 870 / trap 25 | ok 872 | — | — | 82 秒 (05:10:23→05:11:45) |
 
+- 各変種は 1 回 (n=1)。所要は開始→終了の時刻差。argrecover の所要は、旧表の 122 秒が時刻差 (05:12:19→05:14:19 = 120 秒) と 2 秒合わなかったため、時刻差の値に直した (旧値 122 秒の出所は未確認)。
 - fix の run A の rc (1) は、通常起動が trap で終わったこと (`rc_run ≠ 0`) による。judge (`m11_judge.py --require-stage 4 --min-survey-ok 800`) と寛容起動ゲートは fix で rc 0。
 - base の rc (1) は run A の trap に加え、寛容起動ゲートの survey 完全一致 (873) が 870 で外れるため。argrecover 版の出力を `m11_tolerant_gate.py --strict-done 101 --survey-ok 873` に掛けると rc 1 (survey 数値は base と同じ)。
 - ir_sha256 (`boot_final.ll`): fix `9a9cfa06…f769`。base は e2e 内の gen_ir2 の 3 回 (base・argrecover・C 上書き OFF) で `f66aaacc…49f2` に一致。単独の `M11_LDFIX=0 m11_gen_ir2.sh` の 1 回目だけ `f221d203…6c` で、差の原因は未切り分け (IR 生成の非決定性か否か未確認)。argrecover 版は `work/sigfix_fixes.json` (236,734 B) を生成し、opt-in 経路を通った。
@@ -179,14 +182,16 @@ S4_NAME=probe_alloca S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 本番 build の通常起動が base/fix とも unit 98 で OOB trap (`function_535c11`)。原因未特定。§0 の完走の結論と不一致 | 本番の起動 (完走しない)。§0 の結論の修正 | #942 (親。既存 issue へのコメントで結論の修正と原因切り分けを依頼) |
-| 本番の lift 段の PE 一致 (`lift_pe.sha256` 無し・`M11_SKIP_LIFT_FP=1` で迂回) | 本測定の lift 成果物が現 PE 由来かは未検証 (参考値扱い) | #942 (親。`m11_e2e.sh --full` での再測定の要否) |
-| base の `gen_ir2` の出力 sha256 が 1 回だけ別値 (`f221d203…` と `f66aaacc…`)。原因未切り分け | IR の再現性 (測定の基準の固定) | #942 (親) |
-| fix の IR に argrecover を掛けた変種・計測 probe ON・XMM 引数復元 ON の変種は未測定 | 本番既定の外の経路 | #942 (親) |
+| 本番 build の通常起動が base/fix とも unit 98 で OOB trap (`function_535c11`)。原因未特定。§0 の完走の結論と不一致 | 本番の起動 (完走しない)。§0 の結論は (再現 chain の結論) と注記済み | [CI-183] (#3980。親: #942。原因の切り分け) |
+| 2987 由来の受入 2 件 (`dyn_ld143_2987.mjs` の `real_boot.threw` null・`real_boot.cells` の `[V]`)。#3646 の追加受入で、本測定は未達 | 2987 の `[V]` の判定 (完走が前提) | [CI-183] (#3980。#3646 から移管) |
+| 本番の lift 段の PE 一致 (`lift_pe.sha256` 無し・`M11_SKIP_LIFT_FP=1` で迂回) | 本測定の lift 成果物が現 PE 由来かは未検証 (参考値扱い) | PM agent の判断待ち: #942 の再オープン可否・既定案: 未解決表に残す |
+| base の `gen_ir2` の出力 sha256 が 1 回だけ別値 (`f221d203…` と `f66aaacc…`)。原因未切り分け | IR の再現性 (測定の基準の固定) | PM agent の判断待ち: #942 の再オープン可否・既定案: 未解決表に残す |
+| fix の IR に argrecover を掛けた変種・計測 probe ON・XMM 引数復元 ON の変種は未測定 | 本番既定の外の経路 | PM agent の判断待ち: #942 の再オープン可否・既定案: 未解決表に残す |
 
 ### 9.7 差分 (`docs/WORKFLOW.md` §6)
 
 - 測定 commit: `396f9f8b6`。測定経路 (`tools/m11` の ldfix/ 以外・`tools/shared`) の差分は 0 行 (`git diff --stat 396f9f8b6 HEAD -- tools/m11 tools/shared ':!tools/m11/ldfix'` の出力が空)。本 PR で増えるのは `tools/m11/ldfix/prod_full_3646.sh` (再現) と本節だけ。
+- 測定後の変更: `prod_full_3646.sh` の出力のコピーを、rc を出すループに直した (`cp` の失敗が黙って続行されていた)。測定で走らせたコマンド (`m11_gen_ir2.sh`・`m11_e2e.sh`・`m11_judge.py`・寛容起動) と既定値は変えていない。この変更は測定値に入らない。
 
 ### 9.8 再現
 

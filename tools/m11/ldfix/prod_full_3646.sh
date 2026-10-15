@@ -23,7 +23,9 @@ case "$MODE" in
   *) echo "[prod3646] MODE は fix か base"; exit 2 ;;
 esac
 M11_SKIP_LIFT_FP=1 bash m11_e2e.sh > "$OUT/e2e.log" 2>&1; rc=$?
-cp work/e2e_full.out work/e2e_survey.out work/e2e_tolerant.out work/ir_conditions.json work/link.log "$OUT/"
+for f in e2e_full.out e2e_survey.out e2e_tolerant.out ir_conditions.json link.log; do
+  cp "work/$f" "$OUT/" 2>/dev/null; echo "[prod3646] cp $f rc=$?"
+done
 python3 m11_judge.py --require-stage 4 --min-survey-ok 800 > "$OUT/judge.txt" 2>&1; echo "[prod3646] judge rc=$?"
 sha256sum work/boot_final.ll work/m11_boot.cjs.wasm > "$OUT/sha256.txt"
 echo "[prod3646] $MODE e2e rc=$rc"
