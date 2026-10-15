@@ -245,6 +245,6 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 取り込みと再測定 (round 4): main `e1e816c2` を merge commit `384e2cbe` で取り込んだ (競合なし。`heartbeat.sh` は PR 側の版のまま)。README の VM 記述 (commit `517bbb13`) を直した後の HEAD で同じ測定を再実行した。送信回数・終了コード・初回送信の遅延 (1.01 秒・2.01 秒) は上の結果と同じ。
 - 差分 (round 4): `git diff 17eb4e16 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は 0 行。
 
-## 19. main の Ruleset `main-require-review` の実測 (#2648・ADR D27)
-- 測定値の正本: [`REPORT_2648.md`](REPORT_2648.md) (§18 は main の heartbeat 節 (#2629) が使うため、本節の全文は付録へ分割移動)。
+## 19. main の Ruleset `main-require-review` の実測 (#2648・ADR D27): 測定値の正本は [`REPORT_2648.md`](REPORT_2648.md) (§18 は main の heartbeat 節 (#2629) が使うため、本節の全文は付録へ分割移動)
 ## 20. PM Worker の降格 (#2340・PR #2469) の測定 (全文は [`REPORT_APPENDIX_2469.md`](REPORT_APPENDIX_2469.md))
+## 21. PM Worker README の release-age の測定値 (#2611・CI-113): 全文は [`REPORT_APPENDIX_2653.md`](REPORT_APPENDIX_2653.md)
