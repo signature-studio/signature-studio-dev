@@ -1,14 +1,15 @@
 # liftdiff LD-154 (#3350): batch 判定の再現性と timeout の記録
 
 結論: 受入 2 (上限秒数と実測秒の記録) は達成。受入 3 (件数の記録) は達成。受入 1 は未達 (hybrid で関数単位の判定が 2 件変わった)。受入 1 は子 issue #3423 (LD-157) に移した。units の 2 回一致は達成。
+§2〜§6 の実測値は測定 commit `3427318f1` のもの。HEAD (`9e702fe45`) での再測定は未実施 (§8・§9)。
 
 ## 1. 測定条件
 
 | 項目 | 値 |
 |---|---|
 | 実装 commit | `acbf28748` (timing の記録) |
-| 測定 commit (コードを変えた最後の commit) | `3427318f1` (既定 chunk を 1 に変更) |
-| コード差分の確認 | `git diff 3427318f1 HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/rt` = 0 行 (REPORT の commit 後に確認) |
+| 測定 commit (§2〜§6 の値を測った最後の commit) | `3427318f1` (既定 chunk を 1 に変更) |
+| 測定後のコード差分 | `git diff --stat 3427318f1 HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/rt` = 7 files, 152 行追加・12 行削除 (差分 0 行ではない。内訳は §9) |
 | 入力 | `targets/m11.json`・`--set sample:800`・`--shards 12`・`--nobuild` |
 | units state | `--state auto` (`work/m11/boot_state.json`、`bootstate` の units モード) |
 | hybrid state | `--state work/m11/boot_state_hybrid.json` (`bootstate --mode hybrid`) |
@@ -17,10 +18,10 @@
 
 上限 (batch 冒頭の `[batch] limits` 行に出る値):
 
-- native: ITIMER_REAL 1.5 s (`rt/ld_native.c` の `{1, 500000}`)、Python 側の recv 上限 10.0 s
+- native: ITIMER_REAL 1.5 s (`rt/ld_native.c` の `{1, 500000}`。`tests/test_ld154_timing.py` が C 側の値と一致を検査)、Python 側の recv 上限 10.0 s
 - wasm: vm timeout 1.000 s (`wasm_timeout_ms` 既定)、Python 側の recv 上限 10.0 s
 
-## 2. 各 run の結果
+## 2. 各 run の結果 (測定 commit `3427318f1`)
 
 load は `/proc/loadavg` の 1 分値 (run 開始時 → 終了時)。
 
@@ -62,12 +63,13 @@ load は `/proc/loadavg` の 1 分値 (run 開始時 → 終了時)。
 | # | 受入条件 | 判定 | 根拠 |
 |---|---|---|---|
 | 1 | 同じ入力を 2 回連続で実行したとき、遷移件数と判定が一致する | 未達 (子 #3423 へ移管) | units は 2 回とも件数・判定が一致 (変化 0)。hybrid は件数 352/268/180 が一致するが関数単位で 2 件変化 |
-| 2 | hang / timeout の判定に使った上限秒数と実測秒を batch 出力に残す | 達成 | 各 timing 付き case に `limit_s`・`recv_limit_s`・`elapsed_s` を記録。batch 冒頭に `[batch] limits` 行 |
+| 2 | hang / timeout の判定に使った上限秒数と実測秒を batch 出力に残す | 達成 | 各 timing 付き case に `elapsed_s` と、判定を決めた上限 (`limit_s` または `recv_limit_s`)・`cause` を記録 (`9e702fe45` で規則を整理。§6)。batch 冒頭に `[batch] limits` 行 |
 | 3 | units / hybrid の件数を `liftdiff_e2e.sh` [4/4] の基準として記録できる状態にする (値は変えない) | 達成 (本付録に記録、スクリプトの値は未変更) | units 360/233/207 (2 回)、hybrid 352/268/180 (2 回)。関数単位の変化は §3 |
 
-## 6. timing の実測 (HEAD `3427318f1`)
+## 6. timing の実測 (測定 commit `3427318f1`)
 
 timing の `elapsed_s` は、直前の応答 (1 件ずつ送るため送信時刻) から応答を読むまでの Python 側の壁時計。
+wasm timeout の elapsed は、vm timeout (1.000 s) の後の runner 側の後処理 (`sp_restore`・`putStr`・`_ld_w_case_end` = メモリ差分の収集と応答 JSON の組み立て) を含む。後処理の内訳は未計測 (レビュー m2)。
 
 | run | native timeout (limit 1.5 s) | wasm timeout (limit 1.0 s) | wasm crash | wasm hang (実測) | wasm hang (skipped) |
 |---|---|---|---|---|---|
@@ -76,21 +78,26 @@ timing の `elapsed_s` は、直前の応答 (1 件ずつ送るため送信時�
 | hybrid h1 | 24 (1.518〜1.813 s) | 268 (1.012〜2.685 s) | 4 (1.093〜3.057 s) | 0 | 24 |
 | hybrid h2 | 24 (1.521〜1.835 s) | 275 (1.002〜2.949 s) | 2 (1.095〜1.332 s) | 2 (1.236〜3.471 s) | 24 |
 
-- 「skipped」は native が timeout したため wasm を実行しなかった case (`elapsed_s` = null)。
-- native timeout の最小実測は 1.501 s、wasm timeout の最小は 1.000 s で、いずれも上限と整合する。
-- wasm hang の実測 0.918 s (units r1) と 1.236 s・3.471 s (hybrid h2 の 2 件) は、recv 上限 10 s より短い場合がある。`_recv` が EOF またはプロセス終了で None を返す経路で、待ちが早く終わったと読める。個別の原因は未確認。
+- 「skipped」は native が timeout したため wasm を実行しなかった case (`elapsed_s` = null)。3427318f1 の JSON では wasm の status が `hang` (detail `skipped (native timeout)`) で、wasm hang と区別できない。`9e702fe45` 以降は timing の wasm.status が `skipped` になり、`tests/ld154_repeat.py` は wasm hang と別に数える (§7)。
+- native timeout の最小実測は 1.501 s、wasm timeout の最小は 1.000 s で、いずれも上限と整合する。wasm timeout の最大 2.949 s は上限 1.0 s を超えるが、§6 冒頭の後処理を含む壁時計である。
+- wasm hang の実測 0.918 s (units r1) と 1.236 s・3.471 s (hybrid h2 の 2 件) は、recv 上限 10 s より前に `_recv` が None を返した経路と読める。その経路は EOF (stdout が閉じた) かプロセス終了のどちらか。
+  - この case の判定根拠は上限ではない。`limit_s` 1.0 / `recv_limit_s` 10.0 は 3427318f1 の JSON に入っていたが、判定 (outcome は hang のまま) を決めたのは終了の経路。
+  - 3427318f1 の JSON は終了理由 (cause) を持たないため、EOF かプロセス終了かは未確認。
+  - `9e702fe45` 以降は timing に `cause` を付ける (`eof` / `exited` / `deadline` / `runner_timeout`)。EOF・終了の case には上限を付けず (`ldlib/session.py` の `side_timing`)、応答待ちの期限切れ (`deadline`) の case だけ `recv_limit_s` を付ける。status は変えていない。
 
 ### 予備測定 (chunk 16、`acbf28748` 時点) を棄却した理由
 
-測定 1 回目は既定 chunk 16 で行った。結果は units 360/233/207・361/232/207、hybrid 352/268/180 ×2 で、件数は今回と同程度だった (作業ディレクトリに残し、本付録の値には使わない)。ただし native timeout の実測が 0.868〜2.163 s と上限 1.5 s を下回った。原因は、先行 case の応答がパイプに溜まり、その待ち時間が隣の case の応答間隔に計上されたこと。このため `run_cases` の既定 chunk を 1 に変更し (`3427318f1`)、全 run を HEAD で測り直した。送信順・判定ロジック・timeout の既定値は変えていない。
+測定 1 回目は既定 chunk 16 で行った。結果は units 360/233/207・361/232/207、hybrid 352/268/180 ×2 で、件数は今回と同程度だった (作業ディレクトリに残し、本付録の値には使わない)。ただし native timeout の実測が 0.868〜2.163 s と上限 1.5 s を下回った。原因は、先行 case の応答がパイプに溜まり、その待ち時間が隣の case の応答間隔に計上されたこと。このため `run_cases` の既定 chunk を 1 に変更し (`3427318f1`)、全 run を測り直した。送信順・判定ロジック・timeout の既定値は変えていない。
+
+chunk 16 の batch 所要 (秒) は予備測定で記録していない。§2 の所要 103 s・208 s は chunk 1 の値で、chunk 16 との速度比較はできない。chunk 1 にしたのは timeout の実測を正しく記録するためで、速度の主張はしない (レビュー m3)。
 
 ## 7. 検証
 
-- `python3 -m py_compile` (ldlib/runners.py・ldlib/session.py・liftdiff.py)
-- `Runner.run_cases`: 固定の応答スクリプトで、timeout 応答と hang (recv 上限 1.0 s) の経過秒を確認 (hang の `_elapsed_s` = 1.001)
-- `Session._mark_timing`: ok・native timeout (wasm skipped)・wasm timeout の 3 パターンで `timing` の形を確認
-- `liftdiff.py run --fn 0x959a40,0x4133f0` が通り、`timing` は通常の case に付かないことを確認
-- `liftdiff_e2e.sh` の手順を手動で実行: [0/4] `tests/test_compare_ld11.py` (23 件 OK)、[1/4] (`gcc` で `work/ld_native`、`build targets/m11.json`)、[3/4] `bootstate` (units・hybrid)、[4/4] `batch` ×4 (§2)。[2/4] (OTT)・[3/4] の `check_unit18`・[3b] の `check_initunits` は今回の対象外
+- 測定 commit `3427318f1` の時点: `python3 -m py_compile` (ldlib/runners.py・ldlib/session.py・liftdiff.py)、`Runner.run_cases` の固定応答の確認 (hang の `_elapsed_s` = 1.001)、`Session._mark_timing` の 3 パターン、`liftdiff.py run --fn 0x959a40,0x4133f0` (通常の case に timing が付かない)、`liftdiff_e2e.sh` の手順の手動実行のうち [0/4]・[1/4]・[3/4]・[4/4] (§2)。[2/4] (OTT)・[3/4] の `check_unit18`・[3b] の `check_initunits` は今回の対象外。
+- `9e702fe45` の時点 (単体のみ。e2e は未実施):
+  - `python3 tests/test_ld154_timing.py`: 9 件 OK。NATIVE_ITIMER_S と `rt/ld_native.c` の `{1, 500000}` の一致、`side_timing` の上限の付け方 (runner timeout → limit_s、deadline → recv_limit_s、EOF・終了・skipped → 上限なし)、`Runner.run_cases` の cause (終了する runner → eof/exited、応答なし → deadline)、skipped の wasm が wasm hang と別に集計されること。
+  - `python3 tests/test_compare_ld11.py`: 23 件 OK。
+  - `py_compile` OK。
 
 ## 8. 未解決
 
@@ -100,19 +107,26 @@ timing の `elapsed_s` は、直前の応答 (1 件ずつ送るため送信時�
 | `0x959a40` の判定変化 (timing 無関係、units でも揺れた実績あり) | 原因未特定。wasm / native のどちらの状態かは未確認 | #3423 (LD-157) |
 | units / hybrid のどちらを `liftdiff_e2e.sh` [4/4] の基準にするか | 本付録は件数を記録するのみ。基準値は変えていない | #1464 (親) |
 | units state の precondition が ok=False (`units_run=22/942`) | 既存の状態 (LD-42 で記録済み)。本 PR では変えていない | #1464 (親) |
+| HEAD (`9e702fe45`) での再測定 (units 2 回・hybrid 2 回、bootstate の再生成を含む) が未実施。§2〜§6 の値は `3427318f1` のもの。main 取り込みの rt/ 差分 (LD-153・LD-126・LD-129) と 9e702fe45 の変更が入っており、hybrid の件数は LD-153 で変わりうる | 測定値が HEAD と一致する保証がない | 本 PR の次の検収 run (未起票。本 run は時間切れで未実施) |
+| wasm hang 3 件の経路 (EOF か プロセス終了か) が未確認 (3427318f1 の JSON に cause が無い) | §6 の経路は推定の域を出ない | 上と同じ再測定で `cause` を確認 |
 
-## 9. main 取り込み後の差分 (測定 commit からの差)
+## 9. 測定 commit からの差分 (main 取り込み + 9e702fe45)
 
-測定 commit は `3427318f1` のまま。その後 `35e49a1e0` で origin/main (`f44264ebe`) を取り込んだ (DOC_MAP の衝突のみ解消)。取り込みで測定対象の runner 側に次の差分が入った:
+測定 commit `3427318f1` 以降に次の差分が入った。§1〜§6 の値はこの差分の前のコードで測った値で、HEAD の値ではない。
+
+- `35e49a1e0`: origin/main (`f44264ebe`) を取り込んだ (DOC_MAP の衝突のみ解消)。runner 側に LD-153 (仮 proc の thunk の敷設)・LD-126 (wasm の RESET)・LD-129 (書込み監視) の差分が入った。
+- `9e702fe45`: `ldlib/runners.py` (応答待ちの終了理由 `_cause`)・`ldlib/session.py` (`side_timing`、skipped の status、refine_timing の cause)・`tests/ld154_repeat.py` (cause 別の集計) を変えた。`tests/test_ld154_timing.py` を追加した。判定ロジック (`classify.py`・`compare.py`) と timeout の既定値は変えていない。
 
 ```
-git diff 3427318f1 HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/rt tools/liftdiff/targets tools/liftdiff/liftdiff_e2e.sh
+git diff --stat 3427318f1 HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/rt
  tools/liftdiff/ldlib/build_wasm.py |  2 +-
+ tools/liftdiff/ldlib/runners.py    | 10 +++++++-
+ tools/liftdiff/ldlib/session.py    | 42 ++++++++++++++++++++++++------
  tools/liftdiff/rt/ld_core.h        |  7 +++++
- tools/liftdiff/rt/ld_native.c      | 52 +++++++++++++++++++++++++++++++++++++++
+ tools/liftdiff/rt/ld_native.c      | 52 ++++++++++++++++++++++++++++++++++++++
  tools/liftdiff/rt/ld_runner.mjs    |  7 ++++-
  tools/liftdiff/rt/ld_wasm.c        | 44 +++++++++++++++++++++++++++++++-
- 5 files changed, 109 insertions(+), 3 deletions(-)
+ 7 files changed, 152 insertions(+), 12 deletions(-)
 ```
 
-よって §1〜§4 の件数は `3427318f1` の値であり、HEAD (`35e49a1e0`) の値ではない。HEAD での再測定は時間切れで未実施。再測定の担い手は検収 run (本付録の units/hybrid 各 2 回の手順を再実行する)。
+HEAD の再測定 (units 2 回・hybrid 2 回) は本 run では未実施。bootstate も再生成していない。次の検収 run で `liftdiff_e2e.sh` の手順に沿って行い、測定 commit をその HEAD に更新する。
