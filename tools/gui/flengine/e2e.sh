@@ -31,12 +31,12 @@ export GF_M11="$TREE/m11"; M="$GF_M11"
 [ -f "$M/work/boot6.lift.ll" ] || { S "前提欠如: boot6.lift.ll が生成されていない (m11_wndseed.sh)"; exit 2; }
 tail -1 "$W/res/m11_wndseed.log" | sed 's/^/[gf_e2e] wndseed: /'
 (cd "$SRC/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/material  /') > "$R/ir_sha256.txt"   # 素材そのままの IR (provenance)
-S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11_survey.mjs (複製側)"
+S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → build.sh --base → run.mjs / run.mjs --survey (複製側)"
 ( cd "$M" && bash m11_build.sh > "$W/res/m11_build.log" 2>&1 ) || { S "m11_build.sh 失敗"; tail -5 "$W/res/m11_build.log"; exit 2; }
 (cd "$M/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/after_m11_build  /') >> "$R/ir_sha256.txt"   # m11_build.sh (qstore/alloca/post) 後の IR
-( cd "$M" && node m11_run.mjs 2>/dev/null | sed -n 's/^M11_RESULT //p' > "$W/res/baseline_boot.json" )
-[ -s "$W/res/baseline_boot.json" ] || { S "baseline 取得失敗"; exit 2; }
-bash "$HERE/build.sh" --base > "$W/res/build_base.log" 2>&1 || { S "build base 失敗"; tail -5 "$W/res/build_base.log"; exit 2; }   # 比較元は GUI と同じ -pthread build (shim 無し)。非 pthread の m11_boot.cjs と比べると 8 unit ぶん順序・ビルド条件差が出る (REPORT §5-6)
+bash "$HERE/build.sh" --base > "$W/res/build_base.log" 2>&1 || { S "build base 失敗"; tail -5 "$W/res/build_base.log"; exit 2; }   # 比較元は GUI と同じ -pthread build (shim 無し)。非 pthread の m11_boot.cjs と比べると boot は GetMem 761 対 760、survey は 8 unit ぶんの差が出る (REPORT §5-6・#4420)
+( cd "$HERE" && node run.mjs --wasm "$W/m11_base.cjs" --out "$W/res/baseline_boot.json" > /dev/null )   # boot の比較元も同じ -pthread build (m11_run.mjs は非 pthread の wasm を見るため GetMem が 1 回多い)
+[ -s "$W/res/baseline_boot.json" ] || { S "baseline boot 取得失敗"; exit 2; }
 ( cd "$HERE" && GF_SURVEY_UNITS="$W/res/baseline_units.json" node run.mjs --survey --wasm "$W/m11_base.cjs" --out "$W/res/baseline_base_survey.json" > /dev/null )
 python3 -c "import json,sys; d=json.load(open(sys.argv[1]))['survey']; json.dump(d, open(sys.argv[2],'w'))" "$W/res/baseline_base_survey.json" "$W/res/baseline_survey.json" 2>/dev/null
 [ -s "$W/res/baseline_survey.json" ] || { S "baseline survey 取得失敗"; exit 2; }

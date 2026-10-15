@@ -42,8 +42,8 @@ gate('A1 adapters', ad and ad.group(1) == ad.group(2) and ad.group(5) == '0' and
 bu = a.expect_units if a.expect_units is not None else base_boot['units_run']
 gate('B1 boot parity', boot['units_run'] == bu and boot['dllmain_done'] == base_boot['dllmain_done'] and boot['init_count'] == base_boot['init_count']
      and boot['probes'].get('GetMem') == base_boot['probes'].get('GetMem') and boot['probes'].get('FreeMem') == base_boot['probes'].get('FreeMem')
-     and boot['icall_miss'] == base_boot['icall_miss'] and boot['boot_failfast'] is None and boot['boot_threw'] == base_boot.get('threw'),
-     'units_run %s (base %s) / dllmain_done %s / GetMem %s FreeMem %s / icall_miss %s / threw %s (base %s)' % (boot['units_run'], bu, boot['dllmain_done'], boot['probes'].get('GetMem'), boot['probes'].get('FreeMem'), boot['icall_miss'], boot['boot_threw'], base_boot.get('threw')))
+     and boot['icall_miss'] == base_boot['icall_miss'] and boot['boot_failfast'] is None and boot['boot_threw'] == base_boot.get('boot_threw'),
+     'units_run %s (base %s) / dllmain_done %s / GetMem %s (base %s) FreeMem %s / icall_miss %s / threw %s (base %s)' % (boot['units_run'], bu, boot['dllmain_done'], boot['probes'].get('GetMem'), base_boot['probes'].get('GetMem'), boot['probes'].get('FreeMem'), boot['icall_miss'], boot['boot_threw'], base_boot.get('boot_threw')))
 first = boot['reach'][0] if boot['reach'] else None
 gate('R1 first GUI API reaches shim (boot)', first and first['kind'] == 'IMPL' and first['calls'] > 0,
      'first=%s calls=%s kind=%s; reached=%d' % (first and first['name'], first and first['calls'], first and first['kind'], len(boot['reach'])))
