@@ -10,11 +10,12 @@ retdec の IR 名 stack_var_X は X = d - C (機械語 [rbp+d] に対応)。C �
                 接続できれば実値化 (値 = その alloca の番地)。alloca が無ければ未決 (lea_alloca_absent)。
   load_stack  : `[rbp+d]` の読込を、同じ slot への最後の格納まで直線区間で後ろ向きに探す。
                 区間は分岐先・call・ret/jmp・ポインタ経由の書込み・slot を覆う別幅の書込み・
-                メモリ書込みの可能性がある未知の命令 (ldmach の kind=other)・index 付きの書込みで打ち切る (未決)。
+                メモリ書込みの可能性がある未知の命令 (ldmach の kind=other)・メモリオペランドを持つ set* (ldmach は set* を空扱いするため別に判定)・
+                index 付きの書込みで打ち切る (未決)。
                 qword の即値格納なら実値化。reg 格納 (slot_reg) などは未決 (理由付き)。
 
-使い方: python3 m11_setother_mem_class.py nonimm_class_rows.json --pe PE --ir IR.ll --out mem_class_rows.json
-負例・正例の単体テスト: python3 test_setother_mem_class.py
+使い方: python3 m11_setother_slot_class.py nonimm_class_rows.json --pe PE --ir IR.ll --out mem_class_rows.json
+負例・正例の単体テスト: python3 test_setother_slot_class.py
 """
 import argparse, collections, json, os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -94,6 +95,8 @@ def load_def(cs, ins, idx, base, d, tg):
             return ('未決', 'slot_base', None, at)
         if split_ops(x.op_str)[0] == 'rbp' and base == 'rbp':
             return ('未決', 'slot_base', None, at)
+        if x.mnemonic.startswith('set') and '[' in x.op_str:
+            return ('未決', 'slot_unknown_write', None, at)
         for mo in ldmach.memops_of(cs, x):
             if mo.get('rip_rva') is not None:
                 continue

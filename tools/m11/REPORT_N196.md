@@ -7,7 +7,7 @@
 ## 1. 接続方式 (決めたこと)
 
 - 入力: `m11_setother_nonimm_class.py` の出力 `nonimm_class_rows.json` のうち、理由が `load_stack`・`chain>load_stack`・`lea_stack` の行 (110 件)。
-- スクリプト: `tools/m11/m11_setother_mem_class.py` (IR は変更しない・分類のみ)。
+- スクリプト: `tools/m11/m11_setother_slot_class.py` (IR は変更しない・分類のみ)。
 - **frame 定数 C**: 呼出し元の prologue で、entry rsp から `mov rbp, rsp` までの減算量 (push 1 つ 8・`sub rsp, imm`)。例: `function_10c7cd0` は `push` ×3 (24) + `sub rsp, 0x4cf0` で C = 0x4d08 = 19720。
 - **IR 名の対応**: retdec の `stack_var_X` は X = d − C (機械語の `[rbp+d]`)。`function_10c7cd0` で確認: `[rbp+0x4be0]` → `stack_var_-296`、`[rbp+0x2e0]` → `stack_var_-18984` (IR の既存の参照と一致)。
 - **lea_stack (59)**: `lea r, [rbp+d]` を、呼出し元 IR の `%stack_var_(d−C) = alloca` (接尾辞なしの定義) に接続する。定義があれば実値化 (値 = その alloca の番地)。定義が無ければ `lea_alloca_absent` (未決)。接尾辞付き (`.reg2mem` 等) の定義だけなら `lea_alloca_suffixed` (未決)。
@@ -24,7 +24,7 @@
 ## 2. 測定 (旧コード・測定 commit `fe41cc75`。修正後は未再測定 (§4))
 
 - 入力: `work-m11` の `tools/m11/work/boot_final.ll` (`m11_post.py` の既定出力 sha `ecab191b…`・REPORT_N86 と一致)、PE は `fl-win64` の `extracted/block00031_PE.bin` (sha `b2c64da4…`)。
-- 手順: `m11_post.py` → `m11_argrecover.py` (台帳 410 件・非 imm 349 件。REPORT_N171 と一致) → `m11_setother_nonimm_class.py` (349 件・未決 349。REPORT_N171 と一致) → `m11_setother_mem_class.py nonimm_class_rows.json --pe PE --ir boot_final.ll`。
+- 手順: `m11_post.py` → `m11_argrecover.py` (台帳 410 件・非 imm 349 件。REPORT_N171 と一致) → `m11_setother_nonimm_class.py` (349 件・未決 349。REPORT_N171 と一致) → `m11_setother_slot_class.py nonimm_class_rows.json --pe PE --ir boot_final.ll`。
 - 結果 (stdout): 対象 110 件、実値化 25・復元不能 0・未決 85。
 
 | 台帳 kind | 理由 | 件数 | 区分 |
@@ -59,12 +59,12 @@
 | `mov qword ptr [rbp+0x48], 1` → 読込 (正例) | 実値化 `slot_imm` 1 | 実値化 `slot_imm` 1 |
 
 - 修正の中身: (a) `ldmach.memops_of` の kind=other (`movq`・`pop`・`rep stosq` などのメモリ書込みの可能性がある命令。`rip` 相対を除く) は `slot_unknown_write` で打ち切る。読むだけの `lea`・`cmp`・`test`・`bt` は元から対象外。(b) index 付きのメモリ書込みは直接の slot 格納と見なさず `slot_index_write` で打ち切る。
-- 単体テスト: `python3 tools/m11/test_setother_mem_class.py` (`df4801b10`) は 5 件 OK (正例 1・負例 4)。
+- 単体テスト: `python3 tools/m11/test_setother_slot_class.py` (`df4801b10`) は 5 件 OK (正例 1・負例 4)。
 
 ## 4. 測定 commit と差分
 
 - 旧コードの 110 件の実測 (§2): 測定 commit `fe41cc75`。その後の、対象の分類を変えた commit は `load_def` の修正 `df4801b10` (コードを変えた最後の commit)。
-- **修正後の 110 件の再測定は未実施**。`boot_final.ll`・`nonimm_class_rows.json`・PE (`block00031_PE.bin`) が runner に無いことを `find` で確認した (artifacts 側は `fl-win64.tar.zst` のみ)。素材が揃う run で `m11_setother_mem_class.py` を流し、§2 の表 (理由列) と本節を更新する。
+- **修正後の 110 件の再測定は未実施**。`boot_final.ll`・`nonimm_class_rows.json`・PE (`block00031_PE.bin`) が runner に無いことを `find` で確認した (artifacts 側は `fl-win64.tar.zst` のみ)。素材が揃う run で `m11_setother_slot_class.py` を流し、§2 の表 (理由列) と本節を更新する。
 - 修正 commit から HEAD までのコード差分 (`git diff df4801b10 HEAD -- tools/m11 ':(exclude)*.md'`) は 0 行。
 - 件数が変わらないことの論拠 (実測ではない): 修正後の `load_def` は、旧コードと同じ命令を同じ順に見る。違うのは、旧コードが通過していた kind=other の書込みと index 付きの書込みで打ち切る点だけで、通過した命令の判定は同じ。よって修正後に実値化を返す行は、旧コードも同じ格納で実値化を返す行の部分集合になる。旧コードの load_stack の実値化は 0 件なので、修正後も 0 件。lea 行は `load_def` を通らないので不変。よって 実値化 25・未決 85 は変わらない見込み。ただし理由ラベルは変わりうる (§2 の理由列は旧コードの値)。
 - 旧コードの再測定 (記録): コミット済みの `fe41cc75` の script で同じ入力を流し、件数が一致 (実値化 25・未決 85。出力 `mem_class_rows_head.json` の sha `b73f8515…`)。

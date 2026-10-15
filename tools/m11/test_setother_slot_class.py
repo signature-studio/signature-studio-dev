@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""m11_setother_mem_class.load_def の負例・正例 (#3906 / M11-N196)。実行: python3 test_setother_mem_class.py"""
+"""m11_setother_slot_class.load_def の負例・正例 (#3906 / M11-N196)。実行: python3 test_setother_slot_class.py"""
 import os, sys, unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import capstone
-import m11_setother_mem_class as M
+import m11_setother_slot_class as M
 
 CS = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 CS.detail = True
@@ -15,6 +15,9 @@ POP_MEM = '8f4548'              # pop qword ptr [rbp + 0x48]
 REP_STOSQ = 'f348ab'            # rep stosq qword ptr [rdi], rax
 MOV_IDX = '48c744c54801000000'  # mov qword ptr [rbp + rax*8 + 0x48], 1
 MOV_LD = '488b4d48'             # mov rcx, qword ptr [rbp + 0x48]
+SETE_MEM = '0f944548'           # sete byte ptr [rbp + 0x48]
+SETNE_MEM = '0f954548'          # setne byte ptr [rbp + 0x48]
+SETE_REG = '0f94c1'             # sete cl
 
 
 def seq(*hexes):
@@ -47,6 +50,15 @@ class LoadDefTest(unittest.TestCase):
 
     def test_indexed_imm_store_is_not_direct(self):
         self.assertEqual(load_at_end(MOV_IDX, MOV_LD)[:2], ('未決', 'slot_index_write'))
+
+    def test_sete_mem_between_is_unknown(self):
+        self.assertEqual(load_at_end(MOV_IMM, SETE_MEM, MOV_LD)[:2], ('未決', 'slot_unknown_write'))
+
+    def test_setne_mem_between_is_unknown(self):
+        self.assertEqual(load_at_end(MOV_IMM, SETNE_MEM, MOV_LD)[:2], ('未決', 'slot_unknown_write'))
+
+    def test_sete_reg_between_keeps_imm(self):
+        self.assertEqual(load_at_end(MOV_IMM, SETE_REG, MOV_LD)[:2], ('実値化', 'slot_imm'))
 
 
 if __name__ == '__main__':
