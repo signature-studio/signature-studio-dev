@@ -4,6 +4,7 @@
 **自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **32 種**が shim に到達 (実装済み 31 / fail-fast stub 1 = `LoadImageW`)。
 `CreateWindowExW` は survey で **1 回だけ自然到達**したが、直前の `RegisterClassW` は呼ばれず (`GetClassInfoW` の後に直行)、窓は生成されない (§5-2 の lift 欠陥)。受入条件 1 の意図する「実登録を経た窓生成の自然到達」は未達。
 実 WNDCLASS を JS から指向呼出した場合は `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。
+**#4447 (LD-219)**: 起動の dispatch 数 (`units_dispatched` = 109) を e2e JSON に出すようにした。`a4a620a9^` / `a4a620a9` の前後比較は基準環境 (`fl-win64` の PE あり・IR 再生成) で両側 dispatch 109 = 109 (差 0・基準 109 を再現)。詳細は `REPORT_APPENDIX_4447.md`。
 前回 FAIL だった S2 は、`SystemParametersInfoW` の未対応 action を fail-fast から `FALSE` 返却へ変えて解消した (§5-5)。S2 の判定式は `8a6dcf4b` (main 取り込み済み) で旧式から新式に変更済みで、本 PR は判定式を変えていない (詳細は REPORT_APPENDIX §6i)。S1 の判定式も変えていない。
 再現: `bash tools/gui/flengine/e2e.sh` (gate 12 + ネガコン 5。FAIL なら exit 1)。
 

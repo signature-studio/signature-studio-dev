@@ -538,6 +538,7 @@
 | `tools/gui/flengine/REPORT_APPENDIX_3478.md` | ~92 | flengine #3478 (WIN-26): boot の InitUnits が unit 114 (VA `0x623840`) で Halt0 に入り、init 1675 (`function_1266a60`・unit 882) に届かないこと。`boot_halt_probe.mjs` の実測。3353 の「完走」の訂正 |
 | `tools/gui/flengine/REPORT_APPENDIX_3748.md` | 88 | flengine #3748 (WIN-39): Halt0 の例外の種別 (Delphi interface cast 失敗・RunError 23) と IR 箇所 (`function_41a800` の vtable 呼出しの脱落 = D15 類型)。`boot_halt_probe.mjs` の `halt_intf` で class の interface table を実測。受入 2・3 は #4011・#4012 |
 | `tools/gui/flengine/REPORT_APPENDIX_3696.md` | ~65 | flengine #3696 (WIN-37): `cfi_probe.mjs` の `boot.err` / `call.err` の整形 (`err_line.mjs`)・単体検証 (`err_line_check.mjs`)・`cfi_boot7.sh` の前後比較 (`boot.err` だけ `[object Object]` → marker の JSON・他は一致)・KPI 不変 |
+| `tools/gui/flengine/REPORT_APPENDIX_4447.md` | ~50 | flengine #4447 (LD-219): e2e JSON の `units_dispatched` (dispatch 件数 = 起動の unit 数) の定義と、`a4a620a9^` / `a4a620a9` の前後比較 (基準環境で両側 `units_dispatched` 109 = 109、差 0)。GetMem は 760 で `boot.json` の 761 と 1 件ずれる (未解決)。測定値の正本 |
 | `tools/gui/flengine/REPORT_APPENDIX_3832.md` | ~30 | flengine #3832 (CI-180): `pe_image_parity.py` の DIR64 末尾 slot 境界 (`<` → `<=`) の before/after 出力差分 (INFO 1 行のみ) |
 | `tools/gui/flengine/REPORT_APPENDIX_HISTORY_3832_A.md` | ~161 | flengine REPORT §6b〜§6d・§6i の全文 (250 行上限のため #3832 で行を削らず分割移動) |
 | `tools/gui/flengine/REPORT_APPENDIX_HISTORY_3832_B.md` | ~92 | flengine REPORT §6e〜§6h・§6f の全文 (250 行上限のため #3832 で行を削らず分割移動) |
