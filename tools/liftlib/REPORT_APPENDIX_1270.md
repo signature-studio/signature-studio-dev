@@ -23,7 +23,7 @@
 | 前段 commit | `896115a7` (入口 this/idx の張り替え)。両 commit は `tools/liftlib/liftlib/{passes/icall.py,pipeline.py}`・`targets/ott_getparam.json`・`liftlib_e2e.sh` のみ |
 | 測定後のコード変更 | `6a7010ffc` (`entry_blk_args` の break 正規表現に `tail`/`musttail`/`notail` を追加、`ptr` を `ptrtoint` へ、非対応型を ValueError にする。単体テスト T28〜T31 を追加) |
 | 素材 (測定時 e13cd45c) | `$ARTIFACTS_DIR`: `work-liftlib` (→ `tools/liftlib/work/`)・`work-icall` (→ `tools/icall/work/`、`ott_F.txt`)・`work-m6-ott` (→ `tools/m6/work/` ほか)・`analysis-ott-binaries` (→ `[ANALYSIS-PLUGINS]` の `ott/binaries/OTT_vst2_win64.dll`)・`toolchain-emsdk` (→ `[EMSDK]`)・`toolchain-retdec` (→ `[RETDEC]`)。`fl-win64` は本測定に不要 |
-| 素材 (本 run の検証) | `$ARTIFACTS_DIR` は `fl-win64` のみ。OTT DLL と work 素材が無いため、leafspec は再測定できない |
+| 素材 (本 fix run の検証・検証 HEAD は §5) | `ls $ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ (`analysis-ott-binaries`・`work-*`・`toolchain-*` は無い)。`which emcc` は空で、`/opt` に retdec・emsdk が無い。leafspec は再測定できない (§1.1)。PR 本文の `oc_artifacts:` 行に必要素材を指定した |
 | 再現 | `cd tools/liftlib && OTT_DLL=<[ANALYSIS-PLUGINS]>/ott/binaries/OTT_vst2_win64.dll python3 -m liftlib leafspec targets/ott_getparam.json --n 200` |
 | 測定値 | wall 61.98 s (`real 1m1.976s`)・開始時 load 0.74 / 0.83 / 0.57 (runner 4 コア, 単発) |
 
@@ -60,9 +60,11 @@ index 69266141b..6c644dd5b 100644
      return n
 ```
 
-- 再測定できない理由: 本 run の素材は `fl-win64` のみで、OTT DLL と work 素材が無い。
-- 見立て (推定。根拠付き): `ptr` 分岐は測定の入口 (slot 0 = `i32 %arg1`, slot 1 = `i64 %arg2`) では発火しない。発火すると `zext ptr` の不正 IR で emcc まで落ちるはずで、rc=0 の測定と整合する。break 正規表現の `tail`/`musttail`/`notail` は、raw IR の入口ブロックに tail 付き call が現れたときだけ結果に効く。`grep -rn "tail call\|musttail\|notail" tools/liftlib/liftlib --include=*.py` で tail マーカーを生成するのは `recipes/ott/ir7_argpass_fixed.py` だけで、`ott_getparam` の経路 (`pipeline._repair_ll`) は通らない。RetDec の raw 出力の tail 有無は未確認。
-- 次 run で `oc_artifacts` に `analysis-ott-binaries work-liftlib work-icall work-m6-ott toolchain-emsdk toolchain-retdec` を指定し、§4.1 の leafspec を HEAD で再測定する (§6 の未解決表へ)。
+- 再測定できない理由: 本 fix run の素材は `fl-win64` のみ。`analysis-ott-binaries`・`work-liftlib`・`work-icall`・`work-m6-ott`・`toolchain-emsdk`・`toolchain-retdec` は無く、`emcc`・retdec も無い (§1)。以下は推定で、差分 0 の証跡ではない。
+- 推定 1 (型分岐。根拠はコードの読みと rc=0): `i1`/`i8`/`i16`/`i32`/`i64` の出力文字列は旧 `else` 分岐と同一。`ptr` と非整数型は旧版では `zext ptr`・`zext double` の不正 IR になるため、rc=0 の測定経路では発火していない。`this` (slot 0) は `i32 %arg1` (§2) で、測定経路は zext 分岐。
+- 推定 2 (break 正規表現): 旧版の置換数は `function_18011e5a0: 2`。新版で結果が変わるのは、入口ブロック 0 の 2 本目の BLK 読み (`getelementptr @__icall_blk, 8/16` の load) より前に `tail`/`musttail`/`notail` 付き call 行がある場合だけ。raw IR での配置は未確認。tail を書き出すのは `recipes/ott/ir7_argpass_fixed.py` (264 行) だけ (`grep -rn "tail call" tools/liftlib/liftlib --include=*.py` で確認)。RetDec 出力の tail の有無は未確認。
+- 確定させる方法: (a) HEAD で §4.1 の leafspec を再測定する (rc=0・200/0/0/0 なら測定経路で無害)。(b) 測定時の入口 IR の block 0 で、2 本目の BLK 読みより前に `grep -nE '(tail|musttail|notail) call'` が 0 件であることを確認する。
+- PR 本文の `oc_artifacts:` 行に上の素材を指定した。次の review run がこの行で素材を取得する (§6 の未解決表)。
 
 ## 2. 方式 (受入 1): 入口 this/idx は `%arg` から読む
 
@@ -108,7 +110,9 @@ index 69266141b..6c644dd5b 100644
 
 ## 5. 検証範囲 / 範囲外
 
-- `python3 tests/test_unit.py` (`tools/liftlib`・commit `6a7010ffc`・本 run の素材は `fl-win64` のみ): **32 件中 ok 17、FAIL 8** (t1 t2 t3 t4 t6 t7 t9 t26)。FAIL は全て素材不足 (`m6/work`・`liftlib/work`・freshair の DLL・`OTT_vst2_win64.dll` が無い)。新規の T28〜T31 は ok。変更前の `icall.py` に対して T28 (`zext ptr` の不正 IR)・T29 (tail call の後の置換)・T30 (double の素通り) が FAIL することを本 run で確認した。
+- `python3 tests/test_unit.py` (`tools/liftlib`・コード差分の最終 commit `6a7010ffc`・本 fix run の素材は `fl-win64` のみ): **関数 32 件中 FAIL 8** (t1 t2 t3 t4 t6 t7 t9 t26)。出力行 33 件の内訳は ok 17・skip 8・FAIL 8 (T17 関数は T17a ok と T17b skip の 2 行を出す)。
+  - FAIL の理由 (出力の例外で確認): t1〜t4・t6・t7・t26 は素材の FileNotFoundError (`m6/work/ott_lift.ll`・`m6/work/ott.drc.ll`・`liftlib/work/fa_gain/fa_gain.drc.ll`・freshair の work・`OTT_vst2_win64.dll`)。t9 は `m6/work/m6_stubs_hand.c` が無く、期待値 `m6_stubs_hand.c: 4` が 0 件になるための AssertionError (`m6_rt.c` 2・`m8_rt.c` 2・`m10_boot.c` 1 は期待値どおり)。レビュー (round 2) の確認環境では t9 が skip だった。素材の有無で結果が変わる。
+  - 新規の T28〜T31 は ok。変更前の `icall.py` に対する T28・T29・T30 の FAIL (ネガコン) は前 round の run で確認済み。
 - 素材が揃った環境 (測定 commit `e13cd45c` 時点) の記録: 28 件中 27 ok、T6 のみ FAIL。
 - `liftlib_e2e.sh` 全体は未実行 (素材 `work-liftlib-targets` 不足のため。(g) 節の leafspec 行は測定 commit の単発測定で代替)。
 - `ott_route` / `ott_iargs` の出力は未測定 (新フラグは `ott_getparam` の JSON にしか立てていない。コード上は `entry_args` / `image_bytes` が無い cfg で従来の分岐に入る)。
@@ -117,10 +121,9 @@ index 69266141b..6c644dd5b 100644
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ネガコンの期待値 `0` と実測 147 の不一致、jtchain の切り分け (jtchain 外しは入口関数が消えて build 不能。代替の切り分け方法は未検討) | #1270 の受入 3 の一部 (本 issue から外した) | #2859 (ott_getparam の open 残件へコメント) |
-| 測定後のコード差分 `6a7010ffc` の leafspec 再測定と、両方 off の再測定 (§1.1・§4.2) | HEAD の実測が無い | #2859 (同上) |
-| `#883` の残件 (他 target・受入 4 件の充足確認。#883 は closed) | 残件が追跡されていない | #2859 (ott_getparam 系の残件の受け先) |
-| `work-liftlib-targets` 素材での T6 (freshair/kilohearts) 回帰 | 既存 recipe の回帰は T1〜T5・T7〜T27 のみ | #3145 (LIFTLIB-23・liftlib_e2e の再測定の open issue へコメント) |
+| HEAD の leafspec 再測定 (§4.1 の HEAD 版)。必要素材 `analysis-ott-binaries work-liftlib work-icall work-m6-ott toolchain-emsdk toolchain-retdec` は本 fix run に無く、再測定できなかった。PR 本文の `oc_artifacts:` 行に指定済み | 受入 2 の実測は測定 commit `e13cd45c` のまま。コード差分 `6a7010ffc` の影響は §1.1 の推定止まり | #2861 (HB-H49・ott_getparam の leafspec 前後比較を受入に持つ open issue へコメント) |
+| 両方 off の再測定 (§4.2)、ネガコンの期待値 `0` と実測 147 の不一致、jtchain の切り分け (jtchain 外しは入口関数が消えて build 不能。代替の切り分け方法は未検討) | #1270 の受入 3 の一部 (本 issue から外した)。#883 の受入 3 の残件 (#883・#415 は closed) | #2861 (同上) |
+| `work-liftlib-targets` 素材での T6 (freshair/kilohearts) 回帰。素材依存の T9 (`m6/work/m6_stubs_hand.c`)・T26 の再確認 | 既存 recipe の回帰は素材の要らない T1〜T5・T7〜T27 のみ | #3145 (LIFTLIB-23・liftlib_e2e の再測定の open issue へコメント) |
 | `ott_route` / `ott_iargs` の出力は未測定 (新フラグは `ott_getparam` の JSON のみ) | 他 target への影響は未実測 | #2861 (HB-H49・iargs の open issue) |
 | 新類型 D26 案 (§7) の DEFECTS.md 登録 | DEFECTS.md の編集は PM 判断 (WORKFLOW §5) | #2446 (SHX-T29・DEFECTS への類型記録の open issue へコメント) |
 
