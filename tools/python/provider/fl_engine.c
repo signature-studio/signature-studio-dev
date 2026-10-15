@@ -324,12 +324,16 @@ int fl_engine_note_enum_probe(int seed, int n, int chan, int step, int V) {
 }
 int *fl_engine_note_enum_out(void) { return note_probe_out; }
 
-/* ---- mixer (19) ---- */
+/* ---- mixer (21) ---- */
 /* 色の R/B 入替え (PY-115 / REPORT_PY115.md §2)。格納は入替え + alpha 0xff、取得は入替えを再度通して alpha 0xff。 */
 /* 既定色 (フラグ無し track) は FL の .bss 0x15f6774 の初期値 (init 0x770ba6・REPORT_PY118) */
 #define MIX_DEFAULT_COLOR 0xff636c71u
 static uint32_t fl_swap_rb(uint32_t v) { return ((v & 0xff) << 16) | (v & 0xff00) | ((v >> 16) & 0xff); }
 FL_H(mixer, trackCount) { return fl_ret_i(c, NMIX); }
+/* PE 0xd641d0: ポインタ大域 0x15e2198 を読み、その指す先の dword − 2 を変換スロット 0x15e4280 に渡す (trackCount と同じ読み方・REPORT_PY205) */
+FL_H(mixer, getTrackCount) { return fl_ret_i(c, NMIX - 2); }
+/* PE 0xd63870: ecx=3 を変換スロット 0x15e4280 (PyLong_FromLong・REPORT_PY152 §42) に渡すのみ (REPORT_PY205) */
+FL_H(mixer, getEqBandCount) { return fl_ret_i(c, 3); }
 FL_H(mixer, getTrackName) { MX(0); return fl_ret_s(c, t->name); }
 FL_H(mixer, setTrackName) { MX(0); const char *s = A_STR(1); set_name(t->name, s); return fl_ret_none(c); }
 FL_H(mixer, getTrackVolume) { MX(0); int64_t m = A_INT(1, 0); return fl_ret_d(c, m ? db(t->vol, 0.8) : t->vol); }
