@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PY-99 閉包 (#3104・親 #2874): SLOT? 49 件の書込みの値を、CFG 到達 store で再帰に閉じる (実機不要)。
 
-  python3 analysis/py99_closure.py <work/py53/fn.txt> [--negctl drop-pred] [--md <out.md>]
+  python3 analysis/py99_closure.py <work/py53/fn.txt> [--rint] [--negctl {drop-pred|drop-part}] [--md <out.md>]
 
 フレームの読み (r, X) は、r に CFG 上で届く store 集合 R(r, X) で置き換える。R の各 store s は、その値の式
 (def_value) を同じ方法で閉じたものにする。R が 2 件以上なら経路別の場合分け {s1: E1 | s2: E2} になる。
@@ -9,6 +9,7 @@
   算法 A (前向き固定点・検算): R = forward_in(X)[r]。
 書込みごとに A の閉包と B の閉包を比べ、文字列が違う件数を mismatch とする。
 --negctl drop-pred: B だけで py99_merge_sets.py と同じ辺を 1 本外す (mismatch > 0 になるはず)。
+--negctl drop-part: B だけで、読みの到達集合を一部だけ減らす辺を 1 本外す (--rint の 6 件用・寄与が重なる合流では drop-pred が選べないため)。
 閉じた = 式に未確定の葉 (⚠合流・SLOT[・ACC・IN[・_in・clob@・VCALL・CALL[・<・…・⟪) を含まない。
 exit: mismatch == 0 なら 0、それ以外は 1。
 """
@@ -218,8 +219,8 @@ def main(argv):
         k = args.index("--negctl")
         negctl = args[k + 1] if k + 1 < len(args) else ""
         del args[k:k + 2]
-        if negctl != "drop-pred":
-            sys.exit("usage: --negctl drop-pred")
+        if negctl not in ("drop-pred", "drop-part"):
+            sys.exit("usage: --negctl {drop-pred|drop-part}")
     want_rint = "--rint" in args
     if want_rint:
         args.remove("--rint")
@@ -231,7 +232,7 @@ def main(argv):
         if not md_out or negctl:
             sys.exit("usage: --md <out.md> (--negctl と併用しない)")
     if len(args) != 1:
-        sys.exit("usage: python3 analysis/py99_closure.py <work/py53/fn.txt> [--negctl drop-pred] [--md <out.md>]")
+        sys.exit("usage: python3 analysis/py99_closure.py <work/py53/fn.txt> [--rint] [--negctl {drop-pred|drop-part}] [--md <out.md>]")
     path = args[0]
     ins, order = p88.load(path)
     cfg = p99.Cfg(ins, order)
@@ -268,22 +269,47 @@ def main(argv):
             r0 = p99.Rec(ins, order)
             r0.ev(p88.parse_ops(ins[a][1])[1], cfg.idx[a], 0)
             keys |= r0.reads
-        for r, x in sorted(keys):
-            j = p99.first_merge(cfg, r, x)
-            if j is None:
-                continue
-            sets = {p: p99.reach_after(cfg, p, x) for p in cfg.preds(j)}
-            for p in cfg.preds(j):
-                others = set().union(*[sets[q] for q in sets if q != p])
-                if sets[p] - others:
-                    cut = (p, j)
+        if negctl == "drop-pred":
+            for r, x in sorted(keys):
+                j = p99.first_merge(cfg, r, x)
+                if j is None:
+                    continue
+                sets = {p: p99.reach_after(cfg, p, x) for p in cfg.preds(j)}
+                for p in cfg.preds(j):
+                    others = set().union(*[sets[q] for q in sets if q != p])
+                    if sets[p] - others:
+                        cut = (p, j)
+                        break
+                if cut:
                     break
-            if cut:
-                break
-        if not cut:
-            sys.exit("negctl: 寄与を持つ先行辺が無い")
+            if not cut:
+                sys.exit("negctl: 寄与を持つ先行辺が無い")
+        else:
+            for r, x in sorted(keys):
+                base = p99.reach_before(cfg, r, x)
+                stack, seen, edges = [r], set(), set()
+                while stack:
+                    n = stack.pop()
+                    if n in seen:
+                        continue
+                    seen.add(n)
+                    for p in cfg.preds(n):
+                        if p is None:
+                            continue
+                        edges.add((p, n))
+                        if not cfg.store(p, x):
+                            stack.append(p)
+                for e in sorted(edges):
+                    got = p99.reach_before(cfg, r, x, e)
+                    if got and got != base:
+                        cut = e
+                        break
+                if cut:
+                    break
+            if not cut:
+                sys.exit("negctl: 到達集合を一部だけ減らす辺が無い")
         p0 = "IN" if cut[0] is None else f"{cut[0]:#x}"
-        print(f"# negctl drop-pred: 辺 {p0} -> {cut[1]:#x} を外す")
+        print(f"# negctl {negctl}: 辺 {p0} -> {cut[1]:#x} を外す")
 
     fwd = {}
 
