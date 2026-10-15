@@ -4,7 +4,7 @@
 
 親: #1588。前提の結論は `REPORT_1588.md` §4.5 を正とする (`0x5ac308` は実行時に書き換わり、静的参照 0 件)。
 
-> #2770 (LD-129) の節 (ld_native の 0x5ac308 書込み監視・旧 §8) は付録 `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` §8 に分割移動した (250 行上限)。本ファイルの §8 は #2769 の節。結論 (#2770): 監視付き F で `0x5ac308` への書込み 0 件 (監視 page への書込み fault も 0 回)。`LD_PIN_CPU` で CPU を固定すると、arm の有無で boot 状態 (img・heap・unit の detail) は一致する。`0x11e69bf` の揺れは実行 CPU 番号による (付録 §8.9)。page 保護を変えない読取りのみの監視は子 #3648。trace 比較と旧 216 要素の 11 byte 差は未確定 (付録 §8.4)。
+> #2770 (LD-129) の節 (ld_native の 0x5ac308 書込み監視・旧 §8) は付録 `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` §8 に分割移動した (250 行上限)。本ファイルの §8 は #2769 の節。結論 (#2770): 監視付き F で `0x5ac308` への書込み 0 件 (監視 page への書込み fault も 0 回)。`LD_PIN_CPU` で CPU を固定すると、arm の有無で boot 状態 (img・heap・unit の detail) は一致する。`0x11e69bf` の揺れは実行 CPU 番号 (APIC ID) と一致する (因果は未特定。付録 §8.9)。page 保護を変えない読取りのみの監視は子 #3648。trace 比較と旧 216 要素の 11 byte 差は未確定 (付録 §8.4)。
 
 ## 0. 検証環境
 

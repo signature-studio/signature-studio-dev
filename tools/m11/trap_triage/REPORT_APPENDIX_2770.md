@@ -4,7 +4,7 @@
 
 ## 8. #2770 (LD-129): native 側 0x5ac308 の書込み監視 (ld_native)
 
-**判定**: 受入 1 は実装済み (`rt/ld_native.c` の `LD_WATCH_ADDR`・`LD_PIN_CPU`)。実行結果の非摂動性は、CPU を固定した boot 状態 (img・heap・unit の detail) について確認した (§8.9)。`0x11e69bf` の 1 byte の揺れは実行 CPU 番号 (APIC ID) と一致する (§8.9)。未確認: trace (呼出し列)、旧 216 要素環境の 11 byte 差 (CPU 固定の 4 組では出ず、原因未確定)。監視は page 保護を変えるため読取りのみではない (子 #3648)。受入 2 の記録は本付録。監視付き F の 4 run (§8.9) で `0x5ac308` への書込みの記録は 0 件 (監視 page への書込み fault も 0 回)。残り: (a) 942 unit のうち 14 unit は走っていない (§8.2)、(b) 書込み元は未特定 (wasm 側は #2769)。
+**判定**: 受入 1 は実装済み (`rt/ld_native.c` の `LD_WATCH_ADDR`・`LD_PIN_CPU`)。実行結果の非摂動性は、CPU を固定した boot 状態 (img・heap・unit の detail) について確認した (§8.9)。`0x11e69bf` の 1 byte の揺れは実行 CPU 番号 (APIC ID) と一致する (因果は未特定。§8.9)。未確認: trace (呼出し列)、旧 216 要素環境の 11 byte 差 (CPU 固定の 4 組では出ず、原因未確定)。監視は page 保護を変えるため読取りのみではない (子 #3648)。受入 2 の記録は本付録。監視付き F の 4 run (§8.9) で `0x5ac308` への書込みの記録は 0 件 (監視 page への書込み fault も 0 回)。残り: (a) 942 unit のうち 14 unit は走っていない (§8.2)、(b) 書込み元は未特定 (wasm 側の採取は §8.6 の未解決表で追跡)。
 
 ### 8.1 測定条件
 
@@ -60,7 +60,7 @@
 - 集計 (entry・k・ok+N・fail・最初・units_run) は 16 run で同一。unit 単位の status・件数の比較は未実施。旧版の「unit ごとの status と件数は全 run で同一」は裏付けが無いため取り下げる。
 - 記録 0 件の範囲は、実際に走った 928 unit に限られる (未走 14 unit は §8.2)。
 - wasm 側の 0 件の根拠は REPORT_1783.md §2 run2 の `.aw` の `grep -c '\[aw\] '` = 0 だけ (`[aw]` 検出経路は確認済み。wasm 側の陽性対照ではない)。REPORT_1783.md §7.3 は unit 境界の値比較で書込みの証拠ではない。REPORT_1783.md §7.5 は `SV_ERR_LOG` 未指定の run1 のため根拠にしない。
-- 書込み元は未特定。wasm 側は #2769、native 側は #2770。
+- 書込み元は未特定 (wasm 側・native 側とも §8.6 の未解決表で追跡)。
 
 ### 8.4 未確認 (非摂動性・受入 1)
 
@@ -94,15 +94,16 @@ grep -c '^wp ' work/wp_F.txt; tail -1 work/wp_F.txt     # wp 件数・wpsum
 - round 7 の fix (レビュー差し戻し): 「page 保護: 解決」を未解決に戻した (`wp_arm` は R|X、`wp_finish` は毎回 R|X に戻す。元の RWX には戻らない)。§8.4・§8.8 を書き直した (表 1・表 2 で `0x11e69bf` の揺れを示し、216 要素の扱いを未確定と書いた)。`cmp_img_2770.py` に rsp の一致確認・要素数・片側だけの要素数を足した。`rt/ld_native.c` は変えていない。164 行のコメント「結果が変わらないことは未確認」は §8.4 (未確認) と一致する。
 - 本 PR (受入の範囲を縮めた再測定): `rt/ld_native.c` に opt-in の `LD_PIN_CPU` (`sched_setaffinity`) を足した (`b90d87438`。未指定時の動作は変えない)。`cmp_img_2770.py` に state・detail の一致判定を足した (`d94083396`)。CPU 固定下の測定は §8.9。読取りのみの監視 (page 保護を変えない方式) は子 #3648 に移した。
 - レビュー round 2 の fix (差し戻し): §8.8 の run 数を 23 run (直列 21 run と strace 付き 2 run) に直した。表 1 の bc80 行の env を「LD_PAD なし」に直した。216 要素の扱いと img の列挙の定義を書き直した。§8.1 の EFAULT の記述から「確認した」を外した。`cmp_img_2770.py` は rsp が取れない時に `UNKNOWN: not comparable` と出す。DOC_MAP の行を本付録の現行の内容に合わせた。`rt/ld_native.c` は変えていない。
+- レビュー round 4 の fix (差し戻し): §8.9 を全 12 run で `97c4bc87c` から取り直した。`0x15e69bf` の監視 (W0・W2) を表と再現手順に足し、窓内 wp 3 件の記述を wp 行の範囲 (8 byte) に合わせた。結論行の因果断定を「一致する (因果は未特定)」に直した。閉じた #2769 を起票先にした行を「起票なし (表で追跡)」に直した。`rt/ld_native.c` の `LD_PIN_CPU` を strtol で検証し、`cmp_img_2770.py` の JSON を `with open` で読むようにした。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 旧 216 要素環境の 11 byte 差 (§8.2b・§8.7)。現環境の 23 run と CPU 固定の 4 組では出ず、観測できなかった | 旧環境の差が arm 由来か環境差かは未確定 | 起票なし (表で追跡) |
 | trace (呼出し列) の比較 | 呼出し列が変わったかは未確認 | 起票なし (表で追跡) |
 | page 保護: arm 後の page は R\|X に固定。読取りのみではない (元の RWX には戻さない) | カーネル内書込みの EFAULT の可能性 (boot 状態は一致)。読取りのみの監視は別方式が要る | #3648 (読取りのみの 0x5ac308 監視) |
-| 未走 14 unit (942 中 928 完走。skip 10 件の内訳は未分解) | この 14 unit の書込みは未観測 | #2769 (942 unit の採取範囲) |
+| 未走 14 unit (942 中 928 完走。skip 10 件の内訳は未分解) | この 14 unit の書込みは未観測 | 起票なし (表で追跡) |
 | SIGALRM 窓の負の対照 (alrm_def の検出経路) と、幅 16 超の書込み・カーネル内書込みの扱い | 0 件の信頼性 (窓を踏んだ run は無く、検出経路は未検証) | 起票なし (表で追跡) |
-| 全 942 unit の wasm 側 `[aw]` 採取と、書込み元の特定 | 書込み元が未確定 | #2769 |
+| 全 942 unit の wasm 側 `[aw]` 採取と、書込み元の特定 | 書込み元が未確定 | 起票なし (表で追跡) |
 
 ### 8.7 main 取り込み後の再測定 (merge `bda3d706`)
 
@@ -203,35 +204,40 @@ python3 ../m11/trap_triage/cmp_img_2770.py work/probe/C_state.json work/probe/X6
 
 ### 8.9 CPU を固定した再測定 (`LD_PIN_CPU`)
 
-- 測定 commit: `d94083396` (コードを変えた最後の commit。`LD_PIN_CPU` は `b90d87438`)。`git diff b90d87438 d94083396 -- tools/liftdiff` は 0 行。ビルドは §8.1 と同じ。素材は §8.1 と同じ。直列 10 run (各 8〜9 s、python 込み)。
-- 相関: `0x11e69bf` の 1 byte は、実行した CPU の番号と一致する。`cpuid` leaf 1 の APIC ID を `taskset -c <n>` (n = 0〜3) で取ると 0〜3 になる。監視の wp 行 (`case=ep`・`rip_rva=0xf4d9`・`0xf4db`、`movsq`) で、この byte を含む qword (`0x15e69b8`〜`0x15e69bf`) が entry の中で写されるのを確認した。写し元の値が CPUID 由来かは未確認 (因果は未特定)。`arm` の有無とは無関係 (下表の unarm 同士でも同じ値)。
-- 方法: `LD_PIN_CPU=<n>` で `ld_native` 自身が CPU を固定する (env 長は全 run で同じ)。CPU を変えると `0x11e69bf` の値が CPU 番号に従って変わる (下表)。
-- 測定 (CPU 別。`units_run` は全 run 928/942)。
+- 測定 commit: `97c4bc87c` (コードを変えた最後の commit。`LD_PIN_CPU` は `b90d87438`、値の検証 (strtol) は `b046d082e`)。前回の測定 commit `d94083396` からの差分は `git diff d94083396 97c4bc87c -- tools/liftdiff` の `rt/ld_native.c` の検証 (`b046d082e`) のみ。全 12 run を `97c4bc87c` で直列に取り直した (各 10 s 前後)。entry rsp は全 run `0x7fffffffbc20` (前回 `bcd0` は作業 dir の長さの差。比較は同じ組の中で行う)。
+- 方法: `LD_PIN_CPU=<n>` で `ld_native` 自身が CPU を固定する。`0x11e69bf` の 1 byte は、この CPU 番号 (APIC ID。`taskset` で 0〜3 を確認済み) と一致する。因果は未特定。
+- 測定 (CPU 別。`units_run` は全 run 928/942。`0x11e69bf` の値は前回 `d94083396` と全 run で一致)。
 
 | CPU | run | arm (`LD_WATCH_ADDR`) | wp 件数 / wpsum faults | `0x11e69bf` |
 |---|---|---|---|---|
 | 0 | X0a, X0b | なし (`000000`) | — | 00, 00 |
 | 0 | F0a, F0b | `5ac308` | 0 / 0 (各 run) | 00, 00 |
 | 0 | C0 | `15eac98` (System.InitCount) | 248 / 726 | 00 |
+| 0 | W0 | `15e69bf` (`0x11e69bf` の VA) | 3 / 801 | 00 |
 | 2 | X2 | なし | — | 02 |
 | 2 | F2 | `5ac308` | 0 / 0 | 02 |
 | 2 | C2 | `15eac98` | 248 / 726 | 02 |
+| 2 | W2 | `15e69bf` | 3 / 801 | 02 |
 | 3 | X3 | なし | — | 03 |
 | 3 | F3p | `5ac308` | 0 / 0 | 03 |
 
-- 比較 (`cmp_img_2770.py`。entry rsp は全 run `0x7fffffffbcd0` で同じ): 同じ CPU 内の arm 対 unarm (F0a・F0b・C0 対 X0a、F2・C2 対 X2、F3p 対 X3) と、同じ CPU の unarm 同士 (X0b 対 X0a) は、全て `byte_diff=0`・`heap_eq=True`・`state_eq=True`・`detail_eq=True`。img は 215 要素・48,484 byte。
-- 結論 (この環境の範囲): CPU を固定すれば、`0x5ac308` の監視 (F) も陽性対照 (C) も boot 状態 (img・heap・unit の detail) を変えない。F の 4 run で `0x5ac308` への書込みの記録は 0 件 (監視 page への書込み fault も 0 回)。C は窓内 248 件 (page 方式の検出器が働く)。
+- 比較 (`cmp_img_2770.py`): 同じ CPU 内の arm 対 unarm (F0a・F0b・C0・W0 対 X0a、F2・C2・W2 対 X2、F3p 対 X3) と unarm 同士 (X0b 対 X0a) は全て `byte_diff=0`・`heap_eq=True`・`state_eq=True`・`detail_eq=True`。img 215 要素・48,484 byte。
+- `0x15e69bf` の窓内 wp は W0・W2 とも 3 件 (窓は `[va-15, va+7]`。`0x15e69bf`〜`c6` に重なるのは (2) だけ): (1) `rip_rva=0xf4db` addr `0x15e69b0` (`0x15e69bf` は不変)、(2) `rip_rva=0xf4d9` addr `0x15e69b8` (`0x15e69bf` は CPU 0 で `00→00`、CPU 2 で `00→02`)、(3) `rip_rva=0xf4db` addr `0x15e69c0` (`0x15e69bf` は不変、`c0`〜`c6` が変わる)。`0xf4d9`・`0xf4db` は `movsq` (`48 a5`)。CPU 2 で `0x11e69bf` が 02 になったのは (2) の 1 回の書込みである。
+- 未特定: 監視は `0x15e69bf`〜`c6` の 8 byte だけを記録するので、`0x11e69b8`〜`be` の値 (run 終了時 `11 0f a1 00 00 08 10`、両 CPU で同じ) は wp に出ない。(2) の movsq の写し元 (rsi 側の値。CPUID 由来かを含む) は未確認。wpsum faults 801 は同じ page への書込み fault の総数で、窓内は 3 件。
+- 結論 (この環境の範囲): CPU を固定すると、`0x5ac308` の監視 (F) も陽性対照 (C・W) も boot 状態 (img・heap・unit の detail) を変えない。F の 4 run で `0x5ac308` への書込みの記録は 0 件 (監視 page への書込み fault も 0 回)。C の窓内は 248 件、W は 3 件 (検出器が働く)。
 - 残り (この節では確認していない): trace (呼出し列) の比較。CPU 固定下の 11 byte 差 (旧 216 要素環境) は C0 でも出なかった (§8.2b)。X は CPU 2・3 で 1 run ずつ (繰返しは CPU 0 のみ)。
 - 読取りのみの監視 (ハードウェア watchpoint) は未着手: `perf_event_open` は本 runner で `EACCES` (`perf_event_paranoid=4`、kernel 6.17)。子 #3648 で子プロセス + ptrace 方式を検討する。
 
-再現 (`tools/liftdiff` で。`FL_WIN64_DIR` は §8.5):
+再現 (`tools/liftdiff` で。`FL_WIN64_DIR` は §8.5)。wp 出力は `>` で作り直す (`LD_WATCH_OUT` は追記):
 
 ```sh
 gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm
 mkdir -p work/probe
 LD_PIN_CPU=0 LD_WATCH_ADDR=000000 LD_WATCH_OUT=$PWD/work/probe/wp_X.txt python3 liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild
 cp work/m11/boot_state_hybrid.json work/probe/X0.json
-LD_PIN_CPU=0 LD_WATCH_ADDR=5ac308 LD_WATCH_OUT=$PWD/work/probe/wp_F.txt python3 liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild
-cp work/m11/boot_state_hybrid.json work/probe/F0.json
-python3 ../m11/trap_triage/cmp_img_2770.py work/probe/X0.json work/probe/F0.json   # state_eq / detail_eq を見る
+LD_PIN_CPU=0 LD_WATCH_ADDR=15e69bf LD_WATCH_OUT=$PWD/work/probe/wp_W.txt python3 liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild
+cp work/m11/boot_state_hybrid.json work/probe/W0.json
+python3 ../m11/trap_triage/cmp_img_2770.py work/probe/X0.json work/probe/W0.json   # state_eq / detail_eq を見る
 ```
+
+- CPU 2 は `LD_PIN_CPU=2` で同じ 2 本を回す。`LD_WATCH_ADDR=5ac308` が F (監視)、`15eac98` が C (陽性対照)。
