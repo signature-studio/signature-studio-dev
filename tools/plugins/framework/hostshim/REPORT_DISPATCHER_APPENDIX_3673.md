@@ -79,7 +79,7 @@
 
 ## 4.1 #3986 (PLG-P0b-41): 実行時の値の計装
 
-- 測定 commit: `2b07b909b` (コードを変えた最後の commit)。`git diff 2b07b909b HEAD -- tools/plugins/framework/hostshim` は差分 0 行。
+- 測定 commit: `2b07b909b` (コードを変えた最後の commit)。`git diff 2b07b909b HEAD -- tools/plugins/framework/hostshim ':!*.md'` は差分 0 行 (コードは変わらず、変わったのは本付録の `.md` のみ)。
 - 計装: `hs_val_probe.py` の観測点に §2 の書込み元 VA を追加 (0x41d919・0x11fc2b3・0x9dec3f・0x13226dd・0x1322a07・0x1322b47)。
   許可範囲は `HS_ALLOW_LO`/`HS_ALLOW_HI` で広げられるようにした (既定は従来の `[0x13173a0, 0x1330000)`)。
 - 測定: `python3 hs_val_probe.py disp 0x18 0x45 0x54 0x56 0x64 0x65` (既定範囲・広げた範囲 `[0x9d0000, 0x1330000)` の両方。各 7 秒・n=1・終了時の load 0.21 (開始時は未採取))。
@@ -97,9 +97,9 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 6 ID の実行時の値 (§2 の『未確定』列) と、確定後の応答表の更新 | 受入 1・2 の残り。応答表の 0 固定 5 ID と 0x56 の近似 | #3986 ([PLG-P0b-41]) (子・本 PR の本文に番号) |
-| 0x9dec3f が Phase A の経路で実行されるか (未測定) と、0x40f9e0 の vcall の受け手の型 | 0x56 の実値 | #3986 ([PLG-P0b-41]) |
-| 0x9de2c0 の画像値 (コード番地) と実行時の rcx の値の一致 (未確認) | 0x56 の受け手 | #3986 ([PLG-P0b-41]) |
+| 6 ID の実行時の値 (§2 の『未確定』列) と、確定後の応答表の更新 | 受入 1・2 の残り。応答表の 0 固定 5 ID と 0x56 の近似 | #4385 ([PLG-P0b-47]) |
+| 0x9dec3f が Phase A の経路で実行されるか (未測定) と、0x40f9e0 の vcall の受け手の型 | 0x56 の実値 | #4385 ([PLG-P0b-47]) |
+| 0x9de2c0 の画像値 (コード番地) と実行時の rcx の値の一致 (未確認) | 0x56 の受け手 | #4385 ([PLG-P0b-47]) |
 | Phase B の `memory access out of bounds` | Phase B の PASS | #2911 (既存) |
 | `fw_smoke_check` の `runerr=1`・`init_reach=16` | smoke の判定 | #2510 (既存) |
 
