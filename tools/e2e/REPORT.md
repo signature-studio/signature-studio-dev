@@ -219,7 +219,7 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 **e2e の PNG**: `ctx.shot("gui-guest")` は `e2e.yaml` が `tools/e2e/work/shots` を upload する。#3461 本文の「e2e の PNG を Actions artifact に上げない」とは食い違う。方針は PM 判断 (`pm-decision`)。
 
 **オラクル画素の完全一致 (#4312 / WIN-46)**: 完了。判定の内訳と実測 (測定 commit `ead0f325e`・PASS 50 / FAIL 0 / SKIP 6) は `REPORT_APPENDIX_4312.md`。
-**未実施 (子 issue)**: ネガコン (a)(b)(c)・`text_wasm_e2e.sh` 回帰 → #3495 (WIN-27)。`fl-boot` のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
+**ネガコン (a)(b)(c)**: 完了 (#4313 / WIN-47)。実測は `REPORT_APPENDIX_4313.md`。**未実施 (子 issue)**: `text_wasm_e2e.sh` 回帰 → #3495 (WIN-27)。`fl-boot` のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
 
 ## gui=wasm: GUI-REACH trace の機械検査 (WIN-28 #3496)
 `gui-guest-boot` で GUI-REACH / GUI-MSG 行の件数と初回の順序 (RegisterClassA < CreateWindowExA < WM_PAINT < BeginPaint < BitBlt) を検査する。結果は PASS (件数 1/1/1/1)。全文・実測は `REPORT_APPENDIX_3496.md` (分割移動)。

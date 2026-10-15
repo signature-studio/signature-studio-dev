@@ -570,6 +570,7 @@
 | `tools/gui/REPORT_APPENDIX.md` | ~222 | gui REPORT の付録。§9 = GUI-4 (#180 WebGL2 present / 複数矩形 / rAF / seqlock) 全文 (250 行上限のため無変更で分割移動)。§14 = GUI-6 (#182 入力品質: キー配列 US/DE/FR・IME・タッチ/ZOOM・Pointer Lock/ClipCursor) の仕様・検証表・ネガコン実測・範囲外と起票先。§16 = GUI-5 続き (#181): RetDec 付き e2e.sh 全体の全試行と wasm shim 全体 (API 単位) の SIMD128/scalar 比較 |
 | `tools/gui/REPORT_GUI8.md` | ~35 | GUI-8 (#184): e2e の agent-browser/puppeteer ドライバ載せ替え・50,000 フレーム長時間ストレス・ネガコン 3 本・Firefox 取込み (REPORT §15 の要約からの参照先・新規記述) |
 | `tools/gui/REPORT_APPENDIX_W.md` | ~160 | gui REPORT §21 の全文 (#3460 [WIN-23]): headless surface 統計 (`gui_hl_stats`・SHA-256・単体テスト) と W 版 Win32 テストゲストの lift 検証、関数 VA の 32 bit 切り詰め欠陥 (要約は REPORT §21)。#3508 節: 関数 VA 復元・`L"` の UTF-16 化・独立オラクル (`golden/gen_golden_w.py`)・RetDec 欠陥の新規類型 2 件の行案 (番号は PM 割当)。#3510 の節は `REPORT_APPENDIX_3510.md` (導線のみ) |
+| `tools/e2e/REPORT_APPENDIX_4313.md` | ~45 | e2e #4313 [WIN-47]: `gui-guest-boot` のネガコン (a) GuiHost 無し・(b) 描画無し・(c) 1 画素改竄 (常設 `gui-guest-oracle-negctrl`)。測定 commit・PASS 数・FAIL 理由。REPORT の gui=wasm 節から導線 |
 | `tools/e2e/REPORT_APPENDIX_4312.md` | ~20 | e2e #4312 [WIN-46]: `gui-guest-boot` の画素判定を独立オラクル (`tools/gui/golden/gen_golden_text8.py`) と差 0 px で一致させる。オラクルの独立性・ネガコン・実測 (REPORT の gui=wasm 節から導線) |
 | `tools/e2e/REPORT_APPENDIX_3496.md` | ~25 | e2e #3496 [WIN-28]: GUI-REACH trace の機械検査 (件数・初回の順序)。REPORT の gui=wasm 節から分割移動 |
 | `tools/gui/REPORT_APPENDIX_4804.md` | ~20 | gui #4804 [WIN-56]: e2e.sh への step 2d (統計 API 単体 `stats_test.sh`) 組込みの実測 (測定 commit c06575782・差分 0 証跡)、本 run で再現できなかった項目 (RetDec/emsdk/mingw 不在)、子 #4821・#4822 |
