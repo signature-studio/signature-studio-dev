@@ -159,6 +159,6 @@ production 呼出し (dl=0・flag=0) では `key == K` のとき `V ← (dir+1)<
 ### 測定
 
 - 測定 commit (コードを変えた最後の commit): `392fdab8` (`analysis/flapi/pe_t0_probe.py` を追加した commit)。この commit の内容で probe を実行した。以後の commit は REPORT_PY176.md と docs/DOC_MAP.md だけで、`git diff 392fdab8 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (測定対象は変わらない)。
-- 展開: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (1.55 秒・22,227,016 バイト・1 回)。展開先は repo 外の一時領域で `FL_WIN64_DIR` に指定する。
+- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (1.55 秒・22,227,016 バイト・1 回)。展開先は repo 外の一時領域で `FL_WIN64_DIR` に指定する。
 - probe (`FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_t0_probe.py`): 21 件すべて PASS・summary OK・終了 0・所要 45.6 秒 (K の全 .text 走査が大半。測定 commit `392fdab8` で 1 回。実行前後の load average (1 分値) は 0.11 → 0.64)。構造 17 件 (f8e4a0・f8e3f0・f8e4e0・f8e590・f8ea80・f8ecd0・f8eb10・f8e5f0・f8ec70 の命令列)・K の読み位置 2 件・K への書込み 0 件 (.text 全走査)・絶対 disp32 0 件。
 - ネガティブコントロール (1 byte を壊した複製を repo 外の一時領域に置いて実行): `add r14, 0x24` の 0x24 を 0x28 に変えた (file offset `0xb8d87e`・VA `0xf8e47e`・`cmp -l` で `44 → 50` 八進)。出力は `FAIL f8e3f0: 要素 stride 0x24 (36 byte)`・`summary: 1 FAIL`・終了 1。
