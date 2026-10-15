@@ -15,6 +15,11 @@ IR は変更しない (分類のみ)。
              lea_{global,stack,ptr} (アドレス) / arith (算術) / ext (符号・零拡張) /
              partial_* (8/16bit 部分書込・旧値依存) / stack_narrow (型幅未確認の狭いスロット書込) /
              branch (ret/jmp) / other:<mn>
+             call_ret>ret>X: 直接 call の戻り値は callee の全 ret 直前の rax/xmm0 を辿る (全経路が同じ定数なら実値化 ret_const)。
+             call_ret_indirect: 間接 call (callee 不明)。arith[dst|src]: reg 右辺の加減論理演算は旧値と右辺の両方を辿る。
+             stack_narrow_ir<W>_st<S>: 狭い格納 (S<64) で IR 仮引数型幅 W と格納幅 S が不一致 (上位は旧スロット値)。
+             stack_match>X: W == S のとき格納元を辿った終端 X。
+             stack_width_other: 格納幅が SIZE に無い (xmmword 等)。狭い格納には入れない。
              chain>X: 符号・零拡張 (movzx/movsx/movsxd reg)・即値の加減論理演算 (add/sub/and/or r32|r64, imm) の
              旧値をたどった先の終端 X が未決 (復元不能なら復元不能)
 
@@ -31,9 +36,34 @@ import m11_argrecover as AR
 
 ap = argparse.ArgumentParser()
 ap.add_argument('fixes'); ap.add_argument('--pe', required=True)
+ap.add_argument('--ir', default='work/boot_final.ll', help='引数型幅の出所 (callee の define 行)')
 a = ap.parse_args()
 d = json.load(open(a.fixes))
 mach = ldmach.Machine(a.pe)
+
+
+def ir_params(path):
+    """IR の define 行から関数名 -> 仮引数の型 (先頭トークン) の並び。"""
+    out = {}
+    pat = re.compile(r'^define[^@]*@(\w+)\(([^)]*)\)')
+    for line in open(path):
+        if not line.startswith('define'):
+            continue
+        m = pat.match(line)
+        if m:
+            out[m.group(1)] = [p.strip().split()[0] for p in m.group(2).split(',') if p.strip()]
+    return out
+
+
+def type_width(t):
+    if t is None:
+        return None
+    if re.fullmatch(r'i\d+', t):
+        return int(t[1:])
+    return {'ptr': 64, 'float': 32, 'double': 64}.get(t)
+
+
+IRP = ir_params(a.ir)
 fc = {}
 M64 = (1 << 64) - 1
 VOLATILE = {'rax', 'rcx', 'rdx', 'r8', 'r9', 'r10', 'r11'} | {'xmm%d' % i for i in range(6)}
@@ -93,6 +123,48 @@ def imm_val(s):
     return int(s, 0)
 
 
+def chain(why):
+    return 'chain>' + why.replace('chain>', '')
+
+
+NEST = []
+
+
+def ret_value(va, fam):
+    """関数 va の全ての ret 直前の fam (rax / xmm0) を辿る。全経路が同じ定数なら実値化。
+    呼出しの入れ子は NEST で数える (上限 3 段・循環は ret_cycle)。"""
+    if va in NEST:
+        return ('未決', 'ret_cycle', None, None)
+    if len(NEST) >= 3:
+        return ('未決', 'ret_depth', None, None)
+    NEST.append(va)
+    try:
+        c = fn(va)
+        if not c.ins:
+            return ('未決', 'ret_nodisasm', None, None)
+        rets = [i for i, x in enumerate(c.ins) if x.mnemonic == 'ret']
+        if not rets:
+            return ('未決', 'ret_noret', None, None)
+        vals, bad, und = set(), None, None
+        for j in rets:
+            r = c.trace_reg(fam, j - 1) if j > 0 else ('未決', 'entry', None, None)
+            if r[0] == '復元不能':
+                bad = bad or r
+            elif r[0] == '未決':
+                und = und or r
+            else:
+                vals.add(r[2])
+        if bad:
+            return ('復元不能', 'ret>' + bad[1], None, bad[3])
+        if und:
+            return ('未決', 'ret>' + und[1], None, und[3])
+        if len(vals) == 1:
+            return ('実値化', 'ret_const', vals.pop(), None)
+        return ('未決', 'ret_multi', None, None)
+    finally:
+        NEST.pop()
+
+
 class Ctx:
     def __init__(self, cf):
         self.cf = cf
@@ -112,7 +184,7 @@ class Ctx:
             x = self.ins[k]
             if x.mnemonic == 'call':
                 if fam in ('rax', 'xmm0'):
-                    return ('未決', 'call_ret', None, hex(x.address))
+                    return self.call_ret(x, fam, depth)
                 if fam in VOLATILE:
                     return ('復元不能', 'call_clobber', None, hex(x.address))
                 k -= 1
@@ -129,6 +201,16 @@ class Ctx:
             k -= 1
         return ('未決', 'entry', None, None)
 
+    def call_ret(self, x, fam, depth):
+        """直前の call の戻り値 (rax / xmm0)。直接 call なら callee の ret 直前の値を機械語から求める。"""
+        at = hex(x.address)
+        if not (x.operands and x.operands[0].type == capstone.CS_OP_IMM):
+            return ('未決', 'call_ret_indirect', None, at)
+        cls, why, val, _ = ret_value(x.operands[0].imm, fam)
+        if cls == '実値化':
+            return ('実値化', 'call_ret_const', val, at)
+        return (cls, 'call_ret>' + why, None, at)
+
     def def_reg(self, fam, x, dst, src, k, depth):
         mn, at = x.mnemonic, hex(x.address)
         info = reg_of(dst)
@@ -142,14 +224,40 @@ class Ctx:
                 if mn != 'movzx' and (v >> (sw - 1)) & 1:
                     v -= 1 << sw
                 return ('実値化', 'ext_' + mn, v & mask, at)
-            return (cls, 'ext_' + why if cls == '復元不能' else 'chain>' + why.split('>')[-1], None, da)
-        if mn in ('add', 'sub', 'and', 'or') and IMM.match(src) and w >= 32 and not fam.startswith('xmm'):
+            return (cls, 'ext_' + why if cls == '復元不能' else chain(why), None, da)
+        if mn in ('add', 'sub', 'and', 'or', 'xor') and IMM.match(src) and w >= 32 and not fam.startswith('xmm'):
             cls, why, val, da = self.trace_reg(fam, k - 1, depth + 1)
             if cls == '実値化':
                 c = imm_val(src)
-                v = {'add': val + c, 'sub': val - c, 'and': val & c, 'or': val | c}[mn]
+                v = {'add': val + c, 'sub': val - c, 'and': val & c, 'or': val | c, 'xor': val ^ c}[mn]
                 return ('実値化', 'arith_imm', v & mask, at)
-            return (cls, 'arith_' + why if cls == '復元不能' else 'chain>' + why.split('>')[-1], None, da)
+            return (cls, 'arith_' + why if cls == '復元不能' else chain(why), None, da)
+        if mn in ('shl', 'shr', 'sar') and IMM.match(src) and w >= 32 and not fam.startswith('xmm'):
+            cls, why, val, da = self.trace_reg(fam, k - 1, depth + 1)
+            if cls == '実値化':
+                c = imm_val(src) & (0x3f if w == 64 else 0x1f)
+                s = val & mask
+                if mn == 'shl':
+                    v = s << c
+                elif mn == 'shr':
+                    v = s >> c
+                else:
+                    v = (s - (1 << w) if (s >> (w - 1)) & 1 else s) >> c
+                return ('実値化', 'arith_shift', v & mask, at)
+            return (cls, 'arith_' + why if cls == '復元不能' else chain(why), None, da)
+        if mn in ('add', 'sub', 'and', 'or', 'xor') and reg_of(src) and w >= 32 and not fam.startswith('xmm') and (
+                mn != 'xor' or dst != src) and reg_of(src)[1] == w:
+            sfam = reg_of(src)[0]
+            dc, dwhy, dv, dda = self.trace_reg(fam, k - 1, depth + 1)
+            sc, swhy, sv, sda = self.trace_reg(sfam, k - 1, depth + 1)
+            if dc == '実値化' and sc == '実値化':
+                v = {'add': dv + sv, 'sub': dv - sv, 'and': dv & sv, 'or': dv | sv, 'xor': dv ^ sv}[mn]
+                return ('実値化', 'arith_reg', v & mask, at)
+            if '復元不能' in (dc, sc):
+                bc, bwhy, bda = (dc, dwhy, dda) if dc == '復元不能' else (sc, swhy, sda)
+                return ('復元不能', 'arith_' + bwhy, None, bda)
+            return ('未決', 'arith[dst:%s|src:%s]' % (dwhy if dc != '実値化' else 'const',
+                                                   swhy if sc != '実値化' else 'const'), None, at)
         if mn in ARITH:
             return ('未決', 'arith' + ('_load' if '[' in src else ''), None, at)
         if mn == 'lea':
@@ -177,8 +285,10 @@ class Ctx:
             return ('未決', 'ext', None, at)
         return ('未決', 'other:' + mn, None, at)
 
-    def trace_slot(self, disp, s, depth=0):
-        """[rsp+disp] (スタック引数の 8 byte スロット) の値を後ろ向きに辿る。"""
+    def trace_slot(self, disp, s, depth=0, ir_w=None):
+        """[rsp+disp] (スタック引数の 8 byte スロット) の値を後ろ向きに辿る。
+        ir_w: callee の IR 仮引数の型幅 (boot_final.ll の define 行)。狭い格納 (size < 64) は ir_w == 格納幅のときだけ
+        格納元の連鎖をたどる。一致しなければ未決 (上位ビットは旧スロット値に依存)。"""
         if depth > 12:
             return ('未決', 'depth', None, None)
         k = s
@@ -198,6 +308,8 @@ class Ctx:
                     return ('未決', 'stack_other:' + x.mnemonic, None, at)
                 parts = dst.split()
                 size = SIZE.get(parts[0]) if parts else None
+                if size is None:
+                    return ('未決', 'stack_width_other', None, at)
                 if size == 64 and IMM.match(src):
                     return ('実値化', 'mov_imm', imm_val(src) & M64, at)
                 if size == 64 and reg_of(src) and reg_of(src)[1] == 64:
@@ -206,7 +318,20 @@ class Ctx:
                 if size == 64 and src.startswith('xmm'):
                     cls, why, val, da = self.trace_reg(src, k - 1, depth + 1)
                     return (cls, why, val, da)
-                return ('未決', 'stack_narrow', None, at)
+                if ir_w is None:
+                    return ('未決', 'stack_narrow_untyped', None, at)
+                if ir_w != size:
+                    return ('未決', 'stack_narrow_ir%d_st%d' % (ir_w, size or 0), None, at)
+                mask = (1 << size) - 1
+                if IMM.match(src):
+                    return ('実値化', 'stack_match_imm', imm_val(src) & mask, at)
+                fam_src = reg_of(src)[0] if reg_of(src) and reg_of(src)[1] >= size else None
+                if fam_src is None:
+                    return ('未決', 'stack_match_other', None, at)
+                cls, why, val, da = self.trace_reg(fam_src, k - 1, depth + 1)
+                if cls == '実値化':
+                    return ('実値化', 'stack_match_reg', val & mask, at)
+                return (cls, 'stack_match>' + why, None, da)
             k -= 1
         return ('未決', 'entry', None, None)
 
@@ -231,14 +356,18 @@ for r in d['site_detail']:
             continue
         pos = int(pos_s)
         kind = r['args'][pos_s]
+        ir_w = None
         if pos < 4:
             cls, why, val, at = ctx.trace_reg(AR.REGS[pos], ci - 1)
         else:
-            cls, why, val, at = ctx.trace_slot(0x20 + 8 * (pos - 4), ci - 1)
+            pt = IRP.get(r['callee'])
+            ir_w = type_width(pt[pos]) if pt and pos < len(pt) else None
+            cls, why, val, at = ctx.trace_slot(0x20 + 8 * (pos - 4), ci - 1, ir_w=ir_w)
+        assert cls in ('実値化', '復元不能', '未決'), (cls, why)
         cnt[cls] += 1
         xtab[(src, why, cls)] += 1
         rows.append({'caller': r['caller'], 'callee': r['callee'], 'k': r['k'], 'pos': pos, 'kind': kind,
-                     'ledger': src, 'class': cls, 'reason': why,
+                     'ledger': src, 'class': cls, 'reason': why, 'ir_w': ir_w,
                      'value': (hex(val) if val is not None else None), 'def': at,
                      'def_insn': (ctx.txt.get(int(at, 16)) if at else None)})
 print('[nonimm-class] 非 imm 台帳 %d 件' % len(rows))

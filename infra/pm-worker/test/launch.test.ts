@@ -158,10 +158,9 @@ test("LOW_CAP: 残りの枠は lowAllowance が決める (適用中は cap - run
 });
 
 test("cooldown (区分): prio:critical の oc:no-pr は半分 (3 時間)、他は設定どおり (6 時間)", () => {
-  assert.equal(noPrCooldownMs([], 6), 6 * 3_600_000);
-  assert.equal(noPrCooldownMs(["oc:no-pr"], 6), 6 * 3_600_000);
-  assert.equal(noPrCooldownMs(["oc:no-pr", "prio:critical"], 6), 3 * 3_600_000);
-  assert.equal(noPrCooldownMs(["prio:low"], 6), 6 * 3_600_000);
+  assert.equal(noPrCooldownMs("normal", 6), 6 * 3_600_000);
+  assert.equal(noPrCooldownMs("critical", 6), 3 * 3_600_000);
+  assert.equal(noPrCooldownMs("low", 6), 6 * 3_600_000);
 });
 
 test("選定: room = TARGET - active, n = min(room, BATCH, ready)", () => {
