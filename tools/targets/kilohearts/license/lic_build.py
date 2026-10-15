@@ -79,6 +79,41 @@ def capture_stage0(rstr, dst, base):
     open(dst, 'w').write(''.join(cap))
 
 
+def fill_missing_stage0(s0, ranges, base):
+    """RetDec は範囲の終端が次の関数の先頭と一致する (隣接する) と、後ろの関数を定義しないことがある
+    (KH-86: 0x180f88468-0x180f88488 の直後の 0x180f88488 が欠落)。欠落した関数だけを単独範囲で再取得し、
+    stage-0 に定義と未宣言の declare を追記する。戻り値: 追記した関数の VA (hex) リスト"""
+    txt = open(s0).read()
+    have = set(re.findall(r'^define \S+ @function_([0-9a-f]+)\(', txt, re.M))
+    miss = [r for r in ranges if r.split('-')[0][2:] not in have]
+    added = []
+    for r in miss:
+        va = r.split('-')[0][2:]
+        cap = base + '.%s.solo.ll' % va
+        capture_stage0(r, cap, base + '.%s' % va)
+        body, grab, decls = [], False, []
+        for l in open(cap).read().split('\n'):
+            if l.startswith('define ') and ('@function_%s(' % va) in l:
+                grab = True
+            if grab:
+                body.append(l)
+                if l == '}':
+                    break
+            m = re.match(r'^declare \S+ @([\w.\-]+)\(', l)
+            if m:
+                decls.append(l)
+        assert body, 'solo capture に関数 %s が無い' % va
+        txt = txt.rstrip('\n') + '\n' + '\n'.join(body) + '\n'
+        for d in decls:
+            name = re.match(r'^declare \S+ @([\w.\-]+)\(', d).group(1)
+            if not re.search(r'^declare \S+ @%s\(' % re.escape(name), txt, re.M) and not re.search(r'^define \S+ @%s\(' % re.escape(name), txt, re.M):
+                txt += d + '\n'
+        added.append(va)
+    if added:
+        open(s0, 'w').write(txt)
+    return added
+
+
 def decl_named_imports(txt):
     """呼ばれているが宣言の無い Win32/CRT named import (`call i64 @Name()`) に declare を補う (#710)。
     定義は gen_stubs_sigs.py の IMP_SHIM / fail-fast 節が stubs.c 側に出す。宣言が無いと emcc が未定義参照で落ちる。"""
@@ -122,6 +157,7 @@ def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=N
         stat['retdec_sec'] = round(time.time() - t, 1)
     else:
         stat['retdec_sec'] = 0
+    stat['stage0_filled'] = fill_missing_stage0(s0, ranges, os.path.join(R, 'fill.' + key))
     abi = json.dumps(abi or {})
     jts = json.dumps(jt or {})
     r, _ = sh("python3 %s/lift/kh_lower.py %s %s --core %s --lift %s --abi '%s' --jt '%s'%s%s" % (
