@@ -35,24 +35,28 @@
 - `1000b6c1` が読む絶対アドレス `A_(0x10024d50)` の値は未確認。
 - issue 本文が指す `REPORT_APPENDIX_3715.md` は main にも全履歴にも無い。 12 本の一覧の根拠は確認できなかった。
 
-## 3. 検証 (測定 commit 6bd7bd91f・検証 HEAD dd800fa36)
+## 3. 検証 (測定 commit 712e8a993・検証 HEAD 712e8a993)
 
-測定 commit (コードを変えた最後の commit) は `6bd7bd91f` (main `17a3d0796` 取り込みの merge)。検証 HEAD は `dd800fa36` (付録だけを変えた 2 commit 後)。本節の値は検証 HEAD で実測した。
-`git diff 6bd7bd91f dd800fa36 -- tools/plugins/slayer_engine_ia32 ':!*REPORT_APPENDIX*'` は 0 行 (付録のみの差分)。
-harness (`x87_fn_diff.py`) は main 由来の `--classify` 追加 (52 行) を含む版で、PASS・`--nega`・`--nega-lower` もこの版で測った。
-`git diff 32151b62a 6bd7bd91f -- tools/plugins/slayer_engine_ia32/x87_fn_native.c` は空 (exit 7・8 の経路は `32151b62a` に既に入っている)。
-素材は `$RUNNER_TEMP/fl-win64` (fl-win64 の `extracted/block22434_PE.bin`)、emcc は `$RUNNER_TEMP/emsdk-root` (toolchain-emsdk 展開の 6.0.12)。load は各試験の開始時の load1。
+測定 commit (コードを変えた最後の commit) は `712e8a993` (main `9c0dfadc9` 取り込みの merge)。検証 HEAD も `712e8a993` で、以降に積むのは付録と PR 本文だけ。
+`git diff 712e8a993 HEAD -- tools/plugins/slayer_engine_ia32 ':!*REPORT_APPENDIX*'` は 0 行 (差分 0)。
+PR の main に対する実コード差分は `git diff origin/main HEAD -- tools/plugins/slayer_engine_ia32 ':!*REPORT_APPENDIX*'` の 1 ファイル (`x87_fn_native.c` 8 行追加・2 行削除) のみ。
+素材: `fl-win64` の `extracted/block22434_PE.bin` (sha256 `84b64c43…de724a9`) を `$RUNNER_TEMP/fl-win64/extracted/` に、`toolchain-emsdk` を `$RUNNER_TEMP/emsdk-root/emsdk/` に展開 (emcc 6.0.12)。
+load は各試験の開始時の load1 (`uptime`、または試験スクリプトが出した値)。
 
 | 試験 | 結果 | 所要 |
 |---|---|---|
-| `lift_text.py` (block22434) | rc 0・object 1162447 B・被覆 62320 / 73002 B (85.37%) | real 17.044 s (user 16.260 s・sys 0.780 s・load1 0.13) |
-| `x87_fn_diff.py` | PASS。 fn_10002ee0 bit 一致 3890/4000・fn_10005400 bit 一致 3405/4000。 構造 (eax・x87 深さ) 不一致 0 | build native 0.04 s・wasm emcc 6.96 s・run native 0.162 s・wasm 0.242 s・load1 0.43 (試験全体 real 9.489 s) |
-| `x87_fn_diff.py --nega` | 1 bit 反転を検出 (7295 → 7294)・ネガコン OK (rc 0) | real 2.057 s |
-| `x87_fn_diff.py --nega-lower` | fn_10002ee0 で 4000/4000 行の float32 不一致を検出・ネガコン OK (rc 0) | real 8.559 s |
-| 合成入力 (短い行 `abc`) | rc 7 | - |
-| 合成入力 (出力先の open 失敗: 存在しないディレクトリ) | rc 6 (`sc3(1, 6)`・出力 open の経路) | - |
-| 合成入力 (出力先 `/dev/full` へ write: ENOSPC) | rc 8 (`sc3(1, 8)`・`sc3(4)` の戻り値 w ≤ 0 の経路) | - |
-| 正常入力 (`scen.txt` 8000 行) | rc 0・出力 22,096,000 B | - |
+| `lift_text.py` (block22434) を 2 回 | 2 回とも rc 0・出力一致 (時間の行を除く)。pass1 object 1404643 B・被覆 61654 / 73002 B (84.46%)。最終 (pass2) object 1490401 B・被覆 62320 / 73002 B (85.37%)・未被覆 10682 B・functions 472 | 1 回目 real 12.90 s、2 回目 real 12.62 s (user 12.03 s・sys 0.58 s・load1 0.45) |
+| `x87_fn_diff.py` (既定) | PASS。 fn_10002ee0 bit 一致 3890/4000 (97.25%)・fn_10005400 bit 一致 3405/4000 (85.12%)。 構造 (eax・x87 深さ) 不一致 0 | build native 0.12 s・wasm emcc 12.94 s・run native 0.106 s・wasm 0.132 s・load1 before run 0.75 (試験全体 real 14.45 s・user 21.72 s・sys 10.53 s・load1 0.41 開始時) |
+| `x87_fn_diff.py --nega` | 1 bit 反転を検出 (7295 → 7294)・ネガコン OK (rc 0) | real 1.18 s (user 1.06 s・load1 0.85 開始時) |
+| `x87_fn_diff.py --nega-lower` | fn_10002ee0 で 4000/4000 行の float32 不一致を検出・ネガコン OK (rc 0) | real 5.99 s (user 5.72 s・load1 0.86 開始時) |
+| 合成入力 (短い行 `abc`) | rc 7 | 未計測 |
+| 合成入力 (出力先の open 失敗: 存在しないディレクトリ) | rc 6 | 未計測 |
+| 合成入力 (出力先 `/dev/full` へ write: ENOSPC) | rc 8 | 未計測 |
+| 正常入力 (`x87_fn_diff.py` の `scen.txt` 8000 行) | rc 0・出力 22,096,000 B | 未計測 |
+
+合成入力の数え方: 入力 image と scen は `x87_fn_diff.py` が作った `work/x87fn/` のものを使い、ネイティブ (`gcc -m32`・x87_fn_native.c) を直接起動した。
+
+**注意**: pass2 の object の大きさが、付録の旧測定 (`6bd7bd91f`: object 1162447 B・被覆 85.37%) と一致しない。被覆率は一致するが object は約 328 KB 大きい。原因は未確認 (lift_text.py の差分は無い)。本 PR の受入条件には無関係のため、未解決に書く。
 
 ## 4. 未解決
 
