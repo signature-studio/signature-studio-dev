@@ -61,6 +61,23 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD
 - **reason 1 (PROCESS_ATTACH) では flag = 2 (非 0)**。`r13 = 0x5d0c80` のため、静的には経路 B が DllMain 本体 (`0x419dc0`) の後で発火する。経路 A は arm されない (§1)。実行時の発火は未トレース。
 - 再現: `python3 disasm_range_4263.py block24350_PE.bin 0x40f4e1 0x40f4f0` (道具は `tools/qfclift/disasm_range_4263.py`)。
 
+### 5.2 実行時トレース (boot の DllMain 段・reason 1)
+
+再現: `bash qfc_trace_4263.sh` (前提: `qfc_boot.sh` を 1 回実行。測定専用・判定なし。計測 C は `qfc_ov_trace_4263.c`)。
+入口で flag `[0x5d0cb0]`・record `[0x5d0c80]` を出した結果 (DllMain の 1 段のみ):
+
+| 入口 | flag `[0x5d0cb0]` | record `[0x5d0c80]` | 読み |
+|---|---|---|---|
+| `f_40f430` | 0 | 0 | `0x40f4eb` の書込み前 |
+| `f_40fb80` | **2** | 0x102808f8 | `0x40f430` が reason+1 = 2 を書いた後 (経路 B の検査の前) |
+| `f_40fa40` | 2 | 同 | 経路 B の呼出し (`0x40fcb8`) の直後 |
+| `qfc_ov_longjmp` | **0** | 0 | `0x40fa40` 先頭の `rep movsq` (`0x40fa6b`) で保存 frame の値 (0) に戻る |
+
+- longjmp の呼出元 (戻り番地) は `0x40fa94` (`0x40fa40` 内)。スタックの lift 戻り番地に `0x40fcbd` (経路 B の後続) と `0x59c254` (DllMain の setjmp 後の本体スキップ経路) が残る。**経路 B は DllMain で実際に発火する**。
+- 戻り値 `eax = ([0x5aa000] != 0) + 1` は 1 (`[0x5aa000]` = 0 の入口値)。静的な読みでは DllMain の `cmp eax,1` (`0x59c210`) で本体を飛ばす側 (`0x59c254`) へ進む。`0x59c254` へ進んだことはスタック上の戻り番地から推定 (未確認)。
+- よって静的解析の「経路 B は flag 2 で発火」は実行時にも成り立つ。longjmp 時点で `[0x5d0cb0]` が 0 に見えるのは、保存 frame の複写による見かけの値。発火の判定は `0x40fca8` (入口 2) で行われる。
+- 別 reason (≥2) と経路 A の挙動は boot (reason 1) では測れないため未解決。
+
 ### 5.1 実測 (boot、HEAD `bfbe3f683` の lift 設定。`qfc_boot.sh`)
 
 - `qfc_boot.sh` (strict / soft) の結果: strict は `MISSING IMPORT LocalAlloc` で DllMain の trap (FAIL)。soft は `DllMain(PROCESS_ATTACH)` が `ok rax=0x1`、続く `FontCache_GetStats` で `call to UNLIFTED function 0 ret=0x57fb09` (FAIL)。
