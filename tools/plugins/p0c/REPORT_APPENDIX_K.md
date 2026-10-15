@@ -30,14 +30,14 @@ REPORT.md 索引の §24。H の 250 行上限のため新設した (H には節
 | 0x5e1280 (2000 / 10000 case) | buf_diff=3996 / 19986。置換なし IR (ext→hb) でも 2000 case で 3996 |
 
 - 0x5e1280 は本変更の前から buf_diff≠0 である (置換なしの chain でも同値)。`[7]` の回帰判定に
-  引っかかるため p0c4 の rc は 1 になる。本 issue では kernel の修復をしていない。子 issue で扱う。
+  引っかかるため p0c4 の rc は 1 になる。本 issue では kernel の修復をしていない。子 issue #3951 [P0c-24] で扱う。
 - `ret_diff` は rax と比べた値のため、xmm0 を返す kernel では意味を持たない (p0c4_abi_e2e.py の数え方の定義どおり)。
   合否は buf_diff で判定する。
 
 ### 24.2 残った手書き本体 (BODIES 14 本)
 
 本変更は GLOBAL_INITS のみ。BODIES 14 本は残っている。`k80_hand_bodies.py` の冒頭に書かれた根拠 (REPORT_APPENDIX_H §19) は次のとおり。
-残り 10 本の原因は本測定では確認していない (子 issue で切り分ける)。
+残り 10 本の原因は本測定では確認していない (子 issue #3952 [P0c-25] で切り分ける)。
 
 - `function_5dfff0`: 引数 a(xmm2)/b(xmm3) の参照が入れ替わる + (1±a)*b を 80-bit で丸める。
 - `function_5dee20`: out[2k+j] += in[k] (f32 加算)。RetDec の fstp 参照先がずれる。
