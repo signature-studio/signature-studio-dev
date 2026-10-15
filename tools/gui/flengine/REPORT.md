@@ -197,7 +197,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | 3 | 0 | 212 s | 1.02 1.01 0.77 (終了時) | 12/12 PASS | 433 passed / 0 failed | 同上 | 5/5 期待どおり FAIL |
 
 - 3 回の一致: B1 `units_run 52 (base 52)` / `threw memory access out of bounds (base 同じ)`、L1 undefined/sigmismatch/duplicate `0/0/0`、A1 `177 = 177 (impl 159 / stub 18)`、S1 `871/1/47/23/0 (base 871/1/47/23/0)`、S2 `LoadImageW` のみ fail-fast (ff 1 unit) = soft STUB、R1 first `LoadStringW` (calls=3)、R2 reached 32 (floor 19)、P1 atoms `[-16383, -16382]` / `RegisterClassW=2 CreateWindowExW=3`、P4 hwnd `0x210000e`。
-- parity (`pe_image_parity.py --pe block00031_PE.bin`): `.data` 補正 10,284 件 = m11 `m11_data_gen.py` の 10,284 件 (LB=0 / LB=0x10000 とも一致)。PR 側の旧 off-by-one (`<`) は `c39ca16` で `<=` に直済み (レビュー必須 1)。
+- parity (`pe_image_parity.py --pe block00031_PE.bin`): `.data` 補正 10,284 件 = m11 `m11_data_gen.py` の 10,284 件 (LB=0 / LB=0x10000 とも一致)。PR 側の旧 off-by-one (`<`) は `c39ca16` で `<=` に直済み (レビュー必須 1)。DIR64 末尾 slot 境界の是正 (#3832) の before/after は [REPORT_APPENDIX_3832.md](REPORT_APPENDIX_3832.md)。
 - 所要は 211–212 s (e2e.sh の done 行)。
 - IR provenance (`results/ir_sha256.txt`): 今回は素材の `boot_final.ll` を `m11_gen_ir2.sh` で作り直した (ldfix=applied)。material `boot_final.ll` = `995351f5…` (旧記録 `69c774de…` は素材そのままの IR の指紋)。`boot_final3.ll` は `010451ad…` (不変)。`m11_build.sh` 後は `boot_final.ll` `2be93e55…`・`boot_final3.ll` `ac64ad01…`。
 - 親 `bash tools/gui/e2e.sh` (受入条件 2): **ALL PASS / rc 0** (HEAD `de8d603e`、1 回・wall 194 s、load 2.37 1.69 1.31 (終了時))。前提 `tools/e2e` の `npm ci` (rc 0)・`pnpm install --frozen-lockfile` (rc 0) を先に実行。初回 run は前提不足 (`tsc`・`agent-browser` 不在) で落ちたため、前提を入れてから再実行した。
