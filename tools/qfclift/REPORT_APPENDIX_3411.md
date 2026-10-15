@@ -40,13 +40,15 @@
 
 ## 4374 間接経由 import 呼出しの計数 (T-SH-121 / #4374)
 
-測定 commit = `71b77279b` (コードを変えた最後の commit。`93fde48ab` からの差分は `tools/qfclift` 14 ファイル・`tools/flelift/x64c.py` などを含む)。`git diff 71b77279b HEAD -- tools/qfclift tools/flelift/rt tools/shared/oss/freetype tools/flelift/x64c.py` の出力は 0 行 (以後の commit は REPORT の md のみ)。
-手順: `QFC_BOOT_REBUILD=1 qfc_boot.sh` (rc 1・strict `MISSING IMPORT LocalAlloc`・soft は `FontCache_GetStats` で trap。boot は FAIL のまま) → `qfc_count.sh` (foreground)。素材: `fl-win64` と `toolchain-emsdk` (emcc 6.0.12)・FreeType 2.7 wasm32 を `tools/shared/work/` に作成。
-- 実行 `qfc_count.sh`: rc 0・wall 21.0 s・load 0.66 (開始時)。
+測定 commit = `0f43b7741` (計測した code。`origin/main` 取り込み後の HEAD)。`git diff 0f43b7741 HEAD -- tools/qfclift tools/flelift/rt tools/shared/oss/freetype tools/flelift/x64c.py ':!*.md'` の出力は 0 行 (以後の commit は REPORT の md のみ)。
+前回の測定 commit `71b77279b` は main 取り込みで code が入ったため、その後の `0f43b7741` で再測定した (`71b77279b..0f43b7741` の code 差分は `tools/flelift/rt` 4 ファイル・`x64c.py`・`qfc_probe_4262.sh` で 1107 行追加)。
+手順: `QFC_BOOT_REBUILD=1 qfc_boot.sh` → `qfc_count.sh` (いずれも foreground)。素材: `fl-win64` と `toolchain-emsdk` (emcc 6.0.12)・FreeType 2.7 wasm32 を `tools/shared/work/` に作成。
+- boot: rc 1 (FAIL)。lift は functions 6348・unsup 0・unlifted 0・imports 222。strict `MISSING IMPORT LocalAlloc`・soft は `DllMain` rc=0x1 の後 `FontCache_GetStats` で trap。wall 28.3 s・load 1.12 → 1.15。
+- 実行 `qfc_count.sh`: rc 0・wall 11.2 s・load 1.15 → 1.12。
 - 生成: imp_tab 行 223 (used 222)。直接呼出し書換え 1681 箇所 (名前別 222 種)。
 - 停止点まで: `[step] DllMain` → 直接呼出し 5 件 (GetCurrentThreadId 1・TlsAlloc 1・LocalAlloc 1・TlsSetValue 1・TlsGetValue 1) → `[trap] DllMain`。`ExitProcess` は出ない。
 - 間接経由 (`(ind)`) の呼出し: **0 件**。soft 呼出し: **0 件**。
-- 戻り値・副作用: 計数行は stderr の `[fle] CALL <名> (ind)` のみ。行き先は元の imp_<名> をそのまま呼ぶ。
+- 戻り値・副作用: 計数行は stderr の `[fle] CALL <名>` のみ。行き先は元の imp_<名> をそのまま呼ぶ。
 - 未達のまま残る点: 停止後の進行 (偽の停止か) は #4262 で扱う。停止後の間接呼出しは現時点で未計数。
 - 旧計測 (`93fde48ab`・直接 6 件・停止点 `ExitProcess(0)`) は、その後の `tools/qfclift` の変更で HEAD と一致しなくなった。原因は未特定 (§10.3)。
 

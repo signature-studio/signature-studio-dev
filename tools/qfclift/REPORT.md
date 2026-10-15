@@ -232,7 +232,7 @@ guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行�
 ## 10. DllMain 経路の import 呼出し計数 (T-SH-78 / #3411)
 
 測定 commit = `5c79daa2b` (HEAD の計数版 `qfc_count.sh` を実行した commit)。全文 (呼出し回数の表・未解決の詳細) は `REPORT_APPENDIX_3411.md`。
-結論: 直接呼出し `imp_<名>();` の計数件数・停止点・間接呼出し (#4374) の測定値は `REPORT_APPENDIX_3411.md` §4374 を正本とする (HEAD `71b77279b` で直接 5 件・間接 0 件・`TlsGetValue` 後の trap。旧測定 `93fde48ab` の 6 件とは一致しない)。`ExitProcess(0)` の偽の停止は #4262 で判定、#4510 で修正済み (§7.8)。
+結論: 直接呼出し `imp_<名>();` の計数件数・停止点・間接呼出し (#4374) の測定値は `REPORT_APPENDIX_3411.md` §4374 を正本とする (測定 commit `0f43b7741` で直接 5 件・間接 0 件・`TlsGetValue` 後の trap。旧測定 `93fde48ab` の 6 件とは一致しない)。`ExitProcess(0)` の偽の停止は #4262 で判定、#4510 で修正済み (§7.8)。
 
 未解決表は `REPORT_APPENDIX_3411.md` 末尾 (分割移動・#4525)。
 
