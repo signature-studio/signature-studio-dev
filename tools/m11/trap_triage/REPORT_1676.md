@@ -246,3 +246,4 @@
 - 全 store 計装が unit 106 で止まる原因は、監視関数 `m11_sw` を `-O0` でコンパイルしていたこと (同一ソースを `-O2` にすると 379 関数・IR 全 14,881 関数とも unit 114 まで完走)。
 - unit 114 で list B `[0x10bd4c20, +32)` に当たる IR の store は `function_50a830` の `+16` (Count) の 1 件だけ。`+8` (FItems) を書く IR の store は 0 件。
 - 欠落 IR: `function_50a830` (VA `0x50a830`) の仮想 `Grow` (`call [r13]`、VMT slot 0 = VA `0x50aac0`) と `Notify` (`call [rbx+8]`)。D15 同類型。DEFECTS 行案は `REPORT_2408.md` §4。修復は子 issue #2439。
+- **#3631 の結論 (実測は `REPORT_3631.md`)**: `410360` の `call qword ptr [rbx-0x50]` の実 target は VA `0x410070` (機械語 `ret` 1 命令・IR 定義なし)。呼出しは no-op で、`410360` は list B の `base=0` の原因ではないと判定 (PE 静的値と実行時 n=2 で一致)。
