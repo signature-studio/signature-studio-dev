@@ -1,14 +1,14 @@
 # ildsp PSOLA_CreateInstance 閉包の x64c lift — T-SH-82 (#3428)
 
 親: #3401 (ildsp の子)。本件: #3428 (T-SH-82)。REPORT.md §9 から参照する付録 (測定値の正本)。
-既知類型との関係: `docs/DEFECTS.md` の D6 (merge 型命令の dest 上位 lane。VEX.128 のスカラ命令は d=s1 を複写してから legacy 命令で merge し、テストの `xz`・`xl` で上位 lane を検証) と D12 (比較をレジスタ状態全体に広げ、callee-saved 破損を見えるようにした) に関連し、いずれも回避済み。新規の類型は見つからず (D1a〜D25 のうち他は RetDec の IR 段の類型で、x64c は IR を経由しない)。
-検証起点: `730320c46` (origin/main。a1325f0e4 から rebase して再測定)。測定 commit (コードを変えた最後の commit): `e49bf7c9d` (`tools/flelift/x64c.py`・`tools/flelift/tests/x64c_vex_diff.py`。前回の測定 commit は `b2b898522`)。
+既知類型との関係: `docs/DEFECTS.md` の D6 (層 fe: merge 型命令の dest 上位 lane。VEX.128 のスカラ命令は d=s1 を複写してから legacy 命令で merge し、テストの `xz`・`xl` で上位 lane を検証) と D12 (層 ours・harness: 比較をレジスタ状態全体に広げ、callee-saved 破損を見えるようにした) に関連し、いずれも回避済み。新規の類型は見つからず。層 fe・opt の類型は RetDec の capstone2llvmir と LLVM 最適化の機構なので、x64c (機械語から C へ直接 lift し IR を経由しない) には機構として当てはまらない。同型の意味論の誤りは命令単位の差分テスト (Intel 参照値・全 state 比較) の 88 件で判定した。層 ours の D10・D11・D16・D18 (CRT 定数表・絶対 VA の窓・globals 生成・GDI shim) は本パイプラインの別の段にあり、命令単位の差分テストの対象外。閉包単位の native 差分 (子 #3469) で扱う。
+検証起点: `730320c46` (origin/main。a1325f0e4 から rebase して再測定)。測定 commit (コードを変えた最後の commit): `e49bf7c9d` (`tools/flelift/x64c.py`・`tools/flelift/tests/x64c_vex_diff.py`。前回の測定 commit は `b2b898522`)。最終検証 HEAD: `39fbdae8a` (§6。x64c・テスト・rt は `e49bf7c9d` から差分 0 行)。
 
 ## 1. 結論と範囲
 
 - PSOLA 閉包 (CreateInstance + vtable slot 先・`--closure 99`) の unsup を **2,472 → 0** にした (ymm 2,396 + その他 76 の全 site)。関数 235・命令 60,095 は不変。
-- 命令単位の差分テスト (`tests/x64c_vex_diff.py`) **88/88 PASS** (e49bf7c9d)。WaveformColouring の回帰 `lift_wc.sh ok` は前回 (b2b898522) **PASS 64/64**。最終 HEAD での再実行は本 run では未実施 (§6)。
-- 範囲外: 閉包単位の native 差分 (元の機械語の実行と wasm の比較)。`lift_psola.sh` は repo に無く未作成。子 issue へ分離 (§6)。
+- 命令単位の差分テスト (`tests/x64c_vex_diff.py`) **88/88 PASS** (e49bf7c9d・最終 HEAD 39fbdae8a でも再実行)。最終 HEAD `39fbdae8a` で、WaveformColouring の回帰 `lift_wc.sh ok` **PASS 64/64** と、PSOLA の `lift_psola.sh ok` (CreateInstance + slot 0・4・5) **PASS 64/64** を実測 (§6)。
+- 範囲外: 閉包単位の native 差分 (元の機械語の実行と wasm の比較)。`lift_psola.sh` は CreateInstance + slot 0・4・5 (`WC_ROOTS`・36 関数) だけを対象とし、閉包 99 の native 差分は未実施。子 #3469 に分離 (§7)。
 
 ## 2. 再現
 
@@ -67,7 +67,7 @@ origin/main の x64c で同じ root を lift すると unsup 2,472 (issue 本文
 
 ## 5. 差分テスト (`tests/x64c_vex_diff.py`)
 
-- 方式: GNU as で機械語にし、x64c で C に lift して fle_cpu runtime と共に gcc で実行、X/YL/R/フラグ/MBUF を Intel SDM 式の Python 参照値と比較する (既存方式 #3065)。元の機械語を実行して比べる方式ではない (§6 の子で扱う)。
+- 方式: GNU as で機械語にし、x64c で C に lift して fle_cpu runtime と共に gcc で実行、X/YL/R/フラグ/MBUF を Intel SDM 式の Python 参照値と比較する (既存方式 #3065)。元の機械語を実行して比べる方式ではない (閉包単位の native 差分は §7 の子 #3469 で扱う)。
 - 追加した harness: memory operand は `MBUF` (32B) を R[reg] に割り当て、`off` で RSP 相当の位置を指定できる。AF/DF は 0 に固定。FAIL 時は `sys.exit(1)` (従来は rc 0 だった)。
 - ケース: **88 件** (既存 43 + 追加 45)。追加 45 件の内訳:
   - ymm 25: vaddpd・vsubpd・vmulpd (d=s1 / d=s2 の別名)・vdivpd・vmulpd (mem)・vaddps・vsubps・vdivps (ps・review 指摘 6 で追加)・vmulps (mem)・vxorpd・vxorps (review 指摘 6)・vandpd・vandps (review 指摘 6)・vorps (mem)・vorpd (mem・review 指摘 6)・vunpcklpd・vunpckhpd・vshufpd (imm 6 reg / imm 9 mem)・vextractf128 (reg 0/1・mem)・vcvtdq2pd (xmm・mem)
@@ -80,16 +80,27 @@ origin/main の x64c で同じ root を lift すると unsup 2,472 (issue 本文
 
 ## 6. 回帰と実測
 
-- `lift_wc.sh ok` (WaveformColouring): 前回 (`b2b898522`) は **PASS 64/64**、FAIL 0、traps 0、native 64 (SIGSEGV 0)。閉包の unsup は 3 → 2 (`vcvtss2sd` が解消。残りの `vpmovsxdq`・`vshufps` は本件の範囲外)。
-  - **最終 HEAD (`e49bf7c9d`) では本 run で未実行**。`toolchain-emsdk` が素材に無く (取得済みの素材は `fl-win64` の 1 本のみ)、emcc が無いため。本 PR 本文の `oc_artifacts: fl-win64 toolchain-emsdk` で次の検収 run が再実行する前提 (review 指摘 2)。`e49bf7c9d` の変更 (pushfq の IF 定数・vpunpcklqdq の表除去) が WC 閉包の出力に当たるかは、その再実行で判定する。
-- 生成 C のコンパイル: PSOLA 閉包の `fle_lifted.c` を `gcc -c -I tools/flelift/rt` で通過 (rc 0・`e49bf7c9d`)。
+- **測定 commit: `39fbdae8a`** (最終検証 HEAD。コードを変えた最後の commit は `e49bf7c9d`)。`git diff e49bf7c9d 39fbdae8a -- tools/flelift/x64c.py tools/flelift/tests tools/flelift/rt` は 0 行。素材は `fl-win64` (`extracted/block24360_PE.bin`) と `toolchain-emsdk` を R2 から展開して実施 (`oc_artifacts: fl-win64 toolchain-emsdk`)。
+- 回帰 `lift_wc.sh ok` (WaveformColouring) の前回 (`b2b898522`) も PASS 64/64。閉包の unsup は 3 → 2 (`vcvtss2sd` が解消。残りの `vpmovsxdq`・`vshufps` は本件の範囲外)。
+- 閉包 99 の base は `git archive b5435017a tools/flelift` で取り出した x64c、head は作業ツリーの x64c。両方に同じ entries (CreateInstance + slot 0–5 の 7 root) と同じ引数 (`--closure 99 --img 0x180000000 --shift 0x150000000 --img-size 0x447000 --impbase 0x1D80000`) を渡した。
+
+| 測定 (`39fbdae8a`) | 結果 |
+|---|---|
+| `lift_wc.sh ok` (WaveformColouring 回帰) | **PASS 64/64**・FAIL 0・traps 0・native SIGSEGV/SIGBUS 0・functions 60・insns 2,656・unsup 2 (`vpmovsxdq`・`vshufps`)・wasm 138,736 B・18.58 s (load 0.50→1.20)・rc 0 |
+| `lift_psola.sh ok` (CreateInstance + slot 0・4・5) | **PASS 64/64**・FAIL 0・traps 0・functions 36・insns 1,046・unsup `{}`・wasm 80,737 B・1.71 s (load 1.10→1.09)・rc 0 |
+| 閉包 99 の lift (base `b5435017a`) | functions 235・insns 60,095・traps 0・**unsup 2,472** (§3 の内訳と一致)・2.67 s・rc 0 |
+| 閉包 99 の lift (head `39fbdae8a`) | functions 235・insns 60,095・traps 0・**unsup 0**・2.76 s・rc 0 |
+| `tests/x64c_vex_diff.py` | **88 PASS / 0 FAIL**・rc 0・1.18 / 0.89 / 0.90 s (load 0.24) |
+| `tests/rcr_native_check.py` | **4004 / 4004 PASS**・rc 0・0.21 / 0.14 / 0.14 s |
+| 閉包 99 の生成 C (`gcc -c -I tools/flelift/rt`) | rc 0 (警告 2 件: `XCR0` の shift count) |
+
+### 6-1. 測定 commit `e49bf7c9d` の実測 (前回の測定の記録)
 
 | 測定 (`e49bf7c9d`、4 core、各 3 回) | 結果 |
 |---|---|
 | `x64c_vex_diff.py` | 0.93 / 0.93 / 0.91 s、rc 0、88 PASS |
 | PSOLA lift (final: e49bf7c9d) | 2.52 / 2.52 / 2.54 s、functions 235・insns 60,095・unsup 0・traps 0 |
 | PSOLA lift (base: origin/main、b2b898522 時点の測定) | 2.38 / 2.40 / 2.41 s、unsup 2,472 (base 側のコードは本 round で変えていない) |
-| `lift_wc.sh ok` | 本 run では未実行 (上記) |
 
 load (1 分平均): 測定前 0.04・測定後 0.19〜0.21 (4 core)。
 
@@ -97,6 +108,5 @@ load (1 分平均): 測定前 0.04・測定後 0.19〜0.21 (4 core)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 閉包単位の native 差分 (元の機械語の実行と wasm の全バイト比較)。issue 本文の検証方法が参照する `lift_psola.sh` は repo に無く未作成 | 受入の「native と一致」は命令単位 (88 件・Intel 参照値) でのみ示した | 子 issue (T-SH-82 の後続) |
-| issue 本文が参照する `tools/shared/lift/ildsp/REPORT_APPENDIX_3401.md` が repo に無い (git 履歴にも無い) | 本文の内訳は §3 の実測で再現した。付録の代替は本ファイル | 本 PR で代替 (追加の起票なし) |
+| 閉包 99 (CreateInstance + slot 0–5) の native 差分 (元の機械語の実行と wasm の全バイト比較)。main の `lift_psola.sh` (#3401) は CreateInstance + slot 0・4・5 (36 関数) だけが対象 | 受入の「native と一致」は命令単位 (88 件・Intel 参照値) と 36 関数の native 差分 (64 case 一致) でのみ示した | 子 #3469 (T-SH-86) |
 | WaveformColouring 閉包の残り unsup 2 (`vpmovsxdq`・`vshufps`) | WC の lift 規模 (本件の範囲外) | #3216 (T-SH-52) の残り |
