@@ -136,8 +136,8 @@ fbc9971f は 51953f46d の祖先だが、e2e の step 構成が違う (旧 5 ste
 | U4a | FH4 (`__CxxFrameHandler4`・符号化 FuncInfo) の funclet 未解析 (1 本目 .pdata 全体 2,542 entry・入口 1 / 1-round 5)。固定部は §8 で復号済み、可変長整数・table 中身が未了 | FH4 の landing pad が一覧に入らない | [MX-42] (#3807・親 #3791) |
 | U4b | `.pdata` 2 本目 (158,952 B・`.xdata` と VA 重なり) が census の対象外・読取不能 160 件の原因未確定 | 1 本目 .pdata 全体の数値は下界 | [MX-38] (#3775) |
 | U4c | IAT 外の handler (direct) 6,354 件 (1 本目 .pdata 全体) の同定 | 別 handler の EH 構造が未確認 | [MX-38] (#3775) |
-| U4d | funclet を指す E8/E9 一致候補 4 件の由来 (命令境界を確認して、どの関数から来るか) と、深い closure での到達 | #228 同型の判定を closure 拡張で確定できない | [MX-39] (#3776) |
-| U4e | funclet の x64c closure への取り込み (#228 の landing pad 方式を MSVC に当てる実装) | 同型の欠陥が lift 出力に現れる (未修復) | [MX-39] (#3776) |
+| U4d | funclet を指す E8/E9 一致候補 4 件の由来 (命令境界を確認して、どの関数から来るか) と、深い closure での到達 | #228 同型の判定を closure 拡張で確定できない | **`REPORT_APPENDIX_3776.md` §9 で測定済み (MX-39 #3776)** |
+| U4e | funclet の x64c closure への取り込み (#228 の landing pad 方式を MSVC に当てる実装) | 同型の欠陥が lift 出力に現れる (未修復) | **`REPORT_APPENDIX_3776.md` §9.4 で方式を記録 (MX-39 #3776)。実装は [MX-43] (#3838)** |
 
 ## 7. 検証 commit と差分 (docs/WORKFLOW.md §6)
 
@@ -227,3 +227,7 @@ diff --git a/tools/targets/massivex/dsp/scripts/mx6_fh4.py b/tools/targets/massi
 - 素材: `plugins-massivex` の `Native Instruments Massive X v1.7.1.exe` を展開し既存パーサで `Massive X.vst3` = 95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca` (§0 の記録値と一致)。
 - 未解決 (起票先): 可変長整数の符号化、unwind map / try map / IP-to-state map の中身、funclet RVA の全数取り出し、独立再計算、2 件の画像外ポインタ → [MX-42] (#3807・親 #3791)。
 - 検証差分 (docs/WORKFLOW.md §6): 測定後のコード差分は §7 の出力のとおり (`62e3aefbe`・非挙動)。
+
+## 9. MX-39 (#3776): 付録へ分割移動
+
+MX-39 の深い closure 到達・E8/E9 候補の由来・MSVC funclet の取り込み方式 (U4d・U4e) の節 (§9) は付録 `REPORT_APPENDIX_3776.md` §9 にある (250 行上限のため分割移動)。

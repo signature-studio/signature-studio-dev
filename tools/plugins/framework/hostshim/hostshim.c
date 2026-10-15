@@ -115,11 +115,13 @@ EMSCRIPTEN_KEEPALIVE void fw_hs_install(void) {
  *    `[resp]` の vtable+0x30 を BOOL として呼ぶ (test eax,eax; je fail — 0x6bd197 実測)。
  *    → 応答は非 NULL オブジェクトであること。FLE 側 0x47 case の返す実体解析は未 (CAB-195 作業5)。
  *  * 0x56 (86) — Balance 0x6bd2a4: 応答を 0x5c1930() の結果オブジェクト [X+0x14] に store のみ。
- *    FLE case 0x131bb5c は global オブジェクトポインタを返す → shim も非 NULL を返す。
+ *    FLE case 0x131bb5c は [[G56]] を返す。画像値は 0 (P = 0x1426f08 = 0)。P の唯一の書込みは
+ *    0x9dec3f で、書込み値は 0x40f9e0 の戻り値 (実行時)。よって『global オブジェクトポインタ』は
+ *    画像からは確定しない。非 NULL 応答は値の近似で、0 を返し得るかは未確定 (REPORT_DISPATCHER_APPENDIX_3673 §2)。
  *    **検収で独立照合済 (hs_disp_tree.py, 2026-10-11)**: Dispatcher 0x13173a0 の
  *    cmp/sub 二分木を ID 具体駆動すると ID=0x56 だけが `je 0x131bb5c` を取り、
  *    周辺 ID (0x54/0x55/0x57/0x58) はすべて別パス (= 判別力あり)。0x131bb5c の本体は
- *    `mov rax,[rip+0x2c9005]; mov rax,[rax]` で global オブジェクトポインタを返す。
+ *    `mov rax,[rip+0x2c9005]; mov rax,[rax]` で `[[G56]]` を返す (上の注記の通り値は未確定)。
  *  * 0x0d (13) — TDelphiFruityPlug ctor 0x6b8f4b: 応答は未使用 (実測) → 0。
  *  * 上位 35 ID — hostshim/hs_ids.json (894 site の戻り値使用クラス実測):
  *    store/reg クラスは非 NULL (deref に備える), ignore/test クラスは 0。
@@ -141,7 +143,9 @@ static long long hs_dispatcher(uint64_t host, uint64_t tag, uint32_t id, uint64_
     /* 格納元が 0x41d110 の戻り値 + 0x2a8 (非 NULL ポインタ) と機械語で確定した ID (#2886 REPORT_DISPATCHER_APPENDIX_2886 §2) */
     case 0x07: case 0x1c: case 0x4e:                    /* 7,28,78 */
         return (long long)(uintptr_t)g_hs_obj;
-    /* ignore/test クラス + 未知 ID: 0 (fail-soft, 記録済み)
+    /* 格納元の実値が未確定で 0 固定 (fail-soft): 0x01・0x13・0x18・0x26・0x41・0x45・0x46・0x54・0x64・0x65
+     * (格納元の種別は REPORT_DISPATCHER_APPENDIX_2886 §2、実行時の書込み元は APPENDIX_3673 §2)
+     * ignore/test クラス + 未知 ID: 0 (fail-soft, 記録済み)
      * 2,33(0x3b),3,36(0x24),91(0x5b),23(0x17),48(0x30),30(0x1e),40(0x28),38(0x26),
      * 97(0x61),59(0x67),103(0x67?)、17(0x11),27(0x1b),8,13(0x0d),20(0x14),34(0x22),
      * 67(0x43),90(0x5a),0,5,9,13(0x13?)、15(0x15) 他 */

@@ -74,9 +74,10 @@ function coerce(ty, b, kind) {
 
 function runCase(line) {
   // JS 専用トークン sig= rt= を抜く (C 側は未知キーを無視)
-  let sig = [], rt = 'i64', tr = false;
+  let sig = [], wsig = null, rt = 'i64', tr = false;
   for (const t of line.split(/\s+/)) {
     if (t.startsWith('sig=')) sig = t.slice(4) ? t.slice(4).split(',') : [];
+    else if (t.startsWith('wsig=')) wsig = t.slice(5).split(',');   // LD-52 (#1528): wasm 側の引数型 (m11_tr_ は i64 のみ受ける)
     else if (t.startsWith('rt=')) rt = t.slice(3);
     else if (t === 'tr=1') tr = true;   // LD-158: i128 戻りの関数を m11_tr_ (i64 返し = 下位 64bit) 経由で呼ぶ
   }
@@ -91,9 +92,10 @@ function runCase(line) {
   } else {
     const na = mod._ld_w_nargs();
     const args = [];
+    const ts = wsig || sig;
     for (let i = 0; i < sig.length; i++) {
       const v = i < na ? mod._ld_w_arg(i) : 0n;
-      args.push(coerce(sig[i], v, i < na ? mod._ld_w_arg_kind(i) : 0));
+      args.push(coerce(ts[i], v, i < na ? mod._ld_w_arg_kind(i) : 0));
     }
     if (tr) while (args.length < 8) args.push(0n);
     try {

@@ -45,6 +45,11 @@ ABI = {
         ('stereo 185 FUN_180fce0d0 2nd arg xmm1 unset (placeholder 0.0)', r'dVar11 = \(double\)FUN_180fce0d0\(dVar12\);', 'dVar11 = (double)FUN_180fce0d0(dVar12, 0.0);'),
         ('stereo 186 FUN_180fcd690 2nd arg xmm1 unset (placeholder 0.0)', r'dVar12 = \(double\)FUN_180fcd690\(dVar12\);', 'dVar12 = (double)FUN_180fcd690(dVar12, 0.0);'),
         ('stereo 567 FUN_180fdc660 arg double = param_1 bits (movq xmm0,r9 180fce528; ulonglong uVar1 を数値変換しない)', r'uVar3 = (?:func_0x000|FUN_)180fdc660\(uVar1\);', 'uVar3 = FUN_180fdc660(param_1);'),
+        # KH-74 (#3853): FUN_180fdc660 の戻り xmm0 = t2 を kh_xmm0.h の helper で出す (機械語 180fdc6c5 vmovapd xmm0,xmm2)。
+        # 本体の rax 式は helper と同じ値 (k&3) なので置換する。呼出元の extraout_XMM0_Qa_00 は kh_xmm0_180fdc660 を読む。
+        ('stereo FUN_180fdc660 body = kh_fn_180fdc660 (rax と xmm0 を 1 式で出す)', r'return \(int\)\(\(param_1 \* _DAT_18228a860 \+ _DAT_18228a8a0\) - _DAT_18228a8a0\) & 3;', 'return kh_fn_180fdc660(param_1);'),
+        ('stereo 82 caller 180fcd690 reads xmm0 of 660 (extraout_Qa_00)', r'uVar4 = FUN_180fdc660\(dVar2\);\n(\s*)dVar2 = extraout_XMM0_Qa_00;', r'uVar4 = FUN_180fdc660(dVar2);\n\1dVar2 = kh_xmm0_180fdc660;'),
+        ('stereo 24 caller 180fce0d0 reads xmm0 of 660 (extraout_Qa_00)', r'uVar3 = FUN_180fdc660\(param_1\);\n(\s*)dVar2 = extraout_XMM0_Qa_00;', r'uVar3 = FUN_180fdc660(param_1);\n\1dVar2 = kh_xmm0_180fdc660;'),
     ],
     # delay (#3800 KH-64): 引数過不足のうち、呼出先 FUN_180fd4f30 (longlong 1 引数) の 22 件 = FUN_180fe3690 13 件・FUN_180fe3310 4 件・FUN_180fe3cd0 5 件。
     #   呼出元の機械語 (180fe3690 の capstone): `mov rcx,[rbx+off]` → `cmp rcx,[global]` → `je` → `call FUN_180fd4f30` (rbx = 入力 param_1)。

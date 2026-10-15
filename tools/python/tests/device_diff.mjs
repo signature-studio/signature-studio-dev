@@ -1,6 +1,7 @@
 // device 5 関数の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と C provider (provider/fl_engine.c) に流し、
 // 各呼出しの戻り値・エラー code と、forwardMIDICC / midiOutMsg の呼出し件数が一致することを確認する。
 // PY-227 (#3655): midiOutMsg が送った 32bit word の列 (arg4 は channel ≥ 0 のとき bit 24–31) と、device 割当 (-7)・送出先 (-6) の経路も比べる。
+// PY-231 (#3671): forwardMIDICC の -7・-6 の経路と、送った word (第 1 引数) も同じ列に入れて比べる。
 //   node tests/device_diff.mjs     (前提: provider/build.sh 済み)
 import fs from "node:fs";
 import assert from "node:assert/strict";
@@ -50,6 +51,7 @@ const rejectDiffs = rejects.map(([name, args]) => ({ name, args, wasm: run(wasm,
   .filter((r) => r.wasm.code !== 5);
 
 // PY-227: device 割当 [dev, link] を変えて -7 (device 無し)・-6 (送出先無し) を通す。PE 0xd747f0 は device を見てから送出先を見る (channel によらず先に判定)。
+// PY-231: forwardMIDICC (PE 0xd748e0) も同じ判定順。
 const linkSeq = [
   [[1, 1], ["device.midiOutMsg", [0x90, 1, 60, 100]]],
   [[0, 1], ["device.midiOutMsg", [0x90, 1, 60, 100]]],
@@ -57,8 +59,11 @@ const linkSeq = [
   [[1, 0], ["device.midiOutMsg", [0xB0]]],
   [[0, 0], ["device.midiOutMsg", [0xB0, 2, 1, 127, 9]]],
   [[1, 1], ["device.midiOutMsg", [0xB0, 2, 1, 127, 9]]],
+  [[1, 1], ["device.forwardMIDICC", [0x90 | (60 << 8) | (100 << 16) | (10 << 24), 2]]],
+  [[0, 1], ["device.forwardMIDICC", [0xB0, 2]]],
+  [[1, 0], ["device.forwardMIDICC", [0xB0, 2]]],
 ];
-const linkExpectCodes = ["ok", 7, 6, 6, 7, "ok"];
+const linkExpectCodes = ["ok", 7, 6, 6, 7, "ok", "ok", 7, 6];
 const codeOf = (r) => ("code" in r ? r.code : "ok");
 
 const diffs = [];
@@ -82,9 +87,9 @@ const mockOut = mock.state.midiOut.length;
 const wasmOut = wasm.midiOutCount();
 if (mockOut !== wasmOut) diffs.push({ state: "midiOut count", mock: mockOut, wasm: wasmOut });
 
-// 送った word 列 (midiOutMsg のみ)。期待値は式の手計算 (両側が同じ誤りを持つ場合も落とす)
-const expectWords = [0x643C90, 0xB0, 0x097F01B2, 0x7F643C91, 0xB0, 0x9B412DFF, 0x643C91, 0x097F01B2];
-const mockWords = mock.state.midiOut.filter((m) => m.api === "midiOutMsg").map((m) => m.word);
+// 送った word 列 (midiOutMsg と forwardMIDICC の第 1 引数、呼出し順)。期待値は式の手計算 (両側が同じ誤りを持つ場合も落とす)
+const expectWords = [0x0A643C90, 0xB0, 0x643C90, 0xB0, 0x097F01B2, 0x7F643C91, 0xB0, 0x9B412DFF, 0x643C91, 0x097F01B2, 0x0A643C90];
+const mockWords = mock.state.midiOut.map((m) => (m.api === "midiOutMsg" ? m.word : Number(m.message) >>> 0));
 const wasmWords = wasm.midiWords();
 if (JSON.stringify(mockWords) !== JSON.stringify(wasmWords)) diffs.push({ state: "midi word", mock: mockWords, wasm: wasmWords });
 if (JSON.stringify(wasmWords) !== JSON.stringify(expectWords)) diffs.push({ state: "midi word expect", expect: expectWords, wasm: wasmWords });

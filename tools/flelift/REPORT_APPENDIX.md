@@ -90,3 +90,24 @@ REPORT §11 の付録。指定の見出しは `## 10.` だが、既存の PERF-P
 - 範囲内: `tools/flelift` 直下の 3 本と `fle_e2e.sh` (素材 `fl-win64` + emsdk 6.0.12)。
 - 範囲外 (親 #294 の残り): `tools/flelift/boot`・`tools/icall` (#3604)・`tools/ott`・m11。
 - 仕様差: `ANALYSIS_DIR` を設定した場合のみ既定が `$ANALYSIS_DIR/win64` になる (旧 3 本は `ANALYSIS_DIR` を見ていなかった)。両方未設定の既定は従来と同一。
+
+## 12. #3661 (CI-173): `EMSDK_ENV` で emsdk を指定し、素材 `toolchain-emsdk` で e2e before / after
+
+- **変更**: `fle_e2e.sh`・`fle_lift.sh` は `EMSDK_ENV` で `emsdk_env.sh` の場所を指定する (既定は `[EMSDK]` の `emsdk_env.sh`。未設定時の挙動は従来どおり)。ファイルが無ければ rc=2 で止まる。`fle_e2e.sh` は `emsdk_env.sh` の source 後に `EMSDK_ENV` を再 export する。`emsdk_env.sh` は `EMSDK_ENV` に触れないため (`[EMSDK]` の `emsdk_env.sh`・素材 `toolchain-emsdk` の `emsdk_env.sh`・`emsdk construct_env` の出力のいずれにも記述なし)、この再 export は子の `fle_lift.sh` へ渡す値を変えない。将来の emsdk の変化に備えた防御的な再 export。測定 commit `9e5f7f9f6` (最後にコードを変えた commit。以降の commit は REPORT のみ)。
+- **素材**: `fl-win64` と `toolchain-emsdk` を `$RUNNER_TEMP` に展開 (`toolchain-emsdk` の最上位は `emsdk/`)。素材の emcc は 6.0.12 (commit `5488e0871d46`)。runner 既設の `[EMSDK]` と同一 commit。
+- **素材が使われたこと**: `command -v emcc` で素材の `upstream/emscripten/emcc` が解決することを確認。初回 (`a85ca628d`) の素材版 run では素材側 `upstream/emscripten/cache` の 1,729 ファイルが更新され、`[EMSDK]` 側の更新は 0 件 (mtime 比較)。最終 HEAD の素材版 run は cache が暖まっており mtime の変化は出ないため、この確認は初回 run による。
+
+| 項目 | before (`512b09ffa`・既定 `[EMSDK]`) | after 既定 (`9e5f7f9f6`・未設定) | after 素材 (`9e5f7f9f6`・`EMSDK_ENV`=素材) |
+|---|--:|--:|--:|
+| 所要 (s) | 121 | 119 | 120 |
+| load average (1 分) 開始 → 終了 | 0.82 → 1.00 | 0.23 → 0.92 | 0.85 → 1.00 |
+| 終了コード / 結果行 | rc=0 / `[fle_e2e] PASS` | rc=0 / PASS | rc=0 / PASS |
+| lift 所要 (ログ) | lift 15 s、emcc 31 s、合計 46 s | lift 15 s、emcc 31 s、合計 46 s | lift 15 s、emcc 31 s、合計 46 s |
+| lift | 7,018 関数 / 340,761 命令 / unsup 0 / unlifted callee 0 | 同左 | 同左 |
+| spot diff | 7 関数 / 16 case / equal 16 | 同左 | 同左 |
+| D9 | rip-rel 136,333 site / mismatch 0 | 同左 | 同左 |
+| 出力 9 件の sha256 | 基準 | before と全件一致 | before と全件一致 |
+
+- **出力 9 件**: `work/lift/` の `fle_lifted.c`・`fle_data.c`・`lift_meta.json`・`flel.wasm`・`flel.cjs`、`work/verdict.jsonl`・`work/verdict_summary.json`、追跡の `results/verdict_flelift.jsonl`・`results/verdict_summary.json`。
+- **負の確認**: `EMSDK_ENV=<存在しない path>` で `fle_lift.sh`・`fle_e2e.sh` とも rc=2 とメッセージを出す。`fle_e2e.sh` が `EMSDK_ENV` で指定された `emsdk_env.sh` を source した後も、`EMSDK_ENV` の値が子の `fle_lift.sh` へ届くことを `bash -c` で確認 (`emsdk_env.sh` が `EMSDK_ENV` を書き換えないため、値は指定どおり)。
+- **範囲外**: `fle_lto.sh` は `[EMSDK]` を直接 source したまま (e2e・lift の経路外で、本 issue の受入の対象外)。
