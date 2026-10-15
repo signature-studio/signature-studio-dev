@@ -125,7 +125,11 @@ startBtn.addEventListener("click", async () => {
     requestAnimationFrame(tick);
     if (capture) {
       (window as unknown as { __audio: unknown }).__audio = {
-        verify: () => (s.capture ? { ...verifyToneCapture(s.capture, s.sampleRate), sampleRate: s.sampleRate, underruns: s.underruns(), producer: s.producer(), consumer: s.consumer() } : null),
+        verify: () => {
+          if (!s.capture) return null;
+          const producer = s.producer();
+          return { ...verifyToneCapture(s.capture, s.sampleRate, producer.writes), sampleRate: s.sampleRate, underruns: s.underruns(), producer, consumer: s.consumer() };
+        },
         // ネガティブコントロール用: 照合に使う sampleRate を係数倍してずらす (検出力の確認)
         verifyShifted: (k: number) => (s.capture ? verifyToneCapture(s.capture, s.sampleRate * k) : null),
       };

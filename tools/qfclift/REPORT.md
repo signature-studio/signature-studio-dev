@@ -176,9 +176,11 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 |---|---|---|
 | 戻り先 `0x59c210` (setjmp/longjmp 継続) の lift 対応 (FLEngine 同型の override と断片 entry) と、DllMain 側の longjmp 起動元の特定 | DllMain が完走しない | #3410 (T-SH-77) |
 | `ExitProcess(0)` の呼出元と、継続後の進行が正しいか (偽の停止か) の確認 | DllMain の完走 (boot PASS) の判定 | #4262 (T-SH-106) |
-| longjmp の発生条件 (`0x40fa40` の呼出元 `0x40fbd4`・`0x40fcbd` と `[0x5aa000]` の決まり方) | 偽の停止かどうかの切り分け | #4263 (T-SH-107) |
+| longjmp の発生条件 (呼出元は `0x40fb80` 内の `0x40fbcf`・`0x40fcb8`。`[0x5aa000]` の書込みは setter `0x40fd10` のみ。発火経路 A/B の静的解析は付録 `REPORT_APPENDIX_4263.md`。経路 B の flag `[0x5d0cb0]` の書込み元は未特定) | 偽の停止かどうかの切り分け | #4263 (T-SH-107・部分達成) |
 | rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない。直接呼出しの計数は §10 | #3411 (T-SH-78) |
 | GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3434 (T-SH-83。#3412 は closed) |
+
+(§7.9 直接呼出し (#4296): `GetStats` は DllMain の init 無しで trap、`CleanUp` は rax=0。測定 commit `c36a9b817`。詳細は `REPORT_APPENDIX_4296.md`)
 
 ### 7.8 longjmp 継続の対応 (T-SH-77 / #3410・部分達成)
 

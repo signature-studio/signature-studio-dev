@@ -2,7 +2,7 @@
 
 LD-27 (#1034) の分析と再現手順の正本。件数・per-case の出力は [`results/m11_typeb_cause.md`](results/m11_typeb_cause.md) (生成物。`## 集計` 行が件数の正本)。本体 [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §9 は本ファイルへの参照 1 行だけを持つ。
 
-**結論**: xfill 仮説は棄却 (xfill=0 でも X 類が残る)。X 類 (xmm0 入力の脱落) と M 類 (MXCSR 経路) は機構を特定した。R 類は個別原因が未特定。rax の直接計測も未完のため、#1034 は `Refs` のまま残す。
+**結論**: xfill 仮説は棄却 (xfill=0 でも X 類が残る)。X 類 (xmm0 入力の脱落) と M 類 (MXCSR 経路) は機構を特定した。R 類は個別原因が未特定のため、#1034 は `Refs` のまま残す。0x40a3d0 の rax は直接計測し、導出値と一致した (LD-220 / #4466)。
 
 ## 測定条件
 
@@ -47,7 +47,7 @@ class は `results/m11_typeb_cause.md` の各 case 行の `class=` 欄。件数�
 | 0x7ff0 | 1 | 0 |
 | 計 | 21 | 24 |
 
-注: rax は leaf の戻り値を直接ダンプしたものではない (runner に戻り値の記録は無い)。trace の x0 と逆アセンブルから導出した値。直接の実測は runner 側の計装が要る (#1034 の残り)。xfill=0 でも native の x0 は非ゼロ (例: 0x3ff0・0x403b) で、wasm は 0 のまま。よって X の差は xfill の人工値だけでは説明できない。
+注: 上の表は trace の x0 と逆アセンブルからの導出値。直接計測 (LD-220 / #4466) で全 45 行が一致した (下記)。xfill=0 でも native の x0 は非ゼロ (例: 0x3ff0・0x403b) で、wasm は 0 のまま。よって X の差は xfill の人工値だけでは説明できない。
 
 ## 再現手順
 
@@ -60,6 +60,15 @@ class は `results/m11_typeb_cause.md` の各 case 行の `class=` 欄。件数�
 - 生成元は新規の `tests/trace_fullcompare_typeb.py` (issue は `tests/trace_diverge_unreachable.py` §1b の拡張を指定)。理由: 完全 trace の runner 起動が要り、batch jsonl だけを読む §1b の集計に混ぜないため。
 - 再現手順の記載先は本ファイル (issue は `REPORT_APPENDIX.md` §9 への追記を指定)。§9 は既に行数上限を超えているため、本文は新規ファイルに置き、§9 には参照 1 行だけを置く。
 
+## rax の直接計測 (LD-220 / #4466)
+
+- 計測 commit: `d7dd949c8` (計装を入れた commit)。計装は `rt/ld_native.c` の `LD_RETPROBE_VA` / `LD_RETPROBE_OUT` (既定は無効)。entry の int3 で戻り番地を読み、戻り番地の int3 で戻り時の rax を記録する。
+- 実行: `FL_WIN64_DIR=<fl-win64 展開先> LD_RETPROBE_VA=40a3d0 LD_RETPROBE_OUT=<path> python3 tools/liftdiff/tests/trace_fullcompare_typeb.py "$PWD/tools/liftdiff/targets/m11.json"`。`ld_native` は `gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm` で作る (`build_wasm.py` は作り直さない)。`ld_wasm.cjs` は `build_wasm.py targets/m11.json --force` で再ビルド (`sig_mismatch: 0`)。
+- 結果: 所要 6.1 s (load 0.34)。L=0x40a3d0 の 45 行 (xfill=0 21・xfill=1 24) すべてで、直接計測 rax = 導出値 (x0 >> 48)。`MATCH 45 / DIFF 0 / 比較不能 0`。
+- 計装の有無で trace 行と class 集計は変わらない (計装 on/off で差 0)。集計は M 4/2・R 5/4・X 25/28 (xfill=0/1) で、既存結果と一致。
+- 戻り時の rsp 差は全 probe 行で 8 (185 行中、ずれ 0)。ret_rva はすべて 0xc1f3 (呼出元 0x40c1d0 の直後)。
+- 注: probe は L=0x40a3d0 の行に限らず、各 case 内の全 0x40a3d0 呼出しを記録する (185 行)。driver は L の k 回目 (`N` 中の出現順) と照合する。
+
 ## 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
@@ -67,6 +76,6 @@ class は `results/m11_typeb_cause.md` の各 case 行の `class=` 欄。件数�
 | R 類 (集計行の R 件数) の個別原因 (大域の初期状態・引数オブジェクトの読み) | 型 B 受入条件 1 | #1034 (Refs) |
 | M 類の wasm MXCSR 戻り値 0 の修正効果 (`m11_ov.c` 上書きを liftdiff build に適用したときの一致) | M 類の解消可否 | #1034 (wasm 再ビルドが要る) |
 | X 類の修復 (xmm0 入力の接続・sig の float 引数) | X 類 | 既存 #547 (PLG-F2-4 の ARG pass 接続) |
-| rax の直接計測 (runner の戻り値計装) | 受入条件 2 (導出値のみ) | #1034 |
+| ~~rax の直接計測 (runner の戻り値計装)~~ | 解決: LD-220 (#4466) で計測。下記「rax の直接計測」 | — |
 | trace_head 基準の L 算出の不正確さ (full-trace で L が変わる件の型 B 再判定) | 型 B 候補の件数 | #1034 (旧 #864 は CLOSED) |
 | `9d900e5e` (到達不能分岐 2 行の削除) の実行確認 | 出力不変は論理で確認。実行は未実施 | #1034 (work-m11 の取得後に再実行) |
