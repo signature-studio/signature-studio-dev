@@ -27,6 +27,7 @@
   4. `python3 m11_setother_nonimm_class.py work/sigfix_stats/fixes.json --pe <PE>` → **実値化 0 / 復元不能 0 / 未決 349 / 未分類 0** (下表)。
   5. `python3 m11_setother_imm_class.py work/sigfix_stats/fixes.json work/boot_final.ll --pe <PE>` → `full_const 6 / partial_write 35 / stack_partial 9 / arith 11` (計 61)。
 - 直前の HEAD `741d8696` (`bt` を変える前) の再実行も同じ件数だった。`bt` を入れても、349 件の理由に `other:bt` は現れない (件数は変わらない)。
+- 再実行 (HEAD `a7b7b0045`・#3140 の REPORT_N172 の検証で素材 `work-m11` を展開して実行): 手順 1〜4 とも同じ件数 (実値化 0 / 復元不能 0 / 未決 349 / 未分類 0・`match 410`)。宛先幅の判定 (`def_reg` の ext) は未修正のまま (子 #3961)。
 
 | 台帳 kind | 終端の理由 | 件数 | 区分 |
 |---|---|---|---|

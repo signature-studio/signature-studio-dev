@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """x87_diff.py: x87 subset の lowering (x64c --arch ia32 → tools/ott/rt/ott_x87.h) と実 x87 の差分試験 (#1099・#2967)。
 
-  python3 x87_diff.py [--n 100000] [--seed 1] [--nega] [--nega80] [--nega-c1] [--rc] [--rc-arith RC] [--roundtrip] [--skip NAME,...]
+  python3 x87_diff.py [--n 100000] [--seed 1] [--nega] [--nega80] [--nega-c1] [--nega-trig] [--rc] [--rc-arith RC] [--roundtrip] [--skip NAME,...] [--only NAME,...] [--no-e]
 
 - op 表: 機械語 (.byte) を 1 命令ずつ持つ。 native 側はその機械語を実 FPU で実行 (中間値は 80bit)。
   lowered 側は同じ機械語を capstone で decode → x64c の FnLift.one() で C にして実行 (f80 は持たず double)。
@@ -16,7 +16,10 @@
 - --rc: fldcw で RC を変え、fist/fistp の丸めだけを比べる (算術を含まない試行。ADR の制限 (5))。
 - --rc-arith RC: fldcw で RC を RC (0 nearest / 1 down / 2 up / 3 truncate) に固定し、算術・fst m32 を含む全 op で比べる (#2967)。
   同じ seed の試行は RC の値だけが違うので、RC=0 の結果との差を RC 由来として読む。
+- --nega-trig: lowered 側の fyl2x を log2 でなく自然対数にする (negative control・超越 #3687)。
+- --only: 試行の op 表をこの名前だけにする (例: fld,fld1,fscale)。 --no-e: 入力を d/f/i/q だけにし、m80 の命令を外す (f80 の入力丸めを除く)。
 - --roundtrip: f80↔f64 変換 (ott_x87.h の x87_f80_to_f64 / x87_f64_to_f80) の往復試験。 参照は実 x87 (x87_f80_rt.c)。
+- 命令単体 (fsin/fcos/f2xm1/fyl2x/fprem/fscale の 1 命令ずつ・定義域の類ごと) は x87_trans_direct.c (#3687)。
 生成物は work/x87/ (gitignore 対象)。 依存: gcc・capstone・x64c (tools/ott/lift)。
 """
 import argparse, math, os, random, struct, subprocess, sys, time
@@ -71,7 +74,12 @@ def templates():
           dict(name='fscale', bs=[0xD9, 0xFD], form='none', delta=0, need=2, cmp=False, typ=None),
           dict(name='fldl2e', bs=[0xD9, 0xEA], form='none', delta=1, need=0, cmp=False, typ=None),
           dict(name='fldlg2', bs=[0xD9, 0xEC], form='none', delta=1, need=0, cmp=False, typ=None),
-          dict(name='fldpi', bs=[0xD9, 0xEB], form='none', delta=1, need=0, cmp=False, typ=None)]
+          dict(name='fldpi', bs=[0xD9, 0xEB], form='none', delta=1, need=0, cmp=False, typ=None),
+          dict(name='fsin', bs=[0xD9, 0xFE], form='none', delta=0, need=1, cmp=False, typ=None),
+          dict(name='fcos', bs=[0xD9, 0xFF], form='none', delta=0, need=1, cmp=False, typ=None),
+          dict(name='f2xm1', bs=[0xD9, 0xF0], form='none', delta=0, need=1, cmp=False, typ=None),
+          dict(name='fyl2x', bs=[0xD9, 0xF1], form='none', delta=-1, need=2, cmp=False, typ=None),
+          dict(name='fprem', bs=[0xD9, 0xF8], form='none', delta=0, need=2, cmp=False, typ=None)]
     # memory (mod=00 rm=[eax]): 算術・比較は入力 slot (f = float32, d = float64)
     for r, name in [(0, 'fadd'), (1, 'fmul'), (2, 'fcom'), (3, 'fcomp'), (4, 'fsub'), (5, 'fsubr'), (6, 'fdiv'), (7, 'fdivr')]:
         T.append(dict(name=name, bs=[0xD8, r << 3], form='mem', delta=-1 if name == 'fcomp' else 0, need=1,
@@ -136,7 +144,7 @@ def lower_lines(bs):
     return fl.out, ins[0].mnemonic + ' ' + ins[0].op_str
 
 
-def write_inc(insts, nega, nega80, path_n, path_l, nega_c1=False):
+def write_inc(insts, nega, nega80, path_n, path_l, nega_c1=False, nega_trig=False):
     x64c.IA32 = True
     x64c.PTR = 4
     with open(path_n, 'w') as fn, open(path_l, 'w') as fl:
@@ -155,6 +163,8 @@ def write_inc(insts, nega, nega80, path_n, path_l, nega_c1=False):
             if nega80 and bs == [0xDB, 0x38]:
                 bs = [0xDD, 0x18]            # 取り違え (negative control・m80): fstp tbyte を fstp qword として lower
             lines, dis = lower_lines(bs)
+            if nega_trig and o['name'] == 'fyl2x':   # 取り違え (negative control・超越): log2 を自然対数にする
+                lines = ['x87_set(1, x87_st(1) * log(x87_st(0)));', 'x87_pop();']
             fl.write('    case %d: { /* %s */\n' % (o['id'], dis.replace('*/', '* /')))
             for ln in lines:
                 fl.write('  ' + ln + '\n')
@@ -252,7 +262,7 @@ def slot_pair(rng, typ, rc=None):
 def gen_trials(insts, n, seed, mode, rc_fixed=None):
     rng = random.Random(seed)
     lines, metas = [], []
-    fldcw = next(o for o in insts if o['name'] == 'fldcw')
+    fldcw = next((o for o in insts if o['name'] == 'fldcw'), None)
     for _ in range(n):
         if mode == 'rc':
             kinds = ['c'] + [rng.choices(['d', 'i', 'q'], [6, 2, 2])[0] for _ in range(5)]
@@ -319,7 +329,7 @@ def has_m80(ops):
 def compare(nat, low, metas):
     st = dict(trials=0, identical=0, ulp_hist=[0, 0, 0, 0], vals=0, vals_ulp_hist=[0, 0, 0, 0], cmp_ops=0, cmp_match=0,
               f_mismatch_trials=0, s_mismatch_trials=0, ulp_step_bad=0, ulp_max=0,
-              m80_trials=0, m80_identical=0, cls={c: [0, 0] for c in CLASSES})
+              m80_trials=0, m80_identical=0, cls={c: [0, 0] for c in CLASSES}, op={}, f_first={}, f_mis_nom80=0)
     for a, b, (ops, d, _) in zip(nat, low, metas):
         ta, tb = a.split(), b.split()
         iv_a, is_a = ta.index('V'), ta.index('S')
@@ -337,6 +347,12 @@ def compare(nat, low, metas):
         sok = Sa == Sb
         if not fok:
             st['f_mismatch_trials'] += 1
+            if not has_m80(ops):
+                st['f_mis_nom80'] += 1
+            for k, (o, _) in enumerate(ops):
+                if (int(Fa[k], 16) & (CMASK | (C1BIT if o['cmp'] else 0))) != (int(Fb[k], 16) & (CMASK | (C1BIT if o['cmp'] else 0))):
+                    st['f_first'][o['name']] = st['f_first'].get(o['name'], 0) + 1
+                    break
         if not sok:
             st['s_mismatch_trials'] += 1
         for k, (o, _) in enumerate(ops):
@@ -359,6 +375,10 @@ def compare(nat, low, metas):
         ident = fok and sok and Va == Vb
         if ident:
             st['identical'] += 1
+        for nm in set(o['name'] for o, _ in ops):
+            st['op'].setdefault(nm, [0, 0])
+            st['op'][nm][0] += 1
+            st['op'][nm][1] += int(ident)
         c = op_class(ops)
         st['cls'][c][0] += 1
         st['cls'][c][1] += int(ident)
@@ -375,8 +395,8 @@ def build_ref(wd, skip_build):
         src_n = os.path.join(HERE, 'x87_diff_native.c')
         src_l = os.path.join(HERE, 'x87_diff_lowered.c')
         subprocess.run(['gcc', '-O1', '-w', '-I', wd, '-o', bn, src_n, '-lm'], check=True)
-        subprocess.run(['gcc', '-O1', '-w', '-I', RT, '-I', wd, '-o', bl, src_l, os.path.join(RT, 'ott_cpu.c'), '-lm'],
-                       check=True)
+        subprocess.run(['gcc', '-O1', '-w', '-DOTT_X87_DOMAIN_SOFT', '-I', RT, '-I', wd, '-o', bl, src_l,
+                        os.path.join(RT, 'ott_cpu.c'), '-lm'], check=True)
     return bn, bl
 
 
@@ -406,7 +426,10 @@ def main():
     ap.add_argument('--rc-arith', type=int, choices=(0, 1, 2, 3), default=None,
                     help='fldcw で RC を固定 (0 nearest / 1 down / 2 up / 3 trunc)。 算術・fst m32 を含む全 op で比べる')
     ap.add_argument('--nega-c1', action='store_true', help='lowered 側の fxam の直後に C1 を反転させる (negative control・#2966)')
+    ap.add_argument('--nega-trig', action='store_true', help='lowered 側の fyl2x を log2 でなく自然対数にする (negative control・#3687)')
     ap.add_argument('--skip', default='', help='試行の op 表から外す名前 (カンマ区切り。例: fldpi,fldlg2,fldl2e・#2966)')
+    ap.add_argument('--only', default='', help='試行の op 表をこの名前だけにする (カンマ区切り。例: fld,fld1,fscale・#3687)')
+    ap.add_argument('--no-e', action='store_true', help='入力を double で正確に表せる型 (d/f/i/q) だけにし、m80 の命令を外す (f80 の入力丸めを除く・#3687)')
     ap.add_argument('--roundtrip', action='store_true', help='f80↔f64 変換の往復試験 (--n はクラスごとの件数)')
     ap.add_argument('--skip-build', action='store_true')
     a = ap.parse_args()
@@ -427,13 +450,23 @@ def main():
         tag += '_skip'
     if a.nega_c1:
         tag = 'nega_c1'
+    if a.nega_trig:
+        tag = 'nega_trig'
+    only = set(x for x in a.only.split(',') if x)
+    if only:
+        tag += '_only_' + '_'.join(sorted(only))
+    if a.no_e:
+        tag += '_no_e'
+        KINDS[:] = ['d', 'f', 'i', 'q']
+        KIND_W[:] = [4, 2, 2, 2]
     wd = os.path.join(WORK, tag)
     os.makedirs(wd, exist_ok=True)
     insts = instances(templates())
-    trial_insts = [o for o in insts if o['name'] not in skip]
+    trial_insts = [o for o in insts if o['name'] not in skip and (not only or o['name'] in only)
+                   and not (a.no_e and o['typ'] in ('e', 'w10'))]
     inc_n = os.path.join(wd, 'x87_native_ops.inc')
     inc_l = os.path.join(wd, 'x87_lowered_ops.inc')
-    write_inc(insts, a.nega, a.nega80, inc_n, inc_l, a.nega_c1)
+    write_inc(insts, a.nega, a.nega80, inc_n, inc_l, a.nega_c1, a.nega_trig)
     bn, bl = build_ref(wd, a.skip_build)
     lines, metas = gen_trials(trial_insts, a.n, a.seed, mode, a.rc_arith)
     tf = os.path.join(wd, 'trials.txt')
@@ -468,6 +501,10 @@ def main():
         st['m80_trials'], st['m80_identical'], 100.0 * st['m80_identical'] / max(1, st['m80_trials'])))
     print('[x87_diff] class (bit-identical/trials): ' + ', '.join(
         '%s %d/%d' % (c, st['cls'][c][1], st['cls'][c][0]) for c in CLASSES))
+    print('[x87_diff] FSW mismatch trials without m80 input %d' % st['f_mis_nom80'])
+    print('[x87_diff] FSW first mismatch op: ' + ', '.join('%s %d' % kv for kv in sorted(st['f_first'].items())))
+    print('[x87_diff] op (bit-identical/trials containing op): ' + ', '.join(
+        '%s %d/%d' % (k, v[1], v[0]) for k, v in sorted(st['op'].items())))
 
 
 if __name__ == '__main__':

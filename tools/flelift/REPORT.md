@@ -116,18 +116,7 @@ fail-fast) (3) self-assign ✓。`Move(0x409c80)` n=392 (**M11 の 0x188 record 
 
 ## 6. 未解決・限界 (実測ベース)
 
-1. **[解消済 CAB-232] 0x6a7990 (MMX RGB 乗算) の dst 1-3 block が byte 単位で不一致** (16 case 中 2 case) — 原因は lift ではなく wasm 側 harness の scratch 初期化 no-op。以下は初版時の記述:r戻り値・xmm0・他の
-   メモリは一致。packuswb/pmulhuw の primitive 単位は実機 probe で式を確認済みゆえ、ループ内の状態伝搬
-   (eax leftover の `shl eax,16` 経由引継ぎ等) の差と推定。再現: `python3 fle_diff.py` (harness 完備)。
-   → CAB-232/233 の liftdiff 本格採点で原因特定を推奨。
-2. **D12 (Delphi landing pad, 879 site)** は未対応 — CAB-227 の範囲。SEH/例外経路に入る関数は fail-fast。
-3. x87 は制御命令のみのモデル (x87_cw/x87_sw)。FLEngine lift 集合に x87 演算は出現しないことを確認済みだが、
-   集合外関数には x87 演算が残る。ldmxcsr/stmxcsr は値の退避のみ (FTZ/DAZ 等の演算反映は未実装)。
-4. cpuid/rdtsc/xgetbv は固定値モデル (CPUID leaf1 = 0x178bfbff/1, XCR0 = 7)。CPU 特性分岐は SSE2 側に寄る。
-5. .text は原則 data 敷設せず jump table 窓 (1) + rip-rel textref 窓 (3,225) のみ。.text をデータとして
-   読む経路が他にあれば fail-fast で顕在化する。
-6. FastMM boot (`_InitLib` 8 引数含む unit init 連鎖) は未実施 — M11 (CAB-5) の領域。本 ticket は lift 基盤。
-7. native spot diff は single-thread 前提 (lock 系非 atomic)。
+全文 (7 項目) は `REPORT_APPENDIX.md` §13 へ分割移動 (250 行上限のため・削除なし)。
 
 ## 7. M11 chain への接続方針 (チケット要件 4)
 
@@ -244,3 +233,12 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 |---|---|---|
 | `tools/icall` の既定値置換と代表 e2e | 本節の範囲外 (flelift 直下のみ検証) | #3604 |
 | m11 ほか残り area と ott/m11 の代表 e2e | 親 #294 の残り | #294 |
+
+## 12. x64c の addsubpd / vpmovsxdq / vshufps 追加の実測 (#3721)
+
+- 測定 commit: `a9d238a14` (閉包・ネガコン・差分テストの PR 作成時の実測)。
+- 閉包 (`KH_CORE=<HeartCore.core_64> OUT=<work/> bash tools/targets/kilohearts/scripts/ladder_x64c_closure.sh`・real 27.546 s): 改変前 functions 98 / insns 7,766 / unsup 38 (rcpps 34・addsubpd 2・vpmovsxdq 1・vshufps 1) / imports 17 / traps 0。改変後 unsup **34** (rcpps 34 のみ)。HeartCore sha256 先頭 16 hex `d55ce8b4c0ad7ebe` (76,642,304 B)。
+- ネガコン (roots = process slot 14 のみ): functions 2 / insns 178 / unsup 0 (不変)。
+- 差分テスト `python3 tools/flelift/tests/x64c_vex_diff.py`: pass 91 / fail 0 (rc 0)。
+- addsubpd ネガコン (加減を入れ替え): `FAIL addsubpd xmm1, xmm2`・pass 90 / fail 1 (rc 1)。改変後に退避コピーから戻し、`cmp` で一致を確認してから再実行 (pass 91 / fail 0)。
+- 再実行の範囲: fix モード (`ws-4056` worktree・commit 後の HEAD) では差分テストとネガコンのみ再実行。閉包 e2e は `plugins-kilohearts` 由来の `HeartCore.core_64` が `fl-win64` に無く再実行していない (上記は a9d238a14 の値)。
