@@ -88,7 +88,8 @@ void entry_main(u32 *sp) {
         int s = i;
         while (i < n && ibuf[i] != '\n') i++;
         int e = i; i++;
-        if (e - s < 10) continue;
+        if (e == s) continue;
+        if (e - s < 10) { sc3(1, 7, 0, 0); }
         /* 行: va ecx a0 a1 a2 a3 a4 a5 init(hex, OBJ_WIN バイト) */
         u32 f[8]; int k = 0, p = s;
         while (k < 8) {
@@ -127,7 +128,12 @@ void entry_main(u32 *sp) {
         obuf[ofs++] = '\n';
         line++;
     }
-    sc3(4, fd_out, (long)obuf, ofs);
+    long off = 0;
+    while (off < ofs) {
+        long w = sc3(4, fd_out, (long)(obuf + off), ofs - off);
+        if (w <= 0) { sc3(1, 8, 0, 0); }
+        off += w;
+    }
     sc3(6, fd_out, 0, 0);
     sc3(1, 0, 0, 0);
 }
