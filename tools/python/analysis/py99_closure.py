@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PY-99 閉包 (#3104・親 #2874): SLOT? 49 件の書込みの値を、CFG 到達 store で再帰に閉じる (実機不要)。
 
-  python3 analysis/py99_closure.py <work/py53/fn.txt> [--negctl drop-pred] [--md <out.md>]
+  python3 analysis/py99_closure.py <work/py53/fn.txt> [--rint] [--negctl {drop-pred|drop-part}] [--md <out.md>]
 
 フレームの読み (r, X) は、r に CFG 上で届く store 集合 R(r, X) で置き換える。R の各 store s は、その値の式
 (def_value) を同じ方法で閉じたものにする。R が 2 件以上なら経路別の場合分け {s1: E1 | s2: E2} になる。
@@ -232,7 +232,7 @@ def main(argv):
         if not md_out or negctl:
             sys.exit("usage: --md <out.md> (--negctl と併用しない)")
     if len(args) != 1:
-        sys.exit("usage: python3 analysis/py99_closure.py <work/py53/fn.txt> [--negctl drop-pred] [--md <out.md>]")
+        sys.exit("usage: python3 analysis/py99_closure.py <work/py53/fn.txt> [--rint] [--negctl {drop-pred|drop-part}] [--md <out.md>]")
     path = args[0]
     ins, order = p88.load(path)
     cfg = p99.Cfg(ins, order)
