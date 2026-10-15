@@ -15,6 +15,6 @@
 
 ## 3. 再現できなかった項目 (この run の環境)
 - 全体 `bash tools/gui/e2e.sh` は本 run では再実行していない。ランナーに `/opt/retdec`・`/opt/emsdk`・`x86_64-w64-mingw32-gcc` が無く、`selftest.sh` が mingw 不足で落ちることを確認した (実測: `FileNotFoundError: x86_64-w64-mingw32-gcc`、0.06 秒で rc 1)。
-- したがって `[selftest] 512 passed` と全体 `[gui-e2e] ALL PASS` (3m09s) は、作者の run (PR 本文が挙げる `/tmp/opencode/gui_e2e_full2.log`) の値で、本 run では確認していない。このログはこの環境に無い。
+- したがって `[selftest] 512 passed` と全体 `[gui-e2e] ALL PASS` (3m09s) は、作者の run (PR 本文が挙げる作者の全体 run ログ) の値で、本 run では確認していない。このログはこの環境に無い。
 - `tools/gui/flengine/e2e.sh` (既存 gate の回帰) は本 run で実行していない。`tools/gui/e2e.sh` の変更は追加 2 行のみで、`flengine/e2e.sh` は `tools/gui/e2e.sh` を呼ばない (review で確認済み)。
 - 製品 KPI (FLEngine 起動 dispatch 数・通過 unit 数・最初のウィンドウ) は動かしていない。
