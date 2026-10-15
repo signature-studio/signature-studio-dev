@@ -115,6 +115,16 @@ ABI = {
         ('delay 6996 FUN_180fe3cd0 rcx=param_1[2]', r'(if \(param_1\[2\] != _DAT_182989690\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(param_1[2]);'),
         ('delay 6999 FUN_180fe3cd0 rcx=param_1[0xb]', r'(if \(param_1\[0xb\] != _DAT_1829896d8\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(param_1[0xb]);'),
         ('delay 7002 FUN_180fe3cd0 rcx=param_1[0xc]', r'(if \(param_1\[0xc\] != _DAT_1829896e0\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(param_1[0xc]);'),
+        # #4883 (KH-127): FUN_180fb5c6c (3 引数・C 宣言は int, undefined4, undefined4) の呼出し 2 件。
+        #   2573 は 180fb5f8c の `mov r8d,1; lea ecx,[r8+1]` (rcx=2)・`mov edx,0xc0000417` → call 180fb5fb5 → r8 = 1。
+        #   5014 は 180fd2a60 の `mov r8d,1; lea ecx,[r8+2]` (rcx=3)・`mov edx,0x40000015` → call 180fd2aa6 → r8 = 1。
+        ('delay 2573 FUN_180fb5c6c r8=1 (180fb5f8c 180fb5fb5)', r'(?:func_0x000|FUN_)180fb5c6c\(2,0xc0000417\);', 'FUN_180fb5c6c(2,0xc0000417,1);'),
+        ('delay 5014 FUN_180fb5c6c r8=1 (180fd2a60 180fd2aa6)', r'(?:func_0x000|FUN_)180fb5c6c\(3,0x40000015\);', 'FUN_180fb5c6c(3,0x40000015,1);'),
+        # #4883 (KH-127): FUN_180fb5f8c は引数 0 件 (C 宣言 void (void))。機械語 (180fb5f8c〜) は rcx・rdx・r8・r9 を読まず、先に書き換えてから使う。
+        #   よって呼出し側の 5 引数 (rcx・rdx・r8・r9・[rsp+0x20]) は実行に影響しない。宣言に合わせて引数を落とす。
+        #   2521 = 180fb5f35 (rcx=rbp, rdx=rsi, r8=rdi, r9=ebx, [rsp+0x20]=rax)、2547 = 180fb5f85 (全部 0)。
+        ('delay 2521 FUN_180fb5f8c 5 args dropped (180fb5f35)', r'(?:func_0x000|FUN_)180fb5f8c\(param_1,param_2,param_3,param_4,param_5\);', 'FUN_180fb5f8c();'),
+        ('delay 2547 FUN_180fb5f8c 5 args dropped (180fb5f85)', r'(?:func_0x000|FUN_)180fb5f8c\(0,0,0,0,0\);', 'FUN_180fb5f8c();'),
     ],
 }
 # stereo 閉包 (#4871 KH-124) も、同じ 3 呼出元 (FUN_180fe3690・FUN_180fe3310・FUN_180fe3cd0。VA と機械語が delay と同一) を含む。
