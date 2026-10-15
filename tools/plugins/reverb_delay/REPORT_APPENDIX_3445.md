@@ -2,9 +2,9 @@
 
 親 #523 ([PLG-F4-2])。 本付録は REPORT §7 の「IPP の static link と推定・殻との結合は未解析」への静的な回答。 engine の正しさ・lift の可否は示さない。
 
-- **測定 commit**: `ca5a642e8` (道具 `ipp_callers.py` を追加した commit。 道具のコードを変えた最後の commit)。 base は `origin/main` `10daa391b`。 本付録の commit は docs のみ。
-- **素材**: `fl-win64` の `block19164_PE.bin` (殻) と `block19165_PE.bin` (engine) のみを展開 (`tar --zstd -xf … --wildcards '*block19164_PE.bin' '*block19165_PE.bin'`)。 RetDec・emsdk は使わない (静的解析のみ)。 開始時 load average (1 分) 0.49。
-- **道具**: `tools/plugins/reverb_delay/ipp_callers.py` (pefile + capstone)。 実行 27 秒、rc 0。 実行はしない。
+- **測定 commit**: `02b230d19` (道具 `ipp_callers.py` のコードを変えた最後の commit)。 初版 `ca5a642e8` からの変更は、pdata 外の呼出元を箇所ごとに数える修正 (件数の定義) のみ。 区分と pdata 基準・線形の件数は初版と同じ。 base は `origin/main` `10daa391b`。 本付録の commit は docs のみ。
+- **素材**: `fl-win64` の `block19164_PE.bin` (殻) と `block19165_PE.bin` (engine) のみを展開 (`tar --zstd -xf … --wildcards '*block19164_PE.bin' '*block19165_PE.bin'`)。 RetDec・emsdk は使わない (静的解析のみ)。 測定 (`02b230d19`) の開始時 load average (1 分) 0.22。
+- **道具**: `tools/plugins/reverb_delay/ipp_callers.py` (pefile + capstone)。 `02b230d19` で実行 31 秒、rc 0。 実行はしない (解析のみ・対象の機械語は走らせない)。
 
 ## 1. IPPCODE の呼出元・呼出先 (受入 1)
 
@@ -30,7 +30,7 @@ IPPCODE 節は VA `0x1801e2000`–`0x180266b4d` (vsize 543,565 B)。 `.pdata` �
 
 - **殻 (block 19164) からの参照: 0** (PE 上の参照として)。 殻は別イメージで、 import 表に engine の DLL は無い。 殻の文字列に `engine_x64` は無い (ASCII・UTF-16 とも 0)。 engine の呼出しは `LoadLibrary`/`GetProcAddress` で得る export に限られ、 export は `VSTPluginMain` と `main` (同じ VA `0x1801d77f0`・`.text`) の 2 本だけ。 IPPCODE は export されない。
 - 殻の `dsp_ippv2` 系の文字列 (UTF-16 で `ipps` 342 件・`ippsFFT` 28 件) は、 殻が framework の `dsp_ippv2.dll` を読むための名前表と推定 (`ipp_use.py` の対象)。 engine の静的 IPPCODE とは別経路。
-- **engine 内の `.text` から**: 直接 call で入る IPP 入口は 88 (pdata 基準) / 94 (線形)。 呼出元の `.text` 関数は 1 入口あたり最大 4 件 (線形)。
+- **engine 内の `.text` から**: 直接 call で入る IPP 入口は 88 (pdata 基準) / 94 (線形)。 呼出元の `.text` 関数 (pdata 内) は 1 入口あたり最大 4 件 (線形)。 pdata 外の `.text` の呼出し箇所は関数に数えず、箇所ごとに数える (線形で 14 箇所)。 内訳は入口 `0x180266270` に 8 箇所、pdata 入口 6 件 (`0x180238a60`・`0x180238dc0`・`0x180239120`・`0x180239e80`・`0x180239f80`・`0x18023a080`) に各 1 箇所。 後者の 6 件は pdata 内の呼出元が 0 で、線形の 94 件に含まれる。 pdata 外の箇所は線形走査の結果で、誤デコードの可能性を含む (未確認)。
 - **export から直接辺だけで到達する IPP 入口: 0**。 export から直接辺で辿れる `.text` 関数は 74 件 (pdata 基準)。 IPP の `.text` 呼出元の多くは、この直接の到達集合の外にあり、間接 call 経由と推定 (未確定)。
 
 ### 呼出元の無い 179 入口
@@ -45,7 +45,7 @@ IPPCODE 節は VA `0x1801e2000`–`0x180266b4d` (vsize 543,565 B)。 `.pdata` �
 |---|---|---|
 | (a) #38 の代替実装で置換 | `.text` からの直接呼出しは 88〜94 入口。 入口を置換すれば IPPCODE の残りは不要 | 入口の ABI と機能の対応が未同定。 mac 側 Multiband Delay の 57 関数 (FFT・Conj・Mul・Sin・Cos、`tools/shared/REPORT.md`) との対応が未確定。 #140 (ipp-fft)・#137 (ipp-fill) の範囲に依存 |
 | (b) そのまま lift | pdata 関数 272 本・513,403 B。 直接呼出しは lift 範囲内で閉じる | **未測定**。 IPP 本体が AVX 系を含むなら、`.text` 側の E5 (78 関数) と同型の再発がありうる。 pdata 外の 2 入口 (30,162 B 側) は範囲外のまま |
-| (c) 除外を正式化 | 現状の除外 (#3453 の gate: 19165 は 2,602/2,608 define で PASS) | gate は到達性だけを見る。 `.text` の 88〜94 入口からの呼出しは、lift 後に未定義の外部参照として残る (リンク段での検出は未検証) |
+| (c) 除外を正式化 | 現状の除外 (#3453 枝の gate。 19165 は 2,602/2,608 define で PASS と記録されているが、 旧 stub (`b2fc00a71`) での値で、 新 gate・新 stub での再測定は未実施。 出典は #3453 枝の `REPORT_APPENDIX.md` §17) | gate は到達性だけを見る。 `.text` の 88〜94 入口からの呼出しは、lift 後に未定義の外部参照として残る (リンク段での検出は未検証) |
 
 **暫定推奨: (a)**。 理由: (c) では `.text` の呼出し先が 88〜94 件残るため、gate の PASS は engine の完全性を示さない。 (b) は 272 関数の lift 鎖が未測定で、AVX 系の再発が懸念。 ただし (a) の前提は入口の ABI 同定で、これは未了。 最終判断は PM に委ねる。
 
@@ -71,3 +71,4 @@ FL_WIN64_DIR=<DIR> python3 tools/plugins/reverb_delay/ipp_callers.py --json <OUT
 | 扱い (a)/(b)/(c) の PM 判断 | 次の作業 (置換・lift・除外) が決まらない | #3445 (PM 判断待ち) |
 | gate の実測 (受入 3) | (b)/(c) の判定に gate の結果が無い | #3445 (#3453 の merge と `toolchain-retdec`・`toolchain-emsdk` の取得後) |
 | 呼出元の無い 179 入口の経路 | 殻・export からの実到達が未確定 | #3445 (実行トレースまたは逆解析が要る) |
+| pdata 外の `.text` 呼出し箇所 14 件 (入口 `0x180266270` の 8 件と pdata 入口 6 件の各 1 件) の実在 | 線形走査の誤デコードかどうかで、6 入口の「呼出元あり」の扱いが変わる | #3445 (逆解析が要る) |
