@@ -34,7 +34,7 @@
   - `ldfix=applied`: N1479 の記録を踏襲 (本測定では未検証)。
   - `ld108=disabled`・`ld115=disabled`・`r8b=disabled`: 3 pass (`fix_ld108`・`fix_ld115`・`fix_r8b815050`) を artifact の IR に再適用すると IR が変わった (適用されていないとみなす)。build は `M11_ALLOW_LD108_DISABLED=1` 等の opt-in で通した。
 - 絶対値は使わない。判定に使うのは同一 IR 内の A/B だけ (REPORT_N1479 §5 と同じ)。canonical 基準との比較は未実施。
-- toolchain: `/opt/emsdk` (ランナー同梱、emcc 6.0.12) を使った。`toolchain-emsdk` 素材は展開していない (同梱の emsdk で代替)。`toolchain-retdec` は未使用。`work-liftdiff` は展開のみ (本測定では未使用。`tools/liftdiff/ldlib/pe.py` は変更していない)。
+- toolchain: `[EMSDK]` (ランナー同梱、emcc 6.0.12) を使った。`toolchain-emsdk` 素材は展開していない (同梱の emsdk で代替)。`toolchain-retdec` は未使用。`work-liftdiff` は展開のみ (本測定では未使用。`tools/liftdiff/ldlib/pe.py` は変更していない)。
 - 実行環境: 4 vCPU、load 0.5〜1.0。
 
 ## 4. 表 2: survey A/B (コミット済み HEAD `fd03fb1b0`、`bash tools/m11/m11_xmm_ab.sh`)
