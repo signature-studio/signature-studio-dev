@@ -15,13 +15,14 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | `2c011b70c` (監視スクリプトを追加した commit。基点は `origin/main` `e13f1efd2`)。コードを変えたのはこの commit だけ。その後の commit は REPORT・DOC_MAP のみ |
-| 再現 (HEAD) | `2c011b70c` 上で `wval_measure.sh` を再実行: units 209・停止点 同じ・`[wval]` 1 件 (`va=0x6bc1af`)・`[wval-call]` 1 件 (`va=0x6c937a`) で同一 |
-| ベースライン | `FL_WIN64_DIR=<fl-win64> FLE_EXTRA_ROOTS= FLE_BOOT_WORK=<work> FLE_BOOT_TAG=wv0 FLE_BOOT_RUNS=diag_shim bash tools/flelift/boot/fle6_measure.sh` (fle6 全体 3 m 30.8 s: gen-A 7 s / lift 81 s / clang 101 s / boot 22 s、load 0.3→2.2) |
-| 監視版 | `FLE_BOOT_WORK=<work> bash tools/flelift/boot/wval_measure.sh` (patch 4〜5 s / build 88〜102 s / boot 約 22 s) |
+| 測定 commit | `236d83c87` (監視スクリプトを追加した `2c011b70c` に `origin/main` `e03d588ee` を merge した commit)。main 側の FLE-15 (#3770) が `fle_boot.c`・`fle_boot.mjs`・`fle6_measure.sh`・`fle_cpu.c` を変えたため、コードを変えた最後の commit は `236d83c87`。以降の commit は REPORT・DOC_MAP・本付録・結果 JSON のみ |
+| コード差分 (測定 commit → HEAD) | `git diff --stat 236d83c87 HEAD -- tools/flelift/rt tools/flelift/x64c.py tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh tools/flelift/boot/wval_lift.py tools/flelift/boot/wval_measure.sh` は出力なし (差分 0) |
+| 再現 (HEAD) | `236d83c87` 上で再測定 (ベースライン → 監視版 → ネガコン): 監視版は units 209・停止点 同じ・`[wval]` 1 件 (`va=0x6bc1af`)・`[wval-call]` 1 件 (`va=0x6c937a`)。取り込み前の `2c011b70c` と同じ値 |
+| ベースライン | `FL_WIN64_DIR=<fl-win64> FLE_EXTRA_ROOTS= FLE_BOOT_WORK=<work> FLE_BOOT_TAG=wv0 FLE_BOOT_RUNS=diag_shim bash tools/flelift/boot/fle6_measure.sh` (`236d83c87` での値。fle6 全体 3 m 9.3 s: lift 73 s / clang-plain 88 s / boot 21 s、load 0.16→1.73) |
+| 監視版 | `FLE_BOOT_WORK=<work> bash tools/flelift/boot/wval_measure.sh` (`236d83c87` での値: patch 4 s / build 86 s。boot の所要は未計時) |
 | 結果 (ベースライン) | units_run **209** / stopped_at 209 / `unlifted` (`[fleboot][ff] unlifted 0x6bbc20 (call site ret=0x6c9380)`) / getmem 2314 / freemem 1200 / ipp_ok true (`results/boot_summary_wv0_diag_shim.json`) |
 | 結果 (監視版, 書込み監視) | units_run **209** / stopped_at 209 / 停止点 同じ / getmem 2314 / freemem 1200 / ipp_ok true (差 0) |
-| 結果 (ネガコン: 監視値 0x6bbc21) | `[wval]` 一致 **0 件** (0x6bbc20 の 1 件に対して特異的) |
+| 結果 (ネガコン: 監視値 0x6bbc21) | `[wval]` 一致 **0 件** (0x6bbc20 の 1 件に対して特異的。`236d83c87` の再測定でも 0 件) |
 
 KPI (起動に関わる PR。`docs/WORKFLOW.md` §7): FLEngine 起動の units_run は **前 209 / 後 209** (診断 route・shim 有)。最初のウィンドウ: **無し** (停止は `unlifted 0x6bbc20`)。既定経路 (root `0x6a7b70` 有) は**動かしていない** (既定の build・lift 経路は変えていない)。
 
