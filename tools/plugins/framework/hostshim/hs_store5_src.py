@@ -18,7 +18,7 @@ import hs_disp_emu as E
 
 STORES = [0x13218c1, 0x13219b0, 0x1321966, 0x1321b6c, 0x132257d]
 CALLEES = [0x1313220, 0xf5b190, 0xf5ae50, 0x41d110, 0xfdd2c0]
-GATES = [0x1321864, 0x1321906, 0x1321b0c, 0x1321950, 0x132251d]
+GATES = [0x1321854, 0x1321b19, 0x1322550]  # je (store 1 の手前) / call [rax] (store 4 の手前) / je (store 5 の手前)
 BEFORE = 60
 
 
