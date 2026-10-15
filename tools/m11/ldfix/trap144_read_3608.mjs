@@ -17,7 +17,7 @@ const mod = await m2.default({ printErr: () => {} });
 mod.HEAPU8.set(fs.readFileSync(process.env.S4_IMAGE || (M11 + '/m11_image.bin')), 0);
 const hx = (v) => '0x' + BigInt.asUintN(64, v).toString(16);
 const clr = () => {
-  mod.HEAPU8.fill(0, PROBE.ENTRY_BASE, PROBE.ENTRY_BASE + 5 * PROBE.ESLOT);
+  mod.HEAPU8.fill(0, PROBE.ENTRY_BASE, PROBE.ENTRY_BASE + PROBE.ENTRY.length * PROBE.ESLOT);
   mod.HEAPU8.fill(0, PROBE.W_REC, PROBE.W_REC + 24);
 };
 const read = () => {
@@ -51,11 +51,10 @@ const out = [];
 for (let i = 0; i < 942; i++) {
   clr();
   try { mod._m11_call_unit(i); } catch (e) {
-    if (!(e && e.m11_dllmain_done !== undefined)) {
-      const kind = ((e && e.message) || String(e)).split('\n')[0];
-      const chain = e && e.stack ? [...String(e.stack).matchAll(/wasm-function\[(\d+)\]:(0x[0-9a-f]+)/g)].slice(0, 6).map(c => [+c[1], c[2]]) : [];
-      out.push({ i, va: hx(BigInt(mod._m11_unit_va(i))), kind, chain, ...read() });
-    }
+    const halt = !!(e && e.m11_dllmain_done !== undefined);
+    const kind = halt ? 'halt0->longjmp' : ((e && e.message) || String(e)).split('\n')[0];
+    const chain = e && e.stack ? [...String(e.stack).matchAll(/wasm-function\[(\d+)\]:(0x[0-9a-f]+)/g)].slice(0, 6).map(c => [+c[1], c[2]]) : [];
+    out.push({ i, va: hx(BigInt(mod._m11_unit_va(i))), kind, chain, ...read() });
     mod.__emscripten_stack_restore(sp0);
   }
 }
