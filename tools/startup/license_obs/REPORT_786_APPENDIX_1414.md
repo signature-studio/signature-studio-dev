@@ -10,7 +10,7 @@ REPORT_786 §12.2 (F2・F3 が 0x10c7850 の中で停止) の続き。0x10c7850 
   1. 入口で `[g1] != 0x7fffffff` または `[g2] != 0`。両方とも既定値 (sentinel・0) なら、0x10c7850 を呼ばずに `xor eax,eax` で戻る。
   2. 0x10c7850 の戻り値 `eax` (符号付き) が **0 以下**。`mov [g3],eax` で格納した後、`cmp [g4],0` の判定で書く。
 - g3・g4 は g1 と同じ dword (0x14f852c) を指す (§2)。よって 0x10d3a30 の中では、0x10c7850 の戻り値がそのまま次回の g1 になる (§3 の W3・W5・W7 で `g1_after` が戻り値と一致)。
-- 実機経路の 6 入力 (REPORT_786 §8.1) では 0x10c7850 の戻り値が 0x7fffffff で、条件 2 を満たさない。6 入力で '?' が書かれないのは、この条件から説明がつく。
+- 実機経路の 6 入力では 0x10d3a30 が未到達 (REPORT_786 §8.1) のため、6 入力で '?' が書かれないことは条件 2 の検証にならず、条件 2 では説明できない。6 入力で観測した 0x10c7850 の戻り値 0x7fffffff は呼出し元 0x10c9bf2 での値で、0x10d3a30 からの戻り値ではない。
 - 未確定 (起票先は §5): (a) 0x10c7850 が 0 以下を返す入力、(b) 実機の経路で 0x10d3a30 の入口 (条件 1) に届く条件、(c) 0x11cb000 の起動元。
 
 ## 2. 静的: 0x10d3a30 (91 B) の rip 相対参照
@@ -21,10 +21,10 @@ REPORT_786 §12.2 (F2・F3 が 0x10c7850 の中で停止) の続き。0x10c7850 
 | 0x10d3a43 `mov rax,[rip+0x510336]` | 0x15e3d80 | 0x16b6e58 | g2 (`cmp byte [rax],0`) |
 | 0x10d3a58 `mov rcx,[rip+0x50da49]` | 0x15e14a8 | 0x14f852c | g3 (`mov [rcx],eax` の格納先) |
 | 0x10d3a61 `mov rax,[rip+0x50da40]` | 0x15e14a8 | 0x14f852c | g4 (`cmp dword [rax],0`) |
-| 0x10d3a72 `mov rcx,[rip+0x510d17]` | 0x15e4790 | 0x141d6b8 | g5 (gradeChar の親オブジェクト。`[g5]+0xd0` が格納先) |
+| 0x10d3a72 `mov rcx,[rip+0x510d17]` | 0x15e4790 | 0x141d6b8 | g5 (`*(0x141d6b8)` が gradeChar の親オブジェクト。格納先は `*(*(0x141d6b8)+0xd0)`) |
 
 - g1・g3・g4 は同一 dword。g2 は別の byte。
-- 関数の骨格: `sub rsp,0x28` → g1 判定 → g2 判定 → 早期 `xor eax,eax; jmp 0x10d3a86` → `call 0x10c7850; mov [g3],eax` → `cmp [g4],0; setle al; test al,al; je 0x10d3a86` → `mov rcx,[g5]; mov rcx,[rcx+0xd0]; mov byte [rcx],0x3f` → `add rsp,0x28; ret`。
+- 関数の骨格: `sub rsp,0x28` → g1 判定 → g2 判定 → 早期 `xor eax,eax; jmp 0x10d3a86` → `call 0x10c7850; mov [g3],eax` → `cmp [g4],0; setle al; test al,al; je 0x10d3a86` → `mov rcx,[g5]; mov rcx,[rcx]; mov rcx,[rcx+0xd0]; mov byte [rcx],0x3f` (0x10d3a72〜0x10d3a83 の 4 命令。格納先 = `*(*(0x141d6b8)+0xd0)`) → `add rsp,0x28; ret`。
 - `setle` の後に `test al,al` が続くので、`je` は「値 > 0」のとき飛ぶ。書込みは値 ≤ 0 (符号付き) のときだけ。
 
 ## 3. 動的: 0x10c7850 の戻り値を固定 (W1〜W7)
