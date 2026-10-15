@@ -85,6 +85,28 @@ static inline void x87_fcom(double a, double b) {
     ott_fsw = (uint16_t)((ott_fsw & ~OTT_X87_CMASK) | c);
 }
 
+/* FXAM: 分類を C3/C2/C0 へ (SDM: NaN 001・有限 010・inf 011・zero 100)。 C1 (符号) は未モデル化。
+ * double の非正規は f80 では正規値なので 010 にする */
+static inline void x87_fxam(void) {
+    double v = x87_st(0);
+    uint16_t c;
+    if (v != v) c = 0x0100;
+    else if (isinf(v)) c = 0x0500;
+    else if (v == 0) c = 0x4000;
+    else c = 0x0400;
+    ott_fsw = (uint16_t)((ott_fsw & ~OTT_X87_CMASK) | c);
+}
+
+/* FSCALE: ST(0) *= 2^trunc(ST(1))。 指数は ±65536 に丸める (double の指数域外は inf / 0 になる: ADR 制限) */
+static inline void x87_fscale(void) {
+    double n = x87_st(1);
+    if (n != n) { x87_set(0, n); return; }
+    n = trunc(n);
+    if (n > 65536.0) n = 65536.0;
+    if (n < -65536.0) n = -65536.0;
+    x87_set(0, ldexp(x87_st(0), (int)n));
+}
+
 /* fist/fistp の丸め (FCW.RC: 00 nearest / 01 down / 10 up / 11 truncate) */
 static inline double x87_rc(double v) {
     switch ((ott_fcw >> 10) & 3) {

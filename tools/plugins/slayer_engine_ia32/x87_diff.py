@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """x87_diff.py: x87 subset の lowering (x64c --arch ia32 → tools/ott/rt/ott_x87.h) と実 x87 の差分試験 (#1099)。
 
-  python3 x87_diff.py [--n 100000] [--seed 1] [--nega] [--rc]
+  python3 x87_diff.py [--n 100000] [--seed 1] [--nega] [--rc] [--skip NAME,...]
 
 - op 表: 機械語 (.byte) を 1 命令ずつ持つ。 native 側はその機械語を実 FPU で実行 (中間値は 80bit)。
   lowered 側は同じ機械語を capstone で decode → x64c の FnLift.one() で C にして実行 (f80 は持たず double)。
@@ -9,6 +9,7 @@
   終了時に ST(0..d-1) と slot 8 個を記録する。 両者の一致を bit 単位で比べ、不一致は ulp 距離で数える。
 - --nega: lowered 側の `fsub st(i), st(0)` (DC E8+i) を `fsubr` (DC E0+i) に取り違えて FAIL が出ることを確かめる。
 - --rc: fldcw で RC を変え、fist/fistp の丸めだけを比べる (算術を含まない試行。ADR の制限 (5))。
+- --skip: 試行の op 表から指定の名前を外す (寄与の切り分け用。例: --skip fldpi,fldlg2,fldl2e)。 機械語の id は変えない。
 生成物は work/x87/ (gitignore 対象)。 依存: gcc・capstone・x64c (tools/ott/lift)。
 """
 import argparse, math, os, random, struct, subprocess, sys, time
@@ -48,7 +49,16 @@ def templates():
           dict(name='fabs', bs=[0xD9, 0xE1], form='none', delta=0, need=1, cmp=False, typ=None),
           dict(name='fld1', bs=[0xD9, 0xE8], form='none', delta=1, need=0, cmp=False, typ=None),
           dict(name='fldz', bs=[0xD9, 0xEE], form='none', delta=1, need=0, cmp=False, typ=None),
-          dict(name='fnstsw', bs=[0xDF, 0xE0], form='none', delta=0, need=0, cmp=False, typ=None)]
+          dict(name='fnstsw', bs=[0xDF, 0xE0], form='none', delta=0, need=0, cmp=False, typ=None),
+          dict(name='ftst', bs=[0xD9, 0xE4], form='none', delta=0, need=1, cmp=True, typ=None),
+          dict(name='fxam', bs=[0xD9, 0xE5], form='none', delta=0, need=1, cmp=True, typ=None),
+          dict(name='fnclex', bs=[0xDB, 0xE2], form='none', delta=0, need=0, cmp=False, typ=None),
+          dict(name='fsqrt', bs=[0xD9, 0xFA], form='none', delta=0, need=1, cmp=False, typ=None),
+          dict(name='frndint', bs=[0xD9, 0xFC], form='none', delta=0, need=1, cmp=False, typ=None),
+          dict(name='fscale', bs=[0xD9, 0xFD], form='none', delta=0, need=2, cmp=False, typ=None),
+          dict(name='fldl2e', bs=[0xD9, 0xEA], form='none', delta=1, need=0, cmp=False, typ=None),
+          dict(name='fldlg2', bs=[0xD9, 0xEC], form='none', delta=1, need=0, cmp=False, typ=None),
+          dict(name='fldpi', bs=[0xD9, 0xEB], form='none', delta=1, need=0, cmp=False, typ=None)]
     # memory (mod=00 rm=[eax]): 算術・比較は入力 slot (f = float32, d = float64)
     for r, name in [(0, 'fadd'), (1, 'fmul'), (2, 'fcom'), (3, 'fcomp'), (4, 'fsub'), (5, 'fsubr'), (6, 'fdiv'), (7, 'fdivr')]:
         T.append(dict(name=name, bs=[0xD8, r << 3], form='mem', delta=-1 if name == 'fcomp' else 0, need=1,
@@ -72,7 +82,11 @@ def templates():
           dict(name='fistp', bs=[0xDB, 0x18], form='mem', delta=-1, need=1, cmp=False, typ='w4'),
           dict(name='fistp', bs=[0xDF, 0x38], form='mem', delta=-1, need=1, cmp=False, typ='w8'),
           dict(name='fnstsw', bs=[0xDD, 0x38], form='mem', delta=0, need=0, cmp=False, typ='w2'),
-          dict(name='fnstcw', bs=[0xD9, 0x38], form='mem', delta=0, need=0, cmp=False, typ='w2')]
+          dict(name='fnstcw', bs=[0xD9, 0x38], form='mem', delta=0, need=0, cmp=False, typ='w2'),
+          dict(name='fiadd', bs=[0xDA, 0x00], form='mem', delta=0, need=1, cmp=False, typ='i'),
+          dict(name='fiadd', bs=[0xDE, 0x00], form='mem', delta=0, need=1, cmp=False, typ='i2'),
+          dict(name='fimul', bs=[0xDA, 0x08], form='mem', delta=0, need=1, cmp=False, typ='i'),
+          dict(name='fimul', bs=[0xDE, 0x08], form='mem', delta=0, need=1, cmp=False, typ='i2')]
     return T
 
 
@@ -283,12 +297,17 @@ def main():
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--nega', action='store_true', help='lowered 側に fsub/fsubr の取り違えを入れる (negative control)')
     ap.add_argument('--rc', action='store_true', help='fldcw で RC を変え fist/fistp の丸めだけを比べる')
+    ap.add_argument('--skip', default='', help='試行の op 表から外す名前 (カンマ区切り)')
     ap.add_argument('--skip-build', action='store_true')
     a = ap.parse_args()
     tag = 'nega' if a.nega else ('rc' if a.rc else 'main')
+    skip = set(x for x in a.skip.split(',') if x)
+    if skip:
+        tag += '_skip'
     wd = os.path.join(WORK, tag)
     os.makedirs(wd, exist_ok=True)
     insts = instances(templates())
+    trial_insts = [o for o in insts if o['name'] not in skip]
     inc_n = os.path.join(wd, 'x87_native_ops.inc')
     inc_l = os.path.join(wd, 'x87_lowered_ops.inc')
     write_inc(insts, a.nega, inc_n, inc_l)
@@ -300,7 +319,7 @@ def main():
         subprocess.run(['gcc', '-O1', '-w', '-I', wd, '-o', bn, src_n, '-lm'], check=True)
         subprocess.run(['gcc', '-O1', '-w', '-I', RT, '-I', wd, '-o', bl, src_l, os.path.join(RT, 'ott_cpu.c'), '-lm'],
                        check=True)
-    lines, metas = gen_trials(insts, a.n, a.seed, a.rc)
+    lines, metas = gen_trials(trial_insts, a.n, a.seed, a.rc)
     tf = os.path.join(wd, 'trials.txt')
     with open(tf, 'w') as f:
         f.write('\n'.join(lines) + '\n')
