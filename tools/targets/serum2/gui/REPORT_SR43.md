@@ -42,7 +42,7 @@
 | CALLRET | 43 | 関数の戻り値 (ファクトリ等) (41 + 埋め込み 2) |
 | CLOBBER | 12 | 途中の call が破壊 (7 + R 経路 5) |
 | ENTRY (R 経路) | 15 | vtable レジスタが関数先頭からの値 (callee-saved 等) |
-| ARITH | 1 | 演算結果 |
+| ARITH | 1 | 演算結果。`classify()` は mov/movzx/movsx/movsxd/movabs/lea/copy/load 以外の書き込みを既定の ARITH に入れる。`pop` (スタックからの load) もここに入る (分岐していない。`pop rcx` → `('arith', 'pop')` を確認)。この 1 件が `pop` かどうかは本 run では未確認 (入力素材なし) |
 | **合計** | **1052** | |
 
 - 「this の型」を確かめる材料として、SC 伝播 (§1 の C) を回した結果:
@@ -56,7 +56,8 @@
 
 - `THIS` は「所属関数の this が呼出先」であって、「その関数が SerumController のメソッド」の証明ではない。型は §2 の SC 伝播でも確かめられなかった。
 - 関数間の追跡 (呼出元) はしていない。ARG 240 件と THIS の型は、呼出元をたどらないと決まらない。
-- 支配判定は関数内 CFG のみ。間接 jmp を含む関数の NODOM は 0 件だった (switch 表による打ち切りではない)。
+- 支配判定は関数内 CFG のみ。間接 jmp を含む関数では `Fn.dominated` が常に偽を返す (`if self.indirect: return False`)。そのため定義が見つかった候補は全て NODOM になり、定義が無ければ entry になる。
+- **撤回**: 旧記述「間接 jmp を含む関数の NODOM は 0 件だった (switch 表による打ち切りではない)」は根拠にならない。出力の `ind` 行は `r[4].endswith("NODOM")` で数えるが、`receiver()` の top-level 不動点は `R-nodom` (小文字) を返すため、この集計は R 経路の NODOM を数えない (`"R-nodom".endswith("NODOM")` は偽)。間接 jmp 関数の候補件数と、0 件になり得る理由 (候補が無い / 定義が無く entry になる) は未測定。
 - 線形の定義走査はループの back edge を見ない。ループを越える定義を取り逃す可能性がある。
 - 所属関数の範囲は `.pdata` の関数境界に従う。非連続な関数や、関数境界外の thunk は扱えていない。
 
@@ -78,6 +79,10 @@ venv/bin/python $P/receiver_this_trace.py Serum2_win64.vst3 --vtable 0x180a2bf58
   - `receiver_this_trace.py`: real 24.95 s / user 23.55 s / sys 1.40 s。load 0.30 → 0.54。出力は同一 commit で 2 回とも一致。
   - 候補件数 1052 は `receiver_origin.py` の出力 (同じ入力) と一致。sha256 は SR-38/41 と一致。
 - 検証: `git diff 8bbf9c9e HEAD -- tools/targets/serum2/gui/receiver_this_trace.py` の出力は 0 行 (測定後にスクリプトは変えていない)。
+- 報告前コマンド (`docs/WORKFLOW.md` §6・検証 HEAD `26bdd879` の worktree で実行。出力は全て 0 行・rc 0):
+  - `git status --porcelain=v1 -- tools/targets/serum2/gui` → 0 行 (取りこぼし・他担当の WIP 混入なし)
+  - `find tools/targets/serum2/gui -type f -size +20M -not -path '*/work/*'` → 0 行 (20MiB 超の blob なし)
+- 本 run で未実施: n≥3 の再測定 (min–max・load・並列数)、ネガティブコントロール (支配判定 `Fn.dominated`・spill 検出 `find_store`・this 遡り `origin` の 1 件破壊で分類が変わる件数)、間接 jmp 関数の候補件数。`plugins-serum2` が `$ARTIFACTS_DIR` に無く、ローカルの検証スナップショットも無いため。`oc_artifacts: plugins-serum2` で再起動した run で実施する (§5 (d))。
 
 ## 5. 未解決 (起票先)
 
@@ -86,3 +91,6 @@ venv/bin/python $P/receiver_this_trace.py Serum2_win64.vst3 --vtable 0x180a2bf58
 | (a) ARG 240 件・ARG-CHILD 68 件の呼出元をたどり、引数の型 (SerumController か) を確定する。THIS 67 件・THIS-CHILD 191 件の所属関数の型 (SC 伝播の拡張) | 受入 1 | [SR-48] |
 | (b) 関数内の未解決: STACKSLOT 95 件 (spill 対応の拡張)・NODOM 242 件 (支配の判定の精度)・INDEX 58 件・CALLRET 43 件・CLOBBER 12 件・ENTRY 15 件 | 受入 1 | [SR-49] |
 | (c) 実 VSTGUI 上の動的確認 | SR-30 受入 4 相当 | `#68` 残作業 (GUI lift 時) |
+| (d) n≥3 の再測定 (min–max・load・並列数)・ネガティブコントロール (3 判定点の 1 件破壊で分類が変わる件数)・間接 jmp 関数の候補件数 | §4 の実測の再現性と §3 の検証 | 本 PR (`oc_artifacts: plugins-serum2` で再起動後に実施。子 issue は起票しない) |
+| (e) `ind` 集計が `R-nodom` を数えない欠陥 (§3 撤回の原因) | §3 の記述 | 本 PR (修正は測定 commit を変えるため、修正 commit と同時に再測定する) |
+| (f) `pop` が ARITH に入る分類 (§2 の ARITH 1 件の内訳) | §2 の内訳 | 本 PR (分類を直す場合は §2 を同時に再測定する) |
