@@ -2,11 +2,15 @@
 # build_guest.sh — 製品ページ結線の検証用ゲスト (tools/gui/test/text_wasm_app.c、GUI_NO_FT=1 = 内蔵 8x8) を wasm 化し、chunked descriptor にする。
 #   usage: bash tools/gui/e2e/build_guest.sh <outdir>
 #   出力: <outdir>/app.js (emcc glue) ・ <outdir>/app.wasm ・ <outdir>/app.wasm.parts/index.json (+ 64 KiB の part)
-#   前提: emsdk (EMSDK_ENV。既定 /opt/emsdk/emsdk_env.sh) と mingw-w64 (gen_api.py の aux_arity が x86_64-w64-mingw32-gcc を使う)。FreeType 不要。
+#   前提: emsdk (EMSDK_ENV。既定 /opt/emsdk/emsdk_env.sh)。mingw-w64 は無ければ apt で導入 (gen_api.py の aux_arity が使う)。FreeType 不要。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/.."
 OUT="${1:?usage: build_guest.sh <outdir>}"; mkdir -p "$OUT"
 set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u
+if ! command -v x86_64-w64-mingw32-gcc >/dev/null; then
+  sudo -n apt-get update -qq >/dev/null 2>&1 || true
+  sudo -n DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev >/dev/null
+fi
 python3 "$ROOT/gen_api.py" >/dev/null
 TMPB="$(mktemp -d)"
 GUI_NO_FT=1 bash "$ROOT/lift/gui_wasm.sh" "$ROOT/test/text_wasm_app.c" "$TMPB" | tail -1
