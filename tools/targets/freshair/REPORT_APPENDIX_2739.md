@@ -27,7 +27,7 @@
 ## §3. 振り分け結果 (測定 commit `c3fef51c7`)
 
 - 再現: `python3 tools/targets/freshair/ks_identity.py <HeartCore.core_64> <SlateCore.core_64> ident.json` → `python3 tools/targets/freshair/ks_candidate_triage.py ident.json` (素材 `work-liftlib-targets`)。
-- 実測 (実装 run): `ks_identity.py` 単体 2.9 s (EXIT=0、load 1 分値 0.05)。`c3fef51c7` の worktree で再生成した `ident.json` と、そこから作った振り分け表は本節の表と **byte 一致**。fix run (差し戻し対応) では素材 `work-liftlib-targets` が実行環境に無く、`ks_identity.py` は再実行していない (振り分け規則の再現は下記の注記を参照)。
+- 実測 (実装 run): `ks_identity.py` 単体 2.9 s (EXIT=0、load 1 分値 0.05)。`c3fef51c7` の worktree で再生成した `ident.json` と、そこから作った振り分け表は本節の表と **byte 一致**。fix run (差し戻し対応) では `ks_identity.py` を再実行していない (本 run の素材は fl-win64 のみ)。fix run では表の値から合成した `ident.json` を `ks_candidate_triage.py` に通し、37 行が本節の表と一致することだけを確認した。
 - 振り分け表 (クラスは `ident.json` の `process_pair`。KH slot 14 と SC の対応 slot):
 
 | クラス | KH VA | SC VA | KH B | SC B | ratio_M | 区分 | 欠けている側 |
