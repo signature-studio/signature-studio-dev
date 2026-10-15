@@ -169,11 +169,11 @@ test("pm_dispatch_cap / pm_skipped_hour_24h: 毎時上限で見送った件数�
   };
   await tickAt(T0);
   let s = await status(ctx);
-  assert.equal(s.pm_dispatch_cap, 24);
+  assert.equal(s.pm_dispatch_cap, PM_LIMITS.hourMax);
   assert.equal(s.pm_dispatch_1h, PM_LIMITS.hourMax, "上限まで送る");
   assert.equal(s.pm_skipped_hour_24h, 2, "上限を超えた 2 件は見送る");
   await tickAt(T0 + MIN);
-  assert.equal((await status(ctx)).pm_skipped_hour_24h, 4, "次の tick も上限の内。送った 24 件は重複で見送り、残りの 2 件が毎時上限で見送られる");
+  assert.equal((await status(ctx)).pm_skipped_hour_24h, 4, "次の tick も上限の内。送った分は重複で見送り、残りの 2 件が毎時上限で見送られる");
   clock.t = T0 + 23 * H;
   assert.equal((await status(ctx)).pm_skipped_hour_24h, 4, "24 時間の窓の内は残る");
   clock.t = T0 + 24 * H + MIN;

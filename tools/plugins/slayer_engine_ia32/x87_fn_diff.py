@@ -206,6 +206,41 @@ def words(hexstr):
     return [int.from_bytes(b[i:i + 4], 'little') for i in range(0, len(b), 4)]
 
 
+def mismatch_classes(nat, act, scen):
+    """#4743: 行の不一致を原因別に数える。 'nan' = NaN どうしのビット差のみ / 'f80' = float64 のみ 1-2 ulp (float32 は一致) / 'other' = それ以外 (0 件が期待)。"""
+    h = {}
+    for i, (t, line, init) in enumerate(scen):
+        e, w = nat[i], act[i]
+        if e == w:
+            continue
+        kinds = set()
+        for k in ('eax', 'd', 'st0', 'st0d', 'mem', 'stk'):
+            if e[k] == w[k]:
+                continue
+            if k == 'st0d':
+                c = dword_class(int(e[k], 16), int(w[k], 16))
+                kinds.add('f80' if c in (1, 2) else ('nan' if c == 'nan' else 'other'))
+            elif k in ('mem', 'stk'):
+                for x, y in zip(words(e[k]), words(w[k])):
+                    if x != y:
+                        c = word_class(x, y)
+                        kinds.add('nan' if c == 'nan' else 'other')
+            else:
+                c = word_class(int(e[k], 16), int(w[k], 16))
+                kinds.add('nan' if c == 'nan' else 'other')
+        if kinds == {'f80'}:
+            cls = 'f80 (float64 のみ 1-2 ulp)'
+        elif kinds == {'nan'}:
+            cls = 'NaN どうしのビット差'
+        else:
+            cls = '/'.join(sorted(kinds))
+        key = (t['name'], cls)
+        h[key] = h.get(key, 0) + 1
+    for (name, cls), n in sorted(h.items()):
+        print('[mismatch] %s: %s %d 行' % (name, cls, n))
+    return h
+
+
 def compare(nat, act, scen, quiet=False):
     """行ごとに突合する。 戻り値 (ok, 集計 dict)。 ok は構造の判定 (行数・eax・x87 深さ・非自明性) のみ。 float 語は分布を集計する。"""
     if len(nat) != len(scen) or len(act) != len(scen):
@@ -420,6 +455,8 @@ def main():
         print('[build] native %.2f s, wasm emcc %.2f s; [run] native %.3f s, wasm(node) %.3f s; load1 before run %.2f' % (
             t_nat_build, t_wasm_build, t_nat, t_wasm, load))
         ok, _ = compare(parse(nat_out), parse(wasm_out), rows)
+        if special:
+            mismatch_classes(parse(nat_out), parse(wasm_out), rows)
         if not ok:
             print('[x87_fn_diff] FAIL: 構造の不一致または非自明性なし')
             sys.exit(1)

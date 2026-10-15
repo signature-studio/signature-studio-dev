@@ -117,7 +117,7 @@ def _const(ty, cv):
     return str(v & ((1 << int(ty[1:])) - 1)) if ty.startswith('i') else _zero(ty)
 
 
-def sigfix(text, report, pads=None, fixes=None):
+def sigfix(text, report, pads=None, fixes=None, slots=None):
     sigs = {}
     for m in re.finditer(r'^(?:define|declare)(?: weak)? (\S+) @(function_[0-9a-f]+)\(([^)]*)\)', text, re.M):
         ret, nm, args = m.groups()
@@ -131,6 +131,7 @@ def sigfix(text, report, pads=None, fixes=None):
         return '%%m11sf%d' % ctr[0]
     fixed = skipped = 0
     applied = [0]
+    slot_ctr = [0]
     cur = None
     ordn = {}
     ncall = {}
@@ -143,11 +144,21 @@ def sigfix(text, report, pads=None, fixes=None):
             cm = re.search(r'call \S+ @(function_[0-9a-f]+)\(', line)
             if cm:
                 ncall[(_c, cm.group(1))] = ncall.get((_c, cm.group(1)), 0) + 1
+    ent_alloca = set()
+    ent_open = False
     for line in text.split('\n'):
         if line.startswith('define '):
             dm = re.search(r'@([\w.$]+)\(', line)
             cur = dm.group(1) if dm else None
             ordn = {}
+            ent_alloca = set()
+            ent_open = True
+        elif ent_open and re.match(r'^\s*(%[\w.$-]+ = )?(br|ret|switch|indirectbr|invoke|resume|unreachable|callbr)\b', line):
+            ent_open = False
+        elif ent_open:
+            am = re.match(r'^\s*(%stack_var_-?\d+) = alloca\b', line)
+            if am:
+                ent_alloca.add(am.group(1))
         m = callre.match(line) if ' call ' in line else None
         if not m:
             out.append(line)
@@ -180,6 +191,23 @@ def sigfix(text, report, pads=None, fixes=None):
                 pre += ls
                 newargs.append('%s %s' % (pt, nv))
             else:
+                sv = slots.get((cur, nm, k, i)) if slots else None
+                if sv is not None and sv not in ent_alloca:
+                    # entry block 内で呼出しより前に定義された alloca だけ使う (それ以外は呼出し箇所を支配せず IR 不正になる)
+                    report['sigfix_slot_nonentry'] = report.get('sigfix_slot_nonentry', 0) + 1
+                    sv = None
+                if sv is not None and (pt == 'ptr' or pt.startswith('i')):
+                    if pt == 'ptr':
+                        newargs.append('ptr nonnull %s' % sv)
+                    else:
+                        slot_ctr[0] += 1
+                        pv = '%%m11sl%d' % slot_ctr[0]
+                        pre.append('  %s = ptrtoint ptr %s to i64' % (pv, sv))
+                        ls, nv = _conv(pv, 'i64', pt, lambda: '%%m11sl%dx' % slot_ctr[0])
+                        pre += ls
+                        newargs.append('%s %s' % (pt, nv))
+                    report['sigfix_slot_injected'] = report.get('sigfix_slot_injected', 0) + 1
+                    continue
                 cv = fixes.get((cur, nm, k, i)) if fixes else None
                 if cv is not None and cv.get('bits') is not None and pt != 'i%d' % cv['bits']:
                     cv = None
@@ -298,7 +326,13 @@ pads = []
 fixes = None
 if '--fixes' in sys.argv:
     fixes = {(f['caller'], f['callee'], f['k'], f['pos']): dict(f['const'], bits=f.get('bits')) for f in json.load(open(sys.argv[sys.argv.index('--fixes') + 1]))['fixes']}
-text = sigfix(text, rep, pads, fixes)
+slots = None
+if '--slots' in sys.argv:
+    # M11-N201 (#3932): m11_setother_slot_class.py の出力のうち実値化 (lea_alloca) の行だけを 0 詰め引数へ入れる
+    slots = {(r['caller'], r['callee'], r['k'], r['pos']): r['value'][1:] for r in json.load(open(sys.argv[sys.argv.index('--slots') + 1]))
+             if r['class'] == '実値化' and r['reason'] == 'lea_alloca' and r['value'] and r['value'].startswith('&%stack_var_')}
+    rep['sigfix_slot_entries'] = len(slots)
+text = sigfix(text, rep, pads, fixes, slots)
 rep['sigfix_zeropad_sites'] = len(pads)
 rep['sigfix_zeropad_args'] = sum(p['want'] - p['have'] for p in pads)
 print('[m11_post][sigfix] 0 詰め call site: %d (0 詰め引数 %d)' % (rep['sigfix_zeropad_sites'], rep['sigfix_zeropad_args']))
