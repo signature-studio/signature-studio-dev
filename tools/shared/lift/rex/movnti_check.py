@@ -36,15 +36,16 @@ for i, e in enumerate(expect):
         reach_ok += ok
         if t is not None: va_seen.add(t)
     else:
-        ok = True  # info (閾値未満の対照): 判定に入れない。想定 (trap しない) との食い違いは出力と REPORT に書く
-        ctrl_ok += (t is None)
+        # sweep: movnti に入る ⇔ a1 ≥ 0x70000 (静的読み count>>6 ≥ 0x1c00)。入るなら movnti の VA で trap、入らないなら movnti 以外で trap (VA 0 = memory OOB。trap 位置は未特定)
+        ok = (t in movnti) == (e['a1'] >= 0x70000)
+        ctrl_ok += ok
     bad += not ok
     t_s = f'{t:#x}' if t is not None else '-'
     n_s = f'{n:#x}' if n is not None else '-'
     print(f'[movnti] case={i:2d} {e["kind"]:7s} fn={e["fn"]} a1={e["a1"]:#x} wasm_trap_va={t_s:12s} native_fault={n_s:12s} {"OK" if ok else "NG"}')
 nr = sum(1 for e in expect if e['kind'] == 'reach')
-nc = sum(1 for e in expect if e['kind'] == 'info')
-print(f'[movnti] reach {reach_ok}/{nr} (wasm trap at movnti VA・native が arena 外で落ちる)・info (閾値未満) {nc - ctrl_ok}/{nc} が trap (想定は 0 件・未解決)')
+nc = sum(1 for e in expect if e['kind'] == 'sweep')
+print(f'[movnti] reach {reach_ok}/{nr} (wasm trap at movnti VA・native が arena 外で落ちる)・sweep 閾値 (movnti に入る ⇔ a1 ≥ 0x70000) 一致 {ctrl_ok}/{nc}')
 print(f'[movnti] wasm trap VA の種類 = {sorted(hex(v) for v in va_seen)}')
 print(f'[movnti] RESULT {"PASS" if bad == 0 else "FAIL"}')
 sys.exit(0 if bad == 0 else 1)
