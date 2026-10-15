@@ -67,7 +67,7 @@
     `docs/WORKFLOW.md` §3 ① の `gh issue list ... | grep -oE '^\[<AREA>-[0-9]+[a-z]?\]' | grep -oE '[0-9]+' | sort -n | tail -1`)。
     起票の直前に同じ確認を再度行い、`grep -cF '[<AREA>-<n>]'` が 0 件であることを確かめてから起票する。
     本文に `親: #N`・受入条件・`oc_artifacts:` 行。
-    milestone・Status は触らない。優先度は親の `prio:*` ラベルを子に引き継ぐ (親が `prio:critical` なら起票時に `gh issue create ... --label "prio:critical"` を付ける。親に `prio:*` が無ければ付けない。`docs/WORKFLOW.md` §3 ③)。起票した番号は最終回答と issue コメントに書く。
+    milestone・Status・`prio:*` は触らない。子 issue に `prio:*` を付けない (`gh issue create` に `--label "prio:*"` を付けない)。優先度の付与と親からの継承は PM / Worker が行う (#3973・#4387)。起票した番号は最終回答と issue コメントに書く。
     前提となる別 PR が未 merge の作業は着手せず、issue にコメントして停止する。
 12. **reviewer に差し戻されたら、PM を待たずに自分で直す**。差し戻し (changes_requested) を受けると
     workflow があなたを fix モードで自動起動する。その PR ブランチを直して push すれば review が
@@ -120,7 +120,7 @@
 - PR を出す前に `bash .github/scripts/pr-lint.sh --base origin/main --head HEAD --body-file <PR 本文ファイル>` を実行し、
   出力された違反 (REPORT 行数・repo 外パス・Closes と未達の整合・oc_artifacts の値域・DOC_MAP 未登録) を直してから push する。
 - launch を止め得る変更 (`infra/pm-worker/` の停止条件・既定値・launch の経路。#2795) を含む PR は、PR 本文に『本番への影響』を書く。deploy 後に launch が止まるか、止まる条件 (`launch_halted.reason`)、既定のままで止まるかを書く。
-- 既定値を変えるときは、本番に既にある状態 (VM の取り込み済みか・既存の変数) での挙動を書く。止まり得るなら、deploy の判断を依頼者に任せ、止まった状態の見方 (`/status` の `launch_halted`・`launch_halted_overdue`) を本文に添える。
+- 既定値を変えるときは、本番に既にある状態 (VM の取り込み済みか・既存の変数) での挙動を書く。止まり得るなら、deploy の判断を PM に任せ、止まった状態の見方 (`/status` の `launch_halted`・`launch_halted_overdue`) を本文に添える。
 - 停止の規則は、規則を壊すと落ちるテストを同じ PR に入れる (`infra/pm-worker` は `npm run test:mutation`)。
 - 最終回答に: コミット hash・PR URL・e2e 実測結果・未解決 (起票先付き) を含めること。
 - **最終回答と同じ内容を、必ず `gh issue comment <N>` で起点の issue に投稿すること** (完了・停止・

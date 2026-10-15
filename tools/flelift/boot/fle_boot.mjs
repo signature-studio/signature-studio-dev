@@ -238,7 +238,7 @@ for (let i = 0; i < Number(m._fle_ipp_names()); i++) {
     const c = Number(m._fle_ipp_count(i));
     if (c) boot.ipp_called.push([m.UTF8ToString(m._fle_ipp_name(i)), c, '0x' + Number(m._fle_ipp_site(i)).toString(16)]);
 }
-// ippsZero_8u の唯一の呼出し点は 0x67264b (`call qword ptr [rax]`・FF 10)。target は直前の 0x672644 `mov rax,[0x15e0a48]` で読む (PE の逆アセンブル実測)。0x67264d は戻り番地 (ipp.called の ret)。読出し経路の値を残す
+// ippsZero_8u の呼出し点は 0x67264b (`call qword ptr [rax]`・FF 10) と 0x6b91e8 の 2 つ (付録 REPORT_APPENDIX_4004.md §2)。target は直前の 0x672644 `mov rax,[0x15e0a48]` で読む (PE の逆アセンブル実測)。0x67264d は戻り番地 (ipp.called の ret)。読出し経路の値を残す
 const objPtr = Number(BigInt(rd64(0x15e0a48)));
 boot.ipp_call_slot = { slot_15e0a48: rd64(0x15e0a48), obj_first_qword: objPtr ? rd64(objPtr) : null };
 const stopNm = m.UTF8ToString(m._fle_ipp_stop_name());
