@@ -52,8 +52,10 @@
 |---|---|---|---|
 | ON, enc なし | 55/65/9/2 | 55/65/9/2 | 0 行 |
 | OFF, enc なし | 55/65/9/2 | 55/65/9/2 | 0 行 |
-| ON, `FA_ENC_INIT=1` | 57/63/9/2 | 57/63/9/2 (HEAD `d49760bf`) | 0 行 |
-| OFF, `FA_ENC_INIT=1` | 55/63/11/2 | 55/63/11/2 (HEAD `d49760bf` は 1 回) | 0 行 |
+| ON, `FA_ENC_INIT=1` | 57/63/9/2 | 57/63/9/2 | 0 行 |
+| OFF, `FA_ENC_INIT=1` | 55/63/11/2 | 55/63/11/2 | 0 行 |
+
+- HEAD の記録: 上の表の 8 回は、すべて main 取り込み前の HEAD `1ba2e8f3` で取った (測定経路の code は測定 commit `d49760bf` と同一。`1ba2e8f3` は REPORT のみの commit)。取り込み後の HEAD `66be2919` では ON の sweep を 1 回だけ再測定した (57/63/9/2・§6)。OFF は取り込み後に測っていない。
 
 - enc なしでは、`0x1810553d0` は native 側が落ちる (§3) ため、ON/OFF で class が変わらない。ON/OFF の差は enc ありの sweep に現れる。
 - 値の不一致 2 件は全 build で同じ: `0x1803dee20` と `0x180da4030` (native 0 / wasm 入力。xmm0 の出所は 2508 付録 §3.4 で未解決のまま)。
@@ -88,4 +90,4 @@ PE 実値の読み取り: `python3 -c "import pefile; pe=pefile.PE('<SlateCore.c
 | fa_sweep の揺れ (47/48・55 ↔ 54) の原因 | 現 tree で 8 回の行差分 0 件・単独 3 回も一致。原因を特定できない | 未起票 (再現条件が無い。再現したら新 issue。PR 本文の未解決表で追跡) |
 | `fa_cmp.py` は xmm0 のみ比較。戻り値が eax の関数 (`0x1810553d0` など) の rax は見ていない | 本付録では rax を別途確認 (wasm は `_ott_run` の戻り値)。sweep の rax 比較は未実施 | 未起票 (判定を変えると sweep 数値が動くため PM 判断) |
 | `0x1803dee20` の native 0 / wasm 入力 (xmm0 の出所) | 値の不一致 1 件 (全 build) | #2695 (ICALL-81・OPEN) |
-| `0x180da4030` の native 0 / wasm 入力 (xmm0 の出所) | 値の不一致 1 件 (全 build) | #2708 (ICALL-83・CLOSED) の後続 PR #3202 (ICALL-83・open) |
+| `0x180da4030` の native 0 / wasm 入力 (xmm0 の出所) | 値の不一致 1 件 (全 build) | #3198 (ICALL-87・OPEN)。#2708 (ICALL-83・CLOSED) の修復 (受入 1・2) を移した子 |
