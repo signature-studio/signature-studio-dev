@@ -89,7 +89,7 @@
 | 線は lineWidth に依らず 1 px。アンチエイリアスなし | 太い線・角の見え方が実機と異なる | 未起票 |
 | `setTransformMatrix` は no-op (平行移動・拡大縮小は未適用) | 原点 (0,0) 以外の view では描画位置がずれる。harness は原点のみで検証 | 未起票 |
 | placeholder の 5x7 フォント | 確認用の見た目のみ。製品の字形としては使わない | 未起票 |
-| wasm の初期化経路 (`getPlatformFactory` の代替と `CFontDesc::init()` の直呼び) | harness の回避が残る | #3261 (SR-51) |
+| wasm の初期化経路 (`getPlatformFactory` の代替と `CFontDesc::init()` の直呼び) | 解消済み (main の #3261 で `init()` 経路化。§17-10 の再測定で run rc=0) | #3261 (SR-51・main に取り込み済み) |
 | XferOnOffButton の canvas 実装 | 範囲外 | #3262 (SR-52) |
 
 ### 17-8. render 判定の条件 (追加判定 `text_px>0`)
