@@ -32,7 +32,8 @@ need ../m11/work/boot_final3.ll "oc_artifacts: work-m11"
 need ../m11/work/m11_image.bin "oc_artifacts: work-m11"
 [ "$M11_ONLY" = 1 ] || need ../ott/work/ott.ll "oc_artifacts: work-m6-ott (or --m11-only)"
 echo "== [1/4] build"
-gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm
+STK_FLAG=""; [ "${LD_STK_ENTRY28:-0}" = 1 ] && STK_FLAG="-DLD_STK_ENTRY28"   # #3619: 既定は旧 stk (212)
+gcc -O1 -g -Wall -Wno-unused-function $STK_FLAG -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm
 python3 liftdiff.py build targets/m11.json >/dev/null
 if [ "$M11_ONLY" = 0 ]; then
 python3 liftdiff.py build targets/ott_old.json >/dev/null
