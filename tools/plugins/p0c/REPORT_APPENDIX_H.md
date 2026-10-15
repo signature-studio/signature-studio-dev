@@ -90,13 +90,21 @@
 
 ### 19.1 結果
 
-- 修復前の値は §18.3 (同一 census)。修復の commit は `d2e4283a` (測定 commit)。
-- `p0c4_abi_e2e.py 2000` (HEAD `d2e4283a`): rc 0・所要 15.3 秒・`run=67 ok=67 sig11=0`・CSV 67 kernel 全てで buf_diff=0 (修復前は 49/67)。冪等性 OK・llvm-as OK。
-- `p0c_e2e.sh` (クリーン checkout の HEAD `d2e4283a`、`tools/plugins/p0c/work` 無し): rc 0・`== e2e OK ==`・3 分 51 秒。測定時の load average は開始 0.31・終了 9.85 (1 分)。
-- 10000 case の追加検証 (同じ修復済み IR を `k80_diff.py --cases 10000`、20.8 秒):
-  17 kernel は buf_diff=0。**0x5dffc0 だけ buf_diff=3** (20000 cell 中)。2000 case では 0 だった。
+- 修復前の値は §18.3 (同一 census)。修復の commit は `d2e4283a` (修復本体)・`46b908b9` (GLOBAL_INITS の不一致停止と件数検査)・`5d168e1e` (コメント修正)。
+- **測定 commit は `5d168e1e`** (p0c_e2e と 10000 case の測定時点のコード)。その後 `1224865b` で `k80_hand_bodies.py` の冒頭コメント 1 行だけを直した (19.6)。
+  素材は `fl-win64`・`toolchain-retdec`・`plugins-ott` を `$ARTIFACTS_DIR` から展開して使った (`FL_WIN64_DIR` と `PATH=/usr/lib/llvm-18/bin` を前置)。
+  - `p0c4_abi_e2e.py 2000`: rc 0・27.9 秒 (開始 load 1.16)・`run=67 ok=67 sig11=0`・CSV 67 kernel 全てで buf_diff=0 (修復前は 49/67)。冪等性 OK・llvm-as OK。
+  - `bash tools/plugins/p0c/p0c_e2e.sh` (`tools/plugins/p0c/work` 無しの状態から、kernel_matrix と k80 lift を含む全段を実行): rc 0・`== e2e OK ==`・8 分 35 秒 (開始 load 0.28、終了時の 1 分 / 5 分平均 7.79 / 10.09)。
+  - `k80_diff.py --cases 10000 --only <修復 18 kernel>` (IR は `work/diff3/k80.hb.ll`): 完走・36.9 秒 (開始 load 2.95)。17 kernel は buf_diff=0。**0x5dffc0 だけ buf_diff=3** (maxulp 535)。2000 case では 0 だった。
   このため 0x5dffc0 は bit-exact と確定できない (19.3 の未解決)。
-- 測定 commit は `d2e4283a` のまま。その後の差分 (`k80_hand_bodies.py` の GLOBAL_INITS の不一致停止、`p0c4_abi_e2e.py` の置換件数検査と FIX18 コメント) は、素材 `toolchain-retdec` が無い run では再測定できず、**未測定** (19.5)。
+- 前回測定 (測定 commit `d2e4283a`、修復本体のみの版): `p0c4_abi_e2e.py 2000` 15.3 秒、`p0c_e2e.sh` 3 分 51 秒、10000 case 20.8 秒。
+- 測定 commit までのコード差分 (`git diff --stat d2e4283a 5d168e1e -- tools/plugins/p0c ':!*REPORT*'` の出力):
+  ```
+   tools/plugins/p0c/k80_hand_bodies.py | 16 ++++++++++------
+   tools/plugins/p0c/p0c4_abi_e2e.py    | 14 +++++++++++---
+   2 files changed, 21 insertions(+), 9 deletions(-)
+  ```
+  BODIES の本体とシグネチャは変えていない。差分は GLOBAL_INITS の不一致停止・件数検査・コメント。
 
 ### 19.2 kernel 別の原因と修復
 
@@ -146,17 +154,26 @@
 | (案) PE 定数の 0 初期化 | fe (未切り分け) | 新規 | グローバル定数が 0 として読まれ、その定数を使う出力が全域で不一致 | IR の `global i128 0` が PE の .data (VA 0x6fffb0 = (0.5, 0.5)) を取り込まない | 0x5e03f0: buf_diff 5,168,510 → 0 | PE の .data 値と IR の global 初期値の照合が無い | GLOBAL_INITS で初期値を設定。D16 (rdata 窓が縮む) とは別機構 (D16 は窓サイズ、本件は窓内の初期値)。D16 の gen_globals 経路で起きたかは未確認 |
 | (案) fistp 範囲外の処理欠落 | fe | 新規 | \|v\|>32767 や NaN で 0x8000 を返すべき所が別の値になる | fistp word の範囲判定 (0x8000 を返す分岐) が IR に無い | 0x5de620: buf_diff 301,144 → 0 | 機械語の fistp 直後の範囲判定 (cmp/cmov) の有無 | rint と範囲判定 (k80_hand_bodies)。#982 (fistp qword の上位 dword store 欠落) と同じ fistp 系だが、store の欠落ではなく範囲外値の変換規則の欠落 |
 
-### 19.5 負論対照 (新しい gate の FAIL 確認): 未実施
+### 19.5 負論対照 (新しい gate の FAIL 確認)
 
-- 状態: **数値なし**。この run の素材は `fl-win64` のみで、`work/k80.lift.ll` が無いため `p0c4_abi_e2e.py` は [5] の差分試験 (`k80_diff.py`) まで進めない。FIX18 の検査と CSV 全 kernel の buf_diff 検査が 1 kernel の本体除去で FAIL することは、**まだ観測していない**。
-- この run で確認したこと (合成 IR。kernel の数値ではない): `k80_hand_bodies.py` は BODIES 14 + GLOBAL_INITS 1 = 15 件を返す (1 回目・2 回目とも 15)。2 回目の出力は 1 回目と byte 一致。`@global_var_6fffb0` の初期値が想定外 (`global i128 5`) の場合と定義行が無い場合は rc 1 で停止する。
-- 次の素材付き run で行う手順 (未実行):
-  1. `p0c4_abi_e2e.py 2000` を実行し、`work/diff3/k80.ext.ll` を得る。
-  2. 0x5dfff0 の本体だけを外した IR を作る: `replace_bodies` を BODIES から `function_5dfff0` を除いた dict で呼ぶ (`k80_hand_bodies` を import して出力を `nega.ll` に書く)。
-  3. `k80_diff.py --ir nega.ll --only 0x5dfff0 --cases 2000` の buf_diff を記録する (期待: 0 以外)。FIX18 の検査はこの kernel を `buf_diff≠0` として FAIL にするはず。
-- 起票先: 本 PR #3284 の次の review (素材付き run) で実施する。
+測定 commit `5d168e1e` の差分試験 IR (`work/diff3/k80.ext.ll`) から、`k80_hand_bodies.py` の `replace_bodies` で 2 通りの IR を作った (作業用の一時ファイルは repo 外。tracked file は変えていない)。
+
+| 対照 | 置換件数 | 対象 kernel の buf_diff (`k80_diff.py --only <VA> --cases 2000`) | `p0c4_abi_e2e.py 2000` の出力 |
+|---|---|---|---|
+| (a) `function_5dfff0` の本体を BODIES から外す | 14 | 0x5dfff0: **4000** | `[FAIL] k80_hand_bodies 置換件数 14 (期待 15 = BODIES 14 + GLOBAL_INITS 1)` (rc≠0) |
+| (b) GLOBAL_INITS を空にする | 14 | 0x5e03f0: **5168510** | 同上 |
+
+- `p0c4_abi_e2e.py` の件数検査が先に止めるため、FIX18 の buf_diff gate と CSV 全 kernel の gate の FAIL 行は出ていない。両 gate が検査する buf_diff は、上の表のとおり 0 以外になる。
+- `[FAIL]` 行を出すため、(a)(b) の時だけ `k80_hand_bodies.py` に 1 行 (`BODIES.pop(...)` / `GLOBAL_INITS.clear()`) を一時追加して p0c4 を実行し、直後に退避コピーから復元した (`git status` clean を確認)。
+- 対照の後、`p0c4_abi_e2e.py 2000` を正常系で再実行し、`work/` を正常状態に戻した (`run=67 ok=67 sig11=0`・全 67 kernel buf_diff=0 を確認)。
 
 ### 19.6 検証範囲
 
-- 検証した: `k80_hand_bodies.py` の件数・冪等・不一致停止 (合成 IR)、`p0c4_abi_e2e.py` の構文 (`py_compile`)。
-- 検証していない (素材不足): `p0c_e2e.sh`、`p0c4_abi_e2e.py 2000` (件数検査を通ったかを含む)、19.5 の負論対照。範囲外の主張は弱める。
+- 測定 commit `5d168e1e` で実施: §19.1 の 3 本 (素材付き)、§19.5 の対照 2 本 (件数 gate の `[FAIL]` を含む)。
+- `5d168e1e` から HEAD までのコード差分 (`git diff --stat 5d168e1e HEAD -- tools/plugins/p0c ':!*REPORT*'` の出力):
+  ```
+   tools/plugins/p0c/k80_hand_bodies.py | 2 +-
+   1 file changed, 1 insertion(+), 1 deletion(-)
+  ```
+  差分はコメント 1 行のみ。IR 出力は変わらない (`work/diff3/k80.hb.ll` を変更前の出力と `cmp` で byte 一致)。`1224865b` で `p0c4_abi_e2e.py 2000` を再実行: rc 0・27.8 秒・`run=67 ok=67 sig11=0`・全 67 kernel buf_diff=0。p0c_e2e.sh と 10000 case は `5d168e1e` の値をそのまま使う (実行される IR と実行コードは同一)。
+- 未検証: 0x5dffc0 の 10000 case 残差の原因 (19.3 の未解決)。80 本の完全判定 (#2182 の §18.6)。
