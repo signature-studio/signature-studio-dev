@@ -12,7 +12,7 @@
 ## 2. 測定条件
 
 - 測定 commit: `fbb19946c` (`Merge pull request #4649`)。コードは変更していない。
-- 素材: `oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff` のうち、`fl-win64`・`work-m11`・`work-liftdiff` を展開した。`toolchain-emsdk` は [EMSDK] (`/opt/emsdk`) が既に入っていたため展開していない。`emcc` の実在を確認した。
+- 素材: `oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff` のうち、`fl-win64`・`work-m11`・`work-liftdiff` を展開した。`toolchain-emsdk` は [EMSDK] (docs/REFERENCES.md) が既に入っていたため展開していない。`emcc` の実在を確認した。
 - `FL_WIN64_DIR` は runner の一時領域の `fl-win64/extracted` の親を指定した。
 - run 1: 作業ツリーは共有 main のチェックアウト。生成物は `tools/liftdiff/work/` (gitignore 対象) だけで、追跡ファイルは変えていない。
 - run 2: 専用 worktree `ws-4667` (branch `4667-ld234-m11-e2e-timing`、commit `fbb19946c`)。
