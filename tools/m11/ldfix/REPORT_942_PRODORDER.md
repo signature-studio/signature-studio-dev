@@ -4,6 +4,7 @@
 
 ## 0. 結論
 
+- 本 REPORT の「本番の IR 生成順」は、測定 commit `c9d365465` の `m11_gen_ir2.sh` の段 (ldfix → ld108 → ld115 → src412770 → qstore → alloca → guard699 → guard4fa210) を指し、`fix_r8b815050.py` を含まない chain。main では `5c43ea98a` (#1448) で r8b が後から入り既定で適用されるため、r8b を含む判定は #3608 (項目 3) に残す。
 - ldfix_e2e の入力 (snapshot `boot_final3.ll`) は本番の IR 生成順より前にある。本番の後段 (qstore → alloca → guard699 → guard4fa210) と ld108・ld115・src412770 を snapshot に当てると、**通常 boot は完走する** (units_run 17 → 109・threw なし・`DllMain attach 完走` の Halt0 経路で終了)。
 - 同じ順で ldfix 無し (base) と ldfix 有り (fix) を比べると、boot は両方とも完走し結果は同じ。**boot threw は ldfix 起因ではなく、既存の欠陥 (unit 17 の alloca 縮退・unit 56 の D19・unit 87 の refcount 系) が本番の修復を経ていない snapshot に残っていたため**。
 - unit 56 (VA 0x16fde0) の原因: `8c5eb0` の入口ガード (`cmp idx, count-1; jg`) が IR から脱落し、件数 0 で本体が 2 回回る。2 回目に基底 0 + 8 の要素番地 `0x8` を読み、`0x670067` (UTF-16 "gg") を `function_8c6530` に渡して trap。guard699 で消える。
@@ -52,11 +53,11 @@
 
   - `obj = 0x10bc4e40`。件数 0 で本体が 2 回回る。32 bit の残り回数は 0 → -1 (`0xFFFFFFFF`) となり、IR は `icmp ne` で継続する。
   - `function_8c6530` の probe (同じ run): `arg1 = 0x10b698c0`・`arg2 = 0x670067`・`arg3 = 0x67006f`。
-- 修復: guard699 (`icmp sle i32 %9, 0` の分岐を復元する IR pass) を足すと unit 56 の trap は消える (作業変種・参考: boot は 83 units まで進み、次の trap は unit 87 の `function_418190` (C))。本番順の変種では guard699 を含み、boot は完走。
+- 修復: guard699 (`icmp sle i32 %9, 0` の分岐を復元する IR pass) を足すと unit 56 の trap は消える (guard 有無の n=3 測定は `tools/m11/trap_triage/REPORT_699.md` §3-1)。本番順の変種では guard699 を含み、boot は完走。
 
 ## 4. 本番順の残 trap (fix 変種・22 件)
 
-`tools/m11/ldfix/work/prod942_fix/trap_units.json` を `m11_wasmnames.py` で IR 名に戻したもの (最内 frame ← 呼出し元 1 段)。halt0 は Halt 呼出し (trap ではない)。
+`tools/m11/ldfix/work/prod942_fix/trap_units.json` を `tools/m11/m11_wasmnames.py` で IR 名に戻したもの (最内 frame ← 呼出し元 1 段)。halt0 は Halt 呼出し (trap ではない)。
 
 | unit | VA | 種別 | 最内 IR 関数 @ wasm 位置 | 呼出し元 |
 |---|---|---|---|---|
@@ -89,7 +90,7 @@
 
 ## 5. 受入への反映
 
-- 受入 1 (trap 9 件の原因): **部分**。元の 9 件のうち 17 (alloca 44bae0・単独で確認)・56 (D19・guard699 で単独で確認)・53/87/138 (qstore 系・本番順で消える。個別の寄与は未切り分け)・158 (本番順で消える。寄与は未切り分け) は本番順で消えた。残る 144・149 (OOB) と 114 (halt0) の引き金は未確定。
+- 受入 1 (trap 9 件の原因): **部分**。元の 9 件のうち 17 (alloca 44bae0・単独で確認)・56 (D19・guard699 単独で消える。出所は `tools/m11/trap_triage/REPORT_699.md` §3-1)・53/87/138 (qstore 系・本番順で消える。個別の寄与は未切り分け)・158 (本番順で消える。寄与は未切り分け) は本番順で消えた。残る 144・149 (OOB) と 114 (halt0) の引き金は未確定。
 - 受入 2 (boot threw の原因): **達成** (判定: ldfix 起因ではない)。ldfix_e2e の base/fix は同じく threw。本番順の base と fix は両方とも完走 (units 109・Halt0 完走)。原因は既存の pass の未適用 (alloca・guard699・qstore 系)。ただし本測定は再現 chain の範囲で、本番 `m11_build.sh` 全体は未実行。
 - 受入 3 (件数反映): **部分**。ldfix_e2e の snapshot 測定は base = fix (変化なし)。本番順では survey の ok は両方 872、trap は両方 22 で、ldfix の効果は unit 895 (OOB → halt0) の 1 件だけ (r8b を含まない chain での値)。現 main の判定は #1292 / #1469 で別に実施済み。
 
@@ -104,9 +105,9 @@
 |---|---|---|
 | 本番順の survey 残 trap 22 件のうち 144・149 (OOB)・114 (halt0) の引き金 | 受入 1 | #3608 ([CI-171]) |
 | 53・138・158 の消失の寄与が qstore / ld108 / ld115 / src412770 のどれか (段ごとに切り分けていない) | 受入 1 の帰属 | #3608 ([CI-171]) |
-| ldfix_e2e の入力 (snapshot = 本番順より前) を本番順に替えるか (base/fix の基準が変わる) | 測定の基準 | 決定 (PM 判断): 替えない。現行の入力のまま (本番順は `prod_order_942.sh` で別に測定済み)。戻す場合は `ldfix_e2e.sh` の入力を差し替えて再測定 |
-| 本番 `m11_build.sh` 全体 (m11_post・argrecover・instr 段・C 上書き) での boot 再確認 | 受入 2 の範囲 (本測定は再現 chain) | #3646 ([CI-172]・親: #942)。決定 (PM 判断): 本 PR の範囲外として子 issue に起票 |
-| work-m11 の IR と現 main の不一致 | 測定の母体 | PM agent の判断待ち: 追跡先 (#680 は closed で、対応する open issue が無い)・既定案: 新規の子は起票せず本表に残す (測定の母体は測定 commit で固定) |
+| ldfix_e2e の入力 (snapshot = 本番順より前) を本番順に替えるか (base/fix の基準が変わる) | 測定の基準 | PM 決定 (PR #3611 の PM コメント・rule R7・可逆): 替えない。現行の入力のまま (本番順は `prod_order_942.sh` で別に測定済み)。戻す場合は `ldfix_e2e.sh` の入力を差し替えて再測定 |
+| 本番 `m11_build.sh` 全体 (m11_post・argrecover・instr 段・C 上書き) での boot 再確認 | 受入 2 の範囲 (本測定は再現 chain) | #3646 ([CI-172]・親: #942)。PM 決定 (PR #3611 の PM コメント・rule R1・可逆): 本 PR の範囲外として子 issue に起票 |
+| work-m11 の IR と現 main の不一致 | 測定の母体 | PM 決定 (PR #3611 の PM コメント・rule R7・可逆): 新規の子は起票せず本表に残す (既定案どおり)。追跡先の #680 は closed で、対応する open issue が無い。測定の母体は測定 commit で固定 |
 | F3c 関数の件数の変化 (旧 33 → 現 43) の出所 | 受入 3 | #3608 ([CI-171]・項目 4)。現 43 の出所は下の再測定の出力行。同じ入力での 33 → 43 は REPORT_1325 §6 にも記録 |
 
 F3c 件数の再測定 (測定 commit `c9d365465` の `ldfix.py`・入力 `tools/m11/work/boot_final3.ll`): `cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block00031_PE.bin> --report out.json` (約 41 秒・rc 0) の出力行は `F1=0 F1v=0 F2=0 F3a=2 F3b=0 F3c=43 F3d=0 F4=10 (errors=0)`。旧 33 は REPORT_942 の測定時点の値。
