@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """PY-99 閉包 (#3104・親 #2874): SLOT? 49 件の書込みの値を、CFG 到達 store で再帰に閉じる (実機不要)。
 
-  python3 analysis/py99_closure.py <work/py53/fn.txt> [--rint] [--negctl {drop-pred|drop-part}] [--md <out.md>]
+  python3 analysis/py99_closure.py <work/py53/fn.txt> [--rint] [--callargs] [--negctl {drop-pred|drop-part}] [--md <out.md>]
+
+--callargs: call 0x10469f0 の 7 件の引数 (ecx・edx・r8d) を、書込み式ではなく CALL 命令の引数式で閉じる (#4697)。
 
 フレームの読み (r, X) は、r に CFG 上で届く store 集合 R(r, X) で置き換える。R の各 store s は、その値の式
 (def_value) を同じ方法で閉じたものにする。R が 2 件以上なら経路別の場合分け {s1: E1 | s2: E2} になる。
@@ -224,6 +226,9 @@ def main(argv):
     want_rint = "--rint" in args
     if want_rint:
         args.remove("--rint")
+    want_callargs = "--callargs" in args
+    if want_callargs:
+        args.remove("--callargs")
     md_out = None
     if "--md" in args:
         k = args.index("--md")
@@ -241,6 +246,7 @@ def main(argv):
     print(f"# CFG 検査: 辺 {n_edges}・テキスト直読みとの差 {diff}・入口から到達しない命令 {unreach}・間接 jmp {n_ind}")
 
     writes = []
+    call_at = {}
     for a in p88.default_targets(path):
         r0 = p99.Rec(ins, order)
         m, o = ins[a]
@@ -249,9 +255,14 @@ def main(argv):
         if want_rint:
             if cat.startswith("rint(") and ("SLOT?" in cat or "ACC?⚠合流" in cat):
                 writes.append(a)
+        elif want_callargs:
+            if cat.startswith("CALL[未知の関数]") and val.startswith("CALL[0x10469f0]"):
+                writes.append(a)
+                call_at[a] = int(re.search(r"@(0x[0-9a-f]+)$", val).group(1), 16)
         elif cat.startswith("直接式") and "SLOT?" in cat:
             writes.append(a)
-    print(f"# 対象の書込み ({'rint 6 件 (--rint)' if want_rint else '直接式 SLOT?'}): {len(writes)} 件")
+    label = "rint 6 件 (--rint)" if want_rint else "call 0x10469f0 の引数 (--callargs)" if want_callargs else "直接式 SLOT?"
+    print(f"# 対象の書込み ({label}): {len(writes)} 件")
 
     T = Tag(ins, order)
     T.cfg = cfg
@@ -411,7 +422,11 @@ def main(argv):
         res = {}
         for a in writes:
             m, o = ins[a]
-            val = T.ev(p88.parse_ops(o)[1], cfg.idx[a], 0)
+            if want_callargs:
+                val = re.sub(r"^CALL\[0x10469f0\]", "", T.call_expr(cfg.idx[call_at[a]], 0))
+                val = re.sub(r"@0x[0-9a-f]+$", "", val)
+            else:
+                val = T.ev(p88.parse_ops(o)[1], cfg.idx[a], 0)
             res[a] = expand(val, [])
         return res, multi, memo
 
