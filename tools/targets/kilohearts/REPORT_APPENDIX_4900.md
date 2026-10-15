@@ -5,9 +5,8 @@
 ## 結論
 
 - `DELAY_RULES` に 2 件 (件数 assert 付き) を足した。`uVar19 = auVar20._0_4_ & 0x3f` と `uVar3 = (int)(auVar20._0_4_ - uVar19) >> 6` を、ビット列を読む `f2u()` で包む形に書いた (レビュー指摘 blocking 1 の修正)。`V128` の型は変えていない。
-- 旧式 (`(int)` の値変換) は、`float` の数値を int にするため機械語のビット読みと一致しなかった。下の表の `(int)` 版の測定値 (343 → 342) は旧式の値で、現在の `f2u()` 式には対応しない。
-- **現 HEAD (`f2u()` 式) の再測定は未実施**。素材 `plugins-kilohearts` が `$ARTIFACTS_DIR` に無く、emcc も無いため。必要素材は `oc_artifacts: fl-win64 plugins-kilohearts toolchain-emsdk`。
-- Gain/Haas/Gate の `.o` の `cmp` 一致は、旧式での結果。現 HEAD では未確認。
+- 測定 commit `fee4c1bf7` (現 HEAD のコード) で、delay の emcc error 行は基準 343 → 342、演算・代入・ポインタの型不一致は 90 → 89。Gain/Haas/Gate の `.o` は基準と同一 (`cmp` 一致)。
+- 旧式 (`(int)` の値変換、`86abf8a79`) は、`float` の数値を int にするため機械語のビット読みと一致しなかった。旧式の測定値 (342 / 89) は下の表の対比列にだけ残す。
 
 ## 機械語の確認
 
@@ -24,23 +23,25 @@ sar   ecx,0x6         ; 整数の算術右シフト
 
 ## 測定
 
-- 測定 commit (コードを変えた最後の commit): `86abf8a79`。
+- 測定 commit (コードを変えた最後の commit): `fee4c1bf7`。
 - 基準: `origin/main` = `ef51996d0` (同じ `gtype_census.sh`・同じ素材)。
-- 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`)・`toolchain-emsdk` ([EMSDK])・Ghidra 12.1.4 (zip sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)・JDK 21。作業ディレクトリは CI の一時領域 (repo 外・作業 dir 名 `kh`)。n=1。
+- 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`、76,642,304 B、sha256 先頭 16 桁 `d55ce8b4c0ad7ebe`)・`toolchain-emsdk` ([EMSDK] 6.0.12)・Ghidra 12.1.4 (zip sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)・JDK 21。作業ディレクトリは CI の一時領域 (repo 外・`kh`)。n=1。
 - 実行: `bash tools/targets/kilohearts/ghidra_route/gtype_census.sh <作業 dir>` (既定 FX)。decompile 151/151 OK。
-- 所要 (real): 基準 56.6 s・PR 46.1 s。load (1 分平均): 基準 1.19・PR 0.61。
+- 所要 (real): `fee4c1bf7` 66.1 s。load (1 分平均): 開始時 1.22・終了時 1.30 (4 vCPU)。基準の所要時間は本 run では未計測。
+- 比較の `.o`: `gtype_census.sh <作業 dir> <基準 ghidra_route>` で `fee4c1bf7` の Gain/Haas/Gate の `.o` を基準 `ghidra_route` の出力と `cmp` した。3 件とも一致。
 
-| 項目 | 基準 `ef51996d0` | PR `86abf8a79` |
-|---|---|---|
-| delay emcc error 行 | 343 | **342** |
-| 演算・代入・ポインタの型不一致 | 90 | **89** |
-| 128bit レーン型 | 167 | 167 |
-| 引数数不一致 | 86 | 86 |
-| gain / haas / gate `.o` | 1435 / 3217 / 3756 B | 1435 / 3217 / 3756 B (`cmp` 一致) |
+| 項目 | 基準 `ef51996d0` | PR `fee4c1bf7` | (参考) 旧 `(int)` 式 `86abf8a79` |
+|---|---|---|---|
+| delay emcc error 行 | 343 | **342** | 342 |
+| 演算・代入・ポインタの型不一致 | 90 | **89** | 89 |
+| 128bit レーン型 | 167 | 167 | 167 |
+| 引数数不一致 | 86 | 86 | 86 |
+| 合計 | 343 | 342 | 342 |
+| gain / haas / gate `.o` | 1435 / 3217 / 3756 B | 1435 / 3217 / 3756 B (`cmp` 一致) | 1435 / 3217 / 3756 B (`cmp` 一致) |
 
 ## 現 HEAD までの差分
 
-`git diff ef51996d0 86abf8a79 -- tools/targets/kilohearts/ghidra_route` = `ghidra_to_c.py` 7 行 (+7)。
+`git diff fee4c1bf7 HEAD -- tools/targets/kilohearts/ghidra_route` は空 (差分 0)。測定値は現 HEAD と同じ。
 
 ## 基準値の出所 (issue 本文との差)
 
