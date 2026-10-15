@@ -1,6 +1,6 @@
 # REPORT_APPENDIX_3323 — Firefox の burst p99 (AU-37 #3323)
 
-> **正本**: `tools/audio/REPORT_AU2_CI.md` §13。本書はその測定全文。
+> **正本**: `tools/audio/REPORT_AU2_CI.md` §12。本書はその測定全文。
 
 ## A. 変更
 
