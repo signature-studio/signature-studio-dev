@@ -129,9 +129,9 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
   | 実行時間 (`date` で計測) | 2.271 / 2.275 / 2.282 s |
   | load (実行前の 1 分平均) | 0.40 (`uptime`) |
   | 3 回の stdout | `cmp` で 3 回とも一致。rc 0・ALL OK |
-  | 生成物 (`ci.rs.ll`) | md5 `4811e83e9e4343ad70e6ec883023641f` (§7-2 と同一) |
-  | 生成物 (`ci_helpers.c`) | md5 `497d886223a0625f2b236d105c7df119` (§7-2 と同一) |
+  | 生成物 (`ci.rs.ll`・`ci_helpers.c`) | §7-2 の md5 と同一 (値は §7-2 のみに記載) |
 - NC3 は §7-3 の表を参照 (commit `82c802c7b`・rc 1)。
+- 再測定の状態: レビュー round 1 の再実測 (`toolchain-retdec` を含む素材での正常系・NC3) は、素材が揃わなかったため未実施。PR 本文の未解決表に記載。
 
 ### 7-4. 既知の制約
 - 0x1aefa9 の書き込み先は、RetDec の alloca 経由 (`bitcast i64* %rcx to i128*`) の load である。`store i64 %arg1, i64* %rcx` が関数入口の 1 回だけであることを確認して `%arg1` を値として使った。書き込み直前まで rcx に他の store が無い形なので、この 1 箇所だけに当てはまる。pass は、その形以外では exit 1 で止まる。
