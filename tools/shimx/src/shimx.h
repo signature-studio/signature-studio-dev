@@ -1183,6 +1183,11 @@ void shimx_seh_set_pad_resolver(shimx_seh_pad_fn (*fn)(uint32_t rva)); /* scope 
 void shimx_seh_set_typed_matcher(int (*fn)(const EXCEPTION_RECORD64* rec, uint32_t descRva, uint32_t* handlerRva));
 const EXCEPTION_RECORD64* shimx_seh_current_exception(void);           /* 直近に捕捉/巻き戻し中の例外 (スレッド毎) */
 unsigned shimx_seh_depth(void);                                        /* 登録中 frame 数 (スレッド毎) */
+/* MX-45 (#4161): FH3 FuncInfo (RVA 形) の funclet RVA 集合。img は RVA で引ける平坦バッファ。
+ * out には先頭 out_cap 件まで書く。戻り値 n は、n <= out_cap なら重複を除いた件数 (正確)。
+ * n > out_cap なら out は先頭 out_cap 件のみ有効で、n は真の件数の上界 (重複を含みうる)。
+ * 呼出し側は n > out_cap のとき cap を増やして再呼出しする。FuncInfo 不正・上限超過は -1。 */
+int shimx_fh3_funclets(const uint8_t* img, uint32_t img_size, uint32_t fi_rva, uint32_t* out, uint32_t out_cap);
 HMODULE shimx_module_register(const char* name, HMODULE base, const char* winPath);
 int  shimx_proc_register(HMODULE m, const char* name, DWORD ordinal, void* fn);
 void shimx_set_proc_resolver(void* (*fn)(HMODULE m, const char* name, DWORD ordinal));
