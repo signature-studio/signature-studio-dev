@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # py4877_pred_e_probe.sh — PY-4877: 述語 E (0x193fce0 + i*0xc0) の実行時の値と、
-# 初期化関数 0x12d0cc0・0x12d1760 の実行の有無を FLEngine boot (shim 経路) で観測する。
-# 観測点: patternCount 入口 (0xd64d40) で E[1..999] の +0x84・+0x10・+0x14・[E+0x20]・[E+0x28] を
-# 最初の呼出し時にダンプし、以後の呼出しは回数だけ数える。0x12d0cc0・0x12d1760 は入口で呼出し回数と戻り番地を出す。
+# 初期化関数 0x12d0cc0・0x12d1760 の実行の有無を FLEngine boot (既定経路・FLE_IPP 未指定) で観測する。
+# 観測点: 述語 0x12d8d30 の入口で E[1..999] の +0x84・+0x10・+0x14・[E+0x20]・[E+0x28] を最初の呼出し時にダンプし、
+# 以後の呼出しは回数だけ数える。patternCount 入口 0xd64d40・0x12d0cc0・0x12d1760 は入口で呼出し回数と戻り番地を出す。
+# 制御: 同じ bin で 0x12d0cc0 の probe が 1 件発火することを probe 機構の動作確認にする (発火 0 件なら他の 0 件は読めない)。
+# 0x6a7b70 は既定経路の lift に入らない (FLE_EXTRA_ROOTS 未指定) ので制御に使えない。
 #
 #   bash tools/flelift/boot/py4877_pred_e_probe.sh   # 前提: 先に fle6_measure.sh で work/boot/lift を作る
 #
-# 既定経路 (FLE_IPP 未指定・units 895 まで進む) で測る。shim 経路 (FLE_IPP=1) は units 209 で止まり述語に届かない。
+# 既定経路 (FLE_IPP 未指定 = fle_boot.mjs の既定 mode 3・units 895 まで進む) で測る。
+# 注意: 既定は shim 無効ではなく mode 3 (ILTools 分岐入力・ipp_on=true)。shim 無効は FLE_IPP=0 (ネガコン)。
+# shim 経路 (FLE_IPP=1) は units 209 で止まり述語に届かない。
 # 前提: FL_WIN64_DIR / SS_EMSDK_ENV / node。出力は work/boot/ (gitignore)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -33,8 +37,9 @@ for k in 0 1 2 3 4 5 6 7; do
   python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c"  --at 0x12d8d30 --c "$PC_PROBE" || true
   python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0x12d0cc0 --c "$(mk_fn_probe 0cc0)" || true
   python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0x12d1760 --c "$(mk_fn_probe 1760)" || true
+  python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0xd64d40 --c "$(mk_fn_probe d64d40)" || true
 done
-echo "[py4877] probes: $(grep -c 'PY4877' "$DBG"/fle_lifted_s*.c | awk -F: '{s+=$2} END {print s}') (expect 3 関数入口 = 3 件・lift に入っていない関数は 0)"
+echo "[py4877] probe 挿入行数: $(grep -c 'PY4877' "$DBG"/fle_lifted_s*.c | awk -F: '{s+=$2} END {print s}') (AFTER・述語・0x12d0cc0・0x12d1760・0xd64d40 の各 1 行。lift に無い点は挿入されない)"
 
 FLE_LIFT_DIR="$DBG" FLE_LABEL=e4877 FLE_SHARDS=8 SS_EMSDK_ENV="$SS_EMSDK_ENV" bash "$HERE/build.sh" plain
 

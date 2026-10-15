@@ -70,18 +70,25 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_pattern_probe.py   #
 
 ## 6. 実行時の観測 (PY-4877 / #5168)
 
-測定 commit: 本 PR のコミット (`tools/flelift/boot/py4877_pred_e_probe.sh` を追加した commit)。経路: 既定 (`FLE_IPP` 未指定・`fle6_measure.sh` と同じ lift・plain clang)。shim 経路 (`FLE_IPP=1`) は units 209 で止まり、述語・初期化経路に届かない (実測・§6 末尾)。
+測定 commit: `29b86956f` (`tools/flelift/boot/py4877_pred_e_probe.sh` を追加した commit)。本 §6 の数値は、この commit の script を修正した後の版で再採取した (下の「再測定」)。経路: 既定 (`FLE_IPP` 未指定 = `fle_boot.mjs` の既定 mode 3・ILTools 分岐入力・`ipp_on=true`・`fle6_measure.sh` と同じ lift・plain clang)。shim 無効 (`FLE_IPP=0`) とは別。`FLE_IPP=1` (shim 有) は units 209 で止まり、述語・初期化経路に届かない (既存の測定)。
 
 | 観測 | 結果 |
 |---|---|
 | 述語 `0x12d8d30` の入口 (`patternCount`・`isPatternDefault` 等の全呼出し) | 0 件 (未到達) |
-| `patternCount` `0xd64d40` の入口 | 0 件 (未到達) |
-| `0x12d0cc0` (E の初期化) の呼出し | 1 件 (`ecx=0`・戻り番地 `0x12de002`・呼出元 `0x12ddffd`) |
+| `patternCount` `0xd64d40` の入口 | 0 件 (未到達)。probe は `f_d64d40` (lift shard 6) に挿入済み・発火 0 件 |
+| `0x12d0cc0` (E の初期化) の呼出し | 1 件 (`ecx=0`・戻り番地 `0x12de002`・呼出元 `0x12ddffd`)。**制御**: 同じ probe 機構が既知の呼出しを拾う |
 | `0x12d1760` (E の再計算) の呼出し | 0 件 (未到達) |
 | `0x12d0cc0` 呼出し直後の `E[0..999]` のうち非 0 行 | 1 行 (`E[0]`: `+0x84=01`・`+0x10=-1`・`+0x14=00`・`[E+0x20]=0`・`[E+0x28]=0`)。`E[1..999]` は全 0 |
 | boot の停止点 | units 895 / 942 (`stopped_at` 895・`boot_threw` exit) |
+| 同じ bin の shim 無効 (`FLE_IPP=0`) | 未測定 (本 §6 の再測定の範囲外) |
 | 同じ bin の shim 経路 (`FLE_IPP=1`) | units 209 で停止 (`FLEBOOT_IPP_CHECK` ok=false・既存の判定どおり) |
+
+制御の読み: `0x6a7b70` は `FLE_EXTRA_ROOTS` で root 化しない既定の lift には入らず (全 shard で `unresolved`)、制御には使えない。制御は同じ boot で発火する `0x12d0cc0` を使う。`0x12d8d30` の probe は挿入済み (shard 1) で、0 件は「届かなかった」と読む。
+
+静的 probe `analysis/flapi/pe_pattern_probe.py` (`FL_WIN64_DIR` 指定・rc 0): 5 件 OK (patternCount・patternNumber・isPatternDefault・isPatternSelected・`0xea7420`) と述語のフィールド 5 件。実測 0.101 秒 (user 0.068 秒)。
+
+再測定 (script 修正後・commit 済み HEAD): `py4877_pred_e_probe.sh` 1 回 1m51.1s (rc 0・load 最大 2.26)。`[PY4877-0cc0] n=1` と `[PY4877-AFTER-N] nonzero_rows=1` を得た。
 
 再現: `FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> bash tools/flelift/boot/py4877_pred_e_probe.sh` (前提: 先に `fle6_measure.sh` で `work/boot/lift` を作る)。emsdk は `docs/REFERENCES.md` の `[EMSDK]` (pin `6.0.12`) を使った。本 run は `[EMSDK]` の既定位置が無く、一時領域に導入した。
 
-結論: 既定経路では `0x12d0cc0` は 1 回だけ呼ばれ、E は `E[0]` だけが書かれ `E[1..999]` は 0 のまま。述語は boot 中に呼ばれず、`patternCount` の実行時の値はこの経路では観測されない。したがって `patternCount` = 999 の仮置きは、この経路では述語の入力に当たらない (未到達)。`patternCount` を実際に呼ぶ経路 (ユーザー操作・flpy 経由) はこの boot の範囲外で、未確認。
+結論: 既定経路 (mode 3) では `0x12d0cc0` は 1 回だけ呼ばれ、E は `E[0]` だけが書かれ `E[1..999]` は 0 のまま。述語は boot 中に呼ばれず、`patternCount` の実行時の値はこの経路では観測されない。したがって `patternCount` = 999 の仮置きは、この経路では述語の入力に当たらない (未到達)。`patternCount` を実際に呼ぶ経路 (ユーザー操作・flpy 経由) はこの boot の範囲外で、未確認。
