@@ -19,6 +19,7 @@
   - `analysis/flapi/pe_rip_consts.py 1047b93 60`・`pe_rip_consts.py 104839c 40` (定数の確認)。
   - `analysis/flapi/pe_disasm.py ffac50 30` (`0xffac50` の入口)。
 - load average: 00:01 UTC で 1 分値 0.01。
+- 修正時の再確認 (PR HEAD `90e31d35` の内容で `pe_disasm.py 1046a30 4700` を再実行): 4,679 行・終了 0・0.077 秒・load average 1 分値 0.17。出力は上記の初回と一致。`[rbp+0x5b8]` の参照は `grep -n` で 83 行目 (store) が先頭、600 行目 (読出し) が次。
 
 ## 1. key 下位 16bit の振り分け (`0x104756a`〜`0x10476df`)
 
