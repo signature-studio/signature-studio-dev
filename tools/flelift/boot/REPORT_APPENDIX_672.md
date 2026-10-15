@@ -168,6 +168,7 @@ REPORT §7 (旧 165〜167 行):
 - §1-2 (`REPORT_APPENDIX_3090.md`) の『native では面の生成が失敗して別経路に入る (推定)』は、**別経路 = 代替経路 (`f_815e10` の flag != 0) への分岐**であり、面の確保失敗 (仮説 A) ではない。
 - `REPORT_APPENDIX_3090.md` §1-2 の『`[this+0x50]` buf = 0 のまま』は、2^20 面の経路に入った lift の結果であり、native の状態ではない (B-1)。
 
+- §D (#4783 の既定変更の影響の実測・受入 1〜3) は `REPORT_APPENDIX_4783.md` に分割移動 (250 行上限)。
 ### B-7 停止点 `unlifted 0x976da0` の実体 (#4032・測定 commit は本 PR の HEAD)
 
 > 再現: `python3 tools/flelift/boot/fle672_static.py <PE>` と下の逆アセンブル (capstone)。動的は `FLE_EXTRA_ROOTS=0x6a7b70,0x976da0 FLE_BOOT_TAG=fle672root976 FLE_BOOT_RUNS=ilt bash tools/flelift/boot/fle6_measure.sh`。結果 JSON: `results/boot_summary_fle672root976_ilt.json`。
