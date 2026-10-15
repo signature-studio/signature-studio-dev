@@ -116,7 +116,7 @@
 | U4b | `.pdata` 2 本目 (158,952 B・`.xdata` と VA 重なり) が census の対象外・読取不能 160 件の原因未確定 | 1 本目 .pdata 全体の数値は下界 | [MX-33] (#3032) |
 | U4c | IAT 外の handler (direct) 6,354 件 (1 本目 .pdata 全体) の同定 | 別 handler の EH 構造が未確認 | [MX-33] (#3032) |
 | U4d | funclet を指す E8/E9 一致候補 4 件の由来 (命令境界を確認して、どの関数から来るか) と、深い closure での到達 | #228 同型の判定を closure 拡張で確定できない | **§8 で測定済み (MX-39 #3776)** |
-| U4e | funclet の x64c closure への取り込み (#228 の landing pad 方式を MSVC に当てる実装) | 同型の欠陥が lift 出力に現れる (未修復) | **§8.4 で方式を記録 (MX-39 #3776)。実装は [MX-43] (子)** |
+| U4e | funclet の x64c closure への取り込み (#228 の landing pad 方式を MSVC に当てる実装) | 同型の欠陥が lift 出力に現れる (未修復) | **§8.4 で方式を記録 (MX-39 #3776)。実装は [MX-43] (#3838)** |
 
 ## 7. 検証 commit と差分 (docs/WORKFLOW.md §6)
 
@@ -135,7 +135,7 @@
 
 1. **U4d(1) 由来**: `.text` の E8/E9 一致 (全 FH3 funclet 36,533 件が対象) は 213 件。命令境界で見ると **179 件は call/jmp rel32 (長さ 5、宛先一致)**、**34 件は別命令の途中** (NC: 境界判定で除外)。537 母数 (REPORT §4) に当たる **4 件は全て命令境界の call/jmp**。4 件の囲む関数 (pdata begin) は linear・flow いずれの closure にも入らず、由来は「closure 非到達の関数の中の直接辺」。
 2. **U4d(2) 深い closure**: 2 round 以上で funclet は到達する (ただし少数)。537 母数では **2 件 (0x118c780・0x118d1f0) のみ**で、どちらも深さ 3 (元の入口は深さ 2)。残り 535 件は固定点でも到達しない。全 FH3 funclet 36,533 件では固定点で linear 119 件・flow 82 件のみ到達 (表 8.2)。
-3. **U4e 取り込み**: §8.4 に方式を記録 (x64c の追加 root + #228 と同じ SjLj 形の呼出し)。実装は子 issue **[MX-43]**。
+3. **U4e 取り込み**: §8.4 に方式を記録 (x64c の追加 root + #228 と同じ SjLj 形の呼出し)。実装は子 issue **[MX-43] (#3838)**。
 
 ### 8.2 closure の深さ別の到達 (測定 commit bb4ce18b2)
 
@@ -177,10 +177,10 @@
 
 | # | 未解決 | 影響 | 起票先 |
 |---|---|---|---|
-| U4f | FH3 FuncInfo 355 件の上限棄却 (maxState・nTry・nCatch) の妥当性 | 母数 36,533 の下界 | [MX-43] (子) |
-| U4g | flow 到達 funclet の直接辺の元 82 件のうち 4 件 (FH3 親の関数) が funclet を通常フローで指す (ICF / tail-merge による共有か) | funclet と通常コードの境界 | [MX-43] (子) |
-| U4h | 囲む関数 0x10c8b40 の EH 専用 block の位置 (親の pdata 範囲内か) | 親 pdata 範囲の定義 | [MX-43] (子) |
-| U4i | MSVC funclet の呼出し ABI の実機確認 | §8.4 の前提 | [MX-43] (子) |
+| U4f | FH3 FuncInfo 355 件の上限棄却 (maxState・nTry・nCatch) の妥当性 | 母数 36,533 の下界 | [MX-43] (#3838) |
+| U4g | flow 到達 funclet の直接辺の元 82 件のうち 4 件 (FH3 親の関数) が funclet を通常フローで指す (ICF / tail-merge による共有か) | funclet と通常コードの境界 | [MX-43] (#3838) |
+| U4h | 囲む関数 0x10c8b40 の EH 専用 block の位置 (親の pdata 範囲内か) | 親 pdata 範囲の定義 | [MX-43] (#3838) |
+| U4i | MSVC funclet の呼出し ABI の実機確認 | §8.4 の前提 | [MX-43] (#3838) |
 
 ### 8.6 検証 (docs/WORKFLOW.md §6)
 
