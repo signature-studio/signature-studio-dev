@@ -204,6 +204,8 @@ export function createMockEngine() {
     throw WRONG();
   };
   const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
+  // PyArg "i" 相当 (C provider の 'I'/'B' のみ可): None・文字列・実数は code 5
+  const pyInt = (v) => { if (typeof v === "boolean") return +v; if (Number.isInteger(v)) return v; throw WRONG(); };
   // float 引数 (fl_a_dbl と同じ: None は 0、bool・整数・実数は可、他は code 5)。PE の書式 'f' は float32 に丸める
   const argF = (a, i) => { const v = a[i]; if (i >= a.length || v === undefined) return 0; if (typeof v === "boolean") return +v; if (typeof v === "number") return Math.fround(v); throw WRONG(); };
   const scrNeed = () => { if (!st.screenAlive) throw new FlError("Unspecified error", 2); };
@@ -430,6 +432,16 @@ export function createMockEngine() {
     "ui.getFocusedPluginName": (...a) => { arity(a, 0, 0); return ""; },
     "ui.getHintMsg": (...a) => { arity(a, 0, 0); return ""; },
     "ui.isInPopupMenu": (...a) => { arity(a, 0, 0); return false; },
+    // PY-128 (#3005): getProgTitle は PE rodata の定数 (UTF-16)。getHintValue は状態を読まず、(int32)(value*100) / max を最近接偶数で整数化して "%" (REPORT_PY128)
+    "ui.getProgTitle": (...a) => { arity(a, 0, 0); return "FL Studio 2026"; },
+    "ui.getHintValue": (...a) => {
+      arity(a, 2, 2);
+      const v = pyInt(a[0]), m = pyInt(a[1]);
+      const q = Math.imul(v, 100) / (m | 0);
+      if (!(q >= -9223372036854775808 && q < 9223372036854775808)) return "-9223372036854775808%";
+      const f = Math.floor(q), d = q - f;
+      return `${d < 0.5 ? f : d > 0.5 ? f + 1 : f % 2 === 0 ? f : f + 1}%`;
+    },
     // PY-130 (#3007): PE で書込み経路を確定した ui setter 2 件と getVersion (ui)。値は未実測の仮置き (provider/fl_engine.c と同じ・REPORT_PY130_3007)
     "ui.setBrowserAutoHide": (...a) => { arity(a, 1, 1); st.uiBrowserAutoHide = argI(a, 0, 0) === 1; },
     "ui.setStepEditMode": (...a) => { arity(a, 1, 1); st.uiStepEdit = argI(a, 0, 0) === 1; },
@@ -538,7 +550,12 @@ export function createMockEngine() {
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
-    "device.forwardMIDICC": (message, mode = 1) => { st.midiOut.push({ api: "forwardMIDICC", message, mode }); },
+    // PY-231 (#3671): PE 0xd748e0 (書式 ii)。判定順は midiOutMsg と同じ (-7 → -6)。送るのは第 1 引数の word。mode は stub 名 (PE の kwlist 名は forwardTo・REPORT_PY231 §1)
+    "device.forwardMIDICC": (message, mode = 1) => {
+      if (!st.devAssigned) throw new FlError("Device not assigned", 7);
+      if (!st.linkAssigned) throw new FlError("Linked device not assigned", 6);
+      st.midiOut.push({ api: "forwardMIDICC", message, mode });
+    },
     // PY-227 (#3655): PE 0xd747f0 と同じ順 (引数 → -7 → -6)。channel ≤ -1 は message の下位 32bit、channel ≥ 0 は arg4 を bit 24–31 に入れた word を記録する
     "device.midiOutMsg": (...a) => {
       const msg = argI(a, 0, 0), ch = argI(a, 1, -1), d1 = argI(a, 2, 0), d2 = argI(a, 3, 0), a4 = argI(a, 4, 0);

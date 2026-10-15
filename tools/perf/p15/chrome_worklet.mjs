@@ -19,7 +19,7 @@ const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i < 0 ? d : argv[i + 1]; };
 const MS = arg('--m', '1,4,130').split(',').map(Number); const REPS = +arg('--reps', 7); const BLK = +arg('--blk', 1000); const RUNS = +arg('--runs', 3);
 const OUT = arg('--out', path.join(RES, 'chrome_worklet.jsonl'));
-const INIT = argv.includes('--init-only'); const NEG = +arg('--neg', -1);
+const INIT = argv.includes('--init-only'); const NEG = +arg('--neg', -1); const TMO = +arg('--timeout', 1500000);
 const MODE = INIT ? 'init_limit_worklet' : NEG >= 0 ? 'negctl_worklet' : REPS === 0 ? 'sig_only_worklet' : 'steady_shared_memory_worklet';
 
 const srv = await startServer({ '/w': path.join(ROOT, 'ott/work/lift'), '/l': path.join(HERE) });
@@ -29,13 +29,13 @@ for (let r = 0; r < RUNS; r++) for (const m of MS) {
   try {
     const p = await b.newPage(`${srv.url}/l/web/worklet_page.html`);
     const before = b.procs().filter((x) => x.type === 'renderer').reduce((a, x) => a + (x.rssMB ?? 0), 0);
-    const res = await p.eval(`runWorklet(${JSON.stringify({ m, blk: BLK, reps: REPS, initOnly: INIT, neg: NEG })})`, { timeout: +arg('--timeout', 1500000) });
+    const res = await p.eval(`runWorklet(${JSON.stringify({ m, blk: BLK, reps: REPS, initOnly: INIT, neg: NEG })})`, { timeout: TMO });
     const after = b.procs().filter((x) => x.type === 'renderer').reduce((a, x) => a + (x.rssMB ?? 0), 0);
-    const row = { mode: MODE, cfg: 'ott_shared_instance_worklet', M: m, runtime: 'chrome ' + b.version.product, cpus: os.cpus().length, cpu: os.cpus()[0]?.model ?? 'unknown', loadavg: os.loadavg().map((x) => +x.toFixed(2)), blk: BLK, reps: REPS, neg: NEG, run: r, ...res,
+    const row = { mode: MODE, cfg: 'ott_shared_instance_worklet', M: m, runtime: 'chrome ' + b.version.product, cpus: os.cpus().length, cpu: os.cpus()[0]?.model ?? 'unknown', loadavg: os.loadavg().map((x) => +x.toFixed(2)), blk: BLK, reps: REPS, neg: NEG, run: r, timeout_ms: TMO, ...res,
       renderer_rss_mib: +after.toFixed(1), renderer_rss_delta_mib: +(after - before).toFixed(1) };
     fs.appendFileSync(OUT, JSON.stringify(row) + '\n'); console.log(JSON.stringify(row));
   } catch (e) {
-    const row = { mode: MODE, M: m, run: r, neg: NEG, error: String(e).slice(0, 300) };
+    const row = { mode: MODE, M: m, run: r, neg: NEG, timeout_ms: TMO, error: String(e).slice(0, 300) };
     fs.appendFileSync(OUT, JSON.stringify(row) + '\n'); console.log(JSON.stringify(row));
   } finally { await b.close(); }
 }
