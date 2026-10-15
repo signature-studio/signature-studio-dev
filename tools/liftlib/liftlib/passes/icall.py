@@ -91,7 +91,7 @@ def entry_blk_args(fn):
         if g:
             gep[g.group(1)] = int(g.group(2))
     for i, ln in enumerate(lines):
-        if re.match(r"^\s*(store|br|ret|switch)\b", ln) or (re.match(r"^\s*(%\S+ = )?call\b", ln) and "@__asm_" not in ln):
+        if re.match(r"^\s*(store|br|ret|switch)\b", ln) or (re.match(r"^\s*(%\S+ = )?(tail |musttail |notail )?call\b", ln) and "@__asm_" not in ln):
             break
         ld = re.match(r"^(\s*)(%\S+) = load i64, ptr (%\S+), align \d+(.*)$", ln)
         if not ld or gep.get(ld.group(3)) not in BLK_ARG_SLOT:
@@ -102,7 +102,11 @@ def entry_blk_args(fn):
         ty, v = params[k]
         if ty == "i64":
             lines[i] = "%s%s = add i64 %s, 0%s" % (ld.group(1), ld.group(2), v, ld.group(4))
-        else:
+        elif ty == "ptr":
+            lines[i] = "%s%s = ptrtoint ptr %s to i64%s" % (ld.group(1), ld.group(2), v, ld.group(4))
+        elif ty in ("i1", "i8", "i16", "i32"):
             lines[i] = "%s%s = zext %s %s to i64%s" % (ld.group(1), ld.group(2), ty, v, ld.group(4))
+        else:
+            raise ValueError("entry_blk_args: unsupported param type %r (%s)" % (ty, v))
         n += 1
     return n
