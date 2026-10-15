@@ -1173,6 +1173,22 @@ void m11_412770_obs(unsigned long long a) {
 }
 #endif
 
+/* #2407 計測専用 (M11_INSTR_E3EF60=1 のときだけ有効): function_e3ef60 (#2373 の unit 895 経路で 60a270 を呼ぶ caller) の入口で
+ * arg1 (this = rcx) と [arg1+0] (u64) を stderr に出す。線形メモリ外は読まない (address 0 は線形メモリ内なので読む)。既定 0 では何も入らない。 */
+#ifndef M11_INSTR_E3EF60
+#define M11_INSTR_E3EF60 0
+#endif
+#if M11_INSTR_E3EF60
+static int g_e3ef60_n;
+void m11_e3ef60_obs(unsigned long long a) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long w0 = 0;
+    if (a + 8 <= heap) w0 = *(volatile unsigned long long*)(uintptr_t)a;
+    if (g_e3ef60_n++ < 64)
+        fprintf(stderr, "[m11][e3ef60] #%d arg1=0x%llx [arg1]=0x%llx\n", g_e3ef60_n, a, w0);
+}
+#endif
+
 /* ---- #483: TDictionary<K,V> (Generics.Collections) の Add/GetItem が全て「重複キー」と誤判定される原因 3 点の C 転記 ----
  * 8cc190 (Add) は FComparer = TEqualityComparer<K>.Default (53df80 → 479b40 _LookupVtableInfo) の GetHashCode/Equals を使う.
  *   479b40  `movzx rcx,byte [rbx]` (TypeInfo.Kind) の deref 脱落 (D4) で Kind=0 固定, `test cl,2; call rax` (getter 呼出し) 脱落 (D15)
