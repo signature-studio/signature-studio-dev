@@ -16,7 +16,7 @@
 
 ### 未モデル (C と mock で同一)
 
-- unit 0/1 の状態書込み: 戻り値と code は PE どおり。状態は変えない。確定済み: pitch の書込み先 `[chan+0x174]` (PY-170 / #3213)、`0x1046a30` の key 下位 16bit 0・2・3・8 の書込み先 (PY-175 / #3252)、bb の生成元 `0xf82a10` (PY-176 / #3253)。未確定: 書込みに進む条件 (`0x1051720` の戻り値 2 の経路。表 T0 `[0x16bacd8]` と 10519c6 枝の副作用 → #3287・#3288) と `0x1046a30` の残りの枝 (→ #3282)。
+- unit 0/1 の状態書込み: 戻り値と code は PE どおり。状態は変えない。確定済み: pitch の書込み先 `[chan+0x174]` (PY-170 / #3213)、`0x1046a30` の key 下位 16bit 0・2・3・8 の書込み先 (PY-175 / #3252)、bb の生成元 `0xf82a10` (PY-176 / #3253)、10519c6 枝の直接の store と表示の組立て順 (PY-183 / #3288・CLOSED)。未確定: 書込みに進む条件 (`0x1051720` の戻り値 2 の経路。表 T0 `[0x16bacd8]` と 0xff 経路の ac 残存値 → #3287)、10519c6 枝の仮想呼出し先の副作用 (PY-183 §9 で未追跡 → #3377 [PY-191])、`0x1046a30` の残りの枝 (→ #3282)。
 - guard (大域オブジェクト O の vtable `+0x98`): 常に真とみなす。status -2 の経路は出ない (→ #3212)。
 - 通知 PostMessageW (msg 0x550 / 0x562): 送らない。送信元と hwnd の由来は PY-77 (#3214) で確定。受け手 (window proc の分岐先) は未確定 (→ #3440)。通知の直接呼出しの判定 `0x525ec0` の比較対象は未確定 (→ #3268)。
 - useGlobalIndex = 1: 一覧 A/B を同一扱い (両者の要素型は未確定。→ #3371)。
@@ -44,7 +44,7 @@
 | `node tests/patterns_group_diff.mjs` (main 由来の `pe172`・#3219) | 14 呼出し・diffs 0・PASS | 0.053 秒 |
 
 - 負例 (`6e61656f` で採取した両側の実出力。`38fa1159c` と `e2023b505` でも `channels_diff`・`provider_check` の assert が通過): `[0, NaN, 2]` → code 2 (`Unspecified error`)、`[9, NaN, 2]` → code 4 (index が先)、`[9, 0.5]` → code 4、`[0, "x"]` → code 5、`[0]` → code 5。`[2, 47.5, 2]` と `[2, 1e30, 2]` は戻り値が両側で一致 (N の観測口は無く、比較は戻り値と code だけ)。
-- 差分の証跡: `git diff e2023b505 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (測定後の commit はこの REPORT の更新だけ)。
+- 差分の証跡: `git diff e2023b505 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (測定後の commit は REPORT_PY76 と DOC_MAP の文書更新だけ)。
 
 ## 受入条件 (#2563)
 
@@ -59,7 +59,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| unit 0/1 の状態書込みの条件: `0x1051720` の戻り値 2 の経路 (表 T0 `[0x16bacd8]` の hook と item・K、10519c6 枝の副作用) と `0x1046a30` の残りの枝 (負の key・key 1/5/6/7/9 以降・flags 0x3e9)。確定済みは上記の書込み先 | pitchUnit 0/1 で状態が変わらない (戻り値は PE どおり) | #3287 [PY-182]・#3288 [PY-183]・#3282 [PY-181] |
+| unit 0/1 の状態書込みの条件: `0x1051720` の戻り値 2 の経路 (表 T0 `[0x16bacd8]` の hook と item・K、0xff 経路の ac 残存値)、10519c6 枝の仮想呼出し先の副作用、`0x1046a30` の残りの枝 (負の key・key 1/5/6/7/9 以降・flags 0x3e9)。確定済みは上記の書込み先と 10519c6 枝の直接の store (PY-183 / #3288・CLOSED) | pitchUnit 0/1 で状態が変わらない (戻り値は PE どおり) | #3287 [PY-182]・#3377 [PY-191]・#3282 [PY-181] |
 | guard の O と判定入力 this・X の実体 | status -2 (Operation unsafe at current time) が出ない | #3212 [PY-169] |
 | 通知 PostMessageW (msg 0x550 / 0x562) の受け手 (window proc の分岐先)・通知の直接呼出しの判定 `0x525ec0` の比較対象 | 通知は送らない。直接呼出しの判定が未モデル | #3440 [PY-197] (新規・#3214 の子)・#3268 [PY-178] |
 | reset obj と chan の同一性・一覧 A/B の要素型 | N 既定 2 の適用範囲・useGlobalIndex=1 が未モデル | #3371 [PY-190] |
