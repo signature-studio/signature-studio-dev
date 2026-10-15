@@ -25,6 +25,10 @@ else
   python3 trap_triage/watch_store_682.py --out work/probe3972 --fns "$WATCH_FNS" || exit 1
 fi
 python3 trap_triage/copy_watch_3972.py work/probe3972/boot_sw.ll work/probe3972/boot_sw_cp.ll || exit 1
+if [ "${REP:-0}" = 1 ]; then   # rep 系 helper (movsq/movsb/stosq) の入口を計装 (rep_watch_3972.py)
+  python3 trap_triage/rep_watch_3972.py work/probe3972/boot_sw_cp.ll work/probe3972/boot_sw_rp.ll work/probe3972/rep_sites.txt || exit 1
+  mv work/probe3972/boot_sw_rp.ll work/probe3972/boot_sw_cp.ll
+fi
 emcc -c work/probe3972/boot_sw_cp.ll -o work/obj/boot.o $CF || exit 1
 emcc -c trap_triage/watch_addr_2408.c -o work/obj/sw682.o ${CF/-O0/-O2} -DM11_WATCH_ADDR_OVR=${WA}u || exit 1
 emcc -c trap_triage/watch_copy_3972.c -o work/obj/cp3972.o ${CF/-O0/-O2} -DM11_WATCH_ADDR_OVR=${WA}u -DM11_CP_ALL=${M11_CP_ALL:-0} || exit 1

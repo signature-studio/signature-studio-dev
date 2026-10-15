@@ -14,8 +14,8 @@
 - 出力: data/entries.csv (197 行の対応表・コミット対象) と tools/shared/work/elastique/facts.json (中間物・gitignore)。
 - 関数ポインタ経由の到達: .text と IPPCODE の lea rip 相対で IPPCODE を指す箇所・.text の間接 call/jmp・
   .rdata/.data 中の IPPCODE 向き 8 byte 値を数え、入口集合との差を出す (静的確認。実行トレースではない)。
-- direct_calls の範囲: .text の関数は pdata の End まで、IPPCODE (pdata 無し) は次の既知の関数先頭
-  (.text・IPPCODE の rel32 call 着地点と pdata 先頭) まで、かつ SPAN_IPP バイトまで。範囲が取れないときだけ ret で止める。
+- direct_calls の範囲: pdata に入る関数は pdata の End まで。pdata の無い .text 関数は次の既知の関数先頭
+  (.text・IPPCODE の rel32 call 着地点と pdata 先頭) まで。pdata の無い IPPCODE 関数は、それと SPAN_IPP バイトのうち近い方まで。
 """
 import bisect
 import collections
@@ -180,16 +180,27 @@ def pdata_end(img, rva):
 
 
 def fn_span(img, rva):
-    """rva の関数の終端 (RVA・排他)。pdata に入る関数は pdata の End。IPPCODE (pdata 無し) は次の既知の関数先頭 (.text・IPPCODE の rel32 call 着地点と pdata 先頭) と SPAN_IPP・節の終端のうち最小。それ以外は None (範囲を取れない)。"""
+    """rva の関数の終端 (RVA・排他)。pdata に入る関数は pdata の End。pdata の無い .text・IPPCODE は次の既知の関数先頭 (.text・IPPCODE の rel32 call 着地点と pdata 先頭) と SPAN_IPP・節の終端のうち最小。どの節にも無ければ None。"""
     end = pdata_end(img, rva)
     if end is not None:
         return end
-    if not (img['ipp_lo'] <= rva < img['ipp_hi']):
-        return None
     starts = img['starts']
     j = bisect.bisect_right(starts, rva)
-    nxt = starts[j] if j < len(starts) else img['ipp_hi']
-    return min(nxt, rva + SPAN_IPP, img['ipp_hi'])
+    if img['ipp_lo'] <= rva < img['ipp_hi']:
+        nxt = starts[j] if j < len(starts) else img['ipp_hi']
+        return min(nxt, rva + SPAN_IPP, img['ipp_hi'])
+    if img['text_lo'] <= rva < img['text_hi']:
+        nxt = starts[j] if j < len(starts) else img['text_hi']
+        return min(nxt, img['text_hi'])
+    return None
+
+
+def span_kind_of(img, rva):
+    if pdata_end(img, rva) is not None:
+        return 'pdata'
+    if img['ipp_lo'] <= rva < img['ipp_hi']:
+        return 'IPPCODE 次の先頭まで'
+    return '.text 次の先頭まで'
 
 
 def direct_calls(img, md, rva, maxins=MAXINS):
@@ -371,15 +382,14 @@ def main():
     bound = collections.Counter()
     for f in reached:
         end = fn_span(dsp, f)
-        kind = 'pdata' if pdata_end(dsp, f) is not None else (
-            'IPPCODE 次の先頭まで' if end is not None else 'ret まで (範囲なし)')
+        kind = span_kind_of(dsp, f) if end is not None else 'ret まで (範囲なし)'
         span_kind[kind] += 1
         if end is not None:
             mn, on_boundary = span_tail(dsp, md, f, end)
             tails[kind][mn] += 1
-            cut = 'SPAN_IPP 打ち切り' if end - f == SPAN_IPP else '次の先頭'
+            cut = 'SPAN_IPP 打ち切り' if kind.startswith('IPPCODE') and end - f == SPAN_IPP else '次の先頭'
             bound[f'{kind} / {cut} / 命令境界一致={on_boundary}'] += 1
-            span_kind[kind + ' SPAN_IPP 打ち切り'] += end - f == SPAN_IPP
+            span_kind[kind + ' SPAN_IPP 打ち切り'] += cut.startswith('SPAN')
     print(f'direct_calls の範囲 (到達集合 {len(reached)} 本体): {dict(span_kind)}')
     print(f'範囲の最後の命令 (mnemonic): {({k: dict(v.most_common(6)) for k, v in tails.items()})}')
     print(f'範囲の終端と最後に復号した命令の終端の一致: {dict(bound)}')

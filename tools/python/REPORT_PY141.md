@@ -103,7 +103,7 @@ PASS
 | out+8 の実行時の値 (0xd84680 経路は未初期化スロット、0xd843d0 経路は `[obj+0x10]`) | 26 関数の成功時の戻り値の値。mock の戻り値を PE から決められない (scrollWindow は out+8 を使わない) | 起票なし (本 PR の未解決表で扱う。WORKFLOW §3) |
 | 0xd82c20 の status < 0 の経路 (0xd82c6a〜) | scrollWindow のエラー時の戻り値 | #3761 [PY-247] (scrollWindow の作用先と戻り経路) |
 | 引数 arg が op 0x3b の経路で符号判定以外に使われるか | selectWindow の作用 | #3035 [PY-140] (親。作用先の追跡は REPORT_PY140.md) |
-| stub `ui.selectWindow` の `shift: bool` (PE は C int) | 公開 API の型注記。selectWindow を実装するときの引数契約 | #3759 [PY-246] (確定関数の mock/C 実装と同時に stub を直す) |
+| `ui.selectWindow` の `shift: bool` 表記 (PE は C int)。コード上の stub は無く、mock (`host/fl_mock.mjs`) は `argI` で符号を見る。PY-246 (`a0fc92492`) は PE の符号 (arg>0 で Tab、arg≤0 で Shift+Tab) で実装済み | 公開 API の型注記 (REPORT_PY120 の表記) と PE の符号の説明だけが残る | #3759 [PY-246] (型注記を直すのは本 issue の値の確定の範囲外。`ui_keys_diff.mjs` が符号を固定する) |
 | 他 25 関数の個別検算 | 戻り値の形の一般化 | 起票なし。`pe_py141_probe.py` の対象を 27 関数に広げて PR 本文の未解決表で扱う |
 
 ## 受入条件の結果
