@@ -58,5 +58,27 @@ setter `0x180c9d700` 内の間接 call で落ちる。本付録は**機械語の
 |---|---|---|
 | `si_addr` (addr=0) と fault 時 rcx (a5a5…) の不一致、想定 (`0x180c9d74c`・addr=0x50) との不一致 | 未解決 | #1791 (FA-25) |
 | `out[0]` と probe の `found` の対応、node `Z` との照合 | 未解決 | #1791 (FA-25) |
-| wasm の found・vtable 観測点の追加 (`ctrl_harness.mjs`) と同一原因の判定 | 未着手 | #1789 (FA-24) |
+| wasm の found・vtable 観測点の追加 (`ctrl_harness.mjs`) と同一原因の判定 | 観測点追加済み・判定は未 (§8) | #1789 (FA-24) |
 | 0x180da6c00 到達と Filter 出力比較 | 未着手 | #1182 (FA-16) |
+
+## 8. FA-24 (#1789): wasm 側の found・obj 観測点 (既定 OFF) と初期比較
+
+観測点: `build_ctrl.sh` の `FA_TRACE9=1` で `--trace 180c9d700:180c9d760` を埋め込み、`ctrl_harness.mjs` の `FA_TRACE9=1` で
+setter 入口〜出口の命令前レジスタを読む (`TRACE9` 行)。既定ビルドは trace を入れないので出力は変わらない。
+
+- 0x180c9d729 (ca1480 戻り直後): `out0` = `[rsp+0x48]` を読む。
+- 0x180c9d741 (`mov rax,[rcx]` 直前): rcx = obj (= `[out0+0x10]`)。
+
+実測 (S900〜S907、`FA_NODE1=1`、wasm、`FA_TRACE9=1`):
+- 各シナリオで 0x180c9d729 を 2 回通る。1 回目 out0=0、2 回目 out0=0x494b690 等 (非 0)。
+- S900 の 2 回目は 0x180c9d741 の rcx=0 (obj=0)。したがって vtable 読みは `[0]` になり、rax=0 で `call [rax+0x50]` (addr=0x50) に進む。wasm では `fa_icall` の `t=0` が host に落ち `unreachable` になる (FA-22 §4 と同じ失敗形)。
+
+native (`FA_PROBE9=1`・`FA_SET9=1`・`FA_NODE1=1`):
+- SET9 の出力は S900 の 1 行のみ。FA9CA は S900〜S907 とも 1 行 (ca1480 の 1 回目の呼出・out0=0・found=0)。
+- native 側は同じ区間の 2 回目の入場を**観測していない**。probe の仕組み (1 回だけ差替え・再 patch) の限界か、実際に入らないのかは未切り分け。
+
+判定: **同一原因かは未判定**。wasm では 2 回目の入場で obj=0 → vtable=0 → `[0+0x50]` まで確認した。native 側で同じ 2 回目の入場を観測できていないため、found と vtable の比較は完了していない。次は native に `0x180c9d729` 相当の観測を入れ、2 回目の入場の有無と obj の値を揃えること (#1789 の残り・#1791 FA-25 と合流)。判定基準 (`run_fa9.sh` (a) の期待値) は変更していない。
+
+測定 (commit c5bd6af6e 相当の HEAD、load 0.18→0.18、素材 plugins-freshair を `$RUNNER_TEMP` に展開して `fetch.sh`):
+- `bash run_fa9.sh`: GATE PASS、wall 3.06 s。(a) base ERR=0・ca1480=72・found=0・da6c00=0 / (b) ERR=8/8 / (b-wasm) ERR=8/8 / (c) 差分 395 トークン。
+- `bash run_ctrl.sh 2 5`: BIT-EXACT 15/15、wall 2 s、rc=0。
