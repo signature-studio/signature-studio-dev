@@ -4,7 +4,7 @@
 再現スクリプト: [`oc_pm_duration.py`](oc_pm_duration.py)・単体テスト: [`test_oc_pm_duration.py`](test_oc_pm_duration.py)。
 
 - **測定 commit**: `ee50c01de` (測定に使ったコード。`tools/pm/oc_pm_duration.py` と `tools/pm/test_oc_pm_duration.py` を入れた commit)。
-  以後の commit は本書と `tools/pm/README.md`・`docs/DOC_MAP.md` だけ。`git diff ee50c01de HEAD -- tools/pm/oc_pm_duration.py tools/pm/test_oc_pm_duration.py` は 0 行 (§6)。
+  以後の本ブランチの変更は本書・`tools/pm/README.md`・`docs/DOC_MAP.md` と main の取り込み (merge) だけ。`git diff ee50c01de HEAD -- tools/pm/oc_pm_duration.py tools/pm/test_oc_pm_duration.py` は 0 行 (§6)。
 - **取得時刻**: UTC 2026-10-15 02:05〜02:12 (GitHub REST の読み取りのみ)。窓の終わりは `--now 2026-10-15T02:03:34Z` で固定。
 
 ## 0. 結論
@@ -62,15 +62,15 @@ python3 tools/pm/oc_pm_duration.py --now 2026-10-15T02:03:34Z
 - 01 時の内訳 (10 分刻み): 01:00 が 2 件、01:10 が 2 件、01:20 が 2 件、**01:40 が 16 件**、01:50 が 2 件。
   01:40:20〜27Z に 13 件が 8 秒で送られ、13 件はすべて別の ref (kind は user_answered・needs_decision・no_pr)。Worker の 1 回の送信と推定 (Worker のログは未確認)。
 - 60 分の窓の最大は 24 件 (窓の始め 2026-10-15T01:05:50Z)。30 分の窓の最大は 19 件。
-- 送り手は 2 系統ある。(a) Worker (`infra/pm-worker`・上限 `PM_LIMITS`・`hourMax` 24)、(b) watchdog (`.github/scripts/watchdog.sh` L652〜L660・上限 `PM_HOUR_MAX=12`)。
-  (b) は Worker が live かつ fresh のとき送らない (L665)。run の情報からは送り手を区別できず、内訳は未測定。
+- 送り手は 2 系統ある。(a) Worker (`infra/pm-worker`・上限 `PM_LIMITS`・`hourMax` 24)、(b) watchdog (`.github/scripts/watchdog.sh` L701・上限 `PM_HOUR_MAX=24`)。
+  (b) は Worker が live かつ fresh のとき送らない (L711)。run の情報からは送り手を区別できず、内訳は未測定。
 
 ## 4. 同時実行数の実測
 
 - 平均 (Little の法則の検算): 窓内の run 所要の合計 ÷ 1440 分 = **0.383**。起動率 λ = 151 ÷ 1440 = 0.1049 件/分、平均所要 W = 3.65 分、λW = 0.383 で一致。
 - 瞬間の最大: **13**。区間 [run_started, updated) の掃引 (`max_concurrency`)。jq の別算法 (30 秒刻みのサンプリング) でも 13 (初出 2026-10-15T01:40:34Z・3 サンプル)。
   13 件は 01:40:20〜27 に始まり、所要はどれも 100 秒以上なので 01:40:34 には全件が稼働中だった。
-- 30 分の窓の最大起動数: 19 件 (瞬間の同時数の上界の算出に使う。§5)。
+- 参考: 30 分窓の実測最大は 19 件 (上界 24 は 1 時間の上限から出しており、この値は使っていない。§5)。
 
 ## 5. 24 起動/時の同時実行数の見積り
 
@@ -87,12 +87,12 @@ python3 tools/pm/oc_pm_duration.py --now 2026-10-15T02:03:34Z
 - 上の 3 つの式 (1.46・3.16・12.0) は平均同時数であり、瞬間の同時数の上限ではない。実測の瞬間最大 13 は 12 を超えた。
 - 瞬間の上界: 同時数 (時刻 t) ≤ 「t の直前 30 分に始まった run の数」 (run の所要は timeout 30 分以内)、
   その数は上限 (24 件/時) の下で 24 以下。実測の 30 分窓の最大は 19 件。
-- 注 (前提): 上界は Worker の上限 (24 件/時) が全ての送信に効く前提で成り立つ。watchdog の経路 (上限 12) は Worker が live のときは送らないので同時には効かない想定だが、
+- 注 (前提): 上界は Worker の上限 (24 件/時) が全ての送信に効く前提で成り立つ。watchdog の経路 (上限 24) は Worker が live のときは送らないので同時には効かない想定だが、
   両経路が同じ時間に送るケースは本測定では確認していない (未検証)。
 
 ## 6. 検証
 
-- コード: `tools/pm/oc_pm_duration.py`・`tools/pm/test_oc_pm_duration.py` (測定 commit `ee50c01de`)。
+- コード: `tools/pm/oc_pm_duration.py`・`tools/pm/test_oc_pm_duration.py` (測定 commit `ee50c01de`)。`git diff ee50c01de HEAD -- tools/pm/oc_pm_duration.py tools/pm/test_oc_pm_duration.py` の出力は 0 行 (main 取り込み後の HEAD でも同じ)。
 - 単体テスト: `python3 -m unittest discover -s tools/pm -p 'test_oc_pm_duration.py'` → **13 件 PASS** (0.001 s)。CI の `scripts-test` は `tools/pm/test_*.py` を同じ discover で実行する。
 - 再現: コミット後の HEAD `ee50c01de` で `--now 2026-10-15T02:03:34Z` を再実行し、コミット前に取った同じ窓の要約 JSON と比べた → **同一** (`diff` 0 行)。
 - 独立検算 (別算法: jq・生データ `tools/pm/work/oc_pm_runs.json`):
