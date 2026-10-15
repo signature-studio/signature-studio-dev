@@ -160,6 +160,7 @@
   - control は §A3 の 127/200 と一致。ulp (`ks_semantic_gain_ulp.py`): control の不一致 73 件は §A3 と同じ分布 (1:9・2:28・3:5・4:3・5:2・6:2・7:2・8:3・10 以上:19、符号反転 0)。patched は不一致 0 件。
   - 実行: 1 回目 1.630 s・2 回目 1.523 s (`date +%s.%N` の差、`cc` と Python を含む)。load (uptime の 1 分値) 0.19→0.19 と 0.16→0.16、nproc=4。
 - 判定: 受入 1 (置換 native の作成) **達成** (元 SC から 56 B の差分の複製を作り、逆アセンブルで命令列を確認)。受入 2 (200 case で L・R・実行後 state の一致) **達成** (patched 200/200、control 127/200)。受入 3 (本節の追記) **達成**。
+- 置換範囲 (Issue #2736 の受入 1 は `0x180afe160`〜`0x180afe1ea`、本節は `0x180afe160`〜`0x180afe1a0` に縮めた。根拠は元 SC の `objdump -d -M intel` の実測): ramp の計算と保存は `0x180afe160`〜`0x180afe1a0` (65 B) に収まる。`0x160`〜`0x178` が pos の加算と保存、`0x179` が `t = pos*coef`、`0x181`〜`0x198` が `cur = (1-t)*A + t*B`、`0x199`〜`0x1a0` が `movss [rbx+0xac],xmm0` (cur の保存)。`0x180afe1a1`〜`0x180afe1ea` は cur の値を作らず、cur を読む側である: `0x1a1`〜`0x1b3` が L 出力 (`mulss xmm1,xmm0` で in_L·cur を作って保存)、`0x1b4`〜`0x1d7` が meter m1 の更新 (§A3-3 と同式)、`0x1d8`〜`0x1ef` が R 出力 (`0x1e2` の `mulss xmm1,[rbx+0xac]` で cur を state から読む)。`0x1ea` は R の保存命令の先頭。置換で cur の値を決めるのは `0x160`〜`0x1a0` だけで、`0x1a1`〜`0x1ef` は置換前後で 1 B も変わらない (`cmp -l` の差分は `0x180afe156`〜`0x180afe21d` の 56 B に限られ、`0x1a1`〜`0x1ef` の差分は 0 B)。
 - 限界: (a) 結論は seed 7・200 case・Gain 1 件に限る。(b) SC の式 `(1-t)*A + t*B` が元ソースの意図かは未確定。「SC が誤り」とは言わない。(c) Gain 以外への拡大は未検証。
 
 #### 未解決 (本節の範囲外)

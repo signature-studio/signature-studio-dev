@@ -173,7 +173,7 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 
 ### 11-3. `.rdata` 不一致 20 関数の分類 (`ks_rdata_class.py`)
 
-分類結果: `value` 17 / `ptr` 3 / `count`・`order` 0。`value` 17 件は語単位の切り分け (`ks_rdata_value.py`、[REPORT_APPENDIX_FA5_VALUE.md](REPORT_APPENDIX_FA5_VALUE.md) §A5) で **配置差では説明できない** (`.rdata` 内を指す RVA 候補の指す 16 B が KH の `.rdata` に存在しない語がある)。RVA 候補 (32 bit 値) が RVA か定数かは未判定のため、この結論は参照先の内容差の下限であり、「意味が違う」の根拠ではない。詳細・未確定事項は付録 [REPORT_APPENDIX_FA5.md](REPORT_APPENDIX_FA5.md) §A2・§A5。
+分類結果: `value` 17 / `ptr` 3 / `count`・`order` 0。`value` 17 件は語単位の切り分け (`ks_rdata_value.py`、[REPORT_APPENDIX_FA5_VALUE.md](REPORT_APPENDIX_FA5_VALUE.md) §A5) で **配置差では説明できない** (`.rdata` 内を指す RVA 候補の指す 16 B が KH の `.rdata` に存在しない語がある)。RVA 候補 (32 bit 値) が RVA か定数かは未判定のため、この結論は参照先の内容差の下限であり、「意味が違う」の根拠ではない。詳細・未確定事項は付録 [REPORT_APPENDIX_FA5.md](REPORT_APPENDIX_FA5.md) §A2、[REPORT_APPENDIX_FA5_VALUE.md](REPORT_APPENDIX_FA5_VALUE.md) §A5。
 
 ## 12. FA-9: 制御層 setter 経路 (0x180c9d700 → 0x180ca1480 → 0x180da6c00) の実経路測定 (#665, Refs #648 #452)
 
