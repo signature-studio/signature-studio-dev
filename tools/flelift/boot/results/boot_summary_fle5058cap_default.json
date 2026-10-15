@@ -1,0 +1,301 @@
+{
+ "variant": "plain",
+ "boot": {
+  "rc": null,
+  "threw": {
+   "cls": "log_cap",
+   "target": 4227136
+  },
+  "units_run": 13,
+  "units_total": 942,
+  "units_empty": 0,
+  "rax": "0x33",
+  "longjmp": 0,
+  "stage": 1,
+  "diag_nullfill": {
+   "on": false,
+   "skip": 0,
+   "pass": 0
+  },
+  "getmem": 10,
+  "freemem": 5,
+  "va_calls": 1,
+  "va_bytes": 1310704,
+  "getproc": 4,
+  "exit": 0,
+  "cb_calls": 0,
+  "soft_calls": 0,
+  "soft_uniq": 0,
+  "mm_after": {
+   "getmem": "0x407a50",
+   "freemem": "0x407e20",
+   "realloc": "0x408040",
+   "slot3": "0x4083b0"
+  },
+  "undo_probe": {
+   "slot_0x15e1c78": "0x16bb068",
+   "pos_0x20": 0,
+   "count_0x24": 0,
+   "ret_singleton_0x16b82e0": "0x0",
+   "slot_0x15e4790": "0x141d6b8",
+   "safe_obj": "0x0",
+   "safe_obj_0x98": null,
+   "safe_obj_0x88": null
+  },
+  "py_events": {
+   "n": 6,
+   "over": 0,
+   "events": [
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e1c78",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x16bb068",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e4790",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x141d6b8",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b82e0",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e1140",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x16b8488",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b8488",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b8250",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    }
+   ]
+  },
+  "py_snap": {
+   "last": {
+    "unit": 13,
+    "pos": 0,
+    "count": 0,
+    "mgr": "0x16bb068",
+    "safe_g": "0x141d6b8",
+    "safe_obj": "0x0",
+    "f98": "0x0",
+    "f88": "0x0",
+    "sing": "0x0"
+   },
+   "trace": [
+    {
+     "unit": 0,
+     "pos": 0,
+     "count": 0,
+     "mgr": "0x16bb068",
+     "safe_g": "0x141d6b8",
+     "safe_obj": "0x0",
+     "f98": "0x0",
+     "f88": "0x0",
+     "sing": "0x0"
+    }
+   ],
+   "over": 0
+  },
+  "ipp_ptr_15F34A0": "0x0",
+  "ipp_ptr_15F40E8": "0x0",
+  "ipp_total": 0,
+  "ipp_called": [],
+  "ipp_call_slot": {
+   "slot_15e0a48": "0x15f34a0",
+   "obj_first_qword": "0x0"
+  },
+  "ipp_stop": null,
+  "ipp_token_at": [],
+  "stopped_at_1based": 13
+ },
+ "outmem": {
+  "mem_bytes": 905969664,
+  "stack": {
+   "base": "0x11dd2100",
+   "end": "0x115d2100"
+  },
+  "full": "5ebd8d01c3633e2bb8e0f48ed56dedcb4eca4cb70b3c5cd3081fc607a2de83ee",
+  "no_cstack": "596a33523e016de881c7f0a7ab271bf108638e346e621af744031ab87f60a20b",
+  "sections": {}
+ },
+ "survey": null,
+ "tolerant": null,
+ "cfi": null,
+ "log_cap": {
+  "cap": 4096,
+  "time_cap_s": 0,
+  "quiet_bin": false,
+  "bytes": 5311,
+  "lines": 68,
+  "bin_lines": 0,
+  "bin_bytes": 0,
+  "hit": "bytes",
+  "elapsed_ms": 607,
+  "head": [
+   "[fleboot] image + textwin installed, shimx cbtrans/resolver wired",
+   "[blkdiag] 有効 (System._GetMem/_FreeMem トラッキング開始)",
+   "[blkdiag] GETMEM  seq=1 size=120 site=0x412c50<-0x0 live=0",
+   "[blkdiag] CANARY HIT at seq=2 (GetMem) blk#0 p=0x11f100f0 size=120",
+   "[blkdiag]   alloc seq=1 site=0x0<-0x0  snapshot=00000000 00000000 00000000 00000000",
+   "[blkdiag]   now      =00000000 000204b0 00000001 00000033",
+   "[blkdiag]   canary block p=0x11f100f0 align=0",
+   "[blkdiag]     -32:0x00000000 0x00000000 0x00000000 0x00000000",
+   "[blkdiag]     -16:0x00000001 0x00000000 0x11f100c0 0x00000000",
+   "[blkdiag]     +00:0x00000000 0x000204b0 0x00000001 0x00000033   <p",
+   "[blkdiag]     dyn: refcnt=1 len=51 elem@0=3801155 elem@4=5242972",
+   "[blkdiag] GETMEM  seq=2 size=120 site=0x412c50<-0x409424 live=1",
+   "[blkdiag] GETMEM  seq=3 size=114 site=0x412c50<-0x0 live=2",
+   "[fleboot][ff] dispatch(0) -> ret 0 (m11 icall-miss 揃え, call site ret=0x41941f)",
+   "[fleboot][ff] dispatch(0) -> ret 0 (m11 icall-miss 揃え, call site ret=0x4193ca)",
+   "[fleboot][ff] dispatch(0) -> ret 0 (m11 icall-miss 揃え, call site ret=0x419490)",
+   "[fleboot][ff] dispatch(0) -> ret 0 (m11 icall-miss 揃え, call site ret=0x4193ca)",
+   "[blkdiag] GETMEM  seq=4 size=22 site=0x412c50<-0x4193ca live=3",
+   "[blkdiag] GETMEM  seq=5 size=114 site=0x412c50<-0x0 live=4",
+   "[blkdiag] FREEMEM seq=5 p=0x11f11f80 site=0x412e7c<-0x0  liveblk=5",
+   "[blkdiag]   tracked: alloc seq=4 size=22 state=live site=0x4193ca<-0x0",
+   "[blkdiag]   free 対象 p=0x11f11f80 align=0",
+   "[blkdiag]     -32:0x00000000 0x00000000 0x00000000 0x00000000",
+   "[blkdiag]     -16:0x00000000 0x00000000 0x11f100c0 0x00000000",
+   "[blkdiag]     +00:0x00000000 0x000204b0 0x00000000 0x00000002   <p",
+   "[blkdiag]     dyn: refcnt=0 len=2 elem@0=5111877 elem@4=0",
+   "[blkdiag] FREEMEM seq=5 p=0x11f11550 site=0x412e7c<-0x0  liveblk=5",
+   "[blkdiag]   tracked: alloc seq=3 size=114 state=live site=0x0<-0x0",
+   "[blkdiag]   free 対象 p=0x11f11550 align=0",
+   "[blkdiag]     -32:0x00000000 0x00000000 0x00000000 0x00000000",
+   "[blkdiag]     -16:0x00000000 0x00000000 0x11f100c0 0x00000000",
+   "[blkdiag]     +00:0x00000000 0x000204b0 0x00000000 0x00000030   <p",
+   "[blkdiag]     dyn: refcnt=0 len=48 elem@0=3801155 elem@4=5242972",
+   "[blkdiag] FREEMEM seq=5 p=0x11f10b20 site=0x412e7c<-0x0  liveblk=5",
+   "[blkdiag]   tracked: alloc seq=2 size=120 state=live site=0x409424<-0x412c50",
+   "[blkdiag]   free 対象 p=0x11f10b20 align=0",
+   "[blkdiag]     -32:0x00000000 0x00000000 0x00000000 0x00000000",
+   "[blkdiag]     -16:0x00000000 0x00000000 0x11f100c0 0x00000000",
+   "[blkdiag]     +00:0x00000000 0x000204b0 0x00000000 0x00000033   <p",
+   "[blkdiag]     dyn: refcnt=0 len=51 elem@0=3801155 elem@4=5242972"
+  ],
+  "tail": [
+   "[blkdiag]   free 対象 p=0x11f11550 align=0",
+   "[blkdiag]     -32:0x00000000 0x00000000 0x00000000 0x00000000",
+   "[blkdiag]     -16:0x00000000 0x00000000 0x11f100c0 0x00000000",
+   "[blkdiag]     +00:0x00000000 0x000204b0 0x00000000 0x00000030   <p",
+   "[blkdiag]     dyn: refcnt=0 len=48 elem@0=3801155 elem@4=5242972",
+   "[blkdiag] FREEMEM seq=5 p=0x11f10b20 site=0x412e7c<-0x0  liveblk=5",
+   "[blkdiag]   tracked: alloc seq=2 size=120 state=live site=0x409424<-0x412c50",
+   "[blkdiag]   free 対象 p=0x11f10b20 align=0",
+   "[blkdiag]     -32:0x00000000 0x00000000 0x00000000 0x00000000",
+   "[blkdiag]     -16:0x00000000 0x00000000 0x11f100c0 0x00000000",
+   "[blkdiag]     +00:0x00000000 0x000204b0 0x00000000 0x00000033   <p",
+   "[blkdiag]     dyn: refcnt=0 len=51 elem@0=3801155 elem@4=5242972",
+   "[blkdiag] FREEMEM seq=5 p=0x11f100f0 site=0x412e7c<-0x0  liveblk=5",
+   "[blkdiag]   tracked: alloc seq=1 size=120 state=live site=0x0<-0x0",
+   "[blkdiag]   free 対象 p=0x11f100f0 align=0",
+   "[blkdiag]     -32:0x013a5c48 0x00000000 0x11f10b20 0x00000000",
+   "[blkdiag]     -16:0x00000002 0x00000000 0x11f100c0 0x00000000",
+   "[blkdiag]     +00:0x00000000 0x000204b0 0x00000000 0x00000033   <p",
+   "[blkdiag]     dyn: refcnt=0 len=51 elem@0=3801155 elem@4=5242972",
+   "[blkdiag] FREEMEM seq=5 p=0x11f133e0 site=0x412d99<-0x0  liveblk=5",
+   "[blkdiag]   NOT TRACKED (本 _GetMem 経路で確保されていない)",
+   "[blkdiag]   free 対象 p=0x11f133e0 align=0",
+   "[blkdiag]     -32:0x00000000 0x00000000 0x00000000 0x00000000",
+   "[blkdiag]     -16:0x00000000 0x00000000 0x11f100c0 0x00000000",
+   "[blkdiag]     +00:0x00000000 0x000204b0 0x00000000 0x00000032   <p",
+   "[blkdiag]     dyn: refcnt=0 len=50 elem@0=3801155 elem@4=5242972",
+   "[blkdiag] GETMEM  seq=6 size=120 site=0x412c50<-0x409454 live=5",
+   "[blkdiag]   !! 同一 ptr 0x11f100f0 が 2 回目に返却 (alloc seq=6)",
+   "[blkdiag] GETMEM  seq=7 size=120 site=0x412c50<-0x409424 live=6",
+   "[blkdiag]   !! 同一 ptr 0x11f10b20 が 2 回目に返却 (alloc seq=7)",
+   "[blkdiag] GETMEM  seq=8 size=114 site=0x412c50<-0x0 live=7",
+   "[blkdiag]   !! 同一 ptr 0x11f11550 が 2 回目に返却 (alloc seq=8)",
+   "[blkdiag] GETMEM  seq=9 size=22 site=0x412c50<-0x414c64 live=8",
+   "[blkdiag]   !! 同一 ptr 0x11f11f80 が 2 回目に返却 (alloc seq=9)",
+   "[blkdiag] GETMEM  seq=10 size=114 site=0x412c50<-0x0 live=9",
+   "[blkdiag]   !! 同一 ptr 0x11f129b0 が 2 回目に返却 (alloc seq=10)",
+   "FLEBOOT_PY123 {\"n\":6,\"over\":0,\"events\":[{\"unit\":0,\"site\":0,\"slot\":\"0x15e1c78\",\"proc\":\"0x0\",\"old\":\"0x0\",\"new\":\"0x16bb068\",\"aux\":\"0x0\"},{\"unit\":0,\"site\":0,\"slot\":\"0x15e4790\",\"proc\":\"0x0\",\"old\":\"0x0\",\"new\":\"0x141d6b8\",\"aux\":\"0x0\"},{\"unit\":0,\"s",
+   "FLEBOOT_PY201 {\"last\":{\"unit\":13,\"pos\":0,\"count\":0,\"mgr\":\"0x16bb068\",\"safe_g\":\"0x141d6b8\",\"safe_obj\":\"0x0\",\"f98\":\"0x0\",\"f88\":\"0x0\",\"sing\":\"0x0\"},\"trace\":[{\"unit\":0,\"pos\":0,\"count\":0,\"mgr\":\"0x16bb068\",\"safe_g\":\"0x141d6b8\",\"safe_obj\":\"0x0\",\"f",
+   "FLEBOOT_PY106 {\"chain_0x15e1140\":\"0x16b8488\",\"slot_0x16b8488\":\"0x0\",\"exc_type\":null,\"bind_0x16b8250\":\"0x0\"}",
+   "FLEBOOT_OUTMEM {\"full\":\"5ebd8d01c3633e2bb8e0f48ed56dedcb4eca4cb70b3c5cd3081fc607a2de83ee\",\"no_cstack\":\"596a33523e016de881c7f0a7ab271bf108638e346e621af744031ab87f60a20b\",\"sections\":{}}"
+  ]
+ },
+ "px6bbc20": {
+  "calls_all": 0,
+  "calls_site_6c9380": 0,
+  "first_rect_x0_y0_x1_y1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "last_rect_x0_y0_x1_y1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "rect_changes": 0,
+  "x_min_max_y_min_max": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "calls_other_ret": 0
+ },
+ "soft_top": [],
+ "ipp": {
+  "mode": 3,
+  "on": true,
+  "ptr_15F34A0": "0x0",
+  "ptr_15F40E8": "0x0",
+  "total": 0,
+  "called": [],
+  "stop": null,
+  "token_at": [],
+  "call_slot": {
+   "slot_15e0a48": "0x15f34a0",
+   "obj_first_qword": "0x0"
+  }
+ },
+ "notes": {
+  "entry": "0x1376820",
+  "longjmp_target": "0x1376840",
+  "init_table": "0x13768b0",
+  "baseline_retdec": {
+   "boot_units": "17 dispatched (16 completed), raise 0xEEDFADE in unit#17 (0x454090)",
+   "survey": "m11 sx 純リンク baseline (tools/m11/work/shimx_link/baseline/m11_boot.survey.json): ok 800 / oob 50 / halt0 44 / closure外 46 / abort 1 / noproc 1。なお --fix 変種は ok 800 / oob 41 / halt0 53 (CAB-129 halt0 対応表適用)。",
+   "route_diff": "results/verdict_boot.jsonl (gen_verdict.py: baseline を native 側、x64c を wasm 側に対応)"
+  }
+ }
+}

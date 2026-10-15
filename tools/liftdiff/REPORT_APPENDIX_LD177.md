@@ -184,3 +184,49 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 - **起票先**: icall 欠落 (`function_5c1030` の `call [rbx+0x18]` が IR から落ちる原因) の修正は lift 側の作業で、本 PR の範囲外。#4137 (LD-194) へ。
 - **`git diff b3a33a3fa 78ef27d60 --stat -- tools/liftdiff`** の出力: `REPORT_APPENDIX_LD177.md` (+26 / -1)・`tests/test_ld199_fvm_pin.py` (+70)。`d4b8a5309` (テスト追加) と `78ef27d60` (docs のみ) が測定 commit 以降の範囲。`ldlib/` の差分は 0。
 - **main との関係**: 測定 base `7c226bdb3` 以降、main は `tools/liftdiff/ldlib` を変えている (`e46ed6e14`・`dc6a2d08d`・#4874。現 main `2d0357a51`)。本 PR の head は main を取り込んでいないため、本測定は PR head で有効。merge 後の結果は本測定と同一ではない。
+
+## 12.1.4 #5406 (LD-268): fvm 42 件の阻害要因の分類
+
+- **測定 commit**: `09dd25790` (コードを変えた最後の commit。分類スクリプト `ld5406_fvm_classify.py` は `70e0ad8fa`、e2e の順序修正は `09dd25790`)。
+- **入力**: `liftdiff_e2e.sh --m11-only` (HEAD `09dd25790`・`--shards 12 --state auto`・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`) が書いた `work/m11/batch_sample_800.jsonl` (801 行・verdict match 360 / mismatch 236 / unexec 205)。fvm case は 42 関数・42 件 (both_fault 24 / native_fault 15 / diff 3)。
+- **再現**: `python3 tools/liftdiff/ld5406_fvm_classify.py` (集計のみ・実行はしない)。
+
+### 分類 (排他・42 件)
+
+| 分類 | 件数 | 関数 VA | 阻害要因 |
+|---|---|---|---|
+| wasm_stub_unreach | 15 | `0xd2b5b0 0x410a50 0x64fc70 0x10293b0 0xd2b370 0xd2bb50 0x64fa70 0x47d670 0x11e7940 0x10263d0 0x101ea80 0xd2b620 0xebbfb0 0x534eb0 0x5c5500` | wasm が `function_4128b0` の未解決 call スタブで unreachable。原因は未確認 (推定: wasm 側の icall 欠落) |
+| native_null_field | 10 | `0x678460 0x905af0 0x102b6c0 0xa96550 0x47d460 0xebc1a0 0x102b750 0x681380 0x539e00 0x8cbe40` | native が addr 0x0〜0xff を読んで落ちる (fault addr の値のみ確認。原因は未確認)。引数の投入形が疑われる |
+| wasm_oob | 8 | `0xc3efe0 0x4fb160 0x8e7080 0xa96620 0xdc2130 0x450260 0xdc0450 0x101e250` | wasm が memory access out of bounds。引数の投入形、または wasm 側の欠陥 |
+| native_noaddr | 4 | `0xe860d0 0xe8dce0 0x808700 0x472530` | native fault に addr が無い (分岐先の不正など)。候補引数の誤りの可能性 |
+| diff | 3 | `0x1024830 0x132f6a0 0x5c1030` | 両方 ok で差分あり。`0x5c1030` は LD-199 で wasm 側 icall 欠落と確定済み。`0x1024830`・`0x132f6a0` は native_extra_call (LD-199 節) |
+| wasm_other | 1 | `0x126e4c0` | wasm `remainder by zero` (`function_47d960`) |
+| native_cand_arg | 1 | `0x675010` | native fault addr が候補引数 (SMALL[1]) の範囲内。候補は正しいが、wasm は ok |
+
+- 分類の順序: diff → native fault の addr が候補引数 (SMALL[i]+off) → addr<0x100 → addr 無し、の順。wasm の trap は `wasm_detail` の文字列で分ける。
+- 注: `native_null_field` と `native_cand_arg` の境界は addr の値だけで決めた (候補引数の SMALL[i] は 3〜17 で、0x100 未満にも入るため、候補判定を先にする)。
+
+### 受入 2: equal / wasm_trap へ遷移しうる件数 (未確定)
+
+- **実測の遷移: 0 件** (本 run。match 360 は前回と同じ)。
+- `compare_case` (`ldlib/compare.py`) の遷移の経路 (分類からの候補。個別の再測定はしていない):
+  - **wasm_trap へ遷移する経路** (`n_ok and not w_ok`): wasm が fault している件が、native を ok にした case で `wasm_trap` になりうる。候補は `both_fault` 24 件 (`wasm_stub_unreach` 15・`wasm_oob` 8・`wasm_other` 1)。
+  - **equal へ遷移する経路** (native ok・wasm ok で差分 0): 候補は `native_fault` 15 件 (`native_null_field` 10・`native_noaddr` 4・`native_cand_arg` 1。native が ok になれば wasm は ok のまま) と `diff` 3 件 (差分が消えた場合)。計 18 件。
+  - `native_fault` 15 件が `wasm_trap` になる経路は無い (wasm は ok のため)。
+- **結論**: 上限の候補は、wasm_trap 24 件・equal 18 件。ただし、これは分類から出した上限で、実際に遷移するかは未測定 (this の疑似オブジェクトのフィールドを埋めた case を作らないと測れない)。本 run では this の埋め方を変えていない。遷移の確定数は受入 2 の残りとして本 issue #5406 に残す (`Refs #5406`)。
+
+### 受入 3 (e2e)
+
+| run | commit | e2e | 所要 (経過秒) | load (/proc/loadavg 1 分値 開始 → 終了) | match / mismatch / unexec |
+|---|---|---|---|---|---|
+| 1 回目 (スクリプト未修正・`wasm` 未ビルド) | `70e0ad8fa` | FAIL (`[0/4]` の `test_ld259_patch_p` が wasm 未ビルドで落ちた。`--nobuild` の前提) | 3 s で中断 | — | — |
+| 2 回目 (スクリプト未修正・`liftdiff.py build` を手動で先に実行) | `70e0ad8fa` | PASS | 209 | 0.76 → 5.39 | 360 / 236 / 205 |
+| 測定 (修正後) | `09dd25790` | PASS | 207 | 0.66 → 5.11 | 360 / 236 / 205 |
+
+- 修正: `liftdiff_e2e.sh` の `[0/4]` が `test_ld259_patch_p` (LD-259) より先に wasm をビルドするようにした (`09dd25790`)。`--nobuild` の既存テストが wasm を要するため、build を先に行う必要があった。
+- 前回 (LD-177 HEAD `f7d5abbfa`・LD-199 `b3a33a3fa`) との verdict の差 (360/233/207 等) の原因は**未切り分け**。本 run は作業 worktree の素材を新たに展開して測ったもので、コード差分の範囲外の揺らぎかは確認していない。
+
+### 差分証跡 (WORKFLOW §6)
+
+- `git diff 5a103d883 09dd25790 -- tools/liftdiff ':!tools/liftdiff/REPORT*'` の出力 (本 PR の code 範囲): `liftdiff_e2e.sh` (順序の修正)・`ld5406_fvm_classify.py` (新規)。
+- 測定 commit `09dd25790` と HEAD の差分は、本 REPORT の追記だけ。
