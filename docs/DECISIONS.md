@@ -130,11 +130,12 @@
 
 ## D13 — liftdiff の既定 batch 状態は units のまま据え置く (hybrid への切替は根拠待ち)
 
-- **状態**: 保留 (2026-10-13, issue #1248 [LD-42]。子 issue #1464 [LD-50] で判断)
+- **状態**: 採用 (2026-10-13 保留、2026-10-15 issue #1464 [LD-50] で据え置きを確定。hybrid への切替は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §8.2 の条件が揃うまで行わない)
 - **決定**: `liftdiff_e2e.sh` [4/4] の既定 batch 状態は `units` のまま変えない。InitTable 充足の `hybrid` は `--state` で明示したときだけ使う。
-- **比較した方式**: (a) 既定を hybrid に切替 (InitUnits が実際に走り、空振り一致が 0 件になる)、(b) units のまま据え置き (採用・保留)。
+- **比較した方式**: (a) 既定を hybrid に切替 (InitUnits が実際に走り、空振り一致が 0 件になる)、(b) units のまま据え置き (採用)。(a) は不採用: hybrid の InitUnits は native 側が 11/11 で segv し (子 #3349 LD-153)、TLS の実経路 (flag=1) の充足も未確認 (同)、件数が負荷で揺れる (子 #3350 LD-154)。
 - **理由**: hybrid にすると sample:800 の判定が変わる (件数は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §1・§3)。どちらが正しいかは関数ごとの差分根拠が無いと決まらないため、根拠無しに基準値を動かさない。units の InitUnits 空振り一致は `check_initunits.py` で検出済み (LD-25) で、この検出は hybrid 側でのみ成立する。
 - **影響**: 既定 batch の一致数は「InitUnits が呼ばれない状態での一致」である (件数の測定値は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §1)。この数値を外部へ「実行初期化済みの一致」として出さない。
+- **追記 (2026-10-15, LD-50)**: 遷移 68 件の表 (`REPORT_APPENDIX_LD42.md` §6) で、units 一致 → hybrid 差分の 25 件は全件の主因が callee_divergence で、どちらが誤りかを関数ごとに決められなかった。根拠は §6・§7 (TLS)・§8 (件数の揺れ)。
 
 ## D14 — スカラー FMA3 (vfmadd/vfmsub/vfnmadd/vfnmsub の sd 形) は ヘッダの式 + IR 引数順で実装する
 
