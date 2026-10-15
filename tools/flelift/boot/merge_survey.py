@@ -17,7 +17,7 @@ for p in glob.glob(os.path.join(HERE, 'results', 'survey_seg_*.jsonl')) +       
             continue
 # FLE-2: runner は empty/noproc を jsonl に書き出さない (details に載せない設計) ため、
 # 完了した survey の summary json から空き unit を補完する (総数を 942 に揃える)。
-for sp in glob.glob(os.path.join(HERE, 'results', '*summary*.json')):
+for sp in glob.glob(os.path.join(HERE, 'results', '*summary*.json')) + glob.glob(os.path.join(HERE, 'results', 'survey_seg_*.json')):
     try:
         d = json.load(open(sp, errors='replace'))
     except Exception:
