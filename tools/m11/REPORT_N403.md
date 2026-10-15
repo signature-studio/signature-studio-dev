@@ -205,19 +205,28 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 
 ## 7. #3188: LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (本 runner で実測)
 
-測定 commit: `6a20f8b1` (コード差分の最終 commit。1d9e2037 から PATH 行の削除だけ・再測定済み)。測定 runner: Actions (4 vCPU・RAM 15 GiB)。load average は未採取。
+測定 commit (merge 前の旧版): `6a20f8b1` (コード差分の最終 commit。1d9e2037 から PATH 行の削除だけ・再測定済み)。測定 runner: Actions (4 vCPU・RAM 15 GiB)。load average は未採取。merge 後の再測定は 7-0 のとおり未実施。
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の ID は未付与。NULL 源の memcpy は下 §7-3 の候補で、既存類型との対応は未確認)。
 素材: `fl-win64` (`block00031_PE.bin` 22,227,016 B、展開 2.2 s)・`work-m11` (展開 2 s。`lift_pe.sha256` 無し)。
 `m11_e2e.sh` の全再生成 (指紋検査) は使わず、後段だけ `m11_lb_tolerant_repro.sh` で回した (gen_ir2 → data/image → lb_check → build → `m11_tolerant.mjs`)。
 `toolchain-emsdk` は展開せず runner 既存の emsdk ([EMSDK]、`docs/REFERENCES.md` §4) を使った。`toolchain-retdec`・`work-liftdiff` は使っていない (lift を走らせていない)。
 
-### 7-1. 再現スクリプト (新規・issue の指定どおり)
+### 7-0. merge 後の状態 (main 取り込み・数値は merge 前のまま)
+
+- 本 PR の旧版と main (#3160) は同じ修正 (`fix_ld108.py`・`m11_fix912.py`) と同じ再現スクリプトを別の書き方で持っていた。競合は main 側を採用して解消した (merge commit `9c2bcd3a`)。解消後に本 PR が増やすのは `m11_lb_ir_fn_diff.py` と本節だけ。
+- 以下 7-1〜7-6 の数値は merge 前の旧版 (`6a20f8b1`) で測ったもの。**merge 後の再測定は未実施**: 本 run の `$ARTIFACTS_DIR` には `fl-win64` しか無く、`work-m11` (lift 成果物) も `tools/m11/work/` も無いため、後段を回せない。
+- `6a20f8b1` から `9c2bcd3a` までの code 差分 (`git diff 6a20f8b1 9c2bcd3a -- tools/m11/ldfix tools/m11/fix912 tools/m11/m11_lb_tolerant_repro.sh tools/m11/m11_lb_unit_diff.py --stat`): 8 files, +307 −88。main 由来の `fix_ld116.py`・`ld116_e2e.sh`・`dyn_ld115.mjs` と `REPORT_2513.md` を含む。
+- 素材なしで確認した範囲 (merge 後の HEAD): `M11_LB_BASE=0` で `fix_ld108` の照合文字列は `i64 16404608`・`fix912` の VMT は `994072` (修正前の文字列と同一)。`M11_LB_BASE=0x10000` で `16470144`・`1059608`。`m11_lb_ir_fn_diff.py` は合成 .ll で定数変化量 `[65536]` を出した。main 版の `m11_lb_unit_diff.py` は合成 JSON で kind 差 1 件を検出した (差があっても exit 0。結果は `kind_diff=N` の行で読む)。
+
+### 7-1. 再現スクリプト (main #3160 版を使う。本 PR で追加するのは `m11_lb_ir_fn_diff.py` のみ)
 
 - `tools/m11/m11_lb_tolerant_repro.sh <LB> <出力先>`: 後段だけの再現。出力は `tools/m11/<出力先>/` (`tolerant_units.json`・`boot_final.ll`・ログ)。
-- `tools/m11/m11_lb_unit_diff.py A.json B.json`: unit の index 単位で kind を突合 (VA は LB でずれるので比べない)。差 0 件で exit 0。
+- `tools/m11/m11_lb_unit_diff.py A.json B.json`: unit の index 単位で kind を突合 (VA は LB でずれるので比べない)。差は `kind_diff=N` で出る (exit 0 は差の有無と無関係)。
 - `tools/m11/m11_lb_ir_fn_diff.py A.ll B.ll function_X ...`: 関数本体の行差分と、整数定数の変化量 (LB=0x10000 側 − LB=0 側) を出す。
 
 ### 7-2. 修正 (受入 2 の前段: LB 直書きの IR 書換え pass が LB=0x10000 で止まる)
+
+下の修正は merge 前の本 PR 版。merge 後は main (#3160) の同じ修正が残り、定数は 7-0 のとおり同じ値になる。
 
 修正前 (HEAD `24be607a`) は `M11_LB_BASE=0x10000` の IR も wasm も作れなかった (fail-closed)。原因は LB=0 の定数の直書き 2 件:
 
