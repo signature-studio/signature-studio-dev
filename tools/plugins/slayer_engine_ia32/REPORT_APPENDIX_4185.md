@@ -3,7 +3,7 @@
 既知類型との関係: `ott_x87.h` の制限 (4) (スタック over/underflow を模型化しない)。 `docs/DEFECTS.md` の既存 ID へは当てていない。 方式は `docs/DECISIONS.md` D28。
 
 - 親: #4064 (PLG-G2-40)。 本付録は #4064 付録 §5 の「`frndint` 後の NaN」の追跡先 #4185 の測定。
-- 測定 commit: `573088a23` (main の HEAD。 コードは変えていない。 本 PR はこの付録・DOC_MAP・#4064 付録の注記だけを変える)。
+- 測定 commit: `573088a23` (測定時点の main の HEAD。 コードは変えていない。 本 PR はこの付録・DOC_MAP・#4064 付録の注記だけを変える)。
 - 入力: 素材 fl-win64 の `block22434_PE.bin`・乱数 seed 2989 (`x87_fn_diff.py` の既定の生成)。 `lift_text.py` の被覆は 85.37%・未被覆 10,682 B (#4064 §4 と一致)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。
 

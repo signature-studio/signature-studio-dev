@@ -13,7 +13,7 @@
 
 | 関数 | eax 不一致 | ST(0) の差 | 主な差の中身 | 切り分け |
 |---|---:|---:|---|---|
-| `0x10009eb5` | 4,000 / 4,000 | 4,000 / 4,000 (全行 NaN と 0) | native `eax` の差 `0x541` = `IE+SF+C0+C2+C3` を wasm が立てない。 ST(0) は native が NaN、wasm が 0 | **模型の限界**。 `fcomp` の例外フラグ・eax の IE/SF が模型に無い。 ST(0) の NaN は `frndint` ではなく空スタックの読み (underflow) による。 切り分けは REPORT_APPENDIX_4185 |
+| `0x10009eb5` | 4,000 / 4,000 | 4,000 / 4,000 (全行 NaN と 0) | native `eax` の差 `0x541` = `IE+SF+C0+C2` を wasm が立てない。 ST(0) は native が NaN、wasm が 0 | **模型の限界**。 `fcomp` の例外フラグ・eax の IE/SF が模型に無い。 ST(0) の NaN は `frndint` ではなく空スタックの読み (underflow) による。 切り分けは REPORT_APPENDIX_4185 |
 | `0x1000b526` | 2,003 / 4,000 | 0 | native のみ `OE+PE+C1` (と IE) を立て、wasm は 0 (`0x228`・`0x229`) | **模型の限界**。 PE/OE/C1 が模型に無い。 ST(0) は一致 |
 | `0x1000bf60` | 0 / 4,000 | 2,022 / 4,000 | ST(0) が NaN と ±0 の食い違い (native NaN・wasm 0/-0 など) | **模型の限界の候補** (確定ではない)。 無効演算の NaN 生成 (IE 系) が模型と違う見込み。 eax は今回の入力では一致 |
 
