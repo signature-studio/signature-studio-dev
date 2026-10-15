@@ -32,8 +32,13 @@ def main():
     md = Cs(CS_ARCH_X86, CS_MODE_64)
     md.detail = True
     qword_hits, other_hits, idx_hits, lea_hits, n_ins = [], [], [], [], 0
+    baseless_hits, implicit_hits = [], []
     for ins in md.disasm(bytes(img[text_va:text_va + text_sz]), text_va):
         n_ins += 1
+        base_m = ins.mnemonic.split()[-1]
+        if base_m in ('stosb', 'stosw', 'stosd', 'stosq', 'movsb', 'movsw', 'movsq') or \
+           (base_m == 'movsd' and 'xmm' not in ins.op_str):
+            implicit_hits.append((ins.address, ins.mnemonic, ins.op_str))
         if ins.mnemonic == 'lea' and len(ins.operands) == 2 and ins.operands[1].type == CS_OP_MEM:
             m = ins.operands[1].mem
             if m.disp in PTR_RANGE and m.index == X86_REG_INVALID:
@@ -41,6 +46,10 @@ def main():
         if ins.mnemonic in NON_DST or not ins.operands:
             continue
         op = ins.operands[0]
+        if op.type == CS_OP_MEM and op.mem.base == X86_REG_INVALID and op.mem.index != X86_REG_INVALID:
+            if op.mem.disp in PTR_RANGE:
+                baseless_hits.append((ins.address, ins.mnemonic, ins.op_str, op.size))
+            continue
         if op.type != CS_OP_MEM or op.mem.base == X86_REG_INVALID:
             continue
         if op.mem.index != X86_REG_INVALID:
@@ -64,6 +73,12 @@ def main():
     print('PTR_LEA=%d (0xbc..0x12c への lea。後続で index 付き書き込みの基点になる)' % len(lea_hits))
     for a, s in lea_hits:
         print('  LEA %#x lea %s' % (a, s))
+    print('BASELESS_INDEXED_PTR_WRITES=%d (base なし [idx*8+disp] で disp が 0xbc..0x12c)' % len(baseless_hits))
+    for a, m, s, _ in baseless_hits:
+        print('  BI %#x %s %s' % (a, m, s))
+    print('IMPLICIT_STRING_WRITES=%d (stos*/movs* の文字列命令)' % len(implicit_hits))
+    for a, m, s in implicit_hits:
+        print('  IM %#x %s %s' % (a, m, s))
 
 
 if __name__ == '__main__':
