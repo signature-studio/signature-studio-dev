@@ -36,7 +36,7 @@ for i, e in enumerate(expect):
         reach_ok += ok
         if t is not None: va_seen.add(t)
     else:
-        # sweep: movnti に入る ⇔ a1 ≥ 0x70000 (静的読み count>>6 ≥ 0x1c00)。入るなら movnti の VA で trap、入らないなら movnti 以外で trap (VA 0 = memory OOB)
+        # sweep: movnti に入る ⇔ a1 ≥ 0x70000 (静的読み count>>6 ≥ 0x1c00)。入るなら movnti の VA で trap、入らないなら movnti 以外で trap (VA 0 = memory OOB。trap 位置は未特定)
         ok = (t in movnti) == (e['a1'] >= 0x70000)
         ctrl_ok += ok
     bad += not ok

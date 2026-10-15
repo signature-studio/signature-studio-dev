@@ -8,8 +8,8 @@ movnti に入り、その唯一の呼出し元 (f_18001bde8) は count = 0x40 �
 
 case 形式は gen_cases.py と同じ (native_ref.c / run_wasm.mjs が読む)。期待 (reach / info) は OUT と同じ dir の movnti_expect.json に書く。
   reach   : a1 in [0x70000, 0x80000)。wasm は movnti の VA で trap する想定。native は arena 外へ書いて落ちる想定。
-  sweep   : a1 を [0x10000, 0x80000) で振る (a2 = arena 先頭)。movnti の block の最初の store が movnti なので、入ったときは movnti の VA で
-            trap し、入らないときは通常の memset の store が arena 末尾を越えて memory OOB (VA 0) で trap する。判定: movnti に入る ⇔ a1 ≥ 0x70000 (T-SH-94)。
+  sweep   : a1 を [0x10000, 0x80000) で振る (a2 = arena 先頭)。movnti に入ったときは movnti の VA で trap する。入らないときは movnti 以外の
+            OOB (VA 0) で trap するが、trap 位置は未特定 (wasm の線形メモリは arena より広く、arena 越境の store だけでは説明できない)。判定: movnti に入る ⇔ a1 ≥ 0x70000 (T-SH-94)。
 reach / sweep は fn=0 (REXGetCreatorInfo)。木の検索の直後に memset を呼ぶため、入力だけで memset に届く。fn=1 は memset の前の node 参照で落ちるため使わない。
 usage: gen_movnti.py OUT
 """
