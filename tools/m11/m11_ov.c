@@ -593,6 +593,17 @@ u64 function_47b260(u64 self, void* src, u64 unused) {
  * RetDec は `cmp/jne` ごと条件ブロックの `call [r13]` (Grow) と `call [rbx+8]` (Notify) を落とした (DEFECTS D15 同型; REPORT_2408 §4).
  * Grow 実体 0x50aac0 と SetCapacity 0x50ade0 は IR に無いため下で転記し、disp_find に登録する. Notify 実体 0x50b3f0 は ret 1 命令.
  * 既定 OFF (M11_FIX_50A830=0) は lift 版 (IR) を使う. ON で Grow/Notify が呼ばれ、list の FItems と Capacity が更新される. */
+#ifndef M11_PROBE_LIST
+#define M11_PROBE_LIST 0   /* #3482 計測専用: 1 = list Add/Grow の記録と、409440 (解放) に渡る範囲外引数の記録 (409730 の error 経路は省く). 既定 0 */
+#endif
+#if M11_PROBE_LIST
+extern unsigned long long function_407e20(unsigned long long arg1);
+u64 function_409440(u64 arg1) {
+    if (arg1 && (arg1 < 0x10000ULL || arg1 >= 0x12000000ULL || (arg1 & 7))) M11_TRACE("[probe_free] arg1=%llx hdr=%llx [hdr]=%llx\n", (unsigned long long)arg1, (unsigned long long)(arg1 >= 8 && arg1 < 0x12000000ULL ? Q(arg1 - 8) : 0), (unsigned long long)(arg1 >= 8 && arg1 < 0x12000000ULL && Q(arg1 - 8) < 0x12000000ULL ? Q(Q(arg1 - 8)) : 0));
+    if (arg1) function_407e20(arg1);
+    return 0;
+}
+#endif
 #if M11_FIX_50A830
 /* function_50ade0  VA 0x50ade0  (SetCapacity(self, newcap)): newcap < Count なら 50a9a0 (エラー経路); newcap != Capacity なら
  *   417fc0(&FItems, ti, 1, newcap) (DynArraySetLength) の後 Capacity := newcap. rdx の ti = Q(RVA 0xc9730), 50a9a0 の rdx = Q(RVA 0x11e2a30). */
@@ -610,6 +621,9 @@ u64 function_50ade0(u64 self, u64 newcap) {
 u64 function_50aac0(u64 self) {
     long long newlen = (long long)Q(self + 0x10) + 1;
     u64 cap = Q(self + 0x18);
+#if M11_PROBE_LIST
+    M11_TRACE("[probe_grow] self=%llx cnt=%llu cap=%llu items=%llx vmt=%llx\n", (unsigned long long)self, (unsigned long long)Q(self + 0x10), (unsigned long long)cap, (unsigned long long)Q(self + 8), (unsigned long long)Q(self));
+#endif
     u64 hook = Q(R(0x11e4390));
     u64 newcap;
     if (hook && Q(hook)) {
@@ -638,6 +652,9 @@ u64 function_50aac0(u64 self) {
 /* function_50a830 本体 (rcx = self, rdx = item). Grow・Notify は VMT 経由 (ICALL_AT). 呼出し元は IR の 27 件 (REPORT_2408 §4). */
 u64 function_50a830(u64 self, u64 item) {
     u64 cnt = Q(self + 0x10);
+#if M11_PROBE_LIST
+    M11_TRACE("[probe_list] add self=%llx cnt=%llu cap=%llu items=%llx item=%llx vmt=%llx\n", (unsigned long long)self, (unsigned long long)cnt, (unsigned long long)Q(self + 0x18), (unsigned long long)Q(self + 8), (unsigned long long)item, (unsigned long long)Q(self));
+#endif
     if (cnt == Q(self + 0x18)) ICALL_AT(0x50a84f, Q(Q(self)), self, 0, 0, 0, 0, 0, 0, 0);
     Q(Q(self + 8) + cnt * 8) = item;
     Q(self + 0x10) = cnt + 1;
