@@ -11,7 +11,7 @@
 - **setMapItemTarget は保留**。flapi の戻り型は `int` だが、PE の成功経路は int 変換を通らない。項目書込みの取得関数 0x416750 も未確定 (#3745)。
 - **-2 のゲートは `general.safeToEdit` (0xd6a2c0) と同じ述語** `[0x15e4790]→[+8]→vt[+0x98]` を見る。例外化の判定 (0xd82c20 の負の code 経路の `vt[+0x88]`) は、オブジェクトが実行時に作られるため静的に同定できない (#3746)。
 - **持ち越し 1〜3 は未確定**。確定に必要な情報を §持ち越し に書いた (#3746)。
-- 件数 (`length`) は仮置き 0 のまま変えない。provider_check は 実装 162→**165**・未実装 273→**270**。
+- 件数 (`length`) は仮置き 0 のまま変えない。provider_check は 実装 162→**165**・未実装 273→**270** (本 PR 単独)。main (`bb6bdcf41`・PY-130 #3007 の pe130 3 件を含む) の取り込み後は 165→**168**・270→**267** (§検証)。
 
 ## 手段
 
@@ -56,30 +56,32 @@
 - `host/fl_mock.mjs`: `launchMapPages.init` (arity 3・`str(a[0])`・int 2)・`updateMap` (arity 1・int)・`createOverlayMap` (arity 4・int ×4)。戻りは undefined (None)。状態は変えない。
 - `provider/fl_engine.c`: 同じ検査 (`NARGS`・`A_STR(0)`・`A_INT`) と `fl_ret_none`。
 - `tests/launchmap_diff.mjs`: 呼出し 6 件 + 引数違い 9 件 = 15 件。mock と C の差分 0。
-- `tests/provider_check.mjs`: `pe138` (3 件) を実装集合に追加。期待値 実装 162→165・未実装 273→270。
+- `tests/provider_check.mjs`: `pe138` (3 件) を実装集合に追加。期待値 実装 162→165・未実装 273→270。main 取り込み後は `pe130` (3 件) と合わせて期待値を 実装 168・未実装 267 に更新 (`24ec522f5`)。
 - 実装しなかったもの: setMapItemTarget (#3745)・副作用・例外化の述語・持ち越し 1〜3 (#3746)。
 
 ## 検証
 
-測定 commit: `fa78f9a1a` (コードを変えた最後の commit。`feat(python): launchMapPages init・updateMap・createOverlayMap の書式と戻りを PE で確定 (PY-138)`)。
-環境: runner (4 core、測定開始時の load average 1.6)、node 22.23.3、emcc 6.0.12 ([EMSDK])。素材 `fl-win64` の `block00031_PE.bin` と DATA 4 件を `<fl-win64 展開先>` へ展開。
+測定 commit: `24ec522f5` (コードを変えた最後の commit。main `bb6bdcf41` を取り込んだ merge `f8600e9c6` の競合解消と、`tests/provider_check.mjs` の期待値を merge 後の件数 (実装 168・未実装 267) に更新した commit)。main 取り込み前の測定 (`fa78f9a1a`・実装 165・未実装 270) は Git 履歴に残し、本節では置き換えた。
+環境: runner (4 core、測定時の load average 1.99 (1 分平均)、node 22.23.3、emcc 6.0.12 ([EMSDK]))。素材 `fl-win64` の `block00031_PE.bin` と DATA 4 件を `$RUNNER_TEMP/fl-win64` へ展開 (`FL_WIN64_DIR`・2.8 秒)。work/ の無い worktree からクリーンに再ビルド。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `fetch_inputs.sh` | rc 0 | 0.3 s |
-| `build_cpython_wasm.sh` (32 bit) | rc 0 (CPython 3.12.1 wasm を HEAD でクリーンビルド) | 254 s |
-| `FLPY_SKIP_TABLE=1 build_flpy.sh` | rc 0 | 6.2 s |
-| `provider/build.sh` | rc 0 (`dist/flprov.wasm`) | 1.5 s |
+| `fetch_inputs.sh` | rc 0 | 0.7 s |
+| `build_cpython_wasm.sh` (32 bit) | rc 0 (CPython 3.12.1 wasm をクリーンビルド) | 244.7 s |
+| `FLPY_SKIP_TABLE=1 build_flpy.sh` | rc 0 | 6.3 s |
+| `provider/build.sh` | rc 0 (`dist/flprov.wasm`) | 1.4 s |
 | `pe_launchmap_entries.py` | 12/12 OK (entry・fn・flags・docstring が flapi と一致) | 0.09 s |
-| `node tests/provider_check.mjs` | PASS (functions 435 / implemented 165 / unimplemented 270 / mcp_static 60) | 0.37 s |
+| `node tests/provider_check.mjs` | PASS (functions 435 / implemented 168 / unimplemented 267 / mcp_static 60) | 0.37 s |
 | `node tests/launchmap_diff.mjs` | calls 15・diffs 0・PASS | 0.05 s |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true | 2.2 s |
-| 負のコントロール: mock の `createOverlayMap` の引数個数を `3,4` に緩める | `launchMapPages 差分 1 件` で rc 1 (検出)。`4,4` に戻して rc 0 | — |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true | 2.1 s |
+| `tests/*_diff.mjs` (launchmap・ui_state・ui_display・arrangement・arrangement_selection・channels・device・general・mixer・patterns・patterns_group・playlist・screen・step_item・transport・ui・midi_path・note_enum の 18 件) | 全て rc 0・diffs 0 | 17 件で 1.7 s (launchmap 含めず) |
+| 負のコントロール: mock の `createOverlayMap` の引数個数を `4,4` から `3,4` に緩める | `launchmap_diff` rc 1 (検出)。mock を元に戻して rc 0 | — |
 
-- コード差分 (測定 commit 以降、テスト・mock・C・解析に効く範囲): 下の出力を最終 HEAD で取った (REPORT と付録の変更のみ)。
+- main 取り込みで入った tools/python の変更 (`fa78f9a1a` から測定 commit まで・16 ファイル・+1147/−20) も、上の測定に含めて測定した。
+- コード差分 (測定 commit 以降、テスト・mock・C・解析に効く範囲): 下の出力を最終 HEAD で取った (REPORT と PR 本文の変更のみ)。
 
 ```
-$ git diff fa78f9a1a HEAD -- tools/python ':!*.md'
+$ git diff 24ec522f5 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
