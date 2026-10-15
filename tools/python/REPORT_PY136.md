@@ -15,7 +15,7 @@
 - ハンドラ探索: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前...>` (`extracted/block00031_PE.bin`)。10 件とも entry・fn・flags が issue 本文の表と一致した。`init` は entry 0x151e5b8 を選んだ (0x151e058 は別の名前衝突)。
 - 逆アセンブル: `analysis/flapi/pe_disasm.py <VA>`。共通の読み方は REPORT_PY121_2985 と同じ (`call 0xd7eca0` → `[rax]` → `+0x50` → `+0x3f8` で scr)。
 - 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先>` (本 run 7.5 秒)。
-- emsdk 6.0.12 の導入元: 素材 `toolchain-emsdk` ではなく上流から入れた (本 run の `$ARTIFACTS_DIR` には `fl-win64` しか無かった)。手順は `tools/shim/REPORT.md` と同じ: `git clone --depth 1 https://github.com/emscripten-core/emsdk.git $RUNNER_TEMP/emsdk` → `cd $RUNNER_TEMP/emsdk && ./emsdk install 6.0.12 && ./emsdk activate 6.0.12`。`EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh` を `provider/build.sh` に渡した。`build_cpython_wasm.sh` は `/opt/emsdk/emsdk_env.sh` を直書きするため、同じ場所を `/opt/emsdk` に symlink した。`toolchain-emsdk` (`[EMSDK]`) の素材を指定した run では、その展開先を `EMSDK_ENV` に渡せば同じ手順で再現できる。
+- emsdk 6.0.12 の導入元: 素材 `toolchain-emsdk` ではなく上流から入れた (本 run の `$ARTIFACTS_DIR` には `fl-win64` しか無かった)。手順は `tools/shim/REPORT.md` と同じ: `git clone --depth 1 https://github.com/emscripten-core/emsdk.git $RUNNER_TEMP/emsdk` → `cd $RUNNER_TEMP/emsdk && ./emsdk install 6.0.12 && ./emsdk activate 6.0.12`。`EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh` を `provider/build.sh` に渡した。`build_cpython_wasm.sh` は `[EMSDK]` (docs/REFERENCES.md) の `emsdk_env.sh` を直書きするため、導入先を `[EMSDK]` の位置に symlink した。`toolchain-emsdk` (`[EMSDK]`) の素材を指定した run では、その展開先を `EMSDK_ENV` に渡せば同じ手順で再現できる。
 
 ## PE 根拠 (10 件)
 
