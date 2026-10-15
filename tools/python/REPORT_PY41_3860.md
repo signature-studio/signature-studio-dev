@@ -1,7 +1,7 @@
 # PY-262 (#3860): 戻り値 `[rbp+0x584]` の書込み経路と式 (部分・REPORT_PY41.md の PY-65 節の受入 2 の付録)
 
 親: #2034 (PY-65)。前段: `REPORT_PY41.md` の PY-65 節 (受入 2 は未達)・PY-60 (戻り値の書込みと早期 exit の入辺 9 件)。
-測定 commit: §4 は `a6ce09858` (`analysis/py262_ret584_paths.py` を追加し、§4 の数値を測ったコードの最後の commit)。§7 は `031d81296` (`analysis/py341_ret584_dominators.py` を追加した commit)。`git diff 031d81296 HEAD -- tools/python/analysis/` の出力は空 (0 行・差分 0)。`py65_ret584_reach.py` は main (`ea7f810ca`・`8706f8e89`) で入ったもので、本 PR の commit ではない。
+測定 commit: §4 は `a6ce09858` (`analysis/py262_ret584_paths.py` を追加し、§4 の数値を測ったコードの最後の commit)。§9 は `031d81296` (`analysis/py341_ret584_dominators.py` を追加した commit)。`git diff 031d81296 HEAD -- tools/python/analysis/` の出力は空 (0 行・差分 0)。`py65_ret584_reach.py` は main (`ea7f810ca`・`8706f8e89`) で入ったもので、本 PR の commit ではない。
 素材: `oc_artifacts: fl-win64` (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`・`block00031_PE.bin` 22,227,016 B)。
 再現: `python3 tools/python/analysis/py53_dispatch.py <PE> <work/py53>` → `fn=4664 dispatch=13 r8d_tests=174` (本 run で再現)。続けて `python3 tools/python/analysis/py65_ret584_reach.py <work/py53/fn.txt> 0x104cc65`。
 
@@ -55,18 +55,59 @@
 
 ## 5. 未確定 (受入 1・3 の残り)
 
-- **受入 1 (分岐ごとの式・経路条件 + 書く値)** は部分達成。§4 の代表経路の条件は機械的に出せた。§7 で、書込みごとに「必ず通る分岐」(必要条件) を支配関係で確定した。書込みごとの全経路の式 (十分条件の組合せ) と書く値の式は未確定 (§7)。
+- **受入 1 (分岐ごとの式・経路条件 + 書く値)** は部分達成。§4 の代表経路の条件は機械的に出せた。§9 で、書込みごとに「必ず通る分岐」(必要条件) を支配関係で確定した。書込みごとの全経路の式 (十分条件の組合せ) と書く値の式は未確定 (§9)。
 - 72/74 の切り分けは §3 で確定 (戻り値に届かない 2 件は上書きされる)。
-- **受入 3 (判定の行き先と戻り値分岐の突合)** は未実施。`py65_r8d_bits.py` の照合 (objdump 対 capstone) は 174 件 mismatch 0・negctl 1 件で、これは判定の取り直しの一致であり、「行き先と戻り値分岐の対応」の突合ではない。突合の定義と実施は未了。`REPORT_PY41.md` の PY-65 節の受入 3 とは別物。
+- **受入 3 (判定の行き先と戻り値分岐の突合)** は §7 で実施 (PY-342)。
+  `py65_r8d_bits.py` の objdump 照合 (174 件 mismatch 0) は判定の取り直しの一致であり、本節の突合とは別物。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 72 件の書込みそれぞれの全経路の式 (十分条件の組合せ・書く値の式)。単純経路の全列挙は 73 件が上限 2000 に達した (§7) | 受入 1 | #4574 (PY-341) |
-| 判定の行き先と戻り値分岐の突合 (mismatch 数・negctl の定義と実施) | 受入 3 | #4575 (PY-342) |
+| 72 件の書込みそれぞれの全経路の式 (分岐の立ち/落ちの組合せ・書く値) | 受入 1 | #4574 (PY-341) |
+| 「戻り値分岐に入る/入らない」を経路条件つきで分ける (本節の到達は path-insensitive で、判定 174 件は全件 0x104cc65 に届く) | 受入 3 の split の意味 | #4574 (PY-341) |
 
-## 7. 書込みごとの必須分岐 (PY-341・#4574・受入 1 の部分)
+## 7. 判定の行き先と戻り値分岐の突合 (受入 3・PY-342)
+
+測定 commit: `37b08a9d7` (`analysis/py342_r8d_ret_cross.py` を追加した commit)。
+`git diff 37b08a9d7 HEAD -- tools/python/analysis/` の出力は空。
+再現: `py53_dispatch.py` → `py65_r8d_bits.py` (`agree=174 mismatch=0`) の後に
+`python3 tools/python/analysis/py342_r8d_ret_cross.py work/py53/fn.txt work/py65/r8d_sites.tsv work/py342`。
+素材は冒頭の素材行と同じ `block00031_PE.bin` (22,227,016 B)。
+
+定義:
+- **入る / 入らない**: 判定命令の VA が、後ろ向き CFG 閉包 (`py65_ret584_reach.py` の `preds`) で 0x104cc65 に届く集合に含まれるか。
+- **行き先**: `je`/`jz` は落ちで飛ぶ・`jne`/`jnz` は立ちで飛ぶ、として `fn.txt` の命令から独立に決める。`r8d_sites.tsv` の「立ち→」の行き先との一致を見る。
+- **mismatch**: 上の行き先が `r8d_sites.tsv` と 1 件でも違えば 1 件。
+- **分類 (戻り値側)**: 立ち・落ちのどちらの行き先が 0x104cc65 に届くか (both / bitset (立ちだけ) / bitclear (落ちだけ) / none)。
+
+| 区分 | 件数 |
+|---|---|
+| 判定 全件 | 174 |
+| 入る | 174 |
+| 入らない | 0 |
+| 入る / both (立ち・落ち両方が届く) | 169 |
+| 入る / bitclear (落ちだけ届く) | 2 (0x1048465 `test 0x800`・0x1048476 `test 0x20`、どちらも行き先 0x104cc72) |
+| 入る / 分岐なし (`setne`) | 2 (0x104a821・0x104a835) |
+| 入る / `and` 書換え | 1 (0x104a8a9) |
+| mismatch (行き先の突合) | 0 (jcc を持つ 171 件で比較) |
+
+- **mismatch 0 の意味**: 独立計算と TSV の一致。両者とも同じ jcc の意味付けを使うため、jcc の立ち・落ちの取り違えは見えない (取り違えの検出は下の negctl が担う)。
+- **入る 174 / 入らない 0 の意味**: 関数内の全判定が path-insensitive に 0x104cc65 へ届く。この定義では分けられない。「戻り値式に効く」かは経路条件 (§4・#4574) が要る。
+- negctl: `--negctl` は TSV の 1 件の立ち・落ちを入れ替える。`不一致 1 件` (exit 0 = 検出)。
+
+## 8. 測定値 (run 4575)
+
+| 項目 | 値 |
+|---|---|
+| `py53_dispatch.py` | fn=4664 dispatch=13 r8d_tests=174 |
+| `py65_r8d_bits.py` | sites capstone=174 objdump=174・agree=174 mismatch=0 |
+| `py65_r8d_bits.py --negctl` | 不一致 1 件 (検出) |
+| `py342_r8d_ret_cross.py` | 判定 174・mismatch 0・入る 174 |
+| `py342_r8d_ret_cross.py --negctl` | 不一致 1 件 (検出) |
+| 所要 | wall=0.16s・maxrss=54,280 KB (`py53` → `py65` → `py342` の 1 回・測定 commit `37b08a9d7`・load 0.07) |
+
+## 9. 書込みごとの必須分岐 (PY-341・#4574・受入 1 の部分)
 
 測定: `analysis/py341_ret584_dominators.py` (支配関係・1 秒未満)。入力は `py53_dispatch.py` の `fn.txt` (fn=4664・writes_total=74・reachable=74 を本 run で再現)。72 件の VA は `py65_ret584_reach.py` の出力と一致 (72/72)。
 

@@ -29,6 +29,7 @@
 - 差分 (#3457 の測定後のコード修正): `git diff c7e0bee8c 513791f11 -- tools/shared/elastique/ipp_entries.py` (即値走査の IPPCODE への拡大・`span_tail` の命令境界・docstring。`data/entries.csv` は不変)。
 - 差分 (#4535 の修正の範囲): `git diff 513791f11 7fe2ea865 -- tools/shared/elastique/ipp_entries.py tools/shared/elastique/data/entries.csv` (`fn_span` の `.text` 側の範囲・`span_kind_of`・統計の区分ラベル・`data/entries.csv` の再集計)。
 - 差分 (測定後のコード範囲): `git diff 7fe2ea865 HEAD -- tools/shared/elastique/ipp_entries.py tools/shared/elastique/data/entries.csv` → 出力 0 行 (測定後は本書 REPORT.md の更新だけ)。
+  検証 HEAD `ccac99706` (origin/main) で再実行した出力も 0 行。`git diff 7fe2ea865 HEAD -- tools/shared/elastique/ipp_entries.py` は単独でも 0 行 (`data/entries.csv` の変更なし)。本書の commit は REPORT.md だけを変える。
 
 ## 2. 再現
 

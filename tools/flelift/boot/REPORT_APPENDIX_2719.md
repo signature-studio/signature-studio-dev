@@ -240,7 +240,7 @@ FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FLE_BOOT_RUNS="default" FLE_EXTRA_ROOTS= bash
 - 計数 (現 head): dispatch 209・GetMem 2,314 / FreeMem 1,199・ok 208・empty 37・noproc 1・clobber 695・exit 1・停止 `0x733090`。`FLEBOOT_IPP_CHECK` は `ok:false` (`ptr_15F34A0=0x0`・§9 と同じ既知の NG)。計数は §11・§12 と一致。x64c の変更 (movnti・vcomiss 等) は、この closure の計数を動かさなかった。
 - `cfi.stack` (関数名付き): `f_410320` ← `f_5af120` ← `f_1105350` ← `f_13752f0` ← `f_1375990` ← `ott_dispatch` ← `fle_run`。§7 の chain と一致 (`0x1375990 → 0x13752f0 → 0x1105350 → 0x5af120 → 0x410320`)。
 - `outmem` (現 head 1 回): `full` `c9f39e3e…`・`no_cstack` `a6cf4946…`。`stack.base`・`end` は `0x11dbef00`・`0x115bef00` で一致。`full` の値は 12 の非決定性どおり毎回変わるため、この値を正として比べない。
-- 差分 0 の範囲 (測定 commit `e3954b032` から HEAD まで): 再測定で使ったコードは `e3954b032` のまま。本節の後の commit は REPORT・PR 本文のみ (`git diff e3954b032 HEAD -- tools/flelift/x64c.py tools/flelift/boot/gen_boot.py tools/flelift/fle_data_gen.py tools/flelift/boot/rss_cap.py tools/flelift/boot/fle_boot.mjs tools/flelift/boot/fle_boot.c tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh tools/shared/env.sh` の出力は空)。
+- 測定 commit `e3954b032` 時点の値。現 head での再確認は未了 (未解決表の行)。`e3954b032` から現 head までに `fle_boot.c` (#4004 の probe)・`fle_boot.mjs`・`x64c.py` (#4054 の rcpps 近似表) に差分がある。現 head では `FLE_SHARDS=8` の link が `kh_rcp_exact` 未定義で失敗 (`approx_rcp_decl` は shard 0 にしか出力されない・main 同一。#4412 は未 merge)。`FLE_SHARDS=1` は clang の RSS cap (11000MB) で打ち切り。よって現 head の値は取れていない。
 - 注: 再測定で `results/boot_summary_fle6_tol.json` が上書きされたが、絶対 path を含む `stack` が入るため差し替えず、`git restore` で HEAD の版に戻した (`boot_cfi_stack_fle6_tol_named.json` が関数名付きの根拠)。
 
 ## 13. CFI 経路の値の観測 (#4384 [WIN-49])

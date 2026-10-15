@@ -1,4 +1,4 @@
-> **正本**: `tools/python/REPORT_PY41_3860.md` §7。本付録は §7 の 72 件の表 (書込み VA・書く値・必須分岐)。生成: `python3 analysis/py341_ret584_dominators.py work/py53/fn.txt work/py341` の `ret584_dominators.tsv` と `py65_ret584_reach.py` の出力を突き合わせて作成。
+> **正本**: `tools/python/REPORT_PY41_3860.md` §9。本付録は §9 の 72 件の表 (書込み VA・書く値・必須分岐)。生成: `python3 analysis/py341_ret584_dominators.py work/py53/fn.txt work/py341` の `ret584_dominators.tsv` と `py65_ret584_reach.py` の出力を突き合わせて作成。
 
 ## PY-341 (#4574) 付録: 72 件の書込みの書く値と必須分岐
 
