@@ -44,6 +44,41 @@ export function assertIndexHtmlRedirect(r, base) {
 
 const STATUS_JS = `document.getElementById('status')?.textContent ?? ''`;
 
+// fl-boot の判定本体 (FL 起動の契約)。ネガコン fl-boot-negctrl も同じ判定を当てる
+async function flBoot(ctx) {
+  const ok = await ctx.drv.waitFn(
+    `window.__webstudio?.state === 'running' || window.__webstudio?.state === 'error'`,
+    180000,
+  );
+  const st = await ctx.drv.eval(`JSON.stringify(window.__webstudio ?? null)`);
+  assert(ok, `FL が 180s 以内に running にならない: ${st}`);
+  const s = JSON.parse(st);
+  // テストゲスト (guest: "test") では FL の起動として PASS させない (guest 要件)
+  assertEq(s.guest, "fl", `ゲスト種別 (テストゲストでは fl-boot を PASS させない: ${st})`);
+  assertEq(s.state, "running", `state (${st})`);
+  assert(typeof s.frames === "number" && s.frames > 0, `GUI フレーム 0: ${st}`);
+  // 画素検査: 転送済みフレームが canvas に載っている (全面単色でない)。
+  // OffscreenCanvas 移譲後の canvas は getContext 不可なので temp canvas へ drawImage して読む
+  const px = await ctx.drv.eval(`(() => {
+    const c = document.getElementById('screen');
+    const t = document.createElement('canvas');
+    t.width = c.width; t.height = c.height;
+    const g = t.getContext('2d');
+    g.drawImage(c, 0, 0);
+    const d = g.getImageData(0, 0, t.width, t.height).data;
+    const seen = new Set(); let lit = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] | d[i+1] | d[i+2]) lit++;
+      if (seen.size < 8) seen.add((d[i] << 16) | (d[i+1] << 8) | d[i+2]);
+    }
+    return { w: t.width, h: t.height, lit, colors: seen.size };
+  })()`);
+  assert(px.w > 0 && px.h > 0, `canvas サイズ 0: ${px.w}x${px.h}`);
+  assert(px.lit > 0 && px.colors >= 2, `FL フレームが canvas に描画されていない: ${JSON.stringify(px)}`);
+  await ctx.shot("fl");
+  return `${st} canvas ${px.w}x${px.h} lit=${px.lit}px colors>=${px.colors}`;
+}
+
 export const checks = [
   {
     id: "headers-isolation",
@@ -259,37 +294,28 @@ export const checks = [
       if (process.env.E2E_REQUIRE_FL !== "1") {
         throw new Skip("FL 未統合 (統合後 E2E_REQUIRE_FL=1。契約は REPORT.md §FL 起動契約)");
       }
+      return flBoot(ctx);
+    },
+  },
+  {
+    id: "fl-boot-negctrl",
+    title: "ネガコン (D5): テストゲスト (guest:'test'・running) に fl-boot の判定を当てると guest 要件で FAIL する",
+    async run(ctx) {
+      const q = "/?gui=wasm&glue=/__e2e__/gui-guest/app.js&app=/__e2e__/gui-guest/app.wasm.parts/index.json";
+      await ctx.drv.open(new URL(q, ctx.url).href);
       const ok = await ctx.drv.waitFn(
         `window.__webstudio?.state === 'running' || window.__webstudio?.state === 'error'`,
         180000,
       );
-      const st = await ctx.drv.eval(`JSON.stringify(window.__webstudio ?? null)`);
-      assert(ok, `FL が 180s 以内に running にならない: ${st}`);
-      const s = JSON.parse(st);
-      // テストゲスト (guest: "test") では FL の起動として PASS させない (guest 要件)
-      assertEq(s.guest, "fl", `ゲスト種別 (テストゲストでは fl-boot を PASS させない: ${st})`);
-      assertEq(s.state, "running", `state (${st})`);
-      assert(typeof s.frames === "number" && s.frames > 0, `GUI フレーム 0: ${st}`);
-      // 画素検査: 転送済みフレームが canvas に載っている (全面単色でない)。
-      // OffscreenCanvas 移譲後の canvas は getContext 不可なので temp canvas へ drawImage して読む
-      const px = await ctx.drv.eval(`(() => {
-        const c = document.getElementById('screen');
-        const t = document.createElement('canvas');
-        t.width = c.width; t.height = c.height;
-        const g = t.getContext('2d');
-        g.drawImage(c, 0, 0);
-        const d = g.getImageData(0, 0, t.width, t.height).data;
-        const seen = new Set(); let lit = 0;
-        for (let i = 0; i < d.length; i += 4) {
-          if (d[i] | d[i+1] | d[i+2]) lit++;
-          if (seen.size < 8) seen.add((d[i] << 16) | (d[i+1] << 8) | d[i+2]);
-        }
-        return { w: t.width, h: t.height, lit, colors: seen.size };
-      })()`);
-      assert(px.w > 0 && px.h > 0, `canvas サイズ 0: ${px.w}x${px.h}`);
-      assert(px.lit > 0 && px.colors >= 2, `FL フレームが canvas に描画されていない: ${JSON.stringify(px)}`);
-      await ctx.shot("fl");
-      return `${st} canvas ${px.w}x${px.h} lit=${px.lit}px colors>=${px.colors}`;
+      assert(ok, "テストゲストが 180s 以内に判定を出さない");
+      try {
+        await flBoot(ctx);
+      } catch (e) {
+        const msg = e?.message ?? String(e);
+        assert(/ゲスト種別/.test(msg), `fl-boot が guest 要件以外で FAIL: ${msg}`);
+        return `fl-boot は FAIL (${msg})`;
+      }
+      throw new Error("テストゲストで fl-boot が PASS した (D5 違反: guest 要件が効いていない)");
     },
   },
   {
@@ -338,9 +364,8 @@ export const checks = [
       assert(ok, `改竄ゲストの判定が 60s 以内に出ない: ${st}`);
       const s = JSON.parse(st);
       assertEq(s.state, "error", `改竄 part が error にならない: ${st}`);
-      // Chrome は compileStreaming で stream の中身の例外 (sha256 不一致の ChunkIntegrityError) を包む。原因の文言は見えない。
-      // 原因の同定は chunked.mjs 側の単体テスト (deploy/client/chunked.test.mjs) と同じ改竄 descriptor を node で読んだ結果 (REPORT)。
-      assert(/WebAssembly compilation aborted/.test(s.error ?? ""), `error が compile 中断ではない: ${st}`);
+      // loader_boot.ts が stream 内の ChunkIntegrityError を投げ直すので、原因 (sha256 不一致) が page に残る
+      assert(/part の sha256 不一致/.test(s.error ?? ""), `error が sha256 不一致ではない: ${st}`);
       assertEq(s.frames, 0, `改竄ゲストで frames が進んだ: ${st}`);
       return st;
     },
