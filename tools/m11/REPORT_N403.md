@@ -205,7 +205,7 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 
 ## 7. #3296: function_412770 の rep movsq 源 `ptr null` の修正 (受入 1 達成・受入 2 未達)
 
-測定主体: 本 PR の作業 runner (2026-10-15)。素材: fl-win64 (`block00031_PE.bin`)・work-m11 (`tools/m11/work`)・emsdk (`/opt/emsdk`)。
+測定主体: 本 PR の作業 runner (2026-10-15)。素材: fl-win64 (`block00031_PE.bin`)・work-m11 (`tools/m11/work`)・emsdk (`[EMSDK]`)。
 測定 commit: `3b6651de` (コードを変えた最後の commit)。`git diff 3b6651de HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` の出力は空 (差分 0)。
 
 ### 7-1 機械語と lift IR
