@@ -98,7 +98,7 @@ headline の round 2/3 は 1 コマンド e2e では再現できない (規則 3
 比較 (CAB-226 実績): FLEngine lift 集合 7,031 関数 / 340,774 命令 / 未対応 **1,105 site (0.32%)**
 → x64c 拡張で 0。**Massive X の VST3 面だけで 38,485 = FLEngine 全体の 34.8 倍**
 (定義: 38,485 ÷ 1,105 = 34.8)。AES/SHA-NI は OpenSSL 静的リンク由来と推定 (MX-1 REPORT §5 実測)。
-旧値 48,612 は x64c の `ac58a8749`・`fe2dc9ed9` より前の値 (現 HEAD で再測定。詳細は massivex REPORT §11.4)。
+旧値 48,612 は x64c の `ac58a8749`・`fe2dc9ed9` より前の値 (現 HEAD で再測定。詳細は massivex `REPORT_APPENDIX_3454.md`)。
 
 - 群分けは `e2e.sh` の判定順のまま: `v` 接頭辞判定が先のため vaes 系 224 は AVX に入り、pshufb / palignr / pclmulqdq は「その他」に入る。合計 38,485 は不変 (表示のみ・起票先: #3487 [MX-36])。
 - **vectorcall**: 567 関数の到達 import は COM (`CoCreateFreeThreadedMarshaler` 等) 3 件のみ。
@@ -188,7 +188,7 @@ bash dsp/negctl.sh         # ネガティブコントロール (規則 41)
 **クリーン HEAD 検証 (規則 45)**: `git archive HEAD -- tools/targets/massivex/dsp | tar -x -C <tmp>`
 から e2e.sh 再実行 → **全数値不一致なく再現** (567 関数 / 258,087 命令 / 48,612 site / 246 種 /
 .pdata 186,960 / 非 begin 率 99.58%)。検収 agent 実測 36 s, load 16.11 16.37 15.16 → 16.64 16.48 15.24。
-現 HEAD `458405518` の再検証 (#3454・clean checkout): 567 関数 / 258,087 命令 / **38,485 site / 264 種** / e8e9_targets 594,978 (不変)・23 s。詳細は massivex REPORT §11.4。
+現 HEAD `458405518` の再検証 (#3454・clean checkout): 567 関数 / 258,087 命令 / **38,485 site / 264 種** / e8e9_targets 594,978 (不変)・23 s。詳細は massivex `REPORT_APPENDIX_3454.md` (REPORT §11.5)。
 検証起点 commit = **e6c6e91** (検証時 HEAD は a76310f、dsp/ は e6c6e91 以降 report corrections のみ)。
 注: 展開先に gitignore 済み work/ が無いため `mkdir -p dsp/work/lift_seeds dsp/work/logs` が必要
 (mx_rtti.py は出力先 dir が無いと FileNotFoundError)。PE は `MX_PE=` で実体を指す。
