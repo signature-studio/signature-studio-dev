@@ -1,14 +1,15 @@
 # tools/flelift/boot — REPORT 付録 (PERF-P22 #3330: boot 停止時点の出力メモリの sha256 を 3 変種で比較)
 
 > 正本: この付録 (測定値)。親 #970 (PERF-P14) の受入 3 の残り。`REPORT_APPENDIX_970.md` §F の未解決 1 件を扱う。
-> 測定 code: 本 commit の `tools/flelift/boot/{fle_boot.mjs,build.sh,outmem_compare.py,outmem_variants.sh}`。作業ツリーで測定し、その内容をそのまま commit した (測定後の code 差分 0)。
+> 測定 code: 測定 commit `1ca5989f6` の `tools/flelift/boot/{fle_boot.mjs,build.sh,outmem_compare.py,outmem_variants.sh}` (現行の値は §G。その後の code 差分は空・§G)。
 
 ## A. 結論
 
 - **PE の書込み可能セクション** (`.data`・`.bss`・`.idata`・`.didata`) の sha256 は、3 変種 (plain = -O0 / o2 = -O2 / o2lto = -O2 -flto) × 2 run の **6 本すべてで一致** (`891b29801d1bd50a`)。guest 側の書込み可能な状態はこの範囲で変種間一致。
 - **ネガコン (`FLE_IPP=0`) では、この範囲の sha256 は変わらない** (同じ `891b29801d1bd50a`)。よって、この範囲は「shim 有無」という出力を変える入力に対して判別力が無い。ネガコンが変えるのは線形メモリ全体と C スタックを除く範囲 (`no_cstack`) だけ。
-- **線形メモリ全体 (`full`) と `no_cstack` は、変種間でも同一変種の run 間でも一致しない**。原因は 4 節 (C 側の data レイアウト・C heap の数ページ) で、guest の状態ではない。
+- **線形メモリ全体 (`full`) と `no_cstack` は、変種間でも同一変種の run 間でも一致しない**。原因は §D・§G-7 (C 側の data レイアウト・C heap の数ページ) で、guest の状態ではない。
 - 結論の範囲: 「PE 書込み可能セクションは 3 変種で一致」は n=2 で確かめた。「出力メモリ全体が一致」は**言えない**。ネガコンの判別力は `no_cstack` でのみ確かめた。
+- 根拠の節: 本節の結論は現行の測定 (§G-2・§G-3) に基づく。§C-2・§C-3・§D は旧測定 (`09e7239c0` 相当) の値。`image_writable` は旧・現行で同値 (`891b29801d1bd50a`)。`full`・`no_cstack` の値は現行 (§G-2) に従う。
 
 ## B. 測定条件と出力領域の定義
 
@@ -18,7 +19,7 @@
   - `full` = 線形メモリ全体 (864 MiB 固定。`-Wl,--initial-memory` = `--max-memory`)。
   - `no_cstack` = `full` から emscripten の C スタック `[stack_end, stack_base)` を除いた範囲 (スタックの残骸は C の最適化水準に依る)。
   - `image_writable` = PE の `IMAGE_SCN_MEM_WRITE` のセクションを guest VA `0x400000 + VirtualAddress` で連結した範囲 (`.data` 0xfa5000 / `.bss` 0x11e6000 / `.idata` 0x156f000 / `.didata` 0x1576000)。
-- 計算: `fle_boot.mjs` (node:crypto) が JSON の `boot.outmem` に出し、`outmem_compare.py` が dump (`FLE_OUTMEM_DUMP`) を Python hashlib で読み直す。**両者の `full`・`no_cstack` が全 run で一致** (7 本)。`image_writable` は python 側のみ。
+- 計算: `fle_boot.mjs` (node:crypto) が summary のトップレベル `outmem` に出す (`boot` の外。`variant_boot.sh` の署名 = `boot` + `ipp` には入らない。旧測定 `09e7239c0` は `boot.outmem` に出していた)。`outmem_compare.py` が dump (`FLE_OUTMEM_DUMP`) を Python hashlib で読み直す。**両者の `full`・`no_cstack` が全 run で一致** (7 本)。`image_writable` は python 側のみ。
 
 ## C. 実測値
 
@@ -34,6 +35,8 @@
 
 ### C-2. boot と出力範囲 (shim 有 `FLE_IPP=1`・node・`--boot-only`)
 
+> 旧測定 (`09e7239c0` 相当・outmem を boot の中に入れていた版)。現行の所要は §G-4、KPI は §G-6。
+
 | label | run | wall (s) | units_run | stopped | GetMem / FreeMem | ipp.called | rc |
 |---|---|--:|--:|--:|---|---|--:|
 | plain | 1 / 2 | 24.079 / 23.996 | 209 | 209 | 2,314 / 1,199 | ippsZero_8u × 2 | 3 (IPP 判定 NG・既知) |
@@ -43,6 +46,8 @@
 停止点は 3 変種とも unit 209 の後の `exit` (`MessageBoxA` → `ExitProcess`)。最初のウィンドウは未達。
 
 ### C-3. 出力範囲の sha256 (先頭 16 桁。全長は JSON)
+
+> 旧測定 (`09e7239c0` 相当)。`full`・`no_cstack` は run ごとに変わるため、現行 (§G-2) とは値が違う。`image_writable` は両方で `891b29801d1bd50a`。
 
 | label | run | full | no_cstack | image_writable |
 |---|---|---|---|---|
@@ -58,6 +63,8 @@
 - `image_writable` の各セクション (`.data`・`.bss`・`.idata`・`.didata`) も 6 run で一致 (`outmem_compare.py` の出力)。
 
 ## D. 差分の所在 (dump のページ単位比較・Python)
+
+> 旧測定 (`09e7239c0` 相当) の値。現行の run 間差・変種間差の要約は §G-2 (参考行) と §G-7。
 
 - **plain r1 と r2 (同一変種)**: 4 KiB ページで 5 枚だけ異なる。アドレスは `0x11db5000`・`0x11db9000` (スタック範囲内)、`0x11dbe000`〜`0x11dc0000`・`0x11dc8000` (スタック上端 `0x11dbb260` より上 = C heap の先頭付近)。`image_writable` には現れない。**run 間の非決定はこの C heap 付近にある** (原因は未特定。時刻・乱数・ホストの値の書込みが候補)。
 - **plain と o2 (変種間)**: 5,073 ページが 16 区間で異なる。最大の区間は `0x10000000`〜`0x1136e000` (約 20.4 MB)。これは C の data (GLOBAL_BASE 以降) で、guest イメージ (`0x400000`〜) の外。変種の data レイアウトの差と見られる (未確認)。guest イメージ内の差は 0。
