@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(HERE, '..', 'ldfix'))
 from ldmach import Machine  # noqa: E402
 
 
+# judge_dump.fn_body は見つからないと '' を返す (件数 0 で黙って進む)。ここでは例外にするため import せず複製している。
 def fn_body(text, name):
     m = re.search(r'^define [^@\n]*@%s\(' % re.escape(name), text, re.M)
     end = text.index('\n}', m.end()) + 2
