@@ -133,7 +133,9 @@ IR 型は `work/boot_final.ll` の callee の define 行 (仮引数 pos 番目)�
 
 - 測定 commit: `7e5261ce4` (分類器の最後の変更。この commit の分類器・対照検査で §2〜§5 の数値を測った)。以後のこの REPORT の commit は md のみ。
 - 分類器 (`m11_setother_nonimm_class.py`) の変更の履歴: `0ed00d057` (58 件の判定を追加) → `7e5261ce4` (格納幅 SIZE 外を `stack_width_other` に分ける。実 PE の 349 件では理由が変わらない: 修正前の区分表に st0 は無く、修正後の `stack_width_other` は 0 件)。
-- 測定 commit から HEAD までのコード差分: `git diff 7e5261ce4 HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行。再測定は不要。
+- 実 PE の測定 commit: `7e5261ce4` (§2〜§4 の数値)。その後の分類器の変更は `257c3dd51` (rip 相対) と `fa7cd079d` (`movzx`/`movsx` の部分レジスタ書込みを未決 `partial_ext` に戻す・review 指摘の修正) の 2 件。
+- `fa7cd079d` の実 PE 再測定は**未実施** (`work-m11` の素材が本 run の `$ARTIFACTS_DIR` に無く、`boot_final.ll`・`final3_base.ll` を用意できない)。§2〜§4 の数値は `7e5261ce4` の実測のままで、`fa7cd079d` の下での値は未確認。
+- 素材 (`work-m11`) が揃えば `m11_setother_controls.py`・`m11_setother_repro.py`・`m11_argrecover_verify.py` を再実行して、測定 commit を更新する (#4015 の未解決に含める)。
 - 対照検査 `m11_setother_controls.py` と再現 `m11_setother_repro.py` は `4a35c7868` で追加し、`7e5261ce4` で対照 1 件を足した。
 - main の取り込み (merge `26ccd7658`) で `m11_argrecover.py`・`ldfix/` など他の m11 ファイルが変わったため、その取り込み後の tree で §2 の手順 1〜5 を再実行した (数値は取り込み前と同じ)。
 
@@ -155,5 +157,6 @@ IR 型は `work/boot_final.ll` の callee の define 行 (仮引数 pos 番目)�
 - 分類器: `[rip+…]` の読込みは、参照先が書込み不可・非実行の section (.rdata 相当) で幅 8/16/32 の全幅を読めたときだけ値を読む (`rdata_const`)。`.text`・`.data`・`.bss` と読めない場合は、理由語 `load_global` のまま未決 (理由語は変えていない)。
 - 対照検査 (素材不要): rip 相対 3/3 (`.rdata` の値 42 → 実値化 / `.data`・`.text` → 未決)。正の対照 7/7・ネガ対照 3/3 は不変。
 - 実 PE の判定: 非 imm 349 件は 実値化 0 / 未決 349 のまま。rip 相対の読込み 14 件 (`load_global` 11・`stack_match>load_global` 3) の参照先は `.text` 11・`.data` 3 件で、`.rdata` は 0 件 (`block00031_PE.bin` の section 表)。
-- 測定: 測定 commit `257c3dd51` (本 PR の分類器の変更を含む HEAD)。`m11_setother_repro.py` は 4.3 秒。対象外 291 件の理由変化 0・直接 call 202 の内訳は §4 と同じ。
+- 測定: 測定 commit `257c3dd51` (rip 相対の経路を入れた分類器)。`m11_setother_repro.py` は 4.3 秒。対象外 291 件の理由変化 0・直接 call 202 の内訳は §4 と同じ。
+- `fa7cd079d` で `partial_ext` 分岐を戻した (`257c3dd51` で diff から消えていた)。対照 `movzx ax,cl` (上位既知) → 未決 `partial_ext` を追加し、対照検査は rc=0 (正 7/7・ネガ 3/3・rip 3/3・partial_ext 1/1)。実 PE での再測定は未実施 (§7)。
 - 残り 3 種 (算術 16・間接 call の戻り値 4・IR 引数への反映) は未着手。IR への接続方式は未決定。
