@@ -269,6 +269,65 @@ for (const [name, args] of seq) {
   if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ name, args, mock: a, wasm: b });
 }
 
+// PY-224 (#3628): getGridBitWithLoop の loop 分岐 (PE 0x12d3ff0)。行 T[1] は検査用に置く (作成経路は未モデル・PY-223 待ち)。position -1..127 を両側で比べる (p >= 64 は件数以上の event 経路)
+const LOOP_PAT = [1, 0, 0, 1, 0, 1, 0, 0];
+LOOP_PAT.forEach((v, p) => { for (const eng of [mock, wasm]) eng.call("channels.setGridBit", [2, p, v]); });
+const loopCases = [
+  ["行なし", 0, 0, 0, []],
+  ["flag49e 0", 1, 0, 1, [[2, 1, 72]]],
+  ["flag54 0", 1, 1, 0, [[2, 1, 72]]],
+  ["cid 不一致", 1, 1, 1, [[1, 1, 72]]],
+  ["f4 0", 1, 1, 1, [[2, 0, 72]]],
+  ["L 0 (len 23)", 1, 1, 1, [[2, 1, 23]]],
+  ["L 3 (len 72)", 1, 1, 1, [[2, 1, 72]]],
+  ["先頭の一致が勝つ (L 3 の後に L 5)", 1, 1, 1, [[2, 1, 72], [2, 1, 120]]],
+  ["L 70 (p >= 64 で L > p と p mod L)", 1, 1, 1, [[2, 1, 1680]]],
+];
+// 件数以上 (p >= 64) の base は event 経路。項目を入れて真になる点を含め、loop 分岐の両側で比べる
+assert.equal(mock.gridItemsProbe(1, 40), 40);
+assert.equal(wasm.gridItemsProbe(1, 40), 40);
+const loopMoved = {};
+let loopEventTrue = 0;
+for (const [label, row, f49, f54, recs] of loopCases) {
+  mock.setLoop(row, f49, f54, recs);
+  wasm.setLoop(row, f49, f54, recs);
+  let moved = 0;
+  for (let p = -1; p < 128; p++) {
+    const a = run(mock, "channels.getGridBitWithLoop", [2, p]);
+    const b = run(wasm, "channels.getGridBitWithLoop", [2, p]);
+    if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ label, p, mock: a, wasm: b });
+    if (JSON.stringify(b) !== JSON.stringify(run(wasm, "channels.getGridBit", [2, p]))) moved++;
+    if (p >= 64 && a.ok === true) loopEventTrue++;
+  }
+  loopMoved[label] = moved;
+}
+assert.ok(loopEventTrue > 0, "loop 検査の件数以上で真になる点が 0 (検査が空振り)");
+mock.gridItemsProbe(0, 0);
+wasm.gridItemsProbe(0, 0);
+mock.setLoop(0, 0, 0, []);
+wasm.setLoop(0, 0, 0, []);
+// 数値の期待: L 3 では p=5 は base(2)=0 (base は 1)、p=6 は base(0)=1 (base は 0)。旧挙動 (loop 分岐なし) なら逆になり FAIL する
+mock.setLoop(1, 1, 1, [[2, 1, 72]]);
+wasm.setLoop(1, 1, 1, [[2, 1, 72]]);
+const loopExpect = [[5, { ok: false }], [6, { ok: true }], [3, { ok: true }], [4, { ok: false }]];
+for (const [p, want] of loopExpect) {
+  assert.deepEqual(run(mock, "channels.getGridBitWithLoop", [2, p]), want, `mock loop p=${p}`);
+  assert.deepEqual(run(wasm, "channels.getGridBitWithLoop", [2, p]), want, `wasm loop p=${p}`);
+}
+// 先頭一致 (L 3) と末尾一致 (L 5) を区別する: 先頭なら p=5 は base(2)=0、末尾なら p=5 は p<5 でなく base(0)=1
+mock.setLoop(1, 1, 1, [[2, 1, 72], [2, 1, 120]]);
+wasm.setLoop(1, 1, 1, [[2, 1, 72], [2, 1, 120]]);
+for (const [p, want] of [[5, { ok: false }], [6, { ok: true }]]) {
+  assert.deepEqual(run(mock, "channels.getGridBitWithLoop", [2, p]), want, `mock 先頭一致 p=${p}`);
+  assert.deepEqual(run(wasm, "channels.getGridBitWithLoop", [2, p]), want, `wasm 先頭一致 p=${p}`);
+}
+// 上限 8 件を超える setLoop は両側で throw する (C は fl_engine_loop_add が 0 を返し JS が throw)
+const nine = Array.from({ length: 9 }, (_, i) => [2, 1, 72 + i]);
+assert.throws(() => mock.setLoop(1, 1, 1, nine), /上限 8/);
+assert.throws(() => wasm.setLoop(1, 1, 1, nine), /上限 8/);
+mock.setLoop(0, 0, 0, []);
+wasm.setLoop(0, 0, 0, []);
+
 assert.deepEqual(diffs, [], `channels/playlist 差分 ${diffs.length} 件`);
 // ネガティブコントロール: index 範囲外の setChannelPitch は両側とも code 4 (Index out of range) になること (差分 0 が空振りでないことの確認)
 assert.deepEqual(run(mock, "channels.setChannelPitch", [9, 0.5]), { code: 4 });
@@ -300,4 +359,4 @@ assert.deepEqual(gridDiffs, [], `件数超え (event 経路) の差分 ${gridDif
 assert.ok(gridTrue > 0, "件数超えで真になる項目が 1 件も無い (検査が空振り)");
 mock.gridItemsProbe(0, 0);
 wasm.gridItemsProbe(0, 0);
-console.log(JSON.stringify({ calls: seq.length, diffs: 0, grid_calls: gridCalls, grid_true: gridTrue, grid_diffs: gridDiffs.length, PASS: true }));
+console.log(JSON.stringify({ calls: seq.length, loop_cases: loopCases.length, loop_moved_vs_base: loopMoved, loop_event_true: loopEventTrue, diffs: 0, grid_calls: gridCalls, grid_true: gridTrue, grid_diffs: gridDiffs.length, PASS: true }));

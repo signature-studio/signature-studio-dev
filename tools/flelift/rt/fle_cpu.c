@@ -39,10 +39,13 @@ void ott_missing_import(const char* nm) {
 }
 #ifdef FLE_WWATCH
 /* PY-123 (#3028): 監視 slot の値を変える書込みを、書込み元の C の __FILE__:__LINE__ 付きで出す (件数上限あり)。 */
+#ifndef FLE_WWATCH_SLOTS
+#define FLE_WWATCH_SLOTS 0x15e1c78ull, 0x15e4790ull   /* 既定の監視 slot (-DFLE_WWATCH_SLOTS=a,b で上書き) */
+#endif
 void fle_wwatch(uint64_t a, uint32_t n, const void* src, const char* file, int line) {
-    static const uint64_t slot[2] = { 0x15e1c78ull, 0x15e4790ull };
+    static const uint64_t slot[] = { FLE_WWATCH_SLOTS };
     static int nlog = 0;
-    for (int k = 0; k < 2; k++) {
+    for (int k = 0; k < (int)(sizeof slot / sizeof slot[0]); k++) {
         uint64_t w = slot[k];
         if (a >= w + 8 || a + n <= w) continue;
         uint8_t oldb[8], newb[8];
