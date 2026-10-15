@@ -30,7 +30,7 @@
 | spike: CreateFruityInstance | segv rip_rva `0x4e0fab` | segv rip_rva `0xd053a9` | 同左 |
 | spike: 呼出し import 数 (cfi) | 35 | 1 (`timeGetTime` のみ) | 1 |
 | spike: 窓 import の呼出元 (§6.1 of 3557) | `0x52a825`・`0x52a85e`・`0x52a8c3` | 到達せず (記録 0 件) | 到達せず (0 件) |
-| e2e `--m11-only` | PASS・360 / 234 / 206 (前回測定。今回は未再測定) | PASS・360 / 234 / 206 | **PASS・360 / 234 / 206** |
+| e2e `--m11-only` | PASS・360 / 234 / 206 (前回測定。今回は未再測定) | PASS・360 / 234 / 206 | **PASS・360 / 234 / 206** (測定 commit `3be39188d`。`8be4fa7dc` の 224 版は 360 / 236 / 205 で別の測定。§11) |
 | e2e 内 `CHECK_INITUNITS` | PASS | PASS | PASS |
 | e2e 内 UNIT18 の 3 項目 | PASS 3 件 | PASS 3 件 | PASS 3 件 |
 
@@ -142,7 +142,7 @@ case 差の定義は 1 つだけ: 同じ関数 VA の case を pattern 順に並
 ```sh
 cd tools/liftdiff
 FL_WIN64_DIR=<fl-win64 展開先> python3 spike_cfi.py targets/flelift.json
-bash liftdiff_e2e.sh --m11-only                  # 一致/不一致/実行不能 = 360/234/206
+bash liftdiff_e2e.sh --m11-only                  # 一致/不一致/実行不能 = 360/234/206 (測定 commit 3be39188d。8be4fa7dc の 224 版は 360/236/205・§11)
 python3 tests/batch_flips.py <修正前の batch_sample_800.jsonl> <修正後の batch_sample_800.jsonl>
 ```
 
@@ -160,11 +160,12 @@ python3 tests/batch_flips.py <修正前の batch_sample_800.jsonl> <修正後の
 - 当時の値 (既定が on の時点): 既定 (stk 修正あり) の spike は 928/942・830 に戻っていなかった。B2 の条件 (a) (既定 off の切替) または (b) (#3946 の修正を含める) は、本節の時点では未実装。判断は PM。現在の既定 (off) の値は §10。
 - 注: 本節は stk 修正を既定で入れていた時点の測定 (§10 で既定 off に切替えた後の値に置き換え)。
 
-## 10. 既定 off の切替 (レビュー B2・方針 (a)) と測定 (HEAD `348b9981c`)
+## 10. 既定 off の切替 (レビュー B2・方針 (a)) と測定 (HEAD `348b9981c`・当時の記録)
 
-- 変更: `rt/ld_ms_call.S` の stk を `#ifdef LD_STK_ENTRY28` で切替える。既定は旧 `212(%rsp)` (従来と同じ)。`spike_cfi.py` は `LD_STK_ENTRY28=1` のときだけ `-DLD_STK_ENTRY28` を付ける。`liftdiff_e2e.sh` も同じ環境変数を読む。
-- 既定 (`LD_STK_ENTRY28` 未設定) = 従来の挙動。spike 928/942・first_fail 830 (§5 の前の値に戻る)。
-- 有効化 (`LD_STK_ENTRY28=1`) = §3〜§9 の修正版。spike 892/942・first_fail 149。
+- 当時の変更: `rt/ld_ms_call.S` の stk を `#ifdef LD_STK_ENTRY28` で切替えた。当時の既定は旧 `212(%rsp)`。`spike_cfi.py` は `LD_STK_ENTRY28=1` のときだけ `-DLD_STK_ENTRY28` を付けた。`liftdiff_e2e.sh` も同じ環境変数を読んだ。
+- この切替は `8be4fa7dc` で撤去した。現在の既定は 224 (`leaq 224(%rsp),%r9`)。経緯は §11。
+- 当時の既定 (`LD_STK_ENTRY28` 未設定) = 従来の挙動。spike 928/942・first_fail 830 (§5 の前の値に戻る)。
+- 当時の有効化 (`LD_STK_ENTRY28=1`) = §3〜§9 の修正版。spike 892/942・first_fail 149。
 
 | 測定 | 既定 (`348b9981c`) | 有効化 `LD_STK_ENTRY28=1` (`348b9981c`) |
 |---|---|---|
@@ -176,3 +177,21 @@ python3 tests/batch_flips.py <修正前の batch_sample_800.jsonl> <修正後の
 - 作業ツリー (未 commit 版) の e2e は既定・有効化とも 360/234/206 (PASS)。
 - 既定 off の切替で既存の数値 (928/942・830・e2e 360/234/206 付近) を戻した。製品 KPI は既定で従来どおり。
 - 修正 (有効化) の本体の原因 (libc abort 15 unit) は未解決。子 issue #3946 [LD-184]。
+
+## 11. 既定を 224 に直す (測定 commit `8be4fa7dc`・LD_STK_ENTRY28 切替の撤去) (#3619)
+
+- 変更: `rt/ld_ms_call.S` の `#ifdef LD_STK_ENTRY28` を外し、既定を `leaq 224(%rsp),%r9` にした。`spike_cfi.py`・`liftdiff_e2e.sh` の切替配線も削除。`#4916` (仮 proc 表の上限 1024) が main に入った後の状態で測った (§8)。
+- 測定 commit: `8be4fa7dc` (コードを変えた最後の commit)。`git diff 8be4fa7dc HEAD -- tools/liftdiff/rt tools/liftdiff/spike_cfi.py tools/liftdiff/ldlib tools/liftdiff/liftdiff_e2e.sh` は 0 行。
+- 測定の出所: 下表の 224 の値は実装 run (`8be4fa7dc` の PR 本文) の記録。この fix run では `work-m11`・`work-liftdiff` が runner に無く、spike・e2e は再実行していない (`fl-win64` は実在を確認)。値は PR 本文からの転記で、ログは本節に残していない。
+
+| 測定 (`8be4fa7dc`) | 結果 | 実時間 |
+|---|---|---|
+| spike (`spike_cfi.py`) 224 | units_run 928/942・first_fail 830・wintrace `stk_minus_entry=40` | 実装 run の記録 |
+| spike 212 (参考値・§3 の 212 行と同じ値) | units_run 928/942・first_fail 830・`stk_minus_entry=28` | 実装 run の記録 (手順未記録のため参考値) |
+| e2e `--m11-only` 224 | PASS・一致 360 / 不一致 236 / 実行不能 205・`CHECK_INITUNITS` PASS | 3 分 12 秒 |
+| e2e `--m11-only` 212 (参考値) | PASS・一致 360 / 不一致 236 / 実行不能 205 | 3 分 10 秒 (実装 run の記録。手順未記録のため参考値) |
+
+- 212 との比較の扱い: 212 の値は実装 run の記録で、同じ HEAD で 212 をどうビルドしたかの手順は REPORT にもログにも残っていない。そのため再現可能な根拠とは扱わず、参考値とする。224 の判定 (PASS・`CHECK_INITUNITS` PASS) は 224 単独の測定で成立する。
+- 一致 / 不一致 / 実行不能が §3 の `360 / 234 / 206` (測定 commit `3be39188d`) と `360 / 236 / 205` (本節) で違うのは、測定 commit が違うため。両方の値は別の測定で、どちらも有効。どちらを正とも決めない。
+- 結論 (参考): 記録上、212 と 224 で e2e の判定件数は同じ (360 / 236 / 205)。spike の boot 進行 (928/942・830) も同じ。`stk_minus_entry` だけ 28 → 40 に変わる。ただし 212 側は手順未記録のため参考値。
+- 製品 KPI (起動): dispatch 数・通過 unit 数は 928/942・first_fail 830 で変化なし。最初のウィンドウは無し (動かしていない)。
