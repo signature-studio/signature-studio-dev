@@ -19,7 +19,6 @@ HERE = D.HERE
 SEED = 3905
 N_PER_ENTRY = 64
 TEB_LEN = 64
-LIM_SIZE = 0x80000
 
 # 入口 VA: 引数の形 (stdcall は使わない。 cdecl の a0〜a3 を 4 本入れる)
 ENTRIES = [0x1000a307, 0x1000a42e, 0x100106a5]
@@ -31,12 +30,7 @@ def gen_scen(seed, n):
     for va in ENTRIES:
         for k in range(n):
             init = bytes(rng.randrange(256) for _ in range(D.OBJ_LEN))
-            a = [rng.getrandbits(32) for _ in range(4)]
-            if va == 0x1000a42e:
-                a[0] = rng.randrange(LIM_SIZE)   # 大きい a0 は HeapAlloc の巨大サイズ経路 (モデルの heap 領域を超える) のため、 範囲を絞る
-            if va == 0x100106a5:
-                a[0] = rng.randrange(0x8000)     # a0*a1 を HeapAlloc に渡す。 積が heap 領域を超えないよう両方を絞る (積 < 0x80000)
-                a[1] = rng.randrange(0x10)
+            a = [rng.getrandbits(32) for _ in range(4)]   # 範囲は絞らない (#4357: 巨大サイズ経路も突合する)
             if k % 2 == 0:
                 teb = bytes(TEB_LEN)   # 0 埋め模型 (ott_teb_blk と同じ)
             else:
