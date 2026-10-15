@@ -318,6 +318,10 @@ def pass_m2s_fn40fd90_iid(text, report):
         report['m2s_fn40fd90_iid'] = 0
         return text
     j = text.find('\n}\n', i)
+    if j < 0:
+        stage('M2s', 'function_40fd90 IID compare restore: 0 sites (no closing brace)')
+        report['m2s_fn40fd90_iid'] = 0
+        return text
     body = text[i:j]
     old = '  %12 = icmp eq i64 %11, %arg2\n'
     new = ('  %iid0p = inttoptr i64 %arg2 to ptr\n'
@@ -832,7 +836,8 @@ def main():
     text = pass_m2(text, report)
     text = pass_m2q_fn980ed0(text, report)
     text = pass_m2r_fn1046a30(text, report)
-    text = pass_m2s_fn40fd90_iid(text, report)
+    if os.environ.get('M11_M2S') == '1':   # #4012: 既定 OFF (未検証の runtime 確認まで有効化しない)
+        text = pass_m2s_fn40fd90_iid(text, report)
     if os.environ.get('M11_M2P') == '1':   # #417: 既定 OFF (有効化すると unit 503 で survey がハング, REPORT 参照)
         text = pass_m2p_dec_inttoptr(text, report)
     text = pass_m2c(text, report)
