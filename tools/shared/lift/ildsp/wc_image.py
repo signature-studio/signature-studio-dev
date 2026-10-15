@@ -13,7 +13,7 @@ BASE = 0x30000000
 IMPBASE = 0x1D80000  # fle_cpu.h の IMP_VA_BASE と同一
 ARENA = 0x30500000   # ヒープ (HeapAlloc の bump 領域)。image の外・wasm 線形メモリ内
 ARENA_SZ = 0x10000
-ENTRY_RVA = 0x1ac470  # WaveformColouring_CreateInstance (export)
+ENTRY_RVA = int(os.environ.get('WC_ENTRY_RVA', '0x1ac470'), 0)  # WaveformColouring_CreateInstance (export)
 
 pe = pefile.PE(sys.argv[1])
 outdir = sys.argv[2]
@@ -61,7 +61,7 @@ text = next(s for s in pe.sections if s.Name.rstrip(b'\0') == b'.text')
 data = next(s for s in pe.sections if s.Name.rstrip(b'\0') == b'.data')
 iat = {slots[s]: s for s in order}
 # vtable (CreateInstance が置く vptr 先) の slot 先。上の DIR64 補正で img の値は既に BASE 基準なので、RVA = v - BASE
-VTABLE_RVA = 0x3e01b0
+VTABLE_RVA = int(os.environ.get('WC_VTABLE_RVA', '0x3e01b0'), 0)
 SLOT_RVA = []
 for k in range(6):
     v = struct.unpack_from('<Q', img, VTABLE_RVA + 8 * k)[0]
@@ -70,9 +70,16 @@ for k in range(6):
 # 差分テストで CreateInstance の直後に呼ぶ slot の数。既定は slot 0 だけ (slot 1 以降は this の内部フィールドに
 # host 側の事前設定が要り、既定の入力 (0) では null 参照で落ちる)。WC_CALL_SLOTS=6 は probe_slots.sh が使う (実測は REPORT.md §5-5)。
 CALL_SLOTS = int(os.environ.get('WC_CALL_SLOTS', '1'))
+# 呼ぶ slot の番号と順序 (既定は 0 から CALL_SLOTS 個)。WC_CALL_IDX="0 4 5" のように指定すると、その順に呼ぶ (lift_psola.sh)。
+CALL_IDX = [int(x) for x in os.environ.get('WC_CALL_IDX', ' '.join(str(k) for k in range(CALL_SLOTS))).split()]
+CALL_SLOTS = len(CALL_IDX)
+CALL_RVA = [SLOT_RVA[k] for k in CALL_IDX]
+# 戻り値 rax を acc に畳み込む slot (WC_RET_IDX。既定は呼ぶ全 slot)。戻り値が ABI 上未定義の slot (void 相当) は外す。
+RET_IDX = [int(x) for x in os.environ.get('WC_RET_IDX', ' '.join(str(k) for k in CALL_IDX)).split()]
+RET_MASK = sum(1 << i for i, k in enumerate(CALL_IDX) if k in RET_IDX)
 lay = {'base': BASE, 'img_size': SIZE, 'arena': ARENA, 'arena_sz': ARENA_SZ, 'entry_rva': ENTRY_RVA,
        'data_rva': data.VirtualAddress, 'data_sz': data.Misc_VirtualSize, 'text_rva': text.VirtualAddress,
-       'vtable_rva': VTABLE_RVA, 'slots': SLOT_RVA, 'call_slots': CALL_SLOTS,
+       'vtable_rva': VTABLE_RVA, 'slots': CALL_RVA, 'call_slots': CALL_SLOTS, 'ret_mask': RET_MASK,
        'iat_names': [slots[s] for s in order], 'iat_rva': {slots[s]: s for s in order}}
 L = ['#define WC_BASE 0x%xULL' % BASE,
      '#define WC_IMG_SIZE 0x%x' % SIZE,
@@ -82,7 +89,8 @@ L = ['#define WC_BASE 0x%xULL' % BASE,
      '#define WC_DATA_RVA 0x%x' % data.VirtualAddress,
      '#define WC_DATA_SZ 0x%x' % data.Misc_VirtualSize,
      '#define WC_CALL_SLOTS %d' % CALL_SLOTS,
-     'static const uint32_t WC_SLOT_RVA[] = {%s};' % ', '.join('0x%x' % s for s in SLOT_RVA)]
+     '#define WC_RET_MASK 0x%x' % RET_MASK,
+     'static const uint32_t WC_SLOT_RVA[] = {%s};' % ', '.join('0x%x' % s for s in CALL_RVA)]
 for name in ('HeapAlloc', 'HeapFree', 'GetLastError', 'SetLastError', 'GetCurrentProcess', 'EnterCriticalSection',
              'LeaveCriticalSection', 'FlsGetValue', 'FlsSetValue', 'IsProcessorFeaturePresent', 'RaiseException',
              'RtlCaptureContext', 'RtlLookupFunctionEntry', 'RtlPcToFileHeader', 'RtlVirtualUnwind',

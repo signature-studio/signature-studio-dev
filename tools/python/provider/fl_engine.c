@@ -18,7 +18,7 @@
 #define NAME 96
 #define ROOT_NAME "Plugin database"
 
-typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; } Chan;
+typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; int64_t pitch_n; } Chan;
 typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
 typedef struct { char name[NAME]; int64_t color; uint8_t lock; } Pl;
 
@@ -51,6 +51,7 @@ static void init_chan(Chan *c, const char *name, const char *plugin, double vol,
     memset(c, 0, sizeof *c);
     set_name(c->name, name); set_name(c->plugin, plugin);
     c->vol = vol; c->pan = pan; c->sel = sel; c->fx = fx; c->color = color;
+    c->pitch_n = 2; /* N の既定 2: reset 0xfe9090 (REPORT_PY72 §PY-77 受入 E)。chan との同一性は未確定 */
 }
 
 void fl_engine_reset(void) {
@@ -149,6 +150,18 @@ FL_H(channels, getChannelVolume) { CH(0); int64_t m = A_INT(1, 0); return fl_ret
 FL_H(channels, setChannelVolume) { CH(0); k->vol = A_DBL(1, 0); return fl_ret_none(c); }
 FL_H(channels, getChannelPan) { CH(0); return fl_ret_d(c, k->pan); }
 FL_H(channels, setChannelPan) { CH(0); k->pan = A_DBL(1, 0); return fl_ret_none(c); }
+/* PY-76 (#2563): PE 0xd5aa30 → 0xd843d0 → callback 0xd5a720 の判定順 (REPORT_PY72): index 範囲外 -4 → value の NaN -1 → pitchUnit。
+ * 未モデル: guard (常に真)・useGlobalIndex (一覧 A/B は同一扱い)・unit 0/1 の効果 (効果関数 0x1046a30 の書込み条件が未確定。状態は変えない)・通知 PostMessageW。
+ * unit 2 は PE どおり N = clamp(cvtsd2si(value), 1, 48) を書く */
+static int64_t cvt_si64(double x) { return (x >= -9223372036854775808.0 && x < 9223372036854775808.0) ? llrint(x) : INT64_MIN; }
+FL_H(channels, setChannelPitch) {
+    int64_t idx = A_INT(0, 0); float v = (float)A_DBL(1, 0); int64_t unit = A_INT(2, 0);
+    (void)A_INT(3, 0); (void)A_INT(4, 0);
+    if (idx < 0 || idx >= nch) RANGE();
+    if (isnan(v)) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error");
+    if (unit == 2) { int64_t n = cvt_si64(v); ch[idx].pitch_n = n < 1 ? 1 : n > 48 ? 48 : n; }
+    return fl_ret_none(c);
+}
 FL_H(channels, setChannelColor) { CH(0); k->color = A_INT(1, 0); return fl_ret_none(c); }
 FL_H(channels, getTargetFxTrack) { CH(0); return fl_ret_i(c, k->fx); }
 FL_H(channels, setTargetFxTrack) { CH(0); k->fx = (int)A_INT(1, 0); return fl_ret_none(c); }
@@ -172,6 +185,26 @@ FL_H(channels, fillEachNSteps) {
     return fl_ret_none(c);
 }
 FL_H(channels, showEditor) { CH(0); (void)k; return fl_ret_none(c); }
+/* PY-40 (#1529): PE 0xd5ca50 / 0xd5c920 / 0xd5cbd0 / 0xd5c180 / 0xd5c5d0。引数は PyArg 順に全部読んでから index を検査 (範囲外は code 4)。
+ * 述語 (前提ゲート) は真と仮定し、UI 副作用・戻り値の内部経路・useGlobalIndex による配列の違いは未モデル (REPORT_PY40 §8) */
+FL_H(channels, closeGraphEditor) { (void)A_INT(0, 0); return fl_ret_none(c); }
+FL_H(channels, updateGraphEditor) { return fl_ret_none(c); }
+FL_H(channels, showGraphEditor) {
+    (void)A_INT(0, 0); (void)A_INT(1, 0); (void)A_INT(2, 0);
+    int64_t idx = A_INT(3, 0); (void)A_INT(4, 1);
+    if (idx < 0 || idx >= nch) RANGE();
+    return fl_ret_none(c);
+}
+FL_H(channels, showCSForm) {
+    int64_t idx = A_INT(0, 0); (void)A_INT(1, 1); (void)A_INT(2, 0);
+    if (idx < 0 || idx >= nch) RANGE();
+    return fl_ret_none(c);
+}
+FL_H(channels, focusEditor) {
+    int64_t idx = A_INT(0, 0); (void)A_INT(1, 0);
+    if (idx < 0 || idx >= nch) RANGE();
+    return fl_ret_none(c);
+}
 /* PY-100 (#2879): PE 0xd5b930 の readout。構造体は grid bit が立つ step にあるとみなす (生成条件は未確定)。
  * 既定値は stub の並び (param 0..7 = pitch 60・velocity 100・release 64・fine pitch 120・pan 64・mod X 64・mod Y 64・ticks 0)。
  * 構造体が無い・param が 0..7 の外は -1 (PE: 構造体 NULL で -1)。param 8 (PE: byte +0x11) は既定値未確定のため未モデル (-1) */
@@ -441,6 +474,15 @@ FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return f
 #define PGRP_N 0
 FL_H(patterns, getPatternGroupCount) { NARGS(0, 0); return fl_ret_i(c, PGRP_N); }
 FL_H(patterns, getPatternGroupName) { NARGS(1, 1); int64_t i = A_INT(0, 0); if (i < 0 || i >= PGRP_N) RANGE(); return fl_ret_s(c, ""); }
+/* ---- patterns (4, PY-179 #3271): 述語 pred の E = 0x193fce0+i*0xc0 は .bss で未投入 (全 0) のため pred は偽。patternCount は ¬pred を i=1..999 で数えて 999。
+ * patternNumber は slot 0x15e4018 → 0x15d51a0 の dword の PE 初期値 1 (1 始まり)。isPatternDefault の範囲外は status -4 = FL_E_RANGE。
+ * isPatternSelected は G = [[0x15e35c8]+0xd34] の静的値 0 (null) で [0x16b82e0] (.bss 0) を返す = 偽。値は未実測の仮置き (REPORT_PY179) */
+#define PAT_N 999
+#define PAT_NUMBER 1
+FL_H(patterns, patternCount) { NARGS(0, 0); return fl_ret_i(c, PAT_N); }
+FL_H(patterns, patternNumber) { NARGS(0, 0); return fl_ret_i(c, PAT_NUMBER); }
+FL_H(patterns, isPatternDefault) { NARGS(1, 1); int64_t i = A_INT(0, 0); if (i < 1 || i > PAT_N) RANGE(); return fl_ret_b(c, 0); }
+FL_H(patterns, isPatternSelected) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_b(c, 0); }
 /* ---- screen (5) ---- PY-121 (#2985): PE 0xd7c7e0・0xd7c830・0xd7c880・0xd7c8c0・0xd7c740 (REPORT_PY121_2985)。値は未実測の仮置き */
 FL_H(screen, isBlanked) { NARGS(0, 0); return fl_ret_b(c, scr_blanked); }
 FL_H(screen, isUnBlank) { NARGS(0, 0); return fl_ret_b(c, scr_unblank); }

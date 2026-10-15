@@ -16,6 +16,7 @@ const WL_IDLE = 0, WL_BUFFERING = 1, WL_PLAYING = 2;
 const F_DECLICK = 1, F_INPUT = 2;
 const FADE = 32;
 const Q = 128;
+const TR_N = 64, TR_W = 5, TR_SEND = 8;   // consumer 履歴 (直近 64 quantum × [p, rd, wr, wl, dms])・underrun 通知は 1 processor あたり先頭 8 件まで
 
 class FlShimProcessor extends AudioWorkletProcessor {
   constructor(options) {
@@ -24,7 +25,7 @@ class FlShimProcessor extends AudioWorkletProcessor {
     this.L = o.layout;
     this.buffer = o.buffer;
     this.ctlPtr = o.ctlPtr;
-    this.i32 = new Int32Array(this.buffer, this.ctlPtr, 96);
+    this.i32 = new Int32Array(this.buffer, this.ctlPtr, o.ctlSize >> 2);
     this.ix = {};
     for (const k of Object.keys(this.L)) this.ix[k] = this.L[k] >> 2;
     this.f64 = new Float64Array(1);
@@ -51,6 +52,7 @@ class FlShimProcessor extends AudioWorkletProcessor {
     this.burstPrevMs = 0;
     this.burstRun = 0;
     this.err = false;
+    this.tr = new Float64Array(TR_N * TR_W); this.trN = 0; this.trSent = 0; this.trMs = 0;
     this.port.postMessage({ type: "ready", sampleRate, ctlPtr: this.ctlPtr });
   }
 
@@ -105,10 +107,13 @@ class FlShimProcessor extends AudioWorkletProcessor {
       }
     }
     this.prevFrame = frame;
-    {   // バースト長の観測: Date.now() 差 <=1ms で連続する process() の総フレーム数の最大値を burst_obs に公開
+    {   // バースト長の観測: Date.now() 差 <=1ms で連続する process() の総フレーム数の最大値を burst_obs に公開。run の終わりごとに長さを burst_hist (512 f 刻み・末尾 bin は以上) へ加算
       const nowb = Date.now();
       if (this.burstPrevMs > 0 && nowb - this.burstPrevMs <= 1) this.burstRun += Q;
-      else this.burstRun = Q;
+      else {
+        if (this.burstRun > 0) Atomics.add(i, x.burst_hist + Math.min(31, (this.burstRun / 512) | 0), 1);
+        this.burstRun = Q;
+      }
       this.burstPrevMs = nowb;
       if (this.burstRun > Atomics.load(i, x.burst_obs)) Atomics.store(i, x.burst_obs, this.burstRun);
     }
@@ -191,6 +196,7 @@ class FlShimProcessor extends AudioWorkletProcessor {
     // ---- 出力 ----
     const rd = Atomics.load(i, x.out_read), wr = Atomics.load(i, x.out_write);
     const avail = (wr - rd) | 0;
+    this.trace(p, rd, wr, wl);
     if (this.capOk(p)) this.cap.fill[this.cap.ring ? (p >> 7) % this.cap.fill.length : p >> 7] = avail;
     let consumed = 0;
     let produced = 0;   // この quantum で実音声を書いたフレーム数 (declick 起点)
@@ -228,6 +234,12 @@ class FlShimProcessor extends AudioWorkletProcessor {
       if (consumed < Q) {
         // underrun: 不足分は無音、declick、rebuffer 状態へ
         Atomics.add(i, x.underruns, 1);
+        if (this.trSent < TR_SEND) {
+          this.trSent++;
+          const recs = [];
+          for (let j = Math.max(0, this.trN - TR_N); j < this.trN; j++) recs.push(Array.from(this.tr.subarray((j % TR_N) * TR_W, (j % TR_N + 1) * TR_W)));
+          this.port.postMessage({ type: "underrun_trace", p, consumed, rebuf: this.rebuf, recs });
+        }
         if (this.cap) { const h = this.cap.hdr; if (Atomics.load(h, 6) === 0) Atomics.store(h, 4, p / Q); Atomics.store(h, 5, p / Q); Atomics.add(h, 6, 1); }
         Atomics.add(i, x.silence_frames, Q - consumed);
         this.everUnderrun = true;
@@ -256,6 +268,13 @@ class FlShimProcessor extends AudioWorkletProcessor {
       Atomics.store(this.cap.hdr, 0, p + Q);
     }
     void quanta; void produced;
+  }
+
+  // consumer 側の履歴 (quantum ごと): p = run 内の位置, rd/wr = out_read/out_write (producer の pw_trace.w と同じ領域), wl = 状態, dms = 前 quantum からの Date.now 差
+  trace(p, rd, wr, wl) {
+    const now = Date.now(), k = (this.trN++ % TR_N) * TR_W, t = this.tr;
+    t[k] = p; t[k + 1] = rd; t[k + 2] = wr; t[k + 3] = wl; t[k + 4] = this.trMs > 0 ? now - this.trMs : -1;
+    this.trMs = now;
   }
 
   capOk(p) { return !!this.cap && p >= 0 && (this.cap.ring || p + Q <= this.cap.frames); }

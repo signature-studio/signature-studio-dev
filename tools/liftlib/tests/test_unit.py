@@ -881,9 +881,89 @@ def t27():
     print("T27 ok (ott_outhash 出力読取: 混在行の最後の JSON を読む・JSON 無しは rc と stderr を例外に残す)")
 
 
+def _entry_fn(params, body):
+    text = "\n".join(["define i64 @function_18011e5a0(%s) local_unnamed_addr {" % params, "dec_label_pc_18011e5a0:"]
+                     + body + ["}", ""])
+    return IR.Module.parse(text).func("function_18011e5a0")
+
+
+def t28():
+    """[#1270 review] entry_blk_args の正常系: 入口の BLK+0x08/+0x10 読みを仮引数 %argN へ張り替える。
+    型は i64 = add, ptr = ptrtoint, i1/i8/i16/i32 = zext。読まれる slot に仮引数が無ければ触らない。"""
+    from liftlib.passes import icall
+    body = ["  %g1 = getelementptr inbounds i8, ptr @__icall_blk, i64 8",
+            "  %a = load i64, ptr %g1, align 8, !insn.addr !1",
+            "  %g2 = getelementptr inbounds i8, ptr @__icall_blk, i64 16",
+            "  %b = load i64, ptr %g2, align 8, !insn.addr !2",
+            "  %c = add i64 %a, %b",
+            "  ret i64 %c"]
+    fn = _entry_fn("ptr %arg1, i64 %arg2", body)
+    assert icall.entry_blk_args(fn) == 2
+    lines = fn.blocks[0].lines
+    assert "  %a = ptrtoint ptr %arg1 to i64, !insn.addr !1" in lines, lines
+    assert "  %b = add i64 %arg2, 0, !insn.addr !2" in lines, lines
+    fn = _entry_fn("i64 %arg1, i64 %arg2", body)
+    assert icall.entry_blk_args(fn) == 2
+    assert "  %a = add i64 %arg1, 0, !insn.addr !1" in fn.blocks[0].lines
+    for ty in ("i1", "i8", "i16", "i32"):
+        fn = _entry_fn("%s %%arg1, i64 %%arg2" % ty, body)
+        assert icall.entry_blk_args(fn) == 2, ty
+        assert "  %%a = zext %s %%arg1 to i64, !insn.addr !1" % ty in fn.blocks[0].lines, ty
+    fn = _entry_fn("ptr %arg1", body)
+    assert icall.entry_blk_args(fn) == 1
+    assert "  %b = load i64, ptr %g2, align 8, !insn.addr !2" in fn.blocks[0].lines
+    print("T28 ok (entry_blk_args 正常系: ptr=ptrtoint / i64=add / i1,i8,i16,i32=zext, 仮引数の無い slot は不変)")
+
+
+def t29():
+    """[#1270 review] entry_blk_args の break 条件: 入口 block で BLK への store・分岐・非 asm の call より後の BLK 読みは置換しない。
+    call は tail / musttail / notail 付きも対象。@__asm_ helper の call は break しない。"""
+    from liftlib.passes import icall
+    head = ["  %g1 = getelementptr inbounds i8, ptr @__icall_blk, i64 8"]
+    read = "  %a = load i64, ptr %g1, align 8"
+    for call in ("%x = tail call void @f()", "%x = musttail call void @f()", "%x = notail call void @f()", "call void @f()"):
+        fn = _entry_fn("i64 %arg1", head + ["  " + call, read, "  ret i64 %a"])
+        assert icall.entry_blk_args(fn) == 0 and read in fn.blocks[0].lines, call
+    for call in ("call void @__asm_foo()", "%x = tail call void @__asm_foo()"):
+        fn = _entry_fn("i64 %arg1", head + ["  " + call, read, "  ret i64 %a"])
+        assert icall.entry_blk_args(fn) == 1, call
+    fn = _entry_fn("i64 %arg1, i64 %arg2", head + [read, "  %x = tail call void @f()",
+                                                 "  %g2 = getelementptr inbounds i8, ptr @__icall_blk, i64 16",
+                                                 "  %b = load i64, ptr %g2, align 8", "  ret i64 %b"])
+    assert icall.entry_blk_args(fn) == 1
+    assert "  %a = add i64 %arg1, 0" in fn.blocks[0].lines and "  %b = load i64, ptr %g2, align 8" in fn.blocks[0].lines
+    print("T29 ok (entry_blk_args break: tail/musttail/notail/plain call の後の読みは不変 / asm helper は break しない / call 前の読みは置換)")
+
+
+def t30():
+    """[#1270 review] entry_blk_args: 読まれる slot の仮引数が float/double/vector 等の非対応型なら ValueError にする (誤 IR を出さない)。読まれない slot の型は問わない。"""
+    from liftlib.passes import icall
+    head = ["  %g1 = getelementptr inbounds i8, ptr @__icall_blk, i64 8", "  %a = load i64, ptr %g1, align 8", "  ret i64 %a"]
+    for ty in ("double", "float", "<2 x i64>"):
+        fn = _entry_fn("%s %%arg1, i64 %%arg2" % ty, head)
+        try:
+            icall.entry_blk_args(fn)
+        except ValueError as ex:
+            assert "unsupported param type %r" % ty in str(ex), str(ex)
+        else:
+            raise SystemExit("T30: %s が通ってしまった" % ty)
+    fn = _entry_fn("i64 %arg1, double %arg2", head)
+    assert icall.entry_blk_args(fn) == 1 and "  %a = add i64 %arg1, 0" in fn.blocks[0].lines
+    print("T30 ok (entry_blk_args: float/double/<2 x i64> の読まれる slot は ValueError, 読まれない slot の型は不問)")
+
+
+def t31():
+    """[#1270 review] pipeline.image_bytes_c: cfg.image_bytes が無い (空を含む) ときは Image を読まず None を返す。"""
+    from liftlib import pipeline
+    cfg = {"name": "nosuch", "image": "targets/no_such_image.dll", "passes": {"shift": {"newbase": "0x30000000"}}}
+    assert pipeline.image_bytes_c(cfg, HERE) is None
+    assert pipeline.image_bytes_c(dict(cfg, image_bytes=[]), HERE) is None
+    print("T31 ok (image_bytes_c: image_bytes 無し・空は None (存在しない image は読まない))")
+
+
 if __name__ == "__main__":
     import traceback
-    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27)
+    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t28, t29, t30, t31)
     fails = []
     for f in tests:
         try:

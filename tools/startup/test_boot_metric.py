@@ -6,6 +6,7 @@ fixture は一時ディレクトリに出典と同じ形の最小ファイルを
 """
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -257,6 +258,18 @@ class BootMetricTest(unittest.TestCase):
         x64 = recs["x64c-strict-sequential"]
         self.assertTrue(all(s["measured_commit"] is None for s in x64["source"]))
         self.assertIn("commit", x64["null_reasons"])
+
+    def test_file_last_commit_is_8_chars_in_a_small_repo(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            git = ["git", "-C", tmp, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"]
+            subprocess.run(["git", "-C", tmp, "init", "-q"], check=True)
+            (Path(tmp) / "f.txt").write_text("x\n", encoding="utf-8")
+            subprocess.run(git + ["add", "f.txt"], check=True)
+            subprocess.run(git + ["commit", "-q", "-m", "x"], check=True)
+            self.assertRegex(bm.git_commit(Path(tmp), "f.txt"), r"^[0-9a-f]{8}$")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
     def test_every_null_has_a_reason(self):
         for rec in self.build()["records"]:

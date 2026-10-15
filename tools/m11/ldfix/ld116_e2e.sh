@@ -2,7 +2,7 @@
 # ld116_e2e.sh — #2513 (LD-116) 1 コマンド再現。666a60 の entry の回数 0 早期脱出 (fix_ld116.py) を検証する。
 #   1/5 現行 ldfix → fix_ld108 → fix_ld115 (修復前 = post115。#2447 の修復後 IR) と、その上に fix_ld116 を掛けた修復後 IR (post116) を作る
 #       (本番と同じ順序。中間版 pre/mid は dyn の 3 版の既存判定 (BASE TRAP / MID FAIL / NEW PASS) を同じ実行で再測定するために作る)
-#   2/5 4 版 (pre / mid / post115 / post116) それぞれで wasm を build (m11_build.sh。ir_conditions は ldfix=applied ld108=applied)
+#   2/5 4 版 (pre / mid / post115 / post116) それぞれで wasm を build (m11_build.sh。ir_conditions は ldfix=applied ld108=applied、ld115 は pre・mid=disabled (opt-in)、post115・post116=applied)
 #   3/5 666a60 を wasm で直接呼ぶ (dyn_ld115.mjs。既存の 3 版判定に加え、arg2=0 (trap せず ret=0) と arg2=3 (post115 と同一) を見る)
 #   4/5 survey 942 unit を post115 / post116 で測る
 #   5/5 unit 単位の突合 (ok 退行 0 であること)
@@ -38,10 +38,12 @@ diff "$OUT/post115.ll" "$OUT/post116.ll" > "$OUT/ir_116.diff"; echo "[ld116_e2e]
 step "2/5 wasm build (pre → $OUT/pre, mid → $OUT/mid, post115 → $OUT/post115, post116 → $OUT/post116)"
 cd "$M11" || exit 1
 for k in pre mid post115 post116; do
+  # pre・mid は fix_ld115 を掛けていない版 (ld115=disabled。build は M11_ALLOW_LD115_DISABLED=1 の opt-in)、post115・post116 は fix_ld115 適用済み (ld115=applied)
+  case "$k" in pre|mid) LD115=disabled; ALLOW=1 ;; *) LD115=applied; ALLOW=0 ;; esac
   cp "$OUT/$k.ll" "$W/boot_final.ll"
-  python3 m11_cond.py --reset ldfix=applied ld108=applied pe="$PE_QS" && python3 m11_cond.py --bind "$W/boot_final.ll" || exit 1
+  python3 m11_cond.py --reset ldfix=applied ld108=applied ld115="$LD115" pe="$PE_QS" && python3 m11_cond.py --bind "$W/boot_final.ll" || exit 1
   rm -f "$W/obj/boot.o"
-  timeout 1500 bash m11_build.sh > "$OUT/build_$k.log" 2>&1 || { echo "build 失敗: $OUT/build_$k.log"; exit 1; }
+  M11_ALLOW_LD115_DISABLED="$ALLOW" timeout 1500 bash m11_build.sh > "$OUT/build_$k.log" 2>&1 || { echo "build 失敗: $OUT/build_$k.log"; exit 1; }
   cp "$W/m11_boot.cjs" "$OUT/$k/m11_boot.cjs"; cp "$W/m11_boot.cjs.wasm" "$OUT/$k/m11_boot.cjs.wasm"
 done
 

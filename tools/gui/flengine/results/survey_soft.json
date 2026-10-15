@@ -7,13 +7,12 @@
  "units_run": 0,
  "init_count": 895,
  "survey": {
-  "ok": 872,
+  "ok": 873,
   "noproc": 1,
   "miss": 47,
-  "trap": 22,
+  "trap": 21,
   "clobber": 0,
   "kinds": {
-   "unreachable": 1,
    "halt0->longjmp": 7,
    "memory access out of bounds": 14
   },
@@ -101,7 +100,7 @@
    "order": 12,
    "name": "LoadImageW",
    "calls": 21,
-   "kind": "STUB",
+   "kind": "IMPL",
    "prio": "2"
   },
   {
@@ -252,11 +251,9 @@
    "prio": "2"
   }
  ],
- "reach_summary": "reached=33 impl=32 stub=1",
+ "reach_summary": "reached=33 impl=33 stub=0",
  "failfast_apis": {},
- "softstub_apis": {
-  "LoadImageW": 21
- },
+ "softstub_apis": {},
  "failfast_count": 0,
  "gui_icall_calls": 7,
  "gui_ring_discarded": 0,
@@ -286,9 +283,9 @@
   "GetFileVersionInfoSizeW:1"
  ],
  "probes": {
-  "GetMem": 2006,
+  "GetMem": 2008,
   "FreeMem": 162,
-  "FastMM_GetMem(407a50)": 2089,
+  "FastMM_GetMem(407a50)": 2091,
   "FastMM_FreeMem(407e20)": 166,
   "InitUnits": 0,
   "Halt0": 8,
