@@ -141,8 +141,8 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 
 - **xmm FMA (`vf*`) 計 27 件** (Ladder 11 / Filter Table 6 / Slice EQ 10 = 上表の `vf*` 行の合計)。
 - **語彙の対象 (f354504c の census 結果に基づく・PM 判断 2026-10-13 に従う)**: census で `vblend*` / `vperm*` は 0 件と確定したため、#779 の語彙追加対象から外し、**ymm (`vaddps` / `vmulps` / `vsubps` / `vmovaps`・Convolver と Filter Table のみ) と vfmadd 系 (xmm・scalar) に絞る**。
-- **未解決**: ymm 命令の lift (RetDec が ymm を `i256` の `__asm_v*` として出すか、gen_simd の declare 駆動で扱えるか) は未確認。`gen_simd.py` の VEX 別名表は xmm 形のみで、ymm 形の意味 (`vaddps` 等の 8 lane・upper lane 規則) は未実装。`vfmadd*` の scalar 形は既存 `gen_simd.py` で対応済み。
-- **受入条件の残り**: 語彙追加 (ymm)・既存 14 snap-in のハッシュ不変・語彙ごとの bit-exact テストとネガコン・run_all.sh 再実行は未実施。起票先 = #779 (ymm・bit-exact・ハッシュ不変は #779 に残す。#250 LIFTLIB には振らない)。**2026-10-14 に #779 を縮小 (§12-1)。残りは #3256 (KH-48)・#3259 (KH-49) へ移した**。後続: #709 (KH-14) は #779 完了後に着手 (PM が `blocked_by` 登録済み)。
+- **lift 対応 (#3256 で追加)**: `gen_simd.py` の `gen256` が ymm の vaddps / vsubps / vmulps (3 引数) と vmovaps (1 引数) を IR で定義する (void の store 形は stub のまま)。vfmadd 系 xmm は `gen()` の declare 駆動で C 化し、bit-exact 検証は [REPORT_APPENDIX.md §12-2](REPORT_APPENDIX.md)。vfmadd の ymm 形は census 0 件。
+- **受入条件の残り**: 既存 14 snap-in のハッシュ不変 (#3259)・store 形の lift (下表)。語彙の bit-exact とネガコンは §12-2 で実施。**2026-10-14 に #779 を縮小 (§12-1)**。後続: #709 (KH-14) は #779 完了後に着手 (PM が `blocked_by` 登録済み)。
 
 ### 12-1. ymm 語彙 vaddps / vsubps / vmulps の実装と単体検証 (#779 第 2 弾)
 
@@ -155,7 +155,8 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 14 snap-in のハッシュ不変 (run_all.sh) 未実行 | 構造上は不変 (推論)・実測なし | #3259 (KH-49) |
-| vmovaps ymm (Convolver 20 / Filter Table 20) と vfmadd 系の語彙・bit-exact | 受入の残り (vfmadd の ymm 形は census 0 件) | #3256 (KH-48) |
+| ~~vmovaps (1 引数) と vfmadd 系 xmm 7 語彙の語彙・bit-exact~~ → **解決** (§12-2: vmovaps 20,000 call mismatch 0 / FMA 7 語彙 128bit 全 bit (NaN 含む) mismatch 0) | 解決済み | #3256 (KH-48) |
+| vmovaps の **store 形** (`declare void @__asm_vmovaps(i256, i256)`・メモリ書込みが IR に現れない) は定義せず abort スタブのまま | 定義すると store が黙って消える。census は ymm 40 件を load/store で分けていない | #3358 (KH-54) |
 | ymm 語彙を snap-in の lift へ接続 (kh_lower の 256-bit 表現・Convolver/Filter Table) | 難 snap-in は未 lift | #709 (KH-14) |
 
 ## 13. KH-6 第 2 弾 (CAB-258 続, 2026-10-11) — rcpps/rsqrtps 実機近似表で Resonator/Stereo/Delay が bit-exact 化

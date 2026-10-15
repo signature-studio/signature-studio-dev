@@ -231,7 +231,7 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 
 ## 17. /oc 投稿の観測のネガコン (#2342・#2473 の vitest 化)
 
-- 測定 commit: `dd9931bf` (`test/launchobs.test.ts` を `test/unit/launchobs.test.ts` に移して vitest 化。README の 1 行)。worktree で `pnpm install --frozen-lockfile --config.minimum-release-age=0` (診断用。既定設定は 2026-10-15 05:55Z まで `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`)。
+- 測定 commit: `dd9931bf` (`test/launchobs.test.ts` を `test/unit/launchobs.test.ts` に移して vitest 化。README の 1 行)。worktree で `pnpm install --frozen-lockfile --config.minimum-release-age=0` (診断用。既定設定は公開から 24 時間未満の版を含む lock で `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`。版と時刻は `REPORT_APPENDIX_2653.md` §2)。
 - 結論: `test:unit` (vitest) **19 件 PASS** (うち観測 9 件)・2.1 s。`test:workers` **3 件 PASS**・1.5 s。`npm test` (node:test) **204 件 PASS / 0 FAIL**・17.7 s。load 0.33 (Node 22.23.3)。
 - ネガコン: `src/launchobs.ts` を 1 行ずつ壊して FAIL を確認。(b) の題名一致を外す → (b) と純関数の 2 件 FAIL。5 分の境界 `>` を `>=` → (a) と純関数の 2 件 FAIL。元に戻した後 `git diff -- src` は 0 行。
 - 差分の証跡: `git diff dd9931bf HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
@@ -245,6 +245,6 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 取り込みと再測定 (round 4): main `e1e816c2` を merge commit `384e2cbe` で取り込んだ (競合なし。`heartbeat.sh` は PR 側の版のまま)。README の VM 記述 (commit `517bbb13`) を直した後の HEAD で同じ測定を再実行した。送信回数・終了コード・初回送信の遅延 (1.01 秒・2.01 秒) は上の結果と同じ。
 - 差分 (round 4): `git diff 17eb4e16 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は 0 行。
 
-## 19. main の Ruleset `main-require-review` の実測 (#2648・ADR D27)
-- 測定値の正本: [`REPORT_2648.md`](REPORT_2648.md) (§18 は main の heartbeat 節 (#2629) が使うため、本節の全文は付録へ分割移動)。
+## 19. main の Ruleset `main-require-review` の実測 (#2648・ADR D27): 測定値の正本は [`REPORT_2648.md`](REPORT_2648.md) (§18 は main の heartbeat 節 (#2629) が使うため、本節の全文は付録へ分割移動)
 ## 20. PM Worker の降格 (#2340・PR #2469) の測定 (全文は [`REPORT_APPENDIX_2469.md`](REPORT_APPENDIX_2469.md))
+## 21. PM Worker README の release-age の測定値 (#2611・CI-113): 全文は [`REPORT_APPENDIX_2653.md`](REPORT_APPENDIX_2653.md)

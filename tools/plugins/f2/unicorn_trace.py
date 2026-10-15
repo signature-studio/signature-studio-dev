@@ -7,6 +7,7 @@
 # usage: python3 unicorn_trace.py <block_PE.bin> <entry_hex> [-r reg=hex ...] [-a hex ...]
 #                                 [-w lo:hi ...] [-q hex ...] [-m MAX_INSN]
 #                                 [-d addr=val ...] [-t hex ...] [-p hex[:reg=val,...] ...] [-H] [-V] [-z]
+#   -L: en-US (LCID 0x409) の実値を返す (GetThreadLocale・GetLocaleInfoW・LCMapStringW。#3295)。
 #   -p: 本体の前に同じメモリ上で順に実行する関数 (arena 初期化・DllMain)。-V: VirtualAlloc を合成メモリで返す。
 #   -d: 実行前に qword を書く (ホスト構造体の合成用)。-t: 番地に入るたびに rcx/rdx/r8/r9 を出す。
 import argparse
@@ -31,6 +32,24 @@ SCRATCH_SIZE = 0x100000
 POOL = 0x50000000
 POOL_SIZE = 0x8000000
 LOG_LIMIT = 200
+LCID_EN_US = 0x409
+# en-US の LOCALE_* (winnls.h の値)。表に無い LCTYPE は 0 (失敗) を返す。
+EN_US = {
+    0x0001: '0409', 0x0002: 'English (United States)', 0x0003: 'ENU', 0x0005: '1', 0x0006: 'United States',
+    0x000B: '437', 0x000C: ',', 0x000E: '.', 0x000F: ',', 0x0011: '2', 0x0012: '1', 0x0013: '0123456789',
+    0x0014: '$', 0x0015: 'USD', 0x0019: '2', 0x001B: '0', 0x001C: '0', 0x001D: '/', 0x001E: ':',
+    0x001F: 'M/d/yyyy', 0x0020: 'dddd, MMMM dd, yyyy', 0x0021: '0', 0x0023: '0', 0x0025: '0',
+    0x0028: 'AM', 0x0029: 'PM', 0x0051: '-', 0x1003: 'h:mm:ss tt', 0x1009: '1', 0x100B: '1',
+    0x100E: '', 0x1001: 'English', 0x1002: 'United States', 0x1004: '1252',
+}
+EN_US.update({0x002A + i: d for i, d in enumerate(
+    ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])})
+EN_US.update({0x0031 + i: d for i, d in enumerate(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])})
+EN_US.update({0x0038 + i: d for i, d in enumerate(
+    ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September',
+     'October', 'November', 'December'])})
+EN_US.update({0x0044 + i: d for i, d in enumerate(
+    ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])})
 
 
 def align(x):
@@ -54,6 +73,10 @@ def main():
     ap.add_argument('-R', action='append', default=[], help='読取り監視範囲 lo:hi (hex)。読んだ命令 (rip) ごとに件数を出す')
     ap.add_argument('-S', action='store_true',
                     help='user32!LoadStringW を PE の .rsrc (RT_STRING) から返す (uID の block は (uID>>4)+1、16 件ずつ。戻り値は文字数。無いと 0)。kernel32!GetLocalTime は 2026-10-14 を書く (全 0 だと Delphi が時刻の例外を投げる)')
+    ap.add_argument('-L', action='store_true',
+                    help='en-US の実値 (#3295)。kernel32!GetThreadLocale は 0x409。GetLocaleInfoW は表 EN_US の値 (表に無い LCTYPE・未知の LCID は 0)。LCMapStringW は大文字・小文字変換を行い文字数を返す。既定 (オフ) では 0 を返す')
+    ap.add_argument('-N', action='store_true',
+                    help='stub の呼出しを順に出す (名前・rcx/rdx/r8/r9・戻り番地)。デバッグ用')
     ap.add_argument('-m', type=int, default=2000000, help='最大命令数')
     ap.add_argument('-d', action='append', default=[], help='実行前に書く qword addr=val (hex)')
     ap.add_argument('-t', action='append', default=[], type=lambda s: int(s, 0),
@@ -178,6 +201,11 @@ def main():
             print(info)
         if addr in names:
             hits[names[addr]] = hits.get(names[addr], 0) + 1
+            if a.N:
+                ret = struct.unpack('<Q', uc_.mem_read(uc_.reg_read(UC_X86_REG_RSP), 8))[0]
+                print('stub %s rcx=%#x rdx=%#x r8=%#x r9=%#x ret=%#x' % (
+                    names[addr], uc_.reg_read(UC_X86_REG_RCX), uc_.reg_read(UC_X86_REG_RDX),
+                    uc_.reg_read(unicorn.x86_const.UC_X86_REG_R8), uc_.reg_read(unicorn.x86_const.UC_X86_REG_R9), ret))
             if a.V and names[addr].lower() in ('kernel32.dll!virtualalloc', 'kernel32.dll!localalloc'):
                 size = uc_.reg_read(UC_X86_REG_RDX)
                 need = (size + 0xffff) & ~0xffff
@@ -199,6 +227,52 @@ def main():
                 if s and cch:
                     uc_.mem_write(buf, w.encode('utf-16-le') + b'\0\0')
                 uc_.reg_write(UC_X86_REG_RAX, len(w) if s else 0)
+            elif a.L and names[addr].lower() == 'kernel32.dll!getthreadlocale':
+                uc_.reg_write(UC_X86_REG_RAX, LCID_EN_US)
+            elif a.L and names[addr].lower() == 'kernel32.dll!getlocaleinfow':
+                lcid = uc_.reg_read(UC_X86_REG_RCX) & 0xffffffff
+                lctype = uc_.reg_read(UC_X86_REG_RDX) & 0xffff
+                buf = uc_.reg_read(unicorn.x86_const.UC_X86_REG_R8)
+                cch = uc_.reg_read(unicorn.x86_const.UC_X86_REG_R9) & 0xffffffff
+                s = EN_US.get(lctype) if lcid == LCID_EN_US else None
+                if s is None:
+                    uc_.reg_write(UC_X86_REG_RAX, 0)
+                elif cch == 0:
+                    uc_.reg_write(UC_X86_REG_RAX, len(s) + 1)
+                elif len(s) + 1 > cch:
+                    uc_.reg_write(UC_X86_REG_RAX, 0)
+                else:
+                    uc_.mem_write(buf, (s + '\0').encode('utf-16le'))
+                    uc_.reg_write(UC_X86_REG_RAX, len(s) + 1)
+            elif a.L and names[addr].lower() == 'kernel32.dll!lcmapstringw':
+                flags = uc_.reg_read(UC_X86_REG_RDX) & 0xffffffff
+                src = uc_.reg_read(unicorn.x86_const.UC_X86_REG_R8)
+                cch = uc_.reg_read(unicorn.x86_const.UC_X86_REG_R9) & 0xffffffff
+                dst = struct.unpack('<Q', uc_.mem_read(uc_.reg_read(UC_X86_REG_RSP) + 0x28, 8))[0]
+                cd = struct.unpack('<I', uc_.mem_read(uc_.reg_read(UC_X86_REG_RSP) + 0x30, 4))[0]
+                if cch == 0xffffffff:
+                    txt = ''
+                    while True:
+                        ch = struct.unpack('<H', uc_.mem_read(src + 2 * len(txt), 2))[0]
+                        if ch == 0:
+                            break
+                        txt += chr(ch)
+                    txt += '\0'
+                else:
+                    txt = bytes(uc_.mem_read(src, 2 * cch)).decode('utf-16le')
+                if flags & 0x100:
+                    mapped = ''.join(c.lower() if len(c.lower()) == 1 else c for c in txt)
+                elif flags & 0x200:
+                    mapped = ''.join(c.upper() if len(c.upper()) == 1 else c for c in txt)
+                else:
+                    mapped = txt
+                if cd == 0:
+                    uc_.reg_write(UC_X86_REG_RAX, len(mapped))
+                elif len(mapped) > cd:
+                    uc_.reg_write(UC_X86_REG_RAX, 0)
+                else:
+                    uc_.mem_write(dst, mapped.encode('utf-16le'))
+                    uc_.reg_write(UC_X86_REG_RAX, len(mapped))
             else:
                 uc_.reg_write(UC_X86_REG_RAX, rets.get(addr, 0))
 
