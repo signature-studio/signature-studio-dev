@@ -35,8 +35,9 @@ def main():
     baseless_hits, implicit_hits = [], []
     for ins in md.disasm(bytes(img[text_va:text_va + text_sz]), text_va):
         n_ins += 1
-        if ins.mnemonic in ('stosb', 'stosw', 'stosd', 'stosq') or \
-           (ins.mnemonic in ('movsb', 'movsw', 'movsd', 'movsq') and ('es:' in ins.op_str or ins.op_str == '')):
+        base_m = ins.mnemonic.split()[-1]
+        if base_m in ('stosb', 'stosw', 'stosd', 'stosq', 'movsb', 'movsw', 'movsq') or \
+           (base_m == 'movsd' and 'xmm' not in ins.op_str):
             implicit_hits.append((ins.address, ins.mnemonic, ins.op_str))
         if ins.mnemonic == 'lea' and len(ins.operands) == 2 and ins.operands[1].type == CS_OP_MEM:
             m = ins.operands[1].mem
