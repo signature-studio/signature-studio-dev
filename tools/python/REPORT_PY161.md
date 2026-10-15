@@ -97,6 +97,23 @@ py88 の分類 (stderr の件数表・`REPORT_PY159.md` §1 の内訳と同じ)�
 
 件数の検算: 49 + 7 + 3 + 6 = 65。
 
+### 7.2 call 0x10469f0 の引数 (受入 9・#4697)
+
+測定 commit: `4d3264600` (`analysis/py99_closure.py --callargs` を入れた最後のコード commit)。素材 `fl-win64` の `block00031_PE.bin`・`py53_dispatch` → `fn=4664 dispatch=13 r8d_tests=174`。
+
+| 書込み VA | 引数 (ecx・edx・r8d) の閉包 | 結果 |
+|---|---|---|
+| 0x1047719・0x1047969 | ecx=`d_in`・edx=0・r8d=0x3200 | 閉 |
+| 0x1047d98 | ecx=`d_in`・edx=0xffffed40・r8d=0x12c0 | 閉 |
+| 0x104a494 | ecx=`d_in`・edx=`neg(M32[…])`・r8d=`M32[…]` (添字は `c_in` の式・経路 1) | 閉 |
+| 0x104b305 | ecx=`d_in`・edx=0・r8d=0x3e80 | 閉 |
+| 0x104b843 | ecx=`d_in`・edx・r8d の添字 `SLOT[rbp+0x570]?@0x104aa97` → `(and(c_in,0xffff)+0x70000000)` | 閉 (`c_in` のみ残る) |
+| 0x1049b31 | r8d = `CALL[0x7a0c20](…)@0x1049b18 - 1`・edx = `clob@0x1049b08` | **未閉** (vtbl 呼出し先の戻り値・`clob`) |
+
+- 6 件は式まで閉じた (残る葉は入口の `d_in`・`c_in` だけ)。`0x1049b31` は #3101 の受入 2 (`vtbl` の解決・実行時データ) に依存する。
+- 検算: 算法 A と B の閉包の比較 `mismatch 0` (7 件)。直接式 49 件と `--rint` 6 件は変化 0 (`mismatch 0`・exit 0)。
+- 測定: `analysis/py99_closure.py work/py53/fn.txt --callargs --md work/callargs.md` 0.40 秒・load 0.17 (5 分時点)。
+
 ## 8. 再現
 
 ```
