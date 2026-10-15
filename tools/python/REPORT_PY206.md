@@ -88,7 +88,7 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | **48/48 ok**・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 0 |
 | `node tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425 | 0 |
 
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`・8 秒・rc 0)。emsdk は `/opt/emsdk` (emcc 6.0.12)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`・8 秒・rc 0)。emsdk は既定の `EMSDK_DIR` (emcc 6.0.12・[EMSDK])。
 - 所要 (整数秒・`date` 差分。provider build は `time` 実測 0.87 秒): cpython 163・flpy 4・provider_check 0・device_diff 0・mixer_diff 0・patterns_diff 0・all_tools wasm 1・all_tools mock 1。load average は測定中 1.27〜1.99 (`uptime`、n=3)。
 - 前回測定 (`dc65d9857`) から `342d8ce92` までのコード差分 (main 取り込み分): `git diff --stat dc65d9857 342d8ce92 -- tools/python/host tools/python/provider tools/python/tests` は 4 ファイル (+28/-16)。`fl_mock.mjs`・`fl_engine.c` の差分は channels grid bit と mixer 2 関数で、device 関数の実装行は差分 0。device のネガティブコントロール (冒頭の検証節) は本節では未再実施。
 
