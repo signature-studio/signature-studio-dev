@@ -15,7 +15,7 @@ set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
 mkdir -p "$W/obj" "$W/tmp" "$HERE/results"
 export TMPDIR="$W/tmp"
 
-EXPORTS=_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_shimx_set_trace,_shimx_init,_fle_test_throw,_fle_n_dispatch,_fle_n_disp_getmem,_fle_n_disp_freemem,_fle_n_disp_realloc,_fle_n_disp0,_fle_ring_at,_fle_n_loadstr,_fle_boot_set_ipp,_fle_ipp_total,_fle_ipp_names,_fle_ipp_name,_fle_ipp_count
+EXPORTS=_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_shimx_set_trace,_shimx_init,_fle_test_throw,_fle_n_dispatch,_fle_n_disp_getmem,_fle_n_disp_freemem,_fle_n_disp_realloc,_fle_n_disp0,_fle_ring_at,_fle_n_loadstr,_fle_boot_set_ipp,_fle_boot_set_diag_nullfill,_fle_diag_skip_n,_fle_diag_pass_n,_fle_ipp_total,_fle_ipp_names,_fle_ipp_name,_fle_ipp_count
 
 # FLE-5: root 化すると survey が破裂する address の blocklist。
 # lift すると f_6c7900 の fill ループが未初期化幅 (1,048,570 回) で暴走 → ExitProcess

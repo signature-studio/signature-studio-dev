@@ -28,6 +28,9 @@ if (TRACE) { try { m._shimx_set_trace(1); } catch { /* nosx では未 export */ 
 const IPP_MODE = { '1': 1, '2': 2 }[process.env.FLE_IPP] || 0;
 const IPP_ON = IPP_MODE !== 0;
 m._fle_boot_set_ipp(IPP_MODE);
+// FLE-672 診断: FLE_DIAG_NULLFILL=1 は root 無しの fill (0x6a7b70) で buf = 0 の呼出しを戻す。未指定は従来どおり停止する。
+const DIAG_NULLFILL = process.env.FLE_DIAG_NULLFILL === '1';
+m._fle_boot_set_diag_nullfill(DIAG_NULLFILL ? 1 : 0);
 
 const MM = 0x13a5c90, PKG = 0x13768b0;
 function rd64(a) { return '0x' + U8.slice(a, a + 8).reduce((s, b, i) => s + BigInt(b) * (1n << BigInt(8 * i)), 0n).toString(16); }
@@ -112,6 +115,7 @@ boot.longjmp = Number(m._fle_n_longjmp());
 const r0 = m._fle_rget(0);
 boot.rax = '0x' + BigInt.asUintN(64, typeof r0 === 'bigint' ? r0 : BigInt(r0)).toString(16);
 boot.stage = Number(m._fle_boot_stage());
+boot.diag_nullfill = { on: DIAG_NULLFILL, skip: Number(m._fle_diag_skip_n()), pass: Number(m._fle_diag_pass_n()) };
 boot.getmem = Number(m._fle_n_getmem()); boot.freemem = Number(m._fle_n_freemem());
 boot.va_calls = Number(m._fle_va_calls()); boot.va_bytes = Number(m._fle_va_bytes());
 boot.getproc = Number(m._fle_n_getproc()); boot.exit = Number(m._fle_n_exit());
@@ -290,7 +294,7 @@ console.log('FLEBOOT_RESULT ' + JSON.stringify({
     va_calls: boot.va_calls, va_bytes: boot.va_bytes, exit: boot.exit,
     survey: survey && survey.byCls ? survey.byCls : (survey && survey.prologue_threw || null),
     ipp_mode: IPP_MODE, ipp_on: IPP_ON, ipp_ptr_15F34A0: boot.ipp_ptr_15F34A0,
-    ipp_total: boot.ipp_total, ipp_called: boot.ipp_called, ipp_stop: boot.ipp_stop,
+    ipp_total: boot.ipp_total, ipp_called: boot.ipp_called, ipp_stop: boot.ipp_stop, diag_nullfill: boot.diag_nullfill,
     tolerant: TOLERANT ? { mode: TOL_MODE, started: tol.started, hook_ran: tol.hook_ran, kinds: tol.kinds, skipped_n: tol.skipped.length, restored: tol.restored, miss_units: tol.miss_units.length } : null,
     cfi: cfi && { rc: cfi.rc, threw: cfi.threw && cfi.threw.cls, longjmp: cfi.longjmp, exit: cfi.exit },
 }));

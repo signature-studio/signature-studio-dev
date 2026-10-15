@@ -8,10 +8,8 @@
 
 - **判定 (累積, FLE-5 末): unit 進行は 209 止まり、survey は全 942 unit で functional**
   (FLE-1 17 → FLE-2 40 → FLE-3 209 → FLE-4 OOB 修正 → FLE-5 **survey 非 ok 7 → 3**)。
-  **unit 進行は 209 で横ばい** — ただし FLE-5 で unit 進行の blocker は
-  `f_6c7900` の fill ループ幅「未初期化」ではなく、
-  **`f_653f40` (VCL フォーム登録ルーチン) が早期 return して
-  fill コールバック `0x15F34A0` が未設定** であることを 5 段の逆引きで実証 (付録 §B 3-5)。
+  **unit 進行は 209 で横ばい**。FLE-5 の「`f_653f40` の早期 return は VCL リソース読み出し失敗」は誤認 (訂正は `REPORT_APPENDIX_672.md` §A): 原因は `dsp_ippv2_x64.dll` の LoadLibraryW 失敗 (host shim の欠落)。
+  **FLE-672 (#672)**: fill (`0x6a7b70`) の buf = 0 の呼出しを戻す診断 (`FLE_DIAG_NULLFILL=1`) で GetMem・undo slot の 0 化が消え、停止点は `unlifted 0x6bbc20` へ移る (units は 209 のまま・§11)。
 - ラウンドごとの詳細 (FLE-2〜FLE-5 の成果・修正 3 件・FLE-4/5 の逆引き 5 段) は `REPORT_APPENDIX.md` §A・§B。**FLE-12 (#3090)**: unit 209 直後の `0x6a7b70` の呼出元は `0x6c7923` ← `0x815920` (`f_815050`)、幅 r8 = 矩形の幅 = 2^20 (即値 `0x4130000000000000` 由来の推定)、修復は未了 (`REPORT_APPENDIX_3090.md`)。
 - **FLE-9 (§9, #2700) の結果**: lift → 8 shard clang (cap 内・計 89 s) → link (mismatch/undefined/dup 0) → boot まで到達。units_run は shim 有・ネガコンとも 209 のまま (停止点: `MessageBoxA` → `exit(0)`)。shim 有の IPP 判定は NG (終了時の 0x15F34A0 は 0。FLE-10 (§10, #2702): shim 有でも units は前進せず 209)。
 - **PERF-P14 (#970)**: boot closure を -O0 / -O2 / -O2 -flto で build・実行 (node n=10)。3 変種の署名は計数と ipp 状態が一致 (出力メモリは未比較)・units 209 据え置き。ネガコン (`FLE_IPP=0`) で署名は変わる。LTO の結論は shim (-O1 固定) を含まない範囲に限る。実測値・範囲は `REPORT_APPENDIX_970.md`。
@@ -135,14 +133,8 @@ FLE-5 末の残 3 件は `unlifted 280 / 659` (`0x6a7b70`, blocklist 対象) と
 
 ## 5. 未解決・限界 (実測ベース)
 
-1. **unit#209 の次の blocker は `unlifted 0x6a7b70`** (fill コールバック、付録 §B 3-4)。
-   root 化しても `f_6c7900` の fill ループが暴走 → ExitProcess → **survey が成立しない**
-   ため `FLE_ROOT_BLOCKLIST` (既定 `0x6a7b70`) で自動累積から除外している。
-   真因は 付録 §B 3-5 の通り **`f_653f40` が `f_53c5e0` 側の VCL リソース読み出し失敗で
-   早期 return し、fill コールバック `0x15F34A0` を登録できない**こと。
-2. **unit 進行 209 で横ばい**。前ラウンド目標の 250+ には未達。
-   次の一手は 付録 §B 3-5 の `f_43c5e0` / `f_414ec0` が out = 0 を返す理由の特定
-   (VCL リーダのクラス解決 or リソース未検出)。
+1. **unit#209 の次の blocker は `unlifted 0x6a7b70`** (fill、`f_6c7610` ← `f_815050`)。root 化すると fill が image を 0 埋めし survey が成立しないため `FLE_ROOT_BLOCKLIST` で除外。診断 (§11) では fill 後の停止点は `unlifted 0x6bbc20` (f_6c9280)。
+2. **unit 進行 209 で横ばい**。次の一手は `0x6bbc20` の解消 (子 issue #3491 `[FLE-14]`)。fill の上流 (面 2^20) は #3112。
 3. **残 survey 非 ok 3** = unit 280 / 659 (`0x6a7b70`, blocklist 対象) + unit 895
    (`0x976da0`、未調査)。`0x976da0` は次の調査対象。
 3. **VMT slot の自動 root 化 (RTTI/COL walk) は非適用**: 対象 0x6a7b70 は `.pdata` 整齊の
@@ -162,9 +154,7 @@ CAB-129 / CAB-231 の適用は x64c route では不要。D7/D10/D11 も x64c 非
 
 ## 7. 引継ぎ (次ラウンド)
 
-1. **最優先: `f_43c5e0` / `f_414ec0` が out = 0 を返す理由の特定** (付録 §B 3-5)。
-   VCL リーダのクラス解決 or リソース未検出のいずれか。ここが外れれば
-   `f_653f40` がコールバック `0x15F34A0` を登録し、unit 進行が 209 を超える。
+1. **最優先: unit 209 の `unlifted 0x6bbc20` (f_6c9280 ← 0x6c9380)** (子 issue #3491 `[FLE-14]`)。0x15F34A0 の登録は shim で済んでいる (§11)。
 2. **`boot/dbg_lift.py --at 0x...` を常用** — guest VA を直接指定して lift C に
    トレースを埋め込める。FLE-4 の `__LINE__` 逆引きより汎用的。
 3. **`FLE_ROOT_BLOCKLIST` を尊重** — `0x6a7b70` は root 化すると survey が破裂する。
@@ -248,3 +238,10 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 | 呼出時の `[0x15e0a48]`・`0x15F34A0` と、終了前に 0 へ戻す書込み元 | ippsZero 登録経路の確定。IPP_CHECK の観測点 | #3060 (受入条件に追加) |
 | 既定経路で `ippsZero_8u` の呼出点 0x67264b の target が 0 (icall-miss) になる経路。出力のゼロ埋めが未適用 | 既定経路 (`FLE_IPP` 未指定) の出力内容 (silent miscompile の疑い) | #3060 (受入条件に追加) |
 | 既定経路の survey 再実測・0x6a7b70 root 化の可否 | 0x6a7b70 を恒久 root にするかの判断 | #918 (親・PM 判断) |
+
+## 11. FLE-672 (#672): buf = 0 の fill を戻す診断 (`FLE_DIAG_NULLFILL=1`・既定無効)
+
+- 既定経路は不変 (units 209・GetMem / FreeMem は §9-2・§10 と一致)。診断ありは units 209 のまま、停止点が `unlifted 0x6bbc20` (f_6c9280 ← 0x6c9380) へ移る。判定 (①②③)・表・再現は `REPORT_APPENDIX_672.md`。
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 停止点 `unlifted 0x6bbc20` の解消 | 最初のウィンドウ未達 | #3491 [FLE-14] (親 #672) |
