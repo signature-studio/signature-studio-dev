@@ -48,3 +48,12 @@ movnti は memset (`f_18001c8f0`・8 箇所) の大ブロック経路にだけ�
 | fn=1 (REXGetInfo) では movnti に到達しなかった (memset の前の node 参照で落ちる) | fn=1 からの到達は未確認 | #3587 [T-SH-88] (open。fn=1 の成功経路の入力を扱う。閉じた #3588 から付け替え) |
 | memcpy 16 箇所の間接 call 経路 (`f_18001f260` = `ott_dispatch` の register 間接 call 6 箇所の表・`case 0x3001ca80` に memmove) からの到達 | 「memcpy は不要」は直接 call と定数参照の静的読みに限る | 未起票 (追跡のみ。子は起票しない。本表で追跡) |
 | 本番の host が REXGetCreatorInfo に渡す a1 の値域 | 到達が本番で起きるかの判断 | [未確認]。依頼者が FL 側の呼出し値で確認する |
+
+## 付録: #3893 (T-SH-93) の実装と実測 — i_movnti の追加
+
+- 変更: `tools/flelift/x64c.py` に `i_movnti` を追加 (`i_mov` へ委譲。単一スレッドでは通常の store と同じ)。lift 出力の差分は movnti 24 行の `ott_unsup` → `ST64` のみ (lift 出力比較: main と同じ DLL・同じ引数で `diff` 48 行 = 24 削除 + 24 追加。他の行は不変)。
+- 実測 (`lift_x64c.sh movnti`): `ott_unsup` (movnti VA `0x18001c9a0`) は消えた。reach 16 件は wasm が `memory access out of bounds` (VA 0) で trap する。`FLE_CHK` を有効にした build で、`rcx = 0xd8a01030` の書込みと、その後の `0xd8a016b8` (境界外) の読み出しを確認。native も同じ入力で arena 外 (0x30110000) で落ちる。
+- 原因: memset (`count ≥ 0x70000`) が 64 KiB の arena を越えて書く。native と wasm の両方が同じ越境で落ちるため、受入 1 (「trap せず memset が完了する」) は、この入力の作り方では満たせない。
+- 判定: `movnti_check.py` は「movnti VA で trap」を前提にしているため、16/16 が NG (RESULT FAIL)。受入 2 の `all` はこの点で FAIL のまま。
+- 受入 2 の内訳 (実測): `ok` PASS (exit 0・owner 一覧 OK) / `neg-cmp` FAIL 検出 (期待どおり) / `neg-ctx` FAIL 検出 (期待どおり) / `neg-owner` FAIL 検出 (期待どおり)。
+- 未解決: reach 16 件を arena 内で完了させる入力 (または harness の arena モデル) の決定。子 issue に分ける。
