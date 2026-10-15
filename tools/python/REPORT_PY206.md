@@ -190,7 +190,7 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 
 - 測定 commit: `e814e9d20` (`origin/main` (`14cda5e43`) を merge した commit。前節 `b3c3dafdd` の後に main へ入った変更を取り込んだ: `fl_mock.mjs`・`fl_engine.c` (`mixer.getTrackColor` の idx < 0、`playlist.muteTrackLock` の safe-edit 判定、`ui.showPicker`・`ui.openEventEditor` の PyArg 検査 (PY-133・#3014)、`setSafeEdit`)・`fl_provider.mjs`・`provider/build.sh`・テスト 4 本。device 関数の C / mock コードは変わっていない)。競合は `tests/provider_check.mjs` の 1 箇所 (判定 `if` と件数 assert)。main 側の `pe133` (ui PE 確定 2 件) を PR 側 `pe206` と併存させ、件数を **182** 実装・**253** 未実装にした (`fl_table.c` のハンドラ数 182 と一致)。コードを変えた最後の commit。
 - 測定 commit から HEAD までのコード差分: `git diff e814e9d20 HEAD -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (本節を書いた commit は `tools/python/REPORT_PY206.md` と PR 本文だけを変える)。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に全展開 (`tar --zstd -xf`・約 6 秒)、`toolchain-emsdk` は `/opt/emsdk` (emsdk 6.0.12)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` rc 0。`block00031_PE.bin` (win PE) は展開していないため、`build_flpy.sh` は `FLPY_SKIP_TABLE=1` で追跡済みの `flapi_table.json` を使った。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に全展開 (`tar --zstd -xf`・約 6 秒)、`toolchain-emsdk` は `[EMSDK]` (emsdk 6.0.12)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` rc 0。`block00031_PE.bin` (win PE) は展開していないため、`build_flpy.sh` は `FLPY_SKIP_TABLE=1` で追跡済みの `flapi_table.json` を使った。
 
 | 検査 | 結果 | rc |
 |---|---|---|
