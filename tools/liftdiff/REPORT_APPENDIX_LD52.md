@@ -45,7 +45,7 @@ LD-180 (#3863) で追加した 6 件 (機械語を呼び先まで辿って読ん
 | `653c80` | `i64 (i64,i64,i128)` | unexec (`native_fault_all_patterns`) | 11 パターンとも native segv。segv の fault addr は記録されず原因未特定 (§4) |
 | `691dd0` | `i64 (i64,i128,i64)` | unexec (`native_fault_all_patterns`) | z・s は rcx=0/3 の参照で segv (addr `0xc0`/`0xc3`・rip `0x6919f8`)。p0 等は rcx が blob の値を指して segv。オブジェクトの有効な内容が要る (§4) |
 | `4256c0` | `ptr (%tagPOINT)` | unexec (`unsupported_sig`) | `m11_tr_function_4256c0` が `%tagPOINT zeroinitializer` を渡し、a0 (POINT 値) を捨てる (§4) |
-| `442a50` `442b90` `664890` `6649b0` `6649c0` `664a80` | `i64 (i128)` | unexec (`unsupported_sig`) | 入口型の未確定 (LD-53 の方式で未読。§4) |
+| `442a50` `442b90` `664890` `6649b0` `6649c0` `664a80` | `i64 (i128)` | **mismatch** | LD-180 (#3863) で入口型を確定 (§1・`cases.MACHINE_ENTRY`)。不一致の内訳は §2.1 (IR 側の引数落ち・呼び先 entry 欠落。§4) |
 
 ### 2.1 LD-180 (#3863) の 6 件 (測定 commit `46bc0cd35`)
 
@@ -90,7 +90,7 @@ sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `4256c0` (%tagPOINT) の POINT 値が `m11_tr_` で渡らない (`tools/m11/m11_post.py` の生成が `zeroinitializer` を渡す)。`MACHINE_ENTRY` に入れられない | 実行不能 1 | #3862 ([LD-179]) |
-| 6 件 (`442a50` `442b90` `664890` `6649b0` `6649c0` `664a80`) は入口型を確定 (§1) したが、IR の呼出し側の引数落ち (`xor i64 0, 0` placeholder) と呼び先 entry の欠落で不一致 (§2.1)。IR 側の修正が要る | 不一致 6 | #1479 (IR 型・呼出し引数の修正) |
+| 6 件 (`442a50` `442b90` `664890` `6649b0` `6649c0` `664a80`) は入口型を確定 (§1) したが、IR の呼出し側の引数落ち (`xor i64 0, 0` placeholder) と呼び先 entry の欠落で不一致 (§2.1)。IR 側の修正が要る | 不一致 6 | #4193 ([LD-201]・#3863 の子) |
 | `653c80` `691dd0` の native segv (691dd0 は rcx のオブジェクト内容、653c80 は fault addr 未記録)。`irtool.instrument` が IR の i128 入口を `0` と記録する (callee の入口比較の偽陽性の源。sample:800 への影響は未測定) | 実行不能 2・比較の信頼性 | #3864 ([LD-181]) |
 
 ## 5. 検証
@@ -99,7 +99,7 @@ sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実�
 - 前回の測定 commit `f6abfd073`。`git diff f6abfd073 46bc0cd35 -- tools/liftdiff/ldlib` は `cases.py` の `MACHINE_ENTRY` 6 行追加のみ。
 - 単体: `python3 tools/liftdiff/tests/test_ld52_machine_sig.py` → `PASS test_ld52_machine_sig`。
 - 素材の展開: Actions の `oc_artifacts` 素材 `fl-win64`・`work-m11`・`work-liftdiff` を展開 (`fl-win64` は `FL_WIN64_DIR`、`docs/REFERENCES.md` の `[WIN64]`)。emcc は `[EMSDK]` (6.0.12) を使用。
-- 機械語の読み (6 件) は `/tmp` の一時スクリプトで capstone を使って行った (commit しない)。LD-53 の `ld53_arg_regs.py` の計数は使わず、呼び先の本体を人が読んだ (§1 の表が根拠)。
+- 機械語の読み (6 件) は作業用の一時スクリプトで capstone を使って行った (commit しない)。LD-53 の `ld53_arg_regs.py` の計数は使わず、呼び先の本体を人が読んだ (§1 の表が根拠)。
 - 単体: `python3 tools/liftdiff/tests/test_ld52_machine_sig.py` → `PASS test_ld52_machine_sig` (e2e `[0/4]` に追加)。
 - 製品 KPI (FLEngine 起動・最初のウィンドウ): 本 PR は起動・GUI に関わらないため書かない。
 - 範囲外: 入口型の未確定 6 件と 4256c0 は実装していない (§4)。
