@@ -13,6 +13,7 @@
 - 素材の lift (`boot0〜4.lift.ll`) は snapshot を使い、`boot5.lift.ll` は `m11_lift.sh m11_extra_ranges5.txt boot5` (RetDec・8 秒) で作った。`m11_image_gen.py` の出力は snapshot の `m11_image.bin` と **バイト一致** (LB=0)。よって snapshot の lift は現 PE 由来と見てよい。
 - IR は `m11_gen_ir2.sh` で作り直した (ldfix・ld108・ld115 applied)。全再生成 (Ghidra CSV・RetDec 4 chunk) は行っていない。`lift_pe.sha256` は手書きしていない。
 - 測定は `m11_e2e.sh` の 97〜111 行 (run・survey・tolerant・judge・gate) と同じ順・同じ環境変数で行った。
+- 測定の base は origin/main `8a852f69a` (修正前の `tools/m11`)。origin/main (`e99fe343c` 時点) では `tools/m11` が 8a852f69a 以降 24 files 変わっている。`m11_build.sh`・`m11_ov.c`・`m11_gen_ir2.sh` は変わっていない。
 
 ## 2. 実測 (clean = 直前に `work/obj/*.o` を全削除してから build)
 
@@ -20,14 +21,14 @@
 |---|---|---|---|---|---|---|
 | 既定・clean (参考・旧 base) | f8867e72e (旧 base の作業ツリー。本 commit 系列の測定 commit ではない。根拠に使わない) | `bcfda317` | 98 + 3 = 101 | 873 / 22 / 46 / 1 | 71001 (pass) | 69669 (**FAIL**) |
 | `M11_FIX_50A830=1`・clean | a0d9722fe (記録のみ。tree の個別確認は無い) | `bcfda317` | 98 + 3 = 101 | 872 / 23 / 46 / 1 | **71005 (FAIL)** | 69669 (FAIL) |
-| 既定だが直前が ON build (`obj` 削除なし・取り違え) | a0d9722fe (記録のみ) | `bcfda317` | — | 872 / 23 / 46 / 1 | **71005** | 69669 |
+| 既定だが直前が ON build (`obj` 削除なし・取り違え) | 修正前の `m11_build.sh` (stamp 無し)・tree 不明 (前 session) | `bcfda317` | — | 872 / 23 / 46 / 1 | **71005** | 69669 |
 | 既定・最初の IR (初回 gen) | 未記録 | `36079b29` | 101 | 873 / 22 / 46 / 1 | 71001 | 未記録 |
 | origin/main `8a852f69a` の worktree・既定・clean (修正前) | 8a852f69a | `158b2a8b` | 98 + 3 | (未記録) | 71001 | 69669 |
 | 同・ON build (`obj` 削除なし・取り違え・修正前) | 8a852f69a | `158b2a8b` | — | (未記録) | **71001 (既定と同値 = 古い ov.o)** | 69669 |
 | 同・修正後 (8a852f69a + a0d9722fe の `m11_build.sh`)・既定 → ON → 既定 (`obj` 削除なし) | 8a852f69a + m11_build.sh (a0d9722fe の tools/m11 と同一) | `158b2a8b` | 98 + 3 | 873 / 22 / 46 / 1 → 872 / 23 / 46 / 1 → 873 / 22 / 46 / 1 | 71001 → **71005** → 71001 | 69669 |
 
-- 行 1〜3 は IR が同じ `bcfda317` だが、tree の記録は行 1 だけ (f8867e72e)。行 2〜3 の tree は前 session の記録 (a0d9722fe) で、個別の確認は無い。**tree を確認できるのは行 5〜7** で、§3 の結論の主根拠はこの並び。
-- `M11_FIX_535BF2=0` (取り違えの可能性がある build) は 71001 / run 69668。参考値。
+- 行 1〜3 の IR は同じ `bcfda317`。tree の記録は行 1 (f8867e72e) と行 2 (前 session の記録 a0d9722fe。個別の確認は無いが、clean build なので stamp の有無に依らない)。行 3 は stamp の無い script で測られた行 (a0d9722fe の script では ON の後の既定 build が ov.o を作り直すため、71005 は出ない)。tree は不明 (前 session)。**tree を確認できるのは行 5〜7** で、§3 の結論の主根拠はこの並び。
+- `M11_FIX_535BF2=0` の参考値は 71001 / run 69668 (前 session の記録。修正前の script で測り、直前 build の状態は未記録)。535BF2 の切替えは既存の `ov_535bf2.stamp` (`1ee68101c`・#714) で `ov.o` が作り直されるため、50A830 の取り違えの対象ではない。
 - IR 生成の出力 hash は `36079b29`・`bcfda317`・`158b2a8b` の 3 通りになった。`36079b29` と `bcfda317` は同じ入力での差で、hash seed (未指定・1・2) では `bcfda317` に揃う。`158b2a8b` は 8a852f69a 基点の IR で tree が違うため、上の 2 通りの差とは別に扱う。差の原因は未切り分け (§4)。run ptr 68938 の記録は snapshot の古い wasm (units 17) のもので、基準の判定には使わない。
 - survey ptr は、既定 clean で IR の版によらず 71001 だった。
 
@@ -57,12 +58,12 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (a) 通常起動の完了数 56 → 98 (+3) を生んだ commit の二分 (未了) | pin 56 が古い。期待値を上げるには根拠が要る | 既存 issue へのコメント: #3520 (close 後も結果の追記先)。PM agent の判断待ち: 二分を依頼するか・既定案: 依頼せず、期待値 56 は据え置く (gate は FAIL のまま) |
-| (b) survey ok の環境差 (872〜874) と pin 872 の出所 (#2714 時の build 状態・推定) | 既定の期待値が環境で動く | 既存 issue へのコメント: #3520 (同上)。PM agent の判断待ち: 環境差の切り分けを依頼するか・既定案: 依頼せず、期待値 872 は据え置く |
-| 通常起動の ptr 基準 69359 超過 (既定 clean で 69669) | `m11_e2e.sh` の rc=1 の別要因 (本 issue の範囲外) | PM agent の判断待ち: 新 issue を起票するか・既定案: 起票する (e2e の基準の見直しは PM が issue 化) |
-| IR 生成が同じ入力で別出力 (`36079b29` と `bcfda317`。hash seed は無関係) | run ptr の基準が IR の状態で変わり得る | PM agent の判断待ち: 新 issue を起票するか・既定案: 起票せず、本表に残す |
-| origin/main の `m11_gen_ir2.sh` は qstore を適用しない (`ir_conditions.json` が `qstore=not-applied`) | 旧 main と IR の内容が違う可能性。未確認 | PM agent の判断待ち: 確認を依頼するか・既定案: 本 PR では確認しない (未解決のまま) |
-| 全再生成 (Ghidra CSV・RetDec 4 chunk) を行っていない | snapshot の lift と全再生成の IR の一致は未確認 | PM agent の判断待ち: 全再生成を依頼するか・既定案: 依頼しない (時間上限に収まらない) |
+| (a) 通常起動の完了数 56 → 98 (+3) を生んだ commit の二分 (未了) | pin 56 が古い。期待値を上げるには根拠が要る | #3647 (#3520 の受入 (a) を原文のまま移管) |
+| (b) survey ok の環境差 (872〜874) と pin 872 の出所 (#2714 時の build 状態・推定) | 既定の期待値が環境で動く | #3647 (#3520 の受入 (b) を原文のまま移管) |
+| 通常起動の ptr 基準 69359 超過 (既定 clean で 69669) | `m11_e2e.sh` の rc=1 の別要因 (#3520 の受入外) | #3647 (追加分として転記) |
+| IR 生成が同じ入力で別出力 (`36079b29` と `bcfda317`。hash seed は無関係) | run ptr の基準が IR の状態で変わり得る | #3129 (IR 来歴の記録) に合流 |
+| origin/main の `m11_gen_ir2.sh` は qstore を適用しない (`ir_conditions.json` が `qstore=not-applied`) | 旧 main と IR の内容が違う可能性。未確認 | #3129 (IR 来歴の記録) に合流 |
+| 全再生成 (Ghidra CSV・RetDec 4 chunk) を行っていない | snapshot の lift と全再生成の IR の一致は未確認 | #3122 (全再生成 IR の survey) に合流 |
 
 ## 5. 修正
 
@@ -73,9 +74,16 @@
 
 - 測定 commit: `a0d9722fe` (コード変更を含む最後の commit)。その後のコード差分は `tools/m11/m11_build.sh` のコメント 1 行だけ。非コメント行の差分は 0 行 (§7)。
 - **本 fix run では e2e を再実行していない**。素材 (`tools/m11/work`・emsdk・retdec) が run 上に無く、`fl-win64` の展開だけでは lift・IR・build が再現できないため。§2 の数値は前 session の記録で、再測定していない。
-- stamp 行の分離テスト (本 fix run・HEAD の `m11_build.sh` の該当行を切り出して実行): 初回 (stamp 無し) rebuild / 同設定 reuse / 50A830 0→1 rebuild / 同設定 reuse / 535BF2 1→0 (50A830=1) rebuild / 50A830 1→0 (535BF2=0) rebuild。
+- stamp 行の分離テスト (`m11_build.sh` の 146〜147 行を切り出して実行。コードは測定 commit と同一): 初回 (stamp 無し) rebuild / 同設定 reuse / 50A830 0→1 rebuild / 同設定 reuse / 535BF2 1→0 (50A830=1) rebuild / 50A830 1→0 (535BF2=0) rebuild。
 - `m11_e2e.sh` 全体は未実行 (素材 snapshot の全再生成が要り、時間上限に収まらない)。run・survey・tolerant・judge・gate は前 session が個別に実行した (§2)。gate の結果: strict (101 ≠ 56) と survey (873 ≠ 872) は FAIL のまま (期待値は変えていない)。
 
 ## 7. 差分
 
-`git diff a0d9722fe HEAD -- tools/m11` は、コメント 1 行の変更 (`m11_build.sh`) と、本 REPORT の追記・修正だけ。`m11_build.sh` の非コメント行の差分は 0 行 (`git diff -U0 a0d9722fe HEAD -- tools/m11/m11_build.sh | grep -E '^[-+]' | grep -vE '^(\+\+\+|---)' | grep -cvE '^[-+][[:space:]]*#'` が 0)。
+測定 commit `a0d9722fe` から HEAD までのコード差分は、`m11_build.sh` のコメント 1 行だけ (`git diff a0d9722fe HEAD -- tools/m11/m11_build.sh` の出力):
+
+```diff
+-# #3520: M11_FIX_535BF2・M11_FIX_50A830 は m11_ov.c の転記を切り替える。stamp が無いと前回 build の ov.o を再利用し、切替え後の測定が前の設定の値になる
++# #3520: M11_FIX_50A830 の切替えで ov.o を作り直す (stamp 無しだと前回 build の ov.o を再利用していた)。M11_FIX_535BF2 は下の ov_535bf2.stamp と重なるが、組で記録する
+```
+
+`m11_build.sh` の非コメント行の差分は 0 行 (`git diff -U0 a0d9722fe HEAD -- tools/m11/m11_build.sh | grep -E '^[-+]' | grep -vE '^(\+\+\+|---)' | grep -cvE '^[-+][[:space:]]*#'` が 0)。`tools/m11` の残りの差分は本 REPORT だけ。
