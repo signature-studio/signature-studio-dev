@@ -244,7 +244,8 @@
 | `tools/m11/REPORT_APPENDIX_3188.md` | ~95 | m11 #3188 (親 #3188・子 #3296): LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (REPORT_N403 §8 の全文。main 取り込み後の HEAD での再測定・IR 突合・memcpy 源 NULL の修正の参照・未特定の原因) |
 | `tools/m11/REPORT_N134.md` | ~74 | m11 #134 の付録: REPORT §14 (unit 23 の IntToStr 修正・judge の Halt0 分離) と §18 (停止点 unit 101・e2e 期待値の更新・切り分け) の本文 (250 行上限のため分割) |
 | `tools/m11/REPORT_N15.md` | ~16 | m11 REPORT §16 (#490 main HEAD の 4c3baa4 / faee5b6 状態の実測・ネガコン) の付録 (250 行上限のため分割) |
-| `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` | ~244 | #2770 (LD-129): native 側 0x5ac308 の書込み監視 (`rt/ld_native.c` の `LD_WATCH_ADDR`)。REPORT_1783.md の旧 §8 を 250 行上限のため分割移動した節 (§8.1〜§8.9)。分割後に §8.2・§8.4・§8.6・§8.8 を再測定・改訂したので、測定値と判定の正本は本付録 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` | ~249 | #2770 (LD-129): native 側 0x5ac308 の書込み監視 (`rt/ld_native.c` の `LD_WATCH_ADDR`)。REPORT_1783.md の旧 §8 を 250 行上限のため分割移動した節 (§8.1〜§8.9)。分割後に §8.2・§8.4・§8.6・§8.8 を再測定・改訂したので、測定値と判定の正本は本付録。§8.10 は #3648 の結論 1 行とリンク |
+| `tools/m11/trap_triage/REPORT_APPENDIX_3648.md` | ~150 | #3648 (LD-171): page 保護を変えない 0x5ac308 の書込み監視 (`rt/ld_native.c` の `LD_WATCH_MODE=hw`・ptrace の DR0・DR1)。陽性対照 15eac98 の 248 件 (page 方式と 1:1)・5ac308 監視の boot 状態一致 (CPU 0・2)・環境長と rsp の前提・未解決。測定値の正本。再現は `hw_watch_3648.sh`・判定は `hw_watch_3648_check.py` |
 | `tools/m11/REPORT_APPENDIX_1430.md` | ~60 | m11 #1430 の基準 (before) 節の全文 (`REPORT_APPENDIX.md` §9 の後続。xmm 引数の callee 署名復元の前測定 (survey 基準 ok/trap/miss/noproc の実測)・`work-m11` 由来の 7 カテゴリ (和 1,963)。全再生成 IR の測定は #1532) |
 | `tools/m11/REPORT_APPENDIX.md` | ~238 | m11 REPORT §8 (LB_BASE=0x10000 適用 #222)・§9 (sigfix 0 詰め #131)・§10a (#132 commit 別測定表と注記)・§10b (#132 真因・修正 4 点・NC・次 blocker・外した内容)・§12 の一部 (#513 新規類型の行案)・§12b (#513 巨大 VirtualAlloc の n の出所) の全文 (250 行上限のため本体から無変更で分割移動) |
 | `tools/m11/REPORT_N1318.md` | ~69 | #1318 (N82): 10 進 inttoptr 4364 件の VA→LVA 仕分け表 (分類件数・判定規則・QPF 整数定数 1 件の誤 remap)・再現 `m11_inttoptr_class.py` |

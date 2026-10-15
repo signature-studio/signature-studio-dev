@@ -242,3 +242,8 @@ python3 ../m11/trap_triage/cmp_img_2770.py work/probe/X0.json work/probe/W0.json
 ```
 
 - CPU 2 は `LD_PIN_CPU=2` で同じ 2 本を回す。`LD_WATCH_ADDR=5ac308` が F (監視)、`15eac98` が C (陽性対照)。
+
+### 8.10 page 保護を変えない監視 (#3648・結論のみ)
+
+- 結論: `LD_WATCH_MODE=hw` (ptrace の DR0・DR1。`0x5ac308` と `va-8`) で、陽性対照 `15eac98` は page 方式と 248 件・1:1 一致。`0x5ac308` の監視付き boot は監視なしと CPU 0・2 で一致し、記録は 0 件。page 保護は変えない。
+- 測定値・方式・限界・未解決は `REPORT_APPENDIX_3648.md` が正本 (250 行上限のため分割)。
