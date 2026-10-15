@@ -16,7 +16,7 @@ extern uint64_t R[16];
  * VEX.128 命令は dest の上位 128bit をゼロ化 (XZ(i))、legacy SSE 命令は X のみ触り (上位保存)。 */
 extern X128 X[16];
 extern X128 XH[16];
-extern uint8_t fZF, fSF, fCF, fOF, fPF;
+extern uint8_t fZF, fSF, fCF, fOF, fPF, fDF;
 enum { RAX, RCX, RDX, RBX, RSP, RBP, RSI, RDI, R8, R9, R10, R11, R12, R13, R14, R15 };
 
 typedef uint8_t __attribute__((aligned(1))) u8u;

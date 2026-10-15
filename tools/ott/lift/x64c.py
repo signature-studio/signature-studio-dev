@@ -554,6 +554,13 @@ class FnLift:
     def i_rol(self, i, o): self.shift(i, o, 'rol')
     def i_ror(self, i, o): self.shift(i, o, 'ror')
 
+    def i_shld(self, ins, ops):
+        self.ia32_only('shld')
+        if ops[0].size != 4:
+            raise Unsup(ins.mnemonic)
+        cnt = self.rd(ins, ops[2], 1)
+        self.L('{ uint32_t a_ = %s; uint32_t b_ = %s; unsigned c_ = (unsigned)(%s) & 31; if (c_) { uint32_t r_ = (a_ << c_) | (b_ >> (32 - c_)); fCF = (a_ >> (32 - c_)) & 1; fOF = ((r_ >> 31) & 1) ^ fCF; SETZSP(32, r_); %s } }' % (self.rd(ins, ops[0]), self.rd(ins, ops[1]), cnt, self.wr(ins, ops[0], 'r_', 4)))
+
     def i_imul(self, ins, ops):
         if len(ops) == 1:
             sz = ops[0].size
@@ -698,10 +705,14 @@ class FnLift:
         m = ins.mnemonic[4:]
         if m.startswith('movs'):
             w = {'b': 1, 'w': 2, 'd': 4, 'q': 8}[m[-1]]
+            if IA32:   # DF=1 (std) は後ろから 1 要素ずつ。DF=0 は従来どおり memmove
+                return self.L('{ uint64_t n_ = R[RCX]; if (fDF) { for (uint64_t k_ = 0; k_ < n_; k_++) ST%d(R[RDI] - k_ * %d, LD%d(R[RSI] - k_ * %d)); R[RDI] -= n_ * %d; R[RSI] -= n_ * %d; } else { memmove((void*)A_(R[RDI]), (void*)A_(R[RSI]), n_ * %d); R[RDI] += n_ * %d; R[RSI] += n_ * %d; } R[RCX] = 0; }' % (w * 8, w, w * 8, w, w, w, w, w, w))
             self.L('{ uint64_t n_ = R[RCX]; memmove((void*)A_(R[RDI]), (void*)A_(R[RSI]), n_ * %d); R[RDI] += n_ * %d; R[RSI] += n_ * %d; R[RCX] = 0; }' % (w, w, w))
         elif m.startswith('stos'):
             w = {'b': 1, 'w': 2, 'd': 4, 'q': 8}[m[-1]]
             v = {1: 'R[RAX] & 0xff', 2: 'R[RAX] & 0xffff', 4: 'R[RAX] & 0xffffffff', 8: 'R[RAX]'}[w]
+            if IA32:
+                return self.L('{ uint64_t n_ = R[RCX]; uint64_t v_ = %s; int64_t s_ = fDF ? -%d : %d; for (uint64_t k_ = 0; k_ < n_; k_++) ST%d(R[RDI] + k_ * s_, v_); R[RDI] += n_ * s_; R[RCX] = 0; }' % (v, w, w, w * 8))
             self.L('{ uint64_t n_ = R[RCX]; uint64_t v_ = %s; for (uint64_t k_ = 0; k_ < n_; k_++) ST%d(R[RDI] + k_ * %d, v_); R[RDI] += n_ * %d; R[RCX] = 0; }' % (v, w * 8, w, w))
         else:
             raise Unsup(ins.mnemonic)
@@ -721,11 +732,11 @@ class FnLift:
             raise Unsup(m)
 
     def ia32_str(self, ins, kind, w):
-        """ia32 の非 rep 文字列命令 (1 要素)。DF=0 前提 (rep() と同じ)。ES/DS は平坦 (ea() 参照)。"""
+        """ia32 の非 rep 文字列命令 (1 要素)。DF は fDF (std/cld で設定)。ES/DS は平坦 (ea() 参照)。"""
         self.ia32_only(ins.mnemonic)
         if kind == 'movs':
-            return self.L('{ uint%d_t v_ = LD%d(R[RSI]); ST%d(R[RDI], v_); R[RSI] += %d; R[RDI] += %d; }' % (w * 8, w * 8, w * 8, w, w))
-        self.L('ST%d(R[RDI], R[RAX]); R[RDI] += %d;' % (w * 8, w))
+            return self.L('{ uint%d_t v_ = LD%d(R[RSI]); ST%d(R[RDI], v_); R[RSI] += fDF ? -%d : %d; R[RDI] += fDF ? -%d : %d; }' % (w * 8, w * 8, w * 8, w, w, w, w))
+        self.L('ST%d(R[RDI], R[RAX]); R[RDI] += fDF ? -%d : %d;' % (w * 8, w, w))
 
     def i_movsb(self, ins, ops): self.ia32_str(ins, 'movs', 1)
     def i_movsw(self, ins, ops): self.ia32_str(ins, 'movs', 2)
@@ -735,7 +746,7 @@ class FnLift:
 
     def repne_scasb(self, ins):
         self.ia32_only('repne scasb')
-        self.L('{ while (R[RCX] != 0) { uint8_t a_ = (uint8_t)R[RAX]; uint8_t b_ = LD8(R[RDI]); FL_SUB(8, a_, b_, (uint8_t)(a_ - b_)); R[RDI] += 1; R[RCX] -= 1; if (fZF) break; } }')
+        self.L('{ while (R[RCX] != 0) { uint8_t a_ = (uint8_t)R[RAX]; uint8_t b_ = LD8(R[RDI]); FL_SUB(8, a_, b_, (uint8_t)(a_ - b_)); R[RDI] += fDF ? -1 : 1; R[RCX] -= 1; if (fZF) break; } }')
 
     def i_sahf(self, ins, ops):
         self.ia32_only('sahf')   # AF は runtime が持たないため未反映 (x87 比較の後の分岐は CF/ZF/PF で足りる)
@@ -1218,7 +1229,12 @@ class FnLift:
         if IA32:
             return self.L('R[RSP] = R[RBP]; R[RBP] = LD32(R[RSP]); R[RSP] += 4;')
         self.L('R[RSP] = R[RBP]; R[RBP] = LD64(R[RSP]); R[RSP] += 8;')
-    def i_cld(self, ins, ops): pass
+    def i_cld(self, ins, ops):
+        if IA32:
+            self.L('fDF = 0;')
+    def i_std(self, ins, ops):
+        self.ia32_only('std')
+        self.L('fDF = 1;')
     def i_cpuid(self, ins, ops): self.L('ott_unsup(%s, "cpuid");' % hx(ins.address))
 
     # ---- VEX / AVX (CAB-135) ----
