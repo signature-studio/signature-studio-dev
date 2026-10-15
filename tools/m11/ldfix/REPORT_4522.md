@@ -32,12 +32,12 @@ r9 の残件 (`0x412fc0` の rcx・r9 の接続) は #3450・#4521 の時点で�
 
 ## 3. 検証
 
-測定 commit: **`164b087aa`** (コード変更の最後の commit。`fix(m11): 4521 の照合 (C412) を 4521 の形へ戻す ...`)。
-`git diff 164b087aa HEAD -- tools/m11/ldfix/` は空 (測定後の commit は本 REPORT のみ)。
+測定 commit: **`3d1d40841`** (main 取り込み後の HEAD。コード変更の最後の commit は `164b087aa`)。
+`git diff 164b087aa 3d1d40841 -- tools/m11/ldfix/` の出力は REPORT_4522.md のみ (コード差分 0)。
 
 ### 3.1 e2e (`ldfix_e2e.sh`・rc 0)
 
-`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` (commit `164b087aa`・wall 60 s・load 0.63 → 0.87 (16:01〜16:02)):
+`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` (commit `3d1d40841`・wall 61 s・load 0.83 (16:03 時点)。`164b087aa` でも同一結果・wall 60 s):
 
 | 指標 | base | fix | 判定 |
 |---|--:|--:|---|
