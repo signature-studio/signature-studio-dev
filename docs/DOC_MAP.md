@@ -561,6 +561,7 @@
 | `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_4393.md` | ~55 | #4393 (HB-H54): RetDec 分割 lift の `statement not in loop` 27 件の切り分け (飛び先の機械語上の位置・`--backend-no-opts` での再 lift による注釈の有無)。原因は既定 backend 最適化段での注釈付きブロックの統合。測定 commit `093bed7c1`。`notloop_probe.py` が再現手段 |
 | `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_829.md` | ~88 | #829 (HB-H20): x64c wasm build の中間物サイズ (C・`.o`)・unsup 内訳と CreatePlugInstance (0x86ab10) 入場ログ・最初に失敗する関数の実測。表に無い値の正本。exit・秒・load・wasm サイズは REPORT §14 の表が正本 |
 | `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_3597.md` | ~50 | #3597 (HB-H51): slot 6 応答 (NUL 終端の文字列) への修正後の停止点 `f_4079e0` の実測 (測定 commit `dec2ec7a0`)。完走・起動経路・bit 判定は未達。前段の観測は付録 2653 |
+| `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_5253.md` | ~60 | #5253 (HB-H58): 停止点の再確認 (測定 commit `845010c6e`) と、CreatePlugInstance の名前文字列・export の lift C 内の参照数 (`cpi_entry_refs.py`)。起動経路からの到達は部分的 (GetProcAddress 引数の出所は未追跡) |
 | `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_2653.md` | ~88 | #2653 (HB-H46): CreatePlugInstance の host 再構成 (PE イメージ外の fake host の vtable・記録して返す未 lift 呼出)、停止点 `f_409b70` の実測、block23676 の入場、強い NC (`entered=false`)、export 表の静的確認。観測の正本 (測定 commit `22625fe8c`)。表は REPORT §14。完走・起動経路・bit 判定は #3597 |
 | `tools/hostbridge/nfo/REPORT_APPENDIX_B.md` | ~150 | nfo §13〜§14 全文 (generateDb→wvfs 結線 e2e CAB-216 + 検収。#437 で無変更分割移動) |
 | `tools/gui/flengine/REPORT.md` | ~244 | GUI-3 (#174) 実 FLEngine lift × GUI shim 結合: 自然起動・survey で shim に実到達した API、指向呼出、gate 12 + ネガコン 5。§8 = GUI-12 (#566) `__pe_image` の m11_data_gen 方式統合 (実 FLEngine PE parity・ネガコン) |
