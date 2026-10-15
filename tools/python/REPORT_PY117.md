@@ -49,19 +49,20 @@
 - `general.safeToEdit` と同じ変数 (C: `safe_edit`・mock: `st.safeEdit`) を読むので、両者の値は常に一致する。
 - 試験用の setter は本番の FL API ではない (`setSafeEdit`)。既定値 (真) は `fl_engine_reset` と mock の初期値のまま。
 
-## 4. 検証 (測定 commit `395f5496a`・コミット済み HEAD)
+## 4. 検証 (測定 commit `be6d784f9`・コミット済み HEAD)
 
-- 測定 commit は main (`5ec4aef07`) を取り込んだ merge commit `395f5496a`。前回の測定 (`034cab74a`) の後に main が進んだため、取り込みを 2 回した (`058984fa0` → `5ec4aef07`)。
-- 競合は 2 回とも `provider/build.sh` と `provider/fl_engine.c` だけ。`build.sh` は `_fl_engine_set_safe_edit` (本 PR) と `_fl_engine_grid_items_probe` (main) を両方残した。`fl_engine.c` は main の PY-62 の 7 関数 (`getTrackColor` ほか) と本 PR の `muteTrackLock` を両方残した。表の注釈「準備判定 (-2) は未モデル」は本 PR で実装したため、「PY-117 で muteTrackLock に入れた」に直した。
-- 素材: `fl-win64` を `tar --zstd -xf` で展開 (実測 real 5.425 秒)。展開先 `$RUNNER_TEMP/fl-win64`。`fetch_inputs.sh` で `work/` に入力を置いた。
-- emsdk 6.0.12 は upstream から `emsdk install` / `activate` で入れ、`[EMSDK]` の位置に置いた (`toolchain-emsdk` は本 run の素材に無かった)。
-- `provider/build.sh`・`build_cpython_wasm.sh` (実測 real 4 分 33 秒。main 取り込みで CPython 側は変わっていない)・`build_flpy.sh` (`FLPY_SKIP_TABLE=1`・実測 real 6.009 秒) を作って `provider_check` と `all_tools` を回した。
-- `node tests/playlist_diff.mjs`: `{"calls":72,"diffs":0,"mock_state_steps":8,"PASS":true}` (偽の状態の節も差分 0・`lock` 不変を assert。main 取り込みで呼出しが増えた)。real 0.053 秒。
-- `node tests/provider_check.mjs`: `{"functions":435,"implemented":162,"unimplemented":273,"mcp_static":60,"PASS":true}`。real 0.382 秒。
-- `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}`。real 2.066 秒。
-- ミューテーション: mock の `if (!st.safeEdit) throw UNSAFE();` を外す → `unsafe 差分 3 件` で FAIL (exit 1)。C 側の `if (!safe_edit) return fl_err(...)` を外す → 同じく `unsafe 差分 3 件` で FAIL (exit 1)。どちらも戻すと PASS。
-- 実行直前の load average は `0.71 1.18 0.78` (`/proc/loadavg`)。並列 1。
-- 差分確認: `git diff 395f5496a HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` の出力は 0 行 (本 REPORT の commit のみ。測定後のコード変更は無い)。
+- 測定 commit は main (`abb5fbf9d`) を取り込んだ merge commit `be6d784f9`。前回の測定 (`395f5496a`・main `5ec4aef07`) の後に main が進んだため、取り込みを 3 回目にした。
+- 競合は `provider/build.sh` の `EXPORTED_FUNCTIONS` だけ。本 PR の `_fl_engine_set_safe_edit` と main の `_fl_engine_midi_word_count`・`_fl_engine_midi_word`・`_fl_engine_set_device_link` を両方残した (順序は main 側に合わせ、`_fl_engine_set_safe_edit` は `_fl_engine_reset` の直後)。`fl_engine.c` は自動 merge。`muteTrackLock` の C の判定 (`if (!safe_edit) return fl_err(...)`) と mock の判定 (`if (!st.safeEdit) throw UNSAFE();`) が残ることを grep で確認し、`EXPORTED_FUNCTIONS` の全関数は link が通ったことで定義を確認した。
+- 素材: `fl-win64` を `tar --zstd -xf` で `$RUNNER_TEMP` 直下に展開 (実測 real 5.656 秒)。`FL_WIN64_DIR=$RUNNER_TEMP` で `fetch_inputs.sh` を回し `work/` に入力を置いた (real 0.549 秒)。
+- emsdk 6.0.12 は upstream から `/opt/emsdk` に `install` / `activate` で入れた (本 run の時点では未配置だった)。
+- ビルド (実測 real): `provider/build.sh` 1.569 秒・`build_cpython_wasm.sh` 4 分 36 秒・`FLPY_SKIP_TABLE=1 build_flpy.sh` 6.076 秒。
+- `node tests/provider_check.mjs`: `{"functions":435,"implemented":165,"unimplemented":270,"mcp_static":60,"PASS":true}` (前回は implemented 162。main の新規実装分で 165)。
+- `node tests/playlist_diff.mjs`: `{"calls":72,"diffs":0,"mock_state_steps":8,"PASS":true}`。
+- `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}`。real 2.022 秒。
+- main 側で変わった diff テスト (同じ mock・C を通る): `channels_diff` `{"calls":231,"diffs":0,"PASS":true}`・`device_diff` `{"calls":11,"diffs":0,"PASS":true}`・`mixer_diff` `{"calls":69,"diffs":0,"PASS":true}`・`ui_state_diff` `{"calls":58,"diffs":0,"PASS":true}`。
+- ミューテーション (HEAD で再測): mock の guard を外す → `unsafe 差分 3 件` で FAIL (exit 1)。C の guard を外して `build.sh` で作り直す → 同じく FAIL (exit 1)。元に戻して作り直すと `playlist_diff` は PASS。
+- 測定後の load average は `1.09 1.58 0.85` (`/proc/loadavg`)。並列 1。
+- 差分確認: `git diff be6d784f9 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` の出力は 0 行 (本 REPORT の commit のみ。測定後のコード変更は無い)。
 
 ## 5. 未解決
 
