@@ -33,7 +33,7 @@ def name_re(name):
 
 
 def three_value(row):
-    if row['class'] in ('実値化', '未決'):
+    if row['class'] in ('実値化', '復元不能', '未決'):
         return row['class']
     return '未分類'
 
