@@ -81,9 +81,12 @@ export async function createWasmEngine({ flprovUrl, ids }) {
     highlightCb: () => Number(M._fl_engine_highlight_cb()),
     channelCount: () => M._fl_engine_channel_count(),
     midiOutCount: () => M._fl_engine_midi_out_count(),
+    midiWords: () => Array.from({ length: M._fl_engine_midi_word_count() }, (_, i) => Number(M._fl_engine_midi_word(i))),
+    setDeviceLink: (dev, link) => M._fl_engine_set_device_link(dev ? 1 : 0, link ? 1 : 0),
     gridBit: (c, p) => M._fl_engine_grid_bit(c, p),
     displayTime: () => Number(M._fl_engine_display_time()),
     stepItemProbe: (prm, v, s0, s1) => M._fl_engine_step_item_probe(prm, v, s0, s1),
+    gridItemsProbe: (seed, n) => M._fl_engine_grid_items_probe(seed, n),
     noteEnumProbe: (seed, n, chan, step, V) => {
       const k = M._fl_engine_note_enum_probe(seed, n, chan, step, V);
       return Array.from(new Int32Array(M.HEAPU8.buffer, M._fl_engine_note_enum_out(), k));

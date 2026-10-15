@@ -93,9 +93,9 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 異なる plugin を 1 Memory に畳む際の VA 衝突・共有 static の汚染 (本計測は同一 OTT の M 個 = 同一 binary の別 state) | 異なる plugin を同居させる場合は未検証 | #2963 [PERF-P20] |
+| 異なる plugin (OTT + Fresh Air) を 1 Memory に畳む際の emcc 静的データ・heap の衝突と、node での署名一致 (本計測は同一 OTT の M 個 = 同一 binary の別 state)。Fresh Air は lift 時に画像窓を分けた (§8) | 畳み込みは未検証。異なる plugin を同居させる場合は未検証 | #3680 [PERF-P23] (#2963 から分割) |
 | AudioWorklet 上の M=130 の instantiate・署名一致 | 解消 (本 PR): §7 で 130/130 一致・instantiate 失敗なし | なし (§7 で解消) |
-| AudioWorklet 上の instantiate 上限 (M=130 を超える M) | 成功最大 M=130、失敗最小 M=160 (無応答)。131〜159 の境界は未測 (§8) | #2988 [PERF-P21] (親 #1259) |
+| AudioWorklet 上の instantiate 上限 (M=130 を超える M) | 成功最大 M=130、失敗最小 M=160 (無応答)。131〜159 の境界は未測 (§9) | #2988 [PERF-P21] (親 #1259) |
 | setup 時間 (M=130 で 790〜999 ms、Dedicated Worker・§3) | 起動時の一括 instantiate/setup の遅延。pre-warm の設計が必要 | REPORT_P8 §11 (pre-warm) と同じ経路 |
 
 ## 5. 再現
@@ -178,7 +178,43 @@ node tools/perf/p15/chrome_worklet.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3 
 
 **測定 commit から HEAD までの tools/perf/p15 差分**: 測定コードの差分は空。`git diff --stat 80298b02 HEAD -- tools/perf/p15` は、測定結果 `results/chrome_worklet.jsonl` (9 行) の追加だけを示す。
 
-## 8. AudioWorklet 上の instantiate 上限・setup 時間・ネガティブコントロール (PERF-P21 / #2988)
+## 8. 第 2 plugin (Fresh Air GainDsp) の x64c lift と単独 instance の署名 (PERF-P20 / #2963)
+
+**結論**: Fresh Air の `gain::GainDsp::process` (SlateCore `0x180afe090`) を x64c で lift し emcc で wasm 化した。単独 instance の署名は node で `5e5287b5` (400 シナリオ・3 回一致)。同じシナリオで実機機械語 (ms_abi 直接実行) と突き合わせ、**400/400 シナリオ一致**。異なる plugin 2 種の **1 Memory への畳み込みは未実施** で、残りは子 issue #3680 [PERF-P23] に移した。
+
+| 項目 | 結果 (実測) |
+|---|---|
+| 第 2 plugin | Fresh Air。`SlateCore.core_64` (PE32+ DLL、ImageBase `0x180000000`、SizeOfImage `0x2319000`)。素材 `plugins-freshair` の `Fresh Air.Win.zip` を `tools/targets/freshair/fetch.sh` で展開 |
+| lift | `x64c.py --closure 60 --img 0x180000000 --shift 0x17E000000 --img-size 0x2319000`。functions 57、insns 2102、unsup `{}`、traps 0、imports 22、unlifted callees 0 |
+| wasm | `fa.wasm` 2,148,176 B。`emcc -O0 -ffp-contract=off`、compile の warnings 0 / errors 0 |
+| 窓 (lift 時の再配置) | wasm アドレス = VA − `0x17E000000`。画像は wasm `0x02000000`〜`0x04319000`。OTT の画像窓 `0x30000000` (§0 の `shared_worker.mjs`) と重ならない。emcc の静的データ・heap の衝突は未検証 (#3680) |
+| 単独署名 | `fa_gain_sig.mjs` 400 シナリオ・seed 64030: `5e5287b5` (3 回とも一致)。出力が変わったシナリオ 371/400 |
+| 差分 (native) | `fa_native_diff.py` seed 64030: 400/400 一致、比較バッファ 2,800、差分 0、native crash 0、wasm trap 0。seed 7 も 400/400 一致 |
+| NC-1 (入力) | wasm 側だけ seed 64031 のシナリオを流す: 0/400 一致 (400 mismatch) |
+| NC-2 (wasm の 1 命令) | lift C の 1 命令 (`0x180afe195` `addss`→減算、`fle_lifted.c` 行 550) を壊す: 214/400 一致、**186 mismatch**、署名 `5e5287b5`→`5cb40d4b` |
+| 所要 | build 7.40 s (real)、差分 1 本 9.2 s (native 実行 + node) |
+
+- 測定 commit: `e0d62359c` (コードを最後に変えた commit。`git diff e0d62359c HEAD -- tools/perf/p20` の出力は空。本節の追記は `tools/perf/REPORT_P15.md` だけ)。測定時の load average 0.08 (1 分)、CPU は runner の 4 vCPU。
+- 環境: node v22.23.3、emcc は `[EMSDK]` (`toolchain-emsdk`。`EMSDK` に設定して読ませる。`docs/REFERENCES.md` §4)、素材 `plugins-freshair`。
+- 既知類型との関係: 本 lift は x64c (RetDec 非依存)。RetDec 由来の修復 (P1・F7・F2) は適用していない。silent miscompile は差分 harness で検出する。NC-2 で検出力を確認した。
+- 差分 harness の入力: 仕様は `tools/liftlib/specs/fa_gain.json` (vars・buffers) をそのまま使う (`liftlib.harness.spec.build`)。署名 harness (`fa_gain_sig.mjs`) は同じ分布の値を再現し、L/R は一様 [-1, 1] (仕様の sample 定義は使っていない)。署名値は回帰用の ID であり、正しさは差分 harness が担う。
+
+再現 (素材 `plugins-freshair` の展開後。`FA_DL` は zip の置き場):
+
+```sh
+FA_DL=$RUNNER_TEMP/fa bash tools/targets/freshair/fetch.sh
+bash tools/perf/p20/build_fa_gain.sh                                   # §8 の lift・wasm
+node tools/perf/p20/fa_gain_sig.mjs tools/perf/p20/work/fa/fa.cjs 400 64030   # 単独署名
+python3 tools/perf/p20/fa_native_diff.py --n 400 --seed 64030          # native 差分
+python3 tools/perf/p20/fa_native_diff.py --n 400 --seed 64030 --neg-wasm-seed 64031 --out tools/perf/p20/work/fa/diff_neg   # NC-1
+bash tools/perf/p20/fa_negctl.sh                                       # NC-2
+```
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| OTT と Fresh Air を 1 Memory に畳む (emcc 静的データ・heap の衝突、memory import 版の build、畳み込み後の署名一致と静的データ非汚染) | 受入 1 の残り。畳み込みは未検証 | #3680 [PERF-P23] |
+
+## 9. AudioWorklet 上の instantiate 上限・setup 時間・ネガティブコントロール (PERF-P21 / #2988)
 
 **結論**: AudioWorklet 上で 1 instance (Memory 1 本) に畳み込める OTT obj は **M=130 まで**成功した (初期化は 3 run 全て例外なし、署名は 3 run 全て 130/130 一致)。**M=160 以上は 3 run 全て無応答** (20〜30 秒で結果も例外も返らない)。成功最大 M ≥ 130、失敗最小 M ≤ 160。131〜159 の境界は未測。ネガティブコントロールは 1 obj の入力を変えると、その obj だけ署名が外れ、他は一致したまま残ることを示した。
 
