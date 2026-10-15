@@ -10,7 +10,7 @@
   (2) **小さすぎる global 宣言** (20×f32 の既定値表が `[8 x i8]` → 範囲外読み)、(3) call site の r8/r9 引数脱落、
   (4) CRT 数学 (exp/log/tan/pow) を libm へ置換した hand port の ulp 差、(5) 欠落部を hand port した値の誤り (gate box 定数 10.0 等)。
 - **修復**: RetDec 非依存の **自作 x86-64→C lifter `lift/x64c.py`** (capstone, 命令 1:1)。native 単歩 coverage で実行関数を決め
-  (lift 対象 75 関数 / 5,790 命令)、間接 call は dispatch switch、CRT 数学は DLL 自身の機械語をそのまま lift → **bit-exact**。
+  (lift 対象 75 関数 / 5,790 命令)、間接 call は dispatch switch、CRT 数学は DLL 自身の機械語をそのまま lift → **bit-exact**。`i_rcr` の flags 規則は #3125 で flelift 版と揃えた (実機 rcr と 4004/4004 一致・e2e PASS。詳細 `REPORT_APPENDIX_3125.md`)。
   RetDec chain 側の局所修復 `passes/gvraw.py` (小 global 廃止) も残した (単独では junk 不変: §2 表)。
 - **参照 (引継ぎ 3)**: 案 (a) を採用。**native OTT を Linux 上で実行できる** (旧 REPORT の「SEH 依存で不可」は誤り):
   PE を VA 0x180000000 に敷設し IAT を stub 化、MS x64 ABI trampoline で ctor/setParameter/resume/processReplacing を直接呼ぶ

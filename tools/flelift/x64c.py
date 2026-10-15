@@ -809,8 +809,30 @@ class FnLift:
                 return self.L('imp_%s(); return;' % self.pe.iat[slot])
             if self.pe.cfg_rax and slot in self.pe.cfg_slots:
                 return self.L('ott_dispatch(R[RAX]); return;')
+        if op.type == X86_OP_REG and self.pe.cfg_rax and self.cfg_loaded_into(ins, op.reg):
+            return self.L('ott_dispatch(R[RAX]); return;')
         # 間接 tail jmp (CFG dispatch / longjmp 形 / IAT 経由等): target を値として dispatch
         return self.L('{ uint64_t t_ = %s; ott_dispatch(t_); return; }' % self.rd(ins, op, 8))
+
+    def cfg_loaded_into(self, ins, reg):
+        """直前の命令が mov reg,[slot] (slot は CFG dispatch) で、ins がその直後の fall-through の先頭か。
+        その場合 reg は thunk の値で、宛先は rax に入っている (MSVC CFG の規約)。"""
+        if ins.address in self.targets:
+            return False
+        prev = None
+        for k in range(1, 16):          # x86 命令は最大 15 バイト: 直前の命令は address-k から始まり長さ k
+            p = self.insns.get(ins.address - k)
+            if p is not None and p.size == k:
+                prev = p
+                break
+        if prev is None or prev.mnemonic != 'mov' or len(prev.operands) != 2:
+            return False
+        dst, src = prev.operands
+        if dst.type != X86_OP_REG or dst.reg != reg or dst.size != 8:
+            return False
+        if src.type != X86_OP_MEM or src.mem.base != X86_REG_RIP:
+            return False
+        return prev.address + prev.size + src.mem.disp in self.pe.cfg_slots
 
     def i_jecxz(self, ins, ops):
         self.L('if ((R[RCX] & 0xffffffffULL) == 0) goto %s;' % self.label(ops[0].imm))
@@ -837,6 +859,8 @@ class FnLift:
                 return self.L(self.call_stmt(ins, 'imp_%s();' % self.pe.iat[slot]))
             if self.pe.cfg_rax and slot in self.pe.cfg_slots:
                 return self.L(self.call_stmt(ins, 'ott_dispatch(R[RAX]);'))
+        if op.type == X86_OP_REG and self.pe.cfg_rax and self.cfg_loaded_into(ins, op.reg):
+            return self.L(self.call_stmt(ins, 'ott_dispatch(R[RAX]);'))
         self.L('{ uint64_t t_ = %s; ' % self.rd(ins, op, 8) + self.call_stmt(ins, 'ott_dispatch(t_);') + ' }')
 
     def i_ret(self, ins, ops):
