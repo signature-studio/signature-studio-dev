@@ -51,6 +51,8 @@ if [ "$QUICK" = 0 ]; then
   python3 -m liftlib inject-eval || RC=1
   echo "=== (f) OTT leaf native spec (leafabi + 実機機械語オラクル bit 突合, CAB-239)"
   python3 -m liftlib leafspec targets/ott_leaf.json --n 40 || RC=1
+  echo "=== (g) OTT getparam leaf (icall BLK 配線 + 入口 this/idx + image 表, #1270)"
+  python3 -m liftlib leafspec targets/ott_getparam.json --n 200 || RC=1
 fi
 if [ "$RC" = 0 ]; then echo "[liftlib_e2e] ALL PASS"; else echo "[liftlib_e2e] FAIL (上のログ参照)" >&2; fi
 exit $RC

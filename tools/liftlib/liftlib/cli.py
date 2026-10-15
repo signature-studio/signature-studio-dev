@@ -12,6 +12,7 @@
   inject-eval                           パターン注入による検出器の検出力/偽陽性評価
   specgen <image> <func_va>             機械語から harness spec の雛形を生成 (ポインタ/フィールド推定)
   regress                               OTT / FA Gain / KH Gain の回帰 (liftlib_e2e.sh から呼ぶ)
+  boolret <in.ll> <out.ll>              call i1 @F の結果の sext i1→i64 を zext にする (LD-147 / #3180・件数を出力)
 """
 import argparse
 import json
@@ -333,6 +334,16 @@ def cmd_specgen(a):
     return specgen.main([a.image, a.va] + (["--name", a.name] if a.name else []))
 
 
+def cmd_boolret(a):
+    from .passes import boolret
+    with open(a.src, encoding="utf-8") as f:
+        new, n = boolret.apply(f.read())
+    with open(a.dst, "w", encoding="utf-8") as f:
+        f.write(new)
+    print(n)
+    return 0
+
+
 def main(argv=None):
     env.ensure()
     ap = argparse.ArgumentParser(prog="liftlib")
@@ -365,6 +376,8 @@ def main(argv=None):
     p = sp.add_parser("leafspec")
     p.add_argument("cfg"); p.add_argument("--n", type=int); p.add_argument("--workdir"); p.add_argument("--timeout", type=int, default=300)
     p.set_defaults(fn=cmd_leafspec)
+    p = sp.add_parser("boolret")
+    p.add_argument("src"); p.add_argument("dst"); p.set_defaults(fn=cmd_boolret)
     p = sp.add_parser("regress")
     p.set_defaults(fn=cmd_regress)
     a, rest = ap.parse_known_args(argv)
