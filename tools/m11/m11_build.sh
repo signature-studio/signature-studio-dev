@@ -249,6 +249,9 @@ echo "${M11_ENTRY_PROBE:-0}" > work/ov_entry_probe.stamp
 # #3482: M11_PROBE_LIST (list Add/Grow・nil 解放の計測 probe) の ON/OFF で ov.o だけ作り直す
 if [ "$(cat work/ov_probe_list.stamp 2>/dev/null || echo 0)" != "${M11_PROBE_LIST:-0}" ]; then rm -f work/obj/ov.o; fi
 echo "${M11_PROBE_LIST:-0}" > work/ov_probe_list.stamp
+# #3482: M11_FIX_50A830 の ON/OFF で ov.o だけ作り直す (stamp が無いと切替えが ov.o に効かず、ON と OFF が同じ ov.o のまま測られる)
+if [ "$(cat work/ov_fix_50a830.stamp 2>/dev/null || echo 0)" != "$M11_FIX_50A830" ]; then rm -f work/obj/ov.o; fi
+echo "$M11_FIX_50A830" > work/ov_fix_50a830.stamp
 echo "$S_INSTR40" > work/ov_instr_40ff70.stamp
 if [ "$(cat work/ov_instr_40f960.stamp 2>/dev/null || echo none)" != "${M11_INSTR_40F960:-0}" ]; then rm -f work/obj/ov.o; fi
 echo "${M11_INSTR_40F960:-0}" > work/ov_instr_40f960.stamp
