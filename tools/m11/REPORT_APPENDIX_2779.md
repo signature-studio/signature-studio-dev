@@ -9,6 +9,18 @@
 測定 commit: `d890c724` (コードを変えた最後の commit。以降の差分は本 REPORT のみ。§7.5)。
 製品 KPI (`tools/flelift/boot/REPORT.md`) は本節で測っていない。
 
+### 7.0 解消後の再測定 (HEAD `bd5daf9d`・参考値・本節が最新)
+
+main 取り込み後 (merge `c277b9ff`・REPORT 分割 `bd5daf9d`) の再測定。`tools/m11` の PR 差分は main と 0 (§7.4)。素材 `fl-win64`・`work-m11` を展開 (`tools/m11/work/`)。toolchain は runner の既存 `/opt/emsdk`・`/opt/retdec`。node v22.23.3 (`m11_e2e.sh` の前提は v26 で、v26 は未確認)。nproc 4。
+
+| 条件 | 結果 | rc | wall | load (前 → 後 1/5/15 分) |
+|---|---|---|---|---|
+| LB=0 | units_run 53・survey ok 872 / noproc 1 / miss 46 / trap 23・寛容 ok 874 / skipped 67・gate と negctl OK・ir_sha256 `39e97946…` | 0 | 192 s | 0.43 0.55 0.30 → 0.99 0.79 0.45 |
+| LB=0x10000 | gen_ir2・lb_check・build OK・units_run 37 (Halt0 早期)・survey ok 869 / noproc 1 / miss 46 / trap 26 (abort 2・unresolved function_535c2e 2)・寛容起動の出力 0 バイト (M11_TOLERANT 行無し → gate FAIL)・ir_sha256 `d8738edd…` | 1 | 708 s | 0.65 0.72 0.44 → 1.01 1.00 0.78 |
+
+ptrcheck: LB=0x10000 は run 69,099 / 69,359・survey 70,945 / 71,001 (gate pass)。LB=0 は rc 0 で gate 合格 (ptrcheck JSON は LB=0x10000 の run で上書きされ、LB=0 の数値は未記録)。
+units_run・survey・trap・ir_sha256 は §7.1 (HEAD `d890c724`) と一致する。寛容起動の LB=0x10000 の出力空は §7.1 と同じで、#3160 (CLOSED) の再現記録 (REPORT §6) とは食い違う。
+
 ### 7.1 測定 (HEAD `d890c724`・参考値)
 
 再現 (リポジトリ root。`FL_WIN64_DIR` に `extracted/block00031_PE.bin`、`tools/m11/work/` に work-m11 を展開してから実行):
