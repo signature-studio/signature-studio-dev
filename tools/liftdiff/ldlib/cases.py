@@ -145,6 +145,7 @@ MACHINE_ENTRY = {
     0x40c750: ['double'],               # xmm0
     0x653c80: ['i64', 'i64', 'i64'],    # r8 の整数 (rcx・rdx は未使用)
     0x691dd0: ['i64', 'i64', 'i64'],    # rcx: オブジェクトのポインタ / rdx: i64 / r8: 1 byte flag
+    0x4256c0: ['i64'],                  # rcx: POINT の値 (x = 下位 32bit, y = 上位 32bit)
 }
 
 
