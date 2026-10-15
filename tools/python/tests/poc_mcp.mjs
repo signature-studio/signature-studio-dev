@@ -66,7 +66,11 @@ results.set_mixer_routing = await call("set_mixer_routing", { source_track: "1",
 results.get_session_context = await call("get_session_context");
 results.get_plugin_parameter_list = await call("get_plugin_parameter_list", { target: "3x Osc", slot_number: -1 });
 results.set_plugin_parameter_value = await call("set_plugin_parameter_value", { target: "3x Osc", param_identifier: "Cutoff", value: 0.9, slot_number: -1 });
-assert.ok(Math.abs(engine.state.params[0].v - 0.9) < 1e-9);
+// PY-228 (#3656): 値は channel ごとに持つ (3x Osc = channel 2)。他 channel (Kick = 0) と params[] の既定値は変わらない
+assert.ok(Math.abs(engine.state.channels[2].pv[0] - 0.9) < 1e-9);
+assert.ok(Math.abs(engine.state.channels[0].pv[0] - 0.5) < 1e-9);
+results.get_plugin_parameter_value = await call("get_plugin_parameter_value", { target: "3x Osc", param_identifier: "Cutoff", slot_number: -1 });
+assert.match(results.get_plugin_parameter_value, /String Value: '90\.0 %'/);
 results.add_channel = await call("add_channel", { plugin: "Fruity Slicer" });
 
 // --- MIDI scripting 経路 (device script 相当) ---
