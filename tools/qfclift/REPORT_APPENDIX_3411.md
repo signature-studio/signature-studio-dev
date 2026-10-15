@@ -58,6 +58,13 @@
 - 両方で同じ `lift_meta.json` / `soft_imp.c` (`qfc_boot.sh` の出力) を使い、`qfc_count.sh` を foreground で 1 回ずつ実行 (wall 20.9 s / 20.9 s、load 0.10 → 0.10)。
 - 素材: `fl-win64` (`extracted/block24350_PE.bin`)、`toolchain-emsdk` (emcc 6.0.12)、FreeType 2.7 wasm32 を `tools/shared/oss/freetype/build.sh` の手順で作成。
 
+| 項目 | 前 (973b85aca の逆) | 後 (HEAD) |
+|---|---|---|
+| 直接 import 呼出し件数 | 6 | 6 |
+| 内訳 | GetCurrentThreadId 1・TlsAlloc 1・LocalAlloc 1・TlsSetValue 1・TlsGetValue 1・ExitProcess 1 | 同左 |
+| soft 呼出し件数 | 0 | 0 |
+| 停止点 | `ExitProcess(0)` (`[trap] DllMain`) | 同左 |
+| `call.log` | 前後で全行一致 (`diff` 0) | |
 
 判定: 受入を満たす。TLS 変更で DllMain 経路の直接呼出し・停止点は変わらない。
 
