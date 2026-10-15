@@ -5,7 +5,7 @@
 ## 結論
 
 1. **MIDI CC 1 件 = flapi 呼出し 1 回。中央値 230.0µs/イベント** (同梱 device script Forward CCs、`device.forwardMIDICC` 1 回)。flapi を呼ばない NoteOn の対照は中央値 149.3µs。差の約 80.7µs が flapi 1 回分で、残りは配送 (postMessage・Worker・Python 側の 3 callback 配送) の基礎コスト。値はすべて表の元計測 (load 0.56) のもの。
-2. **遅いモードは RPC の wake 遅延では説明できない (Python・flapi を抜いた素の SAB 往復は単峰)**。素の往復の中央値は runner・load で変わる (元計測 34.0〜44.1µs、追試 17.8〜20.0µs / reviewer 追試 19.3〜21.0µs。条件は下表)。2 倍超の遅い側は元計測 0.2〜0.5%、追試 0.1〜1.7% (reviewer 0.2〜1.3%)。どの条件でも単峰で、bimodal (15µs / 100〜130µs) は再現しなかった。
+2. **遅いモードは RPC の wake 遅延では説明できない (Python・flapi を抜いた素の SAB 往復は単峰)**。素の往復の中央値は runner・load で変わる (元計測 34.0〜44.1µs、追試 17.8〜20.0µs / reviewer 追試 19.3〜21.0µs。条件は下表)。2 倍超の遅い側は元計測 0.2〜0.5%、追試 0.1〜1.7% (reviewer 0.2〜1.3%)。どの条件でも単峰で、bimodal (15µs / 100〜130µs) は再現しなかった。ただし呼出し間隔を入れると受け側が idle 後の wake で遅れ、遅い側の割合が増える (run 9、下の節)。遅さの大きさは計測時刻で数倍変わり、機構は部分的にしか切り分けられていない。
 3. **Python 込みの往復は静的版で桁違いに速い**: 静的版の Python `channels.channelCount()` 中央値 0.53µs、Worker+SAB 版 約 39µs (約 74 倍)。PY-2 (静的リンク、§7d) は既に実装済みで、MIDI 1 件のコストは静的版では 1 µs 未満の桁に落ちると推定 (未計測。下の未解決)。
 
 ## 実測 (`tests/midi_event_bench.mjs`、`tests/sab_wake_diag.mjs`、`tests/static_bench.mjs`)
@@ -98,6 +98,39 @@ CC 1 件 (flapi 1.000/件) の所要時間を、mock engine ハンドラ内 (`ha
 - 読み: CC 1 件 (175µs) のうち RPC 往復は 1 回で約 30µs (約 17%)、flapi handler は 1µs 未満 (約 0.4%)。CC − NoteOn 差 約 69µs = RPC 往復 約 30µs + CC 固有の Python 処理 約 39µs (device script の CC 分岐と `device.forwardMIDICC` 前後の Python 処理)。
 - 限界: (1) `rpc_rt` は `channelCount()` の関数本体 (channels モジュール内の Python 処理) を含む差分で、純粋な SAB 往復ではない。素の SAB 往復は上の「SAB 素往復」節 (34〜44µs / 17〜21µs、別 run) を参照。(2) bimodal (100µs 台の遅い峰) は本 run でも再現せず、単峰。(3) 実 FLEngine の flapi 処理時間は含まない。
 
+## 呼出し間隔と idle 後の wake (run 9 追記、`tests/rpc_gap_diag.mjs`・`tests/rtt_gap_bench.mjs`)
+
+計測 commit: 3753e1208 (計測スクリプト追加。以後のコード変更は無し。HEAD までのコード差分は下の「検証」の `git diff` 参照)。
+連続呼出し (従来の計測) は受け側が常に起きている。実運用の MIDI は間隔をあけて届くため、呼出し間で受け側が idle になる条件を追加で計った。
+
+- `rpc_gap_diag.mjs` (素の RPC): gap = 呼出し間の待ち。`sleep` は worker が `Atomics.wait` で眠る (worker も server も idle)、`spin` は worker が回し続ける (server だけ idle)。n=300 × 3 試行。
+- `rtt_gap_bench.mjs` (Python 込み、flapi 1 回 = `channels.channelCount()`): gap = host の待ち。`sleep` は `setTimeout`、`spin` は host が回し続ける。1 呼出し = `py.run` 1 回 (postMessage 往復を含む基底 約 70µs)。
+
+| 素の RPC 中央値 (µs、3 試行のレンジ) | 間隔 0 | 間隔 2ms | 間隔 5ms | 間隔 20ms |
+|---|---|---|---|---|
+| sleep (unpinned) | 18.9〜23.3 | 28.6〜38.0 | 38.4〜39.0 | 48.0〜64.8 |
+| sleep の 60µs 超の割合 | 1〜2% | 2〜3% | 2〜5% | 9〜55% |
+| spin (worker が回し続ける) | 19.0〜23.6 | 25.2〜26.8 | — | 42.9〜77.1 |
+| spin の 60µs 超の割合 | 1〜1.3% | 1〜3% | — | 9〜75% |
+| sleep・`taskset -c 0,1` | 19.2〜22.8 | 31.4〜37.7 | 38.2〜38.9 | 41.8〜62.0 |
+| sleep・`taskset -c 0` (同一 CPU) | 13.8〜17.3 | 16.4〜21.5 | 23.9〜24.5 | 40.0〜90.2 (60µs 超 26〜96%) |
+
+| Python 込み flapi 1 回 (µs、3 試行のレンジ) | 間隔 0 | 間隔 2ms | 間隔 20ms |
+|---|---|---|---|
+| sleep (host が待つ) | 113〜129 (150µs 超 9〜13%) | 110〜123 | 387〜427 (150µs 超 100%) |
+| spin (host が回し続ける) | 66〜116 | — | 373〜389 (150µs 超 100%) |
+| sleep の再測定 (n=200 × 2 試行) | 89〜91 | 115〜125 | 402〜405 |
+
+連続呼出し (既存 `rtt_bench.mjs`、同じ HEAD): unpinned 20.2〜20.8 / `taskset -c 0` 16.0〜16.9 / `taskset -c 2` 15.9〜16.6 / `taskset -c 0,1` 21.4 (µs/呼出し、n=20000 区間)。
+
+- **読み 1 (連続呼出しには遅い峰が出ない)**: 素の RPC の間隔 0 は全条件で中央値 13〜23µs、60µs 超は 1〜2%。従来の結論 (単峰) と一致する。
+- **読み 2 (間隔で遅くなる)**: 間隔 20ms で中央値は連続時の約 2〜3 倍、60µs 超の割合は数〜数十%。この方向は別時刻の予備計測 (素の RPC 中央値 44〜53µs、Python 込み 129〜135µs、同じく間隔 20ms) を含め、全ての計測で一貫した。REPORT §5 の bimodal (速い 15µs / 遅い 100〜130µs) の遅い峰は、この「idle 後の wake」の条件と整合する。
+- **読み 3 (大きさは時刻で変わる)**: 間隔 20ms の Python 込みは、同じ条件で 130µs (予備) と 400µs (本節) に分かれた。steal time (`/proc/stat` の steal 列) は計測中も 0 で、ホスト側の起床遅延かどうかは確認できない。**大きさの値は計測時刻に依存するので、絶対値として使わない。**
+- **読み 4 (機構は部分的)**: worker を回し続けた対照 (spin) でも、間隔 20ms の遅れ (中央値 +20〜+60µs) は残る。このため、受け側 (main、`Atomics.waitAsync`) の idle 後の wake が寄与している。worker 側の寄与 (sleep と spin の差) は時刻によって符号が揃わず、確定できない。同一 CPU への固定は一貫して小さいとは言えない (本節の値は時刻で割れる)。
+- **対策の候補 (未実施)**: 受け側の短時間 spin、または MIDI のバースト中だけ起きたままにする設計。本計測では有効性を確認していない。採否は PM 判断 (未解決表)。
+- 検証 (run 9): 素材は `toolchain-emsdk` のみ (`/opt/emsdk` の emcc 6.0.12)。`build_cpython_wasm.sh` rc=0 (2 分 40 秒)、`FLPY_SKIP_TABLE=1 build_flpy.sh` rc=0 (4 秒)。runner は 4 core、node 22.23.3。
+- 再現 (前提: `build_cpython_wasm.sh` と `FLPY_SKIP_TABLE=1 build_flpy.sh` 済み。fl-win64 は不要): `cd tools/python && node tests/rpc_gap_diag.mjs 300 3 0,2,5,20 sleep` / `node tests/rpc_gap_diag.mjs 300 3 0,2,20 spin` / `taskset -c 0,1 node tests/rpc_gap_diag.mjs 300 3 0,2,5,20 sleep` / `taskset -c 0 node tests/rpc_gap_diag.mjs 300 3 0,2,5,20 sleep` / `node tests/rtt_gap_bench.mjs 300 3 0,2,20 sleep` / `node tests/rtt_gap_bench.mjs 300 3 0,20 spin`。
+
 ## 検証範囲 / 範囲外
 
 - 範囲内: Actions runner (4 core、node 22.23.3)、素材 `fl-win64` (MCPTools.pyc / midi.py / utils.py / device script は `fetch_inputs.sh` で配置)、CPython 3.12.1 wasm・flpy・provider・静的版をクリーンにビルド (`build_cpython_wasm.sh` 4 分 46 秒 (d36dbefe 時点の run)・4 分 03 秒 (HEAD 08c569ba の静的版検証 run)、`build_flpy.sh` rc=0、`build_flpy_static.sh` rc=0)。
@@ -108,6 +141,8 @@ CC 1 件 (flapi 1.000/件) の所要時間を、mock engine ハンドラ内 (`ha
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | MIDI 1 件の静的版 (PY-2 リンク後) の所要時間は未計測 | 「1 µs 未満」は往復コストからの推定。配送経路の実測が必要 | #35 (親)。静的版の MIDI 配送計測は別 issue 候補 |
-| bimodal (100〜130µs) の原因 | 負荷下の Python 込み往復は 52〜113µs まで伸びるが、15µs 台の速い峰は出ず bimodal は未再現。RPC 往復 (約 30µs)・flapi handler (1µs 未満)・Python 残り (約 144µs) の分離は run 6 で実施 (上の節)。bimodal の再現条件は未了 | #80 の後続 (bimodal の再現条件の追試) |
+| bimodal (100〜130µs) の原因 | 連続呼出しでは 15µs 台の速い峰も 100µs 台の遅い峰も出ない。RPC 往復 (約 30µs)・flapi handler (1µs 未満)・Python 残り (約 144µs) の分離は run 6 で実施 (上の節)。呼出し間隔で遅い峰が出る方向は run 9 で確認 (機構は部分的) | #80 の後続 |
+| idle 後の wake の機構 (受け側 main と worker のどちらが寄与するか、ホストの vCPU 起床か) | 対策 (受け側の短時間 spin 等) の採否が決まらない。spin 対照では受け側の寄与が残ったことまで | #80 の後続 (PM 判断。対策を入れるなら実装は別 issue) |
+| idle 後の wake の大きさが計測時刻で数倍変わる | 絶対値は時刻依存。実 MIDI の呼出し間隔の分布も未計測 | #35 (親)。実 FLEngine 結線の計測に含める |
 | 実 FLEngine wasm への結線 | 実エンジンの flapi 処理時間は含まれない | #35 (親)。FLEngine 起動 (MS5) 完了後 |
 | SAB 素往復の中央値が runner・load で 2 倍ほど違う (元計測 34〜44µs / 追試 17〜21µs) | 絶対値は runner 依存。単峰の結論は両方で成立 | #80 の追試 (負荷を揃えた複数 runner 計測) |
