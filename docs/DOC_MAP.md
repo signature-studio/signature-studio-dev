@@ -971,6 +971,7 @@
 | `tools/shared/lift/rex/REPORT_APPENDIX_2870.md` | ~50 | rex REPORT §9 全文 (T-SH-46 #2870: 成功経路 (戻り値 1 / 3) と arena 書込の一致・落ちる case の分類・未解決) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2896.md` | ~41 | rex REPORT §10 の旧版全文 (T-SH-47 #2896: REX_SIDE フラグと owner/rex_side.wasm の旧測定 (測定 commit `105733875`・133 件版)。最新は REPORT §10) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_3589.md` | ~50 | rex REPORT の付録 (T-SH-90 #3589: movnti の到達 (memset 8 箇所は a1 ≥ 0x70000 で入力だけで到達・memcpy 16 箇所は直接 call では到達しない)・x64c 対応の要否・未解決) |
+| `tools/shared/lift/rex/REPORT_APPENDIX_4324.md` | 46 | rex REPORT の付録 (T-SH-117 #4324: movnti reach 16 件を arena 0x80000 と ctx のロック構造で arena 内に完了させた決定と実測 (all ALL OK・reach 16/16)・sweep の trap VA 表示の変化) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_3894.md` | ~40 | rex REPORT の付録 (T-SH-94 #3894: info 4 件の trap の原因 (ハーネス入力の arena 越境・lift の欠陥ではない)・movnti 閾値 0x70000 の sweep 実測 64/64) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2969.md` | ~45 | rex REPORT の付録 (T-SH-48 #2969: 中核閉包 (REXCreate / REXGetInfoFromBuffer / REXRenderSlice) の owner tier 配置と REX_SIDE 除外の実測。測定 commit `9593fe1c1`) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_4833.md` | ~60 | rex REPORT §12 (T-SH-129 #4833: `.data` 書込 stub の到達元 (DllMain `reason==1` 経路)・呼出連鎖・DllMain 閉包の規模 (import 63・movnti 24)・実行方法 (方式 A)。測定 `writer_chain.py` (静的)) |
@@ -1043,6 +1044,7 @@
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_4989.md` | ~60 | MX-52 (#4989) 受入 2〜4 の感度測定: U3d (merge 上位保持・感度 18 件・P 17 関数 / A 1 件 0xefe0)・U3e (call/jmp 転送の未確定の候補 193 件・pdata 始点 47 件)・U3g (未実施)。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_MX15.md` | ~50 | MX-15 (#1810): MX-12 残件 490 件 (0 件 458・2 件以上 32) の失敗理由の内訳と、MX-10 親 18 件の母集団。読み方の規則・親の解決は子 issue (MX-49・MX-50)。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_MX33.md` | ~153 | MX-33 (#3032) 受入 1: xmm0〜3 だけの入口 livein 保留 17 件の読み幅による判定 (0 件確定・判定不能 17)・NC 9 件・線形上限。受入 2〜5 は子 issue。測定値の正本 |
+| `tools/targets/massivex/dsp/REPORT_APPENDIX_5030.md` | ~60 | MX-55 (#5030) 付録: 0x17b680 の同定 (scalar 読み・入口 xmm2)・vtable slot 32 の呼出元 1 件 (xmm2 に float)・測定値の正本。REPORT_MX33 §9 から分割移動 |
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
 | `tools/targets/kilohearts/REPORT_KH19.md` | 70 | KH-19 (#782) ホスト 3 種 (Snap Heap / Multipass / Phase Plant) の vtable 間接 call 込み closure 再計算 (下界・過大評価の参考値・限界) |
 | `tools/targets/kilohearts/REPORT_KH19D.md` | ~96 | KH-19d (#850): 対照 Gain の未確定 before 160 閉包の x64c lift と build の最初の失敗点 (FLEngine 固有の VA 窓)。結論は REPORT §0 |
