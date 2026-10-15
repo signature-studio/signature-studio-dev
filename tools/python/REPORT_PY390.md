@@ -10,8 +10,9 @@
   - 準備不可 (`0x11d1430` の判定が偽) → status **-2** (unsafe)。
   - device 無し (sub object が 0) → status **-7** (Device not assigned)。
   - 成功 → status 0。戻り値は [rbp+0x88] を変換器 (global 0x15e4280 の指す関数) に通した PyLong。status ≠ 0 は 0xd82c20 へ渡す。
-- **findEventID (fl_table 331・本体 0xd75b60)**: 成功経路 (PyArg `i|i` 成功 → helper 0xf8c8e0(a, b) → 変換器) と失敗経路 (0xd82c20(eax)) は確定した。helper 0xf8c8e0 の「見つからない時」の値 (`-1`) の後段 (fallback 0xf78640) の戻りは未確定 (§3)。
-- 残り未確定は §3 に分けた。本 PR は確定分の VA 表と再確認スクリプトだけを入れ、C provider・mock には書かない (issue の指示どおり)。
+- **findEventID (fl_table 331・本体 0xd75b60)**: 成功経路 (PyArg `i|i` 成功 → helper 0xf8c8e0(a, b) → 変換器) と失敗経路 (0xd82c20(eax)) は確定した。helper 0xf8c8e0 の未発見時の値は **-1** (fallback 0xf78640 → 0xf784c0 も未発見で -1 を返す。§7)。
+- **変換器 (global 0x15e4280 の指す関数)** は `PyLong_FromLong` (§7)。findEventID・isDoubleClick の PyLong 化は `PyLong_FromLong` で確定した。
+- 残りの未確定は §3 の表 (0xf82660 の表の供給元のみ)。本 PR は確定分の VA 表と再確認スクリプトだけを入れ、C provider・mock には書かない (issue の指示どおり)。
 
 ## 1. 2 関数の VA 表
 
@@ -35,17 +36,16 @@
 
 | 項目 | 状態 | 扱い |
 |---|---|---|
-| 変換器 (global 0x15e4280 の指す関数) | 静的初期値は 0x16b8298。実行時の値はこの静的データからは決まらない | findEventID・isDoubleClick の PyLong 化の型 (`i`) は fl_table どおりと仮置き |
-| 0xf8c8e0 の「見つからない」戻り (-1) の後段 | `or edi,-1` (0xf8c965) は fallback 0xf78640 (→0xf784c0) を通す。fallback 全体の戻り値の意味は未読 | findEventID の成功値の範囲は未確定 |
-| 0xf82660 の二分探索 (0x16bacb8 の表) | 0x7fffffff を未発見の戻りに使う (0xf826d4)。表の供給元は未確定 | 同上 |
+| 変換器 (global 0x15e4280 の指す関数) | **確定 (PY-400)**: `PyLong_FromLong` を解決した関数ポインタ。§7 | — |
+| 0xf8c8e0 の「見つからない」戻り (-1) の後段 | **確定 (PY-400)**: fallback 0xf78640 → 0xf784c0 も未発見で -1 を返す。§7 | — |
+| 0xf82660 の二分探索 (0x16bacb8 の表) | 0x7fffffff を未発見の戻りに使う (0xf826d4)。表の供給元は未確定。0xf8c8e0 は 0x7fffffff の index を範囲外として扱い (0xf8c941 `jl`)、fallback 側へ進む | 未発見の最終値 (-1) は、表検索 0xf78660 が 0 を返す (未発見) 前提で fallback 0xf784c0 が -1 を返す。0xf77340 の未発見時の戻りは未確認 (§7)。見つかった場合の値域だけが未確定 |
 | 0x11d1430 の global と vtbl+0x88 の意味 | 報告判定と同じ global の +8 object と同一スロットだが、オブジェクトの型は未確定 | REPORT_PY61 §4-1 と同じ未解決 |
 
 ## 4. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| findEventID の fallback 0xf78640 → 0xf784c0 の戻り値の意味 | findEventID の未発見時の値 | #4870 (親: #4830) |
-| 変換器 (0x15e4280 の指す関数) の正体 | isDoubleClick・findEventID の値の型変換 | #4870 (親: #4830) |
+| 0xf82660 の表 (0x16bacb8) の供給元 | 見つかった場合の findEventID の値域 (未発見時の値には影響しない) | #3840 (PY-260) に未解決としてコメント済み (https://github.com/signature-studio/signature-studio-dev/issues/3840#issuecomment-6199925267) |
 
 ## 5. 検証
 
@@ -56,6 +56,29 @@
 - 実測: real **0.069 秒**・user 0.052 秒・sys 0.017 秒。実行前の load average (1 分) は 0.00。確認 14 件 OK・rc 0。
 - 逆アセンブル: `analysis/flapi/pe_disasm.py` (capstone + pefile) の方式。
 
-## 6. 差分
+## 7. PY-400 (#4870) で確定した VA 表
+
+再確認: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py400_probe.py` (rc 0・全 14 件 OK)。
+
+| 項目 | VA | 確定した内容 |
+|---|---|---|
+| findEventID の未発見時 (helper) | 0xf8c8e0 | 初期値 `edi=-1` (0xf8c8ed)。表を引いても未発見なら fallback (0xf8c95c)。fallback も無ければ `or edi,-1` (0xf8c965) → 戻り -1 |
+| fallback | 0xf78640 | `call 0xf784c0` の戻り (eax) をそのまま返す (0xf7864c) |
+| 0xf784c0 の戻り | 0xf784c0〜0xf78608 | 戻り値 `[rbp+0x3c]` の初期値 -1 (0xf784dd)。対象 object が 0 なら -1 のまま返す (0xf78573) |
+| 変換器の参照 | 0xd75b9f・0xd76120 | findEventID・isDoubleClick とも global 0x15e4280 を読み `call [rax]` |
+| 変換器の静的内容 | 0x15e4280 (.data) | 格納場所 0x16b8298 (.bss) を指す |
+| 変換器の登録 | 0xc396c0・0xc396c5 | 名前解決 `call 0x4235f0` の戻りを 0x16b8298 に格納 (0xc396c5) |
+| 登録の名前 | 0xc3a292 | UTF-16 文字列 `PyLong_FromLong` |
+| 名前解決の経路 | 0x4235f0 → 0x4235e0 | 0x4235e0 は IAT slot 0x1971600 (`kernel32.dll!GetProcAddress`) の jmp |
+
+結論: 未発見時の findEventID は **-1** を PyLong で返す (変換器 = `PyLong_FromLong`)。
+
+前提の範囲 (未発見の -1 がどこに依存するか): 0xf784c0 の未発見時の -1 は、3 箇所の表検索 0xf78660 (0xf7850e・0xf78551・0xf7856d) がいずれも 0 を返すことに依存する。0xf78660 は `call 0xf77340` の戻りが 0 なら rbx=0 のまま返す (0xf78681〜0xf78689)。0xf77340 の未発見時の戻りは本 probe で固定していない (未確認)。したがって「表の中身に依らない」とは言わない。表の中身が見つかる場合の値域は §4 の未解決のとおり。
+
+測定 commit: `63651e534` (`feat(python): findEventID の未発見時の値 (-1) と変換器 (PyLong_FromLong) を PE で確定 (PY-400, #4870)`)。コードを変えた最後の commit。
+- 実測: real **0.09 秒**・user 0.06 秒・sys 0.02 秒。実行前の load average (1 分) 0.07。確認 14 件 OK・rc 0。
+- 素材: `fl-win64.tar.zst` を `tar --zstd -xf` で展開 (real 5.595 秒・user 4.587 秒・sys 5.817 秒)。
+
+## 6. 差分 (PY-390 時点)
 
 `git diff 60534394a HEAD -- tools/python/analysis/flapi/pe_py390_probe.py` の出力は 0 行 (スクリプトは測定 commit と同一)。`git diff 60534394a HEAD -- tools/python/REPORT_PY390.md docs/DOC_MAP.md` は本 REPORT の commit (REPORT と索引) だけ。

@@ -211,6 +211,7 @@
 | `tools/liftdiff/tests/ld158_ret_probe.py` | ~110 | LD-158 (#3470) の動的プローブ: i128 戻り関数を 11 pattern × xfill {1,0} で native 実行し、戻り後 rax / rdx / xmm0 の書換えを記録 (`work/ld158_probe.json`)。`--names` で陰性対照の関数を指定できる |
 | `tools/liftdiff/tests/ld158_summarize.py` | ~70 | LD-158 (#3470) の集計: 動的分類・静的 dsm 判定 (窓 3 / 8) の件数と、`ret_override` と動的 xmm0 のみ集合の一致を出す (`work/ld158_table.tsv`) |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
+| `tools/icall/REPORT_APPENDIX_5338.md` | ~45 | icall #5338 (ICALL-114): `ott_ms_call` で 12 語の stack 引数を 5 引数以上の間接 call に注入し、被呼側で値一致 (12/12)・1 語ずらしで FAIL (0/12) を確認。書換え後の STKBUF/BLK 経路は未達 (親 #5338 のチェックリスト) |
 | `tools/icall/REPORT_APPENDIX_4565.md` | ~73 | icall #4565 (ICALL-105): ott_native の x64 unwind (`.pdata` 検索・UNWIND_INFO 逆適用) の実装と 6 関数の単独実測。`RtlUnwindEx`・`__CxxFrameHandler` の dispatch は未実装 (子 #4592 / ICALL-106) |
 | `tools/icall/REPORT_APPENDIX_4271.md` | ~80 | icall #4271 (ICALL-96): Fresh Air closure に callee を加えた sweep の実測 (測定 commit `181e26ebd`・`missing function` 7 → 0・wasm のみ err 9 → 2)。未解決 10 件は #4328 (ICALL-99) |
 | `tools/icall/REPORT_APPENDIX_4338.md` | ~80 | icall #4338 (ICALL-100): `RtlCaptureContext` を native IMPL に追加。件数は不変 (測定 commit `945cf6010`・`REPORT_APPENDIX_4338.md` §4)。`SetUnhandledExceptionFilter` は #4529 (ICALL-104) に移管 |
@@ -731,7 +732,7 @@
 | `tools/python/REPORT_PY101.md` | 102 | PY-101 (#2878): channels.isGridBitAssigned・getGridBitWithLoop の PE 経路 (grid `+0x7ac` の生成元 `0xff63f0`・読出し `0x12d3e20`・loop 分岐の読めた範囲) と実装。getGridBit の position<0 を 4 から 0 に直した照合結果。loop の G1・G2 と行テーブルは未確定 (子 #3595) |
 | `tools/python/REPORT_PY218.md` | 110 | PY-218 (#3596): getGridBit・getGridBitWithLoop の件数超えの event 経路 (PE 0x12d3e20・0x12d16a0・0x12df210・0x12df530・0xfe8bb0) を PE で確定し、mock/C に写した。件数 `[grid+0x22fc]-8` の値は未確定 (子 #3651・PY-225) |
 | `tools/python/REPORT_PY4846.md` | ~100 | PY-4846 (#4846・#3568 子 B): getLinkedValue・getLinkedInfo・getLinkedParamName・getLinkedValueString の index == -1 経路を PE で確定して実装 (-1.0・-1・status -8)。index ≥ 0 は helper 未読のため未実装 (親 #3839) |
-| `tools/python/REPORT_PY390.md` | ~80 | PY-390 (#4830): findEventID・isDoubleClick の戻り値・status 経路を PE で確定 (isDoubleClick は全経路、findEventID は成功・失敗経路)。未発見時の値と値変換器は子 #4870 |
+| `tools/python/REPORT_PY390.md` | ~80 | PY-390 (#4830): findEventID・isDoubleClick の戻り値・status 経路を PE で確定 (isDoubleClick は全経路、findEventID は成功・失敗経路)。未発見時の値 (-1) と値変換器 (PyLong_FromLong) は PY-400 (#4870) で確定 (§7) |
 | `tools/python/REPORT_PY215.md` | 129 | PY-215 (#3568): device linked 系 8 関数の PE 確定。getLinkedChannel のみ全分岐を確定して実装 (-1 → -1・表が空なら None の仮置き)。残り 7 関数は VA 表で未確定のまま残す (親 #3494) |
 | `tools/python/REPORT_PY112.md` | ~100 | PY-112 (#2932・部分): getGridBit・getGridBitWithLoop の件数超えを PE 照合 (位置の範囲検査なし・件数超えは event 経路。RANGE を外して false)。loop 分岐の条件式は PE で確定。T の書込み元と G2 の値は未確定 (子 #3595・#3596) |
 | `tools/python/REPORT_PY111.md` | ~140 | PY-111 (#2929): channels.setGridBit・fillEachNSteps が作る note の生成経路 (0x12d4100 の creation path・init 0x1062210・既定値の PE 照合・param 8 の書込み元 0x12d42ac)。C provider・mock の既定値を PE に合わせ、channels_diff に param 7/8 の検査を追加。実測は REPORT_PY111 §6 |
