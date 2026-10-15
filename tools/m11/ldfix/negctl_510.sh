@@ -14,7 +14,7 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 REPO="$(cd -- "$HERE/../../.." && pwd)"
 W="${M11_WORK:-$REPO/tools/m11/work}"
 PY="${PY:-python3}"
-T="${RUNNER_TEMP:-/tmp}/negctl_510"; mkdir -p "$T"
+T="${RUNNER_TEMP:-/tmp}/negctl_510"; mkdir -p "$T"; rm -f "$T"/nc*.ll "$T"/nc*.json "$T"/nc*.bin
 CFG="$W/boot*.drc.config.json"; IR="$W/boot_final3.ll"; IMG="$W/m11_image.bin"
 run() { "$PY" "$HERE/audit_lsf_ssa.py" "$1" "${2:-$IMG}" "$CFG" --json "$T/$3.json" "${@:4}" | tail -1; }
 sus() { "$PY" -c "
