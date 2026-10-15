@@ -44,6 +44,8 @@ def main():
     ap.add_argument('--at', required=True,
                     help='guest VA (0x...) または関数名 (f_xxxx) のカンマ区切り')
     ap.add_argument('--marker', default='dbg_at')
+    ap.add_argument('--c', default=None,
+                    help='挿入する C 文 (既定は R[4]/R[5] の fprintf)。{tgt} は VA、{fn} は関数名に置換する')
     a = ap.parse_args()
     lines = open(a.src, errors='replace').read().split('\n')
     out = []
@@ -54,9 +56,12 @@ def main():
         if idx is None:
             print('[dbg_lift] %s  unresolved' % tgt, file=sys.stderr)
             continue
-        lines.insert(idx, '  if (g_dbg_6c) fprintf(stderr, "[%s] %s @ %s\\n", '
-                          '(unsigned long long)R[4], (unsigned long long)R[5]);'
-                     % (a.marker, fn, tgt))
+        if a.c:
+            lines.insert(idx, '  ' + a.c.replace('{tgt}', tgt).replace('{fn}', str(fn)))
+        else:
+            lines.insert(idx, '  if (g_dbg_6c) fprintf(stderr, "[%s] %s @ %s\\n", '
+                              '(unsigned long long)R[4], (unsigned long long)R[5]);'
+                         % (a.marker, fn, tgt))
         hits += 1
         print('[dbg_lift] %s -> line %d in %s' % (tgt, idx + 1, fn))
     s = '\n'.join(lines)

@@ -55,11 +55,15 @@ const pe119set = new Set(["general.setRecPPQ", "general.setNumerator", "general.
 const stub89 = new Set(["channels.getChannelIndex", "channels.getChannelMidiInPort"]);
 // PE で件数の読出しを確定した launchMapPages.length 1 件 (REPORT_PY120_2984・PY-120 #2984)。件数は仮置き 0、tests/launchmap_diff.mjs が mock と照合
 const pe120 = new Set(["launchMapPages.length"]);
+// PE で引数書式と成功時の戻り (None) を確定した launchMapPages 3 関数 (REPORT_PY138・PY-138 #3029)。副作用は未確定のため状態を変えない、tests/launchmap_diff.mjs が mock と照合
+const pe138 = new Set(["launchMapPages.init", "launchMapPages.updateMap", "launchMapPages.createOverlayMap"]);
 // PE で状態読出しと確認した ui ゲッター 9 件 (REPORT_PY95・PY-95 #2831)。値は未実測の仮置き、tests/ui_state_diff.mjs が mock と照合
 const pe95 = new Set(["ui.isClosing", "ui.getTimeDispMin", "ui.isMetronomeEnabled", "ui.isPrecountEnabled", "ui.isStartOnInputEnabled",
   "ui.isLoopRecEnabled", "ui.getStepEditMode", "ui.isBrowserAutoHide", "ui.getSnapMode"]);
 // PE で引数書式と時間引数の頭打ち (0x7d0) を確認した表示・メニュー 3 件 + 作用の無い 3 件 (REPORT_PY121_2982・PY-121 #2982)。tests/ui_display_diff.mjs が mock と照合
 const pe121_2982 = new Set(["ui.crDisplayRect", "ui.miDisplayRect", "ui.miDisplayDockRect", "ui.showNotification", "ui.closeAllMenu", "ui.closeActivePopupMenu"]);
+// PE で書式 (toggleBrowserNode '|i'・selectBrowserMenuItem / previewBrowserMenuItem NOARGS) を確認した ui ブラウザ 3 件 (REPORT_PY132・PY-132 #3013)。tests/ui_browser_diff.mjs が mock と照合
+const pe132 = new Set(["ui.toggleBrowserNode", "ui.selectBrowserMenuItem", "ui.previewBrowserMenuItem"]);
 // PE の PyArg 書式で呼出し構造を確定し、個数は fl_table に合わせた arrangement 6 関数 (REPORT_PY152・PY-152 #2983。jumpToMarker は PE と個数不一致の未解決)。副作用は未同定、tests/arrangement_diff.mjs が mock と照合
 const pe152 = new Set(["arrangement.currentTime", "arrangement.selectionClear", "arrangement.selectionSet", "arrangement.liveSelection", "arrangement.addAutoTimeMarker", "arrangement.jumpToMarker"]);
 // PE 0xd5ec60 で取得式を確定した 1 関数 (REPORT_PY115 §2・PY-115 #2951)
@@ -76,12 +80,12 @@ let impl = 0, unimpl = 0;
 for (const id of ids) {
   const r = direct(id, ...Array(40).fill(null).slice(0, 0));
   const notImpl = r.err?.startsWith("Unspecified error (not implemented:");
-  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || pe40.has(id) || pe76.has(id) || stub41.has(id) || pe101.has(id) || pe100.has(id) || stub89.has(id) || pe87.has(id) || pe94.has(id) || pe95.has(id) || pe96.has(id) || pe115.has(id) || pe121.has(id) || pe119.has(id) || pe130.has(id) || pe119set.has(id) || pe152.has(id) || pe121_2982.has(id) || pe102.has(id) || pe125.has(id) || pe172.has(id) || pe120.has(id) || pe179.has(id) || pe205.has(id) || pl61.has(id) || pe206.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
+  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || pe40.has(id) || pe76.has(id) || stub41.has(id) || pe101.has(id) || pe100.has(id) || stub89.has(id) || pe87.has(id) || pe94.has(id) || pe95.has(id) || pe96.has(id) || pe115.has(id) || pe121.has(id) || pe119.has(id) || pe130.has(id) || pe132.has(id) || pe119set.has(id) || pe152.has(id) || pe121_2982.has(id) || pe102.has(id) || pe125.has(id) || pe172.has(id) || pe120.has(id) || pe138.has(id) || pe179.has(id) || pe205.has(id) || pl61.has(id) || pe206.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
   else assert.ok(notImpl, `${id} は未実装のはず`);
   notImpl ? unimpl++ : impl++;
 }
-// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 引数書式・範囲 5 (pe40・#1529) + PE 確定 1 (pe102・#2883) + stub 確定 6 (stub41) + PE 確定 2 (pe101) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 7 (pe94・#2830) + PE 確定 9 (pe95・#2831) + PE 確定 4 (pe96・#2832) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + ui PE 確定 6 (pe119・#2980) + general PE 確定 6 (pe119set・#2977) + arrangement PE 呼出し 6 (pe152・#2983) + ui 表示・メニュー 6 (pe121_2982・#2982) + general PE 確定 2 (pe125・#3001) + launchMapPages PE 確定 1 (pe120・#2984) + channels PE 判定順 1 (pe76・#2563) + patterns グループ 2 (pe172・#3219) + PY61 確定 7 (pl61・#2027) + device PE 確定 7 (pe206・#3494) + patterns 数え・選択 4 (pe179・#3271) + mixer PE 確定 2 (pe205・#3493) + ui setter・getVersion 3 件 (pe130・#3007)
-assert.equal(impl, 172); assert.equal(unimpl, 263);
+// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 引数書式・範囲 5 (pe40・#1529) + PE 確定 1 (pe102・#2883) + stub 確定 6 (stub41) + PE 確定 2 (pe101) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 7 (pe94・#2830) + PE 確定 9 (pe95・#2831) + PE 確定 4 (pe96・#2832) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + ui PE 確定 6 (pe119・#2980) + general PE 確定 6 (pe119set・#2977) + arrangement PE 呼出し 6 (pe152・#2983) + ui 表示・メニュー 6 (pe121_2982・#2982) + general PE 確定 2 (pe125・#3001) + launchMapPages PE 確定 1 (pe120・#2984) + launchMapPages 書式・戻り 3 件 (pe138・#3029) + channels PE 判定順 1 (pe76・#2563) + patterns グループ 2 (pe172・#3219) + PY61 確定 7 (pl61・#2027) + device PE 確定 7 (pe206・#3494) + patterns 数え・選択 4 (pe179・#3271) + mixer PE 確定 2 (pe205・#3493) + ui setter・getVersion 3 件 (pe130・#3007) + ui ブラウザ 3 件 (pe132・#3013)
+assert.equal(impl, 178); assert.equal(unimpl, 257);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);
