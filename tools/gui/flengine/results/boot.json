@@ -6,6 +6,7 @@
  "units_total": 942,
  "units_run": 110,
  "init_count": 111,
+ "units_dispatched": 110,
  "survey": null,
  "reach": [
   {
@@ -198,6 +199,10 @@
  "gui_icall_calls": 6,
  "gui_ring_discarded": 0,
  "icall_miss": 4,
+ "icall_miss_uniq": 1,
+ "icall_miss_targets": [
+  "0xfa9390"
+ ],
  "m11_stub_total": 67,
  "m11_stubs": [
   "GetLocaleInfoW:59",

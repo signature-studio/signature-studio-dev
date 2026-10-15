@@ -6,6 +6,7 @@
  "units_total": 942,
  "units_run": 0,
  "init_count": 0,
+ "units_dispatched": 0,
  "survey": {
   "ok": 764,
   "noproc": 1,

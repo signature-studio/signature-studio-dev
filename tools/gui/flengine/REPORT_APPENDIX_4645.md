@@ -9,7 +9,9 @@ REPORT §6j の全文。要約と未解決は [REPORT.md](REPORT.md) §6j・§7 
 
 ## 2. 実測 (boot)
 
-- baseline / GUI とも `units_run 110` (旧 109)、`icall_miss 4` (旧 7)。miss 先は `0xfa9390` のみ (`0x85df70`・`0x457860` が解消)。B1 PASS。
+- baseline / GUI とも `units_run 110` (旧 109)、`icall_miss 4` (旧 7)。miss 先は `0xfa9390` のみ (`0x85df70`・`0x457860` が解消)。
+- 現 head `ad9c633ac` の e2e: rc 1・`JUDGE FAIL (14/15)`。FAIL は B1 の `GetMem 774 (base 772)` のみ (詳細は [REPORT.md](REPORT.md) GUI-27 節)。B1 は現 head で PASS しない。
+- `results/` の現 head の出力 (`boot.json`・`baseline_boot.json`・`survey_*.json`・`ir_sha256.txt`) は、この e2e の実行結果で書き換えた。`survey_soft_chain.json` の `ok/trap/miss/icall_miss` は `875/20/46/46` で、本文の値と一致する。`mem_*`・`Halt0`・`MessageBoxA` の calls も変わっている (`git diff -- tools/gui/flengine/results/survey_soft_chain.json` で確認)。
 - 解消は boot 経路で確認。残件 `0xfa9390` は子 #4730 (GUI-27)。
 
 ## 3. survey の値 (訂正)

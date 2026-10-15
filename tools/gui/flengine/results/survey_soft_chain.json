@@ -6,6 +6,7 @@
  "units_total": 942,
  "units_run": 0,
  "init_count": 895,
+ "units_dispatched": 0,
  "survey": {
   "ok": 875,
   "noproc": 1,
@@ -13,11 +14,11 @@
   "trap": 20,
   "clobber": 0,
   "mem_boot_bytes": 301989888,
-  "mem_grown_units": 9,
-  "mem_end_bytes": 1578237952,
+  "mem_grown_units": 6,
+  "mem_end_bytes": 1183842304,
   "kinds": {
-   "halt0->longjmp": 7,
-   "memory access out of bounds": 13
+   "halt0->longjmp": 6,
+   "memory access out of bounds": 14
   },
   "failfast_units": {}
  },
@@ -256,7 +257,7 @@
   {
    "order": 34,
    "name": "MessageBoxA",
-   "calls": 2,
+   "calls": 1,
    "kind": "IMPL",
    "prio": "2"
   }
@@ -268,6 +269,10 @@
  "gui_icall_calls": 7,
  "gui_ring_discarded": 0,
  "icall_miss": 46,
+ "icall_miss_uniq": 1,
+ "icall_miss_targets": [
+  "0xfa9390"
+ ],
  "m11_stub_total": 203,
  "m11_stubs": [
   "GetLocaleInfoW:113",
@@ -293,15 +298,15 @@
   "GetFileVersionInfoSizeW:1"
  ],
  "probes": {
-  "GetMem": 2042,
+  "GetMem": 2039,
   "FreeMem": 179,
-  "FastMM_GetMem(407a50)": 2125,
+  "FastMM_GetMem(407a50)": 2119,
   "FastMM_FreeMem(407e20)": 181,
   "InitUnits": 0,
-  "Halt0": 8,
+  "Halt0": 7,
   "ListFind(4fa210)": 2,
   "ListRaise(47a250)": 0
  },
- "va_calls": 28,
- "va_bytes": 1270284288
+ "va_calls": 25,
+ "va_bytes": 876085248
 }
