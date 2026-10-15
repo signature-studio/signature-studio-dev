@@ -134,6 +134,7 @@ export function createMockEngine() {
     arrTime: 0,
     numerator: 4, denominator: 4,
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
+    screenAlive: false, screenDirty: false, screenMenuShowing: false, screenSetup: { l: 0, t: [0, 0, 0, 0, 0] },
     selectedChannel: 0,
     loop: { row: false, flag49e: false, flag54: false, recs: [] },
     gridItems: [],
@@ -205,6 +206,7 @@ export function createMockEngine() {
   const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
   // float 引数 (fl_a_dbl と同じ: None は 0、bool・整数・実数は可、他は code 5)。PE の書式 'f' は float32 に丸める
   const argF = (a, i) => { const v = a[i]; if (i >= a.length || v === undefined) return 0; if (typeof v === "boolean") return +v; if (typeof v === "number") return Math.fround(v); throw WRONG(); };
+  const scrNeed = () => { if (!st.screenAlive) throw new FlError("Unspecified error", 2); };
   // fl_a_dbl と同じ (plugins.setParamValue の値): None は 0、bool・実数は可 (丸めない)、他は code 5
   const argD = (a, i) => { const v = a[i]; if (i >= a.length || v === undefined) return 0; if (typeof v === "boolean") return +v; if (typeof v === "number") return v; throw WRONG(); };
   // plugins の値 API の引数は C と同じ順に型検査してから解決する (paramIndex・index・slotIndex・useGlobalIndex・(setParamValue の pickupMode))。o = paramIndex の位置、n = 最大個数
@@ -512,6 +514,17 @@ export function createMockEngine() {
     "screen.getScreenActiveCounter": (...a) => { arity(a, 0, 0); return st.screenActiveCounter; },
     "screen.setScreenActiveCounter": (...a) => { arity(a, 1, 1); st.screenActiveCounter = (st.screenActiveCounter + argI(a, 0, 0)) | 0; },
     "screen.unBlank": (...a) => { arity(a, 1, 1); st.screenUnBlank = argI(a, 0, 0) === 1; },
+    // PY-136 (#3025): screen 初期化・メニュー系 10 件 (PE 0xd7aa40・0xd7ab00・0xd7b0a0・0xd7b000・0xd7ccb0・0xd7b1f0・0xd7b170・0xd7c9a0・0xd7cac0・0xd7cbe0)。scr 未生成の経路は PE で AV のため Unspecified error を仮置き。引数名と意味は未確定 (REPORT_PY136)
+    "screen.init": (...a) => { arity(a, 6, 6); for (let i = 0; i < 6; i++) argI(a, i, 0); Object.assign(st, { screenAlive: true, screenDirty: false, screenMenuShowing: false, screenSetup: { l: 0, t: [30, 10, 10, 2, 4000] } }); },
+    "screen.setup": (...a) => { arity(a, 6, 6); const v = Array.from({ length: 6 }, (_, i) => argI(a, i, 0)); scrNeed(); st.screenSetup = { l: v[0], t: v.slice(1) }; },
+    "screen.update": (...a) => { arity(a, 0, 0); if (st.screenAlive) st.screenDirty = false; },
+    "screen.deInit": (...a) => { arity(a, 0, 0); Object.assign(st, { screenAlive: false, screenDirty: false, screenMenuShowing: false }); },
+    "screen.keepDisplayActive": (...a) => { arity(a, 0, 0); if (st.screenAlive) st.screenDirty = true; },
+    "screen.hideMenu": (...a) => { arity(a, 0, 0); scrNeed(); st.screenMenuShowing = false; },
+    "screen.menuShowing": (...a) => { arity(a, 0, 0); scrNeed(); return st.screenMenuShowing; },
+    "screen.menuItemClick": (...a) => { arity(a, 0, 0); },
+    "screen.menuNext": (...a) => { arity(a, 0, 0); },
+    "screen.menuPrev": (...a) => { arity(a, 0, 0); },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
