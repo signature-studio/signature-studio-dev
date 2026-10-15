@@ -86,6 +86,7 @@
 | `tools/m3/REPORT.md` | ~100 | M3: 中規模 lift → wasm (純計算 4 関数 bit-exact) |
 | `tools/m5/REPORT.md` | ~120 | M5: Delphi lift → wasm E2E + native bit-exact |
 | `tools/liftlib/REPORT.md` | ~221 | 共通 lift 修復基盤の統合 (CAB-49/54/55/220/239/LIFTLIB-2)。§21 は DIR64 補正境界の全数列挙と修正 (#593)。§10〜§12 は `REPORT_APPENDIX_A.md`・§13〜§16 は `REPORT_APPENDIX_B.md`・§17 (iargs)・§18 (#241 ymm/pcmpistri/F2 xmm 戻り) は `REPORT_APPENDIX.md`・§19 (PERF-P1 #155 標準ビルド設定 + 署名ガード)・§20 (#478 ott_auto_none) は `REPORT_APPENDIX_C.md` に分割。§22 (LIFTLIB-9 #668) は要約のみで全文は `REPORT_APPENDIX_D.md` |
+| `tools/liftlib/REPORT_APPENDIX_CI194.md` | ~70 | liftlib CI-194 (親 #2319) の付録: mypy 段階導入 (Tier 1 = 12 モジュールの --strict 前 161 -> 後 0・type: ignore 0 件・Tier 2 baseline の module 別エラー数)・挙動不変の検証 (test_unit 前後一致・差分ハーネス一致)。**mypy の測定値の正本** |
 | `tools/liftlib/REPORT_APPENDIX_3137.md` | ~70 | liftlib #3137: `legacy_p1` の残留分岐 66 件 (br_other 17 / no_branch 49) の D1a 同型判定 (折畳み形 13 件・非同型 53 件)・`p1_repmap_census.py --residual` の実測 |
 | `tools/liftlib/REPORT_APPENDIX_A.md` | ~240 | liftlib §10〜§12 全文 (lowbase 取り込み CAB-220 / mini-lifter 語彙 + leaf spec CAB-239 / LIFTLIB-2 CAB-256) |
 | `tools/liftlib/REPORT_APPENDIX_B.md` | ~250 | liftlib §13〜§16 全文 (LIFTLIB-3 CAB-264 / LIFTLIB-4 CAB-272 / LIFTLIB-1 #224 検収 / 環境パス置換 #386) |
