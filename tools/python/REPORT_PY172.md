@@ -1,7 +1,7 @@
 # PY-172 (#3219): patterns グループ系 4 関数の PE 解析と C/mock 実装 (2 件)
 
 親: #1804 (PY-48)。既知類型との関係: 該当なし (lift 作業ではない)。
-測定対象の commit: `37e37e00` (コードを変えた最後の commit)。
+測定対象の commit: `235f9cca` (main 取り込みの merge。コードを変えた最後の commit)。
 
 ## 結論
 
@@ -64,23 +64,23 @@ REPORT_PY42 は「署名の不一致 3 件 (getPatternGroupName・getPatternsInG
 
 ## 6. 測定
 
-測定 commit: `37e37e00`。
+測定 commit: `235f9cca`。main 取り込みで provider・mock・テストの差分が入ったため、前回測定 (`37e37e00`) は置き換えた。
 
 | 検査 | 手順 (コマンド) | 結果 |
 |---|---|---|
-| ビルド | `FL_WIN64_DIR=<展開先> bash tools/python/fetch_inputs.sh` / `build_cpython_wasm.sh` / `provider/build.sh` / `FLPY_SKIP_TABLE=1 build_flpy.sh` | cpython 4 分 6.5 秒・provider 1.3 秒・flpy 6.1 秒 (rc 0 each) |
-| provider_check | `node tests/provider_check.mjs` | PASS。実装 126 / 未実装 309 (変更前 124 / 311) |
-| 差分検査 | `node tests/patterns_group_diff.mjs` | 14 呼出し・diffs 0・PASS。未実装 2 件は C で code 2 |
-| 全体 | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・soft_error 0・raised 0・2.04 秒 (load 0.21 前後)。親 run の baseline 1.2 秒とは機材が違うため比較しない |
-| ネガティブコントロール | mock の `PGRP_N` を 1 に変えて差分検査 | 差分 3 件・AssertionError・rc 1 (FAIL)。0 に戻すと PASS |
+| ビルド (provider) | `EMSDK_ENV=<emsdk 6.0.12>/emsdk_env.sh bash provider/build.sh` | rc 0・1.4 秒 (emsdk 6.0.12 を `./emsdk install 6.0.12` で取得) |
+| provider_check (Python 型節を除く) | `tests/provider_check.mjs` の §3 (Python 型検査) を外した一時コピー | PASS。実装 133 / 未実装 302 (MCP 60)。PR の寄与は pe172 の +2 |
+| 差分検査 | `node tests/patterns_group_diff.mjs` | 14 呼出し・diffs 0・PASS |
+| mock 差分 (flpy 不要の 16 本) | `node tests/<name>.mjs` (arrangement_diff・arrangement_selection_diff・channels_diff・device_diff・general_diff・ilmcp_diff・midi_path_diff・mixer_diff・patterns_group_diff・playlist_diff・screen_diff・tool_args・transport_diff・ui_diff・ui_display_diff・ui_state_diff) | 全て rc 0・diffs 0 |
+| 未再測定 | `tests/provider_check.mjs` の §3・`FL_ENGINE=wasm node tests/all_tools.mjs` | flpy (CPython wasm) 未ビルドのため未実施。前回 (`37e37e00`) は 48/48 ok |
 
 コード差分の確認 (差分 0 の証跡):
 
 ```
-git diff 37e37e00 HEAD -- tools/python/provider tools/python/host tools/python/tests
+git diff 235f9cca HEAD -- tools/python/provider tools/python/host tools/python/tests
 ```
 
-この commit 以降の docs は REPORT と DOC_MAP だけ。出力は 0 行 (本 PR の最終確認で再度取る)。
+この commit 以降の docs は REPORT のみ。出力は 0 行。
 
 ## 検証範囲 / 範囲外
 
