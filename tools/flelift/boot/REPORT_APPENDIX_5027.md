@@ -13,7 +13,7 @@
 
 ## 2. 経路の特定 (cap の例外が exit に変わる箇所)
 
-生成物 `fleboot_plain.cjs` (Emscripten 出力) で確認した。
+生成物 `fleboot_plain.cjs` (Emscripten 出力) で確認した。ただし行番号 (L1113-1122・L4476-4486) は、前の測定 run の生成物を見たときの記録で、検収 run には生成物が無く照合していない (再生成には lift から link までの全工程が要る)。照合は後続で行う。
 
 | 段 | 場所 | 働き |
 |---|---|---|
@@ -54,7 +54,14 @@
 | `units_run` | 895 | 895 |
 | `getmem` / `freemem` | 3680 / 1499 | 3680 / 1499 |
 
-cap の有無で units・GetMem/FreeMem・IPP は変わらない。違いは分類と `log_cap` の計数だけで、boot の停止理由 (`exit`) は cap の有無で同じ。
+2 つの結果 JSON を全フィールド比較した差は、次の 2 群だけ。
+
+- 分類・計数: `boot.threw` (`log_cap` / `exit`)・`boot.threw.msg`・`boot.threw_raw`・`log_cap` (cap 無効では null)。
+- 出力メモリのハッシュ: `outmem.full` (`d925e598…` → `b2cbbde9…`)・`outmem.no_cstack` (`3d1da791…` → `0b22ce22…`)。`mem_bytes`・stack の base/end は同一。
+
+cap の有無で同じなのは、units・GetMem/FreeMem・IPP・生の停止理由 (`exit`, code 0)。
+
+出力メモリのハッシュの差が cap の影響か、同一 binary の再実行での非決定性かは、本 PR の測定では**未確認**。cap 0 の同一条件での 2 回実行はしていない。`REPORT_APPENDIX_672` §E-2 でも決定性は未検証と書かれている。したがって本付録では「cap の有無で boot の結果が同じ」とは書かず、停止理由・units・GetMem/FreeMem・IPP が同じことだけを主張する。決定性の確認は後続の子 issue の範囲外とし、必要になった時点で同一 binary の 2 回実行で扱う。
 
 ### 3-5. 規則の確認 (`log_cap_check.py`)
 
@@ -63,5 +70,5 @@ cap の有無で units・GetMem/FreeMem・IPP は変わらない。違いは分�
 
 ## 4. 未解決・範囲外
 
-- cap 超過後も guest が走り続ける理由 (`fprintf` の失敗を guest が無視すること) は本 issue で修正していない。cap の目的は出力の有界化であり、boot の停止は別件。
+- cap 超過後も guest が走り続ける理由 (`fprintf` の失敗を guest が無視すること) と、cap で boot を止める修正は本 issue の受入から外し、子 #5058 (FLE-41) に移した。cap の目的は出力の有界化であり、boot の停止は別件。
 - `exit` が正常終了かの判定は子 issue #4970 [FLE-36] の範囲で、本 issue では扱わない。
