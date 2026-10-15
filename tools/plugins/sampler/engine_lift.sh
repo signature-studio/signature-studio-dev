@@ -8,6 +8,8 @@
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/env.sh"
+# 非 VEX comis/ucomis の flag 反映 ([PLG-F3-34] #3242)。 engine の経路だけ既定 1 (他の lift 経路は従来どおり 0)
+export PLUG_COMIS_FLAGS="${PLUG_COMIS_FLAGS:-1}"
 cd "$HERE/.."
 B="$1"; TMO="${2:-1200}"
 OUT="work/sampler/engine$B"; mkdir -p "$OUT/tmp"

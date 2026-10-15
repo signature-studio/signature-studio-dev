@@ -243,7 +243,7 @@ GHIDRA=1 bash tools/targets/serum2/scripts/run_all.sh   # +Ghidra 全自動解�
 | muParser 窓が組込み関数の登録側を含まない (§11.3 の 6 関数。帰属は未確定、詳細 `REPORT_SR3c.md`) | lift 対象に muParser 一部が残る | #71 継続 |
 | nlohmann::json instantiation が 36 関数しか seed 化できていない (推定: 実数は数百) | 除外不足 (lift 側に残るだけで安全側) | #19 と共有 |
 | 窓内 `window` タグ (SQLite 921 / zstd 202 ほか) はリンク連結による推定で、upstream 関数との 1:1 照合なし | 過除外すると DSP を落とす恐れ。SQLite は §11.3 の検算で支持 (183/189) | SR-4 着手時の動的トレース (blockedBy #71) |
-| `.pdata` 外ブロックの関数性が未確定 (SR-21 で分類し直し。内訳は `REPORT_SR21.md` §0) | lift 入口として使えない | #71 継続 |
+| `.pdata` 外ブロックの関数性が未確定 (SR-21 で分類し直し。内訳は `REPORT_SR21.md` §0。vtable 照合で一部確定: §7) | lift 入口として使えない (vtable メンバーは §7 で入口化可) | #71 継続 |
 
 ### 11.6 検証記録
 - 検証起点: commit `699addb` (クリーン worktree `git worktree add --detach … HEAD` で `sr3_run.sh` を再実行, 40.8 秒, load average 1.58, 4 core・並列 4)。`out/sr3_{cut_table.tsv,signature_db.json,gap_blocks.tsv,anchors.json,verify.txt}` の 5 ファイルが commit 済みと `cmp` 一致。`find tools/targets/serum2 -type f -size +20M -not -path '*/work/*'` = 0 件。ネガティブコントロール: §11.3 (zstd 窓 0 関数 / ±1〜3 倍シフト窓 6 通りとも 0 関数)。範囲外: 検算者による別アルゴリズム再計算 (レビュワーが実施)。
