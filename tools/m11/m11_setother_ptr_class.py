@@ -31,8 +31,17 @@ MEM = re.compile(r'(byte|word|dword|qword) ptr \[(\w+)\s*([+-])\s*(0x[0-9a-fA-F]
 MEM0 = re.compile(r'(byte|word|dword|qword) ptr \[(\w+)\]')
 WIDTH = {'byte': 8, 'word': 16, 'dword': 32, 'qword': 64}
 IMM = re.compile(r'-?(0x[0-9a-fA-F]+|\d+)')
-FAM = {'eax': 'rax', 'ebx': 'rbx', 'ecx': 'rcx', 'edx': 'rdx', 'esi': 'rsi', 'edi': 'rdi',
-       'ebp': 'rbp', 'esp': 'rsp'}
+FAM = {}
+for _r64, _names in (('rax', ('eax', 'ax', 'al', 'ah')), ('rbx', ('ebx', 'bx', 'bl', 'bh')),
+                     ('rcx', ('ecx', 'cx', 'cl', 'ch')), ('rdx', ('edx', 'dx', 'dl', 'dh')),
+                     ('rsi', ('esi', 'si', 'sil')), ('rdi', ('edi', 'di', 'dil')),
+                     ('rbp', ('ebp', 'bp', 'bpl')), ('rsp', ('esp', 'sp', 'spl'))):
+    FAM[_r64] = _r64
+    for _n in _names:
+        FAM[_n] = _r64
+for _i in range(8, 16):
+    for _suf in ('', 'd', 'w', 'b'):
+        FAM['r%d%s' % (_i, _suf)] = 'r%d' % _i
 
 
 def fam(reg):

@@ -19,6 +19,10 @@ MOV_RAX_RAX8 = '488b4008'           # mov rax, qword ptr [rax + 8]
 MOV_IMM_RAX0 = '48c7400001000000'   # mov qword ptr [rax], 1
 CALL_REL = 'e800000000'             # call +0
 MOV_RCX_RSI = '4889f1'              # mov rcx, rsi
+MOV_CL_5 = 'b105'                   # mov cl, 5
+MOV_R8D_9 = '41b809000000'          # mov r8d, 9
+MOV_LD_RCX8 = '488b5108'            # mov rdx, qword ptr [rcx + 8]
+MOV_LD_R8_8 = '498b5008'            # mov rdx, qword ptr [r8 + 8]
 
 
 def seq(*hexes):
@@ -31,9 +35,9 @@ def seq(*hexes):
     return out
 
 
-def load_at_end(*hexes):
+def load_at_end(*hexes, base='rax'):
     ins = seq(*hexes)
-    return M.load_def(CS, ins, len(ins) - 1, 'rax', 8, 64, set())
+    return M.load_def(CS, ins, len(ins) - 1, base, 8, 64, set())
 
 
 class LoadDefTest(unittest.TestCase):
@@ -57,6 +61,12 @@ class LoadDefTest(unittest.TestCase):
 
     def test_no_store_is_entry(self):
         self.assertEqual(load_at_end(MOV_RCX_RSI, MOV_LD_RAX8), ('未決', 'ptr_entry', None))
+
+    def test_partial_byte_base_redefined_blocks(self):
+        self.assertEqual(load_at_end(MOV_CL_5, MOV_LD_RCX8, base='rcx'), ('未決', 'ptr_base_def', None))
+
+    def test_partial_dword_r8_base_redefined_blocks(self):
+        self.assertEqual(load_at_end(MOV_R8D_9, MOV_LD_R8_8, base='r8'), ('未決', 'ptr_base_def', None))
 
 
 if __name__ == '__main__':
