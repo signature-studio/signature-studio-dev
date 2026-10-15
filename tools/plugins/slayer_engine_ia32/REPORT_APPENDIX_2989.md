@@ -94,7 +94,7 @@ index 72a788e2c..80d069f06 100644
 | 残りの leaf x87 関数 36 本 (lift 済み・import と call が無い) の差分試験 | 対象の 2 本以外の x87 の命令組合せは未確認。 本付録の 2 本で受入は満たす | #3715 (PLG-G2-31・子。親 #2989) |
 | 超越関数・`frndint`・`fscale`・`fprem` 等を含む関数 (lift が `ott_unsup` のまま) | 対象外 | #2966 (PLG-G2-23) |
 | `fld`/`fstp` m80 の差分試験 | 80bit メモリ経路は未試験 | #2967 (PLG-G2-24) |
-| 例外値 (NaN・inf・非正規・±0) の NaN どうしのビット差 (符号・ペイロード)。 数値どうしは float32 で全行一致 (§7) | NaN の値そのものは一致しない。 本試験は後段の値を検査していないので、この差が後段の結果を変えるかは判定していない。 残課題は §10 | #4817 (PLG-G2-63・分割元 #4756 PLG-G2-60・親 #4743)。 PM agent の判断待ち: NaN どうしのビット差を許容するか・既定案: 許容 (非決定の源は §9.1 で特定済み。#142 の許容は IPP の話で x87 には当てはまらない) |
+| 例外値 (NaN・inf・非正規・±0) の NaN どうしのビット差 (符号・ペイロード)。 数値どうしは float32 で全行一致 (§7) | NaN の値そのものは一致しない。 本試験は後段の値を検査していないので、この差が後段の結果を変えるかは判定していない。 残課題は §10 | #5263 (PLG-G2-63 の md5 訂正・分割元 #4756 PLG-G2-60・親 #4743)。 PM agent の判断待ち: NaN どうしのビット差を許容するか・既定案: 許容 (非決定の源は §9.1 で特定済み。#142 の許容は IPP の話で x87 には当てはまらない) |
 | export `main`・import を通る関数・実行時の間接 call・`sahf` の AF・`fs:` (TEB) | 関数単位の残り (x87 以外も含む) | #3127 / #3128 |
 | f80→f64 の丸め差 (ST(0) の double で 1 ulp 以上。分布は §1 参照) | float32 結果には伝播しなかった。 方式の帰結 | ADR D28 (方式)。 行案 D24 (案) は `REPORT_APPENDIX_1099.md` §6 |
 
@@ -164,7 +164,7 @@ index 72a788e2c..80d069f06 100644
   - 実測 (`probe_tier.mjs`・入力は float32 の 8 値 (NaN 5 種 = qNaN・-qNaN・sNaN・ペイロード違い・0xffffffff、1.0、±0) の全組、f32 add/sub/mul/div と f64 add/sub/mul、promote・demote・neg): 出力 467 行、Liftoff と TurboFan で 72 行が違う。 違いは f32_add・f32_mul・f64_add・f64_mul の 18 行ずつで、すべて両オペランドが NaN の行 (NaN 以外の入力を含む行は 0 件)。 `sub`・`div`・単項・変換は両 tier で一致。 LDF32 と `(float)` 変換は源ではない。
   - 6 回の再現: 同じ probe を `--liftoff-only` で 6 回実行すると md5 `5c49732b…` が 6/6 同一。 `--no-liftoff` でも 3/3 同一 (md5 `1e471b8b…`、Liftoff とは別の値)。
   - 結論: 源は V8 の tier 切替で、NaN×NaN の返す NaN の選び方が tier で違う。 wasm の NaN の符号・ペイロードは仕様で未規定。
-- 固定の確認 (受入の「同じ入力で 6 回以上」): 全 20,000 行の run を `--liftoff-only` で 6 回 (単独の node 実行) すると、6 回すべて同じ md5 (`23fc7196…`)。 `--no-liftoff` でも 6/6 同一 (`5254ee…` は別の tier の値)。 ※ 未解決: #4817 の 6 回の再測定 (測定 commit `1f7ba1bfb`・`x87_fn_diff.py --special`・既定の `--liftoff-only`) では md5 は 6/6 で `5254ee2f…` となり、本行の `23fc7196…` (`--liftoff-only`) と食い違う。 この対応は §10.2 に記録し、未解決とする。
+- 固定の確認 (受入の「同じ入力で 6 回以上」): 全 20,000 行の run を `--liftoff-only` で 6 回 (単独の node 実行) すると、6 回すべて同じ md5 (`23fc7196…`)。 `--no-liftoff` でも 6/6 同一 (`5254ee…` は別の tier の値)。 ※ 訂正 (#5263): `23fc7196…` は再現しなかった。 `a4f7e12f0` (本節の測定 commit) を再実行すると wasm md5 は `5254ee2f…`、native は `cca1f57e…`。 `1f7ba1bfb` でも同じ値で、§10.2 を参照。 `23fc7196…` の出所 (条件) は記録から特定できず、本行の `23fc7196…` は記録の誤りとして扱う。 固定 (同じ入力で 6 回一致) の根拠は `1f7ba1bfb` の 6/6 (§10.2) と、訂正時の `a4f7e12f0` の 3 回 (`5254ee2f…`)。
   - 入力の出所: `scen.txt`・`image.bin` は `x87_fn_diff.py --special` が seed 2989 と素材 `block22434_PE.bin` (`FL_WIN64_DIR`、`fl-win64` の `extracted/`) から毎回生成する (`work/x87fn_special/`、gitignore)。 生成は決定的で、同じ素材・同じ seed なら同じ `scen.txt` になる。 `wasm_out.txt` の md5 `23fc7196…` は測定時の `work/` 上の出力で、`toolchain-emsdk` (emcc) が無いこの fix run では再実行できていない。 再現手順は `x87_fn_diff.py --special` を実行し、その `work/x87fn_special/wasm_out.txt` を 6 回取り直す。
   - fix run での再確認: 20,000 行の md5 の再取得は未実施 (wasm 側の lift に emcc が要り、この runner には無い)。 代わりに同じ tier 固定の効果を単独 probe で 6 回測定した (上の probe の項)。 両 tier は NaN ビットだけが違い、native 対 liftoff の NaN 以外の差は 0 件 (8,000 行で確認)。 harness の `wasm_out.txt` は chunk 分割の結果で、行番号を除くと単独 run と一致 (0 行差)。
 - 修正前後の判定への影響: 判定 (PASS・構造・nan-num 0) は変わらない。 mismatch 分類の件数は run ごとに揺れた。 固定後の基準値 (`a4f7e12f0`、2 回とも一致): `fn_10002ee0` NaN どうし 858・f80 2 行、`fn_10005400` NaN どうし 701・f80 28 行、`fn_10005d20` NaN どうし 458。
@@ -193,7 +193,8 @@ index 72a788e2c..80d069f06 100644
 ### 10.2 `eax`・OBJ 窓の NaN どうしと実 FL の値 (#4817)
 
 - 基準: 実 FL の x87 (Windows の `Slayer_Engine.dll`) は本 runner では実行できない。 本 issue の定義どおり、基準は native の x87 命令 (`x87_fn_native.c`) とする。 以下は native との一致を見る。
-- 測定 commit `1f7ba1bfb`、`x87_fn_diff.py --special` を 6 回実行 (exit 0・PASS。 wall は 1・2 回目が 15.0 s・14.8 s)。 wasm 出力の md5 は 6/6 で `5254ee2f…`。 native 出力の md5 は `cca1f57e…` (PR #4779 本文の記録と一致。 再計測は 1 回のみ)。 mismatch の件数は 6 回とも §9.1 と一致 (`fn_10002ee0` 858・`fn_10005400` 701・`fn_10005d20` 458、f80 は 2・28)。 ただし §9.1 が記録した wasm 出力の md5 `23fc7196…` とは一致しない。 同じ `--liftoff-only` 設定で別の値になっており、理由は未確認。 件数と 6/6 の再現が受入の根拠。
+- 測定 commit `1f7ba1bfb`、`x87_fn_diff.py --special` を 6 回実行 (exit 0・PASS。 wall は 1・2 回目が 15.0 s・14.8 s)。 wasm 出力の md5 は 6/6 で `5254ee2f…`。 native 出力の md5 は `cca1f57e…` (PR #4779 本文の記録と一致。 再計測は 1 回のみ)。 mismatch の件数は 6 回とも §9.1 と一致 (`fn_10002ee0` 858・`fn_10005400` 701・`fn_10005d20` 458、f80 は 2・28)。 件数と 6/6 の再現が受入の根拠。
+- 食い違いの解消 (#5263・2026-10-15、commit `6bc58a66d`・ws-5263 で再測定): 同じ HEAD で `x87_fn_diff.py --special` を 6 回 (exit 0・PASS・wall 20〜28 s)。 wasm md5 は 6/6 で `b7172a8b…`、native は 6/6 で `2942c957…`。 この HEAD は 7 関数・28,000 行の版 (`fn_100052d0`・`fn_10005550` を含む) で、`1f7ba1bfb` (5 関数・20,000 行) とは入力が違うため直接比べられない。 同じ条件の比較として `1f7ba1bfb` (2 回) と `a4f7e12f0` (3 回) を再実行すると、どちらも wasm `5254ee2f…`・native `cca1f57e…` で、20,000 行・6/6 の記録と一致した (node 24.19.0)。 `a4f7e12f0` は node 22.23.3 でも 2 回とも `5254ee2f…` (`--liftoff-only` の既定)。 `23fc7196…` は再現しなかった。 判定: §9.1 の `23fc7196…` は記録の誤り (訂正済み)。 `5254ee2f…` が `a4f7e12f0`・`1f7ba1bfb` の正の値。 残る未解決 (NaN どうしの許容・後段の算術) は #4756 (PLG-G2-60) と PM 判断 (§10.3)。
 - NaN どうしの差 (`--special` の全 5 関数・20,000 行の合計。 `eax` の 622 件は全て `fn_10005400`):
 
 | 場所 | sign のみ | payload のみ | 計 | NaN と数値の混在 |
