@@ -52,13 +52,21 @@
 
 ## 4. 検証
 
-- 測定 commit: 本 PR の試験を追加した commit (PR 本文の検証節に記載)。 試験は `lift_text.py` (block22434・emcc 6.0.12) の後に実施。
-- 素材: `fl-win64` (`extracted/block22434_PE.bin`) を `$RUNNER_TEMP/fl-win64/` に、`toolchain-emsdk` を `$RUNNER_TEMP/emsdk-root/emsdk/` に展開。
-- 再現: `cd tools/plugins/slayer_engine_ia32 && python3 lift_text.py && python3 probe12_4087.py && python3 probe12_4087_lines.py`
-  (`probe12_4087_lines.py` は `probe12_4087.py` の後に実行する。 `probe12_4087_lines.py` の引数に関数名を渡すと、その関数だけ行単位で実行する)。
-  gdb は無いため `strace -i` で `si_addr` を取った。
-- 実測 (検証 HEAD `9bf84b4db`・load1 は開始時): `lift_text.py` real 23.04 s (user 22.01 s・sys 1.02 s・load1 0.77)。
-  `probe12_4087.py` real 12.71 s (user 10.19 s・sys 1.38 s・load1 0.85)。 結果は §3 の表と一致。
+- 測定 commit: `0ecb2ee5e` (試験を追加した、コードを変えた最後の commit)。 `0ecb2ee5e` から検証 HEAD `f0eafd088` までの実行コードの差分は 0 (REPORT のみ変更)。
+- 素材: `fl-win64` (`extracted/block22434_PE.bin`) を `$RUNNER_TEMP/fl-win64/` に、`toolchain-emsdk` を `$RUNNER_TEMP/emsdk-root/emsdk/` に展開 (`tar --zstd -xf`)。 emcc 6.0.12。
+- 再現 (順に実行): `cd tools/plugins/slayer_engine_ia32 && python3 lift_text.py && python3 probe12_4087.py && python3 probe12_4087_lines.py`
+  (`probe12_4087_lines.py` は `probe12_4087.py` の後に実行する。 引数に関数名を渡すと、その関数だけ行単位で実行する)。
+- si_addr の再現 (§2): gdb は無いため `strace -i` を使う。 `work/probe12_4087/` で次を実行する。
+  ```
+  cd work/probe12_4087
+  for f in fn_10003fe0 fn_100051f0 fn_100085a0 fn_100096d0 fn_1000a95a fn_1000ba05; do
+    head -1 $f.scen > one_$f.scen
+    timeout 60 strace -i -o st_$f.txt ./native_x87 ./image.bin one_$f.scen one_$f.out
+    echo "$f $(grep -o 'si_addr=[^,}]*' st_$f.txt | head -1)"
+  done
+  ```
+  6 本とも §2 の表と一致した (`0x117a1700`・`0x114a0cf4`・`0x114a0cc8`・`0x42a464e8`・`0x425f016a`・`0x4`)。 `one_<fn>.scen` は `<fn>.scen` の 1 行目。 各実行の終了は rc 139 (SIGSEGV)。 `work/` は gitignore 対象。
+- 実測 (検証 HEAD `f0eafd088`・load1 は開始時 1.45): `lift_text.py` real 22.31 s (load1 1.32 時点)・`probe12_4087.py` real 12.31 s (load1 1.97 時点)。 12 本の rc と行数は §3 の表と一致。
 
 ## 5. 未解決
 
