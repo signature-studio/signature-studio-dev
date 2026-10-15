@@ -163,7 +163,8 @@ FL_H(channels, selectOneChannel) {
     return fl_ret_none(c);
 }
 FL_H(channels, muteChannel) { CH(0); int64_t v = A_INT(1, -1); k->mute = TOG(k->mute, v); return fl_ret_none(c); }
-FL_H(channels, soloChannel) { CH(0); k->solo = !k->solo; return fl_ret_none(c); }
+/* PE 0xd59b40 (job 実行) → 0xd843d0: value == -1 は反転、他は現在値 (0/1) の下位 1 B と一致すれば不変・不一致なら反転。useGlobalIndex は未モデル (PE は lookup container を切替える) */
+FL_H(channels, soloChannel) { CH(0); int64_t v = A_INT(1, -1); (void)A_INT(2, 0); if (v == -1 || (uint8_t)v != k->solo) k->solo = !k->solo; return fl_ret_none(c); }
 FL_H(channels, getChannelVolume) { CH(0); int64_t m = A_INT(1, 0); return fl_ret_d(c, m ? db(k->vol, 0.78125) : k->vol); }
 FL_H(channels, setChannelVolume) { CH(0); k->vol = A_DBL(1, 0); return fl_ret_none(c); }
 FL_H(channels, getChannelPan) { CH(0); return fl_ret_d(c, k->pan); }
@@ -223,13 +224,14 @@ FL_H(channels, focusEditor) {
     if (idx < 0 || idx >= nch) RANGE();
     return fl_ret_none(c);
 }
-/* PY-100 (#2879): PE 0xd5b930 の readout。構造体は grid bit が立つ step にあるとみなす (生成条件は未確定)。
- * 既定値は stub の並び (param 0..7 = pitch 60・velocity 100・release 64・fine pitch 120・pan 64・mod X 64・mod Y 64・ticks 0)。
- * 構造体が無い・param が 0..7 の外は -1 (PE: 構造体 NULL で -1)。param 8 (PE: byte +0x11) は既定値未確定のため未モデル (-1) */
-static const int64_t step_def[8] = {60, 100, 64, 120, 64, 64, 64, 0};
+/* PY-100 (#2879): PE 0xd5b930 の readout。構造体は grid bit が立つ step にあるとみなす。
+ * PY-111 (#2929): 生成経路を PE で確認 (REPORT_PY111.md)。setGridBit の note は 0x12d4100 の creation path で作られ、
+ * param 0 = 60 (0x1062200)・1 = 100 (setGridBit が 100 を渡す)・2/3/4 = 64/120/64 (init 0x1062210)・5/6 = 128 (同 G の byte 2/3)・
+ * 7 = 開始 tick = step × V (V 静的 24)・8 = 0 (0x12d42ac)。構造体が無い・param が 0..8 の外は -1 (PE: 構造体 NULL で -1) */
+static const int64_t step_def[9] = {60, 100, 64, 120, 64, 128, 128, 0, 0};
 static int64_t step_param(const Chan *k, int64_t pos, int64_t prm) {
-    if (pos < 0 || pos >= NSTEP || !k->steps[pos] || prm < 0 || prm > 7) return -1;
-    return step_def[prm];
+    if (pos < 0 || pos >= NSTEP || !k->steps[pos] || prm < 0 || prm > 8) return -1;
+    return prm == 7 ? pos * 24 : step_def[prm];
 }
 /* PE 0xd5bb30: 引数を読んでから index を検査 (範囲外は Index out of range)。useGlobalIndex は未モデル (グループ無し) */
 FL_H(channels, getCurrentStepParam) {
@@ -388,7 +390,19 @@ FL_H(mixer, trackCount) { return fl_ret_i(c, NMIX); }
 FL_H(mixer, getTrackCount) { return fl_ret_i(c, NMIX - 2); }
 /* PE 0xd63870: ecx=3 を変換スロット 0x15e4280 (PyLong_FromLong・REPORT_PY152 §42) に渡すのみ (REPORT_PY205) */
 FL_H(mixer, getEqBandCount) { return fl_ret_i(c, 3); }
-FL_H(mixer, getTrackName) { MX(0); return fl_ret_s(c, t->name); }
+/* PE 0x12be470 (maxLen > 0 のみ): 長さが maxLen を超えるとき末尾から、mask 外の文字 (母音 AEIOU・記号・空白。mask = 0-9 と大文字子音) を削除し、最後に先頭 maxLen 文字へ切る。
+ * PE の文字列は UTF-16。ここは ASCII 前提 (非 ASCII 名は未確認) */
+static void track_name_fit(char *s, int64_t m) {
+    if (m <= 0 || (int64_t)strlen(s) <= m) return;
+    for (int64_t i = (int64_t)strlen(s); i >= 1; i--) {
+        if (!strchr("0123456789BCDFGHJKLMNPQRSTVWXYZ", toupper((unsigned char)s[i - 1]))) {
+            memmove(s + i - 1, s + i, strlen(s + i) + 1);
+            if ((int64_t)strlen(s) <= m) break;
+        }
+    }
+    if ((int64_t)strlen(s) > m) s[m] = 0;
+}
+FL_H(mixer, getTrackName) { MX(0); int64_t m = A_INT(1, -1); char b[NAME]; snprintf(b, sizeof b, "%s", t->name); track_name_fit(b, m); return fl_ret_s(c, b); }
 FL_H(mixer, setTrackName) { MX(0); const char *s = A_STR(1); set_name(t->name, s); return fl_ret_none(c); }
 FL_H(mixer, getTrackVolume) { MX(0); int64_t m = A_INT(1, 0); return fl_ret_d(c, m ? db(t->vol, 0.8) : t->vol); }
 FL_H(mixer, setTrackVolume) { MX(0); t->vol = A_DBL(1, 0); return fl_ret_none(c); }
@@ -505,6 +519,11 @@ FL_H(ui, getHintValue) {
     snprintf(buf, sizeof buf, "%lld%%", (long long)n);
     return fl_ret_s(c, buf);
 }
+/* PY-130 (#3007): PE 0xd6ee00 (setBrowserAutoHide) は O+0x8c4 に (v==1) を書く。0xd6f170 (setStepEditMode) は S=[O+0xab8] の +0x49e を (v==1) にする (末端は vtbl[0x200] 経由で未確定)。値は未実測の仮置き (REPORT_PY130_3007) */
+FL_H(ui, setBrowserAutoHide) { NARGS(1, 1); ui_browser_auto_hide = A_INT(0, 0) == 1; return fl_ret_none(c); }
+FL_H(ui, setStepEditMode) { NARGS(1, 1); ui_step_edit = A_INT(0, 0) == 1; return fl_ret_none(c); }
+/* PY-130: ui 版 getVersion (PE 0xd6c2f0 '|i'・既定 4) は mode 0..3 で int、4..6 で str、他は int 0 (分岐表は REPORT_PY130_3007) */
+FL_H(ui, getVersion) { NARGS(0, 1); int64_t m = A_INT(0, 4); return (m >= 4 && m <= 6) ? fl_ret_s(c, "") : fl_ret_i(c, 0); }
 
 /* ---- general (1) ---- mock と同じ MIDI scripting API バージョン (実機値は未実測) */
 FL_H(general, getVersion) { NARGS(0, 0); return fl_ret_i(c, 1); }
