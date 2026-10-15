@@ -1,7 +1,6 @@
 # Massive X DSP closure 特定と lift 計画 (MX-3 / CAB-263)
 
-- **REPORT 行数**: 220 行 (上限 200 行超過・検収の訂正追記に伴う。超過分は訂正・検収
-  スクリプト案内のみ。元実測・未解決は圧縮済み)
+- **REPORT 行数**: 246 行 (上限 250 行・docs/DOC_MAP.md §1)
 
 - 解析日: 2026-10-11 / 担当: `tools/targets/massivex/dsp/` (大物は `work/`, gitignore 済)
 - 素材: `work/extracted/VST3/Massive X.vst3` (95,356,824 B, md5 622993e76565f49c094063a2b717d6ca)
@@ -19,8 +18,8 @@
    (export 4 + MassiveX*/Steinberg::Vst 系 vtable slot 563) からの到達は
    **round 1 で 3,227 / round 2 で 45,611 / round 3 で 320,877** と発散し .text ほぼ全体に接続 (§2)。
    起票時の「process 起点 closure 100〜300 関数」は**成立しない** (推定)。
-2. **x64c 未対応語彙は VST3 面だけで 48,612 site / 246 種** (FLEngine 全体は 1,105 site)。
-   内訳: **AVX (VEX/EVEX) 47,741 (98.2%)**、AES/SHA-NI 224、x87 演算 73 (実測 §3)。
+2. **x64c 未対応語彙は VST3 面だけで 38,485 site / 264 種** (FLEngine 全体は 1,105 site)。
+   内訳: **AVX (VEX/EVEX) 37,630 (97.8%)**、AES/SHA-NI 224、x87 演算 73、その他 558 (実測 §3・測定 commit `458405518`)。
    FLEngine closure が SSE2 中心だったのに対し Massive X は **AVX2/AVX-512 + x87 演算**を伴う。
 3. **.pdata は信頼できない (D11)**: 186,960 関数 / 58,062,780 B (.text の 96.4%) しか載っておらず、
    直接 call の **99.6% (592,497 / 594,978 unique target) が非 begin を指す**。
@@ -86,20 +85,22 @@ headline の round 2/3 は 1 コマンド e2e では再現できない (規則 3
 |---|--:|
 | lift 関数 | 567 |
 | 命令数 | 258,087 |
-| **unsupported site** | **48,612** (18.84% / 258,087) |
-| unsupported 種別 | 246 |
+| **unsupported site** | **38,485** (14.91% / 258,087) |
+| unsupported 種別 | 264 |
 
 | 群 | site | 内訳 (上位) |
 |---|--:|---|
-| **AVX (VEX/EVEX)** | **47,741** | vbroadcastss 3,871 / vmulps 6,614 / vaddps 4,342 / vblendvps 1,561 / vpslld 1,667 / vpxor 1,825 / vmovss 1,368 / vmovd 1,260 / vpsrld 1,177 / **zmm 系 (vmovdqa64/vpxord/vprold/kmovw/vextracti32x8/vpblendmw) ~200** |
-| AES / SHA-NI | 224 | aesenc/dec 108 / vaesenc/dec 216 / sha256rnds2 64 / pclmulqdq 3 |
+| **AVX (VEX/EVEX)** | **37,630** | vmulps 6,614 / vaddps 4,342 / vbroadcastss 3,871 / vpslld 1,667 / vblendvps 1,561 / vinsertps 1,400 / vsubps 1,223 / vpaddd 1,179 / vpsrld 1,177 / vaesenc·vaesdec 等 224 / **zmm 系 20** (vmovups 13 / vpaddq 5 / vmovaps 2) |
+| AES / SHA-NI | 224 | sha256rnds2 64 / aesenc 52 / aesdec 52 / sha256msg1 24 / sha256msg2 24 / aesenclast·aesdeclast 8 |
 | x87 **演算** | 73 | fmul 8 / fisttp 8 / fadd 3 / fild 6 / fdiv 2 / fcmovnb 2 … |
-| その他 | 574 | mulx 49 / adcx 44 / adox 32 / repz ret 37 / tzcnt 39 / in 31 / out 41 / enter 17 / cli 19 / scasb 7 / scasd 6 / mov fs·gs 6 … |
+| その他 | 558 | mulx 49 / adcx 44 / out 41 / tzcnt 39 / repz ret 37 / adox 32 / in 31 / pshufb 24 / palignr 24 / int1 22 / cli 19 / retf 18 / enter 17 … |
 
 比較 (CAB-226 実績): FLEngine lift 集合 7,031 関数 / 340,774 命令 / 未対応 **1,105 site (0.32%)**
-→ x64c 拡張で 0。**Massive X の VST3 面だけで 48,612 = FLEngine 全体の 44.0 倍**
-(定義: 48,612 ÷ 1,105 = 44.0)。AES/SHA-NI は OpenSSL 静的リンク由来と推定 (MX-1 REPORT §5 実測)。
+→ x64c 拡張で 0。**Massive X の VST3 面だけで 38,485 = FLEngine 全体の 34.8 倍**
+(定義: 38,485 ÷ 1,105 = 34.8)。AES/SHA-NI は OpenSSL 静的リンク由来と推定 (MX-1 REPORT §5 実測)。
+旧値 48,612 は x64c の `ac58a8749`・`fe2dc9ed9` より前の値 (現 HEAD で再測定。詳細は massivex REPORT §11.4)。
 
+- 群分けは `e2e.sh` の判定順のまま: `v` 接頭辞判定が先のため vaes 系 224 は AVX に入り、pshufb / palignr / pclmulqdq は「その他」に入る。合計 38,485 は不変 (起票先: 親 #3454 の判断・表示のみ)。
 - **vectorcall**: 567 関数の到達 import は COM (`CoCreateFreeThreadedMarshaler` 等) 3 件のみ。
   独自 vectorcall 修飾子は未検出 — ただし x64c は import 修飾子を無視するため**範囲外** (§6 U3)。
 - **MSVC C++ EH**: .pdata の chained 関数が多数 (D11) ゆえ unwind チェインが濃密と推定。未解析 (§6 U4)。
@@ -187,6 +188,7 @@ bash dsp/negctl.sh         # ネガティブコントロール (規則 41)
 **クリーン HEAD 検証 (規則 45)**: `git archive HEAD -- tools/targets/massivex/dsp | tar -x -C <tmp>`
 から e2e.sh 再実行 → **全数値不一致なく再現** (567 関数 / 258,087 命令 / 48,612 site / 246 種 /
 .pdata 186,960 / 非 begin 率 99.58%)。検収 agent 実測 36 s, load 16.11 16.37 15.16 → 16.64 16.48 15.24。
+現 HEAD `458405518` の再検証 (#3454・clean checkout): 567 関数 / 258,087 命令 / **38,485 site / 264 種** / e8e9_targets 594,978 (不変)・23 s。詳細は massivex REPORT §11.4。
 検証起点 commit = **e6c6e91** (検証時 HEAD は a76310f、dsp/ は e6c6e91 以降 report corrections のみ)。
 注: 展開先に gitignore 済み work/ が無いため `mkdir -p dsp/work/lift_seeds dsp/work/logs` が必要
 (mx_rtti.py は出力先 dir が無いと FileNotFoundError)。PE は `MX_PE=` で実体を指す。
