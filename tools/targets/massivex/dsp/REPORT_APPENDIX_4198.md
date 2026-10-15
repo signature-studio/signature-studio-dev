@@ -3,7 +3,7 @@
 - 親: #1810 (MX-15) / 起票: #4198 (MX-50)。本ファイルは #4198 の実測。
 - 素材: `plugins-massivex` (`$ARTIFACTS_DIR/plugins-massivex.tar.zst`) → インストーラ `Native Instruments Massive X v1.7.1.exe` を `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work key` で `Massive X.vst3` (95,356,824 B、md5 `622993e76565f49c094063a2b717d6ca`、REPORT_MX10 §4 と一致)。
   - 展開先: 前版の記録は `work/extracted/VST3/...` とだけ書いており、実際の所在は確認できていない。再現時は `tools/targets/massivex/work/extracted/VST3/Massive X.vst3` (`dsp/e2e.sh` の既定 `MX_PE`) に置くか、`MX_PE` で指定する。`work/` は gitignore 対象で commit しない。
-- 計測スクリプト: `dsp/scripts/mx_unres_residual_4198.py` (#4198 で新規。main の `mx_unres_residual_4198.py` (MX-15) とは別ファイル)。
+- 計測スクリプト: `dsp/scripts/mx_unres_residual_4198.py` (#4198 で新規。main の `mx_unres_residual.py` (MX-15) とは別ファイル)。
 
 ## 1. 受入の達成状況
 
@@ -35,7 +35,7 @@
 - 本 run の検証: 素材 `plugins-massivex` が無く、`mx_unres_residual_4198.py`・`e2e.sh`・`negctl.sh`・`mx_unres_probe.py` は実行していない。
 - 前版の本文と本節に書いた e2e (rc 0 / `OK elapsed=30s`)・negctl (NC1 unsup 5 / NC2 unsup 292 / NC3 insns 31 unsup 0)・probe (valid 186,961 / 解決不能 19,420 / 整合候補 0・2・3 件 = 160・7,274・64) は、出所 (実行 commit・PE の所在・実行ログ) を確認できないため取り下げる。
   probe の値が REPORT_MX10 §2 と一致するという記述は REPORT_MX10 側の記録との比較であり、本件での再測定ではない。
-- 測定 commit から HEAD までの差分: `git diff c2b976d75 HEAD -- tools/targets/massivex/dsp/scripts/mx_unres_residual.py` は 0 行 (スクリプト不変)。
+- 測定 commit から HEAD までの差分: `git diff c2b976d75 HEAD -- tools/targets/massivex/dsp/scripts/mx_unres_residual_4198.py` は 0 行 (スクリプト不変)。
 
 ## 5. 未解決 (起票先)
 
