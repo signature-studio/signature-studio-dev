@@ -159,21 +159,41 @@ def classify(mem):
     return "oth"
 
 
+def abs_dest(a, mn, ops, size):
+    """書込み先の絶対 VA。RIP 相対は命令末尾基準で解決する。解決できなければ None。"""
+    m = re.search(r"\[rip ([+-]) (0x[0-9a-f]+)\]", ops)
+    if m:
+        d = int(m.group(2), 16)
+        return (a + size + (d if m.group(1) == "+" else -d)) & 0xFFFFFFFFFFFFFFFF
+    m = re.search(r"\[(0x[0-9a-f]+)\]", ops)
+    return int(m.group(1), 16) if m else None
+
+
 def write_appendix(path, sides, per):
     """判定 (側ごと) の表と、呼出し先ごとの表を Markdown で書く。値はすべて per (解析結果) から作る。"""
-    lines = ["| 判定 VA | mask | 側 | 呼出し先 (直接) | グローバル書込み命令 VA | 間接 call |",
-             "|---|---|---|---|---|---|"]
+    lines = ["| 判定 VA | mask | 側 | 呼出し先 (直接) | グローバル書込み命令 VA | 解決先 VA | 間接 call |",
+             "|---|---|---|---|---|---|---|"]
     for site, side, entry, cs in sides:
-        gva, ind = set(), 0
+        gva, ind = {}, 0
         for c in cs:
             ins, _, _, ic, _ = per[c]
             ind += ic
             for a in ins:
-                mn, ops, _ = ins[a]
+                mn, ops, size = ins[a]
                 w = write_target(mn, ops)
                 if w and classify(w) == "abs":
-                    gva.add(a)
-        lines.append(f"| {site} | 0x4 | {side} | {len(cs)} | {' '.join(f'{a:#x}' for a in sorted(gva)) or '-'} | {ind} |")
+                    gva[a] = abs_dest(a, mn, ops, size)
+        dests = sorted({d for d in gva.values() if d is not None})
+        lines.append(f"| {site} | 0x4 | {side} | {len(cs)} | {' '.join(f'{a:#x}' for a in sorted(gva)) or '-'} | {' '.join(f'{d:#x}' for d in dests) or '-'} | {ind} |")
+    lines += ["", "| 判定 VA | 立ちだけが呼ぶ呼出し先 | 落ちだけが呼ぶ呼出し先 |", "|---|---|---|"]
+    by_site = {}
+    for site, side, entry, cs in sides:
+        by_site.setdefault(site, {})[side] = set(cs)
+    for site in sorted(by_site):
+        st, fa = by_site[site].get("立ち", set()), by_site[site].get("落ち", set())
+        only_st = " ".join(f"{t:#x}" for t in sorted(st - fa)) or "-"
+        only_fa = " ".join(f"{t:#x}" for t in sorted(fa - st)) or "-"
+        lines.append(f"| {site} | {only_st} | {only_fa} |")
     lines += ["", "| 呼出し先 | 命令数 | ret | 未読 (上限打切) | 間接 call | 間接 jmp | 基底レジスタ経由の書込み命令数 |",
               "|---|---|---|---|---|---|---|"]
     for t in sorted(per):
