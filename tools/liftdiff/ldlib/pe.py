@@ -80,6 +80,15 @@ class Analyzer:
             return ins
         return None
 
+    def is_ret_fragment(self, va):
+        """entry が `add rsp,N; ret` だけの断片か (関数本体なし。ret は stack 上の値を戻り先として pop する)。"""
+        rva = va - self.pe.base
+        a = self._dis(rva)
+        if a is None:
+            return False
+        b = self._dis(rva + a.size)
+        return b is not None and a.mnemonic == 'add' and a.op_str.startswith('rsp,') and b.mnemonic == 'ret'
+
     def analyze(self, va, max_ins=3000, zero_idiom=False):
         """VA の関数を制御フロー追跡し特徴を返す。zero_idiom=True なら xmm の同一レジスタ読みを
         ゼロ化イディオム (xorps r,r 等) とみなし xmm_slots から除く (#2850。既定 False は従来どおり)"""
