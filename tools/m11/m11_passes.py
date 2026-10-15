@@ -306,6 +306,31 @@ def pass_m2r_fn1046a30(text, report):
     return text
 
 
+def pass_m2s_fn40fd90_iid(text, report):
+    """[M2s] function_40fd90 (GetInterfaceEntry) の IID 先頭 8 バイト比較を復元 (#4012 / WIN-43).
+    機械語 40fdd4 `cmp r11,[r9]` (r9 = arg2 = IID ポインタ) は IID の先頭 8 バイトを読むが、RetDec の IR は
+    `icmp eq i64 %11, %arg2` でポインタ値そのものと比べていた。後半 8 バイト (`[arg2+8]`) は正しく読まれているため、同じ形で先頭も読む。
+    この関数の 1 箇所だけを対象にする (他関数の同形比較は対象外)。"""
+    head = 'define weak i64 @function_40fd90('
+    i = text.find(head)
+    if i < 0:
+        stage('M2s', 'function_40fd90 IID compare restore: 0 sites (function absent)')
+        report['m2s_fn40fd90_iid'] = 0
+        return text
+    j = text.find('\n}\n', i)
+    body = text[i:j]
+    old = '  %12 = icmp eq i64 %11, %arg2\n'
+    new = ('  %iid0p = inttoptr i64 %arg2 to ptr\n'
+           '  %iid0 = load i64, ptr %iid0p, align 8\n'
+           '  %12 = icmp eq i64 %11, %iid0\n')
+    n = body.count(old)
+    if n == 1:
+        text = text[:i] + body.replace(old, new) + text[j:]
+    stage('M2s', 'function_40fd90 IID compare restore: %d sites' % n)
+    report['m2s_fn40fd90_iid'] = n
+    return text
+
+
 def pass_m2b(text, report):
     n = [0]
 
@@ -807,6 +832,7 @@ def main():
     text = pass_m2(text, report)
     text = pass_m2q_fn980ed0(text, report)
     text = pass_m2r_fn1046a30(text, report)
+    text = pass_m2s_fn40fd90_iid(text, report)
     if os.environ.get('M11_M2P') == '1':   # #417: 既定 OFF (有効化すると unit 503 で survey がハング, REPORT 参照)
         text = pass_m2p_dec_inttoptr(text, report)
     text = pass_m2c(text, report)
