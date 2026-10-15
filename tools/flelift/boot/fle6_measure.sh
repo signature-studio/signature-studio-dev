@@ -61,7 +61,9 @@ elapsed "clang-plain" "$T"
 run_boot() {
   local log="$W/run_${TAG}_$1.log"
   local rc=0
-  FLE_IPP="$3" FLE_TOLERANT="${4:-0}" FLE_DIAG_NULLFILL="${5:-0}" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
+  # FLE-15 (#3770): FLE_BOOT_TIMEOUT 秒で打ち切る (時間上限・rc=124)。ログ上限は FLE_BOOT_LOG_CAP (bytes・fle_boot.mjs が JSON に残す)。
+  FLE_IPP="$3" FLE_TOLERANT="${4:-0}" FLE_DIAG_NULLFILL="${5:-0}" FLE_BOOT_LOG_CAP="${6:-0}" FLE_BOOT_VARIANT=plain timeout "${FLE_BOOT_TIMEOUT:-900}" "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
+  if [ "$rc" = 124 ]; then echo "[fle6] $1: 時間上限 ${FLE_BOOT_TIMEOUT:-900}s で打ち切り ($log・ログ $(stat -c%s "$log") B)"; FAIL_RC=124; return 0; fi
   grep 'FLEBOOT_RESULT' "$log" || true
   grep 'FLEBOOT_IPP_CHECK' "$log" || { echo "[fle6] $1: FLEBOOT_IPP_CHECK 行が無い ($log)"; exit 4; }
   [ -s "$2" ] || { echo "[fle6] $1: 結果 JSON が無い ($2)"; exit 4; }
@@ -78,8 +80,9 @@ for r in $RUNS; do
     default) run_boot default "$HERE/results/boot_summary_${TAG}_default.json" "" ;;
     tol)     run_boot tol     "$HERE/results/boot_summary_${TAG}_tol.json"    1 1 ;;   # 寛容起動 (#2719): shim 有 + 逐次 unit 寛容 + CreateFruityInstance 観測
     tol2)    run_boot tol2    "$HERE/results/boot_summary_${TAG}_tol2.json"   1 2 ;;   # 診断: 失敗 unit の後で InitTable を起動時の値へ戻す (補修。既定ではない)
-    diag_shim)   run_boot diag_shim   "$HERE/results/boot_summary_${TAG}_diag_shim.json"   1 0 1 ;;   # #672 診断: shim 有 + buf=0 の fill を戻す
-    diag_negctl) run_boot diag_negctl "$HERE/results/boot_summary_${TAG}_diag_negctl.json" 0 0 1 ;;   # #672 診断: ネガコン + buf=0 の fill を戻す
+    # #672 診断: shim 有 + buf=0 の fill を戻す。FLE-15 (#3770): ログ上限 FLE_BOOT_LOG_CAP (既定 256MiB) で有界にする
+    diag_shim)   run_boot diag_shim   "$HERE/results/boot_summary_${TAG}_diag_shim.json"   1 0 1 "${FLE_BOOT_LOG_CAP:-268435456}" ;;
+    diag_negctl) run_boot diag_negctl "$HERE/results/boot_summary_${TAG}_diag_negctl.json" 0 0 1 "${FLE_BOOT_LOG_CAP:-268435456}" ;;   # #672 診断: ネガコン + buf=0 の fill を戻す
     *) echo "[fle6] unknown run: $r"; exit 2 ;;
   esac
   elapsed "boot $r" "$T"

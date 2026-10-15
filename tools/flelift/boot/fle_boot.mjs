@@ -20,6 +20,40 @@ const BOOT_ONLY = process.argv.includes('--boot-only');
 const SURVEY = process.argv.includes('--survey') || !BOOT_ONLY;
 const TRACE = process.env.FLE_BOOT_TRACE === '1';
 
+// FLE-15 (#3770): 有界実行。FLE_BOOT_LOG_CAP (bytes・既定 0 = 無効) を超えた console 出力 (stdout/stderr) で
+// 例外を投げ、boot を抜けて結果 JSON を出す (診断 route は反復出力で 20GB 級になるため #3491)。
+// 停止は boot 内の JS 例外 (fle_throw_kind と同じ経路)。時間上限は fle6_measure.sh の timeout が担う。
+// FLE_BOOT_TIME_CAP (秒・既定 0 = 無効): 出力の度に経過を見て、超えたら同じ経路で抜ける (出力が途切れない反復の打ち切り)。
+// FLE_BOOT_QUIET_BIN=1: U+FFFD・制御文字を含む行 (ガストの生バイト列の反復) は表示せず数えるだけにし、上限の計数に入れない。
+const LOG_CAP = Number(process.env.FLE_BOOT_LOG_CAP || 0);
+const TIME_CAP = Number(process.env.FLE_BOOT_TIME_CAP || 0);
+const QUIET_BIN = process.env.FLE_BOOT_QUIET_BIN === '1';
+const LOG_T0 = Date.now();
+const logCap = { cap: LOG_CAP, time_cap_s: TIME_CAP, quiet_bin: QUIET_BIN, bytes: 0, lines: 0, bin_lines: 0, bin_bytes: 0, hit: null, elapsed_ms: null, head: [], tail: [] };
+if (LOG_CAP > 0 || TIME_CAP > 0) {
+    for (const k of ['log', 'error']) {
+        const orig = console[k].bind(console);
+        console[k] = (...a) => {
+            const s = a.map(String).join(' ');
+            const el = Date.now() - LOG_T0;
+            if (!logCap.hit && TIME_CAP > 0 && el > TIME_CAP * 1000) {
+                logCap.hit = 'time'; logCap.elapsed_ms = el;
+                throw new Error('FLE_BOOT_LOG_CAP exceeded (time ' + TIME_CAP + ' s)');
+            }
+            const bin = /\uFFFD|[\x00-\x08\x0e-\x1f]/.test(s);
+            if (QUIET_BIN && bin) { logCap.bin_lines++; logCap.bin_bytes += Buffer.byteLength(s) + 1; return; }
+            logCap.bytes += Buffer.byteLength(s) + 1; logCap.lines++;
+            if (logCap.head.length < 40) logCap.head.push(s.slice(0, 240));
+            logCap.tail.push(s.slice(0, 240)); if (logCap.tail.length > 40) logCap.tail.shift();
+            if (!logCap.hit && LOG_CAP > 0 && logCap.bytes > LOG_CAP) {
+                logCap.hit = 'bytes'; logCap.elapsed_ms = el;
+                throw new Error('FLE_BOOT_LOG_CAP exceeded (' + LOG_CAP + ' bytes)');
+            }
+            orig(...a);
+        };
+    }
+}
+
 const mod = await import(cjs);
 let m = await (mod.default ? mod.default() : mod());
 const U8 = m.HEAPU8;
@@ -46,6 +80,7 @@ function classify(e) {
     }
     const s = String(e && e.message || e);
     if (/out of bounds/.test(s)) return { cls: 'oob', msg: s.slice(0, 160) };
+    if (/FLE_BOOT_LOG_CAP/.test(s)) return { cls: 'log_cap', msg: s.slice(0, 160) };
     return { cls: 'trap', msg: s.slice(0, 160) };
 }
 
@@ -331,6 +366,9 @@ const softs = [];
 for (let i = 0; i < Number(m._fle_n_soft_uniq()); i++) softs.push(`${m._fle_soft_name(i)}:${m._fle_soft_count(i)}`);
 softs.sort((a, b) => Number(b.split(':')[1]) - Number(a.split(':')[1]));
 
+// FLE-15 (#3770): 画素ストア 0x6bbc20 の計数 (fle_boot.c px_probe)。呼出し点 ret=0x6c9380 (f_6c9280 の 0x6c937a 直後) の回数と矩形
+const pxRaw = typeof m._fle_px_stat === 'function' ? Array.from({ length: 16 }, (_, k) => m._fle_px_stat(k)) : null;
+const px6bbc20 = pxRaw && { calls_all: pxRaw[0], calls_site_6c9380: pxRaw[1], first_rect_x0_y0_x1_y1: pxRaw.slice(2, 6), last_rect_x0_y0_x1_y1: pxRaw.slice(6, 10), rect_changes: pxRaw[10], x_min_max_y_min_max: pxRaw.slice(11, 15), calls_other_ret: pxRaw[15] };
 const summary = {
     variant: process.env.FLE_BOOT_VARIANT || 'plain',
     wasm_size: (() => { try { return readFileSync(cjs + '.wasm').size; } catch { return null; } })(),
@@ -339,6 +377,8 @@ const summary = {
     survey,
     tolerant: TOLERANT ? { mode: TOL_MODE, started: tol.started, hook_ran: tol.hook_ran, kinds: tol.kinds, skipped_n: tol.skipped.length, restored: tol.restored, skipped: tol.skipped, miss_units: tol.miss_units, units: tol.units } : null,
     cfi,
+    log_cap: logCap,
+    px6bbc20,
     soft_top: softs.slice(0, 40),
     ipp: { mode: IPP_MODE, on: IPP_ON, ptr_15F34A0: boot.ipp_ptr_15F34A0, ptr_15F40E8: boot.ipp_ptr_15F40E8, total: boot.ipp_total, called: boot.ipp_called, stop: boot.ipp_stop, token_at: boot.ipp_token_at, call_slot: boot.ipp_call_slot },
     notes: {
@@ -357,6 +397,8 @@ writeFileSync(outPath, JSON.stringify(summary, null, 1));
 console.log('FLEBOOT_RESULT ' + JSON.stringify({
     units_run: boot.units_run, units_total: boot.units_total, stopped_at: boot.stopped_at_1based,
     boot_threw: boot.threw && (boot.threw.cls + (boot.threw.msg ? ' ' + boot.threw.msg : '')),
+    log_cap: LOG_CAP || TIME_CAP ? { hit: logCap.hit, bytes: logCap.bytes, lines: logCap.lines, bin_lines: logCap.bin_lines, elapsed_ms: logCap.elapsed_ms } : null,
+    px6bbc20,
     longjmp: boot.longjmp, getmem: boot.getmem, freemem: boot.freemem,
     va_calls: boot.va_calls, va_bytes: boot.va_bytes, exit: boot.exit,
     survey: survey && survey.byCls ? survey.byCls : (survey && survey.prologue_threw || null),
