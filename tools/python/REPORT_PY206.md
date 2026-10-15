@@ -42,14 +42,14 @@
 
 | 検査 | 結果 | rc |
 |---|---|---|
-| `bash provider/build.sh` (`emsdk` は runner の `/opt/emsdk` (既定の `EMSDK_ENV`)、`toolchain-emsdk` 素材は未展開) | `fl_table.c: 435 関数, ハンドラ 156` | 0 |
+| `bash provider/build.sh` (`emsdk` は `[EMSDK]` (既定の `EMSDK_ENV`)、`toolchain-emsdk` 素材は未展開) | `fl_table.c: 435 関数, ハンドラ 156` | 0 |
 | `bash build_flpy.sh` (CPython 3.12 wasm は `build_cpython_wasm.sh` で作成、3 分 14 秒) | flpy.js / flpy.wasm 生成 | 0 |
 | `node tests/device_diff.mjs` | calls 18・rejects 10・midi_out 5・**diffs 0**・PASS | 0 |
 | `node tests/provider_check.mjs` | functions 435・**implemented 156**・unimplemented 279・PASS | 0 |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | **48/48 ok**・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 0 |
 | `node tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425 | 0 |
 
-- 測定環境: GitHub Actions runner (`/home/runner/work/signature-studio-dev/ws-3494` の worktree、commit `0641856`)。load average は測定中 2.2〜2.9 (`uptime`、n=1)。`device_diff` / `provider_check` / `all_tools` の所要は main 作業ツリーでの先行測定 (provider_check 0.33 秒、all_tools wasm 1.39 秒、load 2.2〜2.4)。
+- 測定環境: GitHub Actions runner (親 dir の worktree `ws-3494`、commit `0641856`)。load average は測定中 2.2〜2.9 (`uptime`、n=1)。`device_diff` / `provider_check` / `all_tools` の所要は main 作業ツリーでの先行測定 (provider_check 0.33 秒、all_tools wasm 1.39 秒、load 2.2〜2.4)。
 - **ネガティブコントロール** (1 件を壊して FAIL すること。作業ツリーの写し・base `e5c96411e` 上で実施): (a) mock の `getMasterSync` を `return true` → `device 差分 1 件`・exit 1 (`device.getMasterSync` の値の不一致)。(b) mock の `setMasterSync` を `st.masterSync = false` → `device 差分 1 件`・exit 1。本体 (壊していない版) は diffs 0・exit 0。
 - 追加の確認: `git status` で作業ツリーに残る変更は本 PR の 4 ファイル (+ `REPORT_PY206.md` と `docs/DOC_MAP.md`) のみ。`package.json`・`pnpm-lock.yaml` は runner 側の既存差分で commit に含めない。
 
