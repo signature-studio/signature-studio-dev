@@ -6,6 +6,7 @@
 - 測定 commit: `ce0f0872` (`feat(ott): lower x87 subset for ia32 (PLG-G2-9)`。 lowering・runtime・差分試験を含む)。 本付録の commit は docs のみ。
   `git diff ce0f0872 HEAD -- tools/ott/lift tools/ott/rt tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_diff_main.h tools/plugins/slayer_engine_ia32/x87_diff_native.c tools/plugins/slayer_engine_ia32/x87_diff_lowered.c tools/plugins/slayer_engine_ia32/x87_crosscheck.py tools/plugins/slayer_engine_ia32/x64_regress_1099.py` の差分は追加 88 行のみで、その全てが `x87_crosscheck.py` (新規追加・commit `1adb69c3`) である。 この検算スクリプトを除く code (lift・rt・driver・C 参照) の差分は 0 行。 §3・§4 の主 seed 1 と検算は HEAD で再実行し、同じ値を得た (2026-10-14)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` (`$FL_WIN64_DIR/extracted/`) と生成した試行のみ。
+- 注 (#2967): 2967 で op 表に fld/fstp m80 と RC 固定の試験を加えた。 乱択の試行列が変わるので、§3 の数値は `ce0f0872` 時点の値で、HEAD の既定実行では再現しない (現行の値は `REPORT_APPENDIX_2967.md` §3)。 §9 の「m80 未試験」と「RC の算術」は #2967 で測定済み。 §4 の有理数検算 (旧 `x87_crosscheck.py` (a)) は 2967 で置き換えた。
 
 ## 1. 結論
 
