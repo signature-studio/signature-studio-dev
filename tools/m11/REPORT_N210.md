@@ -1,0 +1,49 @@
+# M11-N210 (#4747): function_40c650 の署名変更で unit 149・158 が退行する要因の切り分け
+
+親: #3678 / #2902 / #3642。受入条件 1 (機構の特定) の REPORT。受入条件 2 (退行しない形の survey 差 0) は #4748 (N211)。
+
+結論: **署名 (i32 → i32+f64) だけでは退行しない**。退行を起こすのは、呼出し側 16 site が新しい `f64` 枠へ渡す **実値** (`movsd` / `cvtss2sd` 由来) である (ctlB 退行・ctlC 無退行)。callee 本体が入力を読むこと (`reinterpret`) も加わるが、呼出し側の値を 0 にすると退行は消える。
+ただし wasm 側の機構 (なぜ実値で 149・158 の結果が変わるか) は未特定。caller `function_660050` / `function_668290` の frame 読みの差が候補 (未実測)。
+
+## 測定 (commit 5ec59116d・同一 IR 上の A/B)
+
+IR: `cd tools/m11 && FL_WIN64_DIR=<展開先> bash m11_gen_ir2.sh` (34 秒・rc 0)。survey は `node m11_survey.mjs` (6.6 秒)。
+
+| 変種 | 構成 | ok / noproc / miss / trap / clobber | 基準との unit 差 |
+|---|---|---|---|
+| base | `M11_XMM_ARGS=0` | 873 / 1 / 47 / 21 / 0 | (基準。#3642 の 873/1/47/21/0 と一致) |
+| 既定変換 | `M11_XMM_ARGS=1` (NO_CONV = 40c650) | 873 / 1 / 47 / 21 / 0 | 差 0 |
+| 全変換 | `NO_CONV` 空 (47 callee) | 872 / 1 / 47 / 20 / 0 | 149 trap→clobber、158 ok→clobber (差はこの 2 件のみ) |
+| only40c | 40c650 だけ変換 (`(i32,f64)`、実値を渡す) | 872 / 1 / 47 / 20 / 2 | **149 trap→clobber、158 ok→clobber** |
+| ctlB | only40c と同じ変換。callee 本体は入力を 0 固定 (呼出し側は実値) | 872 / 1 / 47 / 20 / 2 | **149・158 が同じく退行** |
+| ctlC | 呼出し 16 site を `0.0` にする。callee 本体は入力を読む | 873 / 1 / 47 / 21 / 0 | **差 0** |
+| sigzero | 呼出し 16 site を `0.0` にし、callee 本体も 0 固定 | 873 / 1 / 47 / 21 / 0 | **差 0** |
+
+判定: 退行は「呼出し側が `f64` 枠に渡す実値」で起きる (ctlB 退行・ctlC 無退行の対比)。署名変更だけ (sigzero。値を 0 に固定) では退行しない。
+
+## wasm レベルの差 (baseline vs only40c、`wasm-dis` 実測)
+
+- `function_40c650`: `(func (param i32))` → `(func (param i32) (param f64))` (export 1929 → 同じ)。`m11_tr_function_40c650` (`$8696`) は両者で `(i64×8) → i64` のまま。
+- 呼出し側 (例: `function_660050` 内 `$3943`): baseline は sret 用に `(i32.add (local.get $0) (i32.const 16))` を渡すのみ。変換版は sret が `+192` になり、f64 用に `(i64.load offset=208)` / `offset=216` を読んで `f64.reinterpret_i64` で渡す (`wasm-dis` の該当 site の比較。他 site の一覧は未確認)。
+- 呼出し側の関数: `$3943`=`function_660050`、`$4036`=`function_668290` (survey 149・158 の trap/ok 経路上)。
+- 関数 table: 両者とも 7430 要素。`call_indirect` 0 件。table 経由の差は無い。
+
+## 実行時 (unit 149・158 の trap/ok スタック)
+
+- baseline 149: `RuntimeError: memory access out of bounds` (`function_412e40`(idx 77) ← `653660`/`6539e0`/`664190`/`664260` ← `m11_tr_function_664260`)。
+- only40c 149: 同じ OOB が `function_407a50`(idx 1873) → `409410` → `412c20` → `414ad0` → `414bb0` → `652500` → `653660` → `6539e0` → `664190` → `664260` の経路で起きる。baseline とは経路が違う (baseline は `412e40` から)。40c650 の戻り値の使い方が変わったことの裏付けだが、呼出し元との対応は未確認。
+- baseline 158: `ok` (戻り 1)。only40c 158: `clobber` (`RuntimeError`)。158 の経路の名前付けは全変換版 (`NO_CONV` 空) の stack で見たもの (`414bb0` → `665bd0` → `66d050` → `66d1a0`)。only40c の 158 stack は未取得。
+
+## 未解決・起票先
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| wasm 側の機構: 実値で 149・158 の経路が変わる理由 (caller の frame 読み `offset=208/216` と戻り値の使い道) | 受入条件 1 の「機構」の核心。未特定 | 本 issue #4747 (継続)。次 run で caller の戻り値利用を追う |
+| caller の戻り値利用 (sret `+16` → `+192` 変化が 149・158 の分岐をどう変えるか) | 機構の確定に必要 | 同上 |
+| 受入条件 2 (退行しない形で 40c650 を変換して survey 差 0) | #4748 (N211) が担当 | #4748 |
+
+## 測定の範囲
+
+- 全測定は `tools/m11/work/boot_final.ll` (`m11_gen_ir2.sh` の再生成 IR) 上。`work-m11` は素材の旧生成で基準に使わない (WORKFLOW §11)。
+- 測定 commit: 5ec59116d (origin/main)。コード差分はこの run で追加した `m11_sigfix40c_ab.py` と本 REPORT のみ。
+- 生成物 (`work/`・`emsdk/`・`retdec/`) は gitignore または未追跡で commit しない。
