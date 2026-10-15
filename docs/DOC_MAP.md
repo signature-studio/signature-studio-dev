@@ -607,7 +607,7 @@
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
 | `tools/targets/serum2/gui/REPORT_SR43.md` | ~115 | SR-43 (#2174): 間接 call `call [R+disp]` の呼出先オブジェクトを所属関数の this / 引数まで遡る分類 (`receiver_this_trace.py`)・判定点のネガティブコントロール (`negctl_this_trace.py`)。受信が SerumController の this と確定できた候補は 0 件 (残りは #3236・#3237)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_2065.md` | ~99 | SR-36 (#2065): 描画試行 harness と no-op 静的計数の付録。測定値の正本 |
-| `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_3260.md` | ~106 | SR-50 (#3260): canvas の IPlatformString・drawRect/clearRect/drawString と bitmap 結線 (手書き 5x7 placeholder フォント)・render 判定 (`text_px` 追加)・no-op 計数の変化。測定値の正本 |
+| `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_3260.md` | ~128 | SR-50 (#3260): canvas の IPlatformString・drawRect/clearRect/drawString と bitmap 結線 (手書き 5x7 placeholder フォント)・render 判定 (`text_px` 追加)・no-op 計数の変化。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_3261.md` | ~100 | SR-51 (#3261): wasm の初期化経路。`platformfactory.cpp` の WASM 分岐 (patch) と upstream `init()` 経路化、harness の代替 2 点の除去。構文・compile/link/run の実測と負の対照 3 件。測定値の正本 |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
 | `tools/targets/massivex/REPORT_APPENDIX.md` | ~244 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017・§12.9 の対照と一貫性 #3154) |

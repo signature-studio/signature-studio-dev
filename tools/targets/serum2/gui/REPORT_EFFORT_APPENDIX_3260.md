@@ -6,7 +6,7 @@
 
 - 受入条件 5 件を満たす (17-2)。`check_render_poc.sh` の render 判定は pass (`nonzero_after=12000`・`text_width=54`・`text_px=112`)。
 - 文字は同梱の手書き 5x7 placeholder フォントで描く。フォントサイズは無視する (17-7)。
-- 測定 commit: `560357317` (コードを変えた最後の commit。本節を含む REPORT の commit は後続で、コードは変えない)。
+- 測定 commit: `995f9fb32` (main 取り込みの merge commit。コードを変えた最後の commit。値は §17-10)。main 取り込み前の測定 commit は `560357317` (§17-3)。以降の commit は REPORT とドキュメントだけ (§17-9)。
 
 ### 17-2. 受入条件の達成
 
@@ -18,7 +18,7 @@
 | 4 | `check_render_poc.sh` で `nonzero_after>0` かつ `text_width>=0` | 達成 (+ `text_px>0` を追加判定) | `render: pass`。追加条件の理由は 17-8 |
 | 5 | 測定 commit・rc・所要秒・load・画素数を実測で残す | 達成 | 17-3 |
 
-### 17-3. 測定 (測定 commit `560357317`、HEAD で再実行)
+### 17-3. 測定 (main 取り込み前の測定 commit `560357317`。取り込み後の値は §17-10)
 
 | 項目 | 値 |
 |---|---|
@@ -84,11 +84,11 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| フォントサイズを無視する (`size` は保持のみ)。比例幅・ディセンダの余白なし | 文字の大きさ・字間は実フォントと一致しない | 未起票 (実フォント資源の扱いを決める issue が要る) |
-| `drawLine`・`drawLines`・`drawPolygon`・`drawArc`・`drawEllipse`・`drawBitmap`・`drawGraphicsPath`・gradient 2 件・9 分割・`fillRectWithBitmap` は no-op | CTextLabel の枠は `drawGraphicsPath` 経路なので描かれない。黒背景は `drawRect` で描かれる | 未起票 (canvas 描画の後続 issue) |
-| 線は lineWidth に依らず 1 px。アンチエイリアスなし | 太い線・角の見え方が実機と異なる | 未起票 |
-| `setTransformMatrix` は no-op (平行移動・拡大縮小は未適用) | 原点 (0,0) 以外の view では描画位置がずれる。harness は原点のみで検証 | 未起票 |
-| placeholder の 5x7 フォント | 確認用の見た目のみ。製品の字形としては使わない | 未起票 |
+| フォントサイズを無視する (`size` は保持のみ)。比例幅・ディセンダの余白なし | 文字の大きさ・字間は実フォントと一致しない | PM agent の判断待ち: 実フォント資源 (サイズ・比例幅) を扱うか・既定案: 5x7 placeholder を維持 |
+| `drawLine`・`drawLines`・`drawPolygon`・`drawArc`・`drawEllipse`・`drawBitmap`・`drawGraphicsPath`・gradient 2 件・9 分割・`fillRectWithBitmap` は no-op | CTextLabel の枠は `drawGraphicsPath` 経路なので描かれない。黒背景は `drawRect` で描かれる | 子 #3422 (SR-55) |
+| 線は lineWidth に依らず 1 px。アンチエイリアスなし | 太い線・角の見え方が実機と異なる | 子 #3424 (SR-56) |
+| `setTransformMatrix` は no-op (平行移動・拡大縮小は未適用) | 原点 (0,0) 以外の view では描画位置がずれる。harness は原点のみで検証 | 子 #3424 (SR-56) |
+| placeholder の 5x7 フォント | 確認用の見た目のみ。製品の字形としては使わない | PM agent の判断待ち: 実フォント資源 (サイズ・比例幅) を扱うか・既定案: 5x7 placeholder を維持 |
 | wasm の初期化経路 (`getPlatformFactory` の代替と `CFontDesc::init()` の直呼び) | 解消済み (main の #3261 で `init()` 経路化。§17-10 の再測定で run rc=0) | #3261 (SR-51・main に取り込み済み) |
 | XferOnOffButton の canvas 実装 | 範囲外 | #3262 (SR-52) |
 
@@ -97,12 +97,13 @@
 - 受入の 2 条件 (`nonzero_after>0`・`text_width>=0`) だけでは、文字が無くても pass する。`CTextLabel` の既定は黒背景で、実装済みの描画命令のうち不透明な黒を書けるのは `drawRect` だけなので、`nonzero_after=12000` の 11888 px は背景である。
 - そのため `check_render_poc.sh` は `text_px>0` (文字色の画素) を追加で要求する。文字が描かれた証拠を別に残すため。
 - `control` と `before` の計数は変えていない。`text_px` は harness の出力行の末尾に足した。
+- ネガティブコントロール (数値): `canvas_font.cpp` の `CanvasFontPainter::drawString` の先頭に `return;` を入れた一時変更 (測定後に元へ戻した。commit はしない) で `check_render_poc.sh` を実行した。結果は `nonzero_after=12000` (背景は残る)・`text_px=0`・`text_width=54`・`render: fail`・rc=1。文字が描かれないときに `text_px` の条件だけが落ちることを確かめた。
 
 ### 17-9. 測定 commit と差分
 
 - 測定 commit: `995f9fb32` (main 取り込みの merge commit。コードを変えた最後の commit)。main 取り込み前の測定 commit は `560357317` (§17-3 の値)。
 - 差分 (コード・ベースラインからの規模): `git diff --stat cf2966030 560357317 -- tools/targets/serum2/gui/canvas` → 14 files・460 insertions・42 deletions (PR 本体の規模。main 取り込みの差分は含まない)。
-- 差分 (測定 commit から HEAD まで): `git diff 995f9fb32 HEAD -- tools/targets/serum2/gui/canvas tools/targets/serum2/gui/*.py` の出力は **0 行** (本節の commit は REPORT とドキュメントだけ)。
+- 差分 (測定 commit から HEAD まで): `git diff 995f9fb32 HEAD -- tools/targets/serum2/gui/canvas tools/targets/serum2/gui/*.py tools/targets/serum2/gui/check_wasm_syntax.sh tools/targets/serum2/gui/patches` の出力は **0 行** (測定 commit の後に入ったのは REPORT とドキュメントだけ)。
 - 再現: `cd tools/targets/serum2/gui && bash canvas/check_render_poc.sh && bash canvas/check_canvas_syntax.sh && bash check_wasm_syntax.sh && python3 canvas/count_canvas_noop.py`。前提は `work/vstgui4` (vstgui4_14_3 の clone) と `work/emsdk/upstream/emscripten` (`toolchain-emsdk` を `work/` に展開)。
 
 ### 17-10. main 取り込み後の再測定 (`995f9fb32`)
@@ -124,3 +125,4 @@
 | `count_canvas_noop.py` | draw 15 (no-op 12・実装 3)・state 14 (no-op 7・実装 7)。§17-5 と同じ |
 
 - §17-3 からの変化は件数だけ: compile 70→71・canvas 構文検査 7→8 (main 側が upstream の `platformfactory.cpp` を検査対象に加えたため)。画素・文字の値は変わらない。
+- 所要の注記 (`docs/WORKFLOW.md` §5: 所要は秒・load・並列数で書く): compile は `xargs -P 4` (nproc 4) で並列に走る。同じコードの real は測定ごとに変わった。上の 14.644 s (load 0.32→0.70)。差し戻し対応で同じコードを再実行した 22.440 s (load 0.74→2.53)。reviewer 側の再実行は real 31.0〜32.0 s・compile 30.5〜30.9 s。判定値 (画素・文字の値・rc) は、どの回も上の表と一致した。
