@@ -70,8 +70,8 @@ venv/bin/python $P/arg_vt_indirect.py Serum2_win64.vst3 trace.tsv --tsv vt_ind.t
 | `arg_vt_indirect.py` (旧 commit・取りこぼしあり) | 1 | 31.61 | 0.73 | `9b4cb2ff` |
 | `arg_vt_indirect.py` (旧 commit・取りこぼしあり) | 2 | 31.74 | 0.91 | `9b4cb2ff` |
 
-- 修正後の再測定は未実施。理由: 再測定には `plugins-serum2` 素材が必要だが、`$ARTIFACTS_DIR` (`fl-win64.tar.zst` のみ) に無く、`Serum2_win64.vst3` の実体もこの run のどこにも無い。再測定は素材を用意した run で行う (未解決 (e))。この fix run は PR 本文に `oc_artifacts` 行が無く、`plugins-serum2` の取得は試行していない (取得失敗の確認は無い)。
-- `receiver_this_trace.py` の TSV md5 は未記録 (§3 の不一致の検証は本 run では行っていない)。
+- 修正後の再測定は未実施。確認した事実 (fix run・head `50686a8d1`・`$ARTIFACTS_DIR` の実在を確認): `fl-win64.tar.zst` (2,324,302,252 B) のみが存在し、`plugins-serum2` は無い。PR 本文に `oc_artifacts` 行が無かったため、この run は `plugins-serum2` を要求しておらず、取得の試行も無い。`Serum2_win64.vst3` の実体も無いため、再測定は素材を用意した run で行う (未解決 (e))。
+- `receiver_this_trace.py` の TSV md5 は未記録。`trace.tsv` を生成できず、この run では md5 を取れない (未解決 (d))。
 
 ### 鮮度の証跡 (`docs/WORKFLOW.md` §6)
 
