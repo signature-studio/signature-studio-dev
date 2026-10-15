@@ -57,7 +57,7 @@
 
 測定 commit: `59dac085f` (コードを変えた最後の commit。`feat(python): screen 描画・メーター系 7 件の PE 確定と mock/C 実装 (#3022)`)。以下は同じ commit のクリーンな作業ツリーで実行した。
 
-環境: runner 4 core、`/opt/emsdk` (runner 同梱。`toolchain-emsdk` 素材は取得したが展開していない)、fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (5.5 秒)。前提生成物: `fetch_inputs.sh` (rc 0、0.5 秒)・`build_cpython_wasm.sh` (rc 0、4 分 3 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.1 秒)。測定時の load average: 0.92 (1 分値、`uptime` 03:36:29)。
+環境: runner 4 core、emsdk は `[EMSDK]` (runner 同梱の既存版。`toolchain-emsdk` 素材は取得したが展開していない)、fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (5.5 秒)。前提生成物: `fetch_inputs.sh` (rc 0、0.5 秒)・`build_cpython_wasm.sh` (rc 0、4 分 3 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.1 秒)。測定時の load average: 0.92 (1 分値、`uptime` 03:36:29)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
