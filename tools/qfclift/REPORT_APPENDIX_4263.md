@@ -58,7 +58,7 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD
 - 書込みは `0x40f4eb`: `mov byte ptr [r13+0x30], al` (所属関数 `0x40f430`)。`r13` は `0x40f446` で `0x5d0c80`、`0x40f456` で `0x5d0da8` (`[rbp+0x170] >= 2` のとき)。
   `0x5d0cb0 = 0x5d0c80 + 0x30` なので、rip 相対の直接 store 0 件は「レコード経由の store」だった。`0x40f4e1`〜`0x40f4eb` で `al = [rbp+0x170] + 1` (= reason + 1)。
 - 読みは `0x40fca8` (`cmp byte [0x5d0cb0], 0`)。非 0 なら `0x40fcb8` で `0x40fa40` を呼ぶ (= 経路 B)。
-- **reason 1 (PROCESS_ATTACH) では flag = 2 (非 0)**。`r13 = 0x5d0c80` のため、経路 B は DllMain 本体 (`0x419dc0`) の後に必ず発火する。経路 A は arm されない (§1)。
+- **reason 1 (PROCESS_ATTACH) では flag = 2 (非 0)**。`r13 = 0x5d0c80` のため、静的には経路 B が DllMain 本体 (`0x419dc0`) の後で発火する。経路 A は arm されない (§1)。実行時の発火は未トレース。
 - 再現: `python3 disasm_range_4263.py block24350_PE.bin 0x40f4e1 0x40f4f0` (道具は `tools/qfclift/disasm_range_4263.py`)。
 
 ### 5.1 実測 (boot、HEAD `bfbe3f683` の lift 設定。`qfc_boot.sh`)
