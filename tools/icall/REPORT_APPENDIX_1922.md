@@ -39,18 +39,21 @@ crash 65 のうち stderr で分類した 9 関数 (変更前) 以外の内訳 (
 
 ## 5. fa_sweep 実測
 
-`bash tools/icall/diff/fa_sweep.sh 8 60`。測定は未 commit の作業ツリーで行った (測定 tree は `ee2883ab8` + 本 PR の未 commit 変更)。両方とも `funcs 131` の集計が同一。
-**注: コミット済み HEAD での再測定は未実施**。素材 (`plugins-freshair`・`work-icall`・`work-liftlib-targets`) が fix run (`pull_request_review`) に展開されておらず、`tools/icall/work/` と `tools/targets/freshair/work/` が存在しないため。`fa_sweep.sh` は `tools/icall/work/rt_freshair-core/map.json` を必要とする。次の run で素材を指定して再測定し、その測定値で本節の表を置き換える。
+測定 commit: `3d397cb4153dca5e8fc146991d6e102442381255` (コードを変えた最後の commit は `5eac5707a`。以降の `32540cc02`・`3d397cb41` は本付録のみの変更)。
+素材は fix run で `fl-win64`・`plugins-freshair`・`work-icall`・`work-liftlib-targets` を展開し、`tools/targets/freshair/fetch.sh` を実行した。
+`/opt/emsdk` は runner に無かったため、`tools/m1/flags.sh` の pin `6.0.12` を上流から `emsdk install 6.0.12` で導入し、`/opt/emsdk` へ向けた (`fa_route_build.sh` の固定パス)。`fa_route_build.sh` は OK (`fa_route.cjs` 生成)。
 
-コード差分 (測定 commit `ee2883ab8` から HEAD まで。`git diff ee2883ab8 HEAD -- tools/ott/native tools/icall`):
+手順と実測 (HEAD `3d397cb4`):
 
 ```
- tools/icall/REPORT_APPENDIX_1922.md | 68 +++++++++++++++++++++++++++++++++++++
- tools/ott/native/ott_native.c       |  8 +++++
- 2 files changed, 76 insertions(+)
+bash tools/ott/native/build.sh               # [native/build] OK work/libottnative.so
+bash tools/icall/fa_route_build.sh           # [fa_route] OK: fa_route.cjs
+bash tools/icall/diff/fa_sweep.sh 8 60       # funcs 131 bit一致 56 | native crash/timeout 65 | wasm のみ err 9 | 値の不一致 1
 ```
 
-| 項目 | 変更前 | 変更後 | 差分 |
+所要 74.1 秒 (`real 1m14.122s`)、sweep 前後の load average 0.82 (`uptime`)。
+
+| 項目 | 変更前 (前回の未 commit 作業ツリー測定値。本 run では未再測定) | 変更後 (HEAD `3d397cb4` の実測) | 差分 |
 |---|---|---|---|
 | bit一致 | 56 | 56 | 0 |
 | native crash/timeout | 65 | 65 | 0 |
@@ -58,6 +61,15 @@ crash 65 のうち stderr で分類した 9 関数 (変更前) 以外の内訳 (
 | 値の不一致 | 1 | 1 | 0 |
 
 件数は変わらない。`RtlPcToFileHeader` の追加で 6 関数の fail-fast 理由が `MISSING IMPORT` から例外経路に変わったが、分類は crash のまま。
+なお、この run の最初の sweep は `fa_route.cjs` が無く wasm 側が走らず (`n: 0`)、結果は `funcs 131 bit一致 0 | 値の不一致 66` で無効だった。上の表は `fa_route_build.sh` 後の実測。
+
+コード差分 (`git diff ee2883ab8 3d397cb4 -- tools/ott/native tools/icall`。main 取り込み後の基準から測定 commit まで。PR のコード変更):
+
+```
+ tools/icall/REPORT_APPENDIX_1922.md | 68 +++++++++++++++++++++++++++++++++++++
+ tools/ott/native/ott_native.c       |  8 +++++
+ 2 files changed, 76 insertions(+)
+```
 
 ## 6. 再現
 
