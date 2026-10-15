@@ -57,8 +57,7 @@ def scan_code(raw, pe):
 
 
 def scan_qword(raw, pe):
-    base = pe.OPTIONAL_HEADER.ImageBase
-    pat = struct.pack("<Q", base + TARGET)
+    pat = struct.pack("<Q", TARGET)
     hits = []
     off = raw.find(pat)
     while off != -1:
@@ -75,7 +74,8 @@ def main():
     check("0x410090 への direct call/jmp は 0 件", not direct, f"sites={[hex(x) for x in direct]}")
     check("0x410090 への RIP 相対参照は 0 件", not rip_refs, f"sites={[hex(x) for x in rip_refs]}")
     check("0x410090 の即値参照は 0 件", not imm_refs, f"sites={[hex(x) for x in imm_refs]}")
-    check("0x410090 の絶対 qword (VMT・関数ポインタ表) は 0 件", not qhits, f"offs={[hex(x) for x in qhits]}")
+    check("0x410090 の絶対 qword は .text 内に存在する (関数ポインタ表の要素)", len(qhits) > 0,
+          f"件数={len(qhits)} (ImageBase 二重加算の探索誤りで 0 件と判定していた旧版を修正)")
 
     by_va = {a: (m, o) for a, m, o in pc.load()}
     check("msgid 0x057f を edx に入れる (0xfdd5ea)", by_va.get(0xFDD5EA) == ("mov", "edx, 0x57f"),

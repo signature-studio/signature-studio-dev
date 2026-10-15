@@ -21,8 +21,11 @@ issue #4347 の受入 1 は満たしていない。`Refs #4347` の部分達成�
 
 ## 1. 0x410090 への参照 (間接経路の確認)
 
-`pe_py321_upstream.py` の走査 (direct call/jmp・RIP 相対・即値・絶対 qword) は、いずれも 0x410090 への参照 0 件。
-dword RVA (0x10090) のバイト列一致は 126 件と記録していたが、probe では再現していない (未検証。テーブル参照かどうかは未確定)。
+`pe_py321_upstream.py` の走査のうち、direct call/jmp・RIP 相対・即値の 3 形態は 0x410090 への参照 0 件。
+絶対 qword (VMT・関数ポインタ表) は **旧版の probe が誤っていた** (`ImageBase + TARGET` を探索し、TARGET が既に絶対 VA のため 0 件と判定していた)。修正後は 3532 件 (`.text` 内・8 バイト整列 3531 件)。
+- 連続表の例: VA `0x4019d8` から `0x410040`・`0x410030`・`0x410070`・`0x410080`・`0x410090`・`0x410060`… と関数アドレスが並ぶ。表の所属 (どの VMT か) は未確定。
+- 表先頭の切り分け (code pointer の連続で遡る) は不正確で、スロット番号 (0x80 = index 16) は確定していない。`0x410090` が `[rbx+0x80]` に入るという対応は未確認。
+- dword RVA `0x10090` の一致は block00031 内に 128 件 (4 バイト整列 28 件)。テーブル参照かどうかは未確定。
 正の対照: 同じ走査で `0x40ff70` を掛けると direct call 3 件 (0x40ffe8・0x4100b8 ほか) を検出した。走査は機能している。
 
 ## 2. msgid 0x057f の送り手 (0xfdd2c0)
@@ -41,7 +44,8 @@ dword RVA (0x10090) のバイト列一致は 126 件と記録していたが、p
 
 ## 4. 検証
 
-- 新 probe: `tools/python/analysis/flapi/pe_py321_upstream.py` (8 件・全 PASS)。0x410090 の参照形態 4 種の 0 件確認と、msgid 0x057f の送り手の 4 命令 (0xfdd5ea・0xfdd5f9・0x60c22c・0x60c24f) を照合する。
+- 新 probe: `tools/python/analysis/flapi/pe_py321_upstream.py` (8 件・全 PASS)。0x410090 の参照形態 (direct・RIP・即値は 0 件、絶対 qword は 3532 件を検出) と、msgid 0x057f の送り手の 4 命令 (0xfdd5ea・0xfdd5f9・0x60c22c・0x60c24f) を照合する。
+- 旧版の絶対 qword 判定は誤り (§1)。修正版を次 run 以降の基準とする。
 - 既存 probe: `tools/python/analysis/flapi/pe_py274_dispatch.py` 8/8 PASS (worktree 検証時 37.9 秒、load 0.78)。
 - 測定 commit (コードを変えた最後の commit): `8b902f6a9`。
   - `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py321_upstream.py`
