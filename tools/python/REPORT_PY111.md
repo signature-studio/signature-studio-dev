@@ -6,7 +6,7 @@
 ## 結論
 
 1. **note の生成経路を PE で確定した。** `channels.setGridBit` (handler `0xd5b580`) は enqueue した後、thunk `0xd5b4d0` が `0x12d4100(grid, step, value, 1, 100)` を呼ぶ。`0x12d4100` が「既存の note が無く、value > 0 (または flag 0x1234fd0 が真)」のとき note を 1 個作る。これが grid bit の正体。
-2. **既定値の PE 照合。** note の書込みは PE の即値・定数として読めた。param 0 = 60、2 = 64、3 = 120、4 = 64 は stub の既定値と一致 (2〜4 は init `0x1062210` の推定に依存。§2.4)。param 1 は setGridBit の即値 100 と一致する。fillEachNSteps は 4 番目の引数 (既定 100) を clamp して渡すため、既定 100 のときだけ一致する (未モデル。§3 行 1)。**param 5・6 は PE の値が 128 (stub は 64。init の推定に依存)**。**param 7 は開始 tick = step × V** (stub は 0)。**param 8 = 0** (PE の書込み `0x12d42ac`。stub に無く、従来は -1)。
+2. **既定値の PE 照合。** note の書込みは PE の即値・定数として読めた。param 0 = 60、2 = 64、3 = 120、4 = 64 は stub の既定値と一致 (2〜4 は init `0x1062210` の推定に依存。§2.4)。param 1 は setGridBit の即値 100 と一致する。fillEachNSteps は 4 番目の引数 (既定 100) を clamp して渡す (§3 行 1・#3747 で反映済み)。**param 5・6 は PE の値が 128 (stub は 64。init の推定に依存)**。**param 7 は開始 tick = step × V** (stub は 0)。**param 8 = 0** (PE の書込み `0x12d42ac`。stub に無く、従来は -1)。
 3. **param 8 の書込み元を確定した** (`0x12d42ac`: `mov byte [note+0x11], 0`。creation path の無条件書込み)。既定値は 0。
 4. C provider と mock の既定値を PE の値に合わせた (`provider/fl_engine.c`・`host/fl_mock.mjs`)。`channels_diff` diffs 0。fillEachNSteps の 4 番目の引数の反映は未モデル (子 #3747)。
 5. **未確定**: init 関数 `0x1062210` を container の vtable 経由で呼ぶ点 (vtable の基点は RIP 相対の参照から見つからず)、フラグ `0x1234fd0` の値、V の実行時値 (静的 24 のまま)。下の §8。
@@ -80,7 +80,7 @@ dword [note+0x14] = G                    ; G = [0x154a0f8] = 0x80806440
 | param | 構造体 field | PE の書込み | PE の値 | stub (REPORT_PY100 §3) | 判定 |
 |---|---|---|---|---|---|
 | 0 | +0xc word | `0x1062200` (`0x12d429a`) | 60 | 60 | 一致 |
-| 1 | +0x15 byte | `0x12d424c` (clamp) | setGridBit: 即値 100。fillEachNSteps: `clamp(4 番目の引数, 0, 0x7f)` (§2.1) | 100 | setGridBit は一致。fillEachNSteps は既定 (100) のときだけ一致し、4 番目 ≠ 100 では不一致 (未モデル。C・mock は 4 番目を捨てる。子 #3747) |
+| 1 | +0x15 byte | `0x12d424c` (clamp) | setGridBit: 即値 100。fillEachNSteps: `clamp(4 番目の引数, 0, 0x7f)` (§2.1) | 100 | setGridBit は一致。fillEachNSteps は 4 番目の引数 (clamp 後) を反映 (#3747・`channels_diff` で検査) |
 | 2 | +0x12 byte | init `0x1062210` | 64 | 64 | 一致 (init の推定に依存) |
 | 3 | +0x10 byte | init `0x1062210` | 120 | 120 | 一致 (同上) |
 | 4 | +0x14 byte | init (G の byte 0) | 64 | 64 | 一致 (同上) |
@@ -130,6 +130,7 @@ dword [note+0x14] = G                    ; G = [0x154a0f8] = 0x80806440
 - [x] param 8 (+0x11) の既定値と書込み元を PE で確定 (既定 0・書込み `0x12d42ac`・§2.3)。
 - [x] 確定した既定値と生成条件を `provider/fl_engine.c` と `host/fl_mock.mjs` に反映し、`tests/channels_diff.mjs` diffs 0 (§6)。
 - [x] `FL_ENGINE=wasm node tests/all_tools.mjs` 48/48 ok (§6)。
+- [x] fillEachNSteps の 4 番目の引数 (既定 100・clamp 0..127) を note の param 1 に反映 (#3747・§3 行 1)。`channels_diff` に 4 番目 (37・200→127・-5→0・既定 100) の検査を追加し diffs 0。反映を外すと FAIL (ネガティブコントロール)。
 - 補足: REPORT_PY100 §8 の「`fl_table.c` 行 61 の np=6」は解消済み。`provider/gen/fl_table.c` の getStepParam は `np=4`・`"iiaii"` で、#2927 (`46f5a0079`) が直した。本 run では表を変えていない。
 
 ## 8. 未解決 (起票先)
@@ -139,5 +140,4 @@ dword [note+0x14] = G                    ; G = [0x154a0f8] = 0x80806440
 | init `0x1062210` を `call [container vtable + 0x10]` で呼ぶ点の確定 (vtable の基点) | param 2〜6 の既定値の根拠が「引数形と stub 一致」の推定 | PR 本文の未解決表 (次の PE 作業で確定) |
 | `[rsi]` の init 内の呼出し先 (.bss の関数ポインタ) | 「0 初期化」の推定。param 2〜6 の結論には影響しない | PR 本文の未解決表 |
 | フラグ `0x1234fd0` の値 (creation path の分岐条件) | value == 0 の setGridBit で note を作るか | PR 本文の未解決表 |
-| fillEachNSteps の 4 番目の引数 (clamp 後) を note の param 1 に反映していない (C・mock は 4 番目を捨てる) | 4 番目 ≠ 100 の fillEachNSteps で作る note の param 1 が PE と不一致 (既定 100 では一致) | #3747 (PY-243) |
 | V (`[0x15e25f8]`) の実行時値 (静的 24 のまま) | param 7 の値 (step × V) | #3311 (PY-186。`REPORT_APPENDIX_3310.md` の未解決表から追記) |
