@@ -15,7 +15,7 @@
 
 ## 1. 素材と再現
 
-- 素材 (`$ARTIFACTS_DIR`): `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 確認)。`work-m11` を `tools/m11/work/`、`work-liftdiff` を `tools/liftdiff/work/` に展開 (worktree 内)。`toolchain-retdec` / `toolchain-emsdk` は `/opt/retdec`・`/opt/emsdk` が既に存在し (`/opt/emsdk/upstream/bin/wasm-opt` version 133) これを使った。
+- 素材 (`$ARTIFACTS_DIR`): `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 確認)。`work-m11` を `tools/m11/work/`、`work-liftdiff` を `tools/liftdiff/work/` に展開 (worktree 内)。`toolchain-retdec` / `toolchain-emsdk` は `[RETDEC]`・`[EMSDK]` (`docs/REFERENCES.md` §4) が既に存在し (`upstream/bin/wasm-opt` version 133) これを使った。
 - 既定 build: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/m11_gen_ir2.sh` rc 0 (51.2 s、490,761 行) → `bash tools/m11/m11_build.sh` rc 0 (24.8 s)。
 - 計装 build: `M11_PROBE_2780=1 bash tools/m11/m11_build.sh` rc 0 (probe 用。計測後に既定 build へ戻して §2 の survey を取り直した)。
 
@@ -92,7 +92,7 @@
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64
 bash tools/m11/m11_gen_ir2.sh && bash tools/m11/m11_build.sh            # 既定 build (§1)
 node tools/m11/trap_triage/survey_units.mjs tools/m11/work/trap_triage/base1.json   # §2
-export PATH="/opt/emsdk/upstream/bin:$PATH"
+export PATH="$EMSDK_BIN:$PATH"   # [EMSDK] の upstream/bin (docs/REFERENCES.md §4)
 mkdir -p tools/m11/work/trap_2891
 wasm-opt --instrument-memory tools/m11/work/m11_boot.cjs.wasm -o tools/m11/work/trap_2891/instr.wasm
 wasm-dis tools/m11/work/trap_2891/instr.wasm -o tools/m11/work/trap_2891/instr.wat
