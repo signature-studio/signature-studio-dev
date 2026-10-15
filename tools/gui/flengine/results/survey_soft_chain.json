@@ -7,17 +7,17 @@
  "units_run": 0,
  "init_count": 895,
  "survey": {
-  "ok": 873,
+  "ok": 872,
   "noproc": 1,
   "miss": 47,
-  "trap": 21,
+  "trap": 22,
   "clobber": 0,
   "mem_boot_bytes": 301989888,
   "mem_grown_units": 9,
   "mem_end_bytes": 1578237952,
   "kinds": {
    "halt0->longjmp": 7,
-   "memory access out of bounds": 14
+   "memory access out of bounds": 15
   },
   "failfast_units": {}
  },
@@ -261,9 +261,15 @@
  "gui_icall_calls": 7,
  "gui_ring_discarded": 0,
  "icall_miss": 50,
- "m11_stub_total": 151,
+ "icall_miss_uniq": 3,
+ "icall_miss_targets": [
+  "0x457860",
+  "0xfa9390",
+  "0x85df70"
+ ],
+ "m11_stub_total": 200,
  "m11_stubs": [
-  "GetLocaleInfoW:64",
+  "GetLocaleInfoW:113",
   "EnumCalendarInfoW:4",
   "GetTimeZoneInformation:1",
   "MulDiv:2",
@@ -286,10 +292,10 @@
   "GetFileVersionInfoSizeW:1"
  ],
  "probes": {
-  "GetMem": 2002,
-  "FreeMem": 160,
-  "FastMM_GetMem(407a50)": 2083,
-  "FastMM_FreeMem(407e20)": 162,
+  "GetMem": 2030,
+  "FreeMem": 172,
+  "FastMM_GetMem(407a50)": 2112,
+  "FastMM_FreeMem(407e20)": 174,
   "InitUnits": 0,
   "Halt0": 8,
   "ListFind(4fa210)": 2,

@@ -70,7 +70,7 @@
           "file": "tools/m11",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "33881cda"
+          "file_last_commit": "d7c4f781"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -149,7 +149,7 @@
           "file": "tools/m11",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "33881cda"
+          "file_last_commit": "d7c4f781"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -265,43 +265,43 @@
           "file": "tools/gui/flengine/REPORT.md",
           "locator": "md: /^### HEAD `([0-9a-f]{8})` の実測 \\(.*本節を正とする\\)/",
           "measured_commit": "703b4857",
-          "file_last_commit": "e6f7b153"
+          "file_last_commit": "fbb19946"
         },
         {
           "file": "tools/gui/flengine/results/boot.json",
           "locator": "json:units_run",
           "measured_commit": "703b4857",
-          "file_last_commit": "d14566f5"
+          "file_last_commit": "fbb19946"
         },
         {
           "file": "tools/gui/flengine/results/boot.json",
           "locator": "json:boot_threw",
           "measured_commit": "703b4857",
-          "file_last_commit": "d14566f5"
+          "file_last_commit": "fbb19946"
         },
         {
           "file": "tools/gui/flengine/results/boot.json",
           "locator": "json:units_total",
           "measured_commit": "703b4857",
-          "file_last_commit": "d14566f5"
+          "file_last_commit": "fbb19946"
         },
         {
           "file": "tools/gui/flengine/results/boot.json",
           "locator": "json:reach[RegisterClassW].calls (配列に無ければ 0)",
           "measured_commit": "703b4857",
-          "file_last_commit": "d14566f5"
+          "file_last_commit": "fbb19946"
         },
         {
           "file": "tools/gui/flengine/results/boot.json",
           "locator": "json:reach[CreateWindowExW].calls (配列に無ければ 0)",
           "measured_commit": "703b4857",
-          "file_last_commit": "d14566f5"
+          "file_last_commit": "fbb19946"
         },
         {
           "file": "tools/gui/flengine",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "4b79f909"
+          "file_last_commit": "0934a7f9"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -367,55 +367,55 @@
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:units_total",
           "measured_commit": "719f1c43",
-          "file_last_commit": "58a98445"
+          "file_last_commit": "309a38d0"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.ok",
           "measured_commit": "719f1c43",
-          "file_last_commit": "58a98445"
+          "file_last_commit": "309a38d0"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.noproc",
           "measured_commit": "719f1c43",
-          "file_last_commit": "58a98445"
+          "file_last_commit": "309a38d0"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.miss",
           "measured_commit": "719f1c43",
-          "file_last_commit": "58a98445"
+          "file_last_commit": "309a38d0"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.trap",
           "measured_commit": "719f1c43",
-          "file_last_commit": "58a98445"
+          "file_last_commit": "309a38d0"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.clobber",
           "measured_commit": "719f1c43",
-          "file_last_commit": "58a98445"
+          "file_last_commit": "309a38d0"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.kinds",
           "measured_commit": "719f1c43",
-          "file_last_commit": "58a98445"
+          "file_last_commit": "309a38d0"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:reach[RegisterClassW].calls (配列に無ければ 0)",
           "measured_commit": "719f1c43",
-          "file_last_commit": "58a98445"
+          "file_last_commit": "309a38d0"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:reach[CreateWindowExW].calls (配列に無ければ 0)",
           "measured_commit": "719f1c43",
-          "file_last_commit": "58a98445"
+          "file_last_commit": "309a38d0"
         }
       ]
     },
@@ -469,7 +469,7 @@
         "pixels": "全路線で未測定 (画素は後続 WIN の範囲)"
       },
       "derived": {
-        "create_fruity_instance.last_step": "STARTUP の S12 行 (0x1375990 冒頭) = CreateFruityInstance の入口。到達の下限。S13 以降は未測定 (fail-fast の位置は #3077 で未特定)",
+        "create_fruity_instance.last_step": "STARTUP の S12 行 (0x1375990 冒頭) = CreateFruityInstance の入口。到達の下限。S13 以降は未測定 (fail-fast の位置は #3077 で未特定)。寛容起動の観測では harness が self (rcx) を 0 で呼ぶため、0x410320 の間接 call [rax-0x30] が oob する (未再現の観測。受け手 VA は未取得・実機の呼出し元は未特定。REPORT_APPENDIX_4384)",
         "gui_natural": "GUI-REACH (§9-3) は LoadStringW のみ。RegisterClassW・CreateWindowExW は一覧に無いので 0",
         "stop": "CS-MISS 行の key (cs) と FAIL-FAST 行の API (api)。§7-4 と照合"
       },
@@ -612,13 +612,13 @@
           "file": "tools/flelift/boot/REPORT.md",
           "locator": "md:### 4-1. /^\\| plain \\| [^|]*\\| \\*\\*209 dispatch\\*\\* / oob \\(`f_([0-9a-f]+)`\\)/",
           "measured_commit": null,
-          "file_last_commit": "6ff18f44"
+          "file_last_commit": "6558a6f0"
         },
         {
           "file": "tools/flelift/boot",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "1b228dc5"
+          "file_last_commit": "6558a6f0"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -683,7 +683,7 @@
         "units.dispatched": "§3 表行の dispatch。ok + failed と一致を検査",
         "units.noproc": "§3 表行の noproc (起動時から proc 0 の unit)",
         "stop": "§0 の停止 (ExitProcess) の VA と dispatch 番号。stop.unit は dispatch 順の 1 始まり (x64c-strict-sequential と同じ)。出典の『unit 245』は InitTable の添字 (0 始まり) で、dispatch 209 番目の unit と同じ",
-        "create_fruity_instance": "§7 の呼出し・リング記録 (fle_run → 0x1375990 の入口 dispatch) による。入口 S12 が下限。本体内の trap 地点は未特定 (#3969 [WIN-41] で扱う。#3077 は flengine 路線の範囲で部分達成のまま close 済みで、x64c の CFI 本体は対象外)。S13 以降は未測",
+        "create_fruity_instance": "§7 の呼出し・リング記録 (fle_run → 0x1375990 の入口 dispatch) による。入口 S12 が下限。trap 連鎖は 0x1375990 → 0x13752f0 → 0x1105350 → 0x5af120 → 0x410320 (最内で oob。測定 commit e3954b032 時点の値・REPORT_APPENDIX_2719 §7・§12-1。現 head での再確認は未了)。受け手 VA は未確定 (#4384)。S13 以降は未測",
         "gui_natural": "§8 KPI 表の soft 計数 (RegisterClassW/CreateWindowExW)。両名は soft スタブになる (§7) ため、同じ計数で代える。名前別の根拠は §9 の soft 名表示が未了のため確かめられず、#3969 [WIN-41] で扱う"
       },
       "source": [
@@ -691,49 +691,49 @@
           "file": "tools/flelift/boot/REPORT_APPENDIX_2719.md",
           "locator": "md:# tools/flelift/boot /測定 commit: \\*\\*([0-9a-f]{8})\\*\\*/",
           "measured_commit": "181d66ec",
-          "file_last_commit": "a7bade52"
+          "file_last_commit": "1ae3cd3c"
         },
         {
           "file": "tools/flelift/boot/REPORT_APPENDIX_2719.md",
           "locator": "md:## 3. /^\\| 寛容 mode 1 \\| (\\d+) \\| (\\d+) \\| (\\d+) \\| (\\d+) \\| (\\d+) \\| (\\d+) \\| (\\d+) \\| (\\d+) \\| ([\\d,]+) / ([\\d,]+) \\|/",
           "measured_commit": null,
-          "file_last_commit": "a7bade52"
+          "file_last_commit": "1ae3cd3c"
         },
         {
           "file": "tools/flelift/boot/REPORT_APPENDIX_2719.md",
           "locator": "md:## 0. /mode 1 は unit (\\d+) \\(VA `(0x[0-9a-f]+)`・dispatch (\\d+) 番目\\) の ExitProcess の後、unit 246〜940 の (\\d+) 件が呼出し時に proc 0 を返し/",
           "measured_commit": null,
-          "file_last_commit": "a7bade52"
+          "file_last_commit": "1ae3cd3c"
         },
         {
           "file": "tools/flelift/boot/REPORT_APPENDIX_2719.md",
           "locator": "md:## 4. /mode 1 の skip は (\\d+) 件 \\(unit 245 の `exit` 1 件 \\+ unit 246〜940 の `clobber` (\\d+) 件\\)/",
           "measured_commit": null,
-          "file_last_commit": "a7bade52"
+          "file_last_commit": "1ae3cd3c"
         },
         {
           "file": "tools/flelift/boot/REPORT_APPENDIX_2719.md",
           "locator": "md:## 4. /^245 (0x[0-9a-f]+) exit$/",
           "measured_commit": null,
-          "file_last_commit": "a7bade52"
+          "file_last_commit": "1ae3cd3c"
         },
         {
           "file": "tools/flelift/boot/REPORT_APPENDIX_2719.md",
           "locator": "md:## 7. /^- 呼出し: 寛容起動の後で `fle_run` を 1 回 \\(mode 1・mode 2 とも\\)。結果は `oob`/",
           "measured_commit": null,
-          "file_last_commit": "a7bade52"
+          "file_last_commit": "1ae3cd3c"
         },
         {
           "file": "tools/flelift/boot/REPORT_APPENDIX_2719.md",
           "locator": "md:## 7. /mode 1 \\(`tol`\\) (?:`0x[0-9a-f]+` → )+`0x1375990`/",
           "measured_commit": null,
-          "file_last_commit": "a7bade52"
+          "file_last_commit": "1ae3cd3c"
         },
         {
           "file": "tools/flelift/boot/REPORT_APPENDIX_2719.md",
           "locator": "md:## 8. /^\\| `RegisterClassW`/`CreateWindowExW` の呼出し \\(soft 計数\\) \\| 0 \\| (\\d+) \\|/",
           "measured_commit": null,
-          "file_last_commit": "a7bade52"
+          "file_last_commit": "1ae3cd3c"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -779,7 +779,7 @@
         "pixels": "全路線で未測定 (画素は後続 WIN の範囲)"
       },
       "derived": {
-        "units.uncovered": "boot_summary_plain の units_total − survey の units_covered"
+        "units.uncovered": "boot_summary_plain の units_total − survey の (byCls.ok + byCls.unlifted)。empty / noproc を含む"
       },
       "source": [
         {
@@ -792,19 +792,13 @@
           "file": "tools/flelift/boot/results/survey.json",
           "locator": "json:units_covered",
           "measured_commit": null,
-          "file_last_commit": "12958453"
+          "file_last_commit": "30df8948"
         },
         {
           "file": "tools/flelift/boot/results/survey.json",
-          "locator": "json:byCls.ok",
+          "locator": "json:byCls",
           "measured_commit": null,
-          "file_last_commit": "12958453"
-        },
-        {
-          "file": "tools/flelift/boot/results/survey.json",
-          "locator": "json:byCls.unlifted",
-          "measured_commit": null,
-          "file_last_commit": "12958453"
+          "file_last_commit": "30df8948"
         }
       ]
     },

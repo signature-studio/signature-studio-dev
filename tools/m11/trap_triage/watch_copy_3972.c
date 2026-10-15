@@ -17,3 +17,11 @@ void m11_copy_in(u64 dst, u64 src, u64 n) {
     if (!cp_all && (dst + n <= lo || dst >= hi)) return;
     fprintf(stderr, "[cp] dst=%llx src=%llx n=%llu%s\n", dst, src, n, (dst + n <= lo || dst >= hi) ? " (no-overlap)" : "");
 }
+
+/* rep_watch_3972.py が rep 系 helper (movsq/movsb/stosq) の呼出し直前に入れる。bytes は書込みバイト数。 */
+void m11_rep_in(u64 dst, u64 bytes, u64 site) {
+    if (!m11_watch_on_state()) return;
+    u64 lo = M11_WATCH_ADDR_OVR, hi = lo + 32;
+    if (dst + bytes <= lo || dst >= hi) return;
+    fprintf(stderr, "[rp] site=%llu dst=%llx bytes=%llu\n", site, dst, bytes);
+}

@@ -13,11 +13,12 @@ emcc に `-DLB_IMG_BASE=<newbase>` `-DLB_MAX_MEM=<max>` を渡すと低位 base 
 置換は exact 文字列一致 + 出現数の assert (監査可能。元ソースが変わったら気づける)。
 """
 import os
+from typing import Any
 
 # LB_IMG_BASE の既定 (= 元ソースの固定値 0x30000000)。prologue として #ifndef 付きで差し込む。
 PROLOGUE = "#ifndef LB_IMG_BASE\n#define LB_IMG_BASE 0x30000000ul\n#endif\n"
 
-RULES = {
+RULES: dict[str, list[tuple[str, str, int]]] = {
     "m6_rt.c": [
         ("#define M6base 0x30000000ul",
          PROLOGUE + "#define M6base LB_IMG_BASE", 1),
@@ -52,16 +53,17 @@ long long function_1801d2750(long long dst, long long src, long long n, long lon
 }
 
 
-def emit(srcs, outdir):
+def emit(srcs: dict[str, str], outdir: str) -> tuple[dict[str, str], dict[str, list[dict[str, Any]]]]:
     """srcs: {basename: path} → outdir へマクロ化コピー。返値: ({basename: outpath}, report)。
 
     ルール未定義のファイルは無改変コピー (m6_stubs_hand2.c 等の同梱用)。
     """
     os.makedirs(outdir, exist_ok=True)
-    outs, report = {}, {}
+    outs: dict[str, str] = {}
+    report: dict[str, list[dict[str, Any]]] = {}
     for name, path in srcs.items():
         text = open(path).read()
-        rep = []
+        rep: list[dict[str, Any]] = []
         for old, new, expect in RULES.get(name, []):
             c = text.count(old)
             if c != expect:
@@ -78,12 +80,12 @@ def emit(srcs, outdir):
     return outs, report
 
 
-def emcc_defs(lb_base, lb_max):
+def emcc_defs(lb_base: int, lb_max: int) -> list[str]:
     """低位 base ビルド用の -D フラグ。既定値 (0x30000000) は #ifndef 既定と同値。"""
     return ["-DLB_IMG_BASE=0x%xul" % lb_base, "-DLB_MAX_MEM=0x%xull" % lb_max]
 
 
-def audit_summary(report):
+def audit_summary(report: dict[str, list[dict[str, Any]]]) -> dict[str, int]:
     return {k: sum(r["n"] for r in v) for k, v in report.items() if v}
 
 

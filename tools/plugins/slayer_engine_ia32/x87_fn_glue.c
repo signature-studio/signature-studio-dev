@@ -17,6 +17,15 @@ uint32_t ott_call32x(uint32_t va, uint32_t ecx, uint32_t a0, uint32_t a1, uint32
     memset(ott_fst, 0, sizeof ott_fst);
     for (int p = 0; p < 8; p++) ott_tag[p] = 3;
     ott_ftop = 0; ott_fsw = 0; ott_fcw = 0x037f;
+#ifdef X87_PUSH64
+    {
+        /* #4840: native (x87_fn_native.c) と同じ double を ST(0) に積む (a0 = 下位 dword・a1 = 上位 dword) */
+        uint64_t bits = ((uint64_t)a1 << 32) | a0;
+        double dv;
+        memcpy(&dv, &bits, 8);
+        x87_push(dv);
+    }
+#endif
     ott_dispatch(va);
     g_depth = (8u - ott_ftop) & 7u;
     float f = g_depth ? (float)x87_st(0) : 0.0f;

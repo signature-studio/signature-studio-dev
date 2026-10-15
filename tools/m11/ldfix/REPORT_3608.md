@@ -160,3 +160,10 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 
 - 出力は `tools/m11/ldfix/work/p3608/NAME/summary.txt` と `trap_units.json` (gitignore)。本 fix の §1-3 は、§1 の表の変種を全て同じスクリプトで再実行して照合した (`ld108,ld115,src412770` 等の段は表の列どおり。c1〜c6・l_no_*・base_r8b を含む)。
 - F3c 33/43 の確認: `git archive f63b5953d^ tools/m11/ldfix tools/m11/lb_base.py` と `git archive f63b5953d ...` を展開し、各 `ldfix.py` を同じ入力で実行 (本 REPORT §4 の表)。
+
+### 7-1 `ldfix_e2e.sh` の再現 (受入 1 の run・HEAD `d1759801c`)
+
+- `origin/main` の `ldfix.py` は #4421・#4439 で採番が変わり、6074b0 の 1 段読みが `%ldfxu24` → `%ldfxu25` になった。`fix_site_3372.py` がその名前を決め打ちしていたため `ldfix_e2e.sh` が 1d/5 で落ちていた (AssertionError)。`d1759801c` で値名に依存しない判定に直した (機械照合・IR 編集の中身は不変)。
+- `d1759801c` で `ldfix_e2e.sh` を実行: rc=0・所要 36 秒 (13:09:27Z 終了時の `uptime` load 0.82)・判定 PASS。base/fix ともに stage4 到達 4/6・survey ok 136 / miss 14 / trap 9 (§1 の c0 と一致)。
+- 機械照合は 44f040 9 件・47cf10 8 件・6074b0 4 件で、いずれも従来どおり 21 件 ok。
+- **受入 1 は未着手**: 144・149 の trap 時点の引数採取 (`trap56_probe_942.mjs` 相当の probe) と書込み元の追跡は本 run では行っていない。次の run で着手する。

@@ -49,8 +49,8 @@ export interface HistoryEntry {
   prio?: Prio;
 }
 
-// 抑止の上限 (同じ (kind, ref) は 60 分に 1 回、全体で 1 時間に 24 起動、同じ ref に 24 時間で 3 回)。
-export const PM_LIMITS = { dupMs: 60 * 60_000, hourMs: 3_600_000, hourMax: 24, dayMs: 24 * 3_600_000, refDayMax: 3 };
+// 抑止の上限 (同じ (kind, ref) は 60 分に 1 回、全体で 1 時間に 36 起動、同じ ref に 24 時間で 3 回)。
+export const PM_LIMITS = { dupMs: 60 * 60_000, hourMs: 3_600_000, hourMax: 36, dayMs: 24 * 3_600_000, refDayMax: 3 };
 // 種類ごとの毎時の最低配分 (#3704)。毎時の枠 (PM_LIMITS.hourMax) のうち、その kind に送れる対象がある間は N 件を残す。
 // 残した枠は他の kind に使わせない (送れる対象が無い・抑止で送れない分は他の kind に回す)。最低配分より先に送る kind は MIN_EXEMPT_KINDS。
 export const KIND_MIN_PER_HOUR: Partial<Record<DetectedKind, number>> = { refs_orphan: 3 };

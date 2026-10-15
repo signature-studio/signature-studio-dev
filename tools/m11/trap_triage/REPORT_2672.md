@@ -123,3 +123,31 @@ python3 tools/m11/trap_triage/compare_kinds_2672.py tools/m11/work/trap_triage/b
 - 測定 commit 以降の `tools/m11` の差分: 本 REPORT を更新した commit 時点で `git diff --stat c05f4b16 HEAD -- tools/m11` は本ファイルのみ (コード差分 0)。main 取り込み後の再測定は不要 (`docs/WORKFLOW.md` §6)。
 - origin/main (`b7df55e6`) は `208b4ef9` 以降に `tools/m11` の 20 ファイル (`ldfix/` の解析スクリプト・結果・REPORT、`shimx_link/`、`trap_triage/REPORT_1620.md`・`trap_w1620.py`) を更新している。いずれも IR 生成・build・survey の経路から呼ばれず、`ldfix/ldfix.py` と C ソース・`m11_build.sh`・`survey_units.mjs` は `208b4ef9` と差分 0 (`git diff --stat 208b4ef9 origin/main -- tools/m11` の内訳で確認)。`git merge-tree` は衝突なし。
 - 参考: `git diff --stat 39fe9fad c05f4b16 -- tools/m11` は `REPORT_2672.md` と `compare_kinds_2672.py` の 2 ファイル。
+
+## 9. PR #4664 (round 1 の差し戻し対応) の追記
+
+### 9.1 本節の結論 (数値は未測定)
+
+- 本節の実測値 (基準 survey・計装版の hook 数・本番・陽性対照) は **HEAD では未測定 (#2706)**。round 1 までの PR 本文にあった数値は、測定 commit の完全 SHA も実行コマンドも特定できないため、本 REPORT からは外した。`$ARTIFACTS_DIR` には `fl-win64` だけがあり、`work-m11`・`toolchain-emsdk` が無いため再測定できなかった。
+- 基準 base の判定: `654aabbd5` は origin/main (`325cf6a4d`) の祖先 (`git merge-base --is-ancestor` = 真)。origin/main までは 110 commit。
+- `store_sites_2672.py` の単体確認 (本 PR の修正のみ、測定値ではない): 合成 wat (`work/2706/synth_store_ptr.wat`・import `$fimport$34`・呼出し 1 件) で `n_ids 1 / n_dup_ids 0 / sites {133950: func 7, line 4, bytes 4, offset 48}`。import 0 件の wat (`work/2706/synth_noimport.wat`) では `store_ptr の import が 1 件でない: 0` で `exit 1`。
+- `store_sites_2891.py` と重複する理由: 2891 版は import 1 件を前提に `sys.exit` で検査する一般化版。2672 版は REPORT §1 の単発の再現手順の入力 (`store_sites_2672.py`) として残す。
+
+### 9.2 HEAD で再測定が必要な理由
+
+- 測定 commit `c05f4b16` から本節の直前 HEAD (`52e0e0655`) までの、実行される build・survey のコードの差分 (`git diff --stat c05f4b16 HEAD -- tools/m11/m11_ov.c tools/m11/m11_build.sh tools/m11/m11_gen_ir2.sh tools/m11/m11_rt.c tools/m11/trap_triage/survey_units.mjs`):
+
+```
+ 5 files changed, 355 insertions(+), 13 deletions(-)
+```
+
+  - `m11_ov.c` に `tr_41c180`・`tr_4467ac` と寛容起動 (`m11_call_unit_at`) が入り、`m11_build.sh` の既定値に `M11_FIX_535BF2=1` (#2521)・`M11_FIX_4136A0` (#3928) が入った。main 取り込みで入った変更。
+  - §8 の「build 入力は `208b4ef9` と同一」は、main 取り込みにより HEAD では成り立たない (§8 は `c05f4b16` 時点の記録として残す)。
+- よって §2 と §9.1 の数値は、いずれも現 HEAD の build の数値ではない。HEAD での再測定は未了。
+- 本 PR の script 修正 (`store_sites_2672.py`) は測定入力ではないが、上の build 差分は測定入力そのものなので、script 修正だけでは「再測定不要」とは言えない。
+
+### 9.3 未了 (起票先: #2706)
+
+| 未了 | 影響 | 必要な素材 |
+|---|---|---|
+| HEAD (`5252bd0fc` 以降) の build で基準 survey・計装版の本番・陽性対照を再測定する | §2・§9.1 の数値の正本化、陽性対照の成立 | `oc_artifacts: fl-win64 work-m11 toolchain-emsdk` (`docs/WORKFLOW.md` §11 の名前) |

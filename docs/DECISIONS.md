@@ -289,3 +289,20 @@
 - **理由**: 出典は依頼者の方針 (2026-10-15 の依頼: エージェントのエスカレーションは PM が判断すべきで、依頼者の仕事ではない。依頼者の領分は実機・資格情報・課金・法的な最終判断のみ)。(b) は「迷ったら U」の既定 (旧 pm.md の判断の節・stuck・no_pr) が残るため採らない。実際に誤って付いたのは #1987・#2034 (U1)・#1736 (U7) で、文言を弱めるだけでは同じ経路が残る。(c) は判定の根拠が pm.md に残らず、Worker の数字の打ち消しに隠れるため採らない。(a) は pm.md・fixture・test-dispatch-context.sh §10 の検査で守る。
 - **提供物 (U7) の線引き**: 比較した方式は (i) 提供物を全て実機に含める、(ii) 依頼者の機器・環境にしか無い原本 (VM 上のファイル・手元の正規データ) だけを実機に含め、公開物や run の中で取得できるものは PM が決める、(iii) 提供物は 4 種の外として PM が決める。採用は (ii)。手元にしか無い原本は PM が代わりに得られない。公開物は PM が取る (#1989 の Ghidra は公式 release から取得できる)。(iii) は PM が作れない原本を決めて進めることになり停止の理由が消える。(i) は公開物まで依頼者へ回す。
 - **影響**: Worker (`infra/pm-worker/src/classify.ts`・`pm.ts` の `HOLD_LABELS`) は変えない。oc-pm の指示文 (`.github/scripts/assemble-prompt.sh` の「期待する作業」2 行目) の旧既定も同じ方針に揃えた (pm.md と逆の指示が run に渡るのを防ぐため。issue の範囲外の 1 行)。既に付いているラベルの再評価は範囲外 (PM が個別に行う)。4 種の外で付けた `needs-user-input` は、決めて進める先 (R1〜R7) を pm.md の kind 節に書いた。merge 後 24 時間の実測 (oc-pm が付けたラベルの全数確認) は PM が検収する (未解決)。
+
+## D30 — 変換コアは Python 維持・Rust 移行は「致命的な不具合時の選択肢」として保留し、代わりに変換コアの mypy 厳格化を採る
+
+- **状態**: 採用 (2026-10-15, issue #4609 [DOCS-36]。親 #2319。出典は指示 153・154、`docs/pm/DIRECTIVES.md` §1)
+- **決定**: 変換ロジックは Python のまま維持する。Rust (または Go) への移行は今は着手しない。移行は「致命的な不具合に直面した際の選択肢」として記録に残す。発動は自動ではなく、その時点で PM が評価して判断する。代わりに、変換コアの mypy 厳格化を別タスク・別 PR で行う。
+- **比較した方式**: (a) Python 維持 + mypy 厳格化 + Rust 移行は保留 (採用)、(b) 全域的に Rust へ移行する、(c) 一部の変換だけを先に Rust へ移す (部分移行)。
+- **理由**: PM(main) の評価では、欠陥は型ではなく意味論の問題で、主防御は差分実行である (`docs/DEFECTS.md`)。Rust/Go 移行は技術的に可能だが、今は推奨しない。(c) は境界の二重管理が増え、中途半端になる (指示 153)。(b) は進行中の実装→レビューの流れを止める (指示 154)。型の不備に対する手当ては、Python 側の mypy 厳格化で行う。
+- **発動条件**: 次の条件を満たし、PM が判断したときだけ Rust 移行を再検討する。(1) 差分実行・既存の検証で防げない致命的な不具合が出ている、(2) その原因が Python の実装言語 (型・実行時性能・配布形態) に由来すると PM が判断している。発動時は、移行の範囲と、流れを止める期間を PM が決めて記録する。
+- **影響**: `docs/STATUS.md`・`docs/WORKFLOW.md` の運用は変えない。mypy 厳格化の作業は別 issue・別 PR で扱う (本 ADR の範囲外)。
+
+## D31 — 変換コアの型検査は mypy を段階導入し、Tier 1 (liftlib の 12 モジュール) を CI で blocking にする (挙動は変えない)
+
+- **状態**: 採用 (2026-10-15, issue [CI-194] (親 #2319)。オーナー承認: mypy 厳格化)
+- **決定**: `mypy.ini` を置き、Tier 1 = liftlib の 12 モジュール (`ir`/`pe`/`env`/`diag`/`lb_layout`/`runtime_lb`/`passes/{boolret,dataimage,fp_bind,icall,l1_restore,remap}`) を `strict` で検査して `.github/workflows/typecheck.yaml` で blocking にする。Tier 2 (p1/base/x64c 系などの未 strict) は baseline を記録して別 issue で拡大する。挙動は変えない (注釈と型の修正のみ。`# type: ignore` は 0 件)。
+- **比較した方式**: (a) 全コアを一括 strict (採用せず)、(b) Tier 分けして小さく blocking を開始 (採用)、(c) 設定だけ置いて CI は warn のみ。
+- **理由**: 一括 strict は x64c.py (前 1,320 errors)・p1.py (442) などで侵襲的な修正になり「挙動不変」を保証できない。Tier 1 は前 161 errors が全数「注釈追加 + 軽微な修正」で 0 になり (測定: `tools/liftlib/REPORT_APPENDIX_CI194.md`)、silent な interface 誤りをここで止められる。warn のみ (c) は赤にならず、PR が型を壊しても気づけない。mypy.ini の blocking 範囲は `files` の列挙で定める (mypy の per-module `[mypy-X]` は X が import する側まで strict が波及するため。2.4.0 で実測)。
+- **影響**: 変換ロジックの実行時挙動は不変 (test_unit は前後で per-test 一致・差分ハーネスの出力一致)。`pipeline.load_cfg/rpath/run_all`・`harness/diff.run_diff/fmt` に注釈を足し、Tier 2 の既存エラー 8 件を直した。mypy のバージョンは 2.4.0 に固定 (CI と測定で同一)。Tier 2 の拡大は別 issue。

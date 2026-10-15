@@ -59,9 +59,9 @@ let m = await (mod.default ? mod.default() : mod());
 const U8 = m.HEAPU8;
 
 if (TRACE) { try { m._shimx_set_trace(1); } catch { /* nosx では未 export */ } }
-// FLE-6: dsp_ippv2 shim は既定で無効。FLE_IPP=1 のときだけ有効 (ネガコン FLE_IPP=0 / 未指定 = 修正前の挙動)。
-// FLE_IPP=2 (#2702): shim 有 + ippsZero_8u 以外の IPP 呼出で停止 (停止名と呼出元を summary に出す)。
-const IPP_MODE = { '1': 1, '2': 2, '3': 3 }[process.env.FLE_IPP] || 0;
+// FLE-6: dsp_ippv2 shim の mode。FLE_IPP=0 (ネガコン) / 1 (shim 有) / 2 (#2702: shim 有 + ippsZero_8u 以外で停止) / 3 (ILTools 分岐入力)。
+// 未指定・空 = 既定 3 (#672 PM 判断 2026-10-15: ILT 分岐入力を既定化。ネガコンは FLE_IPP=0 を明示する)。
+const IPP_MODE = (process.env.FLE_IPP === undefined || process.env.FLE_IPP === '') ? 3 : ({ '1': 1, '2': 2, '3': 3 }[process.env.FLE_IPP] || 0);
 const IPP_ON = IPP_MODE !== 0;
 m._fle_boot_set_ipp(IPP_MODE);
 // FLE-672 診断: FLE_DIAG_NULLFILL=1 は root 無しの fill (0x6a7b70) で buf = 0 の呼出しを戻す。未指定は従来どおり停止する。
@@ -328,7 +328,11 @@ if (SURVEY) {
     // survey は boot 実機連鎖と同じインスタンスで行う (InitContext 0x15eac90 は boot の _InitLib が設定済み)。
     // unit は 1 本ずつ fle_run (新 RSP) で隔離実行し、trap/raise/halt0 を JS 側で分類する。
     const tbl = 0x15eac90;
-    const tblPtr = BigInt(m.HEAPU32[tbl/4+1]) << 32n | BigInt(m.HEAPU32[tbl/4]);
+    let tblPtr = BigInt(m.HEAPU32[tbl/4+1]) << 32n | BigInt(m.HEAPU32[tbl/4]);
+    // #4854: 既定 (mode 3) の boot は unit 895 の後の exit (ExitProcess 経路) で InitContext.InitTable が 0 になる。
+    // InitUnits の開始時の値は PackageInfo (PKG = 0x13768b0・_StartLib の rdx) なので、survey の前にそれへ戻す。
+    const tblRestored = process.env.FLE_SURVEY_NOREPAIR !== '1' && tblPtr === 0n && m.HEAPU32[PKG / 4] > 0;
+    if (tblRestored) { m.HEAPU32[tbl / 4] = PKG; m.HEAPU32[tbl / 4 + 1] = 0; tblPtr = BigInt(PKG); }
     if (tblPtr === 0n) {
         survey = { error: 'InitContext.InitTable == 0 (boot が _InitLib に届かず)' };
     } else {
@@ -337,14 +341,16 @@ if (SURVEY) {
         const TO = Math.min(Number(process.env.FLE_SURVEY_TO || total), total);
         const byCls = {}; const details = [];
         let longjmp0 = Number(m._fle_n_longjmp());
+        // noproc / empty も jsonl に 1 行ずつ残す (merge_survey.py が 942 件を数えられるように・#4854)
+        const emit = (i, cls, info) => { try { appendFileSync(outPath.replace(/\.json$/, '.jsonl'), JSON.stringify([i, cls, info]) + '\n'); } catch { } };
         for (let i = FROM; i < TO; i++) {
             console.error('[survey] unit ' + i + '/' + total);
             const proc = Number(m._fle_unit_proc(i) >>> 0);
-            if (!proc) { byCls['noproc'] = (byCls['noproc'] || 0) + 1; details.push([i, 'noproc', 0]); continue; }
+            if (!proc) { byCls['noproc'] = (byCls['noproc'] || 0) + 1; details.push([i, 'noproc', 0]); emit(i, 'noproc', 0); continue; }
             // InitUnits と同じ [proc]!=0 check (実機 semantics: 先頭 8B が 0 なら skip)
             let zero8 = true;
             for (let k = 0; k < 8; k++) if (U8[proc + k]) { zero8 = false; break; }
-            if (zero8) { byCls['empty'] = (byCls['empty'] || 0) + 1; details.push([i, 'empty', proc]); continue; }
+            if (zero8) { byCls['empty'] = (byCls['empty'] || 0) + 1; details.push([i, 'empty', proc]); emit(i, 'empty', proc); continue; }
             const lj = Number(m._fle_n_longjmp());
             let cls = 'ok', info = 0;
             try {

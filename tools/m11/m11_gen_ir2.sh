@@ -71,6 +71,15 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
     mv work/boot_final.ld115.ll work/boot_final.ll
     python3 m11_cond.py ld115=applied
   fi
+  # #4675 (LD-236): function_1046a30 の上流 X (cell→C→[C]) の 1 段不足。既定 OFF (本番 IR は変えない・unit 結果は未測定)。
+  #   M11_FIX_LD236=1 のときだけ適用する (ir_conditions.json ld236=applied)。想定外の入力は assert で止まる。
+  if [ "${M11_FIX_LD236:-0}" = 1 ]; then
+    python3 ldfix/fix_ld236.py work/boot_final.ll work/boot_final.ld236.ll
+    mv work/boot_final.ld236.ll work/boot_final.ll
+    python3 m11_cond.py ld236=applied
+  else
+    python3 m11_cond.py ld236=not-applied
+  fi
   # #3296: function_412770 の rep movsq 源 (機械語 mov rsi,[rax] の load が lift で脱落し ptr null)。想定外の入力は assert で止まる (fail-closed)。
   python3 ldfix/fix_src412770.py work/boot_final.ll work/boot_final.src412770.ll
   mv work/boot_final.src412770.ll work/boot_final.ll
@@ -90,6 +99,11 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
     python3 ldfix/fix_shx_t40.py work/boot_final.ll work/boot_final.shx40.ll
     mv work/boot_final.shx40.ll work/boot_final.ll
     python3 m11_cond.py shx_t40=applied
+  elif [ "${M11_FIX_SHX_T40:-0}" = 70 ]; then
+    # #4121 (SHX-T42) ネガコン: +0x70 の書込みだけ (+0x4c の初期 store を外す)。
+    python3 ldfix/fix_shx_t40.py work/boot_final.ll work/boot_final.shx40.ll --only-70
+    mv work/boot_final.shx40.ll work/boot_final.ll
+    python3 m11_cond.py shx_t40=applied-70only
   else
     python3 m11_cond.py shx_t40=not-applied
   fi

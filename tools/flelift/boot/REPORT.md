@@ -12,6 +12,7 @@
   **FLE-672 (#672)**: fill (`0x6a7b70`) の buf = 0 の呼出しを戻す診断 (`FLE_DIAG_NULLFILL=1`) で GetMem・undo slot の 0 化が消え、停止点は `unlifted 0x6bbc20` へ移る (units は 209 のまま・§11)。
 - ラウンドごとの詳細 (FLE-2〜FLE-5 の成果・修正 3 件・FLE-4/5 の逆引き 5 段) は `REPORT_APPENDIX.md` §A・§B。**FLE-12 (#3090)**: unit 209 直後の `0x6a7b70` の呼出元は `0x6c7923` ← `0x815920` (`f_815050`)、幅 r8 = 矩形の幅 = 2^20 (即値 `0x4130000000000000` 由来の推定)、修復は未了 (`REPORT_APPENDIX_3090.md`)。
 - **FLE-9 (§9, #2700) の結果**: lift → 8 shard clang (cap 内・計 89 s) → link (mismatch/undefined/dup 0) → boot まで到達。units_run は shim 有・ネガコンとも 209 のまま (停止点: `MessageBoxA` → `exit(0)`)。shim 有の IPP 判定は NG (終了時の 0x15F34A0 は 0。FLE-10 (§10, #2702): shim 有でも units は前進せず 209)。
+- **既定経路の更新 (#672・PM 判断 2026-10-15)**: 既定 (`FLE_IPP` 未指定) = ILT 分岐入力 (mode 3) + 停止点 `0x976da0` の既定 root 化で **units 209 → 895** (ネガコン `FLE_IPP=0` は 209)。詳細と実測は `REPORT_APPENDIX_672.md` §C。
 - **FLE-15 (#3770・診断 route の有界実行)**: 0x6bbc20 root の診断 route は時間上限 300 s で units 209 のまま停止せず (呼出し 6,559,882 回・矩形 (0,0,2^20,2^20))。既定経路 (root 0x6a7b70) は不変。詳細は `REPORT_APPENDIX_3770.md`。
 - **FLE-16 (#3771)**: `0x6bbc20` を `[obj+0x118]` へ書く命令は `f_6bc010` の `0x6bc1af` (4・8・16 byte の store の監視で実行時 1 件・obj = `0x12d6a090`。1・2 byte の store は未監視)。役割は画素の store/blend 関数の登録 (推定)。呼出しは `f_6c9280` の `0x6c937a`。詳細は `REPORT_APPENDIX_3771.md`。
 - **PERF-P14 (#970)**: boot closure を -O0 / -O2 / -O2 -flto で build・実行 (node n=10)。3 変種の署名は計数と ipp 状態が一致 (出力メモリは未比較)・units 209 据え置き。ネガコン (`FLE_IPP=0`) で署名は変わる。LTO の結論は shim (-O1 固定) を含まない範囲に限る。実測値・範囲は `REPORT_APPENDIX_970.md`。
@@ -138,7 +139,7 @@ FLE-5 末の残 3 件は `unlifted 280 / 659` (`0x6a7b70`, blocklist 対象) と
 1. **unit#209 の次の blocker は `unlifted 0x6a7b70`** (fill、`f_6c7610` ← `f_815050`)。root 化すると fill が image を 0 埋めし survey が成立しないため `FLE_ROOT_BLOCKLIST` で除外。診断 (§11) では fill 後の停止点は `unlifted 0x6bbc20` (f_6c9280)。
 2. **unit 進行 209 で横ばい**。次の一手は `0x6bbc20` の解消 (子 issue #3491 `[FLE-14]`)。fill の上流 (面 2^20) は #3112。
 3. **残 survey 非 ok 3** = unit 280 / 659 (`0x6a7b70`, blocklist 対象) + unit 895
-   (`0x976da0`、未調査)。`0x976da0` は次の調査対象。
+   (`0x976da0` は `PostMessageW` を呼ぶ thunk と特定済み・付録 672 §B-7。root 化で unit 895 (旧 B-7 の『次は oob』は再測定で再現せず・付録 §C-2)。
 3. **VMT slot の自動 root 化 (RTTI/COL walk) は非適用**: 対象 0x6a7b70 は `.pdata` 整齊の
    実関数だが **image 内のあらゆるセクションに qword 参照を持たない** (実行時構築)。
    `.text` 内の連続 .text 参照 (VMT メソッド配列) の scan も実装したが拾えず、
@@ -183,36 +184,9 @@ bash tools/flelift/fle_e2e.sh                # 親チケットの回帰 (PASS)
 前提: tools/flelift/fle_lift.sh と同一 (python3 capstone/pefile, emsdk 6.0.12, node)。
 PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は git に入れない。
 
-## 9. FLE-9 (#2700): lifted C を 8 本に分けて clang・link・boot を実測 (2026-10-14)
+## 9. FLE-9 (#2700): TU 分割 (8 shard) の結論のみ
 
-- **結論**: 単一 TU の clang は cap 11000MB 超で打ち切られていた (FLE-8・付録 E-1)。8 shard (`FLE_SHARDS=8`・`xargs -P3`・各 cap 5000MB) では全て cap 内で完走 (各ピーク 2,202〜2,666MB・clang 段 89 s)。link は mismatch/undefined/duplicate 0・wasm 127,078,695 B。**boot は両 variant とも unit 209 で停止**。shim 有の IPP 判定は NG (`ptr_15F34A0=0x0`)。最初のウィンドウは未到達。
-- 測定 commit: `a741a0ca` (コードを変えた最後の commit。検証起点 `origin/main` `26f90ada`)。差分 0 の証跡: `git diff --stat a741a0ca HEAD -- tools/flelift/x64c.py tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh tools/flelift/boot/rss_cap.py` が空 (本節の commit は REPORT・付録のみ)。
-- 出力同一性: `--shards 1` は旧 `x64c.py` (origin/main) と小入力 (roots 先頭 400・closure 2・386 関数) で `fle_lifted.c` / `lift_meta.json` が sha256 一致。N=8 は関数本体の集合が N=1 と一致し、`ott_dispatch`・`imp_tab` は shard 0 のみ。既知類型: 該当なし (`docs/DEFECTS.md` D1a〜D23)。
-- 再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/flelift/boot/fle6_measure.sh` (既定 `FLE_SHARDS=8`)。素材 `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff`。
-
-### 9-1. 工程の実測 (HEAD `a741a0ca`・`fle6_measure.sh` 1 回。同内容の前回実行は lift 67 s / clang 105 s で、boot の数値は同一)
-
-| 工程 | 結果 | 秒 | ピーク RSS |
-|---|---|---|---|
-| gen-A | rc 0 | 8 | - |
-| lift (closure 2・root 0x6a7b70・cap 13800MB) | rc 0・29,908 関数・1,557,903 insn | 88 | 610MB |
-| clang shard ×8 (-O0・-P3・cap 5000MB) | 8/8 OK・cap 超過 0 件 | 89 (工程計) | s0 2,666 / s1 2,243 / s2 2,406 / s3 2,345 / s4 2,202 / s5 2,363 / s6 2,387 / s7 2,487 MB |
-| shard 別の秒 (s0〜s7) | 46 / 31 / 32 / 20 / 23 / 27 / 26 / 22 | - | - |
-| link | mismatch 0・undefined 0・duplicate 0・wasm 127,078,695 B | - | - |
-| boot shim (`FLE_IPP=1`) | units 209・stopped 209・IPP check NG | 24 | - |
-| boot ネガコン (`FLE_IPP=0`) | units 209・stopped 209・IPP check OK | 25 | - |
-
-### 9-2. 起動指標 (前後)
-
-- **units_run**: 前 209 (FLE-5/6・§2) → 後 **209 のまま** (停止点=209)。shim 有・ネガコンとも同じ。
-- shim 有の確保 `GetMem` 2,314 / `FreeMem` 1,199 (ネガコン 1,891 / 776)。`ipp.called` 全件は `ippsZero_8u` ×2 のみ。`ptr_15F34A0` は shim 有でも `0x0`。
-- 停止: 両方とも unit 209 の後に `MessageBoxA` (text 空・自動 IDOK) → `exit(0)` (call site `0x412a12`)。最初のウィンドウは未達 (生成は未確認)。既定経路 (root 無し) は未測定。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| shim 有で `0x15F34A0` が 0 のまま (`ippsZero_8u` は 2 回呼ばれる)。登録経路が未解明 | FLE-6 の IPP 判定 NG・units 209 据え置き | 既存 #2702 [FLE-10] (`blockedBy: #2700`)。本 PR で事実を追記 |
-| unit 209 の後の `MessageBoxA` → `exit(0)` の原因 | 次の blocker (最初のウィンドウ未達) | 既存 #2702 (同上) |
-| 既定経路 (root 0x6a7b70 無し) の boot 未測定 | 209 据え置きの確認が未了 | 既存 #2702 作業 1 |
+- 結論: 単一 TU の clang は cap 11000MB 超で打ち切られていた (FLE-8)。8 shard (`FLE_SHARDS=8`) で全 shard cap 内で完走し、link の mismatch/undefined/duplicate は 0。boot は両 variant とも unit 209 で停止 (測定値の正本は `REPORT_APPENDIX_2700.md` の全文)。
 
 ## 10. FLE-10 (#2702): dsp_ippv2 shim では units が前進しない (測定 commit `4869ad16`)
 
@@ -243,8 +217,25 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 
 ## 11. FLE-672 (#672): buf = 0 の fill を戻す診断 (`FLE_DIAG_NULLFILL=1`・既定無効)
 
-- 既定経路は不変 (units 209・GetMem / FreeMem は §9-2・§10 と一致)。診断ありは units 209 のまま、停止点が `unlifted 0x6bbc20` (f_6c9280 ← 0x6c9380) へ移る。判定 (①②③)・表・再現は `REPORT_APPENDIX_672.md`。
-- main (`5ee61d4e1`) 取り込み後の再測定 (測定 commit `4cc9c3d72`・競合は `build.sh` の EXPORTS 1 行のみ): 測定した 5 run (shim・negctl・既定・診断 shim・診断 negctl) の units・GetMem / FreeMem・`ptr_15F34A0`・停止点は取り込み前と同値 (上表・付録 §2 と一致)。結果 JSON の boot フィールドは全て一致し、main 由来の `outmem` キーが増えた。shim 有 (root 有) の IPP 判定 NG (rc=3) は既知のまま。
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 停止点 `unlifted 0x6bbc20` の解消 | 最初のウィンドウ未達 | #3491 [FLE-14] (親 #672) |
+- 診断ありは units 209 のまま、停止点が `unlifted 0x6bbc20` (f_6c9280 ← 0x6c9380) へ移る (判定・表・再現は `REPORT_APPENDIX_672.md`)。既定経路は §0 の PM 判断 (ILT 分岐入力・`0x976da0` root) で 895 に変わった (付録 §C)。
+- main 取り込み後の再測定 (測定 commit `4cc9c3d72`): units・GetMem / FreeMem・`ptr_15F34A0`・停止点は取り込み前と同値。shim 有 (root 有) の IPP 判定 NG (rc=3) は既知のまま。
+- 未解決: 停止点 `unlifted 0x6bbc20` の解消 (最初のウィンドウ未達) → #3491 [FLE-14] (親 #672)。
+
+## 12. #4854: mode 3 の survey が InitTable 0 で測定不能 (補修と jsonl の残し方)
+
+- **結論**: 既定 (mode 3) の survey は補修 (`InitTable` を PKG へ戻す) ありで 942 件を判定 (ok 895 / empty 46 / noproc 1)。補修なしは `InitTable == 0` で不成立。補修が判定を変えるかは未切り分け (#4901)。受入 2 (旧 mode 0 との差) は #4901。
+- 測定 commit: `a64aa3aab` (コードを変えた最後の commit。main 取り込み `db771b431` 後の HEAD)。差分 0 の証跡: `git diff a64aa3aab HEAD -- tools/flelift/boot ':!tools/flelift/boot/REPORT.md'` の出力 0 行 (本節の追記のみが REPORT の差分)。
+- 素材: `fl-win64` (`FL_WIN64_DIR` に展開)・emsdk 6.0.12 (`[EMSDK]` を上流から取得して `SS_EMSDK_ENV` で指定)。
+
+| 項目 | 結果 (HEAD `a64aa3aab`) |
+|---|---|
+| lift (closure 2・既定 root) | 50 s・29,910 関数 |
+| clang plain (8 shard) | 50 s・mismatch 0 / undefined 0 / dup 0 |
+| boot 既定 (mode 3・`--boot-only`) | units 895・stopped 895・`exit`・IPP check ok (ptr=0x7f10001c) |
+| survey 既定 (mode 3・補修あり) | 1 セグメント・5〜6 s・ok 895 / empty 46 / noproc 1 (942 件)。jsonl 942 行 |
+| survey 補修なし (`FLE_SURVEY_NOREPAIR=1`) | `InitTable == 0` で不成立 (`survey.error`) |
+| survey mode 0 (`FLE_IPP=0`) | `InitTable == 0` で不成立。`survey_seg_0.json` の boot は units 209・exit code 0 |
+
+- 補修あり/なしの load: 測定時の loadavg 1.7〜1.8 (1 分)。
+- mode 0 の boot 単独の再採取は、`fle_boot.mjs` の `import(cjs)` 相対解決で失敗したため未実施 (survey 実行時の値を引用)。
+- 未解決: 補修の判定への影響 → #4901 [FLE-33]。unit 280 / 659 / 895 の補修なし unlifted → #4855 [FLE-32]。

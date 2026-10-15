@@ -72,6 +72,9 @@ async function main() {
     const code = await E(`window.__e2e.host.exited`);
     need(code === 0, `exit code ${code}`);
     log("W guest exited via ExitProcess, code=" + code);
+    // reach ビルド (gui_wasm.sh reach) のときだけ GUI-REACH / GUI-MSG 行が出る。順序検査 (reach_order_check.py) の入力 (#3510)
+    const tl = await E("window.__e2e.host.logs.filter((l) => l.startsWith('GUI-REACH') || l.startsWith('GUI-MSG'))");
+    if (tl.length) fs.writeFileSync(path.join(OUTDIR, "w_reach.log"), tl.join("\n") + "\n");
     const errs = await E("window.__e2e.errors");
     need(errs.length === 0, "page errors: " + JSON.stringify(errs));
     const perr = await drv.pageErrors();

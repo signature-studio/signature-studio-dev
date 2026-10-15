@@ -20,6 +20,10 @@ X64C = os.path.join(ROOT, 'tools', 'ott', 'lift', 'x64c.py')
 RT = os.path.join(ROOT, 'tools', 'ott', 'rt')
 WORK = os.path.join(HERE, 'work')
 EXPORT_MAIN = 0x10007CA0
+# 判定保留 (全数未確認): (b) と分類されても roots に入れない。 根拠と未解決は REPORT_APPENDIX_3546.md §2。
+HOLD_B = {0x10010BC0}
+# --no-emcc: emcc -c を飛ばす (被覆の測定だけに使う。 gate C1〜C4・jt/iat は実行されない)。
+NO_EMCC = '--no-emcc' in sys.argv
 sys.path.insert(0, HERE)
 import gap_classify
 
@@ -40,6 +44,9 @@ def lift_once(pth, roots, out, tag):
     print(r.stdout.strip()); print(r.stderr.strip()[-400:])
     if r.returncode != 0:
         sys.exit('[lift_text] FAIL: x64c rc %d (%s)' % (r.returncode, tag))
+    if NO_EMCC:
+        print('[emcc -c] (%s) 省略 (--no-emcc)' % tag)
+        return
     cc = ['emcc', '-c', '-O1', '-w', '-I', RT, os.path.join(out, 'ott_lifted.c'), '-o', os.path.join(out, 'ott_lifted.o')]
     r2 = subprocess.run(cc, capture_output=True, text=True)
     print('[emcc -c] (%s) rc %d, object %d B' % (tag, r2.returncode, os.path.getsize(os.path.join(out, 'ott_lifted.o')) if r2.returncode == 0 else 0))
@@ -102,10 +109,15 @@ def main():
                meta=json.load(open(os.path.join(out, 'lift_meta.json'))))
     rows = gap_classify.classify(env)
     json.dump(rows, open(os.path.join(out, 'gap_classes.json'), 'w'), indent=1)
+    gap_classify.selftest()
+    err = gap_classify.check_issue_gap(rows)
+    if err:
+        sys.exit('[gap_classify #4726] FAIL: ' + err)
     cnt = {c: [sum(1 for r in rows if r['cls'] == c), sum(r['size'] for r in rows if r['cls'] == c)] for c in 'abc'}
     print('[classify] (a) %d 区間 %d B / (b) %d 区間 %d B / (c) %d 区間 %d B' % tuple(cnt['a'] + cnt['b'] + cnt['c']))
-    b_roots = {r['va'] for r in rows if r['cls'] == 'b'}
-    print('[classify] (b) の先頭 %d 個を roots に追加: %s' % (len(b_roots), ' '.join('0x%x' % x for x in sorted(b_roots))))
+    b_roots = ({r['fva'] for r in rows if r['cls'] == 'b'} | {e for r in rows if r['cls'] == 'b' for e in r['entries']}) - HOLD_B
+    print('[classify] (b) の先頭 %d 個を roots に追加 (判定保留 %s を除く): %s' % (
+        len(b_roots), ' '.join('0x%x' % x for x in sorted(HOLD_B)), ' '.join('0x%x' % x for x in sorted(b_roots))))
     if b_roots - roots:
         roots |= b_roots
         lift_once(pth, roots, out, 'pass2')

@@ -122,3 +122,19 @@ return np;
 
 - 文字列の書込み (`"he.d"` の 8 バイト) は、上の計装のどれにも映らなかった。`store` 命令・`409c80` の copy のいずれも経由しないことになる。候補は IR の `__asm_rep_movsq_memcpy` (28 箇所)・`__asm_rep_movsb_memcpy` (1 箇所)・`__asm_rep_stosq_memset` (6 箇所) の経路。次の一手として、これらの入口で `dst` が `[WA, WA+32)` と重なる呼出しを記録する (未実施)。
 - 旧 (#3928 補足節) の `[aw]` 件数 3 件は、候補計装で再現した。派生 script は本 PR で commit した (`store_watch_3972.sh`・`copy_watch_3972.py`・`watch_copy_3972.c`)。
+
+### #3972 run 2 の実測 (commit `c39ea4679`・n=1)
+
+- IR: `bash m11_gen_ir2.sh` rc 0 (47 s)。素材 `work-m11`・`work-liftdiff`・`toolchain-emsdk`・`toolchain-retdec`・`fl-win64` (`block00031_PE.bin` のみ `$FL_WIN64_DIR/extracted/` = [WIN64]) を展開。
+- 再現: `bash trap_triage/store_watch_3972.sh rep1` (`M11_FIX_4136A0=1`・unit 158) で `[aw]` 4 件 (`653660` 入口の 0 初期化 `0x10aa1428`・`…1430`・`…1438`・`…1440`)。前回の 3 件から 1 件増えた (監視対象 `0x10aa1440` を含むため。前回は範囲外)。
+- `REP=1` (rep 系 helper 35 箇所の入口計装): unit 158 の `[rp]` は 0 件、`[aw]` は同じ 4 件。結果は halt0。
+- 計装の検証: `REP=1` で `WATCH_ADDR=0x10aa1000` (unit 158) と `WATCH_ADDR=0x10000000` (unit 0) の `[rp]` は 0 件。**既知の書込みで `[rp]` が出ることは未確認** (計装が効くかは未検証)。
+- 未特定: 文字列 `"he.d"` の書込み元。`store` 命令 (54,041 件・ptr 取りこぼし 0) と `409c80` の copy と rep 系 helper の入口のいずれでも、unit 158 の書込みを捕まえていない。残る候補は SSE 系 helper (`__asm_movdqa`・`__asm_movups` 系 等の関数呼出し) の経路。
+- 次の一手: (1) 既知の書込みで `[rp]` が出ることを確かめる計装の検証、(2) SSE 系 helper の入口計装、(3) 書込みが unit 158 の実行中か直前かを切り分ける (`m11_watch_on` の範囲を unit 157 の後から)。
+
+### #3972 run 3: 計装なしの unit 境界サンプリング
+
+- 目的: 計装 (store・copy・rep) に依らず、`0x10aa1428` の 8 バイトが unit の境界でどう変わるかを読むだけで測る。計装 0 の clean build (`M11_FIX_4136A0=1`)。
+- 再現: `cd tools/m11 && bash trap_triage/first_write_3972.sh <tag> 0x10aa1428 158` (前提: `work-m11`・`fl-win64`・`[EMSDK]`・`bash m11_gen_ir2.sh` 済み。出力 `work/probe3972/fw_<tag>.txt`)。
+- 結果 (n=1): unit 0〜157 の境界で値が変わるのは 0 から別の値への一時変化が多数 (unit 43・45・51 ほか)。unit 156 の出口で `3014aa10 3014aa10` に変わり、unit 157 では変化なし、unit 158 の出口 (`halt0` 後) で `0000000000000000`。`"he.d"` (`0x64002e00650068`) は unit 158 の境界では観測されなかった。
+- 解釈: `"he.d"` の書込みは unit 158 の実行中にだけ現れる一時的な値と読める。ただし unit 158 は `halt0` で終わるため、出口の `0` が unit 158 の処理によるか halt 後の後始末かは区別できていない。store 計装も rep 計装も書込みを捕まえていないため、書込み経路は計装の対象外 (未特定)。

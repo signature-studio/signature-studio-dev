@@ -12,8 +12,9 @@ import pefile
 BASE = 0x30000000
 IMPBASE = 0x1D80000  # fle_cpu.h の IMP_VA_BASE と同一
 ARENA = 0x30500000   # ヒープ (HeapAlloc の bump 領域)。image の外・wasm 線形メモリ内
-ARENA_SZ = 0x10000
+ARENA_SZ = int(os.environ.get('WC_ARENA_SZ', '0x10000'), 0)  # init (0x1b7d80) の確保が 64 KiB を超えるため PSOLA では 4 MiB (#4302)
 ENTRY_RVA = int(os.environ.get('WC_ENTRY_RVA', '0x1ac470'), 0)  # WaveformColouring_CreateInstance (export)
+INIT_RVA = int(os.environ.get('WC_INIT_RVA', '0'), 0)  # CreateInstance の前に 1 回呼ぶ host 初期化 (0 = なし)
 
 pe = pefile.PE(sys.argv[1])
 outdir = sys.argv[2]
@@ -74,23 +75,37 @@ CALL_SLOTS = int(os.environ.get('WC_CALL_SLOTS', '1'))
 CALL_IDX = [int(x) for x in os.environ.get('WC_CALL_IDX', ' '.join(str(k) for k in range(CALL_SLOTS))).split()]
 CALL_SLOTS = len(CALL_IDX)
 CALL_RVA = [SLOT_RVA[k] for k in CALL_IDX]
+# 呼出しの引数 (RDX, R8, R9, 5 番目 = 出力)。WC_CALL_ARGS="0 16 IN OUT" のように 4 個指定する (#4302)。
+# IN/OUT は psola_init_probe.sh と同じ位置 (+0x8000/+0xC000)。既定 "IN 0 0 0" は従来の差分テストと同じ (RDX=入力・他は 0)。
+_CA = {'IN': ARENA + 0x8000, 'OUT': ARENA + 0xC000}
+# slot ごとに引数が違う (slot 1: RDX=入力・R8=出力 / slot 3: RDX=0・R8=16・R9=入力・S5=出力) ため、
+# WC_CALL_ARGS は呼ぶ slot と同じ数の "RDX R8 R9 S5" 組をセミコロンで区切って指定する。1 組だけなら全 slot 共通。
+_ARG_SETS = [s.split() for s in os.environ.get('WC_CALL_ARGS', 'IN 0 0 0').split(';')]
+_ARG_SETS = [[_CA.get(t) if t in _CA else int(t, 0) for t in s] for s in _ARG_SETS]
+assert all(len(s) == 4 for s in _ARG_SETS), _ARG_SETS
+assert len(_ARG_SETS) in (1, CALL_SLOTS), (len(_ARG_SETS), CALL_SLOTS)
+CALL_ARGS = _ARG_SETS if len(_ARG_SETS) == CALL_SLOTS else _ARG_SETS * CALL_SLOTS
 # 戻り値 rax を acc に畳み込む slot (WC_RET_IDX。既定は呼ぶ全 slot)。戻り値が ABI 上未定義の slot (void 相当) は外す。
 RET_IDX = [int(x) for x in os.environ.get('WC_RET_IDX', ' '.join(str(k) for k in CALL_IDX)).split()]
 RET_MASK = sum(1 << i for i, k in enumerate(CALL_IDX) if k in RET_IDX)
 lay = {'base': BASE, 'img_size': SIZE, 'arena': ARENA, 'arena_sz': ARENA_SZ, 'entry_rva': ENTRY_RVA,
        'data_rva': data.VirtualAddress, 'data_sz': data.Misc_VirtualSize, 'text_rva': text.VirtualAddress,
        'vtable_rva': VTABLE_RVA, 'slots': CALL_RVA, 'call_slots': CALL_SLOTS, 'ret_mask': RET_MASK,
+       'init_rva': INIT_RVA, 'call_args': CALL_ARGS,  # slot ごとの [RDX, R8, R9, S5]
        'iat_names': [slots[s] for s in order], 'iat_rva': {slots[s]: s for s in order}}
 L = ['#define WC_BASE 0x%xULL' % BASE,
      '#define WC_IMG_SIZE 0x%x' % SIZE,
      '#define WC_ARENA 0x%xULL' % ARENA,
      '#define WC_ARENA_SZ 0x%x' % ARENA_SZ,
      '#define WC_ENTRY_RVA 0x%x' % ENTRY_RVA,
+     '#define WC_INIT_RVA 0x%x' % INIT_RVA,
      '#define WC_DATA_RVA 0x%x' % data.VirtualAddress,
      '#define WC_DATA_SZ 0x%x' % data.Misc_VirtualSize,
      '#define WC_CALL_SLOTS %d' % CALL_SLOTS,
      '#define WC_RET_MASK 0x%x' % RET_MASK,
-     'static const uint32_t WC_SLOT_RVA[] = {%s};' % ', '.join('0x%x' % s for s in CALL_RVA)]
+     'static const uint32_t WC_SLOT_RVA[] = {%s};' % ', '.join('0x%x' % s for s in CALL_RVA),
+     'static const uint64_t WC_SLOT_ARGS[][4] = {%s};' % ', '.join(
+         '{0x%xULL, 0x%xULL, 0x%xULL, 0x%xULL}' % tuple(a) for a in CALL_ARGS)]
 for name in ('HeapAlloc', 'HeapFree', 'GetLastError', 'SetLastError', 'GetCurrentProcess', 'EnterCriticalSection',
              'LeaveCriticalSection', 'FlsGetValue', 'FlsSetValue', 'IsProcessorFeaturePresent', 'RaiseException',
              'RtlCaptureContext', 'RtlLookupFunctionEntry', 'RtlPcToFileHeader', 'RtlVirtualUnwind',

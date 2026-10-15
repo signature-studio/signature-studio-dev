@@ -14,13 +14,19 @@ uint32_t wc_cov_get(uint32_t i) { return wc_covb[i]; }
 
 #define STUB_RET(v) do { R[RAX] = (uint64_t)(v); R[RSP] += 8; wc_hits++; } while (0)
 
-uint64_t wc_run(uint32_t va, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3) {
+/* a4 は 5 番目の引数 (ms_abi で [rsp+0x28] = STACK_TOP+0x20 に置く)。wc_run5 だけが使う (#4302)。 */
+uint64_t wc_run5(uint32_t va, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4) {
     R[RSP] = STACK_TOP;
+    ST64(STACK_TOP + 0x20, a4);
     R[RCX] = a0; R[RDX] = a1; R[R8] = a2; R[R9] = a3;
     R[RAX] = 0xFEEDFACE5EED0000ULL;
     R[RSP] -= 8; ST64(R[RSP], 0xdead0000ull);
     ott_dispatch(va);
     return R[RAX];
+}
+
+uint64_t wc_run(uint32_t va, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3) {
+    return wc_run5(va, a0, a1, a2, a3, 0);
 }
 
 void wc_reset(void) {

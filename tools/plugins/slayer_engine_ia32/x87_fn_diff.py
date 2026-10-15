@@ -42,6 +42,10 @@ TARGETS = [
     # 引数の型は関数ごとに分からないので、a0 は float、a1..a5 は 0..15 の整数 (gen 'mixed')。 行数は N_PER_MIXED。
     # 1000b3a2・10001290 は OBJ 窓もスタックも書かず ST(0) だけを返すため、main の非自明性の判定 (effect) を通らず、範囲から外した (REPORT_APPENDIX_3715.md §5)。
     {'va': 0x10005D20, 'name': 'fn_10005d20', 'gen': 'mixed'},
+    # #4080 (PLG-G2-43): 独立入口 (direct call 先) のうち突合が通る 2 本。 thiscall (ecx = this、float a0..a2、ret 0xc)。
+    # 100052d0・10005550 の float64 差は 1 ulp (f80→f64。 D28)。 float32 と構造は全行一致。
+    {'va': 0x100052D0, 'name': 'fn_100052d0', 'gen': 'state_update'},
+    {'va': 0x10005550, 'name': 'fn_10005550', 'gen': 'state_update'},
 ]
 # ebp = 0x10F00000 - 0x1000 (x87_fn_native.c・x87_fn_glue.c)。 窓は ebp-0x100 から ebp+0xE0 (旧 ebp 0x10EFFF00 と同じ相対位置)。
 STK_LO = 0x10F00000 - 0x1100
@@ -51,9 +55,25 @@ PROBE = [
     {'va': 0x10009EB5, 'name': 'fn_10009eb5', 'gen': 'generic'},
     {'va': 0x1000B526, 'name': 'fn_1000b526', 'gen': 'generic'},
     {'va': 0x1000BF60, 'name': 'fn_1000bf60', 'gen': 'generic'},
+    # #4080: double 引数の 1 本 (cdecl・a0 = double)。 1000bf1e は OBJ 窓を書かないので effect 判定が 0 になる (構造は全行一致・float 全行一致)。
+    {'va': 0x1000BF1E, 'name': 'fn_1000bf1e', 'gen': 'double1'},
+    # #4840: 空スタックで呼ぶ基準線 (ST(0) の入力を積まない)。 入力は X87_PUSH64=1 で測る (付録 REPORT_APPENDIX_4840.md)。
+    # 同じ name を PROBE に 2 つ置くと agg が混ざるため、#4080 の 10009bc4 (double1) 行はここでは外す。
+    {'va': 0x10009BC4, 'name': 'fn_10009bc4', 'gen': 'generic'},
 ]
 if os.environ.get('X87_PROBE'):
     TARGETS = TARGETS + PROBE
+# #4840: double 入力の測定専用 (X87_PUSH64=1)。 呼出し前に double 1 個を x87 に積む (a0 = 下位 dword・a1 = 上位 dword)。
+#   native・glue を -DX87_PUSH64 で作る。 ゲートには入れない (既存の TARGETS の入口状態は変えない)。
+PUSH64 = bool(os.environ.get('X87_PUSH64'))
+if PUSH64:
+    TARGETS = [
+        {'va': 0x10009BC4, 'name': 'fn_10009bc4', 'gen': 'f64'},
+    ]
+    WORK_NAME = 'x87fn_push64'
+else:
+    WORK_NAME = 'x87fn'
+PUSH64_FLAGS = ['-DX87_PUSH64'] if PUSH64 else []
 
 
 def pe_image():
@@ -87,6 +107,12 @@ def gen_rows(seed, n):
                 a = [f32(rng.uniform(-1000, 1000)), rng.randrange(16), 0, 0, 0, 0]
             elif t['gen'] == 'mixed':
                 a = [f32(rng.uniform(-100, 100))] + [rng.randrange(16) for _ in range(5)]
+            elif t['gen'] == 'f64':
+                d = struct.unpack('<Q', struct.pack('<d', rng.uniform(-1000, 1000)))[0]
+                a = [d & 0xFFFFFFFF, d >> 32, 0, 0, 0, 0]
+            elif t['gen'] == 'double1':
+                d = struct.unpack('<Q', struct.pack('<d', rng.uniform(-100, 100)))[0]
+                a = [d & 0xFFFFFFFF, d >> 32, rng.randrange(16), 0, 0, 0]
             else:
                 a = [f32(rng.uniform(-100, 100)) for _ in range(5)] + [0]
             line = '%08x %08x %s %s' % (t['va'], OBJ, ' '.join('%08x' % v for v in a), init.hex())
@@ -107,6 +133,20 @@ SPECIAL_F32 = [
 ]
 
 
+SPECIAL_F64 = [
+    0x7FF8000000000000,  # qNaN
+    0xFFF8000000000000,  # -qNaN
+    0x7FF0000000000000,  # +inf
+    0xFFF0000000000000,  # -inf
+    0x0000000000000001,  # 最小の正の非正規数
+    0x0000000000000000,  # +0
+    0x8000000000000000,  # -0
+    0x41DFFFFFFFC00000,  # 2^31 - 1 (int32 の上限付近)
+    0xC1E0000000000000,  # -2^31
+    0x41E0000000000000,  # 2^31 (int32 を超える)
+]
+
+
 def gen_special_rows(seed, n):
     """例外的な値 (NaN・±inf・非正規・±0 = 除算の除数) を含む行。 通常行と別の乱数系列を使う (通常行の列は変えない)。
     a0 は SPECIAL_F32 を巡回させて全種を必ず通す。 OBJ 窓の各語は 1/4 で例外値にする (除数の位置を含めるため)。"""
@@ -118,8 +158,14 @@ def gen_special_rows(seed, n):
                      for _ in range(OBJ_WIN // 4)]
             init = b''.join(struct.pack('<I', w) for w in words)
             sp = SPECIAL_F32[i % len(SPECIAL_F32)]
-            if t['gen'] == 'idx_store':
+            if t['gen'] == 'f64':
+                d = SPECIAL_F64[i % len(SPECIAL_F64)] if i % 2 == 0 else struct.unpack('<Q', struct.pack('<d', rng.uniform(-1e12, 1e12)))[0]
+                a = [d & 0xFFFFFFFF, d >> 32, 0, 0, 0, 0]
+            elif t['gen'] == 'idx_store':
                 a = [sp, rng.randrange(16), 0, 0, 0, 0]
+            elif t['gen'] == 'double1':
+                d = struct.unpack('<Q', struct.pack('<d', rng.uniform(-100, 100)))[0]
+                a = [d & 0xFFFFFFFF, d >> 32, rng.randrange(16), 0, 0, 0]
             else:
                 a = [sp] + [rng.choice(SPECIAL_F32) if rng.random() < 0.5 else f32(rng.uniform(-100, 100))
                             for _ in range(2)] + [f32(rng.uniform(-100, 100)) for _ in range(2)] + [0]
@@ -138,6 +184,9 @@ def run(cmd, what, timeout=900):
 
 
 CHUNK = 8000
+# #4775: 二つの NaN どうしの add/mul は、V8 の tier (Liftoff と TurboFan) で返す NaN の選び方が違う (仕様で未規定)。
+# 既定の tier 切替はタイミングで変わるため、wasm 側は tier を固定して実行し、NaN ビットを再現可能にする。
+WASM_TIER = '--liftoff-only'
 
 
 def run_chunked(scen_path, out_path, cmd_for, what, timeout):
@@ -206,6 +255,41 @@ def words(hexstr):
     return [int.from_bytes(b[i:i + 4], 'little') for i in range(0, len(b), 4)]
 
 
+def mismatch_classes(nat, act, scen):
+    """#4743: 行の不一致を原因別に数える。 'nan' = NaN どうしのビット差のみ / 'f80' = float64 のみ 1-2 ulp (float32 は一致) / 'other' = それ以外 (0 件が期待)。"""
+    h = {}
+    for i, (t, line, init) in enumerate(scen):
+        e, w = nat[i], act[i]
+        if e == w:
+            continue
+        kinds = set()
+        for k in ('eax', 'd', 'st0', 'st0d', 'mem', 'stk'):
+            if e[k] == w[k]:
+                continue
+            if k == 'st0d':
+                c = dword_class(int(e[k], 16), int(w[k], 16))
+                kinds.add('f80' if c in (1, 2) else ('nan' if c == 'nan' else 'other'))
+            elif k in ('mem', 'stk'):
+                for x, y in zip(words(e[k]), words(w[k])):
+                    if x != y:
+                        c = word_class(x, y)
+                        kinds.add('nan' if c == 'nan' else 'other')
+            else:
+                c = word_class(int(e[k], 16), int(w[k], 16))
+                kinds.add('nan' if c == 'nan' else 'other')
+        if kinds == {'f80'}:
+            cls = 'f80 (float64 のみ 1-2 ulp)'
+        elif kinds == {'nan'}:
+            cls = 'NaN どうしのビット差'
+        else:
+            cls = '/'.join(sorted(kinds))
+        key = (t['name'], cls)
+        h[key] = h.get(key, 0) + 1
+    for (name, cls), n in sorted(h.items()):
+        print('[mismatch] %s: %s %d 行' % (name, cls, n))
+    return h
+
+
 def compare(nat, act, scen, quiet=False):
     """行ごとに突合する。 戻り値 (ok, 集計 dict)。 ok は構造の判定 (行数・eax・x87 深さ・非自明性) のみ。 float 語は分布を集計する。"""
     if len(nat) != len(scen) or len(act) != len(scen):
@@ -215,7 +299,7 @@ def compare(nat, act, scen, quiet=False):
     agg = {}
     for t in TARGETS:
         agg[t['name']] = {'rows': 0, 'eq': 0, 'f32_eq': 0, 'eax_bad': 0, 'eax_nan': 0, 'd_bad': 0, 'effect': 0,
-                          'st0': {}, 'st0d': {}, 'mem': {}}
+                          'eaxs': set(), 'st0': {}, 'st0d': {}, 'mem': {}}
     for i, (t, line, init) in enumerate(scen):
         a = agg[t['name']]
         e, w = nat[i], act[i]
@@ -229,6 +313,7 @@ def compare(nat, act, scen, quiet=False):
             a['d_bad'] += 1
         if e['mem'] != init.hex() or e['stk'] != '00' * STK_WIN:
             a['effect'] += 1
+        a['eaxs'].add(e['eax'])
         if e == w:
             a['eq'] += 1
         if e['st0'] == w['st0'] and e['mem'] == w['mem'] and e['stk'] == w['stk'] and e['eax'] == w['eax']:
@@ -244,7 +329,9 @@ def compare(nat, act, scen, quiet=False):
         a = agg[t['name']]
         n = a['rows']
         mixed = sum(a[k].get('nan-num', 0) for k in ('st0', 'st0d', 'mem'))
-        if a['eax_bad'] or a['d_bad'] or a['effect'] == 0 or n == 0 or mixed:
+        # 非自明性: 窓が変わった行があるか、PUSH64 (窓を書かない関数) では戻り値 eax の種類が 2 以上あること。
+        nontrivial = a['effect'] > 0 or (PUSH64 and len(a['eaxs']) >= 2)
+        if a['eax_bad'] or a['d_bad'] or not nontrivial or n == 0 or mixed:
             ok = False
         if quiet:
             continue
@@ -284,7 +371,7 @@ def nega_lower(scen_path, nat_out):
          '-sGLOBAL_BASE=%d' % 0x11000000, '-sSTACK_SIZE=2097152', '-sINITIAL_MEMORY=%d' % 0x14000000,
          '-sALLOW_MEMORY_GROWTH=0', '-o', mut_mjs], 'mutant wasm build (emcc)', timeout=900)
     mut_out = os.path.join(mut_dir, 'wasm_out.txt')
-    run(['node', os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mut_mjs, os.path.join(WORK, 'image.bin'), scen_path, mut_out],
+    run(['node', WASM_TIER, os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mut_mjs, os.path.join(WORK, 'image.bin'), scen_path, mut_out],
         'mutant wasm run (node)', timeout=900)
     _, agg = compare(parse(nat_out), parse(mut_out), scen_for_compare(scen_path))
     return agg[TARGETS[0]['name']]
@@ -356,6 +443,8 @@ def main():
         for va, (verdict, detail) in classify().items():
             print('[classify] 0x%x %s %s' % (va, verdict, detail))
         sys.exit(0)
+    if PUSH64:
+        WORK = os.path.join(HERE, 'work', WORK_NAME)
     nega = '--nega' in sys.argv
     special = '--special' in sys.argv
     if special:
@@ -404,9 +493,9 @@ def main():
     if not nega:
         t_nat_build = run(['gcc', '-m32', '-O1', '-fno-pic', '-fno-pie', '-fno-stack-protector', '-fcf-protection=none',
                            '-fno-asynchronous-unwind-tables', '-ffreestanding', '-nostdlib', '-static', '-no-pie',
-                           '-o', nat, os.path.join(HERE, 'x87_fn_native.c')], 'native build')
+                           *PUSH64_FLAGS, '-o', nat, os.path.join(HERE, 'x87_fn_native.c')], 'native build')
         t_wasm_build = run(['emcc', '-O1', '-ffp-contract=off', '-fno-fast-math', '-w', '-I', RT,
-                            '-DLIFT_C="%s"' % LIFT, os.path.join(HERE, 'x87_fn_glue.c'), os.path.join(RT, 'ott_cpu.c'),
+                            '-DLIFT_C="%s"' % LIFT, *PUSH64_FLAGS, os.path.join(HERE, 'x87_fn_glue.c'), os.path.join(RT, 'ott_cpu.c'),
                             '-sENVIRONMENT=node', '-sMODULARIZE=1', '-sEXPORT_NAME=createModule', '-sEXIT_RUNTIME=0',
                             '-sEXPORTED_FUNCTIONS=_ott_call32x,_ott_x87_st0,_ott_x87_st0d_hi,_ott_x87_st0d_lo,_ott_x87_depth',
                             '-sEXPORTED_RUNTIME_METHODS=HEAPU8',
@@ -415,11 +504,13 @@ def main():
         load = os.getloadavg()[0]
         img_p = os.path.join(WORK, 'image.bin')
         t_nat = run_chunked(scen, nat_out, lambda cp, co: [nat, img_p, cp, co], 'native run', 600)
-        t_wasm = run_chunked(scen, wasm_out, lambda cp, co: ['node', os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mjs, img_p, cp, co],
+        t_wasm = run_chunked(scen, wasm_out, lambda cp, co: ['node', WASM_TIER, os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mjs, img_p, cp, co],
                              'wasm run (node)', 900)
         print('[build] native %.2f s, wasm emcc %.2f s; [run] native %.3f s, wasm(node) %.3f s; load1 before run %.2f' % (
             t_nat_build, t_wasm_build, t_nat, t_wasm, load))
         ok, _ = compare(parse(nat_out), parse(wasm_out), rows)
+        if special:
+            mismatch_classes(parse(nat_out), parse(wasm_out), rows)
         if not ok:
             print('[x87_fn_diff] FAIL: 構造の不一致または非自明性なし')
             sys.exit(1)

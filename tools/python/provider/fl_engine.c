@@ -49,6 +49,11 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static int changed_flag, use_metronome, precount, rec_ppq;
 static int lm_pages;
 static int ui_closing, ui_time_disp_min, ui_start_on_input, ui_loop_rec, ui_step_edit, ui_browser_auto_hide, ui_snap_mode;
+/* PY-246 (#3759): 送出キーの記録 (PE 0x8186a0 → SendInput)。ui 送出 15 関数が書き、tests/ui_keys_diff.mjs が読む */
+#define KEY_N 256
+typedef struct { int vk, mod, count; } Key;
+static Key keys[KEY_N];
+static int key_n;
 static int undo_pos, undo_count, undo_last, safe_edit;
 static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
 static int sel_start, sel_end, live_anchor;
@@ -98,7 +103,7 @@ void fl_engine_reset(void) {
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
     lm_pages = 0;
-    ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
+    key_n = 0; ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
     undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
     set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
     sel_start = -1; sel_end = -1; live_anchor = -1;
@@ -431,17 +436,56 @@ FL_H(mixer, trackCount) { return fl_ret_i(c, NMIX); }
 FL_H(mixer, getTrackCount) { return fl_ret_i(c, NMIX - 2); }
 /* PE 0xd63870: ecx=3 を変換スロット 0x15e4280 (PyLong_FromLong・REPORT_PY152 §42) に渡すのみ (REPORT_PY205) */
 FL_H(mixer, getEqBandCount) { return fl_ret_i(c, 3); }
-/* PE 0x12be470 (maxLen > 0 のみ): 長さが maxLen を超えるとき末尾から、mask 外の文字 (母音 AEIOU・記号・空白。mask = 0-9 と大文字子音) を削除し、最後に先頭 maxLen 文字へ切る。
- * PE の文字列は UTF-16。ここは ASCII 前提 (非 ASCII 名は未確認) */
+/* UTF-8 ⇄ UTF-16 (名前は UTF-8 で持つ。不正・孤立サロゲートは U+FFFD。境界の TextEncoder/TextDecoder と同じ) */
+static int u8_to_u16(const char *s, uint16_t *o) {
+    const unsigned char *p = (const unsigned char *)s;
+    int n = 0;
+    while (*p) {
+        uint32_t cp = *p++;
+        int k = 0;
+        if (cp >= 0xc2 && cp <= 0xdf) cp &= 0x1f, k = 1;
+        else if (cp >= 0xe0 && cp <= 0xef) cp &= 0x0f, k = 2;
+        else if (cp >= 0xf0 && cp <= 0xf4) cp &= 0x07, k = 3;
+        else if (cp >= 0x80) cp = 0xfffd;
+        for (; k && (*p & 0xc0) == 0x80; k--) cp = cp << 6 | (*p++ & 0x3f);
+        if (k) cp = 0xfffd;
+        if (cp >= 0x10000) o[n++] = (uint16_t)(0xd800 + ((cp - 0x10000) >> 10)), o[n++] = (uint16_t)(0xdc00 + ((cp - 0x10000) & 0x3ff));
+        else o[n++] = (uint16_t)cp;
+    }
+    return n;
+}
+static void u16_to_u8(const uint16_t *u, int n, char *o) {
+    int k = 0;
+    for (int i = 0; i < n; i++) {
+        uint32_t cp = u[i];
+        if (cp >= 0xd800 && cp < 0xdc00 && i + 1 < n && u[i + 1] >= 0xdc00 && u[i + 1] < 0xe000) cp = 0x10000 + ((cp - 0xd800) << 10) + (u[++i] - 0xdc00);
+        else if (cp >= 0xd800 && cp < 0xe000) cp = 0xfffd;
+        if (cp < 0x80) o[k++] = (char)cp;
+        else if (cp < 0x800) o[k++] = (char)(0xc0 | cp >> 6), o[k++] = (char)(0x80 | (cp & 0x3f));
+        else if (cp < 0x10000) o[k++] = (char)(0xe0 | cp >> 12), o[k++] = (char)(0x80 | (cp >> 6 & 0x3f)), o[k++] = (char)(0x80 | (cp & 0x3f));
+        else o[k++] = (char)(0xf0 | cp >> 18), o[k++] = (char)(0x80 | (cp >> 12 & 0x3f)), o[k++] = (char)(0x80 | (cp >> 6 & 0x3f)), o[k++] = (char)(0x80 | (cp & 0x3f));
+    }
+    o[k] = 0;
+}
+/* PE 0x12be470 (maxLen > 0 のみ): PE の文字列は UTF-16 で、長さ・削除は code unit 単位 (0x12be5a4 の判定・0x414f20 の 1 unit 削除)。
+ * 長さが maxLen を超える間、末尾から 1 unit ずつ見て mask 外を削除する (a-z は大文字化してから判定。mask = 0-9 と大文字子音。非 ASCII は全て mask 外)。
+ * 長さが maxLen 以下になったら止め、最後に先頭 maxLen unit へ切る */
 static void track_name_fit(char *s, int64_t m) {
-    if (m <= 0 || (int64_t)strlen(s) <= m) return;
-    for (int64_t i = (int64_t)strlen(s); i >= 1; i--) {
-        if (!strchr("0123456789BCDFGHJKLMNPQRSTVWXYZ", toupper((unsigned char)s[i - 1]))) {
-            memmove(s + i - 1, s + i, strlen(s + i) + 1);
-            if ((int64_t)strlen(s) <= m) break;
+    uint16_t u[NAME];
+    char o[3 * NAME];
+    int n = u8_to_u16(s, u);
+    if (m <= 0 || n <= m) return;
+    for (int i = n; i >= 1 && n > m; i--) {
+        uint16_t ch = u[i - 1];
+        if (ch >= 'a' && ch <= 'z') ch -= 0x20;
+        if (ch > 0xff || !strchr("0123456789BCDFGHJKLMNPQRSTVWXYZ", ch)) {
+            memmove(u + i - 1, u + i, (size_t)(n - i) * sizeof u[0]);
+            n--;
         }
     }
-    if ((int64_t)strlen(s) > m) s[m] = 0;
+    if (n > m) n = (int)m;
+    u16_to_u8(u, n, o);
+    snprintf(s, NAME, "%s", o);
 }
 FL_H(mixer, getTrackName) { MX(0); int64_t m = A_INT(1, -1); char b[NAME]; snprintf(b, sizeof b, "%s", t->name); track_name_fit(b, m); return fl_ret_s(c, b); }
 FL_H(mixer, setTrackName) { MX(0); const char *s = A_STR(1); set_name(t->name, s); return fl_ret_none(c); }
@@ -583,6 +627,32 @@ FL_H(ui, setStepEditMode) { NARGS(1, 1); ui_step_edit = A_INT(0, 0) == 1; return
 FL_H(ui, setTimeDispMin) { NARGS(0, 0); ui_time_disp_min = !ui_time_disp_min; return fl_ret_none(c); }
 /* PY-130: ui 版 getVersion (PE 0xd6c2f0 '|i'・既定 4) は mode 0..3 で int、4..6 で str、他は int 0 (分岐表は REPORT_PY130_3007) */
 FL_H(ui, getVersion) { NARGS(0, 1); int64_t m = A_INT(0, 4); return (m >= 4 && m <= 6) ? fl_ret_s(c, "") : fl_ret_i(c, 0); }
+/* PY-246 (#3759): 送出キー 15 関数。VK・修飾 (1 Shift・2 Alt・4 Ctrl)・回数は PE 0xfdd2c0 の leaf → 0x8186a0 (REPORT_PY140)。
+ * 送出の成否のゲートは PY-245 (#3758) で未確定のため、送出 leaf に入った経路を記録する。戻り値は PY-141 (#3034) で未確定 (仮置き 0) */
+static void key_send(int vk, int mod, int64_t count) {
+    if (count <= 0 || key_n >= KEY_N) return;
+    if (count > 0x7fffffff) count = 0x7fffffff;
+    keys[key_n].vk = vk; keys[key_n].mod = mod; keys[key_n].count = (int)count; key_n++;
+}
+int fl_engine_key_n(void) { return key_n; }
+int fl_engine_key_get(int i, int f) { if (i < 0 || i >= key_n) return -1; return f == 0 ? keys[i].vk : f == 1 ? keys[i].mod : keys[i].count; }
+void fl_engine_key_clear(void) { key_n = 0; }
+FL_H(ui, up) { NARGS(0, 1); key_send(0x26, 0, A_INT(0, 1)); return fl_ret_i(c, 0); }
+FL_H(ui, down) { NARGS(0, 1); key_send(0x28, 0, A_INT(0, 1)); return fl_ret_i(c, 0); }
+FL_H(ui, left) { NARGS(0, 1); key_send(0x25, 0, A_INT(0, 1)); return fl_ret_i(c, 0); }
+FL_H(ui, right) { NARGS(0, 1); key_send(0x27, 0, A_INT(0, 1)); return fl_ret_i(c, 0); }
+FL_H(ui, cut) { NARGS(0, 0); key_send(0x58, 4, 1); return fl_ret_i(c, 0); }
+FL_H(ui, copy) { NARGS(0, 0); key_send(0x43, 4, 1); return fl_ret_i(c, 0); }
+FL_H(ui, paste) { NARGS(0, 0); key_send(0x56, 4, 1); return fl_ret_i(c, 0); }
+FL_H(ui, insert) { NARGS(0, 0); key_send(0x2d, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, delete) { NARGS(0, 0); key_send(0x2e, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, enter) { NARGS(0, 0); key_send(0x0d, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, escape) { NARGS(0, 0); key_send(0x1b, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, yes) { NARGS(0, 0); key_send(0x59, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, no) { NARGS(0, 0); key_send(0x4e, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, nextWindow) { NARGS(0, 0); key_send(0x09, 0, 1); return fl_ret_i(c, 0); }
+/* PE: arg > 0 で修飾 0 (Tab)、arg <= 0 で Shift (修飾 1) + Tab。stub の引数名 shift と符号が逆 (REPORT_PY140 の未解決) */
+FL_H(ui, selectWindow) { NARGS(1, 1); key_send(0x09, A_INT(0, 0) > 0 ? 0 : 1, 1); return fl_ret_i(c, 0); }
 
 /* ---- general (1) ---- mock と同じ MIDI scripting API バージョン (実機値は未実測) */
 FL_H(general, getVersion) { NARGS(0, 0); return fl_ret_i(c, 1); }
@@ -604,15 +674,15 @@ FL_H(general, getProjectGenre) { NARGS(0, 0); return fl_ret_s(c, proj_genre); }
 FL_H(general, clearLog) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(general, dumpScoreLog) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 /* PY-235 (#3701): 成功経路 (gate 0 を仮定) は戻り値 = value (int32)。family の定義は host/fl_mock.mjs の recPassFamily と同一 (REPORT_PY235) */
-static int rec_pass_family(uint32_t e) {
-    return (e & 0xffff) != 8 && ((e >= 0x10000000u && e < 0x40000000u) || (e >= 0x40000003u && e <= 0x40000004u) || (e > 0x40000005u && e < 0x70000000u) || e >= 0xf0000000u);
+static int rec_pass_family(uint32_t e, uint32_t f) {
+    return (e & 0xffff) != 8 && ((e >= 0x10000000u && e < 0x40000000u) || (e >= 0x40000003u && e <= 0x40000004u) || (e > 0x40000005u && e < 0x70000000u) || e >= 0xf0000000u || ((e == 0x40000000u || e == 0x40000001u || e == 0x40000002u || e == 0x40000005u) && (f & 0x22u) == 0));
 }
 FL_H(general, processRECEvent) {
     NARGS(3, 3);
     uint32_t e = (uint32_t)A_INT(0, 0);
     int64_t v = A_INT(1, 0);
-    (void)A_INT(2, 0);
-    if (!rec_pass_family(e)) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error (not implemented: general.processRECEvent)");
+    uint32_t f = (uint32_t)A_INT(2, 0);
+    if (!rec_pass_family(e, f)) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error (not implemented: general.processRECEvent)");
     return fl_ret_i(c, (int32_t)v);
 }
 /* PY-119 (#2977): PE 0xd69350/0xd694e0/0xd69670 は範囲外で status -3 (Range error)。ゲートは未確定のため真と仮定 (REPORT_PY119_2977) */
@@ -629,10 +699,12 @@ FL_H(general, setUndoHistoryLast) { NARGS(1, 1); undo_last = (int)A_INT(0, 0); r
  * obj.+0x50 == 0 の経路 (0xd82c20 に code -7 = "Device not assigned") は未モデル (例外化の述語が実行時値のため) */
 FL_H(launchMapPages, length) { NARGS(0, 0); return fl_ret_i(c, lm_pages); }
 /* ---- launchMapPages (3 of 12, PY-138 #3029) ---- PE init 0xd79020 (sii)・updateMap 0xd79290 (i)・createOverlayMap 0xd7a130 (iiii) は書式と成功時の戻り (定数 = None) を確定。
- * page 配列への副作用は未確定のため状態を変えない (REPORT_PY138)。setMapItemTarget は戻り型の食い違いが未解決のため未実装 */
+ * page 配列への副作用は未確定のため状態を変えない (REPORT_PY138)。 */
 FL_H(launchMapPages, init) { NARGS(3, 3); (void)A_STR(0); (void)A_INT(1, 0); (void)A_INT(2, 0); return fl_ret_none(c); }
 FL_H(launchMapPages, updateMap) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(launchMapPages, createOverlayMap) { NARGS(4, 4); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+/* ---- launchMapPages (PY-243 #3745) ---- PE 0xd7a3a0 は書式 iii・成功時の戻り None (REPORT_PY243)。項目書込みは項目の状態を持たないため状態を変えない */
+FL_H(launchMapPages, setMapItemTarget) { NARGS(3, 3); for (int i = 0; i < 3; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
 
 /* ---- arrangement (4, PY-96 #2832) ---- PE 0xd786e0/0xd78700/0xd78500 が obj+0xd74/+0xd78 を読み、0xd78720 は 0xe43e80 (両方 >= 0) を bool で返す。初期値 -1 は未実測の仮置き */
 FL_H(arrangement, selectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_start); }
@@ -739,6 +811,12 @@ static int midi_send(fl_call *c, uint32_t w) {
 }
 /* PY-215 (#3568): PE 0xd75d30 (書式 'I'、引数 1)。-1 は -1 を返す (0xd75dc0)。それ以外は連動表を末尾から走査し、一致が無い・表が空なら status 1 → None (0xd75dce)。device・link の割当は見ない (-6/-7 経路なし)。表の供給元は未確定のため空と仮定 (REPORT_PY215 §3) */
 FL_H(device, getLinkedChannel) { int64_t i = A_INT(0, 0); if (i == -1) return fl_ret_i(c, -1); return fl_ret_none(c); }
+/* PY-4846 (#3568 子 B): PE 0xd75bc0 (getLinkedValue)・0xd75ed0 (getLinkedInfo)・0xd75de0 (getLinkedParamName)・0xd75c40 (getLinkedValueString) の index == -1 経路だけを確定 (REPORT_PY215 §1 の表)。index >= 0 は連動表・helper (0x1051170・0x1050f90・0x104f580・0x1046a30) が未確定のため未実装 */
+#define LINK_UNIMPL(name) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error (not implemented: device." name " index>=0)")
+FL_H(device, getLinkedValue) { int64_t i = A_INT(0, 0); if (i == -1) return fl_ret_d(c, -1.0); LINK_UNIMPL("getLinkedValue"); }
+FL_H(device, getLinkedInfo) { int64_t i = A_INT(0, 0); if (i == -1) return fl_ret_i(c, -1); LINK_UNIMPL("getLinkedInfo"); }
+FL_H(device, getLinkedParamName) { int64_t i = A_INT(0, 0); if (i == -1) return fl_err(c, FL_E_PLUGIN, "Plugin not valid"); LINK_UNIMPL("getLinkedParamName"); }
+FL_H(device, getLinkedValueString) { int64_t i = A_INT(0, 0); if (i == -1) return fl_err(c, FL_E_PLUGIN, "Plugin not valid"); LINK_UNIMPL("getLinkedValueString"); }
 FL_H(device, createRefreshThread) { return fl_ret_none(c); }
 FL_H(device, destroyRefreshThread) { return fl_ret_none(c); }
 FL_H(device, fullRefresh) { return fl_ret_none(c); }
@@ -746,7 +824,7 @@ FL_H(device, getIdleElapsed) { return fl_ret_d(c, idle_elapsed); }
 FL_H(device, isMidiOutAssigned) { return fl_ret_b(c, midi_out_assigned); }
 FL_H(device, getMasterSync) { return fl_ret_b(c, master_sync); }
 FL_H(device, setMasterSync) { master_sync = A_INT(0, 0) == 1; return fl_ret_none(c); }
-/* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。
+/* PE 0xd75120 (書式 "L|i"・第 2 引数の既定 1 は解析前に PE が書く・REPORT_PY231 §1b)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。
    0xfdc8a0 は [sink+0x5c+4*添字] と同じ 32bit 値なら送らず、変わったときだけ送ってテーブルを書く (REPORT_PY231 §1)。
    テーブルの初期値と添字の範囲は未確定 (#3949): 未設定 (-1) を初期値とみなし、範囲外の添字は重複検出せず送る仮置き */
 FL_H(device, forwardMIDICC) {

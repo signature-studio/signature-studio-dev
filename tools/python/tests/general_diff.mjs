@@ -31,8 +31,12 @@ const calls = [
   ["general.clearLog", []], ["general.dumpScoreLog", [0]], ["general.dumpScoreLog", [-7, 1]],
   // PY-235 (#3701): processRECEvent の成功経路 (R-other・low16 != 8) は戻り値 = value。未確定の family は code 2 (未実装)
   ["general.processRECEvent", [0x10000000, 5, 0]], ["general.processRECEvent", [0x40000003, -7, 2]], ["general.processRECEvent", [-0x10000000, 100, 0x20]],
-  ["general.processRECEvent", [0x50000000, 1, 0]], ["general.processRECEvent", [0x10000008, 9, 0]], ["general.processRECEvent", [0x40000005, 3, 0]],
-  ["general.processRECEvent", [0x40000001, 3, 0]], ["general.processRECEvent", [0, 1, 0]], ["general.processRECEvent", [-0x80000000, 1, 0]],
+  ["general.processRECEvent", [0x50000000, 1, 0]], ["general.processRECEvent", [0x10000008, 9, 0]],
+  ["general.processRECEvent", [0, 1, 0]], ["general.processRECEvent", [-0x80000000, 1, 0]],
+  // PY-252 (#3778): 固定 4 族は flags & 0x22 == 0 のとき value、flags & 0x22 != 0 は code 2
+  ["general.processRECEvent", [0x40000005, 3, 0]], ["general.processRECEvent", [0x40000001, 3, 0]],
+  ["general.processRECEvent", [0x40000000, -4, 0x1c]], ["general.processRECEvent", [0x40000002, 7, 0x1]],
+  ["general.processRECEvent", [0x40000000, 3, 0x2]], ["general.processRECEvent", [0x40000005, 3, 0x20]],
 ];
 // 引数個数違い (NOARGS の関数に引数を渡す): mock と C は共に code 5 (Wrong number of parameters)
 const arity = [

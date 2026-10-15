@@ -111,6 +111,13 @@ void entry_main(u32 *sp) {
         u32 a[6] = {f[2], f[3], f[4], f[5], f[6], f[7]};
         for (u32 b = 0; b < STK_WIN; b++) ((volatile unsigned char *)STK_LO)[b] = 0;
         __asm__ volatile("fninit" ::: "memory");
+#ifdef X87_PUSH64
+        {
+            /* #4840: 呼出し前に double (a[0] = 下位 dword・a[1] = 上位 dword) を ST(0) に積む */
+            volatile u32 dw[2] = {a[0], a[1]};
+            __asm__ volatile("fldl %0" :: "m"(*(volatile double *)dw) : "memory");
+        }
+#endif
         u32 r = call_guest(f[0], f[1], a);
         unsigned short sw;
         __asm__ volatile("fnstsw %0" : "=m"(sw) :: "memory");
