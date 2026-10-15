@@ -15,8 +15,7 @@
 - **depth 6 では出なかった**: 既定で depth 6 (T0 = 1536 frames) になった 9 回は underrun 0・min_fill 896 (全 9 回)。0/9 回も母数が小さく、頻度の差を示すものではない。
 - **未特定**: producer が約 19 ms 書き込みを止める直接の経路 (§3-1)。futex 起床の遅延は 16 回すべてで 4 ms 以上 0 件・
   `wait_timeouts` 0 件 (§12-5 と同傾向)。残る候補は `do_buffer` の外 (未計測)。
-- **対処 (未実装)**: 初期 T の下限を探査に依らず depth 6 相当 (1536 frames) にする案。
-  ただし `lat_out` (FL へ報告する遅延) が +512 frames (約 10.7 ms) 増えるので製品判断が要る。子 issue **#2934** (`[AU-26]`) に起票。
+- **対処 (main に merge 済み)**: 初期 T の下限を探査に依らず depth 6 相当 (1536 frames) にする `FLA_F_T_FLOOR`。`lat_out` +512 frames (約 10.7 ms) の採否は PM 判断で採用 (2026-10-15)。子 issue **#2934** (`[AU-26]`) → PR #2995・#3583。床の適用後の再測定と残存する失敗は §7。
 - **ゲートは無変更**: `com_ramp_b256_d2` の判定基準 (underrun 0・silence 0・ramp bit-exact) は変えていない。
 
 ## 2. 仕組み (コード参照)
@@ -106,9 +105,36 @@ git diff --numstat 6b095da2 3a687abd -- tools/audio
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 初期 T の下限を固定する対処 (lat_out +512 frames の採否を含む) | 受入条件 1 (原因と対処) の対処が未達 | **#2934** (`[AU-26]`) |
-| producer が約 19 ms 書き込みを止める直接経路 (`do_buffer` の外の待ち) | 原因の直接経路が未特定 | #2777 (本 PR で部分達成のまま) |
-| 探査無効 6 回・既定 10 回の母数 (depth 4 は 7 回中 1 回) | 頻度の確定ができない | #2777 |
-| `probed` 値の未記録 (次回は `probed_burst=` ログを表に加える) | depth 4/6 の振り分けを直接確かめられない | #2777 |
+| producer が約 24 ms 以上書き込みを止める直接経路 (`do_buffer` の外の待ち。JS 側か wasm 側かも未切り分け) | 直接経路が未特定。床 (`FLA_F_T_FLOOR`) の下でも §7 で 1 回 FAIL | **[AU-40]** (親 #2777 から起票) |
+| 床の適用後の失敗の頻度 (§7: 本 HEAD 15 回で 1 FAIL) | 母数が小さく、頻度の確定ができない | **[AU-40]** (同上) |
+| `probed` 値の未記録 (次回は `probed_burst=` ログを表に加える) | depth 4/6 の振り分けを直接確かめられない | **[AU-40]** (同上) |
+| 探査無効 6 回・既定 10 回の母数 (depth 4 は 7 回中 1 回) | 対処前の頻度は本付録 §3 の母数のまま | 追加測定はしない (対処前の比較は母数不足と明記) |
 
-- 範囲外: 実オーディオデバイス・Windows/mac・Firefox/Safari・負荷を掛けた状態 (§12-3 の負荷試験は REPORT §12 と `REPORT_APPENDIX_998.md` を参照)。
+- 範囲外: 実オーディオデバイス・Windows/mac・Firefox/Safari。負荷下の測定は §7 の 5 回のみ。B=512・1024 の実測は本 issue の受入条件に無く未実施。
+
+## 7. 2026-10-15 再測定: 床 (`FLA_F_T_FLOOR`) 適用後の失敗の残存
+
+- 測定 commit: `c0fb6e074` (origin/main。`tools/audio` のコードは変えていない。本 PR は REPORT と付録のみ)。worktree は `ws-2777` (branch `2777-asio-com-underrun-load`)。
+- 手順: `bash tools/audio/asio/build.sh` (emsdk は `/opt/emsdk/emsdk_env.sh`・ビルド 9 秒) の後、`node harness/run_com.mjs --quick --only com_ramp_b256_d2 --out <json>` を 1 回ずつ foreground で実行。負荷下は `yes > /dev/null` を 4 本 (4 コア) 掛け、実行後に PID 指定で停止。判定基準 (underrun 0・silence 0・ramp bit-exact) は変えていない。
+- 実行: 負荷なし 10 回・負荷下 (yes×4) 5 回。すべて単独の `--only` 実行で、実行前 load は負荷なし 0.03〜1.15・負荷下 0.30〜5.89。
+
+| 区分 | 結果 | underrun / silence | min_fill | T (lat_out) | latency_changes | ramp 不一致 | cb_max (µs) | callback_gap max (ms) |
+|---|---|---|---|---|---|---|---|---|
+| 負荷なし 1 (初回) | **FAIL** | **1 / 4480** | 0 | 1792 (3841) | 1 | 110208/144768 | 49 | 12 |
+| 負荷なし 2〜10 | PASS ×9 | 0 / 0 | 896 | 1536 (3585) | 0 | 0/144768 | 69〜429 | 11〜16 |
+| 負荷 yes×4 1〜5 | PASS ×5 | 0 / 0 | 896 | 1536 (3585) | 0 | 0/144128〜144896 | 44〜2315 | 16〜18 |
+
+- 負荷なし 10 回のうち 1 回 (初回) のみ FAIL。負荷下 5 回はすべて PASS。成功 14 回はすべて min_fill 896・T 1536 (lat_out 3585) で揃った。
+- 失敗 run の読み (§3-1 と同形):
+  - 開始時 T は 1536 (depth 6・床どおり)。初回 underrun は quantum 270。
+  - 直前 64 quantum の fill は 1152〜1536 frames。そこから 1 quantum (128 frames) ずつ 9 段 (1152 → 0) 落ちた。producer の書き込みが約 24 ms 以上 (1152 frames ÷ 48 kHz = 24.0 ms) 止まった形で、§3-1 の 24〜27 ms と整合する。
+  - worklet 呼出間隔の最大は 12 ms、`cb_max` は 49 µs。worklet の停止ではない (§3-1 と同じ判定)。
+  - 失敗の後に `latency_changes` 1 で T は 1536 → 1792 (lat_out 3841)。
+- 判定 (ゲートは無変更): 判定基準に対して本 run は FAIL。判定の空振りでないことは、underrun 1・ramp 不一致 110208 が同じ run で検出されていることが示す。
+- 読み (推定を含む):
+  - 床は初期 T を 1536 に上げた (実測)。ただし成功 run の定常の fill の底は 896 frames (約 18.7 ms) で揃っており、底の決まり方は未確認。producer の停止が約 19 ms を超えると、底からも枯渇しうる (推定)。
+  - 床の適用後の母数: 本 HEAD の 15 回で 1 FAIL。床の適用後の既存の実測 (`REPORT_APPENDIX_2934.md` §3-2・§6-2・§6-6-2 の計 60 回 PASS) を加えると、床の適用後は計 75 回で 1 FAIL。床の前後で同じ条件の対照は無いので、頻度が下がったとは言えない。
+  - 結論: 床は初期 T を上げるが、producer の書き込み停止そのものを消してはいない。直接経路の特定は子 issue **[AU-40]** に移す。
+- 再現手順 (`tools/audio/asio/` で実行): `bash build.sh` → `node harness/run_com.mjs --quick --only com_ramp_b256_d2 --out work/meas/x.json` (負荷下は事前に `yes > /dev/null` を 4 本起動し、終了後に `kill <PID>`)。`work/meas/` は gitignore 対象で、集計は JSON の `results[0].result` を読んだ。
+
+- 検証 (規則 6): 測定 commit `c0fb6e074` から HEAD までのコード差分 `git diff c0fb6e074 HEAD -- tools/audio ':!*.md'` の出力は空 (本 PR は md のみ)。
