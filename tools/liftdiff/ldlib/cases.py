@@ -151,6 +151,7 @@ MACHINE_ENTRY = {
     0x6649b0: ['double', 'i64', 'i64'], # xmm0 (476500 → 40bf40)。rdx/r8 は出力 ptr
     0x6649c0: ['float', 'i64', 'i64'],  # xmm0 は float (4764c0 が cvtss2sd)。rdx/r8 は出力 float*
     0x664a80: ['double', 'double'],     # xmm0・xmm1 (476020)
+    0x4256c0: ['i64'],                  # rcx: POINT の値 (x = 下位 32bit, y = 上位 32bit)
 }
 
 
