@@ -4,7 +4,8 @@ target (例: slot 17 `0x1800c9680`・Splice 生成 `0x180498090`) の direct 逆
 併せて、C 内の間接 call の形と宛先の定義元、R の関数ポインタ (.rdata/.data の 8 byte スロット) の vtable head と index、
 vtable head を rip 相対で指す箇所 (ctor 候補) を出す。
 限界: 間接 call の宛先は解決しない。C の外へ出る間接 call は「宛先未解決」として数える (非到達の証明にはならない)。
-usage: slot_reach.py <pe> <root_va_hex> [--target <va_hex>]... [--vtable-head <va_hex>]...
+  --offset <hex>: そのオブジェクト offset を [reg+off] で読む/書く命令を全 .text から列挙する (demo bit 0x22792 の参照関数との対照つき)。
+usage: slot_reach.py <pe> <root_va_hex> [--target <va_hex>]... [--vtable-head <va_hex>]... [--offset <hex>]...
 """
 import bisect
 import re
@@ -20,12 +21,15 @@ pe_path = args[0]
 root = int(args[1], 16)
 targets = []
 heads = []
+offsets = []
 i = 2
 while i < len(args):
     if args[i] == "--target":
         targets.append(int(args[i + 1], 16))
     elif args[i] == "--vtable-head":
         heads.append(int(args[i + 1], 16))
+    elif args[i] == "--offset":
+        offsets.append(int(args[i + 1], 16))
     else:
         raise SystemExit(f"unknown arg {args[i]}")
     i += 2
@@ -74,9 +78,18 @@ fwd = defaultdict(set)
 rev = defaultdict(set)
 ind = defaultdict(list)  # f -> [(va, kind, reg, disp, op, src)]
 rip_refs = defaultdict(list)  # 参照先 VA -> [(命令 VA, 所属関数)]
+off_hits = defaultdict(list)  # offset -> [(va, 関数, W/R, 命令)]
+demo_fns = set()
 for lo, hi in funcs:
     ins_list = list(md.disasm(code[lo - t_base:hi - t_base], lo))
     for idx, ins in enumerate(ins_list):
+        for o in [0x22792] + offsets:
+            if re.search(rf"\+ {o:#x}\]", ins.op_str):
+                if o == 0x22792:
+                    demo_fns.add(lo)
+                if o in offsets:
+                    rw = "W" if ins.mnemonic.startswith("mov") and ins.op_str.split(",")[0].strip().endswith("]") else "R"
+                    off_hits[o].append((ins.address, lo, rw, f"{ins.mnemonic} {ins.op_str}"))
         m = rip_re.search(ins.op_str)
         if m:
             ea = ins.address + ins.size + int(m.group(2), 16) * (1 if m.group(1) == "+" else -1)
@@ -242,3 +255,10 @@ for x in sorted(R_ALL):
 for h in heads:
     refs = rip_refs.get(h, [])
     print(f"vtable head {h:#x}: rip-relative refs {len(refs)}; in C {sum(1 for a, f in refs if f in C)}; funcs {[hex(f) for a, f in refs][:8]}")
+
+for o in offsets:
+    hits = off_hits[o]
+    print(f"offset {o:#x}: {len(hits)} memory operand sites in .text, in {len({h[1] for h in hits})} functions")
+    for va, f, rw, op in hits:
+        print(f"  {rw} {va:#x} in {f:#x} {op}  (demo-bit function: {f in demo_fns})")
+print(f"demo-bit 0x22792 operand functions: {sorted(hex(x) for x in demo_fns)}")
