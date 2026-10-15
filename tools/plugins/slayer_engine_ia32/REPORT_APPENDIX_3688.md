@@ -3,8 +3,8 @@
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない)。 FLDENV/FRSTOR 後のタグ語の差は残りの issue ([PLG-G2-48] #4110) で扱う。
 
 - 親 REPORT: `REPORT_APPENDIX_2966.md` §6 (状態の保存・復元 4 件を #3688 に送った)。 方式: `docs/DECISIONS.md` D28 (f80→f64)。 本付録が本 issue の測定値の正本。
-- 検証 HEAD: `36dd4f614` (origin/main を取り込んだ merge commit・測定 commit)。 測定 commit は `0995187a8` から変わった。
-- コード差分 (測定 commit から検証 HEAD まで): `git diff 0995187a8 36dd4f614 -- tools/ott tools/plugins/slayer_engine_ia32` は 19 files・959+/46-。 差分の中身は main 側の x87 変更 (`#3687` の超越関数 lower・試験の `--nega-trig`・`--only`・`--no-e`・定義域の判定) と本 PR の lowering。 以下の数値は全て検証 HEAD で再測定した値。
+- 測定 commit (コードを変えた最後の commit): `36dd4f614` (origin/main を取り込んだ merge commit)。 検証 HEAD: `d35e0f1e8` (本付録の文言の修正のみ)。 `git diff 36dd4f614 d35e0f1e8 -- tools/ott tools/plugins/slayer_engine_ia32` の出力は 0 行 (`#1268` の規則: 差分 0 なので再測定は要らない。 ただし以下の数値は、 `36dd4f614` で再測定した値)。
+- 旧測定 commit `0995187a8` からのコード差分 (main 取り込みを含む): `git diff 0995187a8 36dd4f614 -- tools/ott tools/plugins/slayer_engine_ia32` は 19 files・959+/46-。 差分の中身は main 側の x87 変更 (`#3687` の超越関数 lower・試験の `--nega-trig`・`--only`・`--no-e`・定義域の判定) と本 PR の lowering。
 - 比較基準: main の第 2 親 `feec9980a` (本 PR が取り込んだ main の commit) を `git archive` で展開して同じ試験を実行した。 基準の値は HEAD と全て一致 (§4)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` と生成した試行のみ。
 - 素材: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst`)。
