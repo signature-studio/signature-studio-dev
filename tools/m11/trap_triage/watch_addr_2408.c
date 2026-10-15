@@ -11,6 +11,7 @@ typedef unsigned long long u64;
 static u64 n_hit = 0;
 static int watch_on = 0;
 void m11_watch_on(int on) { watch_on = on; }
+int m11_watch_on_state(void) { return watch_on; }
 __attribute__((noinline)) static void sw_hit(u32 addr, u32 val, u32 site, u32 width) {
     n_hit++;
     fprintf(stderr, "[aw] site=%u addr=%x val=%x width=%u hit=%llu\n", site, addr, val, width, n_hit);
