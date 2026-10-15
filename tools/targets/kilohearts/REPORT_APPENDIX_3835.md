@@ -12,7 +12,7 @@
 
 - 素材 `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B)。取り出し先は repo 外の作業ディレクトリ。
 - [GHIDRA] 12.1.4: 公式 release の asset `ghidra_12.1.4_PUBLIC_20260921.zip` (569,649,598 B・sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)。repo 外に展開。
-- [EMSDK] emcc: `toolchain-emsdk` の `/opt/emsdk` を使用。[JDK21] `temurin-21-jdk-amd64`。
+- [EMSDK] emcc: `toolchain-emsdk` の emcc を使用。[JDK21] `temurin-21-jdk-amd64`。
 - decompile: Delay 閉包 139 関数 → **139/139 OK** (`analyzeHeadless` wall 37.3 s、n=1)。Gain/Haas/Gate の 10 関数 → **10/10 OK**。
 
 #### 3835-③. 機械語による確定 (capstone・`HeartCore.core_64` の .text)
