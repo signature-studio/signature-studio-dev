@@ -36,6 +36,10 @@ lines.forEach((l, idx) => {
     const wide = ecx === WIDE_BASE;
     if (wide) M.HEAPU8.set(wideInit, WIDE_BASE);
     M.HEAPU8.set(init, ecx);
+    for (const tok of f.slice(9)) {
+        const [ad, hx] = tok.slice(1).split('=');
+        M.HEAPU8.set(Buffer.from(hx, 'hex'), parseInt(ad, 16));
+    }
     M.HEAPU8.fill(0, STK_LO, STK_LO + STK_WIN);
     const pre = wide ? M.HEAPU8.slice(WIDE_BASE, WIDE_BASE + WIDE_LEN) : null;
     const eax = M._ott_call32x(va, ecx, a0, a1, a2, a3, a4, a5) >>> 0;
