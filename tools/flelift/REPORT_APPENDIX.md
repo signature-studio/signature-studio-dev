@@ -190,8 +190,9 @@ harness は `fle_glue.c` を含めない (`ott_dispatch` が未定義で link �
 - ネガコン (roots = process slot 14 のみ): functions 2 / insns 178 / unsup 0 (前後で不変。生成 C は改変前後で `cmp` 一致)。
 - 差分テスト `python3 tools/flelift/tests/x64c_vex_diff.py`: pass 100 / fail 0 (rc 0)。rcpps 3 件 (`rcpps xmm1, xmm2`・`rcpps xmm3, xmm3`・`vrcpps xmm1, xmm2`) を追加。(測定 commit `a8d4b6e0d` 時点は pass 94 / fail 0。main 取り込みで x64c の追加命令分が増えた。)
 - rcpps ネガコン `python3 tools/flelift/tests/x64c_vex_diff.py --neg-rcp=0` (表 entry 0 を 1 bit 改変した C を生成): `FAIL rcpps xmm1, xmm2`・`FAIL vrcpps xmm1, xmm2`・pass 98 / fail 2 (rc 1)。(測定 commit 時点は pass 92 / fail 2。)
-- HEAD `9c30210af` での実測 (main 取り込み後): 差分テスト pass 100 / fail 0 (rc 0)、ネガコン pass 98 / fail 2 (rc 1)。閉包 (real / functions / insns / unsup) の HEAD 再測定は未実施。素材 `plugins-kilohearts` が無く実行できないため。閉包値 98 / 7,766 / unsup 0 は測定 commit `a8d4b6e0d` の値。
-- 測定 commit `a8d4b6e0d` から HEAD までの code 差分: `tools/flelift/x64c.py` と `tests/` に計 133 行 (main 取り込み分の vandps・vpsrld/vpslld・vcvtdq2ps・vcomiss・haddps を含む)。差分 0 ではないため、閉包の HEAD 再測定が必要。
+- HEAD `bf3b39b6a` (main 取り込み後・コード `9c30210af` と同一) での実測: 閉包 real 28.548 s・functions 98 / insns 7,766 / unsup **0** / imports 17 / unlifted 0 / traps 0 (rc 0)。ネガコン (process slot 14 のみ) functions 2 / insns 178 / unsup 0。差分テスト pass 100 / fail 0 (rc 0)、ネガコン `--neg-rcp=0` pass 98 / fail 2 (rc 1)。閉包・差分・ネガコンとも測定 commit の値と一致し、main 取り込み分は閉包の値を変えていない。
+- 素材の展開 (HEAD 実測時): `tar --zstd -xf plugins-kilohearts.tar.zst 'Kilohearts Offline Installer.zip'` → `unzip -o Kilohearts\ Offline\ Installer.zip payload.dat` → `unzip -o payload.dat 'windows.zip/1ccb1df8c8f10745'` → `unzip -o windows.zip/1ccb1df8c8f10745 HeartCore.core_64` (installer → payload.dat → windows.zip → HeartCore.core_64 の入れ子。sha256 先頭 16 hex `d55ce8b4c0ad7ebe`)。`docs/WORKFLOW.md` §11 の正本文言の修正は未起票 (PR 本文の未解決表。非 blocking)。
+- 測定 commit `a8d4b6e0d` から HEAD までの code 差分: `tools/flelift/x64c.py` と `tests/` に計 133 行 (main 取り込み分の vandps・vpsrld/vpslld・vcvtdq2ps・vcomiss・haddps を含む)。この差分を含む HEAD で閉包を再測定し、上記の値を得た。
 - 生成 C の構文: `gcc -fsyntax-only fle_lifted.c` rc 0 (閉包 1,006,164 B)。
 - 近似表の出所: `tools/targets/kilohearts/snapins/scripts/approx_tables.b64` (gen_simd.py の `kh_rcp_exact` と同一表・同一式)。表は rcpps を含む生成 C の先頭にだけ入る。
 - 素材の取り出し: `plugins-kilohearts` → `HeartCore.core_64` (76,642,304 B)。手順は `tools/targets/kilohearts/REPORT_KH19D.md`。

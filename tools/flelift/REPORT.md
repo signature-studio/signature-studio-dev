@@ -241,5 +241,5 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 
 ## 13. x64c の rcpps / vrcpps 実装 (#4054)
 
-- 結論: 閉包 unsup 34 → 0 (関数 98・命令 7,766 不変) は測定 commit `a8d4b6e0d` の値。HEAD `9c30210af` (main 取り込み後) の差分テストは pass 100 / fail 0、ネガコンは pass 98 / fail 2 (rcpps / vrcpps FAIL)。閉包の HEAD 再測定は未実施 (`plugins-kilohearts` が素材に無い)。
+- 結論: 閉包 unsup 34 → 0 (関数 98・命令 7,766 不変)。HEAD `bf3b39b6a` (main 取り込み後) で閉包を再測定し、unsup 0・関数 98・命令 7,766 を確認 (差分テスト pass 100 / fail 0、ネガコン pass 98 / fail 2)。
 - 実測の詳細 (閉包・ネガコン・差分テスト・生成 C 構文) は `REPORT_APPENDIX.md` §16 (分割移動)。
