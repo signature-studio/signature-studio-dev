@@ -210,7 +210,7 @@ python3 analysis/py257_r8d_bits.py work/py65/extracted/block00031_PE.bin work/py
 
 ### 8.1 呼出し先の中身 (#4776・PY-381)
 
-- 解析器: `analysis/py381_r8d_callees.py` (main 版・#5298 で merge 済み)。前段は `analysis/py4769_r8d_single.py` の TSV。
+- 解析器: `analysis/py381_r8d_callees.py` (main 版・#5298 で merge 済み)。前段は `analysis/py4769_r8d_single.py` の TSV。付録の先頭 (生成元・再現・検算値) を解析器が書くように変えた測定 commit は `5accd2632`。`git diff 5accd2632 HEAD -- tools/python/analysis tools/python/REPORT_PY257.md` の出力は本 REPORT の commit 時点で 0 行。
 - 測定値の正本は `REPORT_APPENDIX_5295.md` (解析器 `--appendix` の出力) と §8.2 の #5295 追記。本節には件数・検算値を書かない。
 - 本節で確定した範囲 (判定の説明):
   - `0xfdeef0` (`or dword ptr [rip+0x6dbf86], 0x200`) と `0xfdef00` (`or dword ptr [rip+0x6dbf76], 0x1000`): どちらも書込み先は `0x16bae80` の dword。固定ビットを立てるだけで `ret` に届く。
