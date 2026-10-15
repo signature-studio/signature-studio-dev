@@ -4,8 +4,8 @@
 
 ## 12. P2 の p99 (AU-30 #3151)
 
-- **測定 commit**: `e403fd7a` (コードを変えた最後の commit。worklet・ctl・ハーネス・集計)。`git diff --stat e403fd7a HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は測定 commit 時点で 0 行。ただし main 取り込み後の HEAD では 0 行ではない: `d55d2c45` 時点で 5 files・70 insertions(+)・7 deletions(-) (main 側の AU-29・AU-32 の変更)、現 HEAD `8310689a` 時点で 9 files・229 insertions(+)・11 deletions(-)。`e403fd7a` の値は現 HEAD の値ではない。全行列の再測定は §12-3、部分の再測定は §12-2。
-- **方式**: worklet は連続 `process()` の run (Date.now 差 ≤1 ms) が終わるたびに `burst_hist[floor(len/512)]` (測定時は ctl @384・`FLA_CTL_SIZE` 384→512。main 取り込み時に main の `pw_trace` (@388) と衝突したため、末尾の @16772 へ移し `FLA_CTL_SIZE` は 16904) を +1 する。末尾 bin は ≥15872 f。`run.mjs` は p99 を該当 bin の上端で出す (512 f 刻み。真の p99 はこの値以下) → 結果 JSON の `stats.burst_p99`・`stats.burst_runs`。run には待機中の 128 f 単独 run も入る (fake 48k の bin 0 は 1499 run 中 364。発生源は未切り分け)。
+- **測定 commit**: `e403fd7a` (コードを変えた最後の commit。worklet・ctl・ハーネス・集計)。`git diff --stat e403fd7a HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は測定 commit 時点で 0 行。ただし main 取り込み後の HEAD では 0 行ではない: `d55d2c45` 時点で 5 files・70 insertions(+)・7 deletions(-) (main 側の AU-29・AU-32 の変更)、`8310689a` 時点で 9 files・229 insertions(+)・11 deletions(-)。`e403fd7a` の値は現 HEAD の値ではない。全行列の再測定は §12-3、部分の再測定は §12-2。
+- **方式**: worklet は連続 `process()` の run (Date.now 差 ≤1 ms) が終わるたびに `burst_hist[floor(len/512)]` (測定時は ctl @384・`FLA_CTL_SIZE` 384→512。main 取り込み時に main の `pw_trace` (@388) と衝突したため、末尾の @16772 へ移し `FLA_CTL_SIZE` は 16904) を +1 する。末尾 bin は ≥15872 f。`run.mjs` は p99 を該当 bin の上端で出す (512 f 刻み。真の p99 はこの値以下) → 結果 JSON の `stats.burst_p99`・`stats.burst_runs`。末尾 bin (≥15872 f) に p99 が入ると 16384 と出るが、これは上限ではない (実際の長さはそれを超えうる)。run には待機中の 128 f 単独 run も入る (fake 48k の bin 0 は 1499 run 中 364。発生源は未切り分け)。
 - **再現**: `bash tools/audio/build.sh` → `AU2_OUT=tools/audio/results/au30_p99 bash tools/audio/au2_matrix.sh 3` → `node tools/audio/au2_summary.mjs tools/audio/results/au30_p99`。環境: ubuntu runner (4 vCPU), google-chrome 154.0.8037.97, PulseAudio 16.1 (apt 導入)。生結果: `results/au30_p99/`。
 
 ### 12-1 行列 (n=3, 測定 commit `e403fd7a`)
@@ -58,8 +58,9 @@
 
 ### 12-3 全行列の再測定 (測定 commit `8310689a`・受入 2 の全行)
 
+- main 取り込み前の旧 layout (`burst_hist` @384・`FLA_CTL_SIZE` 512) の参考値。受入 2 の根拠は §12-4。
 - **理由**: round 3 の review (blocking 1)。測定 commit から現 HEAD までの測定対象コードの差分が残り、行列の 6 行が 1 つの測定 commit で測られていなかったため、行列を測り直した。
-- **測定 commit**: `8310689a` (測定対象コードを最後に変えた commit は `4ca74476` 以前。`git diff 4ca74476 8310689a -- <範囲>` の出力は 0 行)。**`git diff 8310689a HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は 0 行** (測定後の commit は docs のみ)。
+- **測定 commit**: `8310689a` (測定対象コードを最後に変えた commit は `4ca74476` 以前。`git diff 4ca74476 8310689a -- <範囲>` の出力は 0 行)。**`git diff --stat 8310689a HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は 8 files・82 insertions(+)・24 deletions(-)** (HEAD `1c2711559`。main 取り込みと `fb5a0d69` の修正で layout が変わったため、§12-3 は現コードの測定ではない)。
 - **環境**: ubuntu runner (4 vCPU)・google-chrome 154.0.8037.97 (headless)・PulseAudio 16.1 (apt 導入。fake は `pulseaudio -k` で停止、null は `module-null-sink sink_name=ci_null` を既定 sink)・emsdk 6.0.12 (上流 `emscripten-core/emsdk`。素材 `toolchain-emsdk` は本 run の素材に無し)。
 - **build**: `EMSDK_ENV=<emsdk>/emsdk_env.sh bash tools/audio/build.sh` → `[audio] build OK`。
 - **実行**: `AU2_OUT=tools/audio/results/au30_p99_r2 bash tools/audio/au2_matrix.sh 3` (exit 0・wall 00:09:58 → 00:20:38 = 10 分 40 秒)。生結果は `results/au30_p99_r2/` (各 run の `host` に load 値)。集計: `node tools/audio/au2_summary.mjs tools/audio/results/au30_p99_r2`。
