@@ -23,7 +23,6 @@ win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を
 - issue #3316 の題名の「49 種」は古い数字で、本文の「54 種」が (b) と一致する。
 - 未対応の op 名の例: `cvttss2si`・`movd`・`cvtdq2ps`・`divss`・`vfmadd231sd`・`ucomisd`。
 - 未再測定の扱い: (a) と (c) は、`toolchain-retdec` の素材を付けた run (`oc_artifacts: fl-win64 toolchain-retdec`) で `lift_vtable.sh 0x161fc0` を再実行して確定する。それまでは上の値を「過去の記録」として扱う。
-- 回帰 (過去の記録・未再測定): `lift.sh ok` (libreverb) は 2ae10ac85 の時点で 240/240 PASS と記録された。本 run は `toolchain-retdec` / `toolchain-emsdk` が無く再実行していない。
 - `gen_helpers.py` の rc=1。残りの wasm 化 (helper の C 実装) は [T-SH-65] #3318、native 差分は [T-SH-64] #3317 が持つ。
 
 ## 1. 対象の再特定 (mac の 0x25c0-0x2f87 は win では使えない)
