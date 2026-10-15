@@ -125,7 +125,7 @@ return np;
 
 ### #3972 run 2 の実測 (commit `c39ea4679`・n=1)
 
-- IR: `bash m11_gen_ir2.sh` rc 0 (47 s)。素材 `work-m11`・`work-liftdiff`・`toolchain-emsdk`・`toolchain-retdec`・`fl-win64` (`block00031_PE.bin` のみ `$HOME/analysis/win64/extracted/`) を展開。
+- IR: `bash m11_gen_ir2.sh` rc 0 (47 s)。素材 `work-m11`・`work-liftdiff`・`toolchain-emsdk`・`toolchain-retdec`・`fl-win64` (`block00031_PE.bin` のみ `$FL_WIN64_DIR/extracted/` = [WIN64]) を展開。
 - 再現: `bash trap_triage/store_watch_3972.sh rep1` (`M11_FIX_4136A0=1`・unit 158) で `[aw]` 4 件 (`653660` 入口の 0 初期化 `0x10aa1428`・`…1430`・`…1438`・`…1440`)。前回の 3 件から 1 件増えた (監視対象 `0x10aa1440` を含むため。前回は範囲外)。
 - `REP=1` (rep 系 helper 35 箇所の入口計装): unit 158 の `[rp]` は 0 件、`[aw]` は同じ 4 件。結果は halt0。
 - 計装の検証: `REP=1` で `WATCH_ADDR=0x10aa1000` (unit 158) と `WATCH_ADDR=0x10000000` (unit 0) の `[rp]` は 0 件。**既知の書込みで `[rp]` が出ることは未確認** (計装が効くかは未検証)。
