@@ -1,11 +1,13 @@
-# liftdiff REPORT 付録: LD-268 (#5268) `0x5d19e0` の持ち越し先 mapping の切り分け
+# liftdiff REPORT 付録: LD-261 (#5268) `0x5d19e0` の持ち越し先 mapping の切り分け
+
+成果物の名前 (`ld268_*`・`results/ld268_*`) は付番時の仮番号 LD-268 のまま (`REPORT_APPENDIX_LD261.md` と同じ扱い)。本付録の題名・issue (#5268) の番号は LD-261。
 
 親 #3385 (LD-156)。前提は `REPORT_APPENDIX_LD261.md` (both 条件で match・none で mismatch・n=2/1) と `REPORT_APPENDIX_LD229.md` (native の anon mmap を一括で戻すと match)。本付録は、一括の `mmap` 候補 (bit 8) を領域単位に分けて、どの領域が効くかを切り分けた。
 
 ## 結論
 
 - SNAPSHOT 直後の native の anon rw-p mapping は **6 領域** (`ld268_mmap_regions.py`・`results/ld268_mmap/regions.json`)。
-- wasm `sta` を固定し、native の領域 **k=0 (`0x555555564000`・3,108,864 B) だけを戻す** と **match** (`sta_one0`・equal 10)。前回の一括 `mmap` (6 領域) と同じ結果。
+- wasm `sta` を固定し、native の領域 **k=0 (`0x555555564000`・3,108,864 B) だけを戻す** と **match** (`sta_one0`・`z` 以外 10 件 equal、`z` は native crash・wasm hang)。前回の一括 `mmap` (6 領域) と同じ結果。
 - k=0 を外して残り 5 領域を戻すと **mismatch** (`sta_exc0`)。k=0 は必要。
 - 受入条件 1 (持ち越しの中身の特定) は **部分達成**。持ち越しの実体は k=0 の 3 MB 領域まで絞れたが、その領域の中のどの変数・構造体かは未切り分け。
 - 単独の k=1〜5 (wasm none) はすべて mismatch。wasm `sta` との組み合わせの単独測定は k=0 だけで、k=1〜5 の `sta` 併用は未測定。
@@ -68,17 +70,22 @@ native の領域 (SNAPSHOT 直後):
 | wasm | native | verdict | native diff (B) | skip | wasm diff (B) | equal | ファイル |
 |---|---|---|---|---|---|---|---|
 | sta | 除外 k=0 (= k=1〜5 を戻す) | mismatch | 6 | 1 | 343847 | 0/11 | `sta_exc0.jsonl` |
-| sta | 除外 k=1 (= k=0,2〜5 を戻す) | **match** | 39891 | 0 | 343847 | 10/11 (`z` を除く 10 件 equal) | `sta_exc1.jsonl` |
-| sta | k=0 のみ | **match** | 39891 | 0 | 343847 | 10/11 | `sta_one0.jsonl` |
+| sta | 除外 k=1 (= k=0,2〜5 を戻す) | **match** | 39891 | 0 | 343847 | 10/11 (`z` 以外 10 件 equal。`z` は下の注) | `sta_exc1.jsonl` |
+| sta | k=0 のみ | **match** | 39891 | 0 | 343847 | 10/11 (`z` 以外 10 件 equal。`z` は下の注) | `sta_one0.jsonl` |
+
+- `z` (sta 条件・`sta_one0` と `sta_exc1` の両方): **native crash・wasm hang** (`z` の outcome は `hang`・native `crash`・wasm `hang`)。verdict は match だが、`z` だけは status が一致していない。
+- 同じ `z` は、wasm を作り直した both 条件 (`ld268_raw/both_r1.jsonl`・`both_r2.jsonl`) では `equal / ok / ok`。`sta_exc0` (k=0 を外した mismatch) では `diff / ok / ok` で、native は crash しなかった。
+- `z` だけが both 条件と異なる理由は**未確認** (LD-229 の注と同じく、`z` は timeout 境界の case で run ごとに揺れる。原因の切り分けは未実施)。
+- したがって「k=0 が効く」の結論は、`z` を含む 11 件の一致ではなく、`z` 以外の 10 件の一致と `sta_exc0` の mismatch (`diff`) に基づく。
 
 `sta_exc1` と `sta_one0` は、戻った native の領域がともに k=0 を含む (= k=0 が効く) ことを示す。`sta_exc0` は k=0 を戻さないため mismatch。
 
 ## 4. 未確認 (受入条件 1 の残り)
 
-- **k=0 の中身 (どの変数・構造体か)** は未切り分け。`0x555555564000` は PIE の `.bss` 直後の brk 領域 (libc の malloc の brk heap) と推定されるが、確認していない。
+- **k=0 の中身 (どの変数・構造体か)** は未切り分け。`0x555555564000` が何の領域かは確認していない (`/proc/self/maps` での path 確認も未実施)。
 - k=0 の中をさらに分ける (バイト範囲の半分ずつの戻し) は未実施。
 - `NMMAPN` は SNAPSHOT 直後の値。対象関数の直前で領域の番号・lo が同じかは未確認 (`sta_one0` の match は同一 k=0 を戻しているので、少なくとも k=0 の番号は一致している)。
-- k=1 は対象時点で munmap 済み (skip=1) で、単独 `one1` では戻せていない。`exc0` の diff 6 B は k=1 の skip 分の残りと推定。
+- k=1 は対象時点で munmap 済み (skip=1) で、単独 `one1` では戻せていない。`exc0` の diff 6 B の由来は**未検証**。単独の k=2 は 3 B、k=3〜5 は 0 B だが、k=1 は munmap 済みで寄与しないため、1〜5 の合計が 6 B になる説明にはならない。
 - `sta` 併用の k=1〜5 単独 (wasm sta・native k のみ) は未測定。k=0 以外が単独で match するかは未確認。
 - 各条件 n=1。`sta_one0`・`sta_exc1` の再現 (n=2) は未実施。
 
@@ -101,5 +108,7 @@ python3 ld156_chunk0_carryover.py --native 0 --reset sta --native-reset-except 0
 
 ## 7. 測定 commit 以降の差分
 
-- 測定 commit: 本 PR の commit (`git diff <commit> HEAD` は 0 行の見込み。commit 後に確定して書く)。
-- 測定は未 merge の作業ツリー (`5268-liftdiff-0x5d19e0-mapping`) で行った。main の取り込みは測定後。
+- 測定 commit: **`5857de81b`** (`feat(liftdiff): split native mmap reset per region for 0x5d19e0 (#5268)`。測定に使った `rt/ld_native.c`・`ld156_chunk0_carryover.py`・`ld268_mmap_regions.py` を含む commit)。
+- 測定時の作業ツリーが `5857de81b` の tree と同一だったことは、測定時点の記録が無いため確認できていない。ここでは同 commit の tree から測り直していないことを明記しておく。
+- `git diff 5857de81b HEAD -- tools/liftdiff ':!tools/liftdiff/REPORT_APPENDIX_LD268.md'` の出力は 0 行 (本 REPORT の訂正 commit だけを除く)。
+- main の取り込みは測定後。
