@@ -138,8 +138,8 @@
 |---|---|---|---|
 | U1 | 62a3fda35 の工程別 e2e 値 (§1 の表) を本 run で再取得できない (`plugins-massivex` が無く、PR 作成 run の記録のみ)。直前の 3afa6013d の表は付録 A4 | 本文の 62a3fda35 の値は PR 作成 run の記録のみ。再測定で置き換える | [MX-38] (#3775) |
 | U3a | xmm0〜3 のみの vectorcall (HVA / `__m128` の register 渡し) を Win64 と区別する判定 | seeds 17 / 1-round 17 (pdata 始点) が保留 | [MX-37] (#3774) |
-| U3b | 間接 jmp テーブルの残り (seeds 12 / 1-round 14 の pdata 始点が過大近似のまま。解決器は MSVC の lea 形のみ) | 陰性の保守性は保つが精度は未確定 | [MX-37] (#3774) |
-| U3c | 1-round の root 3,226 のうち解析できない 118 件 (先頭命令のデコード 0 件) の由来 | 118 件は vectorcall 判定の対象外 (陰性の結果は 3,108 関数の範囲に限る) | [MX-37] (#3774) |
+| U3b | 間接 jmp テーブルの残り (解決できない jmp の形と件数は §10。seeds 12 / 1-round pdata 始点 14 が過大近似のまま) | 陰性の保守性は保つが精度は未確定 | [MX-37] (#3774)・由来の測定は §10 (MX-53 #4992) |
+| U3c | 1-round の root 3,226 のうち解析できない 118 件 (先頭命令のデコード 0 件) の由来 → **§10 で測定** (呼び出し元の直接 call/jmp 命令は命令境界・着地点は含む関数の命令境界でない: pdata 内 112 件・pdata 外 6 件) | 118 件は vectorcall 判定の対象外 (陰性の結果は 3,108 関数の範囲に限る)。**なぜ命令境界でないかは未確定** | [MX-53] (#4992) |
 | U4a | FH4 (`__CxxFrameHandler4`・符号化 FuncInfo) の funclet 未解析 (1 本目 .pdata 全体 2,542 entry・入口 1 / 1-round 5)。固定部は §8 で復号済み、可変長整数・table 中身が未了 | FH4 の landing pad が一覧に入らない | [MX-42] (#3807・親 #3791) |
 | U4b | 1 本目の読取不能 160 件の由来 (UnwindInfoAddress が画像外・E8 始まり 148 件)。配布 PE の改変か展開の誤りかは未確定 (§3・`REPORT_APPENDIX_3792.md`)。2 本目の census は MX-41 で済 | 1 本目 .pdata 全体の chained / EH 数値は 160 件を除いた下界 | [MX-38] (#3775) |
 | U4c | IAT 外の handler (direct) 6,354 件 (1 本目 .pdata 全体) の同定。構造は測定済み: 相異なる handler 番地は 214 件・うち上位 2 番地 (`0x1cdd2c4` 5,066 件・`0x1ebf5f0` 952 件) で 6,018 件。上位 2 番地の先頭の call 先 (JSON `top_handlers` の `call_target`) (`0x29b993f`・`0x2b9bc90`) は、どちらも .pdata の関数入口ではなく含む関数の内側。命令境界の判定は `0x29b993f` が一致・`0x2b9bc90` が不一致 (含む関数の先頭からの線形走査。未確定)。**測定の出所**: 測定 commit 62a3fda35・入力 = `plugins-massivex` の `Massive X.vst3` (md5 `622993e7` 一致)・実行 `python3 tools/targets/massivex/dsp/scripts/mx38_direct_handler.py <PE> <out.json>`。`mx6_e2e.sh` は `mx38_direct_handler.py` を呼ばないため、この数値は **e2e 外の別スクリプトの実測** (§1 の e2e 値ではない)。 | 別 handler の EH 構造が未確認 | [MX-38] (#3775) |
@@ -182,3 +182,35 @@
 ## 9. MX-39 (#3776): 付録へ分割移動
 
 MX-39 の深い closure 到達・E8/E9 候補の由来・MSVC funclet の取り込み方式 (U4d・U4e) の節 (§9) は付録 `REPORT_APPENDIX_3776.md` §9 にある (250 行上限のため分割移動)。
+
+## 10. U3b / U3c の由来 (MX-53 #4992・受入 5)
+
+- 測定 commit = **9d1672f57** (コードを変えた最後の commit。測定はこの commit のコードで実施)。実行: `bash tools/targets/massivex/dsp/mx6_e2e.sh` (step 9/9・`mx6_origin_u3.py`)。素材 `plugins-massivex` の `Massive X.vst3` md5 `622993e7` 一致。
+- U3c (解析できない root 118 件): `mx6_vectorcall.analyze()` は先頭から 0 命令しかデコードできない root を捨てる (`n == 0`)。この 118 件は 1-round root 3,226 件の内訳で、seeds (567) には 0 件。
+
+  | 項目 | 件数 |
+  |---|--:|
+  | root (1-round・相異なる) | 3,226 |
+  | 先頭からのデコードが 0 命令 (= analyze が捨てる) | **118** |
+  | うち、seeds の pdata 関数内の直接 call/jmp (E8/E9) の着地点 | **118** |
+  | うち、その直接 call/jmp 命令が出所関数の線形デコードの命令境界 | **118** |
+  | うち、.pdata 関数の内側 (含む関数の先頭からの線形デコードで命令境界か) | 112 (うち命令境界は 0 件・根拠は json の `boundary_in_containing_fn`。e2e の判定 `ok` には含めていない) |
+  | うち、どの .pdata 関数にも含まれない | 6 |
+
+  - 判別力の確認 (NC): 同じ含む関数内で、デコードできた 3,036 root のうち境界に当たるのは 1,613 件。「含む関数の境界でない」だけでは 118 件を分けられない。分けているのは「先頭からデコードできない」と「直接 call の着地点である」の組。
+  - 例: `0x35b2` は `c7 48 89 d3 ...`。`c7 /1` は 64 bit で不正形のため、capstone はここで 0 命令を返す。`0x35b2` は `0x1f10` の `call 0x209d` の着地点で、`0x1f10` の call 命令 `0x209d` は命令境界。
+  - **未確定**: 直接 call の着地点が命令の途中になるのは、正しい lift では通常起きない形。考えられるのは (a) 配布 PE 側の不整合 (U4b・MX-38 と同じ型) (b) call の rel32 を別の base で解釈した (c) 線形デコードの同期ずれ (出所関数の先頭からの走査が、その関数の真の命令列と一致しない)。 (a)〜(c) を区別する測定は本 run では行っていない → 起票先 [MX-38] (#3775)。
+
+- U3b (間接 jmp の残り): `mx6_vectorcall.jt_targets` が解決できない jmp を含む関数 (= analyze の `unknown_flow`)。
+
+  | 集合 | unknown_flow 関数 | うち pdata 始点 | jmp の形 (件数) |
+  |---|--:|--:|---|
+  | seeds | 12 | 12 | `reg_no_table` 9・`mem_indirect` 3 |
+  | 1-round | 53 | 14 | `reg_no_table` 40・`mem_indirect` 27・`table_shape_unmatched` 6 |
+
+  - `reg_no_table` (レジスタ経由の tail jmp・vtable 呼出し) と `mem_indirect` (`jmp [rax+N]` 等の vtable 末尾) は、テーブル形ではない。解決器の対象外。
+  - `table_shape_unmatched` (6 件・1-round のみ) は、近傍に `movsxd` と `add` があるが解決器の形に合わない。switch の別形と見られる。未確定の形のため、件数だけを記録する。
+  - seeds の pdata 始点の unknown_flow 12 件は、`mx6_vectorcall` の 12 件 (`unknown_flow=12`) と一致する。
+
+- 判定への影響: U3c の 118 件は解析対象外のまま (陰性の結果は 3,108 関数の範囲に限る)。U3b の 53 件 (1-round) は過大近似側に残るため、livein の陰性の保守性は保たれる (精度は未確定)。
+- 検証差分 (docs/WORKFLOW.md §6): 測定 commit 9d1672f57 から HEAD までのコード差分 `git diff 9d1672f57 HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は 0 行 (測定時点のコードと一致)。`mx6_origin_u3.py` と `mx6_e2e.sh` (step 9 の追加・番号 /8→/9) は測定 commit 9d1672f57 で入っている。既存 step 1〜8 の値は変えていない。

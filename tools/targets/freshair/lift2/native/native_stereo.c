@@ -1,7 +1,8 @@
-/* native_stereo.c — Stereo snapin (SlateCore 0x1805ee2a0) を実機機械語で実行する参照ハーネス (#4046・FA-48)。
+/* native_stereo.c — Stereo snapin (SlateCore 0x1805ee2a0) を実機機械語で実行する参照ハーネス (#4046・FA-48・#5011)。
  * 書込み元 0x1805cb150 は Stereo の構築関数 (this = P を取り、[P+0x9f88] = P を書く)。
  * 順序の確認: ctor を先に実行してから process を実行する (ctor=1)。ctor を飛ばす対照 (ctor=0) は
  * P+0x9f88 が 0 のまま読まれ、process が落ちることを確かめる。
+ * FA_SELF_STORE=1 のときは構築関数を呼ばず、harness が P の確保直後に [P+0x9f88] = P を書く (#4046 の再現形)。
  *   ./native_stereo <core> <scen.txt> [fma] [ctor=1]
  * シナリオ形式とメモリ閉込は native_vocalfilter.c と同じ。 */
 #include "pe_map.h"
@@ -22,6 +23,7 @@ int main(int argc, char** argv) {
     patch_pokes(getenv("FA_POKES") ? getenv("FA_POKES") : "pokes.txt");
     volatile int* fma = (int*)0x1813070f8ULL; int fma_v = argc > 3 ? atoi(argv[3]) : 0;
     int use_ctor = argc > 4 ? atoi(argv[4]) : 1;
+    int self_store = getenv("FA_SELF_STORE") != NULL;
     proc_t fn = (proc_t)0x1805ee2a0ULL;
     proc_t ctor = (proc_t)0x1805cb150ULL;
     FILE* fp = fopen(argv[2], "r"); if (!fp) { perror("scen"); return 2; }
@@ -33,8 +35,9 @@ int main(int argc, char** argv) {
         unsigned char* S = gr_alloc(0x1400); unsigned char* P = gr_alloc(0xa400); unsigned char* ctx = gr_alloc(0x80);
         unsigned char* A = gr_alloc(0x40);
         *(uint64_t*)(S + 0x90) = (uint64_t)P; *fma = fma_v;
+        if (self_store) *(uint64_t*)(P + 0x9f88) = (uint64_t)P;
         printf("S%d", sidx);
-        if (use_ctor) {
+        if (use_ctor && !self_store) {
             g_in_guard = 1; int s = sigsetjmp(g_jb, 1);
             if (s == 0) ctor(P, A);
             g_in_guard = 0;

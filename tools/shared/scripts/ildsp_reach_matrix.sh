@@ -9,7 +9,7 @@ ROOT="$(cd "$HERE/../../.." && pwd)"
 PE="${FL_WIN64_DIR:?FL_WIN64_DIR を設定する}/extracted/block24360_PE.bin"
 OUT="${1:-$ROOT/tools/shared/work/reach}"
 BIN="$ROOT/tools/shared/work/native/ildsp_native"
-mkdir -p "$OUT"
+mkdir -p "$OUT" "$(dirname "$BIN")"
 [ -x "$BIN" ] || gcc -O1 -g -Wall -Wno-unused-function -o "$BIN" "$HERE/ildsp_native.c" || exit 2
 
 run() { # run <tag> <args...>
