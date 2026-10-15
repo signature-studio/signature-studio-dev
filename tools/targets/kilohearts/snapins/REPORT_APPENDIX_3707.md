@@ -74,3 +74,15 @@
 
 - 測定 commit: `bb4408cc4` (`snapins/lift/build.py` と `license/lic_build.py` の変更)。本付録の commit は測定値の記録だけ。
 - 差分 0 の証跡: 本 PR の後続 commit (付録と DOC_MAP) のみ。`git diff bb4408cc4 HEAD -- tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/license` の出力は空であることを提出時に確認する。
+
+## 7. main 取り込み後の再測定 (競合解消)
+
+- 測定 commit: `25bb8c77b` (`origin/main` (`e13f1efd2`) の merge。競合は `docs/DOC_MAP.md` の索引表の 2 行追加のみで、コードは両側の自動マージ)。
+- 差分 0 の確認: `git diff bb4408cc4 25bb8c77b -- tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/license tools/flelift/boot` の出力は 0 行。
+- 環境は §2 と同じ runner。素材 `plugins-kilohearts` は `Kilohearts Offline Installer.zip` のみ取り出し、`scripts/extract_installer.sh` の Windows 側と同じ手順で `work/winpkg` を作った (dmg 側は省略)。
+
+| 実行 | rc | wall (秒) | emcc (秒) | emcc peak (MB) | 結果 |
+|---|---|---|---|---|---|
+| gain (`--path s0 --trials 200 --seed 1`) | 0 | 13.8 | 1.2 | 30 (0.5 秒採取の値) | `RESULT trials 200/200 bit-exact; calls 999/999`・wasm 23054 B |
+| gain (`KH_EMCC_RSS_CAP_MB=1`) | 1 | 1.4 | — | 5 | `[build] emcc RSS cap 超過: gain peak=5MB (cap=1MB)`・runner 生存 |
+| module F (`license/lic_build.py --module F`) | 0 | 14.2 | 1.2 | 110 | wasm 54394 B・undefined imports 0 |
