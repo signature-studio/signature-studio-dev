@@ -153,3 +153,20 @@ index 72a788e2c..80d069f06 100644
 
 - 判定の数値 (PASS・構造・nan-num 0) は前節 §7 と同じ。 NaN どうしのビット差は判定に入れず、本節の分類で別計上する。
 - 残り (NaN どうしのビット差の原因切り分け・後段への伝播) は子 #4756 (PLG-G2-60)。
+
+### 9.1 揺れの源 (#4775 PLG-G2-61)
+
+- 測定 commit `a4f7e12f0` (`x87_fn_diff.py` の `WASM_TIER` 固定を入れた最後のコード commit)。 `python3 x87_fn_diff.py --special` (exit 0、wall 19.5 s、load1 0.46)。 通常モード・`--nega`・`--special --nega-nan` も同じ commit で exit 0 (ネガコン検出)。
+- 揺れの再現 (修正前、tier 未固定): 同じ `scen.txt` の先頭 8,000 行を同じ wasm・同じ image で 6 回実行すると、出力の md5 が 5 種に割れた (6 回中 2 回は一致)。 揺れは行単位で、同じ行が `ffc00000` と `7fc00001` を返す。 数値 (非 NaN) の差は 0 件。
+- 切り分け (先頭からの接頭辞ではなく、単独の probe で ops ごとに確認した):
+  - 単項・変換 (f32→f64 promote、f64→f32 demote、neg、×1、+0): 1 NaN 入力では Liftoff と TurboFan で一致 (`work/nanprobe/probe.c`、33 行)。 LDF32 と `(float)` 変換は源ではない。
+  - 両オペランドが NaN の `add`・`mul` (f32): 20 件の不一致はすべて NaN どうし。 Liftoff と TurboFan で返す NaN の入力が違う (`probe2.c`、`sub` は一致)。 f64 の add・mul でも同じ (`probe3.c`、6 行で差)。
+  - 結論: 源は V8 の tier 切替で、NaN×NaN の返す NaN の選び方が tier で違う。 wasm の NaN の符号・ペイロードは仕様で未規定。
+- 固定の確認 (受入の「同じ入力で 6 回以上」): 全 20,000 行の run を `--liftoff-only` で 6 回 (単独の node 実行) すると、6 回すべて同じ md5 (`23fc7196…`)。 `--no-liftoff` でも 6/6 同一 (`5254ee…` は別の tier の値)。 両 tier は NaN ビットだけが違い、native 対 liftoff の NaN 以外の差は 0 件 (8,000 行で確認)。 harness の `wasm_out.txt` は chunk 分割の結果で、行番号を除くと単独 run と一致 (0 行差)。
+- 修正前後の判定への影響: 判定 (PASS・構造・nan-num 0) は変わらない。 mismatch 分類の件数は run ごとに揺れた。 固定後の基準値 (`a4f7e12f0`、2 回とも一致): `fn_10002ee0` NaN どうし 858・f80 2 行、`fn_10005400` NaN どうし 701・f80 28 行、`fn_10005d20` NaN どうし 458。
+- 後段への伝播 (固定後の wasm 対 native。 NaN どうしの差のみ。 非 NaN の差は全関数 0 件):
+  - `fn_10005400`: `eax` の NaN どうし 622 行。 OBJ 窓の NaN どうし 4,134 語 (うち `[0x508..0x518)` の範囲は 1,948 語)。
+  - `fn_10002ee0`: ST(0) の NaN どうし 461 行、OBJ 窓 906 語。 `fn_10005d20`: ST(0) 284 行、OBJ 窓 1,320 語。
+  - 分岐 (`fcomp`→`fnstsw`→`test ah`) への影響は未検査。 NaN との比較は符号に依らず unordered になる想定だが、この harness では確認していない。 値を読む後段の演算は未検査 (子 #4756 の受入 (2))。
+- 判断案 (PM の判断が要る): **許容** を推す。 理由: (1) 揺れの源は wasm の NaN 符号の未規定と V8 の tier で、ロジックの誤りではない。 (2) 非 NaN の値は全件一致。 (3) tier 固定で再現する。 ただし `eax` の NaN どうしと OBJ 窓の NaN どうしが実 FL の値と一致するかは未確認。 本件の判断は子 #4756 (PLG-G2-60) に移す。
+- 注: 受入の「先頭から揺れた行までの接頭辞での再現」は、接頭辞の二分探索ではなく ops 単位の probe で代えた。 揺れの源は ops で確定したので、接頭辞の再現は行わなかった。
