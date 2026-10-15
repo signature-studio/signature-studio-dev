@@ -39,6 +39,31 @@ const itemsSet = (items, prm, value) => {
   const delta = prm === 8 ? value : value - itemGet(items[0], prm);
   for (const it of items) itemWrite(it, prm, value, delta);
 };
+// PY-184 (#3309): 項目列挙 PE 0x130f200 の判定式 (C provider の note_enum と同一・REPORT_PY39_2548.md)。note = 項目 (字段 +0 start・+6 ch・+8 len)。note 配列は start 昇順が前提
+const noteGen = (seed, n) => {
+  let s = seed >>> 0;
+  const next = () => { s = (Math.imul(s, 1103515245) + 12345) >>> 0; return s >>> 16; };
+  const arr = Array.from({ length: Math.min(Math.max(n, 0), 256) }, () => {
+    const d0 = (next() % 200) - 50;
+    const len = (next() % 40) - 5;
+    const ch = next() % 4;
+    return { ...newItem(), d0, len, ch };
+  });
+  return arr.sort((a, b) => a.d0 - b.d0);
+};
+const noteEnum = (arr, chan, step, V) => {
+  const out = [];
+  if (V <= 0) return out;
+  const thr = (step + V) | 0;
+  for (let cur = 0; cur < arr.length && arr[cur].d0 < thr; cur++) {
+    const it = arr[cur];
+    const sq = (Math.trunc(it.d0 / V) * V) | 0;
+    const end = Math.max((it.d0 + Math.max(it.len, 1)) | 0, (sq + V - 1) | 0);
+    if (step < sq || step >= end || it.ch !== (chan >>> 0)) continue;
+    out.push(cur);
+  }
+  return out;
+};
 
 export function createMockEngine() {
   const st = {
@@ -339,5 +364,7 @@ export function createMockEngine() {
       itemsSet([a, b], prm, value);
       return itemGet(b, prm);
     },
+    noteEnumProbe: (seed, n, chan, step, V) => noteEnum(noteGen(seed, n), chan, step, V),
+    noteEnumNotes: (notes, chan, step, V) => noteEnum(notes.map(([d0, len, ch]) => ({ ...newItem(), d0, len, ch })), chan, step, V),
   };
 }

@@ -199,7 +199,7 @@ FL_H(channels, getStepParam) {
 }
 /* PY-78 (#2581): PE 0x130f3d0 の項目書換え規則 (param 0..8)。項目の字段位置は PE 実測 (+0 dword, +0xc word, +0x10・+0x11・+0x12・+0x14・+0x15・+0x16・+0x17 byte)。
  * delta は先頭項目の字段から value - 字段 (param 0..7)。param 8 は value の低 8 bit を代入。項目列挙 (0x130f200) と換算用グローバルは未接続 */
-typedef struct { int32_t d0; uint8_t p1[8]; int16_t w0c; uint8_t p2[2]; uint8_t b10, b11, b12, b13, b14, b15, b16, b17; } StepItem;
+typedef struct { int32_t d0; uint8_t p4[2]; uint16_t ch; int32_t len; int16_t w0c; uint8_t p2[2]; uint8_t b10, b11, b12, b13, b14, b15, b16, b17; } StepItem;
 static int64_t clamp_hi(int64_t v, int64_t hi) { return v <= 0 ? 0 : v > hi ? hi : v; }
 static int64_t step_item_get(const StepItem *it, int64_t prm) {
     switch (prm) {
@@ -242,6 +242,54 @@ int fl_engine_step_item_probe(int prm, int value, int seed0, int seed1) {
     step_items_set(items, 2, prm, value);
     return (int)step_item_get(&b, prm);
 }
+/* PY-184 (#3309): 項目列挙 PE 0x130f200 の判定式 (項目 = note)。PE の反復子 0x12df320 は cursor の先頭 dword が閾値未満の要素を返し、最初の start >= 閾値で止まる。
+ * 終端 PE 0x105f2e0 = start + max(len, 1) (32bit)。V (PE の量子 [0x15e25f8]) は子 PY-185 (#3310) で確定。V <= 0 は PE 未確認のため空を返す */
+static StepItem *note_next(StepItem *arr, int n, int *cur, int32_t thr) {
+    if (*cur >= n || arr[*cur].d0 >= thr) return NULL;
+    return &arr[(*cur)++];
+}
+static int32_t note_end(const StepItem *it) {
+    int64_t l = it->len < 1 ? 1 : it->len;
+    return (int32_t)((uint32_t)it->d0 + (uint32_t)l);
+}
+static int note_enum(StepItem *arr, int n, int chan, int32_t step, int32_t V, int *out) {
+    if (V <= 0) return 0;
+    int cur = 0, k = 0;
+    StepItem *it;
+    while ((it = note_next(arr, n, &cur, (int32_t)((uint32_t)step + (uint32_t)V))) != NULL) {
+        int32_t sq = (int32_t)((uint32_t)(it->d0 / V) * (uint32_t)V);
+        int64_t end = note_end(it);
+        int64_t lo = (int32_t)((uint32_t)sq + (uint32_t)V - 1);
+        if (lo > end) end = lo;
+        if (step < sq || step >= (int32_t)end || (uint32_t)it->ch != (uint32_t)chan) continue;
+        out[k++] = (int)(it - arr);
+    }
+    return k;
+}
+#define NOTE_PROBE_MAX 256
+static StepItem note_probe_arr[NOTE_PROBE_MAX];
+static int note_probe_out[NOTE_PROBE_MAX];
+/* 検査用の読出し口: seed から n 件の note を決定的に作り (LCG。host/fl_mock.mjs の noteGen と同一)、chan・step・V で列挙して件数を返す。index 列は fl_engine_note_enum_out が指す。tests/note_enum_diff.mjs が mock と照合 */
+int fl_engine_note_enum_probe(int seed, int n, int chan, int step, int V) {
+    uint32_t s = (uint32_t)seed;
+    if (n < 0) n = 0;
+    if (n > NOTE_PROBE_MAX) n = NOTE_PROBE_MAX;
+    for (int i = 0; i < n; i++) {
+        StepItem *it = &note_probe_arr[i];
+        memset(it, 0, sizeof *it);
+        s = s * 1103515245u + 12345u; it->d0 = (int32_t)((s >> 16) % 200) - 50;
+        s = s * 1103515245u + 12345u; it->len = (int32_t)((s >> 16) % 40) - 5;
+        s = s * 1103515245u + 12345u; it->ch = (uint16_t)((s >> 16) % 4);
+    }
+    for (int i = 1; i < n; i++) {
+        StepItem t = note_probe_arr[i];
+        int j = i;
+        while (j > 0 && note_probe_arr[j - 1].d0 > t.d0) { note_probe_arr[j] = note_probe_arr[j - 1]; j--; }
+        note_probe_arr[j] = t;
+    }
+    return note_enum(note_probe_arr, n, chan, step, V, note_probe_out);
+}
+int *fl_engine_note_enum_out(void) { return note_probe_out; }
 
 /* ---- mixer (19) ---- */
 /* 色の R/B 入替え (PY-115 / REPORT_PY115.md §2)。格納は入替え + alpha 0xff、取得は入替えを再度通して alpha 0xff。 */
