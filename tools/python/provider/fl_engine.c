@@ -41,6 +41,9 @@ static int midi_out_assigned, master_sync;
 #define NMIDI 256
 static uint32_t midi_words[NMIDI];
 static int midi_word_n, dev_assigned, link_assigned;
+#define FCC_N 16
+static int64_t fcc_last[FCC_N];
+static int fcc_init;
 static int sel_chan;
 static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"Resonance", 0.2}, {"Gain", 0.8}};
 static int changed_flag, use_metronome, precount, rec_ppq;
@@ -105,6 +108,7 @@ void fl_engine_reset(void) {
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
     idle_elapsed = 0; midi_out_assigned = 0; master_sync = 0;
     midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
+    fcc_init = 0;
     lp_row = lp_flag49e = lp_flag54 = lp_n = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -728,8 +732,19 @@ FL_H(device, getIdleElapsed) { return fl_ret_d(c, idle_elapsed); }
 FL_H(device, isMidiOutAssigned) { return fl_ret_b(c, midi_out_assigned); }
 FL_H(device, getMasterSync) { return fl_ret_b(c, master_sync); }
 FL_H(device, setMasterSync) { master_sync = A_INT(0, 0) == 1; return fl_ret_none(c); }
-/* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。値の変化検出は未実装 (REPORT_PY231 §4) */
-FL_H(device, forwardMIDICC) { int64_t msg = A_INT(0, 0); (void)A_INT(1, 1); return midi_send(c, (uint32_t)msg); }
+/* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。
+   0xfdc8a0 は [sink+0x5c+4*添字] と同じ 32bit 値なら送らず、変わったときだけ送ってテーブルを書く (REPORT_PY231 §1)。
+   テーブルの初期値と添字の範囲は未確定 (#3949): 未設定 (-1) を初期値とみなし、範囲外の添字は重複検出せず送る仮置き */
+FL_H(device, forwardMIDICC) {
+    int64_t msg = A_INT(0, 0), idx = A_INT(1, 1);
+    uint32_t w = (uint32_t)msg;
+    if (!fcc_init) { for (int i = 0; i < FCC_N; i++) fcc_last[i] = -1; fcc_init = 1; }
+    if (idx < 0 || idx >= FCC_N) return midi_send(c, w);
+    if (fcc_last[idx] == (int64_t)w) return fl_ret_none(c);
+    int r = midi_send(c, w);
+    if (r == 0) fcc_last[idx] = (int64_t)w;
+    return r;
+}
 /* PE 0xd747f0 (書式 i|iiii)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
 FL_H(device, midiOutMsg) {
     int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);

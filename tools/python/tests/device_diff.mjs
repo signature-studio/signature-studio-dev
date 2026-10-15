@@ -106,7 +106,8 @@ if (mockOut !== wasmOut) diffs.push({ state: "midiOut count", mock: mockOut, was
 
 assert.equal(wasm.call("device.getIdleElapsed", []).t, "D", "getIdleElapsed の戻りは float (D タグ)");
 // 送った word 列 (midiOutMsg と forwardMIDICC の第 1 引数、呼出し順)。期待値は式の手計算 (両側が同じ誤りを持つ場合も落とす)
-const expectWords = [0x0A643C90, 0xB0, 0x643C90, 0xB0, 0x097F01B2, 0x7F643C91, 0xB0, 0x9B412DFF, 0x643C91, 0x097F01B2, 0x0A643C90];
+// PY-276: 末尾の forwardMIDICC(0x0A643C90, 2) は、同じ添字 2 で直前 (seq 先頭) に同じ値を送っているため送らない (値の変化が無い)
+const expectWords = [0x0A643C90, 0xB0, 0x643C90, 0xB0, 0x097F01B2, 0x7F643C91, 0xB0, 0x9B412DFF, 0x643C91, 0x097F01B2];
 const mockWords = mock.state.midiOut.map((m) => (m.api === "midiOutMsg" ? m.word : Number(m.message) >>> 0));
 const wasmWords = wasm.midiWords();
 if (JSON.stringify(mockWords) !== JSON.stringify(wasmWords)) diffs.push({ state: "midi word", mock: mockWords, wasm: wasmWords });
@@ -114,6 +115,40 @@ if (JSON.stringify(wasmWords) !== JSON.stringify(expectWords)) diffs.push({ stat
 if (JSON.stringify(linkCodes) !== JSON.stringify(linkExpectCodes)) diffs.push({ state: "link codes", expect: linkExpectCodes, wasm: linkCodes });
 
 // PY-215 (#3568): getLinkedChannel (PE 0xd75d30)。-6/-7 の経路が無いので割当 [dev, link] の両方 (assigned・unassigned) で同じ戻り値。-1 → -1、連動表が空の index ≥ 0 → None (仮置き)
+// PY-276 (#3949): forwardMIDICC は添字の値が変わったときだけ送る (PE 0xfdc8a0)。同じ値・同じ添字の連続は送らない (負例)。
+// 添字ごとに独立。範囲外の添字は重複検出せず送る (仮置き)。mock と C の送出件数・word 列が一致することを見る。
+const dedupSeq = [
+  ["device.forwardMIDICC", [0x11, 3]],
+  ["device.forwardMIDICC", [0x11, 3]],
+  ["device.forwardMIDICC", [0x22, 3]],
+  ["device.forwardMIDICC", [0x22, 3]],
+  ["device.forwardMIDICC", [0x11, 3]],
+  ["device.forwardMIDICC", [0x11, 4]],
+  ["device.forwardMIDICC", [0x11, 4]],
+  ["device.forwardMIDICC", [0x11, 99]],
+  ["device.forwardMIDICC", [0x11, 99]],
+];
+const dedupExpectWords = [0x11, 0x22, 0x11, 0x11, 0x11, 0x11];
+const dedupDiffs = [];
+mock.state.devAssigned = true;
+mock.state.linkAssigned = true;
+wasm.setDeviceLink(1, 1);
+mock.state.midiOut.length = 0;
+const dedupBefore = wasm.midiOutCount();
+for (const [name, args] of dedupSeq) {
+  const a = run(mock, name, args);
+  const b = run(wasm, name, args);
+  if (JSON.stringify(a) !== JSON.stringify(b)) dedupDiffs.push({ name, args, mock: a, wasm: b });
+}
+const dedupWasmWords = wasm.midiWords().slice(-dedupExpectWords.length);
+const dedupMockWords = mock.state.midiOut.map((m) => Number(m.message) >>> 0);
+const dedupWasmCount = wasm.midiOutCount() - dedupBefore;
+if (JSON.stringify(dedupMockWords) !== JSON.stringify(dedupExpectWords)) diffs.push({ state: "dedup mock words", expect: dedupExpectWords, mock: dedupMockWords });
+if (JSON.stringify(dedupWasmWords) !== JSON.stringify(dedupExpectWords)) diffs.push({ state: "dedup wasm words", expect: dedupExpectWords, wasm: dedupWasmWords });
+if (dedupWasmCount !== dedupExpectWords.length) diffs.push({ state: "dedup wasm count", expect: dedupExpectWords.length, wasm: dedupWasmCount });
+if (dedupMockWords.length !== dedupExpectWords.length) diffs.push({ state: "dedup mock count", expect: dedupExpectWords.length, mock: dedupMockWords.length });
+diffs.push(...dedupDiffs.map((d) => ({ dedup: true, ...d })));
+
 const linkedIdx = [-1, 0, 7];
 const linkedRes = [];
 for (const [dev, link] of [[1, 1], [0, 0]]) {
