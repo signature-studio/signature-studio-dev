@@ -240,9 +240,9 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 - mode 0 の boot 単独の再採取は、`fle_boot.mjs` の `import(cjs)` 相対解決で失敗したため未実施 (survey 実行時の値を引用)。
 - 未解決: 補修の判定への影響 → #4901 [FLE-33]。unit 280 / 659 / 895 の補修なし unlifted → #4855 [FLE-32]。
 
-## 13. #4855: boot_e2e の shard 化 (cap 内 build) の実測 (測定 commit `d956129eb`)
+## 13. #4855: boot_e2e の shard 化 (cap 内 build) の実測 (測定 commit `96723a2ed`)
 
-- **結論**: `boot_e2e.sh` の 4 variant (plain/strict/nosx/chk) は全て RSS cap 内で build・link できた (shard の clang peak 最大 2,975MB (chk s1)・cap 5,000MB/shard・超過 0 件。mismatch/undefined/duplicate 0)。boot は plain 895 units・strict 93・nosx 0・chk 895 (trap)。最初のウィンドウは無し。
-- 全数値 (shard 別 RSS・秒・variant 結果表・再現) は `REPORT_APPENDIX_4855.md`。§9 (FLE-9 の shard 化の実測) の全文は `REPORT_APPENDIX_2700.md` (main 側で分割済み)。
-- 測定: 全体 `real 7m38s`・load 0.96→2.05 (4 vCPU)・素材 `fl-win64` 展開・`toolchain-emsdk` (6.0.12)。
+- **結論**: `boot_e2e.sh` の 4 variant (plain/strict/nosx/chk) は全て RSS cap 内で build・link できた (shard の clang peak 最大 2978MB (chk s1)・cap 5,000MB/shard・超過 0 件。mismatch/undefined/duplicate 0)。boot は plain 895 units・strict 93・nosx 0・chk 895 (trap)。最初のウィンドウは無し。
+- 全数値 (shard 別 RSS・秒・variant 結果表・再現) は `REPORT_APPENDIX_4855.md`。
+- 測定: 全体 `real 7m23s`・load 0.31→1.78 (4 vCPU)・素材 `fl-win64` 展開・`toolchain-emsdk` (6.0.12)。
 - 未解決: survey covered 942 の残り (#4931 [FLE-35])。
