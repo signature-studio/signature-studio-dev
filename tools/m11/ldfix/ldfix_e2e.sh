@@ -30,6 +30,9 @@ python3 "$HERE/ldfix.py" tools/m11/work/boot_final3.ll "$HERE/work/ldfix_fixed.l
 step "1b/5 function_450560 の 2 段 deref 復元 (#2502・機械語検証付き): work/ldfix_fixed.ll を上書き"
 python3 "$HERE/fix_450560.py" "$HERE/work/ldfix_fixed.ll" "$HERE/work/ldfix_fixed_450560.ll" --pe "$PE" || fail "fix_450560.py"
 mv "$HERE/work/ldfix_fixed_450560.ll" "$HERE/work/ldfix_fixed.ll"
+step "1c/5 function_44f040 の *arg1 読出し脱落 (#3372・機械語照合付き): work/ldfix_fixed.ll を上書き"
+python3 "$HERE/fix_site_3372.py" "$HERE/work/ldfix_fixed.ll" "$HERE/work/ldfix_fixed_3372.ll" --pe "$PE" || fail "fix_site_3372.py"
+mv "$HERE/work/ldfix_fixed_3372.ll" "$HERE/work/ldfix_fixed.ll"
 python3 - <<'PYEOF'
 import json
 r = json.load(open('tools/m11/ldfix/work/ldfix_report.json'))
