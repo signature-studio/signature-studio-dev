@@ -35,12 +35,15 @@
   - entry block 内・呼出し前の alloca (`%stack_var_-8`・`%stack_var_-24`) → 注入される (`ptr nonnull`)。
   - 後続ブロックの alloca (`%stack_var_-16`) → 注入されず、`sigfix_slot_nonentry` = 1。
 - 単体テスト: `test_setother_slot_class.py` 8 件 OK。`py_compile` と `bash -n` は OK。
+- 測定 commit (2.1) から HEAD までのコード差分: `git diff eba68fdbe HEAD -- tools/m11/m11_post.py tools/m11/m11_build.sh` は 2 ファイル (`m11_post.py` +14・`m11_build.sh` +1/-1)。entry block 判定と RECOVER 分岐の `--slots` のみ。
 
 ## 3. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | survey (`m11_e2e.sh`) の前後実測 | 注入が退行を起こさないかは未確認。既定は不変 | 未解決表のまま (再測定のため子を起票しない) |
-| HEAD の判定 (entry block 制限) を通した後の 25 件の件数 | 2.1 の 25/25 は eba68fdbe の値 | 上と同じ (入力 IR が揃った run で再測定) |
+| HEAD (`622df694b` 以降) の entry block 制限を通した後の 25 件の件数・`sigfix_slot_nonentry`・注入前後の diff | **HEAD 未測定**。2.1 の 25/25 は eba68fdbe の値。入力 IR `work-m11`・`toolchain-retdec`・`toolchain-emsdk` が本 run の素材に無い | 本 PR の未解決表 (入力 IR が揃った run で再測定する。再測定だけなので子を起票しない) |
 | `work-m11` の IR に `ir_conditions.json` (ldfix=applied) の記録が無い | `m11_build.sh` が fail-closed で止まる | #4724 (M11-N220) |
-| REPORT_N196 §6 の 25 件の行の更新 | 未更新 | 未解決表のまま (文言修正のため子を起票しない) |
+| survey (`m11_e2e.sh`) の前後実測 | 注入が退行を起こさないかは未確認 | #4724 (M11-N220) |
+
+REPORT_N196 §6 の 25 件の行は、本 PR で「注入経路は実装済み・HEAD 再測定と survey は未実施」に更新済み (`tools/m11/REPORT_N196.md` §6)。
