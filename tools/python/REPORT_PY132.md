@@ -78,7 +78,7 @@ P 真の後:
 ## 検証
 
 測定 commit: `2b72baa3c` (コードを変えた最後の commit: `feat(python): implement ui browser node and menu item functions (PY-132, refs #3013)`)。以後の commit はこの REPORT (md のみ)。
-環境: runner・`uptime` は `load average: 0.38, 1.14, 0.70` (03:30:12)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (fl-win64 を `tar --zstd -xf` で全展開、11.3 秒)。emsdk は `/opt/emsdk` (pin 済み。toolchain-emsdk の素材も展開したが使ったのは `/opt/emsdk`)。
+環境: runner・`uptime` は `load average: 0.38, 1.14, 0.70` (03:30:12)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (fl-win64 を `tar --zstd -xf` で全展開、11.3 秒)。emsdk は `[EMSDK]` (`docs/REFERENCES.md`、pin 済みの既存インストール) を使った。
 
 | コマンド | 結果 | wall |
 |---|---|---|
