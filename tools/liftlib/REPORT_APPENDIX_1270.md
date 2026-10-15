@@ -19,8 +19,8 @@
 |---|---|
 | 測定 commit (コードを変えた最後の commit) | `e13cd45c` (`fix(liftlib): ott_getparam の switch 表 (image 内 .text) を線形メモリへ敷設し leafspec match 1.0 (refs #1270)`) |
 | 前段 commit | `896115a7` (入口 this/idx の張り替え)。両 commit は `tools/liftlib/liftlib/{passes/icall.py,pipeline.py}`・`targets/ott_getparam.json`・`liftlib_e2e.sh` のみ |
-| 素材 | `$ARTIFACTS_DIR`: `work-liftlib` (→ `tools/liftlib/work/`)・`work-icall` (→ `tools/icall/work/`、`ott_F.txt`)・`work-m6-ott` (→ `tools/m6/work/` ほか)・`analysis-ott-binaries` (→ `$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`)・`toolchain-emsdk` (`/opt/emsdk`)・`toolchain-retdec` (`/opt/retdec`)。`fl-win64` は本測定に不要 |
-| 再現 | `cd tools/liftlib && OTT_DLL=$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll python3 -m liftlib leafspec targets/ott_getparam.json --n 200` |
+| 素材 | `$ARTIFACTS_DIR`: `work-liftlib` (→ `tools/liftlib/work/`)・`work-icall` (→ `tools/icall/work/`、`ott_F.txt`)・`work-m6-ott` (→ `tools/m6/work/` ほか)・`analysis-ott-binaries` (→ `[ANALYSIS-PLUGINS]` の `ott/binaries/OTT_vst2_win64.dll`)・`toolchain-emsdk` (→ `[EMSDK]`)・`toolchain-retdec` (→ `[RETDEC]`)。`fl-win64` は本測定に不要 |
+| 再現 | `cd tools/liftlib && OTT_DLL=<[ANALYSIS-PLUGINS]>/ott/binaries/OTT_vst2_win64.dll python3 -m liftlib leafspec targets/ott_getparam.json --n 200` |
 | 測定値 | wall 61.98 s (`real 1m1.976s`)・開始時 load 0.74 / 0.83 / 0.57 (runner 4 コア, 単発) |
 
 確認コマンド (測定 commit から HEAD までのコード差分。0 なら測定値は現 HEAD で有効):
