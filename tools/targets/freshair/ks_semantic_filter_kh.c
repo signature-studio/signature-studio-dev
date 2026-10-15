@@ -115,8 +115,56 @@ static int run(uint64_t va, Case* c, int idx) {
     return 0;
 }
 
+/* シナリオ入力 (lift2/gen_filter_scen.py が作る SC 用ファイル) を同じ値で実行する。書込み (region 0=S, 1=P) は KH の
+ * 写像に変換: S+0x98 → this+0x60、P の 0x9dc4/0x9e0c/0x9e54/0x9e9c/0x9ee4 → P+0/4/8/0xc/0x10。
+ * 出力は native_filter.c と同じ並び (call ごとに " |" + S+0x98(8) + S+0xa0(0x200) + S+0x4a0(0x200) + S+0xca0(0x670) + " " L " " R)。
+ * KH の対応位置は this+0x60 / +0x70 / +0x470 / +0xc70 (SC 側 = KH + 0x38 / +0x30 / +0x30 / +0x30)。 */
+static int run_scen(const char* core, const char* path) {
+    static char line[1 << 22]; static unsigned long tok[1 << 20];
+    map_pe(core);
+    if (mmap((void*)SUM_VA, 0x1000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0) != (void*)SUM_VA) { fprintf(stderr, "sum map fail\n"); return 3; }
+    FILE* fp = fopen(path, "r"); if (!fp) { perror("scen"); return 2; }
+    while (fgets(line, sizeof line, fp)) {
+        int k = 0; char* p = strtok(line, " \n"); while (p) { tok[k++] = strtoul(p, NULL, 16); p = strtok(NULL, " \n"); }
+        int ti = 0; int sidx = (int)tok[ti++]; int ncalls = (int)tok[ti++];
+        uint8_t* self = calloc(1, ST_SIZE); uint8_t* P = calloc(1, 0x20); uint8_t* ctx = calloc(1, 0x3200);
+        *(void**)(ctx + 0x3188) = P;
+        *(void**)(self + 0x12d8) = (uint8_t*)SUM_VA - 0x28;
+        printf("S%d", sidx);
+        for (int c = 0; c < ncalls; c++) {
+            int nW = (int)tok[ti++];
+            for (int w = 0; w < nW; w++) {
+                int rg = (int)tok[ti++]; unsigned off = (unsigned)tok[ti++]; uint32_t val = (uint32_t)tok[ti++];
+                if (rg == 0 && off == 0x98) memcpy(self + 0x60, &val, 4);
+                else if (rg == 1 && off == 0x9dc4) memcpy(P + 0, &val, 4);
+                else if (rg == 1 && off == 0x9e0c) memcpy(P + 4, &val, 4);
+                else if (rg == 1 && off == 0x9e54) memcpy(P + 8, &val, 4);
+                else if (rg == 1 && off == 0x9e9c) memcpy(P + 0xc, &val, 4);
+                else if (rg == 1 && off == 0x9ee4) memcpy(P + 0x10, &val, 4);
+                else { fprintf(stderr, "unmapped write rg=%d off=%x\n", rg, off); return 4; }
+            }
+            int n = (int)tok[ti++];
+            float* L = calloc(MAXN + 1, 4); float* R = calloc(MAXN + 1, 4);
+            for (int i = 0; i < n; i++) { uint32_t b = (uint32_t)tok[ti + i]; memcpy(&L[i], &b, 4); b = (uint32_t)tok[ti + n + i]; memcpy(&R[i], &b, 4); }
+            ti += 2 * n;
+            uint8_t* aud = calloc(1, 0x40);
+            *(float**)(aud + 0) = L; *(float**)(aud + 8) = R; *(int*)(aud + 0x28) = n;
+            memset((void*)SUM_VA, 0, 0x1000);
+            ((fn_t)VA_FILTER)(self, ctx, aud);
+            printf(" |"); hexdump(stdout, self + 0x60, 8); hexdump(stdout, self + 0x70, 0x200); hexdump(stdout, self + 0x470, 0x200);
+            hexdump(stdout, self + 0xc70, 0x670);
+            printf(" "); hexdump(stdout, L, n * 4); printf(" "); hexdump(stdout, R, n * 4);
+            free(aud); free(L); free(R);
+        }
+        printf("\n");
+        free(self); free(P); free(ctx);
+    }
+    return 0;
+}
+
 int main(int argc, char** argv) {
-    if (argc < 4) { fprintf(stderr, "usage: ks_semantic_filter_kh <core_64> <ncases> <seed>\n"); return 2; }
+    if (argc == 4 && !strcmp(argv[2], "scen")) return run_scen(argv[1], argv[3]);
+    if (argc < 4) { fprintf(stderr, "usage: ks_semantic_filter_kh <core_64> <ncases> <seed> | <core_64> scen <scen.txt>\n"); return 2; }
     int nc = atoi(argv[2]);
     rng = (uint32_t)strtoul(argv[3], 0, 0) * 2654435761u + 12345u; if (!rng) rng = 1;
     map_pe(argv[1]);
