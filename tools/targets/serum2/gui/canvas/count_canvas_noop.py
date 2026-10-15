@@ -10,7 +10,7 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FILES = ["canvas_graphicsdevice.cpp", "canvas_graphicspath.cpp", "canvas_font.cpp", "canvas_bitmap.cpp", "canvas_frame.cpp"]
+FILES = ["canvas_graphicsdevice.cpp", "canvas_graphicspath.cpp", "canvas_font.cpp", "canvas_bitmap.cpp", "canvas_frame.cpp", "canvas_string.cpp"]
 DRAW = re.compile(r"^(draw|clearRect|fill(?!Mode))")
 STATE = re.compile(r"^(set|save|restore)")
 FUNC = re.compile(r"(?P<sig>[^{};]*?)\{(?P<body>[^{}]*)\}", re.S)
