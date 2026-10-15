@@ -10,7 +10,7 @@
 ## 1. 測定条件
 
 - 測定 commit: `2e15e1f29` (コードを変えた最後の commit。`git diff 2e15e1f29 HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/ldfix/fix_450560.py` の差分は本 REPORT の commit 以降は 0)。
-- 素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・`work-m11`・`work-liftdiff` を展開。`toolchain-*` は runner の `/opt/retdec`・`/opt/emsdk` を使用。
+- 素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・`work-m11`・`work-liftdiff` を展開。`toolchain-*` は runner の既定 ([RETDEC]・[EMSDK]。`docs/REFERENCES.md` §4) を使用。
 - 環境: 4 vCPU・load average 0.37〜0.71。
 - **`m11_e2e.sh --full` は実行していない**。素材の `work-m11` に `ir_conditions.json` と `lift_pe.sha256` が無く、全再生成 (scan → Ghidra 12.1.4 → lift 4 chunk → tail 固定点) が 20 分超で本 run の上限 (58 分) に収まらないと判断した。代わりに既存の lift 成果物から `m11_gen_ir2.sh` → `m11_build.sh` → `m11_e2e.sh` (`M11_SKIP_LIFT_FP=1`・参考値) の経路で測った。これは `REPORT_3647.md` §1 と同じ迂回。**受入 3 の `--full` 実測は未達**。
 
