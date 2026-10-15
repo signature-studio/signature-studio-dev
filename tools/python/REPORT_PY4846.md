@@ -1,4 +1,4 @@
-# PY-4846 (#4846・#3568 の子 B): getLinkedValue・getLinkedInfo・getLinkedParamName・getLinkedValueString の index == -1 経路を PE 確定して実装 (index ≥ 0 は未確定)
+# PY-4846 (#4846・#3839 の子 B): getLinkedValue・getLinkedInfo・getLinkedParamName・getLinkedValueString の index == -1 経路を PE 確定して実装 (index ≥ 0 は未確定)
 
 親: #3839 (子 A #4845 とは独立に進めた。index ≥ 0 の残りは子 #4865)
 既知類型との関係: 該当なし (lift 作業ではない)
