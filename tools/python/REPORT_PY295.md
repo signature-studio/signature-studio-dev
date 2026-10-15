@@ -21,9 +21,9 @@
 | CPython wasm | `bash tools/python/build_cpython_wasm.sh` | 0 | 4 分 9 秒 | `python.js` / `python.wasm` / `libpython3.12.a` を生成 (`work/build-wasm`) |
 | 入力 | `bash tools/python/fetch_inputs.sh` | 0 | 0.6 秒 | `work/midi.py`・`utils.py`・device script・`fl-stubs` (clone) |
 | flpy | `bash tools/python/build_flpy.sh` | 0 | 24.9 秒 | `dist/flpy.js` 120,529 B・`flpy.wasm` 5,924,680 B・`flpy.data` 3,303,220 B (初回は zlib 取得で rc 1、§2) |
-| provider | `bash tools/python/provider/build.sh` | 0 | 1.49 秒 | `dist/flprov.js`・`flprov.wasm`。`fl_table.c`: 435 関数・ハンドラ 195 |
-| all_tools | `FL_ENGINE=wasm node tests/all_tools.mjs` | 0 | 2.18 秒 | `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` |
-| provider_check | `node tests/provider_check.mjs` | 0 | 0.36 秒 | `{"functions":435,"implemented":195,"unimplemented":240,"mcp_static":60,"PASS":true}` |
+| provider | `bash tools/python/provider/build.sh` | 0 | 0.95 秒 | `dist/flprov.js`・`flprov.wasm`。`fl_table.c`: 435 関数・ハンドラ 196 (main 取り込み後の HEAD `3d625fb5a`) |
+| all_tools | `FL_ENGINE=wasm node tests/all_tools.mjs` | 0 | 1.34 秒 | `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` |
+| provider_check | `node tests/provider_check.mjs` | 0 | 0.25 秒 | `{"functions":435,"implemented":196,"unimplemented":239,"mcp_static":60,"PASS":true}` |
 
 - load (計測時): `uptime` の 1 分平均 0.28 (4 vCPU・メモリ 15 GiB)。
 - all_tools と provider_check は、assert 失敗時に例外で止まる構成。最後の `console.log` に到達した時点で全 section を通過している。
@@ -44,6 +44,9 @@ EMSDK_DIR=... FL_WIN64_DIR=... bash tools/python/build_flpy.sh          # §2 �
 EMSDK_ENV=$EMSDK_DIR/emsdk_env.sh bash tools/python/provider/build.sh
 cd tools/python && FL_ENGINE=wasm node tests/all_tools.mjs && node tests/provider_check.mjs
 ```
+
+- 注意 (main 取り込み後の再実行で判明): `build_cpython_wasm.sh` は `EMSDK_DIR` を見ず `/opt/emsdk/emsdk_env.sh` をハードコードしている。`/opt/emsdk` が無いと rc 1 でログ無しに落ちる。この run では `/opt/emsdk` を emsdk 6.0.12 の展開先へのシンボリックリンクにして通した。`build_flpy.sh` は `build_cpython_wasm.sh` の成果物を要求するため、この順で実行する。
+- `build_flpy.sh` は `fetch_inputs.sh` の後でないと `fl-stubs` 不足で落ちる。`provider/build.sh` は `build_flpy.sh` の後に `dist/flprov.js` を作る。`fl_provider.mjs` が `dist/flprov.js` を要求するため、これが無いと `all_tools` は ERR_MODULE_NOT_FOUND で落ちる。
 
 ## 4. 未解決
 
