@@ -13,7 +13,7 @@
 ## 1. 測定
 
 - 測定 commit: 本 PR の HEAD (`engine_lift.sh` の経路は main `1ff7c6880` と同一。 本 PR はコード変更が `tools/plugins/sampler/` の新規ファイルのみ)。
-- 素材: fl-win64 (`block19252_PE.bin`・`block19048_PE.bin`)。 RetDec (`/opt/retdec`)・emsdk (`/opt/emsdk`) は runner の既存。
+- 素材: fl-win64 (`block19252_PE.bin`・`block19048_PE.bin`)。 RetDec は [RETDEC]、emsdk は [EMSDK] (いずれも runner の既存。 `docs/REFERENCES.md` §4)。
 - `engine_lift.sh` (前景・timeout 900 s)、summary.csv:
 
 | engine | summary.csv | unimpl (列 6) | emcc -c rc (素 / fixcmp / f80) | lift_s |
