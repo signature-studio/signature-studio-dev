@@ -106,6 +106,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_970.md` | ~100 | PERF-P14 (#970) の付録: boot closure の -O0 / -O2 / -O2 -flto 変種の build (wasm bytes・所要時間・ピーク RSS)、node 実行時間 (n=10)・署名の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_3330.md` | ~160 | PERF-P22 (#3330) の付録: boot 停止時点の線形メモリの sha256 (全体・C スタック除く・PE 書込み可能セクション) を 3 変種 × 2 run とネガコンで比較した実測値と差分の所在。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_3090.md` | ~80 | FLE-12 (#3090) の詳細: 0x6a7b70 への dispatch の呼出元 (0x6c7923 ← 0x815920)・幅 r8 の源 (即値 2^20 由来の推定)・未修復の理由・0x15F34A0 書込み元の未了。REPORT §0 から参照 |
+| `tools/flelift/boot/REPORT_APPENDIX_3770.md` | ~110 | FLE-15 (#3770) の詳細: 診断 route の有界実行 (時間・ログ上限)・呼出点 0x6c9380 の呼出し回数と矩形 (0,0,2^20,2^20)・既定経路の再実測。測定値の正本。REPORT §0 から参照 |
 | `tools/flelift/boot/REPORT_APPENDIX_2702.md` | ~80 | FLE-10 (#2702) の付録: 工程の実測 (§A)・再現コマンド (§B)・IPP 呼出しと slot の実測 (§C)・停止点 (§D)・旧 REPORT §10 (FLE-6 #672) の全文 (§E。250 行上限のため分割移動) |
 | `tools/flelift/boot/REPORT_APPENDIX_672.md` | ~110 | FLE-672 (#672) の付録: buf = 0 の fill を戻す診断 (`FLE_DIAG_NULLFILL=1`) の結果表 (5 route)・仮説 ①②③ の成否・停止点 `unlifted 0x6bbc20`・既定経路の不変の証跡。REPORT §11 と §A (旧記述の移動) から参照 |
 | `tools/flelift/boot/REPORT_APPENDIX_2719.md` | ~190 | #2719 (WIN-8) の付録: x64c 寛容起動 (`FLE_TOLERANT` 1/2) の 942 unit 逐次試行の結果表・skip 一覧 (84)・survey との差 (77)・silent miscompile のリスク評価・CreateFruityInstance (0x1375990) の観測 (oob 即時・API 0 件) |
