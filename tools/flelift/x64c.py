@@ -27,7 +27,7 @@ ott 原版からの差分 (FLEngine 実測 1,105 未対応 site = 0.32% の解�
     movsldup/movshdup/cmpXXps (KH-38 #3065。before 160 closure の unsup 285 site → 0。差分テスト tests/x64c_vex_diff.py)
   - VEX.256 (ymm) の packed 算術 (vaddpd/vsubpd/vmulpd/vdivpd・ps 版)・bitwise・vunpckl/hpd・vshufpd・vextractf128・vcvtdq2pd を
     上位 128bit (YL) 込みで lane 計算 (KH-38 #3428。PSOLA_CreateInstance 閉包 unsup 2,472 → 0)。
-    加えて vcvtss2sd/vcvtsi2sd/vsqrtsd/vmovhpd (VEX.128)・vpunpcklqdq (専用分岐)・movddup/lddqu/movntpd/palignr/shlx/pushfq・div r/m8
+    加えて vcvtss2sd/vcvtsi2sd/vsqrtsd/vmovhpd (VEX.128)・vpunpcklqdq (専用分岐)・movddup/lddqu/movntpd/movnti (ST 系へ写す。単一スレッドでは mov と同じ)/palignr/shlx/pushfq・div r/m8
   - dispatch に IAT pseudo-VA 経路を追加: data 側で IAT slot に IMP_VA_BASE+idx を敷設し,
     `mov rax,[iat]; call rax` 形の間接呼出を imp 呼出に解決
 
@@ -539,6 +539,8 @@ class FnLift:
         self.L(self.wr(ins, ops[0], self.rd(ins, ops[1], ops[0].size)))
 
     def i_movabs(self, ins, ops): self.i_mov(ins, ops)
+
+    def i_movnti(self, ins, ops): self.i_mov(ins, ops)
 
     def i_movzx(self, ins, ops):
         self.L(self.wr(ins, ops[0], self.rd(ins, ops[1]), ops[0].size))
