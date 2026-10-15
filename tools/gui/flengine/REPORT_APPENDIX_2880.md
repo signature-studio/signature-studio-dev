@@ -103,7 +103,7 @@ tools/shim/test/test_main.c | 11 +++++++---
 - 差分の中身: `tools/shim/src/heap.c` の HeapFree は、割当てのない p を FALSE・`ERROR_INVALID_FUNCTION` から TRUE・`ERROR_SUCCESS` に変えた (commit `7278e857`・#2821)。`tools/shim/test/test_main.c` は同じ変更の検査。`cfi_probe.mjs` に差分は無い。`tools/shim/src/sync.c` (CS-MISS の出力元) にも差分は無い。
 - cfi_probe の GUI 実行は `tools/shim` を使う (`tools/gui/flengine/e2e.sh` の複製元) ため、9-3 の結果は HeapFree の変更の影響を受け得る。影響の有無は未測定。
 - 差分の証跡 (`ae963e28` → `adad27ad`): `git diff --stat ae963e28 adad27ad -- tools/shim tools/gui/flengine/cfi_probe.mjs` は上の 3 ファイル (61+/7-) と同じ。
-- 再測定 (commit `adad27ad`・#3191 差し戻し round 2): 素材 `fl-win64 toolchain-retdec toolchain-emsdk work-m11` (`work-liftdiff` は未使用)。toolchain は `/opt/` に展開済みのものを使った (`EMSDK_ENV=/opt/emsdk/emsdk_env.sh`・`RETDEC=/opt/retdec/bin/retdec-decompiler`)。fl-win64 は `FL_WIN64_DIR` へ手で展開し、work-m11 は作業ツリーの `tools/m11/work` へ複製した (gitignore)。`apt-mingw` は oc_artifacts に無いため `gcc-mingw-w64-x86-64` を apt で入れた (§9-2 (2))。
+- 再測定 (commit `adad27ad`・#3191 差し戻し round 2): 素材 `fl-win64 toolchain-retdec toolchain-emsdk work-m11` (`work-liftdiff` は未使用)。toolchain は [EMSDK]・[RETDEC] に展開済みのものを使った (`EMSDK_ENV` に [EMSDK] の `emsdk_env.sh`、`RETDEC` に [RETDEC] の `bin/retdec-decompiler` を指定)。fl-win64 は `FL_WIN64_DIR` へ手で展開し、work-m11 は作業ツリーの `tools/m11/work` へ複製した (gitignore)。`apt-mingw` は oc_artifacts に無いため `gcc-mingw-w64-x86-64` を apt で入れた (§9-2 (2))。
 
 | 手順 (`adad27ad`) | 結果 (実測) |
 |---|---|
