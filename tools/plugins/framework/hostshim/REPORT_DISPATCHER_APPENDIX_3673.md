@@ -77,13 +77,29 @@
 - load average は未採取。
 - `hostshim.c` の変更はコメントだけ (`git diff 321f1620e fe58ff465 -- tools/plugins/framework/hostshim/hostshim.c`: 7 行追加・3 行削除。`+`・`-` の行はすべてコメント)。応答値の変更は無いため、Phase A の結果が変わる根拠は無い。実測で確認した。
 
+## 4.1 #3986 (PLG-P0b-41): 実行時の値の計装
+
+- 測定 commit: `2b07b909b` (コードを変えた最後の commit)。`git diff 2b07b909b HEAD -- tools/plugins/framework/hostshim ':!*.md'` は差分 0 行 (コードは変わらず、変わったのは本付録の `.md` のみ)。
+- 計装: `hs_val_probe.py` の観測点に §2 の書込み元 VA を追加 (0x41d919・0x11fc2b3・0x9dec3f・0x13226dd・0x1322a07・0x1322b47)。
+  許可範囲は `HS_ALLOW_LO`/`HS_ALLOW_HI` で広げられるようにした (既定は従来の `[0x13173a0, 0x1330000)`)。
+- 測定: `python3 hs_val_probe.py disp 0x18 0x45 0x54 0x56 0x64 0x65` (既定範囲・広げた範囲 `[0x9d0000, 0x1330000)` の両方。各 7 秒・n=1・終了時の load 0.21 (開始時は未採取))。
+  素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (5.3 秒)。`FL_WIN64_DIR` はその展開先 (`extracted/block00031_PE.bin` を読む)。
+- 結果: 6 ID とも `rax=0x0 stop=ended`。観測点に到達したのは 0x1318730 (開始点) と 0x13226dd (0x54)・0x1322a07 (0x64)・0x1322b47 (0x65) のみ。
+  **0x41d919・0x11fc2b3・0x9dec3f は 6 ID とも未到達** (広げた範囲でも同じ。経路長は 855〜880 命令で変化なし)。
+- 「0 件」の根拠 (ネガティブコントロール): 未実施。代わりに、既知の到達 0x1318730 が全 6 ID で観測されている (計装が動いている証拠)。
+- 読み: Dispatcher を単独で実行しても、6 ID の格納元 (G18・P45・P56) の書込みには到達しない。書込みは Dispatcher の呼出し元側の経路 (0x41d8f0・0x11fba90・0x9de2c0 の呼出し) で行われる。
+  0x13226dd・0x1322a07 の `[rbp+0x1880]` と 0x1322b47 の `[rbp+0x109c]` の値はいずれも 0。0x1322b47 の `[rbp+0x1168]` は 0x54534154 (TAG)。
+- 結論: 6 ID の実行時の値は**未確定**のまま。応答表は変えない。次は呼出し元 (0x41d8f0 等) からの経路での計装 (子 `[PLG-P0b-47]`)。
+- e2e との関係: `hs_val_probe.py` を呼ぶスクリプトは無い (`tools` 配下の `*.sh`・`*.mjs`・`*.cjs`・`*.js`・`*.ts`・`*.yml`・`*.json` を検索して 0 件)。`hs_e2e.sh`・`fw_stage2.sh` の経路は変わらない。
+- Phase A・`fw_stage2.sh` の HEAD `2b07b909b` での再実行: **未実施**。本 run の素材は `fl-win64` のみで、`fw_stage2.sh` と `hs_e2e.sh` が要る `work-fw-stage1` (`tools/plugins/work/fw/`) が無いため (`fw_stage2.sh` は `cd` で失敗・rc=1)。直近の実測は測定 commit `fe58ff465` (§4)。`fe58ff465` 以降に `hostshim.c`・`hs_e2e.sh`・`fw_route.cjs`・`fw_stage2.sh` の変更は無い (`git diff --stat fe58ff465 HEAD` で 0 件)。
+
 ## 5. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 6 ID の実行時の値 (§2 の『未確定』列) と、確定後の応答表の更新 | 受入 1・2 の残り。応答表の 0 固定 5 ID と 0x56 の近似 | #3986 ([PLG-P0b-41]) (子・本 PR の本文に番号) |
-| 0x9dec3f が Phase A の経路で実行されるか (未測定) と、0x40f9e0 の vcall の受け手の型 | 0x56 の実値 | #3986 ([PLG-P0b-41]) |
-| 0x9de2c0 の画像値 (コード番地) と実行時の rcx の値の一致 (未確認) | 0x56 の受け手 | #3986 ([PLG-P0b-41]) |
+| 6 ID の実行時の値 (§2 の『未確定』列) と、確定後の応答表の更新 | 受入 1・2 の残り。応答表の 0 固定 5 ID と 0x56 の近似 | #4385 ([PLG-P0b-47]) |
+| 0x9dec3f が Phase A の経路で実行されるか (未測定) と、0x40f9e0 の vcall の受け手の型 | 0x56 の実値 | #4385 ([PLG-P0b-47]) |
+| 0x9de2c0 の画像値 (コード番地) と実行時の rcx の値の一致 (未確認) | 0x56 の受け手 | #4385 ([PLG-P0b-47]) |
 | Phase B の `memory access out of bounds` | Phase B の PASS | #2911 (既存) |
 | `fw_smoke_check` の `runerr=1`・`init_reach=16` | smoke の判定 | #2510 (既存) |
 
