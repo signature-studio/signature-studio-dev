@@ -3,7 +3,7 @@
 > **正本の分担**: 前段の停止点 (`f_409b70`) の観測は `REPORT_APPENDIX_2653.md` §3 が正本。本付録は slot 6 応答を直した後の停止点と、その呼出元の確認を記録する。
 
 測定 commit: `dec2ec7a0` (harness `cpi_host.c` を変えた最後の commit)。検証起点: `origin/main` @ `4f3c0ad46`。
-環境: x64c 生成 (`block19091_PE.bin`) と emsdk 6.0.12 (`toolchain-emsdk` 素材の展開先)・`fl-win64` の `extracted/`・node v24.19.0 (emsdk 同梱)。4 vCPU。全段直列。
+環境: x64c 生成 (`block19091_PE.bin`) と emsdk 6.0.12 (`toolchain-emsdk` 素材の展開先)・`fl-win64` の `extracted/`・node v22.23.3 (`PATH` 上のもの)。4 vCPU。全段直列。
 
 ## 1. 受入条件の対応
 
@@ -16,13 +16,13 @@
 ## 2. 変更点 (`dec2ec7a0`)
 
 - slot 6 の応答を、`&out` に文字列の**番地**ではなく NUL 終端の実文字列 (`A`〜の 127 字 + NUL) を書く形にした。
-- 理由: 呼出側 `f_77faf0` は `out` (`rbp+0x50`・上限 0x400) を `f_412c10` (`rcx`=長さ格納先・`rdx`=`out`・`r8`=上限 0x400) に渡す。`f_412c10` は `out` を NUL まで走査して長さを決め、`f_4122c0` にその長さを渡す。番地 `0xA41000` の先頭バイトは 0 のため長さは 0 となり、`f_409b70` の copy 件数 `r8 − rax` が負になって OOB していた (`REPORT_APPENDIX_2653.md` §3.1 の「推定・未検証」の検証結果)。
+- 理由: 呼出側 `f_77faf0` は `out` (`rbp+0x50`・上限 0x400) を `f_412c10` (`rcx`=長さ格納先・`rdx`=`out`・`r8`=上限 0x400) に渡す。`f_412c10` は `out` を NUL まで走査して長さを決め、`f_4122c0` にその長さを渡す。番地 `0xA41000` の先頭バイトは 0 のため長さは 0 となる、と読める。修正後に `f_409b70` を越えたことが、この読みと整合する実測。ただし `f_412c10` の長さ 0 を直接観測してはいない (推定)。
 
 ## 3. 観測
 
-### 3.1 修正前 (測定 commit `22625fe8c` の harness、起点 `origin/main`)
+### 3.1 修正前 (`REPORT_APPENDIX_2653.md` §3.1 の引用・本 run では再実行していない)
 
-- `entered=true`・`insn_count=134`・停止 `0x409b9a` (`f_409b70`・`rep movsb`)・`memory access out of bounds`。`REPORT_APPENDIX_2653.md` §3.1 と同一。
+- `entered=true`・`insn_count=134`・停止 `0x409b9a` (`f_409b70`・`rep movsb`)・`memory access out of bounds`。本 run の修正前 harness の再測定 (`cpi_reach.sh` 1 回目) も同じ停止点・同じ `insn_count=134`・同じ `host_log` を返した。
 
 ### 3.2 修正後 (測定 commit `dec2ec7a0`)
 
@@ -36,7 +36,7 @@
 | 段 | 秒 | load (1 分値・開始→終了) |
 |---|---|---|
 | `x64c_wrapper.py` block19091 | 75 | 未計測 |
-| `cpi_reach.sh` (修正前、`22625fe8c` 相当の harness) | 94 | 未計測 |
+| `cpi_reach.sh` (修正前 harness、本 run の 1 回目) | 94 | 未計測 |
 | `cpi_reach.sh` (修正後、`dec2ec7a0`) | 79 | 0.34 → 0.83 (`uptime` の 1 分値。開始 10:03:58・終了 10:05:17) |
 
 `cpi_reach.sh` の秒は emcc 2 回・link・node 実行の全体。runner の差があるため比較の精度は低い。n=1 のため min–max は未評価。
