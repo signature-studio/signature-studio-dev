@@ -22,14 +22,14 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `461cfe434` (main 取り込みの merge commit。`hs_val_probe.py` 新規は `c95b7a770`、取り込み前の検証 HEAD は `395ba876e`)。
-  取り込みで `hostshim/` に main 側の `hs_callee_sem.py`・`hs_glob_src.py` が増えたが、本件の probe・emu はどちらも読まない。全項目を `461cfe434` で再測定した (§6)。
-  `git diff 461cfe434 HEAD -- tools/plugins/framework/hostshim ':!*.md'` は空 (§6 の末尾で確認)。
+- 測定 commit: `2b3a92d43` (競合解消の merge commit。`hs_val_probe.py` 新規は `c95b7a770`、取り込み前の検証 HEAD は `395ba876e`)。
+  main 取り込みは 2 回。1 回目 (`461cfe434`) で `hostshim/` に main 側の `hs_callee_sem.py`・`hs_glob_src.py` が増え、2 回目 (`2b3a92d43`) で `hs_resp_src.py` に `reach` 関数が増えた。本件の probe・emu はこれらを読まない (`hs_val_probe.py` の hostshim 内 import は `hs_disp_emu` だけ)。全項目を `2b3a92d43` で再測定した (§6)。
+  `git diff 2b3a92d43 HEAD -- tools/plugins/framework/hostshim ':!*.md'` は空 (§6 の末尾で確認)。
 - 素材: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B) を `$RUNNER_TEMP/fl-win64` に展開
-  (`tar --zstd -xf` で 2.97 秒)。`work-fw-stage1` は本件の解析では使わず、展開していない。
+  (`tar --zstd -xf` で 2.97 秒。`2b3a92d43` の再測定は `extracted/block00031_PE.bin` だけを展開し 2.5 秒)。`work-fw-stage1` は本件の解析では使わず、展開していない。
 - Python (repo 外の `$RUNNER_TEMP/hsvenv`): `unicorn 2.1.4` / `pefile 2024.8.26` / `capstone 5.0.7`。
   issue は `capstone 5.0.9` を指すが、本件は 5.0.7 を導入した (差の有無は未確認。出力はすべて 5.0.7 のもの)。
-- 所要と load (n=1、`461cfe434`): 256 ID の Dispatcher 実行 `hs_val_probe.py disp` 73.8 秒 (load 0.20 → 0.81)。`verify` 6.4 秒。`word41` 6.3 秒 (PE の読込みが支配的)。
+- 所要と load (n=1、`2b3a92d43`): 256 ID の Dispatcher 実行 `hs_val_probe.py disp` 61.0 秒 (load 0.29 → 0.74)。`sweep11ffde0` 6.6 秒。`verify` 6.7 秒。`word41` 6.4 秒 (PE の読込みが支配的)。`hs_disp_emu.py` 5 ID 5.8 秒。
 
 ## 2. 受入 1: `0x1318e3e` の call 0x11ffde0 の戻り値
 
@@ -173,11 +173,11 @@ flags=1 の 12 行で予測との mismatch = 0。al=1 になるのは (a78,a18)=
 - **経路 B** (Index の bit0=0 かつ `[[HostTag+0xb8]+8]≠0`): 0x13218c8 → 0x1321952 で `call 0xf5b190` (r8 = `&[rbp+0x111c]`)。その後の 0x1321957 `cmp word [rbp+0x111c],0` の結果 (`[rbp+0x11a0]` に入る) が 1 なら 0x13281af (0x13219bf の jne) へ、0 なら 0x1321a1b へ行く。callee の戻り値 (rax) はここで使われず、word の値で分岐が決まる。0xf5b190 が word を書けば分岐も最終 word も変わる。その書込みは未確定 (§7)。
 - **ID 0x41 の emulator 応答 1 は経路 A (zero-page 前提) の結果**。経路 B の結果は測っていない。
 
-## 6. 実測 (測定 commit `461cfe434`、HEAD で再現)
+## 6. 実測 (測定 commit `2b3a92d43`、HEAD で再現)
 
 | 測定 | コマンド | 結果 |
 |---|---|---|
-| 観測点の到達 (256 ID) | `hs_val_probe.py disp > m.txt` | 74 秒、256 行。`0x1318730` は全 ID で `[rbp+0x1880]`=0。`0x1318e3e` は ID 0x01 のみ (ecx=0, r8d=0x8000)。`0x1319f66`・`0x131c40c`・`0x1321be8`・`0x1321a1b` はそれぞれ ID 0x13・0x26・0x46・0x41 のみ |
+| 観測点の到達 (256 ID) | `hs_val_probe.py disp > m.txt` | 61 秒、256 行。`0x1318730` は全 ID で `[rbp+0x1880]`=0。`0x1318e3e` は ID 0x01 のみ (ecx=0, r8d=0x8000)。`0x1319f66`・`0x131c40c`・`0x1321be8`・`0x1321a1b` はそれぞれ ID 0x13・0x26・0x46・0x41 のみ |
 | 既存ツールとの一致 | `hs_disp_emu.py 0x01 0x13 0x26 0x41 0x46` | rax = 0・0・0・1・0 (`hs_val_probe disp` と一致) |
 | fill 0xff (probe) | `HS_DISP_STACK_FILL=0xff hs_val_probe.py disp 0x01 0x41` | ID 0x01: `[rbp+0x1880]`=-1、ecx=0xffffffff、rax=0。ID 0x41: `0x132178c` で `[rbp+0x1880]`=-1 (0x13217a5 側へ)、`0x1321a1b` で `[rbp+0x111c]`=0、rax=1 |
 | fill 0xff (`hs_disp_emu.py`) | `HS_DISP_STACK_FILL=0xff hs_disp_emu.py 0x01 0x41` | rax は同じ (0・1)、path 長 879・912 も同じ。ただし `0x1318730` の `[rbp+0x1880]` は fill 0xff でも 0 (下の計測)。原因は `hs_disp_emu.py:145` (§7) |
@@ -188,8 +188,8 @@ flags=1 の 12 行で予測との mismatch = 0。al=1 になるのは (a78,a18)=
 
 - 検証範囲: block00031 の機械語と unicorn 単独実行 (callee は stub)。範囲外: 実行時の HostTag・Index・第 5 引数・object・callee の実値、callee の実行 (0xe34190 ほか)。範囲外の主張は本付録では行わない。
 - 到達表 (0x1318e3e・0x1321a1b など) は zero-page の HostTag (= TAG)、第 5 引数の既定値、stub の戻り値 0 の上で得た結果。経路 B の値は測っていない。
-- main 取り込み後の再測定 (`461cfe434`): 上表の全項目 (`disp` 256 ID・`sweep11ffde0` 19 行・`verify` 36 行 + 集計行・`word41`・`hs_disp_emu.py 0x01 0x13 0x26 0x41 0x46`・fill 0xff の `disp 0x01 0x41` と `hs_disp_emu.py` の fill 0xff 0x01 0x41) を再実行し、到達 ID・rax・mismatch 0 が取り込み前と一致した。repo 外の一回限りのスクリプト (表の「`hs_disp_emu.py` の slot 読出し」行) は再実行していない。
-  `git diff 461cfe434 HEAD -- tools/plugins/framework/hostshim ':!*.md'` の出力は空。
+- main 取り込み後の再測定 (`2b3a92d43`、2 回目の取り込み): 上表の全項目 (`disp` 256 ID・`sweep11ffde0` 19 行・`verify` 36 行 + 集計行・`word41`・`hs_disp_emu.py 0x01 0x13 0x26 0x41 0x46`・fill 0xff の `disp 0x01 0x41` と `hs_disp_emu.py` の fill 0xff 0x01 0x41) を再実行し、到達 ID・rax・path 長・mismatch 0 が取り込み前 (`461cfe434`) と一致した。repo 外の一回限りのスクリプト (表の「`hs_disp_emu.py` の slot 読出し」行) は再実行していない。
+  `git diff 2b3a92d43 HEAD -- tools/plugins/framework/hostshim ':!*.md'` の出力は空。
 - 検収向けの別算法: 経路の逆追跡 (`path_dump`)・機械語の直読 (`hs_callee_disasm.py`) と、単独実行 (`fn`/`verify`/`word41`) の結果が一致することを確認した (§2.2 の arm と sweep の一致、§4.1 の式と verify の一致)。
 
 ## 7. 未解決 (起票先)
