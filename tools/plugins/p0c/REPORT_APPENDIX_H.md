@@ -191,7 +191,7 @@
 ### 20.2 測定
 
 - 分類の測定 commit: `907c0c66e` (`k80_unmeasured.py` の追加。パイプラインのコードは無変更)。
-- 前段 (`e59ca23b9` = origin/main 起点・同じコード): `p0c_e2e.sh` rc 0・7 分 36 秒 (開始 load 0.40)、`p0c4_abi_e2e.py 2000` rc 0・35 秒 (`run=67 ok=67 sig11=0`)。素材は `fl-win64` のみ (`FL_WIN64_DIR`)、`/opt/retdec` は既存。
+- 前段 (`e59ca23b9` = origin/main 起点・同じコード): `p0c_e2e.sh` rc 0・7 分 36 秒 (開始 load 0.40)、`p0c4_abi_e2e.py 2000` rc 0・35 秒 (`run=67 ok=67 sig11=0`)。素材は `fl-win64` のみ (`FL_WIN64_DIR`)、`[RETDEC]` (`docs/REFERENCES.md` §4) は既存。
 - 分類 (`python3 tools/plugins/p0c/k80_unmeasured.py`、入力は差分試験 IR `work/diff3/k80.hb.ll`): **`total 80 / ok 67 / groupb 12 / abi-mismatch 1 / no-ir 0`**。`ok` 67 は census の CSV 67 件と一致する。
 - `907c0c66e` から HEAD までのコード差分: 本節を含む commit は REPORT のみを変える。`git diff --stat 907c0c66e HEAD -- tools/plugins/p0c ':!*REPORT*'` の出力は空。
 
