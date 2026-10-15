@@ -50,7 +50,7 @@ fn	site	source	verdict	status	oracle	text
 775340	77593b	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x70], rax
 815050	815220	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x128], rax
 8261a0	8265a2	manual	OK_LOAD	確定	-	mov qword ptr [rbp + 0xa8], rax
-c343f0	c3460e	cand	UNDETERMINED	判定不能	CELL_COLLAPSED	mov dword ptr [rbp + 0xa4], eax
+c343f0	c3460e	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0xa4], eax
 c57a00	c57e24	cand	OK_LOAD	確定	-	mov dword ptr [rbp + 0x5c], ecx
 c589b0	c592c2	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x510], rax
 c589b0	c5a6b4	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x470], rax
@@ -90,7 +90,7 @@ cf3790	cf3f47	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xa8], rax
 cf3790	cf3f55	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xa0], rax
 cf3790	cf3fd3	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x98], rax
 cf3790	cf3fe1	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x90], rax
-dcdde0	dcdeee	cand	UNDETERMINED	判定不能	CELL_COLLAPSED	mov dword ptr [rbp + 0x58], eax
+dcdde0	dcdeee	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x58], eax
 ddf630	ddf6b5	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
 ddf630	ddf6c6	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xb8], rax
 ddf630	ddff5a	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xa0], rax
@@ -154,8 +154,8 @@ ff8b60	ff8c63	manual	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x30],
 128c320	128ca3f	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x4c], eax
 128c320	128cad6	cand	UNDETERMINED	判定不能	CELL_COLLAPSED	mov dword ptr [rsp + 0x20], eax
 128c320	128d007	cand	UNDETERMINED	判定不能	CELL_COLLAPSED	mov dword ptr [rsp + 0x20], eax
-128c320	128d495	cand	UNDETERMINED	判定不能	CELL_COLLAPSED	mov dword ptr [rbp + 0x5c], eax
-128f9e0	12900c4	cand	UNDETERMINED	判定不能	CELL_COLLAPSED	mov dword ptr [rbp + 0x59c], eax
+128c320	128d495	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x5c], eax
+128f9e0	12900c4	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x59c], eax
 128f9e0	12906d1	cand	UNDETERMINED	判定不能	CELL_DEEP	mov qword ptr [rbp + 0x530], rax
 128f9e0	1291ac3	cand	UNDETERMINED	判定不能	CELL_DEEP	mov qword ptr [rbp + 0x490], rax
 128f9e0	1291b14	cand	UNDETERMINED	判定不能	CELL_DEEP	mov qword ptr [rbp + 0x488], rax
