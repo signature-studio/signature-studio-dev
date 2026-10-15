@@ -187,6 +187,9 @@ class Session:
         if not sig or not sig['defined']:
             rec['verdict'] = 'unexec'; rec['reason'] = 'no_wasm_definition'
             return rec
+        msig = cases.machine_sig(va, sig)
+        sigs = self.sigs if msig is sig else dict(self.sigs, **{name: msig})
+        sig = msig
         if not cases.supported_sig(sig):
             rec['verdict'] = 'unexec'; rec['reason'] = 'unsupported_sig'
             return rec
@@ -205,7 +208,7 @@ class Session:
         rec['cases'] = []
         for p, n, w in zip(patterns, rn, rw):
             try:
-                c = compare.compare_case(n, w, self.ctx, self.sigs, self.stub_info, self.thunks())
+                c = compare.compare_case(n, w, self.ctx, sigs, self.stub_info, self.thunks())
             except Exception as e:  # 壊れた応答 (パイプ切断等) は比較不能として記録
                 c = {'outcome': 'hang', 'native': n.get('status'), 'wasm': w.get('status'), 'compare_error': repr(e)[:120]}
             c['pattern'] = p
@@ -215,7 +218,7 @@ class Session:
             self._mark_timing(c, n, w)
             rec['cases'].append(c)
         if not any(c['outcome'] in ('equal', 'diff', 'wasm_trap') for c in rec['cases']):
-            rec['cases'] += self._fvm_cases(nat, was, va, sig, rec['cases'])
+            rec['cases'] += self._fvm_cases(nat, was, va, sig, rec['cases'], sigs)
         if with_refine:
             refined = False
             for c in rec['cases']:
@@ -240,7 +243,7 @@ class Session:
                         c['refine_timing'] = rt
         return rec
 
-    def _fvm_cases(self, nat, was, va, sig, cases_done):
+    def _fvm_cases(self, nat, was, va, sig, cases_done, sigs):
         """LD-23 (#975): 全 pattern が未実行 (equal/diff/wasm_trap 無し) の関数で、's' の native fault addr から
         this 候補の引数を推定し、その引数だけ VMT 付き疑似オブジェクトにした case を実行する。戻りは追加 case 列。"""
         fault = None
@@ -262,7 +265,7 @@ class Session:
         out = []
         for arg, n, w in zip(cand, rn, rw):
             try:
-                c = compare.compare_case(n, w, self.ctx, self.sigs, self.stub_info, self.thunks())
+                c = compare.compare_case(n, w, self.ctx, sigs, self.stub_info, self.thunks())
             except Exception as e:
                 c = {'outcome': 'hang', 'native': n.get('status'), 'wasm': w.get('status'), 'compare_error': repr(e)[:120]}
             c['pattern'] = 'fvm'

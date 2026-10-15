@@ -176,6 +176,8 @@ def main():
         {a: (v["direct"], v["via_reg"]) for a, v in rax["indirect_dispatch"].items()}))
     print("control", control)
     print("wrote", out)
+    if rax["indirect_dispatch"]:
+        sys.exit("--cfg-rax の閉包 %d に rax-in 化されていない CFG 形が残る: %s" % (DEPTHS[-1], sorted(rax["indirect_dispatch"])))
 
 
 if __name__ == "__main__":
