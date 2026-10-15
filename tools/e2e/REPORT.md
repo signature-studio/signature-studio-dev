@@ -214,6 +214,18 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 
 **未実施 (子 issue)**: オラクル画素の完全一致とネガコン (a)(b)(c)・`text_wasm_e2e.sh` 回帰 → #3495 (WIN-27)。GUI-REACH trace → #3496 (WIN-28)。`fl-boot` のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
 
+## gui=wasm: GUI-REACH trace の機械検査 (WIN-28 #3496)
+`gui-guest-boot` のゲストを reach 変種 (`gui_wasm.sh … reach`) で作り、ゲストが初回 WM_PAINT の後に `gui_reach_dump()` を呼ぶ。host の `GuiHost.logs` から `GUI-REACH` / `GUI-MSG` 行を回収し、`CreateWindowExA`・`BeginPaint`・`BitBlt` の件数と、初回の順序 `RegisterClassA < CreateWindowExA < WM_PAINT < BeginPaint < BitBlt` を検査する。生ログは `tools/e2e/work/logs/gui-guest-reach.log`。
+
+- 件数 (HEAD): 到達行 25 (GUI-REACH 23 + GUI-MSG 1 + SUMMARY 1)、`CreateWindowExA`=1・`BeginPaint`=1・`BitBlt`=1・`WM_PAINT`=1。
+- 初回の順序 (生ログ): `RegisterClassA`@1 → `CreateWindowExA`@2 → `DispatchMessageA`@9 → `WM_PAINT`@(GUI-MSG 行) → `BeginPaint`@10 → `BitBlt`@20 → `EndPaint`@21。
+- 測定 commit: `b3a252976` (`feat(gui): gui=wasm reach trace (GUI-REACH) in product-page e2e`)。
+- 実行: `EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/e2e/run.sh --targets preview,edge-sim --driver agent-browser` (開始 08:02 UTC、load average 0.21 / 1 分)。wall 13.5 s (vite build・ゲストの emcc build を含む)、rc 0。**SUMMARY: PASS=23 FAIL=0 SKIP=3**。
+- `gui-guest-boot`: preview 324 ms・edge-sim 430 ms で PASS (`state==='running'`, `frames=1`, `guest='test'`, lit 38400 px, 色 ≥7)。
+- 実行環境: emsdk は素材 `toolchain-emsdk` (`/opt/emsdk`)。mingw-w64 は `build_guest.sh` が apt で導入。
+
+- **未実施**: 順序検査のネガコン (WM_PAINT 行を消した変種で FAIL することの確認) は本 PR では未実施。`tools/gui/test/reach_order_check.py` の selftest は既存。`text_wasm_e2e.sh` の回帰は未実施 (FreeType wasm32 ビルドが要る)。
+
 ## ユーザ依頼事項
 1. **公開ホスト名** (例: `studio.<既存ゾーン>`)。案 S の既定は workers.dev (`deploy/README.md` §移行で自前ドメインへ)。
 2. **Access 許可メール** (`ACCESS_ALLOW_EMAILS`) または許可ドメイン。service token (E2E/CI 用) の新規作成可否。
