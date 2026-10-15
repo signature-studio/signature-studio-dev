@@ -3,7 +3,7 @@
 #3096 (KH-44) の付録 `REPORT_APPENDIX_3096.md` §10-7t の続き。前節の正本は同 §10-7t ②の census。
 
 #### 10-7u. #3802 (KH-66) run: 未定義 identifier 15・未関数化 callee 5・衝突 2 を解消 (部分・emcc 556 → 534 件)
-- 結論: Delay の emcc 残件 556 → **534** 件。下の 3 種を解消した: 未定義 identifier のうち `DAT_`・`uRam` の 15 件 (規則は下の EXT_CTYPE)、未関数化 callee 5 件 (fail-fast stub)、`FUN_18004cf20` の conflicting types 2 件 (本体がある VA の stub を出さない)。Gain/Haas/Gate の生成 C は origin/main と byte 一致、wasm の sha256 も一致、1000/1000 bit-exact。
+- 結論: Delay の emcc 残件 556 → **534** 件 (測定 commit `6323671e7` の値。main 取り込み後 (⑧) の HEAD の件数は未測定)。下の 3 種を解消した: 未定義 identifier のうち `DAT_`・`uRam` の 15 行 (規則は下の EXT_CTYPE)、未関数化 callee 5 件 (fail-fast stub)、`FUN_18004cf20` の conflicting types 2 件 (本体がある VA の stub を出さない)。Gain/Haas/Gate の生成 C は origin/main と byte 一致、wasm の sha256 も一致、1000/1000 bit-exact (いずれも測定 commit `6323671e7` の値。HEAD は未測定・⑥)。
 - 残件 (子 issue): `LAB_180fd2aab`・`PTR__guard_dispatch_icall_1813a1d38` の 2 件 → #3835 [KH-70]。double のビット再解釈 `(ulonglong)dVarN` 98 行 (silent miscompile の疑い) → #3836 [KH-71]。
 - 測定 commit (e2e を実測した converter): `6323671e7` (`tools/targets/kilohearts/ghidra_route/ghidra_to_c.py`)。比較元は origin/main `40d3a788d`。
   - その後のコード変更は 1 commit (レビュー差し戻しの対応: THUNK 表の見出し分割・同一 VA の `gd_` 重複定義の防止)。`git diff 6323671e7 HEAD -- tools/targets/kilohearts/ghidra_route` の出力は ⑥b。e2e は HEAD で再測定していない (⑥b・⑦)。
@@ -33,6 +33,7 @@
 **③ 規則 1: 下線なしの名前 (`DAT_<va>`・`uRam<16 桁>`) (`EXT_CTYPE`)**
 - 規則: 同じ PE 実データを `gd_<va>[16]` (static 配列) で持ち、`#define <名前> (*(<型>*)gd_<va>)` で定義する。`_DAT_` (下線付き) の既存規則と同じ。
 - Ghidra は型を出さないため、型は使用箇所から 1 件ずつ決めて `EXT_CTYPE` に根拠付きで書いた。表に無い名前が出たら停止する (推定の既定値は使わない)。
+- 行数と名数の対応: census の「未定義 identifier 17」は error 行の数 (`emcc_census.py` は行を数える)。`LAB_`・`PTR__` の 2 行を除く DAT_ 10 行・uRam 5 行 (計 15 行) が、下の表の 11 名 (DAT_ 7 名・uRam 4 名) に当たる。1 名が複数行に出るので行数 > 名数。名前別の行数は emcc ログが repo 外 (`_temp`) にあり保存していないため未確認。
 
 | 名前 | 型 | 根拠 (delay.c の使用) |
 |---|---|---|
@@ -62,6 +63,7 @@
 - wasm: sha256 先頭 16 桁 Gain `57d8b9a34c5bcc28`・Haas `af100316c19d5b34`・Gate `95bcc2bd7d1b802f` (origin/main と同一)。サイズ 15,161 B・16,878 B・17,367 B。
 - 突合 (`native_ref` 1000 trial・seed 7・`compare.mjs`): Gain **1000/1000** (calls 4999/4999)・Haas **1000/1000** (calls 5500/5500)・Gate **1000/1000** (calls 4999/4999)。
 - 未実施: Delay の突合・1000 trial (emcc が通らないため。#3073 [KH-41])。
+- HEAD での再測定は未実施 (素材 `plugins-kilohearts`・`toolchain-emsdk` が本 run に無いため)。この節の件数・cmp・sha256・1000 trial は測定 commit `6323671e7` の値で、HEAD の値ではない。受入からは範囲縮小で外した (⑦)。
 
 **⑥b 最後のコード変更 (commit `9588011ed`) の確認**
 - `git diff 6323671e7 HEAD -- tools/targets/kilohearts/ghidra_route` の出力 (33 行・`ghidra_to_c.py` のみ):
@@ -113,8 +115,9 @@ index f6d277c82..a173889f6 100644
 | `LAB_180fd2aab` (コード番地を値に書く継続点) | Delay の emcc が通らない | #3835 [KH-70] |
 | `PTR__guard_dispatch_icall_1813a1d38` (CFG 間接呼出しの呼出先) | 同上 | #3835 [KH-70] |
 | `(ulonglong)dVarN` の double ビット再解釈 98 行 | emcc は通るが、数値変換として誤る可能性 (Delay が通った後に効く) | #3836 [KH-71] |
-| Stereo・Resonator の生成 C (STUB・THUNK・EXT_CTYPE の影響は未確認) | 名前が出る C の emcc 結果が変わるか未確認 | Stereo #3108 [KH-45]・Resonator #3764 [KH-63] (既存) |
-| `9588011ed` での Delay・Gain/Haas/Gate の e2e 再測定 | 出力不変は合成入力で確認 (⑥b)。実データの再測定は未実施 | レビュー判断 (子 issue は作らない。素材 `plugins-kilohearts`・`toolchain-emsdk` を付けた再実行) |
+| Stereo・Resonator の生成 C (STUB・THUNK・EXT_CTYPE の影響は未確認) | 名前が出る C の emcc 結果が変わるか未確認 | Stereo #3109 [KH-46] (open。#3108 は closed)・Resonator #3764 [KH-63] (既存) |
+| HEAD の e2e 再測定 (Delay の emcc 件数・Gain/Haas/Gate の生成 C の cmp・wasm sha256・1000 trial) | HEAD 未測定・測定 commit `6323671e7`。出力不変は合成入力のみ (⑥b) | PM 判断 (素材 `plugins-kilohearts`・`toolchain-emsdk` を付けた再実行。再測定だけの子 issue は規範 11 により起票しない) |
+| 既存 shim (`dint`・`fint`) を使うか | Delay では現状の stub (abort・fail-fast。安全側) | PM agent の判断待ち: 既存 shim (dint・fint) を使うか・既定案: 現状の stub (abort) |
 
 **⑧ main 取り込み後 (merge `0524501f7`・競合 2 件の解消)**
 - origin/main (`396f9f8b6`) を取り込んだ。main 側の変更は `ghidra_to_c.py` (Stereo の `cfg['stubs']`・`stubs` への統合・V128OPS の件数 assert)、`patches.py` (Delay の ABI 規則・#3800)、`ghidra_shim.h`。
