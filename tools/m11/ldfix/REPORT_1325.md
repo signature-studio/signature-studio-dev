@@ -101,9 +101,10 @@
   - `ldfix_509_e2e.sh` の rc は **1**。失敗は step 5/7 の NC 期待値のみ: `nc_prev` (旧版 56bfc979) で store 形 806740 を検出できず (`SUSPECT_VAS` 空)、旧版 `use 形 23 関数` と食い違う。この食い違いは本節の上の §5 (#4041) で既に未確定とされていたもので、今回の変更の影響ではない (旧版の出力は変更前後で同一)。
   - 残件: 修復対象 11 関数のうち 47ad70 以外 10 関数の動的確認 (#3194)。
 - **#5273 (806740 の直接呼び出し)**: 機械語を読んで期待値を決めた (`dyn_509.mjs` の 806740 case)。書込み経路 `806784` で `call 806820` が `this+0x6ac..0x6bc` に arg2 の 16B をコピーし、`80678f` の `mov rax,[rdi]` (rdi = arg3) を `[this+0x6bc]` へ書く。期待値は `*arg3`。呼出先 `8067c0` の `8087c0`・`8085d0`・`808610`・`808930` は `this+0x6bc` を書かない (静的読み)。判定の `420530`・`4203d0` は読み取りのみ。
-  - 測定 commit は本 PR の commit (REPORT の直前)。e2e 全体は rc 1 (NC 期待値の既知の食い違い・後述)。7/7 相当は `dyn_509.mjs` を修復前 wasm (`basewasm`) と修復後 wasm に直接当てて実行: 9 case 中、806740 は before `TRAP remainder by zero` (FAIL) → after `0x1122334455667788` (PASS)。`DYN_SUMMARY after_fail=0/9 known=0`。TRAP の原因は未確認。
+  - 測定 commit `6d5f74af1` (コード変更の最後の commit)。e2e (`ldfix_509_e2e.sh`、foreground 1 回・real 5 分 36 秒・load 開始 0.72 / 終了 1.13) は rc 1 (step 5 NC の既知の食い違い・後述)。step 7 は NC 失敗で走らないため、7/7 相当は `dyn_509.mjs` を修復前 wasm (`basewasm`) と修復後 wasm に直接当てて実行: 9 case 中、806740 は before `TRAP remainder by zero` (FAIL) → after `0x1122334455667788` (PASS)。`DYN_SUMMARY after_fail=0/9 known=0`。TRAP の原因は未確認。
+  - survey (同じ e2e の step 6): ok 870 → 873、**ok 退行 unit 0**。kind 以外も含む記録差 16 unit。
   - e2e の rc 1 は 2 件。(a) step 5 NC の期待値 (既知・§5 の #4041 と同じ未確定の食い違い)。(b) step 6 の修復後 wasm の build が `450560=applied` の記録無しで拒否された。`fix_450560` (#2556) を step 6 の IR 生成に足した (`ldfix_509_e2e.sh`)。これで修復後 build は通った。step 7 は NC 失敗で実行されないため、dyn は直接実行した。
-  - 修復前後の survey 記録差は 16 unit (`[17, 114, 144, 158, 280, 291, 296, 302, 304, 314, 492, 493, 659, 880, 888, 895]`)。従来の 14 unit に 17・492 が増えた。`fix_450560` を step 6 に足したことによる差と推定 (未確認)。ok 退行は確認していない。
+  - 修復前後の survey 記録差は 16 unit (`[17, 114, 144, 158, 280, 291, 296, 302, 304, 314, 492, 493, 659, 880, 888, 895]`)。従来の 14 unit に 17・492 が増えた。`fix_450560` を step 6 に足したことによる差と推定 (未確認)。
 
 | 直した不具合 (issue #4041) | 状況 |
 |---|---|
