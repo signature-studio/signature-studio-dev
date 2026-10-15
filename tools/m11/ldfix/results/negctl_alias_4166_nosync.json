@@ -1,66 +1,66 @@
 {
  "functions": 48,
  "by_verdict": {
-  "UNDETERMINED": 17,
-  "LIVE-IN": 28,
-  "DROP": 3
+  "UNDETERMINED": 44,
+  "DROP": 3,
+  "LIVE-IN": 1
  },
  "site_by_verdict": {
-  "UNDETERMINED": 18,
-  "LIVE-IN": 29,
+  "UNDETERMINED": 46,
   "DROP": 3,
+  "LIVE-IN": 1,
   "PTR_READ": 1
  },
  "negctl_glk": false,
  "verdict": {
   "1006ec0": "UNDETERMINED",
-  "103aa50": "LIVE-IN",
+  "103aa50": "UNDETERMINED",
   "10628a0": "DROP",
-  "11e6e20": "LIVE-IN",
+  "11e6e20": "UNDETERMINED",
   "129df10": "UNDETERMINED",
-  "12cb2e0": "LIVE-IN",
+  "12cb2e0": "UNDETERMINED",
   "13105d0": "DROP",
   "1354630": "UNDETERMINED",
-  "4078c0": "LIVE-IN",
+  "4078c0": "UNDETERMINED",
   "412160": "LIVE-IN",
-  "418b40": "LIVE-IN",
+  "418b40": "UNDETERMINED",
   "441730": "UNDETERMINED",
   "4488f0": "UNDETERMINED",
   "454090": "UNDETERMINED",
   "45c170": "UNDETERMINED",
   "45cda0": "UNDETERMINED",
-  "45d8b0": "LIVE-IN",
+  "45d8b0": "UNDETERMINED",
   "45db40": "UNDETERMINED",
-  "45dc20": "LIVE-IN",
+  "45dc20": "UNDETERMINED",
   "5c4dc0": "UNDETERMINED",
   "5cb210": "UNDETERMINED",
-  "639c70": "LIVE-IN",
+  "639c70": "UNDETERMINED",
   "694c80": "UNDETERMINED",
-  "695640": "LIVE-IN",
+  "695640": "UNDETERMINED",
   "6c01a0": "UNDETERMINED",
-  "6c7610": "LIVE-IN",
-  "6c7ca0": "LIVE-IN",
-  "6ca580": "LIVE-IN",
-  "6ca6c0": "LIVE-IN",
-  "6ced00": "LIVE-IN",
+  "6c7610": "UNDETERMINED",
+  "6c7ca0": "UNDETERMINED",
+  "6ca580": "UNDETERMINED",
+  "6ca6c0": "UNDETERMINED",
+  "6ced00": "UNDETERMINED",
   "7e45e0": "UNDETERMINED",
-  "808930": "LIVE-IN",
-  "808c80": "LIVE-IN",
+  "808930": "UNDETERMINED",
+  "808c80": "UNDETERMINED",
   "81bfd0": "UNDETERMINED",
-  "81c0d0": "LIVE-IN",
-  "820d60": "LIVE-IN",
-  "824020": "LIVE-IN",
-  "864f80": "LIVE-IN",
+  "81c0d0": "UNDETERMINED",
+  "820d60": "UNDETERMINED",
+  "824020": "UNDETERMINED",
+  "864f80": "UNDETERMINED",
   "867220": "UNDETERMINED",
-  "92ea90": "LIVE-IN",
-  "bf8b40": "LIVE-IN",
+  "92ea90": "UNDETERMINED",
+  "bf8b40": "UNDETERMINED",
   "c38bd0": "DROP",
   "c3b340": "UNDETERMINED",
-  "c9cf70": "LIVE-IN",
-  "da5400": "LIVE-IN",
-  "da5510": "LIVE-IN",
-  "e8fba0": "LIVE-IN",
-  "f61710": "LIVE-IN"
+  "c9cf70": "UNDETERMINED",
+  "da5400": "UNDETERMINED",
+  "da5510": "UNDETERMINED",
+  "e8fba0": "UNDETERMINED",
+  "f61710": "UNDETERMINED"
  },
  "fn_info": {
   "1006ec0": {
@@ -69,8 +69,19 @@
    "n_ins": 96,
    "glk": true,
    "leak": "1006ec8 mov qword ptr [rbp + 0x40], rcx [STORE_PTR]",
+   "leaks": [
+    "1006ec8 mov qword ptr [rbp + 0x40], rcx [STORE_PTR]",
+    "1006ecc mov qword ptr [rbp + 0x48], rdx [STORE_PTR]",
+    "1006ef2 call 0x1006cb0 [CALL_ARG]",
+    "1006f1b call qword ptr [rax + 0x38] [CALL_ARG]",
+    "1006f21 call 0x1006ce0 [CALL_ARG]",
+    "1006f67 call qword ptr [rax + 0x38] [CALL_ARG]",
+    "1006f83 call qword ptr [rax + 0x38] [CALL_ARG]",
+    "1006f8f call 0x1006c50 [CALL_ARG]"
+   ],
    "derived": [
-    "rcx"
+    "rcx",
+    "rdx"
    ],
    "sync": null,
    "nonframe_stores": [
@@ -83,9 +94,21 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 227,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "103aa91 call 0x40c660 [CALL_ARG]",
+   "leaks": [
+    "103aa91 call 0x40c660 [CALL_ARG]",
+    "103aab8 call 0x40c660 [CALL_ARG]",
+    "103aaf6 call 0x10463c0 [CALL_ARG]",
+    "103ab4d call 0x6cec50 [CALL_ARG]",
+    "103ab89 call 0x40c660 [CALL_ARG]",
+    "103abee call 0xdc29e0 [CALL_ARG]",
+    "103ac6b call 0x11f23b0 [CALL_ARG]",
+    "103acbd call 0x40c660 [CALL_ARG]"
+   ],
+   "derived": [
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -93,9 +116,18 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 13,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "10628b2 call 0x1062930 [CALL_ARG]",
+   "leaks": [
+    "10628b2 call 0x1062930 [CALL_ARG]",
+    "10628bc mov word ptr [rbp + 0x4e], ax [STORE_PTR]",
+    "10628ca ret  [RET_PTR]"
+   ],
+   "derived": [
+    "r8",
+    "rax",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -103,9 +135,26 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 144,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "11e6eb3 mov qword ptr [rbp + 0x40], rax [STORE_PTR]",
+   "leaks": [
+    "11e6eb3 mov qword ptr [rbp + 0x40], rax [STORE_PTR]",
+    "11e6ec3 mov qword ptr [rbp + 0x38], rax [STORE_PTR]",
+    "11e6ed9 mov qword ptr [rcx], rdx [STORE_PTR]",
+    "11e6ee0 mov qword ptr [rcx], rax [STORE_PTR]",
+    "11e6f54 call 0xfe8bb0 [CALL_ARG]",
+    "11e6f6a call 0xba1620 [CALL_ARG]",
+    "11e6f89 call 0x1064980 [CALL_ARG]",
+    "11e6fd8 call qword ptr [rdi + 0x38] [CALL_ARG]"
+   ],
+   "derived": [
+    "r10",
+    "r13",
+    "r8",
+    "rax",
+    "rdx",
+    "rsi"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -113,9 +162,31 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 435,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "129df20 mov qword ptr [rbp + 0x30], rcx [STORE_PTR]",
+   "leaks": [
+    "129df20 mov qword ptr [rbp + 0x30], rcx [STORE_PTR]",
+    "129df73 call 0x40c660 [CALL_ARG]",
+    "129dfa5 call 0x40c660 [CALL_ARG]",
+    "129dfbc call 0x40c660 [CALL_ARG]",
+    "129dfda call 0x40c660 [CALL_ARG]",
+    "129dfe7 mov dword ptr [rbp + 0x44], eax [STORE_PTR]",
+    "129e004 call 0x40c660 [CALL_ARG]",
+    "129e036 call 0x40c660 [CALL_ARG]"
+   ],
+   "derived": [
+    "r10",
+    "r8",
+    "r9",
+    "rax",
+    "rbx",
+    "rcx",
+    "rdi",
+    "rdx",
+    "rsi",
+    "xmm0",
+    "xmm1"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -123,9 +194,21 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 95,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "12cb316 call 0x12ddaa0 [CALL_ARG]",
+   "leaks": [
+    "12cb316 call 0x12ddaa0 [CALL_ARG]",
+    "12cb33e call qword ptr [rsi + 0x228] [CALL_ARG]",
+    "12cb352 call 0xe50b50 [CALL_ARG]",
+    "12cb364 call 0xe5afb0 [CALL_ARG]",
+    "12cb392 call 0xe92e30 [CALL_ARG]",
+    "12cb3ae call 0x11864c0 [CALL_ARG]",
+    "12cb3db call 0xe4ea50 [CALL_ARG]",
+    "12cb3fc call 0x1060d70 [CALL_ARG]"
+   ],
+   "derived": [
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -135,6 +218,16 @@
    "n_ins": 223,
    "glk": true,
    "leak": "13105de mov qword ptr [rbp + 0x80], rcx [STORE_PTR]",
+   "leaks": [
+    "13105de mov qword ptr [rbp + 0x80], rcx [STORE_PTR]",
+    "13105ec call 0x820b00 [CALL_ARG]",
+    "131064c call qword ptr [rbx + 0x2c0] [CALL_ARG]",
+    "131066c call 0x40c660 [CALL_ARG]",
+    "1310685 call 0x1310300 [CALL_ARG]",
+    "13106db movsd qword ptr [rcx + 0x7f4], xmm0 [STORE_PTR]",
+    "13106f2 call 0x40c660 [CALL_ARG]",
+    "1310700 call 0x13079a0 [CALL_ARG]"
+   ],
    "derived": [
     "rbx",
     "rcx",
@@ -153,7 +246,22 @@
    "n_ins": 320,
    "glk": true,
    "leak": "13546f9 mov qword ptr [rbp + 0x188], rbp [STORE_PTR]",
-   "derived": [],
+   "leaks": [
+    "13546f9 mov qword ptr [rbp + 0x188], rbp [STORE_PTR]",
+    "1354700 mov qword ptr [rbp + 0x220], rcx [STORE_PTR]",
+    "135471f call 0x414890 [CALL_ARG]",
+    "1354745 mov qword ptr [rsp + 0x20], rax [STORE_PTR]",
+    "135474a call 0x414da0 [CALL_ARG]",
+    "135477f call 0x12b0020 [CALL_ARG]",
+    "135479c call 0x8da350 [CALL_ARG]",
+    "13547b1 call 0x8da350 [CALL_ARG]"
+   ],
+   "derived": [
+    "r8",
+    "rax",
+    "rcx",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -161,11 +269,36 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 113,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "407919 call 0x407260 [CALL_ARG]",
+   "leaks": [
+    "407919 call 0x407260 [CALL_ARG]",
+    "407973 call 0x4073c0 [CALL_ARG]",
+    "40798f call 0x4073c0 [CALL_ARG]",
+    "40799c mov qword ptr [rax - 0x10], rsi [STORE_PTR]",
+    "4079ac mov qword ptr [rax - 8], rcx [STORE_PTR]",
+    "4079bb call 0x407a50 [CALL_ARG]",
+    "4079d1 mov qword ptr [rdi - 0x10], rsi [STORE_PTR]",
+    "4079e2 call 0x409c80 [CALL_ARG]"
+   ],
+   "derived": [
+    "r13",
+    "r14",
+    "r8",
+    "rax",
+    "rbx",
+    "rcx",
+    "rdi",
+    "rdx",
+    "rsi"
+   ],
    "sync": null,
-   "nonframe_stores": []
+   "nonframe_stores": [
+    "40799c",
+    "4079ac",
+    "4079fd",
+    "407a1f"
+   ]
   },
   "412160": {
    "escaped": true,
@@ -173,7 +306,11 @@
    "n_ins": 79,
    "glk": false,
    "leak": null,
-   "derived": [],
+   "leaks": [],
+   "derived": [
+    "rdi",
+    "rsi"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -181,9 +318,14 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 14,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "418b52 call 0x407260 [CALL_ARG]",
+   "leaks": [
+    "418b52 call 0x407260 [CALL_ARG]"
+   ],
+   "derived": [
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -193,8 +335,19 @@
    "n_ins": 105,
    "glk": true,
    "leak": "441738 mov qword ptr [rbp + 0x28], rbp [STORE_PTR]",
+   "leaks": [
+    "441738 mov qword ptr [rbp + 0x28], rbp [STORE_PTR]",
+    "44173c mov qword ptr [rbp + 0x80], rcx [STORE_PTR]",
+    "441743 mov qword ptr [rbp + 0x88], rdx [STORE_PTR]",
+    "441758 call 0x441500 [CALL_ARG]",
+    "44175d call 0x40a3b0 [CALL_ARG]",
+    "441767 call 0x4413c0 [CALL_ARG]",
+    "441772 call 0x40a360 [CALL_ARG]",
+    "44177b call 0x441530 [CALL_ARG]"
+   ],
    "derived": [
-    "rcx"
+    "rcx",
+    "rdx"
    ],
    "sync": null,
    "nonframe_stores": [
@@ -207,8 +360,24 @@
    "n_ins": 105,
    "glk": true,
    "leak": "4488fe mov qword ptr [rbp + 0x38], rcx [STORE_PTR]",
+   "leaks": [
+    "4488fe mov qword ptr [rbp + 0x38], rcx [STORE_PTR]",
+    "448902 mov qword ptr [rbp + 0x48], rdx [STORE_PTR]",
+    "448906 mov qword ptr [rbp + 0x40], r8 [STORE_PTR]",
+    "44890a mov dword ptr [rbp + 0x50], r9d [STORE_PTR]",
+    "448928 call 0x423d20 [CALL_ARG]",
+    "44894d call 0x4235a0 [CALL_ARG]",
+    "44896a call 0x4235a0 [CALL_ARG]",
+    "448976 call 0x4488e0 [CALL_ARG]"
+   ],
    "derived": [
-    "rcx"
+    "r8",
+    "r9",
+    "rax",
+    "rbx",
+    "rcx",
+    "rdi",
+    "rdx"
    ],
    "sync": null,
    "nonframe_stores": []
@@ -219,8 +388,20 @@
    "n_ins": 380,
    "glk": true,
    "leak": "45409b mov qword ptr [rbp + 0x38], rbp [STORE_PTR]",
+   "leaks": [
+    "45409b mov qword ptr [rbp + 0x38], rbp [STORE_PTR]",
+    "4540bf call 0x40d210 [CALL_ARG]",
+    "4540cf call 0x423800 [CALL_ARG]",
+    "4540de mov dword ptr [rip + 0x11984a0], eax [STORE_PTR]",
+    "4540e7 mov dword ptr [rip + 0x119849b], eax [STORE_PTR]",
+    "4540f0 mov dword ptr [rip + 0x119848a], eax [STORE_PTR]",
+    "4540fd mov dword ptr [rip + 0x1198499], eax [STORE_PTR]",
+    "45410a mov dword ptr [rip + 0x1198490], eax [STORE_PTR]"
+   ],
    "derived": [
-    "rcx"
+    "rax",
+    "rcx",
+    "rdx"
    ],
    "sync": null,
    "nonframe_stores": []
@@ -229,9 +410,18 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 23,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "45c180 call 0x457270 [CALL_ARG]",
+   "leaks": [
+    "45c180 call 0x457270 [CALL_ARG]",
+    "45c1a3 call qword ptr [rax] [CALL_ARG]",
+    "45c1b0 call 0x45a640 [CALL_ARG]"
+   ],
+   "derived": [
+    "rbx",
+    "rcx",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -239,9 +429,21 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 45,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "45cdb0 call 0x457270 [CALL_ARG]",
+   "leaks": [
+    "45cdb0 call 0x457270 [CALL_ARG]",
+    "45cdd3 call qword ptr [rax] [CALL_ARG]",
+    "45cdfd call qword ptr [rax] [CALL_ARG]",
+    "45ce08 call 0x40c660 [CALL_ARG]",
+    "45ce19 call 0x45dc80 [CALL_ARG]",
+    "45ce2f call 0x45a640 [CALL_ARG]"
+   ],
+   "derived": [
+    "rbx",
+    "rcx",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -249,9 +451,23 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 141,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "45d8ba mov qword ptr [rbp + 0x20], rcx [STORE_PTR]",
+   "leaks": [
+    "45d8ba mov qword ptr [rbp + 0x20], rcx [STORE_PTR]",
+    "45d90d call 0x413fb0 [CALL_ARG]",
+    "45d92e call 0x413fb0 [CALL_ARG]",
+    "45d94c call 0x414320 [CALL_ARG]",
+    "45d955 call 0x414350 [CALL_ARG]",
+    "45d970 call qword ptr [rax] [CALL_ARG]",
+    "45d986 call 0x414e70 [CALL_ARG]",
+    "45d9a7 call 0x414e70 [CALL_ARG]"
+   ],
+   "derived": [
+    "r9",
+    "rcx",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -259,9 +475,18 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 24,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "45db50 call 0x457270 [CALL_ARG]",
+   "leaks": [
+    "45db50 call 0x457270 [CALL_ARG]",
+    "45db73 call qword ptr [rax] [CALL_ARG]",
+    "45db80 call 0x45a640 [CALL_ARG]"
+   ],
+   "derived": [
+    "rbx",
+    "rcx",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -269,11 +494,24 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 33,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "45dc39 call 0x467910 [CALL_ARG]",
+   "leaks": [
+    "45dc39 call 0x467910 [CALL_ARG]",
+    "45dc4a call 0x457270 [CALL_ARG]",
+    "45dc66 call qword ptr [rbx + 0x30] [CALL_ARG]"
+   ],
+   "derived": [
+    "r8",
+    "rbx",
+    "rcx",
+    "rdx",
+    "rsi"
+   ],
    "sync": null,
-   "nonframe_stores": []
+   "nonframe_stores": [
+    "45dc71"
+   ]
   },
   "5c4dc0": {
    "escaped": true,
@@ -281,7 +519,21 @@
    "n_ins": 69,
    "glk": true,
    "leak": "5c4dcb mov qword ptr [rbp + 0x28], rbp [STORE_PTR]",
-   "derived": [],
+   "leaks": [
+    "5c4dcb mov qword ptr [rbp + 0x28], rbp [STORE_PTR]",
+    "5c4dcf mov qword ptr [rbp + 0x460], rcx [STORE_PTR]",
+    "5c4df3 call 0x409c80 [CALL_ARG]",
+    "5c4dfa call 0x424c50 [CALL_ARG]",
+    "5c4e13 call 0x424220 [CALL_ARG]",
+    "5c4e3e call 0x424300 [CALL_ARG]",
+    "5c4e66 call 0x424300 [CALL_ARG]",
+    "5c4e90 call 0x424300 [CALL_ARG]"
+   ],
+   "derived": [
+    "r9",
+    "rcx",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -291,7 +543,25 @@
    "n_ins": 463,
    "glk": true,
    "leak": "5cb21e mov qword ptr [rbp + 0x68], rbp [STORE_PTR]",
-   "derived": [],
+   "leaks": [
+    "5cb21e mov qword ptr [rbp + 0x68], rbp [STORE_PTR]",
+    "5cb222 mov qword ptr [rbp + 0x180], rcx [STORE_PTR]",
+    "5cb229 mov qword ptr [rbp + 0x188], rdx [STORE_PTR]",
+    "5cb230 mov qword ptr [rbp + 0x190], r8 [STORE_PTR]",
+    "5cb237 mov qword ptr [rbp + 0x198], r9 [STORE_PTR]",
+    "5cb245 mov qword ptr [rbp + 0x1a0], rax [STORE_PTR]",
+    "5cb2bc call 0x5cab10 [CALL_ARG]",
+    "5cb2e8 call 0x424280 [CALL_ARG]"
+   ],
+   "derived": [
+    "r8",
+    "r9",
+    "rax",
+    "rbx",
+    "rcx",
+    "rdx",
+    "rsi"
+   ],
    "sync": null,
    "nonframe_stores": [
     "5cb3e7",
@@ -306,9 +576,14 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 22,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "639c7e call 0x639900 [CALL_ARG]",
+   "leaks": [
+    "639c7e call 0x639900 [CALL_ARG]"
+   ],
+   "derived": [
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -318,7 +593,22 @@
    "n_ins": 261,
    "glk": true,
    "leak": "694c94 mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
-   "derived": [],
+   "leaks": [
+    "694c94 mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
+    "694c98 mov qword ptr [rbp + 0xe0], rcx [STORE_PTR]",
+    "694ca7 mov byte ptr [rbp + 0xf0], r8b [STORE_PTR]",
+    "694cec call 0x67d120 [CALL_ARG]",
+    "694d06 mov qword ptr [rax + 0xb8], rcx [STORE_PTR]",
+    "694d30 call 0x41d110 [CALL_ARG]",
+    "694d40 call 0x413480 [CALL_ARG]",
+    "694d4e call 0x681b50 [CALL_ARG]"
+   ],
+   "derived": [
+    "r8",
+    "rbx",
+    "rcx",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": [
     "69514e",
@@ -329,9 +619,29 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 103,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "695656 mov qword ptr [rbp + 0x78], rdx [STORE_PTR]",
+   "leaks": [
+    "695656 mov qword ptr [rbp + 0x78], rdx [STORE_PTR]",
+    "695673 call 0x695c80 [CALL_ARG]",
+    "69568a call 0x40c660 [CALL_ARG]",
+    "6956f4 call 0x691a40 [CALL_ARG]",
+    "695730 call 0x6a25b0 [CALL_ARG]",
+    "69576c call 0x6a2820 [CALL_ARG]",
+    "695788 call 0x423cb0 [CALL_ARG]",
+    "695791 call 0x691d80 [CALL_ARG]"
+   ],
+   "derived": [
+    "r13",
+    "r8",
+    "r9",
+    "rax",
+    "rbx",
+    "rcx",
+    "rdi",
+    "rdx",
+    "rsi"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -339,9 +649,28 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 93,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "6c01c2 mov dword ptr [rbp + 0x90], r8d [STORE_PTR]",
+   "leaks": [
+    "6c01c2 mov dword ptr [rbp + 0x90], r8d [STORE_PTR]",
+    "6c01c9 mov dword ptr [rbp + 0x98], r9d [STORE_PTR]",
+    "6c01e8 mov qword ptr [rsp + 0x20], rax [STORE_PTR]",
+    "6c01ed call 0x6ce490 [CALL_ARG]",
+    "6c026e mov dword ptr [rsp + 0x20], ecx [STORE_PTR]",
+    "6c0276 mov dword ptr [rsp + 0x28], ecx [STORE_PTR]",
+    "6c0282 mov dword ptr [rsp + 0x30], ecx [STORE_PTR]",
+    "6c028f call 0x6a73a0 [CALL_ARG]"
+   ],
+   "derived": [
+    "r13",
+    "r8",
+    "r9",
+    "rax",
+    "rbx",
+    "rcx",
+    "rdi",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -349,9 +678,30 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 331,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "6c762e mov dword ptr [rbp + 0x90], r8d [STORE_PTR]",
+   "leaks": [
+    "6c762e mov dword ptr [rbp + 0x90], r8d [STORE_PTR]",
+    "6c763c call 0x6ce3f0 [CALL_ARG]",
+    "6c765e mov dword ptr [rbp + 0x38], eax [STORE_PTR]",
+    "6c766e mov dword ptr [rbp + 0x3c], r9d [STORE_PTR]",
+    "6c76ec call qword ptr [rax] [CALL_ARG]",
+    "6c7702 call 0x660a90 [CALL_ARG]",
+    "6c7707 mov qword ptr [rbp + 0x30], rax [STORE_PTR]",
+    "6c7761 mov qword ptr [rsp + 0x20], rdi [STORE_PTR]"
+   ],
+   "derived": [
+    "r11",
+    "r13",
+    "r8",
+    "r9",
+    "rax",
+    "rbx",
+    "rcx",
+    "rdi",
+    "rdx",
+    "rsi"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -359,9 +709,30 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 84,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "6c7d48 movss dword ptr [r11], xmm1 [STORE_PTR]",
+   "leaks": [
+    "6c7d48 movss dword ptr [r11], xmm1 [STORE_PTR]",
+    "6c7d77 call 0x6c7ae0 [CALL_ARG]",
+    "6c7db6 mov dword ptr [rsp + 0x20], r13d [STORE_PTR]",
+    "6c7dc4 call 0x6c7df0 [CALL_ARG]",
+    "6c7dd6 ret  [RET_PTR]"
+   ],
+   "derived": [
+    "r10",
+    "r11",
+    "r13",
+    "r8",
+    "r9",
+    "rax",
+    "rbx",
+    "rcx",
+    "rdi",
+    "rdx",
+    "rsi",
+    "xmm0",
+    "xmm1"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -371,7 +742,10 @@
    "n_ins": 91,
    "glk": false,
    "leak": null,
-   "derived": [],
+   "leaks": [],
+   "derived": [
+    "rdi"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -381,7 +755,10 @@
    "n_ins": 70,
    "glk": false,
    "leak": null,
-   "derived": [],
+   "leaks": [],
+   "derived": [
+    "rdi"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -389,9 +766,14 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 10,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "6ced0f call 0x6cec50 [CALL_ARG]",
+   "leaks": [
+    "6ced0f call 0x6cec50 [CALL_ARG]"
+   ],
+   "derived": [
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -399,29 +781,105 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 547,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "7e45f2 movdqa xmmword ptr [rbp + 0x80], xmm7 [STORE_PTR]",
+   "leaks": [
+    "7e45f2 movdqa xmmword ptr [rbp + 0x80], xmm7 [STORE_PTR]",
+    "7e45fa movdqa xmmword ptr [rbp + 0x70], xmm6 [STORE_PTR]",
+    "7e45ff mov qword ptr [rbp + 0x28], rcx [STORE_PTR]",
+    "7e4603 call 0x8203b0 [CALL_ARG]",
+    "7e4613 call 0x820c80 [CALL_ARG]",
+    "7e4647 mov dword ptr [rbp + 0x60], eax [STORE_PTR]",
+    "7e464d mov dword ptr [rbp + 0x64], eax [STORE_PTR]",
+    "7e4653 mov dword ptr [rbp + 0x68], eax [STORE_PTR]"
+   ],
+   "derived": [
+    "r13",
+    "rax",
+    "rbx",
+    "rcx",
+    "rdi",
+    "rdx",
+    "rsi",
+    "xmm0",
+    "xmm1",
+    "xmm2",
+    "xmm3",
+    "xmm4",
+    "xmm6",
+    "xmm7"
+   ],
    "sync": null,
-   "nonframe_stores": []
+   "nonframe_stores": [
+    "7e46fe",
+    "7e471e",
+    "7e4743",
+    "7e4763",
+    "7e47a3",
+    "7e47cf",
+    "7e47f3",
+    "7e4837",
+    "7e48ce",
+    "7e48fb",
+    "7e4960",
+    "7e4971",
+    "7e4b13",
+    "7e4b55",
+    "7e4b7d",
+    "7e4bb8",
+    "7e4c06",
+    "7e4c17",
+    "7e4c3f",
+    "7e4c51",
+    "7e4cbf",
+    "7e4cdd",
+    "7e4d05",
+    "7e4e72",
+    "7e4ea9",
+    "7e4ed7",
+    "7e4f0a"
+   ]
   },
   "808930": {
    "escaped": true,
    "ijmp": false,
    "n_ins": 90,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "80893d mov qword ptr [rbp + 0x38], rcx [STORE_PTR]",
+   "leaks": [
+    "80893d mov qword ptr [rbp + 0x38], rcx [STORE_PTR]",
+    "808954 call 0x617920 [CALL_ARG]",
+    "808960 call 0x424f40 [CALL_ARG]",
+    "8089a8 mov dword ptr [rbp + 0x70], eax [STORE_PTR]",
+    "8089bf mov dword ptr [rbp + 0x74], eax [STORE_PTR]",
+    "8089ce mov dword ptr [rbp + 0x78], ebx [STORE_PTR]",
+    "8089e8 call 0x617920 [CALL_ARG]",
+    "8089f4 call 0x425500 [CALL_ARG]"
+   ],
+   "derived": [
+    "rax",
+    "rbx",
+    "rcx",
+    "rdx"
+   ],
    "sync": null,
-   "nonframe_stores": []
+   "nonframe_stores": [
+    "808a2b"
+   ]
   },
   "808c80": {
    "escaped": true,
    "ijmp": false,
    "n_ins": 17,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "808c8f call 0x617920 [CALL_ARG]",
+   "leaks": [
+    "808c8f call 0x617920 [CALL_ARG]",
+    "808c9b call 0x424f40 [CALL_ARG]"
+   ],
+   "derived": [
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -429,9 +887,20 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 33,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "81bfea call 0x424c10 [CALL_ARG]",
+   "leaks": [
+    "81bfea call 0x424c10 [CALL_ARG]",
+    "81bffe call 0x424c00 [CALL_ARG]",
+    "81c025 call 0x866060 [CALL_ARG]",
+    "81c02d call 0x425400 [CALL_ARG]",
+    "81c032 call 0x817aa0 [CALL_ARG]",
+    "81c048 call 0x866060 [CALL_ARG]",
+    "81c050 call 0x425400 [CALL_ARG]"
+   ],
+   "derived": [
+    "rcx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -439,9 +908,19 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 35,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "81c0f2 call 0x663460 [CALL_ARG]",
+   "leaks": [
+    "81c0f2 call 0x663460 [CALL_ARG]",
+    "81c0f7 mov dword ptr [rip + 0xbe8c37], ebx [STORE_PTR]",
+    "81c10f call 0x663470 [CALL_ARG]",
+    "81c135 mov dword ptr [rip + 0xbe8bf9], ecx [STORE_PTR]",
+    "81c141 call 0x663450 [CALL_ARG]"
+   ],
+   "derived": [
+    "rbx",
+    "rcx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -449,9 +928,17 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 40,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "820d82 call 0x820cb0 [CALL_ARG]",
+   "leaks": [
+    "820d82 call 0x820cb0 [CALL_ARG]",
+    "820d92 call 0x617ed0 [CALL_ARG]",
+    "820dae call qword ptr [rbx + 0x1b0] [CALL_ARG]",
+    "820dda call 0x425250 [CALL_ARG]"
+   ],
+   "derived": [
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -459,9 +946,20 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 39,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "824035 mov byte ptr [rbp + 0x88], r9b [STORE_PTR]",
+   "leaks": [
+    "824035 mov byte ptr [rbp + 0x88], r9b [STORE_PTR]",
+    "824056 call qword ptr [r13 + 0x1b0] [CALL_ARG]",
+    "82408f call 0x825d20 [CALL_ARG]"
+   ],
+   "derived": [
+    "r8",
+    "r9",
+    "rdi",
+    "rdx",
+    "rsi"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -469,9 +967,14 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 10,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "864f8c call 0x864fa0 [CALL_ARG]",
+   "leaks": [
+    "864f8c call 0x864fa0 [CALL_ARG]"
+   ],
+   "derived": [
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -479,9 +982,14 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 16,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "86723c call 0x4255d0 [CALL_ARG]",
+   "leaks": [
+    "86723c call 0x4255d0 [CALL_ARG]"
+   ],
+   "derived": [
+    "r8"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -489,9 +997,22 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 29,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "92eaad call qword ptr [rbx] [CALL_ARG]",
+   "leaks": [
+    "92eaad call qword ptr [rbx] [CALL_ARG]",
+    "92eabc mov qword ptr [rsp + 0x38], rax [STORE_PTR]",
+    "92eac8 mov qword ptr [rsp + 0x30], rax [STORE_PTR]",
+    "92eae6 mov qword ptr [rsp + 0x20], rax [STORE_PTR]",
+    "92eaf4 call 0x479be0 [CALL_ARG]",
+    "92eb0a call 0x479b40 [CALL_ARG]",
+    "92eb14 ret  [RET_PTR]"
+   ],
+   "derived": [
+    "r8",
+    "rax",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -499,9 +1020,25 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 194,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "bf8b57 call 0xbf89b0 [CALL_ARG]",
+   "leaks": [
+    "bf8b57 call 0xbf89b0 [CALL_ARG]",
+    "bf8b63 call 0xbf8670 [CALL_ARG]",
+    "bf8ba2 call 0xbf86f0 [CALL_ARG]",
+    "bf8bd3 call 0x40d210 [CALL_ARG]",
+    "bf8c06 mov dword ptr [rbp + 0x5c], ecx [STORE_PTR]",
+    "bf8c32 mov dword ptr [rbp + 0x60], ecx [STORE_PTR]",
+    "bf8c39 call 0xbf86f0 [CALL_ARG]",
+    "bf8c67 mov dword ptr [rbp + 0xb0], ecx [STORE_PTR]"
+   ],
+   "derived": [
+    "rax",
+    "rbx",
+    "rcx",
+    "rdx",
+    "rsi"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -511,7 +1048,19 @@
    "n_ins": 83,
    "glk": true,
    "leak": "c38beb mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
-   "derived": [],
+   "leaks": [
+    "c38beb mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
+    "c38bef mov qword ptr [rbp + 0xa0], rcx [STORE_PTR]",
+    "c38bfe call qword ptr [rip + 0xa7f6c4] [CALL_ARG]",
+    "c38c13 call 0xc39140 [CALL_ARG]",
+    "c38c25 call 0x448d40 [CALL_ARG]",
+    "c38c2d call 0x411e80 [CALL_ARG]",
+    "c38c36 call qword ptr [rip + 0xa7f6fc] [CALL_ARG]",
+    "c38c4b call 0x41c420 [CALL_ARG]"
+   ],
+   "derived": [
+    "rcx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -521,7 +1070,20 @@
    "n_ins": 144,
    "glk": true,
    "leak": "c3b364 mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
-   "derived": [],
+   "leaks": [
+    "c3b364 mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
+    "c3b368 mov qword ptr [rbp + 0xc0], rcx [STORE_PTR]",
+    "c3b375 mov byte ptr [rbp + 0xd0], r8b [STORE_PTR]",
+    "c3b394 call 0x410320 [CALL_ARG]",
+    "c3b3a2 call 0xc395a0 [CALL_ARG]",
+    "c3b3bb call 0x448d40 [CALL_ARG]",
+    "c3b3c3 call 0x411e80 [CALL_ARG]",
+    "c3b3d1 call 0x481790 [CALL_ARG]"
+   ],
+   "derived": [
+    "r8",
+    "rcx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -529,9 +1091,22 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 29,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "c9cf8d call qword ptr [rbx] [CALL_ARG]",
+   "leaks": [
+    "c9cf8d call qword ptr [rbx] [CALL_ARG]",
+    "c9cf9c mov qword ptr [rsp + 0x38], rax [STORE_PTR]",
+    "c9cfa8 mov qword ptr [rsp + 0x30], rax [STORE_PTR]",
+    "c9cfc6 mov qword ptr [rsp + 0x20], rax [STORE_PTR]",
+    "c9cfd4 call 0x479be0 [CALL_ARG]",
+    "c9cfea call 0x479b40 [CALL_ARG]",
+    "c9cff4 ret  [RET_PTR]"
+   ],
+   "derived": [
+    "r8",
+    "rax",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -539,9 +1114,22 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 29,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "da541d call qword ptr [rbx] [CALL_ARG]",
+   "leaks": [
+    "da541d call qword ptr [rbx] [CALL_ARG]",
+    "da542c mov qword ptr [rsp + 0x38], rax [STORE_PTR]",
+    "da5438 mov qword ptr [rsp + 0x30], rax [STORE_PTR]",
+    "da5456 mov qword ptr [rsp + 0x20], rax [STORE_PTR]",
+    "da5464 call 0x479be0 [CALL_ARG]",
+    "da547a call 0x479b40 [CALL_ARG]",
+    "da5484 ret  [RET_PTR]"
+   ],
+   "derived": [
+    "r8",
+    "rax",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -549,9 +1137,22 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 29,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "da552d call qword ptr [rbx] [CALL_ARG]",
+   "leaks": [
+    "da552d call qword ptr [rbx] [CALL_ARG]",
+    "da553c mov qword ptr [rsp + 0x38], rax [STORE_PTR]",
+    "da5548 mov qword ptr [rsp + 0x30], rax [STORE_PTR]",
+    "da5566 mov qword ptr [rsp + 0x20], rax [STORE_PTR]",
+    "da5574 call 0x479be0 [CALL_ARG]",
+    "da558a call 0x479b40 [CALL_ARG]",
+    "da5594 ret  [RET_PTR]"
+   ],
+   "derived": [
+    "r8",
+    "rax",
+    "rdx"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -559,9 +1160,25 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 54,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "e8fbbc call 0x12dec70 [CALL_ARG]",
+   "leaks": [
+    "e8fbbc call 0x12dec70 [CALL_ARG]",
+    "e8fbd2 call 0xe8de10 [CALL_ARG]",
+    "e8fbde call 0xe85fc0 [CALL_ARG]",
+    "e8fbff sub dword ptr [rbp + 0x40], ecx [STORE_PTR]",
+    "e8fc08 sub dword ptr [rbp + 0x48], ecx [STORE_PTR]",
+    "e8fc1e mov dword ptr [rbp + 0x48], ecx [STORE_PTR]",
+    "e8fc44 call 0x4f2990 [CALL_ARG]",
+    "e8fc50 call 0xe85fc0 [CALL_ARG]"
+   ],
+   "derived": [
+    "r8",
+    "rbx",
+    "rcx",
+    "rdx",
+    "rsi"
+   ],
    "sync": null,
    "nonframe_stores": []
   },
@@ -569,11 +1186,31 @@
    "escaped": true,
    "ijmp": false,
    "n_ins": 338,
-   "glk": false,
-   "leak": null,
-   "derived": [],
+   "glk": true,
+   "leak": "f61720 mov qword ptr [rbp + 0x38], rcx [STORE_PTR]",
+   "leaks": [
+    "f61720 mov qword ptr [rbp + 0x38], rcx [STORE_PTR]",
+    "f6175d mov dword ptr [rbp + 0x80], edx [STORE_PTR]",
+    "f6178e mov dword ptr [rbp + 0x84], edx [STORE_PTR]",
+    "f617a9 call 0x40fe90 [CALL_ARG]",
+    "f617ee call 0x40c660 [CALL_ARG]",
+    "f617f3 mov dword ptr [rbp + 0x80], eax [STORE_PTR]",
+    "f61816 call 0x40c660 [CALL_ARG]",
+    "f6181b mov dword ptr [rbp + 0x84], eax [STORE_PTR]"
+   ],
+   "derived": [
+    "r8",
+    "rax",
+    "rbx",
+    "rcx",
+    "rdi",
+    "rdx",
+    "rsi"
+   ],
    "sync": null,
-   "nonframe_stores": []
+   "nonframe_stores": [
+    "f61c6b"
+   ]
   }
  },
  "sites": [
@@ -612,10 +1249,10 @@
    "mnem": "add r14d, dword ptr [rbp + 0x38]",
    "slot": "rbp+0x38",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -642,12 +1279,15 @@
    "mnem": "movss xmm0, dword ptr [rbp + 0x108]",
    "slot": "rbp+0x108",
    "outcomes": [
-    "ENTRY"
+    "BARRIER:LEAK_STORE",
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(LEAK_STORE)",
    "store_addrs": [],
-   "barrier_addrs": []
+   "barrier_addrs": [
+    "11e6ee0 mov qword ptr [rcx], rax [LEAK_STORE]"
+   ]
   },
   {
    "fn": "129df10",
@@ -656,14 +1296,14 @@
    "mnem": "sub esi, dword ptr [rbp + 0x88]",
    "slot": "rbp+0x88",
    "outcomes": [
-    "BARRIER:MIXED_BASE",
-    "ENTRY"
+    "BARRIER:ALIAS_FRAME_PTR"
    ],
    "verdict": "UNDETERMINED",
-   "why": "BARRIER(MIXED_BASE)",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
    "store_addrs": [],
    "barrier_addrs": [
-    "129e5f8 mov dword ptr [rsp + 0x20], eax [MIXED_BASE]"
+    "129e611 movsq qword ptr [rdi], qword ptr [rsi] [ALIAS_FRAME_PTR]",
+    "129e0fd mov dword ptr [rax], ecx [ALIAS_FRAME_PTR]"
    ]
   },
   {
@@ -673,10 +1313,10 @@
    "mnem": "mov r8d, dword ptr [rsp + 0x28]",
    "slot": "rsp+0x28",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -719,10 +1359,10 @@
    "mnem": "and qword ptr [rbp + 0x38], 0xffffffffffff0000",
    "slot": "rbp+0x38",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -733,10 +1373,10 @@
    "mnem": "cmp dword ptr [rbp + 0x40], 0x10000",
    "slot": "rbp+0x40",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -761,10 +1401,10 @@
    "mnem": "cmp dword ptr [rbp + 0x40], 0x1000",
    "slot": "rbp+0x40",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -855,10 +1495,10 @@
    "mnem": "cmp word ptr [rbp + 0x3e], 0",
    "slot": "rbp+0x3e",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -885,10 +1525,10 @@
    "mnem": "cmp word ptr [rbp + 0x28], 0",
    "slot": "rbp+0x28",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -913,13 +1553,13 @@
    "mnem": "cmp qword ptr [rbp + 0xc0], 0",
    "slot": "rbp+0xc0",
    "outcomes": [
-    "BARRIER:LEAK_STORE"
+    "BARRIER:ALIAS_FRAME_PTR"
    ],
    "verdict": "UNDETERMINED",
-   "why": "BARRIER(LEAK_STORE)",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
    "store_addrs": [],
    "barrier_addrs": [
-    "5cb456 movsq qword ptr [rdi], qword ptr [rsi] [LEAK_STORE]"
+    "5cb47d mov dword ptr [rax + 8], ecx [ALIAS_FRAME_PTR]"
    ]
   },
   {
@@ -929,10 +1569,10 @@
    "mnem": "mov eax, dword ptr [rsp + 0x2c]",
    "slot": "rsp+0x2c",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -962,10 +1602,10 @@
    "mnem": "cmp qword ptr [rbp + 0x38], 0",
    "slot": "rbp+0x38",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -992,12 +1632,14 @@
    "mnem": "mov ecx, dword ptr [rbp + 0x44]",
    "slot": "rbp+0x44",
    "outcomes": [
-    "ENTRY"
+    "BARRIER:ALIAS_FRAME_PTR"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
    "store_addrs": [],
-   "barrier_addrs": []
+   "barrier_addrs": [
+    "6c762c movsq qword ptr [rdi], qword ptr [rsi] [ALIAS_FRAME_PTR]"
+   ]
   },
   {
    "fn": "6c7ca0",
@@ -1006,12 +1648,14 @@
    "mnem": "mov edx, dword ptr [rbp + 0x84]",
    "slot": "rbp+0x84",
    "outcomes": [
-    "ENTRY"
+    "BARRIER:ALIAS_FRAME_PTR"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
    "store_addrs": [],
-   "barrier_addrs": []
+   "barrier_addrs": [
+    "6c7cc2 movsq qword ptr [rdi], qword ptr [rsi] [ALIAS_FRAME_PTR]"
+   ]
   },
   {
    "fn": "6ca580",
@@ -1020,12 +1664,14 @@
    "mnem": "add dword ptr [rbp + 0x64], eax",
    "slot": "rbp+0x64",
    "outcomes": [
-    "ENTRY"
+    "BARRIER:ALIAS_FRAME_PTR"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
    "store_addrs": [],
-   "barrier_addrs": []
+   "barrier_addrs": [
+    "6ca594 movsq qword ptr [rdi], qword ptr [rsi] [ALIAS_FRAME_PTR]"
+   ]
   },
   {
    "fn": "6ca6c0",
@@ -1034,12 +1680,14 @@
    "mnem": "add dword ptr [rbp + 0x64], eax",
    "slot": "rbp+0x64",
    "outcomes": [
-    "ENTRY"
+    "BARRIER:ALIAS_FRAME_PTR"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
    "store_addrs": [],
-   "barrier_addrs": []
+   "barrier_addrs": [
+    "6ca6d4 movsq qword ptr [rdi], qword ptr [rsi] [ALIAS_FRAME_PTR]"
+   ]
   },
   {
    "fn": "6ced00",
@@ -1048,10 +1696,10 @@
    "mnem": "mov eax, dword ptr [rbp + 0x28]",
    "slot": "rbp+0x28",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1062,15 +1710,14 @@
    "mnem": "cvtsi2ss xmm0, dword ptr [rbp + 0x6c]",
    "slot": "rbp+0x6c",
    "outcomes": [
-    "ENTRY",
-    "STORE"
+    "BARRIER:ALIAS_FRAME_PTR"
    ],
    "verdict": "UNDETERMINED",
-   "why": "MIXED_OR_UNREACHABLE",
-   "store_addrs": [
-    "7e4659 mov dword ptr [rbp + 0x6c], eax"
-   ],
-   "barrier_addrs": []
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "7e48ce movss dword ptr [rax + 0x518], xmm0 [ALIAS_FRAME_PTR]"
+   ]
   },
   {
    "fn": "7e45e0",
@@ -1086,10 +1733,10 @@
    "mnem": "cmp dword ptr [rbp + 0x5c], 3",
    "slot": "rbp+0x5c",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1100,10 +1747,10 @@
    "mnem": "cmp dword ptr [rbp + 0x2c], 3",
    "slot": "rbp+0x2c",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1130,10 +1777,10 @@
    "mnem": "mov eax, dword ptr [rbp + 0x2c]",
    "slot": "rbp+0x2c",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1144,10 +1791,10 @@
    "mnem": "add dword ptr [rbp + 0x30], ecx",
    "slot": "rbp+0x30",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1158,10 +1805,10 @@
    "mnem": "add dword ptr [rbp + 0x30], eax",
    "slot": "rbp+0x30",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1172,10 +1819,10 @@
    "mnem": "sub eax, dword ptr [rbp + 0x20]",
    "slot": "rbp+0x20",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1202,10 +1849,10 @@
    "mnem": "cmp qword ptr [rsp + 0x48], 0",
    "slot": "rsp+0x48",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1216,10 +1863,10 @@
    "mnem": "mov eax, dword ptr [rbp + 0xac]",
    "slot": "rbp+0xac",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1246,13 +1893,13 @@
    "mnem": "cmp dword ptr [rbp + 0x60], 0",
    "slot": "rbp+0x60",
    "outcomes": [
-    "BARRIER:LEAK_STORE"
+    "BARRIER:ALIAS_FRAME_PTR"
    ],
    "verdict": "UNDETERMINED",
-   "why": "BARRIER(LEAK_STORE)",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
    "store_addrs": [],
    "barrier_addrs": [
-    "c3b3f5 mov byte ptr [rcx + 0x20], al [LEAK_STORE]"
+    "c3b3f5 mov byte ptr [rcx + 0x20], al [ALIAS_FRAME_PTR]"
    ]
   },
   {
@@ -1262,10 +1909,10 @@
    "mnem": "cmp qword ptr [rsp + 0x48], 0",
    "slot": "rsp+0x48",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1276,10 +1923,10 @@
    "mnem": "cmp qword ptr [rsp + 0x48], 0",
    "slot": "rsp+0x48",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1290,10 +1937,10 @@
    "mnem": "cmp qword ptr [rsp + 0x48], 0",
    "slot": "rsp+0x48",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1304,10 +1951,10 @@
    "mnem": "sub dword ptr [rbp + 0x48], ecx",
    "slot": "rbp+0x48",
    "outcomes": [
-    "ENTRY"
+    "ENTRY_AFTER_CALL"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "ONLY_ENTRY_AFTER_CALL",
    "store_addrs": [],
    "barrier_addrs": []
   },
@@ -1318,12 +1965,14 @@
    "mnem": "mov r8d, dword ptr [rbp + 0x94]",
    "slot": "rbp+0x94",
    "outcomes": [
-    "ENTRY"
+    "BARRIER:ALIAS_FRAME_PTR"
    ],
-   "verdict": "LIVE-IN",
-   "why": "NO_DEF_ON_ANY_PATH",
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
    "store_addrs": [],
-   "barrier_addrs": []
+   "barrier_addrs": [
+    "f61c6b mov qword ptr [rcx + 0x6c8], rax [ALIAS_FRAME_PTR]"
+   ]
   }
  ]
 }
