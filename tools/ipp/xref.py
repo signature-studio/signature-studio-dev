@@ -2,7 +2,7 @@
 """x86_64 Mach-O: rip相対参照 (lea/mov/call) の xref 検索。usage: xref.py slice VA [VA...]"""
 import sys, os, struct
 import numpy as np
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/shared/scripts')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared', 'scripts'))
 from macho_util import MachO
 def xrefs(m, targets):
     tx = m.section("__TEXT", "__text"); t0, tsz, tva = tx[4], tx[3], tx[2]

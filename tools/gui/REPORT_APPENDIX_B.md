@@ -118,3 +118,24 @@
 - 再現時の所要: 4 回で 27 s、開始時 load 0.72 (1 分値)。
 - ログ: `$RUNNER_TEMP/gui740/pre_uaf.log` (Git 管理外。run 終了で消える)。
 - 判断: 受入条件 3 点目 (修正前 ASan 再現ログ) は **達成**。修正後は 94 回 (§18 の 30+64) で発火せず、修正前は 2/2 試行で発火しており、修正の有効性を示す対照として #740 の残件を閉じる根拠になる。#1666 (GUI-24) は本追補で完了扱い。
+
+## GUI-23 (#1665): 6h CDP タイムアウトの切り分け (原因未特定)
+
+測定 commit `f0cb6407d` (コード変更の最後の commit。診断として `stress.mjs` に eval 所要時間の採取と `[slow-eval]` 出力、`stress.sh` の grep に eval 行を追加)。`git diff f0cb6407d HEAD -- tools/gui` は本節 (REPORT) のみの差分。`TMPDIR=$RUNNER_TEMP`、worktree `ws-1665`、`pnpm install --frozen-lockfile`、`tools/e2e` の `npm ci --ignore-scripts`、`gcc-mingw-w64-x86-64` 導入済み。素材 fl-win64 / toolchain-emsdk / toolchain-retdec は `$ARTIFACTS_DIR` に実在を確認。
+
+- **e2e 全体 (コミット済み HEAD で foreground、3 回)**: `76e7e74eb` 1 回目 rc=0 ALL PASS (2 m 41 s)、`76e7e74eb` 2 回目 rc=0 ALL PASS (2 m 28 s)、`f0cb6407d` rc=0 ALL PASS (2 m 26 s)。いずれも 6h の CDP timeout は 0。
+- **6h の eval 所要 (`f0cb6407d` の診断ログ、負荷なし)**: stress.mjs 1 プロセスあたり max 613 ms / 595 ms、3 s 超 0 件。
+- **負荷別の追加測定 (作業用の計測コピー、コミットなし。50000 frames、SAMPLE 2500、全て PASS)**:
+
+  | 負荷 (busy loop) | eval 最大 | 3 s 超の件数 | 終了時 load (1 分値) |
+  |---|---|---|---|
+  | なし | 652 ms | 0 | 未記録 (計測時の load 1 分値は取らず) |
+  | 4 本 | 1934 ms | 0 | 3.91 |
+  | 8 本 | 3814 ms | 6 | 7.78 |
+  | 16 本 | 5441 ms | 19 | 16.86 |
+
+- **CLI の既定 action timeout の陽性対照**: `about:blank` で `new Promise(r => setTimeout(r, 30000))` を eval すると **`CDP command timed out: Runtime.evaluate`** で失敗 (実時間 30 s)。CLI の既定値 (25 000 ms) 由来のメッセージであることは確認できた。境界の厳密な秒数は未測定 (25 s 付近での挙動は未確認)。
+- **`AGENT_BROWSER_DEFAULT_TIMEOUT=1` の対照 (負の結果)**: 600 ms 程度の `window.__s.single` を含む stress は eval の失敗なし (eval 最大 604 ms)。この環境変数だけでは `Runtime.evaluate` の上限が変わらない可能性がある。`AGENT_BROWSER_DEFAULT_TIMEOUT=300` でも 627 ms の eval が通った。**この切り分けは未確定** (env の適用範囲は未確認)。
+- **判定**: 失敗の再現条件 (負荷・eval 長) は**未特定**。上の測定では eval は 25 s 近くまで伸びず、GUI-20 の失敗 (run4 / 0e9fcaae run5) の状態 (負荷・時刻) は再現できなかった。第一仮説 (eval が既定 timeout を超える) は、負荷 16 本でも eval が 5.4 s までしか伸びないため、この環境では説明できていない。
+- **未切り分けの要素**: (1) 失敗時の load と eval 所要 (旧ログには無い。`f0cb6407d` の診断で次回以降採取される)。(2) `AGENT_BROWSER_DEFAULT_TIMEOUT` が `eval` の `Runtime.evaluate` に効くか。(3) GitHub Actions runner 固有のディスク・CPU の競合 (本 run は同一 runner 上で未再現)。(4) `stress.sh` 前段の `wasm_grow` / sync push 量 (burst) との組み合わせ。
+- **次の確認**: 10 連続 rc 0 の再取得 (`f0cb6407d` で) と、失敗時に出る `[slow-eval]` / `eval failed after` 行の採取。

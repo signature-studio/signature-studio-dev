@@ -6,7 +6,7 @@ const [, , modPath, imgPath, scenPath, outPath] = process.argv;
 const createModule = createRequire(import.meta.url)(modPath);
 const M = await createModule();
 const IMG_BASE = 0x10000000, OBJ_ADDR = 0x10f80000, OBJ_WIN = 0x540;
-const STK_LO = 0x10f00000 - 0x200, STK_WIN = 0x1e0;
+const STK_LO = 0x10f00000 - 0x1100, STK_WIN = 0x1e0;
 const img = fs.readFileSync(imgPath);
 M.HEAPU8.set(img, IMG_BASE);
 const lines = fs.readFileSync(scenPath, 'utf8').split('\n').filter((l) => l.trim().length > 0);

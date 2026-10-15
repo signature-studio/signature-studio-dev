@@ -12,7 +12,7 @@ typedef unsigned int u32;
 #define OBJ_WIN 0x540u
 #endif
 #define GUEST_STACK_TOP 0x10F00000u
-#define STK_LO (GUEST_STACK_TOP - 0x200u)
+#define STK_LO (GUEST_STACK_TOP - 0x1100u)
 #define STK_WIN 0x1E0u
 #define IBUF_SZ (1u << 26)
 #define OBUF_SZ (1u << 26)
@@ -47,7 +47,7 @@ __asm__(
     " movl %esp,g_sp\n"
     " mov $0x10F00000,%esp\n"
     " pushl 20(%esi)\n pushl 16(%esi)\n pushl 12(%esi)\n pushl 8(%esi)\n pushl 4(%esi)\n pushl (%esi)\n"
-    " mov %edx,%ecx\n xor %eax,%eax\n xor %edx,%edx\n mov $0x10EFFF00,%ebp\n"
+    " mov %edx,%ecx\n xor %eax,%eax\n xor %edx,%edx\n mov $0x10F00000-0x1000,%ebp\n"
     " call *%edi\n"
     " movl g_sp,%esp\n"
     " pop %edi\n pop %esi\n pop %ebx\n pop %ebp\n ret\n");

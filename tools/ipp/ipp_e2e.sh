@@ -3,9 +3,10 @@
 # usage: bash tools/ipp/ipp_e2e.sh      (所要 ~2 分。大物は tools/ipp/work/ に出力 = gitignore)
 set -euo pipefail
 cd "$(dirname "$0")"; HERE=$PWD; W=$HERE/work; mkdir -p "$W" data /tmp/opencode
-APP="/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents"
-DLL=/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin
-for f in "$APP/Resources/FL/Shared/dsp_ippv2_x64.dylib" "$APP/Libs/FLEngine_x64.dylib" "$DLL" /home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin; do [ -f "$f" ] || { echo "missing input: $f"; exit 2; }; done
+source "$HERE/../shared/env.sh"
+APP="$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents"
+DLL=$FL_WIN64_DIR/extracted/block24356_PE.bin
+for f in "$APP/Resources/FL/Shared/dsp_ippv2_x64.dylib" "$APP/Libs/FLEngine_x64.dylib" "$DLL" "$FL_WIN64_DIR/extracted/block00031_PE.bin"; do [ -f "$f" ] || { echo "missing input: $f"; exit 2; }; done
 step() { echo; echo "## $*"; }
 step "1. universal Mach-O を分割 (lipo 代用)"
 python3 fat_split.py "$APP/Resources/FL/Shared/dsp_ippv2_x64.dylib" "$W" dsp_ippv2 | sed 's/^/  /'
@@ -31,8 +32,8 @@ t=open('work/cmp_avx512.json').read(); r=json.loads(t[t.index('[\n'):])
 print('cmp(AVX512 path): functions',len(r),' bit-exact functions',sum(1 for x in r if x['differ']==0 and x['status_mismatch']==0),' inexact:',[x['fn'] for x in r if x['differ'] or x['status_mismatch']])
 PY
 python3 - <<'PY'
-import subprocess, json
-D='/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin'; B='work/bin/ipp_ref'
+import subprocess, json, os
+D=os.path.join(os.environ['FL_WIN64_DIR'], 'extracted/block24356_PE.bin'); B='work/bin/ipp_ref'
 pairs=[('0xFFFFFFFFFFFFFFFF','0x1FFFF','avx512_vs_avx2'),('0x1FFFF','0x1FF','avx2_vs_avx'),('0x1FF','0xFF','avx_vs_sse42'),('0xFF','0x1F','sse42_vs_ssse3'),('0x1F','0x7','ssse3_vs_sse2')]
 out={}
 for a,b,n in pairs:
