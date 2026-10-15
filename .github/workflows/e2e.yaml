@@ -1,0 +1,140 @@
+name: E2E
+
+# ブラウザ E2E (tools/e2e/run.sh, headless chrome)。
+#   local  : PR / main push / 手動 → build した preview + edge-sim を検証 (秘密情報不要)
+#   remote : 週次 (月曜 03:17 UTC) / 手動 → デプロイ済み URL を `run.sh --url` で検証
+# remote の URL と service token の運用・ローテーションは deploy/README.md §CI / E2E の秘密情報。
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "tools/e2e/**"
+      - "deploy/config/**"
+      - "deploy/lib/**"
+      - ".github/workflows/e2e.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "tsconfig.json"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "tools/e2e/**"
+      - "deploy/config/**"
+      - "deploy/lib/**"
+      - ".github/workflows/e2e.yaml"
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "remote E2E の対象 URL (空 = repo variable E2E_URL)"
+        type: string
+        required: false
+        default: ""
+      remote:
+        description: "remote E2E も実行する (手動時のみ。schedule は常に実行)"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  local:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26.10.0
+      - name: Chrome
+        run: |
+          google-chrome --version
+          node --version
+          pnpm --version
+      - name: E2E (preview + edge-sim x agent-browser + puppeteer-core)
+        shell: bash
+        run: |
+          mkdir -p tools/e2e/work/logs
+          bash tools/e2e/run.sh --driver both --targets preview,edge-sim 2>&1 | tee tools/e2e/work/logs/ci-local.log
+      - name: Summary
+        if: always()
+        run: node tools/e2e/suite/summary.mjs "E2E local (preview + edge-sim)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: e2e-local-${{ github.run_id }}
+          path: |
+            tools/e2e/work/results
+            tools/e2e/work/shots
+            tools/e2e/work/logs
+          if-no-files-found: warn
+          retention-days: 14
+
+  remote:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.remote)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      E2E_URL: ${{ inputs.url || vars.E2E_URL }}
+    steps:
+      - name: URL 確認
+        id: gate
+        run: |
+          if [ -z "$E2E_URL" ]; then
+            echo "::notice::E2E_URL (repo variable) / url 入力が未設定のため remote E2E を skip"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        if: steps.gate.outputs.run == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 26.10.0
+      - name: E2E (--url)
+        if: steps.gate.outputs.run == 'true'
+        env:
+          E2E_ACCESS_CLIENT_ID: ${{ secrets.E2E_ACCESS_CLIENT_ID }}
+          E2E_ACCESS_CLIENT_SECRET: ${{ secrets.E2E_ACCESS_CLIENT_SECRET }}
+        shell: bash
+        run: |
+          mkdir -p tools/e2e/work/logs
+          bash tools/e2e/run.sh --url "$E2E_URL" --driver both 2>&1 | tee tools/e2e/work/logs/ci-remote.log
+      - name: Summary
+        if: always() && steps.gate.outputs.run == 'true'
+        run: node tools/e2e/suite/summary.mjs "E2E remote ($E2E_URL)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always() && steps.gate.outputs.run == 'true'
+        with:
+          name: e2e-remote-${{ github.run_id }}
+          path: |
+            tools/e2e/work/results
+            tools/e2e/work/shots
+            tools/e2e/work/logs
+          if-no-files-found: warn
+          retention-days: 14
