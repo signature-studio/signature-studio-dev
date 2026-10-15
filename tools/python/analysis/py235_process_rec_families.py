@@ -75,7 +75,7 @@ def reach(entry, avoid=frozenset()):
 # 1. 族の分岐 (eventId = [rbp+0x5b0] を eax に読んでから)。各 VA は REPORT_PY235 §1 の表
 check("0x1047424: eax = [rbp+0x5b0] (eventId)", text(0x1047424) == "mov eax, dword ptr [rbp + 0x5b0]")
 check("0x104742a: cmp eax, 0x40000001 / 0x104742f: jg 0x104746a", text(0x104742A) == "cmp eax, 0x40000001" and text(0x104742F) == "jg 0x104746a")
-check("0x1047431: je 0x104c4af (eventId == 0x40000001)", text(0x1047436) == "je 0x104c4af")
+check("0x1047436: je 0x104c4af (eventId == 0x40000001。直前 0x1047431 は cmp eax, 0x40000001)", text(0x1047431) == "cmp eax, 0x40000001" and text(0x1047436) == "je 0x104c4af")
 check("0x1047441: cmp eax, 0x70000000 / 0x1047446: jb 0x104aa87", text(0x1047441) == "cmp eax, 0x70000000" and text(0x1047446) == "jb 0x104aa87")
 check("0x1047451: cmp eax, 0x10000000 / 0x1047456: jb 0x1047497 (index 族)", text(0x1047451) == "cmp eax, 0x10000000" and text(0x1047456) == "jb 0x1047497")
 check("0x104745d: test eax / 0x104745f: jne 0x104caae / 0x1047465: jmp 0x104c2a6 (eventId == 0x40000000)", text(0x104745F) == "jne 0x104caae" and text(0x1047465) == "jmp 0x104c2a6")
