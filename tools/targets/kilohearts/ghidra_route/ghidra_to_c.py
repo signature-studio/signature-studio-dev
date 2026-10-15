@@ -198,7 +198,7 @@ DELAY_RULES = [
     # 呼出元 (delay 1271): uStack_108 (8 byte) と uStack_100 (0 を書いた上位 8 byte) を 1 つの 16 byte 引数にまとめる。
     #   aauStack_f8 は呼出先が 16 byte (aauStack_f8[0]) を読むので V128 * へ cast する (値は変えない)。
     ('caller FUN_1802ecfc0: uStack_108/100 を 16 byte 引数に (KH-136)',
-     r'FUN_1802ecfc0\(\*\(undefined8 \*\)\(param_1 \+ 0x198\),uVar22 & 0xffffffff,&uStack_108,aauStack_f8\);',
+     r'FUN_1802ecfc0\(\*\(undefined8 \*\)\(param_1 \+ 0x198\),uVar22 & 0xffffffff,&uStack_108,\s*aauStack_f8\);',
      '{ V128 kh_p108; kh_p108._0_8_ = uStack_108; kh_p108._8_8_ = uStack_100; FUN_1802ecfc0(*(undefined8 *)(param_1 + 0x198),uVar22 & 0xffffffff,&kh_p108,(V128 *)aauStack_f8); }', 1),
 ]
 
