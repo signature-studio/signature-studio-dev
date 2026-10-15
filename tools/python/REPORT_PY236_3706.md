@@ -74,4 +74,4 @@ C 側だけ `ui_time_disp_min = !ui_time_disp_min` を `ui_time_disp_min = ui_ti
 | `setTimeDispMin` の toggle 後の `0x1248ac0`・`0x12e2ac0`・`0xfdee80` の副作用 | API からは観測不能 (状態は getter で確認できる) | 未追跡 |
 | 0x1249130・0x12491a0 の間接呼出し先が `ui.setTimeDispMin` の経路から到達するか (0x1249150・0x12491ad の書込み) | 到達するなら「setter 後の getter は反転結果」の前提が崩れる | 未追跡 |
 | `provider_check.mjs` の section 3 以降・`all_tools.mjs` (flpy 経路) | 48/48 の維持は未検証 | #4052 (PY-295) |
-| stub 説明文の食い違い (`setTimeDispMin` の stub doc "Is time time display set to minutes")。出所は `flapi_table.json` (生成物) | 説明文のみ。挙動には影響しない | #4145 (PY-305) |
+| stub 説明文の食い違い (`setTimeDispMin` の stub doc "Is time time display set to minutes")。出所は `flapi_table.json` (生成物) | 説明文のみ。挙動には影響しない | 解決済み (#4145・`flapi_table.py` の `DOC_OVERRIDES`。Win PE の rodata では setTimeDispMin の直後に doc が無い) |

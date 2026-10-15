@@ -7,7 +7,7 @@
 
 | クラス | SC 側ハーネス | smoke (fma 0/1, 各 20 case) | 残件 |
 |---|---|---|---|
-| VocalFilter (SC 0x1808e1f30) | `lift2/native/native_vocalfilter.c` 作成 | ERR 0・20 行 × 2 | KH 側との同一入力の差分 (C4〜C6) は未実施 (子 #4071) |
+| VocalFilter (SC 0x1808e1f30 → 訂正: process 本体 0x1808e1fa0・#4071) | `lift2/native/native_vocalfilter.c` 作成 (root は 0x1808e1fa0 に訂正済み) | ERR 0・20 行 × 2 (訂正前の root。§5 注) | KH 側との同一入力の差分 (C4〜C6) は未実施 (子 #4071) |
 | Stereo (SC 0x1805ee2a0) | 作成せず (`native_stereo.c` は未コミットの試行のみ。再現物は無い・§3) | 試行で ERR 20/20 (SIGSEGV)。未コミットのため再現不可 | 子 issue: P+0x9f88 の初期化を特定してから再実行 |
 | Resonator | 未作成 | 未実行 | 子 issue: SC 側 process の特定 (共有関数 0x1803df070 の呼出元照合) |
 
@@ -59,3 +59,5 @@
 | Stereo の SC 側ハーネス (P+0x9f88 の初期化を特定し、smoke を ERR 0 にする) | Stereo の差分実行の前提が無い | #4046 (FA-48) |
 | Resonator の SC 側 process の特定 (0x1803df070 の呼出元と vtable の照合) | Resonator の差分の前提が無い | #4047 (FA-49) |
 | VocalFilter の KH 側との同一入力の差分 (C4〜C6・param 写像) | VocalFilter の意味同一性は未判定 | #4071 (FA-51) |
+
+注 (#4071 訂正): §5 の VocalFilter smoke は `0x1808e1f30` (deleting destructor) を実行していた。`ERR 0・20 行 × 2` は process の実行の証拠にならない。root は `0x1808e1fa0` に訂正済み (FA51 §6)。`ks_sc_vf_smoke.sh` の `--root` も同じ。

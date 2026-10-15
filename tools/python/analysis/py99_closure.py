@@ -22,6 +22,7 @@ import py99_merge_sets as p99  # noqa: E402
 
 LEAF_HEAD = ("SLOT[", "ACC", "IN[", "M8[rbp", "M16[rbp", "M32[rbp", "M64[rbp")
 FR_RE = re.compile(r"FR\[(0x[0-9a-f]+)/(\d)\]@(0x[0-9a-f]+)")
+RG_RE = re.compile(r"RG\[(\w+)\]@(0x[0-9a-f]+)")
 UNCLOSED = ("⚠合流", "SLOT[", "ACC", "IN[", "_in", "clob@", "VCALL", "CALL[", "<", "…", "⚠addr-taken", "⟪")
 LIMIT = 8000
 SIZE_BYTES = {"byte": 1, "word": 2, "dword": 4, "qword": 8}
@@ -47,7 +48,16 @@ class Tag(p99.Rec):
     def cfg_pred(self, a):
         return self.cfg.preds(a)
 
+    def lin_def(self, fam, pos):
+        i = pos - 1
+        while i >= 0 and not defines(self.ins, self.order[i], fam):
+            i -= 1
+        return i
+
     def resolve(self, fam, pos, depth=0):
+        lin = self.lin_def(fam, pos)
+        if any(self.order[j] in self.targets for j in range(lin + 1, pos + 1)):
+            return f"RG[{fam}]@{self.order[pos]:#x}"
         res = p88.Slicer.resolve(self, fam, pos, depth)
         if res.startswith(f"{fam}_in"):
             self.reg_in.add((fam, self.order[pos]))
@@ -102,6 +112,55 @@ class Tag(p99.Rec):
             kind = "他"
         self.leaf_kind[(self.order[pos], x)] = kind
         return f"FR[{x:#x}/{sz}]@{self.order[pos]:#x}"
+
+
+def defines(ins, a, fam):
+    """命令 a が fam のレジスタ族を定義・clob するか (py88 の Slicer.resolve と同じ条件)。"""
+    m, o = ins[a]
+    ops = p88.parse_ops(o)
+    if m == "call":
+        return fam == "a" or fam in p88.CALLER_SAVED
+    if m.startswith("cmov"):
+        return bool(ops) and p88.FAM.get(ops[0]) == fam
+    return bool(ops) and m in p88.WRITE_FIRST and p88.FAM.get(ops[0]) == fam
+
+
+def reg_before(cfg, ins, c, fam, cut=None):
+    out, seen, stack = set(), set(), [c]
+    while stack:
+        n = stack.pop()
+        if n in seen:
+            continue
+        seen.add(n)
+        for p in cfg.preds(n):
+            if cut and (p, n) == cut:
+                continue
+            if p is None:
+                out.add(p99.ENTRY)
+            elif defines(ins, p, fam):
+                out.add(p)
+            else:
+                stack.append(p)
+    return out
+
+
+def reg_forward(cfg, ins, fam):
+    pr = {a: cfg.preds(a) for a in cfg.order}
+    inn = {a: set() for a in cfg.order}
+    out = {a: set() for a in cfg.order}
+    changed = True
+    while changed:
+        changed = False
+        for a in cfg.order:
+            new_in = set()
+            for p in pr[a]:
+                new_in |= {p99.ENTRY} if p is None else out[p]
+            new_out = {a} if defines(ins, a, fam) else set(new_in)
+            inn[a] = new_in
+            if new_out != out[a]:
+                out[a] = new_out
+                changed = True
+    return inn
 
 
 def unclosed_tokens(e):
@@ -234,6 +293,7 @@ def main(argv):
     def run(mode, cut_edge):
         memo = {}
         multi = set()
+        regfwd = {}
 
         def reach(r, x):
             if mode == "A":
@@ -241,6 +301,13 @@ def main(argv):
                     fwd[x] = p99.forward_in(cfg, x)
                 return fwd[x][r]
             return p99.reach_before(cfg, r, x, cut_edge)
+
+        def reg_reach(r, fam):
+            if mode == "A":
+                if fam not in regfwd:
+                    regfwd[fam] = reg_forward(cfg, ins, fam)
+                return regfwd[fam][r]
+            return reg_before(cfg, ins, r, fam, cut_edge)
 
         def close_leaf(x, sz, r, stack):
             R = reach(r, x)
@@ -259,18 +326,58 @@ def main(argv):
                 parts.append(f"{s:#x}: {e}")
             return "{" + " | ".join(parts) + "}"
 
+        def close_reg(fam, r, stack):
+            D = reg_reach(r, fam)
+            if not D:
+                return "⟪到達なし⟫"
+            if len(D) == 1:
+                return close_def(next(iter(D)), fam, stack)
+            parts = []
+            for d in sorted(D, key=lambda v: -1 if v == p99.ENTRY else v):
+                if d == p99.ENTRY:
+                    parts.append(f"{fam}_in")
+                    continue
+                parts.append(f"{d:#x}: {close_def(d, fam, stack)}")
+            return "{" + " | ".join(parts) + "}"
+
+        def close_def(d, fam, stack):
+            if d == p99.ENTRY:
+                return f"{fam}_in"
+            key = ("R", d, fam)
+            if key in memo:
+                return memo[key]
+            if key in stack:
+                return "⟪循環⟫"
+            m, o = ins[d]
+            stack.append(key)
+            if m == "call":
+                out = expand(T.call_expr(cfg.idx[d], 0), stack) if fam == "a" else f"clob@{d:#x}"
+            elif m.startswith("cmov"):
+                out = f"CMOV@{d:#x}"
+            else:
+                out = expand(T.def_value(cfg.idx[d], 0), stack)
+            stack.pop()
+            if len(out) > LIMIT:
+                out = "⟪長さ超過⟫"
+            memo[key] = out
+            return out
+
         def close_store(s, stack):
             if s in memo:
                 return memo[s]
             if s in stack:
                 return "⟪循環⟫"
             stack.append(s)
-            out = FR_RE.sub(lambda m: leaf_of(m, stack), store_expr(s))
+            out = expand(store_expr(s), stack)
             stack.pop()
             if len(out) > LIMIT:
                 out = "⟪長さ超過⟫"
             memo[s] = out
             return out
+
+        def expand(e, stack):
+            e = FR_RE.sub(lambda m: leaf_of(m, stack), e)
+            return RG_RE.sub(lambda m: close_reg(m.group(1), int(m.group(2), 16), stack), e)
 
         def leaf_of(m, stack):
             return close_leaf(int(m.group(1), 16), int(m.group(2), 10), int(m.group(3), 16), stack)
@@ -279,7 +386,7 @@ def main(argv):
         for a in writes:
             m, o = ins[a]
             val = T.ev(p88.parse_ops(o)[1], cfg.idx[a], 0)
-            res[a] = FR_RE.sub(lambda mm: leaf_of(mm, []), val)
+            res[a] = expand(val, [])
         return res, multi, memo
 
     resB, multiB, _ = run("B", cut)

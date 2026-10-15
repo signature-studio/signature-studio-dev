@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # (診断) 未修復 comis の周辺 4 行を一覧表示する
-import sys, re
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/m6')
+import sys, os, re
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ir6_pass as p6
 
 src = sys.argv[1]

@@ -199,7 +199,9 @@ def main():
     check("0x1050546 の判定が 0x1050540 の store と同番地 (0x16bb13c)",
           rip_target(0x1050540) == 0x16BB13C and rip_target(0x1050546) == 0x16BB13C)
     format_checks()
+    desc_checks()
     typecheck_checks()
+    pct_fmt_checks()
     print(f"summary: {'OK' if not FAILS else str(len(FAILS)) + ' FAIL'}")
     return 1 if FAILS else 0
 
@@ -233,9 +235,42 @@ def format_checks():
           u16z(rip_target(0x43A900) + 4 * 0x0A, 2) == "0A" and u16z(rip_target(0x43A900) + 4 * 0xFF, 2) == "FF")
 
 
+def qword_at(va):
+    o = v2o(va)
+    return int.from_bytes(RAW[o:o + 8], "little")
+
+
 def qword(va):
     o = v2o(va)
     return int.from_bytes(RAW[o:o + 8], "little")
+
+
+def section_of(va):
+    rva = va - BASE
+    for s in PEF.sections:
+        if s.VirtualAddress <= rva < s.VirtualAddress + s.Misc_VirtualSize:
+            return s
+    return None
+
+
+def desc_checks():
+    # PY-323 (#4399): desc = [[0x15e2200]+0x940]。0x15e2200 は .data のポインタ slot (初期値 0x16bcaf0)、
+    # 0x16bcaf0 は .bss のオブジェクト、desc の格納先は 0x16bd430 (.bss・PE 上に実体無し = 初期値 0)
+    def sec(va):
+        s = section_of(va)
+        return s.Name.rstrip(b"\0") if s else None
+    check("0x15e2200 は .data の slot で初期値 0x16bcaf0 (PY-323)",
+          sec(0x15E2200) == b".data" and qword_at(0x15E2200) == 0x16BCAF0)
+    check("0x16bcaf0 は .bss 内 (オブジェクト)", sec(0x16BCAF0) == b".bss")
+    check("desc の格納先 0x16bd430 は .bss 内で、ファイル上の実体無し (PE 初期値 0)",
+          sec(0x16BD430) == b".bss" and section_of(0x16BD430).SizeOfRawData == 0)
+    check("0x1196017 が 0x16bcaf0 を書く (mov [rip],rax)",
+          ins_at(0x1196017).op_str == "qword ptr [rip + 0x526ad2], rax" and rip_target(0x1196017) == 0x16BCAF0)
+    check("0xb6fe51 が [rcx+0x940] へ rax を書く (候補 1 件・rcx は引数由来)",
+          ins_at(0xB6FE51).op_str == "qword ptr [rcx + 0x940], rax")
+    check("0xb6fe4d の rcx は [rbp+0x20] (引数の保存元 0xb6fb8c)",
+          ins_at(0xB6FE4D).op_str == "rcx, qword ptr [rbp + 0x20]"
+          and ins_at(0xB6FB8C).op_str == "qword ptr [rbp + 0x20], rcx")
 
 
 def typecheck_checks():
@@ -259,6 +294,29 @@ def typecheck_checks():
     check("T=0xfe2cf8 の基底 (T-0x78 → 0xfe28b0 → 0xfe2978) の 1 段目", qword(0xFE2CF8 - 0x78) == 0xFE28B0 and qword(0xFE28B0) == 0xFE2978)
     check("0x104fa21 call 0x40fe90 → 0x104fa26 test al,al → 0x104fa28 je 0x104fa4b",
           ins_at(0x104FA21).op_str == "0x40fe90" and ins_at(0x104FA28).op_str == "0x104fa4b")
+
+
+def pct_fmt_checks():
+    # PY-311 (#4225): %.2f 経路の呼出し辺と 0x43dd60 の r9 の流れ (丸め規則は未確定)
+    check("0x43ecb5 の %.2f 系 (精度 0x12) が 0x43fce0 を呼ぶ (0x43ece7)", ins_at(0x43ECE7).op_str == "0x43fce0")
+    check("0x43fce0 が 0x43f800 を呼ぶ (0x43fd16)", ins_at(0x43FD16).op_str == "0x43f800")
+    check("0x43f800 が 0x441380 を呼ぶ (0x43f8ee)", ins_at(0x43F8EE).op_str == "0x441380")
+    check("0x441380 が 0x440d30 を呼ぶ (0x4413a2)", ins_at(0x4413A2).op_str == "0x440d30")
+    check("0x440d30 の 10 のべき乗の換算 call 0x40ef40 (0x440e7a)", ins_at(0x440E7A).op_str == "0x40ef40")
+    check("0x440d30 の整数化 call 0x40c660 = cvtsd2si (0x440e7f)", ins_at(0x440E7F).op_str == "0x40c660"
+          and ins_at(0x40C660).mnemonic == "cvtsd2si")
+    check("0x440d30 の桁生成 call 0x440c10 (0x440ec7)", ins_at(0x440EC7).op_str == "0x440c10")
+    check("0x440c10 の 0 埋め call 0x40d210 (0x440c2d)", ins_at(0x440C2D).op_str == "0x40d210")
+    check("0x440c10 の絶対値 call 0x40c660 (0x440c50)", ins_at(0x440C50).op_str == "0x40c660")
+    check("0x43dd60 → 0x43dd90 (0x43dd77)", ins_at(0x43DD77).op_str == "0x43dd90")
+    check("0x43dd90 → 0x43dde0 (0x43dda5)", ins_at(0x43DDA5).op_str == "0x43dde0")
+    check("0x43dde0 → 0x43dc00 (0x43de79)", ins_at(0x43DE79).op_str == "0x43dc00")
+    check("0x43dc00 → 0x43e240 (0x43dc22)", ins_at(0x43DC22).op_str == "0x43e240")
+    check("0x43dde0 が r9 を rbx に保存 (0x43de11 mov rbx, r9)", ins_at(0x43DE11).op_str == "rbx, r9")
+    check("0x43dde0 の 6 番目引数 (rbx) を 0x43dc00 の [rsp+0x28] に渡す (0x43de5c)",
+          ins_at(0x43DE5C).op_str == "qword ptr [rsp + 0x28], rbx")
+    check("0x43e240 は 6 番目の引数を [rbp+0x1c8] で読む (0x43e2db)",
+          ins_at(0x43E2DB).op_str == "ebx, dword ptr [rbp + 0x1c8]")
 
 
 if __name__ == "__main__":

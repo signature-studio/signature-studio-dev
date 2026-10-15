@@ -12,6 +12,11 @@
   "rax": "0x0",
   "longjmp": 0,
   "stage": 1,
+  "diag_nullfill": {
+   "on": false,
+   "skip": 0,
+   "pass": 0
+  },
   "getmem": 2320,
   "freemem": 1200,
   "va_calls": 20,
@@ -37,6 +42,120 @@
    "safe_obj_0x98": null,
    "safe_obj_0x88": null
   },
+  "py_events": {
+   "n": 9,
+   "over": 0,
+   "events": [
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e1c78",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x16bb068",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e4790",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x141d6b8",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b82e0",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e1140",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x16b8488",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b8488",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b8250",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 209,
+     "site": 8,
+     "slot": "0x15e1c78",
+     "proc": "0x74",
+     "old": "0x16bb068",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 209,
+     "site": 8,
+     "slot": "0x15e4790",
+     "proc": "0x74",
+     "old": "0x141d6b8",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 209,
+     "site": 8,
+     "slot": "0x15e1140",
+     "proc": "0x74",
+     "old": "0x16b8488",
+     "new": "0x0",
+     "aux": "0x0"
+    }
+   ]
+  },
+  "py_snap": {
+   "last": {
+    "unit": 0,
+    "pos": 0,
+    "count": 0,
+    "mgr": "0x16bb068",
+    "safe_g": "0x141d6b8",
+    "safe_obj": "0x0",
+    "f98": "0x0",
+    "f88": "0x0",
+    "sing": "0x0"
+   },
+   "trace": [
+    {
+     "unit": 0,
+     "pos": 0,
+     "count": 0,
+     "mgr": "0x16bb068",
+     "safe_g": "0x141d6b8",
+     "safe_obj": "0x0",
+     "f98": "0x0",
+     "f88": "0x0",
+     "sing": "0x0"
+    }
+   ],
+   "over": 0
+  },
   "ipp_ptr_15F34A0": "0x0",
   "ipp_ptr_15F40E8": "0x0",
   "ipp_total": 2,
@@ -59,6 +178,16 @@
    ]
   ],
   "stopped_at_1based": 895
+ },
+ "outmem": {
+  "mem_bytes": 905969664,
+  "stack": {
+   "base": "0x11dbef00",
+   "end": "0x115bef00"
+  },
+  "full": "68b375fcf5d2eb3c92754715d7f7d5a5499664e7899166474d893f4c46e4477a",
+  "no_cstack": "0825554a357cbae87679caeba5966df141ac22b47fc5563536409d2c2b5fed81",
+  "sections": {}
  },
  "survey": null,
  "tolerant": {
@@ -8322,29 +8451,66 @@
   ],
   "soft_called": []
  },
+ "log_cap": {
+  "cap": 0,
+  "time_cap_s": 0,
+  "quiet_bin": false,
+  "bytes": 0,
+  "lines": 0,
+  "bin_lines": 0,
+  "bin_bytes": 0,
+  "hit": null,
+  "elapsed_ms": null,
+  "head": [],
+  "tail": []
+ },
+ "px6bbc20": {
+  "calls_all": 0,
+  "calls_site_6c9380": 0,
+  "first_rect_x0_y0_x1_y1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "last_rect_x0_y0_x1_y1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "rect_changes": 0,
+  "x_min_max_y_min_max": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "calls_other_ret": 0
+ },
  "soft_top": [
-  "268448949:21",
-  "268438499:10",
-  "268437183:7",
-  "268448822:7",
-  "268448292:4",
-  "268449538:3",
-  "268437897:3",
-  "268449569:3",
-  "268448562:3",
-  "268448679:2",
-  "268441291:1",
-  "268448494:1",
-  "268436613:1",
-  "268437861:1",
-  "268448548:1",
-  "268448334:1",
-  "268448061:1",
-  "268448424:1",
-  "268448707:1",
-  "268437838:1",
-  "268437274:1",
-  "268448349:1"
+  "LoadImageW:21",
+  "GetSystemMetrics:10",
+  "GetStockObject:7",
+  "RegisterWindowMessageW:7",
+  "RegisterClipboardFormatW:4",
+  "GetDC:3",
+  "GetDeviceCaps:3",
+  "ReleaseDC:3",
+  "SystemParametersInfoW:3",
+  "LoadIconW:2",
+  "CreatePalette:1",
+  "LoadCursorW:1",
+  "GetKeyboardLayout:1",
+  "EnumDisplayMonitors:1",
+  "GetClassInfoW:1",
+  "RegisterClassW:1",
+  "CreateWindowExW:1",
+  "SetWindowLongPtrW:1",
+  "GetClipboardFormatNameW:1",
+  "GetProcessDpiAwareness:1",
+  "IntersectRect:1",
+  "EnumDisplaySettingsW:1"
  ],
  "ipp": {
   "mode": 1,

@@ -96,6 +96,18 @@ velocity による選択 (`0x122227e`〜`0x12223b9`、K∈{0,2} のみ。S+0xa0 
 
 **lockDisplayZone** 0xd56fc0: zone = `[[job+8]+0x50]` (0xd56ffa) は REPORT_PY91 の通り。`zone->vtbl[+0x148](index, bool)` (0xd57012〜0xd57015) の先と zone の型は未確定 → #3624。
 
+**#3624 の追補 (PY-222、静的解析で確定した分と未確定の分)**:
+
+| 対象 | 確定した作用 (VA) | 確度 |
+|---|---|---|
+| `e5abd0` の `0x4f2990(out, a, b, c, d)` | `out[0..0xc]` に 4 個の int を書く (0x4f2990〜0x4f29a4)。`rect` 相当の書き込み | 確定 |
+| `e5abd0` の `0x1221aa0(x)` | `ebx = x`。`x < 0` なら `-1`。`x ≥ 0` なら `0x12e1a20()` の表 `[rax+0x21c48]` の判定 (0x1221abc〜0x1221ad0) で 2 経路に分かれる。経路 A (表が無い・件数条件を外れる): `index = x × [0x15e0db8]` (0x1221ad2〜0x1221ad9)。経路 B: 表の要素 13 dword 刻み (0x1221af5〜0x1221af9) を `0x442c00` に渡し、戻り値を `[0x15e0120]` (int) と比べて index を返す (0x1221b01〜0x1221b10)。`0x442c00` は `rect` の 4 個の `word` を読んで `0x442670` に渡す (0x442c00〜0x442c26) | 経路 A/B の分岐と参照先は確定。経路 B の `0x442c00` への引数の渡し方・戻り値の意味、`[0x15e0db8]`・`[0x15e0120]` の値は未確定 |
+| `0x737020` の受け手 | `0x737020` は `this = [0x15f61a8]`、`vtbl[+0x40]` の呼出し (0x737047〜0x73705c)。`0x15f61a8` は .bss の遅延初期化スロットで、`0x736ff0` が初回に `[0x15e1fc0]` の関数の戻り値を書く (0x736ffe〜0x737007)。スロットに入るオブジェクトは .bss 上で実行時に決まり、ファイル上の初期値は無い (`0x15f4658`・`not-in-file`) | スロットの位置は確定。オブジェクトの型は未確定 |
+
+旧表記の訂正: `0x737020` の `*(0xebf15a)` などは RIP 相対の disp 値で、実アドレスは `0x15f61a8` (`pe_rip_refs.py` で全参照を検出)。
+
+**未確定 (#3624 に残す)**: `lockDisplayZone` の `zone->vtbl[+0x148]` の先と zone の型。zone の型 (class 名・VMT) は PE 上に手がかりが無く、`0x15f61a8` の実行時オブジェクトの型から決まる。
+
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
@@ -123,6 +135,8 @@ velocity による選択 (`0x122227e`〜`0x12223b9`、K∈{0,2} のみ。S+0xa0 
 - 差分: `git diff 44f02645c HEAD -- tools/python/analysis/flapi/playlist_live_clip_facts.py tools/python/analysis/flapi/pe_disasm.py` の出力は 0 行 (測定対象の 2 本は変更なし)。main 取り込み (merge commit) で `tools/python/analysis/flapi` には `pe_va_read.py`・`pe_mixer_wrappers.py` の追加のみが入ったが、測定対象 2 本は両者を import しない。
 - 再測定 (修正後 HEAD `b184a77c3`、`/usr/bin/time`、n=3): real 0.08 s / user 0.06 s / sys 0.01〜0.02 s。実行直前の load average `0.02 0.14 0.08`、nproc 4、並列 1。全 expectation OK (exit 0)。
 - 逆アセンブル (手動): 0x1221bc0〜0x1222b69 (全体)・0x1222b90・0x100b890・0x100b970・0xd2a550・0xd2a3c0・0x12df530・0xd84f70・0xfdc630・0x420980・0x420b00・0xe5abd0・0x737020 を `pe_disasm.py` で読んだ。実行による検証はしていない。差し戻し修正時に 0x12223bf〜0x12224a9・0x1222200〜0x122221a・0x1222300〜0x122231b・0x1222b90・0xd84f70・0x100bb90 を再読した。
+
+- #3624 追補の実測: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_rip_refs.py 0x15f4658 0x15f61a8` (既存スクリプト。.text 線形走査、n=3、`/usr/bin/time`): real 18.03〜18.61 s / user 18.00〜18.60 s。実行直前の load average `0.78 0.36 0.22`、nproc 4、並列 1。`0x15f61a8` のヒットは 41 件 (0x736ff4〜0x741753)。
 
 ## 9. 参照
 

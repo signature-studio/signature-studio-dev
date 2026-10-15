@@ -344,7 +344,7 @@ void CanvasGraphicsDeviceContext::setLineWidth (CCoord width) const
 //------------------------------------------------------------------------
 void CanvasGraphicsDeviceContext::setDrawMode (CDrawMode mode) const
 {
-	(void)mode;
+	drawMode = mode;
 }
 
 //------------------------------------------------------------------------
@@ -470,9 +470,14 @@ void CanvasGraphicsDeviceContext::strokeRect (const CRect& rect, const CColor& c
 }
 
 //------------------------------------------------------------------------
-// 1 px の Bresenham 線。端点は四捨五入して画素に置く。
+// 太さ 1 かつ aliasing は 1 px の Bresenham 線 (端点は四捨五入して画素に置く)。それ以外は plotThickLine で描く。
 void CanvasGraphicsDeviceContext::plotLine (CPoint from, CPoint to, const CColor& color) const
 {
+	if (lineWidth > 1. || drawMode.antiAliasing ())
+	{
+		plotThickLine (from, to, color);
+		return;
+	}
 	auto x0 = static_cast<int32_t> (std::lround (from.x));
 	auto y0 = static_cast<int32_t> (std::lround (from.y));
 	auto x1 = static_cast<int32_t> (std::lround (to.x));
@@ -497,6 +502,39 @@ void CanvasGraphicsDeviceContext::plotLine (CPoint from, CPoint to, const CColor
 		{
 			err += dx;
 			y0 += sy;
+		}
+	}
+}
+
+//------------------------------------------------------------------------
+// 線分から画素中心までの距離で被覆を求める。太さ lineWidth の半分以内を塗る (端は丸い)。
+// aliasing は被覆 0/1 の二値、kAntiAliasing は境界の 1 px を線形に薄めて alpha に掛ける。
+void CanvasGraphicsDeviceContext::plotThickLine (CPoint from, CPoint to, const CColor& color) const
+{
+	const auto half = std::max (lineWidth, 1.) / 2.;
+	const bool antiAliasing = drawMode.antiAliasing ();
+	const auto dx = to.x - from.x;
+	const auto dy = to.y - from.y;
+	const auto lengthSquared = dx * dx + dy * dy;
+	auto box = pixelBoxOf (CRect (std::min (from.x, to.x) - half - 1., std::min (from.y, to.y) - half - 1.,
+	                              std::max (from.x, to.x) + half + 1., std::max (from.y, to.y) + half + 1.));
+	auto clip = pixelBoxOf (clipRect);
+	for (auto y = std::max (box.y0, clip.y0); y < std::min (box.y1, clip.y1); ++y)
+	{
+		for (auto x = std::max (box.x0, clip.x0); x < std::min (box.x1, clip.x1); ++x)
+		{
+			const auto px = x + 0.5 - from.x;
+			const auto py = y + 0.5 - from.y;
+			const auto t = lengthSquared > 0. ? std::clamp ((px * dx + py * dy) / lengthSquared, 0., 1.) : 0.;
+			const auto ex = px - t * dx;
+			const auto ey = py - t * dy;
+			const auto distance = std::sqrt (ex * ex + ey * ey);
+			const auto coverage = antiAliasing ? std::clamp (half + 0.5 - distance, 0., 1.)
+			                                   : (distance <= half ? 1. : 0.);
+			if (coverage <= 0.)
+				continue;
+			if (auto* dst = pixelAt (x, y))
+				blendRGBA (dst, color, globalAlpha * coverage);
 		}
 	}
 }
