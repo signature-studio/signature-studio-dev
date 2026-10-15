@@ -4,9 +4,11 @@
 tools/ott/work/ott.ll (旧 RetDec chain の産物。読取専用) は書き換えず、--out の下に複製・1 行変更版・target JSON を作る。
 
   python3 bool_sext_probe.py enum [--ir PATH]                 # call i1 @ の列挙 (静的)
-  python3 bool_sext_probe.py variants --out DIR [--ir PATH]   # orig / hf_zext / all_zext の複製と target JSON
-  python3 bool_sext_probe.py run --out DIR                    # liftdiff run を各 variant に実行 (所要秒を記録)
+  python3 bool_sext_probe.py variants --out DIR [--ir PATH]   # orig / hf_zext / all_zext / boolret の複製と target JSON
+  python3 bool_sext_probe.py run --out DIR                    # liftdiff run を各 variant の既定 build と計装 build に実行 (所要秒を記録)
   python3 bool_sext_probe.py rax --out DIR                    # native と wasm の rax を case ごとに比べる
+  python3 bool_sext_probe.py compare --out DIR                # 既定 build と計装 build を results/ld67/compare_blk.py で比べる
+boolret は liftlib の repair pass (tools/liftlib/liftlib/passes/boolret.py) で作る。all_zext と同一の IR になることを確かめる。
 """
 import argparse, difflib, hashlib, json, os, re, shutil, subprocess, sys, time
 
@@ -14,9 +16,12 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..', '..', '..'))
 IR_DEFAULT = os.path.join(REPO, 'tools', 'ott', 'work', 'ott.ll')
 TARGET_BASE = os.path.join(REPO, 'tools', 'liftdiff', 'targets', 'ott_old.json')
+TARGET_BLK = os.path.join(REPO, 'tools', 'liftdiff', 'targets', 'ott_old_blk.json')
 LIFTDIFF = os.path.join(REPO, 'tools', 'liftdiff', 'liftdiff.py')
+COMPARE = os.path.join(REPO, 'tools', 'liftdiff', 'results', 'ld67', 'compare_blk.py')
 FNS = '0x1801ab1d0,0x1801ab258,0x1801c5e84,0x1801c621c,0x1801c682c,0x1801c69cc'
-VARIANTS = ['orig', 'hf_zext', 'all_zext']
+VARIANTS = ['orig', 'hf_zext', 'all_zext', 'boolret']
+KINDS = [('', TARGET_BASE), ('_blk', TARGET_BLK)]
 
 # Win32 のドキュメント上の戻り値型が BOOL の API (ott.ll の call i1 @ の全名)。
 BOOL_APIS = {'IsDebuggerPresent', 'IsProcessorFeaturePresent', 'TerminateProcess', 'HeapFree', 'FreeLibrary',
@@ -99,37 +104,56 @@ def cmd_variants(a):
     lines = read_ir(a.ir)
     calls = enum_calls(lines)
     st = sext_targets(lines, calls)
-    sets = {'orig': {}, 'hf_zext': {k: v for k, v in st.items() if v == 'HeapFree'}, 'all_zext': st}
-    with open(TARGET_BASE, encoding='utf-8') as f:
-        base = json.load(f)
+    sets = {'orig': {}, 'hf_zext': {k: v for k, v in st.items() if v == 'HeapFree'}, 'all_zext': st, 'boolret': st}
+    news = {}
     for v in VARIANTS:
         ir_out = os.path.join(a.out, 'ott_%s.ll' % v)
-        new = list(lines)
-        for ln in sets[v]:
-            m = SEXT_RE.match(new[ln - 1])
-            new[ln - 1] = m.group(1) + 'zext i1 ' + m.group(2) + ' to i64' + m.group(3)
+        if v == 'boolret':
+            sys.path.insert(0, os.path.join(REPO, 'tools', 'liftlib'))
+            from liftlib.passes import boolret
+            text, n = boolret.apply('\n'.join(lines))
+            new = text.split('\n')
+            print('boolret: pass の変更 %d 件 (直接 sext の対象 %d 件) / all_zext と同一 %s' % (n, len(st), new == news['all_zext']))
+        else:
+            new = list(lines)
+            for ln in sets[v]:
+                m = SEXT_RE.match(new[ln - 1])
+                new[ln - 1] = m.group(1) + 'zext i1 ' + m.group(2) + ' to i64' + m.group(3)
+        news[v] = new
         write_variant(new, ir_out)
         changed = [d for d in difflib.unified_diff(lines, new, lineterm='', n=0) if d[:1] in '+-' and d[:3] not in ('+++', '---')]
         print('variant %-9s 変更行 %d 件 (%s) -> %s' % (v, len(changed) // 2, ', '.join('%d:%s' % (k, sets[v][k]) for k in sorted(sets[v])) or '-', ir_out))
-        t = dict(base)
-        t['name'] = 'ld147_%s' % v
-        t['desc'] = 'LD-147 (#3180) 実測用の複製。ott_old と同一の lift・stub。ir のみ複製 (variant=%s)' % v
-        t['ir'] = ir_out
-        with open(os.path.join(a.out, 'target_%s.json' % v), 'w', encoding='utf-8') as f:
-            json.dump(t, f, indent=2, ensure_ascii=False)
+        for suffix, path in KINDS:
+            with open(path, encoding='utf-8') as f:
+                t = json.load(f)
+            t['name'] = 'ld147_%s%s' % (v, suffix)
+            t['desc'] = 'LD-147 (#3180) 実測用の複製。%s と同一の lift・stub。ir のみ複製 (variant=%s)' % (os.path.basename(path), v)
+            t['ir'] = ir_out
+            with open(os.path.join(a.out, 'target_%s%s.json' % (v, suffix)), 'w', encoding='utf-8') as f:
+                json.dump(t, f, indent=2, ensure_ascii=False)
     print('tools/ott/work/ott.ll は書き換えていない (sha256 は上記)')
 
 
 def cmd_run(a):
     for v in VARIANTS:
-        t0 = time.time()
-        js = os.path.join(a.out, 'target_%s.json' % v)
-        res = os.path.join(a.out, 'res_%s.json' % v)
-        p = subprocess.run([sys.executable, LIFTDIFF, 'run', js, '--fn', FNS, '--pattern', 'vm0,u16', '--notrace',
-                            '--json', res], cwd=os.path.join(REPO, 'tools', 'liftdiff'), capture_output=True, text=True)
-        print('run %-9s rc=%d wall=%.2fs -> %s' % (v, p.returncode, time.time() - t0, res))
-        if p.returncode:
-            print(p.stdout[-2000:], p.stderr[-2000:])
+        for suffix, _ in KINDS:
+            t0 = time.time()
+            js = os.path.join(a.out, 'target_%s%s.json' % (v, suffix))
+            res = os.path.join(a.out, 'res_%s%s.json' % (v, suffix))
+            p = subprocess.run([sys.executable, LIFTDIFF, 'run', js, '--fn', FNS, '--pattern', 'vm0,u16', '--notrace',
+                                '--json', res], cwd=os.path.join(REPO, 'tools', 'liftdiff'), capture_output=True, text=True)
+            print('run %-9s%-5s rc=%d wall=%.2fs -> %s' % (v, suffix or '(def)', p.returncode, time.time() - t0, res))
+            if p.returncode:
+                print(p.stdout[-2000:], p.stderr[-2000:])
+
+
+def cmd_compare(a):
+    for v in VARIANTS:
+        p = subprocess.run([sys.executable, COMPARE, os.path.join(a.out, 'res_%s.json' % v),
+                            os.path.join(a.out, 'res_%s_blk.json' % v)], capture_output=True, text=True)
+        with open(os.path.join(a.out, 'compare_%s.txt' % v), 'w', encoding='utf-8') as f:
+            f.write(p.stdout + p.stderr)
+        print('compare %-9s rc=%d %s' % (v, p.returncode, (p.stdout.strip().splitlines() or ['-'])[-1]))
 
 
 def cmd_rax(a):
@@ -159,8 +183,9 @@ def main():
     p = sp.add_parser('variants'); p.add_argument('--ir', default=IR_DEFAULT); p.add_argument('--out', required=True)
     p = sp.add_parser('run'); p.add_argument('--out', required=True)
     p = sp.add_parser('rax'); p.add_argument('--out', required=True)
+    p = sp.add_parser('compare'); p.add_argument('--out', required=True)
     a = ap.parse_args()
-    {'enum': cmd_enum, 'variants': cmd_variants, 'run': cmd_run, 'rax': cmd_rax}[a.cmd](a)
+    {'enum': cmd_enum, 'variants': cmd_variants, 'run': cmd_run, 'rax': cmd_rax, 'compare': cmd_compare}[a.cmd](a)
 
 
 if __name__ == '__main__':

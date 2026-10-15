@@ -140,7 +140,7 @@ def build(t, force=False):
         cc(simd_c, W + '/obj/simd.o')
     out = W + '/ld_wasm.cjs'
     if force or any(newer(o, out) for o in objs):
-        exports = '_ld_w_inbuf,_ld_w_layout,_ld_w_init,_ld_w_add_wr,_ld_w_snapshot,_ld_w_blob,_ld_w_fix,_ld_w_case_begin,_ld_w_fn,_ld_w_arg,_ld_w_arg_kind,_ld_w_nargs,_ld_w_case_end,_ld_w_state,_emscripten_stack_get_current,__emscripten_stack_restore,_malloc,_free'
+        exports = '_ld_w_inbuf,_ld_w_layout,_ld_w_init,_ld_w_add_wr,_ld_w_snapshot,_ld_w_reset,_ld_w_blob,_ld_w_fix,_ld_w_case_begin,_ld_w_fn,_ld_w_arg,_ld_w_arg_kind,_ld_w_nargs,_ld_w_case_end,_ld_w_state,_emscripten_stack_get_current,__emscripten_stack_restore,_malloc,_free'
         gb = t.get('global_base', 0x10000000)
         mem = t.get('initial_memory', 0x16000000)
         for e in t.get('init_exports', []):
