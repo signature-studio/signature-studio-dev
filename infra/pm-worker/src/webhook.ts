@@ -404,11 +404,9 @@ function applyDependencies(s: PmState, p: Json): PmState {
   return { ...s, blockedBy, issues };
 }
 
-// 本文が『Refs #N のみ』か (issue を閉じない merge の判定)。Closes / Fixes / Resolves の語が 1 つでもあれば false。大文字小文字は区別しない。
-const REFS_RE = /\bRefs:?\s+(?:[\w.-]+\/[\w.-]+)?#\d+/i;
-const CLOSE_RE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+(?:[\w.-]+\/[\w.-]+)?#\d+/i;
+// 本文が『Refs #N のみ』か (issue を閉じない merge の判定)。判定は refs.ts の refsOnlyNumbers に一本化 (#2623)。
 export function refsOnlyBody(body: string): boolean {
-  return REFS_RE.test(body) && !CLOSE_RE.test(body);
+  return refsOnlyNumbers(body).length > 0;
 }
 
 function applyPr(s: PmState, p: Json): PmState {

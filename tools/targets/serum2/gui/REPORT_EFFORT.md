@@ -242,3 +242,8 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 
 ## 15. 2026-10-14 run (#2066 / SR-37): XferOnOffButton の .text 対応付けと本体バイト数
 - 詳細・実測・測定スクリプト: 付録 `REPORT_EFFORT_APPENDIX_2066.md` (本節の全文)。
+
+## 16. 2026-10-14 run (#2065 / SR-36): canvas 描画の試行
+- 結論: **未達 (画素計数は計測不能: 描画先が未結線)**。CTextLabel のみの harness は wasm でコンパイル・リンク・実行まで通る。描画未達の根拠は、描画命令 15 件の静的 no-op 計数と、文字列経路 (`createString` が nullptr、`text_width=-1`) の 2 点。`nonzero_after` は構造上 0 のため根拠にしない。XferOnOffButton は範囲外 (阻害要因のみ記録)。
+- 詳細・実測・測定 commit (`39f3702d`)・子 issue (#3260〜#3262): 付録 `REPORT_EFFORT_APPENDIX_2065.md` (本節の全文)。
+- 子 #3261 (SR-51・wasm の初期化経路): `platformfactory.cpp` の WASM 分岐と upstream `init()` 経路で、harness の `getPlatformFactory` 自前定義と `CFontDesc::init()` 直呼びを外した (run rc=0 のまま)。実測と負の対照: 付録 `REPORT_EFFORT_APPENDIX_3261.md`。

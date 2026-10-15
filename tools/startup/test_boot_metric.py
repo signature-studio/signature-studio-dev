@@ -107,7 +107,39 @@ NATIVE = """# liftdiff — 実測
 STARTUP = """| S08 | host | x |
 | S09 | host | `0x140004b60` | `LoadLibraryW(path)` → **DllMain** (entry `0x1376820`) |
 | S11 | host | `0x140006f1b` | `GetProcAddress(engine,"CreateFruityInstance")(0xC0,0xEDE95A,host,&iface)` |
+| S12 | engine | `0x1375990` 冒頭, `0x13752f0` | x |
 """
+APPENDIX_7 = """# appendix 7
+
+## 7. WIN-4 (fixture)
+
+**測定 commit `5f9d7cbd`** (fixture)
+
+### 7-4. 呼出し
+
+- 結果: `CreateFruityInstance` は `[shim] FAIL-FAST: unimplemented Win32 API: EnterCriticalSection (未初期化/未登録)` の後に `abort()` (1 ms)。
+
+## 8. next
+
+x
+"""
+APPENDIX_2880 = """# appendix 2880
+
+## 9. WIN-11 (fixture)
+
+### 9-3. 実測 (`cfi_probe.mjs`・commit `ae963e28`)
+
+| 項目 | 結果 |
+|---|---|
+| `CreateFruityInstance(0xC0, 0xEDE95A, host, &iface)` | `Aborted`・1 ms・`iface` = 0x0 |
+| 最後の shim 行 | `[shim] CS-MISS key=0x12bd390` → `FAIL-FAST: unimplemented Win32 API: EnterCriticalSection (未初期化/未登録)` |
+| GUI-REACH / icall_miss | `LoadStringW` ×3 のみ / 5 (§7-4 と同じ) |
+
+### 9-4. next
+
+x
+"""
+CFI_PROBE = "  const r = mod._CreateFruityInstance(0xC0n, 0xEDE95An, BigInt(host), BigInt(iface));\n"
 
 
 def make_fixture(root, overrides=None):
@@ -116,6 +148,9 @@ def make_fixture(root, overrides=None):
         "tools/m11/REPORT_APPENDIX_1430.md": APPENDIX,
         "tools/m11/REPORT_N2714.md": M11_N2714,
         "tools/gui/flengine/REPORT.md": GUI_REPORT,
+        "tools/gui/flengine/REPORT_APPENDIX.md": APPENDIX_7,
+        "tools/gui/flengine/REPORT_APPENDIX_2880.md": APPENDIX_2880,
+        "tools/gui/flengine/cfi_probe.mjs": CFI_PROBE,
         "tools/gui/flengine/results/boot.json": json.dumps(GUI_BOOT),
         "tools/gui/flengine/results/survey_soft.json": json.dumps(GUI_SURVEY),
         "tools/flelift/boot/results/boot_summary_plain.json": json.dumps(X64_BOOT),
@@ -138,6 +173,14 @@ def fixed_commit(rel):
     return "fixture"
 
 
+def fixed_show(root):
+    """測定 commit 時点の内容の代わりに作業ツリーの内容を返す (fixture に git 履歴は無い)。"""
+    def show(rel, commit):
+        p = Path(root) / rel
+        return p.read_text(encoding="utf-8") if p.is_file() else None
+    return show
+
+
 class BootMetricTest(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="boot_metric_"))
@@ -145,7 +188,7 @@ class BootMetricTest(unittest.TestCase):
 
     def build(self, overrides=None):
         root = make_fixture(self.tmp / "repo", overrides)
-        return bm.build(root, commit_of=fixed_commit)
+        return bm.build(root, commit_of=fixed_commit, show_of=fixed_show(root))
 
     def by_id(self, doc):
         return {r["id"]: r for r in doc["records"]}
@@ -277,6 +320,43 @@ class BootMetricTest(unittest.TestCase):
         broken = M11_N2714.replace("942 試行・ok 874", "942 試行・ok 873")
         with self.assertRaises(bm.MetricError):
             self.build({"tools/m11/REPORT_N2714.md": broken})
+
+    def test_flengine_record_values(self):
+        fle = self.by_id(self.build())["flengine-cfi-probe"]
+        self.assertTrue(fle["create_fruity_instance"]["reached"])
+        self.assertEqual(fle["create_fruity_instance"]["last_step"], "S12")
+        self.assertEqual(fle["stop"]["api"], "EnterCriticalSection")
+        self.assertEqual(fle["stop"]["cs"], "0x12bd390")
+        self.assertEqual(fle["commit"], "ae963e28")
+        self.assertEqual(fle["gui_natural"], {"RegisterClassW": 0, "CreateWindowExW": 0})
+        files = {s["file"] for s in fle["source"]}
+        self.assertIn(bm.FLE_APPENDIX_2880, files)
+        self.assertIn(bm.FLE_APPENDIX, files)
+
+    def test_negative_probe_source_removed_fails(self):
+        with self.assertRaises(bm.MetricError):
+            self.build({"tools/gui/flengine/cfi_probe.mjs": None})
+
+    def test_negative_probe_cs_row_changed_fails(self):
+        broken = APPENDIX_2880.replace("CS-MISS key=", "CS-MIS key=")
+        with self.assertRaises(bm.MetricError):
+            self.build({"tools/gui/flengine/REPORT_APPENDIX_2880.md": broken})
+
+    def test_negative_fail_fast_api_mismatch_fails(self):
+        broken = APPENDIX_7.replace("EnterCriticalSection (未初期化", "CreateEventW (未初期化")
+        with self.assertRaises(bm.MetricError):
+            self.build({"tools/gui/flengine/REPORT_APPENDIX.md": broken})
+
+    def test_negative_non_probe_call_in_gui_dir_fails(self):
+        with self.assertRaises(bm.MetricError):
+            self.build({"tools/gui/flengine/harness.mjs": "mod._CreateFruityInstance(0xC0n, 0xEDE95An)\n"})
+
+    def test_comment_mention_is_not_a_call(self):
+        self.build({"tools/m11/note.sh": "CH=x   # boot7 = CreateFruityInstance (0x1375990)\n"})
+
+    def test_call_after_string_with_comment_marker_fails(self):
+        with self.assertRaises(bm.MetricError):
+            self.build({"tools/m11/harness.mjs": 'log("a // b"); mod._CreateFruityInstance(0xC0n)\n'})
 
 
 if __name__ == "__main__":
