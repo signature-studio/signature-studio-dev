@@ -35,3 +35,12 @@
 
 - 受入 1 の結果 (読取箇所の確定 = 0x10008FA0・numEvents `[arg+0]`・events `[arg+8]` stride 4) は、`marshal.py` の events 受入 (ネガコン付き) の期待値として使える。 `trace_effevents.py` の `check()` がその期待値を持つ。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/plugins/slayer_engine_ia32/trace_effevents.py` → `[trace] OK`・exit 0。 ネガコン `--nega` は `nega: 3/3 hit, 0 miss`・exit 0。
+
+## 5. 実測 (測定 commit `413b5d4db`・n=3)
+
+| 項目 | 実測 |
+|---|---|
+| gate + nega の wall (1 run あたり、`date +%s%N` 差分) | 112 / 113 / 119 ms |
+| load average (1 分、各 run 前) | 0.03 / 0.03 / 0.03 |
+| 出力 | 3 回とも `[trace] OK` (gate) と `nega: 3/3 hit, 0 miss` (nega)・exit 0 |
+| `git diff 413b5d4db HEAD -- tools/plugins/slayer_engine_ia32` | 0 行 (測定 commit 以降のコード差分なし) |
