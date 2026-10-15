@@ -81,7 +81,7 @@ def main():
         res[key] = {"export": nm, "stub_rva": stub, "stub_kind": kind, "begin": tgt, "end": e, "size": e - tgt, "pdata_chain": chain,
                     "range": f"{base + tgt:#x}-{base + e:#x}"}
     open(os.path.join(outdir, "image.bin"), "wb").write(img)
-    json.dump({"image_base": base, **res}, open(os.path.join(outdir, "ranges.json"), "w"), indent=1)
+    json.dump({"image_base": base, **res, "create_rva": ex["CreateReverbInstance"]}, open(os.path.join(outdir, "ranges.json"), "w"), indent=1)
     for k, v in res.items():
         print(f"[locate] {k}: {v['export']} stub {v['stub_rva']:#x} --{v['stub_kind']}--> {v['begin']:#x}..{v['end']:#x} ({v['size']} B, pdata chain {len(v['pdata_chain'])})  select-range {v['range']}")
 
