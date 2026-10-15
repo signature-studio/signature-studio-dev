@@ -140,14 +140,17 @@
 ## 6. 群 C の受け手 (#5144) — 未達
 
 対象: `0xb35298` (fn `0xb35250`・受け手 `[Self+0x18]`) と `0xb671a2` (fn `0xb67190`・受け手 `[Self+0x7a0]`)。
-`analysis/py5144_groupc.py <PE.bin>` (実行 約 2 秒・n=1・load 未計測) で確認した。
+`analysis/py5144_groupc.py <PE.bin>` (実行 2.02 秒・n=1・load 1.36 / 1 分平均) で確認した。注: この script は `0xb32764` を Self 書込みとして数えるため、その行は誤検出 (下の箇条書きを参照)。script は main に残し、誤検出の記録として保持する。修正は #5144 (残り) で行う。
 
 - fn `0xb35250` は VMT `TDBXStreamValue@0xb07378` のスロット関数。fn `0xb67190` は VMT `TGenericPlugin@0xb655c8` のスロット関数。VMT 経由の呼出しだけで、直接 `call rel32` の呼出し元は 0 件 (両 fn)。
 - 両 VMT の .text スロットは 117 件 (`TDBXStreamValue`) と 119 件 (`TGenericPlugin`)。受け手は呼出し元の動的型で決まり、呼出し元までの直接辿りでは決まらない。
-- `TDBXStreamValue` の VMT スロット `[116]` (fn `0xb326f0`) は `[rcx+0x18]` に書くが、rcx が Self かは未確認 (引数の可能性がある)。`TGenericPlugin` 側は書込みを見つけられなかった。
-- 未確定の理由: 書込み元の型 (フィールド `+0x18`・`+0x7a0` の宣言型) を RTTI / フィールド表から引いていない。VMT 即値の 4 バイト検索は誤検出 (データ部) のみで、コンストラクタを特定できなかった。
+- `TDBXStreamValue` の VMT スロット `[116]` (fn `0xb326f0`) の `+0x18` 書込み (`0xb32764`) は、Self の `+0x18` ではない。`rcx = [rbx+0x58]` (Self の `+0x58` の先) の `+0x18` に、`rax = [rsi+0x58]` の `+0x18` を写す。rbx・rsi は第 1・第 2 引数で、Self の `+0x18` は書かない (`groupc` の出力は、このサイトを Self 書込みとして数えた誤検出)。
+- `TGenericPlugin` 側 (`+0x7a0`): `.text` 全域の `mov [reg+0x7a0], …` 書込みは **0 件** (`analysis/py5144_writes.py`・走査範囲は下の「走査範囲」行)。
+- 実測 (`analysis/py5144_writes.py`・n=1・load 1.36 / 1 分平均 (測定直前の `/proc/loadavg`)。`P=work/py5144/extracted/block00031_PE.bin`): `0x7a0` は 1.28 秒・0 件、`0x18` は 1.26 秒・74 件 (全域。どのクラスの書込みかは未分離)。
+- 走査範囲: `mov` 命令で reg 基底の `[reg+disp]` のみ。rsp/rbp/rip 基底は除外。SSE (`movups`/`movdqu` 等) と index 付きアドレッシング (`[reg+idx*s+disp]`) は走査していない。よって「0 件」は「mov の reg 基底の書込みが 0 件」の意味で、SSE 等による書込みの不在は示さない。
+- 未確定の理由: (a) `TDBXStreamValue` の `+0x18` は、全域 74 件から Self 型のものを分ける必要がある。(b) `TGenericPlugin` の `+0x7a0` は、走査範囲 (mov の reg 基底のみ) では書かれていない。コンストラクタ・初期化の経路 (`lea` 経由の VMT 書込み) を VMT の RIP 相対 `lea` 検索で特定できなかった (両 VMT とも参照 0 件)。RTTI / フィールド表から宣言型を引いていない。
 - 結論: 群 C の 2 件は**型を確定できなかった**。件数 (受入 2b) の不確定は 27 件のまま (群 C の 2 件は残る)。
-- 次に必要な情報: `TDBXStreamValue` と `TGenericPlugin` のフィールド表 (+0x18・+0x7a0 の宣言型)。
+- 次に必要な情報: `TDBXStreamValue` のコンストラクタと `TGenericPlugin` の初期化関数 (フィールド表の宣言型)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
