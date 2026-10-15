@@ -90,7 +90,17 @@ M = 機械語で X (= K + 0x400000) を rip 相対で読む命令の数 (`origin
 
 ### 9-1. 実測 (測定 commit と e2e)
 
-(本節は測定後に追記する)
+- 測定 commit: `fc594f86a` (コードを変えた最後の commit。`origin_b_2940.py` の追加。修復の経路は変えていない)。
+- 測定 commit からの差分 (修復の経路の範囲。空 = 0 件):
+
+  ```
+  git diff fc594f86a HEAD -- tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf*.py tools/m11/ldfix/ldmach*.py tools/m11/ldfix/spill37_1169.py tools/m11/ldfix/fix_spill_2794.py tools/m11/ldfix/check_spill_2794.py tools/m11/ldfix/results tools/m11/lb_base.py
+  (空: 差分 0)
+  ```
+
+- e2e `bash tools/m11/ldfix/fix_d17_e2e.sh` (HEAD で n=2): rc=0 / rc=0、real 47.17 s / 47.15 s、load average (1 分、実行前) 0.50 / 0.77。REPORT_2794 の測定 (46.84 s / 46.51 s) と同じ範囲。
+- e2e の出力: 修復 9 / 見送り 15 (`spill fixed=9 skipped=15`)、spill 宛 CELL_COLLAPSED 37 → 28、`check_spill_2794.py` RESULT: PASS、ネガコン 2 (`--gate none`) は `spill fixed=24 skipped=0`、emcc `-c -O0 -g1` rc=0。
+- `origin_b_2940.py`: 0.6 秒。M は 2/3/3/7/4/2、I(K) は 1/2/2/3/3/1 (§2)。
 
 ## 10. 検証の再現
 
