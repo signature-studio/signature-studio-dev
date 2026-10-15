@@ -93,7 +93,7 @@ jobs:
           retention-days: 14
 
   remote:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.remote)
+    if: (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.remote)) && vars.E2E_URL != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
