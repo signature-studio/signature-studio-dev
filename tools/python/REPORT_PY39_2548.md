@@ -216,6 +216,7 @@ note を pattern の container から 0x12df320 で反復 (閾値 thr = step' + 
 - 補助測定 (測定 commit `a9bf0957a`・同じ展開先・終了 0): `pe_xref.py 0x15e25f8` (hits 189・stores 0・100.4 秒)、`pe_xref.py 0x15e2600` (ネガティブコントロール。slot を 1 つずらした対象。hits 35・stores 0・100.6 秒)、`pe_slot_writers.py 0x15e25f8 0` (候補 6 件・100.5 秒)、`pe_slot_writers.py 0x15e25f8 8` (候補 7 件・100.8 秒)。上の 4 本は同時実行の時間。単独の実行 (`f320cc061` 時) は `pe_xref` 61.8〜62.4 秒・`pe_slot_writers` 58.7・59.4 秒。
 - 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` (2.6 秒)。
 - 測定 commit: `a9bf0957a` (`pe_step_v.py` の docstring 2 行の修正。解析の出力は `f320cc061` と同一)。差分 0 の証跡は下の「差分 0 の証跡」節。
+- main 取り込み後の再測定 (測定 commit `236a6da9a`・競合解消の merge commit。測定経路の解析コードは `a9bf0957a` から不変): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_step_v.py` 終了 0・0.46 秒・load average 0.46/0.30/0.12 (実行前)。静的値 (slot → `0x15d89c4`・X 96・V 24・V への store `0x13111e5`) は上と同一。`pe_xref.py 0x15e25f8` は hits 189・stores 0 (48.3 秒・load average 0.42 (実行前))。
 
 ### slot の初期化 (静的)
 
@@ -275,7 +276,8 @@ note を pattern の container から 0x12df320 で反復 (閾値 thr = step' + 
 ### ネガティブコントロールと差分 0 の証跡
 
 - ネガティブコントロール (測定 commit `a9bf0957a`): 対象 slot を 1 つずらした `pe_xref.py 0x15e2600` は hits 35。実 slot `0x15e25f8` は hits 189。対象 VA の参照を数えるため、対象を変えると hits が変わる。
-- 差分 0: `git diff a9bf0957a HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0` (測定 commit から HEAD まで。この REPORT の commit は REPORT だけを変える)。`f320cc061` からの差分は `pe_step_v.py` の docstring 2 行 (`a9bf0957a`) のみ。
+- 差分 (測定経路): `git diff a9bf0957a 236a6da9a -- tools/python/analysis/flapi/pe_step_v.py tools/python/analysis/flapi/pe_xref.py tools/python/analysis/flapi/pe_slot_writers.py tools/python/analysis/flapi/pe_disasm.py | wc -l` の出力は `0`。`f320cc061` からの差分は `pe_step_v.py` の docstring 2 行 (`a9bf0957a`) のみ。
+- 差分 (範囲を広げた場合): `git diff a9bf0957a 236a6da9a -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `1362` (main 取り込みで入った他 PR の 13 ファイル: `provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/note_enum_diff.mjs` 等と PY-188・PY-86 系の解析スクリプト。PY-185 の測定経路には入らない)。この REPORT の commit は REPORT だけを変える。
 
 ### 未解決 (次回の着手点)
 
