@@ -243,3 +243,14 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 - 差分テスト `python3 tools/flelift/tests/x64c_vex_diff.py`: pass 91 / fail 0 (rc 0)。
 - addsubpd ネガコン (加減を入れ替え): `FAIL addsubpd xmm1, xmm2`・pass 90 / fail 1 (rc 1)。改変後に退避コピーから戻し、`cmp` で一致を確認してから再実行 (pass 91 / fail 0)。
 - 再実行の範囲: fix モード (`ws-4056` worktree・commit 後の HEAD) では差分テストとネガコンのみ再実行。閉包 e2e は `plugins-kilohearts` 由来の `HeartCore.core_64` が `fl-win64` に無く再実行していない (上記は a9d238a14 の値)。
+
+## 13. x64c の rcpps / vrcpps 実装 (#4054・閉包 unsup 34 → 0)
+
+- 測定 commit: `a8d4b6e0d` (rcpps / vrcpps を `kh_rcp_exact` で実装。以後コード変更なし)。
+- 閉包 (`KH_CORE=<HeartCore.core_64> OUT=<work/> bash tools/targets/kilohearts/scripts/ladder_x64c_closure.sh`): 改変前 (origin/main 6551d8b64) は real 25.877 s・functions 98 / insns 7,766 / unsup **34** (`rcpps:rcpps` 34 site)。改変後 (a8d4b6e0d) は real 25.402 s・functions 98 / insns 7,766 / unsup **0** / imports 17 / unlifted 0 / traps 0。関数数・命令数は前後で不変。
+- ネガコン (roots = process slot 14 のみ): functions 2 / insns 178 / unsup 0 (前後で不変。生成 C は改変前後で `cmp` 一致)。
+- 差分テスト `python3 tools/flelift/tests/x64c_vex_diff.py`: pass 94 / fail 0 (rc 0)。rcpps 3 件 (`rcpps xmm1, xmm2`・`rcpps xmm3, xmm3`・`vrcpps xmm1, xmm2`) を追加。
+- rcpps ネガコン `python3 tools/flelift/tests/x64c_vex_diff.py --neg-rcp=0` (表 entry 0 を 1 bit 改変した C を生成): `FAIL rcpps xmm1, xmm2`・`FAIL vrcpps xmm1, xmm2`・pass 92 / fail 2 (rc 1)。
+- 生成 C の構文: `gcc -fsyntax-only fle_lifted.c` rc 0 (閉包 1,006,164 B)。
+- 近似表の出所: `tools/targets/kilohearts/snapins/scripts/approx_tables.b64` (gen_simd.py の `kh_rcp_exact` と同一表・同一式)。表は rcpps を含む生成 C の先頭にだけ入る。
+- 素材: `plugins-kilohearts` の `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` から `HeartCore.core_64` (76,642,304 B) を取り出した (REPORT_KH19D の手順)。
