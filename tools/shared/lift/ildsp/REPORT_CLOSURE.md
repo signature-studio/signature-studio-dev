@@ -200,13 +200,15 @@ IAT 名の内訳 (件数):
 #### 7.1 slot の役割表 (#3249 / T-SH-53)
 - 測定 commit: `3248b5154` (`ildsp_native.c` は slot 1・2 の引数を float で渡すよう修正。`ildsp_native_check.py` ALL OK)。
 - 方法: 同じ PE の逆アセンブル (`objdump -d -M intel`) と、単独実行 (`ildsp_native <PE> --slot K V`・1 プロセス 1 実験・`timeout 15`・各 n=6) を突き合わせる。
+- 添字の注意: `--slot K V` の V は rdx の値ではなく `rdx_list = {0, 1, 2, 0xe}` の添字 (V=0→rdx 0、V=1→rdx 1、V=2→rdx 2、V=3→rdx 0xe)。slot 4 のみ V=0 で、rdx は内部オブジェクト (0x50000320)。
+- 測定: 上の役割表の「単独実行」列が正本 (水準ごとに n=6)。slot 1〜5 の 14 設定 × 各 n=6 = 84 回を、同一 PE (sha256 `f4b23b0f…`)・同一ビルドで実行。load average は測定前後で 0.06〜0.21。所要 4 秒。
 - 役割 (this = 配列を持つ wrapper の inner `[wrapper+8]`):
 
 | slot | vtable 先 (RVA) | 実体 (RVA) | 役割 (逆アセンブル) | 引数 (MS x64) | 単独実行 (n=6) |
 |---|---|---|---|---|---|
-| 1 | 0x1aa370 | 0x161fc0 | `[this+8]` に xmm1 (float) を書き、`[this+0x28]` (= ⌊xmm1 × 定数⌋) 個の 4 byte 配列を 3 本 確保 (`HeapAlloc` 相当の 0x1801ac9b8) して、各要素を 0 で埋める。大きさの設定と初期化 | rdx = 未使用, xmm1 = float (1.0 で実行) | rc 0 ×6・rax 0x50001620 ×6 |
-| 2 | 0x1aa380 | 0x162760 | rdx の値で switch (`cmp edx,0xe`・jump table 0x162f54) し、各 case で `[this+0x30..0x50]` などの float パラメタ 1 つを xmm2 (float) から書く。`edx > 0xe` は即 return | rdx = case 番号 (0〜0xe), xmm2 = float | rc 0 ×6・rdx=0 は rax 0x5 (変更 2 件)、rdx=1 は rax 0 (変更なし)、rdx=2 は rax 0x2 (変更 1 件)、rdx=0xe は rax 0x1 (変更 1 件) |
-| 3 | 0x1aa390 | 0x162f90 | `edx` が 0 以下なら即 return。それ以外は配列 (`r15`) の要素 (`[r15 + ecx*4]`・`[r15 + ecx*4 + 4]`) を読み、`[this+0x254]` の値で分岐して `[this+0x224]` などを更新する。**引数 5 番目 (stack) の意味は未確定** | rdx = 件数 (`test edx,edx` で判定), r8d = 第 3 引数 (`esi` に保存して stride に使用), r9 = 配列ポインタ (`r15` に保存) | rdx=0 で rc 0 ×3・rax 0x1801aa390 (変更なし)。rdx=1・2・0xe は SIGSEGV ×9 (ポインタ引数の未設定が原因と考えられるが未検証) |
+| 1 | 0x1aa370 | 0x161fc0 | `[this+8]` に xmm1 (float) を書き、`[this+0x28]` (= ⌊xmm1 × 定数⌋) 個の 4 byte 配列を 3 本 確保 (`HeapAlloc` 相当の 0x1801ac9b8) して、各要素を 0 で埋める。大きさの設定と初期化 | rdx = 未使用, xmm1 = float (1.0 で実行) | rdx=0 で rc 0 ×6・rax 0x50001620 ×6。rdx=1・2・0xe も同じ (各 rc 0 ×6・rax 0x50001620 ×6)。rdx は結果に影響しない |
+| 2 | 0x1aa380 | 0x162760 | rdx の値で switch (`cmp edx,0xe`・jump table 0x162f54) し、各 case で `[this+0x30..0x50]` などの float パラメタ 1 つを xmm2 (float) から書く。`edx > 0xe` は即 return | rdx = case 番号 (0〜0xe), xmm2 = float | rdx=0 で rc 0 ×6・rax 0x5 ×6 (変更 2 件)。rdx=1 で rc 0 ×6・rax 0 ×6 (変更なし)。rdx=2 で rc 0 ×6・rax 0x2 ×6 (変更 1 件)。rdx=0xe で rc 0 ×6・rax 0x1 ×6 (変更 1 件) |
+| 3 | 0x1aa390 | 0x162f90 | `edx` が 0 以下なら即 return。それ以外は配列 (`r15`) の要素 (`[r15 + ecx*4]`・`[r15 + ecx*4 + 4]`) を読み、`[this+0x254]` の値で分岐して `[this+0x224]` などを更新する。**引数 5 番目 (stack) の意味は未確定** | rdx = 件数 (`test edx,edx` で判定), r8d = 第 3 引数 (`esi` に保存して stride に使用), r9 = 配列ポインタ (`r15` に保存) | rdx=0 で rc 0 ×6・rax 0x1801aa390 ×6 (変更なし)。rdx=1 で rc 139 (SIGSEGV) ×6。rdx=2 で rc 139 ×6。rdx=0xe で rc 139 ×6 (SIGSEGV は計 18/18。ポインタ引数の未設定が原因と考えられるが未検証) |
 | 4 | 0x1aa3a0 | (inline) | `[this+0x28]` 個の要素の配列を `[this+0x10/0x18/0x20]` の 3 本に対して 0 で埋め、`[this+0x244]` 個の要素の配列を `[this+0x258/0x260]` に対して 0 で埋め、最後に `[this+0x284..]` 等を 0 にする。**内部状態のリセット (reset)** | rdx = 内部オブジェクト (0x50000320) | rc 0 ×6・rax 0x1801aa3a0 ×6 (変更 0 件) |
 | 5 | 0x1aa470 | (inline) | `xor eax,eax; ret`。何もしない | 未使用 | rc 0 ×6・rax 0 ×6 (変更 0 件) |
 
@@ -233,7 +235,7 @@ IAT 名の内訳 (件数):
 | slot 1 の hang (単独 10/24・12/24・8/24、全件 3/6・4/6・2/6。原因未確認。仮説: 未初期化値・スタック位置・環境変数長。負荷の影響は未検証) | slot 1 の結果を単独で採れない | 追跡 issue なし (PM 判断: 子の起票要否) |
 | slot 1 の完走時の rax と変更範囲は、単独・全件とも実行ごとに揺れる (原因未確認。注 1) | slot 1 の出力の定義 | 追跡 issue なし (PM 判断: 子の起票要否) |
 | slot 2 v0・v2 の変更範囲がセッションで違う (注 2。原因未確認) | 差分テストの入出力の定義 | 追跡 issue なし (PM 判断: 子の起票要否) |
-| slot 3 (rdx=1・2・0xe) の SIGSEGV (単独 18/18 (S2・S3 とも)。全件は slot 3 v1 で 2〜4/6。原因未確認) | slot 3 の入力の扱い。全件は slot 4・5 に届かない | 追跡 issue なし (PM 判断: 子の起票要否) |
+| slot 3 (rdx=1・2・0xe) の SIGSEGV (単独 18/18・本節の再測定で確認。全件は slot 3 v1 で 2〜4/6。原因未確認) | slot 3 の入力の扱い。全件は slot 4・5 に届かない | 追跡 issue なし (PM 判断: 子の起票要否) |
 
 ### 8. 0x161fc0 閉包の間接 call / jmp (T-SH-70 #3346)
 - 結論: 閉包の間接 call / jmp の宛先は、静的に確定する IAT と、実行時の `rax` で決まる CFG/XFG dispatch に分かれる。後者は trap 化する (実装は [T-SH-65] #3318・[T-SH-61] #3299)。正本は `REPORT_APPENDIX_3346.md`。
