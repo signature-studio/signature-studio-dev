@@ -156,3 +156,44 @@ emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90
 - 結論: 0x2e・0x47 の格納値はいずれも qword (ポインタ幅)。0x47 は受け手の `+0x28` フィールドで副作用なし。0x2e は (a) 関数ポインタのコールバック、(b) 受け手の vtable+0x1d0 の効果を経たフィールド値のいずれかで、供給元に仮想メソッドを含むため静的に定まらない。現応答表の `g_hs_obj` (非 NULL) は値の近似であり、0 を返し得るかは未確定。応答表は変えない。
 - 0x2e の rcx (`[[rip+0x2c2318]]`) は §2 の記述 (0x1320dd9〜0x1320de0) を引き継いだ。本節では未検証 (`hs_callee_sem.py` は call 先と格納だけを検証する)。
 - 残りの受入 (格納元 5 callee の実値 → [PLG-P0b-36] #3652、グローバル・フィールドの実値と応答表の更新と Phase A 回帰 → [PLG-P0b-37] #3653) は本 PR の範囲外。
+
+## 8. 受入 1 (#3653・PLG-P0b-37): 格納元 6 ID のグローバル・フィールドの実値
+
+- 測定 commit: `05e88e7bc` (main 取り込みの merge。コードを変えた最後の commit)。`hs_glob_src.py` は `4f758bdf3` (追加) 以降変わっていない。`git diff 4f758bdf3 HEAD -- tools/plugins/framework/hostshim` の .py・.c・.sh は main の `hs_callee_sem.py` (新規 94 行) だけで、測定に使うファイル (`hs_glob_src.py`・`hs_resp_src.py`・`hs_disp_emu.py`) は変わらない。以降の commit は本ファイルだけを変える (`git diff 05e88e7bc HEAD -- tools/plugins/framework/hostshim` の .py・.c・.sh は 0 行)。
+- 素材: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B) を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` で当該 1 件だけ・2.4 秒)。`work-fw-stage1` は本測定では使わない。Python は `uv venv` に `unicorn 2.1.4`・`pefile 2024.8.26`・`capstone 5.0.7`。
+- 実行 (n=1・測定 commit `05e88e7bc`): `hs_glob_src.py` (9 アドレス `0x15ec298 0x15e0ff8 0x15e2118 0x15e4b68 0x15e30f8 0x16bcc00 0x15f61f4 0x1426f08 0x15f7190`・線形逆アセンブル) exit 0・24.5 秒 (load 0.15 → 0.44)。`hs_resp_src.py` (6 ID) exit 0・6.0 秒 (load 0.41 → 0.46)。`hs_callee_sem.py` exit 0・5.3 秒 (OK 18・NG 0)。前回 `4f758bdf3` の測定は 33.5 秒・6.6 秒 (n=1)。
+- 経路: 6 ID の格納 VA は §2 と一致 (`hs_resp_src.py`)。0x18 → 0x131a268、0x45 → 0x1321b89、0x54 → 0x13226dd、0x56 → 0x131bb66、0x64 → 0x1322a07、0x65 → 0x1322b47。emulator の応答は 6 ID とも 0 (callee 戻り値 0 の仮定)。
+
+### 8.1 読みの式と静的な確定結果
+
+| ID | 読みの式 (機械語 VA) | 静的に確定した部分 (VA 根拠) | 未確定の部分 | 判定 |
+|---|---|---|---|---|
+| 0x18 | `qword [G18]`。G18 = 0x15ec298 (.bss・画像値 0)。0x131a261 | rip 直接の書込みは 1 件: 0x41d919 `mov [G18], rdi` (0x41d8f0 の `r9d==1` 分岐内)。0x41d8f0 の呼出し元は 0x1376870 の 1 件で、rdi (= r8 引数) に 0x1376820 の第 1 引数 `[rbp+0x30]` を渡す | 0x1376820 の呼出し元が渡す第 1 引数 (実行時の値) | 未確定 |
+| 0x45 | `int32 [[[G45]]+0x3518]`。G45 = 0x15e0ff8 (.data・画像値 P = 0x16bcc00 (.bss))。0x1321b78 | G45 への rip 直接の書込みなし (P は画像の定数)。`[P]` の書込みは 0x11fc2b3 `mov [P], rax` の 1 件と、0 化 4 件 (0x11fd41e・0x11fda47・0x11fe5ec・0x123164f) | `[P]` の値 (0x11fc2b3 の rax の出所)。`[[P]+0x3518]` の書込み元 (レジスタ経由) | 未確定 |
+| 0x54 | `int32 [T + 4*[rbp+0x1880]]`。G54 = 0x15e2118 (.data・画像値 T = 0x15f61f4 (.bss))。0x13226cb | G54 への書込みなし。T への rip 直接の参照なし (読出し 0 件) | テーブル本体の内容 (実行時に書かれる)。index `[rbp+0x1880]` の値 | 未確定 |
+| 0x56 | `qword [[G56]]`。G56 = 0x15e4b68 (.data・画像値 0x1426f08 (.data))。0x131bb5c | G56 への書込みなし (0x1426f08 は画像の定数)。`qword [0x1426f08]` の画像値は 0。書込みは 0x9dec3f `mov [0x1426f08], rax` の 1 件 | 0x9dec3f の rax の出所 (実行時)。画像のまま読むと 0 | 未確定 (画像値 0) |
+| 0x64 | `cmp dword [[[G64]]+0x168], 0` → `setg`。G64 = 0x15e30f8 (.data・画像値 P = 0x15f7190 (.bss))。0x13229ef | G64・P への rip 直接の書込みなし。`[P]` (.bss・画像値 0) | `[P]` が指すオブジェクト (レジスタ経由で書かれる) | 未確定 |
+| 0x65 | `movsxd [rbp+0x109c]` = `[obj+0x2e4] / [0x1328aa8]` の float ビット列。obj = `[rbp+0x1168]` (0x1322b21) | (obj はローカル・実行時の値) | obj の値 | 未確定 |
+
+判定: 6 ID すべて未確定。画像内の定数に確定できる値はない。
+
+- **注意 (hostshim.c のコメントとの食い違い)**: `hostshim.c` は 0x56 の FLE 応答を「global オブジェクトポインタ」と書くが、画像のまま読むと `qword [0x1426f08]` は 0 である。実行時に 0x9dec3f が非 0 を入れるかで決まり、未確定。`hostshim.c` の 0x56 応答 (`g_hs_obj`) は本節では変えない。
+
+### 8.2 読みの限界
+
+- rip 相対の直接参照だけを見ている。`lea` 経由・レジスタ経由の書込みは見えない。「書込みなし」は「rip 直接の書込みなし」の意味。
+- 線形逆アセンブル (capstone) は候補の列挙。無効バイトは 1 バイト送りで再同期する。
+- 呼出し元は E8 (rel32) の直接呼出しだけを走査した (0x41d8f0 は 1 件)。
+
+### 8.3 hostshim.c と Phase A
+
+- `hostshim.c` は変更しない。6 ID はどれも値が確定しないため、fail-soft の 0 固定 (0x18・0x45・0x54・0x64・0x65) は残す。0x56 の `g_hs_obj` 応答 (非 NULL) も現状のまま。
+- `hs_e2e.sh` (Phase A) は本 run (`05e88e7bc`) でも実行していない。`$ARTIFACTS_DIR` の素材は `fl-win64` のみ。`hostshim.c` を変えていないので fw_route.cjs の入力は変わらないが、`work-fw-stage1` は `fw_route.cjs`・`fw_flat4_canon3.ll` を含まず、`fw_stage2.sh` の emcc が要る。`[EMSDK]` (`docs/REFERENCES.md` §4) が無いため emcc を用意できなかった。必要な素材: `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。
+- 受入 2・3 は子 issue へ移す (§8.4)。
+
+### 8.4 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 0x18・0x45・0x54・0x56・0x64・0x65 の実行時の値 (§8.1 の書込み元: 0x1376820 の呼出し元の引数・0x11fc2b3 の rax・0x9dec3f の rax・0x15f7190 の実行時オブジェクト) | 受入 1 の実値・受入 2 の応答表 | 子 issue (本 PR の本文に番号) |
+| `hostshim.c` 応答表の更新と Phase A 回帰 (`hs_e2e.sh`・`fw_stage2.sh`) | 受入 2・3 | 子 issue (同上。`oc_artifacts: fl-win64 work-fw-stage1 toolchain-emsdk`) |
