@@ -54,7 +54,7 @@
 - 測定 commit は main (`abb5fbf9d`) を取り込んだ merge commit `be6d784f9`。前回の測定 (`395f5496a`・main `5ec4aef07`) の後に main が進んだため、取り込みを 3 回目にした。
 - 競合は `provider/build.sh` の `EXPORTED_FUNCTIONS` だけ。本 PR の `_fl_engine_set_safe_edit` と main の `_fl_engine_midi_word_count`・`_fl_engine_midi_word`・`_fl_engine_set_device_link` を両方残した (順序は main 側に合わせ、`_fl_engine_set_safe_edit` は `_fl_engine_reset` の直後)。`fl_engine.c` は自動 merge。`muteTrackLock` の C の判定 (`if (!safe_edit) return fl_err(...)`) と mock の判定 (`if (!st.safeEdit) throw UNSAFE();`) が残ることを grep で確認し、`EXPORTED_FUNCTIONS` の全関数は link が通ったことで定義を確認した。
 - 素材: `fl-win64` を `tar --zstd -xf` で `$RUNNER_TEMP` 直下に展開 (実測 real 5.656 秒)。`FL_WIN64_DIR=$RUNNER_TEMP` で `fetch_inputs.sh` を回し `work/` に入力を置いた (real 0.549 秒)。
-- emsdk 6.0.12 は upstream から `/opt/emsdk` に `install` / `activate` で入れた (本 run の時点では未配置だった)。
+- emsdk 6.0.12 は upstream から `[EMSDK]` の位置に `install` / `activate` で入れた (本 run の時点では未配置だった)。
 - ビルド (実測 real): `provider/build.sh` 1.569 秒・`build_cpython_wasm.sh` 4 分 36 秒・`FLPY_SKIP_TABLE=1 build_flpy.sh` 6.076 秒。
 - `node tests/provider_check.mjs`: `{"functions":435,"implemented":165,"unimplemented":270,"mcp_static":60,"PASS":true}` (前回は implemented 162。main の新規実装分で 165)。
 - `node tests/playlist_diff.mjs`: `{"calls":72,"diffs":0,"mock_state_steps":8,"PASS":true}`。
