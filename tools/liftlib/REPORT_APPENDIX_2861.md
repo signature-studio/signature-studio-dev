@@ -20,7 +20,7 @@ issue 本文の基準「147/53/0/0」は #2181 時点の値。現 HEAD (`9721869
 | 基準 | HEAD `9721869b7` (変更前) |
 | 素材 | `tools/icall/work/ott_F.txt` (F=281)・`tools/m6/work/ott.drc.ll`・`tools/liftlib/work` は main 側の検証スナップショットを symlink (commit 対象外)・`[ANALYSIS-PLUGINS]` 配下の OTT_vst2_win64.dll・RetDec (`[RETDEC]`) |
 | 再現 | `cd tools/liftlib && OTT_DLL=<[ANALYSIS-PLUGINS] の OTT_vst2_win64.dll> ANALYSIS_DIR=<[ANALYSIS-DIR]> python3 -m liftlib leafspec targets/ott_getparam.json --n 200` |
-| 単体 | `python3 tests/test_unit.py` → `ALL UNIT TESTS PASS (32)` (07:50:50〜07:56:10 の実測, 5 分 20 秒) |
+| 単体 | `python3 tests/test_unit.py` → `ALL UNIT TESTS PASS (32)` (07:50:50〜07:56:10 の実測, 5 分 20 秒)。review 対応で `t16c` (rip `lea` の絶対 VA・32bit 切り詰め) を追加し、単体は 33 件 (下の検証 HEAD で再実行) |
 
 ## 2. 前後比較 (leafspec 実測)
 
@@ -63,5 +63,5 @@ git diff 789b8439d HEAD -- tools/liftlib/liftlib tools/liftlib/targets tools/ica
 |---|---|---|
 | 残 unbound 148 件の site ごとの原因の確定と埋め (rsp / rbp / r11 基準の `lea`、multi 定義、mov 系) | 呼出先に 0 が入る site が残る。leafspec 上の影響は未観測 | 本 issue #2861 の残件 (Refs #2861) |
 | rsp 基準の局所アドレス (41 件) | 入口 rsp と無関係な呼出元フレーム値のため、IR 上の値の再構成が必要 | 本 issue #2861 の残件 |
-| iargs を使う他 cfg (例 `ott_iargs_ctor.json`) への影響 | rip `lea` の合成で、支配しない値を使っていた既存出力が変わる可能性 | 未測定。本 PR の未解決 |
+| iargs を使う他 cfg (例 `ott_iargs_ctor.json`) への影響 | rip `lea` の合成で、支配しない値を使っていた既存出力が変わる可能性 | #4327 ([LIFTLIB-25]・親 #2861。census と他 cfg の leafspec) |
 | leafspec gate 以外の回帰 (`tests/test_unit.py` 外) | 単体 32 件のみ確認 | 未測定 |
