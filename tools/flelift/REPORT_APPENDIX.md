@@ -146,6 +146,9 @@ spot diff の 16 case は TlsAlloc 系を呼ばないため、この e2e では 
 
 ### 14.2 TLS の直接確認 (`tools/flelift/rt/fle_cpu.c` を単体リンクした C harness)
 
+- harness は **未コミット (手元検証)**。`tools/flelift` にはコミットしていないため、再実行できない。
+- 件数の数え方: 下表の**行数 6 件**がすべて ok (表の 6 行が検査の全件。「連番 0,1」は `TlsAlloc` 2 回の 1 行に含まれる)。
+
 | 検査 | 結果 |
 |---|---|
 | 割当前の `TlsGetValue(0)` | 0 |
@@ -157,10 +160,12 @@ spot diff の 16 case は TlsAlloc 系を呼ばないため、この e2e では 
 
 harness は `fle_glue.c` を含めない (`ott_dispatch` が未定義で link できないため)。`fle_cpu.c` の TLS 関数だけを検査した。
 
-### 14.3 DllMain 経路 (issue が挙げた `tools/qfclift/qfc_count.sh`)
+### 14.3 DllMain 経路 (issue 本文が挙げた `tools/qfclift/qfc_count.sh`)
 
-- issue 本文の `qfc_count.sh` は repo に存在しない。`tools/qfclift/REPORT.md` にも §10 は無い (§9 まで)。代わりに DllMain 経路の実測として `tools/qfclift/qfc_boot.sh` を使った。
-- 測定 commit `973b85aca` (`QFC_BOOT_REBUILD=1`、素材 `fl-win64`・`toolchain-emsdk`、real 43 s、load 0.80 → 0.55):
+- **受入 3 は未達**。issue 本文の `qfc_count.sh` は repo に存在しない (`origin/main` で確認)。`tools/qfclift/REPORT.md` にも §10 は無い (§9 まで)。
+  計数の確認は子 issue **#4307** (`[T-SH-116]`) で行う。
+- 代わりに `tools/qfclift/qfc_boot.sh` で DllMain 経路の**停止点のみ**を確認した。これは計数の確認ではない。
+- 測定 commit `973b85aca` (`QFC_BOOT_REBUILD=1`、素材 `fl-win64`・`toolchain-emsdk`、単発の real 43 s、load 0.80 → 0.55。`qfclift/REPORT.md` §7.3 の n=3 (26 s) とは別測定。差は単発か n=3 かの違いで、同一 HEAD の n=3 は 26–26 s。単発の 43 s は計測時の負荷の差と推定 (未切り分け)):
   - strict: `DllMain(PROCESS_ATTACH)=trap`・`[fle] MISSING IMPORT LocalAlloc`・soft 0 件 → FAIL
   - soft: `DllMain=trap`・`[fle] call to UNLIFTED function 0x59c210`・soft 呼出し 0 件 → FAIL
 - REPORT §7.3 (HEAD `1fd48d2ce`) と停止点・停止理由が一致。TLS 変更で DllMain の停止点は変わらない。
