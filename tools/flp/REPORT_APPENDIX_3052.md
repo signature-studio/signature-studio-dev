@@ -95,3 +95,49 @@ string WAVRenderForm  ascii_hits=6 utf16_hits=0
 | 別 wineprefix・別 run での SHA 一致、Render tests 全数の書き出し | 本節の対象外 | #3053 (依存 #3052) |
 
 **差分の証跡**: `git diff b2c1d611 HEAD -- tools/flp/s3_regread_xref.py` の出力は 0 行 (以後は文書の変更のみ)。製品 KPI (flelift の起動 dispatch 数・通過 unit 数): 動かしていない (静的解析のみ、起動なし)。
+
+## 19. #3052 WFBox の読取り経路 (関数先頭の置換による二分探索)
+
+測定 commit: **`3c98162a3`** (`tools/flp/s4_bisect.sh`・`tools/flp/s4_xref.py` の追加)。再現: `bash tools/flp/s4_bisect.sh <VA hex or none> 1` (1 run、約 20 s)。静的呼出し元: `uv run --with pefile --with capstone python3 tools/flp/s4_xref.py $RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin ba5d10 2`。
+差分の証跡: `git diff 3c98162a3 HEAD -- tools/flp/s2_render_probe.sh tools/flp/s4_bisect.sh tools/flp/s4_xref.py` の出力は 0 行。
+
+**結論 (受入 1 の一部達成)**: WFBox の値を読む関数は **`0xba5d10`** (項目リストを回し、各項目の名前 `[item+0x10]` で値を読む汎用ループ)。0 を返す版にすると WFBox の RegQueryValueExW が 4 件 → 0 件になり、書出しは既定の 16-bit (385,000 B) になる。値の格納先と、WAV 書式引数 (`0x670fd0` の第 6 引数) への渡し先は未特定。
+
+**環境 (この run の組立て)**: wine-9.0 (`/usr/lib/wine/wine64`)・xvfb-run。`WINEDLLOVERRIDES="mscoree,mshtml="` (Mono/Gecko の導入待ちを避ける)。`s1_wine_probe.sh` は 280 s の上限で止まり、インストール木が 20,572 ファイルで途切れた (copy 部の `os.listdir` を block ごとに呼ぶ O(N²) が原因)。残りを同じ規則 (`paths[0]` が `$INSTDIR`) で copy して 25,131 ファイル。`Shared/QuickFontCache*.dll` が無いと `/R` が `Runtime error 216` の MessageBox で止まる (`WINEDEBUG=+msgbox`)。copy 後は止まらず完走。
+
+**実測 (1 run ずつ、`s4_bisect.sh` の出力。WFBox の値は 1 (24-bit) を既定に使う)**
+
+| 条件 | fmt / bit | data B | data SHA-256 (先頭 12 桁) | WFBox の RegQueryValueExW 件数 |
+|---|---|--:|---|--:|
+| 基準 (置換なし、WFBox=1) | 1 / 24 | 577,500 | fc353b289269 | 4 |
+| `0xba5d10` を `xor eax,eax; ret` | 1 / 16 | 385,000 | fe7a061441ea | **0** |
+| `0x9073c0` を同上 | 1 / 24 | 577,500 | fc353b289269 | 4 |
+| 基準 (置換なし、WFBox=2、既定) | 3 / 32 float | 770,000 | 9e0251ebf3ab | 未計測 |
+
+同じ方法で `+reg` 件数だけを比べた結果 (WFBox=1、基準 4 件):
+
+| 置換した関数 | 件数 | 置換した関数 | 件数 |
+|---|--:|---|--:|
+| `0x5b0810` (4 バイト読取り) | 4 | `0x9088f0` (項目の種別ループ) | 4 |
+| `0x5b25d0` | 4 | `0x5b1c10` (ラッパ) | 4 |
+| `0x5b1820` | 4 | `0x963ed0` / `0xeec5d0` / `0xdf60e0` / `0x963b50` / `0xba6340` | 各 4 |
+| `0x664fd0` | 4 | `0x5b03a0` | 0 (ただし他の設定も変わり 44,100 Hz / 16-bit) |
+| `0x5b19f0` | 0 (同上、44,100 Hz / 16-bit) | `0xba5d10` | **0** (16-bit) |
+
+**`0xba5d10` の中身 (`ctx.py` の逆アセンブル)**: `rsi = [[rbp+0x40]]` (項目)・`0x40fe90(rsi, …)` で項目の種別を判定・名前 `r8 = [rsi+0x10]`・区間 `rdx = [rbp+0x38]`・既定値 `r9d = 0x7fffffff` (未取得の番兵) で `0x5b19f0` を呼ぶ。直接の呼出し元は `0xba6150`・`0xceee30`・`0x11a57c0` (2 箇所)。`0x11a57c0` は §18 の ReadIniFile 相当。
+
+**読取りの連鎖**: `0x11a57c0` → `0xba5d10` → `0x5b19f0` (呼出し元 99、名前は多くがリテラル) → `0x5b03a0` → `0x5b0bd0` → `RegQueryValueExW` thunk (`0x407210`・`0x423100`、§18)。
+
+**否定された候補**: `0x9073c0` (§18 の整数読取り候補。置換しても出力・件数とも変わらない)、`0x9088f0` (置換しても WFBox の読取りは残る)、`0x5b0810`・`0x5b25d0`・`0x5b1820`・`0x664fd0`。
+
+**受入の状況**: 受入 1 の「読取り経路の VA」は `0xba5d10` まで特定 (置換で経路上を確認)。書式を決める値の格納先と、`0x670fd0` の第 6 引数への渡し先は未特定のため、受入 1 は未達。受入 2 は PR #3084 で達成済み (本 run では変えていない)。
+
+**未解決**
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `0xba5d10` が書き込む項目フィールドと、`0x670fd0` の書式引数 (第 6 引数) への渡し先 | 受入 1 の後半未達 | #3052 |
+| 今回の SHA (WFBox=2 で `9e0251eb…`) が §17 の `aa3253b9…` と一致しない。インストール木の組立て差の可能性 | SHA の比較は同一環境内のみ有効 | #3052 |
+| 全数 (82 + Demo 3) の書出し | 本 issue の対象外 | #3053 |
+
+製品 KPI (flelift の起動 dispatch 数・通過 unit 数): 動かしていない (FLEngine の /R 書出しのみ。flelift は触っていない)。
