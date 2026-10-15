@@ -75,7 +75,11 @@ def watch(k, indent, ty, val, addr, sid):
 def entry_probe(lines, k, fname):
     i = next(j for j, l in enumerate(lines) if re.match(r'^define .*@%s\(' % re.escape(fname), l))
     args = [a.strip() for a in re.search(r'@%s\((.*?)\)' % re.escape(fname), lines[i]).group(1).split(',') if a.strip()]
-    j = next(j for j in range(i + 1, len(lines)) if re.match(r'^[A-Za-z0-9_.$-]+:', lines[j]))
+    j = i + 1
+    while lines[j].strip() == '' or lines[j].lstrip().startswith(';'):
+        j += 1
+    if not re.match(r'^[A-Za-z0-9_.$-]+:', lines[j]):
+        j = i
     base = ENTRY_BASE + k * ESLOT
     ins = [
         '  %%tp%d_b = inttoptr i64 %d to ptr' % (k, base),

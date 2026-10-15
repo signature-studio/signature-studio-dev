@@ -134,7 +134,6 @@
 | 149: `function_412c20` の戻り値 0 の由来・`Blend2D.dll` (0x264208) を渡す上流 | 項目 1 (受入 1 の残り) | #3608 |
 | 114: Halt 呼出し元 (halt0 の probe が未実装) | 項目 1 (受入 1 の残り) | #3608 |
 | ldfix の F3a 2・F3c 43 のうち件数に反映されなかった修復 (反映は unit 895 の 1 件) の理由 | 項目 3 の理由 | #3608 |
-| §8 の引数採取 (probe144.py・read144.mjs) が未 commit で、committed HEAD から再現できない。`--full` の IR 再生成は Ghidra (`functions_dll.csv`) が要るが、本 runner に Ghidra は無い (`work-m11` の展開で `boot_final3.ll` は使える) | §8 の全数値の根拠 (受入 1) | #3608 (採取スクリプトの commit と Ghidra 付き IR 生成環境が要る) |
 
 ## 6. 測定 commit と差分 (`docs/WORKFLOW.md` §6)
 
@@ -145,14 +144,14 @@
 git diff 40d3a788d origin/main -- tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_450560.py tools/m11/ldfix/fix_site_3326.py tools/m11/ldfix/fix_site_3372.py tools/m11/ldfix/fix_abi_3450.py tools/m11/ldfix/fix_ld108.py tools/m11/ldfix/fix_ld115.py tools/m11/ldfix/fix_src412770.py tools/m11/ldfix/fix_r8b815050.py tools/m11/ldfix/ldmach.py tools/m11/ldfix/ldframe.py tools/m11/ldfix/stage4.sh tools/m11/ldfix/run_stage4.mjs tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/trap_units.mjs tools/m11/ldfix/prod_order_942.sh tools/m11/ldfix/prod_order_3608.sh tools/m11/ldfix/ldfix_e2e.sh tools/m11/m11_build.sh tools/m11/m11_gen_ir2.sh tools/m11/alloca tools/m11/guard699 tools/m11/guard4fa210 tools/m11/qstore tools/m11/lb_base.py tools/shared/env.sh
 ```
 
-- 上の範囲の差分は 0 行 (`... | wc -l` → 0)。よって `origin/main` 取り込み後の再測定は不要 (`docs/WORKFLOW.md` §6)。
-- §8 の採取 (trap 144・149) の測定 commit は `b959fc472` (origin/main・本 run の worktree の起点)。`git diff b959fc472 HEAD -- tools/m11` は 2 commit で `trap144_probe_3608.py` (新規)・`trap144_read_3608.mjs` (新規)・`REPORT_3608.md` (§8 ほか) のみ。測定経路 (§6 の一覧) の差分は `ldfix_e2e.sh` (+3)・`m11_build.sh` (+13/−1)・`m11_gen_ir2.sh` (+10) で、§1 の件数は本 run で再現した (ldfix_e2e rc 0・prod fix 872/47/22)。
+- 上の一覧の範囲で、`e6c940834` から `b959fc472` (= 本 PR が取り込んでいる origin/main) までの差分は `ldfix_e2e.sh` (+3)・`m11_build.sh` (+13/−1)・`m11_gen_ir2.sh` (+10) の main 取り込み由来の差分。件数 (§1) は `b959fc472` 上で再現した (ldfix_e2e rc 0・prod fix 872/47/22)。
+- §8 の採取 (trap 144・149) の測定 commit は `b959fc472` (origin/main・本 run の worktree の起点)。`git diff b959fc472 HEAD -- tools/m11` は `trap144_probe_3608.py`・`trap144_read_3608.mjs`・`REPORT_3608.md` の 3 ファイルのみ。測定経路 (§6 の一覧) の既存スクリプトは変えていない。
 - §1 の全変種・§1-3 の数値は、測定 commit `87208313b` で得た値と、HEAD `e6c940834` での再測定 (下記) が一致する。同じ経路 (上の一覧) について `git diff 87208313b HEAD --numstat` は 5 ファイル・90 行追加・7 行削除 (`ldfix/ldfix.py` 44 追加・3 削除、`ldfix/ldfix_e2e.sh` 6 追加、`ldfix/fix_site_3372.py` 3 追加・1 削除、`m11_build.sh` 14 追加・3 削除、`m11_gen_ir2.sh` 23 追加)。
 - HEAD `e6c940834` での再測定 (本 run・`$ARTIFACTS_DIR` の `work-m11.tar.zst` と `fl-win64.tar.zst` を展開。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`TMPDIR=$RUNNER_TEMP`):
   - `ldfix_e2e.sh`: rc 0・所要 71.9 秒 (実測 wall)・load 0.78 → 1.16・判定 PASS。stage4 到達 4/6 (base/fix)・survey ok 136 / miss 14 / trap 9 (base/fix)。`STAGE4_JUDGE` の `pass: true`。
   - `prod_order_3608.sh` (HEAD): c0 (ldfix のみ) 136/14/9 (OOB・halt0 = 8・1・units_run 17)。c4_qstore 139/14/6。c5_alloca 871/47/23。h_nor8b (prod fix) 872/47/22。full_r8b 872/47/22。base_r8b 872/47/22。いずれも §1 の表と一致。c0 は実測 13.1 秒。
   - trap 集合も §1-1 と一致 (c0: 17・53・56・87・114・138・144・149・158。prod fix: 114・144・149 など 22 件)。
-- 上の測定 commit `e6c940834` から HEAD までのコード差分は 0 (REPORT 本文のみ)。`git diff e6c940834 HEAD -- tools/m11` の出力は空。
+- 注: `e6c940834` から HEAD までの `tools/m11` には、main 取り込み由来の測定経路の差分 (上の `ldfix_e2e.sh`・`m11_build.sh`・`m11_gen_ir2.sh`) と、本 PR の probe・read・REPORT の差分がある。件数は `b959fc472` 上で再現した (上記)。`e6c940834` 基準の「差分 0」の主張は撤回する。
 - `origin/main` (`91ed96332`) と `40d3a788d` の差分は、REPORT・新規の別系統スクリプト (`ld175_site_link.py`・`trap_triage/slot653660_exp.py`)・`tools/shared/lift/rex` (x64c 系) のみ。
 
 ## 7. 再現
@@ -205,6 +204,7 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 - `[0x10aa1418]` の最後の書込み: `function_4136a0` の IR 119304 行 `store i64 %9, ptr %15` (%9 = `call function_412c20(len)` の戻り値。採取値は 0)。
 - 未特定: `function_412c20` の戻り値 0 の由来。`0x264208` は `"Blend2D.dll"` (UTF-16LE・image 内の実値) で、`function_6539e0` の定数文字列。
 - 注: `function_412e40` の entry は 4 回 hit で、最後の 1 回の arg1 が `0x10aa1418`。記録は最後の entry のものを読んでいる。
+- 注 (挿入位置): probe の entry 計装は、define 直後に名前付きラベルがあればその直後、無ければ define 直後に入る (合成 IR で確認)。上の hit 回数 (4 回) は、この修正の前の挿入位置 (最初のラベル直後) で採った値。実 IR (`work-m11`) で entry に名前付きラベルが無いかは、本 run では素材が無く確認していない。無い関数があれば hit 回数の意味が変わるので、採り直すまで hit 回数は暫定値として扱う。
 
 ### 8-3 unit 114 (halt0・Halt 呼出し元)
 
