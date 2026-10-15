@@ -65,6 +65,28 @@ python3 tools/shared/lift/ildsp/count_unlifted.py "$FL_WIN64_DIR/extracted/block
 - `0x1be16c` は未 lift の島 (`0x1be14e`–`0x1be167`) の中の `jae`・`jbe` の先。島の入口は直接分岐で届かないため、x64c の経路 (直接 call/jmp・認識した jump table) では届かない。
 - 到達した場合の挙動: 直接 call で届けば x64c が必ず lift する。`call reg` 経由で未 lift の先に届けば `ott_unlifted` で止まる (fail-fast。silent ではない)。
 
+### 7-4b 未 lift 非 padding 16 件の到達性 (T-SH-133 / #5072)
+再現: `python3 tools/shared/lift/ildsp/unlifted_reach.py "$FL_WIN64_DIR/extracted/block24360_PE.bin" <closure.json> <lift dir>` (`lift_wc.sh ok` の後)。測定 commit `7c65af9e7` (`git diff 7c65af9e7 HEAD -- tools/shared/lift/ildsp` の出力は空)。実測: rc 0・5.17 s (4 core・load 0.00 0.04 0.01 → 0.08 0.05 0.02)。16 件は `count_unlifted.py` の出力と一致 (closure 2,757・missing 109・非 padding 16)。
+
+| 番地 | 命令 | 判定 | 根拠 (静的) |
+|---|---|---|---|
+| `0x1b8eb1`・`0x1b8eb8`・`0x1b8ebc`・`0x1b8ebf`・`0x1b8ec4`・`0x1b8ec8` (6) | `0x1b8e68` の SEH except 本体 | **例外 path のみ・未確定** | `.pdata` の UNWIND_INFO (EHANDLER。UNWIND の handler `0x1aebb4`) の scope 表: try `0x1b8eaa`–`0x1b8eb1` (`call 0x1be130`)・except target `0x1b8eb1`・filter `0x1ccb00`。直接の分岐元は 0 件 (直前は `jmp 0x1b8ed2`)。`0x1b8eb1` の 4 byte RVA は `.rdata` の scope 表 (`0x3f2db0`・`0x3f2db8`) の 2 件だけ。到達は `0x1be130` が例外を送出し、filter が実行を許可した時のみ。filter の戻り値と、送出時の wasm 側の挙動 (`_Unwind_RaiseException` の import 経路) は未確認 |
+| `0x1be14e`・`0x1be156`・`0x1be158`・`0x1be160`・`0x1be162`・`0x1be167`・`0x1be16c` (7) | `ret` (`0x1be14d`) の後の島 | **到達不能 (閉包内の静的経路なし)** | 島の入口 `0x1be14e` への直接分岐 0 件、データ参照 (abs8・rva4・rip 相対) 0 件、直前は `ret`。内部の `jae`・`jbe` (`0x1be156`・`0x1be160`) は島の中の `0x1be16c` だけを指す。0x1be16c の `ret` も同じ島の中 |
+| `0x1ac9b8` (1) | `jmp 0x1ac9c0` (alloc への stub) | **到達不能 (閉包内の静的経路なし)・閉包の混入** | 直接の呼出元 109 件はすべて閉包外 (閉包内 0 件)。`0x1ac9b0` は `.pdata` 外で、近似範囲 `0x1ac9b0`–`0x1ac9c0` に入るだけ。閉包へ `0x1ac9b0` が入った経路は未確認 (未解決) |
+| `0x1bd4b0`・`0x1bd4b7` (2) | `mov [G], rcx`・`ret` | **閉包外の呼出元からのみ・未確定** | 直接の呼出元は `0x1b7da8` の 1 件 (閉包外)。データ参照 0。`G` (0x3f84d0) の書込みは `0x1bd4b0` だけ。閉包内の `0x1bd4e9` (間接 jmp) が `G`・`A` に依存する (下表の注)。 |
+
+- 6 件 (`0x1b8e*`) の扱い: x64c は try 本体の `call 0x1be130` を lift するが、landing pad は直接経路が無いため lift されない。例外が送出される path の差は、この 1 件 (`0x1be130`) が決める。
+- 注 (`0x1bd4e9`): 宛先は `rax = ror(A ^ G, A & 63)` (A = 0x3f5d98・G = 0x3f84d0)。ファイル値 (A = `0x2b992ddfa232`・G = 0) では `rax` は `0xae64b77e88c8000` で、16 件のいずれでもない (画像外。CFG dispatch で止まる)。`A` は `0x1ad0d8` で実行時に書かれるため、宛先は静的に確定しない。
+- jump table 候補: 閉包の間接 jmp `0x1af08b` (`jmp r9`・表 `0x442000`) の k = 0〜16 の値は `0x1af090`–`0x1af0e8` の 17 件のみ。16 件のいずれも含まない (k = 17〜19 は 0)。
+- 判定の限界: 静的に見た参照の種類 (直接分岐・絶対 VA・rva4・rip 相対・SEH scope) の全件走査。間接の計算ジャンプは `0x1bd4e9` の 1 件だけで、宛先は実行時値。
+
+### 7-4c 残り (未解決・起票先)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `0x1be130` が例外を送出するか・filter `0x1ccb00` が許可するか (`0x1b8e68` の except 本体 6 件の到達) | 到達すれば 6 件の lift 欠落が実行に出る。wasm 側の挙動は未確認 | [T-SH-52] #3216 (受入 1 の残り) |
+| `0x1ac9b0` が閉包に入った経路 (`0x1ac9b8` の混入) | 閉包の完全性。`0x1ac9b8` は閉包外からのみ呼ばれる | [T-SH-52] #3216 |
+| `0x1bd4e9` の宛先 (A の実行時の書込み・G の値) | 残り 2 件 (`0x1bd4b0`・`0x1bd4b7`) の到達 | [T-SH-65] #3318 (間接 jmp の trap 化) |
+
 ### 7-5 slot 1–5 の観測 (未確定)
 再現: `bash tools/shared/lift/ildsp/probe_slots.sh` (wc_image.py を `WC_CALL_SLOTS=6` で、CreateInstance → slot 0–5 の全呼出を native のみで実行)。
 実測 (`2cff3f50d`): `[native] cases=64 SIGSEGV/SIGBUS=64 SIGALRM=0`・`crashed_cases=64`。全 case で sig=11 addr=0x0。
