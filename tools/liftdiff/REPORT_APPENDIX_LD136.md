@@ -12,7 +12,7 @@
 ## 1. 測定条件
 
 - 測定 commit: `6ead9dcc1` (origin/main。`a4a620a9` (#2802)・`7278e8571` (#2821) を含む)。本 PR はこの commit から REPORT 付録 1 本と `docs/DOC_MAP.md` の 1 行だけを足す。コードは変えていない (§4)。
-- 素材: `work-m6-ott` (`tools/{ott,m6,m8,m9,m10}/work`)・`work-liftdiff` を worktree に展開。展開後に絶対 symlink 68 本を worktree 内へ張り直した。`analysis-ott-binaries` は `$HOME/analysis/plugins/ott/binaries/`。`toolchain-emsdk` は `[EMSDK]` (`build_wasm.py` が `emsdk_env.sh` を読む)。
+- 素材: `work-m6-ott` (`tools/{ott,m6,m8,m9,m10}/work`)・`work-liftdiff` を worktree に展開。展開後に絶対 symlink 68 本を worktree 内へ張り直した。`analysis-ott-binaries` は `[ANALYSIS-PLUGINS]` の `ott/binaries/` に展開。`toolchain-emsdk` は `[EMSDK]` (`build_wasm.py` が `emsdk_env.sh` を読む)。
 - build: `python3 ldlib/build_wasm.py targets/<t>.json --force` (`ott_old`・`ott_old_blk`・`ott_old_site` とも rc 0・`sig_mismatch` 0・`undefined` 0)。site の stderr は `sites skipped (block without dec_label_pc_ VA): 21` で LD-83 と一致。
 - run: `python3 liftdiff.py run targets/<t>.json --fn 0x1801ab1d0,0x1801ab258,0x1801c5e84,0x1801c621c,0x1801c682c,0x1801c69cc --pattern vm0,u16 --nobuild --notrace --json <out>`。各 run は約 5 秒 (`time` 実測)。r1・r2 の 2 回。
 - 集計: `results/ld67/compare_blk.py` (既定 vs 計装)・`results/ld83/decode_sites.py` (site 記録の分解)。LD-83 のツールをそのまま使った。
