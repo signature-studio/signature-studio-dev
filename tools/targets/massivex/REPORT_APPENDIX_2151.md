@@ -158,7 +158,7 @@
 ### 12.16 MX-32 (#2195) の間接参照走査: N5 読み手・N6 呼び出し元は未確定 (測定 commit `2fbba3c4`・2026-10-15)
 
 - 素材: `plugins-massivex` → `$RUNNER_TEMP/mx` → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work/key key`。DLL = 95,249,816 B、md5 `9b3f9107a7b2d7ccd9146622bb39eefb` (§12.12〜§12.15 と一致)。
-- 走査器 `license/scripts/mx_dll_indirect.py` (新規・`--selftest` PASS rc 0)。測定 commit `2fbba3c4` (ラベル入替と未使用変数の削除。コード変更の最後)。実行 `python3 license/scripts/mx_dll_indirect.py` (rc 0・実測 9 min 13 s (00:25:15→00:34:28 UTC)・load 1.00 (終了時の 1 分平均))。出力は `work/mx_dll_indirect_2fbba3c4.out` のみ (非コミット)。測定後のコード差分 `git diff 2fbba3c4 HEAD -- tools/targets/massivex/license/scripts` は 0 行。
+- 走査器 `license/scripts/mx_dll_indirect.py` (新規・`--selftest` PASS rc 0)。測定 commit `2fbba3c4` (ラベル入替と未使用変数の削除。コード変更の最後)。実行 `python3 license/scripts/mx_dll_indirect.py` (rc 0・実測 9 min 13 s (00:25:15→00:34:28 UTC)・load 1.00 (終了時の 1 分平均))。出力は `work/mx_dll_indirect_2fbba3c4.out` のみ (非コミット)。測定後のコード差分 `git diff 2fbba3c4 HEAD -- tools/targets/massivex/license/scripts/mx_dll_indirect.py` は 0 行。同じ `license/scripts` 内で main 取り込みにより変わった `mx_table_refs.py`・`mx_dll_table_refs.py` は走査器から import されない (走査器の import は標準・capstone・numpy・pefile のみ) ため、再測定は行わない。
 - 検出条件: `.text` の全バイト位置で disp32 を変位 4・5・6・8 の RIP 相対として評価し、復号できる命令が RIP 相対 mem を持つもの、または `.text` 内を指す rel32 の call/jmp/jcc だけを採用 (`.rdata` への call は復号の誤りとして除外)。
 
 | 項目 | 結果 |
