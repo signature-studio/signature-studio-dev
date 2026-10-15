@@ -189,7 +189,18 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate      
 - 所要 (実測・本 run の再測定 = `analysis/py264_arith_scan_all.sh`): `real 19m03.8s`・user 74m17s・実行後の load average `3.67 3.92 2.96` (4 コア・並列数 4)。313 block 全て rc=0・命令数合計 240,526,119・hits 0。
 - 限界: 直線区間の定数伝播のみ。関数をまたぐ値・メモリ経由の値は追わない。`0xed0bb0` の関数単位の全経路確認は未達。
 
-## PY-266 (#3890): flag `+0x49e` の書込み元 (部分達成)
+## PY-4914 (#5348): 関数単位の vptr 候補 0xed0bb0 検査 (受入 2・部分達成)
+
+- 検査: `analysis/py4914_vptr_fn_scan.py` (block00031 の .pdata 57,816 関数。関数先頭ごとに値・スタック slot を追い、call で揮発レジスタを捨てる。RIP 相対の qword 読出しは PE の実バイトを使う)。測定 commit `a42680321`。素材 `fl-win64` (`block00031` のみ展開)。
+- 陽性対照: 候補 0x13acb88 は `0x44a86e` で 1 件検出 (PASS)。
+- 結果 (実測・HEAD で再現): 0xed0bb0 を生成する命令 0 件・qword 格納 0 件。0xed0c28 を生成するのは `0x11b2af9` (関数 `0x11b2ac0`) の 1 件で、格納は 0 件。所要 100.8 秒 (n=1)・load average 0.94。
+- 受入 2 の残り: 関数をまたぐ値 (呼出し先の戻り値・分岐合流・ポインタ経由の書換え) は追っていない。`-0x78` の算術は 519 関数・524 命令あり (大半は `sub rsp, 0x78` のフレーム確保) で、個別には検査していない。
+- 前提の疑い: 上の『0xed0c28 は object の番地と読める』(第 4 run) は、本 run でも変わらない。0xed0bb0 を vptr とする経路の有無は、この検査の範囲では 0 件。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 関数をまたぐ値・分岐合流・メモリ経由の値で 0xed0bb0 を作る経路 | 受入 2 の残り | #3888 (親) |
+
 
 - 測定 commit: `251f0e1a5` (`analysis/py266_0x49e_writers.py` の追加 commit)。素材 `fl-win64`・block00031 のみ展開 (1.6 秒)。`.text` 5,022,299 命令・`.pdata` 57,816 関数。
 - 検査 (実測・commit `251f0e1a5`): `FL_WIN64_DIR=$PWD/work/py266 python3 analysis/py266_0x49e_writers.py --tsv work/py266/writers.tsv` → rc 0・70.7 秒 (n=1)・user 70.6 秒・load average 0.75→0.98 (並列数 1・4 コア)。
