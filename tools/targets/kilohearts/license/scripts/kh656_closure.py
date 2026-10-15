@@ -66,7 +66,10 @@ def run_build():
 
 def entry_check():
     """入口 function_180ef7fc0 の実行結果 (kh249_check.mjs)。受入 2 の判定値: 最初の未 lift callee か trap 文言"""
-    r = subprocess.run(['node', os.path.join(LIC, 'kh249_check.mjs')], cwd=LIC, capture_output=True, text=True, timeout=300)
+    try:
+        r = subprocess.run(['node', os.path.join(LIC, 'kh249_check.mjs')], cwd=LIC, capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired:
+        return {'entry': 'timeout', 'check': None}
     out = r.stdout + r.stderr
     e = re.search(r'entry run -> (.*)', out)
     s = re.search(r'kh249_check ok=\d+ ng=\d+', out)
