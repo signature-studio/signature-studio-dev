@@ -897,6 +897,7 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4066.md` | ~45 | x87 断片 10 本の入口判定 (#4066 PLG-G2-42): 直接 call・間接ジャンプテーブルの参照から callee 4 本と switch-arm 断片 6 本に分類 (規則は `x87_fn_diff.py --classify`)。 親関数の入口は未確定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2989.md` | ~115 | x87 を含む leaf 関数 2 本の native vs wasm 差分試験 (#2989 PLG-G2-25): eax・x87 深さ・ST(0)・OBJ 窓の突合、ST(0) の f64 の丸め差の分布、ネガコン 2 種 (判定器・lowering の 1 演算の取り違え)、例外値 (NaN・inf・非正規・±0) の突合 (#3716 PLG-G2-32、§7。 NaN どうしのビット差は未解決)。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_3715.md` | ~130 | x87 leaf 関数 42 本の候補の分類 (§2)・突合が成立した 5 本の測定 (§4)・構造が一致しない・ランナーが異常終了する関数の未解決 (§5・子 #4064・#4065・#4080)。 PLG-G2-31 (#3715)。 測定値の正本 |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4110.md` | ~60 | FLDENV/FRSTOR 後のタグ語 (TW) の復元規則 (PLG-G2-48・#4110)。 空/非空だけ読み、種類は格納時に値から分類する規則。 env 差分試験 99,982 → 100,000 (slot 18 → 0)・ネガコン・主試験の不変・x64 回帰。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4080.md` | ~45 | x87 独立入口 4 本の引数形 (逆アセンブル確定) と突合 (thiscall 2 本は TARGETS、cdecl double 2 本は PROBE)。 断片 6 本の親入口 `0x1000c077` は未確定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4064.md` | ~60 | x87 leaf 3 本 (`0x10009eb5`・`0x1000b526`・`0x1000bf60`) の eax・ST(0) の差の切り分け (#4064 PLG-G2-40): 模型 (`ott_x87.h`) の例外フラグ・C1 の限界。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4840.md` | ~70 | `0x10009bc4` の ST(0) 全行不一致の原因 (#4840 PLG-G2-65): 引数でなく呼出し時の x87 ST(0) を読む関数で、空スタックの読み (underflow) による。 double を積むと 4,000 行 bit 一致。 TARGETS に入れない理由と未解決。 測定値の正本 |
