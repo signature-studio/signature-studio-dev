@@ -72,7 +72,9 @@ ctrl は head 本体 (測定 commit の判定器)。
 ### 3.5 差分 (WORKFLOW §6)
 
 - 測定 commit: `9881e597b`。判定器・結果 JSON・ネガティブコントロールはこの commit で生成した。
-- 差分 0 の確認は `git diff 9881e597b HEAD -- tools/m11/ldfix` を最終 commit で取る (PR 本文に出力を貼る)。
+- 判定器 `audit_frame_store_alias_2211.py` の `9881e597b` からの差分は 0 行 (判定器のコードは測定 commit から変えていない)。
+- `git diff 9881e597b HEAD -- tools/m11/ldfix` の差分は REPORT と `results/` (判定結果 JSON 4 本) だけ。
+- main 取り込み (merge `ddae000b2`) 後に同じ判定器で再実行し、`frame_store_verdict_4166.json` と `cmp` 一致。
 
 ## 4. 受入条件の達成状況
 
