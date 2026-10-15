@@ -84,6 +84,7 @@ for r in $RUNS; do
     # #672 診断: shim 有 + buf=0 の fill を戻す。FLE-15 (#3770): ログ上限 FLE_BOOT_LOG_CAP (既定 256MiB) で有界にする
     diag_shim)   run_boot diag_shim   "$HERE/results/boot_summary_${TAG}_diag_shim.json"   1 0 1 "${FLE_BOOT_LOG_CAP:-268435456}" ;;
     diag_negctl) run_boot diag_negctl "$HERE/results/boot_summary_${TAG}_diag_negctl.json" 0 0 1 "${FLE_BOOT_LOG_CAP:-268435456}" ;;   # #672 診断: ネガコン + buf=0 の fill を戻す
+    ilt)         run_boot ilt         "$HERE/results/boot_summary_${TAG}_ilt.json"         3 0 0 "${FLE_BOOT_LOG_CAP:-268435456}" ;;   # #672 分岐入力実験: shim 有 + ILTools 擬似モジュール (FLE_IPP=3)
     *) echo "[fle6] unknown run: $r"; exit 2 ;;
   esac
   elapsed "boot $r" "$T"
