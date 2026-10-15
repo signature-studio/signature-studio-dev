@@ -23,6 +23,7 @@
     いずれも `movups xmmword ptr [rbp-...], xmm0` の **xmm0 の stack spill** (k=0) で、入口 livein (k=2) の読みではない。
     k=2 の P 読みは線形でも 0 件。
   - 呼出元: 直接 `E8`/`E9` の rel32 参照は .text 全体で 0 件 (`0x17b680` を含む 4 件すべて)。引数の渡し方は未確定。
+    (注: この 0 件の確認に使ったスクリプトは記録に残っていない。本付録の `mx55_callers.py`・`mx55_callers_fn.py` は `ff /2` の間接 call だけを数え、E8/E9 は数えない。E8/E9 の再確認は未了。)
     間接 call・vtable・pdata 経由で呼ばれるとみられるが、呼出元の引数幅は解析していない (U3e・MX-37 側)。
 - **呼出元の探索 (MX-55 #5030 の残件・`scripts/mx55_callers.py`)**: 直接参照は 0 件のため、vtable 経由を見た。
   - `0x18017b680` は `.rdata` の 2 つの vtable (`0x183976038`・`0x1841836a8`) の **index 32 (disp `0x100`)** に登録されている (`.rdata` の 8 バイト照合で 2 件のみ)。
@@ -51,3 +52,14 @@
 - **結論 (受入 3)**: 未達。`0x17b680` に xmm2 を渡す呼出しは **1 件の仮想呼出 (`0x18017b4af`) でのみ支持される**。
   ただし (a) `0x18017b460` の呼出元、(b) `livein_passthrough` の 6 関数の呼出元、(c) `clobbered_by_call` の線形判定の穴、を見ていない。
   よって「非 vectorcall の確定」はしていない。残件は #5030 に残す。
+
+## 測定 (2 回目・`mx55_callers_fn.py` と `mx6_e2e.sh`)
+
+- 測定 commit: **`97d274d5e`** (`feat(massivex): classify call sites of 0x17b680 by xmm2 liveness (MX-55 #5030)`)。コードを変えた最後の commit。
+- 測定 run: 測定 commit の PR #5246 の run。素材 `plugins-massivex` → `Massive X.vst3` 95,356,824 B・md5 `622993e76565f49c094063a2b717d6ca` 一致。
+  - `MX_PE='<展開先>/VST3/Massive X.vst3' MX6_WORK='$RUNNER_TEMP/massivex-mx6' bash tools/targets/massivex/dsp/mx6_e2e.sh`:
+    exit 0・elapsed 53 s・load 0.39 0.44 0.23 → 0.76 0.54 0.28・U3c 118・U3b seeds 12 / one_round 14 で PASS。
+  - `python3 tools/targets/massivex/dsp/scripts/mx55_callers_fn.py '<展開先>/VST3/Massive X.vst3'`: sites 56 (`xmm2_written` 1 / `livein_passthrough` 6 / `clobbered_by_call` 49)。
+- 再測定の状況: 指摘対応の run (review fix) では `plugins-massivex` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、上の 2 つは再実行していない。上の値は測定 commit の run の記録。
+- E8/E9 の 0 件: 上の 2 スクリプトは `ff /2` の間接 call だけを数える。E8/E9 の rel32 の件数は、この記録からは再確認できない (未了)。
+- 測定 commit から HEAD までのコード差分: `git diff 97d274d5e HEAD -- tools/targets/massivex/dsp/scripts` の出力は付録の commit 時に記録する (本付録の変更は文書のみ)。
