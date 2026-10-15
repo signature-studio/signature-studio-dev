@@ -28,6 +28,8 @@ heads = []
 offsets = []
 disps = []
 drop_edges = []
+reg_raw_flag = "--reg-raw" in args
+args = [a for a in args if a != "--reg-raw"]
 i = 2
 while i < len(args):
     if args[i] == "--target":
@@ -101,6 +103,7 @@ def recv_def(ins_list, idx, reg):
 fwd = defaultdict(set)
 rev = defaultdict(set)
 ind = defaultdict(list)  # f -> [(va, kind, reg, disp, op, src)]
+reg_raw = {}  # call reg の命令 VA -> 定義元の生の命令 (disp を正規化しない・--reg-raw 用)
 rip_refs = defaultdict(list)  # 参照先 VA -> [(命令 VA, 所属関数)]
 off_hits = defaultdict(list)  # offset -> [(va, 関数, W/R, 命令)]
 demo_fns = set()
@@ -165,6 +168,7 @@ for lo, hi in funcs:
                 if p.mnemonic == "pop" and parts[0] == op:
                     src = "pop"
                     break
+            reg_raw[ins.address] = src
             src = re.sub(r"0x[0-9a-f]+", "N", src)
             ind[lo].append((ins.address, "reg", op, None, op, src))
             continue
@@ -280,7 +284,8 @@ print("  register/stack call sites in C (va in function):")
 for f in sorted(C):
     for va, kind, reg, disp, op, src in ind.get(f, ()):
         if kind in ("reg", "stack"):
-            print(f"    {va:#x} in {f:#x}: call {op}  <- {src}")
+            raw = f"  (raw: {reg_raw[va]})" if reg_raw_flag and va in reg_raw else ""
+            print(f"    {va:#x} in {f:#x}: call {op}  <- {src}{raw}")
 
 for va_f in sorted(C):
     for va, kind, reg, disp, op, src in ind.get(va_f, ()):

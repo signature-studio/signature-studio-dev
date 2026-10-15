@@ -228,6 +228,8 @@ static int load_pe(const char* path) {
 
 typedef MS uint64_t (*Fn0)(void);
 typedef MS uint64_t (*Fn4)(uint64_t, uint64_t, uint64_t, uint64_t);
+typedef MS uint64_t (*Fn1F)(uint64_t, float);                          /* slot 1: 2 番目の引数が xmm1 (float) */
+typedef MS uint64_t (*Fn2F)(uint64_t, uint64_t, float);                /* slot 2: rdx = index, xmm2 = float */
 typedef MS uint64_t (*Fn5)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
 static void dump_changed(const uint8_t* a, const uint8_t* b, size_t n) {
@@ -298,7 +300,9 @@ int main(int argc, char** argv) {
                 for (int m = 0; m < 6; m++) printf("member +0x%x=0x%llx\n", mem_off[m], (unsigned long long)*(uint64_t*)(in + mem_off[m]));
             }
             uint64_t rax;
-            if (k == 3 && s3bufs) {
+            if (k == 1) rax = ((Fn1F)fn)(w, 1.0f);
+            else if (k == 2) rax = ((Fn2F)fn)(w, rdx, 1.0f);
+            else if (k == 3 && s3bufs) {
                 /* slot 3 (Process 候補): r8=ch 数, r9=入力 float 配列, 第 5 引数=出力 float 配列 (逆アセンブル #2528 追記) */
                 uint64_t ch = 2, n = rdx * ch + 4;
                 float* ibuf = (float*)k_HeapAlloc(NULL, 0, n * 4);

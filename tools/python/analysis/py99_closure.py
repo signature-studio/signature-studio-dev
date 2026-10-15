@@ -161,6 +161,9 @@ def main(argv):
         del args[k:k + 2]
         if negctl != "drop-pred":
             sys.exit("usage: --negctl drop-pred")
+    want_rint = "--rint" in args
+    if want_rint:
+        args.remove("--rint")
     md_out = None
     if "--md" in args:
         k = args.index("--md")
@@ -183,9 +186,12 @@ def main(argv):
         m, o = ins[a]
         val = r0.ev(p88.parse_ops(o)[1], cfg.idx[a], 0)
         cat = p88.category(val)
-        if cat.startswith("直接式") and "SLOT?" in cat:
+        if want_rint:
+            if cat.startswith("rint(") and ("SLOT?" in cat or "ACC?⚠合流" in cat):
+                writes.append(a)
+        elif cat.startswith("直接式") and "SLOT?" in cat:
             writes.append(a)
-    print(f"# 対象の書込み: {len(writes)} 件")
+    print(f"# 対象の書込み ({'rint 6 件 (--rint)' if want_rint else '直接式 SLOT?'}): {len(writes)} 件")
 
     T = Tag(ins, order)
     T.cfg = cfg

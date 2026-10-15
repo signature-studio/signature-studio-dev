@@ -290,7 +290,8 @@ def main():
             continue
         preds, ijmp = v1.build_preds(cs, seq, va, ent[1])
         F = a2.frame_derived(cs, seq)
-        leak = a2.leak_site(cs, seq, F)
+        leaks = a2.leak_sites(cs, seq, F)
+        leak = leaks[0] if leaks else None
         glk = leak is not None
         leak_ext = ext_leak(cs, seq, F)
         slots = frame_slots(cs, seq, F)
