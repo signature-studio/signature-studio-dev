@@ -56,7 +56,7 @@
 - 注 2: 行 40・41 は、機械語が `[[G]+0x10]` (3 段参照)、IR が `sext(i32 [G])+16` (2 段) で参照経路が一致しない。入口判定が IR に無いことは B・L を直接見て確認した。経路の差は別の lift 欠陥の疑いで、未確定。
 - 注 3: 行 63・65 は、同一性の根拠が機械語と IR で一致しないため保留。
 - 未解決: 保留 6 件と単独判定 15 件の 2 系統目の照合。起票先: #3564 (`[M11-N188]`・親 #3499)。
-- 競合解消 run の再実行 (測定 commit `1596c663c`・main 取り込み後の HEAD・foreground・各 1 回): 素材は `work-m11` の `tools/m11/work/boot_final.ll` (19,787,837 B・sha256 `69c774de…`) と `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。`$RUNNER_TEMP/m11_3571/` に展開した (repo 外・未コミット)。
-- 実行結果: `scan_guard.py --report` 4.7 s (strict 288)。`strict_evidence.py` 15.1 s (TSV 288 行)。`judge_ctx_3499.py <IR> <TSV> 36 66` rc 0 (31 件)。`judge_ctx.py <IR> <TSV> <PE> 67 98` rc 0 (32 件)。終了時の load average (1 分値) は 0.25 (`/proc/loadavg`)。
+- 競合解消 run の再実行 (測定 commit `0e7700d53`・main (`feff012eb`) 取り込み後の merge commit・foreground・各 1 回): 素材は `work-m11` の `tools/m11/work/boot_final.ll` (19,787,837 B・sha256 `69c774de…`) と `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。`$RUNNER_TEMP/m11_3571/` に展開した (repo 外・未コミット)。
+- 実行結果: `scan_guard.py --report` 4.3 s (strict 288)。`strict_evidence.py` 12.0 s (TSV 288 行)。`judge_ctx_3499.py <IR> <TSV> 36 66` rc 0 (31 件)。`judge_ctx.py <IR> <TSV> <PE> 67 98` rc 0 (32 件)。実行前後の load average (1 分値) は 0.43→0.47 (`uptime`)。
 - 行 40・45・46 の『脱出先 T の preds』は本節の記載どおり (各 1 件: `dec_label_pc_127bd27`・`dec_label_pc_12a41ab`・`dec_label_pc_12a4665`)。件数と判定は変えていない。今回の run は dump を作り直しただけで、判定そのものは再判定していない。
 
