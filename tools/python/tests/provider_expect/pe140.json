@@ -1,0 +1,6 @@
+{
+  "tag": "pe140",
+  "refs": ["#3759"],
+  "note": "PE で送出キー (VK・修飾・回数) を確定した ui 送出 15 関数 (REPORT_PY140・PY-140 #3035・PY-246 #3759)。送出の成否のゲートは #3758、戻り値は #3034。tests/ui_keys_diff.mjs が mock と照合",
+  "functions": ["ui.up", "ui.down", "ui.left", "ui.right", "ui.cut", "ui.copy", "ui.paste", "ui.insert", "ui.delete", "ui.enter", "ui.escape", "ui.yes", "ui.no", "ui.nextWindow", "ui.selectWindow"]
+}

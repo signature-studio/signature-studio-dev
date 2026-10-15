@@ -9,7 +9,7 @@
 
 | 受入条件 (#2613) | 結果 |
 |---|---|
-| 1. 197 入口のそれぞれに IPP API 名か「未同定」 | 197 入口を再現 (線形走査)。**一意の API 名 34 入口** (`ippsRealToCplx_32f` 12・`ippsSum_32f` 6・`ippsMagnitude_32fc` 4・`ippsMin_32f` 4・`ippsMax_32f` 4・`ippsSet_8u` 2・`ippsConj_32fc` 2)、**API 族の候補 98 入口** (dsp の同一本体を共有する export 群、24 群。うち 1 入口 `0x1803e71b0` は偶然一致の候補、§3 注)、**未同定 65 入口** (内訳 §3)。修正前 (`93307cc6a`) は 8 / 26 / 163 (§3 の修正前後)。対応表は `data/entries.csv` |
+| 1. 197 入口のそれぞれに IPP API 名か「未同定」 | 197 入口を再現 (線形走査)。**一意の API 名 34 入口** (`ippsRealToCplx_32f` 12・`ippsSum_32f` 6・`ippsMagnitude_32fc` 4・`ippsMin_32f` 4・`ippsMax_32f` 4・`ippsSet_8u` 2・`ippsConj_32fc` 2)、**API 族の候補 108 入口** (dsp の同一本体を共有する export 群、名前集合の種類 23。うち 1 入口 `0x1803e71b0` は偶然一致の候補、§3 注)、**未同定 55 入口** (内訳 §3)。修正前 (`93307cc6a`) は 8 / 26 / 163 (§3 の修正前後)。#4535 後は 34 / 108 / 55 (`identified` / 族候補 / 未同定)。対応表は `data/entries.csv` |
 | 2. 同定 API のうち tools/ipp の実装対応が無いもの | 名付けた入口 132 件のうち、**75 件は候補名が全て fail-soft stub のみ** (`tools/ipp` の PoC 未実装。STRICT でのみ fail-fast)、**57 件は実装済み名と stub 名の混在**、実装済みのみは 0 件。stub 名は 88 (§4 に列挙)。#2613 の受入 2 の文言「対応が無い入口が 1 件でも残るなら、D20 の停止条件に従い理由を報告して停止する (その入口は実装しない)」に従い、本 run ではこれらを実装しない |
 | 3. 関数ポインタ経由の到達が無いことの確認 | **静的確認 (§6) + unicorn 実行 (§8)**: 静的に IPPCODE 番地を作る命令は、即値・変位 (`.text`・IPPCODE、分岐を除く) で 0 (#3457 で IPPCODE に広げた)、`lea rip` で IPPCODE 内の 158 箇所 (宛先は全て IPPCODE 内・入口 0。#3457 で追加)、データ中のポインタ 0 (走査した 5 節)。実行範囲で間接 call/jmp の宛先が IPPCODE 入口に当たるもの 0 件 (実行した間接サイト 75/2,714 のみ)。被覆の拡大は子 #3334 ([T-SH-69]) に移管 |
 | 4. REPORT に測定 commit・再現コマンド・差分 | 本書 §1・§2 |
@@ -22,12 +22,13 @@
   PE 情報: ImageBase `0x180000000`、`.text` RVA `0x1000`・vsize `0x2f6550`、**IPPCODE RVA `0x2f8000`・vsize `0xef1c2` (= 979,394 B)**、`.pdata` 1,956 関数 (`.text` 内・pefile 由来。生 `.pdata` の `.text` 内は 4,556 件。出典は `REPORT_4284.md` §0)、export 15 (`Auftakt_CreateInstance` 等)。
 - 照合先: `extracted/block24356_PE.bin` (`dsp_ippv2_x64.dll`, ImageBase `0x180000000`, export 446, IPPCODE RVA `0x17e0000`・vsize `0x6dc771`)。
 - 検証起点: `93307cc6a` (origin/main。#3457 の基点。前の検証起点は `f3102162`)。
-- **測定 commit (コードを変えた最後の commit): `513791f11`** (`fix(shared): élastique 静的走査の即値走査を IPPCODE に広げ、範囲の命令境界を測る (#3457)`)。前の測定 commit は `c7e0bee8c` (`fix(shared): élastique 静的走査の direct_calls を関数範囲で辿り、IPPCODE の lea rip 走査を広げる (#3457)`)。その前の測定 commit は `bcab4049` (`fix(shared): élastique 族候補の起点伝播を起点ごとの BFS に直す`)。
+- **測定 commit (コードを変えた最後の commit): `7fe2ea865`** (`fix(shared): élastique 静的走査で pdata の無い .text 関数の direct_calls を次の先頭まで辿る (#4535)`)。前の測定 commit は `513791f11` (`fix(shared): élastique 静的走査の即値走査を IPPCODE に広げ、範囲の命令境界を測る (#3457)`)。その前の測定 commit は `c7e0bee8c` (#3457)、`bcab4049` (`fix(shared): élastique 族候補の起点伝播を起点ごとの BFS に直す`)。
   前の測定 commit `f3310a00` は `reach()` が既訪問ノードへ起点名を足したとき子へ伝播させず、族候補 26 入口のうち 16 入口の名前集合が不完全だった (round 1 の差し戻し)。`bcab4049` で修正し、全入口の名前集合を再計算した。
 - 差分 (修正の範囲): `git diff f3310a00 bcab4049 -- tools/shared/elastique/ipp_entries.py` (`reach()` を起点ごとの BFS に変更、CSV 列名 `tokens` → `insns`、出力ラベルの探索深さ)。
 - 差分 (#3457 の修正の範囲): `git diff 93307cc6a c7e0bee8c -- tools/shared/elastique/ipp_entries.py tools/shared/elastique/data/entries.csv` (`direct_calls` の範囲・`indirect_scan` の IPPCODE 走査・`data/entries.csv` の再集計)。
 - 差分 (#3457 の測定後のコード修正): `git diff c7e0bee8c 513791f11 -- tools/shared/elastique/ipp_entries.py` (即値走査の IPPCODE への拡大・`span_tail` の命令境界・docstring。`data/entries.csv` は不変)。
-- 差分 (測定後のコード範囲): `git diff 513791f11 HEAD -- tools/shared/elastique/ipp_entries.py tools/shared/elastique/data/entries.csv` → 出力 0 行 (`-- tools/shared/elastique` 全体では、測定後は本書 REPORT.md の更新だけ)。
+- 差分 (#4535 の修正の範囲): `git diff 513791f11 7fe2ea865 -- tools/shared/elastique/ipp_entries.py tools/shared/elastique/data/entries.csv` (`fn_span` の `.text` 側の範囲・`span_kind_of`・統計の区分ラベル・`data/entries.csv` の再集計)。
+- 差分 (測定後のコード範囲): `git diff 7fe2ea865 HEAD -- tools/shared/elastique/ipp_entries.py tools/shared/elastique/data/entries.csv` → 出力 0 行 (測定後は本書 REPORT.md の更新だけ)。
 
 ## 2. 再現
 
@@ -35,7 +36,7 @@
 # 素材の展開 (fl-win64 は docs/WORKFLOW.md §11 の手順)
 mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
 mkdir -p tools/shared/work/win && cp "$RUNNER_TEMP/fl-win64/extracted/block24357_PE.bin" tools/shared/work/win/elastique_x64.dll
-FL_WIN64_DIR="$RUNNER_TEMP/fl-win64" python3 tools/shared/elastique/ipp_entries.py   # 実測 (real): 測定 commit `513791f11` で 33.4 秒 (user 33.2 秒・run 後の load average 0.61)。前の測定 commit `c7e0bee8c` は 44.1 秒、`bcab4049` は 38.2 秒 (実行時間は機械負荷で変わるため参考値。出力の一致が検証の対象)
+FL_WIN64_DIR="$RUNNER_TEMP/fl-win64" python3 tools/shared/elastique/ipp_entries.py   # 実測 (real): 測定 commit `7fe2ea865` で 57.3 秒 (user 57.1 秒)。同日の修正前 (main `ab4b94258`) は 47.9 秒。前の測定 commit `513791f11` は 33.4 秒 (実行時間は機械負荷で変わるため参考値。出力の一致が検証の対象)
 ```
 
 - 出力: `data/entries.csv` (197 行・コミット対象) と `tools/shared/work/elastique/facts.json` (中間物・gitignore)。
@@ -46,12 +47,12 @@ linear-sweep entries (distinct call/jmp targets in IPPCODE): 197 (call/jmp sites
 pdata (.text 関数) 件数: 1956; 入口のうち呼出元が pdata 関数内にあるもの: 181
 dsp export 446: variant 数の分布 (表の項数) {1: 14, 6: 374, 7: 57, 9: 1}
 dsp 関数先頭の候補 (pdata 先頭と .text・IPPCODE の rel32 call 着地点): 34866
-direct_calls の範囲 (到達集合 5079 本体): {'ret まで (範囲なし)': 1393, 'pdata': 2754, 'pdata SPAN_IPP 打ち切り': 0, 'IPPCODE 次の先頭まで': 932, 'IPPCODE 次の先頭まで SPAN_IPP 打ち切り': 63}
-範囲の最後の命令 (mnemonic): {'pdata': {'nop': 2038, 'jle': 393, 'je': 95, 'ret': 57, 'jmp': 48, 'jbe': 32}, 'IPPCODE 次の先頭まで': {'nop': 528, 'int3': 194, 'ret': 119, 'jmp': 23, 'add': 17, 'addpd': 6}}
-範囲の終端と最後に復号した命令の終端の一致: {'pdata / 次の先頭 / 命令境界一致=True': 2754, 'IPPCODE 次の先頭まで / 次の先頭 / 命令境界一致=True': 862, 'IPPCODE 次の先頭まで / 次の先頭 / 命令境界一致=False': 7, 'IPPCODE 次の先頭まで / SPAN_IPP 打ち切り / 命令境界一致=False': 48, 'IPPCODE 次の先頭まで / SPAN_IPP 打ち切り / 命令境界一致=True': 15}
+direct_calls の範囲 (到達集合 7024 本体): {'.text 次の先頭まで': 2528, '.text 次の先頭まで SPAN_IPP 打ち切り': 0, 'IPPCODE 次の先頭まで': 1738, 'IPPCODE 次の先頭まで SPAN_IPP 打ち切り': 143, 'pdata': 2758, 'pdata SPAN_IPP 打ち切り': 0}
+範囲の最後の命令 (mnemonic): {'.text 次の先頭まで': {'nop': 2244, 'int3': 149, 'ret': 106, 'jmp': 24, 'add': 3, 'imul': 1}, 'IPPCODE 次の先頭まで': {'nop': 1124, 'int3': 283, 'ret': 155, 'jmp': 25, 'add': 18, 'addps': 13}, 'pdata': {'nop': 2041, 'jle': 393, 'je': 95, 'ret': 58, 'jmp': 48, 'jbe': 32}}
+範囲の終端と最後に復号した命令の終端の一致: {'.text 次の先頭まで / 次の先頭 / 命令境界一致=True': 2523, '.text 次の先頭まで / 次の先頭 / 命令境界一致=False': 5, 'IPPCODE 次の先頭まで / 次の先頭 / 命令境界一致=True': 1587, 'pdata / 次の先頭 / 命令境界一致=True': 2758, 'IPPCODE 次の先頭まで / 次の先頭 / 命令境界一致=False': 8, 'IPPCODE 次の先頭まで / SPAN_IPP 打ち切り / 命令境界一致=False': 105, 'IPPCODE 次の先頭まで / SPAN_IPP 打ち切り / 命令境界一致=True': 38}
 dsp 候補本体: export 表の variant 2566 個 / export から call で 12 段内 5079 個 / dsp .text 由来の IPPCODE 着地点 2470 個 → 照合対象 6724 個
 照合: {'exact_final': 166, 'fuzzy_only': 31}
-区分: {'family_candidates': 98, 'trivial_body': 10, 'identified': 34, 'unidentified_no_exact': 31, 'exact_dsp_internal_no_export': 24}
+区分: {'family_candidates': 108, 'trivial_body': 10, 'identified': 34, 'unidentified_no_exact': 31, 'exact_dsp_internal_no_export': 14}
 間接 call/jmp の形: {'rax': 261, 'qword ptr [rax]': 100, 'qword ptr [rax + 0x28]': 78, 'qword ptr [rax + 8]': 61, 'qword ptr [rax + 0x58]': 49, 'qword ptr [rax + 0x20]': 44, 'qword ptr [rax + 0x38]': 43, 'qword ptr [rax + 0x30]': 43, 'qword ptr [rax + 0x10]': 41, 'qword ptr [rax + 0x48]': 37, 'table[r10+rax*8]': 33, 'qword ptr [rax + 0x70]': 32}
 即値・変位に IPPCODE 番地を含む命令 (.text と IPPCODE、分岐を除く): 0
 lea rip で IPPCODE を指す箇所 (.text と IPPCODE): 158 箇所 / 152 着地点 (うち入口 0)
@@ -71,10 +72,17 @@ lea rip で IPPCODE を指す箇所 (.text と IPPCODE): 158 箇所 / 152 着地
 先頭が `jmp rel32` / `jmp [rip+x]` の thunk は 4 段まで追う。今回の 197 入口はいずれも thunk ではなかった (`thunk_hops = 0`)。
 
 **dsp の名付け**: dsp の export 446 件の先頭は CPU 別ディスパッチ `movsxd rax,[rip+X]; lea r10,[rip+T]; jmp [r10+rax*8]` で、表 T の項 (6 が 374 件、7 が 57 件、1 が 14 件、9 が 1 件) が variant 本体。
-表の項 (項数の合計 2,666 のうち distinct 2,566 本体。100 件は複数の export で共有) を export 名に対応づけ、**起点 (export) ごとに独立に** direct call を最大 12 段まで辿って到達する本体 (5,079 本体。#3457 の修正前は 3,646) と、dsp `.text` の call 先のうち IPPCODE にある着地点 (2,470) を照合対象 (6,724 本体。修正前は 5,825) とする。
+表の項 (項数の合計 2,666 のうち distinct 2,566 本体。100 件は複数の export で共有) を export 名に対応づけ、**起点 (export) ごとに独立に** direct call を最大 12 段まで辿って到達する本体 (5,079 本体。#3457 の修正前は 3,646) と、dsp `.text` の call 先のうち IPPCODE にある着地点 (2,470) を照合対象とする。#4535 の測定 commit `7fe2ea865` では到達する本体 7,024・照合対象 7,916 (実行ログ `direct_calls の範囲 (到達集合 7024 本体)`・`照合対象 7916 個`)。#3457 時点は到達 5,079・照合対象 6,724 (修正前は到達 3,646・照合対象 5,825)。
 起点ごとの独立 BFS は `bcab4049` での修正。`f3310a00` は既訪問ノードへ起点を伝播させず、名前集合が不完全だった。
 
-**直接 call の範囲 (#3457 で修正)**: 旧 `direct_calls` は本体を先頭から読み、最初の `ret` で止まった。早期 `ret` の後へ `je` で戻る後続ブロックの call を辿れなかった (例: dsp `0xdb08e0` は `0xdb0906` の `ret` の後、`0xdb0907` から `call 0x1a946c0` を持つ)。修正後は範囲の末尾まで線形に読む。範囲は、pdata に入る関数は pdata の End (`.text` 2,754 本体)、IPPCODE (pdata 無し) は次の既知の関数先頭 (`.text`・IPPCODE 内の rel32 call 着地点と pdata 先頭) と 0x2000 バイトのうち近い方 (932 本体。うち 63 本体は 0x2000 で打ち切り)。pdata に入らない `.text` 関数 (1,393 本体) は範囲を決めず、従来どおり `ret` で止める (§7 の子 #3490)。
+**直接 call の範囲 (#3457 で修正、#4535 で `.text` 側を確定)**: 旧 `direct_calls` は本体を先頭から読み、最初の `ret` で止まった。早期 `ret` の後へ `je` で戻る後続ブロックの call を辿れなかった (例: dsp `0xdb08e0` は `0xdb0906` の `ret` の後、`0xdb0907` から `call 0x1a946c0` を持つ)。修正後は範囲の末尾まで線形に読む。範囲は次のとおり (#4535 の測定 commit `7fe2ea865` 時点)。
+- pdata に入る関数: pdata の End (2,758 本体)。
+- pdata の無い `.text` 関数: 次の既知の関数先頭 (`.text`・IPPCODE 内の rel32 call 着地点と pdata 先頭) まで。上限は置かない (2,528 本体)。
+- pdata の無い IPPCODE 関数: 次の既知の先頭と 0x2000 バイトのうち近い方 (1,738 本体。うち 143 本体は 0x2000 で打ち切り)。
+
+**pdata の無い `.text` 関数の範囲 (#4535)**: 採用は「次の既知の先頭まで (上限なし)」(族候補 108・`identified` 34・`exact_dsp_internal_no_export` 14)。IPPCODE 側は 0x2000 のまま。`.text` を 0x400 で切ると `identified` が 40 に動くため採らない。候補の比較表・切り分け・`entries.csv` の変化の内訳は `REPORT_APPENDIX_4535.md` (測定 commit `7fe2ea865`)。
+
+- `entries.csv` の変化 (main 対 採用 C): 197 入口のうち `class` が変わったのは 10 (`exact_dsp_internal_no_export` → `family_candidates`)、`names` が変わったのは 76、`dsp_depth` が変わったのは 62。`identified` は 34 のまま。
 
 **判定区分** (上から優先):
 
@@ -82,14 +90,14 @@ lea rip で IPPCODE を指す箇所 (.text と IPPCODE): 158 箇所 / 152 着地
 |---|---|---|
 | `trivial_body` | 正規化後 8 命令未満 (偶然一致の余地が大きい) | 10 |
 | `identified` | 完全一致 かつ 対応 export 名が 1 つ | **34** |
-| `family_candidates` | 完全一致 かつ 対応 export 名が 2 つ以上 (共有本体。API 名に決まらない) | **98** |
-| `exact_dsp_internal_no_export` | 完全一致 だが export 名へ 12 段以内に到達しない (dsp の内部関数と本体が同一) | **24** |
+| `family_candidates` | 完全一致 かつ 対応 export 名が 2 つ以上 (共有本体。API 名に決まらない) | **108** |
+| `exact_dsp_internal_no_export` | 完全一致 だが export 名へ 12 段以内に到達しない (dsp の内部関数と本体が同一) | **14** |
 | `unidentified_no_exact` | 完全一致が無い (近似比は参考。最大 0.58・中央値 0.30) | **31** |
 
-- 完全一致の合計は 166 (= 34 + 98 + 10 + 24)。thunk 追跡 (`exact_final`) で全て一致し、生の本体 (`exact_raw`) による一致は 0 件。
+- 完全一致の合計は 166 (= 34 + 108 + 10 + 14)。thunk 追跡 (`exact_final`) で全て一致し、生の本体 (`exact_raw`) による一致は 0 件。
 - 近似比 0.9 以上の入口は 0 件。近似比は同定の根拠に使っていない。
 
-**API 族の候補 (98 入口, 24 群)**: 候補名の集合は `data/entries.csv` の `names` 列で決まる。群の大きさは、2 名の群 23 入口・12 名の群 23 入口・6 名の群 17 入口・3 名の群 8 入口が多い。45〜52 名の群が 15 入口ある (先頭名 `ippiFilterBoxBorder_8u_C1R`・`ippsAndC_32u_I`・`ippiCopy_8u_C3R`・`ippiCopyReplicateBorder_8u_C3R` の群などの型違いを含む)。多数の export が同じ本体を呼ぶ共通の下位関数と見られ、API 名には決まらない。族の到達深さは 1 段が 63 入口・2 段が 27 入口。
+**API 族の候補 (108 入口, 名前集合の種類 23)**: 候補名の集合は `data/entries.csv` の `names` 列で決まる。名前数は 2 名が 28 入口・17 名が 8 入口・14 名が 8 入口・23 名が 23 入口。名前数が 46 名以上の群が 13 入口ある (型違いを含む共通の下位関数と見られる)。API 名には決まらない。族の到達深さ (`dsp_depth`) は 1 段が 37 入口・2 段が 48 入口・3 段が 22 入口・4 段が 1 入口。
 
 注 (偶然一致の候補): `0x1803e71b0` (`names` = `ippiResize_8u_C3R`|`ippiResize_8u_C4R`・dsp 深さ 2。10 命令・呼出元 33 か所) は `push rcx/rdx/r8/r9; call T; pop ×4; ret` の退避ラッパで、呼出先 `0x1800010a0` は正規化により `T` に伏せられる。dsp の同形ラッパ `0x1839810` と形だけ一致したもので、呼出先の同一性は確認していない。TRIVIAL (8 命令) を超えるため除外されず、偶然一致の候補として残す。未同定へ戻した場合の試算 (`data/entries.csv` から再集計。#3457 時点): 族候補 97・未同定 66 (`exact_dsp_internal_no_export` 25・照合不能 31・自明本体 10)。
 
@@ -105,7 +113,7 @@ lea rip で IPPCODE を指す箇所 (.text と IPPCODE): 158 箇所 / 152 着地
 
 入口 VA の一覧は `data/entries.csv` (`class` = `identified`)。
 
-**未同定 65 入口**: `exact_dsp_internal_no_export` 24 (dsp 内部関数の本体と一致。最初の一致候補は 15 種の dsp 本体)・`unidentified_no_exact` 31・`trivial_body` 10。
+**未同定 55 入口** (#4535 後): `exact_dsp_internal_no_export` 14 (dsp 内部関数の本体と一致)・`unidentified_no_exact` 31・`trivial_body` 10。
 全入口の一覧は `data/entries.csv` (列: `entry_va`・`class`・`names` (名付けた入口のみ)・`origin_exports`・`tools_ipp_poc`・`insns`・`call_sites`・`dsp_rva`・`dsp_depth`・`ratio`)。`insns` は正規化後の命令数 (手順の長さ。トークン列ではない)。
 
 **修正前後 (`93307cc6a` → `c7e0bee8c`, #3457)**: 入口は 197 のまま。区分の遷移は、`exact_dsp_internal_no_export` → `family_candidates` 72・→ `identified` 26・→ 不変 24、`family_candidates` → 不変 26、`identified` → 不変 8、`unidentified_no_exact` 31・`trivial_body` 10 は不変 (区分が変わった入口 98)。`names` が変わった入口は 119、`dsp_depth` が変わった入口は 118。`ratio`・`insns`・`call_sites` は変わらない。`dsp_rva` (候補本体の並び) は 63 入口で変わる (到達集合が増えたため)。例: `0x1803c47b0` は `exact_dsp_internal_no_export` (depth −1) から `identified` (`ippsSum_32f`・depth 2) になった。
@@ -133,9 +141,9 @@ stub 名 88 (`implemented_poc = 0` の 77 名 + `tools/ipp/data/ipp_matrix.csv` 
 - **入口数の再現**: 線形走査の 197 は issue 本文の 197 と一致。pdata 基準は 181 (issue 182)。
 - **差し戻し round 2 の再実行**: 検証 HEAD `9ecc1301` で §2 のコマンドを再実行した。出力は §2 のログと全行一致。`data/entries.csv` は差分 0 (`git status` に現れない)。script は測定 commit から変えていない (`git diff bcab4049 HEAD -- tools/shared/elastique/ipp_entries.py` = 0 行)。
 - **thunk 追跡**: 197 入口すべて `thunk_hops = 0`。
-- **IPPCODE 範囲の境界 (#3457)**: 範囲の末尾の命令は、IPPCODE 932 本体のうち `nop` 528・`int3` 194・`ret` 119・`jmp` 23 で、864 本体 (93%) は末尾の命令が `nop`・`int3`・`ret`・`jmp` で、残り 68 本体はそれ以外の mnemonic。範囲の終端が最後に復号した命令の終端と一致する (命令境界) のは 877 本体、一致しないのは 55 本体 (うち 0x2000 打ち切り 48・次の先頭 7)。一致しない 55 本体は範囲内で命令を復号しきれない (終端が命令の途中か、途中で復号が止まる)。原因は未分類。pdata の範囲の末尾は `nop` 2,038 が多い (パディング)。
+- **IPPCODE 範囲の境界 (#3457)**: 範囲の末尾の命令は、IPPCODE 932 本体のうち `nop` 528・`int3` 194・`ret` 119・`jmp` 23 で、864 本体 (93%) は末尾の命令が `nop`・`int3`・`ret`・`jmp` で、残り 68 本体はそれ以外の mnemonic。範囲の終端が最後に復号した命令の終端と一致する (命令境界) のは 877 本体、一致しないのは 55 本体 (うち 0x2000 打ち切り 48・次の先頭 7) (以上は #3457 時点の値)。#4535 の測定 commit `7fe2ea865` の現在値: IPPCODE 範囲 1,738 本体のうち命令境界一致 1,625 (= 1,587 + 38)・不一致 113 (= 次の先頭 8 + 0x2000 打ち切り 105)。`.text` 範囲 2,528 本体のうち一致 2,523・不一致 5。一致しない 55 本体は範囲内で命令を復号しきれない (終端が命令の途中か、途中で復号が止まる)。原因は未分類。pdata の範囲の末尾は `nop` 2,038 が多い (パディング)。
 - **境界の有無で入口は変わらない (#3457)**: IPPCODE に境界を入れず `ret` で止める版 (pdata の修正だけを入れた版。CSV に書かず比較のみ) と比べ、197 入口の `class`・`names`・`dsp_depth`・`dsp_rva`・`origin_exports` は 0 件差。到達集合は 4,987 → 5,079 本体 (+92)。
-- **pdata の無い `.text` 関数の境界は採用せず (#3457)**: 試行版 (次の既知の先頭を境界にした版。コミットしていない) では、2,339 本体のうち末尾が `ret`/`jmp` で終わるのは 119 本体のみ。区分は族候補 108・`identified` 34・`exact_dsp_internal_no_export` 14 と動いた。範囲の決め方が未確定のため `ret` 停止のまま残し、子 #3490 ([T-SH-87]) に移す。
+- **pdata の無い `.text` 関数の範囲 (#3457 の試行 → #4535 で採用)**: #3457 の試行版 (次の既知の先頭を境界にした版) では、2,339 本体のうち末尾が `ret`/`jmp` で終わるのは 119 本体のみで、区分は族候補 108・`identified` 34・`exact_dsp_internal_no_export` 14 と動いた。#4535 は、これを採用版 C として `.text` 側の範囲を正式に入れた。決め方と比較は §3 の表を参照。
 - **修正の影響 (`f3310a00` → `bcab4049`)**: 入口・区分・照合の件数は不変 (8 / 26 / 122 / 31 / 10)。名前集合が変わったのは族候補 16 入口のみで、旧名の集合は全て新名に含まれる。入口ごとに増えた名は stub 6 名 (`ippsAutoCorr_NormA_32f`・`ippsCopy_16s`・`ippsCopy_32s`・`ippsCopy_64f`・`ippsCopy_64s`・`ippsFIR64f_32f`) と実装済み 3 名 (`ippsCopy_32f`・`ippsFFTInit_R_32f`・`ippsFFTInit_R_64f`)。このうち stub 名の集合で新たに加わるのは 4 名 (`ippsAutoCorr_NormA_32f`・`ippsCopy_16s`・`ippsCopy_64f`・`ippsCopy_64s`) で、stub 名は 24 → 28。名付けた入口の内訳は stub のみ 28 → 18・混在 6 → 16。
 
 ## 6. 関数ポインタ経由の到達 (受入条件 3・静的確認)
@@ -159,12 +167,12 @@ stub 名 88 (`implemented_poc = 0` の 77 名 + `tools/ipp/data/ipp_matrix.csv` 
 | 間接 call/jmp (2,714 箇所) の実行時の宛先が IPP に当たらないことの確認 (受入 3) | 実行範囲 75 サイトのみ (§8)。全サイトは未確認 | 子 #3334 ([T-SH-69]) |
 | 追記受入 1〜3 (dispatch 表の飛び先 186 個の同定・2 段目 251 個の IPP 同定・初期化スタブと外向き分岐 33 件) | 本 PR では扱わない。子 #2667 は PR #3178 (`Closes #2667`) で完了済み (2026-10-14。結果は `REPORT_152.md` §8) | 完了 (子 #2667 ([T-SH-43])。親 #2613 の追記コメント (16:23) の原文を移した) |
 | 追記受入 4 (thunk 頭 33 本の到達元) | 静的参照 0 件。実行で枠を読む命令は 0 件 (§8) | 子 #3334 ([T-SH-69]) |
-| 未同定 65 入口 (dsp 内部関数と一致 24・照合不能 31・自明本体 10) | API 名が付かない。tools/ipp の実装対応を判定できない | 本 PR 本文の未解決表 (追跡のみ。`Closes #3457` で閉じるため本表が正) |
-| API 族の候補 98 入口 (24 群。うち 45〜52 名の共有本体 15 入口) | 一意の API 名に決まらない | 本 PR 本文の未解決表 (同上) |
+| 未同定 55 入口 (dsp 内部関数と一致 14・照合不能 31・自明本体 10) | API 名が付かない。tools/ipp の実装対応を判定できない | 本 PR 本文の未解決表 (追跡のみ) |
+| API 族の候補 108 入口 (名前集合の種類 23。うち 46 名以上の共有本体 13 入口) | 一意の API 名に決まらない | 本 PR 本文の未解決表 (同上) |
 | `.pdata` 基準の入口数 181 と issue 本文の 182 | 1 件の定義差 (呼出元の範囲の端の扱い等。未確定) | 本 PR 本文の未解決表 (同上) |
 | stub 名 88 (stub のみ 75 入口・混在 57 入口) | 名付けた入口が tools/ipp で未実装 | 既存 #38 (tools/ipp 親) を起票先とする (本 PR では #38 へコメントしない。PM が判断) |
-| `.text` の pdata に入らない関数 (到達集合のうち 1,393 本体) の範囲 | `ret` で止まり、早期 `ret` の後の call を辿らない。この関数に当たる入口の区分・名前が変わり得る (試行で族候補 98 → 108) | 子 #3490 ([T-SH-87])。親 #3457 |
-| IPPCODE の範囲の終端が命令境界と一致しない 55 本体 (うち 0x2000 打ち切り 48) | 範囲が不足・過剰になり得る。入口の結果は境界の有無で変わらない (§5) | 本 PR 本文の未解決表 (追跡のみ) |
+| `.text` の pdata に入らない関数 (旧「ret で止める」読みの到達集合のうち 1,393 本体。#4535 の現在の `.text` 範囲は 2,528 本体) の範囲 | #4535 で解決。次の既知の先頭まで (上限なし)。族候補 98 → 108・`exact_dsp_internal_no_export` 24 → 14 | 完了 (#4535。旧子 #3490 ([T-SH-87]) を置換) |
+| IPPCODE の範囲の終端が命令境界と一致しない 113 本体 (うち 0x2000 打ち切り 105・次の先頭 8。#3457 時点は 55 本体) | 範囲が不足・過剰になり得る。入口の結果は境界の有無で変わらない (§5) | 本 PR 本文の未解決表 (追跡のみ) |
 | `lea rip` 158 箇所の関数内の位置と、関数ポインタとしての使用 | 局所の分岐先と見られるが未確認。入口は 0 件 | 本 PR 本文の未解決表 (追跡のみ) |
 
 ## 8. 実行時の間接 call/jmp 宛先 (T-SH-42 / #2643・unicorn 実行)

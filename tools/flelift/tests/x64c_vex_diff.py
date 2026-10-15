@@ -38,6 +38,44 @@ def f32val(b):
 
 MASKS_W = {8: 0xff, 16: 0xffff, 32: 0xffffffff, 64: MASK}
 
+# 近似命令の参照値: 実機抽出表 (snapins/scripts/approx_tables.b64) を直接読み、式は Intel 規格の近似仕様
+# (rcpps: 1/x の 12bit 近似、rsqrtps: 1/sqrt(x) の 12bit 近似) を指数則 253-e / 190-((e+1)>>1) で組む。
+# C 側 (fle_cpu.c) とは別実装で、表だけを共有する。
+_APPROX = None
+
+
+def approx_table():
+    global _APPROX
+    if _APPROX is None:
+        import base64
+        p = os.path.join(WS, 'tools/targets/kilohearts/snapins/scripts/approx_tables.b64')
+        b64 = ''.join(l for l in open(p) if not l.startswith('#'))
+        blob = base64.b64decode(''.join(b64.split()))
+        vals = struct.unpack('<12288I', blob)
+        _APPROX = (vals[:4096], vals[4096:8192], vals[8192:12288])
+    return _APPROX
+
+
+def approx_ref(kind, x):
+    rcp, odd, even = approx_table()
+    s = x & 0x80000000
+    e = (x >> 23) & 0xff
+    man = x & 0x7fffff
+    if e == 0:
+        return s | 0x7f800000
+    if e == 0xff:
+        if man:
+            return s | 0x7f800000 | (man | 0x400000)
+        if kind == 'rcp':
+            return s
+        return 0xffc00000 if s else 0
+    if kind == 'rcp':
+        t = 253 - e
+        return s if t <= 0 else (s | (t << 23) | rcp[(x >> 11) & 0xfff])
+    if s:
+        return 0xffc00000
+    return ((190 - ((e + 1) >> 1)) << 23) | (odd[(x >> 11) & 0xfff] if (e & 1) else even[(x >> 11) & 0xfff])
+
 
 def rcr_ref(w, a, cnt, F):
     """RCR の参照値 (Intel SDM の疑似コード + 実機 rcr の測定)。
@@ -714,6 +752,39 @@ def cases():
         st['F']['CF'] = 1
         return st
     add('pushfq', e_pushfq, p_pushfq)
+
+    # rcpps / rsqrtps (実機近似表。参照値 = approx_ref: 表は scripts/approx_tables.b64 の実機抽出値をそのまま使う)
+    def lanes_of(q0, q1):
+        return [q0 & 0xffffffff, q0 >> 32, q1 & 0xffffffff, q1 >> 32]
+
+    def approx_pack(kind, q0, q1):
+        r = [approx_ref(kind, v) for v in lanes_of(q0, q1)]
+        return (r[0] | (r[1] << 32), r[2] | (r[3] << 32))
+
+    add('rcpps xmm1, xmm2', xl(1, lambda st: approx_pack('rcp', *st['X'][2])[0], lambda st: approx_pack('rcp', *st['X'][2])[1]))
+    add('rsqrtps xmm3, xmm4', xl(3, lambda st: approx_pack('rsq', *st['X'][4])[0], lambda st: approx_pack('rsq', *st['X'][4])[1]))
+    add('vrcpps xmm1, xmm2', xz(1, lambda st: approx_pack('rcp', *st['X'][2])[0], lambda st: approx_pack('rcp', *st['X'][2])[1]))
+    add('vrsqrtps xmm3, xmm4', xz(3, lambda st: approx_pack('rsq', *st['X'][4])[0], lambda st: approx_pack('rsq', *st['X'][4])[1]))
+    def haddps_lanes(st):
+        # haddps dst, src: 結果 = [dst0+dst1, dst2+dst3, src0+src1, src2+src3] (f32)
+        def lanes(q0, q1):
+            return [f32val(v & 0xffffffff) for v in (q0, q0 >> 32, q1, q1 >> 32)]
+        a = lanes(*st['X'][1])
+        b = lanes(*st['X'][2])
+        r = [a[0] + a[1], a[2] + a[3], b[0] + b[1], b[2] + b[3]]
+        r = [fbits32(v) for v in r]
+        return (r[0] | (r[1] << 32), r[2] | (r[3] << 32))
+
+    add('haddps xmm1, xmm2', xl(1, lambda st: haddps_lanes(st)[0], lambda st: haddps_lanes(st)[1]))
+    add('vpsrld xmm1, xmm2, 3', xz(1, lambda st: sum((((st['X'][2][0] >> (32 * k)) & 0xffffffff) >> 3) << (32 * k) for k in (0, 1)),
+                                  lambda st: sum((((st['X'][2][1] >> (32 * k)) & 0xffffffff) >> 3) << (32 * k) for k in (0, 1))))
+    add('vpslld xmm1, xmm2, 3', xz(1, lambda st: sum(((((st['X'][2][0] >> (32 * k)) & 0xffffffff) << 3) & 0xffffffff) << (32 * k) for k in (0, 1)),
+                                  lambda st: sum(((((st['X'][2][1] >> (32 * k)) & 0xffffffff) << 3) & 0xffffffff) << (32 * k) for k in (0, 1))))
+    add('vandps xmm1, xmm2, xmm3', xz(1, lambda st: st['X'][2][0] & st['X'][3][0], lambda st: st['X'][2][1] & st['X'][3][1]))
+    add('vcvtdq2ps xmm1, xmm2', xz(1, lambda st: sum((fbits32(float(s32(st['X'][2][0] >> (32 * k) & 0xffffffff))) & 0xffffffff) << (32 * k) for k in (0, 1)),
+                                  lambda st: sum((fbits32(float(s32(st['X'][2][1] >> (32 * k) & 0xffffffff))) & 0xffffffff) << (32 * k) for k in (0, 1))))
+    add('rsqrtps xmm5, [rbx]', xl(5, lambda st: approx_pack('rsq', *st['MEM']['data'][:2])[0], lambda st: approx_pack('rsq', *st['MEM']['data'][:2])[1]), yprep(mem=mem_rand))
+    add('rcpps xmm2, [rbx]', xl(2, lambda st: approx_pack('rcp', *st['MEM']['data'][:2])[0], lambda st: approx_pack('rcp', *st['MEM']['data'][:2])[1]), yprep(mem=mem_rand))
     return C
 
 
@@ -785,6 +856,22 @@ def main():
     cfile = os.path.join(D, 'harness.c')
     open(cfile, 'w').write('\n'.join(lines) + '\n')
     rt = os.path.join(WS, 'tools/flelift/rt')
+    neg_rsq = [int(a.split('=', 1)[1]) for a in sys.argv[1:] if a.startswith('--neg-rsq=')]
+    if neg_rsq:
+        # ネガコン (rsqrtps): rsq の odd/even 両表の entry N を 1 bit 改変した fle_approx.inc で harness を作る。
+        # N はテスト入力が引く添字 (例: 448 は even 表が引かれる)。引かれない添字では FAIL しない。
+        rt_neg = os.path.join(D, 'rt_neg')
+        os.makedirs(rt_neg)
+        for n in ('fle_cpu.c', 'fle_cpu.h'):
+            open(os.path.join(rt_neg, n), 'w').write(open(os.path.join(rt, n)).read())
+        _, odd, even = approx_table()
+        odd = list(odd); even = list(even)
+        odd[neg_rsq[0]] ^= 1; even[neg_rsq[0]] ^= 1
+        tbl = lambda nm, t: 'static const uint32_t %s[4096] = {\n%s\n};\n' % (nm, ',\n'.join(
+            '  ' + ', '.join('0x%06xu' % v for v in t[i:i + 8]) for i in range(0, 4096, 8)))
+        open(os.path.join(rt_neg, 'fle_approx.inc'), 'w').write(
+            '/* ネガコン: kh_at_rsq_odd/even[%d] を 1 bit 改変 */\n' % neg_rsq[0] + tbl('kh_at_rsq_odd', odd) + tbl('kh_at_rsq_even', even))
+        rt = rt_neg
     exe = os.path.join(D, 'harness')
     cc = subprocess.run(['gcc', '-std=gnu11', '-O0', '-w', '-I', rt, cfile, os.path.join(rt, 'fle_cpu.c'),
                          '-o', exe, '-lm'], capture_output=True, text=True)
