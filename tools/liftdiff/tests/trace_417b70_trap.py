@@ -6,6 +6,8 @@ site2 = product+0x10 < 0 ≙ 0x417c75) と突き合わせる。
   FL_WIN64_DIR=<fl-win64 展開先> python3 tools/liftdiff/tests/trace_417b70_trap.py > tools/liftdiff/results/m11_417b70_trap_inputs.md
 
 stride は movsxd (32bit 符号付き)、count は qword。native は work/ld_native が必要 (cwd 非依存)。
+呼出し規約は PE 内の直接呼出し元 (LD-159, #3505) に合わせる: rcx = 配列 cell (空なら 0)・rdx = record・r8 = 1・r9 = count の番地。
+アロケータの大域状態は boot 状態 (work/m11/boot_state.json) で初期化する (無いと 0x409470 系で segv する)。
 """
 import os
 import sys
@@ -13,6 +15,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
+from ldlib import boot  # noqa: E402
 from ldlib.session import Session  # noqa: E402
 from ldlib.runners import Runner  # noqa: E402
 
@@ -41,13 +44,15 @@ def le(v, n):
 
 
 def main():
-    s = Session(os.path.join(ROOT, 'targets/m11.json'), build=False, trace=True)
+    s = Session(os.path.join(ROOT, 'targets/m11.json'), build=False, trace=True,
+                state=os.path.join(ROOT, 'work/m11/boot_state.json'))
+    ln, _ = boot.state_lines_for('native', s.state['state'], s)
     nat = Runner('native', ['setarch', '-R', os.path.join(ROOT, 'work/ld_native'), s.t['pe']],
-                 s.init_lines('native') + [s.tracelines()], timeout=10.0)
+                 s.init_lines('native') + ln + [s.tracelines()], timeout=10.0)
     lines = []
     for st, cnt in GRID:
-        patch = ';'.join(['a:0x102:%s' % le(st, 4), 'a:0x106:q=a:0x400', 'a:0x200:%s' % le(cnt, 8)])
-        lines.append('id=%x:st%d_c%d fn=%x blob=- args=i:a:0x300,i:a:0x100,i:0x0,i:a:0x200 trace=1 xfill=0 '
+        patch = ';'.join(['a:0x300:q=0', 'a:0x101:00', 'a:0x102:%s' % le(st, 4), 'a:0x106:q=a:0x400', 'a:0x200:%s' % le(cnt, 8)])
+        lines.append('id=%x:st%d_c%d fn=%x blob=- args=i:a:0x300,i:a:0x100,i:0x1,i:a:0x200 trace=1 xfill=0 '
                      'sig=i64,i64,i64,i64 rt=i64 p=%s' % (FN, st & M64, cnt & M64, FN, patch))
     out = nat.run_cases(lines, ['%d_%d' % g for g in GRID])
     nat.close()

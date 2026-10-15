@@ -242,4 +242,4 @@ WaveformColouring closure の入口 70 関数を x64c で C に lift し wasm �
 
 ### 結論 (1 行)
 PSOLA の閉包の正本は vtable 経由 (82 関数・4,601 命令・間接 call 18)。その一部 (CreateInstance + slot 0・4・5 = 36 関数・1,046 命令・unsup 0) を x64c で lift し、native 対 wasm は 64 case 全一致 (ネガティブコントロール FAIL 64/64)。slot 1–3 (DSP 本体) は子 [T-SH-81]、x64c の VEX-256 は子 [T-SH-82]、間接 call の到達実測は既存 #3250。
-全文 (手順・実測・未解決の表) は `REPORT_APPENDIX_3401.md` §8 が正本 (250 行上限のため分割移動)。
+全文 (手順・実測・未解決の表) は `REPORT_APPENDIX_3401.md` §8 が正本 (250 行上限のため分割移動)。HEAD での再実行記録 (T-SH-86 #3469) は `REPORT_APPENDIX_3428.md`。
