@@ -175,7 +175,7 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 戻り先 `0x59c210` (setjmp/longjmp 継続) の lift 対応 (FLEngine 同型の override と断片 entry) と、DllMain 側の longjmp 起動元の特定 | DllMain が完走しない | #3410 (T-SH-77) |
-| `ExitProcess(0)` の偽の停止 (判定済み。修正は未実装) | DllMain の完走 (boot PASS) の判定 | 子 issue (付録 §1b の修正) |
+| `ExitProcess(0)` の偽の停止 (判定済み。修正は未実装) | DllMain の完走 (boot PASS) の判定 | #4510 (T-SH-126) |
 | longjmp の発生条件 (`0x40fa40` の呼出元 `0x40fbd4`・`0x40fcbd` と `[0x5aa000]` の決まり方) | 偽の停止かどうかの切り分け | #4263 (T-SH-107) |
 | rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない。直接呼出しの計数は §10 | #3411 (T-SH-78) |
 | GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3434 (T-SH-83。#3412 は closed) |
@@ -234,7 +234,7 @@ guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 停止点 `ExitProcess(0)` が偽の停止か (longjmp 継続後の進行) | DllMain が完走したか不明 | #4262 (T-SH-106) |
+| 停止点 `ExitProcess(0)` は偽の停止と判定済み (#4262)。残るのは偽の停止の修正 (停止点を進める) | DllMain が完走していない (boot FAIL のまま) | #4510 (T-SH-126) |
 | longjmp (0x40f9c0) の発生条件と戻り先 `0x59c210` の lift 対応 | 停止点の解釈 | #4263 (T-SH-107) |
 | 間接経由の import 呼出しが未計数 | DllMain 経路の全数が不明 | #4374 (T-SH-121) |
 | rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る | #4375 (T-SH-122) |
