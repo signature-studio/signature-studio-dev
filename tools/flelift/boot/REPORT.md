@@ -184,9 +184,9 @@ bash tools/flelift/fle_e2e.sh                # 親チケットの回帰 (PASS)
 前提: tools/flelift/fle_lift.sh と同一 (python3 capstone/pefile, emsdk 6.0.12, node)。
 PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は git に入れない。
 
-## 9. FLE-9 (#2700): shard 化 (8 本) の実測 → `REPORT_APPENDIX_2700_SHARD.md`
+## 9. FLE-9 (#2700): TU 分割 (8 shard) の結論のみ
 
-- 結論: 8 shard の clang は cap 内で完走 (各ピーク 2,202〜2,666MB)。link・boot は FLE-10 の §10 と同じ unit 209 で停止。詳細 (工程表・起動指標) は付録 §9-1・§9-2。
+- 結論: 単一 TU の clang は cap 11000MB 超で打ち切られていた (FLE-8)。8 shard (`FLE_SHARDS=8`) で全 shard cap 内で完走し、link の mismatch/undefined/duplicate は 0。boot は両 variant とも unit 209 で停止 (測定値の正本は `REPORT_APPENDIX_2700.md` の全文)。
 
 ## 10. FLE-10 (#2702): dsp_ippv2 shim では units が前進しない (測定 commit `4869ad16`)
 
@@ -221,9 +221,28 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 - main 取り込み後の再測定 (測定 commit `4cc9c3d72`): units・GetMem / FreeMem・`ptr_15F34A0`・停止点は取り込み前と同値。shim 有 (root 有) の IPP 判定 NG (rc=3) は既知のまま。
 - 未解決: 停止点 `unlifted 0x6bbc20` の解消 (最初のウィンドウ未達) → #3491 [FLE-14] (親 #672)。
 
-## 12. #4855: boot_e2e の shard 化 (cap 内 build) の実測 (測定 commit `d956129eb`)
+## 12. #4854: mode 3 の survey が InitTable 0 で測定不能 (補修と jsonl の残し方)
+
+- **結論**: 既定 (mode 3) の survey は補修 (`InitTable` を PKG へ戻す) ありで 942 件を判定 (ok 895 / empty 46 / noproc 1)。補修なしは `InitTable == 0` で不成立。補修が判定を変えるかは未切り分け (#4901)。受入 2 (旧 mode 0 との差) は #4901。
+- 測定 commit: `a64aa3aab` (コードを変えた最後の commit。main 取り込み `db771b431` 後の HEAD)。差分 0 の証跡: `git diff a64aa3aab HEAD -- tools/flelift/boot ':!tools/flelift/boot/REPORT.md'` の出力 0 行 (本節の追記のみが REPORT の差分)。
+- 素材: `fl-win64` (`FL_WIN64_DIR` に展開)・emsdk 6.0.12 (`[EMSDK]` を上流から取得して `SS_EMSDK_ENV` で指定)。
+
+| 項目 | 結果 (HEAD `a64aa3aab`) |
+|---|---|
+| lift (closure 2・既定 root) | 50 s・29,910 関数 |
+| clang plain (8 shard) | 50 s・mismatch 0 / undefined 0 / dup 0 |
+| boot 既定 (mode 3・`--boot-only`) | units 895・stopped 895・`exit`・IPP check ok (ptr=0x7f10001c) |
+| survey 既定 (mode 3・補修あり) | 1 セグメント・5〜6 s・ok 895 / empty 46 / noproc 1 (942 件)。jsonl 942 行 |
+| survey 補修なし (`FLE_SURVEY_NOREPAIR=1`) | `InitTable == 0` で不成立 (`survey.error`) |
+| survey mode 0 (`FLE_IPP=0`) | `InitTable == 0` で不成立。`survey_seg_0.json` の boot は units 209・exit code 0 |
+
+- 補修あり/なしの load: 測定時の loadavg 1.7〜1.8 (1 分)。
+- mode 0 の boot 単独の再採取は、`fle_boot.mjs` の `import(cjs)` 相対解決で失敗したため未実施 (survey 実行時の値を引用)。
+- 未解決: 補修の判定への影響 → #4901 [FLE-33]。unit 280 / 659 / 895 の補修なし unlifted → #4855 [FLE-32]。
+
+## 13. #4855: boot_e2e の shard 化 (cap 内 build) の実測 (測定 commit `d956129eb`)
 
 - **結論**: `boot_e2e.sh` の 4 variant (plain/strict/nosx/chk) は全て RSS cap 内で build・link できた (shard の clang peak 最大 2,975MB (chk s1)・cap 5,000MB/shard・超過 0 件。mismatch/undefined/duplicate 0)。boot は plain 895 units・strict 93・nosx 0・chk 895 (trap)。最初のウィンドウは無し。
-- 全数値 (shard 別 RSS・秒・variant 結果表・再現) は `REPORT_APPENDIX_4855.md`。§9 (FLE-9 の shard 化の実測) は `REPORT_APPENDIX_2700_SHARD.md` へ分割移動した (内容は削除していない)。
+- 全数値 (shard 別 RSS・秒・variant 結果表・再現) は `REPORT_APPENDIX_4855.md`。§9 (FLE-9 の shard 化の実測) の全文は `REPORT_APPENDIX_2700.md` (main 側で分割済み)。
 - 測定: 全体 `real 7m38s`・load 0.96→2.05 (4 vCPU)・素材 `fl-win64` 展開・`toolchain-emsdk` (6.0.12)。
 - 未解決: survey covered 942 の残り (#4931 [FLE-35])。

@@ -4,7 +4,7 @@
  *  - 間接 call 4 件 (0x1aedf6・0x1aee04・0x1aee4a・0x1b6f6c) は int3 で捕捉し、到達を数える。
  *    呼び先が画像内ポインタ (0x268260・0x268268) の 2 件は実行せず飛ばす (rax が静的に不明なため)。IAT の 2 件は実行する。
  *  - 出力は key=value の行。checker は ildsp_native_check.py。
- * usage: ildsp_native <PE> [--neg-lea]
+ * usage: ildsp_native <PE> [--neg-lea] [--s0-members] [--pre-slot K]
  *   --neg-lea: CreateInstance の vptr 格納 lea の disp32 を +8 に壊す (ネガティブコントロール)。 */
 #define _GNU_SOURCE
 #include <stdint.h>
@@ -266,7 +266,7 @@ static uint64_t unimpl_total(void) { uint64_t t = 0; for (int i = 0; i < g_nunim
 int main(int argc, char** argv) {
     if (argc < 2) { fprintf(stderr, "usage: ildsp_native <PE> [--neg-lea]\n"); return 2; }
     setvbuf(stdout, NULL, _IOLBF, 0);
-    int neg = 0, only_k = -1, only_v = -1, s3bufs = 0, create_only = 0;
+    int neg = 0, only_k = -1, only_v = -1, s3bufs = 0, create_only = 0, s0_members = 0, pre_k = -1;
     int64_t fail_from = -1, fail_cnt = -1;
     for (int i = 2; i < argc; i++) {
         if (!strcmp(argv[i], "--neg-lea")) neg = 1;
@@ -275,6 +275,8 @@ int main(int argc, char** argv) {
         else if (!strcmp(argv[i], "--newh-zero")) g_newh_zero = 1;
         else if (!strcmp(argv[i], "--rdx") && i + 1 < argc) { g_rdx_ovr = strtoull(argv[i + 1], NULL, 0); i += 1; }
         else if (!strcmp(argv[i], "--s3-bufs")) s3bufs = 1;
+        else if (!strcmp(argv[i], "--s0-members")) s0_members = 1;
+        else if (!strcmp(argv[i], "--pre-slot") && i + 1 < argc) { pre_k = atoi(argv[i + 1]); i += 1; }
         else if (!strcmp(argv[i], "--create-only")) create_only = 1;
         else if (!strcmp(argv[i], "--slot") && i + 2 < argc) { only_k = atoi(argv[i + 1]); only_v = atoi(argv[i + 2]); i += 2; }
     }
@@ -319,6 +321,17 @@ int main(int argc, char** argv) {
             printf("call k=%d variant=%d rdx=0x%llx wrapper=0x%llx\n", k, v, (unsigned long long)rdx, (unsigned long long)w);
             if (k == 0) {
                 static const uint32_t mem_off[] = {0x10, 0x18, 0x20, 0x208, 0x258, 0x260};
+                if (s0_members)
+                    for (int m = 0; m < 6; m++) *(uint64_t*)(in + mem_off[m]) = (uint64_t)k_HeapAlloc(NULL, 0, 0x40);
+                if (pre_k >= 0) {
+                    uint64_t pvt = *(uint64_t*)w, pfn = *(uint64_t*)(pvt + 8 * pre_k);
+                    uint64_t prdx = (pre_k == 4) ? in : (g_rdx_ovr ? g_rdx_ovr : 0);
+                    if (pre_k == 1) ((Fn1F)pfn)(w, 1.0f);
+                    else if (pre_k == 2) ((Fn2F)pfn)(w, prdx, 1.0f);
+                    else ((Fn4)pfn)(w, prdx, 0, 0);
+                    printf("pre_slot k=%d done\n", pre_k);
+                    for (int m = 0; m < 6; m++) printf("pre member +0x%x=0x%llx\n", mem_off[m], (unsigned long long)*(uint64_t*)(in + mem_off[m]));
+                }
                 for (int m = 0; m < 6; m++) printf("member +0x%x=0x%llx\n", mem_off[m], (unsigned long long)*(uint64_t*)(in + mem_off[m]));
             }
             uint64_t rax;

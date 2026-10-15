@@ -12,7 +12,7 @@ export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 SEG_SEC="${1:-180}"
 MAXSEG="${2:-60}"
 mkdir -p "$HERE/results"
-rm -f "$HERE"/results/survey_seg_*.json
+rm -f "$HERE"/results/survey_seg_*.json "$HERE"/results/survey_seg_*.jsonl   # jsonl も消す (残すと再実行の行が重複し merge が件数を誤る・#4854)
 FROM=0; SEGS=0
 TOTAL=942
 while [ "$FROM" -lt "$TOTAL" ] && [ "$SEGS" -lt "$MAXSEG" ]; do

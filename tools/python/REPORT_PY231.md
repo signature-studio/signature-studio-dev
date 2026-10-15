@@ -1,18 +1,44 @@
-# PY-231 (#3671): device.forwardMIDICC の -7 (device 無し)・-6 (送出先無し) の判定と送出の記録 (PE 0xd748e0)
+# PY-231 (#3671): device.forwardMIDICC の -7 (device 無し)・-6 (送出先無し) の判定と送出の記録 (書式は PE 0xd75120 で確定・-7/-6 は仮置き)
 
 親: #2950 (PY-115)。兄弟: #3655 (PY-227・midiOutMsg)。既知類型との関係: 該当なし (`docs/DEFECTS.md` の類型には当たらない。provider の判定順と引数書式の読み違い)。
 
 ## 結論
 
-- **受入 1 (PE の確定)**: 書式は `"ii"` (0xd74960。PyArg 規則上は両方必須・解析関数は未同定)。解析前に出力変数を初期化していないので、呼出し側に既定値は無い。第 1 引数は送る word (そのまま送る)、第 2 引数は送出先テーブルの添字 (forwardTo)。0xfdc8a0 は「添字の値が変わったときだけ」下流へ送る (cmp/je)。
+- **受入 1 (PE の確定)**: 書式は `"L|i"` (0xd75254)。kwlist は `message`・`forwardTo`。第 2 引数は解析前に PE が 1 を書くので、省略時の既定は 1 (§1b)。第 1 引数は送る word (そのまま送る)、第 2 引数は送出先テーブルの添字 (forwardTo)。0xfdc8a0 は「添字の値が変わったときだけ」下流へ送る (cmp/je)。**-7・-6 の判定は 0xd75120 では未検証の仮置き** (§1b の注意。判定表 §1 は取り違えた 0xd748e0 = midiOutNewMsg の逆アセンブル。初版の `"ii"` も同じ取り違え。訂正は §1)
 - **受入 2 (C・mock)**: -7 → -6 → 送出 (word を記録) の順。midiOutMsg と判定を共有する helper `midi_send` に寄せた。
 - **受入 3 (差分 0)**: `node tests/device_diff.mjs` が rc=0 ×3 で PASS、差分 0 (送出 11 件・link 判定 9 通り)。ネガティブコントロール 2 件が FAIL することを確認 (§3)。
-- **未解決 (子 issue に起票)**: 値の変化検出 (0xfdc8a0 の cmp/je・テーブル初期値・添字範囲) は未実装 → #3949 (PY-276)。第 2 引数の既定値 1 (stub 由来) は PE と食い違う → #3950 (PY-277)。下流の送出先 HMIDIOUT (`[obj+0x7c]`) と無効フラグ (`[obj+0x84]`) の由来 → #3981 (PY-287)。
+- **未解決 (子 issue に起票)**: 値の変化検出のテーブル初期値・添字範囲は未確定 → #4884 (PY-401・#3949 受入 1 の移管先)。-7・-6 の PE 上の裏付け (0xd75120 からの呼出し先) と 1 引数呼出しの送出失敗時の戻り code は未確定 → #4909 (PY-402)。下流の送出先 HMIDIOUT (`[obj+0x7c]`) と無効フラグ (`[obj+0x84]`) の由来 → #3981 (PY-287)。
+- 受入 ① (#3950・PY-277・部分達成): 1 引数呼出しは解析成功・既定 1 で送出へ進む。確定した事実と未確定の範囲は §1b。0xd748e0 を forwardMIDICC とした初版の誤記は §1 で訂正済み。
+- 測定 commit `aab81902f` (HEAD・コメント訂正のみ): `node tests/device_diff.mjs` n=3 で rc=0 ×3・所要 0.05・0.05・0.06 秒・load (1 分) 0.18・`PASS true` (diffs 0)。差分 `git diff 320633eb5 HEAD -- tools/python/provider tools/python/host tools/python/tests` はコメント 3 行のみ。
 - 範囲外: flpy (CPython wasm) 依存の `provider_check`・`midi_bundled_device`・`midi_rpc_split` は未実行 (§3)。`provider_check` は #3804 (PY-255)、他 2 本は #3804 へ範囲追加を依頼 (§4)。
 
-## 1. PE の逆アセンブル (forwardMIDICC ハンドラ 0xd748e0)
+## 1. PE の逆アセンブル (forwardMIDICC ハンドラ 0xd75120 の書式・既定値は §1b で確定。下の -7・-6 判定表は 0xd748e0 = midiOutNewMsg の逆アセンブルで、forwardMIDICC の裏付けではない)
 
 対象: `$FL_WIN64_DIR/extracted/block00031_PE.bin` (fl-win64 26.1.7.5653)。方法は REPORT_PY227 §1 と同じ (pefile + capstone、script は §5)。
+
+**訂正 (#3950・PY-277)**: 本節の初版は `0xd748e0` を forwardMIDICC としていたが誤り。`analysis/flapi/flapi_kwargs.json` で `0xd748e0` は `device.midiOutNewMsg` (書式 `"ii"`・kwlist なし)、`device.forwardMIDICC` は `0xd75120` (書式 `"L|i"`・kwlist `message`・`forwardTo`・required 1・max 2) である。下の表のうち 0xd748e0 の行は midiOutNewMsg の記述として残す。forwardMIDICC の確定は次の §1b。
+
+### 1b. forwardMIDICC (0xd75120) の 1 引数呼出し (#3950・PY-277)
+
+手順: `block00031_PE.bin` を pefile + capstone で逆アセンブル (§5 の script)。書式は 0xd75254 の生バイト `4c 7c 69 00` = `"L|i"`。
+
+| VA | 命令 (抜粋) | 意味 |
+|---|---|---|
+| 0xd75158 | `mov dword ptr [rbp+0xa4], 1` | 解析の前に第 2 引数 (forwardTo) の出力変数へ **1 を書く**。省略時はこの値のまま |
+| 0xd7516a〜0xd75197 | `lea r8,[0xd75254]`・`call [解析]` | `PyArg` 系の解析。第 2 引数は任意 (`"L|i"` の `|`) |
+| 0xd7519f | `jle 0xd75202` | 解析失敗 (0 以下) は 0xd75202 へ |
+| 0xd751a1〜0xd751f6 | `rcx=obj(rbx)`・`r8=0xd74eb0`・第 1 引数 = [rbp+0xa8]・第 2 引数 = `movsxd [rbp+0xa4]`・`call 0xd843d0` | 呼出し。0xd843d0 は `0xd74eb0` を `[obj+0x58]` にコールバックとして登録する (0xd84424〜0xd84467) |
+| 0xd751fb〜0xd75204 | `mov rax,[rbp+0x88]`・`mov ecx,eax`・`call 0xd82c20` | 結果コード (`[rbp+0x88]`) を Python 値に変換する (0xd82c20) |
+
+**1 引数呼出しの結果** (実測した範囲):
+
+- 解析は**成功する** (第 2 引数は任意)。よって 0xd75202 の解析失敗経路には入らない。解析由来の例外は出ない。
+- 第 2 引数は既定 **1** (0xd75158 で PE 自身が書く)。PE に「既定値なし」は当たらない。C・mock の既定 1 は PE と一致する。
+- 送出の下流は未確定: `0xd74eb0` の `[obj+0x20]` (forwardTo) による分岐、送出失敗時の経路 (0xd750bc → `0x416230`・第 3 引数 3) の戻り値と例外の種類は、本 run では追い切れていない。戻り code の具体値は未確定。
+
+**注意 (未検証)**: §1 の -7・-6 判定 (0xd74918 以降) と §2 の C・mock の -7・-6 は、取り違えた 0xd748e0 (midiOutNewMsg) の逆アセンブルに基づく。forwardMIDICC (0xd75120) の -7・-6 は、0xd75120 からの呼出し先 (0xd843d0・0xd74eb0 ほか) を確認するまで PE で裏付けられていない。`device_diff` の forwardMIDICC の -7・-6 期待値は、この裏付けが無いまま書いた仮置き。
+
+**残る未確定**: 送出の下流 (0xd74eb0 以降) の全経路と、送出失敗時の Python 例外の型・code。`device_diff` が見る link 経路 (-7・-6) とは別で、#3950 の範囲では未確定のまま残す (下流の追跡は #3949 と同じく子に起票する)。
 
 | VA | 命令 (抜粋) | 意味 |
 |---|---|---|
@@ -26,11 +52,11 @@
 | 0xd7493b | xor eax,eax | 成功 |
 | 0xd7494f〜0xd74951 | mov ecx,eax・call 0xd82c20 | 戻り値の変換 (-7 → FL_E_DEVICE 7、-6 → FL_E_LINKED_DEVICE 6。REPORT_PY227 §1) |
 
-判定順は **-7 → -6** で、送出より前。midiOutMsg (0xd747f0) と違い、word を組み立てずに第 1 引数をそのまま送る。
+この表 (0xd748e0 = midiOutNewMsg) の判定順は **-7 → -6** で、送出より前。forwardMIDICC (0xd75120) の -7・-6 は、この表とは別に確認するまで仮置き (§1b の注意)。
 
 **書式の根拠**: `lea rdx` の指す 0xd74960 の生バイトは `69 69 00` = `"ii\0"`。直後の `"id\0" "message\0" "lastMessage\0" "offset\0"` は、この呼出しでは使われない (解析は kwlist 無しの呼出し形)。解析関数のポインタ (.data の 0x15e1e58) は import 表に無く解決先は未同定だが、呼出し形 (引数・書式・出力ポインタ 2 個) は midiOutMsg と同じ。「両方必須」は PyArg 系の規則に従うという仮定。
 
-**既定値**: 解析の前に `[rbp+0x28]`・`[rbp+0x2c]` を初期化していない。PyArg 規則上 `"ii"` は両方必須 (上記の仮定) なので、呼出し側に既定値は無い。C・mock の既定 1 は stub 由来 (REPORT_PY15・REPORT_APPENDIX の kwlist 表で、stub の `mode` に対しバイナリは `forwardTo`) で、PE と食い違う (#3950)。
+**既定値 (訂正)**: 上の表の 0xd748e0 の行は midiOutNewMsg の記述で、forwardMIDICC ではない。forwardMIDICC の既定 1 は PE が 0xd75158 で書いており、C・mock の既定 1 と一致する (§1b)。-7・-6 の判定は 0xd75120 では未検証の仮置きで、この段落は既定値のみを確定とする。
 
 **0xfdc8a0 が送る内容** (値の変化検出):
 
@@ -103,8 +129,9 @@ ba4a31: call 0x663430
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| テーブルの初期値 (sink 生成時の `[sink+0x5c..]`)・添字の範囲 (C の FCC_N=16 は仮置き) | 初回の添字 (未設定) の扱いと、範囲外の添字の挙動 (C・mock は範囲外を重複検出せず送る) が PE と一致するかは未確定 | #3949 (PY-276・受入 1 は未達) |
-| 第 2 引数の既定値 1 (stub 由来)・1 引数呼出し | PE の `"ii"` は PyArg 規則上は両方必須 (解析関数は未同定)。C・mock は 1 引数を既定 1 で受ける。解析失敗の観測 (例外・戻り code) は未確定 | #3950 (PY-277) |
+| テーブルの初期値 (sink 生成時の `[sink+0x5c..]`)・添字の範囲 (C の FCC_N=16 は仮置き) | 初回の添字 (未設定) の扱いと、範囲外の添字の挙動 (C・mock は範囲外を重複検出せず送る) が PE と一致するかは未確定 | #4884 (PY-401・#3949 受入 1 の移管先) |
+| forwardMIDICC (0xd75120) の -7・-6 判定の PE 上の裏付け (0xd843d0・0xd74eb0 ほかの確認) | -7・-6 の判定と期待値は未検証の仮置き | #4909 (PY-402) |
+| 1 引数呼出しの送出失敗時の戻り code・例外の種類 (0xd750bc → 0x416230、0xd74eb0 以降の下流) | 解析成功 (既定 1) は確定。送出が失敗する経路の戻り code は未確定。C・mock は 1 引数を既定 1 で受ける | #4909 (PY-402) |
 | 送出先 HMIDIOUT (`[obj+0x7c]`)・無効フラグ (`[obj+0x84]`) の由来 (下流は winmm `midiOutShortMsg`・§1) | 送出先 port を C・mock の送出記録は持たない (どの MIDI 出力かは未確定) | #3981 (PY-287) |
 | `provider_check` (flpy 未 build) | 同梱 script の forwardMIDICC 経路を flpy 経由で未確認 | #3804 (PY-255) |
 | `midi_bundled_device`・`midi_rpc_split` (flpy 未 build) | #3804 の本文 (`provider_check`・`all_tools`) の範囲外。同梱 script の forwardMIDICC 経路を flpy 経由で未確認 | #3804 (範囲追加をコメントで依頼) |
