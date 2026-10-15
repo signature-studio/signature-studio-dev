@@ -23,6 +23,9 @@ const swapRb = (v) => ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
 const MIX_DEFAULT_COLOR = 0xff636c71;
 // PY-172 (#3219): パターングループ数の仮置き (未実測・REPORT_PY172)。件数 0 では getPatternGroupName の全索引が範囲外
 const PGRP_N = 0;
+// PY-179 (#3271): 述語 pred の静的状態 (未投入で偽) から導く仮置き・patternNumber の PE 初期値 1 (provider/fl_engine.c の PAT_N・PAT_NUMBER と同じ・REPORT_PY179)
+const PAT_N = 999;
+const PAT_NUMBER = 1;
 // PY-78 (#2581): PE 0x130f3d0 の項目書換え規則 (C provider の step_item_write / step_items_set と同一・REPORT_PY39_2548.md)。項目 = 字段の object
 const clampHi = (v, hi) => (v <= 0 ? 0 : v > hi ? hi : v);
 const newItem = () => ({ d0: 0, w0c: 0, b10: 0, b11: 0, b12: 0, b14: 0, b15: 0, b16: 0, b17: 0 });
@@ -335,6 +338,10 @@ export function createMockEngine() {
     // PY-172 (#3219): PE 0xd67000 は件数 (配列 null で 0)、0xd67030 は索引 [0, 件数-1] の外を status -4。件数 0 は仮置き (provider/fl_engine.c の PGRP_N と同じ)
     "patterns.getPatternGroupCount": (...a) => { arity(a, 0, 0); return PGRP_N; },
     "patterns.getPatternGroupName": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i < 0 || i >= PGRP_N) throw RANGE(); return ""; },
+    "patterns.patternCount": (...a) => { arity(a, 0, 0); return PAT_N; },
+    "patterns.patternNumber": (...a) => { arity(a, 0, 0); return PAT_NUMBER; },
+    "patterns.isPatternDefault": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i < 1 || i > PAT_N) throw RANGE(); return false; },
+    "patterns.isPatternSelected": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return false; },
     // PY-119 (#2977): PE の setRecPPQ 0xd69350・setNumerator 0xd694e0・setDenominator 0xd69670 の範囲判定 (範囲外は status -3 Range error)。ゲート (safeToEdit 相当) は未確定のため真と仮定 (REPORT_PY119_2977)
     "general.setRecPPQ": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 24 || v > 960) throw RANGE("Range error"); st.recPPQ = v; },
     "general.setNumerator": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 1 || v > 16) throw RANGE("Range error"); st.numerator = v; },

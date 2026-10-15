@@ -454,6 +454,15 @@ FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return f
 #define PGRP_N 0
 FL_H(patterns, getPatternGroupCount) { NARGS(0, 0); return fl_ret_i(c, PGRP_N); }
 FL_H(patterns, getPatternGroupName) { NARGS(1, 1); int64_t i = A_INT(0, 0); if (i < 0 || i >= PGRP_N) RANGE(); return fl_ret_s(c, ""); }
+/* ---- patterns (4, PY-179 #3271): 述語 pred の E = 0x193fce0+i*0xc0 は .bss で未投入 (全 0) のため pred は偽。patternCount は ¬pred を i=1..999 で数えて 999。
+ * patternNumber は slot 0x15e4018 → 0x15d51a0 の dword の PE 初期値 1 (1 始まり)。isPatternDefault の範囲外は status -4 = FL_E_RANGE。
+ * isPatternSelected は G = [[0x15e35c8]+0xd34] の静的値 0 (null) で [0x16b82e0] (.bss 0) を返す = 偽。値は未実測の仮置き (REPORT_PY179) */
+#define PAT_N 999
+#define PAT_NUMBER 1
+FL_H(patterns, patternCount) { NARGS(0, 0); return fl_ret_i(c, PAT_N); }
+FL_H(patterns, patternNumber) { NARGS(0, 0); return fl_ret_i(c, PAT_NUMBER); }
+FL_H(patterns, isPatternDefault) { NARGS(1, 1); int64_t i = A_INT(0, 0); if (i < 1 || i > PAT_N) RANGE(); return fl_ret_b(c, 0); }
+FL_H(patterns, isPatternSelected) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_b(c, 0); }
 /* ---- screen (5) ---- PY-121 (#2985): PE 0xd7c7e0・0xd7c830・0xd7c880・0xd7c8c0・0xd7c740 (REPORT_PY121_2985)。値は未実測の仮置き */
 FL_H(screen, isBlanked) { NARGS(0, 0); return fl_ret_b(c, scr_blanked); }
 FL_H(screen, isUnBlank) { NARGS(0, 0); return fl_ret_b(c, scr_unblank); }
