@@ -462,6 +462,10 @@ FL_H(ui, miDisplayDockRect) { NARGS(4, 4); int64_t v[4]; for (int i = 0; i < 4; 
 FL_H(ui, showNotification) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(ui, closeAllMenu) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(ui, closeActivePopupMenu) { NARGS(0, 0); return fl_ret_none(c); }
+/* PE 0xd6f2e0 (showPicker 'i|i'): 1 個目は必須、2 個目は既定 -1。署名なし (np=-1) のため個数と型はここで検査。作用先 (picker の vtbl[0x48]) は未モデル。戻り None */
+FL_H(ui, showPicker) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, -1); return fl_ret_none(c); }
+/* PE 0xd6ef80 (openEventEditor 'Ii|i'): 型と個数は fl_table の 'iib' (2..3) が検査する。作用先 (0xe34450) は未モデル。戻り None (PE の 0xd82c20 に status 0 を渡す経路) */
+FL_H(ui, openEventEditor) { return fl_ret_none(c); }
 /* PY-119 (#2980): PE 0xd6cd80 / 0xd6ca80 / 0xd6c9d0 / 0xd6cab0 / 0xd6c4c0 / 0xd6d6b0 は呼出し経路を確定 (REPORT_PY119)。値は未実測の仮置き */
 FL_H(ui, getFocused) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_b(c, 0); }
 FL_H(ui, getFocusedFormID) { NARGS(0, 0); return fl_ret_i(c, 0); }
