@@ -161,7 +161,7 @@
 
 ### §A5-4. value 17 件の差分語の 3 分類と参照元の用途 (#2743 FA-35, 実測)
 
-- 測定 commit: `f1693b5b3` (コードを変えた最後の commit。`ks_rdata_deep.py` の追加)。`git diff f1693b5b3 HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` は **0 行** (以降の差分は本付録と DOC_MAP のみ)。
+- 測定 commit: `f1693b5b3` (コードを変えた最後の commit。`ks_rdata_deep.py` の追加)。`git diff f1693b5b3 HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` は取り込み前の HEAD で **0 行** だった。main 取り込み後 (merge `10a730f45`) は 184 行 (`ks_ramp_kh_patch.py`・`ks_ramp_kh_native.sh`・`lift2/fa31_ctl.sh`)。測定の連鎖 (`ks_identity.sh`・`ks_rdata_class.py`・`ks_rdata_value.py`・`ks_rdata_value_pos.py`・`ks_rdata_deep.py`・`ks_closure_share.py`) はこの差分に含まれず、いずれも変更された 3 ファイルを呼ばない。素材 (`work-liftlib-targets`・`plugins-kilohearts`) が runner に無いため、取り込み後の再実行は未実施。
 - 再現: 素材 `work-liftlib-targets` (`tools/targets/{freshair,kilohearts}/work/` に展開) で `SLATECORE`・`HEARTCORE` を指定して `bash tools/targets/freshair/ks_identity.sh <dir>` (`ident.json`) → `ks_rdata_class.py` → `ks_rdata_value.py` → `ks_rdata_value_pos.py` → `python3 tools/targets/freshair/ks_rdata_deep.py <HeartCore.core_64> <SlateCore.core_64> rdata_class.json ident.json deep.json 64 3`。
 - 実測 (測定 commit `f1693b5b3`): `ks_rdata_deep.py` 2 回実行で stdout・JSON とも byte 一致、0.80 s real × 2、load avg (1 分) 0.01、nproc=4。前段の `ks_identity.sh` は 54.8 s real・EXIT 0 (§A5-2 と同じ入力、`value` 17 件・差分語 139 を再現)。
 - 差分語 139 (`pos`: rva_pair 72・dbl_pair 14・other 29・text 24) を、指す先 64 B (8 語)・深さ 3 で判定した結果:
