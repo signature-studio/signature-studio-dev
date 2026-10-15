@@ -6,7 +6,8 @@
   1to1    : 関数内で rip セル X に触れる機械語命令が ちょうど 1 つ (site の `mov reg,[rip+X]`) で、
             IR の `i64 K to ptr` の出現も ちょうど 1 つ。さらに、その IR load の幅 N = 機械語 store の幅 w。
   callarg : (#2910) 機械語で、site が `mov dword ptr [rsp+0x20+8j], reg32` (outgoing 引数 argi = 4+j 番目) の store で、
-            その直前の rip 読み出し R から site まで分岐・call が無く、site の直後 (4 命令以内) の direct call が
+            その直前の rip 読み出し R (`mov Rr,[rip+X]`) から site まで分岐・call が無く、R と site の間はちょうど 1 命令で
+            `mov Sr32,[Rr]` (disp 0。store のレジスタ Sr は R の値の逆参照で得た値)、site の直後 (4 命令以内) の direct call が
             callee F。IR では F の呼び出しの引数 argi (0 始まり) が、K の load の値 (sext/zext 1 段まで) に一致し、
             その組が 1 つだけ。幅 N = w = 4。
             根拠の無い site (ローカル変数 [rbp+d] へ流れる等) はこの gate では直さない。
@@ -131,13 +132,28 @@ def judge_callarg(mach, body, site, ins, m_refs, i_refs):
     if disp < 0x20 or (disp - 0x20) % 8:
         return False, 'callarg_site_not_stack_arg', None, None
     argi = 4 + (disp - 0x20) // 8
-    reads = sorted(t[0] for t in ins_reads(mach, X, ins) if t[0] < addr)
+    reads = sorted((t for t in ins_reads(mach, X, ins) if t[0] < addr), key=lambda t: t[0])
     if not reads:
         return False, 'callarg_no_prior_read', None, None
-    r = reads[-1]
+    r, _, r_load = reads[-1]
+    if not r_load:
+        return False, 'callarg_read_not_reg_load', None, None
     between = [i for i in ins if r < i.address < addr]
-    if len(between) > 3 or any(i.mnemonic in ('call', 'ret', 'jmp') or i.mnemonic.startswith('j') for i in between):
+    if any(i.mnemonic in ('call', 'ret', 'jmp') or i.mnemonic.startswith('j') for i in between):
         return False, 'callarg_read_not_straight', None, None
+    if len(between) != 1:
+        return False, 'callarg_no_deref_chain', None, None
+    dr = between[0]
+    rdst = mach.cs.reg_name(by_addr[r].operands[0].reg)
+    if dr.mnemonic != 'mov' or len(dr.operands) != 2:
+        return False, 'callarg_no_deref_chain', None, None
+    e0, e1 = dr.operands
+    if e0.type != capstone.CS_OP_REG or e1.type != capstone.CS_OP_MEM or not e1.mem.base or e1.mem.index or e1.mem.disp:
+        return False, 'callarg_no_deref_chain', None, None
+    if rdst[0] != 'r' or rdst.endswith('d') or reg_fam(mach.cs.reg_name(e1.mem.base)) != reg_fam(rdst):
+        return False, 'callarg_no_deref_chain', None, None
+    if reg_fam(mach.cs.reg_name(e0.reg)) != reg_fam(mach.cs.reg_name(d1.reg)):
+        return False, 'callarg_no_deref_chain', None, None
     nxt = [i for i in ins if i.address > addr][:4]
     call = None
     for i in nxt:
@@ -165,6 +181,15 @@ def judge_callarg(mach, body, site, ins, m_refs, i_refs):
     if len(names) != 1:
         return False, 'callarg_ir_matches=%d' % len(names), None, None
     return True, 'ok', names[0], 'read=%x call=%s argi=%d' % (r, callee, argi)
+
+
+def reg_fam(n):
+    """32 bit と 64 bit の汎用レジスタを同じ族にする (eax → rax・r8d → r8)"""
+    if len(n) == 3 and n[0] == 'e':
+        return 'r' + n[1:]
+    if n.startswith('r') and n.endswith('d'):
+        return n[:-1]
+    return n
 
 
 def ins_reads(mach, X, ins):

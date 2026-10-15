@@ -40,6 +40,15 @@ gate1="$("$PY" "$HERE/fix_spill_2794.py" "$OUT/boot_d17.ll" "$OUT/ssa_base.json"
   --tsv "$HERE/results/spill37_1169.tsv" --gate 1to1)" || exit 1
 echo "$gate1" | head -1
 echo "$gate1" | head -1 | grep -q '^spill fixed=9 skipped=15 ' || { echo "[fix_d17_e2e] FAIL: ネガコン 3 (--gate 1to1 = #2794 の根拠だけ) が 9 件にならない" >&2; exit 1; }
+argi5_py="$OUT/fix_spill_2794_argi5.py"
+sed 's/argi = 4 + /argi = 5 + /' "$HERE/fix_spill_2794.py" > "$argi5_py"
+grep -q 'argi = 5 + ' "$argi5_py" || { echo "[fix_d17_e2e] FAIL: ネガコン 4 のコピーで argi を書き換えられない" >&2; exit 1; }
+argi5="$(PYTHONPATH="$HERE:$REPO/tools/m11" "$PY" "$argi5_py" "$OUT/boot_d17.ll" "$OUT/ssa_base.json" "$IMG" "$CFG" "$OUT/boot_spill_argi5.ll" \
+  --tsv "$HERE/results/spill37_1169.tsv" --gate both)" || exit 1
+echo "$argi5" | head -1
+echo "$argi5" | head -1 | grep -q '^spill fixed=9 skipped=15 ' || { echo "[fix_d17_e2e] FAIL: ネガコン 4 (argi を 1 つずらす) が 9 件・見送り 15 件にならない" >&2; exit 1; }
+echo "$argi5" | grep -c ' callarg_ir_matches=0$' | grep -qx '4' || { echo "[fix_d17_e2e] FAIL: ネガコン 4 で callarg の 4 site が callarg_ir_matches=0 にならない" >&2; exit 1; }
+echo "[fix_d17_e2e] ネガコン 4: 引数位置を 1 つずらすと callarg の 4 site が見送られる (期待どおり)"
 step "6/6 emcc 構文検証 (修復 IR)"
 if ! source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1 || ! command -v emcc > /dev/null 2>&1; then
   echo "[fix_d17_e2e] FAIL: emsdk が無い (/opt/emsdk/emsdk_env.sh の source か emcc の検出に失敗)" >&2
