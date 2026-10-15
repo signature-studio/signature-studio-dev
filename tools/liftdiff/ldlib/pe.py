@@ -103,27 +103,31 @@ class Analyzer:
         # rsp 追跡 (entry からの相対 off / rbp 相対)
         state = {rva0: (0, None)}   # rva -> (rsp_off, rbp_off)
         order = []
+        done = {}   # rva -> 最後に処理したときの defined_in (変わったときだけ再処理する。#3708)
         while work and n < max_ins:
             rva = work.pop()
-            if rva in seen:
+            if rva in done and done[rva] == defined_in.get(rva, frozenset()):
                 continue
+            first = rva not in seen
             seen.add(rva)
+            done[rva] = defined_in.get(rva, frozenset())
             ins = self._dis(rva)
             if ins is None:
                 continue
-            n += 1
+            if first:
+                n += 1
             defs = defined_in.get(rva, frozenset())
             rsp_off, rbp_off = state.get(rva, (0, None))
             mn = ins.mnemonic
             nxt = rva + ins.size
-            # --- 特徴 ---
-            if ins.id in FPCMP:
+            # --- 特徴 (初回のみ数える) ---
+            if first and ins.id in FPCMP:
                 fpcmp += 1
-            if mn.startswith(SIMDINT_PRE) or mn in ('movq', 'movd'):
+            if first and (mn.startswith(SIMDINT_PRE) or mn in ('movq', 'movd')):
                 simdint += 1
-            if mn.startswith('rep'):
+            if first and mn.startswith('rep'):
                 repstr += 1
-            if ins.group(capstone.CS_GRP_CALL) or ins.group(capstone.CS_GRP_JUMP):
+            if first and (ins.group(capstone.CS_GRP_CALL) or ins.group(capstone.CS_GRP_JUMP)):
                 op = ins.operands[0] if ins.operands else None
                 is_call = ins.group(capstone.CS_GRP_CALL)
                 if op is not None and op.type == capstone.CS_OP_IMM:
@@ -141,7 +145,7 @@ class Analyzer:
                             icall += 1
                         elif not ins.group(capstone.CS_GRP_RET):
                             ijmp += 1
-            # --- arity データフロー ---
+            # --- arity データフロー (合流点の定義の交わりが縮んだら再処理する) ---
             try:
                 rr, wr = ins.regs_access()
             except Exception:
@@ -213,7 +217,7 @@ class Analyzer:
                 else:
                     defined_in[s] = fs
                     state[s] = (rsp_off, rbp_off)
-                if s not in seen:
+                if s not in done or done[s] != defined_in[s]:
                     work.append(s)
         arity_gpr = (max(used_args) + 1) if used_args else 0
         return dict(ins=n, icall=icall, ijmp=ijmp, fpcmp=fpcmp, simdint=simdint, calls=sorted(set(calls)), repstr=repstr,

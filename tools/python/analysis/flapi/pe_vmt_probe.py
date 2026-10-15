@@ -21,7 +21,7 @@ import pefile
 
 PE = os.path.join(os.environ["FL_WIN64_DIR"], "extracted", "block00031_PE.bin")
 RIP = re.compile(r"\[rip ([+-]) (0x[0-9a-f]+)\]")
-CALL_DISP = re.compile(r"qword ptr \[(r\w+) \+ (0x[0-9a-f]+)\]")
+CALL_DISP = re.compile(r"qword ptr \[(r\w+) \+ (0x[0-9a-f]+|\d+)\]")
 
 
 def main():
@@ -89,7 +89,7 @@ def main():
                     rip_hits.append((ins.address, ins.mnemonic + " " + ins.op_str))
             if disp is not None and ins.mnemonic == "call":
                 c = CALL_DISP.search(ins.op_str)
-                if c and int(c.group(2), 16) == disp:
+                if c and int(c.group(2), 0) == disp:
                     call_hits.append((ins.address, ins.op_str))
         if last is None:
             pos += 1

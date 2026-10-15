@@ -162,5 +162,6 @@ awk '/^\[UNIT\] /{u=$2} /\[probe_(free|list|grow)\]/{print "unit=" u, $0}' "$RUN
 
 ### 9.5 検証
 
+- 続き (#3928): `function_4136a0` (UniqueString) の `*s` deref 脱落を C 転記 (`M11_FIX_4136A0=1`・既定 OFF) すると unit 144 は ok になるが、unit 158 が oom に回帰する。詳細は `REPORT_APPENDIX_3928.md`。
 - 測定 commit: `68b9de191` (コード変更の最後の commit)。以後の差分は本節 (REPORT) のみ。`git diff 68b9de191 HEAD -- tools/m11 ':!tools/m11/trap_triage/REPORT_APPENDIX_2521.md'` の出力は 0 行。
 - e2e (`m11_e2e.sh`) は未実行 (§9.2)。survey のみ実測。

@@ -20,7 +20,7 @@
 #define ROOT_NAME "Plugin database"
 
 /* pv / spv: plugin パラメータの値 (インスタンスごと。channel の generator と mixer track の insert slot)。PY-228 (#3656) */
-typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; int64_t pitch_n; double pv[NPARAM]; } Chan;
+typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; uint8_t vel[NSTEP]; int64_t pitch_n; double pv[NPARAM]; } Chan;
 typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; double spv[NSLOT][NPARAM]; int act[NMIX]; double lvl[NMIX]; } Mix;
 typedef struct { char name[NAME]; int64_t color; uint8_t lock; double act; int loop, trig_mode, pos_snap, trig_snap; } Pl;
 
@@ -35,6 +35,8 @@ static int playing;
 static int64_t hl_cb;
 static int n_pr, n_run;
 static int dev_port, midi_out_n;
+static double idle_elapsed;
+static int midi_out_assigned, master_sync;
 /* PY-227 (#3655): midiOutMsg が送った 32bit word の列。dev_assigned=0 は -7・link_assigned=0 は -6 (PE 0xd747f0) */
 #define NMIDI 256
 static uint32_t midi_words[NMIDI];
@@ -46,11 +48,14 @@ static int lm_pages;
 static int ui_closing, ui_time_disp_min, ui_start_on_input, ui_loop_rec, ui_step_edit, ui_browser_auto_hide, ui_snap_mode;
 static int undo_pos, undo_count, undo_last, safe_edit;
 static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
-static int sel_start, sel_end;
+static int sel_start, sel_end, live_anchor;
 static int64_t disp_time;
 static int browser_op;
 static int64_t arr_time;
 static int scr_blanked, scr_unblank, scr_active;
+static int scr_alive, scr_menu_show, scr_dirty;
+static int64_t scr_setup_l;
+static int scr_setup_t[5];
 /* PY-224 (#3628): getGridBitWithLoop の loop 行 T[G1] (G1 = 1・G2 = 24)。行の作成経路 (0x12da6d0・PY-223) は未モデルで、既定は行なし (.bss の 0)。テストは fl_engine_loop_set / fl_engine_loop_add で置く */
 #define LP_N 8
 #define LP_G2 24
@@ -93,10 +98,12 @@ void fl_engine_reset(void) {
     ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
     undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
     set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
-    sel_start = -1; sel_end = -1;
+    sel_start = -1; sel_end = -1; live_anchor = -1;
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
+    scr_alive = 0; scr_menu_show = 0; scr_dirty = 0; scr_setup_l = 0; for (int i = 0; i < 5; i++) scr_setup_t[i] = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
+    idle_elapsed = 0; midi_out_assigned = 0; master_sync = 0;
     midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
     lp_row = lp_flag49e = lp_flag54 = lp_n = 0;
 }
@@ -216,7 +223,7 @@ FL_H(channels, setTargetFxTrack) { CH(0); k->fx = (int)A_INT(1, 0); return fl_re
 FL_H(channels, setGridBit) {
     CH(0); int64_t p = A_INT(1, 0), v = A_INT(2, 0);
     if (p < 0 || p >= NSTEP) RANGE();
-    k->steps[p] = v ? 1 : 0; return fl_ret_none(c);
+    k->steps[p] = v ? 1 : 0; if (v) k->vel[p] = 100; return fl_ret_none(c);
 }
 FL_H(channels, quickQuantize) { CH(0); (void)k; return fl_ret_none(c); }
 FL_H(channels, selectedChannel) {
@@ -224,12 +231,13 @@ FL_H(channels, selectedChannel) {
     return fl_ret_i(c, sel_chan + off);
 }
 FL_H(channels, fillEachNSteps) {
-    CH(0); int64_t st = A_INT(1, 1), off = A_INT(2, 0), vel = A_INT(3, 0);
-    (void)vel; (void)A_INT(4, 0);
+    CH(0); int64_t st = A_INT(1, 1), off = A_INT(2, 0), vel = A_INT(3, 100);
+    (void)A_INT(4, 0);
+    if (vel < 0) vel = 0; else if (vel > 127) vel = 127;
     if (st < 1) RANGE();
     int64_t p = off;
     if (p < 0) { p %= st; if (p < 0) p += st; }
-    while (p < NSTEP) { k->steps[p] = 1; if (st > NSTEP - p) break; p += st; }
+    while (p < NSTEP) { k->steps[p] = 1; k->vel[p] = (uint8_t)vel; if (st > NSTEP - p) break; p += st; }
     return fl_ret_none(c);
 }
 FL_H(channels, showEditor) { CH(0); (void)k; return fl_ret_none(c); }
@@ -260,7 +268,7 @@ FL_H(channels, focusEditor) {
 static const int64_t step_def[9] = {60, 100, 64, 120, 64, 128, 128, 0, 0};
 static int64_t step_param(const Chan *k, int64_t pos, int64_t prm) {
     if (pos < 0 || pos >= NSTEP || !k->steps[pos] || prm < 0 || prm > 8) return -1;
-    return prm == 7 ? pos * 24 : step_def[prm];
+    return prm == 7 ? pos * 24 : prm == 1 ? k->vel[pos] : step_def[prm];
 }
 /* PE 0xd5bb30: 引数を読んでから index を検査 (範囲外は Index out of range)。useGlobalIndex は未モデル (グループ無し) */
 FL_H(channels, getCurrentStepParam) {
@@ -545,6 +553,21 @@ FL_H(ui, getFocusedFormCaption) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getFocusedPluginName) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getHintMsg) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, isInPopupMenu) { NARGS(0, 0); return fl_ret_b(c, 0); }
+/* PY-128 (#3005): PE 0xd6c250 は状態を読まず、rodata の UTF-16 定数 "FL Studio 2026" (長さ接頭辞 14) を返す (REPORT_PY128) */
+FL_H(ui, getProgTitle) { NARGS(0, 0); return fl_ret_s(c, "FL Studio 2026"); }
+/* PE 0xd6cb60 は PyArg "ii" (None・文字列・実数は TypeError) の後、0x11f1a70 で (int32)(value*100) を max で割り、
+ * 最近接偶数 (cvtsd2si) で整数化して "%" を付ける。状態は読まない。範囲外と NaN は INT64_MIN (REPORT_PY128) */
+FL_H(ui, getHintValue) {
+    NARGS(2, 2);
+    for (int i = 0; i < 2; i++) if (c->a[i].tag != 'I' && c->a[i].tag != 'B') WRONGN();
+    int64_t v = A_INT(0, 0), m = A_INT(1, 0);
+    int32_t num = (int32_t)((uint32_t)v * 100u);
+    double q = (double)num / (double)(int32_t)m;
+    int64_t n = (q >= -9223372036854775808.0 && q < 9223372036854775808.0) ? (int64_t)nearbyint(q) : INT64_MIN;
+    char buf[32];
+    snprintf(buf, sizeof buf, "%lld%%", (long long)n);
+    return fl_ret_s(c, buf);
+}
 /* PY-130 (#3007): PE 0xd6ee00 (setBrowserAutoHide) は O+0x8c4 に (v==1) を書く。0xd6f170 (setStepEditMode) は S=[O+0xab8] の +0x49e を (v==1) にする (末端は vtbl[0x200] 経由で未確定)。値は未実測の仮置き (REPORT_PY130_3007) */
 FL_H(ui, setBrowserAutoHide) { NARGS(1, 1); ui_browser_auto_hide = A_INT(0, 0) == 1; return fl_ret_none(c); }
 FL_H(ui, setStepEditMode) { NARGS(1, 1); ui_step_edit = A_INT(0, 0) == 1; return fl_ret_none(c); }
@@ -613,7 +636,8 @@ static void sel_set(int x, int y) { sel_start = x; sel_end = y; if (x == y) sel_
 FL_H(arrangement, currentTime) { (void)A_INT(0, 0); return fl_ret_i(c, arr_time); }
 FL_H(arrangement, selectionClear) { NARGS(0, 0); sel_set(-1, -1); return fl_ret_none(c); }
 FL_H(arrangement, selectionSet) { NARGS(2, 5); int64_t x = A_INT(0, 0), y = A_INT(1, 0); for (int i = 2; i < 5; i++) (void)A_INT(i, 0); sel_set((int)x, (int)y); return fl_ret_none(c); }
-FL_H(arrangement, liveSelection) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
+static void live_sel(int a, int flag) { int anc = live_anchor; if (flag && anc >= 0 && anc != a) sel_set(anc, a); else sel_set(-1, -1); live_anchor = flag ? -1 : a; }
+FL_H(arrangement, liveSelection) { NARGS(2, 2); int64_t a = A_INT(0, 0), b = A_INT(1, 0); live_sel((int)a, b == 1); return fl_ret_none(c); }
 FL_H(arrangement, addAutoTimeMarker) { (void)A_INT(0, 0); (void)A_STR(1); return fl_ret_none(c); }
 FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 /* ---- arrangement (2) ---- PY-143 (#3041): PE 0xd78030 (getMarkerName)・0xd785a0 (currentTimeHint) の呼出し構造と戻り str は REPORT_PY143 で確定。
@@ -651,22 +675,53 @@ FL_H(screen, isUnBlank) { NARGS(0, 0); return fl_ret_b(c, scr_unblank); }
 FL_H(screen, getScreenActiveCounter) { NARGS(0, 0); return fl_ret_i(c, scr_active); }
 FL_H(screen, setScreenActiveCounter) { NARGS(1, 1); scr_active = (int)((unsigned)scr_active + (unsigned)A_INT(0, 0)); return fl_ret_none(c); }
 FL_H(screen, unBlank) { NARGS(1, 1); scr_unblank = A_INT(0, 0) == 1; return fl_ret_none(c); }
+/* ---- screen 初期化・メニュー系 (10) ---- PY-136 (#3025): PE 0xd7aa40・0xd7ab00・0xd7b0a0・0xd7b000・0xd7ccb0・0xd7b1f0・0xd7b170・0xd7c9a0・0xd7cac0・0xd7cbe0 (REPORT_PY136)。
+   scr は init で生成し deInit で破棄する。scr 未生成の経路は PE で AV (例外を返さない) なので Unspecified error を仮置き */
+#define SCR_NEED() do { if (!scr_alive) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error"); } while (0)
+static void scr_new(void) {
+    static const int def[5] = {30, 10, 10, 2, 4000};
+    scr_alive = 1; scr_dirty = 0; scr_menu_show = 0; scr_setup_l = 0;
+    for (int i = 0; i < 5; i++) scr_setup_t[i] = def[i];
+}
+FL_H(screen, init) { NARGS(6, 6); scr_new(); return fl_ret_none(c); }
+FL_H(screen, setup) { NARGS(6, 6); SCR_NEED(); scr_setup_l = A_INT(0, 0); for (int i = 0; i < 5; i++) scr_setup_t[i] = (int)A_INT(i + 1, 0); return fl_ret_none(c); }
+FL_H(screen, update) { NARGS(0, 0); if (scr_alive) scr_dirty = 0; return fl_ret_none(c); }
+FL_H(screen, deInit) { NARGS(0, 0); scr_alive = 0; scr_dirty = 0; scr_menu_show = 0; return fl_ret_none(c); }
+FL_H(screen, keepDisplayActive) { NARGS(0, 0); if (scr_alive) scr_dirty = 1; return fl_ret_none(c); }
+FL_H(screen, hideMenu) { NARGS(0, 0); SCR_NEED(); scr_menu_show = 0; return fl_ret_none(c); }
+FL_H(screen, menuShowing) { NARGS(0, 0); SCR_NEED(); return fl_ret_b(c, scr_menu_show); }
+/* メニュー項目の選択・移動は PE で scr 有りのときだけ helper を呼ぶ。helper の効果は未同定 (REPORT_PY136) */
+FL_H(screen, menuItemClick) { NARGS(0, 0); return fl_ret_none(c); }
+FL_H(screen, menuNext) { NARGS(0, 0); return fl_ret_none(c); }
+FL_H(screen, menuPrev) { NARGS(0, 0); return fl_ret_none(c); }
 
 /* ---- device (5, MIDI scripting 用の最小面) ---- mock と同じ: forwardMIDICC / midiOutMsg は呼出しを数える */
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
 FL_H(device, isAssigned) { return fl_ret_b(c, 1); }
 FL_H(device, setHasMeters) { return fl_ret_none(c); }
-FL_H(device, forwardMIDICC) { (void)A_INT(0, 0); (void)A_INT(1, 1); midi_out_n++; return fl_ret_none(c); }
-/* PE 0xd747f0 (書式 i|iiii)。device 無し → -7、送出先無し → -6 (channel によらず先に判定)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
-FL_H(device, midiOutMsg) {
-    int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);
+/* PE 0xd747f0 (midiOutMsg) と PE 0xd748e0 (forwardMIDICC) の共通判定: device 無し → -7、送出先無し → -6 (送出の前に判定)。通ったら word を送出として記録する */
+static int midi_send(fl_call *c, uint32_t w) {
     if (!dev_assigned) return fl_err(c, FL_E_DEVICE, "Device not assigned");
     if (!link_assigned) return fl_err(c, FL_E_LINKED_DEVICE, "Linked device not assigned");
-    uint32_t w = (uint32_t)msg;
-    if (ch >= 0) w = ((uint32_t)(ch & 0xf) | w) + ((uint32_t)d1 << 8) + ((uint32_t)d2 << 16) + ((uint32_t)a4 << 24);
     midi_out_n++;
     if (midi_word_n < NMIDI) midi_words[midi_word_n++] = w;
     return fl_ret_none(c);
+}
+FL_H(device, createRefreshThread) { return fl_ret_none(c); }
+FL_H(device, destroyRefreshThread) { return fl_ret_none(c); }
+FL_H(device, fullRefresh) { return fl_ret_none(c); }
+FL_H(device, getIdleElapsed) { return fl_ret_d(c, idle_elapsed); }
+FL_H(device, isMidiOutAssigned) { return fl_ret_b(c, midi_out_assigned); }
+FL_H(device, getMasterSync) { return fl_ret_b(c, master_sync); }
+FL_H(device, setMasterSync) { master_sync = A_INT(0, 0) == 1; return fl_ret_none(c); }
+/* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。値の変化検出は未実装 (REPORT_PY231 §4) */
+FL_H(device, forwardMIDICC) { int64_t msg = A_INT(0, 0); (void)A_INT(1, 1); return midi_send(c, (uint32_t)msg); }
+/* PE 0xd747f0 (書式 i|iiii)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */
+FL_H(device, midiOutMsg) {
+    int64_t msg = A_INT(0, 0), ch = A_INT(1, -1), d1 = A_INT(2, 0), d2 = A_INT(3, 0), a4 = A_INT(4, 0);
+    uint32_t w = (uint32_t)msg;
+    if (ch >= 0) w = ((uint32_t)(ch & 0xf) | w) + ((uint32_t)d1 << 8) + ((uint32_t)d2 << 16) + ((uint32_t)a4 << 24);
+    return midi_send(c, w);
 }
 
 /* ---- plugins (7) ---- (引数順: paramIndex 系は先頭、index/slotIndex/useGlobalIndex が後続) */

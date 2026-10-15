@@ -108,13 +108,13 @@
 
 ```
 __security_cookie (0x180260ce0) = 0x2b992ddfa232  (UCRT 静的既定と一致: True) / cookie & 0x3f = 50
-api-set 表 0x18026c9f0: 32 entry (8 B × 32 の固定読み出し幅 = ott_crt.c の APISET_N) / ファイル生値は非ゼロ 32/32
+api-set 表 0x18026c9f0: entry 数と PE ファイル生値は `tools/ott/crtinit/REPORT.md` §10 (entry 数 = ott_crt.c の APISET_N) と §2.1 (静的状態) の実測を参照 (本節に数値を書き写さない)
   ror(cookie,50) 方法1(関数)/2(式)/3(文字列)/4(下位抽出) = 0x0ae64b77e88c8000 (4 方式一致: True)
 enc(NULL) = rol(0,14) ^ cookie = 0x2b992ddfa232 == cookie: True ; decode(enc(NULL)) = 0 round-trip OK
 個別 encoded slot: 0x18026c028 / 0x18026c388 / 0x18026cb40 / 0x18026cb88 (matherr hook)
 ```
 
-- **静的 vs ランタイム (規則 40)**: PE **ファイル生値**は非ゼロ 32/32 (reloc 適用後)。一方 **native CRT 未初期化 (DllMain 未実行) ではランタイム生値 0**。`ott_crt_init_tables` はこの 0 を `enc(NULL)=cookie` で埋める = C 等価置換。両側が同一状態になることを 9/9・85/85 が実証。
+- **静的 vs ランタイム (規則 40)**: PE **ファイル生値**は全 entry が 0 埋め (`crtinit/REPORT.md` §2.1 の静的状態。raw 外は 0)。**native CRT 未初期化 (DllMain 未実行) でもランタイム生値は 0**。`ott_crt_init_tables` はこの 0 を `enc(NULL)=cookie` で埋める = C 等価置換。両側が同一状態になることを 9/9・85/85 が実証。
 - **fail-fast 根因は確定**: `decode(0) = ror(cookie,50) = 0xae64b77e88c8000 ≠ 0` → CFG dispatch (0x1801d2750 `jmp rax`) が garbage jump。native SIGSEGV の `rax` と wasm `ott_unlifted` の引数が一致。
 
 ## 5. 誤記の修正 (本コミット)

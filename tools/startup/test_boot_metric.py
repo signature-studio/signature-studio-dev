@@ -140,12 +140,49 @@ APPENDIX_2880 = """# appendix 2880
 
 x
 """
+APPENDIX_2719 = """# tools/flelift/boot — fixture
+
+> 測定 commit: **a55cb0d5** (fixture)
+
+## 0. 結論
+
+- x64c の寛容起動 (fixture)。mode 1 は unit 245 (VA `0x733090`・dispatch 209 番目) の ExitProcess の後、unit 246〜940 の 695 件が呼出し時に proc 0 を返し (clobber)、走れなかった。
+
+## 3. 結果 (942 試行・n=1)
+
+| 経路 | 試行 | ok | empty | noproc | clobber | exit | oob | dispatch (units_run) | GetMem / FreeMem | 停止 | CFI |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|---|
+| 寛容 mode 1 | 942 | 208 | 37 | 1 | 695 | 1 | 0 | 209 | 2,314 / 1,199 | unit 245 の ExitProcess (`0x412a12` 系) | 入口後 oob trap |
+
+## 4. skip 一覧 (mode 2・84 件)
+
+```text
+245 0x733090 exit
+```
+
+mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜940 の `clobber` 695 件)。
+
+## 7. CreateFruityInstance (0x1375990) の観測
+
+- 呼出し: 寛容起動の後で `fle_run` を 1 回 (mode 1・mode 2 とも)。結果は `oob` (memory access out of bounds)。`longjmp` 0・`exit` 0・soft 呼出し 0。
+- dispatch リング末尾 4 件 (`fle_ring_at(124..127)`・古い順): mode 1 (`tol`) `0x6a7b70` → `0x6a7b70` → `0x6a7b70` → `0x1375990`。
+
+## 8. 製品 KPI の前後 (PR 本文の表と同じ値)
+
+| KPI | 前 | 後 |
+|---|---|---|
+| `RegisterClassW`/`CreateWindowExW` の呼出し (soft 計数) | 0 | 0 |
+
+## 9. next
+
+x
+"""
 CFI_PROBE = "  const r = mod._CreateFruityInstance(0xC0n, 0xEDE95An, BigInt(host), BigInt(iface));\n"
 
 
 def make_fixture(root, overrides=None):
     files = {
-        "tools/m11/REPORT.md": M11_REPORT,
+        "tools/m11/REPORT_N134.md": M11_REPORT,
         "tools/m11/REPORT_APPENDIX_1430.md": APPENDIX,
         "tools/m11/REPORT_N2714.md": M11_N2714,
         "tools/gui/flengine/REPORT.md": GUI_REPORT,
@@ -157,6 +194,7 @@ def make_fixture(root, overrides=None):
         "tools/flelift/boot/results/boot_summary_plain.json": json.dumps(X64_BOOT),
         "tools/flelift/boot/results/survey.json": json.dumps(X64_SURVEY),
         "tools/flelift/boot/REPORT.md": X64_REPORT,
+        "tools/flelift/boot/REPORT_APPENDIX_2719.md": APPENDIX_2719,
         "tools/liftdiff/REPORT_LD26.md": NATIVE,
         "tools/startup/STARTUP.md": STARTUP,
     }
@@ -244,6 +282,16 @@ class BootMetricTest(unittest.TestCase):
         self.assertEqual((x64s["units"]["ok"], x64s["units"]["failed"], x64s["units"]["uncovered"]),
                          (892, 3, 47))
 
+        tol = recs["x64c-tolerant-sequential"]
+        self.assertEqual((tol["units"]["total"], tol["units"]["ok"], tol["units"]["skipped"],
+                          tol["units"]["failed"], tol["units"]["dispatched"]), (942, 208, 696, 1, 209))
+        self.assertEqual(tol["stop"], {"unit": 209, "va": "0x733090", "kind": "exit"})
+        self.assertEqual(tol["create_fruity_instance"], {"reached": True, "last_step": "S12"})
+        self.assertEqual(tol["probes"], {"getmem": 2314, "freemem": 1199})
+        self.assertEqual(tol["commit"], "a55cb0d5")
+        self.assertEqual(tol["gui_natural"], {"RegisterClassW": 0, "CreateWindowExW": 0})
+        self.assertEqual(tol["mode"], "tolerant-sequential")
+
         native = recs["native-ref-hybrid"]
         self.assertEqual((native["units"]["ok"], native["units"]["total"], native["first_fail"]),
                          (928, 942, 830))
@@ -295,7 +343,7 @@ class BootMetricTest(unittest.TestCase):
     def test_negative_missing_table_row_fails(self):
         broken = M11_REPORT.replace("| `de50ffa` (指摘対応 3 点, n=1, 増分 build) | 53 |", "| `xxxxxxx` | 53 |")
         with self.assertRaises(bm.MetricError):
-            self.build({"tools/m11/REPORT.md": broken})
+            self.build({"tools/m11/REPORT_N134.md": broken})
 
     def test_negative_missing_json_key_fails(self):
         broken = json.dumps({"boot": {"units_total": 942, "threw": {"cls": "oob"},
@@ -370,6 +418,30 @@ class BootMetricTest(unittest.TestCase):
     def test_call_after_string_with_comment_marker_fails(self):
         with self.assertRaises(bm.MetricError):
             self.build({"tools/m11/harness.mjs": 'log("a // b"); mod._CreateFruityInstance(0xC0n)\n'})
+
+    def _tolerant_broken(self, old, new):
+        broken = APPENDIX_2719.replace(old, new)
+        with self.assertRaises(bm.MetricError):
+            self.build({"tools/flelift/boot/REPORT_APPENDIX_2719.md": broken})
+
+    def test_negative_tolerant_ok_row_changed_fails(self):
+        self._tolerant_broken("| 寛容 mode 1 | 942 | 208 |", "| 寛容 mode 1 | 942 | 209 |")
+
+    def test_negative_tolerant_skip_count_changed_fails(self):
+        self._tolerant_broken("mode 1 の skip は 696 件", "mode 1 の skip は 697 件")
+
+    def test_negative_tolerant_stop_line_changed_fails(self):
+        self._tolerant_broken("mode 1 は unit 245 (VA", "mode 1 は unit 245 (VX")
+
+    def test_negative_tolerant_call_line_changed_fails(self):
+        self._tolerant_broken("- 呼出し: 寛容起動の後で", "- 呼出し: 寛容起動の前で")
+
+    def test_negative_tolerant_source_missing_fails(self):
+        with self.assertRaises(bm.MetricError):
+            self.build({"tools/flelift/boot/REPORT_APPENDIX_2719.md": None})
+
+    def test_negative_tolerant_gui_count_changed_fails(self):
+        self._tolerant_broken("(soft 計数) | 0 | 0 |", "(soft 計数) | 0 | 2 |")
 
 
 if __name__ == "__main__":

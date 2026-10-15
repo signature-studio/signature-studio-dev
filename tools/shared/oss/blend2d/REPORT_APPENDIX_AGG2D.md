@@ -120,8 +120,8 @@ slot の対応 (block24339 の種別 × block24356 の種別, 件数):
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 生成 C の実行 (rax-in が実機の target と一致するか・dispatch 表に載るか) | 受入 (b) の画素比較の前提。未検証のまま `--cfg-rax` を既定にできない | #146 (harness 待ち) |
-| レジスタ経由 CFG 形 (`mov reg,[slot]; call reg`) 2 site は ON でも `LD64(slot)` のまま | 2 site が thunk を dispatch して silent に抜ける恐れ | 子 issue (T-SH-51) |
-| `--cfg-rax` の既定化 | FLEngine の lift 出力が変わる → boot KPI の前後比較が要る (未実施) | 子 issue (T-SH-51) |
+| レジスタ経由 CFG 形 (`mov reg,[slot]; call reg`) 2 site は ON でも `LD64(slot)` のまま | 2 site が thunk を dispatch して silent に抜ける恐れ | 解消: §17 (T-SH-51、`d919b42da`) |
+| `--cfg-rax` の既定化 | FLEngine の lift 出力は変わらない (§17.2)。既定化は CFG load config を持つ全 PE の出力を変える | 既定は OFF のまま (§17.3)。#146 (harness (b)) |
 | 未対応 13 site (6 mnemonic) | 閉包 50 の lift の残り (到達は未確認。ott_unsup は到達時のみ abort) | 子 issue (T-SH-50) |
 
 ## 16. x64c の未対応 6 mnemonic の被覆 (#3138、閉包 50 の unsup 13 site)
@@ -173,3 +173,61 @@ funcs・insns・unlifted は変更前後で同一 (受入条件 (1) 達成)。pr
 - 閉包 50 の `fle_lifted.c`: origin/main 58,903 行 → 5fc307db 58,914 行。`diff` は 13 行の削除と 24 行の追加 (上の本文と同じ)。
 - FLEngine (`block00031_PE.bin`、`--closure 0 --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000`、entries は `tools/flelift/fle_entries.json`): 両側とも **7,018 関数 / 340,761 命令 / unsup {} / unlifted 0 / import 354**、lift 所要 18 秒 (両側 `SECONDS`)。`fle_lifted.c` (745,214 行) と `lift_meta.json` は `cmp` で**バイト一致**。
 - 差分試験 `tools/flelift/tests/x64c_vex_diff.py`: 5fc307db で **44 PASS / 0 FAIL**。`tools/flelift/tests/rcr_native_check.py` (取り込みで入った側の試験): 4004 / 4004 pass。
+
+## 17. レジスタ経由 CFG 形の rax-in と `--cfg-rax` の既定 (T-SH-51, #3139)
+
+> 測定 commit: `08afa5f3c` (コード commit。`cfg_loaded_into()` の直前命令の探索を線形走査から address 引き (最大 15 バイト) に変えた)。直前の `d919b42da` (レジスタ経由形の rax-in) と出力は byte 一致 (閉包 50 の 2 版・FLEngine `--cfg-rax`)。base = `origin/main` `68eb512cd` (#3143 merge `b8ac2283` 取り込み後)。
+> `git diff 08afa5f3c HEAD -- tools/flelift tools/shared/oss/blend2d ':(exclude)*.md'` = 出力 0 行 (本節の文言以外は変えていない)。
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_lift_probe.py` (5.5 s)。FLEngine: `python3 tools/flelift/x64c.py --pe <FLEngine_x64.dll 展開先>/block00031_PE.bin --entries tools/flelift/fle_entries.json --closure 0 --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000 [--cfg-rax] --out <dir>` (約 19 s)。
+> 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (5.6 s)。`toolchain-emsdk` は未使用 (emcc を通さない)。負荷: 4 CPU、測定の直後の `uptime` の 1 分平均 0.21 (並列 1 本ずつの逐次実行)。
+
+### 17.1 レジスタ経由形の rax-in (閉包 50、`agg2d_lift_probe.py`)
+
+| 項目 | 前 (`68eb512cd` + `--cfg-rax`) | 後 (`d919b42da` + `--cfg-rax`) |
+|---|---|---|
+| `ott_dispatch(R[RAX])` (rax-in) | 6 | **8** (直接形 6 + レジスタ経由形 2) |
+| `remaining` (LD64 / レジスタ経由で thunk を読む site) | `{0x1801b7308: (direct 0, via_reg 2)}` | **`{}`** (受入 1 達成) |
+| funcs / insns / unsup / unlifted | 221 / 27,684 / 0 / 0 | 221 / 27,684 / 0 / 0 (同一) |
+
+- 対象の 2 site は同じ形: `mov rax, rX` (宛先) → `mov rdx, qword ptr [rip+0x1950c]` (slot 0x1801b7308) → `call rdx` (`0x18019ddfc`・`0x18019deb7`)。MSVC CFG の規約どおり、宛先は rax に入っている。
+- 変更は `tools/flelift/x64c.py` の `cfg_loaded_into()`: 分岐先でない call/jmp reg の直前が `mov reg,[CFG slot]` (8 バイト) のときだけ rax-in。`--cfg-rax` 無しでは通らない。
+- ネガティブコントロール: 同じ probe の前後差そのもの (前 `remaining` が 2 件、後が 0 件)。probe は rax-in 化されない CFG 形が残れば非 0 で終わる検査を持つ (前は rc=0 で残存を出していた)。
+- 既定 (`--cfg-rax` 無し) の閉包 50 の `fle_lifted.c` / `lift_meta.json` は `68eb512cd` の x64c.py と **cmp で一致** (差分 0)。
+- `--cfg-rax` 版の差分 (`diff` の `<`/`>` 行): 比較の相手ごとに 2 通り。
+  - base (`68eb512cd` の `--cfg-rax`) との差 = 2 hunk・4 行 (46619 行・46685 行。本 PR の 2 site。`{ uint64_t t_ = R[2]; ... ott_dispatch(t_); }` → `... ott_dispatch(R[RAX]);`)。
+  - 既定 (同じ commit で `--cfg-rax` 無し) との差 = 8 hunk・16 行 (46442・46537・46619・46685・48058・49520・49561・49654 行)。内訳は #3143 の直接形 6 hunk (12 行。base 内でも既定との差は 12 行) と本 PR の 2 hunk (4 行) の和。
+  - `gcc -fsyntax-only -w -I tools/flelift/rt` rc=0 (`d919b42da` の出力で確認。`08afa5f3c` の出力は byte 一致)。
+
+### 17.2 FLEngine の lift 出力 (受入 2)
+
+`FLEngine_x64.dll` の `block00031_PE.bin` (`--closure 0`、entries = `tools/flelift/fle_entries.json` 7,421 roots → 7,018 関数)。
+
+| 版 | 関数 / 命令 | unsup / unlifted / imports | `fle_lifted.c` (行数) | `ott_dispatch(R[RAX])` | 所要 |
+|---|---|---|---|---|---|
+| `68eb512cd` (既定) | 7,018 / 340,761 | {} / 0 / 354 | 745,214 | 0 | 19.1 s |
+| `d919b42da` (既定) | 同上 | 同上 | 745,214 | 0 | 19.2 s |
+| `d919b42da` `--cfg-rax` | 同上 | 同上 | 745,214 | 0 | 19.0 s |
+| `08afa5f3c` `--cfg-rax` | 同上 | 同上 | 745,214 | 0 | 19.1 s |
+
+- 既定の `fle_lifted.c` と `lift_meta.json` は `68eb512cd` と **cmp 一致**。`--cfg-rax` の `fle_lifted.c` は既定と **差分 0 行**。`08afa5f3c` の `--cfg-rax` 出力は `d919b42da` の `--cfg-rax` と cmp 一致 (refactor のみ。所要は 19.05 s → 19.13 s で差は誤差の範囲)。
+- 理由: `block00031_PE.bin` は load config を持たない (`DIRECTORY_ENTRY_LOAD_CONFIG` = None)。`cfg_slots` が空なので、`--cfg-rax` の分岐は 1 つも通らない。`block00031` の lift では `--cfg-rax` は出力に影響しない (どの entries でも同じ)。
+- 製品 KPI (受入 3): **動かしていない**。boot の実行 (dispatch 数・通過 unit 数・最初のウィンドウ) は未実施。lift 入力 (C・meta) が既定と ON で一致するため、boot の入力は変わらない。
+
+### 17.3 既定 ON / OFF の判断 (受入 4)
+
+**既定は OFF のまま** (`--cfg-rax` の既定値は変えない)。理由は次の 2 つ。
+
+1. **FLEngine の KPI は動かない**: §17.2 のとおり、既定 ON でも FLEngine の lift 出力は byte 一致。KPI 前後の比較は差分 0 が確定しているため、既定化を止める理由にはならない。
+2. **既定 ON は CFG load config を持つ全 PE の lift 出力を変える**: Agg2D 閉包 50 では 8 site が変わる (§17.1)。他 PE (liftlib 対象の DLL 等) の census は未実施。ON の生成 C を実行して rax-in が実機の target と一致することを確かめる harness (b) は未実施 (#146 に残る)。確かめないまま既定を変えない。
+
+### 17.4 未検証・未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| boot の実行による製品 KPI (dispatch 数・通過 unit 数・最初のウィンドウ) の実測 | FLEngine の lift 出力は ON/OFF で一致 (§17.2) のため、結論 (既定 OFF) は変わらない見込み。実測値は未取得 | #3139 (受入 3。Refs のため open のまま残す) |
+| 生成 C の実行 (rax-in が実機の target と一致するか) | 受入 (b) の画素比較の前提。未検証のまま既定化しない | #146 (harness (b)) |
+| 既定 ON の PE census (CFG load config を持つ PE の lift 出力の変化) | 既定化の影響範囲。現状は OFF のため既存出力は不変 | #146 (既定化の判断と合わせて PM が起票) |
+
+受入 3 の原文 (issue #3139 の本文に元の 4 項目どおり戻した。PM 指示 2026-10-14T22:48Z により部分達成のため Refs で紐づける):
+
+> 3. 製品 KPI の前後 (FLEngine 起動の dispatch 数・通過 unit 数・最初のウィンドウの有無。`tools/flelift/boot/REPORT.md`) を PR 本文に書く。動かせなければ『動かしていない』と書く。
