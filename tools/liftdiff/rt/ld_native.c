@@ -626,6 +626,18 @@ static void __attribute__((noinline)) nrst_add_mmap(void) {
   fclose(f);
 }
 static u64 g_nrst_skip;   /* reset で戻せなかった (munmap 済みの) 区間の数 */
+/* LD-268 (#5268): NRST_MMAP の k 番目 (0 始まり) だけを戻す。ntot に NRST_MMAP の総数を返す */
+static u64 nrst_reset_mmap_at(int k, int* ntot) {
+  u64 diff = 0; g_nrst_skip = 0; int c = 0;
+  for (int i = 0; i < g_nnrst; i++) if (g_nrst[i].cat == NRST_MMAP) {
+    if (c++ != k) continue;
+    if (msync(g_nrst[i].lo, g_nrst[i].n, MS_ASYNC) != 0) { g_nrst_skip++; continue; }
+    for (u64 q = 0; q < g_nrst[i].n; q++) diff += g_nrst[i].lo[q] != g_nrst[i].pr[q];
+    memcpy(g_nrst[i].lo, g_nrst[i].pr, g_nrst[i].n);
+  }
+  if (ntot) *ntot = c;
+  return diff;
+}
 static u64 nrst_reset(int mask) {
   u64 diff = 0; g_nrst_skip = 0;
   for (int i = 0; i < g_nnrst; i++) if (mask & g_nrst[i].cat) {
@@ -693,6 +705,25 @@ int main(int argc, char** argv) {
       ld_snapshot(); nrst_snap(); puts("{\"ready\":true}"); fflush(stdout);
     } else if (!strncmp(l, "NRESET ", 7)) {   /* LD-209: native の候補別 RESET (mask は wasm の RESET と同じ) */
       u64 d = nrst_reset(atoi(l + 7)); printf("{\"nreset\":%d,\"diff\":%llu,\"skip\":%llu}\n", atoi(l + 7), (unsigned long long)d, (unsigned long long)g_nrst_skip); fflush(stdout);
+    } else if (!strncmp(l, "NRESETI ", 8)) {   /* LD-268 (#5268): NRST_MMAP の k 番目だけを戻す */
+      int nt = 0; u64 d = nrst_reset_mmap_at(atoi(l + 8), &nt);
+      printf("{\"nreseti\":%d,\"ntot\":%d,\"diff\":%llu,\"skip\":%llu}\n", atoi(l + 8), nt, (unsigned long long)d, (unsigned long long)g_nrst_skip); fflush(stdout);
+    } else if (!strncmp(l, "NRESETX ", 8)) {   /* LD-268 (#5268): NRST_MMAP の k 番目以外を全部戻す (leave-one-out) */
+      int k = atoi(l + 8), nt = 0; u64 d = 0; g_nrst_skip = 0; int c = 0;
+      for (int i = 0; i < g_nnrst; i++) if (g_nrst[i].cat == NRST_MMAP) {
+        if (c++ == k) continue;
+        if (msync(g_nrst[i].lo, g_nrst[i].n, MS_ASYNC) != 0) { g_nrst_skip++; continue; }
+        for (u64 q = 0; q < g_nrst[i].n; q++) d += g_nrst[i].lo[q] != g_nrst[i].pr[q];
+        memcpy(g_nrst[i].lo, g_nrst[i].pr, g_nrst[i].n);
+      }
+      nt = c;
+      printf("{\"nresetx\":%d,\"ntot\":%d,\"diff\":%llu,\"skip\":%llu}\n", k, nt, (unsigned long long)d, (unsigned long long)g_nrst_skip); fflush(stdout);
+    } else if (!strcmp(l, "NMMAPN")) {   /* LD-268: NRST_MMAP の領域数と各 (lo, n) */
+      int nt = 0; nrst_reset_mmap_at(-1, &nt);
+      printf("{\"nmmapn\":%d,\"regions\":[", nt);
+      int c = 0; for (int i = 0; i < g_nnrst; i++) if (g_nrst[i].cat == NRST_MMAP) {
+        printf("%s[\"%llx\",%llu]", c ? "," : "", (unsigned long long)(uintptr_t)g_nrst[i].lo, (unsigned long long)g_nrst[i].n); c++; }
+      printf("]}\n"); fflush(stdout);
     } else if (!strncmp(l, "BLOB ", 5)) {
       char* sp = strchr(l + 5, ' '); if (sp) { *sp = 0; ld_cmd_blob(l + 5, sp + 1); }
     } else if (!strncmp(l, "FIX ", 4)) {
