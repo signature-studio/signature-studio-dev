@@ -15,6 +15,8 @@
 #       + test/sig/sig_test.sh (合成 fixture: 検出・正規化・adapter 実行・未対応型の fail・sigs.json 乖離検出・符号不明の拡張は unresolved/sext 明示で -1 保存)
 #   6c. R6 検査: ir_undef.py の構造体展開 + 重複 declare 正規化 (--normalize-dup 産物が emcc 通過) を M11 IR で実測
 #   7. OTT undefined 47 種 → shimx リンクで Win/CRT API 24 種が全て解決 (tools/m8 成果物があれば)
+#   7b. 停止規則のガード (test/guard/guard_test.sh・#3069): emcc が終了 0 でも出力が無い・空なら FAIL /
+#       M11・M8 IR が無ければ step 6 は SKIP し生成物 4 件を上書きしない (子の test.sh は SHIMX_GUARD_CHILD=1 で 7b を省く)
 #
 # 使い方:  bash tools/shimx/test.sh        (--quick で 7 を省略)
 set -euo pipefail
@@ -35,6 +37,13 @@ command -v llvm-nm >/dev/null || die "llvm-nm が見つかりません"
 mkdir -p "$BUILD" "$HERE/work"
 source "$HERE/flags.sh"
 PR_INC=(-I"$HERE/src" -I"$HERE/pathreg/include")   # test_absent.c / pathmap.c (VFS 写像 pathreg) 用
+EMCC="${SHIMX_EMCC:-emcc}"
+emcc_js() {  # $1=出力 js  $2...=emcc 引数 (-o は付けない)。終了 0 でも出力が無い・空なら非 0 を返す (#3069)
+    local out="$1"; shift
+    rm -f "$out"
+    "$EMCC" "$@" -o "$out" || return 1
+    [ -s "$out" ] || { echo "[shimx] FAIL: emcc が終了 0 だが出力が無い・空 ($out)" >&2; return 1; }
+}
 { echo "emcc : $(emcc --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"; echo "node : $(node --version)"; echo "date : $(date -Is)"; } > "$BUILD/versions.txt"
 
 info "1/7 オブジェクトビルド + 生成物更新 (proctable / stub prototypes / exports.txt)"
@@ -49,14 +58,14 @@ N_EXPORT="$(grep -vc '^#' "$HERE/exports.txt")"
 info "    公開関数 $N_EXPORT 本 (うち shimx_* 運用フック $(grep -c '^shimx_' "$HERE/exports.txt"))"
 
 info "2/7 MT (pthread) ビルド + node 実行"
-emcc "${SHIMX_CLANG_FLAGS[@]}" "${SHIMX_EMCC_MT[@]}" "${PR_INC[@]}" "$HERE"/src/*.c "$HERE"/test/*.c "$HERE"/pathreg/src/pathmap.c -o "$BUILD/shimx_test_mt.js" || die "emcc MT ビルド失敗"
+emcc_js "$BUILD/shimx_test_mt.js" "${SHIMX_CLANG_FLAGS[@]}" "${SHIMX_EMCC_MT[@]}" "${PR_INC[@]}" "$HERE"/src/*.c "$HERE"/test/*.c "$HERE"/pathreg/src/pathmap.c || die "emcc MT ビルド失敗"
 mv "$BUILD/shimx_test_mt.js" "$BUILD/shimx_test_mt.cjs"
 node "$BUILD/shimx_test_mt.cjs" > "$BUILD/mt.out" 2> "$BUILD/mt.err" || { tail -5 "$BUILD/mt.err" >&2; die "MT テスト失敗 (build/mt.err)"; }
 grep -q "ALL PASS (build=mt(pthreads))" "$BUILD/mt.out" || die "MT: ALL PASS が出力されていない"
 info "    MT PASS ($(grep -c 'OK' "$BUILD/mt.err") グループ)"
 
 info "3/7 ST (シングルスレッド) ビルド + node 実行"
-emcc "${SHIMX_CLANG_FLAGS[@]}" "${SHIMX_EMCC_ST[@]}" "${PR_INC[@]}" "$HERE"/src/*.c "$HERE"/test/*.c "$HERE"/pathreg/src/pathmap.c -o "$BUILD/shimx_test_st.js" || die "emcc ST ビルド失敗"
+emcc_js "$BUILD/shimx_test_st.js" "${SHIMX_CLANG_FLAGS[@]}" "${SHIMX_EMCC_ST[@]}" "${PR_INC[@]}" "$HERE"/src/*.c "$HERE"/test/*.c "$HERE"/pathreg/src/pathmap.c || die "emcc ST ビルド失敗"
 mv "$BUILD/shimx_test_st.js" "$BUILD/shimx_test_st.cjs"
 node "$BUILD/shimx_test_st.cjs" > "$BUILD/st.out" 2> "$BUILD/st.err" || { tail -5 "$BUILD/st.err" >&2; die "ST テスト失敗 (build/st.err)"; }
 grep -q "ALL PASS (build=st)" "$BUILD/st.out" || die "ST: ALL PASS が出力されていない"
@@ -92,24 +101,26 @@ info "5/7 M4 互換 (tools/shim/test/test_main.c 無改変 × shimx 実装)"
 M4T="$HERE/../shim/test/test_main.c"
 [ -f "$M4T" ] || die "M4 テストが見つかりません ($M4T)"
 M4_ST_FLAGS=(-sALLOW_MEMORY_GROWTH=1 -sERROR_ON_UNDEFINED_SYMBOLS=1 -sEXIT_RUNTIME=1 -sENVIRONMENT=node)
-emcc "${SHIMX_CLANG_FLAGS[@]}" "${M4_ST_FLAGS[@]}" -pthread -sPTHREAD_POOL_SIZE=8 "$HERE"/src/*.c "$M4T" -o "$BUILD/m4compat_mt.js" || die "M4 互換 MT ビルド失敗"
+emcc_js "$BUILD/m4compat_mt.js" "${SHIMX_CLANG_FLAGS[@]}" "${M4_ST_FLAGS[@]}" -pthread -sPTHREAD_POOL_SIZE=8 "$HERE"/src/*.c "$M4T" || die "M4 互換 MT ビルド失敗"
 mv "$BUILD/m4compat_mt.js" "$BUILD/m4compat_mt.cjs"
 node "$BUILD/m4compat_mt.cjs" > "$BUILD/m4_mt.out" 2> "$BUILD/m4_mt.err" || { tail -3 "$BUILD/m4_mt.err" >&2; die "M4 互換 MT 失敗"; }
 grep -q "ALL PASS (build=mt(pthreads))" "$BUILD/m4_mt.out" || die "M4 互換 MT: ALL PASS が無い"
-emcc "${SHIMX_CLANG_FLAGS[@]}" "${M4_ST_FLAGS[@]}" "$HERE"/src/*.c "$M4T" -o "$BUILD/m4compat_st.js" || die "M4 互換 ST ビルド失敗"
+emcc_js "$BUILD/m4compat_st.js" "${SHIMX_CLANG_FLAGS[@]}" "${M4_ST_FLAGS[@]}" "$HERE"/src/*.c "$M4T" || die "M4 互換 ST ビルド失敗"
 mv "$BUILD/m4compat_st.js" "$BUILD/m4compat_st.cjs"
 node "$BUILD/m4compat_st.cjs" > "$BUILD/m4_st.out" 2> "$BUILD/m4_st.err" || { tail -3 "$BUILD/m4_st.err" >&2; die "M4 互換 ST 失敗"; }
 grep -q "ALL PASS" "$BUILD/m4_st.out" || die "M4 互換 ST: ALL PASS が無い"
 info "    M4 テスト (MT/ST) PASS"
 
 info "6/7 カバレッジ (inventory.md / BACKLOG.md / data/coverage.json を実測再生成)"
-if [ -f "$HERE/../m11/work/boot_final2.ll" ]; then
-    python3 "$HERE/scripts/ir_undef.py" "$HERE/../m11/work/boot_final2.ll" --nm "$HERE/work/nm_MT.txt" --json "$HERE/work/ir_m11.json" > "$HERE/work/ir_m11.txt"
+M11_IR="${SHIMX_M11_IR:-$HERE/../m11/work/boot_final2.ll}"
+M8_IR="${SHIMX_M8_IR:-$HERE/../m8/work/ott_m8.ll}"
+if [ -f "$M11_IR" ]; then
+    python3 "$HERE/scripts/ir_undef.py" "$M11_IR" --nm "$HERE/work/nm_MT.txt" --json "$HERE/work/ir_m11.json" > "$HERE/work/ir_m11.txt"
 fi
-if [ -f "$HERE/../m8/work/ott_m8.ll" ]; then
-    python3 "$HERE/scripts/ir_undef.py" "$HERE/../m8/work/ott_m8.ll" --nm "$HERE/work/nm_MT.txt" --json "$HERE/work/ir_ott.json" > "$HERE/work/ir_ott.txt"
+if [ -f "$M8_IR" ]; then
+    python3 "$HERE/scripts/ir_undef.py" "$M8_IR" --nm "$HERE/work/nm_MT.txt" --json "$HERE/work/ir_ott.json" > "$HERE/work/ir_ott.txt"
 fi
-for pair in "m11:$HERE/../m11/work/boot_final2.ll" "m11_3:$HERE/../m11/work/boot_final3.ll" "ott:$HERE/../m8/work/ott_m8.ll"; do
+for pair in "m11:$M11_IR" "m11_3:$HERE/../m11/work/boot_final3.ll" "ott:$M8_IR"; do
     tag="${pair%%:*}"; ir="${pair#*:}"
     if [ -f "$ir" ]; then bash "$HERE/scripts/sig_gate.sh" "$ir" "$tag" | sed 's/^/    /' || die "署名不一致 ($tag): sig_normalize.py 後も lift IR の declare と shimx 定義が wasm 署名で食い違う (または未解決型)"; fi
 done
@@ -131,6 +142,7 @@ if [ "$QUICK" -eq 0 ]; then
     grep -q "API 解決 24 種" "$BUILD/ott.out" || [ ! -f "$HERE/../m8/work/ott_m8.ll" ] || die "OTT: Win/CRT API 24 種が解決されていない"
     grep -q "不一致" "$BUILD/ott.out" && die "OTT: t1 出力が baseline と不一致"
 fi
+if [ -f "$M11_IR" ] && [ -f "$M8_IR" ]; then
 python3 "$HERE/scripts/gen_inventory.py" > "$BUILD/coverage.out"
 python3 - <<PYEOF || die "カバレッジ基準未達"
 import json, sys
@@ -141,6 +153,14 @@ print("    FLEngine 738: 実装 %d (機能 %d + スタブ %d) = %.1f%% / 担当�
 ok = c['unimplemented'] == 0 and c['m4_api_inherited'] == c['m4_api'] and c['delay_unimplemented'] == 0
 sys.exit(0 if ok else 1)
 PYEOF
+else
+    info "SKIP: 入力 (M11 IR: $M11_IR / M8 IR: $M8_IR) が揃っていない。BACKLOG.md・inventory.md・data/coverage.json・data/inventory.csv は再生成せず、コミット済みの値を保つ (#3069)"
+fi
+
+if [ -z "${SHIMX_GUARD_CHILD:-}" ]; then
+    info "7b 停止規則のガード (test/guard/guard_test.sh): emcc 無出力は FAIL・入力欠落は生成物を上書きしない"
+    bash "$HERE/test/guard/guard_test.sh" | sed 's/^/    /' || die "ガードテスト (test/guard/guard_test.sh) 失敗"
+fi
 
 info "7/7 完了: shimx $N_EXPORT 公開関数 × MT/ST × M4 互換 × fail-fast 全 PASS"
 exit 0
