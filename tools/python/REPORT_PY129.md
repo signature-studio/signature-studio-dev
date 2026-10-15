@@ -39,7 +39,7 @@
 
 ## 検証
 
-測定 commit: `a052f7390` (コードを変えた最後の commit。`origin/main` (abb5fbf9d) の取り込み merge。衝突 4 件 (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`・`tests/ui_state_diff.mjs`) は PR 側と main 側の両方を残して解消)。その前の取り込み (`72ae6d066`・origin/main 8c23860cd) の衝突 2 件 (`docs/DOC_MAP.md`・`tests/provider_check.mjs`) も両方残した。`build_cpython_wasm.sh` の測定は `72ae6d066` の時点 (以降の差分は provider・host・tests のみで CPython の入力に無い)。以降の commit は `tools/python/REPORT_PY129.md` のみ。
+測定 commit: `ec8e7f897` (コードを変えた最後の commit。`origin/main` (1ccf20c6a) の取り込み merge。衝突はなく、main 側の `host/fl_mock.mjs`・`provider/fl_engine.c` (PY-111) は自動 merge)。その前の取り込み `a052f7390` (origin/main abb5fbf9d) の衝突 4 件 (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`・`tests/ui_state_diff.mjs`) と、`72ae6d066` (origin/main 8c23860cd) の衝突 2 件 (`docs/DOC_MAP.md`・`tests/provider_check.mjs`) は、いずれも PR 側と main 側の両方を残して解消した。`build_cpython_wasm.sh` の測定は `72ae6d066` の時点 (以降の差分は provider・host・tests・REPORT_PY111 のみで CPython の入力に無い)。以降の commit は `tools/python/REPORT_PY129.md` のみ。
 
 環境: runner 4 core。`load` は各コマンドの終了直後の `/proc/loadavg` (1 分平均)。`fl-win64` は `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` に指定。`toolchain-emsdk` は本 run の素材に無かったため、emsdk を pin 6.0.12 で `$RUNNER_TEMP/emsdk` に導入し、`[EMSDK]` (`docs/REFERENCES.md`) の位置に symlink した (`emcc --version` 6.0.12)。
 
@@ -69,7 +69,7 @@
 - `tests/ui_state_diff.mjs`: setter の呼出し列 (通常 13・引数個数違い 6) を追加。
 
 ```
-$ git diff a052f7390 HEAD -- tools/python ':!*.md'
+$ git diff ec8e7f897 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
