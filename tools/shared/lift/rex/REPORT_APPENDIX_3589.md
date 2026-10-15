@@ -44,7 +44,7 @@ movnti は memset (`f_18001c8f0`・8 箇所) の大ブロック経路にだけ�
 - 原因: wasm の `rex_run` は同期実行で、JS 側から途中で止められない。元の機械語は `native_ref.c` の `ualarm(300 ms)` で止まるが、wasm 側に時間制限が無かった。case 101 (fn=1・a1=0x6dd) が wasm で戻らず、全件の実行が時間切れになった (120 s 超・rc 124)。native 側でも case 101 は落ちる入力 (native で打ち切られる。stderr での SIGALRM は未確認)。
 - 修復: `run_wasm.mjs` を case ごとの worker_threads で走らせ、`REX_CASE_MS` (既定 2000 ms) を超えて戻らない case は捨て (`timeout.txt`)、次の case から worker を作り直して続ける。`trap_kind.txt` を新設し、VA が 0 の trap の種類 (JS の例外メッセージ) を case 単位で残す。`trap.txt` の形式は変えていない (`movnti_check.py` が読む)。
 - 実測 (HEAD `4d7b8316b`・`REX_RUN_CRASHED=1`・`ok` で作り直した cases.bin 296 件): rc 0・elapsed 2 s・load `0.25 0.38 0.35 → 0.31 0.39 0.36`・cases=296 traps=38 timeouts=1 (case 101)。戻らなかった case は 1 件。
-- trap の内訳 (38 件): `memory access out of bounds` 36 件 (VA 0)、`unreachable` 2 件 (VA `0x18001788f` = `idiv by zero`)。境界外 36 件の原因は未特定。36 件はいずれも元の機械語が落ちた case (比較対象外) で、wasm 側だけ trap する。`ok` モードの wasm trap は 0 件 (確認済み)。
+- trap の内訳 (38 件): `memory access out of bounds` 36 件 (VA 0)、`unreachable` 2 件 (VA `0x18001788f` = `idiv by zero`)。VA の根拠: x64c の lift 出力 (`lift/fle_lifted.c`) で `/* 18001788f: idiv rcx */` の除数 0 分岐 `ott_unsup(0x18001788fULL, "idiv by zero")` (`tools/flelift/x64c.py` `i_idiv`) を HEAD `8942578eb` で確認。境界外 36 件の原因は未特定。36 件はいずれも元の機械語が落ちた case (比較対象外) で、wasm 側だけ trap する。`ok` モードの wasm trap は 0 件 (確認済み)。
 - 受入 1 の 248 件との差: 旧 cases.bin (248 件) は `ok` で作り直したため、本測定は 296 件。
 - 戻らなかった case (受入 2・§2 と同じ形式):
   - 件数: 1 件 (case 101・fn=1・a1=0x6dd)。
