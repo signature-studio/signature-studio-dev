@@ -61,6 +61,24 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| HEAD の生成物 3 件 (`BACKLOG.md`・`data/coverage.json`・`inventory.md`) が、入力ありの再生成結果と一致しない (`midi_conv.c` の追加・運用フックの 69→79 など。HEAD の値は古い) | 入力ありの run ごとに 3 件が書き換わる。repo の値は古いまま | [SHX-T41] #3819 (子 issue) |
+| (解決済み・§8) HEAD の生成物 3 件が入力ありの再生成結果と一致しない | 解決: #3819 (SHX-T41) で再生成して commit 済み | [SHX-T41] #3819 |
 
 - 入力欠落時は coverage 基準 (担当範囲の未実装 0・M4 継承 53/53) の検査も SKIP される。設計どおり。この検査は入力の揃う run (`oc_artifacts: toolchain-emsdk work-m11 work-m6-ott`) でのみ行われる。
+
+## 8. SHX-T41 (#3819): 生成物 3 件の入力あり再生成
+
+commit `9810d96fd` で `BACKLOG.md`・`data/coverage.json`・`inventory.md` を入力あり (`work-m11`・`work-m6-ott`・`toolchain-emsdk`) の `bash tools/shimx/test.sh` の結果に揃えた。手編集は無し。生成元 (`scripts/gen_inventory.py` 等) は無変更。
+
+差分 (commit 前の HEAD 比): 3 件 (23 行追加・22 行削除)。内訳は `coverage.json` の `shimx_hooks` 69→79、`inventory.md` の運用フック列挙 (`shimx_drop_invoke` 等 10 本の追加)、`midi_conv.c` の新規分類 (BACKLOG の midi 系 API の所属 `net.c` → `midi_conv.c`)。
+
+測定 commit は `9810d96fd` (コードを変えた最後の commit。変更は生成物 3 件のみ)。素材は `$HOME/artifacts` の `toolchain-emsdk`・`work-m11`・`work-m6-ott` を展開して使用。`/opt/emsdk` は sudo で展開後 `chown runner` (展開直後は cache の書込が root で止まった)。
+
+| run | commit | rc | 所要 | load (1 分平均) | 生成物 3 件の差分 |
+|---|---|---|---|---|---|
+| 1 回目 (再生成) | 68d5cb3c4 (変更前) | 0 | 112.0 s (user 88.0 s) | 0.62 (06:25) → 1.16 (06:27) | 3 件変化 (23 行追加・22 行削除) |
+| 2 回目 (冪等確認) | 9810d96fd | 0 | 114.2 s (user 88.8 s) | 1.16 → 1.08 (06:30) | **0 行** |
+
+- 入力あり PASS (両 run): step 2・3・5 の MT/ST/M4 が ALL PASS、fail-fast 13 種と ExitProcess(7)、step 6 の coverage 基準 (`FLEngine 738: 実装 358 = 48.5% / 担当範囲 359 に対し 100.0% / 未実装 0`)、OTT `API 解決 24 種`、`t1 出力 SHA` 一致 (`b5a91b9b2e` 一致)、7b ガード G1a・G1b・G2 全 OK、`7/7 完了`。
+- 受入条件の確認: 変わるのは 3 件のみ (`git status`)、同一 commit の再実行で `git diff` 0 行 (冪等)。
+
+差分 (測定 commit 以後): `git diff 9810d96fd HEAD -- tools/shimx/test.sh tools/shimx/test/guard tools/shimx/scripts` は 0 行 (本節の追記は REPORT のみ)。
