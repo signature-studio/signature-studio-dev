@@ -313,17 +313,19 @@ if (TOLERANT) {
     const CFI_VA = 0x1375990;
     const cstk0 = Number(m._emscripten_stack_get_current()), rsp0 = Number(m._fle_rsp_get());
     const lj0 = Number(m._fle_n_longjmp()), s0 = softSnap(), e0 = Number(m._fle_n_exit());
+    // #4464: FLE_CFI_SEED=1 のとき、CFI 経路の global slot (0x1104e30・0x5ac270) を PE の静的値に戻してから呼ぶ。
+    // 既定 (未指定) は従来どおり。slot は boot 中に 0 になっており、chain は rcx をこの slot から再読込する。
+    if (process.env.FLE_CFI_SEED === '1') {
+        const seed = [[0x1104e30, 0x1104ef8], [0x5ac270, 0x5ac338]];
+        for (const [slot, val] of seed) { const dv = new DataView(m.HEAPU8.buffer); console.error('[cfi-seed] before ' + slot.toString(16) + '=0x' + dv.getBigUint64(slot, true).toString(16) + ' ac308=0x' + dv.getBigUint64(0x5ac308, true).toString(16)); dv.setBigUint64(slot, BigInt(val), true); }
+    }
     let cr = null, cerr = null;
-    // FLE_CFI_SELF (#4464): 既定 0 (従来どおり全引数 0)。実機の呼出し元に近い self (rcx) を渡すときに使う。
-    const CFI_SELF = BigInt(process.env.FLE_CFI_SELF || '0');
-    try { cr = m._fle_run(CFI_VA, CFI_SELF, 0n, 0n, 0n, 0n, 0n, 0n, 0n); } catch (e) { cerr = e; }
+    try { cr = m._fle_run(CFI_VA, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n); } catch (e) { cerr = e; }
     m.__emscripten_stack_restore(cstk0); m._fle_rsp_set(rsp0);
     const s1 = softSnap(), called = [];
     for (const [nm, c] of s1) { const d = c - (s0.get(nm) || 0); if (d > 0) called.push([nm, d]); }
     cfi = {
         va: '0x' + CFI_VA.toString(16),
-        // #4464: 0x13752f0 が rcx に読む大域 0x1104e30 の値 (CFI 開始時)。PE 上は 0x1104ef8。
-        g1104e30: '0x' + ((BigInt(m.HEAPU32[0x1104e30 / 4 + 1]) << 32n) | BigInt(m.HEAPU32[0x1104e30 / 4])).toString(16),
         rc: cerr ? null : '0x' + BigInt.asUintN(64, BigInt(cr)).toString(16),
         threw: cerr ? classify(cerr) : null,
         // trap 地点の手掛かり: wasm の例外スタック (関数 index → VA は fle_lifted の対応表で引く)
@@ -427,7 +429,7 @@ console.log('FLEBOOT_RESULT ' + JSON.stringify({
     ipp_mode: IPP_MODE, ipp_on: IPP_ON, ipp_ptr_15F34A0: boot.ipp_ptr_15F34A0,
     ipp_total: boot.ipp_total, ipp_called: boot.ipp_called, ipp_stop: boot.ipp_stop, diag_nullfill: boot.diag_nullfill,
     tolerant: TOLERANT ? { mode: TOL_MODE, started: tol.started, hook_ran: tol.hook_ran, kinds: tol.kinds, skipped_n: tol.skipped.length, restored: tol.restored, miss_units: tol.miss_units.length } : null,
-    cfi: cfi && { rc: cfi.rc, threw: cfi.threw && cfi.threw.cls, longjmp: cfi.longjmp, exit: cfi.exit, g1104e30: cfi.g1104e30 },
+    cfi: cfi && { rc: cfi.rc, threw: cfi.threw && cfi.threw.cls, longjmp: cfi.longjmp, exit: cfi.exit },
 }));
 console.log('FLEBOOT_UNDO ' + JSON.stringify(undoProbe));
 // PY-106 (#2909): 束縛関数 0xc395a0 を boot 停止後に直接実行し、resolver が引いた名前と slot の値を読む (FLE_PY106_BIND=1 のときだけ。
