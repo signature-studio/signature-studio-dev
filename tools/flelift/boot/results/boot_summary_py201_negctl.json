@@ -12,6 +12,11 @@
   "rax": "0x0",
   "longjmp": 0,
   "stage": 1,
+  "diag_nullfill": {
+   "on": false,
+   "skip": 0,
+   "pass": 0
+  },
   "getmem": 1891,
   "freemem": 776,
   "va_calls": 20,
@@ -129,11 +134,11 @@
  "outmem": {
   "mem_bytes": 905969664,
   "stack": {
-   "base": "0x11dbbaa0",
-   "end": "0x115bbaa0"
+   "base": "0x11dbbb00",
+   "end": "0x115bbb00"
   },
-  "full": "cd23f8121cb96414a3bb1412a166db63fed548b4b8ea0c69f3d031a314b28264",
-  "no_cstack": "cc0a43764be5e97c04b6b809615585d2a0b7fed4ec64cadf50d5cf2cf874a76a",
+  "full": "fac44006c83c850f9f9e983b9c86ad27d006808ca35df5063c9551d7602f515a",
+  "no_cstack": "57c9c42dd19c5eb97edf33f446ad136eed74f11c0099e71e11de8f3dc1588055",
   "sections": {}
  },
  "survey": null,
