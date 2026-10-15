@@ -184,6 +184,22 @@ DELAY_RULES = [
      '*param_1 = (longlong)&UNK_1813a4968;', 1),
     ('*param_1 = &UNK_1822849e0 (#4838)', r'\*param_1 = &UNK_1822849e0;',
      '*param_1 = (longlong)&UNK_1822849e0;', 1),
+    # KH-136 (#4955): FUN_1802ecfc0 (tap_add) の宣言と本体。機械語 0x1802ecfc0〜ecfe6 で確定:
+    #   r8・r9 (param_3・param_4) は addps の 16 byte メモリオペランド。結果は movlps で下位 8 byte (2 lane) だけを書く。
+    #   よって param_3・param_4 は V128 * (float * は誤り)。lane は (float) の数値変換ではなくビット列 (u2f) で読む。
+    ('FUN_1802ecfc0 宣言: 16 byte の V128 * (KH-136)', r'void FUN_1802ecfc0\(longlong param_1,int param_2,float \*param_3,float \*param_4\)',
+     'void FUN_1802ecfc0(longlong param_1,int param_2,V128 *param_3,V128 *param_4)', 1),
+    ('FUN_1802ecfc0 本体 lane 0・1 (param_3): addps の 2 lane (KH-136)',
+     r'CONCAT44\(\(float\)\(\(ulonglong\)uVar1 >> 0x20\) \+ param_3\[1\],\(float\)uVar1 \+ \*param_3\);',
+     'CONCAT44(f2u(u2f((uint)(uVar1 >> 0x20)) + param_3->_4_4_),f2u(u2f((uint)uVar1) + param_3->_0_4_));', 1),
+    ('FUN_1802ecfc0 本体 lane 0・1 (param_4): addps の 2 lane (KH-136)',
+     r'CONCAT44\(\(float\)\(\(ulonglong\)uVar2 >> 0x20\) \+ param_4\[1\],\(float\)uVar2 \+ \*param_4\);',
+     'CONCAT44(f2u(u2f((uint)(uVar2 >> 0x20)) + param_4->_4_4_),f2u(u2f((uint)uVar2) + param_4->_0_4_));', 1),
+    # 呼出元 (delay 1271): uStack_108 (8 byte) と uStack_100 (0 を書いた上位 8 byte) を 1 つの 16 byte 引数にまとめる。
+    #   aauStack_f8 は呼出先が 16 byte (aauStack_f8[0]) を読むので V128 * へ cast する (値は変えない)。
+    ('caller FUN_1802ecfc0: uStack_108/100 を 16 byte 引数に (KH-136)',
+     r'FUN_1802ecfc0\(\*\(undefined8 \*\)\(param_1 \+ 0x198\),uVar22 & 0xffffffff,&uStack_108,aauStack_f8\);',
+     '{ V128 kh_p108; kh_p108._0_8_ = uStack_108; kh_p108._8_8_ = uStack_100; FUN_1802ecfc0(*(undefined8 *)(param_1 + 0x198),uVar22 & 0xffffffff,&kh_p108,(V128 *)aauStack_f8); }', 1),
 ]
 
 
