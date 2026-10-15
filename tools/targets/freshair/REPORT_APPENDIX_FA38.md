@@ -100,6 +100,7 @@ P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r
   - * 入力の写像は HeartCore の機械語の読みで決めた (根拠は REPORT_APPENDIX_2739.md §2):
   + * 入力の写像は HeartCore の機械語の読みで決めた (根拠は REPORT_APPENDIX_FA38.md §2):
   ```
+- smoke 未実施: `ks_sc_native_smoke.sh 200` (Compressor・Filter の fma 0/1 で ERR 件数と行数を見る) は本 run では実行していない。`SlateCore.core_64` (`work-liftlib-targets`) が runner に未展開のため、`missing:` で止まる (測定 commit なし・ERR 件数なし)。SC 側の ERR 0 は未確認のまま。
 - 並列実行の確認 (739c90452 で seed 11・99 を `xargs -P 2` で同時実行。両 script の実行区間が重なり、開始時刻の差 0.30 ms、各 script 全体 0.25 s): 両 SUMMARY と kh_a.txt が直列実行と一致 (seed 11 = 200・292・25・136、seed 99 = 198・293・29・102、byte 一致)。
 - blob 監査: 20 MiB 超の追加なし。`work/` (gitignore) は使用のみ。
 
