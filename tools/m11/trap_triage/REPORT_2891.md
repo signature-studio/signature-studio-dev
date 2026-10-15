@@ -1,6 +1,6 @@
 # #2891: unit 492 OOB の `4473f0` 配列 dest2 の旧値 (`0x1_00000003`) の書込み主体 (現 build での特定)
 
-親: #2780 (経緯は `REPORT_2780.md`)。測定 commit: `ed70adf5a` (build 入力の最後の変更。本 PR は計測スクリプトと本 REPORT を足すだけで、build 入力 (IR・C・build スクリプト) は変えていない。§8)。再測定: `6d978d485` (fix round 1。build 入力は `ed70adf5a` と同一)。
+親: #2780 (経緯は `REPORT_2780.md`)。測定 commit: `ed70adf5a` (build 入力の最後の変更。本 PR は計測スクリプトと本 REPORT を足すだけで、build 入力 (IR・C・build スクリプト) は変えていない。§8)。再測定: `6d978d485` (fix round 1。build 入力は `ed70adf5a` と同一)。受入 2・3 の測定 (§9): `58ed035cf` (origin/main)。
 既知類型との関係: 該当なし (D17 (DEFECTS.md) と機構が一致しない。類型の登録は PM 判断。§5)
 
 ## 0. 結論
@@ -11,8 +11,9 @@
   - unit 477・484: `function_4133f0` (C 版 `System._UStrAsg`、wat 14850) の shadow stack 局所 (+48 の 4B `len`)。REPORT_2672 の `u32 len` と同じ機構。
   - unit 492: `function_4133f0` の `*dest = s` (8B、`s = 0`)。旧値を読んだ後の書込み (OOB 入力そのものは書込み主体ではなく、unit 432 以降の残骸)。
   - 未確認: unit 304 (hit 2,546,099 件) の値の内容は記録していない (§6 未解決 5)。
-- **受入 2 (`4473f0` 配列の native 0 初期化の箇所) は未達。** 呼出し元の逆アセンブルは本 run で行わなかった (§6・未解決 1)。
-- **受入 3 (類型判定) は未確定。** 観測: 同じ 8B 番地 `0x10aa1430` を、寿命の異なる 3 種 (CRITICAL_SECTION の初期化・UStrAsg の局所 `len`・`4473f0` の配列要素 `dest2`) が共有している。既知類型 D17 とは機構が一致しない (§5)。native 側で配列が 0 初期化されるかは未確認のため、§5 の類型案は仮説のまま。
+- **受入 2 (`4473f0` 配列の native 0 初期化の箇所) は達成 (§9)。** native の 0 初期化は `ad5700` の `call 415610` (RTTI による managed field の初期化) → `4159e0` → `40d210` (memset、112 B)。lift 版 `40d210` は n > 32 の本体 (`0x40d2d1..0x40d31a`) を関数範囲の外として落とし、そこへの分岐が no-op になる (§9.2・§9.3)。
+- **受入 3 (類型判定) は達成 (§9.5)。** D17 ではない (8 B の 0 書込みは IR に残っていて、欠けているのは 112 B の memset 本体)。近いのは D13 (関数範囲の過小推定) の新事例。DEFECTS 登録は PM 判断 (未登録)。
+- 修復 (`40d210` の転記) は実装作業なので子 issue に分ける (§9.6)。shim による検証は commit していない (§9.4)。
 
 ## 1. 素材と再現
 
@@ -77,19 +78,21 @@ hit の範囲: 全 942 unit = **2,548,513 件**。unit 0〜492 = 2,548,226 件�
 - unit 291 の書込みは `VirtualAlloc` (wat 14886、`function_407770` ← `function_407a50`) の 4B 2 件 (`0x10aa1164` ← `0x7d50000`、`0x10aa1160` ← `0x101000`)。値の出所は未確認。
 - 旧番地の unit 492 の書込みは `function_4133f0` の shadow stack 局所 (`0x10aa1160 = frame + 32`) で、dest2 とは別物。
 
-## 5. 類型判定 (仮説・未確定)
+## 5. 類型判定 (§9 で確定)
 
-- 既知類型: 該当なし。D17 (`DEFECTS.md`: 64bit 局所の 0 初期化が 4B store に縮み、上位 4B が残る) は 1 つの 8B 初期化の縮退。本件は、上位 dword の残骸が 4B store (unit 432) で作られ、下位 dword も別の 4B store (unit 477・484) の残骸で、D17 の機構とは一致しない。
-- 観測: `0x10aa1430` は寿命の異なる 3 つのもの (CRITICAL_SECTION の初期化・UStrAsg の局所 `len`・`4473f0` の配列要素 `dest2`) が共有している。native で `arg2+0x100..+0x170` が 0 に初期化されていれば、i=2 の旧値は 0 になるはずで、この観測と整合する。ただし native の 0 初期化は**未確認** (§6)。
-- 類型案 (仮説・未検証): 「`4473f0` の配列 (`arg2+0x100..+0x170`) の初期化 (呼出し元の系列) が lift で欠け、同番地の残骸 (CRITICAL_SECTION・UStrAsg 局所) を旧値として読む」。DEFECTS への登録は PM 判断 (`WORKFLOW.md` §5)。
+- 既知類型: D17 ではない。D17 (`DEFECTS.md`: 64bit 局所の 0 初期化が 4B store に縮み、上位 4B が残る) は 8B の初期化が縮退する類型。本件は 8B の 0 書込みが IR に残っていて (`415610`)、欠けているのは 112 B の memset 本体 (書込みが 1 つも出ない)。残存の経路は縮みでなく no-op (§9.5)。
+- 観測: `0x10aa1430` は寿命の異なる 3 つのもの (CRITICAL_SECTION の初期化・UStrAsg の局所 `len`・`4473f0` の配列要素 `dest2`) が共有している。これは wasm の shadow stack 上で unit 間に同じ番地が再利用されるためで、native の配置ずれではない (§9.4 の shim で旧値が消えることと整合)。
+- 類型 (検証済み・§9): 「`4473f0` の配列 (`arg2+0x100..+0x170`) の 0 初期化 (`40d210` memset の 112 B) が lift で no-op になり、同番地に残っていた値 (前の unit の書込み) を旧値として読む」。DEFECTS への登録は PM 判断 (`WORKFLOW.md` §5)。
 
 ## 6. 未達・未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 1. `4473f0` の配列 `arg2+0x100..+0x170` を native がどこで 0 初期化するか (呼出し元 `446ad0`・`446400`・`ad5700` の逆アセンブル。native の配置は `arg2` = `0x10aa12f0` 相当の構造体の中身で確かめる) | 受入 2。修復の方針 | #2891 (残り。本 issue は open のまま) |
-| 2. CRITICAL_SECTION (`0x10aa1420`) と `4473f0` 配列 (`dest2` i=2 = `0x10aa1430`) の重なりが native の配置か、lift の配置ずれか | 受入 3 の根拠 | #2891 |
-| 3. 類型 (D17 / 別類型) の判定と DEFECTS 登録案 | DEFECTS の登録 (PM 判断) | #2891 |
+| 1. (解決: §9.2・§9.3) `4473f0` 配列の 0 初期化は `ad5700` → `415610` → `4159e0` → `40d210`。lift 版 `40d210` の n > 32 本体が欠落 | 受入 2 達成 | — |
+| 2. CRITICAL_SECTION (`0x10aa1420`) と `4473f0` 配列 (`dest2` i=2 = `0x10aa1430`) の重なり | wasm の shadow stack 上の unit 間の共有 (§5)。native の配置ずれではない | — (§9.4 で確認) |
+| 3. 類型判定 (D17 ではない・D13 系の新事例) と DEFECTS 登録案 | DEFECTS の登録 (PM 判断) | #2891 (PM 判断。未登録) |
+| 6. `40d210` の n > 32 本体の転記 (`m11_ov.c`) と全 survey の再測定 | unit 492 の残存値の除去 | #3921 (`[M11-N200]`) |
+| 7. unit 492 の次の trap (`412e40` ← `448490` ← `448350` ← `446400`。shim 試行後) | unit 492 が ok にならない | #3918 (`[M11-N199]`) |
 | 4. 基準の差 (`other 1` → `ok`) の unit 特定 | 基準 survey の鮮度 | 本 REPORT §2 (再測定の子は起票しない) |
 | 5. unit 304 の 2,546,099 hit (`0x10aa1430` の反復 hit) の内容。frame・値を記録していない (`WATCH_LOG_UNITS` の外) | 「値の遷移を作るのは記録した 4 unit の 7 hit」を全 unit に広げられない。本件の書込み主体の結論は記録した 4 unit の範囲に限る | 本 PR の未解決表 (再測定・計測の追跡の子は起票しない) |
 
@@ -119,3 +122,71 @@ python3 tools/m11/trap_triage/watch_summary_2891.py tools/m11/work/trap_2891/wat
 - 測定 commit: `ed70adf5a` (origin/main)。計測に使った build 入力 (IR・C・build スクリプト・`survey_units.mjs`・`probe_2780_units.mjs`) は、この commit と同一。
 - fix round 1 の再測定は `6d978d485` で行った。その後 (本 commit まで) の差分は、本 REPORT・`watch_summary_2891.py` (集計のみ、計測に使っていない) の追加。
 - 検証: `git diff ed70adf5a HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/trap_triage/survey_units.mjs tools/m11/trap_triage/probe2780_ir.py tools/m11/trap_triage/probe_2780_units.mjs` の出力は **0 bytes** (`| wc -c` = 0)。本 PR で新規追加した計測スクリプト (`watch_store_2891.mjs`・`store_sites_2891.py`・`watch_summary_2891.py`) は測定 commit に無いため、この一覧に入れない (`git diff ed70adf5a HEAD -- <3 本>` は新規ファイル分の 7,011 bytes)。計測に使った 2 本は `git diff 6d978d485 HEAD -- tools/m11/trap_triage/watch_store_2891.mjs tools/m11/trap_triage/store_sites_2891.py` の出力が **0 bytes** (測定後に変わっていない)。
+
+## 9. 受入 2・3: 0 初期化経路と lift の欠落 (本 run)
+
+測定 commit: `58ed035cf` (origin/main、本 run の開始時点)。`ed70adf5a` から `58ed035cf` の間に `m11_build.sh`・`m11_ov.c`・`m11_rt.c` が変わっている (`git diff --stat ed70adf5a 58ed035cf` = 3 files、+61/-3)。§2 の基準 survey は `58ed035cf` でも一致した (§9.4)。
+
+### 9.1 結論
+
+- 受入 2: native の 0 初期化は `ad5700` → `415610` (RTTI で managed field を初期化) → `4159e0` (C shim) → `40d210` (memset、112 B)。lift 版 `40d210` は n > 32 の本体を落としている (§9.3)。
+- 受入 3: D17 ではない (§9.5)。D13 (関数範囲の過小推定) の新事例。
+- 修復 (`40d210` の転記) は実装作業なので子 issue に分けた (§9.6)。shim は検証にだけ使い、commit していない。
+
+### 9.2 native の経路 (`tools/m11/trap_triage/native_zeroinit_2891.py`、読取りのみ)
+
+- `ad5700` (unit 492 の入口): `ad570b: lea rcx,[rbp+0x28]` (obj はスタック上の局所レコード)、`ad5716: call 0x415610` (RTTI 駆動の初期化)。
+- `415610`: RTTI の field 表を回る。string 系 (kind 10/11/15/17/18) は `mov qword ptr [rax], 0` (8 B)。static array (kind 13) は `4157d0` から `4159e0` を呼ぶ (IR の `call function_4159e0`)。
+- `4159e0` (`m11_ov.c` の C shim): string 型で count == 1 なら `Q(p) = 0`、それ以外は `function_40d210(p, count << 3, 0, 0)`。count = 14 なら 112 B。
+- `40d210` (memset、`rcx` = p、`rdx` = n、`r8b` = val): `cmp rdx,[rip+0xf97e2d]` (閾値は VA `0x13a5048` の qword = INT64_MAX。`jge 0x40d30b` は実行されない)。`test rdx,rdx; jle` で n <= 0 は何もしない。`cmp rdx,0x20; jg 0x40d2d1` (n > 32)。`40d2d1`: `movd xmm0,eax; pshufd; movups [rcx],xmm0; movups [rcx+rdx-0x10],xmm0; movaps` の 16 B ループ。
+- `446400` は obj+0x170 (`418190`) と obj+0x180 (`412d60`) だけを先に解放し、+0x100..+0x170 には触れない (`446400` の `0x4464e2`・`0x4464f9`)。
+
+### 9.3 lift 側の欠落
+
+- `.pdata`: `40d210..40d31b` が 1 つの RUNTIME_FUNCTION (`native_zeroinit_2891.py` の出力)。RetDec は `function_40d210` を `0x40d210..0x40d2ba` で切る (`boot0.drc.dsm`)。最初の `ret` (`0x40d2b9`) で閉じ、`40d2d1`・`40d30b` は `data inside code section` 扱い。
+- `boot_final.ll` の `function_40d210`: `%5 = icmp sgt i64 %arg2, 32` の分岐先は `dec_label_pc_40d2b9` (return)。`dec_label_pc_40d2d1` は IR 全体で 0 件。よって n > 32 の memset は no-op になり、`40d210` を経由する n > 32 の全呼出しで 0 初期化が起きない。
+
+### 9.4 検証 (shim 試行。commit していない)
+
+- 試行: `m11_ov.c` に `function_40d210` の転記を 1 関数足し、`m11_build.sh` のみ再実行 (IR は不変)。仕様は逆アセンブルどおり (n > 0 のとき n 個の byte を val で埋める)。
+
+```c
+unsigned long long function_40d210(void *p, unsigned long long n, unsigned long long val, unsigned long long x) {
+    (void)x;
+    if ((long long)n > 0) memset(p, (int)(val & 0xff), (size_t)n);
+    return 0;
+}
+```
+
+- 結果: survey `ok 873 / miss 47 / halt0 7 / oob 14 / noproc 1` (基準と同じ)。per-unit の kind 差は 0/942。unit 492 は `oob` のまま、trap の位置だけ移動した。基準 `function_4133f0 ← 4473f0 ← 446400 ← 446ad0 ← ad5700` → 試行 `function_412e40 ← 448490 ← 448350 ← 446400 ← 446ad0 ← ad5700`。`4473f0` の i=2 (`dest2` の旧値 `0x1_00000003`) による trap は消えた。
+- 解釈: 残存値 (`dest2` の旧値) が trap の入力だったことを支持する。次の trap (`412e40`) は本件の範囲外で未調査 (§9.6)。
+- 試行後は `m11_ov.c` を元に戻した (`git status` は空)。
+
+### 9.5 類型判定
+
+- D17 ではない理由: D17 は「8 B の 0 初期化が IR で 4 B に縮み、上位 4 B が残る」。本件では 8 B の 0 書込みが IR に残っている (`415610` の `store i64 0, ptr %78/%79/%81/%83`、shim は `Q(p) = 0`)。欠けているのは 112 B の memset 本体で、書込みが 1 つも出ない。残存の経路は縮みでなく no-op。
+- 近い類型: D13 (`DEFECTS.md`: 関数範囲の過小推定、終端ヒューリスティック)。本件は「最初の `ret` で関数を閉じ、その後ろに置かれた同一関数の分岐先 (`40d2d1`) を落とす」。層は fe。効果は silent (分岐先が無いため `jg` が return に畳まれる)。
+- 登録案 (PM 判断・未登録): D13 の事例追加、または新 ID (「関数本体の後ろに置かれた out-of-line 分岐先の脱落」)。
+
+### 9.6 未解決・起票先
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `40d210` の n > 32 本体の転記 (`m11_ov.c`) と全 survey の再測定 | unit 492 の残存値の除去 (修復) | #3921 (`[M11-N200]`) |
+| unit 492 の次の trap (`412e40` ← `448490` ← `448350` ← `446400`) | unit 492 が ok にならない | #3918 (`[M11-N199]`) |
+| RTTI の要素数 (14 は 0x100..0x170 からの推定。count 自体は未読) | 0x100..0x170 の範囲の厳密な確認 | 本 REPORT (子の修復の検証で確かめる) |
+
+### 9.7 再現
+
+```sh
+export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64          # fl-win64 を展開した先 (§1)
+python3 tools/m11/trap_triage/native_zeroinit_2891.py tools/m11/work/boot_final.ll   # §9.2・§9.3 (読取りのみ)
+bash tools/m11/m11_gen_ir2.sh && bash tools/m11/m11_build.sh                          # 本 run: 52.0 s / 24.6 s (n=1)
+node tools/m11/trap_triage/survey_units.mjs <out>.json                                 # 本 run: 12.3 s (n=1)
+```
+
+- 所要の環境: nproc 4、並列 1、開始時の 1 分 load average 0.15。終了時の load は未記録 (本 run の数値は n=1)。
+
+### 9.8 差分 0 の証跡
+
+- 測定 commit `58ed035cf` から本 commit までの build 入力の差分: `git diff 58ed035cf HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/trap_triage/survey_units.mjs` の出力は **0 bytes** (`| wc -c` = 0)。shim 試行 (§9.4) は commit していない。新規の `native_zeroinit_2891.py` は build 入力ではない。
