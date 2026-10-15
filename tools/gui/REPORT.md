@@ -243,3 +243,6 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - 所要・load の run ごとの値は未記録 (生ログ未保存)。min–max は未確定。
 - 残件 (n≥10 連続 rc 0・6h 原因・修正前 ASan ログ) は #1217 (GUI-20) へ移管。
 - 再現: `bash tools/gui/e2e.sh` (連続は for ループ)。
+
+## 21. WIN-23 (#3460): FL 非依存の W 版 Win32 テストゲストと headless surface 統計
+- 結論: headless surface 統計 (`gui_hl_stats`: w×h・非背景・厳密な色数・sha256 (RGB 3 バイト列)) と単体テスト 21/21 PASS を実測。W 版ゲスト `gui_app_w.c` は lift まで通るが、lift 後の関数 VA の 32 bit 切り詰めで native が SEGV し、オラクル比較・wasm 比較は未達 (子 issue)。全文は [REPORT_APPENDIX_W.md](REPORT_APPENDIX_W.md)。
