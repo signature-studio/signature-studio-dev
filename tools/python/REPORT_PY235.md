@@ -94,7 +94,7 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
 - **未確定**: `flags & 0x22 != 0` の右辺は engine 状態 (`obj+0x3b8`・`obj+0x3bc`・global) と定数 `0x104ccd8` (= 2^-30) に依存するため、静的な式は閉じられない。これらは code 2 (未実装) のまま。
 - 実装: `host/fl_mock.mjs` の `recPassFamily(e, f)`・`provider/fl_engine.c` の `rec_pass_family(e, f)` (3 番目の引数 flags を読む)。`tests/general_diff.mjs` に固定 4 族の境界を追加 (flags 0x1c・0x1 は `& 0x22 == 0` で成功、0x2・0x20 は code 2)。mock と C の一致を見る差分テストで、戻り値の値そのものは検査しない。
 - 測定 commit: `ce6b07dfb`。main 取り込みなし。load avg は測定中 `2.08`〜`2.31` (4 コア)。
-  - `bash provider/build.sh`: rc 0 (1.7 秒)。`fl_table.c: 435 関数, ハンドラ 208` (main の取り込み分を含む)。
+  - `bash provider/build.sh`: rc 0 (1.7 秒)。`fl_table.c: 435 関数, ハンドラ 208`。
   - `build_cpython_wasm.sh`: rc 0 (4 分 1 秒) → `FLPY_SKIP_TABLE=1 build_flpy.sh`: rc 0 (6.2 秒)。
   - `node tests/general_diff.mjs`: `{"calls":56,"diffs":0,"PASS":true}`。
   - `node tests/provider_check.mjs`: `{"functions":435,"implemented":208,"unimplemented":227,"mcp_static":60,"PASS":true}`。件数は 208 のまま (処理関数は既に implemented に数えられている)。
