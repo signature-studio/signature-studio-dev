@@ -304,6 +304,7 @@
 | `tools/m11/trap_triage/REPORT_2373.md` | ~90 | #2373: unit 895 の `60a270` (this=0) の caller は `e3ef60` (9 箇所)。`60a270` の caller 列挙・経路の静的確認・`e3ef60` の 9 箇所の this のフィールド。再現 `callers_of.py` |
 | `tools/m11/trap_triage/REPORT_2407.md` | ~82 | #2407: `e3ef60` 入口の arg1 (this = rcx) を観測する env-gated probe (`M11_INSTR_E3EF60`、既定 0)。unit 895 で arg1 は非 null (`0x12ba808`)・`[arg1]=0`。既定 build は変更前 main と wasm・post IR・per-unit kind が一致 |
 | `tools/m11/trap_triage/REPORT_2408.md` | ~115 | #2408 (親 #2369、REPORT_1676 §14): list B `+8/+16` の書込み主体。全 store 計装が unit 106 で止まる原因 (`m11_sw` の `-O0`)・IR 全関数の計装結果 (`+16` は `function_50a830` の 1 件、`+8` は IR の store 0 件)・欠落 IR (`50a830` の仮想 Grow/Notify、D15 同類型)・DEFECTS 行案。再現 `store_watch_2408.sh` / `reach_2408.py` |
+| `tools/m11/trap_triage/REPORT_3631.md` | ~67 | #3631 (親 #1965、REPORT_1676 §14 の続き): `410360` の間接 call `call qword ptr [rbx-0x50]` の実 target (VA `0x410070`、`ret` 1 命令で no-op)。list B `base=0` の候補から外れる。PE 静的値と実行時 n=2 の実測 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2521.md` | ~46 | #2521 (PR #3485): REPORT_2408 §8.1〜§8.4 の全文 (実測表・unit 144 の trap 経路・未解決・既定変更の到達先)。REPORT_2408 の 250 行上限のため分割移動 |
 | `tools/m11/REPORT_3520.md` | ~100 | #3520: e2e rc=1 の 3 不一致 (期待値 56・872・71001) の原因特定。`m11_build.sh` の ov.o キャッシュ取り違え (M11_FIX_50A830 の stamp 無し) の clean 測定表と stamp の分離テスト。修正は main の `68b9de191` (#3592)。期待値は変えていない |
 | `tools/m11/trap_triage/REPORT_1317_APPENDIX.md` | ~241 | #1317 の §10 (#1786 run: 計装の試行) と §12 (8 回目 run: `b36d3b5f..e7c5c062` の 6 ファイル diff 全文)。REPORT_1317.md の 250 行上限のため分割移動 |
