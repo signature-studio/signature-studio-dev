@@ -51,6 +51,25 @@
 - 未確定件数の種別別 (対照 Gain・all): 14 件 (call_ret 8・reg_copy 2・other_write:ror 2・label 1・other_write:mov 1)。残りは子 #3363 (KH-55)。他の ns・モードは §2 の列の値から同様に読める。
 - 閉包内の既存 vtable 呼び出しの slot 別件数に基づく説明は、再現可能な形でコミットしていない。本付録の判定の根拠には使わない。
 
+## 6. 未確定 14 件の追跡 (#3363 / KH-55・対照 Gain・all)
+
+測定 commit: `scripts/unresolved_cfg_sites.py` を追加した commit (本節を含む commit)。素材・閉包は §2 と同じ (`5e1162712` の規則、Gain・all で after_cfg 1,995 関数 / 731,396 B、未確定 14 件)。`scripts/` の差分は本 commit だけ。
+
+| 分類 | 件数 | 確定 | 理由 (呼び先が静的に決まらない根拠) |
+|---|--:|---|---|
+| `call_ret` | 8 | 不可 | 直前の call の戻り値が rax。内訳は helper `0x180fd7d94` 6 件 (`LoadLibraryExW`・`GetLastError` を使い、解決結果を `xchg` でキャッシュに格納して返す実行時解決)・復号 helper `0x180fd1b00` 1 件・IAT `GetProcAddress` 1 件。戻り値は実行時に決まる |
+| `reg_copy` | 2 | 不可 | `mov rax, r11`。`r11` は直前の `0x180fd7d94` 呼び出しの戻り値 (上と同じ) |
+| `other_write:ror` | 2 | 不可 | グローバル 2 個 (`0x184162118`・`0x184161fa8`) を xor/ror で復号した値が呼び先。両変数は `.text` 内で store される (`0x180fd0b38`・`0x180fd1abc`)。初期値 0 での計算は誤るため採らない |
+| `other_write:mov` | 1 | 不可 | `mov rax, [rdx+rax*8]` の表引き。添字 `r15` は関数の引数由来 (`movsxd r15, edx`) で、関数内で定まらない |
+| `label_barrier` | 1 | 不可 | 分岐 2 経路 (`0x180fb5ee2`・`0x180fb5f1f`) で rax の入りが違い、片方は実行時オブジェクトの `[obj+0x3b8]`。経路は一意でない |
+
+- 結論: 14 件はいずれも静的に確定できない。確定不能の理由は上表の 5 種類 (実行時解決・実行時書換・引数由来の添字・分岐の複数経路) に収まる。
+- 確定できなかったので、閉包 (`after_cfg`) は変えない。呼び先が未確定の site はそのまま `unresolved` として残る (§3 の判定は不変)。
+- 再現: `python3 scripts/unresolved_cfg_sites.py <core> <callgraph.pkl> <rtti_vtables.json> gain all <out.json>`。出力 14 件の `kind` 内訳は上表と一致。
+- 単体テスト: `python3 scripts/test_rax_source.py` → 12 件 OK (`call_ret` と `reg_copy` (`r11`) の 2 件を追加)。
+- 素材: `plugins-kilohearts` の `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (sha256 先頭 16 桁 `d55ce8b4c0ad7ebe`、付録 §0 と一致)。repo 外 (`$RUNNER_TEMP`) に展開。
+- 未確定 (残件): 上 14 件の呼び先の確定は、静的解析では不可能。実行時の trace (GetProcAddress 結果・復号値・オブジェクト状態) が要る。これは本 issue の範囲外 (静的 closure の手段を超える)。
+
 ## 4. 検証 (単体テスト・コード差分・鮮度)
 
 - 単体テスト (`scripts/test_rax_source.py`): `python3 test_rax_source.py` → 10 件 OK (capstone 5.0.7・`5e1162712`)。
