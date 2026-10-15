@@ -39,11 +39,14 @@ find "$W" -maxdepth 1 -type f -size -3M -exec cp {} "$OUT/gen/tools/m11/work/" \
 PRE="$OUT/gen/tools/m11/work/boot_final.ll"
 
 step "2/7 ldfix 旧版 ($PREV_REF) / 新版 (HEAD)"
-mkdir -p "$OUT/prev/ldfix"; cp "$HERE"/ldmach.py "$HERE"/ldmach_img.py "$HERE"/ldfix_img.py "$HERE"/ldframe.py "$OUT/prev/ldfix/"; cp "$REPO/tools/m11/lb_base.py" "$OUT/prev/"
-git -C "$REPO" show "$PREV_REF:tools/m11/ldfix/ldfix.py" > "$OUT/prev/ldfix/ldfix.py"
-"$PY" "$OUT/prev/ldfix/ldfix_img.py" "$PRE" "$OUT/prev.ll" "$IMG" "$CFG" --report "$OUT/prev_report.json" 2>&1 | tail -1 || { echo "[ldfix_509_e2e] 2/7 旧版 ldfix 失敗"; FAIL=1; }
-"$PY" "$HERE/ldfix_img.py" "$PRE" "$OUT/new.ll" "$IMG" "$CFG" --report "$OUT/new_report.json" 2>&1 | tail -1 || { echo "[ldfix_509_e2e] 2/7 新版 ldfix 失敗"; FAIL=1; }
-"$PY" - "$OUT/prev.ll" "$OUT/new.ll" "$OUT/prev_report.json" "$OUT/new_report.json" <<'PYEOF' || { echo "[ldfix_509_e2e] 2/7 旧版/新版の突合に失敗"; FAIL=1; }
+mkdir -p "$OUT/prev/ldfix" "$OUT/prevsrc"
+# 旧版は PREV_REF の ldfix 一式を取り出す (ldframe.py 等の helper を含む。56bfc979 の ldfix.py は ldframe を import する)
+git -C "$REPO" archive "$PREV_REF" tools/m11/ldfix | tar -x -C "$OUT/prevsrc" || { echo "[ldfix_509_e2e] PREV_REF=$PREV_REF の tools/m11/ldfix を取り出せない" >&2; exit 1; }
+cp "$OUT/prevsrc/tools/m11/ldfix/"*.py "$OUT/prev/ldfix/"
+cp "$HERE"/ldmach.py "$HERE"/ldmach_img.py "$HERE"/ldfix_img.py "$OUT/prev/ldfix/"; cp "$REPO/tools/m11/lb_base.py" "$OUT/prev/"
+"$PY" "$OUT/prev/ldfix/ldfix_img.py" "$PRE" "$OUT/prev.ll" "$IMG" "$CFG" --report "$OUT/prev_report.json" > "$OUT/ldfix_prev.log" 2>&1 || { echo "[ldfix_509_e2e] 旧版 ldfix 失敗: $OUT/ldfix_prev.log" >&2; exit 1; }
+"$PY" "$HERE/ldfix_img.py" "$PRE" "$OUT/new.ll" "$IMG" "$CFG" --report "$OUT/new_report.json" > "$OUT/ldfix_new_img.log" 2>&1 || { echo "[ldfix_509_e2e] 新版 ldfix 失敗: $OUT/ldfix_new_img.log" >&2; exit 1; }
+"$PY" - "$OUT/prev.ll" "$OUT/new.ll" "$OUT/prev_report.json" "$OUT/new_report.json" <<'PYEOF'
 import json, re, sys
 def fns(f):
     t = open(f, errors='replace').read()
@@ -80,14 +83,16 @@ print('[overlay] boot_final.ll から変わった関数 %d、うち 新版出力
 PYEOF
 
 step "5/7 ネガティブコントロール"
-"$PY" - "$OUT/new.ll" "$OUT" <<'PYEOF' || { echo "[ldfix_509_e2e] 5/7 ネガコン IR の作成に失敗 (assert)"; FAIL=1; }
+NCFAIL=0
+"$PY" - "$OUT/new.ll" "$OUT" <<'PYEOF' || { echo "[ldfix_509_e2e] NC の IR 生成 (assert) に失敗" >&2; NCFAIL=1; }
 import re, sys
 t = open(sys.argv[1], errors='replace').read()
-# NC-store: 806740 の修復 store (load 経由) を %arg3 に戻す
+# NC-store: 806740 の修復 store (load 経由) を %arg3 に戻す。新版では修復が F3c use 側 (ldfxu) で入るので、ldfxn と ldfxu の両方を受ける
 m = re.search(r'^define [^\n]*@function_806740\(.*?\n}\n', t, re.M | re.S)
 b = m.group(0)
-b2 = re.sub(r'(store i64 )%ldfxn\d+(, ptr %17, align 8)', r'\1%arg3\2', b)
-assert b2 != b
+b2 = re.sub(r'(store i64 )%ldfx[nu]\d+(, ptr %17, align 8)', r'\1%arg3\2', b)
+b2 = re.sub(r'^  %ldfx[nu]\d+_p = inttoptr i64 %arg3 to ptr\n\s*%ldfx[nu]\d+ = load i64, ptr %ldfx[nu]\d+_p, align 8\n', '', b2, flags=re.M)
+assert b2 != b and 'ldfxn' not in b2 and 'ldfxu' not in b2
 open(sys.argv[2] + '/nc_store.ll', 'w').write(t.replace(b, b2))
 # NC-use: 1063090 の消費者置換を戻す (挿入した load 2 行を消し、%ldfxu* を %arg1 に戻す)
 m = re.search(r'^define [^\n]*@function_1063090\(.*?\n}\n', t, re.M | re.S)
@@ -99,9 +104,12 @@ open(sys.argv[2] + '/nc_use.ll', 'w').write(t.replace(b, b2))
 PYEOF
 for k in prev nc_store nc_use; do
   F="$OUT/$k.ll"
-  "$PY" "$HERE/audit_lsf.py" "$F" "$IMG" "$CFG" > "$OUT/nc_$k.txt" || { echo "[ldfix_509_e2e] 5/7 audit_lsf ($k) 失敗"; FAIL=1; }
+  "$PY" "$HERE/audit_lsf.py" "$F" "$IMG" "$CFG" > "$OUT/nc_$k.txt" || { echo "[ldfix_509_e2e] NC:$k の audit 失敗: $OUT/nc_$k.txt" >&2; NCFAIL=1; }
   echo "[NC:$k] $(grep -o '"suspect_fns": [0-9]*, "suspect_sites": [0-9]*' "$OUT/nc_$k.txt" || echo 'store 形 SUSPECT 0') / $(grep '^SUSPECT_VAS' "$OUT/nc_$k.txt" | cut -c1-120) / use 形(pure): $(grep '^SUSPECT_USE_VAS' "$OUT/nc_$k.txt" | awk '{print NF-1}') 関数 (1063090 を含む: $(grep '^SUSPECT_USE_VAS' "$OUT/nc_$k.txt" | grep -c ' 1063090'))"
 done
+# 期待値: 旧版 (修復前相当) は store/use とも SUSPECT 0。戻した NC は各 1 件を検出する (検出できないなら NC として無効)
+grep -q '^SUSPECT_VAS 806740' "$OUT/nc_nc_store.txt" && grep -q '^SUSPECT_USE_VAS.* 1063090' "$OUT/nc_nc_use.txt" && ! grep -q '^SUSPECT_VAS [0-9]' "$OUT/nc_prev.txt" \
+  || { echo "[ldfix_509_e2e] NC の期待値 (store 806740 / use 1063090 を検出・旧版は store 0) を満たさない" >&2; NCFAIL=1; }
 
 step "6/7 survey 前後 (wasm 再ビルド) と動的到達"
 B="$OUT/build"; mkdir -p "$B/tools"; cp -a "$REPO/tools/shim" "$REPO/tools/shared" "$B/tools/"; cp -a "$REPO/tools/m11" "$B/tools/m11_src"; rm -rf "$B/tools/m11_src/work"; mv "$B/tools/m11_src" "$B/tools/m11"; cp -a "$W" "$B/tools/m11/work"
@@ -129,6 +137,7 @@ PYEOF
 M11_WORK="$B/tools/m11/work" bash "$HERE/reach_509.sh" "$FNS" "$OUT/reach.json" || FAIL=1
 
 step "7/7 動的確認 (修復前 wasm / 修復後 wasm を直接呼ぶ)"
+[ "$NCFAIL" = 0 ] || FAIL=1
 if [ "$FAIL" = 0 ]; then
   node "$HERE/dyn_509.mjs" "$OUT/basewasm/m11_boot.cjs" "$B/tools/m11/work/m11_boot.cjs" "$IMG" || FAIL=1
 else

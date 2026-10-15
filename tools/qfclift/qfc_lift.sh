@@ -16,7 +16,8 @@ lift_build() {
 }
 wasm_build() {
   local out="$1" cjs="$2"; shift 2
-  emcc -O0 -ffp-contract=off -fno-fast-math -I../flelift/rt "$out/fle_lifted.c" "$out/fle_data.c" "$@" \
+  emcc -O0 -ffp-contract=off -fno-fast-math -I../flelift/rt -I../shared/oss/freetype -I"$FT_SRC_INC" "$out/fle_lifted.c" "$out/fle_data.c" "$@" \
+    ../shared/oss/freetype/qfc_import.c "$FT_WASM32_LIB" \
     ../flelift/rt/fle_cpu.c ../flelift/rt/fle_glue.c \
     -w -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=createModule \
     -sEXIT_RUNTIME=1 -sEXPORTED_FUNCTIONS=_fle_run,_fle_xmm0,_fle_xmm1,_fle_rget,_fle_mget,_fle_set_stackarg,_fle_data_install,_fle_init,_fle_reset,_malloc \
