@@ -107,6 +107,7 @@
 | `tools/flelift/boot/REPORT.md` | ~350 | FLE-2〜FLE-5・FLE-10 (§10): x64c lift による FLEngine boot 連鎖・IPP 停止 mode・既定経路の no-op |
 | `tools/flelift/boot/REPORT_APPENDIX_2700.md` | ~40 | FLE-8 (#2698) の詳細 (REPORT §9 から移動: E-1 工程の実測・E-2 検証)。FLE-9 の shard 化の実測は REPORT §9 |
 | `tools/flelift/boot/REPORT_APPENDIX_970.md` | ~100 | PERF-P14 (#970) の付録: boot closure の -O0 / -O2 / -O2 -flto 変種の build (wasm bytes・所要時間・ピーク RSS)、node 実行時間 (n=10)・署名の実測。測定値の正本 |
+| `tools/flelift/boot/REPORT_APPENDIX_3868.md` | ~90 | FLE-17 (#3868) の付録: `0x6bbc20` の書込み経路の上流 (実行時の呼出し連鎖・既定 route の書込み・静的走査 (rip 相対 lea)・監視の範囲)。REPORT_APPENDIX_3771 §A の後続 |
 | `tools/flelift/boot/REPORT_APPENDIX_3771.md` | ~150 | FLE-16 (#3771) の付録: `0x6bbc20` を `[obj+0x118]` へ書く命令 `f_6bc010` @ `0x6bc1af` の動的特定 (監視版 lift の実測・呼出し連鎖・ネガコン・再現)。REPORT §0 から参照 |
 | `tools/flelift/boot/REPORT_APPENDIX_3330.md` | ~160 | PERF-P22 (#3330) の付録: boot 停止時点の線形メモリの sha256 (全体・C スタック除く・PE 書込み可能セクション) を 3 変種 × 2 run とネガコンで比較した実測値と差分の所在。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_3090.md` | ~80 | FLE-12 (#3090) の詳細: 0x6a7b70 への dispatch の呼出元 (0x6c7923 ← 0x815920)・幅 r8 の源 (即値 2^20 由来の推定)・未修復の理由・0x15F34A0 書込み元の未了。REPORT §0 から参照 |

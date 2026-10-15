@@ -24,14 +24,21 @@ HOOK = r'''
 #include <stdio.h>
 #define WV_VAL @VALUE@
 static int wv_n_ = 0;
+static int wv_n12_ = 0;
 static void wv_chk_(uint64_t va, uint64_t a, uint32_t n, const void* p) {
     uint64_t q[2] = { 0, 0 };
     int hit;
-    if (n < 4 || wv_n_ >= @CAP@) return;
+    int *cnt = n < 4 ? &wv_n12_ : &wv_n_;
+    if (*cnt >= @CAP@) return;
     memcpy(q, p, n < 16 ? n : 16);
-    hit = (n == 4) ? ((uint32_t)q[0] == (uint32_t)WV_VAL) : (q[0] == WV_VAL || (n == 16 && q[1] == WV_VAL));
+    if (n < 4) {
+        uint64_t m = (1ULL << (8 * n)) - 1;
+        hit = ((q[0] & m) == (WV_VAL & m));
+    } else {
+        hit = (n == 4) ? ((uint32_t)q[0] == (uint32_t)WV_VAL) : (q[0] == WV_VAL || (n == 16 && q[1] == WV_VAL));
+    }
     if (!hit) return;
-    wv_n_++;
+    (*cnt)++;
     fprintf(stderr, "[wval] va=%#llx a=%#llx n=%u v=%#llx R0=%#llx R1=%#llx R2=%#llx R3=%#llx R5=%#llx R6=%#llx R7=%#llx ret=%#llx\n",
             (unsigned long long)va, (unsigned long long)a, n, (unsigned long long)q[0],
             (unsigned long long)R[0], (unsigned long long)R[1], (unsigned long long)R[2], (unsigned long long)R[3],
@@ -43,8 +50,18 @@ static void wv_call_(uint64_t va, uint64_t t) {
     fprintf(stderr, "[wval-call] va=%#llx target=%#llx R1=%#llx R3=%#llx R5=%#llx\n", (unsigned long long)va,
             (unsigned long long)t, (unsigned long long)R[1], (unsigned long long)R[3], (unsigned long long)R[5]);
 }
-#define WV_ST8(va, a, v) ST8(a, v)
-#define WV_ST16(va, a, v) ST16(a, v)
+static int wv_e_n_ = 0;
+static void wv_enter_(uint64_t fn) {
+    if (wv_e_n_ >= 2000) return;
+    wv_e_n_++;
+    fprintf(stderr, "[wval-enter] fn=%#llx ret=%#llx R1=%#llx R2=%#llx R3=%#llx\n", (unsigned long long)fn,
+            (unsigned long long)LD64(R[RSP]), (unsigned long long)R[1], (unsigned long long)R[2], (unsigned long long)R[3]);
+    if (fn == 0x6bc010ULL)
+        fprintf(stderr, "[wval-mode] obj=%#llx dl=%#llx [obj+0x70]=%#x [obj+0xc4]=%#x\n", (unsigned long long)R[1],
+                (unsigned long long)(R[2] & 0xff), (unsigned)LD32(R[1] + 0x70ULL), (unsigned)LD8(R[1] + 0xc4ULL));
+}
+#define WV_ST8(va, a, v) ({ uint8_t wv_ = (uint8_t)(v); wv_chk_((va), (a), 1, &wv_); ST8(a, wv_); })
+#define WV_ST16(va, a, v) ({ uint16_t wv_ = (uint16_t)(v); wv_chk_((va), (a), 2, &wv_); ST16(a, wv_); })
 #define WV_ST32(va, a, v) ({ uint32_t wv_ = (uint32_t)(v); wv_chk_((va), (a), 4, &wv_); ST32(a, wv_); })
 #define WV_ST64(va, a, v) ({ uint64_t wv_ = (uint64_t)(v); wv_chk_((va), (a), 8, &wv_); ST64(a, wv_); })
 #define WV_STF32(va, a, v) ({ float wv_ = (float)(v); wv_chk_((va), (a), 4, &wv_); STF32(a, wv_); })
@@ -56,6 +73,8 @@ static void wv_call_(uint64_t va, uint64_t t) {
 COMMENT_VA = re.compile(r'^\s*/\* ([0-9a-f]+): ')
 STORE = re.compile(r'\b(ST(?:8|16|32|64|F32|F64|X|Y))\(')
 INCLUDE_RT = re.compile(r'^#include "fle_cpu\.h"\s*$')
+ENTER_FN = re.compile(r'^void f_(6ba1f0|6bc010|6cd520|6c9280)\(void\) \{$')
+LABEL = re.compile(r'^L_[0-9a-f]+:;$')
 
 
 def patch(lines, value, cap):
@@ -63,6 +82,7 @@ def patch(lines, value, cap):
     va = 0
     hooked = False
     sites = 0
+    entry_pending = None
     for line in lines:
         if not hooked and INCLUDE_RT.match(line):
             out.append(line)
@@ -72,6 +92,14 @@ def patch(lines, value, cap):
         m = COMMENT_VA.match(line)
         if m:
             va = int(m.group(1), 16)
+        fm = ENTER_FN.match(line)
+        if fm:
+            entry_pending = int(fm.group(1), 16)
+        elif entry_pending is not None and LABEL.match(line):
+            out.append(line)
+            out.append('  wv_enter_(%#xULL);' % entry_pending)
+            entry_pending = None
+            continue
         if STORE.search(line) and not line.lstrip().startswith('/*'):
             line, k = STORE.subn(lambda s: 'WV_%s(%#xULL, ' % (s.group(1), va), line)
             sites += k

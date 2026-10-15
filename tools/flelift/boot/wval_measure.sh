@@ -31,7 +31,7 @@ echo "[wval] build done in $(( $(date +%s) - T ))s load=$(cut -d' ' -f1-3 /proc/
 
 LOG="$W/run_wval.log"
 rc=0
-FLE_IPP=1 FLE_DIAG_NULLFILL=1 FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_wval.cjs" "$W/wval_boot.json" --boot-only > "$LOG" 2>&1 || rc=$?
+FLE_IPP="${WVAL_IPP-1}" FLE_DIAG_NULLFILL="${WVAL_NULLFILL-1}" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_wval.cjs" "$W/wval_boot.json" --boot-only > "$LOG" 2>&1 || rc=$?
 grep 'FLEBOOT_RESULT' "$LOG" || true
 echo "[wval] boot rc=$rc log=$LOG"
 echo "[wval] 一致 (store [wval] と間接呼出し [wval-call]): $(grep -c '^\[wval' "$LOG" || true) 件"
