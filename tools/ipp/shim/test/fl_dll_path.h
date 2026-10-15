@@ -1,6 +1,6 @@
-/* 実 IPP DLL (block24356_PE.bin) の既定パス解決。tools/shared/env.sh・paths.py と同じ優先順:
-   $FL_WIN64_DIR → $ANALYSIS_DIR/win64 → 従来の VM 既定値 (FL_DLL_DEFAULT_ANALYSIS_DIR)/win64。
-   env を source しなくても動く。既定値を変えるときは env.sh・paths.py・paths.mjs と揃えること。 */
+/* 実 IPP DLL (block24356_PE.bin) のパス解決。FL_WIN64_DIR (fl-win64 の展開先) を必須とし、
+   未設定なら exit 2。既定値は持たない (#3830)。直接実行するときは FL_WIN64_DIR=<展開先> を与えるか、
+   tools/shared/env.sh を source する。 */
 #ifndef FL_DLL_PATH_H
 #define FL_DLL_PATH_H
 #include <stdio.h>

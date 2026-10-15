@@ -151,6 +151,7 @@ FFT (`ipp_fft.c`, 倍精度基数2 の素朴実装): ippsFFTGetSize/Init/Fwd_RTo
 ## 12. 付録: VM 固定パス直書きの除去 (#3830)
 
 - 対象 21 件 (`tools/ipp`・`tools/startup`・`tools/m2`) を `tools/shared` の `REPO_ROOT`・`FL_WIN64_DIR`・`FL_MAC_DIR` 経由へ置換。固定パスの grep (`tools/ipp tools/startup tools/m2 --exclude-dir=work`) は 0 件。既定値は `env.sh`・`paths.py` が従来値を保つ (`tools/shared/test_paths.sh` 4/4 PASS)。
-- `shim/test/fl_dll_path.h` は既定値を持たず、`FL_WIN64_DIR` 未設定なら exit 2。呼び出し元 (`shim_e2e.sh` 系) は `env.sh` を source する。
-- win 側 before/after (`resize_oracle`, fl-win64 `block24356_PE.bin`, `FL_WIN64_DIR` は runner の展開先): before (origin/main `68d5cb3c4`) と after で `cases.hash` が一致 (`cmp` 同一)。SUM `cases 82056, case_diff 359, byte_diff 55588` は両者で同一 (既存の差分で本変更の影響なし)。
+- `shim/test/fl_dll_path.h` は既定値を持たず、`FL_WIN64_DIR` 未設定なら exit 2。env を読むのは `shim_e2e.sh`・`*_oracle_run.sh`・`vslope_mis_run.sh` (`env.sh` を source する)。直接実行する `sweep2`・`sp57`・`verify_cab262_quirks`・`verify_cab261_kernel.py`・`verify_cab274_kernel.py` は `FL_WIN64_DIR=<展開先>` を手で与える (usage 行に明記。未設定だと exit 2)。
+- win 側 before/after (`resize_oracle`, fl-win64 `block24356_PE.bin`, `FL_WIN64_DIR` は runner の展開先): before (origin/main `68d5cb3c4`) と after で `cases.hash` が一致 (`cmp` 同一)。SUM `cases 82056, case_diff 359, byte_diff 55588` は両者で同一 (既存の差分で本変更の影響なし。測定機種は本 PR では未記録)。
+- 測定環境の注記: 検収 runner (AMD EPYC 7763・**AVX-512 なし**) では before・after とも `resize_oracle` が `ippiResizeGetBufSize` の段で SIGILL (rc=132) し SUM 行は出ない。`cases.hash` の sha256 (`2fe7ee7e…`) は両者で一致を確認済み。SUM の再現には AVX-512 のある機種が要る。
 - 未検証: `ipp_e2e.sh`・`startup.sh`・`m2` の全体 run は mac 素材 (`[MAC]`・#293) と Ghidra/emsdk (`docs/REFERENCES.md` の該当 ID) が runner に無いため実行せず。構文 (`bash -n`) と `py_compile` のみ確認。
