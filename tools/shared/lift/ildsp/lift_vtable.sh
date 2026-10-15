@@ -2,6 +2,7 @@
 # ildsp GeneralPitchShifter vtable 転送先 (既定 0x161fc0) の closure を lift する前段 (T-SH-61 #3299)。
 #   ildsp_vtable.py -> ildsp_vtable_check.py (生バイト検算) -> closure_select.py (closure の絶対 VA 範囲) -> RetDec --select-ranges
 #   -> ir_normalize (libkio) -> gen_helpers (libreverb)。gen_helpers が未対応 op で止まるのは意図した未達 (wasm 化は子 issue)。
+#   gen_helpers は未対応 op を見つけると rc=1 で終了する (set -e のため、この script も非 0 で終わり "helpers ok" は出ない)。
 # usage: FL_WIN64_DIR=<fl-win64 展開先> RETDEC_BIN=<retdec-decompiler> bash tools/shared/lift/ildsp/lift_vtable.sh [target_rva]
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."

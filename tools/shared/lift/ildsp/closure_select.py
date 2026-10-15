@@ -5,8 +5,8 @@ usage: closure_select.py <ildsp_vtable.json> <pe> <target_rva_hex> <ranges_out>
   入力: tools/shared/scripts/ildsp_vtable.py の出力 (closure_with_slots の function_starts と
         direct_call_sites / direct_jmp_sites) と block24360_PE.bin (命令数の数え直し用)。
   出力: ranges_out に RetDec --select-ranges 用の絶対 VA (`0x180xxxxxx-0x180yyyyyy`, ',' 区切り) を書く。
-  標準出力: target の body (.pdata 範囲) の命令数、closure の関数数・命令数・直接 call / jmp 辺数、
-        閉包内の間接 call / 間接 jmp の箇所。
+  標準出力: target の body (.pdata 範囲) の命令数、closure の関数数・命令数 (関数範囲の和) と
+        一意数 (同じ命令アドレスを 1 回だけ数えた数)・直接 call / jmp 辺数、閉包内の間接 call / 間接 jmp の箇所。
 """
 import sys, json, bisect
 import pefile, capstone
@@ -58,14 +58,18 @@ def main():
     target = int(sys.argv[3], 16)
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 
+    def insn_addrs(s, e):
+        return [i.address for i in md.disasm(img[s:e], s)]
+
     def ninsn(s, e):
-        return sum(1 for _ in md.disasm(img[s:e], s))
+        return len(insn_addrs(s, e))
 
     fns, ends, cedges, jedges, unresolved, ind = closure(vt, target)
     body_end = ends[target]
     print("target=0x%x body=0x%x-0x%x body_insn=%d" % (target, target, body_end, ninsn(target, body_end)))
-    print("closure functions=%d insn=%d direct_call_edges=%d direct_jmp_edges=%d unresolved_edges=%d" % (
-        len(fns), sum(ninsn(f, ends[f]) for f in fns),
+    uniq = {a for f in fns for a in insn_addrs(f, ends[f])}
+    print("closure functions=%d insn=%d insn_unique=%d direct_call_edges=%d direct_jmp_edges=%d unresolved_edges=%d" % (
+        len(fns), sum(ninsn(f, ends[f]) for f in fns), len(uniq),
         sum(len(cedges.get(f, ())) for f in fns), sum(len(jedges.get(f, ())) for f in fns), unresolved))
     print("closure indirect_calls=%d indirect_jmps=%d" % (len(ind["calls"]), len(ind["jmps"])))
     for c in ind["calls"]:
