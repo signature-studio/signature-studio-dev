@@ -72,7 +72,7 @@ REPORT.md §19 の付録。PR #5109 (`Refs #4011`) の実測・検証記録の�
 
 - ON の数値は §20 (測定 commit `af6e700c4`・AddRef 無し) の値と一致した。AddRef 無しの ON を HEAD で再測定はしていない。OFF は基準値 (§3) と一致。
 - 受入 2 (IR 面): `function_41a800` の判定は `%vtret` (vtable[0] の戻り値) で行われ、`trunc` は `%vtret` に掛かる (`trunc(arg3)` の判定は消えている)。実行上の前進は無い。
-- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (fl-win64 展開)・`work-m11` を repo 直下へ展開・`/opt/emsdk` を source。`m11_gen_ir2.sh` → `m11_build.sh` → `tools/gui/flengine/build.sh` → `boot_halt_probe.mjs` (各 rc 0)。
+- 再現: `FL_WIN64_DIR` に fl-win64 を展開 (`[WIN64]`・`docs/REFERENCES.md` §4)・`work-m11` を repo 直下へ展開・`/opt/emsdk` を source。`m11_gen_ir2.sh` → `m11_build.sh` → `tools/gui/flengine/build.sh` → `boot_halt_probe.mjs` (各 rc 0)。
 - ビルド: `m11_build.sh` rc 0 (signature mismatch 0・undefined 0)。`tools/gui/flengine/build.sh` rc 0 (signature 0・undefined 0・duplicate 0)。
 - 所要 (実測・HEAD `a3ff91355` の ON 実行): `m11_gen_ir2.sh` 49.85 秒 / `m11_build.sh` 23.33 秒 / `flengine/build.sh` 21.85 秒 / probe 0.72 秒。load は run の runner 上で計測していない (未計測)。
 - 未解決: ON の OOB (unit 144) は残る。AddRef 復元では OOB は解消しなかった。受入 2 は IR 面のみ確認で、runtime の判定経路は未実測。未特定の OOB・miss 3 件の由来・`M11_M2S` 単独・ネガコンは #4011 (親) の残件。
