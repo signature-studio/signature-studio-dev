@@ -67,7 +67,7 @@
 
 ## 4. 測定
 
-- 素材: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 バイト)。`tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` (2.8 秒)。
+- 素材: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 バイト)。`tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` (2.8 秒)。
 - 測定 commit: `dc84c2ff` (`py86_slot52.py` の最後の変更。フレーム基準の除外を入れた後の版)。
 - 差分 0 の証跡 (測定 commit から本節を書いた HEAD まで):
 
