@@ -1,0 +1,15 @@
+{"mode":"init_limit_worklet","cfg":"ott_shared_instance_worklet","M":145,"runtime":"chrome Chrome/154.0.8037.97","cpus":4,"cpu":"AMD EPYC 7763 64-Core Processor","loadavg":[0.73,0.38,0.16],"blk":1000,"reps":7,"neg":-1,"run":0,"timeout_ms":30000,"runtime_ua":"AudioWorkletGlobalScope","m":145,"instances":1,"init_only":true,"setup_ms":827,"memory_mib":864,"renderer_rss_mib":1248.5,"renderer_rss_delta_mib":544.3}
+{"mode":"init_limit_worklet","cfg":"ott_shared_instance_worklet","M":145,"runtime":"chrome Chrome/154.0.8037.97","cpus":4,"cpu":"AMD EPYC 7763 64-Core Processor","loadavg":[0.73,0.38,0.16],"blk":1000,"reps":7,"neg":-1,"run":1,"timeout_ms":30000,"runtime_ua":"AudioWorkletGlobalScope","m":145,"instances":1,"init_only":true,"setup_ms":799,"memory_mib":864,"renderer_rss_mib":1247.1,"renderer_rss_delta_mib":635.5}
+{"mode":"init_limit_worklet","cfg":"ott_shared_instance_worklet","M":145,"runtime":"chrome Chrome/154.0.8037.97","cpus":4,"cpu":"AMD EPYC 7763 64-Core Processor","loadavg":[0.83,0.41,0.17],"blk":1000,"reps":7,"neg":-1,"run":2,"timeout_ms":30000,"runtime_ua":"AudioWorkletGlobalScope","m":145,"instances":1,"init_only":true,"setup_ms":828,"memory_mib":864,"renderer_rss_mib":1236,"renderer_rss_delta_mib":658.7}
+{"mode":"init_limit_worklet","M":152,"run":0,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":152,"run":1,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":152,"run":2,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":148,"run":0,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":148,"run":1,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":148,"run":2,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":146,"run":0,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":146,"run":1,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":146,"run":2,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":160,"run":0,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":160,"run":1,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":160,"run":2,"neg":-1,"timeout_ms":30000,"error":"Error: eval timeout"}

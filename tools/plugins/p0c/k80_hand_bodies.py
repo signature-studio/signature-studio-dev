@@ -6,7 +6,8 @@
 RetDec 由来の x87 鎖 (fld/fadd/fmul/fstp の stack 参照) が機械語とずれる kernel、または
 x87 の拡張精度 (80-bit 中間値) を f64 に落とすと丸めが変わる kernel は、関数単位で
 機械語どおりの本体を書く。関数のシグネチャ (引数順) は変えない。
-差し替え対象は BODIES の関数本体と GLOBAL_INITS の 1 行 (@global_var_6fffb0 の初期値) のみ。BODIES が呼ぶ declare の補完を除き、他の行は変えない。
+差し替え対象は BODIES の関数本体のみ。BODIES が呼ぶ declare の補完を除き、他の行は変えない。
+global の初期値 (@global_var_6fffb0 の PE 値など) は k80_pe_globals.py が PE の .data から入れる (#3281)。
 
 差し替えの根拠 (REPORT_APPENDIX_H §19):
   0x5dfff0  : 引数 a(xmm2)/b(xmm3) の参照が入れ替わる + (1±a)*b を 80-bit で丸める
@@ -605,12 +606,6 @@ dec_label_pc_5e0377:
 }
 
 
-GLOBAL_INITS = {
-    # 0x6FFFB0 の 16 B は PE の .data に (0.5, 0.5) (f64 x2)。RetDec 由来の IR は 0 初期化だった (#2182)
-    'global_var_6fffb0': ('global i128 0', 'global i128 84904438230761501386333354794579656704'),
-}
-
-
 def replace_bodies(text, bodies):
     done = []
     for name, new in bodies.items():
@@ -621,16 +616,6 @@ def replace_bodies(text, bodies):
         end = text.index('\n}\n', start) + 3
         text = text[:start] + new + text[end:]
         done.append(name)
-    for gname, (old, new) in GLOBAL_INITS.items():
-        lines = [x for x in text.split('\n') if x.startswith('@%s = ' % gname)]
-        if len(lines) != 1:
-            raise SystemExit('[hand_bodies] @%s の定義行が %d 本 (期待 1)' % (gname, len(lines)))
-        line = lines[0]
-        if line.endswith(old):
-            text = text.replace(line, line[:-len(old)] + new, 1)
-        elif not line.endswith(new):
-            raise SystemExit('[hand_bodies] @%s の初期値が想定外: %s' % (gname, line))
-        done.append('@' + gname)  # 適用済み (再実行) も数える: 件数検査を冪等に保つ
     decls = sorted(set(re.findall(r'@(llvm\.\w+\.f80)\(', ''.join(BODIES.values()))))
     for name in decls:
         line = 'declare x86_fp80 @%s(x86_fp80)' % name

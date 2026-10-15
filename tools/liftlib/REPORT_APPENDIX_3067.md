@@ -72,7 +72,7 @@ T1 ok / T2 ok (修正前参照との差は repmap 18 行のみ・inserts=18 shif
 - **修正対象外の残留: 未判定** (`c8316dc7`・`stats.hits`):
   - `br_other` **17 件**: comis 直後の窓 (13 行) 内の最初の `br i1 %N` が cf/zf/pf の名前参照でない (条件値は `%28` 等の番号 SSA 値)。
   - `no_branch` **66 件**: 窓内で書換え対象が 0 件。うち 17 件は `br_other` と重なる (`br_other` で break して repl が空になるため両方に計上される)。残り **49 件**は窓 13 行内に br/or が無い (`__asm_comisd` 25・`__asm_comiss` 11 ほか)。
-  - D1a 同型かどうかは本 PR では判定していない。起票先: **#3137** (`[LIFTLIB-22]`・親 #3067)。
+  - D1a 同型かどうかは本 PR では判定していない。判定は `REPORT_APPENDIX_3137.md` (#3137・`[LIFTLIB-22]`): 残留 66 件 (`br_other` 17 + `no_branch` 49) のうち **D1a 同型 13 件** (折畳み形・うち 1 件は判定保留)、非同型 53 件。13 件の書換えは子 #3899 (LIFTLIB-24)。
 
 ## 5. 再現
 
