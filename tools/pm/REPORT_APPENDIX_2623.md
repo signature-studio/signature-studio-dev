@@ -11,10 +11,10 @@ REPORT.md の §16 (refs_orphan 検出 #2337) の未解決を解消した記録�
 
 ## 2. 実測 (指標の変更点・再現スクリプト)
 
-- 測定 commit: `889ec098` (コードを変えた最後の commit)。窓の終端 `2026-10-15T00:00:48Z` (固定。スクリプトの `--end` の既定値)。
-- 再現スクリプト: [`refs_only_remeasure.ts`](refs_only_remeasure.ts)。1 コマンド: `cd <repo> && node --experimental-strip-types --no-warnings tools/pm/refs_only_remeasure.ts` (読み取りだけ。コミット済み HEAD `97341832` で再実行し、同じ数値を得た。実測 20.7 秒)。
-- 旧判定: `origin/main` の `infra/pm-worker/src/webhook.ts` から `REFS_RE`・`CLOSE_RE` の正規表現リテラルを読み出して評価した (手写しをしない)。新判定: HEAD の `refsOnlyBody` (`src/webhook.ts`)。`refsOnlyNumbers` (`src/refs.ts`) との不一致も数えた。
-- 母集団: REST の `repos/<repo>/pulls` を updated 降順に、窓の始点まで読み切って取り、merged_at が窓内の PR を数えた。
+- 測定 commit: `d61f2a8c` (コードを変えた最後の commit。再測定スクリプトの重複除去)。窓の終端 `2026-10-15T00:00:48Z` (固定。スクリプトの `--end` の既定値)。
+- 再現スクリプト: [`refs_only_remeasure.ts`](refs_only_remeasure.ts)。1 コマンド: `cd <repo> && node --experimental-strip-types --no-warnings tools/pm/refs_only_remeasure.ts` (既定のまま。読み取りだけ)。測定 commit `d61f2a8c` で既定のまま実行: 10.9 秒。
+- 旧判定: 固定 commit `7c85004e` (統一前の `webhook.ts`。`889ec098` の親) の `infra/pm-worker/src/webhook.ts` から `REFS_RE`・`CLOSE_RE` の正規表現リテラルを読み出して評価した (手写しをしない)。既定を `origin/main` にしない: 統一後の main には `REFS_RE` が無く、merge 後にスクリプトが止まるため。新判定: HEAD の `refsOnlyBody` (`src/webhook.ts`)。`refsOnlyNumbers` (`src/refs.ts`) との不一致も数えた。
+- 母集団: REST の `repos/<repo>/pulls` を updated 降順に、窓の始点まで読み切って取り、merged_at が窓内の PR を数えた。読んでいる途中に更新された PR は二度読まれることがあるため、番号で重複を除く。初版 (`234d6599`) は 7 日の窓で 1 件を二度数えて 1599 件になった。重複を除いた後は、`d61f2a8c` を含む 4 回の実行すべてで 1598 件。
 
 | 窓 (終端 2026-10-15T00:00:48Z) | merged | 旧 refs_only (率) | 新 refs_only (率) | 統一前後で値が変わった PR | `refsOnlyNumbers` と `refsOnlyBody` の不一致 |
 |---|---|---|---|---|---|
@@ -22,8 +22,8 @@ REPORT.md の §16 (refs_orphan 検出 #2337) の未解決を解消した記録�
 | 直近 7 日 (2026-10-08T00:00:48Z 〜) | 1598 | 901 (0.5638) | 901 (0.5638) | 0 | 0 |
 
 - 形式の出現数 (判定が変わり得る形): 両窓とも 0 件。`Closes:#N`・`Closes#N` (空白なし)・`Closes owner/repo#N`・`Refs:#N`・`Refs#N` (空白なし)・`Refs owner/repo#N`・`Refs` の後の 8 桁の番号・`Refs` と `#N` の間の改行 (統一後は `\s*` で数える形)。
-- 母集団の検算: 初版は `gh pr list --search "merged:<窓>"` で取った (1 回 1000 件まで)。24 時間の窓で search は 859 件、REST は 860 件。REST のみの 1 件は #2073 (merged 2026-10-14T11:49:08Z・本文 `Closes #1998`)。判定は旧も新も false で、件数には影響しない。search が取りこぼしたため、母集団は REST に切り替えた。7 日の窓は search の上限 (1000 件) では取れなかったため、REST で窓を取り直した。
-- レビューの再現値との差: レビュー (2026-10-15T00:08Z) の 362 件 (0.4214・母数 859) は再現しなかった。本測定では、search の 859 件でも REST の 860 件でも旧判定は 363 件だった。差 1 件の原因は特定できていない (測定時点の本文の差の可能性がある)。数値は本スクリプトの出力に合わせた。
+- 母集団の検算: `gh pr list --search` (GraphQL) による検算は、測定時に installation の GraphQL 制限に掛かって取得できなかった (スクリプトは検算を省き、REST の件数だけで判定する)。初版の検算 (`889ec098` の時点) では、24 時間の窓で search は 859 件、REST は 860 件だった。REST のみの 1 件は #2073 (merged 2026-10-14T11:49:08Z・本文 `Closes #1998`)。判定は旧も新も false で件数には影響しない。search が取りこぼしたため、母集団は REST に切り替えた。7 日の窓は search の上限 (1000 件) では取れなかったため、REST で窓を取り直した。
+- レビューの再現値との差: レビュー (round 1・round 2) の 362 件 (0.4214・母数 859) は再現しなかった。本測定 (REST の 860 件) でも、レビュー側の独立検算 (Python・REST 母集団) でも、旧判定は 363 件だった (round 2 の報告)。差 1 件の原因は特定できていない (§6)。
 
 ## 3. 表の 4 入力 (HEAD `889ec098`)
 
@@ -40,10 +40,10 @@ refs_orphan の判定 (`refsOnlyNumbers`) の中身は変えていない。`src/
 
 ## 4. 検証 (コミット済み HEAD)
 
-- `cd infra/pm-worker && npm test` (HEAD `1bdc5948`): 396 件 PASS / 0 FAIL。実行時間 22238 ms。(うち 1 件は本 PR で追加した『Refs のみの判定の統一』)
+- `cd infra/pm-worker && npm test` (HEAD `d61f2a8c`): 396 件 PASS / 0 FAIL。実行時間 22335.6 ms。(うち 1 件は本 PR で追加した『Refs のみの判定の統一』)
 - `npm run test:workers` (vitest): 2 ファイル・7 件 PASS (測定 commit `889ec098` で実行)。HEAD の `infra/pm-worker` は `889ec098` から変わっていない (下記の差分 0 行) ので、同じ結果とみなす。HEAD では再実行していない (vitest の依存が worktree に無い)。
 - ネガコン: 指標の `refsOnlyBody` を旧判定 (REFS_RE・CLOSE_RE) に作業ツリーで一時的に戻すと、統一テストが FAIL (`pass 14 / fail 1`)。戻した後は HEAD と一致 (`git status` 0 行)。
-- 差分の証跡: `git diff 889ec098 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行。
+- 差分の証跡: `git diff 889ec098 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行。再測定スクリプトの差分 `git diff d61f2a8c HEAD -- tools/pm/refs_only_remeasure.ts` も 0 行 (本付録を commit した後の HEAD で確認)。
 
 ## 5. 本番への影響 (launch 経路)
 
@@ -52,6 +52,6 @@ refs_orphan の判定 (`refsOnlyNumbers`) の中身は変えていない。`src/
 
 ## 6. 未解決
 
-- 無し。受入 1〜3 を満たし、Issue #2623 は `Closes #2623` で閉じる。
+- レビューの 362 件 (§2) との差 1 件。原因は未特定。本測定 (REST の 860 件・1598 件) と独立検算では再現しなかった。判定の変更は 0 件。起票なし (PR 本文の未解決表に記載)。
 - 判定の形式 (`Closes:#N` 等) が将来の PR に現れれば、指標の値はその時点で変わる (仕様どおり。実測の時点では現れていない)。
-- レビューの 362 件 (§2) の差 1 件は、本測定では再現しなかった。再現はスクリプトの 1 コマンドで行える。
+- 受入 1〜3 は満たした (§1)。Issue #2623 は `Closes #2623` で閉じる。
