@@ -37,3 +37,27 @@
 | rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る。FLEngine の既存結果への影響は未確認 | #4375 (T-SH-122) |
 | `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | #4280 (T-SH-108) |
 | `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #4296 (T-SH-113) |
+
+### 10.4 TLS 変更の前後の計数 (#4307 / T-SH-116)
+
+受入: `973b85aca` (rt の Win32 TLS 仕様化 #4234 / PR 4285) の前後で、同じ `qfc_count.sh` の計数が一致すること。
+
+- 測定 commit = `1110965b3` (`qfc_count.sh` に soft 呼出し件数と件数集計を足した commit。計数版の本体)。
+- 前 = `1110965b3` の worktree で `tools/flelift/rt/fle_cpu.c` だけ `973b85aca` を逆適用したもの (TLS の 3 関数だけが `973b85aca^` に戻る)。`9c0dfadc9` とは厳密には一致しない: 残る差は #3434 の `imp_GetProcAddress` → `fle_gpa_hook` 結線 (`git diff 9c0dfadc9 -- tools/flelift/rt/fle_cpu.c` の 2 行) のみで、TLS の差ではない。`9c0dfadc9` には `qfc_count.sh` が無いため、その commit では計数を実行できない。
+- 後 = `1110965b3` そのまま (HEAD の TLS 仕様版)。
+- 両方で同じ `lift_meta.json` / `soft_imp.c` (`qfc_boot.sh` の出力) を使い、`qfc_count.sh` を foreground で 1 回ずつ実行 (wall 20.9 s / 20.9 s、load 0.10 → 0.10)。
+- 素材: `fl-win64` (`extracted/block24350_PE.bin`)、`toolchain-emsdk` (emcc 6.0.12)、FreeType 2.7 wasm32 を `tools/shared/oss/freetype/build.sh` の手順で作成。
+
+| 項目 | 前 (973b85aca の逆) | 後 (HEAD) |
+|---|---|---|
+| 直接 import 呼出し件数 | 6 | 6 |
+| 内訳 | GetCurrentThreadId 1・TlsAlloc 1・LocalAlloc 1・TlsSetValue 1・TlsGetValue 1・ExitProcess 1 | 同左 |
+| soft 呼出し件数 | 0 | 0 |
+| 停止点 | `ExitProcess(0)` (`[trap] DllMain`) | 同左 |
+| `call.log` | 前後で全行一致 (`diff` 0) | |
+
+判定: 受入を満たす。TLS 変更で DllMain 経路の直接呼出し・停止点は変わらない。
+
+計数の限界 (変わらず): 計数は直接呼出しだけ。間接経由は #4374 で未計数。TLS の戻り値の差 (`TlsGetValue` の未設定 slot 0 など) は計数に現れないため、#4375 の範囲。
+
+boot (`qfc_boot.sh`、HEAD・`QFC_BOOT_REBUILD=1`、実測 51.6 s、load 0.21 → 0.71): strict は `MISSING IMPORT LocalAlloc`、soft は `ExitProcess(0)` で DllMain が止まった (前回 REPORT と同じ停止点)。
