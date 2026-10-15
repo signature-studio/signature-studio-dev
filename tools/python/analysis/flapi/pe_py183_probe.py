@@ -272,6 +272,14 @@ def spec_checks():
           rip_target(0x43DD6B) == 0x15EC3B0 and rip_target(0x43DDC4) == 0x15EC3B0)
     check("slot 0x15ec3b0 は .bss (SizeOfRawData 0)・PE 上に初期値の実体無し",
           section_of(0x15EC3B0).Name.rstrip(b"\0") == b".bss" and section_of(0x15EC3B0).SizeOfRawData == 0)
+    check("0x43dfd0 は r9d == -1 のとき 0x413680 で NUL 終端長を求める (0x43dffb・0x43e000)",
+          ins_at(0x43DFF7).op_str == "r9d, -1" and ins_at(0x43E000).op_str == "0x413680")
+    check("0x43eb71 は 'S' 文字列を r9d = -1 (NUL 終端まで) で 0x43dfd0 へ渡す (0x43eb6d)",
+          ins_at(0x43EB6D).op_str == "r9d, 0xffffffff")
+    check("0x414850 は rcx 非 0 ならそれを返し、0 なら [0x13a8040]+0x10 (0x414858・0x41485f)",
+          ins_at(0x414858).op_str.startswith("rax, qword ptr [rip") and ins_at(0x41485F).op_str == "rax, [rax + 0x10]")
+    check("0x13a8040 の静的内容は .text (0x413fec) を指し、文字列ではない (fallback の先は PE 上で確定できない)",
+          rip_target(0x414858) == 0x13A8040 and section_of(0x13A8040).Name.rstrip(b"\0") == b".data")
     reads = []
     va = 0x43E240
     while va < 0x43F1D0:
