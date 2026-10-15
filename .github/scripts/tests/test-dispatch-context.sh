@@ -230,7 +230,7 @@ for old in '迷ったら U として扱い' 'どちらでもなければ U' '判
   ! pm_has "$old"
   expect "pm.md: the old fallback '$old' is removed" $?
 done
-! grep -qF '迷ったら U として' "$HERE/../../assemble-prompt.sh"
+! grep -qF '迷ったら U として' "$HERE/../assemble-prompt.sh"
 expect "assemble-prompt.sh (oc-pm instruction): the old 'U として' fallback is removed" $?
 # 10d. needs-user-input の判定 fixture (#3705): 全件が pm.md の表に同じ判定で載る。escalate は 4 種の区分を持ち、decide は区分が none。
 FX="$HERE/../../../infra/pm-worker/test/fixtures/needs_user_input.input.json"
