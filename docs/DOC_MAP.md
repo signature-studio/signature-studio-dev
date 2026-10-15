@@ -186,6 +186,7 @@
 | `tools/liftdiff/tests/ld39_abi_dump.py` | ~80 | LD-39 (#1194) の ABI 入口ダンプ: 11 関数の PE 先頭命令列を capstone で並べ、jmp thunk の IAT 先を解決する。ABI は断定せず、判定は REPORT_LD39.md で人が行う |
 | `tools/liftdiff/REPORT_LD158.md` | ~190 | liftdiff LD-158 (#3470) 節: ret=i128 39 関数の実戻りレジスタの動的実測 (rax / rdx / xmm0 の書換え) と、xmm0 戻り 8 関数の署名 double 化 (`ret_override`・m11_tr_ 経由)。判定不能 11 と併存 20 は LD-162 (#3572) へ |
 | `tools/liftdiff/REPORT_LD212.md` | ~90 | liftdiff LD-212 (#4379) 節: 併存 20 関数の呼出し元 581 件を窓 24 命令で読んだ rax / rdx / xmm0 の read/dead/unknown 件数。戻りは確定せず `ret_override` 未変更。確定作業は子 issue |
+| `tools/liftdiff/REPORT_LD215.md` | ~90 | liftdiff LD-215 (#4429) 節: 分岐を越えた呼出し元・呼出し先の経路判定 (`tests/ld215_retprop.py`)。確定は 20 関数中 1 件 (型未確定)。`ret_override` 未変更。残件は子 issue |
 | `tools/liftdiff/tests/ld158_ret_probe.py` | ~110 | LD-158 (#3470) の動的プローブ: i128 戻り関数を 11 pattern × xfill {1,0} で native 実行し、戻り後 rax / rdx / xmm0 の書換えを記録 (`work/ld158_probe.json`)。`--names` で陰性対照の関数を指定できる |
 | `tools/liftdiff/tests/ld158_summarize.py` | ~70 | LD-158 (#3470) の集計: 動的分類・静的 dsm 判定 (窓 3 / 8) の件数と、`ret_override` と動的 xmm0 のみ集合の一致を出す (`work/ld158_table.tsv`) |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
@@ -953,6 +954,7 @@
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_4231.md` | ~60 | SR-61 (#4231): canvas の円弧・点・path 描画 (drawArc/drawPoint/drawGraphicsPath)。判定 harness `check_draw_ops.sh`。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_4233.md` | ~60 | SR-62 (#4233): canvas の gradient (線形・放射)・9 分割・fillRectWithBitmap の bitmap 描画。判定 harness `check_draw_ops.sh` (9 op + gradient の色数)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_4428.md` | ~43 | SR-69 (#4428): canvas の setTransformMatrix (点・線・多角形・矩形・文字の基準点への適用)・原点以外の view の実測 (判定 harness `check_transform.sh`)。測定値の正本 |
+| `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_4551.md` | ~50 | SR-78 (#4551): canvas の fillRectWithBitmap の拡大縮小と bilinear・drawBitmapNinePartTiled の 9 部分拡大縮小の実測 (判定 harness `check_draw_ops.sh`)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_3261.md` | ~100 | SR-51 (#3261): wasm の初期化経路。`platformfactory.cpp` の WASM 分岐 (patch) と upstream `init()` 経路化、harness の代替 2 点の除去。構文・compile/link/run の実測と負の対照 3 件。測定値の正本 |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
 | `tools/targets/massivex/REPORT_APPENDIX.md` | ~244 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017・§12.9 の対照と一貫性 #3154) |
@@ -982,6 +984,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_3075.md` | ~34 | #1216 差し戻し round 4: merge 後 head (`2a17665f`) での Stereo / Delay 再測定 (emcc 12・577 件)・merge 前後の C の cmp・census。§10-7p-3 の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3095.md` | ~158 | KH-43 (#3095): Delay の SIMD 疑似関数 13 種 (25 件) を shim に実装・swi 21 件を fail-fast (abort)・emcc 残件 441 (測定 `ab01412df`・SIMD・swi 0。main 取り込み後の `abee0a1ff` は 463・統合前 `12647936d` は 506)・ホスト x86 intrinsics 突合 (200,000 試行 × 13 種、ネガコン FAIL)・Gain/Haas/Gate 1000/1000・issue 本文の件数訂正 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3802.md` | ~126 | #3802 (KH-66): Delay の DAT_/uRam の型規則・未関数化 callee の fail-fast stub・スタブと本体の衝突の解消。結果と測定は付録 §10-7u が正本。§⑧ は main 取り込み後の状態 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_3835.md` | ~70 | #3835 (KH-70): Delay の残件 `LAB_180fd2aab` (戻り番地の書込み)・`PTR__guard_dispatch_icall_1813a1d38` (CFG 間接呼出し) を機械語で確定し `DELAY_RULES` で書換える。census 341 → 339・Gain/Haas/Gate の cmp・1000/1000 が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3836.md` | ~70 | #3836 (KH-71): Ghidra の double ビット再解釈 `(ulonglong)dVarN` を `dbitcast` (d2u/u2d) で書換える fix の測定と未解決。Delay の 98 行の所在・emcc 件数・Gain/Haas/Gate の同一性が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3802_DIFF.md` | ~165 | #3802 付録 §⑧ の差分の全文: 測定 commit `6323671e7` → HEAD の `ghidra_route` の `git diff` 出力 (main 取り込み分を含む)。差分の記録であり測定値の正本ではない |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3800.md` | ~66 | KH-64 (#3800): Delay の引数過不足のうち呼出先 FUN_180fd4f30 分の ABI 規則 (部分)。根拠・census・未解決は §10-7u が正本 (残りは子 #3844・#3847) |

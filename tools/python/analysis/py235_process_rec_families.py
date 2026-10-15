@@ -117,6 +117,9 @@ fixed = {"0x40000001": (0x104C4AF, [0x104C51A, 0x104C56D]), "0x40000000": (0x104
 for name, (entry, want) in fixed.items():
     got = sorted(a for a in stores if a in reach(entry))
     check(f"eventId {name} (entry {entry:#x}) の 5b8 store = {[hex(a) for a in want]}", got == want)
+# PY-252 (#3778): 固定 4 族の store は flags ([rbp+0x5c0]) の 0x20/0x2 ガードの内側。アドレス渡しに届かない
+fixed_all = set().union(*(reach(e) for e, _ in fixed.values()))
+check("固定 4 族から lea 0x104a924 (アドレス渡し) に到達しない (flags & 0x22 == 0 で戻り値 = value)", 0x104A924 not in fixed_all)
 
 # 6. 未確定の族: 0x104aa87 (0x70000000 族) と index 族 (0x1047497) は lea 0x104a924 (アドレス渡し) に到達する
 check("0x70000000 族 (0x104aa87) は lea 0x104a924 に到達する (未確定の理由)", 0x104A924 in reach(0x104AA87))
