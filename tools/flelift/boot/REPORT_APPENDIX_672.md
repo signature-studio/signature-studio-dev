@@ -190,7 +190,7 @@ REPORT §7 (旧 165〜167 行):
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 既定経路で units_run > 209 (受入 2) | 製品 KPI の既定経路は 209 のまま | 本 issue #4032 (Refs・未達) |
+| 既定経路で units_run > 209 (受入 2) | 製品 KPI の既定経路は 209 のまま | 子 #4286 (FLE-22) |
 | 0x976da0 の root 化を既定 root に入れるか | 既定経路の units を 895 に上げられるが、既定 lift の範囲変更 | PM 判断 |
 | 次の停止 `oob memory access out of bounds` (unit 895・発生箇所未特定) | 最初のウィンドウ未達 | 本 issue の次段 (子 issue は PM 判断) |
 | 0x976c80 の vtable 格納を lift の間接 callee 解析で拾う方式 | 同種の thunk が他にもある可能性 | 未起票 (PM 判断) |
