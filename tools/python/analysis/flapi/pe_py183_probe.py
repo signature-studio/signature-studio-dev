@@ -199,6 +199,7 @@ def main():
     check("0x1050546 の判定が 0x1050540 の store と同番地 (0x16bb13c)",
           rip_target(0x1050540) == 0x16BB13C and rip_target(0x1050546) == 0x16BB13C)
     format_checks()
+    desc_checks()
     typecheck_checks()
     print(f"summary: {'OK' if not FAILS else str(len(FAILS)) + ' FAIL'}")
     return 1 if FAILS else 0
@@ -233,9 +234,42 @@ def format_checks():
           u16z(rip_target(0x43A900) + 4 * 0x0A, 2) == "0A" and u16z(rip_target(0x43A900) + 4 * 0xFF, 2) == "FF")
 
 
+def qword_at(va):
+    o = v2o(va)
+    return int.from_bytes(RAW[o:o + 8], "little")
+
+
 def qword(va):
     o = v2o(va)
     return int.from_bytes(RAW[o:o + 8], "little")
+
+
+def section_of(va):
+    rva = va - BASE
+    for s in PEF.sections:
+        if s.VirtualAddress <= rva < s.VirtualAddress + s.Misc_VirtualSize:
+            return s
+    return None
+
+
+def desc_checks():
+    # PY-323 (#4399): desc = [[0x15e2200]+0x940]。0x15e2200 は .data のポインタ slot (初期値 0x16bcaf0)、
+    # 0x16bcaf0 は .bss のオブジェクト、desc の格納先は 0x16bd430 (.bss・PE 上に実体無し = 初期値 0)
+    def sec(va):
+        s = section_of(va)
+        return s.Name.rstrip(b"\0") if s else None
+    check("0x15e2200 は .data の slot で初期値 0x16bcaf0 (PY-323)",
+          sec(0x15E2200) == b".data" and qword_at(0x15E2200) == 0x16BCAF0)
+    check("0x16bcaf0 は .bss 内 (オブジェクト)", sec(0x16BCAF0) == b".bss")
+    check("desc の格納先 0x16bd430 は .bss 内で、ファイル上の実体無し (PE 初期値 0)",
+          sec(0x16BD430) == b".bss" and section_of(0x16BD430).SizeOfRawData == 0)
+    check("0x1196017 が 0x16bcaf0 を書く (mov [rip],rax)",
+          ins_at(0x1196017).op_str == "qword ptr [rip + 0x526ad2], rax" and rip_target(0x1196017) == 0x16BCAF0)
+    check("0xb6fe51 が [rcx+0x940] へ rax を書く (候補 1 件・rcx は引数由来)",
+          ins_at(0xB6FE51).op_str == "qword ptr [rcx + 0x940], rax")
+    check("0xb6fe4d の rcx は [rbp+0x20] (引数の保存元 0xb6fb8c)",
+          ins_at(0xB6FE4D).op_str == "rcx, qword ptr [rbp + 0x20]"
+          and ins_at(0xB6FB8C).op_str == "qword ptr [rbp + 0x20], rcx")
 
 
 def typecheck_checks():
