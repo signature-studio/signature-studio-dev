@@ -39,11 +39,7 @@
 - `"CreatePlugInstance"` の文字列の UTF-16 版は PE に無い (ASCII のみ)。
 - 入場は現状 harness が `_ott_run` で VA を直接呼ぶ方式のまま。Wrapper の LoadLibrary → GetProcAddress 経路での入場は未実施。
 
-## 4. 所見の訂正 (前 run の記述)
-
-#3597 付録 §3.2 と REPORT §14 は、`CreatePlugInstance` の文字列を見ずに経路を推定していた。本付録で名前文字列の VA を PE から直接求めた。前段の記述は訂正不要 (停止点は一致)。
-
-## 5. 未解決 (起票先)
+## 4. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
