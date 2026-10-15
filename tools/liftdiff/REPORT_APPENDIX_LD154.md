@@ -16,7 +16,7 @@
 | hybrid state | `--state work/m11/boot_state_hybrid.json` (`bootstate targets/m11.json --mode hybrid --nobuild` で作成。`units_run=928/942`・`first_fail=830`・`precondition ok=True`) |
 | ビルド | `gcc ... rt/ld_native.c` と `liftdiff.py build targets/m11.json` を HEAD で実行 (`[build] OK`) |
 | 機械 | 4 コア。run は直列 (並列にしない) |
-| 素材 | fl-win64・work-m11・work-liftdiff を `$ARTIFACTS_DIR` から展開 (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)。toolchain-* は展開せず、runner に既にある `/opt/emsdk`・`/opt/retdec` (agent-setup 展開済み) を使った |
+| 素材 | fl-win64・work-m11・work-liftdiff を `$ARTIFACTS_DIR` から展開 (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)。toolchain-* は展開せず、runner に既にある `[EMSDK]`・`[RETDEC]` (agent-setup 展開済み。`docs/REFERENCES.md` §4) を使った |
 
 上限 (batch 冒頭の `[batch] limits` 行に出る値):
 
