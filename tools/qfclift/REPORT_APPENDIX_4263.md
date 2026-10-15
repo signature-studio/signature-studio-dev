@@ -1,6 +1,6 @@
 # tools/qfclift 付録 4263 — T-SH-107 (#4263): longjmp 0x40f9c0 の発生条件
 
-REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD = `6a9f1c3f0` (origin/main 起点)。
+REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。§1〜§4 (静的解析) の検証 HEAD = `bfbe3f683`。§5.2・§5.3 (実行時トレース) の測定 HEAD = `ea44afd71` (`qfc_ov.c` は #4510 の setjmp anchor 化の後の版)。
 道具: `callers_4263.py` (`.pdata` の関数単位で逆アセンブルし、`call` の呼出元と `rip` 相対参照の書込み元を列挙)。出力は `work/callers_4263.txt` (生成物)。
 
 ## 1. 結論 (静的解析)
@@ -58,8 +58,43 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD
 - 書込みは `0x40f4eb`: `mov byte ptr [r13+0x30], al` (所属関数 `0x40f430`)。`r13` は `0x40f446` で `0x5d0c80`、`0x40f456` で `0x5d0da8` (`[rbp+0x170] >= 2` のとき)。
   `0x5d0cb0 = 0x5d0c80 + 0x30` なので、rip 相対の直接 store 0 件は「レコード経由の store」だった。`0x40f4e1`〜`0x40f4eb` で `al = [rbp+0x170] + 1` (= reason + 1)。
 - 読みは `0x40fca8` (`cmp byte [0x5d0cb0], 0`)。非 0 なら `0x40fcb8` で `0x40fa40` を呼ぶ (= 経路 B)。
-- **reason 1 (PROCESS_ATTACH) では flag = 2 (非 0)**。`r13 = 0x5d0c80` のため、静的には経路 B が DllMain 本体 (`0x419dc0`) の後で発火する。経路 A は arm されない (§1)。実行時の発火は未トレース。
+- **reason 1 (PROCESS_ATTACH) では flag = 2 (非 0)**。`r13 = 0x5d0c80` のため、静的には `0x40fca8` の検査が非 0 で通り、`0x40fcb8` から `0x40fa40` を呼ぶ形になる。経路 A は arm されない (§1)。実行時の値は §5.2 を参照。
 - 再現: `python3 disasm_range_4263.py block24350_PE.bin 0x40f4e1 0x40f4f0` (道具は `tools/qfclift/disasm_range_4263.py`)。
+
+### 5.2 実行時トレース (boot の DllMain 段・reason 1)
+
+再現: `bash qfc_trace_4263.sh` (前提: `qfc_boot.sh` を 1 回実行。測定専用・判定なし。計測 C は `qfc_ov_trace_4263.c`)。
+入口で flag `[0x5d0cb0]`・record `[0x5d0c80]` を出した結果 (DllMain の 1 段のみ・測定 HEAD `ea44afd71`):
+根拠は `qfc_trace_4263.sh` の `ENTER` 行 3 件 (`f_40f430`・`f_40fb80`・`f_40fa40`)。注入は `src.index(';')` の最初の `;` に依存するため、再現時は `trace.log` の `grep -c ENTER` が 3 を返すことを先に確かめる。
+
+| 入口 | flag `[0x5d0cb0]` | record `[0x5d0c80]` | 読み |
+|---|---|---|---|
+| `f_40f430` | 0 | 0 | `0x40f4eb` の書込み前 |
+| `f_40fb80` | **2** | 0x102808f8 | `0x40f430` が reason+1 = 2 を書いた後 (経路 B の検査の前) |
+| `f_40fa40` | 2 | 同 | 経路 B の呼出し (`0x40fcb8`) の直後 |
+| `qfc_ov_longjmp` | **0** | 0 | `0x40fa40` 先頭の `rep movsq` (`0x40fa6b`) で保存 frame の値 (0) に戻る |
+
+- longjmp の呼出元 (戻り番地) は `0x40fa94` (`0x40fa40` 内)。スタック範囲出力 (`0x400000`〜`0x620000` の全語) に `0x40fcbd` (経路 B の後続) と `0x59c254` (DllMain の setjmp 後の本体スキップ経路) が現れる。ただし範囲が広く過去の残存値を含みうるため、**呼出元を区別する証拠にはならない**。
+- 戻り値 `eax = ([0x5aa000] != 0) + 1` は 1 (`[0x5aa000]` = 0 の入口値)。静的な読みでは DllMain の `cmp eax,1` (`0x59c210`) で本体を飛ばす側 (`0x59c254`) へ進む。`0x59c254` へ進んだことは未確認。
+- longjmp 時点で `[0x5d0cb0]` が 0 に見えるのは、保存 frame の複写による見かけの値と読んでいる (静的な推定)。
+- **経路 A と B のどちらから `0x40fa40` に入ったかは、この実測では区別できていない。** `f_40fa40` 入口の flag = 2 は、経路 A (`0x40fbcf`) からの呼出しでも同じ値になるため。区別には `[0x5d0db0]` (arm フラグ) の実測値が要る。`qfc_ov_trace_4263.c` は longjmp 入口で `flagA(0x5d0db0)` を出すが、その実測値は本付録に未掲載 (今回の run では trace を再取得していない)。
+- **表現の限界 (経路 B は実行時発火とは確定しない)**: `f_40fa40` 入口の flag 2 は、経路 A (`0x40fbcf`) 経由の呼出しでも同じ値になる。経路 A の arm フラグ `[0x5d0db0]` の実測値は本付録に載っていない (今回の run では trace を再取得していない)。確定するまでは「flag 2 で `f_40fa40` に入る。経路 A/B の対応は静的推定」とする。
+- 別 reason (≥2) と経路 A の挙動は boot (reason 1) では測れないため未解決。
+
+### 5.3 reason を変えた実行 (`QFC_REASON`・測定のみ)
+
+同じ計測版で DllMain の reason だけ変えた結果 (停止点は同じ `FontCache_GetStats`):
+
+| reason | `f_40f430` 入口 | `f_40fb80` 入口 flag | longjmp 入口 retval | DllMain 戻り値 | 備考 |
+|---|---|---|---|---|---|
+| 1 | flag 0 | 2 | 1 | 1 | §5.2 |
+| 2 | flag 0 | 0 | 2 | 0 | `[qfc-soft] MessageBoxA` が出る |
+| 0 | flag 0 | 1 | 1 | 1 | |
+
+- reason 2 では経路 B の flag (`0x40f4eb` で reason+1 = 3) が `f_40fb80` の入口で 0 のため、この時点で `0x40fcb8` の経路 B は見かけ上発火しない。`r13 = 0x5d0da8` (経路 A の record) なので、経路 A の arm (`[0x5d0db0]`) が効くはずだが、`0x40fbcf` の直前の arm・thread id は未測定。
+- 結論 (実測): reason 2 では DllMain の戻り値が 0、longjmp の retval は 2。reason 1 と経路が違う。経路 A が発火したかは未確定 (`0x40fbcf` の直前の `[0x5d0db0]`・`[0x5d0ddc]` を測る必要がある)。
+- 静的な整合: reason 2 の `0x40f4eb` は `[r13+0x30]` (r13 = `0x5d0da8`) に書くため、`[0x5d0cb0]` (= `0x5d0c80+0x30`) は書かれない。実測の flag 0 と合う。
+- 解釈 (未検証): reason 2 の `MessageBoxA` は soft stub の呼出し。soft の 0 返しは実物ではないため、reason 2 の結果を実機の挙動とは読まない。
 
 ### 5.1 実測 (boot、HEAD `bfbe3f683` の lift 設定。`qfc_boot.sh`)
 
@@ -71,7 +106,7 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 経路 A の発火は DllMain reason 1 では起きない (`r13=0x5d0c80`)。reason ≥2 の経路 (boot 未測定) | 別 reason の挙動が不明 | #4263 (継続) |
+| 経路 A の発火は DllMain reason 1 では静的には起きない (`r13=0x5d0c80`)。reason ≥2 の経路 (boot 未測定) | 別 reason の挙動が不明 | #4263 (継続) |
 | `ExitProcess(0)` の呼出し元と、`[0x5d0c80]` の boot 時の値 | 偽の停止か否かの判定 | #4262 (T-SH-106) |
 | 呼出元 `0x40946b` (fn `0x409460`) の上位呼出元 | setter へ渡る code の出所 | #4263 (継続) |
 

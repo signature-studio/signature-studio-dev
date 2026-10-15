@@ -615,11 +615,12 @@ def _x64c_survey(src):
     src.begin()
     total = src.json_value(X64_BOOT, "boot.units_total")
     covered = src.json_value(X64_SURVEY, "units_covered")
-    ok = src.json_value(X64_SURVEY, "byCls.ok")
-    unlifted = src.json_value(X64_SURVEY, "byCls.unlifted")
-    uncovered = int(total) - int(covered)
-    if int(ok) + int(unlifted) != int(covered):
+    by_cls = src.json_value(X64_SURVEY, "byCls")
+    ok = by_cls.get("ok", 0)
+    unlifted = by_cls.get("unlifted", 0)
+    if sum(int(n) for n in by_cls.values()) != int(covered):
         raise MetricError("x64c survey の内訳が units_covered と合わない")
+    uncovered = int(total) - int(ok) - int(unlifted)
     units = {
         "total": int(total), "ok": int(ok), "skipped": None, "failed": int(unlifted),
         "miss": None, "noproc": None, "dispatched": None, "uncovered": uncovered,
@@ -632,7 +633,7 @@ def _x64c_survey(src):
         "gui_natural": "survey.json に GUI 計数が無い",
         "create_fruity_instance": "survey は DllMain を通さない",
     }
-    derived = {"units.uncovered": "boot_summary_plain の units_total − survey の units_covered"}
+    derived = {"units.uncovered": "boot_summary_plain の units_total − survey の (byCls.ok + byCls.unlifted)。empty / noproc を含む"}
     return _record(
         "x64c-isolated-survey", "x64c", "isolated-survey",
         "x64c 隔離 survey (FLE-5 末 / survey.json)",

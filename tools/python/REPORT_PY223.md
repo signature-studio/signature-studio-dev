@@ -161,3 +161,14 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate      
 - `0x11b2ac0` の本体は `0xed0b60` の値を rcx に読んで `0xed4ee0` を `dl=1` で呼ぶ (1 件)。`0xed4ee0` は `0x410320` を経由して vtable の間接 call (`call [rbx-0x28]`・`call [rbx-0x50]`) を行うが、vptr の格納はしていない。
 - 未解決 (受入 1・2): `0x1375990` の呼出し元が直接 call で見えないため、間接 call の受け手を特定できていない。`0xed0c28` を receiver の vptr として格納する箇所は未確定。`0xed0bb0` の算術経路は未検査。
 - 次の一手: `0x1375990` を格納する vtable (`0x11b2ac0` を含む間接 call の受け手) の探索。
+
+### PY-264 第 4 run (#3888): vptr の書込み箇所の不在 (部分達成)
+
+- 検査 `analysis/py264_vptr_scan.py` → `chain.check PASS`・rc 0。所要 38.4 秒 (n=1)。展開は 313 PE block (`*_PE.bin`)。
+- 全 313 PE block で、vptr 候補の絶対値 `0xed0c28` は `.text` の 2 箇所 (`0xed0b60` のセル・`0xed0dac` の ASCII 文字列内)、`0xed0bb0` は `.pdata` の RVA 値 1 件 (ポインタではない)。`0x1375990`・`0x11b2ac0` の絶対値は 0 件。他 block から表への参照は無い。
+- block00031 の `.text` で `0xed0000..0xed1000` を RIP 相対で指す命令は 10 件。うち `0xed0b60` は `0x11b2af9` の読出し 1 件、`0xed0b38`・`0xed0de0`・`0xed0f48`・`0xed0328`・`0xed0718`・`0xed0824`・`0xed0848` は表の内側 (`lea` / 読出し)。vptr への格納 (`mov [reg], reg`) は 0 件。
+- 呼出し経路: `0x11b2ac0` は `rcx = [0xed0b60] (= 0xed0c28)`、`dl = 1` で `0xed4ee0` を呼ぶ。`0xed4ee0` は `dl ≠ 0` のとき `rcx` を `0x410320` に渡し、その戻り値を `[rbp+0x60]` に入れる。その後、`rcx` を引数にして `[rcx+8]`・`[rcx+0x10]`・`[rcx+0x18]`・`[rcx+0x19]` などを書く。つまり `rcx` は書かれる object の本体として使われており、`0xed0c28` は vptr そのものではなく object の番地と読める (推定)。`[0xed0c28]` の先頭 qword は `0xed62e0` (`.text` 内の値)。本 issue の「0xed0c28 は vptr」という前提は、この読みと合わないため再確認が要る。
+- 表 A の `0xed0bb0` と表 B の `0xed0c28` は、スロット `+0x198` / `+0x120` が同じ `0xed0d48` (= `0xed4b70`) を指す。よって receiver は表 A でも表 B でも同じ仮想 call になる。
+- 受入 1 (vptr `0xed0c28` の書込み箇所): **未達**。静的な格納は PE に無い。vptr は実行時に別の経路で作られると推定 (推定)。
+- 受入 2 (`0xed0bb0` を vptr として得る経路の不在): **未達**。`0xed0bb0` の絶対値は 0 件。算術経路は未検査。
+- 未解決 (#3888 で継続・子は起票せず): 受入 1 の実行時経路 (動的な vtable 構築か別 block の未解析部分) と受入 2 の算術経路。
