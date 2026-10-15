@@ -18,7 +18,7 @@
 - **AudioContext / getUserMedia / WebMIDI は main thread のみ** (worker に AudioContext は無い)。wasm → main は制御ブロック内の **mailbox 同期 RPC** (`cmd_seq`/`ack_seq`、wasm 側 `Atomics.wait`、main 側 `Atomics.waitAsync`)。
 - 時間のマスター = **worklet のサンプルカウンタ** (`dev_frames`, `currentFrame`)。FL 側の位置・時刻はここから導出する (§6)。
 
-## 2. 制御ブロック `fla_ctl_t` (384B, 64B ライン × 6) と ring
+## 2. 制御ブロック `fla_ctl_t` (512B, 64B ライン × 8) と ring
 
 オフセットの単一の真実は `src/flaudio.h`。TS は `src/runtime/audio-layout.ts` に同表を持ち、起動時に wasm の `fla_layout_off(i)` と全 67 項目を照合 (不一致 → throw = fail-fast)。worklet は固定値を持たず `processorOptions.layout` を使う。
 
@@ -28,9 +28,9 @@
 | 1 (@64) | worklet | dev_frames(u64), dev_ctx_time_bits(f64), out_read, in_write, underruns, silence_frames, quanta, in_overruns, wl_state, clock_seq(seqlock), play_start_frame, clock_jumps/_frames, clock_skip_frames/clock_dup_frames/clock_jump_max/clock_jump_max_q (@164-179, burst_obs の後の pad2 から割当) |
 | 2 (@128) | producer | out_write, in_read, wake_target, gen, go, tick_target, notify_ms, burst_obs(worklet 書) |
 | 3 (@192) | main | ref_ctx_time_bits, ref_epoch_ms_bits (seqlock), out/base_latency_us |
-| 6 (@384) | worklet | burst_hist[32] (連続 process() の 1 run 終了ごとに bin=floor(len/512) を +1。末尾 bin は以上。AU-30 #3151) |
 | 4 (@256) | wasm↔main | cmd_seq/op/arg[4], ack_seq/status/res[4], ctrl_ready |
 | 5 (@320) | producer | cb_count/late/max_us, wake_count, wait_timeouts, in_underflows, min_fill, wake_hist[6] |
+| 6-7 (@384〜511) | worklet | burst_hist[32] (128B。連続 process() の 1 run 終了ごとに bin=floor(len/512) を +1。末尾 bin は以上。AU-30 #3151) |
 
 - ring は **planar float32、ch ごとに `ring_frames` (2 の冪, 16384 以上)**。index は 32bit 単調増加 (modular, 差 < 2^31)。fill = `write - read`。SPSC: 出力 ring は producer=wasm / consumer=worklet、入力 ring は逆。**データ書込 → index の seq-cst store** の順で公開 (JS の `Atomics.store` / C の `__atomic_store_n` は同一メモリモデル)。
 - 64bit 値 (dev_frames 等) は 2×32bit を `clock_seq` seqlock で一貫読み。
