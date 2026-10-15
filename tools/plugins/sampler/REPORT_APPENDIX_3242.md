@@ -6,7 +6,8 @@
 ## 0. 要点・測定 commit
 
 - 測定 commit: **`dfe82526`** (コードを変えた最後の commit。 `feat(plugins): reflect non-VEX comis/ucomis flags into IR`)。 検証起点: `a9733bbb` (origin/main)。
-- 差分確認: 測定経路 `git diff dfe82526 HEAD -- tools/plugins/lift/passes/comis_flags.py tools/plugins/lift/passes/m11_simd2.py tools/plugins/lift/lift_ranges.sh tools/plugins/sampler/engine_lift.sh` の出力は空 (0 行)。 残りの差分は `test_comis_flags.py` (テストのみ。 lift 経路から呼ばれない)・`SOURCES.txt`・REPORT/付録/DOC_MAP (文書)。
+- 差分確認: 本 PR の pass・m11 の経路 `git diff dfe82526 HEAD -- tools/plugins/lift/passes/comis_flags.py tools/plugins/lift/passes/m11_simd2.py tools/plugins/sampler/engine_lift.sh` の出力は空 (0 行)。 自分の commit の残りは `test_comis_flags.py` (テストのみ。 lift 経路から呼ばれない)・`SOURCES.txt`・文書。
+- **main 取り込み後の差分 (再測定できていない)**: 取り込み merge (main `650590ed`) で、engine の lift 経路に main 側の変更が入った: `lift_ranges.sh` に `vex_comis_flags.py` の呼出し (#3248)・`passes/ir5_patch.py` +102 行・`vex_comis_flags.py` (新規)。 `git diff dfe82526 HEAD -- tools/plugins/lift tools/plugins/sampler/engine_lift.sh` はこの分だけ非 0。 本付録の §1・§2 の数値は **merge 前の dfe82526 の実測**。 merge 後の engine は素材 (`toolchain-retdec`・`toolchain-emsdk`) が無く再実行していない (本 PR 未解決表)。
 - 方式: RetDec の reg2mem 形の関数では flag が `%cf.0.reg2mem`・`%zf.0.reg2mem`・`%pf.0.reg2mem` (alloca i1) に store/load で載る。 comis の直後に fcmp で flag を計算して slot へ store し、呼出しを消す。 slot の無い関数は flag が SSA 値 (`%15 = xor i1 0, 0` など) のまま流れるため、今回は反映せず unimpl に残す (範囲外・子 [PLG-F3-36] #3305)。
 - 実装: `tools/plugins/lift/passes/comis_flags.py` (新規)・`tools/plugins/lift/passes/test_comis_flags.py` (新規)・`tools/plugins/lift/passes/m11_simd2.py` (`PLUG_COMIS_FLAGS=1` のとき comis を unimpl 化)・`tools/plugins/lift/lift_ranges.sh` (`PLUG_COMIS_FLAGS=1` で pass を m11_simd2 の前に実行)・`tools/plugins/sampler/engine_lift.sh` (既定 1)。
 
@@ -58,6 +59,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
+| main 取り込み (merge `54d74bff`) 後の engine は未再測定 (lift 経路に main 側の `ir5_patch.py`・`vex_comis_flags.py` が入った)。 §1・§2 は merge 前 `dfe82526` の値 | merge 後の unimpl・`emcc -c` 判定は未確認 | 素材 (`toolchain-retdec`・`toolchain-emsdk`) を付けた再測定 (PM 判断) |
 | slot の無い関数の非 VEX comis 40 + 64 件、部分 slot の関数 7 + 10 件の flag が未反映 (unimpl に出る) | flag は未反映。 silent は解消 | [PLG-F3-36] #3305 (`親: #3242`) |
 | VEX の comis (19252 11 件・19048 9 件) が unimpl のまま | 従来どおり。 flag 未反映 | [PLG-F3-33] #3241 |
 | `PLUG_COMIS_FLAGS` の既定 0 の経路 (`batch_lift.sh`・他 plugin family) は silent の stub のまま。 既定化は PM agent の判断待ち (既定案: 0 のまま。 他経路の挙動は変えない。 既定が可逆) | 他 family の comis 欠落は未対応 | PM agent の判断待ち |
