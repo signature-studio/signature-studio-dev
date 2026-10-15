@@ -88,7 +88,7 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 
 ## 3c. 子 #4392 の原因切り分け (Node・同期・`tools/perf/p15/ctor_data_overlap.mjs`)
 
-測定 commit: `95f2351e5` (`ctor_data_overlap.mjs` を追加した commit = コードの最後の変更)。HEAD との差分: `git diff 95f2351e5 HEAD -- tools/perf tools/ott` は 0 行 (差分なし)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を展開して測定。
+測定 commit: `95f2351e5` (`ctor_data_overlap.mjs` を追加した commit = コードの最後の変更)。HEAD との差分: `git diff 95f2351e5 HEAD -- tools/perf/p15 tools/ott` は 0 行 (測定コードに差分なし)。`-- tools/perf` は本 REPORT の文言修正 (`docs(perf)` commit 60efc8c36) の 19 行のみ。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を展開して測定。
 本 fix run では素材が展開されず (`$ARTIFACTS_DIR` は `fl-win64` のみ) 再測定していない。下表は実装 run (測定 commit `95f2351e5`) の値。
 
 | 測定 | 結果 |
