@@ -50,4 +50,28 @@ for (const [name, args] of [...calls, ...arity, ...types]) {
 }
 
 assert.deepEqual(diffs, [], `arrangement 差分 ${diffs.length} 件`);
-console.log(JSON.stringify({ calls: calls.length + arity.length + types.length, diffs: 0, PASS: true }));
+
+// PY-144 (#3043): selectionSet / selectionClear の状態反映。PE 0xe43d30 の規則 (start==end で end=-1、start>end で入れ替え) を、
+// 読出し 2 件 (PY-96) で両エンジンに確かめる。期待値は規則からの手計算 (両エンジンの出力を比べるだけでは足りない)
+const seq = [
+  [["arrangement.selectionSet", [3, 1]], 1, 3],
+  [["arrangement.selectionSet", [2, 2]], 2, -1],
+  [["arrangement.selectionSet", [-1, 4, true, false, 0]], -1, 4],
+  [["arrangement.selectionSet", [5, -1]], -1, 5],
+  [["arrangement.selectionClear", []], -1, -1],
+];
+const stateDiffs = [];
+for (const [[name, args], start, end] of seq) {
+  run(mock, name, args);
+  run(wasm, name, args);
+  for (const [eng, tag] of [[mock, "mock"], [wasm, "wasm"]]) {
+    const s = run(eng, "arrangement.selectionStart", []);
+    const e = run(eng, "arrangement.selectionEnd", []);
+    if (JSON.stringify(s) !== JSON.stringify({ ok: start }) || JSON.stringify(e) !== JSON.stringify({ ok: end })) {
+      stateDiffs.push({ name, args, tag, start: s, end: e, want: [start, end] });
+    }
+  }
+}
+assert.deepEqual(stateDiffs, [], `arrangement 状態差分 ${stateDiffs.length} 件`);
+
+console.log(JSON.stringify({ calls: calls.length + arity.length + types.length, diffs: 0, state: seq.length, stateDiffs: 0, PASS: true }));
