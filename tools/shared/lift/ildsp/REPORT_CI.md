@@ -3,7 +3,7 @@
 親: #2529 (T-SH-39)。範囲縮小の経緯は #3300 本文。wasm 化は [T-SH-65] #3318、native 差分は [T-SH-66] #3320。
 
 既知類型との関係: DEFECTS D9 と同型 (fe)。検出信号 (`jmp reg` の直前が `lea reg,[rip+…]; mov eax,[reg+idx*4]; add reg,rax`) が一致する。RetDec の IR は計算ジャンプ表の経路 (n = 1〜16) を落としている (§2-2 (b))。入力作成と census のみ。wasm 化と差分は未実施。
-測定 commit: `eb6f0e1c7` (ci_lift.sh の最後のコード commit)。`git diff eb6f0e1c7 HEAD -- tools/shared/lift/ildsp ':!*.md'` の出力は空 (差分 0)。
+測定 commit: `eb6f0e1c7` (#3300 時点の closure 入力作成の測定。本 PR の数値の根拠は下の §7 の `56ec5cf11`)。`git diff eb6f0e1c7 HEAD -- tools/shared/lift/ildsp ':!*.md'` は 24 ファイルの差分があり、差分 0 ではない。
 
 ## 結論 (1 行)
 closure は 36 関数・961 命令・間接 call 10 件で、RetDec の範囲入力と IR の define 検査は通る。ただし closure は条件分岐と計算ジャンプの先を辿らず、範囲外の直接呼び出し先 1 件が IR に declare のみで残る (§2-2 (a))。IR は計算ジャンプ表の経路 (n = 1〜16) を落とし、その書き込みは IR に無い (§2-2 (b))。census はこれを検出しない。wasm 化 (#3318) と native 差分 (#3320) が残る。
@@ -80,7 +80,7 @@ closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が
 
 結論: RetDec は `movups`・`movntps` のストアを IR の store に出さない (11 箇所)。`ci_restore_stores.py` で 19 箇所すべてを `store i128` に戻し、残りの SSE helper 5 種を `gen_helpers.py` で C 実装した。`ci_lift.sh` は rc=0 (ALL OK)。
 
-測定 commit: `56ec5cf11` (ci_restore_stores.py・gen_helpers.py・ci_lift.sh を含む最後のコード commit)。`git diff 56ec5cf11 HEAD -- tools/shared/lift/ildsp tools/shared/lift/libreverb ':!*.md'` の出力は空 (差分 0)。
+測定 commit: `56ec5cf11` (ci_restore_stores.py・gen_helpers.py・ci_lift.sh を含む最後のコード commit)。`git diff 56ec5cf11 HEAD -- tools/shared/lift/ildsp tools/shared/lift/libreverb ':!*.md'` の出力は `tools/shared/lift/ildsp/lift_psola_closure.sh` の 9 行だけ (main 取り込みで入った。測定経路の外)。測定経路 (`ci_lift.sh`・`ci_restore_stores.py`・`libreverb/gen_helpers.py` ほか) の差分は 0 (`git diff --stat 56ec5cf11 HEAD -- <測定経路>` の出力は空)。
 
 ### 7-1. 書き込みの全数 (x86 の命令と IR の対応・測定 commit `56ec5cf11`)
 x86 の書き込み先は全件 `[rcx …]` (xmm0 を書く) (capstone で逆アセンブルして確認)。IR の書き込み先 (復元後) の基準と offset は、x86 の operand と目視で照合した (19 件)。機械照合はしていない。
