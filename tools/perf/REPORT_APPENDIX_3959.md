@@ -100,14 +100,14 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 結論 (測定で確認した範囲):
 - ctor の呼び出し自体は data を書き換えない。145 回までの ctor で data の hash は不変。
 - heap の確保は `GLOBAL_BASE=0x10000000` の静的データの後ろから伸び、約 145 回で image data 領域 (`0x301e2000`〜`0x30284124`) に届く。届いた確保の後で data の内容が変わる。
-- (注: この段落の「整合する」は §3d の追試で支持されなかった。以後の判断は §3d を正とする。)
+- (→ §3d。この段落の仮説は §3d で棄却できなかった。)
 - **ただし 146 回目の ctor が止まる箇所 (どの関数・どのループ) は未特定**。data 書換え → 停止の因果は直接示していない。
 
 未確定: 146 回目の ctor で止まる関数の特定 (`ott_run` の trace で確認が必要)。修正 (`GLOBAL_BASE` を data 領域より上へ移す、または data の配置を heap と分ける) は lift 全体の再ビルドと harness の object 配置 (`0x31000000` 以降) の変更を伴うため、本 run では行わない。
 
 ## 3d. 子 #4392 の因果確認 (Node・同期・`tools/perf/p15/ctor_restore_data.mjs`)
 
-測定 commit: 本 PR の commit (`ctor_restore_data.mjs` を追加した commit = コードの最後の変更)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を展開して測定。
+測定 commit: `491700c5d` (`ctor_restore_data.mjs` を追加した commit = コードの最後の変更)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を展開して測定。
 
 | 測定 | 結果 |
 |---|---|
@@ -115,8 +115,9 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 | `RESTORE=1` M=145 | 145 返る・data 不変 |
 | `RESTORE=1` M=146 (3 run) | 3/3 とも 146 回目で戻らない (timeout 40 s) |
 
-- 仮説「data 領域の書き換えが 146 回目の停止の原因」を試した。各 ctor の直前に data 領域を `ott_data_install` 直後の内容へ戻す実験で、M=146 は 3/3 で止まった。**この仮説は支持されなかった**。
-- **交絡の注意**: data 領域には allocator のメタデータも重なる可能性があり、書き戻しは allocator の状態も巻き戻す。そのため「書き換えが無い状態で 146 回を通す」条件を作れていない。この実験だけでは data の書き換えを完全に除外できない。
+- 仮説「data 領域の書き換えが 146 回目の停止の原因」を試した。各 ctor の直前に data 領域を `ott_data_install` 直後の内容へ戻しても、M=146 は 3/3 で止まった。
+- **交絡のため仮説の棄却はできない**: data 領域には allocator のメタデータも重なる可能性があり、書き戻しは allocator の状態も巻き戻す。そのため「書き換えが無い状態で 146 回を通す」条件を作れていない。
+- 3 run は同じ決定的スクリプトの反復であり、独立した再現としての重みは小さい。
 - heap を data 領域より上へ逃がす実験 (SKIP) は、wasm メモリ (0x36000000、約 864 MB) に 145 回分 (約 532 MB) が収まらず、M=10 でも止まったため無効。成果物には含めない。
 
 ## 4. 未解決
