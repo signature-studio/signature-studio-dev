@@ -15,6 +15,7 @@
                  NaN 同士は nandiff に分離し buf_diff には数えない (k80_diff.py の実装どおり)
   ret_diff      = 戻り値 (i64) の不一致 case 数 ( native が rax を放置する kernel では
                  200/200 など意味のない値になる。合否は buf_diff のみで判定)
+                 ret_slot=xmm0 の kernel は -1 (rax と比べない。戻り値は [5b] ucomi_ret_check.py で判定 · #3513)
   crash 4       = 0x5de710 / 0x5df610 / 0x5e05b0 / 0x5e0d80 (CAB-253 起点の sig11 4 kernel)
 
 このスクリプトは独立再計算 (規則 37): e2e (p0c3_e2e.sh) を呼ばずに
@@ -210,10 +211,18 @@ def main():
         if r is None or r[7] != 'ok' or r[4] != '0':
             fails.append('%s %s buf_diff=%s (期待: ok かつ buf_diff=0: #3439)' % (
                 k, r[7] if r else 'not-run', r[4] if r else '-'))
+    # #3513: 戻り値が xmm0 の kernel (k80abi.py ret_slot) は、戻り値試験 [5b] の対象と一致しなければ FAIL
+    # (IR の ret は xmm0 を表さないため rax 比較の ret_diff は -1 にして、戻り値は [5b] で判定する)
+    xmm0 = sorted(k for k in abi if abi[k].get('ret_slot') == 'xmm0')
+    for k in sorted(set(xmm0) - set(UCOMI_FIX)):
+        fails.append('%s xmm0 戻り値だが戻り値試験 [5b] で判定していない (#3513)' % k)
+    for k in sorted(set(UCOMI_FIX) - set(xmm0)):
+        fails.append('%s 戻り値試験 [5b] の対象だが ret_slot が xmm0 でない (#3513)' % k)
     if fails:
         for f in fails:
             print('   [FAIL]', f)
         raise SystemExit('[FAIL] 受入基準未達')
+    print('   ⑤ xmm0 戻り値 kernel %d 件 (ret_slot=xmm0) = 戻り値試験 [5b] の対象: %s' % (len(xmm0), ' '.join(xmm0)))
     print('   ① 回帰 %d kernel buf_diff=0: %s' % (len(NINE), ' '.join(NINE)))
     print('   ① #2182 修復 %d kernel buf_diff=0 / CSV 全 %d kernel buf_diff=0' % (len(FIX18), len(rows)))
     print('   ② crash 4 (0x5de710/0x5df610/0x5e05b0/0x5e0d80) すべて sig なしで CSV に出る')

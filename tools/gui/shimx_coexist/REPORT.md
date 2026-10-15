@@ -135,7 +135,7 @@ bash tools/gui/shimx_coexist/coexist.sh      # 実測 8.6–12.1 s (§4・§4.2)
 bash tools/gui/test/selftest.sh              # native 回帰
 bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 ```
-前提: emsdk (`toolchain-emsdk`)、node 22 以上、`x86_64-w64-mingw32-gcc` (`gen_api.py` が arity 表に使う)、`wasm-objdump` (wabt; `sigprobe.sh` の `unresolved-imports` 判定。無いと 0 を空振りで出す)。Ubuntu runner では `apt-get install gcc-mingw-w64-x86-64 wabt`。`e2e.sh` は repo 直下の `node_modules` (tsc) も要る。M11 IR は `work-m11`。
+前提: emsdk (`toolchain-emsdk`)、node 22 以上、`x86_64-w64-mingw32-gcc` (`gen_api.py` が arity 表に使う)、`wasm-objdump` (wabt; `sigprobe.sh` の `unresolved-imports` 判定。無いと 0 を空振りで出す)。Ubuntu runner では `apt-get install gcc-mingw-w64-x86-64 wabt`。`e2e.sh` は repo 直下の `node_modules` (tsc) も要る。M11 IR は `work-m11`。emsdk 6.x (`[EMSDK]`) は `llvm-nm` を `upstream/bin` に置き、`emsdk_env.sh` の 2 回目の source で PATH の補正が消える (`EMSDK_ENV=/dev/null` で回避。根拠は `shbrowse_failfast.sh` 冒頭の注記と `.github/actions/agent-setup/action.yml` の #223 の注記 (`llvm-*` の symlink)。本 REPORT では再現していない)。
 
 ## 8. SHX-T14 (#957): OFN hook / テンプレートの fail-fast 明示
 
@@ -237,3 +237,13 @@ bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 ## 11. save 反映契機の自動結線 (SHX-T15 #958)
 
 書込み file の CloseHandle を契機に、保存待ちの先を host が実体へ反映する (node harness で検証)。検証表・設計・限界は `REPORT_SHX-T15.md`。本番起動経路への結線と再読み込み後の復元は未了 → [SHX-T38] #3131。
+
+## 12. SHBrowseForFolder の gui 側 fail-fast 検査 (SHX-T34 #2917)
+
+`bash tools/gui/test/shbrowse_failfast.sh` (gui 全 obj と shimx 全 obj を同一 wasm にリンク。probe が `GetProcAddress(shell32.dll, "SHBrowseForFolderA/W")` を呼ぶ。IR は fixture (declare 177)。測定 commit `503be2e75`、`git diff 503be2e75 HEAD -- tools/gui ':!tools/gui/shimx_coexist/REPORT.md'` は 0 行)。3 回実行で全て `pass=5 fail=0`、所要 **9.655–9.698 s** (n=3 の min–max、並列数 1 (直列)、load1 0.21–0.43)。限界: fail-fast の文言は `SHBrowseForFolder` のみで A と W を区別しない (`module.c:350`)。名前の別は probe の mode (a/w) で決まり、文言からは判別できない。
+
+| 検査 | 結果 |
+|---|---|
+| A / W: rc≠0 かつ stderr に `FAIL-FAST: unimplemented Win32 API: SHBrowseForFolder` | PASS 2 / 2 (rc=1、abort) |
+| 対照 `ShellExecuteW` (解決・rc=0) / NC (shimx の fail-fast 行を外した wasm で A・W が FAIL) | PASS 1 / 検出 2 / 2 |
+| 回帰 `coexist.sh` (測定 commit `503be2e75`) | ALL PASS・rc=0・15.911 s・duplicate/warning/undefined 0/0/0・C 側 69/0・host 13/0。C 側は `t_main.c` の `CHK(` 呼出し数 (`grep -o 'CHK(' t_main.c` の行数は #define 行を含むので 1 引く): 503be2e75 で 69、§1・§4・§8 の 58 は 96f95dc〜eb09329 の値。差 11 は #958 (`59c74ab5c`) と #1388 (`fb563fbbb`) が加えた検査 |

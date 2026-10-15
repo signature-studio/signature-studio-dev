@@ -11,7 +11,7 @@ import argparse, json, os, random, sys, time, collections
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from ldlib import build_wasm, cases, classify, irtool
-from ldlib.session import Session
+from ldlib.session import Session, NATIVE_ITIMER_S
 
 FORMAT_VERSION = 1
 KEEP_RAW_ALL = False
@@ -171,6 +171,9 @@ def cmd_batch(a):
                 if v not in vas:
                     vas.append(v)
     print('[batch] %d functions, shards=%d' % (len(vas), a.shards), flush=True)
+    nat_recv, was_recv = sess.recv_limits()
+    print('[batch] limits: native itimer %.1fs (recv %.1fs), wasm vm %.3fs (recv %.1fs)' % (
+        NATIVE_ITIMER_S, nat_recv, sess.wasm_timeout_ms / 1000.0, was_recv), flush=True)
     t0 = time.time()
     out = open(a.out, 'w')
     chunk = 400
@@ -221,6 +224,9 @@ def cmd_summary(a):
     trapl = sum(1 for r in recs if r['verdict'] == 'mismatch' and any(c['outcome'] == 'wasm_trap' for c in r['cases']))
     lines.append('')
     lines.append('不一致のうち callee を一切呼ばずに差分が出た (= その関数自身の欠陥と確定) : %d / wasm trap を含む : %d' % (leaf, trapl))
+    tcase = sum(1 for r in recs for c in r.get('cases', []) if c.get('timing'))
+    tfunc = sum(1 for r in recs if any(c.get('timing') for c in r.get('cases', [])))
+    lines.append('timeout/hang/crash を含む case : %d (関数 %d) ・timing は各 case の上限秒数と実測秒' % (tcase, tfunc))
     lines.append('')
     lines.append('実行不能の内訳:')
     for k, c in reasons.most_common():
