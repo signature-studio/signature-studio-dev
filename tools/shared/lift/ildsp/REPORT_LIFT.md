@@ -4,9 +4,9 @@
 
 ## 結論 (1 行)
 
-転送先 0x161fc0 を body 基準で選んだ。closure は直接 call と関数外への直接 jmp の辺で求める (67 関数・2,609 命令 (範囲の和) / 2,597 (一意))。閉包に間接 call 18・間接 jmp 6 があり、trap 化は未実装 (§2)。RetDec 段は素材 (`toolchain-retdec`) が無く、本 run では再測定できていない (§3)。
+転送先 0x161fc0 を body 基準で選んだ。closure は直接 call と関数外への直接 jmp の辺で求める (67 関数・2,609 命令 (範囲の和) / 2,597 (一意))。閉包に間接 call 18・間接 jmp 6 があり、trap 化は未実装 (§2)。RetDec 段は素材 `toolchain-retdec` (RetDec v5.0) で再測定した: `define` 69・`__asm_*` 宣言 54 種・`gen_helpers.py` は `cvttss2si(i128)` で rc=1 停止 (§3)。
 
-測定 commit: `7d27d51cf` (`closure_select.py` の一意数追加・`lift_vtable.sh` の注記を含む最後のコード commit)。`git diff 7d27d51cf HEAD -- tools/shared/lift/ildsp tools/shared/scripts tools/shared/env.sh` の出力は main 取り込みで増えた別の子 area のファイル (`ci_*`・`wc_*`・`REPORT.md` 等) のみで、本 pipeline の入力 (`ildsp_vtable.py`・`ildsp_vtable_check.py`・`closure_select.py`・`lift_vtable.sh`・`libkio`・`libreverb`・`env.sh`) には差分が無い。
+測定 commit: `03e5f3d46` (main 取り込みの merge commit。この後のコード変更は無い)。`git diff 03e5f3d46 HEAD -- tools/shared/lift/ildsp/closure_select.py tools/shared/lift/ildsp/lift_vtable.sh tools/shared/scripts/ildsp_vtable.py tools/shared/scripts/ildsp_vtable_check.py tools/shared/env.sh tools/shared/lift/libkio tools/shared/lift/libreverb/gen_helpers.py` の出力は空 (差分 0)。前回の測定 commit `7d27d51cf` 以降に main 取り込みで増えた別 area のファイル (`ci_*`・`wc_*`・`REPORT.md` 等) は、本 pipeline の入力ではない。
 
 ## 1. 選定 (3 候補の実測)
 
@@ -34,15 +34,18 @@ issue の 4 件 (`0x1aedc0` の 3 件と `0x1b6f4c` の 1 件) の到達経路 (
 
 扱い: この PR では trap 化しない。子 [T-SH-70] #3346 に移す。wasm 化の前に、これらを lift が黙って通すことを防ぐ必要がある。
 
-## 3. RetDec 段 (本 run では未再測定)
+## 3. RetDec 段 (測定 commit `03e5f3d46` で再測定)
 
-- 本 run の素材は `fl-win64` のみ (`$ARTIFACTS_DIR` に `toolchain-retdec` が無い。`retdec-decompiler` も PATH に無い)。`lift_vtable.sh` は RetDec 段で止まる (`retdec-decompiler: command not found`、終了コード 127)。
-- PR 本文の `oc_artifacts` に `toolchain-retdec` を加えた。素材付きの run で `RETDEC_BIN=<toolchain-retdec の bin/retdec-decompiler>` を指定して測り直し、下の値を差し替える。
-- 前回の実測 (出典の RetDec 本体は [未確認]。本 run では再現していない): `--select-ranges` で `define` 69、`declare @__asm_*` 54 種、`gen_helpers.py` が `declare i32 @__asm_cvttss2si(i128)` で停止 (rc=1)。
-- `define` 69 と閉包 67 の差 2 件 (前回の RetDec 出力で確認された名前): `0x1bd4f0` (閉包関数 0x1bd4b8 の範囲 0x1bd4b8-0x1bd531 の内側) と `0x1be14e` (閉包関数 0x1be130 の範囲の内側)。両者は閉包の直接 call / jmp 辺の到達先ではない (`ildsp_vtable.json` に該当する辺が無い)。`closure_select.py` は範囲の内側の番地を関数として数えないため、RetDec が独立の関数として出す理由は未確認。素材付きの再測定で RetDec の出力と照合する。
+- 素材: `toolchain-retdec` を展開し、`RETDEC_BIN` に `retdec/bin/retdec-decompiler` を指定した (RetDec v5.0・commit `53e55b4b`)。`lift_vtable.sh` の RetDec 段は rc=0 で通る。
+- 実測 (`--select-ranges` は閉包の 67 範囲): `[ildsp] retdec: 69 functions lifted`、`declare @__asm_*` 54 種。`ir_normalize` の後、`gen_helpers.py` が `declare i32 @__asm_cvttss2si(i128)` で停止 (rc=1)。前回記録 (69・54 種・`cvttss2si(i128)`) と一致する。
+- `define` 69 と閉包 67 の差 2 件 (照合済み): RetDec の `define` の番地と閉包の範囲の先頭を比べると、RetDec にだけある番地は次の 2 件で、どちらも閉包の範囲の内側にある。残りの 67 件は閉包の範囲の先頭と一致する。
+  - `0x1801bd4f0`: 閉包関数 0x1bd4b8 の範囲 (0x1bd4b8-0x1bd531) の内側。直前の `0x1801bd4e9` は無条件の間接 jmp (`jmp [rip+0xaad78]`)。`0x1801bd4f0` は prologue (`mov [rsp+8],rbx`) で始まる。
+  - `0x1801be14e`: 閉包関数 0x1be130 の範囲 (0x1be130-0x1be16d) の内側。直前の `0x1801be14d` は `ret`。`ucomisd` で始まる。
+  - どちらも閉包の直接 call / jmp 辺の到達先ではない (RetDec の出力に呼び出し元が無く、`ildsp_vtable.json` にも該当する辺が無い)。2 件とも無条件分岐 (jmp / ret) の直後の番地。RetDec がこれを独立の関数として切る基準は `[未確認]`。
+  - 参考: 間接 jmp `0x1801bd4e9` の飛び先 slot `0x180268268` の値は `0x1801cb600` で、閉包の外。閉包内の間接分岐の扱いは [T-SH-70] #3346。
 - `gen_helpers.py` は最初の未対応 op で rc=1 で止まるため、残りの未対応 op の全数は未測定。
 
-## 4. 検証 (測定 commit `7d27d51cf`)
+## 4. 検証 (測定 commit `03e5f3d46`)
 
 ```sh
 FL_WIN64_DIR=<fl-win64 展開先> ILDSP_WORK=<作業先> RETDEC_BIN=<toolchain-retdec の bin/retdec-decompiler> bash tools/shared/lift/ildsp/lift_vtable.sh 0x161fc0
@@ -50,13 +53,12 @@ FL_WIN64_DIR=<fl-win64 展開先> ILDSP_WORK=<作業先> RETDEC_BIN=<toolchain-r
 
 - `ildsp_vtable_check: ALL OK` (`ildsp_vtable.py` → `ildsp_vtable_check.py`。生バイト検算は `direct_jmp_sites` の照合を含まない。§5 の [T-SH-76] #3405)。
 - `closure_select.py`: `body_insn=324`・`closure functions=67 insn=2609 insn_unique=2597 direct_call_edges=84 direct_jmp_edges=7 unresolved_edges=0`・`indirect_calls=18 indirect_jmps=6`。ranges は `1,608 B`。
-- 本 run の再現 (素材 `fl-win64` の `extracted/block24360_PE.bin` の sha256 先頭 12 桁 `f4b23b0f93ee`): 上の前段は同じ値。RetDec 段で rc=127 (§3)。前段の所要は 0.26 秒 (1 回・並列 1・uptime の 1 分 load 0.05)。
+- 再測定 (素材 `fl-win64` の `extracted/block24360_PE.bin` の sha256 先頭 12 桁 `f4b23b0f93ee`・`toolchain-retdec`): 前段の値は上と同じ。RetDec 段は rc=0、`gen_helpers.py` は rc=1 で停止 (§3)。`lift_vtable.sh` 全体の所要は 2.37 秒 (real・1 回・並列 1・実行前の 1 分 load 0.50)。作業出力は `$RUNNER_TEMP/ildsp-work` (`tools/**/work/` を使わない)。
 
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| RetDec 段の再測定 (`toolchain-retdec` 素材。define 数・宣言 op 種数・停止点の差し替え、define 69 と 67 の差 2 件の照合) | §3 の値が未再現 | 本 PR (`oc_artifacts` に `toolchain-retdec` を指定した次の run) |
 | `gen_helpers.py` が `__asm_cvttss2si(i128)` で停止 (残りの未対応 op の全数は未測定) | 新 closure の wasm 化に進めない | [T-SH-63] #3316 |
 | 閉包内の間接 call 18 件・間接 jmp 6 件 (issue の 4 件を含む) の扱い (trap 化または静的解決) | 未処理のまま lift すると誤変換の恐れ | [T-SH-70] #3346 |
 | vtable slot 5 (0x1aa470) の lift と差分テスト | slot 5 が未 lift | [T-SH-75] #3404 |
@@ -77,5 +79,5 @@ FL_WIN64_DIR=<fl-win64 展開先> ILDSP_WORK=<作業先> RETDEC_BIN=<toolchain-r
 
 ## 7. 検証範囲 / 範囲外
 
-- 範囲内: closure の抽出 (`closure_select.py`・call と jmp の辺)・vtable 生バイト検算 (`ildsp_vtable_check.py`)・3 候補の再測定。
-- 範囲外: RetDec の再実行・lift の意味変換の正しさ・wasm の生成・native との比較。どれも未実施。
+- 範囲内: closure の抽出 (`closure_select.py`・call と jmp の辺)・vtable 生バイト検算 (`ildsp_vtable_check.py`)・3 候補の再測定・RetDec 段の再実行と define の照合 (§3)。
+- 範囲外: lift の意味変換の正しさ・wasm の生成・native との比較。どれも未実施。
