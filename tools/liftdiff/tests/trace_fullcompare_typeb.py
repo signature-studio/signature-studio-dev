@@ -74,7 +74,7 @@ def reads_xmm0(f):
 
 
 def r_kind(L, caller, ir_by_fn, mach):
-    """R 類の D15 判定 (trace_diverge_unreachable.py §1 と同一条件)。L または呼出元が、機械語のメモリ間接 call を持ち、
+    """R 類の D15 判定 (trace_diverge_unreachable.py §1 より広い: 呼出元も見る)。L または呼出元が、機械語のメモリ間接 call を持ち、
     IR の call 数 ≤ 機械語の直接 call 先数 なら 'D15' (メモリ間接 call 脱落の候補)。それ以外は 'other' (ldfix 型は未判定)。"""
     for v in (L, caller):
         if v is None:

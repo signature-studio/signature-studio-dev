@@ -71,7 +71,7 @@ class は `results/m11_typeb_cause.md` の各 case 行の `class=` 欄。件数�
 
 ## R 類の D15 判定 (LD-256 / #5113)
 
-- 生成元 `tests/trace_fullcompare_typeb.py` が R 行ごとに、L または呼出元の機械語にメモリ間接 call があり、IR の call 数 ≤ 直接 call 先数なら `D15`、それ以外は `other` を出す (判定条件は `trace_diverge_unreachable.py` §1 と同一)。件数は `results/m11_typeb_cause.md` の `## R 類の D15 判定` 行が正本。
+- 生成元 `tests/trace_fullcompare_typeb.py` が R 行ごとに、L または呼出元の機械語にメモリ間接 call があり、IR の call 数 ≤ 直接 call 先数なら `D15`、それ以外は `other` を出す。この判定は `trace_diverge_unreachable.py` §1 (L のみ判定) より広い (呼出元も見る)。件数は `results/m11_typeb_cause.md` の `## R 類の D15 判定` 行が正本。
 - 結果: R 9 行 (xfill=0 5・xfill=1 4) はすべて `other`。D15 候補は 0。
 - ldfix 型は未判定。機械語のメモリ読み数と IR の load 数を比べる試作は、読み方の違い (スタック・spill の除外方法) で 0〜5 件と揺れたため採らなかった。判定基準の定義 (`docs/DEFECTS.md` の ldfix 行) を決めてから再判定する。
 
