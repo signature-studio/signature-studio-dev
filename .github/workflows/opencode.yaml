@@ -767,8 +767,8 @@ jobs:
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
-          client-id: ${{ vars.OC_APP_CLIENT_ID }}
-          private-key: ${{ secrets.OC_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.OC_PM_APP_CLIENT_ID }}
+          private-key: ${{ secrets.OC_PM_APP_PRIVATE_KEY }}
           permission-issues: write
           permission-pull-requests: write
 

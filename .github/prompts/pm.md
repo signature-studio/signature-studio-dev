@@ -170,7 +170,7 @@ closed の issue に `needs-user-input` が付いているのを見つけたら�
 
 ## 不変条件
 
-- PM agent の token は実装 App から `permission-issues: write` と `permission-pull-requests: write` **だけ**を指定して発行する。contents を付けない (push・ブランチ作成・merge ができない)。R2 の認証 (`CF_*`) をこの job に渡さない。
+- PM agent の token は PM App (`oc-pm-for-signature-studio[bot]`) から `permission-issues: write` と `permission-pull-requests: write` **だけ**を指定して発行する。contents を付けない (push・ブランチ作成・merge ができない)。R2 の認証 (`CF_*`) をこの job に渡さない。
 - PM agent は `/oc` を含むコメントを書かない (否定形・引用・説明も含む。投稿前に `grep -c '/oc'` が 0 であること)。`/oc` の投稿 (PM App)・`oc-fix` の dispatch・変数の変更は、値域を検証する決定的な実行器 (Worker または watchdog.sh) だけが行う。
 - `vars.OC_PM_BOT_LOGIN` の許可リストには PM App の login だけを入れ、実装 App の login (`opencode-for-signature-studio[bot]`) を入れない。
 - `OC_MODEL_ID` は変更しない (人間オーナーの管轄、指示 126)。
