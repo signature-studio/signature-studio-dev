@@ -33,6 +33,7 @@ python3 tests/test_ld248_i128_xmm_entry.py
 python3 tests/test_ld179_tagpoint_tr.py
 python3 tests/test_ld203_slot_fill.py
 python3 tests/test_ld225_sample_vmo.py
+python3 tests/test_ld259_patch_p.py
 need() { [ -e "$1" ] || { echo "missing input: $1 ($2)" >&2; exit 2; }; }
 need ../m11/work/boot_final3.ll "oc_artifacts: work-m11"
 need ../m11/work/m11_image.bin "oc_artifacts: work-m11"

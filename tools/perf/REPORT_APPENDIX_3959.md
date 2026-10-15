@@ -86,6 +86,24 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 
 **未確定 (この節の結論ではない)**: 「heap が data 領域に届いた確保が、data の内容を変えて ctor を戻らなくする」という機構は**仮説**。実測したのは次の 2 点だけ: (a) 145 回目までの ctor では data 領域の hash が不変 (Node・1 run。プローブは commit 外で、コミット済みの再現は未整備)、(b) 146 回目の ctor が戻らないこと (HEAD で 3/3)。146 回目の確保直後に data が変わることの直接確認と、どの関数で戻らなくなるかは未了。
 
+## 3c. 子 #4392 の原因切り分け (Node・同期・`tools/perf/p15/ctor_data_overlap.mjs`)
+
+測定 commit: `95f2351e5` (`ctor_data_overlap.mjs` を追加した commit = コードの最後の変更)。HEAD との差分: `git diff 95f2351e5 HEAD -- tools/perf/p15 tools/ott` は 0 行 (測定コードに差分なし)。`-- tools/perf` は本 REPORT の文言修正 (`docs(perf)` commit 60efc8c36) の 19 行のみ。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を展開して測定。
+本 fix run では素材が展開されず (`$ARTIFACTS_DIR` は `fl-win64` のみ) 再測定していない。下表は実装 run (測定 commit `95f2351e5`) の値。
+
+| 測定 | 結果 |
+|---|---|
+| `node node_init_sweep.mjs --m 145,146 --timeout 15000` (HEAD) | M=145 ok・M=146 timeout (15 s)。`setup_ms` は生ログ (`$RUNNER_TEMP`) のみで commit に無いため載せない |
+| `ctor_data_overlap.mjs 145` ×2 | 2/2 同一: `data_changed_during_ctor_at=-1` (145 回の ctor で data 不変)・heap 起点 `0x1038d528`・1 回目の data 領域への確保 `0x301d3068` (malloc 10 回目, k=9)、その malloc の前後で data hash `b396a36c3521` → `27928e2cfb77` |
+| 対照: `ctor` 145 回後の heap 先頭 | `0x2ff93079` (ctor 1 回あたり約 3.67 MB 進む) |
+
+結論 (測定で確認した範囲):
+- ctor の呼び出し自体は data を書き換えない。145 回までの ctor で data の hash は不変。
+- heap の確保は `GLOBAL_BASE=0x10000000` の静的データの後ろから伸び、約 145 回で image data 領域 (`0x301e2000`〜`0x30284124`) に届く。届いた確保の後で data の内容が変わる。
+- したがって M=146 の無応答は「heap が固定の data 領域に重なった後の、data の書き換えによる ctor の停止」と整合する。**ただし 146 回目の ctor が止まる箇所 (どの関数・どのループ) は未特定**。data 書換え → 停止の因果は直接示していない。
+
+未確定: 146 回目の ctor で止まる関数の特定 (`ott_run` の trace で確認が必要)。修正 (`GLOBAL_BASE` を data 領域より上へ移す、または data の配置を heap と分ける) は lift 全体の再ビルドと harness の object 配置 (`0x31000000` 以降) の変更を伴うため、本 run では行わない。
+
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |

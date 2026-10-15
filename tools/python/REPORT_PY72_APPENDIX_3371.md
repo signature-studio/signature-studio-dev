@@ -75,3 +75,30 @@
 | `0x1001ef0` の `this` の由来 (呼出し元 4 件) | 受入 2 | #3371 |
 | `0xfe9090` を参照する関数ポインタ表 (先頭 VA `0xfe2a90`・19 エントリ) 経由の間接呼出し | 受入 2 (`0xfe9090` が chan に呼ばれるかの経路) | #3371 |
 | 一覧 A・B の容器 Q への要素追加箇所と要素型 T | 受入 3 | #3371 |
+
+## 追補 2 (2026-10-15 run・受入 2 の受け手の出どころを分類)
+
+- 補助 probe `analysis/flapi/pe_slot35_recv_src.py` を追加した。151 箇所の受け手レジスタを、呼出し箇所より前の同一関数内で逆向きにたどり、出どころの連鎖を出す (`rip@<大域>`・`stack`・`call`・`deref<-…`・`reg<-…`)。型は決めない。
+- 結果 (151 箇所の連鎖の形): `rip@0x15e0c40` を起点とする連鎖が 54 件 (行に含まれる数)。`stack` 起点は 42 件 (`stack` 直 5・`deref<-stack` 26・`deref<-deref<-stack` 10・`deref<-deref<-deref<-stack` 1)。`call` 起点は 4 件 (`deref<-call` 3・`reg<-call` 1)。`none` (窓内に定義なし) で終わる連鎖は 42 件 (`deref<-none` 18・`reg<-none` 12・`deref<-reg<-none` 8・`deref<-deref<-none` 2・`deref<-deref<-reg<-none` 2)。
+- 制限: `trace()` が定義として拾う命令は `mov/lea/movzx/movsxd/movsx/xchg` だけ。`pop`・`xor`・`add`・`sub`・32bit 書込み (`mov ebx, …`) は定義として扱わない。そのため `none` と分類された連鎖は「窓内に上記の命令での定義が無い」ことしか言わず、実際の出どころが無いとは限らない。
+- 大域 `0x15e0c40` (`.data` の初期値 `0x16babe8`・RIP 相対の参照 308 箇所) は、RIP 相対の `mov` による store が **0 件**。受け手の型は、この大域を初期化する経路 (`lea` での間接アドレス計算など) を追わないと決まらない。
+- 大域 `0x15e4790` (参照 2422 箇所)・`0x15e0ff8` (1077)・`0x15e2218` (一覧 A・1563)・`0x15e0128` (一覧 B・181) も store 0 件。一覧 A・B の要素追加箇所 (受入 3) は、この 2 大域の参照の中から `add` 相当を分類する必要がある。
+- 大域 `0x16bcae0` の store は 2 件 (`0x11c3817`・`0x11c7f25`)。`0x16bcae8` の store は 0 件 (`.data` 初期値は文字列データ `"\nMemo..."` 相当)。前段 #3267 で TPreviewChannel 生成の格納先として見た `0x16bcae8` は、この解析の受け手の起点とは関係しない。
+
+### 測定 (追補 2)
+
+- 測定 commit (`pe_slot35_sites.py`): `a53ed0561` (そのスクリプトの最後の変更)。測定 commit (`pe_slot35_recv_src.py`・補助 probe): `a695c41ef` (probe を追加した commit)。
+- 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <repo 外の展開先> --wildcards '*block00031_PE.bin'` (2.93 s)。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-3371b python3 analysis/flapi/pe_slot35_sites.py` (12.07 s・rc 0・151 箇所・`0xfe9090` の直接 call 元は `0xffe29b`・`0x1001b7b` の 2 件で前回と一致)。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-3371b python3 analysis/flapi/pe_slot35_recv_src.py` (11.41 s・rc 0)。
+
+### 未解決 (追補 2 後)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 151 箇所のうち受け手の型 (出どころは分類済み・大域 `0x15e0c40` の初期化経路が未確定) | 受入 2 | #3371 |
+| 大域 `0x15e0c40`・`0x15e4790`・`0x15e0ff8` の初期化・格納経路 (RIP 相対の store は 0 件) | 受入 2・3 | #3371 |
+| `0xf48290` の受け手が chan か | 受入 2 | #3371 |
+| `0x1001ef0` の `this` の由来 (呼出し元 4 件) | 受入 2 | #3371 |
+| `0xfe9090` を参照する関数ポインタ表経由の間接呼出し | 受入 2 | #3371 |
+| 一覧 A・B の容器 Q への要素追加箇所と要素型 T | 受入 3 | #3371 |
