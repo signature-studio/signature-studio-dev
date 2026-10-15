@@ -23,7 +23,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import ldfix as L  # noqa: E402
-from ldmach import Machine, FnMach  # noqa: E402
+from ldmach import Machine, FnMach, memops_of  # noqa: E402
 
 FRAME = ('rbp', 'rsp')
 VOLATILE = ('rax', 'rcx', 'rdx', 'r8', 'r9', 'r10', 'r11')
@@ -95,11 +95,14 @@ def mach_entry_loads(mach, va, body):
                 else:
                     origin[dst] = None
                 continue
-            if o0.type == 3 and o1.type == 1 and o0.size == 8 and o0.mem.base and not o0.mem.index:
-                bb = L.gprnorm(cs, o0.mem.base)
-                if bb in FRAME:
-                    slots[(bb, o0.mem.disp)] = origin.get(L.gprnorm(cs, o1.reg))
-                    continue
+        for m in memops_of(cs, ins):
+            if not m['write'] or m['base'] not in FRAME or m['index']:
+                continue
+            n = (m['size_bits'] or 0) // 8
+            for k in [k for k in slots if k[0] == m['base'] and k[1] < m['disp'] + n and m['disp'] < k[1] + 8]:
+                del slots[k]
+            if mn == 'mov' and len(ops) == 2 and n == 8 and ops[1].type == 1 and ops[1].size == 8:
+                slots[(m['base'], m['disp'])] = origin.get(L.gprnorm(cs, ops[1].reg))
         if mn.startswith('call'):
             for r in VOLATILE:
                 origin[r] = None
