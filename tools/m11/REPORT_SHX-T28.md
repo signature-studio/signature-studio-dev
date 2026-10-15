@@ -117,9 +117,9 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 親フレームを callee の view に結線する修復 pass (`function_448490` の `-28` store の欠落の補完、`this` object の拡幅 (`-104`〜`+16`)、call 前後の count・length・arg1 の同期) | unit 18 を越えられず、逐次 boot の ftrace が 0 のまま | `[SHX-T40] #3234` (親 #2444 の子) |
-| 修復 OFF/ON の before-after 実測 (`units_run ≥ 18`・`VirtualAlloc(0x76910000)` 不発・`MessageBoxA` 不発・ネガコン) と、`docs/DEFECTS.md` D23 の「修復」列 | 子 issue の受入 | `[SHX-T40] #3234` |
-| 301 site の真偽のうち site 単位の機械語突合 (IR 幅による分類は §10 で実施済み。判定は組単位・IR 幅ベース) | 修復範囲の決定 | `[SHX-T40] #3234` (修復の受入に含める) |
+| 親フレームを callee の view に結線する修復 pass (`function_448490` の `-28` store の欠落の補完、`this` object の拡幅 (`-104`〜`+16`)、call 前後の count・length・arg1 の同期) | unit 18 を越えられず、逐次 boot の ftrace が 0 のまま | `[SHX-T44] #4189` (親 #4123) |
+| 修復 OFF/ON の before-after 実測 (`units_run ≥ 18`・`VirtualAlloc(0x76910000)` 不発・`MessageBoxA` 不発・ネガコン) と、`docs/DEFECTS.md` D23 の「修復」列 | 子 issue の受入 | `[SHX-T44] #4189` |
+| 301 site の真偽のうち site 単位の機械語突合 (IR 幅による分類は §10 で実施済み。判定は組単位・IR 幅ベース) | 修復範囲の決定 | `[SHX-T44] #4189` (修復の受入に含める) |
 | boot5 (`m11_extra_ranges5.txt`・25 関数) を RetDec で再 lift して IR に含めた経路の閉包数と baseline。本測定の IR は boot5 を含まない (§2) | 閉包と baseline の数値が変わりうる | 起票せず (本 PR の未解決表で追跡) |
 | lift 元 PE との一致 (素材に `lift_pe.sha256` が無い。画像の一致は §2 で確認済み) | lift 成果物の由来は直接には未確認 | 起票せず (本 PR の未解決表で追跡) |
 | `signature mismatch`: T27 §4-A は 1、`786c0144` の build は 0 (原因未確認) | 検証値の再現性の注記のみ | 起票せず (§7) |
@@ -128,6 +128,7 @@
 
 - 分類器 `tools/m11/frame_share/classify.py` (新規)。detect.py の mov 渡し・shared site ごとに、親 IR が callee へ第 1 引数で渡す alloca の大きさ S と、callee が base から触る最大端 E を比べる。E > S なら `ir_frame_too_small` (親 IR のフレームが callee の触る範囲を覆わない)、E ≤ S なら `ir_frame_covers`、IR に該当 call が無ければ `unmatched`。
 - 判定は IR の alloca 幅だけで行う。**真の D23 かどうかの確定ではない**。確定に使えるのは、機械語で確認した site だけ (下の表の機械語列)。
+- **仮定**: 「callee が rbp 基準で触る最大端 E」と「親 IR の渡し先 alloca の幅 S」を比べるのは、渡された alloca の先頭が親の rbp (オフセット 0) に対応すると仮定するため。この対応は未確認 (機械語で site ごとに確かめていない)。
 
 | 分類 | site 数 | (親, callee) 組 | 意味 |
 |---|---|---|---|

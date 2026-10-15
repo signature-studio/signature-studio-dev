@@ -11,7 +11,7 @@
   - 親 IR に該当 call が無い (P が alloca でない・見つからない) → 'unmatched' (未分類)。
 同一 (親, callee) の site は同じ判定になる (site ごとの機械語の突合は行わない。その範囲は REPORT に書く)。
 使い方:
-  python3 tools/m11/frame_share/classify.py --ir work/boot_final3.ll --sites work/frame_share.json
+  python3 tools/m11/frame_share/classify.py --ir work/boot_final3.ll --sites work/frame_share.json [--out work/frame_share_classify.json] [--show function_448490]
 """
 import argparse
 import collections
@@ -46,6 +46,7 @@ def main():
     ap.add_argument('--ir', required=True)
     ap.add_argument('--sites', required=True)
     ap.add_argument('--out')
+    ap.add_argument('--show', help='この親関数の (callee ごとの判定) を標準出力に表示する')
     a = ap.parse_args()
     text = open(a.ir, errors='replace').read()
     fns = bodies(text)
@@ -95,7 +96,7 @@ def main():
                pair_detail={'%s->%s' % k: dict(cls=v[0], why=v[1]) for k, v in sorted(verdict.items())})
     print(json.dumps({k: v for k, v in res.items() if k != 'pair_detail'}, ensure_ascii=False, indent=1))
     for k, v in sorted(verdict.items()):
-        if k[0] == 'function_448490':
+        if a.show and k[0] == a.show:
             print('%s -> %s : %s (%s)' % (k[0], k[1], v[0], v[1]))
     if a.out:
         json.dump(res, open(a.out, 'w'), ensure_ascii=False, indent=1)
