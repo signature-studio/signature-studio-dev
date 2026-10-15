@@ -215,3 +215,45 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 ## 9. 本 runner の参考値 (#2779・LB=0 / 0x10000 の後段・指紋検査を迂回)
 
 参考値のみ (受入の根拠ではない)。`m11_e2e.sh` の指紋検査 (`work/lift_pe.sha256`) を `M11_SKIP_LIFT_FP=1` で迂回した後段の測定。測定値・再現・未解決は付録 `tools/m11/REPORT_APPENDIX_2779.md` が正本 (250 行上限のため分割移動)。
+
+## 10. #3161: boot5 × ld108 × LB の切り分け (`--full` の IR・指紋込み。6/8 通り実測)
+
+測定主体: 本 run (2026-10-15, runner 1 台, load 1.0〜1.2)。測定 commit: `7a91a358e` (driver `tools/m11/m11_lb_matrix.sh` を取り込んだ commit。以後 REPORT のみ変更)。
+素材: fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11 (snapshot)。`work/lift_pe.sha256` 無しのため `M11_LB_BASE=0 bash tools/m11/m11_e2e.sh --full` で lift・IR を全再生成 (05:38→06:00, 約 22 分, Ghidra 12.1.4 取得込み)。
+`--full` の IR `ir_sha256` = `1f1134e339…`。PM 追記の `d8738edd…` (e2e 経路) と `ecbd43c1…` (repro 経路) のどちらとも一致しない (どちらが正かは未確定)。`--full` の終了 rc は 1 (run A の `memory access out of bounds` 停止が理由と見られる。judge の詳細は未確認)。
+
+### 10-1 実測 (`bash tools/m11/m11_lb_matrix.sh <boot5> <ld108> <LB>`)
+
+| boot5 | ld108 | LB | IR sha (先頭12) | units_run | survey ok / noproc / miss / trap | 通常起動 |
+|---|---|---|---|---|---|---|
+| 1 | 1 | 0 | 1f1134e33926 | 98 | 873 / 1 / 46 / 22 | boot threw (OOB) |
+| 1 | 0 | 0 | 6f9e87af9dc0 | 98 | 873 / 1 / 46 / 22 | boot threw (OOB) |
+| 0 | 1 | 0 | 38617ce9e518 | 109 | 873 / 1 / 47 / 21 | dllmain_done, Halt0 1, longjmp 1 |
+| 0 | 0 | 0 | 30cedfcc9fa1 | 109 | 873 / 1 / 47 / 21 | dllmain_done, Halt0 1, longjmp 1 |
+| 1 | 1 | 0x10000 | ac603a4672d1 | 37 | 870 / 1 / 46 / 25 | Halt0 1 (早期終了) |
+| 1 | 0 | 0x10000 | 620f99806e7b | 37 | 870 / 1 / 46 / 25 | Halt0 1 (早期終了) |
+| 0 | 1 | 0x10000 | — 未測定 | — | — | 300 s 打ち切り (下記) |
+| 0 | 0 | 0x10000 | — 未測定 | — | — | 300 s 打ち切り (下記) |
+
+- 1 通りの所要: IR 生成 46–47 s・build 22–24 s・run 1–2 s・survey 15–16 s。
+- ld108 の有無 (boot5 固定): survey の ok/miss/trap は変わらない (LB=0 も 0x10000 も)。IR 指紋と wasm_size は変わる。
+- boot5 の有無 (ld108 固定): LB=0 は ok 873 のまま、miss +1・trap −1 (47/21)。通常起動は boot5 無しの方が units_run 109 で Halt0 に入る (boot5 有りは OOB で boot が throw)。
+- LB=0x10000 は boot5 有無で ok 870 の変化なし (boot5=0 の 2 通りは未測定)。
+- **#403 の実測からの変化**: #403 の引用値 (LB=0 `870/25`・LB=0x10000 `868/27`) とは一致しない。`--full` の IR が #403 の IR と違うため (§3・§5 の指紋不一致の続き)。受入 3 は未達。
+
+### 10-2 Halt0 早期終了 (受入 2) の unit 位置
+
+- LB=0 (boot5=1, ld108=1) の halt を呼んだ unit (`survey halted_units`) に `0x105bd0` (unit 40) は無い。
+- LB=0x10000 (同条件) では `0x115bd0` (= unit 40 の LVA) が halt を呼ぶ。
+- LB=0x10000 の halted_units は、LB=0 の halted_units を LB 分 (+0x10000) ずらしたものに、`0x115bd0` と `0x26c540` が加わる形。**Halt 早期終了の unit は LB=0 と同じではない** (unit 40 が LB 依存の経路で Halt を呼ぶ。#403 §5 と同じ結論)。
+
+### 10-3 未測定と原因
+
+- LB=0x10000 の boot5=0 の 2 通り (`b50_ld1_lb010000`・`b50_ld0_lb010000`): `m11_lb_matrix.sh` が 300 s の timeout で打ち切られ、`LBM_RESULT` 行が出なかった。driver の標準出力を grep で絞っていたため、gen_ir2 / build / run のどの段で止まったかは未確認 (ログ `work/lbm/b50_ld*_lb010000/` に残っている可能性あり)。次の run で再測定する。
+- 寛容起動の「ハング」(#2779 の子) とは別件か未確認。
+
+### 10-4 結論 (この run の範囲)
+
+- 受入 1: 8 通り中 6 通りを `--full` の IR で実測。未測定 2 通りは 10-3。
+- 受入 2: 答えは「同じ unit ではない」(10-2)。
+- 受入 3: 未達。`--full` の IR での値 (LB=0 873/21・LB=0x10000 870/25) は #403 の引用値と異なる。
