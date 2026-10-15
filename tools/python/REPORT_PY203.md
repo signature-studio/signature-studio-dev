@@ -15,7 +15,7 @@
 ## 0 対象と前提
 
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB) から `tar --zstd -xf ... --wildcards '*block00031_PE.bin'` で `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin` を展開 (2.8 秒)。
-- 検証起点 commit: `2f0bd0aa5` (origin/main と同一)。
+- 検証起点 commit: `2f0bd0aa5` (PR 作成時の origin/main)。main 取り込み後の測定 commit は §4。
 - 逆アセは `pe_callgraph.py` の線形走査 (int3 の直後を関数先頭とみなす)。直接 E8 のみを数え、間接 call (`call reg`・`call [mem]`) と `jmp` 経由は数えない。
 
 ## 1. 受入 1: 6 呼出し元の残りの引数の上流 (0x12a4450 の呼出し元)
@@ -55,7 +55,9 @@
 - `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py203_probe.py` → 27/27 PASS、終了 0。
 - `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py203_edx_sites.py` → 終了 0。直接 call の集合は `pe_callgraph.py callers` と照合する。
 - ネガティブコントロール (数値): `[rbp+0x54]` の読みも数えると 9 件 (書込み 1 件・読出し 8 件)。edx の `--ablate merge` で AMBIG 8 → 0。
-- 測定 commit: `0ad96b77d` (probe と edx スクリプトを入れた最後のコード変更)。本 REPORT は後続の docs commit。`git diff 0ad96b77d HEAD -- tools/python/analysis/flapi` の出力は 0 行 (本 PR の後続 commit は REPORT と DOC_MAP のみ)。
+- 測定 commit: `ab3d2d992` (main 取り込みのマージ。前回の測定 commit `0ad96b77d` の後に main が `analysis/flapi/` の 3 ファイル (`pe_k_struct_probe.py`・`pe_mixer_wrappers.py`・`pe_va_read.py`) を変えたため、マージ後のコードで測定し直した)。
+- 実測 (`ab3d2d992`・fl-win64 の展開 1.6 秒・load 0.2): probe 27/27 PASS・終了 0・84 秒。`pe_py203_edx_sites.py` 終了 0・23 秒、IMM 7・COPY 7・MEM 38・AMBIG 8 (60 行)。`--ablate merge`・`--ablate copy` は共に COPY 15・AMBIG 0。直接 call 60 箇所は `pe_callgraph.py callers 0x128f9e0` (60 箇所) と箇所の集合が一致。
+- 本 REPORT は後続の docs commit。`git diff ab3d2d992 HEAD -- tools/python/analysis/flapi` の出力は 0 行。
 
 ## 5. 未解決 (起票先)
 
