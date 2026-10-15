@@ -61,19 +61,19 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 - e2e (既定): rc=1 (既知: tolerant 通常起動 101 ≠ 期待 56、survey ok 873 ≠ 期待 872)。`m11_e2e.sh` の所要は 73 s (IR 再生成 51 s を除く)。load average は 0.42〜0.48 (いずれも単発・n=1)。
 - trap の経路 (probe 下・PR 時点の IR。§8.6 で再確認): `function_407e20` は `[arg1-8]` (hdr) が 0 のとき `[0]` (wasm アドレス 0) を次の block として読む。`[0]` が範囲外なら trap する。
 - unit 144 で `function_412d60` (参照解放: `[arg1]=0`、`[arg1-8]` を減算、0 なら `function_409440(arg1-16)`) に渡る `arg1` = `0x6c`。解放される値は `0x5c` (ポインタでない)。`[0x54]` (= hdr) は OFF/ON とも 0。
-- 差は `[0]` の内容だけ: OFF = `0x10bd4c01` / ON = `0x865901` (`409440(0x5c)` の `[hdr]` の値)。OFF の `[0]` は lift 版 `function_50a830` が nil の FItems (items=0) に `Q(0 + cnt*8) = item` で書いた残骸と推定 (unit 114 の Add が `[0]` へ書く)。ON では list が Grow されるため、この残骸は残らない。ON の `[0]` の書込み元は**未特定**。
+- 差は `[0]` の内容だけ: OFF = `0x10bd4c01` / ON = `0x865901` (`409440(0x5c)` の `[hdr]` の値)。OFF の `[0]` は lift 版 `function_50a830` が nil の FItems (items=0) に `Q(0 + cnt*8) = item` で書いた残骸と推定 (unit 114 の Add が `[0]` へ書く)。ON では list が Grow されるため、この残骸は残らない。ON の `[0]` の書込み元は §9.4 (#3645 で main に merge 済み) で採取した (ON のみ)。OFF は未採取 (#3643 の受入)。
 - unit 144 自身には list 操作が無い (`[probe_list]` 0 件)。範囲外の値が list Add で入る経路は無い (ON の Add 32 件はすべて範囲内の item)。
 - ON で unit 745 も `409440(0x10ba240c)` (8 byte 境界外) を解放するが、hdr = `0xffffffa0` の経路で trap しない。
 - `function_47b260` (REPORT_2408 §7.3 の同型): IR に Grow (`47a3e0`) は残っており、欠けているのは Notify (`[rbx+0x20]` 呼出し、既定 0)。nil FItems の経路とは別物と判断 (未測定)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ON の `[0]` (= 0x865901) の書込み元と、unit 144 が `412d60(0x6c)` に至る nil 読みの元 (どの list・配列が nil のまま読まれるか) | 既定 ON 不可 (survey ok −1) | #3643 ([M11-26])。`[0]` の書込み元は #3592 ([M11-24]) で特定済み |
+| ON の `[0]` (= 0x865901) の書込み元と、unit 144 が `412d60(0x6c)` に至る nil 読みの元 (どの list・配列が nil のまま読まれるか) | 既定 ON 不可 (survey ok −1) | #3643 ([M11-26])。`[0]` の書込み元は §9.4 (ON のみ採取。OFF は未採取・#3643 の受入) |
 | 既定 ON 化と e2e 期待値 (tolerant 101 ≠ 56、survey 872/873) | e2e rc=1 | PM 判断 (§8.3 の既存未解決) |
 
 ### 8.6 fix round 1: 再測定 (ON / OFF / probe の unit 別突合)
 
-測定は実測・単発 (n=1)。survey は直列 1 本、1 回 12 s。測定 commit `62f1345fd` (コード差分の最終 commit。`m11_build.sh` は `a2173a3f3` と同一、`trap_triage/probe_trace.sh` は `24a8965bd` で追加。基点 `bd4463eaa`)。`git diff 62f1345fd HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は 0 行。IR は本 run で `m11_gen_ir2.sh` を作り直した (`ldfix`・`ld108`・`ld115`・`r8b` = applied)。`m11_build.sh` 後は `qstore=applied`、ir_sha256 `e608b0f3…`。PR 時点の `116d9406…`・REPORT §1 の `6909f85d…`・#3482 本文の `17a98d6e…` のいずれとも異なる。IR の sha が環境ごとに変わる理由は未切り分け。
+測定は実測・単発 (n=1)。survey は直列 1 本、1 回 12 s。測定 commit `62f1345fd` (コード差分の最終 commit。`m11_build.sh` は `a2173a3f3` と同一、`trap_triage/probe_trace.sh` は `24a8965bd` で追加。基点 `bd4463eaa`)。fix round 2 で main (`f6fd31b8d`) を merge した (merge `c2b906b45`)。測定経路の差分は `m11_build.sh` の stamp 3 行だけ: `git diff 62f1345fd c2b906b45 -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_survey.mjs tools/m11/m11_cond.py tools/m11/ldfix/ldfix.py tools/m11/ldfix/ldmach.py tools/m11/ldfix/ldframe.py tools/m11/lb_base.py tools/m11/trap_triage/probe_trace.sh` の出力は `m11_build.sh` の `+3` 行 (stamp) のみ。main 側で変わった他のファイル (`e2e_expect.env`・`m11_e2e.sh`・`ldfix/fix_*`・REPORT 群) は、IR 生成・build・survey の呼出し先に入らない。HEAD での再測定は未実施 (fix round 2 のレビューの『再測定は不要』に従う)。IR は本 run で `m11_gen_ir2.sh` を作り直した (`ldfix`・`ld108`・`ld115`・`r8b` = applied)。`m11_build.sh` 後は `qstore=applied`、ir_sha256 `e608b0f3…`。PR 時点の `116d9406…`・REPORT §1 の `6909f85d…`・#3482 本文の `17a98d6e…` のいずれとも異なる。IR の sha が環境ごとに変わる理由は未切り分け。
 
 | 条件 | ok / trap / miss (noproc) | unit 144 (0x25c540) | OFF との unit 差 |
 |---|---|---|---|
@@ -87,11 +87,11 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 - trap 経路 (probe 下): unit 144 の trace は ON + probe・OFF + probe とも `[probe_free] arg1=5c hdr=0 [hdr]=865901` (同じ値)。unit 745 は `arg1=10ba240c hdr=ffffffa0 [hdr]=0`。
 - trace 行の件数 (ON + probe): `[probe_list]` 30・`[probe_grow]` 9・`[probe_free]` 2。§8.5 の『list Add 32 件』は PR 時点 IR の値。
 - 判定: 『ON で unit 144 が ok → oob』は本 run では成立しない (OFF でも trap)。trap 経路 (`412d60(0x6c)` → `409440(0x5c)` → `407e20` で `[0]` が範囲外) は probe 下で ON/OFF とも再現した。ON 固有の回帰の有無は、PR 時点の IR と同じ sha を再現できてから判定する (#3592 の受入)。
-- ov.o の注意: `m11_build.sh` には `M11_FIX_50A830` の切替えで `work/obj/ov.o` を作り直す stamp が無い (同じ修正は #3620・#3645 が持つ。本 PR では重ねない)。stamp 無しでは、ON で作った ov.o を後の OFF build が再利用する (`cc m11_ov.c` 0 件を確認)。上の数値は、各ビルドの前に `rm -f work/obj/ov.o` を実行して取った (各 build の `cc m11_ov.c` は 1 件)。HEAD (`62f1345fd`) で ON+probe・ON・OFF を取り直し、上の表と unit 単位で一致 (差 0)。
+- ov.o の注意: 測定 commit (`62f1345fd`) の `m11_build.sh` には `M11_FIX_50A830` の切替えで `work/obj/ov.o` を作り直す stamp が無かった。stamp 無しでは、ON で作った ov.o を後の OFF build が再利用する (`cc m11_ov.c` 0 件を確認)。上の数値は、各ビルドの前に `rm -f work/obj/ov.o` を実行して取った (各 build の `cc m11_ov.c` は 1 件)。`62f1345fd` の時点で ON+probe・ON・OFF を取り直し、上の表と unit 単位で一致 (差 0)。stamp は #3645 で main に入り、merge 後の HEAD (`c2b906b45`) に含まれる。
 
 GUI (m2): `tools/gui/flengine/build.sh` は `m11_ov.c` を独自の CF で直接コンパイルする。差し戻し時の reviewer 実測 (同じ CF の `cc -E -P`): 基点 `bd4463eaa` と PR head の既定出力は同一 (9132 行・差 0)。`-DM11_PROBE_LIST=1` のみ +6 行 (ネガティブコントロール)。本 run では GUI の e2e は実行していない。
 
-main との関係 (m3): `git merge-tree --write-tree origin/main HEAD` は競合なし (rc 0)。`git diff --stat bd4463eaa origin/main -- tools/m11` は 15 files。merge 後の既定 e2e は未測定。
+main との関係 (m3): fix round 2 で `origin/main` (`f6fd31b8d`) を merge した (`c2b906b45`)。競合は REPORT_APPENDIX_2521.md の 1 箇所 (§8.5・§8.6 と main の §9 の追加が同じ位置) で、両方を残した。`m11_build.sh` は main の stamp (`50a830`) と本 PR の probe stamp が両方残る。merge 後の既定 e2e は未測定 (main で `e2e_expect.env` の期待値が 101・873 に変わった。e2e の判定は本 PR の範囲外)。
 
 再現手順 (1 コマンドずつ。作業ディレクトリはリポジトリのルート):
 
@@ -114,7 +114,7 @@ awk '/^\[UNIT\] /{u=$2} /\[probe_(free|list|grow)\]/{print "unit=" u, $0}' "$RUN
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 本 run の IR (`e608b0f3…`) で ON と OFF が一致し、unit 144 は両方 trap。PR 時点の IR (`116d9406…`) との差 (IR 生成の決定性か環境差か) | 既定 ON 化の判定 (ON 固有の回帰が再現しない) | #3643 ([M11-26]) |
-| `412d60(0x6c)` の元の nil 読み (ON・OFF の `[0]` (0x865901) の書込み元は #3592 で特定済み) | trap の原因 (probe 下) | #3643 ([M11-26]) |
+| `412d60(0x6c)` の元の nil 読み。`[0]` (0x865901) の書込み元は ON のみ採取 (§9.4)。OFF は未採取 | trap の原因 (probe 下) | #3643 ([M11-26]) |
 | merge 後の既定 e2e は未測定 | merge 後の既定 e2e の結果が未確認 | PM 判断 (merge 後の確認) |
 
 ## 9. #3592 (M11-24): ON/OFF の再測定と unit 144 の trap の経路 (測定 commit `68b9de191`)
