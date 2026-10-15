@@ -101,6 +101,29 @@ pdata の関数境界ごとに逆アセンブル (capstone) し、E8/E9 の直�
 | `d8b560` (`d8cc20` の呼出元) の特定と、`d8c4f0`・`d8c8b0`・`d8cfe7` の間接呼出元の走査 | 挿入の根の網羅 | #2207 (Refs) |
 | 陰性対照 (呼出元の無い既知関数で `callers=-` が出ることの確認)。本 run では素材が無く実バイナリで実行できない | §6 の『なし』の検出力が未確認 (正対照は caa820・e15030 の呼出検出のみ) | #2207 (Refs) |
 
+## 8. FA-42 (#3718): UI 入口 popup slot 5 (`0x180d8c0b0`) の harness 駆動
+
+- 測定 commit: `863e07193` (`FA_UI31` 診断を追加した commit。`native_ctrl.c` のみ変更)。`git diff 863e07193 HEAD -- tools/targets/freshair/lift2` = 0 行 (以後の変更なし)。
+- 診断は既定 OFF。`FA_UI31=1` のときだけ、各シナリオの build_tree 後に `0x180d8c0b0(P, G, NULL, NULL)` を guard 付きで 1 回呼ぶ。
+  `P` は 0x1000 B のゼロ埋め。`[P+0xb48]=1`・`[P+0xbb8]=[P+0xbc0]=非 NULL`。`G` は `0x180d215e0` のゲート対象 (先頭 byte=1)。
+  カウンタは `d8d700`・`d8c140` を追加 (`CTL31 summary` に `d8d700=` `d8c140=` を追記)。
+- 静的な読み (`disasm.py`): `0x180d8c0b0` は先頭で `0x180cb79c0(rcx)`、次に `0x180d215e0(G, [P+0xb48] の参照)` を呼び、真なら `0x180d8d700(P)` を呼ぶ。`0x180d215e0` は第 1 引数 (G) の先頭 byte が非 0 なら即 true、0 なら第 1 引数の配列 (`[G+8]`〜`[G+0x10]`) を第 2 引数の値で走査する。
+  SEGV の正確な位置 (どの call か・どのフィールドが偽ポインタか) は未特定。`0x180cb79c0` は `[P+0x1c8]`・`[P+0x1d0]` を読む。
+- 実測 (`FA_UI31=1 bash fa31_ctl.sh`、コミット済み HEAD):
+  - 8 シナリオ S900–S907 とも **`FAULT rip=0x125afc6 addr=0x125afc6`** (guard の SEGV 捕捉。呼出後に戻らない)。
+  - `caa820`・`e13590`・`d8c4f0`・`d8ae60`・`e15030`・`e12f20`・`d8d700`・`d8c140` は全て **0 回**。`CAA31` 行は無し。
+  - 落ちる位置 `0x125afc6` は `.text` の外 (`0x18...` の VA ではない)。popup 入力の内部ポインタを 0 埋めのまま辿った結果と見られる。**未確認**: どのフィールドが偽ポインタか (`P` の構築の不足)。
+- 既定経路 (`FA_UI31` 無し): `fa31_ctl.sh` の base は `ca7db0=72`・`caa820=0` で §3 と一致。`run_ctrl.sh 2 5` は **BIT-EXACT 15/15** (wall 2.7 s・n=1・rc=0)。
+- 所要 (n=1): `build_ctrl.sh` 30.0 s・`fa31_ctl.sh` 0.37 s・load 0.30→0.55 (参考値)。
+- 製品 KPI: **動かしていない** (native harness の診断のみ)。
+
+受入の状況 (#3718):
+- 受入 1 (`0x180d8c0b0` から `caa820` まで到達): **未達**。`0x180d8c0b0` は実行されるが、popup 入力が不完全で `d8d700` に届く前に SEGV。
+- 受入 2 (`this` と controller の同一判定): **未達** (1 の未達により判定対象なし)。
+- 受入 3 (木のノード数 `tree=`): **未達** (`caa820` 未到達)。
+- 受入 4 (判定基準 (a) の期待値は不変): **達成** (`run_fa9.sh` の判定式は変更していない)。
+- 受入 5 (測定 commit と実測値を REPORT に残す): **達成** (本節)。
+
 ## 7. 測定 (`lift2/fa31_refs.py`)
 
 - 測定 commit: `12c4a4fda` (`fa31_refs.py` を追加した commit)。`git diff 12c4a4fda HEAD -- tools/targets/freshair/lift2` = 0 行 (以後の変更は本付録のみ)。
