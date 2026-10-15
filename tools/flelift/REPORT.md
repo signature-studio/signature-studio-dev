@@ -244,7 +244,3 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 | 素材 `toolchain-emsdk` を使った `fle_e2e.sh` の before/after | 本節は runner 既設の `[EMSDK]` (同版 6.0.12) で実施。素材版での一致は未確認 | #3661 (CI-173) |
 | `tools/icall` の既定値置換と代表 e2e | 本節の範囲外 (flelift 直下のみ検証) | #3604 |
 | m11 ほか残り area と ott/m11 の代表 e2e | 親 #294 の残り | #294 |
-
-## 12. #3603 (CI-169): 直下 3 本の VM 既定の絶対パス ([ANALYSIS-DIR]) の置換
-
-- **結論: 達成**。`fle_nat.py`・`fle_diff.py`・`probe_d9_disp.py` の既定値は `tools/shared/paths.py` の `FL_WIN64_DIR` 経由 (3 本で VM 既定の絶対パス 0 件)。`fle_e2e.sh` は変更前後・main 取り込み後とも PASS。実測値・測定 commit・差分 0 の証跡は `REPORT_APPENDIX.md` §12 が正本。
