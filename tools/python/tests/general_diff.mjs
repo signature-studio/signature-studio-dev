@@ -29,6 +29,10 @@ const calls = [
   ["general.safeToEdit", []], ["general.getProjectTitle", []], ["general.getProjectAuthor", []], ["general.getProjectGenre", []],
   // PY-125 (#3001): 戻り値 None。dumpScoreLog は time (必須 int) と silent (任意 int)
   ["general.clearLog", []], ["general.dumpScoreLog", [0]], ["general.dumpScoreLog", [-7, 1]],
+  // PY-235 (#3701): processRECEvent の成功経路 (R-other・low16 != 8) は戻り値 = value。未確定の family は code 2 (未実装)
+  ["general.processRECEvent", [0x10000000, 5, 0]], ["general.processRECEvent", [0x40000003, -7, 2]], ["general.processRECEvent", [-0x10000000, 100, 0x20]],
+  ["general.processRECEvent", [0x50000000, 1, 0]], ["general.processRECEvent", [0x10000008, 9, 0]], ["general.processRECEvent", [0x40000005, 3, 0]],
+  ["general.processRECEvent", [0x40000001, 3, 0]], ["general.processRECEvent", [0, 1, 0]], ["general.processRECEvent", [-0x80000000, 1, 0]],
 ];
 // 引数個数違い (NOARGS の関数に引数を渡す): mock と C は共に code 5 (Wrong number of parameters)
 const arity = [
@@ -38,6 +42,7 @@ const arity = [
   // PY-125: 個数違い・型違い (code 5)
   ["general.clearLog", [1]], ["general.dumpScoreLog", []], ["general.dumpScoreLog", [0, 1, 2]],
   ["general.dumpScoreLog", ["x"]],
+  ["general.processRECEvent", [1, 2]], ["general.processRECEvent", [1, 2, 3, 4]],
   ["general.setRecPPQ", [24]], ["general.setRecPPQ", [960]], ["general.setRecPPQ", [23]], ["general.setRecPPQ", [961]],
   ["general.setNumerator", [1]], ["general.setNumerator", [16]], ["general.setNumerator", [0]], ["general.setNumerator", [17]],
   ["general.setDenominator", [2]], ["general.setDenominator", [16]], ["general.setDenominator", [1]], ["general.setDenominator", [17]],
