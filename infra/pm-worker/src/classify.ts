@@ -1,7 +1,7 @@
 // tools/pm/launch_issues.py の graph / started_map / needed_arts / classify の移植 (純関数のみ)。
 // GitHub・現在時刻・ローカルファイルは読まず、呼び出し側が ClassifyInput で渡す。
 // Python の defaultdict のキー挿入順を保つ (循環除去の結果が順序に依るため)。
-import { ALLOW_ARTS, addArts, defaultArtLine, sortReady } from "./launch.ts";
+import { ALLOW_ARTS, addArts, defaultArtLine, effectivePrioMap, sortReady } from "./launch.ts";
 import type { LaunchState } from "./launchobs.ts";
 import { parentOf } from "./refs.ts";
 import { DIGEST_ROLLING_RE, OC_HOLD_LABEL } from "./pm.ts";
@@ -278,7 +278,9 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
     }
   }
 
-  const ready = rows.ready.map((n) => ({ n, title: iss.get(n)?.title ?? "", blocksCount: blocksCount.get(n) ?? 0, labels: iss.get(n)?.labels ?? [] }));
+  // 区分は親からの継承を含む (#3973)。snapshot は open な issue だけなので、closed の親は引けず継承しない (engine の prioMap と同じ値)。
+  const prios = effectivePrioMap(d.issues.map((i) => ({ number: i.number, state: "open" as const, labels: i.labels, body: i.body })));
+  const ready = rows.ready.map((n) => ({ n, title: iss.get(n)?.title ?? "", blocksCount: blocksCount.get(n) ?? 0, prio: prios.get(n) ?? "normal" }));
   rows.ready = sortReady(ready).map((r) => r.n);
   return {
     rows,
