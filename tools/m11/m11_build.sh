@@ -27,7 +27,9 @@ M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (
 M11_FIX_535BF2="${M11_FIX_535BF2:-1}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現; 既定 #2521); 0 = lift 版
 M11_FIX_50A830="${M11_FIX_50A830:-0}"   # #2439: 1 = m11_ov.c の function_50a830 転記 (list Add の Grow/Notify 復元 + Grow 実体 50aac0/50ade0 の転記); 0 = lift 版 (既定)
 M11_FIX_4136A0="${M11_FIX_4136A0:-0}"   # #3928: 1 = m11_ov.c の function_4136a0 転記 (UniqueString の *s deref 脱落の補正); 0 = lift 版 (既定)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_FIX_50A830=$M11_FIX_50A830 -DM11_FIX_4136A0=$M11_FIX_4136A0 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_DEST_GUARD=${M11_DEST_GUARD:-0} -DM11_INSTR_40F960=${M11_INSTR_40F960:-0} -DM11_INSTR_40FFE0=${M11_INSTR_40FFE0:-0} -DM11_INSTR_60A270=${M11_INSTR_60A270:-0} -DM11_PROBE_2400=${M11_PROBE_2400:-0} -DM11_INSTR_412770=${M11_INSTR_412770:-0} -DM11_INSTR_4128B0=${M11_INSTR_4128B0:-0} -DM11_INSTR_E3EF60=${M11_INSTR_E3EF60:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_PROBE_LIST=${M11_PROBE_LIST:-0} -DM11_NOVCALL=${M11_NOVCALL:-0} -DM11_RT_PADPRE=${M11_RT_PADPRE:-0} -DM11_RT_PADPOST=${M11_RT_PADPOST:-0} -DM11_RT_EMPTY=${M11_RT_EMPTY:-0} -DM11_PRINT_DEST_2118=${M11_PRINT_DEST_2118:-0} -DM11_RT_NODATA=${M11_RT_NODATA:-0} -DM11_RT_NODATA_BODY=${M11_RT_NODATA_BODY:-0}"
+M11_OV_450560="${M11_OV_450560:-0}"   # #2556 (CI-104): 1 = m11_ov.c の function_450560 転記を有効化 (旧既定); 0 = 転記を外し IR 版 (fix_450560 適用済み) を使う (既定)。既定を 0 にした理由は tools/m11/REPORT.md
+M11_OV_450560_DEF=""; [ "$M11_OV_450560" = 1 ] || M11_OV_450560_DEF="-DM11_OV_NO_450560"
+CF="$M11_OV_450560_DEF -w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_FIX_50A830=$M11_FIX_50A830 -DM11_FIX_4136A0=$M11_FIX_4136A0 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_DEST_GUARD=${M11_DEST_GUARD:-0} -DM11_INSTR_40F960=${M11_INSTR_40F960:-0} -DM11_INSTR_40FFE0=${M11_INSTR_40FFE0:-0} -DM11_INSTR_60A270=${M11_INSTR_60A270:-0} -DM11_PROBE_2400=${M11_PROBE_2400:-0} -DM11_INSTR_412770=${M11_INSTR_412770:-0} -DM11_INSTR_4128B0=${M11_INSTR_4128B0:-0} -DM11_INSTR_E3EF60=${M11_INSTR_E3EF60:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_PROBE_LIST=${M11_PROBE_LIST:-0} -DM11_NOVCALL=${M11_NOVCALL:-0} -DM11_RT_PADPRE=${M11_RT_PADPRE:-0} -DM11_RT_PADPOST=${M11_RT_PADPOST:-0} -DM11_RT_EMPTY=${M11_RT_EMPTY:-0} -DM11_PRINT_DEST_2118=${M11_PRINT_DEST_2118:-0} -DM11_RT_NODATA=${M11_RT_NODATA:-0} -DM11_RT_NODATA_BODY=${M11_RT_NODATA_BODY:-0}"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -74,6 +76,12 @@ if [ "$(python3 m11_cond.py --get ldfix)" = applied ]; then
     echo "[m11build] WARNING: M11_ALLOW_LD115_DISABLED=1: fix_ld115 無しの IR で build する (ir_conditions.json ld115=disabled)" >&2
   elif [ "$(python3 m11_cond.py --get ld115)" != applied ]; then
     echo "[m11build] ERROR: work/ir_conditions.json に ld115=applied の記録無し (現在: '$(python3 m11_cond.py --get ld115)')。m11_gen_ir2.sh で IR を作り直すこと (fix_ld115 無しで測るなら M11_FIX_LD115=0 で作り直し、M11_ALLOW_LD115_DISABLED=1)" >&2; exit 2
+  fi
+  # #2556 (CI-104): fix_450560 (function_450560 の IR 修復) は ldfix 直後に常設する。記録の無い IR は build しない。
+  if [ "$(python3 m11_cond.py --get 450560)" = disabled ] && [ "${M11_ALLOW_450560_DISABLED:-0}" = 1 ]; then
+    echo "[m11build] WARNING: M11_ALLOW_450560_DISABLED=1: fix_450560 無しの IR で build する (ir_conditions.json 450560=disabled)" >&2
+  elif [ "$(python3 m11_cond.py --get 450560)" != applied ]; then
+    echo "[m11build] ERROR: work/ir_conditions.json に 450560=applied の記録無し (現在: '$(python3 m11_cond.py --get 450560)')。m11_gen_ir2.sh で IR を作り直すこと (fix_450560 無しで測るなら M11_FIX_450560=0 で作り直し、M11_ALLOW_450560_DISABLED=1)" >&2; exit 2
   fi
 fi
 # #680 (review): 記録の無い差替え (正規 pass を経ない IR の書換え) を拒否する。正規 pass は直後に --bind で指紋を更新する
@@ -229,6 +237,9 @@ if [ "${M11_KEEP_BOOT_O:-0}" != 1 ] || [ ! -f work/obj/boot.o ]; then cc work/bo
 cc work/m11_simd.c work/obj/simd.o msimd11_core.h
 cc work/m11_winstubs.c work/obj/winstubs.o
 cc work/m11_fnstubs.c work/obj/fnstubs.o
+# #2556: M11_OV_450560 が変わったら ov.o だけ無効化 (stamp)
+if [ "$(cat work/ov_450560.stamp 2>/dev/null || echo none)" != "$M11_OV_450560" ]; then rm -f work/obj/ov.o; fi
+echo "$M11_OV_450560" > work/ov_450560.stamp
 # M11_OV_CLASSCREATE が変わったら ov.o だけ無効化 (stamp; ON/OFF の切替で古い ov.o を再リンクしない)
 if [ "$(cat work/ov_classcreate.stamp 2>/dev/null || echo 0)" != "$M11_OV_CLASSCREATE" ]; then rm -f work/obj/ov.o; fi
 echo "$M11_OV_CLASSCREATE" > work/ov_classcreate.stamp
