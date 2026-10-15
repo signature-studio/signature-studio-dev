@@ -4,7 +4,7 @@
 実験は 1 プロセス 1 実験 (CreateInstance の直後に slot を 1 回呼ぶ)。
 
 測定 commit (コードを変えた最後の commit): `d0480f2c1` (`test(ildsp): add slot 1/4 frame-0 and null-pointer runs to slot_probe (#4169)`)。
-slot の測定値は `d0480f2c1` の HEAD で再実行した (§3)。`c37267725` の時点の出力と全 15 run が一致し、追加の 2 run を加えた。
+slot の測定値は `d0480f2c1` の HEAD で再実行した (§3)。`c37267725` の時点の出力と 12 run が一致し、追加の 5 run を加えた (計 17 run)。
 検証起点: `origin/main` `292549785`。
 
 ## 1. 結論
@@ -56,7 +56,10 @@ slot3 all zero                               RESULT completed slot=3 rax=0x30500
 slot5 all zero                               RESULT completed slot=5 rax=0x1 rc=0
 ```
 
-上の追加 2 run (`rdx=0 frames=0` の slot 1 と `out=0 frames=0` の slot 4) と、その他の 2 run (`r8=0 frames=0` の slot 1、`rdx=0` の slot 4 の 2 run) は、`c37267725` の時点では無かった。`d0480f2c1` の HEAD で追加して再実行したもの。
+`c37267725` の時点では 12 run だった。`d0480f2c1` の HEAD で次の 5 run を追加し、再実行したもの (上の出力の該当行):
+
+- slot 1: `rdx=0 frames=0` (完走)・`r8=0 frames=0` (落ちる)
+- slot 4: `out=0 frames=0` (落ちる)・`rdx=0 frames=4` (落ちる)・`rdx=0 frames=0` (完走)
 
 測定の限界: 上記は「落ちない入力の 1 組」の確認で、分岐の網羅ではない。`xmm1` (slot 2) と浮動小数の入力は制御していない。
 
@@ -82,7 +85,7 @@ slot5 all zero                               RESULT completed slot=5 rax=0x1 rc=
 
 - `lift_wc.sh all` (HEAD `c37267725`): ALL OK。本検査 PASS 64/64 (elapsed 1.61s)、ネガコン FAIL 64/64 (elapsed 1.57s)。load 0.22 0.28 0.21 (開始・終了とも)。
 - 測定 commit を `d0480f2c1` に進めた。`c37267725` から `d0480f2c1` の差分は `slot_probe.sh` (run 行の追加のみ) で、lift 経路 (`x64c` / `wc_image.py` / `wc_cases.py` / `lift_wc.sh`) は変えていない。`lift_wc.sh` の結果は `c37267725` 時点のままで有効。
-- `slot_probe.sh` の再実行は HEAD `d0480f2c1` で行い、§3 に貼った (exit 0・約 1.4 秒)。
+- `slot_probe.sh` の再実行は HEAD で行い、出力は §3 に貼ったものと全行一致した (exit 0)。
 - 素材: `fl-win64` (block24360_PE.bin) と `toolchain-emsdk` を `$RUNNER_TEMP` に展開して使った。
 
 ## 7. 未解決 (起票先)
@@ -90,4 +93,4 @@ slot5 all zero                               RESULT completed slot=5 rax=0x1 rc=
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | FL 本体の呼出側の実引数 (slot 1・4) の確定 | 受入条件 (呼出側から確定) の残り。native で動く前提は §4 のとおり | 本 issue の残件。実行時 trace は [T-SH-57] #3274 の gate に依る |
-| slot 2 の `xmm1` (浮動小数) の入力の網羅 | slot 2 の完走条件の網羅性 | 親 #4169 への提案 (xmm1 を変えた入力の網羅は本 issue では行わない) |
+| slot 2 の `xmm1` (浮動小数) の入力の網羅 | slot 2 の完走条件の網羅性 | #4169 へのコメント (xmm1 を変えた入力の網羅は本 issue では行わず、ここに未確認として残す) |
