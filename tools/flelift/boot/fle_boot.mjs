@@ -61,7 +61,7 @@ const U8 = m.HEAPU8;
 if (TRACE) { try { m._shimx_set_trace(1); } catch { /* nosx では未 export */ } }
 // FLE-6: dsp_ippv2 shim は既定で無効。FLE_IPP=1 のときだけ有効 (ネガコン FLE_IPP=0 / 未指定 = 修正前の挙動)。
 // FLE_IPP=2 (#2702): shim 有 + ippsZero_8u 以外の IPP 呼出で停止 (停止名と呼出元を summary に出す)。
-const IPP_MODE = { '1': 1, '2': 2 }[process.env.FLE_IPP] || 0;
+const IPP_MODE = { '1': 1, '2': 2, '3': 3 }[process.env.FLE_IPP] || 0;
 const IPP_ON = IPP_MODE !== 0;
 m._fle_boot_set_ipp(IPP_MODE);
 // FLE-672 診断: FLE_DIAG_NULLFILL=1 は root 無しの fill (0x6a7b70) で buf = 0 の呼出しを戻す。未指定は従来どおり停止する。

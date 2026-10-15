@@ -7,7 +7,7 @@
 - 受入 1 (trap の消失): 測定 commit `6ead9dcc1` で `targets/ott_old.json` (既定)・`ott_old_blk.json` (計装)・`ott_old_site.json` (site 計装) を build し、`1801c5e84` の vm0・u16 を測った。raw を持つ 8 case はすべて wasm `status = ok` (trap 0)。LD-83 の `wasm_trap` (u16) は消えた。
 - 受入 2 (site trace): u16 の wasm 側は HeapFree の call site `C801c0b71` を **5 回** 記録する。native の HeapFree も 5 回 (`native_calls 5`)。各回の戻り br `J801c0b71.1=1` (TRUE) の後は `B1801c0ba8` へ進み、`1c5eb8 → 1c0b6c` のループを経て `B1801c5ecc` で終わる。trap 地点の後続 block は欠けずに取れる。
 - 受入 3 (12 case): `results/ld67/compare_blk.py` で既定 vs 計装 (`ott_old_blk`) と既定 vs site (`ott_old_site`) を r1・r2 とも `cases=12 diff=0`。site trace の JSON は r1 と r2 でバイト一致 (`cmp`)。
-- 受入 4 (製品 KPI の前後): **動かしていない** (§5)。
+- 受入 4 (製品 KPI の前後): gui flengine の e2e を `a4a620a9^` (前) と `a4a620a9` (後) で各 1 回測った。前後で KPI は変わらない (§5・§7)。
 
 ## 1. 測定条件
 
@@ -51,15 +51,37 @@
 - 測定 commit: `6ead9dcc1`。
 - `git diff 6ead9dcc1 HEAD -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/targets tools/liftdiff/results tools/shim tools/ott/rt tools/m6` の出力: 0 行 (本 PR は REPORT 付録と `docs/DOC_MAP.md` の 1 行だけ)。よって測定値の再測定は要らない。
 
-## 5. 受入 4 (製品 KPI の前後) — 未実施
+## 5. 受入 4 (製品 KPI の前後) — 実施 (§7)
 
-- 理由: 修正 `a4a620a9` と `7278e8571` は `tools/shim/src/heap.c` にあり、`tools/flelift/boot` の build (`build.sh`・`boot_e2e.sh`) は shimx を使い heap.c を取り込まない (`grep heap.c tools/flelift/boot/*.sh` で 0 件)。前後の KPI を測るには、heap.c を取り込む `tools/gui/flengine` (e2e 1 回 459〜466 秒 · `tools/gui/flengine/REPORT.md` §6) の前後 2 回が要る。
-- 本 run では前後 2 回 (`a4a620a9^` と HEAD) の準備と実行を行わなかった (§6 の未解決として残す)。
+前後の値は §7。修正 `a4a620a9` は `tools/shim/src/heap.c` にあり、`tools/flelift/boot` の build (shimx) は heap.c を取り込まないため、boot 経路の KPI では効果を測れない (`grep heap.c tools/flelift/boot/*.sh` で 0 件)。本付録は `tools/gui/flengine/e2e.sh` (heap.c を取り込む) で測った。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 受入 4: 製品 KPI の前後 (FLEngine 起動の dispatch 数・通過 unit 数・最初のウィンドウ) | 修正の製品効果が未確認 | #2841 に残す (Refs)。次回 run で `tools/gui/flengine/e2e.sh` を `a4a620a9^` と HEAD で各 1 回 |
 | 命令単位の完全 trace (RetDec IR に命令 VA が無い) | site 単位の対応まで | #2801 (LD-131) |
 | 本測定は `--notrace` のため wasm 側の `calls` 欄が空。import 呼出しの対比は site 記録の `C` で代用 | wasm 側の HeapFree 引数・戻り値の直接比較は未実施 | 本付録の §2 のみ (起票無し) |
+| 製品 KPI の dispatch 数と a4a620a9 対 head の前後 (受入 4 の残り) | 起動の dispatch 面の前後は未確認。head の units_run は base と一致 (109) だが B1 GetMem 760/761 で FAIL | #4093 (LD-193) |
+
+## 7. 製品 KPI の測定 (受入 4・gui flengine の e2e)
+
+- 測定 commit: `65844e9ef` (PR head・#2841 の記録 commit)。`a4a620a9` 以降のコード差分は `git diff a4a620a9 65844e9ef -- tools/shim tools/ott/rt tools/gui/flengine/build.sh` に出る (heap.c 5 行・file.c 51 行・sync.c 6 行・ott_cpu.c/ott_x87.h・build.sh 4 行)。そのため前回値 (`740344ccc`・`a4a620a9`) は再利用せず、head で測り直した。
+- 実行: `EMSDK_ENV=[EMSDK]/emsdk_env.sh GF_EXTRA_PATH=[RETDEC]/bin FL_WIN64_DIR=<RUNNER_TEMP>/fl-win64 RETDEC_ROOT=[RETDEC] bash tools/gui/flengine/e2e.sh` を foreground で 1 回。素材 `work-m11` `fl-win64` `toolchain-emsdk` `toolchain-retdec`。load 開始 0.69 / 終了 2.02。
+- 結果 (実測): done 405 s, rc 1 (judge 12/14)。native selftest 512 passed / 0 failed。pe_image parity・ネガコン N1〜N9 は期待どおり。
+
+| 項目 | head `65844e9ef` の実測 |
+|---|---|
+| judge | 12/14。FAIL は B1 と S1 |
+| B1 boot parity | FAIL。`units_run` 109 (base 109)・dllmain True・init 111 (base 111)・icall_miss 7 (base 7)・GetMem 760 (base 761)・FreeMem 24 (base 24) |
+| S1 survey parity (soft) | FAIL。ok/noproc/miss/trap/clobber = 873/1/47/21/0 (base 871/1/47/23/0) |
+| R1 / R2 | PASS (first LoadStringW・reached 24 / floor 19, reached 33) |
+| P4 TApplication の window | created PASS `0x1100013` |
+| P5 TLightweightLayeredControl の window | created PASS `0x1100012` |
+| 通過 unit 数 (`units_run`) | 109 (base 109) |
+| dispatch 数 | **未測定**。e2e の出力と `results/*.json` に dispatch の件数は無い (`disp_entries` 8621 は間接呼出テーブル。`tools/flelift/boot` の 209 dispatch とは別物) |
+| baseline `wasm_size` | 6917845 |
+
+- 前回記録 (`740344ccc`・`a4a620a9`: units_run 52・judge 13/14) とは一致しない。head の run で base 側の `units_run` も 109 に動いており、shim の差ではない (base は shim 無しの同一 IR)。原因の切り分けは本付録の範囲外。
+- 結論: 最初のウィンドウ (P4・P5) は head でも作られる。通過 unit 数の前後比較は、この head では base と一致する (109)。ただし B1 の GetMem 760 対 761 の 1 件差で judge は FAIL。修正の前後比較は、同じ head で `a4a620a9` を測り直さないと確定できない (本 PR の範囲外)。
+- dispatch 数は本測定では取っていない。受入 4 の dispatch の条件は未達 (子 issue へ移す)。
+- 生の結果 JSON は本 run の作業ツリーで書き換わったが、tracked の `tools/gui/flengine/results/` には戻した (測定 commit 以降のコード差分の判定を崩さないため)。

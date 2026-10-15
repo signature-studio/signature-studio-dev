@@ -1027,7 +1027,8 @@ class FnLift:
             'vcvtss2sd': ('cvtss2sd', False), 'vcvtsi2sd': ('cvtsi2sd', False), 'vsqrtsd': ('sqrtsd', False),
             'vmovhpd': ('movhpd', False)}
     VEX2 = {'vmovd': 'movd', 'vmovq': 'movq', 'vcvtdq2pd': 'cvtdq2pd', 'vcvtps2pd': 'cvtps2pd',
-            'vcvtpd2dq': 'cvtpd2dq', 'vcvttpd2dq': 'cvttpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd'}
+            'vcvtpd2dq': 'cvtpd2dq', 'vcvttpd2dq': 'cvttpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd',
+            'vpmovsxdq': 'pmovsxdq'}
     VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
 
     def vex_leg(self, ins, ops, m):
@@ -1047,6 +1048,12 @@ class FnLift:
             return self.vex2(ins, ops, self.VEX2[m], True)
         if m in self.VEXF:
             return self.vex2(ins, ops, self.VEXF[m], False)
+        if m == 'vshufps' and len(ops) == 4 and ops[3].type == X86_OP_IMM and self.isx(ins, ops[0]) and self.isx(ins, ops[1]):
+            di = self.xd(ins, ops[0]); imm = ops[3].imm
+            self.L('{ X128 a_ = X[%d]; X128 s_ = %s; X128 r_; r_.d[0] = a_.d[%d]; r_.d[1] = a_.d[%d]; r_.d[2] = s_.d[%d]; r_.d[3] = s_.d[%d]; X[%d] = r_; }' % (
+                self.xd(ins, ops[1]), self.xs(ins, ops[2], 'x128'), imm & 3, (imm >> 2) & 3, (imm >> 4) & 3, (imm >> 6) & 3, di))
+            self.L('memset(&YL[%d], 0, 16);' % di)
+            return
         if m == 'vpsrldq' and len(ops) == 3 and ops[2].type == X86_OP_IMM and self.isx(ins, ops[0]) and self.isx(ins, ops[1]):
             di = self.xd(ins, ops[0]); n = ops[2].imm
             self.L('{ X128 a_ = X[%d], r_; memset(&r_, 0, 16); int n_ = %d; if (n_ < 16) memcpy(r_.b, a_.b + n_, 16 - n_); X[%d] = r_; }' % (self.xd(ins, ops[1]), n, di))
@@ -1206,6 +1213,16 @@ class FnLift:
     def i_movddup(self, ins, ops):
         di = self.xd(ins, ops[0])
         self.L('{ uint64_t s_ = %s; X[%d].q[0] = s_; X[%d].q[1] = s_; }' % (self.xs(ins, ops[1], 'q64'), di, di))
+
+    def i_addsubpd(self, ins, ops):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 b_ = %s; X128 a_ = X[%d]; X[%d].df[0] = a_.df[0] - b_.df[0]; X[%d].df[1] = a_.df[1] + b_.df[1]; }' % (
+            self.xs(ins, ops[1], 'x128'), di, di, di))
+
+    def i_pmovsxdq(self, ins, ops):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 s_ = %s; X[%d].sq[0] = (int64_t)s_.sd[0]; X[%d].sq[1] = (int64_t)s_.sd[1]; }' % (
+            self.xs(ins, ops[1], 'x128'), di, di))
 
     def i_movhlps(self, ins, ops):
         di, si = self.xd(ins, ops[0]), self.xd(ins, ops[1])
