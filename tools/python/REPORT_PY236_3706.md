@@ -38,18 +38,18 @@
 
 ## 検証
 
-測定 commit: `b87af9d82` (奇数回 toggle 列の追加と provider_check コメント修正。コードを変えた最後の commit)。以後 HEAD までのコード差分は、この REPORT 更新のみ。環境: runner 4 core。素材は `$ARTIFACTS_DIR/fl-win64.tar.zst` (存在を `ls` で確認)。`tar --zstd -xf` で `*block*` を `$RUNNER_TEMP/fl-win64` に展開し、`fetch_inputs.sh` (rc 0) で `work/` を作った。emsdk は素材に無いため上流 `emsdk install 6.0.12` + `activate` で代替した (`emcc` 6.0.12)。
+測定 commit: `3d505311a` (main 取り込み merge・`provider_check.mjs` の件数 204/231 への解消後。コードを変えた最後の commit)。main の取り込み前の本 PR の変更は `b87af9d82` (奇数回 toggle 列の追加・provider_check コメント修正)。環境: runner 4 core。素材は `$ARTIFACTS_DIR/fl-win64.tar.zst` (存在を `ls` で確認)。`tar --zstd -xf` で `*block*` を `$RUNNER_TEMP/fl-win64` に展開し、`fetch_inputs.sh` (rc 0) で `work/` を作った。emsdk は素材に無いため上流 `emsdk install 6.0.12` + `activate` で代替した (`emcc` 6.0.12)。
 
 | コマンド | 結果 (実測・b87af9d82) |
 |---|---|
-| `bash provider/build.sh` | rc 0・1 秒・`fl_table.c 435 関数, ハンドラ 196` |
-| `python3 provider/gen_provider.py --check-handlers provider/fl_engine.c` | rc 0・ハンドラ 196 |
+| `bash provider/build.sh` | rc 0・1 秒・`fl_table.c 435 関数, ハンドラ 204` |
+| `python3 provider/gen_provider.py --check-handlers provider/fl_engine.c` | rc 0・ハンドラ 204 |
 | `node tests/ui_state_diff.mjs` | rc 0・0 秒・`calls 88, diffs 0, PASS` |
 | `node tests/ui_diff.mjs` | rc 0・0 秒・`calls 17, diffs 0, outOfRangeKnownDiffs 3, PASS` |
 | `node tests/ui_display_diff.mjs` | rc 0・0 秒・`ok 12, bad 11, diffs 0, PASS` |
 | `node tests/ui_browser_diff.mjs` | rc 0・0 秒・`ok 8, bad 5, diffs 0, PASS` |
 | `node tests/ui_editor_diff.mjs` | rc 0・0 秒・`ok 6, bad 8, diffs 0, PASS` |
-| `node tests/provider_check.mjs` | §1・§2 の件数 assert (`impl 196`・`unimpl 239`) は通過。§3 (`dist/flpy.js` 経路) で `ERR_MODULE_NOT_FOUND` により停止 (**未実行・未解決 #4052**) |
+| `node tests/provider_check.mjs` | §1・§2 の件数 assert (`impl 204`・`unimpl 231`) は通過 (`AssertionError` 0 件)。§3 (`dist/flpy.js` 経路) で `ERR_MODULE_NOT_FOUND` により停止 (**未実行・未解決 #4052**) |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | **未実行**: `dist/flpy.js` が無い (`build_cpython_wasm.sh` が必要・#4052) |
 
 ### ネガティブコントロール (merge 後の HEAD で実施)
@@ -63,7 +63,7 @@ C 側だけ `ui_time_disp_min = !ui_time_disp_min` を `ui_time_disp_min = ui_ti
 
 ### コード差分
 
-測定 commit `b87af9d82` から HEAD までの `tools/python` の差分: 本 REPORT の更新のみ (コード差分 0)。確認: `git diff b87af9d82 HEAD -- tools/python/provider tools/python/tests tools/python/host` が空であること。
+本 PR のコード差分は `cb76a81c5..b87af9d82` (`tests/ui_state_diff.mjs`・`tests/provider_check.mjs`) と、main 取り込み merge `3d505311a` での `tests/provider_check.mjs` の件数・コメント解消のみ。`3d505311a` 以降の `tools/python` の差分は REPORT の更新だけ。main 取り込みで入った他 issue の変更 (PY-135・PY-215 など) は本 PR の範囲外。
 
 ## 未解決
 
