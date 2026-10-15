@@ -6,25 +6,12 @@
 
 #include "canvas_bitmap.h"
 #include "canvas_graphicsdevice.h"
-#include "canvas_platformfactory.h"
 #include "vstgui/lib/cdrawcontext.h"
 #include "vstgui/lib/controls/ctextlabel.h"
 #include "vstgui/lib/cviewcontainer.h"
-#include "vstgui/lib/platform/platformfactory.h"
+#include "vstgui/lib/vstguiinit.h"
 #include <cstdio>
 #include <memory>
-
-namespace VSTGUI {
-
-// upstream の platform/platformfactory.cpp は MAC / WINDOWS / LINUX 以外で VSTGUIPlatformFactory が未定義になるため
-// コンパイル対象から外し、代わりにこの定義で canvas factory を返す。
-const IPlatformFactory& getPlatformFactory ()
-{
-	static CanvasPlatformFactory factory;
-	return factory;
-}
-
-} // VSTGUI
 
 namespace {
 
@@ -47,9 +34,8 @@ size_t countNonZeroPixels (const uint8_t* rgba, size_t byteCount)
 int main ()
 {
 	using namespace VSTGUI;
-	// upstream の lib/vstguiinit.cpp の init() は initPlatform() の後に CFontDesc::init() を呼ぶ。
-	// initPlatform の代わりは上の getPlatformFactory で、CFontDesc::init() を呼ばないと kNormalFont 等が nullptr のままになる。
-	CFontDesc::init ();
+	// 初期化は upstream の init() (initPlatform → CFontDesc::init) を使う。wasm の factory は platformfactory.cpp の WASM 分岐が定義する。
+	init (nullptr);
 	const size_t byteCount = static_cast<size_t> (kWidth) * kHeight * 4;
 
 	CanvasBitmap bitmap (kWidth, kHeight);
