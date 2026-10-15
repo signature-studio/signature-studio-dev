@@ -11,6 +11,8 @@
 //       halt0 (longjmp 計数が増えた = Halt0→RestoreContext 経路) / exit (ExitProcess) /
 //       soft (strict 時の未実装 import) / unlifted / missing / badjump / unsup / empty / noproc
 import { writeFileSync, readFileSync, mkdirSync, appendFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { basename } from 'node:path';
 
 const cjs = process.argv[2];
 const outPath = process.argv[3] || 'work/boot/boot_summary.json';
@@ -189,6 +191,43 @@ for (let i = 0; i < Number(m._fle_ipp_names()); i++) {
 // FLE-2 実測: units_run=17 → i=16 proc 0x454090 の body 内で FreeMem 失敗 raise
 // (guest stack 復元で確認、dbg_u18.mjs 参照)。unit#18 (0x455790) は未到達。
 boot.stopped_at_1based = boot.units_run;
+
+// PERF-P22 (#3330): boot 停止時点の出力メモリ (wasm 線形メモリ) の sha256。計数・ipp 状態とは別の値。
+// (a) full = 線形メモリ全体。(b) no_cstack = 全体から emscripten の C スタック [end, base) を除いた範囲
+// (スタックの残骸は C の最適化水準に依る一時値なので、変種間比較からは外す)。
+// (c) PE の書込み可能セクション (IMAGE_SCN_MEM_WRITE) を 1 本ずつ (guest 側の状態そのもの)。
+// FLE_OUTMEM_DUMP=<dir> のとき、線形メモリ全体を <dir>/outmem_<variant>.bin に書く (別算法 (sha256sum) での検算用)。
+const outMem = (() => {
+    const H = m.HEAPU8, len = H.length;
+    const sha = (parts) => { const h = createHash('sha256'); for (const [a, b] of parts) if (b > a) h.update(H.subarray(a, b)); return h.digest('hex'); };
+    const stBase = Number(m._emscripten_stack_get_base() >>> 0), stEnd = Number(m._emscripten_stack_get_end() >>> 0);
+    const res = { mem_bytes: len, stack: { base: '0x' + stBase.toString(16), end: '0x' + stEnd.toString(16) },
+        full: sha([[0, len]]), no_cstack: sha([[0, stEnd], [stBase, len]]), sections: {} };
+    const IMG = 0x400000;
+    const dv = new DataView(H.buffer);
+    if (H[IMG] === 0x4d && H[IMG + 1] === 0x5a) {
+        const pe = IMG + dv.getUint32(IMG + 0x3c, true), nsec = dv.getUint16(pe + 6, true);
+        const optSz = dv.getUint16(pe + 20, true), secTab = pe + 24 + optSz;
+        const ranges = [];
+        for (let i = 0; i < nsec; i++) {
+            const s = secTab + 40 * i;
+            const name = String.fromCharCode(...H.subarray(s, s + 8)).replace(/\0.*$/, '');
+            const vsz = dv.getUint32(s + 8, true), va = dv.getUint32(s + 12, true), chr = dv.getUint32(s + 36, true);
+            if (!(chr & 0x80000000)) continue;
+            res.sections[name] = { va: '0x' + va.toString(16), size: vsz, sha256: sha([[IMG + va, IMG + va + vsz]]) };
+            ranges.push([IMG + va, IMG + va + vsz]);
+        }
+        res.image_writable = sha(ranges);
+    }
+    const dumpDir = process.env.FLE_OUTMEM_DUMP;
+    if (dumpDir) {
+        mkdirSync(dumpDir, { recursive: true });
+        writeFileSync(`${dumpDir}/outmem_${basename(outPath, '.json')}.bin`, H.subarray(0, len));
+    }
+    return res;
+})();
+boot.outmem = outMem;
+console.log('FLEBOOT_OUTMEM ' + JSON.stringify({ full: outMem.full, no_cstack: outMem.no_cstack, image_writable: outMem.image_writable, sections: Object.fromEntries(Object.entries(outMem.sections).map(([k, v]) => [k, v.sha256])) }));
 
 // ---------------- CreateFruityInstance 観測 (#2719) ----------------
 // 寛容起動の後で CreateFruityInstance (0x1375990) を 1 回呼ぶ。soft (未実装 import) の呼出し回数の差分で、
