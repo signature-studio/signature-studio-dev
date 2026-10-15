@@ -95,7 +95,9 @@ const noteEnum = (arr, chan, step, V) => {
   }
   return out;
 };
-// PY-218 (#3596): 件数超え (position >= 64) の event 経路 PE 0x12d3e20 (REPORT_PY218.md)。閾値は (position+1)*V、V = 24 (PE [0x15e25f8]・REPORT_APPENDIX_3310)。32bit 演算 (PE の imul/add と同じ)
+// PY-218 (#3596): 件数超え (position >= 件数) の event 経路 PE 0x12d3e20 (REPORT_PY218.md)。閾値は (position+1)*V、V = 24 (PE [0x15e25f8]・REPORT_APPENDIX_3310)。32bit 演算 (PE の imul/add と同じ)
+// PY-288 (#3985): 件数 GRID_N = ceil(L/96)*4 (既定 L = 384 で 16・REPORT_PY225 PY-230 節)。C provider の GRID_N と同じ
+const GRID_N = 16;
 const GRID_V = 24;
 const gridGen = (seed, n) => {
   let s = seed >>> 0;
@@ -120,7 +122,7 @@ const gridEvent = (items, index, p) => {
 const gridBit = (st, index, k, p) => {
   p |= 0;
   if (p < 0) return false;
-  if (p >= 64) return gridEvent(st.gridItems, index, p);
+  if (p >= GRID_N) return gridEvent(st.gridItems, index, p);
   return !!k.steps[p];
 };
 

@@ -14,6 +14,7 @@
 #define NCH_MAX 512
 #define NPL 500
 #define NSTEP 64
+#define GRID_N 16
 #define NWIN 64
 #define NAME 96
 #define NPARAM 3
@@ -169,11 +170,12 @@ FL_H(channels, isChannelSelected) { CH(0); return fl_ret_b(c, k->sel); }
 FL_H(channels, isChannelMuted) { CH(0); return fl_ret_b(c, k->mute); }
 FL_H(channels, isChannelSolo) { CH(0); return fl_ret_b(c, k->solo); }
 FL_H(channels, getChannelColor) { CH(0); return fl_ret_i(c, k->color); }
-/* PE 0xd5b420: 0x12d3e20 は position<0 で 0 を返す。0xd5b420 は position の範囲検査を持たず、件数以上は event 経路 (0x12d16a0・0x12df210) の値を返す (エラーにしない)。PY-218 (#3596) で event を grid_event に写した */
+/* PE 0xd5b420: 0x12d3e20 は position<0 で 0 を返す。0xd5b420 は position の範囲検査を持たず、件数以上は event 経路 (0x12d16a0・0x12df210) の値を返す (エラーにしない)。PY-218 (#3596) で event を grid_event に写した。
+ * 件数 n = ceil(L/96)*4 (既定 L = 384 で 16・REPORT_PY225 PY-230 節)。境界は GRID_N (件数)。steps の配列長と setGridBit の範囲 (NSTEP) は PE 未照合のため据え置き */
 static int grid_event(int64_t index, int32_t p);
 static int grid_bit(int64_t index, const Chan *k, int32_t p) {
     if (p < 0) return 0;
-    if (p >= NSTEP) return grid_event(index, p);
+    if (p >= GRID_N) return grid_event(index, p);
     return k->steps[p] != 0;
 }
 FL_H(channels, getGridBit) { CH(0); return fl_ret_b(c, grid_bit(_i, k, (int32_t)A_INT(1, 0))); }
