@@ -1,6 +1,6 @@
 PE: extracted/block00031_PE.bin  (ImageBase 0x400000, functions(.pdata)=57816, imports=738, thunks=832)
 entry: 0xc56ae0 (VA)  pdata 関数先頭: True
-候補集合 AT (アドレスを取られた関数): 3495  (うちコード参照 2633)
+候補集合 AT (アドレスを取られた関数): 17874  (うちコード参照 2633)
 vtable 候補表 (参考 slot 用・非コード領域でコードを指す連続 qword): 695 表 / 7295 スロット
 
 ## 下限 (直接 call + tail jmp の BFS)
@@ -23,76 +23,78 @@ vtable 候補表 (参考 slot 用・非コード領域でコードを指す連�
   thread_attr       call_sites=   18 distinct_functions=   15
 
 ## 上限 (間接 call/jmp の目標を AT 閉世界で置く)
-到達集合 (関数 / 命令 / 範囲外の目標): 14523 / 959573 / 30
+到達集合 (関数 / 命令 / 範囲外の目標): 36628 / 2041235 / 95
 到達集合内の call/jmp 箇所 (分母。関数内の無条件 jmp は除く):
-  関数宛て直接                    78766
-  API 呼出し                    2872
-  間接                        14876  (15.4% of 96514)
-  合計                        96514
-  間接の目標: AT 候補で近似 14876 箇所 / vtable スロット候補 0 箇所 / 候補が空で未解決 0 箇所
+  関数宛て直接                   169647
+  API 呼出し                    6096
+  間接                        35585  (16.8% of 211328)
+  合計                       211328
+  間接の目標: AT 候補で近似 35585 箇所 / vtable スロット候補 0 箇所 / 候補が空で未解決 0 箇所
 未追跡の間接 call/jmp (形ごと。vtable 呼出しとの対応は推定):
-  call [mem]                14343
-  call [rip-data]             366
-  call reg                    165
+  call [mem]                34679
+  call [rip-data]             459
+  call reg                    443
   jmp [mem]                     2
+  jmp reg                       2
 ## 到達集合内の API 呼出し (分類別: call 箇所 / 呼出し関数の distinct 数)
-  thread_create     call_sites=    5 distinct_functions=    5
-  blocking_wait     call_sites=  405 distinct_functions=  295
-  nonblocking_sync  call_sites=  422 distinct_functions=  304
+  thread_create     call_sites=   16 distinct_functions=   16
+  blocking_wait     call_sites=  698 distinct_functions=  536
+  nonblocking_sync  call_sites=  805 distinct_functions=  616
   atomic            call_sites=    0 distinct_functions=    0
-  thread_attr       call_sites=   51 distinct_functions=   42
+  thread_attr       call_sites=   71 distinct_functions=   61
 
 ## 参考 (上限 + 読込基底の [R+d] を vtable 候補スロットに限定)
-到達集合 (関数 / 命令 / 範囲外の目標): 14523 / 959573 / 30
+到達集合 (関数 / 命令 / 範囲外の目標): 36628 / 2041235 / 95
 到達集合内の call/jmp 箇所 (分母。関数内の無条件 jmp は除く):
-  関数宛て直接                    78766
-  API 呼出し                    2872
-  間接                        14876  (15.4% of 96514)
-  合計                        96514
-  間接の目標: AT 候補で近似 1209 箇所 / vtable スロット候補 13667 箇所 / 候補が空で未解決 0 箇所
+  関数宛て直接                   169647
+  API 呼出し                    6096
+  間接                        35585  (16.8% of 211328)
+  合計                       211328
+  間接の目標: AT 候補で近似 2338 箇所 / vtable スロット候補 33247 箇所 / 候補が空で未解決 0 箇所
 未追跡の間接 call/jmp (形ごと。vtable 呼出しとの対応は推定):
-  call [mem]                14343
-  call [rip-data]             366
-  call reg                    165
+  call [mem]                34679
+  call [rip-data]             459
+  call reg                    443
   jmp [mem]                     2
+  jmp reg                       2
 ## 到達集合内の API 呼出し (分類別: call 箇所 / 呼出し関数の distinct 数)
-  thread_create     call_sites=    5 distinct_functions=    5
-  blocking_wait     call_sites=  405 distinct_functions=  295
-  nonblocking_sync  call_sites=  422 distinct_functions=  304
+  thread_create     call_sites=   16 distinct_functions=   16
+  blocking_wait     call_sites=  698 distinct_functions=  536
+  nonblocking_sync  call_sites=  805 distinct_functions=  616
   atomic            call_sites=    0 distinct_functions=    0
-  thread_attr       call_sites=   51 distinct_functions=   42
+  thread_attr       call_sites=   71 distinct_functions=   61
 
 ## 上位 API (上限・到達集合内の call 箇所数)
-  kernel32.dll     LeaveCriticalSection             382
-  kernel32.dll     EnterCriticalSection             368
-  user32.dll       PostMessageW                      75
-  kernel32.dll     MulDiv                            50
-  gdi32.dll        DeleteObject                      47
-  oleaut32.dll     VariantInit                       47
-  kernel32.dll     GetLastError                      42
-  winmm.dll        timeGetTime                       38
-  user32.dll       SendMessageW                      38
-  kernel32.dll     GetCurrentThreadId                34
-  kernel32.dll     CloseHandle                       33
-  kernel32.dll     GetTickCount                      27
-  advapi32.dll     RegCloseKey                       26
-  user32.dll       GetSystemMetrics                  23
-  user32.dll       GetWindowLongPtrW                 23
-  kernel32.dll     FreeLibrary                       22
-  gdi32.dll        SelectObject                      22
-  kernel32.dll     CopyFileW                         22
-  kernel32.dll     Sleep                             21
-  user32.dll       IntersectRect                     21
-  advapi32.dll     RegQueryValueExW                  20
-  user32.dll       GetCapture                        20
-  user32.dll       GetCursorPos                      20
-  kernel32.dll     CompareStringW                    19
-  user32.dll       SetWindowPos                      18
+  kernel32.dll     LeaveCriticalSection             657
+  kernel32.dll     EnterCriticalSection             637
+  user32.dll       SendMessageW                     178
+  kernel32.dll     MulDiv                           121
+  gdi32.dll        DeleteObject                     112
+  user32.dll       PostMessageW                     102
+  kernel32.dll     FreeLibrary                       92
+  gdi32.dll        SelectObject                      81
+  winmm.dll        timeGetTime                       73
+  kernel32.dll     CloseHandle                       65
+  kernel32.dll     DeleteCriticalSection             64
+  kernel32.dll     GetLastError                      60
+  advapi32.dll     RegCloseKey                       60
+  user32.dll       GetCursorPos                      58
+  user32.dll       GetWindowLongPtrW                 53
+  ole32.dll        IsEqualGUID                       53
+  kernel32.dll     GetCurrentThreadId                48
+  oleaut32.dll     VariantInit                       48
+  user32.dll       GetSystemMetrics                  44
+  gdi32.dll        BitBlt                            44
+  kernel32.dll     LoadLibraryW                      44
+  kernel32.dll     InitializeCriticalSection         43
+  advapi32.dll     RegQueryValueExW                  42
+  user32.dll       ReleaseDC                         41
+  gdi32.dll        SetBkColor                        40
 
 ## gate
   PASS entry_is_pdata_start
-  PASS known_edge_timeGetTime_reached got=38
+  PASS known_edge_timeGetTime_reached got=73
 
 ## 検算 (objdump 全 .text 線形走査で上限を別実装)
-  objdump : 関数 14522 / 関数宛て直接 78760 / API 2872 / 間接 14876
-  capstone: 関数 14523 / 関数宛て直接 78766 / API 2872 / 間接 14876
+  objdump : 関数 36627 / 関数宛て直接 169645 / API 6096 / 間接 35631
+  capstone: 関数 36628 / 関数宛て直接 169647 / API 6096 / 間接 35585
