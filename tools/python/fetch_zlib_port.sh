@@ -5,7 +5,7 @@
 # emcc と同じ形 (cache/ports/zlib.tar.gz + cache/ports/zlib/ + .emscripten_url marker) に展開する。
 #   1) 公式 tag URL  2) codeload.github.com の同一 tarball (tag 版・同じ内容)
 # 不一致・全失敗は非 0 で止まる (手作業のキャッシュ配置はしない)。
-# 使い方: EMSDK_DIR=/opt/emsdk bash tools/python/fetch_zlib_port.sh   (build_flpy.sh から source される)
+# 使い方: EMSDK_DIR=<emsdk root (docs/REFERENCES.md [EMSDK])> bash tools/python/fetch_zlib_port.sh   (build_flpy.sh から呼ばれる)
 # 環境変数: EM_CACHE (既定 $EMSDK_DIR/upstream/emscripten/cache) / ZLIB_TAG_URL (テスト用の上書き)
 set -euo pipefail
 EMSDK_DIR="${EMSDK_DIR:-/opt/emsdk}"
