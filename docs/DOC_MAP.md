@@ -414,6 +414,7 @@
 | `tools/m11/ldfix/REPORT_4330.md` | ~70 | LD-210 (#4330, 親 #4204): 対照と区別できるネガコン `--negctl-noglk` (対照で glk=True の 45 関数を glk=False に落とす)。関数 verdict 34 件・site 36 件が対照と異なる。判定器の規則は未変更。結果 JSON `results/frame_store_alias_4330_ctl.json`・`results/negctl_alias_4330_noglk.json`・`results/negctl_alias_4330_glk.json` |
 | `tools/m11/ldfix/REPORT_4238.md` | ~73 | LD-205 (#4238, 親 #4204): `407a50` の戻り値の機械語追跡 (import thunk `4073c0` 系が PE 外のため未達)・`5cb210` `5cb4aa` の読み基底が `rbp` で `rdi` ではないことの訂正・判定器 3228 の起動修正 (`a2.leak_site` 改名)・HEAD のネガコン。残件は子 issue |
 | `tools/m11/ldfix/REPORT_4167.md` | ~70 | LD-197 (#4167 / 親 #3225 子 B): 694c80・c3b340 の打ち切り store (LEAK_STORE) の基底の出どころを機械語で追った証拠 (`alias_evidence_4167.py`)。判定は両 site とも未判定のまま。残件は #3225 (LD-150)・#3228 (LD-151)。ネガコン 1 種 |
+| `tools/m11/ldfix/REPORT_4676.md` | ~68 | LD-237 (#4676 / 親 #3675 子): `10479c7` の再判定 ((ii)(iii) 確認・判定不能維持。本番 IR の上流 X が 1 段不足のため)・`spill178_1161.tsv` 再生成 (既存と一致)・本番 unit e2e の参考値 (OFF/ON で unit 結果一致・ゲート失敗は環境要因の疑い) |
 | `tools/m11/ldfix/REPORT_4675.md` | ~95 | LD-236 (#4675 / 親 #3675 子): `1046a30` の上流 X (cell→C→[C]) の 1 段不足の機械語照合と修復 pass `fix_ld236.py` (既定 OFF・`M11_FIX_LD236=1`)。受入 2 (10479c7 再判定)・3 (unit e2e) は未達で子へ |
 | `tools/m11/ldfix/REPORT_3230.md` | ~60 | LD-152 (#3230): 7e48d6 の機械語確認 (先頭経路は 7e4613 の call が定義する)・IR で定数 0 になる原因 (alloca 範囲不足)。判定器の欠陥は #4090 (LD-192) |
 | `tools/m11/ldfix/REPORT_1161.md` | ~59 | LD-35 (#1161): 範囲縮小の完了分。spill 宛 178 site の分類表を HEAD で再測定し、未判定・判定不能を担当 issue (#2245・#2288・#2679・#2583・#2253・#2660) に対応づけた (内訳は REPORT §3)。独立再計算・ネガコン (NC0〜NC7) も再測定で一致 |
