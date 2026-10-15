@@ -37,7 +37,7 @@ FL 本体の 2 段構成である。
 2. **文字列の所在** (素材内の全ファイルの部分一致): ASCII の `LoadSharedElastiqueDll` は `block24349`・`block24350` の 2 件 (QuickFontCache の export 表)。UTF-16LE の `LoadSharedElastiqueDll` は **50 件** の PE にあり、そのうち FL 本体 `block00031` を含む。残り 49 件の PE は本 REPORT では読んでいない (§3)。
 3. **export と呼出しの関係**: `block24349` (i386) と `block24350` (x64) の export `LoadSharedElastiqueDll` は QuickFontCache 側の定義。FL 本体 `block00031` は export 表を引かず、UTF-16 名を `0x4235f0` で解決する。
 4. **`0xc69c10` の呼出し形**: 手で逆アセンブルし、`0x4235f0` の結果を `call rax` で呼ぶことを確認した。
-5. **再現**: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/shared/elastique/fl_loader_callers.py` (約 38 秒・load 0.55)。
+5. **再現**: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/shared/elastique/fl_loader_callers.py`。測定 commit `fc97566e2` (スクリプト・REPORT の最終変更)。コミット済み HEAD `64792bdca` で再実行: rc 0・経過 38.9 s・load 0.09→0.54 (nproc 4・出力は上の表と一致)。コードの差分は 0 (`fl_loader_callers.py` は測定 commit から変わっていない)。REPORT 本文のみ後続の commit で変えた (`git diff fc97566e2 HEAD -- tools/shared/elastique/fl_loader_callers.py` は 0 行)。
 
 ## 3. 限界
 
