@@ -16,7 +16,7 @@
 ## 1. 対象・素材・測定 commit
 
 - 素材: `fl-win64` の `extracted/block24357_PE.bin` (4,997,632 B) を `tools/shared/work/win/elastique_x64.dll` に複製 (gitignore)。RetDec: `toolchain-retdec` (RetDec v5.0・`retdec-decompiler --version` で確認)。
-- 測定 commit (コードと CSV を変えた最後の commit): `4961b8e1e` (#5178)。`e068b5dea` (範囲表の生成と rc の記録) 以降、lift 経路の `scripts/` は変わっていない。`e068b5dea..4961b8e1e` の `data/` 差分は 2 つ: `data/entries.csv` の 166 行 (commit `7fe2ea865`・#4535 の direct_calls 修正) と `data/retdec_lift_4284.csv` の追記 (3,392 行・§2)。鮮度の確認: `git diff --stat 4961b8e1e HEAD -- tools/shared/elastique/scripts tools/shared/elastique/data` は 0 行 (本 REPORT の更新は `scripts/`・`data/` を変えない)。
+- 測定 commit (コードと CSV を変えた最後の commit): `4961b8e1e` (#5178)。`e068b5dea` (範囲表の生成と rc の記録) 以降、lift 経路の `scripts/` は変わっていない。`e068b5dea..4961b8e1e` の `data/` 差分は 2 つ: `data/entries.csv` の 166 行 (commit `7fe2ea865`・#4535 の direct_calls 修正) と `data/retdec_lift_4284.csv` の追記 (3,392 行・§2)。鮮度の確認: lift 経路 (`scripts/elastique_retdec_lift.sh`・`scripts/elastique_pdata_ranges.py`・`data/`) は `git diff --stat 4961b8e1e HEAD -- <それらのパス>` が 0 行。`scripts/elastique_fail_classify.py` だけが 69 行追加されている (`cddf68a89`・分類専用で lift 経路の外)。
 - 件数の確認は `pdata_funcs` (`scripts/elastique_facts.py`) で行った: 生スロット 5,475・`.text` 内 4,556。
 
 ## 2. 再現と実測
@@ -44,8 +44,8 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
   合計 2,200 行 (ok 2,129・fail rc=1 71)。既存 1,164 行 (ok 1,146・fail 18) と合わせて 3,364 行。実行条件と時間: 3 commit のメッセージと #4363 のコメントには実測時間の記録が無く、未測定。#4363 の方針は 1 関数 1 プロセス・4 並列・`timeout 60` (計画の記載)。
 - 3 回目 (#5178): 未実施の 1,192 件 (= 4,556 − 3,364 行) を並列 8・`timeout 60`・`timeout 900` で実行。実測 **8 分 23 秒** (load average 6.9〜7.8・4 コア)。結果 1,192 件 全て ok。`.ll` の空ファイル 0。CSV の合計は **ok 4,467・fail 89 (rc=1 85・rc=124 1・rc=137 3)**・重複 0・未実施 0。
 - 測定 commit: 本 PR の最後のコード・CSV 変更の commit。差分は `git diff <測定 commit> HEAD -- tools/shared/elastique` で確認する。
-- 失敗 18 件の再実行 (本 PR の HEAD で実測・並列 4・`RETDEC` を指定): 61 秒。内訳は rc=1 14 件・rc=124 (60 秒 timeout) 1 件・rc=137 (SIGKILL・原因未確認) 3 件。CSV の status には `fail rc=N` を記録した (旧記載の rc=124 2 件は、この再実行と一致しなかったため訂正)。
->- 実測の load average は 4 並列で 3.9〜4.1 (4 コア・`uptime`)。1 関数あたりの時間は計測していない (合計の所要時間のみ)。
+- 失敗の内訳は CSV の status (`fail rc=N`・計 89 件: rc=1 85・rc=124 1・rc=137 3) を正とする。本 PR では RetDec 本体による失敗件の再実行を行っていないため、再実行の時間・load・RSS は未計測 (§5)。
+- 旧記載 (18 件の再実行 61 秒・load average 3.9〜4.1) は本 PR の HEAD では再現していない。削除した。
 
 ## 2.5 D5 (x64c 主役) との比較
 
@@ -69,7 +69,6 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 |---|---|---|
 | lift 出力の意味検証 (受入 2。`.ll` 4,467 件の D11・D14・D15 判定) | 受入 2 未達。lift の正しさは未確認 | #5178 (受入 2 のまま残す) |
 | 失敗 89 件 (rc=1 85・rc=124 1・rc=137 3) の原因分類 (decoder の `Should not be possible.`・timeout・kill) | 受入 1 未達。完全な lift にならない | #5179 (子・`親: #4363`。本文の「18 件」は CSV の 89 件に読み替える) |
-| `ipp_entries.py` の 1,956 (pefile) と生 `.pdata` の 4,556 (`.text` 内) の件数の出典合わせ | REPORT.md の件数が生 PE と合わない | #5179 (子・同上) |
 | rc=1 の因果 (EVEX マスク付き `vpshufd`・`vshufi32x4` の切り分け) | 原因未確定 (相関のみ) | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
 | rc=124 / rc=137 の原因 (メモリ・時間) | 原因未確定 | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
 | pefile の `Unknown UNWIND_CODE` の原因 | pefile 側の原因は未調査 (件数の出典は確定) | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
