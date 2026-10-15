@@ -252,6 +252,7 @@
 | `tools/m11/REPORT_SHX-T28.md` | ~125 | #2444 (SHX-T28, 親 #1630): 機械語から親フレーム共有 site を検出する `tools/m11/frame_share/detect.py` の結果 (閉包 7,421 関数で mov 渡し 307 site・D23 信号 301 site・親 63・callee 94)、`function_448490` の親 IR に `[rbp+0x4c]` の初期 store が無い静的観測、修復前 baseline (units_run 17・unit 18 の VirtualAlloc/MessageBoxA)。修復は子 [SHX-T40] |
 | `tools/m11/REPORT_SHX-T40.md` | ~50 | #3234 (SHX-T40, 親 #2444): `function_448490` の親 object を callee の view に合わせる修復 pass `ldfix/fix_shx_t40.py` (既定 OFF の実験)。実測で修復 ON は unit 18 で hang、+0x70 のみでは OOB。未解決は子 issue (SHX-T41 以降) |
 | `tools/m11/REPORT_N196.md` | ~90 | #3906 (M11-N196, 親 #3142): set_other 非 imm のスタック slot 読込・frame lea の IR 接続判定 (frame 定数 C と stack_var 対応・分類の件数は REPORT 参照)。load_def の誤判定の修正と負例 (`test_setother_slot_class.py`)。接続の注入と未決の接続先は #3932・#3933。分類器 `m11_setother_slot_class.py` |
+| `tools/m11/REPORT_N202.md` | ~70 | #3933 (M11-N202, 親 #3906): set_other スタック slot 未決 85 件の再測定 (現 HEAD で 112 件・実値化 25・未決 87)・C 規則の IR 突合 (引数単位 0・名前単位 22)。検算 `m11_setother_slot_check.py` |
 | `tools/m11/REPORT_N171.md` | ~120 | #3134 (M11-N171, 親 #1154): set_other 非 imm 349 件 (reg 123・mem 150・lea 76) の定義探索と 3 値分類 (件数は REPORT 参照)。接続方式の決定と未決の接続先 (#3140・#3141・#3142)。survey は素材欠落で未測定 (#1154)。分類器 `m11_setother_nonimm_class.py` |
 | `tools/m11/REPORT_N172.md` | ~80 | #3140 (M11-N172, 親 #3134): set_other 非 imm reg merge 34 件の CFG 到達定義による判定 (件数は REPORT 参照)。実値化 1 件の機械語照合。未決 33 件の接続先の再割当 (#3141・#3142・#1154)。判定器 `m11_setother_nonimm_cfg.py` |
 | `tools/m11/REPORT_N173.md` | ~151 | #3141 (M11-N173, 親 #3134): set_other 非 imm のうち呼出し戻り値・算術・狭い格納 58 件の判定。戻り値の機械語解析・IR 型幅ゲート (define 行の出所)・測定 (実値化 0 / 未決 58 / 未分類 0)・ネガコン・未解決 (#3140・#3142・#3134)。分類器 `m11_setother_nonimm_class.py` |
@@ -677,6 +678,7 @@
 | `tools/python/REPORT_PY219.md` | 62 | PY-219 (#3615): 0x1046a30 の cur ([rbp+0x5b8]) の経路上流。0x10485aa 直前の値は エントリ edx の clamp `min(max(E,0),500)` に確定 (74 件の書込みのうち届くのは 0x1048445 の 1 件)。[rbp+0x4e8] の基底 `*(G+8)` (G = `[0x15e2218]`) と添字 `(エントリ ecx)>>16` を確定。エントリ edx・ecx の呼出し元と `call 0xffac50` の戻り値は未確定 (親 #3476)。照合は `analysis/flapi/pe_py219_probe.py` |
 | `tools/python/REPORT_PY198.md` | 73 | PY-198 (#3442): 0x12a4450 の 6 呼出し元の ecx の式 (直接の出どころ) と、0x128f9e0 の `[rbp+0x838]` (エントリの edx) → 表セル `0x15e26a0` (静的値 `0x193fa10`) 経由の書込みを PE で確定。書込み 2 箇所の全数検証と f8ca50 (ii) 枝の tag 値域、上流の引数は子 [PY-203] #3476・[PY-204] #3477。照合は `analysis/flapi/pe_py198_probe.py` |
 | `tools/python/REPORT_PY173.md` | 81 | PY-173 (#3220): patterns 数え・選択系 4 関数の索引基準 (patternCount・isPatternDefault は 1..999、isPatternSelected は i-1)・型・述語 `0x12d8d30` の論理式。戻り値の値と C/mock 実装は子 #3271 (PY-179)。probe は `analysis/flapi/pe_pattern_probe.py` |
+| `tools/python/REPORT_PY180.md` | ~70 | PY-180 (#3278): patterns.getActivePatternGroup を C/mock に実装 (戻り -1 の仮置き。`.data` の初期値 -1 は番兵として参照箇所で比較される)。getPatternsInGroup の索引 -1 の意味と群番号の既定値は子 #4114 (PY-302) |
 | `tools/python/REPORT_PY179.md` | 65 | PY-179 (#3271): patterns 数え・選択系 4 関数の C/mock 実装 (値は PE 静的状態からの仮置き)。isPatternDefault の範囲外 code 4 と patternNumber 初期値 1 を PE で確定。述語 E・選択リストの意味は子 #3536・#3537 |
 | `tools/python/REPORT_PY152.md` | ~203 | PY-152 (#2983): arrangement 8 件のうち 6 件 (currentTime / addAutoTimeMarker / jumpToMarker / liveSelection / selectionClear / selectionSet) の PE 根拠・mock/C 差分 0・値と副作用は未確定。jumpToMarker の必須個数は PE (1) と表 (2) が不一致で PM 判断待ち。変換スロット 0x15e4280 = PyLong_FromLong を同定。残りは子 #3041 (PY-143)・#3043 (PY-144) |
 | `tools/python/REPORT_PY143.md` | ~60 | PY-143 (#3041): arrangement 2 件 (currentTimeHint・getMarkerName) の呼出し先 (0xe4b8b0・0xe53c90) を同定し、戻り str の書式 (bar:beat:tick・範囲外は空文字) を PE で確定。mock/C 差分 0。BBT 分解 0x1312080 と 0 埋め幅は未同定、all_tools は未実行 |
@@ -826,6 +828,7 @@
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_3428.md` | ~120 | ildsp PSOLA_CreateInstance 閉包の x64c lift (T-SH-82 #3428) の全文: 再現・unsup の before → after (2,472 → 0)・ymm 算術の実装・差分テスト 88 件の内訳・lift_wc 回帰・実測・未解決 (閉包単位の native 差分は子 issue)。REPORT §9 から参照。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_LIFT.md` | ~100 | ildsp vtable 転送先 0x161fc0 の closure lift の前段 (T-SH-61 #3299): 3 候補の選定実測・RetDec 範囲指定・gen_helpers の停止点。wasm 化と差分テストは子 issue。測定値の正本。再現は `lift_vtable.sh` |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_3276.md` | ~65 | ildsp WaveformColouring の native 確定 (T-SH-59 #3276)。結論・手順・実測・ネガティブコントロール・未解決の全文 (`REPORT.md` §5-4・§5-5 から参照)。harness は `native_ref_wc.c` (入力は `native_image.py`)。測定値の正本 |
+| `tools/shared/lift/ildsp/REPORT_APPENDIX_4230.md` | ~55 | ildsp CreateInstance 間接 call 4 件の到達 (T-SH-103 #4230・部分達成): 正の対照 (`0x1ac9ce`・`0x1aedc0` 入口) つきの実測、alloc 失敗注入と巨大 rdx の結果、既定入力の発火の非決定性、未解決の起票先 (#4289)。REPORT_CLOSURE.md §4.5 から参照。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_CI.md` | ~70 | ildsp GeneralPitchShifter_CreateInstance 単独 closure の RetDec 入力・census・閉包の取りこぼし・ネガティブコントロール (T-SH-62 #3300)。測定値の正本 |
 | `tools/shared/lift/rex/REPORT.md` | ~75 | REX Shared Library (win `block24351_PE.bin`) の export 14 本の閉包測定 (T-SH-11 #153): 関数数・命令数・間接 call・import・`.pdata` 無しの近似。lift は未実施 (#2733・#2734)。測定値の正本。再現は `rex_closure.py` |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2870.md` | ~50 | rex REPORT §9 全文 (T-SH-46 #2870: 成功経路 (戻り値 1 / 3) と arena 書込の一致・落ちる case の分類・未解決) |
@@ -915,6 +918,7 @@
 | `tools/targets/kilohearts/license/KH3307_REPORT.md` | 74 | #3307 (KH-52): gen_simd の SSE 整数語彙 6 件の追加と bit 突合・module F の 2 関数の試行。2 関数の実機突合と product 登録は #4153 (KH-91) |
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3256.md` | ~82 | KH-48 (#3256): vmovaps ymm・FMA3 scalar 7 語彙の検証 (`ymm_vocab_check.py` / `fma_vocab_check.py`) の生出力全行 |
+| `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3259.md` | ~45 | #3259: 既存 14 snap-in の生成物 sha256 の比較。B (80fb2fd00) 比較と HEAD 再測定 (測定 commit 4410b3adf) を収録。結果の詳細は付録の `## HEAD 再測定` 節 |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3358.md` | ~44 | KH-54 (#3358): vmovaps store 形を 32B store へ復元する検証 (`vmovaps_store_check.py`) の生出力・ネガコン・コード差分。要約は REPORT.md §16 |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_779.md` | ~9 | KH-16 (#779) 第 2 弾: ymm 語彙 vaddps / vsubps / vmulps の検証 (REPORT.md §12-1 の全文を分割移動) |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_1116.md` | ~7 | #1116: HeapAlloc 0 返却規約のホスト同型性試験 (REPORT.md の 1116 節の全文を分割移動) |
