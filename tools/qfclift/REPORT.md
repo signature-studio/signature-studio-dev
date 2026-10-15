@@ -6,6 +6,7 @@
 ## 0. 結論 (先出し)
 
 - **boot (#3289 / T-SH-60): DllMain(PROCESS_ATTACH) の wasm 実行は FAIL** (§7)。strict (実装済み import のみ) は kernel32 `LocalAlloc` で停止。
+  longjmp 継続 (#3410 / T-SH-77) は override + 戻り先 root で soft 版の停止点が `ExitProcess(0)` に変わった (§7.8・付録 `REPORT_APPENDIX_3410.md`)。
   `LocalAlloc` を実装し、残りの未実装 import を soft stub に置き換えても、setjmp 系の戻り先 `0x59c210` (関数の途中) へ longjmp して UNLIFTED で停止。
   FreeType の FT_* 結合はこの停止より後段のため未到達。**InitDll は QuickFontCache の export ではない** (§7.1)。
 - **判定: 部分達成 (lift + wasm build + 2 関数の native 一致まで。boot は §7 の停止点の測定まで)**。#154 の受入範囲
@@ -176,6 +177,13 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 | 戻り先 `0x59c210` (setjmp/longjmp 継続) の lift 対応 (FLEngine 同型の override と断片 entry) と longjmp の起動元の特定 | DllMain が完走しない | #3410 (T-SH-77) |
 | rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない | #3411 (T-SH-78) |
 | GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3412 (T-SH-79) |
+
+### 7.8 longjmp 継続の対応 (T-SH-77 / #3410・部分達成)
+
+- override `qfc_ov_longjmp` (FLEngine `fle_ov_longjmp` と同型) と boot 専用の戻り先 root `0x59c210` を追加。e2e の entries と assert (6,347) は不変。
+- 停止点の切り分け (soft・各 1 回): override のみでは `0x59c210` の UNLIFTED のまま。**root を加えると `ExitProcess(0)` へ進む** (停止点を動かしたのは root)。
+  この進行は longjmp 後の継続の不整合による偽の停止の可能性がある (推定。未検証)。DllMain の完走は未達。
+- 判定: boot は FAIL のまま (strict は `LocalAlloc`)。起動元・切り分け表・測定は付録 `REPORT_APPENDIX_3410.md` §1〜§3 が正本。
 
 ## 8. 検証実行・再現 (§7 の追加分・実測)
 
