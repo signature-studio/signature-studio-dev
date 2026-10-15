@@ -2,7 +2,7 @@
 
 親: #3678 / #2902 / #3642。受入条件 1 (機構の特定) の REPORT。受入条件 2 (退行しない形の survey 差 0) は #4748 (N211)。
 
-結論: **署名 (i32 → i32+f64) だけでは退行しない**。退行を起こすのは、呼出し側 16 site が新しい `f64` 枠へ渡す **実値** (`movsd` / `cvtss2sd` 由来) である (ctlB 退行・ctlC 無退行)。callee 本体が入力を読むこと (`reinterpret`) も加わるが、呼出し側の値を 0 にすると退行は消える。
+結論 (作成時の記録に基づく。本 run で再確認していない): 退行は、呼出し側 16 site が新しい `f64` 枠へ渡す **実値** (`movsd` / `cvtss2sd` 由来) で起きる可能性が高い (ctlB 退行・ctlC 無退行の作成時の対比)。ctlB・ctlC は生成器の再現性が未解決のため、本 run では再生成できていない (子 #4809)。
 ただし wasm 側の機構 (なぜ実値で 149・158 の結果が変わるか) は未特定。caller `function_660050` / `function_668290` の frame 読みの差が候補 (未実測)。
 
 ## 測定 (測定 commit 4bb58c852・同一 IR 上の A/B)
@@ -43,7 +43,7 @@ python3 fxa_nc.py work/boot_final.ll only40c_full.ll --pe <PE> --report nc_repor
 | ctlC | 呼出し 16 site を `0.0` にする。callee 本体は入力を読む | 873 / 1 / 47 / 21 / 0 | **差 0** |
 | sigzero | 呼出し 16 site を `0.0` にし、callee 本体も 0 固定 | 873 / 1 / 47 / 21 / 0 | **差 0** |
 
-判定: 退行は「呼出し側が `f64` 枠に渡す実値」で起きる (ctlB 退行・ctlC 無退行の対比)。署名変更だけ (sigzero。値を 0 に固定) では退行しない。
+判定: 作成時の記録では、退行は「呼出し側が `f64` 枠に渡す実値」で起きたように見える (ctlB 退行・ctlC 無退行の対比)。ただし ctlB・ctlC・sigzero は本 run で再生成も再測定もしていないため、この対比は本 run では確認されていない。実値で退行する可能性が高い、という程度に留める。
 
 ## wasm レベルの差 (baseline vs only40c、`wasm-dis` 実測)
 
@@ -64,11 +64,13 @@ python3 fxa_nc.py work/boot_final.ll only40c_full.ll --pe <PE> --report nc_repor
 |---|---|---|
 | wasm 側の機構: 実値で 149・158 の経路が変わる理由 (caller の frame 読み `offset=208/216` と戻り値の使い道) | 受入条件 1 の「機構」の核心。未特定 | #4777 (M11-N221) |
 | caller の戻り値利用 (sret `+16` → `+192` 変化が 149・158 の分岐をどう変えるか) | 機構の確定に必要 | #4777 (M11-N221) |
-| 生成器 `m11_sigfix40c_ab.py` の再現性 (素材の IR 形と `BODY_OLD` の一意性、`CALL_RE` の型) | variant の再生成ができず、cmp 一致の根拠も無い。variant の数値は作成時の記録で、本 run では再測定していない | 未起票 (レビュー判断に委ねる) |
+| 生成器 `m11_sigfix40c_ab.py` の再現性 (素材の IR 形と `BODY_OLD` の一意性、`CALL_RE` の型) | variant の再生成ができず、cmp 一致の根拠も無い。variant の数値は作成時の記録で、本 run では再測定していない | #4809 (M11-N223) |
 | 受入条件 2 (退行しない形で 40c650 を変換して survey 差 0) | #4748 (N211) が担当 | #4748 |
 
 ## 測定の範囲
 
 - 全測定は `tools/m11/work/boot_final.ll` (`m11_gen_ir2.sh` の再生成 IR) 上。`work-m11` は素材の旧生成で基準に使わない (WORKFLOW §11)。
 - 測定 commit: 4bb58c852 (生成器を追加した commit)。コード差分は `m11_sigfix40c_ab.py` と本 REPORT のみ。
+- 本 run で再測定したのは入力生成 (only40c 入力の作成 49.5 秒・rc 0) と PE 展開 (2.7 秒) だけ。survey の unit 数値 (上の表) は再測定していない。
+- 鮮度の証跡: `git diff 4bb58c852 HEAD -- tools/m11` は 8 file (`m11_build.sh`・`m11_post.py`・`ldfix/spill_classify_1161.py` ほか) に差分がある。`--slots` 無し (既定) の経路は、素材 `work-m11` の `boot_final.ll` を入力に、4bb58c852 版と HEAD 版の `m11_post.py` を実行して出力を比べた。出力 IR と report JSON は `cmp` で一致 (rc 0・両方)。`m11_build.sh` の `SLOT_ARG` は `M11_SLOT_ROWS` 空のとき空文字になり、`m11_post.py` の `--slots` 分岐は入らない。`ldfix/spill_classify_1161.py` の追加 (candidate_verdicts_4676 の読込) は、`tools/m11/m11_*.sh` からの参照が無い (`grep` で確認。参照元は `ldfix/audit_lsf_ssa_e2e.sh` のみ) ため、build・survey の経路に入らない。
 - 生成物 (`work/`・`emsdk/`・`retdec/`) は gitignore または未追跡で commit しない。
