@@ -91,6 +91,26 @@ async function flBoot(ctx) {
   return `${st} canvas ${px.w}x${px.h} lit=${px.lit}px colors>=${px.colors}`;
 }
 
+// gui=wasm の readback を独立オラクルと画素比較する (page 内で実行)。
+// flip >= 0 のとき、その画素 (index) の B を 1 だけ改竄した期待画像と比べる (ネガコン (c) 用。通常は -1)。
+function guiOracleJs(flip) {
+  return `(async () => {
+    const r = await window.__guiGuest.readback();
+    const o = Uint8Array.from(atob("${GUI_GUEST_ORACLE}"), (c) => c.charCodeAt(0));
+    if (${flip} >= 0) o[${flip} * 3 + 2] ^= 1;
+    const seen = new Set(); let lit = 0, diff = 0, first = null;
+    const n = r.width * r.height;
+    for (let p = 0; p < n; p++) {
+      const i = p * 4, j = p * 3;
+      const R = r.data[i], G = r.data[i+1], B = r.data[i+2];
+      if (R | G | B) lit++;
+      if (seen.size < 8) seen.add((R << 16) | (G << 8) | B);
+      if (R !== o[j] || G !== o[j+1] || B !== o[j+2]) { diff++; if (!first) first = { x: p % r.width, y: (p / r.width) | 0, got: [R, G, B], want: [o[j], o[j+1], o[j+2]] }; }
+    }
+    return { w: r.width, h: r.height, lit, colors: seen.size, diff, first, oracleOk: o.length === n * 3 };
+  })()`;
+}
+
 export const checks = [
   {
     id: "headers-isolation",
@@ -348,20 +368,7 @@ export const checks = [
       assert(typeof s.frames === "number" && s.frames > 0, `GUI フレーム 0: ${st}`);
       // 画素検査: GuiHost の readback (worker 側の canvas 内容) を読み、全面単色でないことを見る
       // 独立オラクル (gen_golden_text8.py) と差 0 px で一致すること。lit / colors は緩い基準として併用する
-      const px = await ctx.drv.eval(`(async () => {
-        const r = await window.__guiGuest.readback();
-        const o = Uint8Array.from(atob("${GUI_GUEST_ORACLE}"), (c) => c.charCodeAt(0));
-        const seen = new Set(); let lit = 0, diff = 0, first = null;
-        const n = r.width * r.height;
-        for (let p = 0; p < n; p++) {
-          const i = p * 4, j = p * 3;
-          const R = r.data[i], G = r.data[i+1], B = r.data[i+2];
-          if (R | G | B) lit++;
-          if (seen.size < 8) seen.add((R << 16) | (G << 8) | B);
-          if (R !== o[j] || G !== o[j+1] || B !== o[j+2]) { diff++; if (!first) first = { x: p % r.width, y: (p / r.width) | 0, got: [R, G, B], want: [o[j], o[j+1], o[j+2]] }; }
-        }
-        return { w: r.width, h: r.height, lit, colors: seen.size, diff, first, oracleOk: o.length === n * 3 };
-      })()`);
+      const px = await ctx.drv.eval(guiOracleJs(-1));
       assert(px.w > 0 && px.h > 0, `canvas サイズ 0: ${px.w}x${px.h}`);
       assert(px.oracleOk, `期待画像のサイズが canvas と合わない: ${JSON.stringify(px)}`);
       assert(px.lit > 0 && px.colors >= 2, `テストゲストのフレームが描画されていない: ${JSON.stringify(px)}`);
@@ -388,6 +395,26 @@ export const checks = [
       writeFileSync(path.join(logDir, "gui-guest-reach.log"), lines.join("\n") + "\n");
       await ctx.shot("gui-guest");
       return `${st} canvas ${px.w}x${px.h} lit=${px.lit}px colors>=${px.colors} reach: ${lines.length} 行 CreateWindowExA=${cnt("CreateWindowExA")} BeginPaint=${cnt("BeginPaint")} BitBlt=${cnt("BitBlt")} WM_PAINT=${cnt("WM_PAINT")}`;
+    },
+  },
+  {
+    id: "gui-guest-oracle-negctrl",
+    title: "ネガコン (c): 独立オラクルの 1 画素 (44,80) の B を 1 改竄すると比較が 1 px の差で FAIL する (検出力)",
+    async run(ctx) {
+      const q = "/?gui=wasm&glue=/__e2e__/gui-guest/app.js&app=/__e2e__/gui-guest/app.wasm.parts/index.json";
+      await ctx.drv.open(new URL(q, ctx.url).href);
+      const ok = await ctx.drv.waitFn(
+        `window.__webstudio?.state === 'running' || window.__webstudio?.state === 'error'`,
+        180000,
+      );
+      const st = await ctx.drv.eval(`JSON.stringify(window.__webstudio ?? null)`);
+      assert(ok && JSON.parse(st).state === "running", `テストゲストが running にならない: ${st}`);
+      const flip = 80 * 320 + 44;
+      const px = await ctx.drv.eval(guiOracleJs(flip));
+      assert(px.oracleOk, `期待画像のサイズが canvas と合わない: ${JSON.stringify(px)}`);
+      assertEq(px.diff, 1, `1 画素改竄の差分数 (${JSON.stringify(px.first)})`);
+      assertEq(`${px.first.x},${px.first.y}`, "44,80", "改竄画素の位置");
+      return `1 画素改竄 (44,80) を比較で検出: diff=${px.diff} got=${JSON.stringify(px.first.got)} want=${JSON.stringify(px.first.want)}`;
     },
   },
   {
