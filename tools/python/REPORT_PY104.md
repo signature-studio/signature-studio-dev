@@ -121,7 +121,7 @@ velocity による選択 (`0x122227e`〜`0x12223b9`、K∈{0,2} のみ。S+0xa0 
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/playlist_live_clip_facts.py`。全 expectation が OK で終了 (exit 0)。主な出力: `0x1222b80` = 0x05 → K ∈ {0, 2}、`0x1222b70` = -1.0、`0x1222bb4` = -1.0 (refresh の定数)、`0x100b95a` (mode≥2 の戻り) など。
 - 実測 (n=3、`/usr/bin/time`): real 0.06 s / user 0.04〜0.05 s / sys 0.01〜0.02 s。実行直前の load average `0.02 0.10 0.13` (`/proc/loadavg`)、nproc 4、並列 1。
 - 差分: `git diff 44f02645c HEAD -- tools/python/analysis/flapi/playlist_live_clip_facts.py tools/python/analysis/flapi/pe_disasm.py` の出力は 0 行 (測定対象の 2 本は変更なし)。main 取り込み (merge commit) で `tools/python/analysis/flapi` には `pe_va_read.py`・`pe_mixer_wrappers.py` の追加のみが入ったが、測定対象 2 本は両者を import しない。
-- 再測定 (修正後の HEAD、差分 0 の確認後): 上記再現コマンドを再実行して全 expectation OK (exit 0) を確認。
+- 再測定 (修正後 HEAD `b184a77c3`、`/usr/bin/time`、n=3): real 0.08 s / user 0.06 s / sys 0.01〜0.02 s。実行直前の load average `0.02 0.14 0.08`、nproc 4、並列 1。全 expectation OK (exit 0)。
 - 逆アセンブル (手動): 0x1221bc0〜0x1222b69 (全体)・0x1222b90・0x100b890・0x100b970・0xd2a550・0xd2a3c0・0x12df530・0xd84f70・0xfdc630・0x420980・0x420b00・0xe5abd0・0x737020 を `pe_disasm.py` で読んだ。実行による検証はしていない。差し戻し修正時に 0x12223bf〜0x12224a9・0x1222200〜0x122221a・0x1222300〜0x122231b・0x1222b90・0xd84f70・0x100bb90 を再読した。
 
 ## 9. 参照
