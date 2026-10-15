@@ -19,7 +19,7 @@
 |---|---|---|---|---|---|
 | 101d180 arg3 | 101d477 | 101d469 | 0/3 | rep-not-dominated | 置換対象の使用が B に支配されない。`fix_f3c_use` は not_dom |
 | 10626e0 arg3 | 1062752 | 1062752 | 1/1 | rep-not-dominated | 同上 (not_dom) |
-| 12f9730 arg3 | 12f9872 | 12f986d | 0/2 | rep-not-dominated | 同上 (not_dom)。同関数の arg2 (entry 内) は既存の門で直る (replaced 2 はこの分) |
+| 12f9730 arg3 | 12f9872 | 12f986d | 0/2 | rep-not-dominated | 同上 (not_dom)。ただし同関数の `fix_f3c_use` の戻りは 1 回目 `replaced=2`・2 回目 `replaced=1 dom=1` で一致しない (§5) |
 | 41a670 arg1 | 41a6a0 | 41a69c | 2/2 | rep-not-dominated | 同上 (not_dom)。`fix_ld108` (LD-112) の対象関数 |
 | 786d50 arg3 | 787019 | 786fe7 | 0/1 | rep-not-dominated | 同上 (not_dom) |
 | 787380 arg3 | 78753f | 787523 | 0/1 | rep-not-dominated | 同上 (not_dom) |
@@ -58,3 +58,4 @@ REPORT_1325 は 6905f0 を「支配は成立するが、前段パスとの相互
 | 残り 6 組 (rep-not-dominated) の修復方式。B 以外からの経路で値を使う形を表す設計が必要 | 6 組は現状のまま | 未起票 (設計判断。PM が起票を判断) |
 | 残り 3 組 (w32) の 32bit 版の門。`fix_f3c_use` の 64bit 限定の拡張 | 3 組は現状のまま | 未起票 (PM が起票を判断) |
 | `REPORT_930` の 23/24 と 30/33 の不一致 (REPORT_1325 §8 の既存行) | 分類の母集団の差 | #1134 (既存) |
+| 12f9730 の `fix_f3c_use` 戻り値が呼び出しごとに違う (1 回目 `replaced=2`・単独の 2 回目 `replaced=1 dom=1`)。`f3c_track` / `FnMach` の状態依存を疑うが未確認 | 判定の再現性。修復 0 組の結論には影響しない (どの呼び方でも 10 組は修復されない) | 未起票 (PM が起票を判断) |
