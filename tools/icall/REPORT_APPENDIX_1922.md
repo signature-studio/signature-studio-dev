@@ -19,7 +19,7 @@
 | 変更後 (`RtlPcToFileHeader` を追加) | 3 | `RtlCaptureContext` 2・`UnhandledExceptionFilter` 1。`RtlPcToFileHeader` 6 は C++ 例外 `RaiseException(0xe06d7363)` に進む |
 
 `fa_sweep` の件数は main で `bit一致 56 / crash 65 / wasm のみ err 9 / 値の不一致 1` (合計 131)。
-SIGSEGV 等の残りの内訳は本付録では数えていない (未確認)。
+crash 65 のうち stderr で分類した 9 関数 (変更前) 以外の内訳 (SIGSEGV 等) は本付録では数えていない (未計数)。
 
 ## 3. 実装 (IMPL 追加)
 
@@ -32,14 +32,15 @@ SIGSEGV 等の残りの内訳は本付録では数えていない (未確認)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `KERNEL32!RtlCaptureContext` (2 関数: `18100cc50`・`18103d218`) | fail-fast のまま。CONTEXT を正しく埋める実装が要る | 本 issue の残り (#1922) |
-| `UnhandledExceptionFilter` (1 関数: `18100ca28`) | fail-fast のまま。`SetUnhandledExceptionFilter` と意味が違うため別実装が要る | 本 issue の残り (#1922) |
-| `RtlPcToFileHeader` 追加後の C++ 例外経路 (6 関数) | `RaiseException 0xe06d7363` で fail-fast。`__CxxFrameHandler` 系の unwind が要る | 子 issue (起票先は PR 本文) |
-| SIGSEGV 46 関数 | encoded slot・ヒープ構造体の未初期化が候補 | ICALL-55 (#2009) の既存範囲 |
+| `KERNEL32!RtlCaptureContext` (2 関数: `18100cc50`・`18103d218`) | fail-fast のまま。CONTEXT を正しく埋める実装が要る | #4338 (ICALL-100・子) |
+| `UnhandledExceptionFilter` (1 関数: `18100ca28`) | fail-fast のまま。`SetUnhandledExceptionFilter` と意味が違うため別実装が要る | #4338 (ICALL-100・子) |
+| `RtlPcToFileHeader` 追加後の C++ 例外経路 (6 関数) | `RaiseException 0xe06d7363` で fail-fast。`__CxxFrameHandler` 系の unwind が要る | #4362 (ICALL-103・子) |
+| SIGSEGV (件数未計数) | encoded slot・ヒープ構造体の未初期化が候補。stderr 分類は本付録では未実施 | ICALL-55 (#2009) の既存範囲 |
 
 ## 5. fa_sweep 実測
 
-`bash tools/icall/diff/fa_sweep.sh 8 60`。同一 tree (`ee2883ab8`) で、変更前 (main の `ott_native.c`) と変更後 (本 PR) を順に測定した。両方とも `funcs 131` の集計が同一。
+`bash tools/icall/diff/fa_sweep.sh 8 60`。測定は未 commit の作業ツリーで行った (測定 tree は `ee2883ab8` + 本 PR の未 commit 変更)。両方とも `funcs 131` の集計が同一。
+**注: コミット済み HEAD (`b64cb3ae3`) での再測定は未実施**。素材 (`plugins-freshair`・`work-icall`) が本 run に無く、`tools/icall/work/` と `tools/targets/freshair/work/` が存在しないため。再測定は次の run で行う (未解決表の子 issue の素材指定と同じ)。
 
 | 項目 | 変更前 | 変更後 | 差分 |
 |---|---|---|---|

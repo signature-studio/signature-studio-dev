@@ -99,7 +99,7 @@ static MS uint32_t k_TlsAlloc(void) { return 0; }
 static void* g_tls[64];
 static MS void* k_TlsGetValue(uint32_t i) { return g_tls[i & 63]; }
 static MS int k_TlsSetValue(uint32_t i, void* v) { g_tls[i & 63] = v; return 1; }
-/* ICALL-52: PC が画像内なら画像基底を返す (範囲外は NULL)。画像外の PC の探索は NULL = 見つからず、の既定どおり。 */
+/* ICALL-52: PC が画像内なら画像基底を返す。範囲外は NULL (見つからず)。 */
 static MS void* k_RtlPcToFileHeader(void* pc, void** base) {
     uint64_t p = (uint64_t)pc;
     void* b = (p >= IMG_BASE && p < IMG_BASE + g_imgsize) ? (void*)g_img : NULL;
