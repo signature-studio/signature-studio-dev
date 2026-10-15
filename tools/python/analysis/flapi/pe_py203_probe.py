@@ -60,7 +60,7 @@ check("0x1192f80 の先頭: 第 3 引数 r8d を [rbp+0x54] へ保存 (0x1192f99
       FN_A == 0x1192F80 and TXT.get(0x1192F99) == "mov dword ptr [rbp + 0x54], r8d", hex(FN_A))
 w54 = [a for a, m, o in window(FN_A, FN_A_END) if m == "mov" and o.startswith("dword ptr [rbp + 0x54],")]
 r54 = [a for a, m, o in window(FN_A, FN_A_END) if "dword ptr [rbp + 0x54]" in o and not o.startswith("dword ptr [rbp + 0x54],")]
-check("[rbp+0x54] への書込みは 1 箇所 (0x1192f99)、読出しは 8 件 (NC: 読みも数えると 9 件)",
+check("[rbp+0x54] への書込みは 1 箇所 (0x1192f99)、読出し命令は 8 件",
       w54 == [0x1192F99] and len(r54) == 8, f"write={[hex(x) for x in w54]} read={len(r54)}")
 check("0x1193bcd-0x1193bd9: esi = [rbp+0x54] & 0xffff、edi = [rbp+0x54] >> 16",
       TXT.get(0x1193BCD) == "mov esi, dword ptr [rbp + 0x54]" and TXT.get(0x1193BD0) == "and esi, 0xffff"
