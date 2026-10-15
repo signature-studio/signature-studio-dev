@@ -32,7 +32,8 @@
 
 ## 検証
 
-測定 commit: `a44acea67` (コードを変えた最後の commit)。環境: runner 4 core、測定時の load average 1.01 (`uptime` 18:56:26)。素材 `fl-win64` と `toolchain-emsdk` を展開して使用 (emsdk は 6.0.12)。
+測定 commit: `a44acea67` (wasm の値を測定した最後の commit)。環境: runner 4 core、測定時の load average 1.01 (`uptime` 18:56:26)。素材 `fl-win64` と `toolchain-emsdk` を展開して使用 (emsdk は 6.0.12)。
+現 head: `7a705c726` (main を取り込んだ merge)。`a44acea67` から現 head までの差分は下の diff 出力のとおり (測定経路の外の解析 probe 3 件のみ)。`provider/build.sh`・`build_cpython_wasm.sh`・`build_flpy.sh`・`fetch_inputs.sh`・`tests/*.mjs` はこの 3 件を呼ばないため、測定経路の差分は 0 で、再測定は行っていない。
 
 | コマンド | 結果 | wall |
 |---|---|---|
@@ -47,12 +48,17 @@
 
 ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `addTextLine` の副作用を外すと `node tests/screen_diff.mjs` は `AssertionError: screen 差分 2 件`・rc 1 で FAIL。戻すと calls 101・diffs 0・PASS (rc 0)。
 
-コード差分 (測定 commit から HEAD まで。`tools/python` の .md 以外):
+コード差分 (測定 commit から現 head `7a705c726` まで。`tools/python` の .md 以外):
 
 ```
-$ git diff a44acea67 HEAD -- tools/python ':!*.md'
-(空)
+$ git diff --stat a44acea67 HEAD -- tools/python ':!*.md'
+ tools/python/analysis/flapi/pe_py400_probe.py     | 105 ++++++++++++++
+ tools/python/analysis/flapi/pe_ret_propagation.py | 164 ++++++++++++++++++++++
+ tools/python/analysis/py398_gate_flow.py          | 110 +++++++++++++++
+ 3 files changed, 379 insertions(+)
 ```
+
+3 件はいずれも main 由来の解析 probe (PE の読取専用の検証スクリプト)。測定経路 (`provider/build.sh`・`build_cpython_wasm.sh`・`build_flpy.sh`・`fetch_inputs.sh`・`tests/*.mjs`) から呼ばれないため、測定値への影響は無い。
 
 ## 未解決
 
