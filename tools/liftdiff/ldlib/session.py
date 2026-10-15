@@ -13,6 +13,8 @@ SKIPPED = 'skipped (native timeout)'
 # rt/ld_native.c run_case: setitimer(ITIMER_REAL) の初回値 {1, 500000} = 1.5 s (SIGALRM → status timeout)。
 # tests/test_ld154_timing.py が C 側の値と一致することを検査する。
 NATIVE_ITIMER_S = 1.5
+# LD-196 (PM 判断 R7): fvm の native_extra_call diff を mismatch にせず unexec に据え置く関数 (0x5c1030 のみ)。
+FVM_HOLD_VAS = {0x5c1030}
 
 
 def side_timing(r, limit_s, recv_limit_s):
@@ -184,6 +186,7 @@ class Session:
         name = self.fn_name(va)
         sig = self.sigs.get(name)
         rec = {'va': hex(va), 'name': name, 'sig': sig}
+        patterns = list(patterns) + [p[0] for p in cases.OBJ_PATTERNS.get(va, [])]
         if not sig or not sig['defined']:
             rec['verdict'] = 'unexec'; rec['reason'] = 'no_wasm_definition'
             return rec
@@ -219,6 +222,9 @@ class Session:
             rec['cases'].append(c)
         if not any(c['outcome'] in ('equal', 'diff', 'wasm_trap') for c in rec['cases']):
             fvm, fvm_skip = self._fvm_cases(nat, was, va, sig, rec['cases'], sigs)
+            for c in fvm:
+                if va in FVM_HOLD_VAS and c['outcome'] == 'diff' and (c.get('diffs') or {}).get('calls', {}).get('kind') == 'native_extra_call':
+                    c['fvm_held'] = True   # LD-196 (PM 判断 R7): 0x5c1030 の fvm native_extra_call diff は mismatch にせず unexec に据え置く
             rec['cases'] += fvm
             if fvm_skip:
                 rec['fvm_skip'] = fvm_skip
@@ -251,17 +257,43 @@ class Session:
         fault = None
         for c in cases_done:
             if c.get('pattern') == 's' and c.get('fault'):
-                fault = c['fault']
+                fault = dict(c['fault'], detail=c.get('native_detail', ''))
                 break
         if self.analyzer.is_ret_fragment(va):
             return None, 'ret_fragment'
         cand = cases.fvm_candidates(fault, cases.kinds_of(sig['params']))
         if len(cand) > 1:
-            arg = self.analyzer.fault_arg(va, int(fault['rip'], 16)) if fault and 'rip' in fault else None
-            if arg is not None and arg in cand:
-                return [arg], None
-            return None, 'multi_candidate'
+            one = self._fault_base_arg(fault, sig, cand)
+            if one is None and fault and 'rip' in fault:
+                arg = self.analyzer.fault_arg(va, int(fault['rip'], 16))
+                if arg is not None and arg in cand:
+                    one = arg
+            if one is None:
+                return None, 'multi_candidate'
+            return [one], None
         return cand, None
+
+    def _fault_base_arg(self, fault, sig, cand):
+        """LD-195 (#4139): 候補多重のとき、fault 命令のメモリ base レジスタの値 (fault detail) が
+        ちょうど 1 つの候補引数の SMALL[i] と一致すれば、その引数を pointer 候補にする。一致が無い・複数なら None。"""
+        import capstone
+        ins = self.analyzer._dis(int(fault['rip'], 16) - self.pe.base) if fault.get('rip') else None
+        if ins is None:
+            return None
+        mem = [op.mem for op in ins.operands if op.type == capstone.CS_OP_MEM]
+        if not mem or not mem[0].base:
+            return None
+        base = ins.reg_name(mem[0].base)
+        regs = {}
+        for kv in (fault.get('detail') or '').split():
+            if '=' in kv:
+                k, v = kv.split('=', 1)
+                regs[k] = v
+        if base not in regs:
+            return None
+        bv = int(regs[base], 16)
+        hit = [i for i in cand if cases.SMALL[i] == bv]
+        return hit[0] if len(hit) == 1 else None
 
     def _fvm_cases(self, nat, was, va, sig, cases_done, sigs):
         """LD-23 (#975): 全 pattern が未実行 (equal/diff/wasm_trap 無し) の関数で、's' の native fault addr から

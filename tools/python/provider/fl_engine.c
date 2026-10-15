@@ -49,6 +49,11 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static int changed_flag, use_metronome, precount, rec_ppq;
 static int lm_pages;
 static int ui_closing, ui_time_disp_min, ui_start_on_input, ui_loop_rec, ui_step_edit, ui_browser_auto_hide, ui_snap_mode;
+/* PY-246 (#3759): 送出キーの記録 (PE 0x8186a0 → SendInput)。ui 送出 15 関数が書き、tests/ui_keys_diff.mjs が読む */
+#define KEY_N 256
+typedef struct { int vk, mod, count; } Key;
+static Key keys[KEY_N];
+static int key_n;
 static int undo_pos, undo_count, undo_last, safe_edit;
 static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
 static int sel_start, sel_end, live_anchor;
@@ -98,7 +103,7 @@ void fl_engine_reset(void) {
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
     lm_pages = 0;
-    ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
+    key_n = 0; ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
     undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
     set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
     sel_start = -1; sel_end = -1; live_anchor = -1;
@@ -557,6 +562,10 @@ FL_H(ui, getFocusedFormCaption) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getFocusedPluginName) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getHintMsg) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, isInPopupMenu) { NARGS(0, 0); return fl_ret_b(c, 0); }
+/* PY-129 (#3006): PE 0xd6c5b0 (setHintMsg 's')・0xd6ce50 (setFocused 'i')・0xd6b7b0 (setSnapMode 'i') は呼出し経路を確定 (REPORT_PY129)。状態は持たない (仮置き) */
+FL_H(ui, setHintMsg) { NARGS(1, 1); (void)A_STR(0); return fl_ret_none(c); }
+FL_H(ui, setFocused) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
+FL_H(ui, setSnapMode) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
 /* PY-128 (#3005): PE 0xd6c250 は状態を読まず、rodata の UTF-16 定数 "FL Studio 2026" (長さ接頭辞 14) を返す (REPORT_PY128) */
 FL_H(ui, getProgTitle) { NARGS(0, 0); return fl_ret_s(c, "FL Studio 2026"); }
 /* PE 0xd6cb60 は PyArg "ii" (None・文字列・実数は TypeError) の後、0x11f1a70 で (int32)(value*100) を max で割り、
@@ -579,6 +588,32 @@ FL_H(ui, setStepEditMode) { NARGS(1, 1); ui_step_edit = A_INT(0, 0) == 1; return
 FL_H(ui, setTimeDispMin) { NARGS(0, 0); ui_time_disp_min = !ui_time_disp_min; return fl_ret_none(c); }
 /* PY-130: ui 版 getVersion (PE 0xd6c2f0 '|i'・既定 4) は mode 0..3 で int、4..6 で str、他は int 0 (分岐表は REPORT_PY130_3007) */
 FL_H(ui, getVersion) { NARGS(0, 1); int64_t m = A_INT(0, 4); return (m >= 4 && m <= 6) ? fl_ret_s(c, "") : fl_ret_i(c, 0); }
+/* PY-246 (#3759): 送出キー 15 関数。VK・修飾 (1 Shift・2 Alt・4 Ctrl)・回数は PE 0xfdd2c0 の leaf → 0x8186a0 (REPORT_PY140)。
+ * 送出の成否のゲートは PY-245 (#3758) で未確定のため、送出 leaf に入った経路を記録する。戻り値は PY-141 (#3034) で未確定 (仮置き 0) */
+static void key_send(int vk, int mod, int64_t count) {
+    if (count <= 0 || key_n >= KEY_N) return;
+    if (count > 0x7fffffff) count = 0x7fffffff;
+    keys[key_n].vk = vk; keys[key_n].mod = mod; keys[key_n].count = (int)count; key_n++;
+}
+int fl_engine_key_n(void) { return key_n; }
+int fl_engine_key_get(int i, int f) { if (i < 0 || i >= key_n) return -1; return f == 0 ? keys[i].vk : f == 1 ? keys[i].mod : keys[i].count; }
+void fl_engine_key_clear(void) { key_n = 0; }
+FL_H(ui, up) { NARGS(0, 1); key_send(0x26, 0, A_INT(0, 1)); return fl_ret_i(c, 0); }
+FL_H(ui, down) { NARGS(0, 1); key_send(0x28, 0, A_INT(0, 1)); return fl_ret_i(c, 0); }
+FL_H(ui, left) { NARGS(0, 1); key_send(0x25, 0, A_INT(0, 1)); return fl_ret_i(c, 0); }
+FL_H(ui, right) { NARGS(0, 1); key_send(0x27, 0, A_INT(0, 1)); return fl_ret_i(c, 0); }
+FL_H(ui, cut) { NARGS(0, 0); key_send(0x58, 4, 1); return fl_ret_i(c, 0); }
+FL_H(ui, copy) { NARGS(0, 0); key_send(0x43, 4, 1); return fl_ret_i(c, 0); }
+FL_H(ui, paste) { NARGS(0, 0); key_send(0x56, 4, 1); return fl_ret_i(c, 0); }
+FL_H(ui, insert) { NARGS(0, 0); key_send(0x2d, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, delete) { NARGS(0, 0); key_send(0x2e, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, enter) { NARGS(0, 0); key_send(0x0d, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, escape) { NARGS(0, 0); key_send(0x1b, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, yes) { NARGS(0, 0); key_send(0x59, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, no) { NARGS(0, 0); key_send(0x4e, 0, 1); return fl_ret_i(c, 0); }
+FL_H(ui, nextWindow) { NARGS(0, 0); key_send(0x09, 0, 1); return fl_ret_i(c, 0); }
+/* PE: arg > 0 で修飾 0 (Tab)、arg <= 0 で Shift (修飾 1) + Tab。stub の引数名 shift と符号が逆 (REPORT_PY140 の未解決) */
+FL_H(ui, selectWindow) { NARGS(1, 1); key_send(0x09, A_INT(0, 0) > 0 ? 0 : 1, 1); return fl_ret_i(c, 0); }
 
 /* ---- general (1) ---- mock と同じ MIDI scripting API バージョン (実機値は未実測) */
 FL_H(general, getVersion) { NARGS(0, 0); return fl_ret_i(c, 1); }
@@ -625,10 +660,12 @@ FL_H(general, setUndoHistoryLast) { NARGS(1, 1); undo_last = (int)A_INT(0, 0); r
  * obj.+0x50 == 0 の経路 (0xd82c20 に code -7 = "Device not assigned") は未モデル (例外化の述語が実行時値のため) */
 FL_H(launchMapPages, length) { NARGS(0, 0); return fl_ret_i(c, lm_pages); }
 /* ---- launchMapPages (3 of 12, PY-138 #3029) ---- PE init 0xd79020 (sii)・updateMap 0xd79290 (i)・createOverlayMap 0xd7a130 (iiii) は書式と成功時の戻り (定数 = None) を確定。
- * page 配列への副作用は未確定のため状態を変えない (REPORT_PY138)。setMapItemTarget は戻り型の食い違いが未解決のため未実装 */
+ * page 配列への副作用は未確定のため状態を変えない (REPORT_PY138)。 */
 FL_H(launchMapPages, init) { NARGS(3, 3); (void)A_STR(0); (void)A_INT(1, 0); (void)A_INT(2, 0); return fl_ret_none(c); }
 FL_H(launchMapPages, updateMap) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(launchMapPages, createOverlayMap) { NARGS(4, 4); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+/* ---- launchMapPages (PY-243 #3745) ---- PE 0xd7a3a0 は書式 iii・成功時の戻り None (REPORT_PY243)。項目書込みは項目の状態を持たないため状態を変えない */
+FL_H(launchMapPages, setMapItemTarget) { NARGS(3, 3); for (int i = 0; i < 3; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
 
 /* ---- arrangement (4, PY-96 #2832) ---- PE 0xd786e0/0xd78700/0xd78500 が obj+0xd74/+0xd78 を読み、0xd78720 は 0xe43e80 (両方 >= 0) を bool で返す。初期値 -1 は未実測の仮置き */
 FL_H(arrangement, selectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_start); }

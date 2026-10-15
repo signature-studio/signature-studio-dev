@@ -1742,7 +1742,31 @@ def f3c_use_dom_at(fn, fv, first, rep_idx):
     return starts[bi] + 1
 
 
+def f3c_indirect_call_before(fv, first):
+    """機械語の基本ブロック先頭 (f3c_use_dom_at と同じ bstart) から最初の deref (first) の直前までに、呼出先が即値でない call (間接 call) があれば True。
+    間接 call は任意のコードを実行しうるため、その間に argN の指す先が書き換わる可能性を否定できない。即値の直接 call は対象外 (REPORT_1325 §9 の 806740)。#4421"""
+    lead = _f3c_leaders(fv.ins)
+    bstart = max([x for x in lead if x <= first], default=None)
+    if bstart is None:
+        return False
+    return any(i.mnemonic == 'call' and i.operands and i.operands[0].type != 2
+               for i in fv.ins if bstart <= i.address < first)
+
+
 ctr_f3cu = [0]             # fix_f3c_use 専用 counter
+
+
+def f3c_late_field_disp(fv, addr, n):
+    """deref の後の raw 使用 (addr) が argN のフィールド読み `mov r64,[argN+D]` (D≠0・index 無し) なら D、それ以外は None (#4439)"""
+    ins = next((i for i in fv.ins if i.address == addr), None)
+    if ins is None or ins.mnemonic != 'mov' or len(ins.operands) != 2:
+        return None
+    o0, o1 = ins.operands
+    if o0.type != 1 or o1.type != 3 or o1.mem.index or not o1.mem.disp or o1.size != 8 or not o1.mem.base:
+        return None
+    if ARGREG_ARG.get(gprnorm(fv.cs, o1.mem.base)) != n:
+        return None
+    return o1.mem.disp
 
 
 def fix_f3c_use(fn, fv, rep, ctr):
@@ -1767,7 +1791,7 @@ def fix_f3c_use(fn, fv, rep, ctr):
         derefs = [u for u in uses if u[0] == 'deref' and u[2] == n and u[4] == 'arg']
         first = min(u[1] for u in derefs)
         raws = [u for u in uses if u[0] == 'raw' and u[2] == n]
-        if not all(u[3] == 64 for u in derefs) or any(u[1] > first for u in raws):
+        if not all(u[3] == 64 for u in derefs):
             continue
         ptrarg = pty.get(n, 'i64') != 'i64'
         argre = re.compile(r'(?<![\w.$-])%arg' + str(n) + r'(?![\w.$-])')
@@ -1785,9 +1809,26 @@ def fix_f3c_use(fn, fv, rep, ctr):
         if loaded:
             continue
         idx = [k for k in range(1, len(lines)) if argre.search(lines[k])]
-        keep = len(raws)
-        rep_idx = idx[keep:]
+        before = [u for u in raws if u[1] < first]
+        late = [u for u in raws if u[1] > first]
+        keep = len(before)
+        late_d = [f3c_late_field_disp(fv, u[1], n) for u in late]
+        if any(d is None for d in late_d):
+            rep['f3c_use_late_raw'] = rep.get('f3c_use_late_raw', 0) + 1
+            continue
+        fl = []
+        for k in idx[keep:]:
+            m = re.match(r'^\s*%[\w.$-]+ = add i64 %arg' + str(n) + r', (\d+)\s*$', lines[k])
+            if m and int(m.group(1)) in late_d:
+                fl.append(k)
+        if sorted(late_d) != sorted(int(re.search(r', (\d+)\s*$', lines[k]).group(1)) for k in fl):
+            rep['f3c_use_late_raw'] = rep.get('f3c_use_late_raw', 0) + 1
+            continue
+        rep_idx = [k for k in idx[keep:] if k not in fl]
         if not rep_idx:
+            continue
+        if f3c_indirect_call_before(fv, first):
+            rep['f3c_use_indirect_call'] = rep.get('f3c_use_indirect_call', 0) + 1
             continue
         if first in blk0:
             entry_end = next((k for k in range(2, len(lines)) if re.match(r'^[\w.$-]+:', lines[k])), len(lines))

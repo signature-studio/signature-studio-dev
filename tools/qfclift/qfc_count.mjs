@@ -6,7 +6,7 @@ import { appendFileSync, writeFileSync } from 'node:fs';
 const log = process.env.QFC_CALL_LOG;
 writeFileSync(log, '');
 const mod = await import(process.env.QFC_CJS);
-const m = await mod.default({ printErr: (s) => { if (s.includes('[fle]')) appendFileSync(log, s + '\n'); }, print: () => {} });
+const m = await mod.default({ printErr: (s) => { if (s.includes('[fle]') || s.includes('[qfc-soft]')) appendFileSync(log, s + '\n'); }, print: () => {} });
 m._fle_data_install();
 m._fle_init();
 const buf = m._malloc(0x1000);

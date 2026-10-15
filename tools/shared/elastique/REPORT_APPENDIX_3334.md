@@ -109,3 +109,38 @@ DYN_POSCTRL=1 tools/shared/work/venv/bin/python tools/shared/elastique/dyn_trace
 
 - 到達元 (受入 2): 実行経路に枠読みが現れないため、呼出箇所・読んだ枠の宛先は**記録なし**。読み手は計算アドレス経由と推定 (未確定)。読み手の同定は子 #3386 (T-SH-73: 引数規約の同定) の結果に依存する。
 - 限界: 合成引数で実行した範囲 (export 15 件 + thunk 頭 33 本) に限る。引数は 3 グループ (`base`・`rate48k`・`obj`) で、`base` は zero・scratch の 2 変種を含むため計 4 引数パターン。FL の実呼出しでの読みは未確認。
+
+## 9.10 uc_error 55 件の切り分け (T-SH-124 / #4397)
+
+- 測定 commit: **`fd5fb31e7`** (`dyn_trace.py` に fault 番地と戻り番地の記録を足した最後の commit。出力 CSV は変えていない)。検証の起点は `origin/main` (`bc77ad41c`)。
+- 差分 (測定後のコード範囲): `git diff fd5fb31e7 HEAD -- tools/shared/elastique/dyn_trace.py tools/shared/elastique/data/runtime_indirect.csv` → 出力 0 行 (本節の追記は REPORT だけ)。
+- 結果 (既定設定・HEAD `fd5fb31e7`・実測 real **22.01 秒**・load average 0.71・190 run・命令 32,170,989・exit 0・`runtime_indirect.csv` は commit 版と `cmp` 一致):
+
+| 変種 | uc_error | A: int3 の trap | B: 合成レート値の参照 | C: scratch 末尾越え | D: 不正な呼出先 |
+|---|---|---|---|---|---|
+| base | 25 | 8 | 6 | 10 | 1 |
+| rate48k | 19 | 5 | 6 | 8 | 0 |
+| obj | 11 | 4 | 6 | 0 | 1 |
+| 計 | 55 | 17 | 18 | 18 | 2 |
+
+分類の根拠 (fault 番地・直前の戻り番地は `dyn_trace.py` が記録):
+
+- **A (17 件)**: 例外は `0x1802c164d` (`int3` で埋まった領域)。`0x1802c1610` の関数が `0x1802c1619` で間接呼出し (slot `0x1804afc30`) し、戻りが 0 だと `0x1802c1636`〜`0x1802caea8` を経て `int3` に入る。割当の要求サイズは `0x300FFBE0` などスタック番地の範囲に見える。host.malloc の要求サイズと戻り値 0 は**未確認** (`dyn_trace.py` は ALLOC を出力しない)。slot `0x1804afc30` の中身は `ElAllocator_SetFunctions` が書く DLL 内の番地 (`0x1802844d0`) で、そこから host.malloc までの経路は未追跡。1 GB プールの写し (参考値・commit 外。下記) でも trap 17 件が残ったが、この参考値は根拠にしない。プール不足の説明は未検証。要求サイズの出所も未追跡。
+- **B (18 件)**: 読み先が `0xac44` (44100) か `0xbb80` (48000) と一致。合成の sample-rate 引数が、thunk 先頭の関数でポインタとして使われている。
+- **C (18 件)**: 読み先が `0x40100000` (scratch 1 MB の直後)。scratch を 16 MB にすると 16 件が消え、残り 2 件は `0x41000000` (16 MB の直後) へ移る。合成バッファ長が足りない。
+- **D (2 件)**: `0xfdd000000000300f` を実行先として取った (`Declicker_CreateInstance`・scratch と obj0)。値は合成データ由来と推定 (未追跡)。
+- 例外の種類は `Unhandled CPU exception` (A) と `Invalid memory` (B・C・D) の 2 種類。
+
+**影響範囲**: uc_error の 55 run が実行した命令は 8,060,185 件 (全体の 25.1%)。scratch を 16 MB にした補助実験 (命令 61,556,812・uc_error 39 件) でも、間接サイト 77・間接 edge 79・IPPCODE 入口ヒット 0 は既定と一致 (基底 75・rate48k 60・obj 62 も同じ)。A・B の 35 件はどちらの設定にも残る。
+
+**未解決**: A の要求サイズの出所 (17 件)。B・C・D は合成引数の取り方の問題として切り分けたが、FL の実引数で同じ経路が通るかは未確定 (#3386 の範囲)。
+
+**再現**:
+
+```sh
+tools/shared/work/venv/bin/python tools/shared/elastique/dyn_trace.py                 # 既定: uc_error 55・real 22.01 秒
+DYN_SCRATCH_SIZE=0x1000000 tools/shared/work/venv/bin/python tools/shared/elastique/dyn_trace.py  # 補助: uc_error 39
+```
+
+- 補助実験の CSV は上書きされる。実行後に `git show fd5fb31e7:tools/shared/elastique/data/runtime_indirect.csv > tools/shared/elastique/data/runtime_indirect.csv` で戻す。
+- 1 GB プールの補助実験 (参考値・根拠にしない): `dyn_trace.py` の `POOL_SIZE` を一時的に `0x40000000` にした写しで行った (commit 外・`tools/shared/work/` の下)。trap 17 件が残った。写しの最後の CSV 書き込みは出力先のパスの誤りで失敗した。run ログの `uc_error` 行は全て出ているが、55 → 54 の 1 件の差は未追跡のため、この実験は結論の根拠にしない。再現には `POOL_SIZE` を環境変数で変える改修が要るため、本 PR では行わず #3386 の範囲に残す。

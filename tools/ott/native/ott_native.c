@@ -81,9 +81,127 @@ static MS void* k_HeapReAlloc(void* h, uint32_t f, void* p, uint64_t sz) {
 static uint32_t g_lasterr;
 static MS uint32_t k_GetLastError(void) { return g_lasterr; }
 static MS void k_SetLastError(uint32_t e) { g_lasterr = e; }
-static MS void k_RaiseException(uint32_t code, uint32_t fl, uint32_t n, const void* a) {
-    (void)fl; (void)n; (void)a;
+/* ---- x64 unwind (ICALL-103): .pdata 検索と UNWIND_INFO の逆適用 ----
+ * UCtx.r は Win64 の番号 (rax0 rcx1 rdx2 rbx3 rsp4 rbp5 rsi6 rdi7 r8..r15)。CONTEXT 上の位置は 0x78+8*i。
+ * 制限: rbx/rsi/rdi/r12..r15 は RaiseException 呼び出し時点の値を取れない (C 関数の prologue で書き換わりうる)。
+ *       RSP・RIP・RBP だけは正しい。UWOP_PUSH_NONVOL で積まれた値は stack から読むので、それ以外の不正確さは
+ *       handler 探索 (frame 列挙) の結果には効かない。 */
+typedef struct { uint32_t begin, end, unwind; } RtFn;
+typedef struct { uint64_t r[16], rip; } UCtx;
+static uint32_t g_pdata_rva, g_pdata_n;
+
+static const RtFn* lookup_fn(uint64_t pc) {
+    if (pc < IMG_BASE || pc >= IMG_BASE + g_imgsize || !g_pdata_n) return NULL;
+    uint32_t r = (uint32_t)(pc - IMG_BASE);
+    const RtFn* t = (const RtFn*)(g_img + g_pdata_rva);
+    long lo = 0, hi = (long)g_pdata_n - 1;
+    while (lo <= hi) {
+        long m = (lo + hi) / 2;
+        if (r < t[m].begin) hi = m - 1;
+        else if (r >= t[m].end) lo = m + 1;
+        else return &t[m];
+    }
+    return NULL;
+}
+static uint64_t rd64(uint64_t a) { uint64_t v; memcpy(&v, (void*)a, 8); return v; }
+static uint32_t rd32p(const uint8_t* p) { uint32_t v; memcpy(&v, p, 4); return v; }
+static uint16_t rd16p(const uint8_t* p) { uint16_t v; memcpy(&v, p, 2); return v; }
+
+/* UNWIND_INFO の codes を逆適用する。filt のとき CodeOffset > off のコードは未実行として飛ばす。-1: 未対応 op。 */
+static int unwind_codes(const uint8_t* u, uint64_t off, int filt, UCtx* c) {
+    int n = u[2], frreg = u[3] & 15, froff = u[3] >> 4;
+    const uint8_t* e = u + 4;
+    for (int i = 0; i < n;) {
+        const uint8_t* k = e + 2 * i;
+        uint8_t co = k[0], op = k[1] & 15, info = k[1] >> 4;
+        int slots = 0;
+        switch (op) {
+            case 1: slots = info ? 2 : 1; break;
+            case 4: case 8: slots = 1; break;
+            case 5: case 9: slots = 2; break;
+            case 6: case 7: case 10: case 11: case 12: case 13: case 14: case 15: return -1;
+            default: break;
+        }
+        if (!(filt && co > off)) {
+            switch (op) {
+                case 0: c->r[info] = rd64(c->r[4]); c->r[4] += 8; break;
+                case 1: c->r[4] += info ? rd32p(k + 2) : (uint64_t)rd16p(k + 2) * 8; break;
+                case 2: c->r[4] += (uint64_t)info * 8 + 8; break;
+                case 3: c->r[4] = c->r[frreg] - (uint64_t)froff * 16; break;
+                case 4: c->r[info] = rd64(c->r[4] + (uint64_t)rd16p(k + 2) * 8); break;
+                case 5: c->r[info] = rd64(c->r[4] + rd32p(k + 2)); break;
+                default: break;
+            }
+        }
+        i += 1 + slots;
+    }
+    return 0;
+}
+
+/* f の関数を 1 段戻す (RtlVirtualUnwind の本体)。*hrva は handler の RVA (無ければ 0)。成功 0。 */
+static int virt_unwind(const RtFn* f, uint64_t pc, UCtx* c, uint32_t* hrva, uint64_t* hdata) {
+    const uint8_t* u = g_img + f->unwind;
+    uint8_t flags = u[0] >> 3; int n = u[2], padded = (n + 1) & ~1;
+    uint64_t off = pc - IMG_BASE - f->begin;
+    *hrva = 0; if (hdata) *hdata = 0;
+    if (unwind_codes(u, off, 1, c)) return -1;
+    if (flags & 4) {                                   /* UNW_FLAG_CHAININFO: 先頭 prolog の情報を続けて戻す */
+        const RtFn* ch = (const RtFn*)(u + 4 + 2 * padded);
+        if (unwind_codes(g_img + ch->unwind, 0, 0, c)) return -1;
+    } else if (flags & 3) {                            /* UNW_FLAG_EHANDLER | UNW_FLAG_UHANDLER */
+        *hrva = rd32p(u + 4 + 2 * padded);
+        if (hdata) *hdata = (uint64_t)(u + 8 + 2 * padded);
+    }
+    c->rip = rd64(c->r[4]); c->r[4] += 8;              /* 戻りアドレス */
+    return 0;
+}
+
+/* 呼び出し元から遡って handler を持つフレームを探す。見つけたフレーム番号を返す。負: 見つからず/.pdata 無し */
+static int eh_walk(UCtx c) {
+    for (int d = 0; d < 64; d++) {
+        const RtFn* f = lookup_fn(c.rip);
+        if (!f) { fprintf(stderr, "[ott_native] EH walk: frame #%d rip=%#llx に .pdata が無い\n", d, (unsigned long long)c.rip); return -1; }
+        uint64_t rip0 = c.rip; uint32_t hr = 0;
+        if (virt_unwind(f, rip0, &c, &hr, NULL)) { fprintf(stderr, "[ott_native] EH walk: UWOP 未対応 frame #%d\n", d); return -2; }
+        fprintf(stderr, "[ott_native] EH walk #%d rip=%#llx fn=[%x,%x) handler_rva=%#x\n", d, (unsigned long long)rip0, f->begin, f->end, hr);
+        if (hr) return d;
+    }
+    return -3;
+}
+
+static MS void k_RaiseException(uint32_t code, uint32_t fl, uint32_t n, const uint64_t* a) {
+    (void)fl;
+    if (code == 0xe06d7363) {
+        /* 呼び出し元 (guest) の状態: この関数は frame pointer を持つ (__builtin_frame_address) ので、
+         * rbp が保存した guest rbp を指し、戻りアドレスは rbp+8、呼び出し元の rsp は rbp+16。 */
+        uint64_t* fp = (uint64_t*)__builtin_frame_address(0);
+        UCtx c; memset(&c, 0, sizeof c);
+        c.r[4] = (uint64_t)fp + 16; c.r[5] = fp[0]; c.rip = (uint64_t)__builtin_return_address(0);
+        if (n >= 3)
+            fprintf(stderr, "[ott_native] RaiseException(0xe06d7363) magic=%#llx obj=%#llx throwinfo=%#llx throw_site_rva=%#llx\n",
+                    (unsigned long long)a[0], (unsigned long long)a[1], (unsigned long long)a[2], (unsigned long long)(c.rip - IMG_BASE));
+        int d = eh_walk(c);
+        if (d >= 0) fprintf(stderr, "[ott_native] RaiseException(0xe06d7363): frame #%d に handler あり。__CxxFrameHandler の dispatch は未実装 — fail-fast\n", d);
+        else fprintf(stderr, "[ott_native] RaiseException(0xe06d7363): handler が見つからない (walk=%d) — fail-fast\n", d);
+        exit(97);
+    }
     fprintf(stderr, "[ott_native] RaiseException(0x%x) 到達 — fail-fast\n", code); exit(97);
+}
+static MS void* k_RtlLookupFunctionEntry(uint64_t pc, uint64_t* ib, void* ht) {
+    (void)ht; if (ib) *ib = IMG_BASE; return (void*)lookup_fn(pc);
+}
+static MS void* k_RtlVirtualUnwind(uint32_t type, uint64_t ib, uint64_t pc, const RtFn* f, uint8_t* ctx, void** hd, uint64_t* est, void* cp) {
+    (void)type; (void)ib; (void)cp;
+    if (!f) return NULL;
+    UCtx c; for (int i = 0; i < 16; i++) memcpy(&c.r[i], ctx + 0x78 + 8 * i, 8);
+    memcpy(&c.rip, ctx + 0xf8, 8);
+    if (est) *est = c.r[4];                            /* EstablisherFrame: 簡略化。戻す前の rsp */
+    uint32_t hr; uint64_t hdat;
+    if (virt_unwind(f, pc, &c, &hr, &hdat)) return NULL;
+    for (int i = 0; i < 16; i++) memcpy(ctx + 0x78 + 8 * i, &c.r[i], 8);
+    memcpy(ctx + 0xf8, &c.rip, 8);
+    if (hd) *hd = (void*)hdat;
+    return hr ? (void*)(g_img + hr) : NULL;
 }
 static MS int k_QPC(int64_t* v) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); *v = t.tv_sec * 1000000000LL + t.tv_nsec; return 1; }
 static MS int k_QPF(int64_t* v) { *v = 1000000000LL; return 1; }
@@ -107,6 +225,26 @@ static MS void* k_RtlPcToFileHeader(void* pc, void** base) {
     return b;
 }
 
+/* ICALL-100: RtlCaptureContext。x64 CONTEXT (0x4d0 B) の制御部だけを埋める。
+ * 呼び出し元の rip/rsp は呼び出し時のフレームから取る。汎用レジスタ (Rax..R15)・XMM は native 側から
+ * 取れない (ゲストの実レジスタは ott_ms_call の外に無い) ためゼロ。ContextFlags に含まれる範囲だけを意味がある値として扱う。 */
+static MS void k_RtlCaptureContext(uint8_t* ctx) {
+    uint64_t* fp = (uint64_t*)__builtin_frame_address(0);
+    memset(ctx, 0, 0x4d0);
+    *(uint32_t*)(ctx + 0x30) = 0x10001f;      /* ContextFlags = CONTEXT_AMD64 | CONTROL|INTEGER|SEGMENTS|FLOAT|DEBUG_REGISTERS */
+    *(uint32_t*)(ctx + 0x34) = 0x1f80;        /* MxCsr 既定値 */
+    *(uint16_t*)(ctx + 0x38) = 0x33;          /* SegCs (64bit code) */
+    *(uint16_t*)(ctx + 0x42) = 0x2b;          /* SegSs */
+    *(uint32_t*)(ctx + 0x44) = 0x202;         /* EFlags (IF) */
+    *(uint64_t*)(ctx + 0xf8) = fp[1];         /* Rip = 戻り先 */
+    *(uint64_t*)(ctx + 0x98) = (uint64_t)fp + 16; /* Rsp = 呼び出し元の rsp */
+}
+
+/* ICALL-104: SetUnhandledExceptionFilter。前の filter を返し新しい filter を登録する (初期値 NULL)。
+ * UnhandledExceptionFilter 本体は未実装 (fail-fast のまま)。 */
+static void* g_uef;
+static MS void* k_SetUnhandledExceptionFilter(void* f) { void* old = g_uef; g_uef = f; return old; }
+
 typedef struct { const char* n; void* f; } Impl;
 static const Impl IMPL[] = {
     {"GetProcessHeap", k_GetProcessHeap}, {"HeapAlloc", k_HeapAlloc}, {"HeapFree", k_HeapFree},
@@ -121,6 +259,9 @@ static const Impl IMPL[] = {
     {"Sleep", k_Sleep}, {"TlsAlloc", k_TlsAlloc}, {"TlsGetValue", k_TlsGetValue}, {"TlsSetValue", k_TlsSetValue},
     {"FlsGetValue", k_TlsGetValue}, {"FlsSetValue", k_TlsSetValue},
     {"RtlPcToFileHeader", k_RtlPcToFileHeader},
+    {"RtlLookupFunctionEntry", k_RtlLookupFunctionEntry}, {"RtlVirtualUnwind", k_RtlVirtualUnwind},
+    {"RtlCaptureContext", k_RtlCaptureContext},
+    {"SetUnhandledExceptionFilter", k_SetUnhandledExceptionFilter},
     {NULL, NULL}};
 
 static MS void missing_import(uint64_t idx) {
@@ -167,6 +308,8 @@ int ott_load(const char* path) {
         uint32_t n = rs < vs ? rs : vs;
         memcpy(g_img + va, f + rp, n);
     }
+    memcpy(&g_pdata_rva, f + pe + 24 + 112 + 3 * 8, 4); memcpy(&g_pdata_n, f + pe + 24 + 112 + 3 * 8 + 4, 4);
+    g_pdata_n /= 12;                                            /* DataDirectory[3] = Exception (.pdata) */
     uint32_t idrva; memcpy(&idrva, f + pe + 24 + 112 + 8, 4);   /* DataDirectory[1] = Import */
     for (uint8_t* d = g_img + idrva;; d += 20) {
         uint32_t oft, nm, ft; memcpy(&oft, d, 4); memcpy(&nm, d + 12, 4); memcpy(&ft, d + 16, 4);

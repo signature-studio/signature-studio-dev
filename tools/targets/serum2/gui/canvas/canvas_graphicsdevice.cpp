@@ -1,12 +1,15 @@
 // SR-39 #2107: canvas platform (wasm) の IPlatformGraphicsDevice* 実装。
 // SR-50 #3260: drawRect・clearRect を bitmap へ描く。bitmap は createBitmapContext で結線し、clip は bitmap 境界で保持する。
 // SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap を bitmap へ描く。
+// SR-62 #4233: fillLinearGradient・fillRadialGradient・drawBitmapNinePartTiled・fillRectWithBitmap を bitmap へ描く。
 
 #include "canvas_graphicsdevice.h"
 #include "canvas_bitmap.h"
 #include "canvas_graphicspath.h"
+#include "vstgui/lib/platform/iplatformgradient.h"
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <vector>
 
 namespace VSTGUI {
@@ -33,6 +36,29 @@ PointList ellipsePoints (const CRect& rect)
 }
 
 //------------------------------------------------------------------------
+// 円弧は角度 (ラジアン) を正の向きに掃引する。開始角と終了角の間の弧長に比例して辺数を取り、上限を置く。
+PointList arcPoints (const CRect& rect, double startAngle, double endAngle)
+{
+	auto cx = (rect.left + rect.right) / 2.;
+	auto cy = (rect.top + rect.bottom) / 2.;
+	auto rx = (rect.right - rect.left) / 2.;
+	auto ry = (rect.bottom - rect.top) / 2.;
+	auto sweep = endAngle - startAngle;
+	while (sweep < 0.)
+		sweep += 2. * M_PI;
+	sweep = std::min (sweep, 2. * M_PI);
+	auto count = static_cast<int32_t> (std::clamp (std::ceil (sweep * (rx + ry)), 2., 1024.));
+	PointList points;
+	points.reserve (static_cast<size_t> (count) + 1);
+	for (int32_t i = 0; i <= count; ++i)
+	{
+		auto rad = startAngle + sweep * i / count;
+		points.push_back (CPoint (cx + rx * std::cos (rad), cy + ry * std::sin (rad)));
+	}
+	return points;
+}
+
+//------------------------------------------------------------------------
 struct PixelBox
 {
 	int32_t x0;
@@ -49,12 +75,76 @@ PixelBox pixelBoxOf (const CRect& rect)
 }
 
 //------------------------------------------------------------------------
+double distanceToSegment (double px, double py, const CPoint& from, const CPoint& to)
+{
+	const auto dx = to.x - from.x;
+	const auto dy = to.y - from.y;
+	const auto lengthSquared = dx * dx + dy * dy;
+	const auto qx = px - from.x;
+	const auto qy = py - from.y;
+	const auto t = lengthSquared > 0. ? std::clamp ((qx * dx + qy * dy) / lengthSquared, 0., 1.) : 0.;
+	const auto ex = qx - t * dx;
+	const auto ey = qy - t * dy;
+	return std::sqrt (ex * ex + ey * ey);
+}
+
+//------------------------------------------------------------------------
+template <typename F>
+void forEachBresenhamPixel (CPoint from, CPoint to, F&& visit)
+{
+	auto x0 = static_cast<int32_t> (std::lround (from.x));
+	auto y0 = static_cast<int32_t> (std::lround (from.y));
+	auto x1 = static_cast<int32_t> (std::lround (to.x));
+	auto y1 = static_cast<int32_t> (std::lround (to.y));
+	auto dx = std::abs (x1 - x0);
+	auto dy = -std::abs (y1 - y0);
+	auto sx = x0 < x1 ? 1 : -1;
+	auto sy = y0 < y1 ? 1 : -1;
+	auto err = dx + dy;
+	while (true)
+	{
+		visit (x0, y0);
+		if (x0 == x1 && y0 == y1)
+			break;
+		auto e2 = 2 * err;
+		if (e2 >= dy)
+		{
+			err += dy;
+			x0 += sx;
+		}
+		if (e2 <= dx)
+		{
+			err += dx;
+			y0 += sy;
+		}
+	}
+}
+
+//------------------------------------------------------------------------
 void writeRGBA (uint8_t* dst, const CColor& color)
 {
 	dst[0] = color.red;
 	dst[1] = color.green;
 	dst[2] = color.blue;
 	dst[3] = color.alpha;
+}
+
+//------------------------------------------------------------------------
+// 色停止点 (位置 0〜1) の間を線形に補間する。stops は空でないこと。
+CColor gradientColorAt (const GradientColorStopMap& stops, double t)
+{
+	t = std::clamp (t, 0., 1.);
+	auto next = stops.lower_bound (t);
+	if (next == stops.end ())
+		return std::prev (next)->second;
+	if (next == stops.begin ())
+		return next->second;
+	auto prev = std::prev (next);
+	auto span = next->first - prev->first;
+	auto f = span > 0. ? (t - prev->first) / span : 0.;
+	auto mix = [f] (uint8_t a, uint8_t b) { return static_cast<uint8_t> (std::lround (a + (b - a) * f)); };
+	return CColor (mix (prev->second.red, next->second.red), mix (prev->second.green, next->second.green),
+	               mix (prev->second.blue, next->second.blue), mix (prev->second.alpha, next->second.alpha));
 }
 
 //------------------------------------------------------------------------
@@ -129,7 +219,7 @@ bool CanvasGraphicsDeviceContext::endDraw () const
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 {
-	plotLine (line.first, line.second, frameColor);
+	plotLines ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
 	return true;
 }
 
@@ -137,7 +227,7 @@ bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 bool CanvasGraphicsDeviceContext::drawLines (const LineList& lines) const
 {
 	for (const auto& line : lines)
-		plotLine (line.first, line.second, frameColor);
+		plotLines ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
 	return true;
 }
 
@@ -147,55 +237,62 @@ bool CanvasGraphicsDeviceContext::drawPolygon (const PointList& polygonPointList
 {
 	if (polygonPointList.size () < 2)
 		return false;
+	auto points = transformPoints (polygonPointList);
 	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
-		fillPolygon (polygonPointList, fillColor);
-	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
-		strokePolyline (polygonPointList, true, frameColor);
-	return true;
-}
-
-//------------------------------------------------------------------------
-bool CanvasGraphicsDeviceContext::drawRect (CRect rect, PlatformGraphicsDrawStyle drawStyle) const
-{
-	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
-		paintRect (rect, fillColor, true);
-	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
-		strokeRect (rect, frameColor);
-	return true;
-}
-
-//------------------------------------------------------------------------
-bool CanvasGraphicsDeviceContext::drawArc (CRect rect, double startAngle1, double endAngle2,
-                                           PlatformGraphicsDrawStyle drawStyle) const
-{
-	(void)rect;
-	(void)startAngle1;
-	(void)endAngle2;
-	(void)drawStyle;
-	return false;
-}
-
-//------------------------------------------------------------------------
-bool CanvasGraphicsDeviceContext::drawEllipse (CRect rect, PlatformGraphicsDrawStyle drawStyle) const
-{
-	auto points = ellipsePoints (rect);
-	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
-		fillPolygon (points, fillColor);
+		fillRings ({points}, fillColor, true);
 	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
 		strokePolyline (points, true, frameColor);
 	return true;
 }
 
 //------------------------------------------------------------------------
+bool CanvasGraphicsDeviceContext::drawRect (CRect rect, PlatformGraphicsDrawStyle drawStyle) const
+{
+	auto r = deviceRect (rect);
+	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
+		paintRect (r, fillColor, true);
+	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
+		strokeRect (r, frameColor);
+	return true;
+}
+
+//------------------------------------------------------------------------
+// 塗りは弧と弦で囲んだ領域 (cairo_arc の fill と同じ)。線は弧だけを描く。
+bool CanvasGraphicsDeviceContext::drawArc (CRect rect, double startAngle1, double endAngle2,
+                                           PlatformGraphicsDrawStyle drawStyle) const
+{
+	auto points = transformPoints (arcPoints (rect, startAngle1, endAngle2));
+	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
+		fillRings ({points}, fillColor, true);
+	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
+		strokePolyline (points, false, frameColor);
+	return true;
+}
+
+//------------------------------------------------------------------------
+bool CanvasGraphicsDeviceContext::drawEllipse (CRect rect, PlatformGraphicsDrawStyle drawStyle) const
+{
+	auto points = transformPoints (ellipsePoints (rect));
+	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
+		fillRings ({points}, fillColor, true);
+	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
+		strokePolyline (points, true, frameColor);
+	return true;
+}
+
+//------------------------------------------------------------------------
+// 1 画素を、端点と同じく四捨五入した位置に置く。
 bool CanvasGraphicsDeviceContext::drawPoint (CPoint point, CColor color) const
 {
-	(void)point;
-	(void)color;
-	return false;
+	auto device = transformPoint (point);
+	blendPixel (static_cast<int32_t> (std::lround (device.x)), static_cast<int32_t> (std::lround (device.y)),
+	            color);
+	return true;
 }
 
 //------------------------------------------------------------------------
 // 1:1 で転写する (dest の左上に offset から始まる画素を置く)。拡大縮小と quality は未対応で、quality は無視する。
+// dest の位置だけ transformMatrix で変換する (拡大縮小は掛けない)。
 bool CanvasGraphicsDeviceContext::drawBitmap (IPlatformBitmap& bitmap, CRect dest, CPoint offset,
                                               double alpha, BitmapInterpolationQuality quality) const
 {
@@ -206,7 +303,8 @@ bool CanvasGraphicsDeviceContext::drawBitmap (IPlatformBitmap& bitmap, CRect des
 	const auto& sourceSize = source->getSize ();
 	auto srcWidth = static_cast<int32_t> (sourceSize.x);
 	auto srcHeight = static_cast<int32_t> (sourceSize.y);
-	auto box = pixelBoxOf (dest);
+	auto origin = transformPoint (CPoint (dest.left, dest.top));
+	auto box = pixelBoxOf (CRect (origin.x, origin.y, origin.x + dest.getWidth (), origin.y + dest.getHeight ()));
 	auto srcX0 = static_cast<int32_t> (offset.x);
 	auto srcY0 = static_cast<int32_t> (offset.y);
 	for (auto y = box.y0; y < box.y1; ++y)
@@ -233,19 +331,38 @@ bool CanvasGraphicsDeviceContext::drawBitmap (IPlatformBitmap& bitmap, CRect des
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::clearRect (CRect rect) const
 {
-	paintRect (rect, CColor (0, 0, 0, 0), false);
+	paintRect (deviceRect (rect), CColor (0, 0, 0, 0), false);
 	return true;
 }
 
 //------------------------------------------------------------------------
+// 全 subpath を対象にする。塗りは Filled (非零) / FilledEvenOdd (偶奇) で切り替える。線は各 subpath を閉じずに描く (閉じる場合は path 側で終点を置く)。
 bool CanvasGraphicsDeviceContext::drawGraphicsPath (IPlatformGraphicsPath& path,
                                                     PlatformGraphicsPathDrawMode mode,
                                                     TransformMatrix* transformation) const
 {
-	(void)path;
-	(void)mode;
-	(void)transformation;
-	return false;
+	auto* source = dynamic_cast<CanvasGraphicsPath*> (&path);
+	if (!source)
+		return false;
+	auto subpaths = source->subpaths ();
+	if (transformation)
+	{
+		for (auto& subpath : subpaths)
+		{
+			for (auto& p : subpath)
+				transformation->transform (p.x, p.y);
+		}
+	}
+	for (auto& subpath : subpaths)
+		subpath = transformPoints (subpath);
+	if (mode != PlatformGraphicsPathDrawMode::Stroked)
+		fillRings (subpaths, fillColor, mode == PlatformGraphicsPathDrawMode::FilledEvenOdd);
+	else
+	{
+		for (const auto& subpath : subpaths)
+			strokePolyline (subpath, false, frameColor);
+	}
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -254,30 +371,37 @@ bool CanvasGraphicsDeviceContext::fillLinearGradient (IPlatformGraphicsPath& pat
                                                       CPoint startPoint, CPoint endPoint,
                                                       bool evenOdd, TransformMatrix* transformation) const
 {
-	(void)path;
-	(void)gradient;
-	(void)startPoint;
-	(void)endPoint;
-	(void)evenOdd;
-	(void)transformation;
-	return false;
+	const auto& stops = gradient.getColorStops ();
+	if (stops.empty ())
+		return false;
+	auto dx = endPoint.x - startPoint.x;
+	auto dy = endPoint.y - startPoint.y;
+	auto len2 = dx * dx + dy * dy;
+	fillPathByPixel (path, evenOdd, transformation, [&] (CPoint p, CColor& color) {
+		auto t = len2 > 0. ? ((p.x - startPoint.x) * dx + (p.y - startPoint.y) * dy) / len2 : 0.;
+		color = gradientColorAt (stops, t);
+		return true;
+	});
+	return true;
 }
 
 //------------------------------------------------------------------------
+// originOffset だけ焦点をずらした放射状。色は焦点からの距離 / radius で求める (楕円形の放射は未対応)。
 bool CanvasGraphicsDeviceContext::fillRadialGradient (IPlatformGraphicsPath& path,
                                                       const IPlatformGradient& gradient,
                                                       CPoint center, CCoord radius,
                                                       CPoint originOffset, bool evenOdd,
                                                       TransformMatrix* transformation) const
 {
-	(void)path;
-	(void)gradient;
-	(void)center;
-	(void)radius;
-	(void)originOffset;
-	(void)evenOdd;
-	(void)transformation;
-	return false;
+	const auto& stops = gradient.getColorStops ();
+	if (stops.empty () || radius <= 0.)
+		return false;
+	auto focal = CPoint (center.x + originOffset.x, center.y + originOffset.y);
+	fillPathByPixel (path, evenOdd, transformation, [&] (CPoint p, CColor& color) {
+		color = gradientColorAt (stops, std::hypot (p.x - focal.x, p.y - focal.y) / radius);
+		return true;
+	});
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -301,7 +425,7 @@ void CanvasGraphicsDeviceContext::setLineWidth (CCoord width) const
 //------------------------------------------------------------------------
 void CanvasGraphicsDeviceContext::setDrawMode (CDrawMode mode) const
 {
-	(void)mode;
+	drawMode = mode;
 }
 
 //------------------------------------------------------------------------
@@ -331,7 +455,7 @@ void CanvasGraphicsDeviceContext::setGlobalAlpha (double newAlpha) const
 //------------------------------------------------------------------------
 void CanvasGraphicsDeviceContext::setTransformMatrix (const TransformMatrix& tm) const
 {
-	(void)tm;
+	transformMatrix = tm;
 }
 
 //------------------------------------------------------------------------
@@ -341,30 +465,38 @@ const IPlatformGraphicsDeviceContextBitmapExt* CanvasGraphicsDeviceContext::asBi
 }
 
 //------------------------------------------------------------------------
+// 9 分割の各部分を、元画像の対応部分から dest の対応部分へ 1:1 タイルで置く。拡大縮小と quality は未対応で無視する。
 bool CanvasGraphicsDeviceContext::drawBitmapNinePartTiled (IPlatformBitmap& bitmap, CRect dest,
                                                            const CNinePartTiledDescription& desc,
                                                            double alpha,
                                                            BitmapInterpolationQuality quality) const
 {
-	(void)bitmap;
-	(void)dest;
-	(void)desc;
-	(void)alpha;
 	(void)quality;
-	return false;
+	auto* source = dynamic_cast<CanvasBitmap*> (&bitmap);
+	if (!source)
+		return false;
+	const auto& size = source->getSize ();
+	CRect srcParts[CNinePartTiledDescription::kPartCount];
+	CRect dstParts[CNinePartTiledDescription::kPartCount];
+	desc.calcRects (CRect (0., 0., size.x, size.y), srcParts);
+	desc.calcRects (dest, dstParts);
+	for (auto i = 0; i < static_cast<int> (CNinePartTiledDescription::kPartCount); ++i)
+		tileBitmap (*source, srcParts[i], dstParts[i], alpha);
+	return true;
 }
 
 //------------------------------------------------------------------------
+// srcRect を繰り返して dstRect を塗る (タイル塗り)。拡大縮小は未対応で、quality は無視する。
 bool CanvasGraphicsDeviceContext::fillRectWithBitmap (IPlatformBitmap& bitmap, CRect srcRect,
                                                       CRect dstRect, double alpha,
                                                       BitmapInterpolationQuality quality) const
 {
-	(void)bitmap;
-	(void)srcRect;
-	(void)dstRect;
-	(void)alpha;
 	(void)quality;
-	return false;
+	auto* source = dynamic_cast<CanvasBitmap*> (&bitmap);
+	if (!source)
+		return false;
+	tileBitmap (*source, srcRect, dstRect, alpha);
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -398,6 +530,71 @@ uint8_t* CanvasGraphicsDeviceContext::pixelAt (int32_t x, int32_t y) const noexc
 }
 
 //------------------------------------------------------------------------
+// path の内側の画素ごとに colorAt で色を決めて source-over で置く。colorAt は path と同じ座標 (transformation の逆変換後) の点を受け取る。
+void CanvasGraphicsDeviceContext::fillPathByPixel (IPlatformGraphicsPath& path, bool evenOdd,
+                                                   TransformMatrix* transformation,
+                                                   const std::function<bool (CPoint, CColor&)>& colorAt) const
+{
+	auto bounds = path.getBoundingBox ();
+	if (transformation)
+		transformation->transform (bounds);
+	auto box = pixelBoxOf (bounds);
+	for (auto y = box.y0; y < box.y1; ++y)
+	{
+		for (auto x = box.x0; x < box.x1; ++x)
+		{
+			auto* dst = pixelAt (x, y);
+			if (!dst)
+				continue;
+			CPoint p (x + 0.5, y + 0.5);
+			if (!path.hitTest (p, evenOdd, transformation))
+				continue;
+			CPoint local = p;
+			if (transformation)
+				transformation->inverse ().transform (local);
+			CColor color;
+			if (colorAt (local, color))
+				blendRGBA (dst, color, globalAlpha);
+		}
+	}
+}
+
+//------------------------------------------------------------------------
+// source の srcRect を左上から繰り返して dstRect へ 1:1 で置く。srcRect の整数化した範囲を 1 タイルとする。
+void CanvasGraphicsDeviceContext::tileBitmap (CanvasBitmap& source, CRect srcRect, CRect dstRect,
+                                              double alpha) const
+{
+	const auto& sourceSize = source.getSize ();
+	auto srcWidth = static_cast<int32_t> (sourceSize.x);
+	auto srcHeight = static_cast<int32_t> (sourceSize.y);
+	auto tile = pixelBoxOf (srcRect);
+	auto tileWidth = tile.x1 - tile.x0;
+	auto tileHeight = tile.y1 - tile.y0;
+	if (tileWidth <= 0 || tileHeight <= 0)
+		return;
+	auto box = pixelBoxOf (dstRect);
+	for (auto y = box.y0; y < box.y1; ++y)
+	{
+		auto sy = tile.y0 + (y - box.y0) % tileHeight;
+		if (sy < 0 || sy >= srcHeight)
+			continue;
+		for (auto x = box.x0; x < box.x1; ++x)
+		{
+			auto sx = tile.x0 + (x - box.x0) % tileWidth;
+			if (sx < 0 || sx >= srcWidth)
+				continue;
+			const uint8_t* src = source.data () + (static_cast<size_t> (sy) * srcWidth + sx) * 4;
+			if (src[3] == 0)
+				continue;
+			auto* dst = pixelAt (x, y);
+			if (!dst)
+				continue;
+			blendRGBA (dst, CColor (src[0], src[1], src[2], src[3]), alpha * globalAlpha);
+		}
+	}
+}
+
+//------------------------------------------------------------------------
 void CanvasGraphicsDeviceContext::paintRect (const CRect& rect, const CColor& color, bool blend) const
 {
 	auto box = pixelBoxOf (rect);
@@ -427,70 +624,153 @@ void CanvasGraphicsDeviceContext::strokeRect (const CRect& rect, const CColor& c
 }
 
 //------------------------------------------------------------------------
-// 1 px の Bresenham 線。端点は四捨五入して画素に置く。
-void CanvasGraphicsDeviceContext::plotLine (CPoint from, CPoint to, const CColor& color) const
+// 画素ごとに標本点 (AA は 4x4・aliasing は 1 点) の bit mask を bbox 上に持ち、線分ごとに、その線分の bbox を半幅 +1 で広げた範囲だけ標本を立てる。
+// 最後に被覆 (立った標本の割合) を alpha に掛けて 1 回だけ合成する。接合部で辺が重なっても二重に合成しない。
+// 太さ 1 かつ aliasing は Bresenham の画素を立てる (頂点の画素も 1 回だけ合成する)。
+void CanvasGraphicsDeviceContext::plotLines (const PointList& points, bool closed, const CColor& color) const
 {
-	auto x0 = static_cast<int32_t> (std::lround (from.x));
-	auto y0 = static_cast<int32_t> (std::lround (from.y));
-	auto x1 = static_cast<int32_t> (std::lround (to.x));
-	auto y1 = static_cast<int32_t> (std::lround (to.y));
-	auto dx = std::abs (x1 - x0);
-	auto dy = -std::abs (y1 - y0);
-	auto sx = x0 < x1 ? 1 : -1;
-	auto sy = y0 < y1 ? 1 : -1;
-	auto err = dx + dy;
-	while (true)
+	if (points.size () < 2)
+		return;
+	const auto segmentCount = closed ? points.size () : points.size () - 1;
+	const bool bresenham = lineWidth <= 1. && !drawMode.antiAliasing ();
+	const auto half = std::max (lineWidth, 1.) / 2.;
+	const int sub = drawMode.antiAliasing () ? 4 : 1;
+	CRect bounds (points[0].x, points[0].y, points[0].x, points[0].y);
+	for (const auto& p : points)
 	{
-		blendPixel (x0, y0, color);
-		if (x0 == x1 && y0 == y1)
-			break;
-		auto e2 = 2 * err;
-		if (e2 >= dy)
+		bounds.left = std::min (bounds.left, p.x);
+		bounds.top = std::min (bounds.top, p.y);
+		bounds.right = std::max (bounds.right, p.x);
+		bounds.bottom = std::max (bounds.bottom, p.y);
+	}
+	bounds.inset (-half - 1., -half - 1.);
+	auto box = pixelBoxOf (bounds);
+	auto clip = pixelBoxOf (clipRect);
+	box.x0 = std::max (box.x0, clip.x0);
+	box.y0 = std::max (box.y0, clip.y0);
+	box.x1 = std::min (box.x1, clip.x1);
+	box.y1 = std::min (box.y1, clip.y1);
+	if (box.x0 >= box.x1 || box.y0 >= box.y1)
+		return;
+	const auto width = static_cast<size_t> (box.x1 - box.x0);
+	const uint16_t fullMask = static_cast<uint16_t> ((1u << (sub * sub)) - 1u);
+	std::vector<uint16_t> covered (width * static_cast<size_t> (box.y1 - box.y0), 0);
+	auto cover = [&] (int32_t x, int32_t y) -> uint16_t& {
+		return covered[static_cast<size_t> (y - box.y0) * width + static_cast<size_t> (x - box.x0)];
+	};
+	for (size_t i = 0; i < segmentCount; ++i)
+	{
+		const auto& from = points[i];
+		const auto& to = points[(i + 1) % points.size ()];
+		if (bresenham)
 		{
-			err += dy;
-			x0 += sx;
+			forEachBresenhamPixel (from, to, [&] (int32_t x, int32_t y) {
+				if (x >= box.x0 && x < box.x1 && y >= box.y0 && y < box.y1)
+					cover (x, y) = 1;
+			});
+			continue;
 		}
-		if (e2 <= dx)
+		// 半幅以内の標本点は線分の bbox を半幅 +1 で広げた範囲に必ず入る。それ以外は走査しない。
+		CRect segment (std::min (from.x, to.x), std::min (from.y, to.y), std::max (from.x, to.x),
+		               std::max (from.y, to.y));
+		segment.inset (-half - 1., -half - 1.);
+		auto segBox = pixelBoxOf (segment);
+		for (auto y = std::max (segBox.y0, box.y0); y < std::min (segBox.y1, box.y1); ++y)
 		{
-			err += dx;
-			y0 += sy;
+			for (auto x = std::max (segBox.x0, box.x0); x < std::min (segBox.x1, box.x1); ++x)
+			{
+				auto& bits = cover (x, y);
+				if (bits == fullMask)
+					continue;
+				for (int sy = 0; sy < sub; ++sy)
+				{
+					for (int sx = 0; sx < sub; ++sx)
+					{
+						const auto px = x + (sx + 0.5) / sub;
+						const auto py = y + (sy + 0.5) / sub;
+						if (distanceToSegment (px, py, from, to) <= half)
+							bits |= static_cast<uint16_t> (1u << (sy * sub + sx));
+					}
+				}
+			}
+		}
+	}
+	for (auto y = box.y0; y < box.y1; ++y)
+	{
+		for (auto x = box.x0; x < box.x1; ++x)
+		{
+			const uint16_t bits = cover (x, y);
+			if (bits == 0)
+				continue;
+			auto* dst = pixelAt (x, y);
+			if (!dst)
+				continue;
+			int hits = 0;
+			for (int b = 0; b < sub * sub; ++b)
+				hits += (bits >> b) & 1;
+			blendRGBA (dst, color, globalAlpha * (hits / double (sub * sub)));
 		}
 	}
 }
 
 //------------------------------------------------------------------------
-// 画素中心 (y + 0.5) で偶奇則の走査線塗りを行う。辺は閉じているものとして扱う。
-void CanvasGraphicsDeviceContext::fillPolygon (const PointList& points, const CColor& color) const
+// 画素中心 (y + 0.5) で走査線塗りを行う。各輪郭の辺は閉じているものとして扱い、輪郭どうしの交点はまとめて数える。
+// evenOdd が false のときは非零巻き数則 (Winding)。
+void CanvasGraphicsDeviceContext::fillRings (const std::vector<PointList>& rings,
+                                             const CColor& color, bool evenOdd) const
 {
-	if (points.size () < 3)
-		return;
-	double minY = points[0].y;
-	double maxY = points[0].y;
-	for (const auto& p : points)
+	bool any = false;
+	double minY = 0.;
+	double maxY = 0.;
+	for (const auto& ring : rings)
 	{
-		minY = std::min (minY, p.y);
-		maxY = std::max (maxY, p.y);
+		if (ring.size () < 3)
+			continue;
+		for (const auto& p : ring)
+		{
+			minY = any ? std::min (minY, p.y) : p.y;
+			maxY = any ? std::max (maxY, p.y) : p.y;
+			any = true;
+		}
 	}
-	std::vector<double> crossings;
+	if (!any)
+		return;
+	std::vector<std::pair<double, int>> crossings;
 	for (auto y = static_cast<int32_t> (std::floor (minY)); y < static_cast<int32_t> (std::ceil (maxY)); ++y)
 	{
 		auto yc = y + 0.5;
 		crossings.clear ();
-		for (size_t i = 0, j = points.size () - 1; i < points.size (); j = i++)
+		for (const auto& points : rings)
 		{
-			const auto& a = points[j];
-			const auto& b = points[i];
-			if ((a.y <= yc) == (b.y <= yc))
+			if (points.size () < 3)
 				continue;
-			crossings.push_back (a.x + (yc - a.y) * (b.x - a.x) / (b.y - a.y));
+			for (size_t i = 0, j = points.size () - 1; i < points.size (); j = i++)
+			{
+				const auto& a = points[j];
+				const auto& b = points[i];
+				if ((a.y <= yc) == (b.y <= yc))
+					continue;
+				auto x = a.x + (yc - a.y) * (b.x - a.x) / (b.y - a.y);
+				crossings.emplace_back (x, b.y > a.y ? 1 : -1);
+			}
 		}
 		std::sort (crossings.begin (), crossings.end ());
-		for (size_t k = 0; k + 1 < crossings.size (); k += 2)
+		int winding = 0;
+		double spanStart = 0.;
+		for (const auto& [x, dir] : crossings)
 		{
-			auto xStart = static_cast<int32_t> (std::ceil (crossings[k] - 0.5));
-			auto xEnd = static_cast<int32_t> (std::ceil (crossings[k + 1] - 0.5));
-			for (auto x = xStart; x < xEnd; ++x)
-				blendPixel (x, y, color);
+			auto wasInside = evenOdd ? (winding & 1) != 0 : winding != 0;
+			winding = evenOdd ? winding + 1 : winding + dir;
+			auto isInside = evenOdd ? (winding & 1) != 0 : winding != 0;
+			if (!wasInside && isInside)
+				spanStart = x;
+			else if (wasInside && !isInside)
+			{
+				auto xStart = static_cast<int32_t> (std::ceil (spanStart - 0.5));
+				auto xEnd = static_cast<int32_t> (std::ceil (x - 0.5));
+				for (auto px = xStart; px < xEnd; ++px)
+					blendPixel (px, y, color);
+			}
 		}
 	}
 }
@@ -499,10 +779,37 @@ void CanvasGraphicsDeviceContext::fillPolygon (const PointList& points, const CC
 void CanvasGraphicsDeviceContext::strokePolyline (const PointList& points, bool closed,
                                                   const CColor& color) const
 {
-	for (size_t i = 0; i + 1 < points.size (); ++i)
-		plotLine (points[i], points[i + 1], color);
-	if (closed && points.size () > 2)
-		plotLine (points.back (), points.front (), color);
+	plotLines (points, closed && points.size () > 2, color);
+}
+
+//------------------------------------------------------------------------
+CPoint CanvasGraphicsDeviceContext::transformPoint (const CPoint& p) const
+{
+	CPoint q (p);
+	transformMatrix.transform (q);
+	return q;
+}
+
+//------------------------------------------------------------------------
+PointList CanvasGraphicsDeviceContext::transformPoints (const PointList& points) const
+{
+	PointList result;
+	result.reserve (points.size ());
+	for (const auto& p : points)
+		result.push_back (transformPoint (p));
+	return result;
+}
+
+//------------------------------------------------------------------------
+// 回転・傾斜があるときは変換後の 4 隅の外接矩形を取る。
+CRect CanvasGraphicsDeviceContext::deviceRect (const CRect& rect) const
+{
+	auto a = transformPoint (CPoint (rect.left, rect.top));
+	auto b = transformPoint (CPoint (rect.right, rect.top));
+	auto c = transformPoint (CPoint (rect.left, rect.bottom));
+	auto d = transformPoint (CPoint (rect.right, rect.bottom));
+	return CRect (std::min ({a.x, b.x, c.x, d.x}), std::min ({a.y, b.y, c.y, d.y}),
+	              std::max ({a.x, b.x, c.x, d.x}), std::max ({a.y, b.y, c.y, d.y}));
 }
 
 //------------------------------------------------------------------------

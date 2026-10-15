@@ -101,7 +101,7 @@
   `doc` (PR 本文/REPORT の記述と実測の不整合)・`remeasure` (再実行・再測定)・`artifact` (素材不足)・
   `closes` (`Closes`/`Refs` と受入の不整合)・`path` (repo 外絶対パス・DOC_MAP 登録漏れ・行数)・
   `conflict` (競合/merge 失敗)・`code` (コードの意味の指摘)・`pm-decision` (PM 判断が必要)・
-  `user-decision` (依頼者しか決められない)。
+  `user-decision` (人間オーナーしか決められない)。
 - マーカーは本文の最後の行に 1 行だけ置く。欠落や語彙外の値は警告の対象になる。
 
 ### PM 判断が絡む指摘の扱い
@@ -114,7 +114,7 @@ PM は不在のことがある。reviewer は PM を待って verdict を保留�
 | 受入条件の一部が未達なのに `Closes` | request-changes。実装 agent が issue の範囲を縮める (未達の条件は原文のまま子 issue へ)、または `Refs` に直す。PM 判断は不要 |
 | 素材が足りない | request-changes。必要な素材名を本文に書く (実装 agent が PR 本文の `oc_artifacts:` を直す) |
 | 方式の (a)/(b) など、本当に決定が要る | merge しても既定の挙動・既存の数値が変わらず可逆なら **approve** し、approve 本文と PR 本文の未解決表に「PM agent の判断待ち: <質問>・既定案: <案>」と書く。変わるなら、既定案へ寄せる修正を request-changes で求める |
-| 依頼者 (人) しか決められない (ライセンス・実機・課金・規約) | `classes` に `user-decision` を付け、影響のない範囲に縮めた形で approve |
+| 人間オーナー (人) しか決められない (ライセンス・実機・課金・規約) | `classes` に `user-decision` を付け、影響のない範囲に縮めた形で approve |
 
 ## 注意
 

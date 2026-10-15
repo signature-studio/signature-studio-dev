@@ -6,10 +6,16 @@ import json, re, sys
 src, out = sys.argv[1], sys.argv[2]
 func_re = re.compile(r'^ \(func \$(\d+)\b')
 exp_re = re.compile(r'^ \(export "([^"]+)" \(func \$(\d+)\)\)')
+imp_re = re.compile(r'^ \(import "env" "store_ptr" \(func \$(fimport\$\d+)\b')
 sites = {}
 exports = {}
 cur = None
 lines = open(src, encoding='utf-8').read().split('\n')
+# store_ptr の import 名は build ごとに変わる (旧 $fimport$32・現 $fimport$34)。import 行から取る
+imp = [m.group(1) for m in map(imp_re.match, lines) if m]
+if len(imp) != 1:
+    sys.exit('store_ptr の import が 1 件でない: %d' % len(imp))
+store_ptr_re = re.compile(r'\(call \$' + re.escape(imp[0]) + r'\b')
 for i, ln in enumerate(lines):
     m = func_re.match(ln)
     if m:
@@ -17,7 +23,7 @@ for i, ln in enumerate(lines):
     m = exp_re.match(ln)
     if m:
         exports.setdefault(int(m.group(2)), m.group(1))
-    if '(call $fimport$32' in ln:
+    if store_ptr_re.search(ln):
         vals = []
         j = i + 1
         while len(vals) < 3 and j < len(lines):

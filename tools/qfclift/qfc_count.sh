@@ -12,11 +12,16 @@ L="$QFC/work/boot/lift"
 C="$QFC/work/count"
 mkdir -p "$C"
 "$QFC_PY" gen_count_wrap.py "$L/lift_meta.json" "$L/fle_lifted.c" "$C"
+SOFT=(); [ -f "$L/soft_imp.c" ] && SOFT=("$L/soft_imp.c")   # qfc_boot.sh が作った soft stub (呼出しを "[qfc-soft] <名>" で記録して 0 を返す)
 emcc -O0 -ffp-contract=off -fno-fast-math -I../flelift/rt -I../shared/oss/freetype -I"$FT_SRC_INC" "$C/fle_lifted.c" "$L/fle_data.c" "$C/count_wrap.c" \
-  qfc_imp.c qfc_ov.c ../shared/oss/freetype/qfc_import.c "$FT_WASM32_LIB" ../flelift/rt/fle_cpu.c ../flelift/rt/fle_glue.c \
+  "${SOFT[@]}" qfc_imp.c qfc_ov.c ../shared/oss/freetype/qfc_import.c "$FT_WASM32_LIB" ../flelift/rt/fle_cpu.c ../flelift/rt/fle_glue.c \
   -w -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=createModule \
   -sEXIT_RUNTIME=1 -sEXPORTED_FUNCTIONS=_fle_run,_fle_xmm0,_fle_xmm1,_fle_rget,_fle_mget,_fle_set_stackarg,_fle_data_install,_fle_init,_fle_reset,_malloc \
   -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU32,HEAPF32,HEAPF64 -Wl,--initial-memory=$((0x36000000)) -Wl,--max-memory=$((0x36000000)) \
   -o "$C/qfcl_count.cjs"
 QFC_CJS="$C/qfcl_count.cjs" QFC_CALL_LOG="$C/call.log" node "$QFC/qfc_count.mjs" || true
 cat "$C/call.log"
+echo "--- 集計 (DllMain → GetStats → CleanUp・停止点まで) ---"
+echo "import 呼出し (直接・計数) 件数: $(grep -c '^\[fle\] CALL ' "$C/call.log" || true)"
+grep -o '^\[fle\] CALL [A-Za-z0-9_]*' "$C/call.log" | sed 's/^\[fle\] CALL //' | sort | uniq -c || true
+echo "soft 呼出し件数: $(grep -c '^\[qfc-soft\] ' "$C/call.log" || true)"

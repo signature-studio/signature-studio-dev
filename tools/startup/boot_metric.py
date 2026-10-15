@@ -600,7 +600,7 @@ def _x64c_tolerant(src):
         "units.dispatched": "§3 表行の dispatch。ok + failed と一致を検査",
         "units.noproc": "§3 表行の noproc (起動時から proc 0 の unit)",
         "stop": "§0 の停止 (ExitProcess) の VA と dispatch 番号。stop.unit は dispatch 順の 1 始まり (x64c-strict-sequential と同じ)。出典の『unit 245』は InitTable の添字 (0 始まり) で、dispatch 209 番目の unit と同じ",
-        "create_fruity_instance": "§7 の呼出し・リング記録 (fle_run → 0x1375990 の入口 dispatch) による。入口 S12 が下限。本体内の trap 地点は未特定 (#3969 [WIN-41] で扱う。#3077 は flengine 路線の範囲で部分達成のまま close 済みで、x64c の CFI 本体は対象外)。S13 以降は未測",
+        "create_fruity_instance": "§7 の呼出し・リング記録 (fle_run → 0x1375990 の入口 dispatch) による。入口 S12 が下限。trap 連鎖は 0x1375990 → 0x13752f0 → 0x1105350 → 0x5af120 → 0x410320 (最内で oob。測定 commit e3954b032 時点の値・REPORT_APPENDIX_2719 §7・§12-1。現 head での再確認は未了)。受け手 VA は未確定 (#4384)。S13 以降は未測",
         "gui_natural": "§8 KPI 表の soft 計数 (RegisterClassW/CreateWindowExW)。両名は soft スタブになる (§7) ため、同じ計数で代える。名前別の根拠は §9 の soft 名表示が未了のため確かめられず、#3969 [WIN-41] で扱う",
     }
     return _record(
@@ -702,7 +702,7 @@ def _flengine_cfi(src):
         "stop.va": "呼出元 VA は未特定 (wasm name section 無し・#3077 [WIN-16])",
     }
     derived = {
-        "create_fruity_instance.last_step": "STARTUP の S12 行 (0x1375990 冒頭) = CreateFruityInstance の入口。到達の下限。S13 以降は未測定 (fail-fast の位置は #3077 で未特定)",
+        "create_fruity_instance.last_step": "STARTUP の S12 行 (0x1375990 冒頭) = CreateFruityInstance の入口。到達の下限。S13 以降は未測定 (fail-fast の位置は #3077 で未特定)。寛容起動の観測では harness が self (rcx) を 0 で呼ぶため、0x410320 の間接 call [rax-0x30] が oob する (未再現の観測。受け手 VA は未取得・実機の呼出し元は未特定。REPORT_APPENDIX_4384)",
         "gui_natural": "GUI-REACH (§9-3) は LoadStringW のみ。RegisterClassW・CreateWindowExW は一覧に無いので 0",
         "stop": "CS-MISS 行の key (cs) と FAIL-FAST 行の API (api)。§7-4 と照合",
     }

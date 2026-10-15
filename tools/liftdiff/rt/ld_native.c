@@ -372,6 +372,28 @@ static void __attribute__((noreturn)) hw_watch_parent(pid_t pid, u64 va) {
   }
 }
 
+/* LD-220 (#4466): 戻り値の直接計測。env LD_RETPROBE_VA=<entry VA hex>・LD_RETPROBE_OUT=<path> で有効 (既定は無効)。
+ * entry の int3 で [rsp] (戻り番地) を読み、戻り番地にも int3 を置いて、戻った時点の rax を記録する。
+ * 記録は 1 呼出し 1 行: rp case=<id> rsp_delta=<戻り時 rsp - entry rsp (正常なら 8)> ret_rva=<戻り番地> rax=<戻り値> rcx・rdx=<entry 時>。 */
+static u64 g_rp_va, g_rp_ret, g_rp_rsp, g_rp_rcx, g_rp_rdx; static u8 g_rp_eorig, g_rp_rorig; static int g_rp_on; static FILE* g_rp_fp; static int g_rp_run;
+static void rp_init(void) {
+  const char* a = getenv("LD_RETPROBE_VA"); const char* o = getenv("LD_RETPROBE_OUT");
+  if (!a || !o || !*a || !*o) return;
+  u64 va = strtoull(a, NULL, 16);
+  if (va < g_imgbase || va >= g_imgbase + g_imgsize) { fprintf(stderr, "[ld_native] LD_RETPROBE_VA %#llx outside image\n", (unsigned long long)va); return; }
+  g_rp_fp = fopen(o, "a"); if (!g_rp_fp) return;
+  g_rp_va = va; g_rp_on = 1;
+}
+static void rp_arm(void) {
+  if (!g_rp_on) return;
+  g_rp_ret = 0; g_rp_eorig = *(u8*)(uintptr_t)g_rp_va; *(u8*)(uintptr_t)g_rp_va = 0xCC;
+}
+static void rp_disarm(void) {
+  if (!g_rp_on) return;
+  *(u8*)(uintptr_t)g_rp_va = g_rp_eorig;
+  if (g_rp_ret) { *(u8*)(uintptr_t)g_rp_ret = g_rp_rorig; g_rp_ret = 0; }
+}
+
 static void on_sig(int sig, siginfo_t* si, void* ucv) {
   ucontext_t* uc = (ucontext_t*)ucv; greg_t* g = uc->uc_mcontext.gregs;
   if (g_wp_va && sig == SIGTRAP && g_wp_pend) { wp_finish(uc); return; }
@@ -386,6 +408,26 @@ static void on_sig(int sig, siginfo_t* si, void* ucv) {
   }
   if (sig == SIGTRAP && g_in_call) {
     if (g_pending) { *g_pending = 0xCC; g_pending = NULL; g[REG_EFL] &= ~0x100; return; }
+    if (g_rp_on) {
+      u64 ra = (u64)g[REG_RIP] - 1;
+      if (ra == g_rp_va) {
+        g_rp_rsp = (u64)g[REG_RSP]; g_rp_rcx = (u64)g[REG_RCX]; g_rp_rdx = (u64)g[REG_RDX];
+        u64 ret = *(u64*)(uintptr_t)g_rp_rsp;
+        if (ret >= g_imgbase && ret < g_imgbase + g_imgsize && tr_find(ret) < 0) { g_rp_ret = ret; g_rp_rorig = *(u8*)(uintptr_t)ret; *(u8*)(uintptr_t)ret = 0xCC; }
+        if (tr_find(ra) < 0) {   /* trace 集合に無い entry は、ここで元の命令を 1 命令実行して再武装する (trace 集合と重なるときは下の trace 処理に任せる) */
+          *(u8*)(uintptr_t)ra = g_rp_eorig; g[REG_RIP] = (greg_t)ra; g[REG_EFL] |= 0x100; g_pending = (u8*)(uintptr_t)ra;
+          return;
+        }
+      }
+      if (g_rp_ret && ra == g_rp_ret) {
+        fprintf(g_rp_fp, "rp run=%d case=%s rsp_delta=%lld ret_rva=%#llx rax=%#llx rcx=%#llx rdx=%#llx\n", g_rp_run, ld_case.id,
+                (long long)((u64)g[REG_RSP] - g_rp_rsp), (unsigned long long)(ra - g_imgbase), (unsigned long long)g[REG_RAX],
+                (unsigned long long)g_rp_rcx, (unsigned long long)g_rp_rdx);
+        fflush(g_rp_fp);
+        *(u8*)(uintptr_t)ra = g_rp_rorig; g_rp_ret = 0; g[REG_RIP] = (greg_t)ra;
+        return;
+      }
+    }
     u64 addr = (u64)g[REG_RIP] - 1; int k = tr_find(addr);
     if (k >= 0) {
       if (addr == g_ab_va) ab_save(uc, addr);
@@ -453,11 +495,12 @@ static void run_case(char* line) {
   if (ld_case.fn < g_imgbase || ld_case.fn >= g_imgbase + g_imgsize) {
     puts(ld_case_end("bad_fn", "fn outside image", 0, 0, 0, 0, 0, 0, 0)); fflush(stdout); return;
   }
-  g_sig = 0; g_pending = NULL; g_fault_rsp = 0; g_fault_stk[0] = 0;
+  g_sig = 0; g_pending = NULL; g_fault_rsp = 0; g_fault_stk[0] = 0; g_rp_run++;
   g_ab_va = ld_case.trace ? ld_case.abortret : 0; g_ab_valid = 0;
   for (int j = 0; j < 8; j++) g_fault_g[j] = 0;
   scrub_stack(ld_case.stkfill);
   step_begin();
+  rp_arm();
   if (ld_case.trace && !g_step_max) tr_arm();
   long tmo_us = 1500000; { const char* tm = getenv("LD_CASE_TMO_US"); if (tm && atol(tm) > 0) tmo_us = atol(tm); }   /* WIN-33 (#3556): 既定 1.5 s */
   struct itimerval it = { {0, 0}, {tmo_us / 1000000, tmo_us % 1000000} };
@@ -474,6 +517,7 @@ static void run_case(char* line) {
     struct itimerval z = {{0,0},{0,0}}; setitimer(ITIMER_REAL, &z, NULL);
     g_in_call = 0;
     if (ld_case.trace) tr_disarm();
+    rp_disarm();
     step_end();
     puts(ld_case_end("ok", NULL, 0, 0, out[0], out[1], out[2], out[3], 1));
   } else {
@@ -481,6 +525,7 @@ static void run_case(char* line) {
     struct itimerval z = {{0,0},{0,0}}; setitimer(ITIMER_REAL, &z, NULL);
     g_in_call = 0;
     if (ld_case.trace) tr_disarm();
+    rp_disarm();
     step_end();
     u64 rip = g_fault_rip;
     char det[512]; snprintf(det, sizeof det, "rip_rva=%#llx", (unsigned long long)(rip - g_imgbase));
@@ -532,6 +577,7 @@ int main(int argc, char** argv) {
     } }
   if (load_pe(argv[1])) return 3;
   install_signals();
+  rp_init();
   if (g_hw_va) {
     if (g_hw_va < g_imgbase || g_hw_va + 8 > g_imgbase + g_imgsize) { fprintf(stderr, "[ld_native] LD_WATCH_ADDR %#llx outside image\n", (unsigned long long)g_hw_va); return 2; }
     raise(SIGSTOP);   /* 親が DR を設定する点 (load_pe の後) */
