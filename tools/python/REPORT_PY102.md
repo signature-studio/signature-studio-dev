@@ -139,7 +139,7 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| muteTrackLock の準備判定 `call [rax+0x98]` (0xd56535) の呼出し先が未特定。偽のとき -2 (`FL_E_UNSAFE`) を返す経路が C・mock に無い (REPORT_PY61 §3) | 準備前の呼出しで code 3 にならない (実機と差がある) | #2959 |
+| (解決) muteTrackLock の準備判定は VMT[0x98] = 0x1262b80 と確定し、偽のとき -2 を C・mock に入れた (REPORT_PY117・#2959) | — | — |
 | `channels.soloChannel` の `value`・`useGlobalIndex`、`mixer.getTrackName` の `maxLen`、`device.midiOutMsg` の 5 個目、`plugins.getParamValueString` の意味論が未確定 (C・mock が読まない) | 追加引数の値を変えても結果が変わらない | #2950 |
 | kwlist 無しの名前と書式が未確定 (`screen.*` 10 件・`screen.addTextLine` ほか。名前は `arg{i}` のまま) | 引数名の検査と書式の正しさが未確認 | #2952 |
 
