@@ -1,0 +1,6 @@
+{
+  "tag": "pe121_2982",
+  "refs": ["#2982"],
+  "note": "PE で引数書式と時間引数の頭打ち (0x7d0) を確認した表示・メニュー 3 件 + 作用の無い 3 件 (REPORT_PY121_2982・PY-121 #2982)。tests/ui_display_diff.mjs が mock と照合",
+  "functions": ["ui.crDisplayRect", "ui.miDisplayRect", "ui.miDisplayDockRect", "ui.showNotification", "ui.closeAllMenu", "ui.closeActivePopupMenu"]
+}

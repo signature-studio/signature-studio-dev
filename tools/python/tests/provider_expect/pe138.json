@@ -1,0 +1,6 @@
+{
+  "tag": "pe138",
+  "refs": ["#3029"],
+  "note": "PE で引数書式と成功時の戻り (None) を確定した launchMapPages 3 関数 (REPORT_PY138・PY-138 #3029)。副作用は未確定のため状態を変えない、tests/launchmap_diff.mjs が mock と照合",
+  "functions": ["launchMapPages.init", "launchMapPages.updateMap", "launchMapPages.createOverlayMap"]
+}

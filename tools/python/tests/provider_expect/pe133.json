@@ -1,0 +1,6 @@
+{
+  "tag": "pe133",
+  "refs": ["#3014"],
+  "note": "PE で PyArg 書式と戻り None を確定した ui 2 関数 (REPORT_PY133・PY-133 #3014)。tests/ui_editor_diff.mjs が mock と照合",
+  "functions": ["ui.showPicker", "ui.openEventEditor"]
+}

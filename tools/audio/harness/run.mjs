@@ -4,6 +4,7 @@
 //        --browser safari: safaridriver (WebDriver classic) で測る (AU-35 #3193)。macOS では既定出力が BlackHole 2ch でなければ終了 2
 import { withChrome } from "./chrome.mjs";
 import { withSafari } from "./safari.mjs";
+import { burstStats, burstGate } from "./burst.mjs";
 import path from "node:path"; import fs from "node:fs"; import os from "node:os"; import { fileURLToPath } from "node:url";
 import { spawn, execFileSync } from "node:child_process";
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -175,13 +176,6 @@ if (process.platform === "darwin" && outDev !== "BlackHole 2ch") { console.error
 const loadStart = os.loadavg(), tStart = Date.now();
 const results = [];
 let failed = 0;
-// AU-30 (#3151): burst_hist (512 f 刻み・32 bin, 末尾 bin は以上) から p99 を出す。p99 は該当 bin の上端 (p99 ≤ この値)
-const burstStats = (h) => {
-  const n = h.reduce((a, b) => a + b, 0), need = Math.ceil(0.99 * n);
-  let c = 0;
-  for (let k = 0; k < h.length && n; k++) { c += h[k]; if (c >= need) return { burst_runs: n, burst_p99: (k + 1) * 512 }; }
-  return { burst_runs: n, burst_p99: 0 };
-};
 const busy = Array.from({ length: busyN }, () => spawn("sh", ["-c", "while :; do :; done"], { stdio: "ignore" }));
 process.on("exit", () => { for (const p of busy) p.kill(); });
 await withBrowser({ root: path.join(here, "../build/web"), page: "index.html?" + sel[0].q, log: () => {} }, async (cdp) => {
@@ -192,12 +186,15 @@ await withBrowser({ root: path.join(here, "../build/web"), page: "index.html?" +
     let r, err = null;
     try { r = await cdp.eval("window.__done"); } catch (e) { err = String(e); }
     let ok = false, msg = err ?? "";
+    if (Array.isArray(r?.stats?.burst_hist)) Object.assign(r.stats, burstStats(r.stats.burst_hist));
     if (r) {
       try { [ok, msg] = sc.expect(r); }
       catch (e) { ok = false; msg = r.aborted ? `想定外の abort: ${r.stderr?.find((l) => l.includes("FAIL-FAST")) ?? r.what}` : `expect 例外: ${e.message}`; }
+      const [bok, bmsg] = burstGate(r);
+      if (!bok) ok = false;
+      if (bmsg) msg += `; ${bmsg}`;
     }
     if (!ok) failed++;
-    if (Array.isArray(r?.stats?.burst_hist)) Object.assign(r.stats, burstStats(r.stats.burst_hist));
     results.push({ name: sc.name, query: sc.q, ok, msg, result: r ?? null, error: err });
     const st = r?.stats ?? {};
     if (r && (r.aborted || r.codes)) { console.log(`${ok ? "PASS" : "FAIL"} ${sc.name.padEnd(28)} ${msg}`); continue; }
