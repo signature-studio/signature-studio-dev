@@ -6,14 +6,14 @@
 
 - `tools/ott/native/ott_native.c` に `RtlLookupFunctionEntry`・`RtlVirtualUnwind` を実装した。`.pdata` (25063 件) を二分探索し、UNWIND_INFO の codes を逆適用して呼び出し元へ遡る。
 - 6 関数 (`1803b3fc0`・`1803b5b60`・`180cbd860`・`18100cf60`・`181011058`・`18102f728`) は、`RaiseException(0xe06d7363)` の時点で `.pdata` を辿れるようになった。ただし単独 harness の境界 (`ott_ms_call` の戻り先) まで遡っても handler が見つからず、fail-fast のままである。
-- wasm route は変更しない。`fa_sweep.sh 8 60` の件数は変更前後で同一 (`bit一致 55 / native crash/timeout 65 / wasm のみ err 9 / 値の不一致 2`)。131 行は全行一致。
+- wasm route は変更しない。`fa_sweep.sh 8 60` は main (`7288cd52b`) 比で件数が 1 件だけ変わった: `0x18100cc50` が `crash_or_timeout` から `wasm_err 8` (比較可能) になった。他 130 行は全行一致。
 - 受入条件 (`RtlUnwindEx`・`__CxxFrameHandler` 系の dispatch) は未達。子 #4592 に分離した。
 
 ## 2. 環境
 
-- HEAD `248816185` (origin/main、branch `4565-icall-cxx-eh-unwind`)。素材: `fl-win64`・`plugins-freshair`・`toolchain-emsdk` ([EMSDK])・`work-icall`・`work-liftlib` を展開。`RetDec` ([RETDEC]) は本作業の経路に無い。
-- `bash tools/targets/freshair/fetch.sh` (`FA_DL=$RUNNER_TEMP/plugins-freshair`): `win: 17 files, factory .epf: 8, mac: 0 files` (mac は `xar`・pkg 無しで skip)。
-- `bash tools/icall/fa_route_build.sh`: 10.1 s、`fa_route.cjs` 生成 (`missing` 4 関数は既存の出力)。
+- 測定 commit `12ad05e7b` (PR HEAD、main `7288cd52b` を取り込んだ merge。コードを変えた最後の commit)。変更前 = `7288cd52b` (`origin/main` の現行 HEAD を別 worktree で build)。
+- 素材: `work-icall`・`work-liftlib` (`$ARTIFACTS_DIR`)・`plugins-freshair` (`FA_DL` で `fetch.sh`: `win: 17 files, factory .epf: 8, mac: 0 files`)・`toolchain-emsdk` (`/opt/emsdk` 6.0.12)。`fl-win64` は本測定の経路に無い。
+- `bash tools/icall/fa_route_build.sh`: 5.8 s、`fa_route.cjs` 生成 (`missing` 4 関数は既存の出力)。wasm route は両 commit で同一物を使う。
 
 ## 3. 実装内容 (`tools/ott/native/ott_native.c`)
 
@@ -34,35 +34,37 @@
 
 ### 4.1 6 関数の単独実行 (`fa_cmp.py <va> --n 2`)
 
-変更前 (`origin/main` の `ott_native.c`): 6 関数とも `RaiseException(0xe06d7363) 到達 — fail-fast` (exit 97)。
-
-変更後:
-
-| VA | EH walk (harness 内) | 結果 |
+| VA | 変更前 (`7288cd52b`) | 変更後 (`12ad05e7b`) |
 |---|---|---|
-| `1803b3fc0` | `18102f7b8` (`fn [102f728,102f7c8)`) → `1803b3fdf` (`fn [3b3fc0,3b3fe0)`) → 戻り先 `7ffff7003f7f` (`.pdata` 無し) | `handler が見つからない (walk=-1)` — fail-fast |
-| `1803b5b60` | `18102f7b8` → `180cbd882` → `1803b5b70` → 戻り先 (`.pdata` 無し) | 同上 |
-| `180cbd860` | `18102f7b8` → `180cbd882` → 戻り先 | 同上 |
-| `18100cf60` | `18102f7b8` → `18100cf7f` → 戻り先 | 同上 |
-| `181011058` | `18102f7b8` → `181011077` → 戻り先 | 同上 |
-| `18102f728` | `18102f7b8` → 戻り先 | 同上 |
+| `1803b3fc0` | `RaiseException(0xe06d7363) 到達 — fail-fast` (exit 97) | `handler が見つからない (walk=-1)` (exit 97) |
+| `1803b5b60` | 同上 | 同上 |
+| `180cbd860` | 同上 | 同上 |
+| `18100cf60` | 同上 | 同上 |
+| `181011058` | 同上 | 同上 |
+| `18102f728` | 同上 (`magic=0x1994000`) | 同上 |
 
-6 関数とも `handler_rva=0` (EH walk の各フレーム)。戻り先 `7ffff7003f7f` は ott_ms_call の呼び出し元 (ホスト側) で、`.pdata` を持たない。従って単独 harness では handler に届かない。
+変更後の EH walk: 各 VA とも `.pdata` を辿り、戻り先 (ott_ms_call の呼び出し元 = ホスト側) で `.pdata` が無くなって止まる。単独 harness では catch 側に届かない。
 
-### 4.2 `fa_sweep.sh 8 60` (変更前後、同一 tree)
+### 4.2 `fa_sweep.sh 8 60` (同一条件で各 commit を測定)
 
-| 条件 | 所要 | 件数 (funcs 131) |
+| 条件 | wall | 件数 (funcs 131) |
 |---|---|---|
-| 変更前 (`origin/main` の `ott_native.c`) | wall 未計測 (変更後の測定と同じ条件・load は未記録) | bit一致 55 / native crash/timeout 65 / wasm のみ err 9 / 値の不一致 2 |
-| 変更後 | real 1m14.120s・user 1m10.060s・sys 4.652s。load average 1.03 → 1.26 | bit一致 55 / native crash/timeout 65 / wasm のみ err 9 / 値の不一致 2 |
+| 変更前 (`7288cd52b`) | 69.829 s (load 1.47→1.14) | bit一致 56 / native crash/timeout 65 / wasm のみ err 9 / 値の不一致 1 |
+| 変更後 (`12ad05e7b`) | 69.921 s (load 0.85→1.47) | bit一致 56 / native crash/timeout 64 / wasm のみ err 10 / 値の不一致 1 |
 
-行単位の比較 (`sweep_base.jsonl` vs `sweep_new.jsonl`): 131 行中 差分 0。6 関数はいずれも `{"status": "crash_or_timeout"}`。
+行単位の比較 (`sweep_base`・`sweep_head` の 131 行): 差分 1 行のみ。
 
-### 4.3 差分 (測定 commit `248816185` → 作業 commit)
+| VA | 変更前 | 変更後 |
+|---|---|---|
+| `0x18100cc50` | `crash_or_timeout` (`MISSING IMPORT RtlLookupFunctionEntry — fail-fast`, exit 99) | `n 8, mismatch 8, wasm_err 8` (`RuntimeError: unreachable`) |
 
-測定 commit (コードを変えた最後の commit): `28329dd08`。
-`git diff 248816185 28329dd08 -- tools/ott/native` の出力 (ベース `248816185` = origin/main 取り込み時点):
-`tools/ott/native/build.sh` (1 行変更: `-fno-omit-frame-pointer`) と `tools/ott/native/ott_native.c` (+118 行) のみ。`git diff --stat` は `2 files changed, 119 insertions(+), 1 deletion(-)`。
+`0x18100cc50` は変更前に `RtlLookupFunctionEntry` が未登録で落ちていた。変更後は native が完走し、wasm と比較できる。`bit一致` 件数は 56 で不変。`wasm のみ err` が 9 → 10 に増えたのは、この 1 件が crash から wasm_err に移ったため。
+
+### 4.3 差分 (測定 commit `12ad05e7b` と PR の `tools/ott/native`)
+
+- 変更前 (`7288cd52b`) → 測定 commit (`12ad05e7b`): `git diff 7288cd52b 12ad05e7b -- tools/ott/native` は `build.sh` 1 行 + `ott_native.c` 129 行 (122 insertions / 9 deletions)。
+- 測定 commit → PR HEAD: `git diff 12ad05e7b HEAD -- tools/ott/native` は **0 行** (本 REPORT の commit は REPORT のみ)。
+- 取り込み済みの main 側差分 (`SetUnhandledExceptionFilter` ICALL-104・`RtlCaptureContext` ICALL-100) は測定 commit に含まれる。両者とも base 側にも入っているため、比較は head と base で同じ IMPL を持つ条件で行った。
 
 ## 5. 未解決
 
