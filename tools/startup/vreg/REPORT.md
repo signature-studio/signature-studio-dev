@@ -235,3 +235,13 @@ CSV の key 数は startup REPORT の 46 (31/5/10) に対し本集計は 47 (33/
 - 既存の runtime e2e (`pnpm runtime:e2e`) は round 1 で実行した (上記)。mt-boot のみ実行し、M1/M6/M10/M11 は素材が無く skip。
 - ui/import.html (standalone) に取消しは無い (製品側のみ)。
 - vite build は `FL_WIN64_DIR` 未指定で THIRD_PARTY_NOTICES 不完全 (15 件) の既存警告を出す。本変更の依存ではない。
+
+**差し戻し round 2 (2026-10-15)**: `tools/e2e/run.sh` (配備入力 `tools/e2e/work/dist` の作成元) が vite build の前に `build.sh module` を呼ぶ。`build.sh` は `EMSDK_ENV` を読む (CI の設定値)。`deploy/RUNBOOK.md` §1(a) に同 1 行。`registry.json` の `ignoreLicensePaths` に取込入口のソースを追加 (notices check PASS・`notices.test.mjs` 52 pass・0 fail)。
+測定 commit `5767a2dfd` (生成物を消した状態から・`EMSDK_ENV=/opt/emsdk/emsdk_env.sh`)。`git diff 5767a2dfd HEAD -- src tools/startup/vreg tools/e2e tools/legal vite.config.ts deploy/RUNBOOK.md ':!tools/startup/vreg/REPORT.md'` は 0 行。
+
+| 項目 | 結果 |
+|---|---|
+| `bash tools/e2e/run.sh --driver both --targets preview,edge-sim` (CI と同じ) | rc 0 / 20 s / PASS=34 FAIL=0 SKIP=6 |
+| `bash tools/startup/vreg/vreg.sh` | rc 0 / 24 s / node 25/25・C/shimx/M4 ALL PASS・Chrome 3 本 PASS (`e2e_product_import` 含む) |
+| `pnpm runtime:e2e` | rc 0 / 5 s / ALL OK (skip: m1-hello・m6/m10/m11 は素材無し) |
+| 製品 bundle | 生成物あり: `license_import_panel` 252.03 kB。なし (`pnpm build` 相当): スタブ 131.41 kB・警告 1 件・rc 0 |
