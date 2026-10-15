@@ -55,7 +55,7 @@ GF_SURVEY_UNITS="$W/res/survey_soft_units.json" node run.mjs --survey --wasm "$W
 GF_SURVEY_RESET=0 node run.mjs --survey --wasm "$W/m11_gui_soft.cjs" --out "$W/res/survey_soft_chain.json" > /dev/null   # R2 (到達 floor) は前 unit の状態を引き継ぐ従来の survey で見る (隔離版では到達が 12 件に減る)
 node probe.mjs                                                --out "$W/res/probe.json"       > /dev/null
 node run.mjs --wasm "$W/m11_gui_plain.cjs"                    --out "$W/res/boot_plain.json"  > /dev/null
-for f in boot_ff survey_ff survey_soft probe boot_plain baseline_boot baseline_survey; do [ -s "$W/res/$f.json" ] || { S "結果 JSON が空: $f"; exit 1; }; done
+for f in boot_ff survey_ff survey_soft survey_soft_chain probe boot_plain baseline_boot baseline_survey baseline_units survey_soft_units; do [ -s "$W/res/$f.json" ] || { S "結果 JSON が空: $f"; exit 1; }; done
 
 S "2b/6 WNDCLASS scan (m11_wndclass_scan.py --check: fn WNDPROC は最終 IR に定義されていること)"
 python3 "$M/m11_wndclass_scan.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" --ir "$M/work/boot_final.ll" --json-out "$W/res/wndclass.json" --check --min-instances 11 -q > "$W/res/wndclass.out" 2>&1; tail -1 "$W/res/wndclass.out"
@@ -64,6 +64,7 @@ S "3/6 judge"
 python3 judge.py --dir "$W/res"; rc=$?
 cp "$W/res/boot_ff.json" "$R/boot.json"; cp "$W/res/survey_soft.json" "$R/survey_soft.json"; cp "$W/res/survey_soft_chain.json" "$R/survey_soft_chain.json"; cp "$W/res/survey_ff.json" "$R/survey_ff.json"; cp "$W/res/probe.json" "$R/probe.json"
 cp "$W/res/baseline_boot.json" "$R/baseline_boot.json"; cp "$W/res/baseline_survey.json" "$R/baseline_survey.json"
+cp "$W/res/baseline_units.json" "$W/res/survey_soft_units.json" "$R/"   # unit 別の出力 (judge の S3 が突き合わせる。REPORT_APPENDIX_1635.md §2-4)
 python3 "$GF_GUI/gen_api.py" > /dev/null    # IMPORTS.md の「実到達」列・§4 を今回の results で再生成
 
 S "4/6 native selftest (tools/gui/test/selftest.sh)"
@@ -118,6 +119,16 @@ for w in p['windows']:
 json.dump(p, open(o + '/probe_null_window.json', 'w'))
 PY
 nc "N9 TLightweightLayeredControl の hwnd が NULL (seed 無し相当)" "P5 TLightweightLayeredControl.*FAIL" python3 judge.py --dir "$W/res" --probe "$W/nc/probe_null_window.json"
+# N10: soft の unit 別出力の 1 unit を ok→trap に壊す (S1 の totals は変わらず、unit 単位の S3 だけが落ちること)
+python3 - "$W/res" "$W/nc" <<'PY'
+import json, sys
+d, o = sys.argv[1:3]
+u = json.load(open(d + '/survey_soft_units.json'))
+k = next(j for j, e in enumerate(u) if e[1] == 'ok')
+u[k] = [u[k][0], 'trap', 'NC-flipped']
+json.dump(u, open(o + '/survey_soft_units_broken.json', 'w'))
+PY
+nc "N10 soft の 1 unit (ok→trap) の unit 別出力 (S3 unit parity)" "S3 unit parity \(soft vs base\) +FAIL" python3 judge.py --dir "$W/res" --soft-units "$W/nc/survey_soft_units_broken.json"
 
 S "6/6 done: $(( $(date +%s) - t0 )) s, load=$(cut -d' ' -f1-3 /proc/loadavg)  → exit $rc"
 exit $rc

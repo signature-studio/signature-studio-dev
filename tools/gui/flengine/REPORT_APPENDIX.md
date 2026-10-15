@@ -22,7 +22,7 @@
 - **#1275 系統の判定 (受入条件 2)**: 同系統ではない。#1275 (`tools/m11/trap_triage/REPORT_1275.md`) の 304/555 は **ClassCreate ON 時の abort** (`function_535c2e` の未定義 closure 外)。本 e2e は ClassCreate OFF (既定) で、304/555 は OFF でも OOB のまま。OFF の OOB は `function_535bf2` が先頭フレーム (REPORT_1275 §3 の OFF 行)。したがって OFF の OOB 原因は #1275 の abort とは別経路で、#1426 側。
 - **S1 の残り (101/291/296)**: 現 IR では base/soft とも同じ結果 (差は無い)。差分は 304/555 (survey 順序依存) で、#1635 `[GUI-22]` の切り分けと隔離条件の統一は [REPORT_APPENDIX_1635.md](REPORT_APPENDIX_1635.md) を正とする。
 
-未解決 (起票先付き): 受入条件 1 は #1426 (304/555/923 の OOB 実値採取)。S1 の 3 unit は #1635 `[GUI-22]`。現 HEAD の S1 FAIL (`870/1/47/24/0` vs `867/1/47/27/0`) は本 PR で解消しない (`Refs #1442`)。
+未解決 (起票先付き): 受入条件 1 は #1426 (304/555/923 の OOB 実値採取)。S1 の 3 unit は #1635 `[GUI-22]`。(#1442 時点の記述。当時の HEAD の S1 FAIL (`870/1/47/24/0` vs `867/1/47/27/0`) は、その PR では解消しなかった。#1635 の隔離条件の統一 (`REPORT_APPENDIX_1635.md`) の結論はこの一文と異なる。`REPORT_APPENDIX_1635.md` を正とする) (`Refs #1442`)。
 
 WIN-21 (#3352) の現 HEAD の実測と S1 の unit 再測定は [REPORT_APPENDIX_3352.md](REPORT_APPENDIX_3352.md) §6k (測定 commit `c3ee6daa7`) を正とする。
 

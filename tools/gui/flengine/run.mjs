@@ -39,14 +39,22 @@ if (survey) {   // m11_survey.mjs と同じ隔離プロトコル: unit ごとに
   const tableIntact = () => mod._m11_unit_va(0) === unitVa0[0] && mod._m11_unit_va(941) === unitVa0[1];
   const snap = new Uint8Array(img.length);
   const only = process.env.GF_SURVEY_ONLY ? process.env.GF_SURVEY_ONLY.split(',').map(Number) : null;   // 単独再測用: 指定 unit だけを (boot 直後・前 unit 無しで) 実行
-  const reset = process.env.GF_SURVEY_RESET === '1' ? new Uint8Array(mod.HEAPU8) : null;   // 各 unit を boot 直後の全メモリ状態から始める (前 unit の副作用を断つ)
+  const reset = process.env.GF_SURVEY_RESET === '1' ? new Uint8Array(mod.HEAPU8) : null;   // 各 unit を boot 直後の wasm 線形メモリの状態から始める (前 unit の副作用を断つ。JS 側の状態は対象外)
+  const memBuf = () => (mod.wasmMemory ? mod.wasmMemory.buffer : mod.HEAPU8.buffer);
+  res.mem_boot_bytes = memBuf().byteLength; res.mem_grown_units = 0;   // ALLOW_MEMORY_GROWTH で線形メモリが伸びた unit 数 (実行の前後で長さが増えた unit)
   for (const i of only ?? Array.from({ length: 942 }, (_, k) => k)) {
-    if (reset) { if (mod._gui_reach_dump) mod._gui_reach_dump(); mod.HEAPU8.set(reset, 0); }   // 前 unit の到達 (wasm 内カウンタ) を errs へ退避してから戻す
+    if (reset) {
+      if (mod._gui_reach_dump) mod._gui_reach_dump();   // 前 unit の到達 (wasm 内カウンタ) を errs へ退避してから戻す
+      if (memBuf().byteLength > reset.length) new Uint8Array(memBuf()).fill(0, reset.length);   // 前 unit が伸ばした領域は boot 直後には存在しない (ゼロ埋め)
+      mod.HEAPU8.set(reset, 0);
+    }
+    const mem0 = memBuf().byteLength;
     errs.push('GF-UNIT-BEGIN ' + i);
     snap.set(mod.HEAPU8.subarray(0, img.length));
     mod._m11_va_unit_begin();
     let r, err = null;
     try { r = mod._m11_call_unit(i); } catch (e) { err = e; }
+    if (memBuf().byteLength > mem0) res.mem_grown_units++;
     if (!tableIntact()) { mod.HEAPU8.set(snap, 0); res.clobber++; perUnit.push([i, 'clobber']); if (err) mod.__emscripten_stack_restore(sp0); continue; }
     if (!err) {
       if (r === 1) res.ok++; else if (r === 0) res.noproc++; else if (r === 2) res.miss++;
@@ -62,6 +70,7 @@ if (survey) {   // m11_survey.mjs と同じ隔離プロトコル: unit ごとに
     perUnit.push([i, 'trap', k]);
     mod.__emscripten_stack_restore(sp0);
   }
+  res.mem_end_bytes = memBuf().byteLength;
   if (process.env.GF_SURVEY_UNITS) fs.writeFileSync(process.env.GF_SURVEY_UNITS, JSON.stringify(perUnit));
 }
 

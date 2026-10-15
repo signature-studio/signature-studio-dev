@@ -11,6 +11,8 @@ ap.add_argument('--boot', default='boot_ff.json')
 ap.add_argument('--survey-ff', default='survey_ff.json')
 ap.add_argument('--survey-soft', default='survey_soft.json')
 ap.add_argument('--survey-soft-chain', default='survey_soft_chain.json')
+ap.add_argument('--base-units', default='baseline_units.json', help='GF_SURVEY_UNITS の base 出力 (unit 別 [i, status, kind?] の配列。e2e.sh が DIR に置く)')
+ap.add_argument('--soft-units', default='survey_soft_units.json', help='GF_SURVEY_UNITS の soft 出力 (同上)')
 ap.add_argument('--probe', default='probe.json')
 ap.add_argument('--wndscan', default='wndclass.json', help='m11_wndclass_scan.py --json-out の出力 (e2e.sh が DIR に置く)')
 ap.add_argument('--expected', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results', 'reach_expected.json'))
@@ -50,6 +52,10 @@ gate('R2 survey reach floor', expected <= names_soft, 'reached %d (expected floo
 sv, bs = svs['survey'], base_sv
 gate('S1 survey parity (soft)', all(sv.get(k, 0) == bs.get(k, 0) for k in ('ok', 'noproc', 'miss', 'trap', 'clobber')),
      'ok/noproc/miss/trap/clobber = %s/%s/%s/%s/%s (base %s/%s/%s/%s/%s)' % (sv['ok'], sv['noproc'], sv['miss'], sv['trap'], sv.get('clobber', 0), bs['ok'], bs['noproc'], bs['miss'], bs['trap'], bs.get('clobber', 0)))
+bunits, sunits = {u[0]: tuple(u[1:]) for u in J(a.base_units)}, {u[0]: tuple(u[1:]) for u in J(a.soft_units)}
+udiff = sorted(i for i in set(bunits) | set(sunits) if bunits.get(i) != sunits.get(i))
+gate('S3 unit parity (soft vs base)', len(bunits) == len(sunits) == 942 and not udiff,
+     'unit 単位の差 %d 件 (base %d / soft %d units); 先頭 %s' % (len(udiff), len(bunits), len(sunits), [(i, bunits.get(i), sunits.get(i)) for i in udiff[:3]]))
 ffu = set(svf['survey']['failfast_units'])
 stub_soft = set(svs['softstub_apis'])
 sfu = set(svs['survey']['failfast_units'])
