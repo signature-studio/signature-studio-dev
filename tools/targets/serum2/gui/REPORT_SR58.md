@@ -3,7 +3,7 @@
 - 日付: 2026-10-15 / 親: #3237 (SR-49) / 前段: `REPORT_SR49.md` §5 (b-1)・`REPORT_SR43.md` §2
 - 範囲: 静的解析のみ。所属関数の中だけを見る (SR-49 と同じ)。支配判定の変更は行わない。
 - 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3` (x86_64-win)。sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` / 19,236,864 B (SR-43・SR-49 と一致)。
-- 測定 commit: `5ec9c5a65` (`receiver_this_trace.py` に NODOM 理由の記録を足した commit)。ベースライン: `ddfb27fb4` (SR-49 の測定 commit)。
+- 測定 commit: `0336ebb96` (コードを変えた最後の commit。store 支配経路の `mark_nodom` を含む)。ベースライン: `ddfb27fb4` (SR-49 の測定 commit)。
 
 ## 0. 結論
 
@@ -34,14 +34,18 @@
 | merge (使用へ定義を通らない経路あり) | 74 | 63 / 10 / 1 |
 | 合計 | 242 | 132 / 108 / 2 |
 
+- `unknown` (理由未記録): 0 件。89 + 79 + 74 + 0 = 242 で、NODOM 候補の全件に理由が付く (測定 commit `0336ebb96`・n=3 の全実行)。
+- store 支配経路 (`find_store` の後) も `mark_nodom` で記録する (`0336ebb96` で追加)。この経路の件数は上の 3 区分に含まれる。
+
 間接 jmp を含む関数の 89 件は、switch の jump table と見られる `jmp [rax+N]`・`jmp r9` などを含む 54 関数由来 (`REPORT_SR43.md` の 89 件と一致)。jump table の分岐先を読んでいないため、支配を見ず全件 NODOM になる。
 
 ## 3. 変更前後の TSV
 
-| 項目 | ベースライン (`ddfb27fb4`) | 測定 (`5ec9c5a65`) | 差 |
+| 項目 | ベースライン (`ddfb27fb4`) | 測定 (`0336ebb96`) | 差 |
 |---|---|---|---|
 | 既定 TSV md5 | `1e1f5500f43b069330b9e2ba41c75367` | `1e1f5500f43b069330b9e2ba41c75367` | 0 件 (同一) |
-| 理由別 TSV 候補数 | (なし) | 242 | +242 |
+| 理由別 TSV 候補数 | (なし) | 242 (`unknown` 0) | +242 |
+| 理由別 TSV md5 | (なし) | `848be6cfbab2dcbd9a8f1b1c60629ed1` | — |
 
 ## 4. 再現手順・実測
 
@@ -56,18 +60,19 @@ venv/bin/python $P/receiver_this_trace.py Serum2_win64.vst3 --vtable 0x180a2bf58
 ```
 
 - 入力の確認: `Serum2_win64.vst3` の sha256 `501e7bb3…` / 19,236,864 B。
-- 決定性: 測定 commit の 3 回の実行で、既定 TSV md5 は全て `1e1f5500…`、理由別 TSV md5 は全て `848be6cf…` で一致。
-- 実測 (`5ec9c5a65`・n=3・逐次・並列数 1・nproc=4。load は `/proc/loadavg` の 1 分値):
+- 決定性: 測定 commit `0336ebb96` の 3 回の実行で、既定 TSV md5 は全て `1e1f5500…`、理由別 TSV md5 は全て `848be6cf…` で一致。
+- 実測 (`0336ebb96`・n=3・逐次・並列数 1・nproc=4。load は `/proc/loadavg` の 1 分値):
 
-| 実行 | real (s) | user (s) | sys (s) |
-|---|---|---|---|
-| 1 | 23.13 | 21.95 | 1.18 |
-| 2 | 23.18 | 22.04 | 1.14 |
-| 3 | 23.36 | 22.23 | 1.11 |
-| min–max | 23.13–23.36 | 21.95–22.23 | 1.11–1.18 |
+| 実行 | real (s) | user (s) | sys (s) | 既定 TSV md5 | 理由別 TSV md5 |
+|---|---|---|---|---|---|
+| 1 | 24.23 | 23.03 | 1.19 | `1e1f5500…` | `848be6cf…` |
+| 2 | 24.71 | 23.44 | 1.26 | `1e1f5500…` | `848be6cf…` |
+| 3 | 24.58 | 23.35 | 1.23 | `1e1f5500…` | `848be6cf…` |
+| min–max | 24.23–24.71 | 23.03–23.44 | 1.19–1.26 | 3 回一致 | 3 回一致 |
 
-- load: 測定前 0.06 → 測定後 0.71 (1 分値)。
-- 報告前コマンド (`docs/WORKFLOW.md` §6): `git diff 5ec9c5a65 HEAD -- tools/targets/serum2/gui/receiver_this_trace.py` は 0 行 (測定後にコードを変えていない)。
+- 入力: sha256 `501e7bb3…` / 19,236,864 B (レビュワーの再実行と一致)。
+- load: 1 回目の前 0.45 → 3 回目の後 0.84 (1 分値)。
+- 報告前コマンド (`docs/WORKFLOW.md` §6): `git diff 0336ebb96 HEAD -- tools/targets/serum2/gui/receiver_this_trace.py` は 0 行 (測定後にコードを変えていない)。
 
 ## 5. 未解決 (起票先)
 
