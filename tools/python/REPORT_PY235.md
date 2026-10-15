@@ -42,19 +42,25 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
 ## 実装と検証
 
 - 変更: `host/fl_mock.mjs` (`general.processRECEvent`・`recPassFamily`)・`provider/fl_engine.c` (`h_general_processRECEvent`・`rec_pass_family`)・`tests/general_diff.mjs` (成功経路 5 件・族外 4 件・個数違い 2 件)・`tests/provider_check.mjs` (`pe235` 1 件を実装扱い。実装数 162→163・未実装数 273→272)・`analysis/py235_process_rec_families.py`。
-- 測定 commit (main 取り込み 2 回目の後): `6556fa7a5` (merge・コードを変えた最後の commit)。以降はこの REPORT の変更のみ。`git diff 6556fa7a5 HEAD -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis` の出力は 0 行。
-- main 取り込みの差分 (2 回): (1) `git diff 470e2d8e0 8861ba46d -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis` は 6 files, +159 −12。main 側の PY-111 (step param 8・5/6/7 の既定値)・PY-130 (ui setter 2 件と ui getVersion)。(2) `git diff 8861ba46d 6556fa7a5 -- (同じ範囲)` は 15 files, +1253 −24。main 側の PY-132 (`pe132`・ui ブラウザ 3 件)・`tests/ui_browser_diff.mjs`・`tests/plugins_diff.mjs`・`provider/build.sh` ほか。競合はどちらも `tests/provider_check.mjs` の実装集合と件数だけで、両側の集合を残した (実装 169・未実装 266)。
-- 測定 (HEAD `6556fa7a5`・load avg 0.38 (測定後に `/proc/loadavg` で確認)):
-  - `bash provider/build.sh` (emsdk 6.0.12): rc 0 (1.6 秒)。`fl_table.c: 435 関数, ハンドラ 169`。
+- 測定 commit (main 取り込み 3 回目と VA 修正の後): `9d39f39ad` (コードを変えた最後の commit)。以降はこの REPORT の変更のみ。`git diff 9d39f39ad HEAD -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis` の出力は 0 行。
+- main 取り込み (3 回目・`795ab6c51`): main `091e4a7b6` を merge。`git diff --stat f1cf42357 795ab6c51 -- (同じ範囲)` は 8 files, +767 −12 (main 側の `host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/arrangement_diff.mjs`・`tests/launchmap_diff.mjs`・`tests/provider_check.mjs`・`analysis/flapi` の probe 3 本)。競合は `tests/provider_check.mjs` の判定式と件数だけで、両側の集合を残した (main の `pe138` を含め、PR の `pe235` を加えた。件数は main の 171/264 + pe235 1 = 実装 172・未実装 263)。
+- 前回までの取り込み: 1 回目 `8861ba46d` (main `2c52cdf74`)・2 回目 `6556fa7a5` (main `e2cefb36a`)。どちらも `provider_check.mjs` の判定式と件数だけが競合した。
+- VA 修正 (`9d39f39ad`): 族表の固定 `0x40000001` の `je` を `0x1047436` に直した (`0x1047431` は `cmp eax, 0x40000001`)。解析スクリプトの §1 も同じ VA に直した。
+- 測定 (コードは `9d39f39ad` と同一。`all_tools` 直後の `/proc/loadavg`: `2.51 1.75 0.86`):
+  - `bash provider/build.sh` (emsdk 6.0.12 を上流から導入し `[EMSDK]` の位置に配置): rc 0。`fl_table.c: 435 関数, ハンドラ 172`。
   - `node tests/general_diff.mjs`: `{"calls":52,"diffs":0,"PASS":true}`。
   - `node tests/ui_state_diff.mjs`: `{"calls":58,"diffs":0,"PASS":true}`。
-  - `node tests/ui_browser_diff.mjs` (main 側 PY-132): `{"ok_calls":8,"bad_calls":5,"diffs":0,"browserOp":3,"PASS":true}`。
-  - `node tests/provider_check.mjs`: `{"functions":435,"implemented":169,"unimplemented":266,"mcp_static":60,"PASS":true}`。CPython wasm は 1 回目の取り込み後に `build_cpython_wasm.sh` (4 分 33 秒 rc 0) で作り、2 回目の取り込み後は `FLPY_SKIP_TABLE=1 build_flpy.sh` を再実行 (rc 0)。入力は `FL_WIN64_DIR` の 4 ブロック (`block24429/24430/25159/24618`) を `fetch_inputs.sh` で配置。
-  - `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` (rc 0)。
-  - wasm 差分テスト 24 本 (`grep -l createWasmEngine tests/*.mjs`): 23 本 rc 0 (diffs 0・PASS。`sig_arity_probe.mjs` は probe で PASS 判定なし)。`static_bench.mjs` は `dist/flpy_static.js` 未ビルドで起動不可 (rc 1・本 PR の範囲外・未実施)。
-  - `analysis/py235_process_rec_families.py` (`FL_WIN64_DIR` の `block00031_PE.bin`): 30 ok・0 FAIL・rc 0 (0.19 秒)。
-  - ネガティブコントロール (HEAD で再実施。470e2d8e0 でも同じ結果): `host/fl_mock.mjs` の `(e & 0xffff) !== 8` を `!== 9` に変えると `general 差分 1 件` (AssertionError・rc 1) で落ちる (`[0x10000008, 9, 0]` が mock は 9、C は code 2)。元に戻した後は `{"calls":52,"diffs":0,"PASS":true}` で、`git status` は変更なし。
-- 前回 (HEAD `8861ba46d`・main 取り込み 1 回目): `provider_check` 166/269・`all_tools` 48/48・`general_diff` 52/0・`ui_state_diff` 58/0 (全て PASS)。
+  - `node tests/ui_browser_diff.mjs`: `{"ok_calls":8,"bad_calls":5,"diffs":0,"browserOp":3,"PASS":true}`。
+  - `node tests/channels_diff.mjs`: `{"calls":238,"diffs":0,"grid_calls":1200,"grid_true":30,"grid_diffs":0,"PASS":true}`。
+  - `node tests/provider_check.mjs`: `{"functions":435,"implemented":172,"unimplemented":263,"mcp_static":60,"PASS":true}`。`build_cpython_wasm.sh` (4 分 35 秒 rc 0) の後に `FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0) を実行してから測定。入力は `FL_WIN64_DIR` の 4 ブロック (`block24429/24430/25159/24618`) と `block00031_PE.bin` (`fl-win64` から展開)。
+  - `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` (rc 0・2.2 秒)。
+  - wasm 差分テスト (`grep -l createWasmEngine tests/*.mjs` の 24 本。`all_tools` を除く): 24 本全て rc 0 (diffs 0・PASS)。`static_bench.mjs` は `build_flpy_static.sh` (rc 0) の後に実行して rc 0 (bench 値のみで PASS 判定なし)。`sig_arity_probe.mjs` は probe で PASS 判定なし。
+  - `analysis/py235_process_rec_families.py` (`FL_WIN64_DIR` の `block00031_PE.bin`): 30 ok・0 FAIL・rc 0。
+  - VA の検証: `objdump -d -M intel block00031_PE.bin` で `0x1047424`〜`0x1047492` を逆アセンブルし、`0x1047431: cmp eax, 0x40000001`・`0x1047436: je 0x104c4af` を確認。
+  - gate の件数: 同じ objdump 出力で `# 0x15e1890` を読む命令は 58 件 (`mov rax` 56・`mov rdx` 1・`mov r8` 1)。
+  - ネガティブコントロール (HEAD `9d39f39ad` で再実施): `host/fl_mock.mjs` の `(e & 0xffff) !== 8` を `!== 9` に変えると `general 差分 1 件` (AssertionError・rc 1) で落ちる (`[0x10000008, 9, 0]` が mock は 9、C は code 2)。元に戻した後は `{"calls":52,"diffs":0,"PASS":true}` で、`git diff -- tools/python/host` は空。
+- 前回 (HEAD `6556fa7a5`・main 取り込み 2 回目): `provider_check` 169/266・`general_diff` 52/0・`ui_state_diff` 58/0・`all_tools` 48/48 (全て PASS)。main 取り込み 3 回目で件数が 172/263 に変わった。
+- 前回の前回 (HEAD `8861ba46d`・main 取り込み 1 回目): `provider_check` 166/269・`all_tools` 48/48・`general_diff` 52/0・`ui_state_diff` 58/0 (全て PASS)。
 - 前回の測定 (HEAD `470e2d8e0`・main 取り込み前・load avg 0.00):
   - `bash provider/build.sh`: rc 0 (1.05 秒)。`fl_table.c: 435 関数, ハンドラ 163`。
   - `node tests/general_diff.mjs`: `{"calls":52,"diffs":0,"PASS":true}` (0.05 秒)。
