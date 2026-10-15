@@ -107,7 +107,7 @@ base IR: `%0 = call 4256c0(i64 %arg1)`。修復: `%a1g = load [arg1]` を入れ�
 
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` (`60cb4d886` の worktree)。
 - 結果: **rc=1**。`[ldfix_e2e] FAILED: tools/m11/work/boot_final3.ll 無し (bash tools/m11/m11_e2e.sh を先に)`。step 0 で止まり、step 1 以降は走っていない。
-- 理由: runner の `$ARTIFACTS_DIR` には `fl-win64.tar.zst` だけがあった (`ls` で確認)。`work-m11`・`work-liftdiff`・`toolchain-emsdk`・`toolchain-retdec` は、PR 本文に `oc_artifacts:` 行が無かったため取得されていない。`/opt/emsdk`・`/opt/retdec` も無い (IR を作る `m11_e2e.sh --full` は RetDec が要る)。
+- 理由: runner の `$ARTIFACTS_DIR` には `fl-win64.tar.zst` だけがあった (`ls` で確認)。`work-m11`・`work-liftdiff`・`toolchain-emsdk`・`toolchain-retdec` は、PR 本文に `oc_artifacts:` 行が無かったため取得されていない。emsdk・RetDec の展開先 (`docs/REFERENCES.md` の `[EMSDK]`・`[RETDEC]`) も無い (IR を作る `m11_e2e.sh --full` は RetDec が要る)。
 - 対応: PR 本文に `oc_artifacts: fl-win64 work-m11 work-liftdiff toolchain-emsdk toolchain-retdec` を入れた。次の review run は本文の行から素材を取得する (`prepare-event-context.sh`)。HEAD での再測定はその run で行う。
 - HEAD で差分がある箇所 (測定 commit から HEAD まで): `tools/m11/ldfix/ldfix_e2e.sh` の 4 行追加・1 行削除 (§8 の diff)。`fix_site_3372.py` は差分 0 行。stage4・survey が HEAD でどう変わるかは未測定。
 
