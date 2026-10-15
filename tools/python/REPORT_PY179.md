@@ -67,3 +67,21 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_pattern_probe.py   #
 | `FL_ENGINE=wasm node tests/all_tools.mjs` 48/48 と `provider_check.mjs` の flpy 部 (`dist/flpy.js`・`work/midi.py` が要る) | 受入 7 は未実測。flpy 経路の回帰も未検証 (既存の未検証範囲・PY-157 と同じ) | 子 #3536・#3537 の PR で実測する (再測定だけの子は起票しない) |
 | probe (`pe_pattern_probe.py`) は分岐の飛び先を検査しない (REPORT_PY173 §5) | 同種の分岐の読み違いを probe が検出しない | 子 #3536 の PR で扱う (実装に直結する分)。残りは #3220 |
 | 4 関数の戻り値の型 (int/bool)。変換スロット `0x15e4280` は int と bool で共通で、PE から区別できない | 型は仮置き (patternCount・patternNumber = int、isPatternDefault・isPatternSelected = bool)。呼出し側の読みで変わり得る | patternCount・isPatternDefault → 子 #3536 (PY-210)、isPatternSelected → 子 #3537 (PY-211) の受入へ追記 (両 issue の本文に追記済み) |
+
+## 6. 実行時の観測 (PY-4877 / #5168)
+
+測定 commit: 本 PR のコミット (`tools/flelift/boot/py4877_pred_e_probe.sh` を追加した commit)。経路: 既定 (`FLE_IPP` 未指定・`fle6_measure.sh` と同じ lift・plain clang)。shim 経路 (`FLE_IPP=1`) は units 209 で止まり、述語・初期化経路に届かない (実測・§6 末尾)。
+
+| 観測 | 結果 |
+|---|---|
+| 述語 `0x12d8d30` の入口 (`patternCount`・`isPatternDefault` 等の全呼出し) | 0 件 (未到達) |
+| `patternCount` `0xd64d40` の入口 | 0 件 (未到達) |
+| `0x12d0cc0` (E の初期化) の呼出し | 1 件 (`ecx=0`・戻り番地 `0x12de002`・呼出元 `0x12ddffd`) |
+| `0x12d1760` (E の再計算) の呼出し | 0 件 (未到達) |
+| `0x12d0cc0` 呼出し直後の `E[0..999]` のうち非 0 行 | 1 行 (`E[0]`: `+0x84=01`・`+0x10=-1`・`+0x14=00`・`[E+0x20]=0`・`[E+0x28]=0`)。`E[1..999]` は全 0 |
+| boot の停止点 | units 895 / 942 (`stopped_at` 895・`boot_threw` exit) |
+| 同じ bin の shim 経路 (`FLE_IPP=1`) | units 209 で停止 (`FLEBOOT_IPP_CHECK` ok=false・既存の判定どおり) |
+
+再現: `FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> bash tools/flelift/boot/py4877_pred_e_probe.sh` (前提: 先に `fle6_measure.sh` で `work/boot/lift` を作る)。emsdk は pin `6.0.12` を `$RUNNER_TEMP` に入れて使った (`/opt/emsdk` は本 run に無い)。
+
+結論: 既定経路では `0x12d0cc0` は 1 回だけ呼ばれ、E は `E[0]` だけが書かれ `E[1..999]` は 0 のまま。述語は boot 中に呼ばれず、`patternCount` の実行時の値はこの経路では観測されない。したがって `patternCount` = 999 の仮置きは、この経路では述語の入力に当たらない (未到達)。`patternCount` を実際に呼ぶ経路 (ユーザー操作・flpy 経由) はこの boot の範囲外で、未確認。
