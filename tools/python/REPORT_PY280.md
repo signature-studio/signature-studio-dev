@@ -17,8 +17,11 @@
 - `git diff 4f256b0be HEAD -- tools/python ':!*.md'` の出力は下の通り (本 PR で測定 commit の後に入ったコードは再現用の `tests/provider_expect_sim.mjs` だけ。`provider_check.mjs`・`all_tools.mjs`・`provider_impl_dump.mjs` からは参照されない)。
 
 ```
-(この下に実行結果を貼る)
+ tools/python/tests/provider_expect_sim.mjs | 33 ++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 ```
+
+上の 1 件は §5 の疑似ブランチ作成の再現スクリプト (新規追加)。`provider_check.mjs`・`provider_expect/`・`provider_impl_dump.mjs`・`fl_engine.c`・`fl_mock.mjs` は測定 commit から変えていない。検証結果 (§3・§4) は測定 commit の内容で得たもの。
 
 ## 2. 移行の対象 (実測)
 
