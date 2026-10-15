@@ -11,56 +11,60 @@
 
 ## 2. 前後比較 (受入 2)
 
-**状態: 再測定は実施したが、基準環境を再現できていない。以下の値は同一環境内の前後比較であり、REPORT の基準値 (units_run 109) とは対応しない。**
+**状態: 達成。** 基準環境 (`fl-win64` の PE あり・IR を再生成) で、`a4a620a9^` と `a4a620a9` の両側とも `units_dispatched` = 109 (基準 109 を再現)。前後の差は 0。
 
-測定条件 (本 run、runner の素材で実施):
+測定条件:
 
-- 素材: `$ARTIFACTS_DIR` の `work-m11.tar.zst` (→ `tools/m11/work/`)・`toolchain-emsdk.tar.zst` (→ `/tmp/opencode/tc/emsdk`)・`toolchain-retdec.tar.zst` (→ `/tmp/opencode/tc/retdec`)。
-- **未入手**: `fl-win64` (`block00031_PE.bin`) が runner に無い。`find /` でも見つからず。そのため import thunk 表は空 (`build.sh` の WARNING 経路)。`boot_final.ll` からの `m11_gen_ir2.sh` / `m11_wndseed.sh` も本 run では回していない (素材の `work/boot_final*.ll` をそのまま使用)。
-- HEAD: `d922d6fac` (コード差分は `run.mjs` 0。`git diff 9bfcc26a3 d922d6fac -- tools/gui/flengine/run.mjs tools/shim tools/m11` は空)。現在の head `8f54cf433` でも同じ (`git diff d922d6fac 8f54cf433 -- tools/gui/flengine/run.mjs tools/shim tools/m11` は空。差分は文書と `results/boot.json` のみ)。
-- 差し替え: `tools/shim/src/heap.c` のみ。`git rev-parse` で blob を確認: `a4a620a9^` = `cde475fbc`、`a4a620a9` = `45ba1484e`、HEAD = `01bfe4b01`。
-- 手順: 各側で `EMSDK_ENV=<emsdk_env.sh> PATH=<retdec/bin>:$PATH bash tools/gui/flengine/build.sh` → `node tools/gui/flengine/run.mjs --out <json>`。
+- 測定 code HEAD: `1adfc37aa`。`git diff 9bfcc26a3 1adfc37aa -- tools/gui/flengine/run.mjs tools/shim tools/m11` は空。
+- 素材: [WIN64] の `extracted/block00031_PE.bin` (`fl-win64`)・[EMSDK] (`toolchain-emsdk`)・[RETDEC] (`toolchain-retdec`)・`work-m11` (`tools/m11/work/`、読取のみ)。
+- 差し替え: `tools/shim/src/heap.c` のみ。blob は `a4a620a9^` = `cde475fbc`、`a4a620a9` = `45ba1484e`。HEAD の blob は `01bfe4b01` (`9bfcc26a3` と同じ)。
+- 手順 (`e2e.sh` step 0 と同じ複製方式。`tools/m11` は読取のみ): 複製先 `tools/gui/work/flengine/tree/` に `m11`・`shim`・`shared`・`m2`・`m5`・`m6/ottlib.py` を複製 → 複製側で `m11_gen_ir2.sh` → `m11_wndseed.sh` → `m11_build.sh` → 各側で heap.c を差し替えて `FL_WIN64_DIR=<fl-win64> bash tools/gui/flengine/build.sh` → `node tools/gui/flengine/run.mjs`。
+- 所要 (実測): `m11_gen_ir2.sh` 52 s、`m11_wndseed.sh` 3 min 30 s (WNDCLASS-CHECK PASS、instances 11、最終 IR 未定義 0)、`m11_build.sh` 32 s、`build.sh` 各 19〜23 s、`run.mjs` 各 0.5 s 程度。
+- 検査: `m11_wndseed.sh` の WNDCLASS-CHECK PASS。build の signature mismatch / undefined / duplicate はどちらも 0。
 
-結果 (同一 HEAD `d922d6fac`・同一 IR・PE 無し):
+結果 (同一 HEAD `1adfc37aa`・同一 IR・PE あり):
 
-| 項目 | `a4a620a9^` (heap.c `cde475fbc`) | `a4a620a9` (heap.c `45ba1484e`) |
-|---|---|---|
-| build | rc 0 | rc 0 |
-| run | rc 0 (11 s 込みの build+run ≒ 11 s) | rc 0 (同 11 s) |
-| `boot_threw` | memory access out of bounds | memory access out of bounds |
-| `units_dispatched` | 17 | 17 |
-| `units_run` | 17 | 17 |
-| `init_count` | 18 | 18 |
-| `icall_miss` | 0 | 0 |
-| GetMem / FreeMem | 16 / 6 | 16 / 6 |
-| FastMM_GetMem(407a50) | 17 | 17 |
+| 項目 | `a4a620a9^` (heap.c `cde475fbc`) | `a4a620a9` (heap.c `45ba1484e`) | 基準 (`9bfcc26a3` の boot.json) |
+|---|---|---|---|
+| build | rc 0 | rc 0 | - |
+| run | rc 0 | rc 0 | - |
+| `boot_threw` | なし | なし | - |
+| `dllmain_done` | true | true | - |
+| `units_total` | 942 | 942 | - |
+| `units_run` | 109 | 109 | 109 |
+| `units_dispatched` | 109 | 109 | 109 |
+| `init_count` | 111 | 111 | - |
+| `icall_miss` | 7 | 7 | - |
+| `gui_icall_calls` | 6 | 6 | - |
+| GetMem / FreeMem | 760 / 24 | 760 / 24 | 761 / 24 |
+| FastMM_GetMem(407a50) | 781 | 781 | 782 |
 
-- 判定: 両側で `units_dispatched` 17 = 17 (差 0)。ただし両側とも boot が trap で止まるため、この前後比較は「PE 無し・IR 未再生成の環境での差 0」しか示さない。基準 (109) は再現していない。
-- 旧表 (参考。受入根拠ではない): 旧 round 1 の表は `cde475fbc` と HEAD (`01bfe4b01`) の比較で、`a4a620a9` 側の heap.c が違っていた。今回は破棄。
+- 判定: 両側 `units_dispatched` = 109、差 0。基準 109 を再現した。
+- GetMem / FastMM は両側 760 / 781 で一致する。基準 (761 / 782) との 1 件差は §3。
 
-## 3. boot.json の GetMem / FastMM の変化 (`22c914300`)
+## 3. boot.json の GetMem / FastMM の差 (`22c914300` 周辺)
 
-- `results/boot.json` の差分 (`9bfcc26a3` → `65844e9ef` 由来の値): `GetMem 761→760`・`FastMM_GetMem(407a50) 782→781`。
-- 本 run の対応: **この変化は本 PR から戻した** (`results/boot.json` は `units_dispatched` 行の追加だけ)。
-- 測定: `22c914300^` / `22c914300` の `tools/m11/m11_ov.c` を入れ替えて同一 HEAD で build → run (同じ PE 無し環境)。結果は両側とも `GetMem 16` / `FastMM_GetMem 17` で、差は 0。boot は両側とも trap で止まるため、この測定では基準の 761/782 → 760/781 の 1 件差を再現・否定できない。
-- 結論: 原因は未確定。`22c914300` は候補だが、この環境では GetMem を動かさなかった。`function_40d210` 転記 (memset の n > 32 本体) が GetMem を 1 件減らすという根拠は本 run では得られていない。
-- 再測定の条件: `fl-win64` (`block00031_PE.bin`) と `m11_gen_ir2.sh` / `m11_wndseed.sh` を含む完全な e2e 環境。これが揃うまで GetMem の原因は未測定のまま。
+- `results/boot.json` の GetMem / FastMM は `9bfcc26a3` の値 (761 / 782) のまま。本 PR では変えていない (`results/boot.json` の差分は `units_dispatched` 行だけ)。
+- 今回の測定 (基準環境・IR 再生成) では、両側とも GetMem 760 / FastMM 781。`heap.c` の差し替え (`cde475fbc` ↔ `45ba1484e`) では GetMem は変わらないことが確定した。
+- よって 761 → 760 は `heap.c` 以外の差。`m11_ov.c` 側の `22c914300` が原因かは、本付録では未測定 (`m11_ov.c` を差し替えた基準環境の測定は行っていない)。
+- 761 と 760 のどちらが現 pipeline の正しい値かは未確定。judge の B1 基準 (761) との扱いは未解決表。
 
 ## 4. e2e 実測
 
-- 測定 commit `9bfcc26a3` の e2e (`bash tools/gui/flengine/e2e.sh`) の記録: 所要 620 s、judge 14/15 (FAIL は B1 のみ: `GetMem 760 (base 761)`)。この run の commit 対応は、この head では再実行していないため記録のみ。
-- 本 head (`d922d6fac`) では e2e 全体は未実行 (`fl-win64` 無し)。`build.sh` と `run.mjs` のみ §2・§3 の条件で実行。
+- 測定 commit `9bfcc26a3` の e2e (`bash tools/gui/flengine/e2e.sh`) の記録: 所要 620 s、judge 14/15 (FAIL は B1 のみ: `GetMem 760 (base 761)`)。
+- 本 head (`1adfc37aa`) では `e2e.sh` 全体 (judge・ネガコン・survey) は再実行していない。`9bfcc26a3` から code 差分は 0 (`run.mjs`・`tools/shim`・`tools/m11` の diff は空) なので、WORKFLOW §6 により再測定は不要とした。
+- 本 head で実行したのは §2 の複製 pipeline と `build.sh` / `run.mjs` / `probe.mjs` のみ。
 
 ## 5. 製品 KPI (前後)
 
-- 起動 dispatch 数: 本 run の値は §2 の環境 (PE 無し・boot trap) のもので、基準 (109) の KPI とは別物。前後は 17 / 17 (差 0)。
-- 通過 unit 数: 同上 (17 / 17)。
-- 最初のウィンドウ: 本 run では未確認 (boot が trap で止まるため P4/P5 の probe は未実施)。前回 run の記録は `P4 hwnd=0x1100013`・`P5 hwnd=0x1100012` (測定 commit `9bfcc26a3` の run、本 head では未再実行)。
+- 起動 dispatch 数: 両側 109 (基準 109 と一致)。前後の差は 0。
+- 通過 unit 数: `units_run` 109 (両側)。
+- 最初のウィンドウ: `probe.mjs` で `a4a620a9` 側のみ測定 (直後の build が `45ba1484e` だったため)。`TLightweightLayeredControl` = `0x1100012`、`TApplication` = `0x1100013` (いずれも非 0)。`a4a620a9^` 側の probe は未実行。
 - `tools/flelift/boot` の 209 dispatch とは別の経路 (GUI shim 経路の値)。混同しない。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 基準環境 (`fl-win64` の PE・`m11_gen_ir2.sh`・`m11_wndseed.sh`) での前後比較。本 run は boot が trap で止まり、基準 109 を再現していない | 受入 2 の「前後比較」は同一環境で差 0 を示したのみ。基準値での前後は未確定 | 本 PR で追跡 (`oc_artifacts:` に `fl-win64` を足して再起動) |
-| GetMem 761→760 の原因 (`22c914300` が候補) | 本 PR では `boot.json` の変化を戻した。候補の真偽は未確定 | 上と同じ基準環境での測定 |
+| GetMem 761 (`9bfcc26a3` の boot.json) と 760 (基準環境の現 pipeline・両側同値) の差の原因 | `boot.json` と judge B1 の基準値 (761) が現測定 (760) と一致しない。`heap.c` の差では説明できないことは確認済み | 本 PR 外。`m11_ov.c` (`22c914300`) の前後を基準環境で測る作業として次の run に回す |
+| `a4a620a9^` 側の window probe (P4/P5 相当) 未測定 | KPI の「最初のウィンドウ」は `a4a620a9` 側のみ | 同上 (次の run で probe を両側で取る) |
