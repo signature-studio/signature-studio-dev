@@ -108,6 +108,35 @@ static uint16_t mod_run(int kind, double a, double b, double *val) {
     return (uint16_t)(ott_fsw & OBS_MASK);
 }
 
+/* スタック例外 (SF・C1): native のみ測る。 模型はスタックの over/underflow を持たない (ott_x87.h 制限 4) ので、模型の観測は 0 */
+enum { ST_UNDER_FADD, ST_UNDER_FSTP, ST_OVER8, ST_OVER9, ST_COUNT };
+static const char *ST_NAME[] = {"空スタック fadd", "空スタック fstp", "8 段 push (対照)", "9 段 push"};
+#define P1 "fldl %1\n\t"
+#define P2 P1 P1
+#define P4 P2 P2
+#define P8 P4 P4
+#define P9 P8 P1
+
+static uint16_t nat_stack(int kind, double a) {
+    uint16_t s = 0;
+    fpu_init();
+    switch (kind) {
+    case ST_UNDER_FADD:
+        __asm__ volatile("fnclex\n\tfadd %%st(0),%%st\n\tfnstsw %0\n\tfninit" : "=m"(s) :: CL, "memory");
+        break;
+    case ST_UNDER_FSTP:
+        __asm__ volatile("fnclex\n\tfstp %%st(0)\n\tfnstsw %0\n\tfninit" : "=m"(s) :: CL, "memory");
+        break;
+    case ST_OVER8:
+        __asm__ volatile("fnclex\n\t" P8 "fnstsw %0\n\tfninit" : "=m"(s) : "m"(a) : CL, "memory");
+        break;
+    default:
+        __asm__ volatile("fnclex\n\t" P9 "fnstsw %0\n\tfninit" : "=m"(s) : "m"(a) : CL, "memory");
+        break;
+    }
+    return s;
+}
+
 static uint64_t bits(double d) { uint64_t u; memcpy(&u, &d, 8); return u; }
 
 static const char *FNAME[] = {"IE", "DE", "ZE", "OE", "UE", "PE", "SF", "C1"};
@@ -175,6 +204,18 @@ static int run_table(uint16_t cw, int verbose) {
 int main(void) {
     int bad = run_table(0x037f, 1);
     bad += run_table(0x027f, 1);
+    /* スタック例外: 空スタックの読み (fadd/fstp) と 9 段 push は SF、8 段 push は SF 無し (対照) */
+    static const int ST_SF[] = {1, 1, 0, 1};
+    long st_sf_rows = 0, st_bad = 0;
+    for (int k = 0; k < ST_COUNT; k++) {
+        uint16_t s = nat_stack(k, 1.0);
+        int sf = (s & 0x0040) != 0;
+        st_sf_rows += sf;
+        printf("[flags] stack %-18s native fsw %04x SF=%d IE=%d C1=%d\n", ST_NAME[k], s, sf, (s & 0x01) != 0, (s & C1_BIT) != 0);
+        if (sf != ST_SF[k]) st_bad++;
+    }
+    printf("[flags] stack SF expectation mismatch %ld (expect 0); native SF rows %ld; model SF rows 0 (model has no stack flags)\n", st_bad, st_sf_rows);
+    bad += (int)st_bad;
     printf("[flags] model-only bits (模型の誤り) total %ld (expect 0)\n", modonly_total);
     if (modonly_total) bad++;
     printf("[flags] %s\n", bad ? "FAIL (control broken or model sets a bit native does not)" : "PASS (controls hold; model sets no bit native lacks; native-only bits are the model's limit)");
