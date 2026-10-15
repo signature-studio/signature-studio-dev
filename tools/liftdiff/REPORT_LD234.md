@@ -14,7 +14,7 @@
 - 測定 commit: `fbb19946c` (`Merge pull request #4649`)。コードは変更していない。
 - 素材: `oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff` のうち、`fl-win64`・`work-m11`・`work-liftdiff` を展開した。`toolchain-emsdk` は [EMSDK] (docs/REFERENCES.md) が既に入っていたため展開していない。`emcc` の実在を確認した。
 - `FL_WIN64_DIR` は runner の一時領域の `fl-win64/extracted` の親を指定した。
-- run 1: 作業ツリーは共有 main のチェックアウト。生成物は `tools/liftdiff/work/` (gitignore 対象) だけで、追跡ファイルは変えていない。
+- run 1: 作業ツリーは共有 main のチェックアウト (WORKFLOW §1-1 違反)。この run は有効な測定として数えない。参考値としてのみ残す。
 - run 2: 専用 worktree `ws-4667` (branch `4667-ld234-m11-e2e-timing`、commit `fbb19946c`)。
 - 機器: 4 vCPU・メモリ 15 GiB。
 - 実行コマンド: `timeout 2300 bash liftdiff_e2e.sh --m11-only`。`time` は bash の time 組み込みで計った。
@@ -32,7 +32,7 @@
 | `[4/4]` バッチ | 116 s | 116 s |
 | 結果 | `LIFTDIFF_E2E PASS` | `LIFTDIFF_E2E PASS` |
 
-step ごとの結果 (run 2 のログ):
+step ごとの結果 (run 2 の実行記録。端末出力のログは保存していない):
 
 - `[0/4]` 単体テスト: `test_ld52_machine_sig`・`test_ld181_i128_entry`・`test_ld179_tagpoint_tr`・`test_ld203_slot_fill`・`test_ld225_sample_vmo` すべて PASS。
 - `[3/4]` unit #18 の原因特定: `_UStrAsg` の mem diff・`Move(409c80)` の `spill_slot_deref`・`4123c0` の resourcestring 脱落 (native entry 67 > wasm 46、`callsite_arg_drop`、mem diff 7) を PASS。
@@ -51,7 +51,7 @@ step ごとの結果 (run 2 のログ):
 - 不一致のうち callee を呼ばずに差分が出たもの: 52。wasm trap を含むもの: 70。
 - 実行不能の内訳 (両 run 同一): `native_fault_all_patterns` 119・`native_null_deref_all_patterns` 49・`hang` 38。合計 206。
 
-不一致の類型 (主因 / 該当数) は両 run で同一。主なもの: `callee_divergence` 57 / 104、`wasm_trap` 44 / 70、`memory_semantics` 25 / 26、`callsite_arg_drop` 23 / 23、`icall_drop` 19 / 23。全一覧は run 2 のログ (`tools/liftdiff/work/ld234_ws_run.log`) を参照。
+不一致の類型 (主因 / 該当数) は両 run で同一。主なもの: `callee_divergence` 57 / 104、`wasm_trap` 44 / 70、`memory_semantics` 25 / 26、`callsite_arg_drop` 23 / 23、`icall_drop` 19 / 23。全類型の一覧は保存していない (ログは gitignore 対象の作業領域にあり、リポジトリ外には残っていない)。ここに載せたのは主なものだけ。
 
 timeout 系の件数だけ run 間で 2 件違う (304 → 306、関数 70 → 71)。件数の他の部分は一致しているので、timeout の境界付近の case が揺れたと見る。原因の特定はしていない。
 
@@ -63,4 +63,6 @@ timeout 系の件数だけ run 間で 2 件違う (304 → 306、関数 70 → 7
 ## 6. 未解決
 
 - timeout 系 case の件数の揺れ (304 / 306)。原因は未調査。
+- run 1 の作業ツリーが共有 main だったこと (§2)。`work-m11`・`work-liftdiff`・`toolchain-emsdk` の素材が無く、単独 worktree での再測定は未実施。
+- step ごとのログ原本は保存していない。
 - LD-215 の `[4/4]` の時間は、この REPORT で実測済み。
