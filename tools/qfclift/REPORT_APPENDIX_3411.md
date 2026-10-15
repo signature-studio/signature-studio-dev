@@ -24,7 +24,7 @@
 
 - 直接呼出しとして計数された import は 6 件で、すべて rt・`qfc_imp.c` に既存。よって直接経路で新たに実装が必要な import は **0 件**。`qfc_imp.c` と rt は変更していない。
 - `qfc_count.sh` の emcc 行を `qfc_lift.sh` の `wasm_build` と同じ入力集合 (`qfc_ov.c`・`qfc_import.c`・`FT_WASM32_LIB`・`-I` 群) に揃えた (commit `5c79daa2b`)。一時版の手修正は使っていない。
-- 停止点までの間接呼出しは 0 件のため、6 件 (直接) と併せて停止点までの全数は 6 件。停止後は #4262 で扱う。
+- 停止点までの間接呼出しは 0 件。直接呼出しの件数は §4374 (HEAD 計測) の 5 件が正本。§10.1 の 6 件は `5c79daa2b` 時点の値で HEAD と一致しない (差の原因は未特定・§10.3 の未解決表)。停止後は #4262 で扱う。
 - 受入 2 の「soft 呼出し 0 件にする」は満たさない (soft 呼出し 0 件は元から満たしていた)。停止点の解釈 (偽の停止か) は #4262 の範囲。
 
 ### 10.3 未解決
@@ -40,12 +40,15 @@
 
 ## 4374 間接経由 import 呼出しの計数 (T-SH-121 / #4374)
 
-測定 commit = `93fde48ab` (`gen_count_wrap.py` が imp_tab の各行 223 件を計数版に置換した commit)。実行 `qfc_count.sh` は rc 0・21 s・load 0.24→0.46。
-- 生成: imp_tab 行 223 (うち used 222・imp_unimpl 1)。直接呼出し書換え 1681 箇所 (名前別 222 種)。
-- 停止点まで: `[step] DllMain` → 直接呼出し 6 件 (GetCurrentThreadId・TlsAlloc・LocalAlloc・TlsSetValue・TlsGetValue・ExitProcess) → `ExitProcess(0)` → `[trap] DllMain`。
-- 間接経由 (`(ind)`) の呼出し: **0 件**。`imp_by_index` 経路は停止点まで通っていない。
+測定 commit = `71b77279b` (HEAD。コードは `93fde48ab` 以降 `tools/qfclift`・`tools/flelift/rt`・`tools/shared/oss/freetype`・`tools/flelift/x64c.py` の変更を含む。`71b77279b` 以降のコード差分は 0。下記 `git diff` の出力を参照)。
+手順: `QFC_BOOT_REBUILD=1 qfc_boot.sh` (rc 1・strict `MISSING IMPORT LocalAlloc`・soft は `FontCache_GetStats` で trap。boot は FAIL のまま) → `qfc_count.sh` (foreground)。素材: `fl-win64` と `toolchain-emsdk` (emcc 6.0.12)・FreeType 2.7 wasm32 を `tools/shared/work/` に作成。
+- 実行 `qfc_count.sh`: rc 0・wall 21.0 s・load 0.66 (開始時)。
+- 生成: imp_tab 行 223 (used 222)。直接呼出し書換え 1681 箇所 (名前別 222 種)。
+- 停止点まで: `[step] DllMain` → 直接呼出し 5 件 (GetCurrentThreadId 1・TlsAlloc 1・LocalAlloc 1・TlsSetValue 1・TlsGetValue 1) → `[trap] DllMain`。`ExitProcess` は出ない。
+- 間接経由 (`(ind)`) の呼出し: **0 件**。soft 呼出し: **0 件**。
 - 戻り値・副作用: 計数行は stderr の `[fle] CALL <名> (ind)` のみ。行き先は元の imp_<名> をそのまま呼ぶ。
 - 未達のまま残る点: 停止後の進行 (偽の停止か) は #4262 で扱う。停止後の間接呼出しは現時点で未計数。
+- 旧計測 (`93fde48ab`・直接 6 件・停止点 `ExitProcess(0)`) は、その後の `tools/qfclift` の変更で HEAD と一致しなくなった。原因は未特定 (§10.3)。
 
 ### 10.4 TLS 変更の前後の計数 (#4307 / T-SH-116)
 
