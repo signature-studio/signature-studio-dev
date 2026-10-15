@@ -141,3 +141,13 @@ pdata の関数境界ごとに逆アセンブル (capstone) し、E8/E9 の直�
 - 本 run では素材が無く実バイナリで再実行できない (`$ARTIFACTS_DIR` は `fl-win64` のみ)。行数は、pefile を一時的に差し替えた合成入力 (`.text` 全 ret・pdata に全対象 VA を配置。リポジトリ外・非コミット) で script を実行して確認: rc=0・`wc -l` = 26。9.8 s と load は前回 run の記録で、本 run では再測定していない。
 - 判定には使わない (表示のみ)。harness (`native/native_ctrl.c`) と `run_fa9.sh`・`run_ctrl.sh` の経路は本 commit で変えていないため、再測定は不要 (WORKFLOW §6)。
 - 製品 KPI: 動かしていない (静的解析のみ。起動・GUI の挙動は不変)。
+
+### 8.2 FA-53 (#4389): SEGV `rip=0x125afc6` の呼出元と IAT 未束縛
+
+- 呼出元 (guard の `FA_BT=1` の戻り番地。`[rsp]` = 最初の bad call の戻り): `0x180d09ae2` → `0x180d09ac0` の `call 0x180f8feb0` (GetTickCount の import thunk) ← `0x180d0a040` ← `0x180d8c0b0` (popup slot 5)。
+- 原因: thunk `0x180f8feb0` は `jmp [0x1810c4208]` で、この slot は KERNEL32!GetTickCount。`iat_slots.txt` (ctrl build の roots 由来 76 件) に無く、生の hint-name RVA `0x125afc6` のまま。`jmp` 先が `.text` 外のため SEGV。
+- 修正: `FA_UI31=1` のときだけ `patch_iat_all()` で全 IAT を shim / `nat_unk0` に束縛 (既定 OFF。他経路は不変)。
+- 実測 (測定 commit `5308b492d`・`FA_UI31=1 bash fa31_ctl.sh`): base・node1 とも rc=0。S900–S907 の FAULT は `rip=0x125afc6` → 全件 `rip=0x180cb9ce9 addr=0xa80` (d8d700 内で `[P+0xb98]`→`0x180cbaec0` 経由の null this・`[rcx+0xa80]`) に変化。`d8d700=1` (受入 2 の一部: `d8c140=0` は未達)。`caa820=0`・`d8c140=0`・`UI31 returned` 0 件。
+- 判定: `run_ctrl.sh 2 5` = BIT-EXACT 15/15 (rc=0・4.37 s・load 0.07)。既定経路は不変。
+- 試行 (棄却): `FA_UI31_P=1` で `P+0xb98`/`P+0xba8` に 0 埋めの 0x200 B を置いた (推測の値)。`0x180d8d7ac` (`[P+0xb88]+0x298`) の `addr=0x298` SEGV に移るだけで `returned` 0 件。推測の P 構築は採らず、コードには残していない。
+- 未解決 (受入 1〜3・P の構築根拠): `caa820` 未到達。`P+0xb88`・`+0xb98`・`+0xba8` の実機の構築元は未特定 (推測)。起票先は子 issue (本 PR 末尾)。
