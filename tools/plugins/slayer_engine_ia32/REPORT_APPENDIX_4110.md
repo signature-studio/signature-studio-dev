@@ -2,7 +2,7 @@
 
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない)。 親: #3688 (REPORT_APPENDIX_3688 §3・§7)。
 
-- 測定 commit (コードを変えた最後の commit): `922ead531`。 検証 HEAD: 同じ (`git diff 922ead531 HEAD -- tools/ott tools/plugins/slayer_engine_ia32` は 0 行)。
+- 測定 commit (コードを変えた最後の commit): `922ead531`。 検証 HEAD (`c4fbccac8`) との差分: 実行されるコードは 0 行 (`git diff 922ead531 HEAD -- tools/ott tools/plugins/slayer_engine_ia32/x87_diff.py tools/ott/lift` = 0 行)。 HEAD で増えたのは main 由来の `tools/plugins/slayer_engine_ia32/` の付録・probe (6 ファイル・299 行追加。測定経路に入らない)。 よって再測定は不要。
 - 比較基準: `ead1c1399` (origin/main) を `git worktree` で展開して同じ試験を実行 (§3)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は生成した試行のみ (fl-win64 は回帰試験の入力だけ)。
 - 素材: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst`・313 本の `_PE.bin`)。
@@ -33,7 +33,8 @@
 | `--skip fldpi,fldlg2,fldl2e` | 20,000 | 1 | (未測定) | 19,230 (96.15%)・FSW 46・slot 172 (一致) |
 
 - 主試験の 93,984 は REPORT_APPENDIX_3688 §4 の 93,985 と 1 件違う。 基準 `ead1c1399` でも 93,984 なので、本変更の影響ではない (3688 の測定時点との差)。
-- env 試行の所要 (HEAD・`time` の real): env 22.96 s・ネガコン 22.87 s。 load1 開始時 0.98。
+- env 試行の所要 (測定 commit `922ead531`・`time` の real): env 22.96 s・ネガコン 22.87 s。 load1 開始時 0.98。
+- 検証 HEAD `c4fbccac8` での再測定は行わない。 上記の差分が測定経路の 0 行であることは §0 の通り。
 
 ## 4. x64 回帰
 
@@ -43,6 +44,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| TW 規則は 3 シード (10 万件ずつ) の観測による経験則。 他の op 列・例外状態での反例は未検出 | 試行外の状況で TW が違う可能性 | 本 PR の残り (追加の試行列で検証) |
-| FIP/FCS/FOO/FOS (環境の 12..27 B) は未モデル (0 で格納) | 環境を読み戻して実行アドレスを見る処理は一致しない | ADR D28 の制限への追記 (PM 判断待ち。 REPORT_APPENDIX_3688 §7 の通り) |
-| x87 を含む関数の native と wasm の差分は未確認 | lowered の実 wasm での一致は未確認 | #2989 (PLG-G2-25) |
+| TW 規則は 3 シード (10 万件ずつ) の観測による経験則。 他の op 列・例外状態での反例は未検出 | 試行外の状況で TW が違う可能性 | 本 PR の未解決表で追跡 (追加の試行列は再測定のみのため子 issue は起票しない。WORKFLOW §3) |
+| FIP/FCS/FOO/FOS (環境の 12..27 B) は未モデル (0 で格納) | 環境を読み戻して実行アドレスを見る処理は一致しない | PM agent の判断待ち: ADR D28 へ追記するか。 既定案: 挙動は変えず制限として追記 (REPORT_APPENDIX_3688 §7 の通り) |
+| x87 を含む関数の native と wasm の差分は未確認 | lowered の実 wasm での一致は未確認 | #3688 (PLG-G2-30・open) |
