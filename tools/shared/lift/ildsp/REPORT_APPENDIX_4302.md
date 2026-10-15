@@ -153,7 +153,7 @@ FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<emsdk_env.sh> bash tools/shared/lif
 
 ## 8. 検証
 
-- 測定 commit: `7ace9f448` (現 head。コードを変えた最後の commit)。`c9c29634a` からの差分は `tools/shared/lift/ildsp/wc_run_wasm.mjs` の 1 行 (診断用 `WC_LOG_FD=1` の `??=`) のみで、その 1 行も測定経路に入るため、以下は `7ace9f448` で測り直した値。
+- 測定 commit: `7ace9f448` (コードを変えた最後の commit。現 head は `974f31260` で文書のみの差分: `git diff 7ace9f448 HEAD -- tools/shared/lift/ildsp tools/flelift` は REPORT_APPENDIX_4302.md のみ)。`c9c29634a` からの差分は `tools/shared/lift/ildsp/wc_run_wasm.mjs` の 1 行 (診断用 `WC_LOG_FD=1` の `??=`) のみで、その 1 行も測定経路に入るため、以下は `7ace9f448` で測り直した値。
 - 素材: `fl-win64` の `extracted/block24360_PE.bin` (`work/fl` に展開)、emsdk は上流から 6.0.12 を導入して使った (`EMSDK_ENV` で指定)。
 - 既定 `lift_psola.sh ok` (`7ace9f448`): PASS=64 FAIL=0 wasm trap 0・rc 0・elapsed 3.73 s (emcc 込み)・load 1.18→1.25。
 - 差分 harness (`7ace9f448`・§9 の完全なコマンド): rc 1・elapsed 42.03 s・load 1.15→1.90。native 64/64 完走 (SEGV 0)、wasm traps 0・PASS 0・FAIL 64 (差分は `rax`・arena `+0x278`・`.data +0xb80` の 3 箇所)。
