@@ -1,0 +1,5 @@
+file	wasm_reset	native_reset	n_file	verdict	case_equal	native_reset_diff	wasm_reset_diff
+none_mmap_r1.jsonl	none	mmap	1	mismatch	0	39891	None
+sta_mmap_r1.jsonl	sta	mmap	1	match	10	39890	343847
+sta_mmap_r2.jsonl	sta	mmap	1	match	10	39891	343847
+sta_none_r1.jsonl	sta	none	1	mismatch	0	None	343847
