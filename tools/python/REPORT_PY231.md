@@ -8,7 +8,8 @@
 - **受入 2 (C・mock)**: -7 → -6 → 送出 (word を記録) の順。midiOutMsg と判定を共有する helper `midi_send` に寄せた。
 - **受入 3 (差分 0)**: `node tests/device_diff.mjs` が rc=0 ×3 で PASS、差分 0 (送出 11 件・link 判定 9 通り)。ネガティブコントロール 2 件が FAIL することを確認 (§3)。
 - **未解決 (子 issue に起票)**: 値の変化検出 (0xfdc8a0 の cmp/je・テーブル初期値・添字範囲) は未実装 → #3949 (PY-276)。1 引数呼出しの送出失敗時の戻り code は未確定 → #3949 (PY-276)。下流の送出先 HMIDIOUT (`[obj+0x7c]`) と無効フラグ (`[obj+0x84]`) の由来 → #3981 (PY-287)。
-- 受入 ① (#3950・PY-277): 1 引数呼出しは解析成功・既定 1 で送出へ進む。確定した事実と未確定の範囲は §1b。0xd748e0 を forwardMIDICC とした初版の誤記は §1 で訂正済み。
+- 受入 ① (#3950・PY-277・部分達成): 1 引数呼出しは解析成功・既定 1 で送出へ進む。確定した事実と未確定の範囲は §1b。0xd748e0 を forwardMIDICC とした初版の誤記は §1 で訂正済み。
+- 測定 commit `aab81902f` (HEAD・コメント訂正のみ): `node tests/device_diff.mjs` n=3 で rc=0 ×3・所要 0.05・0.05・0.06 秒・load (1 分) 0.18・`PASS true` (diffs 0)。差分 `git diff 320633eb5 HEAD -- tools/python/provider tools/python/host tools/python/tests` はコメント 3 行のみ。
 - 範囲外: flpy (CPython wasm) 依存の `provider_check`・`midi_bundled_device`・`midi_rpc_split` は未実行 (§3)。`provider_check` は #3804 (PY-255)、他 2 本は #3804 へ範囲追加を依頼 (§4)。
 
 ## 1. PE の逆アセンブル (forwardMIDICC ハンドラ 0xd75120。0xd748e0 は midiOutNewMsg)
