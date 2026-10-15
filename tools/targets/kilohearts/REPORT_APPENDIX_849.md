@@ -69,7 +69,7 @@
   - 逆アセンブル照合 (§6 の表の記述): `call_ret` 8 件のうち 6 件は直前の call が helper `0x180fd7d94` (site `0x180fd8134`・`0x180fd82b4`・`0x180fd83f8`・`0x180fd8464`・`0x180fd8538`・`0x180fd86a8`)、1 件は復号 helper `0x180fd1b00` (site `0x180fd1ae4`)、1 件は IAT の呼び出し `[rip+0x3d0697]` (site `0x180fd0b1a`)。分岐 `0x180fb5ee2`・`0x180fb5f1f` は label_barrier の関数 `0x180fb5e6c` の中にある。store 箇所 `0x180fd0b38`・`0x180fd1abc` は未確定 site の関数の範囲に入らず、本 run では確認していない。
   - 結論は変わらない: 14 件は静的に確定できず、閉包 (`after_cfg`) も変えない。実行時 trace の作業は子 issue #4252 (KH-92) の範囲。
 - 単体テスト: `python3 scripts/test_rax_source.py` → 12 件 OK (`call_ret` と `reg_copy` (`r11`) の 2 件を追加)。
-- 未確定 (残件): 上 14 件の呼び先の確定は、静的解析では不可能と読んだ。実行時の trace (GetProcAddress 結果・復号値・オブジェクト状態) が要る。実行時 trace の作業と、head での `unresolved_cfg_sites.py` 再実行は子 issue **#4252** ([KH-92]) で扱う (本 issue の範囲外)。
+- 未確定 (残件): 上 14 件の呼び先の確定は、静的解析では不可能と読んだ。実行時の trace (GetProcAddress 結果・復号値・オブジェクト状態) が要る。この実行時 trace の作業は子 issue **#4252** ([KH-92]) で扱う (本 issue の範囲外)。件数の再計測は上の head 再計測で完了している。
 
 ## 4. 検証 (単体テスト・コード差分・鮮度)
 
