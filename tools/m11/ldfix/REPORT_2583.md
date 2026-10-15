@@ -13,11 +13,11 @@
 | `audit_lsf_ssa_e2e.sh` の 7/7 を HEAD で確認する | **達成**。測定 commit `095be5b9` で rc=0・7/7 (§5) |
 
 - 測定した commit (コードと結果を変えた最後の commit): **`095be5b9`** (`feat(m11): verify held 8 spill sites against IR and machine code (LD-118, #2583)`)。
-- 本 REPORT を含む後続 commit は `tools/m11/ldfix/REPORT_2583.md` と `docs/DOC_MAP.md` だけを変える (§5 の差分の証跡)。
+- 測定 commit 以降の変更は、本 REPORT・`docs/DOC_MAP.md`・作業用スクリプト `ld118_show.py` と、台帳 1 行の `evidence` 文字列 (§5 の差分の証跡) だけ。
 
 ## 2. 照合の表 (9 site)
 
-照合は機械語 (`audit_lsf.descend` で降下) と IR (`boot_final3.ll`) の両面で行った。機械語の前後は `ld118_show.py` (作業用・非コミット) で出した。IR の行番号は `boot_final3.ll` の行。旧 evidence の主張のうち誤りのあった点は §4 に書く。
+照合は機械語 (`audit_lsf.descend` で降下) と IR (`boot_final3.ll`) の両面で行った。機械語の番地は `python3 tools/m11/ldfix/ld118_show.py` で出す (`tools/m11/work/` に展開した work-m11 の `m11_image.bin`・`boot*.drc.config.json`・`boot_final3.ll` が要る。表の番地はすべてこの出力に含まれる)。IR の行番号は `boot_final3.ll` の行。旧 evidence の主張のうち誤りのあった点は §4 に書く。
 
 | site | 旧判定 | 機械語 (VA・命令) | IR (boot_final3.ll 行) | 結論 | 新判定 |
 |---|---|---|---|---|---|
@@ -47,7 +47,7 @@
 
 ## 4. 判定の訂正と強さ
 
-- **1042d20:1043e2d**: 旧 evidence の「IR 14896–14897 の load 2 本は未使用」は誤り。14966・14968・14972 で使われる。判定の根拠は間接 call `[rsi+0x188]` に対応する IR の call が無いことで、この根拠は変わらない。台帳の evidence に訂正を注記した。
+- **1042d20:1043e2d**: 旧 evidence の「IR 14896–14897 の load 2 本は未使用」は誤り。14896–14897 の load 2 本は 14966 (`%939 = add i32 %902, …`) と 14968 (`%941 = zext i32 %903`) で使われる。14972 (`%945 = load i32, ptr inttoptr (18760704)`) は同じ global の再 load で、`%903` は使わない。判定の根拠は間接 call `[rsi+0x188]` に対応する IR の call が無いことで、この根拠は変わらない。台帳 (`results/candidate_verdicts_1161.jsonl` の 1042d20 行) の訂正注記も同じ文言に直した。
 - **12f9730:12f9752**: 旧 evidence の「12f975e `mov ecx,[rsp+0x50]` → cmp」は誤り。12f975e の直後は `add ecx,[rax+8]` (機械語 12f9762) で、cmp は 12f9846 の側。判定の根拠 (store 元が `xor i64 0,0` に置換されて 96871 に 0 が流入) は変わらない。
 - **6c3700:6c3c78・6c3d20:6c44bd**: 旧 evidence の「ループに load も無い」は、機械メモリの load が無いという意味に限る (spill slot の再読込はある)。
 - **6c5930:6c6125**: 根拠が IR の不在のみで弱い。機械語の到達は確認できたが、IR が 6c5a6e 付近で打ち切られているため対応箇所を決められない。確認不能として未判定に残す (受入条件の「確認できない site は未判定」)。
@@ -58,15 +58,15 @@
 - 変更前 HEAD `97bfd673`: `TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` → rc=0・real 2m47s・load 0.44 0.29 0.11 (開始) → 0.98 0.62 0.28 (終了)・7/7。step 7: 未判定 9・確定 139・判定不能 30。和集合 77。
 - **測定 commit `095be5b9`** (本 PR のコードと results の最後の commit): 同じ手順 → **rc=0・real 166 s・load 0.02 0.13 0.16 (開始) → 0.98 0.52 0.31 (終了)・7/7 完了**。step 5 の `drops_510.tsv`・step 7 の `spill178_1161.tsv` は results/ と cmp 一致。step 7: 未判定 1・確定 147・判定不能 30。和集合 83 (= 69 + 14)。
 - 差分の証跡: `git diff --stat 97bfd673 095be5b9 -- tools/m11/ldfix/results tools/m11/ldfix/*.py tools/liftdiff` = 3 files changed, 16 insertions(+), 16 deletions(-) (results の 3 ファイルのみ。e2e の入力のうち results の変更)。
-- 測定 commit から HEAD までのコード差分 (e2e が読む範囲): `git diff 095be5b9 HEAD -- tools/m11/ldfix/audit_lsf.py tools/m11/ldfix/audit_lsf_ssa.py tools/m11/ldfix/window_recount.py tools/m11/ldfix/dyn_xcheck.py tools/m11/ldfix/tally_510.py tools/m11/ldfix/negctl_510.sh tools/m11/ldfix/spill_classify_1161.py tools/m11/ldfix/audit_lsf_ssa_e2e.sh tools/m11/ldfix/results tools/liftdiff` の出力は空。この REPORT と `docs/DOC_MAP.md` の追加のみが後続 commit の変更で、e2e の入力に触れない。再測定は要らない (`docs/WORKFLOW.md` §6)。
+- 測定 commit から HEAD までのコード差分 (e2e が読む範囲): `git diff 095be5b9 HEAD -- tools/m11/ldfix/audit_lsf.py tools/m11/ldfix/audit_lsf_ssa.py tools/m11/ldfix/window_recount.py tools/m11/ldfix/dyn_xcheck.py tools/m11/ldfix/tally_510.py tools/m11/ldfix/negctl_510.sh tools/m11/ldfix/spill_classify_1161.py tools/m11/ldfix/audit_lsf_ssa_e2e.sh tools/m11/ldfix/results tools/liftdiff` の出力は次の 1 件だけ: `tools/m11/ldfix/results/candidate_verdicts_1161.jsonl | 2 +-` (1 file changed, 1 insertion(+), 1 deletion(-))。変わったのは 1042d20:1043e2d 行の `evidence` の文字列だけで、JSON 比較で fn・site・verdict と行数 (118) は不変。`spill_classify_1161.py` は fn・site・verdict だけを読むので、spill178 と 7/7 の結果は変わらない。`docs/DOC_MAP.md`・本 REPORT・`ld118_show.py` は e2e の入力に触れない。文字列のみの変更のため再測定は要らない (`docs/WORKFLOW.md` §6)。
 - `find tools/m11/ldfix -type f -size +20M` = 0 件。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `6c5930:6c6125` の確認 (IR が 6c5a6e 付近で打ち切られ、6c6037 以降の対応ブロックが無い) | 脱落集合 83 の外。当該 site は未判定 1 件 | 親 #2265 へ報告。IR の打ち切りは lift 側の修復 (PM 判断) |
-| `775340` の `[rbp+0xac]` の定数化 (IR 291044 `%1 = 0`)。float 格納値の欠落の疑い | 775340:77593b の float 値 (P の流れは一致)。判定の範囲外 | 親 #2265 へ報告 (候補。DEFECTS 未登録) |
-| 12f9846 の `jle` (符号付き) と IR 96871 の `icmp ugt` (符号なし) の不一致 | 12f9730 の比較の符号扱い。REPORT_2265 §4 の 1221290 と同型 | 親 #2246 へ報告 (判定外の別欠陥候補) |
-| 新規類型の DEFECTS 行案 (775340:77545c の間接 call 引数欠落・12f9730:12f9752 の二段参照の定数化) | `docs/DEFECTS.md` 未登録 | 行案は REPORT_2265 §5 に既出。DEFECTS 登録は PM 判断 |
+| `6c5930:6c6125` の確認 (IR が 6c5a6e 付近で打ち切られ、6c6037 以降の対応ブロックが無い) | 脱落集合 83 の外。当該 site は未判定 1 件 | #2705 (LD-125) へコメントで追記。同じ類型 (lift 段で block が `br label` に打ち切られ、後続の機械語が IR から欠落) で、修復の判断は #2705 の範囲 |
+| `775340` の `[rbp+0xac]` の定数化 (IR 291044 `%1 = 0`)。float 格納値の欠落の疑い | 775340:77593b の float 値 (P の流れは一致)。判定の範囲外 | PM agent の判断待ち: 起票先の決定・既定案: 本 issue #2583 のコメントで PM に報告 (open の追跡先は gh で見つからず。DEFECTS 未登録) |
+| 12f9846 の `jle` (符号付き) と IR 96871 の `icmp ugt` (符号なし) の不一致 | 12f9730 の比較の符号扱い。REPORT_2265 §4 の 1221290 と同型 | PM agent の判断待ち: 起票先の決定・既定案: 本 issue #2583 のコメントで PM に報告 (open の追跡先は gh で見つからず。判定外の別欠陥候補) |
+| 新規類型の DEFECTS 行案 (775340:77545c の直接 call の引数欠落 (callee が rcx を読む)・12f9730:12f9752 の二段参照の定数化) | `docs/DEFECTS.md` 未登録 | 行案は REPORT_2265 §5 に既出。DEFECTS 登録は PM 判断 |
 | `REPORT_1161.md` の §表 (旧判定保留 9 site の行) が本 PR 時点で古い | 数値の二重記載 (REPORT_1161 の測定値) | 次の REPORT_1161 再測定で更新 (起票しない) |
