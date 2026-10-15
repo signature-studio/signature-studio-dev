@@ -10,7 +10,7 @@
 
 **① 環境 (repo 外。`work/` は使わない)**
 - 素材 `plugins-kilohearts` (`tar --zstd -xf` で `Kilohearts Offline Installer.zip` 3,833,108,300 B のみ取り出し → `payload.dat` 3,817,512,248 B → `windows.zip/1ccb1df8c8f10745` 55,114,108 B → `HeartCore.core_64` 76,642,304 B)。
-- [GHIDRA] 12.1.4: 本 run で GitHub release から取得 (zip 569,649,598 B・sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)。`/opt/ghidra/ghidra_12.1.4_PUBLIC` に展開 (本 run で作成)。[JDK21] `temurin-21-jdk-amd64`、[EMSDK] emcc 6.0.12。`toolchain-emsdk` は `/opt/emsdk` を使用。`fl-win64` は未使用。
+- [GHIDRA] 12.1.4: 本 run で GitHub release から取得 (zip 569,649,598 B・sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)。`GHIDRA_HOME` (repo 外) に展開 (本 run で作成)。[JDK21] `temurin-21-jdk-amd64`、[EMSDK] emcc 6.0.12。`toolchain-emsdk` は `/opt/emsdk` を使用。`fl-win64` は未使用。
 - decompile: Delay lift 141 件 → **141/141 OK** (`analyzeHeadless` wall 21.3 s、n=1)。gain・haas・gate の 10 関数 → **10/10 OK**。
 
 **② Delay の census (origin/main `40d3a788d` → 測定 commit `ffd2d4070`・`emcc -c -ferror-limit=0`)**
