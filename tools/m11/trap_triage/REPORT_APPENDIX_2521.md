@@ -73,7 +73,7 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 
 ### 8.6 fix round 1: 再測定 (ON / OFF / probe の unit 別突合)
 
-測定は実測・単発 (n=1)。survey は直列 1 本、1 回 12 s。測定 commit `62f1345fd` (コード差分の最終 commit。`m11_build.sh` は `a2173a3f3` と同一、`trap_triage/probe_trace.sh` は `24a8965bd` で追加。基点 `bd4463eaa`)。fix round 2 で main (`f6fd31b8d`) を merge した (merge `c2b906b45`)。測定経路の差分は `m11_build.sh` の stamp 3 行だけ: `git diff 62f1345fd c2b906b45 -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_survey.mjs tools/m11/m11_cond.py tools/m11/ldfix/ldfix.py tools/m11/ldfix/ldmach.py tools/m11/ldfix/ldframe.py tools/m11/lb_base.py tools/m11/trap_triage/probe_trace.sh` の出力は `m11_build.sh` の `+3` 行 (stamp) のみ。main 側で変わった他のファイル (`e2e_expect.env`・`m11_e2e.sh`・`ldfix/fix_*`・REPORT 群) は、IR 生成・build・survey の呼出し先に入らない。HEAD での再測定は未実施 (fix round 2 のレビューの『再測定は不要』に従う)。IR は本 run で `m11_gen_ir2.sh` を作り直した (`ldfix`・`ld108`・`ld115`・`r8b` = applied)。`m11_build.sh` 後は `qstore=applied`、ir_sha256 `e608b0f3…`。PR 時点の `116d9406…`・REPORT §1 の `6909f85d…`・#3482 本文の `17a98d6e…` のいずれとも異なる。IR の sha が環境ごとに変わる理由は未切り分け。
+測定は実測・単発 (n=1)。survey は直列 1 本、1 回 12 s。**fix round 4 で現 head の測定 commit `6ab4c2979` (fix round 3 の main 取り込み merge。コード差分の最終 commit。基点 `bd4463eaa`) を再測定した**。前回の測定 commit は `62f1345fd` (`m11_build.sh` は `a2173a3f3` と同一、`trap_triage/probe_trace.sh` は `24a8965bd` で追加)。fix round 2 で main (`f6fd31b8d`) を merge した (merge `c2b906b45`)。fix round 2 の時点 (`62f1345fd`→`c2b906b45`) の測定経路の差分は `m11_build.sh` の stamp 3 行だけだった。**fix round 3 の main 取り込み (`6ab4c2979`) で測定経路の差分は 0 ではなくなった** (fix round 4 の訂正): `git diff 62f1345fd 6ab4c2979 -- tools/m11 ':!tools/m11/trap_triage'` は 46 files。主な変更は (1) `m11_passes.py` の `pass_m2r_fn1046a30` (`main()` から env ゲート無しで呼ばれ、IR を変える)、(2) `m11_rt.c` の `M11_RT_NODATA_BODY` (既定 0 のため既定の挙動は変わらないが、rt.o の build に入る)、(3) `m11_build.sh` の CF と stamp。IR 生成の呼出し先 (`m11_gen_ir2.sh` が呼ぶ `m11_merge.py`・`m11_asmfix.py`・`m11_passes.py`・`m11_genstubs.py`・`ldfix/ldfix.py`・`ldfix/fix_ld108.py`・`fix_ld115.py`・`fix_src412770.py`・`fix_r8b815050.py`) で差分があるのは `m11_passes.py` だけ。IR は本 round で `m11_gen_ir2.sh` から作り直した (ldfix・ld108・ld115・r8b = applied)。ir_sha256 は生成直後 `597757f4…`、`m11_build.sh` 後 (qstore = applied) `362e47a9…`。前回 (`62f1345fd`) の build 後の `e608b0f3…` とは異なる。原因は `m11_passes.py` の追加 pass が有力な候補 (推定。個別の切り分けは未実施)。
 
 | 条件 | ok / trap / miss (noproc) | unit 144 (0x25c540) | OFF との unit 差 |
 |---|---|---|---|
@@ -83,15 +83,16 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 | ON + probe | 871 / 23 / 47 (1) | trap | 2 件 (下) |
 
 - ON + probe と ON の差は 2 件: unit 304 (VA `0x483140`)・unit 555 (`0x7f2500`) が ok → `memory access out of bounds`。OFF + probe と OFF の差は 0 件。
-- 再現性: ON を 2 回取って 0 件差。ON + probe を 2 回 (trace 付きを含む) 取って 0 件差 (942 unit)。
+- 再現性 (`62f1345fd` での値): ON を 2 回取って 0 件差。ON + probe を 2 回 (trace 付きを含む) 取って 0 件差 (942 unit)。
+- fix round 4 (`6ab4c2979`・IR build 後 `362e47a9…`・各条件 n=1): 上の表の 4 条件の件数は前回と同一 (873/21/47 (1)・873/21/47 (1)・873/21/47 (1)・871/23/47 (1))。unit 単位 (survey の detail) の突合は OFF と ON 0 件、OFF と OFF+probe 0 件、ON と ON+probe 2 件 (304・555)。`probe_trace.sh` (trace 付き) の unit 結果は ON+probe の detail と 0 件差。trace 件数 (ON+probe) は `[probe_list]` 30・`[probe_grow]` 9・`[probe_free]` 2 (前回と同一)。survey の `memory access out of bounds` は ON+probe で 14 → 16 件 (OFF 比)。
 - trap 経路 (probe 下): unit 144 の trace は ON + probe・OFF + probe とも `[probe_free] arg1=5c hdr=0 [hdr]=865901` (同じ値)。unit 745 は `arg1=10ba240c hdr=ffffffa0 [hdr]=0`。
 - trace 行の件数 (ON + probe): `[probe_list]` 30・`[probe_grow]` 9・`[probe_free]` 2。§8.5 の『list Add 32 件』は PR 時点 IR の値。
-- 判定: 『ON で unit 144 が ok → oob』は本 run では成立しない (OFF でも trap)。trap 経路 (`412d60(0x6c)` → `409440(0x5c)` → `407e20` で `[0]` が範囲外) は probe 下で ON/OFF とも再現した。ON 固有の回帰の有無は、PR 時点の IR と同じ sha を再現できてから判定する (#3592 の受入)。
+- 判定: 『ON で unit 144 が ok → oob』は本 run では成立しない (OFF でも trap)。trap 経路 (`412d60(0x6c)` → `409440(0x5c)` → `407e20` で `[0]` が範囲外) は probe 下で ON/OFF とも再現した。ON 固有の回帰の有無は、PR 時点の IR と同じ sha を再現できてから判定する (#3643 の受入)。
 - ov.o の注意: 測定 commit (`62f1345fd`) の `m11_build.sh` には `M11_FIX_50A830` の切替えで `work/obj/ov.o` を作り直す stamp が無かった。stamp 無しでは、ON で作った ov.o を後の OFF build が再利用する (`cc m11_ov.c` 0 件を確認)。上の数値は、各ビルドの前に `rm -f work/obj/ov.o` を実行して取った (各 build の `cc m11_ov.c` は 1 件)。`62f1345fd` の時点で ON+probe・ON・OFF を取り直し、上の表と unit 単位で一致 (差 0)。stamp は #3645 で main に入り、merge 後の HEAD (`c2b906b45`) に含まれる。
 
 GUI (m2): `tools/gui/flengine/build.sh` は `m11_ov.c` を独自の CF で直接コンパイルする。差し戻し時の reviewer 実測 (同じ CF の `cc -E -P`): 基点 `bd4463eaa` と PR head の既定出力は同一 (9132 行・差 0)。`-DM11_PROBE_LIST=1` のみ +6 行 (ネガティブコントロール)。本 run では GUI の e2e は実行していない。
 
-main との関係 (m3): fix round 2 で `origin/main` (`f6fd31b8d`) を merge した (`c2b906b45`)。競合は REPORT_APPENDIX_2521.md の 1 箇所 (§8.5・§8.6 と main の §9 の追加が同じ位置) で、両方を残した。`m11_build.sh` は main の stamp (`50a830`) と本 PR の probe stamp が両方残る。merge 後の既定 e2e は未測定 (main で `e2e_expect.env` の期待値が 101・873 に変わった。e2e の判定は本 PR の範囲外)。
+main との関係 (m3): fix round 2 で `origin/main` (`f6fd31b8d`) を merge した (`c2b906b45`)。競合は REPORT_APPENDIX_2521.md の 1 箇所 (§8.5・§8.6 と main の §9 の追加が同じ位置) で、両方を残した。`m11_build.sh` は main の stamp (`50a830`) と本 PR の probe stamp が両方残る。merge 後の既定 e2e は未測定 (main で `e2e_expect.env` の期待値が 101・873 に変わった。e2e の判定は本 PR の範囲外)。fix round 3 で `origin/main` (`5ec4aef07`) を merge した (merge `6ab4c2979`)。競合は `m11_build.sh` の CF 行 1 箇所 (`-DM11_RT_NODATA_BODY` と `-DM11_PROBE_LIST` の両方を残した)。
 
 再現手順 (1 コマンドずつ。作業ディレクトリはリポジトリのルート):
 
@@ -113,7 +114,7 @@ awk '/^\[UNIT\] /{u=$2} /\[probe_(free|list|grow)\]/{print "unit=" u, $0}' "$RUN
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 本 run の IR (`e608b0f3…`) で ON と OFF が一致し、unit 144 は両方 trap。PR 時点の IR (`116d9406…`) との差 (IR 生成の決定性か環境差か) | 既定 ON 化の判定 (ON 固有の回帰が再現しない) | #3643 ([M11-26]) |
+| IR sha が測定 commit ごとに変わる (`116d9406…`・`e608b0f3…`・`362e47a9…`)。ON と OFF は各 IR で一致し、unit 144 は両方 trap。IR 間の差の原因 (`62f1345fd`→`6ab4c2979` は `m11_passes.py` の pass 追加を含む。推定) | 既定 ON 化の判定 (ON 固有の回帰が再現しない) | #3643 ([M11-26]) |
 | `412d60(0x6c)` の元の nil 読み。`[0]` (0x865901) の書込み元は ON のみ採取 (§9.4)。OFF は未採取 | trap の原因 (probe 下) | #3643 ([M11-26]) |
 | merge 後の既定 e2e は未測定 | merge 後の既定 e2e の結果が未確認 | PM 判断 (merge 後の確認) |
 
