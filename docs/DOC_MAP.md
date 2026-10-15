@@ -73,6 +73,7 @@
 | `tools/perf/REPORT.md` | ~150 | wasm 実時間性能・compile 時間・巨大 wasm 実験 |
 | `tools/perf/REPORT_APPENDIX.md` | ~85 | perf REPORT §12 全文 (PERF-P9 #168: bit-exact OTT の RTF を node / Chrome Worker / 実 AudioWorklet / native 実機械語で再測) |
 | `tools/perf/PERF.md` | ~150 | 性能の設計メモ (bit-exact 版の実測は `tools/perf/REPORT.md` §2.1・完走路の正本は `tools/ott/REPORT.md`) |
+| `tools/perf/REPORT_APPENDIX_3959.md` | ~70 | PERF-P25 (#3959): AudioWorklet 上の instantiate 掃引 (Chrome 154 で M=145 成功・M=146 無応答 3 run)。#3959 の受入の正本。146 回目の ctor (`0x18011d400`) が同一 instance で戻らない (原因は未特定、子 #4392)。147 以上の単調性・Node 掃引は未確認 |
 | `tools/perf/REPORT_P15.md` | ~180 | PERF-P15 (#990): 実 OTT の Chrome Memory 本数上限 (124〜125) に対する instance 数の設計。1 Memory に plugin 処理オブジェクトを畳み込む方式 (a) を採り、M=130 を 1 instance で駆動 (署名 130/130 一致)。AudioWorklet 上の M=130 駆動を §7 で実測 (#1259)。異なる plugin の同居は #2963 [PERF-P20] |
 | `tools/perf/REPORT_P8.md` | ~230 | PERF-P8 (#166): plugin 別 module/instance/memory vs MAIN/SIDE_MODULE 動的リンクの合成カーネル比較 (node + Chrome 154 Worker)。`tools/perf/REPORT.md` §5 項目 7 から参照 |
 | `tools/perf/REPORT_P7.md` | ~60 | PERF-P7 (#165, 部分達成): Chrome headless/headful(Xvfb)/Firefox 157 の compile・上限・code cache・AudioWorklet 駆動の実測 + 実機未測の起票依頼 |
@@ -123,6 +124,7 @@
 | `tools/qfclift/REPORT_APPENDIX_3410.md` | ~47 | T-SH-77 (#3410) の付録: REPORT §7.8 の全文。longjmp (0x40f9c0) の override (`qfc_ov.c`) と戻り先 root `0x59c210` の切り分け表 (soft 版の停止点は `ExitProcess(0)`・偽の停止の可能性は未検証)・boot / e2e の実測 |
 | `tools/qfclift/REPORT_APPENDIX_3412.md` | ~50 | T-SH-79 (#3412) の付録: REPORT §9 の全文。FT_* 14 本の token 経由呼出 (表・直接呼出との照合・ネガコン)・FreeType wasm32 ビルド (#145 方式)・検証範囲と未解決 |
 | `tools/qfclift/REPORT_APPENDIX_3434.md` | ~35 | T-SH-83 (#3434) の付録: REPORT §11 の全文。`imp_GetProcAddress` → `qfc_gpa` の結線 (hook 形・e2e 実測・boot 停止点)・未解決 |
+| `tools/qfclift/REPORT_APPENDIX_4296.md` | ~45 | T-SH-113 (#4296) の付録: REPORT §7.9 の全文。`FontCache_GetStats` / `CleanUp` の直接呼出し (DllMain を通さない) の実測・推定引数・停止点 |
 | `tools/iltools/REPORT.md` | ~66 | T-SH-12 (#154): ILTools_x64.dll の export 閉包 lift gate (閉包 824 関数・unsup 0 / 閉包外の x87 関数 45 本は `x64c --trap` の trap stub・陰性対照 2 本)。全 .pdata 測定 (unsup 1,236 は全て x87) は §3 |
 | `tools/fruityplug/REPORT.md` | ~60 | T-SH-12 (#154): SGv2 の win 対応の検証。classify.py の block24353 (FruityPlug_x64.dll 名) は VERSIONINFO で Maximus と判明し SGv2 の根拠にならない。export 名は 133 本で非一意。mac 素材との突合は未達 |
 | `tools/liftdiff/REPORT.md` | ~250 | flelift (x64c) 全数採点 + native 全起動の参照化 (§5/§6.1/§6.2 は `REPORT_APPENDIX.md` に分割)。§12 (被覆拡大 vm0/u16) は要約のみで全文は `REPORT_APPENDIX.md` §12 |
@@ -397,6 +399,7 @@
 | `tools/m11/ldfix/REPORT_2211.md` | ~239 | LD-87 (#2211): FRAME_IN_ESCAPED 残件の別名 (ポインタ経由 store)・漏出 (frame アドレスの自己保存と引数渡し)・rsp/rbp 区間の判定規則 (`audit_frame_store_alias_2211.py`)。再判定の結果は REPORT §3。残件は #3225 (LD-150)・#3228 (LD-151)・#3230 (LD-152)。ネガコン 2 種。§6 は #4090 (LD-192): `lea` の派生を F に入れる修正と判定の変化 (LIVE-IN 34 → UNDETERMINED) |
 | `tools/m11/ldfix/REPORT_3228.md` | ~75 | LD-151 (#3228): 漏出関数の call 越え 6 site の経路上の call の引数 (frame 番地) と呼び出し先の判定器 (`audit_frame_store_callee_3228.py`)。6 site の打ち切り箇所 (機械語) と判定は #2211 のまま。残件は #4086 (LD-191)。ネガコン 1 種 |
 | `tools/m11/ldfix/REPORT_4166.md` | ~95 | LD-196 (#4166): 入口引数由来の store 基底 (NONFRAME 規則) による 1006ec0・5cb210 の再判定。head の判定器 (#4090 の `lea` 伝播を含む) で再測定。1006ec0 の `1007021` は ONLY_ENTRY_AFTER_CALL。5cb210 は ALIAS_FRAME_PTR。残件は #4204 (LD-204)・#3228 (LD-151)。ネガコン 3 種 |
+| `tools/m11/ldfix/REPORT_4330.md` | ~70 | LD-210 (#4330, 親 #4204): 対照と区別できるネガコン `--negctl-noglk` (対照で glk=True の 45 関数を glk=False に落とす)。関数 verdict 34 件・site 36 件が対照と異なる。判定器の規則は未変更。結果 JSON `results/frame_store_alias_4330_ctl.json`・`results/negctl_alias_4330_noglk.json`・`results/negctl_alias_4330_glk.json` |
 | `tools/m11/ldfix/REPORT_4238.md` | ~73 | LD-205 (#4238, 親 #4204): `407a50` の戻り値の機械語追跡 (import thunk `4073c0` 系が PE 外のため未達)・`5cb210` `5cb4aa` の読み基底が `rbp` で `rdi` ではないことの訂正・判定器 3228 の起動修正 (`a2.leak_site` 改名)・HEAD のネガコン。残件は子 issue |
 | `tools/m11/ldfix/REPORT_4167.md` | ~70 | LD-197 (#4167 / 親 #3225 子 B): 694c80・c3b340 の打ち切り store (LEAK_STORE) の基底の出どころを機械語で追った証拠 (`alias_evidence_4167.py`)。判定は両 site とも未判定のまま。残件は #3225 (LD-150)・#3228 (LD-151)。ネガコン 1 種 |
 | `tools/m11/ldfix/REPORT_3230.md` | ~60 | LD-152 (#3230): 7e48d6 の機械語確認 (先頭経路は 7e4613 の call が定義する)・IR で定数 0 になる原因 (alloca 範囲不足)。判定器の欠陥は #4090 (LD-192) |
@@ -677,7 +680,8 @@
 | `tools/python/REPORT_PY87.md` | ~61 | PY-87 (#2738): general の状態読出しゲッター 4 件 (getChangedFlag / getUseMetronome / getPrecount / getRecPPQ) の PE 根拠・mock/C 差分 0・値は未実測の仮置き。残り 146 件は #2830・#2831・#2832 |
 | `tools/python/REPORT_PY94.md` | ~115 | PY-94 (#2830): general 保留 25 件の PE 逆アセンブル。状態読出し 7 件 (undo 履歴 3・safeToEdit・project 文字列 3) を確定して mock/C 実装 (差分 0・値は仮置き)。残り 10 件は #2978・#3002・#3003 (#2977・#2979・#3001 は closed) |
 | `tools/python/REPORT_PY95.md` | 111 | PY-95 (#2831): ui の状態読出しゲッター 9 件 (isClosing / getTimeDispMin / isMetronomeEnabled / isPrecountEnabled / isStartOnInputEnabled / isLoopRecEnabled / getStepEditMode / isBrowserAutoHide / getSnapMode) の PE 根拠・mock/C 差分 0・値は未実測の仮置き。残り ui 48 件は #3005・#3006・#3007・#3012・#3013・#3014・#3034・#3035 |
-| `tools/python/REPORT_PY299.md` | ~80 | PY-299 (#4107): 効果関数 `0x1046a30` の負の key 群 9 枝のうち、`0x104b739`・`0x104bd22` の n 書込み先 (base・offset・添字の式) を確定。残り 7 枝は子 issue |
+| `tools/python/REPORT_PY299.md` | ~80 | PY-299 (#4107): 効果関数 `0x1046a30` の負の key 群 9 枝のうち、`0x104b739`・`0x104bd22` の n 書込み先 (base・offset・添字の式) を確定。残り 7 枝は PY-306 (§4 の訂正 2 点を含む) |
+| `tools/python/REPORT_PY306.md` | ~55 | PY-306 (#4150): `0x1046a30` の負の key 残り 7 枝の n 書込み先の式 (store 命令と base の出所)。`0x104c4af` は固定 VA `0x196ec34` への書込み、`0x104ae3d` は呼出し先 `0x12bdd40` の `obj+0x138` への書込み。base の実行時 VA は未確定。走査は `analysis/flapi/pe_py306_slot_writers.py` |
 | `tools/python/REPORT_PY193.md` | 144 | PY-193 (#3380): 表示通知 `0xbd68e0` の受け手の PE 確定 (範囲は block00031)。`0x666680`・`0x666780` の枠 (+0x10・+0x18・+0x20 は書込み側で確定、消費側は未解析)。`0x4232e0`・`0x423980` は EnterCriticalSection・LeaveCriticalSection のスタブ (issue 本文の前提は誤り)。フラグ表 `0x16b6dcc` へ非 0 を書く直接の store は block00031 内で 0 件 (0 を書く clear は 1 箇所。`.data` 経由は未確定)。通知先 `0x16b6e00` の直接の store は block00031 内で確保・解放の 2 箇所。未解決は子 #3433 [PY-196]。走査は `analysis/flapi/pe_py193_refs.py` |
 | `tools/python/REPORT_PY208.md` | ~95 | PY-208 (#3522): patterns の選択・移動・探索系 6 関数の引数書式・callback の分岐・戻り値の写像 (`0xd82c20` の status 表と例外文言) を PE 実測で確定。副作用の本体 (選択 setter・移動・ジャンプ・探索の委譲先) は未読で子 issue へ。測定は PE block00031 |
 | `tools/python/REPORT_PY96.md` | ~100 | PY-96 (#2832): arrangement の選択範囲読出し 4 件 (selectionStart / selectionEnd / liveSelectionStart / selectionIsActive) の PE 根拠 (変換スロット 0x15e4280 は PY-87 と同じ)・mock/C 差分 0・値は未実測の仮置き。残りは親 #2832 の子 #2984・#3027・#3029・#3030・#3021・#3022・#3025・#3041 |

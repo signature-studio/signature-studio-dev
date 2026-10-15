@@ -42,6 +42,13 @@ def check(label, va, mnemonic, op_str):
         FAILED.append(label)
 
 
+check("PyArg 'Iii': eventId の出力先 [rbp+0x7c] (arg3)", 0xD69F3C, "lea", "r8, [rbp + 0x7c]")
+check("PyArg 'Iii': value の出力先 [rbp+0x78] (arg4)", 0xD69F40, "lea", "r9, [rbp + 0x78]")
+check("PyArg 'Iii': flags の出力先 [rbp+0x74] (arg5・スタック)", 0xD69F44, "lea", "rax, [rbp + 0x74]")
+check("0xd69f00: eventId [rbp+0x7c] → wrapper の r8d", 0xD69F65, "mov", "r8d, dword ptr [rbp + 0x7c]")
+check("0xd69f00: value [rbp+0x78] → wrapper の r9d", 0xD69F69, "mov", "r9d, dword ptr [rbp + 0x78]")
+check("0xd69f00: flags [rbp+0x74] → wrapper の [rsp+0x20]", 0xD69F6D, "mov", "eax, dword ptr [rbp + 0x74]")
+check("0xd69f00: wrapper 0xd84740 を呼ぶ", 0xD69F74, "call", "0xd84740")
 check("wrapper 0xd84740: r8d = eventId (mov r8d, r8d)", 0xD84755, "mov", "r8d, r8d")
 check("wrapper: eventId → [rsp+0x20] (dispatch の arg5)", 0xD84758, "mov", "qword ptr [rsp + 0x20], r8")
 check("wrapper: value (r9) → [rsp+0x28] (arg6)", 0xD84760, "mov", "qword ptr [rsp + 0x28], r9")

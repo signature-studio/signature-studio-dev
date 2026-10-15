@@ -199,6 +199,7 @@ def main():
     check("0x1050546 の判定が 0x1050540 の store と同番地 (0x16bb13c)",
           rip_target(0x1050540) == 0x16BB13C and rip_target(0x1050546) == 0x16BB13C)
     format_checks()
+    round_checks()
     desc_checks()
     typecheck_checks()
     pct_fmt_checks()
@@ -233,6 +234,41 @@ def format_checks():
           u16z(rip_target(0x43A920), 16) == "0123456789ABCDEF")
     check("0x43a890 の 2 桁表 (dword, 0x43a900) の [0x0a] = '0A' と [0xff] = 'FF'",
           u16z(rip_target(0x43A900) + 4 * 0x0A, 2) == "0A" and u16z(rip_target(0x43A900) + 4 * 0xFF, 2) == "FF")
+
+
+def round_checks():
+    # PY-330 (#4478): %.2f の経路 0x440d30 (r8b=0 の枝) の 18 桁正規化と BCD 化
+    check("0x441380 が r8b=0 で 0x440d30 を呼ぶ (0x44139e〜0x4413a2)",
+          ins_at(0x441396).op_str == "r8b, r8b" and ins_at(0x4413A2).op_str == "0x440d30")
+    check("0x43ecb5 の %.2f 系は精度 0x12 を 0x43fce0 へ渡す (0x43ecc9 / 0x43ece7)",
+          ins_at(0x43ECC9).op_str == "dword ptr [rsp + 0x20], 0x12" and ins_at(0x43ECE7).op_str == "0x43fce0")
+    check("0x440d30 の指数抽出 (0x440e42〜0x440e5d) と 0x40ef40 呼出し (0x440e7a)",
+          ins_at(0x440E72).op_str == "edx, 0x12" and ins_at(0x440E7A).op_str == "0x40ef40")
+    check("0x440d30 の 0x40c660 呼出し (0x440e7f) は cvtsd2si rax, xmm0 (0x40c660)",
+          ins_at(0x440E7F).op_str == "0x40c660" and ins_at(0x40C660).mnemonic == "cvtsd2si"
+          and ins_at(0x40C660).op_str == "rax, xmm0")
+    check("0x440d30 の 1e18 比較 ucomisd (0x440e93 → 0x13ab318 = 1e18)",
+          ins_at(0x440E93).mnemonic == "ucomisd" and rip_target(0x440E93) == 0x13AB318
+          and struct_double(0x13AB318) == 1e18)
+    check("0x440d30 の 10 による除算 (0x440e9d cvtsi2sd → 0x13ab320 = 10)",
+          rip_target(0x440E9D) == 0x13AB320 and struct_int(0x13AB320) == 10)
+    check("0x440d30 の繰上げ (0x440eb7 add word [rax],1) は 1e18 以上のときだけ (0x440ea5 divsd)",
+          ins_at(0x440EAA).mnemonic == "divsd" and ins_at(0x440EB3).op_str == "rax, qword ptr [rbx + 0x30]")
+    check("0x440d30 → 0x440c10 呼出し (0x440ec7) と 0x440c10 内の 0x40c660 (0x440c50)",
+          ins_at(0x440EC7).op_str == "0x440c10" and ins_at(0x440C50).op_str == "0x40c660")
+    check("0x440c10 の 18 桁 BCD 化 (10 進 9 桁 × 2 の除算マジック 0x440c66 ... 0x440cf3)",
+          ins_at(0x440C66).op_str == "rax, 0xa3d70a3d70a3d70b" and ins_at(0x440CF3).op_str == "r8d, 1"
+          and ins_at(0x440D00).op_str == "0x440c60")
+
+
+def struct_double(va):
+    import struct
+    return struct.unpack("<d", RAW[v2o(va):v2o(va) + 8])[0]
+
+
+def struct_int(va):
+    import struct
+    return struct.unpack("<i", RAW[v2o(va):v2o(va) + 4])[0]
 
 
 def qword_at(va):
