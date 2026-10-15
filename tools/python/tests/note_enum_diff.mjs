@@ -13,8 +13,8 @@ const mock = createMockEngine();
 
 // 判定式の要点 (PE 実測から手計算)。note = [start, len, ch] を start 昇順の配列で渡す。閾値は step + V
 const spot = [
-  // V=4・ch=1・step=6 (閾値 10): note 0 は終端 max(1, 3) = 3 で外れ、note 1 は start_q + V - 1 の項で入る (終端 7)。note 2 は ch 違い、note 3 は start_q 8 で外れ、note 4 (start 10) で反復が止まる
-  [[[[0, 0, 1], [5, 1, 1], [6, 10, 2], [9, 1, 1], [10, 1, 1], [7, 1, 1]], 1, 6, 4], [1]],
+  // V=4・ch=1・step=6 (閾値 10・start 昇順): note 0 は終端 max(1, 3) = 3 で外れ、note 1 は start_q + V - 1 の項で入る (終端 7)。note 2 は ch 違い、note 3 (start 7) は start_q 4・終端 8 で入る、note 4 は start_q 8 で外れ、note 5 (start 10) で反復が止まる
+  [[[[0, 0, 1], [5, 1, 1], [6, 10, 2], [7, 1, 1], [9, 1, 1], [10, 1, 1]], 1, 6, 4], [1, 3]],
   // 0 方向への切捨て: start -5 の start_q は -4 (floor なら -8 で入ってしまう)。step -5 は [-4, -1) に入らず空
   [[[[-5, 2, 1], [-2, 1, 1]], 1, -5, 4], []],
   // len <= 0 は長さ 1 とみなす (終端 start + 1)。V=1 で step = start のとき len 0・-3 も入る
