@@ -69,8 +69,8 @@ PE: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_handler_probe.p
 
 - 測定 commit: `4c0af89e6` (コードを変えた最後の commit。`origin/main` (`bb6bdcf41`) を取り込んだ merge。競合は `docs/DOC_MAP.md` と `tools/python/tests/provider_check.mjs` の 2 件)。取り込み前の測定 (`670e99d9d`・件数 164/271) は、main 取り込みで `tools/python` のコードが変わったため無効。
 - `git diff 4c0af89e6 HEAD -- tools/python ':!*.md'` の出力は空 (測定後の変更は REPORT の md のみ)。
-- 環境: runner 4 core、測定直後の `uptime` は `load average: 0.97, 1.24, 0.67` (04:12:00)。emsdk は上流 `emsdk` を `$RUNNER_TEMP/emsdk` に `install 6.0.12` して activate し、`/opt/emsdk` へ symlink した (`build_cpython_wasm.sh`・`build_flpy.sh` の既定値が `/opt/emsdk`)。`fl-win64` 素材は `extracted/block25159_DATA.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block24618_DATA.bin` の 4 ブロックだけを `tar --zstd -xf` で展開し (2.3 秒)、`FL_WIN64_DIR` に指定した。
-- 前提の生成物 (gitignore・`work/`・`dist/`): `FL_WIN64_DIR=<展開先> bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、wasm 段 2 分 5 秒。初回は `/opt/emsdk` が無く rc 1 で止まったため symlink 後に再実行。native 段は初回に完了済み)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.6 秒。表は追跡済みの `flapi_table.json` を使った)。
+- 環境: runner 4 core、測定直後の `uptime` は `load average: 0.97, 1.24, 0.67` (04:12:00)。emsdk は上流 `emsdk` を `$RUNNER_TEMP/emsdk` に `install 6.0.12` して activate し、[EMSDK] へ symlink した (`build_cpython_wasm.sh`・`build_flpy.sh` の既定値が [EMSDK])。`fl-win64` 素材は `extracted/block25159_DATA.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block24618_DATA.bin` の 4 ブロックだけを `tar --zstd -xf` で展開し (2.3 秒)、`FL_WIN64_DIR` に指定した。
+- 前提の生成物 (gitignore・`work/`・`dist/`): `FL_WIN64_DIR=<展開先> bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、wasm 段 2 分 5 秒。初回は [EMSDK] が無く rc 1 で止まったため symlink 後に再実行。native 段は初回に完了済み)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.6 秒。表は追跡済みの `flapi_table.json` を使った)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
