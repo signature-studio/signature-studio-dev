@@ -1,8 +1,10 @@
 // .reg 取込入口の入力検査 (checkUserReg) の単体テスト。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkUserReg } from '../js/license_import.mjs';
+import { checkUserReg, LicenseImport } from '../js/license_import.mjs';
 import { encodeUtf16le } from '../js/regfile.mjs';
+import { MemoryStore } from '../js/store.mjs';
+import { createModule, seed } from './helpers.mjs';
 
 const TEXT = 'Windows Registry Editor Version 5.00\r\n\r\n[HKEY_CURRENT_USER\\Software\\Example]\r\n"A"="1"\r\n"B"=dword:00000002\r\n';
 
@@ -17,4 +19,19 @@ test('checkUserReg: UTF-16LE (BOM) / UTF-8 (BOM) / BOM 無し UTF-16LE を受理
 test('checkUserReg: ヘッダ不一致と値なしは throw', () => {
   assert.throws(() => checkUserReg(new TextEncoder().encode('hello\n')), /1 行目/);
   assert.throws(() => checkUserReg(new TextEncoder().encode('Windows Registry Editor Version 5.00\n\n[HKEY_CURRENT_USER\\Software\\Example]\n')), /値がありません/);
+});
+
+test('revertUserReg: 取込を消し HKCU を既定に戻す (seed 外の取込値も消え、MachineGuid は残る)', async () => {
+  const store = new MemoryStore();
+  const lic = await LicenseImport.open({ createModule, store, seed });
+  assert.equal(await lic.revertUserReg(), false);   // 取込が無ければ何もしない
+  const guid = '12345678-1234-1234-1234-123456789abc';
+  await lic.setMachineGuid(guid);
+  await lic.importUserReg(encodeUtf16le(TEXT, true), 'x.reg');
+  assert.equal(lic.vreg.readStr('HKCU', 'Software\\Example', 'A').value, '1');
+  assert.equal(await lic.revertUserReg(), true);
+  const s = lic.status();
+  assert.equal(s.userReg, null); assert.equal(s.licenseMode, 'registered'); assert.equal(s.registered, true); assert.equal(s.machineGuid, guid);
+  assert.equal(lic.vreg.valueExists('HKCU', 'Software\\Example', 'A'), false);
+  assert.equal(await store.load('default#user-reg'), undefined);
 });
