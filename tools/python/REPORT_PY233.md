@@ -12,7 +12,7 @@
 - **切替条件**: 確定できず。PE 静的の式 (`P≠0` なら `X=[P]`、`P=0` なら `X=[Q]`・REPORT_PY121 §「getRecPPB の切替」) はそのまま。実行時の入力を得るには fill の呼出元の修復 (#3112) が前提。
 - mock・C provider は変えない (実装数・未実装数の変化 0)。
 
-## 1. 観測結果 (測定 commit `21e93ee54`)
+## 1. 観測結果 (測定 commit `d5d8336c3`)
 
 | 観測点 | 位置 (lift C) | 結果 |
 |---|---|---|
@@ -48,9 +48,9 @@ bash tools/flelift/boot/py233_getrecppb_probe.sh   # 観測点 3 つ + FLE_WWATC
 
 ## 4. 検証
 
-- 測定 commit: `21e93ee54` (観測スクリプトの最後のコード変更)。`git diff 21e93ee54 HEAD -- tools/flelift tools/python ':!*.md'` は、本 REPORT の commit 後も空 (差分 0)。
-- 再現 (HEAD `21e93ee54`): `py233_getrecppb_probe.sh` 1 回 (1m35s・load 1.7〜1.9・4 コア)。結果は §1 と同一。lift 出力は `3e88853d7` で作った (`git diff 3e88853d7 HEAD -- tools/flelift/x64c.py tools/flelift/boot/gen_boot.py tools/flelift/boot/fle6_measure.sh tools/flelift/boot/build.sh tools/flelift/fle_data_gen.py tools/flelift/rt/fle_cpu.h` は空)。
-- baseline (`fle6_measure.sh` shim 経路・`3e88853d7` と `21e93ee54` の両方): lift 49〜61s・peak RSS 610MB、clang 8 shard 63〜73s、boot 19〜20s。units 209・stopped 209・exit・getmem 2314・freemem 1199・IPP 判定 NG (rc=3・既知)。変化 0。
+- 測定 commit: `d5d8336c3` (観測スクリプトの最後のコード変更)。`git diff d5d8336c3 HEAD -- tools/flelift tools/python ':!*.md'` は、本 REPORT の commit 後も空 (差分 0)。
+- 再現 (HEAD `d5d8336c3`): `py233_getrecppb_probe.sh` 1 回 (1m33s・4 コア・load は今回の run で未取得)。結果は §1 と同一。lift 出力は `3e88853d7` で作った (`git diff 3e88853d7 HEAD -- tools/flelift/x64c.py tools/flelift/boot/gen_boot.py tools/flelift/boot/fle6_measure.sh tools/flelift/boot/build.sh tools/flelift/fle_data_gen.py tools/flelift/rt/fle_cpu.h` は空)。
+- baseline (`fle6_measure.sh` shim 経路・`3e88853d7` で測定。以後は lift の入力が不変なので再測定していない): lift 49〜61s・peak RSS 610MB、clang 8 shard 63〜73s、boot 19〜20s。units 209・stopped 209・exit・getmem 2314・freemem 1199・IPP 判定 NG (rc=3・既知)。変化 0。
 - ネガティブコントロール: 観測の前後対照として、fill 入口 (6 回目・値は初期値) と停止点 (値は 0) を取った。書込み監視の検出自体の対照 (変化しない slot で 0 件になること) は未実施。
 - e2e: `fle_cpu.c` の変更は `FLE_WWATCH` 定義時だけ効く (既定のマクロ値は従来の 2 slot)。既定の boot の結果は §4 の baseline と一致。`tools/flelift/fle_e2e.sh` は未実行。
 - KPI (起動): 前後とも units 209・最初のウィンドウ未達 (`MessageBoxA` → `exit(0)`)。本 PR は既定経路の boot 結果を変えない。
