@@ -15,7 +15,7 @@
 - **ネガコン (`FLE_IPP=0`): units 209・`unlifted` (0x6a7b70)**。旧既定 (mode 0) の値。GetMem 1,890 / FreeMem 776・IPP ptr 0。
 - **受入 1 (survey 942 unit・既定経路): 未達 (mode 3 の survey が測定できない)**。mode 0 の survey は測定できた (D-2)。mode 3 の survey は `InitContext.InitTable == 0` で `survey` が error になり、942 の functional 判定は得られていない (D-2・子 issue)。
 - **受入 2 (ILTools native 読込): 未達**。wine では DLL が読めず実測できなかった (D-3)。native の成否は推定のまま。
-- **受入 3 (他経路): 一部**。`boot_e2e.sh` 本体は plain の 1 TU clang が RSS cap (11,000MB) を超えて build できず未実行。strict / nosx は `build.sh` で build して実行した (D-4)。
+- **受入 3 (他経路): 一部**。`boot_e2e.sh` 本体は plain の 1 TU clang が RSS cap (11,000MB) を超えて build できず未実行。strict / nosx は旧測定 commit の値のみで、head では未再測定 = 未確認 (D-4。受入 3 の結論には使わない)。
 - 製品 KPI (起動・既定経路): 既定 units 895 (変更前の既定 mode 3 と同値)・ネガコン 209。最初のウィンドウ: 無し。本 PR 自身のコード変更は `merge_survey.py` のみで、起動経路は変えていない。
 
 ### D-2 survey (受入 1)
@@ -42,7 +42,7 @@
 
 ### D-4 他経路 (受入 3)
 
-> 注: 本表は旧測定 commit `8aa9c0289` の値 (head では未再測定)。head での再測定は未実施。
+> 注: 本表は旧測定 commit `8aa9c0289` の値。head では未再測定のため **未確認 (head 未再測定)**。受入 3 の結論には使わない。
 
 | 経路 | 結果 | 備考 |
 |---|---|---|
@@ -73,19 +73,8 @@
 ```sh
 # 素材: fl-win64 (展開先は FL_WIN64_DIR)・toolchain-emsdk 6.0.12 (SS_EMSDK_ENV)
 FL_WIN64_DIR=... SS_EMSDK_ENV=... FLE_EXTRA_ROOTS= FLE_BOOT_TAG=s4810 FLE_BOOT_RUNS="default negctl" bash tools/flelift/boot/fle6_measure.sh   # lift 80 s + clang 99 s + boot 10 s × 2
-FLE_IPP=0 FL_WIN64_DIR=... bash tools/flelift/boot/survey_drive.sh 150 20     # mode 0 (旧既定) → results/survey_seg_0.json
-FL_WIN64_DIR=... bash tools/flelift/boot/survey_drive.sh 150 20               # mode 3 (既定) → InitTable == 0 で error (D-2)
-FLE_SHARDS=8 FLE_BOOT_WORK=$PWD/tools/flelift/work/boot FL_WIN64_DIR=... bash tools/flelift/boot/build.sh strict
-x86_64-w64-mingw32-gcc -O0 -o probe.exe tools/flelift/boot/iltools_native_probe.c && /usr/lib/wine/wine64 probe.exe   # D-3
-```
-
-### D-7 再現
-
-```sh
-# 素材: fl-win64 (展開先は FL_WIN64_DIR)・toolchain-emsdk (SS_EMSDK_ENV)
-FL_WIN64_DIR=... FLE_EXTRA_ROOTS= FLE_BOOT_TAG=s4783 FLE_BOOT_RUNS="default" bash tools/flelift/boot/fle6_measure.sh   # lift 78 s + clang 92 s + boot 10 s
-FL_WIN64_DIR=... bash tools/flelift/boot/survey_drive.sh 150 20                # mode 0 (既定) → results/survey_seg_0.json
-FLE_IPP=3 FL_WIN64_DIR=... bash tools/flelift/boot/survey_drive.sh 150 20      # mode 3
+FLE_IPP=0 FL_WIN64_DIR=... bash tools/flelift/boot/survey_drive.sh 150 20     # mode 0 (旧既定・ネガコン) → 正本 results/survey_4810_mode0.json
+FL_WIN64_DIR=... bash tools/flelift/boot/survey_drive.sh 150 20               # mode 3 (既定) → InitTable == 0 で error (D-2)・正本 results/survey_4810_mode3_error.json
 FLE_SHARDS=8 FLE_BOOT_WORK=$PWD/tools/flelift/work/boot FL_WIN64_DIR=... bash tools/flelift/boot/build.sh strict
 x86_64-w64-mingw32-gcc -O0 -o probe.exe tools/flelift/boot/iltools_native_probe.c && /usr/lib/wine/wine64 probe.exe   # D-3
 ```
