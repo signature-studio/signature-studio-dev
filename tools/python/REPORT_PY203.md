@@ -140,7 +140,26 @@
 
 **受入は部分達成** (COPY 7・AMBIG 8 は 1 段目の基底まで確定。大域 0x15e2218・0x15e22d8 と rbp スロットの直前値の上流は未追跡)。残りは #5407 (大域 0x15e2218・0x15e22d8)・#5408 (rbp スロットの直前値)・#5409 (COPY 7・AMBIG 8 の終端) の子として残す (親 #4588 は CLOSED)。
 
-### 6.4 #5407: 大域 3 種の入り方・rbx ENTRY の呼出し元・`[rbx+0x12b4]` の上流
+### 6.4 COPY 7・AMBIG 8 の終端 (`analysis/flapi/pe_py368_terminal.py`・#5409)
+
+測定 commit: `760faf2d1` (スクリプトを追加した commit)。HEAD (main 取り込み後の merge commit) で 2 回実行し、TSV は一致 (終了 0・rows=7・34.1 秒・34.3 秒)。依存先 (`pe_py368_terminal.py`・`pe_py368_copy_ambig.py`・`pe_py203_edx_sites.py`・`pe_py273_base.py`) は `git diff 760faf2d1 HEAD` が 0 行。`pe_py273_globals.py` のみ main 側の `c44281a3e` で変わったが、本スクリプトは import しない。
+
+対象は 6.3 の終端 7 箇所 (スロット `[rbp+X]` の直前 store と、AMBIG の合流元)。
+
+- `[rbp+X]` を基底・複製元とする 5 件 (スロット直前 store の格納値):
+  - 0x1021826 (COPY rax ← `[rbp+0x150]`): 直前 store 0x10216ff `mov [rbp+0x150], rcx`、rcx = ENTRY 第 1 引数 (ecx)。窓 111 命令、窓内の非境界の飛び先 1 件 (0x1021733) の注記あり。スクリプトはこの飛び先を「線形走査のずれの疑い」と判定する (窓は線形走査の再同期結果のため、この判定をそのまま採る)。
+  - 0x12ab8e8 (COPY rax ← `[rbp+0xa0]` の movzx): 直前 store 0x12ab72f `mov word ptr [rbp+0xa0], r8w`。格納元は部分レジスタ r8w のため、その上流は未分類。
+  - 0x118a275 (AMBIG 主経路 `[rax+0x258]`、rax = `[rbp+0x38]`): 直前 store 0x118a241 の格納値は r8 ← ENTRY 第 3 引数 (r8d)。合流 2 件 (0x118a22b→0x118a24b・0x118a23f→0x118a24b) の注記あり。
+  - 0x118a3f4 (AMBIG 主経路 `[rax+0x130]`、rax = `[rbp+0x38]`): 直前 store 0x118a362 の格納値は r8 ← ENTRY 第 3 引数 (r8d)。
+  - 0x12e6abe (AMBIG 主経路 `[rax+rbx*4+0xdc]`、rax = `[rbp+0x20]`): 直前 store 0x12e6a22 の格納値は rcx ← ENTRY 第 1 引数 (ecx)。合流 1 件 (0x12e6a03→0x12e6a2d) の注記あり。
+- AMBIG の合流元のみ 2 件 (スロットなし):
+  - 0x12c609e: 合流 1 件 (0x12c6252→0x12c5fa8)。合流元 0x12c6252 の分岐は未分類。
+  - 0xfc820f: 合流 1 件 (0xfc81c2→0xfc81c7)。飛び元の rdi は AMBIG のまま (主経路 `xor edi, edi` 0xfc81ae の注記あり)。
+
+- まとめ: 7 件のうち、スロットの格納値まで分類できたのは 4 件 (0x1021826・0x118a275・0x118a3f4・0x12e6abe)。0x12ab8e8 は格納元が部分レジスタ r8w のため未分類。0x12c609e と 0xfc820f は合流元の分類が残る。
+- 残り (受入の残り): 0x12c609e の合流元 0x12c6252 の分岐、0xfc820f の飛び元 rdi、0x12ab8e8 の r8w の上流、スロット ENTRY 値 (ecx・r8d) の呼出し元 (間接呼出しのため未追跡)。
+
+### 6.5 #5407: 大域 3 種の入り方・rbx ENTRY の呼出し元・`[rbx+0x12b4]` の上流
 
 測定 commit: `c44281a3e` (`pe_py273_globals.py` に reloc・初期値の節を足した最後のコード変更 commit)。`git diff c44281a3e HEAD -- tools/python/analysis/flapi` は 0 行。素材は `fl-win64` の `block00031_PE.bin` (展開 3.3 秒)。
 

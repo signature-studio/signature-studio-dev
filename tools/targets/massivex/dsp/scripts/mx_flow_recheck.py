@@ -79,7 +79,7 @@ OBJ_PREFIX = {'lock', 'rep', 'repz', 'repnz', 'data16', 'addr32', 'cs', 'ds', 'e
 LOCKABLE = {'adc', 'add', 'and', 'btc', 'btr', 'bts', 'cmpxchg', 'cmpxchg8b', 'cmpxchg16b', 'dec', 'inc',
             'neg', 'not', 'or', 'sbb', 'sub', 'xadd', 'xchg', 'xor'}
 LEGACY_PREFIX = {'66', '67', 'f0', 'f2', 'f3', '2e', '36', '3e', '26', '64', '65'}
-TERM = {'ret', 'retw', 'retq', 'jmp', 'jmpw', 'jmpq'}
+TERM = {'ret', 'retw', 'retq', 'jmp', 'jmpw', 'jmpq', 'ljmp', 'ljmpw', 'ljmpq'}
 
 
 def first_op_byte(bytes_col):

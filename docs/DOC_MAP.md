@@ -196,6 +196,7 @@
 | `tools/liftdiff/REPORT_LD39.md` | ~75 | liftdiff LD-39 (#1194) 節 (途中報告): i128 / %tagPOINT の 11 関数の振り分けと機械語入口の実測。i128 の渡し方は 2 候補とも未決。case 生成・runner は未実装 |
 | `tools/liftdiff/REPORT_APPENDIX_LD53.md` | ~120 | liftdiff LD-53 (#1546) 節: i128 引数の呼出し側全件 (命令境界の線形走査) と呼び先の判定。(a)/(b) は 691dd0 を含め棄却 (§7)。IR 型誤りの修正は #1479 (§7.4) |
 | `tools/liftdiff/REPORT_APPENDIX_LD211.md` | ~60 | liftdiff LD-211 (#4378) 節: ret=i128 の判定不能 11 関数のうち 6 件を this 疑似オブジェクト (blob=vmt) で native 実行可能にした実測 (戻りレジスタは未確定)。残 5 件は LD-213 (#4423) |
+| `tools/liftdiff/REPORT_APPENDIX_LD238.md` | ~50 | liftdiff LD-238 (#4423) 節: 残 5 件 segv のうち 668390 / 6683d0 は 2 段 this (vmt2) で原因特定 (this+8 の内部オブジェクト欠落)。仮 proc 番地の命令フェッチ segv は未切り分け。実行可能化は 0/5 |
 | `tools/liftdiff/REPORT_APPENDIX_LD203.md` | ~40 | liftdiff LD-203 (#4200): 653c80 の間接 call slot (RVA 0x11f3480) を仮 proc で埋め判定に入れる (`ldlib/cases.py` PATCH_BY_VA)。691dd0 は有効オブジェクトでも小サイズ確保のビンで segv (未達・子 issue) → LD-207 で vtable 付き rcx・flag=0 の投入で判定に入る |
 | `tools/liftdiff/REPORT_APPENDIX_LD207.md` | ~60 | liftdiff LD-207 (#4264): 691dd0 を VMT 付き rcx・r8=0 (`OBJ_PATTERNS` の vmo) で投入し判定に入れた (`diff`)。sample:800 の集合には入らない (単発 run の実測) |
 | `tools/liftdiff/REPORT_APPENDIX_LD226.md` | ~65 | liftdiff LD-226 (#4590): sta_img にスタックを SP 基準の 3 区間 (deep/win/hi) で足す RESET 実験 (n=1)。deep・win では match 4 件が残る。hi は差分量が異常で根拠にできない (子 #4801)。測定値は `results/ld226_sta_img_stack.tsv` (集計 `ld226_summarize.py`) |
@@ -305,6 +306,7 @@
 | `tools/m11/REPORT_N242.md` | ~70 | #5392 (M11-N242, 親 #4890): set_other 非 imm のポインタ経由読込 122 件 (load_ptr) を同一基底の直線区間格納で分類 (実測 実値化 0・復元不能 0・未決 122・未分類 0)。基底の再定義・呼出しを跨ぐ接続は未実装。分類器 `m11_setother_ptr_class.py`・負例 `test_setother_ptr_class.py` |
 | `tools/m11/REPORT_N228.md` | ~60 | #4905 (M11-N228, 親 #4891): set_other 非 imm の gep 17 件の基底 reg を到達定義で分類 (実測 実値化 0・復元不能 0・未決 20・未分類 0)。IR への GEP 接続は未実装。分類器 `m11_setother_gep_global.py --pe` |
 | `tools/m11/REPORT_N229.md` | ~60 | #4906 (M11-N229, 親 #4891): set_other 書込可能グローバル 3 件 (VA 0x15e3a70) の格納元探索 (IR・PE 直接経路の store 0 件・計算ポインタ経由は未決)。分類器 `m11_setother_gep_global.py --pe` |
+| `tools/m11/REPORT_N244.md` | ~70 | #5449 (M11-N244, 親 #4906・#4891): set_other 書込可能グローバル 3 件 (VA 0x15e3a70) の IR 全体の SSA 連鎖探索 (VA への直接 store 0 件・計算ポインタ 10,774 件は未決)。分類器 `m11_global_store_alias.py` |
 | `tools/m11/REPORT_N227.md` | ~50 | #4891 (M11-N227, 親 #3907): set_other 非 imm の gep 17 件と書込可能グローバル 3 件の 3 値判定 (実測 実値化 0・復元不能 0・未決 20・未分類 0)。gep の基底 SSA 対応・global の格納探索は子 #4905・#4906。分類器 `m11_setother_gep_global.py` |
 | `tools/m11/REPORT_N171.md` | ~120 | #3134 (M11-N171, 親 #1154): set_other 非 imm 349 件 (reg 123・mem 150・lea 76) の定義探索と 3 値分類 (件数は REPORT 参照)。接続方式の決定と未決の接続先 (#3140・#3141・#3142)。survey は素材欠落で未測定 (#1154)。分類器 `m11_setother_nonimm_class.py` |
 | `tools/m11/REPORT_N198.md` | ~90 | #3916 (M11-N198, 親 #3140): set_other の CFG 実値化を独立に照合する。具体実行で呼出し点の全経路の値を列挙する照合器 `m11_setother_nonimm_cfg_verify.py` (`--selftest` と実データ)。前提の実値化 1 件は未決 (経路で 0x0 と 0x1)。判定不能 33 件 (未対応命令) |
@@ -493,6 +495,7 @@
 | `tools/m11/ldfix/REPORT_3753.md` | ~100 | LD-175 (#3753): spill 宛 UNDETERMINED 5 site のうち 4 site (128d495・dcdeee・c3460e・12900c4) を機械語 2 段 deref と IR 1 段読みのブロック単位の結線で TRUE_DROP に確定。1284dab は子 #3793 (LD-178)。突合 `ld175_site_link.py` |
 | `tools/m11/ldfix/REPORT_5435.md` | ~60 | LD-270 (#5435): spill 宛 `128f9e0` の 12 site の機械語 BFS 到達経路 (全 site が欠落区間 `0x1290645`〜 を通る) と frame F=2088 の site ごと照合 (`stack_var_-(F-disp)` は IR に alloca・言及なし)。`ld270_bfs_frame.py` が生成。判定は UNDETERMINED のまま (#2705・#4959 の残り) |
 | `tools/m11/ldfix/REPORT_2705.md` | ~70 | LD-125 (#2705): spill 宛 `128f9e0` の 12 site の lift 段欠落区間 (`0x1290645`〜`0x129460a`・枝が `0x129460b` へ付け替え) の特定と、`ld125_lift_gap.py` が生成する欠落区間表。判定は UNDETERMINED のまま (根拠は子 issue) |
+| `tools/m11/ldfix/REPORT_5434.md` | ~110 | LD-269 (#5434): 欠落の機構は RetDec の Jump Threading (dump 68→69) と確定。dispatch の定数 7 の下で 12 site は実行経路から外れる (機械語 CFG)。判定は UNDETERMINED のまま。`ld269_pass_trace.py`・`ld269_reach.py` が生成 |
 | `tools/m11/ldfix/REPORT_2679.md` | ~106 | LD-120 (#2679): spill 宛 未判定 `128f9e0` の 12 site を UNDETERMINED と判定 (frame slot `stack_var_-760〜-1336` が IR 本体・RetDec の lift/drc に無い根拠・`ld120_frame_128f9e0.py` が生成・`ld120_controls.py` が対照と F の数値)。欠落の起点 (lift 段の block `0x1290610` の打ち切り) は子 #2705 (LD-125) |
 | `tools/m11/ldfix/REPORT_3752.md` | ~56 | LD-174 (#3752・#2253 子 A): spill 宛 UNDETERMINED の間接 call 2 site (128cad6・128d007) を TRUE_DROP と判定 (IR に memory-indirect call が無い = D15)。`spill178_1161.tsv` の 2 行を再生成 |
 | `tools/m11/ldfix/REPORT_942.md` | 248 | #942 (CI-22) stage4 の memory access out of bounds の切り分け (部分達成)。trap 9 件の unit 別最上位 frame・boot threw の入口・bin 表の観測 (§9)・サイズ→bin 表 (§10 は要約)。§8-3 の全表と §10 の詳細は付録 |
@@ -1104,6 +1107,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_5077.md` | 152 | #5077 (KH-138): Delay の `(ulonglong)dVarN` 98 行を機械語 (p-code 経由) と突き合わせて分類した表。98 行の機械語分類の正本 (内訳の数値は REPORT 冒頭の結論。#3836 受入 1 の分割先) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3802_DIFF.md` | ~165 | #3802 付録 §⑧ の差分の全文: 測定 commit `6323671e7` → HEAD の `ghidra_route` の `git diff` 出力 (main 取り込み分を含む)。差分の記録であり測定値の正本ではない |
 | `tools/targets/kilohearts/REPORT_APPENDIX_5401.md` | ~40 | KH-160 (#5401): Delay の引数過不足 79 件のうち 1 件 (`FUN_180fe3510` 呼出し・180fd2f3c) を機械語で確定し規則化 (79 → 78)。残件は親 #5401 の本文に追記。本付録が正本 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_5384.md` | ~62 | KH-158 (#5384): Delay の stereo ABI 族前半 3 callee (`FUN_180fdc6ec`・`FUN_180fdc844`・`FUN_180fdc858`) を機械語で確定し `ABI['delay']` に規則化。結論・数値・未解決は付録 §10-7z が正本。後半 3 callee は #5385 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4889.md` | ~40 | KH-128 (#4889): Delay の `FUN_180fbc1f4` 呼出し 2 件 (1082・1088) の引数を機械語で確定し規則化 (xmm0 float・戻り値 xmm0)。引数数不一致 79 → 77。§10-7w が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4883.md` | ~60 | KH-127 (#4883): Delay の引数過不足 10 件のうち 4 件 (`FUN_180fb5c6c`・`FUN_180fb5f8c`) を機械語で確定し規則化 (86 → 82)・残件 6 件は子 #4917 [KH-135]。§10-7v の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_5362.md` | ~90 | KH-154 (#5362): Delay の残件 callee `FUN_181384040` (memmove shim) の呼出し 6 行を機械語で確定し ABI 規則化 (測定値は付録の 5362-4)・Gain/Haas/Gate の `.o` 不変。残りの pointer⇔整数規則は親 #5362 に残す |

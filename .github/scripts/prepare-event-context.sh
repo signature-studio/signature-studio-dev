@@ -87,7 +87,8 @@ oc_pm_prepare() {
     printf '::error::oc-pm: could not read the target #%s\n' "$ref_n"
     return 1
   }
-  # 対象の起票者は、許可 bot (実装・reviewer の App) か、OWNER/MEMBER/COLLABORATOR だけ。
+  # 対象の起票者は、許可 bot (実装・reviewer の App。PM App は OC_PM_BOT_LOGIN と完全一致のとき) か、
+  # OWNER/MEMBER/COLLABORATOR だけ。OC_PM_BOT_LOGIN が空・未設定なら PM App は許可しない (#5466)。
   author_login="$(printf '%s' "$issue_json" | jq -r '.user.login // ""')"
   author_type="$(printf '%s' "$issue_json" | jq -r '.user.type // ""')"
   author_assoc="$(printf '%s' "$issue_json" | jq -r '.author_association // ""')"
@@ -97,6 +98,9 @@ oc_pm_prepare() {
     case "$author_login" in
       'opencode-for-signature-studio[bot]' | 'oc-reviewer-for-signature-studio[bot]') author_ok=true ;;
     esac
+    if [ -n "${OC_PM_BOT_LOGIN:-}" ] && [ "$author_login" = "$OC_PM_BOT_LOGIN" ]; then
+      author_ok=true
+    fi
   fi
   if [ "$author_ok" != true ]; then
     printf '::notice::oc-pm: the target author is not allowed (association=%s, type=%s)\n' "${author_assoc:-none}" "${author_type:-none}"
