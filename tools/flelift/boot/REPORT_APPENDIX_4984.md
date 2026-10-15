@@ -6,12 +6,14 @@
 ## 1. 結論
 
 - **前提の訂正**: `exit` は unit 895 の中では起きない。`units_run=895` は「dispatch した unit 数」で、添字は i=0〜940 (dispatch 895・empty 46・noproc 1 = 942)。最後に dispatch した unit は **i=940** (VA `0x13751d0`)。`ExitProcess` は `InitUnits` (`f_4120c0`) が全 unit を回り終えて戻った後に呼ばれる (呼出し点 `0x412a0d`・戻り先 `0x412a12`)。
-- **判定 (ExitProcess(0))**: **正常終了**。根拠は (a) exit code は `[0x13a5000]` の DWORD で、各 unit 境界 (895 行) で 0 のまま (b) `[fleboot][exit] code=0 call_site=0x412a12`。
-- **未確認 (残り)**: `[0x13a5000]` に非 0 を入れるのは `f_4096b0` → `f_412a40` の経路だけで、その呼出し元 4 箇所は静的に特定した (§3) が、どれが boot で実行されたかは未測定。`f_412770` (`0x4127af`) も 0 を書くので、exit 時点の 0 だけでは途中の非 0 を否定できない (§4)。
+- **判定 (ExitProcess(0))**: **正常終了**。exit code は `0x412a07` で `[0x13a5000]` を読んだ値で、読む時点の値が 0 (`[fleboot][exit] code=0`)。途中の書込みがあっても exit 時点で 0 なら終了コードは 0 である。
+- **残り (判定には影響しない)**: `f_4096b0` の 4 呼出し元 (§3) がどれか boot で実行されたかは未測定。非 0 の書込みが途中で起きたかどうかの確認にだけ要る (§6)。
 
 ## 2. 測定
 
-- 測定 commit: 本 PR の commit (コードを変えた最後の commit)。経路: 既定 (`FLE_IPP` 未指定 = mode 3・補修あり・`FLE_EXTRA_ROOTS` 既定)。
+- 測定 commit: `91e9cc35f` (コードを変えた最後の commit)。経路: 既定 (`FLE_IPP` 未指定 = mode 3・補修あり・`FLE_EXTRA_ROOTS` 既定)。
+- HEAD 再測定 (`91e9cc35f`・診断なし): units 895・stopped 895・exit・IPP ok・rc 0・boot 5 s・load 1.47〜1.67。
+- HEAD 再測定 (`91e9cc35f`・`FLE_EXTRA_CCF=-DFLE_UNITLOG`): unit 行 895・exit-ring 20・i=940 の行あり・rc 0。
 - 実行: `FLE_EXTRA_CCF=-DFLE_UNITLOG bash tools/flelift/boot/fle6_measure.sh` (`FLE_BOOT_RUNS=default`)。
   工程: gen-A 5 s / lift 51 s (rss 610 MB) / clang plain 61 s / boot 5 s。load 最大 1.67。rc 0。
 - 結果: `units_run=895`・`units_total=942`・`stopped_at=895`・`boot_threw=exit`・`exit=1`・IPP check `ok` (`ptr_15F34A0=0x7f10001c`)。
@@ -75,4 +77,4 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `f_4096b0` の 4 呼出し元 (`0x409553`・`0x409722`・`0x40c841`・`0x412acf`) のどれが boot で実行されたか | 非 0 の終了コードが途中で立ったかの判定 | #4984 (Refs・残り) |
+| `f_4096b0` の 4 呼出し元 (`0x409553`・`0x409722`・`0x40c841`・`0x412acf`) のどれが boot で実行されたか | 途中のエラー経路の有無 (exit の判定には影響しない) | 子 issue (未起票・必要なら PM が起票) |
