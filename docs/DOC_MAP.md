@@ -582,6 +582,7 @@
 | `tools/python/REPORT_PY99_3104.md` | 84 | PY-99 (#3104) 付録: SLOT? 49 件の store 値を CFG 到達 store で再帰に閉じた式 (入口のレジスタ葉 3 種を残す)・算法 A/B の閉包の検算 (mismatch 0)・ネガティブコントロール (mismatch 17)・CFG 構築の検査。式の全件表は `analysis/py99_closure.md` (自動生成) |
 | `tools/python/REPORT_PY99_3085.md` | 81 | PY-99 (#3085) 付録: SLOT? 49 件の先行辺 p ごとの store 集合 S_p・算法 A/B の検算とネガティブコントロール・未解決。S_p の全件表は `analysis/py99_merge_sets.md` (自動生成)。PY-41 付録から分割移動 (250 行上限のため) |
 | `tools/python/REPORT_PY41_3860.md` | ~60 | PY-262 (#3860): PY-65 節の受入 2 (戻り値 `[rbp+0x584]` の書込み元) の付録。0x104cc65 に届く `[rbp+0x5b8]` の書込み 72 件 (`analysis/py65_ret584_reach.py`)。分岐ごとの式は未確定 (250 行上限のため `REPORT_PY41.md` から分割) |
+| `tools/python/REPORT_PY99_3104_APPENDIX_4332.md` | ~36 | PY-317 (#4332) 付録: rint 6 件の negative control (`--negctl drop-part`・辺 `0x1047543 → 0x104754a` で mismatch 1・exit 1)。`REPORT_PY99_3104.md` の 250 行上限のため分割移動 |
 | `tools/python/REPORT_PY99_APPENDIX.md` | ~127 | PY-99 (#2874) 付録: `call 0x10469f0` の本体式 `edx + rint(2^-30·ecx·(r8d−edx))` と、その 7 件の戻り値式 (ecx は入口 edx)。後ろ向き CFG 経路列挙の節 (`[rbp+X]` 読み 171 件の到達 store)。`REPORT_PY41_APPENDIX.md` の 250 行上限のため別置き |
 | `tools/python/REPORT_PY159.md` | 134 | PY-159 (#3086): PY-88 の 65 件の `[rbp+0x5b8]` 書込みの全件表 (VA・式・未確定印)。手計算突合 (SLOT 非依存の 7 件) とネガティブコントロールを実施。結果は `REPORT_PY159.md` §4。残りの SLOT 依存 55 件と ACC 合流は #2874 (PY-99) |
 | `tools/python/REPORT_PY163.md` | 97 | PY-163 (#3135): PY-88 の VCALL 3 件の呼出し先・引数・戻り値式 (CFG 到達定義による式。呼出し先は実行時データで未確定)。結果は `REPORT_PY163.md` §1・§3〜§5。解析は `analysis/py163_vcall.py` |
