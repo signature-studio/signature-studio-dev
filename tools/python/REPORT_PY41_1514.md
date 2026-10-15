@@ -111,45 +111,34 @@ PE の読解 (`tools/python/analysis/py41_disasm.py` で逆アセンブル):
 - 負荷: 測定開始 `uptime` で load average 1.02 / 1.52 / 0.87 (4 core)。ビルド中は 2.69 / 1.81 / 0.90。
 - 検証範囲: 2 関数の C / mock の値 (identity・-2・-4 と引数の型検査)。範囲外: 2 グループ以上の project、MIDI-in port の設定経路 (未解決 1・2)。
 
-## 追補 (#1514・残り 6 関数の PE 読解と 3 関数の実装)
+## 追補 (#1514・残り 6 関数の PE 読解。実装は撤回)
 
-親: #1514 (PY-36)。既存の節は無変更。`REPORT_PY41.md` の PE 読解 (fn_va) を前提に、残り 6 関数を読んだ。
+親: #1514 (PY-36)。既存の節は無変更。`REPORT_PY41.md` の PE 読解 (fn_va) を前提に、残り 6 関数を読んだ。PE の読みは本節に残し、3 関数の固定値の実装は撤回した (fix commit `1b36cd735`)。
 
-### 実装 (C と mock 同一)
+### 結論
 
-| 関数 | fn_va・引数 (fmt) | PE で確定した戻り | 実装 | 仮置き・未モデル |
+- 残り 6 関数の実装は 0 件。getChannelPitch・getActivityLevel・isGraphEditorVisible は戻り値の元 (書込み元) が PE で確定しなかったため撤回した。前版の固定値 (raw 0・0.0・false) は、表示後や発音中にも同じ値を返して実機と silent に食い違うため入れない。
+- 基準は isHighLighted と同じ: 未モデル状態の書込み元が確定するまで実装しない。
+- 前版の訂正: 「showGraphEditor は no-op で状態を立てない」は誤り。PE の `0xd5cbd0` は述語が真なら `0x1005730` を呼び、成功なら `0x1307490` を呼んで状態を書く (`REPORT_PY40.md` §8)。
+- 18 関数のうち main で実装済みは 12 件 (channelNumber・getChannelColor・getChannelIndex・getChannelMidiInPort・getChannelType・getCurrentStepParam・getGridBit・getGridBitWithLoop・getStepParam・isChannelMuted・isChannelSolo・isGridBitAssigned)。未実装は 6 件 (下表)。
+
+### 未実装 6 関数 (PE で確定した部分と未確定の部分)
+
+| 関数 | fn_va・引数 (fmt) | PE で確定した戻り | 未確定 (未実装の理由) | 起票先 |
 |---|---|---|---|---|
-| getChannelPitch | 0xd5a600・`i\|ii` | mode 0: `float(raw) / (N·100)`・mode 1: `int(raw)`・mode 2: `int(N)`・他の mode は -4 | 同じ分岐。N = `[chan+0x2f4]` は setChannelPitch unit 2 と共有 | raw (cents) は 0x1046a30 の戻り値 (ピッチ曲げの状態) で未モデル → 0 |
-| getActivityLevel | 0xd5d060・`i\|i` | `float([chan+0x7a4])` | 0.0 | `+0x7a4` の書込み元が未同定。発音の状態を持たない |
-| isGraphEditorVisible | 0xd5c8f0・NOARGS | `bool([[g]+0xa9])` (g = `[rip+0x88743d]`) | false | showGraphEditor は no-op で `+0xa9` を立てないため 0 のまま |
+| getChannelPitch | 0xd5a600・`i\|ii` | mode 0: `float(raw) / (N·100)`・mode 1: `int(raw)`・mode 2: `int(N)` (N = `[chan+0x2f4]`)・他の mode は -4。index は `0x1005730` で検査 | raw (cents) は `0x1046a30` の戻り値 (ピッチ曲げの状態) で未モデル。N = 0 の経路 (NaN) も未確定 (REPORT_PY72 未確定 5) | #1514 |
+| getActivityLevel | 0xd5d060・`i\|i` | `float([chan+0x7a4])` | `+0x7a4` の書込み元が未同定。発音の活動状態が mock に無い | #1514 |
+| isGraphEditorVisible | 0xd5c8f0・NOARGS | `bool([[g]+0xa9])` (g = `[rip+0x88743d]`) | `[g]+0xa9` を書く経路が未同定。showGraphEditor の `0x1307490` の書込み先 (`[obj+0x78c]` ほか) との対応を未確認 | #1514 |
+| isHighLighted | 0xd5c7a0・NOARGS | `PyBool(f1(g1) != 0 ∥ f2(g2) != 0)`。f1 = 0x4204f0 (高さ)・f2 = 0x4204d0 (幅) | g1・g2 の rect が `ui.crDisplayRect` の引数とどう対応するか | #1514 |
+| getRecEventId | 0xd5c0f0・`i\|i` | lookup 後に `PyLong([chan+0x9c])` | `+0x9c` の初期値 (channel 生成時) を同定できない | #1514 |
+| getSwing | 0xd5dbf0 | `REPORT_PY41` の PY-54 節のとおり | 戻り値の数値は `0x196ec34` の setter 入力に依存 | #1514 (関連 #1828・#1911・#1912) |
 
-- getChannelPitch の PE: index は `0x1005730` で検査 (失敗は -4)。mode は `mode-1` の分岐で 0 → factor、1 → raw、2 → `[chan+0x2f4]`。それ以外は `0xd5a704` へ進み、index 範囲外と同じ `mov rax,-4` → `0xd82c20` になる。よって**不正 mode は範囲外と同じ code 4 (Index out of range)**。
-- mode 0 の `divsd` で N = 0 なら NaN になる (C の `0.0 / 0` も NaN)。N が 0 になる経路は未確定 (REPORT_PY72 未確定 5)。
-- 3 関数の実装は PE の戻り型・分岐だけで決めた。仮置きの値 (0.0・false・raw 0) は状態を持たないことによる。
+- getChannelPitch の第 3 引数・getActivityLevel の第 2 引数 (`useGlobalIndex`) は、PE で `0x1005730` の一覧選択 (`dl`) に使われる。実装する場合は一覧 A/B を同一扱いにする未モデルを明記する。
+- 不正 mode の code 4: getChannelPitch は PE の `mode-1` 分岐で `0xd5a704` へ進み、index 範囲外と同じ `mov rax,-4` になる。実装の時点で同じ code を使う。
 
-### 未実装 (PE で確定した部分と未確定の部分)
+### 検証範囲と測定
 
-| 関数 | 確定した部分 (PE) | 未確定 | 起票先 |
-|---|---|---|---|
-| isHighLighted (0xd5c7a0・NOARGS) | `PyBool(f1(g1) != 0 ∥ f2(g2) != 0)`。f1 = 0x4204f0 は `[rcx+0xc] − [rcx+4]` (高さ)、f2 = 0x4204d0 は `[rcx+8] − [rcx]` (幅)。g1 = `[rip+0x885dcd]`・g2 = `[rip+0x885dbd]` | g1・g2 の rect が `ui.crDisplayRect` の引数とどう対応するか (書込み元) | #1514 |
-| getRecEventId (0xd5c0f0・`i\|i`) | lookup 後に `PyLong([chan+0x9c])` | `+0x9c` の初期値。`py89_channel_fields.py` の 0x9c 走査で書込みが多数 (スタック局所を含む) で、channel 生成時の値を同定できず | #1514 |
-| getSwing (0xd5dbf0) | REPORT_PY41 の PY-54 節のとおり | 戻り値の数値は 0x196ec34 の setter 入力に依存 | #1514 (関連 #1828・#1911・#1912) |
-
-- isHighLighted を仮に false で実装すると、`ui.crDisplayRect` で矩形を出した後も false を返す不一致になる。rect の書込み元が確定するまで実装しない。
-- 残り 3 関数 (isHighLighted・getRecEventId・getSwing) が #1514 の未達。18 関数のうち 15 関数が C provider と mock に入った。
-
-### 測定
-
-測定 commit: `b5cad202a` (コードを変えた最後の commit)。素材は `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` のうち `fl-win64` の `block00031_PE.bin` と DATA block 4 本を `$RUNNER_TEMP/fl-win64/extracted` に展開 (`tar --zstd -xf` で wildcard 指定)。`toolchain-retdec` は本件で使わなかった (RetDec 路線は新規に使わない・D5)。`toolchain-emsdk` は `[EMSDK]` を使用。
-
-| 検査 | コマンド | 結果 (実時間) |
-|---|---|---|
-| C provider の build | `bash tools/python/provider/build.sh` | 成功・`fl_table.c: 435 関数, ハンドラ 178` |
-| 件数・ABI | `node tests/provider_check.mjs` | PASS (functions 435・implemented 178・unimplemented 257・mcp_static 60)、0.243 秒 |
-| mock と C の差分 | `node tests/channels_diff.mjs` | PASS (calls 253・diffs 0)、0.054 秒 |
-| 負の対照 | mock の getChannelPitch の mode 2 を `pitchN + 1` にして channels_diff | `channels/playlist 差分 2 件` で AssertionError (FAIL)。HEAD の mock に戻して PASS (diffs 0) |
-| 48 tool (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok (soft_error 0・raised 0・host_calls 37425)、1.088 秒 |
-
-- 作業用ビルド (`dist/`・`work/` は gitignore): `build_cpython_wasm.sh` 2 分 55 秒 (rc 0)、`FLPY_SKIP_TABLE=1 build_flpy.sh` 4.1 秒。
-- 負荷: all_tools 開始時の `uptime` で load average 1.63 / 1.14 / 0.54 (4 core)。
-- 検証範囲: 3 関数の C / mock の値 (mode 0・1・2・不正 mode・index 範囲外・引数の型違い・引数過多)。範囲外: N = 0 の経路、raw (ピッチ曲げ) の状態、channel の発音状態 (未解決の仮置き)。
+- この版の C・mock・テストは `origin/main` (`0c6550546`) と同一。`git diff origin/main HEAD -- tools/python/provider tools/python/host tools/python/tests` は空で、本 PR の差分は本ファイルの追補だけ。
+- `python3 tools/python/provider/gen_provider.py --check-handlers tools/python/provider/fl_engine.c` は rc 0 (`fl_table.c: 435 関数, ハンドラ 176`。main の `provider_check` の implemented 176 と一致)。emcc を使わない検査。
+- 再測定はしていない。`toolchain-emsdk` が展開されず (`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ・`/opt/emsdk` 無し)、`provider/build.sh` (emcc)・`provider_check`・`channels_diff`・`all_tools` (wasm) を実行できなかった。本版の wasm 検証は `oc_artifacts: fl-win64 toolchain-emsdk` を付けた再実行で行う。
+- 撤回前の版 (`b5cad202a`) の測定値 (channels_diff・負の対照・all_tools) は 3 関数を含む版の結果で、現在の版には当てはまらない。履歴は `git show b5cad202a:tools/python/REPORT_PY41_1514.md` に残る。
