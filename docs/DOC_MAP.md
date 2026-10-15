@@ -116,6 +116,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_4983.md` | ~70 | FLE-37 (#4983): 既定経路 `run_boot default` で `FLE_BOOT_LOG_CAP` が効かない不具合の修正 (`${6:-0}` → 環境変数を読む式)・修正前後の `log_cap` の実測・上限超過時の `hit` の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5215.md` | ~70 | PY-4887 (#5215): 選択リスト G の初期化 `0xe38870` の既定 boot での実起動確認 (G・isPatternSelected・呼出元 5 観測点は未到達・制御 1 件発火)。probe は `py5215_g_init_probe.sh` |
 | `tools/flelift/boot/REPORT_APPENDIX_5027.md` | ~80 | FLE-40 (#5027): `FLE_BOOT_LOG_CAP` 超過の例外が Emscripten の tty write で飲まれ `exit` に残る経路の特定・超過を `boot.threw` の `log_cap` として報告する修正・cap の有無での実測差。測定値の正本 |
+| `tools/flelift/boot/REPORT_APPENDIX_5058.md` | ~70 | FLE-41 (#5058): cap 超過後の次の dispatch で `log_cap` の例外を投げて boot を止める修正・既定 cap 4096 の停止 (units 13) と cap 0 の対照 (units 895)・規則検査の変異。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4931.md` | ~50 | FLE-4931 (#4931): REPORT §13 の全文 (既定経路 mode 3 の survey で 942 unit を分類・covered=942・測定 commit `ceb5a0ba6`・差分 0 の証跡・件数 47 の説明・boot_metric の再生成理由)。REPORT §13 は結論と要点表 |
 | `tools/flelift/boot/REPORT_APPENDIX_4004.md` | ~80 | FLE-18 (#4004): 既定経路の dispatch(0) (0x67264b の target 0)・呼出時の `[0x15e0a48]` の実測 (既定 / shim の call-time 表)・0x6b91e8 の第 2 呼出点。REPORT §10 の「唯一の呼出し点」の訂正 |
 | `tools/flelift/boot/REPORT_APPENDIX_3868.md` | ~90 | FLE-17 (#3868) の付録: `0x6bbc20` の書込み経路の上流 (実行時の呼出し連鎖・既定 route の書込み・静的走査 (rip 相対 lea)・監視の範囲)。REPORT_APPENDIX_3771 §A の後続 |
