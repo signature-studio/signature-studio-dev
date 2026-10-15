@@ -314,7 +314,9 @@ if (TOLERANT) {
     const cstk0 = Number(m._emscripten_stack_get_current()), rsp0 = Number(m._fle_rsp_get());
     const lj0 = Number(m._fle_n_longjmp()), s0 = softSnap(), e0 = Number(m._fle_n_exit());
     let cr = null, cerr = null;
-    try { cr = m._fle_run(CFI_VA, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n); } catch (e) { cerr = e; }
+    // FLE_CFI_SELF (#4464): 既定 0 (従来どおり全引数 0)。実機の呼出し元に近い self (rcx) を渡すときに使う。
+    const CFI_SELF = BigInt(process.env.FLE_CFI_SELF || '0');
+    try { cr = m._fle_run(CFI_VA, CFI_SELF, 0n, 0n, 0n, 0n, 0n, 0n, 0n); } catch (e) { cerr = e; }
     m.__emscripten_stack_restore(cstk0); m._fle_rsp_set(rsp0);
     const s1 = softSnap(), called = [];
     for (const [nm, c] of s1) { const d = c - (s0.get(nm) || 0); if (d > 0) called.push([nm, d]); }
