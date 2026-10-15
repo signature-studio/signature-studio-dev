@@ -115,7 +115,7 @@
 親: #2642 (PY-82)・子 #3767 (PY-248)。受入条件の項目 1・2 (判定条件を PE 解析箇所つきで残す) を扱う。全件は `analysis/flapi/py248_gate_chain.py` で再現する。
 
 - 既知類型との関係: 該当なし (lift 作業ではない。PE 逆アセンブルによる判定条件の確定)。
-- 測定 commit: `e1ad20d6d` (再現スクリプトを含む commit)。以後の docs のみの commit では `analysis/` などのコード範囲の差分は 0 行 (下記)。
+- 測定 commit: `614b84bcf` (再現スクリプトを含む commit。main 取り込みの rebase 前の同内容は `e1ad20d6d`)。以後の docs のみの commit では `analysis/` などのコード範囲の差分は 0 行 (下記)。
 
 ### 結論
 
@@ -167,9 +167,9 @@
 ### 再現と測定
 
 - 展開: `mkdir -p $RUNNER_TEMP/fl-win64 && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 --wildcards '*block00031_PE.bin'` (実測 2.8 秒)。
-- 実行: `cd tools/python && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/py248_gate_chain.py` (測定 commit `e1ad20d6d`: 走査 39.6 秒、instructions=5022467)。前後の load average (uptime 1/5/15 分): `0.18 0.39 0.29` → `0.58 0.47 0.32`。同じ commit で 2 回実行し、出力は走査秒以外一致。
+- 実行: `cd tools/python && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/py248_gate_chain.py` (測定 commit `614b84bcf` を取り込んだ HEAD `d5f1d537f` で実行: 走査 39.0 秒、instructions=5022467)。前後の load average (uptime 1/5/15 分): `0.28 0.43 0.33` → `0.90 0.57 0.38`。rebase 前の `e1ad20d6d` でも 2 回実行し、出力は走査秒以外が一致。
 - ネガティブコントロール: VMT の同定を 1 スロットずらす (クラス参照 `0x125b0f0` を読む) と、値 `0x20000` がファイル内に無く VMT 名の読みが失敗する (FAIL)。正しい `0x125b0f8` では `TFLProgramInfo` を得る (PASS)。
-- 差分 0 の証跡: `git diff e1ad20d6d HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 PR の docs commit で確認)。
+- 差分 0 の証跡: `git diff 614b84bcf HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 PR の docs commit で確認)。
 
 ### 検証範囲 / 範囲外
 
