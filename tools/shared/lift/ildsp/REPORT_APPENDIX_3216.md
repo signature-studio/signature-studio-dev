@@ -5,7 +5,7 @@
 ## 7. WaveformColouring_CreateInstance の x64c lift と native 差分 — T-SH-52 (#3216・部分達成)
 
 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23 に VEX 未対応・jump table 未到達の記述は無い。差分は CreateInstance と slot 0 の範囲で 0 件)。
-測定 commit: `2cff3f50d` (origin/main `c2e5ba01c` の取り込み merge。コードを変えた最後の commit。以降の差分は `.md` のみ・§7-8)。検証起点: `bea685f7` (origin/main。取り込み前の PR 枝の起点)。
+測定 commit (閉包の数値 70 関数・2757 命令): `ce4f51453` (origin/main。閉包を出した入力の commit。以降の差分は §7-8)。測定 commit (wasm 実測 138,754 B・64 case・§7-3): `2cff3f50d` (origin/main `c2e5ba01c` の取り込み merge。この時点の値で、現 head では再測定していない)。
 
 ### 7-1 結論 (1 行)
 closure の入口 70 関数は x64c で C に lift し wasm (138,754 B) にした (C 本体 60 + label 8 + IAT thunk 2)。CreateInstance → slot 0 の native 対 wasm は 64 case で全バイト一致。残りは slot 1–5 の host 前提 (native が null 参照で落ちる。§7-5) と、VEX 3 命令の未対応 (unsup 3 site)。
@@ -23,6 +23,7 @@ FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/ildsp/probe_slots.sh   
 - native 側 (`wc_native_ref.c`): 落ちた case の後に残った SIGALRM を `ualarm(0,0)` で解除する (旧版は解除していなかった)。
 
 ### 7-3 実測 (測定 commit `2cff3f50d`・`lift_wc.sh ok` を 3 回・emcc は `[EMSDK]` の 6.0.12)
+注記: 以下は `2cff3f50d` 時点の値。その後 `lift_wc.sh` を含む lift 側のコードが変わっている (`git diff --stat 2cff3f50d a4ee191c2 -- tools/shared/lift/ildsp/lift_wc.sh` は 22 行)。本 PR は lift 側を変えていないため結論には影響しないが、現 head では再測定していない。
 所要 = `lift_wc.sh ok` の起動から終了までの wall (source・x64c・emcc・native・wasm・差分を含む。小数 2 桁)。実ログ行:
 ```
 [ildsp-wc] ok elapsed=2.71s load start=[0.06 0.28 0.18] end=[0.54 0.38 0.21]
