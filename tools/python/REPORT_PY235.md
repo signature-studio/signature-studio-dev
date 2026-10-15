@@ -59,7 +59,7 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
   - 残り (未確定): (a) の配列 `[rcx+8]` の内容 (runtime)・(b) `0x12f9ed0` の戻り値と loop 本体の真偽・(c) `0x16baf90` の間接書込み元・(d) gate 1 を立てる呼出しの意味。受入 1・2 は部分達成 (#4832)。
   - PY-398 (#4859) で追加した PE 事実 (`analysis/py398_gate_flow.py`・35 ok・0 FAIL): gate の pointer は `0x13e7628` (`.data`・初期値 0)。gate 書込み `0x11c761c` は `0x11c7507: je 0x11c7604` の分岐 (`[rbp+0xdc]` = `(([rbp+0xd8]|[rbp+0xd4])&1)-1`) で飛ばされ得る。`0x11c71b0` の呼出しは `0x11c88d3` の 1 件 (`[0x16bcc00]` != 0 のときだけ)。`0x12f9ed0` は `[0x196eb60]` の配列長 (`[ptr-8]`・0 ポインタなら 0) を返し、`0xffac50` の loop 上限はこの長さ。`0x15e2878` を読む命令は 23 件で、読出しのみ (直接の書込みは無い)。runtime 値 (`0x13e7628` の内容・`0x196eb60` の配列・`0x16baf90` の書込み元) は静的に確定しない。
 - 共通 prefix (入口〜0x1047424) の -1 出口は上の 2 箇所だけ (CFG)。prefix からの store は入口の 1 件のみ。
-- 測定 commit (PY-398 の最後のコード変更): `bb40d5156` (py398 の summary 文言と本 REPORT の件数)。`FL_WIN64_DIR=/tmp/opencode/fl-win64 python3 analysis/py398_gate_flow.py` → 35 ok・0 FAIL・rc 0・7.3 秒。`py392_flag_runtime.py` → 18 ok・0 FAIL・rc 0。load avg `0.69 0.23 0.08` (測定直前の `uptime`)。素材は `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` で `$FL_WIN64_DIR/extracted/` に展開。
+- 測定 commit (PY-398 の最後のコード変更): `bb40d5156` (py398 の summary 文言と本 REPORT の件数)。`FL_WIN64_DIR=<展開先> python3 analysis/py398_gate_flow.py` → 35 ok・0 FAIL・rc 0・7.3 秒。`py392_flag_runtime.py` → 18 ok・0 FAIL・rc 0。load avg `0.69 0.23 0.08` (測定直前の `uptime`)。素材は `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` で `$FL_WIN64_DIR/extracted/` に展開。
 
 ## 手段
 
