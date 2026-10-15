@@ -232,6 +232,22 @@ for old in '迷ったら U として扱い' 'どちらでもなければ U' '判
 done
 ! grep -qF '迷ったら U として' "$HERE/../assemble-prompt.sh"
 expect "assemble-prompt.sh (oc-pm instruction): the old 'U として' fallback is removed" $?
+# 10e. #4476: エージェント向けの「依頼者」は PM。workflow 変更は PM の職権で、新規 secrets・資格情報を扱うものだけ needs-user-input (ネガコン: 旧節・旧文言が残れば fail)。
+pm_has '## PM へエスカレーション (4 種は PM が人間オーナーへ移送)'
+expect "pm.md: the escalation section is renamed to PM へエスカレーション" $?
+! pm_has '## 依頼者へ渡す事項'
+expect "pm.md: the old '依頼者へ渡す事項' section is removed" $?
+! pm_has '`.github/workflows/` の変更 (`pm-apply` + `needs-user-input`) を含む'
+expect "pm.md: workflow changes are no longer listed as a needs-user-input credential case" $?
+pm_has '新規 secrets を扱わない `.github/workflows/` の変更は PM の職権で、`needs-user-input` の対象外'
+expect "pm.md: a workflow change without new secrets is PM's authority (not needs-user-input)" $?
+pm_has '新規 secrets・資格情報を扱う変更だけは `needs-user-input` を付けて人間オーナーへ移送する'
+expect "pm.md: a workflow change with new secrets is escalated to the human owner" $?
+! grep -qF '依頼者' "$HERE/../../prompts/implementer.md" && ! grep -qF '依頼者' "$HERE/../../prompts/reviewer.md"
+expect "implementer.md / reviewer.md: no '依頼者' left (the agent-facing requestor is PM)" $?
+WFSEC="$(sed -n '/^### workflow 変更の運用/,/^## 12/p' "$HERE/../../../docs/WORKFLOW.md")"
+[ -n "$WFSEC" ] && ! printf '%s' "$WFSEC" | grep -qF '依頼者'
+expect "WORKFLOW §11 workflow-change section: no '依頼者' left" $?
 # 10d. needs-user-input の判定 fixture (#3705): 全件が pm.md の表に同じ判定で載る。escalate は 4 種の区分を持ち、decide は区分が none。
 FX="$HERE/../../../infra/pm-worker/test/fixtures/needs_user_input.input.json"
 jq -e '.cases | length > 0' "$FX" > /dev/null 2>&1

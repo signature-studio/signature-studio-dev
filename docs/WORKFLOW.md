@@ -122,7 +122,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 
 | 分類 | 判定 (GitHub の事実) | 意味・次の一手 |
 |---|---|---|
-| `user` | `needs-user-input` ラベル、または `pm-apply` ラベル (workflow 変更の適用待ち) が付いている | 依頼者の回答・適用待ち。自動着手しない |
+| `user` | `needs-user-input` ラベル、または `pm-apply` ラベル (workflow 変更の適用待ち) が付いている | 人間オーナーの回答・適用待ち。自動着手しない |
 | `blocked` | open な blocked_by (issue dependencies) がある、本文の依存行 (`依存:`・`blockedBy:` など) が open な issue を指す、`tools/pm/manual_deps.json` の依存 (停止報告に根拠のあるもの) が open、または子 issue を持つ親で PR が無い | blocker が close されるまで着手しない |
 | `started` (着手済み) | open PR が `N-<slug>` ブランチか `Closes/Refs/Fixes #N` で紐づく、または実装 run が稼働中 | 実装・レビュー・修正の途中。二重に着手しない |
 | `stopped` | 直近 24 時間以内の bot の最後のコメントが停止報告で、再投入の素材が無い、または再投入の上限 (2 回) に達した | PM の判断待ち |
@@ -444,8 +444,8 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次の運用に置き換える (判断: 2026-10-14、#2319。運用の正本はこの節)。
 
 - **(a) 凍結**: VM 退役後は `.github/workflows/` の変更を凍結する。ロジックは `.github/scripts/`・`.github/prompts/` に寄せ、workflow は薄い配線に保つ。
-- **(b) 依頼**: 変更が必要になったら、issue に `pm-apply` と `needs-user-input` を付け、`git apply` できる unified diff をコメントに書いて止まる。diff は `.github/workflows/` の変更だけにする。PM agent は `pm-apply` を付けられない (許可ラベル外。`.github/prompts/pm.md`)。その場合は `needs-user-input` だけを付けて依頼者へ渡し、依頼者が `pm-apply` を付ける。
-- **(c) 適用 (依頼者が手元で行う)**: 依頼者は diff の内容 (特に `permissions:` と `secrets.*` の参照) を確かめてから、コメントの diff を `diff.patch` に保存し、次を実行する。merge は reviewer App が行うため、PAT は要らない。
+- **(b) 依頼**: 変更が必要になったら、issue に `git apply` できる unified diff をコメントに書いて止まる。diff は `.github/workflows/` の変更だけにする。workflow 変更の判断は PM の職権で、`needs-user-input` のゲート対象外。PM agent は `pm-apply` を付けられない (許可ラベル外。`.github/prompts/pm.md`)。新規 secrets・資格情報を扱う変更だけは `needs-user-input` を付けて人間オーナーへ移送し、人間オーナーが `pm-apply` を付ける。
+- **(c) 適用 (人間オーナーが手元で行う)**: 人間オーナーは diff の内容 (特に `permissions:` と `secrets.*` の参照) を確かめてから、コメントの diff を `diff.patch` に保存し、次を実行する。merge は reviewer App が行うため、PAT は要らない。
 
   ```sh
   git fetch origin main && git switch -c <N>-workflow origin/main && git apply diff.patch
@@ -458,9 +458,10 @@ PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次�
 - **退役の条件**: VM の timer・PAT・keyring を止める前に、open の `pm-apply` の issue が 0 件であること (確認: `gh api "repos/<R>/issues?labels=pm-apply&state=open" --jq length`)。
 
 
-## 12. 依頼者不在時の運用 (needs-user-input・assume-and-proceed)
+## 12. 人間オーナー不在時の運用 (needs-user-input・assume-and-proceed)
 
-依頼者は指示後、最低 2 時間・最大 2 日間不在になりうる。依頼者の判断が要る事項は `needs-user-input` で積み、
+エージェント向け文脈の「依頼者」は PM を指す (判断: 2026-10-15、指示 151・152、#4476)。PM は全権限と判断責任を持つ。
+人間オーナーは最低 2 時間・最大 2 日間不在になりうる。人間オーナーの判断が要る事項 (4 種) は PM が `needs-user-input` で積み、
 他の作業を止めない。規則 R1〜R9 と境界 U1〜U8 の**正本は `.github/prompts/pm.md`** である (本節に複製しない)。
 
 - **書式**: `needs-user-input` を付けた issue の本文先頭に、次の 4 項目を順に書く。
