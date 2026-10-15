@@ -52,7 +52,7 @@ static int sel_start, sel_end, live_anchor;
 static int64_t disp_time;
 static int browser_op;
 static int64_t arr_time;
-static int scr_blanked, scr_unblank, scr_active;
+static int scr_blanked, scr_unblank, scr_active, scr_dflt;
 static int scr_alive, scr_menu_show, scr_dirty;
 static int64_t scr_setup_l;
 static int scr_setup_t[5];
@@ -100,7 +100,7 @@ void fl_engine_reset(void) {
     set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
     sel_start = -1; sel_end = -1; live_anchor = -1;
     arr_time = 0;
-    scr_blanked = 0; scr_unblank = 0; scr_active = 0;
+    scr_blanked = 0; scr_unblank = 0; scr_active = 0; scr_dflt = 0;
     scr_alive = 0; scr_menu_show = 0; scr_dirty = 0; scr_setup_l = 0; for (int i = 0; i < 5; i++) scr_setup_t[i] = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
     idle_elapsed = 0; midi_out_assigned = 0; master_sync = 0;
@@ -679,6 +679,16 @@ FL_H(screen, isUnBlank) { NARGS(0, 0); return fl_ret_b(c, scr_unblank); }
 FL_H(screen, getScreenActiveCounter) { NARGS(0, 0); return fl_ret_i(c, scr_active); }
 FL_H(screen, setScreenActiveCounter) { NARGS(1, 1); scr_active = (int)((unsigned)scr_active + (unsigned)A_INT(0, 0)); return fl_ret_none(c); }
 FL_H(screen, unBlank) { NARGS(1, 1); scr_unblank = A_INT(0, 0) == 1; return fl_ret_none(c); }
+/* ---- screen 描画・メーター系 (7) ---- PY-135 (#3022): PE 0xd7ada0・0xd7b690・0xd7ae80・0xd7af40・0xd7bcb0・0xd7bec0・0xd7c600 (REPORT_PY135)。addMeter 以外は状態を持たない */
+/* addMeter: 成功経路 (rc>0・scr≠0) で PE 0xd7d9e0 が isUnBlank を真にし activeCounter を scr+0x1dc (仮置き 0) にする。A_INT は失敗で返るので解析失敗は状態を変えない */
+FL_H(screen, addMeter) { NARGS(4, 5); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); (void)A_INT(4, 0); scr_unblank = 1; scr_active = scr_dflt; return fl_ret_none(c); }
+FL_H(screen, displayBar) { NARGS(5, 5); (void)A_INT(0, 0); (void)A_INT(1, 0); (void)A_STR(2); (void)A_DBL(3, 0); (void)A_INT(4, 0); return fl_ret_none(c); }
+FL_H(screen, fillRect) { NARGS(5, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(screen, drawRect) { NARGS(5, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(screen, drawText) { NARGS(6, 6); (void)A_INT(0, 0); (void)A_STR(1); for (int i = 2; i < 6; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(screen, eraseRect) { NARGS(4, 4); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+/* blank: 第 1 引数が 1 なら isBlanked を真に書く。真→偽の解除では activeCounter を scr+0x1dc (仮置き 0) から戻す (REPORT_PY135) */
+FL_H(screen, blank) { NARGS(2, 2); int b = A_INT(0, 0) == 1; (void)A_INT(1, 0); if (b != scr_blanked) { if (!b) scr_active = scr_dflt; scr_blanked = b; } return fl_ret_none(c); }
 /* ---- screen 初期化・メニュー系 (10) ---- PY-136 (#3025): PE 0xd7aa40・0xd7ab00・0xd7b0a0・0xd7b000・0xd7ccb0・0xd7b1f0・0xd7b170・0xd7c9a0・0xd7cac0・0xd7cbe0 (REPORT_PY136)。
    scr は init で生成し deInit で破棄する。scr 未生成の経路は PE で AV (例外を返さない) なので Unspecified error を仮置き */
 #define SCR_NEED() do { if (!scr_alive) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error"); } while (0)
