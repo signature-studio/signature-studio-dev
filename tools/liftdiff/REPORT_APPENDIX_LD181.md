@@ -53,7 +53,8 @@
 
 ## 5. 検証
 
-- 測定 commit `57a146a96`。`git diff 57a146a96 HEAD -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh` の出力は本節の REPORT・DOC_MAP の commit のみ (ldlib・rt・tests・e2e は 0 行)。
+- 測定 commit `57a146a96` (e2e・sample:800 の実測はこの版)。`git diff 57a146a96 HEAD -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh` の出力は 5 ファイル・+67/-6 行 (`ldlib/cases.py`・`rt/ld_core.h`・`rt/ld_ms_call.S`・`liftdiff_e2e.sh`・`tests/test_ld179_tagpoint_tr.py`)。出どころは main 取り込み (#3862 LD-179) で、本 PR の変更ではない。ただし HEAD の判定は上記の実測に含まれていない。
+- 未実施: head (`ae368aea` 以降) での e2e・sample:800 の再測定。素材 `work-m11`・`work-liftdiff`・`toolchain-*` が実行環境に無く、実行できなかった。
 - e2e: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` → **exit 0・`LIFTDIFF_E2E PASS`・164 秒** (`real 2m44.456s`・開始時 load 0.39・終了直後 4.43)。修正前 (`feec9980a`) は exit 0・164 秒 (`real 2m44.474s`・load 0.03)。
 - 単体: `PASS test_ld52_machine_sig`・`PASS test_ld181_i128_entry` (e2e の `[0/4]`)。
 - 製品 KPI (FLEngine 起動・最初のウィンドウ): 本 PR は起動・GUI に関わらないため書かない。
