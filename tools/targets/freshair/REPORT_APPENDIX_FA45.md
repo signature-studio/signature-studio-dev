@@ -25,6 +25,24 @@
 - 原因の見立て (未確定): `0x1805ee0d1` は `mov rdx, [rcx+8]` で、直前の `mov rcx, [rcx+0x9f88]` が 0。`stereo.ll` の 2532・2933 行も同じ `P+0x9f88` を読む。Filter・VocalFilter の P には `+0x9f88` の初期化が無い (`pokes.txt` に無い)。Stereo 固有の初期化が必要と推定。
 - 本 PR では `native_stereo.c` をコミットしない (通らないハーネスを残さない)。子 issue (#4046) が出発点にする。
 
+### §3.1 P+0x9f88 の書込み順 (#5011 実測・測定 commit `52c7e0ca0`)
+
+- 書込み: `0x1805ec9f0` の `mov [rax+0x9f88], rcx` (`rcx = this`)。この命令は関数 `0x1805cb150` (構築関数・`this` を `rcx` で受けて 0x9f90 の object を組む) の内側にある。逆アセンブルの確認で `0x1805cb150` 先頭から 80 KB 以内に書込み命令は無い (範囲外で 0x1805ec9f0 に在る)。
+- ハーネス: `tools/targets/freshair/lift2/native/native_stereo.c` (`ctor=1` は `0x1805cb150(P, A)` を先に実行し、`[P+0x9f88] == P` を確かめてから `0x1805ee2a0` を実行。`ctor=0` は構築を飛ばす対照)。
+- 前提の修正: `0x1805cb150` の先頭の `__chkstk` (`0x18100c710`) が `gs:[0x10]` で SIGSEGV する (Linux は gs_base=0)。`native_ctrl.c` と同じく `0x18100c72c` の gs 読みを `xor r11,r11` + nop に差替えた (wasm 側 `@fa_teb=0` と同値)。
+- 実測 (commit `52c7e0ca0`・`bash tools/targets/freshair/ks_sc_stereo_smoke.sh 20`・load 1 分値 0.07・nproc=4):
+
+| 条件 | fma | 行数 | ERR | `[P+0x9f88]==P` | 所要 |
+|---|---|---|---|---|---|
+| ctor=1 (構築 → process) | 0 | 20 | 0 | 20/20 | 0.275 s (script 全 4 run 計) |
+| ctor=1 (構築 → process) | 1 | 20 | 0 | 20/20 | (同上) |
+| ctor=0 (構築を飛ばす) | 0 | 20 | 20 | — | (同上) |
+| ctor=0 (構築を飛ばす) | 1 | 20 | 20 | — | (同上) |
+
+- ctor=0 の ERR は全 20 case で `sig=11 rip=0x1805ee0d1 addr=0x30` (§3 の #4046 試行と同一)。
+- 結論: process の読み (`0x1805ee0c2`・`0x1805ee0d1`) は、構築 `0x1805cb150` が `[P+0x9f88]=P` を書いた後でしか成立しない。書込みが読み手より前であることを機械語の実行で確かめた。
+- 限界: 本件は依存関係 (書込みが無いと読み手が落ちる) を確かめたもので、実製品の呼出し時刻 (`0x1805ca8a8` の構築経路の順序) は未測定。bit 一致・KH との比較は対象外。
+
 ## §4. Resonator: SC 側 process 未特定
 
 - `ks_identity.py` の SC VA `0x1803df070` (907 B) は制御層の共有関数で、Resonator の process ではない (`REPORT_APPENDIX_2739.md` §3 の注記と同じ)。
