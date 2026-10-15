@@ -118,6 +118,7 @@ typedef int (*GuiResProvider)(uint64_t hinst, uint32_t type, uint32_t id, const 
 void gui_set_resource_provider(GuiResProvider p);
 /* 到達 API ログ (gui_reach.c) */
 void gui_reach_hit(int idx);
+void gui_reach_paint(void);
 void gui_reach_hit_name(const char *name);
 int  gui_reach_index(const char *name);
 void gui_reach_dump(void);
