@@ -229,10 +229,10 @@ G2 の期待値を当時の `unreachable` から現版の `returned` に変え�
 - 機構: `m11_bounds.py` は `array1` (`0xf768e0`, 942 entry) の各 entry の `(init, final)` の両列を、並び順に `work/inits_text.txt` へ書く。`inits_text.txt` は `m11_passes.py --init-list` が読み、列挙された関数に init prologue counter を入れる。
 - `array1` entry 1 は `(init=0x41ce10, final=0x41cd70)`。`function_41cd70` は entry 1 の **final 列**なので、列挙の 4 番目 (`41ce10` の直後) に入る。init 呼出しではない。
 - 中身 (`boot_final.ll`): `0x11E6A38` のフラグを +1 し、結果が 0 のとき解放本体へ進む。解放本体は `function_41bad0` 等と `function_418f20` を呼び、`function_418f20` は `DeleteCriticalSection(0x11EAF00)` を呼ぶ。`function_41ce10` は同じフラグを −1 し、結果が 0 のとき `function_418e10` (`InitializeCriticalSection(0x11EAF00)`) を呼ぶ。対になる init / final の組。
-- 従来の記録 (`REPORT_APPENDIX_2880.md` の「推定」) は、この対応で確定した。解放の早期実行の有無 (#3077 受入 4 の残り) は、boot が `41cd70` に届く条件の実測で別に確かめる (未計測・追跡先は未決。§9 末尾)。本節は掲載理由の確定まで。
+- 従来の記録 (`REPORT_APPENDIX_2880.md` の「推定」) は、この対応で確定した。解放の早期実行の有無 (#3077 受入 4 の残り) は、boot が `41cd70` に届く条件の実測で別に確かめる (未計測・追跡先は親 #3077 への提案コメント https://github.com/signature-studio/signature-studio-dev/issues/3077#issuecomment-6186232211)。本節は掲載理由の確定まで。
 
 ### 9-3. `410360` の戻り値 (参照)
 
 `function_410360` の vtable 呼出し脱落 (D15 型) は `REPORT_699` 本体 §6 (ii) と `REPORT_APPENDIX_3077.md` §4-1 が正本。本節では変更しない。
 
-未解決 (本 PR の範囲外): 解放の早期実行の有無 (boot の `41cd70` 到達条件)。起票先: 未決。親 #3077 は CLOSED (2026-10-15 確認) で、open な追跡 issue は無い。PM の判断待ち (子 issue の起票は `docs/WORKFLOW.md` §3 の「未解決の追跡だけの子は起票しない」に従い見送り)。
+未解決 (本 PR の範囲外): 解放の早期実行の有無 (boot の `41cd70` 到達条件)。起票先: 親 #3077 (CLOSED) への提案コメント https://github.com/signature-studio/signature-studio-dev/issues/3077#issuecomment-6186232211 (子 issue は `docs/WORKFLOW.md` §3 の「未解決の追跡だけの子は起票しない」に従い起票せず、再測定の条件は同コメントに書いた)。
