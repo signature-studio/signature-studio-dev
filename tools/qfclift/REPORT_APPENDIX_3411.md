@@ -4,7 +4,7 @@
 
 
 測定 commit = `5c79daa2b` (HEAD。`qfc_count.sh` を HEAD で link・実行して得た値)。再現は `tools/qfclift/qfc_count.sh` (前提: `qfc_boot.sh` で lift 済み)。判定はしない。
-計数は直接呼出し `imp_<名>();` だけ。間接経由 (`imp_by_index` → `imp_tab[k]()`・`ott_missing_import`) は含まない (未計数。§10.3 → #4374)。
+間接経由も計数した (§4374: 停止点まで 0 件)。停止後の間接呼出しは未計数 (#4262)。
 
 ### 10.1 呼出し回数 (直接呼出し・DllMain(PROCESS_ATTACH) → 停止点まで、n=1)
 
@@ -24,7 +24,7 @@
 
 - 直接呼出しとして計数された import は 6 件で、すべて rt・`qfc_imp.c` に既存。よって直接経路で新たに実装が必要な import は **0 件**。`qfc_imp.c` と rt は変更していない。
 - `qfc_count.sh` の emcc 行を `qfc_lift.sh` の `wasm_build` と同じ入力集合 (`qfc_ov.c`・`qfc_import.c`・`FT_WASM32_LIB`・`-I` 群) に揃えた (commit `5c79daa2b`)。一時版の手修正は使っていない。
-- 間接経由の import 呼出しは未計数のため、「DllMain 経路で実際に呼ばれる import は 6 件」とは言えない (§10.3 の未解決 → #4374)。
+- 停止点までの間接呼出しは 0 件のため、6 件 (直接) と併せて停止点までの全数は 6 件。停止後は #4262 で扱う。
 - 受入 2 の「soft 呼出し 0 件にする」は満たさない (soft 呼出し 0 件は元から満たしていた)。停止点の解釈 (偽の停止か) は #4262 の範囲。
 
 ### 10.3 未解決
@@ -33,7 +33,7 @@
 |---|---|---|
 | 停止点 `ExitProcess(0)` が偽の停止か (longjmp 継続後の進行) | DllMain が完走したか不明 | #4262 (T-SH-106) |
 | longjmp (0x40f9c0) の発生条件と戻り先 `0x59c210` の lift 対応 | 停止点の解釈 | #4263 (T-SH-107) |
-| 間接経由 (`imp_by_index` → `imp_tab[k]()`・`ott_missing_import`) の import 呼出し | 計数は直接呼出しの 6 件だけ。DllMain 経路の間接呼出しは未計数 | #4374 (T-SH-121) |
+| 停止後の間接呼出し | 停止点までは 0 件 (§4374)。停止後は未計数 | #4262 (T-SH-106) |
 | rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る。FLEngine の既存結果への影響は未確認 | #4375 (T-SH-122) |
 | `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | #4280 (T-SH-108) |
 | `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #4296 (T-SH-113) |
