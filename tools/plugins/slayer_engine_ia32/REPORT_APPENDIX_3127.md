@@ -3,7 +3,7 @@
 - 親 REPORT: `tools/plugins/slayer_engine_ia32/REPORT.md` §13 (結論 1 行)。 本付録が測定値の正本。 前提の harness は #1223 (`REPORT_APPENDIX_1223.md`)。
 - 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない。 本件は実行結果の突合と import の ABI モデル)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` (sha256 `84b64c43…de724a9`)。
-- 測定 commit: `d44c868c3` (コードを変えた最後の commit。 `diff_entry.py` のコメントのみの修正)。 そこから HEAD までのコード差分は文書のみ (§6 の鮮度証跡)。
+- 測定 commit: `dadf4ea18` (main `1cda538f5` の取り込み後。 コードを変えた最後の commit)。 そこから HEAD (`1258391e1`、main `ba0f22fb0` の取り込み) までの測定範囲のコード差分は 0 行 (§6 の鮮度証跡)。
 
 ## 1. 結論と範囲
 
@@ -79,22 +79,22 @@
 - fail-fast の 24 件は 448 行の実行で 1 件も呼ばれていない (両側とも rc=0)。 呼ばれると weak stub が abort し、 native は exit 9 で終わるため、 rc=0 がその証跡になる。 呼ばれた時点で止まる動作は設計 (weak stub・`n_missing`) による。 **実行での検証は未実施** (§7)。
 - stub の値はすべて Win32 の実挙動ではなく、 両側で揃えた仮定。 この突合が検証するのは「同じ仮定の下で lift と ia32 規約が一致する」ことだけ。
 
-## 4. 実測 (測定 commit `d44c868c3`・n=3)
+## 4. 実測 (測定 commit `dadf4ea18`・n=3)
 
 | 項目 | 値 |
 |---|---|
 | 突合 (`python3 diff_entry.py`) | `[compare] PASS: 448 / 448 件が bit 一致、不一致 0 件`・`[diff_entry] PASS`・exit 0 (3 回とも同一) |
 | ネガティブコントロール (`--nega`) | `[compare] FAIL: 447 / 448 件が bit 一致、不一致 1 件`・`[nega] 1 bit 壊した出力を検出 (FAIL, exit 1)。 ネガコン OK`・exit 0 (方法は §5) |
-| import 呼出し数 (wasm 側・計数用の一時ビルド) | `1000e1b7`: HeapAlloc 64・VirtualAlloc 64・HeapReAlloc 4・HeapFree 0 (64 行で計 132 件)。 `1000ea7d`: LeaveCriticalSection 64。 `10007ca0` (main): 0 件 (64 行とも)。 leaf 4 本: 0 件。 合計 196 件 |
+| import 呼出し数 (wasm 側・計数用の一時ビルド) | `1000e1b7`: HeapAlloc 64・VirtualAlloc 64・HeapReAlloc 4・HeapFree 0 (64 行で計 132 件)。 `1000ea7d`: LeaveCriticalSection 64。 `10007ca0` (main): 0 件 (64 行とも)。 leaf 4 本: 0 件。 合計 196 件。 計数は `dadf4ea18` で再現 (一致)。 HEAD `1258391e1` では再計数していない (測定範囲のコード差分 0 行) |
 | 計数の方式 | 一時コピー (`git archive`) の `rt32_glue.c` の `imp_*` 入口と `ott_call32` に stderr 出力 (`ROW`・`IMP`) を入れ、 行ごとに数えた。 計数なしのビルドと出力 (`wasm_out.txt`) は `cmp` で一致。 リポジトリにはコードを入れていない。 上の 4 名以外の import は 0 件 |
 | 非自明性 | native 実行で OBJ 領域が変わった行 256 / 448 (leaf 4 本の 256 行。 main・heap・LeaveCS の行は OBJ を変えない)。 heap 先頭 64 B が非 0 なのは `1000e1b7` の 64 行のみ (毎行の reset で heap 先頭 4 KiB を 0 に戻すため、 他の入口の行に前行の残りは出ない)。 `1000e1b7` は `eax=108004f4` などの heap アドレスを返す |
 | 戻り値の内訳 | `10007ca0` (main) は 64 行とも eax=0 (callback 0 経路)。 `1000ea7d` (LeaveCriticalSection) は 64 行とも eax=0。 `1000e1b7` は eax が heap のアドレス (`108004f4`・`108004e0`・…) |
-| ビルド (min–max) | native build 0.06–0.07 s、 wasm emcc 4.72–4.83 s |
-| 実行 (min–max) | native 0.036–0.037 s、 wasm (node) 0.056–0.060 s |
-| load1 (run 直前、 3 回) | 0.44・0.49・0.53 |
+| ビルド (min–max, n=3) | native build 0.04–0.20 s (0.20 s は 1 回目)、 wasm emcc 3.12–11.83 s (11.83 s は 1 回目。 2 回目以降は 3.12–3.14 s) |
+| 実行 (min–max, n=3) | native 0.024–0.026 s、 wasm (node) 0.041–0.073 s (0.073 s は 1 回目) |
+| load1 (run 直前、 n=3) | 1.90・1.91・1.91 |
 | 件数 | 入口 7 本 × 64 = 448 行 (期待値と一致) |
 
-## 5. ネガティブコントロール (測定 commit `d44c868c3`)
+## 5. ネガティブコントロール (測定 commit `dadf4ea18`)
 
 - `python3 diff_entry.py --nega`: wasm 出力の 1 行目 (leaf `10001b40`) の eax の 1 bit を壊し、 判定器に通す。 FAIL を検出して exit 1 になれば OK。 数値は §4。
 - ネガコンは leaf の 1 行で行う (既存の仕組みのまま)。 import を通る行でも同じ判定器を通るため、 判定器の効き自体は変わらない。
@@ -109,7 +109,7 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py    # 突合 (exit 0)
 python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 ```
 
-- 鮮度: 測定 commit は `d44c868c3` (コードを変えた最後の commit)。 そこから HEAD までのコード差分は `git diff d44c868c3 HEAD -- tools/plugins/slayer_engine_ia32/{diff_entry.py,native_entry.c,rt32_glue.c,entry_wasm.mjs,lift_text.py} tools/ott/rt tools/ott/lift` の出力が 0 行 (PR 本文の『検証 HEAD』欄が正)。
+- 鮮度: 測定 commit は `dadf4ea18` (コードを変えた最後の commit)。 そこから HEAD `1258391e1` までのコード差分は `git diff dadf4ea18 HEAD -- tools/plugins/slayer_engine_ia32/{diff_entry.py,native_entry.c,rt32_glue.c,entry_wasm.mjs,lift_text.py} tools/ott/rt tools/ott/lift` の出力が 0 行 (PR 本文の『検証 HEAD』欄が正)。
 - 補足: `lift_text.py` の結果は `imports 41`・`functions 472` (pass2)。 pass1 の `38` は REPORT_APPENDIX_1098 §2 の値。
 
 ## 7. 未解決
@@ -120,4 +120,4 @@ python3 tools/plugins/slayer_engine_ia32/diff_entry.py --nega
 | 突合で未通過の KERNEL32 import 13 件: 実装 8 件 (EnterCriticalSection・InitializeCriticalSection・GetLastError・SetLastError・TlsGetValue・TlsSetValue・HeapFree・VirtualFree) と stub 5 件 (GetCurrentThreadId・GetModuleFileNameA・GetStdHandle・LoadLibraryA・WriteFile) | 既存の入口は 1 回も呼ばない。 実行で未検証で、 方針表の値は両側の仮定が一致することしか示していない | [PLG-G2-39] #3960 (本 PR で起票) |
 | fail-fast の 24 import の実行検証 | 呼ばれた時の止まり方を実行で確認していない (448 行では 1 件も呼ばれない) | [PLG-G2-39] #3960 (本 PR で起票) |
 | `0x100106a5` (SEH: `mov eax, fs:[0]`・`mov fs:[0], esp`) を通る経路 (`0x1000d791` 等) | native に fs 基底が無く fs:[0] への書込みで落ちる。 wasm は `ott_teb_blk` (0 埋め)。 本入口からは外した | [PLG-G2-37] #3905 (fs: TEB を含む 8 関数) |
-| 間接 call 先 (`ott_dispatch`)・sahf の AF・fs: TEB の 0 埋め | #1223 から継続 (leaf 外の実行時の論点) | [PLG-G2-27] #3128 |
+| 間接 call 先 (`ott_dispatch`)・sahf の AF・fs: TEB の 0 埋め | #3128 で測定済み (結果は `REPORT_APPENDIX_3128.md`)。 fs: TEB の native 未達は上の `0x100106a5` の行 (子 [PLG-G2-37] #3905) | 測定済み (#3128・CLOSED) |
