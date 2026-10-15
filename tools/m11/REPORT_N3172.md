@@ -3,7 +3,7 @@
 親: #2779。関連: #3162 (未解決表の起票先)。既知類型との関係: DEFECTS.md の類型は新規確定しない (該当なし)。
 
 ## 1. 結論
-- 受入 1 (全再生成経路で `bash tools/m11/m11_e2e.sh --full` が rc 0): **測定 commit `de8a34d5` (修正前 script) で達成**。`functions_dll.csv`・`work/lift_pe.sha256` を消した状態から rc 0・1274 秒。**修正後 script (`29cdb2ab`・HEAD `11d40389`) では未測定** (§11)。
+- 受入 1 (全再生成経路で `bash tools/m11/m11_e2e.sh --full` が rc 0): **測定 commit `de8a34d5` (修正前 script) で達成**。`functions_dll.csv`・`work/lift_pe.sha256` を消した状態から rc 0・1274 秒。**修正後 script (`29cdb2ab`・コード最終 `e141ce49`) では未測定** (§11)。
 - 受入 2 (生成した lift 成果物の PE 指紋と使った fl-win64 の PE の一致): **測定 commit `de8a34d5` で達成**。`work/lift_pe.sha256` = `b2c64da4…` = fl-win64 の `extracted/block00031_PE.bin` の sha256。修正後は未確認。
 - 修正の中身: `functions_dll.csv` は素材に無い Ghidra 12.1.4 の中間物で、全再生成の `m11_bounds.py` がこれを読めず fail-closed で止まっていた。`tools/m11/m11_ghidra_dll.sh` を新設し、無い時だけ Ghidra を取得 (sha256 検査) して作る。`m11_e2e.sh` の全再生成分岐で `m11_bounds` の前に呼ぶ。
 - 到達 stage は **4/6** のまま (5・6 未達)。停止点は REPORT_N1598 §4 と同じ (`function_8c5eb0` の unreachable)。本 PR は起動の数値を変えていない (units_run 53・survey 872 は修正前の既存値と同じ)。
@@ -16,7 +16,7 @@
 - 実行前の状態: `tools/m2/work/ghidra_dll/functions_dll.csv` 無し・`tools/m11/work/lift_pe.sha256` 無し (issue の前提どおり)。
 
 ## 3. 受入 1: 1 コマンド (全再生成経路・fresh・測定 commit `de8a34d5`)
-実行: `cd ws-3172 && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/m11_e2e.sh --full` (実測 23:21:36 → 23:42:50 UTC)。script は `de8a34d5` のもの。HEAD (`11d40389`) での再測定は未実施 (§11)。
+実行: `cd ws-3172 && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/m11_e2e.sh --full` (実測 23:21:36 → 23:42:50 UTC)。script は `de8a34d5` のもの。修正後 (`e141ce49`) での再測定は未実施 (§11)。
 
 | 工程 | 結果 |
 |---|---|
@@ -48,10 +48,10 @@ Ghidra ログ: `DumpFunctions: 59009 functions`、image base `00400000`。
 ## 6. 既定経路の再確認 (非 `--full`)
 - 69 秒の run: `bash tools/m11/m11_e2e.sh` (`functions_dll.csv`・`lift_pe.sha256` は §3 の run が作ったものを再利用)。script は `dfbc2948` より前 (`de8a34d5` と同じ)。**rc 0・69 秒**・load `0.45 0.85 0.81` → `0.82 0.89 0.83`・survey ok 872 / trap 23 / miss 46 / noproc 1 (§5 と同じ)。
 - 67 秒の run: script を `dfbc2948` (測定後の既定分岐削除を含む) にして同じ経路を実行。**rc 0・67 秒**・load `0.10 0.58 0.72` → `0.90 0.74 0.77`・survey ok 872 / trap 23 / miss 46 / noproc 1 (同じ)。
-- どちらも `29cdb2ab` (sidecar 照合・GPROJ) より前の script。`29cdb2ab` 以降は CSV の再利用に sidecar (`functions_dll.csv.pe_sha256`) が要るため、この 2 run の CSV は再利用の条件を満たさない。**HEAD `11d40389` の非 `--full` 経路は未測定** (§11)。
+- どちらも `29cdb2ab` (sidecar 照合・GPROJ) より前の script。`29cdb2ab` 以降は CSV の再利用に sidecar (`functions_dll.csv.pe_sha256`) が要るため、この 2 run の CSV は再利用の条件を満たさない。**修正後 (`e141ce49`) の非 `--full` 経路は未測定** (§11)。
 
 ## 7. コード差分 (測定 commit → HEAD)
-- 測定 commit `de8a34d5` から HEAD `11d40389` までの `tools/m11` のコード変更は `tools/m11/m11_ghidra_dll.sh` のみ。`dfbc2948` (既定 Ghidra 分岐の削除・注記 1 行) と `29cdb2ab` (sidecar 照合・GPROJ 後始末。29 行) の 2 commit。残りは本 REPORT (docs)。
+- 測定 commit `de8a34d5` から修正後 (`e141ce49`) までの `tools/m11` のコード変更は `tools/m11/m11_ghidra_dll.sh` のみ。`dfbc2948` (既定 Ghidra 分岐の削除・注記 1 行) と `29cdb2ab` (sidecar 照合・GPROJ 後始末。29 行) の 2 commit。残りは本 REPORT (docs)。
 - したがって §3・§5・§6 の数値は、測定 commit の script (修正前) の実測。HEAD の script の数値ではない (§11)。
 - `git diff --stat de8a34d5 HEAD -- tools/m11 docs/REFERENCES.md docs/DOC_MAP.md` の実出力は PR 本文に添付する (本ファイル自身の行数を含むため、本文中には書けない)。
 
