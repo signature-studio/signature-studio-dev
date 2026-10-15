@@ -13,13 +13,13 @@
 
 ## 測定
 
-- 測定 commit (コードを変えた最後の commit): `d3bbceaa` (probe に定数・literal の値検査を追加)。測定 HEAD: `892efc7b` (main 取り込み merge。下の差分の証跡で差分があるため、この HEAD で再測定した)。ベースは origin/main `7c85004e`。作業は `3253-py176-bb-origin` の worktree。
+- 測定 commit (コードを変えた最後の commit): `d3bbceaa` (probe に定数・literal の値検査を追加)。測定 HEAD: `29a94a5a` (main 取り込み merge。下の差分の証跡で差分があるため、この HEAD で再測定した)。ベースは origin/main `7c85004e`。作業は `3253-py176-bb-origin` の worktree。
 - 展開: `cd <展開先> && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst extracted/block00031_PE.bin` (2.2 秒・22,227,016 バイト・1 回。`fl-win64.tar.zst` (2.3 GB) の実在を `ls` で確認済み)。展開先は repo 外の一時領域で、`FL_WIN64_DIR` で指定する。gitignore の `tools/python/work/` は使わない (規約 4)。
 - 逆アセ (HEAD で再実行。以下 24 回すべて終了 0): `pe_disasm.py` (0x1051720 400・0xf82a10 400・0xf82c20 400・0xf829c0 60・0xf8c9d0 40・0xf8ca50 40・0xf8ec70 90・0xf8e4e0 80・0x11f1a20 65・0x104f580 300・0x104d2b0 200・0x414e70 150・0x43dd60 250・0x414da0 250・0x414c70 120・0x104d0d0 100・0x1050f90 200・0x10469f0 150)、`pe_rip_consts.py` (0x1051720 240・0xf82a10 120・0xf82c20 110・0x11f1a20 40)、`pe_callgraph.py callers 0x1051720`、`pe_cstr.py <VA>` (狭い C 文字列として読むため UTF-16 の literal は 1 文字だけ出る。`0x1051bf0` → `' '`。全文は pefile で 2 byte ずつ読んだ)。
-- probe (`FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_bb_state_probe.py`): 17 件すべて PASS・summary OK・終了 0。数え方: 構造 8 件 (呼出し順・slot・初期値・vtable 呼出し)・定数 3 件・literal 6 件。HEAD で n=3 の real は 0.07 秒 ×3 (min–max 0.07–0.07)、load average (1 分値) 0.67。
+- probe (`FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_bb_state_probe.py`): 17 件すべて PASS・summary OK・終了 0。数え方: 構造 8 件 (呼出し順・slot・初期値・vtable 呼出し)・定数 3 件・literal 6 件。HEAD で n=3 の real は 0.07 秒 ×3 (min–max 0.07–0.07)、load average (1 分値) 0.04。
 - 実測した定数・literal (probe が照合する値): 定数 `0x1051b78` = 0.05 (f64)・`0x1051b80` = 100.0 (f64)・`0x1051be0` = 0 (byte)。literal (UTF-16LE・NUL 終端まで): `0x1051bf0` = `" is waiting for pickup: "` (24 文字)・`0x1051c30` = `"%.2f"`・`0x1051c48` = `"%"`・`0x1051c58` = `" "`・`0x1051c68` = `" < "`・`0x1051c7c` = `" > "`。
-- 所要・load: 逆アセ 1 回あたり 0.07 秒 (HEAD で 22 回を計測。並列 1)。`pe_callgraph.py callers 0x1051720` は 24.04 秒・24.16 秒 (n=2・並列 1・load 1 分値 0.26 → 0.57・nproc 4)。e2e ではない。
-- 差分の証跡 (測定 commit `d3bbceaa` → 測定 HEAD `892efc7b`): `git diff --stat d3bbceaa 892efc7b -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行ではない。内訳は main 取り込み分で、`analysis/flapi/pe_flrack_flr_probe.py` +65・`analysis/py167_flr_pyc.py` +90 (別タスクの probe)、provider・host・tests 4 files +37/−10。本 probe `analysis/flapi/pe_bb_state_probe.py` の差分は 0 行。PE (`block00031_PE.bin`) は変わらないが、差分があるため HEAD で再測定した (上記)。
+- 所要・load: 逆アセ 1 回あたり 0.07 秒 (HEAD で 22 回を計測。並列 1)。`pe_callgraph.py callers 0x1051720` は 24.16 秒 (`892efc7b`)・24.04 秒 (`892efc7b`)・24.02 秒 (`29a94a5a`) (n=3・並列 1・nproc 4・load 1 分値は 0.04〜0.57)。e2e ではない。
+- 差分の証跡 (測定 commit `d3bbceaa` → 測定 HEAD `29a94a5a`): `git diff --stat d3bbceaa 29a94a5a -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行ではない (8 files +311/−17)。内訳は main 取り込み分で、別タスクの probe `analysis/flapi/pe_flrack_flr_probe.py` +65・`analysis/flapi/pe_pattern_probe.py` +82・`analysis/py167_flr_pyc.py` +90、provider・host・tests 5 files。本 probe `analysis/flapi/pe_bb_state_probe.py` と逆アセ用の 4 本 (`pe_disasm.py`・`pe_rip_consts.py`・`pe_callgraph.py`・`pe_cstr.py`) の差分は 0 行。PE (`block00031_PE.bin`) は変わらないが、差分があるため HEAD で再測定した (上記)。
 - ネガティブコントロール (HEAD で実行。1 バイトだけ壊した複製を repo 外の一時領域 `<neg>` に置き、`FL_WIN64_DIR=<neg>/<名前>` で probe を実行。`cmp -l` で差分 1 バイトを確認):
 
 | 検査 | 壊し方 (VA・file offset・旧→新) | 出力 | 終了 |
