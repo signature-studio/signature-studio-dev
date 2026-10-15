@@ -51,6 +51,11 @@ static int64_t disp_time;
 static int browser_op;
 static int64_t arr_time;
 static int scr_blanked, scr_unblank, scr_active;
+/* PY-224 (#3628): getGridBitWithLoop の loop 行 T[G1] (G1 = 1・G2 = 24)。行の作成経路 (0x12da6d0・PY-223) は未モデルで、既定は行なし (.bss の 0)。テストは fl_engine_loop_set / fl_engine_loop_add で置く */
+#define LP_N 8
+#define LP_G2 24
+static int lp_row, lp_flag49e, lp_flag54, lp_n;
+static int64_t lp_cid[LP_N], lp_f4[LP_N], lp_len[LP_N];
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -60,6 +65,9 @@ static void init_chan(Chan *c, const char *name, const char *plugin, double vol,
     c->pitch_n = 2; /* N の既定 2: reset 0xfe9090 (REPORT_PY72 §PY-77 受入 E)。chan との同一性は未確定 */
     for (int q = 0; q < NPARAM; q++) c->pv[q] = params[q].v;
 }
+
+/* PY-117 (#2959): 試験用。準備判定 (general.safeToEdit) の値を設定する */
+void fl_engine_set_safe_edit(int v) { safe_edit = v ? 1 : 0; }
 
 void fl_engine_reset(void) {
     nch = 3;
@@ -90,6 +98,7 @@ void fl_engine_reset(void) {
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
     midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
+    lp_row = lp_flag49e = lp_flag54 = lp_n = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
 int fl_engine_channel_count(void) { return nch; }
@@ -107,6 +116,22 @@ int fl_engine_browser_op(void) { return browser_op; }
 int fl_engine_grid_bit(int c, int p) {
     if (c < 0 || c >= nch || p < 0 || p >= NSTEP) return -1;
     return ch[c].steps[p];
+}
+/* 検査用: 行 T[1] の有無・flag49e・flag54 を置き、record を消す。record は fl_engine_loop_add で追加。上限 LP_N 件を超えた追加は 0 を返して捨てる (mock は setLoop で throw) */
+void fl_engine_loop_set(int row, int flag49e, int flag54) { lp_row = row != 0; lp_flag49e = flag49e != 0; lp_flag54 = flag54 != 0; lp_n = 0; }
+int fl_engine_loop_add(int cid, int f4, int len) { if (lp_n >= LP_N) return 0; lp_cid[lp_n] = cid; lp_f4[lp_n] = f4; lp_len[lp_n] = len; lp_n++; return 1; }
+/* PE 0x12d3ff0 の loop 分岐 (REPORT_PY224)。行 T[1] と flag49e・flag54 が非 0 で、channel ci の最初の record (f4 != 0) が L = len / 24 を与えるとき、p < L は base(p)、それ以外は base(p mod L) (1 なら 2・0 なら 0 で、戻り値は bool に写る) */
+static int grid_bit(int64_t index, const Chan *k, int32_t p);
+static int grid_bit_loop(int64_t ci, const Chan *k, int32_t p) {
+    int base = grid_bit(ci, k, p);
+    if (!lp_row || !lp_flag49e || !lp_flag54) return base;
+    for (int r = 0; r < lp_n; r++) {
+        if (lp_cid[r] != ci || lp_f4[r] == 0) continue;
+        int64_t L = lp_len[r] / LP_G2;
+        if (L <= 0 || p < L) return base;
+        return grid_bit(ci, k, (int32_t)(p % L)) ? 2 : 0;
+    }
+    return base;
 }
 
 #define WRONGN() return fl_err(c, FL_E_WRONG_PARAM, "Wrong number of function parameters or wrong parameter type")
@@ -138,8 +163,8 @@ static int grid_bit(int64_t index, const Chan *k, int32_t p) {
 FL_H(channels, getGridBit) { CH(0); return fl_ret_b(c, grid_bit(_i, k, (int32_t)A_INT(1, 0))); }
 /* PE 0xd5b360: grid (+0x7ac) は channel 生成 0xff5aa0 が直接 call する 0xff63f0 で作られ非 null。null の経路 (status 0) は直接 call の範囲では到達しない (間接呼出しは未走査・REPORT_PY101) */
 FL_H(channels, isGridBitAssigned) { CH(0); (void)k; (void)A_INT(1, 0); return fl_ret_b(c, 1); }
-/* PE 0xd5bc10 → 0x12d3ff0: loop 記録の分岐は未モデル (行テーブル T は .bss で起動直後は 0・REPORT_PY112)。base 0x12d3e20 と同じ読出し。件数以上は getGridBit と同じく 0 */
-FL_H(channels, getGridBitWithLoop) { CH(0); return fl_ret_b(c, grid_bit(_i, k, (int32_t)A_INT(1, 0))); }
+/* PE 0xd5bc10 → 0x12d3ff0: loop 分岐は grid_bit_loop。base は grid_bit (件数以上の event 経路 PY-218) */
+FL_H(channels, getGridBitWithLoop) { CH(0); return fl_ret_b(c, grid_bit_loop(_i, k, (int32_t)A_INT(1, 0))); }
 /* 選択の並びで offset 番目 (0 = 先頭)、超えたら最後の選択。負の offset は先頭扱い (stub に記述なし・仮置き)。無選択は canBeNone で -1 / 0 */
 FL_H(channels, channelNumber) {
     int64_t none = A_INT(0, 0), off = A_INT(1, 0), n = 0, pick = -1;
@@ -473,9 +498,10 @@ FL_H(playlist, getLiveTriggerMode) { PL(0); return fl_ret_i(c, p->trig_mode); }
 FL_H(playlist, getLivePosSnap) { PL(0); return fl_ret_i(c, p->pos_snap); }
 FL_H(playlist, getLiveTrigSnap) { PL(0); return fl_ret_i(c, p->trig_snap); }
 /* 表 (gen/fl_table.c・main #2927 で kwsig 'i|i' に合わせ value 引数が入った)。REPORT_PY61 §3 確定: value -1 (省略を含む) は反転、それ以外は下位 1 byte を lock に書く。
- * 準備判定 (-2) は未モデル (常に準備済み) */
-/* PY-102 (#2883): binary 0xd56510 に従う。index 1..500 の外は RANGE (-4)、value -1 は反転、他は下位 1 byte を書く。準備判定 (call [rax+0x98]) は未モデル (常に準備済み) */
-FL_H(playlist, muteTrackLock) { PL(0); int64_t v = A_INT(1, -1); p->lock = v == -1 ? !p->lock : (uint8_t)v; return fl_ret_none(c); }
+ * 準備判定 (-2) は PY-117 (#2959) で muteTrackLock に入れた */
+/* PY-102 (#2883): binary 0xd56510 に従う。index 1..500 の外は RANGE (-4)、value -1 は反転、他は下位 1 byte を書く。
+   PY-117 (#2959): 準備判定 (call [rax+0x98] = general.safeToEdit と同じ式) が偽なら、範囲検査より先に UNSAFE (-2) */
+FL_H(playlist, muteTrackLock) { int64_t v = A_INT(1, -1); if (!safe_edit) return fl_err(c, FL_E_UNSAFE, "Operation unsafe at current time"); PL(0); p->lock = v == -1 ? !p->lock : (uint8_t)v; return fl_ret_none(c); }
 #define WN(a) int64_t _w = A_INT((a), 0); if (_w < 0 || _w >= NWIN) RANGE()
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }
@@ -501,6 +527,10 @@ FL_H(ui, miDisplayDockRect) { NARGS(4, 4); int64_t v[4]; for (int i = 0; i < 4; 
 FL_H(ui, showNotification) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(ui, closeAllMenu) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(ui, closeActivePopupMenu) { NARGS(0, 0); return fl_ret_none(c); }
+/* PE 0xd6f2e0 (showPicker 'i|i'): 1 個目は必須、2 個目は既定 -1。署名なし (np=-1) のため個数と型はここで検査。作用先 (picker の vtbl[0x48]) は未モデル。戻り None */
+FL_H(ui, showPicker) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, -1); return fl_ret_none(c); }
+/* PE 0xd6ef80 (openEventEditor 'Ii|i'): 型と個数は fl_table の 'iib' (2..3) が検査する。作用先 (0xe34450) は未モデル。戻り None (PE の 0xd82c20 に status 0 を渡す経路) */
+FL_H(ui, openEventEditor) { return fl_ret_none(c); }
 /* PY-132 (#3013): PE 0xd6dcd0 (toggleBrowserNode '|i'・既定 -1)。作用先 0xa89690 は値 -1/0/1 で 0xa26190・0xa07d00(0)・0xa07d00(1) に分岐し、他の値は何もしない (分岐のみ。ノード状態は未モデル) */
 FL_H(ui, toggleBrowserNode) { NARGS(0, 1); int64_t v = A_INT(0, -1); browser_op = v == -1 ? 1 : v == 0 ? 2 : v == 1 ? 3 : 0; return fl_ret_none(c); }
 /* PE 0xd6e170 (selectBrowserMenuItem)・0xd6e330 (previewBrowserMenuItem): NOARGS。作用 (0xfdd2c0 のキー送出) は未モデル */
@@ -584,6 +614,21 @@ FL_H(arrangement, selectionSet) { NARGS(2, 5); int64_t x = A_INT(0, 0), y = A_IN
 FL_H(arrangement, liveSelection) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 FL_H(arrangement, addAutoTimeMarker) { (void)A_INT(0, 0); (void)A_STR(1); return fl_ret_none(c); }
 FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
+/* ---- arrangement (2) ---- PY-143 (#3041): PE 0xd78030 (getMarkerName)・0xd785a0 (currentTimeHint) の呼出し構造と戻り str は REPORT_PY143 で確定。
+ * マーカー表は件数 0 の仮置き (addAutoTimeMarker の副作用は未同定のため登録しない)。範囲外は空文字。
+ * currentTimeHint の BBT 分解 (PE 0x1312080) は未同定のため、PPQ 96・4 拍子の仮置きで bar:beat:tick を返す (mock と同じ) */
+FL_H(arrangement, getMarkerName) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_s(c, ""); }
+FL_H(arrangement, currentTimeHint) {
+  NARGS(2, 4);
+  (void)A_INT(0, 0);
+  int64_t t = A_INT(1, 0);
+  (void)A_INT(2, rec_ppq);
+  int zb = A_INT(3, 0) == 1;
+  int64_t per = 4 * 96, bar = t / per, beat = (t % per) / 96, tick = t % 96;
+  char b[64];
+  snprintf(b, sizeof b, "%lld:%lld:%lld", (long long)(bar + !zb), (long long)(beat + !zb), (long long)tick);
+  return fl_ret_s(c, b);
+}
 /* ---- patterns (2 of 4, PY-172 #3219): PE 0xd67000 は配列 null で 0・非 null で ptr-8 の件数を返す。0xd67030 は索引 [0, 件数-1] の外を status -4。
  * グループ配列の実状態は未実測のため、件数 0 (null の経路) を仮置きする。件数 0 では全索引が範囲外 (REPORT_PY172) */
 #define PGRP_N 0
