@@ -210,7 +210,10 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 
 ### 8-3 unit 114 (halt0・Halt 呼出し元)
 
-- 未採取。probe の読みは OOB のみ (halt0 は reader の対象外)。Halt 呼出し元の特定は未実施。
+- reader に halt0 の枝を入れた (`trap144_read_3608.mjs`・halt0 は kind `halt0->longjmp` で採取)。`911cd33b2` 相当の再採取で halt0 8 件 (114・245・279・314・368・509・647・895) と OOB 14 件を採取。prod fix の trap 22 件 (§1-3) と一致。
+- wasm 位置 → IR 名 (`m11_wasmnames.py` で `m11_boot.cjs.wasm` から解決): 114 の最内は `function_412770` (`0x806d16`)、その呼出し元は `function_4128b0__lifted` (`0x2d7a94`) ← `function_4128b0` ← `function_412a40` ← `function_4096b0` ← `function_4096d0`。245・279・509・647 は `function_412a60` ← `function_411d20` の鎖。
+- `function_412770` は `arg1` の領域へ 37 要素を書く関数 (IR 117827 行)。`function_4128b0__lifted` の 2 つの call site (IR 117917 行・118017 行) のうち、どちらが 114 を引いたかは**未確定**。`function_412770` の entry 計数を probe に入れて試したが全 unit で 0 になり、計装の正しさを確認できなかったため撤回した (probe は元の 5 entry に戻した)。
+- 未解決: `function_4128b0__lifted` の分岐条件 (先頭の global 読みと `GetCurrentThreadId` 判定) の trap 時の値は未採取。どの call site かの確定もここから。受入 1 は部分。
 
 ### 8-4 未解決 (起票先 #3608)
 
