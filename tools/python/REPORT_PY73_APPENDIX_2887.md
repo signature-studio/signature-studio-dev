@@ -85,8 +85,8 @@
 
 測定:
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に `*block00031_PE.bin` のみ展開 (実測 2.9 秒)。load average 0.55 (run 開始時)。
-- 測定 commit (コードを変えた最後の commit): `7dc42feb7` (`tools/python/analysis/flapi/pe_vptr_stores.py` の追加)。`git diff 7dc42feb7 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
-- `pe_vptr_stores.py 48` → hits 0・69.7 秒 (命令 5,022,467)。
+- 測定 commit (コードを変えた最後の commit): `7e286e275` (`pe_vptr_stores.py` の追加 `7dc42feb7` の docstring 修正)。`git diff 7e286e275 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
+- `pe_vptr_stores.py 48` → hits 0・70.1 秒 (命令 5,022,467)。`7e286e275` で再現 (初回 69.7 秒)。
 - 陽性対照 `pe_vptr_stores.py 0` → hits 1: `0x44a86e` `mov [rax], rcx` (V = `0x13acb88` (`.data`)、slot+0x20 = `0x44a820`、slot+8 = `0x44a720`)・69.9 秒。
 - 補助 (逆アセンブル): `pe_disasm.py 132e7a0 70`・`410320 40`。`pe_scan_store.py 0x48 qword` の出力は大半が `[rbp+0x48]`・`[rsp+0x48]` (フレーム slot) だった。
 
