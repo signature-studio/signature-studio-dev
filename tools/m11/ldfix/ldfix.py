@@ -1674,6 +1674,74 @@ def fix_f3c_fn(fn, fv, rep, ctr):
     return 1
 
 
+def ir_succ(blocks):
+    """IR の行ブロック列 → 後続ブロックの index 列。終端命令 (br/switch/ret/unreachable) のラベル参照で結ぶ。終端が無い block は次へ落ちる"""
+    name2idx = {}
+    for k, ls in enumerate(blocks):
+        m = re.match(r'^([\w.$-]+):', ls[0]) if ls else None
+        if m:
+            name2idx[m.group(1)] = k
+    succ = []
+    for k, ls in enumerate(blocks):
+        term = None
+        for l in ls:
+            if re.match(r'^\s*(br|switch|ret|unreachable|indirectbr)\b', l):
+                term = l
+        if term is None:
+            succ.append([k + 1] if k + 1 < len(blocks) else [])
+        elif re.match(r'^\s*(ret|unreachable)\b', term):
+            succ.append([])
+        else:
+            succ.append(sorted({name2idx[x] for x in re.findall(r'label %([\w.$-]+)', term) if x in name2idx}))
+    return succ
+
+
+def ir_dominators(succ):
+    """entry = 0 からの支配集合 (反復データフロー)。dom[x] = x を支配する block の index 集合 (x 自身を含む)"""
+    n = len(succ)
+    pred = [[] for _ in range(n)]
+    for a in range(n):
+        for b in succ[a]:
+            pred[b].append(a)
+    dom = [set(range(n)) for _ in range(n)]
+    dom[0] = {0}
+    changed = True
+    while changed:
+        changed = False
+        for x in range(1, n):
+            if not pred[x]:
+                continue
+            new = set.intersection(*[dom[p] for p in pred[x]]) | {x}
+            if new != dom[x]:
+                dom[x] = new
+                changed = True
+    return dom
+
+
+def f3c_use_dom_at(fn, fv, first, rep_idx):
+    """機械語の最初の deref (entry 外) の IR ブロック B が、置換対象の全使用 rep_idx (行 index) を支配するなら、B の先頭 (label の直後) の行 index を返す。
+    B が無い・phi を含む・支配されない使用がある場合は None。修復 load を B の先頭へ置く根拠 (#1325)"""
+    lead = _f3c_leaders(fv.ins)
+    bstart = max([x for x in lead if x <= first], default=None)
+    blocks = fn.blocks()
+    starts, off = [], 0
+    for _bva, ls in blocks:
+        starts.append(off)
+        off += len(ls)
+    cands = [k for k, (bva, _ls) in enumerate(blocks) if bva == bstart]
+    if bstart is None or not cands:
+        return None
+    bi = cands[0]
+    if any(re.match(r'^\s*%[\w.$-]+ = phi ', l) for l in blocks[bi][1]):
+        return None
+    dom = ir_dominators(ir_succ([ls for _bva, ls in blocks]))
+    for k in rep_idx:
+        bk = max(j for j in range(len(blocks)) if starts[j] <= k)
+        if bi not in dom[bk]:
+            return None
+    return starts[bi] + 1
+
+
 ctr_f3cu = [0]             # fix_f3c_use 専用 counter
 
 
@@ -1699,7 +1767,7 @@ def fix_f3c_use(fn, fv, rep, ctr):
         derefs = [u for u in uses if u[0] == 'deref' and u[2] == n and u[4] == 'arg']
         first = min(u[1] for u in derefs)
         raws = [u for u in uses if u[0] == 'raw' and u[2] == n]
-        if first not in blk0 or not all(u[3] == 64 for u in derefs) or any(u[1] > first for u in raws):
+        if not all(u[3] == 64 for u in derefs) or any(u[1] > first for u in raws):
             continue
         ptrarg = pty.get(n, 'i64') != 'i64'
         argre = re.compile(r'(?<![\w.$-])%arg' + str(n) + r'(?![\w.$-])')
@@ -1721,16 +1789,23 @@ def fix_f3c_use(fn, fv, rep, ctr):
         rep_idx = idx[keep:]
         if not rep_idx:
             continue
-        entry_end = next((k for k in range(2, len(lines)) if re.match(r'^[\w.$-]+:', lines[k])), len(lines))
-        if rep_idx[0] >= entry_end:
-            rep['f3c_use_not_entry'] = rep.get('f3c_use_not_entry', 0) + 1
-            continue
-        if keep == 0:
-            at = 2
-            while at < len(lines) and re.match(r'^\s*%[\w.$-]+ = alloca ', lines[at]):
-                at += 1
+        if first in blk0:
+            entry_end = next((k for k in range(2, len(lines)) if re.match(r'^[\w.$-]+:', lines[k])), len(lines))
+            if rep_idx[0] >= entry_end:
+                rep['f3c_use_not_entry'] = rep.get('f3c_use_not_entry', 0) + 1
+                continue
+            if keep == 0:
+                at = 2
+                while at < len(lines) and re.match(r'^\s*%[\w.$-]+ = alloca ', lines[at]):
+                    at += 1
+            else:
+                at = rep_idx[0]
         else:
-            at = rep_idx[0]
+            at = f3c_use_dom_at(fn, fv, first, rep_idx)
+            if at is None:
+                rep['f3c_use_not_dom'] = rep.get('f3c_use_not_dom', 0) + 1
+                continue
+            rep['f3c_use_dom'] = rep.get('f3c_use_dom', 0) + 1
         ctr[0] += 1
         nm = 'ldfxu%d' % ctr[0]
         for k in rep_idx:

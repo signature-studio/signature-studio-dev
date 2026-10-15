@@ -238,3 +238,9 @@
 - **未検証 (範囲外)**: Windows / macOS での実行そのもの、仮想デバイスの導入と既定出力への切替、Edge の `CHROME` 指定。Safari の経路は追加済み (下の Safari の項)。実機では未測定。Firefox は `au2.mjs`・`bidi.mjs` が pactl に依存するため、この行列には流用しない。
 - **P1〜P4 の値**: 未測定 (Windows・macOS とも)。初回の dispatch 結果はこの節に記録する (記録は PM)。
 - **Safari (AU-35 #3193)**: `harness/safari.mjs` (safaridriver の WebDriver classic) と `run.mjs --browser safari` を追加した。Safari の P1〜P4 は未測定。WebDriver BiDi 対応は未確定。詳細・検証・未解決は `REPORT_APPENDIX_3193.md` (正本)。Safari 行の yaml は草案 (未適用)。
+
+## 11. Windows / macOS 行列への Firefox・Safari 追加 (AU-33 #3168・部分達成)
+
+- 測定 commit: `9aa9239b` (コード最終)。9/9 はこの commit のコードで測った。HEAD `c89f18db` では Firefox e2e の入力 (`public/worklets/fl-audio-worklet.js`・`src/runtime/audio-shim.ts`) が main の `7c5ee224` (AU-29) で変わったため、HEAD で再測定した (§A・§G)。
+- 結論: Firefox 157.0 (ubuntu・PulseAudio null-sink・n=3) で **9/9 PASS** (HEAD `c89f18db`・rc 0・underrun 0・既定 sink 接続 9/9。9aa9239b でも 9/9)。既定出力の判定を OS 別にした。Safari の経路は #3208 で main に入った (P1〜P4 は未測定・[AU-36] #3207)。Windows / macOS の Firefox 行は未適用・未実行 (#3192 [AU-34])。
+- 差分: 実行コードの範囲 (`build.sh` 入力を含む) は HEAD `c89f18db` で 8 ファイル・225 行追加・9 行削除 (§A (a))。issue 指定の `-- tools/audio` の内訳・変更・再現・NC・未解決の全文は `REPORT_APPENDIX_3168.md` §A〜§G (250 行上限のため分割移動)。

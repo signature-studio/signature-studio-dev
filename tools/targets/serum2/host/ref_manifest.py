@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-# SR-5 (#73) / SR-47 (#2414): 参照 WAV の sha256 と基本メトリクスを JSON に書く (WAV 本体は commit しない)。
+# SR-5 (#73) / SR-47 (#2414) / SR-46 (#2384): 参照 WAV の sha256 と基本メトリクスを JSON に書く (WAV 本体は commit しない)。
 # usage: python3 ref_manifest.py <render_f32.wav> <out.json> [full|empty]
+#        python3 ref_manifest.py <render_f32.wav> <out.json> preset "<preset 名>" <preset.SerumPreset>
 #   full (既定): installer 全展開 content dir (Tables あり) の参照。正の参照として主エントリ (sha256_file 等) を書き直す。
 #   empty        : 専用の空 content dir (Tables 無し) の参照。out.json の content_empty (variant) だけを更新する。
+#   preset       : factory preset 参照。out.json の presets["<preset 名>"] だけを更新する (SR-46)。
 import hashlib, json, os, struct, sys
 
 src, dst = sys.argv[1], sys.argv[2]
 cond = sys.argv[3] if len(sys.argv) > 3 else "full"
-assert cond in ("full", "empty"), "condition must be full|empty"
+assert cond in ("full", "empty", "preset"), "condition must be full|empty|preset"
 raw = open(src, "rb").read()
 assert raw[:4] == b"RIFF" and raw[8:12] == b"WAVE", "not a RIFF/WAVE file"
 p = 12
@@ -38,6 +40,7 @@ metrics = {
 CONTENT = {
     "full": "work/content_full (installer 全展開 = host/ref_content.sh・7,370 files・Tables あり)。既定。env S2REF_CONTENT で変更可",
     "empty": "work/ref_content (専用の空 dir・Tables 無し)。env S2REF_CONTENT=<dir> で指定する variant",
+    "preset": "work/content_full (installer 全展開)。state = preset を seed (Init) DOM に重ねた processor_state (host/preset_state.py overlay)",
 }
 entry = {
     "content": CONTENT[cond],
@@ -45,7 +48,25 @@ entry = {
     "sha256_file": hashlib.sha256(raw).hexdigest(),
     "metrics": metrics,
 }
-if cond == "full":
+if cond == "preset":
+    name, pset = sys.argv[4], sys.argv[5]
+    rel = "Presets/" + pset.split("/Presets/", 1)[1]
+    entry = {
+        "file": rel,
+        "preset_file_sha256": hashlib.sha256(open(pset, "rb").read()).hexdigest(),
+        "format": {"tag": "IEEE float", "bits": fmt["bits"], "channels": fmt["ch"], "sample_rate": fmt["rate"]},
+        "frames": n // fmt["ch"],
+        "content": CONTENT["preset"],
+        "state": "processor = preset DOM overlay on seed (Init) DOM (preset_state.py overlay)。controller = Init",
+        "midi": "NoteOn pitch=60 block 0 / NoteOff block 24 (既定と同じ)",
+        "command": f"bash tools/targets/serum2/host/ref_render.sh <outdir> 60 'tools/targets/serum2/work/content_full/{rel}'",
+        "sha256_data": entry["sha256_data"],
+        "sha256_file": entry["sha256_file"],
+        "metrics": metrics,
+    }
+    out = json.load(open(dst)) if os.path.exists(dst) else {}
+    out.setdefault("presets", {})[name] = entry
+elif cond == "full":
     out = {
         "file": "render_f32.wav (本体は work/ で gitignore・commit しない)",
         "sha256_data": entry["sha256_data"],
@@ -67,8 +88,9 @@ if cond == "full":
     }
     if os.path.exists(dst):
         prev = json.load(open(dst))
-        if "content_empty" in prev:
-            out["content_empty"] = prev["content_empty"]
+        for keep in ("content_empty", "presets"):
+            if keep in prev:
+                out[keep] = prev[keep]
 else:
     out = json.load(open(dst))
     out["content_empty"] = entry
