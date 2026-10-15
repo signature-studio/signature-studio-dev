@@ -91,7 +91,7 @@ PR #3848 は main が先に進むたびに競合した (1 回目 `f4d8cf90e`・2
 
 測定 commit (コードを変えた最後の commit): `789333bc1` (`origin/main` の取り込み merge)。`git diff 789333bc1 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節の commit は REPORT だけ)。main との差分 (`git diff origin/main HEAD -- tools/python/provider tools/python/host tools/python/tests`) は `device.getLinkedChannel` (C・mock・検査) の追加だけ。
 
-素材: fl-win64 (`tar --zstd -xf` 7.6 秒) と toolchain-emsdk (2.4 秒) を作業用の展開先に置いた。CPython・flpy・provider の emsdk は既定の [EMSDK] (`/opt/emsdk`)。provider_check は `work/` の入力と `dist/flpy.js` を要するため、同じ前段 (取得・CPython・flpy) を先に実行した。
+素材: fl-win64 (`tar --zstd -xf` 7.6 秒) と toolchain-emsdk (2.4 秒) を作業用の展開先に置いた。CPython・flpy・provider の emsdk は既定の [EMSDK] (Emscripten 6.0.12)。provider_check は `work/` の入力と `dist/flpy.js` を要するため、同じ前段 (取得・CPython・flpy) を先に実行した。
 
 | 検査 | コマンド | rc | 所要 | 結果 |
 |---|---|---|---|---|
