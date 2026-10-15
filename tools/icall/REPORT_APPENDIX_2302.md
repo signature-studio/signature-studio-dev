@@ -62,7 +62,8 @@
 ## 6. 測定 commit と差分
 
 - 測定 commit: `d49760bf` (`fix(icall): enable cookie i64 load fix by default (ICALL-71 #2302)`)。修正は `tools/icall/fa_route_build.sh` (既定 `FA_FIX_COOKIE` 0→1) と `tools/icall/ir_fix_cookie.py` (docstring の出所注記)。
-- `git diff d49760bf HEAD -- tools/icall tools/ott` の出力 (本付録の commit 時点): 0 行。以後の差分は本付録と DOC_MAP のみ。
+- 測定経路 (`fa_route_build.sh`・`ir_fix_cookie.py`・`ir_fix_mask.py`・`ir_fix_vstore.py`・`ir_flatten.py`・`ir_override.py`・`vex_gen.py`・`simd_merge.py`・`diff/fa_cmp.py`・`diff/fa_sweep.sh`・`frame_slot_restore.py`・`frame_slot_probe.py`・`rt/`・`tools/ott/native`・`tools/ott/lift/data_gen.py`・`tools/m2/ir_normalize.py`・`tools/m5/ir5_patch.py`・`tools/m11/m11_simd2.py`・`tools/m11/msimd11_core.h`) の `git diff d49760bf HEAD -- <上記>` は 0 行。
+- main 取り込み: `origin/main` (`a9733bbb`) を merge した HEAD `66be2919` で、ON の `fa_cmp 1810553d0 --n 2` (match 2/2) と `fa_sweep 8 60` (57/63/9/2) を再測定し、d49760bf 時点と同じ結果。取り込みで増えた差分は測定経路の外 (`lea_index_scan`・`chain_chunk`・`tools/m11/ldfix` など)。
 
 ## 7. 再現
 
