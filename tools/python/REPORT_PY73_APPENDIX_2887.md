@@ -80,3 +80,23 @@
 | `sub` (= `ref.vt[+0x20](ref)` の戻り値) のクラス・`sub.vt[+8](0x1a)` の本体 (`[ref]` の書込み元・`ref` の vtable の `+0x20` 本体・`ctx.vt[-0x30]` の先を含む) | A 経路の bit1 (float 型か) が決まらない | #2887 (再開時) |
 | `0x1046a30` の mode 0x20 (lo・hi)・mode 2 (cur) の switch 本体 | incEventValue の lo・hi・cur が決まらない | #2033 (PY-64)・#2034 (PY-65) |
 | O (`[0x16bafc8]`) の件数 `[+0x10]` の増加元 (レジスタ経由の書込み) | O の中身の増え方 | #2887 (再開時) |
+
+## 6. 4 回目 run (#2887 再開): X+0x48 の vptr の書込み元を走査 (`pe_vptr_stores.py`)
+
+測定:
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に `*block00031_PE.bin` のみ展開 (実測 2.9 秒)。load average 0.55 (run 開始時)。
+- 測定 commit (コードを変えた最後の commit): `7dc42feb7` (`tools/python/analysis/flapi/pe_vptr_stores.py` の追加)。`git diff 7dc42feb7 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
+- `pe_vptr_stores.py 48` → hits 0・69.7 秒 (命令 5,022,467)。
+- 陽性対照 `pe_vptr_stores.py 0` → hits 1: `0x44a86e` `mov [rax], rcx` (V = `0x13acb88` (`.data`)、slot+0x20 = `0x44a820`、slot+8 = `0x44a720`)・69.9 秒。
+- 補助 (逆アセンブル): `pe_disasm.py 132e7a0 70`・`410320 40`。`pe_scan_store.py 0x48 qword` の出力は大半が `[rbp+0x48]`・`[rsp+0x48]` (フレーム slot) だった。
+
+結果:
+- PE の `.rdata` は 0x45 バイトのみ。vtable 形の表は `.data` (0x13a5000〜0x15e5008) に置かれる (陽性対照の V)。
+- `lea reg,[rip+V]` の 8 命令以内に `mov qword ptr [reg2+0x48], reg` で V を格納する箇所は 0 件。X+0x48 (`ref`) の vptr はこの形では書かれない。
+- X の生成 `0x132e7a0`: `X = 0x410320(ctx, dl)` → `0x13315a0(X, 0, r8, &args)` → `[X+0x40] ← r8` (0x132e80d)。`[X+0x48]` の書込みは無い。
+- `0x410320` は `rax = ctx`・`call [rax-0x30]` (`dl ≥ 0` のとき) の 1 命令。`ctx = 0xfe3340` は `.text` 内のコード (vtable ではない)。X を作るのは `[ctx-0x30]` の間接呼出し先と見られるが、その値と関数本体は未読。X+0x48 の vptr の書込み元も、その先に無いかは未確認。
+- 初版の誤検出: `[rbp+0x48]`・`[rsp+0x48]` (フレーム slot) と `.text` 内の lea 先 (関数の機械語) を拾った。基底レジスタの除外と `is_vtable` (先頭 qword が実行可能 section の VA) で除いた。
+
+判定と未解決:
+- 受入条件 1 (bit1): 未達のまま。`sub` のクラスは X の factory (`[ctx-0x30]`) の先で決まる見込み。次の run は `0xfe3310` の値と、その関数の本体から始める。
+- 受入条件 3 (O の件数増加元): 未達のまま (§2 と同じ)。
