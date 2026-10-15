@@ -4,9 +4,10 @@
   python3 xmm_slot_probe.py PE VA [VA ...]      例: block18982_PE.bin 6b0ef0
 
 (a0) p0c/k80abi.scan_function の read-before-write (線形順。#2850 の修正前に fix_xmm_args が使っていた)
-(a) lift/passes/fix_xmm_args.py の cfg_xmm_slots (現行の pass が使う slot 集合)
-(b) liftdiff ldlib/pe.py Analyzer (arity_x): CFG 上で全経路に定義の無い xmm 読みを数える
-(a) と (b) が一致すれば、pass は CFG 解析を使っている。(a0) が (b) より小さければ、線形順では見えない経路で読まれる xmm 入力を見落としている。
+(a) lift/passes/fix_xmm_args.py の cfg_xmm_slots (現行の pass が使う slot 集合 = pe.py を zero_idiom=True で呼んだ結果)
+(b) liftdiff ldlib/pe.py Analyzer (arity_x 用・既定): CFG 上で全経路に定義の無い xmm 読み。ゼロ化イディオムを除かない
+(a) と (b) は、同一レジスタのゼロ化イディオム (xorps r,r 等) の除外分だけ異なる。(a) と (b) は定義上の関係であり、
+差し替えの正しさの証拠ではない (証拠は lift 結果 = REPORT_APPENDIX_2726 §8)。(a0) が (b) より小さければ線形順の見落とし。
 """
 import os
 import sys

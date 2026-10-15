@@ -40,8 +40,8 @@ from ldlib.pe import PE, Analyzer  # noqa: E402
 
 
 def cfg_xmm_slots(an, va):
-    """(#2850) 関数 VA の xmm 入力 slot を CFG 解析で求める。 -> (['xmmN', ...] 昇順, 打ち切り有無)"""
-    r = an.analyze(va)
+    """(#2850) 関数 VA の xmm 入力 slot を CFG 解析で求める (ゼロ化イディオムの読みは除く)。 -> (['xmmN', ...] 昇順, 打ち切り有無)"""
+    r = an.analyze(va, zero_idiom=True)
     return ['xmm%d' % n for n in r['xmm_slots']], r['truncated']
 
 
@@ -188,7 +188,7 @@ def main():
             else:
                 g, _x, gd, gb, gx, xw, st, xins, sci, cli, ps = K.scan_function(MD, td, tva, va, fend)
                 xs, trunc = cfg_xmm_slots(an, va)
-                if trunc:
+                if xs and trunc:
                     rep['skipped'][fname] = 'cfg_truncated'
                 elif xs:
                     habi = {'xmm_slots': xs, 'xmm_width': xw, 'xmm_insns': [[m, r] for m, r in xins]}
