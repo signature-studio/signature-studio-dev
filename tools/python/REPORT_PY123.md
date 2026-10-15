@@ -3,16 +3,17 @@
 親: #2998 (PY-123)。前段: #2978 (PY-120)・PE 解析は #2998 の issue コメント (2026-10-14 21:08Z)。
 前 run: #3055 (merge 済み・測定 commit `3064340a`・boot 停止時点の 0 を確認)。
 命名: 親の ID は PY-123。#3028 のタイトルは `[PY-137]` だが、PR・REPORT・commit は親に合わせて PY-123 で統一する (#3055 と同じ慣行)。
-既知類型との関係: 判定不能 (理由: 0 化の書込みは fill 関数 `f_6a7b70` の SSE 書込みで、`docs/DEFECTS.md` の D 類型のどれに当たるかは照合していない。fill の源を特定する #3090 の範囲)。
+既知類型との関係: 判定不能 (理由: 0 化の書込みは fill 関数 `f_6a7b70` の SSE 書込みで、`docs/DEFECTS.md` の D 類型のどれに当たるかは照合していない。fill の源を特定する #3090 の範囲。#3090 は PR #3114 merge・PM 判断で縮小 close 済みで、残件の修復は #3112 [FLE-13])。
 
 ## 結論
 
 - **受入条件 1〜3 は未達。** boot は unit 209 (1-based) で止まる。停止点は `MessageBoxA` (lpText 空・自動 IDOK) → `exit(0)` (call site `0x412a12`) で、既存の記録 (`tools/flelift/boot/REPORT.md` §9・§10、`REPORT_APPENDIX_2702.md` §D) と一致する (§2-4)。停止の直前に GetMem(0x74) が FastMM への dispatch で 0 を返し、`fle_ov_getmem` の失敗経路 (`f_409730` = Error) に入る。停止時点の undo 系 global は 0 になっており、起動直後の pos/count・安全判定 VA・singleton の値として使えない。
 - **0 化の位置.** 監視 slot `0x15e1c78`・`0x15e4790` は `fle_run` 直前には PE の値 (`0x16bb068`・`0x141d6b8`) を持つ。0 になるのは **unit 209 の中**。unit 1〜208 の unit 境界・memset・FastMM の GetMem/FreeMem では変化しない。最初に 0 を観測したのは **GetMem(0x74) 呼出し直前 (site 8・GETMEM seq 2312)**。その前の検査点 (site 5・6・7) では非 0 だった (§2-2)。
 - **QuickFontCache は停止点ではない。** `[fleboot][MessageBoxW] text='QuickFontCache DLL not found!'` は shim 有の stderr 8117 行 (GETMEM seq 1849 の直前) に 1 回出るが、boot はその後も GetMem を続けて進む。停止は末尾の `MessageBoxA` である (§2-4)。前版 (本 PR の初版) の「MessageBoxW → GetMem 失敗 → exit」は途中の MessageBoxW を停止点と取り違えた記述で、本版で訂正した。
-- 書込みは直接の `mov [rip+slot], reg` ではない (`pe_xref` の書込み 0 件と整合)。3 回目 run で、書込み命令は fill コールバック `f_6a7b70` の `movdqu` と特定した (§2-5。静的は PE の VA 表で確認し、動的ヒットとの対応は算術による。直接観測ではない。前 run までの未特定は §2-3)。fill の幅の源は #3090 で追う。
+- 書込みは直接の `mov [rip+slot], reg` ではない (`pe_xref` の書込み 0 件と整合)。3 回目 run で、書込み命令は fill コールバック `f_6a7b70` の `movdqu` と特定した (§2-5。静的は PE の VA 表で確認し、動的ヒットとの対応は算術による。直接観測ではない。前 run までの未特定は §2-3)。fill の幅の源は #3090 で追い、残件 (修復) は #3112 が追う。
 - singleton `0x16b82e0` は boot 中ずっと 0 (PE 上も 0 で、変化なし)。
 - 4 回目 (PY-201・§2-6): unit 209 の dispatch 直前 (units 1〜208 の後) で、undo 管理 object は **pos 0・count 0** のまま (unit 0 から変化なし)。安全判定の `obj` = `[[0x15e4790]+8]` は **0** のため、述語の関数 VA は読めない。singleton は 0 (未設定)。fill を越えた後の値は本測定では分からない。
+- 5 回目 (PY-201 後続・§2-7・付録): obj (`[[0x15e4790]+8]` = `0x141d6c0`) を非 0 にする設定経路 (teardown 関数 `0x976a95`・作成呼出し `0x976b60`) は、停止点 (unit 209) までの lifted 実行で**一度も実行されない** (ST* 経由の書込みの範囲で。入口観測 0 件。陽性対照あり)。書込み監視の 0 件は obj (`0x141d6c0`) と `[0x141d6b8]` に対するもので、監視で出た 2 件は別 slot (`0x15e4790`・`0x15e1c78`) の unit 209 fill。受入 2・3 は停止点を越えて経路に届くまで測れない。
 - したがって boot 停止点の値は実 FL の起動直後の状態ではない。起動直後の状態を測るには、unit 209 の停止経路 (GetMem(0x74) の失敗) を越える boot が要る (§5)。
 
 ## 受入条件の判定
@@ -20,7 +21,7 @@
 | # | 受入条件 (issue #3028) | 判定 | 根拠 |
 |---|---|---|---|
 | 1 | undo 管理オブジェクトの起動直後の `+0x20` (pos)・`+0x24` (count) を実測 | **部分** | unit 209 の直前で pos 0・count 0 (§2-6)。units 1〜208 で不変。fill (unit 209) を越えた後の値は未測。 |
-| 2 | 安全判定述語 (`[obj+0x98]`・`[obj+0x88]`、`obj = [[0x15e4790]+8]`) の関数 VA | **未達** | `obj` = 0 (unit 209 の直前まで)。`obj` を設定する経路が未特定のため、VA は決まらない (§2-6)。 |
+| 2 | 安全判定述語 (`[obj+0x98]`・`[obj+0x88]`、`obj = [[0x15e4790]+8]`) の関数 VA | **未達** | `obj` = 0 (unit 209 の直前まで)。設定経路 (`0x976a95`・`0x976b60`) は停止点までに未実行 (§2-7)。VA は決まらない。 |
 | 3 | 成功時戻り値 singleton `[0x16b82e0]` が `None` か | **未達** | 値は 0 (未設定・§2-6)。`None` か否かは判定できない。 |
 | 4 | 上 3 件を本ファイルに書き、#2998 の実装を再開する | **部分** | 本ファイルに書いた。1〜3 が未達のため #2998 の実装は未再開。 |
 
@@ -118,12 +119,12 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 
 - 停止の機構 (`tools/flelift/boot/fle_boot.c` `fle_ov_getmem`): `ott_dispatch` の戻り番地が `0x409424`。戻り値 `R[0]` が 0 なら `if (!p)` の経路で戻り番地 `0x409433` を積み `f_409730()` (= Error) を呼ぶ。Error の先で `MessageBoxA ''` → `exit(0)` になる。
 - 既存の記録との関係: `REPORT.md` §9-2・§10、`REPORT_APPENDIX_2702.md` §D の「`MessageBoxA` (text 空) → `exit(0)` (0x412a12)」は本 run で再現した。既存の記録は正しく、変更しない。
-- 前版 (本 PR の初版) の「`MessageBoxW` (QuickFontCache) → GetMem(0x74) 失敗 → exit」は誤り。MessageBoxW は途中の呼出しで、停止の順序は `GETMEM seq 2312 → icall-miss (ret 0) → Error → MessageBoxA '' → exit(0)`。#3060 [FLE-11] (2026-10-14 21:56Z) は、呼出元 (`f_4127d0` の `0x412886`・呼出元 `f_4128b0`) と lpText の源 (`.data` のテンプレート `Runtime error     at 0000000000000000`。`f_6a7b70` の広域ゼロ埋めで消失) を確定した。残り (ゼロ埋めの呼出元と幅) は子 #3090 [FLE-12] に分けられている (§5)。
+- 前版 (本 PR の初版) の「`MessageBoxW` (QuickFontCache) → GetMem(0x74) 失敗 → exit」は誤り。MessageBoxW は途中の呼出しで、停止の順序は `GETMEM seq 2312 → icall-miss (ret 0) → Error → MessageBoxA '' → exit(0)`。#3060 [FLE-11] (2026-10-14 21:56Z) は、呼出元 (`f_4127d0` の `0x412886`・呼出元 `f_4128b0`) と lpText の源 (`.data` のテンプレート `Runtime error     at 0000000000000000`。`f_6a7b70` の広域ゼロ埋めで消失) を確定した。残り (ゼロ埋めの呼出元と幅) は子 #3090 [FLE-12] に分けられた (§5)。#3090 は 2026-10-15 に PM 判断で縮小 close 済みで、修復は #3112 [FLE-13] が残る。
 - 0 化 (site 8) と icall-miss (`dispatch(0)` の ret 0) の因果は未確認。
 
 ## 2-5. 0 化の命令の特定 (3 回目・WWATCH 測定 commit `009855d26`・HEAD `cd2166181`)
 
-全文は `REPORT_APPENDIX_PY123.md` §2-5 (250 行上限のため分割移動)。結論: 監視 slot を 0 にする命令は fill コールバック `f_6a7b70` の `movdqu` (VA `0x6a7b88`・`0x6a7b92`)。呼出し #5 (dst=`0x1400000`・4 MiB) で起きる。fill の幅の源は #3090 (PR #3114) で推定にとどまり未確定 (即値 `movabs` 由来の推定。#3090 は open)。修復は #3112 [FLE-13]。
+全文は `REPORT_APPENDIX_PY123.md` §2-5 (250 行上限のため分割移動)。結論: 監視 slot を 0 にする命令は fill コールバック `f_6a7b70` の `movdqu` (VA `0x6a7b88`・`0x6a7b92`)。呼出し #5 (dst=`0x1400000`・4 MiB) で起きる。fill の幅の源は #3090 (PR #3114) で推定にとどまり未確定 (即値 `movabs` 由来の推定。#3090 は PR #3114 merge・2026-10-15 に縮小 close 済み)。修復は #3112 [FLE-13] (OPEN)。
 
 ## 2-6. unit 209 の直前の undo 状態 (4 回目・PY-201・測定 commit `d63443334`)
 
@@ -160,6 +161,7 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 | `tools/flelift/boot/results/boot_summary_py123.json`・`boot_summary_py123_negctl.json` | 再測定 (HEAD `f57b7dff`) の summary |
 | `tools/flelift/boot/fle_boot.c`・`fle_boot.mjs`・`build.sh` (4 回目) | `py_snap_undo` (unit 209 直前までの undo 状態の記録・計測のみ)・`FLEBOOT_PY201` 行と `boot.py_snap`・export 4 件 (`_fle_py_snap_trace_over` は 6 回目で追加: trace が `PY_TRACE_MAX` を超えた打切りの有無) |
 | `tools/flelift/boot/results/boot_summary_py201.json`・`boot_summary_py201_negctl.json` | 4 回目 (§2-6) の summary |
+| `tools/flelift/boot/py301_undo_obj_probe.sh`・`results/boot_summary_py301.json` | 5 回目 (§2-7): obj 設定経路の入口観測と書込み監視の再現スクリプト。ベースラインの summary |
 | `tools/python/REPORT_PY123.md` | 本ファイル |
 | `tools/python/REPORT_APPENDIX_PY123.md` | 本ファイルの §2-5 (0 化の命令の特定) の全文。250 行上限のため分割移動 |
 | `docs/DOC_MAP.md` | 本ファイルの索引行 |
@@ -173,10 +175,10 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 |---|---|---|
 | unit 209 の停止直前の GetMem(0x74): FastMM への dispatch が icall-miss (`dispatch(0)` ret 0) で NULL になる経路 | 停止 (Error → exit) の原因。lift 由来の silent miscompile か、実機でも起きるかが不明。0 化との因果も未確認 | #3060 にコメントで記録 (受入条件は未追記) |
 | slot `0x15e1c78`・`0x15e4790` を 0 にする命令 | **特定 (§2-5)**: fill `f_6a7b70` の `movdqu` (VA `0x6a7b88`・`0x6a7b92`)。静的は PE の VA 表で確認、動的ヒットとの対応は算術。受入 1〜3 は、この fill を越えるまで測れない | #3028 (次 run は fill の幅の源を追う) |
-| fill `0x6a7b70` の幅 (`r8` = 0x100000 DWORD) と rect (w=h=1048576) の源 (呼出元 `0x815920` の callerRbp +0x214/+0x218) | 4 MiB × 6 回の 0 埋めの原因。guest 0x0〜0x1800000 を 0 にする | #3090 [FLE-12] (親 #3060) |
-| `obj` (`[[0x15e4790]+8]`) が unit 209 の直前まで 0 (§2-6)。述語の VA と singleton の判定が未確定 | `restoreUndoLevel` の分岐・戻り値の判定ができない | #3028 (`obj` を設定する書込み元を特定して測る) |
+| fill `0x6a7b70` の幅 (`r8` = 0x100000 DWORD) と rect (w=h=1048576) の源 (呼出元 `0x815920` の callerRbp +0x214/+0x218) | 4 MiB × 6 回の 0 埋めの原因。guest 0x0〜0x1800000 を 0 にする | #3112 [FLE-13] (#3090 [FLE-12] は縮小 close 済み) |
+| `obj` (`[[0x15e4790]+8]`) が unit 209 の直前まで 0 (§2-6)。設定経路は停止点までに未実行 (§2-7) | 述語の VA と singleton の判定ができない | #3028 (停止点を越える経路を測る。前提は fill 修復 #3112) |
 | fill 後 (boot が unit 209 を越えた後) の pos/count | 起動直後の値を、fill で 0 にされない状態で確定できない | #3112 [FLE-13] (fill の修復が前提) |
-| boot が unit 209 で止まる。停止点の呼出元と text 源は #3060 FLE-11 で確定済み。残りはゼロ埋めの呼出元と幅 | 起動直後の状態に届かない | #3090 [FLE-12] (親 #3060) |
+| boot が unit 209 で止まる。停止点の呼出元と text 源は #3060 FLE-11 で確定済み。残りはゼロ埋めの呼出元と幅 | 起動直後の状態に届かない | #3112 [FLE-13] (#3090 は縮小 close 済み) |
 | shim 有の IPP 判定 NG (`ok:false`) | 本測定の shim 有の判定が通らない (変更前から) | #3060 (呼出時の `[0x15e0a48]`・`0x15F34A0` の登録経路。`REPORT_APPENDIX_2702.md` の未解決表から移送。#2702 は CLOSED) |
 
 ## 6. 検証範囲
@@ -214,6 +216,7 @@ export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64          # mkdir -p + tar --zstd -xf "
 export SS_EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh # emsdk 6.0.12 (tools/m3/flags.sh の pin。git clone emsdk && ./emsdk install 6.0.12 && ./emsdk activate 6.0.12)
 FLE_BOOT_TAG=py123 FLE_BOOT_RUNS="shim negctl" bash tools/flelift/boot/fle6_measure.sh   # 約 2 分 40 秒 (§2-2)。前提の lift (gen-A → x64c closure 2・8 shard) を含む
 FLE_BOOT_TAG=py201 FLE_BOOT_RUNS="shim negctl" bash tools/flelift/boot/fle6_measure.sh   # 約 3 分 35 秒 (§2-6)。unit 209 直前の undo 状態 (boot.py_snap)
+bash tools/flelift/boot/py301_undo_obj_probe.sh   # §2-7 (obj 設定経路の入口観測・書込み監視。前提: 上の fle6_measure.sh で work/boot/lift を作る)
 FLE_BOOT_VARIANT=plain node tools/flelift/boot/undo_probe_check.mjs "$PWD/tools/flelift/work/boot/fleboot_plain.cjs"   # §2-1
 python3 tools/python/analysis/flapi/pe_xref.py 15e1c78           # §1 (FL_WIN64_DIR 必須)
 python3 tools/python/analysis/flapi/pe_slot_writers.py 15e1c78   # §1
