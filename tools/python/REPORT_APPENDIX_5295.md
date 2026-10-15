@@ -1,3 +1,9 @@
+# PY-4905 (#5295) 付録: mask 0x4 tail 到達側の呼出し先の中身
+
+> 生成元: `analysis/py381_r8d_callees.py --appendix=<path>` の出力 (commit に含まれる解析器が書く。手で編集していない)。
+> 再現 (素材 `fl-win64` の `block00031_PE.bin` を `work/py65/extracted/` に展開してから、`tools/python` で実行): `python3 analysis/py53_dispatch.py work/py65/extracted/block00031_PE.bin work/py53` → `python3 analysis/py4769_r8d_single.py work/py65/extracted/block00031_PE.bin work/py53/fn.txt work/py4769` → `python3 analysis/py381_r8d_callees.py work/py65/extracted/block00031_PE.bin work/py4769/r8d_single.tsv work/py381 --appendix=work/py381/appendix.md`。
+> 検算: `insns_checked=1468 mismatch=0`・負の対照 `mismatch=35`。
+
 | 判定 VA | mask | 側 | 呼出し先 (直接) | グローバル書込み命令 VA | 解決先 VA | 間接 call |
 |---|---|---|---|---|---|---|
 | 0x1047857 | 0x4 | 落ち | 3 | 0xfdeef0 0xfdef00 | 0x16bae80 | 0 |
