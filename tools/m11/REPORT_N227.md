@@ -20,19 +20,23 @@
 | global_store (`mov r, qword ptr [rip+d]` の `.data`) | 3 | 未決 3 | `no_store_in_ir`: 3 件とも同じ VA `0x15e3a70` を読むが、IR 全体でこのアドレスへの store は 0 件 |
 | 合計 | 20 | 実値化 0・復元不能 0・未決 20・未分類 0 | |
 
+- **実測と呼べるのは、対象 20 件 (gep 17・global_store 3) と各行の理由 (`base_ssa_unmapped` 17・`no_store_in_ir` 3) だけ。**
+- 実値化 0・復元不能 0・未分類 0 は実測ではなく、分類規則から決まる値。`m11_setother_gep_global.py` は全分岐で `class` を `'未決'` に固定しており、実値化の経路が無い。未分類は `len - 実値化 - 復元不能 - 未決` なので、必ず 0 になる。復元不能も判定規則が無いため 0 になる。
 - 実値化 0 件のため、`m11_argrecover_verify.py` で照合する値は無い (該当なし)。
-- 復元不能 0 は分類器の判定規則が無い定義上の値で、実測ではない。
 
 ## 3. 接続方式 (受入 2)
 
-- gep 17 件: 接続先は「基底 reg の SSA 値に対する GEP」。17 件の caller 全体の `getelementptr` 行数を数えると 0〜2 件 (`function_a981f0` 2・`function_ff0600`・`function_ff0d70` 各 1、他は 0)。`lea` の基底 reg と個々の GEP を結ぶ数え方はしていない。基底 reg の直前定義を辿る到達定義は未実装のため、対応付けは未決。
-- global_store 3 件: 読込先 VA `0x15e3a70` を指す定数は IR 全体で 1 箇所 (`function_6520b0` の `inttoptr` を経由した load) しか無い。IR 内でこの VA を指す store は 0 件。3 件の呼出し元 (`function_1014ff0`・`function_11ff040`・`function_12b4e30`) の中にも該当 store が無いため、CFG 上の「最後の格納」は呼出し元の中では決まらない。格納の探索を呼出し元の外へ広げる必要がある。計算で作ったアドレスによる store は、この照合では見えない。
+- gep 17 件: 接続先は「基底 reg の SSA 値に対する GEP」。基底 reg の直前定義を辿る到達定義は未実装のため、対応付けは未決 (`base_ssa_unmapped`)。
+- 参考 (手作業の数字・再現不可): 17 件の caller 内の `getelementptr` 行を手で数えたところ、0〜2 件 (`function_a981f0` 2・`function_ff0600`・`function_ff0d70` 各 1、他は 0)。**この数字は `m11_setother_gep_global.py` の出力に含まれず、本 PR の手順でも再現できない。** 数え方の手順も残していない。本 run では `tools/m11/work/` が無く IR を再確認できないため、この数字は根拠として使わない。
+- 参考 (手作業の数字・再現不可): global_store 3 件が読む VA `0x15e3a70` について、`function_6520b0` の `inttoptr` を経由した load が IR 内に 1 箇所あるとの確認も、手作業の数字。スクリプトは出力しない。
+- global_store 3 件: 分類器の出力では `store_count` が 0 (`no_store_in_ir`)。3 件とも同じ VA `0x15e3a70` を読む。`store_count` が 0 のとき `store_fns` は空になる。計算で作ったアドレスによる store は、この照合では見えない。格納の探索を IR 全体・呼出し元の外へ広げる必要がある (子 #4906)。
 
 ## 4. 検証と限界
 
 - 分類器 `m11_setother_gep_global.py` は IR を変えない。判定は store の有無と理由の割当だけで、値は決めない。
 - 件数の再現: 手順 1〜4 の実測は REPORT_N171・N174 と一致 (349・257・実値化 8・gep 17・global_store 3)。
 - 範囲外: gep 17 件の基底 SSA 対応付け (子 #4905)、global_store 3 件の格納値の到達定義と呼出し元外の格納探索 (子 #4906)。
+- 未検証の前提: `target_va` は `def + 7 + disp` で、命令長を 7 バイトと固定している (`mov r64, [rip+d32]` を想定)。`m11_setother_mem_class.py` のように命令長を逆アセンブルで取ってはいない。今の 3 件 (qword) では影響しない想定だが、本 run では入力が無く確認していない。
 - 測定経路の差分: 本 PR は `tools/m11/m11_setother_gep_global.py` と本 REPORT の追加のみ。前段 (`m11_post.py`・`m11_argrecover.py`・`m11_setother_nonimm_class.py`・`m11_setother_mem_class.py`) は変更していない。e2e 経路には入らないため e2e は実行していない。
 
 ## 5. 未解決
