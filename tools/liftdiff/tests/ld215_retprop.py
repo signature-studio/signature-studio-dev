@@ -117,7 +117,60 @@ def callee_defs(t, entry, budget):
     return (set(must or set()), may, True)
 
 
-def caller_use(t, ret_va, budget):
+def callee_reads(t, entry, budget, depth=0):
+    """entry から経路を辿り、(定義前に読まれるレジスタの和 may-use, 全経路で定義されるレジスタの積 must-def) を返す。
+    解析できないとき (間接分岐・間接 call・budget 超過・深さ超過) は None。
+    直接 call は再帰で呼出し先の may-use と must-def を取り込む。must-def に入らない call は定義とみなさない。"""
+    rd_any = set()
+    must = None
+    seen = set()
+    stack = [(entry, frozenset())]
+    steps = 0
+    while stack:
+        va, written = stack.pop()
+        if (va, written) in seen:
+            continue
+        seen.add((va, written))
+        steps += 1
+        if steps > budget:
+            return None
+        ins = t.at(va)
+        if ins is None:
+            return None
+        rd, wr = t.acc(ins)
+        rd_any |= {k for k in rd if k not in written}
+        m = ins.mnemonic
+        if m in ('ret', 'retq'):
+            must = set(written) if must is None else (must & written)
+            continue
+        if m in NORET:
+            continue
+        if m == 'call':
+            if not ins.op_str.startswith('0x') or depth >= 4:
+                return None
+            sub = callee_reads(t, int(ins.op_str, 16), budget, depth + 1)
+            if sub is None:
+                return None
+            sub_rd, sub_must = sub
+            rd_any |= {k for k in sub_rd if k not in written}
+            stack.append((va + ins.size, written | frozenset(sub_must)))
+            continue
+        w2 = written | frozenset(wr)
+        if m == 'jmp':
+            if not ins.op_str.startswith('0x'):
+                return None
+            stack.append((int(ins.op_str, 16), w2))
+        elif m.startswith('j'):
+            if not ins.op_str.startswith('0x'):
+                return None
+            stack.append((va + ins.size, w2))
+            stack.append((int(ins.op_str, 16), w2))
+        else:
+            stack.append((va + ins.size, w2))
+    return (rd_any, set(must or set()))
+
+
+def caller_use(t, ret_va, budget, reads_of=None):
     """call 直後 ret_va から経路を辿り、レジスタごとに分類する。
     返り値: {reg: 'read' | 'dead' | 'pass' | 'unknown'} (read は経路のどれかで読まれたら優先)。"""
     res = {k: None for k in REGS}
@@ -125,7 +178,12 @@ def caller_use(t, ret_va, budget):
     seen = set()
     stack = [(ret_va, frozenset(REGS))]   # pending = まだ読みも上書きもされていない
     steps = 0
-    unknown_hit = set()
+    unknown_hit = {}
+
+    def mark(regs, why):
+        for k in regs:
+            unknown_hit.setdefault(k, why)
+
     while stack:
         va, pending = stack.pop()
         if not pending:
@@ -135,13 +193,11 @@ def caller_use(t, ret_va, budget):
         seen.add((va, pending))
         steps += 1
         if steps > budget:
-            for k in pending:
-                unknown_hit.add(k)
+            mark(pending, 'budget')
             break
         ins = t.at(va)
         if ins is None:
-            for k in pending:
-                unknown_hit.add(k)
+            mark(pending, 'nodecode')
             continue
         rd, wr = t.acc(ins)
         pend = set(pending)
@@ -165,23 +221,37 @@ def caller_use(t, ret_va, budget):
                     res[k] = 'pass'
             continue
         if m == 'call':
-            for k in pend:
-                unknown_hit.add(k)
+            sm = reads_of(int(ins.op_str, 16)) if (reads_of and ins.op_str.startswith('0x')) else None
+            if sm is None:
+                mark(pend, 'call')
+                continue
+            sub_rd, sub_must = sm
+            for k in list(pend):
+                if k in sub_rd:
+                    pend.discard(k)
+                    if res[k] is None:
+                        res[k] = 'read'
+                        mn[k] = 'call-arg'
+                elif k in sub_must:
+                    pend.discard(k)
+                    if res[k] is None:
+                        res[k] = 'dead'
+            if not pend:
+                continue
+            stack.append((va + ins.size, frozenset(pend)))
             continue
         if m == 'jmp':
             if ins.op_str.startswith('0x'):
                 stack.append((int(ins.op_str, 16), frozenset(pend)))
             else:
-                for k in pend:
-                    unknown_hit.add(k)
+                mark(pend, 'ijmp')
             continue
         if m.startswith('j'):
             stack.append((va + ins.size, frozenset(pend)))
             if ins.op_str.startswith('0x'):
                 stack.append((int(ins.op_str, 16), frozenset(pend)))
             else:
-                for k in pend:
-                    unknown_hit.add(k)
+                mark(pend, 'ijcc')
             continue
         stack.append((va + ins.size, frozenset(pend)))
     out = {}
@@ -190,7 +260,8 @@ def caller_use(t, ret_va, budget):
             out[k] = res[k]
         else:
             out[k] = 'unknown'
-    return out, mn
+    why = {k: unknown_hit.get(k, '') for k in REGS if out[k] == 'unknown'}
+    return out, mn, why
 
 
 def call_sites(t, targets):
@@ -215,21 +286,32 @@ def main():
     ap.add_argument('--fn', nargs='*', default=TARGETS.split())
     ap.add_argument('--budget', type=int, default=400)
     ap.add_argument('--tsv', default=None)
+    ap.add_argument('--callee-arg', action='store_true',
+                    help='call 直後の呼出し先が定義前に読むレジスタを『読まれる』として扱う (LD-262)')
     a = ap.parse_args()
 
     t = Text(a.pe)
     want = {int(x, 16): x for x in a.fn}
     hits = call_sites(t, want)
+    rcache = {}
+
+    def reads_of(va):
+        if va not in rcache:
+            rcache[va] = callee_reads(t, va, a.budget * 4)
+        return rcache[va]
+
     rows = []
     for va, name in want.items():
         must, may, ok = callee_defs(t, va, a.budget * 4)
-        use = {k: {'read': 0, 'dead': 0, 'pass': 0, 'unknown': 0, 'mn': {}} for k in REGS}
+        use = {k: {'read': 0, 'dead': 0, 'pass': 0, 'unknown': 0, 'mn': {}, 'why': {}} for k in REGS}
         for c in hits[va]:
-            r, mn = caller_use(t, c + 5, a.budget)
+            r, mn, why = caller_use(t, c + 5, a.budget, reads_of if a.callee_arg else None)
             for k in REGS:
                 use[k][r[k]] += 1
                 if mn[k]:
                     use[k]['mn'][mn[k]] = use[k]['mn'].get(mn[k], 0) + 1
+                if k in why:
+                    use[k]['why'][why[k]] = use[k]['why'].get(why[k], 0) + 1
         rd_n = {k: use[k]['read'] for k in REGS}
         unk_n = sum(use[k]['unknown'] for k in REGS)
         cand = sorted(k for k in REGS if ok and k in must and rd_n[k] > 0) if unk_n == 0 else []
@@ -237,9 +319,10 @@ def main():
         print('== %s  callee_ok=%s must=%s may=%s  calls=%d' % (
             name, ok, sorted(must) if ok else '-', sorted(may) if ok else '-', len(hits[va])))
         for k in REGS:
-            print('   %-5s read=%d dead=%d pass=%d unknown=%d  最初の読み: %s' % (
+            print('   %-5s read=%d dead=%d pass=%d unknown=%d  最初の読み: %s  未確定理由: %s' % (
                 k, use[k]['read'], use[k]['dead'], use[k]['pass'], use[k]['unknown'],
-                ' '.join('%s:%d' % kv for kv in sorted(use[k]['mn'].items(), key=lambda x: -x[1])) or '-'))
+                ' '.join('%s:%d' % kv for kv in sorted(use[k]['mn'].items(), key=lambda x: -x[1])) or '-',
+                ' '.join('%s:%d' % kv for kv in sorted(use[k]['why'].items(), key=lambda x: -x[1])) or '-'))
         print('   候補 (必ず書かれ かつ 読まれる、未確定 0 件の呼出し元群のみ) = %s' % (','.join(cand) or '-'))
     if a.tsv:
         os.makedirs(os.path.dirname(os.path.abspath(a.tsv)), exist_ok=True)

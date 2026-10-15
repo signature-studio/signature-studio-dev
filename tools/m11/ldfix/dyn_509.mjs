@@ -52,6 +52,14 @@ const cases = [
       wr64(m, T, BigInt(A)); wr64(m, T + 8, 3n);
       wr64(m, A, 0x10n); wr64(m, A + 8, 0x20n); wr64(m, A + 16, 0x30n); wr64(m, V, 0x20n);
       return BigInt.asUintN(64, m._function_47ad70(BigInt(T), BigInt(V))); }, want: 1n },
+  // 806740 (#5273): 機械語 420530 が this+0x6ac と arg2 の不一致を返すので書込み経路 806784 に入る。806784 `call 806820` が this+0x6ac..0x6bc へ arg2 の 16B をコピー (0x6bc は書かない)。
+  //   80678f `mov rax,[rdi]` (rdi = r8 = arg3) → 806792 `mov [rbx+0x6bc],rax` (rbx = this)。期待: this+0x6bc = *arg3 (修復前は arg3 のポインタ値を書く)。
+  //   その後の 8067c0 の呼出先 (8087c0・8085d0・808610・808930) は this+0x6bc を書かないことを静的に確認 (#5273)。
+  { name: '806740 (*arg3 を this+0x6bc へ)', run(m) {
+      const T = S + 0x800, R = S + 0x880, V = S + 0x900;
+      wr64(m, V, 0x1122334455667788n); wr64(m, R, 0x10n); wr64(m, R + 8, 0x20n);
+      m._function_806740(BigInt(T), BigInt(R), BigInt(V), 0n);
+      return rd64(m, T + 0x6bc); }, want: 0x1122334455667788n },
   // 1063090 (F3c-use): 機械語 `mov rax,[rcx]; test rax,rax; je; mov rax,[rax-8]; ret`。期待: pp=S, *pp=S+0x1008, [S+0x1000]=0xABCD → 0xABCD
   { name: '1063090 (消費者が演算・address base の D4)', run(m) {
       wr64(m, S, BigInt(S + 0x1008)); wr64(m, S + 0x1000, 0xABCDn);
