@@ -5,7 +5,7 @@
 #### 10-7t. #3094 (KH-42) run: auStack_118/128/138 を V128L に型化 (部分・emcc は未通過)
 - 結論: `ghidra_to_c.py --fix lanes` で Delay の 128bit ローカル `auStack_118`・`auStack_128`・`auStack_138` (各 16 バイト) を、参照文脈で型を決めた `V128L` にした。emcc 件数は **577 → 556 (-21)**。`member reference base type` は **138 → 117** (`undefined1[16]` 32 → 11)。残りは子 [KH-64] (`undefined1[64]` 106 件) と [KH-65] (`aauStack_f8` 11 件)。Gain/Haas/Gate は **1000/1000 bit-exact** (生成 C は旧版と不変)。
 - 測定 commit (コードを変えた最後の commit): `4c0c94150`。`git diff 4c0c94150 HEAD -- tools/targets/kilohearts/ghidra_route` の出力: 0 行 (本節を含む commit 時点)。
-- 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)・`toolchain-emsdk` (`/opt/emsdk`・emcc 6.0.12)・[GHIDRA] 12.1.4 (repo 外に展開・zip sha256 `ddac49f9…d2db` 一致)・JDK 21 (temurin)。n=1。
+- 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)・`toolchain-emsdk` (`[EMSDK]`・emcc 6.0.12)・[GHIDRA] 12.1.4 (repo 外に展開・zip sha256 `ddac49f9…d2db` 一致)・JDK 21 (temurin)。n=1。
 
 | 項目 | 変更前 (origin/main `9e6ae331` の変換器) | 変更後 (`4c0c94150`) |
 |---|---|---|
