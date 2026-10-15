@@ -49,16 +49,18 @@
 - `general.safeToEdit` と同じ変数 (C: `safe_edit`・mock: `st.safeEdit`) を読むので、両者の値は常に一致する。
 - 試験用の setter は本番の FL API ではない (`setSafeEdit`)。既定値 (真) は `fl_engine_reset` と mock の初期値のまま。
 
-## 4. 検証 (測定 commit `66994c4d0`・コミット済み HEAD)
+## 4. 検証 (測定 commit `034cab74a`・コミット済み HEAD)
 
-- 素材: `fl-win64` を `tar --zstd -xf` で展開 (実測 real 13.1 秒)。展開先 `$RUNNER_TEMP/fl-win64`。
-- CPython wasm (`build_cpython_wasm.sh`・実測 real 1 分 52 秒) と `build_flpy.sh` (`FLPY_SKIP_TABLE=1`・real 4.0 秒) を作って `provider_check` と `all_tools` を回した。
-- `node tests/playlist_diff.mjs`: `{"calls":23,"diffs":0,"PASS":true}` (偽の状態の節 5 呼出しも差分 0・`lock` 不変を assert)。real 0.036 秒。
-- `node tests/provider_check.mjs`: `{"functions":435,"implemented":155,"unimplemented":280,"mcp_static":60,"PASS":true}`。real 0.233 秒。
-- `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0}`。real 1.034 秒。
-- ミューテーション: mock の `if (!st.safeEdit) throw UNSAFE();` を外す → `unsafe 差分 3 件` で FAIL。C 側の `if (!safe_edit) return fl_err(...)` を外す → 同じく `unsafe 差分 3 件` で FAIL。どちらも戻すと PASS。
-- 実行直前の load average は `2.02 1.27 0.63` (`/proc/loadavg`)。並列 1。
-- 差分確認: `git diff 66994c4d0 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` の出力は 0 行 (測定後のコード変更は無い)。
+- 測定 commit は main (`058984fa0`) を取り込んだ merge commit `034cab74a`。前回測定 (`66994c4d0`) 以降に main 側で `tools/python/provider` が変わったため、測り直した。競合は `provider/build.sh` の `EXPORTED_FUNCTIONS` だけで、本 PR の `_fl_engine_set_safe_edit` と main の `_fl_engine_grid_items_probe` を両方残した。
+- 素材: `fl-win64` を `tar --zstd -xf` で展開 (実測 real 5.425 秒)。展開先 `$RUNNER_TEMP/fl-win64`。`fetch_inputs.sh` で `work/` に入力を置いた。
+- emsdk 6.0.12 は upstream から `emsdk install` / `activate` で入れ、`[EMSDK]` の位置に置いた (`toolchain-emsdk` は本 run の素材に無かった)。
+- `provider/build.sh` (実測 real 1.598 秒)・`build_cpython_wasm.sh` (実測 real 4 分 33 秒)・`build_flpy.sh` (`FLPY_SKIP_TABLE=1`・real 6.461 秒) を作って `provider_check` と `all_tools` を回した。
+- `node tests/playlist_diff.mjs`: `{"calls":23,"diffs":0,"mock_state_steps":8,"PASS":true}` (偽の状態の節 5 呼出しも差分 0・`lock` 不変を assert)。real 0.050 秒。
+- `node tests/provider_check.mjs`: `{"functions":435,"implemented":155,"unimplemented":280,"mcp_static":60,"PASS":true}`。real 0.369 秒。
+- `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}`。real 2.110 秒。
+- ミューテーション: mock の `if (!st.safeEdit) throw UNSAFE();` を外す → `unsafe 差分 3 件` で FAIL (exit 1)。C 側の `if (!safe_edit) return fl_err(...)` を外す → 同じく `unsafe 差分 3 件` で FAIL (exit 1)。どちらも戻すと PASS。
+- 実行直前の load average は `1.33 1.60 0.83` (`/proc/loadavg`)。並列 1。
+- 差分確認: `git diff 034cab74a HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` の出力は 0 行 (本 REPORT の commit のみ。測定後のコード変更は無い)。
 
 ## 5. 未解決
 
