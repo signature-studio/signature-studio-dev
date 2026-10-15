@@ -78,7 +78,7 @@
 
 | 指標 | 値 |
 |---|---|
-| .text / 関数 (pdata) / Ghidra 関数 | 10,593,334 B / 33,791 / 33,792 (`-noanalysis`+pdata 生成で 1 分)。**`.pdata` 外**: 関数間の隙間 463,748 B のうち実コード約 318KB (61,730 命令・ret 5,096・スカラ/packed FP 演算 1,252。leaf 関数や分割ブロックと推定, 検収の再計測) は上記関数数・census に含まれない |
+| .text / 関数 (pdata) / Ghidra 関数 | 10,593,334 B / 33,791 / 33,792 (`-noanalysis`+pdata 生成で 1 分)。**`.pdata` 外**: 関数間の隙間 463,748 B のうちブロック 318KB (61,730 命令・ret 5,096・スカラ/packed FP 演算 1,252。leaf 関数や分割ブロックと推定, 検収の再計測) は上記関数数・census に含まれない。ただし NOP のみのパディングを含むため実コードとしては過大 (訂正は `REPORT_SR21.md` §0) |
 | 関数サイズ | 中央値 82B, p90 577B, p99 3,473B, 最大 115,265B (SQLite parser 系と推定), >4KB 235 本, >16KB 24 本 |
 | 命令 / call | 2,515,362 / 159,199 (call_mem 29,999 = 仮想呼び出し/IAT) |
 | SSE スカラ FP 演算 (ss/sd) | 51,535 命令 (xmm 操作で mnemonic が ss/sd 終わりのもの。ucomis*/comis*/cmp*s* 比較と scalar FMA を含み、加減乗除・sqrt・min/max のみでは 39,283。**double (sd) 主体**: mulsd 8,381 / addsd 8,175 / mulss 6,187) |
@@ -227,7 +227,7 @@ GHIDRA=1 bash tools/targets/serum2/scripts/run_all.sh   # +Ghidra 全自動解�
 - **ネガティブコントロール**: 同じ SQLite リテラル集合で zstd 窓 (209 関数) 内の参照元 = **0**。同サイズの index 窓を ±1〜3 倍ずらした 6 通りも全て **0 関数**。
 - **muParser は弱い**: upstream v2.3.2 リテラル 84 個のうち参照されるもの 26、参照元 8 関数中の窓内は **2** (0x18091ad70・0x18099a6d0。25.0%)。窓外 6 関数 (0x1809e3240/0x1809eb7b0/0x1809ef030/0x1809ef7b0/0x180a0a3e0/0x180a0f3f0, 計 1,343 B) は `acos`/`log2`/`sinh`/`sqrt`/`log10` の関数名を参照する 32〜306 B の関数で、muParser 本体窓 (0x18091ace0–0x18092741d) の外にある。窓は組込み関数の登録側を含まず不足の可能性が高い → 拡張は SR-4 前に動的トレースで確定。
 - **偽の版文字列を除外**: `2.1.4`/`2.1.3` (0xfd3379/0xfd3547) は直前後が `Env 4`/`CC 73: Sound Controller 4` の Serum 独自テーブルで、muParser 版ではない。muParser の版は**確定不能** (§11.5。2.2.0〜2.2.4 が未取得のため完全突合できず。v2.3.2 リテラルの突合は窓内 2 関数のみで版の識別力なし。v2.2.5 も窓内 2 関数で同様 (先頭一致に限定する前の予備測定))。
-- **`.pdata` 外コード整理 (`out/sr3_gap_blocks.tsv`)**: `.text` の `.pdata` 隙間 29,354 区間 / 463,748 B から、0xCC/0x90/0x00 パディング 145,350 B を除き **20,467 ブロック / 318,398 B / 61,895 命令 / ret 5,096** (§4.1 の旧値 318KB・ret 5,096 と一致)。clean decode 20,459 ブロック / 318,167 B。ブロック先頭を direct call/jmp/lea が指すもの = **1,352 ブロック / 101,257 B** (実関数入口と推定)。残り 19,115 ブロックは分割ブロック/到達未確認で**関数としては確定していない**。cut 窓内: sqlite 48・muparser 120・libsfz 37・zl_convolver 10・nlohmann 2 (計 217 ブロック / 2,280 B)、窓外 20,250 ブロック / 316,118 B。
+- **`.pdata` 外コード整理 (`out/sr3_gap_blocks.tsv`)**: `.text` の `.pdata` 隙間 29,354 区間 / 463,748 B から、0xCC/0x90/0x00 パディング 145,350 B を除き **20,467 ブロック / 318,398 B / 61,895 命令 / ret 5,096** (§4.1 の旧値 318KB・ret 5,096 と一致)。clean decode 20,459 ブロック / 318,167 B。ブロック先頭を direct call/jmp/lea が指すもの (`.pdata` 側参照のみ) = **1,352 ブロック / 101,257 B**。残りは SR-21 で分類し直した (NOP のみのパディングを含む。`REPORT_SR21.md` §0)。cut 窓内: sqlite 48・muparser 120・libsfz 37・zl_convolver 10・nlohmann 2 (計 217 ブロック / 2,280 B)、窓外 20,250 ブロック / 316,118 B。
 - 範囲外: 実機/wasm での挙動一致・upstream の再ビルド品との関数単位の一致確認・mac 版。
 
 ### 11.4 wasm 再ビルド手順 (方針。#19 [T-SH-18] と共有・未実行)
@@ -243,7 +243,7 @@ GHIDRA=1 bash tools/targets/serum2/scripts/run_all.sh   # +Ghidra 全自動解�
 | muParser 窓が組込み関数の登録側を含まない (§11.3 の 6 関数。帰属は未確定、詳細 `REPORT_SR3c.md`) | lift 対象に muParser 一部が残る | #71 継続 |
 | nlohmann::json instantiation が 36 関数しか seed 化できていない (推定: 実数は数百) | 除外不足 (lift 側に残るだけで安全側) | #19 と共有 |
 | 窓内 `window` タグ (SQLite 921 / zstd 202 ほか) はリンク連結による推定で、upstream 関数との 1:1 照合なし | 過除外すると DSP を落とす恐れ。SQLite は §11.3 の検算で支持 (183/189) | SR-4 着手時の動的トレース (blockedBy #71) |
-| `.pdata` 外 19,115 ブロックの関数性が未確定 (SR-21 で分類: 入口 1,352 / 未確定 19,115。`REPORT_SR21.md`) | lift 入口として使えない | #71 継続 |
+| `.pdata` 外ブロックの関数性が未確定 (SR-21 で分類し直し。内訳は `REPORT_SR21.md` §0) | lift 入口として使えない | #71 継続 |
 
 ### 11.6 検証記録
 - 検証起点: commit `699addb` (クリーン worktree `git worktree add --detach … HEAD` で `sr3_run.sh` を再実行, 40.8 秒, load average 1.58, 4 core・並列 4)。`out/sr3_{cut_table.tsv,signature_db.json,gap_blocks.tsv,anchors.json,verify.txt}` の 5 ファイルが commit 済みと `cmp` 一致。`find tools/targets/serum2 -type f -size +20M -not -path '*/work/*'` = 0 件。ネガティブコントロール: §11.3 (zstd 窓 0 関数 / ±1〜3 倍シフト窓 6 通りとも 0 関数)。範囲外: 検算者による別アルゴリズム再計算 (レビュワーが実施)。
