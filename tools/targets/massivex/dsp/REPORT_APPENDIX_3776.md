@@ -26,7 +26,7 @@
 
 - 母数: funclet を持つ FH3 関数 13,525 / funclet 36,533 (`mx39_funclet_reach.py`)。537 母数 = round 1 の FH3 親の funclet (REPORT §4 と一致)。
 - 上限・下限: linear は全域を decode する過大近似 (固定点の入口が pdata 関数数 186,960 を超える)。flow は制御フローで到達する命令だけの下限 (間接 jmp は未解決 `indirect_unres` を含む)。
-- 棄却: FH3 FuncInfo 355 件は上限 (maxState > 0x1000 / nTry > 0x1000 / nCatch > 0x100) で棄却。537 母数は棄却の影響なし (537 を再現)。棄却の値の妥当性は未確認 (U4f)。
+- 棄却: FH3 FuncInfo 355 件は上限 (maxState > 0x1000 / nTry > 0x1000 / nCatch > 0x100) で棄却。537 母数は棄却の影響なし (537 を再現)。棄却の値の妥当性は未確認 (U4f)。訂正は REPORT_APPENDIX_4192 §2.2 (大半は上限ではなく FuncInfo の読取不能)。
 
 ### 9.3 E8/E9 一致 4 件 (537 母数) の由来
 
@@ -54,7 +54,7 @@
 
 | # | 未解決 | 影響 | 起票先 |
 |---|---|---|---|
-| U4f | FH3 FuncInfo 355 件の上限棄却 (maxState・nTry・nCatch) の妥当性 | 母数 36,533 の下界 | [MX-47] (#4192) |
+| U4f | FH3 FuncInfo 355 件の棄却の妥当性 (訂正: 大半 339 件は上限ではなく FuncInfo の読取不能。`REPORT_APPENDIX_4192` §2.2) | 母数 36,533 の下界 | [MX-47] (#4192) |
 | U4g | flow 到達 funclet の直接辺の元 82 件のうち 4 件 (FH3 親の関数) が funclet を通常フローで指す (ICF / tail-merge による共有か) | funclet と通常コードの境界 | [MX-47] (#4192) |
 | U4h | 囲む関数 0x10c8b40 の EH 専用 block の位置 (親の pdata 範囲内か) | 親 pdata 範囲の定義 | [MX-47] (#4192) |
 | U4i | MSVC funclet の呼出し ABI の実機確認 | §9.4 の前提 | [MX-47] (#4192) |
@@ -87,7 +87,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `.text` 外を指す FH3 funclet 候補 211 件 (RVA 0〜0x188 の 8 件・`.text` より上 203 件) の由来 | root から除外した。FH3 walk の誤読か、別の FuncInfo 形かは未確認 | [MX-47] (#4192) |
+| `.text` 外を指す FH3 funclet 候補 211 件 (値が 0x1000 未満の 8 件を含む・`.text` より上 203 件) の由来 | root から除外した。FH3 walk の誤読か、別の FuncInfo 形かは未確認 | [MX-47] (#4192) |
 | SjLj 形の runtime と FH3 FuncInfo walk の C 実装 (受入 2 の残り) | funclet は lift されるが呼べない | [MX-45] (#4161) |
 | native vs wasm の通し一致・ネガティブコントロール (受入 3 の残り) | 未実測 | [MX-46] (#4162) |
 | U4f (上限棄却 355 件の妥当性)・U4g (4 件の共有)・U4h (EH 専用 block の位置)・U4i (呼出し ABI の実機確認) | §9.5 のとおり | [MX-47] (#4192) |

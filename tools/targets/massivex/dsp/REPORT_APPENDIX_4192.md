@@ -12,6 +12,7 @@
 4. **U4h**: 親の pdata 範囲 `[0x10c8b40, 0x10c8eff)` の中に EH 専用の call がある (`site_reached_by_flow_in_container` = False)。
 5. **U4i**: 静的確認のみ。root の 90% (32,696 / 36,240) が `mov [rsp+disp8],rdx` で始まり、RDX 退避の形と整合する。
    実機の呼出し ABI は未確認 (native 実行を行っていない)。
+   なお、root からの 211 件の除外の根拠は値の所在 (画像外・`.data`) だけで、同じ FH3 walk で得た `.text` 内 root 36,240 件の正しさは本付録では未検証 (§2.1 の限界と同じ)。
 
 ## 2. 測定 (再現: `MX_PE=<Massive X.vst3> MX39_WORK=<mx39 作業dir> bash tools/targets/massivex/dsp/mx43_e2e.sh`)
 
@@ -66,14 +67,17 @@
 
 - 囲む関数の pdata 範囲は `[0x10c8b40, 0x10c8eff)` (`.text` 内)。call (0x10c8beb) はこの範囲の中にある。
 - site は囲む関数の入口から flow で到達しない (`site_reached_by_flow_in_container` = No)。よって EH 専用 block と見られる。
-- 補足: pdata のうち 100 行は end が `.text` の末尾を超える (値の由来は未確認)。囲む関数は、範囲が重なる行が複数あるため、begin 一致で決めた。
+- 補足: 囲む関数は、範囲が重なる pdata 行が複数あるため、begin 一致で決めた。
 
 ### 2.5 U4i: MSVC funclet の呼出し ABI (静的確認のみ)
 
-| 集合 | 件数 | `mov [rsp+disp8],rdx` で始まる | push で始まる | その他 |
+| 集合 | 件数 | `mov [rsp+disp8],rdx` で始まる | push / REX (0x55・0x53・0x40) で始まる | その他 |
 |---|--:|--:|--:|--:|
 | `.text` 内の root (flow 未到達) | 36,240 | 32,696 | 686 | 2,858 |
-| flow 到達 | 82 | 65 | 0 | 17 |
+| flow 到達 | 82 | 65 | 未集計 | 17 |
+
+- 区分の定義: 「mov」は先頭 4 バイトが `48 89 54 24`。「push / REX」は先頭 1 バイトが `0x55`・`0x53`・`0x40` (`mx47_origin.py` の `pro` 集計)。`0x40` (REX 接頭辞) は push ではないが、この集計では push 側に入っている。「その他」は上記のどちらでもない。
+- flow 到達の列は `mx47_origin.py` が mov と other の 2 区分しか出さないため、push / REX は未集計。flow の「その他」17 には push / REX で始まる関数が含まれうる (内訳は未集計)。
 
 - 大半が RDX を退避する形で始まる。RDX を使う形と矛盾はしないが、これだけでは establisher frame の受け渡しは確認できない。
 - 静的な形の確認で、実行時の動作の確認ではない。native 実行の検証は本 run では行っていない (landing §9-2 と同じ未解決)。
