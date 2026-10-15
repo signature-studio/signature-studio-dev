@@ -25,6 +25,9 @@
 
 仮定 (未検証): 呼び出し先が frame を得る経路は、引数・戻り値・メモリ (漏出) だけ。保存レジスタ rbp を呼び出し先が読んで外へ出す経路は見ない。戻り値は rax のみ見る。`push` は漏出と数えない。frame アドレスを frame 自身に書く store (`mov [rbp+X], rbp`) は、読み戻されてポインタとして使われる可能性を保守的に漏出と数える。
 
+- 呼び出し先が caller の rsp 相対領域 (home 領域・stack 引数) を書く経路は見ていない。この経路があると、call を越えた先の読みの判定は誤り得る。
+- DROP の探索は call を越える (glk 関数でも。call は ENTRY_AFTER_CALL の印を付けるだけで打ち切らない。#2185 の設計)。call の先で slot が書き換わる経路は見ていないので、DROP は store と read の間に call が無いことを前提にする。現行の DROP 3 site (10628a0・13105d0・c38bd0) は、store と read の間が直線で call が無く、判定は変わらない (機械語で確認)。
+
 ## 3. 結果
 
 ### 3.1 関数単位 (受入 1・2)
@@ -159,6 +162,7 @@ LIVE-IN の全経路は「関数内で定義されない」 (ENTRY)。DROP の�
 
 - 測定 commit: `32925d7f`。判定器・結果 JSON・negctl はこの commit で測定した。
 - この commit から REPORT を含む HEAD までで `tools/m11/ldfix` に変わるのは `REPORT_2211.md` のみ。`git diff --stat 32925d7f HEAD -- tools/m11/ldfix` の出力は PR 本文の検証結果に載せる。
+- 再実行: 修正前 HEAD (`a4480d15`) で判定器を再実行し、3 本の結果 JSON が commit 済みと byte 一致 (`cmp`)。判定器と JSON は本 issue の修正で変えていない。
 - #2185 の判定器 `audit_frame_store_verdict.py` は本 issue で変更していない (差分 0 行)。
 
 ## 4. 未解決 (起票先)
