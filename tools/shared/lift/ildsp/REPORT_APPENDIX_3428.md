@@ -5,7 +5,7 @@ harness `lift_psola.sh` は #3401 で main に入っている (コードは変�
 「ケース数と PASS/FAIL の記録」を HEAD で取った結果の正本。
 
 ## 結論 (1 行)
-`lift_psola.sh` は HEAD `8ea8d42b8` で再現する。CreateInstance → slot 0 → slot 4 → slot 5 の native 対 wasm は 64 case 全一致 (PASS 64 / FAIL 0)、ネガティブコントロール (arena 先頭 1 バイト反転) は FAIL 64 / 64、回帰 `lift_wc.sh ok` は PASS 64 / 64。
+`lift_psola.sh` は HEAD `8ea8d42b8` で再現する。CreateInstance → slot 0 → slot 4 → slot 5 の native 対 wasm は 64 case 全一致 (PASS 64 / FAIL 0)、ネガティブコントロール (arena 先頭 1 bit 反転) は FAIL 64 / 64、回帰 `lift_wc.sh ok` は PASS 64 / 64。
 
 既知類型との関係: 該当なし (`docs/DEFECTS.md` に VEX・ymm・unsup の類型記述は無い。差分は 0 件)。
 
@@ -29,7 +29,7 @@ harness `lift_psola.sh` は #3401 で main に入っている (コードは変�
 | wasm | 80,737 B (emcc `-O1`) |
 | 比較 case | 64 (case 0 = 元の .data。`wc_cases.py`) |
 
-参考 (`lift_wc.sh`・WaveformColouring): 60 関数・2,656 命令・unsup 3 (`vcvtss2sd` 1・`vpmovsxdq` 1・`vshufps` 1)・wasm 138,754 B。
+WaveformColouring の値は `REPORT_APPENDIX_3401.md` §8-5 が正本。
 
 ## 比較の中身
 - native 側: `wc_native_ref.c` を gcc で実行 (元の機械語)。wasm 側: x64c lift → emcc → `wc_run_wasm.mjs`。
@@ -47,7 +47,7 @@ harness `lift_psola.sh` は #3401 で main に入っている (コードは変�
 - 再現: `FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<toolchain-emsdk 展開先>/emsdk/emsdk_env.sh bash tools/shared/lift/ildsp/lift_psola.sh all`
 
 ## ネガティブコントロール
-- `neg-cmp` は wasm 結果の arena 先頭 1 バイトを反転する (`WC_NEG=arena`)。`wc diff` は 64 case すべてで FAIL (`arena@+0x0`)。比較器が 1 バイトの差を検出することを確認した。
+- `neg-cmp` は wasm 結果の arena 先頭 1 bit を反転する (`arena[0] ^= 0x01`・`WC_NEG=arena`)。`wc diff` は 64 case すべてで FAIL (`arena@+0x0`)。比較器が 1 bit 反転 (1 バイトの差) を検出することを確認した。
 
 ## 観測の範囲と限界
 - 64 case は 1 経路の一致。`REPORT_APPENDIX_3401.md` §8-4 と同じ制限で、分岐の網羅ではない。.data は run で変化しない。
