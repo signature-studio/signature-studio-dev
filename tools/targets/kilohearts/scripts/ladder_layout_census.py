@@ -12,7 +12,7 @@ OUT = sys.argv[2] if len(sys.argv) > 2 else None
 CTX_MODEL = 0x3188
 # (名前, 関数 VA, 終端 VA (排他), 入口の this / ctx / 5 番目以降の役割)
 RANGES = [
-    ('process slot14', 0x1804d9930, 0x1804d9b9c, {'rcx': 'self', 'rdx': 'ctx'}),
+    ('process slot14', 0x1804d9930, 0x1804d9ba0, {'rcx': 'self', 'rdx': 'ctx'}),
     ('slot15',         0x1804d9820, 0x1804d98b0, {'rcx': 'self', 'rdx': 'ctx'}),
     ('slot20',         0x1804d9ba0, 0x1804db990, {'rcx': 'self', 'rdx': 'ctx'}),
 ]
