@@ -6,7 +6,7 @@
 
 - 実機 (FL 26.1.7 `fl-win64`、`block00031_PE.bin`) の逆解析で、14 関数すべてについてハンドラの PyArg 書式と検査・戻り値の経路を読んだ (下表)。ただし戻り値・引数の**意味**まで確定したものは無い。patternMax (定数 999) など一部だけ、戻り値の値そのものは読めた。
 - 意味論が未確定の関数は 11 件。残りは子 issue #1804 (`[PY-48]`) に移した。
-- 逆解析で `tools/python/analysis/flapi/flapi_table.json` の署名と実機の PyArg 書式が**食い違う**関数を 3 件見つけた (getPatternGroupName・getPatternsInGroup・getChannelLoopStyle)。署名の正本を直す判断は別途必要。
+- 逆解析で `tools/python/analysis/flapi/flapi_table.json` の署名と実機の PyArg 書式が**食い違う**関数を 3 件見つけた (getPatternGroupName・getPatternsInGroup・getChannelLoopStyle)。署名の正本を直す判断は別途必要。 **(PY-172 で訂正: 現在の `flapi_table.json` は 3 件とも PyArg 書式と一致。REPORT_PY172 §4)**
 - C provider (`provider/fl_engine.c`) と mock にはコード変更を入れていない。未確定の関数を推測実装すると「推測実装はしない」に反するため。
 
 ## 逆解析の方法
@@ -51,5 +51,5 @@
 |---|---|---|
 | 未確定 11 関数 (patternCount・patternNumber・getActivePatternGroup・getPatternGroupCount・getPatternGroupName・getPatternsInGroup・getChannelLoopStyle・getBlockSetStatus・getPatternLength・isPatternDefault・isPatternSelected) の戻り値・引数・副作用 | C provider・mock の実装が 0 件のまま | #1804 (`[PY-48]`) |
 | 索引の基準 (0 始まり / 1 始まり) の不統一 | 実装すると索引がずれる | #1804 |
-| flapi_table の署名と実機 PyArg 書式の不一致 (3 件) | 表の署名を信じると引数検査が誤る | #1804 |
+| ~~flapi_table の署名と実機 PyArg 書式の不一致 (3 件)~~ | PY-172 で解消 (REPORT_PY172 §4)。表の署名と PyArg 書式は一致 | 解消済み |
 | getBlockSetStatus の戻り値・4 つの入力引数 (left/top/right/bottom) の意味 | 未実装 | #1804 |
