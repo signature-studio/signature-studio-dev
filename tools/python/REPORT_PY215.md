@@ -84,3 +84,16 @@
 | all_tools (JS mock・変更後) | `node tests/all_tools.mjs` | 0 | 2.1 秒 | total 48・**ok 48** |
 
 ネガティブコントロール: `host/fl_mock.mjs` の `device.getLinkedChannel` の -1 の戻り値を -2 に一時変更 → `node tests/device_diff.mjs` は **rc 1** (差分 2 件: dev/link 両方の assigned・unassigned で mock -2 / wasm -1 を検出)。元に戻し、`sha256sum` が変更前と一致 (c9d5ef8c…) することを確認してから commit した。
+
+## 6. main 取り込み後の再測定 (PR #3848 の競合解消)
+
+PR #3848 は main (`f4d8cf90e`) が先に進んだため競合した。rebase・force は使わず、`origin/main` を merge した (merge commit `1a66791d4`)。競合は `tests/provider_check.mjs` の実装判定の行と件数だけで、main 側の判定 (`pe132` など) を残し、本 PR の `pe215` を足した。件数は main の 171 / 264 から **172 / 263** になる。
+
+測定 commit (コードを変えた最後の commit): `1a66791d4` (merge)。`git diff 1a66791d4 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節の commit は REPORT だけ)。
+
+| 検査 | コマンド | rc | 結果 |
+|---|---|---|---|
+| provider ビルド | `bash provider/build.sh` | 0 | flprov.js / flprov.wasm 生成 |
+| provider_check | `node tests/provider_check.mjs` | 0 | functions 435・implemented **172**・unimplemented 263・PASS |
+| device_diff | `node tests/device_diff.mjs` | 0 | linked_channel `[-1,null,null,-1,null,null]`・**diffs 0**・PASS |
+| all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 0 | total 48・**ok 48**・host_calls 37,425 |
