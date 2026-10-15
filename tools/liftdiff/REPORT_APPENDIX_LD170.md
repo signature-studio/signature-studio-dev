@@ -92,30 +92,35 @@ boot の変化 (928 → 892) の原因を、修正の内訳を 1 つずつ変え
 
 ### 8-1. 実測 (HEAD 修正版・`fc48aa8a5` の上に修正を 1 commit)
 
-| route | 修正前 units / first_fail | 修正後 units / first_fail | 所要 (spike) |
+| route | base (`fc48aa8a5`・修正前) units / first_fail | 修正後 `35c0a5e99` units / first_fail | 所要 (spike・壁時計) |
 |---|---|---|---|
-| `LD_STK_ENTRY28=1` (有効化) | 892/942 / 149 (abort) | **928/942 / 830** (segv 3 件) | 15.7 s |
-| 既定 (`stk` 212) | 928/942 / 830 | 928/942 / 830 | 16.1 s |
+| `LD_STK_ENTRY28=1` (有効化) | 892/942 / 149 (abort) | **928/942 / 830** (segv 3 件) | 14.6 s |
+| 既定 (`stk` 212) | 928/942 / 830 | **928/942 / 830** | 24.9 s (初回・キャッシュ冷え) |
 
-- 有効化の stderr: 修正前 `仮 proc が上限 256 を超えた` 14 件・修正後 0 件。
-- 測定 commit: `dc6a2d08d` (`LD_VMT_IDX0` 256→1024 の commit。boot の数値はこの commit で測定)。`e46ed6e14` は `PATCH_BY_VA` の番地導出のみで boot・e2e は未再測定。検証起点 `origin/main` `fc48aa8a5`。
+- 測定 commit: `35c0a5e99` (コードを変えた最後の commit は `e46ed6e14`。この HEAD で boot・e2e を実測した)。
+  `git diff 35c0a5e99 HEAD -- tools/liftdiff/rt tools/liftdiff/ldlib tools/liftdiff/spike_cfi.py tools/liftdiff/liftdiff_e2e.sh` は 0 行 (本節の文書差分のみ)。
+- 有効化の stderr: 修正前 `仮 proc が上限 256 を超えた` 14 件・修正後 0 件 (`35c0a5e99` で実測)。
+- 旧版の測定値 (`dc6a2d08d`・`PATCH_BY_VA` 修正前): 有効化 928/942・830 (15.7 s)、既定 928/942・830 (16.1 s)。`e46ed6e14` 以降の値はこの表が正。検証起点 `origin/main` `fc48aa8a5`。
 
 ### 8-2. liftdiff e2e (`--m11-only`・sample:800) の前後
 
-| run | 関数判定 (一致/不一致/実行不能) | verdict の変化 (対 base) | case 結果の変化 (対 base) |
-|---|---|---|---|
-| base (`origin/main` `ld_core.h`・`LD_VMT_IDX0=256`) | 359 / 236 / 206 (PASS) | - | - |
-| 修正 (1 回目) | 360 / 235 / 206 (PASS) | 1 件 (`0x7850d0` mismatch→match) | 42 |
-| 修正 (再実行・同一コード) | 360 / 235 / 206 (PASS) | 0 件 (対 1 回目) | 2 |
+すべて `liftdiff_e2e.sh --m11-only` を foreground で実行し、LIFTDIFF_E2E PASS。
 
-- base は別の batch 実行 (同一コードの再実行で 359/236 と 360/235 が出る揺らぎは未測定)。修正版は再実行で case 2 件が揺らぐ。base との差 (verdict 1・case 42) は修正版の 2 回実行の揺らぎ (2) より大きい。
-- 差の内訳 (`hang` ↔ `both_fault`・`native_fault` 等) は vmt blob の値 (`LD_VMT_IDX0` 由来の番地) が変わったことによる。`vmt` 専用 blob (`make_blob_vmt`) の番地だけが変わるはずだが、`vm0`・`p0` 等の他 pattern にも差が出る。**差の原因 (なぜ他 pattern に波及するか) は未切り分け** (起票先: 下記)。
+| run | 関数判定 (一致/不一致/実行不能) | 実時間 | 対 base の verdict 変化 | 対 base の case 差 |
+|---|---|---|---|---|
+| base `fc48aa8a5` (1 回) | 359 / 236 / 206 | 3 分 06 秒 | - | - |
+| head `35c0a5e99` 1 回目 | 360 / 235 / 206 | 3 分 14 秒 | 1 件 (`0x7850d0` mismatch→match) | 34 (9 関数) |
+| head `35c0a5e99` 2 回目 | 360 / 235 / 206 | 3 分 11 秒 | 1 件 (同上) | 32 (8 関数) |
+
+- head 2 回の間の verdict 変化は 0 件 (`0x7850d0` は base で mismatch・head 2 回で match と安定)。head 2 回の間の case 差は 4 (3 関数)。
+- case 差の数え方: 同じ関数の同じ case 番号で outcome が違うものと、case 数の差の合計。reviewer の再測定とは数え方が異なるため、件数の絶対値は比較しない。
+- verdict 変化 1 件 (`0x7850d0`) の原因は未切り分け。`dc6a2d08d` 以降の `PATCH_BY_VA` の番地変更 (`0x50012000`→`0x50018000` 相当) が候補だが、確認していない。
 
 ### 8-3. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| e2e sample:800 で base との case 差 42 件 (verdict 1 件 `0x7850d0` mismatch→match) の原因。有力候補は `PATCH_BY_VA` の仮 proc 番地 (`0x50012000`) が `LD_VMT_IDX0=1024` で GetProcAddress 域 (index 256) に移ったこと (レビュー B1・コードの読みによる)。番地を `LD_FAKEPROC_BASE + LD_VMT_IDX0 * LD_FAKEPROC_SZ` (`0x50018000`) から導くよう修正済み (単体テスト `test_ld203_slot_fill` は PASS)。**修正後の再測定は未実施** (素材 `work-m11`・`work-liftdiff`・`toolchain-emsdk` が run に無く、boot と e2e を実行できない)。§8-1・§8-2 の数値は修正前のもの | 修正後の判定が base と一致するかは未確認。PR 内では「回帰なし」と断定しない | 再測定 (素材投入後・本 PR の `oc_artifacts:` に `work-m11 work-liftdiff toolchain-emsdk` を指定して再実行) |
+| base との verdict 変化 1 件 (`0x7850d0` mismatch→match・head 2 回で再現) の原因。case 差 (base 対 head 32〜34・head 内で 4) の原因。有力候補は `LD_VMT_IDX0=1024` 化に伴う vmt 系の仮 proc 番地の変化 (`PATCH_BY_VA` を `0x50018000` から導くよう修正済み・単体テスト `test_ld203_slot_fill` PASS) | 判定 1 件が base と異なる。「回帰なし」とは書かない。判定の変化が仮 proc 番地由来かは未確認 | 本 PR の範囲外。起票先: 後続 issue (PM 判断) |
 | 有効化 route の boot 残りの 3 件 (unit 830 segv・他 2 件) | 928/942 (受入の下限は満たす。全数 942 には届かない) | #3946 系の既存追跡 |
 
 ## 7. 再現
