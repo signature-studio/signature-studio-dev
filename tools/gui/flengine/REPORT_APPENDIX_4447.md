@@ -38,9 +38,10 @@
 - `run.mjs` の変更 (`33585cb01`・`7f54678a7` 系の survey 隔離) は survey モードの処理で、通常起動の boot 経路には入らない (`git diff 65844e9ef 9bfcc26a3 -- tools/gui/flengine/run.mjs` で確認)。
 - 結論: `units_dispatched` の追加自体は GetMem を変えない。GetMem の 1 件減は上記の m11 側変更に由来する可能性が高い。確定には `22c914300` の前後を同一 HEAD で測り直す必要があり、この run では未実施。
 
-## 4. e2e 実測 (測定 commit `9bfcc26a3`)
+## 4. e2e 実測 (測定 commit `9bfcc26a3`・記録のみ)
 
-- 実行: `bash tools/gui/flengine/e2e.sh` を foreground で 1 回 (前回 run の記録)。所要 620 s。load 開始 0.23 / 終了 1.17。nproc 4。
+- 測定 commit は `9bfcc26a3` と記録されている。この記録の run ログは確認できず、この head (`84fb96c30`) では再実行していない。
+- 実行: `bash tools/gui/flengine/e2e.sh` を foreground で 1 回。所要 620 s。load 開始 0.23 / 終了 1.17。nproc 4。
 - judge 14/15 (exit 1)。FAIL は B1 のみ。`units_run 109 (base 109)` `dllmain True` `GetMem 760 (base 761)` `FreeMem 24` `icall_miss 7`。`65844e9ef` と同じ FAIL 形。
 - native selftest・pe_image parity・pe_image e2e・ネガコン N1〜N10 は期待どおり。
 - `units_dispatched` は JSON 上で 109。
