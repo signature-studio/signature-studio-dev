@@ -15,6 +15,7 @@
     assoc      Ghidra は浮動小数の積/和の結合括弧を表示で落とす (`a*(b*c)` を `a * b * c` と印字 → C は左結合 `(a*b)*c` で 1 ulp ずれる)。
                実機 x86 の演算順 (逆アセンブルで確認) に合わせ手で括弧を戻す = patches.py の (name, regex, repl) 表。**手作業 1 件 = 1 行**
     stackpair  lStack_e8/lStack_e0 のように「隣接を仮定して &lStack_e8 を配列として渡される」2 変数を long long[2] にする
+    lanes      Delay の 128bit ローカル auStack_118/128/138 を、参照されるレーンの型 (_0_8_・_8_8_ は double、_8_4_・_12_4_ は uint32) を持つ V128L にする (#3094)
 """
 import json
 import re
@@ -93,6 +94,18 @@ static inline V128 kh_rsqrtps(V128 src) {
 '''
 
 
+LANE_HELPER = r'''/* 128bit ローカルの型付きレーン (Delay auStack_118/128/138)。Ghidra の参照文脈で型を決めた: _0_8_・_8_8_ は double (dVar の代入と (double) 参照)、
+   _8_4_・_12_4_ は uint32 (SUB84 と (int)(x >> 0x20) の書込み)。float 型の V128 に載せると整数→浮動小数の数値変換になるため別型にする。 */
+typedef union {
+    uint8_t b[16];
+    struct { double _0_8_; };
+    struct { uint8_t _p8a[8]; double _8_8_; };
+    struct { uint8_t _p8b[8]; uint32_t _8_4_; };
+    struct { uint8_t _p12[12]; uint32_t _12_4_; };
+} V128L;
+'''
+
+
 def approx_rcp_table():
     """snapins/scripts/approx_tables.b64 の rcp 表 (4096 entry) を C 配列リテラルで返す。"""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapins', 'lift'))
@@ -168,6 +181,8 @@ def main():
         out.append(RCPPS_HELPER % approx_rcp_table())
     if 'rsqrtps(' in alltxt:
         out.append(RSQRTPS_HELPER % approx_rsq_tables())
+    if 'lanes' in fixes and re.search(r'undefined1 auStack_(118|128|138) \[16\];', alltxt):
+        out.append(LANE_HELPER)
     for va, (ty, kind, _) in sorted(gtypes.items()):
         d = pe_bytes(pe, va, 16)
         out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
@@ -191,6 +206,8 @@ def main():
         t = rewrite_thunks(t, va)
         t = re.sub(r'undefined1 (auVar\d+) \[16\];', r'V128 \1;', t)
         t = re.sub(r'undefined1 (in_XMM\d+) \[16\];', r'V128 \1;', t)
+        if 'lanes' in fixes:
+            t = re.sub(r'undefined1 (auStack_(?:118|128|138)) \[16\];', r'V128L \1;', t)
         t = re.sub(r'\b(in_XMM\d+)\._0_8_\b', r'\1._0_8_d', t)
         t = re.sub(r'\bmaxps\((\w+),_DAT_([0-9a-f]+)\)', r'maxps(\1,(*(V128 *)gd_\2))', t)
         if tbase is not None:
