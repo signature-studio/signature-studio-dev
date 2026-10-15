@@ -111,7 +111,7 @@ git diff a65a71ed1 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md
 測定 commit: `56254af13` (コードを変えた最後の commit。`kh_lower.py` の `--rdata-str`・`lic_build.py` の配線・`lic_config.json` の `rdata_str`)。
 素材 (本 run で展開): `plugins-kilohearts` (`extract_core.sh` sha256 一致)・`toolchain-emsdk`・`toolchain-retdec`。環境: nproc=4・RAM 15 GB。
 
-**方式**: `--raw-va` の既定は素の VA リテラルを生のまま残す (vtable・関数ポインタの値を native と byte 一致させるため)。その中で、`.rdata` の NUL 終端・印字可能な文字列 (2〜63 字) を指す VA だけを窓 `@global_var_<VA>` へ置換する。窓の中身は `gen_globals.py` が PE の実バイトから埋める (`--window 64`)。文字列以外の VA は従来どおり生のまま。文字列の窓化で `raw_va` の値 store が変わるか: 変わる (文字列 VA を指す store の 84 行だけ。§8.2 で実測)。313 集合の on/off 差 +3,196 B (`56254af13` と HEAD で同じ) の section 単位の内訳は未測定 (値 store の置換 84 行と文字列窓の追加が寄与する、と §8.2 で確認したのみ)。
+**方式**: `--raw-va` の既定は素の VA リテラルを生のまま残す (vtable・関数ポインタの値を native と byte 一致させるため)。その中で、`.rdata` の NUL 終端・印字可能な文字列 (2〜63 字) を指す VA だけを窓 `@global_var_<VA>` へ置換する。窓の中身は `gen_globals.py` が PE の実バイトから埋める (`--window 64`)。文字列以外の VA は従来どおり生のまま。文字列の窓化で `raw_va` の値 store が変わるか: 変わる (文字列 VA を指す store の 84 行だけ。§8.2 で実測)。313 集合の on/off 差 +3,196 B (`56254af13` と HEAD で同じ) の section 単位の内訳は未測定 (§8.2 で値 store の変化 84 行を確認したのみ)。
 
 | 集合 | 条件 | wasm sha256 | bytes | globals | 入口 `function_180ef7fc0` の結果 |
 |---|---|---|---|---|---|
@@ -139,16 +139,11 @@ git diff a65a71ed1 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md
 | lift-8 `rdata_str` 無し | 54,394 | `7ba79e65…8c7707` | 9 |
 | lift-8 `rdata_str` 有り | 54,487 | `3d2bc6fd…e77287` | 10 |
 
-差分 +93 B のセクション別内訳 (実測。wasm section ごとのバイト数):
+section 単位の内訳: **未測定**。
 
-| section | off | on | 差 |
-|---|---|---|---|
-| 6 (global) | 520 | 729 | +209 |
-| 7 (export) | 1,383 | 1,406 | +23 |
-| 10 (code) | 50,025 | 50,025 | 0 (長さ同一。内容は不一致・差の位置は未特定) |
-| 11 (data) | 2,460 | 2,524 | +64 |
-
-section 単位の合計は +93 B と一致する。`final.ll` の差分は、窓 `global_var_1813d47fe` (64 B の `.rdata` 文字列 `Snapin Das Kleine Krokodil`) の宣言 1 行と、`store i64 ptrtoint(@global_var_1813d47fe)` の 1 箇所だけ。data の +64 はこの窓 1 件の `globals.c` 追加 (64 B) と一致する。export の +23 は窓の export 名 `global_var_1813d47fe` (20 B) と付随 3 B。global の +209 は `final.ll` の global 宣言が 1 件増えた (`1813d47fe`) ことと、他の global 初期値の並びが変わったことによるが、後者の寄与は**未測定**。code (10) は長さ一致で、内容の差の位置は未特定 (未測定)。
+- 前版の section 表 (global +209 / export +23 / code 0 / data +64) は撤回した。section 合計が wasm 全体と一致せず、on 側の section 合計が wasm 全体を超えていたため、表の値は実測として成立しない。
+- 再パースには `work/m4272_lift8_{off,on}` の wasm が要る。この run には素材 (`plugins-kilohearts`・`toolchain-emsdk`・`toolchain-retdec`) が展開されておらず、wasm を再生成できなかった。素材を付けた再実行で測る。
+- sha 差の原因 (窓の追加・文字列 VA の置換の別、global・code の寄与) も未測定。
 
 ### 8.2 #4272: 313 集合の on/off と raw_va の値 store (実測)
 
@@ -182,8 +177,8 @@ section 単位の合計は +93 B と一致する。`final.ll` の差分は、窓
 ### 8.4 #4272: 検証の範囲と未解決
 
 - 受入 1: lift-8 の off 側 globals (9 件) を記録 (§8.1)。
-- 受入 2: sha 差分は section 単位で内訳を記録 (§8.1)。ただし global (+209 B) の寄与の一部と code (10) の差の位置は未測定。受入 2 は部分達成。
+- 受入 2: 未達。sha 差分の section 単位の内訳・global の寄与・code の差の位置は未測定 (§8.1)。残りは #4547 へ移す。
 - 受入 3: 313 で `raw_va` の値 store の比較 (§8.2)。文字列 VA の 84 行だけが変わる。
-- 受入 4: 未測定の箇所は本文に未測定と明記した。
+- 受入 4: 未測定の箇所は本文に未測定と明記した。未測定の範囲: lift-8 の `56254af13` での値 (`gen_simd.py` の lift-8 への影響の有無)・sha 差の section 内訳。HEAD 基準の値だけを結論に使う。
 - `kh656_closure.py --rounds 4` は収束せず `FAIL` になる (`lic_config.json` の F ブロックを書き換えた状態で終わるため、測定後は HEAD に戻した)。収束の再確認は本 issue の範囲外。
 - 閉包の 4 ラウンド不収束は #1817 (KH-28) の範囲。
