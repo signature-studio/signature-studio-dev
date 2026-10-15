@@ -41,7 +41,28 @@ load average・並列数は前回 run で未記録のため、所要は §6-1 �
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 8 件の機構 (候補 (b)・(c)) の特定と修正 (kind 差 8 → 0) | LB 依存の寛容起動の結果 | 子 #3296 (親 #3229) |
-| 全 7,422 関数の LB 差の全件確認 (`m11_lb_ir_fn_diff.py` を全件に適用) | 「LB 直書き無し」の範囲 (現状は確認した関数のみ) | 子 #3296 (work-m11・toolchain-emsdk が要る) |
+| 全 7,422 関数の LB 差の全件確認 | 解消 (§7-6・#5069。4,023 件は全て shift_only) | 解消 (#5069) |
 | `m11_ov.c:194` の tkey 検証と LB=0 の address 0 (PE ヘッダ) の実測 | 候補のみ・#3229 記録の再確認は未実施 | 子 #3296 |
 | `function_412770` の `ptr null` 源 (D4 変種) の lift 修正 | kind 差とは独立 (§7-3) | 子 #3296 (別受入) |
 | D4 症状欄への「代用値 null」の追記 | DEFECTS の記述 | PM |
+
+### 7-6 全 7,422 関数の LB 差の全件確認 (#5069・測定 commit `26cfc6106`)
+
+- 測定: `python3 tools/m11/m11_lb_ir_shift_check.py <LB=0 の boot_final.ll> <LB=0x10000 の boot_final.ll>` (新規・`m11_lb_ir_fn_diff.py` の `functions()` を使う)。判定は「行数と骨格 (整数即値を N に置換した行) が一致し、変わった整数の差が全て +0x10000」を shift_only、それ以外を other。
+- IR: `m11_lb_tolerant_repro.sh 0` と `m11_lb_tolerant_repro.sh 0x10000` を同じ work-m11 の lift 成果物から作った (各 490,786 行)。sha256: LB=0 `64a0e5dc…`、LB=0x10000 `fbdfab05…` (`ir_conditions.json` の `ir_sha256` は後者)。
+- 結果 (関数 7,422):
+
+| 区分 | 件数 |
+|---|---:|
+| 本文が同一 | 3,399 |
+| 本文が違う (`m11_lb_ir_fn_diff.py`) | 4,023 |
+| うち shift_only (差は全て +0x10000 = 65,536) | 4,023 |
+| うち other | 0 |
+
+- 整数の差の分布は +65,536 が 20,153 箇所のみ。
+- 負例: LB=0x10000 の IR の `function_412770` 内 1 整数を +1 に改変すると、other 1 件 (`int_delta_1`) で検出した (`shift_check_neg.json`)。判定器は非シフト差を見ている。
+- 寛容起動 (同じ 2 IR・942 unit): LB=0 は ok 871 / miss 47 / oob 17 / halt0 6 / noproc 1。LB=0x10000 は ok 866 / miss 47 / oob 20 / halt0 8 / noproc 1。kind 差は 8 件 (40・153・158・291・296・304・745・895)。
+- **§7-4 の 8 件リストとの違い**: 前回記録の 555 が今回は 895 になっている (40・745 等は一致)。前回 run と本 run の IR・build が同一でないためと推定するが、未確認。
+- 結論: 「確認した関数だけ」の注記は解消された。全関数の差はシフトだけで、IR 段に LB 依存の非シフト差は無い。8 件の機構は依然として未特定 (子 #3296 の範囲)。
+- 測定 commit `26cfc6106` (`m11_lb_ir_shift_check.py` を追加した commit)。`git diff 26cfc6106 HEAD -- tools/m11` の出力は 0 行 (本 PR のコード変更はこの commit のみ)。
+- 制限: `work-m11` に `lift_pe.sha256` が無く、PE (`block00031_PE.bin`) の sha256 は照合していない。IR は `m11_lb_tolerant_repro.sh` (`m11_gen_ir2.sh` の再生成) で作った。LB 別の `ir_conditions.json` は LB ごとに保存していない (後の run で上書きされる)。
