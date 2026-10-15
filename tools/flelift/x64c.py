@@ -819,7 +819,12 @@ class FnLift:
         その場合 reg は thunk の値で、宛先は rax に入っている (MSVC CFG の規約)。"""
         if ins.address in self.targets:
             return False
-        prev = next((p for p in self.insns.values() if p.address + p.size == ins.address), None)
+        prev = None
+        for k in range(1, 16):          # x86 命令は最大 15 バイト: 直前の命令は address-k から始まり長さ k
+            p = self.insns.get(ins.address - k)
+            if p is not None and p.size == k:
+                prev = p
+                break
         if prev is None or prev.mnemonic != 'mov' or len(prev.operands) != 2:
             return False
         dst, src = prev.operands
