@@ -99,6 +99,7 @@ static u64 tr_41c180(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
     u64 r = function_40fcf0(a0, a1, a2);
     return (u8)r ? 0 : 0x80004002u;
 }
+static u64 tr_4467ac(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return tr_41c180(a0 - 0x48, a1, a2, a3, a4, a5, a6, a7); }
 static u64 tr_5c0e70(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_5c0e70(a0); }
 static u64 tr_ret0(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return 0; }
 /* closure 外の既定 IEqualityComparer<pointer-size ordinal> のメソッド (#483): 479b00 Equals = `cmp rdx,r8; sete al`,
@@ -144,6 +145,7 @@ static m11_tr_t disp_find(u32 va) {
     case 0x40f960: return tr_40f960;
     case 0x41c160: return tr_41c160;
     case 0x41c180: return tr_41c180;
+    case 0x4467ac: return tr_4467ac;
     case 0x5c0e70: return tr_5c0e70;   /* 5c03d0 の node 差替え通知の実体 (#482) */
     case 0x5c04a0: return tr_ret0;   /* `ret` 1 命令 (キャッシュ node 解放フックの既定実体) */
     case 0x478420: return tr_478420;
