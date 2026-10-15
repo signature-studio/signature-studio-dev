@@ -223,15 +223,38 @@ def ctype(ty):
     return None
 
 
+STRUCT_DEF_RE = re.compile(r'^(%[\w.$]+) = type \{ ?([^{}]*?) ?\}\s*$')
+SCALAR_ELEM = re.compile(r'^(i(8|16|32|64)|ptr|float|double)$')
+
+
+def struct_table(ll_path):
+    """`%name = type { i32, i32 }` 形式の 8 バイト以下・scalar 要素だけの struct を {name: [要素型...]} で返す。
+    #4184: by-value の POINT (%tagPOINT) を wasm32 では要素ごとの scalar 引数に展開する (shimx R6 と同じ規則)。"""
+    table = {}
+    with open(ll_path, errors='replace') as f:
+        for line in f:
+            if not line.startswith('%') or ' = type ' not in line:
+                continue
+            m = STRUCT_DEF_RE.match(line.rstrip('\n'))
+            if not m:
+                continue
+            elems = [e.strip() for e in m.group(2).split(',') if e.strip()]
+            if elems and all(SCALAR_ELEM.match(e) for e in elems) and len(elems) <= 2:
+                table[m.group(1)] = elems
+    return table
+
+
 def gen_stubs(ll_path, defined_names, prefix='function_'):
     """IR の declare から、呼出しをログして ld_stub() の応答を返す C スタブを生成する。
     戻り値: (C ソース文字列, [名前...], 型未対応で飛ばした名前)
-    CAB-233: 第5/6引数も ld_stub_x へ転送する (MultiByteToWideChar 等 6引数 API の dst 書込み用)。"""
+    CAB-233: 第5/6引数も ld_stub_x へ転送する (MultiByteToWideChar 等 6引数 API の dst 書込み用)。
+    #4184: 2 要素 scalar struct の by-value 引数 (%tagPOINT) は要素ごとの引数に展開する (wasm32 の LLVM 引数分解と一致)。"""
     out = ['#include <stdint.h>', 'typedef unsigned long long u64;',
            'extern u64 ld_stub_x(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5);']
     names, skipped = [], []
     widths = {}
     seen = set()
+    structs = struct_table(ll_path)
     with open(ll_path, errors='replace') as f:
         for line in f:
             if not line.startswith('declare '):
@@ -243,7 +266,13 @@ def gen_stubs(ll_path, defined_names, prefix='function_'):
             if nm in seen or nm in defined_names or SKIP_DECL.match(nm):
                 continue
             seen.add(nm)
-            ps = [param_type(p)[0] for p in split_top(m.group('args'))]
+            ps = []
+            for p in split_top(m.group('args')):
+                t = param_type(p)[0]
+                if t in structs:
+                    ps.extend(structs[t])
+                else:
+                    ps.append(t)
             rt = ret_type(m.group('pre'))
             cps = [ctype(t) for t in ps]
             crt = ctype(rt)
