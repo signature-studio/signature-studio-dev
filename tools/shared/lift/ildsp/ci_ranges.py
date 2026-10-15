@@ -4,7 +4,8 @@
 usage: ci_ranges.py <block24360_PE.bin> <out.json>
 辿り方は tools/shared/scripts/ildsp_closure.py の closure() と同じ (直接 call と .text 内の直接 jmp を辿る。
 .pdata の無い先は次の .pdata 先頭までを範囲とする近似)。entry_only の 36 関数・961 命令と一致することを確認する。
-出力 JSON: image_base / functions (RVA・範囲・命令数) / ranges_va (RetDec --select-ranges の VA 形式)。
+出力 JSON: image_base / functions (RVA・範囲・命令数) / ranges_va (RetDec --select-ranges の VA 形式) /
+outside_targets (範囲内の直接分岐 (call/jmp/jcc) の飛び先のうち、範囲に含まれない .text 内の番地。closure は jcc を辿らないので取りこぼしが出る)。
 """
 import sys, os, struct, bisect, json
 
@@ -67,10 +68,14 @@ def main():
         for addr, m, ops in func_insns(f):
             insns.setdefault(addr, (m, ops))
     indirect = sum(1 for m, ops in insns.values() if m.startswith("call") and not S.is_direct(ops))
+    outside = [{"to": f"{int(ops, 16):#x}", "from": f"{addr:#x}", "mnem": m}
+               for addr, (m, ops) in sorted(insns.items())
+               if (m.startswith("call") or m.startswith("j")) and S.is_direct(ops)
+               and t_lo <= int(ops, 16) < t_hi and int(ops, 16) not in insns]
     rows = [{"rva": f"{b:#x}", "end": f"{end_of(b):#x}", "pdata": b in funcs} for b in sorted(seen)]
     ranges_va = [f"{ib + b:#x}-{ib + end_of(b):#x}" for b in sorted(seen)]
     out = {"image_base": ib, "entry": f"{ENTRY:#x}", "functions": len(seen), "instructions": len(insns),
-           "indirect_calls": indirect, "rows": rows, "ranges_va": ranges_va}
+           "indirect_calls": indirect, "rows": rows, "ranges_va": ranges_va, "outside_targets": outside}
     json.dump(out, open(sys.argv[2], "w"), indent=1)
     print(f"[ci_ranges] functions={len(seen)} instructions={len(insns)} indirect_calls={indirect} "
           f"pdata={sum(r['pdata'] for r in rows)} -> {sys.argv[2]}")
