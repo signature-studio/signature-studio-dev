@@ -38,6 +38,7 @@
 
 - (a) 判定器: wasm 側の bit 一致行 (行 0) の ST(0) float32 の最下位 bit を反転 → bit 一致 `7295 → 7294` (`python3 x87_fn_diff.py --nega`、exit 0 = 検出)。
 - (b) 意味の誤り: `lift` の `f_10002ee0` の最初の `x87_arith(2, 1, …)` (X87_SUB) を `(3, 1, …)` (X87_SUBR) に差し替えて wasm を作り直す → `fn_10002ee0` の float32 結果が一致しない行 `4,000 / 4,000` (`python3 x87_fn_diff.py --nega-lower`、exit 0 = 検出)。 この取り違えで float32 結果がずれることを確認したので、float32 の全行一致は空振りではない。
+- (c) 例外値の判定 (`nan-num`): 特殊値モードの wasm 出力で、両方が NaN の最初の行 (行 0・`fn_10002ee0`) の ST(0) を `3f800000` (1.0) に置き換え、突合し直す。 `nan-num` は 0 → 1 に増え、突合の判定は FAIL (本体の exit 1 と同じ経路) になる (`python3 x87_fn_diff.py --special --nega-nan`、exit 0 = 検出)。
 
 ## 5. 再現手順
 
@@ -48,6 +49,8 @@ python3 tools/plugins/slayer_engine_ia32/lift_text.py                 # work/lif
 python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py               # 突合 (exit 0)
 python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --nega        # ネガコン (a) (exit 0)
 python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --nega-lower  # ネガコン (b) (exit 0)
+python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --special       # 例外値の突合 (exit 0)
+python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --special --nega-nan  # ネガコン (c) (exit 0)
 ```
 
 - 鮮度の証跡 (WORKFLOW §6): 測定 commit `565111174` の後の変更は、本付録・REPORT / DOC_MAP の文書と、review 指摘によるコメントだけの修正 (`x87_fn_diff.py` の TARGETS の注釈 2 行・`x87_fn_native.c` の冒頭注釈 1 行)。 実行されるコード・生成コード・乱数の列は変えていないので、再測定はしていない。 `git diff 565111174 HEAD -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c tools/plugins/slayer_engine_ia32/x87_fn_glue.c tools/plugins/slayer_engine_ia32/x87_fn_entry_wasm.mjs tools/plugins/slayer_engine_ia32/lift_text.py tools/ott/lift tools/ott/rt` の出力 (全文):
@@ -91,13 +94,13 @@ index 72a788e2c..80d069f06 100644
 | 残りの leaf x87 関数 36 本 (lift 済み・import と call が無い) の差分試験 | 対象の 2 本以外の x87 の命令組合せは未確認。 本付録の 2 本で受入は満たす | #3715 (PLG-G2-31・子。親 #2989) |
 | 超越関数・`frndint`・`fscale`・`fprem` 等を含む関数 (lift が `ott_unsup` のまま) | 対象外 | #2966 (PLG-G2-23) |
 | `fld`/`fstp` m80 の差分試験 | 80bit メモリ経路は未試験 | #2967 (PLG-G2-24) |
-| 例外値 (NaN・inf・非正規・±0) の NaN どうしのビット差 (符号・ペイロード)。 数値どうしは float32 で全行一致 (§7) | NaN の値そのものは一致しない。 数値の結果には影響しない | 未起票 (PM 判断が必要。#142 の許容は IPP の話で x87 には当てはまらない) |
+| 例外値 (NaN・inf・非正規・±0) の NaN どうしのビット差 (符号・ペイロード)。 数値どうしは float32 で全行一致 (§7) | NaN の値そのものは一致しない。 本試験は後段の値を検査していないので、この差が後段の結果を変えるかは判定していない | 未起票 (PM 判断待ち: NaN ビット差を要求するか・既定案は許容。#142 の許容は IPP の話で x87 には当てはまらない) |
 | export `main`・import を通る関数・実行時の間接 call・`sahf` の AF・`fs:` (TEB) | 関数単位の残り (x87 以外も含む) | #3127 / #3128 |
 | f80→f64 の丸め差 (ST(0) の double で 1 ulp 以上。分布は §1 参照) | float32 結果には伝播しなかった。 方式の帰結 | ADR D28 (方式)。 行案 D24 (案) は `REPORT_APPENDIX_1099.md` §6 |
 
 ## 7. 例外値 (#3716 PLG-G2-32)
 
-- 測定 commit `18a5dced7` (判定器と `--special` を加えた最後の commit)。 検証 HEAD は同じ。 `python3 x87_fn_diff.py --special` (exit 0、wall 8.65 s、load1 0.40)。 通常モード (`python3 x87_fn_diff.py`、exit 0、wall 8.03 s) も同じ commit で再現し、§3 の数値と一致した。
+- 測定 commit `661530759` (ネガコン `--nega-nan` を加えた最後のコード commit。 判定器の `--special` は `18a5dced7` のまま)。 検証 HEAD は同じ。 `python3 x87_fn_diff.py --special` (exit 0、wall 8.11 s、load1 0.33)。 通常モード (`python3 x87_fn_diff.py`、exit 0、wall 7.57 s、load1 0.13) も同じ commit で再現し、§3 の数値と一致した (`0x10002ee0` 3,890/4,000、`0x10005400` 3,405/4,000)。 `--nega`・`--nega-lower`・`--special --nega-nan` も同じ commit で exit 0。
 - 入力: 別の乱数系列 (seed 2990) で各関数 4,000 行。 `a0` は NaN (±・signaling)・±inf・最小の正の非正規・最大の負の非正規・±0 を巡回させる。 OBJ 窓の語の 1/4 も同じ集合から選ぶ。 `fn_10005400` の a1・a2 も 1/2 で例外値。 通常行 (§3) の列は変えていない。
 - 判定の追加: NaN どうしのビット差 (`nan`) と、NaN と数値の混在 (`nan-num`) を分けて数える。 `nan-num` が 1 件でもあれば PASS しない。 NaN どうしの差は構造の判定 (eax) から外して別計上する。
 
@@ -107,7 +110,8 @@ index 72a788e2c..80d069f06 100644
 | `0x10005400` | 4,000 | 0 | 622 | 0 | 3,459 / 541 / 0 / 0 | 4,134 / 0 |
 
 - 数値どうしの float64 の差 (ST(0) の double): `0x10002ee0` で 2 件、`0x10005400` で 28 件 (いずれも 1 ulp)。 float32 では全て一致。 f80→f64 の丸め差 (ADR D28)。
-- NaN どうしの差: `eax` と ST(0) の NaN の符号・仕様ビットが native と wasm で違う行がある (例: native `7fc00000`・wasm `ffc00000`、native `7fc00001`・wasm `ffc00000`)。 原因は本付録では切り分けていない (どちらが実 FL の x87 の値と一致するかも未確認)。 数値の結果ではないので、本付録の判定では値の一致を要求しない。 この扱いを許容するかは PM の判断が要る。
+- NaN どうしの差: `eax` と ST(0) の NaN の符号・仕様ビットが native と wasm で違う行がある (例: native `7fc00000`・wasm `ffc00000`、native `7fc00001`・wasm `ffc00000`)。 原因は本付録では切り分けていない (どちらが実 FL の x87 の値と一致するかも未確認)。 本付録の判定では NaN どうしのビット差を数値の判定に使わない (値の一致は要求しない)。 後段の値は検査していないので、この差が後段の結果を変えるかは未確認。 この扱いを許容するかは PM の判断が要る。
 - 非自明性: 4,000 / 4,000 行で OBJ 窓が変わった (§3 と同じ)。
 - ネガコン (通常): `--nega` (bit 一致 7,295 → 7,294、exit 0)、`--nega-lower` (`f_10002ee0` の演算取り違えで float32 不一致 4,000 / 4,000、exit 0) とも検出。
+- ネガコン (例外値): `--special --nega-nan` で wasm の NaN 1 語 (行 0 の ST(0)) を 1.0 に置換 → `nan-num` 0 → 1、判定 FAIL (exit 0 = 検出)。 測定 commit `661530759` (§7 の先頭行)。
 - 判定器の誤りを 1 件修正した: 初版は NaN どうしの差も構造の不一致として数えたため、特殊値モードが FAIL した。 数値の差と NaN どうしの差を分けて、この FAIL を解消した (判定の変更は `18a5dced7`)。 NaN と数値の混在は 0 件で、判定はこれで通す。
