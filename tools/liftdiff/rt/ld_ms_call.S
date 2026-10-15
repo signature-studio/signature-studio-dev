@@ -75,11 +75,7 @@ ld_stub_common:
     movq %rcx,%rsi
     movq %r8,%rcx
     movq %r9,%r8
-#ifdef LD_STK_ENTRY28
     leaq 224(%rsp),%r9           # &MS 第5引数 ([entry_rsp+0x28] = rsp+184+40; 第6引数は +8) — ゲスト stack への書込はしない
-#else
-    leaq 212(%rsp),%r9           # 既定 (旧): entry+0x1c。MS 第5引数ではない。#3619 の検証で -DLD_STK_ENTRY28 を付けたときだけ 224 にする (REPORT_APPENDIX_LD170.md)
-#endif
     leaq 184(%rsp),%rax          # entry rsp (= [rsp] が呼出元の戻り番地)。既定の経路でも毎回保存するが、読むのは wintrace の wt_rec だけ (戻り値は変えない)
     movq %rax,ld_stub_ent(%rip)
     call ld_stub_c
