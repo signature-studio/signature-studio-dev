@@ -86,6 +86,7 @@ rax 格納の直前書込み (VA 付き、`hs_store_src27.py` の出力):
 - 0x40fe90 の変更で 0x1321225 が失われるのは、`0x1321e12 call 0x40fe90` の戻り値が 0x1321e17 の分岐を変え、0x1321225 の経路に影響するため (供給元ではなく経路の影響)。
 - 測定時間・load: 基準 `hs_disp_emu.py` 既定 (`HS_DISP_PATH=1`・全 256 ID) real 1m12s、終了時 load 0.91 (`uptime`)。変更 run 3 回の合計は 20:36:56〜20:40:33 (壁時計 3m37s、load 0.98)。`hs_store_src11.py` real 0.174 秒、`hs_store_cov.py` (基準のみ) real 5.9 秒。
 - 残作業 (未解決): 0x1322010 ブロックへ至る上流の分岐の特定 (これが決まれば 0x132206e・0x13220b2・0x13221be の実測が可能)。未確定 7 行の読み元 (グローバル基底・リスト起点・vtable 先・cmp 左辺) の追跡。
+
 ### 5.2 #5421 (PLG-P0b-58) — call 戻り値経路の 5 行
 
 対象 5 行 (`0x13218c1`・`0x13219b0`・`0x1321966`・`0x1321b6c`・`0x132257d`)。解析は `hs_store5_src.py` (新規)。
@@ -113,7 +114,8 @@ rax 格納の直前書込み (VA 付き、`hs_store_src27.py` の出力):
 ## 6. コード差分
 
 - `git diff 31208b4c8 HEAD -- tools/plugins/framework/hostshim/` は `hs_store_src27.py` の新規追加と、本 REPORT の新規追加だけ。`hs_disp_emu.py`・`hostshim.c`・`hs_store_cov.py` は変更なし。
-- #5422 の追加: `hs_store_src11.py` の新規追加 (測定 commit `8436217c4`)。`git diff 8436217c4 HEAD -- tools/plugins/framework/hostshim/` は本 REPORT の追記だけ。
+- #5422 の追加: `hs_store_src11.py` の新規追加 (測定 commit `8436217c4`)。`git diff 8436217c4 HEAD -- tools/plugins/framework/hostshim/` は本 REPORT の追記と `hs_store5_src.py` (main 取り込み分) だけ。
+- main 取り込み後の再測定 (HEAD `582ca621e`・全 256 ID・`hs_disp_emu.py` 既定 `HS_DISP_PATH=1`): 基準 real 57.5 秒・終了時 load 1.12。`hs_store_cov.py` の基準は実行 30・未実行 39・no-case 202 (数値は §4 と一致)。変更 run `0x40fe90:one` は real 58.2 秒、基準比の新規実行 4・失われる実行 3・11 行の新規実行 0 (§5.1 と一致)。`hs_store_src11.py` real 0.156 秒。
 
 ## 7. 再現コマンド
 
