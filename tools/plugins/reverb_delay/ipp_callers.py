@@ -10,6 +10,7 @@
   ptr    データ中の 8 byte / 4 byte の絶対値 (関数ポインタ表の候補) が指す
   addr   コード中の rip 相対参照が指す (関数アドレスの取得の候補)
   none   上のどれも無い (殻・export・間接呼出しのいずれでも静的に辿れない)
+呼出元の件数: pdata 関数 (fn) と、pdata 外の呼出し箇所 (site・箇所の VA ごとに 1 件) を別に数える。 pdata 外を 1 件に潰さない。
 殻 (block 19164) は engine の DLL 名を import せず、IPPCODE は export されない。 殻からの直接参照は PE 上に作れない (別イメージ)。
 usage: ipp_callers.py [--json OUT] [block]
 """
@@ -91,17 +92,18 @@ def analyze(block):
         direct, rip, ind = [], collections.defaultdict(set), collections.Counter()
         for src, ins in seq:
             cls = 'ipp' if in_ipp(ins.address) else sec_of(ins.address)
+            unit = src if src is not None else ('site', ins.address)
             if ins.mnemonic in ('call', 'jmp') and ins.operands:
                 o = ins.operands[0]
                 if o.type == X86_OP_IMM:
                     if ins.mnemonic == 'jmp' and src is not None and owner(o.imm) == src:
                         continue
-                    direct.append((src, cls, o.imm))
+                    direct.append((unit, cls, o.imm))
                 else:
                     ind[cls] += 1
             for o in ins.operands:
                 if o.type == X86_OP_MEM and o.mem.base == X86_REG_RIP:
-                    rip[ins.address + ins.size + o.mem.disp].add(src if src is not None else ins.address)
+                    rip[ins.address + ins.size + o.mem.disp].add(unit)
         return direct, rip, ind
 
     d_p, rip_p, ind_p = edges([(a, i) for a, i in pd_ins])
@@ -125,14 +127,18 @@ def analyze(block):
                     slots[sv + i].add(v)
     ptr_entries = {v for vs in slots.values() for v in vs}
 
-    def per_entry(direct, rip):
+    def per_entry(direct):
         by = collections.defaultdict(lambda: {'text': set(), 'ipp': set()})
-        for src, cls, t in direct:
+        for unit, cls, t in direct:
             if in_ipp(t):
-                by[t]['ipp' if cls == 'ipp' else 'text'].add(src if src is not None else 0)
+                by[t]['ipp' if cls == 'ipp' else 'text'].add(unit)
         return by
 
-    by_p, by_s = per_entry(d_p, rip_p), per_entry(d_s, rip_s)
+    def counts(units):
+        fn = sum(1 for u in units if not isinstance(u, tuple))
+        return fn, len(units) - fn
+
+    by_p, by_s = per_entry(d_p), per_entry(d_s)
     rows = []
     cls_p, cls_s = collections.Counter(), collections.Counter()
     for a in sorted(ipp_starts):
@@ -153,9 +159,11 @@ def analyze(block):
                 k[tag] = 'none'
         cls_p[k['p']] += 1
         cls_s[k['s']] += 1
+        e = by_s.get(a, {'text': set(), 'ipp': set()})
+        (tf, ts), (pf, ps) = counts(e['text']), counts(e['ipp'])
         rows.append({'va': hex(a), 'end': hex(ends[a] - a), 'class_pdata': k['p'], 'class_linear': k['s'],
-                     'text_callers_linear': len(by_s[a]['text']) if a in by_s else 0,
-                     'ipp_callers_linear': len(by_s[a]['ipp']) if a in by_s else 0})
+                     'text_callers_linear': tf, 'text_outside_sites_linear': ts,
+                     'ipp_callers_linear': pf, 'ipp_outside_sites_linear': ps})
     # 非 pdata の IPP 着地点 (線形で見つかるが pdata 先頭ではないもの)
     landings = {t for _, _, t in d_s if in_ipp(t)}
     non_pdata = sorted(t for t in landings if t not in ipp_starts)
@@ -183,6 +191,7 @@ def analyze(block):
             if g not in reach:
                 reach.add(g)
                 todo.append(g)
+    tx_fn, tx_site = counts({s for s, c, t in d_s if c != 'ipp' and in_ipp(t)})
     return {
         'block': block, 'ipp_range': [hex(ipp_lo), hex(ipp_hi)], 'ipp_size': ipp.Misc_VirtualSize,
         'ipp_pdata_funcs': len(ipp_starts), 'ipp_pdata_bytes': sum(ends[a] - a for a in ipp_starts),
@@ -191,7 +200,7 @@ def analyze(block):
         'linear_edges_into_ipp': sum(1 for _, _, t in d_s if in_ipp(t)),
         'linear_entries_into_ipp': len(landings), 'linear_entries_at_pdata_start': len(landings & ipp_starts),
         'linear_entries_inside_pdata_func': len(inside), 'linear_entries_outside_pdata': len(gap),
-        'linear_text_callers': len({s for s, c, t in d_s if c != 'ipp' and in_ipp(t)}),
+        'linear_text_callers': tx_fn, 'linear_text_outside_sites': tx_site,
         'class_pdata_basis': dict(cls_p), 'class_linear_basis': dict(cls_s),
         'ptr_slots': len(slots), 'ptr_slot_sections': dict(collections.Counter(sec_of(s) for s in slots)),
         'ptr_entries': len(ptr_entries),
@@ -201,6 +210,7 @@ def analyze(block):
         'exports': [hex(x) for x in exports], 'export_reach_pdata_funcs': len(reach),
         'export_reach_ipp_pdata_funcs': len(reach & ipp_starts),
         'gap_landings': [hex(t) for t in gap],
+        'gap_landing_callers': {hex(t): counts({s for s, c, v in d_s if c != 'ipp' and v == t}) for t in gap},
         'rows': rows,
         'slots': {hex(s): [hex(v) for v in sorted(vs)] for s, vs in sorted(slots.items())},
     }
