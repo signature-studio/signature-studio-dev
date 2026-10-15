@@ -528,7 +528,12 @@ export function createMockEngine() {
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
-    "device.forwardMIDICC": (message, mode = 1) => { st.midiOut.push({ api: "forwardMIDICC", message, mode }); },
+    // PY-231 (#3671): PE 0xd748e0 (書式 ii)。判定順は midiOutMsg と同じ (-7 → -6)。送るのは第 1 引数の word。mode は stub 名 (PE の kwlist 名は forwardTo・REPORT_PY231 §1)
+    "device.forwardMIDICC": (message, mode = 1) => {
+      if (!st.devAssigned) throw new FlError("Device not assigned", 7);
+      if (!st.linkAssigned) throw new FlError("Linked device not assigned", 6);
+      st.midiOut.push({ api: "forwardMIDICC", message, mode });
+    },
     // PY-227 (#3655): PE 0xd747f0 と同じ順 (引数 → -7 → -6)。channel ≤ -1 は message の下位 32bit、channel ≥ 0 は arg4 を bit 24–31 に入れた word を記録する
     "device.midiOutMsg": (...a) => {
       const msg = argI(a, 0, 0), ch = argI(a, 1, -1), d1 = argI(a, 2, 0), d2 = argI(a, 3, 0), a4 = argI(a, 4, 0);
