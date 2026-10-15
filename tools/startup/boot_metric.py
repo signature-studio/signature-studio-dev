@@ -36,7 +36,7 @@ STOP_UNITS = 1  # 停止 unit 1 本 (REPORT の「unit N 後に Halt0」・boot 
 SKIP_DIRS = {"work", "venv", "node_modules", "dist", ".wrangler", ".git"}
 
 M11_DIR = "tools/m11"
-M11_REPORT = "tools/m11/REPORT.md"
+M11_N134 = "tools/m11/REPORT_N134.md"  # §14 は #134 で REPORT_N134.md へ分割移動 (2f810906c)
 M11_APPENDIX = "tools/m11/REPORT_APPENDIX_1430.md"
 M11_N2714 = "tools/m11/REPORT_N2714.md"
 GUI_DIR = "tools/gui/flengine"
@@ -47,6 +47,7 @@ X64_DIR = "tools/flelift/boot"
 X64_BOOT = "tools/flelift/boot/results/boot_summary_plain.json"
 X64_SURVEY = "tools/flelift/boot/results/survey.json"
 X64_REPORT = "tools/flelift/boot/REPORT.md"
+X64_APPENDIX_2719 = "tools/flelift/boot/REPORT_APPENDIX_2719.md"
 NATIVE_REPORT = "tools/liftdiff/REPORT_LD26.md"
 STARTUP = "tools/startup/STARTUP.md"
 FLE_APPENDIX = "tools/gui/flengine/REPORT_APPENDIX.md"
@@ -304,13 +305,13 @@ NO_COMMIT = "表行・節・JSON に測定 commit の記載が無い (source の
 def _m11_tolerant(src):
     src.begin()
     commit, run, ok, trap, oom, miss, noproc = src.match(
-        M11_REPORT, "## 14.",
+        M11_N134, "## 14.",
         r"^\| `(de50ffa)` [^|]*\| (\d+) \| [^|]*\| (\d+)/(\d+)\((\d+)\)/(\d+)/(\d+)",
         commit_group=0,
     )
-    (skipped,) = src.match(M11_REPORT, "## 14.", r"units_skipped = (\d+) の内訳")
+    (skipped,) = src.match(M11_N134, "## 14.", r"units_skipped = (\d+) の内訳")
     stop_commit, unit, va, kind = src.match(
-        M11_REPORT, "## 14.",
+        M11_N134, "## 14.",
         r"^\| `(6654322)` \(\+414ad0・43a3f0 転記, n=3\) \| \*\*\d+\*\* \| unit (\d+) \((0x[0-9a-f]+)\) 後に (Halt0)",
         commit_group=0,
     )
@@ -542,6 +543,73 @@ def _x64c_boot(src):
     )
 
 
+def _x64c_tolerant(src):
+    src.begin()
+    commit = src.match_commit(X64_APPENDIX_2719, "# tools/flelift/boot", r"測定 commit: \*\*([0-9a-f]{8})\*\*")
+    attempted, ok, empty, noproc, clobber, exit_n, oob, dispatched, getmem, freemem = src.match(
+        X64_APPENDIX_2719, "## 3.",
+        r"^\| 寛容 mode 1 \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| ([\d,]+) / ([\d,]+) \|",
+    )
+    (unit, va, disp, clob) = src.match(
+        X64_APPENDIX_2719, "## 0.",
+        r"mode 1 は unit (\d+) \(VA `(0x[0-9a-f]+)`・dispatch (\d+) 番目\) の ExitProcess の後、unit 246〜940 の (\d+) 件が呼出し時に proc 0 を返し",
+    )
+    (skip_n, clob_n) = src.match(
+        X64_APPENDIX_2719, "## 4.",
+        r"mode 1 の skip は (\d+) 件 \(unit 245 の `exit` 1 件 \+ unit 246〜940 の `clobber` (\d+) 件\)",
+    )
+    (exit_va,) = src.match(X64_APPENDIX_2719, "## 4.", r"^245 (0x[0-9a-f]+) exit$")
+    src.match(X64_APPENDIX_2719, "## 7.", r"^- 呼出し: 寛容起動の後で `fle_run` を 1 回 \(mode 1・mode 2 とも\)。結果は `oob`")
+    src.match(X64_APPENDIX_2719, "## 7.", r"mode 1 \(`tol`\) (?:`0x[0-9a-f]+` → )+`0x1375990`")
+    (gui_after,) = src.match(X64_APPENDIX_2719, "## 8.", r"^\| `RegisterClassW`/`CreateWindowExW` の呼出し \(soft 計数\) \| 0 \| (\d+) \|")
+    (last_step,) = src.find(STARTUP, r"^\| (S12) \| engine \| `0x1375990` 冒頭")
+    if int(attempted) != UNITS:
+        raise MetricError(f"x64c 寛容起動の試行数が {UNITS} でない: {attempted}")
+    if int(ok) + int(empty) + int(noproc) + int(clobber) + int(exit_n) + int(oob) != int(attempted):
+        raise MetricError("x64c 寛容起動の列の合計が試行数と合わない")
+    if int(ok) + int(exit_n) + int(oob) != int(dispatched):
+        raise MetricError("x64c 寛容起動の ok + failed が dispatch 数と合わない")
+    if int(disp) != int(dispatched):
+        raise MetricError("x64c 寛容起動の停止 dispatch 番号と dispatch 数が合わない")
+    if not int(clob) == int(clobber) == int(clob_n):
+        raise MetricError("x64c 寛容起動の clobber 数が §0・§3・§4 で食い違う")
+    if int(skip_n) != int(clobber) + int(exit_n) + int(oob):
+        raise MetricError("x64c 寛容起動の skip 件数が clobber + failed と合わない")
+    if exit_va != va:
+        raise MetricError("x64c 寛容起動の停止 VA が §0 と §4 で食い違う")
+    if int(gui_after) != 0:
+        raise MetricError("x64c 寛容起動の GUI 計数が 0 でない")
+    failed = int(exit_n) + int(oob)
+    units = {
+        "total": int(attempted), "ok": int(ok), "skipped": int(clobber) + failed, "failed": failed,
+        "miss": None, "noproc": int(noproc), "dispatched": int(dispatched), "uncovered": None,
+    }
+    stop = {"unit": int(disp), "va": va, "kind": "exit"}
+    cfi = {"reached": True, "last_step": last_step}
+    gui = {"RegisterClassW": int(gui_after), "CreateWindowExW": int(gui_after)}
+    nulls = {
+        "units.miss": "x64c 寛容起動は icall miss を分けて数えない (出典に miss の計数が無い。非実行の skip は clobber として数える)",
+        "units.uncovered": "逐次起動では使わない",
+    }
+    derived = {
+        "units.total": "試行数 (§3 表行)。ok・empty・noproc・clobber・exit・oob の合計と一致を検査。empty は単一スキーマに列が無いため、ここに説明として書く",
+        "units.ok": "§3 表行の ok。dispatched − failed と一致を検査",
+        "units.failed": "exit + oob (dispatch 後に失敗した unit)",
+        "units.skipped": "failed + clobber (呼出し時に proc 0 で未実行)。§4 の skip 件数と一致を検査",
+        "units.dispatched": "§3 表行の dispatch。ok + failed と一致を検査",
+        "units.noproc": "§3 表行の noproc (起動時から proc 0 の unit)",
+        "stop": "§0 の停止 (ExitProcess) の VA と dispatch 番号。stop.unit は dispatch 順の 1 始まり (x64c-strict-sequential と同じ)。出典の『unit 245』は InitTable の添字 (0 始まり) で、dispatch 209 番目の unit と同じ",
+        "create_fruity_instance": "§7 の呼出し・リング記録 (fle_run → 0x1375990 の入口 dispatch) による。入口 S12 が下限。本体内の trap 地点は未特定 (#3077)。S13 以降は未測",
+        "gui_natural": "§8 KPI 表の soft 計数 (RegisterClassW/CreateWindowExW)。両名は soft スタブになる (§7) ため、同じ計数で代える",
+    }
+    return _record(
+        "x64c-tolerant-sequential", "x64c", "tolerant-sequential",
+        "x64c 寛容起動 mode 1 (FLE_TOLERANT=1・補修なし。REPORT_APPENDIX_2719 §3・§4)",
+        units, stop, cfi, gui, commit, nulls, src.end(),
+        {"getmem": int(getmem.replace(",", "")), "freemem": int(freemem.replace(",", ""))}, derived,
+    )
+
+
 def _x64c_survey(src):
     src.begin()
     total = src.json_value(X64_BOOT, "boot.units_total")
@@ -654,6 +722,7 @@ def build(root=REPO, commit_of=None, show_of=None):
         _m11_gui_survey(src),
         _flengine_cfi(src),
         _x64c_boot(src),
+        _x64c_tolerant(src),
         _x64c_survey(src),
         _native_ref(src),
     ]
