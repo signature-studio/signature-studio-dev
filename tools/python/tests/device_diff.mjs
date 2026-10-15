@@ -193,6 +193,25 @@ for (const [dev, link] of [[1, 1], [0, 0]]) {
 const linkedExpect = [-1, null, null, -1, null, null];
 if (JSON.stringify(linkedRes) !== JSON.stringify(linkedExpect)) diffs.push({ state: "linked channel expect", expect: linkedExpect, wasm: linkedRes });
 
+// PY-4846 (#3568 子 B): getLinkedValue・getLinkedInfo・getLinkedParamName・getLinkedValueString。index -1 の経路だけ PE 確定 (REPORT_PY215 §1)。index >= 0 は未確定の未実装 error (mock と C で同じ code)
+const linkedNames = ["device.getLinkedValue", "device.getLinkedInfo", "device.getLinkedParamName", "device.getLinkedValueString"];
+const linkedNameRes = {};
+for (const name of linkedNames) {
+  for (const idx of [-1, 0]) {
+    const a = run(mock, name, [idx]);
+    const b = run(wasm, name, [idx]);
+    linkedNameRes[`${name}(${idx})`] = "code" in b ? `code ${b.code}` : b.ok;
+    if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ name, args: [idx], mock: a, wasm: b });
+  }
+}
+const linkedNameExpect = {
+  "device.getLinkedValue(-1)": -1, "device.getLinkedValue(0)": "code 2",
+  "device.getLinkedInfo(-1)": -1, "device.getLinkedInfo(0)": "code 2",
+  "device.getLinkedParamName(-1)": "code 8", "device.getLinkedParamName(0)": "code 2",
+  "device.getLinkedValueString(-1)": "code 8", "device.getLinkedValueString(0)": "code 2",
+};
+if (JSON.stringify(linkedNameRes) !== JSON.stringify(linkedNameExpect)) diffs.push({ state: "linked name expect", expect: linkedNameExpect, wasm: linkedNameRes });
+
 assert.deepEqual(diffs, [], `device 差分 ${diffs.length} 件`);
 assert.deepEqual(rejectDiffs, [], `署名違反が code 5 で拒否されない ${rejectDiffs.length} 件`);
 console.log(JSON.stringify({
