@@ -148,8 +148,8 @@ python3 tools/plugins/framework/fw_blk_fold_map.py $R/old/fw6.restored.ll $W/fw[
 
 ## 9. コード差分 (測定 commit 以降)
 
-分類器の測定 commit は `ba58ff628`。以降の実行コードの差分は無し (本 PR の追記は REPORT と DOC_MAP のみ)。`c7ef3b716` → `ba58ff628` の差分は `fw_blk_fold_map.py` の docstring の 1 行 (受入番号)。
+分類器の測定 commit は `ba58ff628`。`ba58ff628` から `f2a7773ac` (main 取り込み後) までの差分は、main 由来の 6 ファイル (`tools/icall/diff/index_table_scan.py`・`index_table_scan_selftest.sh`・`tools/liftlib/dir64_boundary_gate.sh`・`p1_repmap_census.py`・`tools/plugins/framework/hostshim/hostshim.c`・`hs_val_probe.py`) で 589 行。このうち測定の 4 本 (`fw_prep.py`・`icall_rewrite.py`・`fw_lift.sh`・`fw_blk_fold_map.py`) がいずれも参照しない (grep で確認)。`hostshim.c` の変更はコメントのみ (`-U0` で非コメント行 0)。よって測定値は main 取り込み後も有効で、再測定は不要。
 
 ```sh
-git diff ba58ff628 HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md'   # 空 = 実行コード差分 0
+git diff --stat ba58ff628 HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md'   # 6 files, 501 insertions / 4 deletions
 ```
