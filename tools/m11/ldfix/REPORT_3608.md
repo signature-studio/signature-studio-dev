@@ -142,7 +142,7 @@ git diff 40d3a788d origin/main -- tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_4
 ```
 
 - 上の範囲の差分は 0 行 (`... | wc -l` → 0)。よって `origin/main` 取り込み後の再測定は不要 (`docs/WORKFLOW.md` §6)。
-- 本 fix の再測定 (§1 の全変種・§1-3) は `87208313b` で実施。同じ経路 (上の一覧) について、`git diff 40d3a788d 87208313b` は `prod_order_3608.sh` の追加 (71 行) だけ、`git diff 87208313b HEAD` は 0 行 (本 fix は REPORT と DOC_MAP のみ変更)。
+- 本 fix の再測定 (§1 の全変種・§1-3) は `87208313b` で実施。同じ経路 (上の一覧) について、`git diff 40d3a788d 87208313b` は `prod_order_3608.sh` の追加 (71 行) だけ。`git diff 87208313b HEAD` は 90 行追加 (5 ファイル: `ldfix.py`・`ldfix_e2e.sh`・`fix_site_3372.py`・`m11_build.sh`・`m11_gen_ir2.sh`。main 取り込みで入った変更。`d1759801c`・`189d9580b` ほか)。よって §1 の数値は `87208313b` 時点のコードのもので、HEAD のコードでは再測定していない。HEAD 上の測定値は未取得 (§8 と同じく本 runner に RetDec・emsdk が無い)。
 - `origin/main` (`91ed96332`) と `40d3a788d` の差分は、REPORT・新規の別系統スクリプト (`ld175_site_link.py`・`trap_triage/slot653660_exp.py`)・`tools/shared/lift/rex` (x64c 系) のみ。
 
 ## 7. 再現
