@@ -17,7 +17,7 @@
 - 単体: `tests/test_ld225_sample_vmo.py` PASS (`rc=0`)。ネガコン: `sample_vas` の OBJ_PATTERNS 合併を外す (`pass`) と `AssertionError: sample:800 に 691dd0 が入る` で `rc=1` (実測)。
 - 単体: `tests/test_ld207_obj_pattern.py` PASS (`rc=0`)。
 - 再現の前提: `bash tools/m11/m11_gen_ir2.sh` を `FL_WIN64_DIR` 付きで実行して `ir_conditions.json` を作り直した (`gen_rc=0`)。
-- コード差分 (測定 commit `1327bc530` → HEAD): コード (`*.md` 以外) は 0 行 (`git diff 1327bc530 HEAD -- tools/liftdiff ':!*.md'` の出力は 0 行)。差分は本付録の commit `6ac337895` の文書のみ (`git diff 1327bc530 HEAD --stat -- tools/liftdiff` は `REPORT_APPENDIX_LD225.md` の 1 ファイル)。
+- コード差分 (測定 commit `1327bc530` → HEAD): コード (`*.md` 以外) は 0 行 (`git diff 1327bc530 HEAD -- tools/liftdiff ':!*.md'` の出力は 0 行)。差分は本付録を載せた commit `c271c9a7e` (`docs(liftdiff): record LD-225 sample:800 vmo measurement (#4561)`) の文書のみ (`git diff 1327bc530 HEAD --stat -- tools/liftdiff` は `REPORT_APPENDIX_LD225.md` の 1 ファイル)。
 - 製品 KPI (FLEngine 起動・最初のウィンドウ): 本 PR は起動・GUI に関わらないため書かない。
 
 ## 3. 未解決 (起票先)
