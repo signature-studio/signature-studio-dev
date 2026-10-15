@@ -1,0 +1,5 @@
+dump	pass	label_1290645	switch7
+0	After Input binary to LLVM IR decoding	1	0
+66	After Global Value Numbering	1	1
+69	After Jump Threading	0	0
+total	155
