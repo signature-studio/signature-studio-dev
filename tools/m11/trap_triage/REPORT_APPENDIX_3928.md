@@ -122,3 +122,12 @@ return np;
 
 - 文字列の書込み (`"he.d"` の 8 バイト) は、上の計装のどれにも映らなかった。`store` 命令・`409c80` の copy のいずれも経由しないことになる。候補は IR の `__asm_rep_movsq_memcpy` (28 箇所)・`__asm_rep_movsb_memcpy` (1 箇所)・`__asm_rep_stosq_memset` (6 箇所) の経路。次の一手として、これらの入口で `dst` が `[WA, WA+32)` と重なる呼出しを記録する (未実施)。
 - 旧 (#3928 補足節) の `[aw]` 件数 3 件は、候補計装で再現した。派生 script は本 PR で commit した (`store_watch_3972.sh`・`copy_watch_3972.py`・`watch_copy_3972.c`)。
+
+### #3972 run 2 の実測 (commit `c39ea4679`・n=1)
+
+- IR: `bash m11_gen_ir2.sh` rc 0 (47 s)。素材 `work-m11`・`work-liftdiff`・`toolchain-emsdk`・`toolchain-retdec`・`fl-win64` (`block00031_PE.bin` のみ `$FL_WIN64_DIR/extracted/` = [WIN64]) を展開。
+- 再現: `bash trap_triage/store_watch_3972.sh rep1` (`M11_FIX_4136A0=1`・unit 158) で `[aw]` 4 件 (`653660` 入口の 0 初期化 `0x10aa1428`・`…1430`・`…1438`・`…1440`)。前回の 3 件から 1 件増えた (監視対象 `0x10aa1440` を含むため。前回は範囲外)。
+- `REP=1` (rep 系 helper 35 箇所の入口計装): unit 158 の `[rp]` は 0 件、`[aw]` は同じ 4 件。結果は halt0。
+- 計装の検証: `REP=1` で `WATCH_ADDR=0x10aa1000` (unit 158) と `WATCH_ADDR=0x10000000` (unit 0) の `[rp]` は 0 件。**既知の書込みで `[rp]` が出ることは未確認** (計装が効くかは未検証)。
+- 未特定: 文字列 `"he.d"` の書込み元。`store` 命令 (54,041 件・ptr 取りこぼし 0) と `409c80` の copy と rep 系 helper の入口のいずれでも、unit 158 の書込みを捕まえていない。残る候補は SSE 系 helper (`__asm_movdqa`・`__asm_movups` 系 等の関数呼出し) の経路。
+- 次の一手: (1) 既知の書込みで `[rp]` が出ることを確かめる計装の検証、(2) SSE 系 helper の入口計装、(3) 書込みが unit 158 の実行中か直前かを切り分ける (`m11_watch_on` の範囲を unit 157 の後から)。

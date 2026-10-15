@@ -1,12 +1,15 @@
 // SR-39 #2107: canvas platform (wasm) の IPlatformGraphicsDevice* 実装。
 // SR-50 #3260: drawRect・clearRect を bitmap へ描く。bitmap は createBitmapContext で結線し、clip は bitmap 境界で保持する。
 // SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap を bitmap へ描く。
+// SR-62 #4233: fillLinearGradient・fillRadialGradient・drawBitmapNinePartTiled・fillRectWithBitmap を bitmap へ描く。
 
 #include "canvas_graphicsdevice.h"
 #include "canvas_bitmap.h"
 #include "canvas_graphicspath.h"
+#include "vstgui/lib/platform/iplatformgradient.h"
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <vector>
 
 namespace VSTGUI {
@@ -55,6 +58,24 @@ void writeRGBA (uint8_t* dst, const CColor& color)
 	dst[1] = color.green;
 	dst[2] = color.blue;
 	dst[3] = color.alpha;
+}
+
+//------------------------------------------------------------------------
+// 色停止点 (位置 0〜1) の間を線形に補間する。stops は空でないこと。
+CColor gradientColorAt (const GradientColorStopMap& stops, double t)
+{
+	t = std::clamp (t, 0., 1.);
+	auto next = stops.lower_bound (t);
+	if (next == stops.end ())
+		return std::prev (next)->second;
+	if (next == stops.begin ())
+		return next->second;
+	auto prev = std::prev (next);
+	auto span = next->first - prev->first;
+	auto f = span > 0. ? (t - prev->first) / span : 0.;
+	auto mix = [f] (uint8_t a, uint8_t b) { return static_cast<uint8_t> (std::lround (a + (b - a) * f)); };
+	return CColor (mix (prev->second.red, next->second.red), mix (prev->second.green, next->second.green),
+	               mix (prev->second.blue, next->second.blue), mix (prev->second.alpha, next->second.alpha));
 }
 
 //------------------------------------------------------------------------
@@ -258,30 +279,37 @@ bool CanvasGraphicsDeviceContext::fillLinearGradient (IPlatformGraphicsPath& pat
                                                       CPoint startPoint, CPoint endPoint,
                                                       bool evenOdd, TransformMatrix* transformation) const
 {
-	(void)path;
-	(void)gradient;
-	(void)startPoint;
-	(void)endPoint;
-	(void)evenOdd;
-	(void)transformation;
-	return false;
+	const auto& stops = gradient.getColorStops ();
+	if (stops.empty ())
+		return false;
+	auto dx = endPoint.x - startPoint.x;
+	auto dy = endPoint.y - startPoint.y;
+	auto len2 = dx * dx + dy * dy;
+	fillPathByPixel (path, evenOdd, transformation, [&] (CPoint p, CColor& color) {
+		auto t = len2 > 0. ? ((p.x - startPoint.x) * dx + (p.y - startPoint.y) * dy) / len2 : 0.;
+		color = gradientColorAt (stops, t);
+		return true;
+	});
+	return true;
 }
 
 //------------------------------------------------------------------------
+// originOffset だけ焦点をずらした放射状。色は焦点からの距離 / radius で求める (楕円形の放射は未対応)。
 bool CanvasGraphicsDeviceContext::fillRadialGradient (IPlatformGraphicsPath& path,
                                                       const IPlatformGradient& gradient,
                                                       CPoint center, CCoord radius,
                                                       CPoint originOffset, bool evenOdd,
                                                       TransformMatrix* transformation) const
 {
-	(void)path;
-	(void)gradient;
-	(void)center;
-	(void)radius;
-	(void)originOffset;
-	(void)evenOdd;
-	(void)transformation;
-	return false;
+	const auto& stops = gradient.getColorStops ();
+	if (stops.empty () || radius <= 0.)
+		return false;
+	auto focal = CPoint (center.x + originOffset.x, center.y + originOffset.y);
+	fillPathByPixel (path, evenOdd, transformation, [&] (CPoint p, CColor& color) {
+		color = gradientColorAt (stops, std::hypot (p.x - focal.x, p.y - focal.y) / radius);
+		return true;
+	});
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -345,30 +373,38 @@ const IPlatformGraphicsDeviceContextBitmapExt* CanvasGraphicsDeviceContext::asBi
 }
 
 //------------------------------------------------------------------------
+// 9 分割の各部分を、元画像の対応部分から dest の対応部分へ 1:1 タイルで置く。拡大縮小と quality は未対応で無視する。
 bool CanvasGraphicsDeviceContext::drawBitmapNinePartTiled (IPlatformBitmap& bitmap, CRect dest,
                                                            const CNinePartTiledDescription& desc,
                                                            double alpha,
                                                            BitmapInterpolationQuality quality) const
 {
-	(void)bitmap;
-	(void)dest;
-	(void)desc;
-	(void)alpha;
 	(void)quality;
-	return false;
+	auto* source = dynamic_cast<CanvasBitmap*> (&bitmap);
+	if (!source)
+		return false;
+	const auto& size = source->getSize ();
+	CRect srcParts[CNinePartTiledDescription::kPartCount];
+	CRect dstParts[CNinePartTiledDescription::kPartCount];
+	desc.calcRects (CRect (0., 0., size.x, size.y), srcParts);
+	desc.calcRects (dest, dstParts);
+	for (auto i = 0; i < static_cast<int> (CNinePartTiledDescription::kPartCount); ++i)
+		tileBitmap (*source, srcParts[i], dstParts[i], alpha);
+	return true;
 }
 
 //------------------------------------------------------------------------
+// srcRect を繰り返して dstRect を塗る (タイル塗り)。拡大縮小は未対応で、quality は無視する。
 bool CanvasGraphicsDeviceContext::fillRectWithBitmap (IPlatformBitmap& bitmap, CRect srcRect,
                                                       CRect dstRect, double alpha,
                                                       BitmapInterpolationQuality quality) const
 {
-	(void)bitmap;
-	(void)srcRect;
-	(void)dstRect;
-	(void)alpha;
 	(void)quality;
-	return false;
+	auto* source = dynamic_cast<CanvasBitmap*> (&bitmap);
+	if (!source)
+		return false;
+	tileBitmap (*source, srcRect, dstRect, alpha);
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -399,6 +435,71 @@ uint8_t* CanvasGraphicsDeviceContext::pixelAt (int32_t x, int32_t y) const noexc
 	if (x < clip.x0 || y < clip.y0 || x >= clip.x1 || y >= clip.y1)
 		return nullptr;
 	return target->data () + (static_cast<size_t> (y) * static_cast<size_t> (width) + static_cast<size_t> (x)) * 4;
+}
+
+//------------------------------------------------------------------------
+// path の内側の画素ごとに colorAt で色を決めて source-over で置く。colorAt は path と同じ座標 (transformation の逆変換後) の点を受け取る。
+void CanvasGraphicsDeviceContext::fillPathByPixel (IPlatformGraphicsPath& path, bool evenOdd,
+                                                   TransformMatrix* transformation,
+                                                   const std::function<bool (CPoint, CColor&)>& colorAt) const
+{
+	auto bounds = path.getBoundingBox ();
+	if (transformation)
+		transformation->transform (bounds);
+	auto box = pixelBoxOf (bounds);
+	for (auto y = box.y0; y < box.y1; ++y)
+	{
+		for (auto x = box.x0; x < box.x1; ++x)
+		{
+			auto* dst = pixelAt (x, y);
+			if (!dst)
+				continue;
+			CPoint p (x + 0.5, y + 0.5);
+			if (!path.hitTest (p, evenOdd, transformation))
+				continue;
+			CPoint local = p;
+			if (transformation)
+				transformation->inverse ().transform (local);
+			CColor color;
+			if (colorAt (local, color))
+				blendRGBA (dst, color, globalAlpha);
+		}
+	}
+}
+
+//------------------------------------------------------------------------
+// source の srcRect を左上から繰り返して dstRect へ 1:1 で置く。srcRect の整数化した範囲を 1 タイルとする。
+void CanvasGraphicsDeviceContext::tileBitmap (CanvasBitmap& source, CRect srcRect, CRect dstRect,
+                                              double alpha) const
+{
+	const auto& sourceSize = source.getSize ();
+	auto srcWidth = static_cast<int32_t> (sourceSize.x);
+	auto srcHeight = static_cast<int32_t> (sourceSize.y);
+	auto tile = pixelBoxOf (srcRect);
+	auto tileWidth = tile.x1 - tile.x0;
+	auto tileHeight = tile.y1 - tile.y0;
+	if (tileWidth <= 0 || tileHeight <= 0)
+		return;
+	auto box = pixelBoxOf (dstRect);
+	for (auto y = box.y0; y < box.y1; ++y)
+	{
+		auto sy = tile.y0 + (y - box.y0) % tileHeight;
+		if (sy < 0 || sy >= srcHeight)
+			continue;
+		for (auto x = box.x0; x < box.x1; ++x)
+		{
+			auto sx = tile.x0 + (x - box.x0) % tileWidth;
+			if (sx < 0 || sx >= srcWidth)
+				continue;
+			const uint8_t* src = source.data () + (static_cast<size_t> (sy) * srcWidth + sx) * 4;
+			if (src[3] == 0)
+				continue;
+			auto* dst = pixelAt (x, y);
+			if (!dst)
+				continue;
+			blendRGBA (dst, CColor (src[0], src[1], src[2], src[3]), alpha * globalAlpha);
+		}
+	}
 }
 
 //------------------------------------------------------------------------
