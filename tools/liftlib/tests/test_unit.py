@@ -922,7 +922,7 @@ def t27b():
     root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
     src = os.path.join(root, "tools", "m10", "work", "ott_m10.cjs")
     if not os.path.exists(src):
-        print("T28 skip (tools/m10/work/ott_m10.cjs 無し・素材 work-m6-ott)")
+        print("T27b skip (tools/m10/work/ott_m10.cjs 無し・素材 work-m6-ott)")
         return
     d = tempfile.mkdtemp()
     try:

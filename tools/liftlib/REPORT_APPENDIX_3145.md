@@ -1,15 +1,15 @@
-# liftlib #3145 — `ott_outhash` の JSON 失敗の切り分け (原因特定・受入 1)
+# liftlib #3145 — `ott_outhash` の JSON 失敗の切り分け (原因の切り分け・受入 1)
 
 - 親: #3067 (元の症状は `REPORT_APPENDIX_3067.md` §3.2)。担当 dir: `tools/liftlib/`。
 - 基点: `origin/main` `0f283e9b` (#3098・#3156 は merge 済み)。
 - **測定 commit (コードを変えた最後の commit)**: `6fe09885d` (`test(liftlib): pin ott_outhash failure when .wasm is missing (#3145)`)。
   差分確認: `git diff 6fe09885d HEAD -- tools/liftlib/liftlib tools/liftlib/tests` (本 PR で以後 code は変えていない)。
 
-## 0. 結論 (原因の特定)
+## 0. 結論 (原因の切り分け)
 
-- **`Expecting value` の原因は `ott_m10.cjs.wasm` の欠落** (#3067 §3.2 の未切り分けを解消)。node は `.wasm` を読めないと stdout を出さずに `rc=1` で終わる。
+- **再現できた原因 (推定・前回 run は未確認)**: `ott_m10.cjs.wasm` の欠落。`.wasm` を読めないと node は stdout を出さずに `rc=1` で終わり、`Expecting value` と同じ症状になる (#3067 §3.2 の未切り分けに対する候補)。
   実測: `ott_m10.cjs` だけを置いた場所で `ott_outhash.mjs` を実行 → `rc=1`・stdout 0 byte・stderr `ENOENT: ... ott_m10.cjs.wasm`。`outhash_json` は stderr を例外に残す (T27b で固定)。
-- 素材 `work-m6-ott` の tar には `tools/m10/work/ott_m10.cjs` と `ott_m10.cjs.wasm` の両方が入っている。#3067 issue 本文の「`.wasm` は未展開」が前回の原因と推定される (前回 run の展開内容は未確認)。両方を展開した今回は再現しなかった。
+- 素材 `work-m6-ott` の tar には `tools/m10/work/ott_m10.cjs` と `ott_m10.cjs.wasm` の両方が入っている。#3067 issue 本文の「`.wasm` は未展開」が前回の原因の候補だが、前回 run の展開内容は未確認。両方を展開した今回は再現しなかった。
 - 「約 7 分/module」は誤り。参照 module の outhash (42 組) は **0.47〜0.65 s** で終わる (下表)。
 
 ## 1. 環境 (実測)
