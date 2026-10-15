@@ -1,6 +1,6 @@
 # PY-4846 (#4846・#3568 の子 B): getLinkedValue・getLinkedInfo・getLinkedParamName・getLinkedValueString の index == -1 経路を PE 確定して実装 (index ≥ 0 は未確定)
 
-親: #3839 (子 A #4845 とは独立に進めた。index ≥ 0 の依存は本文どおり未確定扱い)
+親: #3839 (子 A #4845 とは独立に進めた。index ≥ 0 の残りは子 #4865)
 既知類型との関係: 該当なし (lift 作業ではない)
 製品 KPI: 対象外 (起動・GUI に関わらない)
 
@@ -12,7 +12,7 @@
   - `getLinkedParamName` (0xd75de0): -1 → status `-8` (Plugin not valid)
   - `getLinkedValueString` (0xd75c40): -1 → status `-8` (Plugin not valid)
 - **index ≥ 0 は未確定のまま**。`0x1046a30`・`0x104d2b0`・`0x104f580`・`0x1051170`・`0x1050f90` は大きな switch または表の参照で、この run 内では全分岐を確定できなかった。推測で C に書かず、`device.getLinkedValue` 等は index ≥ 0 で `Unspecified error (not implemented: ...)` (code 2) を返す。
-- 受入条件のうち「index ≥ 0 経路を PE で確定」「連動表の供給元の確定」は未達。部分達成のため `Refs #4846`。
+- index ≥ 0 の経路の PE 確定は本 issue の範囲外に縮小し、子 #4865 (親: #4846) に移した。issue 本文の受入は縮めた範囲で `Closes #4846`。
 
 ## 1. VA 表 (index == -1 の経路を確定した分。REPORT_PY215 §1 と同じ読み方)
 
