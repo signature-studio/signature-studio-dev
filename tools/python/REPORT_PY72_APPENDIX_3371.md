@@ -87,7 +87,7 @@
 ### 測定 (追補 2)
 
 - 測定 commit: `a53ed0561` (`pe_slot35_sites.py` の最後の変更)。補助 probe は本付録と同じ PR で追加 (解析補助のみ・既存の測定スクリプトは変えていない)。
-- 素材: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-3371b --wildcards '*block00031_PE.bin'` (2.93 s)。
+- 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <repo 外の展開先> --wildcards '*block00031_PE.bin'` (2.93 s)。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-3371b python3 analysis/flapi/pe_slot35_sites.py` (12.07 s・rc 0・151 箇所・`0xfe9090` の直接 call 元は `0xffe29b`・`0x1001b7b` の 2 件で前回と一致)。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-3371b python3 analysis/flapi/pe_slot35_recv_src.py` (11.41 s・rc 0)。
 
