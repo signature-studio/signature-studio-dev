@@ -227,3 +227,20 @@
 ## 11. LD-160 (#3528): 突合・audit の比較と既定化の判断
 
 結論: F3d は既定化しない (`ldfix.py` の除外は残す)。突合・audit の測定値と理由は [REPORT_3528.md](REPORT_3528.md) が正本。
+
+## 12. LD-228 (#4628): 45d570・45d581・45f938 の store 分岐の述語と機械語 jcc の突合
+
+- 測定 commit: `e92645bec` (origin/main)。F3d 適用 IR は `ldfix.py <work-m11 の boot_final3.ll> --passes f3d` で生成 (F3d=58・`ldfxt` 172 行)。機械語は `block00031_PE.bin` (fl-win64)。
+- 対象の W = `movzx eax, word [arg1]` (45d0b5・IR `%ldfxt15` / 45f56c・IR `%ldfxt30`)。`eax` が W のまま後続 jcc に届くかは `eax_path_4628.py` (全経路 BFS) で確認した。
+
+| site | IR の述語 (F3d 後 `function_45d0a0` / `function_45f560`) | 機械語の jcc (入口は `eax = W`) | 判定 |
+|---|---|---|---|
+| 45d570 | `%122 = and %3, 16384`・`icmp eq 0` → 45d5a9 else 45d38e。`%125 = trunc %3 & 49151`。`%144 = %125 - 20`・`eq 0` → 45d565 (store) | 45d381 `mov ecx,eax`・`test cx,0x4000`・`je 45d5a9`。45d38e `and eax,0xffffbfff`・`cmp 0xb`・`cmp 0x12`・`sub 0x13`・`sub 1`・`test`・`je 45d565` | 述語と arm が一致。入口 eax = W が clean |
+| 45d581 | 同上。`%146 = %144 - 1`・`eq 0` → 45d59a else 45d576 (store) | 45d448 `sub eax,1`・`jne 45d59a`・`jmp 45d576` | 述語と arm が一致。入口 eax = W が clean |
+| 45f938 | 45f824 `and %3, 16384`・`eq 0` → 45fa34 else 45f831。45f831 `%118 = trunc(%3 & 49151)`・`ugt 12`・`eq 12`・`ugt 6`・`eq 6` → 45f931 (store) | 45f824 `mov ecx,eax`・`test cx,0x4000`・`je 45fa34`。45f831 `movzx eax,ax`・`and eax,0xffffbfff`・`cmp 0xc`・`jg`・`je`・`cmp 6`・`jg`・`je 45f931` | 述語と arm が一致。入口 eax = W が clean |
+
+- 補足: IR の `and i64 %3, 49151` と機械語の `and eax, 0xffffbfff` は、W が 16 bit 値のため同じ値 (`W & 0xBFFF`)。`and i64 %3, 16384` と `test cx, 0x4000` も同じ bit。
+- eax 経路 (`eax_path_4628.py`・`rbx` は 45f569 の `mov rbx,rcx` 以降書かれない): 45d0b9→45d381 と 45f570→45f824 の全経路で、読み込み後に eax/rax/ax を書く命令を通らない (clean)。
+- IR の store (45d565・45d576) は `[[arg1+8]]` の値を `stack_var_-16` と `rax.1.reg2mem` へ書く。機械語 45d565〜45d574・45d576〜45d585 は同じ 2 段 deref を `[rbp+0x38]` (戻り値スロット) へ書く。`arg1` (`[rbp+0x50]`) は 45d0a0 窓で 45d0ac の 1 回だけ書かれる。
+- 結論: 3 site とも、store を囲む分岐の述語が機械語 jcc と同じ W の値で同じ arm を選ぶことを示せた。これで REPORT_3605 の未照合 (a)「45d381 直前の eax = W」は解消。`results/` の判定は本節で変えない (UNDETERMINED のまま。OK_LOAD への昇格は別の測定で行う)。
+- 未解決 (起票先): 判定を OK_LOAD へ上げる (`results/` 更新と audit 再実行) → #3605 の残り。45b1bf は本節の対象外 (dead edge `45b1a1→45b1b1` の上流は未照合)。
