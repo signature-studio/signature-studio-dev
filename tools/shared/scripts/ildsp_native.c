@@ -337,6 +337,13 @@ int main(int argc, char** argv) {
             uint64_t rax;
             if (k == 3 && s3bufs) {
                 /* slot 3 (Process 候補): r8=ch 数, r9=入力 float 配列, 第 5 引数=出力 float 配列 (逆アセンブル #2528 追記) */
+                if (pre_k >= 0) {
+                    uint64_t pvt = *(uint64_t*)w, pfn = *(uint64_t*)(pvt + 8 * pre_k);
+                    if (pre_k == 1) ((Fn1F)pfn)(w, 1.0f);
+                    else if (pre_k == 2) ((Fn2F)pfn)(w, rdx, 1.0f);
+                    else ((Fn4)pfn)(w, rdx, 0, 0);
+                    printf("pre_slot_before_s3 k=%d done +0x44=0x%x\n", pre_k, *(uint32_t*)(in + 0x44));
+                }
                 uint64_t ch = 2, n = rdx * ch + 4;
                 float* ibuf = (float*)k_HeapAlloc(NULL, 0, n * 4);
                 float* obuf = (float*)k_HeapAlloc(NULL, 0, n * 4);
@@ -358,6 +365,7 @@ int main(int argc, char** argv) {
                 *(int32_t*)(tmp + 0x250) = 0;
                 *(int32_t*)(tmp + 0x254) = 1;
                 *(int32_t*)(tmp + 0x204) = 64;
+                *(int32_t*)(tmp + 0x44) = -421;
                 for (int j = 0; j < 20; j++) { *(int32_t*)(tmp + 0xc4 + 4 * j) = 1; *(int32_t*)(tmp + 0x114 + 4 * j) = 1; }
                 *(int32_t*)(tmp + 0xc4) = 1; *(int32_t*)(tmp + 0x114) = 1;
                 *(int32_t*)(tmp + 0x28) = 1;

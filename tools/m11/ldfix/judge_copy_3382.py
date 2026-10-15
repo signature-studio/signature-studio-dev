@@ -31,13 +31,17 @@ from verify_deref_sites_2555 import fn_bodies, split_args, DEF_RE  # noqa: E402
 BARE_ARG = re.compile(r'^%arg\d+$')
 STORE_RE = re.compile(r'^store i\d+ (%[\w.]+), ptr (%[\w.]+)')
 CALLER_SAVED = {'rax', 'rcx', 'rdx', 'r8', 'r9', 'r10', 'r11'}
+PTRTOINT_ARG = re.compile(r'^%[\w.]+ = ptrtoint ptr (%arg\d+) to i\d+$')
+DEREF_LOAD_RE = re.compile(r'^(\w+), qword ptr \[(\w+)\]$')
 
 
-def rewrite_argpos(ins, deref_va, call_va, deref_reg):
+def rewrite_argpos(ins, deref_va, call_va, deref_reg, base):
     """deref の値が call 時点で届く引数レジスタの argpos (1 始まり)。届かなければ None。
     deref の後から call までを追い、値を持つレジスタ集合を mov の複写で広げ、他の命令の書込みで消す。
-    間の call は caller-saved (rax・rcx・rdx・r8〜r11) を書き換えるので、それらを holding から落とす"""
+    間の call は caller-saved (rax・rcx・rdx・r8〜r11) を書き換えるので、それらを holding から落とす。
+    deref と同じ [base] からの再ロードは、base が変わらず間に store・call が無ければ同じ値 (#5446)"""
     holding, started = {full(deref_reg)}, False
+    base, base_ok, mem_same = full(base), True, True
     for x in ins:
         if x.address == deref_va:
             started = True
@@ -48,10 +52,18 @@ def rewrite_argpos(ins, deref_va, call_va, deref_reg):
             break
         if x.mnemonic == 'call':
             holding -= CALLER_SAVED
+            mem_same = False
             continue
         m = REG2_RE.match(x.op_str)
         d = DST_RE.match(x.op_str)
-        if x.mnemonic == 'mov' and m and full(m.group(2)) in holding:
+        r = DEREF_LOAD_RE.match(x.op_str)
+        if d and x.mnemonic not in NOWRITE and full(d.group(1)) == base:
+            base_ok = False
+        if x.mnemonic not in NOWRITE and '[' in x.op_str.split(', ')[0]:
+            mem_same = False
+        if x.mnemonic == 'mov' and r and base_ok and mem_same and full(r.group(2)) == base:
+            holding.add(full(r.group(1)))
+        elif x.mnemonic == 'mov' and m and full(m.group(2)) in holding:
             holding.add(full(m.group(1)))
         elif d and x.mnemonic not in NOWRITE:
             holding.discard(full(d.group(1)))
@@ -66,7 +78,8 @@ def judge(body, k, argpos, argk, same, machine_count, rewrite=False):
     OK_ARGK : IR の引数が argK 由来の load → 一致候補
     UNCLEAR : それ以外 (定数・別の式) → 人手で窓を読む
     MISMATCH : 呼出し件数が機械語と合わない
-    REWRITE_NOARG : rewrite のとき argpos が None (書換え後の値が引数へ届かない)"""
+    REWRITE_NOARG : rewrite のとき argpos が None (書換え後の値が引数へ届かない)
+    rewrite 行で IR の引数が %argK の ptrtoint (アドレス) だけなら ERR_BARE (#5446)"""
     if rewrite and argpos is None:
         return {'verdict': 'REWRITE_NOARG', 'reason': '書換え後の値が引数レジスタへ届かない (演算結果を渡す)'}
     if len(same) != machine_count:
@@ -84,6 +97,10 @@ def judge(body, k, argpos, argk, same, machine_count, rewrite=False):
         return rec
     d = closure(body, a)
     rec['def_closure_n'] = len(d)
+    pm = PTRTOINT_ARG.match(d[0]) if len(d) == 1 else None
+    if rewrite and pm:
+        rec.update(verdict='ERR_BARE', reason='IR が %s のアドレス (ptrtoint) を渡す。機械語は *arg%d を渡す' % (pm.group(1), argk))
+        return rec
     has_load = any(re.search(r'= load i\d+, ptr ', x) for x in d)
     has_argk = any(re.search(r'%%arg%d\b' % argk, x) for x in d)
     other = sorted(set(re.findall(r'%arg\d+\b', ' '.join(d))) - {f'%arg{argk}'})
@@ -151,7 +168,7 @@ def main():
             argk = ARG.index(h['arg']) + 1
             rewrite = 'rewrite_va' in h
             if rewrite:
-                p = rewrite_argpos(ins, int(h['deref_va'], 16), cva, h['deref_reg'])
+                p = rewrite_argpos(ins, int(h['deref_va'], 16), cva, h['deref_reg'], h['base'])
                 argpos = None if p is None else p - 1
             else:
                 argpos = ARG.index(h['deref_reg'])

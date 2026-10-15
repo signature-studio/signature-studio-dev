@@ -64,7 +64,31 @@ rax 格納の直前書込み (VA 付き、`hs_store_src27.py` の出力):
 | 16 件の rax 格納の値の意味 (call 戻り値・フィールド・グローバルの書込み元) | 直前の書込みは VA で列挙できたが、その先 (`call` 先の戻り値の由来・構造体フィールドの書込み元) は関数外か窓の外にある | `call` 先 (0x1313220・0xf5b190・0x41d110・0x40ae70・0xfdd2c0) の戻り値を関数ごとに追う |
 | 27 行の到達性 (受入 2) | 供給元が未確定のため、与える値が決まらない | 供給元の確定後に `HS_DISP_RET_SPEC` で callee 戻り値を与えて `hs_store_cov.py` で実測 |
 
-### 5.1 #5421 (PLG-P0b-58) — call 戻り値経路の 5 行
+### 5.1 #5422 (PLG-P0b-59): 11 行の供給元と実測
+
+入力は §3 の rax 格納 16 件のうち、call 戻り値以外の 11 行。解析は `hs_store_src11.py` (新規)。測定 commit: `8436217c4` (`hs_store_src11.py` を追加した最後の commit)。
+
+- 確定 4 行 (供給元の命令まで VA で確定): 0x132206e・0x13220b2・0x13221be は `[rbp+0x109c]` ← `0x1322061`/`0x13221b1` の書込み ← `movss [rbp+0xb30]/[rbp+0xb28]` ← `call 0x40ae70` (戻り値 xmm0 を倍率・定数で変換)。0x1321f0e は `[rbp+0x10b8]` ← `0x1321e2c` ← `mov eax,[obj+0x130]` (`obj = [rbp+0x1868]`)。
+- 未確定 7 行 (理由つき): 0x1321f34・0x1321f6c は index `[rbp+0x10b8]` まで確定、グローバル基底 `[rip+0x2be77f]`/`[rip+0x2be759]` の書込み元は未追跡。0x1320fc4 は `[rbp+0xbb8]` のリスト連鎖 (`[rax-8]`) で、起点 `0x1320f8c` の rax は窓外。0x1319f13 は `call [rax+0x18]` (仮想呼出・実行先は動的)。0x1320ff9 は `mov eax,[global]` の書込み元が未追跡。0x1321fc2・0x1321225 は `cmp` の左辺 (`rax` / `[rbp+0x119c]`) が窓外。
+- 検算: 確定 4 + 未確定 7 = 11。
+
+実測 (`hs_store_cov.py`・全 256 ID・基準 `base.json` と 3 通りの変更 run):
+
+| 変更 (HS_DISP_RET_SPEC) | 基準比の新規実行 | 失われる実行 | 11 行の新規実行 |
+|---|---|---|---|
+| 0x40ae70:one | 0 | 0 | 0 |
+| 0x40ae70:host | 0 | 0 | 0 |
+| 0x40fe90:one | 4 (0x1320f72・0x13210ae・0x13211a1・0x1321efb) | 3 (0x1320fda・0x13210e8・0x1321225) | 0 |
+
+- 基準: 静的 69 格納のうち実行 30・未実行 39。11 行のうち基準で実行されたのは 0x1321225 の 1 行 (1 ID) だけ。
+- 実測の結論: 11 行のうち、供給元の値を与えて実行されたのは 0/11。実行できなかった理由は次のとおり。0x132206e・0x13220b2・0x13221be は供給元が `call 0x40ae70` の戻り値で、その呼出しブロックに基準の経路が届かない (下記)。残り 8 行は供給元がフィールド・グローバル・仮想呼出しで、`HS_DISP_RET_SPEC` (callee 戻り値のみ) では値を与えられない。
+- 0x40ae70 の変更で格納が動かない理由: 呼出し位置 0x1322031・0x1322181 と、0x1322010〜0x1322040 の範囲は、基準を含むどの ID の経路にも現れない (`path` 集計で 0 件・§7)。0x1322170〜 の後半は ID 77 が通るが、呼出し位置 0x1322181 は通らない。戻り値より手前の分岐で止まっている。その分岐は未特定。
+- 0x40fe90 の変更で 0x1321225 が失われるのは、`0x1321e12 call 0x40fe90` の戻り値が 0x1321e17 の分岐を変え、0x1321225 の経路に影響するため (供給元ではなく経路の影響)。
+- 測定時間・load (HEAD `74f22dcaa`・2026-10-15 21:10〜21:13 に 1 回ずつ実測。本節の timing は全てこの run の値): 基準 `hs_disp_emu.py` 既定 (`HS_DISP_PATH=1`・全 256 ID) real 72.44 秒、終了時 load 0.87 (`uptime` の 1 分平均)。変更 run `HS_DISP_RET_SPEC=0x40fe90:one` real 72.53 秒、終了時 load 0.96。`hs_store_src11.py` real 0.17 秒。
+- 上の表のうち `0x40fe90:one` の行は、この再測定 (HEAD `74f22dcaa`・`hs_store_cov.py`) でも一致した (新規 4・失われる 3・11 行 0)。`0x40ae70:one` / `0x40ae70:host` の行は今回は再測定していない (測定 commit `8436217c4` の結果)。
+- 残作業 (未解決): 0x1322010 ブロックへ至る上流の分岐の特定 (これが決まれば 0x132206e・0x13220b2・0x13221be の実測が可能)。未確定 7 行の読み元 (グローバル基底・リスト起点・vtable 先・cmp 左辺) の追跡。
+
+### 5.2 #5421 (PLG-P0b-58) — call 戻り値経路の 5 行
 
 対象 5 行 (`0x13218c1`・`0x13219b0`・`0x1321966`・`0x1321b6c`・`0x132257d`)。解析は `hs_store5_src.py` (新規)。
 
@@ -91,6 +115,8 @@ rax 格納の直前書込み (VA 付き、`hs_store_src27.py` の出力):
 ## 6. コード差分
 
 - `git diff 31208b4c8 HEAD -- tools/plugins/framework/hostshim/` は `hs_store_src27.py` の新規追加と、本 REPORT の新規追加だけ。`hs_disp_emu.py`・`hostshim.c`・`hs_store_cov.py` は変更なし。
+- #5422 の追加: `hs_store_src11.py` の新規追加 (測定 commit `8436217c4`)。`git diff 8436217c4 HEAD -- tools/plugins/framework/hostshim/` の差分は、本 REPORT の追記・`hs_store5_src.py` (main 取り込み分)・`hs_store_src11.py` の docstring 1 行だけ。実行コードの差分は無い。
+- 測定値は §5.1 だけに書く (本節に timing は置かない)。
 
 ## 7. 再現コマンド
 
@@ -99,4 +125,11 @@ FL_WIN64_DIR=<展開先> PYTHONPATH=<unicorn,pefile,capstone> python3 hs_store_s
 FL_WIN64_DIR=<展開先> PYTHONPATH=<unicorn,pefile,capstone> python3 hs_store_branch.py
 FL_WIN64_DIR=<展開先> HS_DISP_PATH=1 HS_DISP_OUT=base.json python3 hs_disp_emu.py
 FL_WIN64_DIR=<展開先> PYTHONPATH=<...> python3 hs_store_cov.py base.json
+FL_WIN64_DIR=<展開先> PYTHONPATH=<...> python3 hs_store_src11.py
+```
+
+§5.1 の path 集計 (`base.json` は `HS_DISP_PATH=1` の出力。`path` は VA の list):
+
+```
+python3 -c "import json; r=json.load(open('base.json')); [print(hex(a), sum(1 for v in r.values() if v.get('path') and a in v['path'])) for a in (0x1322031, 0x1322181)]"
 ```

@@ -51,6 +51,18 @@ def make_blob_vmt(size=BLOB_SIZE):
     return bytes(buf), [0x1000]
 
 
+def make_blob_vmt2(size=BLOB_SIZE):
+    """LD-238 (#4423): 2 段の this 疑似オブジェクト。arena+0x1000 の this の +8 に内部オブジェクト (arena+0x3000) を置き、その先頭に VMT (arena+0x2000) を置く。
+    668390 / 6683d0 は [this+8] の先頭 qword を VMT として [VMT+0x20] を間接呼出しするため、this+8 が要る。VMT slot は make_blob_vmt と同じ仮 proc。"""
+    buf = bytearray(size)
+    buf[0x1000:0x1008] = (0x2000).to_bytes(8, 'little')
+    buf[0x1008:0x1010] = (0x3000).to_bytes(8, 'little')
+    buf[0x3000:0x3008] = (0x2000).to_bytes(8, 'little')
+    for k in range(VMT_SLOTS):
+        buf[0x2000 + 8 * k:0x2000 + 8 * k + 8] = (LD_FAKEPROC_BASE + (LD_VMT_IDX0 + k) * LD_FAKEPROC_SZ).to_bytes(8, 'little')
+    return bytes(buf), [0x1000, 0x1008, 0x3000]
+
+
 def make_blob_u16(size=BLOB_SIZE):
     """UTF-16 文字列: arena+0x1000 に Delphi UnicodeString ヘッダ (refcnt=1, length)、本文 UTF-16LE は +8 (arena+0x1008) に置く。引数はヘッダ先頭 (arena+0x1000) を渡す。"""
     import struct
@@ -61,7 +73,7 @@ def make_blob_u16(size=BLOB_SIZE):
     return bytes(buf), []
 
 
-SPECIAL_BLOBS = {'vm': make_blob_vm, 'vmt': make_blob_vmt, 'u16': make_blob_u16}
+SPECIAL_BLOBS = {'vm': make_blob_vm, 'vmt': make_blob_vmt, 'vmt2': make_blob_vmt2, 'u16': make_blob_u16}
 
 # (name, ptr 位置集合, blob, ptr オフセット加算)
 PATTERNS = [
