@@ -45,4 +45,10 @@ for v in wasm32 wasm64; do
   else diff "$O/gpa_out_native.txt" "$O/gpa_out_$v.txt" | head -6; echo "[qfc-gpa] FAIL $v"; rc=1; fi
 done
 grep '^gpa table' "$O/gpa_out_native.txt"
+
+# T-SH-83 (#3434): guest の imp_GetProcAddress (fle_cpu.c) → fle_gpa_hook (qfc_imp.c) → トークン間接 call の経路を native で通す。
+RT="$ROOT/../flelift/rt"; QIMP="$ROOT/../qfclift/qfc_imp.c"
+gcc -O0 -w -I"$RT" -I"$ROOT/../qfclift" -I"$INC" -I"$HERE" "$HERE/test_qfc_gpa_hook.c" "$HERE/qfc_import.c" "$QIMP" "$RT/fle_cpu.c" \
+  "$B/native/src/objs/.libs/libfreetype.a" -lm -o "$O/gpa_hook"
+if "$O/gpa_hook" "$FONT" > "$O/gpa_hook_out.txt"; then cat "$O/gpa_hook_out.txt"; else cat "$O/gpa_hook_out.txt"; rc=1; fi
 exit $rc
