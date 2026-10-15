@@ -8,7 +8,7 @@ V を格納する箇所を列挙し、V の vtable の slot +0x20 と +8 の関�
 - 出力: 格納先 VA・格納する V (vtable の VA)・V の slot +0x20 と +8 の内容 (ファイル上の値)。
 - 追跡は直線区間だけ (call・ret・jmp で打ち切る)。レジスタの書換えは 32/16/8 bit 別名を同一視して無効化する。
 - 線形走査は無効バイトで止まるため、止まったら 1 バイト進めて再同期する (pe_xref.py と同じ方式)。
-展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
+展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
 """
 import os
 import struct
