@@ -1,13 +1,14 @@
-# PY-223 (#3627): 0xed4b70 (0x12da6d0 の唯一の呼出し元) を間接に呼ぶ候補の所在 (PE 解析・コード変更 0 件)
+# PY-223 (#3627): 0xed4b70 (0x12da6d0 の唯一の呼出し元) を間接に呼ぶ候補の所在 (PE 解析。製品コード変更 0 件・解析スクリプト 2 本)
 
 親: #3595 (PY-217) / 前段: PY-112 (#2932)。既知類型との関係: 該当なし (PE の逆アセンブル読解と検査スクリプト。lift 作業ではない)。
 
 ## 結論
 
-- **受入 1 (間接 call 箇所の特定): 部分達成。** 0xed4b70 の所在 (関数ポインタ配列の添字 51) と、それを指せる vtable 候補 2 つ (基点 `0xed0bb0` のスロット `0x198`・基点 `0xed0c28` のスロット `0x120`) は確定した。ただし実際に呼ぶ call 箇所は 1 件に絞れない。候補は `call qword ptr [reg+0x198]` 24 件・`[reg+0x120]` 114 件 (仮想呼出し。receiver の vptr は実行時の値)。vptr を書く箇所が block00031 に無く、どの候補が receiver かは未確定。
-- **受入 2 (obj が非 0 になる条件): 未着手** (本 run の時間内に入れず。未解決表へ)。
-- **受入 3 (flag の書込み元): 未着手** (`0x15e14a0` を RIP 相対で指す命令は 439 件。書込み元の絞り込みは未実施)。
-- **受入 4 (親 #3595 へのコメント): 本 PR の完了時に投稿する。**
+- **受入 1 (間接 call 箇所の特定): 部分達成。** 0xed4b70 の所在 (関数ポインタ配列の添字 51) と、それを指せる vtable 候補 2 つ (基点 `0xed0bb0` のスロット `0x198`・基点 `0xed0c28` のスロット `0x120`) は確定した。ただし実際に呼ぶ call 箇所は 1 件に絞れない。候補は `call qword ptr [reg+0x198]` 24 件・`[reg+0x120]` 114 件 (仮想呼出し。receiver の vptr は実行時の値)。vptr を書く箇所が block00031 に無く、どの候補が receiver かは未確定。本 run で、`0xed0bb0` を指す絶対値・RIP 相対は PE 全体で 0 件と確定し、`0xed0c28` の材料はセル `0xed0b60` (読出し 1 件) だけと分かった (節「G1・ポインタ・vptr の材料」)。残りは子 #3888 (PY-264)。
+- **受入 2 (obj が非 0 になる条件): 未着手** (子 #3889 (PY-265))。G1 への RIP 相対の書込みは 1 件 (`0x12d9629`・関数 `0x12d9450`)。前 REPORT の「G1 の RIP 相対 store 0 件」は mov 系だけを数えた誤りで、ここで訂正する。
+- **受入 3 (flag の書込み元): 未着手** (子 #3890 (PY-266))。`0x15e14a0` を RIP 相対で指す命令は 439 件。
+- **受入 4 (全 PE block で G1・T への書込みを走査): 完了 (本 run)。** 313 block の絶対値参照 (8 byte・4 byte) で、block00031 の G1・T・flag・表・caller の VA を指すものは他 block に 0 件 (節「全 PE block の絶対値参照」)。
+- 受入 5 (親 #3595 へのコメント): 本 PR の完了後に投稿する。
 - 0xed4b70 の参照は、RIP 相対・`lea` が 0 件 (`pe_rip_refs.py`)、生バイト列 (4 バイト・8 バイト) の一致も表の 1 要素だけ。表の番地は、`.text` 内の 1 件 (`0xed0b60`) からだけ指される。
 
 ## 測定
@@ -18,6 +19,37 @@
 - ネガティブコントロール: `--mutate` (表の添字 51 の値を 1 ビット反転したメモリ上の複製で検査) → `table.check FAIL`・rc 1。所要 48.05 秒 (n=1)。検査は効いている。
 - 独立算法の検算: 命令の逆アセンブルを使わず、`.text` のバイト列を正規表現 `\xff[\x90-\x97]<disp32>` で数えた (`call r/m64` の ModRM mod=10 reg=010 の形)。結果は `[reg+0x120]` 114 件・`[reg+0x198]` 24 件で、逆アセンブル側と一致。
 - 表の参照の検算: `pe_rip_refs.py 0xed4b70 0xed0c28 0xed0bb0 0x12da6d0` → `hits 0` (RIP 相対の `lea`/`mov` で指す命令は 0 件)。`pe_callgraph.py callers 0x12da6d0` → 直接 call 元 1 件 (`0xed4c6a` in `0xed4b70`)。
+- 全 block 走査 (受入 4): `analysis/py223_block_scan.py`。測定 commit `148604980` (コードを変えた最後の commit)。本番 (`block.check PASS`) は rc 0・20.14 秒 (n=1)・user 19.97 秒・load average `0.27 0.34 0.32` → `0.48 0.39 0.34`・並列数 1。`--mutate` は `block.check FAIL`・rc 1。`git diff 148604980 HEAD -- tools/python/analysis` は 0 行 (REPORT のみの commit)。
+
+## 全 PE block の絶対値参照 (受入 4)
+
+`analysis/py223_block_scan.py`。素材の PE 313 個 (x64 258・i386 55・ImageBase 0x400000 の block は 165) の生バイト列に対し、block00031 の VA の値を 8 byte (qword) と 4 byte (imm32・絶対 disp32) のリトルエンディアン一致として数える。RIP 相対は、その命令と同じ PE の VA 空間の中だけを指すので、別 block の RIP 相対は block00031 の VA に当たらない (構造上の理由。線形走査はしていない)。
+
+| 対象 (block00031 の VA) | 他 312 block の一致 (8 byte / 4 byte) | block00031 の一致 (8 byte / 4 byte) と場所 |
+|---|---|---|
+| G1 `0x15d51a0` | 0 / 0 | 1 / 1: `.data` の `0x15e4018` の qword (= &G1) |
+| flag cell `0x15e14a0` | 0 / 0 | 0 / 0 |
+| T base `0x193fcf8`・T row `0x193fd08` | 0 / 0 | 0 / 0 |
+| 表の添字 51 `0xed4b70` | 0 / 0 | 1 / 1: 表の要素 (VA `0xed0d48`) |
+| 表の基点 A `0xed0bb0` | 0 / 0 | 0 / 1: 4 byte のみ。`.pdata` の RUNTIME_FUNCTION の RVA 値 (ポインタではない) |
+| 表の基点 B `0xed0c28` | 0 / 0 | 2 / 2: `.text` のセル `0xed0b60`、と `.text` 内の文字列データ中の非整列一致 (VA `0xed0dac`) |
+| セル `0xed0b60` | 0 / 0 | 0 / 0 |
+| caller `0x12da6d0` | 0 / 0 | 0 / 0 |
+
+検査: (1) block00031 の既知の一致 (qword の `0xed4b70`・`0xed0c28`) が各 1 件以上 (PASS)。(2) x64 の全 258 block が自分の ImageBase の qword をヘッダに持つ (他 block の走査経路の対照。258/258 PASS)。(3) `--mutate` で (1) の値を反転すると FAIL (rc 1)。
+
+結論: 他 block から G1・T・flag・表・caller への絶対値の参照は無い。他 block が G1 を書くには、実行時に計算した番地を使う必要があり、それは静的な走査では見えない (限界は「検証範囲」節)。
+
+## G1・ポインタ・vptr の材料 (前 REPORT の訂正を含む)
+
+- G1 (`0x15d51a0`) の RIP 相対参照は 51 件 (`pe_rip_refs.py`): `cmp` 8・読出し (`mov`・`movsxd`) 42・書込み 1。**書込みは `0x12d9629` (`sub dword ptr [rip+0x2fbb70], 1`) の 1 件**で、関数 `0x12d9450` (`pe_callgraph.py func` で確認)。この関数は G1 を 1 減らし、`G1 > 1` の間 `call 0x12d8d30(ecx=G1)` の戻り値が非 0 なら `0x12d9629` へ戻る loop。前 REPORT の「G1 の RIP 相対 store 0 件」は mov 系だけを数えた誤り。
+- ポインタ格納セル `0x15e4018` (`.data`・値 `0x15d51a0`): RIP 相対の読出し 444 件 (`mov reg, [rip+..]`)。G1 はこのセル経由で広く扱われる。このセル経由の書込みは未走査 (子 #3889)。
+- セル `0xed0b60` (`.text`・値 `0xed0c28`): RIP 相対の読出し 1 件 (`0x11b2af9`・関数 `0x11b2ac0`)。`0x11b2ac0` は `[0xed0b60]` を rcx に読み、`dl=1` で `call 0xed4ee0` する。rcx の使い道は未確定 (子 #3888)。
+- `0xed0bb0`・`0xed0c28`・`0xed4b70`・`0x12da6d0` を指す RIP 相対: 0 件。
+
+vptr 候補 (受入 1 の残り):
+- `[reg+0x198]` (24 件) の receiver の vptr `0xed0bb0`: PE 全体に絶対値も RIP 相対も無い。静的に vptr を得る材料が無いので、算術で作る経路 (例: `0xed0c28 - 0x78`) を除けば、この 24 件は 0xed4b70 に到達しないと推定する (推定。算術経路は未検査)。
+- `[reg+0x120]` (114 件) の receiver の vptr `0xed0c28`: 材料はセル `0xed0b60` の読出し 1 件 (`0x11b2af9`) だけ。receiver の vptr を格納する箇所は、このセルの値を複写する経路と推定する (子 #3888)。
 
 ## 0xed4b70 の所在 (表)
 
@@ -61,17 +93,20 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_indirect_callers.py         
 FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_indirect_callers.py --mutate # table.check FAIL・rc 1
 FL_WIN64_DIR=$PWD/work/py223 python3 analysis/flapi/pe_callgraph.py callers 0xed4b70,0x12da6d0
 FL_WIN64_DIR=$PWD/work/py223 python3 analysis/flapi/pe_rip_refs.py 0xed4b70 0xed0c28 0xed0bb0 0x12da6d0
+tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C work/py223 --wildcards '*_PE.bin'   # 全 PE block (313 個・約 2.4 秒)
+FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py                 # block.check PASS・rc 0 (約 20 秒)
+FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate        # block.check FAIL・rc 1
 ```
 
 ## 検証範囲 / 範囲外
 
-- 範囲内: `block00031_PE.bin` の `.text` の逆アセンブル・表の所在・RIP 相対と絶対参照・間接 call の集計。
-- 範囲外: 他の PE block (素材 `fl-win64` は 313 個の `*_PE.bin` を含む。本 run は block00031 のみ走査)。vptr を書く箇所が他 block にある可能性は未確認。実行時の値 (vptr の中身・flag の値・obj の値)。
+- 範囲内: `block00031_PE.bin` の `.text` の逆アセンブル・表の所在・RIP 相対と絶対参照・間接 call の集計。全 313 PE block の絶対値参照 (8 byte・4 byte)。
+- 範囲外: 実行時に計算される番地 (ポインタの値として格納される前の計算) による書込み。静的な絶対値・RIP 相対に現れないので、この走査では見えない。他 block の RIP 相対は、別 VA 空間を指すため対象外 (構造上)。実行時の値 (vptr の中身・flag の値・obj の値)。
 
 ## 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 受入 1 の残り: `0xed4b70` を呼ぶ receiver の vptr (`0xed0bb0` か `0xed0c28` か) の書込み元。block00031 に vptr 書込みが無い。他の PE block の走査 | 呼出し箇所 (`[reg+0x198]` 24 件・`[reg+0x120]` 114 件) の絞り込み | #3627 (続き・open のまま) |
-| 受入 2: `0x12d3ff0` の loop 分岐で `obj = qword [T + G1*192]` が非 0 になる条件 (呼出し時の引数と `[rbp+0x40]` の分岐) | loop 分岐の実装 (親 #3595) | #3627 (続き) |
-| 受入 3: flag `byte [[[0x15e14a0]]+0x7e0+0x49e]` の書込み元 (`0x15e14a0` の RIP 相対参照 439 件) | flag の値 | #3627 (続き) |
+| 受入 1 の残り: `0xed4b70` を呼ぶ receiver の vptr (`0xed0c28` のセル `0xed0b60` からの格納経路) の書込み元。`0x11b2ac0` の呼出し側を含む | 呼出し箇所の絞り込み (`[reg+0x198]` 24 件は静的材料が無いと推定。`[reg+0x120]` 114 件が残る) | #3888 (PY-264) |
+| 受入 2: `0x12d3ff0` の loop 分岐で `obj = qword [T + G1*192]` が非 0 になる条件 (`0xed4b70` の `[rbp+0x40]` 分岐と引数)。G1 の書込み元 (`0x12d9629`・セル `0x15e4018` 経由) | loop 分岐の入力 (PY-229 #3659 の前提) | #3889 (PY-265) |
+| 受入 3: flag `byte [[[0x15e14a0]]+0x7e0+0x49e]` の書込み元 (`0x15e14a0` の RIP 相対参照 439 件) | flag の値 | #3890 (PY-266) |
