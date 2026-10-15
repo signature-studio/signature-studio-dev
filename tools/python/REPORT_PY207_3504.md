@@ -21,7 +21,7 @@
 | 領域外の大域 (`lea-rip-other` 2・`lea-reg>lea-rip-other` 1・`lea-reg>load-rip-other` 2) | 5 |
 | 領域 (`lea rip`・絶対即値・load-rip-region) | **0** |
 | 間接ポインタ (`lea-indexed` 17・`mov>load-ptr` 2・`lea-reg>load-ptr` 11) | 30 |
-| 関数内で rdi の書込みなし (`unwritten-300` 2・`mov>unwritten-300` 8・`mov>mov>unwritten-300` 8・`lea-reg>unwritten-300` 5・`lea-reg>mov>unwritten-300` 13) | 36 |
+| 関数内で rdi の書込みなし (`unwritten-300` 2・`mov>unwritten-300` 8・`mov>mov>unwritten-300` 8・`lea-reg>unwritten-300` 5・`lea-reg>mov>unwritten-300` 13) ※ `-300` は旧窓名の残り。実際の窓は関数先頭まで | 36 |
 
 - 領域を宛先とする rep は **0 件**。
 - 未確定は **36 件** (関数内で rdi の書込みが見つからないもの)。前回 (80 件・窓 300 命令) からの減りは窓を関数先頭まで広げたため。
@@ -55,7 +55,7 @@
 ## 4. 測定
 
 - 測定 commit (コードを変えた最後の commit): `66510c88c` (rep rdi の追跡窓を関数先頭まで広げた版)。
-  `git diff 5d5216087 66510c88c -- tools/python/analysis` は、追跡窓の 1 関数 (`src_of`) の差分だけ。
+  `git diff 5d5216087 66510c88c -- tools/python/analysis/flapi/pe_k_struct_probe.py` は、追跡窓の 1 関数 (`src_of`) の差分だけ (この probe は他の analysis ファイルを import しない)。`tools/python/analysis` 全体では他の差分 (19 ファイル) があるが、本測定の probe は読まない。
 - 実行: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_k_struct_probe.py 2` (`<展開先>` は `fl-win64` の `block00031_PE.bin` を `extracted/` に展開した親)。
   - 測定 commit `66510c88c`: 終了 0・149.1 秒 (scan 69.3 秒)・load 0.40 (開始時) / 0.95 (終了時)。
   - 直前の commit `5d5216087` (窓 300 命令): 終了 0・153.6 秒。
