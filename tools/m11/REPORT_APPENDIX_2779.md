@@ -9,7 +9,7 @@
 測定 commit: `d890c724` (コードを変えた最後の commit。以降の差分は本 REPORT のみ。§7.5)。
 製品 KPI (`tools/flelift/boot/REPORT.md`) は本節で測っていない。
 
-### 7.0 解消後の再測定 (HEAD `bd5daf9d`・参考値・本節が最新)
+### 7.0 解消後の再測定 (HEAD `bd5daf9d`・参考値・e2e 経路の最新。repro 経路の再実行は §7.7)
 
 main 取り込み後 (merge `c277b9ff`・REPORT 分割 `bd5daf9d`) の再測定。`tools/m11` の PR 差分は main と 0 (§7.4)。素材 `fl-win64`・`work-m11` を展開 (`tools/m11/work/`)。toolchain は runner の既存 [EMSDK]・[RETDEC] を使用 (artifact の再展開はしていない)。node v22.23.3 (`m11_e2e.sh` の前提は v26 で、v26 は未確認)。nproc 4。
 
@@ -86,3 +86,24 @@ IR の指紋 (2 つの経路で違う): e2e 経路 (`M11_SKIP_LIFT_FP=1 m11_e2e.
 | 全再生成経路 (`functions_dll.csv`・`lift_pe.sha256` 無し) で `m11_e2e.sh` 1 コマンドが通らない。§7 の値は指紋検査の迂回に依存 | 受入 1 (実測の根拠) 未達。lift 成果物と PE の対応は未確認 | #3172 (`work-m11` の更新・#728 以降の再生成) |
 | e2e 経路 (`M11_SKIP_LIFT_FP=1 m11_e2e.sh`・IR `d8738edd…`) では LB=0x10000 の寛容起動が 600 s で打ち切られ出力が空。repro 経路 (IR `ecbd43c1…`) では完走 (§6) | この e2e 経路の LB=0x10000 は rc=1 | #3160 は CLOSED のまま (再オープンしない・PM 判断)。IR の照合は #3161 |
 | #403 との数値差 (survey ±2)・LB=0 の停止理由 (OOB → unreachable)・LB=0x10000 の Halt0 早期 | 受入 2 (変わらない) 未達 | #3161 |
+
+### 7.7 repro 経路の LB=0x10000 再実行 (参考値・e2e 経路とは別)
+
+PM 判断 (round 8) の手順 2。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/m11_lb_tolerant_repro.sh 0x10000 work/repro_lb10000` を 1 回だけ実行した (`m11_e2e.sh` は走らせていない。`M11_SKIP_LIFT_FP` は使っていない)。素材は `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B) だけを展開し、`work-m11` を `tools/m11/work/` に展開した。toolchain は runner の既存 [EMSDK]・[RETDEC] (素材 `toolchain-*` は展開していない)。nproc 4。node v22.23.3。
+
+| 項目 | 結果 |
+|---|---|
+| rc | 0 (gen_ir2 → data/image → lb_check → build → 寛容起動の全体) |
+| wall | script 全体 1 m 11.5 s。寛容起動の wall_ms 10,885 |
+| load (開始前 → 終了直後、1/5/15 分) | 0.12 0.37 0.20 → 0.76 0.52 0.27 |
+| ir_sha256 | `ecbd43c1…` (`work/ir_conditions.json`・ldfix applied。§7.2 の repro 経路の IR と一致) |
+| units | attempted 942 = units_total 942 |
+| ok / noproc / miss / skipped | 867 / 1 / 47 / 74 (skipped の内訳: oob 16・halt0 8・abort 2・unreachable 1・miss 47) |
+| ptrcheck.gate | pass (`M11_PTRCHECK_MAX_NEW` 未設定で `gated` false)。image_va_words_new 71,987 (LB=0 は 72,042・§6-5) |
+| lb_check | PASS |
+
+unit 数 (942・ok 867・noproc 1・miss 47・skipped 74) は §6 の LB=0x10000 の値と一致する。寛容起動の wall は §6 の 20 s 台と別の run で、条件が違うため比較しない。
+この run は e2e 経路の打ち切り (600 s) を再現する試行ではない。e2e 経路 (IR `d8738edd…`) と repro 経路 (IR `ecbd43c1…`) の違いは §7.2 のとおり未確定。
+
+測定 commit: `bd5daf9d` (コードを変えた最後の commit)。実行は HEAD `6f2b712ff` (docs のみの差分)。
+確認: `git diff bd5daf9d HEAD -- tools/m11 ':!tools/m11/REPORT*'` の出力は 0 バイト。e2e の再測定はしない。`bd5daf9d` の数値 (§7.0) は参考値のまま。
