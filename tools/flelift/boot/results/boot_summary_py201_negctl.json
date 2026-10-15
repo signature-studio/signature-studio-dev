@@ -43,7 +43,7 @@
    "safe_obj_0x88": null
   },
   "py_events": {
-   "n": 5,
+   "n": 9,
    "over": 0,
    "events": [
     {
@@ -74,6 +74,33 @@
      "aux": "0x0"
     },
     {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e1140",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x16b8488",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b8488",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b8250",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
      "unit": 209,
      "site": 8,
      "slot": "0x15e1c78",
@@ -88,6 +115,15 @@
      "slot": "0x15e4790",
      "proc": "0x74",
      "old": "0x141d6b8",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 209,
+     "site": 8,
+     "slot": "0x15e1140",
+     "proc": "0x74",
+     "old": "0x16b8488",
      "new": "0x0",
      "aux": "0x0"
     }
@@ -117,7 +153,8 @@
      "f88": "0x0",
      "sing": "0x0"
     }
-   ]
+   ],
+   "over": 0
   },
   "ipp_ptr_15F34A0": "0x0",
   "ipp_ptr_15F40E8": "0x0",
@@ -134,11 +171,11 @@
  "outmem": {
   "mem_bytes": 905969664,
   "stack": {
-   "base": "0x11dbbb00",
-   "end": "0x115bbb00"
+   "base": "0x11dbbb40",
+   "end": "0x115bbb40"
   },
-  "full": "fac44006c83c850f9f9e983b9c86ad27d006808ca35df5063c9551d7602f515a",
-  "no_cstack": "57c9c42dd19c5eb97edf33f446ad136eed74f11c0099e71e11de8f3dc1588055",
+  "full": "2ed93be27ab91e6427020f643d86993c14c49450eaf29df75340dc33f049887d",
+  "no_cstack": "828d271c327d0d231c1c8041d53ddb932bd1b0804d85da282d610ea5d13d014e",
   "sections": {}
  },
  "survey": null,
