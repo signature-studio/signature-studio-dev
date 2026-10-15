@@ -89,7 +89,7 @@
 ## 9. 追記: (B) 並び・process 履歴と (C) V8 階層化の分離 (LD-243 2 段目)
 
 - 測定 commit: `3da603ce6` (`origin/main`)。harness `tests/ld183_order_load.py` は本 HEAD に既に `--v8` を持つため変更なし。build `[build] OK`・`wasm_size` 4464620 (同一 HEAD で作り直し)。
-- 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64`、`work-m11` / `work-liftdiff` → worktree の `tools/*/work/` (アーカイブ内のパスは repo 相対のため、展開先は repo ルート)、`toolchain-emsdk` → `$RUNNER_TEMP/emsdk-root/emsdk` (build は `/opt/emsdk` を参照し、runner に既存)。
+- 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64`、`work-m11` / `work-liftdiff` → worktree の `tools/*/work/` (アーカイブ内のパスは repo 相対のため、展開先は repo ルート)、`toolchain-emsdk` → `$RUNNER_TEMP/emsdk-root/emsdk` (build は `[EMSDK]` を参照し、runner に既存)。
 - 機: 4 vCPU・15 GiB。run は直列。負荷 0。`--state auto --shards 12` (shards 1 のみ例外)。
 
 ### 9.1 各 run の件数 (一致 / 不一致 / 実行不能, 関数 801)
@@ -137,6 +137,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (B) の機構: 並びや process 履歴で、どの case がどう変わるか (例: 先行 case が残す状態) | 揺れの修復方針が決まらない | #4887 (修復は別起票) |
-| shards 1 の sorted の反復 (r2) が未取得 | (B') の反復の幅が未確定 | #4887 |
-| (A) 追加 CPU 競合の 2×2 への組み込み | 揺れ要因 (A) の再確認 | #4887 |
+| (B) の機構: 並びや process 履歴で、どの case がどう変わるか (例: 先行 case が残す状態) | 揺れの修復方針が決まらない | PM 判断 (修復は切り分け結果に基づく別起票。本 issue の範囲外) |
+| shards 1 の sorted の反復 (r2) が未取得 | (B') の反復の幅が未確定 | PM 判断 (本 issue の受入には不要) |
+| (A) 追加 CPU 競合の 2×2 への組み込み | 揺れ要因 (A) の再確認 | PM 判断 (受入 1 は LD-183 の結果で足りる) |
