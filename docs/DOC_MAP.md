@@ -653,6 +653,7 @@
 | `tools/shared/lift/rex/REPORT.md` | ~75 | REX Shared Library (win `block24351_PE.bin`) の export 14 本の閉包測定 (T-SH-11 #153): 関数数・命令数・間接 call・import・`.pdata` 無しの近似。lift は未実施 (#2733・#2734)。測定値の正本。再現は `rex_closure.py` |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2870.md` | ~50 | rex REPORT §9 全文 (T-SH-46 #2870: 成功経路 (戻り値 1 / 3) と arena 書込の一致・落ちる case の分類・未解決) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2896.md` | ~41 | rex REPORT §10 の旧版全文 (T-SH-47 #2896: REX_SIDE フラグと owner/rex_side.wasm の旧測定 (測定 commit `105733875`・133 件版)。最新は REPORT §10) |
+| `tools/shared/lift/rex/REPORT_APPENDIX_2969.md` | ~90 | rex REPORT の付録 (T-SH-48 #2969: 中核閉包 (REXCreate / REXGetInfoFromBuffer / REXRenderSlice) の owner tier 配置と REX_SIDE 除外の実測。測定 commit `9593fe1c1`) |
 
 ### IPP
 
