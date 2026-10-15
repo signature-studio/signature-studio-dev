@@ -181,40 +181,10 @@
   どちらにも行を足さない。
 - 受入 2〜4 の landing pad 非到達は、`tools/icall/REPORT.md` §4 **D12** (Delphi landing pad 非到達) と同型 (MX-6 §4 と同じ)。MSVC 固有の差は子 issue で扱う。
 
-## 9. 既知の非 vectorcall float 関数の同定と scalar 落ちの確認 (MX-55 #5030 = MX-54 U3g)
+## 9. 既知の非 vectorcall float 関数 (MX-55 #5030)
 
-- 実装: `scripts/mx55_nonvec_float.py` (判定は `mx33_xmm03.py` の `classify_fn` / `classify_read` をそのまま使う)。
-  母集合: seeds と 1-round の vectorcall rows のうち、xmm0〜3 の入口 livein ≥ 1・xmm4/5 の入口 livein = 0・範囲 ≤ 600 B。
-  このうち `scalar`、RIP 相対の読み (定数テーブル) あり、float 演算 (`*ss`/`*sd`) あり、を候補にする。
-- 母集合 (≤600 B・seeds と 1-round の行数の和) の判定件数: **scalar 15 / 128 bit 75 / 判定不能 36** (行数。重複を含む)。
-  候補 (scalar + RIP + float 演算) は **14 行 = 一意 13 関数** (0x17b680 が seeds と 1-round の両方に出るため)。
-  内訳: pdata 始点 1 件 (0x17b680 = §2 の #10 と同一)、pdata 始点でない内部入口 12 件。
-- **同定 (受入 1)**: `0x18017b680` (`0x17b680`〜`0x17b7ed`・79 命令・pdata 始点・seeds と 1-round の両方に含まれる)。
-  - 入口 livein: **xmm2 のみ** (xmm0・xmm1・xmm3 は入口で未定義)。CFG 上の xmm2 の読み: `0x18017b6a5 movaps xmm6, xmm2` (reg-reg 複写)。
-  - 複写先 xmm6 の後続は `maxss xmm1, xmm6` (0x18017b7c0)・`minss xmm0, xmm1` (0x18017b7cc) の scalar 読みのみ。
-    `follow()` の結果は `S` (CFG 後続の読みが全て scalar)。
-  - 関数内の float 演算: `divss` / `maxss` / `minss` / `subss` / `movss` / `movsd`、RIP 相対 3 件 (定数)。
-  - 入口の xmm2 は VEX 3 オペランドの上位保持ではなく、複写先で scalar 演算 (`maxss`/`minss`) に使われる。
-    「xmm2 は単精度 float 1 個の引数」は推定で、引数の型は確認していない。
-  - **非 vectorcall の確定はしていない**: 「vectorcall の規約に乗らない引数」かどうかは呼出元 (引数の渡し方) を見ないと言えない。
-    本節は「scalar 読みの型を持つ内部関数 1 件 (0x17b680) の同定」までを記録する。
-- **scalar 落ちの有無 (受入 2)**: **なし** (scalar が正しく scalar と判定された)。ただし以下の注意が要る:
-  - 線形走査 (CFG を使わない) では P 読み 3 件 (`0x18017b6ab`・`0x18017b6bf`・`0x18017b6f5`) が出る。
-    いずれも `movups xmmword ptr [rbp-...], xmm0` の **xmm0 の stack spill** (k=0) で、入口 livein (k=2) の読みではない。
-    k=2 の P 読みは線形でも 0 件。
-  - 呼出元: 直接 `E8`/`E9` の rel32 参照は .text 全体で 0 件 (`0x17b680` を含む 4 件すべて)。引数の渡し方は未確定。
-    間接 call・vtable・pdata 経由で呼ばれるとみられるが、呼出元の引数幅は解析していない (U3e・MX-37 側)。
-- **呼出元の探索 (MX-55 #5030 の残件・`scripts/mx55_callers.py`)**: 直接参照は 0 件のため、vtable 経由を見た。
-  - `0x18017b680` は `.rdata` の 2 つの vtable (`0x183976038`・`0x1841836a8`) の **index 32 (disp `0x100`)** に登録されている (`.rdata` の 8 バイト照合で 2 件のみ)。
-  - `call qword ptr [reg + 0x100]` は 56 件 (disp 一致のみ・型は未追跡)。直前 40 命令の窓で xmm2 を書くのは **1 件**: `0x18017b4af` (`movss xmm2, [rsp+0x2c]` → `mov rax, [rbx]` → `call [rax+0x100]`)。
-    この呼出元は `0x18017b460` の関数内にあり、`rbx` は関数の第 1 引数 (`rcx`) 由来。
-  - **確定できないこと**: `rbx` が指す型が 2 つの vtable のどちらか (つまり slot 32 が `0x17b680` を指すか) は未確認。
-    disp 一致の 56 件のうち残り 55 件の呼出元は xmm2 を書かず、この 1 件とは別。よって「xmm2 単精度 1 個を渡す呼出し」は 1 件の仮想呼出でのみ支持される。
-  - **結論**: 非 vectorcall は **部分的に支持** (呼出元 1 件が xmm2 に float を載せて呼ぶ)。型の確定 (`rbx` の vtable) と、他の呼出元の除外は未了。残件は #5030。
-- **残件 (U3g の範囲外)**: 非 vectorcall の確定 (呼出元で xmm2 を渡すこと) は未確認。内部入口 12 件は
-  `classify_fn` で scalar だが、いずれも直接 call 0 件で引数の出所を確かめていない。判定の正しさの確認は MX-37 の残件に残す。
-- **import 名**: VST3 の import (318 件) に libm/CRT の float 関数 (sin・cos・exp・pow・sqrt 等) は無い (再確認)。
-  よって同定は内部の関数のみ。
+- 同定 (`0x18017b680`・scalar 読み・入口 xmm2)、scalar 落ちなし。呼出元 1 件 (`0x18017b4af`・xmm2 に float を載せて vtable slot 32 を呼ぶ) を確認。
+- 非 vectorcall の確定は未了 (`rbx` の vtable 型)。詳細・実測は [REPORT_APPENDIX_5030.md](REPORT_APPENDIX_5030.md)。
 
 ## 8. 測定 commit と差分 (docs/WORKFLOW.md §6)
 
@@ -271,8 +241,7 @@
 
 ### 7.2 U3g: 既知の非 vectorcall float 関数での scalar 落ち
 
-- VST3 の import 名 282 件に libm / CRT の float 関数は無い。内部の既知形 (定数テーブルを持つ float 関数) の同定は未着手で、本 PR では測定していない。
-- **結論: 同定できず、scalar 落ちの確認は未実施** (子 #5030 へ移す)。
+- 本 PR の時点 (MX-54) では同定できず未実施。後続の MX-55 (#5030) で同定し、scalar 落ちなしを確認した (§9 → [REPORT_APPENDIX_5030.md](REPORT_APPENDIX_5030.md))。
 
 ### 7.3 e2e と再現 (前 run の記録。本 run では再実行していない)
 

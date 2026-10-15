@@ -1042,6 +1042,7 @@
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_4989.md` | ~60 | MX-52 (#4989) 受入 2〜4 の感度測定: U3d (merge 上位保持・感度 18 件・P 17 関数 / A 1 件 0xefe0)・U3e (call/jmp 転送の未確定の候補 193 件・pdata 始点 47 件)・U3g (未実施)。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_MX15.md` | ~50 | MX-15 (#1810): MX-12 残件 490 件 (0 件 458・2 件以上 32) の失敗理由の内訳と、MX-10 親 18 件の母集団。読み方の規則・親の解決は子 issue (MX-49・MX-50)。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_MX33.md` | ~153 | MX-33 (#3032) 受入 1: xmm0〜3 だけの入口 livein 保留 17 件の読み幅による判定 (0 件確定・判定不能 17)・NC 9 件・線形上限。受入 2〜5 は子 issue。測定値の正本 |
+| `tools/targets/massivex/dsp/REPORT_APPENDIX_5030.md` | ~60 | MX-55 (#5030) 付録: 0x17b680 の同定 (scalar 読み・入口 xmm2)・vtable slot 32 の呼出元 1 件 (xmm2 に float)・測定値の正本。REPORT_MX33 §9 から分割移動 |
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
 | `tools/targets/kilohearts/REPORT_KH19.md` | 70 | KH-19 (#782) ホスト 3 種 (Snap Heap / Multipass / Phase Plant) の vtable 間接 call 込み closure 再計算 (下界・過大評価の参考値・限界) |
 | `tools/targets/kilohearts/REPORT_KH19D.md` | ~96 | KH-19d (#850): 対照 Gain の未確定 before 160 閉包の x64c lift と build の最初の失敗点 (FLEngine 固有の VA 窓)。結論は REPORT §0 |
