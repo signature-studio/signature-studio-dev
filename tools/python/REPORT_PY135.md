@@ -75,7 +75,7 @@
 
 測定 commit: `524693988` (`fix(python): model addMeter state effect from PE 0xd7d9e0 (#3022)`。コードを変えた最後の commit)。以下は同じ commit のクリーンな作業ツリーで実行した。round 0 の測定 (`a60dccce8`) は addMeter の遷移を含まないため無効であり、本節が新しい測定。
 
-環境: runner 4 core。emsdk は pin の 6.0.12 (`tools/m1/flags.sh`) を `$RUNNER_TEMP/emsdk` に初回セットアップし、`/opt/emsdk` へ symlink した (`build_cpython_wasm.sh`・`build_flpy.sh` が `/opt/emsdk` を固定で読むため)。`toolchain-emsdk` の素材は本 run に無く、展開していない。fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (7.6 秒)、`FL_WIN64_DIR` はその展開先。`fetch_inputs.sh` は `FL_WIN64_DIR` を指定して rc 0 (`work/midi.py`・`utils.py`・`MCPTools.pyc` を配置)。前提生成物: `build_cpython_wasm.sh` (rc 0。wall は未計測)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0。wall は未計測)。測定時の load average (1 分値): 0.77 → 0.71。
+環境: runner 4 core。emsdk は pin の 6.0.12 (`tools/m1/flags.sh`) を `$RUNNER_TEMP/emsdk` に初回セットアップし、`[EMSDK]` の位置へ symlink した (`build_cpython_wasm.sh`・`build_flpy.sh` が `[EMSDK]` を固定で読むため)。`toolchain-emsdk` の素材は本 run に無く、展開していない。fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (7.6 秒)、`FL_WIN64_DIR` はその展開先。`fetch_inputs.sh` は `FL_WIN64_DIR` を指定して rc 0 (`work/midi.py`・`utils.py`・`MCPTools.pyc` を配置)。前提生成物: `build_cpython_wasm.sh` (rc 0。wall は未計測)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0。wall は未計測)。測定時の load average (1 分値): 0.77 → 0.71。
 
 | コマンド | 結果 | wall |
 |---|---|---|
