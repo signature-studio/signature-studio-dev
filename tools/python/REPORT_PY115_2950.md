@@ -19,7 +19,9 @@
   - `node tests/device_diff.mjs` → `{"calls":8,"rejects":4,"midi_out":5,"diffs":0,"PASS":true}`
   - `node tests/sig_arity_probe.mjs` → `{"kwsig_targets":24,"fails":0,"PASS":true}`
 - 比較 (前 run の WIP `3e754b8b`、#2927 未 merge の表): `channels_diff`・`mixer_diff` は追加引数が code 5 で FAIL していた。#2956 merge 後の main の表では PASS。
-- 未実行: `node tests/provider_check.mjs` と `FL_ENGINE=wasm node tests/all_tools.mjs` (48/48)。`dist/flpy.js` (CPython wasm) が無いため (§5)。
+- flpy (CPython wasm): `bash build_cpython_wasm.sh` real 3 分 21 秒 rc 0 → `FLPY_SKIP_TABLE=1 EMSDK_DIR=/opt/emsdk bash build_flpy.sh` real 4.789 s rc 0 (`FLPY_SKIP_TABLE=1` で追跡済みの `flapi_table.json` を再生成しない)。
+- `node tests/provider_check.mjs` → `{"functions":435,"implemented":155,"unimplemented":280,"mcp_static":60,"PASS":true}`、real 0.275 s。
+- `FL_ENGINE=wasm node tests/all_tools.mjs` → `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}`、real 1.303 s。
 
 ## 2. 逆アセンブルの事実 (PE `block00031_PE.bin`。前 run の解析)
 
@@ -39,7 +41,7 @@
 - `provider/fl_engine.c`: `soloChannel` を上記の規則にし、`track_name_fit` を追加して `getTrackName` に `maxLen` を入れた。`getTrackCount` (`NMIX - 2`) と `getEqBandCount` (3) は main の行を残した。
 - `host/fl_mock.mjs`: 同じ規則 (`fitName`・`soloChannel`)。`mixer.getTrackName` は `(...a)` で `argI(a, 1, -1)` を読む。
 - `tests/channels_diff.mjs` (+18 行)・`tests/mixer_diff.mjs` (+8 行): value -1/0/1/2/256・型不正、maxLen 0/1/3/4/100/既定/型不正。solo 状態は `isChannelSolo` で比較。
-- 取り込み: 前 run の WIP は #2927 前の main 基点だったため、現 `origin/main` (`6e7d1e59b`) 上に cherry-pick した (衝突 2 箇所は上記 `getTrackName` を新規側に、`getTrackCount`・`getEqBandCount` は main 側を残して解消)。
+- 取り込み: 前 run の WIP は #2927 前の main 基点だったため、現 `origin/main` (`6e7d1e59b`) 上に cherry-pick した (衝突は C と mock の `getTrackName` の 2 箇所。maxLen 対応版を採り、`getTrackCount`・`getEqBandCount` は main 側の行を残した)。
 
 ## 4. 差分の確認
 
@@ -53,8 +55,5 @@
 | `mixer.getTrackName` の非 ASCII (PE は UTF-16) | 非 ASCII 名の切詰めが未確認 | #3654 (PY-226) |
 | `device.midiOutMsg` の 5 個目 `arg4` (word の bit 24–31) | 未実装。C・mock が送った word を記録しない | #3655 (PY-227) |
 | `plugins.getParamValueString` の `index`・`slotIndex`・`useGlobalIndex` (`slotIndex≠-1` の経路 `0xd7fb34` 未読) | 未実装 | #3656 (PY-228) |
-| `provider_check.mjs` §3 以降・`all_tools.mjs` 48/48 (`dist/flpy.js` 要) | 未検証 (§1) | 下記 §5.1 |
 
-### 5.1 flpy の検証
-
-(本節は検証後に更新する)
+- flpy 経由の検査 (`provider_check.mjs`・`all_tools.mjs` 48/48) は §1 のとおり PASS。未解決は上の 4 行だけ。
