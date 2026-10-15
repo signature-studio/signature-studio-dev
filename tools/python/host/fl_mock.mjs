@@ -133,7 +133,7 @@ export function createMockEngine() {
     selStart: -1, selEnd: -1, liveAnchor: -1,
     arrTime: 0,
     numerator: 4, denominator: 4,
-    screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
+    screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0, screenDefaultCounter: 0,
     screenAlive: false, screenDirty: false, screenMenuShowing: false, screenSetup: { l: 0, t: [0, 0, 0, 0, 0] },
     selectedChannel: 0,
     loop: { row: false, flag49e: false, flag54: false, recs: [] },
@@ -535,6 +535,16 @@ export function createMockEngine() {
     "screen.getScreenActiveCounter": (...a) => { arity(a, 0, 0); return st.screenActiveCounter; },
     "screen.setScreenActiveCounter": (...a) => { arity(a, 1, 1); st.screenActiveCounter = (st.screenActiveCounter + argI(a, 0, 0)) | 0; },
     "screen.unBlank": (...a) => { arity(a, 1, 1); st.screenUnBlank = argI(a, 0, 0) === 1; },
+    // PY-135 (#3022): 描画・メーター系 6 件 (PE 0xd7ada0・0xd7b690・0xd7ae80・0xd7af40・0xd7bcb0・0xd7bec0)。addMeter 以外は引数検査と None だけを模す (REPORT_PY135)。
+    // addMeter は書式解析が成功 (rc>0) かつ scr≠0 のとき PE 0xd7d9e0 が isUnBlank (scr+0x1d1) を真にし、activeCounter を scr+0x1dc (仮置き 0) にする。解析失敗は状態を変えない
+    "screen.addMeter": (...a) => { arity(a, 4, 5); for (let i = 0; i < 4; i++) argI(a, i, 0); argI(a, 4, 0); st.screenUnBlank = true; st.screenActiveCounter = st.screenDefaultCounter; },
+    "screen.displayBar": (...a) => { arity(a, 5, 5); argI(a, 0, 0); argI(a, 1, 0); str(a[2]); argF(a, 3); argI(a, 4, 0); },
+    "screen.fillRect": (...a) => { arity(a, 5, 5); for (let i = 0; i < 5; i++) argI(a, i, 0); },
+    "screen.drawRect": (...a) => { arity(a, 5, 5); for (let i = 0; i < 5; i++) argI(a, i, 0); },
+    "screen.drawText": (...a) => { arity(a, 6, 6); argI(a, 0, 0); str(a[1]); for (let i = 2; i < 6; i++) argI(a, i, 0); },
+    "screen.eraseRect": (...a) => { arity(a, 4, 4); for (let i = 0; i < 4; i++) argI(a, i, 0); },
+    // blank (PE 0xd7c600 → callback 0xd7c5a0 → 0xd7d110): 第 1 引数が 1 なら isBlanked (scr+0x1d0) を真に書く。真→偽の解除では activeCounter を scr+0x1dc から戻す (初期値は未実測の仮置き 0)
+    "screen.blank": (...a) => { arity(a, 2, 2); const b = argI(a, 0, 0) === 1; argI(a, 1, 0); if (b !== st.screenBlanked) { if (!b) st.screenActiveCounter = st.screenDefaultCounter; st.screenBlanked = b; } },
     // PY-136 (#3025): screen 初期化・メニュー系 10 件 (PE 0xd7aa40・0xd7ab00・0xd7b0a0・0xd7b000・0xd7ccb0・0xd7b1f0・0xd7b170・0xd7c9a0・0xd7cac0・0xd7cbe0)。scr 未生成の経路は PE で AV のため Unspecified error を仮置き。引数名と意味は未確定 (REPORT_PY136)
     "screen.init": (...a) => { arity(a, 6, 6); for (let i = 0; i < 6; i++) argI(a, i, 0); Object.assign(st, { screenAlive: true, screenDirty: false, screenMenuShowing: false, screenSetup: { l: 0, t: [30, 10, 10, 2, 4000] } }); },
     "screen.setup": (...a) => { arity(a, 6, 6); const v = Array.from({ length: 6 }, (_, i) => argI(a, i, 0)); scrNeed(); st.screenSetup = { l: v[0], t: v.slice(1) }; },
