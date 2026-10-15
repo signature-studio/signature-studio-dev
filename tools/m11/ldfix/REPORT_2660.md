@@ -8,7 +8,7 @@
 - 4 site (45d570・45d581・45b1bf・45f938) は、機械語の消費者 (store 直後の load・間に call 無し) を確認できた。IR の保存ブロックが entry から到達不能なのは、上流の `xor i64 0,0` (機械語 45b18b・45d0b5・45f56c の型タグ読みの置換) が作る死んだ辺による。F3d 適用後は死んだ辺が消え、到達可能になる (§10.2)。ただし到達可能は store の実行を示さない。TRUE_DROP への確定は取り下げた (§2)。OK_LOAD への判定も、store の実行の根拠が立つまで入れない (§10)。上流修復の追跡は LD-127 (#2745) (§2.2)。
 - LD-127 (#2745): 上流 xor 0 の 3 関数の入口タグ読みを load に戻す pass F3d を追加した (既定無効・`--passes f3d`)。4 site の判定と `results/` は未更新 (§2.3・§10)。F3d の既定化は #2833、4 site の判定は子 #3605 (LD-167) (§10.3)。
 - 残る 5 site (41ba8a・41bfd1・41e513・45c6dd・45d754) も UNDETERMINED。所見は §3 に残し、子 issue LD-123 (#2688) に移した。
-- 脱落関数の和集合は **72 関数** (69 + TRUE_DROP 増分 3・PR 基点 `62b33c07` の results での計算。`REPORT_2265.md` §3 の公表値と同じ)。9 site が未確定のため最終化は未了。最終化は子 issue LD-124 (#2689)。現 main (`738074af`) の results は本 PR と版が違い、その和集合は未測定 (§7)。
+- 脱落関数の和集合は **72 関数** (版 `57d6612b`・`62b33c07` の results での計算: 69 + TRUE_DROP 増分 3。`REPORT_2265.md` §3 の公表値と同じ)。本 PR の results (`b706fb666` 版: 確定 147・判定不能 30・未判定 1) では再計算していない (§4・§10.4)。9 site が未確定のため最終化は未了。最終化は子 issue LD-124 (#2689)。
 - 測定: 測定 commit `57d6612b` (F3d を入れたコード commit)。`audit_lsf_ssa_e2e.sh` を前景実行し rc=0・7/7 完走 (120.9 s)。HEAD `4e85ea56` でも再実行し rc=0・7/7 完走 (165.1 s)。主要値は §5。旧測定 (`8a323067`・154.7〜154.8 s) は §5 に旧版の注記付きで残す。
 
 ## 2. 9 site の判定
@@ -73,8 +73,8 @@
 |---|---|---|
 | F3d の既定化 (60 関数の IR 変更の build・e2e 検証) | 既定の pipeline は未修復。4 site は UNDETERMINED のまま | #2833 (LD-134) |
 | 45b1bf の判定 (IR は 1 段目の値 P を store し、2 段目の load を join で行う。P と V の読みの間に store が無いことが未確認) | 45b1bf は UNDETERMINED のまま。4 site とも判定は保留 (§10) | #3605 (LD-167) |
-| RetDec 内部で xor 0 化した pass の特定 (m11 の出力には `xor i64 0,0` を出す箇所は無い) | 上流 (lift 段) を直すか否かの判断に必要。F3d で IR 側に対処済み | #2745 へのコメント (本 PR の merge で close されるため、追跡はそのコメントに残す。新規子 issue は立てない) |
-| main 側 results の再測定 (現 main `738074af` は 確定 117・判定不能 30・未判定 31) | 本 PR の results は基点 `62b33c07` の版 (109/28/41)。main の和集合は未測定 | LD-124 (#2689) |
+| RetDec 内部で xor 0 化した pass の特定 (m11 の出力には `xor i64 0,0` を出す箇所は無い) | 上流 (lift 段) を直すか否かの判断に必要。F3d で IR 側に対処済み | #2745 へのコメント (#2745 は CLOSED のため、追跡はそのコメントに残す。新規子 issue は立てない) |
+| main 側 results の和集合の最終化 | 本 PR の results は `b706fb666` (= 取り込んだ main の results) の版 (147/30/1)。和集合は再計算していない (§4) | LD-124 (#2689) |
 
 ### 2.5 F3d ガードのネガティブコントロール (`f3d_negctl_2745.sh`)
 
@@ -105,7 +105,7 @@
 - 注: 本節の 21・72 は版 57d6612b の値。現 results の分類器出力は spill 宛の確定 TRUE_DROP 関数 32 で、drops_510 に無いもの 14 (§10.4)。和集合は再計算していない (LD-124 #2689)。
 
 - 和集合 = store 宛 DROP 51 ∪ spill 宛 frame 22 (drops_510.tsv) = 69 関数に、spill 宛の確定 TRUE_DROP の増分 3 (4120c0・41a5d0・6c3700) を加えた **72 関数** (`spill_classify_1161.py` の [5][6] 行)。
-- 本 PR で spill 宛 TRUE_DROP 関数は 21 のまま (旧 `3e9a7419` の 24 は取り下げた)。和集合は本 PR の results の版で 72。
+- spill 宛 TRUE_DROP 関数は版 `57d6612b` で 21 (旧 `3e9a7419` の 24 は取り下げた)。現 results (`b706fb666`) では 32 (§10.4) で、和集合 72 は版 `57d6612b` の値のまま。
 - 未確定の要素: UNDETERMINED 9 site (LD-123 #2688・上流 xor 0 の修復待ち 4 を含む)・未判定 41 site (#2245・#2288・#2583 の対象)・#2253 の判定不能 7 site。最終化は LD-124 (#2689)。
 
 ## 5. 監査と測定
@@ -143,8 +143,8 @@
 
 - 測定 commit `57d6612b` 以降のコード差分 (`git diff 57d6612b HEAD -- tools/m11/ldfix/results tools/m11/ldfix/*.py`) は 0 行 (HEAD `4e85ea56` 時点で確認)。`f3d_negctl_2745.sh` は本 commit で追加した再現スクリプトで、audit の経路には入らない。
 - 参考: `8a323067` からの差分 (`git diff 8a323067 HEAD -- tools/m11/ldfix/results tools/m11/ldfix/*.py`) は 12 ファイル・+721/-32 行。旧測定の commit の後に F3d と results が変わっている。
-- `results/` の版: PR の基点 (merge-base) は `62b33c07`。その `results/spill178_1161.tsv` は 確定 109・判定不能 28・未判定 41 で、`57d6612b` と同一 (`git diff 62b33c07 57d6612b -- tools/m11/ldfix/results` は 0 行)。旧 PR 基点 `858ceef0` の版 (97/16/65) とは `git diff --numstat 858ceef0 62b33c07 -- tools/m11/ldfix/results` で +110/-24 行の差がある。
-- 現 origin/main (`8a852f69a`) の `results/spill178_1161.tsv` は本 PR の基点 `b706fb666` と同一 (確定 147・判定不能 30・未判定 1)。旧記載の `738074af` の値 (117/30/31) は本 run では確認できなかったため除く。main 側の再測定は LD-124 (#2689)。
+- `results/` の版: 本 PR の results は `b706fb666` の版 (確定 147・判定不能 30・未判定 1。§10.4)。`62b33c07` の `results/spill178_1161.tsv` は 確定 109・判定不能 28・未判定 41 で、`57d6612b` と同一 (`git diff 62b33c07 57d6612b -- tools/m11/ldfix/results` は 0 行)。`62b33c07` と `b706fb666` の results は `git diff --numstat 62b33c07 b706fb666 -- tools/m11/ldfix/results` で +15584/-48 行の差がある。旧 PR 基点 `858ceef0` の版 (97/16/65) とは `git diff --numstat 858ceef0 62b33c07 -- tools/m11/ldfix/results` で +110/-24 行の差がある。
+- 現 origin/main (`89e0631e9`) の `results/` は `b706fb666` と同一 (`git diff b706fb666 origin/main -- tools/m11/ldfix/results` は 0 行)。旧記載の `738074af` の値 (117/30/31) は本 run では確認できなかったため除く。main 側の再測定は LD-124 (#2689)。
 
 ## 8. 注記
 
@@ -200,9 +200,11 @@
 
 - 結論: F3d を含めて IR を再生成し、4 site の到達性と機械語の消費者を確認した。store が IR で実行される根拠は示せなかったため、3 site (45d570・45d581・45f938) の OK_LOAD 判定と results 更新 (版 `2f921d4dc`) は取り下げた。4 site とも UNDETERMINED のまま。`results/` は基点 `b706fb666` と同一 (本 commit で変更なし)。判定は子 #3605 (LD-167) で行う。
 - 測定の版: IR 再生成と監査は commit `2f921d4dc` (3 site を OK_LOAD にした results) の時点。コードは `b706fb666` から変えていない。
+- 鮮度 (WORKFLOW §6): `git diff 2f921d4dc HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/m11_gen_ir2.sh` は 0 行 (本 fix の commit 時点で確認)。`git diff b706fb666 HEAD -- tools/m11/ldfix/results tools/m11/ldfix/*.py` も 0 行。
 
 ### 10.1 IR 再生成 (版 2f921d4dc)
 - 手順: `LDFIX_ARGS="--passes f1,f1v,f2,f3a,f3b,f3c,f3d,f4" bash tools/m11/m11_gen_ir2.sh` (前景・gen 45.3 s・rc 0)。ldfix の内訳 F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=46 F3d=58 F4=10 (errors 0)。`ir_sha256` `3d7a9cd3…` を 2 回で再現。`boot_final3.ll` は素材の生成物で、本 PR には含めない。
+- `ir_conditions.json` の `ldfix=applied`: `m11_gen_ir2.sh` は `ldfix.py` の直後に `m11_cond.py ldfix=applied` を書く (スクリプト行 51)。版 `2f921d4dc` の gen は ldfix の内訳 (errors 0) を出力した。ファイルの値そのものは本 run で素材 (work-m11) が無く再読していない。
 - 対照 (同じ HEAD で F3d 無し): 変わった関数は 58 (F3d の対象集合と一致)。`xor i64 0, 0` 行は `boot_final3.ll` で 3886 → 3828 行。
 
 ### 10.2 4 site の到達性と機械語の消費者 (F3d 適用 IR)
