@@ -242,3 +242,8 @@ FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FLE_BOOT_RUNS="default" FLE_EXTRA_ROOTS= bash
 - `outmem` (現 head 1 回): `full` `c9f39e3e…`・`no_cstack` `a6cf4946…`。`stack.base`・`end` は `0x11dbef00`・`0x115bef00` で一致。`full` の値は 12 の非決定性どおり毎回変わるため、この値を正として比べない。
 - 差分 0 の範囲 (測定 commit `e3954b032` から HEAD まで): 再測定で使ったコードは `e3954b032` のまま。本節の後の commit は REPORT・PR 本文のみ (`git diff e3954b032 HEAD -- tools/flelift/x64c.py tools/flelift/boot/gen_boot.py tools/flelift/fle_data_gen.py tools/flelift/boot/rss_cap.py tools/flelift/boot/fle_boot.mjs tools/flelift/boot/fle_boot.c tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh tools/shared/env.sh` の出力は空)。
 - 注: 再測定で `results/boot_summary_fle6_tol.json` が上書きされたが、絶対 path を含む `stack` が入るため差し替えず、`git restore` で HEAD の版に戻した (`boot_cfi_stack_fle6_tol_named.json` が関数名付きの根拠)。
+
+## 13. CFI 経路の値の観測 (#4384 [WIN-49])
+
+本節は `tools/flelift/boot/REPORT_APPENDIX_4384.md` に移した (REPORT 上限のための分割移動。内容は削除していない)。値の要約: 観測 `0x410320` の読み出し先 `0xffffffffffffffd0` (oob)・受け手 VA 未取得・再現なし。
+

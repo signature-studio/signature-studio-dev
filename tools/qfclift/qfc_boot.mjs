@@ -24,7 +24,7 @@ function step(name, va, args) {
   const t0 = performance.now();
   try {
     const g = [...args, 0, 0, 0, 0].slice(0, 4).map(BigInt);
-    rec.rax = '0x' + BigInt.asUintN(64, BigInt(m._fle_run(va, g[0], g[1], g[2], g[3], 0n, 0n, 0n, 0n))).toString(16);
+    rec.rax = '0x' + BigInt.asUintN(64, BigInt(m._qfc_run(va, g[0], g[1], g[2], g[3], 0n, 0n, 0n, 0n))).toString(16);
   } catch (e) {
     rec.status = 'trap';
     rec.trap = String(e).slice(0, 160);

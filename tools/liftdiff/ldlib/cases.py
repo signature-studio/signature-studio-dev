@@ -79,6 +79,13 @@ PATTERNS = [
 ]
 PATTERN_NAMES = [p[0] for p in PATTERNS]
 
+# LD-207 (#4264): 691dd0 は rcx が有効オブジェクト (vtable・ビン表が boot 状態) でないと、小サイズ確保のビン読みで segv する。
+# 既定の pattern では rcx が blob の値を指すため入らない。vmt blob (VMT 付き疑似オブジェクト) を rcx に渡す pattern を、その VA だけに足す。
+# r8 (1 byte flag) は 0 にする。0 以外だと 691e65 の判定で segv する (実測)。
+OBJ_PATTERNS = {
+    0x691dd0: [('vmo', {0}, 'vmt', 0, 'zero')],
+}
+
 
 def kinds_of(sig_params, n=8):
     ks = []
@@ -89,7 +96,8 @@ def kinds_of(sig_params, n=8):
 
 
 def build_args(pattern, kinds):
-    name, ptrs, blob, add, base = next(p for p in PATTERNS if p[0] == pattern)
+    allp = PATTERNS + [p for ps in OBJ_PATTERNS.values() for p in ps]
+    name, ptrs, blob, add, base = next(p for p in allp if p[0] == pattern)
     toks = []
     for i, k in enumerate(kinds):
         if k == 'd':

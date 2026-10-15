@@ -33,7 +33,7 @@ crash 65 のうち stderr で分類した 9 関数 (変更前) 以外の内訳 (
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `KERNEL32!RtlCaptureContext` (2 関数: `18100cc50`・`18103d218`) | fail-fast のまま。CONTEXT を正しく埋める実装が要る | #4338 (ICALL-100・子) |
-| `UnhandledExceptionFilter` (1 関数: `18100ca28`) | fail-fast のまま。`SetUnhandledExceptionFilter` と意味が違うため別実装が要る | #4338 (ICALL-100・子) |
+| `SetUnhandledExceptionFilter` (1 関数: `18100ca28`・本付録の旧表記 `UnhandledExceptionFilter` は誤り) | fail-fast のまま。`UnhandledExceptionFilter` とは別 import のため別実装が要る。訂正は `REPORT_APPENDIX_4338.md` §3 | #4529 (ICALL-104・子) |
 | `RtlPcToFileHeader` 追加後の C++ 例外経路 (6 関数) | `RaiseException 0xe06d7363` で fail-fast。`__CxxFrameHandler` 系の unwind が要る | #4362 (ICALL-103・子) |
 | SIGSEGV (件数未計数) | encoded slot・ヒープ構造体の未初期化が候補。stderr 分類は本付録では未実施 | ICALL-55 (#2009) の既存範囲 |
 
