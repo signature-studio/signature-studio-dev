@@ -1,0 +1,14 @@
+{
+  "description": "needs-user-input の判定 (CI-176 #3705)。expect=escalate は依頼者へ渡す 4 種 (category は 実機・資格情報・課金・法的 のどれか)、expect=decide は PM が決めて進める (category=none)。pm.md の「判定の基準 (誤例・正例)」の表と同じ判定であること (test-dispatch-context.sh §10d が検査する)。",
+  "cases": [
+    {"issue": 2034, "rule": "U1", "reason": "no_pr の規則により U とした", "category": "none", "expect": "decide"},
+    {"issue": 1987, "rule": "U1", "reason": "判定基準は PM が決めないため依頼者へ渡す", "category": "none", "expect": "decide"},
+    {"issue": 1736, "rule": "U7", "reason": "生成環境は依頼者だけが持つ可能性がある", "category": "none", "expect": "decide"},
+    {"issue": 1989, "rule": "U7", "reason": "Ghidra の用意は依頼者の提供物", "category": "none", "expect": "decide"},
+    {"issue": 948, "rule": "U7", "reason": "headful Chrome + 実オーディオデバイスでの実機採取", "category": "実機", "expect": "escalate"},
+    {"issue": 3302, "rule": "U3", "reason": "service token の secret とリポジトリ変数の登録", "category": "資格情報", "expect": "escalate"},
+    {"issue": 1900, "rule": "U2", "reason": "NI EULA の逆アセンブル・リバース禁止に触れる", "category": "法的", "expect": "escalate"},
+    {"issue": 785, "rule": "U7", "reason": "依頼者の手元の正規 .reg の投入と許可名の変更", "category": "実機", "expect": "escalate"},
+    {"issue": 874, "rule": "U7", "reason": "依頼者の VM 上にしかない mac pkg 原本", "category": "実機", "expect": "escalate"}
+  ]
+}

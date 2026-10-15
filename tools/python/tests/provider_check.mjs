@@ -22,6 +22,8 @@ const dev = new Set(["device.getPortNumber", "device.isAssigned", "device.setHas
 const mig = new Set(["channels.selectedChannel", "channels.fillEachNSteps", "general.getVersion", "transport.isPlaying", "ilmcp.forwardTutorialEvent"]);
 // PE 解析で意味論を確定した関数 (REPORT_PY69・PY-69 #2499)。channels.setChannelPitch は未確定のため含めない
 const pe39 = new Set(["channels.selectOneChannel"]);
+// REPORT_PY61 §2 で型・範囲 code を確定した playlist 取得系 7 件 (PY-62 #2027・REPORT_PY62。muteTrackLock は pe102)
+const pl61 = new Set(["playlist.getTrackColor", "playlist.isTrackMuteLock", "playlist.getTrackActivityLevelVis", "playlist.getLiveLoopMode", "playlist.getLiveTriggerMode", "playlist.getLivePosSnap", "playlist.getLiveTrigSnap"]);
 // PE で引数書式と index 範囲 (code 4) を確認した channels グラフ/CS エディタ系 5 関数 (REPORT_PY40 §8・PY-40 #1529)。述語・UI 副作用・戻り値の内部経路は未確定、tests/channels_diff.mjs が mock と照合
 const pe40 = new Set(["channels.closeGraphEditor", "channels.updateGraphEditor", "channels.showGraphEditor", "channels.showCSForm", "channels.focusEditor"]);
 // PE で判定順 (index → NaN → pitchUnit) と status 文言を確定し、unit 0/1 の効果を除いて実装した 1 関数 (REPORT_PY72・PY-76 #2563)。tests/channels_diff.mjs が mock と照合
@@ -45,6 +47,8 @@ const pe96 = new Set(["arrangement.selectionStart", "arrangement.selectionEnd", 
 const pe121 = new Set(["screen.isBlanked", "screen.isUnBlank", "screen.getScreenActiveCounter", "screen.setScreenActiveCounter", "screen.unBlank"]);
 // PE で呼出し経路を確定した ui ゲッター 6 件 (REPORT_PY119・PY-119 #2980)。値は未実測の仮置き、tests/ui_state_diff.mjs が mock と照合
 const pe119 = new Set(["ui.getFocused", "ui.getFocusedFormID", "ui.getFocusedFormCaption", "ui.getFocusedPluginName", "ui.getHintMsg", "ui.isInPopupMenu"]);
+// PE で書込み経路を確定した ui setter 2 件と ui 版 getVersion (REPORT_PY130_3007・PY-130 #3007)。setTimeDispMin は未実装 (保留)。tests/ui_state_diff.mjs が mock と照合
+const pe130 = new Set(["ui.setBrowserAutoHide", "ui.setStepEditMode", "ui.getVersion"]);
 // PE で範囲判定・書込み先を確認した general setter 6 件 (REPORT_PY119_2977・PY-119 #2977)。tests/general_diff.mjs が mock と照合
 const pe119set = new Set(["general.setRecPPQ", "general.setNumerator", "general.setDenominator", "general.setUndoHistoryPos", "general.setUndoHistoryCount", "general.setUndoHistoryLast"]);
 // stub 確定 2 関数 (REPORT_PY41_1514 追補 #2805・PY-89)。PE 0xd5bd60 / 0xd5bcd0 で範囲検査と戻り field を確認
@@ -56,6 +60,8 @@ const pe95 = new Set(["ui.isClosing", "ui.getTimeDispMin", "ui.isMetronomeEnable
   "ui.isLoopRecEnabled", "ui.getStepEditMode", "ui.isBrowserAutoHide", "ui.getSnapMode"]);
 // PE で引数書式と時間引数の頭打ち (0x7d0) を確認した表示・メニュー 3 件 + 作用の無い 3 件 (REPORT_PY121_2982・PY-121 #2982)。tests/ui_display_diff.mjs が mock と照合
 const pe121_2982 = new Set(["ui.crDisplayRect", "ui.miDisplayRect", "ui.miDisplayDockRect", "ui.showNotification", "ui.closeAllMenu", "ui.closeActivePopupMenu"]);
+// PE で書式 (toggleBrowserNode '|i'・selectBrowserMenuItem / previewBrowserMenuItem NOARGS) を確認した ui ブラウザ 3 件 (REPORT_PY132・PY-132 #3013)。tests/ui_browser_diff.mjs が mock と照合
+const pe132 = new Set(["ui.toggleBrowserNode", "ui.selectBrowserMenuItem", "ui.previewBrowserMenuItem"]);
 // PE の PyArg 書式で呼出し構造を確定し、個数は fl_table に合わせた arrangement 6 関数 (REPORT_PY152・PY-152 #2983。jumpToMarker は PE と個数不一致の未解決)。副作用は未同定、tests/arrangement_diff.mjs が mock と照合
 const pe152 = new Set(["arrangement.currentTime", "arrangement.selectionClear", "arrangement.selectionSet", "arrangement.liveSelection", "arrangement.addAutoTimeMarker", "arrangement.jumpToMarker"]);
 // PE 0xd5ec60 で取得式を確定した 1 関数 (REPORT_PY115 §2・PY-115 #2951)
@@ -70,12 +76,12 @@ let impl = 0, unimpl = 0;
 for (const id of ids) {
   const r = direct(id, ...Array(40).fill(null).slice(0, 0));
   const notImpl = r.err?.startsWith("Unspecified error (not implemented:");
-  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || pe40.has(id) || pe76.has(id) || stub41.has(id) || pe101.has(id) || pe100.has(id) || stub89.has(id) || pe87.has(id) || pe94.has(id) || pe95.has(id) || pe96.has(id) || pe115.has(id) || pe121.has(id) || pe119.has(id) || pe119set.has(id) || pe152.has(id) || pe121_2982.has(id) || pe102.has(id) || pe125.has(id) || pe172.has(id) || pe120.has(id) || pe205.has(id) || pe179.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
+  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || pe40.has(id) || pe76.has(id) || stub41.has(id) || pe101.has(id) || pe100.has(id) || stub89.has(id) || pe87.has(id) || pe94.has(id) || pe95.has(id) || pe96.has(id) || pe115.has(id) || pe121.has(id) || pe119.has(id) || pe130.has(id) || pe119set.has(id) || pe152.has(id) || pe121_2982.has(id) || pe102.has(id) || pe125.has(id) || pe172.has(id) || pe120.has(id) || pe205.has(id) || pe179.has(id) || pe132.has(id) || pl61.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
   else assert.ok(notImpl, `${id} は未実装のはず`);
   notImpl ? unimpl++ : impl++;
 }
-// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 引数書式・範囲 5 (pe40・#1529) + PE 確定 1 (pe102・#2883) + stub 確定 6 (stub41) + PE 確定 2 (pe101) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 7 (pe94・#2830) + PE 確定 9 (pe95・#2831) + PE 確定 4 (pe96・#2832) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + ui PE 確定 6 (pe119・#2980) + general PE 確定 6 (pe119set・#2977) + arrangement PE 呼出し 6 (pe152・#2983) + ui 表示・メニュー 6 (pe121_2982・#2982) + general PE 確定 2 (pe125・#3001) + launchMapPages PE 確定 1 (pe120・#2984) + channels PE 判定順 1 (pe76・#2563) + patterns グループ 2 (pe172・#3219) + patterns 数え・選択 4 (pe179・#3271) + mixer PE 確定 2 (pe205・#3493)
-assert.equal(impl, 155); assert.equal(unimpl, 280);
+// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 引数書式・範囲 5 (pe40・#1529) + PE 確定 1 (pe102・#2883) + stub 確定 6 (stub41) + PE 確定 2 (pe101) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 7 (pe94・#2830) + PE 確定 9 (pe95・#2831) + PE 確定 4 (pe96・#2832) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + ui PE 確定 6 (pe119・#2980) + general PE 確定 6 (pe119set・#2977) + arrangement PE 呼出し 6 (pe152・#2983) + ui 表示・メニュー 6 (pe121_2982・#2982) + general PE 確定 2 (pe125・#3001) + launchMapPages PE 確定 1 (pe120・#2984) + channels PE 判定順 1 (pe76・#2563) + patterns グループ 2 (pe172・#3219) + PY61 確定 7 (pl61・#2027) + patterns 数え・選択 4 (pe179・#3271) + mixer PE 確定 2 (pe205・#3493) + ui ブラウザ 3 (pe132・#3013)
+assert.equal(impl, 168); assert.equal(unimpl, 267);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);

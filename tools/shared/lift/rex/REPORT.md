@@ -4,7 +4,7 @@
 既知の類型との関係: 該当なし (lift していない)。
 
 ## 結論 (1 行)
-REX DLL の export 14 本の閉包を `rex_closure.py` で実測 (0.6 秒・再実行で JSON 一致)。最小の `REXGetCreatorInfo` は 22 関数・924 命令・間接 0。`REXCreate` (514 関数) など REX 読込の中核は閉包が大きいため、lift と差分テストは子 issue に分ける。**lift は §7 (T-SH-44 #2733 の部分達成) に記録**。中核閉包 (REXCreate 等) の lift と参照元の特定は §8 (T-SH-45 #2734 の部分達成)。
+REX DLL の export 14 本の閉包を `rex_closure.py` で実測 (0.6 秒・再実行で JSON 一致)。最小の `REXGetCreatorInfo` は 22 関数・924 命令・間接 0。`REXCreate` (514 関数) など REX 読込の中核は閉包が大きいため、lift と差分テストは子 issue に分ける。**lift は §7 (T-SH-44 #2733 の部分達成) に記録**。中核閉包 (REXCreate 等) の lift と参照元の特定は §8 (T-SH-45 #2734 の部分達成)。中核閉包の所有者限定 tier 配置と `REX_SIDE` 除外は付録 `REPORT_APPENDIX_2969.md` (T-SH-48 #2969 の部分達成)。
 
 ## 0. 位置づけ
 - 方針: `docs/DECISIONS.md` D20 (#163 の PM 判断, 2026-10-14)。REX は**所有者限定 tier でのみ lift**し、FL 本体と別の side module にして、ビルドフラグで除外できる構成にする。優先度は低いまま。

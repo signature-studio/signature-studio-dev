@@ -4,13 +4,14 @@
 
 - 親 REPORT: `tools/plugins/slayer_engine_ia32/REPORT.md` §11 (#1098 の結論)。 方式は `docs/DECISIONS.md` D28 (f80→f64)。 本付録が測定値の正本。
 - 測定 commit: `ce0f0872` (`feat(ott): lower x87 subset for ia32 (PLG-G2-9)`。 lowering・runtime・差分試験を含む)。 本付録の commit は docs のみ。
-  `git diff ce0f0872 HEAD -- tools/ott/lift tools/ott/rt tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_diff_main.h tools/plugins/slayer_engine_ia32/x87_diff_native.c tools/plugins/slayer_engine_ia32/x87_diff_lowered.c tools/plugins/slayer_engine_ia32/x87_crosscheck.py tools/plugins/slayer_engine_ia32/x64_regress_1099.py` の差分は追加 88 行のみで、その全てが `x87_crosscheck.py` (新規追加・commit `1adb69c3`) である。 この検算スクリプトを除く code (lift・rt・driver・C 参照) の差分は 0 行。 §3・§4 の主 seed 1 と検算は HEAD で再実行し、同じ値を得た (2026-10-14)。
+  `git diff ce0f0872 HEAD -- tools/ott/lift tools/ott/rt tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_diff_main.h tools/plugins/slayer_engine_ia32/x87_diff_native.c tools/plugins/slayer_engine_ia32/x87_diff_lowered.c tools/plugins/slayer_engine_ia32/x87_crosscheck.py tools/plugins/slayer_engine_ia32/x64_regress_1099.py` の差分は追加 88 行のみで、その全てが `x87_crosscheck.py` (新規追加・commit `1adb69c3`) である (1099 の commit 時点の HEAD 基準。 その後の main 取り込み・#2967 の差分は含まない)。 この検算スクリプトを除く code (lift・rt・driver・C 参照) の差分は 0 行。 §3・§4 の主 seed 1 と検算は HEAD で再実行し、同じ値を得た (2026-10-14)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` (`$FL_WIN64_DIR/extracted/`) と生成した試行のみ。
+- 注 (#2967): 2967 で op 表に fld/fstp m80 と RC 固定の試験を加えた。 乱択の試行列が変わるので、§3 の数値は `ce0f0872` 時点の値で、HEAD の既定実行では再現しない (現行の値は `REPORT_APPENDIX_2967.md` §3)。 §9 の「m80 未試験」と「RC の算術」は #2967 で測定済み。 §4 の有理数検算 (旧 `x87_crosscheck.py` (a)) は 2967 で置き換えた。
 
 ## 1. 結論
 
 - x87 subset (下の §2 の表) を x64c の ia32 経路で lower し、ott_x87.h (f80 を持たず double) で実行する。 **x64 の出力は不変** (§7 で 8/8 一致)。
-- 実 x87 (native) との差分試験 (10 万試行): **99.38% が bit 一致**。 差分は主に 1 ulp で、ulp が大きい試行は桁落ちによると推定する (未検算。§3)。 C0/C2/C3 は 24,151 / 24,152 一致 (不一致 1 件は f80 と f64 の丸めで比較結果が変わる例で、有理数の検算で確認。 §4)。
+- 実 x87 (native) との差分試験 (10 万試行): **99.38% が bit 一致**。 差分は主に 1 ulp で、ulp が大きい試行は桁落ちによると推定する (未検算。§3)。 C0/C2/C3 は 24,151 / 24,152 一致 (不一致 1 件は f80 と f64 の丸めで比較結果が変わる例で、旧版の有理数の検算で確認。 §4)。
 - ネガティブコントロール (fsub/fsubr の取り違え 1 種を lowered に入れる) で bit 一致試行が 282 件減る (基準比の件数減少として検出。判定基準は §2)。
 - ia32 の x87 unsup は **4,134 件 → 87 件** (lift 出力の `unsup`)。 残りは超越関数ほか (§8・§9 未解決)。
 
@@ -44,11 +45,12 @@
 
 ## 4. 差分が 0 にならない原因 (検算)
 
-- `x87_crosscheck.py` (a) の trial 13317 (seed 1): 操作は `fld m64`・`fsubr m64`・`fist`・`fsubr m64`・`fnstsw`・`fcomp m64`。 有理数で丸め幅を変えて再計算すると、
+- 有理数の検算は HEAD に無い (#2967 で `x87_crosscheck.py` (a) を FSW 内訳の集計に置き換えた。 `REPORT_APPENDIX_2967.md` §5)。 旧版の (a) は commit `1adb69c3` にあり、ce0f0872 の試行列の trial 13317 (seed 1) を有理数で再計算した。 HEAD の試行列 (m80 入り) では trial 13317 は別の試行 (`fld1 fstp fld1`・FSW は一致) で、この検算は再現しない。
+- 旧版 (a) の検算 (ce0f0872 の試行列): 操作は `fld m64`・`fsubr m64`・`fist`・`fsubr m64`・`fnstsw`・`fcomp m64`。 有理数で丸め幅を変えて再計算すると、
   - f80 (64bit 有効数字): ST0 = 0.0897503210931822 → m64 と **equal (C3)**。 native の FSW C-bits 4000 と一致。
   - f64 (53bit): ST0 = 0.08975032109316317 → **less (C0)**。 lowered の FSW C-bits 0100 と一致。
   - よって 1 件の C 不一致は semantics の誤りではなく、f80 と f64 の丸めの違いによる比較結果の変化 (ADR 制限 4 の延長)。 「必ず全件一致」は f80→f64 の方式では成り立たない (期待値の修正は本付録で行う)。
-- 有理数の検算は (a) の 1 件 (C 値の不一致) だけ。 ulp ≥3 の 30 値は検算していない。
+- 旧版の有理数の検算は (a) の 1 件 (C 値の不一致) だけ。 ulp ≥3 の 30 値は検算していない。
 - ulp ≥3 の例 (桁落ちと推定。未検算): trial 25547 は native 0.0 / lowered 2.84e-14 (差は演算順の丸め由来の残差と推定)、trial 3847 は -1986.1923940838758 と -1986.1923940838897 (ulp 61)。
 
 ## 5. ネガティブコントロール
@@ -110,7 +112,7 @@ cd tools/plugins/slayer_engine_ia32
 python3 x87_diff.py --n 100000 --seed 1          # 主 (native/lowered のビルドを含む)
 python3 x87_diff.py --n 100000 --seed 1 --nega   # ネガコン
 python3 x87_diff.py --n 100000 --seed 1 --rc     # RC
-python3 x87_crosscheck.py main                   # §4 (a)(b)。 直前の seed 1 の結果が work/x87/main にある必要がある
+python3 x87_crosscheck.py main                   # HEAD の (a)(b)(c)(d)。 (d) は rcarith0..3 の実行が要る (2967 §5)。 §4 の有理数検算は HEAD では実行しない (旧版は 1adb69c3)
 python3 lift_text.py                             # §8 の after。 before は origin/main を git archive で展開し同じ手順
 python3 x64_regress_1099.py $RUNNER_TEMP/before 8   # §7 (before = origin/main を git archive で展開した dir)
 ```
