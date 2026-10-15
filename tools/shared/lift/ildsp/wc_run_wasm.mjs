@@ -17,6 +17,21 @@ const imports = {};
 for (const { module, name } of WebAssembly.Module.imports(mod)) {
   (imports[module] ??= {})[name] = () => { throw new Error(`unknown import ${module}.${name}`); };
 }
+// 診断用 (WC_LOG_FD=1): fd_write の文字列 (runtime の fprintf(stderr) の内容) を出して続行する。既定は上の throw のまま。
+if (process.env.WC_LOG_FD === "1") {
+  imports.wasi_snapshot_preview1 ??= {};
+  imports.wasi_snapshot_preview1.fd_write = (fd, iovs, n, nw) => {
+    const dv = new DataView(inst.exports.memory.buffer), bytes = new Uint8Array(inst.exports.memory.buffer);
+    let total = 0, s = "";
+    for (let i = 0; i < n; i++) {
+      const p = dv.getUint32(iovs + i * 8, true), l = dv.getUint32(iovs + i * 8 + 4, true);
+      s += Buffer.from(bytes.subarray(p, p + l)).toString("utf8"); total += l;
+    }
+    dv.setUint32(nw, total, true);
+    console.log(`[fd_write fd=${fd}] ${s.trimEnd()}`);
+    return 0;
+  };
+}
 console.log(`[run_wasm] imports: ${WebAssembly.Module.imports(mod).map((i) => `${i.module}.${i.name}`).join(" ") || "(none)"}`);
 const inst = await WebAssembly.instantiate(mod, imports);
 const ex = inst.exports;
