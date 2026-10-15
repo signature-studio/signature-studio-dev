@@ -251,14 +251,39 @@ class Session:
         fault = None
         for c in cases_done:
             if c.get('pattern') == 's' and c.get('fault'):
-                fault = c['fault']
+                fault = dict(c['fault'], detail=c.get('native_detail', ''))
                 break
         if self.analyzer.is_ret_fragment(va):
             return None, 'ret_fragment'
         cand = cases.fvm_candidates(fault, cases.kinds_of(sig['params']))
         if len(cand) > 1:
-            return None, 'multi_candidate'
+            one = self._fault_base_arg(fault, sig, cand)
+            if one is None:
+                return None, 'multi_candidate'
+            return [one], None
         return cand, None
+
+    def _fault_base_arg(self, fault, sig, cand):
+        """LD-195 (#4139): 候補多重のとき、fault 命令のメモリ base レジスタの値 (fault detail) が
+        ちょうど 1 つの候補引数の SMALL[i] と一致すれば、その引数を pointer 候補にする。一致が無い・複数なら None。"""
+        import capstone
+        ins = self.analyzer._dis(int(fault['rip'], 16) - self.pe.base) if fault.get('rip') else None
+        if ins is None:
+            return None
+        mem = [op.mem for op in ins.operands if op.type == capstone.CS_OP_MEM]
+        if not mem or not mem[0].base:
+            return None
+        base = ins.reg_name(mem[0].base)
+        regs = {}
+        for kv in (fault.get('detail') or '').split():
+            if '=' in kv:
+                k, v = kv.split('=', 1)
+                regs[k] = v
+        if base not in regs:
+            return None
+        bv = int(regs[base], 16)
+        hit = [i for i in cand if cases.SMALL[i] == bv]
+        return hit[0] if len(hit) == 1 else None
 
     def _fvm_cases(self, nat, was, va, sig, cases_done, sigs):
         """LD-23 (#975): 全 pattern が未実行 (equal/diff/wasm_trap 無し) の関数で、's' の native fault addr から
