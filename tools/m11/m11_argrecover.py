@@ -245,8 +245,9 @@ def const_of(fn, ins, reg, lb):
 
 
 FULL_NAMES = {'rcx': ('rcx', 'ecx'), 'rdx': ('rdx', 'edx'), 'r8': ('r8', 'r8d'), 'r9': ('r9', 'r9d')}
-PRIO = ['conflict', 'xmm_callee', 'call_clobber', 'partial_def', 'nonconst_def', 'unknown_pred', 'addr_taken', 'no_caller', 'no_value', 'depth']
+PRIO = ['conflict', 'xmm_callee', 'call_clobber', 'partial_def', 'nonconst_def', 'unknown_pred', 'no_pdata_caller', 'addr_taken', 'no_caller', 'no_value', 'depth']
 MAXD = 8
+RIP_RE = re.compile(r'\[rip ([+-]) 0x([0-9a-f]+)\]')
 
 
 class Blocks:
@@ -301,6 +302,56 @@ class Defchain:
             self.bl[va] = Blocks(fn) if fn.ins else None
         return self.bl[va]
 
+    def index_ins(self, x, src, own, size, rip):
+        """命令 x を索引に入れる。直接 call / jmp の呼出先は callers (src = (呼出元 VA, 命令 index))、rip 相対 lea の指す先は taken。
+        own = 呼出元の関数 VA (pdata 外は None)。"""
+        fns = self.m.fns
+        mn, op = x.mnemonic, x.op_str
+        if mn == 'call' and op.startswith('0x') and int(op, 16) in fns:
+            self.callers[int(op, 16)].append(src)
+        elif mn.startswith('j') and op.startswith('0x') and int(op, 16) in fns and not (own is not None and own <= int(op, 16) < own + size):
+            self.callers[int(op, 16)].append(src)
+        elif mn == 'lea' and '[rip' in op:
+            mm = RIP_RE.search(op)
+            if mm:
+                disp = int(mm.group(2), 16) * (1 if mm.group(1) == '+' else -1)
+                t = x.address + x.size + disp
+                if t in fns:
+                    self.taken.add(t)
+
+    def gaps(self):
+        """.text のうち .pdata の関数範囲に入らない区間 (RVA 順の半開区間)。pdata を持たない関数・thunk はここに入る。"""
+        trva, data = self.m.text
+        end = trva + len(data)
+        cov = []
+        for rva, size in sorted(self.m.fns.values()):
+            lo, hi = max(rva, trva), min(rva + size, end)
+            if lo < hi:
+                if cov and lo <= cov[-1][1]:
+                    cov[-1][1] = max(cov[-1][1], hi)
+                else:
+                    cov.append([lo, hi])
+        out, cur = [], trva
+        for lo, hi in cov:
+            if lo > cur:
+                out.append((cur, lo))
+            cur = max(cur, hi)
+        if cur < end:
+            out.append((cur, end))
+        return out
+
+    def sweep(self, cs, lo, hi):
+        """RVA [lo, hi) の線型 disasm。不正命令で止まったら次のバイトから再開する。"""
+        data = self.m.read(lo, hi - lo)
+        va0 = self.m.base + lo
+        off = 0
+        while off < len(data):
+            nxt = off + 1
+            for x in cs.disasm(data[off:], va0 + off):
+                yield x
+                nxt = x.address - va0 + x.size
+            off = nxt
+
     def build_index(self):
         cs = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
         fns = self.m.fns
@@ -312,26 +363,17 @@ class Defchain:
             d = s.get_data()
             q = array.array('Q', d[:len(d) // 8 * 8])
             self.taken |= set(q) & set(fns)
-        rip = re.compile(r'\[rip ([+-]) 0x([0-9a-f]+)\]')
         for va, (rva, size) in fns.items():
             for i, x in enumerate(cs.disasm(self.m.read(rva, size), va)):
-                mn, op = x.mnemonic, x.op_str
-                if mn == 'call' and op.startswith('0x') and int(op, 16) in fns:
-                    self.callers[int(op, 16)].append((va, i))
-                elif mn.startswith('j') and op.startswith('0x') and int(op, 16) in fns and not (va <= int(op, 16) < va + size):
-                    self.callers[int(op, 16)].append((va, i))
-                elif mn == 'lea' and '[rip' in op:
-                    mm = rip.search(op)
-                    if mm:
-                        disp = int(mm.group(2), 16) * (1 if mm.group(1) == '+' else -1)
-                        t = x.address + x.size + disp
-                        if t in fns:
-                            self.taken.add(t)
+                self.index_ins(x, (va, i), va, size, RIP_RE)
+        for lo, hi in self.gaps():
+            for x in self.sweep(cs, lo, hi):
+                self.index_ins(x, (x.address, None), None, 0, RIP_RE)
         self.build_mod()
 
     def build_mod(self):
         """各関数が引数レジスタ (rcx/rdx/r8/r9) を書きうるか (推移閉包・直接 call/tail jmp の辺で伝播).
-        opaque = 間接 call / 解決できない直接 call を含む (任意に書きうる)."""
+        opaque = 間接 call / 間接 jmp / 解決できない直接 call・jmp を含む (任意に書きうる)。間接 jmp は jump table と区別しない。"""
         cs, fns = self.m.cs, self.m.fns
         own, opq, edges = {}, {}, {}
         for va, (rva, size) in fns.items():
@@ -347,7 +389,7 @@ class Defchain:
                             es.add(t)
                         else:
                             o = True
-                    elif mn == 'call':
+                    else:
                         o = True
                 try:
                     rd, wr = x.regs_access()
@@ -424,6 +466,8 @@ class Defchain:
         return out
 
     def at(self, va, i, pos, depth, path):
+        if va not in self.m.fns:
+            return set(), {'no_pdata_caller'}
         bl = self.blocks(va)
         if bl is None:
             return set(), {'unknown_pred'}
