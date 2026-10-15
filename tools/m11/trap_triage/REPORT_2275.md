@@ -4,13 +4,13 @@
 
 - 測定 commit: **`aa647a2ac`** (測定に使ったコードを変えた最後の commit。pad の並びを `g_dest_n`・`g_rec_*` と一致させた)。生値は `table_2275.tsv`・`addr_2275.txt` に tracked。
 - **測定 commit `aa647a2ac` では getmem −4 が再現しなかった**。測定した 7 構成 (A_default・R0_rtOFF・C_noren・NODATA・NODATA_BODY・PRE64・PRE4096) は全て getmem **2008**・fastmm_getmem_impl 2091・ok/trap/clobber 873/21/0。REPORT_2212 の R0・NODATA・既定の 2012 (と PRE64 の 2006) はこの測定 commit では出ない。
-- **HEAD (`556413937`) の値は未測定**。本 run では素材が無く IR を作り直せなかった (§10)。HEAD と測定 commit の差分は 0 ではない (§9)。本書の数値は、特に断らない限り測定 commit の値である。
+- **HEAD (`e3dc956f9`) の値は §10 で実測した**: 7 構成 (12 セル) が全て 873/21/0・getmem 2008。R0_rtOFF も 2008 のため、HEAD でも −4 は再現しない。本書の §0・§3 の数値は、特に断らない限り測定 commit (`aa647a2ac`) の値である。
 - 入力が変わっている (測定 commit で): IR md5 は REPORT_2212 の `baa100ff` から `423c347e` に変わった (全構成で同一)。ldfix の F3c は 36 から 46 に変わった。既定の基準も 870/24/0 から 873/21/0 に変わった。main 側の IR 生成の変更 (dade5b85 から e695e9f3f までの範囲) が入力を変えたと見ている。どの commit かは未特定 (§7)。本 PR は既定の出力を変えない (§5)。
 - 受入条件への対応 (§6):
   1. 関数本体の書込みを残し静的データだけ外す構成: NODATA_BODY を n=3 (直列・foreground) で測った。結果 2008 (= C_noren)。ただし −4 が測定 commit に無いため、データ由来か本体由来かは判定できない。
   2. heap 開始位置と後続 static の関係: `__heap_base` は map に出ない。静的領域の終端 (`.bss` の VA + 大きさ) を代理に使った。PRE64 (+0x40)・PRE4096 (+0x1000) で終端は動くが、getmem は 2008 のまま。
   3. 既定の基準: 測定 commit の既定は 873/21/0 (REPORT_2212 の 870/24/0 とは違う)。基準の数値を変えた原因と採否は PM 判断 (§5)。本 PR は既定の rt.o の前処理出力を変えない (§5)。
-  4. 測定 commit と差分: §9 (差分は 0 ではない)。HEAD の再測定は未実施 (§10)。
+  4. 測定 commit と差分: §9 (差分は 0 ではない)。HEAD の再測定は §10 で実施 (全構成 getmem 2008・§3 と一致)。
   5. 関数のみ残してデータ無しの対照: NODATA_BODY (n=3) で測った。R0 との分離は、R0 も測定 commit で 2008 のため意味を失った (§4)。
 - 未解決は §7。
 
@@ -86,7 +86,7 @@
 | 1. 関数本体の書込みを残し static data だけ外す構成を n=3 で測る | 測定済み・機序は判定不能 | NODATA_BODY n=3 = 2008 (C_noren と同じ)。−4 が測定 commit に無い (§4) |
 | 2. heap 開始位置・後続 static と getmem の関係 | 部分達成 | 静的終端の代理で測った。PRE64 (+0x40)・PRE4096 (+0x1000) でも 2008。heap 開始位置の直接測定は無い (`__heap_base` が map に無い) |
 | 3. 既定の基準は変えない | 本 PR では変えない | 既定の前処理出力は同一 (§5)。ただし測定 commit の既定は 873/21/0 で 870/24/0 とは違う (§5) |
-| 4. 測定 commit と差分を REPORT に添える | 添付済み (§9)。差分は 0 ではないため HEAD の再測定が要る (§10・未了) | §0・§9・§10 |
+| 4. 測定 commit と差分を REPORT に添える | 添付済み (§9)。HEAD の再測定を §10 で実施 (全構成一致) | §0・§9・§10 |
 | 5. 関数のみ残してデータ無しの対照 (R0 との分離) | 測定済み・分離は無意味になった | NODATA_BODY n=3 = 2008。R0 も測定 commit で 2008 |
 
 ## 7. 未解決 (起票先付き)
@@ -95,13 +95,13 @@
 |---|---|---|
 | 測定 commit で −4 が消えた原因。dade5b85 から e695e9f3f までの main 側の変更 (IR md5 `baa100ff`→`423c347e`・ldfix F3c 36→46) のどれが効いたか未特定 | REPORT_1701・1952・2212 の「rt.o の計測 flag が −4 を生む」が HEAD で成り立つか未確認 | #2275 (本 issue に残す。PM 判断) |
 | 受入条件 1・2・5 の機序判定 (データ由来か本体由来か、heap 開始位置) | −4 が測定 commit に無いため判定不能。heap 開始位置は `__heap_base` の直接測定が無い | #2275 |
-| HEAD (`556413937`) での再測定 (WORKFLOW §6)。差分 23 files (§9) があり、測定値は HEAD の値ではない | §0・§3・§6 の値は測定 commit の値。HEAD で −4 が有るか無いかは未確認 | この PR で未了 (差し戻し中。子 issue にしない。§10) |
+| IR md5 が測定 commit (`423c347e`) と HEAD (`8b4461e0`) で違う (ldfix F3c は両方 46)。違いの原因 (IR の内容か生成の非決定性か) は未確認 | IR の同一性を測定 commit の値で言えない。getmem の値は両方で 2008 | #2275 (PM 判断。§10) |
 
 ## 8. 再現
 
 - `bash tools/m11/trap_triage/repro_1952_rt_mech.sh [N] [CONFIG...]` (CONFIG に `NODATA_BODY` を追加)。表は `work/split_1952/table.tsv`、実アドレスは `work/split_1952/addr.txt` (gitignore)。tracked 版は `table_2275.tsv`・`addr_2275.txt`。
 - 前提: `FL_WIN64_DIR` = `[WIN64]` (`fl-win64` を展開し、`m11_build.sh` と `m11_gen_ir2.sh` で同じ値を使う。IR は PE のパスを記録する)・`work/` が `m11_gen_ir2.sh` 生成済み・`[EMSDK]` 配置済み。
-- 素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` (`docs/WORKFLOW.md` §11)。本 run では `toolchain-retdec`・`toolchain-emsdk`・`work-m11` が無く実行できなかった (§10)。
+- 素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` (`docs/WORKFLOW.md` §11)。前回の run では `toolchain-retdec`・`toolchain-emsdk`・`work-m11` が無く実行できなかった。HEAD で実行した手順は §10。
 
 ## 9. 測定 commit からの差分
 
@@ -138,8 +138,28 @@
 
 差分は 0 ではない。main 取り込みで入った IR 生成・build の変更 (`m11_build.sh`・`m11_gen_ir2.sh`・`m11_post.py`・`m11_ov.c`・`ldfix/`) が測定経路に含まれる。HEAD での再測定は §10。
 
-## 10. HEAD (`556413937`) の再測定 — 未実施 (この run)
+## 10. HEAD (`e3dc956f9`) の再測定 (実施)
 
-- 本 run の `$ARTIFACTS_DIR` には `fl-win64.tar.zst` だけがあり、`toolchain-retdec`・`toolchain-emsdk`・`work-m11` は無かった (`ls` で確認)。PR 本文に `oc_artifacts` 行が無かったため、素材は取得されていない。`tools/m11/work/` も無く、`m11_gen_ir2.sh` の lift 段 (RetDec) を実行できなかった。このため HEAD の IR (md5・ldfix・ld115) も repro の値も測れていない。
-- 次の run で行うこと (素材を指定した run): `bash tools/m11/m11_gen_ir2.sh` → `work/ir_conditions.json` で `ldfix=applied`・`ld115=applied` を確認 → `bash tools/m11/trap_triage/repro_1952_rt_mech.sh` (A_default・C_noren・NODATA_BODY は n=3、残り (R0_rtOFF・NODATA・PRE64・PRE4096) は n=1。直列・foreground)。得た値で §0・§3・§6 を HEAD の値に差し替え、§9 の差分と合わせて書く。
-- この段階では、HEAD で −4 が消えたとも残るとも書かない。
+- 測定 commit (HEAD の値): `e3dc956f9` = origin/main `517b95da3` を取り込んだ merge (`b9164699e` の上)。競合は `tools/m11/m11_build.sh` の CF 行 1 箇所で、origin/main の `-DM11_PROBE_2400` と本ブランチの `-DM11_RT_NODATA_BODY` を両方残して解消した。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (5.8 秒)。`work-m11` を `tools/m11/work/` に展開 (2.5 秒)。`toolchain-retdec`・`toolchain-emsdk` の tarball は展開せず、`/opt/retdec`・`/opt/emsdk` (既存) を使った (m11_build.sh が `/opt/emsdk` を固定で読むため)。
+- IR 再生成 `m11_gen_ir2.sh`: rc=0・50.4 秒。ldfix 行: `F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=46 errors=0` (§2 と同じ)。`ld108=applied`・`ld115=applied`。
+- repro: `bash tools/m11/trap_triage/repro_1952_rt_mech.sh 3 A_default C_noren NODATA_BODY` (rc=0・5 分 39.7 秒) と `... 1 R0_rtOFF NODATA PRE64 PRE4096` (rc=0・2 分 19.3 秒)。直列・foreground。測定終了時の load average 1 分平均 1.00 (4 vCPU)。
+
+| 構成 | 回数 | boot_final3.ll md5 | undefined | ok/trap/clobber | getmem | fastmm_getmem_impl |
+|---|--:|---|--:|--:|--:|--:|
+| A_default | 3 | 8b4461e0 | 0 | 873/21/0 | 2008 | 2091 |
+| C_noren | 3 | 8b4461e0 | 0 | 873/21/0 | 2008 | 2091 |
+| NODATA_BODY | 3 | 8b4461e0 | 0 | 873/21/0 | 2008 | 2091 |
+| R0_rtOFF | 1 | 8b4461e0 | 0 | 873/21/0 | 2008 | 2091 |
+| NODATA | 1 | 8b4461e0 | 0 | 873/21/0 | 2008 | 2091 |
+| PRE64 | 1 | 8b4461e0 | 0 | 873/21/0 | 2008 | 2091 |
+| PRE4096 | 1 | 8b4461e0 | 0 | 873/21/0 | 2008 | 2091 |
+
+- 全 12 セルが同一。生の表は `work/split_1952/table.tsv` (gitignore)。
+- 静的領域 (`.data`・`.bss` の VA と大きさ、pad の位置) は §4 と同一。
+- 結論:
+  - **HEAD でも getmem −4 は再現しない**。R0_rtOFF (rt.o の計測 OFF) も 2008 で、REPORT_2212 の 2012 は出ない。「rt.o の計測 flag が −4 を生む」は HEAD でも成り立たない。
+  - 受入 1・2・5 の機序は、−4 が無いため HEAD でも判定できない (§6 のまま)。
+  - 既定 (A_default) は HEAD でも 873/21/0 で、§5 の既定の変化は HEAD でも同じ。
+  - IR md5 は HEAD `8b4461e0`・測定 commit `423c347e` で違う。F3c は両方 46。違いの原因は未確認 (§7)。
+- 本 PR の KPI: `tools/m11` の計測 knob のみ。起動・GUI に関わらないため、KPI は書かない。
