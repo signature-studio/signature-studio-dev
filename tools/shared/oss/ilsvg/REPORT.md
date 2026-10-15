@@ -97,3 +97,32 @@ mac dylib (`Shared/ILSvg_x64.dylib`) は素材に無いため、受入条件 4 �
 実行不可の根拠: この runner は x86_64 Linux。mac バイナリを動かす qemu・Rosetta・box64・wine が無い (`which` で確認)。workflow にも mac runner が無い。よって (1) mac dylib と wasm / native の画素比較 (2) papki `make_unique` / cssom `kilobyte` 置換の挙動一致 は、この環境では成立しない。
 
 未解決 (起票先): 実行比較の基準定義・実行環境の確定・比較本体 → #1348 `[T-SH-28]` (親 #1148)。
+
+## 版の組の再検討 (#151): svgdom 0.3.61 + svgren 0.6.3 (probe)
+
+結論 1 行: symbol 解析 (svgdom 0.3.59〜0.4.9 / svgren 0.5.9〜0.6.3 / cssom 化済み) と整合する 2021 年版の組が連結 wasm・native で通り、smoke 64x64 の画素が IDENTICAL。採用の確定は PM 判断 (#151)。
+
+根拠 (上流 tag の実測):
+- svgdom は 2f138bb (2021-04-04) で cssdom → cssom に切り替え。0.3.59 は cssdom を使うため除外、0.3.60 以降が FL の cssom 使用と整合。
+- svgdom 0.3.60〜0.3.70 の `spread_method` enum は `default_` (svgren 0.6.3 と一致)。0.4.7 は `default_method` (0.6.4 向け)。
+- svgren 0.6.3 の debian 定義は libsvgdom-dev >= 0.3.61 (上流の宣言)。
+
+組 (`bash tools/shared/oss/ilsvg/probe_pair_0361.sh`、emcc 6.0.12、-O2):
+
+| 部品 | 版 | probe 限定の処置 |
+|---|---|---|
+| svgdom | 0.3.61 (2021-04-09) | なし |
+| svgren | 0.6.3 | `scope_exit.release()` → `reset()` (utki 1.1.124 の名前。動作同一) |
+| cssom | 0.1.19 (cssdom repo tag, 2021-04-08) | なし |
+| utki | 1.1.124 (2021-04-09) | native g++ 13 用に `-include cstdint -include limits` |
+| r4 | 1.0.53 | なし |
+| mikroxml | 0.1.36 | なし |
+| papki | 6ec4c66 (= 1.0.93, 2021-04-08) | `fs_file.cpp` 除外 |
+| agg | 2.8.9 | なし |
+
+実測 (exit 0・real 1 m 12.0 s): wasm 381998 B、native / wasm とも dims 64 64 nonzero_px 4096、ARGB32 16384 B が `cmp` で IDENTICAL。開始時 load average は未記録。
+
+未解決 (起票先):
+- utki は svgren 0.6.3 が要求する `release()` のため 1.1.162 (2021-10-12) 以降が必要。1.1.162 では mikroxml 0.1.36 / cssom 0.1.19 の `utki::span::const_iterator` 欠落と、utki 自身の `unicode.cpp` (libc++ の `char_traits<unsigned char>`) で連結不可。この組は未探索 → #151 (PM 判断)。
+- 採用版の確定 (svgren 0.6.3 + svgdom 0.3.61 案 と 0.6.4 + 0.4.7 案のどちらを正本にするか) → #151 (PM 判断)。
+- mac dylib との比較 → #1148 / #1348 (変更なし)。
