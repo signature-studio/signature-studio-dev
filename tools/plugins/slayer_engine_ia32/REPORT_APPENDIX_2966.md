@@ -3,9 +3,9 @@
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない)。 f80→f64 の精度差は付録 1099 §6 の行案 (D24 案) に記録済みで、本付録の定数の差も同じ類型として §3 に書く (`DEFECTS.md` は未編集)。
 
 - 親 REPORT: `REPORT_APPENDIX_1099.md` §8 (残り x87 unsup 87 件の内訳) と §9 (未解決)。 方式: `docs/DECISIONS.md` D28 (f80→f64)。 本付録が本 issue の測定値の正本。
-- 測定 commit: `c508291cf` (`Merge remote-tracking branch 'origin/main' into 2966-x87-int-state-round`)。 main の x87 差分試験 (#2967: 16 byte slot・m80 入力・`--nega80`・`--rc-arith`) を取り込んだ commit で、x87 差分試験の数値はこの commit で測り直した。 取り込み前の数値 (`139c2c9b5` の 97,857 など) は試行列が違うので使わない。
-  `git diff c508291cf HEAD -- tools/ott tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_diff_main.h tools/plugins/slayer_engine_ia32/x87_crosscheck.py` の出力は 0 行 (本付録の commit は docs のみ)。
-- lift (`tools/plugins/slayer_engine_ia32/lift_text.py`・`tools/ott/lift`) と x64 回帰 (`x64_regress_1099.py`) は測定 commit `f29c59648` のまま。 `git diff f29c59648 HEAD -- tools/ott/lift tools/plugins/slayer_engine_ia32/lift_text.py tools/plugins/slayer_engine_ia32/x64_regress_1099.py` の出力は 0 行 (§4・§5 の数値は HEAD でも同じ)。
+- 測定 commit: `38fea99e1` (HEAD。 x87 差分試験 (主・`--nega`・`--nega-c1`・`--rc`・`--skip`) と `x87_crosscheck.py` を HEAD で再実行した)。 HEAD は main の `139c2c9b5` (`ott_x87.h` の C1 模型化) と `0d527f38a` (`x64c.py` の `i_rcr` 書き換え) を含む。 main の x87 差分試験 (#2967: 16 byte slot・m80 入力・`--nega80`・`--rc-arith`) は `c508291cf` で取り込み済み。
+  `git diff c508291cf HEAD -- tools/ott/rt/ott_x87.h tools/ott/lift/x64c.py` の出力は `ott_x87.h` 11 行・`x64c.py` 16 行 (C1 模型化と `i_rcr`)。 x87 差分試験の入力経路 (`x87_diff.py`・`x87_diff_main.h`・`x87_crosscheck.py`) は `c508291cf` から HEAD まで変わらない。
+- lift (`x64c --arch ia32` の出力) は測定 commit `f29c59648` と HEAD で差がある (`i_rcr` の 1 命令 4 行の C 文のみ。 §4 の確認)。 x64 回帰 (`x64_regress_1099.py`) は HEAD で 8/8 一致 (§5)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` (`$FL_WIN64_DIR/extracted/`) と生成した試行のみ。
 
 ## 1. 結論
@@ -13,8 +13,8 @@
 - x87 unsup (`lift_text.py` pass1 の `lift_meta.json` の `unsup`) を **87 → 36 件** に減らした。 lower した 51 件: 整数 `fiadd` 4・`fimul` 1、比較・状態 `ftst` 3・`fxam` 3・`fnclex` 2、平方根 `fsqrt` 2、定数 `fldl2e` 8・`fldlg2` 1・`fldpi` 1、丸め・スケール `frndint` 11・`fscale` 15。
 - 残り 36 件は子 issue に送った: 超越・剰余 32 件 (`fsin` 15・`fcos` 2・`f2xm1` 8・`fyl2x` 2・`fprem` 5) を [PLG-G2-29] (#3687)、状態の保存・復元 4 件 (`fnsave`・`frstor`・`fnstenv`・`fldenv`) を [PLG-G2-30] (#3688)。 番号は issue 本文と最終回答に書く。
 - x64 の生成 C は不変: `x64_regress_1099.py` 8/8 一致 (§5)。 lift の被覆 (pass2 後) は 85.37% で before/after 同じ (§4)。
-- 差分試験 (native と lowered、10 万試行、seed 1、測定 commit `c508291cf`): bit 一致 **96,510 (96.51%)**。 定数 3 種 (`fldpi`・`fldlg2`・`fldl2e`) を op 表から外すと 98,487 (98.49%) (§3)。
-- RC 試行 (`--rc`: `fldcw` + `fist`/`fistp`/`frndint` 等): 値 145,441 件はすべて 0 ulp。 slot 不一致 1,289 件は全て `fst`/`fstp` m32 を含む (ADR D28 制限 2)。
+- 差分試験 (native と lowered、10 万試行、seed 1、測定 commit `38fea99e1` = HEAD): bit 一致 **96,510 (96.51%)**。 定数 3 種 (`fldpi`・`fldlg2`・`fldl2e`) を op 表から外すと 98,487 (98.49%) (§3)。
+- RC 試行 (`--rc`: `fldcw` + `fist`/`fistp`/`frndint` 等): 値 145,441 件はすべて 0 ulp。 slot 不一致 1,289 件は全て `fst`/`fstp` m32 を含む (ADR D28 制限 2)。 HEAD で再実行して一致 (§3)。
 - **C1 (符号) の模型化**: `fxam` は C1 に符号を立て (`x87_fsw()` が返す)、比較命令 (`fcom`・`fcomp`・`fcompp`・`ftst`) は C1 を 0 にする。 native で実測した結果、比較命令の後の C1 は常に 0、`fxam` の後の C1 は ST(0) の符号と一致した (§3)。 差分試験は比較・`fxam` の直後の C1 も比べる。
 - 比較・`fxam` 27,863 件のうち C0〜C3 (TOP を除く) が一致したのは 27,784 件。 不一致 79 件は、すべて FSW 不一致の 77 試行に含まれ、その入力は f64 の指数域外 (大きすぎる指数・f80 の非正規) を含む (§3)。
 - C1 のネガティブコントロール (新規 `--nega-c1`: fxam の直後に C1 を反転): 96,510 → 93,000 (−3,510) で検出する。 FSW 不一致 3,705 試行。
@@ -41,7 +41,7 @@
 - 比較の定義 (`x87_diff.py` の `compare`): 試行が bit 一致 = F・V (ST(0..d-1))・S (slot 8 個) が全て一致。 F は各 op 後の FSW の C0/C2/C3/TOP で、 **比較命令・`fxam` (`cmp=True`) の直後だけ C1 も比べる** (それ以外の命令の C1 は native の丸めフラグで、模型化していないので比べない)。 `fnstsw m16` の格納値は CMASK (C3/C2/C0/TOP) だけを比べる (ADR 制限 4)。
 - 試行列は main (#2967) の生成規則のまま (入力 slot は 16 byte・`e` 型は m80)。 方法は付録 1099 §2 と同じ (native は機械語を `.byte` で実行、lowered は x64c が出す C を実行)。 driver は FSW を `& 0x7f00` (C1 を含む) で出し、比べる bit は `x87_diff.py` 側で選ぶ。
 
-## 3. 実測 (測定 commit `c508291cf`・以後の HEAD との差は docs のみ)
+## 3. 実測 (測定 commit `38fea99e1` = HEAD で再実行。 2026-10-15、`python3 x87_diff.py --n 100000 --seed 1 [opt]`)
 
 | 試験 (コマンド) | n | bit 一致 | 試行の最大 ulp (0 / 1 / 2 / ≥3) | 値の ulp (0 / 1 / 2 / ≥3, 値数) | C0-C3 一致 (比較・fxam 直後) | FSW 不一致 試行 | slot 不一致 試行 |
 |---|---:|---:|---|---|---:|---:|---:|
@@ -52,7 +52,7 @@
 | RC (`--rc`) | 100,000 | 98,711 (98.71%) | 100,000 / 0 / 0 / 0 | 145,441 値すべて 0 ulp | 対象なし | 0 | 1,289 |
 
 - 試行の最大 ulp の ≥3 には、f80 の指数域外の値 (f64 では inf か 0) を比べた試行が入る。 その最大値 (`4704357450214544768` など) は inf と有限値の距離で、ulp としての意味は無い。
-- 所要 (1 driver 実行の `time` の real): 主 11.97 s (native 0.31 s・lowered 0.31 s、load1 開始時 0.28)。 `--nega` 11.69 s・`--nega-c1` 11.53 s・`--skip` 12.22 s・`--rc` 7.23 s。
+- 所要 (HEAD 再測定。 `time` の real): 主 17.0 s (driver の wall: native 0.36 s・lowered 0.36 s、load1 開始時 1.23)。 `--nega-c1` 15.3 s 前後・`--rc` 9.1 s (load1 1.33)。 `--nega`・`--skip` は load1 0.33・0.56 で実行 (real は未計測)。
 - ulp cross-check (nextafter の歩進との独立算法の検算) は全て一致 (`ulp cross-check bad 0`)。
 - m80 を含む試行 (`fld`/`fstp` m80): 14,269 試行中 12,525 が bit 一致 (87.78%)。 op 種別の内訳 (bit 一致/試行): 算術 59,315/61,947・fst m32 2,570/2,595・算術と fst m32 4,484/4,637・どちらも無し 30,141/30,821。
 - **C1 の判定** (native 実測、主試行の全 op 遷移から): 比較命令 (`fcom`・`fcomp`・`fcompp`・`ftst`) の後の C1 は全件 0。 `fxam` の後の C1 は ST(0) の符号と一致 (不一致 0)。
@@ -76,11 +76,12 @@ before = `origin/main` (`e99fe343c`) を detached worktree で展開して `lift
 - pass1 の before (87 件) は付録 1099 §8 の 87 件と一致する。
 - pass2 の before が 89 件なのは、(b) の roots 追加で `fscale` が 2 件多く現れるため (pass2 の関数数が 465 → 472 に増える)。
 - 被覆は before/after で同じ (lift の起点は増えず、unsup だった x87 が lift されただけ)。
-- `139c2c9b5` の C1 修正は lift の出力を変えない (`x64c.py` は未変更)。 main の取り込み (`c508291cf`) も `tools/ott` を変えない。 lift の数値は再測定していない (範囲の差分 0 行は §0 の確認どおり)。
+- HEAD (`38fea99e1`) での再確認 (2026-10-15): `x64c --arch ia32` を `lift_text.py` の roots (254 本) で `f29c59648` の `tools/ott` と HEAD で実行した。 `lift_meta.json` の unsup は両方とも fsin 15・f2xm1 8・fprem 5・fcos 2・fyl2x 2・fnsave・frstor・fnstenv・fldenv (計 36 件) で一致。 `ott_lifted.c` の起点集合は 20,212 件で md5 が一致 (被覆 85.37% は同じ)。 差は `x64c.py` の `i_rcr` が出す C 文だけ (rcr の 2 箇所・計 4 行、各 2 行の `<`/`>` 差分)。 `i_rcr` は x87 の差分試験 (rcr を含まない) と x87 の lowering 経路には効かない。
+- 注: `lift_text.py` の coverage・pass2 の完全再実行は emcc が runner に無いため本 run では行っていない (pass1 の x64c 出力を上記で比べた)。
 
 ## 5. x64 回帰 (x64 出力が変わらないこと)
 
-- `x64_regress_1099.py <origin/main の tools/ott を展開した dir> 8` (測定 commit `f29c59648`): `[x64-regress] same 8/8`。 x64c は `ia32_only` の handler だけを追加し、x64 の経路は `Unsup` のまま。 `ott_x87.h` は ia32 の生成 C だけが include するので、C1 修正の後も x64 の出力は変わらない。 `tools/ott/lift` と `x64_regress_1099.py` は `f29c59648` から HEAD まで差分 0 行 (§0)。
+- `x64_regress_1099.py <f29c59648 の tools/ott を git archive で展開した dir> 8` (HEAD `38fea99e1` で再実行): `[x64-regress] same 8/8`。 `i_rcr` の書き換えは x64 の rcr 命令の C 文を変えるが、この 8 本 (`x64c` の root 集合) では rcr が lift 出力に現れず、出力は一致した。 `ott_x87.h` は ia32 の生成 C だけが include する。
 
 ## 6. 未解決 (起票先付き)
 
@@ -93,7 +94,6 @@ before = `origin/main` (`e99fe343c`) を detached worktree で展開して `lift
 | slot 不一致 68 件 (`fst`/`fstp` m32 も m80 も含まない試行) の原因 | 差分試験の不一致の一部が未説明 | PM 判断 (原因未確認) |
 | 定数の f80 精度 (`fldpi`・`fldlg2`・`fldl2e`) による 1 ulp 級の差 (主試行の不一致の主因) | 比較・桁落ちの差の源 (D28 の帰結) | 起票なし: 付録 1099 §6 の行案 (D24 案) に含む。 `DEFECTS.md` は PM 判断 |
 | f80 の指数域外の入力による FSW 不一致 77 試行 (§3) | f64 で inf/0 になる値を比較・fxam したときに FSW が違う | ADR D28 の帰結。 方式は変えない (PM 判断) |
-| `frndint` の RC 適用が ADR D28 制限 5 (RC は fist/fistp だけ) の文言を広げる | ADR の文言と実装の範囲が 1 命令ずれる | PM 判断 (#3749) |
 | `fnclex` の例外フラグ (ADR 制限 4) | 例外フラグは未模型化 | #1223 (PLG-G2-11) |
 | `fscale` の指数域外 (double 外は inf/0) | f80 の有限値と差が出る。 差分試験の入力には f64 の指数域外が入るが、`fscale` を含む試行の一致は本 run では個別に確認していない | [PLG-G2-29] (#3687) の受入 |
 | x87 を含む関数の native と wasm の差分 | lowered の実 wasm での一致は未確認 | #2989 (PLG-G2-25) |
