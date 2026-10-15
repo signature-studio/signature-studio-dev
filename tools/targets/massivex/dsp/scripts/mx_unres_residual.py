@@ -69,6 +69,8 @@ def main(path, outp=None):
 
     stat = collections.Counter()
     pats = collections.Counter()
+    pdata_begins = set(b for (b, e, u) in ents)
+    parents = []
     for b, e, u in valid:
         hs = hits(u)
         if len(hs) == 1:
@@ -78,6 +80,7 @@ def main(path, outp=None):
                 pb, pe_, _ = struct.unpack_from('<III', ub, o)
                 if (pb, pe_) not in valid_exact:
                     stat['parent18'] += 1
+                    parents.append((pb, pe_))
             continue
         ubs = [(s, data[fo(s, u): fo(s, u) + 524]) for s in hs]
         m = [mx10(ub, b, e) for _, ub in ubs]
@@ -89,10 +92,16 @@ def main(path, outp=None):
         stat['redo_%d' % min(ok, 2)] += 1
         if ok != 1:
             pats[('redo_%d' % min(ok, 2), tuple(sorted(rs)))] += 1
+    loc = collections.Counter()
+    for pb, pe_ in parents:
+        loc['begin_in_pdata' if pb in pdata_begins else 'begin_not_in_pdata'] += 1
+        loc['begin_in_text' if t_lo <= pb < t_hi else 'begin_not_in_text'] += 1
+        loc['end_in_text' if t_lo <= pe_ <= t_hi else 'end_not_in_text'] += 1
     out = {
         'pe': path,
         'valid_in_text': len(valid),
         'counts': dict(sorted(stat.items())),
+        'parent18_location': dict(sorted(loc.items())),
         'residual_patterns': [[k, list(p), n] for (k, p), n in pats.most_common()],
     }
     if outp:
