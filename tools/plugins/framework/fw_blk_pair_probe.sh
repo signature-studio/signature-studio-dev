@@ -21,7 +21,7 @@ nsec = struct.unpack_from('<H', src, pe + 6)[0]
 opt = struct.unpack_from('<H', src, pe + 20)[0]
 so = pe + 24 + opt
 ic = next(so + 40 * i for i in range(nsec) if src[so + 40 * i:so + 40 * i + 8].rstrip(b'\0') == b'.icall')
-vs, va, rs, rp = struct.unpack_from('<IIII', src, ic + 8)
+_, va, _, rp = struct.unpack_from('<IIII', src, ic + 8)
 off = rp + (0x8A1000 - 0x400000 - va)
 BLK = 0x280
 pairs = {

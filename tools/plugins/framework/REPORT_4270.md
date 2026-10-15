@@ -126,9 +126,9 @@ git diff ffd515723 HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!
 - スクリプト外の測定 (未再現・1 回のみ): 0 埋め + slot 0x18 を `25 00` (byte 0 だけ 0x25) にすると `8a1018` が**残った** (1 回)。同様に full base で slot 0x08 の byte 0 を 0x25 にしても 3 件のまま (1 回)。`24` を `25` に変えても消えないため、`24 00` の値の完全な一致が条件とは言えない。この 2 点は `fw_blk_const_repro.sh` に入っていないため、再現は別途必要。
 - 受入 1 (RetDec が BLK slot を constant にする機構の最小再現) の判定: 最小再現 (`fw_blk_const_repro.sh`) と、先頭 2 byte の値依存の切り分けまで。**RetDec 内部の判定規則そのものは未特定**。`24 00` の値依存は、スクリプト外 1 回の `25 00` 結果と合わせても、規則として確定させるには不足。
 
-## 11. #5165 の探索 (slot 0x18 の先頭 2 byte の値・29 variant)
+## 11. #5165 の探索 (slot 0x18 の先頭 2 byte の値・27 variant)
 
-- 測定: `RETDEC_BIN=<retdec-decompiler> bash tools/plugins/framework/fw_blk_pair_probe.sh` (REPS=1・1 回の実測)。BLK の他 byte は 0 埋め、slot 0x18 の先頭 2 byte だけを変える。`real 1m36s`・開始 load 0.94 → 終了 1.00。
+- 測定: `RETDEC_BIN=<retdec-decompiler> bash tools/plugins/framework/fw_blk_pair_probe.sh` (各 variant 1 回の実測。script に反復回数の指定は無い)。BLK の他 byte は 0 埋め、slot 0x18 の先頭 2 byte だけを変える。`real 1m36s`・開始 load 0.94 → 終了 1.00。
 - 結果 (constant global `8a1018` の件数。1 が残る・0 が消える):
 
 | 先頭 2 byte (byte0 byte1) | 件数 | 先頭 2 byte | 件数 |
