@@ -42,12 +42,32 @@ STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ル
     0x181384040: 'void* FUN_181384040(void* d, const void* s, ulonglong n) { return memmove(d, s, (size_t)n); }',
     0x1813846e0: 'void* FUN_1813846e0(void* d, int c, ulonglong n) { return memset(d, c, (size_t)n); }',
     0x18004cf20: 'longlong FUN_18004cf20(void* a, void* b, void* c) { abort(); return 0; }',
+    # 未関数化 callee (delay 閉包の外・decompile していない)。`()` 定義で呼出の arity を問わない。到達時に abort する。
+    0x180fe5c74: 'longlong FUN_180fe5c74() { abort(); return 0; }',
+    0x180fe2508: 'longlong FUN_180fe2508() { abort(); return 0; }',
 }
-# IAT thunk (jmp [rip+disp] → KERNEL32 の import) → fail-fast stub。Ghidra は thunk の引数を落として `func_0x000<va>(...)` と呼ぶ。
-# 引数無しの定義 (`()`) は呼出の arity を問わない。Win API の意味は実装しない (到達時に abort し、突合で検出する)。
+# THUNK: Ghidra が `func_0x000<va>(...)` と呼ぶ callee → fail-fast stub。引数無しの定義 (`()`) は呼出の arity を問わない。
+# 到達時に abort し、突合で検出する。2 種類ある: (a) IAT thunk (jmp [rip+disp] → KERNEL32 の import)・(b) 未関数化 callee (本体を decompile していない VA)。
 THUNK = {
+    # (a) IAT thunk。Win API の意味は実装しない
     0x180fd81e4: 'longlong func_0x000180fd81e4() { abort(); return 0; } /* KERNEL32!FlsGetValue */',
     0x180fd81ec: 'longlong func_0x000180fd81ec() { abort(); return 0; } /* KERNEL32!FlsSetValue */',
+    # (b) 未関数化 callee (delay 閉包の外)。decompile せず fail-fast stub にする
+    0x180fbdef4: 'longlong func_0x000180fbdef4() { abort(); return 0; } /* 未関数化 callee (stub) */',
+    0x180fbdd78: 'longlong func_0x000180fbdd78() { abort(); return 0; } /* 未関数化 callee (stub) */',
+}
+# Ghidra の下線なし名 (`DAT_<va>`・`uRam<16桁 va>`) の C 型。Ghidra は型を出さないため使用箇所から確定し、表に無い名前は停止する。
+# 根拠 (delay.c の使用行): DAT_182280d00・DAT_182280d70 = `(ulonglong)DAT_x` の bit マスク (uint64)。
+#   DAT_184161fb0 = `!= '\0'` と `= '\x01'` の once フラグ (byte)。DAT_1829899e0 = `== '\0'` (byte)。
+#   DAT_182989850 = `(DAT_x & 2) != 0` の読み出しのみ (byte 読みでも bit 1 は同じ)。
+#   DAT_182989680・DAT_184162358 = `&DAT_x` のアドレスだけ (`undefined *` 型の比較・代入先と一致)。
+#   uRam1829899cc/d0/d4 = `undefined4` 変数への読み出し (uint)。uRam18436cc00 = FUN_181327120 (GS 失敗報告経路・swi(0x29) で fail-fast) の書込み (8 byte の ExceptionInformation 相当)。
+EXT_CTYPE = {
+    'DAT_182280d00': 'ulonglong', 'DAT_182280d70': 'ulonglong', 'DAT_184161fb0': 'unsigned char',
+    'DAT_1829899e0': 'unsigned char', 'DAT_182989850': 'unsigned char', 'DAT_182989680': 'undefined',
+    'DAT_184162358': 'undefined',
+    'uRam00000001829899cc': 'uint', 'uRam00000001829899d0': 'uint', 'uRam00000001829899d4': 'uint',
+    'uRam000000018436cc00': 'ulonglong',
 }
 
 
@@ -198,6 +218,19 @@ def main():
         d = pe_bytes(pe, va, 16)
         out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
         out.append('#define %s_%x (*(%s*)gd_%x)' % (kind, va, ty, va))
+    # --- 下線なしの名前 (DAT_<va>・uRam<16桁>): 同じ PE 実データを指す。型は EXT_CTYPE (使用箇所で確定)。表に無い名前は停止する
+    ext = {}
+    for n in sorted(set(re.findall(r'\b(DAT_[0-9a-f]{8,9}|uRam[0-9a-f]{16})\b', alltxt))):
+        if n not in EXT_CTYPE:
+            raise SystemExit('未定義 identifier の型が未確定 (停止): ' + n)
+        ext[n] = int(n[4:], 16)
+    gd_done = set(gtypes)  # 同じ VA を指す名前 (例 DAT_x と uRam0000000x) があっても gd 配列は 1 回だけ定義する
+    for n, va in sorted(ext.items(), key=lambda kv: kv[1]):
+        if va not in gd_done:
+            gd_done.add(va)
+            d = pe_bytes(pe, va, 16)
+            out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
+        out.append('#define %s (*(%s*)gd_%x)' % (n, EXT_CTYPE[n], va))
     # --- 配列参照 (&UNK_x + 添字 = テーブル先頭からのバイト位置): 参照された範囲を 1 本の byte 配列にする
     tabs = sorted(set(int(x, 16) for x in re.findall(r'&UNK_([0-9a-f]{8,9})\b', alltxt)))
     tbase = tend = None
@@ -262,12 +295,13 @@ def main():
         assert abi_hits.get(nm) == 1, 'ABI rule hit %s: %s' % (abi_hits.get(nm), nm)
     for nm, _, _, n in V128OPS.get(name, []):
         assert v128_hits.get(nm) == n, 'V128 rule hit %s (want %d): %s' % (v128_hits.get(nm), n, nm)
+    # スタブは本体を decompile していない callee にだけ出す (本体がある VA に出すと宣言が衝突する: FUN_18004cf20・delay)
     for va, s in stubs.items():
-        if ('FUN_%x' % va) in alltxt:
+        if ('FUN_%x' % va) in alltxt and va not in vas:
             protos.append(s.split('{')[0].strip() + ';')
     out += protos
-    out += [stubs[v] for v in stubs if ('FUN_%x' % v) in alltxt]
-    out += [THUNK[v] for v in THUNK if ('func_0x000%x' % v) in alltxt]
+    out += [stubs[v] for v in stubs if ('FUN_%x' % v) in alltxt and v not in vas]
+    out += [THUNK[v] for v in THUNK if ('func_0x000%x' % v) in alltxt and v not in vas]
     # --- 呼出名の統一: Ghidra は未命名 callee を func_0x<va> で呼ぶが、定義側は同一 va を FUN_<va> で出す (also 追加分)
     defined = set(vas)
     bodies = [re.sub(r'\bfunc_0x000(180f[0-9a-f]{5})\b', lambda m: 'FUN_' + m.group(1)

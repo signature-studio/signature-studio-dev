@@ -85,6 +85,7 @@
 | `tools/m3/REPORT.md` | ~100 | M3: 中規模 lift → wasm (純計算 4 関数 bit-exact) |
 | `tools/m5/REPORT.md` | ~120 | M5: Delphi lift → wasm E2E + native bit-exact |
 | `tools/liftlib/REPORT.md` | ~221 | 共通 lift 修復基盤の統合 (CAB-49/54/55/220/239/LIFTLIB-2)。§21 は DIR64 補正境界の全数列挙と修正 (#593)。§10〜§12 は `REPORT_APPENDIX_A.md`・§13〜§16 は `REPORT_APPENDIX_B.md`・§17 (iargs)・§18 (#241 ymm/pcmpistri/F2 xmm 戻り) は `REPORT_APPENDIX.md`・§19 (PERF-P1 #155 標準ビルド設定 + 署名ガード)・§20 (#478 ott_auto_none) は `REPORT_APPENDIX_C.md` に分割。§22 (LIFTLIB-9 #668) は要約のみで全文は `REPORT_APPENDIX_D.md` |
+| `tools/liftlib/REPORT_APPENDIX_3137.md` | ~70 | liftlib #3137: `legacy_p1` の残留分岐 66 件 (br_other 17 / no_branch 49) の D1a 同型判定 (折畳み形 13 件・非同型 53 件)・`p1_repmap_census.py --residual` の実測 |
 | `tools/liftlib/REPORT_APPENDIX_A.md` | ~240 | liftlib §10〜§12 全文 (lowbase 取り込み CAB-220 / mini-lifter 語彙 + leaf spec CAB-239 / LIFTLIB-2 CAB-256) |
 | `tools/liftlib/REPORT_APPENDIX_B.md` | ~250 | liftlib §13〜§16 全文 (LIFTLIB-3 CAB-264 / LIFTLIB-4 CAB-272 / LIFTLIB-1 #224 検収 / 環境パス置換 #386) |
 | `tools/liftlib/REPORT_APPENDIX.md` | ~266 | liftlib §17 全文 (HB-H3 #93 iargs pass)・§18 全文 (LIFTLIB #241 ymm(i256) helper ABI / pcmpistri / F2 xmm 戻り搬送) |
@@ -246,6 +247,7 @@
 | `tools/m11/REPORT_N15.md` | ~16 | m11 REPORT §16 (#490 main HEAD の 4c3baa4 / faee5b6 状態の実測・ネガコン) の付録 (250 行上限のため分割) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` | ~244 | #2770 (LD-129): native 側 0x5ac308 の書込み監視 (`rt/ld_native.c` の `LD_WATCH_ADDR`)。REPORT_1783.md の旧 §8 を 250 行上限のため分割移動した節 (§8.1〜§8.9)。分割後に §8.2・§8.4・§8.6・§8.8 を再測定・改訂したので、測定値と判定の正本は本付録 |
 | `tools/m11/REPORT_APPENDIX_1430.md` | ~60 | m11 #1430 の基準 (before) 節の全文 (`REPORT_APPENDIX.md` §9 の後続。xmm 引数の callee 署名復元の前測定 (survey 基準 ok/trap/miss/noproc の実測)・`work-m11` 由来の 7 カテゴリ (和 1,963)。全再生成 IR の測定は #1532) |
+| `tools/m11/REPORT_APPENDIX_3122.md` | ~111 | m11 #3122 (M11-N169): 基準 7e149974 全再生成 IR の unit 別 survey (ok 872 / trap 23 / miss 46 / noproc 1) と本 A/B (main 既定・opt-in) の unit 別対応付け (差 1 件: unit 56)・対応付けスクリプト `m11_unit_map.py`・unit 別 JSON (`xmm_unit_3122/`) |
 | `tools/m11/REPORT_APPENDIX.md` | ~238 | m11 REPORT §8 (LB_BASE=0x10000 適用 #222)・§9 (sigfix 0 詰め #131)・§10a (#132 commit 別測定表と注記)・§10b (#132 真因・修正 4 点・NC・次 blocker・外した内容)・§12 の一部 (#513 新規類型の行案)・§12b (#513 巨大 VirtualAlloc の n の出所) の全文 (250 行上限のため本体から無変更で分割移動) |
 | `tools/m11/REPORT_N1318.md` | ~69 | #1318 (N82): 10 進 inttoptr 4364 件の VA→LVA 仕分け表 (分類件数・判定規則・QPF 整数定数 1 件の誤 remap)・再現 `m11_inttoptr_class.py` |
 | `tools/m11/REPORT_N54.md` | 108 | #954: xmm を読む callee の IR 署名復元 (opt-in `M11_XMM_ARGS=1`)・34/49 件復元・survey 差 0・全件復元時の退行の二分探索表・`fix_xmm_args.py` の呼出し引数個数検査 |
@@ -292,7 +294,7 @@
 | `tools/m11/trap_triage/REPORT_1352.md` | ~50 | #1352: 計測 build (`M11_INSTR_413060=1`) の OFF は HEAD `1be53b3f` で既定と同じ 870/24/0 (871/23 は再現せず)・`M11_DEST_READ=0` でも 870/24/0。3 点切り分けは未実施・再現 `repro_1352.sh` |
 | `tools/m11/trap_triage/REPORT_2672.md` | 125 | #2672: unit 477 の `0x10a9f910` 下位 4B 書込みの主体 (C 版 `function_4133f0` の shadow stack 局所、`m11_ov.c:340`)。wasm 側 store 計装 (`watch_store_2672.mjs`・`store_sites_2672.py`) の陰性対照 (942 unit の kind 差分 0)・陽性対照 (OLD=0 で unit 1 hit)・類型案 (管理型局所のゼロ初期化欠落、仮説) |
 | `tools/m11/trap_triage/REPORT_2780.md` | 114 | #2780: unit 492 OOB の `4473f0` 乗算 (`0x92492493`) の戻り値を実測 (原因ではない)・OOB 入力 `dest=0x10aa1160` の旧値 `0x1_00000003` の値遷移 (unit 432・477・484)・gated probe (`M11_PROBE_2780=1`) |
-| `tools/m11/trap_triage/REPORT_2891.md` | ~115 | #2891: 現 build (`ed70adf5a`) での `4473f0` 配列 dest2 (`0x10aa1430`) の旧値 `0x1_00000003` の書込み主体 (unit 432 の CRITICAL_SECTION 初期化・477/484 の `function_4133f0` 局所 `len`・492 の `*dest = s`)。REPORT_2780 の番地 `0x10aa1160` は build 依存で別用途と判明。計測 `store_sites_2891.py`・`watch_store_2891.mjs` |
+| `tools/m11/trap_triage/REPORT_2891.md` | ~190 | #2891: 現 build (`ed70adf5a`) での `4473f0` 配列 dest2 (`0x10aa1430`) の旧値 `0x1_00000003` の書込み主体 (unit 432 の CRITICAL_SECTION 初期化・477/484 の `function_4133f0` 局所 `len`・492 の `*dest = s`)。§9: 配列の 0 初期化は `ad5700`→`415610`→`4159e0`→`40d210` (memset 112 B)、lift 版 `40d210` の n > 32 本体の脱落 (D13 系の新事例)。計測 `store_sites_2891.py`・`watch_store_2891.mjs`・`native_zeroinit_2891.py` |
 | `tools/m11/trap_triage/REPORT_882.md` | 212 | #882: M11 survey trap の p-144 再現・40ffe0 入口 probe の本体 (§0 結論・§1〜§11)。§12・§13 は `REPORT_882_APPENDIX.md` に分割移動 (250 行上限) |
 | `tools/m11/trap_triage/REPORT_882_APPENDIX.md` | ~89 | #882 の §12 (7 回目 run: p-144 再現測定) と §13 (8 回目 run: 40ffe0 入口 probe の実測) の全文。REPORT_882.md の 250 行上限のため分割移動 |
 | `tools/m11/trap_triage/REPORT_2275.md` | ~175 | #2275 (M11-N147, 親 #2212): NODATA_BODY 対照 (関数本体の書込みを残し静的データを外し、`.data`・`.bss` の並びを C_noren と一致させた) と getmem −4 の再測定 (測定 commit `aa647a2ac`・HEAD `bb8aaf1d5` とも −4 は再現せず。機序は判定不能)。生値 `table_2275.tsv`・`table_2275_head.tsv`・`addr_2275.txt`・`addr_2275_head.txt` |
@@ -788,6 +790,8 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_3065.md` | ~90 | KH-38 (#3065) 対照 Gain before 160 closure の unsup 285 site / 48 種 → 0 (flelift x64c の VEX/FMA/rcr 被覆)。before/after の測定値の正本。再測定 `scripts/lift_closure_x64c.sh`、差分テスト `tools/flelift/tests/x64c_vex_diff.py`、rcr 実機照合 `tools/flelift/tests/rcr_native_check.py` |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3801.md` | ~65 | KH-65 (#3801): Delay の型不一致 187 件の規則。`_DAT_` グローバル 13 件の C 型規則 `GTYPE` (機械語の参照幅で確認) で 187 → 119 (emcc 556 → 488)・Gain/Haas/Gate の `.o` 不変・ネガティブコントロール 3 件・残件 119 の分類と起票先 (#3837・#3849)。§10-7x の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3075.md` | ~34 | #1216 差し戻し round 4: merge 後 head (`2a17665f`) での Stereo / Delay 再測定 (emcc 12・577 件)・merge 前後の C の cmp・census。§10-7p-3 の正本 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_3802.md` | ~126 | #3802 (KH-66): Delay の DAT_/uRam の型規則・未関数化 callee の fail-fast stub・スタブと本体の衝突の解消。結果と測定は付録 §10-7u が正本。§⑧ は main 取り込み後の状態 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_3802_DIFF.md` | ~165 | #3802 付録 §⑧ の差分の全文: 測定 commit `6323671e7` → HEAD の `ghidra_route` の `git diff` 出力 (main 取り込み分を含む)。差分の記録であり測定値の正本ではない |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3800.md` | ~66 | KH-64 (#3800): Delay の引数過不足のうち呼出先 FUN_180fd4f30 分の ABI 規則 (部分)。根拠・census・未解決は §10-7u が正本 (残りは子 #3844・#3847) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3096.md` | ~70 | KH-44 (#3096): `code` 関数ポインタ化で Delay の間接呼出し 21 件を解消 (emcc 577 → 556)・gain/haas/gate の .o 新旧 byte 一致・残件の子 issue 分割。§10-7t の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3071.md` | ~85 | KH-39 (#3071): Stereo の emcc 残件の機械修復 (emcc 39 → 10 件)・ABI 規則 1〜11・rsqrtps 突合・回帰・in_XMM3 の live-in 判定・未解決 1〜5 の全文 (REPORT_APPENDIX §10-7r の分割移動) |
