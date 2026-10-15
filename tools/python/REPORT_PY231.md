@@ -90,11 +90,12 @@ ba4a31: call 0x663430
 ## 3b. 値の変化検出 (#3949 / PY-276)
 
 - 実装: 0xfdc8a0 の cmp/je に合わせ、`forwardMIDICC` は添字ごとの最後に送った値と同じなら送らない (C `provider/fl_engine.c`・mock `host/fl_mock.mjs` とも)。未設定 (-1) から始まり、添字 0..15 (C の `FCC_N` 仮置き)。範囲外は重複検出せず送る。`midiOutMsg` は変えない (PE 0xfdc8e0 を毎回呼ぶ)。
-- 測定 commit (コードを変えた最後の commit): **`a0d2f4d5c`**。差分 `git diff a0d2f4d5c HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行。
+- 割当判定の順 (review 指摘・PY-276 追補): `forwardMIDICC` は -7 → -6 を判定してから、添字の重複判定 (0xfdc8a0 相当) をする。C では `midi_check` (割当判定) を重複判定の前に呼ぶ。`midi_send` は `midi_check` + `midi_record` の合成。
+- 測定 commit (コードを変えた最後の commit): **`20866f567`** (`fix(python): forwardMIDICC の割当判定を重複判定より前に (PY-276, #3949)`)。差分 `git diff 20866f567 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (main 取り込みの merge `bda387094` を含む)。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/python/fetch_inputs.sh`、`EMSDK_ENV=$RUNNER_TEMP/toolchain/emsdk/emsdk_env.sh bash tools/python/provider/build.sh`、`node tools/python/tests/device_diff.mjs`。
-- 結果 (n=3・逐次・wall は `/usr/bin/time`): rc=0 ×3、所要 0.05 秒 ×3、load average (1/5/15 分) 0.10・0.23・0.20。出力: `calls 21・link_calls 9・rejects 13・midi_out 10・diffs 0・PASS true`。送った word 列 (C と mock で一致): `0a643c90, 000000b0, 00643c90, 000000b0, 097f01b2, 7f643c91, 000000b0, 9b412dff, 00643c91, 097f01b2`。
+- 結果 (`bda387094`・n=3・逐次・wall は `/usr/bin/time`): rc=0 ×3、所要 0.04・0.04・0.05 秒、load average (1 分) 0.16。出力: `calls 21・link_calls 9・rejects 13・midi_out 10・diffs 0・PASS true`。送った word 列 (C と mock で一致): `0a643c90, 000000b0, 00643c90, 000000b0, 097f01b2, 7f643c91, 000000b0, 9b412dff, 00643c91, 097f01b2`。
 - 期待 word 列は、末尾の `forwardMIDICC(0x0A643C90, 2)` が直前に同じ添字・同じ値で送っているため送らない形に直した (旧 11 件 → 10 件)。
-- 負例: mock の重複判定を外すと rc=1・`dedup mock words`・`dedup mock count` で FAIL を確認し、戻して PASS を確認 (`work/` の退避ファイルから複写)。C 側の負例は未実施。
+- 負例: mock の重複判定を外すと rc=1・`dedup mock words`・`dedup mock count` で FAIL を確認し、戻して PASS を確認 (`work/` の退避ファイルから複写)。C 側の負例 (review 指摘の差): 旧 C (`6bc77b3ef` の `fl_engine.c`) に戻して再ビルドすると rc=1・`AssertionError: device 差分 2 件` で FAIL (未割当での同値呼出しが C では成功扱いだった)。新 C に戻すと PASS。
 - 他の差分検査 `channels_diff`・`note_enum_diff`・`step_item_diff`・`midi_path_diff`・`plugins_diff` は同じ HEAD で rc=0。
 - 未実行: `midi_script`・`midi_bundled_device` は `dist/flpy.js` (CPython wasm) が無く `ERR_MODULE_NOT_FOUND` で起動前に落ちる (§3 と同じ範囲外)。
 
