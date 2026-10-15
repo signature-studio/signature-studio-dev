@@ -116,7 +116,8 @@ bash tools/icall/diff/fa_sweep.sh 8 60                            # 期待 (base
 ## 8. 子 #3198 (ICALL-87) の実装結果 (オプトイン `FA_FALL_FRAG=1`・既定 OFF)
 
 - 修正: `icall_rewrite.py` に、非断片関数の末尾が断片先頭へ fall-through するとき、その断片を複製する経路を入れた。既定 OFF (`FA_FALL_FRAG=1` で有効)。断片内の分岐先は closure か断片 (`in_closure`) に無いものを含むときは複製しない。
-- 既定 (OFF) の rewriter 出力は `origin/main` と byte 一致 (`rw.dll`・`func_map` 一致)。
+- 既定 (OFF) の rewriter 出力が `origin/main` と byte 一致するかは **未実測** (素材 `plugins-freshair` と `work-icall` が run に無く、rewrite を再実行できない)。コード上は、`FA_FALL_FRAG` 未設定で `fall_target` が常に `None` を返し、`fall_frag` が空になるため、main と同じ経路を通る (`fns`・`add_frag` の処理が main と同一)。
+- 指摘対応 (reviewer round 1): `fall_target` を `FALL` で gate した (既定 OFF の fall-through 複製経路を封じた)。ON 時の経路は変えていないので、上の ON の数値は前の HEAD の測定値のまま。再測定は素材が揃った後に行う。
 - 測定 (同一パイプライン: rewrite → RetDec decode-only → ir_icall_restore → fa_route_build → fa_cmp / fa_sweep 8 60。native は `tools/ott/native/build.sh`)
 
 | 条件 | fa_cmp 180da4030 --n 8 | fa_sweep 8 60 (bit一致/crash/wasm_err/不一致) |

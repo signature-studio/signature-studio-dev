@@ -573,6 +573,8 @@ def main():
                 return False
         return True
     def fall_target(f):
+        if not FALL:
+            return None
         fs_, fe_, its = funcs[f]
         ins_items = [it for it in its if it.kind == 'ins']
         if not ins_items:
