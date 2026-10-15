@@ -232,3 +232,13 @@ FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FLE_BOOT_RUNS="default" FLE_EXTRA_ROOTS= bash
 - 差分の由来: 本節の link は `FLE_EXTRA_LDF="-g --profiling-funcs"` を付けた。`-g` を外した wasm (`FLE_EXTRA_LDF` 無し・`FLE_SHARDS=8`) の 1 回の測定でも `full` は `cd1d6c6b…` で、本節とも前回とも一致しなかった (1 回だけの確認)。よって link フラグだけが原因とは言えない。原因は未特定 (推定: wasm 線形メモリの未初期化領域の内容が、実行ごとに異なる)。
 - 結論: `outmem.full`・`no_cstack` の sha256 は、同一の build でも一致しない。前回の「一致」は件数の一致 (dispatch・GetMem・ok など) を指し、sha256 の一致は主張しない。`stack` の境界値は一致する。
 - 差分 0 の証跡: 本節のみの追加。コード (`fle_boot.mjs`・`fle_boot.c`・`build.sh`・`fle6_measure.sh`) は `FLE_EXTRA_LDF` の追加 (`2ff548657`) 以外に変えていない。
+
+### 12-1. 現 head での再測定 (測定 commit `e3954b032`・mode 1 のみ)
+
+- 理由: `2ff548657` 以降に `tools/flelift/x64c.py` が変わった (`6db897ce2` movnti・`5ab8ae7f5` vcomiss・haddps・vcvtdq2ps・vpsrld/vpslld・vandps)。lift 結果が変わると計数が動くため、現 head で測り直した。
+- 測定: 上節と同じコマンド (`FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh`) → rc 0・所要 2 分 09 秒 (09:17:14〜09:19:23。lift 49 s・clang plain 59 s・boot tol 15 s)。load 0.8〜1.7。素材は `fl-win64` (`$HOME/artifacts/fl-win64.tar.zst`)・emsdk 6.0.12 (`emsdk activate 6.0.12`)。
+- 計数 (現 head): dispatch 209・GetMem 2,314 / FreeMem 1,199・ok 208・empty 37・noproc 1・clobber 695・exit 1・停止 `0x733090`。`FLEBOOT_IPP_CHECK` は `ok:false` (`ptr_15F34A0=0x0`・§9 と同じ既知の NG)。計数は §11・§12 と一致。x64c の変更 (movnti・vcomiss 等) は、この closure の計数を動かさなかった。
+- `cfi.stack` (関数名付き): `f_410320` ← `f_5af120` ← `f_1105350` ← `f_13752f0` ← `f_1375990` ← `ott_dispatch` ← `fle_run`。§7 の chain と一致 (`0x1375990 → 0x13752f0 → 0x1105350 → 0x5af120 → 0x410320`)。
+- `outmem` (現 head 1 回): `full` `c9f39e3e…`・`no_cstack` `a6cf4946…`。`stack.base`・`end` は `0x11dbef00`・`0x115bef00` で一致。`full` の値は 12 の非決定性どおり毎回変わるため、この値を正として比べない。
+- 差分 0 の範囲 (測定 commit `e3954b032` から HEAD まで): 再測定で使ったコードは `e3954b032` のまま。本節の後の commit は REPORT・PR 本文のみ (`git diff e3954b032 HEAD -- tools/flelift/x64c.py tools/flelift/boot/gen_boot.py tools/flelift/fle_data_gen.py tools/flelift/boot/rss_cap.py tools/flelift/boot/fle_boot.mjs tools/flelift/boot/fle_boot.c tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh tools/shared/env.sh` の出力は空)。
+- 注: 再測定で `results/boot_summary_fle6_tol.json` が上書きされたが、絶対 path を含む `stack` が入るため差し替えず、`git restore` で HEAD の版に戻した (`boot_cfi_stack_fle6_tol_named.json` が関数名付きの根拠)。
