@@ -49,5 +49,5 @@ PY-268 §1 の確定を前提とする。0x12acb70 は VMT 0x1277f38 (TFXForm) �
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x12acb70 の発火側 (TMenuItem の Click 系・FOnClick の呼出し形) と rdx = Sender の出どころ | 受入 1 | 子 issue (本 run で起票・番号は PR 本文と issue コメントに記載) |
-| 0x410090 を呼ぶ上流 (TMessage を作る窓プロシージャ・間接呼出しの経路) | 受入 2 の rdx (TMessage*) の出どころ | 子 issue (同上) |
+| 0x12acb70 の発火側 (TMenuItem の Click 系・FOnClick の呼出し形) と rdx = Sender の出どころ | 受入 1 | [PY-320] #4346 |
+| 0x410090 を呼ぶ上流 (TMessage を作る窓プロシージャ・間接呼出しの経路) と msgid 0x057f の送り手 | 受入 2 の rdx (TMessage*) の出どころ | [PY-321] #4347 |
