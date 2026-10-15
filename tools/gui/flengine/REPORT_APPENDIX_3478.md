@@ -5,7 +5,7 @@
 ## 1. 結論
 
 - boot が init 1675 に届かないのは、**`InitUnits` (`function_4120c0`) が unit 114 (0 起算) の Init 実行中に Halt0 に入り、残りの unit を実行せずに抜けるため**。停止 unit の Init は `function_623840` (VA `0x623840`)。init 1675 は `function_1266a60` で、unit 882 (0 起算) の Init (FInit は `function_12669a0`・1676) に当たる。unit 882 は停止より後なので呼ばれない。
-- `dllmain_done True` は**完走ではない**。Halt0 の longjmp 相当 (`function_412770` → JS 例外 `m11_dllmain_done`) による脱出である。REPORT_APPENDIX_3353 §1・§3-1・§9-1 の「boot は完走する」は誤り (§5 で訂正)。
+- `dllmain_done True` は **InitUnits の完走ではない**。InitUnits は trace の `[m11][unit 115/942]` (index0 114) の Init 中に Halt0 に入り、残りの unit を実行せずに抜けた (`function_412770` → JS 例外 `m11_dllmain_done` による脱出)。ここで「111/942 unit で中断」とは書かない: `init_count` 111 は別カウンタ (`tools/m11/m11_rt.c:148-158`) で、停止位置は trace の unit 番号で示す。`tools/m11/m11_ov.c:445` の「DllMain attach 完走」は Halt0 を DllMain の完了として扱う設計上の呼び名で、本 REPORT の「完走ではない」とは別の意味 (コードの注釈は本 PR で変えていない)。REPORT_APPENDIX_3353 §1・§3-1・§9-1 の「boot は完走する」は誤り (§5 で訂正)。
 - Halt0 の直接条件は §3-3 (`[0x11f7110] != 0` と第 3 引数 `0x8494fc` の非 0)。実機で同じ経路が Halt しないかは**未判定**。子 issue に起票 (§7)。
 
 ## 2. 測定の組
