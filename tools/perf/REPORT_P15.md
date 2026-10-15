@@ -218,7 +218,7 @@ bash tools/perf/p20/fa_negctl.sh                                       # NC-2
 
 受入条件の「§7 に追記」は、main の §8 が PERF-P20 に使われたため本節 (§9) に置いた。
 
-**結論** (PERF-P25 追補: 掃引 M=2〜160 で成功最大 145・失敗最小 146、詳細は `tools/perf/REPORT_APPENDIX_3959.md`): AudioWorklet 上で 1 instance (Memory 1 本) に畳んだ OTT obj は、測定点の範囲で **M=145 が成功・M=146 が失敗** (初期化・署名とも M=145 は 3 run 全て成功、署名 145/145 一致)。**M=146 は 3 run 全て無応答** (`Error: eval timeout`、30 s。1 run は 150 s でも戻らない)。単調性は未確認 (147 以上と M=2〜129・131〜144 は未測)。原因は未切り分け (子 #3959)。
+**結論** (PERF-P25 追補: 掃引 M=2〜160 で成功最大 145・失敗最小 146、詳細は `tools/perf/REPORT_APPENDIX_3959.md`): AudioWorklet 上で 1 instance (Memory 1 本) に畳んだ OTT obj は、測定点の範囲で **M=145 が成功・M=146 が失敗** (初期化・署名とも M=145 は 3 run 全て成功、署名 145/145 一致)。**M=146 は 3 run 全て無応答** (`Error: eval timeout`、30 s。1 run は 150 s でも戻らない)。M=2〜160 の掃引で単調性を確認 (146 以上は全て失敗)。原因は未特定 (子 #4392 [PERF-P26])。
 
 | 項目 | 結果 (Chrome 154.0.8037.97・EPYC 7763) |
 |---|---|
