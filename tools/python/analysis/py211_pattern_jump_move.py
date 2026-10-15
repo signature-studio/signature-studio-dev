@@ -86,8 +86,14 @@ has_stride = any(m == "lea" and o == "rbx, [rbx + rbx*2]" for _, m, o, _ in ins)
     m == "mov" and o == "ecx, dword ptr [rax + rbx*8]" for _, m, o, _ in ins)
 check("jump.stride_192", has_stride, "index*8 -> *3 -> [base + idx*24*8] = 192 B/要素 (dword +0 が要素の先頭)")
 a = find(0x12D8AF0, "cmp", "dword ptr [rax + rcx*8], 0")
-check("jump.no_upper_bound", a is not None and nxt(0x12D8AF0, a)[1] == "jl",
-      "cmp dword [表+idx*192], 0 の直後が jl (負なら呼出し省略)。上限 (999 等) の比較は無い")
+check("jump.elem_neg_skip", a is not None and nxt(0x12D8AF0, a)[1] == "jl",
+      "cmp dword [表+idx*192], 0 の直後が jl (負なら呼出し省略)。表要素の符号だけを見る")
+jump_ins = decode(0x12D8AF0)
+idx_cmp = [(addr, o) for addr, m, o, _ in jump_ins if m == "cmp" and ("ebx" in o or "rbx" in o)]
+check("jump.index_cmp_eq_only", len(idx_cmp) == 1 and idx_cmp[0][0] == 0x12D8AF8 and nxt(0x12D8AF0, 0x12D8AF8)[1] == "jne",
+      f"index (ebx) を比較する cmp は {len(idx_cmp)} 件 (0x12d8af8: 現在番号 [0x15d51a0] との等号・直後 jne)。大小の比較は無い")
+imm999 = [o for _, _, o, _ in jump_ins if "0x3e7" in o or "0x3e8" in o]
+check("jump.no_999_imm", not imm999, f"jumpToPattern 本体 (0x12d8af0〜0x12d8bd0) の 999 (0x3e7)・1000 (0x3e8) の即値は {len(imm999)} 件")
 
 # 表の所在: rip 解決先が .bss (ファイル上に初期値なし)
 sec = None
@@ -116,6 +122,16 @@ check("find.mod_999", find(0x12D8BE0, "imul", "eax, eax, 0x3e7") is not None,
       "imul eax, eax, 0x3e7 (x mod 999 の逆算)")
 check("find.iter_1000", find(0x12D8BE0, "cmp", "r13d, 0x3e8") is not None,
       "cmp r13d, 0x3e8 (1..1000 回の走査)")
+bit2 = find(0x12D8BE0, "jne", "0x12d8d18")
+check("find.bit2_early_ret", bit2 == 0x12D8C85,
+      f"bit2 (4) が立つと jne 0x12d8d18 で jump も後段も省いて cand を返す (jne at {bit2 and hex(bit2)})")
+c_ea7 = find(0x12D8BE0, "call", "0xea7ae0")
+c_ea6 = find(0x12D8BE0, "call", "0xea6b30")
+guard = find(0x12D8BE0, "mov", "rax, qword ptr [rip", 0x15E1748)
+check("find.post_calls", c_ea7 is not None and c_ea6 is not None and guard is not None,
+      f"後段: call 0xea7ae0 at {c_ea7 and hex(c_ea7)}・ガード [0x15e1748] at {guard and hex(guard)}・call 0xea6b30 at {c_ea6 and hex(c_ea6)} (役割は未同定 → #3558)")
+w = 0x12D8D28
+check("find.word_zero", data[foff(w):foff(w) + 2] == b"\x00\x00", f"movzx r9 の word [0x12d8d28] はファイル上 {bytes(data[foff(w):foff(w) + 2]).hex()}")
 
 # 3 つの callback の共通 gate: P = [[G]+8]->vtable[+0x98]、初期 status -2
 for name, fn in [("jump", 0xD659C0), ("move", 0xD66E70), ("find", 0xD65B30)]:
