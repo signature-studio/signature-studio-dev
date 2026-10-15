@@ -29,10 +29,26 @@ SEED = 2989
 # va: 入口 VA。 gen: 引数と OBJ 窓の初期値の作り方 (ecx = OBJ)。 どちらも leaf で x87 を含み、import・未 lift の call が無い。
 #   fn_10002ee0: thiscall (ecx = this、float a0、int a1 = 添字 0..15) ret 8。 [ecx+a1*4+0xb0..0x1f4] を読み書きし、ST(0) を残して返る。
 #   fn_10005400: thiscall (ecx = this、float a0..a2) ret 0xc。 fcomp・fnstsw・fdivr を含み、[ecx+0x4fc..0x518] を更新する。 gen が積む a3・a4 (と a5 = 0) は本体が読まない余りの引数。
+#   fn_1000b6c1・fn_1000b936: OBJ 窓を書かず、ebp 相対のスタック (STK_LO..STK_LO+STK_WIN) だけを書く leaf (#4146)。 引数は gen_rows の既定を使う。
+#     どちらも入口で空の ST(0) を読まない (fstp st(0) で捨てるだけ) ので、空スタックの underflow に依らない。
+#   fn_1000b8a2 は TARGETS に入れない (#4146): 入口の fstp TBYTE が空の ST(0) を読み、native は -qNaN 不定値・wasm は 0 を返す (underflow 類型)。
 TARGETS = [
     {'va': 0x10002EE0, 'name': 'fn_10002ee0', 'gen': 'idx_store'},
     {'va': 0x10005400, 'name': 'fn_10005400', 'gen': 'state_update'},
+    {'va': 0x1000B6C1, 'name': 'fn_1000b6c1', 'gen': 'state_update'},
+    {'va': 0x1000B936, 'name': 'fn_1000b936', 'gen': 'state_update'},
 ]
+# ebp = 0x10F00000 - 0x1000 (x87_fn_native.c・x87_fn_glue.c)。 窓は ebp-0x100 から ebp+0xE0 (旧 ebp 0x10EFFF00 と同じ相対位置)。
+STK_LO = 0x10F00000 - 0x1100
+STK_WIN = 0x1E0
+# #4064: 3 本の測定専用 (X87_PROBE=1 で TARGETS に加える)。 ゲートは通さない: 3 本 (0x10009eb5・0x1000b526 は eax が模型の限界で不一致、0x1000bf60 は ST(0) の NaN・ゼロが不一致)。 付録 §1 を参照。
+PROBE = [
+    {'va': 0x10009EB5, 'name': 'fn_10009eb5', 'gen': 'generic'},
+    {'va': 0x1000B526, 'name': 'fn_1000b526', 'gen': 'generic'},
+    {'va': 0x1000BF60, 'name': 'fn_1000bf60', 'gen': 'generic'},
+]
+if os.environ.get('X87_PROBE'):
+    TARGETS = TARGETS + PROBE
 
 
 def pe_image():
@@ -114,6 +130,23 @@ def run(cmd, what, timeout=900):
     return time.time() - t0
 
 
+CHUNK = 8000
+
+
+def run_chunked(scen_path, out_path, cmd_for, what, timeout):
+    """native の入出力バッファ (32 MiB) に収まるよう、シナリオを CHUNK 行ずつ実行して出力を連結する。"""
+    lines = [ln for ln in open(scen_path).read().split('\n') if ln.strip()]
+    t, parts = 0.0, []
+    for k in range(0, len(lines), CHUNK):
+        cp = os.path.join(WORK, 'chunk_%s_%d.txt' % (what.split()[0], k))
+        co = cp + '.out'
+        open(cp, 'w').write('\n'.join(lines[k:k + CHUNK]) + '\n')
+        t += run(cmd_for(cp, co), what, timeout=timeout)
+        parts.append(open(co).read())
+    open(out_path, 'w').write(''.join(parts))
+    return t
+
+
 def parse(path):
     out = []
     for ln in open(path):
@@ -187,17 +220,17 @@ def compare(nat, act, scen, quiet=False):
                 a['eax_bad'] += 1
         if e['d'] != w['d']:
             a['d_bad'] += 1
-        if e['mem'] != init.hex():
+        if e['mem'] != init.hex() or e['stk'] != '00' * STK_WIN:
             a['effect'] += 1
         if e == w:
             a['eq'] += 1
-        if e['st0'] == w['st0'] and e['mem'] == w['mem'] and e['eax'] == w['eax']:
+        if e['st0'] == w['st0'] and e['mem'] == w['mem'] and e['stk'] == w['stk'] and e['eax'] == w['eax']:
             a['f32_eq'] += 1
         for key, x, y in (('st0', int(e['st0'], 16), int(w['st0'], 16)),
                           ('st0d', int(e['st0d'], 16), int(w['st0d'], 16))):
             c = dword_class(x, y) if key == 'st0d' else word_class(x, y)
             a[key][c] = a[key].get(c, 0) + 1
-        for x, y in zip(words(e['mem']), words(w['mem'])):
+        for x, y in zip(words(e['mem']) + words(e['stk']), words(w['mem']) + words(w['stk'])):
             c = word_class(x, y)
             a['mem'][c] = a['mem'].get(c, 0) + 1
     for t in TARGETS:
@@ -373,9 +406,10 @@ def main():
                             '-sGLOBAL_BASE=%d' % 0x11000000, '-sSTACK_SIZE=2097152', '-sINITIAL_MEMORY=%d' % 0x14000000,
                             '-sALLOW_MEMORY_GROWTH=0', '-o', mjs], 'wasm build (emcc)', timeout=900)
         load = os.getloadavg()[0]
-        t_nat = run([nat, os.path.join(WORK, 'image.bin'), scen, nat_out], 'native run', timeout=600)
-        t_wasm = run(['node', os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mjs, os.path.join(WORK, 'image.bin'), scen, wasm_out],
-                     'wasm run (node)', timeout=900)
+        img_p = os.path.join(WORK, 'image.bin')
+        t_nat = run_chunked(scen, nat_out, lambda cp, co: [nat, img_p, cp, co], 'native run', 600)
+        t_wasm = run_chunked(scen, wasm_out, lambda cp, co: ['node', os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mjs, img_p, cp, co],
+                             'wasm run (node)', 900)
         print('[build] native %.2f s, wasm emcc %.2f s; [run] native %.3f s, wasm(node) %.3f s; load1 before run %.2f' % (
             t_nat_build, t_wasm_build, t_nat, t_wasm, load))
         ok, _ = compare(parse(nat_out), parse(wasm_out), rows)

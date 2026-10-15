@@ -2,14 +2,17 @@
 # qfc_lift.sh — QuickFontCache_x64.dll の lift → emcc wasm 生成 (qfc_e2e.sh / qfc_boot.sh が source する)。
 # 前提: env.sh を source 済み (QFC・QFC_PE・QFC_PY)。cwd = $QFC。
 #   lift_build <out-dir> <QFC_NEGCTL>            : lift + fle_data + wasm ($out/qfcl.cjs)
+#     boot 用の任意設定 (未設定なら e2e と同一): QFC_ENTRIES=<entries.json> / QFC_OVERRIDE=<VA=CNAME> / QFC_EXTRA_C=<extra.c ...>
 #   wasm_build <out-dir> <cjs> [extra.c ...]      : fle_lifted.c + fle_data.c (+ extra.c ...) を emcc (boot の soft stub 版に使う)
 lift_build() {
   local out="$1"; mkdir -p "$out"
   "$QFC_PY" gen_entries.py "$QFC_PE" "$out/entries.json" >/dev/null
-  QFC_NEGCTL="$2" "$QFC_PY" x64c_qfc.py --pe "$QFC_PE" --entries "$out/entries.json" --out "$out" --closure 0 \
-    --img 0x400000 --shift 0 --img-size 0x20e000 --impbase 0x1D80000 | tail -1 | tee "$out/lift.log"
+  local ov=()
+  [ -n "${QFC_OVERRIDE:-}" ] && ov=(--override "$QFC_OVERRIDE")
+  QFC_NEGCTL="$2" "$QFC_PY" x64c_qfc.py --pe "$QFC_PE" --entries "${QFC_ENTRIES:-$out/entries.json}" --out "$out" --closure 0 \
+    --img 0x400000 --shift 0 --img-size 0x20e000 --impbase 0x1D80000 "${ov[@]}" | tail -1 | tee "$out/lift.log"
   "$QFC_PY" ../flelift/fle_data_gen.py "$QFC_PE" "$out/fle_data.c" "$out/lift_meta.json" >/dev/null
-  wasm_build "$out" "$out/qfcl.cjs"
+  wasm_build "$out" "$out/qfcl.cjs" ${QFC_EXTRA_C:-}
 }
 wasm_build() {
   local out="$1" cjs="$2"; shift 2

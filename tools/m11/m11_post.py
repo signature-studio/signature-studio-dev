@@ -338,11 +338,11 @@ for (nm, ret, args) in fns:
             cargs.append('float %%c%d' % i)
         elif t == '%tagPOINT':
             # #4184 (LD-200): POINT は 8 バイト値渡し (x64 rcx = x | y<<32)。下位 32bit が x、上位が y
-            L.append('  %%lo%d = trunc i64 %s to i32' % (i, v))
-            L.append('  %%sh%d = lshr i64 %s, 32' % (i, v))
-            L.append('  %%hi%d = trunc i64 %%sh%d to i32' % (i, i))
-            L.append('  %%p%d = insertvalue %%tagPOINT undef, i32 %%lo%d, 0' % (i, i))
-            L.append('  %%c%d = insertvalue %%tagPOINT %%p%d, i32 %%hi%d, 1' % (i, i, i))
+            L.append('  %%px%d = trunc i64 %s to i32' % (i, v))
+            L.append('  %%ps%d = lshr i64 %s, 32' % (i, v))
+            L.append('  %%py%d = trunc i64 %%ps%d to i32' % (i, i))
+            L.append('  %%u%d = insertvalue %%tagPOINT undef, i32 %%px%d, 0' % (i, i))
+            L.append('  %%c%d = insertvalue %%tagPOINT %%u%d, i32 %%py%d, 1' % (i, i, i))
             cargs.append('%%tagPOINT %%c%d' % i)
         else:
             L.append('  ; unsupported param %s' % t)

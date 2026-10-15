@@ -1,0 +1,6 @@
+{
+  "tag": "pe40",
+  "refs": ["#1529"],
+  "note": "PE で引数書式と index 範囲 (code 4) を確認した channels グラフ/CS エディタ系 5 関数 (REPORT_PY40 §8・PY-40 #1529)。述語・UI 副作用・戻り値の内部経路は未確定、tests/channels_diff.mjs が mock と照合",
+  "functions": ["channels.closeGraphEditor", "channels.updateGraphEditor", "channels.showGraphEditor", "channels.showCSForm", "channels.focusEditor"]
+}
