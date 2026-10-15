@@ -45,7 +45,7 @@
 - 本 PR の HEAD (`681e2e811`) で閉包を再測定していない。入力の `plugins-kilohearts` (HeartCore.core_64) が本 run の `$ARTIFACTS_DIR` に無く (`fl-win64.tar.zst` のみ)、`fl-win64` の中にも `HeartCore` は無い。
 - 従って、この付録の §0・§2 の「unsup 38」は `9f02a5b69` の値で、**681e2e811 では一致しない可能性が高い**。`x64c.py` は 681e2e811 で `addsubpd` (`i_addsubpd`)・`vshufps`・`vpmovsxdq`・`rcpps` (`i_rcpps`) を持つ (`9f02a5b69` には無い。main 取り込み由来)。`git diff 9f02a5b69 681e2e811 -- tools/flelift/x64c.py` が測定ずれの原因。
 - 681e2e811 の unsup 件数・閉包 98 / 7,766 の再確認は、`plugins-kilohearts` を `oc_artifacts` で取得できる run で行う。それまで本付録の数値は `9f02a5b69` の値として読むこと。
-- `build.py ladder --path s0` の wasm 574,270 B は本 PR の run で再現していない (`/opt/retdec` と `/opt/emsdk` も無い)。「通過」の主張は取り下げる。
+- `build.py ladder --path s0` の wasm 574,270 B は本 PR の run で再現していない (RetDec・emsdk のツールも本 run に無い。`docs/REFERENCES.md` の [RETDEC]・[EMSDK] を参照)。「通過」の主張は取り下げる。
 
 ## 4. 未実施・未達 (受入条件との対応)
 
