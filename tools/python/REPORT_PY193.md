@@ -120,7 +120,7 @@ F[id] = 0                                  (同じ base 0x16b6dcc へ 2 回目�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `.data` 0x15e0550 の読込み 6 箇所の書込み有無 (F の間接書込み) | 受入 3 の通知条件 | 子 #3433 [PY-196] |
-| `.data` 0x15e2e18 の読込み 35 箇所の書込み有無 (`0x16b6e00` の間接書込み) | 受入 4 | 子 #3433 [PY-196] |
+| `.data` 0x15e2e18 の読込み 35 箇所のうち、読込み後に別関数呼出しを跨いで保持された `&Y` で書く経路 (§10) | 受入 4 | 子 #3433 [PY-196] |
 | 関数ポインタの組 0x1378b10 (`0xbd6a00`・`0xbd69d0`) の参照元 | 確保・解放の呼出し元 | 子 #3433 [PY-196] |
 | 枠 (+0x10・+0x18・+0x20) の消費側 | 受入 1 の「意味」 | 子 #3433 [PY-196] |
 | `0x6666d0` の生成物 (`0x666570` の初期化) | キューの上限・初期化の確定 | 子 #3433 [PY-196] |
@@ -142,3 +142,19 @@ FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_slot_writers.py 0x15e0550    
 ```
 
 範囲外: 他の `*_PE.bin` (312 本) と、`.text` 以外の直接参照 (`.data` の値自体の意味)。
+
+## 10. 0x15e2e18 の読込み 35 箇所の書込み経路 (PY-4876 / #5163)
+
+- 測定 commit: `a1538fd1e` (`tools/python/analysis/flapi/pe_py4876_slot_readers.py` を追加した commit)。
+- 実行: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py4876_slot_readers.py <pe_xref.py 0x15e2e18 の load 35 VA>`。0.12 秒 (load 0.5〜0.9・nproc 4)。出力 `sites=35 store_via_alias=0`。
+- 読込み 35 箇所は全て `mov reg, [0x15e2e18]` で、読んだ値 (`&Y` = `0x16b6e00`) を 1 命令後にもう一度逆参照する (`mov rcx, [rax]` 等)。`&Y` を格納する store は 0 件 (`pe_xref.py` の stores 0)。
+- 線形区間 (call/ret/jmp まで・60 命令) で、`&Y` 自体を base にした store は 0 件。`&Y` を別の場所へ格納する命令も 0 件。引数レジスタへの渡しも 0 件 (区間が call で止まるため、call 直前の rcx/rdx/r8/r9 は見ていない点に注意)。
+- 8 箇所は区間内で別名が消える (`0xc61ab0`・`0xd0dfd0`・`0x104725f`・`0x10718a7`・`0x11fbaf5`・`0x11fc4e8`・`0x12d2c71`・`0x12d2c9e`)。`pe_disasm.py` で確認: `0x11fbaf5` は `[G]` を 2 回逆参照して得た値 (オブジェクト) の `[obj+0x20]` へ書く (`0x16b6e00` ではない)。
+- **未確定**: 区間は call で止まる。`&Y` を callee-saved レジスタ (rbx 等) に退避して call を跨ぎ、その後に store する経路は、この tool では見ていない。試験的な変種 (call を跨いで callee-saved の複写を追う) は 18 件を出したが、別名の消滅を扱わないため大半が偽陽性 (例 `0x10472d0` は別の大域から読んだ箇所への store)。`0xd0dfd0` の 1 件は `call 0xfe8bb0` の戻り値を rbx に格納しており偽陽性と確認済み。変種は commit していない。
+- 結論 (受入 4 の一部): 35 箇所の読込みは区間内で `&Y` へ書かない。`0x16b6e00` の書込みは block00031 内で直接の 2 箇所 (§6) のみ。跨ぎの経路の有無は未確定 (§8 の行)。
+
+再現:
+```
+FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_xref.py 0x15e2e18                       # load 35 件
+FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py4876_slot_readers.py <load VA csv>     # sites=35 store_via_alias=0
+```
