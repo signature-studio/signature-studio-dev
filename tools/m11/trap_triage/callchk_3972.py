@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""callchk_3972.py (#3972): IR の各 call 命令の直後に m11_callchk(site) を入れる (読み取りだけの計装).
+"""callchk_3972.py (#3972): IR の直接 call 命令 (`%x = call ... @name(`) の直後に m11_callchk(site) を入れる (読み取りだけの計装).
   store / copy / rep 系の計装が捕まえなかった書込み (C 側 helper 内の書込み等) を、
   「どの call の直後に監視番地の値が変わったか」で拾うための派生。
+  tail call と間接 call (`call ... %fp(`) は対象外 (正規表現に一致しない)。call 境界で拾えない書込みになりうる。
   usage: callchk_3972.py <in.ll> <out.ll> <sites.json>
   call の追加のみ (IR の値・分岐は不変)。llvm.* intrinsic と m11_* 自身は除外する。"""
 import json, re, sys

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # #3972 (M11-29): unit 158 で監視番地の値が変わった直後の call site を記録する (読み取りだけの計装).
-#   store / copy / rep の計装が書込みを捕まえなかったため、IR の全 call の直後で値を比べる。
+#   store / copy / rep の計装が書込みを捕まえなかったため、IR の直接 call の直後で値を比べる
+#   (tail call と間接 call は対象外。call 境界で拾えない書込みになりうる)。
 #   usage: callchk_3972.sh <tag> [WATCH_ADDR=0x10aa1428] [WATCH_UNIT=158]
 #   前提: work/boot_final.ll (bash m11_gen_ir2.sh 済み)。
 #   出力: work/probe3972/cc_<tag>.err (`[cc] site=... old=... new=...`)・work/probe3972/cc_sites.json で call site を引く。
