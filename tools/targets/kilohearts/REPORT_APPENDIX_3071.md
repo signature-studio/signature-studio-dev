@@ -193,7 +193,7 @@
 
 ## §KH-115 (#4722): stereo の呼出元 2 箇所に戻り xmm1 (残差) を配線 (生成 C の 2 行・突合は helper 単体のみ)
 - 測定 commit: `56ce407b9`。`git diff origin/main 56ce407b9 -- tools/targets/kilohearts/ghidra_route` = `patches.py` 2 規則のみ。
-- 機械語 (capstone・HeartCore.core_64 sha256 `d55ce8b4…` 一致): `180fcd9c8` / `180fce43e` = call `180fdfdb0` 直後の `movapd xmm4, xmm1`。残差は `180fcd7ac` で `[rsp+0x30]` へ退避し、偶数分岐の `dVar2*K*resid` と `resid + (...)` に入る。C の `param_2` の役と一致。
+- 機械語 (capstone・HeartCore.core_64 sha256 `d55ce8b4…` 一致): `180fcd9c8` / `180fce43e` = call `180fdfdb0` 直後の `movapd xmm4, xmm1`。残差は偶数分岐 (`180fcd782` 系) では `180fcd7ac` で `[rsp+0x30]` へ退避して `resid + (...)` に入り、奇数分岐 (`180fcd830` 系) では `180fcd854` で退避して `180fcd8c6` で読み戻す。C の `param_2` は両分岐で読まれるため、代入を分岐の前に置く。
 - 生成 C (stereo・closure 49 関数・`--fix bitcast,intload,stackpair,assoc,concat`): 基準 main 2345 行 → HEAD 2347 行 (+2 = `param_2 = kh_xmm1_180fdfdb0;` を 2 箇所)。規則 hit は各 1 件 (assert 通過)。
 - emcc (stereo, `-w -O1`): 基準 main 20 error・HEAD 20 error (内容一致)。受入「error 0」は未達 (既存 20 件は本 issue の範囲外)。
 - gain / haas / gate の生成 C: main 版 (`patches.py` のみ main に戻した再生成) と diff 0 行 (gain 122 行・haas/gate は cmp 一致)。
