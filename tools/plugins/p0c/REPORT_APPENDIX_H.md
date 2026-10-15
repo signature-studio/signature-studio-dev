@@ -82,7 +82,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 非 ext 鎖 census の buf_diff≠0 が 18 kernel (18.3 表) | 80 本 bit-exact の未達の本体。ext 鎖では 3 件 (0x5dfbe0・0x5dfc90・0x5dfdb0) が buf_diff=0 になる | #2182 [P0c-17] (既存・新規起票なし) |
-| 未測定 13 kernel (ABI 非 ok で CSV 対象外: 0x5de410 0x5de4b0 0x5de540 0x5de6a0 0x5de870 0x5deaa0 0x5df460 0x5df5a0 0x5dfa70 0x5e0380 0x5e11a0 0x5e12b0 0x5e1870) | 80 本の完全な判定ができない。0x5e12b0 は既存 #938 が担当。内訳 (Group B / abi-mismatch 等) は本測定では未分類 | 残りの分類は PM 判断 (#197 本文の更新時に付録 A/C の status と突き合わせる) |
+| 未測定 13 kernel (ABI 非 ok で CSV 対象外: 0x5de410 0x5de4b0 0x5de540 0x5de6a0 0x5de870 0x5deaa0 0x5df460 0x5df5a0 0x5dfa70 0x5e0380 0x5e11a0 0x5e12b0 0x5e1870) | 80 本の完全な判定ができない。内訳は Group B 12 + abi-mismatch 1 (0x5e12b0) で §20.3 に分類済み | §20.3 で記録。0x5e12b0 の旧担当 #938 は範囲外で closed (§20.4) → #3439 [P0c-21] |
 | Group B 12 本を出口条件に含めるか | 判定基準そのもの | PM 判断 (#197 本文の更新) |
 | harness の `maxulp` が 10^8 台を返す | 精度指標としては使えない (buf_diff のみで判定) | harness 修正は本 issue 外 |
 
@@ -177,3 +177,53 @@
   ```
   差分はコメント 1 行のみ。IR 出力は変わらない (`work/diff3/k80.hb.ll` を変更前の出力と `cmp` で byte 一致)。`1224865b` で `p0c4_abi_e2e.py 2000` を再実行: rc 0・27.8 秒・`run=67 ok=67 sig11=0`・全 67 kernel buf_diff=0。p0c_e2e.sh と 10000 case は `5d168e1e` の値をそのまま使う (実行される IR と実行コードは同一)。
 - 未検証: 0x5dffc0 の 10000 case 残差の原因 (19.3 の未解決)。80 本の完全判定 (#2182 の §18.6)。
+
+## 20. #197: 未測定 13 kernel と Group B 12 kernel の分類
+
+### 20.1 目的と判定規則
+
+- 目的: #197 の close 条件 (2026-10-15 の PM 改訂) のうち「未測定 13 本と Group B 12 本の分類が本付録に記録されていること」を満たす。
+- 判定: `tools/plugins/p0c/k80_unmeasured.py` は `k80_diff.py` の `build_argmodel` (slot 判定) と `GROUP_B_HELPERS` (外部 helper 呼出判定) をそのまま import して使う。独自の判定規則は持たない。
+  - `ok`: 差分試験の CSV に出る (census の対象)
+  - `groupb`: `GROUP_B_HELPERS` の外部 helper を呼ぶ (数値差分の対象外)
+  - `abi-mismatch`: 機械語が使う slot のうち IR 引数に割り当てられないものがある
+
+### 20.2 測定
+
+- 分類の測定 commit: `907c0c66e` (`k80_unmeasured.py` の追加。パイプラインのコードは無変更)。
+- 前段 (`e59ca23b9` = origin/main 起点・同じコード): `p0c_e2e.sh` rc 0・7 分 36 秒 (開始 load 0.40)、`p0c4_abi_e2e.py 2000` rc 0・35 秒 (`run=67 ok=67 sig11=0`)。素材は `fl-win64` のみ (`FL_WIN64_DIR`)、`/opt/retdec` は既存。
+- 分類 (`python3 tools/plugins/p0c/k80_unmeasured.py`、入力は差分試験 IR `work/diff3/k80.hb.ll`): **`total 80 / ok 67 / groupb 12 / abi-mismatch 1 / no-ir 0`**。`ok` 67 は census の CSV 67 件と一致する。
+- `907c0c66e` から HEAD までのコード差分: 本節を含む commit は REPORT のみを変える。`git diff --stat 907c0c66e HEAD -- tools/plugins/p0c ':!*REPORT*'` の出力は空。
+
+### 20.3 分類結果
+
+**未測定 13 本 = Group B 12 本 + abi-mismatch 1 本** (Group B 12 本は全て未測定 13 本に含まれる。重なり 12)。
+
+Group B 12 本 (数値差分の対象外。外部 helper の呼出先は kernel 表 80 本の外にある):
+
+| 外部 helper | kernel 数 | kernel |
+|---|---:|---|
+| `function_5de330` | 3 | 0x5de410 0x5de4b0 0x5de540 (f80 分類: cmpsel / f64mem) |
+| `function_40d840` + `function_43c5e0` | 7 | 0x5de6a0 0x5de870 0x5deaa0 0x5df460 0x5df5a0 0x5dfa70 0x5e0380 |
+| `function_5d10b0` | 1 | 0x5e11a0 |
+| `function_408810` | 1 | 0x5e1870 |
+
+- `k80_diff.py` の `HELPER_CIMPL` に C 実装があるのは `function_409d00` / `function_409df0` (cvtsd2si / cvttsd2si) だけで、上の 5 helper は生成物で fail-fast stub (呼ばれたら exit 9) になる。そのため差分試験は走らない。対象にするには 5 helper の C 実装 (Delphi RTL / x87 helper の意味論) が要る。
+- 扱い: 数値差分の対象外のまま記録する。出口条件から外すか許容条件として残すかは PM 判断 (#197 本文)。
+
+abi-mismatch 1 本:
+
+| kernel | 区分 | 詳細 | 担当 |
+|---|---|---|---|
+| 0x5e12b0 | abi-mismatch | 未割当の使用 slot: xmm0, xmm1 (IR は `define i64 @function_5e12b0()` の引数ゼロ) | 起票 #3439 [P0c-21] |
+
+### 20.4 担当と残件 (close 条件への当てはめ)
+
+- **§18.6 の訂正**: 0x5e12b0 の旧担当 #938 (`[T-SH-22]`) は libkio の受入 (`Fix_RCSf` / `LimitFloat_RCSfff` 40/40) で 2026-10-14 に closed。0x5e12b0 はその受入範囲に含まれない。open の担当が無かったため #3439 [P0c-21] を起票した (親 #197)。
+- open のまま残る P0c 系 issue (PM の close 条件表には無いが、80 本の bit-exact に効く):
+  - #3280 [P0c-19]: 0x5dffc0 の 10000 case で buf_diff=3 (2000 case は 0)
+  - #3281 [P0c-20]: RetDec raw lift の x87 スタック参照・xmm 入替えの一般 pass 化 (手書き本体 `k80_hand_bodies.py` の削減)
+  - #1283 [P0c-16]: ext 鎖の f80 2 本と hs_e2e の skip 原因 (依存: #2510・#2566 は open)
+  - #3439 [P0c-21]: 0x5e12b0 (新規)
+- Group B 12 本: §20.3 のとおり数値差分の対象外。扱いは PM 判断。
+- 結論: 未測定 13 本の分類は本節で記録した。#197 の close は、上の open な担当 issue (#1283・#3280・#3281・#3439) の扱いと Group B 12 本の扱いを PM が決めてからになる。
