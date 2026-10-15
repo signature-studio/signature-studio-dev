@@ -566,7 +566,8 @@ export function createMockEngine() {
     "device.setHasMeters": () => { st.hasMeters = true; },
     // PY-231 (#3671): PE 0xd748e0 (書式 ii)。判定順は midiOutMsg と同じ (-7 → -6)。送るのは第 1 引数の word。mode は stub 名 (PE の kwlist 名は forwardTo・REPORT_PY231 §1)
     // PY-276 (#3949): PE 0xfdc8a0 は添字の値が変わったときだけ送る。C (fl_engine.c) と同じく未設定 (-1) から始め、範囲外の添字は重複検出せず送る
-    "device.forwardMIDICC": (message, mode = 1) => {
+    // message 欠落は C の既定 0 と同じ (JS の TypeError にしない)
+    "device.forwardMIDICC": (message = 0, mode = 1) => {
       if (!st.devAssigned) throw new FlError("Device not assigned", 7);
       if (!st.linkAssigned) throw new FlError("Linked device not assigned", 6);
       const w = Number(BigInt.asUintN(32, BigInt(message)));

@@ -149,6 +149,33 @@ if (dedupWasmCount !== dedupExpectWords.length) diffs.push({ state: "dedup wasm 
 if (dedupMockWords.length !== dedupExpectWords.length) diffs.push({ state: "dedup mock count", expect: dedupExpectWords.length, mock: dedupMockWords.length });
 diffs.push(...dedupDiffs.map((d) => ({ dedup: true, ...d })));
 
+// PY-276 追補 (review): 割当判定は重複判定より前 (PE 0xd748e0 は -7 → -6 → 0xfdc8a0)。
+// V を送った後に未割当で同じ添字・値を呼ぶと -7 (送らない)、割当に戻して同じ V を呼ぶと重複で送られない。
+const assignDedupSeq = [
+  [[1, 1], ["device.forwardMIDICC", [0x44, 5]], "ok"],
+  [[0, 1], ["device.forwardMIDICC", [0x44, 5]], 7],
+  [[1, 1], ["device.forwardMIDICC", [0x44, 5]], "ok"],
+];
+const assignDedupDiffs = [];
+const assignDedupCodes = [];
+const assignDedupBefore = wasm.midiOutCount();
+mock.state.midiOut.length = 0;
+for (const [[dev, link], [name, args], expect] of assignDedupSeq) {
+  mock.state.devAssigned = !!dev;
+  mock.state.linkAssigned = !!link;
+  wasm.setDeviceLink(dev, link);
+  const a = run(mock, name, args);
+  const b = run(wasm, name, args);
+  assignDedupCodes.push(codeOf(b));
+  if (codeOf(b) !== expect) assignDedupDiffs.push({ state: "assign dedup expect", args, expect, wasm: b });
+  if (JSON.stringify(a) !== JSON.stringify(b)) assignDedupDiffs.push({ name, args, dev, link, mock: a, wasm: b });
+}
+const assignDedupWords = wasm.midiWords().slice(-1);
+const assignDedupMock = mock.state.midiOut.map((m) => Number(m.message) >>> 0);
+if (wasm.midiOutCount() - assignDedupBefore !== 1) assignDedupDiffs.push({ state: "assign dedup wasm count", expect: 1, wasm: wasm.midiOutCount() - assignDedupBefore });
+if (JSON.stringify(assignDedupMock) !== JSON.stringify([0x44]) || JSON.stringify(assignDedupWords) !== JSON.stringify([0x44])) assignDedupDiffs.push({ state: "assign dedup words", expect: [0x44], mock: assignDedupMock, wasm: assignDedupWords });
+diffs.push(...assignDedupDiffs.map((d) => ({ assignDedup: true, ...d })));
+
 const linkedIdx = [-1, 0, 7];
 const linkedRes = [];
 for (const [dev, link] of [[1, 1], [0, 0]]) {
