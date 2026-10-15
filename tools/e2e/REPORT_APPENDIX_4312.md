@@ -17,4 +17,4 @@
 
 - `bash tools/e2e/run.sh --driver both --targets preview,edge-sim` (`EMSDK_ENV` = 展開した emsdk・`TMPDIR=$RUNNER_TEMP`): **PASS 46 / FAIL 0 / SKIP 6**、rc 0、wall 57 s (ビルド・ゲスト emcc を含む)。基準 46 を下回らない。
 - `gui-guest-boot` は 4 組とも PASS (実測 231〜725 ms・`frames=1`・`guest=test`・320x120)。
-- 素材: `toolchain-emsdk` (emcc 6.0.12) を `$HOME/artifacts` から展開して使用。`fl-win64` は本検証では不要。mingw (`x86_64-w64-mingw32-gcc`) は `build_guest.sh` が apt で導入する。
+- 素材: `toolchain-emsdk` (emcc 6.0.12) を素材置き場から展開して使用。`fl-win64` は本検証では不要。mingw (`x86_64-w64-mingw32-gcc`) は `build_guest.sh` が apt で導入する。
