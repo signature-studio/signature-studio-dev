@@ -29,10 +29,22 @@ def sig(c):
 
 
 def wasm_elapsed(c):
-    t = c.get('timing') or c.get('refine_timing')
-    if not t or 'wasm' not in t:
-        return None
-    return t['wasm'].get('elapsed_s')
+    """wasm 側の実測秒と出所。timing.wasm (元の run) を優先する。無ければ refine_timing.elapsed_s の
+    再試行 (元の run ではない) の最大秒。どちらも無ければ (None, None)。"""
+    t = c.get('timing')
+    if t and 'wasm' in t:
+        return t['wasm'].get('elapsed_s'), 'run'
+    vals = [v for v in (c.get('refine_timing') or {}).get('elapsed_s') or [] if v is not None]
+    if vals:
+        return max(vals), 'refine'
+    return None, None
+
+
+def fmt_elapsed(e):
+    v, src = e
+    if v is None:
+        return '-'
+    return '%.3f%s' % (v, '(再試行)' if src == 'refine' else '')
 
 
 def main(argv):
@@ -62,14 +74,14 @@ def main(argv):
     for kind, n in kinds.most_common():
         print('      wasm %-32s %4d' % (kind, n))
     for r in diff_rows:
-        ea = '%.3f' % r[4] if r[4] is not None else '-'
-        eb = '%.3f' % r[5] if r[5] is not None else '-'
-        print('      %s %-14s A=%s B=%s  wasm_s %s -> %s' % (r[0], r[1], '/'.join(map(str, r[2])), '/'.join(map(str, r[3])), ea, eb))
+        print('      %s %-14s A=%s B=%s  wasm_s %s -> %s' % (r[0], r[1], '/'.join(map(str, r[2])), '/'.join(map(str, r[3])),
+                                                         fmt_elapsed(r[4]), fmt_elapsed(r[5])))
     if tsv:
         with open(tsv, 'w') as f:
             f.write('va\tcase\tA\tB\tA_wasm_s\tB_wasm_s\n')
             for r in diff_rows:
-                f.write('%s\t%s\t%s\t%s\t%s\t%s\n' % (r[0], r[1], '/'.join(map(str, r[2])), '/'.join(map(str, r[3])), r[4], r[5]))
+                f.write('%s\t%s\t%s\t%s\t%s\t%s\n' % (r[0], r[1], '/'.join(map(str, r[2])), '/'.join(map(str, r[3])),
+                                                    fmt_elapsed(r[4]), fmt_elapsed(r[5])))
 
 
 if __name__ == '__main__':
