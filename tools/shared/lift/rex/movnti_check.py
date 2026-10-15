@@ -4,7 +4,8 @@
   lift/fle_lifted.c (ott_unsup(VA, "movnti ...") の 24 件) / native_stderr.txt ('[native] crash case=N ... addr=0x..')。
 判定 (exit 0 = 期待どおり):
   実装 : fle_lifted.c に movnti の ott_unsup が 0 件であること (x64c が ST64 に lift 済み・#3893)。1 件でも残れば FAIL。
-  reach : arena を 0x80000 にした (lift_x64c.sh movnti・#4324)。reach 16 件は native と wasm の両方が trap せず完了し、arena が一致すること。
+  reach : arena を 0x80000 にした (lift_x64c.sh movnti・#4324)。reach 16 件は native と wasm の両方が trap せず完了し、arena が一致し、
+          arena[0:a1] が全 0 (memset が走った証拠。gen_movnti.py の番兵 [0x10000, 0x70000) が非ゼロのため、走らなければ FAIL)。
   sweep : 閾値 (movnti に入る ⇔ a1 ≥ 0x70000) の判定は、x64c 後は movnti の VA で trap しないため判定に入れない。表示のみ (#3894)。
 usage: movnti_check.py W
 """
@@ -35,19 +36,24 @@ was_rec = open(f'{W}/res_wasm.bin', 'rb').read()
 CRASH = 0xC2A5C2A5C2A5C2A5
 reach_ok = 0
 va_seen = set()
+memset_ok = 0
 for i, e in enumerate(expect):
     t = trap.get(i)
     n = native.get(i)
     if e['kind'] == 'reach':
         a = nat_rec[i * RES_REC:(i + 1) * RES_REC]
         b = was_rec[i * RES_REC:(i + 1) * RES_REC]
-        done = n is None and t is None and a[:8] != CRASH.to_bytes(8, 'little') and a[16:16 + lay['arena_sz']] == b[16:16 + lay['arena_sz']]
+        a1 = e['a1']
+        zero = not any(a[16:16 + a1]) and not any(b[16:16 + a1])
+        memset_ok += zero
+        done = n is None and t is None and a[:8] != CRASH.to_bytes(8, 'little') and a[16:16 + lay['arena_sz']] == b[16:16 + lay['arena_sz']] and zero
         reach_ok += done
         if t is not None: va_seen.add(t)
     print(f'[movnti] case={i:2d} {e["kind"]:7s} fn={e["fn"]} a1={e["a1"]:#x} wasm_trap_va={(f"{t:#x}" if t is not None else "-"):12s} native_fault={(f"{n:#x}" if n is not None else "-"):12s}')
 nr = sum(1 for e in expect if e['kind'] == 'reach')
 reach_bad = nr - reach_ok
 print(f'[movnti] reach: arena 内で完了 (native と wasm が arena を一致・trap なし) {reach_ok}/{nr}・不一致 {reach_bad}')
+print(f'[movnti] reach: memset 通過 (native と wasm の両方で arena[0:a1] が全 0) {memset_ok}/{nr}')
 print(f'[movnti] wasm trap VA の種類 = {sorted(hex(v) for v in va_seen)}')
 reach_pass = reach_bad == 0
 if bad == 0 and reach_pass:

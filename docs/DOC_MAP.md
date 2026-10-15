@@ -969,7 +969,7 @@
 | `tools/shared/lift/rex/REPORT_APPENDIX_2870.md` | ~50 | rex REPORT §9 全文 (T-SH-46 #2870: 成功経路 (戻り値 1 / 3) と arena 書込の一致・落ちる case の分類・未解決) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2896.md` | ~41 | rex REPORT §10 の旧版全文 (T-SH-47 #2896: REX_SIDE フラグと owner/rex_side.wasm の旧測定 (測定 commit `105733875`・133 件版)。最新は REPORT §10) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_3589.md` | ~50 | rex REPORT の付録 (T-SH-90 #3589: movnti の到達 (memset 8 箇所は a1 ≥ 0x70000 で入力だけで到達・memcpy 16 箇所は直接 call では到達しない)・x64c 対応の要否・未解決) |
-| `tools/shared/lift/rex/REPORT_APPENDIX_4324.md` | ~45 | rex REPORT の付録 (T-SH-117 #4324: movnti reach 16 件を arena 0x80000 と ctx のロック構造で arena 内に完了させた決定と実測 (all ALL OK・reach 16/16)・sweep の trap VA 表示の変化) |
+| `tools/shared/lift/rex/REPORT_APPENDIX_4324.md` | 38 | rex REPORT の付録 (T-SH-117 #4324: movnti reach 16 件を arena 0x80000 と ctx のロック構造で arena 内に完了させた決定と実測 (all ALL OK・reach 16/16)・sweep の trap VA 表示の変化) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_3894.md` | ~40 | rex REPORT の付録 (T-SH-94 #3894: info 4 件の trap の原因 (ハーネス入力の arena 越境・lift の欠陥ではない)・movnti 閾値 0x70000 の sweep 実測 64/64) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2969.md` | ~45 | rex REPORT の付録 (T-SH-48 #2969: 中核閉包 (REXCreate / REXGetInfoFromBuffer / REXRenderSlice) の owner tier 配置と REX_SIDE 除外の実測。測定 commit `9593fe1c1`) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_4833.md` | ~60 | rex REPORT §12 (T-SH-129 #4833: `.data` 書込 stub の到達元 (DllMain `reason==1` 経路)・呼出連鎖・DllMain 閉包の規模 (import 63・movnti 24)・実行方法 (方式 A)。測定 `writer_chain.py` (静的)) |

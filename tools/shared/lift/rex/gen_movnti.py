@@ -74,7 +74,7 @@ def reach_case(a1):
         for k in range(0, 0x700, 4):
             struct.pack_into('<I', arena, base - ARENA + k, 1)
     struct.pack_into('<I', arena, B_ + 0x62c - ARENA, 0)
-    struct.pack_into('<QQQ', arena, NODE - ARENA, 0, 0, key_of(OBJ))
+    struct.pack_into('<QQQ', arena, NODE - ARENA, 0, 0, OBJ)  # 検索キー key_of(a0) = OBJ と一致させる (key_of は対合)
     struct.pack_into('<Q', arena, OBJ + 0x630 - ARENA, S_)
     struct.pack_into('<Q', arena, OBJ + 0x690 - ARENA, B_)
     struct.pack_into('<Q', arena, OBJ + 0x20 - ARENA, Z_)
@@ -82,6 +82,7 @@ def reach_case(a1):
     struct.pack_into('<Q', arena, CTX_OFF + 0x20, NODE)
     struct.pack_into('<Q', arena, CTX_OFF + 8, LK)
     struct.pack_into('<Q', arena, LK - ARENA, 0x10)
+    arena[0x10000:0x70000] = b'\x01' * (0x70000 - 0x10000)  # memset(arena, 0, a1) が走った証拠: 走らなければ非ゼロが残る (#4324)
     out.append(struct.pack('<IIQQQQQ', 0, 0, key_of(OBJ), a1, ARENA, 0, ARENA + CTX_OFF) + bytes(arena))
     expect.append({'kind': 'reach', 'fn': 0, 'a1': a1})
 
