@@ -228,9 +228,34 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 - ネガティブコントロールは round 6b (`b3c3dafdd`) の値を引き継ぎ、今回は再実行していない (device 関数の C / mock は変わっていない)。
 - 負荷: load average は未計測。各検査は単発の直列実行。
 
+## 再測定 (取り込み後 round 9・測定 commit `1a568288b`・main `43cabef4c` 取り込み後)
+
+- 測定 commit: `1a568288b` (`origin/main` (`43cabef4c`) を merge した `eb6e8deaa` の後、`tests/provider_check.mjs` の件数 assert だけを変えた commit。コードを変えた最後の commit)。取り込みで main の `pe128` (ui 2 件・#3005) を PR 側の判定 `if` に併存させ、件数 assert を **195** 実装・**240** 未実装にした (`fl_table.c` のハンドラ数 195 と一致)。`provider/fl_engine.c`・`host/fl_mock.mjs` は自動 merge。
+- 測定 commit から HEAD までのコード差分: `git diff 1a568288b HEAD -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (本節を書いた commit は `tools/python/REPORT_PY206.md` と PR 本文だけを変える)。
+- 素材・入力: `fl-win64` を `/home/runner/work/_temp/fl` に全展開 (`tar --zstd -xf`・8 秒)、`fetch_inputs.sh` rc 0。`FLPY_SKIP_TABLE=1 build_flpy.sh` の入力は追跡済みの `flapi_table.json`。
+
+| 検査 | 結果 | rc |
+|---|---|---|
+| `bash provider/build.sh` | `fl_table.c: 435 関数, ハンドラ 195` | 0 |
+| `bash build_cpython_wasm.sh` | 新規ビルド・python.wasm 生成 | 0 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | flpy.js / flpy.wasm 生成 | 0 |
+| `node tests/provider_check.mjs` (§3 flpy 段を含む) | functions 435・**implemented 195**・unimplemented 240・mcp_static 60・PASS | 0 |
+| `node tests/device_diff.mjs` | calls 21・link_calls 9・rejects 10・midi_out 11・**diffs 0**・PASS | 0 |
+| `node tests/*_diff.mjs` (23 本・`screen_menu_diff` を含む) | 全て **PASS** (diffs 0) | 0 |
+| `node tests/all_tools.mjs` (JS mock) | **48/48 ok**・soft_error 0・raised 0・host_calls 37,425 | 0 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | **48/48 ok**・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 0 |
+| `node tests/midi_script.mjs` / `node tests/ilmcp_e2e.mjs` | MIDI SCRIPT OK (checks 29・failed []) / PASS | 0 |
+| `FL_WIN64_DIR=/home/runner/work/_temp/fl node tests/pyscript_e2e.mjs` | **72 PASS・FAIL 0** (3 秒) | 0 |
+
+- ネガティブコントロール (測定 commit `1a568288b` で再実行。`host/fl_mock.mjs` を一時変更し、`device_diff.mjs` の件数を記録してから元に戻した):
+  - (a) `device.getMasterSync` を `return true` → **device 差分 2 件**・exit 1 (REPORT の前回値 2 件と一致)
+  - (b) `device.setMasterSync` を `st.masterSync = false` → **device 差分 1 件**・exit 1 (前回値 1 件と一致)
+  - 復元後 `device_diff.mjs` は rc 0。
+- 負荷: load average は未計測。各検査は単発の直列実行。
+
 ## 検証範囲 / 範囲外
 
-- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (測定 commit `a2ecafa0b` で 435 = 実装 183 + 未実装 252)。
+- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (測定 commit `1a568288b` で 435 = 実装 195 + 未実装 240)。
 - 範囲外 (未確定のまま残す): 実 FLEngine 上の状態値 (idle・midi-out・master sync の初期値)、通知 3 件の vtbl 先の効果、`setMasterSync` の述語 P 偽 (-2) の発生条件、`0x1366e00`・`0xfd7170`・`0xfd7240` の効果、-6/-7 の実発生。
 - KPI: device API は起動・GUI に関わらないため、起動 KPI (`tools/flelift/boot/REPORT.md`) は動かしていない。
 
@@ -241,4 +266,4 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 | 残り 25 関数 (MIDI 送信・dispatch 系 13 / linked control 系 8 / その他 4) | device 系の未実装 25 件 (C provider は Unspecified error) | #3566 (PY-214・13 関数)・#3568 (PY-215・8 関数)・#3569 (PY-216・4 関数) |
 | 状態値の実機初期値 (idle / midi-out / master sync) | 実 FLEngine の値と mock の値が異なりうる | 子 #3566・#3568・#3569 の受入に含めない。`general` 系と同じく仮置きのまま、実機測定の子を別途起票する (PM 判断) |
 | P 偽 (-2) と vtbl 先の効果 | `setMasterSync` / 通知 3 件の副作用が C/mock で模擬されない | 同上 (PY-125 の `REPORT_PY125` §4 と同じ未解決として扱う) |
-| 7 関数は未割当 (`q`=0) の status -7 を返さない (assigned を仮定)。`getMasterSync` の -6 も同じ。PE は -7・-6 を返す | 未割当で呼んだ戻りが実機と異なる。`midiOutMsg` (PY-227・`fl_engine.c`) は未割当で -7 を返すため、device 系の判定が揃わない | PM 判断 (本 PR では未起票)。対応する場合は C の `if (!dev_assigned)`・mock の `devAssigned` を入れ、`device_diff` に未割当のケースを足す |
+| 7 関数は未割当 (`q`=0) の status -7 を返さない (assigned を仮定)。`getMasterSync` の -6 も同じ。PE は -7・-6 を返す | 未割当で呼んだ戻りが実機と異なる。`midiOutMsg` (PY-227・`fl_engine.c`) は未割当で -7 を返すため、device 系の判定が揃わない | PM 判断の既定案 (2026-10-15・PM agent の判断待ち): 現状どおり assigned を仮定し、本表で追跡する。C/mock で返すかは未決定。本 PR では未起票。対応する場合は C の `if (!dev_assigned)`・mock の `devAssigned` を入れ、`device_diff` に未割当のケースを足す |

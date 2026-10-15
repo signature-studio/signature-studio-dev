@@ -596,7 +596,7 @@
 | `tools/python/REPORT_PY16.md` | ~100 | PY-16 (#654): stubs 既定値 `midi.*` の評価 (eval 撤去・許可式の評価器・検証・ネガコン) の全文 (REPORT.md §15 の分割移動) |
 | `tools/python/REPORT_PY80.md` | 93 | PY-80 (#2633): 静的版 (flpy_static) のサブインタプリタは達成。Memory64 は部分 (validate は node 22.23 で不可・headless Chrome 154 で可、実行検証は未了)。`_PyInterpreterState_GetRefTotal` は FL PE が呼ばない。結論の正本は REPORT の結論表。pthread+GIL は子 #2856 (PY-97)、Memory64 実行は子 #2858 (PY-98) |
 | `tools/python/REPORT_PY27.md` | ~70 | PY-27 (#1138): ui / general / screen / arrangement / launchMapPages の mock 対応状況・`tests/ui_diff.mjs` の結果・保留 150 件 |
-| `tools/python/REPORT_PY206.md` | 148 | PY-206 (#3494): device 系 32 関数のうち PE 確定の 7 関数 (通知 3・状態読出し 3・setMasterSync 1) の VA 表と C/mock 実装。値は仮置き。残り 25 関数は子 issue (本文の未解決表) |
+| `tools/python/REPORT_PY206.md` | 269 | PY-206 (#3494): device 系 32 関数のうち PE 確定の 7 関数 (通知 3・状態読出し 3・setMasterSync 1) の VA 表と C/mock 実装。値は仮置き。残り 25 関数は子 issue (本文の未解決表) |
 | `tools/python/REPORT_PY125.md` | ~95 | PY-125 (#3001): dispatch `0xd843d0` の out の写し方・clearLog / dumpScoreLog の戻り値 None (mock/C 差分 0)・`0x11eb5f0` の効果。`0x124c020`・-2 の報告ゲートは未確定 (子 #3045) |
 | `tools/python/REPORT_PY126.md` | ~55 | PY-126 (#3002): processRECEvent の `0xd84740` の呼出し鎖と out の構造 (status・結果 int32) を確定。戻り値の式 (`0x1046a30`) は未確定で mock/C 未実装 (子 PY-235)。解析は `analysis/py126_process_rec_chain.py` |
 | `tools/python/REPORT_PY235.md` | ~90 | PY-235 (#3701): processRECEvent の `0x1046a30` の eventId 族の分岐と戻り値 `[rbp+0x5b8]` の書込み census を CFG で確定。R-other 族の成功経路 (戻り値 = value) を mock/C に実装。gate・固定 4 族・0x70000000 族と index 族は子 PY-251〜253。解析は `analysis/py235_process_rec_families.py` |
