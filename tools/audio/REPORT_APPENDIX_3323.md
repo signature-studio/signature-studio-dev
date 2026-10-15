@@ -20,7 +20,7 @@
 | asio_sine_b256_96k (96k) | 3 | 3/3 | 0 | 1920 | 2048 | 2816 | 95992–96004 | 3/3 |
 | asio_sine_b512_96k (96k, B=512) | 3 | 3/3 | 0 | 1920 | 2048 | 3072 | 96009–96028 | 3/3 |
 
-- rep 別の burst_runs (n) は 528〜533 (48k)・531〜533 (96k)。probe の `worklet.wait` は既存 §9-2 と同じ結果 (timed-out・20 ms)。
+- rep 別の burst_runs (n) は 531〜532 (3 条件とも)。probe の `worklet.wait` は既存 §9-2 と同じ結果 (timed-out・20 ms)。
 - 注: `burst_hist` の末尾 bin は ≥15872 f を含むため、p99 がそこに入ると 16384 と出る (`REPORT_APPENDIX_3151.md` §12 と同じ制約)。今回の値は末尾に入っていない。
 
 ## C. 既存 PASS 判定
