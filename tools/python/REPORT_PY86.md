@@ -151,7 +151,7 @@
 - 未確定の理由: (a) `TDBXStreamValue` の `+0x18` は、全域 74 件から Self 型のものを分ける必要がある。(b) `TGenericPlugin` の `+0x7a0` は、走査範囲 (mov の reg 基底のみ) では書かれていない。コンストラクタ・初期化の経路 (`lea` 経由の VMT 書込み) を VMT の RIP 相対 `lea` 検索で特定できなかった (両 VMT とも参照 0 件)。RTTI / フィールド表から宣言型を引いていない。
 - 結論: 群 C の 2 件は**型を確定できなかった**。件数 (受入 2b) の不確定は 27 件のまま (群 C の 2 件は残る)。
 - 次に必要な情報: `TDBXStreamValue` のコンストラクタと `TGenericPlugin` の初期化関数 (フィールド表の宣言型)。
-- 追加の確認 (`analysis/py5144_ctor.py`・n=1・1.47 秒・load 1.15 / 1 分平均): 両 VMT のアドレス (`0xb07378`・`0xb655c8`) を即値 (`mov`・`movabs` 等) または `lea [rip+…]` で書く命令は .text 全域で **0 件**。生バイト検索 (`fl-win64` の `block00031_PE.bin`) でも、4 バイトの VMT 即値は 4 箇所とも `.text` 内 (生データ offset 0x400〜0xfa3a00・データ領域で命令の一部ではない) で、`.data` (VA 0x13a5000〜) にはヒットしない。TDBXStreamValue (0xb07378) は file offset 0x7066b0 (VA 0xb072b0)・0x707079 (VA 0xb07c79)、TGenericPlugin (0xb655c8) は 0x764900 (VA 0xb65500)・0x764db0 (VA 0xb659b0)。コードからの参照ではない。したがって、この 2 クラスのコンストラクタは、VMT を直接書く形では特定できない (Delphi のクラス参照テーブル等の間接経路の可能性)。
+- 追加の確認 (`analysis/py5144_ctor.py`・commit `117b91c07`・n=1・1.93 秒 (real)・load 0.47 / 1 分平均): 両 VMT のアドレス (`0xb07378`・`0xb655c8`) を即値 (`mov`・`movabs` 等) または `lea [rip+…]` で参照する命令は .text 全域で **0 件**。生バイト検索 (`fl-win64` の `block00031_PE.bin`) でも、4 バイトの VMT 即値は 4 箇所とも `.text` 内 (生データ offset 0x400〜0xfa3a00・データ領域で命令の一部ではない) で、`.data` (VA 0x13a5000〜) にはヒットしない。TDBXStreamValue (0xb07378) は file offset 0x7066b0 (VA 0xb072b0)・0x707079 (VA 0xb07c79)、TGenericPlugin (0xb655c8) は 0x764900 (VA 0xb65500)・0x764db0 (VA 0xb659b0)。コードからの参照ではない。したがって、この 2 クラスのコンストラクタは、VMT を直接書く形では特定できない (Delphi のクラス参照テーブル等の間接経路の可能性)。
 - 結論 (本 run): 群 C の 2 件の受け手の型は**引き続き未確定**。残りの手がかり (フィールド宣言型) は、RTTI / フィールド表の解析 (未着手) が要る。
 
 | 未解決 | 影響 | 起票先 |
