@@ -76,8 +76,17 @@
 
 ## 6. 未解決
 
+### 6.1 `0x412acf` の呼出し元 (FLE-46・#5443)
+
+- **静的**: `0x412a82`〜`0x412adf` は `int3` パディングで、実体は関数 `f_412a90` (`0x412a90`〜`0x412ada`)。`0x412acf` は `call 0x4096b0` (`ecx=0xd9`)。
+- **lift 条件**: 既定 root には `f_412a90` が無く、lift 出力に `0x412a82`〜`0x412adf` が出ていなかった (`x64c --closure 2` の既定 root からの到達不可)。`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` で root に足すと、`f_412a90` と `0x412acf` の `call` が lift 出力に入る (`fle_lifted_s0.c`)。既定ビルドは不変。
+- **到達性 (PE 全体)**: `0x412a90` を指す参照は `rel32 call` 1 件 (`0x412b24`) のみ。絶対アドレス・関数ポインタ・IAT からの参照は無い。`0x412b24` は `0x412b20: jmp 0x412b2f` の後ろで、`f_412ae0` の本体からは実行されない死んだ `call`。
+- **probe 結果** (`tools/flelift/boot/fle46_412acf_probe.sh`・陽性対照 `0x412a0d` 込み): boot (`FLE_IPP=3`・`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90`) で発火したのは陽性対照の `[EXITBR-caller] site=412a0d n=1` のみ。`site=412a90` (f_412a90 入口) と `site=412acf` は **0 件**。
+- **判定**: `0x412acf` は boot 中に実行されなかった (陰性)。`f_4096b0` の 4 呼出し元のうち `0x412acf` は除外。残りは `0x409553`・`0x409722`・`0x40c841`。
+- **測定 (実測)**: `fle6_measure.sh` (既定 root・`FLE_EXTRA_ROOTS` 未指定) で units 895・stopped 895・exit・rc 0・IPP ok (lift 80 s・clang 115 s・boot 9 s)。`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` でも units 895・exit・IPP ok (lift 80 s・clang 85 s・boot 10 s)。`boot_summary_fle46_default.json` に保存。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `f_4096b0` の 4 呼出し元 (`0x409553`・`0x409722`・`0x40c841`・`0x412acf`) のどれが boot で実行されたか | 途中のエラー経路の有無 | #5028 (`[FLE-40]`) |
+| `f_4096b0` の 4 呼出し元のうち `0x409553`・`0x409722`・`0x40c841` のどれが boot で実行されたか | 途中のエラー経路の有無 | #5028 (`[FLE-40]`) |
 | `[0x15eac80]`・`[0x15e6068]` の exit 直前の値 (`f_4128b0` の ExitProcess 分岐の条件) | exit が通った枝 (正常か後始末か) の判定。これが無いと正常/異常は未確定 | #5028 (`[FLE-40]`) |
 | 外側の関数の先頭と、`0x412a0d` に至る上位の呼出し経路 (m1) | exit の呼出し位置の静的根拠が閉じない | #5028 (`[FLE-40]`) |
