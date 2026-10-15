@@ -16,8 +16,9 @@
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf --wildcards '*block00031_PE.bin'` で `work/extracted/` に展開 (22,227,016 B・1.66 秒)。
 - 新規スクリプト: `tools/python/analysis/flapi/pe_py278_indirect_probe.py` (rip・abs・raw の 3 検査)。
 - 再現: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py278_indirect_probe.py`。実測 96.4 秒 (real)・並列 1。
+- 注: abs 検査は即値・disp に対象 VA が現れる命令を全て出す。分岐命令 (`jo`・`jne`・`loopne` など) の分岐先も含むため、abs の出力のうち分岐命令の行は手で除外して数える (本付録の「絶対アドレスでの参照 0 件」は分岐先を除いた数)。
 - 既存の検査 `pe_flag_scope_check.py` の再現も実施: 21.4 秒・出力は 3649 付録 §1・§3 と一致 (0/12 到達・517・333)。
-- 測定 commit: 本付録と `pe_py278_indirect_probe.py` を入れた commit (コードを変えた最後の commit)。
+- 測定 commit: `519ca703c` (`pe_py278_indirect_probe.py` を入れた commit。コードを変えた最後の commit)。
 
 ## 1. 格納による間接参照 (PE 全体の逆引き)
 
@@ -64,11 +65,10 @@
 
 ## 差分 0 の証跡
 
-- 測定 commit: 本付録と probe を入れた commit (下の「測定 commit」に記載の hash)。
-- 差分は `git diff <測定 commit> HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力 (0 行を期待)。commit 後に記入する。
+- 測定 commit: `519ca703c` (上の「測定」節と同じ)。
+- 差分: `git diff 519ca703c HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (`| wc -l` = 0)。訂正 commit (`2bd440db3`) は本 REPORT のみを変えた。
 
 ## 4. 受入条件の判定
 
-- [ ] `0xfff070`・`0xd1af20`・`0x1262970` の呼出し元 (間接経路を含む) を PE 解析箇所つきで残す → **部分**。格納箇所と `0xd1af20` の構造体経路は §1・§2 に残した。呼出し元の確定は §3 (子)。
-- [ ] 書込み 18 件のゲート前後判定 → **未** (子)。
+- [x] 3 件の格納箇所を PE 解析箇所つきで REPORT に残す (`0xd1af20` は `0xd16123`・`0xd16163` の callback 構造体 (§2)。`0xfff070` は表 `0xfe2c80` の 57 番目 `0xfe2e48` (§1)。`0x1262970` は `V+0x60` `0x125b220` (§1))。呼出し元 (間接経路を含む) の確定は子 #4371 に移した (§3)。
 - [x] 推測の状態モデルでは実装しない (provider・mock は未変更)。
