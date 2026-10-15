@@ -72,7 +72,7 @@
 ## 4. 測定 commit と差分
 
 - 測定 commit (§2 の実測): `fe41cc75`。コードを変えた最後の commit は `8391cf741` (set* の修正と改名)。
-- **修正後の 110 件の再測定は未実施**。`boot_final.ll`・`nonimm_class_rows.json`・PE (`block00031_PE.bin`) が runner に無いことを確認した (`$HOME/artifacts` は `fl-win64.tar.zst` のみ)。入力は `oc_artifacts: fl-win64 work-m11` の run で取得できる (`work-m11` は #516 以前の生成物で、`m11_e2e.sh --full` の再生成 (633 秒以上) とは一致しない。件数の比較は同じ入力どうしで行う)。その run で §2 の手順を流し、§2 の表 (理由列)・本節を更新する。
+- **修正後の 110 件の再測定は未実施**。`boot_final.ll`・`nonimm_class_rows.json`・PE (`block00031_PE.bin`) が runner に無いことを確認した (素材の置き場 `ARTIFACTS_DIR` には `fl-win64.tar.zst` のみ)。入力は `oc_artifacts: fl-win64 work-m11` の run で取得できる (`work-m11` は #516 以前の生成物で、`m11_e2e.sh --full` の再生成 (633 秒以上) とは一致しない。件数の比較は同じ入力どうしで行う)。その run で §2 の手順を流し、§2 の表 (理由列)・本節を更新する。
 - 測定経路の差分: `git diff fe41cc75 HEAD -- tools/m11/m11_post.py tools/m11/m11_argrecover.py tools/m11/m11_setother_nonimm_class.py tools/m11/ldfix/ldmach.py` は 0 行 (前段の手順と ldmach は測定時と同一)。変わったのは分類器だけ (測定時 `m11_setother_mem_class.py`・現 `m11_setother_slot_class.py`。`df4801b10`・`8391cf741`)。
 - 件数が変わらないことの論拠 (実測ではない): 修正は `load_def` に早期 return を足すだけで、他の判定値は変えない。修正後に実値化を返す行は、修正前も同じ格納で実値化を返す行の部分集合になる。修正前の load_stack の実値化は 0 件なので、修正後も 0 件。lea 行は `load_def` を通らないので不変。よって 実値化 25・未決 85 は変わらない見込み。ただし理由ラベルは変わりうる (§2 の理由列は測定時の値)。
 - 前回の記録 (出力 `mem_class_rows_head.json` の sha `b73f8515…`) は、出力先が gitignore の `work/` で repo から照合できないため取り下げた。
