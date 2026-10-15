@@ -287,7 +287,7 @@ EMSCRIPTEN_KEEPALIVE double m11_p2780_get(int k, int f) { return (k >= 0 && f >=
 #if M11_RT_NODATA_BODY
 /* #2275 (既定 0): m11_dest_obs の本体 (dest の読出し・指紋の更新・rec の store) は残し、名前付きの静的状態 (g_dest_h・g_dest_n・g_rec_*) を外す。
  * 状態は呼出しごとのスタック上の volatile 変数に置く (store・load の命令は残る)。
- * 静的領域の大きさは元と同じ (g_pad_nd_h 8B・g_pad_nd_bss 16392B) なので、後続の配置と heap 開始位置は動かさない。 */
+ * 静的領域の大きさは元と同じ (g_pad_nd_h 8B・g_pad_nd_n 8B と g_pad_nd_rec 16384B の合計 16392B) なので、後続の配置と heap 開始位置は動かさない。 */
 static unsigned long long g_pad_nd_h __attribute__((used)) = 1469598103934665603ULL;
 static unsigned long long g_pad_nd_n __attribute__((used));   /* g_dest_n と同じ 8B */
 static unsigned long long g_pad_nd_rec[2048] __attribute__((used));   /* g_rec_* 4 本分 (16B 整列は g_rec_st と同じ) */
