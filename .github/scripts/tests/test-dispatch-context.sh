@@ -329,11 +329,13 @@ esac
 GHEOF
 chmod +x "$PMBIN/gh"
 # pmctx <client_payload json> [author-assoc] [author-login] [author-type] [body]: 結果は $TMP/{out,env,log,comment,pmtarget}
+# PMBOT が設定されていれば OC_PM_BOT_LOGIN=$PMBOT で渡す。未設定なら unset する (実行環境の値に依存しない)。
 pmctx() {
   rm -rf "$TMP/rt"; mkdir -p "$TMP/rt"
   printf '{"action":"oc-pm","client_payload":%s}' "$1" > "$TMP/ev.json"
   : > "$TMP/out"; : > "$TMP/env"
   PATH="$PMBIN:$PATH" GH_TOKEN=tok FAKE_PM_AUTHOR_ASSOC="${2:-MEMBER}" FAKE_PM_AUTHOR_LOGIN="${3:-pm}" FAKE_PM_AUTHOR_TYPE="${4:-User}" FAKE_PM_BODY="${5:-本文}" \
+    env -u OC_PM_BOT_LOGIN ${PMBOT+OC_PM_BOT_LOGIN="$PMBOT"} \
     GITHUB_EVENT_PATH="$TMP/ev.json" RUNNER_TEMP="$TMP/rt" GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" \
     GITHUB_EVENT_NAME=repository_dispatch OC_PERMISSION=write GITHUB_REPOSITORY=o/r \
     bash "$SCRIPT" > "$TMP/log" 2>&1
@@ -385,6 +387,28 @@ expect "oc-pm: a target by the reviewer App is allowed" $?
 pmctx '{"kind":"stuck","ref":5}' NONE 'oc-reviewer-for-signature-studio-evil[bot]' Bot
 out_has 'should_run=false'
 expect "oc-pm: a look-alike bot login is refused" $?
+
+# 11c'. PM App (#5466): OC_PM_BOT_LOGIN と完全一致 + Bot 型の起票者だけ許可。未設定・空・型 User・別 bot・似た login は拒否
+unset PMBOT
+PMBOT='oc-pm-for-signature-studio[bot]' pmctx '{"kind":"no_pr","ref":5}' NONE 'oc-pm-for-signature-studio[bot]' Bot
+pm_ok
+expect "oc-pm: a target by the PM App (OC_PM_BOT_LOGIN exact match, Bot) is allowed" $?
+PMBOT='oc-pm-for-signature-studio[bot]' pmctx '{"kind":"no_pr","ref":5}' NONE 'oc-pm-for-signature-studio[bot]' User
+out_has 'should_run=false' && grep -q '::notice::oc-pm: the target author is not allowed' "$TMP/log"
+expect "oc-pm: a target by the PM login typed User is refused" $?
+pmctx '{"kind":"no_pr","ref":5}' NONE 'oc-pm-for-signature-studio[bot]' Bot
+out_has 'should_run=false'
+expect "oc-pm: the PM login is refused when OC_PM_BOT_LOGIN is unset" $?
+PMBOT= pmctx '{"kind":"no_pr","ref":5}' NONE 'oc-pm-for-signature-studio[bot]' Bot
+out_has 'should_run=false'
+expect "oc-pm: the PM login is refused when OC_PM_BOT_LOGIN is empty" $?
+PMBOT='oc-pm-for-signature-studio[bot]' pmctx '{"kind":"no_pr","ref":5}' NONE 'oc-pm-for-signature-studio-evil[bot]' Bot
+out_has 'should_run=false'
+expect "oc-pm: a look-alike of the PM login is refused" $?
+PMBOT='oc-pm-for-signature-studio[bot]' pmctx '{"kind":"no_pr","ref":5}' NONE 'other-app[bot]' Bot
+out_has 'should_run=false'
+expect "oc-pm: another bot is refused even when OC_PM_BOT_LOGIN is set" $?
+unset PMBOT
 
 # 11d. 対象の隔離: 対象の本文 (fence の外に出ない) と、stuck なら reviews と oc-fix-limit コメントだけを取る
 pmctx '{"kind":"stuck","ref":5}' MEMBER pm User 'body text'
