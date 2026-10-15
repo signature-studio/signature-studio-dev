@@ -513,6 +513,7 @@
 | `tools/python/REPORT_PY16.md` | ~100 | PY-16 (#654): stubs 既定値 `midi.*` の評価 (eval 撤去・許可式の評価器・検証・ネガコン) の全文 (REPORT.md §15 の分割移動) |
 | `tools/python/REPORT_PY80.md` | 93 | PY-80 (#2633): 静的版 (flpy_static) のサブインタプリタは達成。Memory64 は部分 (validate は node 22.23 で不可・headless Chrome 154 で可、実行検証は未了)。`_PyInterpreterState_GetRefTotal` は FL PE が呼ばない。結論の正本は REPORT の結論表。pthread+GIL は子 #2856 (PY-97)、Memory64 実行は子 #2858 (PY-98) |
 | `tools/python/REPORT_PY27.md` | ~70 | PY-27 (#1138): ui / general / screen / arrangement / launchMapPages の mock 対応状況・`tests/ui_diff.mjs` の結果・保留 150 件 |
+| `tools/python/REPORT_PY206.md` | ~100 | PY-206 (#3494): device 系 32 関数のうち PE 確定の 7 関数 (通知 3・状態読出し 3・setMasterSync 1) の VA 表と C/mock 実装。値は仮置き。残り 25 関数は子 issue (本文の未解決表) |
 | `tools/python/REPORT_PY125.md` | ~95 | PY-125 (#3001): dispatch `0xd843d0` の out の写し方・clearLog / dumpScoreLog の戻り値 None (mock/C 差分 0)・`0x11eb5f0` の効果。`0x124c020`・-2 の報告ゲートは未確定 (子 #3045) |
 | `tools/python/REPORT_PY87.md` | ~61 | PY-87 (#2738): general の状態読出しゲッター 4 件 (getChangedFlag / getUseMetronome / getPrecount / getRecPPQ) の PE 根拠・mock/C 差分 0・値は未実測の仮置き。残り 146 件は #2830・#2831・#2832 |
 | `tools/python/REPORT_PY94.md` | ~115 | PY-94 (#2830): general 保留 25 件の PE 逆アセンブル。状態読出し 7 件 (undo 履歴 3・safeToEdit・project 文字列 3) を確定して mock/C 実装 (差分 0・値は仮置き)。残り 10 件は #2978・#3002・#3003 (#2977・#2979・#3001 は closed) |
