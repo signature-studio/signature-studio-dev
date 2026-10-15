@@ -25,8 +25,8 @@ head の判定器は main の #4090 修正を含む。その修正の前後で�
 
 - 判定器を戻さない理由: `lea` の派生 (`lea reg, [rbp+D]`) は frame を指すポインタそのもの。`6e8a67464` の `frame_derived` は `lea` を伝播させないため、`lea` で作った frame ポインタを F に入れず、その経由の store を漏出として数えない。規則 6 は「非 frame の基底だけを NONFRAME とする」ので、F が過小だと規則 6 の前提 (F の外にある基底) が偽の根拠で成り立つ。head の判定器 (#4090) はこの過小を直しており、規則 6 の意図 (frame を指さない基底だけを NONFRAME にする) に合う。
 - `frame_derived` が `lea` の派生を F に入れる。`glk` 対象の関数が 11 → 45 に増える (`glk=True` の関数)。
-- 関数単位の判定: #2211 の記録 (DROP 3・LIVE-IN 35・UNDETERMINED 10) から、head では DROP 3・LIVE-IN 1・UNDETERMINED 44 になる。34 関数が LIVE-IN → UNDETERMINED (32 件は `glk` が False → True に変わった関数)。
-- 規則 6 の効きは head でも確認できる (`--negctl-noprov` の site 単位の判定が head 本体と 1 件 (`1006ec0 1007021`) だけ異なる)。
+- 関数単位の判定: #2211 の記録 (DROP 3・LIVE-IN 35・UNDETERMINED 10) から、head では DROP 3・LIVE-IN 1・UNDETERMINED 44 になる。34 関数が LIVE-IN → UNDETERMINED。この 34 件はすべて `glk` が False → True に変わった関数。
+- 規則 6 の効きは head でも確認できる (`--negctl-noprov` の site 単位の判定理由が head 本体と 1 件 (`1006ec0 1007021`) 異なる。加えて `694c80 6951c8` は判定 (UNDETERMINED) が同じで、打ち切り store の番地だけが変わる。§3.4)。
 
 ## 3. 結果 (測定 commit `c159cf7fe` の判定器)
 
@@ -60,7 +60,7 @@ ctrl は head 本体 (測定 commit の判定器)。
 | 条件 | 差し替え | DROP / LIVE-IN / UNDETERMINED (関数) | 変わった site (対 ctrl) |
 |---|---|---|---|
 | ctrl | なし | 3 / 1 / 44 | — |
-| 壊す 1 (`--negctl-noprov`) | 規則 6 を外す | 3 / 1 / 44 | 1 (1006ec0 1007021: ONLY_ENTRY_AFTER_CALL → BARRIER(LEAK_STORE)) |
+| 壊す 1 (`--negctl-noprov`) | 規則 6 を外す | 3 / 1 / 44 | 判定が変わった 1 (1006ec0 1007021: ONLY_ENTRY_AFTER_CALL → BARRIER(LEAK_STORE))。判定は同じで打ち切り store の番地だけ変わった 1 (694c80 6951c8: `694d06`・`694f38` → `695163`。`695163` の store は `[rax+0x94]` の書込みで、規則 6 が外れると漏出として数えられる) |
 | 壊す 2 (`--negctl-glk`) | 全関数の漏出を True にする | 3 / 1 / 44 | 0 |
 | 壊す 3 (`--negctl-nosync`) | rsp/rbp 区間を無効にする | 3 / 1 / 44 | 9 (1354630・454090・45c170・45cda0・45db40・694c80・6c01a0・81bfd0・867220 の判定理由が MIXED_BASE 等に変わる) |
 
@@ -75,7 +75,7 @@ ctrl は head 本体 (測定 commit の判定器)。
 - 判定器 `audit_frame_store_alias_2211.py`・入力 JSON (`audit_undefload_564_full.json`・`f4_564_post.json`)・PE は `c159cf7fe` から HEAD まで変更なし (`git diff c159cf7fe HEAD -- <これらのファイル>` の出力 0 行)。
 - `tools/m11/ldfix` 内の他の差分は main 取り込みで入った他 issue のファイル (`REPORT_3382.md`・`REPORT_3418.md`・`REPORT_4167.md` など) で、本判定の入力・判定器には入らない。
 - 本 PR で変更したのは `REPORT_4166.md`・`results/` 4 本・`docs/DOC_MAP.md` の登録行。
-- main 取り込み (merge `ddae000b2`) 後に同じ判定器で再実行し、`frame_store_verdict_4166.json` と `cmp` 一致。
+- main 取り込み (merge `023702951`) 後に同じ判定器で再実行し、`frame_store_verdict_4166.json` と `cmp` 一致。
 
 ## 4. 受入条件の達成状況
 
