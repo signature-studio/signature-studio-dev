@@ -3,6 +3,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 const W = process.argv[2];
 const NEG = process.env.WC_NEG || "";
+const COV = process.env.WC_COV === "1";
+const covChunks = [];
 const L = JSON.parse(readFileSync(`${W}/layout.json`, "utf8"));
 const BASE = L.base, ARENA = L.arena, ARENA_SZ = L.arena_sz, DATA = BASE + L.data_rva, DATA_SZ = L.data_sz;
 const ENTRY = BASE + L.entry_rva;
@@ -55,6 +57,12 @@ for (let c = 0; c < ncase; c++) {
   const arena = Buffer.from(m2.slice(ARENA, ARENA + ARENA_SZ));
   if (NEG === "arena") arena[0] ^= 0x01;
   chunks.push(head, arena, Buffer.from(m2.slice(DATA, DATA + DATA_SZ)));
+  if (COV) {
+    const cov = new Uint8Array(512);
+    for (let i = 0; i < 512; i++) cov[i] = ex.wc_cov_get(i);
+    covChunks.push(Buffer.from(cov));
+  }
 }
 writeFileSync(`${W}/res_wasm.bin`, Buffer.concat(chunks));
+if (COV) writeFileSync(`${W}/res_cov_wasm.bin`, Buffer.concat(covChunks));
 console.log(`[run_wasm] cases=${ncase} traps=${traps} native_excluded=${skipped} neg=${NEG || "none"}`);

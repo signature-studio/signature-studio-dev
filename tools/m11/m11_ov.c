@@ -1409,6 +1409,16 @@ unsigned long long function_40a3b0(void) {
     return 0x1f80;
 }
 
+/* function_40d210 VA 0x40d210 (System.@FillChar(p, n, val)、memset 相当; #3921)
+ * lift 版は最初の ret (0x40d2b9) で関数を閉じ、n > 32 の本体 (0x40d2d1..0x40d31a: movups ループ) を落として
+ * `jg 0x40d2d1` が return に畳まれる (REPORT_2891 §9.3)。逆アセンブル 40d210..40d31b に合わせて転記する。
+ * n <= 0 は何もしない。n > 0 のとき n byte を val (下位 8bit) で埋める。 */
+unsigned long long function_40d210(void *p, unsigned long long n, unsigned long long val, unsigned long long x) {
+    (void)x;
+    if ((long long)n > 0) memset(p, (int)(val & 0xff), (size_t)n);
+    return 0;
+}
+
 /* function_4159e0  VA 0x4159e0  (System.InitializeArray(p, ti, count))  /  function_416db0 (System.CopyArray(dest, src, ti, count))
  * RetDec は型情報の種別バイト `mov rax,ti; movzx rcx,byte [rax]` の load を落とし kind=0 固定 → default 分岐の Error(reInvalidPtr)
  * → Halt0 (#417: survey halt0 の 6 unit 直接原因)。逆アセンブル (4159e0..415b05 / 416db0..416f70) から転記。

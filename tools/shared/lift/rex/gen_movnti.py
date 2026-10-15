@@ -8,8 +8,9 @@ movnti に入り、その唯一の呼出し元 (f_18001bde8) は count = 0x40 �
 
 case 形式は gen_cases.py と同じ (native_ref.c / run_wasm.mjs が読む)。期待 (reach / info) は OUT と同じ dir の movnti_expect.json に書く。
   reach   : a1 in [0x70000, 0x80000)。wasm は movnti の VA で trap する想定。native は arena 外へ書いて落ちる想定。
-  info    : a1 in [0x10000, 0x70000) (閾値未満の対照)。判定に入れず結果だけ表示する。想定 (trap しない) と実測が食い違った (REPORT_APPENDIX_3589.md・未解決)。
-reach / info は fn=0 (REXGetCreatorInfo)。木の検索の直後に memset を呼ぶため、入力だけで memset に届く。fn=1 は memset の前の node 参照で落ちるため使わない。
+  sweep   : a1 を [0x10000, 0x80000) で振る (a2 = arena 先頭)。movnti に入ったときは movnti の VA で trap する。入らないときは movnti 以外の
+            OOB (VA 0) で trap するが、trap 位置は未特定 (wasm の線形メモリは arena より広く、arena 越境の store だけでは説明できない)。判定: movnti に入る ⇔ a1 ≥ 0x70000 (T-SH-94)。
+reach / sweep は fn=0 (REXGetCreatorInfo)。木の検索の直後に memset を呼ぶため、入力だけで memset に届く。fn=1 は memset の前の node 参照で落ちるため使わない。
 usage: gen_movnti.py OUT
 """
 import json, os, random, struct, sys
@@ -19,7 +20,7 @@ ARENA_SZ = 0x10000
 CTX_OFF = 0x8000
 NODE = ARENA + 0xC100
 N_REACH = 16
-N_CTRL = 4
+SWEEP = sorted(set(list(range(0x10000, 0x80000, 0x2000)) + [0x27878, 0x2d324, 0x3d429, 0x3ffa3, 0x6ffc0, 0x6ffff, 0x70000, 0x70001, 0x70040]))
 rnd = random.Random(3589)
 out = []
 expect = []
@@ -44,9 +45,10 @@ def key_of(a):
     return struct.unpack_from('<Q', st, 0x18)[0]
 
 
-def case(kind, fn, a1):
+def case(kind, fn, a1, a2=None):
     a0 = ptr()
-    a2 = ptr()
+    if a2 is None:
+        a2 = ptr()
     arena = bytearray(ARENA_SZ)
     for q in range(ARENA_SZ // 8):
         v = ptr() if (CTX_OFF <= 8 * q < CTX_OFF + 0x4000 or rnd.random() >= 0.1) else 0
@@ -59,10 +61,10 @@ def case(kind, fn, a1):
 
 for i in range(N_REACH):
     case('reach', 0, rnd.randrange(0x70000, 0x80000))
-for i in range(N_CTRL):
-    case('info', 0, rnd.randrange(0x10000, 0x70000))
+for a1 in SWEEP:
+    case('sweep', 0, a1, a2=ARENA)
 
 out[0:0] = [struct.pack('<I', len(out))]
 open(sys.argv[1], 'wb').write(b''.join(out))
 json.dump(expect, open(os.path.join(os.path.dirname(os.path.abspath(sys.argv[1])), 'movnti_expect.json'), 'w'))
-print('[gen_movnti] reach=%d info=%d -> %s' % (N_REACH, N_CTRL, sys.argv[1]))
+print('[gen_movnti] reach=%d sweep=%d -> %s' % (N_REACH, len(SWEEP), sys.argv[1]))
