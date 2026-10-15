@@ -88,6 +88,8 @@ const ADDED_KEYS = [
   "launch_blocked", "imported_at",
   // launch を止めている区間と、15 分以上止まっている (#2795)
   "launch_halted", "launch_halted_overdue",
+  // 保留中の issue の理由と解除見込み (#5110)
+  "launch_holds",
   // Worker の自動着手を見送る oc:hold の issue の数 (#2651)
   "hold",
   // 率制限の判定 (#2345・CI-66)。alert と、直近の評価の窓 (30 分) の件数・割合
@@ -116,6 +118,11 @@ test("/status (d): 既存のキーは全て残り、追加するキーだけが�
   // 公開 (detail なし) は集計だけ: 従来どおり 3 キーを除き、追加したキーは全て出る
   const pub = (await (await get(ctx)).json()) as any;
   assert.deepEqual(Object.keys(pub).sort(), [...EXISTING_KEYS, ...ADDED_KEYS].filter((k) => !["log", "would_launch_now", "last_error"].includes(k)).sort());
+});
+
+test("/status.launch_holds (#5110): 保留の無い状態では空の配列", async () => {
+  const s = (await (await get(await configuredApp())).json()) as any;
+  assert.deepEqual(s.launch_holds, []);
 });
 
 test("/status: 観測の初期値は null / 0 (残量を 0 と誤読しない)", async () => {
