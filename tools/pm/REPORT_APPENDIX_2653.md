@@ -8,7 +8,7 @@
 
 - 移し元: `infra/pm-worker/README.md` の release-age の段落 (測定基準の commit `97bfd673` = origin/main)。
 - 移した値: 2026-10-14 公開の 3 版の時刻、既定設定の install が落ちた内容 (件数・版・cutoff)、範囲を下げた経緯 (#2691)。
-- README に残した結論: 「lock に含む版のうち最も新しいものの公開から 24 時間が過ぎるまで、既定設定の `pnpm install --frozen-lockfile` は失敗する。現在の lock は公開から 24 時間以上たつ版の組で、既定設定のまま通る。」(3 版を例に挙げる文と、`pnpm add` の自動除外の 1 行を含む。時刻の正本は §2)
+- README に残した結論: 「公開から 24 時間未満の版 (一覧は本書 §2) を含む lock は、その版のうち最も新しいものの公開から 24 時間が過ぎるまで、既定設定の `pnpm install --frozen-lockfile` が失敗する。」(版名と時刻は README に書かない。`pnpm add` の自動除外の 1 行を含む。時刻の正本は §2)
 - **issue 本文の案からの変更**: 案は「既定設定の `pnpm install --frozen-lockfile` は 2026-10-15 05:55Z まで失敗する」だった。§3 (a) の実測で現在の lock は既定設定のまま通る (rc=0) ため、この文は現在の lock については成り立たない。失敗するのは 2026-10-14 公開の版を含む lock だけなので、README は条件を付けた文にした。
 
 ## 2. 公開時刻 (実測)
@@ -92,4 +92,4 @@ pnpm install --frozen-lockfile                                 # (a) 現在の l
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `pnpm add` が既定設定で release-age の違反版を `minimumReleaseAgeExclude` に自動で書き足す (§3 c) | 除外が commit されると既定の拒否が外れる。README『除外しない理由』の前提が pnpm 12 の既定では守られない (README に注意 1 行を足した) | #3342 (子。PM 判断待ち。`needs-user-input`) |
+| `pnpm add` が既定設定で release-age の違反版を `minimumReleaseAgeExclude` に自動で書き足す (§3 c)。PM agent の判断待ち: pnpm add の既定の自動除外への対応 (a: `pnpm-workspace.yaml` に `minimumReleaseAgeStrict: true` を入れて書き足しを止める / b: 挙動を受け入れ README に注意を残す)・既定案: 挙動は変えず README に 1 行を足す (本 PR で対応済み) | 除外が commit されると既定の拒否が外れる。README『除外しない理由』の前提が pnpm 12 の既定では守られない。既定の挙動・lock は変わらない | #3342 (子。`needs-user-input`) |
