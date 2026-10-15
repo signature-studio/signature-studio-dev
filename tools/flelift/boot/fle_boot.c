@@ -70,8 +70,27 @@ static u32 g_n_dispatch, g_n_disp_getmem, g_n_disp_freemem, g_n_disp_realloc, g_
  * rcx=dst・edx=値・r8=DWORD 個数)。dispatch の冒頭で呼ばれるため、呼出し時点の guest 引数を読める。 */
 #define FILL_LOG_MAX 200
 static u32 g_fill_n;
+/* FLE-15 (#3770): 画素ストア 0x6bbc20 の計数 (計測のみ)。呼出し点 ret = 0x6c9380 (f_6c9280 の 0x6c937a 直後)。
+ * f_6c9280 は rbp+0x2c..0x38 に矩形 (x0,y0,x1,y1・終端排他) を持つ (rbp = R[5])。x = R[2] (rdx)・y = R[8] (r8) は呼出し直前の値。 */
+#define PX_SITE_RET 0x6c9380ull
+static double g_px[16];   /* 0 全呼出し / 1 呼出し点の回数 / 2-5 初回の矩形 / 6-9 直近の矩形 / 10 矩形の変化数 / 11-14 x,y の min/max / 15 他の呼出し点 */
+static int g_px_init;
+static void px_probe(void) {
+    g_px[0] += 1;
+    if (LD64(R[4]) != PX_SITE_RET) { g_px[15] += 1; return; }
+    int x0 = (int)LD32(R[5] + 0x2c), y0 = (int)LD32(R[5] + 0x30), x1 = (int)LD32(R[5] + 0x34), y1 = (int)LD32(R[5] + 0x38);
+    int x = (int)(u32)R[2], y = (int)(u32)R[8];
+    if (!g_px_init) { g_px[2] = x0; g_px[3] = y0; g_px[4] = x1; g_px[5] = y1; g_px[11] = g_px[12] = x; g_px[13] = g_px[14] = y; g_px_init = 1; }
+    else if (g_px[6] != x0 || g_px[7] != y0 || g_px[8] != x1 || g_px[9] != y1) g_px[10] += 1;
+    g_px[6] = x0; g_px[7] = y0; g_px[8] = x1; g_px[9] = y1;
+    if (x < g_px[11]) g_px[11] = x; if (x > g_px[12]) g_px[12] = x;
+    if (y < g_px[13]) g_px[13] = y; if (y > g_px[14]) g_px[14] = y;
+    g_px[1] += 1;
+}
+EMSCRIPTEN_KEEPALIVE double fle_px_stat(int k) { return (k >= 0 && k < 16) ? g_px[k] : -1.0; }
 static void fle_probe_dispatch(u64 t) {
     g_n_dispatch++;
+    if (t == 0x6bbc20u) px_probe();
     if (t == 0x6a7b70u && g_fill_n < FILL_LOG_MAX) {
         /* f_6c7610 の frame (rbp=R[5]): push 5 本 + sub rsp,0x50 のため戻りアドレス = [rbp+0x78]、矩形 = [rbp+0x40..0x50) */
         fprintf(stderr, "[fill6a7b70] #%u ret=0x%llx dst=0x%llx val=0x%llx cnt=0x%llx caller=0x%llx this=0x%llx rect=%d,%d,%d,%d\n",
