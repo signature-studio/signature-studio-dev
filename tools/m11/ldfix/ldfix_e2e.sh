@@ -42,6 +42,9 @@ mv "$HERE/work/ldfix_fixed_3450.ll" "$HERE/work/ldfix_fixed.ll"
 step "1f/5 function_47b4a0 / c40770 の *arg 読出し脱落・null 経路の基底 (#3418・機械照合付き): work/ldfix_fixed.ll を上書き"
 python3 "$HERE/fix_site_3418.py" "$HERE/work/ldfix_fixed.ll" "$HERE/work/ldfix_fixed_3418.ll" --pe "$PE" || fail "fix_site_3418.py"
 mv "$HERE/work/ldfix_fixed_3418.ll" "$HERE/work/ldfix_fixed.ll"
+step "1g/5 function_412fc0 の 5 引数化・既定値分岐と呼出元 3 site (#3451・機械照合付き): work/ldfix_fixed.ll を上書き"
+python3 "$HERE/fix_abi_3451.py" "$HERE/work/ldfix_fixed.ll" "$HERE/work/ldfix_fixed_3451.ll" --pe "$PE" || fail "fix_abi_3451.py"
+mv "$HERE/work/ldfix_fixed_3451.ll" "$HERE/work/ldfix_fixed.ll"
 python3 - <<'PYEOF'
 import json
 r = json.load(open('tools/m11/ldfix/work/ldfix_report.json'))
