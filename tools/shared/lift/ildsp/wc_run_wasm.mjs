@@ -19,6 +19,7 @@ for (const { module, name } of WebAssembly.Module.imports(mod)) {
 }
 // 診断用 (WC_LOG_FD=1): fd_write の文字列 (runtime の fprintf(stderr) の内容) を出して続行する。既定は上の throw のまま。
 if (process.env.WC_LOG_FD === "1") {
+  imports.wasi_snapshot_preview1 ??= {};
   imports.wasi_snapshot_preview1.fd_write = (fd, iovs, n, nw) => {
     const dv = new DataView(inst.exports.memory.buffer), bytes = new Uint8Array(inst.exports.memory.buffer);
     let total = 0, s = "";
