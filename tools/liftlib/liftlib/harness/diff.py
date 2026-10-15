@@ -108,7 +108,7 @@ def run_diff(image: str, func_va: int, spec: dict[str, Any], cjs: str | None, ll
     ign = set(spec.get("ignore_buffers", []))
     summ: dict[str, Any] = dict(scenarios=nscen, steps=len(N), match=0, mismatch=0, native_crash=0, wasm_trap=0,
                                 wasm_hang=hang, mismatch_scen=set(), details=[])
-    dead: set[str] = set()
+    dead: set[int] = set()
     for key in sorted(N):
         s = key[0]
         if s in dead:

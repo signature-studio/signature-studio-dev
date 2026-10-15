@@ -60,7 +60,7 @@ entry point として単体で strict 検査したときのエラー数 (降順)
 
 ## 検証 (挙動不変)
 
-- `tools/liftlib/tests/test_unit.py`: 変更の前後で per-test の結果が同一 (33 テスト中 26 pass・7 fail。fail は work/ 配下の素材が worktree に無いための FileNotFoundError で, 変更前から同じ)。
+- `tools/liftlib/tests/test_unit.py`: 変更の前後で per-test の結果が同一 (33 テスト中 25 pass・8 fail。fail は work/ 配下の素材が worktree に無いための FileNotFoundError で, 変更前から同じ)。
 - `tools/liftlib/tests/test_boolret.py`: 5 tests OK (unittest)。
 - 差分ハーネス (origin/main の liftlib と本変更の liftlib に同一の合成入力を与える): `ir`/`pe`/`remap`/`boolret`/`dataimage`/`icall`/`fp_bind`/`l1_restore`/`lb_layout`/`runtime_lb`/`env` の出力 JSON が一致 (12,801 + 10,926 bytes)。
 - ネガコン: Tier 1 の注釈を 1 箇所わざと壊すと `mypy` が 2 errors で赤 (`Success: no issues found in 12 source files` が壊れる) を確認。

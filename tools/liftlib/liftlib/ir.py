@@ -75,8 +75,10 @@ class Func:
         out.append(cur.strip())
         res: list[tuple[str, str]] = []
         for p in out:
-            ty, _, nm = p.rpartition(" ")      # 仮引数は "型 %名前" (空白が無い不正形は名前を空にする)
-            res.append((ty if ty else p, nm))
+            ty, sp, nm = p.rpartition(" ")
+            if not sp or not nm.startswith("%"):
+                raise ValueError("params(): 名前の無い仮引数・可変長は未対応: %r (%s)" % (p, self.sig))
+            res.append((ty, nm))                 # (type, %name)
         return res
 
     def ret_type(self) -> str:
