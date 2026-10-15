@@ -217,6 +217,8 @@ class Ctx:
         w = info[1] if info else 0
         mask = (1 << w) - 1 if w else M64
         if mn in ('movzx', 'movsx', 'movsxd') and reg_of(src) and not fam.startswith('xmm'):
+            if w < 32:
+                return ('未決', 'partial_ext', None, at)
             sfam, sw = reg_of(src)
             cls, why, val, da = self.trace_reg(sfam, k - 1, depth + 1)
             if cls == '実値化':

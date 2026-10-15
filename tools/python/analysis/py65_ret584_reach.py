@@ -62,6 +62,17 @@ def main():
         mn, op = ins[v]
         print(f"{hex(v)}  {mn} {op}")
     print("count", len(found))
+    if "--gap" in sys.argv:
+        direct = [v for v in order if ins[v][0] == "mov" and ins[v][1].startswith(WRITE_OP)]
+        print("direct writes", len(direct))
+        for v in direct:
+            if v in found:
+                continue
+            k = order.index(v)
+            nxt_write = next(w for w in order[k + 1:] if ins[w][0] == "mov" and ins[w][1].startswith(WRITE_OP))
+            between = order[k:order.index(nxt_write)]
+            straight = not any(ins[x][0].startswith("j") or ins[x][0] == "ret" for x in between)
+            print(f"gap {hex(v)}  not reaching target; killed by {hex(nxt_write)} straight-line={straight}")
 
 
 if __name__ == "__main__":

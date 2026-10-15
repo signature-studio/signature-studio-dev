@@ -12,7 +12,7 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 T="$HERE/.."
 W="$HERE/work/fa_route"; mkdir -p "$W/tmp"
 SRC="${FA_SRC:-$HERE/work/rt_freshair-core/after.0.restored.ll}"
-MAP="$HERE/work/rt_freshair-core/map.json"
+MAP="${FA_MAP:-$HERE/work/rt_freshair-core/map.json}"
 DLL="${FA_CORE:-$T/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64}"
 if [ ! -f "$SRC" ] || [ ! -f "$MAP" ]; then echo "[fa_route] $SRC / $MAP が無い: 素材 work-icall を展開 (tools/icall/work/rt_freshair-core)" >&2; exit 2; fi
 if [ ! -f "$DLL" ]; then echo "[fa_route] $DLL が無い: 素材 plugins-freshair を展開し tools/targets/freshair/fetch.sh を実行" >&2; exit 2; fi

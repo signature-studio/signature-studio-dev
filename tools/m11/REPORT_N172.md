@@ -1,6 +1,6 @@
 # M11 REPORT (#3140 / [M11-N172] / 親 #3134・#1154): set_other 非 imm reg 引数 merge 34 件の CFG 到達定義
 
-結論: 初版 (`9b205ba79`) の判定器は、定義を含む循環の寄与を捨てていた。そのため実値化 1 件 (`function_f6bb50` → `function_cd1c20` の pos 1 = rdx) は誤りで、rdx は 1 周目 0・2 周目 1 になる (§3)。判定器を直した (循環の経路に定義があれば `loop` 未決、宛先 32bit 未満の ext は未決)。修正版の実測: merge 系 34 件は 実値化 0 / 復元不能 0 / 未決 34 (§2-2)。非 imm 349 件の再測定も同じ 0 / 0 / 349。cross-check (reg 宛先 46 件) は decided 0 / undecided 46 (§2-3)。機械語照合は §3。残りは子 #3961 (M11-N205)。IR は変えていない (分類のみ)。
+結論: 初版 (`9b205ba79`) の判定器は、定義を含む循環の寄与を捨てていた。そのため実値化 1 件 (`function_f6bb50` → `function_cd1c20` の pos 1 = rdx) は誤りで、rdx は 1 周目 0・2 周目 1 になる (§3)。判定器を直した (循環の経路に定義があれば `loop` 未決、宛先 32bit 未満の ext は未決)。修正版の実測: merge 系 34 件は 実値化 0 / 復元不能 0 / 未決 34 (§2-2)。非 imm 349 件の再測定も同じ 0 / 0 / 349。cross-check (reg 宛先 46 件) は decided 0 / undecided 46 (§2-3)。機械語照合は §3。宛先幅の判定 (movzx/movsx/movsxd の宛先 32bit 未満) は #3961 (M11-N205) で `m11_setother_nonimm_class.py` に入れ、349 件・34 件・46 件を修正版で再測定した (§2-2・§2-3・§5)。IR は変えていない (分類のみ)。
 
 ## 1. 方式
 
@@ -18,7 +18,7 @@
 
 ### 2-1. 修正の確認 (HEAD・再実行)
 
-- 測定 commit: `a7b7b0045` (HEAD。判定器 2 本は `5bd2af3fe` から不変 (`git diff 5bd2af3fe HEAD -- tools/m11/m11_setother_nonimm_cfg.py tools/m11/m11_setother_nonimm_cfg_check.py` は 0 行)。`tools/m11` の他の差分は main 取り込み分 (§7))。
+- 測定 commit: `a7b7b0045` (判定器 cfg 2 本の測定。判定器 2 本は `5bd2af3fe` から不変。#3961 の修正後の再測定は §2-4)。
 - 入力: fl-win64 の `extracted/block00031_PE.bin` (sha256 `b2c64da4…`・REPORT と一致)。
 - 1 行再現 (レビューの確認と同じ入力): 初版 `実値化 0x0` (葉 `zero_idiom@0xf6bd0d`) → 修正後 `未決 merge>chain>loop` (葉 `実値化:zero_idiom@0xf6bd0d`・`未決:chain>loop@0xf6bd37`)。
 - 合成検査 `python3 m11_setother_nonimm_cfg_check.py <PE>` (命令列を capstone で組み、同じ `Cfg` で判定。実機 PE は使わない):
@@ -72,6 +72,25 @@
 | chain>merge | merge>chain>call_ret | 未決 | 1 |
 | **合計 (旧版・無効)** | | **実値化 1 / 復元不能 0 / 未決 33 / 未分類 0** | **34** |
 
+### 2-4. #3961 の修正版の再測定 (測定 commit `5817ee7e5`)
+
+- 修正: `m11_setother_nonimm_class.py` の `def_reg` の movzx/movsx/movsxd (reg 源) 分岐に `w < 32` → 未決 `partial_ext` を入れた (cfg 側 `m11_setother_nonimm_cfg.py:176-178` と同じ規則)。
+- 入力: `work-m11` の `boot_final.ll` (sha256 `69c774de…`)・`fl-win64` の `block00031_PE.bin`。`m11_sigfix_stats.sh` で `pads.json`・`fixes.json` を再生成 (`[verify] fixes 33: match 33 / mismatch 0`・`const recovered 24`)。
+- 測定 (すべて rc 0・`ws-3961` 作業ツリーの HEAD `5817ee7e5`):
+
+| 測定 | 件数 | 修正前 (`a7b7b0045`) | 修正後 (`5817ee7e5`) |
+|---|---|---|---|
+| 非 imm 349 件 (`m11_setother_nonimm_class.py`) | 実値化 / 復元不能 / 未決 | 0 / 0 / 349 | **0 / 0 / 349** |
+| 同 349 件の理由・区分 (行単位) | 変化した行 | — | **0 件** (`partial_ext` 0 件) |
+| merge 系 34 件 (`m11_setother_nonimm_cfg.py`) | 実値化 / 復元不能 / 未決 | 0 / 0 / 34 | **0 / 0 / 34** (理由別件数は §2-2 と一致) |
+| 合成検査 (`m11_setother_nonimm_cfg_check.py`) | A1・A2 (16bit 宛先 movzx/movsx) | 実値化 0x0 (誤り) | **未決 merge>partial_ext** |
+| 同 | A3・A4 (32/64bit 宛先)・C | 実値化 | 実値化 (変化なし) |
+| 同 | B・D (循環) | 未決 / 実値化 0x1 (誤り) | 未決 merge>chain>loop |
+| cross-check imm 非定数 55 件 (`m11_setother_cfg_value.py`・reg 宛先 46) | decided / undecided | 0 / 55 | **0 / 55** |
+
+- 合成検査 `m11_setother_nonimm_cfg_check.py` の結果は §2-1 の表 (A1・A2 を「未決 merge>partial_ext」にした修正後) と一致する。
+- 修正前の判定器 (`git show a7b7b0045:...` を一時ファイルで実行) と修正後の 349 行を比べ、差は 0 行。
+
 ### 2-3. cross-check (imm 非定数の reg 行 46 件)
 
 - 実測 (HEAD `a7b7b0045`・`m11_setother_cfg_value.py`): 対象 imm 非定数 55 件、**decided 0 / undecided 55**。うち reg 宛先 (挿入命令の宛先がレジスタ) は 46 件で、decided 0 / undecided 46 (旧版と一致)。mem 宛先 9 件は reg 行に含めない。
@@ -108,13 +127,12 @@ f6bd71  jne    0xf6bd0f                  ← 戻り辺
 
 ## 5. 同型の欠落: `m11_setother_nonimm_class.py` の `def_reg` (#3146)
 
-- `def_reg` の movzx/movsx/movsxd (reg 源) の分岐は宛先幅 `w` を見ない。修正版の判定器と同じ欠落。
-- 影響 (実測・HEAD `a7b7b0045` で `m11_setother_nonimm_class.py` を再実行): 3 値は 実値化 0 / 復元不能 0 / 未決 349 / 未分類 0 (修正前と同じ)。理由ラベルは変わり得るが、この run では宛先幅を直していないので未修正のまま測定した。
-- 対応: 修正と再測定を子 #3961 に移した (`REPORT_N171.md` の内訳を更新する)。
+- 旧版: `def_reg` の movzx/movsx/movsxd (reg 源) の分岐は宛先幅 `w` を見なかった (#3146 で merge 済みの欠落)。
+- 対応: #3961 で `w < 32` → 未決 `partial_ext` を入れた (測定 commit `5817ee7e5`・§2-4)。349 件の 3 値は修正前と同じ 0 / 0 / 349 / 0 で、理由ラベルも 1 件も変わらなかった (`REPORT_N171.md` §2)。
 
 ## 6. 旧版 §5 の接続先 (無効・参考)
 
-旧版の未決 33 件の接続先 (#3141 戻り値 10・#3142 メモリ読込 16・#1154 呼出元 def 7) は、修正版の未決 34 件 (§2-2) に対して付け直す (子 #3961)。
+旧版の未決 33 件の接続先 (#3141 戻り値 10・#3142 メモリ読込 16・#1154 呼出元 def 7) は、修正版の未決 34 件 (§2-2) に対して付け直す。付け直した結果は §2-2 の表の理由別件数 (load_ptr 15・call_ret 9・entry 7・load_stack 1・loop 1・chain>call_ret 1) を接続先に対応させる: #3142 (メモリ読込 16 件) ・#3141 (戻り値 10 件)・#1154 (呼出元 def 7 件)・#3140 (循環 1 件・§3)。
 
 ## 7. 測定 commit と差分
 
@@ -126,7 +144,6 @@ f6bd71  jne    0xf6bd0f                  ← 戻り辺
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `m11_setother_nonimm_class.py` の宛先幅の欠落 (§5)・修正と 349 件の再測定 | 理由ラベルのみ (3 値件数は 0 / 0 / 349 のまま・実測) | 子 #3961 (M11-N205) |
 | 実値化 1 件の自動照合 (分岐先・mov 連鎖) | 手動 (§3) のみ。前提の 1 件は未決になった | #3916 ([M11-N198])。前提が消えたことを #3916 に書いた |
 | 8/16bit 部分書込の旧値を見ない (cfg_value と理由が異なる) | 部分書込を含む経路は未決に寄る (保守側) | #1154 |
 | survey ok ≥ 870 (素材欠落) | 退行判定が未実施 | #1154 |

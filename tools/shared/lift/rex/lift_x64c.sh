@@ -9,6 +9,7 @@
 #   neg-ctx : 入力のネガティブコントロール (wasm 側だけ ctx 大域を 0 にする)。
 #   neg-owner: 配信物一覧の突合のネガティブコントロール (owner/rex_glue.c を追加してから突合する)。
 #   movnti  : movnti (閉包内 24 箇所) を含む経路への到達の実測 (gen_movnti.py・movnti_check.py。T-SH-90 / #3589)。
+#             実装判定 = movnti の ott_unsup が 0 件 (#3893)。reach 16 件は既知の未達 (#4324 で解消。期待値は 0/16 を既知として扱う)。
 #   neg-*   : FAIL を検出したら exit 0 / PASS してしまったら exit 1。all = ok + 全 neg-* + movnti。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
