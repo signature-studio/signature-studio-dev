@@ -18,7 +18,7 @@
 #define NAME 96
 #define ROOT_NAME "Plugin database"
 
-typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; } Chan;
+typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; int64_t pitch_n; } Chan;
 typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
 typedef struct { char name[NAME]; int64_t color; uint8_t lock; } Pl;
 
@@ -49,6 +49,7 @@ static void init_chan(Chan *c, const char *name, const char *plugin, double vol,
     memset(c, 0, sizeof *c);
     set_name(c->name, name); set_name(c->plugin, plugin);
     c->vol = vol; c->pan = pan; c->sel = sel; c->fx = fx; c->color = color;
+    c->pitch_n = 2; /* N の既定 2: reset 0xfe9090 (REPORT_PY72 §PY-77 受入 E)。chan との同一性は未確定 */
 }
 
 void fl_engine_reset(void) {
@@ -145,6 +146,18 @@ FL_H(channels, getChannelVolume) { CH(0); int64_t m = A_INT(1, 0); return fl_ret
 FL_H(channels, setChannelVolume) { CH(0); k->vol = A_DBL(1, 0); return fl_ret_none(c); }
 FL_H(channels, getChannelPan) { CH(0); return fl_ret_d(c, k->pan); }
 FL_H(channels, setChannelPan) { CH(0); k->pan = A_DBL(1, 0); return fl_ret_none(c); }
+/* PY-76 (#2563): PE 0xd5aa30 → 0xd843d0 → callback 0xd5a720 の判定順 (REPORT_PY72): index 範囲外 -4 → value の NaN -1 → pitchUnit。
+ * 未モデル: guard (常に真)・useGlobalIndex (一覧 A/B は同一扱い)・unit 0/1 の効果 (効果関数 0x1046a30 の書込み先が未確定。状態は変えない)・通知 PostMessageW。
+ * unit 2 は PE どおり N = clamp(cvtsd2si(value), 1, 48) を書く */
+static int64_t cvt_si64(double x) { return (x >= -9223372036854775808.0 && x < 9223372036854775808.0) ? llrint(x) : INT64_MIN; }
+FL_H(channels, setChannelPitch) {
+    int64_t idx = A_INT(0, 0); float v = (float)A_DBL(1, 0); int64_t unit = A_INT(2, 0);
+    (void)A_INT(3, 0); (void)A_INT(4, 0);
+    if (idx < 0 || idx >= nch) RANGE();
+    if (isnan(v)) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error");
+    if (unit == 2) { int64_t n = cvt_si64(v); ch[idx].pitch_n = n < 1 ? 1 : n > 48 ? 48 : n; }
+    return fl_ret_none(c);
+}
 FL_H(channels, setChannelColor) { CH(0); k->color = A_INT(1, 0); return fl_ret_none(c); }
 FL_H(channels, getTargetFxTrack) { CH(0); return fl_ret_i(c, k->fx); }
 FL_H(channels, setTargetFxTrack) { CH(0); k->fx = (int)A_INT(1, 0); return fl_ret_none(c); }
