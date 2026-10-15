@@ -118,5 +118,5 @@ mkdir -p $RUNNER_TEMP/before && git archive origin/main tools/ott | tar -x -C $R
 python3 x64_regress_1099.py $RUNNER_TEMP/before 8         # §1 (same 8/8)
 ```
 
-- 差分確認 (測定 commit 以降、コードの差分が 0 行であること): `git diff 7694f4bdd HEAD -- tools/ott tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_trans_direct.c tools/plugins/slayer_engine_ia32/lift_text.py tools/plugins/slayer_engine_ia32/x64_regress_1099.py` の出力は 0 行 (本付録は docs のみ)。
+- 差分確認 (測定 commit 以降のコード差分): `git diff 7694f4bdd HEAD -- tools/ott tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_trans_direct.c tools/plugins/slayer_engine_ia32/lift_text.py tools/plugins/slayer_engine_ia32/x64_regress_1099.py` の出力は `x87_diff.py` の docstring だけ (`7ab16078d`。 usage 行の書き換えと説明 3 行の追加。 動作は変わらないので再測定は不要)。 lowering・runtime・試験本体の差分は 0 行。
 - 大物: `find tools/plugins/slayer_engine_ia32 -type f -size +20M -not -path '*/work/*'` は 0 件。 生成物は `work/` (gitignore)。
