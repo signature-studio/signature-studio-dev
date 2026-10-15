@@ -13,8 +13,8 @@
 
 ## 2. 測定
 
-- 測定 commit: 修正を含む HEAD の 1 つ前の `origin/main` = `1c98a13a7` (worktree `ws-4983`・ブランチ `4983-fle-boot-log-cap`)。修正 commit は本 PR に含まれる。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)。`[EMSDK]` は `/opt/emsdk`。
+- 測定 commit: `7b4b8f68f` (修正を含む commit。ベースは `origin/main` = `1c98a13a7`。worktree `ws-4983`・ブランチ `4983-fle-boot-log-cap`)。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)。`[EMSDK]` (`docs/REFERENCES.md`) の emsdk。
 - 4 vCPU・load は各工程の開始時 (lift 0.86 / clang 0.98 / boot 1.65)。
 
 ### 2-1. 修正後: `FLE_BOOT_LOG_CAP=4096` で `run_boot default`
