@@ -23,8 +23,16 @@
 | K2 循環 (1 周目 0・2 周目 1) claim 0x1 | PASS | PASS |
 | K2 ネガティブ claim 0x0 | FAIL | FAIL (実測 0x1) |
 | K3 部分書込 (旧値未知) | 判定不能 | 判定不能 |
+| K4 call を挟む分岐 (`xor ebx`・`cmp ebx,0`・`call`・`je`・`mov ebx,1`・`movzx edx,bl`) claim なし | 未決 | 未決 (経路 0x0,0x1) |
+| K4 ネガティブ (同上・claim 0x0) | FAIL | FAIL (経路で値が違う) |
+| K4 対照 (call なし・ZF 確定) claim なし | 実値化 | 実値化 0x0 |
 
-結果: 7 件 / 不一致 0。
+結果: 10 件 / 不一致 0。K4 は差し戻し前の版では `実値化 0x0` になっていた (§6)。
+
+### 2-1a. 差し戻し後の判定
+
+- `call` では揮発レジスタに加えて flags (`fl`) も未知にする (§6 参照)。
+- import 時に argparse を実行しないよう、CLI は `if __name__ == '__main__':` の内側へ移した。
 
 ### 2-2. 実データ (素材 `fl-win64` `block00031_PE.bin`・`work-m11`)
 
@@ -41,7 +49,8 @@
 | 判定不能 (未対応命令・flags 等) | 33 | `shl`・`cvtsi2ss`・`cvtsi2sd`・`ucomisd`・`ucomiss`・`mulss`・`neg`・`shr`・`sete`・`jle` 結果 flags など |
 | PASS / FAIL | 0 / 0 | — |
 
-- 照合器が未決にした 1 件の経路値 (実測): `0x0` と `0x1`。REPORT_N172 §3 の機械語 (1 周目 rbx=0・2 周目 rbx=1) と一致。
+- **差し戻し後の再実行は未実施**: `$ARTIFACTS_DIR` (`/home/runner/artifacts`) には `fl-win64.tar.zst` のみあり、`work-m11` (`nonimm_cfg_rows.json`) が無い。このため 34 件の内訳 (実値化 0 / 未決 1 / 判定不能 33) は差し戻し前の版の実測値で、`call` の flags 修正後の値は未確認。次の回で `oc_artifacts: fl-win64 work-m11` を指定して再実行し、内訳を照合する。
+- 照合器が未決にした 1 件の経路値 (実測・差し戻し前の版): `0x0` と `0x1`。REPORT_N172 §3 の機械語 (1 周目 rbx=0・2 周目 rbx=1) と一致。
 - 実データのネガティブコントロール: 同じ 1 件に claim `0x0` → FAIL (経路で値が違う)。claim `0x1` も同じく FAIL。どちらの claim も経路の値の集合と一致しないため、一致と判定されない。
 
 ## 3. 判定
@@ -63,5 +72,14 @@
 
 ## 5. 測定 commit と差分
 
-- 測定 commit: 本 PR の最後のコード commit (`git log -1 -- tools/m11/m11_setother_nonimm_cfg_verify.py` で確認。REPORT_N198.md の commit は除く)。
-- 差分 (コードのみ): REPORT 追加後に `git diff <測定 commit> HEAD -- tools/m11 ':(exclude)*.md'` を取る (PR 本文に出力を貼る)。
+- 測定 commit: 差し戻し対応の commit (`call` の flags 修正・selftest K4・CLI ガード)。合成検査 (`--selftest`) はこの commit で再測定した (10 件・不一致 0・rc 0)。
+- 差分 (コードのみ): `git diff <測定 commit> HEAD -- tools/m11 ':(exclude)*.md'` (PR 本文に出力を貼る)。
+
+## 6. 差し戻し対応 (review round 1)
+
+| 指摘 | 対応 |
+|---|---|
+| 1. `call` で flags が残り、`je` が誤って実値化 `0x0` | `call` で `fl = None`。K4 (call を挟む分岐) を追加。K4 は差し戻し前の版で `実値化 0x0` になることを確認し、修正後は `未決 (0x0,0x1)` |
+| 2. `Closes #3916` と issue 本文の受入 1 の不整合 | issue #3916 本文から受入 1 を外し、原文を子 #4807 へ移す |
+| 3. 実データの素材 (`work-m11`) が PR 本文に無い | PR 本文に `oc_artifacts: fl-win64 work-m11` を追加。ただし本 run では `work-m11` が取得できず、再実行は未実施 (§2-2) |
+| minor: import 時に argparse が走る | CLI を `__main__` ガードの内側へ移動 |

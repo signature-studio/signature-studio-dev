@@ -139,6 +139,7 @@ def run(insns, probe, fam):
             if mn == 'call':
                 for f in VOLATILE:
                     st[f] = None
+                fl = None
                 i += 1
                 continue
             if mn == 'push':
@@ -282,6 +283,9 @@ def selftest():
         ('K2 循環 (rdx は 1 周目 0・2 周目 1 → 出口で 1)', '31db' '89da' '83c301' '83fb02' '75f6' 'c3', 5, 'rdx', 0x1, 'PASS'),
         ('K2 ネガティブ (値 0 と誤る)', '31db' '89da' '83c301' '83fb02' '75f6' 'c3', 5, 'rdx', 0x0, 'FAIL'),
         ('K3 部分書込 (旧値未知)', '31db' '660fb6d3' 'c3', 2, 'rdx', 0x0, '判定不能'),
+        ('K4 call を挟む分岐 (callee が ZF を変えうる)', '31db' '83fb00' 'e800000000' '7405' 'bb01000000' '0fb6d3' 'c3', 6, 'rdx', None, '未決'),
+        ('K4 ネガティブ (call 挟む・claim 0x0)', '31db' '83fb00' 'e800000000' '7405' 'bb01000000' '0fb6d3' 'c3', 6, 'rdx', 0x0, 'FAIL'),
+        ('K4 対照 (call なし・ZF 確定で 0x0)', '31db' '83fb00' '7405' 'bb01000000' '0fb6d3' 'c3', 5, 'rdx', None, '実値化'),
     ]
     bad = 0
     for name, hx, probe, fam, claim, expect in cases:
@@ -318,13 +322,14 @@ def real(rows_path, pe):
     return cnt['FAIL']
 
 
-ap = argparse.ArgumentParser()
-ap.add_argument('rows', nargs='?')
-ap.add_argument('--pe')
-ap.add_argument('--selftest', action='store_true')
-a = ap.parse_args()
-if a.selftest:
-    sys.exit(1 if selftest() else 0)
-if not a.rows or not a.pe:
-    ap.error('ROWS と --pe を指定する (合成検査は --selftest)')
-sys.exit(1 if real(a.rows, a.pe) else 0)
+if __name__ == '__main__':
+    ap = argparse.ArgumentParser()
+    ap.add_argument('rows', nargs='?')
+    ap.add_argument('--pe')
+    ap.add_argument('--selftest', action='store_true')
+    a = ap.parse_args()
+    if a.selftest:
+        sys.exit(1 if selftest() else 0)
+    if not a.rows or not a.pe:
+        ap.error('ROWS と --pe を指定する (合成検査は --selftest)')
+    sys.exit(1 if real(a.rows, a.pe) else 0)
