@@ -599,3 +599,16 @@ test("secret: 集計のみ (個票なし)。公開の /status に issue のタ�
 // 参照されない import の警告を避ける
 void MemoryStore;
 void WH_SECRET;
+
+test("/status.launch_holds (#5110): rate-guard で止まっている ready は、REST の reset 時刻を解除見込みにして出る (挙動は変えない)", async () => {
+  const stop = await liveCtx();
+  await stop.observe("1499");
+  const plan = await stop.app.engine.launch(stop.gh);
+  const s = stop.app.engine.status() as any;
+  assert.equal(s.launch_stop, "rate-guard");
+  assert.deepEqual(plan.picks, []);
+  const ready = s.launch_holds.filter((h: any) => h.row === "ready");
+  assert.ok(ready.length > 0, "ready の issue が launch_holds に出る");
+  assert.ok(ready.every((h: any) => h.reason === "rate-guard"));
+  assert.ok(ready.every((h: any) => h.until === s.rest_reset_at && h.until !== null));
+});

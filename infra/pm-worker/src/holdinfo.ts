@@ -33,6 +33,13 @@ export function recentHold(n: number, note: string, t: HoldTimes): Hold {
   return { n, row: "recent", reason: "recent", until: null };
 }
 
+// 着手待ち (ready) の見送り理由 (planLaunch の held と engine の gate)。
+// rate-guard は REST の残量が窓の reset で戻るので、reset 時刻 (epoch 秒) を解除見込みにする。枠・LOW_CAP・stuck・review-only・no-import は他の issue や人の判断で解けるので null。
+export function readyHold(n: number, why: string, t: { restReset?: number }): Hold {
+  const until = why === "rate-guard" && t.restReset !== undefined ? new Date(t.restReset * 1000).toISOString() : null;
+  return { n, row: "ready", reason: why, until };
+}
+
 // stopped の行の理由。本文の抜粋は出さない。既知の語以外は bot の報告による停止 (bot-report) とする。
 export function stoppedHold(n: number, note: string): Hold {
   const reason = note.startsWith("oc:no-pr") ? "oc:no-pr"
