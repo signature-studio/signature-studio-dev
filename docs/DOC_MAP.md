@@ -181,6 +181,7 @@
 | `tools/liftdiff/REPORT_APPENDIX_LD211.md` | ~60 | liftdiff LD-211 (#4378) 節: ret=i128 の判定不能 11 関数のうち 6 件を this 疑似オブジェクト (blob=vmt) で native 実行可能にした実測 (戻りレジスタは未確定)。残 5 件は LD-213 (#4423) |
 | `tools/liftdiff/REPORT_APPENDIX_LD203.md` | ~40 | liftdiff LD-203 (#4200): 653c80 の間接 call slot (RVA 0x11f3480) を仮 proc で埋め判定に入れる (`ldlib/cases.py` PATCH_BY_VA)。691dd0 は有効オブジェクトでも小サイズ確保のビンで segv (未達・子 issue) → LD-207 で vtable 付き rcx・flag=0 の投入で判定に入る |
 | `tools/liftdiff/REPORT_APPENDIX_LD207.md` | ~60 | liftdiff LD-207 (#4264): 691dd0 を VMT 付き rcx・r8=0 (`OBJ_PATTERNS` の vmo) で投入し判定に入れた (`diff`)。sample:800 の集合には入らない (単発 run の実測) |
+| `tools/liftdiff/REPORT_APPENDIX_LD226.md` | ~65 | liftdiff LD-226 (#4590): sta_img にスタックを SP 基準の 3 区間 (deep/win/hi) で足す RESET 実験 (n=1)。deep・win では match 4 件が残る。hi は差分量が異常で根拠にできない (子 #4801)。測定値は `results/ld226_sta_img_stack.tsv` (集計 `ld226_summarize.py`) |
 | `tools/liftdiff/REPORT_APPENDIX_LD225.md` | ~50 | liftdiff LD-225 (#4561): sample:N の集合に `OBJ_PATTERNS` の VA を足して 691dd0 を入れた (800→801)。batch の実測 360/235/206 と 691dd0 の verdict (`mismatch`・`vmo` の diff 由来) |
 | `tools/liftdiff/REPORT_APPENDIX_LD179.md` | ~60 | liftdiff LD-179 (#3862): `m11_tr_` の `%tagPOINT` 引数を a0 から組む (`m11_post.py`)。4256c0 は実行に入り、判定は `wasm_trap` (user32 `WindowFromPoint` 未実装、子 #4184 [LD-200])。11 関数 batch・sample:800 の実測 |
 | `tools/liftdiff/REPORT_APPENDIX_LD52.md` | ~70 | liftdiff LD-52 (#1528) 節: i128 引数・%tagPOINT の機械語入口型 (`cases.MACHINE_ENTRY`・wsig) による case 投入の方式と、対象 11 関数の実行可能件数の実測 (§2)。未解決の起票先は #3862〜#3864 (§4) |

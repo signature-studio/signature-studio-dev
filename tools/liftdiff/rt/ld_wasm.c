@@ -55,6 +55,10 @@ extern char __global_base[];
 #define LD_RST_HEAPMGR 16
 #define LD_RST_INBUF 32
 #define LD_RST_MALLOCVAR 64
+/* LD-226 (#4590): スタックを SP 基準で 3 区間に分けた切り分け用 (1 = 全体の互換。128 = SP より深い区間・256 = SP より上の区間) */
+#define LD_RST_STKDEEP 128
+#define LD_RST_STKHI 256
+#define LD_RST_STKWIN 512
 typedef struct { int cat; u8* lo; u64 n; u8* pr; } ld_rst_t;
 static ld_rst_t ld_rst[32];
 static int ld_nrst;
@@ -96,7 +100,13 @@ static void ld_rst_sta(void) {
 EMSCRIPTEN_KEEPALIVE void ld_w_snapshot(int imglen) {
   ld_snapshot();
   ld_nrst = 0;
-  ld_rst_add(LD_RST_STK, (u8*)(uintptr_t)emscripten_stack_get_end(), (u64)(emscripten_stack_get_base() - emscripten_stack_get_end()));
+  u8* stend = (u8*)(uintptr_t)emscripten_stack_get_end();
+  u8* stbase = (u8*)(uintptr_t)emscripten_stack_get_base();
+  u8* spS = (u8*)(uintptr_t)emscripten_stack_get_current();
+  u8* winlo = spS - 128 * 1024; if (winlo < stend) winlo = stend;
+  ld_rst_add(LD_RST_STK | LD_RST_STKDEEP, stend, (u64)(winlo - stend));
+  ld_rst_add(LD_RST_STK | LD_RST_STKWIN, winlo, (u64)(spS - winlo));
+  ld_rst_add(LD_RST_STK | LD_RST_STKHI, spS, (u64)(stbase - spS));
   ld_rst_sta();
   ld_rst_add(LD_RST_IMG, (u8*)(uintptr_t)ld_img, (u64)imglen);
   ld_rst_take();

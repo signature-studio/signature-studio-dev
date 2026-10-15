@@ -20,7 +20,10 @@ from ldlib.session import Session
 TSV = os.path.join(HERE, 'results', 'ld58_m11_sample800_shards_t1.tsv')
 TARGET = os.path.join(HERE, 'targets', 'm11.json')
 MASK = {'none': 0, 'stk': 1, 'sta': 2, 'img': 4, 'all': 7, 'sp': 8, 'sta_img': 6, 'sta_sp': 10,
-        'heapmgr': 16, 'inbuf': 32, 'mallocvar': 64}
+        'heapmgr': 16, 'inbuf': 32, 'mallocvar': 64,
+        # LD-226 (#4590): sta_img (6) にスタックの区間を 1 つだけ足す。128 = SP より深い・256 = SP より上・512 = SP 直下 128K 窓
+        'sta_img_deep': 6 | 128, 'sta_img_hi': 6 | 256, 'sta_img_win': 6 | 512,
+        'deep': 128, 'hi': 256, 'win': 512}
 
 
 def read_19():
