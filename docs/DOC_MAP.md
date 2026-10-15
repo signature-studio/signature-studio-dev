@@ -284,6 +284,7 @@
 | `tools/m11/REPORT_3932.md` | ~50 | #3932 (M11-N201, 親 #3906): set_other 実値化 25 件の alloca 番地を 0 詰め call 引数へ注入する経路 (`m11_post.py --slots`・`M11_SLOT_ROWS`)。注入の支配条件 (entry block 内・呼出し前)・既定は不変の検証。survey の前後実測は未達 |
 | `tools/m11/REPORT_N202.md` | ~70 | #3933 (M11-N202, 親 #3906): set_other スタック slot 未決 85 件の再測定 (現 HEAD で 112 件・実値化 25・未決 87)・C 規則の IR 突合 (引数単位 0・名前単位 22)。検算 `m11_setother_slot_check.py` |
 | `tools/m11/REPORT_N171.md` | ~120 | #3134 (M11-N171, 親 #1154): set_other 非 imm 349 件 (reg 123・mem 150・lea 76) の定義探索と 3 値分類 (件数は REPORT 参照)。接続方式の決定と未決の接続先 (#3140・#3141・#3142)。survey は素材欠落で未測定 (#1154)。分類器 `m11_setother_nonimm_class.py` |
+| `tools/m11/REPORT_N198.md` | ~90 | #3916 (M11-N198, 親 #3140): set_other の CFG 実値化を独立に照合する。具体実行で呼出し点の全経路の値を列挙する照合器 `m11_setother_nonimm_cfg_verify.py` (`--selftest` と実データ)。前提の実値化 1 件は未決 (経路で 0x0 と 0x1)。判定不能 33 件 (未対応命令) |
 | `tools/m11/REPORT_N172.md` | ~80 | #3140 (M11-N172, 親 #3134): set_other 非 imm reg merge 34 件の CFG 到達定義による判定 (件数は REPORT 参照)。実値化 1 件の機械語照合。未決 33 件の接続先の再割当 (#3141・#3142・#1154)。判定器 `m11_setother_nonimm_cfg.py` |
 | `tools/m11/REPORT_N173.md` | ~151 | #3141 (M11-N173, 親 #3134): set_other 非 imm のうち呼出し戻り値・算術・狭い格納 58 件の判定。戻り値の機械語解析・IR 型幅ゲート (define 行の出所)・測定 (実値化 0 / 未決 58 / 未分類 0)・ネガコン・未解決 (#3140・#3142・#3134)。分類器 `m11_setother_nonimm_class.py` |
 | `tools/m11/REPORT_N174.md` | ~90 | #3142 (M11-N174, 親 #3134・#1154): set_other 非 imm のメモリ読込・lea 256 件の接続方式 (stack_slot・alloca・ptr_mem・gep・global_store) と 3 値分類 (件数は REPORT 参照)。残りは #3906・#3907。分類器 `m11_setother_mem_class.py` |
