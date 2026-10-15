@@ -32,6 +32,8 @@ static int playing;
 static int64_t hl_cb;
 static int n_pr, n_run;
 static int dev_port, midi_out_n;
+static double idle_elapsed;
+static int midi_out_assigned, master_sync;
 static int sel_chan;
 static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"Resonance", 0.2}, {"Gain", 0.8}};
 static double pvals[3];
@@ -81,6 +83,7 @@ void fl_engine_reset(void) {
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0;
+    idle_elapsed = 0; midi_out_assigned = 0; master_sync = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
 int fl_engine_channel_count(void) { return nch; }
@@ -487,6 +490,13 @@ FL_H(device, isAssigned) { return fl_ret_b(c, 1); }
 FL_H(device, setHasMeters) { return fl_ret_none(c); }
 FL_H(device, forwardMIDICC) { (void)A_INT(0, 0); (void)A_INT(1, 1); midi_out_n++; return fl_ret_none(c); }
 FL_H(device, midiOutMsg) { (void)A_INT(0, 0); (void)A_INT(1, -1); (void)A_INT(2, -1); (void)A_INT(3, -1); midi_out_n++; return fl_ret_none(c); }
+FL_H(device, createRefreshThread) { return fl_ret_none(c); }
+FL_H(device, destroyRefreshThread) { return fl_ret_none(c); }
+FL_H(device, fullRefresh) { return fl_ret_none(c); }
+FL_H(device, getIdleElapsed) { return fl_ret_d(c, idle_elapsed); }
+FL_H(device, isMidiOutAssigned) { return fl_ret_b(c, midi_out_assigned); }
+FL_H(device, getMasterSync) { return fl_ret_b(c, master_sync); }
+FL_H(device, setMasterSync) { master_sync = A_INT(0, 0) == 1; return fl_ret_none(c); }
 
 /* ---- plugins (7) ---- (引数順: paramIndex 系は先頭、index/slotIndex/useGlobalIndex が後続) */
 FL_H(plugins, isValid) {

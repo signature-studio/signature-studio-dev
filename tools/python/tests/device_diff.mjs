@@ -14,7 +14,7 @@ const mock = createMockEngine();
 const run = (eng, name, args) => {
   try {
     const v = eng.call(name, args);
-    return { ok: v === undefined ? null : v };
+    return { ok: v === undefined ? null : (v?.t === "D" ? v.v : v) };
   } catch (e) {
     return { code: e.flCode ?? null };
   }
@@ -29,6 +29,17 @@ const seq = [
   ["device.midiOutMsg", [0x90, 0, 60, 100]],
   ["device.midiOutMsg", [0xB0]],
   ["device.midiOutMsg", [0xB0, 2, 1, 127, 9]],
+  // PY-206 (#3494): PE で確定した 7 関数。getIdleElapsed・isMidiOutAssigned の値は仮置きで、mock と C が同じ値を返すことだけを見る
+  ["device.createRefreshThread", []],
+  ["device.destroyRefreshThread", []],
+  ["device.fullRefresh", []],
+  ["device.getIdleElapsed", []],
+  ["device.isMidiOutAssigned", []],
+  ["device.getMasterSync", []],
+  ["device.setMasterSync", [true]],
+  ["device.getMasterSync", []],
+  ["device.setMasterSync", [false]],
+  ["device.getMasterSync", []],
 ];
 
 // mock は引数の個数・型を検査しない (既知の差)。C 側は署名どおりに拒否する (code 5) ことだけを wasm 単独で確認。
@@ -38,6 +49,12 @@ const rejects = [
   ["device.forwardMIDICC", [1, "x"]],
   ["device.midiOutMsg", [0xB0, 2, 1, 127, 9, 9]],
   ["device.midiOutMsg", [0xB0, "x"]],
+  ["device.createRefreshThread", [1]],
+  ["device.getIdleElapsed", [1]],
+  ["device.getMasterSync", [0]],
+  ["device.isMidiOutAssigned", ["x"]],
+  ["device.setMasterSync", []],
+  ["device.setMasterSync", ["x"]],
 ];
 const rejectDiffs = rejects.map(([name, args]) => ({ name, args, wasm: run(wasm, name, args) }))
   .filter((r) => r.wasm.code !== 5);
@@ -54,6 +71,7 @@ const mockOut = mock.state.midiOut.length;
 const wasmOut = wasm.midiOutCount();
 if (mockOut !== wasmOut) diffs.push({ state: "midiOut count", mock: mockOut, wasm: wasmOut });
 
+assert.equal(wasm.call("device.getIdleElapsed", []).t, "D", "getIdleElapsed の戻りは float (D タグ)");
 assert.deepEqual(diffs, [], `device 差分 ${diffs.length} 件`);
 assert.deepEqual(rejectDiffs, [], `署名違反が code 5 で拒否されない ${rejectDiffs.length} 件`);
 console.log(JSON.stringify({ calls: seq.length, rejects: rejects.length, midi_out: wasmOut, diffs: 0, PASS: true }));
