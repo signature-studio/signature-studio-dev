@@ -5,17 +5,17 @@
 #### 10-7u. #3802 (KH-66) run: 未定義 identifier 15・未関数化 callee 5・衝突 2 を解消 (部分・emcc 556 → 534 件)
 - 結論: Delay の emcc 残件 556 → **534** 件。下の 3 種を解消した: 未定義 identifier のうち `DAT_`・`uRam` の 15 件 (規則は下の EXT_CTYPE)、未関数化 callee 5 件 (fail-fast stub)、`FUN_18004cf20` の conflicting types 2 件 (本体がある VA の stub を出さない)。Gain/Haas/Gate の生成 C は origin/main と byte 一致、wasm の sha256 も一致、1000/1000 bit-exact。
 - 残件 (子 issue): `LAB_180fd2aab`・`PTR__guard_dispatch_icall_1813a1d38` の 2 件 → #3835 [KH-70]。double のビット再解釈 `(ulonglong)dVarN` 98 行 (silent miscompile の疑い) → #3836 [KH-71]。
-- 測定 commit (コードを変えた最後の commit): `ffd2d4070` (`tools/targets/kilohearts/ghidra_route/ghidra_to_c.py`)。比較元は origin/main `40d3a788d`。
-  - `git diff ffd2d4070 HEAD -- tools/targets/kilohearts/ghidra_route` の出力: 0 行 (本節の追記 commit は REPORT のみ)。
+- 測定 commit (コードを変えた最後の commit): `6323671e7` (`tools/targets/kilohearts/ghidra_route/ghidra_to_c.py`)。比較元は origin/main `40d3a788d`。
+  - `git diff 6323671e7 HEAD -- tools/targets/kilohearts/ghidra_route` の出力: 0 行 (本節の追記 commit は REPORT のみ)。
 
 **① 環境 (repo 外。`work/` は使わない)**
 - 素材 `plugins-kilohearts` (`tar --zstd -xf` で `Kilohearts Offline Installer.zip` 3,833,108,300 B のみ取り出し → `payload.dat` 3,817,512,248 B → `windows.zip/1ccb1df8c8f10745` 55,114,108 B → `HeartCore.core_64` 76,642,304 B)。
 - [GHIDRA] 12.1.4: 本 run で GitHub release から取得 (zip 569,649,598 B・sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)。`GHIDRA_HOME` (repo 外) に展開 (本 run で作成)。[JDK21] `temurin-21-jdk-amd64`、[EMSDK] emcc 6.0.12。`toolchain-emsdk` は `/opt/emsdk` を使用。`fl-win64` は未使用。
 - decompile: Delay lift 141 件 → **141/141 OK** (`analyzeHeadless` wall 21.3 s、n=1)。gain・haas・gate の 10 関数 → **10/10 OK**。
 
-**② Delay の census (origin/main `40d3a788d` → 測定 commit `ffd2d4070`・`emcc -c -ferror-limit=0`)**
+**② Delay の census (origin/main `40d3a788d` → 測定 commit `6323671e7`・`emcc -c -ferror-limit=0`)**
 
-| 分類 (census 行) | 前 (origin/main) | 後 (`ffd2d4070`) | 起票先 |
+| 分類 (census 行) | 前 (origin/main) | 後 (`6323671e7`) | 起票先 |
 |---|---|---|---|
 | 未関数化 callee | 5 | **0** | 本 PR で解消 (stub) |
 | レーン型 | 191 | 191 | #3094 [KH-42] |
@@ -56,7 +56,7 @@
 - 原因: Delay は `FUN_18004cf20` を `also` で decompile している (本体あり) のに、`STUB` の宣言 (`void* a, void* b, void* c`) も出していた。
 - 規則: STUB は本体を decompile していない VA にだけ出す (`va not in vas`)。THUNK も同じ条件。Gain/Haas/Gate は `FUN_18004cf20` の本体を持たないため、stub がそのまま出る。
 
-**⑥ 回帰 (Gain / Haas / Gate・測定 commit `ffd2d4070` の converter)**
+**⑥ 回帰 (Gain / Haas / Gate・測定 commit `6323671e7` の converter)**
 - 生成 C: origin/main の converter の出力と **byte 一致** (`cmp`・3 本とも)。
 - wasm: sha256 先頭 16 桁 Gain `57d8b9a34c5bcc28`・Haas `af100316c19d5b34`・Gate `95bcc2bd7d1b802f` (origin/main と同一)。サイズ 15,161 B・16,878 B・17,367 B。
 - 突合 (`native_ref` 1000 trial・seed 7・`compare.mjs`): Gain **1000/1000** (calls 4999/4999)・Haas **1000/1000** (calls 5500/5500)・Gate **1000/1000** (calls 4999/4999)。
