@@ -117,7 +117,9 @@
 
 ### 7.3 slot 0 (dtor) の native 実行 (#4117 / T-SH-97)
 - 測定 commit: `19a9c85d2` (ハーネス `ildsp_native.c`: HeapFree を記録・二重解放を検出・`--slot 0 V` で slot 0 を実行。checker は `--create-only` で create のみ照合)。`git diff 19a9c85d2 HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
-- 対象: vtable `0x1803dfcf8` の [0] = RVA `0x1aa2e0` (ファイル offset `0x1a96e0`)。逆アセンブルでは `vptr ← 0x1803df0f8` を書き、6 メンバ (+0x10・+0x18・+0x20・+0x208・+0x258・+0x260) それぞれに `call 0x1abdb0` し、最後に inner (0x2f8) と wrapper (0x10) を解放する形。`0x1abdb0` の中身は未同定 (virtual call の thunk に見えるが未確認)。
+- 対象: vtable `0x1803dfcf8` の [0] = RVA `0x1aa2e0` (ファイル offset `0x1a96e0`)。逆アセンブルでは `vptr ← 0x1803dfcf8` (create と同じ vtable) を書き、6 メンバ (+0x10・+0x18・+0x20・+0x208・+0x258・+0x260) それぞれに `call 0x1ac9b0` し、最後に inner (0x2f8) と wrapper (0x10) を解放する形。
+- 訂正 (#4154): 旧記述の「`call 0x1abdb0`・vptr `0x1803df0f8`」は誤り。PE 内に `0x1abdb0` を参照する call/jmp は無い (objdump 全文で 0 件)。実際の解放 helper は `0x1ac9b0` (→ `jmp 0x1acfe0` → `jmp 0x1b34a8`)。`0x1ac9c0` は `0x1b6ea0` (`jmp 0x1b9c1c`) の戻り値で分岐する。`0x1b34a8` は `0x1b9084` を経て IAT `0x268130` = HeapFree を呼ぶ (IAT `0x268128` は HeapAlloc)。
+- メンバの非 null 化 (#4154): `--pre-slot 1` で slot 1 (`0x1ab680`) を create 直後に 1 回呼ぶと、メンバ 6 件が非 null になる (`0x50000620`・`0x50000630`・`0x50000640`・`0x50001620`・`0x50000650`・`0x50000660`)。slot 2〜5 を前に呼んでもメンバは null のままだった。`--s0-members` (ハーネスが 6 件を直接張る版) は同じ結果だが、slot 経由の値ではないため正は `--pre-slot 1` とする。
 - 実測 (n=6・各プロセス `timeout 15`・rc 0 ×6・load average 0.13〜0.16・4 vCPU):
 
 | 項目 | 値 |
@@ -130,7 +132,26 @@
 | 実行前のメンバ | +0x10・+0x18・+0x20・+0x208・+0x258・+0x260 は全て 0 (create 直後) |
 | 所要 | 1 プロセス約 3.5 ms |
 
-- 受入 1 の「解放の対象 (inner・配列)」: 解放された 2 ブロックは inner (0x50000320) と wrapper (0x50000310)。メンバ 6 件は create 直後に全て null のため、非 null メンバを解放する経路は**この測定では通っていない**。子 [T-SH-98] #4154 で扱う。
 - 受入 2: HeapFree を観測する形に直し、2 回・二重解放 0 件を確認。
 - 受入 3: `ildsp_native_check.py` (create のみ) は ALL OK (rc 0)。`--neg` は FAIL (rc 1) のまま。
 - 注: 全件実行 (`ildsp_native <PE>`・slot 1〜5) は、既存の表どおり slot 3 rdx=1 で SIGSEGV (rc 139) する。今回の変更で変わっていない。
+
+#### 7.3.1 非 null メンバでの slot 0 (#4154 / T-SH-98)
+- 測定 commit: `<HEAD>` (本 PR の commit。`ildsp_native.c` に `--pre-slot K` と `--s0-members` を追加)。素材 fl-win64 (`26.1.7.5653`)・展開先は `$RUNNER_TEMP`・load average 0.17〜0.31 (4 vCPU)。
+- 手順: `--pre-slot 1` で slot 1 を create 直後に 1 回呼び、その後 `--slot 0 0` で slot 0 を呼ぶ。`--pre-slot K` の K=2〜5 は、slot 0 の直前に呼んでもメンバが null のままだった (下の注)。
+- 実測 (`--slot 0 0 --pre-slot 1`・n=6・`timeout 15`):
+
+| 項目 | 値 |
+|---|---|
+| rc / 戻り値 rax | 0 ×6 / 0x1 ×6 |
+| HeapFree 呼び出し | 8 件 (6/6)。メンバ 6 件 `0x50000620`・`0x50000630`・`0x50000640`・`0x50001620`・`0x50000650`・`0x50000660` → inner `0x50000320` → wrapper `0x50000310` |
+| 二重解放 | 0 件 (6/6) |
+| 未実装 import 呼び出し | 0 件 (6/6) |
+| 変更範囲 (`changed`) | `0xa`〜`0x2e8` の複数範囲 (slot 1 で書いた内部状態・vptr・メンバ解放後の書き換え)。slot 0 単独の `changed=[]` とは別の値 |
+| 所要 | 未測定 (`timeout 15` 内で rc 0 の 6 回すべて) |
+
+- 解放される配列メンバ (確定): slot 1 の後に非 null の 6 件 (+0x10・+0x18・+0x20・+0x208・+0x258・+0x260) を、dtor が 6 回 `call 0x1ac9b0` で解放し、HeapFree 8 件のうち 6 件がこれに当たる。残り 2 件は inner・wrapper。
+- 注: `--pre-slot 2`・`3`・`4`・`5` ではメンバは null のまま (HeapFree 2 件)。非 null メンバを作るのは slot 1 のみ。
+- 対照: `--s0-members` (ハーネスが直接 6 件を確保) でも HeapFree 8 件・二重解放 0 件。ただし slot 経由の値ではないため、正の実測は `--pre-slot 1`。
+- 受入 1 (非 null メンバでの解放対象の確定): **満たした** (本表)。受入 2 (helper 0x1abdb0 の同定): **満たせない** (`0x1abdb0` は PE 内で参照されていない)。実際の解放 helper を `0x1ac9b0` と同定して置き換えた。受入 3: 下記。
+- 受入 3: `ildsp_native_check.py` ALL OK (rc 0・`--pre-slot` 追加後も create 照合は不変)。
