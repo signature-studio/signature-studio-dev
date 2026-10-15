@@ -200,9 +200,27 @@
 
 - 受入 2 (mismatch 0・取りこぼし 0) は未達。閉包 169,752 は規則の判断待ち (`pdata_call` は既定ではない・既定 `any` は不変)。
 
-## 5.8 MX-59 (#5400): 番地ずれ疑い 3 件の判定 (測定 commit `0b91334ed`・main 取り込み前の script の値。head は未測定)
+## 5.8 MX-59 (#5400): 番地ずれ疑い 3 件の判定 (head `9645894e3` を実測。`0b91334ed` の値は main 取り込み前の参考値)
 
-- 素材: `plugins-massivex` → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` (§5.3 と一致)。この表の値は `0b91334ed` の run の実測値で、本 fix run では再実行していない (本 runner に `plugins-massivex` が無い)。
+- **head 実測 (`9645894e3`・`git diff --numstat 0b91334ed 9645894e3 -- tools/targets/massivex/dsp/scripts` = `7 1`)**: 素材 `plugins-massivex` → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` (95,356,824 B・一致)。`mx_rtti.py` → `mx_closure.py flow pdata_call` (22 round・入口 169,752・2 m 0 s) → `mx_flow_recheck.py` (2 m 11 s・終了時 load `4.47 2.04 0.82`・RESULT=FAIL・rc 1)。展開 125 件の md5-ok 0/125 は §8.1 の既知事象。
+- head の結果 (`0b91334ed` の値と並べる):
+
+| 項目 | `0b91334ed` (参考) | head `9645894e3` |
+|---|--:|--:|
+| 入口 | 169,752 | 169,752 |
+| (ii) 先頭ブロック不正 | 21,168 | 21,168 |
+| (iii) 先頭ブロック正常 | 160,259 | 160,259 |
+| 取りこぼし | 23 | 23 |
+| 過剰 | 1 | 1 |
+| mismatch | 115 | **24** |
+| `mismatch_cap_bad_obj_ok` | (未記載) | 23 |
+| `mismatch_cap_ok_obj_bad_(bad)/%?/rex2` | (未記載) | 1 |
+
+- head の 3 件の判定: `0x12e3768` (`(bad)`) と `0x2693a0c` (rex2) は head の mismatch に**無い** (`0b91334ed` の値でも無い。`ljmp` を TERM に加えた効果が head でも維持される)。`0x2470627` (`(bad)`・先頭は表データ `02 f9 fb 46 …`) は head でも**残る** (capstone 受理・objdump `(bad)`)。よって head では「2 件は mismatch に無い・1 件 (`0x2470627`) は未解決」。
+- `0b91334ed` → head の番地ごとの差 (`mismatch_0b91334ed.tsv` と `mismatch_head.tsv` の比較。ともに `work/mx29/`・gitignore): 旧 115 = 共通 6 + LOCK 規則で消えた 109 (旧 `lock` 109 件の全て) ; 新 24 = 共通 6 + 新規 18 (capstone 不正・objdump 受理 18 件)。共通 6 件に `0x2470627` を含む。`insn_sdm_ok` (SDM の LOCK 規則) が capstone 側の LOCK 109 件を一致扱いにし、代わりに capstone 不正・objdump 受理の 18 件が新たに mismatch に出た。取りこぼし・過剰は両方で 23・1 (同一)。
+- head の mismatch 24 の内訳 (`mismatch_cap_bad_obj_ok` 23・`mismatch_cap_ok_obj_bad_(bad)/%?/rex2` 1 = `0x2470627`)。23 件は全て capstone 不正・objdump 受理 (`capstone=False objdump=True`)。
+- `0b91334ed` → head の番地ごとの差 (`work/mx29/mismatch_0b91334ed.tsv` と `mismatch_head.tsv`・gitignore。同じ `flow_pdata_call_sets.pkl` に旧版・新版の script を当てて再生成): 旧 115 = 共通 6 + 旧だけの 109 (旧 `lock` 109 件の全て・capstone 側の LOCK 判定が一致扱いに変わって消えた)。新 24 = 共通 6 + 新だけの 18 (capstone 不正・objdump 受理)。共通 6 件は `0x2470627` を含む 6 件。取りこぼし 23・過剰 1 は両方で同一。
+- 以下の旧記述は `0b91334ed` の値 (取り込み前の参考値)。
 - 入力: `mx_rtti.py` → `mx_closure.py flow pdata_call` (22 round・169,752 入口)。`mx_flow_recheck.py` は `0b91334ed` で実行。
 - 変更 (`0b91334ed`): 先頭ブロックの終端 `TERM` に `ljmp` (`ff /5`・遠方ジャンプ) を加えた。`ljmp` は制御を移すため、その後ろは先頭ブロックではない。
 - 結果 (`0b91334ed`・`RESULT=FAIL`):
