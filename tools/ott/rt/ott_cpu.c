@@ -32,6 +32,22 @@ void ott_vexhit(uint64_t va) {
 }
 #endif
 
+/* LD-185 計装 build (-DOTT_INSNTRACE): 実行された命令の shifted VA を 0x35a00000 に記録 (件数上限付き・volatile 書込み)。
+ * layout: [u32 count][u32 cap][u32 va...]。count が cap に達したら以後は記録しない。JS 側は count を読んで記録を取る。 */
+#ifdef OTT_INSNTRACE
+#define OTT_INSN_BUF ((volatile uint32_t*)0x35a00000)
+#define OTT_INSN_CAP 0x40000u
+__attribute__((constructor)) static void ott_insn_init(void) {
+    OTT_INSN_BUF[0] = 0;
+    OTT_INSN_BUF[1] = OTT_INSN_CAP;
+}
+void ott_insnhit(uint64_t va) {
+    volatile uint32_t* b = OTT_INSN_BUF;
+    uint32_t c = b[0];
+    if (c < b[1]) { b[2 + c] = (uint32_t)va; b[0] = c + 1; }
+}
+#endif
+
 void ott_unsup(uint64_t addr, const char* what) {
     fprintf(stderr, "[ott] UNSUPPORTED instruction at %#llx: %s\n", (unsigned long long)addr, what); abort();
 }
