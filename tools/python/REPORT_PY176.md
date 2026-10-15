@@ -8,8 +8,8 @@
 - 0x1051720 の戻り値 bb (`[rbp+0xbb]`) は、0xf82a10 が G の保存値から decode した bb で決まる。値域は 0xff (見つからず・初期値)・0 (保存値の不整合で reset)・1 (保存時点で変化あり)・2 (保存時点で変化なし)。受入 1 は**確定** (下記 §2・§4)。
 - 0xf82c20 は (G, key, dir, flag, bb) を受け、`bb | ((dir+1)<<8)` を保存する。書込み先は G の item (`+0xc`)、大域 V (`0x16bacec`)、表 `[0x16bacd8]` の 3 系統。受入 2 は**確定** (§3)。
 - 10519c6 枝は G・V・K に**直接の書込みをしない**。枝内で通知文字列を組み、大域 `0x16bd1a0` (文字列) と `0x16bd1a8` (フラグ) を更新して UI 通知 `0xbd68e0(0xa)` を出す。受入 3 のうち枝の命令列と呼出し順は確定。`0x104f580`・`0x104d2b0`・`0x43dd60`・`0x414c70`・`0xbd68e0` の本体は未読 (§5)。
-- 受入 4 (表 `[0x16bacd8]` の hook の実体) は §7 で部分確定 (要素型 36 バイト・操作・K の書込み 0 件)。vtable の同定と通知先は未確定 (§7 の表。親 #3287 に残す)。10519c6 枝の呼出し先の本体は子 #3288 [PY-183]。
-- 未確定: item の tag (`0xf8ca50`) の解決リスト (§7)、`.bss` 上の大域の実行時値。(表の要素型と K の書込み 0 件は §7 で確定)
+- 受入 4 (表 `[0x16bacd8]` の hook の実体) は §7 で部分確定 (要素型 36 バイト・操作・K の静的な書込み 0 件)。vtable の同定と通知先は未確定 (§7 の表。子 #3402 [PY-194] へ移送)。10519c6 枝の呼出し先の本体は子 #3288 [PY-183]。
+- 未確定: item の tag (`0xf8ca50`) の解決リスト (§7。子 #3403 [PY-195])、`.bss` 上の大域の実行時値 (同 #3403)。(表の要素型と K の静的な書込み 0 件は §7 で確定)
 
 ## 測定
 
@@ -111,9 +111,9 @@ production 呼出し (dl=0・flag=0) では `key == K` のとき `V ← (dir+1)<
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 表 T0 (`[0x16bacd8]`) の vtable `+0x10`・`+0x18` の実体と、`0xf8e3f0`・`0xf8e4a0`・`0xf8ecd0`・`0xf8eb10`・`0xf8ea80` の本体 | 受入 4。`f8e4e0` の通知先が決まらない | 子 #3287 [PY-182] |
-| item の tag `f8ca50` の意味 (`0x11e83d0`・`0x11e8280` の解決) と、保存 bb の運用 (reset の条件) | bb=0 (reset) の発生条件が確定しない | 子 #3287 [PY-182] |
-| K `0x16bacf0` の書込み元 | V の意味 (どの key の保存値か) が確定しない | 子 #3287 [PY-182] |
+| 表 T0 (`[0x16bacd8]`) の vtable `+0x10`・`+0x18` の実体と、補助オブジェクト P (`0x53de80()`) の実体 (`0xf8e3f0`・`0xf8e4a0`・`0xf8ecd0`・`0xf8eb10`・`0xf8ea80` の本体は §7 の 1〜4 で確定) | 受入 4。`f8e4e0`・`f8e590`・`f8e5f0` の通知先が決まらない | 子 #3402 [PY-194] (§7 の未確定) |
+| item の tag `f8ca50` の意味 (`0x11e83d0`・`0x11e8280` の解決リスト) と、保存 bb の運用 (reset の条件) | bb=0 (reset) の発生条件が確定しない | 子 #3403 [PY-195] (§7 の未確定) |
+| K `0x16bacf0` の間接書込みの有無 (静的な書込み 0 件は §7 の 6 で確定) | V の意味 (どの key の保存値か) の前提。静的走査の範囲外 | 子 #3403 [PY-195] (§7 の未確定) |
 | 10519c6 枝の `0x104f580`・`0x104d2b0`・`0x43dd60`・`0x414c70`・`0xbd68e0` と、`0x16bd1a0` の表示先 | 枝内の副作用の全量 (受入 3 の残り) | 子 #3288 [PY-183] |
 | `0x414c70` で連結した表示文 (literal は §5 で確定済み。連結結果は未読) | 表示文の確定 | 子 #3288 [PY-183] |
 | 0xff 経路の `ac` 未初期化読み | 実行時値に依存し、0 か 1 の分岐が変わり得る | 本 PR の注意 (§2)。経路上の判定は子 #3288 [PY-183] |
@@ -143,22 +143,24 @@ production 呼出し (dl=0・flag=0) では `key == K` のとき `V ← (dir+1)<
 6. **K (`0x16bacf0`) の書込み元は無い** (静的に確定): `.text` 全走査で RIP 相対の書込み命令 0 件。ファイル全体で絶対 disp32・即値の 4 byte 列 0 件。読みは 2 箇所のみ: `0xf82a43` (dl≠0 の枝の比較) と `0xf82c48` (`0xf82c20` の key 比較)。K は `.bss` の初期値 0 のまま。key の下位 16 bit は 4 (§2 の key 式) なので key ≠ 0。よって `0xf82c48` は偽で、`0xf82c20` の `V ←` 枝 (`0xf82c55`・`0xf82c5f`) は静的には到達しない。`0xf82a43` の枝も dl≠0 でのみ通るので production (dl=0) では到達しない。
    - V (`0x16bacec`) の書込みは `0xf82b80` (0 を書く) と上の K 枝の 2 箇所。読みは `0xf82a52` (K 枝内) のみ。
    - **訂正 (§3)**: §3 の「production 呼出しでは `key == K` のとき `V ← (dir+1)<<8`」は、K が書かれないため静的には到達しない。`W = v` の書込み (item・T0 へ) は K と無関係に行われる。
-   - 未検査: 間接書込み (K を含む構造体の一括複写など)。
+   - 未検査: 間接書込み (K を含む構造体の一括複写など)。子 #3403 [PY-195] で扱う。
 7. **item の tag `0xf8ca50(item)`** (部分確定): `id = [item+0x10]` の上位 16 bit が 0xfff なら、`(item+8)>>22 − 1` (≥0 のとき) を引数に `0x11e83d0` (リスト L1 を走査し `[elem+0x2f8]` が引数と等しい最初の添字)。得られなければ `0x11e8280(cl=1, edx=0, r8=0)` (リスト L2 の `[elem+0x32c] ≠ 0` の要素のうち先頭の添字)。失敗は −1。上位 10 bit = 0xff なら大域ポインタ先の dword (実行時値)。それ以外は −1。
-   - 未確定: L1・L2 の要素型と実体、大域ポインタ `[0x655bf8]` の値。`0x11e8280` は cl=1 の枝だけを読んだ (cl=0 の後段は f8ca50 から通らない)。
+   - 未確定: L1・L2 の要素型と実体、大域ポインタ `[0x655bf8]` の値 (子 #3403 [PY-195])。`0x11e8280` は cl=1 の枝だけを読んだ (cl=0 の後段は f8ca50 から通らない)。
 
-### 未確定 (issue #3287 の残り。Refs のまま残す)
+### 未確定 (子 #3402・#3403 へ移送)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| T0 の vtable の同定。候補は `.text` 内の表 `0xf808d8` (`f8e820`・`f8ed00`・`f8e830`・`f8e860`) で、+0x10 = `0xf8e830`・+0x18 = `0xf8e860`。ただしこの表を指すコード参照は RIP・絶対とも 0 件 | 受入 2。f8e4e0・f8e590・f8e5f0 の通知先 (vtable +0x10/+0x18) が決まらない | #3287 |
-| P = `0x53de80()` の実体 (vtable、+0x18 の (sub,key) 判定、+0x20 の id 供給) | id の値と key 一致判定の入力が未確定 | #3287 |
-| L1・L2 の実体 (`0x11e83d0`・`0x11e8280`)、`[0x655bf8]` の実行時値 | item の tag (高 16 bit) が未確定 | #3287 |
-| K の間接書込みの有無 (構造体の一括複写など) | K = 0 の結論の前提。静的走査の範囲外 | #3287 |
+| T0 の vtable の同定。候補は `.text` 内の表 `0xf808d8` (`f8e820`・`f8ed00`・`f8e830`・`f8e860`) で、+0x10 = `0xf8e830`・+0x18 = `0xf8e860`。この表を指す**命令の参照** (RIP 相対・絶対 disp32・即値) は 0 件 (`.text` 全走査)。データ上には同じ 8 byte 値 (qword `0xf808d8`) が 2 箇所あり、VA `0xf80810` (直前の qword は `0x74`) と VA `0xf8125e` (直前の 8 byte は文字列 `Control>`) に現れる。偶然一致の可能性もある | 受入 2。f8e4e0・f8e590・f8e5f0 の通知先 (vtable +0x10/+0x18) が決まらない | #3402 [PY-194] |
+| P = `0x53de80()` の実体 (vtable、+0x18 の (sub,key) 判定、+0x20 の id 供給) | id の値と key 一致判定の入力が未確定 | #3402 [PY-194] |
+| L1・L2 の実体 (`0x11e83d0`・`0x11e8280`)、`[0x655bf8]` の実行時値 | item の tag (高 16 bit) が未確定 | #3403 [PY-195] |
+| K の間接書込みの有無 (構造体の一括複写など) | K = 0 の結論の前提。静的走査 (RIP 相対・絶対 disp32・即値) の範囲外 | #3403 [PY-195] |
 
 ### 測定
 
-- 測定 commit (コードを変えた最後の commit): `392fdab8` (`analysis/flapi/pe_t0_probe.py` を追加した commit)。この commit の内容で probe を実行した。以後の commit は REPORT_PY176.md と docs/DOC_MAP.md だけで、`git diff 392fdab8 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (測定対象は変わらない)。
+- 測定 commit (コードを変えた最後の commit): `12771b3e7` (`analysis/flapi/pe_t0_probe.py` の K 書込み検査を capstone の access 判定に変えた commit。以前の測定 commit `392fdab8` の probe は mnemonic の白リスト判定だった)。この commit の内容で probe を実行した。以後の commit は REPORT_PY176.md と docs/DOC_MAP.md だけで、`git diff 12771b3e7 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (測定対象は変わらない)。
 - 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (1.55 秒・22,227,016 バイト・1 回)。展開先は repo 外の一時領域で `FL_WIN64_DIR` に指定する。
-- probe (`FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_t0_probe.py`): 21 件すべて PASS・summary OK・終了 0・所要 45.6 秒 (K の全 .text 走査が大半。測定 commit `392fdab8` で 1 回。実行前後の load average (1 分値) は 0.11 → 0.64)。構造 17 件 (f8e4a0・f8e3f0・f8e4e0・f8e590・f8ea80・f8ecd0・f8eb10・f8e5f0・f8ec70 の命令列)・K の読み位置 2 件・K への書込み 0 件 (.text 全走査)・絶対 disp32 0 件。
-- ネガティブコントロール (1 byte を壊した複製を repo 外の一時領域に置いて実行): `add r14, 0x24` の 0x24 を 0x28 に変えた (file offset `0xb8d87e`・VA `0xf8e47e`・`cmp -l` で `44 → 50` 八進)。出力は `FAIL f8e3f0: 要素 stride 0x24 (36 byte)`・`summary: 1 FAIL`・終了 1。
+- probe (`FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_t0_probe.py`): 測定 commit `12771b3e7` で 21 件すべて PASS・summary OK・終了 0・所要 88.8 秒 (`time` の real。実行前後の load average (1 分値) は 0.39 → 0.87)。同じ環境で修正前の HEAD `25ad9fb9b` (probe の内容は `392fdab8` と同一) も 21 件 PASS・所要 90.6 秒 (load 0.49 → 0.98)。構造 17 件 (f8e4a0・f8e3f0・f8e4e0・f8e590・f8ea80・f8ecd0・f8eb10・f8e5f0・f8ec70 の命令列)・K の読み位置 2 件・K への書込み 0 件 (.text 全走査。hits=[])・絶対 disp32・即値の 4 byte 列 0 件。
+- ネガティブコントロール (測定 commit `12771b3e7` で再実行。1 byte を壊した複製を repo 外の一時領域に置いて実行): `add r14, 0x24` の 0x24 を 0x28 に変えた (file offset `0xb8d87e`・VA `0xf8e47e`・`cmp -l` で `44 → 50` 八進)。出力は `FAIL f8e3f0: 要素 stride 0x24 (36 byte)`・`summary: 1 FAIL`・終了 1。
+- 書込み検査の制御 (repo 外の合成バイト列で `sweep_writes_to` を直接呼ぶ): RIP 相対で K を指す `mov`・`xchg`・`cmpxchg`・`lock cmpxchg`・`fstp` の書込み 5 件を検出した。K を読むだけの `mov` (ロード)・`cmp`・`fld` の 3 件は検出せず、別の番地を指す書込みは 0 件。旧判定は mov・add・sub・inc・dec・and・or・xor の書込みしか見ないため、`xchg`・`cmpxchg`・`fstp` を取りこぼす。capstone 5.0.7 は `cmpxchg`・`fstp` のメモリ書込みを READ と返すので、助記 (`cmpxchg`・`fst*`・`fist*`) で補っている。
+- 候補 vtable `0xf808d8` の参照検査 (repo 外の一時スクリプト。capstone で `.text` を全走査): RIP 相対の参照 0 件・即値と絶対 disp32 の参照 0 件。ファイル全体の 4 byte 列 `d8 08 f8 00` は 2 件 (§7 の未確定表の 2 箇所と同じ位置。所要 94.6 秒)。
