@@ -2,11 +2,11 @@
 
 親: #2760 (WIN-7 系)。前提 spike: [`REPORT_WIN7_2718.md`](REPORT_WIN7_2718.md) (#2718)。手順の正本は `win33_catalog.sh` / `win33_trace.py` (本 PR)。
 
-測定 commit: `fa8ec63d9` (コードを変えた最後の commit。本 REPORT の数値は全てこの commit で実測した。§9)。HEAD は本文書の commit で、`git diff fa8ec63d9 HEAD -- tools/liftdiff ':(exclude)*.md'` の出力は空 (コード差分 0。`docs/WORKFLOW.md` §6)。`origin/main` (`c2324dea6`) を取り込んだ後は `git diff --name-status 7080aca8a HEAD -- tools/liftdiff` が main 由来の変更を含むため、旧測定 commit `7080aca8a` の値は使わず、HEAD 系の値だけを §1・§6 に置く (旧値との対応は §9)。
+測定 commit: `b01598aa2` (コードを変えた最後の commit。`origin/main` (`09b96c12f`) を取り込んだ merge。本 REPORT の数値は全てこの commit で実測した。§9)。HEAD は本文書の commit で、`git diff b01598aa2 HEAD -- tools/liftdiff ':(exclude)*.md'` の出力は空 (コード差分 0。`docs/WORKFLOW.md` §6)。旧測定 commit `fa8ec63d9`・`7080aca8a` の値は §9 の対応表に残す。
 既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなく、harness の stub 応答と停止の扱い。新規の類型候補は §7)。
-再現コマンド: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/liftdiff/win33_catalog.sh` (2 分 29 秒・4 spike/trace 実行)。e2e: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/liftdiff/liftdiff_e2e.sh --m11-only` (3 分 13 秒)。
+再現コマンド: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/liftdiff/win33_catalog.sh` (2 分 04 秒・4 spike/trace 実行)。e2e: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/liftdiff/liftdiff_e2e.sh --m11-only` (2 分 56 秒)。
 素材: fl-win64・work-m11・work-liftdiff・toolchain-emsdk (`[EMSDK]`)。`tools/liftdiff/work/` `tools/m11/work/` は work-liftdiff・work-m11 を展開した (gitignore 対象の検証スナップショット。commit しない)。
-実行環境: GitHub Actions runner (4 コア)。load average は win33 の前後で 0.5〜1.0、e2e の前後で 0.7〜6.4 (e2e 内の並列 batch による)。
+実行環境: GitHub Actions runner (4 コア)。load average は win33 の前後で 1.2〜1.5、e2e の前後で 0.8〜6.4 (e2e 内の並列 batch による)。
 
 ## 0. 結論 (実測)
 
@@ -14,9 +14,9 @@
    - ReadFile の応答は正しい (全量 47,405 B をバッファへ。先頭 4 B は blob と一致)。SetFilePointer の応答 (BEGIN/CUR/END=0xb92d/BEGIN) も整合。**原因は読取り位置 0 で magic を count として読んでいること**。どの読取りが位置 0 であるべきか (呼出元の読取り仕様 / .mo との形式不一致) は未同定 → §7 の子。
 2. **rep movsq (rva `0x12a25`) は実カタログ供給の後の偽の止まり**。RTE 201 の後始末で `ExitProcess(0xc9)` の stub が戻る (`r=0`) ため、後続の `mov rsi,[rip+0x11d8267]` (この時点で 0 の global) からコピーして segv する。実プロセスの ExitProcess は戻らない。
 3. S12〜S22 の対応は §5 (実測の import 列と止まり地点を `STARTUP.md` §2 の段に対応づけ、未観測は未観測と書く)。
-4. **既定 (`LD_CATALOG_MO` 未指定) は不変**: spike 928/942・first_fail 830・segv `0x4e0fab`・35 import (= #2718 と同一)。`liftdiff_e2e.sh --m11-only` は同一時間帯の `c2324dea6` (PR が取り込んだ main) と一致 (360/234/206・PASS)。本 commit で 2 回実行し、2 回目は全 800 関数の判定が `c2324dea6` と一致、1 回目は 1 関数の揺れ (§6)。
+4. **既定 (`LD_CATALOG_MO` 未指定) は不変**: spike 928/942・first_fail 830・segv `0x4e0fab`・35 import (= #2718 と同一)。`liftdiff_e2e.sh --m11-only` は同一時間帯の `origin/main` (`09b96c12f`) と一致 (360/234/206・PASS)。HEAD で 2 回実行し、2 回目は全 800 関数の判定が `09b96c12f` と一致、1 回目は 1 関数 (`0x959a40`) の揺れ (§6)。
 
-## 1. 実測結果 (測定 commit `fa8ec63d9`・`win33_catalog.sh` 1 回)
+## 1. 実測結果 (測定 commit `b01598aa2`・`win33_catalog.sh` 1 回。値は `fa8ec63d9` の測定と同一)
 
 | 項目 | 既定 (`LD_CATALOG_MO` なし) | 実カタログ (`LD_CATALOG_MO=block25158`) |
 |---|---|---|
@@ -67,7 +67,7 @@ ReadFile の引数: `h=0x65000001`・`buf=0x3d49240`・`n=0xb92d` (= END の位�
 | 8810609 | 0x7fffffffb6b8 | 0x8 | 正常 |
 | **8819677** | **0x7fffffffa2e8** | **0xffffffff950412de** | **負数 → RTE 201** |
 
-(V のアドレスは実行ごとに環境長で変わる。上の値は `fa8ec63d9` の `win33_catalog.sh` の 1 回目の trace 時の実測。)
+(V のアドレスは実行ごとに環境長で変わる。上の値は `fa8ec63d9` の `win33_catalog.sh` の 1 回目の trace 時の実測。`b01598aa2` の 1 回目は V のアドレス `0x7fffffffa1e8`。)
 
 ### 3.3 V の書込み履歴 (`LD_STEP_MEM=7fffffffa2e8`・MEM 行)
 
@@ -143,15 +143,15 @@ ReadFile の引数: `h=0x65000001`・`buf=0x3d49240`・`n=0xb92d` (= END の位�
 
 ## 6. 受入条件 4 と製品 KPI
 
-| 項目 | 前 (既定) | 後 (既定・測定 commit `fa8ec63d9`) | 判定 |
+| 項目 | 前 (既定) | 後 (既定・測定 commit `b01598aa2`) | 判定 |
 |---|---|---|---|
 | spike の units_run / first_fail | 928/942・830 (#2718 と同一) | 928/942・830 | 不変 |
 | CFI の止まり | segv `0x4e0fab` | segv `0x4e0fab` | 不変 |
 | CFI の import 数 | 35 | 35 | 不変 |
-| e2e `--m11-only` sample:800 (一致/不一致/実行不能) | 同一時間帯の `c2324dea6` (PR が取り込んだ main): 360/234/206 | `fa8ec63d9` 1 回目: 361/233/206 / 2 回目: 360/234/206 | 2 回目で不変。1 回目は 1 関数の揺れ (下) |
-| e2e `--m11-only` の結果 | `LIFTDIFF_E2E PASS` (3 分 12 秒) | 1 回目 `PASS` (3 分 15 秒) / 2 回目 `PASS` (3 分 13 秒) | 不変 |
+| e2e `--m11-only` sample:800 (一致/不一致/実行不能) | 同一時間帯の `09b96c12f` (origin/main): 360/234/206 | `b01598aa2` 1 回目: 361/233/206 / 2 回目: 360/234/206 | 2 回目で不変。1 回目は 1 関数の揺れ (下) |
+| e2e `--m11-only` の結果 | `LIFTDIFF_E2E PASS` (2 分 58 秒) | 1 回目 `PASS` (2 分 56 秒) / 2 回目 `PASS` (2 分 54 秒) | 不変 |
 
-e2e 1 回目の差は 1 関数 (`0x959a40`) の pattern `p1`・`pall` の `diff` → `equal` のみ (同時間帯の `c2324dea6` の run と比べた)。この関数の wasm 戻り値はポインタ (`0x2206ec00`) で、トレース長の差も併せて出ている。e2e は同じ runner を batch 内で使い回すため、負荷による runner の再起動で結果が変わり得る。2 回目 (同じ commit) は 800 関数すべて `c2324dea6` と判定が一致した。1 回目が再現しなかったことを根拠に、揺れとして扱う。
+e2e 1 回目の差は 1 関数 (`0x959a40`) の verdict のみ (HEAD `match`・`09b96c12f` `mismatch`。`fa8ec63d9` の 1 回目でも同じ関数が pattern `p1`・`pall` で揺れた)。この関数の wasm 戻り値はポインタ (`0x2206ec00`) で、トレース長の差も併せて出ている。e2e は同じ runner を batch 内で使い回すため、負荷による runner の再起動で結果が変わり得る。2 回目 (同じ commit) は 800 関数すべて `09b96c12f` と判定が一致した。case 単位の差 (スタック・ヒープのアドレス値と 1000ms の hang 判定) は環境変数長の差による揺れで、verdict には出ていない。1 回目が再現しなかったことを根拠に、揺れとして扱う。
 
 KPI (`docs/WORKFLOW.md` §7・起動に関わる PR): FLEngine 起動の dispatch 数・通過 unit 数 は既定で不変 (928/942)。実カタログ時は first_fail が 830 → 895 (830 は通過)。最初のウィンドウ (画素) は**動かしていない** (画素統計は未取得。`CreateWindowExW` は両方で呼ばれる)。
 
@@ -166,20 +166,21 @@ KPI (`docs/WORKFLOW.md` §7・起動に関わる PR): FLEngine 起動の dispatc
 
 ## 8. 検証範囲 / 範囲外
 
-- 検証 (測定 commit `fa8ec63d9`): 既定 spike・実カタログ spike・命令 trace (2 回・`win33_catalog.sh` 1 run)・e2e `--m11-only` (2 回)。同一時間帯の baseline として `c2324dea6` の e2e を 1 回実行した。
+- 検証 (測定 commit `b01598aa2`): 既定 spike・実カタログ spike・命令 trace (`win33_catalog.sh` 1 run)・e2e `--m11-only` (HEAD で 2 回)。同一時間帯の baseline として `09b96c12f` (origin/main) の e2e を 1 回実行した。
 - 範囲外: wasm 化 (`rt/fle_ldbridge.c` の wasm ビルドは本 PR で触らない。`ld_core.h` の追加は `ld_cat_blob == NULL` で分岐に入らない)。本番コード化。画素統計。
 - 限界: スタックのアドレスは環境変数長に依存 (`win33_catalog.sh` が同じ環境長で取り直す)。trace は単一 case (`cfi`) のみ。Stream の Position は直接 PEEK していない (3.4 の magic 一致からの推定)。
-- 単一 run の実測の限界: e2e の絶対値は負荷で変わる (REPORT.md §6.2) ため、同一時間帯の baseline (`c2324dea6`) と同じ run 比較で判定した。spike と trace は各 1 run。
+- 単一 run の実測の限界: e2e の絶対値は負荷で変わる (REPORT.md §6.2) ため、同一時間帯の baseline (`09b96c12f`) と同じ run 比較で判定した。spike と trace は各 1 run。
 
 ## 9. 測定の対応表 (旧測定・作者の HEAD 実測・レビュー再実行)
 
-| 再測定の対象 | `7080aca8a` (旧測定。値は §1・§6 から外した) | 測定 commit `fa8ec63d9` (作者の実行・本 REPORT) | レビュー再実行 `9694e7564` (round 2) |
+| 再測定の対象 | `7080aca8a` (旧測定。値は §1・§6 から外した) | 測定 commit `fa8ec63d9` (作者の実行・前回の測定値) | レビュー再実行 `9694e7564` (round 2) |
 |---|---|---|---|
 | 既定 spike (`spike_cfi.py`) | 928/942・830・`0x4e0fab`・35 import | 928/942・830・`0x4e0fab`・35 import | 同左 |
 | 実カタログ spike (`LD_CATALOG_MO`) | 928/942・895・`0x12a25`・39 import | 928/942・895・`0x12a25`・39 import | 同左 |
 | 範囲検査の trace (`win33_catalog.sh` 4/4) | V 負数・writer rva `0x17fc9`・行 8819652/8819677 | 同左 (V のアドレス `0x7fffffffa2e8`) | 同左 (V のアドレス `0x7fffffffa2d8`) |
 | e2e `liftdiff_e2e.sh --m11-only` | 360/234/206・PASS | 1 回目 361/233/206・PASS / 2 回目 360/234/206・PASS (同時間帯の `c2324dea6`: 360/234/206・PASS) | 360/234/206・PASS |
 
+- 測定 commit `b01598aa2` (`09b96c12f` 取り込みの merge・本 REPORT の値): spike 928/942・830・`0x4e0fab`・35 import / 実カタログ 928/942・895・`0x12a25`・39 import / 範囲検査 V 負数 (writer rva `0x17fc9`・行 8819652/8819677) は `fa8ec63d9` と同値。e2e は HEAD で 361/233/206・PASS と 360/234/206・PASS、同時間帯の `09b96c12f` で 360/234/206・PASS。
 - 測定 commit `fa8ec63d9` と `7080aca8a` の差は、spike の数値・import 数・trace の行番号・V の負数化・writer rva がすべて同値。違うのは V のアドレスだけで、環境変数長による (0x10 ずれ)。
 - レビュー再実行 (`9694e7564`) と作者の実行 (`fa8ec63d9`) は、spike・trace・e2e (2 回目) で一致。`9694e7564` と `fa8ec63d9` の間の差分は `win33_catalog.sh` の copy 先と `spike_cfi.py` の正規表現 (`model_names()` の名前集合は変わらない) のみ。
-- 測定 commit 以降の HEAD (本文書の commit) はコード差分 0 (`git diff fa8ec63d9 HEAD -- tools/liftdiff ':(exclude)*.md'` の出力は空)。
+- 測定 commit `b01598aa2` 以降の HEAD (本文書の commit) はコード差分 0 (`git diff b01598aa2 HEAD -- tools/liftdiff ':(exclude)*.md'` の出力は空)。
