@@ -134,7 +134,7 @@
 
 - 測定 commit: `870ee5f0e` (解析スクリプト `analysis/flapi/pe_py230_l_default.py` を追加した commit。コードを変えた最後の commit)。本節の commit は REPORT のみ。
   差分の証跡: `git diff 870ee5f0e HEAD -- tools/python/analysis tools/python/host tools/python/provider tools/python/tests` (本節の commit 後に 0 行を確認)。
-- 素材: `fl-win64` (`block00031_PE.bin` 22,227,016 B。`tar --zstd -xf` 2.2 秒) と `toolchain-emsdk` (`$HOME/artifacts/toolchain-emsdk.tar.zst` を `tar --zstd -xf` 2.7 秒、`emsdk/emsdk_env.sh` を `EMSDK_ENV` で指定)。
+- 素材: `fl-win64` (`block00031_PE.bin` 22,227,016 B。`tar --zstd -xf` 2.2 秒) と `toolchain-emsdk` (`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` を `tar --zstd -xf` 2.7 秒、`emsdk/emsdk_env.sh` を `EMSDK_ENV` で指定)。
 - 基線 (provider と channels・コード変更なし。main `512b09ffa` 基点):
 
 | 検査 | コマンド | 結果 | 所要 |
