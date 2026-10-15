@@ -18,9 +18,9 @@
 
   --residual  窓で書換えられなかった comis 直後の分岐を分類する (#3137)。JSON 1 行。
     br_other     窓内の最初の分岐が cf/zf/pf の名前参照でない
-      stale      条件の依存連鎖の葉 (整数比較) が comis より前に定義されている = comis のフラグを読まず前の cmp を読む (D1a 同型)
+      stale      条件の依存連鎖の葉 (整数比較) が 1 つでも comis より前に定義されている = comis のフラグを読まず前の cmp を読む (D1a 同型)。葉が前後に混在する場合も stale
         clean    間に関数呼出し・フラグ更新 asm が無い
-        call     間に関数呼出し・フラグ更新 asm がある (callee がフラグを変えるため IR だけでは決まらない)
+        call     間に関数呼出し・フラグ更新 asm がある (callee がフラグを変えるため IR だけでは決まらない)。フラグ更新 asm の名前は flag_call_re (整数 ALU・bt 系・sahf/popf/clc/stc/cmc/xadd/ptest。SSE の xorpd・subsd 等は含まない)
       fresh      葉が全て comis より後 (分岐のフラグは comis 後の整数比較由来。同型でない)
     no_branch    窓 (13 行) 内に分岐が無い
       next_comis 次のフラグ関連イベントが後続の comis (この comis のフラグは読まれない)
@@ -51,7 +51,7 @@ ir_path = args[0] if args else os.path.join(HERE, "..", "m6", "work", "ott_lift.
 def residual_census(text, parse_call):
     lines = text.split("\n")
     comis_re = re.compile(r"call void @__asm_v?u?comis[sd]")
-    flag_call_re = re.compile(r"call [\w ]+ @(function_|__asm_(add|sub|cmp|test|and|or|xor|inc|dec|neg|shl|shr|sar|bt|adc|sbb|rcl|rcr|ror|rol|mul|imul|div|idiv|bsf|bsr))")
+    flag_call_re = re.compile(r"call [\w ]+ @(function_|__asm_(add|adc|sub|sbb|cmp|test|and|or|xor|inc|dec|neg|shl|shr|sar|rol|ror|rcl|rcr|bt[src]?|mul|imul|div|idiv|bsf|bsr|sahf|popf|clc|stc|cmc|xadd|ptest)(?![a-z0-9]))")
     leaf_ok = re.compile(r"^(icmp (eq|ne) i1|or i1|and i1|xor i1)")
     def defpos(name, before):
         pat = re.compile(r"^\s*%" + re.escape(name) + r" = ")
