@@ -57,14 +57,14 @@
 
 ### 2-2. 束縛関数の直接実行 (試行・未達)
 
-- 方法: `fle_boot.c` の `fle_py_bind_probe` が boot 停止後 (summary の書出しの後) に `fle_run(0xc395a0)` を 1 回実行する。プローブ中だけ (a) `LoadLibraryW("Python312")` の load hook が擬似 hmod `0x7f0e0000` を返し、(b) `GetProcAddress` は名前ごとに cell (データ変数の番地) を返す。cell の中身は型トークン `0x7f300000 + i`。計数は、`GetProcAddress` の呼出し回数 (`_fle_n_getproc` の前後差) と、Python312 名の load hook の呼出し回数 (`_fle_py_bind_hook_n`)。束縛された名前は `_fle_py_bind_name(i)` が空文字になるまで読む (throw の経路でも読む)。`FLE_PY106_BIND=1` のときだけ動き、boot の経路は変えない。出力は `results/boot_summary_<tag>_<label>_py106bind.json` (`FLEBOOT_PY106B`・`FLEBOOT_PY106RING`)。
+- 方法: `fle_boot.c` の `fle_py_bind_probe` が boot 停止後 (summary の書出しの後) に `fle_run(0xc395a0)` を 1 回実行する。プローブ中だけ (a) `LoadLibraryW("Python312")` の load hook が擬似 hmod `0x7f0e0000` を返し、(b) `GetProcAddress` は名前ごとに cell (データ変数の番地) を返す。cell の中身は型トークン `0x7f300000 + i`。計数は、`GetProcAddress` の呼出し回数 (`_fle_n_getproc` の前後差) と、Python312 名の load hook の呼出し回数 (`_fle_py_bind_hook_n`)。束縛された名前は `_fle_py_bind_name(i)` が空文字になるまで読む (throw の経路でも読む)。`FLE_PY106_BIND=1` のときだけ動き、boot の経路は変えない。出力のうち JSON に入るのは `FLEBOOT_PY106B` の内容だけ (`results/boot_summary_<tag>_<label>_py106bind.json`。`probe`・`head_at_stop`・`slot_*_after_bind`・`name_of_slot_*`・`chain`・`names`)。`FLEBOOT_PY106RING` は stdout (`console.log`) のみで JSON には入らない。どちらもログ `tools/flelift/work/boot/run_<tag>_<label>.log` で見る。
 - 測定 commit: **`73a65fc4a`** (`fix(flapi): count probe calls and read names after throw (PY-106, #2909)`)。コードを変えた最後の commit。出力は `results/boot_summary_py106_negctl.json`・`results/boot_summary_py106_negctl_py106bind.json`。
 - 結果 (実測。`FLEBOOT_PY106B`): `threw: exit (code 0)`、`names_n 0`、`getproc_calls 0` (probe 中の GetProcAddress)、`hook_calls 0` (probe 中の Python312 名の load hook)、slot `0x16b8488` は `0x0` のまま。
 - 結果 (実測。`FLEBOOT_PY106RING`): ring は直近 dispatch のリングで、ring に入るのは非 0 の dispatch だけ。末尾 32 件は `0x6a7b70` の 6 件の後に `0xc395a0` (最後の非 0 の dispatch)。`dispatch(0)` は `fle_probe_dispatch` が `t == 0` を ring に入れず `g_n_disp0` を数えて return するため、ring には現れない (`dispatch(0)` の行は次の「実測のログ」に示す)。
 - 実測のログ: `MessageBoxA` の直前の最後の `[fleboot][ff] dispatch(0) -> ret 0` の呼出し元 (call site ret) は `0x409424`。その後 `MessageBoxA` → `exit` (site `0x412a12`)。
 - 読み (PE の逆アセンブル): `0xc395a0` は先頭で `[0x16b85c8]` (hmod) を見て、0 なら `0x6539e0` (Python312 のローダ) を呼ぶ。`0x6539e0` は `0x653660` を呼ぶ。
 - 推定 (未計測): ローダ内部の `0x653660` が post-boot の状態で null の関数ポインタを踏み、`dispatch(0)` になる。`0x653660` の実行は計測していない。最後の `dispatch(0)` の呼出し元 `0x409424` は `0x653660` 内の番地ではなく、ローダ経路で null 呼出しに入ったことは確認されていない。
-- 別案 (不成立): ローダを飛ばして `0xc395d1` (hmod 判定の後) から始める試みは、`0xc395d1` が lift の関数入口でないため `unlifted` (target `0xc395d1`) で止まった。
+- 別案 (未コミットの試行・出力なし): ローダを飛ばして `0xc395d1` (hmod 判定の後) から始める試みを行った。ただしその試行のコード・出力・手順はこの PR (commit・results・§7) に残っていない。したがって「`0xc395d1` は lift の関数入口でなく `unlifted` で止まった」という結果は、この PR では裏付けられない (未検証の記録)。
 - 結論: この probe では、束縛関数は GetProcAddress にも Python312 の load hook にも届かず、null 呼出しの後に `MessageBoxA` → `exit` で終わる。型名の実行時の値は、この段階では得られない (受入 1 は未達のまま)。null 呼出しの位置 (推定の経路) は #2909 の再開条件 (a) で追う。
 
 ## 3. RANGE (-4) と repo の写像 (受入 2)
@@ -116,6 +116,6 @@ export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64
 tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $FL_WIN64_DIR --wildcards '*block00031_PE.bin'
 python3 tools/python/analysis/flapi/exc_type_chain.py
 python3 tools/python/analysis/flapi/pe_rip_refs.py 16b83f8
-FLE_BOOT_TAG=py106 FLE_BOOT_RUNS=negctl timeout 900 bash tools/flelift/boot/fle6_measure.sh
-grep -E 'FLEBOOT_PY106|FLEBOOT_PY123' tools/flelift/work/boot/run_py106_negctl.log
+FLE_PY106_BIND=1 FLE_BOOT_TAG=py106 FLE_BOOT_RUNS=negctl timeout 900 bash tools/flelift/boot/fle6_measure.sh
+grep -E 'FLEBOOT_PY106|FLEBOOT_PY123|\[fleboot\]\[ff\] dispatch\(0\)' tools/flelift/work/boot/run_py106_negctl.log
 ```
