@@ -76,7 +76,7 @@
 |---|---|---|
 | alloca 適用後の boot trap (unit 0x16fde0・`function_8c6530` の `i32.store` の引き金) | 受入 2・1 | #942 (次 run) |
 | only44bae0 の Runtime error 0 (`0x10251740`) の意味。`dllmain_done=True` を正常完走と見なさない判定が必要 | 測定の判定 | #942 (次 run) |
-| survey の noproc (r=0) 件数と VA の未出力 (raw 783 件・alloca 1 件)。trap 9 → 26 の内訳 (noproc 由来か既存 unit の回帰か) と unit 87 (0x19f9a0) の残存の食い違い | 測定の母数・受入 1 | #942 (次 run) |
+| survey の noproc (r=0) 件数と VA の未出力 (raw 783 件・alloca 1 件)。alloca 変種の D(tbl) の未出力。trap 9 → 26 の内訳 (noproc 由来か既存 unit の回帰か) と unit 87 (0x19f9a0) の残存の食い違い | 測定の母数・受入 1 | #942 (次 run) |
 | ldfix_e2e の入力 (snapshot = qstore・alloca 前) を本番順 (alloca → ldfix → qstore) にするか | 測定の基準 | PM agent の判断待ち (既定案: 現行 (alloca 前) を維持) |
 | F3c 33 → 43 の変化の原因 (原因未調査。main の変更は推定) | 受入 3 | #942 (次 run) |
 | work-m11 の IR と現 main の不一致 | 測定の母体 | #942 (次 run) |
