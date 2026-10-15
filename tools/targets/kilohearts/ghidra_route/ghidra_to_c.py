@@ -192,7 +192,7 @@ def main():
         t = re.sub(r'undefined1 (auVar\d+) \[16\];', r'V128 \1;', t)
         t = re.sub(r'undefined1 (in_XMM\d+) \[16\];', r'V128 \1;', t)
         t = re.sub(r'\b(in_XMM\d+)\._0_8_\b', r'\1._0_8_d', t)
-        t = re.sub(r'\bmaxps\((\w+),_DAT_([0-9a-f]+)\)', r'maxps(\1,(*(V128 *)gd_\2))', t)
+        t = re.sub(r'\b(maxps|minps|vpand_avx|vpor_avx|vpsubq_avx|vpsubd_avx)\((\w+),_DAT_([0-9a-f]+)\)', r'\1(\2,(*(V128 *)gd_\3))', t)
         if tbase is not None:
             t = re.sub(r'&UNK_([0-9a-f]{8,9})\b', lambda m: '((unsigned char*)gt_%x + 0x%x)' % (tbase, int(m.group(1), 16) - tbase), t)
         t = re.sub(r'\*\(undefined1 \(\*\) \[16\]\)\((.*?)\) = (auVar\d+) << 0x20;', r'v128_store_shl32((void*)(\1), \2);', t)
