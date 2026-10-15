@@ -15,7 +15,7 @@
 
 ## 1. 測定条件
 
-- 素材: `fl-win64` (`extracted/block00031_PE.bin`・22227016 B)・`work-liftdiff` (`tools/liftdiff/work/m11`・`simd.c` sha256 `d82e2759…` 一致)・`work-m11` (`tools/m11/work`)。`toolchain-emsdk` は runner の `/opt/emsdk` (`[EMSDK]`)。
+- 素材: `fl-win64` (`extracted/block00031_PE.bin`・22227016 B)・`work-liftdiff` (`tools/liftdiff/work/m11`・`simd.c` sha256 `d82e2759…` 一致)・`work-m11` (`tools/m11/work`)。`toolchain-emsdk` は runner 既存の `[EMSDK]` (`docs/REFERENCES.md` §4)。
 - wasm: `build_wasm.build(m11, False)` (link 3.3 s・`wasm_size` 4459215)。native: `gcc -O1` で `work/ld_native`。
 - 機: 4 vCPU・RAM 15 GiB。5 条件を同時に流した (`xargs -P 5`)。全 5 条件 wall 298〜301 s、`sta_img` 単独 wall 199 s。実行前の load は 0.18 (00:29 UTC)。load は各回で未記録 (n=1)。
 - 線形メモリの配置 (`Session._layout` と `ld_w_layout`・測定時): image `[0x0, 0x18c0000)`・C 静的 `[0x10000000, …)`・`g_heap` `0x10070000` (96 MiB)・`g_inbuf` (192 MiB)・`g_arena` `0x22071000` (1 MiB)・stack `[0x224bbd00, 0x22cbbd00)` (8 MiB)。
