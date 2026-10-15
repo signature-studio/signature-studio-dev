@@ -95,7 +95,7 @@ grep -c '^wp ' work/wp_F.txt; tail -1 work/wp_F.txt     # wp 件数・wpsum
 - 本 PR (受入の範囲を縮めた再測定): `rt/ld_native.c` に opt-in の `LD_PIN_CPU` (`sched_setaffinity`) を足した (`b90d87438`。未指定時の動作は変えない)。`cmp_img_2770.py` に state・detail の一致判定を足した (`d94083396`)。CPU 固定下の測定は §8.9。読取りのみの監視 (page 保護を変えない方式) は子 #3648 に移した。
 - レビュー round 2 の fix (差し戻し): §8.8 の run 数を 23 run (直列 21 run と strace 付き 2 run) に直した。表 1 の bc80 行の env を「LD_PAD なし」に直した。216 要素の扱いと img の列挙の定義を書き直した。§8.1 の EFAULT の記述から「確認した」を外した。`cmp_img_2770.py` は rsp が取れない時に `UNKNOWN: not comparable` と出す。DOC_MAP の行を本付録の現行の内容に合わせた。`rt/ld_native.c` は変えていない。
 - 今回の差し戻し (oc-review round=1) への fix: §8.9 を全 12 run で `97c4bc87c` から取り直した。`0x15e69bf` の監視 (W0・W2) を表と再現手順に足し、窓内 wp 3 件の記述を wp 行の範囲 (8 byte) に合わせた。結論行の因果断定を「一致する (因果は未特定)」に直した。閉じた #2769 を起票先にした行を「起票なし (表で追跡)」に直した。`rt/ld_native.c` の `LD_PIN_CPU` を strtol で検証し、`cmp_img_2770.py` の JSON を `with open` で読むようにした。
-- レビュー round 2 の fix (差し戻し): §8.9 の wp 段落の記録条件を `rt/ld_native.c` の `wp_fault` (`g_wp_hit`: 開始アドレスが `[va-15, va+7]`) に合わせた。round 1 の「wp 行の範囲 (8 byte) に合わせた」は誤りだった。W0・W2 を HEAD で取り直し、wp 行と `0x11e69bf` の値 (00・02) を照合した。DOC_MAP の行数と節を直した。
+- レビュー round 2 の fix (差し戻し): §8.9 の wp 段落の記録条件を `rt/ld_native.c` の `wp_fault` (`g_wp_hit`: 開始アドレスが `[va-15, va+7]`) に合わせた。round 1 の「wp 行の範囲 (8 byte) に合わせた」は誤りだった。W0・W2 を取り直し (コードは `0d748e1c5` と同一)、wp 行と `0x11e69bf` の値 (00・02) を照合した。DOC_MAP の行数と節を直した。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
