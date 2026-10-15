@@ -164,26 +164,25 @@ C (`provider/fl_engine.c`) と mock (`host/fl_mock.mjs`) は同じ順序で引�
 ### 8.4 受入条件 (run 7 時点)
 
 - [ ] 1. 5 関数の引数・戻り値・範囲外 code を PE 解析箇所つきで記録 — **部分達成**。引数書式・index 範囲外の経路は §1・§5.1・§8.2 で確定。戻り値 (§8.3-4)・述語 (§8.3-1) は未確定。残りは子 #3351 (PY-189) に移し、#1529 の本文から外した。
-- [x] 2. `provider/fl_engine.c` に実装し、`tests/provider_check.mjs` の実装数を更新 — 実装 5 関数。実装数 121 → 126 (commit `ecaa7658`。main 取り込み前の値。現 HEAD は implemented 145 で、main の PY-94・PY-95・PY-101・PY-102 の実装を含む)。
+- [x] 2. `provider/fl_engine.c` に実装し、`tests/provider_check.mjs` の実装数を更新 — 実装 5 関数。実装数 121 → 126 (commit `ecaa7658`。main 取り込み前の値。現 HEAD は implemented 146 で、main の PY-94・PY-95・PY-101・PY-102・PY-120 の実装を含む)。
 - [x] 3. mock と C の差分検査で diffs 0 — `tests/channels_diff.mjs` 192 呼出し、diffs 0 (ecaa7658 時点。現 HEAD は 201 呼出し。増えた 9 呼出しは main の PY-101 (#2878) の `channels.isGridBitAssigned`・`channels.getGridBitWithLoop` の呼出し)。
 - [x] 4. `FL_ENGINE=wasm node tests/all_tools.mjs` が 48/48 ok — 実測 48/48 (下表)。
 
-### 8.5 検証 (測定 commit `37abd37e`)
+### 8.5 検証 (測定 commit `946da7fd3`)
 
-- 測定 commit: `37abd37e` (`origin/main` (`41623210`) の取り込み merge。コードを変えた最後の commit)。前の測定 commit は `0a1bc5a7` (main `1c8ca077` の取り込み)、その前は `7ff61a39` (HEAD `454b1cc1`)。PY-40 の対象は `provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`。
-- 競合 (取り込みは 2 回): `tests/provider_check.mjs` の判定列と件数だけ。本 PR の `pe40` と main の `pe94` (PY-94 #2830)・`pe95` (PY-95 #2831) を残し、件数は 145 (implemented)・290 (unimplemented)。`handler 145` (provider build) と一致する。2 回目は main が `1c8ca077` から `41623210` へ進んだための取り込み。
-- 差分確認: `git diff 37abd37e HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (REPORT のみの変更)。再測定は不要。main は `650590ed` (69 commit) へ進んだが、本 PR は取り込んでいない (`git merge-tree` の衝突 0 件)。取り込むと `provider/fl_engine.c` 等のコードが変わるため、取り込み後の再測定が要る (emsdk は oc_artifacts で取得する)。
-- 下表は測定 commit `37abd37e` で再実行した結果。前回 (`454b1cc1`) の 129・306 から 145・290 に変わったのは、main の PY-94 (7 関数) と PY-95 (9 関数) が実装済みに加わったため。
-- 環境: 4 コア。素材 fl-win64 から `extracted/block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` の 4 件を展開 (`tar --zstd -xf <archive> -C <dir> --wildcards '*block24429_DATA.bin' ...`、2.956 秒)。emsdk 6.0.12 は測定 run で `[EMSDK]` に導入した (上流 `emsdk install 6.0.12`・repo 外)。R2 の `toolchain-emsdk` を取得したかは記録に無い。本 fix run の ARTIFACTS_DIR には `fl-win64.tar.zst` だけがあり、`toolchain-emsdk` は無かった。CPython 3.12.1 wasm (`build_cpython_wasm.sh`・rc 0・4 分 38 秒) と flpy (`FLPY_SKIP_TABLE=1 build_flpy.sh`・rc 0・6.3 秒) は `0a1bc5a7` の検証で作成し、以後 `src/flpy.c` と flapi table に変更が無いので再作成していない。`fetch_inputs.sh` (`FL_WIN64_DIR` 指定) で `work/midi.py`・`work/utils.py` 等を配置 (rc 0)。
+- 測定 commit: `946da7fd3` (`origin/main` (`a5966bbc7`) の取り込み merge。コードを変えた最後の commit)。前の測定 commit は `37abd37e` (main `41623210` の取り込み)。PY-40 の対象は `provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`。
+- 競合 (3 回目の取り込み。PR ブランチが main に遅れたため): `tests/provider_check.mjs` の判定列と件数だけ。判定列は本 PR の `pe40` と main の `pe94`・`pe95`・`pe120` (PY-120 #2984、`launchMapPages.length`) をすべて残した。件数は main の 141 (implemented、pe120 を含む) + 本 PR の 5 = **146** (implemented)、未実装 289。`handler 146` (provider build) と一致する。
+- 差分確認: `git diff 946da7fd3 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (以後の変更は REPORT のみ)。`git diff 37abd37e 946da7fd3 -- tools/python/host/fl_mock.mjs tools/python/provider/fl_engine.c` の focusEditor 行は 0 件。
+- 環境: 4 コア。素材 fl-win64 から `extracted/block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` の 4 件を展開 (`tar --zstd -xf` の `--wildcards`)。emsdk は runner の既存 `/opt/emsdk` (`emsdk_env.sh`) を使った。R2 の `toolchain-emsdk.tar.zst` は ARTIFACTS_DIR に実在したが展開していない。CPython 3.12.1 wasm (`build_cpython_wasm.sh`・rc 0・3 分 30 秒) と flpy (`FLPY_SKIP_TABLE=1 build_flpy.sh`・rc 0・4.7 秒) は本 run で作成した。`fetch_inputs.sh` (`FL_WIN64_DIR` 指定) は rc 0。
 
 | 検証 | 結果 (実測) |
 |---|---|
-| `bash provider/build.sh` | rc 0。`gen_provider.py --check-handlers` の handler 145 (main の PY-94・PY-95・PY-101・PY-102 を含む)。`dist/flprov.wasm` 61,293 B |
+| `bash provider/build.sh` | rc 0。`gen_provider.py --check-handlers` の handler 146。`dist/flprov.wasm` 62,292 B |
 | `node tests/channels_diff.mjs` | calls 201・diffs 0・PASS |
-| ネガティブコントロール (mock の focusEditor の index 範囲検査を外す) | 再実行していない。`ecaa7658` 時点の記録は diffs 2 件・exit 1。main 取り込み (`454b1cc1`→`37abd37e`) は `host/fl_mock.mjs` の focusEditor の行を変えていない (`git diff 454b1cc1 37abd37e -- tools/python/host/fl_mock.mjs` の focusEditor 行 0 件)。根拠 (`ecaa7658` から HEAD まで): mock の channels 5 関数の行 (HEAD 170〜190) は `host/fl_mock.mjs` の差分 hunk に含まれず、C の 5 関数の行 (HEAD 175〜190) も `provider/fl_engine.c` の差分 hunk に含まれない。`gen/fl_table.c` の差分は `playlist.muteTrackLock` の 1 行だけ。`channels_diff.mjs` の追加 9 行は PY-101 の呼出しだけ。 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (2.1 秒) |
-| `node tests/provider_check.mjs` | functions 435・implemented 145・unimplemented 290・mcp_static 60・PASS |
-| `node tests/*_diff.mjs` (14 本) | 全て rc 0・diffs 0・PASS (arrangement・arrangement_selection・channels・device・general・ilmcp・midi_path・mixer・playlist・screen・transport・ui・ui_display・ui_state) |
+| ネガティブコントロール (mock の focusEditor の index 範囲検査を外す) | 再実行していない。`ecaa7658` 時点の記録は diffs 2 件・exit 1。`37abd37e`→`946da7fd3` で `host/fl_mock.mjs`・`provider/fl_engine.c` の focusEditor の行は変わっていない (上記の差分確認)。 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (1.5 秒) |
+| `node tests/provider_check.mjs` | functions 435・implemented 146・unimplemented 289・mcp_static 60・PASS |
+| `node tests/*_diff.mjs` (16 本) | 全て rc 0・diffs 0・PASS (arrangement・arrangement_selection・channels・device・general・ilmcp・launchmap・midi_path・mixer・playlist・screen・step_item・transport・ui・ui_display・ui_state) |
 
 - 起動・GUI の KPI (FLEngine 起動の dispatch 数・通過 unit 数・最初のウィンドウ) は**動かしていない** (flapi の引数検査だけの変更で、FLEngine の boot は実行していない)。
 - 解析手段: 静的 (`analysis/flapi/pe_disasm.py` 系)。素材の `block00031_PE.bin` を使う再解析は run 7 では行っていない (§8.3 の未確定点は run 2〜6 の記録のとおり)。
@@ -197,4 +196,3 @@ C (`provider/fl_engine.c`) と mock (`host/fl_mock.mjs`) は同じ順序で引�
 | 成功時の戻り値 (`0xc38bc0` 経路) | None 以外の戻り値の可能性 | #3351 (PY-189) |
 | 範囲上限の配列 (`[0x5dcad3]`・`[0x5da9a8]`) の要素数の出所 | useGlobalIndex=0 時の範囲が件数と違う可能性 | #3351 (PY-189) |
 | UI 副作用・`showCSForm` の state 分岐・`closeGraphEditor` の `[+0xa9]` 分岐 | 表示状態は観測できないため mock 上は差が出ない | #3351 (PY-189。観測手段が無いため継続。FLEngine boot の前進 #672・#3060 が前提) |
-| main (`650590ed`・69 commit) が未取り込み | 取り込み後の組合せは未検証 (`git merge-tree` の衝突は 0 件) | #3206 の次の更新 (取り込みと再測定。emsdk は oc_artifacts) |
