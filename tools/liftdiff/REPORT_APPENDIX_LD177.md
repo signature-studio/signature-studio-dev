@@ -90,7 +90,7 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 - **撤回**: 以前の版の 73 件の表 (resolved 29 等)、母集団入力の sha `5506d464…` と `a5cecab2…`、fvm 42 件の内訳 (native_fault / both_fault / diff / hang)、88→73 の除外理由、fvm 12→42 の VA 一覧は、いずれも根拠の jsonl が保存・再現できないため撤回した。`a5cecab2…` の jsonl は、素材にも commit にも残っていない。
 - **再測定の基準**: e2e (`liftdiff_e2e.sh --m11-only`) の PASS・所要時間の記録は、`c592c0e47` の run のもの (195 秒・LIFTDIFF_E2E PASS)。この run の jsonl は保存していないため、その fvm の件数・verdict の内訳は検証できない。
 - **差分証跡** (WORKFLOW §6): 測定 commit `ce18b1c84` と本 PR の code 範囲 (`tools/liftdiff/ldlib tools/liftdiff/ld198_recount.py tools/liftdiff/liftdiff.py tools/liftdiff/liftdiff_e2e.sh`) の差分は空。e2e がビルドする `tools/liftdiff/rt/ld_native.c` は main 取り込みで変わっている (`git diff --stat 258eb9fa6 c592c0e47 -- tools/liftdiff/rt/ld_native.c` = 55 insertions / 2 deletions)。その変化が e2e の結果に与えた影響は未切り分け。
-- **残り**: 多重候補 88 件のうち resolved 32 件以外の 56 件 (候補外 4・伝播できず 49 (base 非 arg 42・分岐 7・ret 跨ぎ 2)・ret 断片 1)。起票先 #4173 で継続 (本 PR で閉じない)。
+- **残り**: 多重候補 88 件のうち resolved 32 件以外の 56 件 (候補外 4・伝播できず 51 (base 非 arg 42・分岐 7・ret 跨ぎ 2)・ret 断片 1)。合計 4 + 51 + 1 = 56 = 88 − 32。起票先 #4173 で継続 (本 PR で閉じない)。
 - **測定 run の記録 (参考。jsonl 未保存のため内訳は検証不能)**: `liftdiff_e2e.sh --m11-only` の run と PASS・所要時間のみ残す。
 
 | run | commit | 所要 (経過秒) | load (uptime 1 分値 開始 → 終了) | match / mismatch / unexec | fvm 関数数 | 結果 |
