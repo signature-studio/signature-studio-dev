@@ -246,14 +246,36 @@ def resolve(fn, pos, reg):
     return ("entry", reg, None)
 
 
+def slot_escapes(fn, mem, lo, hi):
+    """[lo, hi) に、スロット mem のアドレスを lea で取る命令があれば、その位置。"""
+    base, disp = mem
+    for j in range(lo, hi):
+        ins = fn.ins[j]
+        ops = ins.op_str.split(",", 1)
+        if ins.mnemonic.split()[-1] != "lea" or len(ops) != 2 or "[" not in ops[1]:
+            continue
+        m = parse_mem(ops[1], ins)
+        if m and m["base"] == base and m["disp"] == disp and not m["index"]:
+            return j
+    return None
+
+
 def find_store(fn, k, mem):
     base, disp = mem
-    for j in range(k - 1, max(-1, k - 600), -1):
+    lo = max(-1, k - 600)
+    escaped = slot_escapes(fn, mem, 0, k) is not None
+    for j in range(k - 1, lo, -1):
         ins = fn.ins[j]
         mn = ins.mnemonic.split()[-1]
-        if mn == "call" or (mn in ("push", "pop") and base == "rsp"):
+        if mn in ("push", "pop") and base == "rsp":
             return None
+        if mn == "call":
+            if escaped:
+                return None
+            continue
         ops = ins.op_str.split(",", 1)
+        if mn == "lea" and len(ops) == 2 and slot_escapes(fn, mem, j, j + 1) is not None:
+            return None
         if mn == "mov" and len(ops) == 2 and "[" in ops[0]:
             m = parse_mem(ops[0], ins)
             if m and m["base"] == base and m["disp"] == disp and not m["index"]:
@@ -279,6 +301,8 @@ def value(fn, pos, reg, strict):
         if kind == "load" and info[0] in ("rsp", "rbp"):
             sp = find_store(fn, k, info)
             if sp is None:
+                if slot_escapes(fn, info, 0, k) is not None:
+                    return ("outparam", info, k)
                 return ("stackslot", info, k)
             s, src = sp
             if strict and not fn.dominated(s, k):
