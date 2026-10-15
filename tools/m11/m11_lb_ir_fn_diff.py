@@ -3,10 +3,11 @@
 # 整数定数の変化量 (LB=0x10000 側 - LB=0 側) を出す。LB 由来の再配置 (VA→LVA) の定数は +0x10000 になる。
 # それ以外の変化 (0 でも +0x10000 でもない) は再配置の漏れ・誤りの候補。
 #   使い方: python3 tools/m11/m11_lb_ir_fn_diff.py <LB=0 の boot_final.ll> <LB=0x10000 の boot_final.ll> function_412e40 [...]
+import difflib
 import re
 import sys
 
-CONST = re.compile(r'\bi(?:8|16|32|64)\s+(-?\d+)\b')
+CONST = re.compile(r'(?:\bi(?:8|16|32|64)\s+|,\s*)(-?\d+)\b')
 
 
 def body(path, name):
@@ -45,7 +46,6 @@ def main():
         print('%s: lines LB=0=%d LB=0x10000=%d' % (name, len(b0), len(b1)))
         if len(b0) != len(b1):
             print('  行数が違う (構造が変わっている)')
-        import difflib
         sm = difflib.SequenceMatcher(a=b0, b=b1, autojunk=False)
         n = 0
         for tag, i0, i1, j0, j1 in sm.get_opcodes():
