@@ -436,17 +436,56 @@ FL_H(mixer, trackCount) { return fl_ret_i(c, NMIX); }
 FL_H(mixer, getTrackCount) { return fl_ret_i(c, NMIX - 2); }
 /* PE 0xd63870: ecx=3 を変換スロット 0x15e4280 (PyLong_FromLong・REPORT_PY152 §42) に渡すのみ (REPORT_PY205) */
 FL_H(mixer, getEqBandCount) { return fl_ret_i(c, 3); }
-/* PE 0x12be470 (maxLen > 0 のみ): 長さが maxLen を超えるとき末尾から、mask 外の文字 (母音 AEIOU・記号・空白。mask = 0-9 と大文字子音) を削除し、最後に先頭 maxLen 文字へ切る。
- * PE の文字列は UTF-16。ここは ASCII 前提 (非 ASCII 名は未確認) */
+/* UTF-8 ⇄ UTF-16 (名前は UTF-8 で持つ。不正・孤立サロゲートは U+FFFD。境界の TextEncoder/TextDecoder と同じ) */
+static int u8_to_u16(const char *s, uint16_t *o) {
+    const unsigned char *p = (const unsigned char *)s;
+    int n = 0;
+    while (*p) {
+        uint32_t cp = *p++;
+        int k = 0;
+        if (cp >= 0xc2 && cp <= 0xdf) cp &= 0x1f, k = 1;
+        else if (cp >= 0xe0 && cp <= 0xef) cp &= 0x0f, k = 2;
+        else if (cp >= 0xf0 && cp <= 0xf4) cp &= 0x07, k = 3;
+        else if (cp >= 0x80) cp = 0xfffd;
+        for (; k && (*p & 0xc0) == 0x80; k--) cp = cp << 6 | (*p++ & 0x3f);
+        if (k) cp = 0xfffd;
+        if (cp >= 0x10000) o[n++] = (uint16_t)(0xd800 + ((cp - 0x10000) >> 10)), o[n++] = (uint16_t)(0xdc00 + ((cp - 0x10000) & 0x3ff));
+        else o[n++] = (uint16_t)cp;
+    }
+    return n;
+}
+static void u16_to_u8(const uint16_t *u, int n, char *o) {
+    int k = 0;
+    for (int i = 0; i < n; i++) {
+        uint32_t cp = u[i];
+        if (cp >= 0xd800 && cp < 0xdc00 && i + 1 < n && u[i + 1] >= 0xdc00 && u[i + 1] < 0xe000) cp = 0x10000 + ((cp - 0xd800) << 10) + (u[++i] - 0xdc00);
+        else if (cp >= 0xd800 && cp < 0xe000) cp = 0xfffd;
+        if (cp < 0x80) o[k++] = (char)cp;
+        else if (cp < 0x800) o[k++] = (char)(0xc0 | cp >> 6), o[k++] = (char)(0x80 | (cp & 0x3f));
+        else if (cp < 0x10000) o[k++] = (char)(0xe0 | cp >> 12), o[k++] = (char)(0x80 | (cp >> 6 & 0x3f)), o[k++] = (char)(0x80 | (cp & 0x3f));
+        else o[k++] = (char)(0xf0 | cp >> 18), o[k++] = (char)(0x80 | (cp >> 12 & 0x3f)), o[k++] = (char)(0x80 | (cp >> 6 & 0x3f)), o[k++] = (char)(0x80 | (cp & 0x3f));
+    }
+    o[k] = 0;
+}
+/* PE 0x12be470 (maxLen > 0 のみ): PE の文字列は UTF-16 で、長さ・削除は code unit 単位 (0x12be5a4 の判定・0x414f20 の 1 unit 削除)。
+ * 長さが maxLen を超える間、末尾から 1 unit ずつ見て mask 外を削除する (a-z は大文字化してから判定。mask = 0-9 と大文字子音。非 ASCII は全て mask 外)。
+ * 長さが maxLen 以下になったら止め、最後に先頭 maxLen unit へ切る */
 static void track_name_fit(char *s, int64_t m) {
-    if (m <= 0 || (int64_t)strlen(s) <= m) return;
-    for (int64_t i = (int64_t)strlen(s); i >= 1; i--) {
-        if (!strchr("0123456789BCDFGHJKLMNPQRSTVWXYZ", toupper((unsigned char)s[i - 1]))) {
-            memmove(s + i - 1, s + i, strlen(s + i) + 1);
-            if ((int64_t)strlen(s) <= m) break;
+    uint16_t u[NAME];
+    char o[3 * NAME];
+    int n = u8_to_u16(s, u);
+    if (m <= 0 || n <= m) return;
+    for (int i = n; i >= 1 && n > m; i--) {
+        uint16_t ch = u[i - 1];
+        if (ch >= 'a' && ch <= 'z') ch -= 0x20;
+        if (ch > 0xff || !strchr("0123456789BCDFGHJKLMNPQRSTVWXYZ", ch)) {
+            memmove(u + i - 1, u + i, (size_t)(n - i) * sizeof u[0]);
+            n--;
         }
     }
-    if ((int64_t)strlen(s) > m) s[m] = 0;
+    if (n > m) n = (int)m;
+    u16_to_u8(u, n, o);
+    snprintf(s, NAME, "%s", o);
 }
 FL_H(mixer, getTrackName) { MX(0); int64_t m = A_INT(1, -1); char b[NAME]; snprintf(b, sizeof b, "%s", t->name); track_name_fit(b, m); return fl_ret_s(c, b); }
 FL_H(mixer, setTrackName) { MX(0); const char *s = A_STR(1); set_name(t->name, s); return fl_ret_none(c); }

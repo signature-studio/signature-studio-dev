@@ -186,19 +186,16 @@ export function createMockEngine() {
     return [pv, p];
   };
   const tog = (cur, v) => (v === undefined || v === -1 ? !cur : !!v);
-  // PE 0x12be470 (maxLen > 0 のみ): 長さが maxLen を超えるとき末尾から mask 外の文字 (母音・記号・空白) を削り、先頭 maxLen 文字へ切る (C provider の track_name_fit と同一・ASCII 前提)
+  // PE 0x12be470 (maxLen > 0 のみ): JS 文字列は PE と同じ UTF-16 code unit で数える。長さが maxLen を超える間、末尾から mask 外の unit (母音・記号・空白・非 ASCII) を 1 unit ずつ削り、先頭 maxLen unit へ切る。切れた境界の孤立サロゲートは U+FFFD (C provider の track_name_fit と同一)
   const KEEP = new Set("0123456789BCDFGHJKLMNPQRSTVWXYZ");
   const fitName = (s, m) => {
     if (m <= 0 || s.length <= m) return s;
     let t = s;
-    for (let i = t.length; i >= 1; i--) {
+    for (let i = t.length; i >= 1 && t.length > m; i--) {
       const c = t[i - 1];
-      if (!KEEP.has(c >= "a" && c <= "z" ? c.toUpperCase() : c)) {
-        t = t.slice(0, i - 1) + t.slice(i);
-        if (t.length <= m) break;
-      }
+      if (!KEEP.has(c >= "a" && c <= "z" ? c.toUpperCase() : c)) t = t.slice(0, i - 1) + t.slice(i);
     }
-    return t.slice(0, m);
+    return t.slice(0, m).replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD");
   };
   // fl_provider の引数検査 (fl_dispatch.c type_ok / fl_a_int) と同じ: None は既定値、bool と整数のみ可、他は code 5
   const argI = (a, i, def) => {
