@@ -217,11 +217,11 @@ python3 analysis/py257_r8d_bits.py work/py65/extracted/block00031_PE.bin work/py
   - `0xfdef00` (VA。`or dword ptr [rip+0x6dbf76], 0x1000`・命令長 10): 書込み先は `0xfdef00+10+0x6dbf76 = 0x16bae80`。固定ビットを立てるだけ (`ret`)。
   - 2 件は同じ dword `0x16bae80` を立てる。同じ dword を RIP 相対で指す命令は `block00031_PE.bin` の objdump 全逆アセンブル (`# 0x16bae80` で終わる行) で 20 件 (書込み 18 件: `or` 17・`mov` の store 1、読み 2 件: `mov` の load 1・`cmp` 1)。`0xfdeef0`・`0xfdef00` はその書込みの一部。
 - 判定 `0x104785c` (mask 0x4 の `je`・VA `0x104785c`。taken で落ち側の入口 `0x104a9ec`): 落ち側の入口から、`[0x320]>0` かつ `[0x51e]==0` のとき、次のゲートを読む (VA つき)。
-  - 入口 `0x104a9ec` の後、`[0x320]>0` (`0x104aa19`〜) と `[0x51e]==0` (`0x104aa27`) を通ると、`[0x5c0]` のゲートを読む (`0x104aa3a`〜`0x104aa59`)。`test 1` (`0x104aa3a`) が 0 なら `0x104aa4e` へ。`test 1` が立ち `test 0x20` (`0x104aa47`) が 0 なら `je 0x104aa5f` で共通ブロックへ直行する。それ以外は `test 0x3c0` (`0x104aa54`) を読み、0 なら `je 0x104beae` (tail)、非 0 なら共通ブロックへ進む。
+  - 入口 `0x104a9ec` の後、`[0x320]>0` (`0x104aa19`〜) と `[0x51e]==0` (`0x104aa27`) を通ると、`[0x5c0]` のゲートを読む (`0x104aa3a`〜`0x104aa59`)。`test 1` (`0x104aa3a`) が 0 なら `0x104aa4e` へ。`test 1` が立ち `test 0x20` (`0x104aa47`) が 0 なら `je 0x104aa5f` (`0x104aa4c`) で共通ブロックへ直行する。それ以外は `test 0x3c0` (`0x104aa54`) を読み、0 なら `je 0x104caae` (`0x104aa59`・tail)、非 0 なら共通ブロックへ進む。
   - ゲートを通ると VA `0x104aa5f` の共通ブロックに入る。ここで `call 0xf82850` (`0x104aa6f`)、`test al,al; je 0x104aa7d` (`0x104aa74`・`0x104aa76`)。`al != 0` のときだけ `call 0xfdeef0` (`0x104aa78`)。その後は**al の値に関係なく** `call 0xfdef00` (`0x104aa7d`) を呼ぶ。
-  - ゲートに落ちると `0x104beae` へ飛ぶ (tail)。
+  - ゲートに落ちると `0x104caae` へ飛ぶ (tail)。
   - 注: 旧版の「真のときだけ `0xfdeef0`→`0xfdef00`」は誤り。`0xfdef00` は `al` の値に関係なく呼ばれる。`0xfdeef0` だけが `al` の真で呼ばれる。
-- 結果 (測定 commit: `e9beb7402` (解析器の commit)。`git diff e9beb7402 HEAD -- tools/python/analysis` は本節の commit 時点で 0 行):
+- 結果 (測定 commit: `789a6c798`。`git diff 789a6c798 HEAD -- tools/python/analysis` は本 PR の解析器 (`py53`・`py4769`・`py381`・`py60`) で 0 行):
   - `mismatch=0` (exit 0)。同一 TSV の 2 回実行は `cmp` 一致。load 0.09〜0.20。
   - 負の対照: `0x104785c` の `je` を `jne` に変えた `fn.txt` で `mismatch=2`・exit 1。
 
