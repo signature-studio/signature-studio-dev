@@ -49,8 +49,8 @@ P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r
 - `ks_kh_comp_native.c`: PE を base に raw map (`MAP_FIXED_NOREPLACE`)。Gain 版 (`ks_semantic_gain.c`) と同じ方式。
 - **未束縛 import**: 素材の HeartCore は import 379 件の IAT が hint/name RVA のまま。`patch_iat` で `GetLastError` を戻り 0 の stub に、他は戻り 0 かつ呼び出し回数を数える stub に置換した。
 - **実測された未束縛呼び出し** (seed 7): 2 つの call site (呼び出し元 VA は `UNRES` 行に出る) が mode=1 の case で呼ばれた。
-  - `0x180fd3189`: `e8` で thunk `0x180fd81ec` (`jmp [rip+0x3c9175]`) へ。thunk の参照先 `0x1813a1367` は KERNEL32 の FirstThunk (0x13a1178) の 8 B 整列位置から外れ、どの import かは未確定。
-  - `0x180fd31f4`: `call [rip+0x3ce0c7]` = slot `0x1813a12c0` = `KERNEL32!SetLastError` (戻り値は未使用)。
+  - `0x180fd3189`: `e8` で thunk `0x180fd81ec` (`jmp [rip+0x3c9175]`) へ。thunk の参照先 slot `0x1813a1368` は KERNEL32 の FirstThunk (0x13a1178) の index 62 で、`KERNEL32!FlsSetValue` (8 B 整列の内側)。
+  - `0x180fd31f3`: `ff 15` (6 B) の `call [rip+0x3ce0c7]` = slot `0x1813a12c0` = `KERNEL32!SetLastError` (戻り値は未使用)。`ff 15` (indirect call) の site は、harness の `UNRES` 表示 (`ra − 5`、`e8` 前提) が命令 VA より 1 B ずれて出る。
   - 件数は seed 7 で 67+67 = 134 (mode=1 の case 数と一致)。mode=1 の出力は stub 依存で、比較に使えない (§5)。
 - **初回の ERR**: 最初の版は `GetLastError` の未束縛 slot (`0x13a1790`) を踏んで 67/200 が SIGSEGV (RIP = addr = `0x286e1e0`、hint/name RVA の値へ飛んだ)。stub 化で ERR 0 になった。
 
@@ -97,8 +97,8 @@ P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r
 |---|---|---|
 | SC⇄KH 同一入力の bit 一致実測 (旧受入 2) と #52 への判定返し (旧受入 3) | Compressor の判定が未了 | #3534 (FA-41) |
 | `P+0x00`・`P+0x10`・`P+0x14` が出力に届かない原因 (写像か分岐か) | 比較の意味。SC の P 写像の確定 | #3534 (FA-41) |
-| 未束縛 import 2 経路 (mode=1 のみ。`0x1813a1367` の実体) の stub 依存 | mode=1 の出力 | #3534 (FA-41) |
-| ID 一致 37 組の process 候補表 (親 #2739 の作業物。本 PR の範囲外) が main に無い | 本付録は参照しない | 親 #2739 へコメント |
+| 未束縛 import 2 経路 (mode=1 のみ。`KERNEL32!FlsSetValue`・`KERNEL32!SetLastError` を stub 化) の stub 依存 | mode=1 の出力 | #3534 (FA-41) |
+| ID 一致 37 組の振り分け表は親 #2739 の付録 (main の `tools/targets/freshair/REPORT_APPENDIX_2739.md` §3) にある | 本付録は参照しない | 不要 (main に既存) |
 
 ## 7. 再現
 
