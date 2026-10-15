@@ -1,7 +1,7 @@
 # REPORT_APPENDIX_2814 — Slayer_Engine.dll (block22434) の未被覆 .text の区間判定と ia32 の std・shld (#2814 / 親 #1098)
 
 - 親 REPORT: `tools/plugins/slayer_engine_ia32/REPORT.md` §11 (結論 1 行)。 本付録が測定値の正本。
-- 測定 commit: `e0e81a667` (コードを変えた最後の commit。 `tools/ott/lift/x64c.py`・`tools/ott/rt/ott_cpu.{c,h}`・`lift_text.py`・`gap_classify.py`)。 `git diff e0e81a667 HEAD -- tools/ott tools/plugins/slayer_engine_ia32/*.py` の出力は空 (後続は docs のみ)。
+- 測定 commit: `05a1a638b` (コードを変えた最後の commit。 `gap_classify.py` の (b) 判定を区間先頭への参照に限った修正 (PR レビュー m2))。 その前の `e0e81a667` で `tools/ott/lift/x64c.py`・`tools/ott/rt/ott_cpu.{c,h}`・`lift_text.py`・`gap_classify.py` を変えた。 `git diff e0e81a667 05a1a638b -- tools/ott` の出力は空 (x64c は変えていない。x64 回帰は `e0e81a667` の測定を引き継ぐ)。 `git diff 05a1a638b HEAD -- tools/ott tools/plugins/slayer_engine_ia32/*.py` の出力は空 (後続は docs のみ)。
 - 入力: `block22434_PE.bin` (179,512 B, sha256 `84b64c43…de724a9`、素材 `fl-win64` を `extracted/block22434_PE.bin` だけ展開)。 emcc は素材 `toolchain-emsdk` の emcc 6.0.12。
 - 起動・GUI に関わらない (製品 KPI は対象外)。
 - 既知類型との関係 (`docs/DEFECTS.md`): 新類型は無し。 DF 未モデル化は、従来 `std` が `ott_unsup` (fail-fast) で止まっていたため silent の類型に当たらなかった。 本付録の変更で `std` を lift するため、DF の正しさは §5 の試験で確認する。
@@ -22,9 +22,9 @@
 | (c) padding | 区間が 90 / cc / 00 のみ | 184 区間 (1,364 B) |
 | (a) data-in-code | jt 表 (`lift_meta.jt_ranges`) と半分以上重なる | 11 区間 |
 | (a) data-in-code | `.text` 内の reloc 値 (jt の外) を 2 本以上指される | 6 区間 |
-| (b) 関数 | 直接 call/jmp/jcc の先頭になる (先頭が 90/cc/00 でないこと) | 2 区間 |
+| (b) 関数 | 区間の先頭を指す直接 call/jmp/jcc がある (先頭が 90/cc/00 でないこと。 区間内の別の位置への分岐は数えない) | 2 区間 |
 | (b) 関数 | prologue (`55 8b ec`・`8b ff 55 8b ec`・`83 ec`・`81 ec`) で始まる | 3 区間 |
-| (c) 参照なし | 上記のどれでもない | 33 区間 (4,919 B) |
+| (c) 参照なし | 上記のどれでもない。 区間内の分岐だけを受けるもの (先頭への参照なし) を含み、根拠欄で区別する | 33 区間 (4,919 B) |
 
 - 直接分岐は線形掃引 (CS_MODE_32) の rel 先で、掃引の境界ずれを含む上限。 reloc 参照は `.text` 内の HIGHLOW (type 3) のうち jt 表の外にあるもの。
 
@@ -43,10 +43,10 @@
 
 ## 4. reloc 値の区間ごとの判定 (受入 2)
 
-- `.text` 内の reloc 値 (jt の外) のうち、未被覆域を指すものは 97 本 (17 区間)。 本付録の定義は jt 表の内部を指す値も数える。 `REPORT_APPENDIX_1098.md` §3 の 76 本・86 本 (未被覆内 73 値) とは数え方が違う。
+- `.text` 内の reloc のうち、位置が jt 表の外にあり、値が未被覆域を指すものは 97 本 (17 区間)。 数えるのは位置の条件だけで、値が jt 表の内側を指すものも含む。 このうち 31 本は値が jt 表の内側、66 本は jt 表の外を指す (`05a1a638b` で再数: 位置が jt 外の reloc 1,566 本のうち 97 本)。 `REPORT_APPENDIX_1098.md` §3 の 76 本・86 本 (未被覆内 73 値) とは数え方が違う。 比べるときは値が jt 内の 31 本の扱いを揃えること。
 - 17 区間は**すべて (a)** に分類した (jt 表と重なる 11 区間、`.text` 内の reloc 値 2 本以上の 6 区間)。 よって、reloc 値を理由に roots へ加えた区間は 0。 reloc から指された区間を roots に入れると data を命令として読むため、これは 1098 の判断と同じ。
 - 判定保留 2 区間:
-  - `0x10010bbf` (822 B・reloc 46 本): 先頭 `cc 55 8b ec 57 56` は関数の prologue に見えるが、reloc 46 本は区間の中にあり、位置の間隔が 4 バイトの並びになっていない。 命令の途中の即値の可能性がある。 (a) とした。
+  - `0x10010bbf` (822 B・reloc 46 本): 先頭 `cc 55 8b ec 57 56` は関数の prologue に見えるが、命令境界が未確定 (reloc 46 本は区間の中にあり、位置の間隔が 4 バイトの並びになっていない)。 よって code (関数) とも data とも断定しない。 規則の結果は (a) だが、判定は保留のまま。
   - `0x1000ea92` (466 B・reloc 8 本): 先頭 `cc cc 55 8b ec 53` で、reloc 8 本のうち区間の中にあるのは 3 本。 (a) とした。
 - 2 区間は子 #3546 で、命令境界を確かめて決める。
 
@@ -58,7 +58,7 @@
 - runtime: `tools/ott/rt/ott_cpu.h`・`ott_cpu.c` に `fDF` を追加 (x64 の生成物は参照しない)。
 - DF の試験: `gcc` で `ott_cpu.c` と試験 (4 ケース: `rep movsd` の DF=0/1、`rep stosb` DF=1、`movsb` DF=1) を実行し、参照の結果と一致 (4/4)。 **試験は生成式を手で写したもので、lift 出力そのものは実行していない**。 実行の正しさは #1223 の差分試験で扱う。
 
-## 6. 実測 (測定 commit `e0e81a667`、HEAD で再現)
+## 6. 実測 (測定 commit `e0e81a667`。 HEAD `05a1a638b` で再現)
 
 | 項目 | 1 回目 (分類のみ) | 2 回目 (b を追加) | 比較の基準 (origin/main `3cf0f759f`) |
 |---|---:|---:|---|
@@ -78,6 +78,7 @@
   - `verify_ia32_jt.py`: `[jt] OK` (dispatcher 0x100014a4、case 21/PE 25)。
   - `measure.py` (gate): C1 PASS (0x14c)・C2 PASS (73,002 B)・C3 PASS (0.0055%)・C4 PASS (priv 15)・`[measure] OK (4/4)`。
   - `measure.py --nega`: `nega: 0/3 miss`。
+  - HEAD `05a1a638b` での再現 (素材は `fl-win64` の `block22434_PE.bin` だけを展開。 `emcc` は素材 `toolchain-emsdk` が無いため gcc で代替 (rc 0 のみ確認。object サイズは比較していない)): 2 回目の被覆 62,320 B (85.37%)、functions 472・insns 21,354・jt 23・非 x87 unsup 0。 分類は (a) 17 区間 2,677 B / (b) 5 区間 2,388 B / (c) 217 区間 6,283 B で `e0e81a667` と同じ (区間ごとの cls・size も一致。 変わったのは根拠欄の 3 行)。 `jt_check.py` 23/23・`iat_check.py` 80/80・`verify_ia32_jt.py` OK・`measure.py` gate 4/4 PASS・`--nega` 0/3 miss。
   - x64 回帰: 素材の x64 PE 258 本のうち、サイズ順に 16 本おき 17 本 (`*_PE.bin`) を、EntryPoint と export を roots、closure 2 で `origin/main` の x64c と新 x64c で lift → `ott_lifted.c`・`lift_meta.json` を `cmp`。 **17/17 一致**。
 
 ## 7. 再現手順
