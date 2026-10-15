@@ -10,7 +10,7 @@
 
 ## 2. 実測 (測定 commit `a8200f1e0`・修正前は `fee0ae57b`)
 
-- 手順: `ws-3696` (worktree・`3696-cfi-probe-err-format`) に `work-m11` を展開し、`m11_wndseed.sh` (rc 0・3 分 35 秒・WNDCLASS-CHECK PASS) で `boot6.lift.ll` を作ってから `cfi_boot7.sh` を実行。EMSDK = `/opt/emsdk`・RETDEC = `/opt/retdec/bin`・FL_WIN64_DIR = `fl-win64` の展開先。
+- 手順: `ws-3696` (worktree・`3696-cfi-probe-err-format`) に `work-m11` を展開し、`m11_wndseed.sh` (rc 0・3 分 35 秒・WNDCLASS-CHECK PASS) で `boot6.lift.ll` を作ってから `cfi_boot7.sh` を実行。EMSDK = `[EMSDK]`・RETDEC = `[RETDEC]`・FL_WIN64_DIR = `fl-win64` の展開先。
 - `cfi_boot7.sh`: 修正前 5 分 47 秒・rc 0 / 修正後 5 分 43 秒・rc 0 (`closure new functions: 1133`)。
 - load (`uptime` 1 分値・修正後の run の終了後 05:46Z): 0.54 (4 core)。
 - 単体検証: `node err_line_check.mjs` → `PASS all` (rc 0)。ネガコン (`errLine` を元の式に置換した複製) → `FAIL 3 件` (rc 1)。
