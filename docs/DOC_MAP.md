@@ -309,7 +309,7 @@
 | `tools/m11/REPORT_APPENDIX.md` | ~238 | m11 REPORT §8 (LB_BASE=0x10000 適用 #222)・§9 (sigfix 0 詰め #131)・§10a (#132 commit 別測定表と注記)・§10b (#132 真因・修正 4 点・NC・次 blocker・外した内容)・§12 の一部 (#513 新規類型の行案)・§12b (#513 巨大 VirtualAlloc の n の出所) の全文 (250 行上限のため本体から無変更で分割移動) |
 | `tools/m11/REPORT_N1318.md` | ~69 | #1318 (N82): 10 進 inttoptr 4364 件の VA→LVA 仕分け表 (分類件数・判定規則・QPF 整数定数 1 件の誤 remap)・再現 `m11_inttoptr_class.py` |
 | `tools/m11/REPORT_N54.md` | 108 | #954: xmm を読む callee の IR 署名復元 (opt-in `M11_XMM_ARGS=1`)・34/49 件復元・survey 差 0・全件復元時の退行の二分探索表・`fix_xmm_args.py` の呼出し引数個数検査 |
-| `tools/m11/REPORT_N210.md` | 50 | #4747 (N210): `function_40c650` の署名変更で unit 149・158 が退行する要因の切り分け (実値を渡すことが原因・署名だけでは退行しない)。wasm 機構は未特定 |
+| `tools/m11/REPORT_N210.md` | 74 | #4747 (N210): `function_40c650` の署名変更で unit 149・158 が退行する要因の切り分け (実値を渡すことが原因・署名だけでは退行しない)。wasm 機構は未特定 |
 | `tools/m11/REPORT_N154.md` | 94 | #2762: arity 不一致 callee の xmm 呼出し引数の復元 (i128 placeholder を float/double へ変換)・復元 39 件・survey 差 0・`function_40c650` の退行による保留 |
 | `tools/m11/REPORT_N165.md` | 81 | #2903: arity 不一致の 9 callee の分類 (呼出し site の個数・型で 8 件が IR 引数の欠落・1 件が余分な引数の型)・復元 0 件・survey A/B 差 0 件・結論は手書き条件の IR に限る・`fix_xmm_args.py` の cause 出力 |
 | `tools/m11/REPORT_N1479.md` | 82 | #1479 (M11-2): xmm 引数を読む callee の署名復元 (opt-in `M11_XMM_ARGS=1`) の現 HEAD での unit 別 A/B (942 本・差 0・ok 喪失 0・unit 838/882/885 ok)・判定スクリプト `m11_xmm_ab.sh`・全再生成基準との未対応 |

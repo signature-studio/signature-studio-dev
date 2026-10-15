@@ -5,15 +5,39 @@
 結論: **署名 (i32 → i32+f64) だけでは退行しない**。退行を起こすのは、呼出し側 16 site が新しい `f64` 枠へ渡す **実値** (`movsd` / `cvtss2sd` 由来) である (ctlB 退行・ctlC 無退行)。callee 本体が入力を読むこと (`reinterpret`) も加わるが、呼出し側の値を 0 にすると退行は消える。
 ただし wasm 側の機構 (なぜ実値で 149・158 の結果が変わるか) は未特定。caller `function_660050` / `function_668290` の frame 読みの差が候補 (未実測)。
 
-## 測定 (commit 5ec59116d・同一 IR 上の A/B)
+## 測定 (測定 commit 4bb58c852・同一 IR 上の A/B)
+
+測定 commit は `4bb58c852` (variant の生成器 `m11_sigfix40c_ab.py` を追加した commit)。基準の比較対象として `5ec59116d` (origin/main の直前) を書く。`5ec59116d` には生成器が無いので、variant の生成と測定はどちらも `4bb58c852` 以降のコードで行う。
 
 IR: `cd tools/m11 && FL_WIN64_DIR=<展開先> bash m11_gen_ir2.sh` (34 秒・rc 0)。survey は `node m11_survey.mjs` (6.6 秒)。
+
+### 入力 (only40c) の作り方
+
+既定の `fix_xmm_args.py` は `NO_CONV = {'function_40c650'}` のため 40c650 を変換しない (既定版の出力: `skipped: call_arity_mismatch(sites=1, params=0, cause=xmm:16)`)。only40c の入力は、`NO_CONV` を空にした一時コピー (リポジトリ外・`/tmp`) で変換して得た。実行した手順:
+
+```
+# NO_CONV = {'function_40c650'} を NO_CONV = set() にした一時コピーを使い、HERE だけを元の passes/ に向ける
+python3 fxa_nc.py work/boot_final.ll only40c_full.ll --pe <PE> --report nc_report.json   # 実測 49.5 秒
+```
+
+結果: `fixed` に `function_40c650` (params `['double %in.xmm0']`)。呼出し 16 site は `double %xmmcv.N.f` の実値を渡す。
+
+### 生成器の再現 (未解決)
+
+`m11_sigfix40c_ab.py` は `work/boot_final.ll` (素材) から直接は動かない。確認したこと:
+
+- 素材の `boot_final.ll` では `function_40c650` は `define i128 @function_40c650()` (引数なし)・呼出し 16 site は `call i64 @function_40c650(i128 %x)`。生成器の `CALL_RE` / `BODY_OLD` とは一致しない。
+- 上の only40c の入力 (`fix_xmm_args.py` の出力) を生成器に渡すと `callee body not found` で終了する。`BODY_OLD` の文字列が 4 回出現し「ちょうど 1 回」の判定に落ちるため。
+- ctlC.ll・only40c.ll・ctlB.ll の**生成は本 run では再現していない**。そのため「手作り版との cmp 一致」の記録は無い (手作り版の場所も特定していない)。
+- 上の表の variant 数値は作成時の記録。生成器からの再生成と、手作り版との cmp は本 run では確認していない。
+
+よって生成器の再現性は未解決 (下表)。
 
 | 変種 | 構成 | ok / noproc / miss / trap / clobber | 基準との unit 差 |
 |---|---|---|---|
 | base | `M11_XMM_ARGS=0` | 873 / 1 / 47 / 21 / 0 | (基準。#3642 の 873/1/47/21/0 と一致) |
 | 既定変換 | `M11_XMM_ARGS=1` (NO_CONV = 40c650) | 873 / 1 / 47 / 21 / 0 | 差 0 |
-| 全変換 | `NO_CONV` 空 (47 callee) | 872 / 1 / 47 / 20 / 0 | 149 trap→clobber、158 ok→clobber (差はこの 2 件のみ) |
+| 全変換 | `NO_CONV` 空 (47 callee) | 872 / 1 / 47 / 20 / 2 | 149 trap→clobber、158 ok→clobber (差はこの 2 件のみ) |
 | only40c | 40c650 だけ変換 (`(i32,f64)`、実値を渡す) | 872 / 1 / 47 / 20 / 2 | **149 trap→clobber、158 ok→clobber** |
 | ctlB | only40c と同じ変換。callee 本体は入力を 0 固定 (呼出し側は実値) | 872 / 1 / 47 / 20 / 2 | **149・158 が同じく退行** |
 | ctlC | 呼出し 16 site を `0.0` にする。callee 本体は入力を読む | 873 / 1 / 47 / 21 / 0 | **差 0** |
@@ -38,12 +62,13 @@ IR: `cd tools/m11 && FL_WIN64_DIR=<展開先> bash m11_gen_ir2.sh` (34 秒・rc 
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| wasm 側の機構: 実値で 149・158 の経路が変わる理由 (caller の frame 読み `offset=208/216` と戻り値の使い道) | 受入条件 1 の「機構」の核心。未特定 | 本 issue #4747 (継続)。次 run で caller の戻り値利用を追う |
-| caller の戻り値利用 (sret `+16` → `+192` 変化が 149・158 の分岐をどう変えるか) | 機構の確定に必要 | 同上 |
+| wasm 側の機構: 実値で 149・158 の経路が変わる理由 (caller の frame 読み `offset=208/216` と戻り値の使い道) | 受入条件 1 の「機構」の核心。未特定 | #4777 (M11-N221) |
+| caller の戻り値利用 (sret `+16` → `+192` 変化が 149・158 の分岐をどう変えるか) | 機構の確定に必要 | #4777 (M11-N221) |
+| 生成器 `m11_sigfix40c_ab.py` の再現性 (素材の IR 形と `BODY_OLD` の一意性、`CALL_RE` の型) | variant の再生成ができず、cmp 一致の根拠も無い。variant の数値は作成時の記録で、本 run では再測定していない | 未起票 (レビュー判断に委ねる) |
 | 受入条件 2 (退行しない形で 40c650 を変換して survey 差 0) | #4748 (N211) が担当 | #4748 |
 
 ## 測定の範囲
 
 - 全測定は `tools/m11/work/boot_final.ll` (`m11_gen_ir2.sh` の再生成 IR) 上。`work-m11` は素材の旧生成で基準に使わない (WORKFLOW §11)。
-- 測定 commit: 5ec59116d (origin/main)。コード差分はこの run で追加した `m11_sigfix40c_ab.py` と本 REPORT のみ。
+- 測定 commit: 4bb58c852 (生成器を追加した commit)。コード差分は `m11_sigfix40c_ab.py` と本 REPORT のみ。
 - 生成物 (`work/`・`emsdk/`・`retdec/`) は gitignore または未追跡で commit しない。
