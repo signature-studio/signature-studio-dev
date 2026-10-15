@@ -69,7 +69,6 @@ import json as _json
 _lsc = _json.load(open('/fl/Tools/Chord progression/Notes/genres', encoding='utf-8'))
 _lsc = {'mock': True, 'note': 'mock (根拠なし): FL 実機の loop_starter_config ではない。同梱 drum patterns の genres を流用', 'version': _lsc.get('version'), 'compatible_from': _lsc.get('compatible_from'), 'genres': _lsc.get('genres', {}), 'loops': []}
 flrack.rack = types.SimpleNamespace(loop_starter_config=_json.dumps(_lsc), flr=types.SimpleNamespace())
-flrack.flr = types.SimpleNamespace()
 flpianoroll.score.PPQ = ${MOCK_PPQ}
 sys.modules['flcpt'] = flcpt
 sys.modules['flrack'] = flrack
