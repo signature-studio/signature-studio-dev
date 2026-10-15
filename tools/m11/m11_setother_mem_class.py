@@ -9,10 +9,12 @@ retdec の IR 名 stack_var_X は X = d - C (機械語 [rbp+d] に対応)。C �
   lea_stack   : `lea r, [rbp+d]` の値を、呼出し元 IR の `%stack_var_(d-C) = alloca` (接尾辞なし) に接続する。
                 接続できれば実値化 (値 = その alloca の番地)。alloca が無ければ未決 (lea_alloca_absent)。
   load_stack  : `[rbp+d]` の読込を、同じ slot への最後の格納まで直線区間で後ろ向きに探す。
-                区間は分岐先・call・ret/jmp・ポインタ経由の書込み・slot を覆う別幅の書込みで打ち切る (未決)。
+                区間は分岐先・call・ret/jmp・ポインタ経由の書込み・slot を覆う別幅の書込み・
+                メモリ書込みの可能性がある未知の命令 (ldmach の kind=other)・index 付きの書込みで打ち切る (未決)。
                 qword の即値格納なら実値化。reg 格納 (slot_reg) などは未決 (理由付き)。
 
 使い方: python3 m11_setother_mem_class.py nonimm_class_rows.json --pe PE --ir IR.ll --out mem_class_rows.json
+負例・正例の単体テスト: python3 test_setother_mem_class.py
 """
 import argparse, collections, json, os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -20,19 +22,11 @@ sys.path.insert(0, os.path.join(HERE, 'ldfix'))
 import capstone
 import ldmach
 
-ap = argparse.ArgumentParser()
-ap.add_argument('rows'); ap.add_argument('--pe', required=True); ap.add_argument('--ir', required=True)
-ap.add_argument('--out', required=True)
-a = ap.parse_args()
-
 M64 = (1 << 64) - 1
 NOWRITE = {'bt', 'cmp', 'test', 'push', 'ucomiss', 'ucomisd', 'comiss', 'comisd', 'nop', 'nopw', 'nopl', 'ret'}
 MEM = re.compile(r'\[(rbp|rsp)\s*([+-])\s*(0x[0-9a-fA-F]+|\d+)\]')
 ALLOCA = re.compile(r'^\s*%(stack_var_-?\d+)(\.[^ ]*)? = alloca\b')
 HEAD = re.compile(r'^define\b.*?@(function_[0-9a-fA-F]+)\(')
-
-mach = ldmach.Machine(a.pe)
-cs = mach.cs
 
 
 def frame_const(ins):
@@ -81,7 +75,7 @@ def split_ops(s):
     return p[0].strip(), (p[1].strip() if len(p) > 1 else '')
 
 
-def load_def(ins, idx, base, d, tg):
+def load_def(cs, ins, idx, base, d, tg):
     """[base+d] を読む命令 ins[idx] の直前で、同じ slot への最後の格納を直線区間で探す。"""
     k = idx - 1
     while k >= 0:
@@ -101,7 +95,11 @@ def load_def(ins, idx, base, d, tg):
         if split_ops(x.op_str)[0] == 'rbp' and base == 'rbp':
             return ('未決', 'slot_base', None, at)
         for mo in ldmach.memops_of(cs, x):
-            if not mo['write'] or mo.get('rip_rva') is not None:
+            if mo.get('rip_rva') is not None:
+                continue
+            if mo['kind'] == 'other':
+                return ('未決', 'slot_unknown_write', None, at)
+            if not mo['write']:
                 continue
             if mo['base'] not in (base, 'rbp', 'rsp', None):
                 return ('未決', 'slot_ptr_write', None, at)
@@ -109,6 +107,8 @@ def load_def(ins, idx, base, d, tg):
                 return ('未決', 'slot_abs_write', None, at)
             if mo['base'] != base:
                 return ('未決', 'slot_alias_base', None, at)
+            if mo['index'] is not None:
+                return ('未決', 'slot_index_write', None, at)
             if mo['disp'] == d and mo['kind'] == 'store' and mo['size_bits'] == 64:
                 dst, src = split_ops(x.op_str)
                 if x.mnemonic == 'mov' and re.fullmatch(r'-?(0x[0-9a-fA-F]+|\d+)', src):
@@ -122,58 +122,70 @@ def load_def(ins, idx, base, d, tg):
     return ('未決', 'slot_entry', None, None)
 
 
-rows_in = [r for r in json.load(open(a.rows))
-           if r['reason'] == 'lea_stack' or r['reason'].endswith('load_stack')]
-allocas = ir_allocas(a.ir)
-fcache = {}
-out_rows = []
-cnt = collections.Counter()
-xtab = collections.Counter()
-c_ok = c_bad = 0
-for r in rows_in:
-    cva = int(r['caller'].split('_')[1], 16)
-    if cva not in fcache:
-        ins = mach.disasm_fn(cva) or []
-        fcache[cva] = (ins, {x.address: i for i, x in enumerate(ins)},
-                       {x.operands[0].imm for x in ins if x.mnemonic.startswith('j') and x.operands
-                        and x.operands[0].type == capstone.CS_OP_IMM}, frame_const(ins))
-    ins, pos, tg, C = fcache[cva]
-    da = int(r['def'], 16)
-    idx = pos[da]
-    mb = mem_base_disp(ins[idx].op_str)
-    if mb is None or C is None:
-        cls, why, val = '未決', ('no_frame' if C is None else 'no_mem_operand'), None
-    elif mb[0] != 'rbp':
-        cls, why, val = '未決', 'rsp_base', None
-    else:
-        d = mb[1]
-        X = d - C
-        name = 'stack_var_%d' % X
-        ia = allocas.get(r['caller'], {'exact': set(), 'suffixed': set()})
-        present = name in ia['exact'] or name in ia['suffixed']
-        c_ok += present
-        c_bad += not present
-        if r['reason'] == 'lea_stack':
-            if name in ia['exact']:
-                cls, why, val = '実値化', 'lea_alloca', '&%' + name
-            elif name in ia['suffixed']:
-                cls, why, val = '未決', 'lea_alloca_suffixed', None
-            else:
-                cls, why, val = '未決', 'lea_alloca_absent', None
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('rows'); ap.add_argument('--pe', required=True); ap.add_argument('--ir', required=True)
+    ap.add_argument('--out', required=True)
+    a = ap.parse_args()
+
+    mach = ldmach.Machine(a.pe)
+    cs = mach.cs
+    rows_in = [r for r in json.load(open(a.rows))
+               if r['reason'] == 'lea_stack' or r['reason'].endswith('load_stack')]
+    allocas = ir_allocas(a.ir)
+    fcache = {}
+    out_rows = []
+    cnt = collections.Counter()
+    xtab = collections.Counter()
+    c_ok = c_bad = 0
+    for r in rows_in:
+        cva = int(r['caller'].split('_')[1], 16)
+        if cva not in fcache:
+            ins = mach.disasm_fn(cva) or []
+            fcache[cva] = (ins, {x.address: i for i, x in enumerate(ins)},
+                           {x.operands[0].imm for x in ins if x.mnemonic.startswith('j') and x.operands
+                            and x.operands[0].type == capstone.CS_OP_IMM}, frame_const(ins))
+        ins, pos, tg, C = fcache[cva]
+        da = int(r['def'], 16)
+        idx = pos[da]
+        mb = mem_base_disp(ins[idx].op_str)
+        if mb is None or C is None:
+            cls, why, val = '未決', ('no_frame' if C is None else 'no_mem_operand'), None
+        elif mb[0] != 'rbp':
+            cls, why, val = '未決', 'rsp_base', None
         else:
-            cls, why, val, _ = load_def(ins, idx, 'rbp', d, tg)
-            if val is not None:
-                val = hex(val)
-    cnt[cls] += 1
-    xtab[(r['ledger'], why, cls)] += 1
-    out_rows.append({'caller': r['caller'], 'callee': r['callee'], 'k': r['k'], 'pos': r['pos'],
-                     'ledger': r['ledger'], 'prev_reason': r['reason'], 'class': cls, 'reason': why,
-                     'value': val, 'def': r['def'], 'def_insn': ins[idx].mnemonic + ' ' + ins[idx].op_str})
-print('[mem-class] 対象 %d 件 (スタック slot 読込・frame lea)' % len(out_rows))
-for k in ('実値化', '復元不能', '未決'):
-    print('  %-8s %d' % (k, cnt[k]))
-print('[mem-class] C 検証 (stack_var_(d-C) の alloca が呼出し元 IR に在る): 在 %d / 無 %d' % (c_ok, c_bad))
-print('[mem-class] 台帳 kind × 理由 × 区分')
-for (led, why, cls), v in sorted(xtab.items()):
-    print('  %-12s %-22s %-8s %d' % (led, why, cls, v))
-json.dump(out_rows, open(a.out, 'w'), indent=1)
+            d = mb[1]
+            X = d - C
+            name = 'stack_var_%d' % X
+            ia = allocas.get(r['caller'], {'exact': set(), 'suffixed': set()})
+            present = name in ia['exact'] or name in ia['suffixed']
+            c_ok += present
+            c_bad += not present
+            if r['reason'] == 'lea_stack':
+                if name in ia['exact']:
+                    cls, why, val = '実値化', 'lea_alloca', '&%' + name
+                elif name in ia['suffixed']:
+                    cls, why, val = '未決', 'lea_alloca_suffixed', None
+                else:
+                    cls, why, val = '未決', 'lea_alloca_absent', None
+            else:
+                cls, why, val, _ = load_def(cs, ins, idx, 'rbp', d, tg)
+                if val is not None:
+                    val = hex(val)
+        cnt[cls] += 1
+        xtab[(r['ledger'], why, cls)] += 1
+        out_rows.append({'caller': r['caller'], 'callee': r['callee'], 'k': r['k'], 'pos': r['pos'],
+                         'ledger': r['ledger'], 'prev_reason': r['reason'], 'class': cls, 'reason': why,
+                         'value': val, 'def': r['def'], 'def_insn': ins[idx].mnemonic + ' ' + ins[idx].op_str})
+    print('[mem-class] 対象 %d 件 (スタック slot 読込・frame lea)' % len(out_rows))
+    for k in ('実値化', '復元不能', '未決'):
+        print('  %-8s %d' % (k, cnt[k]))
+    print('[mem-class] C 検証 (stack_var_(d-C) の alloca が呼出し元 IR に在る): 在 %d / 無 %d' % (c_ok, c_bad))
+    print('[mem-class] 台帳 kind × 理由 × 区分')
+    for (led, why, cls), v in sorted(xtab.items()):
+        print('  %-12s %-22s %-8s %d' % (led, why, cls, v))
+    json.dump(out_rows, open(a.out, 'w'), indent=1)
+
+
+if __name__ == '__main__':
+    main()
