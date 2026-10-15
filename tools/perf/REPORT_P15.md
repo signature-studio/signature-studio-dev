@@ -216,29 +216,34 @@ bash tools/perf/p20/fa_negctl.sh                                       # NC-2
 
 ## 9. AudioWorklet 上の instantiate 上限・setup 時間・ネガティブコントロール (PERF-P21 / #2988)
 
-**結論**: AudioWorklet 上で 1 instance (Memory 1 本) に畳み込める OTT obj は **M=130 まで**成功した (初期化は 3 run 全て例外なし、署名は 3 run 全て 130/130 一致)。**M=160 以上は 3 run 全て無応答** (20〜30 秒で結果も例外も返らない)。成功最大 M ≥ 130、失敗最小 M ≤ 160。131〜159 の境界は未測。ネガティブコントロールは 1 obj の入力を変えると、その obj だけ署名が外れ、他は一致したまま残ることを示した。
+受入条件は issue #2988 で「REPORT_P15.md §7 に追記」だが、main の §8 が PERF-P20 に使われたため本節 (§9) に置いた。
+
+**結論**: AudioWorklet 上で 1 instance (Memory 1 本) に畳めた OTT obj は **M=130 まで** (初期化・署名とも 3 run 全て成功、署名 130/130 一致)。**M=160 以上は 3 run 全て無応答** (`Error: eval timeout` まで結果も例外も返らない)。成功最大 M ≥ 130、失敗最小 M ≤ 160。131〜159 は未測。
 
 | 項目 | 結果 |
 |---|---|
-| 成功最大 M / 失敗最小 M | 130 (初期化 3 run・署名 3 run) / 160 (3 run とも eval timeout 20 s) |
-| M=176・192・256・288・320・352 | 各 3 run とも無応答 (M=176 は eval timeout 20 s、他は 30 s) |
-| setup_ms | M=1: 17 / 21 / 22 (初期化 3 run)、18 / 20 / 18 (ネガ 3 run)。M=130: 446〜495 ms (初期化 3 run・署名 3 run・ネガ 3 run の計 9 値。中央値 465) |
-| 署名 (M=130) | 基準 3 run: 130/130 (`6b1696f0`、`sig_ok=true`) |
-| ネガティブコントロール | obj 0 の入力振幅を 0.5→0.25 に変更。M=1 (3 run): 0/1 一致 (`d39696f0`)、M=130 (3 run): 129/130 一致 (obj 0 のみ `d39696f0`)。どちらも `sig_ok=false` |
+| 成功最大 M / 失敗最小 M | 130 (初期化 3 run・署名 3 run) / 160 (3 run とも eval timeout)。M=176・192・256・288・320・352 も各 3 run とも eval timeout (timeout 値は未記録) |
+| setup_ms | M=1: 17/21/22 (初期化 3 run)、18/20/18 (ネガ 3 run)。M=130: 446〜495 ms (計 9 値、中央値 465) |
+| 署名 (M=130) | 130/130 一致 (`6b1696f0`、`sig_ok=true`、3 run) |
+| ネガティブコントロール | obj 0 の入力振幅を 0.5→0.25 に変更。M=1: 0/1 一致 (3 run)。M=130: 129/130 一致 (3 run)。どちらも `sig_ok=false` |
 
-- 測定 commit: `e4d2d1799` (`tools/perf/p15/web/shared_worklet.js`・`worklet_page.html`・`chrome_worklet.mjs` の改修と生データ 3 ファイル)。
-- 環境: Chrome 155.0.8059.39 (headless=new・`/usr/bin/google-chrome`。§3〜§7 の 154 とは版が違う)、CPU `AMD EPYC 9V45 96-Core Processor` (4 vCPU)。素材 `work-m6-ott` (`tools/ott/work/lift/ottl.{wasm,cjs}`)。
-- 改修: `setup_ms` を出力に加えた (ctor/setParam/resume の所要、`Date.now()` で計測。分解能 1 ms)。`--init-only` は署名区間を回さず instantiate の成否と setup だけ見る。`--reps 0` は署名区間 (1000 quantum) だけ回す。`--neg <i>` は obj i の入力振幅を変える。
-- 無応答の扱い: 無応答は「例外が届かず、worklet の constructor が戻らない」状態として数えた。エラーは `ok:false` で返る経路があるため、例外による失敗とは区別している。**原因は未切り分け**。obj の VA 配置 (stride 0x40000、OBJ0 = 0x31000000、IN0 = 0x34000000) では obj の基底が IN0 に届くのが M≈192 だが、160 で止まるため配置だけでは説明できない。
-- 生データ: `tools/perf/p15/results/worklet_init_limit.jsonl` (27 行: 初期化 M=1/130/160/176/192/256/288/320/352 × 3 run)、`worklet_sig.jsonl` (3 行: M=130 基準)、`worklet_negctl.jsonl` (6 行: M=1/130 × 3)。
-- 再現 (HEAD `ab6466296`): `rerun_20261015_worklet_{init,sig,negctl}.jsonl` の 5 行で、M=130 初期化 462 ms・M=160 無応答・M=130 署名 130/130・ネガ 129/130 を再確認。
+- **setup_ms の定義**: `shared_worklet.js` の `t0` (instantiate・`__wasm_call_ctors`・`ott_data_install` の後) から、全 obj の ctor・setParam 19 個・resume・入力設定 (入力バッファへの sin N×2 書き込みと入出力ポインタ設定) までのループの所要。`Date.now()` (1 ms 分解能)。issue #2988 の「ctor / setParam / 入力設定」に当たる。
+- **obj 0 の根拠**: 個別 index は記録していない。`sig` は `new Set(sigs)` の挿入順 (obj 番号順) なので、先頭の `d39696f0` は `sigs[0]` = obj 0 の値。`sig_match_n` が 129 なので、残り 1 件 (`d39696f0`) が obj 0。M=1 は obj 0 のみ。
+- **無応答**: constructor が戻らず例外も届かない状態。原因は未切り分け。VA 配置 (stride 0x40000、IN0 = 0x34000000) では obj の基底が IN0 に届くのは M≈192 だが、160 で止まるため配置だけでは説明できない。
+- 測定 commit `e4d2d1799`・検証 HEAD `d064d219d`。`git diff --stat e4d2d1799 d064d219d -- tools/perf/p15` の出力は `rerun_20261015_worklet_{init,negctl,sig}.jsonl` の 3 ファイル (5 行) の追加だけ (コード差分 0)。
+- 環境・生データ: Chrome 155.0.8059.39 (headless=new)、CPU AMD EPYC 9V45 (4 vCPU)、素材 `work-m6-ott`。`results/worklet_init_limit.jsonl` (27 行 = 9 M × 3 run)、`worklet_sig.jsonl` (3 行)、`worklet_negctl.jsonl` (6 行)。HEAD 再現 (`ab6466296`) は `rerun_20261015_worklet_*.jsonl` の 5 行。
 
-**測定 commit から HEAD までの tools/perf/p15 差分**: `git diff --stat e4d2d1799 HEAD -- tools/perf/p15` は `rerun_20261015_worklet_{init,negctl,sig}.jsonl` の 3 ファイル (5 行) の追加だけを示す。コードの差分は空。
+再現 (前提 `oc_artifacts: work-m6-ott`。`--timeout` は明示。元 sweep の timeout 値は未記録のため、下の値は再現時の指定。sig・negctl の成功 run は timeout に達しないので結果に影響しない):
 
-**未解決**:
+```sh
+node tools/perf/p15/chrome_worklet.mjs --init-only --m 1,130,160,176,192,256,288,320,352 --runs 3 --timeout 30000 --out $RUNNER_TEMP/perf/worklet_init_limit.jsonl
+node tools/perf/p15/chrome_worklet.mjs --m 130 --reps 0 --runs 3 --timeout 1500000 --out $RUNNER_TEMP/perf/worklet_sig.jsonl
+node tools/perf/p15/chrome_worklet.mjs --m 1,130 --reps 0 --neg 0 --runs 3 --timeout 1500000 --out $RUNNER_TEMP/perf/worklet_negctl.jsonl
+```
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 成功最大 M と失敗最小 M の境界 (131〜159) の二分探索 | 上限の正確な値が未確定 (130 と 160 の間) | #2988 (残りは本 issue に残す) |
-| M≥160 の無応答の原因 (例外か・ループか・メモリ破壊か) | 上限の意味 (メモリの限界か状態の破壊か) が未確定 | #2988 |
-| M=130 より大きい M の署名一致 (成功した M の署名は 130 のみ確認) | 130 を超える M の正しさは未確認 | #2988 |
+| 元 sweep の eval timeout 値が未記録 (M=160〜352 の判定時間)。生データ・ログに無いため本節は値を書かない | 無応答の判定時間の根拠が無い | #2988 (次 run で `work-m6-ott` を付け、上の再現を実行して記録) |
+| 131〜159 の境界の二分探索 | 上限の正確な値が未確定 (130 と 160 の間) | #2988 |
+| M≥160 の無応答の原因 (例外・ループ・メモリ破壊のどれか) | 上限の意味が未確定 | #2988 |
+| 130 を超える M の署名一致 (成功した M の署名は 130 のみ) | 130 超の正しさは未確認 | #2988 |
