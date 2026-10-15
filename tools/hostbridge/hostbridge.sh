@@ -6,7 +6,7 @@
 # 前提: tools/m10/work/ott_m10.ll (無ければ bash tools/m10/m10_e2e.sh)。tools/m6..m10 は読取のみ。
 set -euo pipefail
 HB="$(cd -- "$(dirname -- "$0")" && pwd)"
-export PATH="/home/ubuntu/.local/share/pnpm/bin:$PATH"
+export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 command -v node >/dev/null || { echo "node が PATH に無い" >&2; exit 1; }
 cd "$HB"
 echo "== [1] evidence 検査"; python3 analysis/verify_evidence.py
