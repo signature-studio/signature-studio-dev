@@ -480,8 +480,9 @@ def main():
     def src_of(reg, addr, depth):
         if depth > 3 or reg is None:
             return "depth-limit"
-        seq = [ins for ins in md.disasm(read_va(addr - 600, 616), addr - 600) if ins.address < addr]
-        for ins in reversed(seq[-300:]):
+        start = func_begin(addr) or addr - 4096
+        seq = [ins for ins in md.disasm(read_va(start, addr - start + 16), start) if ins.address < addr]
+        for ins in reversed(seq):
             if ins.mnemonic.startswith(("rep", "movs", "stos")):
                 continue
             ops = ins.operands
