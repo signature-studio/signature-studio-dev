@@ -777,7 +777,8 @@
 | `tools/targets/massivex/REPORT_APPENDIX_3154.md` | ~71 | Massive X §12.2・§12.2a・§12.10 の分割移動全文 (#3154 MX-34・250 行上限のため・内容無変更) |
 | `tools/targets/massivex/REPORT_APPENDIX_3454.md` | ~24 | Massive X §11.5 (#3454 MX-35) の分割移動全文: dsp unsup 基準の更新と NC3 の base 相対判定。250 行上限のため分割移動・内容無変更 |
 | `tools/targets/massivex/dsp/REPORT.md` | ~220 | Massive X DSP closure 特定と lift 計画 |
-| `tools/targets/massivex/dsp/REPORT_MX6.md` | ~310 | MX-6 (#1123): vectorcall 静的検出・.pdata unwind census・FH3 funclet 一覧と #228 同型判定。§9 は MX-39 (#3776): funclet の深い closure 到達・E8/E9 候補の由来・MSVC funclet の取り込み方式 (U4d・U4e)。測定値の正本 |
+| `tools/targets/massivex/dsp/REPORT_MX6.md` | ~233 | MX-6 (#1123): vectorcall 静的検出・.pdata unwind census・FH3 funclet 一覧と #228 同型判定。MX-39 (#3776) の節は付録 `REPORT_APPENDIX_3776.md` §9 (分割移動)。測定値の正本 |
+| `tools/targets/massivex/dsp/REPORT_APPENDIX_3776.md` | ~70 | MX-39 (#3776) の分割移動全文 (§9): funclet の深い closure 到達 (BFS 深さ)・E8/E9 候補 4 件の由来・MSVC funclet の取り込み方式 (U4d・U4e)。250 行上限のため分割移動 (§9.6 は 3eefb3bab の再測定を追記) |
 | `tools/targets/massivex/dsp/REPORT_MX33.md` | ~153 | MX-33 (#3032) 受入 1: xmm0〜3 だけの入口 livein 保留 17 件の読み幅による判定 (0 件確定・判定不能 17)・NC 9 件・線形上限。受入 2〜5 は子 issue。測定値の正本 |
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
 | `tools/targets/kilohearts/REPORT_KH19.md` | 70 | KH-19 (#782) ホスト 3 種 (Snap Heap / Multipass / Phase Plant) の vtable 間接 call 込み closure 再計算 (下界・過大評価の参考値・限界) |
