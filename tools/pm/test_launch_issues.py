@@ -105,12 +105,18 @@ class LaunchIssuesTest(unittest.TestCase):
         self.assertEqual(rows["stopped"], [])
         self.assertEqual(rows["relaunch"], [])
 
-    # (e) 「素材不足」を含むマーカー無しの bot の停止報告 → 従来どおり stopped (ネガコン)
-    def test_plain_bot_stop_report_is_still_stopped(self):
-        d = snapshot([11], [bot_comment(11, "素材不足のため停止します。fl-win64 が無い。")])
+    # (e) 見出し『## 停止報告』の構造化された停止報告 → stopped (正例)。散文の語だけの停止は stopped にしない (#5111 ネガコン)
+    def test_heading_stop_report_is_stopped(self):
+        d = snapshot([11], [bot_comment(11, "## 停止報告\n素材不足のため停止します。fl-win64 が無い。")])
         _, _, _, rows = lj.classify(d)
         self.assertEqual([n for n, _ in rows["stopped"]], [11])
         self.assertNotIn(11, rows["ready"])
+
+    def test_prose_stop_words_are_not_a_stop(self):
+        d = snapshot([11], [bot_comment(11, "素材不足のため停止します。依存先がブロックしています。")])
+        _, _, _, rows = lj.classify(d)
+        self.assertEqual([n for n, _ in rows["recent"]], [11])
+        self.assertEqual(rows["stopped"], [])
 
     # PM マーカーのコメントも停止報告に数えない
     def test_pm_marker_comment_is_not_a_stop(self):

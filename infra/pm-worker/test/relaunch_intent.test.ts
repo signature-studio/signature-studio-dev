@@ -71,7 +71,7 @@ test("本文: focus があるときだけ受入条件の 1 行を足す。自由
 // 意図の投稿は focus 行 (picks の /oc には無い) で数える。投稿 0 回のネガコンは、picks も止まっている状態だけで置く。
 
 const FOCUS = "だけを実装して PR を出してください";
-const REPORT = "停止します。判断を求めます。";
+const REPORT = "## 停止報告\n停止します。判断を求めます。";
 const GOOD = '<!-- oc-pm-intent: relaunch issue=21 arts="fl-win64 plugins-ott" focus=3 -->';
 const HUMAN_INTENT = '<!-- oc-pm-intent: relaunch issue=21 arts="fl-win64" -->';
 

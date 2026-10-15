@@ -84,7 +84,8 @@ export interface Rows {
 }
 
 const NEED_RE = /不足|無い|無く|無かった|ない|存在しな|必要|依頼|欠|足りな|未配置|未展開|入っていな|のみ|だけ|揃っ/;
-const STOP_RE = /着手不可|着手できません|着手に必要|素材不足|停止します|停止報告|ブロック|PM に.*依頼|判断を/;
+// 停止報告の構造化マーカー (PM 判断 R7・#5111)。散文の語では停止と判定しない。先頭行の見出しだけを見る。
+const STOP_HEAD_RE = /^## 停止報告/;
 // run-outcome (record-run-outcome.sh の定型文) と PM の応答は、停止報告ではない (VM 版と同じ規則)。
 const OUTCOME_OR_PM_RE = /<!-- oc-run-outcome:|<!-- oc-pm-/;
 const WORD = "\\p{L}\\p{N}_\\-";
@@ -210,7 +211,7 @@ const artTokens = (line: string | null | undefined): string[] =>
 // 行の素材名 (allowlist 内) のうち、base に無いもの。
 const newArts = (line: string | null | undefined, base: string[]): string[] =>
   artTokens(line).filter((a) => ALLOW_ARTS.includes(a) && !base.includes(a));
-export const isStopReport = (text: string): boolean => STOP_RE.test(text);
+export const isStopReport = (text: string): boolean => STOP_HEAD_RE.test(text);
 const head90 = (s: string): string => Array.from(s).slice(0, 90).join("").replaceAll("\n", " ");
 const fmt1 = (x: number): string => x.toFixed(1);
 
@@ -251,10 +252,10 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
       rows.started.push([n, st.get(n) ?? []]);
     } else {
       const reported = !!bl && (!isLaunched || ageH(bl.at) < ageH(launchedAt));
-      const stopHit = !!bl && STOP_RE.test(bl.head) && !OUTCOME_OR_PM_RE.test(input.fullBotBody[k] ?? "");
+      const stopHit = !!bl && STOP_HEAD_RE.test(bl.head) && !OUTCOME_OR_PM_RE.test(input.fullBotBody[k] ?? "");
       // 素材による再投入は、直前の報告 (rep) が停止報告で、最後の run-outcome が artifact のときだけ。
       const rep = d.bot_report[k];
-      const repStop = !!rep && STOP_RE.test(rep.head);
+      const repStop = !!rep && STOP_HEAD_RE.test(rep.head);
       const material = repStop && input.outcomeReason[k] === "artifact";
       const ls = input.launchState?.[k];
       // 観測済みで完了を見た run があれば、その完了から 3 時間を recent にする (run が進行中は started が先に効く)。

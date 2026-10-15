@@ -45,8 +45,8 @@ test("分類: 固定 JSON で TS の classify が期待どおりの行に振り�
     [21, "oc_artifacts: fl-win64 work-m11"],
   ]);
   assert.deepEqual(rows.stopped, [
-    [13, "停止します。判断を求めます。"],
-    [17, "素材不足: work-m11 が無い"],
+    [13, "## 停止報告 停止します。判断を求めます。"],
+    [17, "## 停止報告 素材不足: work-m11 が無い"],
   ]);
   assert.deepEqual(rows.recent, [
     [11, "launched 1.0h ago"],
@@ -90,10 +90,10 @@ test("分類: TS と Python (tools/pm/launch_issues.py の classify) が同じ r
   assert.deepEqual(ts, py);
 });
 
-test("分類: STOP_RE の判定から run-outcome と PM マーカーの本文を除く (素材不足の定型文を停止報告にしない)", () => {
+test("分類 (#5111): 停止は見出し『## 停止報告』の構造化マーカーだけで判定する。散文の語 (ブロック・停止します・素材不足) では停止にしない", () => {
   const now = Date.parse("2026-10-14T12:00:00Z");
   const at = new Date(now - 30 * 60_000).toISOString();
-  const outcome = "理由の分類: artifact=素材不足\n<!-- oc-run-outcome: no-pr reason=artifact run=1 -->";
+  const outcome = "## 停止報告\n理由の分類: artifact=素材不足\n<!-- oc-run-outcome: no-pr reason=artifact run=1 -->";
   const snap = (body: string): Snapshot => ({
     issues: [{ number: 70, title: "[X-1] t", labels: ["oc:no-pr"], body: "", deps: null }],
     prs: [],
@@ -112,11 +112,16 @@ test("分類: STOP_RE の判定から run-outcome と PM マーカーの本文�
     reportBody: {},
     outcomeReason: {},
   });
-  const plain = classify(snap("素材不足のため停止します"), input("素材不足のため停止します")).rows;
-  assert.deepEqual(plain.stopped.map(([n]) => n), [70], "対照: マーカーの無い停止報告は stopped");
-  const marked = classify(snap(outcome), input(outcome)).rows;
-  assert.deepEqual(marked.stopped, [], "run-outcome は stopped にしない");
-  assert.deepEqual(marked.recent.map(([n]) => n), [70]);
+  const heading = "## 停止報告\n素材不足のため停止します";
+  const marked = classify(snap(heading), input(heading)).rows;
+  assert.deepEqual(marked.stopped.map(([n]) => n), [70], "正例: 見出しの停止報告は stopped");
+  const prose = "依存: #1 がブロックしているため、判断を求めます。素材不足のため停止します";
+  const neg = classify(snap(prose), input(prose)).rows;
+  assert.deepEqual(neg.stopped, [], "ネガコン: 散文の語だけでは stopped にしない");
+  assert.deepEqual(neg.recent.map(([n]) => n), [70], "ネガコン: 停止にしない bot 投稿は recent (stopped に入らない)");
+  const withOutcome = classify(snap(outcome), input(outcome)).rows;
+  assert.deepEqual(withOutcome.stopped, [], "run-outcome のマーカーを含むコメントは、見出しがあっても stopped にしない");
+  assert.deepEqual(withOutcome.recent.map(([n]) => n), [70]);
 });
 
 test("分類 (#5226): PM の判断 (bot の最後のコメント以降の PM 応答) で bot コメントの窓 1.5h を解く", () => {
@@ -167,8 +172,8 @@ test("分類 (#2651): oc:hold の issue は hold 行に置き、launch の行 (r
     ],
     prs: [],
     runs: [],
-    bot_last: { "84": { at: new Date(now - 5 * 3_600_000).toISOString(), head: "素材不足のため停止します", art: "oc_artifacts: fl-win64 work-m11" } },
-    bot_report: { "84": { at: new Date(now - 5 * 3_600_000).toISOString(), head: "素材不足のため停止します", art: "oc_artifacts: fl-win64 work-m11" } },
+    bot_last: { "84": { at: new Date(now - 5 * 3_600_000).toISOString(), head: "## 停止報告\n素材不足のため停止します", art: "oc_artifacts: fl-win64 work-m11" } },
+    bot_report: { "84": { at: new Date(now - 5 * 3_600_000).toISOString(), head: "## 停止報告\n素材不足のため停止します", art: "oc_artifacts: fl-win64 work-m11" } },
     pm_art: {},
   };
   const input: ClassifyInput = {
@@ -177,8 +182,8 @@ test("分類 (#2651): oc:hold の issue は hold 行に置き、launch の行 (r
     relaunch: {},
     manualDeps: {},
     liveBlockers: {},
-    fullBotBody: { "84": "素材不足のため停止します" },
-    reportBody: { "84": "素材不足のため停止します" },
+    fullBotBody: { "84": "## 停止報告\n素材不足のため停止します" },
+    reportBody: { "84": "## 停止報告\n素材不足のため停止します" },
     outcomeReason: { "84": "artifact" },
   };
   const { rows } = classify(snap, input);
@@ -198,7 +203,7 @@ test("分類 (#2651): oc:hold の issue は hold 行に置き、launch の行 (r
 test("分類 (#2758): 素材の再投入の基準は本文の oc_artifacts 行 (無ければ推定)", () => {
   const now = Date.parse("2026-10-14T12:00:00Z");
   const at = new Date(now - 5 * 3_600_000).toISOString();
-  const head = "素材不足: plugins-serum2 が無い";
+  const head = "## 停止報告\n素材不足: plugins-serum2 が無い";
   const snap = (artLine?: string): Snapshot => ({
     issues: [{ number: 90, title: "[CI-90] t90", labels: [], body: "", deps: null, ...(artLine ? { artLine } : {}) }],
     prs: [],
@@ -226,7 +231,7 @@ test("分類 (#2758): 素材の再投入の基準は本文の oc_artifacts 行 (
 test("分類 (#3050): 再投入の基準は pm_art の行と本文の行の和集合 (pm_art だけの名前は残し、本文だけの名前も加える)", () => {
   const now = Date.parse("2026-10-14T12:00:00Z");
   const at = new Date(now - 5 * 3_600_000).toISOString();
-  const head = "素材不足: plugins-serum2 が無い";
+  const head = "## 停止報告\n素材不足: plugins-serum2 が無い";
   const snap: Snapshot = {
     issues: [{ number: 93, title: "[CI-93] t93", labels: [], body: "", deps: null, artLine: "oc_artifacts: fl-win64 work-m11" }],
     prs: [],
@@ -251,7 +256,7 @@ test("分類 (#3050): 再投入の基準は pm_art の行と本文の行の和�
 test("分類 (#2758): 本文が oc_artifacts: none なら、不足素材は none を外して fl-win64 を補って足す (none と混在させない)", () => {
   const now = Date.parse("2026-10-14T12:00:00Z");
   const at = new Date(now - 5 * 3_600_000).toISOString();
-  const head = "素材不足: plugins-serum2 が無い";
+  const head = "## 停止報告\n素材不足: plugins-serum2 が無い";
   const snap: Snapshot = {
     issues: [{ number: 91, title: "[CI-91] t91", labels: [], body: "", deps: null, artLine: "oc_artifacts: none" }],
     prs: [],
@@ -277,7 +282,7 @@ test("分類 (#2758): 本文が oc_artifacts: none なら、不足素材は none
 test("分類 (#2758): 不足素材が fl-win64 のとき、本文の none・本文の行のどちらでも fl-win64 を重複させない", () => {
   const now = Date.parse("2026-10-14T12:00:00Z");
   const at = new Date(now - 5 * 3_600_000).toISOString();
-  const head = "素材不足: fl-win64 が無い";
+  const head = "## 停止報告\n素材不足: fl-win64 が無い";
   const snap = (artLine: string): Snapshot => ({
     issues: [{ number: 92, title: "[CI-92] t92", labels: [], body: "", deps: null, artLine }],
     prs: [],

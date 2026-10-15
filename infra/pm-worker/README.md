@@ -24,7 +24,7 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 2. open な子 (`親: #N`) を持つ親 issue は着手対象から外す。
 3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。最後の `oc-run-outcome` の reason で再着手を決める (`plan()` の `noPr`)。cooldown (既定 6 時間。`NO_PR_COOLDOWN_H`) の間は着手しない。`prio:critical` の issue は cooldown を半分 (3 時間) にする (`noPrCooldownMs`。意図の投稿の判定 `intentGate` も同じ)。cooldown の後は次のとおり。
    - `unknown`: 1 回だけ再着手する。
-   - `artifact`: 直前の報告 (`botReport`。run-outcome と PM のマーカーを含むコメントを除く) に、前回の `oc_artifacts` (無ければ既定の行) に無い allowlist 内の素材があり、その報告が停止報告 (`STOP_RE`) のときは、素材を足して 1 回再着手する。
+   - `artifact`: 直前の報告 (`botReport`。run-outcome と PM のマーカーを含むコメントを除く) に、前回の `oc_artifacts` (無ければ既定の行) に無い allowlist 内の素材があり、その報告が停止報告 (先頭行が見出し `## 停止報告`) のときは、素材を足して 1 回再着手する。
      新しい素材が無い (報告が無い古い保存値を含む) `artifact` は `unknown` と同じ扱い (#3185): cooldown の後に 1 回だけ、`unknown` の枠で再着手する。素材は前回の行のまま。本文に『前回の停止の理由を再確認し、素材が足りない以外の理由 (分割要・依存・判断待ち) なら、その種類の手順に従ってください』の 1 行を足す (artifact 由来の再投入だけ。`buildLaunchBody` の `recheck`)。その再投入の後の run も素材なしの `artifact` で終われば、`no_pr` として oc-pm に回す (再投入しない)。再投入の上限 (`NO_PR_MAX_RELAUNCH`) に達している素材なしの `artifact` は、unknown の枠を使わず (再投入せず)、上限に達した後の run が素材なしで終われば同じく oc-pm に回す。
    - `stop`・`split`: 再投入せず、PM agent (`oc-pm`・下の oc-pm 節) に回す。
    - `blocked`: blocker (`blocked_by`・本文の依存) が open の間は `blocked` の行に置き、再着手しない。blocker が 0 になった tick で、**その blocked の報告 (`run-outcome` の時刻) につき 1 回だけ**再着手する (`np:<n>.blocked` に報告の時刻を残す。連続する tick では二重に投稿しない)。
