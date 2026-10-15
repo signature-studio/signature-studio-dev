@@ -117,14 +117,17 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
 - **確定した式**: `flags & 0x22 == 0` のとき 4 族は store 0 件で 0x104cc65 → ret に届き、戻り値 = value。CFG で固定 4 族の到達集合 (503 VA) に `lea 0x104a924` は無い。
 - **未確定**: `flags & 0x22 != 0` の右辺は engine 状態 (`obj+0x3b8`・`obj+0x3bc`・global) と定数 `0x104ccd8` (= 2^-30) に依存するため、静的な式は閉じられない。これらは code 2 (未実装) のまま。
 - 実装: `host/fl_mock.mjs` の `recPassFamily(e, f)`・`provider/fl_engine.c` の `rec_pass_family(e, f)` (3 番目の引数 flags を読む)。`tests/general_diff.mjs` に固定 4 族の境界を追加 (flags 0x1c・0x1 は `& 0x22 == 0` で成功、0x2・0x20 は code 2)。mock と C の一致を見る差分テストで、戻り値の値そのものは検査しない。
-- 測定 commit: `ce6b07dfb`。main 取り込みなし。load avg は測定中 `2.08`〜`2.31` (4 コア)。
-  - `bash provider/build.sh`: rc 0 (1.7 秒)。`fl_table.c: 435 関数, ハンドラ 208`。
-  - `build_cpython_wasm.sh`: rc 0 (4 分 1 秒) → `FLPY_SKIP_TABLE=1 build_flpy.sh`: rc 0 (6.2 秒)。
-  - `node tests/general_diff.mjs`: `{"calls":56,"diffs":0,"PASS":true}`。
-  - `node tests/provider_check.mjs`: `{"functions":435,"implemented":208,"unimplemented":227,"mcp_static":60,"PASS":true}`。件数は 208 のまま (処理関数は既に implemented に数えられている)。
-  - `node tests/ui_state_diff.mjs`: `{"calls":109,"diffs":0,"PASS":true}`。`ui_browser_diff.mjs`: `{"ok_calls":8,"bad_calls":5,"diffs":0,"browserOp":3,"PASS":true}`。`channels_diff.mjs`: `"calls":238,"grid_diffs":0,"PASS":true`。
+- 測定 commit: `f5d656a4f` (main 取り込み merge・本 PR の HEAD)。load avg は測定中 `0.74` (4 コア)。
+  - 本 PR の HEAD 前 (`ce6b07dfb`) からの差分は main 側由来で、`fl_engine.c` の `FL_H(...)` が 208→224 (+16)。内訳は PY-246 の `FL_H(ui, up/down/left/right/cut/copy/paste/insert/delete/enter/escape/yes/no/nextWindow/selectWindow)` 15 件と PY-243 の `FL_H(launchMapPages, setMapItemTarget)` 1 件。本 PR の `rec_pass_family` 関連は `FL_H` を増やさない (0 増分)。
+  - `bash provider/build.sh`: rc 0。`fl_table.c: 435 関数, ハンドラ 224`。`EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh` (emsdk 6.0.12 を上流から install)。
+  - `build_cpython_wasm.sh`: rc 0 → `FLPY_SKIP_TABLE=1 build_flpy.sh`: rc 0 (CPython 単体の再ビルド後に実行)。
+  - `node tests/general_diff.mjs`: `{"calls":56,"diffs":0,"PASS":true}` (0.11 秒)。
+  - `node tests/provider_check.mjs`: `{"functions":435,"implemented":224,"unimplemented":211,"mcp_static":60,"PASS":true}`。208→224 の +16 は上記 main 側の `FL_H` 増分と一致。
+  - `node tests/ui_state_diff.mjs`: `{"calls":109,"diffs":0,"PASS":true}` (0.05 秒)。`ui_browser_diff.mjs`: `{"ok_calls":8,"bad_calls":5,"diffs":0,"browserOp":3,"PASS":true}` (0.04 秒)。`channels_diff.mjs`: `{"calls":238,"grid_calls":1200,"diffs":0,"grid_diffs":0,"PASS":true}` (0.08 秒)。
+  - `node tests/launchmap_diff.mjs`: `{"calls":18,"diffs":0,"PASS":true}` (main 側由来・0.04 秒)。`node tests/ui_keys_diff.mjs`: `{"calls":26,"diffs":0,"PASS":true}` (main 側由来・0.04 秒)。
   - `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` (rc 0)。
-  - `analysis/py235_process_rec_families.py` (`FL_WIN64_DIR` の PE): 31 ok・0 FAIL・rc 0 (固定 4 族のアドレス渡し非到達を assert に追加)。
+  - `analysis/py235_process_rec_families.py` (`FL_WIN64_DIR` の PE・素材 `fl-win64` 展開): 31 ok・0 FAIL・rc 0 (固定 4 族のアドレス渡し非到達を assert に追加)。
+  - 補足: `build_flpy.sh` は上流 emsdk の `emsdk_env.sh` が `EMSDK_DIR` を unset するため `set -u` で落ちる (23 行目)。本測定では `_EMSDK_KEEP` で退避した一時コピーを `work/` に置いて実行した。リポジトリの修正は本 PR の範囲外。
 - KPI: 起動・GUI に関わらない PR のため、製品 KPI は記載しない。
 
 ## 未解決
