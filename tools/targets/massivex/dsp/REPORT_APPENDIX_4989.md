@@ -38,9 +38,10 @@
 
 ## 4. 検証と測定 commit
 
-- 測定 commit = **`1c98a13a7`** (origin/main・基準 e2e の HEAD)。本 PR の変更は `scripts/mx4989_probe.py` (新規) と `scripts/mx6_vectorcall.py` (`analyze()` の返り値に `must` を追加・既存の値は不変)。
-- 既定経路の不変確認: `mx6_e2e.sh` を本 PR HEAD で再実行する (下の §6 に結果)。
-- `mx4989_probe.py` の実行時間: 約 2 分 27 秒 (`time` で実測・単一プロセス・load 1 前後)。
+- 基準 (測定 commit) = **`1c98a13a7`** (origin/main・基準 e2e の HEAD)。本 PR のコード変更は `scripts/mx4989_probe.py` (新規) と `scripts/mx6_vectorcall.py` (`analyze()` の返り値に `must` を追加・既存の値は不変)。
+- 測定 commit から HEAD (`3146df45d`) までのコード差分: `git diff 1c98a13a7 3146df45d -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は 2 files (新規 `mx4989_probe.py` +204・`mx6_vectorcall.py` の 1 行: `'undef_reads03': undef03, 'cfg': (insns, succ)}` → `'..., 'must': must}`)。
+- HEAD `3146df45d` での `mx6_e2e.sh`: **exit 0・elapsed 49 s・load 0.19 0.59 0.50 → 0.65 0.65 0.53・判定 28 行のうち PASS・負例の FAIL 1 行 (期待どおり)**。
+- HEAD での `mx4989_probe.py`: 同じ数値 (U3d 1 件・U3e 193 件・pdata 始点 47 件) を再現。実行時間は約 2 分 27 秒 (`time` 実測)。
 
 ## 5. 未解決
 
