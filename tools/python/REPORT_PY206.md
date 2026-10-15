@@ -112,7 +112,7 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 
 - 測定 commit: `17969a203` (`origin/main` (`bacbf7e43`) を merge した commit。競合は `tests/provider_check.mjs` の 1 箇所 (実装判定 `if` と件数 assert) で、main 側の `pe130` (ui setter 2 件・ui getVersion・PY-130 #3007) と PR 側の `pe206` (device 7 関数) を両方残した)。コードを変えた最後の commit。
 - 測定 commit から HEAD までのコード差分: `git diff 17969a203 HEAD -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (測定時点の HEAD は測定 commit と同じ。本節を含む後続 commit は `tools/python/REPORT_PY206.md` と PR 本文だけを変える)。
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`・7.4 秒・rc 0)。`FL_WIN64_DIR` を設定して `fetch_inputs.sh` (rc 0・work/ に midi.py・utils.py・MCPTools.pyc・device script)。emsdk は既定の `EMSDK_ENV` (`provider/build.sh` の既定値)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`・7.4 秒・rc 0)。`FL_WIN64_DIR` を設定して `fetch_inputs.sh` (rc 0・work/ に midi.py・utils.py・MCPTools.pyc・device script)。emsdk は既定の `EMSDK_ENV` (`provider/build.sh` の既定値)。
 
 | 検査 | 結果 | rc |
 |---|---|---|
