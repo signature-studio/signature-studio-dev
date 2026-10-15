@@ -67,6 +67,11 @@ ABI = {
         ('stereo 502 FUN_180fdc470 xmm0 = ABS (vmovq xmm0,r9 180fcdabd)', r'uVar4 = (?:func_0x000|FUN_)180fdc470\(\)(?=;\n\s*dVar2 = extraout_XMM0_Qa_01;)', 'uVar4 = FUN_180fdc470(d2u(dVar2))'),
         ('stereo 528 FUN_180fdc700 xmm0 = param_1 (unchanged from entry)', r'(?:func_0x000|FUN_)180fdc700\(\)(?=;\n\s*return dVar2;\n\s*\}\n\s*if \(\(longlong\)dVar2 < _DAT_1822829b0\))', 'FUN_180fdc700(d2u(param_1))'),
         ('stereo 571 FUN_180fdc470 xmm0 = param_1 (vmovq xmm0,r9 180fce528)', r'uVar3 = (?:func_0x000|FUN_)180fdc470\(\)(?=;\n\s*dVar2 = extraout_XMM0_Qa_01;)', 'uVar3 = FUN_180fdc470(d2u(param_1))'),
+        # KH-113 (#4704): FUN_180fdc470 の戻り xmm0 (縮約値) を kh_fn_180fdc470 (kh_xmm0.h・KH-76) で出す。呼出しと読出しを 1 組で置換する
+        # (呼出しを kh_fn に変えないと kh_xmm0_180fdc470 が書かれず、読出しが未初期化値になる。callee 本体は kh_fn を呼ばない)。
+        # 直前の 502・571 規則で `FUN_180fdc470(d2u(x))` になった呼出しを読む。件数 1 を assert する。
+        ('stereo 502 caller 180fcd690 reads xmm0 of 470 (extraout_XMM0_Qa_01)', r'uVar4 = FUN_180fdc470\(d2u\(dVar2\)\);\n(\s*)dVar2 = extraout_XMM0_Qa_01;', r'uVar4 = kh_fn_180fdc470(dVar2);\n\1dVar2 = kh_xmm0_180fdc470;'),
+        ('stereo 571 caller 180fce0d0 reads xmm0 of 470 (extraout_XMM0_Qa_01)', r'uVar3 = FUN_180fdc470\(d2u\(param_1\)\);\n(\s*)dVar2 = extraout_XMM0_Qa_01;', r'uVar3 = kh_fn_180fdc470(param_1);\n\1dVar2 = kh_xmm0_180fdc470;'),
         ('stereo 598 FUN_180fdc6d8 xmm0 = param_1 (unchanged from entry, jg 476 path)', r'(?:func_0x000|FUN_)180fdc6d8\(\)(?=;\n\s*return dVar2;\n\s*\}\n\s*if \(\(longlong\)uVar1 < \(longlong\)_DAT_182282af0\))', 'FUN_180fdc6d8(d2u(param_1))'),
         ('stereo 631 FUN_180fdc6d8 xmm0 = param_1 (movq xmm0,rdx 180fce450)', r'(?:func_0x000|FUN_)180fdc6d8\(\)(?=;\n\s*return dVar2;\n\s*\}\n\s*uVar3 = FUN_180fdfdb0)', 'FUN_180fdc6d8(d2u(param_1))'),
         ('stereo 634 FUN_180fdfdb0 xmm0 = ABS (movq xmm0,r10 180fce0ff)', r'uVar3 = (?:func_0x000|FUN_)180fdfdb0\(\)(?=;\n\s*dVar4 = extraout_XMM0_Qa;)', 'uVar3 = FUN_180fdfdb0(d2u(dVar2))'),
