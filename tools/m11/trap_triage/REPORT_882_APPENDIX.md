@@ -158,28 +158,28 @@
 
 既知類型との関係: 該当なし (計測 hook の追加のみ。新規の欠陥類型は無い)。
 
-測定 commit: `05f228143` (コードを変えた最後の commit。`tools/m11/m11_ov.c` の `edx` 書式を `%x` に直した commit (review m1))。`tools/m11/m11_build.sh`・`tools/m11/trap_triage/probe2400_ir.py` は `aeb6ceb71` から変えていない。起点は `origin/main` `f44264ebe`。
-素材: `fl-win64` を `$RUNNER_TEMP/fl-win64`、`work-m11`・`work-liftdiff` を worktree 直下に展開 (`toolchain-*` は agent-setup が `/opt` に展開済み)。`m11_gen_ir2.sh` rc=0 (33.3 s)。測定後の `/proc/loadavg` は `0.24 0.46 0.29`。
+測定 commit: `4ab056abe` (コードを変えた最後の commit。`origin/main` `674c8831f` を merge し、`tools/m11/m11_build.sh` の CF と stamp の競合を両方残して解消した。#2407 の `m11_e3ef60_obs` と同名だったため、本 probe の関数を `m11_e3ef60_site_obs` に改名)。直前の `05f228143` (`edx` の `%x` 修正) の測定値も同じ。起点は `origin/main` `f44264ebe`、merge 先は `674c8831f` (§15.4)。
+素材: `fl-win64` を `$RUNNER_TEMP/fl-win64`、`work-m11`・`work-liftdiff` を worktree 直下に展開 (`toolchain-*` は agent-setup が `/opt` に展開済み)。`m11_gen_ir2.sh` rc=0 (`4ab056abe`)。
 build は `m11_gen_ir2.sh` と同じ `FL_WIN64_DIR` を付ける (build は IR の PE パスと一致しないと止まる)。
 
 ### 15.1 実装
 
-- `m11_ov.c`: `M11_PROBE_2400=1` のときだけ有効。`m11_e3ef60_site_obs(site, arg1, this, edx)` が `[m11][e3ef60] #n site=k pe=… off=… arg1=… this=… edx=…` を stderr に出す (512 行で打ち切り)。既定 0 では何も入らない。
+- `m11_ov.c`: `M11_PROBE_2400=1` のときだけ有効。関数名は #2407 の `m11_e3ef60_obs(a)` と衝突しないよう `m11_e3ef60_site_obs(site, arg1, this, edx)` とした。stderr に `[m11][e3ef60] #n site=k pe=… off=… arg1=… this=… edx=…` を stderr に出す (512 行で打ち切り)。既定 0 では何も入らない。
 - `trap_triage/probe2400_ir.py`: `boot_final3.ll` の `function_e3ef60` 内で `call i64 @function_60a270(i64 <this>, i32 <edx>)` の 9 箇所の直前に呼出しを挿入する (番地順 1〜9)。箇所数が 9 でなければ止まる。冪等。
 - `m11_build.sh`: CF に `-DM11_PROBE_2400`、stamp `work/instr_2400.stamp` (値が変わると post 結果と `ov.o` を作り直す)、`M11_PROBE_2400=1` のときだけ probe を呼ぶ。
 
 ### 15.2 静的な 9 箇所との突合 (`REPORT_2373.md` §3)
 
 IR 上の 9 呼出しの this は `[arg1+off]` のロード値で、off は §3 の表と一致する (0x778・0x7d8・0x810・0x840・0x808・0x7f0・0x838・0x8e8・0x9c8)。
-出現順の確認 (`05f228143` の build の `work/boot_final3.ll`、`function_e3ef60` の `m11_e3ef60_site_obs` 9 呼出しを IR の記述順に並べた):
+出現順の確認 (`4ab056abe` の 3 点 build の `work/boot_final3.ll`、`function_e3ef60` の `m11_e3ef60_site_obs` 9 呼出しを IR の記述順に並べた):
 - `this` の `inttoptr (%arg1 + N)` の N は 1912・2008・2064・2112・2056・2032・2104・2280・2504 = 0x778・0x7d8・0x810・0x840・0x808・0x7f0・0x838・0x8e8・0x9c8。C 側の `off` 表と記述順に一致する。
 - IR のブロックラベル `dec_label_pc_e3…` (13 個) は記述順に番地が単調増加する。site 1 は `e3f0a4` のブロック (次は `e3f0c2`)、site 2〜9 は `e3f0db` のブロック (次は `e3f3f3`)。C 側の PE 番地はすべて対応するブロックの範囲 (直前のラベル ≤ PE < 次のラベル) に入る。同一ブロック内は IR の記述順 = 命令順。
 
-### 15.3 測定 (`05f228143`・`SV_RAW=1 node trap_triage/survey_units.mjs`・全て rc=0)
+### 15.3 測定 (`4ab056abe`・`SV_RAW=1 node trap_triage/survey_units.mjs`・全て rc=0)
 
 | build | survey 集計 | 備考 |
 |---|---|---|
-| 既定 (`M11_PROBE_2400` 未設定) | `ok 873 / halt0 7 / miss 47 / oob 14 / noproc 1` (7.3 s) | 起点 `origin/main` `f44264ebe` と同一 (§15.4) |
+| 既定 (`M11_PROBE_2400` 未設定) | `ok 873 / halt0 7 / miss 47 / oob 14 / noproc 1` | `origin/main` `674c8831f` と wasm sha256 (`7624cc03…`) が一致、942 unit の分類も一致 (§15.4) |
 | `M11_PROBE_2400=1` | `ok 871 / halt0 7 / miss 47 / oob 16 / noproc 1` (JSON の unit 別分類で突合) | 既定との分類差は unit 304・555 (ok→oob) の 2 件 |
 | `M11_PROBE_2400=1 M11_INSTR_60A270=1 M11_INSTR_40FFE0=1` | `ok 873 / halt0 7 / miss 47 / oob 14 / noproc 1` (JSON の unit 別分類で突合) | 既定との分類差 0 |
 
@@ -203,7 +203,7 @@ unit 895 (既定・3 build とも `halt0`。frames は `function_60a270` ← `fu
 ### 15.4 既定 build の同一性 (基準値の移動)
 
 - 受入の「既定 build が 870 / 16」は起点 `f44264ebe` 時点でも成り立たない。870/16 は #882 時点 (`8963d89b`) の値で、その後に m11 の変更が入り (#2439・#2502・#2773・#3325 など)、起点時点の既定 build は `873 / 14` になっている。現在の `origin/main` (`10daa391b` 以降) については確認していない。
-- 本 PR の既定挙動が変わらないことは、起点 `f44264ebe` の clean worktree で既定 build と survey を取って確認した (`aeb6ceb71` の測定)。`tools/m11/work/boot_final3.ll` の sha256 が一致 (`a415baa4…`)、`m11_boot.cjs.wasm` の sha256 が一致 (`42ae28e1…`)、942 unit の survey 結果が一致 (frames に出る JS のソースパス `ws-2400` と `ws-2400-base` の違いを除く)。`05f228143` の既定 build の wasm sha256 も `42ae28e1…` で一致する (§15.3)。
+- 本 PR の既定挙動が変わらないことは、起点 `f44264ebe` の clean worktree で既定 build と survey を取って確認した (`aeb6ceb71` の測定)。`tools/m11/work/boot_final3.ll` の sha256 が一致 (`a415baa4…`)、`m11_boot.cjs.wasm` の sha256 が一致 (`42ae28e1…`)、942 unit の survey 結果が一致 (frames に出る JS のソースパス `ws-2400` と `ws-2400-base` の違いを除く)。`4ab056abe` (main 取り込み後) の既定 build は、`origin/main` `674c8831f` の clean worktree の既定 build と wasm sha256 (`7624cc03…`) が一致し、942 unit の分類も一致した (§15.3)。`f44264ebe` 時点の `42ae28e1…` とは、その後の main の変更で異なる。
 
 ### 15.5 受入条件
 
@@ -230,4 +230,4 @@ rm -f work/e3ef60_err.log; SV_RAW=1 SV_ERR_LOG=$PWD/work/e3ef60_err.log node tra
 grep '^unit 895 \[m11\]\[e3ef60\]' work/e3ef60_err.log
 ```
 
-- 測定 commit `05f228143` から本 REPORT を含む commit までのコード差分: `git diff 05f228143 HEAD -- tools/m11/m11_rt.c tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/trap_triage/probe2400_ir.py` は 0 (docs のみ)。
+- 測定 commit `4ab056abe` から本 REPORT を含む commit までのコード差分: `git diff 4ab056abe HEAD -- tools/m11/m11_rt.c tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/trap_triage/probe2400_ir.py` は 0 (docs のみ)。
