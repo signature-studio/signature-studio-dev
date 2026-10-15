@@ -71,9 +71,11 @@ def build(t, force=False):
     ir2 = W + '/ir_instr.ll'
     if t.get('site_trace') and not t.get('block_trace'):
         raise SystemExit('[build] site_trace には block_trace が必要 (site の VA は block 入口の記録で決まる): %s' % t.get('name'))
-    if force or newer(ir, ir2):
+    if force or newer(ir, ir2) or newer(os.path.join(ROOT, 'ldlib/irtool.py'), ir2) or newer(os.path.join(ROOT, 'ldlib/cases.py'), ir2):
+        from ldlib import cases
         t0 = time.time()
-        n = irtool.instrument(ir, ir2, t.get('fn_prefix', 'function_'), blocks=bool(t.get('block_trace')), sites=bool(t.get('site_trace')))
+        n = irtool.instrument(ir, ir2, t.get('fn_prefix', 'function_'), blocks=bool(t.get('block_trace')), sites=bool(t.get('site_trace')),
+                              entry_types=cases.MACHINE_ENTRY)
         print('[build] instrumented %d functions (%.1fs)' % (n, time.time() - t0))
     extra_objs = []
     extra_defined = set()
@@ -108,7 +110,8 @@ def build(t, force=False):
                         alldef.add(m.group('name'))
         src, names, skipped = irtool.gen_stubs(ir, alldef | extra_defined)
         open(stubs_c, 'w').write(src)
-        json.dump({'stubs': names, 'skipped': skipped, 'widths': irtool.gen_stubs.widths}, open(W + '/stubs.json', 'w'))
+        json.dump({'stubs': names, 'skipped': skipped, 'widths': irtool.gen_stubs.widths,
+                   'slots': irtool.gen_stubs.slots}, open(W + '/stubs.json', 'w'))
         print('[build] stubs: %d (skipped %d: %s)' % (len(names), len(skipped), skipped[:5]))
     # simd helper
     objs = []

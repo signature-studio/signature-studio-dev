@@ -43,12 +43,12 @@ const restComment = (n: number, who: Who, body: string, at: number, id: number) 
 });
 const outcome = (reason: string) => `[run-outcome] 停止\n<!-- oc-run-outcome: no-pr reason=${reason} run=1 -->`;
 
-// 対象 (Bot 起票・oc:no-pr・split) 30 件 (101-130) と、ネガコン 7 件 (201-207)。
+// 対象 (Bot 起票・oc:no-pr・split) 40 件 (101-140) と、ネガコン 7 件 (201-207)。
 function fixture() {
   const issues: any[] = [];
   const comments: any[] = [];
   let id = 1;
-  for (let n = 101; n <= 130; n++) {
+  for (let n = 101; n <= 140; n++) {
     issues.push(restIssue(n));
     comments.push(restComment(n, IMPL_BOT, outcome("split"), T0 - 30 * MIN, id++));
   }
@@ -96,7 +96,7 @@ const noPrRefs = (app: any) => app.engine.detectPmTargets().filter((t: any) => t
 function staleStore(): MemoryStore {
   const store = new MemoryStore();
   store.put("meta", "main", { fullSyncAt: T0 - 3 * HOUR, reconcileAt: T0 - 10 * MIN });
-  for (let n = 101; n <= 130; n++) {
+  for (let n = 101; n <= 140; n++) {
     store.put("issues", String(n), { number: n, title: `[CI-${n}] t${n}`, labels: ["oc:no-pr"], body: "", state: "open", updatedAt: iso(T0 - HOUR), blockedByCount: 0 });
   }
   return store;
@@ -110,8 +110,8 @@ test("保存値の版が無い状態では、最初の tick の全体同期で�
   await ctx.app.engine.tick();
   assert.equal(fullSyncCalls(ctx.m.calls).length, 1, "版が無いので周期を待たず全体同期が 1 回走る");
   assert.equal(ctx.app.engine.meta.signalVer, SIGNAL_VER);
-  assert.deepEqual(noPrRefs(ctx.app), Array.from({ length: 30 }, (_, i) => 101 + i), "対象は Bot 起票・oc:no-pr・split の 30 件だけ");
-  assert.equal(ctx.app.engine.status().pm_detected.no_pr, 30);
+  assert.deepEqual(noPrRefs(ctx.app), Array.from({ length: 40 }, (_, i) => 101 + i), "対象は Bot 起票・oc:no-pr・split の 40 件だけ");
+  assert.equal(ctx.app.engine.status().pm_detected.no_pr, 40);
   // PM 起動の上限: 1 時間に送るのは PM_LIMITS.hourMax 件まで。2 回目の tick (1 分後) は同じ時間帯の枠を使い切っている。
   const first = ctx.m.calls.filter(isPmDispatch);
   assert.equal(first.length, PM_LIMITS.hourMax);
@@ -126,7 +126,7 @@ test("ネガコン: 外部起票者・ラベル無し・outcome 無し・保留�
   const ctx = await configuredApp({ now: { t: T0 }, store: staleStore(), handlers: restHandlers(fx) });
   await ctx.app.engine.tick();
   const refs = noPrRefs(ctx.app);
-  assert.equal(refs.length, 30, "対照: 同じ補完で対象の 30 件は検出される (空集合で通さない)");
+  assert.equal(refs.length, 40, "対照: 同じ補完で対象の 40 件は検出される (空集合で通さない)");
   for (const n of [201, 202, 203, 204, 205, 206, 207]) assert.ok(!refs.includes(n), `#${n} は対象外`);
 });
 
@@ -157,5 +157,5 @@ test("補完の全体同期が失敗しても、再試行は SIGNAL_RETRY_MS (15
   await ctx.app.engine.tick();
   assert.equal(fullSyncCalls(ctx.m.calls).length, 2, "15 分を過ぎたら再試行する");
   assert.equal(ctx.app.engine.meta.signalVer, SIGNAL_VER);
-  assert.equal(noPrRefs(ctx.app).length, 30);
+  assert.equal(noPrRefs(ctx.app).length, 40);
 });

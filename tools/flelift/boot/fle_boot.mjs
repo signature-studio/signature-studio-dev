@@ -47,6 +47,7 @@ if (LOG_CAP > 0 || TIME_CAP > 0) {
             logCap.tail.push(s.slice(0, 240)); if (logCap.tail.length > 40) logCap.tail.shift();
             if (!logCap.hit && LOG_CAP > 0 && logCap.bytes > LOG_CAP) {
                 logCap.hit = 'bytes'; logCap.elapsed_ms = el;
+                // #5027: この throw は Emscripten の tty write (FS) が EIO に変換して飲むため boot を止めない (下の分類で報告する)。
                 throw new Error('FLE_BOOT_LOG_CAP exceeded (' + LOG_CAP + ' bytes)');
             }
             orig(...a);
@@ -59,9 +60,9 @@ let m = await (mod.default ? mod.default() : mod());
 const U8 = m.HEAPU8;
 
 if (TRACE) { try { m._shimx_set_trace(1); } catch { /* nosx では未 export */ } }
-// FLE-6: dsp_ippv2 shim は既定で無効。FLE_IPP=1 のときだけ有効 (ネガコン FLE_IPP=0 / 未指定 = 修正前の挙動)。
-// FLE_IPP=2 (#2702): shim 有 + ippsZero_8u 以外の IPP 呼出で停止 (停止名と呼出元を summary に出す)。
-const IPP_MODE = { '1': 1, '2': 2, '3': 3 }[process.env.FLE_IPP] || 0;
+// FLE-6: dsp_ippv2 shim の mode。FLE_IPP=0 (ネガコン) / 1 (shim 有) / 2 (#2702: shim 有 + ippsZero_8u 以外で停止) / 3 (ILTools 分岐入力)。
+// 未指定・空 = 既定 3 (#672 PM 判断 2026-10-15: ILT 分岐入力を既定化。ネガコンは FLE_IPP=0 を明示する)。
+const IPP_MODE = (process.env.FLE_IPP === undefined || process.env.FLE_IPP === '') ? 3 : ({ '1': 1, '2': 2, '3': 3 }[process.env.FLE_IPP] || 0);
 const IPP_ON = IPP_MODE !== 0;
 m._fle_boot_set_ipp(IPP_MODE);
 // FLE-672 診断: FLE_DIAG_NULLFILL=1 は root 無しの fill (0x6a7b70) で buf = 0 の呼出しを戻す。未指定は従来どおり停止する。
@@ -146,6 +147,14 @@ try {
 } catch (e) {
     boot.threw = classify(e);
     if (e && e.stack) boot.threw.stack = e.stack.split('\n').slice(0, 6).join('\n');
+}
+// #5027: cap 超過 (logCap.hit) の後も guest は走り続け、boot の停止理由は cap の例外ではなく後続の exit になる
+// (cap の throw は Emscripten の tty write が EIO に変換して飲む)。上限超過は log_cap として報告し、生の停止理由は threw_raw に残す。
+if (logCap.hit === 'bytes' && boot.threw) {
+    boot.threw_raw = boot.threw;
+    boot.threw = { cls: 'log_cap', msg: 'FLE_BOOT_LOG_CAP exceeded (' + LOG_CAP + ' bytes); raw=' + boot.threw.cls };
+} else if (logCap.hit === 'bytes' && !boot.threw) {
+    boot.threw = { cls: 'log_cap', msg: 'FLE_BOOT_LOG_CAP exceeded (' + LOG_CAP + ' bytes); raw=returned' };
 }
 boot.units_run = Number(m._fle_units_run()); boot.units_total = Number(m._fle_units_total()); boot.units_empty = Number(m._fle_units_empty());
 boot.longjmp = Number(m._fle_n_longjmp());
@@ -238,7 +247,7 @@ for (let i = 0; i < Number(m._fle_ipp_names()); i++) {
     const c = Number(m._fle_ipp_count(i));
     if (c) boot.ipp_called.push([m.UTF8ToString(m._fle_ipp_name(i)), c, '0x' + Number(m._fle_ipp_site(i)).toString(16)]);
 }
-// ippsZero_8u の唯一の呼出し点は 0x67264b (`call qword ptr [rax]`・FF 10)。target は直前の 0x672644 `mov rax,[0x15e0a48]` で読む (PE の逆アセンブル実測)。0x67264d は戻り番地 (ipp.called の ret)。読出し経路の値を残す
+// ippsZero_8u の呼出し点は 0x67264b (`call qword ptr [rax]`・FF 10) と 0x6b91e8 の 2 つ (付録 REPORT_APPENDIX_4004.md §2)。target は直前の 0x672644 `mov rax,[0x15e0a48]` で読む (PE の逆アセンブル実測)。0x67264d は戻り番地 (ipp.called の ret)。読出し経路の値を残す
 const objPtr = Number(BigInt(rd64(0x15e0a48)));
 boot.ipp_call_slot = { slot_15e0a48: rd64(0x15e0a48), obj_first_qword: objPtr ? rd64(objPtr) : null };
 const stopNm = m.UTF8ToString(m._fle_ipp_stop_name());
@@ -328,7 +337,11 @@ if (SURVEY) {
     // survey は boot 実機連鎖と同じインスタンスで行う (InitContext 0x15eac90 は boot の _InitLib が設定済み)。
     // unit は 1 本ずつ fle_run (新 RSP) で隔離実行し、trap/raise/halt0 を JS 側で分類する。
     const tbl = 0x15eac90;
-    const tblPtr = BigInt(m.HEAPU32[tbl/4+1]) << 32n | BigInt(m.HEAPU32[tbl/4]);
+    let tblPtr = BigInt(m.HEAPU32[tbl/4+1]) << 32n | BigInt(m.HEAPU32[tbl/4]);
+    // #4854: 既定 (mode 3) の boot は unit 895 の後の exit (ExitProcess 経路) で InitContext.InitTable が 0 になる。
+    // InitUnits の開始時の値は PackageInfo (PKG = 0x13768b0・_StartLib の rdx) なので、survey の前にそれへ戻す。
+    const tblRestored = process.env.FLE_SURVEY_NOREPAIR !== '1' && tblPtr === 0n && m.HEAPU32[PKG / 4] > 0;
+    if (tblRestored) { m.HEAPU32[tbl / 4] = PKG; m.HEAPU32[tbl / 4 + 1] = 0; tblPtr = BigInt(PKG); }
     if (tblPtr === 0n) {
         survey = { error: 'InitContext.InitTable == 0 (boot が _InitLib に届かず)' };
     } else {
@@ -337,14 +350,16 @@ if (SURVEY) {
         const TO = Math.min(Number(process.env.FLE_SURVEY_TO || total), total);
         const byCls = {}; const details = [];
         let longjmp0 = Number(m._fle_n_longjmp());
+        // noproc / empty も jsonl に 1 行ずつ残す (merge_survey.py が 942 件を数えられるように・#4854)
+        const emit = (i, cls, info) => { try { appendFileSync(outPath.replace(/\.json$/, '.jsonl'), JSON.stringify([i, cls, info]) + '\n'); } catch { } };
         for (let i = FROM; i < TO; i++) {
             console.error('[survey] unit ' + i + '/' + total);
             const proc = Number(m._fle_unit_proc(i) >>> 0);
-            if (!proc) { byCls['noproc'] = (byCls['noproc'] || 0) + 1; details.push([i, 'noproc', 0]); continue; }
+            if (!proc) { byCls['noproc'] = (byCls['noproc'] || 0) + 1; details.push([i, 'noproc', 0]); emit(i, 'noproc', 0); continue; }
             // InitUnits と同じ [proc]!=0 check (実機 semantics: 先頭 8B が 0 なら skip)
             let zero8 = true;
             for (let k = 0; k < 8; k++) if (U8[proc + k]) { zero8 = false; break; }
-            if (zero8) { byCls['empty'] = (byCls['empty'] || 0) + 1; details.push([i, 'empty', proc]); continue; }
+            if (zero8) { byCls['empty'] = (byCls['empty'] || 0) + 1; details.push([i, 'empty', proc]); emit(i, 'empty', proc); continue; }
             const lj = Number(m._fle_n_longjmp());
             let cls = 'ok', info = 0;
             try {
@@ -399,6 +414,7 @@ writeFileSync(outPath, JSON.stringify(summary, null, 1));
 console.log('FLEBOOT_RESULT ' + JSON.stringify({
     units_run: boot.units_run, units_total: boot.units_total, stopped_at: boot.stopped_at_1based,
     boot_threw: boot.threw && (boot.threw.cls + (boot.threw.msg ? ' ' + boot.threw.msg : '')),
+    boot_threw_raw: boot.threw_raw ? boot.threw_raw.cls : null,
     log_cap: LOG_CAP || TIME_CAP ? { hit: logCap.hit, bytes: logCap.bytes, lines: logCap.lines, bin_lines: logCap.bin_lines, elapsed_ms: logCap.elapsed_ms } : null,
     px6bbc20,
     longjmp: boot.longjmp, getmem: boot.getmem, freemem: boot.freemem,

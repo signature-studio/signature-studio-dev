@@ -7,11 +7,15 @@
    (lift IR の VA 直値 → VA_BASE 系 remap (remap.shift_va) と対で使う)
 """
 import struct
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from liftlib.pe import Image
 
 
-def sections_raw(img):
+def sections_raw(img: "Image") -> list[tuple[str, int, bytes]]:
     """ottlib.Bin 互換: (name, rva, bytes[vsize]) の列。"""
-    out = []
+    out: list[tuple[str, int, bytes]] = []
     for s in img.pe.sections:
         sva, vsz, roff, rsz = s.VirtualAddress, s.Misc_VirtualSize, s.PointerToRawData, s.SizeOfRawData
         nm = s.Name.rstrip(b"\0").decode("utf-8", "replace")
@@ -23,12 +27,13 @@ def sections_raw(img):
     return out
 
 
-def gen_data_c(img, va_base=0x30000000, img_base=None, names=(".rdata", ".data"), header=True):
+def gen_data_c(img: "Image", va_base: int = 0x30000000, img_base: int | None = None,
+               names: tuple[str, ...] = (".rdata", ".data"), header: bool = True) -> tuple[str, dict[str, int]]:
     img_base = img.base if img_base is None else img_base
     secs_all = sections_raw(img)
     secs = [(n, lo, bytearray(d)) for (n, lo, d) in secs_all if n in names]
     relocs = img.relocs_dir64()
-    counts = {}
+    counts: dict[str, int] = {}
     for (n, lo, sd) in secs:
         c = 0
         for r in relocs:

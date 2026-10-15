@@ -1,0 +1,6 @@
+{
+  "tag": "pe129",
+  "refs": ["#3006"],
+  "note": "PE 呼出し経路を確定した ui setter 3 件 (REPORT_PY129・PY-129 #3006)。戻り None・状態なし。snapMode は PY-242 (#3719) へ",
+  "functions": ["ui.setHintMsg", "ui.setFocused", "ui.setSnapMode"]
+}

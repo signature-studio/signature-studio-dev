@@ -240,3 +240,28 @@ index c59421af9..7ac5ec4bf 100644
 - 結論: `todo == []` には未収束 (受入 1 未達)。round 8 (lift 589) まで build が通り、round 9 は `kh_lower` の stage0 欠落 `0x180f88488` で停止。round 6 の失敗 (i256 判定の誤り・失敗時に lift 集合が空になる) は修正済み。module F に memset shim `1813846e0` を登録 (HEAD と同じ wasm 54,394 B・kh249 ok=17 ng=0 を維持)。
 - 各ラウンドの実測・原因の切り分け・未解決: [`KH656_REPORT_APPENDIX_3590.md`](KH656_REPORT_APPENDIX_3590.md)
 - 測定 commit: `0b487d4f2` (以後は REPORT のみ)。
+
+## 11. 閉包 lift-8 / 313 窓化の HEAD 再測定 (#4670 / KH-105、実測)
+
+測定 commit: `d3bb79581` (`scripts/kh656_window_measure.py` を main に取り込んだ commit。測定はこの HEAD で実施)。
+素材: `plugins-kilohearts` (installer zip → `work/winpkg/HeartCore.core_64` 76,642,304 B)・`toolchain-retdec`・`toolchain-emsdk`。環境: nproc=4・load average 0.52〜0.67。
+
+| 測定 | wasm B | globals | sha256 先頭 8 桁 | undefined import |
+|---|---|---|---|---|
+| lift-8 off (`rdata_str` 無し) | 54,394 | 9 | `7ba79e65…` | 0 |
+| lift-8 on (`rdata_str` + `rdata_raw_allow`) | 54,487 | 10 | `3d2bc6fd…` | 0 |
+
+- 受入 1 達成: wasm B と sha256 先頭 8 桁は測定 commit `091c68915` の記録 (`KH656_REPORT_APPENDIX_1821.md` §3: lift-8 on 54,487 B・`3d2bc6fd`、lift-8 off 54,394 B・`7ba79e65`) と一致する。globals は on の 10 のみ `091c68915` の記録 (10) と一致。off の globals 9 は `091c68915` では「未記録」だったため、今回が初回記録であり、一致の根拠にはしない。
+- 注: `091c68915` の on 測定は `rdata_raw_allow` を渡さずに行われた。今回の on は `rdata_raw_allow` を渡して測ったが、sha は一致した。
+- driver は `091c68915` の `scripts/kh656_window_measure.py` を取り込んだ後に改変している (単純な取り込みではない): `lift8` を `LIFT8` 固定、on 側で `rdata_raw_allow` を渡す、`set313` の停止条件追加、出力 tag `m4670_*`、docstring。
+- lift 8 件は `LIFT8` で固定 (`lic_config.json` の F の現行 lift 集合は 1,305 件で、使わない)。`091c68915` 時点の F は lift 8 件。
+- 313 集合: 元の源 `work/kh656_rounds.json` は gitignore で本 runner に無い。閉包を再実行して再生成し、`scripts/kh656_set313.json` (313 VA、commit `cd26429ed`) に tracked 化した。再生成は次の手順: `lic_config.json` の F を lift 8 件・`rdata_str` 無しにして `scripts/kh656_closure.py --rounds 4` を実行し、4 ラウンド後の F の lift 314 件 (`1813846e0` を含む。付録 `KH656_REPORT_APPENDIX_1821.md` §5 の 2) から memset shim `1813846e0` を除く (314 − 1 = 313)。式は 初期 lift 8 件 + `new_lift` 306 件 (shim を含む) − shim 1 件 = 313 件。`new_lift` の 306 件は 314 − 8 から導いた値で、`work/kh656_rounds.json` の件数は本 run で数えていない (ファイルが無い)。一致確認の根拠は、閉包実行で書き換えられた未コミットの `lic_config.json` (4 ラウンド後の F の lift 314 件) との比較。commit 済みの `lic_config.json` (lift 1,305 件) からは再現できない。この比較は本 run では再実行していない。
+- set313 の off (`rdata_str` 無し): HEAD で測定し、§8.2 の値と一致 (1,543,976 B・`422c129f…`・globals 82・undefined import 0)。
+- set313 の on (`rdata_str` 有り): **HEAD 未測定 (ブロック)**。`lic_build` が `.rdata` 生 VA の検査で停止する: 許可外 129 件 (`rdata 生 VA が窓化されず残った (許可外・deref され得る)`)。この検査は `728eab8b9` (#4257) で入り、測定 commit `091c68915` には無い。旧 on 値 (1,547,172 B) は検査無しで測った値なので、HEAD で同じ条件では比べられない。許可外 129 件を `rdata_raw_allow` に足すと「deref されない」を仮定することになるため、足さなかった。129 件の扱い (窓の拡張か許可の根拠の確認か) は PM 判断。
+- 閉包の再実行 (lift 8 から、HEAD `cd26429ed`・`rdata_str` 無し): round 1〜2 は §9 と一致 (54,394 B `7ba79e65`・192,136 B `0dac597b`・lift 42)。round 3〜4 の wasm B は §9 と違う (round 3: 437,094 B `1e922280`・§9 は 436,971 B `907a34bc`、round 4: 876,297 B `4c930f3a`・§9 は 876,222 B `b7de032a`)。lift 件数・入口の未 lift callee (`0x180138750`・`0x180138a30`) は一致。§9 の測定 commit は `5db386d26` で、差は未確認。
+- 素材の再現性: 本 run の `$ARTIFACTS_DIR` には `plugins-kilohearts` が無く (`fl-win64` のみ)、`work/` も無い。driver の再実行による独立検証は行っていない。数値は `091c68915` の既存記録との照合のみ。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 313 on (`rdata_str` 有り) の HEAD 測定: `.rdata` 生 VA 許可外 129 件で停止。許可外の扱い (窓の拡張か、deref されないことの確認か) | 受入 2 未達 (§8.2 の on 値は HEAD 未測定のまま) | PM 判断 (`.rdata` 検査の #4257 の扱い。起票先は PM が決める) |
+| 閉包の round 3・4 の wasm B が §9 の値と違う (lift 件数は一致) | §9 の測定値の照合 | 本 PR の REPORT 記録。原因は未確認 |

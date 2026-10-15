@@ -1,0 +1,19 @@
+va	sta_img	sta_img_deep	sta_img_win	sta_img_hi	all
+0x4150d0	mismatch	mismatch	mismatch	mismatch	mismatch
+0x423810	mismatch	mismatch	mismatch	mismatch	mismatch
+0x423f80	mismatch	mismatch	mismatch	mismatch	mismatch
+0x4388d0	mismatch	mismatch	mismatch	mismatch	mismatch
+0x4425f0	mismatch	mismatch	mismatch	mismatch	mismatch
+0x4bf600	match	match	match	mismatch	mismatch
+0x50ab90	match	match	match	mismatch	mismatch
+0x529280	mismatch	mismatch	mismatch	mismatch	mismatch
+0x53d7e0	mismatch	mismatch	mismatch	mismatch	mismatch
+0x6971f0	mismatch	mismatch	mismatch	mismatch	mismatch
+0x6cd900	mismatch	mismatch	mismatch	mismatch	mismatch
+0x7850d0	match	match	match	mismatch	mismatch
+0x9567c0	mismatch	mismatch	mismatch	mismatch	mismatch
+0x959a40	mismatch	mismatch	mismatch	mismatch	mismatch
+0xa21170	mismatch	mismatch	mismatch	mismatch	mismatch
+0xb77200	match	match	match	mismatch	mismatch
+0xde10c0	mismatch	mismatch	mismatch	mismatch	mismatch
+reset_diff(first 4 RESET)	15321005,39744,9659,193698	15321011,39752,9659,193698	15451810,40026,9964,324289	587202032,587202032,587202032,587202032	587202032,587202032,587202032,587202032

@@ -69,7 +69,7 @@ FastMM4 の初期化関数群 (InitializeMemoryManager 相当) を単体で検�
 
 ## 4. 未解決
 
-* 通常起動 unit #18 以降: `446400` (ロケール/書式設定読込) 内の `_UStrAsg` が OOB。`0x450560` の誤 lift は修正済だが停止位置は不変で、
+* 通常起動 unit #18 以降: `446400` (ロケール/書式設定読込) 内の `_UStrAsg` が OOB。`0x450560` の誤 lift は修正済だが停止位置は不変 (#2556: 本番 IR は fix_450560 を常設し C 転記は既定 OFF。`REPORT_2556.md`)。
   dest は `44bb70` の local record で、**「local ゼロ初期化落ち」仮説は反証済** (`446400` の 18 個の `mov [rbp+x],0` は IR に全て有り、`44bb70` も memset 有り)。真因は record の `alloca i64` 縮退 (§1)。`44bb70` を 392 byte 配列で C 転記する実験 (revert 済・未コミット) で OOB は消え、unit #18 は Halt0→longjmp に進む (survey: OOB 34→33 / Halt0 48→49 で ok 812 不変)。aggregate local の alloca 縮退は他関数にも及ぶ可能性 (`rep stos` 定数長で 8 byte 超のサイト 4 件を確認、全数は未調査)。
   同時に 339MB×2 の巨大 `VirtualAlloc` 要求 (サイズ算出の誤 lift と推定) が出る。
 * survey の trap 83 本: OOB 34 (最多は `function_8cbcb0` 系 9 unit が共通: `8cc190`←`8c7a10`←`8c5cc0`; 1 箇所の修正で複数 unit が通る見込み) /
@@ -223,3 +223,26 @@ unit 149 は OFF/ON とも oob のまま。ON で kind が変わるのは unit 8
 
 ## 18. #134 [M11-N5]: main `93307cc6a` の停止点 (unit 101 = VA 0x5de960 の 535c11 OOB) と e2e 期待値の更新 (部分達成)
 通常起動 98 unit + skip 3 = 101 で停止 (stage 4/6)。e2e 期待値 (完了 56→101・survey 872→873) を実測へ更新。本文・切り分け・未解決は [REPORT_N134.md](REPORT_N134.md) §18。
+
+## 19. #4011 [WIN-42]: vtable[0] 復元 `function_41a800` (gated `M11_M2V`) と QueryInterface `0x41c180` の C 転記 (部分達成)
+
+- 変更: `m11_passes.py` `pass_m2s_fn41a800_vtable0` (既定 OFF・`M11_M2V=1` で有効)・`m11_ov.c` に `tr_41c180` / `tr_4467ac` を `disp_find` 登録。`tr_41c180` の戻り値は `test al,al` で非 0 → 0・0 → `0x80004002` (機械語 `41c180`〜`41c191` と一致)。
+- 測定 commit: `71f6e449ac2218f3bff31a61e64da58c30dcee47`。以後の差分は REPORT.md のみ (`m11_ov.c` / `m11_passes.py` は差分 0)。以下は作者が同 commit で測定した値。**本 review 修正 run では再測定していない** (`work-m11` / `toolchain-retdec` が未取得で `tools/m11/work/` が無いため実行不可)。
+
+| コマンド | rc | 所要 | 備考 |
+|---|---|---|---|
+| `m11_wndseed.sh` | 0 | 3 分 26 秒 | WNDCLASS-CHECK PASS |
+| `m11_gen_ir2.sh` | — | 1 分 10 秒 | `ir_conditions.json` ldfix=applied |
+| `m11_build.sh` (既定 OFF / `M11_M2V=1`) | 0 / 0 | 25 秒 | 両方 rc 0 |
+| `tools/gui/flengine/build.sh` | 0 | 42 秒 | |
+| `boot_halt_probe.mjs` | — | 0.56 秒 | |
+
+- 製品 KPI (`M11_M2V` 既定 OFF / `=1`): units_run 109 / 109・last_unit.index0 114 (Halt0) / 114 (OOB)・icall_miss 7 / 7・threw null / `memory access out of bounds`・最初のウィンドウ 未到達 / 未到達。
+- stage ログ: `[M2v] function_41a800 vtable0 restore: 1 sites` (pass が 1 箇所に適用)。
+- 対応の根拠 (未独立確認): pass は `%arg2` を this (vtable 読出し元 `[rsi]`)・`%arg3` を IID として `m11_icall(vtva, arg2, ptrtoint arg3, out, ...)` に渡す。`%arg3` の下位 32 bit を判定に使っていた旧 IR と対応する。IR (`work/`) は本 run に無く、1 site 適用は作者の stage ログの記載のみで、本 run では独立確認していない。
+- 受入: 1 (`last_unit.index0 > 114`) 未達 (114 で OOB)。2 (vtable[0] の戻り値判定) 部分達成 (`0x41c180` 以降の戻り値経路は未実測)。
+- 未解決: unit 114 以降の OOB・`function_40fcf0` の AddRef `call [rax+8]` (`40fd3a`) 未復元 → 次の run (#4011)。受入 3 (CS-INIT 0x12bd390) は範囲外で #4031。
+
+## 20. #4011 段 2: `pass_m2v_fn40fcf0_arg1` (gated `M11_M2V`, 既定 OFF, 受入 1 未達)
+
+`function_40fcf0` の `function_40fd90` 呼出しの第 1 引数を `[self]` (VMT) に直す。`M11_M2V=1 M11_M2S=1` で last_unit 114→144 に前進したが OOB が残り、icall miss 7→16。「偽の前進」の疑いがあり、受入 1 は未達。測定・測定 commit・差分 0 の証跡・未解決は [REPORT_N4011.md](REPORT_N4011.md)。

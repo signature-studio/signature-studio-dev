@@ -105,12 +105,21 @@ void entry_main(u32 *sp) {
             p = q;
         }
         while (ibuf[p] == ' ') p++;
+        /* #4147: 窓は行の ecx (f[1]) に置く。 ecx 相対の読みが大きい関数は ecx を image 内の番地にずらす */
+        u32 win = f[1];
         for (int b = 0; b < (int)OBJ_WIN; b++) {
-            ((unsigned char *)OBJ_ADDR)[b] = (unsigned char)hexval(ibuf + p + 2 * b, 2);
+            ((unsigned char *)win)[b] = (unsigned char)hexval(ibuf + p + 2 * b, 2);
         }
         u32 a[6] = {f[2], f[3], f[4], f[5], f[6], f[7]};
         for (u32 b = 0; b < STK_WIN; b++) ((volatile unsigned char *)STK_LO)[b] = 0;
         __asm__ volatile("fninit" ::: "memory");
+#ifdef X87_PUSH64
+        {
+            /* #4840: 呼出し前に double (a[0] = 下位 dword・a[1] = 上位 dword) を ST(0) に積む */
+            volatile u32 dw[2] = {a[0], a[1]};
+            __asm__ volatile("fldl %0" :: "m"(*(volatile double *)dw) : "memory");
+        }
+#endif
         u32 r = call_guest(f[0], f[1], a);
         unsigned short sw;
         __asm__ volatile("fnstsw %0" : "=m"(sw) :: "memory");
@@ -130,7 +139,7 @@ void entry_main(u32 *sp) {
         oput(" st0=", 5); ohex(st0u.u, 8); oput(" st0d=", 6);
         ohex((u32)(st0du.u >> 32), 8); ohex((u32)st0du.u, 8);
         oput(" d=", 3); ohex(depth, 1); oput(" mem=", 5);
-        for (int b = 0; b < (int)OBJ_WIN; b++) ohex(((unsigned char *)OBJ_ADDR)[b], 2);
+        for (int b = 0; b < (int)OBJ_WIN; b++) ohex(((unsigned char *)win)[b], 2);
         oput(" stk=", 5);
         for (u32 b = 0; b < STK_WIN; b++) ohex(((unsigned char *)STK_LO)[b], 2);
         obuf[ofs++] = '\n';

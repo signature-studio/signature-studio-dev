@@ -34,7 +34,7 @@ ott 原版からの差分 (FLEngine 実測 1,105 未対応 site = 0.32% の解�
 usage: x64c.py --pe DLL --entries entries.json --out out_dir [--closure N] [--override VA=CNAME] [--trap VA]
                [--img 0x400000] [--shift 0] [--img-size 0x18c0000] [--impbase 0x1D80000] [--cfg-rax]
 """
-import sys, json, struct, argparse, bisect, collections, os, shutil, contextlib
+import sys, json, struct, argparse, bisect, collections, os, shutil, contextlib, base64
 import pefile
 import capstone
 from capstone import *
@@ -118,6 +118,43 @@ class PEInfo:
         return self.img[o:o + n]
 
 
+APPROX_TABLES_B64 = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'targets', 'kilohearts', 'snapins', 'scripts', 'approx_tables.b64')
+
+_APPROX_RCP_DECL = None
+
+
+def approx_rcp_table():
+    """approx_tables.b64 の rcp 表 (先頭 4096 エントリ, uint32)。読めないときは例外 (IEEE に黙って落とさない)。"""
+    b64 = ''.join(l for l in open(APPROX_TABLES_B64) if not l.startswith('#'))
+    blob = base64.b64decode(''.join(b64.split()))
+    if len(blob) != 3 * 4096 * 4:
+        raise RuntimeError('approx_tables.b64 size %d' % len(blob))
+    return list(struct.unpack('<4096I', blob[:4096 * 4]))
+
+
+def approx_rcp_decl(vals=None):
+    """rcpps の実機近似表 (AMD Ryzen 9 9950X 抽出, gen_simd.py と同一表) と kh_rcp_exact の C 定義。
+    vals はネガコン用 (テストが表を改変して渡す)。省略時は approx_tables.b64 の表。"""
+    global _APPROX_RCP_DECL
+    if vals is None and _APPROX_RCP_DECL is not None:
+        return _APPROX_RCP_DECL
+    if vals is None:
+        vals = approx_rcp_table()
+    decl = (
+        '/* rcpps 近似表 (実機 AMD Ryzen 9 9950X 抽出 = approx_tables.b64 の rcp 表・gen_simd.py と同一) */\n'
+        'static const uint32_t kh_at_rcp[4096] = {%s};\n'
+        'static inline uint32_t kh_rcp_exact(uint32_t x) {\n'
+        '    uint32_t s = x & 0x80000000u, e = (x >> 23) & 0xff, man = x & 0x7fffffu;\n'
+        '    if (e == 0) return s | 0x7f800000u;\n'
+        '    if (e == 0xff) return man ? (s | 0x7f800000u | (man | 0x400000u)) : s;\n'
+        '    int t = 253 - (int)e;\n'
+        '    return t <= 0 ? s : (s | ((uint32_t)t << 23) | kh_at_rcp[(x >> 11) & 0xfffu]);\n'
+        '}\n') % ','.join(str(v) for v in vals)
+    if vals is None:
+        _APPROX_RCP_DECL = decl
+    return decl
+
+
 class FnLift:
     """1 関数 (entry からの再帰降下) を C に変換"""
 
@@ -128,6 +165,7 @@ class FnLift:
         self.calls = set()         # 直接 call 先 VA
         self.unsup = collections.Counter()
         self.unsup_va = []
+        self.approx_used = False   # rcpps を含むとき True (kh_rcp_exact の近似表を生成 C に埋め込む)
         self.out = []
         self.jtabs = {}            # jmp va → [target va]
         self.tail = set()
@@ -1031,8 +1069,9 @@ class FnLift:
             'vmovhpd': ('movhpd', False)}
     VEX2 = {'vmovd': 'movd', 'vmovq': 'movq', 'vcvtdq2pd': 'cvtdq2pd', 'vcvtps2pd': 'cvtps2pd',
             'vcvtpd2dq': 'cvtpd2dq', 'vcvttpd2dq': 'cvttpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd',
-            'vpmovsxdq': 'pmovsxdq', 'vcvtdq2ps': 'cvtdq2ps'}
-    VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vcomiss': 'comiss', 'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
+            'vpmovsxdq': 'pmovsxdq', 'vrcpps': 'rcpps', 'vrsqrtps': 'rsqrtps', 'vcvtdq2ps': 'cvtdq2ps'}
+    VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vcomiss': 'comiss',
+            'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
 
     def vex_leg(self, ins, ops, m):
         if any(o.type == X86_OP_REG and self.isymm(ins, o.reg) for o in ops):
@@ -1199,7 +1238,11 @@ class FnLift:
         self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 2; k_++) X[%d].q[k_] = cmp_pred_f(%d, X[%d].df[k_], b_.df[k_]) ? ~0ULL : 0ULL; }' % (
             self.xs(ins, ops[1], 'x128'), di, p, di))
 
+    def i_cmpeqpd(self, ins, ops): self.cmppd_pred(ins, ops, 0)
+    def i_cmpltpd(self, ins, ops): self.cmppd_pred(ins, ops, 1)
+    def i_cmplepd(self, ins, ops): self.cmppd_pred(ins, ops, 2)
     def i_cmpneqpd(self, ins, ops): self.cmppd_pred(ins, ops, 4)
+    def i_cmpnlepd(self, ins, ops): self.cmppd_pred(ins, ops, 6)
 
     def i_movlpd(self, ins, ops):
         d, s = ops
@@ -1375,6 +1418,15 @@ class FnLift:
         di = self.xd(ins, ops[0])
         self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 4; k_++) X[%d].f[k_] = sqrtf(b_.f[k_]); }' % (self.xs(ins, ops[1], 'x128'), di))
 
+    def i_rcpps(self, ins, ops):
+        di = self.xd(ins, ops[0])
+        self.approx_used = True
+        self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 4; k_++) X[%d].d[k_] = kh_rcp_exact(b_.d[k_]); }' % (self.xs(ins, ops[1], 'x128'), di))
+
+    def i_rsqrtps(self, ins, ops):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 4; k_++) X[%d].d[k_] = fle_rsqrt_exact(b_.d[k_]); }' % (self.xs(ins, ops[1], 'x128'), di))
+
     def bitw(self, ins, ops, op):
         di = self.xd(ins, ops[0])
         self.L('{ X128 b_ = %s; X128 a_ = X[%d]; for (int k_ = 0; k_ < 2; k_++) a_.q[k_] = %s; X[%d] = a_; }' % (self.xs(ins, ops[1], 'x128'), di, op, di))
@@ -1408,6 +1460,7 @@ class FnLift:
         self.L('{ X128 b_ = %s; X128 a_ = X[%d]; for (int k_ = 0; k_ < %d; k_++) a_.%s[k_] = %s; X[%d] = a_; }' % (self.xs(ins, ops[1], 'x128'), di, n, field, op, di))
 
     def i_paddq(self, i, o): self.lane(i, o, 'q', 2, 'a_.q[k_] + b_.q[k_]')
+    def i_pmuludq(self, i, o): self.lane(i, o, 'q', 2, '(uint64_t)(uint32_t)a_.q[k_] * (uint64_t)(uint32_t)b_.q[k_]')
     def i_psubq(self, i, o): self.lane(i, o, 'q', 2, 'a_.q[k_] - b_.q[k_]')
     def i_paddd(self, i, o): self.lane(i, o, 'd', 4, 'a_.d[k_] + b_.d[k_]')
     def i_psubd(self, i, o): self.lane(i, o, 'd', 4, 'a_.d[k_] - b_.d[k_]')
@@ -1906,6 +1959,7 @@ def main():
     ninsn = 0
     textrefs = set()
     jt_ranges = set()
+    shard_approx = [False] * nsh
     with contextlib.ExitStack() as stack:
         bfs = [stack.enter_context(open(p, 'w')) for p in body_paths]
         for i, e in enumerate(sorted(done)):
@@ -1913,6 +1967,7 @@ def main():
             f = FnLift(pe, e, known, md, thunks)
             bf.write(('void f_%x(void) { %s(); }' % (e, overrides[e])) if e in overrides else f.lift())
             bf.write('\n')
+            shard_approx[i % nsh] = shard_approx[i % nsh] or f.approx_used
             unsup.update(f.unsup)
             unsup_sites += ['%x' % va for va in f.unsup_va]
             for t in f.calls:
@@ -1936,6 +1991,8 @@ def main():
     for k, name in enumerate(names):
         with open(os.path.join(out, name), 'w') as fh:
             fh.write('#include "fle_cpu.h"\n')
+            if shard_approx[k]:
+                fh.write(approx_rcp_decl())
             for nm in used_imps:
                 fh.write('void imp_%s(void);\n' % nm)
             for c in sorted(set(overrides.values())):

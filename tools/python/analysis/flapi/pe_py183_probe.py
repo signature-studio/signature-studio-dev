@@ -199,9 +199,12 @@ def main():
     check("0x1050546 の判定が 0x1050540 の store と同番地 (0x16bb13c)",
           rip_target(0x1050540) == 0x16BB13C and rip_target(0x1050546) == 0x16BB13C)
     format_checks()
+    spec_checks()
+    round_checks()
     desc_checks()
     typecheck_checks()
     pct_fmt_checks()
+    round_facts_checks()
     print(f"summary: {'OK' if not FAILS else str(len(FAILS)) + ' FAIL'}")
     return 1 if FAILS else 0
 
@@ -233,6 +236,125 @@ def format_checks():
           u16z(rip_target(0x43A920), 16) == "0123456789ABCDEF")
     check("0x43a890 の 2 桁表 (dword, 0x43a900) の [0x0a] = '0A' と [0xff] = 'FF'",
           u16z(rip_target(0x43A900) + 4 * 0x0A, 2) == "0A" and u16z(rip_target(0x43A900) + 4 * 0xFF, 2) == "FF")
+
+
+def spec_checks():
+    # #4481 (PY-311): 書式 0x43e240 の kind 9 の 'S' 分岐・'G'/'E' の精度 clamp・第 5〜7 引数の流れ
+    check("0x43e240 の kind 9 (文字列) が 'S' 分岐 0x43eb1c へ (0x43e993・0x43e9c0)",
+          ins_at(0x43E993).op_str == "0x43eb1c" and ins_at(0x43E9C0).op_str == "0x43eb1c")
+    check("0x43eb1c が spec 'S' (0x53) を比較し、外れると 0x43eb7e (0x43eb24)",
+          ins_at(0x43EB1C).op_str == "word ptr [rbp + 0x16a], 0x53" and ins_at(0x43EB24).op_str == "0x43eb7e")
+    check("'S' 分岐の 1 文字化: al==2 は byte 0x414890 (0x43eb39), 他は word 0x414890 (0x43eb4f)",
+          ins_at(0x43EB26).op_str == "al, 2" and ins_at(0x43EB31).op_str == "dx, byte ptr [rbp + 0xb0]"
+          and ins_at(0x43EB39).op_str == "0x414890" and ins_at(0x43EB4F).op_str == "0x414890")
+    check("'S' 分岐の文字列ポインタ取得 0x414850 (0x43eb5b) → 0x43eb71 call 0x43dfd0",
+          ins_at(0x43EB5B).op_str == "0x414850" and ins_at(0x43EB71).op_str == "0x43dfd0")
+    check("'S' 以外は 0x43eb7e で xor ecx → call 0x43db50 (0x43eb88) で r8d = [rbp+0x5c] を渡す",
+          ins_at(0x43EB84).op_str == "r8d, dword ptr [rbp + 0x5c]" and ins_at(0x43EB88).op_str == "0x43db50")
+    check("'G'/'E' の精度 clamp: 0x43eb9e が 'G' (0x47)・0x43eba8 が 'E' (0x45)",
+          ins_at(0x43EB9E).op_str == "word ptr [rbp + 0x16a], 0x47" and ins_at(0x43EBA8).op_str == "word ptr [rbp + 0x16a], 0x45")
+    check("'G'/'E' の clamp 値 0xf (0x43ebbb) / 他の clamp 値 2 (0x43ebd0)",
+          ins_at(0x43EBBB).op_str == "dword ptr [rbp + 0x16c], 0xf" and ins_at(0x43EBD0).op_str == "dword ptr [rbp + 0x16c], 2")
+    check("spec 'M' (0x4d) 分岐 0x43ebda が 7 番目の引数の byte [+9] を精度へ入れる (0x43ebe4・0x43ebeb・0x43ebf0)",
+          ins_at(0x43EBDA).op_str == "word ptr [rbp + 0x16a], 0x4d" and ins_at(0x43EBE4).op_str == "rcx, qword ptr [rbp + 0x1d0]"
+          and ins_at(0x43EBEB).op_str == "rcx, byte ptr [rcx + 9]" and ins_at(0x43EBF0).op_str == "dword ptr [rbp + 0x16c], ecx")
+    check("0x43dd60 と 0x43dd90 は r9 を書かない (第 4 引数は 0x43dde0 まで素通し)", not any(
+        (ins_at(va) is not None and ins_at(va).op_str.split(",")[0].strip() == "r9d") or
+        (ins_at(va) is not None and ins_at(va).op_str.split(",")[0].strip() == "r9")
+        for va in range(0x43DD60, 0x43DDB3)))
+    check("0x43dde0 が r9 を rbx に保存 (0x43de11) し、6 番目 [rsp+0x28] に rbx を渡す (0x43de5c)",
+          ins_at(0x43DE11).op_str == "rbx, r9" and ins_at(0x43DE5C).op_str == "qword ptr [rsp + 0x28], rbx")
+    check("0x43dc00 が 0x43e240 の 6 番目を [rsp+0x68] → [rsp+0x28] で渡す (0x43dc0e・0x43dc13)",
+          ins_at(0x43DC0E).op_str == "rax, qword ptr [rsp + 0x68]" and ins_at(0x43DC13).op_str == "qword ptr [rsp + 0x28], rax")
+    check("0x43dde0 の 7 番目 [rbp+0x20b0] を 0x43dc00 へ渡す (0x43de61・0x43de68)",
+          ins_at(0x43DE61).op_str == "rcx, qword ptr [rbp + 0x20b0]" and ins_at(0x43DE68).op_str == "qword ptr [rsp + 0x30], rcx")
+    check("0x43dd6b と 0x43ddc4 の lea は第 5 引数に slot 0x15ec3b0 の address を置く",
+          rip_target(0x43DD6B) == 0x15EC3B0 and rip_target(0x43DDC4) == 0x15EC3B0)
+    check("slot 0x15ec3b0 は .bss (SizeOfRawData 0)・PE 上に初期値の実体無し",
+          section_of(0x15EC3B0).Name.rstrip(b"\0") == b".bss" and section_of(0x15EC3B0).SizeOfRawData == 0)
+    check("0x43dfd0 は r9d == -1 のとき 0x413680 で NUL 終端長を求める (0x43dffb・0x43e000)",
+          ins_at(0x43DFF7).op_str == "r9d, -1" and ins_at(0x43E000).op_str == "0x413680")
+    check("0x43eb71 は 'S' 文字列を r9d = -1 (NUL 終端まで) で 0x43dfd0 へ渡す (0x43eb6d)",
+          ins_at(0x43EB6D).op_str == "r9d, 0xffffffff")
+    check("0x414850 は rcx 非 0 ならそれを返し、0 なら [0x13a8040]+0x10 (0x414858・0x41485f)",
+          ins_at(0x414858).op_str.startswith("rax, qword ptr [rip") and ins_at(0x41485F).op_str == "rax, [rax + 0x10]")
+    check("0x13a8040 の静的内容は .text (0x413fec) を指し、文字列ではない (fallback の先は PE 上で確定できない)",
+          rip_target(0x414858) == 0x13A8040 and section_of(0x13A8040).Name.rstrip(b"\0") == b".data")
+    reads = []
+    va = 0x43E240
+    while va < 0x43F1D0:
+        ins = ins_at(va)
+        if ins is None:
+            break
+        if "rbp + 0x1c8]" in ins.op_str:
+            reads.append(hex(va))
+        va += ins.size
+    check("0x43e240 の 6 番目 [rbp+0x1c8] は 0x43e2db の 1 箇所だけで読まれる (ebx = flag + 1)",
+          reads == ["0x43e2db"] and ins_at(0x43E2DB).op_str == "ebx, dword ptr [rbp + 0x1c8]"
+          and ins_at(0x43E2E1).op_str == "ebx, 1", str(reads))
+
+
+def round_checks():
+    # PY-330 (#4478): %.2f の経路 0x440d30 (r8b=0 の枝) の 18 桁正規化と BCD 化
+    check("0x441380 が r8b=0 で 0x440d30 を呼ぶ (0x44139e〜0x4413a2)",
+          ins_at(0x441396).op_str == "r8b, r8b" and ins_at(0x4413A2).op_str == "0x440d30")
+    check("0x43ecb5 の %.2f 系は精度 0x12 を 0x43fce0 へ渡す (0x43ecc9 / 0x43ece7)",
+          ins_at(0x43ECC9).op_str == "dword ptr [rsp + 0x20], 0x12" and ins_at(0x43ECE7).op_str == "0x43fce0")
+    check("0x440d30 の指数抽出 (0x440e42〜0x440e5d) と 0x40ef40 呼出し (0x440e7a)",
+          ins_at(0x440E72).op_str == "edx, 0x12" and ins_at(0x440E7A).op_str == "0x40ef40")
+    check("0x440d30 の 0x40c660 呼出し (0x440e7f) は cvtsd2si rax, xmm0 (0x40c660)",
+          ins_at(0x440E7F).op_str == "0x40c660" and ins_at(0x40C660).mnemonic == "cvtsd2si"
+          and ins_at(0x40C660).op_str == "rax, xmm0")
+    check("0x440d30 の 1e18 比較 ucomisd (0x440e93 → 0x13ab318 = 1e18)",
+          ins_at(0x440E93).mnemonic == "ucomisd" and rip_target(0x440E93) == 0x13AB318
+          and struct_double(0x13AB318) == 1e18)
+    check("0x440d30 の 10 による除算 (0x440e9d cvtsi2sd → 0x13ab320 = 10)",
+          rip_target(0x440E9D) == 0x13AB320 and struct_int(0x13AB320) == 10)
+    check("0x440d30 の繰上げ (0x440eb7 add word [rax],1) は 1e18 以上のときだけ (0x440ea5 divsd)",
+          ins_at(0x440EAA).mnemonic == "divsd" and ins_at(0x440EB3).op_str == "rax, qword ptr [rbx + 0x30]")
+    check("0x440d30 は精度 18 桁固定 (0x440e72 mov edx, 0x12)",
+          ins_at(0x440E72).op_str == "edx, 0x12")
+    ldm = RAW[v2o(0x40A36C):v2o(0x40A36C) + 7]
+    ldm_va = 0x40A36C + 7 + struct_int(0x40A36C + 3)
+    check("0x40a36c の ldmxcsr の参照先は MXCSR 大域 0x13a5054・既定値 0x1f80 は RC (bit 13-14) = 0 (最近接・偶数)",
+          ldm[:3] == b"\x0f\xae\x15" and ldm_va == 0x13A5054 and (struct_int(0x13A5054) & 0x6000) == 0)
+    check("0x440d30 → 0x440c10 呼出し (0x440ec7) と 0x440c10 内の 0x40c660 (0x440c50)",
+          ins_at(0x440EC7).op_str == "0x440c10" and ins_at(0x440C50).op_str == "0x40c660")
+    check("0x440c10 の 18 桁 BCD 化 (10 進 9 桁 × 2 の除算マジック 0x440c66 ... 0x440cf3)",
+          ins_at(0x440C66).op_str == "rax, 0xa3d70a3d70a3d70b" and ins_at(0x440CF3).op_str == "r8d, 1"
+          and ins_at(0x440D00).op_str == "0x440c60")
+
+
+def round_facts_checks():
+    # PY-335 (#4513): %.2f の桁出力 0x43f580 は丸め命令を持たない・桁取得 0x43f550 は 0 埋め・
+    # 0x40ef40 は MXCSR の下位マスク 0x800 (UM) だけを扱う (RC 未変更)
+    kinds = []
+    va = 0x43F580
+    while va < 0x43F6C8:
+        ins = ins_at(va)
+        if ins is None:
+            break
+        kinds.append(ins.mnemonic)
+        va += ins.size
+    check("0x43f580 (桁出力) に cvt/round 系命令が無い", not any(
+        k.startswith("cvt") or k.startswith("round") for k in kinds))
+    check("0x43f550 (桁取得) の空桁は '0' 埋め (mov al, 0x30 at 0x43f567)",
+          ins_at(0x43F567).op_str == "al, 0x30")
+    check("0x40ef40 が MXCSR 設定 0x40a2c0 を ecx=0x800, edx=0x800 で呼ぶ (0x40ef56〜0x40ef60)",
+          ins_at(0x40EF56).op_str == "ecx, 0x800" and ins_at(0x40EF5B).op_str == "edx, 0x800"
+          and ins_at(0x40EF60).op_str == "0x40a2c0")
+    check("0x40a2c0 の変更マスクは 0x1f80 (0x40a2cb)", ins_at(0x40A2CB).op_str == "esi, 0x1f80")
+    check("0x440d30 の精度 0x12 (18 桁) は 0x440e72 で固定", ins_at(0x440E72).op_str == "edx, 0x12")
+
+
+def struct_double(va):
+    import struct
+    return struct.unpack("<d", RAW[v2o(va):v2o(va) + 8])[0]
+
+
+def struct_int(va):
+    import struct
+    return struct.unpack("<i", RAW[v2o(va):v2o(va) + 4])[0]
 
 
 def qword_at(va):

@@ -117,7 +117,7 @@ def _const(ty, cv):
     return str(v & ((1 << int(ty[1:])) - 1)) if ty.startswith('i') else _zero(ty)
 
 
-def sigfix(text, report, pads=None, fixes=None):
+def sigfix(text, report, pads=None, fixes=None, slots=None):
     sigs = {}
     for m in re.finditer(r'^(?:define|declare)(?: weak)? (\S+) @(function_[0-9a-f]+)\(([^)]*)\)', text, re.M):
         ret, nm, args = m.groups()
@@ -131,6 +131,7 @@ def sigfix(text, report, pads=None, fixes=None):
         return '%%m11sf%d' % ctr[0]
     fixed = skipped = 0
     applied = [0]
+    slot_ctr = [0]
     cur = None
     ordn = {}
     ncall = {}
@@ -143,11 +144,21 @@ def sigfix(text, report, pads=None, fixes=None):
             cm = re.search(r'call \S+ @(function_[0-9a-f]+)\(', line)
             if cm:
                 ncall[(_c, cm.group(1))] = ncall.get((_c, cm.group(1)), 0) + 1
+    ent_alloca = set()
+    ent_open = False
     for line in text.split('\n'):
         if line.startswith('define '):
             dm = re.search(r'@([\w.$]+)\(', line)
             cur = dm.group(1) if dm else None
             ordn = {}
+            ent_alloca = set()
+            ent_open = True
+        elif ent_open and re.match(r'^\s*(%[\w.$-]+ = )?(br|ret|switch|indirectbr|invoke|resume|unreachable|callbr)\b', line):
+            ent_open = False
+        elif ent_open:
+            am = re.match(r'^\s*(%stack_var_-?\d+) = alloca\b', line)
+            if am:
+                ent_alloca.add(am.group(1))
         m = callre.match(line) if ' call ' in line else None
         if not m:
             out.append(line)
@@ -180,6 +191,23 @@ def sigfix(text, report, pads=None, fixes=None):
                 pre += ls
                 newargs.append('%s %s' % (pt, nv))
             else:
+                sv = slots.get((cur, nm, k, i)) if slots else None
+                if sv is not None and sv not in ent_alloca:
+                    # entry block 内で呼出しより前に定義された alloca だけ使う (それ以外は呼出し箇所を支配せず IR 不正になる)
+                    report['sigfix_slot_nonentry'] = report.get('sigfix_slot_nonentry', 0) + 1
+                    sv = None
+                if sv is not None and (pt == 'ptr' or pt.startswith('i')):
+                    if pt == 'ptr':
+                        newargs.append('ptr nonnull %s' % sv)
+                    else:
+                        slot_ctr[0] += 1
+                        pv = '%%m11sl%d' % slot_ctr[0]
+                        pre.append('  %s = ptrtoint ptr %s to i64' % (pv, sv))
+                        ls, nv = _conv(pv, 'i64', pt, lambda: '%%m11sl%dx' % slot_ctr[0])
+                        pre += ls
+                        newargs.append('%s %s' % (pt, nv))
+                    report['sigfix_slot_injected'] = report.get('sigfix_slot_injected', 0) + 1
+                    continue
                 cv = fixes.get((cur, nm, k, i)) if fixes else None
                 if cv is not None and cv.get('bits') is not None and pt != 'i%d' % cv['bits']:
                     cv = None
@@ -241,6 +269,7 @@ M11_INSTR_40FF70 = os.environ.get('M11_INSTR_40FF70') == '1'
 M11_INSTR_40FFE0 = os.environ.get('M11_INSTR_40FFE0') == '1'
 M11_INSTR_60A270 = os.environ.get('M11_INSTR_60A270') == '1'
 M11_INSTR_412770 = os.environ.get('M11_INSTR_412770') == '1'
+M11_INSTR_4128B0 = os.environ.get('M11_INSTR_4128B0') == '1'   # #4457: 計測専用。function_4128b0 の入口で 412770 分岐の 3 値を観測する (既定 0 では入れない)
 M11_INSTR_E3EF60 = os.environ.get('M11_INSTR_E3EF60') == '1'
 
 
@@ -277,6 +306,8 @@ def weaken(m):
             w += ['  call void @m11_a270_obs(i64 %p0)']
         if va == 0x412770 and M11_INSTR_412770:
             w += ['  %pi = ptrtoint ptr %p0 to i64', '  call void @m11_412770_obs(i64 %pi)']
+        if va == 0x4128b0 and M11_INSTR_4128B0:
+            w += ['  call void @m11_4128b0_obs()']
         if va == 0xe3ef60 and M11_INSTR_E3EF60:
             w += ['  call void @m11_e3ef60_obs(i64 %p0)']
         if rt == 'void':
@@ -295,7 +326,13 @@ pads = []
 fixes = None
 if '--fixes' in sys.argv:
     fixes = {(f['caller'], f['callee'], f['k'], f['pos']): dict(f['const'], bits=f.get('bits')) for f in json.load(open(sys.argv[sys.argv.index('--fixes') + 1]))['fixes']}
-text = sigfix(text, rep, pads, fixes)
+slots = None
+if '--slots' in sys.argv:
+    # M11-N201 (#3932): m11_setother_slot_class.py の出力のうち実値化 (lea_alloca) の行だけを 0 詰め引数へ入れる
+    slots = {(r['caller'], r['callee'], r['k'], r['pos']): r['value'][1:] for r in json.load(open(sys.argv[sys.argv.index('--slots') + 1]))
+             if r['class'] == '実値化' and r['reason'] == 'lea_alloca' and r['value'] and r['value'].startswith('&%stack_var_')}
+    rep['sigfix_slot_entries'] = len(slots)
+text = sigfix(text, rep, pads, fixes, slots)
 rep['sigfix_zeropad_sites'] = len(pads)
 rep['sigfix_zeropad_args'] = sum(p['want'] - p['have'] for p in pads)
 print('[m11_post][sigfix] 0 詰め call site: %d (0 詰め引数 %d)' % (rep['sigfix_zeropad_sites'], rep['sigfix_zeropad_args']))
@@ -337,6 +374,7 @@ for (nm, ret, args) in fns:
             L.append('  %%c%d = bitcast i32 %%t%d to float' % (i, i))
             cargs.append('float %%c%d' % i)
         elif t == '%tagPOINT':
+            # #4184 (LD-200): POINT は 8 バイト値渡し (x64 rcx = x | y<<32)。下位 32bit が x、上位が y
             L.append('  %%px%d = trunc i64 %s to i32' % (i, v))
             L.append('  %%ps%d = lshr i64 %s, 32' % (i, v))
             L.append('  %%py%d = trunc i64 %%ps%d to i32' % (i, i))
@@ -385,7 +423,7 @@ for (nm, ret, args) in fns:
 open(dst.replace('.ll', '_sigs.h'), 'w').write('\n'.join(hdr) + '\n')
 ent = ', '.join('{ i32, ptr } { i32 %d, ptr @m11_tr_%s }' % (va, nm) for va, nm in tab)
 # 計測時 (M11_INSTR_413060=1) のみ PROBES に 0x413060 が入り、dest 観測の宣言が出る
-tail = ['', 'declare void @m11_probe(i32)'] + (['declare void @m11_dest_obs(i64)'] if 0x413060 in PROBES and M11_PROBE_VARIANT not in ('nodecl', 'noren') else []) + (['declare void @m11_p144_obs(i64)'] if M11_INSTR_40FF70 else []) + (['declare void @m11_ffe0_obs(i64)'] if M11_INSTR_40FFE0 else []) + (['declare void @m11_a270_obs(i64)'] if M11_INSTR_60A270 else []) + (['declare void @m11_412770_obs(i64)'] if M11_INSTR_412770 else []) + (['declare void @m11_e3ef60_obs(i64)'] if M11_INSTR_E3EF60 else []) + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
+tail = ['', 'declare void @m11_probe(i32)'] + (['declare void @m11_dest_obs(i64)'] if 0x413060 in PROBES and M11_PROBE_VARIANT not in ('nodecl', 'noren') else []) + (['declare void @m11_p144_obs(i64)'] if M11_INSTR_40FF70 else []) + (['declare void @m11_ffe0_obs(i64)'] if M11_INSTR_40FFE0 else []) + (['declare void @m11_a270_obs(i64)'] if M11_INSTR_60A270 else []) + (['declare void @m11_412770_obs(i64)'] if M11_INSTR_412770 else []) + (['declare void @m11_4128b0_obs()'] if M11_INSTR_4128B0 else []) + (['declare void @m11_e3ef60_obs(i64)'] if M11_INSTR_E3EF60 else []) + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
 tail.extend(tr)
 tail.append('@m11_disp_n = constant i32 %d' % len(tab))
 tail.append('@m11_disp_tab = constant [%d x { i32, ptr }] [%s]' % (len(tab), ent))

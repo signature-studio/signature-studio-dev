@@ -47,7 +47,7 @@ def label_target(label):
 # p1 が領域 block を新設した機械語 VA (run_function 単位)。後続 site はこれらの VA を
 # 「未 lift」扱いで自分の経路値で再 lift する (領域 block は経路固有の SSA を持つため,
 # 他経路の辺 (relay 等) が直接飛び込むと支配が壊れる — LIFTLIB-2)
-_REGION_VAS = set()
+_REGION_VAS: set[int] = set()
 
 # p1 が領域内で生成した値の名前: %p1r_<機械語va>_<salt>_<tag><n>
 # (salt = "<A>_<J>" = site 識別子で自体内に "_" を含む。他 site の領域値の流入検出に使う — LIFTLIB-2)

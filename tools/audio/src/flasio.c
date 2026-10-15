@@ -32,6 +32,7 @@ static struct {
     uint32_t reset_requests, latency_changes, T, timeinfo_cb;
     uint32_t grows, shrinks, T_max, T0;
     int use_timeinfo, notify_lat;
+    uint32_t seg_max_us[4];                 /* do_buffer 区間の最大 µs: in_read / memset / bufferSwitch 本体 / out_write */
 } A = { .sr = 48000.0, .depth = 2, .hint = 0 };
 
 static void wake32(uint32_t *a) { __builtin_wasm_memory_atomic_notify((int *)a, 0x7fffffff); }
@@ -175,9 +176,16 @@ ASIOError flasio_create_buffers(ASIOBufferInfo *infos, ASIOLong n, ASIOLong buff
     return ASE_OK;
 }
 
+static void seg_note(int k, double us) {
+    uint32_t u = (uint32_t)us;
+    if (u > A.seg_max_us[k]) A.seg_max_us[k] = u;
+}
+
 static void do_buffer(int idx) {
     fla_ctl_t *c = fla_ctl();
+    double ta = emscripten_get_now();
     if (A.nIn) fla_in_read(A.ibuf[idx], A.B);       /* 入力 buffers[idx] を更新してからコールバック */
+    double tb = emscripten_get_now();
     for (int ch = 0; ch < A.nOut; ch++) memset(A.obuf[idx][ch], 0, A.B * sizeof(float));
     double t0 = emscripten_get_now();
     if (A.use_timeinfo) {
@@ -197,12 +205,18 @@ static void do_buffer(int idx) {
     } else {
         A.cb.bufferSwitch(idx, 1);
     }
-    double us = (emscripten_get_now() - t0) * 1000.0;
+    double t1 = emscripten_get_now();
+    double us = (t1 - t0) * 1000.0;
     uint32_t u = (uint32_t)us;
     c->cb_count++;
     c->cb_sum_us_lo += u;
     if (u > c->cb_max_us) { c->cb_max_us = u; c->cb_max_q = LD(c->quanta); }
     fla_out_write((const float *const *)A.obuf[idx], A.B);
+    double te = emscripten_get_now();
+    seg_note(0, (tb - ta) * 1000.0);
+    seg_note(1, (t0 - tb) * 1000.0);
+    seg_note(2, (t1 - t0) * 1000.0);
+    seg_note(3, (te - t1) * 1000.0);
 }
 
 static void *thread_fn(void *arg) {
@@ -211,6 +225,7 @@ static void *thread_fn(void *arg) {
     int idx = 0;
     for (uint32_t k = 0; k < A.depth; k++) { do_buffer(idx); idx ^= 1; }     /* prefill (ASIO: 起動時に連続 bufferSwitch) */
     c->cb_count = 0; c->cb_sum_us_lo = 0; c->cb_max_us = 0; c->cb_max_q = 0; c->in_underflows = 0;   /* prefill 分は統計から除外 */
+    for (int k = 0; k < 4; k++) A.seg_max_us[k] = 0;
     fla_go();
     __atomic_store_n(&A.ready, 1, __ATOMIC_SEQ_CST);
     wake32(&A.ready);
@@ -244,14 +259,14 @@ static void *thread_fn(void *arg) {
         }
         if (rc < 0) break;
         if (rc == 1) continue;
-        double tw = emscripten_get_now();
+        double tw = fla_now_ms();
         uint32_t fill = fla_out_fill();
         if (fill < c->min_fill) c->min_fill = fill;
         c->fill_sum_lo += fill; c->fill_samples++;
         if (fill < FLA_QUANTUM) c->cb_late++;
         uint32_t w0 = c->out_write, k = (c->pw_n % FLA_PW_N) * 4;
         do_buffer(idx); idx ^= 1;
-        double td = emscripten_get_now();
+        double td = fla_now_ms();
         c->pw_trace[k] = w0; c->pw_trace[k + 1] = fill;
         c->pw_trace[k + 2] = (uint32_t)(uint64_t)(tw * 1000.0); c->pw_trace[k + 3] = (uint32_t)(uint64_t)(td * 1000.0);
         c->pw_n++;
@@ -334,5 +349,6 @@ void flasio_get_stats(flasio_stats_t *s) {
     s->grows = A.grows; s->shrinks = A.shrinks; s->T_max = A.T_max; s->T0 = A.T0;
     for (int k = 0; k < 6; k++) s->wake_hist[k] = c->wake_hist[k];
     for (int k = 0; k < 32; k++) s->burst_hist[k] = LD(c->burst_hist[k]);
+    for (int k = 0; k < 4; k++) s->seg_max_us[k] = A.seg_max_us[k];
 }
 

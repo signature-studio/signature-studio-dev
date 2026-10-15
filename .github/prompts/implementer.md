@@ -59,15 +59,19 @@
     親が open のまま残り、open 数の水増しと自動着手の分類の乱れを生む)。受入条件を全て満たせないときは、満たした範囲を
     完了単位として **issue 自体の範囲を縮め** (未達の受入条件を子 issue に移し、元の issue の本文から外す)、`Closes #N` にする。
     未解決は PR 本文の `| 未解決 | 影響 | 起票先 |` 表に書く。
-    1 run に収まらない**実装・修復の作業**の残りは、子 issue として**自分で起票してよい**。再測定・REPORT の文言修正・
-    「未解決の追跡」だけの子は起票しない (PR 本文の未解決表に書く)。**1 PR あたりの子は最大 3 件**。
+    1 run に収まらない**実装・修復の作業**の残りは、既定では**親 issue の本文にチェックリストとして追記する**
+    (行範囲・VA・前 run の証拠の場所を書き、次の run が同じ親の続きから着手できる形にする)。子 issue として起票してよいのは、
+    次のいずれかに該当する場合だけ: (1) 独立に行動可能 (その子だけで PR を出して受入を完了できる)、(2) 別レーン (別の AREA・
+    別ツールチェーン・別担当に渡す必要がある)、(3) ブロック要因 (別の作業の完了待ちで、親の受入判定を止めてしまう)。
+    発見ごとに 1 件ずつ子を切る分割はしない (証拠表の行範囲・関数 1 本ごとの分割はしない)。
+    再測定・REPORT の文言修正・「未解決の追跡」だけの子は起票しない (PR 本文の未解決表に書く)。**1 PR あたりの子は最大 3 件**。
     親が子の完了待ちでも `blocked_by` は付けない (親を blocker にしない。子を親の blocker にもしない。子の本文の `親: #N` だけにする)
     (`docs/WORKFLOW.md` §3。題名の
     `[AREA-n]` の n は既存の最大 + 1 を確認し、重複を作らない (`<AREA>` は親 issue の AREA に置換。確認コマンドは
     `docs/WORKFLOW.md` §3 ① の `gh issue list ... | grep -oE '^\[<AREA>-[0-9]+[a-z]?\]' | grep -oE '[0-9]+' | sort -n | tail -1`)。
     起票の直前に同じ確認を再度行い、`grep -cF '[<AREA>-<n>]'` が 0 件であることを確かめてから起票する。
     本文に `親: #N`・受入条件・`oc_artifacts:` 行。
-    milestone・Status は触らない。優先度は親の `prio:*` ラベルを子に引き継ぐ (親が `prio:critical` なら起票時に `gh issue create ... --label "prio:critical"` を付ける。親に `prio:*` が無ければ付けない。`docs/WORKFLOW.md` §3 ③)。起票した番号は最終回答と issue コメントに書く。
+    milestone・Status・`prio:*` は触らない。子 issue に `prio:*` を付けない (`gh issue create` に `--label "prio:*"` を付けない)。優先度の付与と親からの継承は PM / Worker が行う (#3973・#4387)。起票した番号は最終回答と issue コメントに書く。
     前提となる別 PR が未 merge の作業は着手せず、issue にコメントして停止する。
 12. **reviewer に差し戻されたら、PM を待たずに自分で直す**。差し戻し (changes_requested) を受けると
     workflow があなたを fix モードで自動起動する。その PR ブランチを直して push すれば review が
@@ -120,7 +124,7 @@
 - PR を出す前に `bash .github/scripts/pr-lint.sh --base origin/main --head HEAD --body-file <PR 本文ファイル>` を実行し、
   出力された違反 (REPORT 行数・repo 外パス・Closes と未達の整合・oc_artifacts の値域・DOC_MAP 未登録) を直してから push する。
 - launch を止め得る変更 (`infra/pm-worker/` の停止条件・既定値・launch の経路。#2795) を含む PR は、PR 本文に『本番への影響』を書く。deploy 後に launch が止まるか、止まる条件 (`launch_halted.reason`)、既定のままで止まるかを書く。
-- 既定値を変えるときは、本番に既にある状態 (VM の取り込み済みか・既存の変数) での挙動を書く。止まり得るなら、deploy の判断を依頼者に任せ、止まった状態の見方 (`/status` の `launch_halted`・`launch_halted_overdue`) を本文に添える。
+- 既定値を変えるときは、本番に既にある状態 (VM の取り込み済みか・既存の変数) での挙動を書く。止まり得るなら、deploy の判断を PM に任せ、止まった状態の見方 (`/status` の `launch_halted`・`launch_halted_overdue`) を本文に添える。
 - 停止の規則は、規則を壊すと落ちるテストを同じ PR に入れる (`infra/pm-worker` は `npm run test:mutation`)。
 - 最終回答に: コミット hash・PR URL・e2e 実測結果・未解決 (起票先付き) を含めること。
 - **最終回答と同じ内容を、必ず `gh issue comment <N>` で起点の issue に投稿すること** (完了・停止・

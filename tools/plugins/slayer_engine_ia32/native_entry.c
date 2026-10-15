@@ -72,6 +72,9 @@ static long rd_all(const char *path, char *buf, long cap) {
 #define HOST_LEN 0x10000u
 #define TEB_BASE 0x00838000u
 #define TEB_LEN 0x40u
+/* heap・VirtualAlloc の上限 (#4357): ブロックの終端はこの VA 未満。 guest stack (0x10F00000 から下へ伸びる) の 1 MiB 手前 */
+#define H32_LIMIT 0x10E00000ull
+#define ERR_NOT_ENOUGH_MEMORY 8u
 static u32 g_top, g_lasterr, g_tls[64];
 static void zero(u32 p, u32 n) { volatile unsigned char *q = (unsigned char *)p; for (u32 i = 0; i < n; i++) q[i] = 0; }
 static void copy(u32 d, u32 s, u32 n) {
@@ -86,24 +89,28 @@ static void h32_reset(void) {
     zero(HOST_BASE, HOST_LEN);
 }
 static u32 h32_alloc(u32 sz) {
-    u32 p = (g_top + 8 + 7) & ~7u;
-    g_top = p + (((sz ? sz : 1) + 7) & ~7u);
+    unsigned long long p = ((unsigned long long)g_top + 8 + 7) & ~7ull;
+    unsigned long long end = p + ((((unsigned long long)(sz ? sz : 1)) + 7) & ~7ull);
+    if (end > H32_LIMIT) { g_lasterr = ERR_NOT_ENOUGH_MEMORY; return 0; }
+    g_top = (u32)end;
     *(u32 *)(p - 8) = sz;
-    zero(p, sz);
-    return p;
+    zero((u32)p, sz);
+    return (u32)p;
 }
 static u32 h32_realloc(u32 p, u32 sz) {
     if (!p) return h32_alloc(sz);
     u32 old = *(u32 *)(p - 8), n = h32_alloc(sz);
+    if (!n) return 0;
     copy(n, p, old < sz ? old : sz);
     return n;
 }
 static u32 h32_valloc(u32 sz) {
-    g_top = (g_top + 4095) & ~4095u;
-    u32 p = g_top;
-    g_top += (sz + 4095) & ~4095u;
-    zero(p, sz);
-    return p;
+    unsigned long long p = ((unsigned long long)g_top + 4095) & ~4095ull;
+    unsigned long long end = p + ((((unsigned long long)sz) + 4095) & ~4095ull);
+    if (end > H32_LIMIT) { g_lasterr = ERR_NOT_ENOUGH_MEMORY; return 0; }
+    g_top = (u32)end;
+    zero((u32)p, sz);
+    return (u32)p;
 }
 static STD u32 n_EnterCriticalSection(u32 a) { return 0; }
 static STD u32 n_LeaveCriticalSection(u32 a) { return 0; }

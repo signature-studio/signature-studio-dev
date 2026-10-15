@@ -77,6 +77,25 @@ for k in "${KEYS[@]}"; do
   done
 done
 
+# 子 issue の prio 規則 (#4509 [DOCS-35]): 実装 run は子に prio:* を付けない。旧規則 (親の prio を引き継ぐ) は残さない。
+if grep -qF -- '子 issue に `prio:*` を付けない' "$IMPL" && ! grep -qF -- '親が `prio:critical` なら起票時' "$IMPL"; then
+  ok "子 prio 規則: 実装 run は子に prio:* を付けない (旧・継承規則は無い)"
+else
+  ng "子 prio 規則: implementer.md の子 prio 規則が旧規則のままか、新規則が無い"
+fi
+
+# 子 issue の起票規則 (#5016 [DOCS-37]): 既定は親の本文チェックリスト。子は独立行動可能・別レーン・ブロック要因の場合のみ。
+# 旧規則 (1 run に収まらない残りは子 issue として自分で起票してよい、の無条件許可) は残さない。
+if grep -qF -- '既定では**親 issue の本文にチェックリストとして追記する**' "$IMPL" \
+  && grep -qF -- '独立に行動可能' "$IMPL" \
+  && grep -qF -- '別レーン' "$IMPL" \
+  && grep -qF -- 'ブロック要因' "$IMPL" \
+  && ! grep -qF -- '子 issue として**自分で起票してよい**' "$IMPL"; then
+  ok "子起票規則: 既定は親の本文チェックリスト・子は 3 条件のみ (旧・無条件許可は無い)"
+else
+  ng "子起票規則: implementer.md の子 issue 起票規則が旧規則のままか、新規則が無い"
+fi
+
 echo
 echo "test-implementer-rules: pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

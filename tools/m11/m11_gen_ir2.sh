@@ -49,6 +49,16 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
   python3 ldfix/ldfix.py work/boot_final.ll work/boot_final.ldfix.ll --pe "$PE" --report work/ldfix_report.json ${LDFIX_ARGS:-}
   mv work/boot_final.ldfix.ll work/boot_final.ll
   python3 m11_cond.py ldfix=applied
+  # #2556 (CI-104): function_450560 の 2 段 deref 復元 (#2502)。ldfix 直後に常設する。機械語 26 命令と突合して fail-closed。
+  #   M11_FIX_450560=0 は適用前の IR を明示的に取る A/B 検証用 (ir_conditions.json 450560=disabled。build は M11_ALLOW_450560_DISABLED=1 でしか通さない)。
+  if [ "${M11_FIX_450560:-1}" = 0 ]; then
+    python3 m11_cond.py 450560=disabled
+    echo "[gen_ir2] M11_FIX_450560=0: fix_450560 を適用しない (ir_conditions.json 450560=disabled; build は M11_ALLOW_450560_DISABLED=1 が要る)" >&2
+  else
+    python3 ldfix/fix_450560.py work/boot_final.ll work/boot_final.450560.ll --pe "$PE"
+    mv work/boot_final.450560.ll work/boot_final.ll
+    python3 m11_cond.py 450560=applied
+  fi
   # ld108 (#2316/#2402, D20): 41a670 の head 解除 store (機械語 `mov rax,[rax]` = [arg1+0]) を lift 段の [arg1+8] の load から直す。
   #   1 関数だけを書き換え、想定と違う IR (仮引数の型・store 行・二重適用) は assert で止める (set -e で fail-closed)。
   #   M11_FIX_LD108=0 は適用前の IR を明示的に取る A/B 検証用 (ldfix/ld108_e2e.sh)。ir_conditions.json に ld108=disabled を残し、build は M11_ALLOW_LD108_DISABLED=1 でしか通さない。
@@ -71,6 +81,15 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
     mv work/boot_final.ld115.ll work/boot_final.ll
     python3 m11_cond.py ld115=applied
   fi
+  # #4675 (LD-236): function_1046a30 の上流 X (cell→C→[C]) の 1 段不足。既定 OFF (本番 IR は変えない・unit 結果は未測定)。
+  #   M11_FIX_LD236=1 のときだけ適用する (ir_conditions.json ld236=applied)。想定外の入力は assert で止まる。
+  if [ "${M11_FIX_LD236:-0}" = 1 ]; then
+    python3 ldfix/fix_ld236.py work/boot_final.ll work/boot_final.ld236.ll
+    mv work/boot_final.ld236.ll work/boot_final.ll
+    python3 m11_cond.py ld236=applied
+  else
+    python3 m11_cond.py ld236=not-applied
+  fi
   # #3296: function_412770 の rep movsq 源 (機械語 mov rsi,[rax] の load が lift で脱落し ptr null)。想定外の入力は assert で止まる (fail-closed)。
   python3 ldfix/fix_src412770.py work/boot_final.ll work/boot_final.src412770.ll
   mv work/boot_final.src412770.ll work/boot_final.ll
@@ -90,6 +109,11 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
     python3 ldfix/fix_shx_t40.py work/boot_final.ll work/boot_final.shx40.ll
     mv work/boot_final.shx40.ll work/boot_final.ll
     python3 m11_cond.py shx_t40=applied
+  elif [ "${M11_FIX_SHX_T40:-0}" = 70 ]; then
+    # #4121 (SHX-T42) ネガコン: +0x70 の書込みだけ (+0x4c の初期 store を外す)。
+    python3 ldfix/fix_shx_t40.py work/boot_final.ll work/boot_final.shx40.ll --only-70
+    mv work/boot_final.shx40.ll work/boot_final.ll
+    python3 m11_cond.py shx_t40=applied-70only
   else
     python3 m11_cond.py shx_t40=not-applied
   fi

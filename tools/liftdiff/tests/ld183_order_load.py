@@ -22,6 +22,18 @@ from ldlib.session import Session  # noqa: E402
 HOG = 'while :; do :; done'
 
 
+def _patch_liftoff():
+    # ldlib は判定を変えずに Runner を生成する。wasm 側の node コマンドにだけ V8 フラグを挿す (NODE_OPTIONS では通らないため)。
+    from ldlib import session as _session
+    _Runner = _session.Runner
+
+    def _R(name, cmd, *args, **kw):
+        if name == 'wasm' and cmd and cmd[0] == 'node':
+            cmd = ['node', '--liftoff-only'] + cmd[1:]
+        return _Runner(name, cmd, *args, **kw)
+    _session.Runner = _R
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('target')
@@ -29,8 +41,13 @@ def main():
     ap.add_argument('--shards', type=int, default=12)
     ap.add_argument('--order', default='sorted')
     ap.add_argument('--load', type=int, default=0)
+    ap.add_argument('--v8', default='default', help='default | liftoff (wasm 側 node に --liftoff-only を付ける。LD-243)')
     ap.add_argument('--out', required=True)
     a = ap.parse_args()
+    if a.v8 == 'liftoff':
+        _patch_liftoff()
+    elif a.v8 != 'default':
+        raise SystemExit('bad --v8')
 
     if a.state == 'auto':
         state = os.path.join(build_wasm.load_target(a.target)['work'], 'boot_state.json')

@@ -38,7 +38,8 @@ const cvtSi64 = (x) => {
 };
 const WRONG = (m) => new FlError(m || "Wrong number of function parameters or wrong parameter type", 5);
 // PY-235 (#3701): processRECEvent の成功経路の family (REPORT_PY235)。eventId は uint32。戻り値 = value になるのは R-other かつ (eventId & 0xffff) != 8 のとき
-const recPassFamily = (e) => (e & 0xffff) !== 8 && ((e >= 0x10000000 && e < 0x40000000) || (e >= 0x40000003 && e <= 0x40000004) || (e > 0x40000005 && e < 0x70000000) || e >= 0xf0000000);
+// 固定 4 族 (0x40000000/1/2/5) は flags & 0x22 == 0 のとき store 0 件で value を返す (REPORT_PY252)。flags & 0x22 の分岐は engine 状態依存のため未確定
+const recPassFamily = (e, f) => (e & 0xffff) !== 8 && ((e >= 0x10000000 && e < 0x40000000) || (e >= 0x40000003 && e <= 0x40000004) || (e > 0x40000005 && e < 0x70000000) || e >= 0xf0000000 || ([0x40000000, 0x40000001, 0x40000002, 0x40000005].includes(e) && (f & 0x22) === 0));
 // mixer の色の R/B 入替え (REPORT_PY115.md §2)。既定色は FL の .bss 0x15f6774 の初期値 (REPORT_PY118)
 const swapRb = (v) => ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
 const MIX_DEFAULT_COLOR = 0xff636c71;
@@ -94,7 +95,9 @@ const noteEnum = (arr, chan, step, V) => {
   }
   return out;
 };
-// PY-218 (#3596): 件数超え (position >= 64) の event 経路 PE 0x12d3e20 (REPORT_PY218.md)。閾値は (position+1)*V、V = 24 (PE [0x15e25f8]・REPORT_APPENDIX_3310)。32bit 演算 (PE の imul/add と同じ)
+// PY-218 (#3596): 件数超え (position >= 件数) の event 経路 PE 0x12d3e20 (REPORT_PY218.md)。閾値は (position+1)*V、V = 24 (PE [0x15e25f8]・REPORT_APPENDIX_3310)。32bit 演算 (PE の imul/add と同じ)
+// PY-288 (#3985): 件数 GRID_N = ceil(L/96)*4 (既定 L = 384 で 16・REPORT_PY225 PY-230 節)。C provider の GRID_N と同じ
+const GRID_N = 16;
 const GRID_V = 24;
 const gridGen = (seed, n) => {
   let s = seed >>> 0;
@@ -119,7 +122,7 @@ const gridEvent = (items, index, p) => {
 const gridBit = (st, index, k, p) => {
   p |= 0;
   if (p < 0) return false;
-  if (p >= 64) return gridEvent(st.gridItems, index, p);
+  if (p >= GRID_N) return gridEvent(st.gridItems, index, p);
   return !!k.steps[p];
 };
 
@@ -130,6 +133,7 @@ export function createMockEngine() {
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
     launchPages: 0,
     uiClosing: false, uiTimeDispMin: false, uiStartOnInput: false, uiLoopRec: false, uiStepEdit: false, uiBrowserAutoHide: false, uiSnapMode: 0,
+    keys: [],
     undoPos: 0, undoCount: 0, undoLast: 0, safeEdit: true, projTitle: "", projAuthor: "", projGenre: "",
     selStart: -1, selEnd: -1, liveAnchor: -1,
     arrTime: 0,
@@ -185,19 +189,16 @@ export function createMockEngine() {
     return [pv, p];
   };
   const tog = (cur, v) => (v === undefined || v === -1 ? !cur : !!v);
-  // PE 0x12be470 (maxLen > 0 のみ): 長さが maxLen を超えるとき末尾から mask 外の文字 (母音・記号・空白) を削り、先頭 maxLen 文字へ切る (C provider の track_name_fit と同一・ASCII 前提)
+  // PE 0x12be470 (maxLen > 0 のみ): JS 文字列は PE と同じ UTF-16 code unit で数える。長さが maxLen を超える間、末尾から mask 外の unit (母音・記号・空白・非 ASCII) を 1 unit ずつ削り、先頭 maxLen unit へ切る。切れた境界の孤立サロゲートは U+FFFD (C provider の track_name_fit と同一)
   const KEEP = new Set("0123456789BCDFGHJKLMNPQRSTVWXYZ");
   const fitName = (s, m) => {
     if (m <= 0 || s.length <= m) return s;
     let t = s;
-    for (let i = t.length; i >= 1; i--) {
+    for (let i = t.length; i >= 1 && t.length > m; i--) {
       const c = t[i - 1];
-      if (!KEEP.has(c >= "a" && c <= "z" ? c.toUpperCase() : c)) {
-        t = t.slice(0, i - 1) + t.slice(i);
-        if (t.length <= m) break;
-      }
+      if (!KEEP.has(c >= "a" && c <= "z" ? c.toUpperCase() : c)) t = t.slice(0, i - 1) + t.slice(i);
     }
-    return t.slice(0, m);
+    return t.slice(0, m).replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD");
   };
   // fl_provider の引数検査 (fl_dispatch.c type_ok / fl_a_int) と同じ: None は既定値、bool と整数のみ可、他は code 5
   const argI = (a, i, def) => {
@@ -208,6 +209,8 @@ export function createMockEngine() {
     throw WRONG();
   };
   const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
+  // PY-246 (#3759): 送出キーの記録 (C の key_send と同じ: 回数 <= 0 は送出 leaf に入らない)
+  const sendKey = (vk, mod, count) => { if (count > 0) st.keys.push({ vk, mod, count: Math.min(count, 0x7fffffff) }); };
   // PyArg "i" 相当 (C provider の 'I'/'B' のみ可): None・文字列・実数は code 5
   const pyInt = (v) => { if (typeof v === "boolean") return +v; if (Number.isInteger(v)) return v; throw WRONG(); };
   // float 引数 (fl_a_dbl と同じ: None は 0、bool・整数・実数は可、他は code 5)。PE の書式 'f' は float32 に丸める
@@ -444,6 +447,10 @@ export function createMockEngine() {
     "ui.getFocusedPluginName": (...a) => { arity(a, 0, 0); return ""; },
     "ui.getHintMsg": (...a) => { arity(a, 0, 0); return ""; },
     "ui.isInPopupMenu": (...a) => { arity(a, 0, 0); return false; },
+    // PY-129 (#3006): PE で呼出し経路を確定した ui setter 3 件 (REPORT_PY129)。状態は持たない (仮置き)。書込み先と書込み値の読出し経路は未確定。範囲外の挙動も未確認
+    "ui.setHintMsg": (...a) => { arity(a, 1, 1); str(a[0]); },
+    "ui.setFocused": (...a) => { arity(a, 1, 1); ix(a[0]); },
+    "ui.setSnapMode": (...a) => { arity(a, 1, 1); ix(a[0]); },
     // PY-128 (#3005): getProgTitle は PE rodata の定数 (UTF-16)。getHintValue は状態を読まず、(int32)(value*100) / max を最近接偶数で整数化して "%" (REPORT_PY128)
     "ui.getProgTitle": (...a) => { arity(a, 0, 0); return "FL Studio 2026"; },
     "ui.getHintValue": (...a) => {
@@ -461,6 +468,23 @@ export function createMockEngine() {
     "ui.setTimeDispMin": (...a) => { arity(a, 0, 0); st.uiTimeDispMin = !st.uiTimeDispMin; },
     // mode 0..3 は int、4..6 は str、他は int 0 (PE 0xd6c2f0 の分岐表)。既定 mode 4 (|i)
     "ui.getVersion": (...a) => { arity(a, 0, 1); const m = argI(a, 0, 4); return m >= 4 && m <= 6 ? "" : 0; },
+    // PY-246 (#3759): 送出キー 15 関数 (PE 0xfdd2c0 の leaf → 0x8186a0。REPORT_PY140)。戻り値は PY-141 で未確定の仮置き 0。送出の成否のゲートは PY-245 で未確定
+    "ui.up": (...a) => { arity(a, 0, 1); sendKey(0x26, 0, argI(a, 0, 1)); return 0; },
+    "ui.down": (...a) => { arity(a, 0, 1); sendKey(0x28, 0, argI(a, 0, 1)); return 0; },
+    "ui.left": (...a) => { arity(a, 0, 1); sendKey(0x25, 0, argI(a, 0, 1)); return 0; },
+    "ui.right": (...a) => { arity(a, 0, 1); sendKey(0x27, 0, argI(a, 0, 1)); return 0; },
+    "ui.cut": (...a) => { arity(a, 0, 0); sendKey(0x58, 4, 1); return 0; },
+    "ui.copy": (...a) => { arity(a, 0, 0); sendKey(0x43, 4, 1); return 0; },
+    "ui.paste": (...a) => { arity(a, 0, 0); sendKey(0x56, 4, 1); return 0; },
+    "ui.insert": (...a) => { arity(a, 0, 0); sendKey(0x2d, 0, 1); return 0; },
+    "ui.delete": (...a) => { arity(a, 0, 0); sendKey(0x2e, 0, 1); return 0; },
+    "ui.enter": (...a) => { arity(a, 0, 0); sendKey(0x0d, 0, 1); return 0; },
+    "ui.escape": (...a) => { arity(a, 0, 0); sendKey(0x1b, 0, 1); return 0; },
+    "ui.yes": (...a) => { arity(a, 0, 0); sendKey(0x59, 0, 1); return 0; },
+    "ui.no": (...a) => { arity(a, 0, 0); sendKey(0x4e, 0, 1); return 0; },
+    "ui.nextWindow": (...a) => { arity(a, 0, 0); sendKey(0x09, 0, 1); return 0; },
+    // PE: arg > 0 で修飾 0 (Tab)、arg <= 0 で Shift (修飾 1) + Tab。stub の引数名 shift と符号が逆 (REPORT_PY140 の未解決)
+    "ui.selectWindow": (...a) => { arity(a, 1, 1); sendKey(0x09, argI(a, 0, 0) > 0 ? 0 : 1, 1); return 0; },
     "plugins.isValid": (i, slot = -1) => (slot < 0 ? !!st.channels[i] : !!st.mixer[i]?.slots[slot]),
     "plugins.getPluginName": (i, slot = -1, userName) => (slot < 0 ? ch(i).plugin : (tr(i).slots[slot] ?? "")),
     "plugins.getParamCount": () => st.params.length,
@@ -490,11 +514,13 @@ export function createMockEngine() {
     "launchMapPages.init": (...a) => { arity(a, 3, 3); str(a[0]); argI(a, 1, 0); argI(a, 2, 0); },
     "launchMapPages.updateMap": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
     "launchMapPages.createOverlayMap": (...a) => { arity(a, 4, 4); for (let i = 0; i < 4; i++) argI(a, i, 0); },
+    // PY-243 (#3745): PE 0xd7a3a0 は書式 iii (0xd7a3d8)・成功時の戻り [0x16b82e0] = _Py_NoneStruct (None、REPORT_PY243)。項目書込み (0xd7a280) は項目の状態を持たないため状態を変えない
+    "launchMapPages.setMapItemTarget": (...a) => { arity(a, 3, 3); for (let i = 0; i < 3; i++) argI(a, i, 0); },
     // PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない
     "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
     "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
     // PY-235 (#3701): 成功経路 (gate 0 を仮定) は戻り値 = value (int32)。他の family は未確定のため code 2 (C provider と同じ未実装 error)
-    "general.processRECEvent": (...a) => { arity(a, 3, 3); const e = ix(a[0]) >>> 0; const v = ix(a[1]) | 0; ix(a[2]); if (!recPassFamily(e)) throw new FlError("Unspecified error (not implemented: general.processRECEvent)", 2); return v; },
+    "general.processRECEvent": (...a) => { arity(a, 3, 3); const e = ix(a[0]) >>> 0; const v = ix(a[1]) | 0; const f = ix(a[2]); if (!recPassFamily(e, f)) throw new FlError("Unspecified error (not implemented: general.processRECEvent)", 2); return v; },
     // PY-96 (#2832): 選択範囲の読出し 4 件。PE 0xd786e0/0xd78700/0xd78500 は obj+0xd74 (start)・obj+0xd78 (end) を読み、
     // 0xd78720 は 0xe43e80 (start>=0 かつ end>=0) を bool で返す。未選択は負値。初期値 -1 は未実測の仮置き (provider/fl_engine.c と同じ)
     "arrangement.selectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
@@ -566,7 +592,7 @@ export function createMockEngine() {
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
-    // PY-231 (#3671): PE 0xd748e0 (書式 ii)。判定順は midiOutMsg と同じ (-7 → -6)。送るのは第 1 引数の word。mode は stub 名 (PE の kwlist 名は forwardTo・REPORT_PY231 §1)
+    // PY-231 (#3671): PE 0xd75120 (書式 "L|i"・既定 1 は PE が書く)。判定順 (-7 → -6) は midiOutMsg と同じ判定順と仮置き (REPORT_PY231 §1b)。送るのは第 1 引数の word。mode は stub 名 (PE の kwlist 名は forwardTo・REPORT_PY231 §1)
     // PY-276 (#3949): PE 0xfdc8a0 は添字の値が変わったときだけ送る。C (fl_engine.c) と同じく未設定 (-1) から始め、範囲外の添字は重複検出せず送る
     // message 欠落は C の既定 0 と同じ (JS の TypeError にしない)
     "device.forwardMIDICC": (message = 0, mode = 1) => {
@@ -589,6 +615,11 @@ export function createMockEngine() {
     },
     // PY-215 (#3568): PE 0xd75d30 と同じ (-1 → -1、連動表が空の index ≥ 0 → None)。表の供給元は仮置き (空)。device・link の割当は見ない
     "device.getLinkedChannel": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) return -1; return undefined; },
+    // PY-4846 (#3568 子 B): index == -1 の経路だけ PE 確定 (REPORT_PY215 §1)。index >= 0 は未確定のため C provider と同じ未実装 error (code 2)
+    "device.getLinkedValue": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) return -1; throw new FlError("Unspecified error (not implemented: device.getLinkedValue index>=0)", 2); },
+    "device.getLinkedInfo": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) return -1; throw new FlError("Unspecified error (not implemented: device.getLinkedInfo index>=0)", 2); },
+    "device.getLinkedParamName": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) throw new FlError("Plugin not valid", 8); throw new FlError("Unspecified error (not implemented: device.getLinkedParamName index>=0)", 2); },
+    "device.getLinkedValueString": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) throw new FlError("Plugin not valid", 8); throw new FlError("Unspecified error (not implemented: device.getLinkedValueString index>=0)", 2); },
     // PY-206 (#3494): PE 0xd75f40・0xd75f80・0xd75fc0 は assigned 機器 (obj.+0x50) の vtbl 先を呼び、戻り status 0 で None を返す (REPORT_PY206)。vtbl 先の効果は未読のため状態を持たない
     "device.createRefreshThread": (...a) => { arity(a, 0, 0); },
     "device.destroyRefreshThread": (...a) => { arity(a, 0, 0); },
@@ -634,5 +665,9 @@ export function createMockEngine() {
       st.loop = { row: !!row, flag49e: !!flag49e, flag54: !!flag54, recs: recs.map(([cid, f4, len]) => ({ cid, f4, len })) };
     },
     gridItemsProbe: (seed, n) => { st.gridItems = gridGen(seed, n); return st.gridItems.length; },
+    // PY-246 (#3759): 送出キーの記録の読出し口 (C の fl_engine_key_* と同じ)。f: 0 = vk・1 = 修飾・2 = 回数
+    keyClear: () => { st.keys = []; },
+    keyN: () => st.keys.length,
+    keyGet: (i, f) => { const k = st.keys[i]; return k ? [k.vk, k.mod, k.count][f] : -1; },
   };
 }

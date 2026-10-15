@@ -80,6 +80,8 @@ if (isMainThread) {
   } });
   const inst = await WebAssembly.instantiate(await WebAssembly.compile(readFileSync(`${W}/rex.wasm`)), { wasi_snapshot_preview1: wasi, env: wasi });
   const ex = inst.exports;
+  // trap の JS スタックの最内側 lift 関数名 (rex.wasm は --profiling-funcs で名前付き: f_<VA>) から VA を取る。名前が無ければ 0。
+  const wasmTrapVA = (e) => { const m = /\bf_([0-9a-f]+) \(/.exec(String(e && e.stack)); return m ? m[1] : "0"; };
   const REC = 16 + ARENA_SZ + DATA_SZ;
   const dv = new DataView(cases.buffer, cases.byteOffset, cases.byteLength);
   let p = 0;
@@ -108,6 +110,8 @@ if (isMainThread) {
     } catch (e) {
       trap = ex.rex_unsup_get().toString(16);   // trap した case と未対応命令の VA (movnti_check.py が読む)。境界外等の wasm trap は 0
       kind = String(e && e.message).replace(/\s+/g, " ");
+      if (trap === "0") trap = wasmTrapVA(e);   // 境界外等: 最内側の lift 関数 (f_<VA>) の入口 VA (wasm の name section 由来)
+      else kind = `unsup 0x${trap}`;   // 未対応命令 (ott_unsup) の trap は、境界外等・他の unreachable と区別して VA ごと記録する
       rax = 0xdeadn; hits = 0xdeadn;
     }
     const head = Buffer.alloc(16);

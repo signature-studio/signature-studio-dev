@@ -1,0 +1,94 @@
+# PY-318 (#4337): 0x45c290 の変換 helper の間接 call 先の確定
+
+親: #3926 (PY-272)。前段: `tools/python/REPORT_PY272.md` §2 (未解決)。
+既知類型との関係: 該当なし (lift 作業ではない。PE の逆アセンブルによる解析)。
+
+## 結論 (PE 実測で確定した範囲)
+
+- **0x45c170 の間接 call `[rax]`** (slot 0x15e3ea8 → セル 0x15f1038) の先は `oleaut32.dll!VariantChangeTypeEx`。
+  セルは初期化関数 0x457c70 が `GetProcAddress` で解決して格納する (0x457c9e)。モジュール名 `oleaut32.dll` (0x457c78)、名前 `VariantChangeTypeEx` (0x457c8b)。
+  - 解決関数 0x457c40 は `GetProcAddress` の結果が 0 なら既定値 (r8) を返す。VariantChangeTypeEx の既定値は 0x4572c0 (lea 解決で確定)。0x4572c0 は `cmp r8d, 0x400` で lcid を見て 0x4572b0 (slot 経由の jmp) を呼ぶ shim、という逆アセ読み (probe では未検証)。実行時に GetProcAddress が 0 を返すかは未確認。
+- **0x45c040 の間接 call `[rax]`** (slot 0x15e4a68 → セル 0x15f10a0) の先は `oleaut32.dll!VarI4FromStr` (推定ではなく、格納箇所 0x457e17 と名前 0x457f8e の照合で確定)。
+  - 0x45c040 の `0x7ffdfffb` (`add` 後に 0 判定) は、戻り値 `ebx == 0x80020005` の判定そのもの。`0x80020005` は Win32 の `DISP_E_TYPEMISMATCH` と一致 (定数の一致。用途は推定)。
+- **0x45c1c0 の間接 call `[rip+0x1194f0f]`** (セル 0x15f1100) の先は関数 `0x45a050` (`call 0x459ef0` だけの thunk)。セルは初期化関数 0x467f00 が `lea` で求めた値を格納する (0x467f40 で rcx = 0x45a050)。
+  - 0x45a050 の先は IAT の API ではない (`0x459ef0` は内部関数)。
+  - 0x459ef0 (PY-338, 逆アセ確認): 戻り値を作らない (rax 非設定)。rcx は読まずに `lea rcx,[rbp+0x28]` で上書きし、0x41c820 (文字列系の生成)・0x448d40・0x411e80 (→0x411d20)・0x412d60 (参照解放) を呼ぶ。0x45c1c0 は 0x45c1eb の間接 call の戻り値 (eax) を使わず、続く 0x45c290 の戻り値を返す。よって 0x45c1c0 の戻り値は 0x459ef0 ではなく 0x45c290 由来。0x459ef0 から例外 API (IAT の RaiseException 系) への直接・2 段の到達は見えない (間接先 `[rip+X]` は未解決)。
+
+## 0x40f540・0x40f560 と 0x7ffdfffb の扱い
+
+- 0x40f540 (`cl=4`) と 0x40f560 (`cl=5`) は `0x4096d0` を呼ぶ薄いラッパ (逆アセ確認済み)。
+- 0x4096d0 は (a) 第 2 引数 `rdx` を読む、(b) 0x15e… の hook 関数ポインタ `[rip+0x11dc925]` が非 0 なら呼ぶ、(c) 0 なら `0x41d110` → `[rax+0x210]` の値を使う、(d) `0x4096b0` を呼ぶ、の順。
+  `0x4096b0` は `rdx` を大域に保存して `0x412a40` を呼び、`0x412a40` は `ecx` を大域に保存して `0x4128b0` を呼ぶ。
+  PY-338 で読んだ範囲 (逆アセ): 0x4096d0 は `bl > 0x1c` のとき表引きを飛ばし (0x409709 `ja 0x40971b`)、bl をそのまま 0x4096b0 → 0x412a40 に渡す。0x412a40 は ecx を大域へ保存して 0x4128b0 を呼ぶ。0x4128b0 は `.text` 内に**戻り辺が無い** (0x412a2d・0x412a34 の ret へ直接分岐する命令が無い。0x412a28 の `jmp 0x412936` が内側ループを回す)。よって範囲外時は「例外として送出される」より「呼び出し元へ戻らない」経路が静的には見える。送出か終了かは §3 参照。
+- 0x7ffdfffb は 0x80020005 の 2 の補数 (`0x7ffdfffb + 0x80020005 = 0x1_0000_0000`)。0x45c096 の `add eax, 0x7ffdfffb; test; je` は `eax == 0x80020005` の判定 (確定)。
+
+## 0 対象と前提
+
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB) を `tar --zstd -xf ... --wildcards '*block00031_PE.bin'` で `<展開先>/extracted/block00031_PE.bin` に展開 (22 MB)。
+- 逆アセは `pe_disasm.py` (capstone)。import 名は `pe_iat_name.py` と pefile の import 表照合。
+- 参照探索: `.text` 全体で RIP 相対 disp32 が対象 VA を指す命令を列挙 (逐次逆アセは無効バイトでずれるため、disp32 候補の直前から再逆アセして確認)。探索スクリプトは `work/` (gitignore) に置き、commit しない。
+
+## 1. 検証
+
+測定 commit: 本ブランチで probe を最後に変えた commit (本ファイルと同じ commit に含む。`git log -1 -- tools/python/analysis/flapi/pe_py318_probe.py` で確認)。
+
+- probe: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py318_probe.py` → 21/21 PASS・終了 0。
+  - 内訳: 初期化関数の名前解決 (モジュール・名前・格納セル) / 0x45c170・0x45c040・0x45c1c0 の間接 slot とセルの対応 / 0x467f00 の store と lea / 0x409709 の ja (範囲外の分岐) / 0x459ef0 が rcx を読まないこと / 0x45c1c0 の戻り値が 0x45c290 由来であること / 0x7ffdfffb の算術 / ネガティブ 2 件 (誤認した期待は偽)。
+- 既存 probe: `pe_py272_probe.py` (41/41 PASS) は本 PR で変えていない。実行は本 PR の測定 commit 上で行い、結果を最終回答に書く。
+- 逆アセ・到達解析の補助スクリプトは `tools/python/work/` (gitignore、commit しない)。`.text` 全体の分岐元探索は線形スイープの再同期方式 (完全ではない)。
+
+## 2. 未解決 (起票先)
+
+未解決は §6 の表にまとめる。0x459ef0 の役割は §4 で確定 (副作用のみ)。
+
+## 3. PY-366 (#4543): 0x4096d0 の範囲外経路 (終了か送出か)
+
+既知類型との関係: 該当なし (PE の逆アセンブルによる解析)。
+
+- 0x40f540 (`cl=4`) → 0x4096d0 (`bl > 0x1c`、0x409709 の `ja`) → 0x4096b0 → 0x412a40 → 0x4128b0 の順に、`bl` をそのまま大域 G へ保存する。
+- 0x4128b0 の終端: 0x412a07 が exit code の大域 0x13a5000 を読み、0x412a0d で `ExitProcess` (thunk 0x406fc0 = kernel32!ExitProcess) を呼ぶ。0x4128b0 の範囲内に `RaiseException` (thunk 0x406fd0) の直接 call は無い。
+- エピローグ 0x412a2d-0x412a34 (`ret`) へ入る分岐は 0x4128b0 の範囲内に無く、戻り先は到達しない。
+- 0x412a44 (0x412a40 の `mov [0x13a5000], ecx`) は exit code の大域 0x13a5000 を書く (G への書き込みではない。G への書き込みは §7)。範囲外時の exit code は `bl` の生値。
+- 0x4129f5 の `jne 0x412a12` は大域フラグ (0x15eac80) が非 0 なら ExitProcess を飛ばす。フラグの書き込み元は未特定 (静的には本ファイル内で見つからず)。フラグ非 0 の経路は 0x412936 のループへ戻る。
+- 結論: 範囲外時 (G = 0x15eac80 が 0) の出口は ExitProcess (0x412a07 → 0x406fc0) で、例外送出 (RaiseException) への直接経路は無い。exit code = bl (生値)。ただし 0x4129f7 の大域 0x15e6068 が非 0 なら、0x412a01 の間接 call を経てから ExitProcess へ進む。間接 call の先は静的に未確定 (§7)。フラグ 0x15eac80 が非 0 なら ExitProcess を飛ばして 0x412936 のループへ戻るため、「必ず終了する」とは静的には言えない (§6)。0x412020・0x41a670・0x4127d0 の中身は読み切った (0x412020 = 登録済みコールバックの逆順呼び出し、0x41a670 = リストからの要素除去、0x4127d0 = 25 文字のコンソール出力)。
+
+## 4. PY-366 (#4543): 0x459ef0 の中身
+
+- 0x459ef0 は戻り値を作らない (§1 と同じ)。呼び出し順は 0x41c820 → 0x448d40 → 0x411e80 → 0x412d60。
+- 0x41c820 は `LoadStringW` (user32 thunk 0x407030) で文字列を作る。0x448d40 は文字列オブジェクトの組み立て。0x412d60 は参照解放。
+- 0x411e80 → 0x411d20 は MSVC 形式の例外レコード (`0xeedfade`) を組み立てるが、0x411d20 の範囲内に `RaiseException` の直接 call は無い。
+- 結論: 0x459ef0 は**例外を送出せず、文字列とレコードを作って解放する副作用のみ**の補助関数 (変換結果は返さない)。
+
+## 5. 検証 (PY-366)
+
+- 測定 commit: 本ファイルと `pe_py366_probe.py` を同じ commit に含めた commit (`git log -1 -- tools/python/analysis/flapi/pe_py366_probe.py` で確認)。
+- `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py366_probe.py` → 14/14 PASS・終了 0。
+- 既存: `pe_py318_probe.py` 21/21 PASS (終了 0)。`pe_py272_probe.py` は本 PR で変えていない (実行結果は PR 本文)。
+- §4 の 0x411d20 の範囲内に `RaiseException` の直接 call が無いことは probe で検査していない。手作業 (逆アセの目視) で確認。
+- 素材: `fl-win64.tar.zst` から `block00031_PE.bin` を展開 (2.8 秒)。
+- `pe_py366b_probe.py` (PY-366 続き・§7) → 18/18 PASS・終了 0 (B1・B2 の指摘で検査を 8 件追加)。既存 `pe_py318_probe.py` 21/21・`pe_py272_probe.py` 41/41・`pe_py366_probe.py` 14/14 も PASS (実測値は PR 本文)。
+- §7 の rep movsq と間接 call は probe 7〜10 で検査済み。`.text` 全体の rep 系命令 (272 件) を走査し、G 書き込みは §7 の 3 箇所 (0x41279b・0x412a25 の rep movsq と 0x412160 内の store) に限られることを確認 (0x41219a は rdi = [rbp+0x20] への複写、0x4121a8 は rdi = rax (引数側) への複写で、いずれも rdi が G を指す命令ではない。0x4121b8 は rdi = r13+0x38 で、r13 = G の時のみ G を書く)。この rep 系の走査は手作業の確認で、probe には入れていない。
+
+## 6. 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 0x15eac80 の連結リストが範囲外時に空か (親フレームが残るか) の実行時値。書き込み元は §7 の 3 箇所 (0x412160・0x412770・0x412a25) | 範囲外時が必ず ExitProcess か、親フレームへ巻き戻すかの確定 | #4543 (追跡のみ。子は起票しない) |
+| 0x15e6068 (.bss 大域) の実行時値と、非 0 のときの間接 call `call qword [0x15e6068]` (0x412a01) の先 | 範囲外時 (G が 0) でも 0x15e6068 が非 0 なら間接 call を経由する。その先が ExitProcess に届くかの確定 | #4543 (追跡のみ。子は起票しない) |
+| 0x41d8f0 の呼び出し元 (0x1376870 は未読) と 0x15eac80 の初期値 (BSS の 0 か) | 0x412160 が最初に積まれる経路の確定 | #4543 (追跡のみ。子は起票しない) |
+| 0x457c70 の GetProcAddress 結果が 0 になる実行時条件 (0x4572c0 の shim へ落ちる経路) | VariantChangeTypeEx が本物か shim かの確定。通常の Windows では本物と推定 | #4543 (追跡のみ。子は起票しない) |
+
+## 7. PY-366 続き (#4543): 0x15eac80 (大域 G) の書き込み元と 0x4129f5 の分岐
+
+- G への rip 相対の `mov` store は `.text` 全体に 0 件 (probe 3)。G は `rep movsq` と `lea` 経由で書かれる。`.text` 全体の線形走査で G (と G+4) を rip 相対で参照する命令は 5 件 (0x412176・0x4129e1・0x4129ed・0x412a12・0x412a19)。
+- **G への書き込み元は 3 箇所** (probe 7・8):
+  1. **0x412160** (0x4121c3): `mov [r13], rax`。`r13` は 0x412176 の `lea` で G を指す (`[rbp+0x170] >= 2` なら 0x15eada8 の別枠)。同じ関数内の 0x4121b8 の `rep movsq` (rdi = r13+0x38、0x1e qword) と `[r13+0x10]`・`[r13+0x20]` の store も G 側 (r13 = G の時) へ書く。0x412160 の呼び出し元は 0x41d984 (1 箇所)。0x41d984 を含む関数の先頭は 0x41d8f0。
+  2. **0x412770** (0x41279b): 0x4129e1 `lea rcx,[G]` → 0x4129e8 `call 0x412770`。0x412770 は `rax = rcx` (G)、`rdi = rax` (G)、`rsi = [rax]` で、`rep movsq` (0x25 qword) を **G の指す先から G の領域へ** 書く。REPORT の旧版の向き (G から退避領域を読み戻す) は逆。0x412770 の呼び出し元は 0x4129e8 と 0x4128ff (0x4128f8 `lea rcx,[0x15eada8]` は G ではない枠)。
+  3. **0x412a25**: 0x412a19 `lea rdi,[G]`・0x412a12 `mov rsi,[G]` → 0x412a25 `rep movsq` (0x25 qword)。rdi = G に書く。0x412a28 で 0x412936 のループへ戻る。
+- 0x412160 は G の旧内容を引数側の退避領域へ複写し、G へ新しい値を入れる (push 相当)。0x412770 と 0x412a25 は G の指す先の内容を G の領域へ戻す (pop 相当)。
+- 0x4129ed-0x4129f5: `[G] != 0` なら 0x412a12 へ飛び、(3) の 0x412a25 で 0x25 qword を複写し直して 0x412936 のループへ戻る (ExitProcess を飛ばす)。
+- 0x4129f7-0x412a0d (probe 9・10): `[G] == 0` のとき、0x4129f7 `cmp qword [0x15e6068], 0` (G とは別の .bss 大域) が 0 なら 0x412a07 へ直行し、0x412a07 の `mov ecx,[0x13a5000]` の後、0x412a0d `call 0x406fc0` (kernel32!ExitProcess、probe 10 で import 表照合)。0x15e6068 が非 0 なら 0x412a01 の間接 `call qword [0x15e6068]` を経てから 0x412a07 → ExitProcess へ進む。0x15e6068 は IAT ではなく .bss の大域で、`.text` 内に書く rip 相対命令は無い (静的)。
+- 結論: 範囲外時点で G が 0 のとき、出口は ExitProcess (0x406fc0)。RaiseException への直接経路は無い (§3 と同じ)。ただし 0x15e6068 が非 0 のときの間接 call 先は**未確定**。このため「G が 0 なら必ず ExitProcess」とは、間接 call が戻る・ExitProcess に達すると仮定した場合の結論に限られる。
+- G の初期値 = 0 (確定、probe pe_py366c): G は `.bss` 内で、`.bss` は raw データ 0 バイトのためゼロ初期化される。
+- 0x41d8f0 の E8 直接 call 元は 0x1376870 の 1 箇所 (確定)。0x1376870 を含む関数の先頭 0x1376820 は、block00031 内の直接・RIP 相対・絶対参照が 0 件 (.pdata の unwind エントリのみ)。よって 0x1376820 の呼び出しは別ブロックからの間接参照 (関数ポインタ・テーブル) に依り、block00031 単体では閉じない。
+- 未確定: (a) 範囲外時点で G が 0 か非 0 か。G は初期 0 だが、0x412160 (push) と 0x412a25・0x412770 (pop) の実行時の入れ子状態に依る。0x1376820 の呼び出し元 (他ブロックの間接参照) を読むまで確定しない。(b) 0x15e6068 の実行時値と、非 0 のときの間接 call の先 (未確定)。このため「必ず ExitProcess する」とは言えない。

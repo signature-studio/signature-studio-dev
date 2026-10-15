@@ -92,7 +92,7 @@ def _site_store(fo, t, val):
              '  store volatile i64 %%%s.n1, ptr @ld_blk_n\n' % (t, t, t, t, t, val, t, t, t, t))
 
 
-def instrument(ll_in, ll_out, prefix='function_', blocks=False, sites=False):
+def instrument(ll_in, ll_out, prefix='function_', blocks=False, sites=False, entry_types=None):
     """各 `function_*` の entry に ld_trace(va, np, a0..a7, x0..x3) 呼出しを挿入する (意味不変)。
     blocks=True のとき、各 `dec_label_pc_<VA>:` の直後に ld_blk_arr への volatile store を挿入する (LD-64 / #1854)。
     call を使うと wasm の戻り値が変わるため store で記録する (LD-67 / #1906)。
@@ -101,6 +101,8 @@ def instrument(ll_in, ll_out, prefix='function_', blocks=False, sites=False):
     kind 1 = br・2 = call、ord = block 内の site 通し番号 (0 始まり)。
     block VA は直前の dec_label_pc_ で決まるため、dec_label_pc_ 以外の block 境界 (`; <label>:N`・`dec_label_pc_<VA>.<suffix>:`)
     から次の dec_label_pc_ までの site は記録せず、件数を stderr に出す (B 記録が無く VA が決まらないため)。
+    entry_types (VA → 機械語入口型のリスト, cases.MACHINE_ENTRY) を渡すと、機械語入口型が double の i128 引数は
+    下位 64bit を x 側 (xmm) にも記録する (LD-248 / #4975)。native は xmm0 に載せるため、整数側だけでは一致しない。
     戻り値: 計装した関数数"""
     n = 0
     declared = set()
@@ -176,6 +178,7 @@ def instrument(ll_in, ll_out, prefix='function_', blocks=False, sites=False):
                 except ValueError:
                     continue
                 ps = [param_type(p) for p in split_top(m.group('args'))]
+                mt = (entry_types or {}).get(va, [])
                 body = []
                 A = ['0'] * 8
                 X = ['0'] * 4
@@ -189,6 +192,8 @@ def instrument(ll_in, ll_out, prefix='function_', blocks=False, sites=False):
                         A[i] = ref
                     elif mi and int(mi.group(1)) == 128:
                         body.append('  %s = trunc i128 %s to i64' % (t, ref)); A[i] = t
+                        if i < 4 and i < len(mt) and mt[i] == 'double':
+                            X[i] = t
                     elif mi and int(mi.group(1)) < 64:
                         body.append('  %s = zext %s %s to i64' % (t, ty, ref)); A[i] = t
                     elif ty == 'double':
@@ -225,15 +230,38 @@ def ctype(ty):
     return None
 
 
+STRUCT_DEF_RE = re.compile(r'^(%[\w.$]+) = type \{ ?([^{}]*?) ?\}\s*$')
+SCALAR_ELEM = re.compile(r'^(i(8|16|32|64)|ptr|float|double)$')
+
+
+def struct_table(ll_path):
+    """`%name = type { i32, i32 }` 形式の 8 バイト以下・scalar 要素だけの struct を {name: [要素型...]} で返す。
+    #4184: by-value の POINT (%tagPOINT) を wasm32 では要素ごとの scalar 引数に展開する (shimx R6 と同じ規則)。"""
+    table = {}
+    with open(ll_path, errors='replace') as f:
+        for line in f:
+            if not line.startswith('%') or ' = type ' not in line:
+                continue
+            m = STRUCT_DEF_RE.match(line.rstrip('\n'))
+            if not m:
+                continue
+            elems = [e.strip() for e in m.group(2).split(',') if e.strip()]
+            if elems and all(SCALAR_ELEM.match(e) for e in elems) and len(elems) <= 2:
+                table[m.group(1)] = elems
+    return table
+
+
 def gen_stubs(ll_path, defined_names, prefix='function_'):
     """IR の declare から、呼出しをログして ld_stub() の応答を返す C スタブを生成する。
     戻り値: (C ソース文字列, [名前...], 型未対応で飛ばした名前)
-    CAB-233: 第5/6引数も ld_stub_x へ転送する (MultiByteToWideChar 等 6引数 API の dst 書込み用)。"""
+    CAB-233: 第5/6引数も ld_stub_x へ転送する (MultiByteToWideChar 等 6引数 API の dst 書込み用)。
+    #4184: 2 要素 scalar struct の by-value 引数 (%tagPOINT) は要素ごとの引数に展開する (wasm32 の LLVM 引数分解と一致)。"""
     out = ['#include <stdint.h>', 'typedef unsigned long long u64;',
            'extern u64 ld_stub_x(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5);']
     names, skipped = [], []
-    widths = {}
+    widths, slots = {}, {}
     seen = set()
+    structs = struct_table(ll_path)
     with open(ll_path, errors='replace') as f:
         for line in f:
             if not line.startswith('declare '):
@@ -245,7 +273,19 @@ def gen_stubs(ll_path, defined_names, prefix='function_'):
             if nm in seen or nm in defined_names or SKIP_DECL.match(nm):
                 continue
             seen.add(nm)
-            ps = [param_type(p)[0] for p in split_top(m.group('args'))]
+            ps = []
+            pslots = []
+            for reg, p in enumerate(split_top(m.group('args'))):
+                t = param_type(p)[0]
+                if t in structs:
+                    # LD-253 (#5032): 8 byte の struct は native で 1 レジスタ (reg) に詰まる。要素 j は
+                    # その下位 (j=0) / 上位 (j=1) 32bit。slot = (reg, シフト量)。
+                    for j in range(len(structs[t])):
+                        pslots.append((reg, 32 * j))
+                    ps.extend(structs[t])
+                else:
+                    ps.append(t)
+                    pslots.append((reg, 0))
             rt = ret_type(m.group('pre'))
             cps = [ctype(t) for t in ps]
             crt = ctype(rt)
@@ -254,6 +294,7 @@ def gen_stubs(ll_path, defined_names, prefix='function_'):
                 continue
             names.append(nm)
             widths[nm] = [64 if c == 'u64' else 32 for c in cps[:4]]
+            slots[nm] = pslots[:4]
             params = ', '.join('%s a%d' % (c, i) for i, c in enumerate(cps)) or 'void'
             av = []
             for i, c in enumerate(cps[:6]):
@@ -275,6 +316,7 @@ def gen_stubs(ll_path, defined_names, prefix='function_'):
             else:
                 out.append('%s %s(%s) { return (%s)%s; }' % (crt, nm, params, crt, call))
     gen_stubs.widths = widths
+    gen_stubs.slots = slots
     return '\n'.join(out) + '\n', names, skipped
 
 

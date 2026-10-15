@@ -73,6 +73,7 @@ const p134ir = () => {
 const p134hist = [];
 for (let i = 0; i < 942; i++) {
   const va = hex(i);
+  if (process.env.M11_SURVEY_PROGRESS === '1') console.error('[survey][progress] ' + i + ' ' + va + ' t=' + Date.now());
   if (P134) p134hist.push(JSON.stringify(p134obj()));
   snap.set(mod.HEAPU8.subarray(0, img.length));
   mod._m11_va_unit_begin();
@@ -80,7 +81,9 @@ for (let i = 0; i < 942; i++) {
   const vaUsed0 = Number(mod._m11_va_used()), gm0 = Number(mod._m11_probe_count(0)), fm0 = Number(mod._m11_probe_count(1));
   const lf0 = Number(mod._m11_probe_count(6)), lr0 = Number(mod._m11_probe_count(7)), p413_0 = process.env.M11_INSTR_413060 === '1' ? Number(mod._m11_probe_count(8)) : 0;
   let r, err = null;
+  if (process.env.M11_SURVEY_PROGRESS === '1') fs.writeSync(2, '[progress] unit ' + i + ' ' + va + ' begin\n');
   try { r = mod._m11_call_unit(i); } catch (e) { err = e; }
+  if (process.env.M11_SURVEY_PROGRESS === '1') fs.writeSync(2, '[progress] unit ' + i + ' ' + va + ' end\n');
   const clob = !tableIntact();
   if (P134 && i === P134_UNIT) console.error('[probe134] unit ' + i + ' ' + va + ' err=' + JSON.stringify(err ? String((err && err.message) || err) : null) + ' trap_state=' + JSON.stringify(p134obj()));
   if (P134 && i === P134_UNIT) console.error('[probe134] unit ' + i + ' ir=' + JSON.stringify(p134ir()));
