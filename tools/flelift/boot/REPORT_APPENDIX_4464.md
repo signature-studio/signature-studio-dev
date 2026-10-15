@@ -1,4 +1,4 @@
-# tools/flelift/boot — #4464 (WIN-51) CFI 経路の入口値の再現と受け手の取得 (#4384 の受入 1・2)
+# tools/flelift/boot — #4464 (WIN-51) CFI 経路の入口値の再現と受け手の取得 (#4384 の受入 1・2・後続 #5337)
 
 測定 commit: 下の「コミット」節の hash (コードを変えた最後の commit)。素材は `fl-win64` (`$RUNNER_TEMP/extracted/block00031_PE.bin`)・`toolchain-emsdk` (emsdk 6.0.12)。
 
@@ -49,9 +49,9 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実機で受け手 slot `0x5ac308` に入る値 (loader の充填)。harness では 0 のまま | 実機の受け手 VA は未特定。S13 以降に進めない | #4384 [WIN-49] |
-| `[icall]` の target `0x0` と、wasm stack の先頭 `f_410360` の対応 (stack 名の解釈) | trap 段の厳密な特定に使う。推定のまま | #4384 [WIN-49] |
-| harness が `self` を渡さない (`fle_run(0x1375990)` の全引数 0) | 実機の `self` を harness で再現できない | #4384 [WIN-49] |
+| 実機で受け手 slot `0x5ac308` に入る値 (loader の充填)。harness では 0 のまま | 実機の受け手 VA は未特定。S13 以降に進めない | #5337 [WIN-60] (#4384 [WIN-49] は CLOSED) |
+| `[icall]` の target `0x0` と、wasm stack の先頭 `f_410360` の対応 (stack 名の解釈) | trap 段の厳密な特定に使う。推定のまま | #5337 [WIN-60] |
+| harness が `self` を渡さない (`fle_run(0x1375990)` の全引数 0) | 実機の `self` を harness で再現できない | #5337 [WIN-60] |
 
 ## 6. 統合 HEAD での再測定 (#4464・測定 commit `09eedbf0c`・mode 1 のみ)
 
@@ -61,3 +61,15 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 - 入口の値 (probe 生成器 `cfi_entry_probe.py` を `work/` の lift 複製に適用・`FLE_CFI_SEED` 無し): §2 の表と一致 (`0x410320` は rcx=0・rdx=1・dl=1)。
 - seed 有 (`FLE_CFI_SEED=1`): `[cfi-seed]` の書く前の live 値は `0x1104e30=0x0`・`0x5ac270=0x0`・`0x5ac308=0x0`。chain の rcx は `0x1105350` で `0x1104ef8`・`0x5af120` と `0x410320` で `0x5ac338`。`[icall] rax=0x5ac338 target=0x0`。
 - 差分 (測定 commit から HEAD まで): 本節の追加のみ (`git diff 09eedbf0c HEAD -- tools/flelift` は REPORT のみ)。
+
+## 7. 受け手 VA の実行時取得 (#5337・測定 commit `f045b48fc`・mode tol・寛容起動)
+
+- 測定: `FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0・所要 3 分 56 秒 (lift 〜48 s・clang plain 119 s・boot tol 25 s)。load 0.85 → 2.19。baseline の計数は dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob`・longjmp 0・exit 0 で §11 と一致 (測定 commit `6e1b4d6c8` = origin/main)。
+- 受け手 VA: `f_410320` の `call [rax-0x30]` は `rax = rcx = self` で、受け手 slot は `self - 0x30`。`self = 0x5ac338` のとき slot は `0x5ac308`。PE 静的値は `0x40f960` (`.text` 内 raw off `0x1ab708`・`f_40f960` は lift 済み)。
+- 実行時の値: `0x5ac308` は呼出し前 `0x0`。理由は `fle_data_install` がこの slot を含まないため。生成器の実出力は `[fle_data_gen] sections ..., windows 11079, total 4002981 bytes` (`fle_data_gen.py`・PR HEAD の `x64c.py` lift 出力に対して静的に実行。`tools/flelift` のコード差分は 0)。敷設は memcpy 11,083 件 (窓 11,079 + セクション 4) で、合計 4,002,981 B。`fle_data.c` を走査し、`0x5ac308` を覆う memcpy は 0 件。PE の値は harness に敷設されていない。
+- `FLE_CFI_RECV=1` (新設): `0x5ac308` へ `0x40f960` を書く。`FLE_CFI_SELF=<VA>` (新設): `fle_run` の第 1 引数 (rcx) を渡す。
+- seed 有 (`FLE_CFI_SEED=1`・RECV 無し): trap 段 `f_410360` ← `f_5af120` ← `f_1105350` ← `f_13752f0` ← `f_1375990`。§4 と一致。
+- seed 有 + RECV (A): trap 段の先頭 `f_410320` ← `f_976b60` ← `f_976a90` ← `f_1264050` ← `f_12652c0` ← `f_1265390` ← `f_1265690` ← `f_1375990`。`threw=oob`・dispatch 209・GetMem 2,314・FreeMem 1,199 (計数は不変)。
+- seed 有 + RECV + SELF=`0x5ac338` (B): A と同じ stack・同じ threw。`self` を渡しても、chain は `rcx` を global から再読込するため結果は変わらない。
+- 所見 (静的・生成器の出力を走査): `0x976410` は窓 `w_4420` (`0x976400`・96 B) に入るため、敷設後は前版の PE 値 `0x9764d8` になる。`0x9764a8` (PE 値 `0x40f960`)・`0x5ac308` は敷設する memcpy に入らず、harness では 0 のまま。前版の「`f_976b60` の `rcx` は `0x976410` から来る」は、コードの静的な読みで実行時値は未計測。`f_410320` の `rax` が 0 となり `LD64(0xffffffffffffffd0)` で oob する、は推定 (`rcx`・`rax` の実行時値は未計測。推定)。
+- 未解決 (起票先: #5337 に残す): (1) `0x976410` の敷設後の実行時値を probe で確定する (静的には `0x9764d8`)。(2) `fle_data_install` が覆わない `0x9764a8`・`0x5ac308` (いずれも `.text` 内) の敷設方法を決める。(3) 実機の loader が充填する値は未確認 (起票先: #5337。#4384 は CLOSED)。

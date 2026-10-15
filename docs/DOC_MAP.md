@@ -301,6 +301,7 @@
 | `tools/m11/REPORT_3932.md` | ~50 | #3932 (M11-N201, 親 #3906): set_other 実値化 25 件の alloca 番地を 0 詰め call 引数へ注入する経路 (`m11_post.py --slots`・`M11_SLOT_ROWS`)。注入の支配条件 (entry block 内・呼出し前)・既定は不変の検証。survey の前後実測は未達 |
 | `tools/m11/REPORT_N202.md` | ~70 | #3933 (M11-N202, 親 #3906): set_other スタック slot 未決 85 件の再測定 (現 HEAD で 112 件・実値化 25・未決 87)・C 規則の IR 突合 (引数単位 0・名前単位 22)。検算 `m11_setother_slot_check.py` |
 | `tools/m11/REPORT_N228.md` | ~60 | #4905 (M11-N228, 親 #4891): set_other 非 imm の gep 17 件の基底 reg を到達定義で分類 (実測 実値化 0・復元不能 0・未決 20・未分類 0)。IR への GEP 接続は未実装。分類器 `m11_setother_gep_global.py --pe` |
+| `tools/m11/REPORT_N229.md` | ~60 | #4906 (M11-N229, 親 #4891): set_other 書込可能グローバル 3 件 (VA 0x15e3a70) の格納元探索 (IR・PE 直接経路の store 0 件・計算ポインタ経由は未決)。分類器 `m11_setother_gep_global.py --pe` |
 | `tools/m11/REPORT_N227.md` | ~50 | #4891 (M11-N227, 親 #3907): set_other 非 imm の gep 17 件と書込可能グローバル 3 件の 3 値判定 (実測 実値化 0・復元不能 0・未決 20・未分類 0)。gep の基底 SSA 対応・global の格納探索は子 #4905・#4906。分類器 `m11_setother_gep_global.py` |
 | `tools/m11/REPORT_N171.md` | ~120 | #3134 (M11-N171, 親 #1154): set_other 非 imm 349 件 (reg 123・mem 150・lea 76) の定義探索と 3 値分類 (件数は REPORT 参照)。接続方式の決定と未決の接続先 (#3140・#3141・#3142)。survey は素材欠落で未測定 (#1154)。分類器 `m11_setother_nonimm_class.py` |
 | `tools/m11/REPORT_N198.md` | ~90 | #3916 (M11-N198, 親 #3140): set_other の CFG 実値化を独立に照合する。具体実行で呼出し点の全経路の値を列挙する照合器 `m11_setother_nonimm_cfg_verify.py` (`--selftest` と実データ)。前提の実値化 1 件は未決 (経路で 0x0 と 0x1)。判定不能 33 件 (未対応命令) |
@@ -829,6 +830,7 @@
 | `tools/python/REPORT_PY131.md` | 93 | PY-131 (#3012): ui のブラウザ移動 3 件 (navigateBrowser・navigateBrowserMenu・navigateBrowserTabs) の PE 根拠。3 件とも保留 (戻り値 str の中身と作用先の状態が未同定)・mock/C は変更なし。作用先の同定は子 PY-239 (#3720) |
 | `tools/python/REPORT_PY140_3761.md` | 97 | PY-140 (#3761, 親 #3035・PY-247): `0xfdd2c0` の op 別の到達先 (`REPORT_PY140.md` が保留にした ui 12 関数のうち 6 関数の leaf を VA で確定: jog・jog2・stripJog → `0x1180dd0`、previous・next → `0x1180ef0`、snapOnOff → `0x12134f0`)。5 関数は `0xfdd2c0` 内に直接の作用の呼出し無し (間接 `0xfdd438` は全 op 共通で未確定)。scrollWindow は保留 (vtable)。probe は `analysis/flapi/pe_ui_dispatch_probe_3761.py` (main 版とは別実装) |
 | `tools/python/REPORT_PY170.md` | ~110 | PY-170 (#3999): screen テキスト行・表示系 6 件 (addTextLine・removeTextLine・findTextLine・displayText・displayTimedText・animateText) の PE 根拠 (entry・fn VA・書式・引数の割当て・戻り値の式)。戻り値の値・範囲 code の意味は未確定で mock/C 差分 0。probe は `analysis/flapi/pe_handler_probe.py` |
+| `tools/python/REPORT_PY5328.md` | 60 | PY-5328 (#5328): screen.addTextLine の副作用と引数検査 (mock・C 差分 0)。行 record の中身は未確定で未実装 |
 | `tools/python/REPORT_PY374_5327.md` | ~139 | PY-374 (#5327・親 #4741 の子 1/2): screen テキスト行 addTextLine の未同定点の PE 確定。`0x4f2990` (4 int を構造体へ詰める)・`0x41c6e0` (char* → 参照カウント付き文字列)・`0xd7d460` (行の登録。戻り値は呼出し元が使わない) を VA 付きで確定し、`0x668670`・`0xd7e330`・`scr+0x1dc` の保留を記録 |
 | `tools/python/REPORT_PY121_2985.md` | 89 | PY-121 (#2985): screen 状態の 5 関数 (isBlanked / isUnBlank / getScreenActiveCounter / setScreenActiveCounter / unBlank) の PE 根拠・mock/C 差分 0 (int・bool・float・str の入力まで)・値は未実測の仮置き。残り 23 件は子 #3021 (PY-134)・#3022 (PY-135)・#3025 (PY-136) |
 | `tools/python/REPORT_PY135.md` | 117 | PY-135 (#3022): screen 描画・メーター系 7 件の PE 根拠 (entry・fn VA・書式・呼出し経路)。`blank` は isBlanked と activeCounter の効果を確定して mock/C に実装。`addMeter` は isUnBlank と activeCounter の効果を確定して実装。残り 5 件 (displayBar・fillRect・drawRect・drawText・eraseRect) は観測できる状態を変えないと推定し、引数検査と None だけを模す。mock/C 差分 0 |
@@ -1114,7 +1116,7 @@
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_1116.md` | ~7 | #1116: HeapAlloc 0 返却規約のホスト同型性試験 (REPORT.md の 1116 節の全文を分割移動) |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3707.md` | ~100 | KH-59 (#3707): emcc 段の RSS cap (`rss_cap.py`) の実測。変更前後の sha256 一致・ネガコン・snapins 14 本 + module F の emcc ピーク RSS 表・cap 超過 4 本の未解決 |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3756.md` | ~50 | KH-62 (#3756): `gen_globals.py` の BSS 0 埋め膨張の原因 (宣言長超えの 0 埋め・19〜25 件) と修正。phaser/limiter/khbase bit-exact 200/200・delay FAIL 155/200 の未解決 |
-| `tools/targets/kilohearts/snapins/REPORT_APPENDIX_780.md` | 65 | KH-17 (#780): Ladder Filter (ksla) の process 閉包を x64c で測る。数え方・測定値・ネガコン・測定 commit は付録 §1〜§3 が正本。未解決は §5 |
+| `tools/targets/kilohearts/snapins/REPORT_APPENDIX_780.md` | ~135 | KH-17 (#780): Ladder Filter (ksla) の process 閉包を x64c で測る。数え方・測定値・ネガコン・測定 commit は付録 §1〜§3 が正本。未解決は §5。§3d (KH-150 / #5326): process・slot 15・slot 20 の self / ctx の参照オフセットを機械語から集計 (型は命令幅からの推定) |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_781.md` | 102 | KH-18 (#781): Carve EQ (ksge) の IAT 呼出 site 19 件の扱い (判定は付録 §2 が正本)・process 経路 (slot 14) の unique 側 25 関数に IAT 0 件・infra 側 120 関数の名前付き IAT 51 件 (§5・KH-123)・間接 call の下限。測定 commit `fcf3a630`・再測定 commit `29252657c`。未確定の slot 7・13 呼出は KH-130 (#4895)、間接 call は KH-131 (#4896) |
 | `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
