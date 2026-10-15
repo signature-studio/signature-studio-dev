@@ -2,10 +2,10 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `fbd89e0d7` (store 基底の出どころを機械語から出す `alias_evidence_4167.py` と結果 `results/alias_evidence_4167.json`)。判定器 `audit_frame_store_alias_2211.py` は変えていない。
-- 入力: `results/audit_undefload_564_full.json`・`results/f4_564_post.json` (#2211 と同じ)。PE は fl-win64 の `extracted/block00031_PE.bin` (sha256 先頭 16 桁 `b2c64da40921cf26`)。素材は fl-win64 (`docs/REFERENCES.md` `[WIN64]` の展開物。アーカイブを `tar --zstd -xf` で展開して使った。展開 5.8 秒)。
-- 再現確認: #2211 の判定器を同じ入力で再実行し、`DROP 3・LIVE-IN 35・UNDETERMINED 10` (関数)、`DROP 3・LIVE-IN 36・UNDETERMINED 11・PTR_READ 1` (site) を得た。#2211 の値と一致。判定器の実行は 0.27 秒 (`real 0m0.267s`)。
-- 判定器の run は HEAD (`fbd89e0d7`) 相当の作業ツリーで行った。判定器のコードは `origin/main` と同一。
+- 測定 commit: `64eea9eac` (main 取り込み後の HEAD。判定器のコードは `origin/main` と同一)。store 基底の出どころを機械語から出す `alias_evidence_4167.py` と結果 `results/alias_evidence_4167.json` は `fbd89e0d7` で作り、`64eea9eac` で再実行して byte 一致を確認した。
+- 入力: `results/audit_undefload_564_full.json`・`results/f4_564_post.json` (#2211 と同じ)。PE は fl-win64 の `extracted/block00031_PE.bin` (sha256 先頭 16 桁 `b2c64da40921cf26`)。素材は fl-win64 (`docs/REFERENCES.md` `[WIN64]` の展開物。`tar --zstd -xf` で `extracted/block00031_PE.bin` だけ展開。2.3 秒)。
+- 判定器の現 HEAD 値: `DROP 3・LIVE-IN 1・UNDETERMINED 44` (関数)、`DROP 3・LIVE-IN 1・UNDETERMINED 46・PTR_READ 1` (site)。判定器の実行は 0.23 秒 (`real 0m0.230s`)。
+- #2211 の値 (`DROP 3・LIVE-IN 35・UNDETERMINED 10` / `LIVE-IN 36・UNDETERMINED 11・PTR_READ 1`) とは一致しない。差は main #4090 の判定器変更 (`frame_derived` が lea を F に入れる・`leak_sites` が複数化) による。判定 JSON は `results/frame_store_verdict_4090.json` と byte 一致する。
 
 ## 2. 対象 site の機械語の根拠 (受入 1)
 
@@ -21,13 +21,15 @@ store 基底の値の出どころを `alias_evidence_4167.py` で機械的に追
 
 ## 3. 判定 (受入 2)
 
-| 関数 | 判定器の結果 (#2211 と同じ) | 打ち切り | 判定 |
-|---|---|---|---|
-| 694c80 | UNDETERMINED (BARRIER(LEAK_STORE)・STORE 混在) | `695163` (LEAK_STORE)・`69514e mov [rax+0x8c], rcx` | 未判定のまま |
-| c3b340 | UNDETERMINED (BARRIER(LEAK_STORE)) | `c3b3f5` (LEAK_STORE)・`c3b3dd mov [rcx+0x10], rax` | 未判定のまま |
+判定器の結果 (測定 commit `64eea9eac`)。#2211 版からの差は、main #4090 による `frame_derived` の変更 (lea を F に入れる) で、c3b340 の `c3b3f5` の barrier が LEAK_STORE から ALIAS_FRAME_PTR に変わったこと。
 
-- ネガティブコントロール (受入 4): `--negctl-glk` (全関数の漏出を強制 True) で関数判定は `DROP 3・LIVE-IN 1・UNDETERMINED 44`。#2211 の `壊す 1` と一致する。上記 2 関数は両方とも UNDETERMINED のまま変わらない。
-- 追加の実験 (判定器は変えていない): 上記 2 store だけを透過にすると、同じ関数の別の pointer store (`69514e`・`c3b3dd`) が LEAK_STORE になり、site は UNDETERMINED のまま。判定を変えるには、store 基底の provenance 規則を判定器に入れる必要がある。
+| 関数 | 判定器の結果 (`64eea9eac`) | 打ち切り | 判定 |
+|---|---|---|---|
+| 694c80 | UNDETERMINED (BARRIER(LEAK_STORE)) | `695163` (LEAK_STORE) | 未判定のまま |
+| c3b340 | UNDETERMINED (BARRIER(ALIAS_FRAME_PTR)) | `c3b3f5` (ALIAS_FRAME_PTR。#2211 版では LEAK_STORE) | 未判定のまま |
+
+- ネガティブコントロール (受入 4): 現 HEAD の `--negctl-glk` (全関数の漏出を強制 True) は、関数判定・site 判定とも通常実行と**同一** (関数 `DROP 3・LIVE-IN 1・UNDETERMINED 44`、site 51 件の判定が全て一致)。判定を変えないので、判定器が漏出規則に依存していることの確認にはならない。`--negctl-nosync` も関数判定は同一で、site 判定のみ 8 件が変わる。#2211 の「壊す 1 と一致」は現 HEAD では成り立たないため削除する。ネガコンとして判定を変えるのは `--negctl-nosync` のみ。
+- 追加の実験 (`work/` の作業用コピーで判定器を変更して実行。コミットしない): 694c80 の `695163`・c3b340 の `c3b3f5` を、LEAK_STORE の判定 (`glk` 分岐) から外すと、関数判定は変わらず (`UNDETERMINED 44`)。694c80 の site 6951c8 の barrier は `695163` から同じ関数の別の pointer store `69514e mov [rax+0x8c], rcx` (LEAK_STORE) に移る。c3b340 の site c3b46f の barrier は `c3b3f5` のまま (ALIAS_FRAME_PTR のため、漏出の規則を外しても打ち切られる)。判定を変えるには、store 基底の provenance 規則を判定器に入れる必要がある。
 
 ## 4. 残る理由 (DROP / LIVE-IN にできない理由)
 
@@ -37,8 +39,9 @@ store 基底の値の出どころを `alias_evidence_4167.py` で機械的に追
 
 ## 5. 差分 (WORKFLOW §6)
 
-- 測定 commit: `fbd89e0d7`。
-- `git diff fbd89e0d7 HEAD -- tools/m11/ldfix` の出力は PR 本文に載せる (本 REPORT の commit だけ)。判定器の差分は 0 行。
+- 測定 commit: `64eea9eac` (判定器・結果 JSON・ネガコンの実行はこの commit で行った)。
+- `git diff fbd89e0d7 64eea9eac -- tools/m11/ldfix` は 12 ファイル・5059 行の追加 (うち判定器 `audit_frame_store_alias_2211.py` は 14 行追加・10 行削除)。これは main 取り込み (#4090 ほか) による差分で、本 PR の変更ではない。本 PR で判定器は変えていない。
+- 本 PR の追加は `REPORT_4167.md`・`alias_evidence_4167.py`・`results/alias_evidence_4167.json` の 3 ファイル (247 行) のみ。
 
 ## 6. 未解決 (起票先)
 
