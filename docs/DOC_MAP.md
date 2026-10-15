@@ -116,6 +116,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_4983.md` | ~70 | FLE-37 (#4983): 既定経路 `run_boot default` で `FLE_BOOT_LOG_CAP` が効かない不具合の修正 (`${6:-0}` → 環境変数を読む式)・修正前後の `log_cap` の実測・上限超過時の `hit` の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5215.md` | ~70 | PY-4887 (#5215): 選択リスト G の初期化 `0xe38870` の既定 boot での実起動確認 (G・isPatternSelected・呼出元 5 観測点は未到達・制御 1 件発火)。probe は `py5215_g_init_probe.sh` |
 | `tools/flelift/boot/REPORT_APPENDIX_5027.md` | ~80 | FLE-40 (#5027): `FLE_BOOT_LOG_CAP` 超過の例外が Emscripten の tty write で飲まれ `exit` に残る経路の特定・超過を `boot.threw` の `log_cap` として報告する修正・cap の有無での実測差。測定値の正本 |
+| `tools/flelift/boot/REPORT_APPENDIX_5058.md` | ~70 | FLE-41 (#5058): cap 超過後の次の dispatch で `log_cap` の例外を投げて boot を止める修正・既定 cap 4096 の停止 (units 13) と cap 0 の対照 (units 895)・規則検査の変異。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4931.md` | ~50 | FLE-4931 (#4931): REPORT §13 の全文 (既定経路 mode 3 の survey で 942 unit を分類・covered=942・測定 commit `ceb5a0ba6`・差分 0 の証跡・件数 47 の説明・boot_metric の再生成理由)。REPORT §13 は結論と要点表 |
 | `tools/flelift/boot/REPORT_APPENDIX_4004.md` | ~80 | FLE-18 (#4004): 既定経路の dispatch(0) (0x67264b の target 0)・呼出時の `[0x15e0a48]` の実測 (既定 / shim の call-time 表)・0x6b91e8 の第 2 呼出点。REPORT §10 の「唯一の呼出し点」の訂正 |
 | `tools/flelift/boot/REPORT_APPENDIX_3868.md` | ~90 | FLE-17 (#3868) の付録: `0x6bbc20` の書込み経路の上流 (実行時の呼出し連鎖・既定 route の書込み・静的走査 (rip 相対 lea)・監視の範囲)。REPORT_APPENDIX_3771 §A の後続 |
@@ -301,6 +302,7 @@
 | `tools/m11/REPORT_N196.md` | ~90 | #3906 (M11-N196, 親 #3142): set_other 非 imm のスタック slot 読込・frame lea の IR 接続判定 (frame 定数 C と stack_var 対応・分類の件数は REPORT 参照)。load_def の誤判定の修正と負例 (`test_setother_slot_class.py`)。接続の注入と未決の接続先は #3932・#3933。分類器 `m11_setother_slot_class.py` |
 | `tools/m11/REPORT_3932.md` | ~50 | #3932 (M11-N201, 親 #3906): set_other 実値化 25 件の alloca 番地を 0 詰め call 引数へ注入する経路 (`m11_post.py --slots`・`M11_SLOT_ROWS`)。注入の支配条件 (entry block 内・呼出し前)・既定は不変の検証。survey の前後実測は未達 |
 | `tools/m11/REPORT_N202.md` | ~70 | #3933 (M11-N202, 親 #3906): set_other スタック slot 未決 85 件の再測定 (現 HEAD で 112 件・実値化 25・未決 87)・C 規則の IR 突合 (引数単位 0・名前単位 22)。検算 `m11_setother_slot_check.py` |
+| `tools/m11/REPORT_N242.md` | ~70 | #5392 (M11-N242, 親 #4890): set_other 非 imm のポインタ経由読込 122 件 (load_ptr) を同一基底の直線区間格納で分類 (実測 実値化 0・復元不能 0・未決 122・未分類 0)。基底の再定義・呼出しを跨ぐ接続は未実装。分類器 `m11_setother_ptr_class.py`・負例 `test_setother_ptr_class.py` |
 | `tools/m11/REPORT_N228.md` | ~60 | #4905 (M11-N228, 親 #4891): set_other 非 imm の gep 17 件の基底 reg を到達定義で分類 (実測 実値化 0・復元不能 0・未決 20・未分類 0)。IR への GEP 接続は未実装。分類器 `m11_setother_gep_global.py --pe` |
 | `tools/m11/REPORT_N229.md` | ~60 | #4906 (M11-N229, 親 #4891): set_other 書込可能グローバル 3 件 (VA 0x15e3a70) の格納元探索 (IR・PE 直接経路の store 0 件・計算ポインタ経由は未決)。分類器 `m11_setother_gep_global.py --pe` |
 | `tools/m11/REPORT_N227.md` | ~50 | #4891 (M11-N227, 親 #3907): set_other 非 imm の gep 17 件と書込可能グローバル 3 件の 3 値判定 (実測 実値化 0・復元不能 0・未決 20・未分類 0)。gep の基底 SSA 対応・global の格納探索は子 #4905・#4906。分類器 `m11_setother_gep_global.py` |
@@ -489,6 +491,7 @@
 | `tools/m11/ldfix/REPORT_1325.md` | ~110 | LD-46 (#1325): first-deref-not-entry の支配関係つき修復。deref の IR ブロックが置換対象の全使用を支配する 11 組を修復し、残り 10 組は見送り理由を記録。survey 到達 (23 関数) を再測定 (#1134・#3194・#3195) |
 | `tools/m11/ldfix/REPORT_2688.md` | ~104 | LD-123 (#2688): spill 宛 判定不能 9 site の F3d 適用 IR 再検証。上流 xor 0 の 4 site は OK_LOAD 候補 (本番 IR は未修復・配線は #2834)、残り 5 site は UNDETERMINED |
 | `tools/m11/ldfix/REPORT_3753.md` | ~100 | LD-175 (#3753): spill 宛 UNDETERMINED 5 site のうち 4 site (128d495・dcdeee・c3460e・12900c4) を機械語 2 段 deref と IR 1 段読みのブロック単位の結線で TRUE_DROP に確定。1284dab は子 #3793 (LD-178)。突合 `ld175_site_link.py` |
+| `tools/m11/ldfix/REPORT_5435.md` | ~60 | LD-270 (#5435): spill 宛 `128f9e0` の 12 site の機械語 BFS 到達経路 (全 site が欠落区間 `0x1290645`〜 を通る) と frame F=2088 の site ごと照合 (`stack_var_-(F-disp)` は IR に alloca・言及なし)。`ld270_bfs_frame.py` が生成。判定は UNDETERMINED のまま (#2705・#4959 の残り) |
 | `tools/m11/ldfix/REPORT_2705.md` | ~70 | LD-125 (#2705): spill 宛 `128f9e0` の 12 site の lift 段欠落区間 (`0x1290645`〜`0x129460a`・枝が `0x129460b` へ付け替え) の特定と、`ld125_lift_gap.py` が生成する欠落区間表。判定は UNDETERMINED のまま (根拠は子 issue) |
 | `tools/m11/ldfix/REPORT_2679.md` | ~106 | LD-120 (#2679): spill 宛 未判定 `128f9e0` の 12 site を UNDETERMINED と判定 (frame slot `stack_var_-760〜-1336` が IR 本体・RetDec の lift/drc に無い根拠・`ld120_frame_128f9e0.py` が生成・`ld120_controls.py` が対照と F の数値)。欠落の起点 (lift 段の block `0x1290610` の打ち切り) は子 #2705 (LD-125) |
 | `tools/m11/ldfix/REPORT_3752.md` | ~56 | LD-174 (#3752・#2253 子 A): spill 宛 UNDETERMINED の間接 call 2 site (128cad6・128d007) を TRUE_DROP と判定 (IR に memory-indirect call が無い = D15)。`spill178_1161.tsv` の 2 行を再生成 |
@@ -951,6 +954,7 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4110.md` | ~60 | FLDENV/FRSTOR 後のタグ語 (TW) の復元規則 (PLG-G2-48・#4110)。 空/非空だけ読み、種類は格納時に値から分類する規則。 env 差分試験 99,982 → 100,000 (slot 18 → 0)・ネガコン・主試験の不変・x64 回帰。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4080.md` | ~45 | x87 独立入口 4 本の引数形 (逆アセンブル確定) と突合 (thiscall 2 本は TARGETS、cdecl double 2 本は PROBE)。 断片 6 本の親入口 `0x1000c077` は未確定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4064.md` | ~60 | x87 leaf 3 本 (`0x10009eb5`・`0x1000b526`・`0x1000bf60`) の eax・ST(0) の差の切り分け (#4064 PLG-G2-40): 模型 (`ott_x87.h`) の例外フラグ・C1 の限界。 測定値の正本 |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_5423.md` | ~60 | `0x100085a0` の辿るポインタ (窓の外 `ecx+0x520cc8`) の位置 (受入 1) と、窓の外の 1 語に有効な番地を書いた複製プローブの native・wasm 2000 行突合 (#5423 PLG-G2-78)。 既存 harness は変えず、プローブの複製で測定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4923.md` | ~50 | `0x1000ba05` の引数 edx の形 (指す先の 8 B の double・Inf/NaN 分岐) と、edx に有効な番地を渡した native・wasm の 2000 行突合 (#4923 PLG-G2-68)。 既存 harness の edx=0 は変えず、プローブの複製で測定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4105.md` | ~60 | `0x1000bf60` の ST(0) の NaN・ゼロの食い違いの分類 (#4105 PLG-G2-47): 非 normal オペランド (denorm・unnorm) で模型の限界 (例外処理)、normal 系は一致。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_5264.md` | ~60 | NaN どうしのビット差の後段の算術への伝播 (#5264 PLG-G2-73): 四則・符号・絶対値・比較・連鎖 144 組で native (x87 命令) と wasm を突合。 NaN ビットの差は非 NaN の結果と比較に伝播せず 0 件。 PM の許容判断は未決。 測定値の正本 |
@@ -1101,6 +1105,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_3802_DIFF.md` | ~165 | #3802 付録 §⑧ の差分の全文: 測定 commit `6323671e7` → HEAD の `ghidra_route` の `git diff` 出力 (main 取り込み分を含む)。差分の記録であり測定値の正本ではない |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4889.md` | ~40 | KH-128 (#4889): Delay の `FUN_180fbc1f4` 呼出し 2 件 (1082・1088) の引数を機械語で確定し規則化 (xmm0 float・戻り値 xmm0)。引数数不一致 79 → 77。§10-7w が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4883.md` | ~60 | KH-127 (#4883): Delay の引数過不足 10 件のうち 4 件 (`FUN_180fb5c6c`・`FUN_180fb5f8c`) を機械語で確定し規則化 (86 → 82)・残件 6 件は子 #4917 [KH-135]。§10-7v の正本 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_5362.md` | ~90 | KH-154 (#5362): Delay の残件 callee `FUN_181384040` (memmove shim) の呼出し 6 行を機械語で確定し ABI 規則化 (測定値は付録の 5362-4)・Gain/Haas/Gate の `.o` 不変。残りの pointer⇔整数規則は親 #5362 に残す |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3800.md` | ~66 | KH-64 (#3800): Delay の引数過不足のうち呼出先 FUN_180fd4f30 分の ABI 規則 (部分)。根拠・census・未解決は §10-7u が正本 (残りは子 #3844・#3847) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4911.md` | ~60 | KH-134 (#4911): Stereo 閉包の型不一致 12 件のうち 10 件を delay 表の機械語確定済み GTYPE で書換え (部分・emcc 型不一致 12 → 2)。根拠・件数・未解決は本付録が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4871.md` | ~60 | KH-124 (#4871): Stereo 閉包の FUN_180fd4f30 引数なし呼出 22 件を delay の ABI 規則で書換え (emcc 42 → 20)。根拠・内訳・未解決は §10-7v が正本 (残りは子 #4910・#4911) |

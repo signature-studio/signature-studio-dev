@@ -8,7 +8,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const TESTS = ["test/engine.test.ts", "test/launch.test.ts", "test/killed.test.ts"];
+const TESTS = ["test/engine.test.ts", "test/launch.test.ts", "test/killed.test.ts", "test/status.test.ts", "test/launch_holds.test.ts"];
 
 const MUTANTS = [
   { name: "報告の素材を前回の行と比べない (常に新しい素材ありとみなす)", file: "src/engine.ts", from: "return addArts(base, neededArtsOf(", to: 'return addArts("oc_artifacts: none", neededArtsOf(' },
@@ -18,6 +18,7 @@ const MUTANTS = [
   { name: "unknown の枠の上限を外す (fallback の c.unknown === 0 を外す)", file: "src/engine.ts", from: '} else if (reason === "artifact" && c.unknown === 0) {', to: '} else if (reason === "artifact" && c.unknown < 99) {' },
   { name: "再投入後の素材なし artifact を oc-pm に渡さない", file: "src/pm.ts", from: "const artDone = oc.reason === \"artifact\" && !!o.artSpent?.(i.number);", to: "const artDone = false;" },
   { name: "上限に達した素材なし artifact を oc-pm に渡さない (artSpent の上限の枝を外す)", file: "src/engine.ts", from: "this.noPrState(n).unknown >= 1 || this.noPrState(n).count >= NO_PR_MAX_RELAUNCH", to: "this.noPrState(n).unknown >= 1" },
+  { name: "stopped の判定根拠 (run-outcome) を reason なしの語にする (#5234)", file: "src/engine.ts", from: "stopBasis.set(n, `run-outcome reason=${reason}`);", to: 'stopBasis.set(n, "run-outcome");' },
   { name: "再確認の 1 行を本文から外す", file: "src/launch.ts", from: 'if (l === "{recheck}") return recheck ? [RECHECK_LINE] : [];', to: 'if (l === "{recheck}") return [];' },
 ];
 
