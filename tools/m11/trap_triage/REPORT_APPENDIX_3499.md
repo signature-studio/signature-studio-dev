@@ -1,8 +1,8 @@
-# REPORT_718 付録 (#3499): §4i 証拠表の行 36〜66
+# REPORT_718 付録 (#3499): §4j 証拠表の行 36〜66
 
-`REPORT_718.md` の §4i の全文。`REPORT_718.md` が 250 行上限を超えるため分割移動した (内容は削除していない)。本付録の『§』は `REPORT_718.md` の節を指す。
+`REPORT_718.md` の §4j の全文。`REPORT_718.md` が 250 行上限を超えるため分割移動した (内容は削除していない)。本付録の『§』は `REPORT_718.md` の節を指す。
 
-## 4i. 証拠表の行 36〜66 (#3499・部分達成: 母数 31・判定 25 件 (真陽性 25・偽陽性 0)・保留 6 件)
+## 4j. 証拠表の行 36〜66 (#3499・部分達成: 母数 31・判定 25 件 (真陽性 25・偽陽性 0)・保留 6 件)
 
 - 初回の測定 commit: `4b6ec01b0` (origin/main。本 PR の基点)。`git diff 4b6ec01b0 HEAD -- tools/m11/guard699/ tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py` = 0 行。初回の判定はこのコードで行った。
 - 再測定 commit: `0e7700d53` (main `feff012eb` 取り込み後の merge)。`git diff 0e7700d53 HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py tools/m11/trap_triage/judge_ctx.py tools/m11/trap_triage/judge_ctx_3499.py` = 0 行。判定の件数・表は初回のまま (再測定は走査・証拠表・ダンプを作り直しただけ)。本 PR は `tools/m11/trap_triage/judge_ctx_3499.py` (文脈ダンプ) を追加するだけで、既存の走査・証拠表・ダンプのコードは変えない。
