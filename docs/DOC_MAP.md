@@ -115,6 +115,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_672.md` | ~110 | FLE-672 (#672) の付録: buf = 0 の fill を戻す診断 (`FLE_DIAG_NULLFILL=1`) の結果表 (5 route)・仮説 ①②③ の成否・停止点 `unlifted 0x6bbc20`・既定経路の不変の証跡。REPORT §11 と §A (旧記述の移動) から参照 |
 | `tools/flelift/boot/REPORT_APPENDIX_2719.md` | ~190 | #2719 (WIN-8) の付録: x64c 寛容起動 (`FLE_TOLERANT` 1/2) の 942 unit 逐次試行の結果表・skip 一覧 (84)・survey との差 (77)・silent miscompile のリスク評価・CreateFruityInstance (0x1375990) の観測 (oob 即時・API 0 件) |
 | `tools/qfclift/REPORT.md` | ~185 | T-SH-12 (#154 部分達成): QuickFontCache_x64.dll の x64c lift (6,347 関数・unsup 0) + SSSE3 handler 注入 (pshufb/pmulhrsw/phaddw) + native-vs-wasm の SSSE3 spot diff (§0〜§6)。boot (#3289・T-SH-60): DllMain の wasm 実行は FAIL で停止点を実測 (§7・§8)。FT_* の GetProcAddress 解決 (T-SH-79 / #3412) の結論は §9 (全文は付録)。ILTools は `tools/iltools/REPORT.md` 参照。FruityPlug は未着手 |
+| `tools/qfclift/REPORT_APPENDIX_3411.md` | ~40 | T-SH-78 (#3411) の付録: REPORT §10 の全文。DllMain 経路の直接呼出し計数 (5 件・表・Windows 仕様との対応)・計数の限界 (間接経由は未計数)・未解決 |
 | `tools/qfclift/REPORT_APPENDIX_3412.md` | ~50 | T-SH-79 (#3412) の付録: REPORT §9 の全文。FT_* 14 本の token 経由呼出 (表・直接呼出との照合・ネガコン)・FreeType wasm32 ビルド (#145 方式)・検証範囲と未解決 |
 | `tools/iltools/REPORT.md` | ~66 | T-SH-12 (#154): ILTools_x64.dll の export 閉包 lift gate (閉包 824 関数・unsup 0 / 閉包外の x87 関数 45 本は `x64c --trap` の trap stub・陰性対照 2 本)。全 .pdata 測定 (unsup 1,236 は全て x87) は §3 |
 | `tools/fruityplug/REPORT.md` | ~60 | T-SH-12 (#154): SGv2 の win 対応の検証。classify.py の block24353 (FruityPlug_x64.dll 名) は VERSIONINFO で Maximus と判明し SGv2 の根拠にならない。export 名は 133 本で非一意。mac 素材との突合は未達 |
