@@ -34,7 +34,7 @@ static const fla_layout_entry_t g_layout[] = {
     OFF(ref_ctx_time_bits), OFF(ref_epoch_ms_bits), OFF(ref_seq), OFF(out_latency_us), OFF(base_latency_us),
     OFF(cmd_seq), OFF(cmd_op), OFF(cmd_arg), OFF(ack_seq), OFF(ack_status), OFF(ack_res), OFF(ctrl_ready),
     OFF(cb_count), OFF(cb_late), OFF(cb_max_us), OFF(cb_sum_us_lo), OFF(wake_count), OFF(wait_timeouts),
-    OFF(in_underflows), OFF(min_fill), OFF(fill_sum_lo), OFF(fill_samples),
+    OFF(in_underflows), OFF(min_fill), OFF(fill_sum_lo), OFF(fill_samples), OFF(pw_n), OFF(pw_trace),
 };
 const fla_layout_entry_t *fla_layout_offsets(int *count) {
     *count = (int)(sizeof g_layout / sizeof g_layout[0]);
@@ -174,6 +174,7 @@ void fla_reset_indexes(void) {
     c->cb_count = c->cb_late = c->cb_max_us = c->cb_sum_us_lo = c->wake_count = c->wait_timeouts = 0;
     c->in_underflows = 0; c->min_fill = 0xffffffffu; c->fill_sum_lo = 0; c->fill_samples = 0;
     memset(c->wake_hist, 0, sizeof c->wake_hist);
+    c->pw_n = 0;
 }
 
 void fla_go(void) {
