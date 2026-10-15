@@ -139,8 +139,8 @@ python3 tools/shared/scripts/ildsp_vtable_check.py tools/shared/work/raw/ildsp_v
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| vtable slot 1–3・5 の役割 (どの method か) の native 実行による確定 | 受入条件 (1) の残り | 子 [T-SH-38] |
-| 間接 call 4 件 (0x1aedc0 / 0x1b6f4c) の正常系での到達実測・扱いの決定 (4-6) | 受入条件 (3) | 子 [T-SH-38] |
+| vtable slot 1–3・5 の役割 (どの method か) の native 実行による確定 | 受入条件 (1) の残り | 子 [T-SH-53] #3249 |
+| 間接 call 4 件 (0x1aedc0 / 0x1b6f4c) の正常系での到達実測・扱いの決定 (4-6) | 受入条件 (3) | 子 [T-SH-54] #3250 |
 | 15 関数 (closure は 4-5 の定義で 36 / 87 関数) の lift・native 差分・ネガコン・gate | 受入条件 (2)(4) | 子 [T-SH-39] |
 | 旧 issue 本文の「15 関数・473 命令・SIMD 11.4%」の出典 | 本 REPORT で再現できない | #2483 本文から削除 (本 PR) |
 | §2 survey 表が chained `.pdata` 未処理で下限 | §2 の数値は下限 | #161 継続 |
@@ -226,11 +226,11 @@ Issue 本文の「sub-object の vtable」という前提は誤り。CreateInsta
 - 検算の範囲: 命令は objdump、slot 値と DIR64 reloc は PE の生バイトで照合。closure の完全性は検算していない。対象 VA の参照は、RIP 相対の命令参照と 8 バイト絶対値だけを見る (レジスタ計算値・4 バイト相対値は対象外。他 vtable 格納 2 件の書き込み先は §5-4 の走査で確認)。
 - `git diff da2ba516 HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
 
-## 6. vtable slot 4 (0x1aa3a0) の lift と native 差分 (#2529)
+## 6. vtable slot 4 (0x1aa3a0) と slot 5 (0x1aa470) の lift と native 差分 (#2529・#3404)
 
 ### 結論 (1 行)
-GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0・42 命令・直接 call / 間接 call 0) を RetDec で lift し、元の機械語との差分は 240/240 で一致。ネガティブコントロール 2 件は期待どおり FAIL。
-全文 (手順・選定根拠・実測・未解決) は `REPORT_APPENDIX_2529.md` §6 が正本 (250 行上限のため分割移動)。
+GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0・42 命令・直接 call / 間接 call 0) を RetDec で lift し、元の機械語との差分は 240/240 で一致。ネガティブコントロール 2 件は期待どおり FAIL。slot 5 (RVA 0x1aa470・`xor eax,eax; ret`) も同じ手順で lift し、戻り値を含む差分は 240/240 で一致 (#3404)。
+全文 (手順・選定根拠・実測・未解決) は slot 4 が `REPORT_APPENDIX_2529.md` §6、slot 5 が `REPORT_APPENDIX_3404.md` が正本 (250 行上限のため分割移動)。
 
 ## 7. WaveformColouring_CreateInstance の x64c lift と native 差分 — T-SH-52 (#3216・部分達成)
 

@@ -29,4 +29,20 @@ for v in wasm32 wasm64; do
   else diff "$O/out_native.txt" "$O/out_$v.txt" | head -6; echo "[qfc-import] FAIL $v"; rc=1; fi
 done
 head -1 "$O/out_native.txt"; grep '^table' "$O/out_native.txt"
+
+# T-SH-79 (#3412): guest の GetProcAddress 相当 (qfc_gpa) のトークンだけで同じ FT 呼出を行い、native / wasm32 / wasm64 で一致することを見る。
+gcc -O2 -I"$INC" -I"$HERE" "$HERE/test_qfc_gpa.c" "$HERE/qfc_import.c" "$B/native/src/objs/.libs/libfreetype.a" -lm -o "$O/gpa_native"
+emcc -O2 -I"$INC" -I"$HERE" "$HERE/test_qfc_gpa.c" "$HERE/qfc_import.c" "$B/wasm32/src/objs/.libs/libfreetype.a" -o "$O/gpa_wasm32.cjs" \
+  -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
+emcc -O2 -sMEMORY64=1 -I"$INC" -I"$HERE" "$HERE/test_qfc_gpa.c" "$HERE/qfc_import.c" "$B/wasm64/src/objs/.libs/libfreetype.a" -o "$O/gpa_wasm64.cjs" \
+  -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
+"$O/gpa_native" "$FONT" > "$O/gpa_out_native.txt"
+node "$O/gpa_wasm32.cjs" "$FONT" > "$O/gpa_out_wasm32.txt"
+"$node64" "$O/gpa_wasm64.cjs" "$FONT" > "$O/gpa_out_wasm64.txt" 2>"$O/gpa_out_wasm64.err"
+for v in wasm32 wasm64; do
+  if diff -q "$O/gpa_out_native.txt" "$O/gpa_out_$v.txt" >/dev/null; then
+    echo "[qfc-gpa] PASS $v: native == wasm ($(wc -l < "$O/gpa_out_$v.txt") lines, $(tail -1 "$O/gpa_out_$v.txt"))"
+  else diff "$O/gpa_out_native.txt" "$O/gpa_out_$v.txt" | head -6; echo "[qfc-gpa] FAIL $v"; rc=1; fi
+done
+grep '^gpa table' "$O/gpa_out_native.txt"
 exit $rc

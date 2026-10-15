@@ -11,6 +11,7 @@ cfg (JSON) の passes.icall:
 """
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -55,7 +56,6 @@ def blk_global_text(text, blk):
     """#1269: BLK (icall の固定 block, 既定 VA 0x184308000) への inttoptr 定数を module-local global への GEP に張り替える。
     wasm32 では BLK VA が線形メモリ外へ切り詰められ load/store が trap するため。配置は wasm 内の global に任せる。
     対象は blk ..< blk+BLK_GLOBAL_SIZE の inttoptr のみ。返値 (text, 置換数)"""
-    import re
     n = [0]
 
     def sub(m):
@@ -70,3 +70,43 @@ def blk_global_text(text, blk):
         m = re.search(r"^(define|declare) ", text, flags=re.M)
         text = text[:m.start()] + decl + text[m.start():] if m else text + "\n" + decl
     return text, n[0]
+
+
+# icall_rewrite.py の BLK_RCX / BLK_RDX / BLK_R8 / BLK_R9 → MS x64 の整数引数位置 (0 = rcx = 第 1 引数)
+BLK_ARG_SLOT = {0x08: 0, 0x10: 1, 0x18: 2, 0x20: 3}
+
+
+def entry_blk_args(fn):
+    """#1270: leaf (harness が直接呼ぶ関数) の入口で BLK の rcx/rdx 読み (BLK+0x08/+0x10) を仮引数 %argN へ張り替える。
+    harness は leaf の引数を wasm 引数 (%argN) で渡し BLK へは書かないため、BLK 読みは 0 になる (this=0 で値が合わない)。
+    対象は入口ブロックで BLK への store・関数呼出し (asm helper を除く) より前にある load だけ。
+    blk_global_text (@__icall_blk への GEP) と iargs (仮引数の補完) の後に呼ぶ。返値: 置換数。"""
+    if not fn.blocks:
+        return 0
+    params = [(p[0], p[1]) for p in fn.params()]
+    lines = fn.blocks[0].lines
+    gep, n = {}, 0
+    for ln in lines:
+        g = re.match(r"^\s*(%\S+) = getelementptr inbounds i8, ptr @__icall_blk, i64 (\d+)\s*$", ln)
+        if g:
+            gep[g.group(1)] = int(g.group(2))
+    for i, ln in enumerate(lines):
+        if re.match(r"^\s*(store|br|ret|switch)\b", ln) or (re.match(r"^\s*(%\S+ = )?(tail |musttail |notail )?call\b", ln) and "@__asm_" not in ln):
+            break
+        ld = re.match(r"^(\s*)(%\S+) = load i64, ptr (%\S+), align \d+(.*)$", ln)
+        if not ld or gep.get(ld.group(3)) not in BLK_ARG_SLOT:
+            continue
+        k = BLK_ARG_SLOT[gep[ld.group(3)]]
+        if k >= len(params):
+            continue
+        ty, v = params[k]
+        if ty == "i64":
+            lines[i] = "%s%s = add i64 %s, 0%s" % (ld.group(1), ld.group(2), v, ld.group(4))
+        elif ty == "ptr":
+            lines[i] = "%s%s = ptrtoint ptr %s to i64%s" % (ld.group(1), ld.group(2), v, ld.group(4))
+        elif ty in ("i1", "i8", "i16", "i32"):
+            lines[i] = "%s%s = zext %s %s to i64%s" % (ld.group(1), ld.group(2), ty, v, ld.group(4))
+        else:
+            raise ValueError("entry_blk_args: unsupported param type %r (%s)" % (ty, v))
+        n += 1
+    return n
