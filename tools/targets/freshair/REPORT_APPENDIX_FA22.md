@@ -87,7 +87,7 @@ setter `0x180c9d700` 内の間接 call で落ちる。本付録は**機械語の
 | `FA_NODE1 FA_SET9 FA_PROBE9 FA_P9GUARD` (HEAD `f5160903f`, S900〜S906 同形) | 1 回目 (map 経路) | C=C0 | 0 | 0 |
 | 同 | 2 回目 (nokey 経路) | C=Z (S900: `0x555947237750`) | `Z+0x2b0` (S900: `out0-C=0x2b0`) | 1 |
 
-- 上の「probe 無し」行は未測定。前回実測 (`63d53758b`) は、その後 `tools/targets/freshair/lift2` 他 17 ファイルが変わったため採らない。HEAD で取り直すには素材 `plugins-freshair` が要る。`f5160903f` の測定 run では `$RUNNER_TEMP` に展開できたが、HEAD 作業の run では `$ARTIFACTS_DIR` に `fl-win64` しか無く展開できなかった。取り直しは素材追加後の別作業とし、親 #4223 の本文にチェックリストで残す。
+- 上の「probe 無し」行は未測定。前回実測 (`63d53758b`) は、その後 `tools/targets/freshair/lift2` 他 17 ファイルが変わったため採らない。HEAD で取り直すには素材 `plugins-freshair` が要る。`f5160903f` の測定 run では `$RUNNER_TEMP` に展開できたが、HEAD 作業の run では `$ARTIFACTS_DIR` に `fl-win64` しか無く展開できなかった。取り直しは `plugins-freshair` を取得できる run の別作業とし、PR #5465 本文の未解決表で追跡する (再測定だけの子は起票しない・規約 11)。
 - probe 下の 2 回目 (C 行, HEAD) では `out[0]=C+0x2b0` (`0x180ca1651`) で、node Z 自身の値ではない。`[out0+0x10]=Z+0x2c0` が poison と一致し、ERR の直接原因になる。
 - probe 無しの `out[0]=Z+0x2b0` (旧測定 `63d53758b`) は HEAD では未測定。表の値は再測定できるまで根拠に使わない。
 - `found` は `out[0]!=0` で定義する (§3 の 31〜32 行目の `out+0x10` 判定は誤り)。1 回目 0・2 回目 1。
