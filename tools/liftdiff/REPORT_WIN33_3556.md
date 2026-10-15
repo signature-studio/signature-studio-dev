@@ -4,7 +4,7 @@
 
 測定 commit: `fa8ec63d9` (コードを変えた最後の commit。本 REPORT の数値は全てこの commit で実測した。§9)。HEAD は本文書の commit で、`git diff fa8ec63d9 HEAD -- tools/liftdiff ':(exclude)*.md'` の出力は空 (コード差分 0。`docs/WORKFLOW.md` §6)。`origin/main` (`c2324dea6`) を取り込んだ後は `git diff --name-status 7080aca8a HEAD -- tools/liftdiff` が main 由来の変更を含むため、旧測定 commit `7080aca8a` の値は使わず、HEAD 系の値だけを §1・§6 に置く (旧値との対応は §9)。
 既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなく、harness の stub 応答と停止の扱い。新規の類型候補は §7)。
-再現コマンド: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/liftdiff/win33_catalog.sh` (約 150 s・4 spike/trace 実行)。e2e: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/liftdiff/liftdiff_e2e.sh --m11-only` (約 3 分 13 秒)。
+再現コマンド: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/liftdiff/win33_catalog.sh` (2 分 29 秒・4 spike/trace 実行)。e2e: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/liftdiff/liftdiff_e2e.sh --m11-only` (3 分 13 秒)。
 素材: fl-win64・work-m11・work-liftdiff・toolchain-emsdk (`[EMSDK]`)。`tools/liftdiff/work/` `tools/m11/work/` は work-liftdiff・work-m11 を展開した (gitignore 対象の検証スナップショット。commit しない)。
 実行環境: GitHub Actions runner (4 コア)。load average は win33 の前後で 0.5〜1.0、e2e の前後で 0.7〜6.4 (e2e 内の並列 batch による)。
 
@@ -36,7 +36,7 @@ ReadFile の引数: `h=0x65000001`・`buf=0x3d49240`・`n=0xb92d` (= END の位�
 - `ld_core.h`: `LD_CATALOG_MO` 指定時だけ `CreateFileW` が `default.moe` を仮ハンドル `0x65000001` で開き、`ReadFile`・`SetFilePointer`・`GetFileSize` を実バイトで応答する (前の実験の再現。既定では `ld_cat_blob == NULL` で分岐に入らない)。main 由来の WIN-9 分岐 `ld_cat_on()` は同じ env で先に応答するため、`if (!ld_cat_blob && ld_cat_on())` で譲らせて応答を 1 経路にした (`9694e7564`)。
 - `ld_native.c` の trace 拡張 (環境変数のみ・既定無効): `LD_STEP_ID=<case id>` で 1 case だけ命令 trace、`LD_STEP_MEM=<VA>` で 8B の変化を `MEM writer_last_img_rva=…` 行として記録、`LD_CASE_TMO_US` で case の timer (既定 1.5 s)。`ldlib/runners.py` の `LD_RUNNER_TMO` は Runner の read timeout を上書きする (trace が長いため。未指定時は従来どおり)。
 - `spike_cfi.py` の `model_names()` は、WIN-9 分岐の除外を `if (!ld_cat_blob && ld_cat_on()) {` の形に合わせた (`fa8ec63d9`)。ブロックは除去されるが、`ld_streq` の名前集合は 146 件のまま変わらない (同名が他の箇所でも使われるため)。
-- trace の 1 行は `rva rax rcx rdx rbx rsp rbp rsi rdi r8 r9` (実行前のレジスタ)。cfi の trace は約 8.82 M 命令 (trace 行 8,819,946 で `0x12a25`)。
+- trace の 1 行は `rva rax rcx rdx rbx rsp rbp rsi rdi r8 r9` (実行前のレジスタ)。cfi の trace は 8.82 M 命令 (trace 行 8,819,946 で `0x12a25`)。
 - スタック上のアドレス (V の場所) は環境変数の長さで変わるため、`win33_catalog.sh` は 1 回目の trace で最後の `0x17b70` の r9 を取り、同じ環境長で 2 回目に `LD_STEP_MEM` を付ける。`win33_catalog.sh` の [2/4] は `LD_CATALOG_MO` 指定時の出力 `spike_cfi_cat.json` を copy する (`fa8ec63d9`)。
 - `win33_catalog.sh` の `TRACE_ENV` は配列にして `env "${TRACE_ENV[@]}"` で展開する (空白を含むパスで壊れない。`9694e7564`)。
 
