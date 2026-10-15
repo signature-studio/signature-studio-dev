@@ -184,7 +184,7 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 | `gui-guest-boot` (`state==='running'`, `frames=1`, lit 38400 px, 色 ≥7) | 384 | 198 | 410 | 198 |
 | `gui-guest-tamper` (`state==='error'`, `frames=0`) | 142 | 151 | 149 | 50 |
 
-- `EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/e2e/run.sh --driver both --targets preview,edge-sim`: **PASS 42 / FAIL 0 / SKIP 6**、wall 14 s、rc 0。前の基準 (`75131c60`) は PASS 34 / FAIL 0 / SKIP 6。増分 8 = 新検査 2 件 × 4 組 (取り込み前の `c56c734d0` も同じ 42/0/6)。
+- `EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/e2e/run.sh --driver both --targets preview,edge-sim`: **PASS 42 / FAIL 0 / SKIP 6**、wall 14 s、rc 0。前の基準 (`75131c60`) は PASS 34 / FAIL 0 / SKIP 6。増分 8 = 新検査 2 件 × 4 組 (取り込み前の `c56c734d0` も同じ 42/0/6)。
 - 同系列の別 run (`3b1370f0f`・`9a3e4f520`・`c56c734d0`) でも PASS 42 / 0 / 6、`gui-guest-boot` は 197〜424 ms。`open → running` は検査の所要が上限値 (`drv.open` を含む)。180 s の予算に対して十分小さい。FL の wasm での値は未計測。
 - 単体テスト `node --test tools/e2e/webstudio_state.test.mjs`: 7 PASS (新規 1 件: `setGuest` 前は契約に guest が無い・設定後は保持)。`pnpm typecheck` rc 0。
 
