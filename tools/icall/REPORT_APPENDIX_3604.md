@@ -1,6 +1,6 @@
 # icall #3604 (CI-170): tools/icall の従来既定値 8 本を tools/shared の環境変数定義へ置換
 
-親: #294 (CI-4)。`tools/icall/REPORT.md` は 250 行上限のため、本節は付録に置く (REPORT.md §8.5 の『`/home/ubuntu/...` ハードコード』行を解決済みに更新)。
+親: #294 (CI-4)。`tools/icall/REPORT.md` は 250 行上限のため、本節は付録に置く (REPORT.md §8.5 の『`[ANALYSIS-DIR]` 直書き』行を解決済みに更新)。
 従来の既定値は `docs/REFERENCES.md` §4 の `[ANALYSIS-DIR]` (`ANALYSIS_DIR` の既定値) で表す。
 
 ## 1. 結論

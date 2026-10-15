@@ -170,7 +170,7 @@ native は CRT 未初期化で SIGSEGV するため突合不能 (UCRT の観測�
 | `_handle_errorf` (1801c8cb8) は route の closure F に無く未 lift | float 版エラー経路に到達すると fail-fast | #231 続報 (到達 scenario が構築できた時点で) |
 | 関数単位 gate は SSE2 経路の 6 関数のみ。他の CRT 関数 (exp/log/pow の 1801b4220 等) は DSP matrix の bit 一致のみ | OTT が踏まない入力域の 1ulp は残り得る | #231 続報 (候補選別 `fn_diff.py` は rip/rsp 相対 leaf の 8 関数に限定) |
 | #9 (OTT bit-exact 512/512) への反映: route でも 512/512 (t1 std 512 cell: zero 5 / normal 507 / junkHi 0 / junkTiny 0, |max| 0.2516) | — | #9 にコメントで報告 |
-| `/home/ubuntu/work/analysis/...` ハードコード | runner で動かない | tools/icall の 8 本は #3604 で解決 (`REPORT_APPENDIX_3604.md`)。tools/ の残りは #294 |
+| `[ANALYSIS-DIR]` 直書き | runner で動かない | tools/icall の 8 本は #3604 で解決 (`REPORT_APPENDIX_3604.md`)。tools/ の残りは #294 |
 
 ### 8.6 再現
 ```sh
