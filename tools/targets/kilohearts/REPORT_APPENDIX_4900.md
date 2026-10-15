@@ -4,9 +4,10 @@
 
 ## 結論
 
-- `DELAY_RULES` に 2 件 (件数 assert 付き) を足した。`uVar19 = auVar20._0_4_ & 0x3f` と `uVar3 = (int)(auVar20._0_4_ - uVar19) >> 6` を、`(int)` で読む形に書いた。`V128` の型は変えていない。
-- emcc error **343 → 342** (−1)、演算・代入・ポインタの型不一致 **90 → 89** (−1)。3069・3071 行の `invalid operands to binary expression ('float' and 'int')` は消えた。
-- Gain/Haas/Gate の `.o` は基準 `ef51996d0` と `cmp` 一致 (gain 1435・haas 3217・gate 3756 B)。
+- `DELAY_RULES` に 2 件 (件数 assert 付き) を足した。`uVar19 = auVar20._0_4_ & 0x3f` と `uVar3 = (int)(auVar20._0_4_ - uVar19) >> 6` を、ビット列を読む `f2u()` で包む形に書いた (レビュー指摘 blocking 1 の修正)。`V128` の型は変えていない。
+- 旧式 (`(int)` の値変換) は、`float` の数値を int にするため機械語のビット読みと一致しなかった。下の表の `(int)` 版の測定値 (343 → 342) は旧式の値で、現在の `f2u()` 式には対応しない。
+- **現 HEAD (`f2u()` 式) の再測定は未実施**。素材 `plugins-kilohearts` が `$ARTIFACTS_DIR` に無く、emcc も無いため。必要素材は `oc_artifacts: fl-win64 plugins-kilohearts toolchain-emsdk`。
+- Gain/Haas/Gate の `.o` の `cmp` 一致は、旧式での結果。現 HEAD では未確認。
 
 ## 機械語の確認
 
@@ -19,7 +20,7 @@ sub   ecx,eax
 sar   ecx,0x6         ; 整数の算術右シフト
 ```
 
-整数演算なので、読み方は `int`。`auVar20` の `_0_4_` は `V128` 上で `float` だが、この箇所は値を整数として読む。
+整数演算なので、読み方は `int`。ただし `movd` はビット列を読む。`auVar20` の `_0_4_` は `V128` 上で `float` なので、`f2u()` (`memcpy` によるビット再解釈) で読み直す。`(int)` の値変換は、小さい整数のビット列 (denormal) を 0 にするため使わない。
 
 ## 測定
 

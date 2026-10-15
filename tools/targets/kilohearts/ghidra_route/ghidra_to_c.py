@@ -165,11 +165,11 @@ DELAY_RULES = [
      'memcpy(&auVar2._4_12_, gd_182280e04, 12);', 1),
     # #4900 (KH-132): vcvtpd2dq の結果 (32bit 整数) の下位 lane を int で読む 2 行。機械語で確定 (REPORT_APPENDIX_4900.md)。
     #   FUN_180fc4590 0x180fc48bc〜48db: movd ecx,xmm4 → and eax,ecx → sub ecx,eax → sar ecx,6 (整数演算)。
-    #   auVar20 は V128 (_0_4_ が float) なので、整数として読む式だけを (int) キャストで書く (V128 の型は変えない)。
-    ('auVar20._0_4_ & 0x3f: vcvtpd2dq の下位 lane を int で読む (#4900)', r'uVar19 = auVar20\._0_4_ & 0x3f;',
-     'uVar19 = (uint)((int)auVar20._0_4_ & 0x3f);', 1),
-    ('auVar20._0_4_ - uVar19: vcvtpd2dq の下位 lane を int で読む (#4900)', r'uVar3 = \(int\)\(auVar20\._0_4_ - uVar19\) >> 6;',
-     'uVar3 = (int)((int)auVar20._0_4_ - (int)uVar19) >> 6;', 1),
+    #   auVar20 は V128 (_0_4_ が float) なので、ビット列を f2u() で読み直す (値変換の (int) にしない。V128 の型は変えない)。
+    ('auVar20._0_4_ & 0x3f: vcvtpd2dq の下位 lane をビット列で読む (#4900)', r'uVar19 = auVar20\._0_4_ & 0x3f;',
+     'uVar19 = f2u(auVar20._0_4_) & 0x3f;', 1),
+    ('auVar20._0_4_ - uVar19: vcvtpd2dq の下位 lane をビット列で読む (#4900)', r'uVar3 = \(int\)\(auVar20\._0_4_ - uVar19\) >> 6;',
+     'uVar3 = (int)(f2u(auVar20._0_4_) - uVar19) >> 6;', 1),
     # #4838 (KH-119): 代入の pointer⇔整数 5 行。機械語で確定 (REPORT_APPENDIX_3801.md の P6 の現 HEAD 残件)。
     #   FUN_180f88084・FUN_180f880a4・FUN_180fd2d38: 初期化の 8 byte スロットへ leaq で得た番地を movq で書く。
     #   値はそのアドレス (&UNK_<va>) のビット列。整数型スロットへ同ビットを明示キャストで書く (数値変換にしない)。
