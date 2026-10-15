@@ -68,6 +68,24 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 
 この表の再現スクリプトは repo に無い。本 run では再現していない。**分かったことは「配置の境界ではなく、同一 instance 内での ctor の呼び出し回数に結びつく可能性」まで**。原因 (どのループ・どのテーブルか) は未確定。
 
+## 3b. 子 #4392 の一次切り分け (Node・同期・`tools/perf/p15/ctor_heap_probe.mjs`)
+
+測定 commit: `daea2d06f` (プローブを追加した commit。コードの最後の変更)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb…`) を展開して測定。
+
+| 測定 | 結果 | 出典 |
+|---|---|---|
+| `node node_init_sweep.mjs --m 145,146 --timeout 15000` | M=145 成功 (setup 788 ms)・M=146 timeout | 本 run のローカル出力 |
+| `ctor_heap_probe.mjs 146` 3 run (HEAD) | 3/3 とも 146 回目の ctor 前 (`before_call` 145) で戻らず (25 s で打ち切り) | 本 run のローカル出力 (未 commit) |
+| `ctor_heap_probe.mjs 145` (対照) | 完了 (wall 1 s)・`bytes_per_ctor` 3673793 | 同上 |
+
+観察 (本 run で確認した数値):
+- ctor 1 回で wasm heap の先頭が約 3.67 MB 進む (`bytes_per_ctor` 3673793)。`ctor` は `operator new` (`f_1801a04d0`・`f_1801a7794`) で `0x40000` などを 6〜14 回確保する (`ott_lifted.c` 18011d720 付近)。
+- 145 回後の heap 先頭は `0x2ff93020`。次の 3.67 MB の確保範囲が image の data 領域 (`0x301e2000`〜`0x30284124`) と重なる。
+- `ott_data_install` が敷く rdata・data の領域 (`0x301e2000`〜`0x30284124`) は、wasm heap の伸びる範囲と重なる。heap 側の確保は `imp_HeapAlloc` が確保ごとに `memset(0)` する (`tools/ott/rt/ott_cpu.c` 76 行。ただし `HeapAlloc` のゼロ化は確保した領域だけに効く)。
+- heap を 64 MiB ずらすと (`malloc` を先に呼ぶ)、止まる位置が 146 回目から 127 回目 (index) へ早まる (約 64 MiB ÷ 3.67 MB ≈ 17.4 回と整合)。Node・1 run のみ・`work/` で実施 (commit 外)。
+
+**未確定 (この節の結論ではない)**: 「heap が data 領域に届いた確保が、data の内容を変えて ctor を戻らなくする」という機構は**仮説**。実測したのは次の 2 点だけ: (a) 145 回目までの ctor では data 領域の hash が不変 (Node・1 run。プローブは commit 外で、コミット済みの再現は未整備)、(b) 146 回目の ctor が戻らないこと (HEAD で 3/3)。146 回目の確保直後に data が変わることの直接確認と、どの関数で戻らなくなるかは未了。
+
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
