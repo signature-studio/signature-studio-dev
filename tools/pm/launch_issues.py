@@ -265,7 +265,7 @@ def classify(d):
             bl = d["bot_last"].get(str(n))
             # 着手後に agent が報告している (= run は終わっている) なら、3 時間待たずに停止判定へ進む
             reported = bool(bl) and (str(n) not in launched or age_h(bl["at"]) < age_h(launched[str(n)]))
-            stop_re = r"着手不可|着手できません|着手に必要|素材不足|停止します|停止報告|ブロック|PM に.*依頼|判断を"
+            stop_re = r"^## 停止報告"
             if str(n) in launched and age_h(launched[str(n)]) < 3 and not reported:
                 rows["recent"].append((n, "launched %.1fh ago" % age_h(launched[str(n)])))
             elif bl and reported and age_h(bl["at"]) < 24 and re.search(stop_re, bl["head"]):
