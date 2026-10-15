@@ -5,10 +5,10 @@
 
 - 親 #2642 (PY-82) の分割。項目 1・2 (前提ゲート `0xd5af58`・後段ゲート `0xd82c6a`) は #3767 (PY-248)、項目 4 (`useGlobalIndex>0` の表) は #3684 (PY-232)。本節は項目 3 (`*p` 書込み元) と項目 5 (`+0x32c` 書込み 9 箇所の型) のみ。
 - 既知類型との関係: 該当なし (lift 作業ではない。PE 逆アセンブルと静的参照の列挙による意味論の確定)。
-- 測定 commit: `527bc1eee` (`analysis/flapi/pe_py249_probe.py` を追加した commit)。コードの変更はこの 1 件のみ。以後の commit は `tools/python/REPORT_PY69.md` と `docs/DOC_MAP.md` (索引の行) のみ。
-- 差分 0 の証跡: `git diff 527bc1eee HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (PR 本文の検証 HEAD で再確認)。
-- 入力: `fl-win64.tar.zst` から `block00031_PE.bin` (22,227,016 B) のみ展開 (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'`、実測 2.9 秒)。
-- 再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py249_probe.py 24` (静的値と 15 箇所の文脈を出す。実測 0.09 秒。load average 0.06 / 0.32 / 0.30 (1・5・15 分平均・実行前)、nproc 4)。
+- 測定 commit: `0945f2102` (main 取り込みの merge。コードを変えた最後の commit)。解析スクリプト `analysis/flapi/pe_py249_probe.py` を追加したのは `527bc1eee`。以後の commit は `tools/python/REPORT_PY69.md`・`tools/python/REPORT_PY249.md`・`docs/DOC_MAP.md` の docs のみ。
+- 差分の証跡: `git diff 527bc1eee 0945f2102 -- tools/python/analysis/flapi/pe_py249_probe.py tools/python/analysis/flapi/pe_xref.py tools/python/analysis/flapi/pe_slot_writers.py tools/python/analysis/flapi/pe_disasm.py` は 0 行 (本節の入力スクリプトは変わっていない)。`tools/python/provider`・`host`・`tests` は main 取り込みで差分がある (`git diff 527bc1eee 0945f2102` で 242・220・542 行) が、本節は PE の静的解析 (`capstone`・`pefile`) のみで、この 3 範囲を読まない。
+- 入力: `fl-win64.tar.zst` から `block00031_PE.bin` (22,227,016 B) のみ展開 (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'`、HEAD で実測 2.8 秒)。
+- 再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py249_probe.py 24` (静的値と 15 箇所の文脈を出す。HEAD で実測 0.095 秒。load average 0.43 / 0.46 / 0.23 (1・5・15 分平均・実行前)、実行後も 0.43、nproc 4)。
 
 ### 結論 (項目 3: `*p` の書込み元)
 
@@ -69,16 +69,16 @@
 - 確定の根拠 (4 件): `T1 = 0x15E2218` の静的初期値は `0x16bafc8` (コンテナ)。`0x11f8840` は `T1` 由来の要素だけに書く (`0x11f8878`・`0x11f88cc`・`0x11f896e`・`0x11f89da` の 4 箇所すべて `0x15E2218`)。同じ表の要素の `+0x798` を `0x103b950` (`0x103b9ad`) と `0x103bd60` (`0x103bda2`) が id と比較し、`0x11e84a0` は `+0x32d`・`+0x160` を同じ表から読む。よって表の要素は channel item と同定する (同定の根拠は `+0x798` の比較。構造体の正式名称は未確定。REPORT_PY69 の `item` と同じ語)。
 - 未確定の 5 件は、`+0x34` (word)・`+0x304`・`+0x310`・`+0x14`・`+0x158`・`+0x160`・`+0x398` (16 件の配列) などを読むが、表示した窓 (関数先頭から書込みまで) では channel item の `+0x798` を読む箇所は見当たらない (関数全体は未読)。型の確定には呼出し元の vtable 先か、呼出し元の基底の由来が要る (未解決表)。
 
-### 検証 (測定 commit `527bc1eee`)
+### 検証 (測定 commit `0945f2102` で再測定)
 
 | 検証 | 結果 |
 |---|---|
 | `pe_disasm.py 0xffac20 30` | 判定式 (`cmp [p],0`・`cmp ecx,[p]`) を再確認 |
-| `pe_xref.py 0x15e3a60` | hits 50・stores 0 (測定 63.0 秒) |
-| `pe_slot_writers.py 0x15e3a60 0` | 候補 6 件 (`candidates=6`)。測定 63.9 秒。偽陽性 1 件 (`0xfffa00`) は節 A で切り分け |
-| `pe_xref.py 0x15e4b08,0x15e2218` | 合計 hits 1573 (`Q` 10・`T1` 1563)・stores 0 (測定 63.7 秒) |
-| `pe_xref.py 0x15452a0,0x1548b8e,0x1548b95,0x1548b89,0x154528c` | `0x1548b95` の store 4・load 4、`0x15452a0`・`0x154528c` の RIP 相対参照 0 (測定 63.3 秒) |
-| `pe_py249_probe.py 24` | 静的値 (`*p` = -1、`S` = 1、`T1` = `0x16bafc8`、mask = `0x30`)。節 A の基底由来 (`0x15e3a60` 5 件・`0x15e0bd0` 1 件)。節 B の由来 (`fe8bb0(*0x15e2218)` 4 件、`frame[..]` 3 件、なし 2 件 (`0x6e9f4d` は `rcx`、`0x82bce0` は `rdx` の引数由来で手で確認))。実行 0.09 秒 |
+| `pe_xref.py 0x15e3a60` | hits 50・stores 0 (57.9 秒) |
+| `pe_slot_writers.py 0x15e3a60 0` | 候補 6 件 (`candidates=6`)。59.1 秒。偽陽性 1 件 (`0xfffa00`) は節 A で切り分け |
+| `pe_xref.py 0x15e4b08,0x15e2218` | 合計 hits 1573 (`Q` 10・`T1` 1563)・stores 0 (57.4 秒) |
+| `pe_xref.py 0x15452a0,0x1548b8e,0x1548b95,0x1548b89,0x154528c` | hits 8・stores 4 (全 8 件が `0x1548b95` の store 4・load 4。`0x15452a0`・`0x1548b8e`・`0x1548b89`・`0x154528c` の参照 0)。56.7 秒 |
+| `pe_py249_probe.py 24` | 静的値 (`*p` = -1、`S` = 1、`T1` = `0x16bafc8`、mask = `0x30`)。節 A の基底由来 (`0x15e3a60` 5 件・`0x15e0bd0` 1 件)。節 B の由来 (`fe8bb0(*0x15e2218)` 4 件、`frame[..]` 3 件、なし 2 件 (`0x6e9f4d` は `rcx`、`0x82bce0` は `rdx` の引数由来で手で確認))。実行 0.095 秒 |
 | ネガティブコントロール (節 A) | 基底の由来を見て `0xfffa00` (`0x15e0bd0`) を除外できる。`0x15e3a60` と一致する 5 件とは区別される |
 
 - 検証範囲 / 範囲外: 静的な PE 解析のみ。実行時の値 (`*p`・`S`) は推定。`*p` と `S` の書込みは線形の窓 (40 命令) と RIP 相対の参照に基づき、別レジスタへの複写経由の書込みは見ていない (未解決表)。実機 FL の挙動は検証していない。
