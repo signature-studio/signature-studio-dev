@@ -20,6 +20,7 @@ bash m11_gen_ir2.sh > "$OUT/gen_ir2.log" 2>&1 || { echo "gen_ir2 FAIL (fail-clos
 python3 m11_data_gen.py "$PE" > "$OUT/data.log" 2>&1 && python3 m11_image_gen.py "$PE" > "$OUT/image.log" 2>&1 || { echo "image FAIL"; exit 1; }
 python3 lb_check.py "$PE" work/m11_image.bin "$LB" > "$OUT/lb_check.log" 2>&1 || { echo "lb_check FAIL: $OUT/lb_check.log"; exit 1; }
 bash m11_build.sh > "$OUT/build.log" 2>&1 || { echo "build FAIL: $OUT/build.log"; exit 1; }
+cp work/boot_final.ll "$OUT/boot_final.ll"
 t0=$(date +%s%N)
 M11_TOLERANT_OUT="$OUT/tolerant_units.json" timeout 600 node m11_tolerant.mjs > "$OUT/tolerant.out" 2>&1; rc=$?
 t1=$(date +%s%N)

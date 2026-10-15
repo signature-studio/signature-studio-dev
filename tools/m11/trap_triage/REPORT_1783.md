@@ -4,6 +4,8 @@
 
 親: #1588。前提の結論は `REPORT_1588.md` §4.5 を正とする (`0x5ac308` は実行時に書き換わり、静的参照 0 件)。
 
+> #2770 (LD-129) の節 (ld_native の 0x5ac308 書込み監視・旧 §8) は付録 `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` §8 に分割移動した (250 行上限)。本ファイルの §8 は #2769 の節。
+
 ## 0. 検証環境
 
 - 測定 base: `origin/main` `6e001233` (branch `1783-m11-slot-5ac308-writer`)。
