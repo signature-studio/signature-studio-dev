@@ -318,6 +318,7 @@
 | `tools/m11/trap_triage/REPORT_3631.md` | ~67 | #3631 (親 #1965、REPORT_1676 §14 の続き): `410360` の間接 call `call qword ptr [rbx-0x50]` の実 target (VA `0x410070`、`ret` 1 命令で no-op)。list B `base=0` の候補から外れる。PE 静的値と実行時 n=2 の実測 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2521.md` | ~46 | #2521 (PR #3485): REPORT_2408 §8.1〜§8.4 の全文 (実測表・unit 144 の trap 経路・未解決・既定変更の到達先)。REPORT_2408 の 250 行上限のため分割移動 |
 | `tools/m11/REPORT_3520.md` | ~100 | #3520: e2e rc=1 の 3 不一致 (期待値 56・872・71001) の原因特定。`m11_build.sh` の ov.o キャッシュ取り違え (M11_FIX_50A830 の stamp 無し) の clean 測定表と stamp の分離テスト。修正は main の `68b9de191` (#3592)。期待値は変えていない |
+| `tools/m11/REPORT_3647.md` | ~101 | #3647 (親 #3520): e2e rc=1 の残件 (ptr 基準・完了数・survey exact) の原因特定。結論は REPORT 冒頭 |
 | `tools/m11/trap_triage/REPORT_1317_APPENDIX.md` | ~241 | #1317 の §10 (#1786 run: 計装の試行) と §12 (8 回目 run: `b36d3b5f..e7c5c062` の 6 ファイル diff 全文)。REPORT_1317.md の 250 行上限のため分割移動 |
 | `tools/m11/trap_triage/REPORT_134.md` | ~120 | #134: unit 56 (VA 0x16fde0) の fail-fast 辺の guard 入力の trap 時実測 (arg2 dl=1・R (410320 戻り)・list (8c67a0(R) 戻り) の件数 0・[vt-0x50] = ret stub)、基準 survey の再測定 (870/24/47/1)、機械語照合、IR probe (`probe134_ir.py`・`M11_PROBE_134`)・再現 `probe_134.sh` |
 | `tools/m11/trap_triage/REPORT_1542.md` | ~90 | #1542: 計測 build の getmem −4 (既定 2012 / 計測 OFF 2008) は post の 3 点 (probe・改名・宣言) に帰属せず、IR 同一でも残る (C 側の計測 flag が候補)。C 側の切り分けは #1701。A〜D 再現 `repro_1542_split.sh` |
