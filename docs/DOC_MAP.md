@@ -576,6 +576,7 @@
 | `tools/shared/REPORT_APPENDIX.md` | ~110 | shared REPORT の分割移動節の全文: §A win freetype.dll の版判定 (#145, 上流 VER-2-4-{10,11,12} 照合の実測)・§10 ライブラリのビルド詳細 (libFLAC/LAME/WavPack/FFmpeg/ILSvg)・§12 検収記録 (2026-10-11)。250 行上限のため無変更で分割移動 |
 | `tools/shared/elastique/REPORT_2614.md` | ~125 | élastique 2.2.15 (win `elastique_x64.dll`) の KERNEL32・WS2_32 IAT の呼出元と host 置換方針 A〜J (T-SH-41 受入 4 / #2614)。測定値は本 REPORT §0・§3。対応表は `data/iat_policy.csv`・測定は `scripts/elastique_iat.py`。判断が要る項目は §5。受入 1〜3 は子 T-SH-67 (#3332)・T-SH-68 (#3333) |
 | `tools/shared/elastique/REPORT_152.md` | ~215 | élastique 2.2.15 (win `elastique_x64.dll`) の静的 IPP 入口と dispatch 層 (thunk・表の飛び先) の実測と lift 前提 (D20 の side module 方針)。測定値は本 REPORT §0。T-SH-10 (#152)。dispatch 飛び先の IPP 同定は T-SH-43 (#2667・§8)、lift 本体は子 T-SH-41 (#2614) |
+| `tools/shared/elastique/REPORT_3420.md` | ~100 | élastique 間接 call 宛先 `0x1803c4710` の IPP 同定 (T-SH-80 / #3420)。正規化命令列の SHA-1 完全一致と dsp の直接 call 経路から、`ippsSum_32f` の内部カーネルと同定 (tools/ipp は stub)。script は `ipp_target_ident.py`。既存照合の早期 ret 欠陥は子 T-SH-85 (#3457) |
 | `tools/shared/oss/sidemod/REPORT.md` | ~60 | FFmpeg/LAME を差し替え可能な side module として再ビルド + GPL 混入検出 (LGL-4) |
 | `tools/shared/oss/ilsvg/REPORT.md` | ~50 | ILSvg の版の組 probe (#877): svgdom 0.4.7 は emcc 26/26 cpp OK、svgren 0.6.3 / 0.5.9 は svgdom 0.4.7 と enum 名不一致で版の組は未確定 (未解決 #927) |
 | `tools/shared/oss/blend2d/REPORT_SIMD.md` | ~60 | Blend2D wasm `-msimd128` 試験 (T-SH-02, #146) の実測詳細・ネガティブコントロール・前版の実測・未解決の起票先 (`tools/shared/REPORT.md` §3.3 から分割移動) |
