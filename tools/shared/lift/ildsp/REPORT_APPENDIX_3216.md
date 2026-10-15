@@ -5,7 +5,7 @@
 ## 7. WaveformColouring_CreateInstance の x64c lift と native 差分 — T-SH-52 (#3216・部分達成)
 
 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23 に VEX 未対応・jump table 未到達の記述は無い。差分は CreateInstance と slot 0 の範囲で 0 件)。
-測定 commit: `a099ff25` (コードを変えた最後の commit。以降の差分は `.md` のみ・§7-8)。検証起点: `bea685f7` (origin/main)。
+測定 commit: `2cff3f50d` (origin/main `c2e5ba01c` の取り込み merge。コードを変えた最後の commit。以降の差分は `.md` のみ・§7-8)。検証起点: `bea685f7` (origin/main。取り込み前の PR 枝の起点)。
 
 ### 7-1 結論 (1 行)
 closure の入口 70 関数は x64c で C に lift し wasm (138,754 B) にした (C 本体 60 + label 8 + IAT thunk 2)。CreateInstance → slot 0 の native 対 wasm は 64 case で全バイト一致。残りは slot 1–5 の host 前提 (native が null 参照で落ちる。§7-5) と、VEX 3 命令の未対応 (unsup 3 site)。
@@ -22,14 +22,14 @@ FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/ildsp/probe_slots.sh   
 - wasm の import は `wc_run_wasm.mjs` が全て throw する関数に置き換える (旧版は 0 を返して黙殺していた)。呼ばれれば trap として数え、差分は FAIL になる。実測の import 一覧 (`[run_wasm] imports:`): `wasi_snapshot_preview1.{fd_write, fd_read, proc_exit, clock_time_get, fd_close, fd_seek, fd_fdstat_get}`・`env._Unwind_RaiseException` (計 8)。3 回の実測で trap は 0 件 = どの import も呼ばれていない。
 - native 側 (`wc_native_ref.c`): 落ちた case の後に残った SIGALRM を `ualarm(0,0)` で解除する (旧版は解除していなかった)。
 
-### 7-3 実測 (測定 commit `a099ff25`・`lift_wc.sh ok` を 3 回)
+### 7-3 実測 (測定 commit `2cff3f50d`・`lift_wc.sh ok` を 3 回・emcc は `[EMSDK]` の 6.0.12)
 所要 = `lift_wc.sh ok` の起動から終了までの wall (source・x64c・emcc・native・wasm・差分を含む。小数 2 桁)。実ログ行:
 ```
-[ildsp-wc] ok elapsed=2.25s load start=[0.15 0.33 0.18] end=[0.15 0.33 0.18]
-[ildsp-wc] ok elapsed=2.26s load start=[0.15 0.33 0.18] end=[0.22 0.34 0.18]
-[ildsp-wc] ok elapsed=2.27s load start=[0.22 0.34 0.18] end=[0.22 0.34 0.18]
+[ildsp-wc] ok elapsed=2.71s load start=[0.06 0.28 0.18] end=[0.54 0.38 0.21]
+[ildsp-wc] ok elapsed=2.19s load start=[0.50 0.37 0.21] end=[0.54 0.38 0.21]
+[ildsp-wc] ok elapsed=2.27s load start=[0.49 0.37 0.21] end=[0.69 0.42 0.22]
 ```
-(4 core。3 回とも rc=0・`wc diff ... PASS=64 FAIL=0`)
+(4 core。3 回とも rc=0・`wc diff ... PASS=64 FAIL=0`。同じ HEAD で `lift_wc.sh all` も `ALL OK`。前版 `a099ff25` の実測 (2.25 / 2.26 / 2.27 s) は merge 前の値)
 
 | 項目 | 値 |
 |---|---:|
@@ -67,7 +67,7 @@ python3 tools/shared/lift/ildsp/count_unlifted.py "$FL_WIN64_DIR/extracted/block
 
 ### 7-5 slot 1–5 の観測 (未確定)
 再現: `bash tools/shared/lift/ildsp/probe_slots.sh` (wc_image.py を `WC_CALL_SLOTS=6` で、CreateInstance → slot 0–5 の全呼出を native のみで実行)。
-実測 (`a099ff25`): `[native] cases=64 SIGSEGV/SIGBUS=64 SIGALRM=0`・`crashed_cases=64`。全 case で sig=11 addr=0x0。
+実測 (`2cff3f50d`): `[native] cases=64 SIGSEGV/SIGBUS=64 SIGALRM=0`・`crashed_cases=64`。全 case で sig=11 addr=0x0。
 - slot 0 (`0x1a9cf0`): CreateInstance 直後に `this` = instance で呼べる (import 0 回)。差分 64 case に含めた。
 - slot 1 (`0x1a9f10`): `[this+0x20]` (`0x1a9f2a`) を読む。CreateInstance が 0 にしたままなので値は 0。後続の参照で null を踏む、と推定 (deref の箇所は未特定)。
 - したがって slot 1–5 は、host が事前に `this` の内部フィールドを設定する前提が要る。その前提は未確定 (子 #3274 / T-SH-57)。
@@ -88,4 +88,4 @@ python3 tools/shared/lift/ildsp/count_unlifted.py "$FL_WIN64_DIR/extracted/block
 | 未 lift 非 padding 16 件 (直接分岐の先でない 15 + 島の 1。§7-4) の到達性 | closure の完全性 | [T-SH-57] の受入に含める |
 
 ### 7-8 測定後のコード差分 (差分 0 の証跡)
-`git diff a099ff25 HEAD -- tools/shared/lift/ildsp ':!*.md'` の出力は空 (本節の REPORT 更新は `.md` のみ)。
+`git diff 2cff3f50d HEAD -- tools/shared/lift/ildsp tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh tools/shared/scripts ':!*.md'` の出力は空 (測定 commit `2cff3f50d` 以降は `.md` のみ)。
