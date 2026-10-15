@@ -10,6 +10,7 @@
 - **native 判定 (受入 1)**: `0x1810553d0` は `0x181055400` の戻り値 (`ror(cookie ^ slot, cookie & 0x3f)`) が 0 のとき indirect call を飛ばして `eax=0` を返す。enc 初期化 (`slot = cookie`、UCRT の enc(NULL)=cookie 相当) を入れた native は `rax=0` (call-skip 経路)。enc 初期化なしの native は indirect call 先で SIGSEGV する (§3)。
 - **wasm 修正 (受入 2)**: cookie の i64 load 修復が必要。修復なし (OFF) は `fa_cmp 1810553d0 --n 2` が `wasm_err=2` (Aborted)。修復あり (ON) は match 2/2、wasm の戻り値 rax も native と同じ 0。`tools/icall/fa_route_build.sh` の `FA_FIX_COOKIE` 既定を 1 に変えた (`d49760bf`)。
 - **sweep (受入 3)**: ON/OFF をそれぞれ 2 回ずつ取った。同一 build の 2 回は行単位で完全一致し、揺れは再現しなかった。47/48 の揺れの原因は、再現しないため特定できない (§5・未解決)。
+- **既定 ON の影響**: `FA_ENC_INIT=1` で既定 build (`FA_FIX_COOKIE` 既定 1) を使う sweep は 57/63/9/2 になる (OFF は 55/63/11/2)。過去付録の enc ありの数値と比べるときは `FA_FIX_COOKIE=0` を明示する。
 
 ## 2. cookie 初期値の出所 (PE 実値)
 
@@ -64,7 +65,7 @@
 ## 6. 測定 commit と差分
 
 - 測定 commit: `d49760bf` (`fix(icall): enable cookie i64 load fix by default (ICALL-71 #2302)`)。修正は `tools/icall/fa_route_build.sh` (既定 `FA_FIX_COOKIE` 0→1) と `tools/icall/ir_fix_cookie.py` (docstring の出所注記)。
-- 測定経路 (`fa_route_build.sh`・`ir_fix_cookie.py`・`ir_fix_mask.py`・`ir_fix_vstore.py`・`ir_flatten.py`・`ir_override.py`・`vex_gen.py`・`simd_merge.py`・`diff/fa_cmp.py`・`diff/fa_sweep.sh`・`frame_slot_restore.py`・`frame_slot_probe.py`・`rt/`・`tools/ott/native`・`tools/ott/lift/data_gen.py`・`tools/m2/ir_normalize.py`・`tools/m5/ir5_patch.py`・`tools/m11/m11_simd2.py`・`tools/m11/msimd11_core.h`) の `git diff d49760bf HEAD -- <上記>` は 0 行。
+- 測定経路 (`fa_route_build.sh`・`ir_fix_cookie.py`・`ir_fix_mask.py`・`ir_fix_vstore.py`・`ir_flatten.py`・`ir_override.py`・`vex_gen.py`・`simd_merge.py`・`diff/fa_cmp.py`・`diff/fa_sweep.sh`・`frame_slot_restore.py`・`frame_slot_probe.py`・`rt/`・`tools/ott/native`・`tools/ott/lift/data_gen.py`・`tools/m2/ir_normalize.py`・`tools/m5/ir5_patch.py`・`tools/m11/m11_simd2.py`・`tools/m11/msimd11_core.h`) の `git diff d49760bf HEAD -- <上記>` は 0 行 (確認時 HEAD は `4c41f964`。以後の修正 commit は本付録だけで、測定経路の差分は 0 行のまま)。
 - main 取り込み: `origin/main` (`a9733bbb`) を merge した HEAD `66be2919` で、ON の `fa_cmp 1810553d0 --n 2` (match 2/2) と `fa_sweep 8 60` (57/63/9/2) を再測定し、d49760bf 時点と同じ結果。取り込みで増えた差分は測定経路の外 (`lea_index_scan`・`chain_chunk`・`tools/m11/ldfix` など)。
 
 ## 7. 再現
@@ -88,6 +89,6 @@ PE 実値の読み取り: `python3 -c "import pefile; pe=pefile.PE('<SlateCore.c
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | fa_sweep の揺れ (47/48・55 ↔ 54) の原因 | 現 tree で 8 回の行差分 0 件・単独 3 回も一致。原因を特定できない | 未起票 (再現条件が無い。再現したら新 issue。PR 本文の未解決表で追跡) |
-| `fa_cmp.py` は xmm0 のみ比較。戻り値が eax の関数 (`0x1810553d0` など) の rax は見ていない | 本付録では rax を別途確認 (wasm は `_ott_run` の戻り値)。sweep の rax 比較は未実施 | 未起票 (判定を変えると sweep 数値が動くため PM 判断) |
+| `fa_cmp.py` は xmm0 のみ比較。戻り値が eax の関数 (`0x1810553d0` など) の rax は見ていない | 本付録では rax を別途確認 (wasm は `_ott_run` の戻り値)。sweep の rax 比較は未実施 (判定を変えると sweep 数値が動く) | 未起票 (PM agent の判断待ち: sweep の判定に eax を入れるか・既定案: 現行 (xmm0 のみ) のまま) |
 | `0x1803dee20` の native 0 / wasm 入力 (xmm0 の出所) | 値の不一致 1 件 (全 build) | #2695 (ICALL-81・OPEN) |
 | `0x180da4030` の native 0 / wasm 入力 (xmm0 の出所) | 値の不一致 1 件 (全 build) | #3198 (ICALL-87・OPEN)。#2708 (ICALL-83・CLOSED) の修復 (受入 1・2) を移した子 |
