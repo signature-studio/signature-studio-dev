@@ -37,6 +37,7 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static double pvals[3];
 #define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
+static int lm_pages;
 static int ui_closing, ui_time_disp_min, ui_start_on_input, ui_loop_rec, ui_step_edit, ui_browser_auto_hide, ui_snap_mode;
 static int undo_pos, undo_count, undo_last, safe_edit;
 static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
@@ -71,6 +72,7 @@ void fl_engine_reset(void) {
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
+    lm_pages = 0;
     ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
     undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
     set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
@@ -194,6 +196,51 @@ FL_H(channels, getStepParam) {
     int64_t q = step / pads, idx = q + off;
     if (idx < 0 || idx >= nch) RANGE();
     return fl_ret_i(c, step_param(&ch[idx], step - q * pads + st0, prm));
+}
+/* PY-78 (#2581): PE 0x130f3d0 の項目書換え規則 (param 0..8)。項目の字段位置は PE 実測 (+0 dword, +0xc word, +0x10・+0x11・+0x12・+0x14・+0x15・+0x16・+0x17 byte)。
+ * delta は先頭項目の字段から value - 字段 (param 0..7)。param 8 は value の低 8 bit を代入。項目列挙 (0x130f200) と換算用グローバルは未接続 */
+typedef struct { int32_t d0; uint8_t p1[8]; int16_t w0c; uint8_t p2[2]; uint8_t b10, b11, b12, b13, b14, b15, b16, b17; } StepItem;
+static int64_t clamp_hi(int64_t v, int64_t hi) { return v <= 0 ? 0 : v > hi ? hi : v; }
+static int64_t step_item_get(const StepItem *it, int64_t prm) {
+    switch (prm) {
+    case 0: return it->w0c;
+    case 1: return it->b15;
+    case 2: return it->b12;
+    case 3: return it->b10;
+    case 4: return it->b14;
+    case 5: return it->b16;
+    case 6: return it->b17;
+    case 7: return it->d0;
+    case 8: return it->b11;
+    default: return 0;
+    }
+}
+static void step_item_write(StepItem *it, int64_t prm, int64_t value, int64_t delta) {
+    switch (prm) {
+    case 0: it->w0c = (int16_t)clamp_hi(it->w0c + delta, 0x83); break;
+    case 1: it->b15 = (uint8_t)clamp_hi(it->b15 + delta, 0x80); break;
+    case 2: it->b12 = (uint8_t)clamp_hi(it->b12 + delta, 0x80); break;
+    case 3: it->b10 = (uint8_t)clamp_hi(it->b10 + delta, 0xf0); break;
+    case 4: it->b14 = (uint8_t)clamp_hi(it->b14 + delta, 0x80); break;
+    case 5: it->b16 = (uint8_t)clamp_hi(it->b16 + delta, 0xff); break;
+    case 6: it->b17 = (uint8_t)clamp_hi(it->b17 + delta, 0xff); break;
+    case 7: it->d0 += (int32_t)delta; break;
+    case 8: it->b11 = (uint8_t)value; break;
+    default: break;
+    }
+}
+static void step_items_set(StepItem *const *items, int n, int64_t prm, int64_t value) {
+    if (n <= 0 || prm < 0 || prm > 8) return;
+    int64_t delta = prm == 8 ? value : value - step_item_get(items[0], prm);
+    for (int i = 0; i < n; i++) step_item_write(items[i], prm, value, delta);
+}
+/* 検査用の読出し口: 項目 2 件に字段の初期値 seed0・seed1 を入れ、規則を 1 回適用して 2 件目の param の字段を返す。tests/step_item_diff.mjs が mock と照合 */
+int fl_engine_step_item_probe(int prm, int value, int seed0, int seed1) {
+    StepItem a, b, *items[2] = {&a, &b};
+    memset(&a, 0, sizeof a); memset(&b, 0, sizeof b);
+    step_item_write(&a, prm, 0, seed0); step_item_write(&b, prm, 0, seed1);
+    step_items_set(items, 2, prm, value);
+    return (int)step_item_get(&b, prm);
 }
 
 /* ---- mixer (19) ---- */
@@ -322,6 +369,10 @@ FL_H(general, setDenominator) { NARGS(1, 1); int64_t v = A_INT(0, 0); if (v < 2 
 FL_H(general, setUndoHistoryPos) { NARGS(1, 1); undo_pos = (int)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(general, setUndoHistoryCount) { NARGS(1, 1); undo_count = (int)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(general, setUndoHistoryLast) { NARGS(1, 1); undo_last = (int)A_INT(0, 0); return fl_ret_none(c); }
+
+/* ---- launchMapPages (1 of 12, PY-120 #2984) ---- PE 0xd791b0: obj.+0x50 の配列 (+0x3c0) の件数を返す。件数は仮置き 0 (REPORT_PY120_2984)。
+ * obj.+0x50 == 0 の経路 (0xd82c20 に code -7 = "Device not assigned") は未モデル (例外化の述語が実行時値のため) */
+FL_H(launchMapPages, length) { NARGS(0, 0); return fl_ret_i(c, lm_pages); }
 
 /* ---- arrangement (4, PY-96 #2832) ---- PE 0xd786e0/0xd78700/0xd78500 が obj+0xd74/+0xd78 を読み、0xd78720 は 0xe43e80 (両方 >= 0) を bool で返す。初期値 -1 は未実測の仮置き */
 FL_H(arrangement, selectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_start); }

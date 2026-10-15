@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { refsOnlyBody } from "../src/webhook.ts";
+import { refsOnlyNumbers } from "../src/refs.ts";
 import { BOT, MARK, REPO, T0, commentPayload, configuredApp, issuePayload, j, markFresh, runPayload, send, type Call } from "./helpers.ts";
 import { outcomeBody, stopBody } from "./pm_helpers.ts";
 
@@ -170,6 +171,19 @@ test("refsOnlyBody: Refs #N のみだけ true。Closes / Fixes が 1 つでも�
   assert.equal(refsOnlyBody("本文なし"), false, "参照が無い");
   assert.equal(refsOnlyBody(""), false);
   assert.equal(refsOnlyBody("Refs #x"), false, "番号でない");
+});
+
+test("Refs のみの判定の統一 (#2623): 指標の refsOnlyBody と refs_orphan の refsOnlyNumbers が表の 4 入力で同じ値", () => {
+  const cases: Array<[string, boolean]> = [
+    ["Closes:#6 Refs #5", false],
+    ["Refs owner/repo#5", false],
+    ["Refs:#5", true],
+    ["Refs #12345678", false],
+  ];
+  for (const [body, refsOnly] of cases) {
+    assert.equal(refsOnlyBody(body), refsOnly, `指標: ${body}`);
+    assert.equal(refsOnlyNumbers(body).length > 0, refsOnly, `refs_orphan: ${body}`);
+  }
 });
 
 test("refs_only_merge_rate_24h: 直近 24 時間に merge された PR のうち、本文が Refs のみの件数と率", async () => {

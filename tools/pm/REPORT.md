@@ -227,7 +227,7 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 測定 commit: `b7fb7a40` (main `b3c699d4` の取り込み merge。修正本体は `ebfd0a41`)。全文 (測定・ネガコン・Refs のみ判定の差): [`REPORT_APPENDIX_2337.md`](REPORT_APPENDIX_2337.md) (§16 の分割移動)。
 - 結論: `npm test` 213 件 PASS / 0 FAIL (n=3)。`test:unit` 10 件・`test:workers` 3 件 PASS。ネガコン 5 種は各 1 件ずつ壊して FAIL を確認。
 - 差分の証跡: `git diff b7fb7a40 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
-- 未解決: refs-only の判定が 2 系統 (指標 `refsOnlyBody`・refs_orphan `refsOnlyNumbers`)。判定の差は付録 §16-3。追跡は #2623 ([CI-115])。
+- 解消 (#2623・[CI-115]): 判定は `refsOnlyNumbers` の 1 関数に統一 (指標の `refsOnlyBody` はこれを呼ぶ)。統一前後で値が変わった PR は 0 件 (直近 24 時間・7 日の両窓)。測定値・再現: [`refs_only_remeasure.ts`](refs_only_remeasure.ts)・全文: [`REPORT_APPENDIX_2623.md`](REPORT_APPENDIX_2623.md)。
 
 ## 17. /oc 投稿の観測のネガコン (#2342・#2473 の vitest 化)
 
