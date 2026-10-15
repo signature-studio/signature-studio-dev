@@ -54,6 +54,8 @@ if [[ "${E2E_SKIP_BUILD:-0}" != "1" ]]; then
     (cd "$ROOT" && pnpm install --frozen-lockfile)
   fi
   (cd "$ROOT" && node_modules/.bin/tsc --noEmit)
+  step "vreg wasm (製品 bundle の ?license=import 取込入口に組込む。emsdk は EMSDK_ENV)"
+  bash "$ROOT/tools/startup/vreg/build.sh" module
   (cd "$ROOT" && node_modules/.bin/vite build --outDir tools/e2e/work/dist --emptyOutDir) 2>&1 | tail -6
   mkdir -p work/dist/__e2e__
   cp fixtures/add.wasm work/dist/__e2e__/add.wasm
