@@ -30,7 +30,7 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
 ## `0xc61250` の書換え (#4585 / 親 #3779 受入 1)
 
 - **呼出し元**: 0x104a92b の 1 箇所。`edx` = eventId (`[rbp+0x5b0]`)、`rcx` = obj (`*(0x15e3510)`)、**`r8` は書込み先のアドレス** (`lea r8, [rbp+0x5b8]` の結果 `&[rbp+0x5b8]`)。書換え値は `r8` の値に依存しない。
-- **書換えの有無と値**: `T = [obj+0x30]`、`0xc62db0(T, eventId, &[rbp+0x28])` の戻り `al` (= `idx >= 0`) が真 (found) のとき、`[rbp+0x5b8]` = `[rbp+0x2c]` = **hi32(arr[idx].value)**。`arr = [T+8]`、value の qword は `[arr + 16*idx + 8]`。`[rbp+0x2c]` は `0xc62db0` が書いた qword の上位 dword で、後続の vtable 呼出しは触らない。caller は `al != 0` で 0x104a9cd へ飛び、0x104a938 の `vt[+0x30]` 呼出しを通らない。
+- **書換えの有無と値**: `T = [obj+0x30]`、`0xc62db0(T, eventId, &[rbp+0x28])` の戻り `al` (= `idx >= 0`) が真 (found) のとき、`[rbp+0x5b8]` = `[rbp+0x2c]` = **hi32(arr[idx].value)**。`arr = [T+8]`、value の qword は `[arr + 16*idx + 8]`。`[rbp+0x2c]` は `0xc62db0` が書いた qword の上位 dword。後続の vtable 呼出し (`call [rbx+8]`) へは rcx = obj しか渡されず、`&[rbp+0x2c]` は渡されない (ただし callee が obj 経由で任意の内容を書く可能性は別途未確定)。caller は `al != 0` で 0x104a9cd へ飛び、0x104a938 の `vt[+0x30]` 呼出しを通らない。
 - **not found** (`idx < 0`): `0xc61250` は書かない。caller は `al == 0` で 0x104a938 へ進み、`vt[+0x30]` の戻りで `[rbp+0x5b8]` を置き換える。
 - **`0xc62db0`** (呼出し先は `0xc626e0`・`0xc62630` の 2 つだけ): `K = 0xc626e0(T)`、`idx = 0xc62630(T, eventId, K)`。`idx >= 0` なら `[rdi]` = qword `[arr + 16*idx + 8]`、else `[rdi]` = 0。
 - **`0xc62630`** (`T` の hash 表): `arr = [T+8]`、`n = [arr-8]`、`slot0 = sext32(K) & (n-1)`、線形探査。`key` (u32 `[entry+0]`) == -1 で `~slot` (負) を返す。`key == K` かつ `Y.vt[+0x18](Y, [entry+4], eventId)` が真で `slot` を返す。`n == 0` は `-2^63`。
