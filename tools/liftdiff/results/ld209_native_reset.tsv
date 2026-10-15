@@ -1,11 +1,11 @@
 wasm_reset	native_reset	n	verdict	case_equal	cases	native_reset_diff	wasm_reset_diff	va	raw
 none	none	1	mismatch	0	11	None	None	0x5d19e0	n0_nrnone_r1.jsonl
-none	sta	1	mismatch	0	11	339	None	0x5d19e0	n0_nrsta_r1.jsonl
-sta	all	1	mismatch	0	11	339	343847	0x5d19e0	w_sta_n_all_r1.jsonl
-sta	all	2	mismatch	0	11	339	343847	0x5d19e0	w_sta_n_all_r2.jsonl
+none	sta	1	mismatch	0	11	39454	None	0x5d19e0	n0_nrsta_r1.jsonl
+sta	all	1	match	11	11	39454	343847	0x5d19e0	w_sta_n_all_r1.jsonl
+sta	all	2	match	11	11	39453	343847	0x5d19e0	w_sta_n_all_r2.jsonl
 sta	img	1	mismatch	0	11	0	343847	0x5d19e0	w_sta_n_img_r1.jsonl
 sta	img	2	mismatch	0	11	0	343847	0x5d19e0	w_sta_n_img_r2.jsonl
-sta	sta	1	mismatch	0	11	339	343847	0x5d19e0	w_sta_n_sta_r1.jsonl
-sta	sta	2	mismatch	0	11	339	343847	0x5d19e0	w_sta_n_sta_r2.jsonl
+sta	sta	1	match	11	11	39454	343847	0x5d19e0	w_sta_n_sta_r1.jsonl
+sta	sta	2	match	11	11	39454	343847	0x5d19e0	w_sta_n_sta_r2.jsonl
 sta	stk	1	mismatch	0	11	0	343847	0x5d19e0	w_sta_n_stk_r1.jsonl
 sta	stk	2	mismatch	0	11	0	343847	0x5d19e0	w_sta_n_stk_r2.jsonl
