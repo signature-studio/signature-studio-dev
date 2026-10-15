@@ -50,6 +50,12 @@ test("stopped の理由は既知の語だけを出し、本文の抜粋は理由
   assert.equal(stoppedHold(1, "着手不可 素材不足の本文").until, null);
 });
 
+test("stopped の判定根拠 (#5234): 見出し由来と run-outcome 由来の根拠が basis に出る。根拠が無いときは basis のキーを出さない", () => {
+  assert.deepEqual(stoppedHold(2, "着手不可", "見出し ## 停止報告"), { n: 2, row: "stopped", reason: "bot-report", until: null, basis: "見出し ## 停止報告" });
+  assert.deepEqual(stoppedHold(3, "split", "run-outcome reason=split"), { n: 3, row: "stopped", reason: "split", until: null, basis: "run-outcome reason=split" });
+  assert.equal("basis" in stoppedHold(4, "stop"), false);
+});
+
 test("ready の見送り (planLaunch.held): 枠 (room) で落ちた ready は room、batch で落ちたものは batch", () => {
   const ready = Array.from({ length: 6 }, (_, i) => ({ n: 100 + i, title: "t", blocksCount: 0 }));
   const byRoom = planLaunch({ ready, relaunch: [], active: 48, target: 50, batch: 25 });

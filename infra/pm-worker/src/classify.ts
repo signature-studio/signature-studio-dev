@@ -86,6 +86,8 @@ export interface Rows {
 const NEED_RE = /不足|無い|無く|無かった|ない|存在しな|必要|依頼|欠|足りな|未配置|未展開|入っていな|のみ|だけ|揃っ/;
 // 停止報告の構造化マーカー (PM 判断 R7・#5111)。散文の語では停止と判定しない。先頭行の見出しだけを見る。
 const STOP_HEAD_RE = /^## 停止報告/;
+// stopped の判定根拠 (/status.launch_holds の basis。#5234)。
+export const STOP_BASIS_HEAD = "見出し ## 停止報告";
 // run-outcome (record-run-outcome.sh の定型文) と PM の応答は、停止報告ではない (VM 版と同じ規則)。
 const OUTCOME_OR_PM_RE = /<!-- oc-run-outcome:|<!-- oc-pm-/;
 const WORD = "\\p{L}\\p{N}_\\-";
@@ -220,6 +222,8 @@ export interface Classified {
   blocksCount: Record<string, number>;
   // 親 (open) -> open な子の番号。
   children: Record<string, number[]>;
+  // stopped の行の判定根拠 (issue 番号 -> 根拠の語。STOP_BASIS_HEAD など)。
+  stopBasis: Map<number, string>;
 }
 
 export function classify(d: Snapshot, input: ClassifyInput): Classified {
@@ -227,6 +231,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
   const st = startedMap(d, iss);
   const ageH = (ts: string) => (input.nowMs - Date.parse(ts)) / 3_600_000;
   const rows: Rows = { blocked: [], started: [], user: [], hold: [], stopped: [], recent: [], relaunch: [], ready: [] };
+  const stopBasis = new Map<number, string>();
 
   const blocksCount = new Map<number, number>();
   for (const bs of blockers.values()) for (const b of bs) blocksCount.set(b, (blocksCount.get(b) ?? 0) + 1);
@@ -263,6 +268,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
       // 観測できなかった投稿は再投稿しない (stopped で止める)。観測するまでは recent (run が現れれば started になる)。
       if (ls === "failed") {
         rows.stopped.push([n, "launch-unobserved"]);
+        stopBasis.set(n, "launch 観測 failed");
       } else if (isLaunched && ls === "launched" && !reported) {
         rows.recent.push([n, `launch not observed yet (${fmt1(ageH(launchedAt) * 60)} min)`]);
       } else if (isLaunched && doneAt !== undefined && ageH(doneAt) < RUN_WINDOW_H && !reported) {
@@ -276,14 +282,20 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
         let cand: string | null = material ? addArts(baseLine, neededArts(n, input)) : null;
         if (!cand && material && newArts(rep?.art, base).length) cand = rep?.art ?? null;
         if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
-        else rows.stopped.push([n, head90(bl.head)]);
+        else {
+          rows.stopped.push([n, head90(bl.head)]);
+          stopBasis.set(n, STOP_BASIS_HEAD);
+        }
       } else if (bl && ageH(bl.at) < BOT_COMMENT_WINDOW_H && !pmAnswered(input.pmAt?.[k], bl.at)) {
         rows.recent.push([n, `bot comment ${fmt1(ageH(bl.at))}h ago`]);
       } else if (bl && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);
         const cand = material && newArts(rep?.art, artTokens(artifactsFor(n, i))).length ? (rep?.art ?? null) : null;
         if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
-        else rows.stopped.push([n, head90(bl.head)]);
+        else {
+          rows.stopped.push([n, head90(bl.head)]);
+          stopBasis.set(n, STOP_BASIS_HEAD);
+        }
       } else {
         rows.ready.push(n);
       }
@@ -298,5 +310,6 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
     rows,
     blocksCount: Object.fromEntries(blocksCount),
     children: Object.fromEntries([...children].map(([k, v]) => [String(k), [...v]])),
+    stopBasis,
   };
 }

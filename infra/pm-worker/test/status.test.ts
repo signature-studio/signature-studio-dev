@@ -150,6 +150,18 @@ test("/status.launch_holds (#5110): engine の status() 経由で、stopped の 
   assert.equal(h.row, "stopped");
   assert.equal(h.reason, "split");
   assert.equal(h.until, null);
+  assert.equal(h.basis, "run-outcome reason=split");
+});
+
+test("/status.launch_holds (#5234): 見出し『## 停止報告』由来の stopped は basis に見出しを出す", async () => {
+  const ctx = await configuredApp();
+  await send(ctx.app, "issues", issuePayload(52, { labels: [] }));
+  await send(ctx.app, "issue_comment", commentPayload(52, BOT, "## 停止報告\n素材が足りません", iso(T0 - 2 * H)));
+  const s = (await (await get(ctx)).json()) as any;
+  const h = s.launch_holds.find((x: any) => x.n === 52);
+  assert.ok(h, "issue 52 が launch_holds に出る");
+  assert.equal(h.row, "stopped");
+  assert.equal(h.basis, "見出し ## 停止報告");
 });
 
 test("/status: 観測の初期値は null / 0 (残量を 0 と誤読しない)", async () => {
