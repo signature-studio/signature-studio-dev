@@ -10,6 +10,9 @@ case 形式 (little endian, native_ref.c と run_wasm.mjs が同じ規約で読�
          wasm の線形メモリで一致しないため)。arena 内ポインタは両側で同じ内容を指す。arena 内の 0 qword (ctx 領域の外で約 10%)
          を deref すると NULL 参照で native 側は SIGSEGV する (除外の候補。落ちた case の fault アドレスは native_ref の
          stderr に出る。REPORT §7.6)。
+成功経路の case (末尾 SUCC 件・REXGetCreatorInfo のみ・seed 2870): 木の根 (ctx+0x20) のノード key = OBJ (アリーナ内)、
+  key_of(a0) = OBJ となる a0 (key_of は対合)。OBJ+0x688 = B (0 なら 0x12a50 が偽で戻り値 3)。B の +0x28/+0x50/+0x78 = 0 (SSO の文字列を
+  0x12ed0 が読む)。a1 は 0x500 以上 (0x12ed0 の書込に進む)。a2 は N バイトが arena 内に収まる位置。戻り値 1 (書込あり) と 3 を得る。
 usage: gen_cases.py OUT [N]
 """
 import random, struct, sys
@@ -17,9 +20,13 @@ import random, struct, sys
 ARENA = 0x30100000
 ARENA_SZ = 0x10000
 CTX_OFF = 0x8000
+NODE = ARENA + 0xC100
+OBJ = ARENA + 0xC200
+OBJ_B = ARENA + 0xC300
+SUCC = 48
 rnd = random.Random(2733)
 N = int(sys.argv[2]) if len(sys.argv) > 2 else 200
-out = [struct.pack('<I', N)]
+out = []
 
 
 def ptr():
@@ -60,5 +67,22 @@ for i in range(N):
         struct.pack_into("<Q", arena, CTX_OFF + 0x20, node)
     out.append(struct.pack('<IIQQQQQ', fn, 0, a0, a1, a2, a3, ctx) + bytes(arena))
 
+rnd2 = random.Random(2870)
+for i in range(SUCC):
+    a0 = key_of(OBJ)
+    arena = bytearray(ARENA_SZ)
+    for q in range(ARENA_SZ // 8):
+        v = ptr() if (CTX_OFF <= 8 * q < CTX_OFF + 0x4000 or rnd2.random() >= 0.1) else 0
+        struct.pack_into('<Q', arena, 8 * q, v)
+    struct.pack_into('<Q', arena, OBJ + 0x688 - ARENA, OBJ_B if i % 4 else 0)
+    for off in (0x28, 0x50, 0x78):
+        struct.pack_into('<Q', arena, OBJ_B + off - ARENA, 0)
+    struct.pack_into('<QQQ', arena, NODE - ARENA, 0, 0, key_of(a0))
+    struct.pack_into('<Q', arena, CTX_OFF + 0x20, NODE)
+    a1 = rnd2.randrange(0x500, 0x800)
+    a2 = ARENA + 8 * rnd2.randrange(0, 0xE000 // 8)
+    out.append(struct.pack('<IIQQQQQ', 0, 0, a0, a1, a2, 0, ARENA + CTX_OFF) + bytes(arena))
+
+out[0:0] = [struct.pack('<I', len(out))]
 open(sys.argv[1], 'wb').write(b''.join(out))
-print('[gen_cases] N=%d -> %s' % (N, sys.argv[1]))
+print('[gen_cases] N=%d (通常 %d + 成功経路 %d) -> %s' % (len(out) - 1, N, SUCC, sys.argv[1]))
