@@ -114,6 +114,17 @@
   +   0x5e12b0   sse             -1        0    0.0000 ok
   ```
 
+検証 HEAD `086c474f2` での再現 (差し戻し後・同じ手順を clean checkout で実行。`git diff 9c38a83e4 086c474f2 -- tools/plugins/p0c ':!*REPORT*'` の出力は空)。
+
+| コマンド | rc | 所要 | load (終了時 1 分値) | 結果 |
+|---|---:|---:|---:|---|
+| kernel_table.py → 80 kernel の `lift_ranges.sh` (`PLUG_CANON_ALLOCA=1`) → `f80_assess.py` | 0 | 4 s (lift) | 0.18 | `k80.final.ll` 80 defines・`ret_slot` rax 13 / none 23 / unknown 43 / xmm0 1 |
+| `p0c4_abi_e2e.py 2000` | 0 | 34 s | 0.55 | `run=68 ok=68 sig11=0`・`⑤` xmm0 1 件 = `0x5e12b0`・`[5b]` 2001/2001 一致 |
+| `p0c2_e2e.sh 2000` | 0 | 53 s | 0.80 | `== p0c2 e2e OK ==` |
+| `p0c3_e2e.sh 2000` | 0 | 52 s | 0.99 | `== p0c3 e2e OK (構造修復 3 kernel bit-exact + 回帰 0) ==` |
+
+同じ HEAD での負論対照: `K80_NO_UCOMI_FLAGS=1` で `mismatch=1014` (2001 中)・rc 1。`K80_NO_RETSLOT=1` で `[FAIL] 0x5e12b0 戻り値試験 [5b] の対象だが ret_slot が xmm0 でない (#3513)`・rc 1。
+
 ### 22.4 負論対照 (数値)
 
 | 対照 | 操作 | 結果 |
