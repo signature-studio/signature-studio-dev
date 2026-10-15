@@ -1,0 +1,6 @@
+{
+  "tag": "pe180",
+  "refs": ["#3278"],
+  "note": "PE の .data グローバル初期値 -1 を番兵として確定した patterns 1 件 (REPORT_PY180・PY-180 #3278。書込み元は未同定の仮置き)。tests/patterns_group_diff.mjs が mock と照合",
+  "functions": ["patterns.getActivePatternGroup"]
+}
