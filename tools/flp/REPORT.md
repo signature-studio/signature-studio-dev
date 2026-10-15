@@ -215,7 +215,7 @@
 
 - 詳細・実測・未解決 (起票先付き) は **`REPORT_APPENDIX.md` §12**。Fruity Parametric EQ 2 / Limiter / Reeverb 2 / Maximus / Delay 3 の state(213) デコーダ (`src/plugstate.ts`) を実装し、コーパス 2,090 件の往復が byte-exact。**受入条件 (クラス A/B 判定表) は未達** (X/L/W 3 者比較は未実施。静的走査による推定のみ)。
 
-- #113 は **部分達成**。S1 (wine64 での FL 26.1.7 起動) は達成 (G03 を oracle ローカルコピーで回避、FLEngine_x64.dll ロード・GUI 継続)。S2 は `/R` で WAV が出る・決定性 3 回一致まで確認した。鍵なし (既定) は 48 kHz / **16-bit**。詳細・測定 commit `8be0756f`・未解決は **`REPORT_APPENDIX.md` §15** (S1 の前回測定は §14)。2026-10-14 の追加調査 (#2546): §16 (`/R` の書出し経路は未特定、16-bit のまま。子 #3052・#3053)。#3052 で `General\WAVRenderForm` の `WFBox`=2 により 32-bit float (fmt 3) を実測 (§17)。読取り関数の VA は未特定 (受入 1 未達・#3052 継続)。静的調査の候補と再現スクリプト `s3_regread_xref.py` は `REPORT_APPENDIX_3052.md` (§18)。§19 で WFBox の読取り関数を `0xba5d10` まで特定 (関数先頭の置換で経路を確認、再現 `s4_bisect.sh`)。書式引数への渡し先は未解決 (#3052 継続)。
+- #113 は **部分達成**。S1 (wine64 での FL 26.1.7 起動) は達成 (G03 を oracle ローカルコピーで回避、FLEngine_x64.dll ロード・GUI 継続)。S2 は `/R` で WAV が出る・決定性 3 回一致まで確認した。鍵なし (既定) は 48 kHz / **16-bit**。詳細・測定 commit `8be0756f`・未解決は **`REPORT_APPENDIX.md` §15** (S1 の前回測定は §14)。2026-10-14 の追加調査 (#2546): §16 (`/R` の書出し経路は未特定、16-bit のまま。子 #3052・#3053)。#3052 で `General\WAVRenderForm` の `WFBox`=2 により 32-bit float (fmt 3) を実測 (§17)。読取り関数の VA は未特定 (受入 1 未達・#3052 継続)。静的調査の候補と再現スクリプト `s3_regread_xref.py` は `REPORT_APPENDIX_3052.md` (§18)。§19 で WFBox の RegQuery が通る汎用ループ `0xba5d10` まで特定 (関数先頭の置換で経路上を確認。WFBox の値を読む関数とは未確定。再現 `s4_bisect.sh`・`s4_xref.py` の `fn` 出力)。書式引数への渡し先は未解決 (#3052 継続)。
 
 ## 13. Wrapper chunk (event 213) の実データ検証 (#110 / L-7)
 
