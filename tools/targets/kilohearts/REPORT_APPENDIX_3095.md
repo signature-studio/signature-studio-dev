@@ -1,7 +1,7 @@
 # #3095 (KH-43) Delay の SIMD 疑似関数・swi の規則 (付録)
 
-- **結論**: 現 main の Delay emcc 残件 576 件のうち、SIMD 疑似関数 25 件 (13 種) を shim に**実装**し、swi 21 件を **fail-fast** (abort) とした。main 取り込み後の HEAD (測定 commit `934c8dd71`) の emcc 残件は **485 件** (SIMD・swi の未宣言 0)。統合前 (`12647936d`) の 506 件は取り込み前の値。Gain/Haas/Gate は 1000/1000 bit-exact (回帰なし)。実装 13 種はホスト x86 intrinsics と 200,000 試行で一致 (ネガティブコントロールは FAIL)。
-- **main 取り込み後の値は §8** (測定 commit `934c8dd71`): emcc 残件 **485 件** (main の #3096 で code 間接呼出し 21 件が消えた分を含む)。突合と回帰の結果は同じ。
+- **結論**: 現 main の Delay emcc 残件 576 件のうち、SIMD 疑似関数 25 件 (13 種) を shim に**実装**し、swi 21 件を **fail-fast** (abort) とした。main 取り込み後の HEAD (測定 commit `ecc91a700`) の emcc 残件は **463 件** (SIMD・swi の未宣言 0)。統合前 (`12647936d`) の 506 件は取り込み前の値。Gain/Haas/Gate は 1000/1000 bit-exact (回帰なし)。実装 13 種はホスト x86 intrinsics と 200,000 試行で一致 (ネガティブコントロールは FAIL)。
+- **main 取り込み後の値は §8** (測定 commit `ecc91a700`): emcc 残件 **463 件** (main の #3096 で code 間接呼出し 21 件、#3800 で引数過不足 22 件が消えた分を含む)。突合と回帰の結果は同じ。
 - **入力の訂正**: issue 本文の「SIMD 40 件・swi(3) 21 件」は測定 commit `7d1d0e2e` の値 (emcc 601 件) である。現 main では SIMD 25 件。差 15 件 (ABS 10・ZEXT416 2・maxps 2・vpsrldq_avx 1) は #3071 で shim に定義済み。swi 21 件の内訳は **swi(3) 17 件 + swi(0x29) 4 件** (issue の「swi(3) 21 件」は誤り)。
 
 ## 1. 測定の前提
@@ -74,7 +74,7 @@ cd tools/targets/kilohearts
 # (1) decompile: DecompEach.java に lift 集合 141 件を挿入順の 10 進で渡す (snapins.json の delay.lift)
 python3 ghidra_route/ghidra_to_c.py delay work/gr/x work/ghidra/out141 work/winpkg/HeartCore.core_64 --fix bitcast,intload,stackpair,assoc,concat
 emcc -c -ferror-limit=0 -I ghidra_route work/gr/x/delay.c -o work/gr/x/delay.o 2> work/gr/x/emcc.log
-python3 ghidra_route/emcc_census.py work/gr/x/emcc.log            # 合計 485 (測定 commit 934c8dd71・§8)
+python3 ghidra_route/emcc_census.py work/gr/x/emcc.log            # 合計 463 (測定 commit ecc91a700・§8)
 # (1') 件数の数え方 (§2・§3 の 576 列)。件数は emcc のエラー行で数える (生成 C の出現数 42 とは一致しない)。
 #      576 列 (SIMD 46 = 13 種 25 + swi 21) は 26b003692 の変換器・shim で同じ out141 から作った emcc ログで再現する
 #      (work/c26b/emcc.log。git archive 26b003692 の ghidra_route と snapins/{lift,scripts} を使う)
@@ -94,7 +94,7 @@ bash ghidra_route/build_cmp.sh gain 1000 7 bitcast,intload,stackpair,assoc,conca
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | レーン参照 166 件 (`undefined1[N]` のメンバ参照。`auStack_x._8_4_`・`auVar._0_16_` 等) | Delay の emcc が通らない | #3094 [KH-42] |
-| 引数過不足 108 件 (`too few` 84・`too many` 24) | 同上 | #3800 [KH-64] |
+| 引数過不足 86 件 (#3800 の 22 件は main で解消) | 同上 | #3844 [KH-72] 33 件・#3847 [KH-73] 53 件 |
 | 型不一致 186 件 (V128 同士の `*`・`^` を含む) | 同上 | #3801 [KH-65] |
 | 未定義 identifier 17・未関数化 callee 6・その他 2 (計 25 件) | 同上 | #3802 [KH-66] |
 | 実装 13 種のオペランド順 (Ghidra pcodeop の規約: 先頭が vvvv の src1) を機械語で個別確認していない。swi の到達は未確認 | 反転・到達の誤りは Delay の native 突合でしか検出できない | #3073 [KH-41] |
@@ -102,29 +102,29 @@ bash ghidra_route/build_cmp.sh gain 1000 7 bitcast,intload,stackpair,assoc,conca
 
 - 子 issue の本文の件数 (#3801 の「型不一致 187」・#3802 の「未関数化 callee 5」) は #3096 の記録 (census 556) の値。本 HEAD の census は 186・6 (§8)。件数の差の原因は §8 に書く。
 
-## 8. main 取り込み後の再測定 (測定 commit `934c8dd71`)
+## 8. main 取り込み後の再測定 (測定 commit `ecc91a700`)
 
-- 経緯: PR 作成後に main が進み、2 回取り込んだ。(1) `origin/main` (`45182bf1b` → `5ebde52cc`) は merge commit `793662e84`・`537247f81` で取り込み済み (`docs/DOC_MAP.md` の競合は両行を残して解消)。(2) `origin/main` (`ce3f5eac7`) は merge commit `934c8dd71` で取り込んだ。`ghidra_shim.h` が #3108 (`eb5532ae9`) の `SUB168` 追加と競合したため、main 側の `SUB168` (下位・上位 8 byte) を残し、本 PR 側の `SUB168` を削除した (意味は同じ)。本 PR の他の shim (`SUB84`・`ZEXT816`・`minps` ほか) は残した。
-- §0・§3・§4 の数値は取り込み前 (`12647936d`) の値。以下が取り込み後 (`934c8dd71`) の値。前回の測定 (`793662e84`) も 485 件で全分類が一致していた。
-- 前提: §1 と同じ素材・道具。`plugins-kilohearts` の `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B。Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致)、JDK 21、emcc 6.0.12 ([EMSDK])。load は開始時 0.5 (`/proc/loadavg`)。
-- decompile: 挿入順の lift 集合 141 件を 10 進で渡す (`analyzeHeadless` wall 21.6 s, n=1) で **141/141 OK**。Gain/Haas/Gate の 10 関数 (`run_all.sh` [2] と同じ) は **10/10 OK** (wall 24.0 s)。
-- emcc (`--fix bitcast,intload,stackpair,assoc,concat`・`emcc -c -ferror-limit=0`): wall 14.2 s、rc 1 (残件あり)。census は **485 件**。Win API・LOCK・MXCSR は 0 件のため表から省いた。
+- 経緯: PR 作成後に main が進み、取り込みは 3 段階 (merge commit は 4 つ)。(1) `origin/main` (`45182bf1b` → `5ebde52cc`) は merge commit `793662e84`・`537247f81` で取り込み済み (`docs/DOC_MAP.md` の競合は両行を残した)。(2) `origin/main` (`ce3f5eac7`) は merge commit `934c8dd71` で取り込んだ。`ghidra_shim.h` が #3108 (`eb5532ae9`) の `SUB168` 追加と競合したため、main 側の `SUB168` (下位・上位 8 byte) を残し、本 PR 側の `SUB168` を削除した (意味は同じ)。(3) `origin/main` (`396f9f8b6`・#3800 の delay ABI 規則 22 件を `patches.py` に追加) は merge commit `ecc91a700` で取り込んだ (`DOC_MAP.md` の競合は KH-43 と KH-64 の両行を残した)。
+- 測定は (3) の HEAD (`ecc91a700`) で取り直した。(2) の HEAD (`934c8dd71`) の census は 485 件 (引数過不足 108)、(3) で 463 件 (引数過不足 86) に変わった。差 22 件は #3800 の規則による。
+- 前提: §1 と同じ素材・道具。`plugins-kilohearts` の `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B。Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致)、JDK 21、emcc 6.0.12 ([EMSDK])。
+- decompile (挿入順の lift 集合 141 件を 10 進で渡す): **141/141 OK**。Gain/Haas/Gate の 10 関数 (`run_all.sh` [2] と同じ) は **10/10 OK**。
+- emcc (`--fix bitcast,intload,stackpair,assoc,concat`・`emcc -c -ferror-limit=0`): wall 10.4 s、rc 1 (残件あり)。census は **463 件**。Win API・LOCK・MXCSR は 0 件のため表から省いた。
 
-| 分類 | 506 (`12647936d`, §3) | 485 (`934c8dd71`) |
-|---|---|---|
-| 未関数化 callee | 6 | 6 |
-| レーン型 | 166 | 166 |
-| 引数数不一致 | 108 | 108 |
-| SIMD・AVX・swi 疑似関数 | 0 | 0 |
-| code 型の間接呼出し | 21 | **0** (main #3096 で解消) |
-| 未定義 identifier | 17 | 17 |
-| 演算・代入の型不一致 | 186 | 186 |
-| その他 | 2 | 2 |
-| **合計** | **506** | **485** |
+| 分類 | 506 (`12647936d`, §3) | 485 (`934c8dd71`) | 463 (`ecc91a700`) |
+|---|---|---|---|
+| 未関数化 callee | 6 | 6 | 6 |
+| レーン型 | 166 | 166 | 166 |
+| 引数数不一致 | 108 | 108 | 86 |
+| SIMD・AVX・swi 疑似関数 | 0 | 0 | 0 |
+| code 型の間接呼出し | 21 | 0 (main #3096 で解消) | 0 |
+| 未定義 identifier | 17 | 17 | 17 |
+| 演算・代入の型不一致 | 186 | 186 | 186 |
+| その他 | 2 | 2 | 2 |
+| **合計** | **506** | **485** | **463** |
 
-- 件数の差 (#3096 の記録との 1 件): `26b003692` の変換器・shim で同じ out141 から作った census は **555 件** (未関数化 6・レーン 190・引数 108・SIMD 46・未定義 17・型不一致 186・その他 2) で、#3096 の記録 556 (未関数化 5・レーン 191・型 187) と 1 件ずれる。原因は未特定 (`snapins/snapins.json`・`scripts/ghidra`・`emcc_census.py` は `26b003692` から HEAD まで不変。`patches.py` だけが +10 行)。本 HEAD の未関数化 6・型 186 は `26b003692` の再生成と一致する。
+- 件数の差 (#3096 の記録との 1 件): `26b003692` の変換器・shim で同じ out141 から作った census は **555 件** (未関数化 6・レーン 190・引数 108・SIMD 46・未定義 17・型不一致 186・その他 2) で、#3096 の記録 556 (未関数化 5・レーン 191・型 187) と 1 件ずれる。原因は未特定 (`snapins/snapins.json`・`scripts/ghidra`・`emcc_census.py` は `26b003692` から HEAD まで不変。`patches.py` だけが後から変わった)。`ecc91a700` の未関数化 6・型 186 は `26b003692` の再生成と一致する。
 - 単体突合 (`simd_shim_check.c`・`gcc -O1 -mavx2`): 実装 13 種 × 200,000 試行 **mismatches: 0** (rc 0)。ネガティブコントロール (`-DKH_NEG=1`) は **mismatches: 200000** (rc 1)。
 - 回帰 (`build_cmp.sh <n> 1000 7 bitcast,intload,stackpair,assoc,concat`): Gain **1000/1000** (calls 4999/4999・wasm 15,161 B)、Haas **1000/1000** (calls 5500/5500・wasm 16,878 B)、Gate **1000/1000** (calls 4999/4999・wasm 17,367 B)。wasm サイズは §4 と一致。
 - 再現の注意: `build_cmp.sh` は `snapins/work/<n>/` が無いと `native_ref` が segfault する (`run_all.sh` [1] は `mkdir -p` している)。本測定では事前に作成した。
-- 未実施: Delay の native 突合 (emcc が 485 件で通らないため)。#3073 の範囲。
-- 測定 commit から HEAD までのコード差分: 測定 commit = `934c8dd71` (コードを変えた最後の commit = main 取り込みの merge)。`git diff 934c8dd71 HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` の出力は 0 行 (この節を含む REPORT・DOC_MAP の commit は範囲外)。
+- 未実施: Delay の native 突合 (emcc が 463 件で通らないため)。#3073 の範囲。
+- 測定 commit から HEAD までのコード差分: 測定 commit = `ecc91a700` (コードを変えた最後の commit = main 取り込みの merge)。`git diff ecc91a700 HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` の出力は 0 行 (この節を含む REPORT・DOC_MAP の commit は範囲外)。
