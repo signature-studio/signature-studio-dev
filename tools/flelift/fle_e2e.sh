@@ -6,7 +6,7 @@
 #   (4) spot diff (native 実機械語 vs wasm, FORMAT.md v1 準拠 verdict JSONL)
 #   (5) D9 検証 (capstone rip-rel × 手動 modrm 全件突合)
 # 前提: python3 (capstone, pefile), emsdk 6.0.12, node, setarch, gcc
-#   emsdk は EMSDK_ENV で emsdk_env.sh の場所を指定 (既定 /opt/emsdk/emsdk_env.sh = [EMSDK])。
+#   emsdk は EMSDK_ENV で emsdk_env.sh の場所を指定 (既定は [EMSDK] の emsdk_env.sh)。
 # 編集禁止 dir (tools/ott, tools/liftdiff, tools/liftlib, tools/icall) には書かない。
 set -euo pipefail
 FLE="$(cd -- "$(dirname -- "$0")" && pwd)"

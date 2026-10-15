@@ -93,9 +93,9 @@ REPORT §11 の付録。指定の見出しは `## 10.` だが、既存の PERF-P
 
 ## 12. #3661 (CI-173): `EMSDK_ENV` で emsdk を指定し、素材 `toolchain-emsdk` で e2e before / after
 
-- **変更**: `fle_e2e.sh`・`fle_lift.sh` は `EMSDK_ENV` で `emsdk_env.sh` の場所を指定する (既定 `/opt/emsdk/emsdk_env.sh` = `[EMSDK]`。未設定時の挙動は従来どおり)。ファイルが無ければ rc=2 で止まる。`fle_e2e.sh` は `emsdk_env.sh` の source 後に `EMSDK_ENV` を再 export する。`emsdk_env.sh` は source 時に `EMSDK_ENV` を unset するため、子の `fle_lift.sh` へ渡すのに必要。測定 commit `a85ca628d`。
-- **素材**: `fl-win64` と `toolchain-emsdk` を `$RUNNER_TEMP` に展開 (`toolchain-emsdk` の最上位は `emsdk/`)。素材の emcc は 6.0.12 (commit `5488e0871d46`)。runner の `/opt/emsdk` と同一 commit。
-- **素材が実際に使われたこと**: 素材版 run の間に、素材側 `upstream/emscripten/cache` の 1,729 ファイルが更新され、`/opt/emsdk` 側の更新は 0 件 (mtime 比較)。
+- **変更**: `fle_e2e.sh`・`fle_lift.sh` は `EMSDK_ENV` で `emsdk_env.sh` の場所を指定する (既定は `[EMSDK]` の `emsdk_env.sh`。未設定時の挙動は従来どおり)。ファイルが無ければ rc=2 で止まる。`fle_e2e.sh` は `emsdk_env.sh` の source 後に `EMSDK_ENV` を再 export する。`emsdk_env.sh` は source 時に `EMSDK_ENV` を unset するため、子の `fle_lift.sh` へ渡すのに必要。測定 commit `a85ca628d`。
+- **素材**: `fl-win64` と `toolchain-emsdk` を `$RUNNER_TEMP` に展開 (`toolchain-emsdk` の最上位は `emsdk/`)。素材の emcc は 6.0.12 (commit `5488e0871d46`)。runner 既設の `[EMSDK]` と同一 commit。
+- **素材が実際に使われたこと**: 素材版 run の間に、素材側 `upstream/emscripten/cache` の 1,729 ファイルが更新され、`[EMSDK]` 側の更新は 0 件 (mtime 比較)。
 
 | 項目 | before (`512b09ffa`・既定 `[EMSDK]`) | after 既定 (`a85ca628d`・未設定) | after 素材 (`a85ca628d`・`EMSDK_ENV`=素材) |
 |---|--:|--:|--:|
@@ -110,4 +110,4 @@ REPORT §11 の付録。指定の見出しは `## 10.` だが、既存の PERF-P
 
 - **出力 9 件**: `work/lift/` の `fle_lifted.c`・`fle_data.c`・`lift_meta.json`・`flel.wasm`・`flel.cjs`、`work/verdict.jsonl`・`work/verdict_summary.json`、追跡の `results/verdict_flelift.jsonl`・`results/verdict_summary.json`。
 - **負の確認**: `EMSDK_ENV=<存在しない path>` で `fle_lift.sh`・`fle_e2e.sh` とも rc=2 とメッセージを出す。`EMSDK_ENV` が `emsdk_env.sh` の source を跨いで子プロセスへ届くことを `bash -c` で確認。
-- **範囲外**: `fle_lto.sh` は `/opt/emsdk` を直接 source したまま (e2e・lift の経路外で、本 issue の受入の対象外)。
+- **範囲外**: `fle_lto.sh` は `[EMSDK]` を直接 source したまま (e2e・lift の経路外で、本 issue の受入の対象外)。

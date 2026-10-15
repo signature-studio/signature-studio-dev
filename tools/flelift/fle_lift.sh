@@ -2,7 +2,7 @@
 # fle_lift.sh — FLEngine_x64.dll 全体を x64c (flelift fork) で lift → C → emcc → wasm (1 コマンド)。
 #   env: FLE_ENTRIES (default work/fle_entries.json), FLE_OUT (default work/lift), FLE_NAME (default flel)
 #   entries が無ければコミット済み fle_entries.json (M11 closure F 集合 7,421 roots) から生成。
-#   env: EMSDK_ENV (emsdk_env.sh の場所, default /opt/emsdk/emsdk_env.sh)
+#   env: EMSDK_ENV (emsdk_env.sh の場所, default は [EMSDK] の emsdk_env.sh)
 #   前提: python3 (capstone, pefile), emsdk 6.0.12
 set -euo pipefail
 FLE="$(cd -- "$(dirname -- "$0")" && pwd)"
