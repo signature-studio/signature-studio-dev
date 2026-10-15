@@ -14,7 +14,9 @@ OUT="work/reverb_delay/engine$B${ENGINE_TAG:-}"
 t0=$(date +%s)
 python3 reverb_delay/engine_f80_stub.py "$OUT/e.fixcmp.ll" "$OUT/e.sub.ll" "$OUT/f80_excluded.tsv" 2> "$OUT/f80_stub.info"
 NEX=$(($(wc -l < "$OUT/f80_excluded.tsv") - 1))
-( source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; mkdir -p "$OUT/tmp"; TMPDIR="$OUT/tmp" emcc -c "$OUT/e.sub.ll" -o "$OUT/e.sub.o" -w -O0 -msimd128 > "$OUT/emcc_sub.log" 2>&1 )
+command -v emcc >/dev/null 2>&1 || source "${EMSDK_ENV:?EMSDK_ENV に emsdk_env.sh を指定する (docs/REFERENCES.md [EMSDK])}" >/dev/null 2>&1
+mkdir -p "$OUT/tmp"
+TMPDIR="$OUT/tmp" emcc -c "$OUT/e.sub.ll" -o "$OUT/e.sub.o" -w -O0 -msimd128 > "$OUT/emcc_sub.log" 2>&1
 rc=$?
 t1=$(date +%s)
 NFULL=$(grep -c '^define' "$OUT/e.fixcmp.ll")
