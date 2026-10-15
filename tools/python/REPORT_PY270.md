@@ -88,6 +88,7 @@ WheelDelta として読まれる `movsx ..., word ptr [reg+0xa]` は 11 箇所�
 - 検証 HEAD: `d9417da68` (origin/main `a9afb18ec` を取り込んだ競合解消後のマージ commit)。以下の再測定は検証 HEAD で行った。
 - `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py270_wheel_source.py` → 13/13 PASS・終了 0。
   検証 HEAD で所要 44.17 秒 (load average 1 分 0.37 → 0.71)。測定 commit `8e2540ebe` では n=3 で 24.14・24.67・24.82 秒、3 回の出力は一致。
+  m3 の検査名の変更 (コード commit `2315b8ba6`) 後も、同じ HEAD で 13/13 PASS・終了 0 を再確認 (検査名のみの変更で判定は不変)。
 - 前提の `pe_py203_probe.py` → 27/27 PASS・終了 0。検証 HEAD で所要 153.74 秒 (load 0.41 → 0.95)。PY-203 の結論は変えていない。
 - 検証スクリプト `pe_py220_methods.py` → 11/11 PASS・終了 0・15.13 秒 (検証 HEAD)。issue 本文の 10 件とは件数が違う (#3616 へ報告)。
 - 負の対照: 形の条件から r9 の符号付き条件を外すと 2 → 618 件 (スクリプトの判定 `loose`)。
