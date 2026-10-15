@@ -209,3 +209,7 @@ IAT 名の内訳 (件数):
 | slot 1 の完走時の rax と変更範囲は、単独・全件とも実行ごとに揺れる (原因未確認。注 1) | slot 1 の出力の定義 | 追跡 issue なし (PM 判断: 子の起票要否) |
 | slot 2 v0・v2 の変更範囲がセッションで違う (注 2。原因未確認) | 差分テストの入出力の定義 | 追跡 issue なし (PM 判断: 子の起票要否) |
 | slot 3 (rdx=1・2・0xe) の SIGSEGV (単独 18/18 (S2・S3 とも)。全件は slot 3 v1 で 2〜4/6。原因未確認) | slot 3 の入力の扱い。全件は slot 4・5 に届かない | 追跡 issue なし (PM 判断: 子の起票要否) |
+
+### 8. 0x161fc0 閉包の間接 call / jmp 24 件 (T-SH-70 #3346)
+- 結論: 閉包 (67 関数・2,609 命令・間接 call 18 件・間接 jmp 6 件) の 24 件のうち、**IAT 21 件は宛先が静的に確定** (KERNEL32 の import 名。スロットは `.rdata` の IAT で、コードから書かれない)。**CFG/XFG dispatch 経由の 3 件** (0x1aedf6・0x1b6f6c・0x1bd4e9) は宛先が実行時の `rax` で、**trap 化**する (実装は [T-SH-65] #3318・[T-SH-61] #3299)。
+- 再現: `ildsp_vtable.py --seed 0x161fc0` → `ildsp_indirect_resolve.py`。全文・根拠・実測は付録 `REPORT_APPENDIX_3346.md` (測定 commit `a99604b1a`)。

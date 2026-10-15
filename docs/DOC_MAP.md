@@ -572,6 +572,7 @@
 | `tools/shared/lift/libreverb/REPORT.md` | ~60 | libreverb (win `Reverb.dll`) lift + 差分テスト (T-SH-15 #161 部分達成)。ildsp は §6 で一行参照のみ |
 | `tools/shared/lift/ildsp/REPORT.md` | ~230 | ildsp (`block24360_PE.bin`) 規模調査 (§1–3: 命令数・call 数・export closure 表・SIMD 比の未解決) と GeneralPitchShifter_CreateInstance の instance vtable (§4: 6 slot の種別・間接 call のスロットと宛先・生バイト検算とネガティブコントロール・実測) (T-SH-19 #791 / #2483)。§5 は WaveformColouring の vcall dispatch 先 (#2484 / T-SH-37)。§6 は vtable slot 4 (0x1aa3a0) の lift と native 差分 (#2529) の結論 1 行と付録への参照 |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_2529.md` | ~60 | ildsp vtable slot 4 (0x1aa3a0) の lift と native 差分 (#2529) の全文 (REPORT §6 から分割移動): 手順 (`lift.sh`)・選定根拠・closure 規模・実測・ネガティブコントロール・未解決の起票先。測定値の正本 |
+| `tools/shared/lift/ildsp/REPORT_APPENDIX_3346.md` | ~90 | ildsp 0x161fc0 閉包 (`ildsp_vtable.py --seed`) の間接 call 18 件・間接 jmp 6 件の分類 (#3346 / T-SH-70): IAT 21 件の静的同定、CFG/XFG dispatch 3 件の trap 化の根拠 (`rax` の由来・`.data` の書込み元)、実測と未解決の起票先。測定値の正本。REPORT_CLOSURE.md §8 から参照 |
 | `tools/shared/lift/ildsp/REPORT_CLOSURE.md` | ~140 | ildsp vtable 経由の実体 closure (10 export・`.pdata` の無い先を含む・推移閉包・間接 call 内訳と末尾 jmp 内訳・objdump 検算) (T-SH-15 #161)。分離元は `REPORT.md` §2 の下限表 (§4 は GPS vtable)。測定値の正本 |
 | `tools/shared/lift/rex/REPORT.md` | ~75 | REX Shared Library (win `block24351_PE.bin`) の export 14 本の閉包測定 (T-SH-11 #153): 関数数・命令数・間接 call・import・`.pdata` 無しの近似。lift は未実施 (#2733・#2734)。測定値の正本。再現は `rex_closure.py` |
 
