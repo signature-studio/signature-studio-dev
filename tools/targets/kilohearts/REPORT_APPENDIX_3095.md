@@ -1,6 +1,6 @@
 # #3095 (KH-43) Delay の SIMD 疑似関数・swi の規則 (付録)
 
-- **結論**: 現 main の Delay emcc 残件 576 件のうち、SIMD 疑似関数 25 件 (13 種) を shim に**実装**し、swi 21 件を **fail-fast** (abort) とした。main 取り込み後の HEAD (測定 commit `ecc91a700`) の emcc 残件は **463 件** (SIMD・swi の未宣言 0)。統合前 (`12647936d`) の 506 件は取り込み前の値。Gain/Haas/Gate は 1000/1000 bit-exact (回帰なし)。実装 13 種はホスト x86 intrinsics と 200,000 試行で一致 (ネガティブコントロールは FAIL)。
+- **結論**: #3096 (`26b003692`) 取り込み前の main の Delay emcc 残件 576 件のうち、SIMD 疑似関数 25 件 (13 種) を shim に**実装**し、swi 21 件を **fail-fast** (abort) とした。main 取り込み後の HEAD (測定 commit `abee0a1ff`) の emcc 残件は **463 件** (SIMD・swi の未宣言 0)。統合前 (`12647936d`) の 506 件は取り込み前の値。Gain/Haas/Gate は 1000/1000 bit-exact (回帰なし)。実装 13 種はホスト x86 intrinsics と 200,000 試行で一致 (ネガティブコントロールは FAIL)。
 - **main 取り込み後の値は §8** (測定 commit `abee0a1ff`): emcc 残件 **463 件** (main の #3096 で code 間接呼出し 21 件、#3800 で引数過不足 22 件が消えた分を含む)。突合と回帰の結果は同じ。
 - **入力の訂正**: issue 本文の「SIMD 40 件・swi(3) 21 件」は測定 commit `7d1d0e2e` の値 (emcc 601 件) である。現 main では SIMD 25 件。差 15 件 (ABS 10・ZEXT416 2・maxps 2・vpsrldq_avx 1) は #3071 で shim に定義済み。swi 21 件の内訳は **swi(3) 17 件 + swi(0x29) 4 件** (issue の「swi(3) 21 件」は誤り)。
 
@@ -35,7 +35,7 @@
 
 ## 3. emcc 残件の変化 (`ghidra_route/emcc_census.py`、排他分類)
 
-| 分類 | 601 (`7d1d0e2e` 再現) | 576 (現 main, 変更前) | 506 (`12647936d`) |
+| 分類 | 601 (`7d1d0e2e` 再現) | 576 (#3096 前の main, 変更前) | 506 (`12647936d`) |
 |---|---|---|---|
 | 未関数化 callee | 6 | 6 | 6 |
 | レーン型 (`undefined1[N]`・メンバ参照) | 200 | 190 | 166 |
@@ -75,9 +75,9 @@ cd tools/targets/kilohearts
 python3 ghidra_route/ghidra_to_c.py delay work/gr/x work/ghidra/out141 work/winpkg/HeartCore.core_64 --fix bitcast,intload,stackpair,assoc,concat
 emcc -c -ferror-limit=0 -I ghidra_route work/gr/x/delay.c -o work/gr/x/delay.o 2> work/gr/x/emcc.log
 python3 ghidra_route/emcc_census.py work/gr/x/emcc.log            # 合計 463 (測定 commit abee0a1ff・§8)
-# (1') 件数の数え方 (§2・§3 の 576 列)。件数は emcc のエラー行で数える (生成 C の出現数 42 とは一致しない)。
-#      576 列 (SIMD 46 = 13 種 25 + swi 21) は 26b003692 の変換器・shim で同じ out141 から作った emcc ログで再現する
-#      (work/c26b/emcc.log。git archive 26b003692 の ghidra_route と snapins/{lift,scripts} を使う)
+# (1') 件数の数え方 (§2・§3 の 576 列)。件数は emcc のエラー行で数える。
+#      SIMD 46 (= 13 種 25 + swi 21) と swi 21 は 26b003692 の変換器・shim で同じ out141 から作った emcc ログでも再現する
+#      (work/c26b/emcc.log。git archive 26b003692 の ghidra_route と snapins/{lift,scripts} を使う)。この log の総数は 555 (= 576 − code 間接呼出し 21)
 grep -cE "call to undeclared function '(SUB84|SUB168|ZEXT816|minps|vcvtdq2pd_avx|vcvtpd2dq_avx|vshufps_avx|vpmovsxdq_avx|vpsubq_avx|vpsubd_avx|vpsrlq_avx|vpand_avx|vpor_avx)'" work/c26b/emcc.log   # SIMD 25
 grep -c "call to undeclared function 'swi'" work/c26b/emcc.log                                                              # swi 21
 grep -oE 'swi\([^)]*\)' work/gr/x/delay.c | sort | uniq -c                                                                  # swi(3) 17・swi(0x29) 4 (生成 C)
@@ -93,13 +93,15 @@ bash ghidra_route/build_cmp.sh gain 1000 7 bitcast,intload,stackpair,assoc,conca
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| レーン参照 166 件 (`undefined1[N]` のメンバ参照。`auStack_x._8_4_`・`auVar._0_16_` 等) | Delay の emcc が通らない | #3094 [KH-42] |
+| レーン参照 166 件 (既定の `--fix`。`undefined1[N]` のメンバ参照。`auStack_x._8_4_`・`auVar._0_16_` 等) | Delay の emcc が通らない | #3808 [KH-67] (`undefined1[64]` 106 件)・#3809 [KH-68] (`aauStack_f8` 11 件)・新規子 #3953 [KH-78] (残り 49 件 = 166 − 117、内訳は未確定) |
 | 引数過不足 86 件 (#3800 の 22 件は main で解消) | 同上 | #3844 [KH-72] 33 件・#3847 [KH-73] 53 件 |
 | 型不一致 186 件 (V128 同士の `*`・`^` を含む) | 同上 | #3801 [KH-65] |
 | 未定義 identifier 17・未関数化 callee 6・その他 2 (計 25 件) | 同上 | #3802 [KH-66] |
 | 実装 13 種のオペランド順 (Ghidra pcodeop の規約: 先頭が vvvv の src1) を機械語で個別確認していない。swi の到達は未確認 | 反転・到達の誤りは Delay の native 突合でしか検出できない | #3073 [KH-41] |
 | レーン 200 → 190 の 10 件の原因 (`7d1d0e2e` 以降の変更のどれか) | 件数の説明のみ | 本 PR の未解決表で保留 (原因未特定) |
 
+- #3813 の lanes 規則は `--fix lanes` の opt-in で、既定の --fix 外。本 census (既定の --fix) には入っていない。
+- #3808 (106) と #3809 (11) の計 117 件は、#3813 の post-lanes 測定の `member reference base type` 残件 117 件と同じ数 (#3094 の本文)。
 - 子 issue の本文の件数 (#3801 の「型不一致 187」・#3802 の「未関数化 callee 5」) は #3096 の記録 (census 556) の値。本 HEAD の census は 186・6 (§8)。件数の差の原因は §8 に書く。
 
 ## 8. main 取り込み後の再測定 (測定 commit `abee0a1ff`)
