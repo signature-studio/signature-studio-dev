@@ -120,6 +120,8 @@ export function createMockEngine() {
     throw WRONG();
   };
   const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
+  // PyArg "i" 相当 (C provider の 'I'/'B' のみ可): None・文字列・実数は code 5
+  const pyInt = (v) => { if (typeof v === "boolean") return +v; if (Number.isInteger(v)) return v; throw WRONG(); };
   // float 引数 (fl_a_dbl と同じ: None は 0、bool・整数・実数は可、他は code 5)。PE の書式 'f' は float32 に丸める
   const argF = (a, i) => { const v = a[i]; if (i >= a.length || v === undefined) return 0; if (typeof v === "boolean") return +v; if (typeof v === "number") return Math.fround(v); throw WRONG(); };
   const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
@@ -315,6 +317,16 @@ export function createMockEngine() {
     "ui.getFocusedPluginName": (...a) => { arity(a, 0, 0); return ""; },
     "ui.getHintMsg": (...a) => { arity(a, 0, 0); return ""; },
     "ui.isInPopupMenu": (...a) => { arity(a, 0, 0); return false; },
+    // PY-128 (#3005): getProgTitle は PE rodata の定数 (UTF-16)。getHintValue は状態を読まず、(int32)(value*100) / max を最近接偶数で整数化して "%" (REPORT_PY128)
+    "ui.getProgTitle": (...a) => { arity(a, 0, 0); return "FL Studio 2026"; },
+    "ui.getHintValue": (...a) => {
+      arity(a, 2, 2);
+      const v = pyInt(a[0]), m = pyInt(a[1]);
+      const q = Math.imul(v, 100) / (m | 0);
+      if (!(q >= -9223372036854775808 && q < 9223372036854775808)) return "-9223372036854775808%";
+      const f = Math.floor(q), d = q - f;
+      return `${d < 0.5 ? f : d > 0.5 ? f + 1 : f % 2 === 0 ? f : f + 1}%`;
+    },
     "plugins.isValid": (i, slot = -1) => (slot < 0 ? !!st.channels[i] : !!st.mixer[i]?.slots[slot]),
     "plugins.getPluginName": (i, slot = -1, userName) => (slot < 0 ? ch(i).plugin : (tr(i).slots[slot] ?? "")),
     "plugins.getParamCount": () => st.params.length,
