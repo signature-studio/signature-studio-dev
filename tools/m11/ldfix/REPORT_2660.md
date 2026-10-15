@@ -236,7 +236,7 @@
 | site | IR の述語 (F3d 後 `function_45d0a0` / `function_45f560`) | 機械語の jcc (入口は `eax = W`) | 判定 |
 |---|---|---|---|
 | 45d570 | `%122 = and %3, 16384`・`icmp eq 0` → 45d5a9 else 45d38e。`%125 = trunc %3 & 49151`。`%144 = %125 - 20`・`eq 0` → 45d565 (store) | 45d381 `mov ecx,eax`・`test cx,0x4000`・`je 45d5a9`。45d38e `and eax,0xffffbfff`・`cmp 0xb`・`cmp 0x12`・`sub 0x13`・`sub 1`・`test`・`je 45d565` | 述語と arm が一致。入口 eax = W が clean |
-| 45d581 | 同上。`%146 = %144 - 1`・`eq 0` → 45d59a else 45d576 (store) | 45d448 `sub eax,1`・`jne 45d59a`・`jmp 45d576` | 述語と arm が一致。入口 eax = W が clean |
+| 45d581 | 同上。`%146 = icmp eq %144, 1`・`%147 = eq %146, false` → 45d59a else 45d576 (store。`%144 == 1` すなわち X == 21) | 45d448 `sub eax,1`・`jne 45d59a`・`jmp 45d576` | 述語と arm が一致。入口 eax = W が clean |
 | 45f938 | 45f824 `and %3, 16384`・`eq 0` → 45fa34 else 45f831。45f831 `%118 = trunc(%3 & 49151)`・`ugt 12`・`eq 12`・`ugt 6`・`eq 6` → 45f931 (store) | 45f824 `mov ecx,eax`・`test cx,0x4000`・`je 45fa34`。45f831 `movzx eax,ax`・`and eax,0xffffbfff`・`cmp 0xc`・`jg`・`je`・`cmp 6`・`jg`・`je 45f931` | 述語と arm が一致。入口 eax = W が clean |
 
 - 補足: IR の `and i64 %3, 49151` と機械語の `and eax, 0xffffbfff` は、W が 16 bit 値のため同じ値 (`W & 0xBFFF`)。`and i64 %3, 16384` と `test cx, 0x4000` も同じ bit。
