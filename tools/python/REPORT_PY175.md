@@ -12,7 +12,7 @@
 ## 測定
 
 - 測定 commit: `7c85004e` (origin/main 取り込み時点)。コードは変更していない。本節の追記は `tools/python/REPORT_PY175.md` と `docs/DOC_MAP.md` の 1 行だけ。
-- 展開: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (1.6 秒・22,227,016 バイト)。`FL_WIN64_DIR=<展開先>`。
+- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (1.6 秒・22,227,016 バイト)。`FL_WIN64_DIR=<展開先>`。
 - 実行 (全て終了 0):
   - `analysis/flapi/pe_disasm.py 1046a30 4700` → 4,679 行 (0.063 秒)。既存の関数範囲 (`REPORT_PY41_APPENDIX.md`) の末尾 `0x104ccca` を含む。
   - `analysis/flapi/pe_rip_consts.py 1047b93 60`・`pe_rip_consts.py 104839c 40` (定数の確認)。
