@@ -202,4 +202,4 @@
 - 第 5 引数: `0x43dd60` は第 5 引数を受け取らず、`lea rax,[rip+0x11ae63e]` (= `0x15ec3b0`) を `0x43dd90` の第 5 引数に置く。`0x43dd90` はそれを `0x43dde0` の第 5 引数へ渡す。`0x43dde0` の第 5 引数は `[rbp+0x20b0]`、`0x43dc00` 経由で `0x43e240` の第 7 引数 `[rbp+0x1d0]` になる。値はポインタ `0x15ec3b0`。`0x43e240` は spec 'M' (0x43ebda) のとき `byte [[rbp+0x1d0]+9]` を読む (0x43ebe4・0x43ebeb)。
 - `0x15ec3b0` は `.bss` (`0x15e6000`〜、SizeOfRawData 0)。PE ファイル上に実体は無い。実行時の内容は未確認。
 - 第 4 引数 r9: `0x43dd60`・`0x43dd90` は r9 を書かない (素通し)。`0x43dde0` は r9 を `rbx` に保存し (0x43de11)、6 番目として `0x43dc00` に渡す (0x43de5c)。`0x43e240` の第 6 引数は `[rbp+0x1c8]` で、0x43e2db で `ebx = flag + 1` になり、0x43e716・0x43e843・0x43e944 で `cmp eax, ebx` の上限比較に使われる。0/1 の差が上限の差になるかは確定していない。意味 (何の上限か) は未確定。
-- 検証: `pe_py183_probe.py` の `spec_checks` (13 件) を追加。probe 全体は 133 件 PASS・`summary: OK`。
+- 検証: `pe_py183_probe.py` の `spec_checks` (13 件) を追加。probe 全体は 142 件 PASS・`summary: OK`。
