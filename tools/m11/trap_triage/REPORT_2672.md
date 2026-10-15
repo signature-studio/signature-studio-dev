@@ -123,3 +123,41 @@ python3 tools/m11/trap_triage/compare_kinds_2672.py tools/m11/work/trap_triage/b
 - 測定 commit 以降の `tools/m11` の差分: 本 REPORT を更新した commit 時点で `git diff --stat c05f4b16 HEAD -- tools/m11` は本ファイルのみ (コード差分 0)。main 取り込み後の再測定は不要 (`docs/WORKFLOW.md` §6)。
 - origin/main (`b7df55e6`) は `208b4ef9` 以降に `tools/m11` の 20 ファイル (`ldfix/` の解析スクリプト・結果・REPORT、`shimx_link/`、`trap_triage/REPORT_1620.md`・`trap_w1620.py`) を更新している。いずれも IR 生成・build・survey の経路から呼ばれず、`ldfix/ldfix.py` と C ソース・`m11_build.sh`・`survey_units.mjs` は `208b4ef9` と差分 0 (`git diff --stat 208b4ef9 origin/main -- tools/m11` の内訳で確認)。`git merge-tree` は衝突なし。
 - 参考: `git diff --stat 39fe9fad c05f4b16 -- tools/m11` は `REPORT_2672.md` と `compare_kinds_2672.py` の 2 ファイル。
+
+## 9. PR #4664 (round 1 の差し戻し対応) の追記
+
+### 9.1 本節の数値の出所 (再測定していない)
+
+- 下記の数値は PR #4664 の作成者が実行し PR 本文に書いた値。本 run では再測定していない。`$ARTIFACTS_DIR` に `fl-win64` だけがあり、`work-m11`・`toolchain-emsdk` が無いため。
+- 測定 commit: PR 本文は「本 PR の commit」とだけ書き、完全 SHA を記録していない。`c05f4b16` (§2〜§8 の測定) とは別の測定。
+- 基準 survey の base: PR 本文が「現 main」とした `654aabbd5`。現 origin/main は `325cf6a4d` (本 run で fetch)。
+
+| 項目 | 値 (PR 作成者の測定) | §2 (c05f4b16) との関係 |
+|---|---|---|
+| 基準 survey (`654aabbd5`) | `ok 873 / miss 47 / halt0 7 / oob 14 / noproc 1` | §2.1 (`ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1`) と build が違い、一致しない |
+| 計装版の hook (`store_ptr`) | `$fimport$34`、59,375 件 | §1 の `$fimport$32` と違う (build で import 番号が変わる) |
+| 本番 (`OLD=0x1029e5d8`、942 unit) | hit 0 | §2.4 の hit 1 (unit 477) と違う |
+| 陽性対照 (`OLD=0`、unit 0,1) | hit 0 | §2.3 の hit 5 を再現できない |
+
+- 陽性対照が 0 件なので、計装の検出 (hook の引数・`mem` の参照・store id の割当て) が現 build で機能しているかは未確認。§2.3 の「検出機構が動く」の結論は c05f4b16 の build に限られる。
+- `store_sites_2672.py` の修正 (本 PR) の単体確認: 合成 wat (import `$fimport$34`・呼出し 1 件) で `n_ids 1 / n_dup_ids 0 / sites {133950: func 7, line 4, bytes 4, offset 48}`。修正前の版は同じ入力で 0 件。import が 0 件の wat では `sys.exit` で止まる (件数検査)。
+- `store_sites_2891.py` と重複する理由: 2891 版は import 1 件を前提に `sys.exit` で検査する一般化版。2672 版は REPORT §1 の単発の再現手順の入力 (`store_sites_2672.py`) として残す。2 版の出力は同じ入力で一致 (`sites`・`exports` が同一)。
+
+### 9.2 HEAD で再測定が必要な理由
+
+- 測定 commit `c05f4b16` から現 HEAD (`5252bd0fc`) までの、実行される build・survey のコードの差分 (`git diff --stat c05f4b16 HEAD -- tools/m11/m11_ov.c tools/m11/m11_build.sh tools/m11/m11_gen_ir2.sh tools/m11/m11_rt.c tools/m11/trap_triage/survey_units.mjs`):
+
+```
+ 5 files changed, 355 insertions(+), 13 deletions(-)
+```
+
+  - `m11_ov.c` に `tr_41c180`・`tr_4467ac` と寛容起動 (`m11_call_unit_at`) が入り、`m11_build.sh` の既定値に `M11_FIX_535BF2=1` (#2521)・`M11_FIX_4136A0` (#3928) が入った。main 取り込みで入った変更。
+  - §8 の「build 入力は `208b4ef9` と同一」は、main 取り込みにより HEAD では成り立たない (§8 は `c05f4b16` 時点の記録として残す)。
+- よって §2 と §9.1 の数値は、いずれも現 HEAD の build の数値ではない。HEAD での再測定は未了。
+- 本 PR の script 修正 (`store_sites_2672.py`) は測定入力ではないが、上の build 差分は測定入力そのものなので、script 修正だけでは「再測定不要」とは言えない。
+
+### 9.3 未了 (起票先: #2706)
+
+| 未了 | 影響 | 必要な素材 |
+|---|---|---|
+| HEAD (`5252bd0fc` 以降) の build で基準 survey・計装版の本番・陽性対照を再測定する | §2・§9.1 の数値の正本化、陽性対照の成立 | `oc_artifacts: fl-win64 work-m11 toolchain-emsdk` (`docs/WORKFLOW.md` §11 の名前) |
