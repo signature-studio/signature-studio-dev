@@ -1,6 +1,6 @@
 # #3259 — 既存 snap-in の生成物ハッシュ不変 (起点 B vs 比較先 H)
 
-- 起点 B = `80fb2fd00` (`3d51fd7a3^`・#779 の直前)、比較先 H = `origin/main` (#779 変更 + #3256 含む)
+- 起点 B = `80fb2fd00` (`3d51fd7a3^`・#779 の直前)、比較先 H = `3769b0f76` (測定時の origin/main。#779 変更 + #3256 含む)
 - 手順: PM 指示 (2026-10-15 05:30Z) どおり、snap-in を 1 本ずつ `lift/build.py <name> --path s0 --tag <B|H> --trials 200 --seed 1` で build。
 - 測定項目: emcc 前生成物 (`final.ll`・`simd.c`・`globals.c`・`stubs.c`・`sigs.json`) と wasm (`mod.wasm`) の sha256 (64 桁)、RESULT 行、所要秒、load。
 - 判定: B と H の sha256 が一致すれば「生成物不変」。
@@ -38,11 +38,11 @@
 
 ## 結論
 
-- **測定 commit**: B = `80fb2fd00` (`3d51fd7a3^`)、H = `3769b0f76` (origin/main 時点)。H と HEAD の間は本付録の追加だけ (下の差分を参照)。
-- **emcc 前の 5 項目 (final.ll・simd.c・globals.c・stubs.c・sigs.json)**: 14 本すべてで B と H の sha256 が一致。
-- **wasm (mod.wasm)**: 10 本 (matrix・gain・haas・clipper・gate・quickeq・resonator・stereo・disperser・formant) で一致。RESULT も B・H で同一。
-- **wasm は未測定の 4 本**: phaser・delay・limiter・khbase。emcc の RSS cap (11000MB) 超過で wasm が出ない。#3756 の完了後に再測定する。
-- resonator (80/200)・stereo (12/200) は RESULT が 200/200 ではない。B と H で同じ値なので本件の変更による差ではない。既存の未解決 (従来値) として扱う。
+- **測定 commit**: B = `80fb2fd00` (`3d51fd7a3^`)、H = `3769b0f76` (測定時の origin/main)。HEAD 再測定の測定 commit は `4410b3adf` (main 取り込み後)。`4410b3adf` → HEAD `37f6fa946` のコード差分は 0 (本付録のみ)。旧 H の表は HEAD の値ではない。HEAD の値は `## HEAD 再測定` 節を正とする。
+- **旧 H (3769b0f76) の結果**: emcc 前の 5 項目 (final.ll・simd.c・globals.c・stubs.c・sigs.json) は 14 本すべてで B と H の sha256 が一致。mod.wasm は 10 本で一致し、RESULT も B・H で同一。
+- **旧 H で wasm が出なかった 4 本** (phaser・delay・limiter・khbase): H は emcc の RSS cap (11000MB) 超過で wasm 未出力。B 側も globals.c 段で SIGKILL (-9) し wasm が無い。このため B と H の wasm は比較できない。HEAD 再測定では wasm が出た (下表)。
+- **HEAD (4410b3adf)**: 14 本 rc=0。final.ll・simd.c・stubs.c・sigs.json は 14 本すべて B と一致。mod.wasm は 10 本で B と一致。残り 4 本 (phaser・delay・limiter・khbase) は B 側に wasm が無いため比較不能 (HEAD では出力あり)。RESULT は 14 本すべて 200/200。
+- resonator (旧 H 80/200)・stereo (旧 H 12/200): HEAD では RESULT 200/200 に変わった。wasm・final.ll は B と一致。原因は未切り分け (本 PR はコードを変えていない。main 側の変更との対応は未確認)。
 
 ## cap 超過 4 本の実測 (emcc 前生成物)
 
@@ -65,7 +65,9 @@
 
 ## 差分 (測定 commit から HEAD まで)
 
-`git diff 3769b0f76 HEAD -- tools/targets/kilohearts/snapins` は本付録 (REPORT_APPENDIX_3259.md) のみ。コードの変更は 0。
+- `git diff --stat 3769b0f76 37f6fa946 -- tools/targets/kilohearts/snapins ':!*.md'` は 4 ファイル・+187/-1 (`lift/kh_passes.py`・`lift/gen_globals.py`・`scripts/vmovaps_store_check.py`・`harness/vmovaps_store_harness.c`)。旧 H (3769b0f76) と HEAD の間には main 側の変更が入っている。
+- `git diff 4410b3adf 37f6fa946 -- tools/targets/kilohearts ':!*.md'` は空。HEAD の値は下の `## HEAD 再測定` (測定 commit 4410b3adf) を正とする。
+- `git diff origin/main HEAD -- tools/targets/kilohearts ':!*.md'` は空 (PR 自身のコード差分は 0)。
 
 ## HEAD 再測定 (main 取り込み後・測定 commit 4410b3adf)
 
@@ -83,13 +85,13 @@ main 側に H (`3769b0f76`) より後の変更 (#3756 `c19086fdb`・#3358 `4a8c4
 | disperser | 14 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 999/999 |
 | formant | 14 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 999/999 |
 | matrix | 2 | = B | = B | = B | = B | = B | = B | 200/200, calls 1149/1149 |
-| phaser | 16 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 1100/1100 |
-| delay | 21 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 1299/1299 |
-| limiter | 16 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 1100/1100 |
-| khbase | 18 | = B | = B | ≠ B | = B | = B | = B | 200/200, calls 10500/10500 |
+| phaser | 16 | = B | = B | ≠ B | = B | = B | 出力あり (B は未出力・比較不能) | 200/200, calls 1100/1100 |
+| delay | 21 | = B | = B | ≠ B | = B | = B | 出力あり (B は未出力・比較不能) | 200/200, calls 1299/1299 |
+| limiter | 16 | = B | = B | ≠ B | = B | = B | 出力あり (B は未出力・比較不能) | 200/200, calls 1100/1100 |
+| khbase | 18 | = B | = B | ≠ B | = B | = B | 出力あり (B は未出力・比較不能) | 200/200, calls 10500/10500 |
 
 - **B との比較** (B = `80fb2fd00` の sha256 は上の旧表): `final.ll`・`simd.c`・`stubs.c`・`sigs.json`・`mod.wasm` は 14 本すべて一致。`globals.c` は 8 本で不一致 (quickeq・stereo・disperser・formant・phaser・delay・limiter・khbase)。
-- **`globals.c` の不一致**: main 側の #3756 (`c19086fdb`・`gen_globals.py` の BSS 0 埋め膨張の修正) が原因。B・H の時点では 0 埋めが宣言長を超えていた。この PR の差分ではない。`globals.c` を含む生成物の変化は、この修正の意図した効果である。
-- **cap 超過の 4 本 (phaser・delay・limiter・khbase)**: #3756 の修正後は emcc RSS cap 内に収まり、wasm が出た。旧表の「未測定」は HEAD では解消。
-- **resonator・stereo**: RESULT は HEAD で 200/200 (旧 H は 80/200・12/200)。差の原因は**未切り分け** (本 PR はコードを変えていない。main 側の変更との対応は未確認)。wasm・final.ll は B・H と一致しているため、差は oracle 側の出力と読めるが、確認は未実施。
+- **`globals.c` の不一致**: main 側の #3756 (`c19086fdb`・`gen_globals.py` の BSS 0 埋め膨張の修正) が原因と推定。B・H の時点では 0 埋めが宣言長を超えていた。この PR の差分ではない。
+- **cap 超過の 4 本 (phaser・delay・limiter・khbase)**: HEAD (4410b3adf) では emcc RSS cap 内に収まり wasm が出た。B 側には wasm が無いため、wasm の B 比較は不能。
+- **resonator・stereo**: RESULT は HEAD で 200/200 (旧 H は 80/200・12/200)。差の原因は**未切り分け** (本 PR はコードを変えていない。main 側の変更との対応は未確認)。wasm・final.ll は B と一致しているため、差は oracle 側の出力と読めるが、確認は未実施。
 - 測定ログ: `work/<name>/H/` (gitignore 対象・commit しない)。

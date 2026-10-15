@@ -901,7 +901,7 @@
 | `tools/targets/kilohearts/license/KH3307_REPORT.md` | 74 | #3307 (KH-52): gen_simd の SSE 整数語彙 6 件の追加と bit 突合・module F の 2 関数の試行。2 関数の実機突合と product 登録は #4153 (KH-91) |
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3256.md` | ~82 | KH-48 (#3256): vmovaps ymm・FMA3 scalar 7 語彙の検証 (`ymm_vocab_check.py` / `fma_vocab_check.py`) の生出力全行 |
-| `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3259.md` | ~45 | #3259: 既存 14 snap-in の生成物 sha256 の起点 B (80fb2fd00) と比較先 H (origin/main) の比較表。emcc 前 5 項目は 14 本すべて一致。wasm は 10 本一致・4 本 (cap 超過) は未測定 |
+| `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3259.md` | ~45 | #3259: 既存 14 snap-in の生成物 sha256 の比較。B (80fb2fd00) 比較と HEAD 再測定 (測定 commit 4410b3adf) を収録。結果の詳細は付録の `## HEAD 再測定` 節 |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3358.md` | ~44 | KH-54 (#3358): vmovaps store 形を 32B store へ復元する検証 (`vmovaps_store_check.py`) の生出力・ネガコン・コード差分。要約は REPORT.md §16 |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_779.md` | ~9 | KH-16 (#779) 第 2 弾: ymm 語彙 vaddps / vsubps / vmulps の検証 (REPORT.md §12-1 の全文を分割移動) |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_1116.md` | ~7 | #1116: HeapAlloc 0 返却規約のホスト同型性試験 (REPORT.md の 1116 節の全文を分割移動) |
