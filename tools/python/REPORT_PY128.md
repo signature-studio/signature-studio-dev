@@ -32,25 +32,27 @@
 
 ## 検証
 
-測定 commit: `3bdba9d55` (コードを変えた最後の commit。`feat(python): ui.getProgTitle / getHintValue を PE 確定・mock/C 実装 (#3005)`)。以降の変更は `REPORT_PY128.md` と `docs/DOC_MAP.md` (md のみ)。
+測定 commit: `b9dc4a500` (コードを変えた最後の commit。`main` (`1bb93134e`) の取り込み merge。PR 自身の実装は `3bdba9d55`)。取り込みで `tests/provider_check.mjs` が衝突し、`main` 側の pl61 (7 件) と本 PR の pe128 (2 件) を両方残して 164 / 271 に直した。以降の変更は `REPORT_PY128.md` のみ (md)。
 
-環境: runner 4 core、load average 0.15 (HEAD 再現時、03:22:27)。`FL_WIN64_DIR` は素材 `fl-win64` の展開先 (`block00031_PE.bin`・`block24429/24430/25159/24618_DATA.bin` を展開)。`toolchain-emsdk` は [EMSDK] (`docs/REFERENCES.md`)。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、3 分 40 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
+環境: runner 4 core、load average 1.05 (03:42:24)。`FL_WIN64_DIR` は `$HOME/artifacts/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に `tar --zstd -xf` で展開 (7 秒。`extracted/block00031_PE.bin` を含む)。`toolchain-emsdk` は展開せず `/opt/emsdk` (既存) を使用。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、213 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5 秒)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 157 (155 + 2) | 1.3 秒 (emcc キャッシュ済み) |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 157 / 未実装 278 / MCP 静的 60) | 0.28 秒 |
+| `bash provider/build.sh` | rc 0・ハンドラ 164 (main 162 + 2) | 1.2 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 164 / 未実装 271 / MCP 静的 60) | 0.51 秒 |
 | `node tests/ui_state_diff.mjs` | calls 56、diffs 0、PASS | 0.04 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.28 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.34 秒 |
+
+main 取り込みで変わった隣接の差分テスト (wall 未計測): `tests/channels_diff.mjs` は calls 214・grid 1,200 (true 30)・diffs 0・PASS。`tests/device_diff.mjs` は calls 11・diffs 0・PASS。`tests/playlist_diff.mjs` は calls 72・diffs 0・PASS。
 
 mock と C の値 (同一): `getProgTitle()` = `FL Studio 2026`、`getHintValue(50,100)` = `50%`、`(-1,100)` = `-1%`、`(1,8)` = `12%` (12.5 は偶数側)、`(5,0)` と `(0,0)` = `-9223372036854775808%`、`(2147483647,1)` = `-100%` (int32 折返し)、`(None,1)` = code 5。
 
-ネガティブコントロール: `host/fl_mock.mjs` の係数 `100` を `10` に変えると `node tests/ui_state_diff.mjs` は `ui 状態ゲッター差分 9 件` で rc 1 (FAIL)。元に戻すと calls 56・diffs 0・PASS。
+ネガティブコントロール (main 取り込み後に再測定): `host/fl_mock.mjs` 366 行の係数 `100` を `10` に変えると `node tests/ui_state_diff.mjs` は `ui 状態ゲッター差分 9 件` で rc 1 (FAIL)。元に戻すと calls 56・diffs 0・PASS。
 
 コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 3bdba9d55 HEAD -- tools/python ':!*.md'
+$ git diff b9dc4a500 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
