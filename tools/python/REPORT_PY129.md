@@ -6,7 +6,7 @@
 
 - PY-119 で保留した ui の setter 4 件のうち、**3 件** (`ui.setHintMsg` / `ui.setFocused` / `ui.setSnapMode`) は呼出し経路 (書込み先の呼出し・引数の変換・戻り型) を PE で確定し、mock と C provider に実装した。実装の戻り値は None。**状態は持たない (仮置き)**。書込んだ値を後で読み出す経路は未確定のため、setter は値を記録しない。
 - 残り **1 件** `ui.snapMode` は保留 (`0xfdd2c0` の意味が未同定)。実装しない。
-- mock と C の差分は 0 (`tests/ui_state_diff.mjs` calls 52・diffs 0)。`tests/provider_check.mjs` は実装 158 / 未実装 277 (PR 前は 155 / 280)。`FL_ENGINE=wasm tests/all_tools.mjs` は 48/48 ok を維持。
+- mock と C の差分は 0 (`tests/ui_state_diff.mjs` calls 52・diffs 0)。`tests/provider_check.mjs` は実装 165 / 未実装 270 (main 取り込み後。本 PR の 3 件を含む。PR 前の本体は 155 → 158)。`FL_ENGINE=wasm tests/all_tools.mjs` は 48/48 ok を維持。
 - 未確定の点 (setter の状態モデル・setSnapMode の範囲外・snapMode) は子 issue **#3719 ([PY-242])** に分けた。
 
 ## 手段
@@ -39,37 +39,37 @@
 
 ## 検証
 
-測定 commit: `195ae347d` (コードを変えた最後の commit。`feat(python): ui setter 3 件の PE 呼出し経路を確定し mock と C provider に実装 (#3006)`)。以降の commit は `tools/python/REPORT_PY129.md` と `docs/DOC_MAP.md` (md のみ)。
+測定 commit: `72ae6d066` (コードを変えた最後の commit。`origin/main` (8c23860cd) の取り込み merge。衝突した `docs/DOC_MAP.md` と `tests/provider_check.mjs` を解消)。前回の測定 commit `195ae347d` (main 取り込み前) の数値は本節で置き換えた。以降の commit は `tools/python/REPORT_PY129.md` のみ。
 
-環境: runner 4 core。`load` は `uptime` の 1 分平均。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。`toolchain-emsdk` は `[EMSDK]` (`docs/REFERENCES.md` の既定位置) に既にインストール済みで、`emcc --version` は 6.0.12 (pin と一致)。artifact `toolchain-emsdk` の `emsdk/upstream/emscripten/emscripten-version.txt` (= "6.0.12") と一致を確認したので、上書き展開はしていない。
+環境: runner 4 core。`load` は各コマンドの終了直後の `/proc/loadavg` (1 分平均)。`fl-win64` は `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` に指定。`toolchain-emsdk` は本 run の素材に無かったため、emsdk を pin 6.0.12 で `$RUNNER_TEMP/emsdk` に導入し、`[EMSDK]` (`docs/REFERENCES.md`) の位置に symlink した (`emcc --version` 6.0.12)。
 
 | コマンド | 結果 | wall | load |
 |---|---|---|---|
-| `bash fetch_inputs.sh` | rc 0 | 未計時 | — |
-| `bash build_cpython_wasm.sh` | rc 0 | 約 244 秒 (`uptime` 03:24:23 → 03:28:27) | 3.70 (終了時) |
-| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 | 約 7 秒 (`date` 03:29:25 → 03:29:32) | 1.36 |
-| `bash provider/build.sh` | rc 0・ハンドラ 158 | 1.411 秒 (emcc キャッシュ済み) | 1.46 |
-| `node tests/provider_check.mjs` | PASS (functions 435・実装 158・未実装 277・MCP 静的 60) | 0.429 秒 | 1.34 |
-| `node tests/ui_state_diff.mjs` | calls 52・diffs 0・PASS (rc 0) | 0.048 秒 | 1.24 |
-| `node tests/general_diff.mjs` | calls 41・diffs 0・PASS (rc 0) | 0.047 秒 | 1.05 |
-| `node tests/ui_diff.mjs` | calls 17・diffs 0・範囲外既知差分 3・PASS (rc 0) | 0.048 秒 | 1.05 |
-| `node tests/mixer_diff.mjs` | calls 62・diffs 0・PASS (rc 0) | 0.046 秒 | 0.96 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (rc 0) | 2.079 秒 | 0.96 |
+| `bash fetch_inputs.sh` | rc 0 (`work/` に MCPTools.pyc・midi.py・utils.py・device script を配置) | 未計時 | — |
+| `bash build_cpython_wasm.sh` | rc 0 | 3 分 25.5 秒 (205.5 秒) | 未計測 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 | 4.6 秒 | 未計測 |
+| `bash provider/build.sh` | rc 0・ハンドラ 165 (`fl_table.c`: 関数 435) | 未計時 | 未計測 |
+| `node tests/provider_check.mjs` | PASS (functions 435・実装 165・未実装 270・MCP 静的 60) | 0.270 秒 | 2.59 |
+| `node tests/ui_state_diff.mjs` | calls 52・diffs 0・PASS (rc 0) | 0.042 秒 | 2.59 |
+| `node tests/general_diff.mjs` | calls 41・diffs 0・PASS (rc 0) | 0.042 秒 | 2.59 |
+| `node tests/ui_diff.mjs` | calls 17・diffs 0・範囲外既知差分 3・PASS (rc 0) | 0.041 秒 | 2.59 |
+| `node tests/mixer_diff.mjs` | calls 69・diffs 0・PASS (rc 0)。calls 62 → 69 は main 側の `mixer_diff.mjs` の追加 (本 PR の変更ではない) | 0.043 秒 | 2.59 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (rc 0) | 1.248 秒 | 2.19 |
 
 - `ui_state_diff.mjs` の calls 52 は、通常呼出し (ui ゲッター 14 + getFocused 3 + setter 13 = 30) と引数個数違い (22) の合計。setter 追加分は 19 呼出し (通常 13 + 個数違い 6)。
 - 参考: PY-119 報告の `ui_state_diff` calls 12 は、現在のスクリプトの呼出し列と一致しない (PR 前の列は、ゲッター 17 + 個数違い 16 = 33 件と列から数えた値で、実行して測ったものではない)。PY-119 の件数は古いまま残っている (本 PR では訂正しない)。
 
-ネガティブコントロール: `host/fl_mock.mjs` の `ui.setSnapMode` の引数個数検査を `arity(a, 1, 1)` から `arity(a, 1, 2)` に変えると、`node tests/ui_state_diff.mjs` は `AssertionError [ERR_ASSERTION]: ui 状態ゲッター差分 1 件` (差分の name は `ui.setSnapMode`) で rc 1 (FAIL)。元に戻すと calls 52・diffs 0・PASS (rc 0)。`provider/*.wasm` は変えていない (mock のみの変更)。
+ネガティブコントロール: `host/fl_mock.mjs` の `ui.setSnapMode` の引数個数検査 (382 行) を `arity(a, 1, 1)` から `arity(a, 1, 2)` に変えると、`node tests/ui_state_diff.mjs` は `ui 状態ゲッター差分 1 件` で rc 1 (FAIL)。元に戻すと calls 52・diffs 0・PASS (rc 0)。元に戻した後の `git diff -- tools/python/host/fl_mock.mjs` は空。`provider/*.wasm` は変えていない (mock のみの変更)。
 
 ## コード差分
 
 - `host/fl_mock.mjs`: `ui.setHintMsg` (文字列検査)・`ui.setFocused` / `ui.setSnapMode` (整数検査) を PY-119 の ui 行の直後に追加。状態は持たない。
 - `provider/fl_engine.c`: 同じ 3 関数を `FL_H(ui, ...)` で追加 (`NARGS(1, 1)` と `A_STR(0)` / `A_INT(0, 0)`、戻り `fl_ret_none`)。
-- `tests/provider_check.mjs`: `pe129` の Set (3 件) と実装判定への追加、件数 assert を 155 → 158、未実装 280 → 277。
+- `tests/provider_check.mjs`: `pe129` の Set (3 件) と実装判定への追加、件数 assert は 165 / 270 (PR の 3 件を加えて 158 / 277。main 取り込みで衝突した判定行に `pl61` (PY-61・7 件) を両方残した結果)。
 - `tests/ui_state_diff.mjs`: setter の呼出し列 (通常 13・引数個数違い 6) を追加。
 
 ```
-$ git diff 195ae347d HEAD -- tools/python ':!*.md'
+$ git diff 72ae6d066 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
