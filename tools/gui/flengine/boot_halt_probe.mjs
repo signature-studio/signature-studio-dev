@@ -36,7 +36,8 @@ const hex32 = (n) => (n === null ? null : '0x' + (n >>> 0).toString(16));
 const hexBytes = (a, n) => Array.from(mod.HEAPU8.subarray(a, a + n), (b) => b.toString(16).padStart(2, '0')).join(' ');
 const VA_BASE = 0x400000, ARG3_VA = 0x8494fc;
 const objP = u32(0x11f7110), vtP = objP ? u32(objP) : null, vt0 = vtP ? u32(vtP) : null;
-const vt0Jmp = vt0 !== null && mod.HEAPU8[vt0 + 4] === 0xe9 ? vt0 + 9 + (u32(vt0 + 5) | 0) : null;
+const i32u = (a) => new DataView(mod.HEAPU8.buffer).getInt32(a, true);
+const vt0Jmp = vt0 !== null && mod.HEAPU8[vt0 + 4] === 0xe9 ? vt0 + 9 + i32u(vt0 + 5) : null;
 const halt_mem = {
   obj: hex32(objP), vtable: hex32(vtP), vtable0: hex32(vt0),
   vtable0_bytes: vt0 ? hexBytes(vt0, 8) : null,
