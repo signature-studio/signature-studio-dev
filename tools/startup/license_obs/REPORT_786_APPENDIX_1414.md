@@ -50,8 +50,10 @@ REPORT_786 §12.2 (F2・F3 が 0x10c7850 の中で停止) の続き。0x10c7850 
 | `probe_1414_writecond.py` 単体 (0e6168b67) | 39.6 秒・rc 0・`all_match True` (W1〜W7 全一致) |
 | `bash license_obs.sh` (0e6168b67・素材 fl-win64・load average 1 分値 0.42 → 1.02) | 2 分 45.9 秒・rc 0・`ALL OK`・`RESULT ALL PASS`・PASS 行 40 件・FAIL 0 |
 | 同条件の先行実行 (93307cc6a・新 probe は未コミットで license_obs.sh は呼ばない・load average 0.66 → 0.98) | 2 分 46.6 秒・rc 0・`ALL OK`・`RESULT ALL PASS`・PASS 行 40 件・FAIL 0 |
+| `probe_1414_writecond.py` (HEAD `285058310`・main 取り込み後) | 41 秒・rc 0・`all_match True` (W1〜W7 全一致) |
+| `bash license_obs.sh` (HEAD `285058310`・素材 fl-win64 全展開・load average 1 分値: probe 直後 0.52 → 終了直後 0.97) | 2 分 50 秒・rc 0・`ALL OK`・`RESULT ALL PASS`・PASS 行 40 件・FAIL 0 |
 
-- 差分: `git diff 0e6168b67 HEAD -- tools/startup/license_obs/*.py` の出力は 0 行。測定の後にコードは変えていない (後続の変更は REPORT (.md) と DOC_MAP のみ)。
+- 差分: `git diff 0e6168b67 HEAD -- tools/startup/license_obs` の md 以外 (`*.py`・`*.sh`・`*.json`) は 0 行。`tools/startup/vreg/ilreg`・`tools/shared/paths.py` (license_obs が読む経路) も 0 行。測定の後にコードは変えていない (後続の変更は REPORT (.md) と DOC_MAP のみ)。
 
 ## 5. 未解決 (起票先)
 
