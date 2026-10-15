@@ -129,6 +129,60 @@
 - 試作した自動突合は、レジスタ名の一致だけで偽陽性にしてしまうためコミットしていない。
 - 残作業: 95 件の件ごと判定 (受入条件 1・2)。本 issue (#1654) の範囲として未解決のまま残す。
 
+## 4g. 証拠表の行 4〜35 (#3498・母数 32 件: 真陽性 29・偽陽性 0・保留 3)
+
+- 母数: `strict_evidence.tsv` のデータ行 4〜35 (ヘッダ除く 1 始まり) の 32 件。判定: **真陽性 29・偽陽性 0・保留 3** (保留は行 17・18・29)。偽陽性率は判定済み 29 件に対して 0 件。保留 3 件を含む母数では偽陽性率を確定できない。
+- 入力: `work-m11` の `tools/m11/work/boot_final.ll` (19,787,837 B・sha256 `69c774de…`。§4a・§4f と一致)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
+- 測定 commit: `04c0332d8` (origin/main)。`scan_guard.py`・`strict_evidence.py`・`judge_dump.py` はこの commit のまま使用。本 PR で追加したのは `trap_triage/judge_entry_check.py` (新規) と本 REPORT のみ。`git diff 04c0332d8 HEAD -- tools/m11/guard699/ tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py` = 0 行。
+- 実行: `scan_guard.py --report` (4.0 s) で strict 288。`strict_evidence.py --out` (12.0 s) で TSV 288 行。`judge_dump.py <IR> <TSV> 4 35` で 32 件をダンプ。`judge_entry_check.py <IR> <TSV> 4 35` で脱出先の前提を機械的に出力 (32 行)。TSV・ダンプは `work/` (gitignore・未コミット)。
+- 判定方法 (件ごと):
+  1. 機械語: jcc 直前の cmp の被演算子と条件コードを取る (`judge_dump.py` の MACH)。`jg` は符号付き比較で、被演算子が境界より大きいとき脱出する。
+  2. 機械的な前提 (`judge_entry_check.py`): jcc を含むブロックの終端が無条件 `br` で loop head に入るか、脱出先ラベルの preds は何か。32 件すべてで jcc ブロックは無条件 `br` で loop head に入る。脱出先の preds は本体内か後端の判定だけで、入口ブロックからの直接の辺は無い。
+  3. 被演算子の対応: reg2mem の alloca を遡り、機械語の入口ガード (`0` と境界) に対応する IR の入口判定があるかを見る。対応の追跡は subagent 4 本 (行 4〜11・12〜19・20〜27・28〜35) が行い、本 run で 2 の preds と照合した。直接 IR を読んだのは行 4・5・12・13・14・15・29。
+  4. 真陽性 = 入口から脱出先へ直接の経路が IR に無く、機械語の入口ガードに対応する同値の判定も IR に無い。偽陽性 = 同値の入口判定が IR にあり、脱出先へ直結している。保留 = 3. の対応が確定できない。
+  - 注意: 真陽性は構造上の欠落 (入口ガードが IR に無い) の判定であり、境界値 (例: N-1 < 0) が実行時に到達するかは検証していない。
+- 件ごとの判定:
+
+| 行 | 関数 | jcc → 脱出先 | 判定 | 根拠 (入口ガードの被演算子 / 脱出先の preds) |
+|---|---|---|---|---|
+| 4 | function_100bb90 | 100bcf4 → 100bd4d | 真陽性 | `ecx(=0)` vs `r14d`。脱出先 preds は 100bd39 (本体後) のみ。直接確認 |
+| 5 | function_1017ca0 | 1017d39 → 1017df9 | 真陽性 | `ebx(=0)` vs `r13d`。関数内に符号付き比較なし。preds 1017de8 (本体後)。直接確認 |
+| 6 | function_1018db0 | 1018e1a → 1018e68 | 真陽性 | `eax(=0)` vs `edx`。preds は本体内の 2 辺 (1018e5e・1018e4e) |
+| 7 | function_1042d20 | 1042fe8 → 10431af | 真陽性 | `ecx(=0)` vs `esi`。preds 1043140 (本体後) |
+| 8 | function_1042d20 | 10431cf → 1043ef7 | 真陽性 | `edx(=0)` vs `N-1`。preds 1043eda (本体後) |
+| 9 | function_1045410 | 104555b → 1045713 | 真陽性 | `ecx(=0)` vs `r14d (N-1)`。preds 10456fd (本体後) |
+| 10 | function_1046a30 | 104c70a → 104c744 | 真陽性 | `[rbp+0x580](=0)` vs `ebx (N-1)`。preds 104c711 (単一ブロックの末尾判定) |
+| 11 | function_1050f90 | 1050fc7 → 105103e | 真陽性 | `r13d(=0)` vs `eax`。preds 1051039 (本体後) |
+| 12 | function_1050f90 | 10510cf → 105112e | 真陽性 (偽陽性から訂正) | `r13d` vs `eax`。preds 1051129 (本体後の `%91 = icmp sgt`)。入口 10510aa→10510d1 に判定なし。直接確認 |
+| 13 | function_1060950 | 1060973 → 10609d8 | 真陽性 (保留から訂正) | `r13d(=0)` vs `r14d`。head の `icmp slt (sext, sext1)` は本体内の分岐で 10609d8 へ向かわない。preds 10609cb (本体後)。直接確認 |
+| 14 | function_10609f0 | 1060a06 → 1060a25 | 真陽性 (保留から訂正) | `esi(=0)` vs `edi (N-1)`。preds 1060a0d (後端の計数判定)。直接確認 |
+| 15 | function_1060d20 | 1060d3d → 1060d65 | 真陽性 (保留から訂正) | `esi(=0)` vs `edi`。preds 1060d5b (本体後の計数)。head の icmp は byte の符号で別値。直接確認 |
+| 16 | function_10624d0 | 10624f1 → 106262a | 真陽性 (保留から訂正) | `ebx(=0)` vs `edi (N-1)`。preds 106261c (本体後の計数) |
+| 17 | function_10c7cd0 | 10c8d17 → 10c8d6b | 保留 | 被演算子 `[rbp+0x774]-1` の IR 側の slot を特定できない (関数内に対応する参照なし) |
+| 18 | function_10c7cd0 | 10c8dc4 → 10c8e18 | 保留 | 被演算子 `[rbp+0x76c]-1` が stack 変数経由で、IR の対応を一意に確定できない |
+| 19 | function_1185da0 | 1185dfe → 1185e7d | 真陽性 | `ebx(=0)` vs `r13d (N-1)`。preds 1185e71 (本体後) |
+| 20 | function_1185e90 | 1185eea → 1185fd6 | 真陽性 | `ecx(=0)` vs `r14d (N-1)`。preds 1185fbe (本体後) |
+| 21 | function_11862e0 | 1186323 → 11863bd | 真陽性 | `esi(=0)` vs `r14d`。preds 11863ad (本体後) |
+| 22 | function_1189310 | 11893a0 → 11893dc | 真陽性 | `ebx(=0)` vs `edi (N-1)`。preds 11893a7 (head の後端判定) |
+| 23 | function_1192da0 | 1192dc9 → 1192e08 | 真陽性 | `ebx(=0)` vs `esi (N-1)`。preds 1192dfe (本体後) |
+| 24 | function_11c9930 | 11c99af → 11c9a17 | 真陽性 | `ebx(=0)` vs `edi (N-1)`。preds 11c99b6 (head の計数判定) |
+| 25 | function_11e6e20 | 11e6e60 → 11e6ef5 | 真陽性 | `ebx(=0)` vs `r10d`。preds 11e6ee5 (本体後) |
+| 26 | function_11e7860 | 11e788b → 11e7907 | 真陽性 | `esi(=0)` vs `r13d (N-1)`。preds 11e7894 (head の計数判定) |
+| 27 | function_11e7fa0 | 11e7fbd → 11e802b | 真陽性 | `ebx(=0)` vs `esi (N-1)`。preds 11e8021 (本体後) |
+| 28 | function_11e8280 | 11e82b1 → 11e82ec | 真陽性 | `r13d(=0)` vs `r14d (N-1)`。preds 11e82d5・11e82df (本体内)。入口の判定は byte==0 で別値 |
+| 29 | function_11e84a0 | 11e8505 → 11e8541 | 保留 | 入口に `N-1 < arg1` (%8) があり N-1 を共有するが、比較相手は arg1 で機械語の `N-1 < 0` と別。直接確認 |
+| 30 | function_1221840 | 122193e → 122196f | 真陽性 | `ebx(=0)` vs `esi (M-1)`。preds 1221965 (本体後) |
+| 31 | function_1221840 | 122199b → 1221a3f | 真陽性 | `ebx(=0)` vs `edi (M-1)`。preds 1221a31 (本体後) |
+| 32 | function_1221bc0 | 122251f → 122272f | 真陽性 | `ecx(=0)` vs `r13d (M-1)`。preds 1222545 (本体内) |
+| 33 | function_1223020 | 12230df → 122330f | 真陽性 | `ecx(=0)` vs `r13d (M-1)`。preds 122310b・12232f7 (本体内) |
+| 34 | function_1251590 | 1251621 → 12516a2 | 真陽性 | 外側添字 `ebx(=0)` vs `edi`。preds 1251698 (本体後) |
+| 35 | function_1251590 | 1251728 → 12517db | 真陽性 | `ebx(=0)` vs `esi (N2-1)`。preds 12517cd (本体後) |
+
+- 訂正 (前段の subagent 判定から変えたもの):
+  - 行 12: subagent は偽陽性としたが、IR の同値判定 (`%91`・`dec_label_pc_1051129`) は本体後の戻り判定で、入口 `dec_label_pc_10510aa` → `10510d1` には判定が無い。行 11 (`1051039` の本体後判定) と同型のため真陽性とする。
+  - 行 13〜16・19: subagent 2 は保留としたが、脱出先の preds が本体内の判定だけで、入口から脱出先への直接の経路が無い。同型の行 4〜11・20〜35 と同じ基準で真陽性とした。規則 3 を「脱出先へ至る経路が一切無い」と読むと、後端からの経路があるため常に満たせず、判定基準にならない。
+- 未解決 (起票先: #3498 本 issue、`Refs`): 行 17・18・29 の 3 件。次の一手は、17・18 が `[rbp+0x774]`・`[rbp+0x76c]` を IR の `stack_var_` に対応づけること、29 が脱出先 `11e85fc` と `11e8541` の後続を比べること。
+
 ## 5. 再現
 
 本 PR にコミットされた再現手段は `scan_guard.py` のみで、入力は `work-m11` の `boot_final.ll` を要する。
