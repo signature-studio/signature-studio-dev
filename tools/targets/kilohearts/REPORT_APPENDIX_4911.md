@@ -14,7 +14,7 @@
 #### 素材・環境
 
 - `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip` → `HeartCore.core_64` (sha256 は REPORT_APPENDIX_4871.md と同じ素材)。
-- [GHIDRA] 12.1.4 (公式 release zip・sha256 先頭 `ddac49f9` 一致。`/opt/ghidra/ghidra_12.1.4_PUBLIC` に展開)。JDK 21。[EMSDK] 6.0.12。n=1。
+- [GHIDRA] 12.1.4 (公式 release zip・sha256 先頭 `ddac49f9` 一致。展開先は [GHIDRA] の `$OPT` 直下)。JDK 21。[EMSDK] 6.0.12。n=1。
 
 #### emcc 件数 (`emcc_census.py`・`emcc -c -w -O1 -ferror-limit=0`)
 
