@@ -61,24 +61,27 @@
 |---|---|---|
 | 命令単位の完全 trace (RetDec IR に命令 VA が無い) | site 単位の対応まで | #2801 (LD-131) |
 | 本測定は `--notrace` のため wasm 側の `calls` 欄が空。import 呼出しの対比は site 記録の `C` で代用 | wasm 側の HeapFree 引数・戻り値の直接比較は未実施 | 本付録の §2 のみ (起票無し) |
+| 製品 KPI の dispatch 数と a4a620a9 対 head の前後 (受入 4 の残り) | 起動の dispatch 面の前後は未確認。head の units_run は base と一致 (109) だが B1 GetMem 760/761 で FAIL | #4093 (LD-193) |
 
-## 7. 製品 KPI の前後 (受入 4・gui flengine の e2e)
+## 7. 製品 KPI の測定 (受入 4・gui flengine の e2e)
 
-- 前: `a4a620a9^` = `740344ccc`。後: `a4a620a9` (#2802 の差分は `tools/shim/src/heap.c` +6/−1 と `tools/shim/test/test_main.c` +20 だけ)。
-- 実行: 各 commit の detached worktree で `ANALYSIS_DIR=<RUNNER_TEMP> FL_WIN64_DIR=<RUNNER_TEMP>/fl-win64 EMSDK_ENV=[EMSDK]/emsdk_env.sh RETDEC=[RETDEC]/bin/retdec-decompiler bash tools/gui/flengine/e2e.sh` を foreground で 1 回ずつ。`fl-win64` は 1 回だけ展開した (19 秒)。
+- 測定 commit: `65844e9ef` (PR head・#2841 の記録 commit)。`a4a620a9` 以降のコード差分は `git diff a4a620a9 65844e9ef -- tools/shim tools/ott/rt tools/gui/flengine/build.sh` に出る (heap.c 5 行・file.c 51 行・sync.c 6 行・ott_cpu.c/ott_x87.h・build.sh 4 行)。そのため前回値 (`740344ccc`・`a4a620a9`) は再利用せず、head で測り直した。
+- 実行: `EMSDK_ENV=[EMSDK]/emsdk_env.sh GF_EXTRA_PATH=[RETDEC]/bin FL_WIN64_DIR=<RUNNER_TEMP>/fl-win64 RETDEC_ROOT=[RETDEC] bash tools/gui/flengine/e2e.sh` を foreground で 1 回。素材 `work-m11` `fl-win64` `toolchain-emsdk` `toolchain-retdec`。load 開始 0.69 / 終了 2.02。
+- 結果 (実測): done 405 s, rc 1 (judge 12/14)。native selftest 512 passed / 0 failed。pe_image parity・ネガコン N1〜N9 は期待どおり。
 
-| 項目 | 前 (`740344ccc`) | 後 (`a4a620a9`) |
-|---|---|---|
-| e2e の done 行 | 405 s (rc 1) | 398 s (rc 1) |
-| judge | 13/14 (S1 FAIL: 872/1/47/22/0 対 base 870/1/47/24/0) | 同じ |
-| B1 boot parity (`units_run`・GetMem・FreeMem・icall_miss) | 52 (base 52) · 560 · 20 · 5 | 同じ |
-| R2 reach floor | 33 (floor 19) | 同じ |
-| P4 TApplication の window (hwnd) | created PASS `0x110000f` | 同じ |
-| P5 TLightweightLayeredControl の window (hwnd) | created PASS `0x110000e` | 同じ |
-| native selftest | 506 passed / 0 failed | 同じ |
-| ネガティブコントロール N1〜N9 | 期待どおり FAIL | 同じ |
-| baseline の `wasm_size` | 6914481 | 6914538 (+57 B) |
+| 項目 | head `65844e9ef` の実測 |
+|---|---|
+| judge | 12/14。FAIL は B1 と S1 |
+| B1 boot parity | FAIL。`units_run` 109 (base 109)・dllmain True・init 111 (base 111)・icall_miss 7 (base 7)・GetMem 760 (base 761)・FreeMem 24 (base 24) |
+| S1 survey parity (soft) | FAIL。ok/noproc/miss/trap/clobber = 873/1/47/21/0 (base 871/1/47/23/0) |
+| R1 / R2 | PASS (first LoadStringW・reached 24 / floor 19, reached 33) |
+| P4 TApplication の window | created PASS `0x1100013` |
+| P5 TLightweightLayeredControl の window | created PASS `0x1100012` |
+| 通過 unit 数 (`units_run`) | 109 (base 109) |
+| dispatch 数 | **未測定**。e2e の出力と `results/*.json` に dispatch の件数は無い (`disp_entries` 8621 は間接呼出テーブル。`tools/flelift/boot` の 209 dispatch とは別物) |
+| baseline `wasm_size` | 6917845 |
 
-- rc 1 は S1 gate の FAIL による。前後とも同じ FAIL で、修正由来ではない (REPORT `tools/gui/flengine/REPORT.md` §6 の 14/14 は別 HEAD の値)。
-- 解釈: 最初のウィンドウ (P4・P5 の window 作成) と通過 unit 数 (52) は修正の前後で変わらない。dispatch 数は e2e の出力に無く、本測定では取っていない。`tools/flelift/boot` の 209 dispatch は shimx の経路で、本修正の影響は無い。
-- 起動の進み方は同じ。製品の起動を変える効果は、この gui 経路では確認できなかった。
+- 前回記録 (`740344ccc`・`a4a620a9`: units_run 52・judge 13/14) とは一致しない。head の run で base 側の `units_run` も 109 に動いており、shim の差ではない (base は shim 無しの同一 IR)。原因の切り分けは本付録の範囲外。
+- 結論: 最初のウィンドウ (P4・P5) は head でも作られる。通過 unit 数の前後比較は、この head では base と一致する (109)。ただし B1 の GetMem 760 対 761 の 1 件差で judge は FAIL。修正の前後比較は、同じ head で `a4a620a9` を測り直さないと確定できない (本 PR の範囲外)。
+- dispatch 数は本測定では取っていない。受入 4 の dispatch の条件は未達 (子 issue へ移す)。
+- 生の結果 JSON は本 run の作業ツリーで書き換わったが、tracked の `tools/gui/flengine/results/` には戻した (測定 commit 以降のコード差分の判定を崩さないため)。
