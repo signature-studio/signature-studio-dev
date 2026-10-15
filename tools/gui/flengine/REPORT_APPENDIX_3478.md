@@ -50,7 +50,7 @@
 ### 3-3. Halt の直接条件 (機械語 と IR の突き合わせ)
 
 - 停止 unit の呼出し鎖の要所は `function_8494c0` (`VA 0x8494c0`)。機械語: `mov qword [rbx],0`・`call 0x849480`・`mov rdx,[rip+0xdadc2e]` (= グローバル `0x11f7110`)・`lea r8,[rip+0x13]` (= `0x8494fc`・非 0 の定数)・`call 0x41a800`。
-- `function_41a800` (IR `dec_label_pc_41a800`): 第 2 引数が非 0 で、第 3 引数の下位 32 bit が非 0 のとき `function_4096d0((arg2 & ~0xff) | 0x17, arg4)` に入り `unreachable` (= Halt 経路)。機械語の `0x41a800` も同じ分岐で読める (未検証)。
+- `function_41a800` (IR `dec_label_pc_41a800`・機械語 `0x41a800` を capstone で確認): Delphi の interface cast の形。第 2 引数 (obj) が非 0 のとき `call [obj]` (vtable[0] = QueryInterface 相当) を第 3 引数 (IID 相当の `0x8494fc`) で呼び、戻り値 `eax != 0` なら `mov cl,0x17; call 0x4096d0` (RunError 23 相当・Halt)。`eax == 0` なら成功。`0x8494fc` はコード領域内 (`ret` の直後) を指す。実機でも同じ IID を読むかは未検証。
 - グローバル `0x11f7110` は `function_849480` が書く。`[0x11f7110] == 0` のときだけ `function_8495c0(0x446b00, 1)` の結果 (非 0 なら +72) を格納する。`function_8495c0` は通常 obj を返す。
 - よって、この unit で `[0x11f7110] != 0` になった時点で Halt は必然になる。実機で同じ経路が Halt しないなら、(a) グローバルが実機では 0 のまま (書込み側の差)、または (b) `function_41a800` の分岐の読みが誤り (lift 欠陥) のどちらか。**未判定**。子 #3748 の受入 1 で切り分ける。
 
