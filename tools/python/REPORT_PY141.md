@@ -65,7 +65,7 @@ PASS
 | コマンド (測定 commit `7dfc960a8`) | 結果 | wall |
 |---|---|---|
 | `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py141_probe.py` | PASS (11 項目 ok・rc 0) | 0.091 秒 (load average 0.00 / 0.16 / 0.19、03:56 UTC) |
-| ネガティブコントロール: 同じ probe の `"PyLong_FromLong"` を `"PyBool_FromLong"` に変えたコピー (`/home/runner/work/_temp/py141/`) | rc 1 (FAIL 2 行: loader の名前照合が落ちる) | 未計測 |
+| ネガティブコントロール: 同じ probe の `"PyLong_FromLong"` を `"PyBool_FromLong"` に変えた一時コピー (`$RUNNER_TEMP` 配下。commit しない) | rc 1 (FAIL 2 行: loader の名前照合が落ちる) | 未計測 |
 
 - 前段 REPORT_PY120 の表 (selectWindow の書式 `i`・op 0x3b・r9 = 受け取った引数) と、本 probe の出力は一致する。
 
