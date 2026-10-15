@@ -24,10 +24,10 @@
 
 §3 の表は `tools/targets/freshair/ks_candidate_triage.py` が `ident.json` から機械的に作る。
 
-## §3. 振り分け結果 (測定 commit `c3fef51c7`)
+## §3. 振り分け結果 (測定 commit `691ee7153`)
 
 - 再現: `python3 tools/targets/freshair/ks_identity.py <HeartCore.core_64> <SlateCore.core_64> ident.json` → `python3 tools/targets/freshair/ks_candidate_triage.py ident.json` (素材 `work-liftlib-targets`)。
-- 実測 (実装 run): `ks_identity.py` 単体 2.9 s (EXIT=0、load 1 分値 0.05)。`c3fef51c7` の worktree で再生成した `ident.json` と、そこから作った振り分け表は本節の表と **byte 一致**。fix run (差し戻し対応) では `ks_identity.py` を再実行していない (本 run の素材は fl-win64 のみ)。fix run では表の値から合成した `ident.json` を `ks_candidate_triage.py` に通し、37 行が本節の表と一致することだけを確認した。
+- 実測 (測定 commit `691ee7153`・素材 `work-liftlib-targets` を `$ARTIFACTS_DIR` から展開・nproc=4・load 1 分値 0.35): `ks_identity.py` 2.8 s・EXIT=0。`ks_candidate_triage.py` の出力は本節の表と **37 行一致** (表の行だけを diff して差分 0)。区分の内訳も一致。実装 run (`c3fef51c7`・2.9 s) では再生成した `ident.json` と表が byte 一致だった (当時の記録)。鮮度: `git diff 691ee7153 HEAD -- 'tools/targets/freshair/*.py' 'tools/targets/freshair/*.sh' 'tools/targets/freshair/lift/' 'tools/targets/freshair/lift2/' 'tools/targets/kilohearts/snapins/' 'tools/targets/kilohearts/scripts/'` の出力は 0 行 (以後の commit は本 REPORT のみ)。
 - 振り分け表 (クラスは `ident.json` の `process_pair`。KH slot 14 と SC の対応 slot):
 
 | クラス | KH VA | SC VA | KH B | SC B | ratio_M | 区分 | 欠けている側 |
@@ -74,21 +74,21 @@
 
 表の注記 (表は機械出力のまま。注記は手書き):
 
-- **SC VA `0x1803df070` (907 B) の 8 組** (Chorus・CombFilter・Faturator・FrequencyShifter・Ladder・Resonator・TranceGate・Unison) は、process の対応として成立しない。この VA は制御層から呼ばれる共有関数で、`lift2/build_ctl.sh` の ICALLS と `lift2/build_ctrl.sh` の `--icall` 一覧にも現れる。`ks_identity.py` は「全 SC slot のうち M 比が最大の slot」を process_pair にするため、この共有関数が候補に選ばれた (ratio_M 0.14〜0.25)。この 8 組の SC 側 process は未特定で、判定基準 C1 の max-ratio 規則では対応が決まらない。規則を直すときは §1 の版を上げ、理由を書く。区分 (なし / KH のみ) はハーネスの有無だけで決まるので、§4 の結論は変わらない。
+- **SC VA `0x1803df070` (907 B) の 8 組** (Chorus・CombFilter・Faturator・FrequencyShifter・Ladder・Resonator・TranceGate・Unison) は、process の対応として成立しない。この VA は制御層から呼ばれる共有関数で、`lift2/build_ctl.sh` の ICALLS と `lift2/build_ctrl.sh` の `--icall` 一覧にも現れる。`ks_identity.py` は「命令数 3 以上の SC slot のうち M 比が最大の slot」を process_pair にするため、この共有関数が候補に選ばれた (ratio_M 0.14〜0.25)。この 8 組の SC 側 process は未特定で、判定基準 C1 の max-ratio 規則では対応が決まらない。規則を直すときは §1 の版を上げ、理由を書く。区分 (なし / KH のみ) はハーネスの有無だけで決まるので、§4 の結論は変わらない。
 - **Gain 行**: 「§A3 で測定済み」は表の機械出力に無い手書きの注記。Gain の差分結果は [REPORT_APPENDIX_FA5.md](REPORT_APPENDIX_FA5.md) §A3 を参照。
 
 ## §4. 差分実行の結論 (C3 を満たす組)
 
-- **両側 (差分実行できる組) は Gain だけ**。Gain の差分は既存の §A3 (同一 200 case で L/R/state の bit 一致 127/200) と §A3-5 (丸め形のモデル。native 未確認)。本付録での新規の差分実行は **0 件**。
+- **両側 (差分実行できる組) は Gain だけ**。Gain の差分は既存の §A3 (同一 200 case で L/R/state の bit 一致 127/200)・§A3-5 (丸め形のモデル)・§A3-6 (機械語の ramp を KH 形に置換した native で 200/200、control は 127/200)。本付録での新規の差分実行は **0 件**。
 - **SC のみ**: Compressor (0x180775220)・Filter (0x180b6f050)。SC 側の harness は動く (§5) が、KH 側の harness と snapins 登録が無いため差分は未実施。子 issue #3506 (Compressor)・#3507 (Filter)。
 - **KH のみ** (10 組): Delay・Disperser・Gate・Haas・Limiter・Phaser・QuickEq・Resonator・Stereo・VocalFilter。KH 側の登録はあるが、SC 側の実機機械語ハーネスが無い。差分の対象外。起票先は #52 の残件。
 - **なし** (22 組): 両側とも無い。判定しない (#52 の残件)。
 - **stub** (2 組): TapeStop (9 B)・HostProxy (KH 41 B)。C2 により除外。
 
-## §5. SC 側ハーネスの smoke (測定 commit `c3fef51c7`)
+## §5. SC 側ハーネスの smoke (測定 commit `691ee7153`)
 
-- 再現: `SC_CORE=<work-liftlib-targets の SlateCore.core_64> bash tools/targets/freshair/ks_sc_native_smoke.sh 20 [outdir]`。mlift の report から `iat_slots` を作り、同じ root・map・pokes で `native_comp` / `native_filter` を fma 0・1 で実行する。判定はしない。
-- 実測 (2 回実行・同じ結果。4.66 s real、load 1 分値 0.04、nproc=4):
+- 再現: `SC_CORE=<work-liftlib-targets の SlateCore.core_64> bash tools/targets/freshair/ks_sc_native_smoke.sh 20 [outdir]`。mlift の report から `iat_slots` を作り、同じ root・map・pokes で `native_comp` / `native_filter` を fma 0・1 で実行する。判定はしない。emsdk は不要 (`lift2/env.sh` は `/opt/emsdk` があるときだけ読む。`691ee7153` で修正。それ以前は emsdk の無い runner で無言に exit 1 した)。
+- 実測 (測定 commit `691ee7153`・2 回実行、nproc=4、load 1 分値 0.24〜0.33。1 回目 9.51 s は lift2venv の作成を含む、2 回目 4.40 s。2 回の出力ファイルの md5 が一致、EXIT=0):
 
 | ハーネス | fma | 行数 | ERR |
 |---|---|---|---|
@@ -97,6 +97,7 @@
 | Filter (`native_filter.c`) | 0 | 20 | 0 |
 | Filter (`native_filter.c`) | 1 | 20 | 0 |
 
+- 出力: 4 ファイル (`comp_n0`・`comp_n1`・`f_n0`・`f_n1`) の md5 は 2 回の実行で一致。fma 0 と fma 1 の出力も一致した (Compressor `af1c35e5aa66`・Filter `c6500f7db0e9`。このシナリオでは fma の違いが出力に現れていない。判定はしない)。stderr は 4 本とも 0 B。
 - 注: 最初の試行では cwd に `pokes.txt` を置かずに実行し、Compressor が ERR 7/20 になった。`pokes.txt` (CRT 初期化の再現) を `FA_POKES` で渡すと ERR 0。smoke スクリプトは `FA_IAT`・`FA_POKES` を明示する。
 - 限界: これは「SC 側の harness が実機機械語を実行できる」までの確認。出力の値が正しいこと (wasm・KH との一致) は未確認。
 
@@ -114,4 +115,4 @@
 | Filter の KH 側 harness と同一入力の差分 (C4〜C6) | Filter の意味同一性は未判定 | #3507 |
 | KH のみ 10 組の SC 側実機ハーネス (Delay・Disperser・Gate・Haas・Limiter・Phaser・QuickEq・Resonator・Stereo・VocalFilter) | 差分の対象が無い | #52 (残件) |
 | なし 22 組 (両側とも無し) | 判定の対象外 | #52 (残件) |
-| Gain の ramp 丸め形の機械語置換 (§A3-5 の未解決) | 変更なし | #52 (残件) |
+| Gain の ramp 式 `(1-t)*a + t*b` がソースの意図か (§A3-6 の未解決。機械語の置換による 200/200 は §A3-6 で確認済み) | 「どちらが正しい式か」は未確定。Gain の判定の解釈に残る | #52 (残件) |
