@@ -23,6 +23,8 @@ usage: mx_flow_recheck.py <sets.pkl> <rounds.json> [<PE>]
 import sys, os, re, json, pickle, collections, bisect, threading, tempfile, shutil, subprocess
 from concurrent.futures import ThreadPoolExecutor
 import capstone, pefile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mx_closure import insn_sdm_ok  # closure と同じ LOCK/REX 規則 (capstone 側の判定に使う)
 
 THUNK_LO, THUNK_HI = 0x396e000, 0x3970200
 UNDOC = {'fstpnce'}  # D9 D8+i (FSTP1、未文書化の別名)。SDM の命令表に無く、objdump も不正とする
@@ -55,10 +57,14 @@ def bfs_check(s, rounds_json):
 
 
 def cap_first_ok(md, chunk, va):
+    # capstone 側の判定。closure (mx_closure.block_ok) と同じ SDM の LOCK/REX 規則 (insn_sdm_ok) を通す。
+    # REX2 (d5) は APX 接頭辞で x64 基準では不正 (capstone 5.0.7 は APX として復号するため除外する)。
     n = 0
     try:
         for ea, iz, mn, ops in md.disasm_lite(chunk, va):
-            if mn in UNDOC:
+            if mn in UNDOC or first_op_byte(chunk[ea - va:ea - va + iz].hex(' ')) == 'd5':
+                return False
+            if not insn_sdm_ok(chunk[ea - va:ea - va + iz], mn, ops):
                 return False
             n += 1
             if 'ret' in mn.split() or 'jmp' in mn.split() or n >= 32:
