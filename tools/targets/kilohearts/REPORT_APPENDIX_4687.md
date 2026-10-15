@@ -11,19 +11,34 @@
 
 ## 測定
 
-- 測定 commit: 本 PR の HEAD (`GTYPE` 4 行を含む commit)。
+- 測定 commit: `632d687f3` (`GTYPE` 4 行を入れた、コードを変えた最後の commit)。
+- **検証 HEAD ではない**: 現 HEAD (`b7f80495e` = main 取り込み merge と以後の fix commit) は、下の「現 HEAD までの差分」のとおり `ghidra_route` が変わっている。この差分の後の HEAD では再測定していない。下の数値は `632d687f3` 時点の値。
 - 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)・`toolchain-emsdk` (emcc 6.0.12)・Ghidra 12.1.4 (zip sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)・JDK 21 (temurin-21)。すべて `$RUNNER_TEMP/kh` (repo 外)。n=1。
 - 実行: `bash tools/targets/kilohearts/ghidra_route/gtype_census.sh $RUNNER_TEMP/kh` (既定 FX = `bitcast,intload,stackpair,assoc,concat,gtype`)。decompile 151/151 OK。
 - 所要: 基準 1 m 05 s (real)、規則入れ後 47.6 s (real)。load は未記録。
 
-| 測定 | 規則なし (`origin/main`) | 規則あり (本 PR) |
+| 測定 (`632d687f3`) | 規則なし (作業ツリーで `FX` から `gtype` を外した値) | 規則あり (本 PR) |
 |---|---|---|
 | 型不一致 | 110 | **104** |
 | emcc error 行 | 363 | **357** |
 | `invalid operands` のうち float/uint 系 | 6 | **0** |
 | gain.o / haas.o / gate.o | 1,435 / 3,217 / 3,756 B | 同じ (`cmp` 一致) |
 
-注: 規則なし側は `origin/main` の `ghidra_route` (`git archive`) で同じ FX で比べた。
+注: 規則なし側は `gtype` を外した `FX` (`bitcast,intload,stackpair,assoc,concat`) で同じ作業ツリーを回した値。`REPORT_APPENDIX_3849.md` の emcc 365 とは一致しない。363 の出所 (どの作業ツリーで測ったか) は再確認していない。
+
+## 現 HEAD までの差分 (未再測定)
+
+`git diff 632d687f3 HEAD -- tools/targets/kilohearts/ghidra_route --stat` (`b7f80495e` 時点):
+
+```
+ ghidra_to_c.py |  5 ++
+ kh_xmm0.h      | 90 ++++++++++++++++++++++
+ patches.py     |  7 ++
+ xmm0_check.c   | 24 ++++--
+ 4 files changed, 118 insertions(+), 8 deletions(-)
+```
+
+差分の中身は main 側の FNPTR 規則 (#4671) と、main 取り込み後の `kh_xmm0.h`・`xmm0_check.c` の変更。上の表の数値は、この差分を含まない HEAD の値であり、現 HEAD での値ではない。現 HEAD での再測定は、`plugins-kilohearts`・`toolchain-emsdk` を用意できる run で行う (`oc_artifacts: fl-win64 plugins-kilohearts toolchain-emsdk`)。
 
 ## 残件 (BINOP) の分類
 
