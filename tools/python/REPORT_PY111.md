@@ -13,7 +13,7 @@
 
 ## 1. 測定の入力と再現
 
-- 展開: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (1.5 秒)。DATA 4 本も同じ要領で展開 (`fetch_inputs.sh` の入力)。`<展開先>` = `$RUNNER_TEMP/fl-win64`。
+- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (1.5 秒)。DATA 4 本も同じ要領で展開 (`fetch_inputs.sh` の入力)。`<展開先>` = `$RUNNER_TEMP/fl-win64`。
 - PE の ImageBase は `0x400000`。`analysis/flapi/pe_disasm.py` の VA はこの base を含む。
 - 逆アセンブル: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>`。
 - handler の特定: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py setGridBit fillEachNSteps setStepParameterByIndex` (handler 本体 `0xd5b580`・`0xd5b7b0`・`0xd5cec0`)。
