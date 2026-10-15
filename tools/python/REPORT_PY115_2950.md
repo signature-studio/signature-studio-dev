@@ -24,7 +24,7 @@
 - `node tests/provider_check.mjs` → `{"functions":435,"implemented":155,"unimplemented":280,"mcp_static":60,"PASS":true}`、real 0.275 s。
 - `FL_ENGINE=wasm node tests/all_tools.mjs` → `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}`、real 1.303 s。
 - 修正 run (差し戻し対応。C・mock のソースは変えていない。変えたのは本 REPORT・DOC_MAP・PR 本文):
-  - 素材: `$ARTIFACTS_DIR` (`/home/runner/artifacts`) に `toolchain-emsdk` が無かったため、上流 emsdk を `git clone --depth 1` して `./emsdk install 6.0.12`・`./emsdk activate 6.0.12` で取得した (版は `tools/m1/flags.sh` の pin と同じ。取得の所要は未計測)。PE は `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <tmp> extracted/block00031_PE.bin` real 2.178 s。
+  - 素材: `$ARTIFACTS_DIR` に `toolchain-emsdk` が無かったため、上流 emsdk を `git clone --depth 1` して `./emsdk install 6.0.12`・`./emsdk activate 6.0.12` で取得した (版は `tools/m1/flags.sh` の pin と同じ。取得の所要は未計測)。PE は `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <tmp> extracted/block00031_PE.bin` real 2.178 s。
   - build: `EMSDK_ENV=<上流 emsdk>/emsdk_env.sh bash tools/python/provider/build.sh` real 1.192 s、rc 0 (sysroot キャッシュ済み)。
   - 差分検査 (コード差分 0 の HEAD 上): `channels_diff` `{"calls":231,"diffs":0,"PASS":true}`、`mixer_diff` `{"calls":69,"diffs":0,"PASS":true}`、`device_diff` `{"calls":8,"rejects":4,"midi_out":5,"diffs":0,"PASS":true}`。
   - ネガティブコントロール (C を 1 件ずつ壊して実行し、元に戻して再ビルド):
