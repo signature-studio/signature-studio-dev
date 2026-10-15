@@ -6,18 +6,20 @@
 // SR-62 #4233: fillLinearGradient・fillRadialGradient (path の内側を色停止点で塗る) も bitmap へ画素を書く。
 // SR-69 #4428: transformMatrix は点・線・多角形・楕円・矩形・clearRect・bitmap の dest 位置・文字の基準点へ適用する (clipRect は CDrawContext が device 座標で渡すので変換しない)。回転・傾斜は矩形を外接矩形で近似し、拡大縮小は bitmap と文字に掛けない。
 // SR-68 #4427: 線は lineWidth の太さで描く (太さ 1 かつ aliasing は従来の Bresenham)。drawMode の kAntiAliasing は線の被覆率を alpha に掛けて描く。
-// 状態設定は lineWidth・drawMode・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha・transformMatrix を保持し、他 (lineStyle・global state の save/restore) は何もしない。
+// 状態設定は lineWidth・lineStyle (cap・join・破線)・drawMode・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha・transformMatrix を保持し、global state の save/restore は何もしない (lineWidth・lineStyle も復元されないため、一度設定すると後続の描画に残る)。
 
 #pragma once
 
 #include "vstgui/lib/cbitmap.h"
 #include "vstgui/lib/ccolor.h"
+#include "vstgui/lib/clinestyle.h"
 #include "vstgui/lib/cdrawdefs.h"
 #include "vstgui/lib/cgraphicstransform.h"
 #include "vstgui/lib/crect.h"
 #include "vstgui/lib/platform/iplatformgraphicsdevice.h"
 #include <cstdint>
 #include <functional>
+#include <vector>
 #include <memory>
 
 namespace VSTGUI {
@@ -107,6 +109,7 @@ private:
 	CRect deviceRect (const CRect& rect) const;
 	void paintRect (const CRect& rect, const CColor& color, bool blend) const;
 	void strokeRect (const CRect& rect, const CColor& color) const;
+	void plotThinPolyline (const PointList& points, bool closed, const CColor& color) const;
 	void plotLines (const PointList& points, bool closed, const CColor& color) const;
 	void fillRings (const std::vector<PointList>& rings, const CColor& color, bool evenOdd) const;
 	void strokePolyline (const PointList& points, bool closed, const CColor& color) const;
@@ -121,6 +124,7 @@ private:
 	mutable CColor fillColor {};
 	mutable CColor frameColor {};
 	mutable CCoord lineWidth {1.};
+	mutable CLineStyle lineStyle {};
 	mutable CDrawMode drawMode {};
 	mutable CRect clipRect {};
 	mutable TransformMatrix transformMatrix {};

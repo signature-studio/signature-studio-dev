@@ -3,6 +3,7 @@
 // SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap を bitmap へ描く。
 // SR-78 #4551: fillRectWithBitmap の拡大縮小と bilinear、drawBitmapNinePartTiled の 9 部分拡大縮小を入れる。
 // SR-62 #4233: fillLinearGradient・fillRadialGradient・drawBitmapNinePartTiled・fillRectWithBitmap を bitmap へ描く。
+// SR-71 #4469: 太い線の端 (cap)・接合 (join)・破線 (setLineStyle) を plotLines の被覆に載せて描き分ける。
 
 #include "canvas_graphicsdevice.h"
 #include "canvas_bitmap.h"
@@ -76,6 +77,101 @@ PixelBox pixelBoxOf (const CRect& rect)
 }
 
 //------------------------------------------------------------------------
+// 線の形状 (線分の帯・端の円・接合の多角形) は凸多角形か円で表し、符号付き距離 (内側が負) で内外を判定する。
+struct Convex
+{
+	std::vector<CPoint> normals; // 外向き単位法線
+	std::vector<double> offsets; // 法線と辺上の点との内積
+	double x0;
+	double y0;
+	double x1;
+	double y1;
+};
+
+//------------------------------------------------------------------------
+Convex convexOf (const std::vector<CPoint>& vertices)
+{
+	Convex s {};
+	CPoint centroid (0., 0.);
+	for (const auto& v : vertices)
+	{
+		centroid.x += v.x / static_cast<double> (vertices.size ());
+		centroid.y += v.y / static_cast<double> (vertices.size ());
+	}
+	s.x0 = s.x1 = vertices[0].x;
+	s.y0 = s.y1 = vertices[0].y;
+	for (size_t i = 0; i < vertices.size (); ++i)
+	{
+		const auto& a = vertices[i];
+		const auto& b = vertices[(i + 1) % vertices.size ()];
+		s.x0 = std::min (s.x0, a.x);
+		s.y0 = std::min (s.y0, a.y);
+		s.x1 = std::max (s.x1, a.x);
+		s.y1 = std::max (s.y1, a.y);
+		auto len = std::hypot (b.x - a.x, b.y - a.y);
+		if (len < 1e-9)
+			continue;
+		CPoint n ((b.y - a.y) / len, -(b.x - a.x) / len);
+		if (n.x * (centroid.x - a.x) + n.y * (centroid.y - a.y) > 0.)
+			n = CPoint (-n.x, -n.y);
+		s.normals.push_back (n);
+		s.offsets.push_back (n.x * a.x + n.y * a.y);
+	}
+	return s;
+}
+
+//------------------------------------------------------------------------
+double signedDistance (const Convex& s, CPoint p)
+{
+	if (s.normals.empty ())
+		return 1e300;
+	double d = -1e300;
+	for (size_t i = 0; i < s.normals.size (); ++i)
+		d = std::max (d, s.normals[i].x * p.x + s.normals[i].y * p.y - s.offsets[i]);
+	return d;
+}
+
+//------------------------------------------------------------------------
+// 形状 1 つ。disc は中心と半径の円、そうでなければ凸多角形 (poly)。poly の外接矩形は disc でも入れる。
+struct Shape
+{
+	bool disc;
+	CPoint center;
+	double radius;
+	Convex poly;
+};
+
+//------------------------------------------------------------------------
+Shape discShape (CPoint center, double radius)
+{
+	Shape s {};
+	s.disc = true;
+	s.center = center;
+	s.radius = radius;
+	s.poly.x0 = center.x - radius;
+	s.poly.y0 = center.y - radius;
+	s.poly.x1 = center.x + radius;
+	s.poly.y1 = center.y + radius;
+	return s;
+}
+
+//------------------------------------------------------------------------
+Shape polyShape (const std::vector<CPoint>& vertices)
+{
+	Shape s {};
+	s.poly = convexOf (vertices);
+	return s;
+}
+
+//------------------------------------------------------------------------
+bool insideShape (const Shape& s, CPoint p)
+{
+	if (s.disc)
+		return std::hypot (p.x - s.center.x, p.y - s.center.y) <= s.radius;
+	return signedDistance (s.poly, p) <= 0.;
+}
+
+//------------------------------------------------------------------------
 // 非 premultiplied 画素を α で重み付けして足し合わせる (bilinear の 4 近傍用)。
 struct SampleAccumulator
 {
@@ -98,20 +194,6 @@ struct SampleAccumulator
 uint8_t toByte (double value)
 {
 	return static_cast<uint8_t> (std::clamp (std::lround (value), 0L, 255L));
-}
-
-//------------------------------------------------------------------------
-double distanceToSegment (double px, double py, const CPoint& from, const CPoint& to)
-{
-	const auto dx = to.x - from.x;
-	const auto dy = to.y - from.y;
-	const auto lengthSquared = dx * dx + dy * dy;
-	const auto qx = px - from.x;
-	const auto qy = py - from.y;
-	const auto t = lengthSquared > 0. ? std::clamp ((qx * dx + qy * dy) / lengthSquared, 0., 1.) : 0.;
-	const auto ex = qx - t * dx;
-	const auto ey = qy - t * dy;
-	return std::sqrt (ex * ex + ey * ey);
 }
 
 //------------------------------------------------------------------------
@@ -245,7 +327,7 @@ bool CanvasGraphicsDeviceContext::endDraw () const
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 {
-	plotLines ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
+	strokePolyline ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
 	return true;
 }
 
@@ -253,7 +335,7 @@ bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 bool CanvasGraphicsDeviceContext::drawLines (const LineList& lines) const
 {
 	for (const auto& line : lines)
-		plotLines ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
+		strokePolyline ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
 	return true;
 }
 
@@ -439,7 +521,7 @@ void CanvasGraphicsDeviceContext::restoreGlobalState () const {}
 //------------------------------------------------------------------------
 void CanvasGraphicsDeviceContext::setLineStyle (const CLineStyle& style) const
 {
-	(void)style;
+	lineStyle = style;
 }
 
 //------------------------------------------------------------------------
@@ -706,28 +788,246 @@ void CanvasGraphicsDeviceContext::strokeRect (const CRect& rect, const CColor& c
 	paintRect (CRect (rect.right - 1., rect.top + 1., rect.right, rect.bottom - 1.), color, true);
 }
 
+namespace {
+
 //------------------------------------------------------------------------
-// 画素ごとに標本点 (AA は 4x4・aliasing は 1 点) の bit mask を bbox 上に持ち、線分ごとに、その線分の bbox を半幅 +1 で広げた範囲だけ標本を立てる。
-// 最後に被覆 (立った標本の割合) を alpha に掛けて 1 回だけ合成する。接合部で辺が重なっても二重に合成しない。
-// 太さ 1 かつ aliasing は Bresenham の画素を立てる (頂点の画素も 1 回だけ合成する)。
+// 折れ線を破線の区間 (on の部分) に分け、それぞれを開いた折れ線として返す。
+// 区間の並びは dashLengths を繰り返す。要素数が奇数のときは 2 周で 1 サイクル (SVG と同じ)。
+std::vector<PointList> dashRuns (const PointList& points, bool closed, const CLineStyle& style)
+{
+	const auto& dashes = style.getDashLengths ();
+	const size_t count = dashes.size ();
+	const size_t cycle = count % 2 ? 2 * count : count;
+	double cycleLength = 0.;
+	for (size_t k = 0; k < cycle; ++k)
+		cycleLength += std::max (dashes[k % count], 0.);
+	std::vector<PointList> runs;
+	if (cycleLength <= 0.)
+		return runs;
+	auto phase = std::fmod (style.getDashPhase (), cycleLength);
+	if (phase < 0.)
+		phase += cycleLength;
+	size_t k = 0;
+	double remaining = std::max (dashes[0], 0.);
+	while (phase > 0.)
+	{
+		if (phase >= remaining)
+		{
+			phase -= remaining;
+			k = (k + 1) % cycle;
+			remaining = std::max (dashes[k % count], 0.);
+		}
+		else
+		{
+			remaining -= phase;
+			phase = 0.;
+		}
+	}
+	bool on = k % 2 == 0;
+	PointList current;
+	auto push = [&] (const CPoint& p) {
+		if (current.empty () || current.back ().x != p.x || current.back ().y != p.y)
+			current.push_back (p);
+	};
+	// 区間の境界で on/off を切り替える。on から off では現在の区間を runs へ出す。
+	auto toggle = [&] (const CPoint& p) {
+		if (on)
+		{
+			push (p);
+			if (current.size () >= 2)
+				runs.push_back (current);
+			current.clear ();
+		}
+		else
+		{
+			current.clear ();
+			current.push_back (p);
+		}
+		on = !on;
+	};
+	if (on)
+		current.push_back (points.front ());
+	const size_t segments = closed ? points.size () : points.size () - 1;
+	for (size_t i = 0; i < segments; ++i)
+	{
+		const auto& a = points[i];
+		const auto& b = points[(i + 1) % points.size ()];
+		auto length = std::hypot (b.x - a.x, b.y - a.y);
+		if (length <= 0.)
+			continue;
+		auto ux = (b.x - a.x) / length;
+		auto uy = (b.y - a.y) / length;
+		double pos = 0.;
+		while (pos < length)
+		{
+			if (remaining <= 0.)
+			{
+				k = (k + 1) % cycle;
+				remaining = std::max (dashes[k % count], 0.);
+				toggle (CPoint (a.x + ux * pos, a.y + uy * pos));
+				continue;
+			}
+			auto step = std::min (length - pos, remaining);
+			pos += step;
+			remaining -= step;
+		}
+		if (on)
+			push (b);
+	}
+	if (on && current.size () >= 2)
+		runs.push_back (current);
+	return runs;
+}
+
+} // namespace
+
+//------------------------------------------------------------------------
+// 太さ 1 かつ aliasing は 1 px の Bresenham 線 (端点は四捨五入して画素に置く)。画素は集めてから 1 回ずつ合成する。
+// 辺どうしが共有する頂点や交差の画素を二重に合成しない (plotLines の bit mask と同じ考え方)。
+void CanvasGraphicsDeviceContext::plotThinPolyline (const PointList& points, bool closed,
+                                                    const CColor& color) const
+{
+	const auto segmentCount = closed ? points.size () : points.size () - 1;
+	std::vector<std::pair<int32_t, int32_t>> pixels;
+	for (size_t i = 0; i < segmentCount; ++i)
+	{
+		forEachBresenhamPixel (points[i], points[(i + 1) % points.size ()],
+		                       [&] (int32_t x, int32_t y) { pixels.emplace_back (x, y); });
+	}
+	std::sort (pixels.begin (), pixels.end ());
+	pixels.erase (std::unique (pixels.begin (), pixels.end ()), pixels.end ());
+	for (const auto& [x, y] : pixels)
+		blendPixel (x, y, color);
+}
+
+//------------------------------------------------------------------------
+// 太い線 (lineWidth > 1 または kAntiAliasing) の被覆。線分ごとの帯・端 (cap)・接合 (join) の形状の和を、
+// 画素ごとに標本点 (AA は 4x4・aliasing は 1 点) の bit mask で求め、被覆 (立った標本の割合) を alpha に掛けて 1 回だけ合成する。
+// 形状どうしが重なっても標本は 1 回だけ立つので、接合部で二重に濃くならない。
 void CanvasGraphicsDeviceContext::plotLines (const PointList& points, bool closed, const CColor& color) const
 {
 	if (points.size () < 2)
 		return;
-	const auto segmentCount = closed ? points.size () : points.size () - 1;
-	const bool bresenham = lineWidth <= 1. && !drawMode.antiAliasing ();
 	const auto half = std::max (lineWidth, 1.) / 2.;
 	const int sub = drawMode.antiAliasing () ? 4 : 1;
-	CRect bounds (points[0].x, points[0].y, points[0].x, points[0].y);
-	for (const auto& p : points)
+	const auto cap = lineStyle.getLineCap ();
+	const auto join = lineStyle.getLineJoin ();
+	std::vector<Shape> shapes;
+	const auto segmentCount = closed ? points.size () : points.size () - 1;
+	for (size_t i = 0; i < segmentCount; ++i)
 	{
-		bounds.left = std::min (bounds.left, p.x);
-		bounds.top = std::min (bounds.top, p.y);
-		bounds.right = std::max (bounds.right, p.x);
-		bounds.bottom = std::max (bounds.bottom, p.y);
+		const auto& a = points[i];
+		const auto& b = points[(i + 1) % points.size ()];
+		auto len = std::hypot (b.x - a.x, b.y - a.y);
+		if (len <= 0.)
+			continue;
+		auto nx = -(b.y - a.y) / len * half;
+		auto ny = (b.x - a.x) / len * half;
+		shapes.push_back (polyShape ({CPoint (a.x + nx, a.y + ny), CPoint (b.x + nx, b.y + ny),
+		                              CPoint (b.x - nx, b.y - ny), CPoint (a.x - nx, a.y - ny)}));
 	}
-	bounds.inset (-half - 1., -half - 1.);
-	auto box = pixelBoxOf (bounds);
+	// 端: dir は線の外側へ向かう単位ベクトル。round は端の円、square は半幅ぶん延ばした矩形、butt は何もしない。
+	auto addCap = [&] (const CPoint& p, const CPoint& dir) {
+		if (cap == CLineStyle::kLineCapRound)
+			shapes.push_back (discShape (p, half));
+		else if (cap == CLineStyle::kLineCapSquare)
+		{
+			auto nx = -dir.y * half;
+			auto ny = dir.x * half;
+			auto ex = dir.x * half;
+			auto ey = dir.y * half;
+			shapes.push_back (polyShape ({CPoint (p.x + nx, p.y + ny), CPoint (p.x + nx + ex, p.y + ny + ey),
+			                              CPoint (p.x - nx + ex, p.y - ny + ey), CPoint (p.x - nx, p.y - ny)}));
+		}
+	};
+	if (!closed && points.size () >= 2)
+	{
+		const auto& a = points.front ();
+		const auto& b = points[1];
+		const auto& y = points[points.size () - 2];
+		const auto& z = points.back ();
+		auto l0 = std::hypot (b.x - a.x, b.y - a.y);
+		auto l1 = std::hypot (z.x - y.x, z.y - y.y);
+		if (l0 > 0.)
+			addCap (a, CPoint ((a.x - b.x) / l0, (a.y - b.y) / l0));
+		if (l1 > 0.)
+			addCap (z, CPoint ((z.x - y.x) / l1, (z.y - y.y) / l1));
+	}
+	// 接合: 頂点 p で前後の線分をつなぐ。外側の隙間を、miter は三角形の先端、bevel は直線、round は円で埋める。
+	auto addJoin = [&] (const CPoint& prev, const CPoint& p, const CPoint& next) {
+		if (join == CLineStyle::kLineJoinRound)
+		{
+			shapes.push_back (discShape (p, half));
+			return;
+		}
+		auto ax = p.x - prev.x;
+		auto ay = p.y - prev.y;
+		auto bx = next.x - p.x;
+		auto by = next.y - p.y;
+		auto la = std::hypot (ax, ay);
+		auto lb = std::hypot (bx, by);
+		if (la <= 0. || lb <= 0.)
+			return;
+		ax /= la;
+		ay /= la;
+		bx /= lb;
+		by /= lb;
+		// 外側の側を求める: 曲がる方向の反対側。
+		auto cross = ax * by - ay * bx;
+		auto sgn = cross > 0. ? -1. : 1.;
+		CPoint n1 (-ay * half * sgn, ax * half * sgn);
+		CPoint n2 (-by * half * sgn, bx * half * sgn);
+		CPoint o1 (p.x + n1.x, p.y + n1.y);
+		CPoint o2 (p.x + n2.x, p.y + n2.y);
+		if (join == CLineStyle::kLineJoinBevel)
+		{
+			shapes.push_back (polyShape ({p, o1, o2}));
+			return;
+		}
+		// miter: 2 本の外側の辺の交点を先端とする。角が鋭すぎる (比が大きい) 場合は bevel に落とす。
+		auto denom = ax * by - ay * bx;
+		if (std::abs (denom) < 1e-9)
+		{
+			shapes.push_back (polyShape ({p, o1, o2}));
+			return;
+		}
+		auto t = ((o2.x - o1.x) * by - (o2.y - o1.y) * bx) / denom;
+		CPoint tip (o1.x + ax * t, o1.y + ay * t);
+		auto tipDistance = std::hypot (tip.x - p.x, tip.y - p.y);
+		if (tipDistance > 4. * half)
+			shapes.push_back (polyShape ({p, o1, o2}));
+		else
+			shapes.push_back (polyShape ({p, o1, tip, o2}));
+	};
+	if (closed)
+	{
+		for (size_t i = 0; i < points.size (); ++i)
+		{
+			const auto& prev = points[(i + points.size () - 1) % points.size ()];
+			const auto& next = points[(i + 1) % points.size ()];
+			addJoin (prev, points[i], next);
+		}
+	}
+	else
+	{
+		for (size_t i = 1; i + 1 < points.size (); ++i)
+			addJoin (points[i - 1], points[i], points[i + 1]);
+	}
+	if (shapes.empty ())
+		return;
+	// 形状の外接矩形の和を描画範囲にする (miter の先端は点の外接矩形の外へ出る)。
+	double minX = shapes[0].poly.x0;
+	double minY = shapes[0].poly.y0;
+	double maxX = shapes[0].poly.x1;
+	double maxY = shapes[0].poly.y1;
+	for (const auto& shape : shapes)
+	{
+		minX = std::min (minX, shape.poly.x0);
+		minY = std::min (minY, shape.poly.y0);
+		maxX = std::max (maxX, shape.poly.x1);
+		maxY = std::max (maxY, shape.poly.y1);
+	}
+	auto box = pixelBoxOf (CRect (minX - 1., minY - 1., maxX + 1., maxY + 1.));
 	auto clip = pixelBoxOf (clipRect);
 	box.x0 = std::max (box.x0, clip.x0);
 	box.y0 = std::max (box.y0, clip.y0);
@@ -741,26 +1041,13 @@ void CanvasGraphicsDeviceContext::plotLines (const PointList& points, bool close
 	auto cover = [&] (int32_t x, int32_t y) -> uint16_t& {
 		return covered[static_cast<size_t> (y - box.y0) * width + static_cast<size_t> (x - box.x0)];
 	};
-	for (size_t i = 0; i < segmentCount; ++i)
+	for (const auto& shape : shapes)
 	{
-		const auto& from = points[i];
-		const auto& to = points[(i + 1) % points.size ()];
-		if (bresenham)
+		auto shapeBox = pixelBoxOf (CRect (shape.poly.x0 - 1., shape.poly.y0 - 1., shape.poly.x1 + 1.,
+		                                   shape.poly.y1 + 1.));
+		for (auto y = std::max (shapeBox.y0, box.y0); y < std::min (shapeBox.y1, box.y1); ++y)
 		{
-			forEachBresenhamPixel (from, to, [&] (int32_t x, int32_t y) {
-				if (x >= box.x0 && x < box.x1 && y >= box.y0 && y < box.y1)
-					cover (x, y) = 1;
-			});
-			continue;
-		}
-		// 半幅以内の標本点は線分の bbox を半幅 +1 で広げた範囲に必ず入る。それ以外は走査しない。
-		CRect segment (std::min (from.x, to.x), std::min (from.y, to.y), std::max (from.x, to.x),
-		               std::max (from.y, to.y));
-		segment.inset (-half - 1., -half - 1.);
-		auto segBox = pixelBoxOf (segment);
-		for (auto y = std::max (segBox.y0, box.y0); y < std::min (segBox.y1, box.y1); ++y)
-		{
-			for (auto x = std::max (segBox.x0, box.x0); x < std::min (segBox.x1, box.x1); ++x)
+			for (auto x = std::max (shapeBox.x0, box.x0); x < std::min (shapeBox.x1, box.x1); ++x)
 			{
 				auto& bits = cover (x, y);
 				if (bits == fullMask)
@@ -769,9 +1056,8 @@ void CanvasGraphicsDeviceContext::plotLines (const PointList& points, bool close
 				{
 					for (int sx = 0; sx < sub; ++sx)
 					{
-						const auto px = x + (sx + 0.5) / sub;
-						const auto py = y + (sy + 0.5) / sub;
-						if (distanceToSegment (px, py, from, to) <= half)
+						const CPoint p (x + (sx + 0.5) / sub, y + (sy + 0.5) / sub);
+						if (insideShape (shape, p))
 							bits |= static_cast<uint16_t> (1u << (sy * sub + sx));
 					}
 				}
@@ -862,7 +1148,28 @@ void CanvasGraphicsDeviceContext::fillRings (const std::vector<PointList>& rings
 void CanvasGraphicsDeviceContext::strokePolyline (const PointList& points, bool closed,
                                                   const CColor& color) const
 {
-	plotLines (points, closed && points.size () > 2, color);
+	if (points.size () < 2)
+		return;
+	// 点が 2 つの閉じた線は往復になるので、閉じるのは 3 点以上のときだけにする (従来の plotLine と同じ)。
+	closed = closed && points.size () > 2;
+	const bool dashed = !lineStyle.getDashLengths ().empty ();
+	const bool thick = lineWidth > 1. || drawMode.antiAliasing ();
+	if (!dashed)
+	{
+		if (thick)
+			plotLines (points, closed, color);
+		else
+			plotThinPolyline (points, closed, color);
+		return;
+	}
+	// 破線は区間ごとの開いた折れ線にして、区間の中では太さに応じて描く。
+	for (const auto& run : dashRuns (points, closed, lineStyle))
+	{
+		if (thick)
+			plotLines (run, false, color);
+		else
+			plotThinPolyline (run, false, color);
+	}
 }
 
 //------------------------------------------------------------------------
