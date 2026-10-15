@@ -1,6 +1,6 @@
 /* x87_fn_native.c: x87 を含む Slayer_Engine.dll (block22434) の関数の参照ランナー (#2989)。
  * native_entry.c と同じ方式 (freestanding i386 ELF・int 0x80 のみ) だが、x87 を含む関数のために
- *  - 引数は 6 本 (stdcall の float 引数を含む)、 OBJ 窓は OBJ_WIN バイト (既定 0x540)、
+ *  - 引数は 6 本 (スタック渡しの float 引数を含む)、 OBJ 窓は OBJ_WIN バイト (既定 0x540)、
  *  - 呼出し前に fninit、呼出し後に ST(0) を float32 として読み (fsts)・x87 の深さを FSW.TOP から求める。
  * 使い方: x87_fn_native <image.bin> <scen.txt> <out.txt>
  * 出力 1 行: 行番号 va eax st0(float32 bits) d(x87 深さ) mem(OBJ 窓の hex)。 */

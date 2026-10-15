@@ -15,8 +15,8 @@
 ## 2. 対象と方法
 
 - 対象 (`x87_fn_diff.py` の `TARGETS`): どちらも lift 出力で x87 を含み、import も未 lift の call も無い leaf 関数。
-  - `0x10002ee0`: stdcall (float a0, 添字 a1) `ret 8`。 `[ecx+a1*4+0xb0..0x1f4]` を読み書きし、ST(0) を残して返る (lift 出力の x87 行 18 件)。
-  - `0x10005400`: stdcall (float a0..a4) `ret 0xc`。 `fcomp`・`fnstsw`・`fdivr` と `[ecx+0x4fc..0x518]` の更新を含む (x87 行 71 件)。
+  - `0x10002ee0`: thiscall (`ecx` = this、float a0、添字 a1) `ret 8`。 `[ecx+a1*4+0xb0..0x1f4]` を読み書きし、ST(0) を残して返る (lift 出力の x87 行 18 件)。
+  - `0x10005400`: thiscall (`ecx` = this、float a0..a2) `ret 0xc`。 `fcomp`・`fnstsw`・`fdivr` と `[ecx+0x4fc..0x518]` の更新を含む (x87 行 71 件)。 entry 時点で読む引数は `[esp+4]`・`[esp+8]`・`[esp+0xc]` (a0・a1・a2) の 3 本だけ。 harness は a3・a4 (と a5 = 0) にも値を入れるが、本体は読まない余りの引数 (native・wasm とも 6 本を積む)。
 - native (`x87_fn_native.c`): freestanding i386 ELF。 image を VA `0x10000000` に敷設し、呼出し前に `fninit`、呼出し後に `fnstsw` で TOP から深さ `d = (8 - TOP) & 7` を求め、`fsts` (float32)・`fstl` (float64) で ST(0) を読む。
 - wasm (`x87_fn_glue.c`・`x87_fn_entry_wasm.mjs`): `ott_lifted.c` を同じ翻訳単位に取り込む (`ott_x87.h` の state は static のため)。 呼出し前に x87 を初期化し、呼出し後に `d = (8 - ott_ftop) & 7`、ST(0) を `(float)` と `(double)` で取る。
 - 入力: seed 2989。 OBJ 窓の初期値は一様な有限の float32 (±1000)。 float 引数は `fn_10002ee0` が ±1000、`fn_10005400` が ±100。 添字は 0..15。
@@ -49,15 +49,47 @@ python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --nega        # ネガ�
 python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --nega-lower  # ネガコン (b) (exit 0)
 ```
 
-- 鮮度の証跡 (WORKFLOW §6): 測定 commit `565111174` の後に変えたのは本付録と REPORT / DOC_MAP の文書のみ。 `git diff 565111174 HEAD -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c tools/plugins/slayer_engine_ia32/x87_fn_glue.c tools/plugins/slayer_engine_ia32/x87_fn_entry_wasm.mjs tools/plugins/slayer_engine_ia32/lift_text.py tools/ott/lift tools/ott/rt` の出力は 0 行。 検証 HEAD は PR 本文の『検証 HEAD』欄が正 (付録の commit 自身では hash を書けないため)。
+- 鮮度の証跡 (WORKFLOW §6): 測定 commit `565111174` の後の変更は、本付録・REPORT / DOC_MAP の文書と、review 指摘によるコメントだけの修正 (`x87_fn_diff.py` の TARGETS の注釈 2 行・`x87_fn_native.c` の冒頭注釈 1 行)。 実行されるコード・生成コード・乱数の列は変えていないので、再測定はしていない。 `git diff 565111174 HEAD -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c tools/plugins/slayer_engine_ia32/x87_fn_glue.c tools/plugins/slayer_engine_ia32/x87_fn_entry_wasm.mjs tools/plugins/slayer_engine_ia32/lift_text.py tools/ott/lift tools/ott/rt` の出力 (全文):
+
+```diff
+diff --git a/tools/plugins/slayer_engine_ia32/x87_fn_diff.py b/tools/plugins/slayer_engine_ia32/x87_fn_diff.py
+index 73ef78a57..834c45fb4 100644
+--- a/tools/plugins/slayer_engine_ia32/x87_fn_diff.py
++++ b/tools/plugins/slayer_engine_ia32/x87_fn_diff.py
+@@ -27,8 +27,8 @@ N_PER_TARGET = 4000
+ SEED = 2989
+ 
+ # va: 入口 VA。 gen: 引数と OBJ 窓の初期値の作り方 (ecx = OBJ)。 どちらも leaf で x87 を含み、import・未 lift の call が無い。
+-#   fn_10002ee0: stdcall (float a0, int a1 = 添字 0..15) ret 8。 [ecx+a1*4+0xb0..0x1f4] を読み書きし、ST(0) を残して返る。
+-#   fn_10005400: stdcall (float a0..a4) ret 0xc。 fcomp・fnstsw・fdivr を含み、[ecx+0x4fc..0x518] を更新する。
++#   fn_10002ee0: thiscall (ecx = this、float a0、int a1 = 添字 0..15) ret 8。 [ecx+a1*4+0xb0..0x1f4] を読み書きし、ST(0) を残して返る。
++#   fn_10005400: thiscall (ecx = this、float a0..a2) ret 0xc。 fcomp・fnstsw・fdivr を含み、[ecx+0x4fc..0x518] を更新する。 gen が積む a3・a4 (と a5 = 0) は本体が読まない余りの引数。
+ TARGETS = [
+     {'va': 0x10002EE0, 'name': 'fn_10002ee0', 'gen': 'idx_store'},
+     {'va': 0x10005400, 'name': 'fn_10005400', 'gen': 'state_update'},
+diff --git a/tools/plugins/slayer_engine_ia32/x87_fn_native.c b/tools/plugins/slayer_engine_ia32/x87_fn_native.c
+index 72a788e2c..80d069f06 100644
+--- a/tools/plugins/slayer_engine_ia32/x87_fn_native.c
++++ b/tools/plugins/slayer_engine_ia32/x87_fn_native.c
+@@ -1,6 +1,6 @@
+ /* x87_fn_native.c: x87 を含む Slayer_Engine.dll (block22434) の関数の参照ランナー (#2989)。
+  * native_entry.c と同じ方式 (freestanding i386 ELF・int 0x80 のみ) だが、x87 を含む関数のために
+- *  - 引数は 6 本 (stdcall の float 引数を含む)、 OBJ 窓は OBJ_WIN バイト (既定 0x540)、
++ *  - 引数は 6 本 (スタック渡しの float 引数を含む)、 OBJ 窓は OBJ_WIN バイト (既定 0x540)、
+  *  - 呼出し前に fninit、呼出し後に ST(0) を float32 として読み (fsts)・x87 の深さを FSW.TOP から求める。
+  * 使い方: x87_fn_native <image.bin> <scen.txt> <out.txt>
+  * 出力 1 行: 行番号 va eax st0(float32 bits) d(x87 深さ) mem(OBJ 窓の hex)。 */
+```
+
+検証 HEAD は PR 本文の『検証 HEAD』欄が正 (付録の commit 自身では hash を書けないため)。 `0x10005400` の逆アセンブル根拠 (`objdump -d -M intel`・`pei-i386`): `sub esp,0x8` の後の `[esp+0xc]`・`[esp+0x10]`・`[esp+0x14]` が entry の `[esp+4]`・`[esp+8]`・`[esp+0xc]` (a0・a1・a2) に当たり、`call` を含まず、`add esp,0x8` の後に `ret 0xc`。 `0x10002ee0` は `call` を含まず、`ret 0x8`。 両方とも `[ecx+...]` を基底にする (thiscall)。
 
 ## 6. 範囲と未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 残りの leaf x87 関数 36 本 (lift 済み・import と call が無い) の差分試験 | 対象の 2 本以外の x87 の命令組合せは未確認。 本付録の 2 本で受入は満たす | 未起票 (本表で追跡。 同じ scen 生成で足せる) |
+| 残りの leaf x87 関数 36 本 (lift 済み・import と call が無い) の差分試験 | 対象の 2 本以外の x87 の命令組合せは未確認。 本付録の 2 本で受入は満たす | #3715 (PLG-G2-31・子。親 #2989) |
 | 超越関数・`frndint`・`fscale`・`fprem` 等を含む関数 (lift が `ott_unsup` のまま) | 対象外 | #2966 (PLG-G2-23) |
 | `fld`/`fstp` m80 の差分試験 | 80bit メモリ経路は未試験 | #2967 (PLG-G2-24) |
-| 入力は一様な有限 float32 のみ (NaN・inf・非正規・0 除算は未試験)。 引数は 6 本まで | 例外的な値での一致は未確認 | 未起票 (本表で追跡) |
+| 入力は一様な有限 float32 のみ (NaN・inf・非正規・0 除算は未試験)。 引数は 6 本まで | 例外的な値での一致は未確認 | #3716 (PLG-G2-32・子。親 #2989) |
 | export `main`・import を通る関数・実行時の間接 call・`sahf` の AF・`fs:` (TEB) | 関数単位の残り (x87 以外も含む) | #3127 / #3128 |
 | f80→f64 の丸め差 (ST(0) の double で 1 ulp 以上、行の 2.75% / 14.88%) | float32 結果には伝播しなかった。 方式の帰結 | ADR D28 (方式)。 行案 D24 (案) は `REPORT_APPENDIX_1099.md` §6 |
