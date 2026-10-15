@@ -15,6 +15,7 @@ class: X = xmm0 入力の脱落 (呼出元/L の entry で xmm0 を読み、x0 �
 import collections
 import json
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +32,7 @@ target = sys.argv[1]
 batch = sys.argv[2] if len(sys.argv) > 2 else os.path.join(ROOT, 'work/m11/batch_closure.jsonl')
 sess = Session(target, shards=1, build=False, trace=True)
 md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+md.detail = True
 
 
 def leaf(va):
@@ -71,6 +73,22 @@ def reads_xmm0(f):
     return False
 
 
+def r_kind(L, caller, ir_by_fn, mach):
+    """R 類の D15 判定 (trace_diverge_unreachable.py §1 と同一条件)。L または呼出元が、機械語のメモリ間接 call を持ち、
+    IR の call 数 ≤ 機械語の直接 call 先数 なら 'D15' (メモリ間接 call 脱落の候補)。それ以外は 'other' (ldfix 型は未判定)。"""
+    for v in (L, caller):
+        if v is None:
+            continue
+        d, mi, _ = mach(v)
+        body = ir_by_fn.get('function_%x' % v)
+        if body is None:
+            continue
+        ic = len(re.findall(r'\bcall\b', body))
+        if mi > 0 and ic <= len(d):
+            return 'D15'
+    return 'other'
+
+
 def call_site(caller, L):
     """caller の本体で L への直接 call 命令の番地 (最初の 1 件) と、その後の最初の jcc と分岐先を返す。"""
     if caller is None:
@@ -85,6 +103,45 @@ def call_site(caller, L):
     return None, None, None
 
 
+IR_PATH = os.environ.get('LD_M11_IR') or os.path.join(ROOT, '../m11/work/boot_final3.ll')
+
+
+def load_ir(path):
+    """boot_final3.ll の function_<va> 本体 (define から閉じ括弧まで) を {名前: テキスト} で返す。"""
+    out, cur, buf = {}, None, []
+    for line in open(path):
+        if cur is None:
+            if line.startswith('define ') and '@function_' in line:
+                cur = line.split('@', 1)[1].split('(', 1)[0]
+                buf = [line]
+        else:
+            buf.append(line)
+            if line.startswith('}'):
+                out[cur] = ''.join(buf)
+                cur = None
+    return out
+
+
+def mach(va):
+    """trace_diverge_unreachable.py の mach と同一: (直接 call 先集合, メモリ間接 call 数, レジスタ間接 call 数)。"""
+    direct, mem_ind, reg_ind = set(), 0, 0
+    for i in md.disasm(sess.pe.read(va - sess.pe.base, 0x600), va):
+        if i.id == X.X86_INS_CALL:
+            op = i.operands[0]
+            if op.type == X.X86_OP_IMM:
+                direct.add(op.imm)
+            elif op.type == X.X86_OP_MEM:
+                if op.mem.base != X.X86_REG_RIP:
+                    mem_ind += 1
+            else:
+                reg_ind += 1
+        if i.id in (X.X86_INS_RET, X.X86_INS_INT3):
+            break
+    return direct, mem_ind, reg_ind
+
+
+IRS = load_ir(IR_PATH)
+rkinds = collections.Counter()
 items = []
 for line in open(batch):
     r = json.loads(line)
@@ -151,6 +208,9 @@ try:
             else:
                 cls = 'R'
             rows.append((xf, cls, Lf, caller))
+            if cls == 'R':
+                rk = r_kind(Lf, caller, IRS, mach)
+                rkinds[(1 if xf else 0, rk)] += 1
             if Lf == 0x40a3d0 and RP:
                 k = N[:i + 1].count(0x40a3d0) - 1   # L の entry が、trace 上で何回目の 0x40a3d0 呼出しか
                 if k >= len(RL):
@@ -178,6 +238,7 @@ try:
                 post or '-',
                 ('%s %s' % jcc) if jcc else '-'))
     print('## 集計 (xfill, class): %s' % sorted(collections.Counter((int(x), c) for x, c, _, _ in rows).items()))
+    print('## R 類の D15 判定 (xfill, 判定): %s' % sorted(rkinds.items()))
     if RP:
         print('## rax 直接計測 (LD-220): %s' % sorted(rp_stat.items()))
 finally:
