@@ -763,6 +763,8 @@ FL_H(screen, unBlank) { NARGS(1, 1); scr_unblank = A_INT(0, 0) == 1; return fl_r
 /* ---- screen 描画・メーター系 (7) ---- PY-135 (#3022): PE 0xd7ada0・0xd7b690・0xd7ae80・0xd7af40・0xd7bcb0・0xd7bec0・0xd7c600 (REPORT_PY135)。addMeter 以外は状態を持たない */
 /* addMeter: 成功経路 (rc>0・scr≠0) で PE 0xd7d9e0 が isUnBlank を真にし activeCounter を scr+0x1dc (仮置き 0) にする。A_INT は失敗で返るので解析失敗は状態を変えない */
 FL_H(screen, addMeter) { NARGS(4, 5); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); (void)A_INT(4, 0); scr_unblank = 1; scr_active = scr_dflt; return fl_ret_none(c); }
+/* addTextLine (#5328): 書式 siiii。成功経路 (scr≠0) で PE 0xd7d460 の副作用 scr+0x1cc←scr+0x1dc・scr+0x1d1←1 を模す。行 record は未確定のため模さない (REPORT_PY5328) */
+FL_H(screen, addTextLine) { NARGS(5, 5); (void)A_STR(0); for (int i = 1; i < 5; i++) (void)A_INT(i, 0); if (scr_alive) { scr_active = scr_dflt; scr_unblank = 1; } return fl_ret_none(c); }
 FL_H(screen, displayBar) { NARGS(5, 5); (void)A_INT(0, 0); (void)A_INT(1, 0); (void)A_STR(2); (void)A_DBL(3, 0); (void)A_INT(4, 0); return fl_ret_none(c); }
 FL_H(screen, fillRect) { NARGS(5, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
 FL_H(screen, drawRect) { NARGS(5, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
