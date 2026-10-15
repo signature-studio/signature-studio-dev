@@ -9,7 +9,7 @@ const F = (v) => ({ t: "D", v });
 const STEP_V = 24;
 const STEP_DEF = [60, 100, 64, 120, 64, 128, 128, 0, 0];
 const PARAM_DEFAULT = [0.5, 0.2, 0.8];
-const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 8 ? -1 : prm === 7 ? pos * STEP_V : STEP_DEF[prm]);
+const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 8 ? -1 : prm === 7 ? pos * STEP_V : prm === 1 ? (k.vel?.[pos] ?? STEP_DEF[1]) : STEP_DEF[prm]);
 // PY-224 (#3628): PE 0x12d3ff0 の loop 分岐 (C provider の grid_bit_loop と同一・REPORT_PY224)。行 T[1] と flag49e・flag54 が立ち、channel i の最初の record (f4 != 0) が L = len / 24 を与えるとき、p < L は base、それ以外は base(p mod L)
 const LOOP_G2 = 24;
 const LOOP_MAX = 8;
@@ -130,10 +130,10 @@ export function createMockEngine() {
     launchPages: 0,
     uiClosing: false, uiTimeDispMin: false, uiStartOnInput: false, uiLoopRec: false, uiStepEdit: false, uiBrowserAutoHide: false, uiSnapMode: 0,
     undoPos: 0, undoCount: 0, undoLast: 0, safeEdit: true, projTitle: "", projAuthor: "", projGenre: "",
-    selStart: -1, selEnd: -1,
+    selStart: -1, selEnd: -1, liveAnchor: -1,
     arrTime: 0,
     numerator: 4, denominator: 4,
-    screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
+    screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0, screenDefaultCounter: 0,
     screenAlive: false, screenDirty: false, screenMenuShowing: false, screenSetup: { l: 0, t: [0, 0, 0, 0, 0] },
     selectedChannel: 0,
     loop: { row: false, flag49e: false, flag54: false, recs: [] },
@@ -217,6 +217,12 @@ export function createMockEngine() {
   const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
   // PY-144 (#3043): PE 0xe43d30 の書込み規則。start=x・end=y を置き、x==y なら end=-1、x>y なら入れ替える。selectionClear は (-1,-1) で同じ経路
   const selSet = (x, y) => { st.selStart = x; st.selEnd = y; if (x === y) st.selEnd = -1; else if (x > y) { st.selStart = y; st.selEnd = x; } };
+  // PY-254 (#3796): PE 0xe43ff0 (liveSelection) の a≠0x7fffffff 経路。b==1 なら anchor (≥0 かつ a と異なる) から a までを選択し anchor=-1。それ以外は選択を (-1,-1)。b!=1 は anchor=a。anchor の初期値 -1 は仮置き
+  const liveSel = (a, b) => {
+    const flag = b === 1, anc = st.liveAnchor;
+    if (flag && anc >= 0 && anc !== a) selSet(anc, a); else selSet(-1, -1);
+    st.liveAnchor = flag ? -1 : a;
+  };
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
@@ -232,11 +238,12 @@ export function createMockEngine() {
       const ci = argI(a, 0, 0);
       ch(ci);
       const stride = argI(a, 1, 1), offset = argI(a, 2, 0);
-      argI(a, 3, 0); argI(a, 4, 0);
+      const vel = Math.min(Math.max(argI(a, 3, 100), 0), 127);
+      argI(a, 4, 0);
       if (stride < 1) throw RANGE();
       let p = offset;
       if (p < 0) { p = offset % stride; if (p < 0) p += stride; }
-      for (; p < 64; p += stride) ch(ci).steps[p] = 1;
+      for (; p < 64; p += stride) { const k = ch(ci); k.steps[p] = 1; (k.vel ??= [])[p] = vel; }
     },
     "channels.getChannelName": (i) => ch(i).name,
     "channels.setChannelName": (i, n) => { ch(i).name = str(n); },
@@ -330,6 +337,7 @@ export function createMockEngine() {
       pos = ix(pos);
       if (pos < 0 || pos >= 64) throw RANGE();
       k.steps[pos] = v ? 1 : 0;
+      if (v) (k.vel ??= [])[pos] = 100;
     },
     "channels.quickQuantize": (i) => { ch(i); },
     "channels.showEditor": (i) => { ch(i); },
@@ -493,7 +501,7 @@ export function createMockEngine() {
     "arrangement.currentTime": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return st.arrTime; },
     "arrangement.selectionClear": (...a) => { arity(a, 0, 0); selSet(-1, -1); },
     "arrangement.selectionSet": (...a) => { arity(a, 2, 5); const x = argI(a, 0, 0), y = argI(a, 1, 0); for (let i = 2; i < 5; i++) argI(a, i, 0); selSet(x, y); },
-    "arrangement.liveSelection": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
+    "arrangement.liveSelection": (...a) => { arity(a, 2, 2); liveSel(argI(a, 0, 0), argI(a, 1, 0)); },
     "arrangement.addAutoTimeMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); str(a[1]); },
     "arrangement.jumpToMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
     // PY-143 (#3041): PE 0xd78030 (getMarkerName) と 0xd785a0 (currentTimeHint) の呼出し構造と戻り str は REPORT_PY143 で確定。
@@ -527,6 +535,16 @@ export function createMockEngine() {
     "screen.getScreenActiveCounter": (...a) => { arity(a, 0, 0); return st.screenActiveCounter; },
     "screen.setScreenActiveCounter": (...a) => { arity(a, 1, 1); st.screenActiveCounter = (st.screenActiveCounter + argI(a, 0, 0)) | 0; },
     "screen.unBlank": (...a) => { arity(a, 1, 1); st.screenUnBlank = argI(a, 0, 0) === 1; },
+    // PY-135 (#3022): 描画・メーター系 6 件 (PE 0xd7ada0・0xd7b690・0xd7ae80・0xd7af40・0xd7bcb0・0xd7bec0)。addMeter 以外は引数検査と None だけを模す (REPORT_PY135)。
+    // addMeter は書式解析が成功 (rc>0) かつ scr≠0 のとき PE 0xd7d9e0 が isUnBlank (scr+0x1d1) を真にし、activeCounter を scr+0x1dc (仮置き 0) にする。解析失敗は状態を変えない
+    "screen.addMeter": (...a) => { arity(a, 4, 5); for (let i = 0; i < 4; i++) argI(a, i, 0); argI(a, 4, 0); st.screenUnBlank = true; st.screenActiveCounter = st.screenDefaultCounter; },
+    "screen.displayBar": (...a) => { arity(a, 5, 5); argI(a, 0, 0); argI(a, 1, 0); str(a[2]); argF(a, 3); argI(a, 4, 0); },
+    "screen.fillRect": (...a) => { arity(a, 5, 5); for (let i = 0; i < 5; i++) argI(a, i, 0); },
+    "screen.drawRect": (...a) => { arity(a, 5, 5); for (let i = 0; i < 5; i++) argI(a, i, 0); },
+    "screen.drawText": (...a) => { arity(a, 6, 6); argI(a, 0, 0); str(a[1]); for (let i = 2; i < 6; i++) argI(a, i, 0); },
+    "screen.eraseRect": (...a) => { arity(a, 4, 4); for (let i = 0; i < 4; i++) argI(a, i, 0); },
+    // blank (PE 0xd7c600 → callback 0xd7c5a0 → 0xd7d110): 第 1 引数が 1 なら isBlanked (scr+0x1d0) を真に書く。真→偽の解除では activeCounter を scr+0x1dc から戻す (初期値は未実測の仮置き 0)
+    "screen.blank": (...a) => { arity(a, 2, 2); const b = argI(a, 0, 0) === 1; argI(a, 1, 0); if (b !== st.screenBlanked) { if (!b) st.screenActiveCounter = st.screenDefaultCounter; st.screenBlanked = b; } },
     // PY-136 (#3025): screen 初期化・メニュー系 10 件 (PE 0xd7aa40・0xd7ab00・0xd7b0a0・0xd7b000・0xd7ccb0・0xd7b1f0・0xd7b170・0xd7c9a0・0xd7cac0・0xd7cbe0)。scr 未生成の経路は PE で AV のため Unspecified error を仮置き。引数名と意味は未確定 (REPORT_PY136)
     "screen.init": (...a) => { arity(a, 6, 6); for (let i = 0; i < 6; i++) argI(a, i, 0); Object.assign(st, { screenAlive: true, screenDirty: false, screenMenuShowing: false, screenSetup: { l: 0, t: [30, 10, 10, 2, 4000] } }); },
     "screen.setup": (...a) => { arity(a, 6, 6); const v = Array.from({ length: 6 }, (_, i) => argI(a, i, 0)); scrNeed(); st.screenSetup = { l: v[0], t: v.slice(1) }; },
@@ -555,6 +573,8 @@ export function createMockEngine() {
       const word = ch >= 0 ? (((ch & 0xf) | msg) + (d1 << 8) + (d2 << 16) + (a4 << 24)) >>> 0 : msg >>> 0;
       st.midiOut.push({ api: "midiOutMsg", args: a, word });
     },
+    // PY-215 (#3568): PE 0xd75d30 と同じ (-1 → -1、連動表が空の index ≥ 0 → None)。表の供給元は仮置き (空)。device・link の割当は見ない
+    "device.getLinkedChannel": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) return -1; return undefined; },
     // PY-206 (#3494): PE 0xd75f40・0xd75f80・0xd75fc0 は assigned 機器 (obj.+0x50) の vtbl 先を呼び、戻り status 0 で None を返す (REPORT_PY206)。vtbl 先の効果は未読のため状態を持たない
     "device.createRefreshThread": (...a) => { arity(a, 0, 0); },
     "device.destroyRefreshThread": (...a) => { arity(a, 0, 0); },

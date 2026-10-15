@@ -16,7 +16,8 @@
                実機 x86 の演算順 (逆アセンブルで確認) に合わせ手で括弧を戻す = patches.py の (name, regex, repl) 表。**手作業 1 件 = 1 行**
     stackpair  lStack_e8/lStack_e0 のように「隣接を仮定して &lStack_e8 を配列として渡される」2 変数を long long[2] にする
     gtype      `_DAT_<va>` の C 型を patches.py の GTYPE (実機の命令の幅で確認した整数マスク) で上書きする
-    lanes      Delay の 128bit ローカル auStack_118/128/138 を、参照されるレーンの型 (_0_8_・_8_8_ は double、_8_4_・_12_4_ は uint32) を持つ V128L にする (#3094)
+    lanes      Delay の 128bit ローカル auStack_118/128/138 を、参照されるレーンの型 (_0_8_・_8_8_ は double、_8_4_・_12_4_ は uint32) を持つ V128L にする (#3094)。
+               同じ関数の aauStack_f8[11][16] (混在型) を整数レーンの V128A にし、float 読みは u2f・12 バイト代入は memcpy にする (#3809)
 """
 import json
 import re
@@ -131,6 +132,17 @@ typedef union {
 '''
 
 
+LANE_F8_HELPER = r'''/* Delay の aauStack_f8[11][16] (128bit 一時領域の 2 次元配列)。参照文脈で型を決めた (#3809): _0_4_・_4_4_・_8_4_・_12_4_ は整数レーン
+   (書込みは int・uint の値、float 読みは u2f でビット再解釈)、_4_12_ は 12 バイトのバイト列 (undefined1[12] の代入は memcpy)、_8_8_ は uint64。 */
+typedef union {
+    uint8_t b[16];
+    struct { uint32_t _0_4_, _4_4_, _8_4_, _12_4_; };
+    struct { uint8_t _p4[4]; uint8_t _4_12_[12]; };
+    struct { uint8_t _p8[8]; uint64_t _8_8_; };
+} V128A;
+'''
+
+
 def approx_rcp_table():
     """snapins/scripts/approx_tables.b64 の rcp 表 (4096 entry) を C 配列リテラルで返す。"""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapins', 'lift'))
@@ -158,6 +170,49 @@ def rewrite_thunks(t, va):
     """関数 va の本文 (コメント除去済み): 定義ヘッダの thunk_FUN_<X> は FUN_<va>、本体の呼出 thunk_FUN_<X> は飛び先の FUN_<X> (jmp thunk なので同じ動作)。"""
     t = THUNK_HDR.sub(lambda m: m.group(1) + 'FUN_%x' % va + m.group(3), t, count=1)
     return re.sub(r'\bthunk_FUN_([0-9a-f]+)\b', r'FUN_\1', t)
+
+
+def _close(t, o):
+    """t[o] == '(' の対応する ')' の位置。"""
+    depth = 0
+    for k in range(o, len(t)):
+        if t[k] == '(':
+            depth += 1
+        elif t[k] == ')':
+            depth -= 1
+            if depth == 0:
+                return k
+    raise SystemExit('括弧が閉じない (dbitcast・停止)')
+
+
+def dbitcast(t):
+    """double のビット再解釈を d2u/u2d に書換える。対象は double 変数 (dVarN と double 引数 param_N)。
+    (double)( … (ulonglong)X … ) はビット演算の結果を double に読む形なので u2d( … ) にする。
+    (double)(int)・(double)(uint) で始まる式は数値変換なので残す。残りの (ulonglong)X は d2u(X)。"""
+    dnames = set(re.findall(r'\bdouble (\w+)\b', t)) | set(re.findall(r'\bdVar\d+\b', t))
+    alt = '|'.join(sorted(map(re.escape, dnames), key=len, reverse=True)) or r'(?!)'
+    cast = re.compile(r'\(ulonglong\)(' + alt + r')\b')
+
+    def rec(s):
+        out, i = [], 0
+        while True:
+            j = s.find('(double)(', i)
+            if j < 0:
+                out.append(s[i:])
+                break
+            o = j + len('(double)')
+            k = _close(s, o)
+            inner = s[o + 1:k]
+            is_bits = bool(cast.search(inner)) and not re.match(r'\s*\((int|uint)\)', inner)
+            if is_bits:
+                out.append(s[i:j] + 'u2d(' + rec(inner) + ')')
+            else:
+                out.append(s[i:j] + '(double)(' + rec(inner) + ')')
+            i = k + 1
+        return ''.join(out)
+
+    t = rec(t)
+    return cast.sub(r'd2u(\1)', t)
 
 
 def infer_type(lines, sym):
@@ -216,6 +271,8 @@ def main():
         out.append(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'kh_xmm0.h')).read())
     if 'lanes' in fixes and re.search(r'undefined1 auStack_(118|128|138) \[16\];', alltxt):
         out.append(LANE_HELPER)
+    if 'lanes' in fixes and re.search(r'undefined1 aauStack_f8 \[11\] \[16\];', alltxt):
+        out.append(LANE_F8_HELPER)
     for va, (ty, kind, _) in sorted(gtypes.items()):
         d = pe_bytes(pe, va, 16)
         out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
@@ -258,6 +315,10 @@ def main():
         t = re.sub(r'undefined1 (in_XMM\d+) \[16\];', r'V128 \1;', t)
         if 'lanes' in fixes:
             t = re.sub(r'undefined1 (auStack_(?:118|128|138)) \[16\];', r'V128L \1;', t)
+            t = re.sub(r'undefined1 aauStack_f8 \[11\] \[16\];', r'V128A aauStack_f8 [11];', t)
+            t = re.sub(r'\b(aauStack_f8\[\d+\]\._4_12_) = (auStack_\w+);', r'memcpy(\1, \2, 12);', t)
+            t = re.sub(r'= (aauStack_f8\[\d+\]\._(?:0|4)_4_);', r'= u2f(\1);', t)
+            t = re.sub(r'(auVar\d+\._(?:8|12)_4_) = (uVar\d+ & aauStack_f8\[\d+\]\._(?:8|12)_4_);', r'\1 = u2f(\2);', t)
         t = re.sub(r'\b(in_XMM\d+)\._0_8_\b', r'\1._0_8_d', t)
         t = re.sub(r'\b(maxps|minps|vpand_avx|vpor_avx|vpsubq_avx|vpsubd_avx)\((\w+),_DAT_([0-9a-f]+)\)', r'\1(\2,(*(V128 *)gd_\3))', t)
         if tbase is not None:
@@ -267,6 +328,8 @@ def main():
         if 'bitcast' in fixes:
             t = re.sub(r'\(float\)\(\(uint\)(\(.*?\)) & (_DAT_[0-9a-f]+|uVar\d+)\)', r'u2f(f2u\1 & \2)', t)
             t = re.sub(r'\(float\)\((\*\(uint \*\)\(.*?\)) & (uVar\d+)\)', r'u2f(\1 & \2)', t)
+        if 'dbitcast' in fixes:
+            t = dbitcast(t)
         if 'concat' in fixes:
             t = re.sub(r'CONCAT44\((\w+),(fVar\d+)\)', r'CONCAT44(\1,f2u(\2))', t)
         if 'intload' in fixes:

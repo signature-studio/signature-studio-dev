@@ -20,7 +20,7 @@
 #define ROOT_NAME "Plugin database"
 
 /* pv / spv: plugin パラメータの値 (インスタンスごと。channel の generator と mixer track の insert slot)。PY-228 (#3656) */
-typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; int64_t pitch_n; double pv[NPARAM]; } Chan;
+typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; uint8_t vel[NSTEP]; int64_t pitch_n; double pv[NPARAM]; } Chan;
 typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; double spv[NSLOT][NPARAM]; int act[NMIX]; double lvl[NMIX]; } Mix;
 typedef struct { char name[NAME]; int64_t color; uint8_t lock; double act; int loop, trig_mode, pos_snap, trig_snap; } Pl;
 
@@ -48,11 +48,11 @@ static int lm_pages;
 static int ui_closing, ui_time_disp_min, ui_start_on_input, ui_loop_rec, ui_step_edit, ui_browser_auto_hide, ui_snap_mode;
 static int undo_pos, undo_count, undo_last, safe_edit;
 static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
-static int sel_start, sel_end;
+static int sel_start, sel_end, live_anchor;
 static int64_t disp_time;
 static int browser_op;
 static int64_t arr_time;
-static int scr_blanked, scr_unblank, scr_active;
+static int scr_blanked, scr_unblank, scr_active, scr_dflt;
 static int scr_alive, scr_menu_show, scr_dirty;
 static int64_t scr_setup_l;
 static int scr_setup_t[5];
@@ -98,9 +98,9 @@ void fl_engine_reset(void) {
     ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
     undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
     set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
-    sel_start = -1; sel_end = -1;
+    sel_start = -1; sel_end = -1; live_anchor = -1;
     arr_time = 0;
-    scr_blanked = 0; scr_unblank = 0; scr_active = 0;
+    scr_blanked = 0; scr_unblank = 0; scr_active = 0; scr_dflt = 0;
     scr_alive = 0; scr_menu_show = 0; scr_dirty = 0; scr_setup_l = 0; for (int i = 0; i < 5; i++) scr_setup_t[i] = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
     idle_elapsed = 0; midi_out_assigned = 0; master_sync = 0;
@@ -223,7 +223,7 @@ FL_H(channels, setTargetFxTrack) { CH(0); k->fx = (int)A_INT(1, 0); return fl_re
 FL_H(channels, setGridBit) {
     CH(0); int64_t p = A_INT(1, 0), v = A_INT(2, 0);
     if (p < 0 || p >= NSTEP) RANGE();
-    k->steps[p] = v ? 1 : 0; return fl_ret_none(c);
+    k->steps[p] = v ? 1 : 0; if (v) k->vel[p] = 100; return fl_ret_none(c);
 }
 FL_H(channels, quickQuantize) { CH(0); (void)k; return fl_ret_none(c); }
 FL_H(channels, selectedChannel) {
@@ -231,12 +231,13 @@ FL_H(channels, selectedChannel) {
     return fl_ret_i(c, sel_chan + off);
 }
 FL_H(channels, fillEachNSteps) {
-    CH(0); int64_t st = A_INT(1, 1), off = A_INT(2, 0), vel = A_INT(3, 0);
-    (void)vel; (void)A_INT(4, 0);
+    CH(0); int64_t st = A_INT(1, 1), off = A_INT(2, 0), vel = A_INT(3, 100);
+    (void)A_INT(4, 0);
+    if (vel < 0) vel = 0; else if (vel > 127) vel = 127;
     if (st < 1) RANGE();
     int64_t p = off;
     if (p < 0) { p %= st; if (p < 0) p += st; }
-    while (p < NSTEP) { k->steps[p] = 1; if (st > NSTEP - p) break; p += st; }
+    while (p < NSTEP) { k->steps[p] = 1; k->vel[p] = (uint8_t)vel; if (st > NSTEP - p) break; p += st; }
     return fl_ret_none(c);
 }
 FL_H(channels, showEditor) { CH(0); (void)k; return fl_ret_none(c); }
@@ -267,7 +268,7 @@ FL_H(channels, focusEditor) {
 static const int64_t step_def[9] = {60, 100, 64, 120, 64, 128, 128, 0, 0};
 static int64_t step_param(const Chan *k, int64_t pos, int64_t prm) {
     if (pos < 0 || pos >= NSTEP || !k->steps[pos] || prm < 0 || prm > 8) return -1;
-    return prm == 7 ? pos * 24 : step_def[prm];
+    return prm == 7 ? pos * 24 : prm == 1 ? k->vel[pos] : step_def[prm];
 }
 /* PE 0xd5bb30: 引数を読んでから index を検査 (範囲外は Index out of range)。useGlobalIndex は未モデル (グループ無し) */
 FL_H(channels, getCurrentStepParam) {
@@ -635,7 +636,8 @@ static void sel_set(int x, int y) { sel_start = x; sel_end = y; if (x == y) sel_
 FL_H(arrangement, currentTime) { (void)A_INT(0, 0); return fl_ret_i(c, arr_time); }
 FL_H(arrangement, selectionClear) { NARGS(0, 0); sel_set(-1, -1); return fl_ret_none(c); }
 FL_H(arrangement, selectionSet) { NARGS(2, 5); int64_t x = A_INT(0, 0), y = A_INT(1, 0); for (int i = 2; i < 5; i++) (void)A_INT(i, 0); sel_set((int)x, (int)y); return fl_ret_none(c); }
-FL_H(arrangement, liveSelection) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
+static void live_sel(int a, int flag) { int anc = live_anchor; if (flag && anc >= 0 && anc != a) sel_set(anc, a); else sel_set(-1, -1); live_anchor = flag ? -1 : a; }
+FL_H(arrangement, liveSelection) { NARGS(2, 2); int64_t a = A_INT(0, 0), b = A_INT(1, 0); live_sel((int)a, b == 1); return fl_ret_none(c); }
 FL_H(arrangement, addAutoTimeMarker) { (void)A_INT(0, 0); (void)A_STR(1); return fl_ret_none(c); }
 FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 /* ---- arrangement (2) ---- PY-143 (#3041): PE 0xd78030 (getMarkerName)・0xd785a0 (currentTimeHint) の呼出し構造と戻り str は REPORT_PY143 で確定。
@@ -673,6 +675,16 @@ FL_H(screen, isUnBlank) { NARGS(0, 0); return fl_ret_b(c, scr_unblank); }
 FL_H(screen, getScreenActiveCounter) { NARGS(0, 0); return fl_ret_i(c, scr_active); }
 FL_H(screen, setScreenActiveCounter) { NARGS(1, 1); scr_active = (int)((unsigned)scr_active + (unsigned)A_INT(0, 0)); return fl_ret_none(c); }
 FL_H(screen, unBlank) { NARGS(1, 1); scr_unblank = A_INT(0, 0) == 1; return fl_ret_none(c); }
+/* ---- screen 描画・メーター系 (7) ---- PY-135 (#3022): PE 0xd7ada0・0xd7b690・0xd7ae80・0xd7af40・0xd7bcb0・0xd7bec0・0xd7c600 (REPORT_PY135)。addMeter 以外は状態を持たない */
+/* addMeter: 成功経路 (rc>0・scr≠0) で PE 0xd7d9e0 が isUnBlank を真にし activeCounter を scr+0x1dc (仮置き 0) にする。A_INT は失敗で返るので解析失敗は状態を変えない */
+FL_H(screen, addMeter) { NARGS(4, 5); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); (void)A_INT(4, 0); scr_unblank = 1; scr_active = scr_dflt; return fl_ret_none(c); }
+FL_H(screen, displayBar) { NARGS(5, 5); (void)A_INT(0, 0); (void)A_INT(1, 0); (void)A_STR(2); (void)A_DBL(3, 0); (void)A_INT(4, 0); return fl_ret_none(c); }
+FL_H(screen, fillRect) { NARGS(5, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(screen, drawRect) { NARGS(5, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(screen, drawText) { NARGS(6, 6); (void)A_INT(0, 0); (void)A_STR(1); for (int i = 2; i < 6; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(screen, eraseRect) { NARGS(4, 4); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+/* blank: 第 1 引数が 1 なら isBlanked を真に書く。真→偽の解除では activeCounter を scr+0x1dc (仮置き 0) から戻す (REPORT_PY135) */
+FL_H(screen, blank) { NARGS(2, 2); int b = A_INT(0, 0) == 1; (void)A_INT(1, 0); if (b != scr_blanked) { if (!b) scr_active = scr_dflt; scr_blanked = b; } return fl_ret_none(c); }
 /* ---- screen 初期化・メニュー系 (10) ---- PY-136 (#3025): PE 0xd7aa40・0xd7ab00・0xd7b0a0・0xd7b000・0xd7ccb0・0xd7b1f0・0xd7b170・0xd7c9a0・0xd7cac0・0xd7cbe0 (REPORT_PY136)。
    scr は init で生成し deInit で破棄する。scr 未生成の経路は PE で AV (例外を返さない) なので Unspecified error を仮置き */
 #define SCR_NEED() do { if (!scr_alive) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error"); } while (0)
@@ -705,6 +717,8 @@ static int midi_send(fl_call *c, uint32_t w) {
     if (midi_word_n < NMIDI) midi_words[midi_word_n++] = w;
     return fl_ret_none(c);
 }
+/* PY-215 (#3568): PE 0xd75d30 (書式 'I'、引数 1)。-1 は -1 を返す (0xd75dc0)。それ以外は連動表を末尾から走査し、一致が無い・表が空なら status 1 → None (0xd75dce)。device・link の割当は見ない (-6/-7 経路なし)。表の供給元は未確定のため空と仮定 (REPORT_PY215 §3) */
+FL_H(device, getLinkedChannel) { int64_t i = A_INT(0, 0); if (i == -1) return fl_ret_i(c, -1); return fl_ret_none(c); }
 FL_H(device, createRefreshThread) { return fl_ret_none(c); }
 FL_H(device, destroyRefreshThread) { return fl_ret_none(c); }
 FL_H(device, fullRefresh) { return fl_ret_none(c); }
