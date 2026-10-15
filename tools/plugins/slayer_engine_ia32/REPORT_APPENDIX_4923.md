@@ -11,7 +11,7 @@
 
 ## 2. 入力と突合 (測定)
 
-- 測定 commit: `189d9580b` (origin/main)。 worktree `ws-4923` (branch `4923-x87-ba05-edx`) で測った。
+- 測定 commit: `f74f87006` (本 PR の HEAD。 origin/main `dfeecc239` を取り込んだ merge commit)。 branch `4923-x87-ba05-edx` で測った。
 - 入力: `probe_ba05_4923.py` が作る。 seed 4923。 行数 2000。 double の種類を 6 通りに循環させる (normal・inf・nan・zero・denorm・big 指数)。 符号は乱数。 OBJ 窓の残り (0x540 − 8 B) は乱数。 `edx = OBJ (0x10F80000)`。 `ecx = OBJ`。 引数 6 本は 0。
 - 変更点は native・glue の `call_guest` の `edx` だけ (`xor %edx,%edx` を外し、`R[RDX] = ecx` にする)。 既存の `x87_fn_native.c`・`x87_fn_glue.c` は変えていない。 プローブ用の複製を `work/ba05_4923/` に作る。
 
@@ -26,12 +26,12 @@
 | **全体** | **2000 / 2000** |
 
 - 一致の自明性: native の出力は eax の種類 655、ST(0) の float64 bit の種類 1337。 x87 深さは全行 1。 OBJ 窓は全行で入力の先頭 8 B と一致 (`mem` 差分 0 行)。 Inf/NaN 分岐 (callee 側 `1000ba12: je 0x1000ba17`) の行を含む。
-- 実測 (測定 commit `189d9580b`): `lift_text.py` real 23.93 s・rc 0 (load1 0.35 時点)。 `probe_ba05_4923.py` real 10.72 s・rc 0 (load1 0.67 時点)。
+- 実測 (測定 commit `f74f87006`): `lift_text.py` real 18.96 s・rc 0 (load1 1.52 時点)。 `probe_ba05_4923.py` real 19.16 s・rc 0 (load1 1.32 時点)。
 - 再現: `cd tools/plugins/slayer_engine_ia32 && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 lift_text.py && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 probe_ba05_4923.py` (`emcc` を PATH に入れる)。
 
 ## 3. 既存 harness との比較 (同じ commit)
 
-- `probe12_4087.py` (既存・`edx=0`) を同じ commit で実行: `fn_1000ba05` は native rc -11・out_lines 0、wasm rc 0・out_lines 16。 wasm は読み先 0x4 が線形メモリ内なので trap せず、読んだ値は native と比べられない (`REPORT_APPENDIX_4087.md` §3 の結論と同じ)。
+- `probe12_4087.py` (既存・`edx=0`) を同じ commit `f74f87006` で実行 (real 10.15 s・load1 1.37 時点): `fn_1000ba05` は native rc -11・out_lines 0、wasm rc 0・out_lines 16。 wasm は読み先 0x4 が線形メモリ内なので trap せず、読んだ値は native と比べられない (`REPORT_APPENDIX_4087.md` §3 の結論と同じ)。
 - したがって、既存の 16 行 (`edx=0`) の wasm 出力は、差分試験の根拠にしない。 本付録の 2000 行 (edx = 有効な番地) が、この関数の突合の根拠。
 
 ## 4. 未解決
