@@ -947,6 +947,7 @@
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_2065.md` | ~99 | SR-36 (#2065): 描画試行 harness と no-op 静的計数の付録。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_3260.md` | ~129 | SR-50 (#3260): canvas の IPlatformString・drawRect/clearRect/drawString と bitmap 結線 (手書き 5x7 placeholder フォント)・render 判定 (`text_px` 追加)・no-op 計数の変化。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_3422.md` | ~70 | SR-55 (#3422): canvas の線・多角形・楕円・bitmap 描画 (drawLine/drawLines/drawPolygon/drawEllipse/drawBitmap の 1:1 転写)。判定 harness `check_draw_ops.sh`。測定値の正本 |
+| `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_4231.md` | ~60 | SR-61 (#4231): canvas の円弧・点・path 描画 (drawArc/drawPoint/drawGraphicsPath)。判定 harness `check_draw_ops.sh`。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_4233.md` | ~60 | SR-62 (#4233): canvas の gradient (線形・放射)・9 分割・fillRectWithBitmap の bitmap 描画。判定 harness `check_draw_ops.sh` (9 op + gradient の色数)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_4428.md` | ~43 | SR-69 (#4428): canvas の setTransformMatrix (点・線・多角形・矩形・文字の基準点への適用)・原点以外の view の実測 (判定 harness `check_transform.sh`)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_3261.md` | ~100 | SR-51 (#3261): wasm の初期化経路。`platformfactory.cpp` の WASM 分岐 (patch) と upstream `init()` 経路化、harness の代替 2 点の除去。構文・compile/link/run の実測と負の対照 3 件。測定値の正本 |

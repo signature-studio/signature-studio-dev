@@ -6,6 +6,7 @@
 #include "canvas_bitmap.h"
 #include "canvas_gradient.h"
 #include "canvas_graphicsdevice.h"
+#include "canvas_graphicspath.h"
 #include "vstgui/lib/cdrawcontext.h"
 #include "vstgui/lib/platform/iplatformgraphicspath.h"
 #include "vstgui/lib/platform/iplatformgraphicsdevice.h"
@@ -73,6 +74,21 @@ int main ()
 	});
 	run ("drawEllipse", [] (IPlatformGraphicsDeviceContext& c) {
 		return c.drawEllipse (CRect (4., 4., 60., 60.), PlatformGraphicsDrawStyle::Filled);
+	});
+	run ("drawArc", [] (IPlatformGraphicsDeviceContext& c) {
+		return c.drawArc (CRect (4., 4., 60., 60.), 0., M_PI, PlatformGraphicsDrawStyle::FilledAndStroked);
+	});
+	run ("drawPoint", [] (IPlatformGraphicsDeviceContext& c) {
+		return c.drawPoint (CPoint (30., 30.), CColor (0, 0, 255, 255));
+	});
+	CanvasGraphicsPath graphicsPath (PlatformGraphicsPathFillMode::Winding);
+	graphicsPath.addRect (CRect (4., 4., 30., 30.));
+	graphicsPath.beginSubpath (CPoint (40., 40.));
+	graphicsPath.addLine (CPoint (60., 40.));
+	graphicsPath.addLine (CPoint (50., 60.));
+	graphicsPath.closeSubpath ();
+	run ("drawGraphicsPath", [&] (IPlatformGraphicsDeviceContext& c) {
+		return c.drawGraphicsPath (graphicsPath, PlatformGraphicsPathDrawMode::Filled, nullptr);
 	});
 
 	auto makeSource = [] (uint32_t w, uint32_t h) {

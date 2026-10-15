@@ -29,6 +29,9 @@ public:
 
 	PlatformGraphicsPathFillMode getFillMode () const override { return fillMode; }
 
+	// subpath ごとの頂点列 (曲線は制御点を含む近似のまま)。描画 (drawGraphicsPath) が使う。
+	std::vector<std::vector<CPoint>> subpaths () const;
+
 private:
 	void appendPoint (const CPoint& p);
 
