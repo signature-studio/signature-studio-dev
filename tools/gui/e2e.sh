@@ -79,4 +79,6 @@ echo "[gui-e2e] 6g/6 GUI-6 入力品質 e2e (キー配列 / IME / タッチ・�
 bash "$HERE/input/e2e.sh" | grep -E "FAIL|ALL PASS|input ring"
 echo "[gui-e2e] 6h/6 長時間ストレス (GUI-8: 50000 frames / drop 0 / memory 有界 / surface gen 不変 + ネガコン burst・leak)"
 bash "$HERE/e2e/stress.sh"
+echo "[gui-e2e] 6i/6 W 版ゲスト wasm 版の読み戻し sha256 が native と一致 + ネガコン 1 px 改竄 (wasm_w_e2e.sh; WIN-58)"
+bash "$HERE/test/wasm_w_e2e.sh" | grep -E "readback sha256|EXACT|MISMATCH|PASS|FAIL"
 echo "[gui-e2e] ALL PASS"
