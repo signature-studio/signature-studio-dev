@@ -160,3 +160,43 @@
 (c) 戻り値の採取は trap を消す (§9.4) ため、`SV_STK_FILL` の感度と合わせて判定する。
 (d) `653660` の alloca 配置 (`-24`・`-16`・`-32`・`-48`) と、`414bb0`・`43c8f0`・`414c70`・`6525b0` の shadow stack 使用幅・SP 復元が `653660` の frame を越えて書かないか。
 (e) probe を使わず、wasm の store 単位で書込元を記録する方法を検討する。
+
+## 10. #3083 再着手 run (2026-10-15): 412e40 の 2 要素目は `-32` の slot (隣接前提の破れ)
+
+**判定: 受入 1 は未達 (書込元は未特定)。trap で読まれる値が「その呼出しの中で書かれない残骸」であることを wasm の逆アセンブルと IR 変更の実測で確定。Refs #3083。**
+
+- 測定 base: `origin/main` `93c5cc323`、worktree `ws-3083` (ブランチ `3083-m11-unit149-writer`)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64`、`work-m11` / `work-liftdiff` を worktree 直下に展開。`m11_gen_ir2.sh` rc=0 (42 s, 490761 行)。`M11_FIX_652500=0 m11_build.sh` rc=0 (25 s)。
+- ベースライン (`survey_units.mjs`, n=1): 873/47/7/14/1。unit 149 は oob (`412e40` ← `653660` ← `6539e0`)。§9.1 と一致。
+
+### 10.1 wasm の frame 配置 (静的・確定)
+
+- `function_653660` は `boot.wat` (`wasm-dis m11_boot.cjs.wasm`) の `$3877`。frame は 144 B (`global$0 - 144`)。
+- 配置: `&-16` = frame+104 (`413480(frame+104, …)`)、`&-24` = frame+120 (`413480(frame+120, …)` と末尾の `412e40(frame+120, 2)`)、`-32` = frame+128 (`i64.store offset=128`)。
+- IR は `412e40(&-24, 2)` の 2 要素目を `-16` と仮定する (native の `[rbp+0xb8]` = `-24` の隣)。wasm では 2 要素目は frame+128 = `-32` の slot。`-16` は `-24` より下の frame+104 にある。**隣接前提が破れている。**
+- `-32` への store は `arg3 != 0` の経路だけ (`i64.store offset=128` は `br_if` の内側)。unit 149 は `arg3 == 0` (§9.3) なので、この呼出しで frame+128 は書かれず、その時点の残骸を読む。
+
+### 10.2 IR 変更の実測 (probe は入れない・`trap_triage/slot653660_exp.py`)
+
+| 変更 | 件数 ok/miss/halt0/oob/noproc | unit 149 | 他の unit の変化 |
+|---|---|---|---|
+| base | 873/47/7/14/1 | oob (`412e40` ← `653660`) | — |
+| zero32 (入口で `-32` を 0 埋め) | 873/47/7/14/1 | ok | 153: ok → oob (`664fd0` → `412e40`) |
+| split (`412e40` を 1 要素ずつ 2 回に分割) | 873/47/8/13/1 | ok | 153: ok → oob (同上)、280: oob → halt0 |
+
+- 残骸は unit をまたいで持ち越される。149 の読みを消すと、同じ残骸が 153 (と 280) の読みに現れる。`653660` の局所の修復だけでは根本修復にならない。
+- `slot653660_exp.py split` の出力は測定時の IR と一致 (`cmp`)。zero32 は同じ置換を生成し compile まで確認 (測定は inline の同一置換)。
+
+### 10.3 書込元の特定を止めた理由 (未確定)
+
+- probe 版 (`probe_entry.sh p412 412e40`): unit 149 の `412e40` は `a=10aa14e8`、要素 1 = `0x8002e4d6e49969e0` (frame+128 = `0x10aa14f0`)。**probe 版でだけ確認。**
+- 同じ番地の unit 境界の 4B 比較 (`SV_SLOT=0x10aa14f0`、計装なし) は base で 942 unit 全て変化なし。よって **probe 版の番地は base の番地と一致しない** (一致しない理由は未確認。probe が `.o` を足して static データ配置が変わり、shadow stack の位置がずれる可能性がある)。
+- 全関数入口の watch (`PROBE_WATCH=10aa14f0 probe_entry.sh pwX all`) は 720 秒で打ち切り (rc 124)。watch 版では unit 149 の同番地が 0 で、p412 版の `0x8002…` と一致しない。probe は残骸を変えるため、書込元の結論には使えない。
+- 次の手段: #2891 (`REPORT_2891.md` §4) の store 計装 (`wasm-opt --instrument-memory`、JS hook で線形メモリを変えない)。base の番地を先に求める必要がある (子 issue)。
+
+### 10.4 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| base の残骸番地と、その最後の store (unit 149 で読まれる `0x8002e4d6e49969e0` の書込元) | 受入 1 | 子 issue (本 PR の `Refs #3083` の続き) |
+| `653660` の 2 要素目を実 slot に合わせる修復と、残骸の伝播 (153・280) の確認 | 受入 2・3 | #1463 (続き) |
+| probe が残骸を変える機構 (static データ配置 → shadow stack 位置) | 測定方法 | 子 issue に含める |

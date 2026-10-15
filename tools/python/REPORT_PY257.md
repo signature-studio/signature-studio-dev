@@ -142,7 +142,7 @@
 ```
 cd tools/python
 python3 analysis/py53_dispatch.py work/py65/extracted/block00031_PE.bin work/py65/py53
-python3 analysis/py65_r8d_bits.py work/py65/extracted/block00031_PE.bin work/py65/py53/fn.txt work/py65
+python3 analysis/py257_r8d_bits.py work/py65/extracted/block00031_PE.bin work/py65/py53/fn.txt work/py65
 ```
 
 出力: `work/py65/r8d_sites.tsv` (判定箇所ごとに両側の行・15 列)・`work/py65/r8d_scope.md` (§3 の表)・`work/py65/r8d_tail_src.md` (共通後半に入る側の一覧)。

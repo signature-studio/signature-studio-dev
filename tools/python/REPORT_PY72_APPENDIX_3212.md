@@ -192,3 +192,46 @@ vptr の書込み後に PE 上で到達する書込みの確認: `0x40fb40` は 
 - 実測: `FL_WIN64_DIR=$RUNNER_TEMP/fl3549 python3 analysis/flapi/pe_va_read.py 0x125b0f8,0x125b1c0,0x125b190,0x125b140,0x13a5c90,0x125b258,0x15e04a8,0x16baff0,0x15e0ff0,0x125b208,0x15e1890,0x13e7628,0x125b220,0x15e30f8,0x15f7190,0x15f72f8,0x16baff1,0x15e05b8,0x16b8300,0x1971600,0x1573c7c,0x1973c7c,0x1973c7e,0x16b85c8,0xc3a4b8,0xc3a124,0xc3a144` (27 VA・§7 の値の一覧) は real 0.036 秒・user 0.022 秒。load average (1 分値) 0.04 → 0.04。出力 27 行。
 - 出力の要点: `0x125b0f8` → `0x125b1c0`、`0x125b258` → `0x1262b80`、`0x15e05b8` → `0x16b8300` (.bss)、`0x1971600` → `0x1573c7c` (RVA)、`0x1973c7e` = `GetProcAddress`、`0xc3a4b8` = `PyModule_GetState`、`0xc3a124` = `Python312`、`0xc3a144` = `Python\`。出力の値は 7.1〜7.3 の記載と一致。
 - 差分: `git diff 75bac8b5c HEAD -- tools/python/analysis` の出力は空 (0 行)。
+
+### 8. 第 3 段 (#3212 の 3 回目の run): 別名経由の書込みを制御フローに沿って追跡 (受入 1 の残り)
+
+前段 §7.4 の未解決「別名経由の `[Q+8]` 書込みの網羅」を、新規 probe `analysis/flapi/pe_chain_alias.py` で追った。線形走査 (`pe_chain_stores.py`) は `jmp` でタグを消すため、ジャンプ先の書込みを取り逃がす。新 probe は次の規則で追う。
+
+- seed: `.text` 全体の `mov r, [G]` (タグ QS) と `mov r, [Q スロット]` (タグ QO) の直後の位置 (2425 箇所)。
+- 分岐は両方の飛び先へ (状態 = タグ集合で重複排除)、`jmp` は飛び先へ、`ret`・間接 jmp で止まる。`add/sub reg, imm` で Q のオフセットを更新する。
+- Q を保持するレジスタと `[rsp|rbp+d]` の spill を追う。引数レジスタ (rcx/rdx/r8/r9) に Q を載せた直接 call は、callee の先頭から同じ規則で再帰的に追う。
+- 追加の起点 (Q 固有。seed があるときだけ): (a) Q の仮想デストラクタ `0x976dc0`、(b) Q の vptr 表 `0x9764d8` の `-0x48`〜`-0x8` の全スロット。
+  - 根拠 (PE 上の値の連鎖): ctor `0x976b60` が `dl=1` で `0x410320(this = [0x976410] = 0x9764d8)` を呼ぶ。`0x410320` は `call [this-0x30]` (= `[0x9764a8]` = `0x40f960`)。`0x40f960` は rcx (= this) を保存して `0x40fb40` に渡し、`0x40fb40` は `mov rdi, rbx` (rbx = rcx) して `0x40fb66` で `mov [rsi], rdi`。よって Q の vptr = `0x9764d8`。
+  - dtor: `0x40faa0` の `call [rbx-0x20]` (rbx = Q の vptr) = `[0x9764b8]` = `0x976dc0`。`0x976dc0` は `[Q+8]` を読んで `0x40faa0` (O の解放) に渡す。追跡した範囲に `[Q+8]` への書込みは無い。
+- 追わないもの: 戻り値 (`rax`) による Q の受け渡し、間接 jmp、間接 call の先 (vptr 表の seed 以外)。
+
+#### 結果 (測定 commit `2b735fa53`)
+
+| 項目 | 件数 | 内容 |
+|---|---|---|
+| seed (G・Q スロットからの `mov r, [..]`) | 2425 | 全 `.text` の線形走査で集めた |
+| 追跡した状態 | 8742 | ret で止まった経路 23 |
+| `[Q+8]` の非 0 書込み | 2 | `0x1263571`・`0x1264145` (前段と同じ。`mov [rcx+8], rax`) |
+| `[Q+8]` の読出し (O) | 278 | 前段の 277 に、dtor `0x976df6` の 1 件を加えた |
+| 引数で Q を渡した直接 call の先 | 22 | 再帰的に追跡。いずれも `[Q+8]` への書込みは無い |
+| スタックへの spill | 6 | 追跡 (タグはスタック slot に乗る)。格納先は Q として追う |
+| グローバル・別オブジェクトへの格納 | 0 / 1 | 1 件 (`0x40fb66`) は偽陽性: 割当関数 `0x40f960` を this = Q として seed したため、this が `0x9764d8` (vptr 自身) の経路を Q と誤認した |
+| push で Q を積む | 0 | |
+| Q を引数に持つ間接 call (未解決) | 8 | `0x40944e`・`0x40fab5`・`0x4100d1`・`0x4100df`・`0x4100ed`・`0x41034e`・`0x4103d2`・`0x415ca8`。`0x40fab5` は dtor として seed 済み |
+| Q を `rax` で返す ret (未解決) | 1 | `0x416091` |
+
+- 陰性対照 `0x13a5000` (Q スロットの値 0): seed 0・追跡 0 (`store=0 load=0`)。Q 固有の起点は seed があるときだけ使う (`2b735fa53` の修正)。
+- 参照の一致: 線形版 `pe_chain_stores.py 0x15e4790 8` の pass 1 (`bfceba9e` 測定) は `intra_store=2`・`intra_load=277`。新 probe の書込み 2 箇所は線形版と一致。
+
+#### 測定
+
+- 測定 commit: `2b735fa53` (`pe_chain_alias.py` の最後のコード変更)。測定は HEAD で再現した。
+- 展開: 前段と同じ (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl3212 extracted/block00031_PE.bin`。22,227,016 B・2.9 秒)。
+- 陽性: `FL_WIN64_DIR=$RUNNER_TEMP/fl3212 python3 analysis/flapi/pe_chain_alias.py 0x15e4790 8` (real 1 分 1.2 秒。scan 60.8 秒・walk 0.3 秒)。load average (1 分値) 0.60 → 0.86。
+- 陰性対照: `... 0x13a5000 8` (scan 60.8 秒。walk 0)。load average 0.95 → 0.98。
+- 差分: `git diff 2b735fa53 HEAD -- tools/python/analysis` の出力は空 (0 行)。
+
+#### 結論 (受入 1 の残り)
+
+- 別名 (スタック・直接 call・CFG 合流) を経由した `[Q+8]` の非 0 書込みは、追跡した範囲で 2 箇所 (`0x1263571`・`0x1264145`) のみ。前段と同じ。
+- 未解決 (子 issue へ移送): Q を this として呼ぶ間接 call 8 箇所の先と、Q を返す `0x416091` の呼出し元。受入 1 の「間接 store を含む」は、この 8 + 1 箇所の範囲で未達。
