@@ -144,9 +144,9 @@ def main():
             f".reloc 対象スロット={n_reloc}/{2 * len(sel)}"
         )
 
-    issue = [r for r in rows if ISSUE_LO <= r[1] + 0 and r[1] <= ISSUE_HI]
+    issue = [r for r in rows if ISSUE_LO <= r[1] < ISSUE_HI]
     summarize(rows, f"全体 (count={count})")
-    summarize(issue, "issue 範囲 RVA 0x19c7e0〜0x19ccf0")
+    summarize(issue, "issue 範囲 RVA [0x19c7e0, 0x19ccf0) (半開)")
 
     tsv = None
     if "--tsv" in sys.argv:
@@ -156,7 +156,7 @@ def main():
         for kind, v in (("first", a), ("second", b)):
             c = classify(v)
             line = (
-                f"{i}\t{ra:#x}\t{int(ISSUE_LO <= ra <= ISSUE_HI)}\t{kind}\t{v:#x}\t{c['sec']}\t"
+                f"{i}\t{ra:#x}\t{int(ISSUE_LO <= ra < ISSUE_HI)}\t{kind}\t{v:#x}\t{c['sec']}\t"
                 f"{int(c['pdata_start'])}\t{c['func']}\t{c['thunk']}\t{int((ra if kind == 'first' else ra + 8) in relocs)}"
             )
             if tsv:
