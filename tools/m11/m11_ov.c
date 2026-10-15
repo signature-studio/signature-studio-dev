@@ -1168,7 +1168,7 @@ void m11_e3ef60_obs(unsigned int site, unsigned long long arg1, unsigned long lo
     static const unsigned int pe[10] = {0, 0xe3f0b4, 0xe3f0f7, 0xe3f118, 0xe3f139, 0xe3f15a, 0xe3f178, 0xe3f196, 0xe3f1b4, 0xe3f215};
     static const unsigned int off[10] = {0, 0x778, 0x7d8, 0x810, 0x840, 0x808, 0x7f0, 0x838, 0x8e8, 0x9c8};
     if (site >= 1 && site <= 9 && g_e3ef60_n++ < 512)
-        fprintf(stderr, "[m11][e3ef60] #%d site=%u pe=0x%x off=0x%x arg1=0x%llx this=0x%llx edx=0x%llx\n",
+        fprintf(stderr, "[m11][e3ef60] #%d site=%u pe=0x%x off=0x%x arg1=0x%llx this=0x%llx edx=0x%x\n",
                 g_e3ef60_n, site, pe[site], off[site], arg1, th, edx);
 }
 #endif
