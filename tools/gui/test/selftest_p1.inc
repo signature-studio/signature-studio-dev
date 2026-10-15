@@ -544,7 +544,18 @@ static void run_p1(int64_t keep_focus) {
     CHK(GetPixel(dc, 0, 1) == cref(0x10, 0x20, 0x30) && GetPixel(dc, 1, 0) == cref(0xA0, 0xB0, 0xC0), "DIB resource rows are bottom-up");
     SelectObject(dc, GetStockObject(0)); DeleteDC(dc); DeleteObject(rb);
     CHK(LoadBitmapW(0x400000, 999) == 0 && GetLastError_gui() == 1813 && LoadBitmapW(0x123, 101) == 0, "missing resource -> 0/ERROR_RESOURCE_TYPE_NOT_FOUND");
+    g_res_calls = 0; int64_t li = LoadImageW(0x400000, 101, 0 /* IMAGE_BITMAP */, 2, 2, 0);
+    CHK(li != 0 && g_res_calls == 1, "LoadImageW(IMAGE_BITMAP) from the resource provider (natural size)"); DeleteObject(li);
     gui_set_resource_provider(NULL); }
+  SECTION("P1/LoadImageW: IMAGE_ICON / IMAGE_CURSOR / IMAGE_BITMAP");
+  { int64_t ico = LoadIconW(0, 32512), arrow = LoadCursorW(0, 32512), cross = LoadCursorW(0, 32515);
+    CHK(LoadImageW(0, 32512, 1 /* IMAGE_ICON */, 0, 0, 0x8000 /* LR_SHARED */) == ico, "LoadImageW(IMAGE_ICON, OIC_*) = LoadIconW");
+    CHK(LoadImageW(0, 32515, 2 /* IMAGE_CURSOR */, 32, 32, 0x8000) == cross, "LoadImageW(IMAGE_CURSOR, IDC_*, 32x32) = LoadCursorW");
+    CHK(LoadImageW(0, 32512, 2, 0, 0, 0x40 /* LR_DEFAULTSIZE */) == arrow, "LoadImageW(IMAGE_CURSOR, default size) = LoadCursorW");
+    CHK(LoadImageW(0, 0x7F86, 2, 32, 32, 0x8000) == LoadCursorW(0, 0x7F86), "LoadImageW(IMAGE_CURSOR, IDC_SIZEALL) = LoadCursorW");
+    WBITMAP bm; int64_t lb = LoadImageW(0, 32760, 0, 13, 13, 0);
+    CHK(lb != 0 && GetObjectW(lb, sizeof bm, PTR(&bm)) && bm.bmWidth == 13 && bm.bmHeight == 13, "LoadImageW(IMAGE_BITMAP, OBM_*, 13x13) placeholder");
+    DeleteObject(lb); }
 
   gui_set_resource_provider(NULL);
   SetActiveWindow(keep_focus); SetFocus(keep_focus); p1_drain();

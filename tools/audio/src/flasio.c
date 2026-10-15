@@ -149,7 +149,7 @@ ASIOError flasio_create_buffers(ASIOBufferInfo *infos, ASIOLong n, ASIOLong buff
     }
     if (nOut == 0) nOut = 1;                    /* 出力ゼロ指定でも ring は 1ch 必要 */
     A.B = (uint32_t)bufferSize; A.nOut = nOut; A.nIn = nIn; A.cb = *cb;
-    int orc = fla_open((uint32_t)A.sr, (uint32_t)nOut, (uint32_t)nIn, A.B, A.depth, FLA_F_DECLICK | (A.hint << 8));
+    int orc = fla_open((uint32_t)A.sr, (uint32_t)nOut, (uint32_t)nIn, A.B, A.depth, FLA_F_DECLICK | FLA_F_T_FLOOR | (A.hint << 8));
     if (orc == FLA_E_BURST_TOO_LARGE) return ASE_NoMemory;   /* FL: "Couldn't create the streaming ASIO buffer." (ホストは落とさない) */
     if (orc != 0) return ASE_NotPresent;
     A.depth = fla_ctl()->depth;                 /* burst に合わせて自動拡張された実効 depth */
@@ -333,5 +333,6 @@ void flasio_get_stats(flasio_stats_t *s) {
     s->timeinfo_cb = A.timeinfo_cb; s->latency_changes = A.latency_changes; s->T = A.depth * A.B; s->burst_obs = LD(c->burst_obs);
     s->grows = A.grows; s->shrinks = A.shrinks; s->T_max = A.T_max; s->T0 = A.T0;
     for (int k = 0; k < 6; k++) s->wake_hist[k] = c->wake_hist[k];
+    for (int k = 0; k < 32; k++) s->burst_hist[k] = LD(c->burst_hist[k]);
 }
 

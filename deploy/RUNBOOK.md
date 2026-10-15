@@ -29,7 +29,7 @@ APPLY=1 bash deploy/scripts/deploy.sh --src deploy/work/app-dist [--manifest ...
 ## 2. 成功の確認項目
 - stage 出力: `headers: ok`、`deployedFiles` ≤ 20,000、`chunked` に >24MiB のファイルが列挙されている (元ファイルは配備されない)。
 - `90-verify.sh`: 無認証 `GET /` = **302** (Access)、`<ver>-<name>.<sub>.workers.dev` 形式 = 非 200、service token で `Cross-Origin-{Opener,Embedder,Resource}-Policy` が付く。
-- `bash tools/e2e/run.sh --url https://signature-studio.<sub>.workers.dev` (90-verify が最後に実行。token は `deploy/work/secrets/<name>-e2e.json` を自動使用)。**現行 tools/e2e では `edge-policy` が `/index.html` の 307 で FAIL (7 PASS + 1 FAIL + fl-boot SKIP)**。これは実機の正しい挙動で、edge-sim 側の修正待ち (EDGE-SIM.md §B)。修正前の CAB-35 では `node deploy/probe/policy-check.mjs <url> <token.json>` が同等検査を 307 許容で行うので併用して判定する。
+- `bash tools/e2e/run.sh --url https://signature-studio.<sub>.workers.dev` (90-verify が最後に実行。token は `deploy/work/secrets/<name>-e2e.json` を自動使用)。`tools/e2e` の `edge-policy` は `/index.html` の `307 -> /` を正しい挙動として PASS にする (#3526・EDGE-SIM.md §B)。`node deploy/probe/policy-check.mjs <url> <token.json>` は同等検査を 307 許容で行うので、必要なら併用して判定する。
 - ブラウザ手動: Access ログイン後 `crossOriginIsolated === true`。
 
 ## 3. 失敗時・巻き戻し

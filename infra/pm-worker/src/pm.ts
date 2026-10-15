@@ -44,8 +44,8 @@ export interface HistoryEntry {
   at: number;
 }
 
-// 抑止の上限 (同じ (kind, ref) は 60 分に 1 回、全体で 1 時間に 12 起動、同じ ref に 24 時間で 3 回)。
-export const PM_LIMITS = { dupMs: 60 * 60_000, hourMs: 3_600_000, hourMax: 12, dayMs: 24 * 3_600_000, refDayMax: 3 };
+// 抑止の上限 (同じ (kind, ref) は 60 分に 1 回、全体で 1 時間に 24 起動、同じ ref に 24 時間で 3 回)。
+export const PM_LIMITS = { dupMs: 60 * 60_000, hourMs: 3_600_000, hourMax: 24, dayMs: 24 * 3_600_000, refDayMax: 3 };
 // 種類ごとの上限 (PM_LIMITS に加えて効く)。refs_orphan は同じ N に 24 時間 1 回、1 日 10 件まで。
 export const KIND_LIMITS: Partial<Record<DetectedKind, { dupMs: number; dayMax: number }>> = {
   refs_orphan: { dupMs: 24 * 3_600_000, dayMax: 10 },
@@ -169,4 +169,10 @@ export function selectDispatch(
   return { send, skipped };
 }
 
-export const pruneHistory = (now: number, h: HistoryEntry[]): HistoryEntry[] => h.filter((x) => now - x.at < PM_LIMITS.dayMs);
+export const pruneHistory = <T extends { at: number }>(now: number, h: T[]): T[] => h.filter((x) => now - x.at < PM_LIMITS.dayMs);
+
+// 毎時上限 (hourMax) で見送った件数。tick ごとに 1 件 (時刻と件数)。pruneHistory と同じ 24 時間の窓で捨てる (#3462)。
+export interface SkipEntry {
+  at: number;
+  n: number;
+}

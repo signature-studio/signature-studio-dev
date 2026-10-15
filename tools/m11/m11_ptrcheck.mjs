@@ -95,7 +95,7 @@ export function ptrCheck(mod, pre, maxEnv = 'M11_PTRCHECK_MAX_NEW', unremapEnv =
     injected_value: inj ? hex(injV) : null,
     gate: { env: maxEnv, gated, max, pass: !gated || (max !== null && post <= max) },
     unremap: {
-      classes: { file: cls.file, available: cls.available, ir_sha256: cls.ir_sha256, pe_sha256: cls.pe_sha256, image_sha256: cls.image_sha256 },
+      classes: { file: path.relative(M11, cls.file), available: cls.available, ir_sha256: cls.ir_sha256, pe_sha256: cls.pe_sha256, image_sha256: cls.image_sha256 },
       code_va: cls.available ? nA : null,
       unremap_cand: cls.available ? nB : null,
       image_copy: cls.available ? nD : null,

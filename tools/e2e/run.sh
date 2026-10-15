@@ -57,6 +57,11 @@ if [[ "${E2E_SKIP_BUILD:-0}" != "1" ]]; then
   (cd "$ROOT" && node_modules/.bin/vite build --outDir tools/e2e/work/dist --emptyOutDir) 2>&1 | tail -6
   mkdir -p work/dist/__e2e__
   cp fixtures/add.wasm work/dist/__e2e__/add.wasm
+
+  step "ゲスト wasm (gui=wasm 結線用: text_wasm_app を chunked 化。FL ではない検証用)"
+  bash "$ROOT/tools/gui/e2e/build_guest.sh" work/guest
+  mkdir -p work/dist/__e2e__/gui-guest
+  cp -r work/guest/. work/dist/__e2e__/gui-guest/
 fi
 
 step "テスト音 wasm (/wasm/audio) を stage (preview/dev: RUNTIME_WASM_DIR 側 / edge-sim: dist 直下へコピー)"

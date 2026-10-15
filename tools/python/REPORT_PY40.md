@@ -8,6 +8,7 @@
 ## 結論 (1 行)
 
 5 関数とも引数解析・内部ディスパッチの形は PE で確定した。**範囲外 code の扱い・各 callback が変える状態・戻り値の意味は未確定**のため、`provider/fl_engine.c` への実装は今回行わない (推測実装の禁止)。mock にも 5 関数の意味論は無い。残りは #1529 で継続する。
+(追記 run 7: §8 のとおり、確定した引数書式と、件数 = チャンネル数と仮定した index 範囲 (範囲外 code 4 は未確定) だけを C provider と mock に実装した。述語・戻り値・UI 副作用は未モデル。)
 
 ## 1. 入口と引数形式 (確定)
 
@@ -59,7 +60,7 @@ callback の VA: `closeGraphEditor` → 0xd5ca50 / `updateGraphEditor` → 0xd5c
 5. **`showCSForm` の `state` の意味**: `state` は `[obj+0x20]` に入り、`-1` / `0` / その他で分岐する (`0xd5c1d6` 以降)。各分岐の意味は未読。
 6. **`focusEditor` の `useGlobalIndex`**: `[rbx+0x20]>0` で `0x1005730` の `dl` を決める。`dl=0` 時の index の扱いは未確定。
 
-## 4. 実装と検証の状態
+## 4. 実装と検証の状態 (run 1 時点。run 7 の実装は §8)
 
 - `provider/fl_engine.c` に 5 関数は未実装 (`FL_H(channels, ...)` が無い)。`provider/gen/fl_table.c` には weak 宣言のみ。
 - mock (`host/fl_mock.mjs`) に 5 関数の定義は無い (`mixer.focusEditor` のみ、別関数)。そのため差分検査 (`mock` と C の diffs 0) は実施できない。
@@ -133,3 +134,66 @@ callback の VA: `closeGraphEditor` → 0xd5ca50 / `updateGraphEditor` → 0xd5c
 §6 の 3 項目はいずれも**静的 PE 解析では確定できない** (実行時の状態に依存する)。よって §6 の「決まった範囲で C 実装」に該当する確定事項は現時点で増えていない。C 実装・mock 追加は今回も行わない (推測実装の禁止)。
 
 必要なのは FL 実機 (または動的トレース) での観測。起票先: #1529 (継続)。
+
+## 8. 追補 (run 7): 引数書式と index 範囲の C 実装 (PY-40 #1529)
+
+### 8.1 §7.2 の訂正 (run 6 で確定)
+
+述語の参照鎖は `P=*(G)` (G = `0x15e4790`)、`Q=*(P)`、`O=*(Q+8)`、`call [O+0x98]` の 3 段。§7.2 の「`[slot]→[+8]→obj`」は段数を一つ省いた書き方だった。同じ鎖は selectOneChannel (PY-69, `0xd5af58`) と setChannelPitch の guard (PY-72) と共有する。
+
+### 8.2 実装した範囲 (引数書式は確定・index 範囲は仮定を含む)
+
+| 関数 | 引数 (PyArg 順に全部読む) | index の検査 (範囲外は code 4) | 戻り値 |
+|---|---|---|---|
+| closeGraphEditor | 1 個 (型検査のみ。callback は `[obj+0x18]==1` の判定に使う) | なし (§3 の記述に範囲検査の呼出しは無い) | None |
+| updateGraphEditor | なし | なし | None |
+| showGraphEditor | 5 個 (`temporary, param, step, index, useGlobalIndex=True`) | index: `0..件数-1` (件数は仮定 §8.3-2) (`0x1005730`) | None |
+| showCSForm | 3 個 (`index, state=1, useGlobalIndex=False`) | index: `0..件数-1` (件数は仮定 §8.3-2) | None |
+| focusEditor | 2 個 (`index, useGlobalIndex=False`) | index: `0..件数-1` (件数は仮定 §8.3-2) | None |
+
+C (`provider/fl_engine.c`) と mock (`host/fl_mock.mjs`) は同じ順序で引数を読み、型違いは code 5、件数違いは code 5、index 範囲外は code 4 を返す (上限の件数は仮定 §8.3-2、範囲外 code 4 の出し分けは未確定 §8.3-3)。
+
+### 8.3 未モデル (実装に入れていない・推測で決めていない)
+
+1. **述語 `[O+0x98]` (5 関数共通)**: C と mock は真と仮定する。偽のとき callback は `[obj+0x60]=-4` の失敗経路に入るが、その判定条件は未確定 (子 #3351 で扱う。旧起票先 #2576 は CLOSED のため移送)。
+2. **範囲上限の出所**: `0x1005730` が引く配列 (`useGlobalIndex≠0` は `[0x5dcad3]`、`=0` は `[0x5da9a8]`) は `.bss` で実行時に初期化される。C と mock は件数 = チャンネル数と仮定する (selectOneChannel の PY-69 と同じ扱い)。`useGlobalIndex` は値を読むだけで、経路の違いは見ていない。
+3. **`-4` の文言**: `0xd82c20` の `-4` → "Index out of range" の出し分けは `0xd82c6a` の別ゲートに依る (#2642 PY-82 の対象)。ゲートが偽のときは例外にならない可能性があり、C は真と仮定して code 4 を返す。
+4. **成功時の戻り値**: `0xc38bc0` 経路の戻り値は未読。None と推定 (PY-69 と同じ扱い)。
+5. **UI 副作用・分岐**: `0x13076e0` / `0x1307760` / `0x1307490` / `0x737640` / `0x1330c70` の中身、`showCSForm` の `state` 分岐、`closeGraphEditor` の `[+0xa9]` 分岐は未モデル。mock に観測できる状態は無い。
+
+### 8.4 受入条件 (run 7 時点)
+
+- [ ] 1. 5 関数の引数・戻り値・範囲外 code を PE 解析箇所つきで記録 — **部分達成**。引数書式・index 範囲外の経路は §1・§5.1・§8.2 で確定。戻り値 (§8.3-4)・述語 (§8.3-1) は未確定。残りは子 #3351 (PY-189) に移し、#1529 の本文から外した。
+- [x] 2. `provider/fl_engine.c` に実装し、`tests/provider_check.mjs` の実装数を更新 — 実装 5 関数。実装数 121 → 126 (commit `ecaa7658`。main 取り込み前の値。現 HEAD は implemented 149 で、main の PY-76・PY-94・PY-95・PY-101・PY-102・PY-120・PY-172 の実装を含む)。
+- [x] 3. mock と C の差分検査で diffs 0 — `tests/channels_diff.mjs` 192 呼出し、diffs 0 (ecaa7658 時点。現 HEAD は 214 呼出し。増えた 13 呼出しは main が `channels_diff.mjs` に追加した PY-76 (#2563) の `channels.setChannelPitch` の呼出し)。
+- [x] 4. `FL_ENGINE=wasm node tests/all_tools.mjs` が 48/48 ok — 実測 48/48 (下表)。
+
+### 8.5 検証 (測定 commit `4b6edd8fc`)
+
+- 測定 commit: `4b6edd8fc` (`origin/main` (`674c8831f`) の取り込み merge。コードを変えた最後の commit)。前の測定 commit は `4d0ef6757` (main `f44264ebe` の取り込み)。PY-40 の対象は `provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`。
+- 競合 (5 回目の取り込み。PR ブランチが main に遅れたため。main `674c8831f` は PR #3436 を含む): `tests/provider_check.mjs` の判定列と件数だけ。判定列は本 PR の `pe40` (PY-40) と main の `pe76` (PY-76 #2563、`channels.setChannelPitch`) を両方残し、main 側の全項目 (`pe172` を含む) も残した。件数は main の 144 (implemented、pe76 を含む) + 本 PR の 5 = **149** (implemented)、未実装 286 (総数 435)。`handler 149` (provider build) と一致する。
+- 差分確認: `git diff 4b6edd8fc HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (以後の変更は REPORT のみ)。差し戻し (round 8) への対応時にも同じ差分は 0 行で、`origin/main` (`e5c96411e`) との `git merge-tree` の競合は 0 件だった。
+- 環境: 4 コア。emsdk は `[EMSDK]` (emsdk 6.0.12) を使った。本 run (`4b6edd8fc`) は `[EMSDK]` (既定の `EMSDK_ENV`・emcc 6.0.12) を使い、R2 の `toolchain-emsdk.tar.zst` は展開していない。前の測定 (`4d0ef6757`) では R2 の `toolchain-emsdk.tar.zst` を `$RUNNER_TEMP` 配下に展開して provider を作り、その wasm は `[EMSDK]` 版と sha256 が一致した (取り込み前の 62,292 B で確認)。素材は fl-win64 から `extracted/block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` の 4 件を展開 (`tar --zstd -xf` の `--wildcards`)、`fetch_inputs.sh` (`FL_WIN64_DIR` 指定) は rc 0。CPython 3.12.1 wasm (`build_cpython_wasm.sh`・rc 0・4 分 10 秒。本測定で再ビルド) と flpy (`FLPY_SKIP_TABLE=1 build_flpy.sh`・rc 0・6 秒で `4b6edd8fc` 上に再リンク) は本 run で作成・実行した。main 取り込みで CPython・flpy の入力 (`build_*.sh`・`src/`) は変わっていない (`git diff 4d0ef6757 HEAD` で 0 行)。
+
+| 検証 | 結果 (実測。`4b6edd8fc`) |
+|---|---|
+| `bash provider/build.sh` | rc 0。`gen_provider.py --check-handlers` の handler 149。`dist/flprov.wasm` 63,365 B |
+| `node tests/channels_diff.mjs` | calls 214・diffs 0・PASS (rc 0) |
+| ネガティブコントロール (mock の focusEditor の index 範囲検査 `if (idx < 0 \|\| idx >= st.channels.length) throw RANGE();` を一時的に外す) | `4b6edd8fc` 上で 1 回実行: `node tests/channels_diff.mjs` が **rc 1**・AssertionError「channels/playlist 差分 2 件」(`channels.focusEditor` の args `[3]`・`[-1,false]` で mock は ok、wasm は code 4)。元に戻し (バックアップから復元) `git diff -- host/fl_mock.mjs` が空であることを確認 → 再実行 calls 214・diffs 0・PASS・rc 0。前の測定 (`4d0ef6757`) の rc 1 と一致。 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (rc 0) |
+| `node tests/provider_check.mjs` | functions 435・implemented 149・unimplemented 286・mcp_static 60・PASS (rc 0) |
+| `node tests/*_diff.mjs` (18 本) | 全て rc 0・diffs 0・PASS (arrangement・arrangement_selection・channels・device・general・ilmcp・launchmap・midi_path・mixer・note_enum・patterns_group・playlist・screen・step_item・transport・ui・ui_display・ui_state) |
+
+- 表の全行は `4b6edd8fc` で実行した値。前の測定 commit `4d0ef6757` の値 (handler 148・63,031 B・implemented 148・unimplemented 287) は main の取り込み (`674c8831f`) で変わったため使わない。
+- 起動・GUI の KPI (FLEngine 起動の dispatch 数・通過 unit 数・最初のウィンドウ) は**動かしていない** (flapi の引数検査だけの変更で、FLEngine の boot は実行していない)。
+- 解析手段: 静的 (`analysis/flapi/pe_disasm.py` 系)。素材の `block00031_PE.bin` を使う再解析は run 7 では行っていない (§8.3 の未確定点は run 2〜6 の記録のとおり)。
+
+### 8.6 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 述語 `[O+0x98]` の真偽条件と `-4` の失敗経路 | C・mock は述語を真と仮定するため、偽になる実機の失敗経路は成功扱いになる | #3351 (PY-189・同じ O の解析。旧起票先 #2576 (PY-77) は CLOSED のため移送) |
+| `0xd82c6a` ゲート (`-4` の文言の出し分け) | range error が Python 例外にならない可能性 | #2642 (PY-82) |
+| 成功時の戻り値 (`0xc38bc0` 経路) | None 以外の戻り値の可能性 | #3351 (PY-189) |
+| 範囲上限の配列 (`[0x5dcad3]`・`[0x5da9a8]`) の要素数の出所 | useGlobalIndex=0 時の範囲が件数と違う可能性 | #3351 (PY-189) |
+| UI 副作用・`showCSForm` の state 分岐・`closeGraphEditor` の `[+0xa9]` 分岐 | 表示状態は観測できないため mock 上は差が出ない | #3351 (PY-189。観測手段が無いため継続。FLEngine boot の前進 #672・#3060 が前提) |

@@ -45,6 +45,14 @@ def main():
 
     # --- globals
     macros = []; gnames = []
+    # 関数ポインタ型の大域 `T (*gN)(args) = NULL;` (SetWindowLongPtr の戻り値を保持する WNDPROC 変数など) は int64 の大域として宣言する
+    for m in re.finditer(r"^[^\n;=]*?\(\*(g\d+)\)\([^\n;]*\)(?:\s*=\s*[^;]*)?;(?:\s*//\s*(0x[0-9a-fA-F]+))?\s*$", gtxt, re.M):
+        name, addr = m.group(1), m.group(2)
+        gnames.append(name)
+        if addr is None:
+            macros.append("static int64_t %s;" % name)
+        else:
+            macros.append("#define %s (*(int64_t *)(__pe_image + 0x%x))" % (name, int(addr, 16) - base))
     for m in re.finditer(r"^([^\n;=\[]+?)\s+(g\d+)(\[\d+\])?(?:\s*=\s*[^;]*)?;(?:\s*//\s*(0x[0-9a-fA-F]+))?\s*$", gtxt, re.M):
         ty, name, arr, addr = m.group(1).strip(), m.group(2), m.group(3), m.group(4)
         gnames.append(name)
@@ -75,6 +83,7 @@ def main():
         s = re.sub(r"struct\s+\w+\s*\*+\s*", "int64_t ", s)
         s = re.sub(r"\(struct\s+\w+\s*\*+\)", "(int64_t)", s)
         s = re.sub(r"\(int64_t\s*\*\*+\)", "(int64_t)", s)
+        s = re.sub(r"\(\w+ \(\*\)\([^()]*\)\)\(int64_t\)", "(int64_t)", s)   # 整数→関数ポインタ→整数 (VA を保持する大域への代入)
         return s
 
     if not a.no_auto_wndproc:

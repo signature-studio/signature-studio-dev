@@ -74,6 +74,7 @@ const ADDED_KEYS = [
   "active_all", "active_impl", "active_other", "active_by_event",
   // 自律運転の指標 (#2335)
   "stuck", "stuck_age_max_min", "needs_pm", "needs_user", "no_pr_by_reason", "refs_only_merge_rate_24h", "open_issues_delta_24h", "pm_dispatch_1h",
+  "pm_dispatch_cap", "pm_skipped_hour_24h",
   "mode_close", "auto_close_detected", "launch_unobserved",
   // 着手待ちの区分別の件数 (prio:critical / prio:low。#2683)
   "ready_by_prio",

@@ -58,24 +58,15 @@ oob の `frames` は `.slice(1)` で先頭 frame を落とす (REPORT_495 §の�
 ## 5. 再現 + ネガコン + gate
 
 ```sh
-FL_WIN64_DIR=<fl-win64 の展開先> bash tools/m11/trap_triage/negctl_594.sh   # 前提: work/ に work-m11, PE (extracted/block00031_PE.bin), capstone/pefile。欠ければ exit 1 (fail-closed)。全 9 構成を survey し G1–G13 を判定。1 つでも FAIL なら exit 1
+FL_WIN64_DIR=<fl-win64 の展開先> bash tools/m11/trap_triage/negctl_594.sh   # 前提: work/ に work-m11, PE (extracted/block00031_PE.bin), capstone/pefile。欠ければ exit 1 (fail-closed)。全 3 構成 (base / qbase / qprobe) を survey し G11–G13 を判定 (G1–G10 は #1041 で廃止, §7)。1 つでも FAIL なら exit 1
 ```
 
-| gate | 内容 | 結果 (HEAD `c26b41d` 実測) |
+| gate | 内容 | 結果 (現行 gate。測定値は §7) |
 |---|---|---|
-| G1 | [qstore 無し] base の `8cc190←8c7a10` 系 OOB = [56, 58–63] | PASS (n=7) |
-| G2 | [qstore 無し] 決定性: base と base2 の kind 完全一致 | PASS (差 0) |
-| G3 | probe: 辞書 self / FComparer が各 1 種、Add ≥ 64 回 | PASS (Add=118) |
-| G4 | probe: cnt==cap==0x40 の Grow (OOB の入口) を観測 | PASS |
-| G5 | [qstore 無し] mask: 58–63 が oob→ok | PASS |
-| G6 | [qstore 無し] mask: ok 退行 0 | PASS |
-| G7 **ネガコン** | [qstore 無し] mask 値を全 bit 1 (無加工と同義) にすると base と kind 完全一致 | PASS (差 0) |
-| G8 **ネガコン** | [qstore 無し] 同構成で 58–63 は oob のまま | PASS |
-| G9 | [qstore 無し] fill00: 58–63 が ok | PASS |
-| G10 | [qstore 無し] fillff: 58–63 は oob のまま | PASS |
-| G11 | [qstore あり] qstore 適用 site 数 = 前提の検出数 (279 = 279) | PASS |
-| G12 | [qstore あり] probe と base の kind 差 0 (probe 透過) | PASS (差 0) |
-| G13 | [qstore あり] 58–63 が ok | PASS |
+| G1–G10 | (廃止。定義・外す理由・復活条件は §7) | 廃止 (#1041 PM 判断 (b)) |
+| G11 | [qstore あり] qstore 適用 site 数 = 前提の検出数 (pristine) | §7 |
+| G12 | [qstore あり] probe と qbase の kind 差 0 (probe 透過) | §7 |
+| G13 | [qstore あり] 58–63 が ok | §7 |
 
 実測 (HEAD `c26b41d`, 4 vCPU runner, 1 回目, PE 展開済み): 全体 **4 分 29 秒** (`real 4m29.328s`)、survey 1 回 13.8–21.2 秒、load average (1 分値) 1.07–1.57、直列。SUMMARY ALL PASS、exit 0。
 旧版 (qstore 無しのみ, 7 構成, G1–G10) の計測は 2 分 44 秒。現版との比較ではない。
@@ -120,8 +111,36 @@ PE (`extracted/block00031_PE.bin`) と capstone/pefile が無い環境では qst
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | (解決) 58–63 の修復 (qstore) は #552 として main に merge 済み | main で 58–63 は ok (G13) | — |
-| negctl 前提の再設計 (ldfix 適用後の IR で 58–63 は base で ok) | gate G1/G5/G8/G10/G12 が FAIL (§6-3 実測) | #1041 (M11-N59) |
+| (解決) negctl 前提の再設計: 前提が成立しない G1–G10 を廃止し G11–G13 のみ残す | 旧 gate の FAIL 集合 (G1/G5/G8/G10/G12) は消えた (§7) | #1041 (M11-N59) |
 | units_run 測定経路 (`functions_dll.csv` の入手) | `m11_e2e.sh` 全体が未測定 | #1042 (M11-N60) |
 | unit 56: `8c7710` の D4 型 deref 脱落は #662 (closed)。`8c5eb0` の 0 件ガードは #717 (merged) で IR に復元。残る fail-fast の到達可否 | 56 の未解決部分 | #856 (M11-N36, open) |
 | `survey_units.mjs` oob の `.slice(1)` (§4 は c26b41d 時点の記述) | 現 main の `survey_units.mjs:74` は `.slice(0, 30)` で先頭 frame を残す (#663 closed) | #663 (closed) |
 | `alloca/REPORT.md` §6 / `m11/REPORT.md` の「上流 8c5cc0 のポインタ破壊」帰属は誤り (本 REPORT §2) | 調査の誤誘導 | 本 PR で REPORT_594 を索引に追加。元 REPORT の訂正は PM 判断 |
+
+## 7. #1041: gate の再設計 (PM 判断 (b))。G1–G10 を廃止し、G11–G13 を残す
+
+- **判断**: #1041 の PM 判断 (2026-10-15)。受入 2 は期待値を緩めず、前提が main で成立しない gate を外して満たす。別 fixture への移植 (a) は採らない。
+- **外す理由**: §6-3 のとおり、ldfix 適用済み main の IR では qstore 無しの base でも 58–63 は既に ok。G1/G5/G8/G10 の前提 (base で 58–63 が oob) が成立しない。G2・G3・G4・G6・G7・G9 は同じ base 構成 (または base 構成の probe・mask・fill) に依存するため、同時に外す。
+- **廃止した gate** (旧版: 基準 commit `fc3883358` (origin/main) の `negctl_594.sh`。旧版の HEAD 実測の FAIL 集合は G1/G5/G8/G10/G12):
+
+| gate | 旧定義 | 復活条件 |
+|---|---|---|
+| G1 | [qstore 無し] base の `8cc190←8c7a10` 系 OOB = [56, 58–63] | base で 8cc190 系 OOB が再び現れ、その集合を確定できた時 (再定義して新 gate にする) |
+| G2 | [qstore 無し] 決定性: base と base2 の kind 完全一致 | base 構成を gate に戻す時 |
+| G3 | probe (qstore 無し): 辞書 self / FComparer が各 1 種、Add ≥ 64 回 | probe 観測を gate に戻す時 |
+| G4 | probe (qstore 無し): cnt==cap==0x40 の Grow を観測 | 同上 |
+| G5 | [qstore 無し] mask: 58–63 が oob→ok | base で 58–63 が oob に戻る時 (救済対象が生まれる) |
+| G6 | [qstore 無し] mask: ok 退行 0 | 同上 |
+| G7 | ネガコン: mask 値を全 bit 1 にすると base と kind 完全一致 | 同上 |
+| G8 | ネガコン: 同構成で 58–63 は oob のまま | 同上 (旧版の FAIL 集合に含む) |
+| G9 | [qstore 無し] fill00: 58–63 が ok | base で 58–63 が oob に戻る時 |
+| G10 | [qstore 無し] fillff: 58–63 は oob のまま | 同上 (旧版の FAIL 集合に含む) |
+
+- **除いた構成**: base2 / probe (qstore 無し) / mask / maskneg / fill00 / fillff。**残した構成**: base (遷移 info の基準のみ。gate には使わない) / qbase / qprobe。
+- **残した gate** (判定は G11–G13 だけ): G11 qstore 適用 site 数 = 前提の検出数 / G12 probe 透過 (qprobe と qbase の kind 完全一致) / G13 58–63 が ok (qbase)。
+- **旧 G12 の失敗の訂正 (§6-1・§6-3)**: 旧版は qbase・qprobe の前に IR と指紋を戻さなかった。直前の qstore 無し build が後処理 (alloca 等) を加えた IR に qstore を重ねていて、main の build 順 (qstore → alloca) と違っていた。現版は構成ごとに pristine IR と `ir_conditions.json` を対で戻す。`m11_build.sh` は後処理の結果を指紋に記録するため、IR だけ戻すと指紋検査 (`--check`) で拒否される。この修正で G12 の差は 0。したがって §6-1・§6-3 の「304・555 が oob→ok」は probe 非透過の確証としては扱わない (単発の実測で、probe 透過の一般的な証明ではない)。
+- **実測 (測定 commit `5dd9edf8f`、HEAD で foreground 実行)**: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/trap_triage/negctl_594.sh` → **rc 0、SUMMARY ALL PASS**、`real 3m5.368s`。load (1 分値) は開始 0.14 → 終了 1.02、各 survey 中 0.81〜1.06。survey 1 回 13.1〜13.3 秒。
+  - 前提: qstore 検出 (pristine) = 279 site。G11 applied = 279 (PASS)。G12 qprobe と qbase の kind 差 0 (PASS)。G13 58–63 は全て ok (PASS)。
+  - survey: base (qstore 無し) ok 870 / miss 47 / oob 17 / halt0 7 / noproc 1。qbase (main 既定) ok 873 / miss 47 / oob 14 / halt0 7 / noproc 1。qprobe は qbase と同一。base→qbase は oob→ok 3、oob→halt0 0、halt0→ok 0、ok 退行 0。8cc190←8c7a10 系 OOB は qbase で 0 件。
+  - 1 回目の試行 (指紋を戻さない版) は qbase の link で `ir_conditions.json` の指紋不一致により停止した。この修正を測定 commit に含めた。測定は単発 (同一 HEAD の 1 回)。
+- **戻し方**: 本 PR を revert する (変更先は `tools/m11/trap_triage/negctl_594.sh` と本 REPORT の §5・§6・§7)。旧版の gate を復活させるなら、上の「復活条件」が成立した時点で `git show fc3883358:tools/m11/trap_triage/negctl_594.sh` から該当 gate を戻す。

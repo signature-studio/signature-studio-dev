@@ -224,7 +224,7 @@ rbx = callback の第 1 引数 (ctx)。ctx のフィールドは使い方から�
 |---|---|---|
 | `0xffe290`・`0x1001b70` の受け手 (仮想呼出し slot 35 の受け手) | N 既定値 2 が chan に適用されるか。格納元は VMT `TPublicChannel`・`TPreviewChannel` の slot 35 と確定 (付録 `REPORT_PY72_APPENDIX_3267.md`) | #3371 (PY-190) |
 | 一覧 A/B の要素追加箇所と要素型 T の構造体名 | 要素の型 | #3371 (PY-190) |
-| `*(0x15e4f18)` の初期化元 (owner thread id)・X の `[X+8]` の設定元 | `0x525ec0` の同期判定の入力 | #3268 (PY-178) |
+| `*(0x15e4f18)` の初期化元 (owner thread id)・X の `[X+8]` の設定元 | `0x525ec0` の同期判定の入力 | PY-178 (#3268) で確定: 初期化 store `0x41cee9`・`[X+8]` = X を持つスレッド自身の ID (`REPORT_PY178.md`)。`0x41ce10` の呼出し元は未確定 |
 | 受け手 WndProc の分岐先 (0x550・0x562)・`obj+0x1d0` (window 生成) の実装 | 通知の受け手が決まらない | 子は作らない (本表に記載。次の PY 課題で扱う) |
 | O (`[Q+8]`) の生成元と vtable `+0x98` の本体 | guard 偽 (status -2) の条件が PE だけで確定しない | [PY-169] #3212 |
 | `0x1046a30` の書込み先 (n が `[chan+0x2f4]` か) | 効果関数の状態モデル | [PY-170] #3213 |
@@ -245,3 +245,6 @@ rbx = callback の第 1 引数 (ctx)。ctx のフィールドは使い方から�
 
 - 確定 (受入 1): `0xffe290` と `0x1001b70` は、VMT `TPublicChannel` (VA `0xfe2cf8`) と `TPreviewChannel` (VA `0xfe2fc8`) の slot 35 (VMT+0x118)。格納元は `.text` 内の静的な VMT。
 - 未確定 (受入 2・3): slot 35 への仮想呼出しの受け手の型、一覧 A/B の要素型と追加箇所 (件数と測定は付録 `REPORT_PY72_APPENDIX_3267.md`)。子 #3371 (PY-190) へ移送。
+
+## 追加解析 (PY-197 / #3440): 通知 0x550・0x562 の受け手 (DMT の分岐先) と窓生成の由来 (要約)
+- 分岐先は Delphi の動的メッセージ表で確定 (0x550 → `TPluginForm` の `0xf6d160`、0x562 → `TFruityLoopsMainForm` の `0x11d18d0`)。hwnd からの経路・実体クラスは未確定 (部分達成)。節・測定・未解決の表は付録 `REPORT_PY72_APPENDIX_3440.md`。
