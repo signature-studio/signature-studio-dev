@@ -2,7 +2,7 @@
 
 - 既知類型との関係: `docs/DEFECTS.md` に該当 ID なし。ただし §3 の xmm/ymm 別グローバルは **silent miscompile の類型候補** (KH-51 #3306 で扱う)。
 - 親 #656 (KH-13) の閉包展開で、この 2 関数が `KeyError: 'i256'` (`license/lift/gen_simd.py` の i256 経路なし) により停止していた (`KH656_REPORT.md`)。
-- 素材: `fl-win64` (HeartCore.core_64 は `ui_eval/extract_core.sh` で sha256 一致の展開を確認)・`toolchain-retdec` (`/opt/retdec`)・`toolchain-emsdk` (`/opt/emsdk`)。`plugins-kilohearts` は HeartCore の展開にのみ使用。
+- 素材: `fl-win64` (HeartCore.core_64 は `ui_eval/extract_core.sh` で sha256 一致の展開を確認)・`toolchain-retdec` (`[RETDEC]`)・`toolchain-emsdk` (`[EMSDK]`)。`plugins-kilohearts` は HeartCore の展開にのみ使用。
 - 測定 commit: 本 PR のコード commit (下の `§5`)。
 
 ## 1. 結論
@@ -31,7 +31,7 @@
 
 ## 4. 検証 (実測)
 
-host: nproc=4, Linux, clang 18.1.3 (`/usr/bin/clang`), emcc は `/opt/emsdk` の 6.0.12。
+host: nproc=4, Linux, host の clang 18.1.3, emcc は `[EMSDK]` の 6.0.12。
 
 **(a) 回帰: module F (lift 8 件・shim 4 件、本 PR の product 設定) は不変**
 
