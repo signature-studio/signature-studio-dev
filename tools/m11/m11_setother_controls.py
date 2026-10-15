@@ -16,11 +16,29 @@ sys.path.insert(0, HERE)
 import m11_setother_repro as R
 
 
-class FakeMachine:
-    """ldmach.Machine の代用 (分類器が使うのは disasm_fn と cs だけ)。VA -> 機械語 bytes。"""
+class FakeSec:
+    """pefile の section の代用 (rip 相対の読込み先の判定に使う属性だけ)。"""
 
-    def __init__(self, funcs):
+    def __init__(self, va, chars, data):
+        self.VirtualAddress, self.Misc_VirtualSize, self.Characteristics = va, len(data), chars
+        self._data = data
+
+    def get_data(self):
+        return self._data
+
+
+class FakePE:
+    def __init__(self, sections):
+        self.sections = sections
+        self.OPTIONAL_HEADER = type('OH', (), {'ImageBase': 0})()
+
+
+class FakeMachine:
+    """ldmach.Machine の代用 (分類器が使うのは disasm_fn・cs・pef)。VA -> 機械語 bytes。"""
+
+    def __init__(self, funcs, sections=()):
         self.funcs = funcs
+        self.pef = FakePE(list(sections))
         self.cs = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
         self.cs.detail = True
 
@@ -34,13 +52,13 @@ def call_rel(at, target):
     return b'\xe8' + struct.pack('<i', target - (at + 5))
 
 
-def load(funcs, ir_text, fixes):
+def load(funcs, ir_text, fixes, sections=()):
     d = tempfile.mkdtemp(prefix='m11ctl_')
     ir = os.path.join(d, 'ir.ll')
     fx = os.path.join(d, 'fixes.json')
     open(ir, 'w').write(ir_text)
     json.dump(fixes, open(fx, 'w'))
-    return R.classify(open(R.CLS).read(), fx, 'synthetic', ir, FakeMachine(funcs))
+    return R.classify(open(R.CLS).read(), fx, 'synthetic', ir, FakeMachine(funcs, sections))
 
 
 def main():
@@ -100,6 +118,30 @@ def main():
     got = rows[0]['reason'] if rows else None
     print('  %s 格納幅が SIZE に無い (movups xmmword ptr [rsp+0x20]) → %s (期待 stack_width_other)' % ('ok ' if ok else 'NG ', got))
     print('[controls] ネガ対照 %d/3 一致' % n_ok)
+
+    # rip 相対の読込み: 読取専用 (.rdata 相当) の値は読み、.data (書込み可)・.text (実行可) は読まない。
+    # 関数 0x1000 の ret 直前の rax を mov eax,[rip+X] で決める (ret_value 経由)。X は section 先頭 (値 42) を指す。
+    secs = [FakeSec(0x5000, 0x40000040, bytes.fromhex('2a000000') + b'\0' * 12),
+            FakeSec(0x6000, 0xc0000040, bytes.fromhex('2a000000') + b'\0' * 12),
+            FakeSec(0x7000, 0x60000020, bytes.fromhex('2a000000') + b'\0' * 12)]
+    rip_cases = [
+        ('.rdata の 4 byte 読込み (rdata_const 42)', 'mov eax,[rip+X]; ret', 0x5000, 42),
+        ('.data の 4 byte 読込み (未決 load_global)', 'mov eax,[rip+X]; ret', 0x6000, None),
+        ('.text の 4 byte 読込み (未決 load_global)', 'mov eax,[rip+X]; ret', 0x7000, None),
+    ]
+    print('[controls] rip 相対の読込み (section 判定):')
+    n_ok = 0
+    for name, _, sec_va, want in rip_cases:
+        at = 0x1000
+        disp = sec_va - (at + 6)
+        code = b'\x8b\x05' + struct.pack('<i', disp) + b'\xc3'
+        g = load({at: code}, 'define i64 @function_0(i64 %a)\n', {'site_detail': []}, secs)
+        cls, why, val, _ = g['ret_value'](at, 'rax')
+        ok = (want is not None and cls == '実値化' and val == want) or (want is None and cls == '未決' and why == 'ret>load_global')
+        n_ok += ok
+        bad += not ok
+        print('  %s %-40s → %s %s %s' % ('ok ' if ok else 'NG ', name, cls, why, val))
+    print('[controls] rip 相対 %d/3 一致' % n_ok)
 
     # 既知の限界 M1: 間接 jmp (jmp rcx) の後ろの ret を直前の定数の続きとして扱う (偽の定数)。未修正。
     m1 = 0x3000
