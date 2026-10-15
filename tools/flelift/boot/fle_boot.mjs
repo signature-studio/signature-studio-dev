@@ -320,7 +320,7 @@ if (TOLERANT) {
         for (const [slot, val] of seed) { const dv = new DataView(m.HEAPU8.buffer); console.error('[cfi-seed] before ' + slot.toString(16) + '=0x' + dv.getBigUint64(slot, true).toString(16) + ' ac308=0x' + dv.getBigUint64(0x5ac308, true).toString(16)); dv.setBigUint64(slot, BigInt(val), true); }
     }
     // #5337: FLE_CFI_RECV=1 のとき受け手 slot 0x5ac308 を PE の静的値 0x40f960 (file off 0x1ab708) へ戻す。
-    // fle_data_install の 96 B 窓はこの slot を含まないため、boot 中は 0 のまま。
+    // fle_data_install が敷設する範囲 (memcpy 11,083 件・合計 4,002,981 B) はこの slot を含まないため、boot 中は 0 のまま。
     // FLE_CFI_SELF=<VA> のとき fle_run の第 1 引数 (rcx = self) をその値にする。既定は 0。
     if (process.env.FLE_CFI_RECV === '1') {
         const dv = new DataView(m.HEAPU8.buffer);
