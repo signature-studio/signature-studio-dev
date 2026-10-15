@@ -142,6 +142,22 @@ def main():
             check(int(tgt, 16) in starts or any(
                 int(r[0], 16) <= int(tgt, 16) < int(r[1], 16) for f in cl["function_starts"] for r in f["ranges"]),
                 f"{key}: 直接 call {site} -> {tgt} が closure に無い")
+        # 関数外への直接 jmp 辺 (direct_jmp_sites)。E9 rel32 / EB rel8 の生バイトで宛先を照合する
+        for site, tgt in cl["direct_jmp_sites"]:
+            x = int(site, 16)
+            op = raw[off(x)]
+            if op == 0xE9:
+                jt = rel_target(x, 1, 5)
+            elif op == 0xEB:
+                jt = x + 2 + struct.unpack_from("<b", raw, off(x + 1))[0]
+            else:
+                jt = None
+                fails.append(f"{key}: 直接 jmp {site} の生バイトが jmp rel8/rel32 でない: {raw[off(x):off(x) + 2].hex()}")
+            check(jt == int(tgt, 16),
+                  f"{key}: 直接 jmp {site} の生バイトが {tgt} を指さない")
+            check(int(tgt, 16) in starts or any(
+                int(r[0], 16) <= int(tgt, 16) < int(r[1], 16) for f in cl["function_starts"] for r in f["ranges"]),
+                f"{key}: 直接 jmp {site} -> {tgt} が closure に無い")
         # 参考値: 関数範囲内の生バイト e8 のうち宛先が closure 外の .text 関数 (逆アセンブル由来の JSON と突き合わせる。偽陽性を含みうる)
         ext = []
         for f in cl["function_starts"]:

@@ -198,8 +198,38 @@ def main():
     check("0x11f12c0 の書式呼出し第 4 引数 r9d=1", ins_at(0x11F1347).op_str == "r9d, 1")
     check("0x1050546 の判定が 0x1050540 の store と同番地 (0x16bb13c)",
           rip_target(0x1050540) == 0x16BB13C and rip_target(0x1050546) == 0x16BB13C)
+    format_checks()
     print(f"summary: {'OK' if not FAILS else str(len(FAILS)) + ' FAIL'}")
     return 1 if FAILS else 0
+
+
+def format_checks():
+    # PY-192: 書式エンジン 0x43dde0 の変換指定子の分岐と、0x43aa10(key, 8) の 16 進出力
+    check("0x43dd60 が 0x43dd90 を呼ぶ (0x43dd77)", ins_at(0x43DD77).op_str == "0x43dd90")
+    check("0x43dd90 が 0x43dde0 を呼ぶ (0x43dda5)", ins_at(0x43DDA5).op_str == "0x43dde0")
+    check("0x43dde0 が 0x43e240 (書式本体) を呼ぶ 0x43dc00 経路 (0x43de79 call 0x43dc00)",
+          ins_at(0x43DE79).op_str == "0x43dc00" and ins_at(0x43DC22).op_str == "0x43e240")
+    check("0x43e240 の変換指定子 'D' (0x44) → 0x43eaa7 (je)", ins_at(0x43EA91).op_str == "0x43eaa7")
+    check("0x43eaa7 の 'D' が符号付き整数 0x43a7e0 を呼ぶ", ins_at(0x43EAB4).op_str == "0x43a7e0")
+    check("0x43e240 の 'U' (0x55) → 0x43eabb (je) → 0x43a850 (符号なし)",
+          ins_at(0x43EA9A).op_str == "0x43eabb" and ins_at(0x43EAC8).op_str == "0x43a850")
+    check("0x43e240 の 'X' (0x58) → 0x43eacf (jmp 0x43eaa5) → 0x43aa10 (xor r8: 最小桁 0)",
+          ins_at(0x43EAA5).op_str == "0x43eacf" and ins_at(0x43EADF).op_str == "0x43aa10"
+          and ins_at(0x43EADC).op_str == "r8, r8")
+    check("0x43e240 の 'F' 系: 0x43ecb5 が精度 0x12 で 0x43fce0 を呼ぶ (0x43ece7)",
+          ins_at(0x43ECC6).op_str == "r9b, 2" and ins_at(0x43ECC9).op_str == "dword ptr [rsp + 0x20], 0x12"
+          and ins_at(0x43ECE7).op_str == "0x43fce0")
+    check("0x43a7e0 の符号 flag (setl r9b, 0x43a7fa) を 0x43a3f0 の r8 に渡す (0x43a803)",
+          ins_at(0x43A7FA).mnemonic == "setl" and ins_at(0x43A803).op_str == "r8d, r9d")
+    check("0x43a3f0 が '-' (0x2d) を書く (0x43a48c)", ins_at(0x43A48C).op_str == "word ptr [r8], 0x2d")
+    check("0x43aa10 の pad 文字 0x30 (0x43aa37) と 0x43a890 呼出し (0x43aa41)",
+          ins_at(0x43AA37).op_str == "word ptr [rsp + 0x20], 0x30" and ins_at(0x43AA41).op_str == "0x43a890")
+    check("0x1050566 mov r8d, 8 → 0x105056c call 0x43aa10 (0x104f580 の 16 進 8 桁)",
+          ins_at(0x105056C).op_str == "0x43aa10" and ins_at(0x1050566).op_str == "r8d, 8")
+    check("0x43a890 の桁表 (word, 0x43a920) = '0123456789ABCDEF'",
+          u16z(rip_target(0x43A920), 16) == "0123456789ABCDEF")
+    check("0x43a890 の 2 桁表 (dword, 0x43a900) の [0x0a] = '0A' と [0xff] = 'FF'",
+          u16z(rip_target(0x43A900) + 4 * 0x0A, 2) == "0A" and u16z(rip_target(0x43A900) + 4 * 0xFF, 2) == "FF")
 
 
 if __name__ == "__main__":
