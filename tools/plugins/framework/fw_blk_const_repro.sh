@@ -71,7 +71,7 @@ b[off + 0x18:off + 0x1a] = b'\x00\x00'
 out('b18_pair_00', b)
 # "24 00" だけを残し、0x18 の残り 6 byte を 0 にした variant (十分性の確認)。
 out('b18_keep24', keep_only(0x18, 0x1a))
-# #5165: 残す slot の先頭 2 byte ("24 00") だけを残す variant (slot 0x08・0x10・0x18)・0x18 の 0x25 切り分け。
+# #5165: 残す slot の先頭 2 byte ("24 00") だけを残す variant (slot 0x08・0x10・0x18)。0x25 の切り分けはスクリプト外 (1 回のみ・本スクリプトに variant なし。REPORT §10 参照)。
 def pair_only(slot, pair):
     b = blank(0)
     b[off + slot:off + slot + 2] = pair
