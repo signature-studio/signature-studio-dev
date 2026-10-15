@@ -3,13 +3,13 @@
 
 op の値を定数として与え、関数先頭から .pdata の終端まで制御フローを辿る。`cmp`/`sub`/`test` と
 `jcc` は、オペランドが既知のときだけ確定させる。既知にならない条件 (メモリ・呼出しの戻り値・
-部分レジスタへの書込み) は両方向に辿る。よって出力は「到達しうる呼出し」の上位集合であり、
-各呼出しの条件列 (`cond=`) で経路の出所を確かめられる。`cond` のうち `--from` 以降の確定分岐
-(`T`/`F` が付くもの) は op による振り分けを表す。
+部分レジスタへの書込み) は両方向に辿る。よって出力は「到達しうる直接の呼出し (`call` 即値)」の上位集合であり、
+各呼出しの条件列 (`det=`) で経路の出所を確かめられる。`det` のうち `--from` 以降で確定した分岐
+(`T`/`F`) は op による振り分けを表す。間接呼出し (`call [reg+disp]`・`call reg`) は記録しない。
 
-  FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_dispatch_probe.py <fn VA(16進)> <op[,op...]> [--from <VA>]
+  FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_dispatch_probe_3761.py <fn VA(16進)> <op[,op...]> [--from <VA>]
 
-既定は関数 0xfdd2c0・op 0x0〜0x30 の一覧。`FL_WIN64_DIR` 直下の `extracted/block00031_PE.bin` を読む。
+op は必須 (例: `0x0,0x1`)。`FL_WIN64_DIR` 直下の `extracted/block00031_PE.bin` を読む。
 """
 import argparse
 import os
@@ -315,6 +315,8 @@ def main():
             describe(img, int(d, 16))
         if not args.ops:
             return
+    if not args.ops:
+        ap.error("op を指定する (例: 0x0,0x1)")
     fn = int(args.fn, 16)
     ex = Explorer(img, fn, int(args.dispatch_from, 16))
     for op_s in args.ops.split(","):
