@@ -37,3 +37,12 @@
 | rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る。FLEngine の既存結果への影響は未確認 | #4375 (T-SH-122) |
 | `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | #4280 (T-SH-108) |
 | `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #4296 (T-SH-113) |
+
+## 4374 間接経由 import 呼出しの計数 (T-SH-121 / #4374)
+
+測定 commit = `93fde48ab` (`gen_count_wrap.py` が imp_tab の各行 223 件を計数版に置換した commit)。実行 `qfc_count.sh` は rc 0・21 s・load 0.24→0.46。
+- 生成: imp_tab 行 223 (うち used 222・imp_unimpl 1)。直接呼出し書換え 1681 箇所 (名前別 222 種)。
+- 停止点まで: `[step] DllMain` → 直接呼出し 6 件 (GetCurrentThreadId・TlsAlloc・LocalAlloc・TlsSetValue・TlsGetValue・ExitProcess) → `ExitProcess(0)` → `[trap] DllMain`。
+- 間接経由 (`(ind)`) の呼出し: **0 件**。`imp_by_index` 経路は停止点まで通っていない。
+- 戻り値・副作用: 計数行は stderr の `[fle] CALL <名> (ind)` のみ。行き先は元の imp_<名> をそのまま呼ぶ。
+- 未達のまま残る点: 停止後の進行 (偽の停止か) は #4262 で扱う。停止後の間接呼出しは現時点で未計数。
