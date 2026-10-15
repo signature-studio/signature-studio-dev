@@ -76,7 +76,7 @@
 - `T` は `[rip-0x6cdf1]` (`0x104fa1a`) のセル `0xfe2c30` の内容で、そのセル自体は `.text` (読取専用) に置かれた定数 `0xfe2cf8` である。`T` の基底鎖 (vtable 列) は `0xfe2cf8 → 0xfe2978 → 0x12b05b0 → 0x12b0358 → 0x132e150 → 0x401a38` の 5 段で、末尾の `[0x401a38-0x78] == 0` で偽になる (各段の `[x-0x78]` = 基底参照は `0xfe28b0`・`0x12b04e8`・`0x12b0290`・`0x132e088`・`0x401970`・`0`)。
 - 確定したこと: 判定は「`obj` の型が `T` (またはその派生) か」の is-a 判定。`T` の型名 (RTTI の TypeDescriptor) は本 run では読めなかった (MSVC RTTI の辿り方で名前が取れず未確定)。
 - 未確定: 実行時に `obj` がどのクラスの vtable を持つか (`G.items[chan]`・Omni オブジェクトの実体)。よって「この key で true になるか」は静的に決まらない。`[obj+0x160] == 5` と合わせた「Time stretch」表示の実発火条件も実行時値次第。
-- 検証: `analysis/flapi/pe_py183_probe.py` に `typecheck_checks()` 12 件を追加 (96 件 PASS・`summary: OK`)。ネガティブコントロール: VA `0x410018` の先頭バイト `0x48` (REX.W) を `0x90` に置換した複製で FAIL (`FAIL 0x410010 の基底の辿り方 …`・`1 FAIL`・終了 1)。
+- 検証: `analysis/flapi/pe_py183_probe.py` に `typecheck_checks()` 11 件を追加 (96 件 PASS・`summary: OK`)。ネガティブコントロール: VA `0x410018` の先頭バイト `0x48` (REX.W) を `0x90` に置換した複製で FAIL (`FAIL 0x410010 の基底の辿り方 …`・`1 FAIL`・終了 1)。
 
 ## 3. 0x104d2b0 (production 枝: 低位 4) と cents 表示 (受入 2)
 
