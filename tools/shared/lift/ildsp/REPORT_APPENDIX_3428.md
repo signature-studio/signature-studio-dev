@@ -1,7 +1,7 @@
 # ildsp PSOLA_CreateInstance 閉包の x64c lift — T-SH-82 (#3428)
 
 親: #3401 (ildsp の子)。本件: #3428 (T-SH-82)。REPORT.md §8 から参照する付録 (測定値の正本)。
-検証起点: `a1325f0e4` (origin/main)。測定 commit (コードを変えた最後の commit): `d4d828b18` (`tools/flelift/x64c.py`・`tools/flelift/tests/x64c_vex_diff.py`)。
+検証起点: `730320c46` (origin/main。a1325f0e4 から rebase して再測定)。測定 commit (コードを変えた最後の commit): `b2b898522` (`tools/flelift/x64c.py`・`tools/flelift/tests/x64c_vex_diff.py`)。
 
 ## 1. 結論と範囲
 
@@ -29,7 +29,7 @@ origin/main の x64c で同じ root を lift すると unsup 2,472 (issue 本文
 
 ## 3. unsup の before → after (閉包 99 の site 数)
 
-| 命令 (unsup 名) | origin/main | d4d828b18 |
+| 命令 (unsup 名) | origin/main | b2b898522 |
 |---|---:|---:|
 | ymm `vmulpd` | 639 | 0 |
 | ymm `vaddpd` | 633 | 0 |
@@ -71,7 +71,7 @@ origin/main の x64c で同じ root を lift すると unsup 2,472 (issue 本文
 - ケース: **83 件** (既存 43 + 追加 40)。追加 40 件の内訳:
   - ymm 20: vaddpd・vsubpd・vmulpd (d=s1 / d=s2 の別名)・vdivpd・vmulpd (mem)・vaddps・vmulps (mem)・vxorpd・vandpd・vorps (mem)・vunpcklpd・vunpckhpd・vshufpd (imm 6 reg / imm 9 mem)・vextractf128 (reg 0/1・mem)・vcvtdq2pd (xmm・mem)
   - VEX.128・非 VEX 20: vsqrtsd・vcvtss2sd・vcvtsi2sd (ecx / rdx)・vpunpcklqdq (2、うち d==s2)・vmovhpd (load / store)・movddup (reg / mem)・lddqu・movntpd・palignr (3)・shlx (rax / edx)・div cl・div byte ptr [rbx]・pushfq
-- 結果 (測定 commit `d4d828b18`): **83 PASS / 0 FAIL**、rc 0。
+- 結果 (測定 commit `b2b898522`): **83 PASS / 0 FAIL**、rc 0。
 - ネガティブコントロール:
   - vsubpd の参照を `b - a` に壊す (複製テスト・当時 63 件) → `FAIL vsubpd ymm4, ymm4, ymm5`、62 PASS / 1 FAIL。
   - pushfq の参照の CF 項を壊す (`0 | CF`) → `FAIL pushfq`・`SUMMARY pass 82 fail 1`・rc 1 (新 harness)。
@@ -79,17 +79,17 @@ origin/main の x64c で同じ root を lift すると unsup 2,472 (issue 本文
 
 ## 6. 回帰と実測
 
-- `lift_wc.sh ok` (WaveformColouring、`d4d828b18`): **PASS 64/64**、FAIL 0、traps 0、native 64 (SIGSEGV 0)。閉包の unsup は 3 → 2 (`vcvtss2sd` が解消。残りの `vpmovsxdq`・`vshufps` は本件の範囲外で、従来どおり)。
+- `lift_wc.sh ok` (WaveformColouring、`b2b898522`): **PASS 64/64**、FAIL 0、traps 0、native 64 (SIGSEGV 0)。閉包の unsup は 3 → 2 (`vcvtss2sd` が解消。残りの `vpmovsxdq`・`vshufps` は本件の範囲外で、従来どおり)。
 - 生成 C のコンパイル: PSOLA 閉包の `fle_lifted.c` を `gcc -c -I tools/flelift/rt` で通過 (rc 0)。
 
-| 測定 (`d4d828b18`、4 core、各 3 回) | 結果 |
+| 測定 (`b2b898522`、4 core、各 3 回) | 結果 |
 |---|---|
-| `x64c_vex_diff.py` | 0.81 / 0.80 / 0.80 s、rc 0、83 PASS |
-| PSOLA lift (final: d4d828b18) | 2.46 / 2.46 / 2.47 s、unsup 0 |
-| PSOLA lift (base: origin/main) | 2.44 / 2.47 / 2.53 s、unsup 2,472 |
-| `lift_wc.sh ok` | 2.08 s (emcc キャッシュ温): PASS 64/64。初回 (キャッシュ冷) は 15.97 s |
+| `x64c_vex_diff.py` | 0.80 / 0.78 / 0.78 s、rc 0、83 PASS |
+| PSOLA lift (final: b2b898522) | 2.40 / 2.42 / 2.47 s、unsup 0 |
+| PSOLA lift (base: origin/main) | 2.38 / 2.40 / 2.41 s、unsup 2,472 |
+| `lift_wc.sh ok` | 1.98 s (emcc キャッシュ温): PASS 64/64。初回 (キャッシュ冷) は 15.97 s |
 
-load (1 分平均): 実行前 0.20〜0.34・実行後 0.34〜0.49 (4 core)。
+load (1 分平均): 実行前 0.24〜0.33・実行後 0.30〜0.46 (4 core)。
 
 ## 7. 未解決
 

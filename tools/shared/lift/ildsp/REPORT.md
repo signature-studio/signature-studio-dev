@@ -242,4 +242,4 @@ WaveformColouring closure の入口 70 関数を x64c で C に lift し wasm �
 
 ### 結論 (1 行)
 PSOLA 閉包 (CreateInstance + vtable slot 先) の unsup を 2,472 site から 0 にした (ymm 算術・vextractf128 ほか)。命令単位の差分 83 件 PASS、WaveformColouring の回帰 PASS 64/64。閉包単位の native 差分は子 issue に分離。
-全文 (再現・内訳・差分テストの内訳・実測・未解決) は `REPORT_APPENDIX_3428.md` が正本 (測定 commit `d4d828b18`)。
+全文 (再現・内訳・差分テストの内訳・実測・未解決) は `REPORT_APPENDIX_3428.md` が正本 (測定 commit `b2b898522`)。
