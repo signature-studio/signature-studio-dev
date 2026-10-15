@@ -172,6 +172,49 @@ def rewrite_thunks(t, va):
     return re.sub(r'\bthunk_FUN_([0-9a-f]+)\b', r'FUN_\1', t)
 
 
+def _close(t, o):
+    """t[o] == '(' の対応する ')' の位置。"""
+    depth = 0
+    for k in range(o, len(t)):
+        if t[k] == '(':
+            depth += 1
+        elif t[k] == ')':
+            depth -= 1
+            if depth == 0:
+                return k
+    raise SystemExit('括弧が閉じない (dbitcast・停止)')
+
+
+def dbitcast(t):
+    """double のビット再解釈を d2u/u2d に書換える。対象は double 変数 (dVarN と double 引数 param_N)。
+    (double)( … (ulonglong)X … ) はビット演算の結果を double に読む形なので u2d( … ) にする。
+    (double)(int)・(double)(uint) で始まる式は数値変換なので残す。残りの (ulonglong)X は d2u(X)。"""
+    dnames = set(re.findall(r'\bdouble (\w+)\b', t)) | set(re.findall(r'\bdVar\d+\b', t))
+    alt = '|'.join(sorted(map(re.escape, dnames), key=len, reverse=True)) or r'(?!)'
+    cast = re.compile(r'\(ulonglong\)(' + alt + r')\b')
+
+    def rec(s):
+        out, i = [], 0
+        while True:
+            j = s.find('(double)(', i)
+            if j < 0:
+                out.append(s[i:])
+                break
+            o = j + len('(double)')
+            k = _close(s, o)
+            inner = s[o + 1:k]
+            is_bits = bool(cast.search(inner)) and not re.match(r'\s*\((int|uint)\)', inner)
+            if is_bits:
+                out.append(s[i:j] + 'u2d(' + rec(inner) + ')')
+            else:
+                out.append(s[i:j] + '(double)(' + rec(inner) + ')')
+            i = k + 1
+        return ''.join(out)
+
+    t = rec(t)
+    return cast.sub(r'd2u(\1)', t)
+
+
 def infer_type(lines, sym):
     """グローバル sym ごとの C 型推定。(double) キャスト直前の比較 → double / `& sym`・`uVarN = sym`・`sym = uVarN` → uint / 他 float。
     Ghidra は同一グローバルを float と uint の両方で使うことがある (abs マスク 0x1813d6fc0)。uint が 1 行でもあれば uint。"""
@@ -285,6 +328,8 @@ def main():
         if 'bitcast' in fixes:
             t = re.sub(r'\(float\)\(\(uint\)(\(.*?\)) & (_DAT_[0-9a-f]+|uVar\d+)\)', r'u2f(f2u\1 & \2)', t)
             t = re.sub(r'\(float\)\((\*\(uint \*\)\(.*?\)) & (uVar\d+)\)', r'u2f(\1 & \2)', t)
+        if 'dbitcast' in fixes:
+            t = dbitcast(t)
         if 'concat' in fixes:
             t = re.sub(r'CONCAT44\((\w+),(fVar\d+)\)', r'CONCAT44(\1,f2u(\2))', t)
         if 'intload' in fixes:

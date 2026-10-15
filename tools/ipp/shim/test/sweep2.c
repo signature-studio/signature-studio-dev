@@ -1,4 +1,5 @@
-/* CAB-261: it 別の位相スイープ。dst 行全体を記録し、書込のある dst 位置の重みを使う。 */
+/* CAB-261: it 別の位相スイープ。dst 行全体を記録し、書込のある dst 位置の重みを使う。
+   usage: FL_WIN64_DIR=<fl-win64 展開先> ./sweep2 <it>   (it 既定 7。未設定だと exit 2) */
 #define _GNU_SOURCE
 #include "../../ref/pe_load.h"
 #include "fl_dll_path.h"

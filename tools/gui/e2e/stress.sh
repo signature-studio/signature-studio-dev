@@ -8,9 +8,9 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; BUILD="$HERE/../build"
 FR="${STRESS_FRAMES:-50000}"; SM="${STRESS_SAMPLE:-2500}"; NFR="${STRESS_NEG_FRAMES:-2000}"
 for d in wasm wasm_grow; do [ -f "$BUILD/$d/app.wasm" ] || { echo "[stress.sh] $BUILD/$d/app.wasm 無し (先に gui_wasm.sh)" >&2; exit 2; }; done
 echo "[stress.sh] 1/4 固定メモリ ${FR} frames"
-STRESS_FRAMES=$FR STRESS_SAMPLE=$SM node "$HERE/stress.mjs" | grep -E "summary|golden|PASS|FAIL"
+STRESS_FRAMES=$FR STRESS_SAMPLE=$SM node "$HERE/stress.mjs" | grep -E "summary|golden|PASS|FAIL|eval|slow-eval"
 echo "[stress.sh] 2/4 ALLOW_MEMORY_GROWTH + memory.grow 注入 (worker の memory.buffer 再取得) ${FR} frames"
-GUI_WASM_DIR="$BUILD/wasm_grow" STRESS_GROW=6 STRESS_FRAMES=$FR STRESS_SAMPLE=$SM node "$HERE/stress.mjs" | grep -E "summary|golden|PASS|FAIL"
+GUI_WASM_DIR="$BUILD/wasm_grow" STRESS_GROW=6 STRESS_FRAMES=$FR STRESS_SAMPLE=$SM node "$HERE/stress.mjs" | grep -E "summary|golden|PASS|FAIL|eval|slow-eval"
 negctl() {   # negctl <label> <env...>: stress.mjs が exit 1 で落ちること
   local label="$1"; shift; local rc=0 out
   out="$(env "$@" node "$HERE/stress.mjs" 2>&1)" || rc=$?

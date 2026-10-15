@@ -2,9 +2,10 @@
 """dsp_ippv2 ローダ表 (UTF-16 'ippMalloc' リテラル) を持つモジュールを mac .app / win 抽出ツリーから自前探索し、
    mac は x86_64/arm64 両スライスを work/mac/ に抽出。 tools/shared に依存しない (独立再現用)。"""
 import os, sys, json, struct
-APP = "/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app"
-WIN = "/home/ubuntu/work/analysis/win64/extracted"
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', 'shared')); from paths import FL_MAC_DIR, FL_WIN64_DIR
+APP = f"{FL_MAC_DIR}/pkg_extract/payload_out/Applications/FL Studio 2026.app"
+WIN = f"{FL_WIN64_DIR}/extracted"
 PAT = "ippMalloc".encode("utf-16le")
 
 def slices(path):

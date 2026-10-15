@@ -152,7 +152,7 @@
 | U4c | IAT 外の handler (direct) 6,354 件 (1 本目 .pdata 全体) の同定 | 別 handler の EH 構造が未確認 | [MX-38] (#3775) |
 | U4f | census から除外した行 36 件 (1 本目 33 = st==0 9・e≤st 23・同じ st の重複 1、2 本目 3 = st==0 2・e≤st 1) の由来と、同じ st の重複 1 組 (st `0x039373E0`) の選択 | 1 本目の EH 件数 23,293 は重複の選択に依存 (±1)。除外行は census の母数に入らない | [MX-38] (#3775) |
 | U4d | funclet を指す E8/E9 一致候補 4 件の由来 (命令境界を確認して、どの関数から来るか) と、深い closure での到達 | #228 同型の判定を closure 拡張で確定できない | **`REPORT_APPENDIX_3776.md` §9 で測定済み (MX-39 #3776)** |
-| U4e | funclet の x64c closure への取り込み (#228 の landing pad 方式を MSVC に当てる実装) | 同型の欠陥が lift 出力に現れる (未修復) | **`REPORT_APPENDIX_3776.md` §9.4 で方式を記録 (MX-39 #3776)。実装は [MX-43] (#3838)** |
+| U4e | funclet の x64c closure への取り込み (#228 の landing pad 方式を MSVC に当てる実装) | 同型の欠陥が lift 出力に現れる (未修復) | **受入 1 (root 追加・36,240 件 lift) は [MX-43] (#3838) で実測 (`REPORT_APPENDIX_3776.md` §9.7)。SjLj runtime は [MX-45] (#4161)、通し一致は [MX-46] (#4162)** |
 
 ## 7. 検証 commit と差分 (docs/WORKFLOW.md §6)
 
