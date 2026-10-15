@@ -108,9 +108,33 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 - (a) の件数は `0641856` 節の「1 件」が誤りで、HEAD `868d0fbbb` の再実行で 2 件。`0641856` 節の該当行には訂正を付けて残した。
 - 差分 0 の根拠: 上の方法の `git diff 342d8ce92 868d0fbbb -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行。
 
+## 再測定 (差し戻し round 5・測定 commit `17969a203`・main `bacbf7e43` 取り込み後)
+
+- 測定 commit: `17969a203` (`origin/main` (`bacbf7e43`) を merge した commit。競合は `tests/provider_check.mjs` の 1 箇所 (実装判定 `if` と件数 assert) で、main 側の `pe130` (ui setter 2 件・ui getVersion・PY-130 #3007) と PR 側の `pe206` (device 7 関数) を両方残した)。コードを変えた最後の commit。
+- 測定 commit から HEAD までのコード差分: `git diff 17969a203 HEAD -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (測定時点の HEAD は測定 commit と同じ。本節を含む後続 commit は `tools/python/REPORT_PY206.md` と PR 本文だけを変える)。
+- 素材: `$HOME/artifacts/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`・7.4 秒・rc 0)。`FL_WIN64_DIR` を設定して `fetch_inputs.sh` (rc 0・work/ に midi.py・utils.py・MCPTools.pyc・device script)。emsdk は既定の `/opt/emsdk`。
+
+| 検査 | 結果 | rc |
+|---|---|---|
+| `bash provider/build.sh` | `fl_table.c: 435 関数, ハンドラ 172` | 0 |
+| `bash build_cpython_wasm.sh` | 2 分 33 秒 (152.6 秒) | 0 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | flpy.js / flpy.wasm 生成 (3.7 秒) | 0 |
+| `node tests/provider_check.mjs` (§3 flpy 段を含む) | functions 435・**implemented 172**・unimplemented 263・mcp_static 60・PASS | 0 |
+| `node tests/device_diff.mjs` | calls 21・link_calls 6・rejects 10・midi_out 10・midi_words 8・link_codes [ok,7,6,6,7,ok]・**diffs 0**・PASS | 0 |
+| `node tests/mixer_diff.mjs` | calls 69・**diffs 0**・PASS | 0 |
+| `node tests/patterns_diff.mjs` | calls 25・**diffs 0**・PASS | 0 |
+| `node tests/channels_diff.mjs` | calls 238・grid 1200/30・**diffs 0**・PASS | 0 |
+| `node tests/playlist_diff.mjs` | calls 72・**diffs 0**・PASS | 0 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | **48/48 ok**・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 0 |
+| `node tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425 | 0 |
+
+- ネガティブコントロール (HEAD `17969a203`。作業ツリーの `host/fl_mock.mjs` に一時的に変異を入れ、`cp` で元に戻して `git status` で差分 0 を確認): (a) `getMasterSync` を `return true` → **`device 差分 2 件`**・rc 1 (初期値と `setMasterSync(false)` 後)。(b) `setMasterSync` を `st.masterSync = false` → **`device 差分 1 件`**・rc 1。変異なしの `device_diff` は diffs 0・rc 0。
+- 所要 (整数秒・`time` と `date` 差分): provider build 1.1 秒・cpython 152.6 秒・flpy 3.7 秒・`device_diff` / `provider_check` / `mixer_diff` / `patterns_diff` / `channels_diff` / `playlist_diff` 各 0 秒・all_tools wasm 1 秒・all_tools mock 1 秒。load average は測定開始直前の `uptime` 1 点のみ (1 分平均 1.21・5 分平均 1.28、n=1)。
+- 広めの確認 (同 HEAD・flpy 込み、`tests/*.mjs` 53 本のうち 40 本を実行。各 120 秒上限): rc 0 が 33 本 (上表の 7 本と、`arrangement_diff`・`arrangement_selection_diff`・`general_diff`・`ilmcp_diff`・`launchmap_diff`・`midi_path_diff`・`note_enum_diff`・`patterns_group_diff`・`screen_diff`・`step_item_diff`・`transport_diff`・`ui_diff`・`ui_display_diff`・`ui_state_diff`・`tool_args`・`sig_arity_probe`・`sab_wake_diag`・`midi_path_split`・`midi_rpc_split`・`smoke_direct`・`ilmcp_e2e`・`midi_bundled_device`・`midi_script`・`pyscript_e2e` (72/72 PASS)・`pyscript_scenarios`・`browser_check`)。rc 1 が 7 本: `chord_progression_call_probe`・`chord_progression_e2e` (`work/fl_extract/` 無し)、`static_check`・`fulltext_parity`・`static_browser_check` (`dist/flpy_static*.js` 未ビルド)、`mcp_ui_check`・`midi_ui_check` (`vite` 未導入)。未実行 13 本 (`dump_builtins`・`flpianoroll_dialog_load_e2e`・`midi_event_bench`・`poc_mcp`・`pyscript_browser`・`rtt_bench`・`static64_browser_probe`・`static_bench`・`static_midi_bench`・`static_mt_check`・`static_subinterp_browser`・`static_subinterp_probe`・`subinterp_probe`) はベンチ・probe・static ビルド物を要し、本節では実行していない。
+
 ## 検証範囲 / 範囲外
 
-- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (435 = 実装 162 + 未実装 273)。
+- 範囲内: PE の戻り型・status 経路 (上表)、mock と C の 7 関数の差分 0、既存 48 件の回帰、件数の表 (測定 commit `17969a203` で 435 = 実装 172 + 未実装 263)。
 - 範囲外 (未確定のまま残す): 実 FLEngine 上の状態値 (idle・midi-out・master sync の初期値)、通知 3 件の vtbl 先の効果、`setMasterSync` の述語 P 偽 (-2) の発生条件、`0x1366e00`・`0xfd7170`・`0xfd7240` の効果、-6/-7 の実発生。
 - KPI: device API は起動・GUI に関わらないため、起動 KPI (`tools/flelift/boot/REPORT.md`) は動かしていない。
 
@@ -121,3 +145,4 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 | 残り 25 関数 (MIDI 送信・dispatch 系 13 / linked control 系 8 / その他 4) | device 系の未実装 25 件 (C provider は Unspecified error) | #3566 (PY-214・13 関数)・#3568 (PY-215・8 関数)・#3569 (PY-216・4 関数) |
 | 状態値の実機初期値 (idle / midi-out / master sync) | 実 FLEngine の値と mock の値が異なりうる | 子 #3566・#3568・#3569 の受入に含めない。`general` 系と同じく仮置きのまま、実機測定の子を別途起票する (PM 判断) |
 | P 偽 (-2) と vtbl 先の効果 | `setMasterSync` / 通知 3 件の副作用が C/mock で模擬されない | 同上 (PY-125 の `REPORT_PY125` §4 と同じ未解決として扱う) |
+| 7 関数は未割当 (`q`=0) の status -7 を返さない (assigned を仮定)。`getMasterSync` の -6 も同じ。PE は -7・-6 を返す | 未割当で呼んだ戻りが実機と異なる。`midiOutMsg` (PY-227・`fl_engine.c`) は未割当で -7 を返すため、device 系の判定が揃わない | PM 判断 (本 PR では未起票)。対応する場合は C の `if (!dev_assigned)`・mock の `devAssigned` を入れ、`device_diff` に未割当のケースを足す |
