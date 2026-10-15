@@ -2,6 +2,7 @@
 # build_guest.sh — 製品ページ結線の検証用ゲスト (tools/gui/test/text_wasm_app.c、GUI_NO_FT=1 = 内蔵 8x8) を wasm 化し、chunked descriptor にする。
 #   usage: bash tools/gui/e2e/build_guest.sh <outdir>
 #   出力: <outdir>/app.js (emcc glue) ・ <outdir>/app.wasm ・ <outdir>/app.wasm.parts/index.json (+ 64 KiB の part)
+#   reach 変種 (gui_wasm.sh の reach) で作る。GUI-REACH / GUI-MSG 行を GuiHost.logs に出す (gui-guest-boot が順序を検査; #3496)
 #   前提: emcc (EMSDK_ENV = emsdk_env.sh のパス、または PATH 上の emcc)。mingw-w64 は無ければ apt で導入 (gen_api.py の aux_arity が使う)。FreeType 不要。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/.."
@@ -14,7 +15,7 @@ if ! command -v x86_64-w64-mingw32-gcc >/dev/null; then
 fi
 python3 "$ROOT/gen_api.py" >/dev/null
 TMPB="$(mktemp -d)"; trap 'rm -rf "$TMPB"' EXIT
-GUI_NO_FT=1 bash "$ROOT/lift/gui_wasm.sh" "$ROOT/test/text_wasm_app.c" "$TMPB" | tail -1
+GUI_NO_FT=1 bash "$ROOT/lift/gui_wasm.sh" "$ROOT/test/text_wasm_app.c" "$TMPB" reach | tail -1
 cp "$TMPB/app.js" "$TMPB/app.wasm" "$OUT/"
 node "$HERE/stage_guest.mjs" "$OUT/app.wasm" 65536
 # ネガコン (d): part 0 (index.json の parts[0]) を 1 バイト改竄したコピー (descriptor の sha256 は元のまま。chunked の検証で止まること)

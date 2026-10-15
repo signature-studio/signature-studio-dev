@@ -7,6 +7,10 @@
 static uint8_t guest_stack[1 << 16] __attribute__((aligned(16)));
 #define STACK_TOP ((uint64_t)(uintptr_t)guest_stack + sizeof(guest_stack) - 0x100)
 static uint64_t wc_hits, wc_heap_top;
+static uint8_t wc_covb[512];
+
+void wc_cov(uint32_t i) { wc_covb[i] = 1; }
+uint32_t wc_cov_get(uint32_t i) { return wc_covb[i]; }
 
 #define STUB_RET(v) do { R[RAX] = (uint64_t)(v); R[RSP] += 8; wc_hits++; } while (0)
 
@@ -26,6 +30,7 @@ void wc_reset(void) {
     x87_cw = 0x037f; x87_sw = 0; mxcsr = 0x1f80;
     fle_install_teb();
     wc_hits = 0;
+    memset(wc_covb, 0, sizeof wc_covb);
     wc_heap_top = WC_ARENA;
 }
 
