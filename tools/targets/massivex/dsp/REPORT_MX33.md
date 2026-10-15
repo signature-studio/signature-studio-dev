@@ -17,7 +17,7 @@
    受入 1 の確定にはこの追跡が要る (未解決 U3h・§6)。
 4. **独立再計算 (線形): 範囲内に 128 bit 読みを持つ関数は 9 件**。ただし CFG で入口から未定義と判定された読みに 128 bit 型はなく、
    線形の 128 bit 読みは定義後 (または CFG 非到達) の読み。CFG 側の 128 bit 候補は 0 件のため包含検査 `CFG-P ⊆ 線形-P` は空真。構造上の上限確認にとどまる (§4)。
-5. **NC 9/9 PASS** (MX-6 の 5 件 + 本件の 4 件)。e2e `mx6_e2e.sh` は exit 0 (35 s)。funclet は seeds 533 / pdata 始点 529 のまま (positive control PASS)。
+5. **NC 9/9 PASS** (MX-33 の合成列 9 件・§3)。MX-6 の `mx6_vectorcall.py --selftest` 5/5 は別集合 (§3・§5)。e2e `mx6_e2e.sh` は exit 0 (35 s)。funclet は seeds 533 / pdata 始点 529 のまま (positive control PASS)。
 6. **MX-6 の表示値は不変**: pdata 始点の xmm4/5 livein 0・保留 17 (seeds)・census・funclet の値は MX-6 §1 と一致。
 
 ## 1. 判定定義 (実装: `scripts/mx33_xmm03.py`・読み列挙は `scripts/mx6_vectorcall.py` の `analyze`)
