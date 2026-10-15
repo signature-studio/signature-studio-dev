@@ -8,7 +8,7 @@
 |---|---|
 | 1. 宛先の本体と呼出元を読み、IPP API 名か「未同定」を付ける | **API 名 `ippsSum_32f` の内部カーネル** (経路上の API。宛先自体は export ではないので、export 名は付かない)。根拠は正規化命令列の SHA-1 完全一致 (dsp_ippv2 の 3 本体) と、dsp の直接 call 経路 (`ippsSum_32f` の dispatch 変種 3 本から到達)。呼出元 `0x1803c4850` の dsp 側の呼出元は静的に見つからず (§7) |
 | 1 の後段. API 名が付いたら tools/ipp の実装対応 | `ippsSum_32f`: `implemented_poc=0` (fail-soft stub のみ・PoC 未実装)。本件は同定のみで実装しない (§6) |
-| 2. 測定 commit・再現コマンド・差分を REPORT に書く | 測定 commit `b7695367b` (§2)。`git diff b7695367b HEAD -- tools/shared/elastique` は 0 行 (§2) |
+| 2. 測定 commit・再現コマンド・差分を REPORT に書く | 測定 commit `b7695367b` (§2)。`git diff b7695367b HEAD -- tools/shared/elastique/ipp_target_ident.py` は 0 行 (§2) |
 
 ## 1. 対象・素材・前提
 
@@ -24,7 +24,7 @@ ELASTIQUE_DLL="$RUNNER_TEMP/fl-win64/extracted/block24357_PE.bin" DSP_IPP_DLL="$
 ```
 
 - 測定 commit: **`b7695367b`** (`ipp_target_ident.py` を追加した commit。以後このファイルは変えていない)。
-- 差分 (測定後のコード範囲): `git diff b7695367b HEAD -- tools/shared/elastique` → 0 行。
+- 差分 (測定後のコード範囲): `git diff b7695367b HEAD -- tools/shared/elastique/ipp_target_ident.py` → 0 行。測定後に変えたのは本 REPORT (`tools/shared/elastique/REPORT_3420.md`) と `docs/DOC_MAP.md` の索引 1 行だけ (文書)。
 - 実測 (real): **51.22 s** (user 51.01 s)・load average (1 分) 0.33 → 0.71。HEAD で再実行した出力は、初回の出力と全行一致した。
 - 出力は標準出力のみ。`tools/shared/work/` は使わない。
 
