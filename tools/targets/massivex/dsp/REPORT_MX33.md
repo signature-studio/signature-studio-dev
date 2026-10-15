@@ -4,7 +4,7 @@
 - 素材: `plugins-massivex` の `Native Instruments Massive X v1.7.1.exe` (1,870,391,792 B) を既存パーサで展開
   (`scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> <work> key`)。
   `Massive X.vst3` = 95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca` (検収値と一致)。PE の置き場所は `$RUNNER_TEMP` 配下。
-- **測定 commit = `d9a2b7ec2`** (コードを変えた最後の commit)。再現: `MX_PE='$RUNNER_TEMP/mx33/work/extracted/VST3/Massive X.vst3' MX6_WORK='$RUNNER_TEMP/massivex-mx33' bash tools/targets/massivex/dsp/mx6_e2e.sh`。
+- **測定 commit = `1083467fe`** (コードを変えた最後の commit・前版 = `d9a2b7ec2`)。再現: `MX_PE='$RUNNER_TEMP/mx33/work/extracted/VST3/Massive X.vst3' MX6_WORK='$RUNNER_TEMP/massivex-mx33' bash tools/targets/massivex/dsp/mx6_e2e.sh`。
 
 ## 0. 結論 (先出し)
 
@@ -18,7 +18,7 @@
    受入 1 の確定にはこの追跡が要る (未解決 U3h・§6)。
 4. **独立再計算 (線形): 範囲内に 128 bit 読みを持つ関数は 9 件**。ただし CFG で入口から未定義と判定された読みに 128 bit 型はなく、
    線形の 128 bit 読みは定義後 (または CFG 非到達) の読み。CFG 側の 128 bit 候補は 0 件のため包含検査 `CFG-P ⊆ 線形-P` は空真。構造上の上限確認にとどまる (§4)。
-5. **NC 9/9 PASS** (MX-33 の合成列 9 件・§3)。MX-6 の `mx6_vectorcall.py --selftest` 5/5 は別集合 (§3・§5)。e2e `mx6_e2e.sh` は exit 0 (35 s)。funclet は REPORT_MX6.md §4 と一致 (step 7/7 で assert・positive control PASS)。
+5. **NC 15/15 PASS** (MX-33 の合成列 15 件・§3。前版 9 件 + #3774 で追加 6 件)。MX-6 の `mx6_vectorcall.py --selftest` 5/5 は別集合 (§3・§5)。e2e `mx6_e2e.sh` は exit 0 (48 s・測定 commit `1083467fe`)。funclet は REPORT_MX6.md §4 と一致 (step 7/7 で assert・positive control PASS)。
 6. **MX-6 の表示値は不変**: pdata 始点の xmm4/5 livein 0・保留 17 (seeds)・census・funclet の値は MX-6 §1 と一致。
 
 ## 1. 判定定義 (実装: `scripts/mx33_xmm03.py`・読み列挙は `scripts/mx6_vectorcall.py` の `analyze`)
@@ -65,7 +65,8 @@
 | 16 | 0x7ddc90–0x7dde31 | 79 | 0, 1 | 0x1807ddcc4 `vcvtsi2sd xmm0, xmm0, rax`・0x1807ddd78 `vcvtsi2sd xmm1, xmm1, rax` (A: merge) | 0,1,2,3 | 判定不能 |
 | 17 | 0x118d8b0–0x118d994 | 49 | 0 | 0x18118d8cc `vcvtsi2sd xmm0, xmm0, rax` (A: merge) | – | 判定不能 |
 
-- 内訳: **scalar 0 / 128 bit 0 / 判定不能 17**。読みの型: 複写 9 件 (1 読み each・全て k=2)、merge 8 件 (計 12 読み)。
+- 内訳: **scalar 1 / 128 bit 0 / 判定不能 16** (#3774 後。前版 #3032 は 0 / 0 / 17)。読みの型: 複写 9 件 (1 読み each・全て k=2・うち 0x17b680 のみ scalar 確定)、merge 8 件 (計 12 読み)。
+- 0x17b680 の根拠: 複写先 xmm6 の後続読みが全て scalar (`follow()` の結果)。PR 本文の「関数末で stack から復元」は未確認。`follow()` は `ret` で xmm0 のみを見るため、xmm6 の stack 復元はコードで確かめていない。
 - merge の読みは、同じ命令が xmm_k の下位を新しい値で上書きする。上書き後の xmm_k を後続の命令が使い
   (例 #2: `vdivss xmm0, xmm1, xmm0` は `vcvtsi2ss` の結果を使う)、入口の xmm_k の下位は計算に入らない。
 
@@ -84,12 +85,18 @@
 | 7 | `paddd xmm0, xmm1; ret` (追加・整数 SIMD) | 128 bit | PASS |
 | 8 | `movss xmm0, xmm1; ret` (追加・k0 は merge のみ・k1 は scalar) | 判定不能 | PASS |
 | 9 | `vcvtsi2ss xmm0, xmm0, eax; ret` (追加・VEX merge のみ) | 判定不能 | PASS |
+| 10 | `movaps xmm1, xmm0; addss xmm1, xmm2; ret` (追加・複写 → scalar 読み) | scalar | PASS |
+| 11 | `movaps xmm1, xmm0; addps xmm1, xmm2; ret` (追加・複写 → 128 bit 読み) | 128 bit | PASS |
+| 12 | `movaps xmm1, xmm0; movaps xmm1, [rsp+8]; ret` (追加・全幅上書きで追跡停止) | 判定不能 | PASS |
+| 13 | `vcvtsi2ss xmm0, xmm0, eax; addps xmm0, xmm1; ret` (追加・merge の上位 → 128 bit) | 128 bit | PASS |
+| 14 | `vcvtsi2ss xmm0, xmm0, eax; addss xmm0, xmm1; ret` (追加・merge の後続 scalar は証拠にしない) | 判定不能 | PASS |
+| 15 | `vcvtsi2ss xmm0, xmm0, eax; movddup xmm0, xmm0; ret` (追加・merge 上位の shuffle は下位 64 bit のみ) | 判定不能 | PASS |
 
-- **NC 9/9 PASS**。MX-6 の `mx6_vectorcall.py --selftest` (5 件) も PASS のまま。
-- **感度 (分類規則の影響)**:
-  - 仕様文言どおり `cvtsi2*` の xmm 入力を scalar 読みにする: **scalar 8 / 128 bit 0 / 判定不能 9**。増えた 8 件は上表の merge 8 件そのもので、
+- **NC 15/15 PASS** (`--selftest` 15 cases)。MX-6 の `mx6_vectorcall.py --selftest` (5 件) も PASS のまま。
+- **感度 (分類規則の影響・前版 #3032 の計算。#3774 後は未再計測)**:
+  - 仕様文言どおり `cvtsi2*` の xmm 入力を scalar 読みにする: **scalar 8 / 128 bit 0 / 判定不能 9** (前版)。増えた 8 件は上表の merge 8 件そのもので、
     入力を消費しないため採らない (§1 (a))。
-  - bitwise `*ps`/`*pd` を 128 bit 証拠に含める: **変化なし** (17 件に bitwise 読みはない)。
+  - bitwise `*ps`/`*pd` を 128 bit 証拠に含める: **変化なし** (前版。17 件に bitwise 読みはない)。
   - 既知の非 vectorcall float 関数での scalar 落ちの確認 (任意項目): **未実施**。
 
 ## 4. 独立再計算 (線形走査・構造上の上限)
@@ -107,15 +114,16 @@
 | 工程 | 結果 (MX-6 §1 との比較) |
 |---|---|
 | NC (MX-6・5 件) | 5/5 PASS (MX-6 と同じ) |
-| NC (MX-33・9 件) | 9/9 PASS |
+| NC (MX-33・15 件) | 15/15 PASS (#3774 後。前版は 9/9) |
 | RTTI + 入口面 | REPORT_MX6.md §1 と一致 (測定 commit の step 2/7 の出力) |
 | vectorcall (MX-6) | seeds: pdata 始点 livein xmm4/5 = 0 (REPORT_MX6.md §2 と一致) |
-| 受入 1 (MX-33) | 17 件: scalar 0 / 128 bit 0 / 判定不能 17 (§2) |
+| 受入 1 (MX-33) | 17 件: scalar 1 / 128 bit 0 / 判定不能 16 (§2・#3774 後。前版 #3032 は 0 / 0 / 17) |
 | .pdata census | REPORT_MX6.md §3 と一致 (測定 commit の step 5/7 の出力) |
 | funclet (positive control) | REPORT_MX6.md §1・§4 と一致 (step 7/7 で assert) |
 | 判定 | PASS (step 6/7・7/7)。step 6/7 の「包含 OK」は空真 (CFG 側の 128 bit 候補 0 件・§4) |
 
-- e2e: `mx6_e2e.sh` (7 工程) → **exit 0・elapsed 35 s**。load average: 開始 `0.00 0.04 0.04` → 終了 `0.39 0.13 0.07`。
+- e2e: `mx6_e2e.sh` (7 工程) → **exit 0・elapsed 48 s** (#3774 後・測定 commit `1083467fe`)。load average: 開始 `0.08 0.06 0.09` → 終了 `0.64 0.21 0.14`。前版 (#3032・`d9a2b7ec2`) は 35 s。
+- 本 HEAD (`docs` commit) の再実行は未実施: この run では `plugins-massivex` が `$ARTIFACTS_DIR` に無く、`mx6_e2e.sh` は回せなかった。上記は測定 commit の記録。
 - 追加した assert: step 6/7 は `vectorcall` の livein 0・整合 OK に加え、受入 1 の件数 17 と内訳合計 17、包含 OK を要求。
   step 7/7 は `pdata_eh.json` の `funclets_fh3.seeds` の funclet 数を `mx6_e2e.sh` 内の固定値と比べ、不一致なら exit 1。
 
@@ -137,7 +145,20 @@
 | 受入 3 (MX-6 U4b・U4c・unwind 残件) | 1 本目 .pdata 全体の数値は下界・読取不能の件数と原因は未確定 (REPORT_MX6.md §3) | 子 issue **[MX-38]** |
 | 受入 4・5 (MX-6 U4d・U4e・funclet 到達と取り込み設計) | #228 同型の確定 (深い closure での到達) と x64c への取り込み | 子 issue **[MX-39]** |
 
-- 子 issue の割当: **[MX-37]** = 受入 1 の残件 (U3 系: 複写先の追跡・merge 扱い・引数転送・感度・間接 jmp・解析不能の件数 (U3c))、**[MX-38]** = 受入 2・3 (FH4 funclet・unwind 残件)、**[MX-39]** = 受入 4・5 (funclet 到達・取り込み設計)。起票番号は PR 本文に記載。
+- 起票先: **#3774 ([MX-37])** = 受入 1 の残件 (U3 系: 複写先の追跡・merge 扱い・引数転送・感度・間接 jmp・解析不能の件数 (U3c))。#3774 は本 PR で Closes せず、残件表 (下記) を #3774 の本文に追記した。
+  **[MX-38]** = 受入 2・3 (FH4 funclet・unwind 残件)、**[MX-39]** = 受入 4・5 (funclet 到達・取り込み設計)。これらの子 issue 番号は本 REPORT では未確認 (起票番号の確認は PR 本文に記載)。
+
+### 6.1 受入 1 の判定不能 16 件の残件 (#3774 PR 本文の記録)
+
+| 残件の理由 | 件数 | 扱い |
+|---|--:|---|
+| 複写先が call/ret 境界に届く | 9 | #3774 の残件 |
+| cvtsi2 merge 上位の後続が無い | 6 | #3774 の残件 |
+| ambiguous (0x11830 の cvtsd2ss) | 1 | #3774 の残件 |
+
+- **未整合 (未解決)**: §2 の行型の数え方は、判定不能 16 件を複写型 8 件 (行 1・3〜9) と merge 型 8 件 (行 2・11〜17) とする。
+  上表の 9 / 6 / 1 とは内訳が一致しない。PE が無く `mx33_xmm03.py` を再実行できないため、理由ごとの行対応は未確定。
+  再実行できる run で行ごとに出し直すことを #3774 の残件に含める。
 
 ## 7. 既知類型との関係
 
@@ -149,7 +170,9 @@
 
 - 測定 commit = **`1083467fe`** (`feat(massivex): follow copy/merge destinations for xmm0-3 classification (MX-37 #3774)`)。前版 = `d9a2b7ec2` (MX-33 #3032)。
   変更 (#3774): `scripts/mx33_xmm03.py` (複写先・merge 上位の後続追跡 `follow()`・NC 6 件追加)・`scripts/mx6_vectorcall.py` (`analyze()` の返り値に `cfg` を追加・JSON には出さない)。
-- `git diff d9a2b7ec2 1083467fe -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` の差分は上記 2 ファイルのみ (`mx6_e2e.sh` は未変更)。
+- commit `1083467fe` 自身の変更は上記 2 ファイルのみ (`mx6_e2e.sh` は commit `1083467fe` では未変更)。
+  ただし `git diff d9a2b7ec2 1083467fe -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は 3 ファイル (+154/−20 行) で、`mx6_e2e.sh` の 37 行は main 取り込み (他 PR の変更) による差分。
+- 測定 commit から HEAD までのコード差分 (`git diff 1083467fe HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh`) は 0 行 (HEAD `e078d37fc` は docs のみ)。
 - 測定 (#3774・`mx6_e2e.sh`・MX_PE = 展開 `Massive X.vst3`・md5 `622993e7…` 一致): **exit 0・elapsed 48 s・load 0.08 0.06 0.09 → 0.64 0.21 0.14**。受入 1 の件数は scalar 1 / 128 bit 0 / 判定不能 16 (前版 0 / 0 / 17)。
-  `tools/targets/massivex/dsp` 全体の差分は本 REPORT の追加 (docs commit `61e1aabbe`) のみで、測定対象外。
+  `git diff 1083467fe HEAD -- tools/targets/massivex/dsp` の差分は本 REPORT の修正 (docs のみ・測定対象外)。
 - MX-6 測定 commit (`fbc9971f`) からの変更 (`mx6_vectorcall.py` の +4/−1 行・`mx6_e2e.sh`) は、MX-6 の表示値を変えないことを e2e (§5) で確認した。
