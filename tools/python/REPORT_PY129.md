@@ -42,7 +42,7 @@
 
 測定 commit は `9952407f4`。以下の全件をこの commit で再実行した (CPython を含む)。`9952407f4` は main `4e652e194` の取り込み merge で、`tools/python` の md 以外のコードは `f48ddb218` (main 側の `analysis/py300_ret_census.py` を含む merge) から変わっていない。
 
-環境: runner 4 core。`load` は `/proc/loadavg` の 1 分平均。`fl-win64.tar.zst` を展開し (`FL_WIN64_DIR`)、`fetch_inputs.sh` で `work/` に配置した (win64 経路。mac pkg 無し)。`toolchain-emsdk.tar.zst` の `emscripten-version.txt` は `6.0.12` で、runner 同梱の `/opt/emsdk` も `6.0.12`。ビルドは `/opt/emsdk` で行った。`wall` の「未計測」は時間を測っていない行。
+環境: runner 4 core。`load` は OS の 1 分平均の負荷値。`fl-win64` を `[FL-WIN64]` の展開先に展開し (`FL_WIN64_DIR`)、`fetch_inputs.sh` で `work/` に配置した (win64 経路。mac pkg 無し)。`toolchain-emsdk.tar.zst` の `emscripten-version.txt` は `6.0.12` で、runner 同梱の `[EMSDK]` も `6.0.12`。ビルドは `[EMSDK]` で行った。`wall` の「未計測」は時間を測っていない行。
 
 | コマンド | 測定 commit | 結果 | wall | load |
 |---|---|---|---|---|
