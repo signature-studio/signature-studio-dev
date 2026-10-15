@@ -70,14 +70,16 @@
 | 残件 | 受入 | 起票先 |
 |---|---|---|
 | 文字列窓の除外 (判定基準の決定・除外件数の記録) | 1 | 実装済み (§5.1)。除外件数を記録 |
-| 入口判定 `pdata_call` の検算: capstone と objdump の先頭ブロック判定の不一致 118 件 (mismatch 0 は未達) | 2 | #4068 [MX-44] (§5.5) |
+| 入口判定 `pdata_call` の検算: capstone と objdump の先頭ブロック判定の不一致 117 件 (mismatch 0 は未達・再測定 `a505be525`) | 2 | #4068 [MX-44] (§5.5) |
 | `pdata_call` を既定にするか・`pdata` 案で落ちる code の正しさ検証 (REPORT_MX13 §3 の範囲外) | 2 | PM 判断 (#1987 本文 5。既定は `any` のまま) |
 
 ## 5. MX-29 (#1987): 文字列窓の除外と入口判定 `ENTRY=pdata_call`
 
 - 判定基準: #1987 本文の PM 判断 (2026-10-15) のとおり。既定 `ENTRY=any` は変えない。
-- 測定 commit: `039adc3f6` (`mx_closure.py` / `mx_flow_recheck.py` の最後のコード変更)。素材 `plugins-massivex` → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` (95,356,824 B)。
-- 測定 commit 以降のコード差分: `git diff 039adc3f6 HEAD -- tools/targets/massivex/dsp/scripts` は本 REPORT の commit 時点で 0 行。
+- 測定 commit (検算 `mx_flow_recheck.py` の再測定): `a505be525` (`LOCKABLE` に `xor` を加えた commit。`mx_closure.py` の最後のコード変更は `039adc3f6`)。素材 `plugins-massivex` → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` (95,356,824 B)。素材の展開は `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` (展開 125 件の md5-ok 0/125 は §8.1 の既知事象。VST3 本体は md5 一致)。
+- 測定 commit 以降のコード差分 (`git diff a505be525 HEAD -- tools/targets/massivex/dsp/scripts`): 本 REPORT 更新の commit ではスクリプトを変えないため 0 行 (出力は PR 本文に添付)。
+- 再測定の手順: `mx_rtti.py` → `mx_closure.py flow pdata` (4 s)・`flow pdata_call` (3 m 23 s、22 round で収束・169,974 入口) → `mx_flow_recheck.py` (`pdata` 4.9 s PASS / `pdata_call` 3 m 9 s・RESULT=FAIL)。
+- 測定時の load: `pdata_call` の開始時 0.37 0.47 0.36 (06:41)。
 - 039adc3f6 の変更: (1) `mx_closure.py`: 先頭ブロックで未文書化の FSTP1 別名 `fstpnce` (D9 D8+i) を不正扱い (SDM の命令表に無い)。閉包 169,981 → 169,974 (−7)。(2) `mx_flow_recheck.py`: objdump 出力に SDM 規則の後処理 (字句 `(bad)`・`%?`、REX2 (`d5`)、REX 直後の VEX、LOCK の非ロック命令・非メモリ宛先)。宛先は AT&T の最後のオペランドを括弧内のカンマを無視して取る。mismatch 行は `work/mx29/flow_pdata_call_mismatch.tsv` に出す。
 
 ### 5.1 文字列窓 (受入 1)
@@ -101,22 +103,23 @@
 
 ### 5.3 検算 (受入 2・`mx_flow_recheck.py` の ENTRY 対応・測定 commit `039adc3f6`)
 
-> **注記 (無効・再測定待ち)**: 下表は `LOCKABLE` に `xor` が無い版 (`039adc3f6`) の数字で、`lock xor` のメモリ形を誤って不正扱いしている。レビュー指摘 B1 で修正済み (`LOCKABLE` に `xor` を追加)。修正後の再測定には `plugins-massivex` 素材が要るため、この表の数字は使わない。再測定の結果は本節を書き直して入れる (#4068 で追跡)。
+`LOCKABLE` に `xor` を加えた版 (測定 commit `a505be525`・2026-10-15 再測定) の数字。`039adc3f6` の旧数値 (118 件・113 件) は `lock xor` のメモリ形を誤って不正扱いしていたため無効で、使わない。
 
 直接 call 目標 (`.text` 内・thunk 外・`.pdata` begin を除く) を (i) 文字列窓 (ii) 先頭ブロック不正 (iii) 先頭ブロック正常 に分類。(ii)/(iii) の判定は objdump 2.42 (`-b binary -m i386:x86-64`) に SDM 後処理を入れた側で行い、capstone (入口の採否に使った判定) と食い違いを数えた。
 
 | ENTRY | 対象 | (i) 窓 | (ii) 不正 | (iii) 正常 | (iii) で入口に入らない (取りこぼし) | 入口で (iii) でない (過剰) | mismatch |
 |---|--:|--:|--:|--:|--:|--:|--:|
 | `pdata` | 1,712 | 0 | 299 | 1,413 | 1,413 (pdata 案で落ちる leaf 候補) | 0 | **0 (PASS)** |
-| `pdata_call` | 181,532 | 0 | 21,188 | 160,344 | 5 | 113 | **118 (未達)** |
+| `pdata_call` | 181,532 | 0 | 21,187 | 160,345 | 5 | 112 | **117 (未達)** |
 
-- `pdata` は mismatch 0 (前回 22 件は、objdump 側の後処理と `last_operand` 修正で解消)。
-- `pdata_call` の mismatch 118 の内訳 (`flow_pdata_call_mismatch.tsv` の理由別):
-  - 110 件: capstone が受理・SDM 規則が LOCK 違反とする (`lock adc 0x…(%rbp),%ch` のように宛先がレジスタ、`lock nop`・`lock movsd`・`lock repnz movsb` など)。capstone 5.0.7 は LOCK の宛先・命令・REP との併用を見ないため受理する。SDM 上は #UD。判定は capstone 側の修正が要る (子 issue #4068)。
-  - 5 件: objdump 受理・capstone 不正 (`57 ff c4 62 …`・`62 02 …` の EVEX 形・`0f ff` (UD0) を objdump が受理するもの)。理由は未分類。
-  - 3 件: 形の差 (objdump が `(bad)` を出す VEX `c4 c1 7d 7f …`・`d5` (REX2) 先頭の行を capstone が受理する 1 件など)。理由は未分類。
-- 取りこぼし 5 件 (objdump 側では leaf 候補、capstone 側では不採用) は上の未分類 5 件と重なる。過剰 113 件は mismatch 110+3 件と重なる (objdump の不採用で capstone の採用)。
-- 検算は `pdata_call` の入口を正しいと認めない: mismatch 118 のため、「入口が (iii) を全て取る (取りこぼし 0)」は未達。
+- `pdata` は mismatch 0 (再測定でも変化なし)。
+- `pdata_call` の mismatch 117 の内訳 (`mx_flow_recheck.py` が出す `_mismatch.tsv` の理由別・§5.5 に分類):
+  - 109 件: objdump (SDM 規則) が LOCK 違反とし、capstone が受理する。内訳は、LOCK 可能な命令で宛先がレジスタ 80 件 (`adc` 50・`add` 19・`or` 5・`xor` 3・`and` 2・`sub` 1)、LOCK 不可の命令 29 件 (`repnz movsb`・`movsd`・`bnd`・`cvt*`・`nopl`・`movq` など)。SDM 上はいずれも #UD。capstone 5.0.7 は LOCK の宛先・命令・REP との併用を見ないため受理する。判定は capstone 側の修正が要る (子 issue #4068)。
+  - 5 件: capstone が不正・objdump が受理する。4 件は単独デコードで確認 (`62 02 …` EVEX 形 2 件と `4e 4e …` 1 件は capstone が拒否、`0f ff` は capstone が `ud0` と復号するが、スクリプトの判定では不正扱い)。残り 1 件 (0x81a740) は先頭命令は capstone が受理するため、先頭ブロック内の後続命令の不正を疑うが、個別の命令は未特定。
+  - 3 件: 原因未確定。TSV の objdump 行 (`(bad)`・`rex2`) と、対象番地を単独でデコードした結果が一致しない (例: 0x12e3768 は先頭 `00 00` が単独デコードで `add %al,(%rax)` と受理され、`(bad)` にならない)。objdump 側の番地の取り方 (連続逆アセンブル時の境界ずれ) の疑い。切り分けは #4068。
+- 取りこぼし 5 件 (objdump 側では leaf 候補、capstone 側では不採用) は上の「capstone が不正・objdump が受理」の 5 件と重なる。過剰 112 件は、objdump が不採用で capstone が採用した行 (`cap_ok_obj_bad`: LOCK 109 + `(bad)/%?/rex2` 2 + `rex2` 1 = 112) と一致する。
+- 検算は `pdata_call` の入口を正しいと認めない: mismatch 117 のため、「入口が (iii) を全て取る (取りこぼし 0)」は未達。
+- `xor` 修正 (B1) の効果: 旧 110 → 新 109 (LOCK 行) の 1 件減。残る `lock xor` 3 件 (`lock xor 0x…(%rax),%esi`・`lock xor 0x0(%rax),%dl` ×2) は宛先がレジスタで、SDM 上 #UD のため不正のまま。メモリ宛先の `lock xor` が受理されたかは、旧 TSV を残さなかったので直接は確認していない (1 件減は推定)。
 
 ### 5.4 検証 (受入 3・測定 commit `039adc3f6`・n=1)
 
@@ -128,5 +131,5 @@
 
 | 残件 | 受入 | 起票先 |
 |---|---|---|
-| `pdata_call` の mismatch 118 (capstone 側の LOCK 規則 110 件・未分類 8 件) → mismatch 0 と取りこぼし 0 の確認 | 2 | #4068 [MX-44] (子 issue。本 issue から移管) |
+| `pdata_call` の mismatch 117 → mismatch 0 と取りこぼし 0 の確認。内訳: capstone の LOCK 規則 109 件 (宛先レジスタ 80・LOCK 不可命令 29)・objdump 受理 capstone 不正 5 件 (単独デコードで 4 件確認・1 件未特定)・原因未確定 3 件 | 2 | #4068 [MX-44] (子 issue。本 issue から移管) |
 | `pdata_call` を既定にするか (数値は §5.2・§5.3。既定は `any` のまま) | 2 | PM 判断 (#1987 本文 5) |
