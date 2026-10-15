@@ -287,6 +287,7 @@
 | `tools/m11/trap_triage/REPORT_495.md` | ~115 | `SV_TRACE_AT` 付き survey で unit 134 が ok→oob になる原因 (trace の fprintf が残す stack 残骸 × `function_413870` の引数脱落) と trace の透過化 (#495) |
 | `tools/m11/trap_triage/REPORT_663.md` | ~158 | survey の oob frames が最上位 wasm frame を 1 段捨てる (`.slice(1)`) 欠陥の修正・filter の `/^\s*at /` アンカー化・annotate の最上位集計の再計算 (#663、基準 (c) は未実施。最終 HEAD の再測定は REPORT_663 §8) |
 | `tools/m11/trap_triage/REPORT_861.md` | ~70 | unit 189 (409470 ReallocMem) の IR↔逆アセンブル突合・既存 C 転記 (#474) のネガコン (転記なしで 189 は halt0、ok→非 ok 24 件)・転記あり/なしの回帰 (unit 368 のみ)・未解決の起票先 (#861) |
+| `tools/m11/trap_triage/REPORT_3492.md` | ~150 | #3492: strict 証拠表の行 241〜288 の件ごと判定 (46 件判定: 真陽性 44・偽陽性 2、保留 2 は #3574)・判定規則・入力 sha256・再現 `judge_ctx.py`・参照段数不一致の所見 |
 | `tools/m11/trap_triage/REPORT_1043.md` | ~60 | unit 368 の 409470 VA-big 確保の原因 (`function_980ed0` の 10 進 `inttoptr` 1 件の VA→LVA remap 漏れ)・`pass_m2q_fn980ed0` による修復・ネガコン/修復の survey (ok 869→870, 変化は 368 の halt0→ok のみ)・残件 (#861 受入 4) |
 | `tools/m11/trap_triage/REPORT_1046.md` | ~67 | #1046 unit 492 OOB 途中経過 (`4133f0` の入力値は未実測・受入 4 のみ達成・受入 1–3 は #1288) |
 | `tools/m11/trap_triage/REPORT_1620.md` | ~204 | #1620: unit 477 の `0x10a9f910` 下位 4B 上書きの書込み元 (IR store 経路ではない見込み・書込み主体は未特定)。埋め値依存の位置 (unit 134) は §10 で検証不能と訂正。C 呼出し計装の副作用 (unit 304)・計装 `trap_w1620.py`。§10: `0x10a9f910` への書込みは初期 SP の配置 (C 側の静的データ量) で消える (HEAD で前提が再現しない)・埋め実験の訂正 |
