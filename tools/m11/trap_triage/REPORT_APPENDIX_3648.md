@@ -17,11 +17,11 @@
 ## 1. 測定条件
 
 - 測定 commit: `dda07f5cf` (コードを変えた最後の commit。`feat(liftdiff): ld_native に page 保護を変えない DR 書込み監視 (LD_WATCH_MODE=hw) を追加`)。
-- `git diff dda07f5cf HEAD -- tools/liftdiff tools/m11/trap_triage` の出力は 0 行 (本付録の追記のみ。コード差分 0)。
-- ビルド: `tools/liftdiff` で `gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm`。`rt/ld_native.c` 自身の警告は 0 件 (`rt/ld_core.h:286` の既存警告 1 件のみ。#2770 §8.1 と同じ)。
+- `git diff --stat dda07f5cf HEAD -- tools/liftdiff tools/m11/trap_triage` の出力 (作成時 HEAD `1bec3fb65`): `3 files changed, 182 insertions(+)` (`REPORT_APPENDIX_2770.md` +5・`REPORT_APPENDIX_3648.md` +93・`tools/m11/trap_triage/hw_watch_3648_check.py` +84)。測定に使ったコードは差分 0: `git diff --stat dda07f5cf HEAD -- tools/liftdiff tools/m11/trap_triage/hw_watch_3648.sh` は空。`hw_watch_3648_check.py` は ca95e5509 で追加した判定スクリプトで、測定 boot には関与しない。
+- ビルド: `tools/liftdiff` で `gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm`。`rt/ld_native.c` 自身の警告は 0 件。`rt/ld_core.h` には gcc 13.3.0 (Ubuntu) で 3 件 (行 144・153・286。#2770 §8.1 の既存警告) 出る。別の gcc 版では件数が変わりうる。
 - 素材: `fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` とした。`work-m11.tar.zst`・`work-liftdiff.tar.zst` は `tools/m11/work/`・`tools/liftdiff/work/` に展開 (`tar --zstd -xf`)。
 - 実行: `tools/m11/trap_triage/hw_watch_3648.sh` (環境は `env -i` で固定。下記 §3)。直列 12 run。所要: 12 run 合計 183 s (1 run 約 15 s)。1 分 load average は開始 0.33・終了 0.97 (`uptime`)。
-- 判定スクリプト: `tools/m11/trap_triage/hw_watch_3648_check.py` (出力は `work/probe3648/check.txt`。state 比較は `cmp_img_2770.py` と同じ項目)。
+- 判定スクリプト: `tools/m11/trap_triage/hw_watch_3648_check.py` (state 比較は `cmp_img_2770.py` と同じ項目)。判定出力 (`work/probe3648/check.txt`) は測定時に保存していなかった (§5 の注記)。
 
 ## 2. 方式 (`rt/ld_native.c` の `LD_WATCH_MODE=hw`)
 
@@ -31,6 +31,7 @@
 - page 保護: hw モードでは `wp_arm`・`wp_fault`・`wp_finish` が呼ばれず、`mprotect` を呼ぶ経路 (`wp_prot`) に入らない (`grep -n 'wp_prot(' rt/ld_native.c` で確認)。
 - 窓: DR の枠は [va, va+8) と [va-8, va)。page 方式の窓 [va-15, va+7] とは一致しない。C の 248 件の内訳は va 側 247・va-8 側 1 で、窓の外の書込みは観測されなかった (§5)。
 - 限界: カーネル内の書込み (`read(2)` の宛先など) を DR が捕まえるかは未確認 (§7)。8 byte を超える書込み、枠の外から始まる書込みは捕まらない場合がある。
+- 限界: hw 行の `old` は、直前の hit (または arm) の時点の値で、書込み直前の値ではない。DR に掛からない書込み (カーネル内など) があると、以後の `chg` は古い値との比較になりうる。
 
 ## 3. 環境長と初期 rsp (測定の前提)
 
@@ -55,7 +56,7 @@
 | X7c2 | 2 | xx | 0000000 | — | — | 基準 |
 | C7c2 | 2 | hw | 15eac98 | hits 248 | — | 一致 |
 
-- 同じ CPU 内で、監視なし・監視あり (5ac308・15eac98 の hw と page) の全組で `byte_diff=0`・`heap_eq=True`・`state_eq=True`・`detail_eq=True`・units_run 928/928。
+- 同じ CPU 内で、監視なし・監視あり (5ac308・15eac98 の hw と page) の全組で `byte_diff=0`・`heap_eq=True`・`state_eq=True`・`detail_eq=True`。units_run は 928 (全 942 unit のうち) で、run 間の比較は 928 同士。
 - `hwsum` (C7e): `hits=248 stops=253 rc=0`。`hwsum` (F6e1・F6e2・F6c2): `hits=0 stops=5 rc=0`。
 
 ## 5. 陽性対照 (15eac98) の 1:1 対応
@@ -65,6 +66,7 @@
 - 枠の内訳: page の `addr - va` は 0 が 247 件・-8 が 1 件。hw の dr6 は bit 0 が 247 件・bit 1 が 1 件。
 - RIP の差 (hw − page): +6 が 246 件・+4 が 1 件・+8 が 1 件 (page は書込み命令の先頭、hw は書込み直後)。
 - 当初は DR 1 本 (va のみ) で 247 件だった。page 窓の 248 件の内訳 (va-8 の 1 件) を見て DR1 (va-8) を足し、248 件に合わせた。
+- 判定出力の所在: `hw_watch_3648_check.py` の出力 (`work/probe3648/check.txt`) は測定時に保存しておらず、gitignore 対象の `work/` にも残っていない。素材 (`work-m11`・`work-liftdiff`) も fix 時の run には無く、12 run を再実行できなかった。よって 1:1 一致 248/248 の出典は、測定時の作業記録 (上記の dr6・枠・RIP の内訳) であり、判定出力の全文は本付録に貼れない。再現には §6 の手順で 12 run を取り直す必要がある (`oc_artifacts: fl-win64 work-m11 work-liftdiff`)。
 
 ## 6. 再現
 
@@ -86,8 +88,8 @@ python3 tools/m11/trap_triage/hw_watch_3648_check.py tools/liftdiff/work/probe36
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| カーネル内の書込み (`read(2)` の宛先など) を DR が捕まえるかは未確認 | 監視が取りこぼす書込みがあり得る。0 件の記録は「user 側の書込みが 0 件」の根拠 | 本 PR 本文の未解決表 (追跡のみ。子 issue 不要) |
-| 8 byte を超える書込み・枠 (va-8〜va+8) の外から始まる書込みは、今回の boot では観測されなかったが一般には保証されない | 件数が一致しても superset とは言えない | 本 PR 本文の未解決表 |
-| CPU 3 の hw 再測定は未実施 (page 方式の CPU 3 は #2770 §8.9 で測定済み) | 受入 3 の CPU 範囲は 0・2 | 本 PR 本文の未解決表 |
-| trace (呼出し列) の比較は範囲外 (#3648 の受入に含まれない) | 書込み値の一致は確認したが、呼出し列の一致は未確認 | 本 PR 本文の未解決表 (#2770 の未解決の続き) |
+| カーネル内の書込み (`read(2)` の宛先など) を DR が捕まえるかは未確認 | 監視が取りこぼす書込みがあり得る。0 件の記録は「user 側の書込みが 0 件」の根拠 | #2770 へのコメント (本 PR の完了後に投稿。merge 後の追跡先) |
+| 8 byte を超える書込み・枠 (va-8〜va+8) の外から始まる書込みは、今回の boot では観測されなかったが一般には保証されない | 件数が一致しても superset とは言えない | #2770 へのコメント (同上) |
+| CPU 3 の hw 再測定は未実施 (page 方式の CPU 3 は #2770 §8.9 で測定済み) | 受入 3 の CPU 範囲は 0・2 | #2770 へのコメント (同上) |
+| trace (呼出し列) の比較は範囲外 (#3648 の受入に含まれない) | 書込み値の一致は確認したが、呼出し列の一致は未確認 | #2770 へのコメント (#2770 の未解決の続き) |
 | 0x5ac308 への書込み元 (wasm 側) の特定 | 監視 0 件の意味づけに影響 | #2770 の未解決表 (LD-129 の経緯) |
