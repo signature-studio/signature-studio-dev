@@ -181,7 +181,11 @@
 - 真陽性の構造判定 (IR に count の入口判定が無い) の到達可能性 (count が 0 や負になる経路の有無) は未測定。`docs/DEFECTS.md` の類型への対応は PM 判断。
 - 再現: `python3 tools/m11/guard699/scan_guard.py <boot_final.ll> --pe <block00031_PE.bin> --report strict.json` → `python3 tools/m11/trap_triage/strict_evidence.py <IR> --pe <PE> --report strict.json --out strict_evidence.tsv` → `python3 tools/m11/trap_triage/judge_ctx.py <IR> strict_evidence.tsv <PE> 67 98`。
 
-## 4h. 証拠表の行 36〜66 の残り (#3564・部分達成: 判定 21 件・真陽性 12・偽陽性 1・保留 8)
+## 4h. 証拠表の行 4〜35 (#3498・母数 32 件: 真陽性 0・偽陽性 0・保留 32)
+
+- 判定 (母数 32): 真陽性 0・偽陽性 0・保留 32。件ごとの表・判定規則・未解決は `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` §4h が正本 (250 行上限のため分割移動)。
+
+## 4i. 証拠表の行 36〜66 の残り (#3564・部分達成: 判定 21 件・真陽性 12・偽陽性 1・保留 8)
 
 - 全文・行ごとの根拠・判定方法は `REPORT_APPENDIX_3564.md`。本節は結論のみ。
 - 測定 commit: `4517825a2` (origin/main)。`git diff 03df83be4 4517825a2 -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行。入力: `work-m11` の `boot_final.ll` (sha256 `69c774de…`)・`fl-win64` の `block00031_PE.bin` (22,227,016 B)。strict 288 (§3 と一致)。
@@ -192,14 +196,17 @@
 
 ## 5. 再現
 
-本 PR にコミットされた再現手段は `scan_guard.py` のみで、入力は `work-m11` の `boot_final.ll` を要する。
+本 PR の再現手段は `guard699/scan_guard.py`・`trap_triage/strict_evidence.py`・`trap_triage/judge_entry_check.py` で、入力は `work-m11` の `boot_final.ll` を要する (`oc_artifacts: fl-win64 work-m11`)。`block00031_PE.bin` は `fl-win64` 素材に入っている。
 
 ```sh
 cd tools/m11
-python3 guard699/scan_guard.py <boot_final.ll> --pe <block00031_PE.bin>
+python3 guard699/scan_guard.py <boot_final.ll> --pe <block00031_PE.bin> --report strict.json
+python3 trap_triage/strict_evidence.py <boot_final.ll> --pe <block00031_PE.bin> --report strict.json --out strict_evidence.tsv
+python3 trap_triage/judge_entry_check.py <boot_final.ll> strict_evidence.tsv 4 35
 ```
 
-`block00031_PE.bin` は `fl-win64` 素材に入っている。`boot_final.ll` は `oc_artifacts: fl-win64 work-m11` で取得する。§2・§4 の数値を再現する作業スクリプトは本 PR にコミットされていない (`work/` は gitignore 対象)。
+- 期待する出力 (`judge_entry_check.py`): 32 行。行 i の形式は `#<i> <関数> jcc=<jcc の VA> target=<target の VA> | jcc ブロック終端: ... | 脱出先 preds: ...`。先頭行は `#4 function_100bb90 jcc=100bcf4 target=100bd4d` で、以降の各行の関数・jcc・target は上の表の行 i と一致する (前版の記録。IR が無いと照合できない)。
+- 形式の確認 (本 run): 合成 IR (`function_100bb90` を模した 1 関数) と TSV の 1 行で `judge_entry_check.py <IR> <TSV> 1 1` を実行し、rc 0 で `#1 function_100bb90 jcc=100bcf4 target=100bd4d | ...` の形式で出ることを確かめた。IR の実データは使っていない。
 
 ## 6. 未解決 (子 issue に分割)
 
