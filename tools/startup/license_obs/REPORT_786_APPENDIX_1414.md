@@ -121,9 +121,12 @@ g1 の dword (`0x14f852c`) を rip 相対で直接指す命令は 0 件 (既知)
 |---|---|---|---|
 | 0x10d3a30 | 0x10cf498 (0x10c7cd0 内・g6 gate)・0x11fd457・0x11fe627 (0x11fc770 内) | 3 | 0 (0x10c7cd0 の entry のみ 6 入力で到達) |
 | 0x11fc770 | 0xc4e49e (0xc4dba0 内)・0xd1a996 (0xd18130 内)・0xed7c32 (0xed7c00 内) | 3 | 0 |
-| 0xc4dba0 | 0xc51e6e (0xc51e50 内) | 1 | 0 |
-| 0xd18130 | 0xd1e53c (0xd1e180 内)・0xd1f5de (0xd1f5c0 内) | 2 | 0 |
-| 0xed7c00 | 0 (rel32 の call/jmp 参照は無し。0xed7c00 は 0xd1efd0 を呼ぶ側) | 0 (直接) | 0 |
+| 0xc4dba0 | 0xc4f32e (0xc4ecf0 内) | 1 | 0 |
+| 0xd18130 | 0xd1d656 (0xd1d3d0 内)・0xd1f026 (0xd1efd0 内) | 2 | 0 |
+| 0xed7c00 | 0 (rel32 の call/jmp 参照は無し。0xed7c00 は 0xed83c5 で 0xd1efd0 を call する側。0xd1efd0 は 0xd18130 の呼出し元) | 0 (直接) | 0 |
+
+- 深さは呼出し辺の数で数える。0x10d3a30 ← 0x11fc770 (1) ← 0xc4dba0・0xd18130 (2) ← 0xc4ecf0・0xd1d3d0・0xd1efd0 (3)。深さ 3 までを列挙し、深さ 3 の関数の呼出し元は遡っていない (0xd1efd0 の呼出し元は 0xed83c5 (0xed7c00 内) だが、表の深さ外)。
+- 上の表は `probe_1414_callers.py --dyn --write` の出力 (`results/probe_1414_callers.json`) から作った。
 
 - 6 入力 (`probe_1414.CASES`) の unicorn code hook: 0x10d3a30・0x11fc770・0xc4dba0・0xd18130・0xed7c00 は 6 入力とも未到達 (hit 0)。到達したのは 0x10c7cd0 の entry (6 入力とも 1 回) のみ。
 - 0x10d3a30 の入口 (条件 1) の実機経路は未特定。0xed7c00 は直接呼出し 0 件のため、関数ポインタ経由と推定 (未確認)。
