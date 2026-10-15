@@ -35,19 +35,23 @@ def main():
     fv = cases.fvm_line(0x653c80, 'function_653c80', 2, cases.machine_sig(0x653c80, IR_653))
     assert 'wsig=i64,i64,i64' in fv and 'tr=1' in fv, fv
 
-    # 比較: 機械語入口型の i128 位置 (653c80 の r8) だけを外し、i64 の位置 (rcx・rdx) は比べる
+    # 比較: 653c80 の r8 (IR i128 位置) も LD-248 (#4975) で比べる。wasm が 33 を記録すれば一致、0 なら entry_arg (pos 2)
     sigs = {'function_653c80': cases.machine_sig(0x653c80, IR_653)}
     n = trace(entry('653c80', 3, ['11', '22', '33']))
-    assert compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '22', '0'])), CTX, sigs) is None
+    assert compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '22', '33'])), CTX, sigs) is None
+    r = compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '22', '0'])), CTX, sigs)
+    assert r and r['kind'] == 'entry_arg' and r['pos'] == 2, r
     r = compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '23', '0'])), CTX, sigs)
     assert r and r['kind'] == 'entry_arg' and r['pos'] == 1, r
     r = compare.cmp_trace(n, trace(entry('653c80', 3, ['10', '22', '0'])), CTX, sigs)
     assert r and r['kind'] == 'entry_arg' and r['pos'] == 0, r
 
-    # 40c660 (IR i128 が xmm0): 入口値は比べない (wasm は 0 と記録する)
+    # 40c660 (IR i128 が xmm0): LD-248 (#4975) で i128 位置も比べる。wasm が xmm0 に 1.5 を記録すれば一致、0 なら不一致
     sigs = {'function_40c660': cases.machine_sig(0x40c660, IR_SIG)}
     n = trace(entry('40c660', 1, ['0'], ['3ff8000000000000']))
-    assert compare.cmp_trace(n, trace(entry('40c660', 1, ['0'])), CTX, sigs) is None
+    assert compare.cmp_trace(n, trace(entry('40c660', 1, ['0'], ['3ff8000000000000'])), CTX, sigs) is None
+    r = compare.cmp_trace(n, trace(entry('40c660', 1, ['0'])), CTX, sigs)
+    assert r and r['kind'] == 'entry_arg' and r['pos'] == 0 and r['type'] == 'double', r
 
     # 機械語入口型でない関数 (IR の i128 を含む) は従来どおり比べる
     sigs = {'function_1234': {'ret': 'i64', 'params': ['i64', 'i128'], 'defined': True}}
