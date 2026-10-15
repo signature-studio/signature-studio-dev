@@ -11,7 +11,7 @@
 
 ### 7.0 解消後の再測定 (HEAD `bd5daf9d`・参考値・本節が最新)
 
-main 取り込み後 (merge `c277b9ff`・REPORT 分割 `bd5daf9d`) の再測定。`tools/m11` の PR 差分は main と 0 (§7.4)。素材 `fl-win64`・`work-m11` を展開 (`tools/m11/work/`)。toolchain は runner の既存 `/opt/emsdk`・`/opt/retdec`。node v22.23.3 (`m11_e2e.sh` の前提は v26 で、v26 は未確認)。nproc 4。
+main 取り込み後 (merge `c277b9ff`・REPORT 分割 `bd5daf9d`) の再測定。`tools/m11` の PR 差分は main と 0 (§7.4)。素材 `fl-win64`・`work-m11` を展開 (`tools/m11/work/`)。toolchain は runner の既存 [EMSDK]・[RETDEC] を使用 (artifact の再展開はしていない)。node v22.23.3 (`m11_e2e.sh` の前提は v26 で、v26 は未確認)。nproc 4。
 
 | 条件 | 結果 | rc | wall | load (前 → 後 1/5/15 分) |
 |---|---|---|---|---|
