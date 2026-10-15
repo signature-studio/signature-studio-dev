@@ -85,7 +85,17 @@ python3 tools/shared/lift/ildsp/count_unlifted.py "$FL_WIN64_DIR/extracted/block
 | slot 1–5 の host 前提の確定と、closure 70 関数の native 対 wasm 全バイト差分 | 受入 (2) の残り・gate の範囲 | 子 [T-SH-57] |
 | VEX 3 命令 (vcvtss2sd・vpmovsxdq・vshufps) の x64c 対応 (unsup 3 site) | 受入 (1) の残り。実行到達時は trap | 子 [T-SH-58] |
 | REPORT_CLOSURE.md §4.6 の未解決 (WC 以外の vptr 格納 3 件・helper `0x1aedc0`/`0x1b6f4c` の正常系到達) の native 確定 | 受入 (3) | 子 [T-SH-59] |
-| 未 lift 非 padding 16 件 (直接分岐の先でない 15 + 島の 1。§7-4) の到達性 | closure の完全性 | [T-SH-57] の受入に含める |
+| 未 lift 非 padding 16 件 (直接分岐の先でない 15 + 島の 1。§7-4) の到達性 | closure の完全性 | [T-SH-57] の受入に含める。SEH except 6 件 (`0x1b8eb1`–`0x1b8ec8`) と `0x1ac9b8` は §7-7b で静的に判定済み (残りは ldmxcsr 入力の仮定の確認のみ) |
+
+### 7-7b 未解決の確定 (T-SH-134 / #5090・静的判定)
+再現: `python3 tools/shared/lift/ildsp/seh_reach.py "$FL_WIN64_DIR/extracted/block24360_PE.bin" tools/shared/work/lift/ildsp-wc/closure.json` (closure.json は §7-4 の `ildsp_closure.py` の出力)。
+- SEH (`0x1b8e68`): scope table は try `0x1b8eaa–0x1b8eb1` (`call 0x1be130` の 1 命令)・filter `0x1ccb00`・except `0x1b8eb1`。filter は `0xc0000005`・`0xc000001d` のときだけ 1 を返す。
+- `0x1be130` は `ldmxcsr` だけの関数。閉包内の `0x1b8e68` 呼出元 (`0x1c34df`・`0x1c3727`・`0x1c37f2`) は `edx = 0xffc0` を渡し、ldmxcsr の予約 bit に影響しない前提が立つ。except 本体 6 件 (`0x1b8eb1`・`0x1b8eb8`・`0x1b8ebc`・`0x1b8ebf`・`0x1b8ec4`・`0x1b8ec8`) は、この前提の下で閉包から到達しない。
+- except 本体への直接参照 (`call`・`jmp`・`jcc`・データポインタ) は PE 内に 0 件。
+- `0x1ac9b8`: 閉包の入口 `0x1ac460` (`mov edx, 0x228`) → `jmp 0x1ac9b0` → `jmp 0x1acfe0` (alloc 本体) が実行経路。`0x1ac9b0` は `.pdata` の関数先頭ではなく、`ildsp_closure.py` の「次の .pdata 先頭まで」の近似で閉包に入った。`0x1ac9b8` は `0x1ac9b0` の無条件 `jmp` の直後で、実行されない死んだ断片。`0x1ac9b8` への直接参照は全て閉包外 (`0x161fc0`・`0x1621b1`・`0x166970` ほか) からの call。
+
+根拠の内訳: ldmxcsr 入力 `ecx = ((~ebx | 0xffff807f) & eax) | (edi & ebx)`。閉包内の呼出では `ebx = 0xffc0` なので、ecx の上位 16 bit = eax (stmxcsr の結果) の上位 16 bit。MXCSR の bit 16–31 は x86 の予約 bit で stmxcsr は 0 を返すため、ldmxcsr の予約 bit 違反 (#GP → 0xc0000005) は閉包内の経路では起きない。except 本体は閉包から到達しない。
+未確定 (残り): 閉包外の呼出元 `0x1c35ff`・`0x1c36be` (owner `0x1c35c4`) は閉包の外で、どの export からも到達しない。閉包の定義を変えた場合は、この 2 呼出元の到達を確認し直す (子 [T-SH-57] の範囲)。
 
 ### 7-8 測定後のコード差分 (差分 0 の証跡)
 `git diff 2cff3f50d HEAD -- tools/shared/lift/ildsp tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh tools/shared/scripts ':!*.md'` の出力は空 (測定 commit `2cff3f50d` 以降は `.md` のみ)。
