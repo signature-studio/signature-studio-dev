@@ -434,6 +434,7 @@
 | `tools/audio/REPORT_APPENDIX_3168.md` | ~85 | AU-33 (#3168) Firefox 行列の OS 別 sink 判定と 3 シナリオ化の検証全文 (REPORT_AU2_CI.md §11 から分割移動。250 行上限のため)。測定範囲と issue 指定範囲の差分内訳・9aa9239b の ubuntu 再現 9/9 PASS・HEAD c89f18db の再測定 9/9 PASS (§G)・NC・Safari の理由と代替・Win/mac の未検証 |
 | `tools/audio/REPORT_APPENDIX_863.md` | ~20 | AU-15 (#863) 現 HEAD (`2f235a0a`) での再試行 15 run 全 PASS の全文 (REPORT.md §20 から分割移動。250 行上限のため)。§19 (旧 HEAD の失敗 1 件) は REPORT.md 本体 |
 | `tools/audio/REPORT_APPENDIX_863_287655cf.md` | ~30 | AU-15 (#863) 旧 §30 の全文 (測定 commit `287655cf`・write 記録の初回 31 run 全 PASS)。REPORT_APPENDIX_863.md §30 から分割移動 (250 行上限のため)。現行の §30 (`89b10538`) が正本 |
+| `tools/audio/REPORT_APPENDIX_863_CONSUMER.md` | ~40 | AU-15 (#863) §31: consumer (worklet) 側の quantum 履歴と underrun 通知。測定の結論と数値は同ファイル §31 が正本。REPORT_APPENDIX_863.md は 250 行上限のため新節を別置き |
 | `tools/audio/asio/REPORT.md` | ~200 | IASIO COM アダプタ + 120s soak |
 | `tools/audio/asio/REPORT_APPENDIX_998.md` | ~23 | asio REPORT §12-2 全文 (#998 負荷下の再現試験 L1〜L3)。250 行上限のため無変更で分割移動 |
 | `tools/audio/asio/REPORT_APPENDIX_2934.md` | ~125 | asio #2934 (AU-26): 初期目標充填 T の下限 (`FLA_F_T_FLOOR`) の baseline・同一 HEAD 20 回連続・lat_out 前後・親 e2e 実測・need→増分の式・B=128 の 5 回と基点 5 回の比較 |
