@@ -31,12 +31,21 @@ static uint32_t g_lasterr;
 static char g_unimpl[256][96]; static uint64_t g_unimpl_calls[256]; static int g_nunimpl;
 static uint8_t* g_thunks; static size_t g_thunk_off;
 
-typedef struct { uint64_t site; const char* name; int skip_image; uint64_t hits; uint64_t target; } Hook;
+typedef struct { uint64_t site; const char* name; int skip_image; int direct; uint64_t hits; uint64_t target; } Hook;
 static Hook g_hooks[] = {
-    {0x1aedf6, "helper 0x1aedc0 -> [0x268260] (画像内ポインタ 0x1cb5e0)", 1, 0, 0},
-    {0x1aee04, "helper 0x1aedc0 -> [0x268088] RtlPcToFileHeader", 0, 0, 0},
-    {0x1aee4a, "helper 0x1aedc0 -> [0x268090] RaiseException", 0, 0, 0},
-    {0x1b6f6c, "0x1b6f4c -> [0x268268] (画像内ポインタ 0x1cb600)", 1, 0, 0},
+    {0x1aedf6, "helper 0x1aedc0 -> [0x268260] (画像内ポインタ 0x1cb5e0)", 1, 0, 0, 0},
+    {0x1aee04, "helper 0x1aedc0 -> [0x268088] RtlPcToFileHeader", 0, 0, 0, 0},
+    {0x1aee4a, "helper 0x1aedc0 -> [0x268090] RaiseException", 0, 0, 0, 0},
+    {0x1b6f6c, "0x1b6f4c -> [0x268268] (画像内ポインタ 0x1cb600)", 1, 0, 0, 0},
+    /* 正の対照 (直接 call 12 箇所の trace。実行はそのまま本物の helper へ進む) */
+    {0x1aa29f, "ctl direct -> 0x1ac9c0 (CreateInstance 先頭・必ず実行)", 0, 1, 0, 0},
+    {0x1ac9ce, "ctl direct -> 0x1b6f4c (0x1ac9c0 内・CreateInstance 経由)", 0, 1, 0, 0},
+    {0x1647da, "ctl direct -> 0x1aedc0", 0, 1, 0, 0}, {0x1ad022, "ctl direct -> 0x1aedc0", 0, 1, 0, 0},
+    {0x1ad042, "ctl direct -> 0x1aedc0", 0, 1, 0, 0}, {0x1adcad, "ctl direct -> 0x1aedc0", 0, 1, 0, 0},
+    {0x1adcd1, "ctl direct -> 0x1aedc0", 0, 1, 0, 0}, {0x1b006a, "ctl direct -> 0x1aedc0", 0, 1, 0, 0},
+    {0x1b056d, "ctl direct -> 0x1aedc0", 0, 1, 0, 0}, {0x1cc1ae, "ctl direct -> 0x1aedc0", 0, 1, 0, 0},
+    {0x1ac9ce, "ctl direct -> 0x1b6f4c", 0, 1, 0, 0}, {0x1b9049, "ctl direct -> 0x1b6f4c", 0, 1, 0, 0},
+    {0x1b9c45, "ctl direct -> 0x1b6f4c", 0, 1, 0, 0}, {0x1c20a9, "ctl direct -> 0x1b6f4c", 0, 1, 0, 0},
 };
 #define NHOOK (sizeof g_hooks / sizeof g_hooks[0])
 
@@ -119,6 +128,15 @@ static void on_trap(int sig, siginfo_t* si, void* vuc) {
     uint64_t site = (uint64_t)g[REG_RIP] - 1 - IMG_BASE;
     Hook* h = find_hook(site);
     if (!h) { fprintf(stderr, "unexpected trap at 0x%llx\n", (unsigned long long)site); _exit(95); }
+    if (h->direct) {
+        int32_t rel; memcpy(&rel, g_img + site + 1, 4);
+        uint64_t ret = IMG_BASE + site + 5;
+        uint64_t tgt = ret + (int64_t)rel;
+        h->hits++; h->target = tgt;
+        g[REG_RSP] -= 8; memcpy((void*)g[REG_RSP], &ret, 8);
+        g[REG_RIP] = tgt;
+        return;
+    }
     int32_t disp; memcpy(&disp, g_img + site + 2, 4);
     uint64_t ret = IMG_BASE + site + 6;
     uint64_t slot = ret + (int64_t)disp;

@@ -1,0 +1,6 @@
+{
+  "tag": "pe205",
+  "refs": ["#3493"],
+  "note": "PE で確定した mixer 2 関数 (REPORT_PY205・PY-205 #3493)。getTrackCount = trackCount − 2、getEqBandCount = 3。tests/mixer_diff.mjs が mock と照合",
+  "functions": ["mixer.getTrackCount", "mixer.getEqBandCount"]
+}

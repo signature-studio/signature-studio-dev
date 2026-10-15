@@ -51,6 +51,8 @@ A. **別 Worker + SAB RPC (現行 PoC)** ✔ C provider 実装済み (`provider/
 B. **CPython を FLEngine wasm に静的リンク (最終形)** ✔ provider との同一 wasm リンクは実装済み (`build_flpy_static.sh`、REPORT §7d / REPORT_PY2.md。実 FLEngine wasm とのリンクは未実施): `_flhost.call` を同一 wasm 内の C 呼出しに (JS 往復・JSON 無し, <1µs)。FL 本来の「同一プロセス・同一スレッドで callback」と一致。`libpython3.12.a`(9.6MB .a / +5.9MB wasm) をリンクし `PyImport_AppendInittab` で `_flhost` を登録する点は flpy.c と同じ (再利用可)。FLEngine lift 後に移行。
 C. FL 側に固有の Python C API 使用 (`PythonSession`/`TMCPPythonSession`, `PyInterpreterConfig`=サブインタプリタ示唆, `pycb*`) は rodata から確認できるが、呼出し関数名は dlopen/dlsym 経由で平文に残らず未抽出 (§REPORT 未解決)。サブインタプリタ分離は wasm で動く (REPORT §11 の実測) が、`_flhost` が static 状態を持つため現状は不可 (isolated は import 拒否、legacy は main を壊す)。device script は module namespace 分離で足りる判断で採用しない。
 
+D. **provider の期待集合 (PY-280・#3978)**: 関数を実装した PR は `tests/provider_expect/<tag>.json` を 1 つ足す (`tag` はファイル名と一致・`functions` に関数 id)。`tests/provider_check.mjs` 本体は編集しない。件数は集合から導出して assert する。
+
 ## 6. 既知の限界 / 次の拡張
 
 - 戻り値の float/int 区別はモックのみ `F()` が必要。構造値は JSON (getTrackInfo 等)。

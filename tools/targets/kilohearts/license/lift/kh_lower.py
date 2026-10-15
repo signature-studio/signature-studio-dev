@@ -44,6 +44,26 @@ COMIS = re.compile(r'^(\s*)call void @__asm_(?:v)?u?comis(s|d)(?:\.\d+)?\(i128 (
 MERGE = re.compile(r'^(\s*)(%[\w.\-]+) = call i128 @__asm_(cvtsi2ss|cvtsi2sd|cvtss2sd|cvtsd2ss|sqrtsd|sqrtss)(?:\.\d+)?\(([^)]*)\)\s*$')
 FN_DEF = re.compile(r'^define \S+ @function_([0-9a-f]+)\(\) \{$')
 LIT = re.compile(r'(?<![\w%.@])(\d{10,11})(?![\w.])')
+_PE_CACHE = {}
+
+
+def rdata_cstr(core, va):
+    """va が PE の .rdata 上で NUL 終端の印字可能文字列 (長さ 2〜63) の先頭か。--rdata-str の判定用 (#3866)"""
+    if core not in _PE_CACHE:
+        import pefile
+        pe = pefile.PE(core, fast_load=True)
+        data = open(core, 'rb').read()
+        _PE_CACHE[core] = (pe, data)
+    pe, data = _PE_CACHE[core]
+    rva = va - pe.OPTIONAL_HEADER.ImageBase
+    for s in pe.sections:
+        if s.Name.rstrip(b'\0') == b'.rdata' and s.VirtualAddress <= rva < s.VirtualAddress + min(s.Misc_VirtualSize, s.SizeOfRawData):
+            o = s.PointerToRawData + rva - s.VirtualAddress
+            end = min(s.PointerToRawData + min(s.Misc_VirtualSize, s.SizeOfRawData), o + 64)
+            b = data[o:end]
+            i = b.find(b'\0')
+            return 2 <= i <= 63 and all(0x20 <= c < 0x7f for c in b[:i])
+    return False
 VEX_DEF = re.compile(r'^\s*(%[\w.\-]+) = call i128 @__asm_v[\w.]*\(')
 XMM_ST = re.compile(r'^(\s*)store i128 (%[\w.\-]+|-?\d+|undef), i128\* @xmm(\d+)\s*$')
 YMM_ST = re.compile(r'^(\s*)store i256 (%[\w.\-]+|-?\d+|undef), i256\* @ymm(\d+)\s*$')
@@ -301,6 +321,8 @@ def main():
     ap.add_argument('--skip', default='')
     ap.add_argument('--raw-va', action='store_true',
                     help='素の VA リテラルを ptrtoint(@global_var) に置換せず値として残す (EditorModel 層: vtable store の byte parity 用)')
+    ap.add_argument('--rdata-str', action='store_true',
+                    help='--raw-va 時も、.rdata の NUL 終端文字列 (長さ 2〜63・印字可能) を指す素の VA リテラルは窓 (@global_var_<VA>) へ置換する (#3866 / D11)')
     ap.add_argument('--volatile-ret', action='store_true',
                     help='kh_ 本体末尾の load @rax を volatile にする (LLVM -O1 TailCallElim による中間副作用削除の抑止)')
     ap.add_argument('--jt', default='{}', help='{"<jmp insn va hex>": {"table": va, "n": N}}  switch jump table (32bit signed offsets from table base)')
@@ -434,6 +456,13 @@ def main():
             v = int(m.group(1))
             if IMG_LO <= v < IMG_HI:
                 vaset.add(v)
+    strva = set()
+    if raw_va and a.rdata_str:
+        for m in LIT.finditer(CAST.sub('', allt)):
+            v = int(m.group(1))
+            if IMG_LO <= v < IMG_HI and rdata_cstr(a.core, v):
+                strva.add(v)
+        vaset |= strva
 
     def window(txt):
         if 'rdata' in skip:
@@ -442,7 +471,8 @@ def main():
         if raw_va:
             # --raw-va: 素の VA リテラルを値として生のまま残す (vtable/RTTI store が native と byte 一致)。
             # deref は CAST 形のみ窓へ行くため、計算 index のテーブル読み (DSP closure) は旧動作のまま。
-            return txt
+            # 例外 (--rdata-str): 文字列リテラルの VA は、読み手が deref するため窓へ置換する。
+            return LIT.sub(lambda m: (f'ptrtoint (i8* @global_var_{int(m.group(1)):x} to i64)' if int(m.group(1)) in strva else m.group(1)), txt)
         return LIT.sub(lambda m: (f'ptrtoint (i8* @global_var_{int(m.group(1)):x} to i64)' if int(m.group(1)) in vaset else m.group(1)), txt)
 
     def rename(txt):

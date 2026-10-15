@@ -107,6 +107,9 @@ IAT 名の内訳 (件数):
 - vcall `call [reg+disp]`: Transmitter 60 件、LimiterLite 5・TransientLooper 5 件ほか。WaveformColouring の 1 件は `0x1a9e2b: call qword ptr [rax+0x18]` (関数 `0x1a9e10`)。
 - `call reg`: Shimmer 4 件、LowFreqEnhancer・StereoEnhancer・TransientLooper 各 2 件、LimiterLite・Limiter 各 1 件。
 
+### 4.5 間接 call 4 件の到達 (#3250 / T-SH-54・部分達成)
+- 結論: 間接 call 4 件 (`0x1aedf6`・`0x1aee04`・`0x1aee4a`・`0x1b6f6c`) は、この実験では到達しなかった (hook 0 件)。到達しない根拠ではない。到達条件 (`0x1b6ea0` の戻り値) と trap 化か stub 化かの判断は保留し、子 #4230 に移す。測定の正本は `REPORT_APPENDIX_3250.md`。
+
 ### 5. 起票 (子 issue)
 | 子 | 対象 | 規模 (本節の数値) |
 |---|---|---|

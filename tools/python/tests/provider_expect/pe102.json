@@ -1,0 +1,6 @@
+{
+  "tag": "pe102",
+  "refs": ["#2883","#2959"],
+  "note": "PE 解析で value 引数の意味論 (準備判定を除く) を確定した関数 (REPORT_PY61 §3 の muteTrackLock・PY-102 #2883。準備判定は #2959)",
+  "functions": ["playlist.muteTrackLock"]
+}

@@ -1,0 +1,6 @@
+{
+  "tag": "pe215",
+  "refs": ["#3568"],
+  "note": "PE 0xd75d30 で -1 の戻り値と status 経路を確定した device 連動 1 件 (REPORT_PY215・PY-215 #3568)。連動表は空と仮定、tests/device_diff.mjs が mock と照合",
+  "functions": ["device.getLinkedChannel"]
+}

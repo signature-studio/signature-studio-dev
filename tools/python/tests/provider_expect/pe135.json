@@ -1,0 +1,6 @@
+{
+  "tag": "pe135",
+  "refs": ["#3022"],
+  "note": "PE で引数書式を確定した描画・メーター系 6 件と blank 1 件 (REPORT_PY135・PY-135 #3022)。描画は状態を持たず、blank は isBlanked を書く。tests/screen_diff.mjs が mock と照合",
+  "functions": ["screen.addMeter", "screen.displayBar", "screen.fillRect", "screen.drawRect", "screen.drawText", "screen.eraseRect", "screen.blank"]
+}

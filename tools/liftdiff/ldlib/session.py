@@ -218,7 +218,10 @@ class Session:
             self._mark_timing(c, n, w)
             rec['cases'].append(c)
         if not any(c['outcome'] in ('equal', 'diff', 'wasm_trap') for c in rec['cases']):
-            rec['cases'] += self._fvm_cases(nat, was, va, sig, rec['cases'], sigs)
+            fvm, fvm_skip = self._fvm_cases(nat, was, va, sig, rec['cases'], sigs)
+            rec['cases'] += fvm
+            if fvm_skip:
+                rec['fvm_skip'] = fvm_skip
         if with_refine:
             refined = False
             for c in rec['cases']:
@@ -243,17 +246,28 @@ class Session:
                         c['refine_timing'] = rt
         return rec
 
-    def _fvm_cases(self, nat, was, va, sig, cases_done, sigs):
-        """LD-23 (#975): 全 pattern が未実行 (equal/diff/wasm_trap 無し) の関数で、's' の native fault addr から
-        this 候補の引数を推定し、その引数だけ VMT 付き疑似オブジェクトにした case を実行する。戻りは追加 case 列。"""
+    def fvm_cand(self, va, sig, cases_done):
+        """fvm の候補引数 index と対象外の理由 (cand, skip) を返す。ret 断片 (add rsp,N; ret) と候補 2 件以上は対象外 (#3782)。"""
         fault = None
         for c in cases_done:
             if c.get('pattern') == 's' and c.get('fault'):
                 fault = c['fault']
                 break
+        if self.analyzer.is_ret_fragment(va):
+            return None, 'ret_fragment'
         cand = cases.fvm_candidates(fault, cases.kinds_of(sig['params']))
+        if len(cand) > 1:
+            return None, 'multi_candidate'
+        return cand, None
+
+    def _fvm_cases(self, nat, was, va, sig, cases_done, sigs):
+        """LD-23 (#975): 全 pattern が未実行 (equal/diff/wasm_trap 無し) の関数で、's' の native fault addr から
+        this 候補の引数を推定し、その引数だけ VMT 付き疑似オブジェクトにした case を実行する。戻りは追加 case 列。"""
+        cand, skip = self.fvm_cand(va, sig, cases_done)
+        if skip:
+            return [], skip
         if not cand:
-            return []
+            return [], None
         lines = [cases.fvm_line(va, self.fn_name(va), i, sig, trace=self.trace) for i in cand]
         ids = ['%x:fvm%d' % (va, i) for i in cand]
         rn = nat.run_cases(lines, ids)
@@ -275,7 +289,7 @@ class Session:
             c['_n'] = n; c['_w'] = w
             self._mark_timing(c, n, w)
             out.append(c)
-        return out
+        return out, None
 
     def static_info(self, va):
         return self.analyzer.analyze(va)
