@@ -68,7 +68,7 @@ const rejectDiffs = rejects.map(([name, args]) => ({ name, args, wasm: run(wasm,
   .filter((r) => r.wasm.code !== 5);
 
 // PY-227: device 割当 [dev, link] を変えて -7 (device 無し)・-6 (送出先無し) を通す。PE 0xd747f0 は device を見てから送出先を見る (channel によらず先に判定)。
-// PY-231: forwardMIDICC (PE 0xd748e0) も同じ判定順。
+// PY-231: forwardMIDICC (PE 0xd75120) も同じ判定順。
 const linkSeq = [
   [[1, 1], ["device.midiOutMsg", [0x90, 1, 60, 100]]],
   [[0, 1], ["device.midiOutMsg", [0x90, 1, 60, 100]]],
