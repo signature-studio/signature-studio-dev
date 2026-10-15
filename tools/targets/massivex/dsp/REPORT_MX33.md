@@ -1,6 +1,6 @@
 # Massive X MX-33 (#3032) 受入 1: xmm0〜3 だけの入口 livein (MX-6 の保留 17 件) の判定
 
-- 解析日: 2026-10-15 / 担当: `tools/targets/massivex/dsp/` (親 #1123 MX-6 の残件。受入 2〜5 は子 issue に分離)
+- 解析日: 2026-10-15 / 担当: `tools/targets/massivex/dsp/` (親 #1123 MX-6 の残件。受入 1 の残件と受入 2〜5 は子 issue に分離)
 - 素材: `plugins-massivex` の `Native Instruments Massive X v1.7.1.exe` (1,870,391,792 B) を既存パーサで展開
   (`scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> <work> key`)。
   `Massive X.vst3` = 95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca` (検収値と一致)。PE の置き場所は `$RUNNER_TEMP` 配下。
@@ -125,18 +125,18 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| U3h: reg-reg 複写 (`movaps xmm6, xmm2` 等) の転送先 xmm_j の後続読みを追わない | 受入 1 の判定不能 9 件 (複写型) | 親 #3032 へ追補 (要判断) |
-| U3d: 既存 must-def は部分書込 (merge) を全幅の定義として扱う。merge 後の上位保持の利用を見ない。MX-6 の xmm4/5 陰性 (livein 0) も、merge 先頭の入力を見落とす過小検出側の影響を受けうる (未測定) | 判定不能 8 件 (merge 型)・MX-6 の陰性の強さ | 親 #3032 へ追補 |
-| U3e: call/jmp の引数転送 (xmm を読まずに渡す形) は `regs_access` に現れず、母集合 (livein 17) に入らない | 母集合の外側の関数は未判定 | 親 #3032 へ追補 |
+| U3h: reg-reg 複写 (`movaps xmm6, xmm2` 等) の転送先 xmm_j の後続読みを追わない | 受入 1 の判定不能 9 件 (複写型) | 子 **[MX-37]** |
+| U3d: 既存 must-def は部分書込 (merge) を全幅の定義として扱う。merge 後の上位保持の利用を見ない。MX-6 の xmm4/5 陰性 (livein 0) も、merge 先頭の入力を見落とす過小検出側の影響を受けうる (未測定) | 判定不能 8 件 (merge 型)・MX-6 の陰性の強さ | 子 **[MX-37]** |
+| U3e: call/jmp の引数転送 (xmm を読まずに渡す形) は `regs_access` に現れず、母集合 (livein 17) に入らない | 母集合の外側の関数は未判定 | 子 **[MX-37]** |
 | U3f: 包含検査が空真 (CFG の 128 bit 候補 0 件)・線形側と分類器を共有 | §4 の独立性は弱い | 本 PR の限界として記載 (追加起票なし) |
-| U3g: 既知の非 vectorcall float 関数での感度確認 (任意) | scalar 落ちの実地確認なし | 未実施 (親 #3032 へ追補) |
-| U3b (MX-6 から): 間接 jmp テーブルの残り (seeds 12 / 1-round 14 の過大近似) | 陰性の保守性は保つが精度は未確定 | 親 #3032 (本 PR の対象外) |
-| U3c (MX-6 から): 1-round の解析不能 118 件の由来 | vectorcall 判定の対象外 | 親 #3032 (本 PR の対象外) |
-| 受入 2 (MX-6 U4a・FH4 funclet 全数) | FH4 の landing pad が一覧に入らない | 子 issue **[MX-37]** (親 #3032 から起票予定) |
-| 受入 3 (MX-6 U4b・U4c・unwind 残件) | 1 本目 .pdata 全体の数値は下界・読取不能 160 件の原因未確定 | 子 issue **[MX-38]** (親 #3032 から起票予定) |
-| 受入 4・5 (MX-6 U4d・U4e・funclet 到達と取り込み設計) | #228 同型の確定 (深い closure での到達) と x64c への取り込み | 子 issue **[MX-39]** (親 #3032 から起票予定) |
+| U3g: 既知の非 vectorcall float 関数での感度確認 (任意) | scalar 落ちの実地確認なし | 未実施 (子 **[MX-37]**) |
+| U3b (MX-6 から): 間接 jmp テーブルの残り (seeds 12 / 1-round 14 の過大近似) | 陰性の保守性は保つが精度は未確定 | 子 **[MX-37]** |
+| U3c (MX-6 から): 1-round の解析不能 118 件の由来 | vectorcall 判定の対象外 | 子 **[MX-37]** |
+| 受入 2 (MX-6 U4a・FH4 funclet 全数) | FH4 の landing pad が一覧に入らない | 子 issue **[MX-38]** |
+| 受入 3 (MX-6 U4b・U4c・unwind 残件) | 1 本目 .pdata 全体の数値は下界・読取不能 160 件の原因未確定 | 子 issue **[MX-38]** |
+| 受入 4・5 (MX-6 U4d・U4e・funclet 到達と取り込み設計) | #228 同型の確定 (深い closure での到達) と x64c への取り込み | 子 issue **[MX-39]** |
 
-- 上表の子 issue 番号は、受入 2〜5 を [MX-37]・[MX-38]・[MX-39] に割り当てた案 (受入 4 と 5 を [MX-39] に併合)。親が確定する。
+- 子 issue の割当: **[MX-37]** = 受入 1 の残件 (U3 系: 複写先の追跡・merge 扱い・引数転送・感度・間接 jmp・解析不能 118 件)、**[MX-38]** = 受入 2・3 (FH4 funclet・unwind 残件)、**[MX-39]** = 受入 4・5 (funclet 到達・取り込み設計)。起票番号は PR 本文に記載。
 
 ## 7. 既知類型との関係
 
@@ -148,6 +148,6 @@
 
 - 測定 commit = **`d9a2b7ec2`** (`feat(massivex): classify xmm0-3 vectorcall candidates (MX-33 #3032)`)。
   変更: `scripts/mx6_vectorcall.py` (読み位置の返却: +4/−1 行)・`scripts/mx33_xmm03.py` (新規)・`mx6_e2e.sh` (step 4/7 と assert の追加)。
-- `git diff d9a2b7ec2 HEAD -- tools/targets/massivex/dsp` → **0 行** (測定時点の HEAD で確認)。
-  本 REPORT の commit は docs のみで、測定対象外。
+- `git diff d9a2b7ec2 HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` → **0 行** (コードの差分 0)。
+  `tools/targets/massivex/dsp` 全体の差分は本 REPORT の追加 (docs commit `61e1aabbe`) のみで、測定対象外。
 - MX-6 測定 commit (`fbc9971f`) からの変更 (`mx6_vectorcall.py` の +4/−1 行・`mx6_e2e.sh`) は、MX-6 の表示値を変えないことを e2e (§5) で確認した。
