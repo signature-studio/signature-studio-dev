@@ -67,10 +67,10 @@ RETDEC_BIN=<retdec-decompiler のパス> bash tools/plugins/framework/fw_blk_con
 ## 8. コード差分 (測定 commit 以降)
 
 ```sh
-git diff 96b26019e HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md'
+git diff ffd515723 HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md'
 ```
 
-結果 (検証 HEAD `ce5e7dc61` 時点で出力 0 行。最終 HEAD での結果は PR 本文の検証欄に記載):
+結果 (検証 HEAD `e3a5bc727` 時点で出力 0 行。`.md` を除く非 md 差分が 0 行であることを確認):
 
 （出力なし・0 行）
 
@@ -86,11 +86,11 @@ git diff 96b26019e HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!
 | only08 / only18 | 残す slot 1 つ | 1 / 1 / 1 | only18 は残る・only08 は消える |
 | b18_k_00 / _ff (k=0〜7) | slot 0x18 の k 番目 byte を 0 / 0xff | k=0 (00・ff とも): 2 件 / k=1 の ff: 2 件 / 他 (k=1 の 00 を含む): 3 件 | 8a1018 が消えるのは k=0 (00・ff) と k=1 の ff。他は残る |
 | b18_pair_00 | 0x18〜0x19 (`24 00`) を 0 埋め | 2 / 2 / 2 | 消える |
-| b18_keep24 | 0x18 の `24 00` だけ残し残り 6 byte を 0 埋め | 1 / 1 / 1 | 残る (値 `i64 36`) |
+| b18_keep24 | BLK の他の全 byte を 0、0x18〜0x19 (`24 00`) のみ元の値 | 1 / 1 / 1 | 残る (値 `i64 36`) |
 
 - 読み取れること (n=3 で一致):
   1. 1 byte 単独の変異で 8a1018 が消えるのは、0x18 を 0x00 / 0xff にした場合と、0x19 を 0xff にした場合だけ (0x19 の `b18_1_00` は元の値が `00` のため恒等変換で、残るのは当然)。0x1a〜0x1f の 6 byte は単独で変えても消えない。`24 00` (0x18〜0x19) を 0 にした `b18_pair_00` も消える。
-  2. `24 00` だけを残し残りを 0 にした `b18_keep24` では 8a1018 は残るが、値が `i64 36` に変わる。したがって 8a1018 の constant 化は先頭 2 byte の値に依るが、`"$"` (`24 00`) が条件かは確定できない (0x18 を 0xff にしても消えるため、`"$"` 固有の条件ではない)。
+  2. `24 00` だけを残し BLK の他の全 byte を 0 にした `b18_keep24` でも 8a1018 は残る (値は `i64 36` に変わる)。これは `24 00` の十分性だけを示す。`"$"` (`24 00`) が必要条件かは未確定 (0x18 を 0xff にすると 0x18 の `24` 自体が消えるため、その実測からは必要性を判定できない)。
   3. 8a1008・8a1010 (`i32 36`) は 0x18 の単独変異 (n=3) では消えなかった。0x08・0x10 の変異は未測定。
 - 訂正: §4 の「0x18 は `24 00` を含まない」は誤り。0x18 の先頭は `24 00 00 00` (`"$"` を含む)。
 - **修復前提 (受入 3)**: BLK 0x280 byte を 0 埋めすると、この関数の constant global は 3 件とも 0 件になる (zero: n=3 で 0)。`icall_rewrite.py` の BLK 0 埋めを修復候補とするなら、constant 化の消去は前提として成立する。ただし「fold が消えた後に smoke PASS するか」は未検証 (#3120 / #3121 の範囲)。
