@@ -193,8 +193,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| F3d 58 関数のうち 3 対象以外の 55 関数の機械語・IR 突合と、`audit_lsf_ssa_e2e.sh` の HEAD / F3d 比較 (未実施) | 既定化の判断材料が無い | #3528 (LD-160) |
-| 既定 e2e の pin (STRICT_DONE 56・SURVEY_OK_EXACT 872) と本 snapshot の不一致 (HEAD でも発生) | 既定の e2e が rc=1 で終わる | #3528 (LD-160) の注意欄 |
+| 既定化の判断 (効果の実測・既定化した HEAD の e2e・guard の効く入力の negative control)。突合と audit の比較は §11 で完了 | 既定化は PM 判断で見送り (R7 (a)・可逆・§11)。既定の挙動は変わらない | PM 判断 (しない)。再検討時に起票 |
+| 既定 e2e の pin (STRICT_DONE 56・SURVEY_OK_EXACT 872) と本 snapshot の不一致 (HEAD でも発生) | 既定の e2e が rc=1 で終わる | #3647 (M11-27・OPEN・親 #3520) |
 
 ## 10. LD-135 (#2834): F3d 適用 IR の再生成と 4 site の判定 (保留)
 
@@ -223,3 +223,7 @@
 - 監査 `audit_lsf_ssa_e2e.sh` (`M11_WORK`・`LD_WORK` 指定・前景): 版 `2f921d4dc` で 2 m 05 s・rc 0・7/7 (3 site を OK_LOAD にした results の版)。取り下げ後の results では再実行していない (素材 work-m11・work-liftdiff が本 run に無いため)。
 - 分類器 `spill_classify_1161.py tools/m11/ldfix/results/audit_510_ssa.json` を取り下げ後の results (= `b706fb666` = origin/main) に対して実行: 178 site / 71 関数。status 確定 147・判定不能 30・未判定 1。出力は `results/spill178_1161.tsv` と `cmp` で一致。spill 宛の確定 TRUE_DROP 関数 32、うち drops_510 に無いもの 14 (4120c0 41a5d0 466af0 6bb3f0 6c3700 6c3d20 775340 815050 ddf630 f3e050 1042d20 10c7cd0 12cb680 12f9730)。
 - 版 `2f921d4dc` の分類器 status: 確定 150・判定不能 27・未判定 1 (3 site の OK_LOAD 分の差)。
+
+## 11. LD-160 (#3528): 突合・audit の比較と既定化の判断
+
+結論: F3d は既定化しない (`ldfix.py` の除外は残す)。突合・audit の測定値と理由は [REPORT_3528.md](REPORT_3528.md) が正本。

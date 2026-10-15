@@ -331,8 +331,28 @@ dec_label_pc_5dffc0:
   %inr = fcmp olt x86_fp80 %at, 0xK403E8000000000000000
   br i1 %inr, label %dec_label_pc_5dffe7, label %dec_label_pc_5dffef
 dec_label_pc_5dffe7:
-  %sn = call x86_fp80 @llvm.sin.f80(x86_fp80 %t)
-  %cs = call x86_fp80 @llvm.cos.f80(x86_fp80 %t)
+  ; x87 fsincos は 66-bit π で引数縮約する (REPORT_APPENDIX_H §22)。k·π/2 を 2 分割で引き、sin/cos を r に適用する
+  %qf = fmul x86_fp80 %t, 0xK3FFEA2F9836E4E44152A
+  %qr = call x86_fp80 @llvm.rint.f80(x86_fp80 %qf)
+  %k = fptosi x86_fp80 %qr to i64
+  %u1 = fmul x86_fp80 %qr, 0xK3FFFC90FDAA200000000
+  %d1 = fsub x86_fp80 %t, %u1
+  %u2 = fmul x86_fp80 %qr, 0xK3FDD85A308D300000000
+  %r = fsub x86_fp80 %d1, %u2
+  %sr = call x86_fp80 @llvm.sin.f80(x86_fp80 %r)
+  %cr = call x86_fp80 @llvm.cos.f80(x86_fp80 %r)
+  %q = and i64 %k, 3
+  %qodd = and i64 %q, 1
+  %even = icmp eq i64 %qodd, 0
+  %sb = select i1 %even, x86_fp80 %sr, x86_fp80 %cr
+  %cb = select i1 %even, x86_fp80 %cr, x86_fp80 %sr
+  %sneg = icmp ugt i64 %q, 1
+  %qm = sub i64 %q, 1
+  %cneg = icmp ule i64 %qm, 1
+  %sm = fmul x86_fp80 %sb, 0xKBFFF8000000000000000
+  %sn = select i1 %sneg, x86_fp80 %sm, x86_fp80 %sb
+  %cm = fmul x86_fp80 %cb, 0xKBFFF8000000000000000
+  %cs = select i1 %cneg, x86_fp80 %cm, x86_fp80 %cb
   %c0 = fmul x86_fp80 %cs, %be
   %s0 = fmul x86_fp80 %sn, %be
   %f0 = fptrunc x86_fp80 %c0 to float

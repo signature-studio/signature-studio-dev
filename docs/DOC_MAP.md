@@ -271,6 +271,7 @@
 | `tools/m11/trap_triage/REPORT.md` | ~228 | M11 survey trap の個別原因切り分け (#130)・halt0 20 の原因 (#417)・OOB 分類 (#419、§8.2 = 旧 tree の実測。現 main の ON/OFF 比較は REPORT_595) |
 | `tools/m11/trap_triage/REPORT_2212.md` | ~115 | #2212: rt.o の静的データ配置 (`g_dest_h`・`g_rec_*`・pad) と関数有無の対照 (NODATA 2012・PRE/POST の 2006・既定 2008)・リンク後の実アドレス・n=3 の決定性 (生値 `table_2212.tsv`・`addr_2212.txt`)・再現 `repro_1952_rt_mech.sh` |
 | `tools/m11/trap_triage/REPORT_714.md` | ~246 | #714: OOB 呼出し鎖・計測器の影響・実値採取の再試行 (§12〜§13)。#1602 r4 の要約は末尾。全文は `REPORT_APPENDIX_1602.md` |
+| `tools/m11/trap_triage/REPORT_APPENDIX_3564.md` | ~70 | #3564: strict 候補の残り (証拠表の行 36〜66 の保留 6・単独 15) の件ごと判定 (真陽性 12・偽陽性 1・保留 8)。REPORT_718 §4i の全文・判定補助 `judge_src.py`・機械語側のネガティブコントロール `negctl_3564.py` (付録 §7) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` | ~56 | #3498 (PR #3567): strict 候補の証拠表 行 4〜35 (32 件) の件ごとの表・判定規則・未解決 (REPORT_718 §4h の全文。REPORT_718.md の 250 行上限のため分割移動)。判定は保留 32 (真陽性 0・偽陽性 0) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2773.md` | ~70 | #2773 (2 回目): REPORT_679 §10 の全文。unit 101 の周回の根本原因 (4fa210 の件数 0 ガード脱落・D19 同型)・修復の測定表・原典突合・未解決 |
@@ -340,6 +341,7 @@
 | `tools/m11/ldfix/REPORT_2396.md` | ~120 | LD-111 (#2396): `audit_lsf_disp.py` の変位形を `audit_lsf.py` に統合 (既存 3 判定は byte 不変、SUSPECT_DISP_VAS を並べて出力)。残 SUSPECT 3 件 (6677a0・d237e0・de1da0) を機械語 `movs` の列挙漏れ (誤検出) と確定し、列挙を拡張して 4 → 1 件 (41a670 のみ、修復後 0)。独立算法 `triage_ld111.py` の突合と NC 5 本 |
 | `tools/m11/ldfix/REPORT_2438.md` | ~106 | LD-114 (#2438): #2264 §8.3 から移管された spill 宛 未判定 12 site の消費者分類 (OK_LOAD 5・UNDETERMINED 7)。入口の memory 読みの `xor i64 0, 0` (新類型候補・3009 関数) を記録 |
 | `tools/m11/ldfix/REPORT_2921.md` | ~77 | LD-138 (#2921): `ddf630` の spill 宛 未判定 4 site (ddf6b5・ddf6c6・ddff5a・de0bfe) を機械語と IR の段数で TRUE_DROP と分類。判定根拠は `results/candidate_verdicts_2921.jsonl`、再現は `ld138_ddf630_dis.py` |
+| `tools/m11/ldfix/REPORT_2987.md` | ~80 | LD-143 (#2987): ddf630 の CELL_DEEP TRUE_DROP 4 site の IR 修復 (`fix_spill_deep_2987.py`、1 段 load 2 本に 2 段目の deref)。修復前後で spill 確定・脱落和集合は不変。2 段目の値 `[V]` の確認は未解決 |
 | `tools/m11/ldfix/REPORT_2922.md` | ~65 | LD-139 (#2922): #2838 の残り 12cb680 の 3 site (12cb8e1 判定不能 → 再分類・12cba4d・12cbab4 未判定) を TRUE_DROP に分類 (消費者 = 間接 call 先のコールバックの読み、IR 脱落)。脱落関数の和集合は REPORT §1 の実測値。動的 callback 経路と書き戻しは未解決 (PM) |
 | `tools/m11/ldfix/REPORT_2838.md` | ~50 | LD-135 (#2838): #2245 の群 B 残りのうち 466af0 の 3 site (2 段参照の 1 段脱落) を TRUE_DROP に分類。残り 9 site は #2921・#2922・#2923 (LD-138〜140) に起票 (範囲縮小) |
 | `tools/m11/ldfix/REPORT_2923.md` | ~42 | LD-140 (#2923): spill 宛 1046a30 の 2 site を再判定。10479c7 は判定不能 (OK_LOAD は撤回。IR 側の確認は #2958)、1047556 は段数は一致するが cell 番地が VA 表記 (22946304) の VA 漏れの疑いで判定不能のまま (修復は #2958 (LD-142))。上流 X の段数は未確認 |
@@ -354,6 +356,7 @@
 | `tools/m11/ldfix/REPORT_3328.md` | ~100 | CI-149 (#3328): スピル引数 deref の走査定義 (CALL・EXCL・COPY・CMP の kind 分け、偽陽性の再ロード除外、判定不能の定義)。件数と判定は本 REPORT §0・§6。未判定は子 #3381 [CI-152]・#3382 [CI-153] |
 | `tools/m11/ldfix/REPORT_3326.md` | ~110 | CI-148 (#3326): 誤り 13 箇所 (DEFECTS D4) のうち単純型 5 箇所を機械照合 22 命令付きの site 単位 IR 修復 `fix_site_3326.py` で直す (既存 pass で直る 4 箇所を除く)。ネガティブコントロール 4/4 拒否。`ldfix_e2e.sh` の stage4・survey は base と一致 (変化なし・OOB は両方に残る)。複雑型 4 箇所と 0x413340 の 3 番目引数は子 #3372 (CI-151) |
 | `tools/m11/ldfix/REPORT_2660.md` | ~70 | LD-119 (#2660): spill 宛 判定不能 9 site を再検証。4 site は上流 `xor i64 0,0` (型タグ読みの置換) が作る死んだ辺に依存するため TRUE_DROP を取り下げ、判定不能のまま (`ir_reach_2660.py` で到達性を検査)。脱落関数の和集合は 72 (未確定・#1161 残) |
+| `tools/m11/ldfix/REPORT_3528.md` | ~86 | LD-160 (#3528): F3d 対象関数の機械語・IR 突合 (突合ツール `f3d_crosscheck_3528.py`・negative control `f3d_negctl_3528.sh`・単体テスト `test_f3d_slots_3528.py`)、audit の HEAD / F3d 比較、既定化は見送り (理由と条件は §4)。測定値は本ファイルが正本 |
 | `tools/m11/ldfix/REPORT_2388.md` | ~75 | LD-109 (#2388): cf3790 の spill 宛 未判定 15 site を全て OK_LOAD と判定 (機械語・IR の行を `ld109_cf3790_verify.py` が照合して生成)・slot 名の式の独立確認 (#2389 と同じ `stack_var_(disp-0x1d8)`)・基底が上流の脱落値由来で汚染される注意。静的突合のみ |
 | `tools/m11/ldfix/REPORT_3426.md` | ~95 | CI-157 (#3426・親 #3416): `0x412fc0` の呼出規約の機械語↔IR 対応表 (5 番目引数の既定値分岐・レジスタ引数 rcx〜r9 の欠落・スタック部は一致) と D5 系の分類 (D7 は非該当)。検査器 `verify_abi_3426.py` (NC 5/5 拒否)。修復は子 #3450 (CI-163)・#3451 (CI-164) |
 | `tools/m11/ldfix/REPORT_3450.md` | ~100 | CI-163 (#3450・親 #3426): `function_41c8c0` (WideCharToMultiByte の薄いラッパ) を 8 引数化し、呼出元 4 site を機械語の rcx〜r9 と照合して接続。e2e 実測 (stage4・survey 不変)・DEFECTS D26 の行案 |
@@ -366,6 +369,7 @@
 | `tools/m11/ldfix/REPORT_942_TRAPSITE.md` | 102 | #942 (CI-22): stage4 survey の trap 9 件の発生箇所 (unit 別) と引き金の実測。上流の書込み元は未特定 (次 run) |
 | `tools/m11/ldfix/REPORT_942_QSTORE.md` | 81 | #942 (CI-22): post 済み snapshot に本番の IR 生成順 (ldfix → ld108 → qstore) を適用した stage4/survey A/B (`qstore_ab_942.sh`)。qstore で survey trap 9→6 (unit 53・87・138 が消える = D17)。本番 IR (post 前) での件数は未測定。逐次 boot の threw (unit 17) は不変 |
 | `tools/m11/ldfix/REPORT_942_ALLOCA.md` | ~102 | #942 (CI-22): 通常 boot の unit 17 trap の書込み元 (44bae0 の alloca 縮退・GetCPInfo 越え書き) を観測フックで特定し、alloca 修正の A/B (`alloca_ab_942.sh`) を実測。残りの trap (unit 56 ほか) は次 run |
+| `tools/m11/ldfix/REPORT_942_PRODORDER.md` | ~126 | #942 (CI-22): 本番の IR 生成順での通常 boot の A/B 再現と unit 56 の診断。測定値と判定は本文が正本 |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |
 | `tools/m11/shimx_link/REPORT_APPENDIX_179.md` | ~49 | M11 closure の旧 main link 失敗 (`sxt_*` export) の修正前後・`--midi` / `--ws --midi` の e2e 実測・起動 KPI (#179 SHX-T6)。REPORT §11 の全文を分割移動 (250 行上限のため) |
 | `tools/m11/shimx_link/REPORT_APPENDIX_2839.md` | ~70 | midiOutShortMsg の HMIDIOUT が IR で i64 になる根因 (SHX-T31 #2839): 機械語・IR・署名 DB (`windows.json` の HMIDIOUT = unknown) の突合、HANDLE 系の対照 (CloseHandle = i64*)、修正方針 (正規化 pass の恒久化)。測定値の正本。再現は `hmo_rootcause.py` |
@@ -482,8 +486,10 @@
 | `tools/python/REPORT_PY56.md` | ~70 | PY-56 (#1934): playlist 38 関数のうち `selectTool` (書式 `i`)・`scrollTo` (書式 `iiii`) の引数確定。残り 36 関数は子 #1971 (PY-57) |
 | `tools/python/REPORT_PY57.md` | ~75 | PY-57 (#1971): playlist 残り 36 関数のうち 8 件の逆アセンブル骨格 (戻り値・範囲 code は未確定)。未読 26 件は #2026 (PY-61) |
 | `tools/python/REPORT_PY61.md` | ~130 | PY-61 (#2026): playlist 未読 26 関数の引数・戻り値の型・範囲 code を VA 付きで確定。`-4` ↔ `RANGE` は文言で対応 (数値は非対応)。操作コアと残り helper は子 #2809 (PY-91) |
+| `tools/python/REPORT_PY62.md` | 136 | PY-62 (#2027): PY-61 で確定した playlist 関数のうち表で実装できる 8 件 (取得 7・muteTrackLock の反転と設定) を C provider と mock に実装し差分 0。表の引数数の不一致 24 件は main #2927 で解消 (解消前の 24 件は §4-3)。残り 18 件と getLive\* の既定値は #3058 (PY-157)。作用の確定は #2906・#2908・#2909 |
 | `tools/python/REPORT_PY113.md` | ~100 | PY-113 (#2943): playlist.setTrackColor の格納式を VA 付きで確定 (R/B 入替え + `0xffffff` で `+0x2c` へ)。getTrackColor との食い違いの原因 (C 側の素通し格納) と修正。テスト期待値は子 #2949 (PY-114)、mixer 側は子 #2951 (PY-115) |
 | `tools/python/REPORT_PY91.md` | 181 | PY-91 (#2809): playlist 操作系 inc 4 件の更新式・getLive 系の状態 helper・書式 5 件を VA 付きで確定。trigger・zone のコア本体、時間変換、solo/select の副作用、例外型は子 #2906・#2908・#2909 |
+| `tools/python/REPORT_PY104.md` | 128 | PY-104 (#2906): triggerLiveClip の flags (K・M・bit0-7・bit31) と S+0xa0・S+0xa8 の意味、refreshLiveClips の作用を VA 付きで確定 (意味づけは推定を明記)。REPORT_PY91 の訂正 2 件 (velocity mask の位置、zone 系の readiness 判定の対象)。zone の型と vtbl[+0x148] は子 #3624 (PY-222)。検算は `analysis/flapi/playlist_live_clip_facts.py` |
 | `tools/python/REPORT_PY105.md` | 119 | PY-105 (#2908): 時間 ↔ block 変換・0x442c00 (時刻)・inc 系の排他・select mode 5・7〜10 を VA 付きで確定。cfg・+0xd4/+0xd6・UI 通知名・theme 型は未確定 (#2908 に残す)。解析は `analysis/flapi/playlist_time_facts.py` |
 | `tools/python/REPORT_PY106.md` | 101 | PY-106 (#2909): RANGE (-4) の例外型の参照チェーン (sink 0xd82daf → `PyErr_SetString([[[0x15e1140]]])`・束縛名 `PyExc_RuntimeError`・静的) と repo の RANGE → IndexError の照合 (不一致)。boot 停止時の実測 (束縛は未到達・chain は unit 209 で 0 化)。実行時の型名は未達 (#2909) |
 | `tools/python/REPORT_PY124.md` | 88 | PY-124 (#2999): general.saveUndo の書式 `si\|i`・kwlist・既定値 updateHistory=1・戻り値 None・準備不可 -2 (文言付き例外か None かは未確定の報告判定に依存)・核の job 配置を VA 付きで確定。履歴 record の本体 (`0x101b780`・`0x1016ca0`) は子 `[PY-137]` (#3026) へ |
@@ -524,6 +530,7 @@
 | `tools/python/REPORT_PY73.md` | 250 | PY-73 (#2547・途中記録): channels.incEventValue (`Ii|d`) の戻り値の型 (flags bit1 で int / float ビット列)・`0x1051330` 本体の範囲外 code (例外経路なし)・本体の副作用 (スタック書込みのみ) を PE で確定 (§7)。事象表は eventId の初回参照で要素を作る遅延キャッシュと確定 (§8)。事象 flags の分類器 `0x104d0d0` の PE 確定 (§9): B 経路 (A 以外) の flags は 0x00/0x04 のみ。未確定は A 経路の flags (getter)・`0x1046a30` の lo・hi・cur・表挿入 `0x664090` (子 #2887) と channels.midiNoteOn (`iii|i`) の副作用。文言は `analysis/flapi/pe_errmsg_probe.py`、参照箇所は `analysis/flapi/pe_xref.py`、RIP スロットの実バイトは `analysis/flapi/pe_flag_slots.py` で再現 |
 | `tools/python/REPORT_PY73_APPENDIX_2887.md` | ~82 | PY-103 (#2887・1 回目 run・部分達成): `0x664090` の移動向きを確定 (間接先は登録名 `ippsMove_8u`・shift-up。登録名は `analysis/flapi/pe_slot_names.py` で読む)、A 経路 getter の入口 `0x1331340` (`ref`) と既定オブジェクト G の生成 (`0x1330f29`)。bit1 の表は `sub` (= `ref.vt[+0x20](ref)` の戻り値) のクラス未確定、lo・hi・cur は #2033・#2034。`REPORT_PY73.md` §9-6 の付録 |
 | `tools/python/REPORT_PY73_APPENDIX_2817.md` | ~85 | PY-93 (#2817・部分): `0x11d1430` のゲート参照鎖 (G3 → スロット → Q → T)・T の書込み元 2 箇所・T の vptr (`0x125b1c0`。`0x40fb40` の `mov [rsi],rdi`)・vtable 先 `0x1262a90`・-2 ゲートの条件 (フラグ 3 byte の実行時値は未確定)。測定は `analysis/flapi/pe_slot_writers.py` で再現。`REPORT_PY73.md` §8-4 の付録 |
+| `tools/python/REPORT_PY73_APPENDIX_2926.md` | ~160 | PY-110 (#2926・部分): midiNoteOn ゲートの 3 フラグの書込み元 18 件 (flagA 4・flagB 12・flagC 2。スロット・ロード 214 件の直線区間の全数走査で確定)・note-on 経路 (`0x10002a0` の書込み先・channel の扱い・`0x10602e0` 呼出し)・`0x63a730` の副作用 (無し)。書込みの到達条件と note-off 側は子 issue。再現は `analysis/flapi/pe_straight_writers.py`・`pe_iat_name.py` |
 | `tools/python/REPORT_PY73_APPENDIX_2547.md` | ~65 | PY-73 (#2547・5 回目 run・縮小後の受入 1 の付録): `0x1046a30` (lo・hi・cur の共通 getter) の eventId 種別振り分け表 (`0x1047424` の compare チェーン 7 分岐先・根拠 VA 付き)、mode `0x240` の直行条件、`0x10476f9` 系の mode 0x20 経路。RetDec の `return` 誤読の注意。値源は #2887 (PY-103)。測定は `analysis/flapi/pe_disasm.py`・`analysis/flapi/pe_retdec.sh` で再現 |
 | `tools/python/REPORT_PY74.md` | ~50 | PY-1 ilmcp 意味論の整合 (#74, PR #763): getBrowserNames 木・getHighlightNames 21 件・addChannel/addEffect/storePRScript 検証の実測表、`tests/ilmcp_diff.mjs` の結果、NC (addEffect 検証を外して 2 件差分)、非 ASCII 空白の未解決。REPORT.md §7b-3 の実測表の全文 |
 | `tools/python/REPORT_PY175.md` | ~116 | PY-175 (#3252): 効果関数 `0x1046a30` の n 書込み先。key 下位 16bit の 0・2・3・8 の格納先 (`[chan+0x170]`・`[chan+0x178]`・`[chan+0x17c]`・`[chan+0x258]`)・負の key 入口の分岐・`0x104aa87` の 0x1f00 枝 (符号だけを書く)・flags `0x3e9` の経路。残り (負の key の残りの枝・戻り値 eax・`0x1050f90`) は子 [PY-181] |
@@ -622,6 +629,7 @@
 | `tools/plugins/p0c/REPORT_APPENDIX_E2.md` | ~95 | p0c §14.6 (#983 残差 3 kernel の原因と修復)・§14.7 (#982 0x5de3e0 の上位 dword store 復元)・§14.8 (#331 残件の現況) の全文 (`REPORT_APPENDIX_E.md` から分割移動・無変更) |
 | `tools/plugins/p0c/REPORT_APPENDIX_F.md` | ~62 | p0c §16 (P0c-8 #311 ext IR の wasm32 検証 + framework 統合) 全文 (同上・E の 250 行上限のため分割) |
 | `tools/plugins/p0c/REPORT_APPENDIX_I.md` | ~70 | p0c §21 (#3439 P0c-21 0x5e12b0 の ucomiss 被演算子・flags の接続 (`k80_argfix` [C] void 接続・[D] flags)・戻り値試験 `ucomi_ret_check.py`・負論対照)。H §20 の 0x5e12b0 行は「修復済 (#3439)」に更新し、詳細は本付録に分けた |
+| `tools/plugins/p0c/REPORT_APPENDIX_J.md` | ~41 | p0c §23 (#3280 0x5dffc0 の x87 fsincos 66-bit π 縮約の原因・修復・測定)。H §23 から分割移動 (H の 250 行上限のため) |
 | `tools/plugins/dynamics/REPORT_APPENDIX.md` | ~102 | dynamics §E ([PLG-F3-15] #1778): 19252 の残 helper `vmovsd` store の宛先 (spill → B1 の 0 埋め) の原因実測。 方式は DECISIONS D16。 dynamics REPORT §4 の「脱落の原因 (#1412)」の全文 (250 行上限のため分割移動。 静的検出 (`statically linked function`) による `.pdata` define 脱落 208 件の内訳と切替実測) |
 | `tools/plugins/sampler/REPORT.md` | ~245 | PLG-G3 (#208) sampler 8 本: lift 前提の実測。 engine lift 鎖の根本原因と `emcc -c` gate・NC。 §2b (#537 推移閉包) は REPORT_INDIRECT.md (#208 / #540) |
 | `tools/plugins/sampler/REPORT_APPENDIX.md` | ~60 | sampler REPORT §6 の旧版 (§A 検証起点 53c2eb6、§B 82a99ac/7de96e0、§C 7ffab50) と §D (RetDec C 出力段の経緯) の全文 (250 行上限のため分割移動) |

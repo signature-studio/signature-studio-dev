@@ -126,7 +126,7 @@ export function createMockEngine() {
       name: i === 0 ? "Master" : i === 125 ? "Current" : `Insert ${i}`, vol: 0.8, pan: 0, mute: false, solo: false,
       color: 0, colorSet: false, sel: i === 0, slots: [], routes: i === 0 ? {} : { 0: 1.0 },
     })),
-    playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156, lock: 0 })),
+    playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156, lock: 0, act: 0, loop: 0, trigMode: 0, posSnap: 0, trigSnap: 0 })),
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
     displayTime: 0,
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
@@ -315,6 +315,15 @@ export function createMockEngine() {
     "playlist.getTrackName": (i) => { i = ix(i); return st.playlist[i - 1]?.name ?? ""; }, // 範囲外は空文字 (C と同じ)
     "playlist.setTrackName": (i, n) => { pl(i).name = str(n); },
     "playlist.setTrackColor": (i, c) => { pl(i).color = (((c & 0xff) << 16) | (c & 0xff00) | ((c >>> 16) & 0xff)) & 0xffffff; }, // FL の格納式 (C と同じ)
+    // PY-62 (#2027): REPORT_PY61 §2 で確定した 8 関数 (C provider と同一)。既定値は 0 の仮置き。引数検査は C の dispatch と同じ順 (型 → 範囲)
+    "playlist.getTrackColor": (...a) => { arity(a, 1, 1); const u = pl(a[0]).color >>> 0; return (((u & 0xff) << 16) | (u & 0xff00) | ((u >>> 16) & 0xff) | 0xff000000) >>> 0; },
+    "playlist.isTrackMuteLock": (...a) => { arity(a, 1, 1); return !!pl(a[0]).lock; },
+    "playlist.getTrackActivityLevelVis": (...a) => { arity(a, 1, 1); return F(pl(a[0]).act); },
+    "playlist.getLiveLoopMode": (...a) => { arity(a, 1, 1); return pl(a[0]).loop; },
+    "playlist.getLiveTriggerMode": (...a) => { arity(a, 1, 1); return pl(a[0]).trigMode; },
+    "playlist.getLivePosSnap": (...a) => { arity(a, 1, 1); return pl(a[0]).posSnap; },
+    "playlist.getLiveTrigSnap": (...a) => { arity(a, 1, 1); return pl(a[0]).trigSnap; },
+    // 表の引数数は 1〜2 (C と同一・main #2927)。value -1 (省略を含む) は反転、それ以外は下位 1 byte を設定 (REPORT_PY61 §3)。準備判定 (-2) は未モデル
     // PY-102 (#2883): value 検査 (argI) を index の範囲検査より先に行う。C の dispatch は型を先に見るため (code 5 が先)
     "playlist.muteTrackLock": (...a) => { arity(a, 1, 2); const v = argI(a, 1, -1); if (!st.safeEdit) throw UNSAFE(); const t = pl(a[0]); t.lock = v === -1 ? (t.lock ? 0 : 1) : v & 0xff; },
     "ui.getVisible": (w) => !!st.windows[w],
