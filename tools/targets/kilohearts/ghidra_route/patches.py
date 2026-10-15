@@ -85,8 +85,10 @@ ABI = {
         ('stereo 24 caller 180fce0d0 reads xmm0 of 660 (extraout_Qa_00)', r'uVar3 = FUN_180fdc660\(param_1\);\n(\s*)dVar2 = extraout_XMM0_Qa_00;', r'uVar3 = FUN_180fdc660(param_1);\n\1dVar2 = kh_xmm0_180fdc660;'),
         # KH-77 (#3885): FUN_180fdfdb0 (三角関数の引数縮約・ret 180fdffb6・機械語 132 命令) の戻り xmm0 (縮約値) を kh_xmm0.h の helper で出す。
         # 呼出元 2 箇所の extraout_XMM0_Qa は kh_xmm0_180fdfdb0 を読む。呼出し (rax 側) は既存の ABS 規則のまま残す。
-        ('stereo 603 caller 180fcd690 reads xmm0 of dfdb0 (extraout_XMM0_Qa)', r'uVar4 = FUN_180fdfdb0\(d2u\(dVar2\)\);\n(\s*)dVar5 = extraout_XMM0_Qa;', r'uVar4 = FUN_180fdfdb0(d2u(dVar2));\n\1dVar5 = kh_xmm0_180fdfdb0;'),
-        ('stereo 769 caller 180fce0d0 reads xmm0 of dfdb0 (extraout_XMM0_Qa)', r'uVar3 = FUN_180fdfdb0\(d2u\(dVar2\)\);\n(\s*)dVar4 = extraout_XMM0_Qa;', r'uVar3 = FUN_180fdfdb0(d2u(dVar2));\n\1dVar4 = kh_xmm0_180fdfdb0;'),
+        # KH-115 (#4722): 呼出元 180fcd9c8・180fce43e の `movapd xmm4, xmm1` (xmm1 = 戻り残差) を、C の残差項 param_2 に配線する。
+        # 機械語: 残差は [rsp+0x30] (180fcd7ac) へ退避し、最終式 R + (x + poly) の R に入る。C の `param_2 + (...) + dVar5` の param_2 と一致。
+        ('stereo 603 caller 180fcd690 reads xmm0 of dfdb0 (extraout_XMM0_Qa)', r'uVar4 = FUN_180fdfdb0\(d2u\(dVar2\)\);\n(\s*)dVar5 = extraout_XMM0_Qa;', r'uVar4 = FUN_180fdfdb0(d2u(dVar2));\n\1dVar5 = kh_xmm0_180fdfdb0;\n\1param_2 = kh_xmm1_180fdfdb0;'),
+        ('stereo 769 caller 180fce0d0 reads xmm0 of dfdb0 (extraout_XMM0_Qa)', r'uVar3 = FUN_180fdfdb0\(d2u\(dVar2\)\);\n(\s*)dVar4 = extraout_XMM0_Qa;', r'uVar3 = FUN_180fdfdb0(d2u(dVar2));\n\1dVar4 = kh_xmm0_180fdfdb0;\n\1param_2 = kh_xmm1_180fdfdb0;'),
     ],
     # delay (#3800 KH-64): 引数過不足のうち、呼出先 FUN_180fd4f30 (longlong 1 引数) の 22 件 = FUN_180fe3690 13 件・FUN_180fe3310 4 件・FUN_180fe3cd0 5 件。
     #   呼出元の機械語 (180fe3690 の capstone): `mov rcx,[rbx+off]` → `cmp rcx,[global]` → `je` → `call FUN_180fd4f30` (rbx = 入力 param_1)。
