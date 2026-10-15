@@ -182,8 +182,7 @@ def classify_fn(md, r, literal_cvtsi2=False, bitwise_as_p=False):
                 why = '複写先の後続: %s' % w
             elif up is not None:
                 c, w = follow(md, insns, succ, idx[ins.address], {up}, False, merge=True)
-                if c == 'P':
-                    why = 'merge 上位の後続 P 読み: %s' % w
+                why = ('merge 上位の後続 P 読み: %s' if c == 'P' else 'merge 上位の後続 (A): %s') % w
         reads.setdefault(k, []).append((ins, c, why))
     per_k = {}
     for k, lst in reads.items():
