@@ -3,7 +3,7 @@
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない)。
 
 - 親 issue: #3715 (PLG-G2-31 の前提)。 本付録が判定の正本。
-- 測定 commit: `5ba8578ed` (`feat(x87): classify x87 leaf entry candidates ...`。 規則のコードを含む最後の commit)。
+- 測定 commit: `8a87170f1` (本 PR の検証 HEAD。 規則のコードを含む最後の commit)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` のみ (静的解析。 実行はしていない)。
 - 依頼文の前提の訂正: 本文は「`add esp, 0x2c` で始まる」としたが、10 本の先頭は `83 ec 08` (`sub esp,8`) 等で、`add esp,0x2c` で始まるものは無い。 後半 6 本の末尾が `add esp,0x2c; ret` である。 判定は先頭命令でなく参照関係で行った。
 
@@ -15,7 +15,7 @@
 |---|---|---|
 | `0x100052d0` | callee (独立入口) | direct call 4 件 (`0x10006ae9`・`0x10006d87`・`0x10006f09`・`0x10007068`) |
 | `0x10005550` | callee (独立入口) | direct call 1 件 (`0x10006600`) |
-| `0x10009bc4` | callee (独立入口) | direct call 53 件 |
+| `0x10009bc4` | callee (独立入口) | direct call 50 件 |
 | `0x1000bf1e` | callee (独立入口) | direct call 3 件 (`0x1000bd7b`・`0x1000bd89`・`0x1000befb`) |
 | `0x1000c084`・`0x1000c08f`・`0x1000c09a`・`0x1000c0a0`・`0x1000c0a6`・`0x1000c0ac` | switch-arm (断片) | direct 参照 0 件。 `ff 24 85` (`0x1000c07d`) のジャンプテーブル (`0x10024e3e`) の case 先 |
 
@@ -31,7 +31,9 @@ mkdir -p $FL_WIN64_DIR && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $FL_
 python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --classify
 ```
 
-実測 (commit `5ba8578ed`、本 run の worktree `ws-4066`): 上の 10 行が出力され、rc=0。 `python3 -m py_compile` も通った。
+実測 (commit `8a87170f1`): 上の 10 行が出力され、rc=0。 `python3 -m py_compile` も通った。 `0x10009bc4` の direct call 元は 50 箇所 (`--classify` の出力で数えた)。
+
+`--classify` の経路が main 由来の変更を含むか: 測定 commit `5ba8578ed` から HEAD `8a87170f1` までの `x87_fn_diff.py` の差分は、`gen_special_rows` (新規)・`word_class`/`dword_class`/`compare` の NaN 判定・`main()` の `--special`/`--nega-nan` 分岐と `global WORK` である。 `classify()` の本体と `CLASSIFY_ENTRIES` は変わっていない。 両 commit で `--classify` の出力を比較し、10 行が完全に一致した (`cmp` で差分 0)。
 
 ## 3. 未解決
 
