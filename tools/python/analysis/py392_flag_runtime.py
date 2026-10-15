@@ -52,9 +52,10 @@ check("0x663bf0: 配列の先頭 = [rcx+8]", text(0x663C0A) == "mov    r8,QWORD 
 check("0x663bf0: 比較 = qword [r8+idx*8] と rdx", text(0x663C11) == "cmp    QWORD PTR [r8+r10*8],rdx")
 check("0x663bf0: 見つからなければ -1 (or eax,-1)", text(0x663C24) == "or     eax,0xffffffff")
 
-# 0xffac50 の先頭: [obj+0x160] が 0..7 なら bit mask (byte 0xffacd8) で判定。
+# 0xffac50 の先頭: [obj+0x160] が 0..7 で mask bit が立つと偽 (0xffacc9 で esi を返す)。範囲外・bit 0 は loop へ。
 check("0xffac50: 判定元 = [obj+0x160]", text(0xFFAC5F) == "mov    eax,DWORD PTR [rbx+0x160]")
-check("0xffac50: 範囲 0..7 の外は偽 (0xffac82 で xor eax)", text(0xFFAC82) == "xor    eax,eax")
+check("0xffac50: 範囲外は al=0 で loop 側 (0xffac82 で xor eax、je 0xffac8d)", text(0xFFAC82) == "xor    eax,eax" and text(0xFFAC86) == "je     0xffac8d")
+check("0xffac50: mask bit 立ちは esi=0 で即 return (0xffac88)", text(0xFFAC88) == "rex xor esi,esi" and text(0xFFAC8B) == "jmp    0xffacc9")
 check("0xffac50: mask 参照 = byte 0xffacd8", text(0xFFAC73) == "movzx  rax,BYTE PTR [rip+0x5d]" and 0xFFACD8 == 0xFFAC7B + 0x5D)
 
 # [0x15e2878] (gate 別フラグ) の実体: ポインタ先は .data 外ではなく 1 byte、初期値 0。
@@ -78,5 +79,5 @@ check("0x1262950: getter (movzx byte [gate])", text(0x1262957) == "movzx  rax,BY
 check("0x1262977: setter (mov byte [gate],1)", text(0x1262977) == "mov    BYTE PTR [rax],0x1")
 
 print("summary: 0x663bf0 は配列の線形探索 (見つからなければ -1)。0x15e2878 の指す先は初期値 0 で書込みは間接。")
-print("summary: gate の 1 書込みは 0x11c71b0 (flag=1 後に 0x86a220・0x938460・0x93f180 等を呼ぶ) と 0x1262970 (setter)。")
+print("summary: gate の 1 書込みは 0x11c71b0 の内側 (0x11c761c・直前の呼出し 0x976f40) と 0x1262970 (setter)。")
 sys.exit(0)
