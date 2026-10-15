@@ -428,6 +428,7 @@
 | `tools/audio/REPORT_APPENDIX_863_287655cf.md` | ~30 | AU-15 (#863) 旧 §30 の全文 (測定 commit `287655cf`・write 記録の初回 31 run 全 PASS)。REPORT_APPENDIX_863.md §30 から分割移動 (250 行上限のため)。現行の §30 (`89b10538`) が正本 |
 | `tools/audio/asio/REPORT.md` | ~200 | IASIO COM アダプタ + 120s soak |
 | `tools/audio/asio/REPORT_APPENDIX_998.md` | ~23 | asio REPORT §12-2 全文 (#998 負荷下の再現試験 L1〜L3)。250 行上限のため無変更で分割移動 |
+| `tools/audio/asio/REPORT_APPENDIX_2934.md` | ~125 | asio #2934 (AU-26): 初期目標充填 T の下限 (`FLA_F_T_FLOOR`) の baseline・同一 HEAD 20 回連続・lat_out 前後・親 e2e 実測・need→増分の式・B=128 の 5 回と基点 5 回の比較 |
 | `tools/audio/asio/REPORT_APPENDIX_2777.md` | ~115 | asio #2777 (#998 残件): 初期目標充填 T (burst probe 由来の depth 4/6) と com_ramp_b256_d2 underrun の実測 16 回・全 e2e (測定 commit `e137c4a8`)。測定値の正本。対処は #2934 ([AU-26]) |
 | `tools/audio/wl/REPORT.md` | ~75 | AU-8 (#194): ring 方式 vs worklet 直走行の遅延比較 (テスト音ミキサ代役) + FLEngine スレッド/待機面の静的見積り |
 | `tools/assets/REPORT.md` | ~125 | 314MB 級 wasm asset の chunk ローダ + 二段キャッシュ |
