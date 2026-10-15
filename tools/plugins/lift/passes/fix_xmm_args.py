@@ -3,7 +3,8 @@
 
   python3 fix_xmm_args.py IN.ll OUT.ll --pe PE [--report r.json] [--skip-funcs a,b]
 
-機械語 (p0c/k80abi.py scan_function = win64 slot の read-before-write) で関数ごとの xmm 入力 slot を求め、
+機械語で関数ごとの xmm 入力 slot を求める。slot 集合は liftdiff/ldlib/pe.py Analyzer (CFG 上で全経路に定義の無い xmm 読み; #2850)、
+slot の幅 (32/64) は p0c/k80abi.py scan_function の xmm_width を使う (CFG だけで見つかった slot は幅が不明なので skip)。
 p0c/k80_argfix.py の [A] movd-from-zero / [C] helper 被演算子の placeholder (`xor i128 0, 0`) 接続を再利用する。
 k80_argfix は引数を `i64 %in.xmmN.bits` として末尾に足す (kernel の k80_diff 用)。本 pass は、それを
 **Win64 の slot 位置 N に float/double 型で置き直す** (位置 N → xmm N。slot の隙間は未使用 i64 で埋める)。
@@ -15,6 +16,8 @@ k80_argfix は引数を `i64 %in.xmmN.bits` として末尾に足す (kernel の
   - 既に位置 N に引数がある (RetDec が xmm 位置を整数引数として宣言済み)        : 'slot_occupied'
   - 接続できる placeholder が無い                                                : 'no_placeholder'
   - 機械語が読む xmm slot の一部しか placeholder に接続できない (部分復元は署名を半端に変えるので適用しない) : 'partial_slots(...)'
+  - CFG 解析が命令数上限で打ち切られ、slot 集合が確定しない                         : 'cfg_truncated'
+  - CFG だけで見つかった slot の幅 (32/64) が k80abi で得られない                 : 'width_unknown(...)'
   - call 以外 (関数ポインタ・ptrtoint 定数式・他関数の引数) から @function_xxx が参照されている
     (参照側の型を更新できず署名と食い違う)                                          : 'non_call_ref'
   call site の書換えは括弧の対応を取って行う (引数に `ptrtoint (...)` 等の定数式があってもよい)。
@@ -28,10 +31,18 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', '..', 'p0c'))
+sys.path.insert(0, os.path.join(HERE, '..', '..', '..', 'liftdiff'))
 import k80_argfix as KA  # noqa: E402
 import k80abi as K  # noqa: E402
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64  # noqa: E402
 import pefile  # noqa: E402
+from ldlib.pe import PE, Analyzer  # noqa: E402
+
+
+def cfg_xmm_slots(an, va):
+    """(#2850) 関数 VA の xmm 入力 slot を CFG 解析で求める (ゼロ化イディオムの読みは除く)。 -> (['xmmN', ...] 昇順, 打ち切り有無)"""
+    r = an.analyze(va, zero_idiom=True)
+    return ['xmm%d' % n for n in r['xmm_slots']], r['truncated']
 
 
 def split_defs(text):
@@ -155,6 +166,7 @@ def main():
     base = pe.OPTIONAL_HEADER.ImageBase
     MD = Cs(CS_ARCH_X86, CS_MODE_64)
     MD.detail = True
+    an = Analyzer(PE(a.pe))
     head, chunks = split_defs(text)
     callers = {}
     noncall = {}
@@ -191,14 +203,19 @@ def main():
             if fend is None:
                 rep['skipped'][fname] = 'no_pdata'
             else:
-                g, x, gd, gb, gx, xw, st, xins, sci, cli, ps = K.scan_function(MD, td, tva, va, fend)
-                xs = [s for s in x if int(s[3:]) < 4]
-                if xs:
+                g, _x, gd, gb, gx, xw, st, xins, sci, cli, ps = K.scan_function(MD, td, tva, va, fend)
+                xs, trunc = cfg_xmm_slots(an, va)
+                if xs and trunc:
+                    rep['skipped'][fname] = 'cfg_truncated'
+                elif xs:
                     habi = {'xmm_slots': xs, 'xmm_width': xw, 'xmm_insns': [[m, r] for m, r in xins]}
                     plist = params_of(header)
                     occ = [s for s in xs if len(plist) > int(s[3:])]
+                    unk = [s for s in xs if s not in xw]
                     if occ:
                         rep['skipped'][fname] = 'slot_occupied(%s, IR params=%d)' % (','.join(occ), len(plist))
+                    elif unk:
+                        rep['skipped'][fname] = 'width_unknown(%s)' % ','.join(unk)
                     elif noncall.get(fname):
                         rep['skipped'][fname] = 'non_call_ref(%d)' % noncall[fname]
                     elif any(c != len(plist) for c in arity.get(fname, ())) and (fname in NO_CONV or not conv_ok(xs, len(plist), argsites.get(fname, []))):
