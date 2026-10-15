@@ -59,7 +59,7 @@ soak10 の初回 FAIL は、`REPORT_AU10.md` §16.5 と同じ形 (T=1024・dev_f
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| worklet に `performance` が無く `pn` (performance.now()) が −1 | 受入条件の performance.now() 部分が未達。ct と ms で絶対時刻は取れるが、performance.now() の時間軸との対応は無い | [AU-31] #3157 (親: #3115) |
+| worklet に `performance` が無く `pn` (performance.now()) が −1 | 受入条件の performance.now() 部分が未達。ct と ms で絶対時刻は取れるが、performance.now() の時間軸との対応は無い | [AU-31] #3157 (親: #3115)。解決: §7 |
 | 10 秒ソーク FAIL の原因 (本 run 初回 1 件。§16.10 までの通算 2/44 に本 run の 1/6 を加えて 3/50) | 30 分実測の信頼性。原因は未特定 | #1570 (再現時は cb・ct・clock_jump_log を採取) |
 | 同一 frame の process() が 2 回呼ばれる条件 (ブラウザ内部の起床) | 無害の根拠は sample 照合のみ。cb は同一 (producer 起因でない) | #1570 |
 | 負荷下 (load avg 10 超) の 30 分ソーク | 負荷下の clock・spike は未計測 | #1570 |
@@ -102,3 +102,67 @@ PR が main と競合したため main (`b34d93fe`) を取り込んだ (merge `c
 - `node tools/audio/test/worklet_jump_check.mjs` は HEAD で PASS 4/4 (exit 0)。
 - HEAD の 6 回の soak10 では jump が 0 件で、`ct`・`pn`・`cb` の表示は実ブラウザで出力されていない。表示の経路は `worklet_jump_check.mjs` (mock) でのみ検査した。
 - `--soak30` は HEAD で再測定していない (30 分の前景実行が本 run の時間上限に収まらないため)。§2 の結果は `7c5ee224` の実測で、対象コードは上記の差分 0 のとおり同一。
+
+## 7. AU-31 (#3157) clock_jump の performance.now() (main thread の受信時に取得)
+
+既知類型との関係: 該当なし (ランタイム shim の計測。`docs/DEFECTS.md` の類型には当たらない)。親: #3115 (AU-29)。
+測定 commit: `a50e00c6b` (コード変更の最後の commit)。起点: origin/main `512b09ffa`。
+
+### 7.1 変更・取得元・遅延の定義
+
+- worklet は `performance` を持たない (AudioWorkletGlobalScope)。worklet からの `pn` を外した (`public/worklets/fl-audio-worklet.js`)。
+- **取得元 (案 A)**: shim の main thread が `port.onmessage` で受信した時刻の `performance.now()` を `pn` に入れる。同時に `rx = Date.now()` を入れる (`src/runtime/audio-shim.ts`)。
+- **遅延**: `dl = rx − ms` (ms は worklet の `Date.now()`、rx は main thread の `Date.now()`。同じ wall clock・分解能 1 ms)。`pn` は受信時刻なので、事象時刻の performance 時間は `pn − dl` で近似する。
+- 案 B (ref 点による写像) は未実装。
+
+### 7.2 検査 (mock)
+
+- `node tools/audio/test/worklet_jump_check.mjs`: PASS 4/4、exit 0 (jump 件数 3、1 件目 d/frame/cb/ct、重複の cb、worklet の message に `pn` が無いこと 3/3)。
+- ネガティブコントロール: `cb: 0` に置換した worklet (`tools/audio/work/nc/nc_cb0.js`、gitignore) で cb の検査 2 件が FAIL、exit 1。
+- 検査は `FLA_CTL_SIZE` (audio-layout.ts) を読む。#3151 で worklet が `processorOptions.ctlSize` を要求するようになり、旧版の 96 要素固定の検査は `Invalid atomic access index` で落ちていた。
+- shim の `pn` / `rx` は mock では検査できない (実ブラウザの soak30 で確認、§7.3)。
+
+### 7.3 30 分ソーク (`node tools/audio/harness/run.mjs --soak30`、HEAD `a50e00c6b`)
+
+環境: GitHub runner 4 core (nproc 4)、headless google-chrome、`toolchain-emsdk` を `$RUNNER_TEMP/emsdk-x/emsdk` に展開して `EMSDK_ENV` で指定。`bash tools/audio/build.sh` は build OK。
+開始 05:10:39 UTC → 終了 05:40:51 UTC (host wall 1811.9 s)、load 1 分平均 start 0.32 → end 0.00。結果 JSON: `tools/audio/work/soak30_a50e00c6b.json` (gitignore)。
+
+| 項目 | 値 |
+|---|---|
+| 判定 | **FAIL** (exit 1 = 完了。合格条件の underrun 0・ramp 全一致を満たさず) |
+| underruns / silence | 1 (`first_underrun_q` 306 = frame 39,168 ≈ 0.816 s) / 1,152 f |
+| ramp mismatches | 86,364,288 / 86,403,456 f (`first_mismatch_frame` 39,168) |
+| workletErrors | 0 |
+| clock_jumps | 4 (skip 256 f、dup 256 f、符号付き合計 0) |
+| cb | 337,507 回、late 0、cb_max 56,440 µs |
+| T / lat_changes | 1536 / 2 (§2 の 30 分実測は T=1536・lat_changes 0) |
+
+clock_jump_log (4 件、全件 `pn` が値を持つ):
+
+| # | q | d (f) | ct (s) | pn (ms) | dl = rx − ms (ms) | cb |
+|---|---|---|---|---|---|---|
+| 1 | 17,319 | −128 | 46.5333 | 47,258.4 | 0 | 8,653 |
+| 2 | 17,320 | +128 | 46.5387 | 47,268.2 | 0 | 8,653 |
+| 3 | 472,690 | −128 | 1260.8560 | 1,261,583.0 | 0 | 236,337 |
+| 4 | 472,691 | +128 | 1260.8613 | 1,261,592.9 | 0 | 236,339 |
+
+- 受入条件 (`pn` が −1 でない): **4/4 で満たす**。
+- 時間軸の整合: 件 1→3 の Δpn = 1,214,324.6 ms、Δct = 1,214,322.7 ms (差 1.9 ms)。件 1→2 は Δct 5.4 ms、Δpn 9.8 ms (差 4.4 ms。ct は 1 render quantum = 5.33 ms で量子化されるため、この範囲内)。
+- 遅延: 4/4 で `dl` = 0 ms (`Date.now` の 1 ms 分解能の範囲で、遅延は 1 ms 未満と読める)。
+- **soak の FAIL は本変更の経路の外**: 最初の underrun は frame 39,168 (0.816 s) で、jump (46.5 s) より前。shim の clock_jump 受信処理は jump が起きて初めて実行される。形は §2 の 10 秒ソーク初回 FAIL と同じ (早期の underrun 1 と ramp 不一致)。原因は未特定 (#1570)。
+
+### 7.4 短いソーク (同 HEAD)
+
+- `node tools/audio/harness/run.mjs --soak 10` を 1 回: PASS (underruns 0、silence 0、ramp 0 / 480,512 f、workletErrors 0、secs_wall 10.004、exit 0)。反復は未実施。
+
+### 7.5 差分 (測定 commit からの範囲)
+
+- 測定 commit `a50e00c6b` (HEAD と同一)。本節の追記は docs の REPORT のみ。音声経路 (`public/worklets`・`src/runtime/audio-shim.ts`・`tools/audio/harness`・`tools/audio/test`) の差分は 0 行。
+
+### 7.6 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 30 分ソークの FAIL (早期の underrun 1 と ramp 不一致、frame 39,168) | 30 分ソークの合格条件を満たさない。pn の検証 (受入条件) は実行・記録済み | #1570 (再現時は cb・ct・clock_jump_log を採取) |
+| 案 B (ref 点の写像) は未実装。遅延は Date.now (1 ms 分解能) で推定 | performance 側の誤差を直接比べていない | 本 PR の未解決表 (案 A で受入条件を満たす。比較のための子は起票しない) |
+| shim の `pn` / `rx` は mock で検査できない | 検査は実ブラウザの soak30 (1 試行・jump 4 件) に依る | 本 PR の未解決表 |
