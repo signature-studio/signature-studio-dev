@@ -3,7 +3,7 @@
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない)。 f80→f64 の精度差は付録 2966 §3 と同じ類型 (ADR D28 の帰結) で、`DEFECTS.md` は未編集。
 
 - 親 REPORT: `REPORT_APPENDIX_2966.md` §6 (残り unsup 36 件の内訳。超越・剰余 32 件を本 issue に送った)。 方式: `docs/DECISIONS.md` D28 (f80→f64)。 本付録が本 issue の測定値の正本。
-- 測定 commit: `7694f4bdd` (`feat(ott): lower x87 fsin/fcos/f2xm1/fyl2x/fprem for ia32 (PLG-G2-29)`)。 この後の HEAD は docs だけの commit。 コード差分の確認は §8。
+- 測定 commit: `c3d7802e7` (`fix(ott): fail fast outside the verified x87 trig/f2xm1 domain (PLG-G2-29)`)。 元の測定は `7694f4bdd` (定義域判定の追加前)。 定義域内の値は両者で同じ (§4)。 コード差分の確認は §8。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` (`lift_text.py`) と、生成した試行のみ。
 - 環境: x86-64 Linux (Ubuntu 24.04・gcc 13.3・capstone 5.0.7・python3)。 native = 実 x87 (機械語を `.byte` / inline asm で実行)、 lowered = gcc -O1 の SSE double。 実行時の 1 分 load は 0.28〜0.88、 CPU 4。
 
@@ -120,5 +120,5 @@ mkdir -p $RUNNER_TEMP/before && git archive origin/main tools/ott | tar -x -C $R
 python3 x64_regress_1099.py $RUNNER_TEMP/before 8         # §1 (same 8/8)
 ```
 
-- 差分確認 (測定 commit 以降のコード差分): 定義域判定 (fail-fast) の追加により、`tools/ott` の runtime・生成 C と差分試験の lowered 側にコード差分が入った。 差分試験の主試行の値 (93,984) は変更前後で同じ。 `git diff 7694f4bdd HEAD -- tools/ott tools/plugins/slayer_engine_ia32` の範囲を §8 に記録する。
+- 差分確認 (測定 commit 以降のコード差分): 定義域判定 (fail-fast) の追加 `c3d7802e7` で、`tools/ott` の runtime・生成 C と差分試験の lowered 側にコード差分が入った。 差分試験の主試行の値 (93,984) は変更前後で同じ (再測定済み)。 `c3d7802e7` 以降の x87 範囲の差分は 0 行 (`git diff c3d7802e7 HEAD -- tools/ott tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_diff_lowered.c` の出力は空)。
 - 大物: `find tools/plugins/slayer_engine_ia32 -type f -size +20M -not -path '*/work/*'` は 0 件。 生成物は `work/` (gitignore)。
