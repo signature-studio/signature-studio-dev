@@ -13,7 +13,7 @@ if "--break" in args:
 assert brk in (None, "addss", "subss", "mulss"), brk
 src = open(args[0]).read()
 decls = re.findall(r"^declare (\S+) @(__asm_[A-Za-z0-9_.]+)\(([^)]*)\)", src, re.M)
-T = {"i128": "u128", "i64": "uint64_t", "i32": "uint32_t", "void": "void"}
+T = {"i128": "u128", "i64": "uint64_t", "i32": "uint32_t", "i8": "uint8_t", "void": "void"}
 out = ['#include <stdint.h>', '#include <string.h>', 'typedef unsigned __int128 u128;',
        'static float f0(u128 a){uint32_t u=(uint32_t)a;float f;memcpy(&f,&u,4);return f;}',
        'static float fb(uint32_t u){float f;memcpy(&f,&u,4);return f;}',
@@ -21,6 +21,7 @@ out = ['#include <stdint.h>', '#include <string.h>', 'typedef unsigned __int128 
 ARITH = {"addss": "+", "subss": "-", "mulss": "*"}
 BROKEN = {"addss": "-", "subss": "+", "mulss": "+"}
 nh = {}
+unsup = []
 for i, (ret, name, a_) in enumerate(decls):
     op = re.match(r"__asm_([a-z0-9]+)", name).group(1)
     a = [x.strip() for x in a_.split(",") if x.strip()]
@@ -37,9 +38,14 @@ for i, (ret, name, a_) in enumerate(decls):
     elif op == "xorps" and a == ["i128", "i128"] and ret == "i128": body = "return p0^p1;"
     elif op == "ucomiss" and a == ["i128", "i128"] and ret == "void": body = ""
     else:
-        sys.exit(f"[gen_helpers] unsupported helper: declare {ret} @{name}({a_})")
+        unsup.append(f"declare {ret} @{name}({a_})")
+        continue
     out.append(f'{head} __asm__("{name}");')
     out.append(f"{head} {{ {body} }}")
     nh[op] = nh.get(op, 0) + 1
+if unsup:
+    print(f"[gen_helpers] {len(unsup)} unsupported helper signatures (全数):", file=sys.stderr)
+    for u in unsup: print(f"  {u}", file=sys.stderr)
+    sys.exit(1)
 open(args[1], "w").write("\n".join(out) + "\n")
 print(f"[gen_helpers] {len(decls)} helpers ({', '.join(f'{k}:{v}' for k, v in sorted(nh.items()))})" + (f" BREAK={brk}" if brk else "") + f" -> {args[1]}")
