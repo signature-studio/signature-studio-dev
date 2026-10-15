@@ -3,7 +3,7 @@
 `REPORT_APPENDIX_3075.md` と同じく、`REPORT_APPENDIX.md` の 250 行上限のため分割した付録。正本は本付録の §10-7t。
 
 #### 10-7t. #3094 (KH-42) run: auStack_118/128/138 を V128L に型化 (部分・emcc は未通過)
-- 結論: `ghidra_to_c.py --fix lanes` で Delay の 128bit ローカル `auStack_118`・`auStack_128`・`auStack_138` (各 16 バイト) を、参照文脈で型を決めた `V128L` にした。emcc 件数は **577 → 556 (-21)**。`member reference base type` は **138 → 117** (`undefined1[16]` 32 → 11)。残りは子 [KH-64] (`undefined1[64]` 106 件) と [KH-65] (`aauStack_f8` 11 件)。Gain/Haas/Gate は **1000/1000 bit-exact** (生成 C は旧版と不変)。
+- 結論: `ghidra_to_c.py --fix lanes` で Delay の 128bit ローカル `auStack_118`・`auStack_128`・`auStack_138` (各 16 バイト) を、参照文脈で型を決めた `V128L` にした。emcc 件数は **577 → 556 (-21)**。`member reference base type` は **138 → 117** (`undefined1[16]` 32 → 11)。残りは子 [KH-67] (#3808・`undefined1[64]` 106 件) と [KH-68] (#3809・`aauStack_f8` 11 件)。Gain/Haas/Gate は **1000/1000 bit-exact** (生成 C は旧版と不変)。
 - 測定 commit (コードを変えた最後の commit): `4c0c94150`。`git diff 4c0c94150 HEAD -- tools/targets/kilohearts/ghidra_route` の出力: 0 行 (本節を含む commit 時点)。
 - 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)・`toolchain-emsdk` (`[EMSDK]`・emcc 6.0.12)・[GHIDRA] 12.1.4 (repo 外に展開・zip sha256 `ddac49f9…d2db` 一致)・JDK 21 (temurin)。n=1。
 
@@ -41,8 +41,8 @@
 ##### 未解決 (起票先付き)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `undefined1 auVar7..33 [64]` (ZMM 系 12 ローカル)・`_8_56_`・`_16_48_` などの部分レーン代入 (配列どうしの代入) | member reference 106 件 | [KH-64] 子 issue |
-| `aauStack_f8[11][16]` の混在型 (`_0_4_` を float 読み・int 書き、`_4_12_` と `undefined1[12]` の代入) | member reference 11 件 | [KH-65] 子 issue |
+| `undefined1 auVar7..33 [64]` (ZMM 系 12 ローカル)・`_8_56_`・`_16_48_` などの部分レーン代入 (配列どうしの代入) | member reference 106 件 | [KH-67] (#3808) |
+| `aauStack_f8[11][16]` の混在型 (`_0_4_` を float 読み・int 書き、`_4_12_` と `undefined1[12]` の代入) | member reference 11 件 | [KH-68] (#3809) |
 | `SUB84`・`SUB168`・`ZEXT416` 等の疑似関数 | census SIMD 46 件 | #3095 [KH-43] (既存) |
 | Delay の native 突合 (1000 trial) | Delay は emcc 未通過のため未検証 | #3073 [KH-41] (既存) |
 
