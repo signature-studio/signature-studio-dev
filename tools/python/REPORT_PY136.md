@@ -8,14 +8,14 @@
 - 確定したのは **制御フローと戻り値と scr の状態遷移** (`init` で生成・`deInit` で破棄・`setup` の書込み先・`hideMenu`/`menuShowing` の読み書き・dirty の遷移)。
 - **値・引数の意味は未確定**: `init` の a1〜a6、`setup` の L と i1〜i5 は格納先だけ確定し、意味は未確定 (PY-116 の範囲)。scr 未生成の経路は PE で AV (例外を返さない) のため、mock と C は Unspecified error (code 2) を仮置きした。
 - メニュー項目の選択・移動 (`menuItemClick`・`menuNext`・`menuPrev`) は、呼び出す helper の効果が未同定のため **no-op**。
-- 件数 (現 HEAD `7ca185334`・`tests/provider_check.mjs`): 実装 185、未実装 250 (functions 435、MCP 静的 60)。本 PR の寄与は 10 件。C のハンドラ数は `gen_provider.py --check-handlers` で 185。
+- 件数 (測定 commit `4276b7d1b`・`tests/provider_check.mjs`): 実装 186、未実装 249 (functions 435、MCP 静的 60)。本 PR の寄与は 10 件 (main 側は 176 / 259)。C のハンドラ数は `gen_provider.py --check-handlers` で 186。
 
 ## 手段
 
 - ハンドラ探索: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前...>` (`extracted/block00031_PE.bin`)。10 件とも entry・fn・flags が issue 本文の表と一致した。`init` は entry 0x151e5b8 を選んだ (0x151e058 は別の名前衝突)。
 - 逆アセンブル: `analysis/flapi/pe_disasm.py <VA>`。共通の読み方は REPORT_PY121_2985 と同じ (`call 0xd7eca0` → `[rax]` → `+0x50` → `+0x3f8` で scr)。
-- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先>` (本 run 7.5 秒)。
-- emsdk 6.0.12 の導入元: 素材 `toolchain-emsdk` ではなく上流から入れた (本 run の `$ARTIFACTS_DIR` には `fl-win64` しか無かった)。手順は `tools/shim/REPORT.md` と同じ: `git clone --depth 1 https://github.com/emscripten-core/emsdk.git $RUNNER_TEMP/emsdk` → `cd $RUNNER_TEMP/emsdk && ./emsdk install 6.0.12 && ./emsdk activate 6.0.12`。`EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh` を `provider/build.sh` に渡した。`build_cpython_wasm.sh` は `[EMSDK]` (docs/REFERENCES.md) の `emsdk_env.sh` を直書きするため、導入先を `[EMSDK]` の位置に symlink した。`toolchain-emsdk` (`[EMSDK]`) の素材を指定した run では、その展開先を `EMSDK_ENV` に渡せば同じ手順で再現できる。
+- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先>` (本 run 7.3 秒)。
+- emsdk の由来: 素材 `toolchain-emsdk` (`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst`) を `tar --zstd -xf` で `$RUNNER_TEMP/toolchain-emsdk` に展開し (10.5 秒)、`EMSDK_ENV=$RUNNER_TEMP/toolchain-emsdk/emsdk/emsdk_env.sh` を `provider/build.sh` に渡した。展開物の版 (`emsdk/upstream/.emsdk_version` = `releases-6e9f6885…`) は `[EMSDK]` と同じで、どちらも 6.0.12 (`tools/m1/flags.sh` の pin)。上流からの導入はしていない。`build_cpython_wasm.sh` は `[EMSDK]` の `emsdk_env.sh` を直書きするため、そこだけは `[EMSDK]` を使った。
 
 ## PE 根拠 (10 件)
 
@@ -58,34 +58,34 @@
 
 ## 検証
 
-測定 commit: `7ca185334` (コードを変えた最後の commit。PR head `1a1ac96a3` に main `58ed035cf` を取り込んだ merge。競合は `tools/python/tests/provider_check.mjs` の 1 件)。以下の表はこの commit のクリーンな作業ツリー (`git status` 空) で、`provider/build.sh` を実行してから測定した。測定の後に足す commit は md (本 REPORT) のみ。
-前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、247 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.3 秒)。これらは `657e37a76` で作った生成物を流用した (main 取り込みで両 script と `fetch_inputs.sh` の入力は変わっていない)。素材 `fl-win64` は `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (5.7 秒) して `FL_WIN64_DIR` に渡した。emsdk は [EMSDK] (`EMSDK_ENV` 既定) を使った。
-環境: runner 4 core。load average は各コマンドの直前の `/proc/loadavg` (1 分値): 0.30〜0.35。
+測定 commit: `4276b7d1b` (コードを変えた最後の commit。main `512b09ffa` を取り込んだ merge。競合は `tools/python/tests/provider_check.mjs` の 1 件で、判定行に main 側の `pe235` を残して本 PR の `pe136` を足し、件数を 186 / 249 に更新した)。以下の表はこの commit のクリーンな作業ツリー (`git status` 空) で測定した。測定の後に足す commit は md (本 REPORT) のみ。
+前提の生成物 (gitignore・本 run で再生成): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、167.7 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、4.1 秒)。素材 `fl-win64` は `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (7.3 秒) して `FL_WIN64_DIR` に渡した。emsdk は「emsdk の由来」のとおり。
+環境: runner 4 core。全テストの直前の `/proc/loadavg` (1 分値): 1.88 (直前の `build_cpython_wasm.sh` の影響を含む)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` (`EMSDK_ENV` 既定 = [EMSDK]) | rc 0・`fl_table.c: 435 関数, ハンドラ 185` | 1.5 秒 |
-| `node tests/provider_check.mjs` | rc 0・`{"functions":435,"implemented":185,"unimplemented":250,"mcp_static":60,"PASS":true}` | 0.35 秒 |
-| `node tests/screen_menu_diff.mjs` | calls 42、diffs 0、PASS | 0.05 秒 |
-| `node tests/screen_diff.mjs` (回帰) | calls 32、diffs 0、PASS | 0.05 秒 |
-| `node tests/ui_browser_diff.mjs` (main 側の回帰) | ok_calls 8・bad_calls 5、diffs 0、browserOp 3、PASS | 0.05 秒 |
-| `node tests/ui_state_diff.mjs` (main 側の回帰) | calls 58、diffs 0、PASS | 0.05 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・`{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` | 2.15 秒 |
+| `bash provider/build.sh` (`EMSDK_ENV` = 素材 toolchain-emsdk) | rc 0・`fl_table.c: 435 関数, ハンドラ 186` (sysroot キャッシュ生成を含む初回) | 11.5 秒 |
+| `node tests/provider_check.mjs` | rc 0・`{"functions":435,"implemented":186,"unimplemented":249,"mcp_static":60,"PASS":true}` | 0.26 秒 |
+| `node tests/screen_menu_diff.mjs` | calls 42、diffs 0、PASS | 0.04 秒 |
+| `node tests/screen_diff.mjs` (回帰) | calls 32、diffs 0、PASS | 0.04 秒 |
+| `node tests/ui_browser_diff.mjs` (main 側の回帰) | ok_calls 8・bad_calls 5、diffs 0、browserOp 3、PASS | 0.04 秒 |
+| `node tests/ui_state_diff.mjs` (main 側の回帰) | calls 58、diffs 0、PASS | 0.04 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・`{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` | 1.11 秒 |
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5): 測定 commit `7ca185334` で再実施。`host/fl_mock.mjs` の `screen.menuShowing` (520 行) から `scrNeed()` を外すと、`node tests/screen_menu_diff.mjs` は `ERR_ASSERTION` で rc 1 (FAIL)。差分は `screen 初期化・メニュー差分 2 件`。元の内容に戻し (`cmp` 一致)、同じ test を再実行すると calls 42・diffs 0・PASS (rc 0)。
+ネガティブコントロール (`docs/WORKFLOW.md` §5): 測定 commit `4276b7d1b` で再実施。`host/fl_mock.mjs` の `screen.menuShowing` (524 行) から `scrNeed()` を外すと、`node tests/screen_menu_diff.mjs` は `ERR_ASSERTION` で rc 1 (FAIL)。差分は `screen 初期化・メニュー差分 2 件` (`screen.menuShowing` の 2 件)。元の内容に戻し (`cmp` 一致、`git status` 空)、同じ test を再実行すると calls 42・diffs 0・PASS (rc 0)。
 
 コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外。本 REPORT を含む md のみの commit を後から足しても 0 行のまま):
 
 ```
-$ git diff 7ca185334 HEAD -- tools/python ':!*.md'
+$ git diff 4276b7d1b HEAD -- tools/python ':!*.md'
 (空)
 ```
 
-参考 (main 取り込みの差分。PR head `1a1ac96a3` から測定 commit まで。測定の基準は `7ca185334`):
+参考 (前回の測定 commit `7ca185334` から本測定 commit までの main 側の差分。実行に当たるのは `host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/general_diff.mjs`・`tests/provider_check.mjs`、残りは `analysis/` の 6 本):
 
 ```
-$ git diff --stat 1a1ac96a3 7ca185334 -- tools/python ':!*.md' | tail -1
- 11 files changed, 595 insertions(+), 11 deletions(-)
+$ git diff --stat 7ca185334 4276b7d1b -- tools/python ':!*.md' | tail -1
+ 10 files changed, 1441 insertions(+), 3 deletions(-)
 ```
 
 ## 訂正の候補 (未検証)
