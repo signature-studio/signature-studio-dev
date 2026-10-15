@@ -4,7 +4,7 @@
 
 - 親 REPORT: `tools/plugins/slayer_engine_ia32/REPORT.md` §13。 本付録が測定値の正本。
 - 前提 (merge 済み): #4091 (異常終了の exit 非 0 検出 = 受入条件 3) と #4160 (ebp 設定 = 受入条件 1・2 の上に積む)。
-- 測定 commit: 本付録を含む PR の、コードを変えた最後の commit (PR 本文の「検証」節)。 入力は fl-win64 の `block22434_PE.bin` (sha256 `84b64c43…de724a9`) と乱数 (seed 2989)。
+- 測定 commit: `9abd7c77b` (main 取り込みの merge commit。 コードを変えた最後の commit)。 §5 の測定値は全てこの commit で取った。 入力は fl-win64 の `block22434_PE.bin` (sha256 `84b64c43…de724a9`) と乱数 (seed 2989)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。
 
 ## 1. 結論
@@ -18,7 +18,7 @@
 
 ## 2. 6 本の ecx 相対の読み (受入条件 1)
 
-`work/lift_text/ott_lifted.c` の `R[1] + <const>` (ecx) と、絶対読みを数えた。 native が segfault した元の条件は `ecx = 0x10F80000` のとき、`ecx + max` が 16MB のイメージ窓 (0x10000000〜0x11000000) の外に出ること。 測定 commit `87ebc24ea` の lift 出力と突合済み (絶対読み・オフセットの値は全て一致)。
+`work/lift_text/ott_lifted.c` の `R[1] + <const>` (ecx) と、絶対読みを数えた。 native が segfault した元の条件は `ecx = 0x10F80000` のとき、`ecx + max` が 16MB のイメージ窓 (0x10000000〜0x11000000) の外に出ること。 オフセットの最大・最小は、前回 (`87ebc24ea`) の lift 出力との突合の値。 測定 commit `9abd7c77b` の lift 出力 (`work/lift_text/ott_lifted.c`) では、下表の絶対読みが現れることを grep で再確認した (オフセットの再突合はしていない)。
 
 | 関数 | ecx 相対の最大・最小 (オフセット) | 絶対読み (例) | 判定 |
 |---|---|---|---|
@@ -62,14 +62,14 @@ python3 x87_fn_diff.py                # exit 0 (PASS)
 X87_PROBE=1 python3 x87_fn_diff.py    # 測定専用 (判定は FAIL のまま。 §3 の 3 本の一致を見る)
 ```
 
-### 再測定 (測定 commit `87ebc24ea`・load1 0.89)
+### 再測定 (測定 commit `9abd7c77b`・load1 0.82 (lift 開始前))
 
 | 試験 | exit | 実測時間 |
 |---|---:|---:|
-| `python3 lift_text.py` | 0 | 22.27 s |
-| `python3 x87_fn_diff.py` (ゲート 7 本) | 0 (PASS) | 19.39 s |
-| `python3 x87_fn_diff.py --nega` | 0 (1 bit 検出) | 7.52 s |
-| `python3 x87_fn_diff.py --nega-lower` | 0 (演算の取り違え検出) | 15.99 s |
-| `X87_PROBE=1 python3 x87_fn_diff.py` | 1 (想定どおり非自明性 FAIL。 3 本は bit 一致 200/200・200/200・4000/4000) | 27.92 s |
+| `python3 lift_text.py` | 0 | 22.09 s |
+| `python3 x87_fn_diff.py` (ゲート 7 本) | 0 (PASS) | 32.98 s |
+| `python3 x87_fn_diff.py --nega` | 0 (1 bit 検出) | 7.55 s |
+| `python3 x87_fn_diff.py --nega-lower` | 0 (演算の取り違え検出) | 15.79 s |
+| `X87_PROBE=1 python3 x87_fn_diff.py` | 1 (想定どおり非自明性 FAIL。 3 本は bit 一致 200/200・200/200・4000/4000) | 28.00 s |
 
-入力: `block22434_PE.bin` sha256 `84b64c43cc652840…` (fl-win64)。 emsdk は上流 `emscripten-core/emsdk` の tag `6.0.12` (`35ff8a6`) を `emsdk install`・`activate` で入れた (`emcc 6.0.12`)。
+入力: `block22434_PE.bin` sha256 `84b64c43cc652840…` (fl-win64)。 emsdk は素材 `toolchain-emsdk` (emcc 6.0.12) を `$RUNNER_TEMP/emsdk-tc/emsdk` に展開し、`upstream/emscripten` を PATH に通した。
