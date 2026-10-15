@@ -105,3 +105,25 @@ PR #3848 は main が先に進むたびに競合した (1 回目 `f4d8cf90e`・2
 | all_tools (JS mock) | `node tests/all_tools.mjs` | 0 | 2 秒 | total 48・**ok 48**・host_calls 37,425 |
 
 所要・load: 検査は逐次 (並列数 1)。各検査開始時の load average (1 分) は 0.49〜2.94 (4 core)。ネガティブコントロールは §5 (`d911ecb97`) で実施済み。本節では再実施していない。
+
+## 7. main 取り込み後の再測定 (4 回目の競合・main `abf0981f7`)
+
+main が `ac7ca0637` から `abf0981f7` に進み、PR #3848 は再び競合した (`git merge origin/main`。rebase・force は使わない)。競合は `tests/provider_check.mjs` の判定行と件数だけ。main 側の `pe235` (PY-235・`general.processRECEvent`・#3701) を残し、本 PR の `pe215` を足した。コメントは両側の追記を残した。期待値は main 側の 176 / 259 に本 PR の 1 件を足して **177 / 258** に更新し、実測で一致した。取り込み merge は `8176f9e6f`、期待値の更新は `8631aa46c`。
+
+測定 commit (コードを変えた最後の commit): `8631aa46c` (`fix(python): update provider_check expectation after main merge (PY-215, #3568)`)。`git diff 8631aa46c HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節の commit は REPORT だけ)。main との差分 (`git diff origin/main HEAD -- tools/python/provider tools/python/host tools/python/tests`) は `device.getLinkedChannel` (C・mock・検査) の追加だけ (4 files・+31/−4)。
+
+素材: fl-win64 は `tar --zstd -xf` (6.9 秒) で `$RUNNER_TEMP/pyv3848/win64` に、toolchain-emsdk は同じ親に展開 (10.8 秒)。`FL_WIN64_DIR=<展開先>/win64`。CPython・flpy・provider は各スクリプトの既定の `/opt/emsdk` を使った。
+
+| 検査 | コマンド | rc | 所要 | 結果 |
+|---|---|---|---|---|
+| 入力取得 | `FL_WIN64_DIR=<展開先>/win64 bash fetch_inputs.sh` | 0 | 1.2 秒 | work/midi.py・utils.py・MCPTools.pyc・device script |
+| CPython wasm | `bash build_cpython_wasm.sh` | 0 | 152.3 秒 | python.wasm。repo の記録ファイルは変化なし (git status clean) |
+| flpy | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | 0 | 3.7 秒 | flpy.js/wasm/data |
+| provider ビルド | `bash provider/build.sh` | 0 | 0.8 秒 | flprov.js/wasm・生成ログ「fl_table.c: 435 関数, ハンドラ 177」 |
+| provider_check | `node tests/provider_check.mjs` | 0 | 0.20 秒 | functions 435・**implemented 177**・unimplemented **258**・mcp_static 60・PASS |
+| device_diff | `node tests/device_diff.mjs` | 0 | 0.03 秒 | calls 11・link_calls 6・rejects 7・linked_channel `[-1,null,null,-1,null,null]`・**diffs 0**・PASS |
+| general_diff | `node tests/general_diff.mjs` | 0 | 0.03 秒 | calls 52・**diffs 0**・PASS |
+| all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 0 | 0.95 秒 | total 48・**ok 48**・soft_error 0・raised 0・host_calls 37,425 |
+| all_tools (JS mock) | `node tests/all_tools.mjs` | 0 | 0.98 秒 | total 48・**ok 48**・soft_error 0・raised 0・host_calls 37,425 |
+
+所要・load: 検査は逐次 (並列数 1)。各検査開始時の load average (1 分) は 0.65〜1.26 (4 core)。ネガティブコントロールは §5 で実施済みで、本節では再実施していない。main との差分の `host/fl_mock.mjs`・`provider/fl_engine.c` は、いずれも本 PR の `device.getLinkedChannel` の 2 行ずつだけ。
