@@ -85,6 +85,12 @@
 - slot 4 (クリア) と slot 5 (`return [+0x98]`) は呼び出しの memory 効果を差分に含める。戻り値は slot 5 だけ畳み込む (§8-4)。slot 4 の戻り値は未検証。
 - slot 5 の `[+0x98]` は CreateInstance が 0 にする領域で、差分の rax は 0 相当の値のみ見ている。0 以外の入力での振る舞いは未検証 (`.data` は run で不変のため、内部 +0x98 は zero のまま)。
 
+### 8-9 閉包 7 root の再測定と slot 1–3 の差分 (#3427 / 子 T-SH-81 の一部)
+- #3428 (PR #3471) の ymm 対応が main に入った後の実測。7 root (基準 + slot 1–3) の閉包は **unsup 0** (§8-3 の 2,472 site が解消)。235 関数・60,095 命令・unlifted callees 0・traps 0・imports 18 (`lift_psola_closure.sh` の lift)。
+- 差分 (呼出しは基準と同じ CreateInstance → slot 0 → slot 4 → slot 5): PASS 64 / FAIL 0 (wasm 3,549,536 B・trap 0)。閉包を広げても基準の一致は保たれる。
+- slot 1–3 を差分に入れると、native 側が全 64 case で addr 0 の SIGSEGV になり比較対象が 0 件になる (`wc diff` は PASS 0・excluded 64)。DSP 本体 (0x17f700 ほか) は `this` の内部フィールド (+0xc4・+0xcc・+0x33c・+0x6a0・+0x24・+0x6bc など) を書いてから helper を呼ぶ。null 参照の原因 (未設定の内部ポインタ) は未特定。host 側の事前設定が要る。
+- 未解決 (子 T-SH-81 の受入): slot 1–3 の host 前提の確定と、その入力での native 対 wasm 差分。slot 2 の差分は未実施。
+
 ### 8-8 測定後のコード差分 (差分 0 の証跡)
 測定 commit `9b1902fe5` 以降に変えたのは本付録・`REPORT.md`・`DOC_MAP.md` (`.md` のみ)。
 `git diff 9b1902fe5 HEAD -- tools/shared/lift/ildsp tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh tools/shared/scripts ':!*.md'` の出力は空 (差分 0)。
