@@ -3,7 +3,7 @@
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID には当たらない)。 ST(0) の f80→f64 の丸め差は ADR D28 の帰結で、行案は `REPORT_APPENDIX_1099.md` §6 (D24 (案)) にある。 本付録は関数単位の観測のみを足す (`DEFECTS.md` は編集しない)。
 
 - 親 issue: #3715 (PLG-G2-31・親 #2989)。 前付録: `REPORT_APPENDIX_2989.md`。
-- 測定 commit: `e706cc113` (main (`946ea5588`) 取り込み後の merge commit。 試験コード `x87_fn_diff.py` を含む最後の code commit)。 旧測定 commit `b3275dc1c` の実測は、main 取り込みで試験ハーネスが変わったため、本記録の値として使わない (§6 の鮮度の証跡)。
+- 測定 commit: `54ea02944` (main (`861c6aef8`) 取り込み後の merge commit。 試験コードを変えた最後の code commit)。 旧測定 commit `e706cc113`・`b3275dc1c` の実測は、main 取り込みで試験ハーネスが変わったため、本記録の値として使わない (§6 の鮮度の証跡)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` と乱数 (seed 2989) で生成した試行のみ。
 
 ## 1. 結論
@@ -34,7 +34,7 @@
 - native のバッファを 32MiB から 64MiB に広げた (`IBUF_SZ`・`OBUF_SZ`)。 40 本 × 200 行の入力と出力が 32MiB に収まらないため。
 - 試験ランナーが異常終了したとき native は exit 0 で抜けて出力が欠ける (本 run で確認: `1000c084` の 2 行目以降が出ず、`rc=0`)。 そのため、行数の突合 (`件数 native / wasm / 期待`) が、欠損の検出の役割を果たした。 ランナーの exit 規約は変えていない (この欠陥は §5 で未解決として扱う)。
 
-## 4. 実測 (測定 commit `e706cc113`・HEAD で再現)
+## 4. 実測 (測定 commit `54ea02944`・HEAD で再現)
 
 | 関数 | n | 行の全項目が bit 一致 | float32 結果 (ST(0)・OBJ 窓) のみ一致 | ST(0) float64 の一致 / 1ulp / 2ulp / ≥3ulp | eax 不一致 | x87 深さ不一致 | OBJ 窓が変わった行 |
 |---|---:|---:|---:|---|---:|---:|---:|
@@ -45,7 +45,7 @@
 | `10001290` | 200 | 200 (100.00%) | 200 / 200 | 200 / 0 / 0 / 0 | 0 | 0 | 0 |
 
 - OBJ 窓の float32 語 (1,344 B): `10002ee0` 1,344,000 語・`10005400` 1,344,000 語・`10005d20` 67,200 語 = 全語一致。 `1000b3a2`・`10001290` は OBJ 窓を書かず、ST(0) が非ゼロで一致 (本付録では ST(0) の一致で非自明性を示す)。
-- 所要 (通常・`e706cc113`): native build 0.04 s、emcc 9.63 s、native 実行 0.169 s、wasm (node) 0.322 s、load1 0.70。 `--special` (同): native build 0.04 s、emcc 9.73 s、native 実行 0.363 s、wasm (node) 0.661 s、load1 0.77。
+- 所要 (`54ea02944`・foreground の wall 時間。 `lift_text.py` 20 s (rc 0)、通常 `x87_fn_diff.py` 21 s (rc 0・load1 開始時 0.69)、`--special` 15 s (rc 0・load1 開始時 0.85)、`--nega` 2 s、`--nega-lower` 10 s、`--special --nega-nan` 8 s。 native build・emcc の内訳は本 run では未計測)。
 - 再現: 同じ seed で 2 回実行し、`work/x87fn/native_out.txt` の md5 は実行ごとに同一 (ネガコン後の再測定で確認)。
 
 ## 5. ネガコン・未解決
@@ -84,10 +84,15 @@ python3 tools/plugins/slayer_engine_ia32/x87_fn_diff.py --nega-lower       # ネ
   git diff d5afb6ae5 b3275dc1c -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c
   → x87_fn_diff.py | 52 +++++++++++++++++++++++++  (1 file changed, 52 insertions(+))
   ```
-  次に main (`946ea5588`・#4064 の PROBE 追加と `run_chunked`) を取り込んだ `b3275dc1c..e706cc113` の差分は、測定ハーネスの変更 (`PROBE` は `X87_PROBE=1` のときだけ加わる。 `run_chunked` は入出力を 8,000 行ずつに分ける。 判定規則は不変)。 上の実測は全て `e706cc113` で取り直した値。
+  次に main (`946ea5588`・#4064 の PROBE 追加と `run_chunked`) を取り込んだ `b3275dc1c..e706cc113` の差分は、測定ハーネスの変更 (`PROBE` は `X87_PROBE=1` のときだけ加わる。 `run_chunked` は入出力を 8,000 行ずつに分ける。 判定規則は不変)。
   ```
   git diff b3275dc1c e706cc113 -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c
   → x87_fn_diff.py | 32 +++++++++++++++++++++++++-  (1 file changed, 29 insertions(+), 3 deletions(-))
   ```
-  以降 (`e706cc113` の後) の commit は文書のみ。
-- `--special` (例外値の入力) の実測 (`e706cc113`・20,000 行): PASS。 bit 一致は `10002ee0` 3,140 / 4,000・`10005400` 3,098 / 4,000・`10005d20` 3,488 / 4,000・`1000b3a2` 3,999 / 4,000・`10001290` 4,000 / 4,000。 構造 (eax・x87 深さ) は全行一致 (`10005400` は NaN どうし 637 行を別計上)。 ネガコン `--special --nega-nan` (NaN を 1.0 に置換) は nan-num 0 → 1・判定 FAIL で検出。
+  次に main (`861c6aef8`) を取り込んだ `e706cc113..54ea02944` の差分は、`x87_fn_native.c` の RBP 初期化 (`x87_fn_glue.c` と揃えた `GUEST_STACK_TOP - 0x1000`) の 1 行ずつ。 `--special` の一部の bit 一致の数値がこれで変わった (`10005d20` 3,488 → 3,490・`10005400` の NaN 併記 637 → 639)。 上の実測は全て `54ea02944` で取り直した値。
+  ```
+  git diff e706cc113 54ea02944 -- tools/plugins/slayer_engine_ia32/x87_fn_glue.c tools/plugins/slayer_engine_ia32/x87_fn_native.c
+  → x87_fn_glue.c | 2 +- / x87_fn_native.c | 2 +-  (2 files changed, 2 insertions(+), 2 deletions(-))
+  ```
+  測定 commit `54ea02944` から HEAD までの試験コード差分 (`git diff 54ea02944 HEAD -- tools/plugins/slayer_engine_ia32/x87_fn_diff.py tools/plugins/slayer_engine_ia32/x87_fn_native.c tools/plugins/slayer_engine_ia32/x87_fn_glue.c tools/ott/rt`) は、この記録を commit する時点で 0 件 (文書のみ)。
+- `--special` (例外値の入力) の実測 (`54ea02944`・20,000 行): PASS (exit 0)。 bit 一致は `10002ee0` 3,140 / 4,000・`10005400` 3,098 / 4,000・`10005d20` 3,490 / 4,000・`1000b3a2` 3,999 / 4,000・`10001290` 4,000 / 4,000。 構造 (eax・x87 深さ) は全行一致 (`10005400` は NaN どうし 639 行を別計上)。 ネガコン `--special --nega-nan` (NaN を 1.0 に置換) は nan-num 0 → 1・判定 FAIL で検出。
