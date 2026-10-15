@@ -12,28 +12,32 @@
 - `canvas_graphicspath.{h,cpp}`: `subpaths ()` を追加 (subpath ごとの頂点列を返す)。曲線は既存の近似 (制御点を含む) のまま。
 
 ### 1-2. 測定 commit と検証
-- 測定 commit: `1d2a5c9ab` (コードを変えた最後の commit)。
+- 測定 commit: `c95e740d1` (コードを変えた最後の commit。main 取り込み後の SR-68 (#4427) の `plotLine`・`plotThickLine` を含む)。
 - 判定 harness: `canvas/draw_ops_main.cpp` に `drawArc`・`drawPoint`・`drawGraphicsPath` を追加。判定は `check_draw_ops.sh` (rc=1 かつ nonzero>0)。
+- 測定日時: 2026-10-15。素材は `toolchain-emsdk` (emsdk 上流から取得、pin 6.0.12) と `vstgui4_14_3` を `work/` に用意して測った。`work/` は gitignore。
+- 所要・load は 2 回目の測定 (依存の取得を含まない) の値。load は `/proc/loadavg` の 1 分値 (開始→終了)。
 
-| 検証 | 結果 | 所要 | load (開始時) |
+| 検証 | 結果 | 所要 | load (開始→終了) |
 |---|---|---|---|
-| `check_draw_ops.sh` (rc) | **0** | 64.82 s (real) | 1.01 |
-| drawLine | pass (nonzero=49) | | |
-| drawLines | pass (nonzero=26) | | |
-| drawPolygon | pass (nonzero=607) | | |
-| drawEllipse | pass (nonzero=2472) | | |
-| **drawArc** | **pass (nonzero=1307)** | | |
-| **drawPoint** | **pass (nonzero=1)** | | |
-| **drawGraphicsPath** | **pass (nonzero=876)** | | |
-| drawBitmap | pass (nonzero=64) | | |
-| `check_render_poc.sh` (rc, 既存の判定) | **0** (render pass: nonzero_after=12000 text_px=112) | 64.90 s (real) | 1.01 |
-| `check_canvas_syntax.sh` (rc) | **0** (7 ファイル全て rc=0・errors=0) | 7.11 s (real) | — |
+| `check_draw_ops.sh` | rc=0 (8 op 全 pass) | 21 s | 1.66→2.32 |
+| 　drawLine | pass (nonzero=49) | | |
+| 　drawLines | pass (nonzero=26) | | |
+| 　drawPolygon | pass (nonzero=607) | | |
+| 　drawEllipse | pass (nonzero=2472) | | |
+| 　**drawArc** | **pass (nonzero=1307)** | | |
+| 　**drawPoint** | **pass (nonzero=1)** | | |
+| 　**drawGraphicsPath** | **pass (nonzero=876)** | | |
+| 　drawBitmap | pass (nonzero=64) | | |
+| `check_render_poc.sh` (既存の判定) | rc=0 (render pass: nonzero_after=12000 text_px=112) | 22 s | 2.32→2.80 |
+| `check_canvas_syntax.sh` | rc=0 (8 ファイル errors=0) | 5 s | 2.80→2.66 |
+| `check_line_width.sh` | rc=0 (4 判定 pass) | 22 s | 2.66→3.03 |
 
-- 測定条件: vstgui4_14_3 (`work/vstgui4`)、toolchain-emsdk (`work/emsdk`、emcc 6.0.12)。`work/` は gitignore。
-- 初回の run は vstgui4 の clone と素材の展開を含むため、所要の比較対象にしない。
+- 測定条件: vstgui4_14_3 (`work/vstgui4`)、toolchain-emsdk (`work/emsdk`、emcc 6.0.12)。
+- 初回の run は vstgui4 の clone と emsdk の取得を含むため、所要の比較対象にしない。
 
 ### 1-3. コード差分 (測定 commit 以降)
-`git diff 1d2a5c9ab HEAD -- tools/targets/serum2/gui/canvas` は、この付録 commit までで 0 行 (コード差分なし)。
+`git diff c95e740d1 HEAD -- tools/targets/serum2/gui/canvas` は 0 行 (コード差分なし)。
+参考: 前の測定 commit `1d2a5c9ab` からの差分は main 取り込みで 183 行 (`canvas_graphicsdevice.cpp`・`.h`・`check_line_width.sh`・`line_width_main.cpp`)。この差分の中身は SR-68 (#4427)。
 
 ### 1-4. 未解決
 | 未解決 | 影響 | 起票先 |
