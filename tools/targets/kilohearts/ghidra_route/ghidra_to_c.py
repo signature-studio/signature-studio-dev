@@ -373,10 +373,13 @@ def main():
     delay_hits = {}
     stubs = dict(STUB)
     stubs.update(cfg['stubs'])
+    defined = set(vas)
     for va in vas:
         t = src[va]
         t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
         t = rewrite_thunks(t, va)
+        # 呼出名の統一 (DELAY_RULES より前): Ghidra は未命名 callee を func_0x000<va> で呼ぶが、定義側は同じ va を FUN_<va> で出す (also 追加分)
+        t = re.sub(r'\bfunc_0x000([0-9a-f]{9})\b', lambda m: 'FUN_' + m.group(1) if int(m.group(1), 16) in defined else m.group(0), t)
         t = re.sub(r'undefined1 (auVar\d+) \[16\];', r'V128 \1;', t)
         t = re.sub(r'undefined1 (in_XMM\d+) \[16\];', r'V128 \1;', t)
         if 'lanes' in fixes:
@@ -439,10 +442,6 @@ def main():
     out += protos
     out += [stubs[v] for v in stubs if ('FUN_%x' % v) in alltxt and v not in vas]
     out += [THUNK[v] for v in THUNK if ('func_0x000%x' % v) in alltxt and v not in vas]
-    # --- 呼出名の統一: Ghidra は未命名 callee を func_0x<va> で呼ぶが、定義側は同一 va を FUN_<va> で出す (also 追加分)
-    defined = set(vas)
-    bodies = [re.sub(r'\bfunc_0x000(180f[0-9a-f]{5})\b', lambda m: 'FUN_' + m.group(1)
-                     if int(m.group(1), 16) in defined else m.group(0), b) for b in bodies]
     out += bodies
     # --- export wrapper (harness は i64×4 + 戻り値 kind で呼ぶ)
     sigs = {}
