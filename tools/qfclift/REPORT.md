@@ -245,5 +245,6 @@ guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `0x59c210` (setjmp/longjmp 継続) の lift 対応と longjmp の起動元 | DllMain が完走しない。残りの import 呼出し (計数は停止までの 5 件) が不明 | #3410 (T-SH-77) |
-| rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0)・`GetCurrentThreadId` (固定 1) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る。FLEngine の既存結果への影響は未確認 | 未起票 (PM 判断。修正は FLEngine 既存結果への影響確認が先) |
+| rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る。FLEngine の既存結果への影響は未確認 | #4234 (T-SH-104) |
+| `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | 未起票 (根拠の測定が先。§10.1 に記載) |
 | `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #3412 の子 #3434 ・ #3410 の後段 |
