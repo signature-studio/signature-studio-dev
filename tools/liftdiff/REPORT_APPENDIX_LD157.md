@@ -11,7 +11,7 @@
 
 ## 1. 測定条件
 
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (`FL_WIN64_DIR`)。`work-m11` と `work-liftdiff` は runner の既存展開を worktree から symlink。`toolchain-emsdk` は `/opt/emsdk`。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (`FL_WIN64_DIR`)。`work-m11` と `work-liftdiff` は runner の既存展開を worktree から symlink。`toolchain-emsdk` は `[EMSDK]` (`docs/REFERENCES.md` §4)。
 - build: `python3 liftdiff.py build targets/m11.json` (`wasm_size` 4459339 @ HEAD・4459215 @ 旧 `5ed1552bc`)。
 - hybrid state: `python3 liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild` → `units_run=928/942 first_fail=830`、`precondition ok=True` (LD-42 と一致)。
 - batch: `python3 liftdiff.py batch targets/m11.json --set sample:800 --shards 12 --nobuild --state work/m11/boot_state_hybrid.json --out work/m11/batch_<名>.jsonl` を 2 回。
