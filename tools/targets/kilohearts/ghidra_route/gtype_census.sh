@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # #3801 (KH-65): Delay の型不一致 (`_DAT_<va>` のグローバル型) の規則 `--fix gtype` を census し、Gain/Haas/Gate の .o 不変を見る。
 #   bash tools/targets/kilohearts/ghidra_route/gtype_census.sh <work>
+#   基点 (gtype なし): FX=bitcast,intload,stackpair,assoc,concat bash …/gtype_census.sh <work>
+#   併用 (gtype・lanes): FX=bitcast,intload,stackpair,assoc,concat,gtype,lanes bash …/gtype_census.sh <work>
+#   基点+lanes: FX=bitcast,intload,stackpair,assoc,concat,lanes bash …/gtype_census.sh <work>
 # <work> は repo 外 (例: $RUNNER_TEMP/kh)。下に次を置く前提:
 #   <work>/win/HeartCore.core_64   plugins-kilohearts の Installer zip → payload.dat → windows.zip/1ccb1df8c8f10745 → HeartCore.core_64
 #   <work>/emsdk                   toolchain-emsdk (emsdk_env.sh を source する)
@@ -11,7 +14,8 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; KH="$(cd -- "$HERE/.." && pwd)"
 W=${1:?usage: gtype_census.sh <work>}
 CORE="$W/win/HeartCore.core_64"; O="$W/gtype"
 GHIDRA="$W/ghidra/ghidra_12.1.4_PUBLIC"; export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/temurin-21-jdk-amd64}; export PATH="$JAVA_HOME/bin:$PATH"
-FX=bitcast,intload,stackpair,assoc,concat,gtype
+# FX は環境変数で上書きできる (census の基点・併用の再現用。既定 = gtype 単独)
+FX=${FX:-bitcast,intload,stackpair,assoc,concat,gtype}
 rm -rf "$O"; mkdir -p "$O/out" "$W/proj"
 # lift 集合 = delay・stereo の lift 一意アドレス ∪ gain・haas・gate (昇順・10 進。0x 付きの引数は使わない)
 VAS=$(cd "$KH" && python3 -c "
