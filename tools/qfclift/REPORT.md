@@ -174,8 +174,10 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 戻り先 `0x59c210` (setjmp/longjmp 継続) の lift 対応 (FLEngine 同型の override と断片 entry) と longjmp の起動元の特定 | DllMain が完走しない | #3410 (T-SH-77) |
-| rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない | #3411 (T-SH-78) |
+| rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない | #3411 (T-SH-78)。直接呼出しの計数は §10 (5 件) |
 | GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3412 (T-SH-79) |
+
+- DllMain 経路の import 呼出し回数 (直接呼出しの計数) は §10 に置く (#3411 の受入 1)。
 
 ## 8. 検証実行・再現 (§7 の追加分・実測)
 
@@ -221,9 +223,11 @@ guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行�
 測定 commit = 本 PR の commit。計数の再現は `tools/qfclift/qfc_count.sh` (前提: `qfc_boot.sh` で lift 済み)。
 計数は直接呼出し `imp_<名>();` だけを数える (lift が `imp_tab` 経由で呼ぶものは含まない)。判定はしない。
 
-### 10.1 呼出し回数 (DllMain(PROCESS_ATTACH) → 停止点まで、n=1)
+### 10.1 呼出し回数 (直接呼出し `imp_<名>();` のみ・DllMain(PROCESS_ATTACH) → 停止点まで、n=1)
 
-| import | 呼出し回数 | 実装元 | Windows 仕様との対応 (戻り値・副作用) |
+間接経由 (`imp_by_index` → `imp_tab[k]()`・`ott_missing_import`) の呼出しは計数に入らない (`gen_count_wrap.py` は書き換えない)。よって下表は「直接呼出しの計数」であり、DllMain 経路で呼ばれる import の全数ではない。
+
+| import | 呼出し回数 (直接) | 実装元 | Windows 仕様との対応 (戻り値・副作用) |
 |---|---|---|---|
 | `GetCurrentThreadId` | 1 | `fle_cpu.c:160` | 戻り値 = スレッド ID。rt は固定値 1 を返す (実物の ID ではない) |
 | `TlsAlloc` | 1 | `fle_cpu.c:165` | 戻り値 = 新しい TLS index。rt は常に 0 を返す (index 0 を毎回返すため、2 回目以降の割当が区別できない) |
@@ -236,7 +240,8 @@ guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行�
 
 ### 10.2 この PR で行ったこと / 行わなかったこと
 
-- DllMain 経路で新たに実装が必要な import は **0 件** (5 件すべて rt・`qfc_imp.c` に既存)。`qfc_imp.c` と rt は変更していない。
+- 直接呼出しとして計数された import は 5 件で、すべて rt・`qfc_imp.c` に既存。よって直接経路で新たに実装が必要な import は **0 件**。`qfc_imp.c` と rt は変更していない。
+- 間接経由の import 呼出しは未計数のため、「DllMain 経路で実際に呼ばれる import は 5 件」とは言えない (§10.3 の未解決)。再測定 (計数版に `imp_by_index` 経路を加える) は emcc 実行環境が必要で、本 PR では行っていない。
 - 受入 2 の「soft 呼出し 0 件にする」は満たさない (soft 呼出し 0 件は既に満たしていた。停止点は #3410 の範囲で、`0x59c210` の lift 対応が必要)。
 - rt の `TlsGetValue` の未設定 slot の値 (仕様は 0) は、DllMain がこの値を読むまでは停止点に影響しない。修正は rt の既存 FLEngine の結果に影響し得るため本 PR では変えない (別件で確認が必要)。
 
@@ -244,7 +249,8 @@ guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `0x59c210` (setjmp/longjmp 継続) の lift 対応と longjmp の起動元 | DllMain が完走しない。残りの import 呼出し (計数は停止までの 5 件) が不明 | #3410 (T-SH-77) |
+| `0x59c210` (setjmp/longjmp 継続) の lift 対応と longjmp の起動元 | DllMain が完走しない。残りの import 呼出し (計数は停止までの直接呼出し 5 件) が不明 | #3410 (T-SH-77) |
 | rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る。FLEngine の既存結果への影響は未確認 | #4234 (T-SH-104) |
-| `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | 未起票 (根拠の測定が先。§10.1 に記載) |
+| `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | #4280 (T-SH-108。#4234 は `GetCurrentThreadId` を範囲外としている) |
 | `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #3412 の子 #3434 ・ #3410 の後段 |
+| 間接経由 (`imp_by_index` → `imp_tab[k]()`・`ott_missing_import`) の import 呼出し | 計数は直接呼出しの 5 件だけ。DllMain 経路の間接呼出しは未計数 | #3410 (T-SH-77) |
