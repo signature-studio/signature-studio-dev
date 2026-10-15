@@ -106,7 +106,7 @@ bash ghidra_route/build_cmp.sh gain 1000 7 bitcast,intload,stackpair,assoc,conca
 
 - 経緯: PR 作成後に main が進み、2 回取り込んだ。(1) `origin/main` (`45182bf1b` → `5ebde52cc`) は merge commit `793662e84`・`537247f81` で取り込み済み (`docs/DOC_MAP.md` の競合は両行を残して解消)。(2) `origin/main` (`ce3f5eac7`) は merge commit `934c8dd71` で取り込んだ。`ghidra_shim.h` が #3108 (`eb5532ae9`) の `SUB168` 追加と競合したため、main 側の `SUB168` (下位・上位 8 byte) を残し、本 PR 側の `SUB168` を削除した (意味は同じ)。本 PR の他の shim (`SUB84`・`ZEXT816`・`minps` ほか) は残した。
 - §0・§3・§4 の数値は取り込み前 (`12647936d`) の値。以下が取り込み後 (`934c8dd71`) の値。前回の測定 (`793662e84`) も 485 件で全分類が一致していた。
-- 前提: §1 と同じ素材・道具。`plugins-kilohearts` の `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B。Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致)、JDK 21、emcc 6.0.12 (`/opt/emsdk`)。load は開始時 0.5 (`/proc/loadavg`)。
+- 前提: §1 と同じ素材・道具。`plugins-kilohearts` の `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B。Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致)、JDK 21、emcc 6.0.12 ([EMSDK])。load は開始時 0.5 (`/proc/loadavg`)。
 - decompile: 挿入順の lift 集合 141 件を 10 進で渡す (`analyzeHeadless` wall 21.6 s, n=1) で **141/141 OK**。Gain/Haas/Gate の 10 関数 (`run_all.sh` [2] と同じ) は **10/10 OK** (wall 24.0 s)。
 - emcc (`--fix bitcast,intload,stackpair,assoc,concat`・`emcc -c -ferror-limit=0`): wall 14.2 s、rc 1 (残件あり)。census は **485 件**。Win API・LOCK・MXCSR は 0 件のため表から省いた。
 
