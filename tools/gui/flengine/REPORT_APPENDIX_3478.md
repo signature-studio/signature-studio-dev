@@ -6,7 +6,7 @@
 
 - boot が init 1675 に届かないのは、**`InitUnits` (`function_4120c0`) が unit 114 (0 起算) の Init 実行中に Halt0 に入り、残りの unit を実行せずに抜けるため**。停止 unit の Init は `function_623840` (VA `0x623840`)。init 1675 は `function_1266a60` で、unit 882 (0 起算) の Init (FInit は `function_12669a0`・1676) に当たる。unit 882 は停止より後なので呼ばれない。
 - `dllmain_done True` は **InitUnits の完走ではない**。InitUnits は trace の `[m11][unit 115/942]` (index0 114) の Init 中に Halt0 に入り、残りの unit を実行せずに抜けた (`function_412770` → JS 例外 `m11_dllmain_done` による脱出)。ここで「111/942 unit で中断」とは書かない: `init_count` 111 は別カウンタ (`tools/m11/m11_rt.c:148-158`) で、停止位置は trace の unit 番号で示す。`tools/m11/m11_ov.c:445` の「DllMain attach 完走」は Halt0 を DllMain の完了として扱う設計上の呼び名で、本 REPORT の「完走ではない」とは別の意味 (コードの注釈は本 PR で変えていない)。REPORT_APPENDIX_3353 §1・§3-1・§9-1 の「boot は完走する」は誤り (§5 で訂正)。
-- Halt0 の判定は §3-3: obj (`[0x11f7110]`) の vtable[0] 呼出し (`call [obj]`) の戻り値 `eax != 0`。`eax` の決定元は未確定 (vtable[0] は QueryInterface 相当ではない・§3-4)。実機で同じ経路が Halt しないかは**未判定**。子 #3748 の受入で詰める (§7)。
+- Halt0 の判定は §3-3: obj (`[0x11f7110]`) の vtable[0] 呼出し (`call [obj]`) の戻り値 `eax != 0`。`eax` の決定元は未確定 (vtable[0] は `add rcx,-0x48; jmp` の thunk・§3-4)。実機で同じ経路が Halt しないかは**未判定**。子 #3748 の受入で詰める (§7)。
 
 ## 2. 測定の組
 
@@ -19,6 +19,7 @@
   4. `bash tools/gui/flengine/build.sh` (24.8 秒・`m11_gui.cjs`)。`-g2` の診断 build は `build.sh` の `-g1`→`-g2` の sed 複製 (`cfi_boot7.sh` と同じ・コミットしない)
   5. `node tools/gui/flengine/run.mjs --wasm <m11_gui.cjs>` (0.37 秒)
   6. `node tools/gui/flengine/boot_halt_probe.mjs --wasm <-g2 の m11_gui.cjs> --out <json>` (0.5 秒)
+- 再測定 (差し戻し対応): 測定 commit は `6dcf7aa96` (probe に `halt_mem` を追加した commit)。`git diff 9a5767521 6dcf7aa96 -- tools/m11 tools/shim tools/gui/flengine/build.sh tools/gui/flengine/run.mjs` は 0 行で、測定経路は変わっていない。上の手順 1〜6 を同じ順で実行: wndseed rc 0 (3 分 26 秒・閉包 1212・WNDCLASS-CHECK PASS)、m11_build OK、-g2 build OK (25.9 秒)。値は §3・§3-4 と一致。
 - 注意: `m11_wndseed.sh` は追跡ファイル `tools/m11/results/wndclass_scan.json` を書き換える。本 PR ではコミットせず、`git checkout --` で戻した。
 - 負の対照 (素材の旧 IR): 素材の `boot_final3.ll` (boot5・boot6 無し) で作った GUI build は `units_run 17 / init_count 18 / threw "memory access out of bounds"`。boot5・boot6 を入れて初めて `units_run 110` になる。
 
@@ -50,15 +51,17 @@
 ### 3-3. Halt の直接条件 (機械語 と IR の突き合わせ)
 
 - 停止 unit の呼出し鎖の要所は `function_8494c0` (`VA 0x8494c0`)。機械語: `mov qword [rbx],0`・`call 0x849480`・`mov rdx,[rip+0xdadc2e]` (= グローバル `0x11f7110`)・`lea r8,[rip+0x13]` (= `0x8494fc`・非 0 の定数)・`call 0x41a800`。
-- `function_41a800` (IR `dec_label_pc_41a800`・機械語 `0x41a800` を capstone で確認): Delphi の interface cast の形。第 2 引数 (obj) が非 0 のとき `call [obj]` (vtable[0] = QueryInterface 相当) を第 3 引数 (IID 相当の `0x8494fc`) で呼び、戻り値 `eax != 0` なら `mov cl,0x17; call 0x4096d0` (RunError 23 相当・Halt)。`eax == 0` なら成功。`0x8494fc` はコード領域内 (`ret` の直後) を指す。実機でも同じ IID を読むかは未検証。
+- `function_41a800` (IR `dec_label_pc_41a800`・機械語 `0x41a800` を capstone で確認): Delphi の interface cast の形。第 2 引数 (obj) が非 0 のとき `call [obj]` (vtable[0] は §3-4 の thunk) を第 3 引数 (`0x8494fc`) を渡して呼び、戻り値 `eax != 0` なら `mov cl,0x17; call 0x4096d0` (RunError 23 相当・Halt)。`eax == 0` なら成功。`0x8494fc` はコード領域内 (`ret` の直後) を指す。第 3 引数が IID かは未確認 (§3-4)。実機でも同じ値かは未検証。
 - グローバル `0x11f7110` は `function_849480` が書く。`[0x11f7110] == 0` のときだけ `function_8495c0(0x446b00, 1)` の結果 (非 0 なら +72) を格納する。`function_8495c0` は通常 obj を返す。
 - よって、この unit の Halt は obj の vtable[0] 呼出しの戻り値 `eax` で決まる。`[0x11f7110]` (obj) は入力で、非 0 なら `call [obj]` が呼ばれるだけ。`eax` の決定元は未確定 (§3-4)。実機で同じ経路が Halt しないなら、(a) 実機では obj の書込み側 (`function_849480`・`function_8495c0`) が違う、(b) vtable[0] の戻り値が実機と違う (lift 欠陥の可能性を含む) のどちらか。**未判定**。子 #3748 の受入 1 で切り分ける。
 
-### 3-4. Halt 時点のメモリ (停止後に wasm メモリを読んだ実測・`vt.mjs` 相当の一回限りの読取り)
+### 3-4. Halt 時点のメモリ (停止後に wasm メモリを読んだ実測)
 
-- `[0x11f7110]` = obj `0x10c5c468` (heap)。obj の vtable = VA `0x446878`、vtable[0] = VA `0x4467ac` (コード・先頭は `call 0x4133f0` で、IID 比較を行う QueryInterface の形ではない)。
+- 再現: §2 の手順 6 の出力 JSON の `halt_mem` (下の値はその転記)。旧版の「vtable[0] は `call 0x4133f0`」の記述は誤りで、本節で訂正する。
+- `[0x11f7110]` = obj `0x10c5c468` (heap)。obj の vtable = VA `0x446878`、vtable[0] = VA `0x4467ac`。
+- vtable[0] の先頭 8 バイトは `48 83 c1 b8 e9 cb 59 bd` = `add rcx,-0x48; jmp rel32`。`call` ではなく、this を調整して別関数へ飛ぶ thunk。jmp 先は未追跡 (rel32 の 4 バイト目を読んでいない)。
 - `0x8494fc` (`function_41a800` の第 3 引数) の 16 バイトは `8b 48 08 e8 6c 9d c1 ff 48 8b 45 20 c6 40 1d 01` (コードのバイト列で、GUID ではない)。
-- よって「第 3 引数が GUID へのポインタ」という読みは当たらない可能性が高い。実機で同じ値が渡るかは未検証。Halt の判定条件の読みを子 #3748 で詰める。
+- よって `eax` (Halt の判定) は vtable[0] の thunk が飛ぶ先の戻り値で決まる。その先は未確定。第 3 引数を GUID と読む前提は採らない。実機で同じ値が渡るかは未検証。子 #3748 で詰める。
 
 ## 4. 考察 (推定を含む)
 
