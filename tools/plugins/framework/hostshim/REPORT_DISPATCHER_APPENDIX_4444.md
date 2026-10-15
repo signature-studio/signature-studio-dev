@@ -15,7 +15,7 @@
 - 測定 commit は §1 の末尾 (§2 実測) を参照。基準 run の `hs_disp_emu.py` は `origin/main` `2e3c6d554` でも測り、同じ集計を得た。
 - 素材: `fl-win64` の `extracted/*_PE.bin` (313 ブロック)。`block00031_PE.bin` (22,227,016 B) が Dispatcher を含む。Python venv に `unicorn 2.1.4`・`pefile`・`capstone 5.0.7`。
 - 実測 (HEAD `151625a41`): 基準 run (全 256 ID・既定・`HS_DISP_PATH=1`) real 72.3 秒、load 0.78 (uptime)。集計は `distinct (rax, path) = 109` / unmapped 61 ID・5,340 件・200 組・197 ページ。`REPORT_DISPATCHER_APPENDIX_4130.md` §1 と一致。`hs_glob_writers.py` は 313 ブロック・`.text` 近傍の書込み 0 件 (同じ結果)。
-- 測定 commit: `151625a41` (`hs_glob_writers.py` 追加。コードを変えた最後の commit)。`git diff 151625a41 HEAD -- tools/plugins/framework/hostshim` の出力は 0 行 (本 REPORT の commit は docs のみ)。
+- 測定 commit: `151625a41` (`hs_glob_writers.py` 追加。コードを変えた最後の commit)。`git diff 151625a41 HEAD -- 'tools/plugins/framework/hostshim/*.py' '...*.c' '...*.sh'` の出力は 0 行 (その後の commit は REPORT のみ)。
 
 ## 3. 受入 1: `0x15e4790` の連鎖
 
