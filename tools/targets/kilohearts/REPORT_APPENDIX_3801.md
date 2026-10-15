@@ -7,17 +7,17 @@
 - 測定 commit (コードを変えた最後の commit): `bd1b7a297` (規則 `4f9eb85a9`・再現スクリプト `gtype_census.sh` の追加)。`git diff bd1b7a297 HEAD -- tools/targets/kilohearts/ghidra_route` の出力は `patches.py` のコメント 1 行だけ (`182280c30` の `0x800` → `0x0008000000000000 (bit 51)`)。`ast.dump` の比較でコードは不変のため、再測定は不要。
 - 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B、手展開)・`toolchain-emsdk` (emcc 6.0.12)・Ghidra 12.1.4 (zip sha256 `ddac49f9…d2db` 一致、repo 外)・JDK 21 (temurin 21.0.12.1)。すべて repo 外の `_temp` で作業。n=1。
 
-- **main 取り込み後の再測定 (merge commit `a4922e206`)**: `origin/main` `079067e79` を取り込んだ。競合は `ghidra_to_c.py` の `--fix` 説明文の 1 箇所だけで、`gtype` と `lanes` (#3094) の両行を残した (コード側は独立)。測定 commit (コードを変えた最後の commit): `a4922e206`。`git diff bd1b7a297 a4922e206 -- tools/targets/kilohearts/ghidra_route --stat` は `3 files changed, 91 insertions(+), 4 deletions(-)` (main 側の変更)。上の『再測定は不要』は、この main 側の変更で成り立たなくなったため無効。`git diff a4922e206 HEAD -- tools/targets/kilohearts/ghidra_route` は本 commit 時点で 0 行。
-- 再測定 (`gtype_census.sh <work> <origin/main の ghidra_route>`・HEAD `a4922e206`・decompile 151/151 OK)。main 単独 (`--fix` に gtype・lanes なし) は 556 → 529 で、引数数 108 → 86・SIMD 46 → 41 に減っている (本 PR の差分ではない)。
+- **main 取り込み後の再測定 (測定 commit `fe5fa8215`)**: `origin/main` を 2 回取り込んだ (`079067e79`、その後 `b201ce387`。2 回目は #3852 (#3802) が `ghidra_to_c.py` を変えた)。1 回目の競合は `ghidra_to_c.py` の `--fix` 説明文の 1 箇所だけで、`gtype` と `lanes` (#3094) の両行を残した (コード側は独立)。2 回目は競合なし。測定 commit (コードを変えた最後の commit): `fe5fa8215` (merge)。`git diff bd1b7a297 fe5fa8215 -- tools/targets/kilohearts/ghidra_route --stat` は `3 files changed, 129 insertions(+), 8 deletions(-)` (main 側の変更を含む)。上の『再測定は不要』は、この main 側の変更で成り立たなくなったため無効。`git diff fe5fa8215 HEAD -- tools/targets/kilohearts/ghidra_route` は本 commit 時点で 0 行。
+- 再測定 (`gtype_census.sh <work> <origin/main の ghidra_route>`・HEAD `fe5fa8215`・decompile 151/151 OK)。main 単独 (`--fix` に gtype・lanes なし) は 529 → 507。#3852 で未定義 identifier 17 → 2・未関数化 callee 5 → 0・その他 2 → 0 (main 側の変更で、本 PR の差分ではない)。
 
 | 測定 (`emcc -c` の error 行を `emcc_census.py` で分類) | 型不一致 | 合計 |
 |---|---|---|
-| origin/main `079067e79` (`--fix bitcast,intload,stackpair,assoc,concat`) | 187 | 529 |
-| HEAD `a4922e206` (`--fix bitcast,intload,stackpair,assoc,concat,gtype`) | **119** | **461** |
-| HEAD `a4922e206` (`… ,gtype,lanes`・両機能の併用) | 119 | 440 |
-| origin/main `079067e79` (`… ,lanes`) | 187 | 508 |
+| origin/main `b201ce387` (`--fix bitcast,intload,stackpair,assoc,concat`) | 187 | 507 |
+| HEAD `fe5fa8215` (`--fix bitcast,intload,stackpair,assoc,concat,gtype`) | **119** | **439** |
+| HEAD `fe5fa8215` (`… ,gtype,lanes`・両機能の併用) | 119 | 418 |
+| origin/main `b201ce387` (`… ,lanes`) | 187 | 486 |
 
-- 併用の確認: gtype の効果 (型不一致 187 → 119 = 68 件) と lanes の効果 (レーン 191 → 170 = 21 件) は、同じ `delay.c` で両方有効にしたときも独立に出る。Gain/Haas/Gate の `.o` は HEAD `a4922e206` で旧規則と `cmp` 一致 (gain 1,435 B・haas 3,217 B・gate 3,756 B)。
+- 併用の確認: gtype の効果 (型不一致 187 → 119 = 68 件) と lanes の効果 (レーン 191 → 170 = 21 件) は、同じ `delay.c` で両方有効にしたときも独立に出る。Gain/Haas/Gate の `.o` は HEAD `fe5fa8215` で旧規則と `cmp` 一致 (gain 1,435 B・haas 3,217 B・gate 3,756 B)。
 
 **census (`emcc -c -ferror-limit=0`・`emcc_census.py`・排他的)**
 
