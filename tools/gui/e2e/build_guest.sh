@@ -2,11 +2,12 @@
 # build_guest.sh — 製品ページ結線の検証用ゲスト (tools/gui/test/text_wasm_app.c、GUI_NO_FT=1 = 内蔵 8x8) を wasm 化し、chunked descriptor にする。
 #   usage: bash tools/gui/e2e/build_guest.sh <outdir>
 #   出力: <outdir>/app.js (emcc glue) ・ <outdir>/app.wasm ・ <outdir>/app.wasm.parts/index.json (+ 64 KiB の part)
-#   前提: emsdk (EMSDK_ENV。既定 /opt/emsdk/emsdk_env.sh)。mingw-w64 は無ければ apt で導入 (gen_api.py の aux_arity が使う)。FreeType 不要。
+#   前提: emcc (EMSDK_ENV = emsdk_env.sh のパス、または PATH 上の emcc)。mingw-w64 は無ければ apt で導入 (gen_api.py の aux_arity が使う)。FreeType 不要。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/.."
 OUT="${1:?usage: build_guest.sh <outdir>}"; mkdir -p "$OUT"
-set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u
+if [ -n "${EMSDK_ENV:-}" ]; then set +u; . "$EMSDK_ENV" >/dev/null 2>&1 || true; set -u; fi
+command -v emcc >/dev/null || { echo "emcc が無い (EMSDK_ENV に emsdk_env.sh のパスを指定)" >&2; exit 2; }
 if ! command -v x86_64-w64-mingw32-gcc >/dev/null; then
   sudo -n apt-get update -qq >/dev/null 2>&1 || true
   sudo -n DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev >/dev/null
