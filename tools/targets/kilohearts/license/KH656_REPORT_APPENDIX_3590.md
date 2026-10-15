@@ -5,7 +5,7 @@
 測定 commit: `0b487d4f2` (`kh656_closure.py` の修正と module F の memset shim 登録。以後の commit は REPORT のみ)。
 `git diff 0b487d4f2 HEAD -- tools/targets/kilohearts/license ':!*REPORT*'` の出力は 0 行。
 
-環境: nproc=4・MemTotal 15,989 MB・load average 0.6〜0.7 (実行中)。素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` (3,833,108,300 B) → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `work/winpkg/HeartCore.core_64` (76,642,304 B。§0 と同一)。`toolchain-emsdk` ([EMSDK] = `/opt/emsdk`)・`toolchain-retdec` ([RETDEC] = `/opt/retdec`) は既設を使用。`KH_EM_CACHE=$RUNNER_TEMP/emcache`。emcc RSS 上限は既定 11000 MB。
+環境: nproc=4・MemTotal 15,989 MB・load average 0.6〜0.7 (実行中)。素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` (3,833,108,300 B) → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `work/winpkg/HeartCore.core_64` (76,642,304 B。§0 と同一)。`toolchain-emsdk` ([EMSDK])・`toolchain-retdec` ([RETDEC]) は既設を使用。`KH_EM_CACHE=$RUNNER_TEMP/emcache`。emcc RSS 上限は既定 11000 MB。
 
 ## 1. 各ラウンドの実測
 
