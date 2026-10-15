@@ -244,8 +244,6 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 
 ## 11. FLE-672 (#672): buf = 0 の fill を戻す診断 (`FLE_DIAG_NULLFILL=1`・既定無効)
 
-- 既定経路は不変 (units 209・GetMem / FreeMem は §9-2・§10 と一致)。診断ありは units 209 のまま、停止点が `unlifted 0x6bbc20` (f_6c9280 ← 0x6c9380) へ移る。判定 (①②③)・表・再現は `REPORT_APPENDIX_672.md`。
-- main (`5ee61d4e1`) 取り込み後の再測定 (測定 commit `4cc9c3d72`・競合は `build.sh` の EXPORTS 1 行のみ): 測定した 5 run (shim・negctl・既定・診断 shim・診断 negctl) の units・GetMem / FreeMem・`ptr_15F34A0`・停止点は取り込み前と同値 (上表・付録 §2 と一致)。結果 JSON の boot フィールドは全て一致し、main 由来の `outmem` キーが増えた。shim 有 (root 有) の IPP 判定 NG (rc=3) は既知のまま。
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 停止点 `unlifted 0x6bbc20` の解消 | 最初のウィンドウ未達 | #3491 [FLE-14] (親 #672) |
+- 診断ありは units 209 のまま、停止点が `unlifted 0x6bbc20` (f_6c9280 ← 0x6c9380) へ移る (判定・表・再現は `REPORT_APPENDIX_672.md`)。既定経路は §0 の PM 判断 (ILT 分岐入力・`0x976da0` root) で 895 に変わった (付録 §C)。
+- main 取り込み後の再測定 (測定 commit `4cc9c3d72`): units・GetMem / FreeMem・`ptr_15F34A0`・停止点は取り込み前と同値。shim 有 (root 有) の IPP 判定 NG (rc=3) は既知のまま。
+- 未解決: 停止点 `unlifted 0x6bbc20` の解消 (最初のウィンドウ未達) → #3491 [FLE-14] (親 #672)。
