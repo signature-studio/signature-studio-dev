@@ -55,7 +55,12 @@
 
 ## 6. 差分と測定の鮮度
 
-- 測定 commit `1fc351661` 以降、実行コード (`tools/liftdiff/rt`・`tools/liftdiff/ld126_wasm_state.py`・`tools/liftdiff/ldlib`) の差分は 0 (`git diff 1fc351661 HEAD -- tools/liftdiff/rt tools/liftdiff/ld126_wasm_state.py tools/liftdiff/ldlib | wc -l` = 0)。本 PR が追加した REPORT・結果 TSV は実行コードではないため範囲から外す。再測定は不要。
+- 測定 commit `1fc351661` 以降、実行コード (`tools/liftdiff/rt`・`tools/liftdiff/ld126_wasm_state.py`・`tools/liftdiff/ldlib`) の差分は 95 行 (main 取り込み由来。`git diff 1fc351661 e27283d81 -- tools/liftdiff/rt tools/liftdiff/ld126_wasm_state.py tools/liftdiff/ldlib | wc -l` = 95)。内訳は `ldlib/session.py` の fvm 候補の対象外判定 (`fvm_cand`・`ret_fragment`・`multi_candidate`)、`ldlib/pe.py` の `is_ret_fragment`、`ldlib/cases.py` の `MACHINE_ENTRY` への 6 件追加 (`442a50`・`442b90`・`664890`・`6649b0`・`6649c0`・`664a80`)。`rt/` (C・runner) は変わっていない。
+- 再測定はしていない (`work-m11` の `boot_final3.ll` が runner に無く、`ldlib.build_wasm` が再生成できないため。D5 により m11 の IR 再生成は新規作業にしない)。代わりに、差分が chunk 1 の 18 件の結果に影響しないことを次で示す:
+  - `MACHINE_ENTRY` は `cases.machine_sig(va, ...)` で解析中の VA 自身にだけ掛かる。追加 6 件の VA は chunk 1 の 18 件 (`ch1` = TSV の VA 列) に 1 件も含まれない。
+  - 18 件の結果 (`none`・`sta`・`heapmgr`・`inbuf`・`mallocvar`) はいずれも `mismatch` (計 90 セル)。fvm 分岐 (`session.py` の `_run_one`) は「`equal`・`diff`・`wasm_trap` の case が 1 件も無い関数」だけに入るため、判定の入口が 18 件の `mismatch` とは両立しない (`classify.verdict` は `diff`/`wasm_trap` が 1 件でもあれば `mismatch`)。よって fvm の対象外判定の変更は 18 件の判定を変えない。
+  - `MACHINE_ENTRY` の全 11 キー (追加 6 件を含む) は chunk 1 の 18 件のどれにも含まれない (`python3` で照合)。`compare.py` の `ir_params` (i128 位置の除外) は `machine_sig` が差し替えた VA にしか付かないため、18 件の比較は変わらない。
+- 本 PR が追加した REPORT・結果 TSV は実行コードではないため、範囲から外す。
 
 ## 7. 再現
 
