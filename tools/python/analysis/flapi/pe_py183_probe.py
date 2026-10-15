@@ -200,6 +200,7 @@ def main():
           rip_target(0x1050540) == 0x16BB13C and rip_target(0x1050546) == 0x16BB13C)
     format_checks()
     desc_checks()
+    typecheck_checks()
     print(f"summary: {'OK' if not FAILS else str(len(FAILS)) + ' FAIL'}")
     return 1 if FAILS else 0
 
@@ -238,6 +239,11 @@ def qword_at(va):
     return int.from_bytes(RAW[o:o + 8], "little")
 
 
+def qword(va):
+    o = v2o(va)
+    return int.from_bytes(RAW[o:o + 8], "little")
+
+
 def section_of(va):
     rva = va - BASE
     for s in PEF.sections:
@@ -264,6 +270,29 @@ def desc_checks():
     check("0xb6fe4d の rcx は [rbp+0x20] (引数の保存元 0xb6fb8c)",
           ins_at(0xB6FE4D).op_str == "rcx, qword ptr [rbp + 0x20]"
           and ins_at(0xB6FB8C).op_str == "qword ptr [rbp + 0x20], rcx")
+
+
+def typecheck_checks():
+    # PY-324 (#4400): 0x104fa17 の型判定 0x40fe90(obj, T) と 0x410010 の継承鎖の歩き方
+    check("0x40fe90 が null なら false (test rcx,rcx; je 0x40fea5)",
+          ins_at(0x40FE94).op_str == "rcx, rcx" and ins_at(0x40FE97).op_str == "0x40fea5")
+    check("0x40fe90 が *obj (vtable) を取り 0x410010 を呼ぶ (0x40fe9c)",
+          ins_at(0x40FE99).op_str == "rcx, qword ptr [rcx]" and ins_at(0x40FE9C).op_str == "0x410010")
+    check("0x40fe90 の戻り al=1 は 0x410010 の al が非 0 のとき (0x40fea1/0x40fea3)",
+          ins_at(0x40FEA1).op_str == "al, al" and ins_at(0x40FEA3).op_str == "0x40fea9")
+    check("0x410010 の比較 cmp rax,rdx; je 0x410026 (一致で true)",
+          ins_at(0x410013).op_str == "rax, rdx" and ins_at(0x410016).op_str == "0x410026")
+    check("0x410010 の基底の辿り方 mov rax,[rax-0x78] (0x410018)",
+          ins_at(0x410018).mnemonic == "mov" and "rax - 0x78" in ins_at(0x410018).op_str)
+    check("0x410010 の空判定 test rax,rax; je 0x410029 (0x41001f) と [rax] 読み (0x410021)",
+          ins_at(0x41001F).op_str == "0x410029" and ins_at(0x410021).op_str == "rax, qword ptr [rax]")
+    check("0x410010 のループ戻り jmp 0x410013 (0x410024)", ins_at(0x410024).op_str == "0x410013")
+    check("0x104fa1a の型記述子セル = [rip-0x6cdf1] → 0xfe2c30 (mov rdx)",
+          rip_target(0x104FA1A) == 0xFE2C30)
+    check("0xfe2c30 の値 (T) = 0xfe2cf8 (.text 内の定数・読取専用)", qword(0xFE2C30) == 0xFE2CF8)
+    check("T=0xfe2cf8 の基底 (T-0x78 → 0xfe28b0 → 0xfe2978) の 1 段目", qword(0xFE2CF8 - 0x78) == 0xFE28B0 and qword(0xFE28B0) == 0xFE2978)
+    check("0x104fa21 call 0x40fe90 → 0x104fa26 test al,al → 0x104fa28 je 0x104fa4b",
+          ins_at(0x104FA21).op_str == "0x40fe90" and ins_at(0x104FA28).op_str == "0x104fa4b")
 
 
 if __name__ == "__main__":

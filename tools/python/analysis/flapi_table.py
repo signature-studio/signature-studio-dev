@@ -83,6 +83,14 @@ EXTRA_PARAMS = {
 }
 
 
+# 説明文 (doc) の上書き (#4145・PY-305)。mac rodata では ui.setTimeDispMin が getTimeDispMin の doc を
+# 複写して見える (Win PE では setTimeDispMin の直後に doc が無く getFocused が続く)。本体は toggle (引数なし・None)
+# なので、公開 stub の説明に差し替える。キーは "<module>.<name>"。
+DOC_OVERRIDES = {
+    "ui.setTimeDispMin": "Toggles whether the song position panel is displaying time or bar and beat",
+}
+
+
 mcp_used = {}
 for t in mcp["tools"]:
     for api in t["api_calls_transitive"]:
@@ -108,7 +116,7 @@ for m, blocks in raw["modules"].items():
         if sig and f"{m}.{n}" in EXTRA_PARAMS:
             sig = {"params": sig["params"] + EXTRA_PARAMS[f"{m}.{n}"], "returns": sig["returns"], "arity_from": "kwsig"}
         ent[n] = {
-            "doc": d,
+            "doc": DOC_OVERRIDES.get(f"{m}.{n}", d),
             "sig": sig,
             "new_vs_stubs": n not in stubs_json.get(m, {}),
             "win_pair_verified": win if d else None,
