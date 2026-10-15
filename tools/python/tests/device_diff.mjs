@@ -68,7 +68,7 @@ const rejectDiffs = rejects.map(([name, args]) => ({ name, args, wasm: run(wasm,
   .filter((r) => r.wasm.code !== 5);
 
 // PY-227: device 割当 [dev, link] を変えて -7 (device 無し)・-6 (送出先無し) を通す。PE 0xd747f0 は device を見てから送出先を見る (channel によらず先に判定)。
-// PY-231: forwardMIDICC (PE 0xd748e0) も同じ判定順。
+// PY-231: forwardMIDICC も midiOutMsg と同じ判定順と仮置き (REPORT_PY231 §1b)。
 const linkSeq = [
   [[1, 1], ["device.midiOutMsg", [0x90, 1, 60, 100]]],
   [[0, 1], ["device.midiOutMsg", [0x90, 1, 60, 100]]],
@@ -149,7 +149,7 @@ if (dedupWasmCount !== dedupExpectWords.length) diffs.push({ state: "dedup wasm 
 if (dedupMockWords.length !== dedupExpectWords.length) diffs.push({ state: "dedup mock count", expect: dedupExpectWords.length, mock: dedupMockWords.length });
 diffs.push(...dedupDiffs.map((d) => ({ dedup: true, ...d })));
 
-// PY-276 追補 (review): 割当判定は重複判定より前 (PE 0xd748e0 は -7 → -6 → 0xfdc8a0)。
+// PY-276 追補 (review): 割当判定は重複判定より前 (midiOutNewMsg 0xd748e0 の -7 → -6 → 0xfdc8a0 を見た順。forwardMIDICC の判定順は仮置き・REPORT_PY231 §1b)。
 // V を送った後に未割当で同じ添字・値を呼ぶと -7 (送らない)、割当に戻して同じ V を呼ぶと重複で送られない。
 const assignDedupSeq = [
   [[1, 1], ["device.forwardMIDICC", [0x44, 5]], "ok"],
