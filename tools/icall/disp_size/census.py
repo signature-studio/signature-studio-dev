@@ -17,14 +17,16 @@ ICALL = os.path.join(HERE, '..')
 T = os.path.join(ICALL, '..')
 sys.path.insert(0, HERE)
 sys.path.insert(0, ICALL)
+sys.path.insert(0, os.path.join(T, 'shared'))
+from paths import FL_MAC_DIR, FL_WIN64_DIR, PLUGINS_DIR
 import dispfix as D
 
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
-OTT = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
+EXT = os.path.join(FL_WIN64_DIR, 'extracted')
+OTT = os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
 FA = os.path.join(T, 'targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64')
 KH = os.path.join(T, 'targets/kilohearts/work/winpkg/HeartCore.core_64')
 SERUM = os.path.join(T, 'targets/serum2/work/Serum2_win64.vst3')
-MACROOT = '/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Plugins/Fruity'
+MACROOT = os.path.join(FL_MAC_DIR, 'pkg_extract', 'payload_out', 'Applications', 'FL Studio 2026.app', 'Contents', 'Resources', 'FL', 'Plugins', 'Fruity')
 W = os.path.join(ICALL, 'work')
 
 

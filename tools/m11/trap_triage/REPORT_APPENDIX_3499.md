@@ -1,8 +1,8 @@
-# REPORT_718 付録 (#3499): §4h 証拠表の行 36〜66
+# REPORT_718 付録 (#3499): §4i 証拠表の行 36〜66
 
-`REPORT_718.md` の §4h の全文。`REPORT_718.md` が 250 行上限を超えるため分割移動した (内容は削除していない)。本付録の『§』は `REPORT_718.md` の節を指す。
+`REPORT_718.md` の §4i の全文。`REPORT_718.md` が 250 行上限を超えるため分割移動した (内容は削除していない)。本付録の『§』は `REPORT_718.md` の節を指す。
 
-## 4h. 証拠表の行 36〜66 (#3499・部分達成: 母数 31・判定 25 件 (真陽性 25・偽陽性 0)・保留 6 件)
+## 4i. 証拠表の行 36〜66 (#3499・部分達成: 母数 31・判定 25 件 (真陽性 25・偽陽性 0)・保留 6 件)
 
 - 測定 commit: `4b6ec01b0` (origin/main。本 PR の基点)。`git diff 4b6ec01b0 HEAD -- tools/m11/guard699/ tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py` = 0 行。本 PR は `tools/m11/trap_triage/judge_ctx_3499.py` (文脈ダンプ) を追加するだけで、既存の走査・証拠表・ダンプのコードは変えない。
 - 入力 (本 run で展開): `work-m11` の `boot_final.ll` (19,787,837 B・sha256 `69c774de…`。§4a・§4d・§4e・§4f と一致)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
