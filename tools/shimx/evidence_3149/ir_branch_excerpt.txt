@@ -1,0 +1,28 @@
+== (1) function_467c40: slot の読み (VA 0x15E3AF0 = LVA 0x11E3AF0) と分岐
+174337:   %ce0n11_function_467c40 = inttoptr i64 22952688 to ptr
+174338:   %0 = load i64, ptr %ce0n11_function_467c40, align 16
+174339:   %1 = inttoptr i64 %0 to ptr
+174340:   %2 = load i64, ptr %1, align 8
+174341:   %3 = icmp eq i64 %2, 0
+174342:   br i1 %3, label %dec_label_pc_467e07, label %dec_label_pc_467cac
+== (2) function_467f00: 初期化フラグ (VA 0x11F1114) の分岐と init 経路の呼出し
+174463:   %0 = load i32, ptr inttoptr (i64 18813204 to ptr), align 4
+174464:   %1 = add i32 %0, -1
+174465:   store i32 %1, ptr inttoptr (i64 18813204 to ptr), align 4
+174466:   %2 = icmp eq i32 %0, 0
+174467:   %3 = icmp eq i1 %2, false
+174468:   br i1 %3, label %dec_label_pc_467fcf, label %dec_label_pc_467f1d
+174500:   %18 = call i64 @function_40f9e0(i64 %ce4n11_function_467f00, i32 %17)
+174502:   %19 = call i64 @function_467c40()
+== (3) function_40f9e0: low8(arg2) != 0 なら function_410320 を呼ぶ
+115586: define weak i64 @function_40f9e0(i64 %arg1, i32 %arg2) local_unnamed_addr {
+115587: dec_label_pc_40f9e0:
+115588:   %rax.1.reg2mem = alloca i64
+115589:   %0 = trunc i32 %arg2 to i8
+115590:   %1 = icmp eq i8 %0, 0
+115591:   br i1 %1, label %dec_label_pc_40fa50, label %dec_label_pc_40fa13
+115594:   %2 = call i64 @function_410320(i64 %arg1, i8 %0)
+== (4) function_410320: IR は ret arg1 のみ (間接 call は C 転記 m11_ov.c:556-558 が ICALL 0x41032e で補う)
+116093: define weak i64 @function_410320(i64 %arg1, i8 %arg2) local_unnamed_addr {
+116094: dec_label_pc_410320:
+116095:   ret i64 %arg1

@@ -182,8 +182,12 @@ function startedMap(d: Snapshot, iss: Map<number, SnapIssue>): Map<number, strin
 }
 
 export function neededArts(n: number, input: ClassifyInput): string[] {
+  return neededArtsOf(input.reportBody[String(n)] ?? "");
+}
+// 報告本文から、不足と書かれた行の allowlist 内の素材名を取る (neededArts の本体。engine の oc-pm 検出も使う)。
+export function neededArtsOf(body: string): string[] {
   const out: string[] = [];
-  for (const line of lines(input.reportBody[String(n)] ?? "")) {
+  for (const line of lines(body)) {
     if (!NEED_RE.test(line)) continue;
     for (const a of ALLOW_ARTS) if (wordBounded(a).test(line) && !out.includes(a)) out.push(a);
   }

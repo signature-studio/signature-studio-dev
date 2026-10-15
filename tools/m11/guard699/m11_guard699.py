@@ -7,7 +7,10 @@ RetDec の IR (dec_label_pc_8c5ef5) ではこの分岐が脱落し、無条件�
               %g699 = <cond>                        ; 既定 icmp sle i32 %9, 0 (件数 <= 0)
               br i1 %g699, label %dec_label_pc_8c5ef5_g699, label %dec_label_pc_8c5f23
             dec_label_pc_8c5ef5_g699:               ; ガード辺専用ブロック。8c6066 へ合流させない
-              arg2 下位 byte != 0 → _t (llvm.trap, fail-fast。8c608d の rdx は未確定のため)
+              arg2 下位 byte != 0 → _t:
+                arg3 != 0 → call 8ca670(arg3, [rbp+0x80]) (機械語 8c6071〜8c607f。戻り値は捨てる)
+                → call 410360([rbp+0x80]) し、その戻り値を ret (機械語 8c608d〜8c60a0 の mov [rbp+0x80],rax; jmp 8c60df)
+                  (#3077: 旧版は llvm.trap で fail-fast。boot が件数 0 の init 54 でこの経路に入り、停止していた)
               arg2 下位 byte == 0 → _e:
                 arg3 == 0 → ret [rbp+0x80]          (機械語 8c6067 je 8c6084 → 8c608b je 8c60df → mov rax,[rbp+0x80])
                 arg3 != 0 → call 8ca670(arg3, [rbp+0x80]) してから ret [rbp+0x80] (機械語 8c6071〜8c607f)
@@ -32,8 +35,14 @@ GD_BLOCK = (GD + ':\n'
             '  %g699b = icmp ne i64 %g699a, 0\n'
             '  br i1 %g699b, label %' + GD + '_t, label %' + GD + '_e\n'
             + GD + '_t:\n'
-            '  call void @llvm.trap()\n'
-            '  unreachable\n'
+            '  %g699t = icmp eq i64 %arg3, 0\n'
+            '  br i1 %g699t, label %' + GD + '_t2, label %' + GD + '_t1\n'
+            + GD + '_t1:\n'
+            '  %g699u = call i64 @function_8ca670(i64 %arg3, i64 %stack_var_8.0.reload)\n'
+            '  br label %' + GD + '_t2\n'
+            + GD + '_t2:\n'
+            '  %g699v = call i64 @function_410360(i64 %stack_var_8.0.reload)\n'
+            '  ret i64 %g699v\n'
             + GD + '_e:\n'
             '  %g699c = icmp eq i64 %arg3, 0\n'
             '  br i1 %g699c, label %' + GD + '_r, label %' + GD + '_c\n'
@@ -73,6 +82,8 @@ def main():
         fail('件数 load (%s) が 1 件でない' % COUNT)
     if 'define i64 @function_8ca670(' not in s and 'declare i64 @function_8ca670(' not in s:
         fail('function_8ca670 の宣言が無い')
+    if 'define weak i64 @function_410360(' not in s and 'define i64 @function_410360(' not in s and 'declare i64 @function_410360(' not in s:
+        fail('function_410360 の宣言が無い')
 
     m = GUARDED.search(blk)
     if m and m.end() == len(blk):

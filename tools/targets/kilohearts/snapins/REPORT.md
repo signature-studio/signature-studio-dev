@@ -142,7 +142,21 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 - **xmm FMA (`vf*`) 計 27 件** (Ladder 11 / Filter Table 6 / Slice EQ 10 = 上表の `vf*` 行の合計)。
 - **語彙の対象 (f354504c の census 結果に基づく・PM 判断 2026-10-13 に従う)**: census で `vblend*` / `vperm*` は 0 件と確定したため、#779 の語彙追加対象から外し、**ymm (`vaddps` / `vmulps` / `vsubps` / `vmovaps`・Convolver と Filter Table のみ) と vfmadd 系 (xmm・scalar) に絞る**。
 - **未解決**: ymm 命令の lift (RetDec が ymm を `i256` の `__asm_v*` として出すか、gen_simd の declare 駆動で扱えるか) は未確認。`gen_simd.py` の VEX 別名表は xmm 形のみで、ymm 形の意味 (`vaddps` 等の 8 lane・upper lane 規則) は未実装。`vfmadd*` の scalar 形は既存 `gen_simd.py` で対応済み。
-- **受入条件の残り**: 語彙追加 (ymm)・既存 14 snap-in のハッシュ不変・語彙ごとの bit-exact テストとネガコン・run_all.sh 再実行は未実施。起票先 = #779 (ymm・bit-exact・ハッシュ不変は #779 に残す。#250 LIFTLIB には振らない)。後続: #709 (KH-14) は #779 完了後に着手 (PM が `blocked_by` 登録済み)。
+- **受入条件の残り**: 語彙追加 (ymm)・既存 14 snap-in のハッシュ不変・語彙ごとの bit-exact テストとネガコン・run_all.sh 再実行は未実施。起票先 = #779 (ymm・bit-exact・ハッシュ不変は #779 に残す。#250 LIFTLIB には振らない)。**2026-10-14 に #779 を縮小 (§12-1)。残りは #3256 (KH-48)・#3259 (KH-49) へ移した**。後続: #709 (KH-14) は #779 完了後に着手 (PM が `blocked_by` 登録済み)。
+
+### 12-1. ymm 語彙 vaddps / vsubps / vmulps の実装と単体検証 (#779 第 2 弾)
+
+- **生成形 (実測)**: `retdec-decompiler -m raw -a x86-64 -e little` に `c5 f4 58 c2` (vaddps ymm0,ymm1,ymm2) を通すと `call i256 @__asm_vaddps(i256 src1, i256 src2)`。`gen_simd.py` は i256 宣言を `OUT.c.i256.ll` の LLVM IR 定義 (bitcast i256→`<8 x float>`・fadd/fsub/fmul・bitcast 戻し) で出す。C に i256 の正体型が無いため IR で定義し、呼出側と ABI を揃える。`build.py` は `.i256.ll` がある時だけ emcc 入力に加える。未対応の i256 宣言は `undefined` に報告し、`abort()` スタブを出す (SSE の未対応と同じ扱い。呼ばれたら abort)。vsubps / vmulps の ymm 生成形は未実測で、引数順 (src1 = 第 1 引数 → `a0 - a1`) は xmm 版の前提を継承する。
+- **本検証** `python3 snapins/scripts/ymm_vocab_check.py 20000 1` (測定 commit `428eef1a`・oracle = ホスト AVX2 `_mm256_*_ps`・32B 全 bit 比較・NaN 含む): vaddps / vsubps / vmulps 各 20,000 call・160,000 lane **mismatch 0**。数え方は §12 の census (ymm 計 40 件)。wall 1.26 秒・load 0.21 0.24 0.11 (nproc=4)。
+- **ネガコン**: (a) 語彙定義を外す → リンク失敗 (FAIL)。(b) vaddps の fadd を fsub に変える → mismatch **19,971 / 20,000** (FAIL)。(c) 未対応 `declare i256 @__asm_vfmadd231ps(i256, i256, i256)` → `undefined(abort stub) 1`・呼出で abort (rc=-6・FAIL)。
+- **回帰**: i256 を含まない 8 宣言 (SSE 系) の入力で、main と新 `gen_simd.py` の C 出力・標準出力が `cmp` 一致。HEAD で build が通る 14 本は i256 宣言を含まない (旧版は i256 宣言で `KeyError` して落ちるため。推論)。**14 snap-in のハッシュ照合 (`run_all.sh`) は未実施**: run で取得したのは `fl-win64` のみ (`plugins-kilohearts` / `toolchain-emsdk` / `toolchain-retdec` は無い)。
+- **測定 commit `428eef1a` → HEAD のコード差分** (`git diff 428eef1a HEAD -- tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/snapins/harness tools/targets/kilohearts/snapins/scripts`): 0 行 (`git diff --stat 428eef1a HEAD` は REPORT.md のみ)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 14 snap-in のハッシュ不変 (run_all.sh) 未実行 | 構造上は不変 (推論)・実測なし | #3259 (KH-49) |
+| vmovaps ymm (Convolver 20 / Filter Table 20) と vfmadd 系の語彙・bit-exact | 受入の残り (vfmadd の ymm 形は census 0 件) | #3256 (KH-48) |
+| ymm 語彙を snap-in の lift へ接続 (kh_lower の 256-bit 表現・Convolver/Filter Table) | 難 snap-in は未 lift | #709 (KH-14) |
 
 ## 13. KH-6 第 2 弾 (CAB-258 続, 2026-10-11) — rcpps/rsqrtps 実機近似表で Resonator/Stereo/Delay が bit-exact 化
 
