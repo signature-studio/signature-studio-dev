@@ -36,7 +36,7 @@
 
 - 単体: `tests/test_ld203_slot_fill.py` PASS。規則 (`PATCH_BY_VA`) を `""` に変えると rc=1 (ネガコン)。`tests/test_ld52_machine_sig.py` 等の既存テストも `liftdiff_e2e.sh` の [0/4] で PASS。
 - e2e (`liftdiff_e2e.sh --m11-only`): **実測値は未確定。** 測定 commit `acf54ba0e` の e2e 実行ログは repo にも Actions の run ログにも残っていない。PR 本文に書いた wall 3m09.0s・load 4.99 と、本書の旧記載 wall 3m02.6s・load 3.99 のどちらが同じ run の値かを確定できない。推定値は書かない。
-- 再測定を試みた結果: `$HOME/artifacts` に `fl-win64` のみ。`work-m11` が無いため、`liftdiff_e2e.sh` は [0/4] の単体テスト (`test_compare_ld11` / `test_ld52_machine_sig` / `test_ld179_tagpoint_tr` / `test_ld203_slot_fill`) の後、`missing input: ../m11/work/boot_final3.ll` で止まる。e2e の [1/4] 以降は未実行。
+- 再測定を試みた結果: 取得済みの素材は `fl-win64` のみ。`work-m11` が無いため、`liftdiff_e2e.sh` は [0/4] の単体テスト (`test_compare_ld11` / `test_ld52_machine_sig` / `test_ld179_tagpoint_tr` / `test_ld203_slot_fill`) の後、`missing input: ../m11/work/boot_final3.ll` で止まる。e2e の [1/4] 以降は未実行。
 - 単体: 上記 4 件は PASS (rc=0)。
 - 測定 commit: `acf54ba0e` (コード変更の最後の commit)。
 - `git diff acf54ba0e HEAD -- tools/liftdiff ':!tools/liftdiff/REPORT_APPENDIX_LD203.md'` の出力: 0 行 (コード差分 0)。本 REPORT の追記のみが差分で、これは実測に影響しない文書の変更。
