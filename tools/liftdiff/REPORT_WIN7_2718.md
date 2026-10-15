@@ -176,5 +176,5 @@ KPI は PR 本文の表を参照 (`docs/WORKFLOW.md` §7)。
 
 - 窓 import (`GetClassInfoW`・`RegisterClassW`・`CreateWindowExW`) の呼出元 VA と引数を記録した。既定の応答は変えない。窓の class は隠し窓 `TPUtilWindow`。
 - 既定の起動の挙動は変わらない (dispatch 数・segv の位置・import 数は main 取り込み前後で一致)。
-- 測定 commit は `913063ebe` (§6.1〜§6.6)。main 取り込み後は `33ddb3f45` で再測定した (付録 §6.7)。
+- 測定 commit は `913063ebe` (§6.1〜§6.6)。main 取り込み後は `cfc0071d9` で再測定した (付録 §6.7・spike 2 回と e2e 2 回とも PASS)。
 - 未解決: 画素統計は子 issue [WIN-35] (#3618・依存 #3556)。stk 位置の不一致は [LD-170] (#3619)。

@@ -73,24 +73,24 @@
 | stk 位置 (entry+28 ≠ 第5引数 entry+40) | MultiByteToWideChar/WideCharToMultiByte の a4/a5 が誤り得る | 子 issue [LD-170] |
 | 呼出元 rva 0x12a8c3 の関数名 | 未同定 (推定: Classes.AllocateHWnd) | 追跡のみ (PR 本文の未解決表に記載) |
 
-### 6.7 main 取り込み後の再測定 (merge `33ddb3f45`・競合解消)
+### 6.7 main 再取り込み後の再測定 (merge `cfc0071d9`・競合解消)
 
-main の取り込みで `rt/ld_native.c`・`rt/ld_core.h`・`spike_cfi.py`・`ldlib/` に main 側の変更 (WIN-9 #2760) が入り、§6.1〜§6.4 の測定 commit `913063ebe` とはコードが変わった。取り込み後の HEAD で spike と e2e を再実行した。
+main `058984fa0` の取り込みで `rt/ld_native.c` (main 側の LD-161 `ab_return`)・`rt/ld_core.h`・`rt/ld_runner.mjs`・`ldlib/` にコード変更が入った。前回の測定 commit `33ddb3f45` とはコードが変わったため、取り込み後の HEAD で spike と e2e を再実行した。競合は `rt/ld_native.c` の 1 箇所で、両側を残した (`wt_rec` を先、`ab_return` を後)。
 
-- 測定 commit: `33ddb3f45` (main `c2324dea6` の merge。コードを変えた最後の commit)。
-- 測定後の差分: `git diff 33ddb3f45 HEAD -- tools/liftdiff/rt tools/liftdiff/spike_cfi.py tools/liftdiff/ldlib tools/liftdiff/liftdiff_e2e.sh` の出力は空。`git diff --name-only 33ddb3f45 HEAD -- tools/liftdiff` の出力は REPORT の文書 (`REPORT_WIN7_2718.md`・本付録) だけ (コード差分 0)。
-- 環境: GitHub Actions runner (4 CPU)。load average は spike 1 回目の直前 0.73、e2e の直前 0.72、e2e の終了直後 6.22 (e2e の並列実行による)。
+- 測定 commit: `cfc0071d9` (main `058984fa0` の merge と競合解消。コードを変えた最後の commit)。
+- 測定後の差分: `git diff cfc0071d9 HEAD -- tools/liftdiff/rt tools/liftdiff/spike_cfi.py tools/liftdiff/ldlib tools/liftdiff/liftdiff_e2e.sh` の出力は空 (コード差分 0)。
+- 環境: GitHub Actions runner (4 CPU)。load average は spike 1 回目の直前 0.61、e2e 1 回目の直前 0.77、e2e 2 回目の直前 5.51 (1 回目の直後で並列 shard の負荷が残った)。
 
-| 項目 | 結果 (`33ddb3f45`) |
+| 項目 | 結果 (`cfc0071d9`) |
 |---|---|
 | spike: units_run / first_fail | 928/942・830 (2 回とも同一) |
 | spike: CreateFruityInstance | segv rip_rva `0x4e0fab`・呼出し import 35 件・`calls_over` 0 (2 回とも同一) |
-| spike: 窓 import の呼出元 VA | GetClassInfoW `0x52a825`・RegisterClassW `0x52a85e`・CreateWindowExW `0x52a8c3` (§6.1 と一致) |
-| spike 2 回の差 | rsp/rbp/rsi/s1 など stack アドレスのみ。rip・status・calls・窓の記録行は一致 |
-| spike 実行時間 (real, 1 回目) | 18.7 s |
-| e2e `bash liftdiff_e2e.sh --m11-only` | `LIFTDIFF_E2E PASS` (rc 0)・real 3m07.4s |
-| e2e 内の `CHECK_INITUNITS` | PASS (hybrid `units_run=928/942 first_fail=830`) |
-| e2e 内の UNIT18 の 3 項目 (`_UStrAsg`・`Move(409c80)`・`4123c0`) | 3 件 PASS |
-| e2e sample:800 | 一致 360 / 不一致 234 / 実行不能 206 (§6.4 の基準 360/234/206 と同一) |
+| spike: 窓 import の呼出元 VA | GetClassInfoW `0x52a825`・RegisterClassW `0x52a85e`・CreateWindowExW `0x52a8c3` (§6.1 と一致。2 回とも同一) |
+| spike 2 回の差 | rsp/rbp/rsi/s1 など stack アドレス (0x10) のみ。rip・status・calls・窓の記録行は一致 |
+| spike 実行時間 (real, 1 回目) | 18.4 s |
+| e2e `bash liftdiff_e2e.sh --m11-only` 1 回目 | `LIFTDIFF_E2E PASS` (rc 0)・real 3m09.9s・sample:800 一致 361 / 不一致 233 / 実行不能 206 |
+| e2e `bash liftdiff_e2e.sh --m11-only` 2 回目 | `LIFTDIFF_E2E PASS` (rc 0)・real 3m10.1s・sample:800 一致 360 / 不一致 234 / 実行不能 206 |
+| e2e 内の `CHECK_INITUNITS` | PASS (2 回とも・hybrid `units_run=928/942 first_fail=830`) |
+| e2e 内の UNIT18 の 3 項目 (`_UStrAsg`・`Move(409c80)`・`4123c0`) | 3 件 PASS (2 回とも) |
 
-e2e は 1 run。sample:800 の揺れは §6.4 と同じく n=1 で評価しない。`CreateWindowExW` の窓は戻り 0 の stub のため作られず、KPI (最初のウィンドウ・dispatch 数・通過 unit 数) は §6.5 と同じ。
+e2e は 2 run。一致 361/233 と 360/234 の差は §6.4 と同じく同一コードでの揺れで、既定の挙動の変化とは判定しない。`CreateWindowExW` の窓は戻り 0 の stub のため作られず、KPI (最初のウィンドウ・dispatch 数・通過 unit 数) は §6.5 と同じ。
