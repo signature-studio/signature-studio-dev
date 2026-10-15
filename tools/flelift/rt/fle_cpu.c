@@ -162,9 +162,22 @@ void imp_GetCurrentProcessId(void) { R[RAX] = 1000; IMP_RET(); }
 void imp_GetCurrentProcess(void) { R[RAX] = 0x2000; IMP_RET(); }
 void imp_IsDebuggerPresent(void) { R[RAX] = 0; IMP_RET(); }
 void imp_IsProcessorFeaturePresent(void) { R[RAX] = 1; IMP_RET(); }
-void imp_TlsAlloc(void) { R[RAX] = 0; IMP_RET(); }
-void imp_TlsGetValue(void) { R[RAX] = LD64(FLE_TLSARRAY + 8 * (R[RCX] & 63)); IMP_RET(); }
-void imp_TlsSetValue(void) { ST64(FLE_TLSARRAY + 8 * (R[RCX] & 63), R[RDX]); R[RAX] = 1; IMP_RET(); }
+/* Win32 TLS slot (TlsAlloc/TlsGetValue/TlsSetValue)。gs:[0x58] の TLS 配列 (コンパイラ生成 TLS 用) とは別。
+ * 割当は連番、未設定 slot の値は 0 (仕様)。 */
+static uint64_t g_tls_val[64];
+static uint32_t g_tls_next;
+void imp_TlsAlloc(void) {
+    R[RAX] = g_tls_next < 64 ? g_tls_next++ : 0xFFFFFFFFULL; IMP_RET();
+}
+void imp_TlsGetValue(void) {
+    uint32_t i = (uint32_t)R[RCX];
+    R[RAX] = i < g_tls_next ? g_tls_val[i] : 0; IMP_RET();
+}
+void imp_TlsSetValue(void) {
+    uint32_t i = (uint32_t)R[RCX];
+    if (i < g_tls_next) { g_tls_val[i] = R[RDX]; R[RAX] = 1; } else R[RAX] = 0;
+    IMP_RET();
+}
 void imp_QueryPerformanceCounter(void) { ST64(R[RCX], 0); R[RAX] = 1; IMP_RET(); }
 void imp_QueryPerformanceFrequency(void) { ST64(R[RCX], 1000000000ULL); R[RAX] = 1; IMP_RET(); }
 void imp_Sleep(void) { IMP_RET(); }
