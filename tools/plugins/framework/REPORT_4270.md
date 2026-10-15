@@ -11,7 +11,7 @@ RetDec が BLK slot を `constant` にするかは、**BLK の各 slot のバイ
 
 - 起点: `origin/main` `6a9f1c3f0`。worktree `../ws-4270`・branch `4270-plg-blk-constant`。
 - 素材: `work-fw-stage1` を `tools/plugins/work/fw/` に、`work-liftlib` を `tools/liftlib/work/` に展開 (gitignore)。RetDec は `RETDEC_BIN` で指定 (`docs/REFERENCES.md` の `[RETDEC]`)。
-- 測定 commit: `96b26019e` (コードを変えた最後の commit)。以降の HEAD は `.md` の追記だけ (§8 の差分 0 行)。
+- 測定 commit: `ffd515723` (コードを変えた最後の commit。#4503 で更新)。以降の HEAD は `.md` の追記だけ (§8 の差分 0 行)。
 
 ## 2. 最小再現の手順と対象
 
@@ -21,7 +21,7 @@ RetDec が BLK slot を `constant` にするかは、**BLK の各 slot のバイ
 
 ## 3. 実測 (1 回の実測・decode 1 回は 4 秒程度・load 0.4〜0.6)
 
-- 注: 下表は 1 回の実測の値。3 回の反復それぞれの値は本ファイルに記録していない (再測定は未実施。素材 `work-fw-stage1`・RetDec が実行環境に無かった)。「n=3 で一致」は本ファイルでは主張しない。
+- 注: 下表は 1 回目の実測。n=3 の再測定は §9 (測定 commit `ffd515723`) で行い、5 variant すべて一致した。
 
 | variant | 変更 | `constant` global 数 | BLK 直読み (`inttoptr 90480…`) |
 |---|---|---|---|
@@ -40,7 +40,7 @@ RetDec が BLK slot を `constant` にするかは、**BLK の各 slot のバイ
 - 実測 (1 回): BLK slot を 0 埋め・0x90 埋めにすると constant global は 0 件。元のバイトを残すと 3 件。slot 0x08 だけ・0x18 だけでも 1 件ずつ constant になる。
 - 読み取れること: この関数では constant 化が BLK の**値の内容**に依存する (0 埋め・0x90 埋めで消える)。0x90 埋めでも 0 件なので、「非ゼロなら constant」ではない。
 - 読み取れないこと: WRITE 属性の影響 (未検証)。
-- 読み取れないこと: どの値の形で RetDec が畳むか (RetDec の内部の判定条件)。`24 00` (`"$"`) を含むかは未検証 (0x18 の slot は `24 00` を含まない)。
+- 読み取れないこと: RetDec の内部の判定条件そのもの。`24 00` (`"$"`) の有無は §9 で切り分けた (0x18 の先頭 2 byte が `24 00`。§4 の旧記述「`24 00` を含まない」は誤り)。
 - 含意: BLK を 0 埋めすれば、この関数では BLK slot の constant 化は消える (`REPORT_3121` §4 の「BLK 直読み」への移行と一致)。ただし 0 埋めで fold が消えても、smoke PASS の確認は #3120 / #3121 の範囲。
 
 ## 5. 受入条件の状態 (issue #4270)
@@ -73,3 +73,25 @@ git diff 96b26019e HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!
 結果 (検証 HEAD `ce5e7dc61` 時点で出力 0 行。最終 HEAD での結果は PR 本文の検証欄に記載):
 
 （出力なし・0 行）
+
+## 9. #4503 の追加測定 (n=3・slot 0x18 の 1 byte 変異・切り分け)
+
+- 測定 commit: `ffd515723` (`fw_blk_const_repro.sh` に 0x18 の変異 variant を追加した commit)。`REPS=3` で実行、`real 4m59.040s`・終了時 load 1.00 (`uptime`)。素材 `work-fw-stage1`・`toolchain-retdec` (`$RUNNER_TEMP/retdec`) を展開して測定。
+- 実行: `REPS=3 RETDEC_BIN=<retdec-decompiler> bash tools/plugins/framework/fw_blk_const_repro.sh`。
+
+| variant | 変更 | constant global (n=3 の値) | `@global_var_8a1018` |
+|---|---|---|---|
+| base | なし | 3 / 3 / 3 | constant (`i64` 6293007887648161828) |
+| zero / nop | BLK 0x280 byte を 0 / 0x90 埋め | 0 / 0 / 0 | 消える |
+| only08 / only18 | 残す slot 1 つ | 1 / 1 / 1 | only18 は残る・only08 は消える |
+| b18_k_00 / _ff (k=0〜7) | slot 0x18 の k 番目 byte を 0 / 0xff | k=0 (00・ff とも): 2 件 / k=1 の ff: 2 件 / 他 (k=1 の 00 を含む): 3 件 | 8a1018 が消えるのは k=0 (00・ff) と k=1 の ff。他は残る |
+| b18_pair_00 | 0x18〜0x19 (`24 00`) を 0 埋め | 2 / 2 / 2 | 消える |
+| b18_keep24 | 0x18 の `24 00` だけ残し残り 6 byte を 0 埋め | 1 / 1 / 1 | 残る (値 `i64 36`) |
+
+- 読み取れること (n=3 で一致):
+  1. 1 byte 単独の変異で 8a1018 が消えるのは、0x18 を 0x00 / 0xff にした場合と、0x19 を 0xff にした場合だけ (0x19 の `b18_1_00` は元の値が `00` のため恒等変換で、残るのは当然)。0x1a〜0x1f の 6 byte は単独で変えても消えない。`24 00` (0x18〜0x19) を 0 にした `b18_pair_00` も消える。
+  2. `24 00` だけを残し残りを 0 にした `b18_keep24` では 8a1018 は残るが、値が `i64 36` に変わる。したがって 8a1018 の constant 化は先頭 2 byte の値に依るが、`"$"` (`24 00`) が条件かは確定できない (0x18 を 0xff にしても消えるため、`"$"` 固有の条件ではない)。
+  3. 8a1008・8a1010 (`i32 36`) は 0x18 の単独変異 (n=3) では消えなかった。0x08・0x10 の変異は未測定。
+- 訂正: §4 の「0x18 は `24 00` を含まない」は誤り。0x18 の先頭は `24 00 00 00` (`"$"` を含む)。
+- **修復前提 (受入 3)**: BLK 0x280 byte を 0 埋めすると、この関数の constant global は 3 件とも 0 件になる (zero: n=3 で 0)。`icall_rewrite.py` の BLK 0 埋めを修復候補とするなら、constant 化の消去は前提として成立する。ただし「fold が消えた後に smoke PASS するか」は未検証 (#3120 / #3121 の範囲)。
+- 未解決 (起票先付き・再測定のみのため子は起票しない): RetDec 内部の判定条件そのもの (`24 00` が必要条件か・どの値の組合せで畳むか) は未確定。WRITE 属性の影響は未検証。`24 00` の十分性は `b18_keep24` (`i64 36`) の 1 件で示しただけ。
