@@ -85,6 +85,7 @@ export async function createWasmEngine({ flprovUrl, ids }) {
     setDeviceLink: (dev, link) => M._fl_engine_set_device_link(dev ? 1 : 0, link ? 1 : 0),
     gridBit: (c, p) => M._fl_engine_grid_bit(c, p),
     displayTime: () => Number(M._fl_engine_display_time()),
+    browserOp: () => M._fl_engine_browser_op(),
     stepItemProbe: (prm, v, s0, s1) => M._fl_engine_step_item_probe(prm, v, s0, s1),
     gridItemsProbe: (seed, n) => M._fl_engine_grid_items_probe(seed, n),
     noteEnumProbe: (seed, n, chan, step, V) => {

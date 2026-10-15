@@ -70,11 +70,11 @@ wasm メモリ (`HEAPU8.length`): wasm32 は 3 系列とも 33,554,432 → 33,55
 
 - 再現: `cd tools/python && node tests/static_subinterp_browser.mjs` (既定 `flpy_static64`、MEM64=1)。
 - 判定: check 12 が `false`。他の 11 件は PASS。失敗は wasm 線形メモリの増加で、インタプリタの実行結果 (`ok`・`result`) の誤りではない。
-- 同じ条件での対照: 同一 commit・同一 probe の wasm32 (`flpy_static`) は増えない (3 系列とも 33,554,432 B のまま)。
+- 同じ条件での対照: 同一 commit・同一 probe の wasm32 (`flpy_static`) は 160 回では増えない (3 系列とも 33,554,432 B のまま)。**訂正 (#2918, `REPORT_PY108.md` §3・§4)**: 400 回では wasm32 も増える (33.5 → 58.1 MB)。import 無しの反復でも増える。増加は Memory64 に固有ではない。
 - 増加の形 (同一インスタンス、`import json, re` のみの反復、20 回ごとに記録。2 回とも同じ): 0〜100 回は 33,554,432 B。120 回で 40,304,640 B。140 回は同じ。160 回で 48,365,568 B。
 - smoke 版 (`result = str(1 + 1)`、同一インスタンス 160 回) は、wasm64 でも全点 33,554,432 B。増加は import を含む workload でだけ観測された。
 - 3 系列 (isolated・isolated+_flhost・legacy+_flhost) で増加量が同じ (+14,811,136 B) ため、この増加は隔離モード・_flhost の有無に依らない (単一観測)。
-- **未切り分け**: 増えた分が解放されない確保 (リーク) か、allocator の高水位 (断片化) か。mallinfo 等の計測は未実施。wasm32 は増えないため、Memory64 版 (table64 の lowering) に固有の挙動と見られる。
+- **未切り分け**: 増えた分が解放されない確保 (リーク) か、allocator の高水位 (断片化) か。mallinfo 等の計測は未実施。(上記の訂正: 「Memory64 版に固有」は誤り。`REPORT_PY108.md` §4。)
 
 ## 4. 変更点
 
