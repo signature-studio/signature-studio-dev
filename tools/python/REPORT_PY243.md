@@ -75,4 +75,6 @@ $ git diff 9edd0f327 HEAD -- tools/python ':!*.md'
 |---|---|---|
 | 項目書込み (0xd7a280) の副作用 (`item[itemIndex]+1` への target 書込み) と 0x416750 の意味 | `setMapItemTarget` は状態を変えない (mock・C)。実機と項目の状態が違う可能性 | #4581 (PY-344) |
 | itemIndex・index の範囲検査 (PE に検査が無いように見える) | 範囲外の引数の扱いは未モデル。mock・C は値をそのまま受ける | #4581 (PY-344) |
-| `flapi_table.json` の `setMapItemTarget` の戻り型 `int` | 表と PE の None が食い違う。生成元 (`analysis/flapi_table.py`) の戻り型の扱いは未確認 | #4581 (PY-344・受入条件に追記済み) |
+| 項目書込み・範囲検査 (受入の 2・3) | mock・C は項目の状態を持たない (`launchMapPages.length` も仮置き 0) | #4581 (PY-367) |
+
+戻り型の表の修正 (#4581): `analysis/flapi_table.py` の `RETURN_OVERRIDES` で `setMapItemTarget` の戻り型を `None` に上書き (公開 stub の `int` は PE と食い違う)。`flapi_table.json` は 1 行だけ変わり、`provider/gen/fl_table.c` の `'i'` → `'n'` になる。
