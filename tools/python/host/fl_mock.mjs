@@ -152,13 +152,12 @@ export function createMockEngine() {
     "channels.isChannelMuted": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).mute; },
     "channels.isChannelSolo": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).solo; },
     "channels.getChannelColor": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).color; },
-    // PY-101 (#2878): PE 0xd5b420 は position<0 を 0 として返す (エラーにしない)。範囲外は index の -4 のみ (C と同一)
+    // PY-101 (#2878) / PY-112 (#2932): PE 0xd5b420 は position の範囲検査を持たない。position<0 は 0、件数以上は event 経路の値 (mock は event 未モデルのため false) (C と同一)
     "channels.getGridBit": (...a) => {
       arity(a, 2, 3);
       ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
       const k = ch(a[0]);
-      if (p >= 64) throw RANGE();
-      return p >= 0 && !!k.steps[p];
+      return p >= 0 && p < 64 && !!k.steps[p];
     },
     // PY-101 (#2878): PE 0xd5b360 は grid (+0x7ac) 非 null で True。mock の channel は生成時に grid を持つものとして扱い、null 経路は持たない (C と同一)
     "channels.isGridBitAssigned": (...a) => {
@@ -167,13 +166,12 @@ export function createMockEngine() {
       ch(a[0]);
       return true;
     },
-    // PY-101 (#2878): PE 0xd5bc10 → 0x12d3ff0。loop 分岐は未モデル (G1・G2・行テーブルの意味が未確定・#2932)。base 0x12d3e20 と同じ読出し
+    // PY-101 (#2878): PE 0xd5bc10 → 0x12d3ff0。loop 分岐は未モデル (行テーブル T の生成元が未確定・REPORT_PY112)。base 0x12d3e20 と同じ読出し。件数以上は getGridBit と同じく false
     "channels.getGridBitWithLoop": (...a) => {
       arity(a, 2, 3);
       ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
       const k = ch(a[0]);
-      if (p >= 64) throw RANGE();
-      return p >= 0 && !!k.steps[p];
+      return p >= 0 && p < 64 && !!k.steps[p];
     },
     // 選択の並びで offset 番目 (負は先頭扱い・仮置き)、超えたら最後の選択。無選択は canBeNone で -1 / 0
     "channels.channelNumber": (...a) => {
@@ -257,6 +255,10 @@ export function createMockEngine() {
       if (idx < 0 || idx >= st.channels.length) throw RANGE();
     },
     "mixer.trackCount": () => st.mixer.length,
+    // PE 0xd641d0: ポインタ大域 0x15e2198 の指す先の dword を読んで −2 (trackCount 0xd5e8b0 と同じ読み方・REPORT_PY205)
+    "mixer.getTrackCount": () => st.mixer.length - 2,
+    // PE 0xd63870: ecx=3 を変換スロット 0x15e4280 に渡すのみ (REPORT_PY205)
+    "mixer.getEqBandCount": () => 3,
     "mixer.getTrackName": (i) => tr(i).name,
     "mixer.setTrackName": (i, n) => { tr(i).name = n; },
     "mixer.getTrackVolume": (i, mode) => F(mode ? 20 * Math.log10(Math.max(tr(i).vol, 1e-6) / 0.8) : tr(i).vol),

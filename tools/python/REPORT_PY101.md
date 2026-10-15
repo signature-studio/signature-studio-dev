@@ -7,7 +7,7 @@
 - `channels.isGridBitAssigned` と `channels.getGridBitWithLoop` を C provider (`provider/fl_engine.c`) と mock (`host/fl_mock.mjs`) に実装した。`tests/channels_diff.mjs` は diffs 0。
 - `+0x7ac` (channel の grid 構造体ポインタ) の生成元を PE で読んだ。直接 call の範囲では grid は生成時に作られ、null 経路 (status 0) には到達しない (間接呼出しは未走査)。
 - `getGridBit` の position < 0 は PE で 0 を返す (エラーにならない)。mock/C の code 4 を 0 に直した (本 PR の照合の結果)。
-- **未確定**: `getGridBitWithLoop` の loop 分岐 (loop 行テーブルの参照条件・loop 長) は条件式の形まで読めたが、グローバル G1・G2 と行テーブルの意味が決まらない。mock に loop 記録が無いため、この分岐は未モデル (到達条件は未確定)。子 issue #2932 (`[PY-112]`) に分けた。
+- **未確定**: `getGridBitWithLoop` の loop 分岐 (loop 行テーブルの参照条件・loop 長) は条件式の形まで読めたが、グローバル G1・G2 と行テーブルの意味が決まらない。mock に loop 記録が無いため、この分岐は未モデル (到達条件は未確定)。子 issue #2932 (`[PY-112]`) に分けた (その後、loop 分岐の残りは #3595 (`[PY-217]`) に移した。`REPORT_PY112.md`)。
 
 ## 測定
 
@@ -69,22 +69,22 @@
 5. 採った `L > 0` のとき: position < L なら `base(position)`。position ≥ L なら `base(position mod L) == 1 ? 2 : 0`。`L <= 0` または採らなかったときは `base(position)`。
 6. 戻り値は callback に渡る。getGridBitWithLoop の table 型は `bool` のため、2 は True に写る。callback の実型は未確認。
 
-未確定: G1 と G2 が何の設定値か、行テーブル `obj` の意味、`0x15e14a0` 経由 flag の意味。このため loop 分岐の**値**は決められず、mock/C は loop 分岐を未モデル (到達条件は未確定・#2932) として扱った。
+未確定: G1 と G2 が何の設定値か、行テーブル `obj` の意味、`0x15e14a0` 経由 flag の意味。このため loop 分岐の**値**は決められず、mock/C は loop 分岐を未モデル (到達条件は未確定・#3595) として扱った。
 
 ## 実装の内容
 
 - `channels.isGridBitAssigned(index, useGlobalIndex)`: index が範囲外なら -4。範囲内なら True (grid は生成済み)。`useGlobalIndex` は未モデル (既存 `getGridBit` と同じ)。
-- `channels.getGridBitWithLoop(index, position, useGlobalIndex)`: index 範囲外は -4。`position >= 64` は RANGE (4)。`position < 0` は False。それ以外は `steps[position]` (base 読出しと同じ。loop 分岐は未モデル)。
-- `channels.getGridBit`: `position < 0` を RANGE (4) から False に変更。根拠は `0xd5b420` → `0x12d3e20` の position < 0 が 0 を返すこと。`position >= 64` は変えない (PE 未照合)。
+- `channels.getGridBitWithLoop(index, position, useGlobalIndex)`: index 範囲外は -4。`position >= 64` は RANGE (4) (#2932 (PY-112) で訂正: RANGE を外した。`REPORT_PY112.md`)。`position < 0` は False。それ以外は `steps[position]` (base 読出しと同じ。loop 分岐は未モデル)。
+- `channels.getGridBit`: `position < 0` を RANGE (4) から False に変更。根拠は `0xd5b420` → `0x12d3e20` の position < 0 が 0 を返すこと。`position >= 64` は変えない (PE 未照合)。#2932 (PY-112) で訂正 (`REPORT_PY112.md`)。
 - 変更前の mock/C は `getGridBit` の `position < 0` で code 4 を返していた。PE の経路と違うため直した。
 
 ## 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| G1 (VA `0x15d51a0`)・行テーブル (VA `0x193fd08`)・flag (VA `0x15e14a0` → `+0x7e0` → `+0x49e`)・G2 (VA `0x15e25f8`) の意味 | getGridBitWithLoop の loop 分岐 (戻り値 2・loop 長) が mock/C で未モデル | 子 #2932 (`[PY-112]`) |
-| `position >= 件数` の経路 (`0x12d16a0`・`0x12df210`) | getGridBit / getGridBitWithLoop の `position >= 64` (RANGE 4) が PE と未照合 | 子 #2932 (`[PY-112]`) |
-| callback の実型 (2 を bool にするか int にするか) | loop 分岐の戻り値の見え方 | 子 #2932 (`[PY-112]`) |
+| G1 (VA `0x15d51a0`)・行テーブル (VA `0x193fd08`)・flag (VA `0x15e14a0` → `+0x7e0` → `+0x49e`)・G2 (VA `0x15e25f8`) の意味 | getGridBitWithLoop の loop 分岐 (戻り値 2・loop 長) が mock/C で未モデル | 子 #3595 (`[PY-217]`) |
+| `position >= 件数` の経路 (`0x12d16a0`・`0x12df210`) | getGridBit / getGridBitWithLoop の `position >= 64` (RANGE 4) は #2932 (PY-112) で PE 照合し外した (`REPORT_PY112.md`)。event 経路は未モデル | 子 #3596 (`[PY-218]`) |
+| callback の実型 (2 を bool にするか int にするか) | loop 分岐の戻り値の見え方 | 子 #3595 (`[PY-217]`) |
 | +0x7ac の byte・dword 書込み 20 件の型、間接呼出しによる `0xff63f0`・`0xff5aa0` の呼出し | null 経路が到達しない結論は直接 call の範囲のみ | 本 REPORT の未解決 (追跡子は作らない) |
 | `0x1005730` の解決表に入る全 object が `0xff5aa0` で作られるか (`0x1003c05` 以外の生成経路) | isGridBitAssigned の True 固定の前提 | 本 REPORT の未解決 (追跡子は作らない) |
 
