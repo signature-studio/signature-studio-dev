@@ -52,7 +52,6 @@
 - 台帳の再生成 (本測定・`work-m11` の `boot_final.ll` と `fl-win64` の `block00031_PE.bin` から): `m11_sigfix_stats.sh` 相当の手順で `fixes 33: match 33 / mismatch 0`、`m11_setother_ledger_verify.py` で `match 410`、`m11_setother_nonimm_class.py` で非 imm 349 (reg 123・mem 150・lea 76)・未決 349、`m11_setother_nonimm_cfg.py` で 34 件。`work-m11` 単独には `nonimm_cfg_rows.json`・`nonimm_class_rows.json`・`FIXES.json` は含まれないため、上の手順で都度生成する。`final3_base.ll` の sha は `c029ada4…` で、REPORT_N86 の `ecab191b…` と異なる (台帳の件数は一致)。
 - 照合器 (`verify()` を 34 件に適用・測定 commit `07bae9afb`): 判定不能 33 (値が未知の経路 16・step 上限 15・cdq 2)・未決 1・実値化 0。判定不能の内訳は、`verify` の戻り値の理由を集計した実測値。
 - 未決 1 件 (`function_f6bb50` → `function_cd1c20` pos 1) の経路値は `0x0` と `0x1` (`経路で値が違う: 0x0,0x1`)。REPORT_N172 §3 の機械語 (1 周目 rbx=0・2 周目 rbx=1) と一致。
-- 実データのネガティブコントロール: 同じ 1 件に claim `0x0` → FAIL。claim `0x1` も FAIL (§3 の受入 2 の根拠は合成 K0〜K2 と本件の両 claim)。
 - 実データのネガティブコントロール: 同じ 1 件に claim `0x0` → FAIL (経路で値が違う)。claim `0x1` も同じく FAIL。どちらの claim も経路の値の集合と一致しないため、一致と判定されない。
 
 ## 3. 判定
