@@ -47,7 +47,9 @@ if (LOG_CAP > 0 || TIME_CAP > 0) {
             logCap.tail.push(s.slice(0, 240)); if (logCap.tail.length > 40) logCap.tail.shift();
             if (!logCap.hit && LOG_CAP > 0 && logCap.bytes > LOG_CAP) {
                 logCap.hit = 'bytes'; logCap.elapsed_ms = el;
-                // #5027: この throw は Emscripten の tty write (FS) が EIO に変換して飲むため boot を止めない (下の分類で報告する)。
+                // #5027: この throw は Emscripten の tty write (FS) が EIO に変換して飲むため boot を止めない。
+                // #5058: 代わりに guest の次の dispatch (fle_probe_dispatch) で log_cap の例外を投げて止める。
+                globalThis.FLE_LOG_CAP_HIT = 1;
                 throw new Error('FLE_BOOT_LOG_CAP exceeded (' + LOG_CAP + ' bytes)');
             }
             orig(...a);
@@ -150,7 +152,8 @@ try {
 }
 // #5027: cap 超過 (logCap.hit) の後も guest は走り続け、boot の停止理由は cap の例外ではなく後続の exit になる
 // (cap の throw は Emscripten の tty write が EIO に変換して飲む)。上限超過は log_cap として報告し、生の停止理由は threw_raw に残す。
-if (logCap.hit === 'bytes' && boot.threw) {
+// #5058: 停止は fle_probe_dispatch が投げる log_cap で行うので、cls が log_cap の場合は包み直さない (threw_raw は無し)。
+if (logCap.hit === 'bytes' && boot.threw && boot.threw.cls !== 'log_cap') {
     boot.threw_raw = boot.threw;
     boot.threw = { cls: 'log_cap', msg: 'FLE_BOOT_LOG_CAP exceeded (' + LOG_CAP + ' bytes); raw=' + boot.threw.cls };
 } else if (logCap.hit === 'bytes' && !boot.threw) {
