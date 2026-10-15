@@ -56,6 +56,18 @@ REPL = [
 ]
 
 
+def check_ir(src):
+    """IR: 0x413340 の 2 site の 412fc0 呼出し引数列 (rcx・rdx・r8=arg2・r9=zext(arg3)・5 番目) を照合する。"""
+    import re
+    calls = re.findall(r'call i64 @function_412fc0\(([^)]*)\)', src)
+    want = ['i32 0, i32 0, i64 %arg2, i64 %ldfx4522_r9a, i64 %14',
+            'i32 %20, i32 %18, i64 %arg2, i64 %ldfx4522_r9b, i64 %14']
+    assert calls[:2] == want, 'IR: 0x413340 の 412fc0 呼出し引数列が想定と違う: %r' % calls[:2]
+    assert src.count('%ldfx4522_r9a = zext i32 %0 to i64\n') == 1, 'IR: site1 の r9 (zext arg3) が無い'
+    assert src.count('%ldfx4522_r9b = zext i32 %0 to i64\n') == 1, 'IR: site2 の r9 (zext arg3) が無い'
+    return 2
+
+
 def check_machine(m):
     """機械語: 2 site の呼出し直前の区間 (rcx・rdx・r8・r9・5 番目) を全命令で照合する。"""
     n = 0
@@ -67,12 +79,37 @@ def check_machine(m):
     return n
 
 
+def negctl(src):
+    """#4522 のネガティブコントロール: 修復後 IR の r8・r9 を 0 へ戻す改変。全件拒否されること。"""
+    cases = [
+        ('N5 site1 の r8 を 0 へ戻す',
+         src.replace('i32 0, i32 0, i64 %arg2, i64 %ldfx4522_r9a', 'i32 0, i32 0, i64 0, i64 %ldfx4522_r9a', 1)),
+        ('N6 site2 の r9 を 0 へ戻す',
+         src.replace('i32 %20, i32 %18, i64 %arg2, i64 %ldfx4522_r9b', 'i32 %20, i32 %18, i64 %arg2, i64 0', 1)),
+    ]
+    bad = 0
+    for name, s in cases:
+        assert s != src, name + ': 置換が効いていない (テスト無効)'
+        try:
+            check_ir(s)
+            print('[fix_abi_4522] %s: 拒否されなかった (NG)' % name)
+            bad += 1
+        except AssertionError:
+            print('[fix_abi_4522] %s: 拒否 OK' % name)
+    return bad
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('src')
     ap.add_argument('dst')
     ap.add_argument('--pe', required=True)
+    ap.add_argument('--negctl', action='store_true', help='修復後 IR (src) に対するネガティブコントロール')
     a = ap.parse_args()
+    if a.negctl:
+        bad = negctl(open(a.src, errors='replace').read())
+        print('[fix_abi_4522] ネガティブコントロール: NG %d 件' % bad)
+        sys.exit(1 if bad else 0)
     m = Machine(a.pe)
     n = check_machine(m)
     print('[fix_abi_4522] 機械照合 OK: %d 項目 (0x413340 の 2 site の rcx〜r9・5 番目)' % n)
@@ -81,6 +118,7 @@ def main():
         got = src.count(old)
         assert got == cnt, '[fix_abi_4522] 行が %d 件 (想定 %d): %r' % (got, cnt, old[:80])
         src = src.replace(old, new)
+    check_ir(src)
     with open(a.dst, 'w') as f:
         f.write(src)
     print('[fix_abi_4522] 修復 OK: 0x413340 の 2 site の r8・r9 を接続 (%s)' % a.dst)
