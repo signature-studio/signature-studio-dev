@@ -52,8 +52,8 @@ const toF32 = (b) => { dv.setUint32(0, Number(BigInt.asUintN(32, b)), true); ret
 const f64bits = (x) => { dv.setFloat64(0, x, true); return dv.getBigUint64(0, true); };
 const f32bits = (x) => { dv.setFloat32(0, x, true); return BigInt(dv.getUint32(0, true)); };
 const fnCache = new Map();
-function getFn(va) {
-  const nm = 'function_' + va.toString(16);
+function getFn(va, tr) {
+  const nm = (tr ? 'm11_tr_' : '') + 'function_' + va.toString(16);
   if (fnCache.has(nm)) return fnCache.get(nm);
   const f = exp[nm] || mod['_' + nm] || null;
   fnCache.set(nm, f);
@@ -74,15 +74,16 @@ function coerce(ty, b, kind) {
 
 function runCase(line) {
   // JS 専用トークン sig= rt= を抜く (C 側は未知キーを無視)
-  let sig = [], rt = 'i64';
+  let sig = [], rt = 'i64', tr = false;
   for (const t of line.split(/\s+/)) {
     if (t.startsWith('sig=')) sig = t.slice(4) ? t.slice(4).split(',') : [];
     else if (t.startsWith('rt=')) rt = t.slice(3);
+    else if (t === 'tr=1') tr = true;   // LD-158: i128 戻りの関数を m11_tr_ (i64 返し = 下位 64bit) 経由で呼ぶ
   }
   putStr(line);
   mod._ld_w_case_begin();
   const va = mod._ld_w_fn();
-  const f = getFn(va);
+  const f = getFn(va, tr);
   const sp0 = sp_get();
   let status = 'ok', detail = '', rax = 0n, x0 = 0n, hasRet = 1;
   if (!f) {
@@ -94,11 +95,12 @@ function runCase(line) {
       const v = i < na ? mod._ld_w_arg(i) : 0n;
       args.push(coerce(sig[i], v, i < na ? mod._ld_w_arg_kind(i) : 0));
     }
+    if (tr) while (args.length < 8) args.push(0n);
     try {
       globalThis.__ld_call = () => f(...args);
       const r = vm.runInThisContext('__ld_call()', { timeout: wasmTimeoutMs });
       if (rt === 'void') hasRet = 0;
-      else if (rt === 'double') x0 = f64bits(r);
+      else if (rt === 'double') x0 = tr ? BigInt.asUintN(64, r) : f64bits(r);
       else if (rt === 'float') x0 = f32bits(r);
       else if (typeof r === 'bigint') rax = BigInt.asUintN(64, r);
       else if (typeof r === 'number') rax = BigInt(r >>> 0);
