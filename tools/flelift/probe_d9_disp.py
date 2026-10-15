@@ -7,11 +7,14 @@ disp_size/disp_offset フィールドに依存しない (tools/icall REPORT.md �
 生バイトから prefixes + modrm を手動解釈した disp と capstone の disp を突合する
 (prefix 群 66/F2/F3/REX/segment/67/F0 別に集計)。不一致 0 なら D9 は x64c に影響しない。
 """
-import pefile, capstone, struct, collections, os
+import pefile, capstone, struct, collections, os, sys
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_MEM, X86_REG_RIP
 
-PE = os.environ.get('FLE_PE') or os.path.join(os.environ.get('FL_WIN64_DIR', '/home/ubuntu/work/analysis/win64'), 'extracted', 'block00031_PE.bin')
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', 'shared'))
+from paths import FL_WIN64_DIR
+PE = os.environ.get('FLE_PE') or os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
 IMG = 0x400000
 
 pe = pefile.PE(data=open(PE, 'rb').read())
