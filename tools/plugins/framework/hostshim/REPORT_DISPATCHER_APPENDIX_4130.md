@@ -37,11 +37,11 @@
 
 ## 3. 受入 1 の補足: 到達条件 (8 件の即値格納)
 
-確定した事実 (`hs4130_gate.py` の実測・PE 内の初期値):
+確定した事実 (`hs_store_supplier.py` の出力 (§5) と基準 JSON の path。PE 内の初期値):
 
 - 0x13280b3・0x13280cf・0x1328149・0x1328161・0x1322957 の 5 つの読み出しは、すべて同じ global `0x15e4790` から始まる。`*(0x15e4790) = 0x141d6b8`、`*(0x141d6b8) = 0` (PE 内の初期値)。したがって、この連鎖の先頭は PE 内の初期値では null オブジェクトである。
-- 基準 run で 0x13280c9 と 0x132815f の gate は実行され、どちらも `je 0x13281af` で分岐する (実測 path)。そのため 0x1328098〜0x13281a4 の即値格納には到達しない。
-- 0x1322971 の call 戻り値格納は、基準 run の ID 0x98 で 0x132296f の間接 call まで実行される (実測 path)。その後の経路は emulator 上で 0 ページを踏んで終わり (stop=ended・最終 callout なし・unmapped 196 件)、格納 0x1322971 には届かない。受け手の vtable が null 由来である点が根拠 (§2 の `*(0x141d6b8)=0`)。
+- 基準 run で 0x13280c9 と 0x132815f の gate は実行され、どちらも `je 0x13281af` で分岐する (base.json: ID 0x6c の path で 0x13280c9→0x13281af、ID 0x6d の path で 0x132815f→0x13281af)。そのため 0x1328098〜0x13281a4 の即値格納には到達しない。
+- 0x1322971 の call 戻り値格納は、基準 run の ID 0x62 だけが 0x132296f の間接 call まで実行される (base.json: path 500 件、0x132296f は index 499、stop=ended)。受け手は `*(0x141d6b8)=0` 由来の null で、その後の読み出しは `0x0` の read が unmapped になって止まる (最終 callout なし・unmapped 196 件)。格納 0x1322971 には届かない。受け手の vtable が null 由来である点が根拠 (§2 の `*(0x141d6b8)=0`)。ID 0x98 は 0x132296f に届かない (path 856 件、0x13281af 経由で 0x1328a4a に ended、unmapped 0)。
 - 0x13280c5 の gate (`cmp byte [rax+0x40],0; je 0x13281af`) と 0x132815f の gate は、この null 連鎖から読む。0x13280e1 の `al` (0x1328104〜0x1328131 の入力) も同じ連鎖 (`+0x4c`・`+8`・`+0x41`) を経由する。
 - 0x132818a〜0x13281a4 の入力 `byte [rax+0x42]` も同じ連鎖 (`+0x4c`・`+8`) を経由する。
 - 結論: 8 件が実行されるには、`0x15e4790` が指す null の先に、初期化で実値が入っている必要がある。PE 内の初期値では、その gate は閉じたまま。256 ID の既定 run で 8 件が一度も実行されない理由は、この null 連鎖である (本 run で確認したのは連鎖の値であり、初期化が書く値は未確定)。
@@ -54,7 +54,7 @@
 
 - `hostshim.c` に、これら 11 格納の応答表は無い (`grep` で 0x1328・0x1320e・0x13213・0x1322971 に該当なし)。応答表の変更は行わない。
 - 理由: 8 件の即値は値が確定したが、到達させる gate の入力が PE 外の状態で、表に入れても実行されない。3 件の call 戻り値は受け手の vtable が未確定で、値の供給元を決められない。
-- `hs_e2e.sh` Phase A の回帰 (`dispatch=38 ff=0`) は**本 run では実行していない**。理由: `work-fw-stage1` の中身は `fw*.restored.ll`・`fw_map.json`・`fw_icall.dll` の 12 件で、`hs_e2e.sh` が要求する `fw_flat4_canon3.ll`・`fw_image.bin`・`fw_rt.c` 等は無い。さらに emsdk (`emsdk_env.sh`・`docs/REFERENCES.md` の `[EMSDK]`) が runner に無い。hostshim.c を変えていないため、Phase A の結果は変わらない見込みだが、実測はしていない。
+- `hs_e2e.sh` Phase A の回帰 (`dispatch=38 ff=0`) は**本 run では実行していない**。PR 本文に `oc_artifacts: fl-win64 work-fw-stage1` を指定する。本 run の `ARTIFACTS_DIR` には `fl-win64.tar.zst` だけがあり、`work-fw-stage1` は実在しなかった (`ls $ARTIFACTS_DIR` で確認)。`work-fw-stage1` の中身は `fw*.restored.ll`・`fw_map.json`・`fw_icall.dll` 等で、`hs_e2e.sh` が要求する `work/fw/fw_flat4_canon3.ll`・`fw_image.bin`・`fw_rt.c`・`fw_simd.c`・`fw_imports.json`・`fw_rt.h`・`fw_boot.c`・`fw_route.cjs` は含まれない (`hs_e2e.sh` 38 行の前提チェック)。emsdk (`/opt/emsdk/emsdk_env.sh`) も runner に無い。hostshim.c を変えていないため、Phase A の結果は変わらない見込みだが、実測はしていない。
 
 ## 5. 受入 3: 再現
 
@@ -64,7 +64,7 @@ FL_WIN64_DIR=<展開先> python3 hs_store_cov.py base.json                      
 FL_WIN64_DIR=<展開先> python3 hs_store_supplier.py                                         # 11 件の供給元
 ```
 
-基準 JSON は `$RUNNER_TEMP/hs4130/base.json` に置いた (リポジトリには入れない)。
+基準 JSON は `$RUNNER_TEMP/hs4130/base.json` に置いた (リポジトリには入れない)。`base.json` のキーは 10 進の ID (0x62 = `'98'`・0x6c = `'108'`・0x6d = `'109'`・0x98 = `'152'`)。`path` は VA の列で、§3 の到達の判定はこれを見る。
 
 ## 6. 未解決 (起票先)
 
