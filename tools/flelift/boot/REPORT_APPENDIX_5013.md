@@ -8,7 +8,7 @@
 
 - **受入条件 1 は未達**。既定経路 (`run_boot default`) で `FLE_BOOT_LOG_CAP` を超過させると `log_cap.hit = "bytes"` は記録されるが、`boot.threw` は `log_cap ...` ではなく `exit` (code 0) になる。
 - **止まった場合と止まらなかった場合の差は無い**。cap あり (4096 bytes) / cap なし (0) の両方で `units_run` 895・`boot_threw: exit`・`exit` 1 回・`longjmp` 1 回。cap の超過は止める効果を持たず、計数だけが残る。
-- 原因 (確認できた範囲): cap の `throw` は `console.log/error` の中で投げられるが、`fle_boot.mjs` が差し替える前に `fleboot_plain.cjs` が `out`/`err` を `console.log/error` に束縛しているため、guest の `fprintf(stderr, ...)` は cap を経由せずに出力される。`imp_ExitProcess` は後続の `fprintf` と `fle_throw_kind("exit")` を発し、この `exit` 例外が boot の最終的な `threw` になる。cap の例外が boot 境界の外へ届かなかった直接の証跡は未取得 (次の作業)。
+- 原因 (確認できた範囲): cap の `throw` は `console.log/error` の中で投げられるが、`fle_boot.mjs` が差し替える前に `fleboot_plain.cjs` が `out`/`err` を `console.log/error` に束縛しているため、guest の `fprintf(stderr, ...)` は cap を経由せずに出力される (推定。コードの読みによる推定で、直接の証跡は未取得)。`imp_ExitProcess` は後続の `fprintf` と `fle_throw_kind("exit")` を発し、この `exit` 例外が boot の最終的な `threw` になる。cap の例外が boot 境界の外へ届かなかった直接の証跡は未取得 (次の作業)。
 
 ## 2. 測定 (既定経路 `run_boot default`)
 
@@ -19,7 +19,7 @@
 | load | lift 開始 0.81 / clang 開始 0.81 / boot 開始 2.42 (4 vCPU) |
 | 結果 JSON | `tools/flelift/boot/results/boot_summary_fle39cap_default.json` (11,456 B・絶対パス無し) |
 | `FLEBOOT_RESULT` | `units_run 895` / `units_total 942` / `boot_threw "exit"` / `log_cap {hit: bytes, bytes: 932930, lines: 14429, elapsed_ms: 648}` / `getmem 3680` / `freemem 1499` / `longjmp 1` / `exit 1` / `ipp_total 67` |
-| ログ | `$RUNNER_TEMP/fle39/w_cap/run_fle39cap_default.log` (933,819 B・repo 外。ログは成果物として残さない) |
+| ログ | `$RUNNER_TEMP/fle39/w_cap/run_fle39cap_default.log` (933,819 B)。repo 外 (`$RUNNER_TEMP` 配下) で、成果物として保存していない (受入条件 2 の「ログの成果物 path」は、保存対象外のためこの path を記録するに留める) |
 
 ## 3. 対照 (cap あり / なし の直接比較・`fle_boot.mjs` 単体)
 
