@@ -5,7 +5,7 @@
 
 測定 commit: `4448a6ae0` (コードを変えた最後の commit。`349e1aa3d` の後に `GetClassInfoW` を振り分けに足した)。
 既知類型との関係 (DEFECTS.md): 該当なし (harness の窓応答の接続。lift 欠陥ではない)。
-素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff (`$HOME/artifacts` に実在を `ls` で確認してから展開)。
+素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff (`$ARTIFACTS_DIR` に実在を `ls` で確認してから展開)。
 実行環境: GitHub Actions runner (4 コア)。load average は e2e の前後で 0.94 → 3.49 (e2e 内の並列 batch による)。
 
 ## 0. 結論 (実測)
