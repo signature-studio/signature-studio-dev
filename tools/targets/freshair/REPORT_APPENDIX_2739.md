@@ -83,7 +83,7 @@ P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r
 
 - 検証範囲: KH process の機械語を、本 harness の入力 (§2 の写像・乱数) で 200 case × 3 seed 実行。範囲外: SC との bit 比較、P フィールドの意味の確定、未束縛 import の実体の確定、mode=1 の出力の正しさ。
 - 差分確認: `git diff 739c90452 HEAD -- tools/targets/freshair/ks_kh_comp.sh tools/targets/freshair/ks_kh_comp_native.c` (出力 0 行)。
-- 並列実行の確認 (C1 で seed 11・99 を `xargs -P 2` で同時実行。両 script の実行区間が重なり、開始時刻の差 0.30 ms、各 script 全体 0.25 s): 両 SUMMARY と kh_a.txt が直列実行と一致 (seed 11 = 200・292・25・136、seed 99 = 198・293・29・102、byte 一致)。
+- 並列実行の確認 (測定 commit で seed 11・99 を `xargs -P 2` で同時実行。両 script の実行区間が重なり、開始時刻の差 0.30 ms、各 script 全体 0.25 s): 両 SUMMARY と kh_a.txt が直列実行と一致 (seed 11 = 200・292・25・136、seed 99 = 198・293・29・102、byte 一致)。
 - blob 監査: 20 MiB 超の追加なし。`work/` (gitignore) は使用のみ。
 
 ## 6. 未解決
