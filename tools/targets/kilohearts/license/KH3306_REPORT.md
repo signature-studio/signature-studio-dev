@@ -2,7 +2,7 @@
 
 - 担当 dir: `tools/targets/kilohearts/license/` (親 #709 KH-14・後続 #3307 KH-52)
 - 既知類型との関係 (DEFECTS.md / icall §4): **該当 ID なし (新類型候補)**。`@xmmN` (i128) と `@ymmN` (i256) が別グローバルで、VEX-128 の書込みが ymm の下位を更新しないため、後続の `load i256 @ymmN` が古い値を読む。silent miscompile (loud failure ではない)。行案は §8。
-- 測定 commit: `ca83f24e` (コード変更の最後の commit。本 REPORT の commit はコードを変えない)
+- 測定 commit: `0145b3414` (コード変更の最後の commit。差し戻し対応で `ec895fa7a` (wrapper の ymm 宣言) と `0145b3414` (identity 検査) を追加。前回の測定 commit は `ca83f24e`)
 
 ## 0. 結論 (先出し)
 
@@ -15,13 +15,16 @@
 
 → 4 件とも達成。`Closes #3306`。実機 2 関数 (`0x180f89cf0`・`0x180fb6124`) の lift 完了は #3307 (KH-52) の範囲 (gen_simd に i256 語彙が無い)。
 
+差し戻し対応 (review round 1・blocking 1): wrapper の `ymm_sync` が参照する `@ymm0-15` の宣言漏れを修正 (§2)。vzeroupper を含まず ymm 参照が 1 つだけの 2 関数 (`0x180f89cf0`・`0x180fb6124` と同形) は、修正前 `clang -c` が `use of undefined value '@ymm10'` で失敗していた。修正後は受理される。検出用に `ymm_sync_check.py` へ `one` ケースを追加 (§3-1: 修正前 FAIL / 修正後 PASS)。
+
 ## 1. 変更点
 
 | ファイル | 内容 |
 |---|---|
-| `lift/kh_lower.py` | `ymm_sync(lines, rep)` を追加。`ymm_on` (モジュール内の関数本体に `@ymmN` 参照がある時だけ真) のとき、関数本体と wrapper に適用。`--skip ymmsync` で外せる。`@ymmN` の宣言を使用分だけ追加 |
-| `scripts/ymm_sync_check.py` | 2 関数の模擬 (+ vzeroupper を含む 3 関数) の検証。on / off (ネガコン) の 2 系を clang で実行して判定 |
+| `lift/kh_lower.py` | `ymm_sync(lines, rep)` を追加。`ymm_on` (モジュール内の関数本体に `@ymmN` 参照がある時だけ真) のとき、関数本体と wrapper に適用。`--skip ymmsync` で外せる。`@ymmN` の宣言は使用分に加え、`ymm_on` のとき 0-15 を全て宣言 (wrapper の同期用、差し戻し対応) |
+| `scripts/ymm_sync_check.py` | 2 関数の模擬 (+ vzeroupper を含む 3 関数) の検証。on / off (ネガコン) の 2 系を clang で実行して判定。差し戻し対応で `one` (vzeroupper なし・ymm 参照 1 つの 2 関数を `clang -c` で検査) を追加 |
 | `scripts/ymm_sync_driver.c` | 上記の実行器。OK (rc 0) / MISMATCH (rc 1) |
+| `scripts/lowered_identity.sh` | module A/B/E/F の lowered.ll・mod.wasm を、比較元 commit (既定 64fd760) と現 HEAD で cmp (§3-3・§5)。差し戻し対応で追加 |
 
 ymm を参照しないモジュールは `ymm_on` が偽で、出力は従来コードと同一 (§3-3 で A/B/E/F の lowered.ll をバイト比較)。
 
@@ -33,6 +36,8 @@ ymm を参照しないモジュールは `ymm_on` が偽で、出力は従来コ
 | `store i128 %v, @xmmN` (非 VEX = legacy SSE) | `ymmN := (ymmN & 上位mask) \| zext(%v)` (上位保持) |
 | `store i256 %v, @ymmN` | 元の store の後に `xmmN := trunc(%v)` |
 | `store i256 undef, @ymmN` (vzeroupper、N<16) | `ymmN := zext(xmmN)` (下位は xmm の値、上位 0) |
+
+宣言: wrapper (abicheck の `store i128 …, @xmm6..15` と float 引数の `store @xmm0..3`) も `ymm_sync` の対象になり `@ymm0..15` を参照する。`used` (宣言の集計) は wrapper 生成より前に計算されるため、`ymm_on` のとき `@ymm0..15` を全て宣言する (`lift/kh_lower.py` の `regs`)。
 
 限界: VEX かどうかは「書込む値の SSA 定義が `__asm_v*` の呼出か」で判定する。load など別の出所の値は legacy 扱い (上位保持)。実機 2 関数は全て VEX 形のため、legacy 経路は合成テストでも未検証 (未解決 2)。
 
@@ -46,10 +51,13 @@ ymm を参照しないモジュールは `ymm_on` が偽で、出力は従来コ
 |---|---|---|---|
 | on (規則あり) | `ymmsync` 33 / `ymmzero` 16 | `OK xmm2=12345779` | 0 |
 | off (`--skip ymmsync`) | 規則なし | `MISMATCH bits=3 xmm2=12345779 ymm2_lo=00000000` | 1 |
+| one (`--lift 180f89cf0,180fb6124 --skip icall`・vzeroupper なし) | `ymmsync` 23 | `clang -c` 受理 (`lower_rc` 0 / `clang_c_rc` 0) | 0 |
+| one の負例 (比較元 64fd760 の kh_lower を一時ツリーで実行) | `ymmsync` 23 | `clang -c` error: `use of undefined value '@ymm10'` (`clang_c_rc` 1) | 1 |
 
 - A: `vmovd` → `vpshufd` で xmm2 を書く (VEX-128)。B: `load i256 @ymm2` と `vinsertf128 ymm2, ymm2, xmm2, 1`。C: `vzeroupper` (ymm0-31 の undef store)。
 - driver の判定: bit1 = ymm2 下位 ≠ xmm2、bit2 = ymm2 上位 ≠ 0、bit4 = xmm2 ≠ 期待値。off は bit1 のみでなく bit2 も立つが、ymm2 上位の undef 値に依存するため判定は bit 全体で見る。
-- 結果: `RESULT PASS` (on = OK かつ off = MISMATCH)。所要 0.40 秒 (wall)。
+- 結果: `RESULT PASS` (on = OK かつ off = MISMATCH かつ one = `clang -c` 受理)。所要 0.46 秒 (wall)。逐次実行 (並列 1・nproc 4)、load average (1 分) は実行前 0.40 → 実行後 0.40。
+- one の経路: wrapper の `ymm_sync` が `@ymm6..15` (abicheck) と `@ymm0..3` (float 引数) を参照する。修正前は `regs` が body の集計だけで宣言していたため、`@ymm10` が未宣言になった。
 
 ### 3-2. 実機 2 関数の stage-0 IR (素材 `plugins-kilohearts`)
 
@@ -58,6 +66,7 @@ ymm を参照しないモジュールは `ymm_on` が偽で、出力は従来コ
 - `kh_lower.py` (`--lift 180f89cf0,180fb6124`、既定 skip): `ymmsync` 33 / `ymmzero` 48 (vzeroupper 3 箇所 × 16 語)。unlifted callees 0・icall sites 0。
 - `clang -c` で lowered.ll → object: 36,344 B (受理)。
 - 出力例 (`ymm2`): `store i128 %57, @xmm2` の後に `%kys1.z = zext i128 %57 to i256` → `store i256 %kys1.z, @ymm2`。
+- 差し戻し対応後の再測定 (`0145b3414`・同じ入力): stage-0 4,210 行 (同じ)、`ymmsync` 33 / `ymmzero` 48 (同じ)、`clang -c` 受理・36,344 B (同じ)。`capture_stage0` + kh_lower + clang を 11.8 秒 (wall)、逐次、load average 0.16 → 0.34。
 - **gen_simd は未実施**: 2 関数の `vinsertf128` / `vpcmpeqd` / `vpmovmskb` (i256) の語彙が license の gen_simd に無いため、module 化 (emcc) は KH-52 (#3307) の範囲。
 
 ### 3-3. 既存モジュールの不変
@@ -77,6 +86,18 @@ ymm を参照しないモジュールは `ymm_on` が偽で、出力は従来コ
 - `kh249_check.mjs` (module F の 17 項目): ok 17 / ng 0 (`kh249_product_index.py` を素材から生成してから実行。KH656_REPORT の値と一致)。
 - lic_build の A/B/E の wasm sha256 は本 run では比較基準が無い (変更前の値を取っていない)。同一 lowered.ll から下流 (emcc) は同一出力になるため、比較は lowered.ll のバイト一致で代える。
 
+- 差し戻し対応後の再測定 (測定 commit `0145b3414`・比較元 `64fd760` = 差し戻し前の PR head)。`bash scripts/lowered_identity.sh 64fd760` (§5):
+
+| module | lowered.ll | mod.wasm | sha256 | bytes |
+|---|---|---|---|---|
+| A | IDENTICAL (ymm 参照 0) | IDENTICAL | `411007b8…b6fc` | 26,705 |
+| B | IDENTICAL (ymm 参照 0) | IDENTICAL | `62182947…cf04` | 25,249 |
+| E | IDENTICAL (ymm 参照 0) | IDENTICAL | `0cf066d1…fed8` | 364,770 |
+| F | IDENTICAL (ymm 参照 0) | IDENTICAL | `7ba79e65…7707` | 54,394 |
+
+- module F の wasm は `7ba79e65…7707` (54,394 B) で、変更前の REPORT 値と一致 (`lic_build.py --module F` を `0145b3414` で実行)。所要 24.0 秒 (wall)、逐次実行 (並列 1・nproc 4)、load average (1 分) 0.37 → 0.65。
+- `lic_check.mjs` / `kh249_check.mjs` は本対応で再実行していない。A/B/E/F の wasm が比較元と同一 sha のため、判定は前回値 (測定 commit `ca83f24e`) を引き継ぐ。
+
 ### 3-4. ネガティブコントロール
 
 | 対象 | 壊した点 | 結果 |
@@ -94,16 +115,19 @@ vzeroupper の undef 規則を個別に外す対照は未実施 (undef の実行
 
 ```sh
 cd tools/targets/kilohearts/license
-python3 scripts/ymm_sync_check.py          # 合成検証 (素材不要)
+python3 scripts/ymm_sync_check.py          # 合成検証 (素材不要。clang のみ)
+KH_UI_WORK=<kilohearts>/work bash ui_eval/extract_core.sh   # 素材: HeartCore.core_64 (plugins-kilohearts を展開。sha256 検証あり)
+bash scripts/lowered_identity.sh 64fd760   # A/B/E/F の lowered.ll・mod.wasm を比較元 commit と cmp (RetDec + emsdk)。rc 0 で全 IDENTICAL
 python3 lic_build.py --module F            # wasm sha256 = 7ba79e65…7707 (素材 + RetDec + emsdk)
 ```
 
 ## 6. 測定 commit と差分 (docs/WORKFLOW.md §6)
 
-- 測定 commit `ca83f24e`。本 REPORT の commit 以降の HEAD までのコード差分 (`lift`・`scripts` の範囲): 下記で確認。
+- 測定 commit `0145b3414`。本 REPORT の commit 以降の HEAD までのコード差分 (`lift`・`scripts` の範囲): 下記で確認。
+- 前回の測定 commit `ca83f24e` からの差分 (`git diff --stat ca83f24e 0145b3414 -- …lift …scripts`): `lift/kh_lower.py` 3 行 (宣言の修正)、`scripts/ymm_sync_check.py` 15 行 (one 追加)、`scripts/lowered_identity.sh` 34 行 (新規)。差し戻し対応 (§0) の範囲。
 
 ```
-git diff ca83f24e HEAD -- tools/targets/kilohearts/license/lift tools/targets/kilohearts/license/scripts
+git diff 0145b3414 HEAD -- tools/targets/kilohearts/license/lift tools/targets/kilohearts/license/scripts
 (出力 0 行)
 ```
 
