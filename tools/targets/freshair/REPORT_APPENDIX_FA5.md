@@ -24,41 +24,9 @@
 - したがって「定数が違う関数がある」は事実だが、「意味が違う」の根拠にはならない。意味同一性は REPORT §11-2 ① の差分実行で判定する (未実施)。
 - 起票先: ① の意味同一性と `value` 17 件の中身 → #52 (本 issue の残件)。
 
-## §A4. `value` 17 件の内訳 (`ks_rdata_detail.py`, #52 残件)
+## §A4・§A5. `value` 17 件の内訳・語単位切り分け
 
-- 再現: `ks_rdata_detail.py <HeartCore.core_64> <SlateCore.core_64> rdata_class.json share.json` (`ks_identity.sh` と `ks_rdata_class.py` の出力を入力にする)。素材は `work-liftlib-targets` のみ (`SlateCore.core_64`・`HeartCore.core_64` を含む)。
-- 実測 (2 回実行で byte 一致、EXIT=0): 内容が違う組は 44 組 (うち text 2、非 text 42。`pairs` の値)。非 text の 42 組について 32 B の参照先を 8 B 語に分けた結果は次のとおり (語数。`text_ref` は参照数)。
-
-| 区分 | SC | KH | 判定の定義 |
-|---|---|---|---|
-| `text_ref` | 2 | 2 | 印字可能 ASCII を含む参照 (文字列断片) |
-| `rva32` | 75 | 74 | 上位 32 bit が 0 で、下位 32 bit がいずれかのセクションの [VirtualAddress, +VirtualSize) 内の語 (RVA 候補。セクション範囲内に入る整数定数は区別していない。0x1000 未満は除外) |
-| `abs` | 3 | 5 | image 範囲の 8 B 絶対アドレス (`ptr` 判定の対象) |
-| `dbl` | 73 | 75 | それ以外 (倍精度・整数定数など) |
-
-- 読み: `rva32` は「RVA の候補」であって、RVA と確認した値ではない。セクション範囲に入る小さな整数定数が混じりうるため、件数は上限として読む。`dbl` 語は定数の差の候補だが、本節では位置ごとの対応を取っていない。文字列断片は 2 件ずつ。
-- 判定: `value` 17 件の中身が定数値の差か配置差かは、この集計からは決まらない (未確認)。`ptr` 判定 (8 B 絶対アドレスのみ) では 32 bit の RVA を拾えないので、`value` と `ptr` の境界は下限でしか決まらない。
-- 未解決: `dbl` 語が同一位置で bit 一致するかの対応付け。`rva32` 候補が RVA か定数かの確認と、RVA 差分による正規化。起票先 → #52 (本 issue の残件)。
-
-## §A5. `value` 17 件の語単位切り分け (`ks_rdata_value.py`, #52 残件 ②)
-
-- 再現: `ks_rdata_class.py` の出力 `rdata_class.json` を入力に `python3 ks_rdata_value.py <HeartCore.core_64> <SlateCore.core_64> rdata_class.json share.json out.json` (uv で pefile/numpy/capstone)。素材は `work-liftlib-targets`。
-- 方法: `value` 17 関数の rip 参照 (32 B) を 8 B 語で対にし、差分語を分類。`rva_off_*` は「SC 語が指すセクション内 RVA の 16 B」を KH 側と比べる。
-- 前提の訂正: 旧 §A4 の `rva32` (セクション範囲内の整数) は、RVA ポインタなのか定数なのかを区別していなかった。本節の定義: **RVA 候補** = 上位 32 bit が 0 で、いずれかのセクション範囲に入る値 (RVA か定数かは未判定)。`layout` / `target_eq` / `rva_off_*` の対象は、そのうち `.rdata` 内を指すもの (両側とも `.rdata` に解決される組) に限る。
-- 本節の分類は RVA 候補の「指す先」を見るだけで、値が RVA であることは確認していない。
-- 測定 commit: `115debea` (最後にコードを変えた commit。RVA 候補を `.rdata` に限定し `sec_hits` を追加)。`ks_identity.sh` と `ks_rdata_value.py` は同じ commit で再実行。コード差分の証跡 `git diff 115debea HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` は **0 行** (差分は本節の文書のみ)。
-- 実測 (測定 commit `115debea`。HEAD `d148d08a` まで `tools/targets/freshair/*.py` / `*.sh` の差分 0 行。`ks_identity.sh` EXIT=0、54.6 s、load 0.38 (nproc=4)。`ks_rdata_value.py` 2 回実行で stdout・JSON とも byte 一致、EXIT=0、0.68 s real × 2、load 0.43): 下記の数値が本 PR の正本。
-  `{"abs_vs_const": 8, "dbl": 13, "fn_value_differs": 17, "int": 23, "rva_off_absent": 72, "text": 23}`
-  - `abs_` 接頭辞は、片側以上が ImageBase〜SizeOfImage の 8 B 絶対アドレスである組。`abs_vs_const` 8 語は、片側だけが絶対アドレスで、もう片側が `.rdata` に解決できない定数。
-  - `layout` 0 件・`target_eq` 0 件・`abs_layout` 0 件・`abs_target_eq` 0 件 (配置差で説明できる語は無い)。
-  - `sec_hits` (語の解決先セクション件数): SC `.rdata` rva 74 / abs 2、SC `.text` rva 1 / abs 1、KH `.rdata` rva 74 / abs 5。
-  - **限定前後の比較** (限定前 = `1b3a1b33` の `ks_rdata_value.py`、限定後 = `115debea` 以降。同じ入力 `rdata_class.json` と `share.json` で実行): 全バケットの件数は before / after とも同一 (`abs_vs_const` 8・`dbl` 13・`int` 23・`text` 23・`rva_off_absent` 72)。`sec_hits` は限定後だけの出力のため、before 側は未計測 (件数の差は 0 件と読める)。
-  - **`.text` を指す RVA 候補 1 語の行き先**: SC `0x18105b380` (値 `0x776f70` = 文字列断片 "pow")。KH 側 `0x686e697300776f70` は KH 側の解決先がセクション外のため `.rdata` 対にならず、`is_text` で `text` に入る。限定前も同じ経路 (`sy` が None → `text`) で、`rva_off_*` には入っていなかった。同じ入力で `.rdata` 限定の前後とも `text` 側。
-  - `rva_off_absent` 72 語は、「RVA 候補の指す 16 B が KH の `.rdata` の全バイト位置のどこにも無い」件数 (`rva_off_found` 0 / 72)。RVA か定数かは未判定のため、「内容が違う」の確定ではなく、参照先の内容差の下限として読む。
-  - `int` 23 / `dbl` 13 / `text` 23 は、差分語のうち RVA 候補・絶対アドレスでないもの (整数・倍精度・文字列断片)。
-- 読み: `value` 17 件は「配置がずれただけ」とは言えず、RVA 候補の指す先の 16 B が KH 側に無い (RVA か定数かは未判定)。参照先がさらにポインタを含む場合は未追跡 (下限)。`dbl` 13 / `int` 23 が同一位置の定数差か、そもそも対応しない語の組み合わせかは未確定。
-- 判定: `value` 17 件は **配置差だけでは説明できない**。「内容が違う」の断定は下限としてのみ言える。「意味が違う」とは言えない (定数表や型テーブルの内容差の可能性)。意味同一性は #1264 (FA-18) の差分実行で判定する。
-- 起票先: 残件の意味判定 → #1264 (FA-18)、`dbl`/`int` 対応付けは #52 残件。
+- 本文 (`ks_rdata_detail.py`・`ks_rdata_value.py`、#52 残件) は [REPORT_APPENDIX_FA5_VALUE.md](REPORT_APPENDIX_FA5_VALUE.md) §A4・§A5 へ分割移動 (250 行上限のため、無変更)。
 
 ## §A3. Gain の意味同一性 (native ⇄ native 差分, REPORT §11-2 ① の実施)
 
@@ -170,6 +138,36 @@
 | 機械語の ramp 命令を KH 形に置き換えた native で 200/200 を確認する | 反実仮想がモデル上の結果にとどまる | #52 (残件) |
 | SC の ramp 丸め形がソースの意図か | 「どちらが正しい式か」は未確定 | #52 (残件) |
 | Gain 以外の snapin への同じ差分実行の拡大 (#1264 受入 3) | ①の意味同一性は Gain の 1 件のみで判定 | #52 (残件) |
+
+### §A3-6. 機械語の ramp を KH 形に置換した native で 200 case を比較 (#2736, 実測)
+
+- 測定 commit: `fbfec952c` (追加: `ks_ramp_kh_patch.py`・`ks_ramp_kh_native.sh`)。`git diff fbfec952c HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` は 0 行。
+- 再現: `SC_CORE=<SlateCore.core_64> KH_CORE=<HeartCore.core_64> bash tools/targets/freshair/ks_ramp_kh_native.sh 200 7` (素材パスは環境変数で必ず指定。未指定は exit 2)。出力は `work/ks_ramp_kh/` (gitignore)。
+- 置換の設計 (`ks_ramp_kh_patch.py`、元 SC の逆アセンブル実測):
+  - 元の ramp (VA `0x180afe160`〜`0x180afe1a0`、65 B) は `cur = (1-t)*A + t*B` (t = pos*coef)。
+  - 置換後 (66 B、10 命令): `pos+1` → `t = pos*inc` → `B-A` → `(B-A)*t` → `+A` → `cur` 保存。KH (`0x1804b0460`〜) の演算順に一致。`(B-A)*t` と `t*(B-A)` は float32 で同値。
+  - 1 B 増えるため、直前の nop を 14 B → 13 B に詰めて `0x180afe152`〜`0x180afe1a0` の 79 B を保ち、ループ頭を `0x180afe15f` に寄せる。`0x180afe1a1` の `mov rax,[rdx]` は不変。
+  - back-edge `jl` (`0x180afe21b`) の rel32 を `3fffffff` → `3effffff` (`0x180afe15f` へ)。`0x180afe160` への他の分岐は無い (`0x180afe090`〜`0x180afe400` の分岐を走査して確認)。
+  - 書き込み前に元バイトを assert (一致しなければ dst を作らず exit 1)。元 SC は変えない。
+  - 差分: `cmp -l` で 56 B (領域内 55 B + jl の rel32 の 1 B)。逆アセンブルで置換後の命令列を目視確認 (`0x180afe15f`〜`0x180afe1a1`、末尾 `jl 0x180afe15f`)。
+- 結果 (2 回実行で `sc_patched.txt`・`kh.txt`・`cmp_patched.json`・`sc_orig.txt`・`cmp_orig.json` が byte 一致。stderr 0 B):
+
+| 比較 | bit_exact_LRS | mismatch_L | mismatch_R | mismatch_S | notify_count_mismatch |
+|---|---|---|---|---|---|
+| control: 元 SC × KH | 127 / 200 | 73 | 73 | 48 | 0 |
+| patched: 置換 SC × KH | **200 / 200** | **0** | **0** | **0** | 0 |
+
+  - control は §A3 の 127/200 と一致。ulp (`ks_semantic_gain_ulp.py`): control の不一致 73 件は §A3 と同じ分布 (1:9・2:28・3:5・4:3・5:2・6:2・7:2・8:3・10 以上:19、符号反転 0)。patched は不一致 0 件。
+  - 実行: 1 回目 1.630 s・2 回目 1.523 s (`date +%s.%N` の差、`cc` と Python を含む)。load (uptime の 1 分値) 0.19→0.19 と 0.16→0.16、nproc=4。
+- 判定: 受入 1 (置換 native の作成) **達成** (元 SC から 56 B の差分の複製を作り、逆アセンブルで命令列を確認)。受入 2 (200 case で L・R・実行後 state の一致) **達成** (patched 200/200、control 127/200)。受入 3 (本節の追記) **達成**。
+- 限界: (a) 結論は seed 7・200 case・Gain 1 件に限る。(b) SC の式 `(1-t)*A + t*B` が元ソースの意図かは未確定。「SC が誤り」とは言わない。(c) Gain 以外への拡大は未検証。
+
+#### 未解決 (本節の範囲外)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| SC の ramp 式 `(1-t)*A + t*B` がソースの意図かの確認 | 「どちらが正しい式か」は未確定 | #52 (残件) |
+| Gain 以外の snapin への同じ置換・差分実行の拡大 (#1264 受入 3) | ①の判定は Gain 1 件のみ | #52 (残件) |
 
 ### §A5-2. value 17 件の位置対応・再配置・指す先の切り分け (#2024, 実測)
 
