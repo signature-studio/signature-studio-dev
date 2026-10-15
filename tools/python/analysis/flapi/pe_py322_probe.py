@@ -9,7 +9,7 @@
 - abs : メモリ・オペランドの disp (base 無し) がその範囲に入る。
 - imm : 即値オペランドがその範囲に入る。
 - qword: 全 section の 8 byte 境界の格納値 (表の要素・関数先頭・vtable 格納)。
-展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
+展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
 """
 import os
 import struct
