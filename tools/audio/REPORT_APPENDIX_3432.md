@@ -6,8 +6,9 @@
 
 - 測定 commit: `4d97f703e` (`feat(audio): AU-2 行列の PASS 判定に burst_runs > 0 を加える (#3432)`)
 - 検証 HEAD: 本付録を含む commit (fix-up 後の PR head)。
-- `git diff 4d97f703e HEAD -- tools/audio` の出力: **0 バイト** (`wc -c` = 0)。
-  測定後に変わったのは PR 本文と本付録だけで、`tools/audio` のコードは測定時と同一。
+- `git diff 4d97f703e HEAD -- tools/audio ':!*.md'` (コード・テスト・スクリプト) の出力: **0 バイト**。
+- `git diff 4d97f703e HEAD -- tools/audio` の全体は md のみの差分 (本付録の新規追加 39 行と、`REPORT_AU2_CI.md` §12 のリンク 1 行)。
+  測定対象のコードは測定時と同一で、差分は文書だけ。
 
 ## 2. node テスト (HEAD で再実行)
 
