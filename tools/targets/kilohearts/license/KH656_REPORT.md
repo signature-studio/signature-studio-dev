@@ -192,3 +192,35 @@ round 5 の扱い (確認結果):
 | 313 関数 lift 時の入口 `memory access out of bounds` | 閉包を広げた状態の実行検証不能 | #1821 [KH-29] |
 | ymm (AVX2) 2 件 `0x180f89cf0` / `0x180fb6124` の lift | 閉包を広げると build 失敗 (記録上。round 5 の原因は未確認) | #709 (KH-14・既存) |
 | 0x180ef7fc0 の native oracle (ctx-fuzz) | bit 照合不可 | #1761 継続 |
+
+## 9. 閉包の各ラウンドの入口経路 (#3591 / KH-58、実測)
+
+測定 commit: `5db386d26` (`kh656_closure.py` に各ラウンドの入口結果 `entry_check()` を追加。`lic_build.py`・`lic_config.json`・`kh249_check.mjs` は HEAD と同一)。
+コード差分 (本節を除く): `git diff 5db386d26 HEAD -- tools/targets/kilohearts ':!*KH656_REPORT.md'` = 0 行。
+環境: nproc=4・load average 0.6〜0.8。素材 `plugins-kilohearts` は installer zip (`HeartCore.core_64` 76,642,304 B) と `product_index.json` (46 plugins) を展開。
+
+実行: `python3 scripts/kh656_closure.py --rounds 6` (2 分 12 秒)。`work/kh656_rounds.json` に各ラウンドの結果を記録。
+
+| ラウンド (lift 集合の数) | 未 lift callee | wasm B (sha256 先頭) | undefined import | 入口 `function_180ef7fc0` | `kh249_check` |
+|---|---|---|---|---|---|
+| 1 (HEAD 相当・8) | 40 | 54,394 (`7ba79e65`) | 0 | `unlifted callee 0x180112a30` | ok=17 ng=0 |
+| 2 (42) | 44 | 192,136 (`0dac597b`) | 0 | `unlifted callee 0x1801d3b60` | ok=16 ng=1 |
+| 3 (80) | 92 | 436,971 (`907a34bc`) | 0 | `unlifted callee 0x180138750` | ok=16 ng=1 |
+| 4 (166) | 154 | 876,222 (`b7de032a`) | 0 | `unlifted callee 0x180138a30` | ok=16 ng=1 |
+| 5 (314) | 144 | 1,687,866 (`ac0dc441`) | 0 | `memory access out of bounds` | ok=16 ng=1 |
+| 6 (452・試行) | — | build 失敗 | — | — | — |
+
+- 閉包は 2 回実行した (1 回目は `kh656_closure.py` の変更を未コミットのまま、2 回目は `5db386d26` で実行)。ラウンド 1〜5 の wasm sha256 は両回で一致した。
+- `ng=1` は `kh249_check.mjs` [2] の期待値 (`0x180112a30` で止まること) が、ラウンド 2 以降で外れたための判定。check 自体は変えていない。
+
+**受入 2 の判定: 未達 (部分)**。
+- `0x180112a30` に届かない: 達成 (ラウンド 2 以降は越える)。
+- 分類本体まで到達: 未達。越えた先の最初の未 lift callee は `0x1801d3b60` → `0x180138750` → `0x180138a30` と移り、ラウンド 5 (314 lift) で `memory access out of bounds`。trap VA は本 run で再測定していない (#1821 の §7.6 を参照。ラウンド 5 の memset `1813846e0` は lift 扱いで、#1821 の 313 集合 (shim 版) とは wasm が異なる。入口の症状は一致)。
+
+**ラウンド 6 の失敗 (#3590 の範囲)**: `dropped_i256` が 452 件で、ラウンド 5 の lift 314 + 新規 138 の全件に当たる。i256 判定 (`i256_defs()`) が機能しておらず、失敗時の自動除外が lift 集合を空にする。本 run では `lic_config.json` を HEAD に戻して測定した。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 入口経路の未 lift callee (`0x1801d3b60`・`0x180138750`・`0x180138a30`) の lift/shim 化 | 分類本体への到達 (受入 2) | #3590 (閉包の収束) |
+| ラウンド 5 (314 lift) の入口 OOB の trap VA と原因 | 受入 2 の残り | #1821 |
+| `i256_defs()` の全件誤判定と、失敗時に lift 集合が空になる自動除外 | 閉包の収束 (受入 1) | #3590 |
