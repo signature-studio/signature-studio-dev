@@ -5,13 +5,14 @@
 
 ## 0. 要点・測定 commit
 
-- 測定 commit: **`dfe82526`** (コードを変えた最後の commit。 `feat(plugins): reflect non-VEX comis/ucomis flags into IR`)。 検証起点: `a9733bbb` (origin/main)。
-- 差分確認: 本 PR の pass・m11 の経路 `git diff dfe82526 HEAD -- tools/plugins/lift/passes/comis_flags.py tools/plugins/lift/passes/m11_simd2.py tools/plugins/sampler/engine_lift.sh` の出力は空 (0 行)。 自分の commit の残りは `test_comis_flags.py` (テストのみ。 lift 経路から呼ばれない)・`SOURCES.txt`・文書。
-- **main 取り込み後の差分 (再測定できていない)**: 取り込み merge (main `650590ed`) で、engine の lift 経路に main 側の変更が入った: `lift_ranges.sh` に `vex_comis_flags.py` の呼出し (#3248)・`passes/ir5_patch.py` +102 行・`vex_comis_flags.py` (新規)。 `git diff dfe82526 HEAD -- tools/plugins/lift tools/plugins/sampler/engine_lift.sh` はこの分だけ非 0。 本付録の §1・§2 の数値は **merge 前の dfe82526 の実測**。 merge 後の engine は素材 (`toolchain-retdec`・`toolchain-emsdk`) が無く再実行していない (本 PR 未解決表)。
+- 測定 commit: **`c45bf383a`** (lift 経路を最後に変えた commit = origin/main `7f70eb1d5` の取り込み merge)。 §2 の実測は全てこの commit。 検証起点: `a9733bbb` (origin/main)。 初版の実装 commit は `dfe82526` (`feat(plugins): reflect non-VEX comis/ucomis flags into IR`)。
+- 差分確認 (測定 commit 以後): `git diff c45bf383a HEAD -- tools/plugins/lift tools/plugins/sampler/engine_lift.sh` の出力は空 (0 行)。 本 PR の pass・m11・engine の経路 `git diff dfe82526 HEAD -- tools/plugins/lift/passes/comis_flags.py tools/plugins/lift/passes/m11_simd2.py tools/plugins/sampler/engine_lift.sh` も 0 行。
+- 取り込み分 (`git diff --stat dfe82526 c45bf383a -- tools/plugins/lift tools/plugins/sampler/engine_lift.sh` = 7 files・+351 −1): main 側の `passes/ir5_patch.py` +102 (`forward_vmovsd_store`・#2017 ほか)・`passes/vex_comis_flags.py` (新規)・`passes/test_vex_comis_flags.py`・`passes/test_forward_vmovsd.py` (新規)・`lift_ranges.sh` の VEX 呼出し。 本 PR の commit 分は `passes/test_comis_flags.py` (assert 追加) と `passes/SOURCES.txt` (2 行のうち 1 行)。
+- 旧版の未再測定 (merge 前の `dfe82526` の数値だけを載せていた) は、この commit の再測定で解消した (§2)。
 - 方式: RetDec の reg2mem 形の関数では flag が `%cf.0.reg2mem`・`%zf.0.reg2mem`・`%pf.0.reg2mem` (alloca i1) に store/load で載る。 comis の直後に fcmp で flag を計算して slot へ store し、呼出しを消す。 slot の無い関数は flag が SSA 値 (`%15 = xor i1 0, 0` など) のまま流れるため、今回は反映せず unimpl に残す (範囲外・子 [PLG-F3-36] #3305)。
 - 実装: `tools/plugins/lift/passes/comis_flags.py` (新規)・`tools/plugins/lift/passes/test_comis_flags.py` (新規)・`tools/plugins/lift/passes/m11_simd2.py` (`PLUG_COMIS_FLAGS=1` のとき comis を unimpl 化)・`tools/plugins/lift/lift_ranges.sh` (`PLUG_COMIS_FLAGS=1` で pass を m11_simd2 の前に実行)・`tools/plugins/sampler/engine_lift.sh` (既定 1)。
 
-## 1. 件数 (測定 commit `dfe82526`・`engine_lift.sh` 既定 = 反映あり)
+## 1. 件数 (`engine_lift.sh` 既定 = 反映あり。 dfe82526 で測定、c45bf383a でも `e.cflag.json` の hist が一致)
 
 | engine | 非 VEX 呼出し | 反映 (呼出し削除) | 未反映 (unimpl に残す) | 内訳 (未反映) | VEX (範囲外・#3241) |
 |---|---|---|---|---|---|
@@ -19,22 +20,25 @@
 | 19048 | 80 | **6** (comiss 1・ucomisd 系 2・ucomiss 3) | **74** | slot 無し 64 ・部分 slot 10 | 9 |
 
 - 数え方: `comis_flags.py` が入力 (lift 後の `e.final.ll`) の `call void @__asm_(u)?comis[sd](__N)?(...)` を数え、関数ごとの slot の有無で反映・未反映を分けた (`e.cflag.json` の `hist`)。 `__N` 付きは base で合算 (`ucomisd 系` = `ucomisd` + `ucomisd__35`/`__38`)。 非 VEX = 反映 + 未反映。
-- 反映後に残る呼出し (symbol 別, 測定 commit): 19252 = comisd 16・comiss 25・comiss__17 5・ucomiss 1 (計 47)。 19048 = comisd 18・comiss 6・comiss__25 36・ucomisd__38 1・ucomiss 13 (計 74)。 VEX は 19252 が vcomisd 6・vucomisd 2・vucomiss 3、19048 が vcomisd 3・vcomisd__22 1・vucomisd 2・vucomiss 3 (本 issue の範囲外のまま unimpl)。
+- 反映後に残る呼出し (symbol 別, dfe82526 の値。 c45bf383a の `e.final.ll` でも宣言行を除いて一致): 19252 = comisd 16・comiss 25・comiss__17 5・ucomiss 1 (計 47)。 19048 = comisd 18・comiss 6・comiss__25 36・ucomisd__38 1・ucomiss 13 (計 74)。 VEX は 19252 が vcomisd 6・vucomisd 2・vucomiss 3、19048 が vcomisd 3・vcomisd__22 1・vucomisd 2・vucomiss 3 (本 issue の範囲外のまま unimpl)。
 - 反映で宣言が消えた symbol: 19252 = `ucomisd`・`ucomisd__35` (`declare` を削除)、19048 = `ucomisd`。
 
 ## 2. 実測 (`summary.csv` の列: block,pdata_funcs,lift_rc,defines,f80_funcs,**unimpl_helpers**,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines,**emcc_c_rc_after_f80**)
 
-| 測定 | block | unimpl | emcc (argw) | emcc (fixcmp) | emcc (f80 後) | lift_s | wall |
+| 測定 | block | unimpl (dfe82526・旧) | **unimpl (c45bf383a)** | emcc (argw) | emcc (fixcmp) | emcc (f80 後) | lift_s |
 |---|---|---|---|---|---|---|---|
-| baseline `PLUG_COMIS_FLAGS=0` | 19252 | 4 | 1 | 1 | **0** | 16 | 18 s |
-| 反映 (既定 1) | 19252 | 8 | 1 | 1 | **0** | 15 | 18 s |
-| baseline `PLUG_COMIS_FLAGS=0` | 19048 | 4 | 0 | 0 | **0** | 62 | 66 s |
-| 反映 (既定 1) | 19048 | 9 | 0 | 0 | **0** | 61 | 65 s |
+| baseline `PLUG_COMIS_FLAGS=0` | 19252 | 4 | **3** | 1 | 1 | **0** | 17 |
+| 反映 (既定 1) | 19252 | 8 | **7** | 1 | 1 | **0** | 16 |
+| baseline `PLUG_COMIS_FLAGS=0` | 19048 | 4 | **4** | 0 | 0 | **0** | 64 |
+| 反映 (既定 1) | 19048 | 9 | **9** | 0 | 0 | **0** | 64 |
 
-- 生の行: `19252,522,0,551,1,4,1,0,1,16,2,165,0,29,549,0` → `19252,522,0,551,1,8,1,0,1,15,2,165,0,29,549,0`。 `19048,1658,0,1712,0,4,0,0,0,62,2,97,0,54,1710,0` → `19048,1658,0,1712,0,9,0,0,0,61,2,97,0,54,1710,0`。
+- 測定: `bash tools/plugins/sampler/engine_lift.sh <B>` (反映) と `PLUG_COMIS_FLAGS=0 bash tools/plugins/sampler/engine_lift.sh <B>` (baseline) を各 1 回、commit `c45bf383a` で実行。 PE は `fl-win64` の `extracted/block19252_PE.bin`・`block19048_PE.bin` (2 本だけ展開)。 emcc は `/opt/emsdk`、RetDec は `/opt/retdec` (`lift_ranges.sh`)。
+- 生の行 (`summary.csv`・c45bf383a): `19252,522,0,551,1,3,1,0,1,17,2,165,0,29,549,0` (baseline) / `19252,522,0,551,1,7,1,0,1,16,2,165,0,29,549,0` (反映) / `19048,1658,0,1712,0,4,0,0,0,64,2,97,0,54,1710,0` (baseline) / `19048,1658,0,1712,0,9,0,0,0,64,2,97,0,54,1710,0` (反映)。
 - 19252 の `emcc (argw)` = 1 は baseline から変わらない (`do not know how to soften fp_extend`。f80 段で 0 になる既存の挙動)。 受入の `emcc -c` rc 0 は f80 後の列で判定した。
-- 19048 の反映あり実行を 2 回行い (測定 commit で 2 回目)、summary は同一。 実行時間は 19252 が 18–19 s (baseline 2 回 / 反映 2 回)、19048 が 65–66 s。 負荷は `uptime` で load 0.11–1.43 (4 vCPU)。 n=2 の min–max。
-- unimpl の増分は、反映されずに残った非 VEX の comis (19252 で 4 symbol・19048 で 5 symbol) が、従来の「実装済み扱いの空 stub」から unimpl に変わったため。 VEX の 4 件 (19252) は従来どおり。
+- 19252 の baseline unimpl が 4 → 3 に変わった理由: `dfe82526` の 4 件は `__asm_vcomisd`・`__asm_vmovsd(i64,i128)`・`__asm_vucomisd`・`__asm_vucomiss`、`c45bf383a` は vmovsd を除く 3 件。 原因は main 側の `ir5_patch.py` `forward_vmovsd_store` (#2017・`db8de2922`・dfe82526 より後)。 `__asm_vmovsd` を含む行は 39 → 35 (`e.final.ll`)。 baseline は `PLUG_COMIS_FLAGS=0` なので comis の反映とは無関係。
+- 反映 (19252 = 7) の内訳: 非 VEX 4 (`comisd`・`comiss`・`comiss__17`・`ucomiss`) + VEX 3 (`vcomisd`・`vucomisd`・`vucomiss`)。 反映で増えた unimpl は非 VEX の 4 symbol (反映されずに残った comis が、従来の「実装済み扱いの空 stub」から unimpl に変わったため)。
+- 19048 の反映 (9) の内訳: 非 VEX 5 (`comisd`・`comiss`・`comiss__25`・`ucomisd__38`・`ucomiss`) + VEX 4 (`vcomisd`・`vcomisd__22`・`vucomisd`・`vucomiss`)。 baseline 4 は VEX 4 件で dfe82526 と同じ。 反映で増えた非 VEX は 5 symbol。
+- lift_s は 16–17 s (19252)・64 s (19048)。 wall は 19252 反映の 1 回のみ計測 (18.9 s)。 uptime の load は実行中 0.7–1.0 (4 vCPU)。
 
 ## 3. 述語の検算 (反映の向きと式)
 
@@ -59,11 +63,10 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| main 取り込み (merge `54d74bff`) 後の engine は未再測定 (lift 経路に main 側の `ir5_patch.py`・`vex_comis_flags.py` が入った)。 §1・§2 は merge 前 `dfe82526` の値 | merge 後の unimpl・`emcc -c` 判定は未確認 | 素材 (`toolchain-retdec`・`toolchain-emsdk`) を付けた再測定 (PM 判断) |
 | slot の無い関数の非 VEX comis 40 + 64 件、部分 slot の関数 7 + 10 件の flag が未反映 (unimpl に出る) | flag は未反映。 silent は解消 | [PLG-F3-36] #3305 (`親: #3242`) |
 | VEX の comis (19252 11 件・19048 9 件) が unimpl のまま | 従来どおり。 flag 未反映 | [PLG-F3-33] #3241 |
 | `PLUG_COMIS_FLAGS` の既定 0 の経路 (`batch_lift.sh`・他 plugin family) は silent の stub のまま。 既定化は PM agent の判断待ち (既定案: 0 のまま。 他経路の挙動は変えない。 既定が可逆) | 他 family の comis 欠落は未対応 | PM agent の判断待ち |
-| comis の OF/SF/AF は未反映 (pass は CF/ZF/PF のみ書く。 SDM では comis が 0 にする)。 対象 IR で OF/SF/AF を読む分岐 (jcc・cmov・setcc) が有るかは未確認 | 読まれていれば、その分岐は直前の flag を誤って読む (silent の可能性) | 読みの有無を確認した後に PM 判断で起票 (未起票) |
+| comis の OF/SF/AF は未反映 (pass は CF/ZF/PF のみ書く。 SDM では comis が 0 にする)。 対象 2 engine (19252・19048) では読みが無い: `e.final.ll` (4 測定) に `%of`・`%sf`・`%af` の参照と reg2mem slot は 0 件 (slot は cf・zf のみ。 pf の slot も 0 件) (c45bf383a で確認) | 対象 2 engine では影響なし。 他 family に広げるときは読みの有無を再確認 | 未起票 (他 family に広げるときに再確認) |
 | 19252 の `emcc (argw)` rc 1 (`fp_extend` の f80 段) | 変化なし。 f80 段で rc 0 になる既存 | 既存 (本 REPORT §7b・変更なし) |
 
 ## 6. 再現
