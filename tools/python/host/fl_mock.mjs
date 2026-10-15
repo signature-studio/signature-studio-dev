@@ -73,6 +73,34 @@ const noteEnum = (arr, chan, step, V) => {
   }
   return out;
 };
+// PY-218 (#3596): 件数超え (position >= 64) の event 経路 PE 0x12d3e20 (REPORT_PY218.md)。閾値は (position+1)*V、V = 24 (PE [0x15e25f8]・REPORT_APPENDIX_3310)。32bit 演算 (PE の imul/add と同じ)
+const GRID_V = 24;
+const gridGen = (seed, n) => {
+  let s = seed >>> 0;
+  const next = () => { s = (Math.imul(s, 1103515245) + 12345) >>> 0; return s >>> 16; };
+  const arr = Array.from({ length: Math.min(Math.max(n, 0), 256) }, () => {
+    const d0 = (next() % 2000) - 200;
+    const ch = next() % 4;
+    const flag = next() & 0xff;
+    return { d0, ch, flag };
+  });
+  return arr.sort((a, b) => a.d0 - b.d0);
+};
+const gridEvent = (items, index, p) => {
+  const lo = Math.imul(p, GRID_V) | 0, hi = (lo + GRID_V) | 0;
+  let cur = 0;
+  while (cur < items.length && items[cur].d0 < lo) cur++;
+  for (; cur < items.length && items[cur].d0 < hi; cur++) {
+    if (items[cur].ch === index && !(items[cur].flag & 0x20)) return true;
+  }
+  return false;
+};
+const gridBit = (st, index, k, p) => {
+  p |= 0;
+  if (p < 0) return false;
+  if (p >= 64) return gridEvent(st.gridItems, index, p);
+  return !!k.steps[p];
+};
 
 export function createMockEngine() {
   const st = {
@@ -87,6 +115,7 @@ export function createMockEngine() {
     numerator: 4, denominator: 4,
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
     selectedChannel: 0,
+    gridItems: [],
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0), pitchN: 2 },
       { name: "Snare", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 2, steps: new Array(64).fill(0), pitchN: 2 },
@@ -151,12 +180,12 @@ export function createMockEngine() {
     "channels.isChannelMuted": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).mute; },
     "channels.isChannelSolo": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).solo; },
     "channels.getChannelColor": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).color; },
-    // PY-101 (#2878) / PY-112 (#2932): PE 0xd5b420 は position の範囲検査を持たない。position<0 は 0、件数以上は event 経路の値 (mock は event 未モデルのため false) (C と同一)
+    // PY-101 (#2878) / PY-112 (#2932): PE 0xd5b420 は position の範囲検査を持たない。position<0 は 0、件数以上は event 経路 (PY-218・gridBit)
     "channels.getGridBit": (...a) => {
       arity(a, 2, 3);
-      ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
-      const k = ch(a[0]);
-      return p >= 0 && p < 64 && !!k.steps[p];
+      const index = ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
+      const k = ch(index);
+      return gridBit(st, index, k, p);
     },
     // PY-101 (#2878): PE 0xd5b360 は grid (+0x7ac) 非 null で True。mock の channel は生成時に grid を持つものとして扱い、null 経路は持たない (C と同一)
     "channels.isGridBitAssigned": (...a) => {
@@ -165,12 +194,12 @@ export function createMockEngine() {
       ch(a[0]);
       return true;
     },
-    // PY-101 (#2878): PE 0xd5bc10 → 0x12d3ff0。loop 分岐は未モデル (行テーブル T の生成元が未確定・REPORT_PY112)。base 0x12d3e20 と同じ読出し。件数以上は getGridBit と同じく false
+    // PY-101 (#2878): PE 0xd5bc10 → 0x12d3ff0。loop 分岐は未モデル (行テーブル T の生成元が未確定・REPORT_PY112)。base 0x12d3e20 と同じ読出し。件数以上は getGridBit と同じ (PY-218・gridBit)
     "channels.getGridBitWithLoop": (...a) => {
       arity(a, 2, 3);
-      ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
-      const k = ch(a[0]);
-      return p >= 0 && p < 64 && !!k.steps[p];
+      const index = ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
+      const k = ch(index);
+      return gridBit(st, index, k, p);
     },
     // 選択の並びで offset 番目 (負は先頭扱い・仮置き)、超えたら最後の選択。無選択は canBeNone で -1 / 0
     "channels.channelNumber": (...a) => {
@@ -411,5 +440,6 @@ export function createMockEngine() {
     },
     noteEnumProbe: (seed, n, chan, step, V) => noteEnum(noteGen(seed, n), chan, step, V),
     noteEnumNotes: (notes, chan, step, V) => noteEnum(notes.map(([d0, len, ch]) => ({ ...newItem(), d0, len, ch })), chan, step, V),
+    gridItemsProbe: (seed, n) => { st.gridItems = gridGen(seed, n); return st.gridItems.length; },
   };
 }

@@ -74,6 +74,28 @@ static void wt_rec(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk
   fflush(g_wt_fp);
 }
 
+/* LD-161 (#3563): abort helper (case の abortret=<VA>, 例 0x409730) の入口を trace hit で保存する。
+ * helper は必ず abort 経路 (RaiseException は noncontinuable) に入り、その RaiseException で入口の return 状態へ戻す
+ * (rsp+8・rip=戻り先・rax=0・callee-saved と xmm は入口の値)。native 専用 (wasm は trace の int3 を持たない)。 */
+static greg_t g_ab_gr[NGREG]; static struct _libc_fpstate g_ab_fp; static u64 g_ab_va; static int g_ab_valid;
+static void ab_save(ucontext_t* uc, u64 addr) {
+  memcpy(g_ab_gr, uc->uc_mcontext.gregs, sizeof g_ab_gr);
+  g_ab_gr[REG_RIP] = (greg_t)addr; g_ab_gr[REG_EFL] &= ~0x100;
+  g_ab_fp = *uc->uc_mcontext.fpregs; g_ab_valid = 1;
+}
+static void __attribute__((noreturn)) ab_return(void) {
+  ucontext_t uc; memset(&uc, 0, sizeof uc);
+  memcpy(uc.uc_mcontext.gregs, g_ab_gr, sizeof g_ab_gr);
+  greg_t sp = g_ab_gr[REG_RSP];
+  uc.uc_mcontext.gregs[REG_RIP] = *(greg_t*)(uintptr_t)sp;
+  uc.uc_mcontext.gregs[REG_RSP] = sp + 8;
+  uc.uc_mcontext.gregs[REG_RAX] = 0;
+  uc.uc_mcontext.fpregs = &g_ab_fp;
+  g_ab_valid = 0;
+  setcontext(&uc);
+  abort();
+}
+
 u64 ld_stub_c(u64 idx, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk) {
   const char* n = "?bad";
   if (idx >= LD_FAKEPROC_MARK) n = ld_fakeproc_name(idx - LD_FAKEPROC_MARK);   /* GetProcAddress 仮 proc */
@@ -84,6 +106,7 @@ u64 ld_stub_c(u64 idx, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk) {
   }
   u64 r = ld_stub(n, a0, a1, a2, a3, a4, a5);
   if (wt_on(n)) wt_rec(n, a0, a1, a2, a3, stk, r);
+  if (g_ab_valid && (a1 & 1) && strcmp(n, "RaiseException") == 0) ab_return();   /* LD-161: abort (noncontinuable) は入口の return へ */
   return r;
 }
 
@@ -262,6 +285,7 @@ static void on_sig(int sig, siginfo_t* si, void* ucv) {
     if (g_pending) { *g_pending = 0xCC; g_pending = NULL; g[REG_EFL] &= ~0x100; return; }
     u64 addr = (u64)g[REG_RIP] - 1; int k = tr_find(addr);
     if (k >= 0) {
+      if (addr == g_ab_va) ab_save(uc, addr);
       u64 a[8] = {0}, x[4] = {0};
       a[0] = g[REG_RCX]; a[1] = g[REG_RDX]; a[2] = g[REG_R8]; a[3] = g[REG_R9];
       u64* sp = (u64*)g[REG_RSP]; for (int j = 0; j < 4; j++) a[4 + j] = sp[5 + j];   /* [rsp]=ret, +8..+0x20 shadow, +0x28 = 5th */
@@ -327,6 +351,7 @@ static void run_case(char* line) {
     puts(ld_case_end("bad_fn", "fn outside image", 0, 0, 0, 0, 0, 0, 0)); fflush(stdout); return;
   }
   g_sig = 0; g_pending = NULL; g_fault_rsp = 0; g_fault_stk[0] = 0;
+  g_ab_va = ld_case.trace ? ld_case.abortret : 0; g_ab_valid = 0;
   for (int j = 0; j < 8; j++) g_fault_g[j] = 0;
   scrub_stack(ld_case.stkfill);
   step_begin();

@@ -6,8 +6,8 @@
 | 16 | 2 | False | False | ok | False | False |
 | -16 | 2 | False | True | segv | True | True |
 | -16 | 3 | False | True | segv | True | True |
-| 16 | 1152921504606846976 | True | False | segv | True | True |
-| -16 | 1152921504606846976 | True | False | segv | True | True |
+| 16 | 1152921504606846976 | True | False | sigfpe | True | True |
+| -16 | 1152921504606846976 | True | False | sigfpe | True | True |
 | 2147483647 | 3 | False | False | segv | True | False |
 
 生の trace 先頭 (t[0] は hex 文字列):
