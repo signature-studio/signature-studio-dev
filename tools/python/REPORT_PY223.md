@@ -4,22 +4,22 @@
 
 ## 結論
 
-- **受入 1 (間接 call 箇所の特定): 部分達成。** 0xed4b70 の所在 (関数ポインタ配列の添字 51) と、それを指せる vtable 候補 2 つ (基点 `0xed0bb0` のスロット `0x198`・基点 `0xed0c28` のスロット `0x120`) は確定した。ただし実際に呼ぶ call 箇所は 1 件に絞れない。候補は `call qword ptr [reg+0x198]` 24 件・`[reg+0x120]` 114 件 (仮想呼出し。receiver の vptr は実行時の値)。vptr を書く箇所が block00031 に無く、どの候補が receiver かは未確定。本 run で、`0xed0bb0` を指す絶対値・RIP 相対は PE 全体で 0 件と確定し、`0xed0c28` の材料はセル `0xed0b60` (読出し 1 件) だけと分かった (節「G1・ポインタ・vptr の材料」)。残りは子 #3888 (PY-264)。
-- **受入 2 (obj が非 0 になる条件): 未着手** (子 #3889 (PY-265))。G1 への RIP 相対の書込みは 1 件 (`0x12d9629`・関数 `0x12d9450`)。前 REPORT の「G1 の RIP 相対 store 0 件」は mov 系だけを数えた誤りで、ここで訂正する。
+- **受入 1 (間接 call 箇所の特定): 部分達成。** 0xed4b70 の所在 (関数ポインタ配列の添字 51) と、それを指せる vtable 候補 2 つ (基点 `0xed0bb0` のスロット `0x198`・基点 `0xed0c28` のスロット `0x120`) は確定した。ただし実際に呼ぶ call 箇所は 1 件に絞れない。候補は `call qword ptr [reg+0x198]` 24 件・`[reg+0x120]` 114 件 (仮想呼出し。receiver の vptr は実行時の値)。vptr を書く箇所が block00031 に無く、どの候補が receiver かは未確定。本 run で、`0xed0bb0` を指す 8 byte の絶対値・RIP 相対は PE 全体で 0 件と確定し (4 byte の 1 件は `.pdata` の RVA 値で、ポインタではない)、`0xed0c28` の材料はセル `0xed0b60` (読出し 1 件) だけと分かった (節「G1・ポインタ・vptr の材料」)。残りは子 #3888 (PY-264)。
+- **受入 2 (obj が非 0 になる条件): 未着手** (子 #3889 (PY-265))。G1 への RIP 相対の書込みは 1 件 (`0x12d9629`・関数 `0x12d94f0`)。前 REPORT の「G1 の RIP 相対 store 0 件」は mov 系だけを数えた誤りで、ここで訂正する。
 - **受入 3 (flag の書込み元): 未着手** (子 #3890 (PY-266))。`0x15e14a0` を RIP 相対で指す命令は 439 件。
 - **受入 4 (全 PE block で G1・T への書込みを走査): 完了 (本 run)。** 313 block の絶対値参照 (8 byte・4 byte) で、block00031 の G1・T・flag・表・caller の VA を指すものは他 block に 0 件 (節「全 PE block の絶対値参照」)。
-- 受入 5 (親 #3595 へのコメント): 本 PR の完了後に投稿する。
+- 親 #3595 へのコメント (元の受入 5): 本 PR の範囲外。merge 後に PM が投稿する (子 issue は作らない)。
 - 0xed4b70 の参照は、RIP 相対・`lea` が 0 件 (`pe_rip_refs.py`)、生バイト列 (4 バイト・8 バイト) の一致も表の 1 要素だけ。表の番地は、`.text` 内の 1 件 (`0xed0b60`) からだけ指される。
 
 ## 測定
 
-- 測定 commit: `674ac4248` (`tools/python/analysis/py223_indirect_callers.py` を最後に変えた commit)。この後のコード差分は 0 行 (`git diff 674ac4248 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力 0 行。REPORT のみ変更)。
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (`oc_artifacts: fl-win64`)。展開: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C tools/python/work/py223 --wildcards '*block00031_PE.bin'` (1.5 秒)。展開先 `tools/python/work/py223/extracted/` は gitignore。
-- 検査 (PASS): `FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_indirect_callers.py` → `table.check PASS`・rc 0。所要 47.46 秒 (n=1)、user 47.43 秒、load average (1/5/15 分) は実行前 `0.43 0.55 0.35`・実行後 `0.77 0.63 0.39`、並列数 1。
-- ネガティブコントロール: `--mutate` (表の添字 51 の値を 1 ビット反転したメモリ上の複製で検査) → `table.check FAIL`・rc 1。所要 48.05 秒 (n=1)。検査は効いている。
+- 測定 commit: `63789e470` (main の取り込み merge。以下の 2 本の検査と `flapi/pe_callgraph.py` は、この commit の内容で再測定した)。`git diff 63789e470 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (REPORT のみ変更)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (`oc_artifacts: fl-win64`)。展開: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C tools/python/work/py223 --wildcards '*block00031_PE.bin'` (2.9 秒)。展開先 `tools/python/work/py223/extracted/` は gitignore。
+- 検査 (PASS): `FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_indirect_callers.py` → `table.check PASS`・rc 0。所要 99.39 秒 (n=1)、user 99.31 秒、実行後の load average (1/5/15 分) `0.99 0.52 0.23`、並列数 1 (4 コア)。
+- ネガティブコントロール: `--mutate` (表の添字 51 の値を 1 ビット反転したメモリ上の複製で検査) → `table.check FAIL`・rc 1。所要 98.74 秒 (n=1)。検査は効いている。
 - 独立算法の検算: 命令の逆アセンブルを使わず、`.text` のバイト列を正規表現 `\xff[\x90-\x97]<disp32>` で数えた (`call r/m64` の ModRM mod=10 reg=010 の形)。結果は `[reg+0x120]` 114 件・`[reg+0x198]` 24 件で、逆アセンブル側と一致。
 - 表の参照の検算: `pe_rip_refs.py 0xed4b70 0xed0c28 0xed0bb0 0x12da6d0` → `hits 0` (RIP 相対の `lea`/`mov` で指す命令は 0 件)。`pe_callgraph.py callers 0x12da6d0` → 直接 call 元 1 件 (`0xed4c6a` in `0xed4b70`)。
-- 全 block 走査 (受入 4): `analysis/py223_block_scan.py`。測定 commit `148604980` (コードを変えた最後の commit)。本番 (`block.check PASS`) は rc 0・20.14 秒 (n=1)・user 19.97 秒・load average `0.27 0.34 0.32` → `0.48 0.39 0.34`・並列数 1。`--mutate` は `block.check FAIL`・rc 1。`git diff 148604980 HEAD -- tools/python/analysis` は 0 行 (REPORT のみの commit)。
+- 全 block 走査 (受入 4): `analysis/py223_block_scan.py` (測定 commit `63789e470`)。本番 (`block.check PASS`) は rc 0・23.48 秒 (n=1)・user 23.28 秒・実行後の load average `0.44 0.22 0.10`・並列数 1。`--mutate` は `block.check FAIL`・rc 1・23.43 秒。
 
 ## 全 PE block の絶対値参照 (受入 4)
 
@@ -38,17 +38,17 @@
 
 検査: (1) block00031 の既知の一致 (qword の `0xed4b70`・`0xed0c28`) が各 1 件以上 (PASS)。(2) x64 の全 258 block が自分の ImageBase の qword をヘッダに持つ (他 block の走査経路の対照。258/258 PASS)。(3) `--mutate` で (1) の値を反転すると FAIL (rc 1)。
 
-結論: 他 block から G1・T・flag・表・caller への絶対値の参照は無い。他 block が G1 を書くには、実行時に計算した番地を使う必要があり、それは静的な走査では見えない (限界は「検証範囲」節)。
+結論: 他 block から G1・T・flag・表・caller への絶対値の参照は無い。この走査は書込み命令の列挙ではなく、絶対値参照 (8 byte・4 byte の値の一致) の走査である。他 block が G1 を書くには、実行時に計算した番地を使う必要があると推定する (根拠: block ごとに ImageBase が異なる別 PE で、他 block の絶対値は自 block の VA 空間を指すため)。この番地は静的な走査では見えない (限界は「検証範囲」節)。
 
 ## G1・ポインタ・vptr の材料 (前 REPORT の訂正を含む)
 
-- G1 (`0x15d51a0`) の RIP 相対参照は 51 件 (`pe_rip_refs.py`): `cmp` 8・読出し (`mov`・`movsxd`) 42・書込み 1。**書込みは `0x12d9629` (`sub dword ptr [rip+0x2fbb70], 1`) の 1 件**で、関数 `0x12d9450` (`pe_callgraph.py func` で確認)。この関数は G1 を 1 減らし、`G1 > 1` の間 `call 0x12d8d30(ecx=G1)` の戻り値が非 0 なら `0x12d9629` へ戻る loop。前 REPORT の「G1 の RIP 相対 store 0 件」は mov 系だけを数えた誤り。
+- G1 (`0x15d51a0`) の RIP 相対参照は 51 件 (`pe_rip_refs.py`): `cmp` 8・読出し (`mov`・`movsxd`) 42・書込み 1。**書込みは `0x12d9629` (`sub dword ptr [rip+0x2fbb70], 1`) の 1 件**で、関数 `0x12d94f0` (`.pdata` の RUNTIME_FUNCTION `0x12d94f0`〜`0x12d96d0` で確認。`pe_callgraph.py func` は `0x12d9450` を返すが、限界の節を参照)。この関数は G1 を 1 減らし、`G1 > 1` の間 `call 0x12d8d30(ecx=G1)` の戻り値が非 0 なら `0x12d9629` へ戻る loop。前 REPORT の「G1 の RIP 相対 store 0 件」は mov 系だけを数えた誤り。
 - ポインタ格納セル `0x15e4018` (`.data`・値 `0x15d51a0`): RIP 相対の読出し 444 件 (`mov reg, [rip+..]`)。G1 はこのセル経由で広く扱われる。このセル経由の書込みは未走査 (子 #3889)。
 - セル `0xed0b60` (`.text`・値 `0xed0c28`): RIP 相対の読出し 1 件 (`0x11b2af9`・関数 `0x11b2ac0`)。`0x11b2ac0` は `[0xed0b60]` を rcx に読み、`dl=1` で `call 0xed4ee0` する。rcx の使い道は未確定 (子 #3888)。
 - `0xed0bb0`・`0xed0c28`・`0xed4b70`・`0x12da6d0` を指す RIP 相対: 0 件。
 
 vptr 候補 (受入 1 の残り):
-- `[reg+0x198]` (24 件) の receiver の vptr `0xed0bb0`: PE 全体に絶対値も RIP 相対も無い。静的に vptr を得る材料が無いので、算術で作る経路 (例: `0xed0c28 - 0x78`) を除けば、この 24 件は 0xed4b70 に到達しないと推定する (推定。算術経路は未検査)。
+- `[reg+0x198]` (24 件) の receiver の vptr `0xed0bb0`: PE 全体に 8 byte の絶対値も RIP 相対も無い (4 byte の 1 件は `.pdata` の RVA 値で、ポインタではない)。静的に vptr を得る材料が無いので、算術で作る経路 (例: `0xed0c28 - 0x78`) を除けば、この 24 件は 0xed4b70 に到達しないと推定する (推定。算術経路は未検査)。
 - `[reg+0x120]` (114 件) の receiver の vptr `0xed0c28`: 材料はセル `0xed0b60` の読出し 1 件 (`0x11b2af9`) だけ。receiver の vptr を格納する箇所は、このセルの値を複写する経路と推定する (子 #3888)。
 
 ## 0xed4b70 の所在 (表)
@@ -93,8 +93,8 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_indirect_callers.py         
 FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_indirect_callers.py --mutate # table.check FAIL・rc 1
 FL_WIN64_DIR=$PWD/work/py223 python3 analysis/flapi/pe_callgraph.py callers 0xed4b70,0x12da6d0
 FL_WIN64_DIR=$PWD/work/py223 python3 analysis/flapi/pe_rip_refs.py 0xed4b70 0xed0c28 0xed0bb0 0x12da6d0
-tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C work/py223 --wildcards '*_PE.bin'   # 全 PE block (313 個・約 2.4 秒)
-FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py                 # block.check PASS・rc 0 (約 20 秒)
+tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C work/py223 --wildcards '*_PE.bin'   # 全 PE block (313 個・約 3 秒)
+FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py                 # block.check PASS・rc 0 (約 23 秒)
 FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate        # block.check FAIL・rc 1
 ```
 
@@ -102,6 +102,7 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate      
 
 - 範囲内: `block00031_PE.bin` の `.text` の逆アセンブル・表の所在・RIP 相対と絶対参照・間接 call の集計。全 313 PE block の絶対値参照 (8 byte・4 byte)。
 - 範囲外: 実行時に計算される番地 (ポインタの値として格納される前の計算) による書込み。静的な絶対値・RIP 相対に現れないので、この走査では見えない。他 block の RIP 相対は、別 VA 空間を指すため対象外 (構造上)。実行時の値 (vptr の中身・flag の値・obj の値)。
+- 限界 (関数境界): `pe_callgraph.py func 0x12d9629` は `0x12d9450` を返すが、`.pdata` (RUNTIME_FUNCTION) では `0x12d94f0`〜`0x12d96d0` の関数に含まれ、`0x12d9450`〜`0x12d94f0` の関数は `0x12d94ef` の `ret` で終わる (`0x12d94f0` の直前は int3 でない。`function_starts` の見落としと推定)。関数境界の根拠は `.pdata` とし、`pe_callgraph.py func` の結果は根拠にしない (`.pdata` の直接読みは repo に含めない一時の検算)。
 
 ## 未解決 (起票先付き)
 
