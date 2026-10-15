@@ -58,7 +58,7 @@ CALL_TARGETS = {FN_BD68E0, FN_128F9E0, FN_E9C770}
 def fo(va):
     rva = va - BASE
     for s in pe.sections:
-        if s.VirtualAddress <= rva < s.VirtualAddress + max(s.Misc_VirtualSize, s.SizeOfRawData):
+        if s.VirtualAddress <= rva < s.VirtualAddress + s.SizeOfRawData:
             off = s.PointerToRawData + rva - s.VirtualAddress
             return off if off < len(raw) else None
     return None
