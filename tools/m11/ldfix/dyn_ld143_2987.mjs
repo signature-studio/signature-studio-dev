@@ -2,7 +2,8 @@
 //   V の指す先 [V] の値を、静的イメージ・survey 経路 (942 unit の Init を隔離実行) の後・実 boot の後で読む。
 //   機械語は `mov rax,[rip+X]` → `mov rax,[rax]` → `cmp dword [rax+0x14],0` の 2 段。IR は 1 段 (V を object とする)。
 //   修復 (fix_spill_deep_2987.py) は [V] を object とする。よって [V] = 0 なら消費者は [0+0x14] を読む (u32_at_deref_plus14)。
-//   survey は m11_survey.mjs と同じ呼び方 (set_survey・va_unit_budget 256・unit ごとの va_unit_begin)。
+//   survey は m11_survey.mjs の clobber 検出・復元 (InitTable 先頭・末尾の VA が変われば unit 実行前の image を戻す) を写す。
+//   set_va_unit_budget・va_unit_begin は export があるときだけ呼ぶ (展開済み build には無い)。ptrPre は計測用のため省く。
 // 使い方: M11_WORK=<tools/m11/work の絶対パス> node dyn_ld143_2987.mjs   (既定は ../work/。work-m11 の展開が必要)
 import fs from 'fs';
 const WORK = process.env.M11_WORK || new URL('../work/', import.meta.url).pathname;
@@ -54,17 +55,22 @@ function surveyRun(mod) {
   }
   const afterBoot = snapCells(mod);
   const n = Number(mod._m11_units_total());
+  const unitVa0 = [mod._m11_unit_va(0), mod._m11_unit_va(n - 1)];
+  const tableIntact = () => mod._m11_unit_va(0) === unitVa0[0] && mod._m11_unit_va(n - 1) === unitVa0[1];
+  const snap = new Uint8Array(img.length);
   let prev = JSON.stringify(afterBoot), traps = 0;
-  const changes = [];
+  const clobbers = [], changes = [];
   const hasUnitBegin = typeof mod._m11_va_unit_begin === 'function';
   for (let i = 0; i < n; i++) {
     const sp = mod._emscripten_stack_get_current();
+    snap.set(mod.HEAPU8.subarray(0, img.length));
     if (hasUnitBegin) mod._m11_va_unit_begin();
     try { mod._m11_call_unit(i); } catch (e) { traps++; mod.__emscripten_stack_restore(sp); }
+    if (!tableIntact()) { clobbers.push(i); mod.HEAPU8.set(snap, 0); }
     const s = JSON.stringify(snapCells(mod));
     if (s !== prev) { changes.push({ unit: i, cells: JSON.parse(s) }); prev = s; }
   }
-  return { after_boot: afterBoot, units_total: n, va_budget_export: hasBudget, unit_begin_export: hasUnitBegin, traps, changes, final: JSON.parse(prev) };
+  return { after_boot: afterBoot, units_total: n, va_budget_export: hasBudget, unit_begin_export: hasUnitBegin, traps, clobbers: clobbers.length, clobber_units: clobbers.slice(0, 40), changes, final: JSON.parse(prev) };
 }
 const t0 = Date.now();
 const a = await instance();
