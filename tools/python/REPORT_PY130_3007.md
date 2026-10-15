@@ -6,7 +6,7 @@
 
 - 保留 4 件のうち **3 件**を実装した: `ui.setBrowserAutoHide` (確定)・`ui.setStepEditMode` (状態の所在は確定、末端の書込みは未確定)・`ui.getVersion` (ui 版、mode の型分岐は確定・値は仮置き)。mock と C の差分は 0 (`tests/ui_state_diff.mjs` 58 呼出し)。
 - **`ui.setTimeDispMin` は保留**。callback は値を使わず、getter `getTimeDispMin` が読む field とは別の global byte を toggle するだけ。getter と整合する状態モデルを PE から立てられないため、未実装のまま子 issue に分けた。
-- 未実行: `tests/provider_check.mjs` と `FL_ENGINE=wasm node tests/all_tools.mjs` (`dist/flpy.js` の生成が必要)。本 run では時間内に収まらなかった (検証の節を参照)。
+- 未実行: `FL_ENGINE=wasm node tests/all_tools.mjs` (`dist/flpy.js` の生成が必要)。`tests/provider_check.mjs` は取り込み後に section 1〜2b まで実行して通過し、section 3 以降 (flpy 経路) が未実行 (検証の節の『main 取り込み後』を参照)。
 
 ## 手段
 
@@ -76,7 +76,11 @@ $ git diff 0dd1d67c8 9692b214a -- tools/python ':!*.md'
 | `node --check` (`host/fl_mock.mjs`・`tests/provider_check.mjs`・`tests/ui_state_diff.mjs`) | 3 件とも OK |
 | provider_check の件数を、テストの `if` 条件式に現れる集合の和集合から再計算 | impl 165・unimpl 270 (総数 435)。同じ方法で HEAD 版 158/277・main 版 162/273 を再現 |
 | mock の直接呼出し (`createMockEngine().call`) | `setBrowserAutoHide(1)` → `isBrowserAutoHide` = true・`setStepEditMode(1)` → `getStepEditMode` = true・`getVersion()` = `""` (mode 4)・mode 9 → `0`・引数 2 個 → code 5 |
-| `node tests/ui_state_diff.mjs`・`node tests/provider_check.mjs`・`FL_ENGINE=wasm node tests/all_tools.mjs` | **未実行**: runner に emcc / emsdk が無く `dist/flprov.js` を作れない |
+| `EMSDK_ENV=$HOME/emsdk/emsdk_env.sh bash provider/build.sh` (emsdk latest = emcc 6.0.12 を新規 install) | rc 0・警告 0・ハンドラ 165 | 1.43 秒 |
+| `node tests/ui_state_diff.mjs` | calls 58・diffs 0・PASS | 0.057 秒 |
+| `node tests/provider_check.mjs` | 134 行目の `work/midi.py` が無く rc 1 で停止。それまでの assert (件数 165/270 の 83 行目を含む) は通過。section 3 以降は `dist/flpy.js` が要る | 0.063 秒 |
+| flpy 不要のテスト 20 本 (`ui_diff` `ui_display_diff` `playlist_diff` `mixer_diff` `general_diff` `device_diff` `channels_diff` `patterns_diff` `transport_diff` `arrangement_diff` `screen_diff` `launchmap_diff` `tool_args` `ilmcp_diff` `midi_path_diff` `note_enum_diff` `step_item_diff` `patterns_group_diff` `arrangement_selection_diff`) | 全件 rc 0。`diffs` は全て 0 (例: ui_diff calls 17・playlist_diff 72・channels_diff 214・note_enum_diff 33264) | 未計測 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | **未実行**: `dist/flpy.js` (CPython wasm・`build_cpython_wasm.sh`) が無い | — |
 
 取り込み後のコード差分 (`d0e81d2f8` から HEAD まで、`tools/python` の .md 以外): 空 (本節は md のみ)。
 
@@ -93,5 +97,5 @@ $ git diff d0e81d2f8 HEAD -- tools/python ':!*.md'
 | `setStepEditMode` の書込み末端 (`vtbl[0x200]` の先・S の型) | `[S+0x49e]` への書込みは model 上の仮定 | 同上 (子 issue に含める) |
 | `setBrowserAutoHide` の notify `0x107f310`・`setStepEditMode` の `0x40ffe0` 通知 | API から観測不能 | 親 #2831 の残件として追跡 |
 | `getVersion` (ui) の値 (X の word 群・3 種の文字列) | 仮置き。実機と異なる | 親 #2831 の残件として追跡 |
-| `provider_check.mjs`・`all_tools.mjs` (wasm 経路) の未実行 | 件数 158・277 の更新と 48/48 の維持は未検証 | 本 PR を review する run で実行 (PM 判断) |
+| `provider_check.mjs` の section 3 以降・`all_tools.mjs` (flpy 経路) の未実行 | 48/48 の維持は未検証。件数 165/270 の assert は取り込み後の HEAD で通過 | CPython wasm (`build_cpython_wasm.sh`) を用意して実行 (PM 判断) |
 | 説明文の食い違い (`setTimeDispMin` の stub doc) | 説明文のみ | 上記の子 issue |
