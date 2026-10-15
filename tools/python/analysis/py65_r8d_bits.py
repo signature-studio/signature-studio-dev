@@ -4,17 +4,20 @@
   python3 analysis/py65_r8d_bits.py <PE.bin> <work/py53/fn.txt> <outdir> [--negctl]
 
 出力:
-  <outdir>/r8d_sites.tsv  判定 1 件 1 行 (VA・マスク・jcc・ビット立ち/落ちの行き先・到達する ecx 分岐)
+  <outdir>/r8d_sites.tsv  test/and の判定 1 件 1 行 (VA・マスク・jcc・ビット立ち/落ちの行き先・到達する ecx 分岐)
+  <outdir>/r8d_others.tsv test/and 以外の [rbp+0x5c0] 参照 12 件 1 行 (mov+and+cmp の判定・格納・値の受け渡し)
   標準出力                 ビット別の件数と照合結果
 
 照合 (別算法): objdump -M intel で同じ判定箇所を取り直し、VA・マスク・次の jcc/setcc と分岐先が
 capstone 側 (fn.txt) と一致するかを見る。--negctl は capstone 側の 1 件のマスクを壊し、不一致が出ることを確かめる。
-行き先は CFG 上の path-insensitive な到達で、ビットの作用の確定は REPORT_PY65.md の表と突合して判断する。
+母集団の完全性: [rbp+0x5c0] の参照総数を fn のバイト列の走査 (c0 05 00 00) と capstone の件数で数えて一致を見る。
+行き先は CFG 上の path-insensitive な到達で、ビットの作用の確定は REPORT_PY41.md の表と突合して判断する。
 """
 import os
 import re
 import subprocess
 import sys
+from collections import Counter
 
 import pefile
 
@@ -142,6 +145,45 @@ def polarity(mn, mask, tgt, nxt):
     return f"{mn}"
 
 
+def byte_refs(pe_path, shift):
+    with open(pe_path, "rb") as f:
+        data = f.read()
+    return data[FN_START - shift:FN_END + 1 - shift].count(b"\xc0\x05\x00\x00")
+
+
+def ref_kinds(ins, order):
+    pos = {va: k for k, va in enumerate(order)}
+    out = []
+    for va in order:
+        mn, op = ins[va]
+        if "[rbp + 0x5c0]" not in op:
+            continue
+        k = pos[va]
+        nxt = [(order[j],) + ins[order[j]] for j in range(k + 1, min(k + 4, len(order)))]
+        nxt += [(0, "", "")] * (3 - len(nxt))
+        (_, m1, o1), (_, m2, o2), (v3, m3, o3) = nxt[0], nxt[1], nxt[2]
+        load = op.startswith("eax, dword ptr [rbp + 0x5c0]")
+        if mn == "and" and op.startswith("dword ptr [rbp + 0x5c0]"):
+            kind = "and"
+        elif mn == "mov" and op.startswith("dword ptr [rbp + 0x5c0]"):
+            kind = "store"
+        elif mn == "mov" and load and m1 == "test" and o1.startswith("eax, "):
+            kind = "test"
+        elif mn == "mov" and load and m1 == "and" and m2 == "cmp" and o2 == o1 and m3.startswith("j"):
+            kind = "andcmp"
+        else:
+            kind = "other"
+        if kind == "andcmp":
+            fall, tgt = order[pos[v3] + 1], int(o3, 16)
+            mask = int(o1.split(", ")[1], 16)
+            pol = f"全立ち→{fall:#x} / 一部落ち→{tgt:#x}" if m3 == "jne" else f"全立ち→{tgt:#x} / 一部落ち→{fall:#x}"
+            out.append((va, kind, mask, m3, tgt, pol, f"{m1} {o1} ; {m2} {o2}"))
+        else:
+            detail = " ; ".join(f"{m} {o}" for _, m, o in nxt[:2] if m)
+            out.append((va, kind, None, "-", None, "-", f"{mn} {op} ; {detail}"))
+    return out
+
+
 def main():
     pe_path, fn_path, outdir = sys.argv[1], sys.argv[2], sys.argv[3]
     negctl = "--negctl" in sys.argv
@@ -161,6 +203,9 @@ def main():
     mism = sum(1 for x, y in zip(cap_set, ob_set) if x != y) + abs(len(cap_set) - len(ob_set))
     print(f"sites capstone={len(cap)} objdump={len(ob)} test={sum(1 for s in cap if s[1] == 'test')} and={sum(1 for s in cap if s[1] == 'and')}")
     print(f"objdump 照合: agree={len(cap_set) - mism} mismatch={mism}")
+    refs = ref_kinds(ins, order)
+    nb = byte_refs(pe_path, shift)
+    print(f"[rbp+0x5c0] 参照: byte走査={nb} capstone={len(refs)} 内訳={dict(Counter(r[1] for r in refs))}")
 
     reach = owners(ins, order)
     rows = []
@@ -178,7 +223,13 @@ def main():
         for va, kind, mask, mn, tgt, nva, pol, own in rows:
             f.write(f"{va:#x}\t{kind}\t{mask:#x}\t{mn}\t{'' if tgt is None else hex(tgt)}\t{pol}\t{own}\n")
     print(f"tsv={os.path.join(outdir, 'r8d_sites.tsv')} rows={len(rows)}")
-    return 0 if mism == 0 else 1
+    others = [r for r in refs if r[1] not in ("test", "and")]
+    with open(os.path.join(outdir, "r8d_others.tsv"), "w") as f:
+        f.write("VA\tclass\tmask\tjcc\ttarget\tpolarity\tnext\n")
+        for va, kind, mask, mn, tgt, pol, detail in others:
+            f.write(f"{va:#x}\t{kind}\t{'-' if mask is None else hex(mask)}\t{mn}\t{'' if tgt is None else hex(tgt)}\t{pol}\t{detail}\n")
+    print(f"others={os.path.join(outdir, 'r8d_others.tsv')} rows={len(others)}")
+    return 0 if mism == 0 and nb == len(refs) else 1
 
 
 if __name__ == "__main__":
