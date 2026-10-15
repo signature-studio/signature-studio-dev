@@ -24,7 +24,7 @@
 ## 測定
 
 - 測定 commit: `3fe9b4e5` (コードを変えた最後の commit。`origin/main` (`f8e93eb2`) の merge)。元の実装 commit は `6e61656f`。merge で `tests/provider_check.mjs` の集合と件数が競合し、main の `pe95` (#2831) と本 PR の `pe76` を併存させ `impl 141`・`unimpl 294` とした。
-- 素材: `fl-win64.tar.zst` から `extracted/` の `block00031_PE.bin` と DATA 4 本 (`block25159`・`block24429`・`block24430`・`block24618`) を `$RUNNER_TEMP/fl-win64` へ展開 (1.6 秒)。`FL_WIN64_DIR` をこれに向けた。emsdk は `/opt/emsdk` (emcc 6.0.12) を使い、`toolchain-emsdk` は展開していない。`FL_MAC_DIR` は無いので `fetch_inputs.sh` は win64 の DATA block 経路を取った。
+- 素材: `fl-win64.tar.zst` から `extracted/` の `block00031_PE.bin` と DATA 4 本 (`block25159`・`block24429`・`block24430`・`block24618`) を `$RUNNER_TEMP/fl-win64` へ展開 (1.6 秒)。`FL_WIN64_DIR` をこれに向けた。emsdk は `[EMSDK]` (emcc 6.0.12) を使い、`toolchain-emsdk` は展開していない。`FL_MAC_DIR` は無いので `fetch_inputs.sh` は win64 の DATA block 経路を取った。
 - wasm の build (merge 後の HEAD で順に実行。全て rc 0):
   - `fetch_inputs.sh`: 0.5 秒
   - `build_cpython_wasm.sh`: 2 分 41 秒
