@@ -4,7 +4,7 @@
 
 ## 結論
 
-- 保留 4 件のうち **2 件を確定して実装した**: `ui.getProgTitle` (定数 `FL Studio 2026`)・`ui.getHintValue` (状態を読まない整数の百分率表示)。mock と C の差分 0 (`tests/ui_state_diff.mjs` 56 呼出し)。
+- 保留 4 件のうち **2 件を確定して実装した**: `ui.getProgTitle` (定数 `FL Studio 2026`)・`ui.getHintValue` (状態を読まない整数の百分率表示)。mock と C の差分 0 (`tests/ui_state_diff.mjs` の呼出し 81 件。main 取り込み後で、PY-130 の setter 分を含む)。
 - 残り **2 件** (`ui.getFocusedNodeCaption`・`ui.getFocusedNodeFileType`) は、フォーカスされたノードの実体の vtable slot (`[vtbl+0x100]`・`[vtbl+0x88]`) と字段 (`+0x54`) の意味が未同定のため、実装せず子 issue #3694 (PY-234) に移した。
 - 本 PR は issue の範囲を 2 件に縮めて `Closes #3005` とする (規範 11)。
 
@@ -32,27 +32,27 @@
 
 ## 検証
 
-測定 commit: `b9dc4a500` (コードを変えた最後の commit。`main` (`1bb93134e`) の取り込み merge。PR 自身の実装は `3bdba9d55`)。取り込みで `tests/provider_check.mjs` が衝突し、`main` 側の pl61 (7 件) と本 PR の pe128 (2 件) を両方残して 164 / 271 に直した。以降の変更は `REPORT_PY128.md` のみ (md)。
+測定 commit: `43b9e5614` (コードを変えた最後の commit。`origin/main` (`bb6bdcf41`) の取り込み merge)。取り込みで `tools/python/host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`・`tests/ui_state_diff.mjs` が衝突した。いずれも main 側 (PY-130・#3007 の setter 2 件と ui 版 getVersion) と本 PR (PY-128 の 2 件) の追加なので、両方を残した。`provider_check` の期待値は 167 / 268 (main 165 / 270 + 2)。以降の変更は `REPORT_PY128.md` のみ (md)。
 
-環境: runner 4 core、load average 1.05 (03:42:24)。`FL_WIN64_DIR` は素材 `artifacts/fl-win64.tar.zst` (R2 由来) を `$RUNNER_TEMP/fl-win64` に `tar --zstd -xf` で展開 (7 秒。`extracted/block00031_PE.bin` を含む)。`toolchain-emsdk` は展開せず [EMSDK] (既存。`docs/REFERENCES.md`) を使用。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、213 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5 秒)。
+環境: runner 4 core、load average 1.31 (04:12:11)。`FL_WIN64_DIR` は素材 `artifacts/fl-win64.tar.zst` (R2 由来) を `$RUNNER_TEMP/fl-win64` に `tar --zstd -xf` で展開 (5.6 秒。`extracted/block00031_PE.bin` を含む)。`toolchain-emsdk` は展開せず [EMSDK] (既存。`docs/REFERENCES.md`) を使用。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、250 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6 秒)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 164 (main 162 + 2) | 1.2 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 164 / 未実装 271 / MCP 静的 60) | 0.51 秒 |
-| `node tests/ui_state_diff.mjs` | calls 56、diffs 0、PASS | 0.04 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.34 秒 |
+| `bash provider/build.sh` | rc 0・ハンドラ 167 (main 165 + 2) | 1.7 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 167 / 未実装 268 / MCP 静的 60) | 0.35 秒 |
+| `node tests/ui_state_diff.mjs` | calls 81、diffs 0、PASS | 0.05 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.27 秒 |
 
-main 取り込みで変わった隣接の差分テスト (wall 未計測): `tests/channels_diff.mjs` は calls 214・grid 1,200 (true 30)・diffs 0・PASS。`tests/device_diff.mjs` は calls 11・diffs 0・PASS。`tests/playlist_diff.mjs` は calls 72・diffs 0・PASS。
+main 取り込みで変わった隣接の差分テスト (wall は `channels_diff` の 0.07 秒のみ計測): `tests/channels_diff.mjs` は calls 238・grid 1,200 (true 30)・diffs 0・PASS。`tests/device_diff.mjs` は calls 11・diffs 0・PASS。`tests/playlist_diff.mjs` は calls 72・diffs 0・PASS。
 
 mock と C の値 (同一): `getProgTitle()` = `FL Studio 2026`、`getHintValue(50,100)` = `50%`、`(-1,100)` = `-1%`、`(1,8)` = `12%` (12.5 は偶数側)、`(5,0)` と `(0,0)` = `-9223372036854775808%`、`(2147483647,1)` = `-100%` (int32 折返し)、`(None,1)` = code 5。
 
-ネガティブコントロール (main 取り込み後に再測定): `host/fl_mock.mjs` 366 行の係数 `100` を `10` に変えると `node tests/ui_state_diff.mjs` は `ui 状態ゲッター差分 9 件` で rc 1 (FAIL)。元に戻すと calls 56・diffs 0・PASS。
+ネガティブコントロール (merge 後に再測定): `host/fl_mock.mjs` 388 行の係数 `100` を `10` に変えると `node tests/ui_state_diff.mjs` は `ui 状態ゲッター差分 9 件` で rc 1 (FAIL)。元に戻すと calls 81・diffs 0・PASS。
 
 コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff b9dc4a500 HEAD -- tools/python ':!*.md'
+$ git diff 43b9e5614 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
