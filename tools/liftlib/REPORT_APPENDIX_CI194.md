@@ -85,15 +85,16 @@ DEFINE 正規表現に一致 (params() の入力になり得る行): 66
 - 境界の確認 (旧版との比較): 通常の属性付き仮引数 (`noundef`・`nocapture`・`byval(...)`・`local_unnamed_addr` 付き define) は新旧同一。名前の無い仮引数・可変長・`{ i64, i64 } %s` のような構造体引数・`%"quoted name"` は、旧版で `('{', 'i64')` 等の壊れたタプルを返していた入力で、新版は `ValueError` になる (意図した変更)。
 - `passes/iargs.py:94` (`[p[0] for p in fns[name].params()]`) は、旧版で名前無し仮引数を型だけ返していた。新版は ValueError。ただし上記の通りリポジトリ内の定義行には該当が無い。実 IR に該当が無いことは未確認 (素材不足)。
 
-結論: 拒否経路はリポジトリ内の全 `define` 行で発火せず、新旧の出力は一致する。実 IR での確認は素材 (`work-liftlib`) を用意して別途行う (未解決)。12 モジュールの差分ハーネスの出力 JSON は `194081d19` で再実行していない。
+結論: 拒否経路はリポジトリ内の全 `define` 行で発火せず、新旧の出力は一致する。実 IR での確認 (素材 `work-liftlib`) は次節 (review round 4 への対応) で完了した。12 モジュールの差分ハーネスの出力 JSON は `194081d19` で再実行していない (未解決のまま)。
 
-### review round 3 への対応 (HEAD `a6a150ea0`・実行コードは `194081d19` と同一)
+### review round 4 への対応 (実 IR 測定・検証 HEAD `9731385def19957bee7da7bfb54b68a0568b8b85`・測定日 2026-10-15)
 
-round 3 の要求 (1)〜(5) について、この run で取れたもの・取れなかったものを記録する。
+実行コードは `194081d19` と同一 (`git diff 194081d19 9731385de -- tools/liftlib/liftlib` は 0 行)。
 
-- 素材の実在 (実測): `$HOME/artifacts` には `fl-win64.tar.zst` (2,324,302,252 bytes) の 1 件だけ。`tar --zstd -tf` の 25,168 entries のうち `.ll`・`.bc` は 0 件。`tools/liftlib/work/` は存在しない。
-- `work-liftlib` は本 run の `oc_artifacts` に含まれず、取得されていない。よって (2) の実 IR の `.ll` 全件集めと `Func.params()` の旧新比較は**実行できなかった**。
-- (3) 12 モジュールの差分ハーネスは、元の合成入力がリポジトリに残っていないため `194081d19`・`a6a150ea0` のどちらでも再実行できなかった。測定値は `73d7d9444` のまま。
-- (4) PR 本文の `Func.params()` と差分ハーネスの行は、未再測定のため hash を書き換えず、「未再測定」と明記した。
-- (5) 素材が取れなかったため、`passes/iargs.py:94` (`_param_types` の `fns[name].params()`) が実 IR で名前無し仮引数に当たらないことの根拠は、**リポジトリ内の証拠のみ**。リポジトリ内 `define` 行 66 件では該当 0 件 (上記)。実 IR は未確認のため、未解決として PR 本文の未解決表に残す。
-- 次の run で `work-liftlib` を取得できれば、`tools/liftlib/work/` の `.ll` を全件対象に `Func.params()` を旧版 (`325cf6a4d`) と新版で比べ、差分ハーネスも同じ head で再実行する。
+- 素材: アーティファクト `work-liftlib` を `tools/liftlib/work/` へ展開した (リポジトリ直下で `tar --zstd -xf`)。`.ll` は 596 件。そのうち 64 件は壊れた symlink (外部の絶対パスを指し中身なし) のため除外し、読めた **532 件**を比較した。`.bc` は 4 件で対象外。
+- `Func.params()`: 旧版 `325cf6a4d` の `ir.py` と新版 (`9731385de` の `ir.py`) を、読めた 532 件の全 `define` **91,380 関数**で比較した。結果は一致 91,380 / 差分 0 / 新版の ValueError 0 / 旧版の例外 0 / `ret_type()` の差分 0。
+- `passes/iargs.py:94` の名前無し仮引数の懸念: 実 IR の 91,380 関数で該当 0 件。解消した。
+- 差分ハーネス (12 モジュールの出力 JSON の比較): 元の合成入力がリポジトリに残っておらず**未再実行**。測定値は `73d7d9444` のまま。代わりに、実 IR の `params()` 全件一致を根拠とする。
+- `tools/liftlib/tests/test_unit.py`: 旧版 `325cf6a4d` と新版 `9731385de` を同じ `work/` で実行。両方とも `FAIL 8/33: t1 t2 t3 t4 t6 t7 t9 t26`。結果行 (`T*` と `FAIL`) は一致。
+- `tools/liftlib/tests/test_boolret.py` (`9731385de`): 5 tests OK。
+- 測定スクリプトは repo 外の作業領域に置いた (commit していない)。素材は `work/` (gitignore 対象) にのみ展開し、commit していない。
