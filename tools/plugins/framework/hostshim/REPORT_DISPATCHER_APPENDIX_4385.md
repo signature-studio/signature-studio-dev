@@ -14,19 +14,21 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `44f5c68bb` (`hs_val_probe.py` に `g18caller`・`p45caller` を追加。コードを変えた最後の commit。基点は main `e16513904`)。
-- 素材: `fl-win64` の `extracted/block00031_PE.bin` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` 5.6 秒)。
+- 測定 commit: PR 本文の「測定 commit」行 (`hs_val_probe.py` を変えた最後の commit。基点は main `e16513904`)。
+- 素材: `fl-win64` の `extracted/block00031_PE.bin` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` 6.7 秒 real)。
 - Python: `$RUNNER_TEMP/hsvenv` (`unicorn 2.1.4` / `pefile` / `capstone 5.0.7`)。
-- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 hs_val_probe.py g18caller` / `p45caller`。
-  各 6.4 秒・6.4 秒 (real。n=1)。load average は 0.36 (09:47 時点)。
+- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 $RUNNER_TEMP/hsvenv/bin/python hs_val_probe.py g18caller` / `p45caller`。
+  `g18caller` 6.7 秒 real、`p45caller` 6.6 秒 real (n=1)。load average は 0.47 (09:59 時点)。
 - 呼出し元の走査: `.text` の rel32 `call` (E8) を全件走査して呼出し先を集計した (作業ファイルは `$RUNNER_TEMP`・repo 外)。
 
 ## 2. 呼出し元 (静的・rel32 call のみ)
 
+未コミットの走査 (repo 外・再現コード無し。参考値)。コミット済みの手順では再現できない。
+
 | 対象 | 直接の呼出し元 |
 |---|---|
-| 0x41d8f0 (G18 の書込み関数) | 0x1376870 の 1 件 |
-| 0x11fba90 (P45 の書込み関数) | 0x124e621 の 1 件 |
+| 0x41d8f0 (G18 の書込み関数) | 0x1376870 の 1 件 (未コミット走査) |
+| 0x11fba90 (P45 の書込み関数) | 0x124e621 の 1 件 (未コミット走査) |
 | 0x1376870・0x124e621・0x1376820 | 直接の呼出し無し (間接呼出しの可能性。未確認) |
 | 0x13173a0 (Dispatcher) | 直接の呼出し無し |
 
@@ -43,14 +45,14 @@
 | 0x64 | 到達 | 0x64 |
 | 0x65 | 到達 | 0x65 |
 
-- `r9=0` のときは 0x41d919 に届かない (0x41d98e 側の経路。`r9=0` の 1 回の試行で確認)。よって G18 の書込みは `r9≠0` の分岐でのみ起きる。
+- `r9=0` のときは 0x41d919 に届かない (`g18caller` の `r9=0` 行で確認。6 ID とも NOT reached)。よって G18 の書込みは `r9≠0` の分岐でのみ起きる。
 - 0x41d8f0 の呼出し元 0x1376870 が `r9` に何を入れるかは未確定。ここが確定しないと、G18 に入る値の実行時の決定はできない。
 
 ### 3.2 P45: `p45caller` (0x11fba90 を this=HOST・[this+0x34a8]=0 で単独実行)
 
 - 0x11fbaef (`[this+0x34a8] <= 0` の入口) まで到達。
 - 0x11fbb4f (`cmp eax,0xb`) と 0x11fc2b3 (`mov [P45], rax`) には未到達。`[rbp+0x140]` の `[+0x10]` の前提 (0xb) を与えないと分岐に届かない。
-- 前提の 0xb をメモリに置いて試したが、0x11fbb4f には届かなかった (`[rbp+0x140]` の初期値の経路が未確定)。よって P45 の値は未確定。
+- 未コミットの試行 (再現コード無し): `[rbp+0x140]` の `[+0x10]` に 0xb を置いて試したが、0x11fbb4f には届かなかった。この試行は `p45caller` に含まれず、コミット済みの手順では再現できない。`[rbp+0x140]` の初期値の経路は未確定。よって P45 の値は未確定。
 
 ## 4. 受入 4 と Phase A (未実施)
 

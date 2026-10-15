@@ -247,16 +247,17 @@ def verify_11d06e0():
 
 
 def g18_caller():
-    """0x41d8f0 (G18 の書込み関数) を r9=1 で単独実行し、0x41d919 (mov [G18], rdi) の到達と書込み直前の値を出す (受入 1)。
+    """0x41d8f0 (G18 の書込み関数) を r9=1・r9=0 で単独実行し、0x41d919 (mov [G18], rdi) の到達と書込み直前の値を出す (受入 1)。
     rdi は 0x41d8ff で r8 から複写されるため、観測は r8 (= ID) で行う。"""
     rows = []
-    for ident in (0x18, 0x45, 0x54, 0x56, 0x64, 0x65):
-        r = emulate(0x41d8f0, {'rcx': E.HOST, 'rdx': E.TAG, 'r8': ident, 'r9': 1}, [(0x41d8f0, 0x41d8f0 + 0x200)],
-                    probes={0x41d919: ['r8', 'rcx']}, sent_ret=E.SENT)
-        hit = [vals for va, vals in r['probe'] if va == 0x41d919]
-        print('G18 caller: ID=0x%02x 0x41d919 %s rax=0x%x stop=%s' % (
-            ident, ('reached r8=0x%x' % hit[0]['r8']) if hit else 'NOT reached', r['rax'], r['stop']))
-        rows.append((ident, bool(hit)))
+    for r9 in (1, 0):
+        for ident in (0x18, 0x45, 0x54, 0x56, 0x64, 0x65):
+            r = emulate(0x41d8f0, {'rcx': E.HOST, 'rdx': E.TAG, 'r8': ident, 'r9': r9}, [(0x41d8f0, 0x41d8f0 + 0x200)],
+                        probes={0x41d919: ['r8', 'rcx']}, sent_ret=E.SENT)
+            hit = [vals for va, vals in r['probe'] if va == 0x41d919]
+            print('G18 caller: r9=%d ID=0x%02x 0x41d919 %s rax=0x%x stop=%s' % (
+                r9, ident, ('reached r8=0x%x' % hit[0]['r8']) if hit else 'NOT reached', r['rax'], r['stop']))
+            rows.append((r9, ident, bool(hit)))
     return rows
 
 
