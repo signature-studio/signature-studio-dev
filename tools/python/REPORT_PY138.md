@@ -15,7 +15,7 @@
 
 ## 手段
 
-- 素材: `fl-win64` の `extracted/block00031_PE.bin` と DATA 4 件を `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst --wildcards 'extracted/...'` で展開 (2.9 秒)。emsdk は runner 同梱の `/opt/emsdk` (emcc 6.0.12) を使い、`toolchain-emsdk` は展開していない。
+- 素材: `fl-win64` の `extracted/block00031_PE.bin` と DATA 4 件を `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards 'extracted/...'` で展開 (2.9 秒)。emsdk は runner 同梱の [EMSDK] (emcc 6.0.12) を使い、`toolchain-emsdk` は展開していない。
 - 逆アセンブル: `python3 analysis/flapi/pe_disasm.py <VA> [命令数]` (任意 VA)。12 件の表は `python3 analysis/flapi/pe_launchmap_entries.py --disasm` (PY-120 と同じ)。
 - 値の確認: `python3 analysis/flapi/pe_va_read.py <VA>` (ファイル上の値・所属セクション。`.bss` は `not-in-file` と出る)。
 - 注記: 呼出し先の IAT 名は解決していない (RIP 相対の絶対アドレスを注記)。`[0x15e….]` の呼出しスロットは `.data` にあり、その先の関数ポインタ (`0x16b8xxx`) は `.bss` で実行時に埋まる。値は ELF の初期値ではなく実行時の値として扱う。
@@ -62,7 +62,7 @@
 ## 検証
 
 測定 commit: `fa78f9a1a` (コードを変えた最後の commit。`feat(python): launchMapPages init・updateMap・createOverlayMap の書式と戻りを PE で確定 (PY-138)`)。
-環境: runner (4 core、測定開始時の load average 1.6)、node 22.23.3、emcc 6.0.12 (`/opt/emsdk`)。素材 `fl-win64` の `block00031_PE.bin` と DATA 4 件を `$RUNNER_TEMP/fl-win64-3029` へ展開。
+環境: runner (4 core、測定開始時の load average 1.6)、node 22.23.3、emcc 6.0.12 ([EMSDK])。素材 `fl-win64` の `block00031_PE.bin` と DATA 4 件を `<fl-win64 展開先>` へ展開。
 
 | コマンド | 結果 | wall |
 |---|---|---|
