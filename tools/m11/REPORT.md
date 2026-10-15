@@ -223,3 +223,12 @@ unit 149 は OFF/ON とも oob のまま。ON で kind が変わるのは unit 8
 
 ## 18. #134 [M11-N5]: main `93307cc6a` の停止点 (unit 101 = VA 0x5de960 の 535c11 OOB) と e2e 期待値の更新 (部分達成)
 通常起動 98 unit + skip 3 = 101 で停止 (stage 4/6)。e2e 期待値 (完了 56→101・survey 872→873) を実測へ更新。本文・切り分け・未解決は [REPORT_N134.md](REPORT_N134.md) §18。
+
+## 19. #4074 [WIN-45]: M2s (function_40fd90 IID 比較) の適用不発の修正と runtime 確認 (受入 2・3 は未達)
+PR #4020 の `pass_m2s_fn40fd90_iid` は、検索 head を `define weak i64 @function_40fd90(` としていた。実 IR の定義は `define i64 @function_40fd90(` (weak なし) のため **0 sites (function absent)** で不発だった (合成 IR でしか確認していなかった)。head を実 IR に合わせた (`m11_passes.py`)。
+- `M11_M2S=1 m11_gen_ir2.sh`: `[M2s] function_40fd90 IID compare restore: 1 sites`。`boot_final.ll` 113037 行の `icmp eq i64 %11, %arg2` が `%iid0 = load i64, ptr %arg2` 経由の比較になる。`ir_conditions.json` の bind OK・ldfix applied。
+- `M11_M2S=1 m11_build.sh`: OK (wasm-ld signature mismatch 0 / undefined 0)。
+- 実行 (`m11_run.mjs`): 既定と M2s で **units_run 109 / init_count 111 / Halt0 1** が一致。停止位置は動かない。
+- `boot_halt_probe.mjs` (M2s): 停止 unit 114 (VA 0x623840)、`arg3` の 16 バイトは `53 93 fc b0 0e 5f d3 11 a3 b9 00 c0 4f 79 ad 3a` (IID `{B0FC9353-5F0E-11D3-A3B9-00C04F79AD3A}` のリトルエンディアン)。
+- halt 後に `_function_40fd90` を直接呼ぶ試み (`work/intf_probe.mjs`, gitignore 対象): halt 時の VMT `0x446878` の `vmt-192` が有効なテーブルを指さず (`0x59e2e9b8`・中身 0) memory access out of bounds。戻り値は**取れていない**。受入 2 は未達。
+- 受入 3 の参照 (`boot_final3.ll` 214667 行) は `function_639c70` 内のラベル行で、比較ではない。同形比較は `boot_final.ll` に 138 箇所 (`icmp eq i64 %X, %argN`)。分類は未実施。

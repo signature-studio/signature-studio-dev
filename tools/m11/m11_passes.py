@@ -311,7 +311,7 @@ def pass_m2s_fn40fd90_iid(text, report):
     機械語 40fdd4 `cmp r11,[r9]` (r9 = arg2 = IID ポインタ) は IID の先頭 8 バイトを読むが、RetDec の IR は
     `icmp eq i64 %11, %arg2` でポインタ値そのものと比べていた。後半 8 バイト (`[arg2+8]`) は正しく読まれているため、同じ形で先頭も読む。
     この関数の 1 箇所だけを対象にする (他関数の同形比較は対象外)。"""
-    head = 'define weak i64 @function_40fd90('
+    head = 'define i64 @function_40fd90('
     i = text.find(head)
     if i < 0:
         stage('M2s', 'function_40fd90 IID compare restore: 0 sites (function absent)')
