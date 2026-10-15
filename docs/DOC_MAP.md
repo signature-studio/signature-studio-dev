@@ -112,6 +112,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_2700.md` | ~80 | FLE-8 (#2698) の詳細 (E-1 工程の実測・E-2 検証)・FLE-9 (#2700) の全文 (§9 から分割移動: shard 化の工程の実測・起動指標の前後・未解決)。REPORT §9 は結論 1 行 |
 | `tools/flelift/boot/REPORT_APPENDIX_4855.md` | ~40 | #4855: boot_e2e の shard 別 clang peak RSS・秒 (cap 5,000MB/shard)・4 variant の link と boot の結果表 (測定 commit `96723a2ed`)。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_970.md` | ~100 | PERF-P14 (#970) の付録: boot closure の -O0 / -O2 / -O2 -flto 変種の build (wasm bytes・所要時間・ピーク RSS)、node 実行時間 (n=10)・署名の実測。測定値の正本 |
+| `tools/flelift/boot/REPORT_APPENDIX_4983.md` | ~70 | FLE-37 (#4983): 既定経路 `run_boot default` で `FLE_BOOT_LOG_CAP` が効かない不具合の修正 (`${6:-0}` → 環境変数を読む式)・修正前後の `log_cap` の実測・上限超過時の `hit` の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4931.md` | ~50 | FLE-4931 (#4931): REPORT §13 の全文 (既定経路 mode 3 の survey で 942 unit を分類・covered=942・測定 commit `ceb5a0ba6`・差分 0 の証跡・件数 47 の説明・boot_metric の再生成理由)。REPORT §13 は結論と要点表 |
 | `tools/flelift/boot/REPORT_APPENDIX_4004.md` | ~80 | FLE-18 (#4004): 既定経路の dispatch(0) (0x67264b の target 0)・呼出時の `[0x15e0a48]` の実測 (既定 / shim の call-time 表)・0x6b91e8 の第 2 呼出点。REPORT §10 の「唯一の呼出し点」の訂正 |
 | `tools/flelift/boot/REPORT_APPENDIX_3868.md` | ~90 | FLE-17 (#3868) の付録: `0x6bbc20` の書込み経路の上流 (実行時の呼出し連鎖・既定 route の書込み・静的走査 (rip 相対 lea)・監視の範囲)。REPORT_APPENDIX_3771 §A の後続 |
