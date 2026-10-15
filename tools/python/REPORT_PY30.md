@@ -156,7 +156,7 @@ node tests/chord_progression_call_probe.mjs                   # 呼べた 3/9
 | `node tests/chord_progression_call_probe.mjs` (呼べた数) | 3/9 | 3/9 (増えない) |
 | probe の `text_to_chord` | `AttributeError: 'ChordMarker' has no attribute 'alternativeCount'` | `AttributeError: 'NoneType' object has no attribute 'locked'` |
 
-- 測定環境: fl-win64 展開 (`tar --zstd -xf`・5.8 s)・`build_cpython_wasm.sh` exit 0 (4 分 2 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` exit 0 (6 s)・emsdk は runner 同梱 (`/opt/emsdk`)。
+- 測定環境: fl-win64 展開 (`tar --zstd -xf`・5.8 s)・`build_cpython_wasm.sh` exit 0 (4 分 2 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` exit 0 (6 s)・emsdk は runner 同梱 (EMSDK_DIR で指定)。
 - `text_to_chord` の変化は ChordMarker の属性が読めるようになった結果で、呼べた数 (成功扱い) には入らない。
 
 ### 7.3 未解決 (起票先)
