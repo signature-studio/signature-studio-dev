@@ -2,7 +2,7 @@
 # #2577: RetDec drc.ll の uselistorder 並びの差が入る段を二分する (REPORT_APPENDIX_2577 §21)。
 #   G1: バックエンド最適化を止める (--backend-no-opts)・全 150 range・3 回 (バックエンド段を除いても差が残るか)
 #   G2: 150 range を半分に分ける: A=1-75, B=76-150, B1=76-112, B2=113-150 (各 4 回)
-#   G3: 差の出た単独 range 0x409c80-0x409ed8 (B の 111 番目。function_409c80) を
+#   G3: 差の出た単独 range 0x409c80-0x409ed8 (boot_ranges.txt 全 7,360 range の 111 番目・B の 36 番目。function_409c80) を
 #       on=ASLR 有効 / off=ASLR 無効 (setarch -R) / tc=ASLR 無効 + glibc.malloc.tcache_count=0 で各 4 回
 # 使い方: M11_PE=<fl-win64>/extracted/block00031_PE.bin RETDEC=<toolchain-retdec>/bin/retdec-decompiler bash tools/m11/uselist_stage_2577.sh
 # 前提: work/boot_ranges.txt (work-m11)。出力は work/uselist_2577/ (gitignore)。
@@ -71,7 +71,8 @@ g4run() { # g4run <len> <tag> [extra arg]
   rm -f "$G4/$base.ll"
   ( cd "$G4" && env -i PATH=/usr/bin:/bin TMPDIR="$OUT/tmp" setarch x86_64 -R timeout 250 "$RETDEC_BIN" "$PE" \
       -o "$name" --select-ranges "$SINGLE" --select-decode-only --timeout 100 $extra > "$G4/$base.$tag.log" 2> "$G4/$base.$tag.err" ) || true
-  printf 'G4\t%s\tlen=%s\tll=%s\terr_md5=%s\n' "$tag" "$n" "$(md5sum < "$G4/$base.ll" 2>/dev/null | cut -c1-8)" \
+  mv -f "$G4/$base.ll" "$G4/$base.$tag.ll" 2>/dev/null || true
+  printf 'G4\t%s\tlen=%s\tll=%s\terr_md5=%s\n' "$tag" "$n" "$(md5sum < "$G4/$base.$tag.ll" 2>/dev/null | cut -c1-8)" \
     "$(md5sum < "$G4/$base.$tag.err" | cut -c1-8)" >> "$G4/g4.tsv"
 }
 : > "$G4/g4.tsv"
@@ -80,6 +81,8 @@ for i in 1 2; do for n in 9 17; do g4run "$n" "noopts$i" "--backend-no-opts"; do
 for n in 9 17; do g4run "$n" "printall" "--print-after-all"; done
 echo "== G4 (出力名の長さ・ASLR 無効・env -i。ll=.ll の md5、err_md5=stderr 全体の md5)"
 cat "$G4/g4.tsv"
+echo "== G4 diff (plain1: 9 字 → 17 字の .ll 差。1 行なら指示行だけ)"
+diff "$G4/qqqqqqq.plain1.ll" "$G4/$(printf 'q%.0s' $(seq 1 15)).plain1.ll" || true
 
 echo "== summary (group / label / rc / sec / load1 / ll md5 / 指示行を除いた md5 / 指示行数)"
 cat "$SUM"
