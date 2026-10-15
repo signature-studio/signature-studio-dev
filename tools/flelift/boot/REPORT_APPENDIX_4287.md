@@ -1,0 +1,59 @@
+# tools/flelift/boot — FLE-22 (#4287) 付録: f_6cd520 の mode (obj+0xc4) の設定元
+
+> 親 REPORT: `tools/flelift/boot/REPORT.md`。前提の付録 `REPORT_APPENDIX_3868.md` は main に無いため、本付録は `REPORT_APPENDIX_3771.md` §C〜§G の監視 (`wval_lift.py`) を土台にした。
+> 既知類型との関係: 該当なし (書込み元の特定のみ。類型の追加は行わない)。
+
+## A. 結論 (部分達成)
+
+- `f_6ba1f0` 内で `rbx` (R[3]) は**書かれない** (入口の push と出口の pop のみ)。issue 本文の「`f_6ba1f0` 内の `rbx`」は、実際には `f_6cd520` 入口の `rbx = rcx` (`0x6cd527`) の出所を指す。
+- `f_6cd520` の rcx (= obj) は、`f_6ba1f0` の `0x6ba38a` 直前の `mov rcx, [rbp+0xe0]` で決まる。`[rbp+0xe0]` は入口の rcx (`0x6ba202`) と、`f_410320` の戻り値 (`0x6ba254`) で書かれる。実測の obj は `0x12d6a090` (両 route 同じ)。
+- obj+0xc4 への store は、監視範囲 (lifted C の全幅 store・宛先一致) で **`f_6bc010` の `0x6bc010` 1 件だけ** (`mov byte [rcx+0xc4], dl`)。その値は `dl = 0`。
+- つまり `f_6cd520` が読む時点で mode は既に **0** で、その 0 を書いた lifted の store は無い。0 の出所 (obj の確保時の 0 埋め・ホスト C の書込み・未監視の store のいずれか) は**未特定**。受入条件 1 は未達。
+
+## B. 測定 (工程と実測)
+
+| 項目 | 値 |
+|---|---|
+| 測定 commit | `a49255dc0` (監視の追加を含み、コードを変えた最後の commit) |
+| base | `e3f55dc40` (main 上の commit。監視の追加は含まない) |
+| 素材 | `fl-win64` / `toolchain-emsdk` を `$RUNNER_TEMP/ss4287` に展開 (repo 外) |
+| baseline (root `0x6a7b70` 無) | units_run **209** / stopped_at 209 / `unlifted 0x6bbc20` (REPORT_APPENDIX_3771 §B と同値) |
+| 監視版 (`WVAL_OBJWATCH=1`) | units_run **209** / 停止点 同じ / `[wval]` 1 件 (0x6bbc20) / `[wobj]` 1 件 (obj+0xc4 への store) |
+| 既定経路 (root `0x6a7b70` 有) | units_run **209** / `boot_threw: "exit"` / `px6bbc20.calls_all` 0 / rc=3 (IPP チェック NG)。baseline と停止の仕方が異なる |
+| 既定経路の監視版 | 同じ連鎖: `f_6cd520` で mode=0・`f_6bc010` が `[obj+0xc4]=0` を書く。`0x6bbc20` への store は 0 件 |
+
+KPI (起動に関わる PR): FLEngine 起動の units_run は **前 209 / 後 209**。最初のウィンドウ: **無し**。既定の build・lift 経路は変えていない (監視は `--objwatch` の時だけ挿入)。
+
+## C. 監視の出力 (baseline 系・`run_wval.log` 抜粋)
+
+```
+[wobj-enter] va=0x6ba1f0 rcx=0x6b80d8 dl=0xffffff01 ret=0x6cf0fc
+[wobj-set] va=0x6ba25b obj=0x12d6a090
+[wobj-enter] va=0x6cd520 rcx=0x12d6a090 dl=0x100000 ret=0x6ba38f
+[wobj-read] va=0x6cd520 obj=0x12d6a090 mode(+0xc4)=0 0x70=0
+[wobj] va=0x6bc010 a=0x12d6a154 n=1 v=0 obj=0x12d6a090 R0=0x12d6af10 R1=0x12d6a090 R2=0 R3=0x12d6a090 R5=0x1158b468 ret=0x6cd5d6
+```
+
+- `[wobj]` の `a = 0x12d6a154 = obj+0xc4` (一致)。`ret=0x6cd5d6` は `f_6cd520` の `call 0x6bc010` の戻り番地。
+- `[wobj-read]` の `mode=0` は、`f_6cd520` 入口 (`0x6cd520`) の時点で obj+0xc4 が 0 であることを示す。
+
+## D. 監視の仕組み・限界
+
+- `wval_lift.py --objwatch`: lifted C の全 store (ST8〜STY) を `WO_*` に置換し、宛先が `obj+0xc4` に一致したものを出す。値の比較はしない (1/2/4/8/16 byte 全て)。obj は `f_6cd520` 入口 (`rcx`) と、`f_6ba1f0` の `L_6ba25b` 直後で `[rbp+0xe0]` から更新する。`rt/` と `x64c.py` は変えない。
+- 限界 (未観測): (1) ホスト側 C (`fle_boot.c`・shimx・`rt/fle_glue.c`) からの書込み。(2) `f_410320` と getmem の 0 埋め (lifted 外・ホスト側のため見えない)。(3) obj の確保が `f_6ba1f0` の前にあるかの確認。
+- 1 run・n=1。決定的な boot のため同一 commit の再実行は同値と見る。
+
+## E. 再現
+
+```sh
+FL_WIN64_DIR=<fl-win64 展開先> FLE_EXTRA_ROOTS= FLE_BOOT_WORK=<work> FLE_BOOT_TAG=wv0 FLE_BOOT_RUNS=diag_shim bash tools/flelift/boot/fle6_measure.sh
+FL_WIN64_DIR=<fl-win64 展開先> FLE_BOOT_WORK=<work> WVAL_OBJWATCH=1 bash tools/flelift/boot/wval_measure.sh
+```
+
+素材: `oc_artifacts: fl-win64 toolchain-emsdk`。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| obj+0xc4 の初期値 0 の出所 (確保時の 0 埋め・ホスト C の書込み) | mode の設定元の確定 (受入条件 1) | #4287 (本 issue・部分達成のため残す) |
+| `f_6cd5f0` 経由の `f_6cd520` 呼出し (実行時の呼出元) | 呼出し連鎖の上流 | #4287 |
+| 既定経路で boot が `exit` で止まる原因 (IPP 判定 NG) | 既定経路の書込み元の比較 | #3868 (OPEN・既定経路の書込み元と obj+0xc4 の追跡。本 PR では扱わない) |
