@@ -88,7 +88,7 @@
 #### 10-7t. #3108 (KH-45) run: Stereo の emcc 残件 10 件の解消 (emcc 10 → 0 件・Stereo 突合は 0/1000 で未達)
 - 結論: Stereo の emcc は **10 → 0 件** (`grep -c error:` = 0、終了コード 0)。Gain/Haas/Gate は 1000/1000 bit-exact を維持し、生成 C は修復前と diff 0 行。Stereo の数値は突合で **0/1000 bit-exact** (未達)。emcc が通ったことは数値の正しさを示さない (§10-7r の注記どおり)。`FUN_180fd8aac` は関数化せず、到達で abort する stub にした (未解決 2)。
 - 測定 commit: `eb5532ae9` (コード変更: `ghidra_route/ghidra_shim.h`・`patches.py`・`ghidra_to_c.py`)。コミット済み HEAD で再現した。
-- 素材: `plugins-kilohearts` の Installer zip → `payload.dat` → `windows.zip/1ccb1df8…` → `HeartCore.core_64` (76,642,304 B)。Ghidra 12.1.4 = `[GHIDRA]` (zip sha256 先頭 `ddac49f9…` 一致)、JDK 21 (`[JDK21]`)、emsdk 6.0.12 = `[EMSDK]` (`/opt/emsdk` に既存)。
+- 素材: `plugins-kilohearts` の Installer zip → `payload.dat` → `windows.zip/1ccb1df8…` → `HeartCore.core_64` (76,642,304 B)。Ghidra 12.1.4 = `[GHIDRA]` (zip sha256 先頭 `ddac49f9…` 一致)、JDK 21 (`[JDK21]`)、emsdk 6.0.12 = `[EMSDK]` (runner 同梱の既存導入)。
 - decompile: 19 関数 (gain/haas/gate 10・stereo 8・`FUN_180fd8aac` 1) すべて OK (`analyzeHeadless` wall 34.2 s、n=1)。
 
 **残件 10 件の機械語での確定**
