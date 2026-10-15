@@ -105,5 +105,20 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 
 **未達と起票先**: 残りの候補多重 60 件 (fvm 非対象。内訳 38 件の理由は未計測) と、equal / wasm_trap への遷移の成立は #4173 (LD-198)。`0x5c1030` の切り分けは #4137 (LD-194)。
 
-**`0x5c1030` の判断 (据え置きはしない)**: 現 HEAD の結果 (mismatch 235) をそのまま出す。既定案 (fvm の `native_extra_call` 系 diff を unexec に据え置く) は、fvm 結果の種類で判定を分ける規則を新設することになる。その規則は e2e を再測定して初めて検証できるが、本 run では `work-m11` 素材が無く再測定できない。そのため実装していない。判断は PM agent に委ねる。
-- PM agent の判断待ち: `0x5c1030` の diff を mismatch として出すか / 既定案: 据え置き (実装は未着手)。
+**`0x5c1030` の据え置き (PM 判断 R7・LD-196、適用済み)**: fvm の `native_extra_call` 系 diff を持つ `0x5c1030` だけ、mismatch にせず unexec のまま据え置く (`session.FVM_HOLD_VAS`・`fvm_held` を `classify.verdict` で除外)。fvm の件数の増加 (12 → 25) は残す。
+
+- 実装の範囲は `0x5c1030` の 1 件。fvm の `native_extra_call` diff を持つ関数は sample:800 にほかに `0x1024830`・`0x132f6a0` の 2 件あり、main でも mismatch (保存 verdict) のため、規則を一般化すると main の数値が変わる。よって一般化せず関数アドレス指定にした。
+- 据え置き規則を一般化する案 (`native_extra_call` 全件を据え置く) は mismatch 232 になり、PM 判断の既定案 (234) と合わない。採らない。
+- `classify.verdict` は `fvm_held` の case を数えない (`fvm_held` は fvm の diff にだけ付く)。
+
+**測定 (HEAD `80e066053`・`liftdiff_e2e.sh --m11-only`・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・素材 `work-m11` `work-liftdiff` を展開済み)**:
+
+| run | commit | match / mismatch / unexec | fvm case (native_fault / both_fault / diff) | e2e | 所要 (`time` 実測) |
+|---|---|---|---|---|---|
+| main 再測定 | `1f12b1b6d` | 360 / 234 / 206 | 12 | PASS | 182 s |
+| HEAD 1 回目 | `80e066053` | 360 / 234 / 206 | 25 (12 / 10 / 3) | PASS | 179 s |
+| HEAD 2 回目 | `80e066053` | 360 / 234 / 206 | 25 | PASS | 182 s |
+
+- 保存された verdict (jsonl の `verdict`) で main と HEAD を関数単位に突き合わせると、遷移 0 件 (match 360・mismatch 234・unexec 206 が一致)。
+- 注: `verdict()` を main の jsonl の `cases` に当て直すと `0x5c1030` が mismatch に見える (235)。main の実行時の保存 verdict は unexec なので、main の値は 234 が正しい。当て直しは fvm の diff を含んだ cases を見るため、保存値と一致しない。
+- 2 回の mismatch 集合は同一 (差 0)。
