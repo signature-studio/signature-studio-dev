@@ -8,7 +8,7 @@
 - base は main の `grid_bit` / `gridBit` を使う。件数以上 (p >= 64) は PY-218 (#3657) の event 経路 (`grid_event` / `gridEvent`) に従い、範囲外を RANGE にしない (PE `0xd5b420` は範囲検査を持たない・`fl_engine.c` の `grid_bit` の注記)。
 - 式は PE `0x12d3ff0` の逆アセンブルと 1 点ずつ照合した (下の表)。`REPORT_PY101` の読解と一致した。
 - 行 `T[1]` の作成経路 (`0x12da6d0` の間接呼出し元・flag の書込み元) は PY-223 (#3627) の結果待ち。本 PR では検査用の注入 (`setLoop`・C は `fl_engine_loop_set` / `fl_engine_loop_add`) でしか行を置けない。既定は行なし (PE の `.bss` 0) で、loop 分岐に入らない。このため通常経路の値は変わらない。残りは子 #3659 (`[PY-229]`) に移した。
-- 経緯: 当初の測定 commit は件数以上を RANGE にしていたため、main の #3601 (`651eb50cb`) と #3657 (`058984fa0`) と競合した。解消は merge commit `b3f90a545` (#3601)・`fc9525275` (#3657)。以後 main の取り込みを重ね、現在の測定 commit は `a3c3ec28a` (main `93202140d` の取り込み merge)。取り込みの競合は 2 回あった: `host/fl_mock.mjs` の `stepParam` (main `ccea1a0df` の PY-111 の `STEP_V`・param 8 と本 PR の `loopBit`)、`provider/build.sh` の `EXPORTED_FUNCTIONS` (main `93202140d` の `_fl_engine_browser_op` と本 PR の `_fl_engine_loop_set`・`_fl_engine_loop_add`)。どちらも両方の変更を残した。
+- 経緯: 当初の測定 commit は件数以上を RANGE にしていたため、main の #3601 (`651eb50cb`) と #3657 (`058984fa0`) と競合した。解消は merge commit `b3f90a545` (#3601)・`fc9525275` (#3657)。以後 main の取り込みを重ね、現在の測定 commit は `eb1dac14a` (main `d5681415e` の取り込み merge。競合なし)。取り込みの競合は 2 回あった: `host/fl_mock.mjs` の `stepParam` (main `ccea1a0df` の PY-111 の `STEP_V`・param 8 と本 PR の `loopBit`)、`provider/build.sh` の `EXPORTED_FUNCTIONS` (main `93202140d` の `_fl_engine_browser_op` と本 PR の `_fl_engine_loop_set`・`_fl_engine_loop_add`)。どちらも両方の変更を残した。
 
 ## 式と実装の対応
 
@@ -30,31 +30,30 @@ PE は `analysis/flapi/pe_disasm.py 12d3ff0 90` の逆アセンブル (`FL_WIN64
 
 ## 測定
 
-- 測定 commit: `a3c3ec28a` (main `93202140d` の取り込み merge。コードを変えた最後の commit。競合の解消は上の結論の 2 件のみ)。
-- 検証 HEAD: 本 REPORT の commit。コード範囲の差分 `git diff a3c3ec28a HEAD -- tools/python/host tools/python/provider tools/python/tests` は 0 行 (本 REPORT の commit は範囲外)。
-- 直前の測定 commit からの差分: `git diff 828c677e6 a3c3ec28a -- tools/python/host tools/python/provider tools/python/tests` は 12 files・390 insertions・24 deletions (main `93202140d` の取り込み分と競合解消)。
-- 変更の規模 (main `93202140d` に対する正味): 7 files・211 insertions・6 deletions (`docs/DOC_MAP.md`・`REPORT_PY224.md`・`fl_engine.c`・`fl_mock.mjs`・`fl_provider.mjs`・`build.sh`・`channels_diff.mjs`)。`fl_engine.c` の `FL_H` の差分は `getGridBitWithLoop` の 1 行の書換えのみで、新規のハンドラは追加していない (implemented の増減は main 由来)。
+- 測定 commit: `eb1dac14a` (main `d5681415e` の取り込み merge。コードを変えた最後の commit。競合の解消は上の結論の 2 件のみ。main の変更は `fl_engine.c`・`arrangement_diff.mjs` 等で、測定範囲のコードに変化あり)。
+- 検証 HEAD: 本 REPORT の commit。コード範囲の差分 `git diff eb1dac14a HEAD -- tools/python/host tools/python/provider tools/python/tests` は 0 行 (本 REPORT の commit は範囲外)。
+- 直前の測定 commit からの差分: `git diff a3c3ec28a eb1dac14a -- tools/python/host tools/python/provider tools/python/tests` は 3 files・34 insertions・7 deletions (main `d5681415e` の取り込み分)。
+- 変更の規模 (main `d5681415e` に対する正味): 7 files・211 insertions・6 deletions (`docs/DOC_MAP.md`・`REPORT_PY224.md`・`fl_engine.c`・`fl_mock.mjs`・`fl_provider.mjs`・`build.sh`・`channels_diff.mjs`)。`fl_engine.c` の `FL_H` の差分は `getGridBitWithLoop` の 1 行の書換えのみで、新規のハンドラは追加していない (implemented の増減は main 由来)。
 - 素材: `fl-win64` を `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C $RUNNER_TEMP/fl-win64` で全展開。`fetch_inputs.sh` は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` で rc 0 (`work/midi.py`・`work/utils.py`・`work/fl-stubs` を生成)。emsdk は `[EMSDK]` (既定の `EMSDK_ENV`・`docs/REFERENCES.md` §4) をそのまま使用。
-- flpy: `build_cpython_wasm.sh` rc 0 (04:10:34 → 04:14:39 の 245 秒) は測定 commit 828c677e6 での実行。CPython の入力は main 93202140d の取り込みでも変わっていないため再ビルドせず、`FLPY_SKIP_TABLE=1 build_flpy.sh` だけを a3c3ec28a で再実行して rc 0 (`flpy.wasm` 5,924,680 B。REPORT_PY101 と同じサイズ)。
-- 負荷: 測定開始時の load average 0.47 / 1.02 / 0.75、測定終了時 0.47 / 1.02 / 0.75。node v22.23.3。
+- flpy: `build_cpython_wasm.sh` rc 0 (04:10:34 → 04:14:39 の 245 秒) は測定 commit 828c677e6 での実行。CPython の入力は main の取り込みで変わっていないため再ビルドせず、`FLPY_SKIP_TABLE=1 build_flpy.sh` を eb1dac14a で再実行して rc 0 (`flpy.wasm` 5,924,680 B。REPORT_PY101 と同じサイズ)。
+- 負荷: 測定開始時の load average 0.27 / 0.73 / 0.68、測定終了時 0.49 / 0.77 / 0.70。node v22.23.3。
 
-| 検査 (a3c3ec28a) | コマンド | 結果 | 所要 |
+| 検査 (eb1dac14a) | コマンド | 結果 | 所要 |
 |---|---|---|---|
-| provider ビルド | `bash tools/python/provider/build.sh` | rc 0・関数 435・ハンドラ 168・警告 0 | 1,117 ms |
-| channels 差分 (loop 検査と件数超え検査を含む) | `node tests/channels_diff.mjs` | calls 238・loop_cases 9・loop_event_true 51・diffs 0・grid_calls 1200・grid_true 30・grid_diffs 0・PASS | 83 ms |
-| 実装数 | `node tests/provider_check.mjs` | functions 435・implemented 168・unimplemented 267・mcp_static 60・PASS | 373 ms |
-| 全 tool | `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・host_calls 37425・callback_roundtrip true・rc 0 | 1,624 ms |
-| general 差分 | `node tests/general_diff.mjs` | calls 41・diffs 0・PASS | 55 ms |
-| device 差分 | `node tests/device_diff.mjs` | calls 11・link_calls 6・rejects 4・midi_out 10・diffs 0・PASS | 55 ms |
+| provider ビルド | `bash tools/python/provider/build.sh` | rc 0・関数 435・ハンドラ 168・警告 0 | 1,096 ms |
+| channels 差分 (loop 検査と件数超え検査を含む) | `node tests/channels_diff.mjs` | calls 238・loop_cases 9・loop_event_true 51・diffs 0・grid_calls 1200・grid_true 30・grid_diffs 0・PASS | 78 ms |
+| 実装数 | `node tests/provider_check.mjs` | functions 435・implemented 168・unimplemented 267・mcp_static 60・PASS | 369 ms |
+| 全 tool | `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・host_calls 37425・callback_roundtrip true・rc 0 | 1,709 ms |
+| general 差分 | `node tests/general_diff.mjs` | calls 41・diffs 0・PASS | 56 ms |
+| device 差分 | `node tests/device_diff.mjs` | calls 11・link_calls 6・rejects 4・midi_out 10・diffs 0・PASS | 54 ms |
 | ui 状態差分 | `node tests/ui_state_diff.mjs` | calls 58・diffs 0・PASS | 55 ms |
 | screen 差分 | `node tests/screen_diff.mjs` | calls 32・diffs 0・PASS | 59 ms |
-| mixer 差分 | `node tests/mixer_diff.mjs` | calls 69・diffs 0・PASS | 54 ms |
-| arrangement 差分 | `node tests/arrangement_diff.mjs` | calls 25・diffs 0・PASS | 55 ms |
-| arrangement 選択差分 | `node tests/arrangement_selection_diff.mjs` | calls 8・diffs 0・PASS | 53 ms |
+| mixer 差分 | `node tests/mixer_diff.mjs` | calls 69・diffs 0・PASS | 55 ms |
+| arrangement 差分 | `node tests/arrangement_diff.mjs` | calls 25・state 5・stateDiffs 0・diffs 0・PASS | 53 ms |
+| arrangement 選択差分 | `node tests/arrangement_selection_diff.mjs` | calls 8・diffs 0・PASS | 52 ms |
 | ui 表示差分 | `node tests/ui_display_diff.mjs` | ok_calls 12・bad_calls 11・diffs 0・displayTime 2000・PASS | 55 ms |
-| playlist 差分 | `node tests/playlist_diff.mjs` | calls 72・diffs 0・mock_state_steps 8・PASS | 58 ms |
-| step item 差分 | `node tests/step_item_diff.mjs` | calls 5929・spot 5・diffs 0・PASS | 68 ms |
-
+| playlist 差分 | `node tests/playlist_diff.mjs` | calls 72・diffs 0・mock_state_steps 8・PASS | 57 ms |
+| step item 差分 | `node tests/step_item_diff.mjs` | calls 5929・spot 5・diffs 0・PASS | 73 ms |
 - 所要は `date` の差分 (node の起動を含む)。
 
 ### loop 検査の内容 (`tests/channels_diff.mjs`)
@@ -66,7 +65,7 @@ PE は `analysis/flapi/pe_disasm.py 12d3ff0 90` の逆アセンブル (`FL_WIN64
 - 先頭一致と末尾一致の区別: `[[2,1,72],[2,1,120]]` (L 3 の後に L 5) で p=5 は false (先頭 L 3 なら `base(2)`・末尾 L 5 なら p<5 でなく `base(0) = 1` で true)、p=6 は true。両側で assert する。
 - 上限: 9 件の `setLoop` は mock・wasm とも throw する (`上限 8`)。C は `fl_engine_loop_add` が上限超過で 0 を返し、JS の wrapper が throw する。
 
-### ネガティブコントロール (a3c3ec28a で実施)
+### ネガティブコントロール (eb1dac14a で実施)
 
 - mock の loop 分岐を無効化 (`fl_mock.mjs` の `loopBit` 先頭の `if (!st.loop.row || …) return base;` を `if (true || …)` に変更) → `channels_diff` は `AssertionError [ERR_ASSERTION]: mock loop p=5` で rc 1 (FAIL)。
 - C の loop 分岐を無効化 (`fl_engine.c` の `grid_bit_loop` 先頭の `if (!lp_row || …) return base;` を `if (1 || …)`・`provider/build.sh` で再ビルド) → `AssertionError [ERR_ASSERTION]: wasm loop p=5` で rc 1 (FAIL)。
