@@ -477,3 +477,15 @@ PM 指示: 「main でも同じ 870 vs 872 なら既存の欠陥、違えば本 
 **R2 の FAIL は回避の副作用の可能性が高い (未確定)**: 回避後の main では `EnumDisplayMonitors` / `GetMonitorInfoW` が reach に出ず (`missing=['EnumDisplayMonitors', 'GetMonitorInfoW']`、reached 30 ≥ floor 19 だが欠落 2 件で FAIL)。直前の main 測定 (§6e、ソース側で重複を削除した版) では R2 PASS の 13/14 だった。回避方法で R2 が変わるため、本節の R2 は main の欠陥の根拠にしない。S1 の値は両方法で `870/1/47/24/0` と一致する。
 
 **結論**: S1 の `870/1/47/24/0` (base `872/1/47/22/0`) は `origin/main` (`b4a8422c`) でも同一。**PR #577 の変更が原因ではない**。S1 は FAIL のまま (判定を緩和していない)。原因の追跡は子 issue **#1442** (`[GUI-21]`、親 #564)。#1275 (`[M11-N78]`) とは対象 unit が一致するが、同一原因か・同系統かは未確認 (機械語・IR の突合は未実施)。
+
+## 6j. `m11_ov.c` の既定変更 (#2521) と GUI build の固定 (PR #3485)
+
+`tools/m11/m11_ov.c` の `M11_FIX_535BF2` 既定が 0 → 1 になった (`d80e9909f`)。本節の GUI 側 build は `-DM11_FIX_535BF2=0` を `CF` に足して従来値 (0) に固定する (`tools/gui/flengine/build.sh`)。上の §1〜§6i の gate 値は、既定 0 の `m11_ov.c` で測った値のまま有効。
+
+| 項目 | 値 |
+|---|---|
+| 照合の方法 | `clang -E -P` で `m11_ov.c` を前処理 (素材の `work/boot_final3_sigs.h`・emscripten の headers は空スタブ。GUI の `CF` と同じ `-DM11_LB_BASE=0 -DM11_OV_CLASSCREATE=0` と、その他の `-w -O0 -pthread` を付ける) |
+| 変更前 (`44a7f4465` の `m11_ov.c`、既定 0) | 1704 行 |
+| 修正後 HEAD (`CF` に `-DM11_FIX_535BF2=0`) | 1704 行。変更前と **差 0** (`cmp` で一致) |
+| ネガコン (修正前の `CF` を HEAD の `m11_ov.c` に当てる) | 1721 行。変更前と **17 行差** (`function_535c11` / `function_535bf2` の転記が入る) |
+| GUI の e2e | 再実行していない (素材 `work-m11`・toolchain が PR #3485 の run に無い)。前処理が同一なので GUI の `m11_gui.cjs` の入力は変わらない |
