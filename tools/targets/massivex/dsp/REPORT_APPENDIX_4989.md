@@ -44,7 +44,7 @@
 
 - 基準 (測定 commit) = **`1c98a13a7`** (origin/main・基準 e2e の HEAD)。本 PR のコード変更は `scripts/mx4989_probe.py` (新規) と `scripts/mx6_vectorcall.py` (`analyze()` の返り値に `must` を追加・既存の値は不変)。
 - 基準 e2e の測定 commit = `1c98a13a7` (origin/main)。本 PR の変更は `scripts/mx4989_probe.py` (新規) と `scripts/mx6_vectorcall.py` (`analyze()` の返り値に `must` を追加・既存の値は不変)。`mx6_e2e.sh` は `mx4989_probe.py` を呼ばないため、e2e の測定値は本 PR の変更の影響を受けない。
-- e2e の測定値 (本 PR の正本・1 組のみ): commit `3146df45d` の `mx6_e2e.sh` = **exit 0・elapsed 49 s・load 0.19 0.59 0.50 → 0.65 0.65 0.53・判定 28 行のうち PASS 27・負例の FAIL 1 行 (期待どおり)**。`601a3ecc7` は docs のみの差分で、コードは同一。
+- e2e の測定値 (本 PR の正本・1 組のみ): commit `3146df45d` の `mx6_e2e.sh` = **exit 0・elapsed 49 s・load 0.19 0.59 0.50 → 0.65 0.65 0.53・判定 28 行のうち PASS・負例の FAIL 1 行 (期待どおり)**。`601a3ecc7` は docs のみの差分で、コードは同一。
 - 測定 commit `3146df45d` から本修正 commit (HEAD) までのコード差分: `git diff 3146df45d HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` (修正は `mx4989_probe.py` の `partial_dst`・`must_partial_off` の引数・`--selftest` の追加)。
 - `mx4989_probe.py` の実行時間 (約 2 分 27 秒・修正前の定義) は HEAD `3146df45d` での実測。修正後の本体は未測定 (PE 不在)。
 
