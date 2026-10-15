@@ -74,5 +74,60 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 線端の形状 (cap・join)・破線 (`setLineStyle`) | 太い線の角が丸まる。破線は no-op | 子 #4469 (SR-71) |
-| AA の被覆は線形近似 (厳密な面積被覆ではない) | 画素値は実機と一致しない可能性 | 子 #4470 (SR-72) |
-| 閉じた polyline の角で AA の境界 1 px が二重に alpha 合成される (未測定) | 角が濃くなる。harness に角のケースは未追加 | 子 #4470 (SR-72) |
+| AA の被覆は線形近似 → SR-72 (§3) で面積被覆へ改めた | 解消 (§3) | — |
+| 閉じた polyline の角の二重合成 → SR-72 (§3) で解消 | 解消 (§3) | — |
+
+## 3. 2026-10-15 run (#4470 / SR-72): AA の面積被覆と閉じた polyline の角の二重合成
+
+### 3-1. 原因 (変更前)
+- `strokePolyline` が辺ごとに `plotLine` を呼び、`plotThickLine` が辺ごとに画素へ alpha 合成していた。角では 2 辺の境界 1 px が重なり、二重に合成される。
+- AA の被覆は `clamp (half + 0.5 - distance)` の線形近似で、厳密な面積被覆ではない。
+
+### 3-2. 方式 (変更後)
+- `plotLines (points, closed, color)` に一本化 (`drawLine`・`drawLines`・`drawPolygon`・`drawEllipse` の輪郭が通る)。
+- 画素ごとに「線分の和集合」の被覆を 1 回だけ求め、`blendRGBA` を 1 回だけ呼ぶ。角で辺が重なっても二重合成しない。
+- 被覆: aliasing (太さ 1 を含む) は画素中心 1 点の内外 (0/1)。`kAntiAliasing` は画素を 4x4 に分けた標本点の割合 (面積被覆の近似・16 段階)。
+- 太さ 1 かつ aliasing は従来どおり Bresenham (`forEachBresenhamPixel`)。判定の旧値と一致する。ただし画素は bit mask に立てるだけで、閉じた polyline の頂点の画素も辺ごとに二重合成せず、1 回だけ合成する (半透明色でも二重に濃くならない)。
+- 計算量: 画素ごとの bit mask は線分の bbox を半幅 +1 で広げた範囲だけを走査する (線分ごとに全画素を見ない)。全標本が立った画素は以降の標本計算を省く。
+
+### 3-3. 判定
+- `check_line_width.sh` に角のケースを追加 (`corner_tri_w4_aa`: 頂点 (8.5,50.5)・(32.5,10.5)・(56.5,50.5)、w4 AA の閉じた三角形)。参照値は同じ標本法で「線分の和集合の被覆」を直接求めた値。判定 `corner_no_double_blend` は `over` (参照値より alpha が 1 を超えて濃い画素数) = 0 を要求。
+- 変更前 (本体 = `origin/main` `d355f2a71`・判定は本 commit の新版): `corner_join over=105 maxdiff=64` → `corner_no_double_blend: fail`。
+- 変更後 (測定 commit `66f9d8acd`): `corner_join over=0 maxdiff=0` → pass。rc=0。
+- 注意: 参照値は実装と同じ 4x4 標本法・同じ距離関数で作っている。判定の意味は「和集合を 1 回だけ合成したか」のみ。実機 VSTGUI の画素との一致は測っていない。
+- review 対応 (本 commit 後): 同じ判定 (`corner_join over=0 maxdiff=0`) を native (`g++`・vstgui4_14_3・emsdk 無し) で再確認した。
+
+### 3-5. 計算量の実測 (review 対応・native)
+- 測定: `g++` で `canvas_graphicsdevice.cpp` を旧 (`66f9d8acd^`) と新 (HEAD) で各々ビルドし、同じ bench (`drawEllipse`・`Stroked`・AA・太さ 4 (d200 は 1 px 太さも)) を 1 回あたり平均で計った。`check_line_width.sh` の emsdk は無いので wasm の値ではない。
+- 結果 (1 回あたり ms):
+
+| ケース | 旧 -O0 | 新 -O0 | 旧 -O2 | 新 -O2 |
+|---|---|---|---|---|
+| 楕円 d200 w4 AA | 1.47 | 7.83 | 0.59 | 2.68 |
+| 楕円 d400 w4 AA | 2.99 | 16.22 | 1.16 | 4.89 |
+| 楕円 d200 w1 AA | 0.51 | 4.03 | 0.19 | 1.34 |
+
+- 頂点の二重合成 (太さ 1 aliasing・`globalAlpha` 0.5・赤線): 旧 `max_alpha=192` (2 回合成) → 新 `max_alpha=128` (1 回)。native・同じ三角形。
+- 判断: 新方式は旧方式の約 4.5 倍 (-O2)。reviewer の「全辺を画素ごとに見る」最悪 (約 2.6 億回) にはならない (辺 bbox 走査で抑えている)。ただし楕円の描画は旧より重くなるため、wasm の実機での時間は未測定。画面に多数の楕円を描く場面では再測定が要る。未解決として残す。
+
+| ケース | 変更前 nonzero / partial / full | 変更後 nonzero / partial / full |
+|---|---|---|
+| w1 aliasing | 55 / 0 / 55 | 55 / 0 / 55 |
+| w4 aliasing | 263 / 0 / 263 | 263 / 0 / 263 |
+| w1 AA | 127 / 124 / 3 (§2 旧方式) | 127 / 127 / 0 |
+| w4 AA | 335 / 136 / 199 (§2 旧方式) | 335 / 140 / 195 |
+| 閉じた三角形 w4 AA (角) | 692 / 278 / 414 (`over=105`) | 692 / 276 / 416 (`over=0`) |
+
+- AA 行は被覆方式を 4x4 標本に変えたため、§2 の partial/full の値は置換される (nonzero は変わらない)。
+- 既存判定: `check_draw_ops.sh` rc=0 (drawLine 49・drawLines 26・drawPolygon 607・drawEllipse 2472・drawBitmap 64、従来と同一)。`check_render_poc.sh` rc=0 (nonzero_after=12000 text_px=112)。`check_canvas_syntax.sh` rc=0。
+
+### 3-4. 測定条件と所要
+- 測定 commit: `66f9d8acd` (コードを変えた最後の commit)。
+- `check_line_width.sh` real 24.28 s (測定 commit で再実行)。load (開始時) 1.46。
+- `check_draw_ops.sh` real 24.42 s、`check_render_poc.sh` real 24.40 s、`check_canvas_syntax.sh` real 5.66 s (いずれも変更後・同一作業ツリー)。
+- 測定環境: vstgui4_14_3 (`work/vstgui4`)、toolchain-emsdk (`work/emsdk`)。`work/` は gitignore。
+
+### 3-5. 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 線端の形状 (cap・join)・破線 (`setLineStyle`) | 太い線の角が丸まる。破線は no-op | 子 #4469 (SR-71) |

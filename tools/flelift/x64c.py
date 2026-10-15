@@ -1954,7 +1954,7 @@ def main():
     ninsn = 0
     textrefs = set()
     jt_ranges = set()
-    approx_used = False
+    shard_approx = [False] * nsh
     with contextlib.ExitStack() as stack:
         bfs = [stack.enter_context(open(p, 'w')) for p in body_paths]
         for i, e in enumerate(sorted(done)):
@@ -1962,7 +1962,7 @@ def main():
             f = FnLift(pe, e, known, md, thunks)
             bf.write(('void f_%x(void) { %s(); }' % (e, overrides[e])) if e in overrides else f.lift())
             bf.write('\n')
-            approx_used = approx_used or f.approx_used
+            shard_approx[i % nsh] = shard_approx[i % nsh] or f.approx_used
             unsup.update(f.unsup)
             unsup_sites += ['%x' % va for va in f.unsup_va]
             for t in f.calls:
@@ -1986,7 +1986,7 @@ def main():
     for k, name in enumerate(names):
         with open(os.path.join(out, name), 'w') as fh:
             fh.write('#include "fle_cpu.h"\n')
-            if approx_used and k == 0:
+            if shard_approx[k]:
                 fh.write(approx_rcp_decl())
             for nm in used_imps:
                 fh.write('void imp_%s(void);\n' % nm)

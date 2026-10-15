@@ -4,8 +4,13 @@
 判定定義 (REPORT_MX33.md §1):
   1. 対象 (f, k∈{0..3}): f の入口から k が定義されずに読まれる読み命令 (mx6_vectorcall.analyze の must-def で列挙)。
   2. 読み命令の幅で分類 (classify_read): S = scalar (下位 32/64 bit) / P = 128 bit (packed 証拠) / A = 曖昧。
-  3. 関数: いずれかの k の読みが P なら 128bit 候補 / 全 k が S なら scalar / それ以外は判定不能。
-  4. 独立再計算: CFG を使わない線形走査で、関数範囲内の P 読みの有無を数え、CFG の P ⊆ 線形 P を検査
+  3. 後続追跡 (MX-37 #3774): A の読みのうち次の 2 つは CFG 上で後続の読みを追う。
+     - 複写 (xmm_j ← xmm_k): 複写先 xmm_j の値を CFG 上で追う。S の読みは幅の証拠、P の読みは 128 bit の証拠。
+       完全上書き (movaps 等の reg/mem 全幅書込) で追跡を止める。追跡できない書込・呼出境界は A。
+     - merge (VEX 3 オペランドの cvtsi2* / scalar 算術): 入力 xmm_k の上位は宛先へ素通しされるので、宛先の後続の
+       P 読みだけを証拠にする (下位は新しい値で上書きされるので S は証拠にしない)。
+  4. 関数: いずれかの k の読みが P なら 128 bit 候補 / 全 k が S なら scalar / それ以外は判定不能。
+  5. 独立再計算: CFG を使わない線形走査で、関数範囲内の P 読みの有無を数え、CFG の P ⊆ 線形 P を検査
      (構造上の上限確認にとどまる。同じ逆アセンブラと読み集合 effects() を使う)。
 
 usage: mx33_xmm03.py <pe> <vectorcall.json> <out.json>
@@ -19,7 +24,7 @@ import capstone
 import pefile
 from capstone import x86
 
-from mx6_vectorcall import analyze, bits, effects, _regidx
+from mx6_vectorcall import analyze, bits, effects, _regidx, XOR_IDIOM
 
 MERGE_DEST = {'movss', 'movsd', 'movlps', 'movlpd', 'movhps', 'movhpd', 'movhlps', 'movlhps'}
 BITWISE = {'andps', 'andnps', 'orps', 'xorps', 'andpd', 'andnpd', 'orpd', 'xorpd'}
@@ -27,6 +32,8 @@ FULLW = {'movaps', 'movapd', 'movups', 'movupd', 'movdqa', 'movdqu', 'movntps', 
 SHUF = {'movddup', 'movsldup', 'movshdup', 'movhlps', 'movlhps'}
 SCALAR_CVT = re.compile(r'cvtt?(ss|sd)2si')
 SCALAR_CONSUME = re.compile(r'(add|sub|mul|div|min|max|cmp|fn?m(add|sub))')
+COPY = {'movaps', 'movapd', 'movups', 'movupd', 'movdqa', 'movdqu'}
+CALL_VOLATILE = range(6)  # xmm0-5: call の境界で引数として渡りうる
 
 
 def base_mnem(ins):
@@ -69,20 +76,114 @@ def classify_read(md, ins, k, literal_cvtsi2=False):
     return 'A', '未分類 (%s)' % b
 
 
-def fn_class(per_k_cls):
-    if any(v == 'P' for v in per_k_cls.values()):
-        return '128bit'
-    if per_k_cls and all(v == 'S' for v in per_k_cls.values()):
-        return 'scalar'
-    return 'undetermined'
+def copy_pair(md, ins):
+    """reg-reg 全幅複写 (xmm_dst ← xmm_src) なら (src, dst)、違えば None。"""
+    if base_mnem(ins) not in COPY or len(ins.operands) != 2:
+        return None
+    d, s = ins.operands
+    if d.type != x86.X86_OP_REG or s.type != x86.X86_OP_REG:
+        return None
+    dst, src = _regidx(md, d.reg), _regidx(md, s.reg)
+    return (src, dst) if dst is not None and src is not None else None
+
+
+def upper_flow_dst(md, ins, k):
+    """merge の入力 xmm_k の上位が素通しされる宛先 (VEX 3 オペランドの cvtsi2* / scalar 上位保持)。該当しなければ None。"""
+    b = base_mnem(ins)
+    ops = ins.operands
+    if len(ops) != 3 or ops[0].type != x86.X86_OP_REG or ops[1].type != x86.X86_OP_REG:
+        return None
+    if _regidx(md, ops[1].reg) != k:
+        return None
+    if not (b.startswith('cvtsi2') or (b.endswith(('ss', 'sd')) and not SCALAR_CONSUME.match(b))):
+        return None
+    return _regidx(md, ops[0].reg)
+
+
+def full_kill(md, ins, t):
+    """xmm_t を全幅で上書きする命令か (宛先が t の reg で全幅の書込)。"""
+    ops = ins.operands
+    if not ops or ops[0].type != x86.X86_OP_REG or _regidx(md, ops[0].reg) != t:
+        return False
+    b = base_mnem(ins)
+    return b in FULLW or b in ('movd', 'movq') or ins.mnemonic in XOR_IDIOM
+
+
+def follow(md, insns, succ, start, taint0, s_is_evidence, merge=False):
+    """insns[start] の後続で taint0 (xmm レジスタ集合) の値を CFG 上で追う。
+    P 読み → ('P', 理由)。s_is_evidence なら S 読み → 証拠。どちらでもなければ ('A', 理由)。
+    追跡中に、taint の値を読む命令が曖昧 (A) なら A で止める。taint の部分書込 (読まない) は A。
+    merge=True は merge の保持上位 (bit 127:64) の追跡。shuffle 族 (movddup 等) は下位 64 bit しか読まないため証拠にしない。"""
+    stack = [(s, frozenset(taint0)) for s in succ[start]]
+    seen = set()
+    evid = False
+    while stack:
+        k, T = stack.pop()
+        if (k, T) in seen or not T:
+            continue
+        seen.add((k, T))
+        ins = insns[k]
+        if ins.group(x86.X86_GRP_CALL) and any(t in CALL_VOLATILE for t in T):
+            return 'A', 'call 境界で追跡中の値が引数として渡りうる'
+        if ins.group(x86.X86_GRP_RET) and 0 in T:
+            return 'A', 'ret で追跡中の値 (xmm0 戻り値) が呼出側へ渡る'
+        if not succ[k] and not ins.group(x86.X86_GRP_RET) and ins.mnemonic not in ('int3', 'ud2') \
+                and any(t in CALL_VOLATILE for t in T):
+            return 'A', '関数外への jmp で追跡中の値が引数として渡りうる'
+        rd, wr = effects(md, ins)
+        cp = copy_pair(md, ins)
+        hit = {t for t in T if rd >> t & 1}
+        read_s = set()
+        for t in hit:
+            cls, why = classify_read(md, ins, t)
+            if cls == 'P' and merge and why == 'shuffle 族':
+                return 'A', 'merge 上位の読みが shuffle (下位 64 bit のみ読む): %s' % base_mnem(ins)
+            if cls == 'P':
+                return 'P', why
+            if cls == 'S':
+                read_s.add(t)
+                evid = evid or s_is_evidence
+                continue
+            if cp is not None and cp[0] == t:
+                continue
+            return 'A', '追跡中の読みが曖昧: %s (%s)' % (base_mnem(ins), why)
+        T2 = set(T)
+        for t in T:
+            if not (wr >> t & 1):
+                continue
+            if t in read_s:
+                continue
+            if full_kill(md, ins, t) and t not in hit:
+                T2.discard(t)
+                continue
+            return 'A', '追跡中の値が部分書込で上書きされる: %s' % base_mnem(ins)
+        if cp is not None and cp[0] in T:
+            T2.add(cp[1])
+        for s in succ[k]:
+            stack.append((s, frozenset(T2)))
+    if evid:
+        return 'S', 'CFG 後続の読みが全て scalar'
+    return 'A', 'CFG 後続に幅の証拠なし'
 
 
 def classify_fn(md, r, literal_cvtsi2=False, bitwise_as_p=False):
+    insns, succ = r['cfg']
+    idx = {ins.address: i for i, ins in enumerate(insns)}
     reads = {}
     for ins, k in r['undef_reads03']:
         c, why = classify_read(md, ins, k, literal_cvtsi2)
         if bitwise_as_p and why.startswith('bitwise'):
             c = 'P'
+        if c == 'A':
+            cp = copy_pair(md, ins)
+            up = upper_flow_dst(md, ins, k)
+            if cp is not None and cp[0] == k:
+                c, w = follow(md, insns, succ, idx[ins.address], {cp[1]}, True)
+                why = '複写先の後続: %s' % w
+            elif up is not None:
+                c, w = follow(md, insns, succ, idx[ins.address], {up}, False, merge=True)
+                if c == 'P':
+                    why = 'merge 上位の後続 P 読み: %s' % w
         reads.setdefault(k, []).append((ins, c, why))
     per_k = {}
     for k, lst in reads.items():
@@ -91,16 +192,30 @@ def classify_fn(md, r, literal_cvtsi2=False, bitwise_as_p=False):
     return fn_class(per_k), per_k, reads
 
 
+def fn_class(per_k_cls):
+    if any(v == 'P' for v in per_k_cls.values()):
+        return '128bit'
+    if per_k_cls and all(v == 'S' for v in per_k_cls.values()):
+        return 'scalar'
+    return 'undetermined'
+
+
 NC = [
     ('addss xmm0,xmm1; ret', 'f30f58c1c3', 'scalar'),
     ('addps xmm0,xmm1; ret', '0f58c1c3', '128bit'),
     ('movss [rsp+8],xmm0; ret', 'f30f11442408c3', 'scalar'),
     ('movaps [rsp+8],xmm0; ret', '0f29442408c3', '128bit'),
-    ('movaps xmm1,xmm0; ret (reg-reg 複写のみ)', '0f28c8c3', 'undetermined'),
+    ('movaps xmm1,xmm0; ret (reg-reg 複写のみ・後続なし)', '0f28c8c3', 'undetermined'),
     ('andps xmm0,xmm1; ret (bitwise → 判定不能)', '0f54c1c3', 'undetermined'),
     ('paddd xmm0,xmm1; ret (integer SIMD)', '660ffec1c3', '128bit'),
     ('movss xmm0,xmm1; ret (k0 は merge のみ・k1 は scalar)', 'f30f10c1c3', 'undetermined'),
     ('vcvtsi2ss xmm0,xmm0,eax; ret (VEX merge のみ)', 'c5fa2ac0c3', 'undetermined'),
+    ('movaps xmm1,xmm0; addss xmm1,xmm2; ret (複写 → scalar 読み)', '0f28c8' + 'f30f58ca' + 'c3', 'scalar'),
+    ('movaps xmm1,xmm0; addps xmm1,xmm2; ret (複写 → 128 bit 読み)', '0f28c8' + '0f58ca' + 'c3', '128bit'),
+    ('movaps xmm1,xmm0; movaps xmm1,[rsp+8]; ret (複写先の全幅上書きで追跡停止)', '0f28c8' + '0f284c2408' + 'c3', 'undetermined'),
+    ('vcvtsi2ss xmm0,xmm0,eax; addps xmm0,xmm1; ret (merge の上位 → 128 bit)', 'c5fa2ac0' + '0f58c1' + 'c3', '128bit'),
+    ('vcvtsi2ss xmm0,xmm0,eax; addss xmm0,xmm1; ret (merge の後続 scalar は証拠にしない)', 'c5fa2ac0' + 'f30f58c1' + 'c3', 'undetermined'),
+    ('vcvtsi2ss xmm0,xmm0,eax; movddup xmm0,xmm0; ret (merge 上位の shuffle は下位 64 bit のみ → 証拠にしない)', 'c5fa2ac0' + 'f20f12c0' + 'c3', 'undetermined'),
 ]
 
 
