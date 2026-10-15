@@ -82,6 +82,6 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_pattern_probe.py   #
 | boot の停止点 | units 895 / 942 (`stopped_at` 895・`boot_threw` exit) |
 | 同じ bin の shim 経路 (`FLE_IPP=1`) | units 209 で停止 (`FLEBOOT_IPP_CHECK` ok=false・既存の判定どおり) |
 
-再現: `FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> bash tools/flelift/boot/py4877_pred_e_probe.sh` (前提: 先に `fle6_measure.sh` で `work/boot/lift` を作る)。emsdk は pin `6.0.12` を `$RUNNER_TEMP` に入れて使った (`/opt/emsdk` は本 run に無い)。
+再現: `FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> bash tools/flelift/boot/py4877_pred_e_probe.sh` (前提: 先に `fle6_measure.sh` で `work/boot/lift` を作る)。emsdk は `docs/REFERENCES.md` の `[EMSDK]` (pin `6.0.12`) を使った。本 run は `[EMSDK]` の既定位置が無く、一時領域に導入した。
 
 結論: 既定経路では `0x12d0cc0` は 1 回だけ呼ばれ、E は `E[0]` だけが書かれ `E[1..999]` は 0 のまま。述語は boot 中に呼ばれず、`patternCount` の実行時の値はこの経路では観測されない。したがって `patternCount` = 999 の仮置きは、この経路では述語の入力に当たらない (未到達)。`patternCount` を実際に呼ぶ経路 (ユーザー操作・flpy 経由) はこの boot の範囲外で、未確認。
