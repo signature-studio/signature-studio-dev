@@ -167,3 +167,30 @@ REPORT §7 (旧 165〜167 行):
 
 - §1-2 (`REPORT_APPENDIX_3090.md`) の『native では面の生成が失敗して別経路に入る (推定)』は、**別経路 = 代替経路 (`f_815e10` の flag != 0) への分岐**であり、面の確保失敗 (仮説 A) ではない。
 - `REPORT_APPENDIX_3090.md` §1-2 の『`[this+0x50]` buf = 0 のまま』は、2^20 面の経路に入った lift の結果であり、native の状態ではない (B-1)。
+
+### B-7 停止点 `unlifted 0x976da0` の実体 (#4032・測定 commit は本 PR の HEAD)
+
+> 再現: `python3 tools/flelift/boot/fle672_static.py <PE>` と下の逆アセンブル (capstone)。動的は `FLE_EXTRA_ROOTS=0x6a7b70,0x976da0 FLE_BOOT_TAG=fle672root976 FLE_BOOT_RUNS=ilt bash tools/flelift/boot/fle6_measure.sh`。結果 JSON: `results/boot_summary_fle672root976_ilt.json`。
+
+- **実体**: PE 内の小さな thunk (`.text`・pdata あり)。`0x976da0: sub rsp,0x28; call 0x976fd0; add rsp,0x28; ret`。`0x976fd0` は `call 0x425210` (`jmp [IAT]`) で、IAT slot `0x1970b10` = **`user32!PostMessageW`**。つまり『ウィンドウへメッセージを投げる』薄いラッパ。ILTools の API ではなく、lift 関数でもない (PE 内の関数)。
+- **なぜ unlifted か**: 直接 call / jmp の先ではない。関数 `0x976c80` が `lea rcx,[rip+0x109]` → `mov [rax+0xc], rcx` で **オブジェクトの vtable 風スロット (+0xc)** に格納する。呼出元 `0x92d24e` は `call [rbx+0xc]` の戻り先で、間接 dispatch。lift の `textrefs` (11,037 件) にも `0x976da0`・`0x976fd0` は無い (`lift_meta.json`)。したがって lift は root / 直接 callee として発見できず、実行時に unlifted で止まる。
+- **実測 (n = 1・同一 lift 方式)**:
+
+| route | 追加 root | units_run | 停止 (boot_threw) | getmem / freemem | CreateCursorFromFont 呼出し |
+|---|---|--:|---|--:|--:|
+| 既定 (FLE_IPP 未指定) | なし | **209** | `exit` @0x412a12 | 1,891 / 776 | 0 |
+| ネガコン (FLE_IPP=0) | なし | **209** | `exit` @0x412a12 | 1,891 / 776 | 0 |
+| ILT 分岐入力 (FLE_IPP=3) | なし | 851 | `unlifted 0x976da0` | 3,139 / 1,490 | 64 |
+| ILT 分岐入力 + 0x976da0 root | `0x976da0` | **895** | `oob memory access out of bounds` | — | 64 |
+
+- 0x976da0 を root 化すると、停止点は unit 851 → 895 に進み、`unlifted` は消える。次の停止は `oob memory access out of bounds` (ログに発生箇所は無い・未特定)。
+- **既定経路は不変** (209 → 209)。よって受入 2『既定経路で units_run > 209』は**未達**。root 化は `FLE_EXTRA_ROOTS` の opt-in で、既定 (`fle6` の root 0x6a7b70 のみ) には入っていない。
+
+### B-8 未解決 (起票先付き・本 PR)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 既定経路で units_run > 209 (受入 2) | 製品 KPI の既定経路は 209 のまま | 本 issue #4032 (Refs・未達) |
+| 0x976da0 の root 化を既定 root に入れるか | 既定経路の units を 895 に上げられるが、既定 lift の範囲変更 | PM 判断 |
+| 次の停止 `oob memory access out of bounds` (unit 895・発生箇所未特定) | 最初のウィンドウ未達 | 本 issue の次段 (子 issue は PM 判断) |
+| 0x976c80 の vtable 格納を lift の間接 callee 解析で拾う方式 | 同種の thunk が他にもある可能性 | 未起票 (PM 判断) |
