@@ -7,7 +7,7 @@
   - 関数の範囲 [RVA, end) が 600 バイト以下
   - 関数内に RIP 相対の読み (定数テーブル) がある
   - classify_fn が 'scalar'
-  - 逆アセンブル上の float 演算 (*ss/*sd) を 1 つ以上含む
+  - 逆アセンブル上の float 演算 (*ss/*sd。movss/movsd を含む) を 1 つ以上含む
 各候補について、入口 livein の読み命令 (位置・mnemonic・分類・理由) と線形 P 読みの有無を出す。
 
 usage: mx55_nonvec_float.py <pe> <vectorcall.json> <out.json>

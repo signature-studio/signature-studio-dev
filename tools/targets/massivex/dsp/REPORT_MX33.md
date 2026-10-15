@@ -202,18 +202,21 @@
     k=2 の P 読みは線形でも 0 件。
   - 呼出元: 直接 `E8`/`E9` の rel32 参照は .text 全体で 0 件 (`0x17b680` を含む 4 件すべて)。引数の渡し方は未確定。
     間接 call・vtable・pdata 経由で呼ばれるとみられるが、呼出元の引数幅は解析していない (U3e・MX-37 側)。
-- **残件 (U3g の範囲外)**: 非 vectorcall の確定 (呼出元で xmm2 を渡すこと) は未確認。内部入口 13 件は
+- **残件 (U3g の範囲外)**: 非 vectorcall の確定 (呼出元で xmm2 を渡すこと) は未確認。内部入口 12 件は
   `classify_fn` で scalar だが、いずれも直接 call 0 件で引数の出所を確かめていない。判定の正しさの確認は MX-37 の残件に残す。
 - **import 名**: VST3 の import (318 件) に libm/CRT の float 関数 (sin・cos・exp・pow・sqrt 等) は無い (再確認)。
   よって同定は内部の関数のみ。
 
 ## 8. 測定 commit と差分 (docs/WORKFLOW.md §6)
 
-- 測定 commit = **`d106f3c23`** (`fix(massivex): record merge follow-up reasons for xmm0-3 undetermined (MX-37 #3774)`)。前版 = `1083467fe` (`feat(massivex): follow copy/merge destinations ... (MX-37 #3774)`、PR #4620)。
-  変更 (#3774): `scripts/mx33_xmm03.py` (複写先・merge 上位の後続追跡 `follow()`・NC 6 件追加)・`scripts/mx6_vectorcall.py` (`analyze()` の返り値に `cfg` を追加・JSON には出さない)。
-- commit `1083467fe` 自身の変更は上記 2 ファイルのみ (`mx6_e2e.sh` は commit `1083467fe` では未変更)。
-  ただし `git diff d9a2b7ec2 1083467fe -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は 3 ファイル (+154/−20 行) で、`mx6_e2e.sh` の 37 行は main 取り込み (他 PR の変更) による差分。
-- 測定 commit から HEAD までのコード差分 (`git diff 1083467fe HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh`) は 0 行 (HEAD `e078d37fc` は docs のみ)。
-- 測定 (#3774・`mx6_e2e.sh`・MX_PE = 展開 `Massive X.vst3`・md5 `622993e7…` 一致): **exit 0・elapsed 48 s・load 0.08 0.06 0.09 → 0.64 0.21 0.14**。受入 1 の件数は scalar 1 / 128 bit 0 / 判定不能 16 (前版 0 / 0 / 17)。
-  `git diff 1083467fe HEAD -- tools/targets/massivex/dsp` の差分は本 REPORT の修正 (docs のみ・測定対象外)。
+- 測定 commit = **`d9edb0ad9`** (`feat(massivex): identify scalar-read internal float fn and check classification (MX-55 #5030)`)。
+  変更: `scripts/mx55_nonvec_float.py` (新規)・本 REPORT §9。前回の測定 commit = `d106f3c23` (MX-37 #3774)。
+- 測定 (MX-55 実装 run・`mx6_e2e.sh`・MX_PE = 展開 `Massive X.vst3`・md5 `622993e7…` 一致): **exit 0・elapsed 58 s・load 0.24 0.41 0.22 → 0.70 0.51 0.27**。
+  mx55 の候補は **14 行 = 一意 13 関数** (§9)。`mx6_e2e.sh` は `mx55` を呼ばないため、mx55 の件数は同じ素材での個別実行の値。
+- **再現の状況**: 本 fix run (review 差し戻し対応) では `plugins-massivex` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、
+  `Massive X.vst3` を展開できないため、上の e2e と mx55 は再実行していない。上の値は実装 run の記録。
+  再測定は素材 `plugins-massivex` を付けて再起動した run で行う。
+- 測定 commit から HEAD までのコード差分: `git diff d9edb0ad9 HEAD -- tools/targets/massivex/dsp/scripts` は `mx55_nonvec_float.py` の docstring の 1 行のみ (説明文の修正・判定ロジックは変えない)。
+  `mx6_e2e.sh` は差分 0。
+- 上の差分は docstring のみのため、測定値は測定 commit のコードに対するものとして扱う。
 - MX-6 測定 commit (`fbc9971f`) からの変更 (`mx6_vectorcall.py` の +4/−1 行・`mx6_e2e.sh`) は、MX-6 の表示値を変えないことを e2e (§5) で確認した。
