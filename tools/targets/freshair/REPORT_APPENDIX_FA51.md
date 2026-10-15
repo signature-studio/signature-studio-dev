@@ -8,10 +8,10 @@
 |---|---|
 | SC 側の root | `0x1808e1fa0` (process 本体)。FA-45 が使った `0x1808e1f30` は deleting destructor で process ではなかった (§2) |
 | KH 側の root | `0x18085a730` (formant process, `snapins.json` の `formant`・ns `vocalfilter`) |
-| C4 同一入力 | 同一 seed `0x5F17E4`・N=200・600 call。**param 写像は未確定** (SC 側の型の読みが FA-39 と食い違う・§2) |
-| L/R (C5) | 600/600 call で bit 一致 (測定値)。ただし写像が未確定のため、同一性の根拠にしない |
-| state (C5) | 591/600 call で不一致 (比較窓 0x80 B の先頭付近)。判定は「bit 不一致の確定のみ」(C6) |
-| 意味の同一性 | **未判定**。param 写像と state 窓の配置が未確定 (§2・§4) |
+| C4 同一入力 | 同一 seed `0x5F17E4`・N=200・600 call。param 写像は両側の逆アセンブルで確認済み (§2) |
+| L/R (C5) | 600/600 call で bit 一致 (測定値・写像確定後の再測定 §3) |
+| state (C5) | 591/600 call で不一致 (比較窓 `S+0xa0`・先頭付近)。`S+0xca0` は 600/600 不一致。判定は「bit 不一致の確定のみ」(C6) |
+| 意味の同一性 | **未判定**。state 窓の配置が未確定 (§4・#4417 / FA-54) |
 
 ## §2. param 写像の根拠 (機械語の読み)
 
@@ -46,11 +46,27 @@
 
 ## §3. 測定 (コミット済み HEAD で再現)
 
-- 測定 commit: `6e5a837a6` (root の訂正と差分ハーネスを commit した最後の commit)。nproc=4・load 1 分値 0.03〜0.11 (08:49〜08:50)。
-- 実行: `SC_CORE=<SlateCore.core_64> KH_CORE=<HeartCore.core_64> bash tools/targets/freshair/ks_semantic_vf_scen.sh 200 0x5F17E4 0`
-- 実測: fma=0 `real 0.617 s`・`user 0.530 s`・EXIT=0。fma=1 `real 0.622 s`・`user 0.531 s`・EXIT=0。
-- SC の出力は fma=0 と fma=1 でバイト一致 (`cmp`)。このシナリオでは fma の差が出力に出ない。
-- smoke (`ks_sc_vf_smoke.sh 20`・root 訂正後): fma=0/1 とも rows=20・ERR=0・stderr=0 B。
+- 測定 commit: `532617a68` (写像の読みと KH harness を直した最後の commit。以降のコード差分は無い)。nproc=4・load 1 分値 0.02〜0.09。素材は `work-liftlib-targets` を `$ARTIFACTS_DIR` から展開したもの (`SlateCore.core_64`・`HeartCore.core_64`)。
+- 実行: `SC_CORE=<SlateCore.core_64> KH_CORE=<HeartCore.core_64> bash tools/targets/freshair/ks_semantic_vf_scen.sh 200 0x5F17E4 0` (fma=1 は末尾を `1`)。
+- 実測: fma=0 `real 3.665 s`・`user 0.560 s`・EXIT=0 (初回のため clang の build を含む)。fma=1 `real 0.675 s`・`user 0.552 s`・EXIT=0。
+- fma=0 と fma=1 の `cmp.txt` はバイト一致 (`cmp`)。
+- 出力 (fma=0 と同一の `cmp.txt`): `scenarios=200 calls=600`・`L/R bit mismatch calls=0`・`S+0x98 0`・`S+0xa0 591/600`・`S+0x4a0 0`・`S+0xca0 600/600`。前回 (`6e5a837a6`) の報告値と一致した。
+- smoke (`ks_sc_vf_smoke.sh 20`・root 訂正後): fma=0/1 とも rows=20・ERR=0・stderr=0 B (smoke は SC 単独で、この commit の写像変更の影響を受けない)。
+
+`cmp.txt` (fma=0・fma=1 共通):
+
+```
+scenarios=200 calls=600
+L/R bit mismatch calls=0
+state field mismatch [sr S+0x98/KH+0x60]: calls=0 first(scen,byte)=None
+state field mismatch [arr S+0xa0/KH+0x70]: calls=591 first(scen,byte)=('S0', 104)
+state field mismatch [arr S+0x4a0/KH+0x470]: calls=0 first(scen,byte)=None
+state field mismatch [ctx S+0xca0/KH+0xc70]: calls=600 first(scen,byte)=('S0', 1640)
+state word mismatch [sr S+0x98/KH+0x60]: words=0 rel>1e-3 (|SC-KH|/|KH|)=0
+state word mismatch [arr S+0xa0/KH+0x70]: words=4417 rel>1e-3 (|SC-KH|/|KH|)=389
+state word mismatch [arr S+0x4a0/KH+0x470]: words=0 rel>1e-3 (|SC-KH|/|KH|)=0
+state word mismatch [ctx S+0xca0/KH+0xc70]: words=1200 rel>1e-3 (|SC-KH|/|KH|)=1200
+```
 
 | 比較 | 結果 |
 |---|---|
@@ -72,13 +88,14 @@
 
 ## §5. 受入条件への対応
 
-- 受入 1 (KH param 写像の機械語読みで確定・根拠): **未達**。写像が FA-39 と食い違い、本 run で逆アセンブルし直せない (§2)。
-- 受入 2 (同一 seed・N=200 の bit 一致の実測 C5): 測定は実施済み (§3、`6e5a837a6`)。L/R 600/600 は一致、state は 591/600 が不一致。写像と state 窓が未確定のため、判定は未達。
+- 受入 1 (KH param 写像の機械語読みで確定・根拠): **達成**。両側の逆アセンブル行で §2 の表に書いた (`HeartCore.core_64` `0x18085a730`・`SlateCore.core_64` `0x1808e1fa0`)。
+- 受入 2 (同一 seed・N=200 の bit 一致の実測 C5): 測定は実施済み (§3、`532617a68`、fma=0/1)。L/R 600/600 は一致。state は `S+0xa0` 591/600・`S+0xca0` 600/600 が不一致。state 窓の確定は #4417 (FA-54) に残す。よって受入 2 は「L/R の一致と state 不一致の記録まで」で、意味の同一性の判定は未達。
+- 受入 3 (実測の記載先): **逸脱**。issue は `REPORT_APPENDIX_FA45.md` の後続節に書くことを求めたが、実測は本付録 (FA51) に置く。FA45 は root の訂正 (§6) のみ。逸脱はこの記述で明記する。
 - 受入 3 (実測の記載先): **逸脱**。issue は `REPORT_APPENDIX_FA45.md` の後続節に書くことを求めたが、実測は本付録 (FA51) に置く。FA45 は root の訂正 (§6) のみ。逸脱はこの記述で明記する。
 
 ## §5.1 再測定 (本 run)
 
-- 未実施。理由: 素材 `work-liftlib-targets` が `$ARTIFACTS_DIR` に無い (§2)。写像の修正 (レビュー指摘 1) が先で、写像を直した commit の後に `ks_semantic_vf_scen.sh 200 0x5F17E4 0` を再実行して §3 に書く。
+- 実施 (round 2 の指摘 2 への対応)。素材 `work-liftlib-targets` は `$ARTIFACTS_DIR` に存在した (展開して使用)。写像の読みを直した commit `532617a68` の head で `ks_semantic_vf_scen.sh 200 0x5F17E4` を fma=0/1 で実行し、§3 に測定 commit と `cmp.txt` を書いた。報告値 (L/R 0/600・`S+0xa0` 591/600・`S+0xca0` 600/600) と一致した。写像の読みは変えていないので、数値が変わらないのは想定どおり。
 
 ## §6. FA-45 §5 の訂正
 
