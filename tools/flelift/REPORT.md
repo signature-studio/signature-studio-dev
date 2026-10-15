@@ -233,11 +233,14 @@ bash tools/ott/ott_e2e.sh                         # OTT 回帰 (読取のみ, �
 ## 11. 環境パス置換 (#294 / #3603): flelift 直下 3 本の既定値を `tools/shared` 経由へ
 
 - **結論**: `fle_nat.py`・`fle_diff.py`・`probe_d9_disp.py` の従来の既定 (`[WIN64]` の既定) を `tools/shared/paths.py` の `FL_WIN64_DIR` 経由へ置換。`FLE_PE` → `FL_WIN64_DIR` の優先順は不変。lift/IR に触れないため既知類型 (`docs/DEFECTS.md`) は該当なし。
-- **e2e (`fle_e2e.sh`、素材 `fl-win64` + `toolchain-emsdk`)**: before (03df83be4) / after (C1) とも PASS。所要 158 s / 157 s。lift 7,018 関数・unsup 0、spot diff equal 16/16、D9 mismatch 0。出力物の sha256 は全件一致、ログは作業パス以外一致。
+- **e2e (`fle_e2e.sh`、素材 `fl-win64`)**: 素材 `toolchain-emsdk` は展開せず、スクリプトが直接 source する runner 既設の `[EMSDK]` (6.0.12) を使用。before (03df83be4) / after (C1) とも PASS。所要 158 s / 157 s。lift 7,018 関数・unsup 0、spot diff equal 16/16、D9 mismatch 0。出力物の sha256 は全件一致、ログは作業パス以外一致。
 - **仕様差**: `ANALYSIS_DIR` を設定した場合のみ既定が `$ANALYSIS_DIR/win64` になる (従来は無視)。両方未設定の既定は従来どおり。
+- **フォールバックの実測範囲**: e2e は `FLE_PE` を export してから `fle_diff.py`・`probe_d9_disp.py` を呼ぶため、両者の `FL_WIN64_DIR` 式は e2e で評価されない。実測は `probe_d9_disp.py` のネガコンと、PE 代入行の exec による 4 ケースの解決先確認 (`REPORT_APPENDIX.md` §11.2b)。
+- **静的検証のみ**: `fle_nat.py` は e2e の経路外 (リポジトリ内に import 元が無く、`work/libflenative.so` を作る tracked スクリプトも無い)。変更行は py_compile と旧既定値 0 件の静的検証のみ。
 - 変更表・測定条件・静的検証・ネガティブ制御・検算: `REPORT_APPENDIX.md` §11。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
+| 素材 `toolchain-emsdk` を使った `fle_e2e.sh` の before/after | 本節は runner 既設の `[EMSDK]` (同版 6.0.12) で実施。素材版での一致は未確認 | #3661 (CI-173) |
 | `tools/icall` の既定値置換と代表 e2e | 本節の範囲外 (flelift 直下のみ検証) | #3604 |
 | m11 ほか残り area と ott/m11 の代表 e2e | 親 #294 の残り | #294 |

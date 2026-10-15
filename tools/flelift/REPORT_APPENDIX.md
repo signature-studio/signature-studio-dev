@@ -52,7 +52,20 @@ REPORT §11 の付録。指定の見出しは `## 10.` だが、既存の PERF-P
 | 全変数未設定時の `FL_WIN64_DIR` | 従来の `[WIN64]` 既定と一致 |
 | ネガティブ制御: `FL_WIN64_DIR` に存在しないディレクトリを指定し `probe_d9_disp.py` を実行 | `FileNotFoundError` (`<指定dir>/extracted/block00031_PE.bin` を開けず rc=1)。環境変数が効くことを確認 |
 
-### 11.3 e2e before / after (`bash tools/flelift/fle_e2e.sh`、`FL_WIN64_DIR` = 同一の展開先)
+### 11.2b フォールバックの実測 (e2e 外、本 fix で追加)
+
+`fle_e2e.sh` は `FLE_PE` を export してから `fle_diff.py`・`probe_d9_disp.py` を呼ぶため、この 2 本の `FL_WIN64_DIR` 式は e2e で評価されない。両スクリプトの先頭から PE 代入行 (`IMG = 0x400000` の直前まで) を exec し、解決先を 4 ケースで確認した (コード HEAD `ec306ec74`、コード変更なし)。
+
+| 設定した環境変数 | PE の解決先 (両スクリプトで同一) |
+|---|---|
+| なし (すべて未設定) | `ANALYSIS_DIR` 既定 (`tools/shared/env.sh` の値) 配下の `win64/extracted/block00031_PE.bin` |
+| `FL_WIN64_DIR=<存在しない dir>` | `<dir>/extracted/block00031_PE.bin` |
+| `ANALYSIS_DIR=<存在しない dir>` | `<dir>/win64/extracted/block00031_PE.bin` |
+| `FLE_PE=<存在しない file>` + `FL_WIN64_DIR=<存在しない dir>` | `<FLE_PE の値>` (`FLE_PE` 優先) |
+
+4 ケースとも仕様どおり。
+
+### 11.3 e2e before / after (`bash tools/flelift/fle_e2e.sh`、素材 `fl-win64`。`toolchain-emsdk` は展開せず、スクリプトが直接 source する runner 既設の `[EMSDK]` (6.0.12) を使用、`FL_WIN64_DIR` = 同一の展開先)
 
 | 項目 | before (03df83be4) | after (C1 `b5c49356c`) |
 |---|--:|--:|
