@@ -171,6 +171,8 @@
 | SC の ramp 丸め形がソースの意図か | 「どちらが正しい式か」は未確定 | #52 (残件) |
 | Gain 以外の snapin への同じ差分実行の拡大 (#1264 受入 3) | ①の意味同一性は Gain の 1 件のみで判定 | #52 (残件) |
 
+- Gain 以外の判定 (#2739): 判定基準 (§1) と ID 一致 37 組の振り分け (§3) は [REPORT_APPENDIX_2739.md](REPORT_APPENDIX_2739.md)。新規の差分実行は 0 件。Compressor・Filter の差分は #3506・#3507 へ。
+
 ### §A5-2. value 17 件の位置対応・再配置・指す先の切り分け (#2024, 実測)
 
 - 測定 commit: `2ca41218` (追加した 3 本のスクリプトを含む commit。`git diff 2ca41218 HEAD -- tools/targets/freshair` は 0 行)。
