@@ -1,7 +1,7 @@
 /* CAB-262 (IPP-7) 検収の独立再計算: quirk を**実装 (impl/ipp_sig_fill3.c) を参照せず**に
    win64 実 DLL だけに対して確認する probe。
    usage: gcc -O1 -I ../../src -I ../../ref -o /tmp/vq test/verify_cab262_quirks.c ../../ref/pe_load.c -lm
-          /tmp/vq [path/to/block24356_PE.bin]   (省略時 $FL_WIN64_DIR/extracted/block24356_PE.bin)
+          FL_WIN64_DIR=<fl-win64 展開先> /tmp/vq [path/to/block24356_PE.bin]   (省略時 $FL_WIN64_DIR/extracted/block24356_PE.bin)
    出力 (検収実測 2026-10-11, AVX-512 経路 = ippSetCpuFeatures(~0)):
      quirk1 RealToCplx_32f : dst=NULL が最優先 (-8)、len<1 は -6、片方 src NULL は書込のみ
      quirk2 AddProductC_32f : double で 1 回丸め (判別入力 180 組合せのうち DLL と一致は double 側)
