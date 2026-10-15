@@ -6,7 +6,8 @@
 
 - 保留 4 件のうち **3 件**を実装した: `ui.setBrowserAutoHide` (確定)・`ui.setStepEditMode` (状態の所在は確定、末端の書込みは未確定)・`ui.getVersion` (ui 版、mode の型分岐は確定・値は仮置き)。mock と C の差分は 0 (`tests/ui_state_diff.mjs` 58 呼出し)。
 - **`ui.setTimeDispMin` は保留**。callback は値を使わず、getter `getTimeDispMin` が読む field とは別の global byte を toggle するだけ。getter と整合する状態モデルを PE から立てられないため、未実装のまま子 issue に分けた。
-- 未実行: `FL_ENGINE=wasm node tests/all_tools.mjs` (`dist/flpy.js` の生成が必要)。`tests/provider_check.mjs` は取り込み後に section 1〜2b まで実行して通過し、section 3 以降 (flpy 経路) が未実行 (検証の節の『main 取り込み後』を参照)。
+- HEAD (測定 commit `3b74a1077`・main 再取り込み後) の実測: `provider/build.sh` rc 0・ハンドラ 165。`ui_state_diff` 58 呼出し diffs 0 PASS・`ui_diff` 17 呼出し diffs 0 PASS (いずれも wasm)。flpy 不要の 20 本は全件 rc 0・diffs 0。
+- 未実行: `tests/provider_check.mjs` の section 3 以降と `FL_ENGINE=wasm node tests/all_tools.mjs` (48/48)。`dist/flpy.js` (CPython wasm) と flapi_table の生成が要り、本 run の時間内に収まらなかった (§検証 の『HEAD 再測定』)。
 
 ## 手段
 
@@ -41,11 +42,11 @@
 - `host/fl_mock.mjs`: `ui.setBrowserAutoHide` (`st.uiBrowserAutoHide = (v === 1)`)・`ui.setStepEditMode` (`st.uiStepEdit = (v === 1)`)・`ui.getVersion` (mode 4..6 → `""`、他 → `0`)。引数検査は既存の `arity`/`argI` (PY-119 と同じ)。
 - `provider/fl_engine.c`: 同じ 3 関数 (`NARGS(1,1)`・`NARGS(0,1)`・`A_INT(0, 4)` の既定 4)。
 - `tests/ui_state_diff.mjs`: 本 PR で 25 呼出しを追加 (setter → getter の順で状態の一致を見る 19 件と、引数個数違い 6 件)。追加前は 33 呼出し、追加後 58 呼出し。
-- `tests/provider_check.mjs`: `pe130` 集合を追加し、実装 155 → 158・未実装 280 → 277 (総数 435 は不変)。実装件数 158 は `provider/build.sh` の `ハンドラ 158` と一致する (件数の assert 自体は未実行)。main 取り込み後の値は 165・270 (§検証 の『main 取り込み後』)。
+- `tests/provider_check.mjs`: `pe130` 集合を追加し、取り込み前 (PR 作成時) は 実装 155 → 158・未実装 280 → 277 とした (総数 435 は不変)。main 取り込み後の現行値は 実装 165・未実装 270 (§検証 の『HEAD 再測定』)。
 
 ## 検証
 
-測定 commit: `0dd1d67c8` (PR 作成時、main 取り込み前)。以下の表と下の差分は取り込み前の測定。取り込み後の測定は次節 (測定 commit `d0e81d2f8`)。
+測定 commit は節ごとに書く。現行 (最新) の測定は『HEAD 再測定』節 (測定 commit `3b74a1077`)。以下の 2 節は履歴。
 
 環境: runner 4 core。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst`・`toolchain-emsdk.tar.zst` を確認済み。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` に `block00031_PE.bin` と `block24429/24430/25159/24618_DATA.bin` を展開し、`fetch_inputs.sh` (rc 0) で `work/` を作った。
 
@@ -58,14 +59,14 @@
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | **未実行**: 同上 (`work/midi.py` は生成済み・`dist/flpy.js` が無い) | — |
 
 - ネガティブコントロール: 未実施 (時間不足)。
-- コード差分 (取り込み前の測定 commit から PR 作成時の HEAD まで、`tools/python` の .md 以外): 空。
+- コード差分 (取り込み前の測定 commit `0dd1d67c8` から PR 作成時の HEAD `9692b214a` まで、`tools/python` の .md 以外): 空。(取り込み後の範囲は main の変更を含むため、下の節で別に測る。)
 
 ```
 $ git diff 0dd1d67c8 9692b214a -- tools/python ':!*.md'
 (空)
 ```
 
-### main 取り込み後 (測定 commit `d0e81d2f8`)
+### main 取り込み後 (測定 commit `d0e81d2f8`・履歴。現行は『HEAD 再測定』)
 
 `origin/main` (`1bb93134e`) を merge した。競合は `tests/provider_check.mjs` の 1 箇所だけで、PR 側の `pe130` 条件式と main 側の `pl61` 条件式を両方残し、件数の期待値を 158/277 → 165/270 に直した。自動マージされた `provider/fl_engine.c`・`host/fl_mock.mjs`・`docs/DOC_MAP.md` は PR 側の変更が残っていることを確認した。
 
@@ -89,13 +90,38 @@ $ git diff d0e81d2f8 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
+### HEAD 再測定 (測定 commit `3b74a1077`・main 再取り込み後)
+
+測定 commit `3b74a1077` は `origin/main` (`bb0f61949`) を merge した commit。この commit で `tools/python` のコードを最後に変えた。
+
+環境: runner 4 core・load 0.19 (03:54 時点)。`$ARTIFACTS_DIR` には `fl-win64.tar.zst` のみ (`toolchain-emsdk` は無し)。emsdk は upstream から `./emsdk install latest` で入れた (emcc 6.0.12)。fl-win64 の `extracted/` から `block24429/24430/25159/24618_DATA.bin` を取り、`work/midi.py`・`work/utils.py`・`work/MCPTools.pyc`・device script を配置した (`fetch_inputs.sh` の win64 分岐の抜粋)。`block00031_PE.bin` と fl-stubs は取得していない (flpy 経路の未実行の理由)。
+
+| コマンド | 結果 | wall |
+|---|---|---|
+| `EMSDK_ENV=<emsdk>/emsdk_env.sh bash provider/build.sh` | rc 0・警告 0・ハンドラ 165 (`gen_provider.py --check-handlers` も 165) | 1.61 秒 |
+| `node tests/ui_state_diff.mjs` (wasm) | calls 58・diffs 0・PASS | 0.04 秒 |
+| `node tests/ui_diff.mjs` (wasm) | calls 17・diffs 0・範囲外既知差分 3・PASS | 0.05 秒 |
+| `node tests/provider_check.mjs` | 第 1〜2 節 PASS (件数 assert impl 165・unimpl 270 を含む)。第 3 節 (`dist/flpy.js` の読込) で `ERR_MODULE_NOT_FOUND` により rc 1 | 0.06 秒 |
+| flpy 不要の 20 本 (`ui_display_diff` `playlist_diff` `mixer_diff` `general_diff` `device_diff` `channels_diff` `patterns_diff` `transport_diff` `arrangement_diff` `screen_diff` `launchmap_diff` `tool_args` `ilmcp_diff` `midi_path_diff` `note_enum_diff` `step_item_diff` `patterns_group_diff` `arrangement_selection_diff`) | 全件 rc 0・diffs 0 (例: ui_display_diff ok 12・bad 11、note_enum_diff calls 33264・nonempty 5869、channels_diff calls 231) | 各 1 秒未満 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | **未実行**: `dist/flpy.js` (CPython wasm・`build_cpython_wasm.sh` と `build_flpy.sh`) が無い。48/48 は未検証 | — |
+
+- ネガティブコントロール: 未実施 (時間不足)。
+- 件数の内訳: 実装 165 = MCP 60 + device 5 + mig 5 + pe39 1 + pe40 5 + pe102 1 + stub41 6 + pe101 2 + pe100 2 + stub89 2 + pe87 4 + pe94 7 + pe95 9 + pe96 4 + pe115 1 + pe121 5 + pe119 6 + pe119set 6 + pe152 6 + pe121_2982 6 + pe125 2 + pe120 1 + pe76 1 + pe172 2 + pl61 7 + pe179 4 + pe205 2 + pe130 3 (= 本 PR の 3 件)。未実装 270 = 435 − 165。
+
+コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
+
+```
+$ git diff 3b74a1077 HEAD -- tools/python ':!*.md'
+(空。HEAD は REPORT の md 更新のみ)
+```
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `ui.setTimeDispMin` の実装 (toggle 0x16bc9f2 の先と、getter の field との関係) | 未実装のまま。getVersion と setter 2 件とは別作業 | 子 issue (本 PR の issue コメントに番号) |
-| `setStepEditMode` の書込み末端 (`vtbl[0x200]` の先・S の型) | `[S+0x49e]` への書込みは model 上の仮定 | 同上 (子 issue に含める) |
+| `ui.setTimeDispMin` の実装 (toggle 0x16bc9f2 の先と、getter の field との関係) | 未実装のまま。getVersion と setter 2 件とは別作業 | #3706 |
+| `setStepEditMode` の書込み末端 (`vtbl[0x200]` の先・S の型) | `[S+0x49e]` への書込みは model 上の仮定 | #3706 |
 | `setBrowserAutoHide` の notify `0x107f310`・`setStepEditMode` の `0x40ffe0` 通知 | API から観測不能 | 親 #2831 の残件として追跡 |
 | `getVersion` (ui) の値 (X の word 群・3 種の文字列) | 仮置き。実機と異なる | 親 #2831 の残件として追跡 |
-| `provider_check.mjs` の section 3 以降・`all_tools.mjs` (flpy 経路) の未実行 | 48/48 の維持は未検証。件数 165/270 の assert は取り込み後の HEAD で通過 | CPython wasm (`build_cpython_wasm.sh`) を用意して実行 (PM 判断) |
-| 説明文の食い違い (`setTimeDispMin` の stub doc) | 説明文のみ | 上記の子 issue |
+| `provider_check.mjs` の section 3 以降・`all_tools.mjs` (flpy 経路) の未実行 | 48/48 は未検証。件数 165/270 の assert は HEAD `3b74a1077` で通過 | PM 判断 (再測定のみのため子 issue は起票しない。CPython wasm と flapi_table の用意後に別 run で再測定) |
+| 説明文の食い違い (`setTimeDispMin` の stub doc) | 説明文のみ | #3706 |
