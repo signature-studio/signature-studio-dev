@@ -655,7 +655,7 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2814.md` | ~106 | Slayer_Engine.dll (block22434) の未被覆 `.text` 区間の 3 類分類 (#2814)・(b) 5 区間の追加 lift・`std`/`shld`/DF の試験・判定保留 2 区間。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/GAP_CLASSES_2814.md` | ~243 | 未被覆 `.text` 239 区間の分類表 (自動生成: `gap_classify.py --json ... --md`)。 人手編集禁止 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1099.md` | 116 | x87 subset の ia32 lowering (#1099、測定 commit `ce0f0872`)。 実 x87 との差分試験 (`x87_diff.py`)・ネガコン・lift の before/after・x64 回帰。 測定値の正本 |
-| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2966.md` | ~107 | x87 の整数・比較・状態・定数・丸め命令の ia32 lowering (#2966 PLG-G2-23 の部分達成、測定 commit `c508291cf`)。 差分試験 (`x87_diff.py` の op 表・RC・C1 のネガコン)・定数の寄与・lift の before/after・x64 回帰。 測定値の正本 |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2966.md` | ~116 | x87 の整数・比較・状態・定数・丸め命令の ia32 lowering (#2966 PLG-G2-23 の部分達成、測定 commit `c508291cf`)。 差分試験 (`x87_diff.py` の op 表・RC・C1 のネガコン)・定数の寄与・lift の before/after・x64 回帰。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2967.md` | 120 | x87 の m80 経路 (fld/fstp tbyte)・RC 固定の算術と fst m32/m64・f80↔f64 往復 (#2967、測定 commit `59fb4abd6`)。 ネガコン 2 種 (fsub 取り違え・m80 取り違え)。 RC≠nearest の材料 (ADR D28 改訂は PM 判断)。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1223.md` | ~54 | Slayer_Engine.dll (block22434) の native vs wasm 差分試験 (#1223 PLG-G2-11): leaf 関数 4 本の eax と OBJ 領域の bit 突合・ネガコン。 測定値の正本 (REPORT §13 の付録) |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2989.md` | ~95 | x87 を含む leaf 関数 2 本の native vs wasm 差分試験 (#2989 PLG-G2-25): eax・x87 深さ・ST(0)・OBJ 窓の突合、ST(0) の f64 の丸め差の分布、ネガコン 2 種 (判定器・lowering の 1 演算の取り違え)。 測定値の正本 |
