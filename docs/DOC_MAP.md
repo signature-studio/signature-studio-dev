@@ -560,7 +560,7 @@
 | `tools/python/REPORT_PY172.md` | 89 | PY-172 (#3219): patterns グループ系 4 関数の PE 確定 (件数・群名・群の索引は 0 始まり・索引 -1 の意味は未確定)。getPatternGroupCount / getPatternGroupName を件数 0 の仮置きで C・mock に実装 (差分 0)。残り 2 件は子 #3278 (PY-180) |
 | `tools/python/REPORT_PY120.md` | 120 | PY-120 (#2981): ui の操作・キー・ジョグ・編集 27 関数の PE 呼出し契約 (書式・既定値・op code・経路)。PE 確定 0 件 (作用先・戻り値の値が未確定) で保留。0xd81740 は関数ではなく型記述子、0x15e1e58 は PyArg_ParseTuple スロットと訂正。mock/C 差分 0 (実装なし) |
 | `tools/python/REPORT_PY119.md` | ~87 | PY-119 (#2980): ui の状態・フォーカス・文字列ゲッター 6 件 (getFocused / getFocusedFormID / getFocusedFormCaption / getFocusedPluginName / getHintMsg / isInPopupMenu) の PE 根拠・mock/C 差分 0・値は仮置き。保留 12 件は #3005・#3006・#3007 |
-| `tools/python/REPORT_PY129.md` | 83 | PY-129 (#3006): ui の setter 3 件 (setHintMsg / setFocused / setSnapMode) の PE 呼出し経路と mock/C 実装 (値は持たない・戻り None)・mock/C 差分 0。snapMode (0xfdd2c0) と setter の状態モデルは子 #3719 (PY-239) |
+| `tools/python/REPORT_PY129.md` | 83 | PY-129 (#3006): ui の setter 3 件 (setHintMsg / setFocused / setSnapMode) の PE 呼出し経路と mock/C 実装 (値は持たない・戻り None)・mock/C 差分 0。snapMode (0xfdd2c0) と setter の状態モデルは子 #3719 (PY-242) |
 | `tools/python/REPORT_PY120_2984.md` | ~186 | PY-120 (#2984): launchMapPages 12 件のうち `length` 1 件を PE (0xd791b0) で確定・mock/C 差分 0 (件数は仮置き 0)。残り 11 件は子 #3027・#3029・#3030 |
 | `tools/python/REPORT_APPENDIX_2984.md` | ~184 | PY-120 (#2984) の付録: REPORT §検証 から分割移動した過去の測定節 (初回〜merge `a2a56bf8`)。内容は削除していない。正本は `REPORT_PY120_2984.md` |
 | `tools/python/REPORT_PY119_2977.md` | ~100 | PY-119 (#2977): general の setter 6 件 (setRecPPQ / setNumerator / setDenominator / setUndoHistoryPos / Count / Last) の PE 確定 (範囲・status 文言の VA・undo 書込み先)・mock/C 差分 0・ゲート (G = 0x15e4790)・例外型・既定値は未確定 (親 #2830 にコメント)。解析補助 `analysis/flapi/pe_cstr.py` |

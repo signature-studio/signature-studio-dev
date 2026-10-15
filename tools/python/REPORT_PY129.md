@@ -1,4 +1,4 @@
-# tools/python REPORT: PY-129 ui setter 4 件の PE 呼出し経路と C provider 実装 (#3006, 親 #2980 PY-119, 子 #3719 PY-239)
+# tools/python REPORT: PY-129 ui setter 4 件の PE 呼出し経路と C provider 実装 (#3006, 親 #2980 PY-119, 子 #3719 PY-242)
 
 > 正本: `tools/python/REPORT_PY119.md` (保留 12 件の一覧と VA)。本 run の根拠は PE `block00031_PE.bin` の逆アセンブル (VA 付き)。
 
@@ -7,7 +7,7 @@
 - PY-119 で保留した ui の setter 4 件のうち、**3 件** (`ui.setHintMsg` / `ui.setFocused` / `ui.setSnapMode`) は呼出し経路 (書込み先の呼出し・引数の変換・戻り型) を PE で確定し、mock と C provider に実装した。実装の戻り値は None。**状態は持たない (仮置き)**。書込んだ値を後で読み出す経路は未確定のため、setter は値を記録しない。
 - 残り **1 件** `ui.snapMode` は保留 (`0xfdd2c0` の意味が未同定)。実装しない。
 - mock と C の差分は 0 (`tests/ui_state_diff.mjs` calls 52・diffs 0)。`tests/provider_check.mjs` は実装 158 / 未実装 277 (PR 前は 155 / 280)。`FL_ENGINE=wasm tests/all_tools.mjs` は 48/48 ok を維持。
-- 未確定の点 (setter の状態モデル・setSnapMode の範囲外・snapMode) は子 issue **#3719 ([PY-239])** に分けた。
+- 未確定の点 (setter の状態モデル・setSnapMode の範囲外・snapMode) は子 issue **#3719 ([PY-242])** に分けた。
 
 ## 手段
 
@@ -35,7 +35,7 @@
 
 | 関数 | entry | fn (VA) | 確定した事実 | 未確定の点 | 子 issue |
 |---|---|---|---|---|---|
-| `ui.snapMode` | 0x151b468 | 0xd6b8d0 | flags 1 (VARARGS)・stub は int。PyArg `i` の後 `0xd84680(obj, &out, id=0x31, value=i, flag=0xfdd270(), 0xf)` → 内部で `0xfdd2c0(id, value, flag, 0xf)` | `0xfdd2c0` の意味 (読み書きの別・戻り値の範囲)。`0xd82c20` (戻り変換) の確認 | PY-239 (#3719) |
+| `ui.snapMode` | 0x151b468 | 0xd6b8d0 | flags 1 (VARARGS)・stub は int。PyArg `i` の後 `0xd84680(obj, &out, id=0x31, value=i, flag=0xfdd270(), 0xf)` → 内部で `0xfdd2c0(id, value, flag, 0xf)` | `0xfdd2c0` の意味 (読み書きの別・戻り値の範囲)。`0xd82c20` (戻り変換) の確認 | PY-242 (#3719) |
 
 ## 検証
 
@@ -77,7 +77,7 @@ $ git diff 195ae347d HEAD -- tools/python ':!*.md'
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| setHintMsg / setFocused / setSnapMode の状態モデル (値を持たない。書込んだ値の読出し経路は未確定: getHintMsg の `[0x15e2eb8]→+0xbe8` と `0x11f16b0` の `+0x858` 系が同じ object か、getFocused の sub-object の読出し) | 書いた値を後で読めない。mock と C は getHintMsg / getFocused / getSnapMode を初期値で返す | 子 #3719 (PY-239) |
-| setSnapMode の範囲外 (i ∉ 0..14・gate 偽) の挙動 (status -2 のまま。Python 側の戻り変換 `0xd82c20` が未確認) | 範囲外で例外になるかが未確認。mock と C は範囲検査せず None を返す | 子 #3719 (PY-239) |
-| snapMode (`0xfdd2c0` id 0x31) の意味・戻り型 | `ui.snapMode` は未実装 (Unspecified error) | 子 #3719 (PY-239) |
+| setHintMsg / setFocused / setSnapMode の状態モデル (値を持たない。書込んだ値の読出し経路は未確定: getHintMsg の `[0x15e2eb8]→+0xbe8` と `0x11f16b0` の `+0x858` 系が同じ object か、getFocused の sub-object の読出し) | 書いた値を後で読めない。mock と C は getHintMsg / getFocused / getSnapMode を初期値で返す | 子 #3719 (PY-242) |
+| setSnapMode の範囲外 (i ∉ 0..14・gate 偽) の挙動 (status -2 のまま。Python 側の戻り変換 `0xd82c20` が未確認) | 範囲外で例外になるかが未確認。mock と C は範囲検査せず None を返す | 子 #3719 (PY-242) |
+| snapMode (`0xfdd2c0` id 0x31) の意味・戻り型 | `ui.snapMode` は未実装 (Unspecified error) | 子 #3719 (PY-242) |
 | 実装 3 件の値 (None・状態なし) は実機測定していない | 実機の戻り挙動は未確認 | 親 #2831 の残件として追跡 |
