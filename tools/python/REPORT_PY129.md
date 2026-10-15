@@ -39,7 +39,7 @@
 
 ## 検証
 
-測定 commit: `e4a7903b1` (tools/python のコードを変えた最後の commit。origin/main `57c01b91b` の取り込み merge `9f3779cc7` と件数の修正 `e4a7903b1`。競合は `tests/provider_check.mjs` の 1 件ずつ)。検証 HEAD は `e4a7903b1` で、以下の全件をこの HEAD で再実行した (CPython のみ例外: 下の注)。ネガティブコントロールも `e4a7903b1` で再実行した。
+測定 commit: `f48ddb218` (tools/python のコードを変えた最後の commit。origin/main `c3916d65e` まで取り込んだ merge。main 側の `analysis/py300_ret_census.py` (新規) を含む)。検証 HEAD は `f48ddb218` で、以下の全件をこの HEAD で再実行した (CPython のみ例外: 下の注)。ネガティブコントロールも `e4a7903b1` で再実行した。
 
 環境: runner 4 core。`load` は `/proc/loadavg` の 1 分平均 (テスト行はループ開始時に読んだ値)。`fl-win64.tar.zst` を `[FL-WIN64]` の展開先 (`$FL_WIN64_DIR`) に全展開し (`FL_WIN64_DIR`)、`fetch_inputs.sh` で `work/` に配置した。`toolchain-emsdk.tar.zst` は `[EMSDK]` の展開先に展開したが、`[EMSDK]` の版 (`releases-6e9f6885…-64bit`) が展開物と同一だったため、ビルドは `EMSDK_DIR=[EMSDK]` で行った。
 
@@ -64,7 +64,7 @@
 注: `build_cpython_wasm.sh` は `5e92b8104` で実行した。以後 `build_cpython_wasm.sh`・`build_flpy.sh`・`src/`・`provider/build.sh`・`gen_provider.py`・`analysis/flapi` は変えていない (`git diff --stat 5e92b8104 HEAD` で 0 行)。`flpy.wasm` は `e4a7903b1` で再ビルドし rc 0。
 
 - `ui_state_diff.mjs` の calls 102 は、通常呼出し・引数個数違い・型違いを合わせた件数 (スクリプトの `calls` と `arity` の合計)。PY-119 報告の calls 12 は現在の呼出し列と一致しない。PY-119 の件数は古いまま残っている (本 PR では訂正しない)。
-- ネガティブコントロール (`e4a7903b1`): `host/fl_mock.mjs` の `ui.setSnapMode` (447 行) の引数個数検査 `arity(a, 1, 1)` を `arity(a, 1, 2)` に変えると、`node tests/ui_state_diff.mjs` は rc 1 (FAIL)。元に戻すと calls 102・diffs 0・PASS (rc 0)。元に戻した後の `git diff -- tools/python/host/fl_mock.mjs` は空。`provider/*.wasm` は変えていない (mock のみの変更)。
+- ネガティブコントロール (`f48ddb218`): `host/fl_mock.mjs` の `ui.setSnapMode` (447 行) の引数個数検査 `arity(a, 1, 1)` を `arity(a, 1, 2)` に変えると、`node tests/ui_state_diff.mjs` は rc 1 (FAIL)。元に戻すと calls 102・diffs 0・PASS (rc 0)。元に戻した後の `git diff -- tools/python/host/fl_mock.mjs` は空。`provider/*.wasm` は変えていない (mock のみの変更)。
 
 ## コード差分
 
@@ -75,6 +75,9 @@
 - `analysis/flapi/pe_handler_probe.py`: VA 指定 (`0x...`) で任意の VA を逆アセンブルできるようにした。名前指定の動作は変えていない。
 
 ```
+$ git diff e4a7903b1 HEAD -- tools/python ':!*.md'
+(空。差分 0 行)
+
 $ git diff 5e92b8104 HEAD -- tools/python/build_cpython_wasm.sh tools/python/build_flpy.sh tools/python/src tools/python/provider/build.sh tools/python/provider/gen_provider.py tools/python/analysis/flapi
 (空。差分 0 行)
 ```
