@@ -48,13 +48,13 @@
 
 - 測定 commit: `38e8ba9bf` (probe のコードを変えた最後の commit)。以降の commit は REPORT の文言だけを変える。
 - 測定 commit から検証 HEAD までの probe 差分: 0 (`git diff 38e8ba9bf HEAD -- tools/python/analysis/flapi/pe_py354_probe.py tools/python/analysis/flapi/pe_py141_probe.py` の出力は空)。
-- 検証 HEAD: `5e66804da` (probe のコードは `38e8ba9bf` から無変更。`5e66804da` は REPORT の検証節だけを変える)。
-- 実測 (HEAD `5e66804da`、素材 fl-win64 の `extracted/block00031_PE.bin` だけを展開):
+- 検証 HEAD: `bd32455be` (実測を取った commit。以降は検証節の文言だけを変える。probe のコードは `38e8ba9bf` から無変更)。
+- 実測 (HEAD `bd32455be`、素材 fl-win64 の `extracted/block00031_PE.bin` だけを展開):
 
 | コマンド | 結果 | wall | load |
 |---|---|---|---|
-| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py354_probe.py` | PASS (rc 0・全 13 項目 ok) | 3.54 秒 | 0.52 / 0.35 / 0.14 (11:20 UTC、開始時) |
-| 既存の検算 `analysis/flapi/pe_py141_probe.py` (回帰確認・素材同じ) | PASS (rc 0・「PASS」行を確認) | 0.23 秒 | 0.56 / 0.36 / 0.14 (11:20 UTC、終了時) |
+| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py354_probe.py` | PASS (rc 0・全 13 項目 ok) | 3.39 秒 | 0.52 / 0.36 / 0.15 (11:20:28 UTC、終了時) |
+| 既存の検算 `analysis/flapi/pe_py141_probe.py` (回帰確認・素材同じ) | PASS (rc 0・「PASS」行を確認) | 0.23 秒 | 0.55 / 0.37 / 0.15 (11:20:31 UTC、終了時) |
 
 ## 未解決
 
