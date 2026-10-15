@@ -80,6 +80,6 @@ Ghidra ログ: `DumpFunctions: 59009 functions`、image base `00400000`。
 - minor (JDK 21 の絶対パス): `docs/REFERENCES.md` §1 のローカルツール表に `[JDK21]` を追加。script の既定値はこの ID を参照する。
 
 ## 11. 未実施: 修正後 HEAD の `--full` 再測定
-- **未実施**。理由: 本 runner に `/opt/emsdk`・`/opt/retdec`・`/opt/ghidra` が無い (`command -v emcc` / `retdec-decompiler` も無し)。emsdk 6.0.12 と RetDec v5.0 の導入に加えて全再生成 (約 21 分) が、差し戻し run の上限 (40 分) に収まらない。
+- **未実施**。理由: 本 runner に `[EMSDK]`・`[RETDEC]`・`[GHIDRA]` (`docs/REFERENCES.md` §1 の install 先) が無い (`command -v emcc` / `retdec-decompiler` も無し)。emsdk 6.0.12 と RetDec v5.0 の導入に加えて全再生成 (約 21 分) が、差し戻し run の上限 (40 分) に収まらない。
 - §3〜§6 の数値は修正前の script (`de8a34d5`) の実測。修正後の script (`29cdb2ab`) では測っていない。修正後の script の検証は §10 (分岐・Ghidra 単体の 2 回) のみ。
 - 対応: emsdk・RetDec 入りの runner で `bash tools/m11/m11_e2e.sh --full` を fresh (`functions_dll.csv`・`lift_pe.sha256` 無し) で再投入し、本節と §3 の測定 commit・数値を更新する。merge はその後。
