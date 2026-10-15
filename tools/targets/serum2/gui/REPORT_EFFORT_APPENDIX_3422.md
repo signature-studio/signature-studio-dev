@@ -131,3 +131,52 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 線端の形状 (cap・join)・破線 (`setLineStyle`) | 太い線の角が丸まる。破線は no-op | 子 #4469 (SR-71) |
+
+## 4. 2026-10-15 run (#4469 / SR-71): 線端 (cap)・接合 (join)・破線 (dash) を plotLines の被覆に載せる
+
+### 4-1. 方式 (統合後)
+- 統合は main の `plotLines` (線分の被覆の和集合を画素ごとに 1 回だけ合成) を土台にする。PR 側の `strokeThick` (符号付き距離) は削除した。
+- cap・join の形状は `plotLines` の被覆に入れる (cap: butt は何もしない・round は端の円・square は半幅ぶん延ばした矩形。join: bevel は三角形・miter は先端まで延ばす (先端が幅の 4 倍を超えると bevel)・round は円)。形状どうしが重なっても標本は 1 回だけ立つので二重合成しない。
+- 破線は `dashRuns` で on 区間に分け、区間ごとに `plotLines` を呼ぶ。
+- 太さ 1 かつ aliasing は `plotThinPolyline` (Bresenham の画素を集めて sort・unique し、1 回ずつ合成)。辺どうしが共有する頂点の画素を二重に合成しない。
+- 閉じた線の点が 2 つのとき閉じない (従来どおり)。
+
+### 4-2. 測定 commit と検証
+- 測定 commit: `d96f5ecff` (統合 merge。コードを変えた最後の commit)。
+- 判定: `check_line_width.sh` (8 項目) / `check_draw_ops.sh` / `check_render_poc.sh` / `check_canvas_syntax.sh`。
+
+| 検証 | 結果 | 所要 (real) | load (全検証の後に読んだ uptime 1 分平均) |
+|---|---|---|---|
+| `check_line_width.sh` | rc=0 (8 項目 pass) | 21.81 s | 0.81 |
+| `check_draw_ops.sh` | rc=0 | 21.54 s | 0.81 |
+| `check_render_poc.sh` | rc=0 (nonzero_after=12000 text_px=112) | 21.46 s | 0.81 |
+| `check_canvas_syntax.sh` | rc=0 (4 ファイル errors=0) | 4.91 s | 0.81 |
+
+- 素材: `toolchain-emsdk` を `work/emsdk` へ展開 (`em++` 利用)、vstgui は `steinbergmedia/vstgui` の tag `vstgui4_14_3` を `work/vstgui4` へ clone。`work/` は gitignore。
+
+### 4-3. 実測 (統合後・64x64)
+| ケース | nonzero / partial / full |
+|---|---|
+| w1 aliasing | 55 / 0 / 55 |
+| w4 aliasing | 250 / 0 / 250 |
+| w1 AA | 127 / 127 / 0 |
+| w4 AA | 321 / 140 / 181 |
+| 閉じた三角形 w4 AA (丸い接合の角) | 692 / 276 / 416 (`corner_join over=0 maxdiff=0`) |
+| w8 cap butt | 503 / 0 / 503 |
+| w8 cap round | 551 / 0 / 551 |
+| w8 cap square | 566 / 0 / 566 |
+| w8 join bevel | 1117 / 0 / 1117 |
+| w8 join round | 1141 / 0 / 1141 |
+| w8 join miter | 1184 / 0 / 1184 |
+| w4 dash 6/4 | 154 / 0 / 154 |
+
+- `check_draw_ops.sh` の既存値は main と一致: drawLine 49・drawLines 26・drawPolygon 607・drawEllipse 2472・drawBitmap 64。
+- 判定: `corner_no_double_blend` (over=0) pass・`cap_shapes_differ` pass・`join_shapes_differ` pass・`dash_less_than_solid` pass。既存 4 項目も pass。
+- 注意: 角の参照値は線分の和集合の被覆 (§3 と同じ 4x4 標本法)。実機 VSTGUI の画素との一致は測っていない。
+
+### 4-4. 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| miter の先端が幅の 4 倍を超えるときは bevel に落とす (VSTGUI の miterlimit 既定値との一致は未測定) | 鋭い角の形が実機と異なる可能性 | 未起票 (PR 本文の表に残す) |
+| 破線の on/off の端 (cap の扱い) は実機と未照合 | 破線の端の画素が実機と 1 px ずれる可能性 | 未起票 (PR 本文の表に残す) |
+| 楕円・多数の線の wasm 実行時間は未測定 (§3-5 の native 計測は旧方式) | 描画の重さ | §3 の未解決を継続 |
