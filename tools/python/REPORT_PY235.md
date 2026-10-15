@@ -42,17 +42,19 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
 ## 実装と検証
 
 - 変更: `host/fl_mock.mjs` (`general.processRECEvent`・`recPassFamily`)・`provider/fl_engine.c` (`h_general_processRECEvent`・`rec_pass_family`)・`tests/general_diff.mjs` (成功経路 5 件・族外 4 件・個数違い 2 件)・`tests/provider_check.mjs` (`pe235` 1 件を実装扱い。実装数 162→163・未実装数 273→272)・`analysis/py235_process_rec_families.py`。
-- 測定 commit (main 取り込み後): `8861ba46d` (merge・コードを変えた最後の commit)。以降はこの REPORT の変更のみ。`git diff 8861ba46d HEAD -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis` の出力は 0 行。
-- main 取り込みの差分 (`git diff 470e2d8e0 8861ba46d -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis`): 6 files, +159 −12。main 側の PY-111 (step param 8・5/6/7 の既定値)・PY-130 (ui setter 2 件と ui getVersion) と、`tests/channels_diff.mjs`・`tests/ui_state_diff.mjs`・`analysis/py137_saveundo_record.py`。競合は `tests/provider_check.mjs` の実装集合と件数だけで、両側の集合を残した (実装 166・未実装 269)。
-- 測定 (HEAD `8861ba46d`・load avg 0.45 (測定後に `/proc/loadavg` で確認)):
-  - `bash provider/build.sh` (emsdk 6.0.12): rc 0 (1.6 秒)。`fl_table.c: 435 関数, ハンドラ 166`。gcc `-fsyntax-only` (fl_dispatch.c・fl_engine.c・gen/fl_table.c) rc 0。
+- 測定 commit (main 取り込み 2 回目の後): `6556fa7a5` (merge・コードを変えた最後の commit)。以降はこの REPORT の変更のみ。`git diff 6556fa7a5 HEAD -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis` の出力は 0 行。
+- main 取り込みの差分 (2 回): (1) `git diff 470e2d8e0 8861ba46d -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis` は 6 files, +159 −12。main 側の PY-111 (step param 8・5/6/7 の既定値)・PY-130 (ui setter 2 件と ui getVersion)。(2) `git diff 8861ba46d 6556fa7a5 -- (同じ範囲)` は 15 files, +1253 −24。main 側の PY-132 (`pe132`・ui ブラウザ 3 件)・`tests/ui_browser_diff.mjs`・`tests/plugins_diff.mjs`・`provider/build.sh` ほか。競合はどちらも `tests/provider_check.mjs` の実装集合と件数だけで、両側の集合を残した (実装 169・未実装 266)。
+- 測定 (HEAD `6556fa7a5`・load avg 0.38 (測定後に `/proc/loadavg` で確認)):
+  - `bash provider/build.sh` (emsdk 6.0.12): rc 0 (1.6 秒)。`fl_table.c: 435 関数, ハンドラ 169`。
   - `node tests/general_diff.mjs`: `{"calls":52,"diffs":0,"PASS":true}`。
-  - `node tests/ui_state_diff.mjs` (main 側 PY-130 の pe130 を含む): `{"calls":58,"diffs":0,"PASS":true}`。
-  - `node tests/provider_check.mjs`: `{"functions":435,"implemented":166,"unimplemented":269,"mcp_static":60,"PASS":true}`。CPython wasm (`build_cpython_wasm.sh` 4 分 33 秒 rc 0)・`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 の後に実行。入力は `FL_WIN64_DIR` の 4 ブロック (`block24429/24430/25159/24618`) を `fetch_inputs.sh` で配置。
+  - `node tests/ui_state_diff.mjs`: `{"calls":58,"diffs":0,"PASS":true}`。
+  - `node tests/ui_browser_diff.mjs` (main 側 PY-132): `{"ok_calls":8,"bad_calls":5,"diffs":0,"browserOp":3,"PASS":true}`。
+  - `node tests/provider_check.mjs`: `{"functions":435,"implemented":169,"unimplemented":266,"mcp_static":60,"PASS":true}`。CPython wasm は 1 回目の取り込み後に `build_cpython_wasm.sh` (4 分 33 秒 rc 0) で作り、2 回目の取り込み後は `FLPY_SKIP_TABLE=1 build_flpy.sh` を再実行 (rc 0)。入力は `FL_WIN64_DIR` の 4 ブロック (`block24429/24430/25159/24618`) を `fetch_inputs.sh` で配置。
   - `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` (rc 0)。
-  - wasm 差分テスト全 23 本 (`grep -l createWasmEngine tests/*.mjs`): 22 本 rc 0 (diffs 0・PASS。`sig_arity_probe.mjs` は probe で PASS 判定なし)。`static_bench.mjs` は `dist/flpy_static.js` 未ビルドで起動不可 (rc 1・本 PR の範囲外・未実施)。
+  - wasm 差分テスト 24 本 (`grep -l createWasmEngine tests/*.mjs`): 23 本 rc 0 (diffs 0・PASS。`sig_arity_probe.mjs` は probe で PASS 判定なし)。`static_bench.mjs` は `dist/flpy_static.js` 未ビルドで起動不可 (rc 1・本 PR の範囲外・未実施)。
   - `analysis/py235_process_rec_families.py` (`FL_WIN64_DIR` の `block00031_PE.bin`): 30 ok・0 FAIL・rc 0 (0.19 秒)。
-  - ネガティブコントロール (HEAD で再実施。470e2d8e0 でも同じ結果): `host/fl_mock.mjs` の `(e & 0xffff) !== 8` を `!== 9` に変えると `general 差分 1 件` (AssertionError・rc 1) で落ちる (`[0x10000008, 9, 0]` が mock は 9、C は code 2)。元に戻した後は `{"calls":52,"diffs":0,"PASS":true}` で、`git diff` は 0 行。
+  - ネガティブコントロール (HEAD で再実施。470e2d8e0 でも同じ結果): `host/fl_mock.mjs` の `(e & 0xffff) !== 8` を `!== 9` に変えると `general 差分 1 件` (AssertionError・rc 1) で落ちる (`[0x10000008, 9, 0]` が mock は 9、C は code 2)。元に戻した後は `{"calls":52,"diffs":0,"PASS":true}` で、`git status` は変更なし。
+- 前回 (HEAD `8861ba46d`・main 取り込み 1 回目): `provider_check` 166/269・`all_tools` 48/48・`general_diff` 52/0・`ui_state_diff` 58/0 (全て PASS)。
 - 前回の測定 (HEAD `470e2d8e0`・main 取り込み前・load avg 0.00):
   - `bash provider/build.sh`: rc 0 (1.05 秒)。`fl_table.c: 435 関数, ハンドラ 163`。
   - `node tests/general_diff.mjs`: `{"calls":52,"diffs":0,"PASS":true}` (0.05 秒)。
