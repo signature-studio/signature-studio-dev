@@ -97,6 +97,7 @@ sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実�
 | 6 件 (`442a50` `442b90` `664890` `6649b0` `6649c0` `664a80`) は入口型を確定 (§1) したが、IR の呼出し側の引数落ち (`xor i64 0, 0` placeholder) と呼び先 entry の欠落で不一致 (§2.1)。IR 側の修正が要る | 不一致 6 | #4193 ([LD-201]・#3863 の子) |
 | `653c80` `691dd0` の native segv。原因は LD-181 で機械語から特定 (691dd0: 確保のビン読み rdx=0、653c80: 間接 call の null slot)。判定に入る case は未作成 | 実行不能 2 | #4200 ([LD-203])。原因と結論は `REPORT_APPENDIX_LD181.md` §2 |
 | `irtool.instrument` の i128 入口記録は LD-181 で下位 64bit に修正済み (sample:800 の判定差 0 件)。`cmp_trace` の i128 位置の除外は残存 | 比較の信頼性 | #4195 ([LD-202])。結論は `REPORT_APPENDIX_LD181.md` §3 |
+| LD-202 (#4195) の実測: 除外を外すと、対象 11 関数すべてが `mismatch` になる (偽の不一致)。原因は記録経路。`irtool.instrument` は i128 引数を `%ld.0 = trunc i128 %arg1 to i64` として整数側 (`A[0]`) に載せるが、機械語の入口型は `double` (xmm0) で、`ld_trace` の x0 は 0 のまま (`40c660`: native xmm0 `0x3ff8…`・wasm `0x0`)。`691dd0` は入口 PC 自体が違う (`entry_va`)。除外は本 PR で戻したまま | 比較の信頼性 (i128 の 11 関数) | #4195 の後続。`irtool.instrument` の入口記録で、`double` 型の i128 引数を x0 (xmm0) に載せる修正が要る (LD-202 は除外撤去の前提が未達) |
 
 ## 5. 検証
 
