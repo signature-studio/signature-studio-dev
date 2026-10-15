@@ -19,5 +19,6 @@
  "regress": {"expect_match": "all"},
  "stub_externals": true,
  "stub_skip": ["HeapAlloc", "HeapFree", "GetCurrentThreadId", "GetLastError", "SetLastError", "EnterCriticalSection", "LeaveCriticalSection"],
- "gdata_pad": true
+ "gdata_pad": true,
+ "image_bytes": ["0x18011e6f0-0x18011e76c"]
 }
