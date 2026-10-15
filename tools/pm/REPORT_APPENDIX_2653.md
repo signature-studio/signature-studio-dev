@@ -97,7 +97,7 @@ pnpm install --frozen-lockfile                                 # (a) 現在の l
 
 - 方針: PM 判断 (#3342・2026-10-15) の (a)。`infra/pm-worker/pnpm-workspace.yaml` に `minimumReleaseAgeStrict: true` を入れた。`minimumReleaseAge` の値・lock の版・`package.json` は変えない。
 - 測定 commit: `233b96584` (strict を入れた commit)。変更前は `233b96584~1` (origin/main)。その後にコードは変えていない (下の差分の証跡)。
-- 隔離: 各 project は `packageManager: pnpm@12.10.1` だけの `package.json` と、対象の `pnpm-workspace.yaml` (変更前 / 変更後) を置いた temp dir。`pnpm add` は `</dev/null` の非対話。測定時刻は 2026-10-15 02:00Z 前後 (表の 1〜5 行) と 02:07Z (表の 6・7 行)。
+- 隔離: 各 project は `packageManager: pnpm@12.10.1` だけの `package.json` と、対象の `pnpm-workspace.yaml` (変更前 / 変更後) を置いた temp dir。`pnpm add` は `</dev/null` の非対話。測定時刻は 2026-10-15 02:00Z 前後 (表の 1〜4 行・7 行) と 02:07Z (表の 5・6 行)。
 
 | 条件 | コマンド | 結果 | `pnpm-workspace.yaml` |
 |---|---|---|---|
