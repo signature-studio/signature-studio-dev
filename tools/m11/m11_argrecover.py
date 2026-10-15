@@ -302,8 +302,8 @@ class Defchain:
             self.bl[va] = Blocks(fn) if fn.ins else None
         return self.bl[va]
 
-    def index_ins(self, x, src, own, size, rip):
-        """命令 x を索引に入れる。直接 call / jmp の呼出先は callers (src = (呼出元 VA, 命令 index))、rip 相対 lea の指す先は taken。
+    def index_ins(self, x, src, own, size):
+        """命令 x を索引に入れる。直接 call / jmp の呼出先は callers (src = (呼出元 VA, 命令 index)。pdata 外の gap では (命令 VA, None))、rip 相対 lea の指す先は taken。
         own = 呼出元の関数 VA (pdata 外は None)。"""
         fns = self.m.fns
         mn, op = x.mnemonic, x.op_str
@@ -341,7 +341,8 @@ class Defchain:
         return out
 
     def sweep(self, cs, lo, hi):
-        """RVA [lo, hi) の線型 disasm。不正命令で止まったら次のバイトから再開する。"""
+        """RVA [lo, hi) の線型 disasm。不正命令で止まったら次のバイトから再開する。
+        注記: 再開のたびに data[off:] を複製するため、不正命令が多い区間では O(n²) になる (#3124 の gap 5.84 MB では stats 全体 35.3 秒)。"""
         data = self.m.read(lo, hi - lo)
         va0 = self.m.base + lo
         off = 0
@@ -365,10 +366,10 @@ class Defchain:
             self.taken |= set(q) & set(fns)
         for va, (rva, size) in fns.items():
             for i, x in enumerate(cs.disasm(self.m.read(rva, size), va)):
-                self.index_ins(x, (va, i), va, size, RIP_RE)
+                self.index_ins(x, (va, i), va, size)
         for lo, hi in self.gaps():
             for x in self.sweep(cs, lo, hi):
-                self.index_ins(x, (x.address, None), None, 0, RIP_RE)
+                self.index_ins(x, (x.address, None), None, 0)
         self.build_mod()
 
     def build_mod(self):
