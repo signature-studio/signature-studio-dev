@@ -74,7 +74,7 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 
 ### 9.4 unit 144 の trap の経路と [0] の書込み元 (ON と OFF で同一)
 
-- 呼出し連鎖 (wasm 番号は §8.2 と同じ): `412d60` (C 転記、`m11_ov.c` の UStrClr) → `409440` (FreeMem) → `407e20` (FastMM 解放、IR `function_407e20__lifted`)。`407e20` の引数は 0x5c (= 0x6c − 0x10)。`407e20` は `[0x54]` (= 0) を読み、次ブロックとして `[0]` (= 0x865901) を読んで範囲外で trap する。
+- 呼出し連鎖 (`407e20` の wasm 番号 1877 は §8.2 と同じ。他は関数名で示す): `412d60` (C 転記、`m11_ov.c` の UStrClr) → `409440` (FreeMem) → `407e20` (FastMM 解放、IR `function_407e20__lifted`)。`407e20` の引数は 0x5c (= 0x6c − 0x10)。`407e20` は `[0x54]` (= 0) を読み、次ブロックとして `[0]` (= 0x865901) を読んで範囲外で trap する。
 - unit 144 の開始時点で `[0x60, 0x80)` は全て 0。trap の後も同じ。
 - IR の全 store を計装して番地 `0x60`〜`0x7f` を監視したが、unit 0〜144 で 0 件。`412d60` の refcount (`[0x64]`) を 1 にした書込みは IR store の外 (C 側の書込み、または wasm 番号の対応の誤り) と見られるが、未確定。
 - `[0]` の書込み (計装は `store_watch_2408.sh` の派生で、run 部を unit 0〜144 の全区間に変えた。`work/probe3592/sw.sh`、コミットしない。`WATCH_ALL=1 WATCH_ADDR=0x0u`):
