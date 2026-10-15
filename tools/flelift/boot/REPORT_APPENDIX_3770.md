@@ -36,11 +36,11 @@ FLE_BOOT_WORK=$RUNNER_TEMP/fle3770/w_r FLE_BOOT_TAG=fle15 FLE_BOOT_RUNS="shim ne
 
 | route | 診断 | units | GetMem / FreeMem | 呼出点 0x6c9380 の回数 | 矩形 (x0,y0,x1,y1) | 停止 | 結果 JSON |
 |---|---|--:|--:|--:|---|---|---|
-| 診断 shim (root `0x6bbc20`) | on | 209 | 2,314 / 1,200 | 6,559,882 | (0,0,1048576,1048576) | **300 s で打ち切り (停止せず)** | `boot_summary_fle15x_diag_shim.json` |
-| 診断 ネガコン (root `0x6bbc20`) | on | 209 | 1,891 / 777 | 6,559,461 | (0,0,1048576,1048576) | **300 s で打ち切り (停止せず)** | `boot_summary_fle15x_diag_negctl.json` |
-| 既定 shim (root `0x6a7b70`) | off | 209 | **2,314 / 1,199** | — | — | exit (MessageBoxA → ExitProcess)・IPP 判定 NG (rc=3・既知) | `boot_summary_fle15.json` |
-| 既定 ネガコン (root `0x6a7b70`) | off | 209 | **1,891 / 776** | — | — | exit・IPP 判定 OK | `boot_summary_fle15_negctl.json` |
-| 既定 (FLE_IPP 未指定・root `0x6a7b70`) | off | 209 | 1,891 / 776 | — | — | exit・IPP 判定 OK | `boot_summary_fle15_default.json` |
+| 診断 shim (root `0x6bbc20`) | on | 209 | 2,314 / 1,200 | 6,559,882 | (0,0,1048576,1048576) | **300 s で打ち切り (停止せず)** | 生成のみ・非コミット (`boot.threw.stack` に絶対パスが入るため。再生成は §2 のコマンド) |
+| 診断 ネガコン (root `0x6bbc20`) | on | 209 | 1,891 / 777 | 6,559,461 | (0,0,1048576,1048576) | **300 s で打ち切り (停止せず)** | 同上 |
+| 既定 shim (root `0x6a7b70`) | off | 209 | **2,314 / 1,199** | — | — | exit (MessageBoxA → ExitProcess)・IPP 判定 NG (rc=3・既知) | `results/boot_summary_fle15.json` |
+| 既定 ネガコン (root `0x6a7b70`) | off | 209 | **1,891 / 776** | — | — | exit・IPP 判定 OK | `results/boot_summary_fle15_negctl.json` |
+| 既定 (FLE_IPP 未指定・root `0x6a7b70`) | off | 209 | 1,891 / 776 | — | — | exit・IPP 判定 OK | `results/boot_summary_fle15_default.json` |
 
 - 工程 (診断 route): lift 80 s (load 0.86)・clang 8 shard + link 85 s (load 2.34)。boot は shim 300 s・ネガコン 300 s (いずれも時間上限)。
 - 工程 (既定経路): lift 81 s・clang 99 s・boot 24 s / 25 s / 25 s。
