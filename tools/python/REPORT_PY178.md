@@ -19,7 +19,7 @@
 - 測定 commit: `e4cc24cd4` (probe に到達条件の検査を足した commit。コードを変えた最後の commit)。`git diff e4cc24cd4 HEAD -- tools/python/analysis/flapi/pe_owner_thread_probe.py tools/python/analysis/flapi/pe_disasm.py tools/python/analysis/flapi/pe_xref.py tools/python/analysis/flapi/pe_callgraph.py tools/python/analysis/flapi/pe_scan_store.py` の出力は 0 行。後続の差分は本 REPORT の文書と main 取り込みの merge (`tools/python/analysis` に main の新規ファイル `py86_*.py`・`pe_chain_stores.py`・`pe_launchmap_entries.py` が増えただけ) で、測定に使ったファイルは変わっていない。
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` の `extracted/block00031_PE.bin` を repo 外 `${RUNNER_TEMP}/fl-win64` に展開 (2.9 秒・終了 0)。依存 `pefile 2024.8.26`・`capstone 5.0.7` は実在を確認。
 - 使用ツール: `pe_owner_thread_probe.py` (本測定)。逆アセの独立確認は capstone の範囲指定ダンプ (repo 外のスクラッチ)。
-- 再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_owner_thread_probe.py` (約 65 秒・`RESULT: PASS`・終了 0)。
+- 再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_owner_thread_probe.py` (HEAD `a969abb94` で 64.7 秒・`RESULT: PASS`・終了 0)。
 
 ## 1. 同期比較 `0x525ec0` の入力
 
@@ -87,6 +87,7 @@
 | (vii) `0x15e6080` への dword store 1 件 (`0x41cee9`)・直前 call `0x406f90` (GetCurrentThreadId) | 一致 | OK 3 件 |
 
 結果: HEAD `2334ecfce` (main 取り込み後の再測定) で `RESULT: PASS`・終了 0 (全 24 件 OK・64 秒)。
+結果 (レビュー round 2 の修正後・HEAD `a969abb94`): `RESULT: PASS`・終了 0・24 件 OK・64.7 秒 (load 1 分値 0.73 → 0.90)。
 
 ネガティブコントロール (HEAD `2334ecfce` で再測定。期待値を実測と違えて FAIL することを確認。両方とも終了 1):
 
