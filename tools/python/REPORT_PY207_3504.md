@@ -25,7 +25,9 @@
 
 - 領域を宛先とする rep は **0 件**。
 - 未確定は **36 件** (関数内で rdi の書込みが見つからないもの)。前回 (80 件・窓 300 命令) からの減りは窓を関数先頭まで広げたため。
-- 関数内で書込みが無い 36 件は、Win64 ABI では rdi が非揮発で呼出し元から渡されるため、値は呼出し側に依る。呼出し側を追わない限り宛先は確定しない。残件は #3504 に残す。
+- 関数内で書込みが無い 36 件は、Win64 ABI では rdi が非揮発で呼出し元から渡されるため、値は呼出し側に依る。
+- **ext D (直接呼出し元 1 段・測定 commit `5bb776d78`)**: 36 件のうち 11 件は直接の呼出し元が無い (関数先頭の呼出し・間接呼出しのみ)。残り 25 件の呼出し元 (全 call 箇所) の rdi を同じ後ろ向き追跡 (深さ 3) で分類すると、領域を指すものは **0 件**。大半は呼出し元側でも rdi が関数内で書かれず (`unwritten-300`)、さらに上の呼出し元に依る。
+- よって rep 宛先の由来は、領域を指すものが 0 件であることまでは確かめたが、36 件すべての値は確定していない (ext D は 1 段のみ)。残りは #3504 に残す。
 
 ## 2. 戻り値の領域ポインタ 7 件の呼出し側 (ext B・受入 2)
 
@@ -54,17 +56,17 @@
 
 ## 4. 測定
 
-- 測定 commit (コードを変えた最後の commit): `66510c88c` (rep rdi の追跡窓を関数先頭まで広げた版)。
-  `git diff 5d5216087 66510c88c -- tools/python/analysis/flapi/pe_k_struct_probe.py` は、追跡窓の 1 関数 (`src_of`) の差分だけ (この probe は他の analysis ファイルを import しない)。`tools/python/analysis` 全体では他の差分 (19 ファイル) があるが、本測定の probe は読まない。
+- 測定 commit (コードを変えた最後の commit): `5bb776d78` (ext D を追加)。
+  `git diff 66510c88c 5bb776d78 -- tools/python/analysis/flapi/pe_k_struct_probe.py` は ext D の 27 行追加だけ (他の analysis ファイルは import しない)。
 - 実行: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_k_struct_probe.py 2` (`<展開先>` は `fl-win64` の `block00031_PE.bin` を `extracted/` に展開した親)。
-  - 測定 commit `66510c88c`: 終了 0・149.1 秒 (scan 69.3 秒)・load 0.40 (開始時) / 0.95 (終了時)。
-  - 直前の commit `5d5216087` (窓 300 命令): 終了 0・153.6 秒。
-- 窓の変更の前後で `direct_K_writes=0 direct_K_reads=2`・正の対照 V 書込み 3 件・`returned pointers=7`・`alias accesses=38 K writes=0`・`ret-origin accesses=2528 K-covering=0` は一致。変わったのは rep rdi の分類だけ。
+  - 測定 commit `5bb776d78`: 終了 0・141.3 秒 (scan 67.9 秒)・load 0.90 (開始時) / 0.99 (終了時)。
+  - 直前の commit `66510c88c` (ext D 追加前): 終了 0・149.1 秒。
+- 追加前後で `direct_K_writes=0 direct_K_reads=2`・`returned pointers=7 region-valued=7`・`ret-origin accesses=2528 K-covering=0 K-writes=0` は一致。ext D は追加のみで既存の数値を変えない。
 
 ## 5. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| rep 文字列の rdi 由来 36 件 (§1) | K 領域への bulk copy の有無が未確定 | #3504 [PY-207] |
+| rep 文字列の rdi 由来 36 件 (§1。ext D は 1 段で領域 0 件・11 件は呼出し元なし) | K 領域への bulk copy の有無が未確定 | #3504 [PY-207] |
 | 戻り値の領域ポインタの呼出し側: 先の関数 (深さ 1 以上) | 呼出し側経由の K 書込みの有無が未確定 | #3504 [PY-207] |
 | K を含む構造体の大きさ (§3) | 受入 3 | #3504 [PY-207] |
