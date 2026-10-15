@@ -41,7 +41,7 @@
 
 測定 commit: `8c0a1a5ab` (tools/python のコードを変えた最後の commit)。その直前の `7d864c6d6` (origin/main 取り込み merge) から、`tests/ui_state_diff.mjs` に `setFocused(null)`・`setSnapMode(null)` の 2 件を足した。検証 HEAD は `8c0a1a5ab` で、測定はこの HEAD で行った (差分は 2 行)。
 
-環境: runner 4 core。`load` は `/proc/loadavg` の 1 分平均。`fl-win64.tar.zst` は必要な 5 blob (`block00031_PE.bin`・`block25159_DATA.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block24618_DATA.bin`) だけ `$RUNNER_TEMP/fl-win64` に展開し、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` で `work/` に配置した。`toolchain-emsdk.tar.zst` は `$ARTIFACTS_DIR` に実在したが、`/opt/emsdk` (`[EMSDK]`・emcc 6.0.12) が既にあって動作したため、そのまま `source /opt/emsdk/emsdk_env.sh` して使った。
+環境: runner 4 core。`load` は `/proc/loadavg` の 1 分平均。`fl-win64.tar.zst` は必要な 5 blob (`block00031_PE.bin`・`block25159_DATA.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block24618_DATA.bin`) だけ `$RUNNER_TEMP/fl-win64` に展開し、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` で `work/` に配置した。`toolchain-emsdk.tar.zst` は `$ARTIFACTS_DIR` に実在したが、`[EMSDK]` (emcc 6.0.12) が既にあって動作したため、そのまま `source "$EMSDK_ENV"` (`[EMSDK]` の `emsdk_env.sh`) して使った。
 
 | コマンド | 測定 commit | 結果 | wall | load |
 |---|---|---|---|---|
