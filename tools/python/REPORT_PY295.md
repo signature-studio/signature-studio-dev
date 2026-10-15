@@ -45,7 +45,7 @@ EMSDK_ENV=$EMSDK_DIR/emsdk_env.sh bash tools/python/provider/build.sh
 cd tools/python && FL_ENGINE=wasm node tests/all_tools.mjs && node tests/provider_check.mjs
 ```
 
-- 注意 (main 取り込み後の再実行で判明): `build_cpython_wasm.sh` は `EMSDK_DIR` を見ず `[EMSDK]` (`/opt/emsdk`) の `emsdk_env.sh` をハードコードしている。`[EMSDK]` が無いと rc 1 でログ無しに落ちる。この run では `[EMSDK]` を emsdk 6.0.12 の展開先へのシンボリックリンクにして通した。`build_flpy.sh` は `build_cpython_wasm.sh` の成果物を要求するため、この順で実行する。
+- 注意 (main 取り込み後の再実行で判明): `build_cpython_wasm.sh` は `EMSDK_DIR` を見ず `[EMSDK]` の `emsdk_env.sh` をハードコードしている (`[EMSDK]` の既定位置)。`[EMSDK]` が無いと rc 1 でログ無しに落ちる。この run では `[EMSDK]` を emsdk 6.0.12 の展開先へのシンボリックリンクにして通した。`build_flpy.sh` は `build_cpython_wasm.sh` の成果物を要求するため、この順で実行する。
 - `build_flpy.sh` は `fetch_inputs.sh` の後でないと `fl-stubs` 不足で落ちる。`provider/build.sh` は `build_flpy.sh` の後に `dist/flprov.js` を作る。`fl_provider.mjs` が `dist/flprov.js` を要求するため、これが無いと `all_tools` は ERR_MODULE_NOT_FOUND で落ちる。
 
 ## 4. 未解決
