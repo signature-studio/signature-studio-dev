@@ -9,7 +9,7 @@ const F = (v) => ({ t: "D", v });
 const STEP_V = 24;
 const STEP_DEF = [60, 100, 64, 120, 64, 128, 128, 0, 0];
 const PARAM_DEFAULT = [0.5, 0.2, 0.8];
-const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 8 ? -1 : prm === 7 ? pos * STEP_V : STEP_DEF[prm]);
+const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 8 ? -1 : prm === 7 ? pos * STEP_V : prm === 1 ? (k.vel?.[pos] ?? STEP_DEF[1]) : STEP_DEF[prm]);
 // PY-224 (#3628): PE 0x12d3ff0 の loop 分岐 (C provider の grid_bit_loop と同一・REPORT_PY224)。行 T[1] と flag49e・flag54 が立ち、channel i の最初の record (f4 != 0) が L = len / 24 を与えるとき、p < L は base、それ以外は base(p mod L)
 const LOOP_G2 = 24;
 const LOOP_MAX = 8;
@@ -231,11 +231,12 @@ export function createMockEngine() {
       const ci = argI(a, 0, 0);
       ch(ci);
       const stride = argI(a, 1, 1), offset = argI(a, 2, 0);
-      argI(a, 3, 0); argI(a, 4, 0);
+      const vel = Math.min(Math.max(argI(a, 3, 100), 0), 127);
+      argI(a, 4, 0);
       if (stride < 1) throw RANGE();
       let p = offset;
       if (p < 0) { p = offset % stride; if (p < 0) p += stride; }
-      for (; p < 64; p += stride) ch(ci).steps[p] = 1;
+      for (; p < 64; p += stride) { const k = ch(ci); k.steps[p] = 1; (k.vel ??= [])[p] = vel; }
     },
     "channels.getChannelName": (i) => ch(i).name,
     "channels.setChannelName": (i, n) => { ch(i).name = str(n); },
@@ -329,6 +330,7 @@ export function createMockEngine() {
       pos = ix(pos);
       if (pos < 0 || pos >= 64) throw RANGE();
       k.steps[pos] = v ? 1 : 0;
+      if (v) (k.vel ??= [])[pos] = 100;
     },
     "channels.quickQuantize": (i) => { ch(i); },
     "channels.showEditor": (i) => { ch(i); },

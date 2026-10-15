@@ -20,7 +20,7 @@
 #define ROOT_NAME "Plugin database"
 
 /* pv / spv: plugin パラメータの値 (インスタンスごと。channel の generator と mixer track の insert slot)。PY-228 (#3656) */
-typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; int64_t pitch_n; double pv[NPARAM]; } Chan;
+typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; uint8_t vel[NSTEP]; int64_t pitch_n; double pv[NPARAM]; } Chan;
 typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; double spv[NSLOT][NPARAM]; int act[NMIX]; double lvl[NMIX]; } Mix;
 typedef struct { char name[NAME]; int64_t color; uint8_t lock; double act; int loop, trig_mode, pos_snap, trig_snap; } Pl;
 
@@ -220,7 +220,7 @@ FL_H(channels, setTargetFxTrack) { CH(0); k->fx = (int)A_INT(1, 0); return fl_re
 FL_H(channels, setGridBit) {
     CH(0); int64_t p = A_INT(1, 0), v = A_INT(2, 0);
     if (p < 0 || p >= NSTEP) RANGE();
-    k->steps[p] = v ? 1 : 0; return fl_ret_none(c);
+    k->steps[p] = v ? 1 : 0; if (v) k->vel[p] = 100; return fl_ret_none(c);
 }
 FL_H(channels, quickQuantize) { CH(0); (void)k; return fl_ret_none(c); }
 FL_H(channels, selectedChannel) {
@@ -228,12 +228,13 @@ FL_H(channels, selectedChannel) {
     return fl_ret_i(c, sel_chan + off);
 }
 FL_H(channels, fillEachNSteps) {
-    CH(0); int64_t st = A_INT(1, 1), off = A_INT(2, 0), vel = A_INT(3, 0);
-    (void)vel; (void)A_INT(4, 0);
+    CH(0); int64_t st = A_INT(1, 1), off = A_INT(2, 0), vel = A_INT(3, 100);
+    (void)A_INT(4, 0);
+    if (vel < 0) vel = 0; else if (vel > 127) vel = 127;
     if (st < 1) RANGE();
     int64_t p = off;
     if (p < 0) { p %= st; if (p < 0) p += st; }
-    while (p < NSTEP) { k->steps[p] = 1; if (st > NSTEP - p) break; p += st; }
+    while (p < NSTEP) { k->steps[p] = 1; k->vel[p] = (uint8_t)vel; if (st > NSTEP - p) break; p += st; }
     return fl_ret_none(c);
 }
 FL_H(channels, showEditor) { CH(0); (void)k; return fl_ret_none(c); }
@@ -264,7 +265,7 @@ FL_H(channels, focusEditor) {
 static const int64_t step_def[9] = {60, 100, 64, 120, 64, 128, 128, 0, 0};
 static int64_t step_param(const Chan *k, int64_t pos, int64_t prm) {
     if (pos < 0 || pos >= NSTEP || !k->steps[pos] || prm < 0 || prm > 8) return -1;
-    return prm == 7 ? pos * 24 : step_def[prm];
+    return prm == 7 ? pos * 24 : prm == 1 ? k->vel[pos] : step_def[prm];
 }
 /* PE 0xd5bb30: 引数を読んでから index を検査 (範囲外は Index out of range)。useGlobalIndex は未モデル (グループ無し) */
 FL_H(channels, getCurrentStepParam) {

@@ -329,6 +329,19 @@ mock.setLoop(0, 0, 0, []);
 wasm.setLoop(0, 0, 0, []);
 
 assert.deepEqual(diffs, [], `channels/playlist 差分 ${diffs.length} 件`);
+// PY-111 (#3747): fillEachNSteps の 4 番目の引数 (既定 100・clamp 0..127) が note の param 1 (velocity) に入る。step p の期待 = 4 番目の引数 (p mod 4 で 4 通り)
+const velArgs = [[0, 37], [1, 200], [2, -5], [3, undefined]];
+const velWant = (p) => [37, 127, 0, 100][p % 4];
+for (const eng of [mock, wasm]) {
+  for (const [off, v] of velArgs) eng.call("channels.fillEachNSteps", v === undefined ? [1, 4, off] : [1, 4, off, v]);
+  for (let p = 0; p < 64; p++) assert.equal(eng.call("channels.getCurrentStepParam", [1, p, 1]), velWant(p), `param 1 step ${p}`);
+}
+const velDiffs = [];
+for (let p = 0; p < 64; p++) {
+  const a = run(mock, "channels.getCurrentStepParam", [1, p, 1]), b = run(wasm, "channels.getCurrentStepParam", [1, p, 1]);
+  if (JSON.stringify(a) !== JSON.stringify(b)) velDiffs.push({ p, mock: a, wasm: b });
+}
+assert.deepEqual(velDiffs, [], `fillEachNSteps 4 番目の差分 ${velDiffs.length} 件`);
 // ネガティブコントロール: index 範囲外の setChannelPitch は両側とも code 4 (Index out of range) になること (差分 0 が空振りでないことの確認)
 assert.deepEqual(run(mock, "channels.setChannelPitch", [9, 0.5]), { code: 4 });
 assert.deepEqual(run(wasm, "channels.setChannelPitch", [9, 0.5]), { code: 4 });
