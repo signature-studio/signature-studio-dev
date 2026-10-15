@@ -140,7 +140,10 @@ REPORT §11 の付録。指定の見出しは `## 10.` だが、既存の PERF-P
 |---|---|---|---|---|---|---|
 | `9c0dfadc9` (変更前 = 当時の main、変更なし) | 158 s | 0.61 → 1.12 | 7,018 関数 / unsup 0 | equal 16/16 | mismatch 0 | PASS |
 | 作業ツリー (変更後) | 141 s | 0.23 → 0.93 | 同上 | equal 16/16 | mismatch 0 | PASS |
-| **`973b85aca` (測定 commit、コミット済み HEAD)** | 142 s | 0.58 → 0.96 | 7,018 / unsup 0 | equal 16/16 | mismatch 0 | PASS |
+| `973b85aca` (main 取り込み前の測定 commit) | 142 s | 0.58 → 0.96 | 7,018 / unsup 0 | equal 16/16 | mismatch 0 | PASS |
+| **`6035a72d5` (測定 commit、コミット済み HEAD。main 取り込み後)** | 153 s (1 回目) / 150 s (2 回目) | 0.84 → 0.93 (1 回目) / 0.50 → 1.06 (2 回目) | 7,018 / unsup 0 | equal 16/16 | mismatch 0 | PASS |
+
+`973b85aca` → `6035a72d5` の差分は `rt/fle_cpu.c` (+2/-1)・`rt/fle_cpu.h` (+2) の `fle_gpa_hook` 結線のみ (既定 0 = 従来挙動)。両 run とも同じ HEAD で再現した。
 
 spot diff の 16 case は TlsAlloc 系を呼ばないため、この e2e では TLS の挙動変化は見えない (下の 14.2 で直接確認)。
 
@@ -165,7 +168,7 @@ harness は `fle_glue.c` を含めない (`ott_dispatch` が未定義で link �
 - **受入 3 は未達**。issue 本文の `qfc_count.sh` は repo に存在しない (`origin/main` で確認)。`tools/qfclift/REPORT.md` にも §10 は無い (§9 まで)。
   計数の確認は子 issue **#4307** (`[T-SH-116]`) で行う。
 - 代わりに `tools/qfclift/qfc_boot.sh` で DllMain 経路の**停止点のみ**を確認した。これは計数の確認ではない。
-- 測定 commit `973b85aca` (`QFC_BOOT_REBUILD=1`、素材 `fl-win64`・`toolchain-emsdk`、単発の real 43 s、load 0.80 → 0.55。`qfclift/REPORT.md` §7.3 の n=3 (26 s) とは別測定。差は単発か n=3 かの違いで、同一 HEAD の n=3 は 26–26 s。単発の 43 s は計測時の負荷の差と推定 (未切り分け)):
+- 測定 commit `973b85aca` (`QFC_BOOT_REBUILD=1`、素材 `fl-win64`・`toolchain-emsdk`、単発の real 43 s、load 0.80 → 0.55。`qfclift/REPORT.md` §7.3 の n=3 (26 s) とは別測定。下記の 43 s は HEAD `973b85aca` の単発 1 回。`qfclift/REPORT.md` §7.3 の n=3 (26–26 s) は別 HEAD `1fd48d2ce` の値で、差は未切り分け):
   - strict: `DllMain(PROCESS_ATTACH)=trap`・`[fle] MISSING IMPORT LocalAlloc`・soft 0 件 → FAIL
   - soft: `DllMain=trap`・`[fle] call to UNLIFTED function 0x59c210`・soft 呼出し 0 件 → FAIL
 - REPORT §7.3 (HEAD `1fd48d2ce`) と停止点・停止理由が一致。TLS 変更で DllMain の停止点は変わらない。
