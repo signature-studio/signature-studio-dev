@@ -1,0 +1,6 @@
+{
+  "tag": "pe115",
+  "refs": ["#2951"],
+  "note": "PE 0xd5ec60 で取得式を確定した 1 関数 (REPORT_PY115 §2・PY-115 #2951)",
+  "functions": ["mixer.getTrackColor"]
+}

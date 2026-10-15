@@ -1,0 +1,6 @@
+{
+  "tag": "pe130",
+  "refs": ["#3007"],
+  "note": "PE で書込み経路を確定した ui setter 2 件と ui 版 getVersion (REPORT_PY130_3007・PY-130 #3007)。setTimeDispMin は未実装 (保留)。tests/ui_state_diff.mjs が mock と照合",
+  "functions": ["ui.setBrowserAutoHide", "ui.setStepEditMode", "ui.getVersion"]
+}

@@ -1,0 +1,6 @@
+{
+  "tag": "pe76",
+  "refs": ["#2563"],
+  "note": "PE で判定順 (index → NaN → pitchUnit) と status 文言を確定し、unit 0/1 の効果を除いて実装した 1 関数 (REPORT_PY72・PY-76 #2563)。tests/channels_diff.mjs が mock と照合",
+  "functions": ["channels.setChannelPitch"]
+}
