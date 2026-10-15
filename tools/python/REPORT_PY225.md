@@ -86,3 +86,78 @@
 - 静的値: `pe_va_read.py 15e2aa0,193fce0,15e2218,15e27f0,15e1c70,15d89c8,15d898c`。
 - provider: `EMSDK_ENV=<emsdk>/emsdk_env.sh bash tools/python/provider/build.sh` → `cd tools/python && node tests/channels_diff.mjs`。
 - channels の対照: 上の「channels_diff の対照」の手順。
+
+## PY-230 (#3669): L (行 +0x50) の既定値 — 静的連鎖の途中結果
+
+既知類型との関係: 該当なし (逆アセンブルと静的値からの計算。`docs/DEFECTS.md` の類型には当たらない)。
+
+### 結論 (推定。実行は未確認)
+
+- 空の project の pattern 1 の L は、PE の静的な値の連鎖から **384 (= 1 小節 = 4 拍 × 96 ticks)** と読める。件数は `n = ceil(384/96)×4 = 16`。
+- mock/C の `NSTEP = 64` は、この既定値と一致しない (`n = 64` になるのは `1440 < L <= 1536` のときだけ)。
+- **書込み元**: L (行 `+0x50`) を書くのは `0x12d1760` (行 `G` の L を再計算する関数・直接の呼出しは関数 30 個・call site 32 箇所)。`0x12da6d0` の `0x12dac02` は、行 `G` の `+0x28` (pattern obj) の `+0x50` を別の構造体へ複写するだけで、行テーブルには書かない。
+- **未確認 (確定まで NSTEP は変えない)**: 起動時の行 `+0x20` (callback)・flag `[0x15d529f]` の実行時の値、`0x12da6d0` が `0x11862e0` (件数確保) を `0x12d1760` より先に呼ぶ順序 (`0x12dab6a` → `0x12dab74`)。この順序だと初回の確保は L の .bss 値 0 (n = 0) で行われる。
+
+### 連鎖 (PE 実測。VA は絶対 VA)
+
+| VA | 役割 | 読めた処理 |
+|---|---|---|
+| `0x12d1760` | L の再計算 (書込み) | 行 `G` (`0x193fce0 + G*0xC0`) の `+0x50` を `0x12d1b4e` で書く。`ebx > 0` なら ebx、そうでなければ `[行+0x44]` (非 0 のとき)、なければ `max([行+0x48], r13)` |
+| `0x1062c50` | 行 `+0x30` の項目リストの検索 | 型 6 (`[item+4] == 6`) の項目の値 (`[item+0]`)。無ければ -1 (`or eax,-1`)。空リストは -1 |
+| `0x12d1a8a`〜`0x12d1ade` | `[行+0x44]` の設定 | 型 6 の項目があるときだけ `[行+0x44]` = その値 (`al=1`)。空リストはループに入らず `[行+0x44] = 0` (`0x12d1ae3`) |
+| `0x12d19bd` | 項目 0 件の経路 | `r13 = 0x1062840([rbp+0x54])` (周期)。拍子 `[rbp+0x3c]` は `0x1062930` の既定値 |
+| `0x1062840` | 周期 r13 | `byte[p] × 0x10627f0(p) × V` (`V = [*0x15e25f8]`) |
+| `0x10627f0` | 1 拍あたりの step 数 f | flag byte (`[*0x15e37c8]`) が 1 なら `16 / byte[p+1]`、そうでなければ `C = [*0x15e1c70]` |
+| `0x1062930` | 項目が無いときの既定値 | 項目 0 件 (`0x10629ea`〜`0x10629f7`) で既定の構造体 `{0, 0x7fffffff, 0, [rbp+0x3c]}` を返す。`[rbp+0x3c]` は `0x1062890` が書く |
+| `0x1062890` | 拍子 `{N, D}` の書込み | `byte[rcx] = dl` (N)、`byte[rcx+1] = r8b` (D)。呼出しは `N = byte[*0x15e39c0]`・`D = 16 / C` (`0x1062984` の idiv) |
+| `0x12d09e0` (PY-225) | 件数 | `n = ceil(L / X) × C` |
+
+### 静的値 (`analysis/flapi/pe_py230_l_default.py` の出力)
+
+| 変数 | 参照の連鎖 (VA) | 値 |
+|---|---|---|
+| N | `*(0x15e39c0)` = `0x15d8988` の byte | 4 |
+| C | `*(0x15e1c70)` = `0x15d898c` | 4 |
+| D | `16 / C` | 4 |
+| flag | `*(0x15e37c8)` = `0x15d529f` の byte | 0 (`.data` の初期値) |
+| f | flag が 0 なので C | 4 |
+| V | `*(0x15e25f8)` = `0x15d89c4` | 24 |
+| X | `*(0x15e27f0)` = `0x15d89c8` | 96 |
+| r13 = N·f·V | | 384 |
+| L = max([行+0x48], r13) | 空のとき `[行+0x48]` = 0 | 384 |
+| n = ceil(L/X)·C | | 16 |
+
+- 空の経路の前提 (静的に確認): 行 `+0x48` は `max([rbp+0x58], f)` で、空の経路では 0 (`0x12d1a45`〜`0x12d1a5a`。`f` は `0x10628d0` の戻り値で空リストは 0。`jl` で `f` を、そうでなければ `[rbp+0x58]` を格納する)。`[rbp+0x58]` は行 `+0x20` が 0 なら 0 (`0x12d17e0`)。行 `+0x20` は .bss で 0 (実行時の値は未確認)。`[行+0x44]` は空リストで 0 (上の表)。
+- 既定の L の式は、`0x12d1b2e`〜`0x12d1b4e` の `max` と `ebx = -1` の分岐の読みによる。
+
+### 検証
+
+- 測定 commit: `870ee5f0e` (解析スクリプト `analysis/flapi/pe_py230_l_default.py` を追加した commit。コードを変えた最後の commit)。本節の commit は REPORT のみ。
+  差分の証跡: `git diff 870ee5f0e HEAD -- tools/python/analysis tools/python/host tools/python/provider tools/python/tests` (本節の commit 後に 0 行を確認)。
+- 素材: `fl-win64` (`block00031_PE.bin` 22,227,016 B。`tar --zstd -xf` 2.2 秒) と `toolchain-emsdk` (`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` を `tar --zstd -xf` 2.7 秒、`emsdk/emsdk_env.sh` を `EMSDK_ENV` で指定)。
+- 基線 (provider と channels・コード変更なし。main `512b09ffa` 基点):
+
+| 検査 | コマンド | 結果 | 所要 |
+|---|---|---|---|
+| provider ビルド | `EMSDK_ENV=<emsdk>/emsdk/emsdk_env.sh bash tools/python/provider/build.sh` | rc 0 (`dist/flprov.{js,wasm}`) | 12.355 秒 |
+| channels 差分 | `cd tools/python && node tests/channels_diff.mjs` | `calls 238・loop_cases 9・diffs 0・grid_calls 1200・grid_diffs 0・PASS true` | 0.074 秒 |
+| 静的連鎖 | `python3 analysis/flapi/pe_py230_l_default.py` | n = 16、rc 0 | — |
+| 同 (正) | `pe_py230_l_default.py --expect-n 16` | PASS (rc 0) | — |
+| 同 (ネガ) | `pe_py230_l_default.py --expect-n 64` | FAIL (rc 1)。NSTEP 64 は静的連鎖と一致しない | — |
+
+- 環境: runner 4 core、load average 0.13 (05:21 UTC)。
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 起動時 (空 project) の L の実行時の値。行 `+0x20` (callback)・flag `[0x15d529f]` の実行時の値・`0x12d1760` と `0x11862e0` の起動時の順序 | 静的連鎖の 384 (n = 16) が実行時に成り立つかは未確定。NSTEP の決定の根拠 | PR #3967 の未解決表 (子は起票しない) |
+| 件数の複製経路 (`0x418030`・`min(n, S-start)`) | 旧配列がある場合の件数 | PR #3967 の未解決表 (子は起票しない) |
+| NSTEP の変更 (64 → 静的既定 16 か L 由来) と event 境界 (`p >= n`) | 上の確定の後に直す。確定前に変えると、L を未確定のまま mock/C を変えることになる | #3985 ([PY-288]) |
+
+### 再現
+
+- 展開: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'`、`export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。
+- 連鎖の計算: `python3 analysis/flapi/pe_py230_l_default.py` (`--expect-n 16` で PASS、`64` で FAIL)。
+- 逆アセンブル: `pe_disasm.py 12d1760 60`・`12d19bd 30`・`1062840 20`・`10627f0 12`・`1062930 96`・`1062890 3`・`1062c50 39`。呼出し元: `pe_callgraph.py callers 12d1760`。
+- 静的値: `pe_va_read.py 15e39c0,15e37c8,15e1c70,15e25f8,15e27f0,15d8988,15d529f`。

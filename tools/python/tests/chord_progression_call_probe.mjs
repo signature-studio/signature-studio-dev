@@ -61,11 +61,15 @@ class Rec:
         return False
 import flcpt
 flrack = types.ModuleType('flrack')
+# FLEngine PE の CPT 属性表 (53 行・REPORT_PY164 §2) に無い名前は AttributeError (genre など)。表の名前だけ Rec に委譲する。
+CPT_TABLE = set("""style1 style2 style_balance resolution loop_length look_ahead wrap_around position_depth loop_depth temperature repeats extension_prob extensions_replace max_extensions weights_power bass_depth pitch_depth duration_depth velocity_depth cumulative similarity transition_depth sampling_methods main_render_type bass_render_type main_param_1 main_param_2 main_param_3 main_param_4 bass_param_1 bass_param_2 bass_param_3 bass_param_4 human_time human_vel time_scaling positional_depth auto_accompany auto_acc_depth fixed_bass_depth chord_name_style generate_main generate_bass gen_seed pattern_seed context_length diatonic_depth macro_adventurous main_param_5 main_param_6 main_param_7 main_param_8 reference_octave""".split())
 class _CPTRec(flcpt.CPT):
     def __getattr__(self, k):
+        if k not in CPT_TABLE:
+            raise AttributeError(k)
         return getattr(Rec('cpt'), k)
 flcpt.cpt = _CPTRec()
-flcpt.chordPool = Rec('chordPool')
+# flcpt に chordPool は置かない (PE に名前が無い・REPORT_PY164 §3)。control は import 失敗で None を使う。
 flrack.rack = types.SimpleNamespace(loop_starter_config='{"mock": true, "genres": {}, "loops": []}', flr=types.SimpleNamespace())
 flrack.flr = types.SimpleNamespace()
 flpianoroll.score.PPQ = 96
