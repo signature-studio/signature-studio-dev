@@ -1138,5 +1138,18 @@
    "1813846e0": "memset"
   },
   "scenario": "ladder"
+ },
+ "carveproc": {
+  "ns": "graphiceq",
+  "cls": "GraphicEqDsp",
+  "id": "ksge",
+  "title": "Carve EQ process (unique 25 callgraph nodes, 20 function entries)",
+  "lift": {
+   "f_37d210": "18037d210", "f_37e5e0": "18037e5e0", "f_37e660": "18037e660", "f_389700": "180389700",
+   "f_38a510": "18038a510", "f_38a680": "18038a680", "f_bacaa0": "180bacaa0", "f_c23d90": "180c23d90",
+   "f_c23ec0": "180c23ec0", "f_c240c0": "180c240c0", "f_c242c0": "180c242c0", "f_f8ce84": "180f8ce84", "f_f8cea8": "180f8cea8", "f_f8cecc": "180f8cecc", "f_fa7058": "180fa7058",
+   "f_fa74f4": "180fa74f4", "f_fbbae0": "180fbbae0", "f_fd2ab8": "180fd2ab8", "f_fd4c50": "180fd4c50", "f_fd4d48": "180fd4d48"
+  },
+  "scenario": "graphiceq"
  }
 }
