@@ -199,7 +199,7 @@ CSV の key 数は startup REPORT の 46 (31/5/10) に対し本集計は 47 (33/
 
 | 項目 | 結果 |
 |---|---|
-| 実行 | `RUNTIME_TMP=/home/runner/work/_temp bash tools/startup/vreg/vreg.sh` |
+| 実行 | `RUNTIME_TMP=<一時ディレクトリ> bash tools/startup/vreg/vreg.sh` |
 | 所要 / exit / load (実行直前の uptime: 1 分 0.03・5 分 0.25・15 分 0.20) | 17 s / 0 / 0.03 |
 | C 単体 / shimx 既存 (st・mt・M4) / symcheck | ALL PASS / ALL PASS ×3 / vreg 要求 38 シンボルを shimx reg.c が全て定義 (公開 45) |
 | node テスト | **25 / 25 PASS** (既存 24 + `revertUserReg` 1) |
