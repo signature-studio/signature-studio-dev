@@ -21,11 +21,16 @@ run "slot1 in out frames=4 flag=0"         1 $IN $OUT 4 0
 run "slot1 in out frames=4 flag=1"         1 $IN $OUT 4 1
 run "slot1 r8=0 (出力 null)"               1 $IN 0 4 0
 run "slot1 rdx=0 (入力 null)"              1 0 $OUT 4 0
+run "slot1 rdx=0 frames=0 (入力 null)"     1 0 $OUT 0 0
+run "slot1 r8=0 frames=0 (出力 null)"      1 $IN 0 0 0
 echo "## slot 4 (rdx=入力, r8=frame 数, r9=channel フラグ, 5 番目=出力)"
 run "slot4 in frames=0 flag=0 out"         4 $IN 0 0 $OUT
 run "slot4 in frames=4 flag=0 out"         4 $IN 4 0 $OUT
 run "slot4 in frames=16 flag=1 out"        4 $IN 16 1 $OUT
 run "slot4 out=0 (5 番目 null)"            4 $IN 16 1 0
+run "slot4 out=0 frames=0 (5 番目 null)"   4 $IN 0 0 0
+run "slot4 rdx=0 frames=4 out"             4 0 4 0 $OUT
+run "slot4 rdx=0 frames=0 out"             4 0 0 0 $OUT
 echo "## slot 2・3・5 (全引数 0)"
 run "slot2 all zero"                       2 0 0 0 0
 run "slot3 all zero"                       3 0 0 0 0
