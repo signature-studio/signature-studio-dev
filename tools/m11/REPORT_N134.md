@@ -38,14 +38,14 @@ judge: stage 6 は Halt0/longjmp 無し・全 942 unit 実行・skip 0・DllMain
 測定 commit: `93307cc6a` (origin/main、コードは変更していない)。`git diff 93307cc6a HEAD -- tools/m11/*.sh tools/m11/*.c tools/m11/*.py tools/m11/*.mjs` = 0 行。変更は `e2e_expect.env` (期待値 2 行) と本節のみ。
 素材: `fl-win64` (`extracted/block00031_PE.bin` のみ・sha256 `b2c64da4…`)、`work-m11` (→ `tools/m11/work/`)、toolchain は `/opt` の既存。`work/lift_pe.sha256` を手で書き `m11_gen_ir2.sh` で IR のみ再生成 (`ir_sha256` `36079b29…822a6a`。`--full` は未実施)。
 
-### 実測 (`bash tools/m11/m11_e2e.sh`, 4 vCPU, n=2 (期待値変更前後の run で同一値), 所要 71.2 s / 開始時 load 0.89)
+### 実測 (非 canonical: hybrid IR `36079b29…`・`--full` 未実施。`bash tools/m11/m11_e2e.sh`, 4 vCPU, n=2 (期待値変更前後の run で同一値), 所要 71.2 s / 開始時 load 0.89)
 | 項目 | 値 |
 |---|---|
 | 通常起動 | units_run 98 / skipped 3 (完了 101) / total 942。icall ok 391 miss 3。Halt0 0 |
 | 通常起動の停止 | trap "memory access out of bounds" @ `function_535c11` ← `4fad10` ← `4fb910` ← `5de960` (unit index 101, VA 0x5de960) |
 | stage | 4/6 (5・6 未達) |
 | survey | ok 873 / noproc 1 / miss 46 / trap 22 (oom 0) / clobber 0 |
-| 寛容起動 | attempted 942 / ok 875 / skipped 66 (miss 46, halt0 7, oob 13) |
+| 寛容起動 | attempted 942 / ok 875 / noproc 1 / skipped 66 (875+1+66=942。miss 46, halt0 7, oob 13) |
 
 前回 (`750340fc`、#134 コメント): 停止は unit 56 (`function_8c5eb0` unreachable)、survey 871/24。停止が unit 56 → 101 に進んだ原因 (main 側の複数の変更の合成) は未特定。
 
@@ -55,7 +55,17 @@ judge: stage 6 は Halt0/longjmp 無し・全 942 unit 実行・skip 0・DllMain
 | `M11_EXPECT_STRICT_DONE` | 56 | 101 | 通常起動の完了数 = units_run + skipped = 98 + 3 |
 | `M11_EXPECT_SURVEY_OK_EXACT` | 872 | 873 | survey ok 実測 873 |
 
-上限は変えていない: `M11_EXPECT_PTR_NEW_MAX` 69359 に対し実測 69668 (全件 run) で ptrcheck ゲートが不合格 (e2e は rc=1)。増分 +309 の内訳 (完了 unit 増に伴う正当な書込みか、未 remap の VA 語か) は未分析のため、上限は据え置いた。
+### canonical 再測定 (判定の正・main 取り込み後の HEAD `15e0fb5a6`・`bash tools/m11/m11_e2e.sh --full`)
+- 測定 head: `15e0fb5a6` (`origin/main` `6d7ec87f5` を merge・rebase なし)。PR 側は本節と `e2e_expect.env` 以外のコードを変えていない。main 由来の `tools/m11` 実行コードの差分は 101 行 (`git diff 93307cc6a 6d7ec87f5 -- tools/m11/*.sh tools/m11/*.c tools/m11/*.py tools/m11/*.mjs`)。
+- 素材: `fl-win64` (`extracted/block00031_PE.bin` のみを `FL_WIN64_DIR`)・`work-m11` (→ `tools/m11/work/`)・toolchain は [RETDEC]・[EMSDK] (agent-setup 展開)。`TMPDIR=$RUNNER_TEMP`。
+- 所要 1333 s (01:55:42 → 02:17:55 UTC)・load 開始 0.28 / 終了 1.05。全工程 (scan・Ghidra CSV・bounds・lift・tail・gen_ir2・build) ok。
+- `ir_sha256` `226727758db9d3ff2ade83e25d42e06aa7c4f2df1de9861826563e97aeca1fe5` (`work/ir_conditions.json`: ldfix・qstore・ld108・ld115 = applied)。
+- 停止 (通常起動): `trap "memory access out of bounds" @ function_535c11 <- function_4fad10 <- function_4fb910 <- function_5de960`。stage 4/6・units_run 98 + units_skipped 3 = **101**。
+- survey: ok **873** / noproc 1 / miss 46 / trap 22 (oom 0) / clobber 0。
+- 寛容起動: attempted 942 / ok 875 / noproc 1 / skipped 66 (875+1+66=942)。
+- ptrcheck: 実行 A の `image_va_words_new` **69668 > 上限 69359** で不合格 (e2e rc=1)。survey 側の `image_va_words_new` は 71001。
+- 判定: strict 101・survey 873 は canonical で再現したため、pin (101/873) を維持する。ptrcheck は canonical でも上限を超えるため、上限 69359 は据え置く (緩めない)。+309 の原因は未分析 (main 取り込みで変わった生成物か・正当な書込みか)。
+- 未実施: 同環境の `origin/main` の canonical (変更前の並べ値) は時間上限内に取れていない。`REPORT_N3172` run B (旧 HEAD `93fac3c5`) の 56/872 は main 取り込み前の値。
 
 ### 停止点の切り分け
 - `535c11` の `self` は 4fad10 が `535240(%42)` で得た R (`535b30` が `[R+8] = %42` を格納)。`535c11` は `[[R+8]+8]` を読むため、`%42` (4fad10 の table 項目 `[item+8]`) が線形メモリ外の値。
@@ -66,8 +76,8 @@ judge: stage 6 は Halt0/longjmp 無し・全 942 unit 実行・skip 0・DllMain
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | unit 101 (`5de960`) の `4fad10` が読む table 項目 `[item+8]` (`%42`) の出所 (上流 unit の書込み) | stage 5/6 未達 (101/942) | #134 (継続。PM 判断で子 issue 化) |
-| 125 MB VirtualAlloc の要求元 (unit 95・101) のサイズ算出が誤 lift か | 上記 §1 の「巨大要求は誤 lift の疑い」と同じ | 同上 |
-| `M11_EXPECT_PTR_NEW_MAX` 69359 と実測 69668 の差の分析 | e2e rc=1 (ptrcheck) | PM 判断 |
+| 125 MB VirtualAlloc の要求元 (unit 95・101) のサイズ算出が誤 lift か | `REPORT.md` §1 の「巨大要求は誤 lift の疑い」と同じ | 同上 |
+| canonical の ptrcheck 69668 > 上限 69359 (+309 の原因は未分析。上限は据え置き) | e2e rc=1 (ptrcheck) | #134 (継続) |
 | FL_* 初期化 API 呼出し・skip 3 (0xfa9390) | stage 6 の前提 | #134 (継続) |
 
 KPI (m11 = RetDec 路線の boot 部分起動): 通過 unit 101 (strict)・stage 4/6。FLEngine の最初のウィンドウ: 動かしていない (GUI なし、MessageBox 0 件)。
