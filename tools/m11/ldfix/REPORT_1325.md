@@ -93,6 +93,14 @@
   - 7/7: `DYN_SUMMARY after_fail=0/5` (c62780・7e5240・409c80・41a670・1063090 がすべて before FAIL → after PASS)。
 - **#4041 の再測定** (測定 commit `5e17a9229`、`PREV_REF=56bfc979`、`FL_WIN64_DIR`・`EMSDK_ENV`・`M11_WORK` を指定して `ldfix_509_e2e.sh` を foreground 1 回): rc 0・real 432 秒・load 開始 0.19 / 終了 1.00。step 2〜7 完走、7/7 `DYN_SUMMARY after_fail=0/5`。survey の記録差は 14 unit (`[114, 144, 158, 280, 291, 296, 302, 304, 314, 493, 659, 880, 888, 895]`。§5 の上の 2 段と同じ母集団)。NC は 806740 の store と 1063090 の use を各 1 件検出 (「旧版 store 0」は 91 行目と同じ未確定の測定で、`f07ef8dc9` の旧版 store 8 関数と食い違う)。
 
+- **#4439 (47ad70 の array 基点)**: `fix_f3c_use` の門を一部緩和した (`f3c_late_field_disp`)。deref 後の raw 使用が `mov r64,[argN+D]` (D≠0) のフィールド読みで、IR に `add %argN, D` が 1 対 1 で対応するときだけ許す。これで 47ad70 の `%arg1` (array 基点 `*arg1`) が `load` 値へ置換される (`%11 = add %10, %ldfxu22`)。フィールド用の `add` は `%argN` のまま残す。測定 commit `d833de088`。
+  - 全 942 関数の IR 比較 (`work/boot_final3.ll` 入力・`ldfix.py --pe`): 旧 (緩和前) と新で正規化後 (`ldfx[nuvtcb]\d+`) に内容が変わった関数は **47ad70 の 1 件のみ**。`f3c_use_replaced` 79 → 80・`f3c_use_dom` 10 → 11。
+  - 単体: `test_f3c_indirect_4421.py` 5/5 PASS。
+  - 動的 (`dyn_509.mjs` 単独実行、commit `d833de088`・修復前 wasm = `ldfix` 無し・修復後 wasm = `ldfix` 適用): 47ad70 は 修復前 `-1` FAIL → 修復後 `0x1` PASS。`DYN_SUMMARY after_fail=0/6 known=0` (known 行は削除)。
+  - survey (`ldfix_509_e2e.sh` の step 6/7 の結果を `survey_diff.py` で再判定): ok 871 → 873、**ok 退行 unit 0**、kind 以外も含む記録差 14 unit (前 run と同じ集合)。
+  - `ldfix_509_e2e.sh` の rc は **1**。失敗は step 5/7 の NC 期待値のみ: `nc_prev` (旧版 56bfc979) で store 形 806740 を検出できず (`SUSPECT_VAS` 空)、旧版 `use 形 23 関数` と食い違う。この食い違いは本節の上の §5 (#4041) で既に未確定とされていたもので、今回の変更の影響ではない (旧版の出力は変更前後で同一)。
+  - 残件: 修復対象 11 関数のうち 47ad70 以外 10 関数の動的確認 (#4438)。
+
 | 直した不具合 (issue #4041) | 状況 |
 |---|---|
 | 1. 旧版の `ldframe.py` 欠落 (`ModuleNotFoundError`) | `git archive PREV_REF tools/m11/ldfix` で旧版 ldfix 一式を取り出す。`009e823` の ldfix.py は ldframe を import しないので、`PREV_REF=56bfc979` 以降で必要。 |
@@ -134,7 +142,7 @@ cd .. && PREV_REF=56bfc979 EMSDK_ENV=<[EMSDK] の emsdk_env.sh> PE=<block00031_P
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| U-1 修復対象 11 関数と c62780 の動的確認 (修復前後の直接呼び出し・7/7 相当) | 修復の正しさが survey の到達 3 関数以外では確かめられていない | #3194 (LD-148) |
+| U-1 修復対象 11 関数と c62780 の動的確認 (修復前後の直接呼び出し・7/7 相当)。47ad70 は #4439 で確認済み (§5) | 残り 10 関数は survey の到達 3 関数以外では確かめられていない | #3194 (LD-148)・#4438 |
 | U-2 支配されない 6 組・w32 2 組・no-ir-block 1 組の修復 (6905f0 は理由の訂正のみ・REPORT_3195 §3) | 11 組の修復のみ。残りは現状のまま | #3195 (LD-149) で不能理由を記録 (REPORT_3195 §2)。修復の設計は PM 判断 (未起票) |
 | U-3 B 先頭の load 配置の安全性: §9 の機械語確認で、10 組は同じ先を書く store・call が無いことを確認。c40420 は間接 call を含むため #4421 で置換を除外 (§6)。即値の直接 call (806740) は除外の対象外 | 間接 call を含む関数の修復は今後も対象外。呼出先の特定 (#4069 の残件) は未実施 | #4069 (LD-190) |
 | U-4 は #4041 で解消 (c62780 は `ldfxn\d+` 正規化で一致。§6)。全関数の一致は 33 関数の F3c 件数増による本体変化のため、採番だけでは一致しない | — | — |
