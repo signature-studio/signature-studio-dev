@@ -158,7 +158,7 @@
 
 - 測定 commit: `69116039d` (census の補正 `fix(python): census ignores RET_N copy fallthrough nop`。この commit 以降のコード変更なし)。
 - 差分の証跡 (`docs/WORKFLOW.md` §6): `git diff 69116039d HEAD -- tools/python/analysis` は 0 行。
-- 展開: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (2.8 秒・22,227,016 バイト)。`FL_WIN64_DIR=/tmp/opencode/fl` (`work/` 外の一時展開先)。
+- 展開: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (2.8 秒・22,227,016 バイト)。`FL_WIN64_DIR=<展開先>` (repo 外の一時展開先)。
 - 逆アセンブル `pe_disasm.py 1046a30 4700` → 4,679 行 (同一出力を 2 回取得して一致)。census: 0.022 秒、終了 0。
 - load average: 13:07 UTC で 1 分値 0.00。
 
