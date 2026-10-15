@@ -73,6 +73,10 @@
 
 結論: 未発見時の findEventID は **-1** を PyLong で返す (変換器 = `PyLong_FromLong`)。
 
+測定 commit: `63651e534` (`feat(python): findEventID の未発見時の値 (-1) と変換器 (PyLong_FromLong) を PE で確定 (PY-400, #4870)`)。コードを変えた最後の commit。
+- 実測: real **0.09 秒**・user 0.06 秒・sys 0.02 秒。実行前の load average (1 分) 0.07。確認 14 件 OK・rc 0。
+- 素材: `fl-win64.tar.zst` を `tar --zstd -xf` で展開 (real 5.595 秒・user 4.587 秒・sys 5.817 秒)。
+
 ## 6. 差分 (PY-390 時点)
 
 `git diff 60534394a HEAD -- tools/python/analysis/flapi/pe_py390_probe.py` の出力は 0 行 (スクリプトは測定 commit と同一)。`git diff 60534394a HEAD -- tools/python/REPORT_PY390.md docs/DOC_MAP.md` は本 REPORT の commit (REPORT と索引) だけ。
