@@ -232,7 +232,7 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 
 - 測定 commit: `1a568288b` (`origin/main` (`43cabef4c`) を merge した `eb6e8deaa` の後、`tests/provider_check.mjs` の件数 assert だけを変えた commit。コードを変えた最後の commit)。取り込みで main の `pe128` (ui 2 件・#3005) を PR 側の判定 `if` に併存させ、件数 assert を **195** 実装・**240** 未実装にした (`fl_table.c` のハンドラ数 195 と一致)。`provider/fl_engine.c`・`host/fl_mock.mjs` は自動 merge。
 - 測定 commit から HEAD までのコード差分: `git diff 1a568288b HEAD -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (本節を書いた commit は `tools/python/REPORT_PY206.md` と PR 本文だけを変える)。
-- 素材・入力: `fl-win64` を `/home/runner/work/_temp/fl` に全展開 (`tar --zstd -xf`・8 秒)、`fetch_inputs.sh` rc 0。`FLPY_SKIP_TABLE=1 build_flpy.sh` の入力は追跡済みの `flapi_table.json`。
+- 素材・入力: `fl-win64` を `$RUNNER_TEMP/fl` に全展開 (`tar --zstd -xf`・8 秒)、`FL_WIN64_DIR=$RUNNER_TEMP/fl bash fetch_inputs.sh` rc 0。`FLPY_SKIP_TABLE=1 build_flpy.sh` の入力は追跡済みの `flapi_table.json`。
 
 | 検査 | 結果 | rc |
 |---|---|---|
@@ -245,7 +245,7 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 | `node tests/all_tools.mjs` (JS mock) | **48/48 ok**・soft_error 0・raised 0・host_calls 37,425 | 0 |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | **48/48 ok**・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 0 |
 | `node tests/midi_script.mjs` / `node tests/ilmcp_e2e.mjs` | MIDI SCRIPT OK (checks 29・failed []) / PASS | 0 |
-| `FL_WIN64_DIR=/home/runner/work/_temp/fl node tests/pyscript_e2e.mjs` | **72 PASS・FAIL 0** (3 秒) | 0 |
+| `FL_WIN64_DIR=$RUNNER_TEMP/fl node tests/pyscript_e2e.mjs` | **72 PASS・FAIL 0** (3 秒) | 0 |
 
 - ネガティブコントロール (測定 commit `1a568288b` で再実行。`host/fl_mock.mjs` を一時変更し、`device_diff.mjs` の件数を記録してから元に戻した):
   - (a) `device.getMasterSync` を `return true` → **device 差分 2 件**・exit 1 (REPORT の前回値 2 件と一致)
