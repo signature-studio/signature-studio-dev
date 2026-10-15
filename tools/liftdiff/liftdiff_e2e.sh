@@ -28,6 +28,7 @@ echo "== [0/4] 比較系の単体テスト (LD-11 / #548: cmp_mem byte 単位・
 python3 tests/test_compare_ld11.py
 python3 tests/test_ld52_machine_sig.py
 python3 tests/test_ld179_tagpoint_tr.py
+python3 tests/test_ld203_slot_fill.py
 need() { [ -e "$1" ] || { echo "missing input: $1 ($2)" >&2; exit 2; }; }
 need ../m11/work/boot_final3.ll "oc_artifacts: work-m11"
 need ../m11/work/m11_image.bin "oc_artifacts: work-m11"

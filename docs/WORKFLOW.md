@@ -49,7 +49,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    └ (検収が approve と同じ run で gh pr merge --merge) ──→ branch/worktree 削除
 ```
 
-- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone・優先度は PM が確定する。Project の Status は参考で、§3)。
+- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone は PM が確定する。子 issue には親の `prio:*` ラベルを引き継ぐ (§3 ③)。Project の Status は参考で、§3)。
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
@@ -114,7 +114,7 @@ PM (main)                      subagent (実装)                  subagent (検�
   `gh issue list --repo <R> --state all --limit 5000 --json title --jq '.[].title' | grep -oE '^\[<AREA>-[0-9]+[a-z]?\]' | grep -oE '[0-9]+' | sort -n | tail -1`
   起票の直前にもう一度、`gh issue list --repo <R> --state all --limit 5000 --json title --jq '.[].title' | grep -cF '[<AREA>-<n>]'`
   が 0 になることを確認する (番号の重複を作らない)。② 本文に `親: #N`・受入条件・
-  必要な `oc_artifacts:` 行を書く。③ milestone・優先度は PM が確定する (subagent は触らない。Project の Status は参考のため触らない)。
+  必要な `oc_artifacts:` 行を書く。③ milestone は PM が確定する (subagent は触らない。Project の Status は参考のため触らない)。優先度は、親の `prio:*` ラベルを子に引き継ぐ (親が `prio:critical` なら子も `prio:critical`、親が `prio:low` なら `prio:low`。親に `prio:*` が無ければ付けない)。この引き継ぎ以外の優先度の付け外しは PM が行う。
   ④ 起票した番号を、最終回答と issue コメントに書く。
 - **チケット状態の正は issue の open/closed + ラベル + PR の状態** (技術進捗の正本は `docs/STATUS.md`)。
   open な issue は次の表のどれかに分類する。語は `/status` (PM Worker) と `tools/pm/launch_issues.py plan` が出すもので、新しい語は作らない。
