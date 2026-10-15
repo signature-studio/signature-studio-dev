@@ -11,7 +11,7 @@
 
 ## 手段
 
-- ハンドラ探索と逆アセンブル: `tools/python/analysis/flapi/pe_handler_probe.py` (入力は `$FL_WIN64_DIR/extracted/block00031_PE.bin`。`fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開して使う)。entry・fn VA は名前指定で得た (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_handler_probe.py setHintMsg setFocused setSnapMode snapMode`)。cb と共通経路は VA 指定で ret まで逆アセンブルした (`... pe_handler_probe.py 0xd6b700 0xd843d0`。VA 指定は本 PR で追加: `c2ee73c93`)。RIP 相対の絶対アドレスは `次命令 + disp` で求めた。
+- ハンドラ探索と逆アセンブル: `tools/python/analysis/flapi/pe_handler_probe.py` (入力は `$FL_WIN64_DIR/extracted/block00031_PE.bin`。`fl-win64.tar.zst` を `[FL-WIN64]` の展開先に展開して使う)。entry・fn VA は名前指定で得た (`FL_WIN64_DIR=$FL_WIN64_DIR python3 analysis/flapi/pe_handler_probe.py setHintMsg setFocused setSnapMode snapMode`)。cb と共通経路は VA 指定で ret まで逆アセンブルした (`... pe_handler_probe.py 0xd6b700 0xd843d0`。VA 指定は本 PR で追加: `c2ee73c93`)。RIP 相対の絶対アドレスは `次命令 + disp` で求めた。
 - 形式・戻り型: 公開 stub (`analysis/flapi/flapi_table.json` の `sig.returns` / `kwsig.fmt`)。`flapi_table.json` の既存エントリ (`ui.setHintMsg` = `s`・`ui.setFocused` / `ui.setSnapMode` = `i`、np 1) と PE の PyArg 書式は一致した。
 - 共通経路 `0xd6fd10` (self → object) と `0xd843d0` (書込みの投入):
   - `0xd843d0(obj, &ret, cb, value, ...)`: 第 1 引数 obj の +0x50 sub-object が非 null かつ `0xd84f30(sub)` が偽なら何もしない (status -2 = 未適用)。それ以外は node を作り (`0xd841e0`)、value・stack 引数・cb (node+0x58) を格納して `0x526190` で投入する。`0xd84290` が node+0x58 の cb を呼ぶ。戻り status は node+0x60 (-2 = 未適用 / -4 = 途中 / 0 = 適用)。
@@ -41,7 +41,7 @@
 
 測定 commit: `a3a09451b` (tools/python のコードを変えた最後の commit。origin/main `c0f249266` の取り込み merge)。検証 HEAD は `a3a09451b` で、以下の全件をこの HEAD で再実行した。以降の commit は `docs` (`.md`) だけで、その差分は下の `git diff` で 0 行。
 
-環境: runner 4 core。`load` は `/proc/loadavg` の 1 分平均 (テスト行はループ開始時に読んだ値)。`fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に全展開し (`FL_WIN64_DIR`)、`fetch_inputs.sh` で `work/` に配置した。`toolchain-emsdk.tar.zst` は `$RUNNER_TEMP/emsdk` に展開したが、`/opt/emsdk` の版 (`releases-6e9f6885…-64bit`) が展開物と同一だったため、ビルドは `EMSDK_DIR=/opt/emsdk` で行った。
+環境: runner 4 core。`load` は `/proc/loadavg` の 1 分平均 (テスト行はループ開始時に読んだ値)。`fl-win64.tar.zst` を `[FL-WIN64]` の展開先 (`$FL_WIN64_DIR`) に全展開し (`FL_WIN64_DIR`)、`fetch_inputs.sh` で `work/` に配置した。`toolchain-emsdk.tar.zst` は `[EMSDK]` の展開先に展開したが、`[EMSDK]` の版 (`releases-6e9f6885…-64bit`) が展開物と同一だったため、ビルドは `EMSDK_DIR=[EMSDK]` で行った。
 
 | コマンド | 測定 commit | 結果 | wall | load |
 |---|---|---|---|---|
