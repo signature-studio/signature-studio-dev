@@ -16,27 +16,26 @@
 ## 2. 変更点 (`dec2ec7a0`)
 
 - slot 6 の応答を、`&out` に文字列の**番地**ではなく NUL 終端の実文字列 (`A`〜の 127 字 + NUL) を書く形にした。
-- 理由: 呼出側 `f_77faf0` は `out` (`rbp+0x50`・上限 0x400) を `f_412c10` (`rcx`=長さ格納先・`rdx`=`out`・`r8`=上限 0x400) に渡す。`f_412c10` は `out` を NUL まで走査して長さを決め、`f_4122c0` にその長さを渡す。番地 `0xA41000` の先頭バイトは 0 のため長さは 0 となる、と読める。修正後に `f_409b70` を越えたことが、この読みと整合する実測。ただし `f_412c10` の長さ 0 を直接観測してはいない (推定)。
+- 理由: 呼出側 `f_77faf0` は `out` (`rbp+0x50`・上限 0x400) を `f_412c10` (`rcx`=長さ格納先・`rdx`=`out`・`r8`=上限 0x400) に渡す。`f_412c10` は `out` を NUL まで走査して長さを決め、`f_4122c0` にその長さを渡す。番地 `0xA41000` の先頭バイトは 0 のため長さは 0 となる、と読める。修正後に `f_409b70` を越えたことは、この読みと整合する観測である。ただし `f_412c10` の長さ 0 は直接観測していない (推定)。また修正後の応答は `'A' + (k % 26)` の 127 字の合成文字列で、実 host の応答を観測したものではない。
 
 ## 3. 観測
 
 ### 3.1 修正前 (`REPORT_APPENDIX_2653.md` §3.1 の引用・本 run では再実行していない)
 
-- `entered=true`・`insn_count=134`・停止 `0x409b9a` (`f_409b70`・`rep movsb`)・`memory access out of bounds`。本 run の修正前 harness の再測定 (`cpi_reach.sh` 1 回目) も同じ停止点・同じ `insn_count=134`・同じ `host_log` を返した。
+- `entered=true`・`insn_count=134`・停止 `0x409b9a` (`f_409b70`・`rep movsb`)・`memory access out of bounds`。本 run では再実行していない (引用元の値)。
 
 ### 3.2 修正後 (測定 commit `dec2ec7a0`)
 
 - `entered=true`・`ret=null`・`insn_count=908`・`host_calls=2`・`trap=memory access out of bounds`。
 - `host_log`: `[cpi] host slot 0 rcx=0xa00000 rdx=0 r8=0x47` → `[cpi] host slot 6 rcx=0xa40000 rdx=0x40f r8=0x77fba8` (修正前と同じ)。
 - 停止: 命令 VA `0x407a3e` (`f_4079e0` 内の `and rcx, qword ptr [rax - 8]`)。直近は `0x407a21`〜`0x407a3e` で、`[rbx+8]` から辿ったチャンクのヘッダ (`[rax-8]`) を読む箇所。
-- 呼出連鎖の `f_409b70` を通過したため、copy の件数の問題は解消した。新しい停止は guest の割当て管理 (malloc 系) 側の読み出しで、host 応答とは別の原因と見られる。原因は未特定。
+- 呼出連鎖の `f_409b70` を通過したため、copy の件数の問題は解消した。新しい停止は guest の割当て管理 (malloc 系) 側の読み出しに見えるが、原因は未特定。応答の内容を変えたため、割当て側の入力が変わった可能性があり、host 応答との関係は未検証。
 
 ### 3.3 所要と load (n=1)
 
 | 段 | 秒 | load (1 分値・開始→終了) |
 |---|---|---|
 | `x64c_wrapper.py` block19091 | 75 | 未計測 |
-| `cpi_reach.sh` (修正前 harness、本 run の 1 回目) | 94 | 未計測 |
 | `cpi_reach.sh` (修正後、`dec2ec7a0`) | 79 | 0.34 → 0.83 (`uptime` の 1 分値。開始 10:03:58・終了 10:05:17) |
 
 `cpi_reach.sh` の秒は emcc 2 回・link・node 実行の全体。runner の差があるため比較の精度は低い。n=1 のため min–max は未評価。
