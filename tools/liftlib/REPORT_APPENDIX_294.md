@@ -1,11 +1,11 @@
 # liftlib #294 (親 CI-4) — dir64_boundary_gate.sh の FL_WIN64_DIR を tools/shared/env.sh 経由に置換 (付録)
 
-親: #294 (`tools/` 配下の `/home/ubuntu` 直書きの置換)。本付録は範囲 `tools/liftlib/dir64_boundary_gate.sh` 1 本の実測。
+親: #294 (`tools/` 配下の絶対パス直書きの環境変数化)。本付録は範囲 `tools/liftlib/dir64_boundary_gate.sh` 1 本の実測。
 既知類型との関係 (DEFECTS.md): 該当なし (パス既定値の置換のみ)。
 
 ## 0. 結論
 
-- 置換: `dir64_boundary_gate.sh` の `${FL_WIN64_DIR:-/home/ubuntu/work/analysis/win64}` を `source ../shared/env.sh` + `$FL_WIN64_DIR` に変えた。既定値は env.sh 経由で従来と同一 (`/home/ubuntu/work/analysis/win64`)。
+- 置換: `dir64_boundary_gate.sh` の `${FL_WIN64_DIR:-<固定の作業用 VM パス>}` を `source ../shared/env.sh` + `$FL_WIN64_DIR` に変えた。既定値は env.sh 経由で従来と同一 (`$ANALYSIS_DIR/win64` の既定値 = 従来の固定パス。[WIN64] 参照)。
 - 変更前後で gate の出力は一致 (パス差のみ)。終了コードも一致 (rc=1)。
 - **gate は変更前 (origin/main `ffb17f14d`) から `[1] 列挙` で FAIL している** (本変更とは無関係)。原因は `tools/gui/flengine/pe_image_parity.py` の旧境界 2 箇所 → 子 [CI-180] で扱う。
 
@@ -26,8 +26,8 @@
 | `[2] m6 実バイト` | PASS (補正漏れ=0、末尾slot補正=1) | PASS (同一) |
 | `[2] liftlib 実バイト` | PASS (補正漏れ=0、末尾slot補正=1) | PASS (同一) |
 | `[3]` ネガコン 4 件 | PASS (4/4) | PASS (4/4) |
-| 既定値 (`env -u FL_WIN64_DIR -u ANALYSIS_DIR`) | rc=2、`PE 無し: /home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin` | rc=2、同一 (diff 0 行) |
-| `source tools/shared/env.sh` の `FL_WIN64_DIR` 解決 | — | `/home/ubuntu/work/analysis/win64` (従来値と同一) |
+| 既定値 (`env -u FL_WIN64_DIR -u ANALYSIS_DIR`) | rc=2、`PE 無し: <既定の win64 解決先>/extracted/block00031_PE.bin` | rc=2、同一 (diff 0 行) |
+| `source tools/shared/env.sh` の `FL_WIN64_DIR` 解決 | — | 既定の win64 解決先 (従来値と同一。`[WIN64]`) |
 
 `[1]` の内訳 (変更前後で同一):
 
@@ -52,6 +52,6 @@
 | 未解決 | 起票先 |
 |---|---|
 | `pe_image_parity.py` の旧境界 2 箇所 (gate `[1]` FAIL) | [CI-180] |
-| `tools/ipp`・`tools/startup`・`tools/m2` の `/home/ubuntu` 直書き | [CI-178] |
+| `tools/ipp`・`tools/startup`・`tools/m2` の絶対パス直書き | [CI-178] |
 | `tools/assets`・`tools/audio`・`tools/hostbridge`・`tools/perf`・`tools/ott/f7eval`・`tools/shared` の直書き | [CI-179] |
 | `tools/m6`〜`tools/m8`・`tools/m11` の直書き、代表 e2e (ott / m11) の before/after | #294 (親) |
