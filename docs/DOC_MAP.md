@@ -889,6 +889,7 @@
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_779.md` | ~9 | KH-16 (#779) 第 2 弾: ymm 語彙 vaddps / vsubps / vmulps の検証 (REPORT.md §12-1 の全文を分割移動) |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_1116.md` | ~7 | #1116: HeapAlloc 0 返却規約のホスト同型性試験 (REPORT.md の 1116 節の全文を分割移動) |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3707.md` | ~100 | KH-59 (#3707): emcc 段の RSS cap (`rss_cap.py`) の実測。変更前後の sha256 一致・ネガコン・snapins 14 本 + module F の emcc ピーク RSS 表・cap 超過 4 本の未解決 |
+| `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3756.md` | ~50 | KH-62 (#3756): `gen_globals.py` の BSS 0 埋め膨張の原因 (宣言長超えの 0 埋め・19〜25 件) と修正。phaser/limiter/khbase bit-exact 200/200・delay FAIL 155/200 の未解決 |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_780.md` | 65 | KH-17 (#780): Ladder Filter (ksla) の process 閉包を x64c で測る。数え方・測定値・ネガコン・測定 commit は付録 §1〜§3 が正本。未解決は §5 |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_781.md` | 86 | KH-18 (#781): Carve EQ (ksge) の IAT 呼出 site 19 件の扱い (判定は付録 §2 が正本)・process 経路 (slot 14) の unique 側 25 関数に IAT 0 件 (共通基盤 120 関数は未集計)・間接 call の下限。測定 commit `fcf3a630` |
 | `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
