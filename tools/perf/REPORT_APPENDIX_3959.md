@@ -120,6 +120,30 @@ node tools/perf/p15/chrome_worklet.mjs --init-only --m 146 --runs 1 --timeout 15
 - 3 run は同じ決定的スクリプトの反復であり、独立した再現としての重みは小さい。
 - heap を data 領域より上へ逃がす実験 (SKIP) は、wasm メモリ (0x36000000、約 864 MB) に 145 回分 (約 532 MB) が収まらず、M=10 でも止まったため無効。成果物には含めない。
 
+## 3e. 子 #5403 (PERF-P28) の trace: 146 回目の ctor は仮想呼び出しで壊れ、ログ出力が止まらない (Node・同期)
+
+測定 commit: `ctor_loop_trace.mjs` と `instr_loops.py` を追加した commit (コードの最後の変更)。素材 `work-m6-ott` の `tools/ott/work/lift/ottl.wasm` (sha `e8fb06203811ff1f`) を使い、`wasm2wat` → `instr_loops.py` (loop 先頭 209 箇所に実行回数カウンタと budget) → `wat2wasm` で計装した (生成物は `tools/ott/work/` 配下のみ・commit 外)。
+
+| 測定 | 結果 |
+|---|---|
+| `node_init_sweep.mjs --m 145,146 --timeout 15000` (計装なし・HEAD) | M=145 ok (setup 783 ms)・M=146 timeout |
+| 計装 wasm・`ctor_loop_trace.mjs 145` | 145 完走・budget 切れなし |
+| 計装 wasm・`ctor_loop_trace.mjs 146` 3 run | 3/3 とも ctor 146 で budget 切れ (`unreachable`)。wall 8.5 s |
+| 146 回目の ctor 内の loop 実行回数 | loop 170 が 399,163,510 回 (3/3 で同値)。ctor 1〜145 では loop 170 は 0 回 |
+| `fd_write` の stub を書き込み可能に変えた計装 wasm・M=146 (3 run) | 3/3 とも `_abort_js` (abort) で停止。ハングはしない |
+| 同 (M=145) | 完走 |
+| 同 (`fd_write` 書き込み内容を記録) | 出力は `[ott] call to UNLIFTED function 0 (shifted VA; RVA 0xffffffffd0000000) ret=0x3011d9fc` |
+
+分かったこと:
+- **loop 170 は wasm func 92 の stdio 書き込みループ**。`fd_write` の stub (`return 0`) は `nwritten` を書かないため、ループは終わらない。M=146 の「無応答」は、この stub の下で実エラー文言の出力が終わらない結果である。
+- **ctor 146 の本当の失敗は、ctor `0x18011d400` 内の仮想呼び出し** (`ott_lifted.c` の `18011d9f9`: `mov rcx,[rdi]`・`mov rax,[rcx]`・`call [rax+0x38]`)。vtable 経由で読んだ呼び先が VA `0` (shifted RVA `0xffffffffd0000000`) になり、`ott_unlifted` が中断する。
+- つまり 146 の上限は、「heap が data 領域に届いた後で vtable が壊れる」ことで起きる、と読むのが自然。ただし、どの確保が vtable を書き換えたかは未確定。§3d の交絡 (allocator メタデータ) と同じ問題が残る。
+- 注意: `fd_write` の stub は `tools/perf/p15` ほか 9 箇所の harness にコピーされている。Chrome 側 (`chrome_worklet.mjs`・`web/*`) の 146 の「無応答」も、同じ stub のエラー出力ループの可能性がある。Chrome 側は本 run で再測定していない。
+
+未確定:
+- 壊れた vtable を書いた store の特定 (watchpoint 相当の計装が必要)。
+- wasm 関数番号と VA `0x18011d400` の対応表。`ottl.wasm` に name section が無く、`ott_run` の dispatch から関数番号を取り出す作業は本 run で完了していない。`ott_lifted.c` の `f_18011d400` (195 行) が対応の正本。
+
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
