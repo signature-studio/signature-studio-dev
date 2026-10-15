@@ -39,7 +39,7 @@ negative control (`f3d_crosscheck_3528.py` の判定が効くこと): `f3d_negct
 - negative control: `bash tools/m11/ldfix/f3d_negctl_3528.sh` → `# changed=58 OK=57 NG=1`、NG は 45b170 のみ、`NC PASS`。全体 6.1 s。
 - 単体テスト: `python3 tools/m11/ldfix/test_f3d_slots_3528.py` → `FAIL=0` (6 件)。
 - load: 上の実行の後に `/proc/loadavg` は `0.19 0.30 0.14` (nproc 4)。実行中の load は取っていない。
-- 鮮度: 測定対象のコード差分は `git diff 8affe0dba HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results/` が 0 行 (REPORT のみの commit では変わらない)。
+- 鮮度: 測定経路 (突合・NC・単体テストの入力と、それらが import する `ldfix.py`・`ldmach.py`・`ldframe.py`・`lb_base.py`) の差分は `git diff 8affe0dba HEAD -- tools/m11/lb_base.py tools/m11/ldfix/ldfix.py tools/m11/ldfix/ldmach.py tools/m11/ldfix/ldframe.py tools/m11/ldfix/f3d_crosscheck_3528.py tools/m11/ldfix/f3d_negctl_3528.sh tools/m11/ldfix/test_f3d_slots_3528.py tools/m11/ldfix/results/f3d_crosscheck_3528.tsv` が 0 行 (本 commit の時点で確認)。main の取り込みで入った別系統のファイル (`fix_spill_2794.py`・`verify_abi_3426.py` など) は測定経路の外。
 
 突合の範囲: 由来 argN と挿入 load の argK の一致までを見る。挿入 load の値と後段の比較 (`trunc i64 .. to i16` / `and`) の定数が機械語の比較定数と一致するかは見ていない。guard の IR 側条件 (`fix_f3d`) で確かめているのは「挿入先の xor が 1 本」まで。
 
@@ -49,33 +49,22 @@ negative control (`f3d_crosscheck_3528.py` の判定が効くこと): `f3d_negct
 - F3d: 同じ IR に `ldfix.py --passes f3d` を掛けた版 (58 関数・`f3d_fns`=58・`f3d_ambiguous`=21・`f3d_base_unresolved`=3・`f3d_arg_missing`=2)。
 - 実行: `audit_lsf_ssa_e2e.sh` を前景で 2 回。HEAD 2 m 44.8 s (rc 0・7/7)・F3d 2 m 44.2 s (rc 0・7/7)。nproc 4。
 - 差: 出力ログは HEAD と F3d で `diff` 0 行 (7 step とネガティブコントロール NC0〜NC7 を含む)。step 2 の `ssa.json` は 225 関数すべて同一。
-- 修正後の audit は再実行しない。audit が実行するコード (`ldfix.py`・`audit_lsf_ssa_e2e.sh`・`results/drops_510.tsv`・`results/spill178_1161.tsv`) は測定 commit `b706fb666` から HEAD まで差分 0 行 (`git diff b706fb666 HEAD -- tools/m11/ldfix/ldfix.py tools/m11/ldfix/audit_lsf_ssa_e2e.sh tools/m11/ldfix/results/drops_510.tsv tools/m11/ldfix/results/spill178_1161.tsv` = 0 行)。測定対象の差分が 0 なので、`docs/WORKFLOW.md` §6 の鮮度基準により再測定は要らない。
+- 修正後の audit は再実行しない。audit が実行するコード (`audit_lsf_ssa_e2e.sh`・`audit_lsf.py`・`audit_lsf_ssa.py`・`window_recount.py`・`dyn_xcheck.py`・`tally_510.py`・`negctl_510.sh`・`spill_classify_1161.py`・`ldmach.py`・`ldmach_img.py`・`results/drops_510.tsv`・`results/spill178_1161.tsv`・`results/manual_verdicts_510.jsonl`) は測定 commit `b706fb666` から HEAD まで差分 0 行 (`git diff b706fb666 HEAD -- tools/m11/ldfix/audit_lsf_ssa_e2e.sh tools/m11/ldfix/audit_lsf.py tools/m11/ldfix/audit_lsf_ssa.py tools/m11/ldfix/window_recount.py tools/m11/ldfix/dyn_xcheck.py tools/m11/ldfix/tally_510.py tools/m11/ldfix/negctl_510.sh tools/m11/ldfix/spill_classify_1161.py tools/m11/ldfix/ldmach.py tools/m11/ldfix/ldmach_img.py tools/m11/ldfix/results/drops_510.tsv tools/m11/ldfix/results/spill178_1161.tsv tools/m11/ldfix/results/manual_verdicts_510.jsonl` = 0 行)。測定対象の差分が 0 なので、`docs/WORKFLOW.md` §6 の鮮度基準により再測定は要らない。
+- HEAD 側の step 1〜7 の値は重複させない。正本は `REPORT_2660.md` の §5 (step 1〜6) と §10.4 (step 7)。
 - 母集団: `ssa.json` の 225 関数のうち F3d 対象は 4 関数 (45b170・45d0a0・45e3c0・45f560)。この 4 関数の record も変わらなかった。残り 54 関数は audit の母集団に無く、audit では観測できない。
-
-HEAD の step 値 (本 run・`b706fb666` の素材):
-
-| step | 主要値 |
-|---|---|
-| 1/7 `audit_lsf.py` | lsf 90 site / 解決不能 370 site / 169 関数 |
-| 2/7 `audit_lsf_ssa.py` | alg1 26・alg2 38・alg3 77 関数 (alg1 ∪ alg2 = 41) |
-| 3/7 `window_recount.py` | window_pairs 420・window_not_in_dataflow 0 |
-| 4/7 `dyn_xcheck.py` | 既知 TRUE_DROP 8 関数: match 2・mismatch 3・unexec 3。解決不能 169 関数: match 25・mismatch 52・unexec 92 |
-| 5/7 `tally_510.py` | store 宛 192 site: DROP 89 site / 51 関数・UNDETERMINED 2 site |
-| 6/7 `negctl_510.sh` | NC0〜NC7 完走 |
-| 7/7 `spill_classify_1161.py` | spill 宛 178 site: 確定 147・判定不能 30・未判定 1。TRUE_DROP 関数 32。`results/spill178_1161.tsv` と一致 |
-
-注記: step 1〜5 の値は `REPORT_2660.md` §5 と一致する。step 7 だけは §5 の値と違う。§5 は `4e85ea56` 時点の値で、現 main の `results/spill178_1161.tsv` と本 run の HEAD 側は一致する。
 
 ## 4. 既定化の判断: しない
 
-`REPORT_2660.md` §9.3 の見送り理由のうち、突合 (受入 1) と audit の比較 (受入 2) は本節で済んだ。残る理由で既定化を見送る。
+PM 判断 (R7 (a)・可逆。PR #3584 の PM 判断コメント): 既定化しない。`ldfix.py` と `audit_lsf_ssa_e2e.sh` は変えず、除外 (`if tag == 'f3d' and passes is None`) は残す。以下は判断の理由。
+
+`REPORT_2660.md` §9.3 の見送り理由のうち、突合 (受入 1) と audit の比較 (受入 2) は §2・§3 で済んだ。残る理由で既定化を見送る。
 
 1. 効果が観測できない。e2e (`REPORT_2660.md` §9.1) で F3d 適用 IR の到達 stage・survey・通過 unit・trap は HEAD と同一だった。audit も差 0 である。既定化しても観測できる改善が無いまま、58 関数の本番 IR を変えることになる。
 2. audit の差 0 は、F3d 対象 54 関数に影響が無いことの証拠にならない (§3 の母集団)。
 3. 既定化した状態を再測定していない。コミット済み HEAD で `m11_gen_ir2.sh` → `m11_e2e.sh` を既定の経路で実行していない (§9.1 は F3d を明示した実行)。
 4. guard の negative control (効く入力での FAIL) は未測定。`REPORT_2660.md` §2.5 の入力では全ガードが効いていない。
 
-既定化の判断を覆す条件: 1 の効果が観測されること、または既定化したコミット済み HEAD の e2e と 4 の negative control が揃うこと。どちらも本 run の範囲を超える。前提を持つ #2834 (LD-135) の扱いに関わるため PM に返す (§5)。
+既定化の判断を覆す条件: 1 の効果が観測されること、または既定化したコミット済み HEAD の e2e と 4 の negative control が揃うこと。どちらも本 run の範囲を超える。再検討するときに §5 の前提を揃えて起票する。
 
 コード差分 (確認): `git diff b706fb666 HEAD -- tools/m11/ldfix/ldfix.py tools/m11/ldfix/audit_lsf_ssa_e2e.sh tools/m11/ldfix/results/drops_510.tsv tools/m11/ldfix/results/spill178_1161.tsv` は 0 行。本 PR の新規は `f3d_crosscheck_3528.py`・`REPORT_3528.md`・`results/f3d_crosscheck_3528.tsv` のみ。
 
@@ -83,8 +72,9 @@ HEAD の step 値 (本 run・`b706fb666` の素材):
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 既定化の判断: 効果の実測・既定化したコミット済み HEAD の e2e 再測定・guard の効く入力の negative control・挿入 load の値と後段の比較定数の一致 | #2834 (LD-135) の前提「F3d を既定化すると判断したこと」が未成立。4 site の判定と results 更新は未着手 | #2834 へのコメント (前提は PM が決める) |
-| 既定 e2e の pin と本 snapshot の不一致 (pin の値は `REPORT_2660.md` §9.4 参照。HEAD でも発生・`REPORT_2660.md` §9.1) | 既定 e2e が rc=1 で終わる (F3d の影響ではない) | #2834 へのコメント (本 issue の本文が「別途扱う」とした件の引継ぎ) |
+| 既定化の前提: 効果の実測・既定化したコミット済み HEAD の e2e 再測定・guard の効く入力の negative control・挿入 load の値と後段の比較定数の一致 | 既定化は PM 判断で見送り (§4・R7 (a)・可逆)。既定の挙動は変わらない | PM 判断 (しない)。再検討時に起票 |
+| 4 site (45d570・45d581・45b1bf・45f938) の store 実行の判定と results 更新 | 4 site は UNDETERMINED のまま | #3605 (LD-167・OPEN) |
+| 既定 e2e の pin と本 snapshot の不一致 (pin の値は `REPORT_2660.md` §9.4 参照。HEAD でも発生) | 既定 e2e が rc=1 で終わる (F3d の影響ではない) | #3647 (M11-27・OPEN・親 #3520) |
 
 ## 6. 再現手順
 
