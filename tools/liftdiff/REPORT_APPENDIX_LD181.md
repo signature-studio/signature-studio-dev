@@ -1,14 +1,14 @@
 # 付録: liftdiff LD-181 (#3864): 653c80 / 691dd0 の native segv の原因と、irtool.instrument の i128 入口記録
 
 > 親: #1528 (LD-52)。前提: `REPORT_APPENDIX_LD52.md` §4 の未解決。
-> 測定 commit: `57a146a96` (コードを変えた最後の commit)。`57a146a96` から HEAD までのコード差分は §5。
+> 測定 commit: `d256d3432` (コードを変えた最後の commit。検証 HEAD = 測定 commit)。`57a146a96` からの差分は §5。
 > 基準 (修正前): origin/main `feec9980a` (同じ build 手順・同じ素材)。
 
 ## 結論
 
 - **691dd0**: native segv の原因は、小サイズ用アロケータ (`0x407a50`) のビン読み `0x407a97` (`mov rax,[rdx+0x18]`) で、rdx=0 (ビン先頭 `[rbx+8]` が 0)。fault addr は `0x18`。boot 状態を読んでも同じ segv で、LD-159 の「大域ビン (`0x407a50` の表) が 0 のまま」と同型。`691dd0` は rcx のオブジェクト (`[rcx+0x78]`・`[rcx+0x94]`・`[rcx+0x8c]`) を読んで確保 (`0x409410`) を呼ぶ。有効なオブジェクトを渡す case は作れていない (§2)。**判定には入らない** (11 パターンとも `native_null_deref_all_patterns`)。
 - **653c80**: segv の rip は **0** (`rip_rva=0xffffffffffc00000`)。`0x653c8d` の `call qword ptr [rip+0xf9f7ed]` が、.bss の slot (`VA 0x15f3480`) が 0 のまま null を呼ぶ。r8 が `0x7fffffff` 未満の経路 (`cmp r8,0x7fffffff` → `jge` を取らない) で発生する。fault addr は記録されず、呼び先 slot は boot 状態でも未設定 (§2)。**判定には入らない** (11 パターンとも `native_fault_all_patterns`)。
-- **irtool.instrument の i128 入口記録**: 修正した (受入 (a))。i128 引数を `trunc i128 %x to i64` で下位 64bit として `ld_trace` に記録する。旧版は `0` と記録していた。sample:800 の判定差は **0 件** (件数 360/234/206 のまま。関数単位の判定差 0・§3)。
+- **irtool.instrument の i128 入口記録**: 修正した (受入 (a))。i128 引数を `trunc i128 %x to i64` で下位 64bit として `ld_trace` に記録する。旧版は `0` と記録していた。sample:800 の判定差は前の測定 (`57a146a96`) で **0 件** (360/234/206 のまま。関数単位の判定差 0・§3)。HEAD `d256d3432` の実測は 361/233/206 (§5)。
 - `cmp_trace` の i128 位置の除外 (`compare.py`) は**残した**。除外を外すと、xmm0 を trunc した値と native の値が合うかの確認が要るため、この PR では判定の経路を変えない (§4 の未解決)。
 
 ## 1. 方式
@@ -39,7 +39,8 @@
 | 版 | 一致 | 不一致 | 実行不能 | 関数単位の判定差 |
 |---|---|---|---|---|
 | 修正前 `feec9980a` | 360 | 234 | 206 | — |
-| 修正後 `57a146a96` | 360 | 234 | 206 | **0 件** (800 件を突合) |
+| 修正後 `57a146a96` (前の測定) | 360 | 234 | 206 | **0 件** (800 件を突合) |
+| 修正後 HEAD `d256d3432` (実測 2 回) | 361 | 233 | 206 | 2 回とも同値 (1 回目と 2 回目の関数単位の判定差 0 件) |
 
 - 突合は修正前の `batch_sample_800.jsonl` (退避) と修正後の出力の `verdict`・`unexec_reason` の比較。
 
@@ -53,8 +54,25 @@
 
 ## 5. 検証
 
-- 測定 commit `57a146a96` (e2e・sample:800 の実測はこの版)。`git diff 57a146a96 HEAD -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh` の出力は 5 ファイル・+67/-6 行 (`ldlib/cases.py`・`rt/ld_core.h`・`rt/ld_ms_call.S`・`liftdiff_e2e.sh`・`tests/test_ld179_tagpoint_tr.py`)。出どころは main 取り込み (#3862 LD-179) で、本 PR の変更ではない。ただし HEAD の判定は上記の実測に含まれていない。
-- 未実施: head (`ae368aea` 以降) での e2e・sample:800 の再測定。素材 `work-m11`・`work-liftdiff`・`toolchain-*` が実行環境に無く、実行できなかった。
-- e2e: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` → **exit 0・`LIFTDIFF_E2E PASS`・164 秒** (`real 2m44.456s`・開始時 load 0.39・終了直後 4.43)。修正前 (`feec9980a`) は exit 0・164 秒 (`real 2m44.474s`・load 0.03)。
+- 測定 commit `d256d3432` (検証 HEAD)。実測は素材 `fl-win64`・`work-m11`・`work-liftdiff`・`toolchain-emsdk` を `$RUNNER_TEMP` / `tools/{m11,liftdiff}/work` に展開して行った (`tools/m11/m11_gen_ir2.sh` で `ir_conditions.json` を作ってから)。
+- e2e: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/liftdiff/liftdiff_e2e.sh --m11-only` → **exit 0・`LIFTDIFF_E2E PASS`・`real 3m14.299s`** (開始時 load 0.73・終了直後 5.21)。
+- 単体 (e2e の `[0/4]`・`[3/4]`): `PASS test_ld52_machine_sig`・`PASS test_ld181_i128_entry`・`PASS test_ld179_tagpoint_tr`・`PASS` の 3 件 (UStrAsg・Move・4123c0)・`CHECK_INITUNITS PASS`。
+- sample:800 (`--shards 12 --state auto`): e2e 内の batch は `done 113s`・結果 `361 / 233 / 206`。同 HEAD で `liftdiff.py batch` を単独で再実行 (`real 1m54.597s`) しても `361 / 233 / 206`。関数単位の判定は 2 回の突合で 0 件差。
+- 前の測定 (`57a146a96`) は `360 / 234 / 206`。HEAD の実測は 1 件ずれて `361 / 233 / 206` で、2 回とも同じ。HEAD の値を正とする。
+- 前の測定 `57a146a96` の e2e: `real 2m44.456s`。修正前 `feec9980a`: `real 2m44.474s` (load 0.03)。
+- `57a146a96` から HEAD までのコード差分 (`git diff 57a146a96 d256d3432 -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh`):
+
+  ```
+   tools/liftdiff/ldlib/cases.py                  |  7 ++++
+   tools/liftdiff/ldlib/pe.py                     |  9 +++++
+   tools/liftdiff/ldlib/session.py                | 26 ++++++++++----
+   tools/liftdiff/liftdiff_e2e.sh                 |  4 ++-
+   tools/liftdiff/rt/ld_core.h                    | 14 +++++---
+   tools/liftdiff/rt/ld_ms_call.S                 |  6 +++-
+   tools/liftdiff/tests/test_ld179_tagpoint_tr.py | 48 ++++++++++++++++++++++++++
+   7 files changed, 102 insertions(+), 12 deletions(-)
+  ```
+
+  出どころは main 取り込み (#4186 (LD-179)・#4187 (LD-180) など) で、本 PR の変更ではない。全文 (234 行) は REPORT の行数上限 (250 行) を超えるため、上の stat と上記コマンドで再現する。
 - 単体: `PASS test_ld52_machine_sig`・`PASS test_ld181_i128_entry` (e2e の `[0/4]`)。
 - 製品 KPI (FLEngine 起動・最初のウィンドウ): 本 PR は起動・GUI に関わらないため書かない。
