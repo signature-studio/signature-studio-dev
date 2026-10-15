@@ -8,8 +8,16 @@ import re
 import sys
 
 FUNCS = ['180fc4590', '180fcce40', '180fcd690', '180fce0d0', '180fc6d70', '180fc6870', '180fcd400', '1802ed7f0']
-BIT = re.compile(r'^(AND|OR|XOR|CMP|TEST|SHR|SHL|SAR|JA|JB|JBE|JAE|JZ|JNZ|CMOV|PAND|POR|PXOR|PSRLQ|PSUBD|ANDPD|ANDNPD|ORPD|XORPD|VAND|VOR|VXOR|VANDN|MOVDDUP|MOVQ|MOVD|PSUBQ|PSLL)')
+BIT = re.compile(r'^(AND|OR|XOR|CMP|TEST|SHR|SHL|SAR|PAND|POR|PXOR|PSRLQ|PSLL|ANDPD|ANDNPD|ORPD|XORPD|VAND|VOR|VXOR|VANDN|MOVDDUP|MOVQ|MOVD)')
+CTRL = re.compile(r'^(J[A-Z]+|CALL)')
 CAST = re.compile(r'\(ulonglong\)dVar\d+')
+
+
+def kind_of(insn):
+    # 制御命令 (Jcc・CALL) は判定の根拠にしない。残りの全命令がビット/論理系なら「ビット再解釈」、
+    # 1 つでも数値演算 (CVT*・*SD・*PD の算術・VFMADD*・UCOMISD 等) があれば、または残りが無ければ「要確認」。
+    ops = [x.split()[0] for x in insn if x and not CTRL.match(x.split()[0])]
+    return 'ビット再解釈' if ops and all(BIT.match(o) for o in ops) else '要確認'
 
 
 def main():
