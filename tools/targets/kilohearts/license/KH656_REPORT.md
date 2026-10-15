@@ -251,10 +251,13 @@ index c59421af9..7ac5ec4bf 100644
 | lift-8 off (`rdata_str` 無し) | 54,394 | 9 | `7ba79e65…` | 0 |
 | lift-8 on (`rdata_str` + `rdata_raw_allow`) | 54,487 | 10 | `3d2bc6fd…` | 0 |
 
-- 受入 1 達成: 測定 commit `091c68915` の値 (54,394 B / 54,487 B、globals 9 / 10) と HEAD で一致。
-- lift 8 件は `LIFT8` で固定 (`lic_config` の現行 lift 集合 1,305 件は使わない)。
-- 313 集合: **HEAD 未測定**。元の集合の源 `work/kh656_rounds.json` は gitignore で、本 runner に無い。どの commit にも 313 の VA 一覧は無く、`lic_config.json` の F は各 commit で lift 8 件のまま (uncommitted 設定でのみ 313 を作っていた)。よって §8.2 の表 (84 行・34 VA) は、再測定できないため置き換えない。
+- 受入 1 達成: wasm B と sha256 先頭 8 桁は測定 commit `091c68915` の記録 (`KH656_REPORT_APPENDIX_1821.md` §3: lift-8 on 54,487 B・`3d2bc6fd`、lift-8 off 54,394 B・`7ba79e65`) と一致する。globals は on の 10 のみ `091c68915` の記録 (10) と一致。off の globals 9 は `091c68915` では「未記録」だったため、今回が初回記録であり、一致の根拠にはしない。
+- 注: `091c68915` の on 測定は `rdata_raw_allow` を渡さずに行われた。今回の on は `rdata_raw_allow` を渡して測ったが、sha は一致した。
+- driver は `091c68915` の `scripts/kh656_window_measure.py` を取り込んだ後に改変している (単純な取り込みではない): `lift8` を `LIFT8` 固定、on 側で `rdata_raw_allow` を渡す、`set313` の停止条件追加、出力 tag `m4670_*`、docstring。
+- lift 8 件は `LIFT8` で固定 (`lic_config.json` の F の現行 lift 集合は 1,305 件で、使わない)。`091c68915` 時点の F は lift 8 件。
+- 313 集合: **HEAD 未測定**。元の集合の源 `work/kh656_rounds.json` は gitignore で、本 runner に無い。どの commit にも 313 の VA 一覧は無い。313 の集合は uncommitted な `lic_config.json` 一時設定でのみ作っていた。よって §8.2 の表 (84 行・34 VA) は、再測定できないため置き換えない。
 - driver `set313` は `scripts/kh656_set313.json` が無ければ停止する (未 commit)。
+- 素材の再現性: 本 run の `$ARTIFACTS_DIR` には `plugins-kilohearts` が無く (`fl-win64` のみ)、`work/` も無い。driver の再実行による独立検証は行っていない。数値は `091c68915` の既存記録との照合のみ。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
