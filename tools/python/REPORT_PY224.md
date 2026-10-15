@@ -34,7 +34,7 @@ PE は `analysis/flapi/pe_disasm.py 12d3ff0 90` の逆アセンブル (`FL_WIN64
 - 検証 HEAD: 本 REPORT の commit。コード範囲の差分 `git diff 828c677e6 HEAD -- tools/python/host tools/python/provider tools/python/tests` は 0 行 (本 REPORT の commit は範囲外)。
 - 直前の測定 commit からの差分: `git diff a923a54db 828c677e6 -- tools/python/host tools/python/provider tools/python/tests` は 6 files・110 insertions・15 deletions (main の取り込み分と競合解消)。
 - 変更の規模 (main `ccea1a0df` に対する正味): 7 files・211 insertions・6 deletions (`docs/DOC_MAP.md`・`REPORT_PY224.md`・`fl_engine.c`・`fl_mock.mjs`・`fl_provider.mjs`・`build.sh`・`channels_diff.mjs`)。`fl_engine.c` は `getGridBitWithLoop` の行の書換えのみで、新規のハンドラは追加していない (implemented の増減は main 由来)。
-- 素材: `fl-win64` を `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C $RUNNER_TEMP/fl-win64` で全展開。`fetch_inputs.sh` は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` で rc 0 (`work/midi.py`・`work/utils.py`・`work/fl-stubs` を生成)。emsdk は `/opt/emsdk/emsdk_env.sh` (既定の `EMSDK_ENV`) をそのまま使用。
+- 素材: `fl-win64` を `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C $RUNNER_TEMP/fl-win64` で全展開。`fetch_inputs.sh` は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` で rc 0 (`work/midi.py`・`work/utils.py`・`work/fl-stubs` を生成)。emsdk は `[EMSDK]` (既定の `EMSDK_ENV`・`docs/REFERENCES.md` §4) をそのまま使用。
 - flpy: `build_cpython_wasm.sh` rc 0 (04:10:34 → 04:14:39 の 245 秒)。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (`flpy.wasm` 5,924,680 B。REPORT_PY101 と同じサイズ)。
 - 負荷: 測定開始時の load average 1.38 / 1.62 / 0.85、測定終了時 1.83 / 1.71 / 0.89。node v22.23.3。
 
