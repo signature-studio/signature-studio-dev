@@ -96,15 +96,16 @@ venv/bin/python $P/arg_vtable_callers.py Serum2_win64.vst3 trace.tsv --cats vptr
 
 ### 鮮度の証跡 (`docs/WORKFLOW.md` §6)
 
-- 測定 commit `ea3ffa68d` → 現 head `16bcab6ef` の差分 (REPORT の修正のみ):
-- `git diff --stat ea3ffa68d 16bcab6ef -- tools/targets/serum2/gui` の出力:
+- 測定 commit `ea3ffa68d` → 現 head `28a4d95ec` の差分 (REPORT の修正のみ):
+- `git diff --stat ea3ffa68d 28a4d95ec -- tools/targets/serum2/gui` の出力:
 
 ```
- tools/targets/serum2/gui/REPORT_SR59.md | 116 ++++++++++++++++++++++++++++++++
- 1 file changed, 116 insertions(+)
+ tools/targets/serum2/gui/REPORT_SR59.md | 122 ++++++++++++++++++++++++++++++++
+ 1 file changed, 122 insertions(+)
 ```
 
-- code 範囲 (`*.py`): `git diff --stat ea3ffa68d 16bcab6ef -- 'tools/targets/serum2/gui/*.py'` は出力 0 行。`git log --oneline ea3ffa68d..16bcab6ef -- 'tools/targets/serum2/gui/*.py'` も 0 行。
+- `git diff --stat ea3ffa68d 28a4d95ec -- 'tools/targets/serum2/gui/*.py'` の出力: 0 行。
+- `git log --oneline ea3ffa68d..28a4d95ec -- 'tools/targets/serum2/gui/*.py'` の出力: 0 行。
 - 結論: 測定に使ったコードは変わっていないので、再測定は不要。変更は REPORT のみ。
 
 ### 未再現 (入力 PE 不在)
