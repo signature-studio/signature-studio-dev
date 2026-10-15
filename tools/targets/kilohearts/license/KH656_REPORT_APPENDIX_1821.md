@@ -3,7 +3,7 @@
 本付録は `KH656_REPORT.md` §7.6・§7.7 の続き。本文 (§7) は 250 行上限のため、結論と追跡だけを本文に残し、詳細をここへ移した。
 
 測定 commit: `a65a71ed1` (コードを変えた最後の commit。`gen_globals.py` の修正と検証スクリプト)。そこから HEAD までのコード差分は §7 の確認コマンドで 0 行 (REPORT のみ)。
-環境: nproc=4・RAM 15.9GB (空き約 14GB)・素材 `plugins-kilohearts` / `toolchain-retdec` / `toolchain-emsdk` (`$HOME/artifacts` に実在を確認)。
+環境: nproc=4・RAM 15.9GB (空き約 14GB)・素材 `plugins-kilohearts` / `toolchain-retdec` / `toolchain-emsdk` (R2 由来の素材ディレクトリに実在を確認)。
 
 ## 1. 結論
 
