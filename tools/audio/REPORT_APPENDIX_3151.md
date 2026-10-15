@@ -61,7 +61,7 @@
 - **理由**: round 3 の review (blocking 1)。測定 commit から現 HEAD までの測定対象コードの差分が残り、行列の 6 行が 1 つの測定 commit で測られていなかったため、行列を測り直した。
 - **測定 commit**: `8310689a` (測定対象コードを最後に変えた commit は `4ca74476` 以前。`git diff 4ca74476 8310689a -- <範囲>` の出力は 0 行)。**`git diff 8310689a HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は 0 行** (測定後の commit は docs のみ)。
 - **環境**: ubuntu runner (4 vCPU)・google-chrome 154.0.8037.97 (headless)・PulseAudio 16.1 (apt 導入。fake は `pulseaudio -k` で停止、null は `module-null-sink sink_name=ci_null` を既定 sink)・emsdk 6.0.12 (上流 `emscripten-core/emsdk`。素材 `toolchain-emsdk` は本 run の素材に無し)。
-- **build**: `EMSDK_ENV=/home/runner/work/_temp/emsdk/emsdk_env.sh bash tools/audio/build.sh` → `[audio] build OK`。
+- **build**: `EMSDK_ENV=<emsdk>/emsdk_env.sh bash tools/audio/build.sh` → `[audio] build OK`。
 - **実行**: `AU2_OUT=tools/audio/results/au30_p99_r2 bash tools/audio/au2_matrix.sh 3` (exit 0・wall 00:09:58 → 00:20:38 = 10 分 40 秒)。生結果は `results/au30_p99_r2/` (各 run の `host` に load 値)。集計: `node tools/audio/au2_summary.mjs tools/audio/results/au30_p99_r2`。
 - **load avg (1 分値)**: 行列の開始 (fake_r1) 0.61 → 終了 (`nc_soak15_negctl`) 0.06。
 - **結果** (`au2_summary.mjs` の出力):
