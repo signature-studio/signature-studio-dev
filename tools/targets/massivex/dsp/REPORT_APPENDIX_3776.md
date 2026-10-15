@@ -87,7 +87,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `.text` 外を指す FH3 funclet 候補 211 件 (値が 0x1000 未満の 8 件を含む・`.text` より上 203 件) の由来 | root から除外した。FH3 walk の誤読か、別の FuncInfo 形かは未確認 | [MX-47] (#4192) |
+| `.text` 外を指す FH3 funclet 候補 211 件 (画像外 208・`.data` 3。値が 0x1000 未満の 8 件は 0x0〜0x438 で `REPORT_APPENDIX_4192` §2.1) の由来 | root から除外した。FH3 walk の誤読か、別の FuncInfo 形かは未確認 | [MX-47] (#4192) |
 | SjLj 形の runtime と FH3 FuncInfo walk の C 実装 (受入 2 の残り) | funclet は lift されるが呼べない | [MX-45] (#4161) |
 | native vs wasm の通し一致・ネガティブコントロール (受入 3 の残り) | 未実測 | [MX-46] (#4162) |
 | U4f (上限棄却 355 件の妥当性)・U4g (4 件の共有)・U4h (EH 専用 block の位置)・U4i (呼出し ABI の実機確認) | §9.5 のとおり | [MX-47] (#4192) |
