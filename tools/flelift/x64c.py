@@ -25,6 +25,9 @@ ott 原版からの差分 (FLEngine 実測 1,105 未対応 site = 0.32% の解�
   - VEX.128 (xmm) を legacy SSE handler へ落とす (vex_leg: 3-op は d=s1 コピー後に legacy (d,s2)、上位 YL を 0 化)、
     VEX FMA (vfmadd/fmsub/fnmadd/fnmsub × 132/213/231 × sd/ss)、vinsertf128・vmovntdq (ymm)、rcr、int (fail-fast)、
     movsldup/movshdup/cmpXXps (KH-38 #3065。before 160 closure の unsup 285 site → 0。差分テスト tests/x64c_vex_diff.py)
+  - VEX.256 (ymm) の packed 算術 (vaddpd/vsubpd/vmulpd/vdivpd・ps 版)・bitwise・vunpckl/hpd・vshufpd・vextractf128・vcvtdq2pd を
+    上位 128bit (YL) 込みで lane 計算 (KH-38 #3428。PSOLA_CreateInstance 閉包 unsup 2,472 → 0)。
+    加えて vcvtss2sd/vcvtsi2sd/vsqrtsd/vpunpcklqdq/vmovhpd (VEX.128)・movddup/lddqu/movntpd/palignr/shlx/pushfq・div r/m8
   - dispatch に IAT pseudo-VA 経路を追加: data 側で IAT slot に IMP_VA_BASE+idx を敷設し,
     `mov rax,[iat]; call rax` 形の間接呼出を imp 呼出に解決
 
@@ -552,6 +555,9 @@ class FnLift:
     def i_push(self, ins, ops):
         self.L('{ uint64_t v_ = %s; R[RSP] -= 8; ST64(R[RSP], v_); }' % self.rd(ins, ops[0], 8))
 
+    def i_pushfq(self, ins, ops):
+        self.L('{ uint64_t v_ = 2 | fCF | ((uint64_t)fPF << 2) | ((uint64_t)fAF << 4) | ((uint64_t)fZF << 6) | ((uint64_t)fSF << 7) | ((uint64_t)fDF << 10) | ((uint64_t)fOF << 11); R[RSP] -= 8; ST64(R[RSP], v_); }')
+
     def i_pop(self, ins, ops):
         self.L('{ uint64_t v_ = LD64(R[RSP]); R[RSP] += 8; %s }' % self.wr(ins, ops[0], 'v_', 8))
 
@@ -712,6 +718,8 @@ class FnLift:
             self.L('{ uint64_t d_ = %s; if (!d_) ott_unsup(%s, "div by zero"); unsigned __int128 n_ = ((unsigned __int128)R[RDX] << 64) | R[RAX]; R[RAX] = (uint64_t)(n_ / d_); R[RDX] = (uint64_t)(n_ %% d_); }' % (self.rd(ins, ops[0]), hx(ins.address)))
         elif sz == 4:
             self.L('{ uint32_t d_ = %s; if (!d_) ott_unsup(%s, "div by zero"); uint64_t n_ = ((uint64_t)(uint32_t)R[RDX] << 32) | (uint32_t)R[RAX]; R[RAX] = (uint32_t)(n_ / d_); R[RDX] = (uint32_t)(n_ %% d_); }' % (self.rd(ins, ops[0]), hx(ins.address)))
+        elif sz == 1:
+            self.L('{ uint8_t d_ = %s; if (!d_) ott_unsup(%s, "div by zero"); uint32_t n_ = (uint32_t)(R[RAX] & 0xffff); uint32_t q_ = n_ / d_, r_ = n_ %% d_; if (q_ > 0xff) ott_unsup(%s, "div8 overflow"); R[RAX] = (R[RAX] & ~0xffffULL) | q_ | ((uint64_t)r_ << 8); }' % (self.rd(ins, ops[0]), hx(ins.address), hx(ins.address)))
         else:
             raise Unsup('div%d' % sz)
 
@@ -933,6 +941,7 @@ class FnLift:
             return self.L('X[%d] = X[%d];' % (di, self.xd(ins, s)))
         self.L('X[%d] = LDX(%s);' % (di, self.ea(ins, s)))
     i_movaps = i_movapd = i_movdqa = i_movups = i_movupd = i_movdqu = mov128
+    i_lddqu = mov128
 
     # AVX (ymm / xmm の両形)
     def vmov(self, ins, ops):
@@ -968,7 +977,7 @@ class FnLift:
     def i_vzeroupper(self, ins, ops):
         self.L('for (int k_ = 0; k_ < 16; k_++) memset(&YL[k_], 0, 16);')
 
-    i_vmovntdq = i_movntdq = i_movntps = i_vmovntps
+    i_vmovntdq = i_movntdq = i_movntps = i_movntpd = i_vmovntps
 
     def i_vinsertf128(self, ins, ops):
         d, s1, s2, im = ops
@@ -987,17 +996,24 @@ class FnLift:
             'vpxor': ('pxor', True), 'vpand': ('pand', True), 'vpor': ('por', True),
             'vxorpd': ('xorpd', True), 'vxorps': ('xorps', True), 'vorpd': ('orpd', True), 'vandpd': ('andpd', True), 'vorps': ('orps', True),
             'vpaddq': ('paddq', True), 'vpaddd': ('paddd', True), 'vpsubq': ('psubq', False), 'vpsubd': ('psubd', False),
-            'vunpcklpd': ('unpcklpd', False), 'vpunpckldq': ('punpckldq', False),
+            'vunpcklpd': ('unpcklpd', False), 'vunpckhpd': ('unpckhpd', False), 'vpunpckldq': ('punpckldq', False),
             'vpsrlq': ('psrlq', False), 'vpsllq': ('psllq', False), 'vpsrad': ('psrad', False),
             'vmovsd': ('movsd', False), 'vmovss': ('movss', False),
-            'vcvtsd2ss': ('cvtsd2ss', False), 'vcvtsi2ss': ('cvtsi2ss', False)}
+            'vcvtsd2ss': ('cvtsd2ss', False), 'vcvtsi2ss': ('cvtsi2ss', False),
+            'vcvtss2sd': ('cvtss2sd', False), 'vcvtsi2sd': ('cvtsi2sd', False), 'vsqrtsd': ('sqrtsd', False),
+            'vpunpcklqdq': ('punpcklqdq', False), 'vmovhpd': ('movhpd', False)}
     VEX2 = {'vmovd': 'movd', 'vmovq': 'movq', 'vcvtdq2pd': 'cvtdq2pd', 'vcvtps2pd': 'cvtps2pd',
             'vcvtpd2dq': 'cvtpd2dq', 'vcvttpd2dq': 'cvttpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd'}
     VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
 
     def vex_leg(self, ins, ops, m):
         if any(o.type == X86_OP_REG and self.isymm(ins, o.reg) for o in ops):
-            raise Unsup('ymm ' + m)
+            return self.vex_ymm(ins, ops, m)
+        if m == 'vpunpcklqdq' and len(ops) == 3 and self.isx(ins, ops[1]):
+            di = self.xd(ins, ops[0])
+            self.L('{ X128 a_ = X[%d]; X128 b_ = %s; X[%d].q[0] = a_.q[0]; X[%d].q[1] = b_.q[0]; }' % (
+                self.xd(ins, ops[1]), self.xs(ins, ops[2], 'x128'), di, di))
+            return self.L('memset(&YL[%d], 0, 16);' % di)
         if m in self.VEX3:
             leg, comm = self.VEX3[m]
             if len(ops) == 3:
@@ -1013,6 +1029,55 @@ class FnLift:
             self.L('memset(&YL[%d], 0, 16);' % di)
             return
         raise Unsup(m)
+
+    # VEX.256 (ymm)。上位 128bit (YL) を含めて lane ごとに計算する。lane 配列 A_/B_/R_ は X128[2] (0 = 下位 X・1 = 上位 YL)。
+    # 読み出しを全て済ませてから書くので、d が s1/s2 と同じでも安全。
+    YPK = {'vaddpd': ('df', 'double', 2, 'x_ + y_'), 'vsubpd': ('df', 'double', 2, 'x_ - y_'),
+           'vmulpd': ('df', 'double', 2, 'x_ * y_'), 'vdivpd': ('df', 'double', 2, 'x_ / y_'),
+           'vaddps': ('f', 'float', 4, 'x_ + y_'), 'vsubps': ('f', 'float', 4, 'x_ - y_'),
+           'vmulps': ('f', 'float', 4, 'x_ * y_'), 'vdivps': ('f', 'float', 4, 'x_ / y_'),
+           'vxorpd': ('q', 'uint64_t', 2, 'x_ ^ y_'), 'vxorps': ('q', 'uint64_t', 2, 'x_ ^ y_'),
+           'vandpd': ('q', 'uint64_t', 2, 'x_ & y_'), 'vandps': ('q', 'uint64_t', 2, 'x_ & y_'),
+           'vorpd': ('q', 'uint64_t', 2, 'x_ | y_'), 'vorps': ('q', 'uint64_t', 2, 'x_ | y_')}
+
+    def ysrc(self, ins, op, arr):
+        if op.type == X86_OP_REG:
+            i = self.xreg(ins, op.reg)
+            return '%s[0] = X[%d]; %s[1] = YL[%d];' % (arr, i, arr, i)
+        return 'LDYSPLIT(%s, &%s[0], &%s[1]);' % (self.ea(ins, op), arr, arr)
+
+    def ylanes(self, ins, d, s1, s2, body):
+        di = self.xd(ins, d); ai = self.xd(ins, s1)
+        self.L('{ X128 A_[2], B_[2], R_[2]; A_[0] = X[%d]; A_[1] = YL[%d]; %s for (int h_ = 0; h_ < 2; h_++) { %s } X[%d] = R_[0]; YL[%d] = R_[1]; }' % (
+            ai, ai, self.ysrc(ins, s2, 'B_'), body, di, di))
+
+    def vex_ymm(self, ins, ops, m):
+        yr = lambda o: o.type == X86_OP_REG and self.isymm(ins, o.reg)
+        src_ok = lambda o: yr(o) or o.type == X86_OP_MEM
+        if m in self.YPK and len(ops) == 3 and yr(ops[0]) and yr(ops[1]) and src_ok(ops[2]):
+            et, T, n, ex = self.YPK[m]
+            return self.ylanes(ins, ops[0], ops[1], ops[2],
+                               'for (int k_ = 0; k_ < %d; k_++) { %s x_ = A_[h_].%s[k_], y_ = B_[h_].%s[k_]; R_[h_].%s[k_] = %s; }' % (n, T, et, et, et, ex))
+        if m in ('vunpcklpd', 'vunpckhpd') and len(ops) == 3 and yr(ops[0]) and yr(ops[1]) and src_ok(ops[2]):
+            b = 1 if m == 'vunpckhpd' else 0
+            return self.ylanes(ins, ops[0], ops[1], ops[2], 'R_[h_].q[0] = A_[h_].q[%d]; R_[h_].q[1] = B_[h_].q[%d];' % (b, b))
+        if m == 'vshufpd' and len(ops) == 4 and ops[3].type == X86_OP_IMM and yr(ops[0]) and yr(ops[1]) and src_ok(ops[2]):
+            im = ops[3].imm
+            return self.ylanes(ins, ops[0], ops[1], ops[2],
+                               'int s0_ = (%d >> (2 * h_)) & 1, s1_ = (%d >> (2 * h_ + 1)) & 1; '
+                               'R_[h_].df[0] = s0_ ? A_[h_].df[1] : A_[h_].df[0]; R_[h_].df[1] = s1_ ? B_[h_].df[1] : B_[h_].df[0];' % (im, im))
+        if m == 'vextractf128' and len(ops) == 3 and ops[2].type == X86_OP_IMM and yr(ops[1]) and (ops[0].type == X86_OP_MEM or self.isx(ins, ops[0])):
+            si = self.xd(ins, ops[1])
+            src = ('YL[%d]' if ops[2].imm & 1 else 'X[%d]') % si
+            if ops[0].type == X86_OP_MEM:
+                return self.L('STX(%s, %s);' % (self.ea(ins, ops[0]), src))
+            di = self.xd(ins, ops[0])
+            return self.L('{ X128 t_ = %s; X[%d] = t_; memset(&YL[%d], 0, 16); }' % (src, di, di))
+        if m == 'vcvtdq2pd' and len(ops) == 2 and yr(ops[0]) and (ops[1].type == X86_OP_MEM or self.isx(ins, ops[1])):
+            di = self.xd(ins, ops[0])
+            return self.L('{ X128 s_ = %s; X[%d].df[0] = (double)s_.sd[0]; X[%d].df[1] = (double)s_.sd[1]; YL[%d].df[0] = (double)s_.sd[2]; YL[%d].df[1] = (double)s_.sd[3]; }' % (
+                self.xs(ins, ops[1], 'x128'), di, di, di, di))
+        raise Unsup('ymm ' + m)
 
     def vex2(self, ins, ops, leg, zero):
         getattr(self, 'i_' + leg)(ins, list(ops))
@@ -1113,6 +1178,10 @@ class FnLift:
         if d.type == X86_OP_MEM: return self.L('ST64(%s, X[%d].q[1]);' % (self.ea(ins, d), self.xd(ins, s)))
         self.L('X[%d].q[1] = LD64(%s);' % (self.xd(ins, d), self.ea(ins, s)))
     i_movhps = i_movhpd
+
+    def i_movddup(self, ins, ops):
+        di = self.xd(ins, ops[0])
+        self.L('{ uint64_t s_ = %s; X[%d].q[0] = s_; X[%d].q[1] = s_; }' % (self.xs(ins, ops[1], 'q64'), di, di))
 
     def i_movhlps(self, ins, ops):
         di, si = self.xd(ins, ops[0]), self.xd(ins, ops[1])
@@ -1495,6 +1564,16 @@ class FnLift:
     def i_psrldq(self, ins, ops):
         di = self.xd(ins, ops[0]); n = ops[1].imm
         self.L('{ X128 a_ = X[%d], r_; memset(&r_, 0, 16); int n_ = %d; if (n_ < 16) memcpy(r_.b, a_.b + n_, 16 - n_); X[%d] = r_; }' % (di, n, di))
+
+    def i_palignr(self, ins, ops):
+        di = self.xd(ins, ops[0]); imm = ops[2].imm
+        self.L('{ X128 s_ = %s; X128 a_ = X[%d]; uint8_t t_[32]; X128 r_; memcpy(t_, s_.b, 16); memcpy(t_ + 16, a_.b, 16); '
+               'for (int k_ = 0; k_ < 16; k_++) r_.b[k_] = (k_ + %d < 32) ? t_[k_ + %d] : 0; X[%d] = r_; }' % (
+                   self.xs(ins, ops[1], 'x128'), di, imm, imm, di))
+
+    def i_shlx(self, ins, ops):
+        d, s, c = ops
+        self.L(self.wr(ins, d, '(%s) << ((%s) & %d)' % (self.rd(ins, s), self.rd(ins, c), 63 if d.size == 8 else 31)))
 
     def i_pshufd(self, ins, ops):
         di = self.xd(ins, ops[0]); imm = ops[2].imm

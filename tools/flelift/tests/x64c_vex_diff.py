@@ -72,8 +72,11 @@ def fresh_state():
 
 
 def clone(st):
-    return {'X': [list(x) for x in st['X']], 'YL': [list(x) for x in st['YL']],
-            'R': list(st['R']), 'F': dict(st['F'])}
+    c = {'X': [list(x) for x in st['X']], 'YL': [list(x) for x in st['YL']],
+         'R': list(st['R']), 'F': dict(st['F'])}
+    if 'MEM' in st:
+        c['MEM'] = st['MEM']
+    return c
 
 
 def set_nice_lo(st, i, v):
@@ -351,6 +354,241 @@ def cases():
         s['YL'][2] = [0, 0]
         return s
     add('vpsrldq xmm2, xmm3, 5', e_vpsrldq)
+
+    # ymm (VEX.256, KH-38 #3428)。上位 128bit (YL) を含めて検算する。memory operand は R[3] (rbx) に 32B の MBUF を割り当てる。
+    # 期待値は 4 qword (X.q0, X.q1, YL.q0, YL.q1) の要素ごとに Intel SDM の式で作る。
+    def nq():
+        return dbits(random.choice(NICE))
+
+    def psq():
+        return fbits32(random.choice(NICE)) | (fbits32(random.choice(NICE)) << 32)
+
+    def mem_nice():
+        return [nq() for _ in range(4)]
+
+    def mem_ps():
+        return [psq() for _ in range(4)]
+
+    def mem_rand():
+        return [random.getrandbits(64) for _ in range(4)]
+
+    def mem_zero():
+        return [0, 0, 0, 0]
+
+    def yprep(regs=(), ps=False, mem=None, reg=3, off=0):
+        def prep(st):
+            for i in regs:
+                st['X'][i] = [psq(), psq()] if ps else [nq(), nq()]
+                st['YL'][i] = [psq(), psq()] if ps else [nq(), nq()]
+            if mem is not None:
+                st['MEM'] = {'reg': reg, 'data': mem(), 'off': off}
+            return st
+        return prep
+
+    def q4(st, i):
+        return [st['X'][i][0], st['X'][i][1], st['YL'][i][0], st['YL'][i][1]]
+
+    def src4(st, s):
+        return st['MEM']['data'] if s == 'M' else q4(st, s)
+
+    def pdop(op):
+        return lambda x, y: dbits(op(fval(x), fval(y)))
+
+    def psop(op):
+        def f(x, y):
+            out = 0
+            for k in (0, 32):
+                out |= fbits32(op(f32val(x >> k), f32val(y >> k))) << k
+            return out
+        return f
+
+    def e_y(fn, d, s1, s2):
+        def e(st):
+            s = clone(st)
+            a = q4(st, s1); b = src4(st, s2)
+            r = [fn(x, y) for x, y in zip(a, b)]
+            s['X'][d] = [r[0], r[1]]; s['YL'][d] = [r[2], r[3]]
+            return s
+        return e
+
+    def e_unpack(hi, d, s1, s2):
+        k = 1 if hi else 0
+        def e(st):
+            s = clone(st)
+            a = q4(st, s1); b = src4(st, s2)
+            r = [a[k], b[k], a[2 + k], b[2 + k]]
+            s['X'][d] = [r[0], r[1]]; s['YL'][d] = [r[2], r[3]]
+            return s
+        return e
+
+    def e_shuf(imm, d, s1, s2):
+        def e(st):
+            s = clone(st)
+            a = q4(st, s1); b = src4(st, s2)
+            r = []
+            for h in (0, 1):
+                r.append(a[2 * h + ((imm >> (2 * h)) & 1)])
+                r.append(b[2 * h + ((imm >> (2 * h + 1)) & 1)])
+            s['X'][d] = [r[0], r[1]]; s['YL'][d] = [r[2], r[3]]
+            return s
+        return e
+
+    def e_ext(d, s, half):
+        def e(st):
+            s2 = clone(st)
+            s2['X'][d] = list(st['YL'][s] if half else st['X'][s])
+            s2['YL'][d] = [0, 0]
+            return s2
+        return e
+
+    def e_ext_mem(s, half):
+        def e(st):
+            s2 = clone(st)
+            s2['MEMQ'] = list(st['YL'][s]) + [0, 0] if half else list(st['X'][s]) + [0, 0]
+            return s2
+        return e
+
+    def s32(v):
+        v &= 0xffffffff
+        return v - (1 << 32) if v & 0x80000000 else v
+
+    def e_cvtdq(d, s):
+        def e(st):
+            s2 = clone(st)
+            src = st['MEM']['data'] if s == 'M' else [st['X'][s][0], st['X'][s][1]]
+            dw = [s32(src[0]), s32(src[0] >> 32), s32(src[1]), s32(src[1] >> 32)]
+            s2['X'][d] = [dbits(float(dw[0])), dbits(float(dw[1]))]
+            s2['YL'][d] = [dbits(float(dw[2])), dbits(float(dw[3]))]
+            return s2
+        return e
+
+    ADD = lambda a, b: a + b
+    SUB = lambda a, b: a - b
+    MUL = lambda a, b: a * b
+    DIV = lambda a, b: a / b
+    add('vaddpd ymm1, ymm2, ymm3', e_y(pdop(ADD), 1, 2, 3), yprep(regs=(2, 3)))
+    add('vsubpd ymm4, ymm4, ymm5', e_y(pdop(SUB), 4, 4, 5), yprep(regs=(4, 5)))
+    add('vmulpd ymm6, ymm7, ymm6', e_y(pdop(MUL), 6, 7, 6), yprep(regs=(6, 7)))
+    add('vdivpd ymm0, ymm1, ymm2', e_y(pdop(DIV), 0, 1, 2), yprep(regs=(1, 2)))
+    add('vmulpd ymm2, ymm3, [rbx]', e_y(pdop(MUL), 2, 3, 'M'), yprep(regs=(3,), mem=mem_nice))
+    add('vaddps ymm1, ymm2, ymm3', e_y(psop(ADD), 1, 2, 3), yprep(regs=(2, 3), ps=True))
+    add('vmulps ymm5, ymm5, [rbx]', e_y(psop(MUL), 5, 5, 'M'), yprep(regs=(5,), ps=True, mem=mem_ps))
+    add('vxorpd ymm0, ymm1, ymm2', e_y(lambda x, y: x ^ y, 0, 1, 2))
+    add('vandpd ymm3, ymm4, ymm5', e_y(lambda x, y: x & y, 3, 4, 5))
+    add('vorps ymm7, ymm6, [rbx]', e_y(lambda x, y: x | y, 7, 6, 'M'), yprep(mem=mem_rand))
+    add('vunpcklpd ymm1, ymm2, ymm3', e_unpack(False, 1, 2, 3))
+    add('vunpckhpd ymm1, ymm2, ymm3', e_unpack(True, 1, 2, 3))
+    add('vshufpd ymm1, ymm2, ymm3, 6', e_shuf(6, 1, 2, 3))
+    add('vshufpd ymm4, ymm4, [rbx], 9', e_shuf(9, 4, 4, 'M'), yprep(mem=mem_nice))
+    add('vextractf128 xmm1, ymm2, 1', e_ext(1, 2, 1))
+    add('vextractf128 xmm3, ymm3, 0', e_ext(3, 3, 0))
+    add('vextractf128 [rbx], ymm4, 1', e_ext_mem(4, 1), yprep(regs=(4,), mem=mem_zero))
+    add('vcvtdq2pd ymm1, xmm2', e_cvtdq(1, 2))
+    add('vcvtdq2pd ymm5, [rbx]', e_cvtdq(5, 'M'), yprep(mem=mem_rand))
+
+    # PSOLA 閉包の残り unsup (KH-38 #3428)。legacy SSE 形は YL を変えず、VEX.128 形は上位 YL を 0 にする。
+    def s64(v):
+        return v - (1 << 64) if v & (1 << 63) else v
+
+    def xz(d, x0, x1):              # VEX.128: X[d] = (x0, x1), YL[d] = 0
+        def e(st):
+            s2 = clone(st)
+            s2['X'][d] = [x0(st), x1(st)]; s2['YL'][d] = [0, 0]
+            return s2
+        return e
+
+    def xl(d, x0, x1):              # legacy SSE: X[d] だけ変え、YL は不変
+        def e(st):
+            s2 = clone(st)
+            s2['X'][d] = [x0(st), x1(st)]
+            return s2
+        return e
+
+    def p_sqrt(st):
+        st['X'][3][0] = dbits(7.0)
+        return st
+
+    def p_cvtss(st):
+        st['X'][3][0] = fbits32(2.5) | (0x77 << 32)
+        return st
+
+    add('vsqrtsd xmm1, xmm2, xmm3', xz(1, lambda st: dbits(math.sqrt(fval(st['X'][3][0]))), lambda st: st['X'][2][1]), p_sqrt)
+    add('vcvtss2sd xmm1, xmm2, xmm3', xz(1, lambda st: dbits(f32val(st['X'][3][0] & 0xffffffff)), lambda st: st['X'][2][1]), p_cvtss)
+    add('vcvtsi2sd xmm1, xmm2, ecx', xz(1, lambda st: dbits(float(s32(st['R'][1]))), lambda st: st['X'][2][1]))
+    add('vcvtsi2sd xmm3, xmm4, rdx', xz(3, lambda st: dbits(float(s64(st['R'][2]))), lambda st: st['X'][4][1]))
+    add('vpunpcklqdq xmm1, xmm2, xmm3', xz(1, lambda st: st['X'][2][0], lambda st: st['X'][3][0]))
+    add('vpunpcklqdq xmm2, xmm1, xmm2', xz(2, lambda st: st['X'][1][0], lambda st: st['X'][2][0]))
+    add('vmovhpd xmm1, xmm2, [rbx]', xz(1, lambda st: st['X'][2][0], lambda st: st['MEM']['data'][0]), yprep(mem=mem_rand))
+
+    def e_movhpd_st(st):
+        s2 = clone(st)
+        s2['MEMQ'] = [st['X'][3][1], 0, 0, 0]
+        return s2
+    add('vmovhpd [rbx], xmm3', e_movhpd_st, yprep(mem=mem_zero))
+    add('movddup xmm1, xmm2', xl(1, lambda st: st['X'][2][0], lambda st: st['X'][2][0]))
+    add('movddup xmm3, [rbx]', xl(3, lambda st: st['MEM']['data'][0], lambda st: st['MEM']['data'][0]), yprep(mem=mem_rand))
+    add('lddqu xmm1, [rbx]', xl(1, lambda st: st['MEM']['data'][0], lambda st: st['MEM']['data'][1]), yprep(mem=mem_rand))
+
+    def e_movntpd(st):
+        s2 = clone(st)
+        s2['MEMQ'] = [st['X'][2][0], st['X'][2][1], 0, 0]
+        return s2
+    add('movntpd [rbx], xmm2', e_movntpd, yprep(mem=mem_zero))
+
+    def e_palignr(d, s, imm):
+        def e(st):
+            s2 = clone(st)
+            t = struct.pack('<QQ', st['X'][s][0], st['X'][s][1]) + struct.pack('<QQ', st['X'][d][0], st['X'][d][1])
+            r = bytes(t[k + imm] if k + imm < 32 else 0 for k in range(16))
+            s2['X'][d] = list(struct.unpack('<QQ', r))
+            return s2
+        return e
+    add('palignr xmm1, xmm2, 5', e_palignr(1, 2, 5))
+    add('palignr xmm3, xmm4, 20', e_palignr(3, 4, 20))
+    add('palignr xmm5, xmm5, 40', e_palignr(5, 5, 40))
+
+    def e_shlx64(st):
+        s2 = clone(st)
+        s2['R'][0] = (st['R'][3] << (st['R'][1] & 63)) & MASK
+        return s2
+
+    def e_shlx32(st):
+        s2 = clone(st)
+        s2['R'][2] = ((st['R'][6] & 0xffffffff) << (st['R'][7] & 31)) & 0xffffffff
+        return s2
+    add('shlx rax, rbx, rcx', e_shlx64)
+    add('shlx edx, esi, edi', e_shlx32)
+
+    def p_div8(st):
+        st['R'][0] = (st['R'][0] & ~0xffff & MASK) | 0x0123
+        st['R'][1] = (st['R'][1] & ~0xff & MASK) | 7
+        return st
+
+    def e_div8(st):   # AX / r/m8: AL = 商, AH = 余り (flags は不変)
+        s2 = clone(st)
+        q, r = divmod(0x0123, 7)
+        s2['R'][0] = (st['R'][0] & ~0xffff & MASK) | q | (r << 8)
+        return s2
+    add('div cl', e_div8, p_div8)
+
+    def p_div8m(st):
+        st['R'][0] = (st['R'][0] & ~0xffff & MASK) | 0x0056
+        st['MEM'] = {'reg': 3, 'data': [9, 0, 0, 0], 'off': 0}
+        return st
+
+    def e_div8m(st):
+        s2 = clone(st)
+        q, r = divmod(0x56, 9)
+        s2['R'][0] = (st['R'][0] & ~0xffff & MASK) | q | (r << 8)
+        return s2
+    add('div byte ptr [rbx]', e_div8m, p_div8m)
+
+    def e_pushfq(st):   # RSP -= 8; [RSP] = RFLAGS (AF・DF は 0 に固定してある)
+        s2 = clone(st)
+        f = st['F']
+        s2['MEMQ'] = [0, 0, 0, 2 | f['CF'] | (f['PF'] << 2) | (f['ZF'] << 6) | (f['SF'] << 7) | (f['OF'] << 11)]
+        return s2
+    add('pushfq', e_pushfq, yprep(mem=mem_zero, reg=4, off=32))
     return C
 
 
@@ -387,7 +625,7 @@ def main():
             print('UNSUP', va, dict(f.unsup))
 
     rng_states = [fresh_state() for _ in cs]
-    lines = ['#include "fle_cpu.h"', '#include <stdio.h>']
+    lines = ['#include "fle_cpu.h"', '#include <stdio.h>', 'static uint64_t MBUF[4] __attribute__((aligned(32)));']
     lines += texts
     lines.append('int main(void) {')
     for k, (asm, prep, expect) in enumerate(cs):
@@ -398,11 +636,17 @@ def main():
         for i in range(16):
             lines.append('  X[%d].q[0]=0x%xULL; X[%d].q[1]=0x%xULL; YL[%d].q[0]=0x%xULL; YL[%d].q[1]=0x%xULL; R[%d]=0x%xULL;' % (
                 i, st['X'][i][0], i, st['X'][i][1], i, st['YL'][i][0], i, st['YL'][i][1], i, st['R'][i]))
-        lines.append('  fZF=%d; fSF=%d; fCF=%d; fOF=%d; fPF=%d;' % (st['F']['ZF'], st['F']['SF'], st['F']['CF'], st['F']['OF'], st['F']['PF']))
+        lines.append('  memset(MBUF, 0, sizeof MBUF);')
+        if 'MEM' in st:
+            for j, v in enumerate(st['MEM']['data']):
+                lines.append('  MBUF[%d]=0x%xULL;' % (j, v))
+            lines.append('  R[%d]=(uint64_t)MBUF + %d;' % (st['MEM']['reg'], st['MEM'].get('off', 0)))
+        lines.append('  fZF=%d; fSF=%d; fCF=%d; fOF=%d; fPF=%d; fAF=0; fDF=0;' % (st['F']['ZF'], st['F']['SF'], st['F']['CF'], st['F']['OF'], st['F']['PF']))
         lines.append('  f_%x();' % vas[k])
         lines.append('  printf("C %d");' % k)
         for i in range(16):
             lines.append('  printf(" %%llx %%llx %%llx %%llx %%llx", (unsigned long long)X[%d].q[0], (unsigned long long)X[%d].q[1], (unsigned long long)YL[%d].q[0], (unsigned long long)YL[%d].q[1], (unsigned long long)R[%d]);' % (i, i, i, i, i))
+        lines.append('  printf(" %llx %llx %llx %llx", (unsigned long long)MBUF[0], (unsigned long long)MBUF[1], (unsigned long long)MBUF[2], (unsigned long long)MBUF[3]);')
         lines.append('  printf(" %d %d %d %d %d\\n", fZF, fSF, fCF, fOF, fPF);')
     lines.append('  return 0;\n}')
     cfile = os.path.join(D, 'harness.c')
@@ -425,11 +669,18 @@ def main():
         for i in range(16):
             x0, x1, y0, y1, r = (int(vals[p + j], 16) for j in range(5)); p += 5
             got_X.append([x0, x1]); got_YL.append([y0, y1]); got_R.append(r)
+        got_mem = [int(vals[p + j], 16) for j in range(4)]; p += 4
         fl = [int(v) for v in vals[p:p + 5]]
         got = {'X': got_X, 'YL': got_YL, 'R': got_R, 'F': dict(zip(['ZF', 'SF', 'CF', 'OF', 'PF'], fl))}
-        exp = expect(clone(rng_states[k]))
+        rng = rng_states[k]
+        exp = expect(clone(rng))
         exp['R'][4] = (exp['R'][4] + 8) & MASK   # ret が RSP を 8 進める
+        exp_mem = exp.get('MEMQ', rng['MEM']['data'] if 'MEM' in rng else [0, 0, 0, 0])
+        if 'MEM' in rng:
+            exp['R'][rng['MEM']['reg']] = got['R'][rng['MEM']['reg']]   # 割り当てた MBUF の host アドレスは既知でないので素通し
         diffs = []
+        if exp_mem != got_mem:
+            diffs.append('MEM exp %s got %s' % ([hex(v) for v in exp_mem], [hex(v) for v in got_mem]))
         for i in range(16):
             if exp['X'][i] != got['X'][i]: diffs.append('X%d exp %x %x got %x %x' % (i, *exp['X'][i], *got['X'][i]))
             if exp['YL'][i] != got['YL'][i]: diffs.append('YL%d exp %x %x got %x %x' % (i, *exp['YL'][i], *got['YL'][i]))
@@ -443,6 +694,7 @@ def main():
             ok += 1
             print('PASS', asm)
     print('SUMMARY pass %d fail %d' % (ok, bad))
+    sys.exit(1 if bad else 0)
 
 
 if __name__ == '__main__':
