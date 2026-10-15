@@ -23,6 +23,7 @@ m6 build IR (work/ott_memfix0.ll) へ splice する。
 """
 import re
 import sys
+from typing import Any
 
 FULL = 'work/full_t1.drc.ll'
 MEMFIX = 'work/ott_memfix0.ll'
@@ -81,7 +82,7 @@ HELPER_RENAME = {
     'cvttps2dq': 'cvttpd2dq',
 }
 
-TYPES_FROM_FULL = {}   # %typename = type {...} 定義 (抽出先から現れた場合に 補完)
+TYPES_FROM_FULL: dict[str, Any] = {}   # %typename = type {...} 定義 (抽出先から現れた場合に 補完)
 
 
 def carve(full, name):

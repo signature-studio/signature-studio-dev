@@ -37,7 +37,7 @@ static void map_image(const char* path) {
 }
 
 /* native_ref.c と同じ呼出し形: 引数 xmm0 のみ、戻り rax と xmm0 を回収 */
-typedef struct { u64 x0, rax, xmm0; } Frame;
+typedef struct { u64 x0, rax, xmm0, xmm1; } Frame;
 static void call_xmm0(u64 fn, Frame* fr) {
     __asm__ volatile(
         "mov %%rsp, %%r12\n\t"
@@ -48,6 +48,7 @@ static void call_xmm0(u64 fn, Frame* fr) {
         "call *%%rbx\n\t"
         "mov %%rax, 8(%%rdi)\n\t"
         "movq %%xmm0, 16(%%rdi)\n\t"
+        "movq %%xmm1, 24(%%rdi)\n\t"
         "mov %%r12, %%rsp\n\t"
         : "+D"(fr)
         : "b"(fn)
@@ -69,19 +70,35 @@ static double gen(int mode) {
     }
 }
 
+/* 第 4 引数 fn: 660 (既定・KH-74)・dfdb0 (KH-77)・470 (KH-76)。
+ * dfdb0 は呼出元の ABS 規則に合わせ |x| を入力し、|x| < 1 は除外する (|x| < 1 では table の添字が範囲外になる)。
+ * 470 は native が 0<x<1 で table 外を読んで落ちるため、負の入力と |x|>=1 のみ突合する。 */
+static double gen470(void) {
+    for (;;) {
+        double x = gen((int)(rnd() % 5));
+        if (x == x && (x < 0.0 || fabs(x) >= 1.0) && x != 0.0) return x;
+    }
+}
+
 int main(int argc, char** argv) {
-    if (argc < 4) { fprintf(stderr, "usage: %s <HeartCore.core_64> <trials> <seed>\n", argv[0]); return 2; }
+    if (argc < 4) { fprintf(stderr, "usage: %s <HeartCore.core_64> <trials> <seed> [660|dfdb0|470]\n", argv[0]); return 2; }
     map_image(argv[1]);
     long n = atol(argv[2]);
     rs_state = (u64)atoll(argv[3]) * 0x9E3779B97F4A7C15ULL + 1;
-    const u64 fn = 0x180fdc660ULL;
-    long mis_rax = 0, mis_x = 0, nan_both = 0, nan_payload = 0;
+    int dfdb0 = argc > 4 && strcmp(argv[4], "dfdb0") == 0;
+    int f470 = argc > 4 && strcmp(argv[4], "470") == 0;
+    const u64 fn = dfdb0 ? 0x180fdfdb0ULL : f470 ? 0x180fdc470ULL : 0x180fdc660ULL;
+    long mis_rax = 0, mis_x = 0, nan_both = 0, nan_payload = 0, skipped = 0;
     for (long t = 0; t < n; t++) {
-        double x = gen((int)(t % 5));
+        double x = f470 ? gen470() : gen((int)(t % 5));
+        if (dfdb0) {
+            x = fabs(x);
+            if (!(x >= 1.0) && !isnan(x)) { skipped++; t--; continue; }
+        }
         Frame fr = { 0 }; memcpy(&fr.x0, &x, 8);
         call_xmm0(fn, &fr);
-        unsigned got = kh_fn_180fdc660(x);
-        double gx = kh_xmm0_180fdc660;
+        unsigned got = dfdb0 ? kh_fn_180fdfdb0(x) : f470 ? kh_fn_180fdc470(x) : kh_fn_180fdc660(x);
+        double gx = dfdb0 ? kh_xmm0_180fdfdb0 : f470 ? kh_xmm0_180fdc470 : kh_xmm0_180fdc660;
         u64 gxb; memcpy(&gxb, &gx, 8);
         if ((u64)got != fr.rax) mis_rax++;
         if (gxb != fr.xmm0) {
@@ -90,8 +107,8 @@ int main(int argc, char** argv) {
             else mis_x++;
         }
     }
-    printf("xmm0_check: trials %ld | rax mismatch %ld | xmm0 mismatch %ld | NaN both (bit differs %ld)\n",
-           n, mis_rax, mis_x, nan_payload);
+    printf("xmm0_check %s: trials %ld | rax mismatch %ld | xmm0 mismatch %ld | NaN both (bit differs %ld) | skipped %ld\n",
+           f470 ? "470" : dfdb0 ? "dfdb0" : "660", n, mis_rax, mis_x, nan_payload, skipped);
     printf("kh_xmm0_check RESULT: %s\n", (mis_rax == 0 && mis_x == 0) ? "PASS" : "FAIL");
     return (mis_rax == 0 && mis_x == 0) ? 0 : 1;
 }
