@@ -1,0 +1,6 @@
+{
+  "tag": "stub5328",
+  "refs": ["#5328"],
+  "note": "screen.addTextLine (書式 siiii・PE 0xd7abb0 → 0xd7d460)。副作用 scr+0x1cc←scr+0x1dc・scr+0x1d1←1 のみ確定。行 record は未確定で模さない (REPORT_PY5328)。tests/screen_diff.mjs が mock と照合",
+  "functions": ["screen.addTextLine"]
+}
