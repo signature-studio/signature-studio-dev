@@ -477,6 +477,9 @@
 | `tools/gui/flengine/REPORT_APPENDIX_3353.md` | ~155 | flengine #3353 (WIN-22): LoadImageW 実装後の boot (init 111。InitUnits は unit 114 の Halt0 で抜ける。「完走」は誤りで #3478 §5 が訂正)・init 1675 (`InitializeCriticalSection(0x12bd390)`) が boot で呼ばれないこと (CS 計装)・boot7 (CreateFruityInstance 閉包) 取込後の CFI が `EnterCriticalSection` の CS-MISS で止まること。§9 は main 取り込み後の HEAD での再測定。残りは子 #3478 ([WIN-26])。`boot.err` の整形は未達で #3353。手順は `cfi_boot7.sh`。測定値の正本 |
 | `tools/gui/flengine/REPORT_APPENDIX_3478.md` | ~92 | flengine #3478 (WIN-26): boot の InitUnits が unit 114 (VA `0x623840`) で Halt0 に入り、init 1675 (`function_1266a60`・unit 882) に届かないこと。`boot_halt_probe.mjs` の実測。3353 の「完走」の訂正 |
 | `tools/gui/flengine/REPORT_APPENDIX_3696.md` | ~65 | flengine #3696 (WIN-37): `cfi_probe.mjs` の `boot.err` / `call.err` の整形 (`err_line.mjs`)・単体検証 (`err_line_check.mjs`)・`cfi_boot7.sh` の前後比較 (`boot.err` だけ `[object Object]` → marker の JSON・他は一致)・KPI 不変 |
+| `tools/gui/flengine/REPORT_APPENDIX_3832.md` | ~30 | flengine #3832 (CI-180): `pe_image_parity.py` の DIR64 末尾 slot 境界 (`<` → `<=`) の before/after 出力差分 (INFO 1 行のみ) |
+| `tools/gui/flengine/REPORT_APPENDIX_HISTORY_3832_A.md` | ~161 | flengine REPORT §6b〜§6d・§6i の全文 (250 行上限のため #3832 で行を削らず分割移動) |
+| `tools/gui/flengine/REPORT_APPENDIX_HISTORY_3832_B.md` | ~92 | flengine REPORT §6e〜§6h・§6f の全文 (250 行上限のため #3832 で行を削らず分割移動) |
 | `tools/gui/flengine/REPORT_APPENDIX_3352.md` | ~65 | flengine #3352 (WIN-21, 部分達成): S1 の unit 差の再測定 (#1442 で扱った unit 集合) と現 HEAD の e2e 実測 (JUDGE 14/14 は未達)。結論と数値の正本は付録 §6k |
 | `tools/gui/flengine/REPORT_APPENDIX_1635.md` | 138 | flengine #1635 (GUI-22): S1 の差分 unit (304/555) の順序依存の切り分けと、survey の隔離条件 (`GF_SURVEY_RESET`) の統一。実測値は測定 commit `33585cb01` の付録 §2-0 を正とする (unit 別 S3・伸長領域は §2-4・§2-5) |
 | `tools/gui/flengine/REPORT_APPENDIX_2521.md` | ~20 | flengine #2521 (PR #3485): `m11_ov.c` の既定変更 (`M11_FIX_535BF2` 0→1) が GUI build に入らないことの前処理照合 (変更前と差 0・ネガコン 17 行)。GUI build は `-DM11_FIX_535BF2=0` で固定 |
