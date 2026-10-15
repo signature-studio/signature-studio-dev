@@ -117,7 +117,7 @@ L2 の 4 件 (`0xad0260`・`0xb64880`・`0xb69c90`・`0xb75f40`) は直接呼出
   - `py59_func.py` 6 関数の範囲: 15.3 秒 (1 関数あたり約 2.5 秒)。
   - `py67_callers.py $P 0xac4b50,0xb4b5b0,0xb664d0,0xb6db00,0xc9dfd0`: 37.0 秒。`py67_callers.py $P 0xad0260,...,0xca24e0`: 37.2 秒。
   - `py67_qword.py` (find 含む): 1 秒未満。`py71_vmt.py`: 1 秒未満。
-- 再現コマンド (`tools/python` で実行。`P` は `tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` で展開):
+- 再現コマンド (`tools/python` で実行。`P` は `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` で展開):
 
   ```
   P=$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin
