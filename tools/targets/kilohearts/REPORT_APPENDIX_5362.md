@@ -5,7 +5,7 @@
 **本 PR 後の残件 (実測)**: 引数の `passing ... to parameter` の error は 78 行 (ソース行 59 箇所)。
 
 #### 5362-1. 結論
-- **部分達成**。`FUN_181384040` の呼出し 6 行 (`FUN_18004cf20` 内の 3 箇所・if/else で重複するため 6 行) を規則化した。emcc の error 行は 415 → 409 (−6)。残りの pointer⇔整数 行は本 PR では分類していない (5362-6)。
+- **部分達成**。`FUN_181384040` の呼出し 6 行 (`FUN_18004cf20` 内の 3 箇所・if/else で重複するため 6 行) を規則化した。emcc の error 行は 415 → 409 (−6・`f4c9be58f` 時点)。現 head では 407 (下記 5362-4)。残りの pointer⇔整数 行は本 PR では分類していない (5362-6)。
 - 規則の場所: `ghidra_route/patches.py` の `ABI['delay']` (ブロック単位の規則 1 件・件数 1 を assert)。`ghidra_to_c.py` の shim 宣言は変えない (理由は 5362-3)。
 - Gain / Haas / Gate の生成 `.o` は baseline と **byte 一致** (1435 B・3217 B・3756 B)。受入 2 を満たす。
 
@@ -27,30 +27,33 @@
 - 規則は呼出し側の `(void *)` cast。値は変わらない (整数に入ったアドレスを pointer に戻すだけ)。
 
 #### 5362-4. 測定 (実測・n=1)
-- **測定 commit: `f4c9be58f`** (本 PR の旧 HEAD)。main 取り込み後の HEAD `313a504d0` でも delay の生成 C は `f4c9be58f` と byte 一致 (`cmp`) で、emcc 行数も同じ 409。`git diff f4c9be58f 313a504d0 -- tools/targets/kilohearts/ghidra_route` は 0 行。
+- **測定 HEAD: `aa3b58964`** (main `c3fcf0f97` 取り込み後の現 head。runner で再測定)。`f4c9be58f` からの `ghidra_route` 差分は main 由来の #4889 規則 (`patches.py` 10 行) で、Delay の生成 C を変える (下記)。KH-154 規則 (6 行) は両方に入っている。
 - 測定環境: 素材 `plugins-kilohearts` (HeartCore.core_64 76,642,304 B) と `toolchain-emsdk` (emcc 6.0.12)、[GHIDRA] 12.1.4 (sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)、openjdk 17 (runner 既定・`analyzeHeadless` が通った。JDK 21 指定の検証はしていない)。作業領域は runner の `$RUNNER_TEMP` (repo 外)。
 - decompile: `DecompEach.java` で Delay 139 関数 (proc + also) すべて OK・Gain/Haas/Gate の 10 関数すべて OK。
-- emcc (`emcc -c -ferror-limit=0 -I ghidra_route delay.c`): 実測 16.2 s・error 行 **409** (規則なしの `origin/main` 相当の生成では 415)。
+- emcc (`emcc -c -ferror-limit=0 -I ghidra_route delay.c`, 現 head `aa3b58964`): 実測 8.0 s・error 行 **407** (`f4c9be58f` の生成 C では 409 (実測 7.7 s)。規則なしの `origin/main` 相当の生成では 415)。
+- 測定手順: `FX=bitcast,intload,stackpair,assoc,concat bash ghidra_route/gtype_census.sh <work>` (`<work>` は runner の `$RUNNER_TEMP/kh`) で decompile・C 生成・emcc・`.o` を作り、`emcc` を別途再実行して時間を測った。`gtype_census.sh` の既定 `FX` は `gtype` を含むが、本付録の `.o` と census は `gtype` 無しで揃えている。
 
-| 分類 (`emcc_census.py`) | 規則なし (origin/main 相当) | `f4c9be58f` / `313a504d0` |
-|---|---|---|
-| 128bit レーン型 | 166 | 166 |
-| 引数数不一致 | 79 | 79 |
-| 演算・代入・ポインタの型不一致 | 170 | 164 |
-| 合計 | 415 | 409 |
+| 分類 (`emcc_census.py`) | 規則なし (origin/main 相当) | `f4c9be58f` | 現 head `aa3b58964` |
+|---|---|---|---|
+| 128bit レーン型 | 166 | 166 | 166 |
+| 引数数不一致 | 79 | 79 | 77 |
+| 演算・代入・ポインタの型不一致 | 170 | 164 | 164 |
+| 合計 | 415 | 409 | 407 |
 
-- error 行の差分: 削除 6 行 = `FUN_181384040` の `void *` への `incompatible integer to pointer conversion` のみ (生成 C の差分は 1346 行の `FUN_181384040` 呼出し 3 箇所 (if/else で計 6 行) の cast だけ)。
+- error 行の差分 (`f4c9be58f` → 現 head): −2 行 = #4889 規則の `FUN_180fbc1f4` 宣言が `float (float)` に変わり、呼出し 2 件 (1082・1088) の引数数不一致が解消したため (引数数不一致 79 → 77)。`FUN_181384040` の KH-154 規則 (−6 行) は両方に効いている。
+- 生成 C の差分 (`f4c9be58f` → 現 head、`diff` 実測): `FUN_180fbc1f4` の宣言 (`undefined8 (undefined8)` → `float (float)`)・本体 (入力・戻り値の変換)・呼出し 2 件 (1081・1087 行付近の `-0.16609640419483185f`・`0.16609640419483185f` の引数付与)。他の差分は無し。
+- 現 head の生成 C 同士の比較 (`ghidra_to_c.py delay --fix bitcast,intload,stackpair,assoc,concat`): `gtype` の有無で C が大きく変わるため、比較は同じ fix 集合どうしで行った。
 
 #### 5362-5. Gain / Haas / Gate の不変 (受入 2)
-`ghidra_to_c.py --fix bitcast,intload,stackpair,assoc,concat` で、規則なし (origin/main 相当) と `f4c9be58f`・`313a504d0` の生成 C から、`emcc -w -O1` (build_cmp.sh の `-Wno-error` 指定付き) で `.o` を作って `cmp`。
+`ghidra_to_c.py --fix bitcast,intload,stackpair,assoc,concat` で、`origin/main` (c3fcf0f97) の `ghidra_route` と現 head (`aa3b58964`) の生成 C から、`emcc -w -O1` (build_cmp.sh の `-Wno-error` 指定付き) で `.o` を作って `cmp`。
 
-| snap-in | `.o` (規則なし / `f4c9be58f`・`313a504d0`) | 判定 |
-|---|---|---|
-| gain (1 関数) | 1435 B / 1435 B | **同一** (`cmp`) |
-| haas (5 関数) | 3217 B / 3217 B | **同一** (`cmp`) |
-| gate (3 関数) | 3756 B / 3756 B | **同一** (`cmp`) |
+| snap-in | `.o` (`origin/main` / 現 head `aa3b58964`) | 生成 C | 判定 |
+|---|---|---|---|
+| gain (1 関数) | 1435 B / 1435 B | 同一 (`diff`) | **同一** (`cmp`) |
+| haas (5 関数) | 3217 B / 3217 B | 同一 (`diff`) | **同一** (`cmp`) |
+| gate (3 関数) | 3756 B / 3756 B | 同一 (`diff`) | **同一** (`cmp`) |
 
-注: 「規則なし」は測定時の `origin/main` の `ghidra_route` (`patches.py` に本規則が無い。`f4c9be58f` との差分は `patches.py` の 6 行のみ)。`.o` の一致は、その `origin/main` 版と `f4c9be58f`・`313a504d0` の生成 C を比べた結果。
+注: `origin/main` の `ghidra_route` は KH-154 規則 (本 PR の 6 行) を持たない。gain / haas / gate の生成 C は、KH-154 規則 (`FUN_18004cf20` の memmove 呼出し) と #4889 規則 (`FUN_180fbc1f4`・Delay 専用) のどちらにも当たらないため、両者の生成 C は一致する。
 
 - 注: 最初は shim `FUN_181384040` の宣言を整数型へ変えた。Gate も同じ shim を呼ぶため `gate.o` が 3756 → 3769 B に変わった (不変の受入を破る)。そこで shim は変えず、delay の呼出し側だけを `patches.py` の規則にした。
 
