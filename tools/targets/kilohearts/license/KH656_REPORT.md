@@ -234,3 +234,9 @@ index c59421af9..7ac5ec4bf 100644
 | ラウンド 5 (314 lift) の入口 OOB の trap VA と原因 | 受入 2 の残り | #1821 |
 | `i256_defs()` の全件誤判定と、失敗時に lift 集合が空になる自動除外 | 閉包の収束 (受入 1) | #3590 |
 | `5bab5649c` 以降の HEAD での閉包再測定と、64 桁 sha256 の記録 | 測定値の照合 (本 fix run は素材不足で未実施) | 本 PR の review run (`oc_artifacts` 付き) |
+
+## 10. 閉包の収束試行と round 6 失敗の切り分け (#3590 / KH-57、付録へ分割)
+
+- 結論: `todo == []` には未収束 (受入 1 未達)。round 8 (lift 589) まで build が通り、round 9 は `kh_lower` の stage0 欠落 `0x180f88488` で停止。round 6 の失敗 (i256 判定の誤り・失敗時に lift 集合が空になる) は修正済み。module F に memset shim `1813846e0` を登録 (HEAD と同じ wasm 54,394 B・kh249 ok=17 ng=0 を維持)。
+- 各ラウンドの実測・原因の切り分け・未解決: [`KH656_REPORT_APPENDIX_3590.md`](KH656_REPORT_APPENDIX_3590.md)
+- 測定 commit: `0b487d4f2` (以後は REPORT のみ)。

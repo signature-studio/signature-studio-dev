@@ -98,6 +98,89 @@ static inline V128 vpsrldq_avx(V128 s, int n) {
     for (int i = 0; i + n < 16; i++) r.b[i] = s.b[i + n];
     return r;
 }
+/* SUB84(x, off): x の byte 位置 off から 4 byte の切り出し (little-endian)。lvalue を取る。 */
+static inline uint kh_sub84(const void *p, int off) { uint r; memcpy(&r, (const unsigned char *)p + off, 4); return r; }
+#define SUB84(x, off) kh_sub84(&(x), (off))
+/* ZEXT816(v): 64bit を下位に置き上位 64bit は 0 (movq xmm,r64) */
+static inline V128 ZEXT816(ulonglong v) { V128 r; memset(&r, 0, sizeof r); memcpy(r.b, &v, 8); return r; }
+/* MINPS dst,src: lane 毎に dst < src ? dst : src (NaN は src)。maxps と対称 */
+static inline V128 minps(V128 a, V128 b) {
+    V128 r;
+    for (int i = 0; i < 4; i++) {
+        float x, y, z;
+        memcpy(&x, a.b + 4 * i, 4);
+        memcpy(&y, b.b + 4 * i, 4);
+        z = (x < y) ? x : y;
+        memcpy(r.b + 4 * i, &z, 4);
+    }
+    return r;
+}
+/* VPSUBQ / VPSUBD (src1 - src2, lane 毎・wrap)。Ghidra の pcodeop は vvvv (src1) を先頭に取る */
+static inline V128 vpsubq_avx(V128 a, V128 b) {
+    V128 r;
+    for (int i = 0; i < 2; i++) { uint64_t x, y, z; memcpy(&x, a.b + 8 * i, 8); memcpy(&y, b.b + 8 * i, 8); z = x - y; memcpy(r.b + 8 * i, &z, 8); }
+    return r;
+}
+static inline V128 vpsubd_avx(V128 a, V128 b) {
+    V128 r;
+    for (int i = 0; i < 4; i++) { uint32_t x, y, z; memcpy(&x, a.b + 4 * i, 4); memcpy(&y, b.b + 4 * i, 4); z = x - y; memcpy(r.b + 4 * i, &z, 4); }
+    return r;
+}
+/* VPAND / VPOR (128bit 論理積・論理和) */
+static inline V128 vpand_avx(V128 a, V128 b) { V128 r; for (int i = 0; i < 16; i++) r.b[i] = a.b[i] & b.b[i]; return r; }
+static inline V128 vpor_avx(V128 a, V128 b) { V128 r; for (int i = 0; i < 16; i++) r.b[i] = a.b[i] | b.b[i]; return r; }
+/* VPSRLQ xmm,xmm,imm8: 64bit lane 毎の論理右シフト。imm >= 64 は 0 */
+static inline V128 vpsrlq_avx(V128 s, int n) {
+    V128 r;
+    for (int i = 0; i < 2; i++) {
+        uint64_t x, z;
+        memcpy(&x, s.b + 8 * i, 8);
+        z = (n >= 0 && n < 64) ? (x >> n) : 0;
+        memcpy(r.b + 8 * i, &z, 8);
+    }
+    return r;
+}
+/* VCVTDQ2PD: 下位 2 個の int32 を 2 個の double へ (lane 0 が下位) */
+static inline V128 vcvtdq2pd_avx(V128 s) {
+    V128 r; int32_t a, b; double d0, d1;
+    memcpy(&a, s.b, 4); memcpy(&b, s.b + 4, 4);
+    d0 = (double)a; d1 = (double)b;
+    memcpy(r.b, &d0, 8); memcpy(r.b + 8, &d1, 8);
+    return r;
+}
+/* VCVTPD2DQ: 2 個の double を現在の丸め (既定 = 最近接偶数) で int32 へ。NaN・範囲外は 0x80000000 (integer indefinite)。上位 64bit は 0 */
+static inline int32_t kh_cvt_d2i(double d) {
+    double r = rint(d);
+    if (isnan(d) || r < -2147483648.0 || r > 2147483647.0) return INT32_MIN;
+    return (int32_t)r;
+}
+static inline V128 vcvtpd2dq_avx(V128 s) {
+    V128 r; double d0, d1; int32_t i0, i1;
+    memcpy(&d0, s.b, 8); memcpy(&d1, s.b + 8, 8);
+    i0 = kh_cvt_d2i(d0); i1 = kh_cvt_d2i(d1);
+    memset(&r, 0, sizeof r);
+    memcpy(r.b, &i0, 4); memcpy(r.b + 4, &i1, 4);
+    return r;
+}
+/* VSHUFPS dst,src1,src2,imm8: dst[0]=a[imm1:0]・dst[1]=a[imm3:2]・dst[2]=b[imm5:4]・dst[3]=b[imm7:6] */
+static inline V128 vshufps_avx(V128 a, V128 b, int imm) {
+    V128 r; uint32_t sa[4], sb[4], d[4];
+    memcpy(sa, a.b, 16); memcpy(sb, b.b, 16);
+    d[0] = sa[imm & 3]; d[1] = sa[(imm >> 2) & 3]; d[2] = sb[(imm >> 4) & 3]; d[3] = sb[(imm >> 6) & 3];
+    memcpy(r.b, d, 16);
+    return r;
+}
+/* VPMOVSXDQ: 下位 2 個の int32 を符号拡張して 2 個の int64 へ */
+static inline V128 vpmovsxdq_avx(V128 s) {
+    V128 r; int32_t a, b; int64_t x, y;
+    memcpy(&a, s.b, 4); memcpy(&b, s.b + 4, 4);
+    x = a; y = b;
+    memcpy(r.b, &x, 8); memcpy(r.b + 8, &y, 8);
+    return r;
+}
+/* swi(n) = x86 の int n (int 3 = breakpoint, int 0x29 = __fastfail)。どちらも戻らない trap。到達時は abort (fail-fast) */
+static inline void *kh_swi_fail(void) { abort(); return 0; }
+#define swi(n) kh_swi_fail()
 /* x86 `mul r64` (rdx:rax = rax × r64) を 128bit ベクタの `*` と印字した形 (stereo 180fdc470・180fdfdb0)。
  * 呼出し直前に両オペランドの上位 qword は 0 (`_8_8_ = 0`) なので、積は 64×64→128 の符号なし積。 */
 static inline V128 v128_mul64(V128 a, V128 b) {
