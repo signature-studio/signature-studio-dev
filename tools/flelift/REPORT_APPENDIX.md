@@ -93,7 +93,7 @@ REPORT §11 の付録。指定の見出しは `## 10.` だが、既存の PERF-P
 
 ## 12. #3661 (CI-173): `EMSDK_ENV` で emsdk を指定し、素材 `toolchain-emsdk` で e2e before / after
 
-- **変更**: `fle_e2e.sh`・`fle_lift.sh` は `EMSDK_ENV` で `emsdk_env.sh` の場所を指定する (既定は `[EMSDK]` の `emsdk_env.sh`。未設定時の挙動は従来どおり)。ファイルが無ければ rc=2 で止まる。`fle_e2e.sh` は `emsdk_env.sh` の source 後に `EMSDK_ENV` を再 export する。`emsdk_env.sh` は `EMSDK_ENV` に触れないため (`/opt/emsdk/emsdk_env.sh`・素材の `emsdk/emsdk_env.sh`・`emsdk construct_env` の出力のいずれにも記述なし)、この再 export は子の `fle_lift.sh` へ渡す値を変えない。将来の emsdk の変化に備えた防御的な再 export。測定 commit `9e5f7f9f6` (最後にコードを変えた commit。以降の commit は REPORT のみ)。
+- **変更**: `fle_e2e.sh`・`fle_lift.sh` は `EMSDK_ENV` で `emsdk_env.sh` の場所を指定する (既定は `[EMSDK]` の `emsdk_env.sh`。未設定時の挙動は従来どおり)。ファイルが無ければ rc=2 で止まる。`fle_e2e.sh` は `emsdk_env.sh` の source 後に `EMSDK_ENV` を再 export する。`emsdk_env.sh` は `EMSDK_ENV` に触れないため (`[EMSDK]` の `emsdk_env.sh`・素材 `toolchain-emsdk` の `emsdk_env.sh`・`emsdk construct_env` の出力のいずれにも記述なし)、この再 export は子の `fle_lift.sh` へ渡す値を変えない。将来の emsdk の変化に備えた防御的な再 export。測定 commit `9e5f7f9f6` (最後にコードを変えた commit。以降の commit は REPORT のみ)。
 - **素材**: `fl-win64` と `toolchain-emsdk` を `$RUNNER_TEMP` に展開 (`toolchain-emsdk` の最上位は `emsdk/`)。素材の emcc は 6.0.12 (commit `5488e0871d46`)。runner 既設の `[EMSDK]` と同一 commit。
 - **素材が使われたこと**: `command -v emcc` で素材の `upstream/emscripten/emcc` が解決することを確認。初回 (`a85ca628d`) の素材版 run では素材側 `upstream/emscripten/cache` の 1,729 ファイルが更新され、`[EMSDK]` 側の更新は 0 件 (mtime 比較)。最終 HEAD の素材版 run は cache が暖まっており mtime の変化は出ないため、この確認は初回 run による。
 
