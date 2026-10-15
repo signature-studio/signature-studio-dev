@@ -46,6 +46,9 @@ static int sel_start, sel_end;
 static int64_t disp_time;
 static int64_t arr_time;
 static int scr_blanked, scr_unblank, scr_active;
+static int scr_alive, scr_menu_show, scr_dirty;
+static int64_t scr_setup_l;
+static int scr_setup_t[5];
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -82,6 +85,7 @@ void fl_engine_reset(void) {
     sel_start = -1; sel_end = -1;
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
+    scr_alive = 0; scr_menu_show = 0; scr_dirty = 0; scr_setup_l = 0; for (int i = 0; i < 5; i++) scr_setup_t[i] = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -548,6 +552,25 @@ FL_H(screen, isUnBlank) { NARGS(0, 0); return fl_ret_b(c, scr_unblank); }
 FL_H(screen, getScreenActiveCounter) { NARGS(0, 0); return fl_ret_i(c, scr_active); }
 FL_H(screen, setScreenActiveCounter) { NARGS(1, 1); scr_active = (int)((unsigned)scr_active + (unsigned)A_INT(0, 0)); return fl_ret_none(c); }
 FL_H(screen, unBlank) { NARGS(1, 1); scr_unblank = A_INT(0, 0) == 1; return fl_ret_none(c); }
+/* ---- screen 初期化・メニュー系 (10) ---- PY-136 (#3025): PE 0xd7aa40・0xd7ab00・0xd7b0a0・0xd7b000・0xd7ccb0・0xd7b1f0・0xd7b170・0xd7c9a0・0xd7cac0・0xd7cbe0 (REPORT_PY136)。
+   scr は init で生成し deInit で破棄する。scr 未生成の経路は PE で AV (例外を返さない) なので Unspecified error を仮置き */
+#define SCR_NEED() do { if (!scr_alive) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error"); } while (0)
+static void scr_new(void) {
+    static const int def[5] = {30, 10, 10, 2, 4000};
+    scr_alive = 1; scr_dirty = 0; scr_menu_show = 0; scr_setup_l = 0;
+    for (int i = 0; i < 5; i++) scr_setup_t[i] = def[i];
+}
+FL_H(screen, init) { NARGS(6, 6); scr_new(); return fl_ret_none(c); }
+FL_H(screen, setup) { NARGS(6, 6); SCR_NEED(); scr_setup_l = A_INT(0, 0); for (int i = 0; i < 5; i++) scr_setup_t[i] = (int)A_INT(i + 1, 0); return fl_ret_none(c); }
+FL_H(screen, update) { NARGS(0, 0); if (scr_alive) scr_dirty = 0; return fl_ret_none(c); }
+FL_H(screen, deInit) { NARGS(0, 0); scr_alive = 0; scr_dirty = 0; scr_menu_show = 0; return fl_ret_none(c); }
+FL_H(screen, keepDisplayActive) { NARGS(0, 0); if (scr_alive) scr_dirty = 1; return fl_ret_none(c); }
+FL_H(screen, hideMenu) { NARGS(0, 0); SCR_NEED(); scr_menu_show = 0; return fl_ret_none(c); }
+FL_H(screen, menuShowing) { NARGS(0, 0); SCR_NEED(); return fl_ret_b(c, scr_menu_show); }
+/* メニュー項目の選択・移動は PE で scr 有りのときだけ helper を呼ぶ。helper の効果は未同定 (REPORT_PY136) */
+FL_H(screen, menuItemClick) { NARGS(0, 0); return fl_ret_none(c); }
+FL_H(screen, menuNext) { NARGS(0, 0); return fl_ret_none(c); }
+FL_H(screen, menuPrev) { NARGS(0, 0); return fl_ret_none(c); }
 
 /* ---- device (5, MIDI scripting 用の最小面) ---- mock と同じ: forwardMIDICC / midiOutMsg は呼出しを数える */
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
