@@ -35,24 +35,19 @@ def main():
     fv = cases.fvm_line(0x653c80, 'function_653c80', 2, cases.machine_sig(0x653c80, IR_653))
     assert 'wsig=i64,i64,i64' in fv and 'tr=1' in fv, fv
 
-    # 比較: 機械語入口型の i128 位置 (653c80 の r8) も、wasm の trunc 値 (下位 64bit) と native の入口値を比べる
+    # 比較: 機械語入口型の i128 位置 (653c80 の r8) だけを外し、i64 の位置 (rcx・rdx) は比べる
     sigs = {'function_653c80': cases.machine_sig(0x653c80, IR_653)}
     n = trace(entry('653c80', 3, ['11', '22', '33']))
-    assert compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '22', '33'])), CTX, sigs) is None
-    r = compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '22', '0'])), CTX, sigs)
-    assert r and r['kind'] == 'entry_arg' and r['pos'] == 2, r
-    r = compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '23', '33'])), CTX, sigs)
+    assert compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '22', '0'])), CTX, sigs) is None
+    r = compare.cmp_trace(n, trace(entry('653c80', 3, ['11', '23', '0'])), CTX, sigs)
     assert r and r['kind'] == 'entry_arg' and r['pos'] == 1, r
-    r = compare.cmp_trace(n, trace(entry('653c80', 3, ['10', '22', '33'])), CTX, sigs)
+    r = compare.cmp_trace(n, trace(entry('653c80', 3, ['10', '22', '0'])), CTX, sigs)
     assert r and r['kind'] == 'entry_arg' and r['pos'] == 0, r
 
-    # 40c660 (IR i128 が xmm0): 入口値 (xmm0 の下位 64bit) を比べる
+    # 40c660 (IR i128 が xmm0): 入口値は比べない (wasm は 0 と記録する)
     sigs = {'function_40c660': cases.machine_sig(0x40c660, IR_SIG)}
     n = trace(entry('40c660', 1, ['0'], ['3ff8000000000000']))
-    assert compare.cmp_trace(n, trace(entry('40c660', 1, ['0'], ['3ff8000000000000'])), CTX, sigs) is None
-    ctx_nostack = compare.Ctx(0, [], (0, 0))   # スタック一致の救済を外し、値の不一致だけを見る
-    r = compare.cmp_trace(n, trace(entry('40c660', 1, ['0'])), ctx_nostack, sigs)
-    assert r and r['kind'] == 'entry_arg' and r['pos'] == 0, r
+    assert compare.cmp_trace(n, trace(entry('40c660', 1, ['0'])), CTX, sigs) is None
 
     # 機械語入口型でない関数 (IR の i128 を含む) は従来どおり比べる
     sigs = {'function_1234': {'ret': 'i64', 'params': ['i64', 'i128'], 'defined': True}}

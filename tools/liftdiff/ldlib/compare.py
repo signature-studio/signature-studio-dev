@@ -176,6 +176,10 @@ def cmp_trace(n, w, ctx, sigs, prefix='function_', skip=frozenset()):
         sig = ent.get('params', [])
         ir = ent.get('ir_params', [])
         for pos in range(min(np_, 8)):
+            if pos < len(ir) and ir[pos] == 'i128':
+                # LD-52 (#1528): 機械語入口型 (cases.MACHINE_ENTRY) の関数だけ ir_params を持つ。wasm の entry 記録は IR の
+                # i128 引数を 0 と記録する (irtool.instrument) ため、その位置だけ比べない。他の位置は入口型どおりに比べる。
+                continue
             ty = sig[pos] if pos < len(sig) else 'i64'
             width = _width(ty)
             fp = ty in ('float', 'double')
