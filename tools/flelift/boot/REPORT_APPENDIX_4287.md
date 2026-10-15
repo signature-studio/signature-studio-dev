@@ -50,13 +50,15 @@ FL_WIN64_DIR=<fl-win64 展開先> FLE_EXTRA_ROOTS= FLE_BOOT_WORK=<work> FLE_BOOT
 FL_WIN64_DIR=<fl-win64 展開先> FLE_BOOT_WORK=<work> WVAL_OBJWATCH=1 bash tools/flelift/boot/wval_measure.sh
 ```
 
+- 注意: `wval_measure.sh` の既定 `WVAL_FIXOBJ` は `0x12d7a090` (§G で更新)。§A〜§F の `0x12d6a090` の結果を再現するには `WVAL_FIXOBJ=0x12d6a090` を付ける。
+
 素材: `oc_artifacts: fl-win64 toolchain-emsdk`。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | obj+0xc4 の初期値 0 の出所 (確保時の 0 埋め・ホスト C の書込み) | mode の設定元の確定 (受入条件 1) | #4287 (本 issue・部分達成のため残す) |
 | `f_6cd5f0` 経由の `f_6cd520` 呼出し (実行時の呼出元) | 呼出し連鎖の上流 | #4287 |
-| 既定経路で boot が `exit` で止まる原因 (IPP 判定 NG) | 既定経路の書込み元の比較 | #3868 (OPEN・既定経路の書込み元と obj+0xc4 の追跡。本 PR では扱わない) |
+| 既定経路で boot が `exit` で止まる原因 (IPP 判定 NG) | 既定経路の書込み元の比較 | #4806 (本 PR では扱わない。#3868 は CLOSED で IPP 判定は扱っていない) |
 
 ## F. 追補 (FLE-22 再実行): 確保内の store と getmem の戻り値
 
@@ -76,9 +78,10 @@ FL_WIN64_DIR=<fl-win64 展開先> FLE_BOOT_WORK=<work> WVAL_OBJWATCH=1 bash tool
   - 以降 `[wobj] va=0x6bc010 ... v=0` の 1 件のみ (lifted の store は 0 を書く 1 件のみ)。
 - 既定経路 (root 0x6a7b70 有・`WVAL_IPP= WVAL_NULLFILL=0`) でも同じ連鎖。`boot_threw: exit`・`px6bbc20.calls_all` 0。
 - 結論: obj+0xc4 の 0 は、解放時点の値が既に 0 の領域を再利用した結果。**0 がどこで最初に書かれたか (最初の確保時の 0 埋めか、ホスト C の書込みか) は、解放・確保の区間の観測では特定できない**。最初の確保 (解放より前) の値は本測定の対象外。
-- KPI: FLEngine 起動 units 前 209 / 後 209 (baseline・既定)。最初のウィンドウ: 無し。既定の build・lift 経路は変えていない (診断は boot/ 内・`[wobj-*]` 出力時のみ)。
+- 診断の入り方: `fle_boot.c` の `fle_ov_getmem` (`[wobj-getmem]`) と `fle_ov_freemem` (`[wobj-free]`) は既定 build にも入る (`boot_e2e.sh` は全 variant で同じ `fle_boot.c` を cc する)。環境変数による分岐は無い。obj を含む範囲に当たったときだけ stderr に出る。制御フローは変えていない (記録変数の更新と出力のみ)。
+- KPI: FLEngine 起動 units 前 209 / 後 209 (baseline・既定)。最初のウィンドウ: 無し。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 最初の確保時の obj+0xc4 の値 (0 埋めか未初期化の 0 か) | 受入条件 1 の確定 | #4287 |
-| 既定経路で boot が `exit` で止まる原因 (IPP 判定 NG) | 既定経路の比較 | #3868 |
+| 既定経路で boot が `exit` で止まる原因 (IPP 判定 NG) | 既定経路の比較 | #4806 |

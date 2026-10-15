@@ -620,6 +620,9 @@ void fle_ov_longjmp(void) {
     ott_dispatch(LD64(buf));             /* jmp qword ptr [rcx] */
 }
 
+static int g_objfree_seq = 0;      /* #4287 診断: obj を含む領域が解放された記録 */
+static u32 g_objfree_p = 0, g_objfree_val = 0;
+
 /* f_409410 = System._GetMem(size) — mm table 経由の呼出を計数 (逆アセンブル照合済の転記)
  * スタック約束: x64c の call_stmt は「R[RSP] -= 8; ST64(R[RSP], retaddr); f_T();」を発行し、
  * callee 側は ret で R[RSP] += 8 する。本 override は C 関数なので、mm table の実装
@@ -629,8 +632,6 @@ void fle_ov_longjmp(void) {
  * ずつ沈む — 呼出元の `pop rbx` が 8B 低い slot を読み、野生指针になって OOB する
  * (FLE-2 実測: f_412c20 → f_413060 の rbx = 0x43000000000000 → OOB)。
  */
-static int g_objfree_seq = 0;      /* #4287 診断: obj を含む領域が解放された記録 */
-static u32 g_objfree_p = 0, g_objfree_val = 0;
 void fle_ov_getmem(void) {
     g_n_getmem++;
     u64 save_rbx = R[3];
