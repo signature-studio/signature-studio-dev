@@ -56,16 +56,15 @@ def fixed_fields(rd, fi):
 
 
 def validate(rd, fi, in_image):
-    """固定部の検査 (独立した 3 条件): (a) 固定部が読める (BBT なし) (b) 各ポインタが画像内 (c) ポインタの順序が
-    構造の並び (dispUnwindMap < dispTryBlockMap < dispIPtoStateMap は必須ではないが、各ポインタは重ならない)。
-    戻り値は違反の list (空なら OK)。"""
+    """固定部の検査 (独立した 3 条件): (a) 固定部が読める (BBT なし) (b) 各ポインタが画像内 (c) 固定部のポインタ値が
+    互いに重複しない (同値の検出のみ。範囲の重なりは見ない)。戻り値は違反の list (空なら OK)。"""
     hd, f = fixed_fields(rd, fi)
     if hd is None:
         return ['header_unreadable'], None, None
     if f is None:
         return ['fixed_part_unresolved(BBT)' if hd['BBT'] else 'pointer_unreadable'], hd, None
     probs = []
-    for n, (o, v) in f.items():
+    for n, (_, v) in f.items():
         if not in_image(v):
             probs.append('%s_outside_image' % n)
     vals = sorted(v for (_, v) in f.values())
@@ -82,7 +81,7 @@ def image_checker(pe):
     return in_image
 
 
-def fh4_entries(pe, data, rd):
+def fh4_entries(pe, rd):
     base = pe.OPTIONAL_HEADER.ImageBase
     iat = walk_imports(rd, pe.OPTIONAL_HEADER.DATA_DIRECTORY[1].VirtualAddress)
     pdata = [s for s in pe.sections if s.Name.rstrip(b'\0') == b'.pdata'][0]
@@ -114,10 +113,11 @@ def fh4_entries(pe, data, rd):
 
 def census(pe_path):
     pe = pefile.PE(pe_path, fast_load=False)
-    data = open(pe_path, 'rb').read()
+    with open(pe_path, 'rb') as fp:
+        data = fp.read()
     rd = make_rva_reader(pe, data)
     in_image = image_checker(pe)
-    base, rows = fh4_entries(pe, data, rd)
+    base, rows = fh4_entries(pe, rd)
     bits = collections.Counter()
     probs = collections.Counter()
     fi_set = set()
@@ -146,7 +146,9 @@ def census(pe_path):
     return pe, rd, in_image, rows, res
 
 
-KNOWN_OPEN = 2  # 画像外の dispUnwindMap を持つ 2 件 (原因未確定・REPORT_MX6 §8)
+# 画像外の dispUnwindMap を持つ 2 件 (原因未確定・REPORT_MX6 §8)。解消すると正例が FAIL するので、
+# 解消したら KNOWN_OPEN と REPORT_MX6 §8 を同じ commit で更新する。
+KNOWN_OPEN = 2
 
 
 def selftest(pe_path):

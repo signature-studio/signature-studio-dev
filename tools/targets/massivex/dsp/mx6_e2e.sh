@@ -14,26 +14,26 @@ mkdir -p "$W"
 L0="$(cut -d' ' -f1-3 /proc/loadavg)"
 T0=$(date +%s)
 
-echo "== 1/7 NC: 合成バイト列の正例・負例 (PE 不要)"
+echo "== 1/8 NC: 合成バイト列の正例・負例 (PE 不要)"
 python3 "$DSP/scripts/mx6_vectorcall.py" --selftest | sed 's/^/   /'
 
-echo "== 2/7 RTTI + VST3 入口面 (seeds 567 / 1-round closure)"
+echo "== 2/8 RTTI + VST3 入口面 (seeds 567 / 1-round closure)"
 python3 "$DSP/scripts/mx_rtti.py" "$PE" "$W/rtti_vtables.json" >/dev/null 2>&1
 python3 "$DSP/scripts/mx_entry_surface.py" "$PE" "$W/rtti_vtables.json" "$W/surface" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('   seeds=%d one_round=%d pdata=%d' % (d['seeds'], d['one_round_closure'], d['pdata_funcs'] if 'pdata_funcs' in d else 0))"
 
-echo "== 3/7 vectorcall 静的検出 (本体: CFG must-def / 独立再計算: 線形 anyref / 感度: 非 begin 入口)"
+echo "== 3/8 vectorcall 静的検出 (本体: CFG must-def / 独立再計算: 線形 anyref / 感度: 非 begin 入口)"
 python3 "$DSP/scripts/mx6_vectorcall.py" "$PE" "$W/surface_seeds_x64c.json" "$W/surface_one_x64c.json" "$W/vectorcall.json" | sed 's/^/   /'
 
-echo "== 4/7 受入1 (MX-33 #3032): xmm0〜3 だけの入口 livein 保留 17 件の判定 (NC 9 件・独立再計算・感度)"
+echo "== 4/8 受入1 (MX-33 #3032): xmm0〜3 だけの入口 livein 保留 17 件の判定 (NC 9 件・独立再計算・感度)"
 python3 "$DSP/scripts/mx33_xmm03.py" "$PE" "$W/vectorcall.json" "$W/xmm03.json" > "$W/xmm03.log"
 grep -v '^| ' "$W/xmm03.log" | sed 's/^/   /'
 
-echo "== 5/7 .pdata unwind census (CHAININFO / EH handler 名)"
+echo "== 5/8 .pdata unwind census (CHAININFO / EH handler 名)"
 python3 "$DSP/scripts/mx6_pdata_eh.py" "$PE" "$W/surface_seeds_x64c.json" "$W/surface_one_x64c.json" "$W/pdata_eh.json" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('   PE: pdata=%d chained=%d eh=%d unreadable_uinfo=%d' % (d['pe_total']['pdata_entries'], d['pe_total'].get('chained_entries(CHAININFO)',0), d['pe_total'].get('eh_handler_entries',0), d['pe_total'].get('unreadable_unwind_info',0))); print('   seeds: %s' % d['seeds']); print('   one_round: %s' % d['one_round']); print('   funclets(FH3): %s' % d['funclets_fh3'])"
 
-echo "== 6/7 判定 (期待値: seeds と 1-round の pdata 始点で xmm4/5 入口 livein = 0 / 受入1 の内訳が 17 件)"
+echo "== 6/8 判定 (期待値: seeds と 1-round の pdata 始点で xmm4/5 入口 livein = 0 / 受入1 の内訳が 17 件)"
 python3 - "$W" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1] + '/vectorcall.json'))
@@ -45,7 +45,7 @@ print('   %s' % ('PASS (pdata 始点の vectorcall livein 0 / 整合 OK / 受入
 sys.exit(0 if ok else 1)
 PY
 
-echo "== 7/7 positive control: funclet 数の固定値 (MX-6 測定値 seeds 533 / pdata 始点 529 が変わらないこと)"
+echo "== 7/8 positive control: funclet 数の固定値 (MX-6 測定値 seeds 533 / pdata 始点 529 が変わらないこと)"
 python3 - "$W" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1] + '/pdata_eh.json'))['funclets_fh3']['seeds']
