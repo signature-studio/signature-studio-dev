@@ -6,23 +6,12 @@ name: Notices
 # 素材 (FL / plugins) は不要。registry / 再ビルド記録 / repo 内ライセンスファイルの整合と単体テストだけを見る。
 # FL 同梱表記を含む完全な NOTICES の生成は素材のある環境 (NOTICES_STRICT=1 pnpm build) で行い、
 # deploy/scripts/05-stage.mjs のゲートが不完全な NOTICES を拒否する。
+# paths で絞らない (LGL-11, #3301)。検査は repo 全体の追跡ファイルを見る (lib.mjs checkRegistry の git ls-files) ため、
+# 絞ると filter の外へライセンス名のファイルを足す PR や coveredBy / vendored.path の削除で job が起動しない。
 on:
   pull_request:
-    paths:
-      - "tools/legal/notices/**"
-      - "tools/shared/oss/**"
-      - "tools/python/build_cpython_wasm.sh"
-      - "tools/ipp/shim/fft/**"
-      - "deploy/scripts/05-stage.mjs"
-      - "vite.config.ts"
-      - ".github/workflows/notices.yaml"
   push:
     branches: [main]
-    paths:
-      - "tools/legal/notices/**"
-      - "tools/shared/oss/**"
-      - "tools/python/build_cpython_wasm.sh"
-      - "tools/ipp/shim/fft/**"
 
 permissions:
   contents: read

@@ -82,7 +82,7 @@ Worker の経路 (`applyEvent` で REST の payload を保存し、`detectRuleA`
 - 固定 fixture の照合 (`rule_a_crosscheck.py`): 終了コード 0。候補 4 件 (`[100,200,101]`・`[110,210,111]`・`[115,215,116]`・`[190,290,191]`)。
 - 型チェック (HEAD `0f0492bb`): `tsc --noEmit --ignoreConfig --lib es2022,dom --types "" --allowImportingTsExtensions src/*.ts` は 7 件 (`config.ts` 1・`crypto.ts` 2・`github.ts` 1・`hmac.ts` 3 の既存の型の差。前回と同じ件数・同じファイル)。`autoclose.ts`・`engine.ts` の型エラーは 0。
 - バンドル (HEAD `0f0492bb`): `bun build src/index.ts --target=browser --format=esm --external 'node:*' --minify` が成功 (71.44 KB。main 側の変更を含む)。
-- vitest (`npm run test:unit` / `test:workers`): **HEAD `0f0492bb` では未実行**。`pnpm install --frozen-lockfile` が `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で止まるため (再試行でも同じ)。原因は main の lockfile (`infra/pm-worker/pnpm-lock.yaml`・PR と同一) の 3 件: `@cloudflare/vitest-plugin@1.4.2`・`miniflare@5.20261012.0-beta`・`wrangler@4.151.0` が公開から 24 時間未満 (公開 2026-10-14 05:43〜05:53Z)。猶予を外す操作はしていない。前回 (`028ad1f2`) の結果 (10 件 / 3 件 PASS) は、この HEAD では再現していない。
+- vitest (`npm run test:unit` / `test:workers`): **HEAD `0f0492bb` では未実行**。`pnpm install --frozen-lockfile` が `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で止まるため (再試行でも同じ)。原因は main の lockfile (`infra/pm-worker/pnpm-lock.yaml`・PR と同一) の、公開から 24 時間未満の版 (版と公開時刻は [`REPORT_APPENDIX_2653.md`](REPORT_APPENDIX_2653.md) §2)。猶予を外す操作はしていない。前回 (`028ad1f2`) の結果 (10 件 / 3 件 PASS) は、この HEAD では再現していない。
 - 範囲外・未実行: Cloudflare への反映・`wrangler.toml` の変更・secret は範囲外 (依頼者 / PM)。`LIVE_CLOSE` は未設定のまま。
 
 ## 7. 未解決
@@ -92,6 +92,6 @@ Worker の経路 (`applyEvent` で REST の payload を保存し、`detectRuleA`
 | 24 時間窓より前に merge された PR の参照は Worker が持たない (移行前の保存値) | 該当する親は規則 A で閉じない (全履歴と窓の差。保守的な側) | PM 判断 (REST で merged PR の参照を取り直す子 issue の要否。本 run では未起票) |
 | 規則 A は Refs でも閉じる (issue 本文の定義どおり)。残りの作業は子 issue が追跡している前提 | 子の起票漏れがあると、親の残作業が見えないまま閉じる | PM 判断 (親 #2319 の検収で確認) |
 | `LIVE_CLOSE="1"` (live 化) と `wrangler.toml` への反映 | 反映まで記録のみ | 依頼者 / PM (Cloudflare 書き込みは範囲外) |
-| `test:unit` / `test:workers` (vitest) を HEAD `0f0492bb` で未実行。`pnpm install --frozen-lockfile` が main の lockfile の 3 件 (`@cloudflare/vitest-plugin@1.4.2`・`miniflare@5.20261012.0-beta`・`wrangler@4.151.0`) の公開 24 時間の猶予で止まる | CI では node の `npm test` だけが回る。猶予が過ぎれば再実行できる | PM 判断 (猶予後の再実行。lockfile は main 側) |
+| `test:unit` / `test:workers` (vitest) を HEAD `0f0492bb` で未実行。`pnpm install --frozen-lockfile` が main の lockfile の公開 24 時間未満の版 (`REPORT_APPENDIX_2653.md` §2) の猶予で止まる | CI では node の `npm test` だけが回る。猶予が過ぎれば再実行できる | PM 判断 (猶予後の再実行。lockfile は main 側) |
 | `tools/pm/rule_a_realcheck.py` が一覧の `state` を確かめない。取得の途中で閉じた issue を open として数え、照合が exit 1 になりうる (初回の取得で `#2337` の 1 件) | 照合の一時的な不一致。Worker の判定は正しい (`#2337` は GitHub で閉じていた) | PM 判断 (1 行の修正: 一覧の抽出に `i.get("state") == "open"` を足す。競合解消の範囲外のため本 PR では未修正) |
 | 起動側の分類 (`src/engine.ts` の `snapshot`) も、件数が一覧より多い状態を『不明』として扱わない | 配送の取りこぼしで blocked の issue に着手しうる。実データでは食い違いは 0 件 | PM 判断 (本 run では未起票) |
