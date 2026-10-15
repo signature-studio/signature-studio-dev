@@ -128,13 +128,31 @@ def fvm_line(va, name_prefix, arg, sig, trace=True, xfill=True):
             toks.append('i:a:0x%x' % PTR_SLOTS[0])
         else:
             toks.append('i:0x%x' % SMALL[i])
-    return 'id=%x:fvm%d fn=%x blob=vmt args=%s trace=%d xfill=%d sig=%s rt=%s' % (
-        va, arg, va, ','.join(toks), 1 if trace else 0, 1 if xfill else 0, ','.join(sig['params']), sig['ret'])
+    ext = (' tr=1 wsig=' + ','.join(sig['wsig'])) if sig.get('wsig') else ''
+    return 'id=%x:fvm%d fn=%x blob=vmt args=%s trace=%d xfill=%d sig=%s rt=%s%s' % (
+        va, arg, va, ','.join(toks), 1 if trace else 0, 1 if xfill else 0, ','.join(sig['params']), sig['ret'], ext)
 
 
 def supported_sig(sig):
     ok = {'i1', 'i8', 'i16', 'i32', 'i64', 'ptr', 'float', 'double'}
     return all(t in ok for t in sig['params']) and (sig['ret'] in ok or sig['ret'] == 'void')
+
+
+# LD-52 (#1528): IR の i128 引数は機械語では xmm0 (double) か整数レジスタ 1 本。入口型は REPORT_APPENDIX_LD53.md §7.1。
+# 投入は native が sig の型どおりに行い、wasm は m11_tr_<fn> (i64×8 → IR 引数へ zext) に raw 64bit を wsig で渡す。
+MACHINE_ENTRY = {
+    0x40c660: ['double'],               # xmm0 (IR は i128 の型誤り)
+    0x40c750: ['double'],               # xmm0
+    0x653c80: ['i64', 'i64', 'i64'],    # r8 の整数 (rcx・rdx は未使用)
+    0x691dd0: ['i64', 'i64', 'i64'],    # rcx: オブジェクトのポインタ / rdx: i64 / r8: 1 byte flag
+}
+
+
+def machine_sig(va, sig):
+    ps = MACHINE_ENTRY.get(va)
+    if ps is None:
+        return sig
+    return dict(sig, params=ps, wsig=['i64'] * len(ps), tr=True)
 
 
 CUSTOM = {}
@@ -153,6 +171,8 @@ def case_line(va, name_prefix, pattern, sig, trace=True, xfill=True, stkfill=Non
         va, pattern, va, blob, ','.join(toks), 1 if trace else 0, 1 if xfill else 0, ','.join(sig['params']), rt)
     if sig.get('tr'):
         s += ' tr=1'
+    if sig.get('wsig'):
+        s += ' wsig=' + ','.join(sig['wsig'])
     if stkfill is not None:
         s += ' stkfill=%x' % stkfill
     if extra:

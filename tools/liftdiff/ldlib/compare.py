@@ -171,8 +171,13 @@ def cmp_trace(n, w, ctx, sigs, prefix='function_', skip=frozenset()):
         a, b = tn[i], tw[i]
         if a[0] != b[0]:
             return {'index': i, 'kind': 'entry_va', 'native': a[0], 'wasm': b[0], 'native_len': len(tn), 'wasm_len': len(tw)}
+        ent = sigs.get('%s%x' % (prefix, int(b[0], 16)), {})
+        if ent.get('wsig'):
+            # LD-52 (#1528): machine-entry 関数 (IR の i128 引数が xmm0 等の入口値) の入口引数は、wasm の entry 記録が
+            # IR の i128 を 0 と記録する (irtool.instrument) ため比べない。引数の投入は m11_tr_ 経由 (wsig) で行う。
+            continue
         np_ = b[1]
-        sig = sigs.get('%s%x' % (prefix, int(b[0], 16)), {}).get('params', [])
+        sig = ent.get('params', [])
         for pos in range(min(np_, 8)):
             ty = sig[pos] if pos < len(sig) else 'i64'
             width = _width(ty)
