@@ -121,7 +121,7 @@ python3 tools/plugins/f2/xmm_slot_probe.py "$FL_WIN64_DIR/extracted/block18982_P
 - 測定 commit: **`b955ba7b3`** (コードを変えた最後の commit = origin/main `bb6bdcf41` の取り込み merge。round 6 の差し戻しで再測定)。clean worktree (`ws-3621`、branch `2850-plg-f2-9-xmm-cfg-slot`、merge 後 `git status` 0 件)。`git diff b955ba7b3 HEAD -- tools/liftdiff tools/plugins/lift tools/plugins/p0c tools/plugins/f2 ':!*.md'` の出力は 0 行 (本 commit は REPORT のみ)。取り込みで測定範囲に入った変更は `git diff 2eadbacd7 b955ba7b3 -- tools/liftdiff tools/plugins/lift tools/plugins/p0c tools/plugins/f2 ':!*.md'` の 22 ファイル (`k80abi.py` の xmm 読み幅 (#3641)、`fix_xmm_args.py` の `arity_cause` (#2903) 等)。旧測定 (`2eadbacd7`、取り込み前) は §8-2・§8-3 に残す。
 - 測定 (各 1 回。§7 と同じ注記: 再現性の回数測定は未実施):
   - 前提 `f2_step1.sh` rc 0 (**581 秒**、04:04:46 〜 04:14:27 UTC、load 6.25 (終了時))。V1 lift (`PLUG_XMMARG=1 PLUG_LDFIX=1 PLUG_ICALL=0`、11 block): rc 0 ×11 (**47 秒**、04:14:52 〜 04:15:39)。
-    - 最初の V1 lift は `FL_WIN64_DIR` が未設定 (既定 `/home/ubuntu/...`) で rc 1 ×11 になった (素材を見ていない。4 秒で終了)。`f2/env.sh` の展開先 `$RUNNER_TEMP/fl-win64` を設定して再実行し、上の rc 0 を得た。
+    - 最初の V1 lift は `FL_WIN64_DIR` が未設定 (既定 (`shared/env.sh` の `ANALYSIS_DIR` 既定値)) で rc 1 ×11 になった (素材を見ていない。4 秒で終了)。`f2/env.sh` の展開先 `$RUNNER_TEMP/fl-win64` を設定して再実行し、上の rc 0 を得た。
   - `leaf_diff.sh`: rc 0、`LEAF_DIFF elapsed 145 s` (load 0.60)、最終判定 **一致 15 / 不一致 8 / 実行不能 0** (取り込み前と同じ)。
   - `xmm_slot_probe.py` (block18982 0x6b0ef0、block19013 0x6ca5c0): (a0) k80abi = `xmm2`、(a) pass = `xmm1,xmm2,xmm3`、(b) pe.py 素 = `xmm1,xmm2,xmm3` (取り込み前と同じ。(a)=(b) は定義上の関係)。
   - `nc_leaf.py` (受入 4): 取り込み後の lift 結果に対して実行。rc 0、181 秒 (04:18:18 〜 04:21:19 UTC、load 0.63)。store_drop 4/4、load_drop 11/11、offset_shift 11/11 (変異後 mismatch = 検出)、未検出 0、unexec 0。
