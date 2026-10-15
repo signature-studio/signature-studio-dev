@@ -30,7 +30,11 @@ def gen_scen(seed, n):
     for va in ENTRIES:
         for k in range(n):
             init = bytes(rng.randrange(256) for _ in range(D.OBJ_LEN))
-            a = [rng.getrandbits(32) for _ in range(4)]   # 範囲は絞らない (#4357: 巨大サイズ経路も突合する)
+            a = [rng.getrandbits(32) for _ in range(4)]   # 大きい a0 は巨大サイズ経路 (失敗 0) (#4357)
+            if va in (0x1000a42e, 0x100106a5) and k % 4 == 1:
+                a[0] = rng.randrange(0x8000)   # 4 行に 1 行は小さいサイズ (成功経路の有効ポインタも突合する)
+                if va == 0x100106a5:
+                    a[1] = rng.randrange(0x10)
             if k % 2 == 0:
                 teb = bytes(TEB_LEN)   # 0 埋め模型 (ott_teb_blk と同じ)
             else:
