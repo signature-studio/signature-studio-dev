@@ -186,6 +186,7 @@ def make_fixture(root, overrides=None):
         "tools/m11/REPORT_APPENDIX_1430.md": APPENDIX,
         "tools/m11/REPORT_N2714.md": M11_N2714,
         "tools/gui/flengine/REPORT.md": GUI_REPORT,
+        "tools/gui/flengine/REPORT_APPENDIX_HISTORY_3832_A.md": GUI_REPORT,
         "tools/gui/flengine/REPORT_APPENDIX.md": APPENDIX_7,
         "tools/gui/flengine/REPORT_APPENDIX_2880.md": APPENDIX_2880,
         "tools/gui/flengine/cfi_probe.mjs": CFI_PROBE,
@@ -363,7 +364,7 @@ class BootMetricTest(unittest.TestCase):
     def test_negative_gui_survey_report_mismatch_fails(self):
         broken = GUI_REPORT.replace("S1 `870/1/47/24/0`", "S1 `871/1/47/24/0`")
         with self.assertRaises(bm.MetricError):
-            self.build({"tools/gui/flengine/REPORT.md": broken})
+            self.build({"tools/gui/flengine/REPORT_APPENDIX_HISTORY_3832_A.md": broken})
 
     def test_negative_harness_mentions_create_fruity_instance_fails(self):
         with self.assertRaises(bm.MetricError):

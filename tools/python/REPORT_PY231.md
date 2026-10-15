@@ -42,6 +42,8 @@
 | 0xfdc8be〜0xfdc8c3 | rcx=rax・edx=esi・call 0xba4a20 | 下流へ送出 (値は edx のまま) |
 | 0xfdc8c8 | mov [rbx+rdi*4+0x5c],esi | テーブル更新 |
 
+**#3949 (PY-276) での確定**: 0xfdc8a0 の全体を再逆アセンブルした (0xfdc8a0〜0xfdc8d3)。上表の通りで、添字に境界検査は無い。`[sink+0x5c+4*添字]` を書くのは 0xfdc8c8 のみ。`forwardMIDICC` の呼出し元は PE 内の 20 件以上 (例: 0xd74936・0xf90e6c)。`midiOutMsg` (0xd747f0) は 0xfdc8e0 を呼び、こちらは変化検出を通さず毎回送る (0xd748a3)。テーブル (sink+0x5c) の**初期値と長さは未確定**。PE 全 `.text` で `[base+rdi*4+0x5c]` 形の書込みを走査したが、sink を作る関数は同定できなかった (`ea9f20` は別表 (stride 0x45) の書込み)。
+
 **0xba4a20 → 0x663430 (送出の下流)**: 本 PR で再逆アセンブルした (§5 の script・`block00031_PE.bin`):
 
 ```
@@ -85,11 +87,23 @@ ba4a31: call 0x663430
 - **未実行**: `provider_check.mjs`・`midi_bundled_device.mjs`・`midi_rpc_split.mjs` は `dist/flpy.js` (CPython wasm) が要り、本 run では build していない (`provider_check` は `ERR_MODULE_NOT_FOUND` で起動前に落ちる)。REPORT_PY227 §3 と同じ範囲外。
 - 検証範囲: C provider (wasm) と JS mock の比較と手計算の期待値。PE の意味は §1 の逆アセンブルに依る。-7 側の単独の控えは未実施 (-6 と同じ判定順の helper を共有するため、C と mock の双方で -7 の経路は device_diff の link 3 件に含まれる)。
 
+## 3b. 値の変化検出 (#3949 / PY-276)
+
+- 実装: 0xfdc8a0 の cmp/je に合わせ、`forwardMIDICC` は添字ごとの最後に送った値と同じなら送らない (C `provider/fl_engine.c`・mock `host/fl_mock.mjs` とも)。未設定 (-1) から始まり、添字 0..15 (C の `FCC_N` 仮置き)。範囲外は重複検出せず送る。`midiOutMsg` は変えない (PE 0xfdc8e0 を毎回呼ぶ)。
+- 割当判定の順 (review 指摘・PY-276 追補): `forwardMIDICC` は -7 → -6 を判定してから、添字の重複判定 (0xfdc8a0 相当) をする。C では `midi_check` (割当判定) を重複判定の前に呼ぶ。`midi_send` は `midi_check` + `midi_record` の合成。
+- 測定 commit (コードを変えた最後の commit): **`20866f567`** (`fix(python): forwardMIDICC の割当判定を重複判定より前に (PY-276, #3949)`)。差分 `git diff 20866f567 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (main 取り込みの merge `bda387094` を含む)。
+- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/python/fetch_inputs.sh`、`EMSDK_ENV=$RUNNER_TEMP/toolchain/emsdk/emsdk_env.sh bash tools/python/provider/build.sh`、`node tools/python/tests/device_diff.mjs`。
+- 結果 (`bda387094`・n=3・逐次・wall は `/usr/bin/time`): rc=0 ×3、所要 0.04・0.04・0.05 秒、load average (1 分) 0.16。出力: `calls 21・link_calls 9・rejects 13・midi_out 10・diffs 0・PASS true`。送った word 列 (C と mock で一致): `0a643c90, 000000b0, 00643c90, 000000b0, 097f01b2, 7f643c91, 000000b0, 9b412dff, 00643c91, 097f01b2`。
+- 期待 word 列は、末尾の `forwardMIDICC(0x0A643C90, 2)` が直前に同じ添字・同じ値で送っているため送らない形に直した (旧 11 件 → 10 件)。
+- 負例: mock の重複判定を外すと rc=1・`dedup mock words`・`dedup mock count` で FAIL を確認し、戻して PASS を確認 (`work/` の退避ファイルから複写)。C 側の負例 (review 指摘の差): 旧 C (`6bc77b3ef` の `fl_engine.c`) に戻して再ビルドすると rc=1・`AssertionError: device 差分 2 件` で FAIL (未割当での同値呼出しが C では成功扱いだった)。新 C に戻すと PASS。
+- 他の差分検査 `channels_diff`・`note_enum_diff`・`step_item_diff`・`midi_path_diff`・`plugins_diff` は同じ HEAD で rc=0。
+- 未実行: `midi_script`・`midi_bundled_device` は `dist/flpy.js` (CPython wasm) が無く `ERR_MODULE_NOT_FOUND` で起動前に落ちる (§3 と同じ範囲外)。
+
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 値の変化検出 (0xfdc8a0 の cmp/je)・テーブル初期値・添字の範囲 | 同じ値・同じ添字の連続 forwardMIDICC を、C・mock は毎回送出として数える (PE は送らない) | #3949 (PY-276) |
+| テーブルの初期値 (sink 生成時の `[sink+0x5c..]`)・添字の範囲 (C の FCC_N=16 は仮置き) | 初回の添字 (未設定) の扱いと、範囲外の添字の挙動 (C・mock は範囲外を重複検出せず送る) が PE と一致するかは未確定 | #3949 (PY-276・受入 1 は未達) |
 | 第 2 引数の既定値 1 (stub 由来)・1 引数呼出し | PE の `"ii"` は PyArg 規則上は両方必須 (解析関数は未同定)。C・mock は 1 引数を既定 1 で受ける。解析失敗の観測 (例外・戻り code) は未確定 | #3950 (PY-277) |
 | 送出先 HMIDIOUT (`[obj+0x7c]`)・無効フラグ (`[obj+0x84]`) の由来 (下流は winmm `midiOutShortMsg`・§1) | 送出先 port を C・mock の送出記録は持たない (どの MIDI 出力かは未確定) | #3981 (PY-287) |
 | `provider_check` (flpy 未 build) | 同梱 script の forwardMIDICC 経路を flpy 経由で未確認 | #3804 (PY-255) |
