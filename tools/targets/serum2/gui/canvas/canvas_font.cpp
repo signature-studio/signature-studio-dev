@@ -45,7 +45,7 @@ void CanvasFontPainter::drawString (const PlatformGraphicsDeviceContextPtr& cont
 	auto* canvasContext = dynamic_cast<const CanvasGraphicsDeviceContext*> (context.get ());
 	auto* canvasString = dynamic_cast<CanvasString*> (string);
 	if (canvasContext && canvasString)
-		paintGlyphs (*canvasContext, canvasString->getUTF8String (), p, color);
+		paintGlyphs (*canvasContext, canvasString->getUTF8String (), canvasContext->transformPoint (p), color);
 }
 
 //------------------------------------------------------------------------
