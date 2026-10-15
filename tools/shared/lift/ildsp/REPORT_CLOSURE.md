@@ -107,11 +107,8 @@ IAT 名の内訳 (件数):
 - vcall `call [reg+disp]`: Transmitter 60 件、LimiterLite 5・TransientLooper 5 件ほか。WaveformColouring の 1 件は `0x1a9e2b: call qword ptr [rax+0x18]` (関数 `0x1a9e10`)。
 - `call reg`: Shimmer 4 件、LowFreqEnhancer・StereoEnhancer・TransientLooper 各 2 件、LimiterLite・Limiter 各 1 件。
 
-### 4.4 間接 call 4 件の到達 (#3250 / T-SH-54)
-- 対象: helper `0x1aedc0` の `0x1aedf6` (→画像内 `0x268260`)・`0x1aee04` (→RtlPcToFileHeader)・`0x1aee4a` (→RaiseException)、helper `0x1b6f4c` の `0x1b6f6c` (→画像内 `0x268268`)。
-- 実測 (測定 commit `180307dfc`・詳細は §7.1a): 全件 (n=6・rc 124 ×4・139 ×2) と単独 slot 2〜5 (rc 0 ×4) のいずれも、4 件の hook は 0 件。完走した実行は全件実行で 0 件。
-- 正の対照: CreateInstance 先頭の直接 call は 1 回発火 (trace 機構は動く)。`0x1b6f4c` を呼ぶ `0x1ac9ce` は 0 件。`0x1ac9ce` は `0x1b6ea0` の戻り値が 0 の分岐の先にあり、0 件は戻り値が非 0 だったことを意味する。
-- 扱い (現時点): 現在の入力では到達していない。ただし到達しない根拠ではない (注: 完走実行が無く、helper の入口で hook を確かめていない)。`0x1b6ea0` の戻り値を 0 にする入力と、helper `0x1aedc0` の入口の正の対照は未確定。trap 化か stub 化かの判断は、この条件が分かるまで保留する。
+### 4.4 間接 call 4 件の到達 (#3250 / T-SH-54・部分達成)
+- 結論: 間接 call 4 件 (`0x1aedf6`・`0x1aee04`・`0x1aee4a`・`0x1b6f6c`) は、現在の入力では到達していない (hook 0 件)。ただし到達しない根拠ではない。到達条件 (`0x1b6ea0` の戻り値) と trap 化か stub 化かの判断は保留し、子 #4230 に移す。測定の正本は `REPORT_APPENDIX_3250.md`。
 
 ### 5. 起票 (子 issue)
 | 子 | 対象 | 規模 (本節の数値) |
@@ -202,17 +199,6 @@ IAT 名の内訳 (件数):
 - slot 1 の hang: 単独 (4 rdx × n=6) の件数は S2 10/24・S3 12/24・RV3 8/24、全件の slot 1 v0 は S2 3/6・S3 4/6・RV2 2/6・RV3 2/6。RV1 の単独 slot 1 v0 は 0/4。S1 は 16 回中 9 回。件数はセッションごとに変わり、rdx ごとの偏りも一定しない (1 セッション 6 回では rdx の差は判定できない)。hang は slot 1 の call 内で起きる。原因は未確認。仮説 (未検証): 未初期化値・スタック位置・環境変数長に依存する分岐。負荷の影響は未検証。
 - 全件実行 (同一プロセス・n=6): 表 7-2。slot 3 v0 の rax 0x2e は S2・S3 とも一致。slot 4・5 には届かない。
 - slot 0 (dtor) は §7.2 で実行済み (#4117)。
-
-### 7.1a 間接 call 4 件の到達 (#3250 / T-SH-54・部分達成)
-- 測定 commit: `180307dfc` (ハーネスに直接 call の trace 制御 (`direct` フラグ) を追加。既存の 4 件の hook は変更なし)。`git diff 180307dfc HEAD -- tools/shared/scripts` は本節の commit 時点で空 (差分 0)。
-- 素材: `fl-win64.tar.zst` を展開し、`block24360_PE.bin` の sha256 は `f4b23b0f93ee9119…` (issue 記載と一致)。
-- 既存照合: `ildsp_native_check.py` ALL OK、`--neg` FAIL (期待どおり)。
-- 全件実行 (`ildsp_native <PE>`・n=6): rc 139 ×2 (slot 3 v0 の直前・slot 1 の call 内で SIGSEGV)、rc 124 ×4 (hang)。4 件の hook は 0 件。完走した実行は 1 件も無い。
-- 単独 slot 2〜5 (v0): rc 0 ×4。4 件の hook は 0 件。
-- trace の正の対照 (直接 call、いずれも `call` 命令の先頭): CreateInstance 先頭 `0x1aa29f` (→`0x1ac9c0`) は 1 回発火 (create のみ・slot 2〜5 でも 1 回ずつ)。`0x1ac9ce` (→`0x1b6f4c`) は 0 件。
-  - 解釈: `0x1ac9ce` は `0x1ac9da: call 0x1b6ea0; test rax; je 0x1ac9cb` の戻り値が 0 のときだけ実行される。0 件は `0x1b6ea0` が非 0 を返したことを意味し、trace の不具合ではない。`0x1b6f4c` (間接 call `0x1b6f6c` を含む) はこの分岐の先にしか無いので、CreateInstance の通常経路では届いていない可能性が高い。
-  - 未確認: `0x1b6ea0` の戻り値の内訳 (どの入力で 0 を返すか)。hook の発火 0 件は「到達しない根拠」ではない (§4.4 注 3 と同じ)。
-- 扱い: 間接 call 4 件は、現在の入力 (`block24360_PE.bin` の create と slot 1〜5 の標準入力) では到達していない。到達条件 (`0x1b6ea0` の戻り値を 0 にする入力) は未確定で、子 issue に移す。
 
 ### 7.2 slot 0 (dtor) の native 実行 (#4117 / T-SH-97)
 - 測定 commit: `19a9c85d2` (ハーネス `ildsp_native.c`: HeapFree を記録・二重解放を検出・`--slot 0 V` で slot 0 を実行。checker は `--create-only` で create のみ照合)。`git diff 19a9c85d2 HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
