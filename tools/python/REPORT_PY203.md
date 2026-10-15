@@ -80,3 +80,15 @@
 | 0x12ab520・0x12acb70・0x1021670・0x12ac210 の呼出し元 (関数ポインタ・VMT 経由)、0x12ab520 の VMT 推定の検証 | 受入 1 の rdx 2 件・eax・r9d | [PY-220] #3616 |
 | 0x45c290 の戻り値の意味、0x128f9e0 の edx の MEM 38・COPY 7・AMBIG 8 の基底、0x1192f80 の r8d の呼出し元 `[[rbp+0x140]+0x20]` の `[rbp+0x140]` の上流 | 受入 1 の eax・edi/esi (ecx = sgn(edi − esi))・受入 2 の残り | [PY-221] #3617 |
 | 線形走査の限界 (非境界の飛び先 101,337 件、5 件の注記の窓)、間接 jmp・jump table 経由の飛び込み | §0・§4 の範囲外。60 箇所の結論は前向き復号と飛び先の検算で確認済み。命令境界の全面的な再構成は PY-203 の受入外 | 親 #3476 への提案 (未起票) |
+
+## 6. PY-273 (#3927): edx の基底 MEM 38 の 1 段上流
+
+照合は `analysis/flapi/pe_py273_base.py` (MEM setter の基底レジスタの、setter 直前の値を `pe_py203_edx_sites.py` の `resolve` で 1 段分類) と `analysis/flapi/pe_py273_globals.py` (大域と rbp スロットの確認)。
+
+- MEM 38 の基底レジスタの 1 段分類: rax 19・rbx 9・rbp 6・rsi 2・rdi 1・rdx 1。
+  - rbp 6 件 (スタックスロット): `[rbp+0x2c]` 4 件、`[rbp+0x24]` 1 件、`[rbp+0x4508]` 1 件。直前 store が見つかるのは 4 件 (0xf699ff・0x128e8f2・0x12878f4・0x12a46bf)。残り 2 件 (`[rbp+0x2c]` の setter 0x12a1afe・0x12a1c16、関数 0x12a13c0・0x12a1be0 内) は関数内に直前 store が無い。
+  - rax 19・rbx 9 の内訳は未整理 (rax は大域 3 種の RIP 相対読込み 12 件を含む。rbx は COPY 6・MEM 2・ARITH 1)。
+- 大域 3 種 (0x15e26a0・0x15e2218・0x15e22d8) はいずれも `.data` の節にあり、RIP 相対の書込みは 0 件。`pe_rip_refs.py` の参照は 247・1563・284 件で、すべて読込み。`.data` の初期値は 0x193fa10・0x16bafc8・0x16bd450。値を入れる経路は未特定。
+- COPY 7・AMBIG 8 の基底は、本 PR では分類していない。
+
+**受入は未達**。基底の上流は 1 段目までで、次の段 (大域 3 種を埋める経路・rbx の ENTRY 経路の呼出し元・関数内に store の無い `[rbp+0x2c]` の 2 件) は子 issue に移す。
