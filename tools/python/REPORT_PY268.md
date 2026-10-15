@@ -59,7 +59,7 @@ issue #3901 の範囲を受入 1・2 に縮めた (3・4 は #3937 へ移し、�
 ## 5. 検証
 
 - probe: `tools/python/analysis/flapi/pe_py268_rdx.py` (15 件)。
-  - 測定 commit (コードを変えた最後の commit): `b5d65bb35`。同一 commit で 2 回測定し、いずれも 15/15 PASS・終了 0 (40.6 秒・40.5 秒)。
+  - 測定 commit (コードを変えた最後の commit): `b5d65bb35`。同一 commit で 3 回測定し、いずれも 15/15 PASS・終了 0 (40.6 秒・40.5 秒・40.6 秒)。3 回目の load (`/proc/loadavg` の 1 分値) は開始前 0.05・終了後 0.51。
   - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64/extracted python3 tools/python/analysis/flapi/pe_py268_rdx.py`。
 - 差分の証跡: `git diff b5d65bb35 HEAD -- tools/python/analysis/flapi` の出力は 0 行 (本 REPORT の commit は docs のみ)。
 - 負の対照: 未実施 (時間制限)。
