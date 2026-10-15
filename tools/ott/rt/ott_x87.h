@@ -6,7 +6,8 @@
  * (6) C1 は fxam (符号) と比較命令 (0) の後だけ模型化する。 他の命令の C1 は native では丸めの上向きフラグになるが、
  *     f64 は丸め方向を持たないので模型化しない (C1 は直前の fxam/比較の値を persist する)。
  * (7) タグ (TW) は物理レジスタごとの 2 bit (00 valid / 01 zero / 10 special / 11 empty)。 値の書込みで分類し直し、
- *     FLDENV/FRSTOR で読んだタグはそのまま残す (#3688)。 f80 の非正規・指数域外は f64 で表せないので分類が native と違う (ADR 制限)。 */
+ *     FLDENV/FRSTOR で読んだ TW は空/非空だけ残し、非空の種類は次の FNSTENV/FNSAVE で値から分類する (#4110)。
+ *     f80 の非正規・指数域外は f64 で表せないので分類が native と違う (ADR 制限)。 */
 #ifndef OTT_X87_H
 #define OTT_X87_H
 #include "ott_cpu.h"
@@ -221,7 +222,7 @@ static inline int64_t x87_fist64(double v) { double r = x87_rc(v); return (r >= 
 /* ---- 状態の保存・復元 (#3688)。 環境 28 B (32bit 保護): CW @0・SW @4・TW @8。 FIP/FCS/FOO/FOS (12..27) は未モデル (0) ---- */
 static inline uint16_t x87_tw(void) {
     uint16_t tw = 0;
-    for (unsigned p = 0; p < 8; p++) tw |= (uint16_t)(ott_tag[p] << (2 * p));
+    for (unsigned p = 0; p < 8; p++) tw |= (uint16_t)((ott_tag[p] == 3 ? 3u : x87_cls(ott_fst[p])) << (2 * p));
     return tw;
 }
 
@@ -233,14 +234,14 @@ static inline void x87_fnstenv(uint8_t* e) {
     ott_fcw |= 0x3f;
 }
 
-/* FLDENV: CW・TOP・C0/C2/C3 を戻し、タグは読んだ TW をそのまま使う (値は書き換えない) */
+/* FLDENV: CW・TOP・C0/C2/C3 を戻す。 タグは空かどうか (TW = 11) だけを読み、 空でない物理レジスタの種類は次の FNSTENV/FNSAVE で値から決める (x87_tw) */
 static inline void x87_load_env(const uint8_t* e) {
     uint16_t cw, sw, tw;
     memcpy(&cw, e, 2); memcpy(&sw, e + 4, 2); memcpy(&tw, e + 8, 2);
     ott_fcw = cw;
     ott_ftop = (sw >> 11) & 7;
     ott_fsw = sw & OTT_X87_CMASK;
-    for (unsigned p = 0; p < 8; p++) ott_tag[p] = (uint8_t)((tw >> (2 * p)) & 3);
+    for (unsigned p = 0; p < 8; p++) ott_tag[p] = ((tw >> (2 * p)) & 3) == 3 ? 3 : 0;
 }
 static inline void x87_fldenv(const uint8_t* e) { x87_load_env(e); }
 
