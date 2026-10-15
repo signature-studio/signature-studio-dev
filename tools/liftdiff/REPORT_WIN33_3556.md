@@ -2,7 +2,7 @@
 
 親: #2760 (WIN-7 系)。前提 spike: [`REPORT_WIN7_2718.md`](REPORT_WIN7_2718.md) (#2718)。手順の正本は `win33_catalog.sh` / `win33_trace.py` (本 PR)。
 
-測定 commit: `7080aca8a` (コード変更の最後の commit)。再測定を省く根拠 (`docs/WORKFLOW.md` §6): `git diff --name-status 7080aca8a HEAD -- tools/liftdiff` の出力は本 REPORT の追加 (`A tools/liftdiff/REPORT_WIN33_3556.md`) の 1 件だけ (コード差分 0)。
+測定 commit: `7080aca8a` (本 REPORT の数値は全てこの commit で実測)。HEAD `c3d5e46a9` は `origin/main` (`c2324dea6`) を merge した commit で、`git diff --name-status 7080aca8a HEAD -- tools/liftdiff` は main 由来の変更を含む 14 件を示す。よって `docs/WORKFLOW.md` §6 の「差分 0」条件は満たさず、HEAD での再測定が必要 (§9・本 run では未実施)。
 既知類型との関係 (DEFECTS.md): 該当なし (lift 欠陥ではなく、harness の stub 応答と停止の扱い。新規の類型候補は §7)。
 再現コマンド: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/liftdiff/win33_catalog.sh` (約 100 s・4 spike/trace 実行)。e2e: `bash tools/liftdiff/liftdiff_e2e.sh --m11-only`。
 素材: fl-win64・work-m11・work-liftdiff・toolchain-emsdk (`[EMSDK]`)。`tools/liftdiff/work/` `tools/m11/work/` は展開済み。
@@ -14,9 +14,9 @@
    - ReadFile の応答は正しい (全量 47,405 B をバッファへ。先頭 4 B は blob と一致)。SetFilePointer の応答 (BEGIN/CUR/END=0xb92d/BEGIN) も整合。**原因は読取り位置 0 で magic を count として読んでいること**。どの読取りが位置 0 であるべきか (呼出元の読取り仕様 / .mo との形式不一致) は未同定 → §7 の子。
 2. **rep movsq (rva `0x12a25`) は実カタログ供給の後の偽の止まり**。RTE 201 の後始末で `ExitProcess(0xc9)` の stub が戻る (`r=0`) ため、後続の `mov rsi,[rip+0x11d8267]` (この時点で 0 の global) からコピーして segv する。実プロセスの ExitProcess は戻らない。
 3. S12〜S22 の対応は §5 (実測の import 列と止まり地点を `STARTUP.md` §2 の段に対応づけ、未観測は未観測と書く)。
-4. **既定 (`LD_CATALOG_MO` 未指定) は不変**: spike 928/942・first_fail 830・segv `0x4e0fab`・35 import (= #2718 と同一)。`liftdiff_e2e.sh --m11-only` は clean `origin/main` と本 HEAD で同一値 (sample:800 = 一致 360 / 不一致 234 / 実行不能 206)・PASS。
+4. **既定 (`LD_CATALOG_MO` 未指定) は不変 (測定 commit `7080aca8a` で確認)**: spike 928/942・first_fail 830・segv `0x4e0fab`・35 import (= #2718 と同一)。`liftdiff_e2e.sh --m11-only` は clean `origin/main` と測定 commit で同一値 (sample:800 = 一致 360 / 不一致 234 / 実行不能 206)・PASS。HEAD `c3d5e46a9` での再確認は §9 (未実施)。
 
-## 1. 実測結果 (HEAD `7080aca8a`・`win33_catalog.sh` 1 回目の実測)
+## 1. 実測結果 (測定 commit `7080aca8a`・`win33_catalog.sh` 1 回目の実測)
 
 | 項目 | 既定 (`LD_CATALOG_MO` なし) | 実カタログ (`LD_CATALOG_MO=block25158`) |
 |---|---|---|
@@ -34,7 +34,7 @@ ReadFile の引数: `h=0x65000001`・`buf=0x3d49240`・`n=0xb92d` (= END の位�
 
 ## 2. 方法 (再現用の仕組み)
 
-- `ld_core.h`: `LD_CATALOG_MO` 指定時だけ `CreateFileW` が `default.moe` を仮ハンドル `0x65000001` で開き、`ReadFile`・`SetFilePointer`・`GetFileSize` を実バイトで応答する (前の実験の再現。既定では `ld_cat_blob == NULL` で分岐に入らない)。
+- `ld_core.h`: `LD_CATALOG_MO` 指定時だけ `CreateFileW` が `default.moe` を仮ハンドル `0x65000001` で開き、`ReadFile`・`SetFilePointer`・`GetFileSize` を実バイトで応答する (前の実験の再現。既定では `ld_cat_blob == NULL` で分岐に入らない)。HEAD では、main 由来の WIN-9 分岐 `ld_cat_on()` が同じ env で先に応答しないよう `if (!ld_cat_blob && ld_cat_on())` で譲らせた (測定 commit `7080aca8a` には `ld_cat_on` が無く、測定経路はこの `ld_cat_blob` 分岐だけだった)。
 - `ld_native.c` の trace 拡張 (環境変数のみ・既定無効): `LD_STEP_ID=<case id>` で 1 case だけ命令 trace、`LD_STEP_MEM=<VA>` で 8B の変化を `MEM writer_last_img_rva=…` 行として記録、`LD_CASE_TMO_US` で case の timer (既定 1.5 s)。`ldlib/runners.py` の `LD_RUNNER_TMO` は Runner の read timeout (既定 20 s) を上書きする (trace が長いため)。
 - trace の 1 行は `rva rax rcx rdx rbx rsp rbp rsi rdi r8 r9` (実行前のレジスタ)。cfi の trace は約 8.82 M 命令 (trace 行 8,819,946 で `0x12a25`)。
 - スタック上のアドレス (V の場所) は環境変数の長さで変わるため、`win33_catalog.sh` は 1 回目の trace で最後の `0x17b70` の r9 を取り、同じ環境長で 2 回目に `LD_STEP_MEM` を付ける。
@@ -43,15 +43,17 @@ ReadFile の引数: `h=0x65000001`・`buf=0x3d49240`・`n=0xb92d` (= END の位�
 
 ### 3.1 範囲検査の機械語 (`win33_trace.py dis 17b70 17bce`・rva)
 
+番地はすべて rva (image base `0x400000` からの相対。VA = rva + 0x400000)。逆アセンブルの分岐先・call 先は capstone が VA で出すため、rva に直して書く。
+
 ```
 17b70 push rbp / push rbx / sub rsp,0x98 / mov rbp,rsp      ; 入口 r9 = V のアドレス (0x17b70 の r9)
 17b80 mov [rbp+0xb0],rcx / [rbp+0xb8],rdx / [rbp+0xc0],r8 / [rbp+0xc8],r9
 17baa mov rax,[rbp+0xc8]      ; rax = V のアドレス
 17bb1 mov rax,[rax]           ; rax = V (8B)
 17bb4 mov [rbp+0x60],rax
-17bb8 cmp qword [rbp+0x60],0 ; jg 0x417be5 (V>0 は正常)
-17bbf cmp qword [rbp+0x60],0 ; jge 0x417bcd (V==0 は正常)
-17bc6 mov cl,4 ; call 0x409730   ← V<0: RunError (code 201)。戻り番地 0x417bcd が「at」の値
+17bb8 cmp qword [rbp+0x60],0 ; jg 0x17be5 (V>0 は正常)
+17bbf cmp qword [rbp+0x60],0 ; jge 0x17bcd (V==0 は正常)
+17bc6 mov cl,4 ; call 0x9730   ← V<0: RunError (code 201)。戻り番地 rva 0x17bcd が「at」の値
 ```
 
 ### 3.2 trace で見た V (`win33_trace.py trace` の出力・rva 0x17bb8 直後の rax = V)
@@ -89,10 +91,10 @@ ReadFile の引数: `h=0x65000001`・`buf=0x3d49240`・`n=0xb92d` (= END の位�
 4d8627 mov rax,[rbp+0x38] ; mov rax,[rax] ; call qword [rax+0x30]   ← Stream.Read(buf, 4)
 4d862d lea rcx,[rbp+0x70] ...
 4d863e movsxd r9, dword [rbp+0x6c]      ; ← 読んだ 4 B を符号拡張
-4d8642 call 0x417fc0                     ; → 0x17fc9 で [rbp+0x58] へ
+4d8642 call 0x17fc0                          ; → 0x17fc9 で [rbp+0x58] へ
 ```
 
-- 仮想呼出し先: `0x113b90` (1 回のみ実行・trace 上)→ `call [rbx+0x40]` → `0x113b60` 系の `Move` (`call 0x409c80`)。ストリームの `Memory + Position` から `count` 字をコピーし `Position` を進める (`add [rbx+0x18],rsi`)。
+- 仮想呼出し先: `0x113b90` (1 回のみ実行・trace 上)→ `call [rbx+0x40]` → `0x113b60` 系の `Move` (`call 0x9c80`)。ストリームの `Memory + Position` から `count` 字をコピーし `Position` を進める (`add [rbx+0x18],rsi`)。
 - 返った 4 B は blob の先頭 4 B (`de 12 04 95`)。よって**この Read は Position 0 で行われた** (Position 0 の内容が magic と一致)。CFI 経路では、この Stream に対する Read はこの 1 回だけ (trace の `4d862a` 1 件・`113b90` 1 件)。
 - Int32 の magic `0x950412de` は最上位ビットが立つため、`movsxd` で負数になる。範囲検査 (V≥0 を要求) がこれを弾く。
 
@@ -111,7 +113,7 @@ ReadFile の引数: `h=0x65000001`・`buf=0x3d49240`・`n=0xb92d` (= END の位�
 
 - ExitProcess の stub は戻り値 `r=0` (`calls_full` の最後の要素)。`ExitProcess` は `ld_core.h` の既定 (`return 0`) に落ちる。
 - 直後の trace (実カタログ・trace の 2 回目): `12a07` → `12a0d call 0x6fc0` → `12a12 mov rsi,[rip+0x11d8267]` (rsi=0) → `12a19`/`12a20` (`lea rdi`・`mov ecx,0x25`) → `12a25 rep movsq` で segv (rcx=0x25・rsi=0・rdi=0x15eac80)。
-- 戻り番地の検査: 実カタログの detail `s5=0x417bcd` = RTE 201 の「at」。よって `rep movsq` は**範囲検査の RunError の後始末** (rva 0x12a0x 系の関数) に属する。
+- 戻り番地の検査: 実カタログの detail `s5=0x17bcd` (rva) = RTE 201 の「at」。よって `rep movsq` は**範囲検査の RunError の後始末** (rva 0x12a0x 系の関数) に属する。
 - rsi=0 の由来: `[rip+0x11d8267]` は Delphi の後始末が読む global で、この実行では 0 のまま (未初期化)。実プロセスでは ExitProcess が戻らないため、この後始末に進まない。
 
 判定: **harness 由来の偽の止まり**。lift 欠陥ではない。ExitProcess の stub を「case を status=exit(code) で終える」に変えれば、0x12a25 は到達しなくなる (§7 の子)。
@@ -138,12 +140,14 @@ ReadFile の引数: `h=0x65000001`・`buf=0x3d49240`・`n=0xb92d` (= END の位�
 
 ## 6. 受入条件 4 と製品 KPI
 
-| 項目 | 前 (既定) | 後 (既定) | 判定 |
+以下は測定 commit `7080aca8a` の実測。HEAD `c3d5e46a9` の値は §9 (未実施)。
+
+| 項目 | 前 (既定) | 後 (既定・測定 commit) | 判定 |
 |---|---|---|---|
 | spike の units_run / first_fail | 928/942・830 | 928/942・830 | 不変 |
 | CFI の止まり | segv `0x4e0fab` | segv `0x4e0fab` | 不変 |
 | CFI の import 数 | 35 | 35 | 不変 |
-| e2e `--m11-only` sample:800 (一致/不一致/実行不能) | clean `origin/main` (c42713e52): 360/234/206 | 本 HEAD (7080aca8a): 360/234/206 | 不変 |
+| e2e `--m11-only` sample:800 (一致/不一致/実行不能) | clean `origin/main` (c42713e52): 360/234/206 | 測定 commit `7080aca8a`: 360/234/206 | 不変 |
 | e2e `--m11-only` の結果 | `LIFTDIFF_E2E PASS` (2m43s) | `LIFTDIFF_E2E PASS` (2m44s) | 不変 |
 
 KPI (`docs/WORKFLOW.md` §7・起動に関わる PR): FLEngine 起動の dispatch 数・通過 unit 数 は既定で不変 (928/942)。実カタログ時は first_fail が 830 → 895 (830 は通過)。最初のウィンドウ (画素) は**動かしていない** (画素統計は未取得。`CreateWindowExW` は両方で呼ばれる)。
@@ -159,7 +163,19 @@ KPI (`docs/WORKFLOW.md` §7・起動に関わる PR): FLEngine 起動の dispatc
 
 ## 8. 検証範囲 / 範囲外
 
-- 検証: 既定 spike・実カタログ spike・命令 trace (2 回)・e2e `--m11-only` (clean `origin/main` と本 HEAD)。いずれも `7080aca8a` (HEAD) で再現。
+- 検証: 既定 spike・実カタログ spike・命令 trace (2 回)・e2e `--m11-only` (clean `origin/main` と測定 commit)。いずれも測定 commit `7080aca8a` で実施。HEAD `c3d5e46a9` での再測定は §9 (未実施)。
 - 範囲外: wasm 化 (`rt/fle_ldbridge.c` の wasm ビルドは本 PR で触らない。`ld_core.h` の追加は `ld_cat_blob == NULL` で分岐に入らない)。本番コード化。画素統計。
 - 限界: スタックのアドレスは環境変数長に依存 (`win33_catalog.sh` が同じ環境長で取り直す)。trace は単一 case (`cfi`) のみ。Stream の Position は直接 PEEK していない (3.4 の magic 一致からの推定)。
 - 単一 run の実測。e2e の絶対値は負荷で変わる (REPORT.md §6.2) ため、clean HEAD との同一 run 比較で判定した。
+
+## 9. HEAD `c3d5e46a9` での再測定 (未実施・次の run で実施)
+
+本 run は `$ARTIFACTS_DIR` に `fl-win64` のみがあり、`work-liftdiff`・`work-m11`・`toolchain-emsdk` が無かったため、spike と e2e を HEAD で実行できなかった。以下は再測定の対象。PR 本文の `oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff` で素材を付けた run で実施し、結果を本節に HEAD の値で書く。
+
+| 再測定の対象 | 測定値 (測定 commit) | HEAD `c3d5e46a9` |
+|---|---|---|
+| 既定 spike (`spike_cfi.py`) | §1・§6 | 未実施 |
+| 実カタログ spike と trace (`win33_catalog.sh`) | §1・§3 | 未実施 |
+| e2e `liftdiff_e2e.sh --m11-only` | §6 | 未実施 |
+
+HEAD の値は、実施後にこの表の右列へ書く (測定値は §1・§6 だけに置く)。

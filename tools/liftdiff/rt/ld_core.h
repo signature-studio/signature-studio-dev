@@ -322,7 +322,7 @@ static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, 
       if (a1 && a2 && ld_dst_ok(a1, l * 2 + 2)) { u64 nn = l < a2 - 1 ? l : a2 - 1; for (u64 k = 0; k < nn; k++) ((uint16_t*)(uintptr_t)a1)[k] = (uint16_t)s[k]; ((uint16_t*)(uintptr_t)a1)[nn] = 0; return nn; }
       return 0;
     }
-    if (ld_cat_on()) {   /* WIN-9 (#2760) 実験: LD_CATALOG_MO 指定時のみ */
+    if (!ld_cat_blob && ld_cat_on()) {   /* WIN-9 (#2760) 実験: LD_CATALOG_MO 指定時のみ。WIN-33 (ld_cat_blob) 設定時は譲る */
       if (ld_streq(n, "GetFileAttributesW") && ld_cat_path(a0)) return 0x80;   /* FILE_ATTRIBUTE_NORMAL */
       if (ld_streq(n, "CreateFileW") && ld_cat_path(a0)) { ld_cat_pos = 0; return LD_CAT_H; }
       if (ld_streq(n, "SetFilePointer") && (u32)a0 == (u32)LD_CAT_H) {

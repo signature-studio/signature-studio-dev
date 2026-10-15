@@ -15,13 +15,13 @@ cp work/flelift/spike_cfi.json "$OUT/default_spike_cfi.json"
 echo "== [2/4] 実カタログ spike (LD_CATALOG_MO=block25158)"
 LD_CATALOG_MO="$CAT" python3 spike_cfi.py targets/flelift.json | grep "^\[spike\] CreateF\|units_run"
 cp work/flelift/spike_cfi.json "$OUT/catalog_spike_cfi.json"
-TRACE_ENV="LD_CATALOG_MO=$CAT LD_STEP_N=80000000 LD_STEP_ID=cfi LD_STEP_OUT=$HERE/$OUT/step LD_RUNNER_TMO=900 LD_CASE_TMO_US=800000000"
+TRACE_ENV=(LD_CATALOG_MO="$CAT" LD_STEP_N=80000000 LD_STEP_ID=cfi LD_STEP_OUT="$HERE/$OUT/step" LD_RUNNER_TMO=900 LD_CASE_TMO_US=800000000)
 echo "== [3/4] cfi 命令 trace 1 回目: V のアドレス (最後の範囲検査入口の r9) を求める"
 rm -f "$OUT/step.cfi"
-env $TRACE_ENV LD_STEP_MEM=7fffffffe000 python3 spike_cfi.py targets/flelift.json > /dev/null
+env "${TRACE_ENV[@]}" LD_STEP_MEM=7fffffffe000 python3 spike_cfi.py targets/flelift.json > /dev/null
 VADDR="$(grep '^17b70 ' "$OUT/step.cfi" | tail -1 | awk '{print $11}')"
 rm -f "$OUT/step.cfi"
 echo "   V = [r9] のアドレス: 0x$VADDR (スタック。環境変数長で変わる)"
 echo "== [4/4] cfi 命令 trace 2 回目: LD_STEP_MEM=$VADDR で V の書込み履歴"
-env $TRACE_ENV LD_STEP_MEM="$VADDR" python3 spike_cfi.py targets/flelift.json | grep "^\[spike\] CreateF"
+env "${TRACE_ENV[@]}" LD_STEP_MEM="$VADDR" python3 spike_cfi.py targets/flelift.json | grep "^\[spike\] CreateF"
 python3 win33_trace.py trace "$OUT/step.cfi"
