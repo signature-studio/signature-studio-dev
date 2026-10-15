@@ -5,7 +5,8 @@
 #   fix : ldfix (修復段 1〜1d) → fix_ld108 → fix_ld115 → fix_src412770 → qstore → alloca → guard699 → guard4fa210
 #         (前提: 先に bash tools/m11/ldfix/ldfix_e2e.sh を実行して work/ldfix_fixed.ll を作る)
 #   base: snapshot (boot_final3.ll) → qstore → alloca → guard699 → guard4fa210 (ldfix 系の修復を入れない)
-#   順序は m11_gen_ir2.sh (ldfix → ld108 → ld115 → src412770) と m11_build.sh (qstore → alloca → guard699 → guard4fa210) に合わせる。
+#   順序は測定 commit c9d365465 の m11_gen_ir2.sh (ldfix → ld108 → ld115 → src412770) と m11_build.sh (qstore → alloca → guard699 → guard4fa210) に合わせる。
+#   注: fix_r8b815050.py (main の 5c43ea98a・#1448 で入り m11_gen_ir2.sh が既定で適用する) は含めない。r8b を含めた判定は #3608。
 #   注: fix_ld115 / guard699 / guard4fa210 は weak 化の前の定義 (define i64 @...) を照合する (m11_build.sh も weak 化の前に走る)。
 #       本スクリプトは照合対象の 4 関数の define 行だけ一時的に weak を外し、チェーンの最後で戻す。
 set -uo pipefail
