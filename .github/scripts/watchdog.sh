@@ -54,7 +54,7 @@
 #   stuck : oc:stuck の PR で、最新の oc-fix-limit コメント (github-actions[bot] の投稿) に、当該 PR の oc-pm-intent: stuck がある (fix-progress.sh の停止印)
 #   no_pr : oc:no-pr の open issue で、最後の oc-run-outcome の reason が split か stop (pm-apply・needs-user-input の付いた issue は除く)
 #   送るのは kind と ref の 2 つだけ。送る前に対象へ <!-- oc-pm-dispatch:<ref> ts=... --> を残す (残せなければ送らない)。
-#   上限は 1 回の点検で 3 件、1 時間に 12 件、同じ ref に 24 時間で 3 件 (記録のコメントを数える。記録は REVIEWER_LOGIN の Bot だけ数える)。
+#   上限は 1 回の点検で 3 件、1 時間に 24 件、同じ ref に 24 時間で 3 件 (記録のコメントを数える。記録は REVIEWER_LOGIN の Bot だけ数える)。
 #   Worker の /status が mode=live かつ fresh=true なら送らない。/status が取れないときは live でないとみなして送る。
 #   記録の一覧が読めないときは送らない (fail-closed)。DRY=1 は計画だけ表示する。
 #
@@ -651,7 +651,7 @@ echo "$rate_line"
 
 # --- 暫定の oc-pm 起動 (#CI-50)。判定と上限は冒頭の説明を正とする ---
 PM_PASS_MAX=3
-PM_HOUR_MAX=12
+PM_HOUR_MAX=24
 PM_REF_DAY_MAX=3
 pm_dispatch() { # pm_dispatch <kind> <ref>: 記録のコメントを残してから oc-pm を送る。記録できなければ送らない (payload は kind と ref だけ)
   local ts

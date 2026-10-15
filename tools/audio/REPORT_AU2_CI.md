@@ -72,7 +72,7 @@
 
 - 表の値: burst = `stats.burst_obs` (連続 process の総フレーム数の**最大**)、T_req = `ceil((burst×1.25 + B)/B)×B` (各 run の burst で計算)。セル内の範囲は n=3 の min〜max。表は `node tools/audio/au2_summary.mjs` の出力と一致する。
 - 元の 18 シナリオ実行 (n=3) はすべて PASS (underrun 0・ramp/sine 誤差 1.49e-8)。load avg は各 run 開始 0.0〜0.6。**ただし同 HEAD の再採取 (n=1, §5-4) では fake_r1 の `asio_sine_b256_d2` が underrun 1 で FAIL した**。元の n=3 と合わせても再現性は確定していない。
-- P2 の p99 は **未計測**。worklet が公開するのは最大値 (`burst_obs`) だけで、分布は取れていない。
+- P2 の p99 は §12 で計測した (AU-30 #3151)。この節の表は p99 列の無い旧測定。
 
 ### 5-2. 30 分ソーク (P1) — 10 分 (2 回目 run) と 30 分 (3 回目 run)
 
@@ -152,7 +152,7 @@
 | ~~Firefox 行列 (PulseAudio null-sink × 48k/96k)~~ | ~~`tools/audio/harness` が Chrome CDP 専用~~ → 解消 (§9・AU-23 #2540) | — |
 | OPEN 較正 burst と run 中 burst のずれで grows が残る (係数は 125 維持・§5-5) | 96k null で grows 0〜3 回・underrun 0 (§5-5 の再測定)。係数の変更では解消しない | **[AU-28]** #3051 |
 | ~~30 分ソーク (null-sink, 48k B=256)~~ | ~~10 分 PASS のみ~~ → 解消 (§5-2 の 30 分 PASS) | — |
-| P2 burst の p99 | worklet が最大値しか公開しない。分布は未計測 | [AU-30] #3151 (worklet 拡張が要る) |
+| ~~P2 burst の p99~~ | ~~worklet が最大値しか公開しない~~ → 解消 (§12・AU-30 #3151: `burst_hist` を公開し結果 JSON に `burst_p99`)。Firefox 側は未配線 | [AU-37] #3323 (Firefox の p99) |
 | Windows / macOS runner (任意・受入 4) の P1〜P4 の実測 | workflow は差分化のみ (§10。適用も初回 dispatch も未実施)。Windows / macOS の値は無い | [AU-32] #3164 (本 PR で close。適用は PM が PR 本文の差分で行う) |
 | Safari の P1〜P4 の実測と WebDriver BiDi 対応 | 経路は追加済み (§10)。macOS 実測と BiDi 判定は未実施 | [AU-36] (子 #3207) |
 | `asio_ramp_b128_d2` quick FAIL (§2) | 本 run では再実行していない。原因未切り分け | #187 |
@@ -244,3 +244,7 @@
 - 測定 commit: `9aa9239b` (コード最終)。9/9 はこの commit のコードで測った。HEAD `c89f18db` では Firefox e2e の入力 (`public/worklets/fl-audio-worklet.js`・`src/runtime/audio-shim.ts`) が main の `7c5ee224` (AU-29) で変わったため、HEAD で再測定した (§A・§G)。
 - 結論: Firefox 157.0 (ubuntu・PulseAudio null-sink・n=3) で **9/9 PASS** (HEAD `c89f18db`・rc 0・underrun 0・既定 sink 接続 9/9。9aa9239b でも 9/9)。既定出力の判定を OS 別にした。Safari の経路は #3208 で main に入った (P1〜P4 は未測定・[AU-36] #3207)。Windows / macOS の Firefox 行は未適用・未実行 (#3192 [AU-34])。
 - 差分: 実行コードの範囲 (`build.sh` 入力を含む) は HEAD `c89f18db` で 8 ファイル・225 行追加・9 行削除 (§A (a))。issue 指定の `-- tools/audio` の内訳・変更・再現・NC・未解決の全文は `REPORT_APPENDIX_3168.md` §A〜§G (250 行上限のため分割移動)。
+
+## 12. P2 の p99 (AU-30 #3151)
+
+- **結論**: worklet が連続 `process()` の burst 分布 (`burst_hist`) を公開し、結果 JSON に `burst_p99` を出す。測定 commit `fb5a0d69` の n=3 行列 (`results/au30_p99_r3/`) で、null-sink は 9/9 PASS、fake は 8/9 PASS。fake 48k の rep 1 だけ underrun 1 で FAIL (`e403fd7a`・`8310689a` と同じ rep。原因は未切り分け・本 PR の未解決表で追跡)。p99 (bin 上端): fake 48k 1024・96k 1536、null 48k 1536・96k 3584。Firefox の p99 は未配線 ([AU-37] #3323)。測定の全文は `REPORT_APPENDIX_3151.md` (§12)。

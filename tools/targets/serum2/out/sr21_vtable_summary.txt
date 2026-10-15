@@ -1,0 +1,81 @@
+COL signature==1 candidates (slot-1 pointer into .rdata/.data): 3633
+vtables (COL pSelf verified): 3633
+distinct members: 9504
+member location pdata_start	5473
+member location gap_start	3936
+member location gap_mid	95
+member location pdata_inner	0
+member location other	0
+## gap_start members by block class: class / blocks / vt-member blocks / bytes
+entry_call	844	59	3363
+entry_rip	464	7	82
+branch_only	49	5	197
+table_ptr	3928	3850	81373
+ptr_single	80	11	743
+unref	36	0	0
+data	5	4	97
+control: non-padding block starts +8 that hit a member	5	expected by chance	4.85
+owner sharing: members with >=2 distinct owner class names	1497 of 9504	gap_start 468 of 3936
+## gap members by name class of first owner (regex; first match wins)
+VSTGUI	497	^VSTGUI::
+Steinberg	108	^Steinberg::
+std	290	^std::
+OSS	18	^(mu::|ZL|nlohmann|libsfz|sqlite|zstd|FLAC|PFFFT|pffft|Vorbis|sndfile)
+Serum	2676	^(Serum|Xfer|V[A-Z])|ProxyParameter|Controller|Editor|Lane|NoteGrid|PianoRoll
+other	442	(rest)
+## gap_mid members: byte before the member (hex count, then category)
+0xCC	51
+0xC3	28
+0xFF	7
+0x00	6
+0xE0	2
+0xE2	1
+0xCC (int3)	51
+ret (0xC2/0xC3)	28
+other	16
+## OSS-namespace members outside the cut windows (cut_library -): first owner / any owner
+OSS outside cut windows	17	27
+4	ZLSingleFDLConvolve::?0??prepareImpulse::V<lambda_1>::?$_Func_impl_no_alloc
+3	ZLFIRConvolve::?0??prepareImpulse::V<lambda_1>::?$_Func_impl_no_alloc
+3	ZLDualFDLConvolve::?0??prepareImpulse::V<lambda_1>::?$_Func_impl_no_alloc
+3	mu::ParserBase::D::?$change_dec_sep
+2	ZLFIRConvolve
+1	nlohmann::json_abi_v3_12_0::detail::type_error
+1	ZLDualFDLConvolve
+## OSS members counted only through a non-first owner (outside cut windows): va / first owner / OSS owners
+0x18000d920	Steinberg::Vst::AudioEffect	libsfz::VSound::?$_Ref_count_obj2
+0x1800120a0	Steinberg::WinPlatformTimer	mu::Parser | mu::ParserBase
+0x180014910	Steinberg::Vst::?A0x8FCC0F43::TestBase	mu::ParserBase
+0x1800149a0	Steinberg::Vst::?A0x8FCC0F43::FuncTest	ZLFIRConvolve
+0x180015130	_WDU_Mbstatet::?$codecvt	mu::ParserBase::D::?$change_dec_sep
+0x180015140	_WDU_Mbstatet::?$codecvt	mu::ParserBase::D::?$change_dec_sep
+0x18001dd00	V<lambda_2>::?$_Func_impl_no_alloc	ZLDualFDLConvolve::?0??prepareImpulse::V<lambda_1>::?$_Func_impl_no_alloc | ZLFIRConvolve::?0??prepareImpulse::V<lambda_1>::?$_Func_impl_no_alloc | ZLSingleFDLConvolve::?0??prepareImpulse::V<lambda_1>::?$_Func_impl_no_alloc
+0x1800a5d90	SerumDSP::UAutomatableParamAssignMessage::?$_Ref_count_obj2	libsfz::VSound::?$_Ref_count_obj2
+0x1800a5ee0	MidiClip::UEditAction::?$_Ref_count_obj2	libsfz::VSound::?$_Ref_count_obj2
+0x180100150	SerumController::?0??hybridizePreset::V<lambda_43>::?$_Func_impl_no_alloc	ZLFIRConvolve::?0??prepareImpulse::V<lambda_1>::?$_Func_impl_no_alloc
+## rtti class of gap members (top 25)
+232	std::U_Unforced::V?$_Binder::?$_Func_impl_no_alloc
+52	SerumController
+26	VSTGUI::CDataBrowser
+26	VSTGUI::COptionMenu
+19	ProxyParameter
+18	VSTGUI::CAutoAnimation
+17	SerumDSP::?1??createParams::GlobalTuningParam
+17	NoteGridController
+15	Steinberg::Vst::EditController
+15	AutomationLaneController
+15	ClipPlayerAutomationLaneController
+14	SerumDSP
+14	ArpNoteGridController
+13	VSTGUI::CSearchTextEdit
+13	SerumEditor
+13	ClipPlayerNoteGridController
+13	ArpAutomationLaneController
+10	VSTGUI::CKnobBase
+9	ClipPlayerPianoRollController
+9	MultiLineTextEdit
+8	Steinberg::WinPlatformTimer
+8	Steinberg::Vst::AudioEffect
+8	VSTGUI::CDataBrowserHeader
+8	VSTGUI::CCheckBox
+8	VSTGUI::CKnob

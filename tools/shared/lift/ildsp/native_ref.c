@@ -1,19 +1,21 @@
-// 参照実装 (native): win x64 GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0) の *元の機械語* を RWX mmap し、ms_abi 関数ポインタで直接実行する。
-// build: gcc -O1 -o native_ref native_ref.c   usage: native_ref fn.bin cases.bin res_native.bin
+// 参照実装 (native): win x64 GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0) / slot 5 (RVA 0x1aa470) の *元の機械語* を RWX mmap し、ms_abi 関数ポインタで直接実行する。
+// build: gcc -O1 -o native_ref native_ref.c   usage: native_ref fn.bin cases.bin res_native.bin [ret]
+// ret=1 のとき戻り値 (rax の下位 32 bit) を record に書く (戻り値を比べる slot 5 用)。既定 0 (void 扱い・record の欄は 0)。
 // cases.bin: u32 ncase, then per case: inner[0x2f8] + 5 buffers (64 dword each; ptr 欄の順 0x10,0x18,0x20,0x258,0x260) + wrapper[16]
-// 出力 (per case, 固定 2060 B): u32 status(0) + inner[0x2f8] + wrapper[16] + 5 buffers。ポインタ欄 (inner 5 個) と wrapper+8 は 0 に正規化して書く。
+// 出力 (per case, 固定 2064 B): u32 status(0) + u32 ret + inner[0x2f8] + wrapper[16] + 5 buffers。ポインタ欄 (inner 5 個) と wrapper+8 は 0 に正規化して書く。
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <sys/mman.h>
-typedef void (__attribute__((ms_abi)) *FN)(void *);
+typedef uint64_t (__attribute__((ms_abi)) *FN)(void *);
 #define INNER 0x2f8
 #define NB 5
 #define BUFN 64
 static const uint32_t PTR[NB] = {0x10, 0x18, 0x20, 0x258, 0x260};
 static void rd(FILE *f, void *p, size_t n) { if (fread(p, 1, n, f) != n) { fprintf(stderr, "short read\n"); exit(2); } }
 int main(int argc, char **argv) {
+  int retc = argc > 4 && argv[4][0] == '1';
   FILE *ff = fopen(argv[1], "rb"); uint8_t code[0x100] = {0};
   size_t cn = fread(code, 1, sizeof code, ff); fclose(ff);
   uint8_t *img = mmap(0, 4096, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -29,11 +31,11 @@ int main(int argc, char **argv) {
     rd(fc, wrap, 16);
     for (int i = 0; i < NB; i++) { uint64_t p = (uint64_t)buf[i]; memcpy(inner + PTR[i], &p, 8); }
     uint64_t ip = (uint64_t)inner; memcpy(wrap + 8, &ip, 8);
-    ((FN)img)(wrap);
+    uint64_t rax = ((FN)img)(wrap);
     for (int i = 0; i < NB; i++) memset(inner + PTR[i], 0, 8);
     memset(wrap + 8, 0, 8);
-    uint32_t st = 0;
-    fwrite(&st, 4, 1, fo); fwrite(inner, 1, INNER, fo); fwrite(wrap, 1, 16, fo);
+    uint32_t st = 0, rv = retc ? (uint32_t)rax : 0;
+    fwrite(&st, 4, 1, fo); fwrite(&rv, 4, 1, fo); fwrite(inner, 1, INNER, fo); fwrite(wrap, 1, 16, fo);
     for (int i = 0; i < NB; i++) fwrite(buf[i], 4, BUFN, fo);
     free(inner); free(wrap); for (int i = 0; i < NB; i++) free(buf[i]);
   }
