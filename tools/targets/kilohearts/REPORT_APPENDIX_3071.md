@@ -171,3 +171,18 @@
 **未解決**
 1. Stereo の数値突合 0/1000 (未一致の原因の切り分けは未実施。KH-46 の多値戻りが有力) → #3109 (KH-46)。
 2. `FUN_180fd8aac` は関数化せず abort stub (閉包 7 関数の追加と件数の測定が未実施) → #3821 [KH-69]。
+
+## §KH-114 (#4705): callee FUN_180fdfdb0 の戻り xmm1 (残差) の式を機械語で確定 (helper 追加・突合 PASS、呼出元の配線は未)
+- 測定 commit: `ebd0c63cf` (コード変更: `ghidra_route/kh_xmm0.h`・`xmm0_check.c`。基点は `origin/main` = `8c785332e`)。コミット済み HEAD で再測定した。
+- 素材: `plugins-kilohearts` → `HeartCore.core_64` (76,642,304 B、`work/winpkg/`)。Ghidra 12.1.4 (zip sha256 先頭 `ddac49f9…` 一致)、JDK 21。decompile 20 関数 OK (30.6 s、`DecompEach.java`)。
+- 機械語 (`FUN_180fdfdb0`、capstone 132 命令、ret は 180fdffb6 の 1 本): ret 直前の xmm1 は `180fdff09 movq xmm0,r10` 後の double-double の下位成分。
+  - `movlhps` (180fdff24・27) で xmm0 = (d0,d0)、xmm2 = (d0−hh, hh) を作り、`mulpd` (180fdff6d〜75) と `addsd` 列 (180fdff83〜9a) で積和。`addsd xmm0,xmm1` (180fdffa2) が xmm0 = S = x0 + t、`subsd xmm2,xmm0`・`addsd xmm1,xmm2` (180fdffa6・aa) が xmm1 = t + (x0 − S)。
+  - よって `kh_xmm1_180fdfdb0 = t + (x0 − kh_xmm0_180fdfdb0)` (Fast2Sum の誤差項)。
+- 突合 (`ghidra_route/xmm0_check.c dfdb0`、native 実行と bit 一致。|x| ≥ 1 の定義域。コミット済み HEAD `ebd0c63cf` で再実行):
+  - seed 7 × 1,000,000 試行: rax 不一致 0・xmm0 不一致 0・**xmm1 不一致 0・PASS**。
+  - seed 1 × 1,000,000: PASS (rax/xmm0/xmm1 とも 0)。
+  - KH-74 回帰 (`660`、seed 7 × 1,000,000): PASS。
+  - ネガコン (`kPiA` の仮数 1 bit を変えた版、seed 7 × 100,000): **FAIL** (xmm0 不一致 100,000・xmm1 不一致 77,936・rc=1)。
+- 生成 C (stereo、`ghidra_to_c.py stereo ... --fix bitcast,intload,stackpair,assoc,concat`): 修正前 (`origin/main`) と差分は 3 箇所のみ: コメント 1 行 (未対応 → 式だけ持つ)・helper 宣言 (`kh_xmm1_180fdfdb0` の追加)・式 1 行。未配線のため呼出し側は不変。`extraout_XMM0_Qa*` の読出しは 9 件のまま (`FUN_180fdc470` の `extraout_XMM0_Qa_01` 系 #3884 の範囲)。
+- gain / haas / gate の生成 C: `kh_` を含まない (stereo 専用の規則) ため、kh_xmm0.h の変更で生成 C は変わらない (diff 0 行の根拠)。
+- 未達 (受入条件 2・4 の配線): 呼出元 180fcd9c8 (`movapd xmm4, xmm1`) と 180fce43e の xmm1 の読出し先は、生成 C に `extraout_XMM1` として現れない (Ghidra が xmm1 を戻り値として C に出していない)。`patches.py` の置換規則は、この読出し先 (xmm4 経由で多項式の補正項に入る経路) を機械語で確定してから書く。子 issue へ。
