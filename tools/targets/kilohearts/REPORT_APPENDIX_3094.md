@@ -87,7 +87,7 @@
 
 #### 10-7v. #3809 (KH-68) run: aauStack_f8[11][16] の混在型レーンを型付けする (完了)
 - 結論: Delay の `aauStack_f8[11][16]` (128bit 一時領域の 2 次元配列) の参照 11 件 (`member reference base type 'undefined1[16]'`) を、`ghidra_to_c.py --fix lanes` の規則で解消した。emcc `member reference base type 'undefined1[16]'` は **11 → 0**。Gain/Haas/Gate は生成 C・`.o`・1000 trial の突合が旧版と一致した。
-- 測定 commit (コードを変えた最後の commit): `287469238`。`git diff 287469238 HEAD -- tools/targets/kilohearts/ghidra_route` の出力は本節の commit 時点で 0 行。
+- 測定 commit (コードを変えた最後の commit): `af67b870d` (main `68d5cb3c4` を取り込んだ merge)。取り込み差分は `gtype` 規則 (#3801・`patches.py` の GTYPE) で、`gtype` を付けない限り本 PR の生成 C は変わらない (下の再測定で確認)。
 - 環境 (n=1・GitHub runner 4 vCPU・RAM 15GB): 素材 `plugins-kilohearts` (`Kilohearts Offline Installer.zip` 3,833,108,300 B → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)。[GHIDRA] 12.1.4 は公式 zip を取得し sha256 `ddac49f9…d2db` を一致確認。JDK 21 (temurin-21.0.12)。[EMSDK] 6.0.12。作業先はすべて repo 外 (`$RUNNER_TEMP`)。
 - decompile: Delay 閉包 139 関数 → **139/139 OK**。gain・haas・gate (それぞれの閉包) → **9/9 OK** (gain 1・haas 5・gate 3。`work/ghidra/out` へ集約)。
 
@@ -111,8 +111,8 @@
 - 残る数値変換: なし。`uint ^ float` (1258・1267 行相当) と `FUN_180289ea0` の引数型 (1174 行) は `aauStack_f8` と無関係の既存の型不一致で、旧版にも同じ行が残る (エラー種別の差分は `undefined1[16]` の 11 件だけ)。
 - 影響範囲: `aauStack_f8` の宣言を持つ関数は Delay の `FUN_1802ed7f0` だけ (`grep` で確認)。`lanes` を付けた Gain/Haas/Gate の生成 C は旧版と本体が一致 (下表)。
 
-##### 測定 (測定 commit `287469238`・HEAD 時点で再実行・実測)
-| 項目 | origin/main `68c6cbb75` (lanes なし相当) | 測定 commit `287469238` (lanes) |
+##### 測定 (測定 commit `af67b870d`・実測)
+| 項目 | origin/main `68d5cb3c4` (lanes なし) | 測定 commit `af67b870d` (lanes) |
 |---|---|---|
 | decompile (delay 閉包) | 139/139 OK | 139/139 OK |
 | C 行数 (delay.c) | 7,281 | 7,290 (+9: V128A 定義と変換行) |
@@ -124,7 +124,7 @@
 
 - Gain/Haas/Gate (`lanes` 付き・新旧とも `--fix bitcast,intload,stackpair,assoc,concat,lanes`):
   - 生成 C: 新旧で本体一致 (ヘッダ 1 行目の fix 一覧を除く)。gain 122 行・haas 301 行・gate 429 行。
-  - `.o`: `emcc -c -w -O1` で **byte 一致** (gain 1,435 B・haas 3,217 B・gate 3,756 B)。
+  - `.o`: HEAD と origin/main の生成 C を同じ emcc フラグ (`-w -O1 -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=incompatible-pointer-types-discards-qualifiers`) で `-c` した結果が **byte 一致** (gain 1,435 B・haas 3,217 B・gate 3,756 B)。
   - 突合 (`build_cmp.sh <name> 1000 7`・HEAD): gain **1000/1000** (calls 4999/4999・wasm 15,161 B)、haas **1000/1000** (calls 5500/5500・wasm 16,878 B)、gate **1000/1000** (calls 4999/4999・wasm 17,367 B)。wasm サイズは §10-7u と一致。
 
 - 再現 (`<gr>` = repo 外の作業先・`<C>` = `HeartCore.core_64`):
