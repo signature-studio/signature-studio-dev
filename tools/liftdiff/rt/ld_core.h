@@ -69,7 +69,10 @@ static u64 ld_tls_vals[1088];
 static u64 ld_fakemod_h[32];        /* 仮モジュールハンドル (LoadLibraryW 系の応答) */
 static char ld_fakemod_n[32][64];
 static int ld_nfakemod;
-static struct { u64 mod; char name[96]; } ld_fakeprocs[256];
+/* GetProcAddress の仮 proc 表の上限は VMT 静的 index 域 (LD_VMT_IDX0) と同じ。#4874: 256 では fleboot の
+ * IPP 名 (ippsXxx) 列挙で満杯になり ld_fakeproc_get が abort する (boot 892/942)。 */
+#define LD_VMT_IDX0      1024
+static struct { u64 mod; char name[96]; } ld_fakeprocs[LD_VMT_IDX0];
 static int ld_nfakeproc;
 static u64 ld_fake_atom;            /* RegisterClipboardFormatW / atom / handle 系の連番 */
 /* WIN-33 (#3556): 実カタログ供給。native 専用。ld_native.c が env LD_CATALOG_MO 指定時だけ設定する (既定 NULL = 従来応答)。 */
@@ -93,9 +96,8 @@ static int ld_dst_ok(u64 p, u64 n) {
 #define LD_FAKEPROC_BASE 0x50010000ull
 #define LD_FAKEPROC_MARK 0x40000000ull   /* thunk → ld_stub_c に渡す index の目印 */
 #define LD_FAKEPROC_SZ   32
-/* LD-48 (#1398): fvm の VMT slot 専用の仮 proc index 域。GetProcAddress 側 (0..255) と重ならせ、
+/* LD-48 (#1398): fvm の VMT slot 専用の仮 proc index 域。GetProcAddress 側 (0..LD_VMT_IDX0-1) と重ならせ、
  * ld_nfakeproc を増やさない (増やすと以後の GetProcAddress 応答の index がずれる)。 */
-#define LD_VMT_IDX0      256
 #define LD_VMT_SLOTS     8
 static const char* ld_vmslot_names[LD_VMT_SLOTS] = {"?vmslot0", "?vmslot1", "?vmslot2", "?vmslot3", "?vmslot4", "?vmslot5", "?vmslot6", "?vmslot7"};
 
