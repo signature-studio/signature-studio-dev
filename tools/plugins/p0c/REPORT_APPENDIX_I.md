@@ -68,3 +68,71 @@
 - `git diff 14731ce2c HEAD -- tools/plugins/p0c ':!*REPORT*'` の出力: `p0c4_abi_e2e.py` の 199 行目のコメント 1 行の `-`/`+` 組のみ。
 - 同ファイルを `ast.dump` で比べると、14731ce2c 版と HEAD 版は一致 (コメントは AST に入らない)。実行されるコードは測定時と同じで、測定値は現 HEAD に有効 (WORKFLOW §6)。
 - 未実行: `p0c_e2e.sh` の全段 (kernel_matrix を含み数分)、`p0c4_nega.py`。`k80_argfix.py` を使う p0c2 / p0c3 / p0c4 の経路は 21.3 で実行済み。
+
+## 22. #3513: 戻り値が xmm0 の kernel を戻り値試験の対象に入れる (測定 commit `9c38a83e4`・基準 origin/main `4868fc52b`)
+
+### 22.1 原因と方針
+
+- census の ret_diff は `nat` が rax から読む値と IR の `ret` を比べる。xmm0 で返す kernel では rax は戻り値ではないため、比較は意味を持たない (0x5e12b0 は 2000/2000 の不一致)。
+- RetDec IR の `ret` は xmm0 を表さない。例: 0x5e1280 は `ret i64 %6` (%6 は `function_409df0` の変換結果で、機械語は rax を書かず buffer へ store する)、0x5e03f0 は `ret i64 %2` (`xor i64 0,0`)。汎用の xmm0 判定は IR 側の接続 (pass) が要る。**子 issue #3573 [P0c-23] に分離**。
+- 本節で行ったこと: (1) `k80abi.py` が kernel ごとの戻り slot `ret_slot` を機械語の書込みから決める。(2) `k80_diff.py` は `ret_slot=xmm0` の kernel で rax を比べず `ret_diff=-1` を出す (buffer 比較と nat/ir の呼出しは従来どおり)。(3) `p0c4_abi_e2e.py` の受入 ⑤: `ret_slot=xmm0` の kernel の集合が戻り値試験 [5b] の対象 (`UCOMI_FIX`) と一致しなければ FAIL。
+
+### 22.2 分類規則 (機械語のみ・fail-closed)
+
+`ret_slot_of()` (`k80abi.py`)。kernel 内の全命令の書込みオペランドを見る (capstone `access`)。
+
+- rax 系 (rax/eax/ax/al/ah) を書き、xmm0 を書かない → `rax`
+- xmm0 を書き、rax 系を書かず、メモリへの書込み (store) を持たない → `xmm0`
+- rax 系も xmm0 も書かない → `none` (戻り値を書かない)
+- それ以外 (rax と xmm0 を両方書く / xmm0 を書いて store を持つ) → `unknown` (未判定。rax 比較を従来どおり続ける)
+
+| ret_slot | kernel 数 (80) | census ok | 内訳 |
+|---|---:|---:|---|
+| rax | 13 | 12 | — |
+| none | 23 | 14 | rax・xmm0 を書かない 17 (ok 8) / store を持つ 6 (ok 6) |
+| unknown | 43 | 41 | rax と xmm0 を両方書く 38 (ok 36) / xmm0 を書き store を持つ 5 (ok 5) |
+| xmm0 | 1 | 1 | 0x5e12b0 |
+
+数え方: kernel = `k80abi.json` の 80 エントリ (kernel_table の 80 実装)。census ok = `p0c4_abi_e2e.py 2000` の CSV で status=ok の行 (68)。内訳の `unknown` の 5 件は 0x5decb0・0x5df270・0x5df340・0x5e03f0・0x5e1280 (子 issue #3573 の対象)。
+
+### 22.3 検証 (測定 commit `9c38a83e4`・detached clean worktree で全段を再生成)
+
+素材: `fl-win64` (`extracted/block18983_PE.bin`)・`toolchain-retdec` (`[RETDEC]`)。llvm-18 を PATH に置いた。load は各 run 終了時の 1 分値 (開始時の値は記録していない)。
+
+| コマンド | rc | 所要 | load (終了時 1 分値) | 結果 |
+|---|---:|---:|---:|---|
+| `kernel_table.py` → 80 kernel の `lift_ranges.sh` (`PLUG_CANON_ALLOCA=1`) → `f80_assess.py` (clean HEAD `9c38a83e4`。lift の所要は同手順の初回 ws-3513 で 4.1 s、clean 側は未計測) | 0 | — | — | `k80.final.ll` 80 defines |
+| `p0c4_abi_e2e.py 2000` (clean HEAD `9c38a83e4`) | 0 | 31.2 s | 0.75 | `run=68 ok=68 sig11=0`・`⑤` xmm0 1 件 = [5b] 対象 `0x5e12b0`・`[5b]` 2001/2001 一致 |
+| `p0c4_abi_e2e.py 2000` (基準 `4868fc52b`) | 0 | 36.9 s | — | `run=68 ok=68 sig11=0` |
+| `p0c2_e2e.sh 2000` (`9c38a83e4`) | 0 | 56.6 s | 0.96 | `== p0c2 e2e OK ==` |
+| `p0c3_e2e.sh 2000` (`9c38a83e4`) | 0 | 55.9 s | 0.37 | `== p0c3 e2e OK (構造修復 3 kernel bit-exact + 回帰 0) ==` |
+
+- 基準との差分: 修正前後の census 表 (status=ok の 68 行) を `diff` で比べると、差は `0x5e12b0` の `ret_diff` のみ (`2000` → `-1`)。他 67 kernel の ret_diff・buf_diff・status は同一。
+
+  ```
+  -   0x5e12b0   sse           2000        0    0.0000 ok
+  +   0x5e12b0   sse             -1        0    0.0000 ok
+  ```
+
+### 22.4 負論対照 (数値)
+
+| 対照 | 操作 | 結果 |
+|---|---|---|
+| (a) xmm0 戻り値の破壊 | `K80_NO_UCOMI_FLAGS=1 python3 p0c4_abi_e2e.py 2000` | `[ucomi_ret] ... mismatch=1014` (2001 中)・`[FAIL] 戻り値が native と不一致 (1014 / 2001)`・rc 1 |
+| (b) 分類の破壊 | `K80_NO_RETSLOT=1 python3 p0c4_abi_e2e.py 2000` | `[FAIL] 0x5e12b0 戻り値試験 [5b] の対象だが ret_slot が xmm0 でない (#3513)`・`[FAIL] 受入基準未達`・rc 1 |
+
+(a) は #3439 の記録 (`mismatch=1014`) と同値。(b) は分類を外すと gate が落ちることを示す。
+
+### 22.5 検証範囲
+
+- 測定 commit: `9c38a83e4` (コードを変えた最後の commit)。その後の commit は REPORT のみ。
+- `git diff 9c38a83e4 HEAD -- tools/plugins/p0c ':!*REPORT*'` の出力は空 (コード差分 0)。
+- 範囲外: `0x5e12b0` 以外の xmm0 戻り値の正しさは未検証 (`ret_slot` は機械語の書込みから推定した分類で、戻り値の意味は見ていない)。`unknown` 43 件の戻り値 slot は未確定 (rax 比較を従来どおり続けるため、その ret_diff は意味を持たない)。
+- 未実行: `p0c_e2e.sh` の全段 (kernel_matrix)、`p0c4_nega.py`。
+
+### 22.6 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| IR に xmm0 の戻り値を接続する pass が無く、xmm0 戻り値の汎用判定ができない (現状は 0x5e12b0 だけ [5b] で判定) | xmm0 で返す kernel の戻り値は census で判定されない | #3573 [P0c-23] |
+| `unknown` 43 件 (xmm0 を書き store を持つ 5 件 と、rax と xmm0 を両方書く 38 件) の戻り slot が未確定 | 戻り slot の誤分類は gate の対象外。rax 比較の ret_diff は従来どおり意味を持たない | #3573 [P0c-23] |
