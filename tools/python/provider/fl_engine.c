@@ -552,6 +552,21 @@ FL_H(ui, getFocusedFormCaption) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getFocusedPluginName) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getHintMsg) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, isInPopupMenu) { NARGS(0, 0); return fl_ret_b(c, 0); }
+/* PY-128 (#3005): PE 0xd6c250 は状態を読まず、rodata の UTF-16 定数 "FL Studio 2026" (長さ接頭辞 14) を返す (REPORT_PY128) */
+FL_H(ui, getProgTitle) { NARGS(0, 0); return fl_ret_s(c, "FL Studio 2026"); }
+/* PE 0xd6cb60 は PyArg "ii" (None・文字列・実数は TypeError) の後、0x11f1a70 で (int32)(value*100) を max で割り、
+ * 最近接偶数 (cvtsd2si) で整数化して "%" を付ける。状態は読まない。範囲外と NaN は INT64_MIN (REPORT_PY128) */
+FL_H(ui, getHintValue) {
+    NARGS(2, 2);
+    for (int i = 0; i < 2; i++) if (c->a[i].tag != 'I' && c->a[i].tag != 'B') WRONGN();
+    int64_t v = A_INT(0, 0), m = A_INT(1, 0);
+    int32_t num = (int32_t)((uint32_t)v * 100u);
+    double q = (double)num / (double)(int32_t)m;
+    int64_t n = (q >= -9223372036854775808.0 && q < 9223372036854775808.0) ? (int64_t)nearbyint(q) : INT64_MIN;
+    char buf[32];
+    snprintf(buf, sizeof buf, "%lld%%", (long long)n);
+    return fl_ret_s(c, buf);
+}
 /* PY-130 (#3007): PE 0xd6ee00 (setBrowserAutoHide) は O+0x8c4 に (v==1) を書く。0xd6f170 (setStepEditMode) は S=[O+0xab8] の +0x49e を (v==1) にする (末端は vtbl[0x200] 経由で未確定)。値は未実測の仮置き (REPORT_PY130_3007) */
 FL_H(ui, setBrowserAutoHide) { NARGS(1, 1); ui_browser_auto_hide = A_INT(0, 0) == 1; return fl_ret_none(c); }
 FL_H(ui, setStepEditMode) { NARGS(1, 1); ui_step_edit = A_INT(0, 0) == 1; return fl_ret_none(c); }
