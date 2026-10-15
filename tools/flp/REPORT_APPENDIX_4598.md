@@ -23,7 +23,7 @@
 | Patcher (generator) | 120 s | rc=124・WAV なし |
 | Sytrus | 120 s | rc=124・WAV なし |
 
-- 受入 1: 8 本のうち 1 本 (Patcher (effect)) は「rc=124 で要確認」から「rc=0 で成功」になった。残り 7 本は「WAV なし」のままで、**原因は未特定**。
+- 受入 1: 未達 8 本のうち WAV が出たのは 0 本。要確認だった Patcher (effect) は「rc=124 で要確認」から「rc=0 で成功」になった。未達 8 本 (FLEX・Fruity Center・Fruity Convolver・Fruity Parametric EQ 2・Fruity Slicer・Maximus・Patcher (generator)・Sytrus) は 120 s で WAV なしのままで、**原因は未特定**。
 - 前段の 5 本 (FLEX・Fruity Center・Fruity Convolver・Fruity Parametric EQ 2・Fruity Slicer) は 120 s の再測定で再現。Fruity Center だけ 300 s まで延ばして確認。他 4 本の 300 s 測定は未実施。
 - 残り 3 本 (Maximus・Patcher (generator)・Sytrus) も 120 s の再現まで。
 
@@ -35,6 +35,6 @@
 ## 4. 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 残り 7 本 (FLEX・Fruity Center・Fruity Convolver・Fruity Parametric EQ 2・Fruity Slicer・Maximus・Patcher (generator)・Sytrus のうち 8 本から成功 1 本を除く) の WAV 未出力の原因 | 受入 1・2 が未達 | #4598 (Refs) |
-| 上記の 300 s 測定 (Fruity Center 以外) | 遅いだけか、止まっているかの区別がつかない | #4598 |
+| 未達 8 本 (FLEX・Fruity Center・Fruity Convolver・Fruity Parametric EQ 2・Fruity Slicer・Maximus・Patcher (generator)・Sytrus) の WAV 未出力の原因 | 受入 1・2 が未達 | #4598 (Refs) |
+| 上記 8 本の 300 s 測定 (Fruity Center 以外は未実施) | 遅いだけか、止まっているかの区別がつかない | #4598 |
 | Patcher (effect) は同環境の別 run で成功。wine の終了の正常性 (rc=0) は確認済み | 受入 2 (TSV 追記) は本 PR で反映 | — |
