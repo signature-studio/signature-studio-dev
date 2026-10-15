@@ -1,4 +1,4 @@
-# tools/python REPORT: PY-128 ui 読出し 4 件の PE 確定と実装 (#3005, 親 #2980・#2831)
+# tools/python REPORT: PY-128 ui 読出し 2 件の実装と残り 2 件の保留 (#3005, 親 #2980・#2831)
 
 > 前段: `tools/python/REPORT_PY119.md` (保留 12 件の記録)。前提の #2980 は PR #3010 で merge 済み (2026-10-14)。
 
