@@ -1,6 +1,6 @@
 # edge-sim (tools/e2e) を Workers Static Assets の実挙動に合わせるための調整一覧
 
-**tools/e2e は本チケットでは編集禁止**のため未適用。検収終了後に別チケットで適用する。根拠はすべて実エッジ実測
+§B の `/index.html` 検査は #3526 で `tools/e2e/suite/checks.mjs` に適用済み (§A の他項目は未適用)。根拠はすべて実エッジ実測
 (`deploy/probe/edge-facts.sh` の出力 = `deploy/REPORT.md`、および `tools/hosting/REPORT.md` §6)。対象は `tools/e2e/suite/servers.mjs` の `startEdgeSim()` と `checks.mjs` の `edge-policy`。
 
 ## A. 配信挙動の差 (edge-sim -> 実機)
@@ -22,7 +22,7 @@
 
 ## B. `checks.mjs` の `edge-policy` (remote / strict ターゲット)
 
-- **`/index.html` (唯一の実 FAIL)**: 実機は 307 -> `/`。`http()` が 3xx を Access ログインとみなして例外にするため、`--url` の `edge-policy` が FAIL する (実測: agent-browser/puppeteer とも 7 PASS + この 1 FAIL)。修正案: remote(strict) では probes から `/index.html` を外し `/` で代替するか、`/index.html` だけ `redirect:'manual'` で 307 + `Location: /` を assert する。`deploy/probe/policy-check.mjs` は同等の検査を 307 許容で実装済みで、`/` `/assets/*.js` `/worklets/*.js` `/__e2e__/add.wasm` と 404 が全て policy 一致 (REPORT.md)。
+- **`/index.html` (唯一の実 FAIL)**: 実機は 307 -> `/`。`http()` が 3xx を Access ログインとみなして例外にするため、`--url` の `edge-policy` が FAIL する (実測: agent-browser/puppeteer とも 7 PASS + この 1 FAIL)。修正案: remote(strict) では probes から `/index.html` を外し `/` で代替するか、`/index.html` だけ `redirect:'manual'` で 307 + `Location: /` を assert する。**#3526 で後者を適用** (`assertIndexHtmlRedirect`。edge-sim は 200 のまま)。`deploy/probe/policy-check.mjs` は同等の検査を 307 許容で実装済みで、`/` `/assets/*.js` `/worklets/*.js` `/__e2e__/add.wasm` と 404 が全て policy 一致 (REPORT.md)。
 - `content-type`: policy は `text/html; charset=utf-8` 等。stage が `_headers` で上書きするため実機でも一致 (上記 policy-check で実測)。stage を通さない素の dist を `--url` で検査すると不一致になる。
 - `Cache-Control`: `/`・`/index.html` は no-cache、`/assets/*`・`/wasm/*`・`/data/*`(+ `/c/` `/m/`) は immutable、mutable prefix は stage が明示。prefix 外の非ハッシュ資産は `max-age=0, must-revalidate` なので、policy を直接比較するテストを足す場合は `tools/hosting/headers-from-policy.mjs` の `equivalent()` (より厳格な既定は可) を使う。
 - 圧縮: remote では `content-encoding` は記録のみ (現行どおり)。実機は zstd が来るので `br` 固定の assert を remote に足さないこと。
