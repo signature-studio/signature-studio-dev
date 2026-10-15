@@ -70,7 +70,7 @@
           "file": "tools/m11",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "83e79d0b"
+          "file_last_commit": "b61def8b"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -149,7 +149,7 @@
           "file": "tools/m11",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "83e79d0b"
+          "file_last_commit": "b61def8b"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -618,7 +618,7 @@
           "file": "tools/flelift/boot",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "db8a176d"
+          "file_last_commit": "139d3849"
         },
         {
           "file": "tools/startup/STARTUP.md",
