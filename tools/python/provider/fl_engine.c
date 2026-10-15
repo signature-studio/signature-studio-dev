@@ -151,7 +151,7 @@ FL_H(channels, setChannelVolume) { CH(0); k->vol = A_DBL(1, 0); return fl_ret_no
 FL_H(channels, getChannelPan) { CH(0); return fl_ret_d(c, k->pan); }
 FL_H(channels, setChannelPan) { CH(0); k->pan = A_DBL(1, 0); return fl_ret_none(c); }
 /* PY-76 (#2563): PE 0xd5aa30 → 0xd843d0 → callback 0xd5a720 の判定順 (REPORT_PY72): index 範囲外 -4 → value の NaN -1 → pitchUnit。
- * 未モデル: guard (常に真)・useGlobalIndex (一覧 A/B は同一扱い)・unit 0/1 の効果 (効果関数 0x1046a30 の書込み先が未確定。状態は変えない)・通知 PostMessageW。
+ * 未モデル: guard (常に真)・useGlobalIndex (一覧 A/B は同一扱い)・unit 0/1 の効果 (効果関数 0x1046a30 の書込み条件が未確定。状態は変えない)・通知 PostMessageW。
  * unit 2 は PE どおり N = clamp(cvtsd2si(value), 1, 48) を書く */
 static int64_t cvt_si64(double x) { return (x >= -9223372036854775808.0 && x < 9223372036854775808.0) ? llrint(x) : INT64_MIN; }
 FL_H(channels, setChannelPitch) {
