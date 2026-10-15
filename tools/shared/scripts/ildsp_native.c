@@ -4,7 +4,7 @@
  *  - 間接 call 4 件 (0x1aedf6・0x1aee04・0x1aee4a・0x1b6f6c) は int3 で捕捉し、到達を数える。
  *    呼び先が画像内ポインタ (0x268260・0x268268) の 2 件は実行せず飛ばす (rax が静的に不明なため)。IAT の 2 件は実行する。
  *  - 出力は key=value の行。checker は ildsp_native_check.py。
- * usage: ildsp_native <PE> [--neg-lea]
+ * usage: ildsp_native <PE> [--neg-lea] [--s0-members] [--pre-slot K]
  *   --neg-lea: CreateInstance の vptr 格納 lea の disp32 を +8 に壊す (ネガティブコントロール)。 */
 #define _GNU_SOURCE
 #include <stdint.h>

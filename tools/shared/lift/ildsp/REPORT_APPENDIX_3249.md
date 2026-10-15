@@ -119,7 +119,7 @@
 - 測定 commit: `19a9c85d2` (ハーネス `ildsp_native.c`: HeapFree を記録・二重解放を検出・`--slot 0 V` で slot 0 を実行。checker は `--create-only` で create のみ照合)。`git diff 19a9c85d2 HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
 - 対象: vtable `0x1803dfcf8` の [0] = RVA `0x1aa2e0` (ファイル offset `0x1a96e0`)。逆アセンブルでは `vptr ← 0x1803dfcf8` (create と同じ vtable) を書き、6 メンバ (+0x10・+0x18・+0x20・+0x208・+0x258・+0x260) それぞれに `call 0x1ac9b0` し、最後に inner (0x2f8) と wrapper (0x10) を解放する形。
 - 訂正 (#4154): 旧記述の「`call 0x1abdb0`・vptr `0x1803df0f8`」は誤り。PE 内に `0x1abdb0` を参照する call/jmp は無い (objdump 全文で 0 件)。実際の解放 helper は `0x1ac9b0` (→ `jmp 0x1acfe0` → `jmp 0x1b34a8`)。`0x1ac9c0` は `0x1b6ea0` (`jmp 0x1b9c1c`) の戻り値で分岐する。`0x1b34a8` は `0x1b9084` を経て IAT `0x268130` = HeapFree を呼ぶ (IAT `0x268128` は HeapAlloc)。
-- メンバの非 null 化 (#4154): `--pre-slot 1` で slot 1 (`0x1ab680`) を create 直後に 1 回呼ぶと、メンバ 6 件が非 null になる (`0x50000620`・`0x50000630`・`0x50000640`・`0x50001620`・`0x50000650`・`0x50000660`)。slot 2〜5 を前に呼んでもメンバは null のままだった。`--s0-members` (ハーネスが 6 件を直接張る版) は同じ結果だが、slot 経由の値ではないため正は `--pre-slot 1` とする。
+- メンバの非 null 化 (#4154): `--pre-slot 1` で slot 1 (`0x1aa370`) を create 直後に 1 回呼ぶと、メンバ 6 件が非 null になる (`0x50000620`・`0x50000630`・`0x50000640`・`0x50001620`・`0x50000650`・`0x50000660`)。slot 2〜5 を前に呼んでもメンバは null のままだった。`--s0-members` (ハーネスが 6 件を直接張る版) は同じ結果だが、slot 経由の値ではないため正は `--pre-slot 1` とする。
 - 実測 (n=6・各プロセス `timeout 15`・rc 0 ×6・load average 0.13〜0.16・4 vCPU):
 
 | 項目 | 値 |
