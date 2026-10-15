@@ -187,6 +187,7 @@
 | `tools/liftdiff/tests/ld158_ret_probe.py` | ~110 | LD-158 (#3470) の動的プローブ: i128 戻り関数を 11 pattern × xfill {1,0} で native 実行し、戻り後 rax / rdx / xmm0 の書換えを記録 (`work/ld158_probe.json`)。`--names` で陰性対照の関数を指定できる |
 | `tools/liftdiff/tests/ld158_summarize.py` | ~70 | LD-158 (#3470) の集計: 動的分類・静的 dsm 判定 (窓 3 / 8) の件数と、`ret_override` と動的 xmm0 のみ集合の一致を出す (`work/ld158_table.tsv`) |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
+| `tools/icall/REPORT_APPENDIX_4565.md` | ~110 | icall #4565 (ICALL-105): ott_native の x64 unwind (`.pdata` 検索・UNWIND_INFO 逆適用) の実装と 6 関数の単独実測。`RtlUnwindEx`・`__CxxFrameHandler` の dispatch は未実装 (子 #4592 / ICALL-106) |
 | `tools/icall/REPORT_APPENDIX_4271.md` | ~80 | icall #4271 (ICALL-96): Fresh Air closure に callee を加えた sweep の実測 (測定 commit `181e26ebd`・`missing function` 7 → 0・wasm のみ err 9 → 2)。未解決 10 件は #4328 (ICALL-99) |
 | `tools/icall/REPORT_APPENDIX_3604.md` | 95 | icall #3604 (CI-170): tools/icall の従来既定値 8 本を tools/shared 経由に置換した実測。代表 e2e (`icall_e2e.sh`) の before (origin/main) / after (`58dad0116`) が PASS で stdout 一致、既定値の同一性、素材 `libottnative.so` の古さ (§7) |
 | `tools/icall/REPORT_APPENDIX.md` | 242 | icall REPORT §10.1 (#530 OTT 回帰再実行)・§11 (ICALL-6 #361)・§12 (#229 FLEngine 分割 lift・§12.1 ICALL-9 #847)・§14 (ICALL-16 #1023 stack 引数の実測。REPORT §12 から分割移動)・§15 (#851 の結論 1 行)・§16 (#852 FLEngine jump table) の全文 (250 行上限のため分割移動) |
