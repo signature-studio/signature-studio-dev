@@ -5,7 +5,7 @@
 # 出力は work/qfc-table/ (gitignore 対象)。素材本体は変更しない。
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ART="${ARTIFACTS_DIR:-$HOME/artifacts}"
+ART="${ARTIFACTS_DIR:?ARTIFACTS_DIR を設定する (素材の置き場)}"
 W="$(git rev-parse --show-toplevel)/work/qfc-table"
 WINE="${WINE_BIN:-$(dpkg -L wine64 2>/dev/null | grep -m1 '/wine64$')}"
 PROBE_TIMEOUT="${PROBE_TIMEOUT:-120}"
