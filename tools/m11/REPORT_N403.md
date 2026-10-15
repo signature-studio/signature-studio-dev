@@ -218,8 +218,7 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 
 ## 10. #3161: boot5 × ld108 × LB の切り分け (`--full` の IR・指紋込み。6/8 通り実測)
 
-測定主体: 本 run (2026-10-15, runner 1 台, load 1.0〜1.2)。測定 commit: `7a91a358e` (driver `tools/m11/m11_lb_matrix.sh` を取り込んだ commit。以後 REPORT のみ変更)。
-素材: fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11 (snapshot)。`work/lift_pe.sha256` 無しのため `M11_LB_BASE=0 bash tools/m11/m11_e2e.sh --full` で lift・IR を全再生成 (05:38→06:00, 約 22 分, Ghidra 12.1.4 取得込み)。
+測定主体: 本 run (2026-10-15, runner 1 台, load 1.0〜1.2)。測定 commit: `7a91a358e` (driver `tools/m11/m11_lb_matrix.sh` を取り込んだ commit。以後 REPORT のみ変更)。 素材: fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11 (snapshot)。`work/lift_pe.sha256` 無しのため `M11_LB_BASE=0 bash tools/m11/m11_e2e.sh --full` で lift・IR を全再生成 (05:38→06:00, 約 22 分, Ghidra 12.1.4 取得込み)。
 `--full` の IR `ir_sha256` = `1f1134e339…`。PM 追記の `d8738edd…` (e2e 経路) と `ecbd43c1…` (repro 経路) のどちらとも一致しない (どちらが正かは未確定)。`--full` の終了 rc は 1 (run A の `memory access out of bounds` 停止が理由と見られる。judge の詳細は未確認)。
 
 ### 10-1 実測 (`bash tools/m11/m11_lb_matrix.sh <boot5> <ld108> <LB>`)
