@@ -9,6 +9,7 @@
 RIP 相対の参照は、その命令と同じ PE の VA 空間の中だけを指す。別 block から block00031 の VA を指せるのは絶対値の形だけなので、
 この走査で別 block の RIP 相対を見る必要は無い (構造上の理由。線形走査はしていない)。
 検査 (positive control): block00031 の qword に 0xed4b70 (表の添字 51) と 0xed0c28 (cell 0xed0b60 の値) が各 1 件以上あること。
+加えて、x64 の全 block が自分の ImageBase の qword をヘッダに持つこと (他 block の走査経路の対照)。
 --mutate: 検査の値を 1 ビット反転して FAIL することを確かめる (ネガティブコントロール)。
 """
 import glob
@@ -64,6 +65,8 @@ def main():
             res[(label, v, 8)] = count(raw, pat8)
             if v < 1 << 32:
                 res[(label, v, 4)] = count(raw, struct.pack("<I", v))
+        if mach == 0x8664:
+            res[("ib", ib, 8)] = count(raw, struct.pack("<Q", ib))
         per[name] = (mach, ib, len(raw), res)
 
     print(f"blocks {len(paths)}: " + ", ".join(f"{hex(m)} {n}" for m, n in sorted(machines.items())))
@@ -95,6 +98,10 @@ def main():
         ok = len(hits) >= 1
         ctrl_ok = ctrl_ok and ok
         print(f"  {hex(v)}: {len(hits)} hit(s) at {[hex(h) for h in hits[:4]]} {'PASS' if ok else 'FAIL'}")
+    x64 = [n for n, (m, _, _, _) in per.items() if m == 0x8664]
+    ib_hits = [n for n in x64 if per[n][3].get(("ib", per[n][1], 8))]
+    print(f"[control] 他 block の走査経路: x64 {len(x64)} block のうち、自分の ImageBase の qword を持つ block {len(ib_hits)}")
+    ctrl_ok = ctrl_ok and len(ib_hits) == len(x64)
     if mutate:
         print("mutate: control value changed on purpose")
     verdict = "PASS" if ctrl_ok else "FAIL"
