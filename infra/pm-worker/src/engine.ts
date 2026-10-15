@@ -1397,6 +1397,11 @@ export class Engine {
     if (n <= 0) return;
     this.d.store.put("meta", this.pmHourSkipKey(), [...this.pmHourSkips(now), { at: now, n }]);
   }
+  private pmDispatch1hByKind(now: number): Record<string, number> {
+    const out: Record<string, number> = Object.fromEntries(DETECTED_KINDS.map((k) => [k, 0]));
+    for (const h of this.pmHistory()) if (now - h.at < 3_600_000) out[h.kind] = (out[h.kind] ?? 0) + 1;
+    return out;
+  }
 
   // 検出した対象を oc-pm で送る。payload は kind (列挙) と ref (数字) だけ。LIVE_DISPATCH=1 のときだけ送る (oc-watchdog と同じスイッチ)。
   // 同期が古い間は送らない (誤った対象を起こさない)。
@@ -1434,7 +1439,8 @@ export class Engine {
       this.d.store.put("meta", this.pmHistoryKey(), hist);
       this.saveMeta();
     }
-    this.recordHourSkip(now, skipped.filter((s) => s.why === "hour").length);
+    // 毎時の枠による見送り。reserve は他の kind の最低配分 (KIND_MIN_PER_HOUR) のために枠を残した見送り (#3704)。
+    this.recordHourSkip(now, skipped.filter((s) => s.why === "hour" || s.why === "reserve").length);
     return out;
   }
 
@@ -1841,6 +1847,8 @@ export class Engine {
       refs_only_merge_rate_24h: { merged: mergedDay.length, refs_only: refsOnly, rate: mergedDay.length ? refsOnly / mergedDay.length : null },
       open_issues_delta_24h: base ? open - base.open : null,
       pm_dispatch_1h: this.pmHistory().filter((h) => now - h.at < 3_600_000).length,
+      // 直近 1 時間の oc-pm の送信数を kind 別に (合計は pm_dispatch_1h と同じ。refs_orphan の最低配分 (KIND_MIN_PER_HOUR) が効いたかを見る #3704)。
+      pm_dispatch_1h_by_kind: this.pmDispatch1hByKind(now),
       // oc-pm の毎時上限 (PM_LIMITS.hourMax) と、直近 24 時間にその上限で見送った件数 (対象ごと・tick ごとの回数。pmDispatch と haltNotify が数える)。
       pm_dispatch_cap: PM_LIMITS.hourMax,
       pm_skipped_hour_24h: this.pmHourSkips(now).reduce((sum, h) => sum + h.n, 0),
