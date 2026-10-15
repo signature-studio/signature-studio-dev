@@ -5,11 +5,13 @@ import os, subprocess, sys, json, struct
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..')
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, '..', 'shared'))
+from paths import PLUGINS_DIR
 import icall_rewrite as R
 import audit_icall as A
 import capstone
 
-OTT = os.path.join(os.environ.get('ANALYSIS_DIR', '/home/ubuntu/work/analysis'), 'plugins/ott/binaries/OTT_vst2_win64.dll')
+OTT = os.path.join(PLUGINS_DIR, 'ott/binaries/OTT_vst2_win64.dll')
 fails = []
 
 

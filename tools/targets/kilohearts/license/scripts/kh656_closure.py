@@ -7,7 +7,8 @@
 (3) shims (modules.F.shims) に無く、lift にも excluded_i256 にも無いものを modules.F.lift へ追記。
 lic_build が失敗し n1.ll に i256 (AVX2 ymm) を含む関数があれば、それを lift から外して
 modules.F.excluded_i256 へ記録し再試行する (gen_simd.py は i256 未対応のため。未 lift のままなら fail-fast stub)。
-増分が 0 になったら終了。書換えは lic_config.json の modules.F ブロックだけ。
+増分が 0 になったら終了。各ラウンドの build 成功後に入口 function_180ef7fc0 の結果 (kh249_check.mjs) を記録する。
+書換えは lic_config.json の modules.F ブロックだけ。
 """
 import argparse
 import json
@@ -63,6 +64,18 @@ def run_build():
     return r
 
 
+def entry_check():
+    """入口 function_180ef7fc0 の実行結果 (kh249_check.mjs)。受入 2 の判定値: 最初の未 lift callee か trap 文言"""
+    try:
+        r = subprocess.run(['node', os.path.join(LIC, 'kh249_check.mjs')], cwd=LIC, capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired:
+        return {'entry': 'timeout', 'check': None}
+    out = r.stdout + r.stderr
+    e = re.search(r'entry run -> (.*)', out)
+    s = re.search(r'kh249_check ok=\d+ ng=\d+', out)
+    return {'entry': e.group(1) if e else None, 'check': s.group(0) if s else None}
+
+
 def build():
     """戻り値: (stat or None, unlifted list, i256 excluded list)"""
     r = run_build()
@@ -101,7 +114,7 @@ def main():
         todo = [x for x in unl if x not in shims and x not in lift and x not in excl]
         rec = {'round': n, 'lift': len(lift), 'unlifted': len(unl), 'shimmed': sorted(x for x in unl if x in shims),
                'excluded_i256': sorted(excl), 'new_lift': todo, 'wasm_bytes': st['wasm_bytes'],
-               'undefined_imports': st['undefined_imports']}
+               'wasm_sha256': st['wasm_sha256'], 'undefined_imports': st['undefined_imports'], **entry_check()}
         rounds.append(rec)
         print(json.dumps(rec, ensure_ascii=False))
         if not todo:
