@@ -153,6 +153,9 @@ S_P2780="${M11_PROBE_2780:-0}"   # #2780: 1 = 計測用 IR probe (function_4473f
 if [ "$(cat work/instr_2780.stamp 2>/dev/null || echo 0)" != "$S_P2780" ]; then rm -f work/boot_final3.ll; fi
 echo "$S_P2780" > work/instr_2780.stamp
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
+# M11-N201 (#3932): M11_SLOT_ROWS=<mem_class_rows.json> のとき、実値化 (lea_alloca) の alloca 番地を 0 詰め引数へ入れる (既定は空 = 入れない)
+if [ "$(cat work/slot_rows.stamp 2>/dev/null || echo)" != "${M11_SLOT_ROWS:-}" ]; then rm -f work/boot_final3.ll; fi
+echo "${M11_SLOT_ROWS:-}" > work/slot_rows.stamp
 # #954 (M11-N54): M11_XMM_ARGS=1 = 機械語が xmm0..3 を入力に読む callee の IR 署名へ float/double 引数を復元する (fix_xmm_args.py, #547)。
 #   既定 0 (従来どおり復元しない)。1 のときだけ post (m11_post) の入力を boot_final.xa.ll に差し替える。切替えは stamp で post 結果を無効化する。
 #   M11_XMM_SKIP=f1,f2 は復元から外す関数 (fix_xmm_args.py の --skip-funcs。退行の二分探索用)。
@@ -177,7 +180,8 @@ if [ ! -f work/boot_final3.ll ] || [ "$POST_IN" -nt work/boot_final3.ll ] || [ m
     [ -n "${M11_SIGFIX_FIXES:-}" ] || python3 m11_argrecover.py work/sigfix_pads.json --pe "$PE" --lb "$M11_LB_BASE" --out "$FIXES"
     python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json --fixes "$FIXES"
   else
-    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json
+    SLOT_ARG=""; [ -n "${M11_SLOT_ROWS:-}" ] && SLOT_ARG="--slots $M11_SLOT_ROWS"
+    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json $SLOT_ARG
   fi
 fi
 if [ "$S_P134" = 1 ]; then python3 trap_triage/probe134_ir.py work/boot_final3.ll || exit 1; fi   # #134 計測専用 (既定 0 では何もしない)
