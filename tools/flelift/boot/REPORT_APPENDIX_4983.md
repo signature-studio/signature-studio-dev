@@ -55,7 +55,7 @@ units 895 は REPORT §0 の既定経路の値 (`REPORT_APPENDIX_672.md` §C) �
 
 ### 2-2. 規則の確認: 修正前の式 `${6:-0}` に戻す
 
-同じ `FLE_BOOT_LOG_CAP=4096` を指定し、`run_boot` の式だけを修正前 (`FLE_BOOT_LOG_CAP="${6:-0}"`) に戻した一時スクリプトで `default` を実行 (結果ファイルは残さない)。
+同じ `FLE_BOOT_LOG_CAP=4096` を指定し、`run_boot` の式だけを修正前 (`FLE_BOOT_LOG_CAP="${6:-0}"`) に戻した一時スクリプトで `default` を実行 (結果ファイルは残さない)。再現手順: `fle6_measure.sh` の `FLE_BOOT_LOG_CAP="${6:-${FLE_BOOT_LOG_CAP:-0}}"` を `FLE_BOOT_LOG_CAP="${6:-0}"` に書き換え、2-1 と同じ指定で `FLE_BOOT_RUNS=default` を実行し、結果 JSON の `log_cap` が `null` になることを見る (修正は戻す)。
 
 | 式 | `log_cap` |
 |---|---|
@@ -68,5 +68,5 @@ units 895 は REPORT §0 の既定経路の値 (`REPORT_APPENDIX_672.md` §C) �
 
 ## 3. 未解決・範囲外
 
-- `hit` が立った後も boot は `exit` まで走った (`boot_threw: "exit"`)。上限超過で boot を `log_cap` の例外として止める経路 (`boot.threw` が `log_cap ...` になる分類) は、本 issue では測定していない。
+- `hit` が立った後も boot は `exit` まで走った (`boot_threw: "exit"`)。上限超過で boot を `log_cap` の例外として止める経路 (`boot.threw` が `log_cap ...` になる分類) は、本 issue では測定していない。起票先: #5013 (FLE-39)。
 - 既定の上限 (`diag_*` の 256MiB) の値は変えていない。
