@@ -15,7 +15,7 @@
 ## 1. 測定条件
 
 - 測定 commit: `9bbbd6c15` (`feat(liftdiff): add x64c instruction VA map for OTT 6 roots (Refs #2801)`。計測コード・テスト・TSV を入れた最後の commit。本付録の commit はこの範囲の外)。
-- 入力: `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll` (`plugins-ott` と `analysis-ott-binaries` を展開済み。`$HOME/analysis/plugins/ott/binaries/`)。
+- 入力: `[ANALYSIS-PLUGINS]` の `ott/binaries/OTT_vst2_win64.dll` (`plugins-ott` と `analysis-ott-binaries` を展開済み。`PLUGINS_DIR` で指す)。
 - lift: `tools/ott/lift/x64c.py` (`--closure 6`・root は 6 関数 `1801ab1d0 1801ab258 1801c5e84 1801c621c 1801c682c 1801c69cc`)。
   - 実行: `bash tools/liftdiff/results/ld131/ld131_lift.sh` (出力先は `${RUNNER_TEMP}/ld131`。repo の `work/` は使わない)。
   - 結果: `[x64c] functions 28, insns 941, unsup {}, unlifted callees 1, imports 11`。wall 0.67 s (`real`)。
