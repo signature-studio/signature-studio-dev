@@ -6,9 +6,9 @@ FA-30 (#2187, `REPORT_APPENDIX_FA30.md` §5) で未解決として #2207 に移�
 ## 1. 結論
 
 - **受入 1 (実機の controller map を空 map 以外の実経路で観測): 未達。** 本 harness の経路では木 (`[ctl+0xa8]`) を埋める関数が 1 回も実行されない。
-  F ctor と PROCESS の全 8 シナリオで、木への挿入候補 `0x180caa820` と、その上流 5 関数の呼出は 0 回 (§3)。
-  したがって node の有無は本 harness では観測できない。
-- **受入 2・3:** 受入 1 が未達のため node の有無を前提にする判定はできない (未実施)。(a) の期待値は不変 (受入 3 は達成)。
+  F ctor と PROCESS の全 8 シナリオで、木への挿入候補 `0x180caa820` と、その上流 5 関数 (`0x180e13590`・`0x180e12f20`・`0x180e15030`・`0x180d8ae60`・`0x180d8c4f0`) の呼出は 0 回 (§3)。
+  UI 入口 (`0x180d8c0b0`・`0x180d8d700`・`0x180d8c140`) は probe していない (§5)。したがって node の有無は本 harness では観測できない。
+- **受入 1・2: 未達** (2 は 1 の未達により判定対象なし。node の有無を前提にする判定は未実施)。**受入 3・4: 達成** (3: (a) の期待値は不変。4: 測定 commit と実測値は §4)。
 - **新しい静的事実:** 木を埋める候補の上流は、UI 系クラスの vtable から到達する (§2)。前回の候補 `0x180a79c30` も UI 系 vtable (`UIGraphicEq`) から呼ばれる。
   実機で木に node が入るのは、GUI の操作 (モジュレーション表示・編集) 経由の可能性がある。**未確認**: 挿入先が C+0x318 の controller と同一か、UI 経路だけで足りるか (boot 連鎖 #672 が要るか)。
 
@@ -20,7 +20,7 @@ FA-30 (#2187, `REPORT_APPENDIX_FA30.md` §5) で未解決として #2207 に移�
 | `0x180d8d700` (0xd2d B) | `0x180d8c140` を 4 回呼ぶ | E8 (`0x180d8c140` の呼出元はこの関数のみ) |
 | `0x180d8c140` (0x1ad B) | `0x180d8ae60` を呼ぶ | E8 `0x180d8c24b` |
 | `0x180d8ae60` (0x298 B) | `0x180e15030` を呼ぶ | E8 `0x180d8aec7` |
-| `0x180d8c4f0` (0x3be B) | `0x180e15030` を呼ぶ (直接の呼出元なし) | E8 `0x180d8c7b9` |
+| `0x180d8c4f0` (0x3be B) | `0x180e15030` を呼ぶ。上の slot 5 の経路の外 (`0x180e15030` の別の呼出元)。直接の呼出元なし | E8 `0x180d8c7b9` |
 | `0x180e15030` (0x67a B) | `0x180e12f20` を呼ぶ | E8 `0x180e1511e` |
 | `0x180e12f20` (0x1f3 B) | ModulationFormatter (vtable `0x181110fc8`) を構築する | `lea` で vtable を書く (`0x180e12fae`) |
 | vtable `0x181110fc8` slot 2 = `0x180e13590` | 仮想呼出 (直接の E8 なし) | `.?AVModulationFormatter@?A0xc6f8f7e4@@` |
@@ -44,14 +44,17 @@ FA-30 (#2187, `REPORT_APPENDIX_FA30.md` §5) で未解決として #2207 に移�
 - ca7db0 が base で 72 回 = ca1480 の呼出数 (72) と一致。probe の方式は効いている。
 - caa820 が 0 回のため、CAA31 行 (木のノード数 `tree=`) は出ていない。木のノード数は未観測。
 - node1 で ca7db0 が 8 回に減る理由は未確認 (ca1480 の found 経路の違い)。本付録の判定には使わない。
+- 0 回の解釈: 観測したのは挿入候補の上流 5 関数までで、UI 入口 `0x180d8c0b0`・`0x180d8d700`・`0x180d8c140` は未 probe。UI 経路が実行されたかは未観測のため、0 回は「挿入候補の上流に到達しなかった」までを示す。
 
 ## 4. 測定 (測定 commit `e11367a6b`・HEAD 差分 0 行)
 
+- 測定 commit: `e11367a6b` (コード差分の最終 commit)。`git diff e11367a6b HEAD -- tools/targets/freshair/lift2` = 0 行 (本付録・DOC_MAP の修正は lift2 の外)。WORKFLOW §6 の鮮度基準により再測定は不要。
+- 再実行: 素材 `plugins-freshair` が本 fix run の `$ARTIFACTS_DIR` に無いため、e2e は再実行していない。以下は測定 commit の結果。
+- 所要時間は全て n=1 の参考値。判定には使わない (未取得の min–max レンジは §5)。
 - `bash tools/targets/freshair/lift2/run_fa9.sh`: 初回 (build_ctrl を含む、work 無し) **40.8 s (n=1)**、load 0.10→0.54。**GATE PASS**。
   (a) base: ERR=0・ca1480=72・path=map・eq=1・found=0・da6c00=0 / (b) alt: ERR=8/8 path=static / (b-wasm) alt: wasm ERR=8/8 / (c) pert: 差分 395 トークン・L/R 同一 40 呼出・差分 0 呼出。
 - `bash tools/targets/freshair/lift2/run_ctrl.sh 2 5`: **BIT-EXACT 15/15** (epf 8 + structured 2 + random 5, fma0+fma1)、**wall 4.4 s (n=1)**、load 0.50→0.54、rc=0。
 - `bash tools/targets/freshair/lift2/fa31_ctl.sh`: rc=0、wall 0.5 s (n=1)、load 0.54→0.54。§3 の表。
-- 測定 commit から HEAD までの lift2 差分: `git diff e11367a6b HEAD -- tools/targets/freshair/lift2` (本付録の commit は docs のみ) = 0 行。
 - 製品 KPI (FLEngine 起動 dispatch 数・units_run・最初のウィンドウ): **動かしていない** (native harness の診断のみ。起動経路と GUI の挙動は既定で不変)。
 
 ## 5. 未解決
@@ -59,7 +62,9 @@ FA-30 (#2187, `REPORT_APPENDIX_FA30.md` §5) で未解決として #2207 に移�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 木 (`[ctl+0xa8]`) に node が入る経路の実行: UI 系 `0x180d8c0b0` (ModulationKnobsPopup slot 5) から `0x180caa820` までを harness で実行し、木の node 数を観測 | 受入 1・2 が未達 | #2207 (本 issue・open のまま。Refs) |
+| UI 入口 `0x180d8c0b0`・`0x180d8d700`・`0x180d8c140` の probe 未実施 | UI 経路が実行されたかが未観測。§3 の上流 5 関数の 0 回は「挿入候補の上流に到達しなかった」までの解釈 | #2207 (Refs) |
 | `0x180caa820` の `this` (controller) が C+0x318 の controller と同一か | 挿入先の同定 (受入 1 の前提) | #2207 |
 | UI 経路だけで木が埋まるか、boot 連鎖 (#672) が要るか | blocked_by の要否 | PM 判断 (#2207 コメント) |
 | `0x180dde530` の呼出元 3 つ (snapin 構築側) の特定 | 木の初期化の全体像 | #2207 |
 | node1 で ca7db0 が 8 回に減る理由 | 観測の解釈 (判定には未使用) | #2207 |
+| 所要時間の n≥3 min–max レンジ (WORKFLOW §5) の未取得 | §4 の秒数は n=1 の参考値で判定に使わない。素材 `plugins-freshair` が無く再測定できない | #2207 (Refs) |
