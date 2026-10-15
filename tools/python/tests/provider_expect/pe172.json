@@ -1,0 +1,6 @@
+{
+  "tag": "pe172",
+  "refs": ["#3219"],
+  "note": "PE で件数と索引範囲を確定した patterns グループ 2 件 (REPORT_PY172・PY-172 #3219)。件数は仮置き 0、tests/patterns_group_diff.mjs が mock と照合",
+  "functions": ["patterns.getPatternGroupCount", "patterns.getPatternGroupName"]
+}
