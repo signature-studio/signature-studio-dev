@@ -20,6 +20,7 @@
 5. **SIMD kernel 依存は 5 本、うち 4 本 (Convolver / Delay 2 / Delay Bank / Reeverb 2) の閉包が #331 ([P0c-7]) 未解決の 0x5dee90 / 0x5df040 を呼ぶ** (§4)。 Delay 3 / Reeverb / LuxeVerb / Multiband Delay の殻は閉包内 kernel 呼出 0 site。
 6. **Convolver の FFT は IPP 経由ではない (静的調査)**: IPP 関数ポインタ 420 変数のうち DLL 全体で参照する関数は Convolver 5 / LuxeVerb 4 / 他 7 本 0 で、名前は Move / Zero / Add / MulC のみ。 FFT 系 (`fft`/`dft`/`conv`/`corr`) の参照は 0。 → #38 ([IPP-10]) 側の FFT 代替は Convolver に不要と推定 (§6、範囲は§6 の但し書き)。
 7. **T3 の C++ engine 2 本は `emcc -c` 未通過**: Delay 3 engine (19000) は RetDec 完走だが IR 型エラー (E1 → E4) で止まる。 **Multiband Delay engine (19165) は RetDec が `.text` の 78/2,078 関数で落ちる (`Should not be possible.`) ため IR が出ない。** 78 関数を除いても E6 / E1 / zext 定数式で止まる。
+   **#523 追補 (2026-10-15)**: x86_fp80 を含む関数を関数単位で除外すると、両 engine とも部分集合の `emcc -c` が rc 0 (19000 は 1 本、19165 は 6 本を除外。 到達性のみ。 REPORT_APPENDIX.md §17)。
    78 関数は AVX2/AVX-512 命令 (`vpermpd` / `vpermd` / `vpexpandd` / `vshufi32x4` / `valignd`) を含み、残り 2,000 関数は 1 本も含まない (§7)。 さらに 272 関数 / 513,403 B は静的リンクされた Intel IPP (`IPPCODE` section)。
 
 ## 1. 閉包 lift 結果 (Delphi 殻 9 本)

@@ -65,3 +65,26 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 - **両スタブ外し後の残り (ferror-limit=0)**: `emcc -c` rc 1 / error 296 件。 内訳は `no libcall available for fmul with type f80` 134、`fadd` 116、`do not know how to soften fp_extend` 22、`fp_round` 19、`sint_to_fp` 4、`frem` 1。 segfault 以外の未解決はすべて f80 の libcall 不足。
 - **判断**: 19165 の `emcc -c` rc 0 の前提は「f80 の扱い」の 1 点に集約される。 f80 を f64 に下げる (`PLUG_F80_LOWER=1`) と segfault は消えた (§13 で 19165 rc 1 = E7)。 一方で E7 の型誤り推定は §15 で単独では成立しなかった。 次の判断は PM 側で、(a) f80 を持つ関数の扱い (精度を落とす lowering か、関数単位の除外か)、(b) x87 を含む 2 関数の DAG combine 回避 (LLVM 側・wasm backend の回避策) のどちらを取るか。
 - **注意**: スタブ版の wasm は生成していない (関数を消すため miscompile)。 本節の数値は到達性の診断であり、engine の正しさは示さない。
+
+## 17. #523 f80 関数の関数単位除外による部分集合の `emcc -c` (2026-10-15 · 実測 · 到達性のみ)
+
+- **測定 commit**: `83e92e2c1` (`engine_f80_stub.py` / `engine_f80_subset.sh` を追加した commit。 gate はこの commit で実行)。 19165 の lift 出力は `42357b73e` で生成し、そのまま再利用。 19000 は `83e92e2c1` で lift からやり直した。 `git diff 42357b73e 83e92e2c1 -- tools/lift tools/p0c tools/plugins/reverb_delay/engine_lift.sh` は空 (lift 鎖は未変更)。
+- **方法**: `engine_f80_stub.py` が `e.fixcmp.ll` の `x86_fp80` を含む関数の定義を `declare` に置換する (本体は捨てる。 除外は関数単位で、 名前・VA・理由を `f80_excluded.tsv` に記録)。 `engine_f80_subset.sh` が部分集合を `emcc -c` し、gate を判定する。 gate: rc 0 かつ define 数が除外数だけ減る (除外が f80 関数以外に及んでいないことの確認)。 NC は同じ入力の無改変 `emcc -c` rc (`engine_lift.sh` の summary 第 9 列)。
+
+| engine | 条件 | lift rc | define | f80 関数 (除外) | NC: 無改変 `emcc -c` | 部分集合 `emcc -c` | gate |
+|---|---|--:|--:|--:|--:|--:|---|
+| 19000 Delay 3 | 全 3,632 関数 (IPPCODE 対象外) | 0 | 4,107 | 1 | 1 | **0** | PASS (define 4,106 = 4,107 − 1) |
+| 19165 Multiband Delay | IPPCODE 除外 + AVX 系 78 除外 | 0 | 2,608 | 6 | 139 (segfault) | **0** | PASS (define 2,602 = 2,608 − 6) |
+
+- 除外 VA: 19000 は `0x1800bcb00` の 1 本。 19165 は `0x18006fea0` / `0x1800ceec0` / `0x1801434a0` / `0x1801439a0` / `0x1801dbbe0` / `0x1801e12fc` の 6 本。 19165 の segfault の 2 関数 (§16) はいずれも除外集合に含まれる。
+- 部分集合に残る `x86_fp80` は `__frontend_reg_load.fpr` / `__frontend_reg_store.fpr` の宣言 2 行のみで、呼出は 0 件。 定義本体に f80 は残らない。
+- 実測時間: 19000 lift 108 s (`83e92e2c1`、再実行。 前回 `42357b73e` は 107 s)。 19165 lift 386 s (wall 6 分 36 秒、`42357b73e`)。 部分集合の `emcc -c` は 19000 が 2 s、19165 が 6 s (python 込み)。 load は未測定。
+- **注意**: 除外した関数は外部宣言になるため、部分集合の挙動は元の engine と無関係。 正しさ・精度・f80 の扱いは未検証 (到達性のみ)。 19000 の既存 `PLUG_F80_LOWER=1` (精度低下あり) とは別経路。
+- **再現手順**: `bash tools/plugins/reverb_delay/engine_lift.sh 19000 800` → `bash tools/plugins/reverb_delay/engine_f80_subset.sh 19000`。 19165 は `python3 tools/plugins/reverb_delay/avx_bad_ranges.py 19165` の出力 (絶対パス) を `--exclude-ranges` に渡し、`ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges <絶対パス>" ENGINE_TAG=_noipp_nobad bash tools/plugins/reverb_delay/engine_lift.sh 19165 900` → `ENGINE_TAG=_noipp_nobad bash tools/plugins/reverb_delay/engine_f80_subset.sh 19165`。
+
+### 受入条件への対応 (#523・本節)
+
+1. **部分集合で達成** (19000: 4,106 / 4,107 define、19165: 2,602 / 2,608 define、除外理由とともに記録。 gate と NC 付き)。 全件 (f80 関数 7 本を含む) の達成ではない。 残り (f80 関数の lift) は #3447 ([PLG-F4-5])。
+2. 共有鎖 (`lift/` `p0c/`) を変えていないため、本 PR では T0/T1 の退行確認は要らない。 共有鎖を変える場合は #3447 で実施する。
+3. IPPCODE の扱い: #3445 ([PLG-F4-3])。
+4. LoadLibrary 結合解析: #3446 ([PLG-F4-4])。
