@@ -189,7 +189,7 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
   4. `bash tools/m11/ldfix/stage4.sh work/t144/probe.ll t144` (rc 0・units_run 109・init 111・icall_ok 435・dllmain_done True・threw なし)
   5. `S4_NAME=t144 S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap144_read_3608.mjs > work/t144/read.txt` (26 秒)
 - 採取件数: probe 版の trap は 14 件 (全て OOB)。prod fix の OOB 14 件 (144・149・275・280・477・484・492・513・520・659・745・830・880・923) と一致。halt0 8 件は reader の対象外 (kind が OOB のみ採取) のため未採取。
-
+- 出力: `tools/m11/ldfix/work/t144/read.txt`・`work/t144/sites.json` (gitignore)。site 番号は `work/t144/sites.json` の `stores[sid-1]` (元 IR の関数名・行番号)。
 
 ### 8-1 unit 144 (OOB・最内 `function_44aeb0`)
 
