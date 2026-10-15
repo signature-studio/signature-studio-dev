@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-""".text を線形走査し、RIP 相対オペランドが指す先が指定 VA の命令を列挙する (PY-39 の解析補助)。
+"""RIP 相対で指す VA を持つ命令を全セクションから探す (PY-222 / #3624 の解析補助)。
 
-  FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_rip_refs.py <VA(16進)> [<VA(16進)> ...]
+  FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_rip_refs.py <VA(16進)>[,<VA(16進)>...]
 
-例: pe_rip_refs.py 0x15e3a60   (selectAll の *p を格納するスロット。0x154528c は RIP 相対の直接参照が 0 件で hits 0 になる)
-出力: 命令アドレス・命令・参照先 VA。書込み/読込みの区別は行わない (mnemonic と先頭オペランドで目視する)。
-
-線形走査: 復号できないバイトは 1 バイト進めて再同期する (pe_scan_store.py と同じ方式)。
+- 命令を 1 バイトずつ進めて復号するので、線形走査で同期が外れた箇所も拾う。
+- 出力: 命令の VA・mnemonic・オペランド。値は PE 上の初期値ではなく、参照の位置だけを示す。
 """
 import os
 import re
@@ -16,34 +14,25 @@ import capstone
 import pefile
 
 PE = os.path.join(os.environ["FL_WIN64_DIR"], "extracted", "block00031_PE.bin")
-RIP = re.compile(r"\[rip ([+-]) (0x[0-9a-f]+)\]")
+raw = open(PE, "rb").read()
+pe = pefile.PE(data=raw, fast_load=True)
+BASE = pe.OPTIONAL_HEADER.ImageBase
+MD = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+targets = {int(t, 16) for t in sys.argv[1].split(",")}
+RIP = re.compile(r"rip \+ (0x[0-9a-f]+)")
 
-
-def main():
-    targets = {int(a, 16) for a in sys.argv[1:]}
-    raw = open(PE, "rb").read()
-    pe = pefile.PE(data=raw, fast_load=True)
-    text = next(s for s in pe.sections if s.Name.rstrip(b"\0") == b".text")
-    n = min(text.Misc_VirtualSize, text.SizeOfRawData)
-    va0 = pe.OPTIONAL_HEADER.ImageBase + text.VirtualAddress
-    data = raw[text.PointerToRawData:text.PointerToRawData + n]
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
-    off, hits = 0, 0
-    while off < n:
-        ins = next(md.disasm(data[off:off + 16], va0 + off), None)
-        if ins is None:
-            off += 1
+for s in pe.sections:
+    if not s.Characteristics & 0x20:
+        continue
+    base = BASE + s.VirtualAddress
+    data = raw[s.PointerToRawData:s.PointerToRawData + s.SizeOfRawData]
+    i = 0
+    while i < len(data):
+        insn = next(MD.disasm(data[i:i + 16], base + i), None)
+        if insn is None:
+            i += 1
             continue
-        m = RIP.search(ins.op_str)
-        if m:
-            d = int(m.group(2), 16) * (1 if m.group(1) == "+" else -1)
-            slot = ins.address + ins.size + d
-            if slot in targets:
-                hits += 1
-                print(f"{hex(ins.address)} {ins.mnemonic} {ins.op_str} -> {hex(slot)}")
-        off += ins.size
-    print(f"hits {hits}", file=sys.stderr)
-
-
-if __name__ == "__main__":
-    main()
+        m = RIP.search(insn.op_str)
+        if m and insn.address + insn.size + int(m.group(1), 16) in targets:
+            print(f"{insn.address:#x} {insn.mnemonic} {insn.op_str}")
+        i += insn.size
