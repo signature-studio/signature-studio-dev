@@ -3,9 +3,11 @@
 // 返す number は整数なら int、実数なら float になる。整数値の float は F(x) で明示。
 import { createIlmcp } from "./ilmcp.mjs";
 const F = (v) => ({ t: "D", v });
-// PY-100 (#2879): PE 0xd5b930 の readout (C provider と同一)。構造体 = grid bit が立つ step。param 0..7 の既定値は stub 順、範囲外と param 8 (未モデル) は -1
-const STEP_DEF = [60, 100, 64, 120, 64, 64, 64, 0];
-const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 7 ? -1 : STEP_DEF[prm]);
+// PY-100 (#2879): PE 0xd5b930 の readout (C provider と同一)。構造体 = grid bit が立つ step。範囲外は -1
+// PY-111 (#2929): note の生成経路の PE 値 (C provider と同一)。param 5/6 = 128・param 7 = step × 24 (V 静的)・param 8 = 0
+const STEP_V = 24;
+const STEP_DEF = [60, 100, 64, 120, 64, 128, 128, 0, 0];
+const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 8 ? -1 : prm === 7 ? pos * STEP_V : STEP_DEF[prm]);
 // PY-224 (#3628): PE 0x12d3ff0 の loop 分岐 (C provider の grid_bit_loop と同一・REPORT_PY224)。行 T[1] と flag49e・flag54 が立ち、channel i の最初の record (f4 != 0) が L = len / 24 を与えるとき、p < L は base、それ以外は base(p mod L)
 const LOOP_G2 = 24;
 const LOOP_MAX = 8;
@@ -157,6 +159,20 @@ export function createMockEngine() {
   const pl = (i) => { i = ix(i); if (i < 1 || i > st.playlist.length) throw RANGE(); return st.playlist[i - 1]; };
   const tr = (i) => { if (!st.mixer[i]) throw RANGE(); return st.mixer[i]; };
   const tog = (cur, v) => (v === undefined || v === -1 ? !cur : !!v);
+  // PE 0x12be470 (maxLen > 0 のみ): 長さが maxLen を超えるとき末尾から mask 外の文字 (母音・記号・空白) を削り、先頭 maxLen 文字へ切る (C provider の track_name_fit と同一・ASCII 前提)
+  const KEEP = new Set("0123456789BCDFGHJKLMNPQRSTVWXYZ");
+  const fitName = (s, m) => {
+    if (m <= 0 || s.length <= m) return s;
+    let t = s;
+    for (let i = t.length; i >= 1; i--) {
+      const c = t[i - 1];
+      if (!KEEP.has(c >= "a" && c <= "z" ? c.toUpperCase() : c)) {
+        t = t.slice(0, i - 1) + t.slice(i);
+        if (t.length <= m) break;
+      }
+    }
+    return t.slice(0, m);
+  };
   // fl_provider の引数検査 (fl_dispatch.c type_ok / fl_a_int) と同じ: None は既定値、bool と整数のみ可、他は code 5
   const argI = (a, i, def) => {
     const v = a[i];
@@ -255,7 +271,13 @@ export function createMockEngine() {
       st.channels.forEach((c) => (c.sel = c === k));
     },
     "channels.muteChannel": (i, v) => { ch(i).mute = tog(ch(i).mute, v); },
-    "channels.soloChannel": (i) => { ch(i).solo = !ch(i).solo; },
+    // PE 0xd59b40 → 0xd843d0: value == -1 は反転、他は現在値の下位 1 B と一致すれば不変・不一致なら反転 (C と同一)。useGlobalIndex は未モデル (型検査のみ)
+    "channels.soloChannel": (...a) => {
+      const k = ch(a[0]);
+      const v = argI(a, 1, -1);
+      argI(a, 2, 0);
+      if (v === -1 || (v & 0xff) !== +k.solo) k.solo = !k.solo;
+    },
     "channels.getChannelVolume": (i, mode) => F(mode ? 20 * Math.log10(Math.max(ch(i).vol, 1e-6) / 0.78125) : ch(i).vol),
     "channels.setChannelVolume": (i, v) => { ch(i).vol = v; },
     "channels.getChannelPan": (i) => F(ch(i).pan),
@@ -304,7 +326,7 @@ export function createMockEngine() {
     "mixer.getTrackCount": () => st.mixer.length - 2,
     // PE 0xd63870: ecx=3 を変換スロット 0x15e4280 に渡すのみ (REPORT_PY205)
     "mixer.getEqBandCount": () => 3,
-    "mixer.getTrackName": (i) => tr(i).name,
+    "mixer.getTrackName": (...a) => fitName(tr(a[0]).name, argI(a, 1, -1)),
     "mixer.setTrackName": (i, n) => { tr(i).name = n; },
     "mixer.getTrackVolume": (i, mode) => F(mode ? 20 * Math.log10(Math.max(tr(i).vol, 1e-6) / 0.8) : tr(i).vol),
     "mixer.setTrackVolume": (i, v) => { tr(i).vol = v; },
@@ -370,6 +392,11 @@ export function createMockEngine() {
     "ui.getFocusedPluginName": (...a) => { arity(a, 0, 0); return ""; },
     "ui.getHintMsg": (...a) => { arity(a, 0, 0); return ""; },
     "ui.isInPopupMenu": (...a) => { arity(a, 0, 0); return false; },
+    // PY-130 (#3007): PE で書込み経路を確定した ui setter 2 件と getVersion (ui)。値は未実測の仮置き (provider/fl_engine.c と同じ・REPORT_PY130_3007)
+    "ui.setBrowserAutoHide": (...a) => { arity(a, 1, 1); st.uiBrowserAutoHide = argI(a, 0, 0) === 1; },
+    "ui.setStepEditMode": (...a) => { arity(a, 1, 1); st.uiStepEdit = argI(a, 0, 0) === 1; },
+    // mode 0..3 は int、4..6 は str、他は int 0 (PE 0xd6c2f0 の分岐表)。既定 mode 4 (|i)
+    "ui.getVersion": (...a) => { arity(a, 0, 1); const m = argI(a, 0, 4); return m >= 4 && m <= 6 ? "" : 0; },
     "plugins.isValid": (i, slot = -1) => (slot < 0 ? !!st.channels[i] : !!st.mixer[i]?.slots[slot]),
     "plugins.getPluginName": (i, slot = -1, userName) => (slot < 0 ? ch(i).plugin : (tr(i).slots[slot] ?? "")),
     "plugins.getParamCount": () => st.params.length,
