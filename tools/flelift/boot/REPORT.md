@@ -220,3 +220,22 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 - 診断ありは units 209 のまま、停止点が `unlifted 0x6bbc20` (f_6c9280 ← 0x6c9380) へ移る (判定・表・再現は `REPORT_APPENDIX_672.md`)。既定経路は §0 の PM 判断 (ILT 分岐入力・`0x976da0` root) で 895 に変わった (付録 §C)。
 - main 取り込み後の再測定 (測定 commit `4cc9c3d72`): units・GetMem / FreeMem・`ptr_15F34A0`・停止点は取り込み前と同値。shim 有 (root 有) の IPP 判定 NG (rc=3) は既知のまま。
 - 未解決: 停止点 `unlifted 0x6bbc20` の解消 (最初のウィンドウ未達) → #3491 [FLE-14] (親 #672)。
+
+## 12. #4854: mode 3 の survey が InitTable 0 で測定不能 (補修と jsonl の残し方)
+
+- **結論**: 既定 (mode 3) の survey は補修 (`InitTable` を PKG へ戻す) ありで 942 件を判定 (ok 895 / empty 46 / noproc 1)。補修なしは `InitTable == 0` で不成立。補修が判定を変えるかは未切り分け (#4901)。受入 2 (旧 mode 0 との差) は #4901。
+- 測定 commit: `a64aa3aab` (コードを変えた最後の commit。main 取り込み `db771b431` 後の HEAD)。差分 0 の証跡: `git diff a64aa3aab HEAD -- tools/flelift/boot` の出力 0 行。
+- 素材: `fl-win64` (`$HOME/artifacts`)・emsdk 6.0.12 (上流から取得・`/tmp/opencode/emsdk`)。`FL_WIN64_DIR=/tmp/opencode/fl`。
+
+| 項目 | 結果 (HEAD `a64aa3aab`) |
+|---|---|
+| lift (closure 2・既定 root) | 50 s・29,910 関数 |
+| clang plain (8 shard) | 50 s・mismatch 0 / undefined 0 / dup 0 |
+| boot 既定 (mode 3・`--boot-only`) | units 895・stopped 895・`exit`・IPP check ok (ptr=0x7f10001c) |
+| survey 既定 (mode 3・補修あり) | 1 セグメント・5〜6 s・ok 895 / empty 46 / noproc 1 (942 件)。jsonl 942 行 |
+| survey 補修なし (`FLE_SURVEY_NOREPAIR=1`) | `InitTable == 0` で不成立 (`survey.error`) |
+| survey mode 0 (`FLE_IPP=0`) | `InitTable == 0` で不成立。`survey_seg_0.json` の boot は units 209・exit code 0 |
+
+- 補修あり/なしの load: 測定時の loadavg 1.7〜1.8 (1 分)。
+- mode 0 の boot 単独の再採取は、`fle_boot.mjs` の `import(cjs)` 相対解決で失敗したため未実施 (survey 実行時の値を引用)。
+- 未解決: 補修の判定への影響 → #4901 [FLE-33]。unit 280 / 659 / 895 の補修なし unlifted → #4855 [FLE-32]。
