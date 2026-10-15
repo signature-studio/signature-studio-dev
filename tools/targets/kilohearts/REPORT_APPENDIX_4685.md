@@ -6,8 +6,8 @@
 
 - issue 本文の「残り 8 件」は現行 main の census と合わない。origin/main `b28128e48` で同じ fix 集合を流すと、型不一致は **110 行** で、#3837 (ptr⇔int 75)・#4672 (void 14・BINOP 9)・#4671 (関数ポインタ 9) の 107 行に当たる。当たらないのは **3 行** のみ。
 - 3 行を機械語で確定し、`ghidra_to_c.py` の `DELAY_RULES` に 1 行 1 規則で入れた (件数 assert 付き)。
-- 現 HEAD `40e8af6de` (origin/main `6519db32a` を取り込んだ後) で再測定した。Delay の emcc error 行は **322** (比較先 origin/main `6519db32a` は 325)、型不一致 (`演算・代入・ポインタ`) は **101** (同 104)。3 規則ぶん (-3・-3) が効いている。
-- Gain/Haas/Gate の生成 C は origin/main `6519db32a` と byte 一致 (`cmp`・3 本)。突合 1000 trial は 3 本とも 1000/1000。
+- 現 HEAD `d3d7ac989` (origin/main `2b0e4af9c` を取り込んだ merge) で再測定した。Delay の emcc error 行は **316** (比較先 origin/main `2b0e4af9c` は 319)、型不一致 (`演算・代入・ポインタ`) は **95** (同 98)。3 規則ぶん (-3・-3) が効いている。
+- Gain/Haas/Gate の生成 C は origin/main `2b0e4af9c` と同一 (`.c` 同一・`.o` byte 一致・3 本)。突合 1000 trial は 3 本とも 1000/1000。
 
 ## ②. 3 行の分類と機械語による確定
 
@@ -27,25 +27,26 @@
 
 ## ④. 測定
 
-測定 commit: `40e8af6de` (`ghidra_route` の最後のコード変更。origin/main `6519db32a` の取り込み merge)。比較先 (base): origin/main `6519db32a` (worktree で同じ手順を実行)。
+測定 commit: `d3d7ac989` (本 PR の merge commit。`ghidra_route` の最後のコード変更)。比較先 (base): origin/main `2b0e4af9c` (`git archive` で `ghidra_route`・`snapins/lift`・`snapins/scripts` を展開して同じ手順を実行)。
 
-- 環境: `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)・`toolchain-emsdk` (emcc 6.0.12)・Ghidra 12.1.4 (zip sha256 全 64 桁 `ddac49f9…d2db` 一致)・JDK 21 (temurin-21)。素材の所在は `[DOWNLOADS]`・`[EMSDK]`・`[GHIDRA]` (`docs/REFERENCES.md`)。n=1。load は測定開始時 0.26 0.74 0.54 (`/proc/loadavg`)。
+- 環境: `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)・`toolchain-emsdk` (emcc 6.0.12)・Ghidra 12.1.4 (zip sha256 全 64 桁 `ddac49f9…d2db` 一致)・JDK 21 (temurin-21)。素材の所在は `[DOWNLOADS]`・`[EMSDK]`・`[GHIDRA]` (`docs/REFERENCES.md`)。n=1。load は測定開始時 1.31 0.77 0.32 (`/proc/loadavg`)。
 
-| 測定 | base origin/main `6519db32a` | HEAD `40e8af6de` |
+| 測定 | base origin/main `2b0e4af9c` | HEAD `d3d7ac989` |
 |---|---|---|
-| Delay emcc error 行 (`emcc -c -ferror-limit=0`・fix `bitcast,intload,stackpair,assoc,concat,gtype,lanes`) | 325 | **322** |
-| 型不一致 (`演算・代入・ポインタ`) | 104 | **101** |
+| Delay emcc error 行 (`emcc -c -ferror-limit=0`・fix `bitcast,intload,stackpair,assoc,concat,gtype,lanes`) | 319 | **316** |
+| 型不一致 (`演算・代入・ポインタ`) | 98 | **95** |
 | Delay closure を含む lift 集合 (`gtype_census.sh`) | — | 151 関数 OK |
-| Gain / Haas / Gate の生成 C (`cmp`・同じ fix) | — | origin/main と **byte 一致** (3 本) |
+| Gain / Haas / Gate の生成 C (同じ fix) | — | origin/main と **同一** (`.c` 同一・`.o` byte 一致・3 本) |
 | 突合 (`build_cmp.sh`・1000 trial・seed 7) | — | Gain **1000/1000** (4999/4999・wasm 15,161 B)・Haas **1000/1000** (5500/5500・16,878 B)・Gate **1000/1000** (4999/4999・17,367 B) |
 
-- 現 HEAD の emcc census (`emcc_census.py`・322 行): 128bit レーン型 135・引数数不一致 86・演算・代入・ポインタの型不一致 101。他の分類は 0。
-- 所要 (実測 wall): `gtype_census.sh` (Ghidra decompile 151 関数・g2c・Delay と Gain/Haas/Gate の emcc) 全体 36.1 s。`build_cmp.sh` は gain・haas・gate とも 1 本 1 秒未満 (emcc 0.2 s・突合は 1 秒前後)。
+- HEAD の emcc census (`emcc_census.py`・316 行): 128bit レーン型 135・引数数不一致 86・演算・代入・ポインタの型不一致 95。他の分類は 0。base は同じ分類で 135・86・98 (合計 319)。
+- 所要 (実測 wall): `gtype_census.sh` (Ghidra decompile 151 関数・g2c・Delay と Gain/Haas/Gate の emcc) 全体 41.0 s。`build_cmp.sh` は gain・haas・gate とも emcc 0.5 s 未満。
 - `DELAY_RULES` の件数は 4 規則すべて hit (converter は停止せず終了)。
 
-### ④-2. HEAD までのコード差分 (`c682f1185` → `40e8af6de`)
+### ④-2. 測定 commit 以降の差分
 
-`git diff --stat c682f1185 40e8af6de -- tools/targets/kilohearts/ghidra_route` = 4 ファイル・+227/-9。main 取り込みで入った変更で、本 PR の 3 行の規則とは別物。
+- `git diff --stat 40e8af6de d3d7ac989 -- tools/targets/kilohearts/ghidra_route` = `patches.py` 4 行 (+4)。main 取り込み (#4687) の `GTYPE` の `ulonglong` 4 件で、この差分も上の表の測定 (`d3d7ac989`) に含まれる。
+- `git diff --stat origin/main d3d7ac989 -- tools/targets/kilohearts/ghidra_route` = `ghidra_to_c.py` と `patches.py` (本 PR の 3 行の規則・`18436cd18: longlong`)。
 
 | ファイル | 出所 |
 |---|---|
@@ -54,7 +55,7 @@
 | `kh_xmm0.h` (+189 新規) | xmm0 helper (#3885) |
 | `xmm0_check.c` (+35/-9) | xmm0 規則 (#3885) |
 
-- 測定 commit (`40e8af6de`) 以降の `ghidra_route` の差分: `git diff --stat 40e8af6de HEAD -- tools/targets/kilohearts/ghidra_route` = 0 行。
+- 測定 commit (`d3d7ac989`) 以降の `ghidra_route` の差分: `git diff --stat d3d7ac989 HEAD -- tools/targets/kilohearts/ghidra_route` = 0 行 (本 commit は REPORT のみ)。
 - 旧測定 (`c682f1185`・base `b28128e48`): Delay emcc error 328・型不一致 107 (未割当 0)・Gain/Haas/Gate 1000/1000。この値は main 取り込み前のもので、現 HEAD では読まない。
 
 ## ⑤. 未解決
