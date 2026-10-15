@@ -5,8 +5,8 @@
 
 前段: analysis/py4769_r8d_single.py (到達集合・呼出し先の VA)。
 既知の呼出し先 (逆アセンブルで中身を読んだもの):
-  0xf82850 : 述語。引数 (rcx=オブジェクト, edx=値) を読み al を返す。[rbp+0x5b8] へは書かない。
-  0xfdeef0 : or dword [0x16bae7c], 0x200 (固定ビットを立てるだけ)。
+  0xf82850 : al を返す関数 (al = [rbp+0x2b])。本体の直接の書込みはスタック上の [rbp+0x2b]・[rbp+0x2c]・[rbp+0x2e] のみ。呼出し先 (0xf8d730・0xf8d580・0xf783c0) は未読。
+  0xfdeef0 : or dword [0x16bae80], 0x200 (固定ビットを立てるだけ)。
   0xfdef00 : or dword [0x16bae80], 0x1000 (固定ビットを立てるだけ)。
 それ以外の呼出し先は『未確認』として数える。
 検算: 既知 3 件の本体を capstone と objdump (intel) で照合し、0x4 の各側の呼出し集合を
@@ -25,8 +25,8 @@ from py257_r8d_bits import load_objdump
 from py64_branch_regions import load
 
 KNOWN = {
-    0xF82850: "predicate",
-    0xFDEEF0: "or [0x16bae7c],0x200",
+    0xF82850: "bool_ret",
+    0xFDEEF0: "or [0x16bae80],0x200",
     0xFDEF00: "or [0x16bae80],0x1000",
 }
 BODY = [(0xF82850, 0x40), (0xFDEEF0, 0x0B), (0xFDEF00, 0x0B)]
@@ -135,7 +135,7 @@ def main():
         print(f"side={lab} sides={len(rs)} "
               f"or0x1000={sum(0xFDEF00 in r[5] for r in rs)} "
               f"or0x200={sum(0xFDEEF0 in r[5] for r in rs)} "
-              f"pred0xf82850={sum(0xF82850 in r[5] for r in rs)} "
+              f"bool0xf82850={sum(0xF82850 in r[5] for r in rs)} "
               f"sides_with_unknown_calls={sum(bool(r[6]) for r in rs)}")
     return 0 if mismatch == 0 else 1
 
