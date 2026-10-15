@@ -183,6 +183,18 @@ FL_H(channels, getChannelType) { CH(0); return fl_ret_i(c, strcmp(k->plugin, "Sa
 /* PY-89 (#2805): getChannelIndex は全 channel を 1 グループとみなして identity (PE 0xd5bd60 は 0..nch-1 の範囲検査)。getChannelMidiInPort は既定 -2 (未割当・PE 0xfe976e の初期化)。設定経路は公開 API に無いため状態は持たない。useGlobalIndex は未モデル */
 FL_H(channels, getChannelIndex) { CH(0); return fl_ret_i(c, _i); }
 FL_H(channels, getChannelMidiInPort) { CH(0); (void)A_INT(1, 0); return fl_ret_i(c, -2); }
+/* PE 0xd5a600 (getChannelPitch 'i|ii'): mode 0 は raw / (N·100)、1 は raw (cents)、2 は N = [chan+0x2f4]。他の mode は範囲外と同じ分岐 (-4)。raw はピッチ曲げの状態で未モデル (setChannelPitch の unit 0/1 と同じく 0) */
+FL_H(channels, getChannelPitch) {
+    CH(0); int64_t m = A_INT(1, 0); (void)A_INT(2, 0);
+    if (m == 0) return fl_ret_d(c, 0.0 / (double)(k->pitch_n * 100));
+    if (m == 1) return fl_ret_i(c, 0);
+    if (m == 2) return fl_ret_i(c, k->pitch_n);
+    RANGE();
+}
+/* PE 0xd5d060: 戻り値は float(channel [+0x7a4])。発音の活動 (ノートの再生) は状態を持たないため 0.0 を仮置き */
+FL_H(channels, getActivityLevel) { CH(0); (void)A_INT(1, 0); return fl_ret_d(c, 0.0); }
+/* PE 0xd5c8f0: 戻り値は bool([[g]+0xa9])。showGraphEditor は no-op で状態を立てないため false を仮置き */
+FL_H(channels, isGraphEditorVisible) { NARGS(0, 0); return fl_ret_b(c, 0); }
 FL_H(channels, selectChannel) { CH(0); int64_t v = A_INT(1, -1); k->sel = TOG(k->sel, v); return fl_ret_none(c); }
 FL_H(channels, deselectAll) { for (int i = 0; i < nch; i++) ch[i].sel = 0; return fl_ret_none(c); }
 /* PE 0xd5afc0 → 0xd5af30 → 0x11e84a0: 範囲外は -4 (Index out of range)、他 channel の選択を解除して対象だけ選ぶ。未モデル: useGlobalIndex・前提ゲート 0xd5af58・選択 gating 0xffac20 (REPORT_PY69) */
