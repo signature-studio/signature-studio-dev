@@ -386,6 +386,7 @@ def main():
             t = re.sub(r'= (aauStack_f8\[\d+\]\._(?:0|4)_4_);', r'= u2f(\1);', t)
             t = re.sub(r'(auVar\d+\._(?:8|12)_4_) = (uVar\d+ & aauStack_f8\[\d+\]\._(?:8|12)_4_);', r'\1 = u2f(\2);', t)
         if name == 'delay':
+            t = t.replace('func_0x0001802ecfc0(', 'FUN_1802ecfc0(')
             for nm, rx, rp, _ in DELAY_RULES:
                 t, k = re.subn(rx, rp, t)
                 delay_hits[nm] = delay_hits.get(nm, 0) + k
