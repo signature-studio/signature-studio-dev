@@ -25,7 +25,7 @@
 
 - 対応の根拠 (算術・直接観測ではない): dst=`0x1400000` は 0x40 の倍数で、rcx は 0x40 刻みに進む。`0x15e1c70 − 0x1400000 = 0x1E1C70` は mod 0x40 で `0x30` → VA `0x6a7b92`。`0x15e4790 − 0x1400000 = 0x1E4790` は mod 0x40 で `0x10` → VA `0x6a7b88`。
 - 結論: **0 化を行う命令は `f_6a7b70` の `movdqu` (VA `0x6a7b88`・`0x6a7b92`)** (静的は PE の VA 表で確認。動的ヒットとの対応は上の算術による)。前 run の「間接書込み・未特定」は、fill 関数の 16 バイト書込みで解消した (前 run の §2-3 の窓 `f_412c90` の外)。
-- 残り: fill の幅 (`r8` = 0x100000 DWORD) と rect (w=h=1048576) の源は、呼出元 `0x815920` (callerRbp の +0x214/+0x218) で、未確定。#3090 [FLE-12] が追う。0 化と unit 209 の icall-miss・exit の因果は未確認 (§2-4)。
+- 残り: fill の幅 (`r8` = 0x100000 DWORD) と rect (w=h=1048576) の源は、呼出元 `0x815920` (callerRbp の +0x214/+0x218) で、未確定。#3090 [FLE-12] の範囲だったが、#3090 は縮小 close 済みで、残件は #3112 [FLE-13] が追う。0 化と unit 209 の icall-miss・exit の因果は未確認 (§2-4)。
 - 既定ビルド (`FLE_EXTRA_CCF` 無し・shim 有・HEAD `cd2166181`・`fle6_measure.sh`): units_run 209 / 942・停止 `MessageBoxA`→`exit(0)`・getmem 2314 / freemem 1199 (WWATCH 版と同じ)。`py_events` も同じ (unit 209・site 8 で両 slot が 0)。`[fle_wwatch]` は 0 件 (フック無効)。`FLEBOOT_IPP_CHECK ok:false` は既知の NG で rc=3 (変更前と同じ)。結果 JSON は `results/boot_summary_py123def.json`。同条件の前測定 (`fee239ea2`・main 取り込み前) も units_run 209・停止同じ。
 - WWATCH 版 (HEAD `cd2166181` で再現): `[fle_wwatch]` 2 件・fill 6 件・units_run 209 / 942・停止 `MessageBoxA`→`exit(0)` (前測定と同じ)。
 - 最初のウィンドウ無し。`FLE_WWATCH` は計測用の既定無効フックで、`ST*`/`STX`/`STY` は未定義時に従来と同じ展開になる (コード検査。既定ビルドは上で実測)。
@@ -36,6 +36,7 @@
 
 静的 (PE・`FL_WIN64_DIR` 必須):
 - `pe_xref.py 141d6c0,141d6b8`: `0x141d6c0`・`0x141d6b8` を RIP 相対で参照する命令は 9 件。書込みは 3 件で、いずれも 0 を書くか `[0x141d6b8]` に格納する (`0x976aad`・`0x976ac4`・`0x976b10`)。obj へ非 0 を直接書く命令は PE に無い。
+- PE の初期値 (`block00031_PE.bin`・`.data` の file 上の u64・本 run で再読): `[0x141d6c0]` = `0x0`・`[0x141d6b8]` = `0x0`・`[0x15e4790]` = `0x141d6b8`。停止点まで obj が 0 のまま、という §2-7 の結論と整合する。
 - 関数 `0x976a90` 付近 (逆アセンブル `pe_disasm.py 0x976a95 30`): `[0x141d6b8]` が 0 なら `0x976b60` で作って `[0x141d6b8]` に格納し、非 0 なら `[0x141d6c0]` の関数ポインタを呼んでから `[0x141d6c0]` を 0 にし、`[[0x141d6b8]+0x40]` の vtable 先頭を呼ぶ。この関数を以下「teardown 関数」と呼ぶ。
 - 注意: teardown 関数は `[0x141d6c0]` を**関数ポインタ**として呼ぶ。PY-201 が前提にした「obj はオブジェクト (述語の VA は `[obj+0x98]`)」とは読みが食い違う。どちらが正しいかは未確定 (ここでは判定しない)。
 - `pe_slot_writers.py 15e4790 8` (`[reg+8]` 経由の候補): 20 件 (dword 13・qword 7)。qword の 7 件 (`0xedffd2`・`0xeef1c2`・`0x11c44e5`・`0x11c7aec`・`0x1263571`・`0x1264145`・`0x1312884`) は未個別検証 (tool の注記どおり、逆アセンブルで確認が要る)。
@@ -46,7 +47,7 @@
 - 陽性対照 `0x412a0d` (boot 末尾の MessageBoxA → exit の call site): **1 件** (`[PY301-c] 0x412a0d n=1 (control)`)。観測の仕組みは効いている。
 - 制約: WWATCH は ST* マクロ経由の書込みだけを見る。`imp_memset` 等の C 側の書込みと、`rep` 系の書込みは監視外 (未確認)。0 を書く候補は値が変わらないため出ない。
 
-結論: obj を非 0 にする経路 (teardown 関数・作成呼出し・`[reg+8]` の候補) は、**停止点 (unit 209) までの lifted 実行では 1 度も実行されない**。したがって boot 停止時点では obj は 0 のままで、受入 2 (述語の VA) と 3 (singleton) は、停止点を越えて経路に届くまで測れない。停止点を越える前提は fill の修復 (#3112 [FLE-13]) と、unit 209 の停止の呼出元 (#3090 [FLE-12])。
+結論: obj を非 0 にする経路 (teardown 関数・作成呼出し・`[reg+8]` の候補) は、**停止点 (unit 209) までの lifted 実行では 1 度も実行されない** (ST* 経由の書込みの範囲で。入口観測も 0 件)。したがって boot 停止時点では obj は 0 のままで、受入 2 (述語の VA) と 3 (singleton) は、停止点を越えて経路に届くまで測れない。停止点を越える前提は fill の修復 (#3112 [FLE-13]・OPEN)。停止点の呼出元は #3060 FLE-11 で確定済みで、#3090 [FLE-12] は PR #3114 merge・PM 判断で縮小 close 済み。その先で止まる unlifted `0x6bbc20` は #3491 (CLOSED)・#3770 (CLOSED) を経て #3771 (OPEN) に引き継がれている。
 
 KPI (起動に関わる変更ではないが、boot 実行の前後を記録): units_run 209/942 (前後で同じ)。最初のウィンドウ: 無し (MessageBoxA → exit(0))。`FLEBOOT_IPP_CHECK` shim は既知の `ok:false` (rc=3 は変更前と同じ)。boot の挙動は変えていない (計測の追加のみ)。
 

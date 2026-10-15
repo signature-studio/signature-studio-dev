@@ -513,7 +513,7 @@
 | `tools/python/REPORT_PY86.md` | ~120 | PY-86 (#2701, 部分): call [reg+0x1a0] の受け手の分類 (受入 2b の一部)。残りは子 #3337・#3338。測定値は REPORT_PY86.md が正本 |
 | `tools/python/REPORT_PY116.md` | 105 | PY-116 (#2952): flapi 表の kwlist 無し引数 (flags=1) の書式を wrapper の出力ポインタ数と照合 (304 件中 302 件一致。`screen.addTextLine`・`screen.addMeter` の 6 個目は解析されない余剰で、表の個数 5 は正)。`plugins.getPresetCount` は kw 形式の唯一の flags=1 として書式 `i\|ii` を照合 (表の kwsig 1 件のみ変更)。名前の新規確定 0 件 (未確定 42 位置は `arg{i}` のまま) |
 | `tools/python/REPORT_PY123.md` | 243 | PY-123 (#3028, 未達・部分): undo 管理 global `0x15e1c78` は unit 209 の fill で 0 になる。unit 209 直前の pos/count は 0/0 (§2-6)。安全判定 obj は 0 で述語 VA は未確定。obj の設定経路は停止点までに未実行 (§2-7)。fill 後の値は #3112 待ち。0 化の命令は §2-5 (付録) |
-| `tools/python/REPORT_APPENDIX_PY123.md` | 57 | PY-123 (#3028): REPORT_PY123.md §2-5 (0 化の命令の特定 = fill `f_6a7b70` の `movdqu`) の全文と §2-7 (obj 設定経路の静的・入口観測・書込み監視)。250 行上限のため分割移動 |
+| `tools/python/REPORT_APPENDIX_PY123.md` | 58 | PY-123 (#3028): REPORT_PY123.md §2-5 (0 化の命令の特定 = fill `f_6a7b70` の `movdqu`) の全文と §2-7 (obj 設定経路の静的・入口観測・書込み監視)。250 行上限のため分割移動 |
 | `tools/python/REPORT_PY233.md` | 66 | PY-233 (#3690, 親 #3003): getRecPPB の切替先 (`0x15e4558`・`0x15e35c8`) の実行時値。切替関数 `0xd68d90` は shim 経路 boot (units 209) で未到達。停止点の P・Q は fill `f_6a7b70` の 6 回目 (dst=0x1400000) で 0 化されると推定 (書込み監視で P・Q への書込みを実測。書込み元は推定。観測スクリプト `tools/flelift/boot/py233_getrecppb_probe.sh`) |
 | `tools/python/REPORT_PY12.md` | ~46 | PY-12 (#587): `_flhost` の per-module state 化・サブインタプリタ採用判断の実測 (REPORT.md の PY-12 節の全文。250 行上限のため分離) |
 | `tools/python/REPORT_PY31.md` | ~50 | PY-31 (#1329): mixer 残り 57 関数の扱い決定 (今回非実装・根拠は MCP 利用 0 件と mock 定義 0 件)、未実装 57 件の一覧、分割先 #941、検証 (provider_check / mixer_diff / all_tools) |
