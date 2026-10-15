@@ -9,7 +9,7 @@
 - 3 件の PyArg 書式・引数の出力先・dispatch への渡し方・戻り値の経路を PE (`block00031_PE.bin`) から VA 付きで確定した。
 - **showPicker・openEventEditor は実装した** (mock と C の差分 0)。戻り値は PE の経路で None (stub の `openEventEditor` 戻り `int` とは食い違う。下の未解決)。作用先 (picker・エディタの起動) は未モデルの no-op。
 - **launchAudioEditor は保留**。戻り値 int は callee `0x118a810` の戻り値で、その意味が未同定。値を mock/C に書くと silent miscompile になるため実装しない。子 issue #3734 (PY-242) に移した。
-- 件数: 実装 155 → 157 (+2・`pe133`)、未実装 280 → 278。
+- 件数 (main 取り込み後の基準): 実装 162 → 164 (+2・`pe133`)、未実装 273 → 271。
 
 ## PE 根拠 (3 件)
 
@@ -49,22 +49,22 @@ PE: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_handler_probe.p
 
 ## 検証
 
-- 測定 commit: `aeec4c877` (コードを変えた最後の commit。`feat(python): implement ui showPicker and openEventEditor (PY-133)`)。
-- `git diff aeec4c877 HEAD -- tools/python ':!*.md'` の出力は空 (本節の後の変更は md のみ)。
-- 環境: runner 4 core、測定時の `uptime` は `load average: 2.62, 1.57, 0.75` (03:33:29)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64.tar.zst` を `tar --zstd -xf` で全展開、7.3 秒)。emsdk は `[EMSDK]` (`docs/REFERENCES.md`) の既定位置。
+- 測定 commit: `670e99d9d` (コードを変えた最後の commit。main を取り込んだ merge。`provider_check.mjs` の競合を解消)。取り込み前の初回測定は `aeec4c877` (`feat(python): implement ui showPicker and openEventEditor (PY-133)`、件数 155 → 157)。
+- `git diff 670e99d9d HEAD -- tools/python ':!*.md'` の出力は空 (本節の後の変更は md のみ)。
+- 環境: runner 4 core、測定時の `uptime` は `load average: 0.31, 0.62, 0.56` (03:39:01)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64.tar.zst` を `tar --zstd -xf` で全展開、7.3 秒)。emsdk は `[EMSDK]` (`docs/REFERENCES.md`) の既定位置。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64.tar.zst` を `tar --zstd -xf` で全展開、7.3 秒)。emsdk は `[EMSDK]` (`docs/REFERENCES.md`) の既定位置。
 - 前提の生成物 (gitignore・本測定で再生成): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、3 分 41 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
 | `bash provider/build.sh` | rc 0 (`dist/flprov.wasm` 64,219 B) | (未計測) |
-| `node tests/ui_editor_diff.mjs` | PASS (正常 6・異常 8・diffs 0) | 0.040 秒 |
-| `node tests/ui_display_diff.mjs` | PASS (正常 12・異常 11・diffs 0・displayTime 2000) | 0.040 秒 |
-| `node tests/ui_diff.mjs` | PASS (calls 17・diffs 0・範囲外既知差分 3) | 0.041 秒 |
+| `node tests/ui_editor_diff.mjs` | PASS (正常 6・異常 8・diffs 0) | 0.041 秒 |
+| `node tests/ui_display_diff.mjs` | PASS (正常 12・異常 11・diffs 0・displayTime 2000) | 0.041 秒 |
+| `node tests/ui_diff.mjs` | PASS (calls 17・diffs 0・範囲外既知差分 3) | 0.042 秒 |
 | `node tests/ui_state_diff.mjs` | PASS (calls 33・diffs 0) | 0.042 秒 |
-| `node tests/provider_check.mjs` | PASS (functions 435 / 実装 157 / 未実装 278 / MCP 静的 60) | 0.264 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.320 秒 |
+| `node tests/provider_check.mjs` | PASS (functions 435 / 実装 164 / 未実装 271 / MCP 静的 60) | 0.286 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.419 秒 |
 
-- コミット済み HEAD (`aeec4c877`) で `provider/build.sh` を再実行し、`ui_editor_diff`・`provider_check`・`all_tools`・`ui_display_diff` が同じ結果で PASS することを確認した。
+- コミット済み HEAD (`670e99d9d`) で `provider/build.sh` と `build_flpy.sh` を再実行し、上の表の検査が同じ結果で PASS することを確認した (初回の `aeec4c877` でも同じ結果)。
 - ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `ui.openEventEditor` の個数上限を 3 から 2 にすると `node tests/ui_editor_diff.mjs` は rc 1 (`AssertionError: ui.openEventEditor`)。元に戻すと PASS。
 
 ## 製品 KPI (起動・GUI に関わる PR の記載)
