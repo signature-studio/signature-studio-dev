@@ -217,7 +217,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 4 site の store 実行の根拠 (分岐述語と jcc の対応。45b1bf は P と V の読みの間の store)・取り下げた results の更新 | 4 site は UNDETERMINED のまま | #3605 (LD-167) |
-| `negctl_510.sh` の NC1 が評価されない (`nc1.json` 不在。`function_5c0270` の `store i64 %arg2` の patch が assert で通らない疑い)。step 6 の失敗は audit の rc に表れない | 監査の NC1 が未評価。rc と 7/7 には表れない | #3602 (LD-166) |
+| `negctl_510.sh` の NC1 が評価されない (`nc1.json` 不在。`function_5c0270` の `store i64 %arg2` の patch が assert で通らない疑い)。step 6 の失敗は audit の rc に表れない | 監査の NC1 が未評価。rc と 7/7 には表れない | 解決 (#3602・`REPORT_3602.md`) |
 
 ### 10.4 監査と分類器 (版を明記)
 - 監査 `audit_lsf_ssa_e2e.sh` (`M11_WORK`・`LD_WORK` 指定・前景): 版 `2f921d4dc` で 2 m 05 s・rc 0・7/7 (3 site を OK_LOAD にした results の版)。取り下げ後の results では再実行していない (素材 work-m11・work-liftdiff が本 run に無いため)。
