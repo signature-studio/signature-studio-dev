@@ -72,6 +72,8 @@ static int ld_nfakemod;
 static struct { u64 mod; char name[96]; } ld_fakeprocs[256];
 static int ld_nfakeproc;
 static u64 ld_fake_atom;            /* RegisterClipboardFormatW / atom / handle 系の連番 */
+/* WIN-33 (#3556): 実カタログ供給。native 専用。ld_native.c が env LD_CATALOG_MO 指定時だけ設定する (既定 NULL = 従来応答)。 */
+static u8* ld_cat_blob; static u64 ld_cat_blob_len, ld_cat_blob_pos;
 
 /* CAB-233: 出力ポインタ (第1〜4引数に来る dst) の妥当性検査。
  * guest の不正 state 由来の garbage ポインタへの書込みが native ランナ自体を壊すため、
@@ -320,7 +322,7 @@ static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, 
       if (a1 && a2 && ld_dst_ok(a1, l * 2 + 2)) { u64 nn = l < a2 - 1 ? l : a2 - 1; for (u64 k = 0; k < nn; k++) ((uint16_t*)(uintptr_t)a1)[k] = (uint16_t)s[k]; ((uint16_t*)(uintptr_t)a1)[nn] = 0; return nn; }
       return 0;
     }
-    if (ld_cat_on()) {   /* WIN-9 (#2760) 実験: LD_CATALOG_MO 指定時のみ */
+    if (!ld_cat_blob && ld_cat_on()) {   /* WIN-9 (#2760) 実験: LD_CATALOG_MO 指定時のみ。WIN-33 (ld_cat_blob) 設定時は譲る */
       if (ld_streq(n, "GetFileAttributesW") && ld_cat_path(a0)) return 0x80;   /* FILE_ATTRIBUTE_NORMAL */
       if (ld_streq(n, "CreateFileW") && ld_cat_path(a0)) { ld_cat_pos = 0; return LD_CAT_H; }
       if (ld_streq(n, "SetFilePointer") && (u32)a0 == (u32)LD_CAT_H) {
@@ -467,7 +469,38 @@ static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, 
      *     WIN-9 (#2760) の LD_CATALOG_MO 分岐 (ld_cat_on) は別の応答 (GetFileAttributesW=0x80・SetFilePointer の size 応答) で
      *     同じ .mo を供給し、magic 検査の後の範囲検査 (rva 0x17bcd) まで進む。新しい応答で 0x513da9 の rbp 破壊が起きるかは未確認
      *     (tools/liftdiff/REPORT_WIN7_2718.md §5.3)。
-     * 真正ファイル I/O 接続 (System/Languages/LC_MESSAGES/default.moe = block25158) は下流タスクへ。 */
+     * 真正ファイル I/O 接続 (System/Languages/LC_MESSAGES/default.moe = block25158) は下流タスクへ。
+     * WIN-33 (#3556): env LD_CATALOG_MO 指定時の分岐 (ld_cat_blob・ld_native.c が同じ .mo を読む)。default.moe は仮ハンドル LD_CAT_H で開き、
+     * ReadFile/SetFilePointer/GetFileSize を実バイトで応答する。他のファイルは従来どおり 0。
+     * 同じ env では上段の WIN-9 分岐 (ld_cat_on) が CreateFileW/ReadFile/SetFilePointer を先に応答するため、この分岐に届くのは GetFileSize だけ。 */
+    if (ld_cat_blob) {
+      if (ld_streq(n, "CreateFileW") || ld_streq(n, "CreateFileA")) {
+        char fn[512];
+        if (n[strlen(n) - 1] == 'W') ld_read_strW(a0, fn, sizeof fn); else ld_read_strA(a0, fn, sizeof fn);
+        if (!strstr(fn, "default.moe")) return 0;
+        ld_cat_blob_pos = 0; return LD_CAT_H;
+      }
+      if (ld_streq(n, "ReadFile") && a0 == LD_CAT_H) {
+        u64 k = ld_cat_blob_len > ld_cat_blob_pos ? ld_cat_blob_len - ld_cat_blob_pos : 0;
+        if (k > (a2 & 0xffffffffull)) k = a2 & 0xffffffffull;
+        if (k && !ld_dst_ok(a1, k)) return 0;
+        if (k) memcpy((void*)(uintptr_t)a1, ld_cat_blob + ld_cat_blob_pos, k);
+        ld_cat_blob_pos += k;
+        if (a3 && ld_dst_ok(a3, 4)) *(u32*)(uintptr_t)a3 = (u32)k;
+        return 1;
+      }
+      if (ld_streq(n, "SetFilePointer") && a0 == LD_CAT_H) {
+        int64_t d = (int64_t)(int32_t)(u32)a1;
+        if (a2 && ld_dst_ok(a2, 4)) d += (int64_t)*(int32_t*)(uintptr_t)a2 << 32;
+        int64_t base = a3 == 0 ? 0 : a3 == 1 ? (int64_t)ld_cat_blob_pos : (int64_t)ld_cat_blob_len;
+        int64_t np = base + d;
+        if (np < 0) { ld_lasterr = 131; return 0xffffffffull; }
+        ld_cat_blob_pos = (u64)np;
+        if (a2 && ld_dst_ok(a2, 4)) *(int32_t*)(uintptr_t)a2 = (int32_t)(np >> 32);
+        return (u64)np & 0xffffffffull;
+      }
+      if (ld_streq(n, "GetFileSize") && a0 == LD_CAT_H) { if (a1 && ld_dst_ok(a1, 4)) *(u32*)(uintptr_t)a1 = 0; return ld_cat_blob_len; }
+    }
   }
   if (ld_streq(n, "VirtualAlloc")) { if (a0) return a0; return ld_heap_alloc((u32)a1 ? (a1 & 0xffffffffull) : 0x1000, 0x10000, 1); }
   if (ld_streq(n, "VirtualFree") || ld_streq(n, "HeapFree") || ld_streq(n, "CloseHandle") || ld_streq(n, "TlsFree")) return 1;

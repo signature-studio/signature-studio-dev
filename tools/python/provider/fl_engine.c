@@ -597,6 +597,21 @@ FL_H(arrangement, selectionSet) { NARGS(2, 5); int64_t x = A_INT(0, 0), y = A_IN
 FL_H(arrangement, liveSelection) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 FL_H(arrangement, addAutoTimeMarker) { (void)A_INT(0, 0); (void)A_STR(1); return fl_ret_none(c); }
 FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
+/* ---- arrangement (2) ---- PY-143 (#3041): PE 0xd78030 (getMarkerName)・0xd785a0 (currentTimeHint) の呼出し構造と戻り str は REPORT_PY143 で確定。
+ * マーカー表は件数 0 の仮置き (addAutoTimeMarker の副作用は未同定のため登録しない)。範囲外は空文字。
+ * currentTimeHint の BBT 分解 (PE 0x1312080) は未同定のため、PPQ 96・4 拍子の仮置きで bar:beat:tick を返す (mock と同じ) */
+FL_H(arrangement, getMarkerName) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_s(c, ""); }
+FL_H(arrangement, currentTimeHint) {
+  NARGS(2, 4);
+  (void)A_INT(0, 0);
+  int64_t t = A_INT(1, 0);
+  (void)A_INT(2, rec_ppq);
+  int zb = A_INT(3, 0) == 1;
+  int64_t per = 4 * 96, bar = t / per, beat = (t % per) / 96, tick = t % 96;
+  char b[64];
+  snprintf(b, sizeof b, "%lld:%lld:%lld", (long long)(bar + !zb), (long long)(beat + !zb), (long long)tick);
+  return fl_ret_s(c, b);
+}
 /* ---- patterns (2 of 4, PY-172 #3219): PE 0xd67000 は配列 null で 0・非 null で ptr-8 の件数を返す。0xd67030 は索引 [0, 件数-1] の外を status -4。
  * グループ配列の実状態は未実測のため、件数 0 (null の経路) を仮置きする。件数 0 では全索引が範囲外 (REPORT_PY172) */
 #define PGRP_N 0
