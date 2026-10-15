@@ -14,18 +14,19 @@
 
 ## 測定
 
-- 測定 commit: `dcb38d210` (`pe_slot35_sites.py` を追加した commit。コードを変えた最後の commit)。
-- 測定 HEAD: `dcb38d210`。`git diff dcb38d210 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本付録の commit は REPORT と `docs/DOC_MAP.md` だけを変える)。
+- 測定 commit: `b40721add` (`pe_slot35_sites.py` のコードを変えた最後の commit。素材パスの文言修正)。
+- 測定 HEAD: `b40721add`。`git diff b40721add HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本付録の commit は REPORT だけを変える)。
 - 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-3371 --wildcards '*block00031_PE.bin'` (2.9 秒。`extracted/block00031_PE.bin`。repo 外)。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-3371 python3 analysis/flapi/pe_slot35_sites.py` を同一 HEAD で連続 3 回。終了コード 3 回とも 0。出力は 3 回ともバイト単位で同一 (md5 `7d1816a0a5a7f324cef8a441d450d400`)。
 
 | 回 | 所要 | load (1 分値・開始時) |
 |---|---|---|
-| 1 | 11.77 s | 0.17 |
-| 2 | 11.79 s | 0.45 |
-| 3 | 11.62 s | 0.35 |
+| 1 | 11.92 s | 0.13 |
+| 2 | 17.05 s | 0.68 |
+| 3 | 17.01 s | 0.68 |
 
-- 参考: `pe_vmt_probe.py 0xfe2cf8 0xfe2e10 --disp 0x118` (前段の再現) は 13.2 秒 (load 0.45)。前段 REPORT の 8.2 秒とは差がある。秒数は性能の主張に使わない。
+- 所要は 11.9 秒と 17.0 秒の 2 水準に分かれた。load は 0.13〜0.68 で、負荷では説明できない。原因は未確認。秒数は性能の主張に使わない。
+- 参考: 前段 (`dcb38d210`) の同スクリプトの 3 回は 11.6〜11.8 秒 (load 0.17〜0.45)。`pe_vmt_probe.py 0xfe2cf8 0xfe2e10 --disp 0x118` (前段の再現) は 13.2 秒 (load 0.45)。
 - 再現: TPublicChannel の VMT (`0xfe2cf8`) で `pe_vmt_probe.py` を実行し、slot 35 `0xffe290`・仮想呼出し 151 件・`0x40fe90` の is-a 判定を確認 (rc 0)。
 
 ## 解析の範囲と限界
