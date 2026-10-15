@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """KH Resonator process (HeartCore 0x180743390) の SC 側対応を機械語で探す (FA-60 / #4978)。
 
-3 つの照合を行い、表形式で出す。
+4 つの照合を行い、表形式で出す。
   (a) SC ResonatorDsp vtable の各 slot と KH process の M 列比 (ks_identity.py の norm を使う)
   (b) SC 全関数 (.pdata・300〜3000 B) を KH process と M 列比で総当たり (上位 10)
   (c) SC の Resonator 関連 vtable と、各 SC 候補 slot を参照する関数 (RIP 相対 lea/mov の参照元)
+  (d) KH process の呼出先ごとに r 列 (数値を潰した比較) を SC 全関数と照合する (上位 5)。process 本体の r 列は比較しない
 usage: ks_resonator_fa60.py <HeartCore.core_64> <SlateCore.core_64> [out.json]
 """
 import sys, json, difflib, struct
