@@ -599,7 +599,7 @@ def _x64c_tolerant(src):
         "units.dispatched": "§3 表行の dispatch。ok + failed と一致を検査",
         "units.noproc": "§3 表行の noproc (起動時から proc 0 の unit)",
         "stop": "§0 の停止 (ExitProcess) の VA と dispatch 番号。stop.unit は dispatch 順の 1 始まり (x64c-strict-sequential と同じ)。出典の『unit 245』は InitTable の添字 (0 始まり) で、dispatch 209 番目の unit と同じ",
-        "create_fruity_instance": "§7 の呼出し・リング記録 (fle_run → 0x1375990 の入口 dispatch) による。入口 S12 が下限。本体内の trap 地点は未特定 (#3077)。S13 以降は未測",
+        "create_fruity_instance": "§7 の呼出し・リング記録 (fle_run → 0x1375990 の入口 dispatch) による。入口 S12 が下限。本体内の trap 地点は未特定 (#3077 は flengine 路線の範囲で完了済み。x64c 側の残件は未起票)。S13 以降は未測",
         "gui_natural": "§8 KPI 表の soft 計数 (RegisterClassW/CreateWindowExW)。両名は soft スタブになる (§7) ため、同じ計数で代える",
     }
     return _record(

@@ -167,7 +167,7 @@ x64c 寛容起動 (`x64c-tolerant-sequential`) は mode 1 (`FLE_TOLERANT=1`・�
 | gui `results/survey_soft.json` は `5f9d7cbd` で 870/24 → 872/22 に更新されたが、gui REPORT §6d・§6i は測定 commit `719f1c43` の 870/24 のまま | `m11-gui-survey` は `719f1c43` 時点の JSON を読む (本 PR で変更)。HEAD の JSON とは食い違う | #174 (OPEN, GUI-3) へ。PM 判断 |
 | 規則 (f) (pr-lint) の対象は #3191 の 4 パス (`tools/m11/REPORT.md`・`tools/flelift/boot/REPORT.md`・`tools/gui/flengine/`・`tools/startup/`)。`boot_metric.json` の出典には `tools/m11/REPORT_N2714.md`・`tools/m11/REPORT_APPENDIX_1430.md`・`tools/liftdiff/REPORT_LD26.md`・`tools/flelift/boot/results/boot_summary_plain.json`・`tools/m11/REPORT_N134.md`・`tools/flelift/boot/REPORT_APPENDIX_2719.md` もあるが、これらの変更では警告されない | 出典を変えた PR の boot_metric.json 更新漏れを検出しない | PM 判断 (対象の拡張。issue 未起票) |
 | x64c 寛容 mode 1 の clobber 695 (unit 246〜940 が呼出し時に proc 0 を返す) の原因と `f_6a7b70` の広域ゼロ埋め | 寛容 mode 1 は unit 246 以降を走らせていないため、ok 208 は 942 unit の完走の値ではない | #3060 [FLE-11] (既存) |
-| x64c 寛容起動の CFI 本体内の trap 地点 | `create_fruity_instance` は S12 が下限。S13 以降は未測 | #3077 [WIN-16] (既存) |
+| x64c 寛容起動の CFI 本体内の trap 地点 | `create_fruity_instance` は S12 が下限。S13 以降は未測 | PM 判断 (#3077 は 2026-10-15 に範囲を縮めて完了。x64c 側の残件は未起票) |
 | x64c の出典ハーネス 4 ファイルが測定 commit `a55cb0d5` 後に 27 commit 変更されている (§8-4) | 出典の値は測定時のハーネスの値。現行ハーネスでは未再現 | PM 判断 (再測定の要否。出典 §0 の注記と食い違う) |
 
 ### 8-6. flengine 路線の record (`flengine-cfi-probe`)
