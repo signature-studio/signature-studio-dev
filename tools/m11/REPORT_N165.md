@@ -2,14 +2,16 @@
 
 既知類型との関係: D5 (`docs/DEFECTS.md`、xmm 引数の落ち) の子。`REPORT_N154.md` 表 3 の「変換不能 9 callee」を、呼出し個数の不一致の原因で分類した。新規類型は無し。
 
-結論: 9 callee の xmm 枠の位置はすべて IR 引数の直後に揃っている (`xmm3` / `xmm1` / `xmm0`)。不一致の原因は呼出し site の引数列だけにある。8 件は **IR 引数 (GPR) が呼出し側に無い** 0 引数 site を含み、1 件 (`function_6a3ac0`) は **余分な引数の型** (IR 0 引数に対し 4 引数 site: `i64 i64 i8 i128`)。xmm 変換 (`conv_ok`) を満たす site が 1 つも無いため、**復元は 0 件**。survey (942 unit) の A/B は unit 別差 **0**。既定は OFF のまま。
+結論: 9 callee の xmm 枠の位置はすべて IR 引数の直後に揃っている (`xmm3` / `xmm1` / `xmm0`)。不一致の原因は呼出し site の引数列だけにある。8 件は **IR 引数 (GPR) が呼出し側に無い** 0 引数 site を含み、1 件 (`function_6a3ac0`) は **余分な引数の型** (IR 0 引数に対し 4 引数 site: `i64 i64 i8 i128`)。xmm 変換 (`conv_ok`) を満たす site が 1 つも無いため、**復元は 0 件**。survey (942 unit) の A/B は unit 別差 **0**。既定は OFF のまま。表 1・表 2 の結論は、測定条件の手書き条件の IR に限る (正規の生成経路の IR では未確認)。
 
 ## 測定条件
 
 - IR: `work-m11` の `tools/m11/work/boot_final.ll` (sha256 `69c774de…`、N54 指紋と一致)。`ir_conditions.json` は素材に無いため、`ldfix`・`ld108`・`r8b`・`ld115` = applied を手で記録して `--bind` した (N154 と同じ扱い。正規の生成経路ではない)。
+- 正規の生成経路 (`bash tools/m11/m11_gen_ir2.sh`) は実行できなかった。この run の `$ARTIFACTS_DIR` は `fl-win64` のみで、`work-m11` (lift 出力 `work/boot0..3.lift.ll` の出所) と `toolchain-emsdk` が無い。`m11_gen_ir2.sh` を実行すると `m11_merge.py` が `work/boot0.lift.ll` の不在 (FileNotFoundError) で rc 1 になることを確認した。
+- したがって表 1・表 2 は、guard (#680) を通した IR ではなく **手書き条件の work-m11 IR に限る**結論。
 - PE: fl-win64 `extracted/block00031_PE.bin` (sha256 `b2c64da4…` 一致)。
-- 測定 commit: `6a253996` (分類の出力を足したコード commit)。以後の REPORT commit は文書のみ (下の差分表)。
-- 単位: n=1。`m11_xmm_stats.sh` 1 回 1 分 18 秒 (前処理を含む)。`m11_xmm_ab.sh` (build 2 回 + survey 2 回) 1 分 18 秒。load は測っていない。
+- 測定 commit: `6a253996` (分類の出力を足したコード commit)。以後の commit は文書のみ (下の「測定 commit からの差分」)。
+- 単位: n=1。`m11_xmm_stats.sh` と `m11_xmm_ab.sh` の所要は、どちらも 1 分 18 秒と記録した。load average と並列数は記録していない。所要は参考値で、比較には使わない。
 
 ## 表 1: 9 callee の分類 (`m11_xmm_stats.sh` の `[arity]` 行を実測)
 
@@ -54,7 +56,12 @@
 | 計 | 752 |
 
 - `call_arity_mismatch` 34 件の内訳 (cause 付き) は `m11_xmm_stats.sh` の `[arity]` 行に出る。
-- **N154 表 4 との差**: 同じ IR 指紋 (`69c774de…`) でも fixed は 39 → 48、no_placeholder は 77 → 64、partial_slots は 5 → 9 と違う。arity 不一致 34 件は一致。原因は未確認 (未解決表)。絶対値は使わず、A/B の結果だけを根拠にする。
+- **N154 表 4 との差**: N154 は IR の指紋を記録していないため、同一 IR かは未照合。そのうえで fixed は 39 → 48、no_placeholder は 77 → 64、partial_slots は 5 → 9 と違う。arity 不一致 34 件は一致。原因は未確認 (未解決表)。絶対値は使わず、A/B の結果だけを根拠にする。
+
+## 測定 commit からの差分 (WORKFLOW §6)
+
+- 測定 commit: `6a253996`。`git diff 6a253996 HEAD -- tools/plugins tools/m11/*.sh` の出力なし (差 0)。
+- 測定 commit から HEAD までの変更は文書のみ (`tools/m11/REPORT_N165.md`・`docs/DOC_MAP.md`)。
 
 ## 再現手順
 
@@ -67,7 +74,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 9 callee の IR 引数 (GPR) を呼出し側から回収する方式 (0 詰めを含む) が未決 | 9 callee は復元できない。0 詰めは未検証の値を渡すため、採るかどうかは判断が要る | 判断待ち (PM)。方式を決めてから起票 |
-| `function_6a3ac0` の 4 引数 site (`i64 i64 i8 i128`) と IR 0 引数の対応 (4 番目の i128 が xmm3 か) | 1 件の復元方式が未確定 | 判断待ち (PM) |
+| PM agent の判断待ち: 9 callee の GPR 回収方式 (0 詰めを含む) を採るか・既定案: 採らず復元 0 件のまま | 9 callee は復元できない。0 詰めは未検証の値を渡す | PR 本文の未解決表のみ (判断待ち・子 issue なし) |
+| PM agent の判断待ち: `function_6a3ac0` の 4 引数 site (`i64 i64 i8 i128`) と IR 0 引数の対応 (4 番目の i128 が xmm3 か)・既定案: 復元しない | 1 件の復元方式が未確定 | PR 本文の未解決表のみ (判断待ち・子 issue なし) |
 | `function_40c650` の変換で unit 149・158 が退行する原因 | 1 件が `NO_CONV` で保留 | #2902 [M11-N164] |
-| N154 表 4 と本 run の内訳の差 (fixed 39 → 48 ほか) | 絶対値は使えない。A/B のみ有効 | #1479 (canonical 基準・OPEN) へのコメント |
+| N154 表 4 と本 run の内訳の差 (fixed 39 → 48 ほか) | 絶対値は使えない。A/B のみ有効。原因は未確認。推定: N154 は IR の sha256 を記録しておらず、同じ IR かは未照合。#2907 の取り込みでは説明できない (N154 の測定 commit は `0ea7df21` で、これは `6a253996` の祖先) | PR 本文の未解決表のみ (追跡だけ・子 issue なし) |
+| 正規の生成経路 (`m11_gen_ir2.sh`) で作った `ir_conditions.json` の IR での表 1・表 2 の再測定。所要の load と並列数の併記 | 表 1 の結論は手書き条件の IR に限る。素材 (`work-m11`・`toolchain-emsdk`) が本 run に無い | PR 本文の未解決表のみ (再測定だけの子は起票しない・WORKFLOW §3) |
