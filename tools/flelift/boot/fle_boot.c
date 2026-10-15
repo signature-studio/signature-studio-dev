@@ -43,6 +43,8 @@ EM_JS(void, fle_throw_kind, (long kind, long a), {
 EM_JS(void, fle_throw_soft, (const char* nm), {
     throw { fle_kind: 'soft', name: UTF8ToString(nm) };
 });
+/* #5058: JS 側 (fle_boot.mjs) の cap 超過フラグ。tty write が飲んだ cap の例外の代わりに次の dispatch で止める */
+EM_JS(int, fle_log_cap_hit, (void), { return globalThis.FLE_LOG_CAP_HIT ? 1 : 0; });
 
 extern uint64_t fle_run(uint32_t va, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
                         uint64_t x0, uint64_t x1, uint64_t x2, uint64_t x3);
@@ -89,6 +91,7 @@ static void px_probe(void) {
 }
 EMSCRIPTEN_KEEPALIVE double fle_px_stat(int k) { return (k >= 0 && k < 16) ? g_px[k] : -1.0; }
 static void fle_probe_dispatch(u64 t) {
+    if (fle_log_cap_hit()) fle_throw_kind((long)(intptr_t)"log_cap", (long)t);
     g_n_dispatch++;
     if (t == 0x6bbc20u) px_probe();
     if (t == 0x6a7b70u && g_fill_n < FILL_LOG_MAX) {
