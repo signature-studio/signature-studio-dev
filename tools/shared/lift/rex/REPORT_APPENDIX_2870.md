@@ -13,7 +13,7 @@
 - gate 追加 (`diff_test.py`): 戻り値 1・3 がそれぞれ 1 件以上、書込 case が 1 件以上、でなければ FAIL。
 - 落ちた case の分類 (`crash_class.py`・新規): 入力から予測する原因 (ctx-null = ctx 0 で addr 0x8、key-deref = addr が key+0x688、timeout、out-overrun)。
 
-### 9.3 実測 (測定 commit `80c5ff7a`・`bash tools/shared/lift/rex/lift_x64c.sh all`)
+### 9.3 実測 (測定 commit `80c5ff7a`・測定 HEAD `acafc52b5`・`bash tools/shared/lift/rex/lift_x64c.sh all` を 3 回)
 | 項目 | 値 |
 |---|---|
 | `ok` | PASS。比較 175・一致 175・不一致 0。除外 73 (SIGSEGV/SIGBUS 72・SIGALRM 1) |
@@ -23,7 +23,7 @@
 | wasm の traps (248 件) | 0 (movnti 24 箇所は比較入力で未到達。到達すれば fail-fast で trap) |
 | `neg-cmp` | FAIL (期待どおり・1 件不一致) |
 | `neg-ctx` | FAIL (期待どおり・全件不一致) |
-| 所要 (`elapsed`) | ok 2 s・neg-cmp 2 s・neg-ctx 3 s (lift・emcc・native・node・diff を含む) |
+| 所要 (`elapsed`・n=3 の min–max。3 回の件数は上表と同一) | ok 2–3 s・neg-cmp 2–3 s・neg-ctx 3 s。lift・emcc・native・node・diff を含む。load (1 分値) は各 mode の開始時 0.00〜0.34・並列数 4 (`nproc`) |
 
 ### 9.4 未解決 (起票先)
 | 未解決 | 影響 | 起票先 |
