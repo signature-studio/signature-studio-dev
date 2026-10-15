@@ -229,3 +229,9 @@ Issue 本文の「sub-object の vtable」という前提は誤り。CreateInsta
 ### 結論 (1 行)
 GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0・42 命令・直接 call / 間接 call 0) を RetDec で lift し、元の機械語との差分は 240/240 で一致。ネガティブコントロール 2 件は期待どおり FAIL。
 全文 (手順・選定根拠・実測・未解決) は `REPORT_APPENDIX_2529.md` §6 が正本 (250 行上限のため分割移動)。
+
+## 7. WaveformColouring_CreateInstance の x64c lift と native 差分 — T-SH-52 (#3216・部分達成)
+
+### 結論 (1 行)
+WaveformColouring closure の入口 70 関数を x64c で C に lift し wasm にした。CreateInstance → slot 0 の native 対 wasm は 64 case で全バイト一致 (ネガティブコントロール FAIL 64/64)。slot 1–5 の host 前提と VEX 3 命令の未対応は子 T-SH-57・58・59 に残す。
+全文 (手順・実測・未解決の表) は `REPORT_APPENDIX_3216.md` §7 が正本 (250 行上限のため分割移動)。
