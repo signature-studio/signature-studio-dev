@@ -1,7 +1,7 @@
 # PLG-P0b-51 (#4557) — G18 書込み関数の呼出し元と P45 分岐の前提
 
 親 #4385 (PLG-P0b-47)。前身は `REPORT_DISPATCHER_APPENDIX_3673.md` §2・§4.1 (6 ID の書込み元 VA と未確定)。
-本付録は新規ファイル。#4385 の付録 (`REPORT_DISPATCHER_APPENDIX_4385.md`) は未作成のため、本 issue の計装結果をここに書く。
+本付録は新規ファイル。#4385 の付録 (`REPORT_DISPATCHER_APPENDIX_4385.md`) とは別に、本 issue の計装結果をここに書く。
 
 ## 0. 結論
 
@@ -13,7 +13,8 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `ebd21817e` (`hs_val_probe.py` に `g18caller`・`p45caller` を追加。コードを変えた最後の commit)。基点は main `566304b53`。
+- 測定 commit: probe 系 (§3・§4) は `0cd23a296` (HEAD で再実行)。e2e 系 (§5) は `ebd21817e` (`hs_val_probe.py` に `g18caller`・`p45caller` を追加した commit)。基点は main `566304b53`。
+- `ebd21817e` から HEAD までの hostshim コード差分 (`git diff ebd21817e 0cd23a296 -- tools/plugins/framework/hostshim ':!*.md'`): `hs_val_probe.py | 34 ++++++++++++++++++++++++` (34 行追加・0 行削除)。追加は main 由来の `g18_caller`・`p45_caller` 関数と `__main__` の分岐。`g18caller`・`p45caller` の本体と分岐は変えていない。e2e 経路 (`hs_e2e.sh`・`fw_stage2.sh`) は `hs_val_probe.py` を呼ばない (`grep -rn hs_val_probe` で該当 0 件) ため、§5 の e2e 測定値は HEAD でも有効。
 - 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (5.7 秒)。`work-fw-stage1` はリポジトリ root 基準のパスで `tools/plugins/work/fw/` に展開 (12 ファイル)。
 - Python: `$RUNNER_TEMP/hsvenv` (`unicorn 2.1.4` / `pefile` / `capstone`)。
 - 負の確認: `g18caller` の `edx=0` と `edx=2` で G18 書込みが無いこと、`p45caller` の `+0x10=0` で P45 書込みが無いことで、観測点が効いていることを確かめた。
@@ -32,7 +33,7 @@
 
 ## 3. 受入 1: G18 (0x41d919 `mov [G18], rdi`)
 
-`hs_val_probe.py g18caller` (n=1・各 6.4 秒)。0x1376820 を `edx` ごとに単独実行 (`rcx=HOST, r8=0x18`):
+`hs_val_probe.py g18caller` (HEAD `0cd23a296`・n=1・1 プロセス 5.68 秒・load 1.04)。0x1376820 を `edx` ごとに単独実行 (`rcx=HOST, r8=0x18`):
 
 | edx (= 0x41d8f0 の r9d) | 0x41d919 (G18 書込み) | 書込み値 |
 |---|---|---|
@@ -42,11 +43,13 @@
 
 0x41d8f0 の `r9d == 1` の分岐 (0x41d905) が条件。書込み値は 0x41d8f0 の第 3 引数 `r8` (`rdi`)。0x1376820 では `r8` = `[rbp+0x30]`、つまり 0x1376820 の第 1 引数 (rcx)。
 
+main 側の `hs_val_probe.py g18_caller` (#4385 由来・HEAD `0cd23a296`・5.7 秒・load 1.00) も再実行した。`r9=1` の 6 ID (0x18・0x45・0x54・0x56・0x64・0x65) は全て 0x41d919 に到達し、`r9=0` の 6 ID は全て未到達。`g18caller` の結果 (`r9d=1` のみ到達) と一致する。
+
 **未確定**: 0x1376820 の呼出し元が `edx` に何を入れるか。静的参照が無いため、実行時の値は測れていない。
 
 ## 4. 受入 2: P45 (0x11fc2b3 `mov [P45], rax`)
 
-`hs_val_probe.py p45caller` (n=1・各 6.4 秒)。0x11fba90 を単独実行 (`rcx=obj`, `[obj+0x34a8]=0`, `[obj+0x3518]=0x77`)。0x6668d0 は stub で `[+0x10]` を指定:
+`hs_val_probe.py p45caller` (HEAD `0cd23a296`・n=1・1 プロセス 5.72 秒・load 1.00)。0x11fba90 を単独実行 (`rcx=obj`, `[obj+0x34a8]=0`, `[obj+0x3518]=0x77`)。0x6668d0 は stub で `[+0x10]` を指定:
 
 | 0x6668d0 戻り値の `[+0x10]` | 0x11fbb4f (cmp eax,0xb) | 0x11fc2b3 (P45 書込み) |
 |---|---|---|
@@ -55,6 +58,8 @@
 
 書込み値は `rax` = `[rbp+0x170]` = 0x11fba90 の第 1 引数 (rcx = this)。
 
+main 側の `hs_val_probe.py p45_caller` (#4385 由来・HEAD `0cd23a296`・5.7 秒) は `[+0x10]` を固定せず単独実行する。0x11fbaef までは到達するが、0x11fbb4f (分岐) と 0x11fc2b3 (書込み) は未到達。前提 (`[0x6668d0 戻り値]+0x10==0xb`) が無いため、`p45caller` の `+0x10=0xb` の結果と矛盾しない。
+
 **未確定**: 0x6668d0 の戻り値の実体 (受け手のオブジェクトと `+0x10`)。P45 = this は確定、`[this+0x3518]` の値 (ID 0x45 の応答) は未確定。
 
 ## 5. 回帰 (Phase A)
@@ -62,7 +67,7 @@
 - `fw_stage2.sh` (`FW_W` 既定): 6 分 53 秒・rc=1。`[fw] SMOKE PASS (Halt0/RestoreContext 到達): dispatch=38 units_done=0 va=1 heap=1 ff=0`。`fw_smoke_check` の FAIL (`runerr` / `init_reach`) は既存 #2510 の既知の失敗。
 - `hs_e2e.sh`: 2 分 38 秒・rc=1。Phase A `[fw] Phase A (framework smoke): Halt0/RestoreContext dispatch=38 ff=0` → PASS。Phase B `memory access out of bounds` は既存 #2911 の既知の失敗。
 - load average: 開始時 0.52、終了時は未採取。
-- 注: 本 run の hostshim コードは変えていない (`hs_val_probe.py` の観測モード追加のみ)。`hostshim.c` と e2e 経路は変わらない。
+- 注: 測定 commit `ebd21817e` から HEAD `0cd23a296` までの hostshim 差分は `hs_val_probe.py` の 34 行追加のみ (§1)。`hostshim.c` と e2e 経路 (`hs_e2e.sh`・`fw_stage2.sh`) は変わらない。e2e は `ebd21817e` で測定した値をそのまま使う。
 
 ## 6. 未解決 (起票先)
 
