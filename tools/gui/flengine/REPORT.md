@@ -218,7 +218,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 ### GUI-25 (#4420): B1 の GetMem 不一致の切り分け
 
 - 切り分け: GetMem の 761 対 760 は shim ではなくビルド条件。比較元 `m11_run.mjs` は非 pthread の wasm、GUI 結合は `-pthread`。同じ `-pthread` の shim 無し base (`run.mjs --wasm m11_base.cjs`) は GetMem 760 (2 回再現)、非 pthread は 761 (2 回再現)。
-- 修正: boot の比較元を `-pthread` の base に揃えた (`e2e.sh` / `judge.py` の `threw` キー名も `boot_threw` に揃えた。判定条件は緩めていない)。
+- 修正: boot の比較元を `-pthread` の base に揃えた (`e2e.sh` / `judge.py` の `threw` キー名も `boot_threw` に揃えた)。判定条件の変更は B1 の比較先のみ (旧 `base_boot.get('threw')` → 新 `base_boot.get('boot_threw')`)。コミット済み baseline は両キーとも `None` で結果は変わらないが、base が throw する場合は新式が同じ throw を PASS にする (旧式は FAIL)。現 HEAD での判定は #4751 で再測定する。
 - 記録値の変化: main の `results/boot.json` は GetMem 761 (FastMM_GetMem 782)。`696d3f18b` の記録も 761。`309a38d0e` (results のみの記録 commit) で GetMem 760 (FastMM_GetMem 781) に変わった。変わった原因は未確認 (再測定は未実施。本 PR の commit で GUI ビルド入力は変わっていない)。よって「GetMem 760 は変更前後で同じ」とは言えない。
 - 残件: `icall_miss` GUI 7 対 base 6。差分の宛先は `0x85df70` 1 件。これは `EnumDisplayMonitors` の callback (#1096 / #1331 / #1507 / #881 で確定済み)。GUI では `EnumDisplayMonitors` が IMPL のため callback が呼ばれる。子 #4645 で解消する。
 - 測定 (HEAD `696d3f18b`・foreground 1 回): e2e rc 1 / 432 s / judge 14/15 (FAIL は B1 のみ: `icall_miss` 7 対 6)。ネガコン N1〜N10 は期待どおり FAIL。
