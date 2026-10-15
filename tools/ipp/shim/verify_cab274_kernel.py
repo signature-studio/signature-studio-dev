@@ -22,11 +22,11 @@
 
 前提: work/resize/ のログ。再生成:
   gcc -O1 -I ../../src -I ../../ref -o /tmp/sw2 shim/test/sweep2.c ref/pe_load.c -lm
-  /tmp/sw2 6 > work/resize/sw6.txt ; /tmp/sw2 7 > work/resize/sw7.txt
+  FL_WIN64_DIR=<fl-win64 展開先> /tmp/sw2 6 > work/resize/sw6.txt ; FL_WIN64_DIR=<fl-win64 展開先> /tmp/sw2 7 > work/resize/sw7.txt
   gcc -O1 -I ../../src -I ../../ref -o /tmp/swv work/resize/sweepv.c ref/pe_load.c -lm
-  /tmp/swv 6 > work/resize/swv6.txt
+  FL_WIN64_DIR=<fl-win64 展開先> /tmp/swv 6 > work/resize/swv6.txt
   gcc -O1 -I ../../src -I ../../ref -o /tmp/ksw work/resize/probe274/ksweep.c ref/pe_load.c -lm
-  /tmp/ksw 6 > work/resize/ksw6.txt ; /tmp/ksw 7 > work/resize/ksw7.txt
+  FL_WIN64_DIR=<fl-win64 展開先> /tmp/ksw 6 > work/resize/ksw6.txt ; FL_WIN64_DIR=<fl-win64 展開先> /tmp/ksw 7 > work/resize/ksw7.txt
 
 usage: python3 shim/verify_cab274_kernel.py
 """

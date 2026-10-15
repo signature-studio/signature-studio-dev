@@ -76,6 +76,7 @@ static inline uint f2u(float f) { uint u; memcpy(&u, &f, 4); return u; }
 static inline float u2f(uint u) { float f; memcpy(&f, &u, 4); return f; }
 /* double のビット列 (callee の ulonglong 引数 = xmm0 のビット列。patches.py ABI 規則が使う) */
 static inline ulonglong d2u(double d) { ulonglong u; memcpy(&u, &d, 8); return u; }
+static inline double u2d(ulonglong u) { double d; memcpy(&d, &u, 8); return d; }
 /* Ghidra の ABS(double) = 符号ビット clear (stereo の機械語 btr r,0x3f と一致) = fabs */
 static inline double ABS(double x) { return fabs(x); }
 /* movd xmm,r32 相当: 32bit を下位レーンに置き、残りは 0 (stereo の ZEXT416) */

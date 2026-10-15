@@ -13,6 +13,8 @@ PE を渡したとき (MX-29): 閉包の code が直接 call する .text 内・
   (ii) 先頭ブロック (入口から最初の ret / jmp まで・最大 32 命令) が不正命令
   (iii) 先頭ブロックが正常 (leaf 候補)
 先頭ブロックのデコード可否は capstone と objdump (別の逆アセンブラ) の 2 通りで判定し、食い違い (mismatch) を数える。
+  objdump 2.42 は LOCK の非ロック命令・REX2 (d5)・不正オペランド (字句 (bad) / %?) を受理するため、objdump の出力は
+  SDM の規則で後処理してから判定する (obj_insn / first_op_byte)。capstone 側は未後処理 (残件は REPORT_MX25 §5.5)。
   ENTRY=pdata_call: (iii) が入口に全て入ること (取りこぼし 0) と、入口が (iii) 以外を含まないこと (過剰 0)。
   ENTRY=pdata:      (iii) のうち入口に入らなかった件数 = pdata 案で落ちる code の候補。
 
@@ -23,8 +25,9 @@ from concurrent.futures import ThreadPoolExecutor
 import capstone, pefile
 
 THUNK_LO, THUNK_HI = 0x396e000, 0x3970200
+UNDOC = {'fstpnce'}  # D9 D8+i (FSTP1、未文書化の別名)。SDM の命令表に無く、objdump も不正とする
 PRN = rb'\t\r\n\x20-\x7e'
-OBJ_LINE = re.compile(r'^\s*[0-9a-f]+:\t[0-9a-f ]+\t(.*)$')
+OBJ_LINE = re.compile(r'^\s*[0-9a-f]+:\t([0-9a-f ]+)\t(.*)$')
 tl = threading.local()
 
 
@@ -55,6 +58,8 @@ def cap_first_ok(md, chunk, va):
     n = 0
     try:
         for ea, iz, mn, ops in md.disasm_lite(chunk, va):
+            if mn in UNDOC:
+                return False
             n += 1
             if 'ret' in mn.split() or 'jmp' in mn.split() or n >= 32:
                 return True
@@ -63,8 +68,61 @@ def cap_first_ok(md, chunk, va):
     return False
 
 
+OBJ_PREFIX = {'lock', 'rep', 'repz', 'repnz', 'data16', 'addr32', 'cs', 'ds', 'es', 'ss', 'fs', 'gs',
+              'notrack', 'bnd', 'xacquire', 'xrelease'}
+LOCKABLE = {'adc', 'add', 'and', 'btc', 'btr', 'bts', 'cmpxchg', 'cmpxchg8b', 'cmpxchg16b', 'dec', 'inc',
+            'neg', 'not', 'or', 'sbb', 'sub', 'xadd', 'xchg', 'xor'}
+LEGACY_PREFIX = {'66', '67', 'f0', 'f2', 'f3', '2e', '36', '3e', '26', '64', '65'}
+TERM = {'ret', 'retw', 'retq', 'jmp', 'jmpw', 'jmpq'}
+
+
+def first_op_byte(bytes_col):
+    # 先頭の接頭辞 (レガシー) を除いた最初のバイト。d5 は REX2 (APX 接頭辞。x64 基準では不正)。
+    for b in bytes_col.split():
+        if b not in LEGACY_PREFIX:
+            return b
+    return ''
+
+
+def last_operand(ops):
+    # AT&T の最後のオペランド (宛先)。括弧の中のカンマは区切りにしない。
+    depth, start = 0, 0
+    for i, ch in enumerate(ops):
+        if ch == '(':
+            depth += 1
+        elif ch == ')':
+            depth -= 1
+        elif ch == ',' and depth == 0:
+            start = i + 1
+    return ops[start:]
+
+
+def obj_insn(raw):
+    # objdump 1 行の SDM 規則による判定 (binutils 2.42 は下の不正を受理するため、後段で落とす)。
+    #   (bad) / 不正セグメントレジスタ %? / REX2 (APX。x64 基準では不正) / REX の直後の VEX /
+    #   LOCK 接頭辞で非ロック命令 or メモリ宛先でない形。戻り値: None (不正) か (命令名, 最後のオペランド, 理由)。
+    if '(bad)' in raw or '%?' in raw or '{rex2' in raw:
+        return None, '(bad)/%?/rex2'
+    tok = raw.split()
+    pre = set()
+    while tok and (tok[0] in OBJ_PREFIX or tok[0].startswith('rex')):
+        pre.add('rex' if tok[0].startswith('rex') else tok[0])
+        tok.pop(0)
+    if not tok:
+        return ('', '', 'prefix'), 'prefix'
+    mn = tok[0]
+    last = last_operand(''.join(tok[1:]))
+    if 'rex' in pre and mn.startswith('v') and mn not in ('verr', 'verw'):
+        return None, 'rex+vex'
+    if 'lock' in pre:
+        base = mn if mn in LOCKABLE else mn[:-1]
+        if base not in LOCKABLE or '(' not in last:
+            return None, 'lock'
+    return (mn, last, ''), ''
+
+
 def obj_first_ok(chunk, va, tmpdir):
-    # 戻り値: (判定, 先頭ブロックの命令の文字列列)。判定の理由別集計に使う。
+    # 戻り値: (判定, 不正の理由, 不正と判定した行)。理由は最初に不正と判定した行の規則名 (正常なら '')。
     if not hasattr(tl, 'path'):
         tl.path = os.path.join(tmpdir, 'w%d.bin' % threading.get_ident())
     with open(tl.path, 'wb') as f:
@@ -72,28 +130,22 @@ def obj_first_ok(chunk, va, tmpdir):
     out = subprocess.run(
         ['objdump', '-D', '-b', 'binary', '-m', 'i386:x86-64', '--adjust-vma=0x%x' % va, tl.path],
         capture_output=True, text=True).stdout
-    n, seen = 0, []
+    n = 0
     for line in out.splitlines():
         m = OBJ_LINE.match(line)
         if not m:
             continue
-        tok = m.group(1).split()
-        seen.append(m.group(1).strip())
-        if not tok or '(bad)' in tok:
-            return False, seen
+        if first_op_byte(m.group(1)) == 'd5':
+            return False, 'rex2', m.group(2)
+        ins, why_bad = obj_insn(m.group(2))
+        if ins is None:
+            return False, why_bad, m.group(2)
+        if not ins[0]:
+            continue
         n += 1
-        if 'ret' in tok or 'jmp' in tok or n >= 32:
-            return True, seen
-    return False, seen
-
-
-def why(lines):
-    # objdump だけが受理した先頭ブロックの理由 (SDM の制約。capstone は不正として止まる)
-    if any(x.startswith('lock ') for x in lines):
-        return 'lock'
-    if any(x.startswith('rex') for x in lines):
-        return 'rex'
-    return 'other'
+        if ins[0] in TERM or n >= 32:
+            return True, '', ''
+    return False, 'no-ret', ''
 
 
 def windows_of(pe_path, fsz):
@@ -153,8 +205,11 @@ def classify(pe_path, s, entries, fsz, seeds):
         else:
             cls = 'iii_leaf' if obj[t] else 'ii_bad'
             if cap[t] != obj[t]:
-                mism.append((t, cap[t], obj[t]))
-                cnt['mismatch_%s_%s' % ('obj_only' if obj[t] else 'cap_only', why(res[t][1]) if obj[t] else 'bad')] += 1
+                mism.append((t, cap[t], obj[t], res[t][1], res[t][2], chunk[t][:12].hex(' ')))
+                if obj[t]:
+                    cnt['mismatch_cap_bad_obj_ok'] += 1
+                else:
+                    cnt['mismatch_cap_ok_obj_bad_%s' % res[t][1]] += 1
         cnt[cls] += 1
         if cls == 'iii_leaf' and t not in entries:
             cnt['iii_not_in_entries'] += 1
@@ -181,8 +236,12 @@ def main(sets_pkl, rounds_json, pe_path=None):
         print('capstone と objdump の先頭ブロック判定の不一致 (mismatch)=%d' % cnt['mismatch'])
         for k in sorted(k for k in cnt if k.startswith('mismatch_')):
             print('   %s=%d' % (k, cnt[k]))
-        for t, c, o in mism[:5]:
-            print('   mismatch 0x%x capstone=%s objdump=%s' % (t, c, o))
+        for t, c, o, r, txt, hx in mism[:5]:
+            print('   mismatch 0x%x capstone=%s objdump=%s (%s %r)' % (t, c, o, r, txt))
+        with open(os.path.splitext(rounds_json)[0] + '_mismatch.tsv', 'w') as f:
+            f.write('va\tcapstone\tobjdump\treason\tobjdump_line\tbytes\n')
+            for t, c, o, r, txt, hx in mism:
+                f.write('0x%x\t%s\t%s\t%s\t%s\t%s\n' % (t, c, o, r, txt, hx))
         ok = ok and cnt['mismatch'] == 0
         if entry == 'pdata_call':
             ok = ok and cnt['iii_not_in_entries'] == 0 and cnt['entry_not_iii'] == 0

@@ -15,7 +15,8 @@ set -euo pipefail
 
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 WORK="$HERE/work"
-EASYFLAC_FAT="/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Library/Audio/Plug-Ins/Components/FL Studio.component/Contents/Resources/FL Studio VSTi.vst/Contents/Resources/Shared/EasyFLAC_x64.dylib"
+source "$HERE/../shared/env.sh"
+EASYFLAC_FAT="$FL_MAC_DIR/pkg_extract/payload_out/Library/Audio/Plug-Ins/Components/FL Studio.component/Contents/Resources/FL Studio VSTi.vst/Contents/Resources/Shared/EasyFLAC_x64.dylib"
 RETC="${RETDEC_DECOMPILER:-/opt/retdec/bin/retdec-decompiler}"
 
 log() { echo "[poc_crc8] $*"; }
