@@ -1,7 +1,8 @@
 """PE の直接 call/jmp の逆向き探索 (#3257 / T-SH-55)。関数境界は .pdata から取る。
 指定した関数 (RVA) を呼ぶ関数を再帰的にたどり、target (VA) に達する経路を出す。
+対象は .pdata を持つ x64 PE32+ (実測は block24350_PE.bin = QuickFontCache_x64)。ImageBase と .pdata の位置は PE ヘッダ・セクション名から読む。
 usage: callgraph.py <PE> <target VA hex> <depth> <root VA hex> [<root VA hex> ...]
-前提: objdump (-d -M intel) が使えること。出力は work/ 以下の dis.txt にキャッシュする。
+前提: objdump (-d -M intel) が使えること。出力は PE と同じ dir の dis.txt にキャッシュする。
 """
 import bisect
 import collections
@@ -11,9 +12,8 @@ import struct
 import subprocess
 import sys
 
-IMAGE_BASE = 0x400000
 path, target_s, depth_s = sys.argv[1:4]
-roots = [int(x, 16) for x in sys.argv[4:]]  # VA (ImageBase 0x400000 + RVA)
+roots = [int(x, 16) for x in sys.argv[4:]]  # VA (ImageBase + RVA)
 target, depth = int(target_s, 16), int(depth_s)
 
 d = open(path, "rb").read()
@@ -21,12 +21,18 @@ pe = struct.unpack_from("<I", d, 0x3C)[0]
 opt = pe + 24
 optsz = struct.unpack_from("<H", d, pe + 20)[0]
 nsec = struct.unpack_from("<H", d, pe + 6)[0]
-secs = []
+if struct.unpack_from("<H", d, opt)[0] != 0x20B:
+    sys.exit("PE32+ (x64) のみ対応: .pdata による関数境界を使う")
+IMAGE_BASE = struct.unpack_from("<Q", d, opt + 24)[0]
+secs = {}
 for i in range(nsec):
     s = opt + optsz + i * 40
+    name = d[s:s + 8].rstrip(b"\0").decode("ascii", "replace")
     vsz, va, rsz, rp = struct.unpack_from("<IIII", d, s + 8)
-    secs.append((va, max(vsz, rsz), rp))
-pdata = [x for x in secs if x[0] == 0x1F7000][0]
+    secs[name] = (va, max(vsz, rsz), rp)
+if ".pdata" not in secs:
+    sys.exit(".pdata セクションが無い: 関数境界を取れない")
+pdata = secs[".pdata"]
 funcs = []
 for k in range(pdata[1] // 12):
     b, e, _ = struct.unpack_from("<III", d, pdata[2] + k * 12)
