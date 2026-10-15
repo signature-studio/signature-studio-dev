@@ -62,6 +62,12 @@ if [ "$(python3 m11_cond.py --get ldfix)" = applied ]; then
   elif [ "$(python3 m11_cond.py --get ld108)" != applied ]; then
     echo "[m11build] ERROR: work/ir_conditions.json に ld108=applied の記録無し (現在: '$(python3 m11_cond.py --get ld108)')。m11_gen_ir2.sh で IR を作り直すこと (fix_ld108 無しで測るなら M11_FIX_LD108=0 で作り直し、M11_ALLOW_LD108_DISABLED=1)" >&2; exit 2
   fi
+  # #1448: fix_r8b815050 (6cefb0 第 3 引数の即値 1) は M11_FIX_R8B=0 で外した IR を A/B 測定用に opt-in でだけ build する
+  if [ "$(python3 m11_cond.py --get r8b)" = disabled ] && [ "${M11_ALLOW_R8B_DISABLED:-0}" = 1 ]; then
+    echo "[m11build] WARNING: M11_ALLOW_R8B_DISABLED=1: fix_r8b815050 無しの IR で build する (ir_conditions.json r8b=disabled)" >&2
+  elif [ "$(python3 m11_cond.py --get r8b)" != applied ]; then
+    echo "[m11build] ERROR: work/ir_conditions.json に r8b=applied の記録無し (現在: '$(python3 m11_cond.py --get r8b)')。m11_gen_ir2.sh で IR を作り直すこと (fix_r8b815050 無しで測るなら M11_FIX_R8B=0 で作り直し、M11_ALLOW_R8B_DISABLED=1)" >&2; exit 2
+  fi
 fi
 # #680 (review): 記録の無い差替え (正規 pass を経ない IR の書換え) を拒否する。正規 pass は直後に --bind で指紋を更新する
 if ! python3 m11_cond.py --check work/boot_final.ll; then
