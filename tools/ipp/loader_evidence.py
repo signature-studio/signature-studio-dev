@@ -4,9 +4,10 @@
 import json, os, re, struct, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); W = f'{HERE}/work'
 sys.path.insert(0, HERE); import scan_x64
+sys.path.insert(0, os.path.join(HERE, '..', 'shared')); from paths import FL_WIN64_DIR
 ev = {}
 def u16(s): return s.encode('utf-16le')
-for tag, path in (('mac_x86_64', f'{W}/FLEngine.x86_64'), ('mac_arm64', f'{W}/FLEngine.arm64'), ('win64', '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin')):
+for tag, path in (('mac_x86_64', f'{W}/FLEngine.x86_64'), ('mac_arm64', f'{W}/FLEngine.arm64'), ('win64', f'{FL_WIN64_DIR}/extracted/block00031_PE.bin')):
     b = open(path, 'rb').read()
     ev[tag] = {
       'dll_literal': ('dsp_ippv2.dll' if tag == 'win64' else 'dsp_ippv2.dylib'),

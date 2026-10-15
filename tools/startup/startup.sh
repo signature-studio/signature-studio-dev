@@ -7,9 +7,10 @@ set -euo pipefail
 cd "$(dirname "$0")"
 W=work; mkdir -p $W
 GH=/opt/ghidra/ghidra_12.1.4_PUBLIC/support/analyzeHeadless
-EXT=/home/ubuntu/work/analysis/win64/extracted
-APP="/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents"
-M2=/home/ubuntu/work/webstudio/tools/m2/work
+source ../shared/env.sh
+EXT="$FL_WIN64_DIR/extracted"
+APP="$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents"
+M2="$REPO_ROOT/tools/m2/work"
 F=${FORCE:-0}
 step() { echo "[startup] $*"; }
 need() { [ "$F" = 1 ] || [ ! -s "$1" ]; }
@@ -28,8 +29,8 @@ if [ ! -d $W/ghidra_eng/ghproj_dll.rep ]; then mkdir -p $W/ghidra_eng; cp -r $M2
 step "4/7 全関数 index (strings/imports/callees) = func_index.tsv"
 if need $W/func_index.tsv; then
   python3 - <<'PY'
-import csv
-rows=list(csv.DictReader(open('/home/ubuntu/work/webstudio/tools/m2/work/ghidra_dll/functions_dll.csv')))
+import csv, os
+rows=list(csv.DictReader(open(os.path.join(os.environ['REPO_ROOT'], 'tools/m2/work/ghidra_dll/functions_dll.csv'))))
 open('work/all_roots.txt','w').write('\n'.join(r['entry'].split(':')[-1] for r in rows)+'\n')
 PY
   $GH $W/ghidra_eng ghproj_dll -process -noanalysis -readOnly -scriptPath ghidra_scripts -postScript CallTree.java $W/func_index.tsv 0 100000 @$W/all_roots.txt > $W/ct_all.log 2>&1

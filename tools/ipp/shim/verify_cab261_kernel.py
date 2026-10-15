@@ -16,9 +16,9 @@ spike ログ (work/resize/sw5.txt = interp 5, sw7.txt = interp 7) と
 
 前提: work/resize/sw5.txt と sw7.txt が必要。再生成:
   gcc -O1 -I ../../src -I ../../ref -o /tmp/sw2 shim/test/sweep2.c ref/pe_load.c -lm
-  /tmp/sw2 5 > work/resize/sw5.txt ; /tmp/sw2 7 > work/resize/sw7.txt
+  FL_WIN64_DIR=<fl-win64 展開先> /tmp/sw2 5 > work/resize/sw5.txt ; FL_WIN64_DIR=<fl-win64 展開先> /tmp/sw2 7 > work/resize/sw7.txt
 
-usage: python3 verify_cab261_kernel.py
+usage: FL_WIN64_DIR=<fl-win64 展開先> python3 verify_cab261_kernel.py
 """
 import math
 import os
