@@ -143,3 +143,84 @@ rbx = callback の第 1 引数 (ctx)。ctx のフィールドは使い方から�
 | N の既定値 (`[chan+0x2f4]` の初期化元)、一覧 A (`[rip+0x5dcad3]`)・B (`[rip+0x5da9a8]`) の要素型 | C provider の初期状態が決まらない | [PY-77] |
 | `0x425210` (ids `0x550`・`0x562`)、`0x526190` (同期/非同期) | 受入条件 2 の残り | [PY-77] |
 | C provider / mock の状態モデル | 推測で実装しない | [PY-76] #2563 (本節の結論を入力にする) |
+
+## 追加解析 (PY-77 / #2576): guard・効果関数本体・N 既定値の PE 確定
+
+既知類型との関係: 該当なし (lift 作業ではない。PE の逆アセ解析)。親: #2562 (PY-75)・#2542 (PY-72)。
+
+### 結論
+
+- 確定: pickupMode は `ctx+0x30`、useGlobalIndex は `ctx+0x38` (B)。値検査の分類 8 は NaN (D)。`0x425210` は `user32!PostMessageW` の thunk (D)。`0x526190` は呼出しスレッドが所有者なら callback を同期実行 (D)。flags `0x3fd` の 0x20・0x10・0x4 の作用 (C)。N の既定値 2 (reset 関数 `0xfe9090` 内、E)。
+- 一部確定: guard の O は `G(0x15e4790) → 0x141d6b8 → Q → O=Q+8` の鎖まで確定。O の実体と vtable `+0x98` は未確定 (A)。status -2 の経路は 2 つ確定 (A・B)。
+- 未確定: O の生成元と vtable 本体、効果関数 `0x1046a30` の書込み先、message 0x550/0x562 の意味、同期性の所有者スレッド値 (実行時)。下表。
+
+### 受入 A: guard の O と status -2 の条件
+
+- G = `0x15e4790` は `.data` (静的値 `0x141d6b8`)。`pe_xref.py` で G への store は 0 件。
+- callback guard (`0xd5a73b`〜`0xd5a74f`): `rax=[G]` (= スロット `0x141d6b8` の番地) → `Q=[0x141d6b8]` → `O=[Q+8]` → `call [[O]+0x98]` (rcx=O)。
+- Q (`0x141d6b8`) への store は 2 件のみ: `0x976aad` (`0x976a90` の遅延生成。`0x976b60` の戻り値を格納) と `0x976b10` (`0x976af0` の解放で 0)。
+- Q の ctor `0x976b60` は `[Q+8]=0` を `0x976b9c` で書く。非 0 の O 書込みは `pe_slot_writers.py 141d6b8 8` で候補 0 件。この tool は RIP 直接読みの直後の `[reg+8]` store だけを検出するため、間接経路は検出外。**O の生成元は未確定**。vtable `+0x98` の本体も O が未確定のため未読。
+- status -2 のまま終わる経路 (どちらも文言は `Operation unsafe at current time`):
+  1. guard 偽: `0xd5a755` `test al,al`・`0xd5a757 je 0xd5a9cf` (status は -2 のまま)。
+  2. task を作らない早期終了: `0xd843e9` で `out=-2`。`[this+0x50]≠0` かつ `0xd84f30([this+0x50])=0` なら `0xd84403 je 0xd84500` で out=-2 のまま戻る (callback は呼ばれない)。
+
+### 受入 B: ctx の格納元と `0xd84f30`
+
+- 呼出し側 `0xd5ab04`〜`0xd5ab42` の stack 引数: 5 番目 `[rbp+0xa8]` (index)、6 番目 `&[rbp+0xac]` (value)、7 番目 `[rbp+0xa4]` (pitchUnit)、8 番目 `[rbp+0xa0]` (pickupMode)、9 番目 `[rbp+0x9c]` (useGlobalIndex)、10 番目 0、11 番目 byte 1。
+- `0xd843d0` の格納 (`0xd84430`〜`0xd84467`): `task+0x18`←5、`+0x20`←6、`+0x28`←7、`+0x30`←8、`+0x38`←9、`+0x40`←10、`+0x58`←r8 (callback)。
+- よって **ctx+0x30 = pickupMode** (callback は `0xf81ce0(esi, byte[ctx+0x30])` の第 2 引数で 1 byte 読む)、**ctx+0x38 = useGlobalIndex** (`0xd5a768` `cmp qword[rbx+0x38],0; setg dl`)。flapi 署名の順 `(int, float, int=0, int=PIM_None, bool)` と一致。
+- `0xd84f30(X)` (X = `[this+0x50]`) の戻り al は `[X+0x410]≠0 ∨ ([X+0x2d8]=0 ∧ [X+0x3b8]=0 ∧ [X+0x2da]≠0 ∧ [X+0x2d9]≠0)` (`0xd84f30`〜`0xd84f63`)。
+- `this` は `0xd5aa65` `mov rbx,[rax]` (rax = `0xd5e620(self)`)。`0xd5e620` は `call [rip+0x881f8d]` の間接呼出しで、実体は実行時値。**this・X の実体は未確定**。
+
+### 受入 C: 効果関数の本体 (flags `0x3fd` の作用)
+
+- `0x1051c90(rbp, n)` (flags & 0x20 の経路): 条件は `key ≤ 0x0fffffff` (`0x1051ca4`)・`key&0xffff == 4` (`0x1051caf`)・`flags&0x20` (`0x1051cb7`)・`0 ≤ key>>16 < 件数` (`0x1051cc5`〜`0x1051cd6`)。`chan = 0xfe8bb0(配列, key>>16)` (`0x1051ce7`)。満たせば `n2 = 0x661450(n−0x20000000, [chan+0x2f4], 0x30) + 0x20000000` (`0x1051cf7`〜`0x1051d09`)。`0x661450` は `imul rdx`・`idiv r8` の符号付き `(a·b)/c`。**N (`[chan+0x2f4]`) はピッチ範囲 (半音) で、0x30=48 は unit 2 の clamp 上限と一致**。
+- `0xf824b0(ptr, n)`: `ptr=0` なら n をそのまま返す (`0xf824b4`〜`0xf8250b`)。効果関数の 7 番目引数 (ptr) は本経路で 0 なので n1 = n。
+- `0x104cf90(key, n2, flags)`: `edi = 0x1046a30(key, n2, flags & ~0x14)` (`0x104cfa5`)、戻り値は edi。`flags&0x10` で `0x6667f0(…, edx=6, r8=key, r9=0)` (`0x104cfae`〜`0x104cfca`)。`flags&4` で `0x6667f0(…, edx=0x13, r8=key, r9=edi)` (`0x104cfd5`〜`0x104cfec`)。flags=0x3fd は 0x10・0x4 を両方含むので、イベント 6 と 0x13 (値 edi) を発行する。イベントの受け手は未確定。
+- flags `0x3fd` は param id ではなく bit 集合。0x20 は N 換算の gate (`0x1051cb7`)、0x10・0x4 はイベント発行。`0x1046a30` へは 0x3e9 が渡る。0x4000 は節 3 のとおり key −33/−32 変換でのみ参照。
+- `0x1046a30` (n の書込み先): 0x590 バイトのフレームで key の型により分岐し、`0xfe8bb0` を 7 箇所以上で呼び、`call [rbx+0x1f0]` の仮想呼出しを持つ。全量は未読。先頭 700 命令の範囲に `[reg+0x2f4]` への直接 store は無い (grep 目視)。**n の最終書込み先は未確定**。
+- `0xf81ce0(key, pickupMode)` (`0xf81ce0`〜`0xf81d58`): `al = 0xf8ecd0([0xf81cef], key)` (登録判定)。登録済みで mode=0 → `0xf8eb10(…, key)`、mode≠0 → 変更なし。未登録で mode=1 → `0xf8ea80(…, key, …)`、mode=2 かつ `byte [[[0x65f68f]]+0xf30+0x49e]≠0` → 登録、それ以外は変更なし。`0xf8ecd0`・`0xf8eb10`・`0xf8ea80` の本体は未読 (役割名は推定)。
+- `0xf824b0`・`0x1051c90` は本節で確定。`0x1051720` は `0x1046a30(key, 0, 2)` を呼ぶ読取り相当の経路 (推定)。戻り値判定の全量は未読。
+
+### 受入 D: 値検査・PostMessage・task 登録
+
+- `0x450c10(&value)` (上位 16bit `cx` と全体を見る) の戻り al: 0=+0、1=−0 (`0x80000000`)、2=+subnormal (`cx≤0x7f`)、3=−subnormal (`0x8000≤cx≤0x807f`)、4=+normal (`0x0080≤cx≤0x7f7f`)、5=−normal (`0x8080≤cx≤0xff7f`)、6=+inf (`0x7f800000`)、7=−inf (`0xff800000`)、**8=それ以外 = NaN** (`0x450c8f`)。`0x477180` は `al==8` (`0x477194`〜`0x477196`)。よって値 −1 は NaN のみ。
+- `0x425210` は `jmp [0x1970b10]` = **user32!PostMessageW** の thunk。`0xd84495` の `(…, 0x562, 0, 0)` と pitchUnit 2 の `(…, 0x550, chan+0x794, 0)` は PostMessageW(hwnd, msg, wParam, lParam)。**非同期** (メッセージ投入)。msg 0x550・0x562 の意味 (window proc の分岐先) は未読。
+- `0x526190`: item = {owner=this, fn=`0xd84290`, ctx=task} を作り `0x525ec0(sched, &item, r8=0, r9=0)` (`0x526190`〜`0x5261dc`)。`0xd84290` は `call [task+0x58]` (rcx=task、`0xd8429b`) なので callback を呼ぶ。`0x525ec0`: `0x525940` の戻り値 +8 と `[[rip+0x10befcf]]` を比較 (`0x525f42`〜`0x525f4e`)。一致し r8&r9=0 なら `0x525f60`〜`0x525f7d` で `fn(ctx)` を**同期**実行。不一致なら `0x525faf` 以降でキュー投入 (非同期)。`0xd844d7` が直後に status を読むので同期が前提の設計。**`[[rip+0x10befcf]]` は実行時値で、Python 呼出しが所有者スレッドかは未確定**。
+
+### 受入 E: N の既定値と一覧 A/B
+
+- N の既定値: `0xfe9090(obj)` (reset 関数) の `0xfe948d` で `mov dword [obj+0x2f4], 2` (同時に `0xfe9486` で `[obj+0x6f4]=1.0`)。wrapper は `0xffe290` (`[obj+0x79d]=0`、`0xffe2a0`) と `0x1001b70` (`[obj+0x2f0]=-1`、`0x1001b80`)。**既定値 2 は reset 内で確定**。obj が chan (`0xfe8bb0` の要素) と同一か、channel 生成時に reset が呼ばれるかは**未確定** (推定: +0x794・+0x79d と同じ構造体)。
+- `dword [reg+0x2f4]` への store は 30 件 (`0x609339`・`0x60f096`・`0x60f120`・`0x722024`・`0xd1c434`・`0xd5a97c`・`0xe8c98d`・`0xfe948d` 他)。構造体型は各件未確認。走査は `pe_scan_store.py` の dword 版 (リポジトリ外の一時複製で正規表現の型だけ変更)。
+- 一覧 A (`[rip+0x5dcad3]`系) と B (`[rip+0x5da9a8]`系): `0x1005730` (`0x100573e`〜`0x10057a8`) が `0xfe8bb0(配列, idx)` を呼ぶ。`0xfe8bb0` は `[obj+0x10]` = 件数−1 で範囲検査し、`[obj+8][idx]` を返す (`0xfe8bbc`〜`0xfe8bcd`)。**要素は 8 byte ポインタ**。要素の構造体型 (chan と推定) は未確定。
+
+### 測定
+
+- 測定 commit: `25d323ca` (記録直前の HEAD)。解析対象は未変更: `git diff 25d323ca HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行。
+- 実測コマンド (`FL_WIN64_DIR=<worktree>/tools/python/work/fl`):
+  - `pe_disasm.py 0xd5a720 200`: 0.067 秒 (終了 0)。
+  - `pe_xref.py 15e4790,141d6b8`: 47.2 秒 (命令 5,022,467・hits 2,428・store 2)。
+  - `pe_slot_writers.py 141d6b8 8`: 48.4 秒 (slot_loads 3・candidates 0)。
+  - dword 版 `0x2f4` 走査 (`pe_scan_store.py` の複製): 27.2 秒 (hits 30)。
+  - `pe_callgraph.py func / callers`、`pe_disasm.py` 他は所要を測っていない (1 件ずつ数秒未満)。
+- load average (1 分値): 開始時 0.23 (23:28 UTC)、終了時 0.56 (23:41 UTC)。
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| O (`[Q+8]`) の生成元と vtable `+0x98` の本体 | guard 偽 (status -2) の条件が PE だけで確定しない | [PY-169] #3212 |
+| `0x1046a30` の書込み先 (n が `[chan+0x2f4]` か) | 効果関数の状態モデル | [PY-170] #3213 |
+| `0xf8ecd0`・`0xf8eb10`・`0xf8ea80`・`0x1051720` の本体 | pickupMode の登録・イベント受け手の意味 | [PY-170] #3213 |
+| message 0x550・0x562 の意味 (window proc) | PostMessageW 通知の内容 | [PY-171] #3214 |
+| `[[rip+0x10befcf]]` (所有者スレッド値) | Python 呼出しの同期性 (実行時にしか決まらない) | [PY-171] #3214 |
+| `this` (`0xd5e620` の間接先) と X (`[this+0x50]`) の実体 | `0xd84f30` の入力 | [PY-169] #3212 |
+| reset `0xfe9090` の obj と chan の同一性・呼出し箇所、一覧 A/B 要素の型 | N 既定値の適用範囲 | [PY-171] #3214 |
+
+## 追加解析 (PY-170 / #3213): 書込み先 (`0x1046a30`)・登録表・`0x1051720` の戻り値
+
+既知類型との関係: 該当なし (lift 作業ではない。PE の逆アセ解析)。親: #2576 (PY-77)。測定・結論の全文と未解決の表は付録 `REPORT_PY72_APPENDIX_3213.md` が正本。
+
+- 確定: setChannelPitch の key 枝 (下位 16bit = 4) で `0x1046a30` が n を書く先は `[chan+0x174]` (`[chan+0x2f4]` ではない)。`0x104cf90` はラッパ (通知のみ)。
+- 確定: `0xf8ecd0` (contains)・`0xf8eb10` (erase)・`0xf8ea80` (insert) と `0xf81ce0` (pickupMode 0/1/2) の登録・解除の意味。
+- 分岐のみ確定: `0x1051d20` の flags&0x20 経路は、`0x1051720` の戻り値 2 のときだけ `0x104cf90` へ進む。戻り値の生成元 (`0xf82a10`・`0xf82c20`) は #3253 へ移送。
