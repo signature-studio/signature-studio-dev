@@ -54,7 +54,7 @@
 
 - `hostshim.c` に、これら 11 格納の応答表は無い (`grep` で 0x1328・0x1320e・0x13213・0x1322971 に該当なし)。応答表の変更は行わない。
 - 理由: 8 件の即値は値が確定したが、到達させる gate の入力が PE 外の状態で、表に入れても実行されない。3 件の call 戻り値は受け手の vtable が未確定で、値の供給元を決められない。
-- `hs_e2e.sh` Phase A の回帰 (`dispatch=38 ff=0`) は**本 run では実行していない**。理由: `work-fw-stage1` の中身は `fw*.restored.ll`・`fw_map.json`・`fw_icall.dll` の 12 件で、`hs_e2e.sh` が要求する `fw_flat4_canon3.ll`・`fw_image.bin`・`fw_rt.c` 等は無い。さらに emsdk (`/opt/emsdk/emsdk_env.sh`) が runner に無い。hostshim.c を変えていないため、Phase A の結果は変わらない見込みだが、実測はしていない。
+- `hs_e2e.sh` Phase A の回帰 (`dispatch=38 ff=0`) は**本 run では実行していない**。理由: `work-fw-stage1` の中身は `fw*.restored.ll`・`fw_map.json`・`fw_icall.dll` の 12 件で、`hs_e2e.sh` が要求する `fw_flat4_canon3.ll`・`fw_image.bin`・`fw_rt.c` 等は無い。さらに emsdk (`emsdk_env.sh`・`docs/REFERENCES.md` の `[EMSDK]`) が runner に無い。hostshim.c を変えていないため、Phase A の結果は変わらない見込みだが、実測はしていない。
 
 ## 5. 受入 3: 再現
 
