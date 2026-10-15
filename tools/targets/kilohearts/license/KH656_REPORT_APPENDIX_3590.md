@@ -26,6 +26,7 @@
 ※ round 1 は直前の build で emcc キャッシュが温まっていたため 5 MB。round 2 以降は新規の C 生成で peak が増えた。
 
 - round 5 の wasm 1,543,853 B は `KH656_REPORT.md` §7.2 の表の値と一致した (同じ lift 集合・memset shim 版)。
+- 注 (既存の不一致): 同じ lift 集合は `KH656_REPORT.md` §7.6 (`9d491eb4`) で 1,543,901 B と記録されており、今回の 1,543,853 B と 48 B 異なる。差の原因は未解明 (`KH656_REPORT.md` §7.2 注と同じ扱い)。受入 3 の wasm 指紋は今回の測定値 (1,543,853 B) を正とし、不一致は既存記録のまま残す。
 - round 7: `gen_simd.py` が `KeyError: 'ptr'` で失敗。宣言 `declare void @__asm_rep_stosq_memset(ptr, i64, i64)` を `kh_180fd157c` (lift 内) が呼んでいた。`excluded_i256` に `180fd157c` を加えて再 build し、round 8 が通った。
 - round 9: `kh_lower.py` が `stage0 に関数が無い: ['0x180f88488']` で失敗 (gen_simd 由来ではないため、`lic_config.json` は書き換えず停止)。この直前の round 8 の `set_key` で書かれた lift 725 件は未検証のため commit していない。commit 対象の config は HEAD の lift に戻した。
 - ラウンド 8 までの emcc peak は 534 MB (cap 11000 MB の 5% 弱)。cap には達していない。
@@ -80,4 +81,4 @@ round 6 の再現 (修正前の `kh656_closure.py`・HEAD の config・memset sh
 | round 9: `kh_lower` の stage0 に無い関数 `0x180f88488` (retdec の関数検出か fnscan の extent の不整合。原因未確定) | 閉包が round 8 (lift 589) で止まる。受入 1 未達 | 子 issue #4025 [KH-86] (本 run で起票) |
 | `kh_180fd157c` が `__asm_rep_stosq_memset(ptr, i64, i64)` を呼ぶ。gen_simd は ptr を扱えないため閉包から除外 (未 lift のまま fail-fast)。除外後の RDI/RCX の状態の扱いは未確認 | 閉包の完全性が未確認。除外関数は呼ばれると停止 (loud) | 子 issue #4026 [KH-87] (本 run で起票) |
 | 入口 OOB (round 5 以降の `memory access out of bounds`) | `kh249_check` ng=1 (受入 2 未達) | #1821・#3866 (既存) |
-| ymm (AVX2) 2 件 `0x180f89cf0`・`0x180fb6124` の lift | 閉包の対象外 | #709 (既存) |
+| ymm (AVX2) 2 件 `0x180f89cf0`・`0x180fb6124` の lift | 閉包の対象外 | 子 issue #4061 [KH-89] (本 run で起票。#709 は CLOSED のため再起票) |
