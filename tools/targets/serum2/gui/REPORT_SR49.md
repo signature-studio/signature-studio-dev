@@ -9,7 +9,7 @@
 
 | 受入条件 | 判定 |
 |---|---|
-| 1. STACKSLOT 95 件: spill の store 検出を広げ、解決件数と残りの理由を書く | **部分達成**。spill 検出を call 越えに広げ、STACKSLOT 80 件 (vptr 経路) のうち 59 件を `OUTPARAM` (呼出の出力引数として書かれたスロット) と特定した。残り 10 件は STACKSLOT のまま。R 経路 15 件は 11 件が ENTRY・4 件が OUTPARAM に移った (§2) |
+| 1. STACKSLOT 95 件: spill の store 検出を広げ、解決件数と残りの理由を書く | **部分達成**。spill 検出を call 越えに広げ、STACKSLOT 80 件 (vptr 経路) のうち 59 件を `OUTPARAM` (呼出の出力引数として書かれたスロットと仮定した分類。個別確認は 1 件・§3) に移した。残り 10 件は STACKSLOT のまま。R 経路 15 件は 11 件が ENTRY・4 件が OUTPARAM に移った (§2) |
 | 2. NODOM 242 件: 支配判定の精度を上げ、偽陰性・偽陽性を書く | **未達 (未着手)**。本 run では支配判定に触れていない。子 issue へ分割 (§5) |
 | 3. INDEX 58・CALLRET 43・CLOBBER 12・ENTRY 15: 残りの原因を件数で分類する | **達成** (§2 に件数。原因の深掘りは未着手) |
 | 4. 測定 commit と再現手順を書く | **達成** (§4) |
@@ -19,6 +19,7 @@
 1. **`find_store` の call 越え**: 従来は窓内の `call` で打ち切っていた。スロットのアドレスを `lea` で取っていない (escape していない) 限り、call を越えて store を探す。
 2. **escape の判定**: `slot_escapes(fn, mem, 0, k)` は、関数先頭から使用 `k` までに `lea` でスロットの address を取る命令の有無。escape したスロットは call を越えず、store が無ければ `OUTPARAM` にする。
 3. **新分類 `OUTPARAM`**: escape したスロットの load で store が見つからないもの。例: `0x18000f55b` は `lea r8,[rbp-0x10]` を出力引数にして直前の `call [r9]` (QueryInterface 型) が書いたスロットを `call [rax+0x38]` の receiver に読んでいる。spill の取り逃しではなく、呼出の出力。
+4. **lea 規則 (`find_store`)**: 後ろ向きの store 探索の途中で、同じスロットへの `lea` (escape) に当たったら store を探さず `None` を返す。意図: `lea` でアドレスを渡した後は、呼出先がスロットを書き換えうるため、それより前の store の値は信用できない。この規則を通ると、`store → lea → load` の並びは store が見つからず、`value()` が escape を理由に `OUTPARAM` へ落とす。つまり store 済みのスロットが `OUTPARAM` に入りうる。本入力での件数は §3。
 
 限界: `slot_escapes` は使用より前の `lea` だけを見る。使用より後に escape するスロットは対象外 (本入力の 10 件の STACKSLOT に該当するかは未確認)。
 
@@ -54,6 +55,7 @@
 ## 3. 限界 (結論を読むときの注意)
 
 - `OUTPARAM` は「呼出の出力引数として書かれた」を仮定した分類。出力であることを個別に確認したのは `0x18000f55b` の 1 件のみ。残り 58 件は未確認。
+- lea 規則 (§1 の 4) の件数: 測定 commit `ddfb27fb4` の分類器で、`find_store` が lea 規則に当たった回数は **0 件** (一時計測・`work/` 内・非コミット)。規則を外した一時コピーでも TSV md5 は `1e1f5500…` で同一 (分類の変化 0 件)。したがって `OUTPARAM` 59 件・`R-outparam` 4 件・件数表は、lea 規則の有無で変わらない。
 - `slot_escapes` は使用より前の `lea` だけを見る (§1 限界)。
 - NODOM 242 件 (支配判定) は本 run で手を入れていないため、偽陰性・偽陽性の件数は未測定。
 - SR-43 §3 の限界 (関数間の追跡・支配判定の関数内 CFG のみ・間接 jmp 関数の 89 件) は変わらない。
@@ -91,4 +93,4 @@ venv/bin/python $P/receiver_this_trace.py Serum2_win64.vst3 --vtable 0x180a2bf58
 | (b-2) OUTPARAM 59 件の出力引数であることの個別確認・呼出先の型 | 受入 1 の解釈 | #3236 [SR-48] |
 | (b-3) 使用より後に escape するスロット (`slot_escapes` の限界)・INDEX 59・CALLRET 42・CLOBBER 12・ENTRY 26 の原因の深掘り | 受入 1・3 | #3237 に残す (次の run) |
 | (a) ARG 240・ARG-CHILD 68 の呼出元 | SR-43 の (a) | #3236 [SR-48] |
-| (f) `pop` の ARITH 分類 | §2 の分類 | 親 #2174 へ提案 |
+| (f) `pop` の ARITH 分類 | §2 の分類 | #2174 は CLOSED のため、open の #3237 にコメントで提案 |
