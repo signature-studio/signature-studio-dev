@@ -139,4 +139,8 @@ PE (`extracted/block00031_PE.bin`) と capstone/pefile が無い環境では qst
 - **除いた構成**: base2 / probe (qstore 無し) / mask / maskneg / fill00 / fillff。**残した構成**: base (遷移 info の基準のみ。gate には使わない) / qbase / qprobe。
 - **残した gate** (判定は G11–G13 だけ): G11 qstore 適用 site 数 = 前提の検出数 / G12 probe 透過 (qprobe と qbase の kind 完全一致) / G13 58–63 が ok (qbase)。
 - **旧 G12 の失敗の訂正 (§6-1・§6-3)**: 旧版は qbase・qprobe の前に IR と指紋を戻さなかった。直前の qstore 無し build が後処理 (alloca 等) を加えた IR に qstore を重ねていて、main の build 順 (qstore → alloca) と違っていた。現版は構成ごとに pristine IR と `ir_conditions.json` を対で戻す。`m11_build.sh` は後処理の結果を指紋に記録するため、IR だけ戻すと指紋検査 (`--check`) で拒否される。この修正で G12 の差は 0。したがって §6-1・§6-3 の「304・555 が oob→ok」は probe 非透過の確証としては扱わない (単発の実測で、probe 透過の一般的な証明ではない)。
+- **実測 (測定 commit `5dd9edf8f`、HEAD で foreground 実行)**: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/trap_triage/negctl_594.sh` → **rc 0、SUMMARY ALL PASS**、`real 3m5.368s`。load (1 分値) は開始 0.14 → 終了 1.02、各 survey 中 0.81〜1.06。survey 1 回 13.1〜13.3 秒。
+  - 前提: qstore 検出 (pristine) = 279 site。G11 applied = 279 (PASS)。G12 qprobe と qbase の kind 差 0 (PASS)。G13 58–63 は全て ok (PASS)。
+  - survey: base (qstore 無し) ok 870 / miss 47 / oob 17 / halt0 7 / noproc 1。qbase (main 既定) ok 873 / miss 47 / oob 14 / halt0 7 / noproc 1。qprobe は qbase と同一。base→qbase は oob→ok 3、oob→halt0 0、halt0→ok 0、ok 退行 0。8cc190←8c7a10 系 OOB は qbase で 0 件。
+  - 1 回目の試行 (指紋を戻さない版) は qbase の link で `ir_conditions.json` の指紋不一致により停止した。この修正を測定 commit に含めた。測定は単発 (同一 HEAD の 1 回)。
 - **戻し方**: 本 PR を revert する (変更先は `tools/m11/trap_triage/negctl_594.sh` と本 REPORT の §5・§6・§7)。旧版の gate を復活させるなら、上の「復活条件」が成立した時点で `git show fc3883358:tools/m11/trap_triage/negctl_594.sh` から該当 gate を戻す。
