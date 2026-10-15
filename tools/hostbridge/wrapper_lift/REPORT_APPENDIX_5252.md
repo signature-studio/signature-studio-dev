@@ -2,7 +2,7 @@
 
 > **正本の分担**: 停止点 (`f_4079e0`・VA `0x407a3e`) の観測は `REPORT_APPENDIX_3597.md` §3.2 が正本。本付録はその停止原因を実測で特定した結果。
 
-測定 commit: `<測定 commit>` (`tools/hostbridge/wrapper_lift/cpi_pool_probe.sh`・`cpi_pool_drive.mjs` を入れた最後の commit。PR 本文に記載)。
+測定 commit: `133b54e71` (`cpi_pool_probe.sh` を変えた最後の commit)。再測定 (同 HEAD・n=2) で §2・§3 の値が一致。
 検証起点: `origin/main` @ `7a9006b81`。環境: x64c 生成 (`block19091_PE.bin`・`ott_lifted.c` 66MB)、emsdk 6.0.12 (`toolchain-emsdk`)、`fl-win64` の `extracted/`、node v22.23.3、4 vCPU。全段直列。
 
 ## 1. 受入条件の対応
