@@ -110,8 +110,8 @@ emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90
 | 整数・bool 格納元の実値 (0x01・0x13・0x26・0x41・0x46 と call 先 `0x11ffde0`・`0x9636a0`→`0x9635d0`・`0xe4e970`・`0xed6780`・`0x11d06e0` の戻り値の実値。供給元は §2 で分類済み) | 受入 1 の値・応答表 | [PLG-P0b-36] (#3652) |
 | 0x2e の fallback (out=0 のとき `0x617920`→`0x6178e0` の vtable+0x1d0 の先 = 受け手の型) と `[O1+0x1d0]` のコールバックの target (§7) | 受入 1 の 0x2e の値 | [PLG-P0b-36] (#3652) へのコメント |
 | グローバル・フィールドの実値 (0x18・0x45・0x54・0x56・0x64・0x65) と `hostshim.c` 応答表の更新・Phase A 回帰 | 応答表 | [PLG-P0b-37] (#3653) |
-| 0x40fe90 以外の 81 callee の個別の影響 (未測定。全 82 VA = 1 の集合の結果は main 付録 B-2)。202 件の応答 0 と未収載 ID の応答 0 は callee 戻り値 0 の仮定の上 | 受入 2 の 202 件・未収載 ID の応答 0 | 親 #2886 (PM 判断。再測定だけのため子は起票しない) |
-| 分岐条件が未解析の未実行格納 24 件と、基準で実行され変更で失う格納 3 件 (§3.4) | 受入 1・3 | 親 #2886 (PM 判断。解析だけのため子は起票しない) |
+| 0x40fe90 以外の 81 callee の個別の影響 (実測済み: `REPORT_DISPATCHER_APPENDIX_3735.md` §3。変化は 11 callee・202 集合は不変)。202 件の応答 0 は callee 戻り値 0 の仮定の上 (0x40fe90 のみ崩れる) | 受入 2 の 202 件の応答 0 | 解決済み (`REPORT_DISPATCHER_APPENDIX_3735.md` §3) |
+| 分岐条件が未解析の未実行格納 24 件と、基準で実行され変更で失う格納 3 件 (§3.4)。VA は `REPORT_DISPATCHER_APPENDIX_3735.md` §5 | 受入 1・3 | 子 `[PLG-P0b-42]` (#3735 から分割) |
 | Phase B の OOB | Phase B の PASS | #2911 (既存) |
 | stage-2 smoke `fw_smoke_check` の `init_reach=16` | Phase A の判定 (dispatch=38 は PASS) | #2510 (既存) |
 

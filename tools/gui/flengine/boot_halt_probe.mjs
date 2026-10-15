@@ -44,11 +44,30 @@ const halt_mem = {
   vtable0_jmp_target: hex32(vt0Jmp), vtable0_jmp_bytes: vt0Jmp ? hexBytes(vt0Jmp, 16) : null,
   arg3_va: '0x' + ARG3_VA.toString(16), arg3_wasm: '0x' + (ARG3_VA - VA_BASE).toString(16), arg3_bytes: hexBytes(ARG3_VA - VA_BASE, 16),
 };
+// #3748: halt 時の obj の class (Self = obj + vtable[0] thunk の add rcx,imm8) の interface table。GetInterfaceEntry (VA 0x40fd90): VMT-0xc0 が table、先頭 4B が件数、エントリ 0x28B (IID 16B・VTable +0x10・IOffset +0x18・ImplGetter +0x20)。
+const guid = (a) => {
+  const h = (n, k) => Array.from(mod.HEAPU8.subarray(a + n, a + n + k), (b) => b.toString(16).padStart(2, '0'));
+  const g = [...h(0, 4).reverse(), ...h(4, 2).reverse(), ...h(6, 2).reverse(), ...h(8, 8)].join('').toUpperCase();
+  return `{${g.slice(0, 8)}-${g.slice(8, 12)}-${g.slice(12, 16)}-${g.slice(16, 20)}-${g.slice(20)}}`;
+};
+const selfAdj = vt0 !== null ? (mod.HEAPU8[vt0 + 3] << 24) >> 24 : 0;
+const intfSelf = objP !== null ? objP + selfAdj : null, intfVmt = intfSelf !== null ? u32(intfSelf) : null;
+const intfTbl = intfVmt !== null ? u32(intfVmt - 0xc0) : null, intfCount = intfTbl ? u32(intfTbl) : null;
+const arg3Guid = guid(ARG3_VA - VA_BASE);
+const intfEntries = [];
+for (let i = 0; intfCount !== null && i < intfCount && i < 256; i++) {
+  const e = intfTbl + 8 + i * 0x28;
+  intfEntries.push({ i, iid: guid(e), vtable: '0x' + u32(e + 16).toString(16), ioffset: new DataView(mod.HEAPU8.buffer).getInt32(e + 24, true), hit: guid(e) === arg3Guid });
+}
+const halt_intf = {
+  self: hex32(intfSelf), vmt: hex32(intfVmt), intf_table: hex32(intfTbl), count: intfCount,
+  arg3_guid: arg3Guid, arg3_in_table: intfEntries.some((x) => x.hit), entries: intfEntries,
+};
 const result = {
   units_total: mod._m11_units_total(), units_run: mod._m11_units_run(), init_count: mod._m11_init_count(),
   icall_miss: mod._m11_icall_miss(), longjmp_halt0: halt !== null, threw,
   last_unit: last ? { index0: Number(last[1]) - 1, total: Number(last[2]), unit_va: '0x' + (0x400000 + parseInt(last[3], 16)).toString(16) } : null,
-  halt_chain: chain, halt_mem,
+  halt_chain: chain, halt_mem, halt_intf,
 };
 const json = JSON.stringify(result);
 if (outFile) fs.writeFileSync(outFile, JSON.stringify(result, null, 1));
