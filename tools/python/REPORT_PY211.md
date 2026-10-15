@@ -13,7 +13,7 @@
 
 - 測定 commit: `574c37c36` (検査スクリプト `tools/python/analysis/py211_pattern_jump_move.py` を追加した commit)。この後のコード範囲の差分は 0 行 (`git diff 574c37c36 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力 0 行、PR 作成直前に確認)。
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (`oc_artifacts: fl-win64`)。展開: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C work/py211 --wildcards '*block00031_PE.bin'` (実測 2.758 秒・`real 0m2.758s`)。展開先 `tools/python/work/py211/extracted/` は gitignore。
-- 検査: `python3 analysis/py211_pattern_jump_move.py work/py211/extracted/block00031_PE.bin` → **18/18 PASS**・rc 0・実測 `real 0m0.131s`。load average は測定時 `0.01 0.11 0.12` (uptime の 1/5/15 分値。`up 12 min` の時点)。
+- 検査: `python3 analysis/py211_pattern_jump_move.py work/py211/extracted/block00031_PE.bin` → **18/18 PASS**・rc 0・実測 `real 0m0.126s`。load average は同じ検査の直前 (uptime 02:18:43 UTC) で `0.00 0.06 0.09` (1/5/15 分値)。
 - ネガティブコントロール: `--mutate` (movePattern の上限 `cmp eax, 0x3e7` の即値を `0x3e8` に書き換えたメモリ上の複製で検査) → `FAIL move.upper_bound_999`・`FAIL crosscheck.bytes_3e7_jg`、16/18 PASS・rc 1。検査は効いている。
 - 別算法の検算: capstone の逆アセンブルとは独立に、機械語の並び `3d e7 03 00 00` + `jg` (7f / 0f 8f) を .text のファイル上で正規表現で数えた。出現 26 件の中に 0xe33f09 がある (同形は他関数にもあるため、番地の包含だけを見る)。
 - 解析方法: capstone で関数先頭から ret までを逆アセンブルし、rip 相対の参照は「次命令の VA + disp」で VA に解決した (`decode()`)。表 (`0x193fcf8` 付近) の所在は `.bss` (ファイル上に初期値が無く、実行時に埋まる)。要素数は PE から決まらない。
