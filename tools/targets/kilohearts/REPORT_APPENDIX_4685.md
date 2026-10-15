@@ -6,7 +6,7 @@
 
 - issue 本文の「残り 8 件」は現行 main の census と合わない。origin/main `b28128e48` で同じ fix 集合を流すと、型不一致は **110 行** で、#3837 (ptr⇔int 75)・#4672 (void 14・BINOP 9)・#4671 (関数ポインタ 9) の 107 行に当たる。当たらないのは **3 行** のみ。
 - 3 行を機械語で確定し、`ghidra_to_c.py` の `DELAY_RULES` に 1 行 1 規則で入れた (件数 assert 付き)。型不一致は 110 → **107** (emcc error 行 331 → 328)。残り 107 行は既存の子 issue が担う (表 ③)。
-- Gain/Haas/Gate の生成 C は origin/main と **byte 一致** (3 本)。1000/1000 bit-exact も HEAD で再測定した。
+- Gain/Haas/Gate の生成 C と 1000/1000 bit-exact は測定 commit `c682f1185` の値。現 HEAD `e427f9fa3` では未再測定 (④ 参照)。
 
 ## ②. 3 行の分類と機械語による確定
 
@@ -44,6 +44,20 @@
 
 - 所要 (実測 wall): Ghidra の closure 33.0 s・Delay の emcc (census・`-ferror-limit=0`) 15.8 s・`build_cmp.sh gain` 1.002 s (haas・gate は未計時)。
 - `DELAY_RULES` の件数は 4 規則すべて hit (converter は停止せず終了)。
+
+### ④-2. HEAD までのコード差分 (`c682f1185` → `e427f9fa3`)
+
+`git diff --stat c682f1185 e427f9fa3 -- tools/targets/kilohearts/ghidra_route` = 4 ファイル・+118/-8。main 取り込みで入った変更で、本 PR の 3 行の規則とは別物。
+
+| ファイル | 変更 | 出所 |
+|---|---|---|
+| `ghidra_to_c.py` | +5 | FNPTR 規則 (#4671 KH-106) |
+| `patches.py` | +7 | `1813a1d40: FNPTR` (#4671)・xmm0 規則 (#3885 KH-77) |
+| `kh_xmm0.h` | +90 (新規) | xmm0 helper (#3885) |
+| `xmm0_check.c` | +24/-8 | xmm0 規則 (#3885) |
+
+- この差分に対する再測定 (Delay emcc error 行・型不一致の内訳・Gain/Haas/Gate の byte 一致 (比較先は origin/main)・1000 trial 突合) は**未実施**。
+- 理由: `$HOME/artifacts` に `fl-win64.tar.zst` のみあり、`plugins-kilohearts`・`toolchain-emsdk` が実在しない。PR 本文に `oc_artifacts: plugins-kilohearts toolchain-emsdk` を書いて再起動すれば測定できる。
 
 ## ⑤. 未解決
 
