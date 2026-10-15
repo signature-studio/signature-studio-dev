@@ -12,6 +12,7 @@
 ## 2. 測定の組
 
 - 測定 commit: `f4e471170` (origin/main 着手時点)。probe の追記は `8f36af762` (本 PR の commit 1)。
+- **現 head の状態 (fix 時点)**: head `79a62d3f9` は main (`b585af9f0`・`a06acf466` 等) を取り込んでおり、`git diff 8f36af762 HEAD -- tools/gui/flengine` は 18 ファイル・1589 行。本節以降の数値は取り込み前の `8f36af762` の IR で得たもので、**現 head では未測定**。fix の run では `work-m11`・`toolchain-emsdk`・`toolchain-retdec` が `$ARTIFACTS_DIR` に無く、再生成できなかった。現 head での再測定は未実施。
 - 素材: fl-win64 (`[WIN64]`・`FL_WIN64_DIR`)・toolchain-emsdk (`[EMSDK]`)・toolchain-retdec (`[RETDEC]`)・work-m11 (repo 直下 `tools/m11/work`)。apt-mingw は使っていない (GUI build は不要)。`$ARTIFACTS_DIR` の 4 本を `tar --zstd -xf` で展開して確認した。
 - 再生成 (REPORT_APPENDIX_3478 §2 の手順 1〜4 を同じ順で実行): lift boot5 (`ir5 OK 2686 行`) → `m11_wndseed.sh` (rc 0・閉包 1212・WNDCLASS-CHECK PASS・3 分 24 秒) → `m11_build.sh` (mismatch 0) → `tools/gui/flengine/build.sh` (`signature mismatch 0・undefined 0・duplicate 0`・25 秒)。`-g2` の診断 build は `build.sh` を sed で複製 (`-g1`→`-g2`・`tools/gui/work/flengine/diag/` 配下・コミットしない)。
 - `m11_wndseed.sh` は追跡ファイル `tools/m11/results/wndclass_scan.json` を書き換えた。本 PR ではコミットしない。
