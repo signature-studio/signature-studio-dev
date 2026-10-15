@@ -181,7 +181,7 @@
 ### 測定
 
 - 測定 commit: `93d202284` (コードを変えた最後の commit)。
-- 素材: `fl-win64` を `tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` で展開 (2.229 秒)。`toolchain-emsdk` は `$HOME/artifacts/toolchain-emsdk.tar.zst` を `$RUNNER_TEMP/emsdk-x` に展開 (2.742 秒) し、`emsdk_env.sh` で `provider/build.sh` を実行。
+- 素材: `fl-win64` を `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` で展開 (2.229 秒)。`toolchain-emsdk` は `$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` を `$RUNNER_TEMP/emsdk-x` に展開 (2.742 秒) し、`emsdk_env.sh` で `provider/build.sh` を実行。
 
 | 検査 | コマンド | 結果 | 所要 |
 |---|---|---|---|
