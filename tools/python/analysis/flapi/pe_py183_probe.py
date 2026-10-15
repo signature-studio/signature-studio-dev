@@ -199,6 +199,7 @@ def main():
     check("0x1050546 の判定が 0x1050540 の store と同番地 (0x16bb13c)",
           rip_target(0x1050540) == 0x16BB13C and rip_target(0x1050546) == 0x16BB13C)
     format_checks()
+    spec_checks()
     desc_checks()
     typecheck_checks()
     pct_fmt_checks()
@@ -233,6 +234,54 @@ def format_checks():
           u16z(rip_target(0x43A920), 16) == "0123456789ABCDEF")
     check("0x43a890 の 2 桁表 (dword, 0x43a900) の [0x0a] = '0A' と [0xff] = 'FF'",
           u16z(rip_target(0x43A900) + 4 * 0x0A, 2) == "0A" and u16z(rip_target(0x43A900) + 4 * 0xFF, 2) == "FF")
+
+
+def spec_checks():
+    # #4481 (PY-311): 書式 0x43e240 の kind 9 の 'S' 分岐・'G'/'E' の精度 clamp・第 5〜7 引数の流れ
+    check("0x43e240 の kind 9 (文字列) が 'S' 分岐 0x43eb1c へ (0x43e993・0x43e9c0)",
+          ins_at(0x43E993).op_str == "0x43eb1c" and ins_at(0x43E9C0).op_str == "0x43eb1c")
+    check("0x43eb1c が spec 'S' (0x53) を比較し、外れると 0x43eb7e (0x43eb24)",
+          ins_at(0x43EB1C).op_str == "word ptr [rbp + 0x16a], 0x53" and ins_at(0x43EB24).op_str == "0x43eb7e")
+    check("'S' 分岐の 1 文字化: al==2 は byte 0x414890 (0x43eb39), 他は word 0x414890 (0x43eb4f)",
+          ins_at(0x43EB26).op_str == "al, 2" and ins_at(0x43EB31).op_str == "dx, byte ptr [rbp + 0xb0]"
+          and ins_at(0x43EB39).op_str == "0x414890" and ins_at(0x43EB4F).op_str == "0x414890")
+    check("'S' 分岐の文字列ポインタ取得 0x414850 (0x43eb5b) → 0x43eb71 call 0x43dfd0",
+          ins_at(0x43EB5B).op_str == "0x414850" and ins_at(0x43EB71).op_str == "0x43dfd0")
+    check("'S' 以外は 0x43eb7e で xor ecx → call 0x43db50 (0x43eb88) で r8d = [rbp+0x5c] を渡す",
+          ins_at(0x43EB84).op_str == "r8d, dword ptr [rbp + 0x5c]" and ins_at(0x43EB88).op_str == "0x43db50")
+    check("'G'/'E' の精度 clamp: 0x43eb9e が 'G' (0x47)・0x43eba8 が 'E' (0x45)",
+          ins_at(0x43EB9E).op_str == "word ptr [rbp + 0x16a], 0x47" and ins_at(0x43EBA8).op_str == "word ptr [rbp + 0x16a], 0x45")
+    check("'G'/'E' の clamp 値 0xf (0x43ebbb) / 他の clamp 値 2 (0x43ebd0)",
+          ins_at(0x43EBBB).op_str == "dword ptr [rbp + 0x16c], 0xf" and ins_at(0x43EBD0).op_str == "dword ptr [rbp + 0x16c], 2")
+    check("spec 'M' (0x4d) 分岐 0x43ebda が 7 番目の引数の byte [+9] を精度へ入れる (0x43ebe4・0x43ebeb・0x43ebf0)",
+          ins_at(0x43EBDA).op_str == "word ptr [rbp + 0x16a], 0x4d" and ins_at(0x43EBE4).op_str == "rcx, qword ptr [rbp + 0x1d0]"
+          and ins_at(0x43EBEB).op_str == "rcx, byte ptr [rcx + 9]" and ins_at(0x43EBF0).op_str == "dword ptr [rbp + 0x16c], ecx")
+    check("0x43dd60 と 0x43dd90 は r9 を書かない (第 4 引数は 0x43dde0 まで素通し)", not any(
+        (ins_at(va) is not None and ins_at(va).op_str.split(",")[0].strip() == "r9d") or
+        (ins_at(va) is not None and ins_at(va).op_str.split(",")[0].strip() == "r9")
+        for va in range(0x43DD60, 0x43DDB3)))
+    check("0x43dde0 が r9 を rbx に保存 (0x43de11) し、6 番目 [rsp+0x28] に rbx を渡す (0x43de5c)",
+          ins_at(0x43DE11).op_str == "rbx, r9" and ins_at(0x43DE5C).op_str == "qword ptr [rsp + 0x28], rbx")
+    check("0x43dc00 が 0x43e240 の 6 番目を [rsp+0x68] → [rsp+0x28] で渡す (0x43dc0e・0x43dc13)",
+          ins_at(0x43DC0E).op_str == "rax, qword ptr [rsp + 0x68]" and ins_at(0x43DC13).op_str == "qword ptr [rsp + 0x28], rax")
+    check("0x43dde0 の 7 番目 [rbp+0x20b0] を 0x43dc00 へ渡す (0x43de61・0x43de68)",
+          ins_at(0x43DE61).op_str == "rcx, qword ptr [rbp + 0x20b0]" and ins_at(0x43DE68).op_str == "qword ptr [rsp + 0x30], rcx")
+    check("0x43dd6b と 0x43ddc4 の lea は第 5 引数に slot 0x15ec3b0 の address を置く",
+          rip_target(0x43DD6B) == 0x15EC3B0 and rip_target(0x43DDC4) == 0x15EC3B0)
+    check("slot 0x15ec3b0 は .bss (SizeOfRawData 0)・PE 上に初期値の実体無し",
+          section_of(0x15EC3B0).Name.rstrip(b"\0") == b".bss" and section_of(0x15EC3B0).SizeOfRawData == 0)
+    reads = []
+    va = 0x43E240
+    while va < 0x43F1D0:
+        ins = ins_at(va)
+        if ins is None:
+            break
+        if "rbp + 0x1c8]" in ins.op_str:
+            reads.append(hex(va))
+        va += ins.size
+    check("0x43e240 の 6 番目 [rbp+0x1c8] は 0x43e2db の 1 箇所だけで読まれる (ebx = flag + 1)",
+          reads == ["0x43e2db"] and ins_at(0x43E2DB).op_str == "ebx, dword ptr [rbp + 0x1c8]"
+          and ins_at(0x43E2E1).op_str == "ebx, 1", str(reads))
 
 
 def qword_at(va):
