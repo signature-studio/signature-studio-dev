@@ -241,6 +241,6 @@
 
 ## 11. Windows / macOS 行列への Firefox・Safari 追加 (AU-33 #3168・部分達成)
 
-- 測定 commit: `9aa9239b` (コード最終)。9/9 はこの commit のコードで測った。HEAD `fa57175d` では Firefox e2e の入力 (`public/worklets/fl-audio-worklet.js`・`src/runtime/audio-shim.ts`) が main の `7c5ee224` (AU-29) で変わったため、HEAD での再測定が要る (未実施。§A・§F)。
-- 結論: Firefox 157.0 (ubuntu・PulseAudio null-sink・n=3) で 9/9 PASS (9aa9239b)。既定出力の判定を OS 別にした。Safari の経路は #3208 で main に入った (P1〜P4 は未測定・[AU-36] #3207)。Windows / macOS の Firefox 行は未適用・未実行 (#3192 [AU-34])。
-- 差分: issue 指定の `git diff --stat 9aa9239b HEAD -- tools/audio` は 20 ファイル (PR の記録 10 件・main 由来 10 件)。内訳・範囲・変更・再現・NC・未解決表の全文は `REPORT_APPENDIX_3168.md` §A〜§F (250 行上限のため分割移動)。
+- 測定 commit: `9aa9239b` (コード最終)。9/9 はこの commit のコードで測った。HEAD `c89f18db` では Firefox e2e の入力 (`public/worklets/fl-audio-worklet.js`・`src/runtime/audio-shim.ts`) が main の `7c5ee224` (AU-29) で変わったため、HEAD で再測定した (§A・§G)。
+- 結論: Firefox 157.0 (ubuntu・PulseAudio null-sink・n=3) で **9/9 PASS** (HEAD `c89f18db`・rc 0・underrun 0・既定 sink 接続 9/9。9aa9239b でも 9/9)。既定出力の判定を OS 別にした。Safari の経路は #3208 で main に入った (P1〜P4 は未測定・[AU-36] #3207)。Windows / macOS の Firefox 行は未適用・未実行 (#3192 [AU-34])。
+- 差分: 実行コードの範囲 (`build.sh` 入力を含む) は HEAD `c89f18db` で 8 ファイル・225 行追加・9 行削除 (§A (a))。issue 指定の `-- tools/audio` の内訳・変更・再現・NC・未解決の全文は `REPORT_APPENDIX_3168.md` §A〜§G (250 行上限のため分割移動)。

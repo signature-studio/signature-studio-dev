@@ -392,7 +392,7 @@
 | `tools/audio/REPORT_AU6.md` | ~38 | AU-6 (#190) 遅延ポリシー: T の減衰の全文 (REPORT.md §17 から分割)。減衰テスト・quick 全体の実測値の正本 (§2) |
 | `tools/audio/REPORT_APPENDIX_3193.md` | ~43 | AU-35 (#3193) Safari の経路: safaridriver (WebDriver classic) の harness 設計、macOS の既定出力 (BlackHole 2ch) の判定、BiDi 対応の確認手順 (未確定)、mock と Chrome の回帰検証、macOS 実測の未解決 (子 AU-36)。要約は REPORT_AU2_CI.md §10 |
 | `tools/audio/REPORT_AU2_CI.md` | ~246 | AU-2 (#187) CI 代理指標: Chrome 行列 (2 回目 run・null-sink 接続確認済み・NC・再採取 n=1 の FAIL 1 件・§8 の clock_jump 差分)、Firefox 行列 (WebDriver BiDi, §9・AU-23 #2540)、未解決 (§4・§6)。1 回目 run の記録は §1 (§5 で解消)。quick ベースライン 43/44。実機分は [AU-22] (#2366) |
-| `tools/audio/REPORT_APPENDIX_3168.md` | ~65 | AU-33 (#3168) Firefox 行列の OS 別 sink 判定と 3 シナリオ化の検証全文 (REPORT_AU2_CI.md §11 から分割移動。250 行上限のため)。測定範囲と issue 指定範囲の差分内訳・ubuntu 再現 9/9 PASS・NC・Safari の理由と代替・Win/mac の未検証 |
+| `tools/audio/REPORT_APPENDIX_3168.md` | ~85 | AU-33 (#3168) Firefox 行列の OS 別 sink 判定と 3 シナリオ化の検証全文 (REPORT_AU2_CI.md §11 から分割移動。250 行上限のため)。測定範囲と issue 指定範囲の差分内訳・9aa9239b の ubuntu 再現 9/9 PASS・HEAD c89f18db の再測定 9/9 PASS (§G)・NC・Safari の理由と代替・Win/mac の未検証 |
 | `tools/audio/REPORT_APPENDIX_863.md` | ~20 | AU-15 (#863) 現 HEAD (`2f235a0a`) での再試行 15 run 全 PASS の全文 (REPORT.md §20 から分割移動。250 行上限のため)。§19 (旧 HEAD の失敗 1 件) は REPORT.md 本体 |
 | `tools/audio/asio/REPORT.md` | ~200 | IASIO COM アダプタ + 120s soak |
 | `tools/audio/asio/REPORT_APPENDIX_998.md` | ~23 | asio REPORT §12-2 全文 (#998 負荷下の再現試験 L1〜L3)。250 行上限のため無変更で分割移動 |

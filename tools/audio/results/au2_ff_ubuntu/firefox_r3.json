@@ -5,19 +5,19 @@
  "rep": 3,
  "secs": 10,
  "extra": "",
- "date": "2026-10-14T23:25:44.498Z",
+ "date": "2026-10-15T00:08:33.239Z",
  "load_start": [
-  0.36,
-  0.35,
-  0.28
+  0.67,
+  0.48,
+  0.22
  ],
  "load_end": [
-  0.26,
-  0.32,
-  0.27
+  1.79,
+  0.77,
+  0.32
  ],
  "nproc": 4,
- "wall_s": 40.553,
+ "wall_s": 40.58,
  "pulse": {
   "default_sink": "ci_null",
   "ci_null_before": [
@@ -35,10 +35,10 @@
   "wait_main": "throw TypeError",
   "worklet": {
    "wait": "timed-out",
-   "wait_ms": 20,
+   "wait_ms": 21,
    "notify": "function"
   },
-  "worklet_ctx_state": "suspended"
+  "worklet_ctx_state": "running"
  },
  "results": [
   {
@@ -59,14 +59,14 @@
    "ctx": {
     "sampleRate": 48000,
     "baseLatency": 0,
-    "outputLatency": 0.048583333
+    "outputLatency": 0.04825
    },
    "burst": 1024,
    "T": 1536,
-   "clock_hz": 48017.059,
+   "clock_hz": 47997.431,
    "underruns": 0,
    "silence_frames": 0,
-   "cb_count": 1874,
+   "cb_count": 1875,
    "result": {
     "api": "asio",
     "driver": "FL Studio ASIO",
@@ -74,7 +74,7 @@
     "depth": 6,
     "sr": 48000,
     "mode": 0,
-    "secs_wall": 10.005,
+    "secs_wall": 10.004,
     "reported": {
      "nin": 2,
      "nout": 2,
@@ -83,29 +83,29 @@
      "pref": 512,
      "gran": 0,
      "lat_in": 384,
-     "lat_out": 3996,
-     "lat_out0": 3996,
-     "olat_us0": 48583,
+     "lat_out": 3980,
+     "lat_out0": 3980,
+     "olat_us0": 48250,
      "ch_type": 19
     },
     "stats": {
-     "cb_count": 1874,
+     "cb_count": 1875,
      "cb_late": 0,
-     "cb_max_us": 60,
-     "cb_avg_us": 11,
+     "cb_max_us": 40,
+     "cb_avg_us": 16,
      "underruns": 0,
      "silence_frames": 0,
      "in_overruns": 0,
      "in_underflows": 0,
      "min_fill": 384,
-     "avg_fill": 948,
-     "wake_count": 539,
+     "avg_fill": 959,
+     "wake_count": 537,
      "wait_timeouts": 0,
      "ring_frames": 16384,
-     "quanta": 3756,
+     "quanta": 3757,
      "reset_requests": 0,
      "wake_hist": [
-      539,
+      537,
       0,
       0,
       0,
@@ -133,11 +133,11 @@
     "clock": {
      "samples": 40,
      "fit_ok": 1,
-     "rate_hz": 48017.059,
-     "audible_minus_now_ms": -1.952,
+     "rate_hz": 47997.431,
+     "audible_minus_now_ms": -2.316,
      "monotonic": 1
     },
-    "produced_frames": 481536,
+    "produced_frames": 481792,
     "resets_seen": 0,
     "rate_changes": 0,
     "panel_code": 1,
@@ -145,23 +145,23 @@
     "ctx": {
      "sampleRate": 48000,
      "baseLatency": 0,
-     "outputLatency": 0.048583333
+     "outputLatency": 0.04825
     },
     "snapshot": {
      "underruns": 0,
      "silence_frames": 0,
-     "quanta": 3770,
+     "quanta": 3771,
      "in_overruns": 0,
      "wl_state": 0,
-     "out_read": 480768,
-     "out_write": 481536,
+     "out_read": 480896,
+     "out_write": 481792,
      "in_write": 0,
      "in_read": 0,
      "gen": 1,
-     "cb_count": 1875,
+     "cb_count": 1876,
      "cb_late": 0,
-     "cb_max_us": 60,
-     "wake_count": 541,
+     "cb_max_us": 40,
+     "wake_count": 539,
      "wait_timeouts": 0,
      "in_underflows": 0,
      "min_fill": 384,
@@ -173,12 +173,12 @@
      "clock_jump_max_q": 0,
      "clock_first_q": 0,
      "clock_last_q": 0,
-     "cb_max_q": 50,
+     "cb_max_q": 22,
      "ring_frames": 16384,
      "buffer_frames": 256,
      "depth": 6,
      "sample_rate": 48000,
-     "out_latency_us": 48583,
+     "out_latency_us": 48250,
      "base_latency_us": 0
     },
     "workletErrors": [],
@@ -210,20 +210,20 @@
      "olat_zero_ms": 0
     },
     "ref_slope": {
-     "n": 41,
-     "ctx_per_wall": 0.9999714274985984
+     "n": 40,
+     "ctx_per_wall": 1.000031692825201
     },
     "verify": {
-     "covered_frames": 480768,
+     "covered_frames": 480896,
      "sr": 48000,
      "gen_inits": 1,
-     "playing_quanta": 3756,
+     "playing_quanta": 3757,
      "first_underrun_q": 0,
      "last_underrun_q": 0,
      "underrun_events": 0,
      "audio_thread_gap_ms_hist": {
-      "0": 3219,
-      "1-5": 17,
+      "0": 3211,
+      "1-5": 26,
       "6-12": 0,
       "13-20": 533,
       "21-40": 0,
@@ -233,22 +233,22 @@
      "spans": [
       [
        1,
-       480767,
+       480895,
        0.028782013803720474
       ]
      ],
      "device_fill": {
       "min": 512,
       "max": 1536,
-      "avg": 1091.0053361792957,
+      "avg": 1089.2120565484129,
       "unit": "frames (リング充填, worklet 消費直前)"
      },
      "sine": {
-      "frames_checked": 480768,
+      "frames_checked": 480896,
       "max_abs_err": 1.4870864706306719e-8,
       "samples_over_1e5": 0,
       "peak": 0.5,
-      "rms": 0.3535518310593746,
+      "rms": 0.35355162409876967,
       "expect_rms": 0.35355339059327373,
       "zero_runs_ge16": 0
      }
@@ -273,14 +273,14 @@
    "ctx": {
     "sampleRate": 96000,
     "baseLatency": 0,
-    "outputLatency": 0.049020833
+    "outputLatency": 0.049197916
    },
    "burst": 1920,
    "T": 2816,
-   "clock_hz": 95987.505,
+   "clock_hz": 96004.29,
    "underruns": 0,
    "silence_frames": 0,
-   "cb_count": 3747,
+   "cb_count": 3755,
    "result": {
     "api": "asio",
     "driver": "FL Studio ASIO",
@@ -288,7 +288,7 @@
     "depth": 11,
     "sr": 96000,
     "mode": 0,
-    "secs_wall": 10.005,
+    "secs_wall": 10.01,
     "reported": {
      "nin": 2,
      "nout": 2,
@@ -297,29 +297,29 @@
      "pref": 512,
      "gran": 0,
      "lat_in": 384,
-     "lat_out": 7650,
-     "lat_out0": 7394,
-     "olat_us0": 49021,
+     "lat_out": 7667,
+     "lat_out0": 7411,
+     "olat_us0": 49198,
      "ch_type": 19
     },
     "stats": {
-     "cb_count": 3747,
+     "cb_count": 3755,
      "cb_late": 0,
-     "cb_max_us": 139,
-     "cb_avg_us": 10,
+     "cb_max_us": 60,
+     "cb_avg_us": 15,
      "underruns": 0,
      "silence_frames": 0,
      "in_overruns": 0,
      "in_underflows": 0,
      "min_fill": 768,
-     "avg_fill": 1929,
-     "wake_count": 628,
+     "avg_fill": 1996,
+     "wake_count": 649,
      "wait_timeouts": 0,
      "ring_frames": 16384,
-     "quanta": 7507,
+     "quanta": 7523,
      "reset_requests": 0,
      "wake_hist": [
-      628,
+      649,
       0,
       0,
       0,
@@ -347,11 +347,11 @@
     "clock": {
      "samples": 40,
      "fit_ok": 1,
-     "rate_hz": 95987.505,
-     "audible_minus_now_ms": -1.702,
+     "rate_hz": 96004.29,
+     "audible_minus_now_ms": -1.019,
      "monotonic": 1
     },
-    "produced_frames": 962048,
+    "produced_frames": 964096,
     "resets_seen": 0,
     "rate_changes": 0,
     "panel_code": 1,
@@ -359,23 +359,23 @@
     "ctx": {
      "sampleRate": 96000,
      "baseLatency": 0,
-     "outputLatency": 0.049020833
+     "outputLatency": 0.049197916
     },
     "snapshot": {
      "underruns": 0,
      "silence_frames": 0,
-     "quanta": 7535,
+     "quanta": 7551,
      "in_overruns": 0,
      "wl_state": 0,
-     "out_read": 960896,
-     "out_write": 962048,
+     "out_read": 962944,
+     "out_write": 964096,
      "in_write": 0,
      "in_read": 0,
      "gen": 1,
-     "cb_count": 3748,
+     "cb_count": 3756,
      "cb_late": 0,
-     "cb_max_us": 139,
-     "wake_count": 630,
+     "cb_max_us": 60,
+     "wake_count": 651,
      "wait_timeouts": 0,
      "in_underflows": 0,
      "min_fill": 768,
@@ -387,12 +387,12 @@
      "clock_jump_max_q": 0,
      "clock_first_q": 0,
      "clock_last_q": 0,
-     "cb_max_q": 1030,
+     "cb_max_q": 504,
      "ring_frames": 16384,
      "buffer_frames": 256,
      "depth": 11,
      "sample_rate": 96000,
-     "out_latency_us": 49021,
+     "out_latency_us": 49198,
      "base_latency_us": 0
     },
     "workletErrors": [],
@@ -425,21 +425,21 @@
     },
     "ref_slope": {
      "n": 41,
-     "ctx_per_wall": 0.9997212637357707
+     "ctx_per_wall": 0.9998524822267649
     },
     "verify": {
-     "covered_frames": 960896,
+     "covered_frames": 962944,
      "sr": 96000,
      "gen_inits": 1,
-     "playing_quanta": 7507,
+     "playing_quanta": 7523,
      "first_underrun_q": 0,
      "last_underrun_q": 0,
      "underrun_events": 0,
      "audio_thread_gap_ms_hist": {
-      "0": 6968,
-      "1-5": 33,
+      "0": 6955,
+      "1-5": 61,
       "6-12": 0,
-      "13-20": 533,
+      "13-20": 534,
       "21-40": 0,
       ">40": 0,
       "max": 20
@@ -447,22 +447,22 @@
      "spans": [
       [
        1,
-       960895,
+       962943,
        0.014396975748240948
       ]
      ],
      "device_fill": {
       "min": 896,
       "max": 2816,
-      "avg": 2030.8457127617016,
+      "avg": 2063.9936127744513,
       "unit": "frames (リング充填, worklet 消費直前)"
      },
      "sine": {
-      "frames_checked": 960896,
+      "frames_checked": 962944,
       "max_abs_err": 1.4870864706306719e-8,
       "samples_over_1e5": 0,
       "peak": 0.5,
-      "rms": 0.35355021020479743,
+      "rms": 0.35355365642782016,
       "expect_rms": 0.35355339059327373,
       "zero_runs_ge16": 0
      }
@@ -487,14 +487,14 @@
    "ctx": {
     "sampleRate": 96000,
     "baseLatency": 0,
-    "outputLatency": 0.049260416
+    "outputLatency": 0.049229166
    },
    "burst": 1920,
    "T": 3072,
-   "clock_hz": 96042.232,
+   "clock_hz": 95997.809,
    "underruns": 0,
    "silence_frames": 0,
-   "cb_count": 1873,
+   "cb_count": 1876,
    "result": {
     "api": "asio",
     "driver": "FL Studio ASIO",
@@ -502,7 +502,7 @@
     "depth": 6,
     "sr": 96000,
     "mode": 0,
-    "secs_wall": 10.005,
+    "secs_wall": 10.004,
     "reported": {
      "nin": 2,
      "nout": 2,
@@ -511,30 +511,30 @@
      "pref": 512,
      "gran": 0,
      "lat_in": 640,
-     "lat_out": 7929,
-     "lat_out0": 7929,
-     "olat_us0": 49260,
+     "lat_out": 7926,
+     "lat_out0": 7926,
+     "olat_us0": 49229,
      "ch_type": 19
     },
     "stats": {
-     "cb_count": 1873,
+     "cb_count": 1876,
      "cb_late": 0,
-     "cb_max_us": 159,
-     "cb_avg_us": 20,
+     "cb_max_us": 119,
+     "cb_avg_us": 28,
      "underruns": 0,
      "silence_frames": 0,
      "in_overruns": 0,
      "in_underflows": 0,
-     "min_fill": 768,
-     "avg_fill": 1975,
-     "wake_count": 637,
+     "min_fill": 896,
+     "avg_fill": 2043,
+     "wake_count": 680,
      "wait_timeouts": 0,
      "ring_frames": 16384,
-     "quanta": 7507,
+     "quanta": 7520,
      "reset_requests": 0,
      "wake_hist": [
-      636,
-      1,
+      680,
+      0,
       0,
       0,
       0,
@@ -561,11 +561,11 @@
     "clock": {
      "samples": 40,
      "fit_ok": 1,
-     "rate_hz": 96042.232,
-     "audible_minus_now_ms": -0.299,
+     "rate_hz": 95997.809,
+     "audible_minus_now_ms": -1.087,
      "monotonic": 1
     },
-    "produced_frames": 962560,
+    "produced_frames": 964096,
     "resets_seen": 0,
     "rate_changes": 0,
     "panel_code": 1,
@@ -573,26 +573,26 @@
     "ctx": {
      "sampleRate": 96000,
      "baseLatency": 0,
-     "outputLatency": 0.049260416
+     "outputLatency": 0.049229166
     },
     "snapshot": {
      "underruns": 0,
      "silence_frames": 0,
-     "quanta": 7536,
+     "quanta": 7549,
      "in_overruns": 0,
      "wl_state": 0,
-     "out_read": 960896,
-     "out_write": 962560,
+     "out_read": 962560,
+     "out_write": 964096,
      "in_write": 0,
      "in_read": 0,
      "gen": 1,
-     "cb_count": 1874,
+     "cb_count": 1877,
      "cb_late": 0,
-     "cb_max_us": 159,
-     "wake_count": 639,
+     "cb_max_us": 119,
+     "wake_count": 682,
      "wait_timeouts": 0,
      "in_underflows": 0,
-     "min_fill": 768,
+     "min_fill": 896,
      "clock_jumps": 0,
      "clock_jump_frames": 0,
      "clock_skip_frames": 0,
@@ -601,12 +601,12 @@
      "clock_jump_max_q": 0,
      "clock_first_q": 0,
      "clock_last_q": 0,
-     "cb_max_q": 3428,
+     "cb_max_q": 2568,
      "ring_frames": 16384,
      "buffer_frames": 512,
      "depth": 6,
      "sample_rate": 96000,
-     "out_latency_us": 49260,
+     "out_latency_us": 49229,
      "base_latency_us": 0
     },
     "workletErrors": [],
@@ -638,22 +638,22 @@
      "olat_zero_ms": 0
     },
     "ref_slope": {
-     "n": 40,
-     "ctx_per_wall": 1.000104148502333
+     "n": 41,
+     "ctx_per_wall": 0.9997668396863784
     },
     "verify": {
-     "covered_frames": 960896,
+     "covered_frames": 962560,
      "sr": 96000,
      "gen_inits": 1,
-     "playing_quanta": 7507,
+     "playing_quanta": 7520,
      "first_underrun_q": 0,
      "last_underrun_q": 0,
      "underrun_events": 0,
      "audio_thread_gap_ms_hist": {
-      "0": 6963,
-      "1-5": 39,
+      "0": 6948,
+      "1-5": 66,
       "6-12": 0,
-      "13-20": 533,
+      "13-20": 534,
       "21-40": 0,
       ">40": 0,
       "max": 20
@@ -661,22 +661,22 @@
      "spans": [
       [
        1,
-       960895,
+       962559,
        0.014396975748240948
       ]
      ],
      "device_fill": {
       "min": 896,
       "max": 3072,
-      "avg": 2132.747299639952,
+      "avg": 2176.3407880724176,
       "unit": "frames (リング充填, worklet 消費直前)"
      },
      "sine": {
-      "frames_checked": 960896,
+      "frames_checked": 962560,
       "max_abs_err": 1.4870864706306719e-8,
       "samples_over_1e5": 0,
       "peak": 0.5,
-      "rms": 0.35355021020479743,
+      "rms": 0.35355254569131245,
       "expect_rms": 0.35355339059327373,
       "zero_runs_ge16": 0
      }
