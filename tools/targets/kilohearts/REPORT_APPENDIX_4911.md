@@ -2,8 +2,9 @@
 
 #### 結論
 
-- **結論**: Stereo 閉包の型不一致 (build_cmp 条件) は **12 → 2** に減った (`stereo` の GTYPE 4 行)。受入 1 は**未達** (2 件残り)。受入 2 (emcc 0) は**未達**。受入 3 (Gain/Haas/Gate 1000/1000) は **達成**。
+- **結論**: Stereo 閉包の型不一致 (build_cmp 条件) は **12 → 2** に減った (emcc error 10 件の解消。`stereo` の GTYPE 4 行が効く C の行は 6 箇所)。受入 1 は**部分** (2 件残り)。受入 2 (emcc 0) は**未達**。受入 3 (Gain/Haas/Gate 1000/1000) は **達成**。
 - 本 PR は受入 1 の一部だけを完了単位にする。`Refs #4911` (未 close)。
+- 単位: 件数は emcc の error 件数。行数は生成 C の行 (stereo.c 1300 等)。両者は別物 (GTYPE 1 行が複数の error 行に効く)。
 
 #### 測定 commit
 
