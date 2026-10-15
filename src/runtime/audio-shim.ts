@@ -9,7 +9,7 @@
  *   - AudioContext の状態変化を dev_events で wasm へ通知 (ASIO kAsioResetRequest の元)
  * 設計: tools/audio/docs/PROTOCOL.md
  */
-import { FLA_CMD, FLA_EV, FLA_LAYOUT, verifyLayout, type FlaField } from "./audio-layout";
+import { FLA_CMD, FLA_CTL_SIZE, FLA_EV, FLA_LAYOUT, FLA_PW_N, verifyLayout, type FlaField } from "./audio-layout";
 import type { FlAudioInput } from "./audio-input";
 
 /** wasm モジュールへの薄い口 (Emscripten Module / 自前 instance いずれからも作れる) */
@@ -31,6 +31,14 @@ export interface FlCaptureSpec {
   ring?: boolean;
 }
 
+/** producer の write 1 件 (ctl.pw_trace): 書き込み開始 frame / 起床時の充填 / 起床時刻・完了時刻 (µs, 下 32bit) */
+export interface ProducerWrite {
+  w: number;
+  fill: number;
+  wake_us: number;
+  done_us: number;
+}
+
 /** producer (ASIO bufferSwitch 側の fla_out_wait_fill_le) の起床統計。wake_hist は worklet の notify から producer 起床までの遅延 (ms: <1,<2,<4,<8,<16,>=16) */
 export interface ProducerStats {
   wake_hist: number[];
@@ -39,6 +47,9 @@ export interface ProducerStats {
   cb_count: number;
   cb_max_us: number;
   cb_max_q: number;
+  /** write の通算数 (writes はその直近 FLA_PW_N 件・古い順) */
+  pw_n: number;
+  writes: ProducerWrite[];
 }
 
 export interface FlAudioShimOptions {
@@ -111,7 +122,7 @@ export class FlAudioShim {
     const n = this.api.layoutCount();
     verifyLayout(n, (i) => this.api.layoutOff(i), (i) => this.api.layoutName(i));
     this.ctlPtr = this.api.ctlPtr();
-    this.i32 = new Int32Array(this.api.getBuffer(), this.ctlPtr, 96);
+    this.i32 = new Int32Array(this.api.getBuffer(), this.ctlPtr, FLA_CTL_SIZE >> 2);
     this.st("ctrl_ready", 1);
     Atomics.notify(this.i32, this.ix("ctrl_ready"));
     this.offInput = this.opts.input?.on((e) => {
@@ -356,6 +367,18 @@ export class FlAudioShim {
   /** producer の起床統計 (ctl の wake_hist[6] / wake_count / wait_timeouts) */
   producerStats(): ProducerStats {
     const base = this.ix("wake_hist");
+    const n = this.ld("pw_n") >>> 0;
+    const pw = this.ix("pw_trace");
+    const writes: ProducerWrite[] = [];
+    for (let k = n - Math.min(n, FLA_PW_N); k < n; k++) {
+      const e = pw + (k % FLA_PW_N) * 4;
+      writes.push({
+        w: Atomics.load(this.i32, e) >>> 0,
+        fill: Atomics.load(this.i32, e + 1) >>> 0,
+        wake_us: Atomics.load(this.i32, e + 2) >>> 0,
+        done_us: Atomics.load(this.i32, e + 3) >>> 0,
+      });
+    }
     return {
       wake_hist: [0, 1, 2, 3, 4, 5].map((k) => Atomics.load(this.i32, base + k) >>> 0),
       wake_count: this.ld("wake_count") >>> 0,
@@ -363,6 +386,8 @@ export class FlAudioShim {
       cb_count: this.ld("cb_count") >>> 0,
       cb_max_us: this.ld("cb_max_us") >>> 0,
       cb_max_q: this.ld("cb_max_q") >>> 0,
+      pw_n: n,
+      writes,
     };
   }
 

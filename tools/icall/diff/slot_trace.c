@@ -17,6 +17,32 @@ static uint64_t g_stub_va;
 static int g_stub_ret, g_stubbed;
 static uint64_t g_gpr[4];
 
+#define ITRN 300000
+static uint64_t g_trace_fn, g_trace_on, g_itr_n, g_trace_orig;
+static greg_t g_itr[ITRN][19];
+
+static void itr_record(ucontext_t* uc) {
+    greg_t* r = g_itr[g_itr_n++ % ITRN];
+    memcpy(r, uc->uc_mcontext.gregs, 18 * sizeof(greg_t));
+    r[18] = *(greg_t*)(uc->uc_mcontext.gregs[REG_RSP] + 0x28);
+}
+
+static void itr_dump(void) {
+    const char* p = getenv("SLOT_TRACE_OUT");
+    FILE* f = fopen(p ? p : "slot_trace_insn.txt", "w");
+    if (!f) return;
+    uint64_t s = g_itr_n > ITRN ? g_itr_n - ITRN : 0;
+    for (uint64_t i = s; i < g_itr_n; i++) {
+        greg_t* r = g_itr[i % ITRN];
+        fprintf(f, "I %llx", (unsigned long long)r[REG_RIP]);
+        static const int ord[] = {REG_RAX, REG_RBX, REG_RCX, REG_RDX, REG_RSI, REG_RDI, REG_RBP, REG_RSP,
+                                  REG_R8, REG_R9, REG_R10, REG_R11, REG_R12, REG_R13, REG_R14, REG_R15};
+        for (int k = 0; k < 16; k++) fprintf(f, " %llx", (unsigned long long)r[ord[k]]);
+        fprintf(f, " s28=%llx\n", (unsigned long long)r[18]);
+    }
+    fclose(f);
+}
+
 static void record(uint64_t a, uint64_t rip) {
     for (int i = 0; i < g_nacc; i++)
         if (g_acc_addr[i] == a && g_acc_rip[i] == rip) { g_acc_cnt[i]++; return; }
@@ -27,6 +53,20 @@ static void on_acc(int sig, siginfo_t* si, void* uc_) {
     ucontext_t* uc = (ucontext_t*)uc_;
     greg_t* g = uc->uc_mcontext.gregs;
     uint64_t a = (uint64_t)si->si_addr;
+    if (sig == SIGTRAP && g_trace_fn && !g_trace_on && g[REG_RIP] == g_trace_fn + 1) {
+        g_trace_on = 1;
+        *(uint8_t*)g_trace_fn = (uint8_t)g_trace_orig;
+        g[REG_RIP] = (greg_t)g_trace_fn;
+        itr_record(uc);
+        g[REG_EFL] |= 0x100;
+        return;
+    }
+    if (sig == SIGTRAP && g_trace_on) {
+        itr_record(uc);
+        if (g_armed) { mprotect((void*)g_armed, 4096, PROT_NONE); g_armed = 0; }
+        g[REG_EFL] |= 0x100;
+        return;
+    }
     if (sig == SIGSEGV && a >= ZLO && a < ZHI) {
         record(a, (uint64_t)g[REG_RIP]);
         uint64_t pg = a & ~0xfffULL;
@@ -55,6 +95,7 @@ static void on_acc(int sig, siginfo_t* si, void* uc_) {
             (unsigned long long)g[REG_RSP], (unsigned long long)g[REG_RBP], (unsigned long long)g[REG_R8], (unsigned long long)g[REG_R9]);
     fprintf(stderr, "[slot_trace] heap_args %#llx %#llx %#llx %#llx\n", (unsigned long long)g_gpr[0], (unsigned long long)g_gpr[1],
             (unsigned long long)g_gpr[2], (unsigned long long)g_gpr[3]);
+    if (g_trace_on) itr_dump();
     for (int i = 0; i < g_nacc; i++)
         printf("ACC %llx %llx %llu\n", (unsigned long long)g_acc_addr[i], (unsigned long long)g_acc_rip[i], (unsigned long long)g_acc_cnt[i]);
     fflush(stdout);
@@ -84,10 +125,19 @@ int main(int argc, char** argv) {
         g_stub_va = strtoull(getenv("SLOT_STUB_VA"), NULL, 16);
         g_stub_ret = 1;
     }
+    if (getenv("SLOT_TRACE_FN")) {
+        g_trace_fn = strtoull(getenv("SLOT_TRACE_FN"), NULL, 16);
+        uint64_t pg = g_trace_fn & ~0xfffULL;
+        mprotect((void*)pg, 4096, PROT_READ | PROT_WRITE | PROT_EXEC);
+        g_trace_orig = *(uint8_t*)g_trace_fn;
+        *(uint8_t*)g_trace_fn = 0xcc;
+    }
     mprotect((void*)ZLO, ZHI - ZLO, PROT_NONE);
     sigaction(SIGSEGV, &sa, NULL);
     sigaction(SIGTRAP, &sa, NULL);
-    ott_call(fn, gpr, xmm, NULL, 0, out);
+    uint64_t stk5[1] = {getenv("SLOT_STK5") ? strtoull(getenv("SLOT_STK5"), NULL, 16) : 0};
+    if (getenv("SLOT_STK5")) ott_call(fn, gpr, xmm, stk5, 1, out);
+    else ott_call(fn, gpr, xmm, NULL, 0, out);
     mprotect((void*)ZLO, ZHI - ZLO, PROT_READ | PROT_WRITE);
     for (int i = 0; i < g_nacc; i++)
         printf("ACC %llx %llx %llu\n", (unsigned long long)g_acc_addr[i], (unsigned long long)g_acc_rip[i], (unsigned long long)g_acc_cnt[i]);

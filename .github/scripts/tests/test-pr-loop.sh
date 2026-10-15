@@ -429,6 +429,111 @@ setup aaa '[{"name":"oc:stuck"}]' 0
 run_fix record > /dev/null 2>&1
 { grep -qx 'stop=true' "$TMP/out" && ! grep -q OC_RECORD_OK "$TMP/env" && ! grep -q 'reason=record-failed' "$TMP/out"; }; expect "停止の判定で終わった (stop=true) なら OC_RECORD_OK を残さず、record-failed とも出さない" $?
 
+echo "== fix-progress.sh gate / snapshot (窓の判定を agent の無い fixgate job へ分ける #2873)"
+# run_gate: fixgate job の gate。$GITHUB_ENV は書かせない (呼び出しの後に空であることを見る)
+run_gate() { GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" OC_MARK_TOKEN="${OC_MARK_TOKEN-mark-tok}" bash "$SCRIPTS/fix-progress.sh" gate; }
+# run_snap <gate の stop>: implement job の snapshot (workflow は needs.fixgate.outputs.stop を OC_GATE_STOP で渡す)
+run_snap() { GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" OC_GATE_STOP="$1" bash "$SCRIPTS/fix-progress.sh" snapshot; }
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
+run_gate > /dev/null 2>&1; rc=$?
+{ [ "$rc" -eq 0 ] && grep -qx 'stop=false' "$TMP/out" && grep -qx 'reason=none' "$TMP/out"; }; expect "gate: 窓が閉じていない -> rc=0・stop=false・reason=none" $?
+! grep -q . "$TMP/env"; expect "gate: \$GITHUB_ENV に何も書かない (head も OC_RECORD_OK も残さない)" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 5 1)"
+run_gate > /dev/null 2>&1
+{ grep -qx 'stop=false' "$TMP/out" && grep -qx 'reason=reset' "$TMP/out"; }; expect "gate: 5 件 (doc) -> stop=false・reason=reset" $?
+logged 'oc-fix-reset n=1.*GH_TOKEN=mark-tok'; expect "gate: 窓の印は OC_MARK_TOKEN で投稿する" $?
+! logged 'issues/7/labels'; expect "gate: 自動再開では oc:stuck を付けない" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv code 5 1)"
+run_gate > /dev/null 2>&1
+{ grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=code' "$TMP/out"; }; expect "gate: 直近 3 件に code -> stop=true・reason=code" $?
+logged 'issues/7/labels' && logged 'oc-pm-intent: stuck pr=7 reason=code.*GH_TOKEN=mark-tok'; expect "gate: oc:stuck を付け、停止印を OC_MARK_TOKEN で残す" $?
+! grep -q . "$TMP/env"; expect "gate: 停止の判定でも \$GITHUB_ENV は空のまま" $?
+
+setup aaa '[{"name":"oc:stuck"}]' 0
+run_gate > /dev/null 2>&1
+{ grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=stuck-label' "$TMP/out" && ! logged 'pr comment'; }; expect "gate: ラベル済みは reason=stuck-label・再コメントしない" $?
+
+setup aaa '[]' 1
+fx repos/o/r/pulls/7 '{"state":"closed","merged":true,"head":{"sha":"aaa"}}'
+run_gate > /dev/null 2>&1
+{ grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=not-open' "$TMP/out" && ! logged 'pr comment' && ! logged 'issues/7/labels'; }; expect "gate: merge 済みは reason=not-open・何も付けない" $?
+
+setup aaa '[]' 1
+review_event old000
+GITHUB_EVENT_PATH="$TMP/event.json" run_gate > /dev/null 2>&1
+{ grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=stale-head' "$TMP/out"; }; expect "gate: 古い head への差し戻し -> reason=stale-head" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 5 1)"
+FAKE_COMMENT_FAILS=1 run_gate > "$TMP/rec.out" 2>&1; rc=$?
+{ [ "$rc" -ne 0 ] && grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=record-failed' "$TMP/out" && grep -q '::error::fix-progress gate failed' "$TMP/rec.out"; }; expect "gate: 印の投稿に失敗 -> rc!=0・stop=true・reason=record-failed" $?
+rf_check; crc=$?
+{ [ "$crc" -ne 0 ] && ! grep -q '^result=' "$TMP/out"; }; expect "gate: 失敗の後の check は result を出さない" $?
+
+setup aaa '[]' 0
+GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" OC_PR_NUMBER='7;x' bash "$SCRIPTS/fix-progress.sh" gate > /dev/null 2>&1; rc=$?
+{ [ "$rc" -ne 0 ] && grep -qx 'stop=true' "$TMP/out" && [ ! -s "$LOG" ]; }; expect "gate: OC_PR_NUMBER が数字でなければ gh を呼ばず rc!=0・stop=true (fail-closed)" $?
+
+setup bbb '[]' 0
+run_snap false > /dev/null 2>&1; rc=$?
+{ [ "$rc" -eq 0 ] && grep -qx 'OC_HEAD_BEFORE=bbb' "$TMP/env" && grep -qx 'OC_RECORD_OK=1' "$TMP/env" && grep -q '^OC_START_TS=' "$TMP/env"; }; expect "snapshot: gate が通過 (false) -> OC_HEAD_BEFORE・OC_START_TS・OC_RECORD_OK=1" $?
+! grep -q '^stop=' "$TMP/out"; expect "snapshot: stop を出さない" $?
+
+setup bbb '[]' 0
+run_snap true > "$TMP/snap.out" 2>&1; rc=$?
+{ [ "$rc" -ne 0 ] && ! grep -q 'OC_RECORD_OK' "$TMP/env" && ! grep -q 'OC_HEAD_BEFORE' "$TMP/env" && grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=record-failed' "$TMP/out"; }; expect "snapshot: gate が止めた (true) -> rc!=0・OC_RECORD_OK を残さず stop=true" $?
+
+setup bbb '[]' 0
+run_snap "" > /dev/null 2>&1; rc=$?
+{ [ "$rc" -ne 0 ] && ! grep -q 'OC_RECORD_OK' "$TMP/env"; }; expect "snapshot: gate の結果が空なら fail-closed (OC_RECORD_OK を残さない)" $?
+
+setup bbb '[]' 0
+GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" env -u OC_GATE_STOP bash "$SCRIPTS/fix-progress.sh" snapshot > /dev/null 2>&1; rc=$?
+{ [ "$rc" -ne 0 ] && ! grep -q 'OC_RECORD_OK' "$TMP/env" && grep -qx 'stop=true' "$TMP/out"; }; expect "snapshot: OC_GATE_STOP が未設定なら rc!=0・stop=true" $?
+
+setup bbb '[]' 0
+FAKE_FAIL_PATH=repos/o/r/pulls/7 run_snap false > "$TMP/snap.out" 2>&1; rc=$?
+{ [ "$rc" -ne 0 ] && ! grep -q 'OC_RECORD_OK' "$TMP/env" && grep -qx 'stop=true' "$TMP/out"; }; expect "snapshot: head を読めなければ OC_RECORD_OK を残さず stop=true" $?
+
+# gate が通った後 (agent の順番待ちの間) に停止条件が付いた場合: snapshot が止め、OC_RECORD_OK を残さない (#2873)
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
+run_gate > /dev/null 2>&1; g="$(sed -n 's/^stop=//p' "$TMP/out")"
+fx repos/o/r/issues/7 '{"labels":[{"name":"oc:stuck"}]}'
+: > "$TMP/out"; : > "$LOG"
+run_snap "$g" > /dev/null 2>&1; rc=$?
+{ [ "$g" = false ] && [ "$rc" -eq 0 ] && grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=stuck-label' "$TMP/out" && ! grep -q OC_RECORD_OK "$TMP/env" && ! grep -q OC_HEAD_BEFORE "$TMP/env" && ! logged 'issues/7/labels' && ! logged 'pr comment'; }; expect "snapshot: gate の後に oc:stuck が付いた -> stop=true・reason=stuck-label・rc=0・OC_RECORD_OK を残さず、何も投稿しない" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
+run_gate > /dev/null 2>&1; g="$(sed -n 's/^stop=//p' "$TMP/out")"
+fx repos/o/r/pulls/7 '{"state":"closed","merged":true,"head":{"sha":"aaa"}}'
+: > "$TMP/out"; : > "$LOG"
+run_snap "$g" > /dev/null 2>&1; rc=$?
+{ [ "$g" = false ] && [ "$rc" -eq 0 ] && grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=not-open' "$TMP/out" && ! grep -q OC_RECORD_OK "$TMP/env" && ! logged 'pr comment' && ! logged 'issues/7/labels'; }; expect "snapshot: gate の後に merge・close された -> stop=true・reason=not-open・OC_RECORD_OK を残さない" $?
+
+setup aaa '[]' 1
+review_event aaa
+GITHUB_EVENT_PATH="$TMP/event.json" run_gate > /dev/null 2>&1; g="$(sed -n 's/^stop=//p' "$TMP/out")"
+fx repos/o/r/pulls/7 '{"state":"open","head":{"sha":"bbb"}}'
+: > "$TMP/out"; : > "$LOG"
+GITHUB_EVENT_PATH="$TMP/event.json" run_snap "$g" > /dev/null 2>&1; rc=$?
+{ [ "$g" = false ] && [ "$rc" -eq 0 ] && grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=stale-head' "$TMP/out" && ! grep -q OC_RECORD_OK "$TMP/env" && ! logged 'pr comment' && ! logged 'issues/7/labels'; }; expect "snapshot: gate の後に head が進み、差し戻しが古い head になった -> stop=true・reason=stale-head・OC_RECORD_OK を残さない" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
+run_gate > /dev/null 2>&1; g="$(sed -n 's/^stop=//p' "$TMP/out")"
+run_snap "$g" > /dev/null 2>&1
+fx repos/o/r/pulls/7 '{"state":"open","head":{"sha":"bbb"}}'
+( while IFS='=' read -r k v; do export "$k=$v"; done < "$TMP/env"; run_fix check > /dev/null 2>&1 )
+{ [ "$g" = false ] && grep -qx 'OC_HEAD_BEFORE=aaa' "$TMP/env" && grep -qx 'result=pushed' "$TMP/out"; }; expect "gate -> snapshot -> check: head が進んだ -> pushed (snapshot は gate の後の head を記録する)" $?
+
 echo "== fix-progress.sh check (pushed / answered / none)"
 setup bbb '[]' 1
 OC_RECORD_OK=1 OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > /dev/null
