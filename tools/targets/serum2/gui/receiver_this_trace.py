@@ -13,7 +13,7 @@
   ARG / ARG-EMB / ARG-CHILD  this 以外の引数 (rdx/r8/r9) 由来
   CALLRET / GLOBAL / STACK / STACKSLOT / CLOBBER / ARITH / OTHER / INDEX / NODOM / DEPTH 他: 未解決の理由
 strict: 遡りで見つけた定義が使用を支配しない (使用へ定義を通らずに到達できる) なら NODOM として未解決にする。
-        間接 jmp を含む関数は全て NODOM 扱い (分岐先が見えないため)。
+        間接 jmp を含む関数は、定義が見つかった候補を全て NODOM 扱い (分岐先が見えないため)。
 loose : 支配関係を見ず線形に遡る (参考値。分岐の反対側の定義を誤って拾い得る)。
 限界: 関数間の追跡 (呼出元の引数) はしない。
       this の型は証明しない。THIS と判定された関数が slot 関数 (vtable の登録関数) なら SerumController の this。
@@ -406,8 +406,8 @@ print(f"candidates (disp 0x30/0x38/0x88): {len(rows_s)}")
 print("== strict (分岐越えの定義は未解決) ==")
 for k, n in cs.most_common():
     print(f"{n:5d}  {k}")
-ind = sum(1 for r in rows_s if r[4].endswith("NODOM") and fns[r[1]].indirect)
-print(f"strict NODOM のうち間接 jmp を含む関数: {ind} 件")
+ind = [r for r in rows_s if r[1] is not None and fns[r[1]].indirect]
+print(f"間接 jmp を含む関数の候補: {len(ind)} 件 ({len({r[1] for r in ind})} 関数)・分類 {dict(Counter(r[4] for r in ind))}")
 print("== loose (分岐を無視・参考) ==")
 for k, n in cl.most_common(12):
     print(f"{n:5d}  {k}")
