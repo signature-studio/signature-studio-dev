@@ -32,7 +32,7 @@
 
 ## 検証
 
-測定 commit: 本 PR の最後のコード変更 commit (下の表の commit hash 参照)。環境: runner 4 core、測定時の load average 2.12 (`uptime` 18:55:34)。素材 `fl-win64` と `toolchain-emsdk` を展開して使用 (emsdk は 6.0.12)。
+測定 commit: `a44acea67` (コードを変えた最後の commit)。環境: runner 4 core、測定時の load average 1.01 (`uptime` 18:56:26)。素材 `fl-win64` と `toolchain-emsdk` を展開して使用 (emsdk は 6.0.12)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
@@ -48,7 +48,11 @@
 ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `addTextLine` の副作用を外すと `node tests/screen_diff.mjs` は `AssertionError: screen 差分 2 件`・rc 1 で FAIL。戻すと calls 101・diffs 0・PASS (rc 0)。
 
 コード差分 (測定 commit から HEAD まで。`tools/python` の .md 以外):
-(測定 commit を確定した後に記入する)
+
+```
+$ git diff a44acea67 HEAD -- tools/python ':!*.md'
+(空)
+```
 
 ## 未解決
 
