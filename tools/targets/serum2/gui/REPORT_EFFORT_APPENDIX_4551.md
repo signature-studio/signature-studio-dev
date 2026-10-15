@@ -8,19 +8,22 @@
 - 判定 harness (`draw_ops_main.cpp`) に 8x8→32x32 の拡大、白黒 2x2 の bilinear / 最近傍、9 分割 (dest 20x20) を追加。判定 (`check_draw_ops.sh`) は画素数の一致で行う (期待: 拡大 1024、9 分割 400)。bilinear は中間階調が 1 以上、最近傍は 0 を要求する。
 
 ### 1-2. 測定 commit と検証
-- 測定 commit: `52d2a6d29` (`fix(serum2): keep canvas bitmap alive in draw_ops stretch harness (#4551)`)。前回の `201b10a2f` は harness が解放済みポインタを返して二重 delete していたため、測定の根拠にしない (round 1 blocking 1)。この付録を含む commit は REPORT のみ。
+- 測定 commit: `a91be2092` (`merge: origin/main into 4551-canvas-bitmap-scale (resolve canvas conflicts with #4231 and #4233) (#4551)`)。main (`70f4ffaa7`) の取り込みで `canvas_graphicsdevice.h` と `check_draw_ops.sh` の競合を解消した commit。判定の期待件数を 12 → 15 に直したのもこの commit。前回の `52d2a6d29` は main 取り込み前の測定のため、現 head の根拠にしない (round 2 blocking 1)。この付録を含む commit は REPORT のみ。
 - 前提の素材と取得経路:
   - `toolchain-emsdk` 素材は `$ARTIFACTS_DIR` に無かった (`fl-win64` のみ)。runner 上の既存の emsdk も無い。そこで上流 emsdk を `git clone --depth 1` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12` で `work/emsdk` に導入した (emcc 6.0.12)。install 所要は clone 込みで計測対象外。
   - 導入後、`work/emsdk/upstream/emscripten/.emscripten` が無く em++ が `BINARYEN_ROOT` 不明で失敗したため、`EM_CONFIG` を emsdk ルートの `.emscripten` に、`PATH` に `upstream/bin` を与えて実行した (`check_draw_ops.sh` の PATH 設定だけでは足りない)。
   - `work/vstgui4` (vstgui4_14_3・commit `b1e82355`): `https://github.com/steinbergmedia/vstgui.git` を `git clone --filter=blob:none --no-checkout` し、`git checkout vstgui4_14_3`。
   - `fl-win64` は本 run の検証では使わない (canvas の検証は vstgui の lib と canvas 層のみ)。
 
-| 検証 (HEAD `52d2a6d29`) | 結果 | 所要 (real) | load (uptime 1 分平均・開始→終了) |
+| 検証 (HEAD `a91be2092`) | 結果 | 所要 (real) | load (uptime 1 分平均・開始→終了) |
 |---|---|---|---|
-| `check_draw_ops.sh` (rc) | **0** (link rc=0・run rc=0) | 31.608 s | 1.59 → 2.49 |
-| `check_canvas_syntax.sh` (rc) | **0** (全ファイル errors=0) | 6.966 s | 2.49 → 2.26 |
+| `check_draw_ops.sh` (rc) | **0** (link rc=0・compile fail=0・run rc=0・draw_op 15 件) | 28 s | 1.41 → 2.19 |
+| `check_canvas_syntax.sh` (rc) | **0** (全 8 ファイル errors=0) | 6 s | 2.19 → 2.10 |
 
-`check_draw_ops.sh` の判定 (HEAD `52d2a6d29`):
+- 前提の emsdk は上流 6.0.12 を `work/emsdk` (`tools/targets/serum2/gui/work/`、gitignore) に導入し、`EM_CONFIG=work/emsdk/.emscripten`・`PATH` に `upstream/bin` を与えて実行した (`emsdk install 6.0.12` → `emsdk activate 6.0.12`。install は計測対象外)。`fl-win64` は使わない。
+- `work/vstgui4` は `b1e82355` (vstgui4_14_3)。
+
+`check_draw_ops.sh` の判定 (HEAD `a91be2092`):
 
 | op | nonzero | 判定 |
 |---|---|---|
@@ -28,19 +31,33 @@
 | drawLines | 26 | pass |
 | drawPolygon | 607 | pass |
 | drawEllipse | 2472 | pass |
+| drawArc | 1307 | pass (#4231) |
+| drawPoint | 1 | pass (#4231) |
+| drawGraphicsPath | 876 | pass (#4231) |
 | drawBitmap | 64 | pass (1:1 のまま) |
-| fillRectWithBitmap_scale | 1024 (want 1024) | pass |
+| fillLinearGradient | 3136 (distinct 57) | pass (#4233) |
+| fillRadialGradient | 3136 (distinct 173) | pass (#4233) |
+| drawBitmapNinePartTiled | 3136 | pass (1:1 タイル, #4233) |
+| fillRectWithBitmap | 900 | pass (1:1 タイル, #4233) |
+| fillRectWithBitmap_scale | 1024 (want 1024) | pass (#4551) |
 | fillRectWithBitmap_bilinear (mid-tone) | 512 | pass (bilinear_mid=512) |
 | fillRectWithBitmap_nearest (mid-tone) | 0 | pass (nearest_mid=0) |
-| drawBitmapNinePartTiled | 400 (want 400) | pass |
+| drawBitmapNinePartTiled_scale | 400 (want 400) | pass (#4551) |
+
+注: `fillRectWithBitmap` (1:1 タイル, #4233 の harness) と `fillRectWithBitmap_scale` (#4551) は同じ `fillRectWithBitmap` 経路を別入力で測っている。#4233 の 1:1 方針は #4551 で拡大縮小へ置き換わった (PM 判断待ち、§1-6)。
 
 - `run.log` の `rc=` は実測値になった (`fillRectWithBitmap_bilinear rc=1`・`fillRectWithBitmap_scale rc=1` 等。前回の固定 `rc=1` を外した)。
 - 同じ入力での対比: 最近傍は中間階調 0、bilinear は 512。判定はこの差で bilinear の効きを見ている (負の対照の実行はしていない)。
 - 参考 (前回 `201b10a2f` の数値 15.838 s は、解放済みポインタの上で出た値のため採らない)。
 
 ### 1-3. コード差分 (測定 commit 以降)
-- 測定 commit `52d2a6d29` 以降のコード差分は 0 行 (REPORT のみの commit)。
-- 前回測定 (`201b10a2f`) から `52d2a6d29` までの差分 (`git diff 201b10a2f 52d2a6d29 -- tools/targets/serum2/gui/canvas`) は `draw_ops_main.cpp` の 13 insertions / 11 deletions (`runStretch`・`countMid` の所有権修正と rc の実測化)。
+- 測定 commit `a91be2092` 以降のコード差分 (`git diff a91be2092 HEAD -- tools/targets/serum2/gui/canvas`) は 0 行 (この付録の commit は REPORT のみ)。
+- main の取り込み: `1bf34deea` (main `325cf6a4d`・SR-62 競合の解消) の後、main が `70f4ffaa7` まで進んだため、`a91be2092` で再度取り込んだ。競合は `canvas_graphicsdevice.h` の注釈と `check_draw_ops.sh` の期待件数 (drawArc・drawPoint・drawGraphicsPath の #4231 を含めて 15 件)。`canvas_graphicsdevice.cpp`・`draw_ops_main.cpp` は自動マージ。
+- 前回測定 (`52d2a6d29`) からの差分: `1bf34deea` 以前の main 取り込みで canvas 層の差分が増えたため、現 head の根拠は `a91be2092` の測定のみ。
+
+### 1-6. #4233 の 1:1 タイル方針との関係 (PM 判断待ち)
+- `fillRectWithBitmap`・`drawBitmapNinePartTiled` は #4233 (SR-62) で 1:1 タイルだった。#4551 (SR-78) は srcRect → dstRect の拡大縮小 (quality に応じて bilinear・最近傍) へ置き換えた。#4551 の受入条件に沿う変更で、#4233 の受入 (1:1 タイル) の挙動は変わる。
+- PM agent の判断待ち: #4233 の 1:1 タイル方針を #4551 の拡大縮小で置き換えてよいか。既定案: 拡大縮小 (#4551 の受入)。
 
 ### 1-4. 製品 KPI
 - 起動・GUI の製品 KPI (FLEngine 起動 dispatch・通過 unit・最初のウィンドウ) は動かしていない。本 PR は canvas の描画 harness の範囲。
