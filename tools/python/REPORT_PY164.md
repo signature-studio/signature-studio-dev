@@ -5,7 +5,7 @@
 (2) `genre` は CPT 表に無い (`reset_chord_pool` の `hasattr` が偽になる根拠)。
 (3) `chordPool` の名前は PE に無い (control.pyc の ImportError 経路で `None` になる根拠)。
 値 (`resolution` の実値・getter) は FLEngine の実行時に決まり、表とハンドラからは確定できなかった。推定で埋めず、src/flcpt.py には属性を足していない。
-mock の差し替えで probe の reset の読取りが変わった (§5)。呼べた数は 3/9 のまま。
+mock の差し替えで probe の reset の読取りが変わった (§5)。呼べた数は 3/9 のまま。genre の読取りの有無と chordPool.clear 経路の実測での到達は未確認 (§4・§5)。
 
 ## 0. 属性ごとの根拠
 
@@ -14,7 +14,7 @@ mock の差し替えで probe の reset の読取りが変わった (§5)。呼�
 | `cpt.resolution` | PE 属性表 行 `0x1512810` (§2) | 型 T_FLOAT (type 0x03) | 実値の getter・既定値 (§2.3) |
 | `cpt.genre` | PE 属性表に無し。`'genre'` を指す qword は flrack.Rack 表の 1 件のみ (§2.2) | CPT の属性として存在しないと読める。`hasattr(flc,'genre')` は偽 (§4) | 表の完全性 (§6) |
 | `chordPool` | PE に `chordPool` の文字列が無い (§3) | native flcpt に属性が無いと読める。control.pyc が `chordPool = None` (§3) | 実機での import 失敗の挙動 (§6) |
-| `chordPool.clear` | 上の `chordPool` が None なら `None.clear` (§4) | 呼ばれる経路は genre の真偽と preset の真偽に依存 | 実機の経路 (§6) |
+| `chordPool.clear` | 上の `chordPool` が None なら `None.clear` (§4) | 静的な読みでは、genre が偽の経路で `chordPool.clear()` が呼ばれ AttributeError になる。実測 (probe の reset) では未到達・未確認 (§4・§5) | 実機の経路 (§6) |
 
 ## 1. 入力と測定
 
@@ -33,7 +33,7 @@ mock の差し替えで probe の reset の読取りが変わった (§5)。呼�
 | `node tests/chord_progression_e2e.mjs` | 41/41 PASS (0.6 s) | 41/41 PASS (0.5 s) |
 | `node tests/chord_progression_e2e.mjs --neg` | 34/41・FAIL 7・exit 1 | 34/41・FAIL 7・exit 1 |
 | `node tests/chord_progression_call_probe.mjs` (呼べた数) | 3/9 | 3/9 |
-| probe の reset の読取り | `chordPool.clear`・`chordPool.clear()`・`cpt.genre` | 読取り 0 件 (OK) |
+| probe の reset の読取り (`SEEN` の記録) | `chordPool.clear`・`chordPool.clear()`・`cpt.genre` | `SEEN` に 0 件 (reset は OK)。ただし `SEEN` は Rec 経由の読取りだけを記録し、`genre` の AttributeError は含まない。この値では genre の読取りの有無は判定できない (§5) |
 
 `git diff 24f0421f1 HEAD -- tools/python/src tools/python/tests` の出力は 0 行 (測定後の差分なし)。
 
@@ -91,12 +91,16 @@ mock の差し替えで probe の reset の読取りが変わった (§5)。呼�
   - offset 88〜152: `if hasattr(flc, 'genre'): genre = flc.genre` / `else: genre = ''`。genre が無いので `''`。
   - offset 164〜194: `genre` が偽のとき `chordPool.clear()`。chordPool が None なら AttributeError。
   - offset 398〜410: `preset` が真のときの 2 つ目の `chordPool.clear()`。
+- 静的な読み (上記) では、offset 164 の経路は `genre` が偽 (= 常に偽) なので通り、`chordPool` が None なら AttributeError になる。
+  しかし実測の probe では reset は OK で、この AttributeError は出ていない。両者の食い違いの理由は未確定 (実行時に通った分岐を特定していない)。
+  したがって §4 の chordPool.clear 経路は「静的な読みで、実測では未到達・未確認」として扱う。
 
 ## 5. mock の差し替え (本 PR)
 
 - `tests/chord_progression_call_probe.mjs`: `_CPTRec` は表 53 行の名前だけを Rec に委譲し、他は AttributeError (genre が `hasattr` で偽になる)。`flcpt.chordPool` の Rec を置かない。
 - `tests/chord_progression_e2e.mjs`: `flcpt.chordPool` の SimpleNamespace を置かない (e2e は 41/41 のまま)。
-- 結果: reset の読取りが 0 件になり、OK のまま。旧 mock では chordPool・genre を Rec で読んでいた。この run の probe の経路では、`chordPool.clear` (§4 の offset 164) に到達していない。到達しない理由は未確認。
+- 結果: reset は OK のまま。`SEEN` (Rec 経由の読取り記録) は 0 件。旧 mock では chordPool・genre を Rec で読んでいた。
+- 注意: `_CPTRec.__getattr__` は `genre` で AttributeError を投げ、`SEEN` には入らない。よって「SEEN 0 件」は genre が読まれなかったことの証拠にならず、genre の読取りの有無はこの値では判定できない。`chordPool.clear` (§4 の offset 164) に実測で到達したかも未確認 (分岐の追跡はしていない)。
 
 ## 6. 未解決 (起票先)
 
