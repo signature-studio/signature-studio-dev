@@ -90,7 +90,7 @@ PE: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_handler_probe.p
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.24 秒 |
 
 - ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `ui.openEventEditor` の個数上限を 3 から 2 にすると `node tests/ui_editor_diff.mjs` は rc 1 (`AssertionError [ERR_ASSERTION]: ui.openEventEditor`)。元に戻すと `arity(a, 2, 3)` に戻り、テストは PASS (本節の測定と同じ commit で確認)。
-- PE の VA の再確認 (差し戻し round 3 への対応で、この run で実行)。展開は `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 extracted/block00031_PE.bin` (1 ファイル・2.6 秒)。実行は `tools/python` で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。
+- PE の VA の再確認 (差し戻し round 3 への対応で、この run で実行)。展開は `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 extracted/block00031_PE.bin` (1 ファイル・2.6 秒)。実行は `tools/python` で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。
   - `python3 analysis/flapi/pe_handler_probe.py launchAudioEditor openEventEditor showPicker` → fn `0xd6d540`・`0xd6ef80`・`0xd6f2e0`、PyArg `isiss` (0xd6d6a4)・`Ii|i` (0xd6f0b4)・`i|i` (0xd6f404)、既定値の `mov dword ptr [rbp+0xa4],0` (0xd6efb4) が REPORT の表と一致。
   - `python3 analysis/flapi/pe_disasm.py d6d440 75` → launchAudioEditor の callback の `sete cl` (0xd6d4d4)・`mov r8d,dword ptr [rax+0x28]` (0xd6d4df)・`call 0x118a810` (0xd6d4f0) が一致。
   - `python3 analysis/flapi/pe_disasm.py e34614 12` → newWindow==2 の分岐 (`cmp eax,2` 0xe34617・`call 0xe3d440` 0xe34630) が一致。
