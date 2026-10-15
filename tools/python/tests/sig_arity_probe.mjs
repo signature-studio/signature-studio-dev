@@ -14,13 +14,15 @@ const table = JSON.parse(fs.readFileSync(new URL("analysis/flapi/flapi_table.jso
 const wasm = await createWasmEngine({ flprovUrl: new URL("dist/flprov.js", root), ids });
 const mock = createMockEngine();
 
-// 型ごとの代表値 (C 側 type_ok は bool/int/str の tag を検査する。型不明は any 扱い)
-const sample = (t) => (t === "bool" ? false : t === "str" ? "x" : 0);
+// 型ごとの代表値 (C 側は A_STR/A_INT が tag を検査し、整数を文字列引数へ渡すと code 5)
+// 型は sig.params の type を優先し、型不明 (null) は kwsig.fmt の文字 (s = 文字列・それ以外 = 整数) で決める
+const sampleAt = (t, fmtCh) => (t === "bool" ? false : t === "str" || (t == null && fmtCh === "s") ? "x" : 0);
+const okArgsOf = (t) => t.params.map((p, i) => sampleAt(p.type, (t.fmt ?? "").replace("|", "")[i]));
 
 const targets = [];
 for (const [m, fs_] of Object.entries(table.modules)) {
   for (const [n, e] of Object.entries(fs_)) {
-    if (e.sig?.arity_from === "kwsig") targets.push({ name: `${m}.${n}`, params: e.sig.params, req: e.kwsig.required, max: e.kwsig.max });
+    if (e.sig?.arity_from === "kwsig") targets.push({ name: `${m}.${n}`, params: e.sig.params, fmt: e.kwsig.fmt, req: e.kwsig.required, max: e.kwsig.max });
   }
 }
 
@@ -37,7 +39,7 @@ const implemented = [];
 const unimpl = [];
 const fails = [];
 for (const t of targets) {
-  const okArgs = t.params.map((p) => sample(p.type));
+  const okArgs = okArgsOf(t);
   const first = probe(wasm, t.name, okArgs);
   if (first.unimpl) { unimpl.push(t.name); continue; }
   implemented.push(t.name);
