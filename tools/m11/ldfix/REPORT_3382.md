@@ -195,7 +195,7 @@ python3 tools/m11/ldfix/classify_err_cand_4972.py <judge.json> --md <out.md>
 - 再現コマンド: `python3 tools/m11/ldfix/classify_err_cand_4972.py <judge.json> --md <out.md>`。出力の `判定不能: 45` は `保留` 1 件を含む (分類名を ` (` で切るため)。内訳は 判定不能 44 + 保留 1 + 正常 2 = 47。
 - 未解決: 判定不能 44 件と保留 1 件 (0x7372a0 の戻り値の読み) は、窓の外 (呼出し元・呼出し先の引数の意味) まで見る作業が要る。受入条件 1 は部分達成で、残りは #4993 に残す。
 
-## 12. rewrite_argpos の同一 [base] 再ロード修正と再判定 (#5446 / CI-221)
+## 13. rewrite_argpos の同一 [base] 再ロード修正と再判定 (#5446 / CI-221)
 
 - 欠陥: `rewrite_argpos` は deref 後の `mov rcx,[rbx]` (同じ `[base]` からの再ロード) を書込みとみなし、holding から落としていた。0x44b380 (deref 0x44b392 → 0x44b39d 再ロード → call 0x44b3a2) が REWRITE_NOARG になった原因。
 - 修正: `rewrite_argpos` は `base` を取り、base が変わらず間に store (メモリ書込み)・call が無いあいだは、`[base]` からの再ロードを値の保持として holding に加える。`judge` は rewrite 行で IR の引数が `%argK` の `ptrtoint` (アドレス) だけなら ERR_BARE とする (#5446)。
@@ -227,3 +227,24 @@ python3 tools/m11/ldfix/classify_err_cand_4972.py <judge.json> --md <out.md>
 
 - 範囲内: `judge_copy_3382.py` の rewrite 行の判定 (6 件)。ptrtoint 規則は rewrite 行にだけ適用した (全行に適用すると 0x43c990・0x4473b0・0x44ed80・0x44edd0 も変わるが、これらは本 issue の範囲外のため除外)。
 - 範囲外: 修復 (#3326)・CMP 側 (#3381)・ERR_CAND 47 件の判定 (#4993)。
+
+## 12. MISMATCH 13 件の呼出し件数不一致の原因分類 (#5436 / CI-219)
+
+- 対象: `judge_copy_3382.py` の MISMATCH 行 (本 run の再現では 13 件。§9 の argpos 補正後の数。§5 の 14 件は補正前)。分類は `mismatch_5436.py` (`--judge` の JSON と IR・PE から判定)。
+- 結果: **THUNK 3 / IR_FEWER 9 / IR_MORE 1 / ABSENT 0 / OTHER 0**。`ABSENT` (IR 本体に callee が 1 件も無い) は無い。
+- issue 本文の区分との対応: A (THUNK の 3 関数) = 0x4130c0・0x4398f0・0x439930。B (IR_FEWER) = 0x439f90 の 3 件 + 0xf552a0 の 6 件。C (IR_MORE) = 0x51abb0 の 1 件。issue の「0x439f90 が A と B の両方」は、本 run の再現では A に入らない (0x439f90 の callee 0x409c80 の行は REWRITE_NOARG に移り MISMATCH ではない。0x439f90 の MISMATCH 3 件は全て `44ba40`)。
+- 再現: `python3 tools/m11/ldfix/judge_copy_3382.py tools/m11/work/boot_final3.ll --pe <PE> --scan <scan.json> --out <judge.json>` → `ERR_BARE 14 / UNCLEAR 14 / REWRITE_NOARG 5 / ERR_CAND 47 / MISMATCH 13 / OK_ARGK 10`。続けて `python3 tools/m11/ldfix/mismatch_5436.py tools/m11/work/boot_final3.ll --pe <PE> --judge <judge.json>` → `{'THUNK': 3, 'IR_FEWER': 9, 'IR_MORE': 1}`。
+
+| 関数 | call → callee | 原因 | 窓での根拠 |
+|---|---|---|---|
+| 0x4130c0 | 0x4130f9 → 0x407290 | THUNK (`oleaut32!SysFreeString`) | 0x407290 は `jmp [IAT]`。IR は `call void @SysFreeString` で持つ |
+| 0x4398f0 | 0x439917 → 0x424830 | THUNK (`user32!CharUpperBuffW`) | 同上。IR は `@CharUpperBuffW` |
+| 0x439930 | 0x439957 → 0x4247c0 | THUNK (`user32!CharLowerBuffW`) | 同上。IR は `@CharLowerBuffW` |
+| 0x51abb0 | 0x51abfe → 0x500630 | IR_MORE (機械語 1 箇所が IR で 2 箇所) | 機械語の `500630` 呼出しは 1 箇所 (51abfe)。入口 (51abb0 の後の経路) と loop の back-edge (51abd0〜) が同じ 51abfe に合流する。IR は loop 側を複製して 2 件にする |
+| 0x439f90 | 0x439fd8・0x439ffb・0x43a121 → 0x44ba40 | IR_FEWER (k=1,2,4) | 機械語は `jne 0x43a094` の分岐 (43a094〜43a12f) で `414ad0`・`414850`・`44ba40`・`409c80` を呼ぶ。IR の `dec_label_pc_43a027` 以降は `413060` の 1 経路だけで、この分岐を 44ba40 2 件しか持たない |
+| 0xf552a0 | f552d3・f552ed・f5531d・f55330・f5534d・f55372 → 0x12df530 | IR_FEWER (機械語 6 件・IR 5 件) | 機械語 `f5532b` の `call 0x12df530` (f55330) に対応する IR 呼出しが、`dec_label_pc_f5532b` ブロックに無い (IR の `f55348` 以降の呼出しは対応する)。IR の 1 件欠落の位置は確認したが、同じ引数の既存の結果 (`%5`・`%10`) を流用したのか、別の経路で落ちたのかは未確認 |
+
+- 補足: `0xf552a0` の機械語にある `call qword ptr [rsi+0x18]` (f55396) は IR で間接呼出しとして出ない。callee が特定の関数 VA ではないため `judge_copy_3382.py` の対象外 (#3382 の判定は直接呼出しのみ)。
+- 判定: 本 issue の受入条件 (6 関数の原因分類) は満たした。`IR_FEWER` 9 件と `IR_MORE` 1 件は、IR の lift が呼出しを落とす・複製する現象で、呼出し件数の数え方の誤りではない。これらが copy 判定 (`ERR_BARE` 等) に効くかは本 REPORT の範囲外。
+- 未解決: IR_FEWER 9 件 (0x439f90 の `44ba40` 3 件・0xf552a0 の `12df530` 6 件) と IR_MORE 1 件 (0x51abb0) の lift 側の修正 (本 issue は分類まで)。起票先: 未起票 (lift の修正方針は PM 判断)。
+- 測定 commit: `mismatch_5436.py` を追加した commit (`git log --oneline -- tools/m11/ldfix/mismatch_5436.py` で確認)。以後の変更は REPORT の文言のみ。
