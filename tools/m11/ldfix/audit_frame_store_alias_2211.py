@@ -23,9 +23,15 @@ audit_frame_store_verdict.py (#2185) と同じ CFG 逆向き探索・同じ 3 �
 glk 関数の call は呼び出し先の書き込みを見ていない (子 issue の範囲)。
 frame アドレスを自分の frame に書く store (`mov [rbp+X], rbp`) も漏出と数える (保守的)。
 
-使い方: python3 audit_frame_store_alias_2211.py PE.bin AUDIT.json F4.json OUT.json [--negctl-glk] [--negctl-nosync]
+   6. (#4166) glk 関数のポインタ store のうち、基底が入口の引数値から無改変の 8 バイト slot を経て来るものは
+      LEAK_STORE と数えない (NONFRAME)。引数値は呼び出し元の生きたポインタで、この frame (戻り番地より下) を指さない。
+      slot の書きが全て frame 派生でない値の store で、入口まで未定義の経路が無いときだけ成立する。
+      call を越える経路は透過する (仮定: 呼び出し先が caller の frame slot を書かない。上記の仮定と同じ)。
+
+使い方: python3 audit_frame_store_alias_2211.py PE.bin AUDIT.json F4.json OUT.json [--negctl-glk] [--negctl-nosync] [--negctl-noprov]
   --negctl-glk:    全関数の glk を強制 True にする (ネガティブコントロール: 漏出規則が効いていることの確認用)
   --negctl-nosync: 区間 sync を無効にする (ネガティブコントロール: rsp/rbp 同一視の規則が効いていることの確認用)
+  --negctl-noprov: NONFRAME 規則 (6) を無効にする (#2211 の判定に戻る。#2211 の site 判定を再現する)
 """
 import collections
 import json
@@ -110,6 +116,114 @@ def leak_site(cs, seq, F):
 
 
 NO_SYNC = False
+NO_PROV = False
+NONFRAME = set()
+CALLER_SAVED = ('rax', 'rcx', 'rdx', 'r8', 'r9', 'r10', 'r11')
+
+
+def reg_nonframe(cs, seq, preds, idx, reg, depth):
+    """命令 idx の直前で reg の値が frame 派生でないことを、到達する全定義から示せるか (流れ依存)。
+    定義の追跡: 単純な mov reg, reg / mov reg, [rbp+D] (スロットの定義を再帰で追う)。
+    入口まで定義が無い引数レジスタは、呼び出し前から存在する値なので frame 派生でないとする。
+    それ以外 (演算・call の戻り値・未知) は示せないので False。"""
+    if depth <= 0:
+        return False
+    outs = []
+    stack = [(p, idx) for p in preds.get(idx, [])]
+    seen = set()
+    while stack:
+        j, _ = stack.pop()
+        if j in seen:
+            continue
+        seen.add(j)
+        ins = seq[j]
+        m = ins.mnemonic
+        ops = ins.operands
+        if m.startswith('call'):
+            if reg in CALLER_SAVED:
+                return False
+            stack.extend((p, j) for p in preds.get(j, []))
+            continue
+        if ops and ops[0].type == capstone.CS_OP_REG and rname(cs, ops[0].reg) == reg and writes_dst(m):
+            if m != 'mov' or len(ops) != 2:
+                return False
+            src = ops[1]
+            if src.type == capstone.CS_OP_REG:
+                sn = rname(cs, src.reg)
+                if sn in FRAME_REGS:
+                    return False
+                if not reg_nonframe(cs, seq, preds, j, sn, depth - 1):
+                    return False
+                outs.append(j)
+                continue
+            if src.type == capstone.CS_OP_MEM and src.mem.base and rname(cs, src.mem.base) == 'rbp' and not src.mem.index and src.size == 8:
+                if not slot_nonframe(cs, seq, preds, j, src.mem.disp, depth - 1):
+                    return False
+                outs.append(j)
+                continue
+            return False
+        if j == 0:
+            if reg in ARG_REGS:
+                continue
+            return False
+        stack.extend((p, j) for p in preds.get(j, []))
+    return bool(outs) or reg in ARG_REGS
+
+
+def slot_nonframe(cs, seq, preds, idx, disp, depth):
+    """命令 idx の直前で [rbp+disp] (8 バイト) の値が frame 派生でないことを示せるか。
+    到達する書きが全て frame 派生でない値の 8 バイト store であり、読み・lea で他の定義が入り得ないときだけ True。"""
+    if depth <= 0:
+        return False
+    stack = [p for p in preds.get(idx, [])]
+    seen = set()
+    n_def = 0
+    while stack:
+        j = stack.pop()
+        if j in seen:
+            continue
+        seen.add(j)
+        ins = seq[j]
+        m = ins.mnemonic
+        if m.startswith('call'):
+            stack.extend(preds.get(j, []))
+            continue
+        ops = ins.operands
+        if ops and ops[0].type == capstone.CS_OP_MEM and ops[0].mem.base and rname(cs, ops[0].mem.base) == 'rbp' and not ops[0].mem.index:
+            lo, hi = ops[0].mem.disp, ops[0].mem.disp + (ops[0].size or 8)
+            if lo < disp + 8 and disp < hi:
+                if m != 'mov' or lo != disp or (ops[0].size or 8) != 8 or ops[1].type != capstone.CS_OP_REG:
+                    return False
+                sn = rname(cs, ops[1].reg)
+                if sn in FRAME_REGS or not reg_nonframe(cs, seq, preds, j, sn, depth - 1):
+                    return False
+                n_def += 1
+                continue
+        if j == 0:
+            return False
+        stack.extend(preds.get(j, []))
+    return n_def > 0
+
+
+def nonframe_store_addrs(cs, seq, preds):
+    """基底が流れ依存で frame 派生でないと示せる store の番地集合。
+    基底が入口の引数値 (呼び出し前から存在する値) から、無改変の slot (8 バイト・frame 派生でない値の store のみ) を経て来るとき。
+    入口の引数値は、呼び出し元の生きたポインタであり、この関数の frame (戻り番地より下) を指さない。"""
+    ok = set()
+    if NO_PROV:
+        return ok
+    for i, ins in enumerate(seq):
+        ops = ins.operands
+        if not ops or ops[0].type != capstone.CS_OP_MEM or not writes_dst(ins.mnemonic):
+            continue
+        if ops[0].mem.base and cs.reg_name(ops[0].mem.base) == 'rip':
+            continue
+        bname = rname(cs, ops[0].mem.base) if ops[0].mem.base else None
+        iname = rname(cs, ops[0].mem.index) if ops[0].mem.index else None
+        if bname and bname not in FRAME_REGS and iname not in FRAME_REGS and not ops[0].mem.index:
+            if reg_nonframe(cs, seq, preds, i, bname, 6):
+                ok.add(seq[i].address)
+    return ok
 
 
 def sync_range(cs, seq):
@@ -190,7 +304,7 @@ def effect(cs, glk, F, ins, slot, sync=None, slot_in=False):
             continue
         if bname in F or iname in F:
             return ('BARRIER', 'ALIAS_FRAME_PTR')
-        if glk:
+        if glk and ins.address not in NONFRAME:
             return ('BARRIER', 'LEAK_STORE')
     return res
 
@@ -226,10 +340,11 @@ def walk(cs, seq, preds, glk, F, ridx, slot, sync):
 
 
 def main():
-    global NO_SYNC
+    global NO_SYNC, NO_PROV, NONFRAME
     args = sys.argv[1:]
     force_glk = '--negctl-glk' in args
     NO_SYNC = '--negctl-nosync' in args
+    NO_PROV = '--negctl-noprov' in args
     args = [a for a in args if not a.startswith('--')]
     pe, audit_path, f4_path, out = args[:4]
     mach = Machine(pe)
@@ -258,10 +373,12 @@ def main():
         leak = leak_site(mach.cs, seq, F)
         glk = (leak is not None) or force_glk
         sync = sync_range(mach.cs, seq)
+        NONFRAME = nonframe_store_addrs(mach.cs, seq, preds) if glk else set()
         fn_info[fn] = dict(escaped=esc, ijmp=ijmp, n_ins=len(seq), glk=glk,
                            leak=None if leak is None else '%s [%s]' % leak,
                            derived=sorted(F - set(FRAME_REGS)),
-                           sync=None if sync is None else '%x-%x' % sync)
+                           sync=None if sync is None else '%x-%x' % sync,
+                           nonframe_stores=sorted('%x' % x for x in NONFRAME))
         idx_of = {x.address: i for i, x in enumerate(seq)}
         for s in sites:
             addr = int(s['detail'][0].split()[0], 16) if s.get('detail') else None
