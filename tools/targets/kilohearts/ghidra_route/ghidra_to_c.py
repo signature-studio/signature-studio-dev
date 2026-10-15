@@ -143,6 +143,22 @@ typedef union {
 '''
 
 
+# delay の 2 件 (機械語で確定・REPORT_APPENDIX_3835.md)。件数は各 1 件に固定し、外れたら停止する (DELAY_RULES)
+#   LAB_180fd2aab: FUN_180fd2a60 の `call FUN_180fb5c6c` の戻り番地 (機械語の fall-through 先と同じ番地)。
+#                  C の継続は制御の流れで表すので、戻り番地の 8 byte 書込みは同関数の既存行 (0x180fd2ab5) と同形に書く。
+#   PTR__guard_dispatch_icall_1813a1d38: FUN_180fa8534 の CFG 間接呼出し (機械語 0x180fa856a)。
+#                  this = rcx = *param_1 - 8、vtable = *this、呼出先 = vtable[0x40] (rax)、rdx = 呼出し時点の元の param_2。
+#                  param_2 は vtable[0x30] に置き換える (機械語の rbx)。戻り値は使わない (直後で eax=0)。
+DELAY_RULES = [
+    ('LAB_180fd2aab: 戻り番地の書込み', r'\*\(undefined1 \*\*\)\(puVar4 \+ -8\) = &LAB_180fd2aab;',
+     '*(undefined8 *)(puVar4 + -8) = 0x180fd2aab;'),
+    ('PTR__guard_dispatch_icall: CFG 間接呼出し',
+     r'param_2 = \*\(byte \*\*\)\(\*\(longlong \*\)\(\*param_1 \+ -8\) \+ 0x30\);\n    \(\*\(code \*\)PTR__guard_dispatch_icall_1813a1d38\)\(\);',
+     '{ longlong kh_this = *param_1 - 8; longlong kh_vt = *(longlong *)kh_this; byte *kh_p2 = param_2; param_2 = *(byte **)(kh_vt + 0x30);\n'
+     '      ((void (*)(longlong, byte *))*(code **)(kh_vt + 0x40))(kh_this, kh_p2); }'),
+]
+
+
 def approx_rcp_table():
     """snapins/scripts/approx_tables.b64 の rcp 表 (4096 entry) を C 配列リテラルで返す。"""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapins', 'lift'))
@@ -305,6 +321,7 @@ def main():
     abi_hits = {}
     from patches import V128OPS
     v128_hits = {}
+    delay_hits = {}
     stubs = dict(STUB)
     stubs.update(cfg['stubs'])
     for va in vas:
@@ -319,6 +336,10 @@ def main():
             t = re.sub(r'\b(aauStack_f8\[\d+\]\._4_12_) = (auStack_\w+);', r'memcpy(\1, \2, 12);', t)
             t = re.sub(r'= (aauStack_f8\[\d+\]\._(?:0|4)_4_);', r'= u2f(\1);', t)
             t = re.sub(r'(auVar\d+\._(?:8|12)_4_) = (uVar\d+ & aauStack_f8\[\d+\]\._(?:8|12)_4_);', r'\1 = u2f(\2);', t)
+        if name == 'delay':
+            for nm, rx, rp in DELAY_RULES:
+                t, k = re.subn(rx, rp, t)
+                delay_hits[nm] = delay_hits.get(nm, 0) + k
         t = re.sub(r'\b(in_XMM\d+)\._0_8_\b', r'\1._0_8_d', t)
         t = re.sub(r'\b(maxps|minps|vpand_avx|vpor_avx|vpsubq_avx|vpsubd_avx)\((\w+),_DAT_([0-9a-f]+)\)', r'\1(\2,(*(V128 *)gd_\3))', t)
         if tbase is not None:
@@ -360,6 +381,8 @@ def main():
         assert abi_hits.get(nm) == 1, 'ABI rule hit %s: %s' % (abi_hits.get(nm), nm)
     for nm, _, _, n in V128OPS.get(name, []):
         assert v128_hits.get(nm) == n, 'V128 rule hit %s (want %d): %s' % (v128_hits.get(nm), n, nm)
+    for nm, _, _ in (DELAY_RULES if name == 'delay' else []):
+        assert delay_hits.get(nm) == 1, 'delay rule hit %s: %s' % (delay_hits.get(nm), nm)
     # スタブは本体を decompile していない callee にだけ出す (本体がある VA に出すと宣言が衝突する: FUN_18004cf20・delay)
     for va, s in stubs.items():
         if ('FUN_%x' % va) in alltxt and va not in vas:

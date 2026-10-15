@@ -981,6 +981,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_3075.md` | ~34 | #1216 差し戻し round 4: merge 後 head (`2a17665f`) での Stereo / Delay 再測定 (emcc 12・577 件)・merge 前後の C の cmp・census。§10-7p-3 の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3095.md` | ~158 | KH-43 (#3095): Delay の SIMD 疑似関数 13 種 (25 件) を shim に実装・swi 21 件を fail-fast (abort)・emcc 残件 441 (測定 `ab01412df`・SIMD・swi 0。main 取り込み後の `abee0a1ff` は 463・統合前 `12647936d` は 506)・ホスト x86 intrinsics 突合 (200,000 試行 × 13 種、ネガコン FAIL)・Gain/Haas/Gate 1000/1000・issue 本文の件数訂正 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3802.md` | ~126 | #3802 (KH-66): Delay の DAT_/uRam の型規則・未関数化 callee の fail-fast stub・スタブと本体の衝突の解消。結果と測定は付録 §10-7u が正本。§⑧ は main 取り込み後の状態 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_3835.md` | ~70 | #3835 (KH-70): Delay の残件 `LAB_180fd2aab` (戻り番地の書込み)・`PTR__guard_dispatch_icall_1813a1d38` (CFG 間接呼出し) を機械語で確定し `DELAY_RULES` で書換える。census 341 → 339・Gain/Haas/Gate の cmp・1000/1000 が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3836.md` | ~70 | #3836 (KH-71): Ghidra の double ビット再解釈 `(ulonglong)dVarN` を `dbitcast` (d2u/u2d) で書換える fix の測定と未解決。Delay の 98 行の所在・emcc 件数・Gain/Haas/Gate の同一性が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3802_DIFF.md` | ~165 | #3802 付録 §⑧ の差分の全文: 測定 commit `6323671e7` → HEAD の `ghidra_route` の `git diff` 出力 (main 取り込み分を含む)。差分の記録であり測定値の正本ではない |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3800.md` | ~66 | KH-64 (#3800): Delay の引数過不足のうち呼出先 FUN_180fd4f30 分の ABI 規則 (部分)。根拠・census・未解決は §10-7u が正本 (残りは子 #3844・#3847) |
