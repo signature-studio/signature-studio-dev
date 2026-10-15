@@ -158,6 +158,12 @@ ABI = {
         ('delay 3909 FUN_180fc6d70 uVar25 = FUN_180fdc844 (xmm0 = float 入力)', r'(if \(\(\(uint\)fVar22 & 0x7f800000\) == 0x7f800000\) \{\n\s*)uVar25 = (?:func_0x000|FUN_)180fdc844\(\);', r'\1uVar25 = FUN_180fdc844(f2u(fVar22));'),
         ('delay 4042 FUN_180fcce40 dVar2 = FUN_180fdc858 (xmm0 = param_1)', r'(if \(\(ulonglong\)_DAT_1822828a0 <= \(ulonglong\)dVar2\) \{\n\s*dVar2 = \(double\))(?:func_0x000|FUN_)180fdc858\(\);', r'\1FUN_180fdc858(d2u(param_1));'),
         ('delay 4136 FUN_180fcce40 dVar2 = FUN_180fdc858 (xmm0 = param_1)', r'\n  dVar2 = \(double\)(?:func_0x000|FUN_)180fdc858\(\);\n  return dVar2;', '\n  dVar2 = (double)FUN_180fdc858(d2u(param_1));\n  return dVar2;'),
+        # KH-154 (#5362): FUN_18004cf20 (vector の再確保・memmove) の呼出し 3 箇所 (18004d008・18004d01a・18004d035) は、d・s をアドレスの整数値 (rcx・rdx) で渡す。
+        # 宣言は void* のまま (Gate の閉包も同じ shim を呼ぶため、shim を変えると gate.o が変わる)。delay の呼出し側だけ (void*) で包む。
+        # 1 行 1 規則にすると if/else の同一行 (uVar3 ... 2 件) が 2 規則に当たるため、ブロック単位の規則 1 件 (件数 1 を assert) にする。
+        ('delay 18004cf20 FUN_181384040 d/s as (void*) (18004d008・18004d01a・18004d035)',
+         r'if \(param_2 == param_1\[1\]\) \{\n      FUN_181384040\(uVar3,\*param_1,param_2 - \*param_1\);\n      uVar1 = \*param_1;\n    \}\n    else \{\n      FUN_181384040\(uVar3,\*param_1,param_2 - \*param_1\);\n      FUN_181384040\(lVar4 \+ 4,param_2,param_1\[1\] - param_2\);',
+         'if (param_2 == param_1[1]) {\n      FUN_181384040((void *)uVar3,(void *)*param_1,param_2 - *param_1);\n      uVar1 = *param_1;\n    }\n    else {\n      FUN_181384040((void *)uVar3,(void *)*param_1,param_2 - *param_1);\n      FUN_181384040((void *)(lVar4 + 4),(void *)param_2,param_1[1] - param_2);'),
         # #4889 (KH-128): FUN_180fbc1f4 の入力は xmm0 (float)、戻り値も xmm0 (float)。呼出元 FUN_1802ed7f0 の 2 件 (1082・1088) は
         #   1802ede08〜ede29: xmm6 = fVar26*48*[p+0x3188+0x24] の後、1802ede18 `jae` (X>=0) で 1802eded3 (×-0.16609640419483185) → 1802edede call (C 1082)、
         #   X<0 は 1802ede21 (×+0.16609640419483185) → 1802ede2c call (C 1088)。movaps xmm0,xmm6 の後に call。rcx は設定しない。

@@ -93,6 +93,9 @@ for f in sorted(targets):
 
 n_hit = sum(1 for f in targets if hits.get(f))
 print(f"ARG 系の所属関数 = {len(targets)} 個 / データ表に現れる = {n_hit} 個 / 現れない = {len(targets) - n_hit} 個")
+n_slot = sum(len(hits.get(f, [])) for f in targets)
+n_run = len({r[2] for r in rows if r[2] != "-"})
+print(f"表の出現 slot = {n_slot} 件 / 表 (run = COL 直後の先頭 h で同定) = {n_run} 個")
 sc = [r for r in rows if r[4] and "SerumController" in r[4]]
 print(f"RTTI が SerumController の表に現れる関数 = {len({r[0] for r in sc})} 個")
 out = sys.stdout
