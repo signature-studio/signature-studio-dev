@@ -15,6 +15,7 @@
     assoc      Ghidra は浮動小数の積/和の結合括弧を表示で落とす (`a*(b*c)` を `a * b * c` と印字 → C は左結合 `(a*b)*c` で 1 ulp ずれる)。
                実機 x86 の演算順 (逆アセンブルで確認) に合わせ手で括弧を戻す = patches.py の (name, regex, repl) 表。**手作業 1 件 = 1 行**
     stackpair  lStack_e8/lStack_e0 のように「隣接を仮定して &lStack_e8 を配列として渡される」2 変数を long long[2] にする
+    gtype      `_DAT_<va>` の C 型を patches.py の GTYPE (実機の命令の幅で確認した整数マスク) で上書きする
     lanes      Delay の 128bit ローカル auStack_118/128/138 を、参照されるレーンの型 (_0_8_・_8_8_ は double、_8_4_・_12_4_ は uint32) を持つ V128L にする (#3094)
 """
 import json
@@ -200,6 +201,12 @@ def main():
         ls = [l for l in alltxt.split('\n') if ('%s_%x' % (kind, va)) in l]
         ts = infer_type(ls, '%s_%x' % (kind, va))
         gtypes[va] = ('uint' if kind == '_UNK' or 'uint' in ts else ('double' if 'double' in ts else 'float'), kind, sorted(ts))
+    if 'gtype' in fixes:
+        from patches import GTYPE
+        for k, ty in GTYPE.get(name, {}).items():
+            va = int(k, 16)
+            assert va in gtypes, 'gtype rule not used (global not in %s): %s' % (name, k)
+            gtypes[va] = (ty, gtypes[va][1], gtypes[va][2])
     out = ['#include "ghidra_shim.h"', '/* 自動生成: ghidra_to_c.py %s (fix=%s) */' % (name, ','.join(sorted(f for f in fixes if f)) or 'none')]
     if 'rcpps(' in alltxt:
         out.append(RCPPS_HELPER % approx_rcp_table())
