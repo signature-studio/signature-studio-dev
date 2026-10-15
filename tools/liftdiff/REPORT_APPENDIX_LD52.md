@@ -1,7 +1,7 @@
 # liftdiff LD-52 (#1528) — i128 引数の機械語入口型による case 投入と実行可能件数の実測
 
 > 親: #1194 (LD-39)。前提: #1526 (LD-51)、投入形の判定は #1546 (LD-53・PR #2791・`REPORT_APPENDIX_LD53.md` §7)。
-> 測定 commit: `46bc0cd35` (§2.1・§3 の実測はこの commit)。§2 本表の 5 件は `f6abfd073` の値で、`46bc0cd35` でも変わらない (`f6abfd073..46bc0cd35` の ldlib 差分は `MACHINE_ENTRY` の 6 行のみ)。`46bc0cd35` から現 HEAD までのコード差分は §5。**現 HEAD では未再測定** (§5)。
+> 測定 commit: `d6595d4ed` (§2・§2.1・§3 の現在の実測はこの commit)。前の測定 commit `46bc0cd35` の値は §2.1 の「判定 (前)」列と §3 の LD-180 行に残す。`46bc0cd35` から `d6595d4ed` までのコード差分は §5。
 > 素材: `fl-win64` (`$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`)・`work-m11`・`work-liftdiff`・`toolchain-emsdk`。
 > `work-liftdiff` の `ld_wasm.cjs` は現行の `rt/ld_wasm.c` と export の引数数が合わない (`ld_w_snapshot`) ため使えず、`python3 liftdiff.py build targets/m11.json` (emsdk) で再 build した。
 
@@ -32,7 +32,7 @@ LD-180 (#3863) で追加した 6 件 (機械語を呼び先まで辿って読ん
 - wasm は `m11_tr_<fn>` (i64×8 を受け、IR 引数へ `zext`) を `tr=1` で呼ぶ。`wsig=i64,...` で raw 64bit を渡す (`rt/ld_runner.mjs`)。`zext` により xmm0 の下位 64bit が入力値になる。
 - 比較 (`ldlib/compare.py` `cmp_trace`): 入口型の関数 (`machine_sig` が付ける `ir_params` を持つ関数) について、IR の i128 位置だけを比べない。wasm の entry 記録 (`irtool.instrument`) は IR の i128 引数を `0` と記録するため (§4 の未解決)。i64 の位置 (`653c80` の rcx・rdx、`691dd0` の rcx・r8) は入口型どおりに比べる。戻り値・memory・calls も比べる。入口型でない関数の判定は変えない。除外の検査は `tests/test_ld52_machine_sig.py`。
 
-## 2. 対象 11 関数の実行可能件数 (測定 `f6abfd073`・§2.1 の 6 件は `46bc0cd35`。現 HEAD は未再測定 (§5))
+## 2. 対象 11 関数の実行可能件数 (測定 `d6595d4ed`)
 
 対象は `targets/ld52_11.txt` の 11 VA (sigs.json の定義済み関数のうち、params に `i128` を含む 10 関数 (`ret` が i128 の `1311ea0` は LD-24 の対象外) と `%tagPOINT` 1 関数)。
 
@@ -44,12 +44,12 @@ LD-180 (#3863) で追加した 6 件 (機械語を呼び先まで辿って読ん
 | `40c750` | `i64 (i128)` | **match** | 11/11 パターンとも equal |
 | `653c80` | `i64 (i64,i64,i128)` | unexec (`native_fault_all_patterns`) | 11 パターンとも native segv。segv の fault addr は記録されず原因未特定 (§4) |
 | `691dd0` | `i64 (i64,i128,i64)` | unexec (`native_fault_all_patterns`) | z・s は rcx=0/3 の参照で segv (addr `0xc0`/`0xc3`・rip `0x6919f8`)。p0 等は rcx が blob の値を指して segv。オブジェクトの有効な内容が要る (§4) |
-| `4256c0` | `ptr (%tagPOINT)` | unexec (`unsupported_sig`・測定 `46bc0cd35` 以前) | 機械語の入口は rcx の 8 バイト POINT 値 (x = 下位 32bit, y = 上位 32bit)。`main` 取り込み (`4edbf8a95`) で `MACHINE_ENTRY` に `0x4256c0: ['i64']` が入ったため、現 HEAD の判定は**未測定** (§5)。m11_tr_ の生成が a0 から組むことは単体テスト `test_ld179_tagpoint_tr` で確認 (PASS)。実機 batch は未測定 (§4) |
+| `4256c0` | `ptr (%tagPOINT)` | **mismatch** (`wasm_trap`・11/11 件) | 機械語の入口は rcx の 8 バイト POINT 値 (x = 下位 32bit, y = 上位 32bit)。`MACHINE_ENTRY` に `0x4256c0: ['i64']` (main 側 #3862) で入口型は入った。wasm 側は `Aborted(missing function: WindowFromPoint)` で `abort` する (呼び先 `WindowFromPoint` の stub 欠落。§4)。native は `WindowFromPoint` を呼んで戻り値 0 を返す |
 | `442a50` `442b90` `664890` `6649b0` `6649c0` `664a80` | `i64 (i128)` | **mismatch** | LD-180 (#3863) で入口型を確定 (§1・`cases.MACHINE_ENTRY`)。不一致の内訳は §2.1 (IR 側の引数落ち・呼び先 entry 欠落。§4) |
 
-### 2.1 LD-180 (#3863) の 6 件 (測定 commit `46bc0cd35`・現 HEAD `4edbf8a95` では未再測定 (§5))
+### 2.1 LD-180 (#3863) の 6 件 (現在の判定は測定 `d6595d4ed`。「判定 (前)」は `46bc0cd35`)
 
-測定: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 liftdiff.py batch targets/m11.json --set file:targets/ld52_11.txt --shards 4 --nobuild --state auto` (7 秒)。
+測定: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 liftdiff.py batch targets/m11.json --set file:targets/ld52_11.txt --shards 4 --nobuild --state auto` (`d6595d4ed` の実測 9.3 秒・`46bc0cd35` の実測 7 秒)。
 
 | VA | 判定 (前) | 判定 (後) | 主な差分 (後) |
 |---|---|---|---|
@@ -60,7 +60,9 @@ LD-180 (#3863) で追加した 6 件 (機械語を呼び先まで辿って読ん
 | `6649c0` | unexec (`unsupported_sig`) | **mismatch** | `callsite_arg_drop`: `4764c0` arg0 が native `0x11` / wasm `0` |
 | `664a80` | unexec (`unsupported_sig`) | **mismatch** | `native_extra_entry` (#4) |
 
-- 対象 11 件の結果 (測定 `46bc0cd35`): 一致 2 / 不一致 6 / 実行不能 3 (`unsupported_sig` 1 = `4256c0`・`native_fault_all_patterns` 2 = `653c80` `691dd0`)。前は 一致 2 / 不一致 0 / 実行不能 9。
+- 対象 11 件の結果 (測定 `d6595d4ed`): **一致 2 / 不一致 7 / 実行不能 2**。不一致 7 = LD-180 の 6 件 + `4256c0` (`wasm_trap`)。実行不能 2 = `native_fault_all_patterns` (`653c80` `691dd0`)。
+- 前 (測定 `46bc0cd35`): 一致 2 / 不一致 6 / 実行不能 3 (`unsupported_sig` 1 = `4256c0`・`native_fault_all_patterns` 2)。前は 一致 2 / 不一致 0 / 実行不能 9。
+- 不一致の類型 (`d6595d4ed` の batch 出力): `callsite_arg_drop` 3・`wasm_trap` 2・`callee_divergence` 2 (主因。該当は複数タグ重複あり)。
 - 不一致 6 件の差分は、いずれも IR の呼出し側が引数 (`xor i64 0, 0` の placeholder) を落とすか、呼び先の entry が wasm で欠けることに由来する。入口型の読み (機械語) は変えていない。IR 側の修正は §4。
 - sample:800 では `442b90` の 1 件だけが含まれ、unexec → mismatch (実行不能 206→205・不一致 234→235)。他 5 件は sample:800 に含まれない。
 
@@ -70,10 +72,12 @@ LD-180 (#3863) で追加した 6 件 (機械語を呼び先まで辿って読ん
 
 ## 3. e2e (`bash tools/liftdiff/liftdiff_e2e.sh --m11-only`)
 
-sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実測・各 run の exit と `LIFTDIFF_E2E PASS`)。下表は測定 commit `46bc0cd35` の行 (最終行) を含め、現 HEAD `4edbf8a95` では**未再測定** (§5)。
+sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実測・各 run の exit と `LIFTDIFF_E2E PASS`)。現在の値は測定 commit `d6595d4ed` の 2 run (最初の行)。
 
 | run | 測定コード | exit | 所要 | sample:800 一致 / 不一致 / 実行不能 |
 |---|---|---|---|---|
+| **現在 (run 1)** | **`d6595d4ed`** | **0 (PASS)** | **194 s** (`date` 差・開始前 load 0.15・終了直後 5.01) | **360 / 235 / 205** |
+| **現在 (run 2)** | **`d6595d4ed`** | **0 (PASS)** | **193 s** (`date` 差・開始前 load 3.90・終了直後 5.17) | **360 / 235 / 205** |
 | 同手順の比較 (再 build) | origin/main `09b96c12f` | 0 (PASS) | 193 s | 361 / 233 / 206 |
 | 前版 run 1 | `b37494bec` と同じ版 (`f6abfd073` より前・入口引数を全て除外する版) | 0 (PASS) | 191 s | 360 / 234 / 206 |
 | 前版 run 2 | `b37494bec` と同じ版 (`f6abfd073` より前・同上) | 0 (PASS) | 189 s | 360 / 234 / 206 |
@@ -89,14 +93,15 @@ sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `4256c0` (%tagPOINT) は `MACHINE_ENTRY` に `['i64']` を追加済み (`main` 取り込み `4edbf8a95`)。`m11_tr_` の POINT 値の組立ては単体テスト PASS。実機 batch の判定は未測定 (§5) | 実行不能 1 (測定時点) | #3862 ([LD-179]) |
+| `4256c0` (%tagPOINT) は実機 batch で mismatch (`wasm_trap`: `Aborted(missing function: WindowFromPoint)`・11/11 件)。wasm 側の `WindowFromPoint` の stub が無く `abort` する。入口型 (`MACHINE_ENTRY` `['i64']`・main 側 #3862) と `m11_tr_` の POINT 値の組立ては単体テスト PASS。stub の追加は本 PR の範囲外 | 不一致 1 | #3862 ([LD-179]) |
 | 6 件 (`442a50` `442b90` `664890` `6649b0` `6649c0` `664a80`) は入口型を確定 (§1) したが、IR の呼出し側の引数落ち (`xor i64 0, 0` placeholder) と呼び先 entry の欠落で不一致 (§2.1)。IR 側の修正が要る | 不一致 6 | #4193 ([LD-201]・#3863 の子) |
 | `653c80` `691dd0` の native segv (691dd0 は rcx のオブジェクト内容、653c80 は fault addr 未記録)。`irtool.instrument` が IR の i128 入口を `0` と記録する (callee の入口比較の偽陽性の源。sample:800 への影響は未測定) | 実行不能 2・比較の信頼性 | #3864 ([LD-181]) |
 
 ## 5. 検証
 
-- 測定 commit `46bc0cd35` (LD-180 / #3863・`ldlib/cases.py` の `MACHINE_ENTRY` 6 行追加)。§2.1・§3 の実測はこの commit のコード。
-- 測定 commit 以降のコード差分 (`main` 取り込み merge `4edbf8a95` を含む)。`git diff 46bc0cd35 HEAD -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh` は 0 行ではない:
+- 測定 commit `d6595d4ed` (現在値。§2・§2.1・§3 の現在行)。batch と e2e (run 2 回) を同じコードで実測。
+- 前の測定 commit `46bc0cd35` (LD-180 / #3863・`ldlib/cases.py` の `MACHINE_ENTRY` 6 行追加)。§2.1 の「前」列と §3 の LD-180 行の実測はこの commit。
+- `git diff 46bc0cd35 d6595d4ed -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/tests tools/liftdiff/liftdiff_e2e.sh` は 0 行ではない (`d6595d4ed` の差分は REPORT のみ):
   ```
   tools/liftdiff/ldlib/cases.py                  |  1 +
   tools/liftdiff/liftdiff_e2e.sh                 |  4 ++-
@@ -106,7 +111,9 @@ sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実�
   5 files changed, 67 insertions(+), 6 deletions(-)
   ```
   内容: `cases.py` の `0x4256c0: ['i64']` (main 側 #3862)。`ld_core.h` は `ld_int_arg` を追加し、`MultiByteToWideChar`・`WideCharToMultiByte` の int 引数を下位 32bit の符号付きで読む。`ld_ms_call.S` は `LD_STK_ENTRY28` 分岐 (既定のコードは従来と同じ)。`liftdiff_e2e.sh` は `test_ld179` の追加と `LD_STK_ENTRY28` 分岐。
-- **未再測定の理由**: この run の `$ARTIFACTS_DIR` は `fl-win64` のみで、`tools/m11/work`・`tools/liftdiff/work`・`tools/ott/work` が無い (`work-m11`・`work-liftdiff` は未取得)。m11 の再 build は RetDec 路線で、この run の上限 (58 分) に収まらないと判断した。PR 本文に `oc_artifacts` 行を追加したが、取得されるのは次回の起動から。そのため §2・§2.1・§3 の数値は `46bc0cd35` の値で、現 HEAD の値ではない。推定値は書かない。
+- 素材: `fl-win64`・`work-m11`・`work-liftdiff`・`toolchain-emsdk`・`toolchain-retdec` を `$ARTIFACTS_DIR` から展開して実測 (`fl-win64` は `$RUNNER_TEMP/fl-win64`・他は worktree の `tools/m11/work`・`tools/liftdiff/work`・`$HOME/emsdk`・`$HOME/retdec`)。wasm は `liftdiff.py build targets/m11.json` で `d6595d4ed` から再 build (`sig_mismatch 0`・`undefined 1`) した後に batch を実行。
+- 同じ head での e2e 2 回は sample:800 で 360 / 235 / 205 (run 間で一致)。前の測定 (`46bc0cd35`) の 361 / 234 / 205 とは 1 件ずれる。このずれの原因は未特定 (`46bc0cd35`..`d6595d4ed` の 67 行の差分 (`ld_core.h`・`ld_ms_call.S` を含む) が効いた可能性を排除していない)。
+- 単体: `python3 tools/liftdiff/tests/test_ld52_machine_sig.py` → `PASS test_ld52_machine_sig`。
 - 現 HEAD で実施した単体の確認 (実測): `python3 tools/liftdiff/tests/test_ld52_machine_sig.py` → PASS、`python3 tools/liftdiff/tests/test_ld179_tagpoint_tr.py` → PASS。
 - 前回の測定 commit `f6abfd073`。`git diff f6abfd073 46bc0cd35 -- tools/liftdiff/ldlib` は `cases.py` の `MACHINE_ENTRY` 6 行追加のみ。
 - 単体: `python3 tools/liftdiff/tests/test_ld52_machine_sig.py` → `PASS test_ld52_machine_sig`。
