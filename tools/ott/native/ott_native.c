@@ -131,6 +131,7 @@ static void* make_thunk(int idx) {
     uint8_t* q = p;
     *q++ = 0xB9; memcpy(q, &idx, 4); q += 4;                      /* mov ecx, idx */
     *q++ = 0x48; *q++ = 0xB8; void* f = (void*)missing_import; memcpy(q, &f, 8); q += 8; /* mov rax, f */
+    *q++ = 0x48; *q++ = 0x83; *q++ = 0xEC; *q++ = 0x08;             /* sub rsp, 8 (missing_import 入口を 16n+8 に揃える) */
     *q++ = 0xFF; *q++ = 0xD0;                                       /* call rax */
     return p;
 }
