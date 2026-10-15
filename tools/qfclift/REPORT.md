@@ -118,10 +118,10 @@ guest の `imp_GetProcAddress` への結線と FontCache_GetStats / CleanUp の�
 ### 7.2 FreeType wasm32 ビルド (#145 の採用方式)
 - 手順: `bash tools/shared/oss/freetype/build.sh` (FreeType 2.7、`FORCE_INT64` + `ftgrays_lp64.patch`、wasm64 は無改変 + `-sMEMORY64=1`)。
 - ソース: `freetype-2.7.tar.gz` (savannah, 2,381,403 B) を `tools/shared/work/src/` に展開。`fetch_sources.sh` 全体は使わなかった。
-- emcc: 6.0.12 (`/opt/emsdk` = runner 同梱)。`toolchain-emsdk.tar.zst` は本 run で展開していない (未使用)。wasm64 の node は `/opt/emsdk/node/24.19.0_64bit` (v24.19.0)。
+- emcc: 6.0.12 (`[EMSDK]` = runner 同梱)。`toolchain-emsdk.tar.zst` は本 run で展開していない (未使用)。wasm64 の node は `[EMSDK]` 配下の node (v24.19.0)。
 - 所要: build.sh の configure+make 3 種 = **36.7 s** (real, n=1)。成果: libfreetype.a native 5,722,182 B / wasm32 714,774 B / wasm64 749,072 B。
 - build.sh の末尾のテスト実行は既定の FONT (`analysis-mac-shared` の OpenSans) が無く失敗する (rc=1、ライブラリは生成済み)。
-  テスト用フォントは **DejaVuSans.ttf** (`/usr/share/fonts/truetype/dejavu/`) に差し替えた。
+  テスト用フォントは **DejaVuSans.ttf** (fonts-dejavu 同梱。e2e には `$FONT` として渡す) に差し替えた。
 
 ### 7.3 検証 (実測。n=1、load は 2.32 (ビルド時 1 分平均))
 | 検査 | 結果 |
