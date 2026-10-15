@@ -140,6 +140,22 @@ void entry_main(u32 *sp) {
         for (int b = 0; b < (int)OBJ_WIN; b++) {
             ((unsigned char *)win)[b] = (unsigned char)hexval(ibuf + p + 2 * b, 2);
         }
+        /* #5464: 行末の任意の書込み (@<addr hex>=<bytes hex>)。 窓の後・広い範囲の snapshot の前に書く */
+        for (int q2 = p + 2 * (int)OBJ_WIN; q2 < e;) {
+            while (q2 < e && ibuf[q2] == ' ') q2++;
+            if (q2 >= e) break;
+            if (ibuf[q2] != '@') { sc3(1, 10, 0, 0); }
+            int ae = ++q2;
+            while (ae < e && ibuf[ae] != '=') ae++;
+            if (ae >= e) { sc3(1, 11, 0, 0); }
+            u32 pa = hexval(ibuf + q2, ae - q2);
+            int be = ae + 1;
+            while (be < e && ibuf[be] != ' ') be++;
+            for (int b = 0; b < (be - ae - 1) / 2; b++) {
+                ((volatile unsigned char *)pa)[b] = (unsigned char)hexval(ibuf + ae + 1 + 2 * b, 2);
+            }
+            q2 = be;
+        }
         u32 a[6] = {f[2], f[3], f[4], f[5], f[6], f[7]};
         for (u32 b = 0; b < STK_WIN; b++) ((volatile unsigned char *)STK_LO)[b] = 0;
         if (wide) wcopy((volatile u32 *)(WIDE_SAVE + WIDE_LEN), (volatile u32 *)WIDE_BASE);

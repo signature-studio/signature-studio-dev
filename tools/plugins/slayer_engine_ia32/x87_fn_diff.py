@@ -69,10 +69,13 @@ PROBE = [
 # #4147 (PLG-G2-50): ecx 相対の読みが 0x80174〜0x821700 に及ぶ関数。 ecx = OBJ (0x10F80000) では 16MB の窓の外に出て native が segfault した (rc 139)。
 # ecx を ECX_HI に置くと segfault は消える。 ただし判定 (非自明性 = OBJ 窓が変わること) は通らない: 書込みが窓の外 (0x10003fe0・0x100051f0)・
 # 窓を読むだけ (0x1000a95a) のため。 測定専用 (X87_PROBE=1)。 0x100085a0・0x100096d0 は窓の中身をポインタとして辿り、0x1000ba05 は edx 経由の引数のため、入力の設計が別に要る (子 issue)。
+# #5464 (PLG-G2-79): 0x10003fe0 は ecx = ECX_HI の wide 範囲で、6 周のループの各周の状態を行末の書込み (@addr=hex) で指定する (gen 'wide_patch')。
+# 書込み経路に入る (広い範囲の変化 4000/4000 行、native と wasm の広い範囲の不一致 0) が、eax が 747 行 (denormal の float32 ビット) 不一致のため
+# 判定は通らない。 ゲートには入れず測定専用 (X87_PROBE=1)。 REPORT_APPENDIX_5464.md。
 PROBE_ECX = [
-    {'va': 0x10003FE0, 'name': 'fn_10003fe0', 'gen': 'mixed', 'ecx': ECX_HI},
     {'va': 0x100051F0, 'name': 'fn_100051f0', 'gen': 'mixed', 'ecx': ECX_HI},
     {'va': 0x1000A95A, 'name': 'fn_1000a95a', 'gen': 'ptr_win', 'ecx': ECX_HI},
+    {'va': 0x10003FE0, 'name': 'fn_10003fe0', 'gen': 'wide_patch', 'ecx': ECX_HI},
 ]
 if os.environ.get('X87_PROBE'):
     TARGETS = TARGETS + PROBE + PROBE_ECX
@@ -111,6 +114,24 @@ def f32(x):
     return struct.unpack('<I', struct.pack('<f', x))[0]
 
 
+WIDE_LOOP_N = 6
+WIDE_LOOP_STRIDE = 0x80198
+WIDE_LOOP_OFF = 0x520D08
+
+
+def wide_patch_tokens(rng, ecx):
+    """#5464: 0x10003fe0 の 6 周ループの状態を行末の書込み (@addr=hex) で作る。 base = ecx + 0x520d08 + k*0x80198。
+    各周で [base-4]・[base]・[base+4] (float)、[base+0xc] (byte)、[base+0x80174] (int32) を書く。"""
+    toks = []
+    for k in range(WIDE_LOOP_N):
+        base = ecx + WIDE_LOOP_OFF + k * WIDE_LOOP_STRIDE
+        for off in (-4, 0, 4):
+            toks.append('@%08x=%s' % (base + off, struct.pack('<f', rng.uniform(-100, 100)).hex()))
+        toks.append('@%08x=%02x' % (base + 0xC, rng.choice([1, 2, 3, 4, 1, 2, 3, 4, 0, 5])))
+        toks.append('@%08x=%s' % (base + 0x80174, struct.pack('<i', rng.choice([1, 2, 3, 5, 0, -1])).hex()))
+    return ' '.join(toks)
+
+
 def gen_rows(seed, n):
     """(target, 行の文字列, OBJ 窓の初期値 bytes) の列。 入力は乱数 (一様な有限の float32 と添字)。"""
     rng = random.Random(seed)
@@ -120,6 +141,8 @@ def gen_rows(seed, n):
             init = b''.join(struct.pack('<f', rng.uniform(-1000, 1000)) for _ in range(OBJ_WIN // 4))
             if t['gen'] == 'idx_store':
                 a = [f32(rng.uniform(-1000, 1000)), rng.randrange(16), 0, 0, 0, 0]
+            elif t['gen'] == 'wide_patch':
+                a = [f32(rng.uniform(-100, 100))] + [0] * 5
             elif t['gen'] == 'mixed':
                 a = [f32(rng.uniform(-100, 100))] + [rng.randrange(16) for _ in range(5)]
             elif t['gen'] == 'ptr_win':
@@ -135,6 +158,8 @@ def gen_rows(seed, n):
             else:
                 a = [f32(rng.uniform(-100, 100)) for _ in range(5)] + [0]
             line = '%08x %08x %s %s' % (t['va'], t['ecx'], ' '.join('%08x' % v for v in a), init.hex())
+            if t['gen'] == 'wide_patch':
+                line += ' ' + wide_patch_tokens(rng, t['ecx'])
             rows.append((t, line, init))
     return rows
 
