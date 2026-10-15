@@ -586,6 +586,7 @@
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_2529.md` | ~60 | ildsp vtable slot 4 (0x1aa3a0) の lift と native 差分 (#2529) の全文 (REPORT §6 から分割移動): 手順 (`lift.sh`)・選定根拠・closure 規模・実測・ネガティブコントロール・未解決の起票先。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_3216.md` | ~100 | ildsp #3216 (T-SH-52・部分達成) の付録: WaveformColouring_CreateInstance の x64c lift・native 対 wasm 差分 (CreateInstance → slot 0 の 64 case)・未 lift 命令の内訳 (§7-4)・slot 1–5 の観測 (§7-5)・検証範囲と未解決 (§7-6・§7-7)。REPORT §7 の全文 (250 行上限のため分割移動)。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_CLOSURE.md` | ~140 | ildsp vtable 経由の実体 closure (10 export・`.pdata` の無い先を含む・推移閉包・間接 call 内訳と末尾 jmp 内訳・objdump 検算) (T-SH-15 #161)。分離元は `REPORT.md` §2 の下限表 (§4 は GPS vtable)。測定値の正本 |
+| `tools/shared/lift/ildsp/REPORT_APPENDIX_3276.md` | ~65 | ildsp WaveformColouring の native 確定 (T-SH-59 #3276)。結論・手順・実測・ネガティブコントロール・未解決の全文 (`REPORT.md` §5-4・§5-5 から参照)。harness は `native_ref_wc.c` (入力は `native_image.py`)。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_CI.md` | ~70 | ildsp GeneralPitchShifter_CreateInstance 単独 closure の RetDec 入力・census・閉包の取りこぼし・ネガティブコントロール (T-SH-62 #3300)。測定値の正本 |
 | `tools/shared/lift/rex/REPORT.md` | ~75 | REX Shared Library (win `block24351_PE.bin`) の export 14 本の閉包測定 (T-SH-11 #153): 関数数・命令数・間接 call・import・`.pdata` 無しの近似。lift は未実施 (#2733・#2734)。測定値の正本。再現は `rex_closure.py` |
 
