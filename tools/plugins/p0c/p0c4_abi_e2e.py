@@ -36,6 +36,7 @@ NINE = ['0x5de820', '0x5dedf0', '0x5dfb60', '0x5df210', '0x5df240', '0x5e0760',
         '0x5e0b70', '0x5e0bb0', '0x5e1590', '0x5e1780', '0x5e0330']
 CRASH4 = ['0x5de710', '0x5df610', '0x5e05b0', '0x5e0d80']
 B6 = ['0x5dee90', '0x5df040', '0x5e09f0', '0x5e0a70', '0x5e0b10', '0x5e1210']
+UCOMI_FIX = ['0x5e12b0']  # #3439: ucomiss の被演算子・flags を接続 (k80_argfix [C]・[D])
 # #2182 (P0c-17): census の buf_diff≠0 だった 18 kernel。修復後は 2000 case で全て buf_diff=0
 # (10000 case では 0x5dffc0 のみ buf_diff=3: REPORT_APPENDIX_H §19.1・#3280)
 FIX18 = ['0x5de620', '0x5dea40', '0x5dec40', '0x5dedb0', '0x5dee20', '0x5dee50', '0x5df340',
@@ -167,6 +168,10 @@ def main():
         f = rows[k]
         print('   %-10s %-9s %8s %8s %9s %s' % (f[0], f[1], f[3], f[4], f[6][:9], f[7]))
 
+    # #3439 (P0c-21): 0x5e12b0 は書き込みを持たず buf_diff が自明に 0 になるため、戻り値 (xmm0) を native と比べる
+    print('== [5b] 戻り値試験 (0x5e12b0: native vs 修復後 IR, #3439) ==')
+    print('   ' + run(['python3', os.path.join(HERE, 'ucomi_ret_check.py'), hb]).strip())
+
     print('== [6] 検算: status センサス ==')
     ok = [k for k in rows if rows[k][7] == 'ok']
     sig = sorted(k for k in rows if rows[k][7].startswith('sig'))
@@ -191,7 +196,7 @@ def main():
         if r is None or r[7].startswith('sig'):
             fails.append('%s %s (期待: sig なし)' % (k, r[7] if r else 'not-run'))
     # #277: native crash (sig) の kernel が 0 / 対象 B の 6 kernel が ok モデルで CSV に出る
-    # (0x5e12b0 は RetDec が ucomiss のフラグと被演算子を落とすため引数接続では救えない: REPORT §14)
+    # (0x5e12b0 は #3439 で ucomiss の被演算子・flags を接続して ok になった: REPORT_APPENDIX_H §20)
     for k in sorted(rows):
         if rows[k][7].startswith('sig'):
             fails.append('%s %s (期待: sig なし)' % (k, rows[k][7]))
@@ -199,6 +204,12 @@ def main():
         r = rows.get(k)
         if r is None or r[7] != 'ok':
             fails.append('%s %s (期待: ok モデル)' % (k, r[7] if r else 'not-run'))
+    # #3439 (P0c-21): 0x5e12b0 は xmm0/xmm1 の引数と ucomiss flags を持ち、ok で CSV に出る (buf_diff=0)
+    for k in UCOMI_FIX:
+        r = rows.get(k)
+        if r is None or r[7] != 'ok' or r[4] != '0':
+            fails.append('%s %s buf_diff=%s (期待: ok かつ buf_diff=0: #3439)' % (
+                k, r[7] if r else 'not-run', r[4] if r else '-'))
     if fails:
         for f in fails:
             print('   [FAIL]', f)
