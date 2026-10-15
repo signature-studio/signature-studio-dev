@@ -2,7 +2,7 @@
    src の 1 バイト (k) だけ 255、他 0 → dst = 255·w_k(x) (整数)。
    H パス (1 行) と V パス (1 列) を分離して採取。it=5/6/7 + 比較用 it=4 (CUBIC)。
    build: gcc -O1 -g -o sp57 sp57.c ../../ref/pe_load.c -lm
-   usage: ./sp57 > sp57.log */
+   usage: FL_WIN64_DIR=<fl-win64 展開先> ./sp57 > sp57.log */
 #define _GNU_SOURCE
 #include "../../ref/pe_load.h"
 #include "fl_dll_path.h"

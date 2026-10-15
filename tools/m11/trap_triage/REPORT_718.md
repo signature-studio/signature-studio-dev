@@ -181,9 +181,9 @@
 - 真陽性の構造判定 (IR に count の入口判定が無い) の到達可能性 (count が 0 や負になる経路の有無) は未測定。`docs/DEFECTS.md` の類型への対応は PM 判断。
 - 再現: `python3 tools/m11/guard699/scan_guard.py <boot_final.ll> --pe <block00031_PE.bin> --report strict.json` → `python3 tools/m11/trap_triage/strict_evidence.py <IR> --pe <PE> --report strict.json --out strict_evidence.tsv` → `python3 tools/m11/trap_triage/judge_ctx.py <IR> strict_evidence.tsv <PE> 67 98`。
 
-## 4h. 証拠表の行 4〜35 (#3498・母数 32 件: 真陽性 27・偽陽性 0・保留 5)
+## 4h. 証拠表の行 4〜35 (#3498・母数 32 件: 真陽性 27・偽陽性 1・保留 4)
 
-- 判定 (母数 32): 真陽性 27・偽陽性 0・保留 5 (行 4・10・24・27・29)。保留の 5 件は #3854 (`[M11-N195]`) と、その追記に移す。件ごとの表・判定規則・未解決は `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` §4h が正本 (250 行上限のため分割移動)。
+- 判定 (母数 32): 真陽性 27・偽陽性 1 (行 4・#3854 で確定)・保留 4 (行 10・24・27・29)。保留の 4 件は #3854 の子 issue に移す。件ごとの表・判定規則・未解決は `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` §4h が正本 (250 行上限のため分割移動)。
 
 ## 4j. 証拠表の行 36〜66 (#3499・部分達成)
 
