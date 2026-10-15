@@ -14,28 +14,28 @@ mkdir -p "$W"
 L0="$(cut -d' ' -f1-3 /proc/loadavg)"
 T0=$(date +%s)
 
-echo "== 1/8 NC: 合成バイト列の正例・負例 (PE 不要)"
+echo "== 1/9 NC: 合成バイト列の正例・負例 (PE 不要)"
 python3 "$DSP/scripts/mx6_vectorcall.py" --selftest | sed 's/^/   /'
 
-echo "== 2/8 RTTI + VST3 入口面 (seeds 567 / 1-round closure)"
+echo "== 2/9 RTTI + VST3 入口面 (seeds 567 / 1-round closure)"
 python3 "$DSP/scripts/mx_rtti.py" "$PE" "$W/rtti_vtables.json" >/dev/null 2>&1
 python3 "$DSP/scripts/mx_entry_surface.py" "$PE" "$W/rtti_vtables.json" "$W/surface" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('   seeds=%d one_round=%d pdata=%d' % (d['seeds'], d['one_round_closure'], d['pdata_funcs'] if 'pdata_funcs' in d else 0))"
 
-echo "== 3/8 vectorcall 静的検出 (本体: CFG must-def / 独立再計算: 線形 anyref / 感度: 非 begin 入口)"
+echo "== 3/9 vectorcall 静的検出 (本体: CFG must-def / 独立再計算: 線形 anyref / 感度: 非 begin 入口)"
 python3 "$DSP/scripts/mx6_vectorcall.py" "$PE" "$W/surface_seeds_x64c.json" "$W/surface_one_x64c.json" "$W/vectorcall.json" | sed 's/^/   /'
 
-echo "== 4/8 受入1 (MX-33 #3032): xmm0〜3 だけの入口 livein 保留 17 件の判定 (NC 9 件・独立再計算・感度)"
+echo "== 4/9 受入1 (MX-33 #3032): xmm0〜3 だけの入口 livein 保留 17 件の判定 (NC 9 件・独立再計算・感度)"
 python3 "$DSP/scripts/mx33_xmm03.py" "$PE" "$W/vectorcall.json" "$W/xmm03.json" > "$W/xmm03.log"
 grep -v '^| ' "$W/xmm03.log" | sed 's/^/   /'
 
-echo "== 5/8 .pdata unwind census (CHAININFO / EH handler 名)"
+echo "== 5/9 .pdata unwind census (CHAININFO / EH handler 名)"
 python3 "$DSP/scripts/mx6_pdata_eh.py" "$PE" "$W/surface_seeds_x64c.json" "$W/surface_one_x64c.json" "$W/pdata_eh.json" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('   PE: pdata=%d chained=%d eh=%d unreadable_uinfo=%d' % (d['pe_total']['pdata_entries'], d['pe_total'].get('chained_entries(CHAININFO)',0), d['pe_total'].get('eh_handler_entries',0), d['pe_total'].get('unreadable_unwind_info',0))); print('   seeds: %s' % d['seeds']); print('   one_round: %s' % d['one_round']); print('   funclets(FH3): %s' % d['funclets_fh3'])"
 python3 "$DSP/scripts/mx41_pdata2_census.py" "$PE" "$W" > /dev/null
 python3 -c "import json,sys; d=json.load(open(sys.argv[1]+'/mx41_pdata2.json')); print('   MX-41 pdata2 census: %s' % d['census_pdata2']); print('   MX-41 pdata1 unreadable=%d class=%s raw_present=%d E8/E9=%d' % (d['unreadable_pdata1'], d['unreadable_by_class'], d['unreadable_raw_present'], d['unreadable_first_byte_E8E9'])); print('   MX-41 independent(pefile): %s' % d['independent_pefile']); print('   MX-41 negctl: break delta=%+d fix delta=%+d' % (d['negctl']['break']['delta'], d['negctl']['fix']['delta']))" "$W"
 
-echo "== 6/8 判定 (期待値: seeds と 1-round の pdata 始点で xmm4/5 入口 livein = 0 / 受入1 の内訳が 17 件 / MX-41: pdata 数の維持・読取不能 160 の独立再計算一致・ネガコン ±1)"
+echo "== 6/9 判定 (期待値: seeds と 1-round の pdata 始点で xmm4/5 入口 livein = 0 / 受入1 の内訳が 17 件 / MX-41: pdata 数の維持・読取不能 160 の独立再計算一致・ネガコン ±1)"
 python3 - "$W" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1] + '/vectorcall.json'))
@@ -59,7 +59,7 @@ print('   %s' % ('PASS (pdata 始点の vectorcall livein 0 / 整合 OK / 受入
 sys.exit(0 if ok else 1)
 PY
 
-echo "== 7/8 positive control: funclet 数の固定値 (MX-6 測定値 seeds 533 / pdata 始点 529 が変わらないこと)"
+echo "== 7/9 positive control: funclet 数の固定値 (MX-6 測定値 seeds 533 / pdata 始点 529 が変わらないこと)"
 python3 - "$W" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1] + '/pdata_eh.json'))['funclets_fh3']['seeds']
@@ -69,10 +69,32 @@ print('   funclets=%d (期待 533) pdata 始点=%d (期待 529) -> %s' % (
 sys.exit(0 if ok else 1)
 PY
 
-echo "== 8/8 FH4 FuncInfo4 固定部 census + NC (U4a・構造は MSVC 公式記事の FuncInfo4 定義に従う)"
+echo "== 8/9 FH4 FuncInfo4 固定部 census + NC (U4a・構造は MSVC 公式記事の FuncInfo4 定義に従う)"
 python3 "$DSP/scripts/mx6_fh4.py" --selftest "$PE" | sed 's/^/   /'
 python3 "$DSP/scripts/mx6_fh4.py" "$PE" "$W/fh4_census.json" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('   fh4_entries=%d fi_distinct=%d problems=%s' % (d['fh4_entries'], d['fh4_fi_distinct'], d['fixed_part_problems'])); print('   header_bit_sets=%s' % d['header_bit_sets']); print('   pointer_position=%s' % d['pointer_position_census'])"
+
+echo "== 9/9 U3b/U3c 由来 (MX-53 #4992): 解析できない root 118 件の出所 + 間接 jmp の形 + NC"
+python3 "$DSP/scripts/mx6_origin_u3.py" --selftest | sed 's/^/   /'
+python3 "$DSP/scripts/mx6_origin_u3.py" "$PE" "$W/surface_seeds_x64c.json" "$W/surface_one_x64c.json" "$W/origin_u3.json" > /dev/null
+python3 - "$W" <<'PY'
+import json, sys
+o = json.load(open(sys.argv[1] + '/origin_u3.json'))
+c, b = o['U3c'], o['U3b']
+print('   U3c roots=%d no_own_decode=%d has_seed_direct_source=%d source_is_insn_boundary=%d outside_pdata_fn=%d' % (
+    c['roots_unique'], c['no_own_decode'], c['has_seed_direct_source'], c['source_is_insn_boundary'], c['outside_pdata_fn']))
+print('   U3c NC decodable roots in containing fn=%d (containing-fn boundary=%d: 判別力の確認)' % (
+    c['nc_decodable_in_containing_fn'], c['nc_decodable_boundary_in_containing_fn']))
+print('   U3b seeds unknown_flow=%d shapes=%s / one_round unknown_flow=%d (pdata begin %d) shapes=%s' % (
+    b['seeds']['unknown_flow_fns'], b['seeds']['unresolved_jmp_shapes'],
+    b['one_round']['unknown_flow_fns'], b['one_round']['unknown_flow_fns_pdata_begin'], b['one_round']['unresolved_jmp_shapes']))
+ok = (c['roots_unique'] == 3226 and c['no_own_decode'] == 118 and c['has_seed_direct_source'] == 118
+      and c['source_is_insn_boundary'] == 118 and c['outside_pdata_fn'] == 6
+      and c['nc_decodable_boundary_in_containing_fn'] < c['nc_decodable_in_containing_fn']
+      and b['seeds']['unknown_flow_fns'] == 12 and b['one_round']['unknown_flow_fns_pdata_begin'] == 14)
+print('   %s' % ('PASS (U3c 118 = 直接 call の出所あり・出所は命令境界 / NC: 判別力あり / U3b 12・14)' if ok else 'FAIL'))
+sys.exit(0 if ok else 1)
+PY
 
 T1=$(date +%s)
 echo "OK  elapsed=$((T1-T0))s  load start=[$L0] end=[$(cut -d' ' -f1-3 /proc/loadavg)]"

@@ -29,6 +29,7 @@ python3 tests/test_compare_ld11.py
 python3 tests/test_ld52_machine_sig.py
 python3 tests/test_ld200_struct_stub.py
 python3 tests/test_ld181_i128_entry.py
+python3 tests/test_ld248_i128_xmm_entry.py
 python3 tests/test_ld179_tagpoint_tr.py
 python3 tests/test_ld203_slot_fill.py
 python3 tests/test_ld225_sample_vmo.py

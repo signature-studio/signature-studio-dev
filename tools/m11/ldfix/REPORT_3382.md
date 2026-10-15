@@ -68,12 +68,68 @@ ERR_BARE 14 件 (deref VA → call VA。`judge_copy_3382.py` の出力): 0x12802
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| COPY 103 箇所の窓の人手判定 (ERR_BARE 14・ERR_CAND 57・UNCLEAR 16) | 複写経由の取りこぼしの確定数 | 子 #4211 [CI-186] |
-| 0x78890f (IR 定数 0) と 0x1280250・0x1280380 の定数引数 (計 24 件のうち ERR_CAND 15・UNCLEAR 7) の判定 | 保留の件数 | 子 #4211 [CI-186] |
-| MISMATCH 14 件の判定不能 (呼出し件数の不一致) | 判定不能の件数 | 子 #4211 [CI-186] |
+| COPY 103 箇所の窓の人手判定 (ERR_BARE 14・ERR_CAND 57・UNCLEAR 16) | 複写経由の取りこぼしの確定数 | 子 #4961 [CI-200] |
+| 誤り候補 (未確定) 3 件: 0x4504e0・0x5b03a0 の引数の向き、0x41c0a0 の arg2 | ERR_BARE の確定数 | 子 #4961 [CI-200] |
+| 0x78890f (IR 定数 0) と 0x1280250・0x1280380 の定数引数 (計 24 件のうち ERR_CAND 15・UNCLEAR 7) の判定 | 保留の件数 | 子 #4961 [CI-200] |
+| MISMATCH 14 件の判定不能 (呼出し件数の不一致) | 判定不能の件数 | 子 #4961 [CI-200] |
 
 ## 7. 検証範囲
 
 - 範囲内: COPY 103 箇所の一次分類と、0x7888f0 の 3 箇所の窓での確認。
 - 範囲外: 全 103 箇所の人手判定、修復、ldfix_e2e の実測。
-- 測定 commit: この PR の最後のコード commit。`judge_copy_3382.py` は本 PR で追加した。
+- 測定 commit: `80fc6efe2` (コードを変えた最後の commit。対象スクリプトはこの commit 以降変わっていない)。`judge_copy_3382.py` は本 PR で追加した。
+
+## 8. ERR_BARE の窓による確認 (#4211 / CI-186)
+
+本 run では `work-m11` (gitignore・`$ARTIFACTS_DIR` に無し) が無く、窓の再読は未実施。以下の表は前 commit までの窓の記録。各窓で機械語の deref 元 (entry の `mov rbx,rcx`・`mov rsi,rdx` で保持した引数) が、IR の呼出しに裸の引数として渡っているかを見た。判定ラベルは「誤り」「誤り候補 (未確定)」のどちらかで、未確定のものは確認待ち。
+
+| 関数 | deref → call | 機械語 | IR の該当引数 | 判定 |
+|---|---|---|---|---|
+| 0x1280250 | 0x1280271 → 0x1280274 (`1280170`・argpos 2) | `*arg2` (`mov rdx,[rsi]`・rsi=arg2) | `%arg2` | 誤り (窓) |
+| 0x1280380 | 0x12803a1 → 0x12803a4 (`1280170`・argpos 2) | `*arg2` (`mov rdx,[rsi]`) | `%arg2` | 誤り (窓) |
+| 0x40fcf0 | 0x40fd0b → 0x40fd11 (`40fd90`・argpos 1) | `*arg1` (`mov rcx,[rbx]`) | `%arg1` | 誤り (窓) |
+| 0x41c0a0 | 0x41c0b2 → 0x41c0bc (`40fee0`・argpos 1) | `*arg1` (`mov rcx,[rbx]`) | `%arg1` | 誤り (arg1 のみ。arg2 は未確認)。IR の 2 番目の引数は定数 `inttoptr 6712`。機械語の `rdx` は `[rip-…]` の load で、値の一致は窓だけでは確かめられない (未確認) |
+| 0x41c780 | 0x41c7b5 → 0x41c7b8 (`414850`・argpos 1) | `*arg1` (`mov rcx,[rbx]`) | `%arg1` | 誤り (窓) |
+| 0x4504e0 | 0x45050d → 0x450510 (`414850`・argpos 1) | `*arg1` (`mov rcx,[rbx]`) | `%arg2` | 誤り候補 (未確定・向きの確認待ち)。judge は argK=1 で ERR_BARE。IR は別の引数 `%arg2` を裸で渡す |
+| 0x5b03a0 | 0x5b040f → 0x5b0412 (`414850`・argpos 1・k=2) | `*arg2` (`mov rcx,[rsi]`・rsi=arg2) | `%arg3` | 誤り候補 (未確定・向きの確認待ち)。IR は `%arg3` を裸で渡す |
+| 0x79da80 | 0x79da9e → 0x79dab4 (`6edf50`・argpos 1) | `*arg2` (`mov rcx,[rsi]`) | `%arg2` | 誤り (窓) |
+| 0x79da80 | 0x79dab9 → 0x79dabe (`6ed370`・argpos 1) | `*arg2` (`mov rcx,[rsi]`) | `%arg2` | 誤り (窓) |
+| 0x79da80 | 0x79dc23 → 0x79dc32 (`6eeaf0`・argpos 1・k=2) | `*arg2` (`mov rcx,[rsi]`) | `%arg2` | 誤り (窓) |
+| 0x44f440 | 0x44f501 → 0x44f50f (`414da0`・argpos 3) | `*arg1` (`mov r8,[rbx]`) | `%arg1` | 誤り (窓) |
+
+- 残り 3 件 (0x41c650・0x7888f0 の 0x78892d・0x788954) は §2 と REPORT_2555 §2 で確認済みのため、本表には再掲しない。
+- 0x79da80 の `rsi` は entry の `mov rsi,rdx` (= arg2) から、窓の範囲では再代入が見えないことを確かめた (400 命令前までの窓)。
+- 0x4504e0 と 0x5b03a0 は、機械語の deref 元 (`*arg1`・`*arg2`) と IR の裸の引数 (`%arg2`・`%arg3`) が一致しない。judge の argK と窓の読みが同じ向きかは、呼出し先の引数の並びを個別に確かめる必要があり、未確定の誤り候補として残す (未解決表の子 #4961 で確認)。
+- rewrite_va を持つ 6 件 (§3) は未判定。0x1280250・0x1280380 の rewrite_va 行はこの表に含まない (別の deref 行)。
+- 判定の総数 (ERR_CAND 57・UNCLEAR 16・MISMATCH 14・OK_ARGK 2 と、保留 0x78890f) は未判定のまま。子 #4961 [CI-200] に移す。
+- 0x78890f: `show_site_2555.py` の call VA に deref VA を渡すと IR の呼出しが見つからない (call VA は 0x788912)。0x78890f は deref 位置であって呼出し位置ではないため、判定は子 #4961 で行う。
+
+## 9. ERR_CAND 57 件の窓による人手判定 (#4972 / CI-201)
+
+- 対象: `judge_copy_3382.py` の ERR_CAND 57 件 (定義閉包に `%argK` が無い)。全 57 件の窓 (`show_site_2555.py --before 6`) を読んだ。
+- 結果: **誤り 0 / 正常な参照 2 / 判定不能 55** (判定不能 = 定数・定数式 18 + 別式 37)。誤りと断定できた件は無い。
+- 正常な参照 (2): 0x414120 → 0x414194 (#16) と 0x414ad0 → 0x414b4c (#19)。機械語は `[rbp+0x28]+0x10` を `[rbx]` に格納してから `[rbx]` を読んで渡す。読む値は自関数の書込みで、ERR_CAND の前提 (`*argK` を渡す) に当たらない。IR の `stack_var_-48` との同一性は窓外で未確認。
+- 判定不能 (55) の内訳:
+  - IR 引数が定数・定数式 (18): 0x1280250 の 5 件・0x1280380 の 8 件・0x419750・0x5b03a0・0x60a420・0x707f10・0x7888f0 の 1 件ずつ。機械語は `*argK` を読むが、IR の定数が同じ値かは呼出し元の窓外。
+  - IR 引数が別引数・計算式由来 (37): 窓の定義閉包で `%arg2`/`%arg3` 由来と分かっても、機械語の `*argK` と IR の対応は決まらない。
+- 0x1280250 (#1): 機械語は `rsi = rdx = arg2`。0x128028f で `*arg2` が null の経路だけ `[rsi]` に新しい値を書き、0x12802dd で `*arg2` を再読みして 0x73ca40 の第 1 引数に渡す。IR の `%23 = call @function_73ca40(i64 0, i64 8)` は定数 0。0x73ca20 の呼出しを挟むため、`*arg2` が 0 に畳まれたかは確定できない。**判定不能 (保留)**。
+- 0x1280380 (#6〜#15): 関数先頭で `rsi = rdx = arg2` (0x128038e `mov rsi, rdx`) を確認。IR の引数は `%25`・`%27` の式・定数・`%ce*` の定数式が混在し、`*argK` との対応は窓外。**判定不能**。
+- 0x1280250・0x1280380 の定数引数 (受入条件 3): 定数の出所を窓で確かめた。`*arg2` を null 判定した後の書込み (0x128028f) と、その後の再読みが IR で 0 になるかが焦点。書込み先の値の出所は呼出し先 0x7372a0 の戻り値で、本 REPORT の窓の外。**判定不能で止める**。
+
+### 再現
+
+```
+python3 tools/m11/ldfix/scan_spill_deref_3328.py tools/m11/work/boot_final3.ll --pe <PE> --out <scan.json>
+python3 tools/m11/ldfix/judge_copy_3382.py tools/m11/work/boot_final3.ll --pe <PE> --scan <scan.json> --out <judge.json>
+python3 tools/m11/ldfix/classify_err_cand_4972.py <judge.json> --md <out.md>
+```
+
+- scan: `COPY 49 関数 103 箇所` (REPORT_3328 §2 と一致)、judge: `ERR_BARE 14 / ERR_CAND 57 / UNCLEAR 16 / MISMATCH 14 / OK_ARGK 2` (§0 と一致)。
+- classify: `ERR_CAND 57 件: 判定不能 55 / 正常な参照 2`。
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 判定不能 55 件の確定 (定数 18 + 別式 37、0x1280250・0x1280380 の定数引数を含む) | 複写経由の取りこぼしの確定数は未確定 | #4993 [CI-205] |
+| 0x7372a0・0x73ca20 の副作用 (`*arg2` の書込み) の確認 | 0x1280250 #1 の定数 0 の正否 | #4993 [CI-205] |
