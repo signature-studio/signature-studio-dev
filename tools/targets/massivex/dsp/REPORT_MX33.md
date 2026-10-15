@@ -17,12 +17,12 @@
    受入 1 の確定にはこの追跡が要る (未解決 U3h・§6)。
 4. **独立再計算 (線形): 範囲内に 128 bit 読みを持つ関数は 9 件**。ただし CFG で入口から未定義と判定された読みに 128 bit 型はなく、
    線形の 128 bit 読みは定義後 (または CFG 非到達) の読み。CFG 側の 128 bit 候補は 0 件のため包含検査 `CFG-P ⊆ 線形-P` は空真。構造上の上限確認にとどまる (§4)。
-5. **NC 9/9 PASS** (MX-33 の合成列 9 件・§3)。MX-6 の `mx6_vectorcall.py --selftest` 5/5 は別集合 (§3・§5)。e2e `mx6_e2e.sh` は exit 0 (35 s)。funclet は seeds 533 / pdata 始点 529 のまま (positive control PASS)。
+5. **NC 9/9 PASS** (MX-33 の合成列 9 件・§3)。MX-6 の `mx6_vectorcall.py --selftest` 5/5 は別集合 (§3・§5)。e2e `mx6_e2e.sh` は exit 0 (35 s)。funclet は REPORT_MX6.md §4 と一致 (step 7/7 で assert・positive control PASS)。
 6. **MX-6 の表示値は不変**: pdata 始点の xmm4/5 livein 0・保留 17 (seeds)・census・funclet の値は MX-6 §1 と一致。
 
 ## 1. 判定定義 (実装: `scripts/mx33_xmm03.py`・読み列挙は `scripts/mx6_vectorcall.py` の `analyze`)
 
-- **対象**: pdata 始点かつ seeds (567 入口面) の関数のうち、`xmm4/5` の入口 livein が 0 で `xmm0〜3` の入口 livein が 1 つ以上ある 17 件。
+- **対象**: pdata 始点かつ seeds (入口面) の関数のうち、`xmm4/5` の入口 livein が 0 で `xmm0〜3` の入口 livein が 1 つ以上ある 17 件。
   `vectorcall.json` の rows から抽出し、関数範囲 `[RVA, end)` を再解析して livein 集合が一致することを assert。
   1-round 側の pdata 始点保留 (17 件) も同じ RVA 集合 (`same set=True`)。
 - **読み列挙**: `analyze` の must-def (全経路で書かれている集合) で、入口から未定義の xmm_k (k∈0..3) を読む命令を列挙する
@@ -107,16 +107,16 @@
 |---|---|
 | NC (MX-6・5 件) | 5/5 PASS (MX-6 と同じ) |
 | NC (MX-33・9 件) | 9/9 PASS |
-| RTTI + 入口面 | seeds 567 / 1-round 3,226 / pdata 186,960 (MX-6 と同じ) |
-| vectorcall (MX-6) | seeds: pdata 始点 livein xmm4/5 = 0 / 保留 17 (MX-6 と同じ) |
+| RTTI + 入口面 | REPORT_MX6.md §1 と一致 (測定 commit の step 2/7 の出力) |
+| vectorcall (MX-6) | seeds: pdata 始点 livein xmm4/5 = 0 (REPORT_MX6.md §2 と一致) |
 | 受入 1 (MX-33) | 17 件: scalar 0 / 128 bit 0 / 判定不能 17 (§2) |
-| .pdata census | pdata 187,060 / chained 62,526 / EH 23,293 / 読取不能 160 (MX-6 と同じ) |
-| funclet (positive control) | **seeds 533 / pdata 始点 529** (MX-6 と同じ・step 7/7 で assert) |
-| 判定 | PASS (step 6/7・7/7) |
+| .pdata census | REPORT_MX6.md §3 と一致 (測定 commit の step 5/7 の出力) |
+| funclet (positive control) | REPORT_MX6.md §1・§4 と一致 (step 7/7 で assert) |
+| 判定 | PASS (step 6/7・7/7)。step 6/7 の「包含 OK」は空真 (CFG 側の 128 bit 候補 0 件・§4) |
 
 - e2e: `mx6_e2e.sh` (7 工程) → **exit 0・elapsed 35 s**。load average: 開始 `0.00 0.04 0.04` → 終了 `0.39 0.13 0.07`。
 - 追加した assert: step 6/7 は `vectorcall` の livein 0・整合 OK に加え、受入 1 の件数 17 と内訳合計 17、包含 OK を要求。
-  step 7/7 は `pdata_eh.json` の `funclets_fh3.seeds` から funclet 533 / pdata 始点 529 を読み、不一致なら exit 1。
+  step 7/7 は `pdata_eh.json` の `funclets_fh3.seeds` の funclet 数を `mx6_e2e.sh` 内の固定値と比べ、不一致なら exit 1。
 
 ## 6. 検証範囲・範囲外と未解決
 
@@ -130,13 +130,13 @@
 | U3e: call/jmp の引数転送 (xmm を読まずに渡す形) は `regs_access` に現れず、母集合 (livein 17) に入らない | 母集合の外側の関数は未判定 | 子 **[MX-37]** |
 | U3f: 包含検査が空真 (CFG の 128 bit 候補 0 件)・線形側と分類器を共有 | §4 の独立性は弱い | 本 PR の限界として記載 (追加起票なし) |
 | U3g: 既知の非 vectorcall float 関数での感度確認 (任意) | scalar 落ちの実地確認なし | 未実施 (子 **[MX-37]**) |
-| U3b (MX-6 から): 間接 jmp テーブルの残り (seeds 12 / 1-round 14 の過大近似) | 陰性の保守性は保つが精度は未確定 | 子 **[MX-37]** |
-| U3c (MX-6 から): 1-round の解析不能 118 件の由来 | vectorcall 判定の対象外 | 子 **[MX-37]** |
+| U3b (MX-6 から): 間接 jmp テーブルの残り (過大近似の件数は REPORT_MX6.md §6 U3b) | 陰性の保守性は保つが精度は未確定 | 子 **[MX-37]** |
+| U3c (MX-6 から): 1-round の解析不能の件数 (REPORT_MX6.md §6 U3c) の由来 | vectorcall 判定の対象外 | 子 **[MX-37]** |
 | 受入 2 (MX-6 U4a・FH4 funclet 全数) | FH4 の landing pad が一覧に入らない | 子 issue **[MX-38]** |
-| 受入 3 (MX-6 U4b・U4c・unwind 残件) | 1 本目 .pdata 全体の数値は下界・読取不能 160 件の原因未確定 | 子 issue **[MX-38]** |
+| 受入 3 (MX-6 U4b・U4c・unwind 残件) | 1 本目 .pdata 全体の数値は下界・読取不能の件数と原因は未確定 (REPORT_MX6.md §3) | 子 issue **[MX-38]** |
 | 受入 4・5 (MX-6 U4d・U4e・funclet 到達と取り込み設計) | #228 同型の確定 (深い closure での到達) と x64c への取り込み | 子 issue **[MX-39]** |
 
-- 子 issue の割当: **[MX-37]** = 受入 1 の残件 (U3 系: 複写先の追跡・merge 扱い・引数転送・感度・間接 jmp・解析不能 118 件)、**[MX-38]** = 受入 2・3 (FH4 funclet・unwind 残件)、**[MX-39]** = 受入 4・5 (funclet 到達・取り込み設計)。起票番号は PR 本文に記載。
+- 子 issue の割当: **[MX-37]** = 受入 1 の残件 (U3 系: 複写先の追跡・merge 扱い・引数転送・感度・間接 jmp・解析不能の件数 (U3c))、**[MX-38]** = 受入 2・3 (FH4 funclet・unwind 残件)、**[MX-39]** = 受入 4・5 (funclet 到達・取り込み設計)。起票番号は PR 本文に記載。
 
 ## 7. 既知類型との関係
 
