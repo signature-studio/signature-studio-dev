@@ -9,8 +9,8 @@
 - **`blank` (0xd7c600) は isBlanked と activeCounter の効果を確定した**: 第 1 引数が 1 なら `isBlanked` (`scr+0x1d0`) を真に書く。真→偽の解除では `scr+0x1cc ← scr+0x1dc` (activeCounter の復元) を行う。`scr+0x1dc` の初期値は未実測のため仮置き 0。偽の経路の `0xd7e330` 呼出し (`[scr+0x1c4]` 側。観測対象を変えるかは未確定) は mock/C に含めていない (未解決 (d))。
 - **`addMeter` (0xd7ada0) は観測できる状態を変える (PE で確定。round 1 で追加)**: 書式解析が成功 (rc>0) し `scr≠0` のとき `0xd7d9e0` が呼ばれ、その分岐なしの経路で `isUnBlank` (`scr+0x1d1`) を真に、`activeCounter` (`scr+0x1cc`) を `scr+0x1dc` (仮置き 0) にする。mock と C はこの遷移を持ち、`tests/screen_diff.mjs` の期待値で検査する。
 - **残り 5 件** (`displayBar`・`fillRect`・`drawRect`・`drawText`・`eraseRect`) は、**API から観測できる状態を変えないと推定**する。根拠は本体と dispatch callback の先頭 1200 命令に `scr+0x1c?`・`+0x1d?` への直接の書込みが無かったことだけで、本体の全経路と下位呼出しは未確認 (未解決 (a)〜(d))。mock と C は引数検査と None だけを模す (`arrangement.selectionSet` 等と同じ扱い)。描画の引数の意味 (矩形の書式 x/y/w/h か l/t/r/b か) は保留。
-- 実装・未実装の件数は main (`cac0e4112`) の 186/249 (main の `tests/provider_check.mjs` の期待値。PY-235 の `general.processRECEvent` 1 件と PY-136 の screen 初期化・メニュー 10 件を含む) → **193/242** (`fl_table.c` 435 関数。本 PR の 7 件を加えた。`provider/build.sh` のハンドラ 193 と一致)。`tests/screen_diff.mjs` は 87 呼出しで mock と C の差分 0、期待値の不一致 0。
-- 測定 commit: `a068596b9` (コードを変えた最後の commit。main `cac0e4112` を取り込んだ merge)。e2e はすべて PASS (下の検証表)。
+- 実装・未実装の件数は main (`09d6e4b84`) の 196/239 (main の `tests/provider_check.mjs` の期待値。PY-235 の `general.processRECEvent` と PY-136 の screen 初期化・メニュー 10 件などを含む) → **203/232** (`fl_table.c` 435 関数。本 PR の 7 件を加えた。`provider/build.sh` のハンドラ 203 と一致)。`tests/screen_diff.mjs` は 87 呼出しで mock と C の差分 0、期待値の不一致 0。
+- 測定 commit: `fac0afbff` (コードを変えた最後の commit。main `09d6e4b84` を取り込んだ merge)。e2e はすべて PASS (下の検証表)。
 
 ## PE 根拠 (VA)
 
@@ -74,28 +74,28 @@
 
 ## 検証
 
-測定 commit: `a068596b9` (`Merge remote-tracking branch 'origin/main' into 3022-py135-screen-draw-pe`。main `cac0e4112` を取り込んだ merge。コードを変えた最後の commit)。以下は同じ commit のクリーンな作業ツリーで実行した。これより前の測定 (`cad48bf70`) は main 取り込みで無効になったため、本節が新しい測定。
+測定 commit: `fac0afbff` (`Merge remote-tracking branch 'origin/main' into 3022-py135-screen-draw-pe`。main `09d6e4b84` を取り込んだ merge。コードを変えた最後の commit)。以下は同じ commit で前提生成からやり直した (それ以前の測定 `a068596b9` は main 取り込みで無効になった)。
 
-環境: runner 4 core。load average (1 分値) 0.07 (`uptime` の測定時点)。emsdk は `[EMSDK]` の 6.0.12 (`tools/m1/flags.sh` の pin と一致。runner に既存)。`toolchain-emsdk` の素材 (`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst`) は展開していない。前提生成物 (fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 5.5 秒、`FL_WIN64_DIR` はその展開先。`fetch_inputs.sh` rc 0。`build_cpython_wasm.sh` rc 0 wall 4 分 06 秒。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 wall 6.4 秒) は `cad48bf70` の作業ツリーで作ったものを再利用した。その後の main 取り込み (`cac0e4112`) で flpy の入力 (`src/`・`analysis/flapi/`・ビルドスクリプト) は変わっていない (`git diff cad48bf70 HEAD -- tools/python/src tools/python/analysis/flapi tools/python/build_*.sh` は空)。main 取り込みの衝突は 2 回とも `tests/provider_check.mjs` を含み、両側の変更を残した。`acd2efdc3` (1 回目) は PR 側 `pe135` と main 側 `pe235` (#3701 `general.processRECEvent`)。`cac0e4112` (2 回目) は `docs/DOC_MAP.md` の表の行 (PY-135 と PY-136 の 2 行)、`tools/python/host/fl_mock.mjs` と `tools/python/provider/fl_engine.c` の状態宣言と screen 関数 (PY-135 の 7 件と PY-136 の 10 件)、`tools/python/tests/provider_check.mjs` の条件行 (`pe135` と `pe136`) だった。いずれも両側の集合を残し、件数は実測の 193 / 242 にした。
+環境: runner 4 core。load average (1 分値) 1.38 (`uptime` 06:38 の測定時点)。emsdk は `[EMSDK]` の 6.0.12 (`tools/m1/flags.sh` の pin と一致。runner に既存)。`toolchain-emsdk` の素材 (`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst`) は展開していない。前提生成物は `fac0afbff` の作業ツリーで作った: fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 4.282 秒 (`FL_WIN64_DIR` はその展開先)、`fetch_inputs.sh` rc 0 (0.801 秒)、`build_cpython_wasm.sh` rc 0 wall 3 分 47.970 秒、`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 wall 5.927 秒。main 取り込み (`fac0afbff`) の衝突は `tests/provider_check.mjs` の 1 箇所だけで、main 側の `pe215` と本 PR の `pe135` の両方の条件行を残し、件数は main 側の 196/239 から 203/232 にした (`docs/DOC_MAP.md`・`host/fl_mock.mjs`・`provider/fl_engine.c` は自動 merge)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・`fl_table.c: 435 関数, ハンドラ 193`・警告 0 | 1.124 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 193 / 未実装 242 / MCP 静的 60) | 0.355 秒 |
-| `node tests/screen_diff.mjs` | calls 87、diffs 0、PASS | 0.052 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.135 秒 |
-| `node tests/*_diff.mjs` (23 本。main 由来の差分テストを含む。23 本の合計) | 23/23 rc 0 | 2.015 秒 |
+| `bash provider/build.sh` | rc 0・`fl_table.c: 435 関数, ハンドラ 203`・警告 0 (出力に warn 0 件) | 1.348 秒 |
+| `node tests/provider_check.mjs` | `{"functions":435,"implemented":203,"unimplemented":232,"mcp_static":60,"PASS":true}` | 0.368 秒 |
+| `node tests/screen_diff.mjs` | `{"calls":87,"diffs":0,"PASS":true}` | 0.048 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` | 1.634 秒 |
+| `node tests/*_diff.mjs` (23 本。main 由来の差分テストを含む) | 23/23 rc 0 | 1.913 秒 |
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5)。`59dac085f` では `blank` の解除時の復元 (1) と `drawText` の文字列検査 (2) を外して FAIL を確かめた。addMeter の状態遷移は次の 2 件で確かめ、どちらも `a068596b9` で再実行した (改変 → FAIL → 元の内容に戻して PASS。戻した内容は `cmp` で元と一致を確認)。
+ネガティブコントロール (`docs/WORKFLOW.md` §5)。`59dac085f` では `blank` の解除時の復元 (1) と `drawText` の文字列検査 (2) を外して FAIL を確かめた。addMeter の状態遷移は次の 2 件で確かめ、どちらも `fac0afbff` で再実行した (改変 → FAIL → 元の内容に戻して PASS。戻した内容は `cmp` で元と一致を確認)。
 
-- (3) mock の `addMeter` から `isUnBlank`・`activeCounter` の書込みを外す → `AssertionError: screen 型違い 期待値と不一致 5 件`、rc 1 (FAIL)。戻すと PASS (calls 87)。
-- (4) C の `addMeter` から同じ書込みを外す → 同じ 5 件、rc 1 (FAIL)。戻すと PASS (calls 87)。
+- (3) mock の `addMeter` から `isUnBlank`・`activeCounter` の書込みを外す → `AssertionError: screen 型違い 期待値と不一致 5 件`、rc 1 (FAIL)。戻すと PASS (calls 87、diffs 0)。
+- (4) C の `addMeter` から同じ書込みを外す → `AssertionError: screen 型違い 期待値と不一致 2 件`、rc 1 (FAIL)。戻すと PASS (calls 87、diffs 0)。
 - 旧 `screen_diff` は mock と C の戻り値だけを比べていたため、(3)(4) は通ってしまう。状態の期待値 (addMeter の前後の `isUnBlank` / `getScreenActiveCounter`) を足して検出できるようにした。
 
 コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff a068596b9 HEAD -- tools/python ':!*.md'
+$ git diff fac0afbff HEAD -- tools/python ':!*.md'
 (空)
 ```
 
