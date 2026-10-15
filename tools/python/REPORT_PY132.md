@@ -8,7 +8,7 @@
 - 3 件の PyArg 書式・既定値・戻り値 (None) と、共通の dispatch 呼出し形を PE で確定した。
 - `toggleBrowserNode` は、値 -1 / 0 / 1 で作用先の分岐が 3 通りに分かれることまで確定した (`0xa89690` → `0xa26190`・`0xa07d00(0)`・`0xa07d00(1)`)。
 - mock と C に 3 件を実装し、差分は 0 (`tests/ui_browser_diff.mjs`)。**作用は未モデル**: toggle は要求された分岐 (`browserOp`) だけを残す。ノードが実際に開閉するかは未確定。select・preview の作用 (キー送出 `0xfdd2c0`) も未確定。
-- `provider_check`: 実装 155 → 158、未実装 280 → 277。
+- `provider_check` (現 head): 実装 168・未実装 267 (main `71e64d058` 基準で 165 → 168、270 → 267)。測定は「main 取り込み後の再測定」節。
 
 ## PE 根拠 (block00031_PE.bin・VA)
 
@@ -75,9 +75,9 @@ P 真の後:
 - `selectBrowserMenuItem`・`previewBrowserMenuItem`: NOARGS (引数ありは code 5)。None を返す。作用は未モデル (推測での実装はしない)。
 - 変更箇所: `host/fl_mock.mjs`・`host/fl_provider.mjs`・`provider/fl_engine.c`・`provider/build.sh` (EXPORTED_FUNCTIONS)・`tests/provider_check.mjs` (集合 `pe132`・件数)・`tests/ui_browser_diff.mjs` (新規)。
 
-## 検証
+## 検証 — 旧測定 (main 取り込み前・359cf28af の節に置換)
 
-測定 commit: `2b72baa3c` (コードを変えた最後の commit: `feat(python): implement ui browser node and menu item functions (PY-132, refs #3013)`)。以後の commit はこの REPORT (md のみ)。
+測定 commit: `2b72baa3c` (main 取り込み前に測定した時点の、コードを変えた最後の commit: `feat(python): implement ui browser node and menu item functions (PY-132, refs #3013)`)。この測定の後に main を 3 回取り込み (`d8beed07c`・`7923bbfe3`・`359cf28af`)、`tools/python` のコードが変わった (`git diff 2b72baa3c 359cf28af -- tools/python ':!*.md'` は 20 ファイル)。この節の数値は現 head の値ではない。現 head の測定は「main 取り込み後の再測定」節。
 環境: runner・`uptime` は `load average: 0.38, 1.14, 0.70` (03:30:12)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (fl-win64 を `tar --zstd -xf` で全展開、11.3 秒)。emsdk は `[EMSDK]` (`docs/REFERENCES.md`、pin 済みの既存インストール) を使った。
 
 | コマンド | 結果 | wall |
@@ -107,7 +107,7 @@ P 真の後:
 
 ## 件数の変化
 
-main 75c48ab21 基準: 実装 155 → 158 (+3)、未実装 280 → 277 (-3)。`pe132` (3 件) を判定に入れた。
+main 75c48ab21 基準: 実装 155 → 158 (+3)、未実装 280 → 277 (-3)。`pe132` (3 件) を判定に入れた。(初回の測定値。現 head の値は「main 取り込み後の再測定」節)
 
 ## main 取り込み後の再測定 (競合解消)
 
