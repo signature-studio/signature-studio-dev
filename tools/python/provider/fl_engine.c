@@ -824,7 +824,7 @@ FL_H(device, getIdleElapsed) { return fl_ret_d(c, idle_elapsed); }
 FL_H(device, isMidiOutAssigned) { return fl_ret_b(c, midi_out_assigned); }
 FL_H(device, getMasterSync) { return fl_ret_b(c, master_sync); }
 FL_H(device, setMasterSync) { master_sync = A_INT(0, 0) == 1; return fl_ret_none(c); }
-/* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。
+/* PE 0xd75120 (書式 "L|i"・第 2 引数の既定 1 は解析前に PE が書く・REPORT_PY231 §1b)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。
    0xfdc8a0 は [sink+0x5c+4*添字] と同じ 32bit 値なら送らず、変わったときだけ送ってテーブルを書く (REPORT_PY231 §1)。
    テーブルの初期値と添字の範囲は未確定 (#3949): 未設定 (-1) を初期値とみなし、範囲外の添字は重複検出せず送る仮置き */
 FL_H(device, forwardMIDICC) {
