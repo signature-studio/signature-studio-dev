@@ -11,10 +11,10 @@
 
 ## 0 対象と前提
 
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf ... --wildcards '*block00031_PE.bin'` で `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin` に展開 (1.6 秒、22,227,016 バイト)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf ... --wildcards '*block00031_PE.bin'` で `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin` に展開 (2.9 秒、22,227,016 バイト)。
 - 逆アセ: `pe_callgraph.py` の `load()`・`function_starts()`・`around`・`callers`。
-- 検証: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_probe.py` → P1〜P9 ALL PASS、終了 0、所要 21.5 秒 (n=1)。前段 `pe_py269_probe.py` (C1〜C11) は ALL PASS、所要 21.5 秒。
-- 測定 commit: 本 PR の `pe_py275_probe.py` を最後に変えた commit。
+- 検証: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_probe.py` → P1〜P9 ALL PASS、終了 0、所要 38.4 秒 (n=1、load average 0.65)。前段 `pe_py269_probe.py` (C1〜C11) は ALL PASS、終了 0、所要 39.4 秒 (n=1、load average 0.65)。
+- 測定 commit: `6f0a0171e` (コードを変えた最後の commit。`pe_py275_map_readers.py` の `ARR` を読出し (`mov reg, qword ptr [...]`) に限定した修正)。本 REPORT の §0・§4・§5・§6 の測定値はすべてこの commit で測った。`pe_py275_probe.py` の最後の変更は `a35ffb975`。
 
 ## 1. 受入 1: 格納先
 
@@ -38,27 +38,45 @@
 | `call [X+8]` の全件 | 1638 件 (P8。PY-269 C3 と一致) |
 | キー 0xb の格納元 | 0x101cc60 (0x16 とは別の生成関数) (P9) |
 
-- 0x101a6e0 の slot 1 呼出し 6 件のうち、キー 0x16 で取り出した値が呼出し時点で TUndoEvent_MovedFXTracks であるかは、表 `[rbp+0x118]` の内容 (実行時データ) に依存する。本 REPORT は静的に確定しない (§3)。`[rbp+0xd0]` は 0x101a6f8 で 0 初期化される別の変数で、0x101a9ff の `lea` と 0x101aa29 の読みに出る。役割は未確定。
+- 0x101a6e0 の slot 1 呼出し 6 件のうち、キー 0x16 で取り出した値が呼出し時点で TUndoEvent_MovedFXTracks であるかは、表 `[rbp+0x118]` の内容 (実行時データ) に依存する。本 REPORT は静的に確定しない (§3)。
+- 表ポインタの食い違い (#4964 の指摘) は解消: 表ポインタは `[rbp+0x118]` (0x101a991〜0x101aa06 で読まれ、0x16 を書く 0x101a9b9 もこの値経由)。`[rbp+0xd0]` は別変数で、0x101aa29・0x101aacf で読まれる (表ポインタではない)。#4761 のコメント `[rbp+0xd0]` は誤り。
 - 1632 件の残りは、0x102bb20 を呼ぶ 26 関数 (0x101a6e0 以外。0x102bb20 の呼出し元は計 27 関数) の中にはない。ただし、これは「キーで取り出す経路」の外側を見ただけで、`[map+8]` の配列を直接読んで slot 1 を呼ぶ経路の除外にはならない (§3)。
 
 ## 3. 限界 (未解決)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x101a6e0 のキー表 (表ポインタ `[rbp+0x118]`) の内容 (実行時に 0x16 が入る条件) | 6 件の slot 1 呼出しのうち、実際に TUndoEvent_MovedFXTracks を受けるかの確定 | #3944 (Refs のまま残す。動的確認が要る) |
-| 1632 件の残りが、格納配列 `[map+8]` を 0x102bb20 以外の経路で読んで slot 1 を呼ぶか | 受入 2 の「残りは受け手ではない」の確度。0x102b750 は `[map+8]` の配列に値を格納し、0x102b6c0・0x102b610 で添字を計算する (逆アセ確認のみ・未追跡) | #3944 (Refs のまま残す。`[map+8]` の読出し箇所を全件列挙する) |
+| 0x101a6e0 のキー表 (表ポインタ `[rbp+0x118]`) の内容 (実行時に 0x16 が入る条件) | 6 件の slot 1 呼出しのうち、実際に TUndoEvent_MovedFXTracks を受けるかの確定 | #4995 (PY-4850) へ追記。動的確認が要る |
+| 1632 件の残りが、格納配列 `[map+8]` を 0x102bb20 以外の経路で読んで slot 1 を呼ぶか | 受入 2 の「残りは受け手ではない」の確度。0x102b750 は `[map+8]` の配列に値を格納し、0x102b6c0・0x102b610 で添字を計算する (逆アセ確認のみ・未追跡) | #4995 (PY-4850)。`[map+8]` の読出し箇所を全件列挙し、同インスタンスかを確定する |
 
 ## 4. 検証
 
-- probe: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_probe.py` → P1〜P9 ALL PASS、終了 0。
-- 前段: `pe_py269_probe.py` → C1〜C11 ALL PASS、終了 0。
-- コード差分: 測定 commit から HEAD までの `tools/python/analysis/flapi` 差分は本 PR の新規 probe のみ。
+- `pe_py275_map_readers.py` (§5 の候補列挙): M1・M2 ALL PASS、終了 0、所要 40.4 秒 (n=1、load average 0.32)。候補 3 関数。
+- probe: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_probe.py` → P1〜P9 ALL PASS、終了 0、所要 38.4 秒 (n=1、load average 0.65)。
+- 前段: `pe_py269_probe.py` → C1〜C11 ALL PASS、終了 0、所要 39.4 秒 (n=1、load average 0.65)。
+- コード差分: 測定 commit `6f0a0171e` から HEAD までの flapi 差分は空 (`git diff 6f0a0171e HEAD -- tools/python/analysis/flapi` の出力 0 行)。前回の測定 commit `5cb0fb182` からの差分は次の 2 ファイル: `pe_py275_map_readers.py` (4 行。`ARR` の読出し限定) と `pe_py275_map_slot1.py` (新規 62 行。main 取り込み後の merge `a181d9b3d` で入った §6 の probe)。`5cb0fb182` 以前の `pe_py366b_probe.py` の追加は別 PR の probe で、本 REPORT の測定対象外。
 
-## 5. #4995: 格納配列 `[map+8]` の直接読みと slot 1 の共存 (部分達成)
+## 5. 受入 2 後半の候補 (解析補助・上限ではない)
+
+`pe_py275_map_readers.py` の条件 (関数内に `[reg+0x40]` の読み・配列要素の読出し `mov reg, qword ptr [base+idx*8+8]`・`call [reg+8]` が同居) で 3 関数:
+
+| 関数 | 0x102bb20 (キー取り出し) | 所見 |
+|---|---|---|
+| 0xc3b930 | なし | 配列読みの元は `[rbp+0xd0]+0x18` (map 由来ではない)。slot 1 の受け手は未確定 |
+| 0xc3bc00 | なし | 配列読みの元は `[rbp+0xa0]+0x18`。0xc3bd98 の slot 1 の受け手は `[rbp+0xa0]+0x10` 経由 (map ではない) |
+| 0x1046a30 | なし | 大関数 (4904 命令)。`[rbp+0x40]` 直接読みあり。受け手の同一性は未確定 |
+
+- 0x1304060 は、旧 `ARR` (store `qword ptr [..], reg` も数えた判定) では候補に入っていた。読出し限定の修正後は候補外 (格納配列 `[rax+rcx*8+8]` へのアクセスは store のみで、読出しは 0 件)。slot 1 呼出し 0x1304d5d の受け手 `rbx` の出所 (`mov rbx, rdx` 0x1304ad9・`mov rbx, rax` 0x1304ba3) は未確定。
+- 0x102bb20 を呼ぶ 27 関数のうち、候補 3 関数には含まれない。
+- 候補 3 関数の受け手の同一性は、前方の単純な追跡 (40 命令) では確定できなかった (スタックへの退避が多い)。受入 2 後半は未達のまま子 issue へ分割する。
+
+## 6. #4995: 格納配列 `[map+8]` の直接読みと slot 1 の共存 (部分達成)
+
+- 本節の probe `pe_py275_map_slot1.py` は main 取り込み後の merge `a181d9b3d` で入った新規 probe。§0・§4 の測定 (`pe_py275_probe.py` 等) とは測定対象が別。本節の値は測定 commit `6f0a0171e` の HEAD でも再測定 (下記 検証) した。
 
 - 格納配列の値読出し `mov r, qword ptr [base + idx*8 + 8]` は 360 件 (`pe_py275_map_slot1.py` Q1)。`call qword ptr [reg+8]` は 1638 件 (Q2・PY-269 C3 と一致)。
-- 同一関数内に両方が共存する関数は 7 件: 0x69b640・0x8c9d20・0xb70190・0xc3b930・0xc3bc00・0xd328f0・0x1046a30 (Q3〜Q5)。#4964 が挙げた 4 関数のうち 0xc3b930・0xc3bc00・0x1046a30 を含み、0x1304060 は含まない。
-- 0x1304060 は格納配列の読出しを 0 件持つ。slot 1 呼出しは 0x1304d5d の 1 件で、呼出し元は 0x1304481 のみ。受け手は格納配列由来ではない可能性が高いが、未確定。
+- 同一関数内に両方が共存する関数は 7 件: 0x69b640・0x8c9d20・0xb70190・0xc3b930・0xc3bc00・0xd328f0・0x1046a30 (Q3〜Q5)。#4964 が挙げた 4 関数のうち 0xc3b930・0xc3bc00・0x1046a30 を含み、0x1304060 は含まない (格納配列の読出し 0 件)。
+- 0x1304060 は格納配列の読出しを 0 件持つ (store のみ)。slot 1 呼出しは 0x1304d5d の 1 件で、呼出し元は 0x1304481 のみ。受け手は格納配列由来ではない可能性が高いが、未確定。
 - 0xd328f0 は格納配列の読出し 4 件を持つ。#4964 のコメントは「map 由来ではない」と書くが、読出し元 (`[rax + rcx*8 + 8]` の `rax`) を確定していないため、本 REPORT は否定も肯定もしない。
 - 7 関数の逆アセ (`around`) で確認できた事実:
   - 0xc3b930: 読出し (0xc3b9fd) の値を `[rbp+0x78]` に置く。slot 1 (0xc3bb2e) の receiver は `[rbp+0xd0]+0x10` の別オブジェクトで、読出し値とは別経路。
@@ -70,7 +88,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 7 関数の受け手の同インスタンス確定 (手作業追跡) | 受入条件の残り。slot 1 が TUndoEvent_MovedFXTracks を受けるかの確定 | #4995 (Refs のまま残す) |
+| 7 関数の受け手の同インスタンス確定 (手作業追跡) | 受入条件の残り。slot 1 が TUndoEvent_MovedFXTracks を受けるかの確定 | 子 issue #4995 へ移送 |
 | `pe_py275_map_slot1.py` の自動追跡が候補ゼロ | 自動化の信頼性。結論には使っていない | #4995 |
 
-- 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py275_map_slot1.py` → Q1〜Q4 ALL PASS、終了 0、所要 37.3 秒 (n=1)。
+- 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py275_map_slot1.py` → Q1〜Q5 ALL PASS、終了 0、所要 36.7 秒 (n=1、load average 0.82)。
