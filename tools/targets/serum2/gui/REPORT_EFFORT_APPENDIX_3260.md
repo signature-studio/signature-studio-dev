@@ -97,7 +97,7 @@
 - 受入の 2 条件 (`nonzero_after>0`・`text_width>=0`) だけでは、文字が無くても pass する。`CTextLabel` の既定は黒背景で、実装済みの描画命令のうち不透明な黒を書けるのは `drawRect` だけなので、`nonzero_after=12000` の 11888 px は背景である。
 - そのため `check_render_poc.sh` は `text_px>0` (文字色の画素) を追加で要求する。文字が描かれた証拠を別に残すため。
 - `control` と `before` の計数は変えていない。`text_px` は harness の出力行の末尾に足した。
-- ネガティブコントロール (数値): `canvas_font.cpp` の `CanvasFontPainter::drawString` の先頭に `return;` を入れた一時変更 (測定後に元へ戻した。commit はしない) で `check_render_poc.sh` を実行した。結果は `nonzero_after=12000` (背景は残る)・`text_px=0`・`text_width=54`・`render: fail`・rc=1。文字が描かれないときに `text_px` の条件だけが落ちることを確かめた。
+- ネガティブコントロール (数値): `canvas_font.cpp` の `CanvasFontPainter::drawString` の先頭に `return;` を入れた一時変更 (測定後に元へ戻した。commit はしない) で `check_render_poc.sh` を実行した。結果は `nonzero_after=12000` (背景は残る)・`text_px=0`・`text_width=54`・`render: fail`・rc=1 (`7cc2dedce` と `5ed15ae6d` で同じ)。文字が描かれないときに `text_px` の条件だけが落ちることを確かめた。
 
 ### 17-9. 測定 commit と差分
 
@@ -125,4 +125,5 @@
 | `count_canvas_noop.py` | draw 15 (no-op 12・実装 3)・state 14 (no-op 7・実装 7)。§17-5 と同じ |
 
 - §17-3 からの変化は件数だけ: compile 70→71・canvas 構文検査 7→8 (main 側が upstream の `platformfactory.cpp` を検査対象に加えたため)。画素・文字の値は変わらない。
-- 所要の注記 (`docs/WORKFLOW.md` §5: 所要は秒・load・並列数で書く): compile は `xargs -P 4` (nproc 4) で並列に走る。同じコードの real は測定ごとに変わった。上の 14.644 s (load 0.32→0.70)。差し戻し対応で同じコードを再実行した 22.440 s (load 0.74→2.53)。reviewer 側の再実行は real 31.0〜32.0 s・compile 30.5〜30.9 s。判定値 (画素・文字の値・rc) は、どの回も上の表と一致した。
+- 所要の注記 (`docs/WORKFLOW.md` §5: 所要は秒・load・並列数で書く): compile は `xargs -P 4` (nproc 4) で並列に走る。同じコードの real は測定ごとに変わった。上の 14.644 s (load 0.32→0.70)。差し戻し対応で同じコードを再実行した 22.440 s (`7cc2dedce`・load 0.74→2.53)。reviewer 側の再実行は real 31.0〜32.0 s・compile 30.5〜30.9 s。判定値 (画素・文字の値・rc) は、どの回も上の表と一致した。
+- 差し戻し対応の検証 HEAD `5ed15ae6d` (コード差分 0 行): `check_render_poc.sh` rc=0・real 20.850 s・load 0.68→1.81・render pass (`nonzero_after=12000 text_width=54 text_px=112`)。`check_canvas_syntax.sh` rc=0 (8/8 errors=0)・`check_wasm_syntax.sh` rc=0 (seed 6 errors=0)・`count_canvas_noop.py` は draw 15 / state 14 で、上の表と同じ。
