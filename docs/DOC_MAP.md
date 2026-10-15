@@ -508,8 +508,9 @@
 | `tools/startup/license_obs/REPORT.md` | ~235 | 登録フラグ byte[0x14f84a8] の全サイト列挙 + gradeChar のサイト列挙 (連続形/レジスタ追跡形; 下限) + 0x10c7cd0 の実機械語実行 (ST-T11 #107) + unit 初期化後の ILRegKey 非空観測 (ST-T15 #525) + gradeChar 確定手段の選定 (ST-T16 #526 §8) |
 | `tools/startup/license_obs/REPORT_786_APPENDIX_1492.md` | ~48 | REPORT_786 §13・§14 全文 (#1492 callee 越し解析の表・未追跡の内訳・限界・未解決表)。REPORT_786 本体は 250 行上限のため分割移動 |
 | `tools/startup/license_obs/REPORT_786_APPENDIX_1640.md` | ~54 | #1640 間接 call 0x40944e の行き先 (静的スロット 0x13a5c98 → 0x407e20)・再帰打切り 10 件の不動点・`--no-rec-summary` アブレーション (345 件) の付録。測定 commit は本文に記載 |
+| `tools/startup/license_obs/probe_4764_widen.py` | ~70 | #4764: 0x10c7cd0 の間接 call の実行サイト和集合を 13 入力 (GUID・ComputerName・AppData・IL 長・cl) に広げて測る。結果は `results/probe_4764_widen.json`。 |
 | `tools/startup/license_obs/probe_1414_callers.py` | ~80 | #3727: 0x10d3a30 → 0x11fc770 → 3 直接呼出し元の遡及 (rel32 の call 静的) と 6 入力の code hook (`--dyn`)。結果は `results/probe_1414_callers.json` |
-| `tools/startup/license_obs/REPORT_786_APPENDIX_1414.md` | ~140 | #1414 (#786 受入 2) の付録: 0x10d3a30 の gradeChar 書込み条件 (g3・g4 は g1 と同一 dword、0x10c7850 の戻り値 ≤ 0 で書込み)・戻り値スタブ W1〜W7・測定。REPORT_786 §12 の続き |
+| `tools/startup/license_obs/REPORT_786_APPENDIX_1414.md` | ~180 | #1414 (#786 受入 2) の付録: 0x10d3a30 の gradeChar 書込み条件 (g3・g4 は g1 と同一 dword、0x10c7850 の戻り値 ≤ 0 で書込み)・戻り値スタブ W1〜W7・測定。REPORT_786 §12 の続き |
 | `tools/startup/license_obs/REPORT_786_APPENDIX_3725.md` | ~70 | #3725 (ST-1) の付録: 0x10c7850 の戻り値の式 (v98 = min(v88,v90) 系・trunc(v98 - trunc(G)))・11 ケース一致 (probe_3725_retformula.py)・実機 6 入力の観測 (probe_3725_observe.py)。g1 の意味は未確定 |
 | `tools/startup/license_obs/REPORT_APPENDIX_107.md` | ~32 | #107 残項目の付録: inline HWID ×24 (API・MachineGuid 文字列・SHGetFolderPathW の動的解決の 3 定義で同一集合) と `== 0x3f` 26 の突合 (probe_hwid.py)・限界。REPORT §9 の正本。250 行上限のため分割移動 |
 | `tools/startup/winstubs/REPORT.md` | ~100 | 起動 critical Win32 API の fail-soft stub |
@@ -760,6 +761,7 @@
 | `tools/python/REPORT_PY352_4674.md` | ~70 | PY-352 (#4674): `mixer.getTrackName` の `maxLen` 切詰めを PE (`0x12be470`) で UTF-16 code unit 単位と確定し、C (UTF-8 数えを UTF-16 単位へ) と mock を合わせた。差分検査 `mixer_diff` の非 ASCII 7 件を追加。flpy 経由の検査は `build_flpy.sh` の既知問題で未実施 (§2) |
 | `tools/python/REPORT_PY115_2950.md` | ~79 | PY-115 (#2950): flapi 表の追加引数のうち `mixer.getTrackName` の `maxLen` (mask 外の文字の削除) を PE (`0x12be470`) で確定し C/mock に実装。`channels.soloChannel` の `value` は -1 の反転呼出しのみ PE で確認し、`value ≠ -1` の比較対象は未同定 (推定で実装)。差分検査の結果は REPORT §1。残りは子 #3654・#3655・#3656 |
 | `tools/python/REPORT_PY120_2984.md` | ~186 | PY-120 (#2984): launchMapPages 12 件のうち `length` 1 件を PE (0xd791b0) で確定・mock/C 差分 0 (件数は仮置き 0)。残り 11 件は子 #3027・#3029・#3030 |
+| `tools/python/REPORT_PY379.md` | ~80 | PY-379 (#4765・親 #3746): launchMapPages の例外化の述語 `vt[+0x88]` (VMT 0x125b1c0 → 0x1262a90) と gate `vt[+0x98]` (→ 0x1262b80) を PE で同定。フラグ 2 つの書込み元は未確定 (#3746) |
 | `tools/python/REPORT_PY139_3030.md` | ~133 | PY-139 (#3030): launchMapPages のイベント処理 3 件 (processMapItem・releaseMapItem・checkMapForHiddenItem) の PE 呼出し契約 (書式・戻り・失敗 code・共通ディスパッチャ 0xd843d0 の要求格納)。作用先 (mgr の vtable) は未確定で mock/C は未実装。残りは子 issue |
 | `tools/python/REPORT_APPENDIX_2984.md` | ~184 | PY-120 (#2984) の付録: REPORT §検証 から分割移動した過去の測定節 (初回〜merge `a2a56bf8`)。内容は削除していない。正本は `REPORT_PY120_2984.md` |
 | `tools/python/REPORT_PY138.md` | ~150 | PY-138 (#3029): launchMapPages の init・updateMap・createOverlayMap の書式・個数・成功時の戻りを PE で確定し mock/C に実装 (副作用は未確定)。setMapItemTarget の戻り型 None は PY-243 (#3745) で確定 (`REPORT_PY243.md`)。項目書込み・範囲検査は子 #4581、例外化の述語・持ち越し 1〜3 は子 #3746 |

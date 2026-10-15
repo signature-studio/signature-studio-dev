@@ -138,6 +138,9 @@ def run(cmd, what, timeout=900):
 
 
 CHUNK = 8000
+# #4775: 二つの NaN どうしの add/mul は、V8 の tier (Liftoff と TurboFan) で返す NaN の選び方が違う (仕様で未規定)。
+# 既定の tier 切替はタイミングで変わるため、wasm 側は tier を固定して実行し、NaN ビットを再現可能にする。
+WASM_TIER = '--liftoff-only'
 
 
 def run_chunked(scen_path, out_path, cmd_for, what, timeout):
@@ -319,7 +322,7 @@ def nega_lower(scen_path, nat_out):
          '-sGLOBAL_BASE=%d' % 0x11000000, '-sSTACK_SIZE=2097152', '-sINITIAL_MEMORY=%d' % 0x14000000,
          '-sALLOW_MEMORY_GROWTH=0', '-o', mut_mjs], 'mutant wasm build (emcc)', timeout=900)
     mut_out = os.path.join(mut_dir, 'wasm_out.txt')
-    run(['node', os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mut_mjs, os.path.join(WORK, 'image.bin'), scen_path, mut_out],
+    run(['node', WASM_TIER, os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mut_mjs, os.path.join(WORK, 'image.bin'), scen_path, mut_out],
         'mutant wasm run (node)', timeout=900)
     _, agg = compare(parse(nat_out), parse(mut_out), scen_for_compare(scen_path))
     return agg[TARGETS[0]['name']]
@@ -450,7 +453,7 @@ def main():
         load = os.getloadavg()[0]
         img_p = os.path.join(WORK, 'image.bin')
         t_nat = run_chunked(scen, nat_out, lambda cp, co: [nat, img_p, cp, co], 'native run', 600)
-        t_wasm = run_chunked(scen, wasm_out, lambda cp, co: ['node', os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mjs, img_p, cp, co],
+        t_wasm = run_chunked(scen, wasm_out, lambda cp, co: ['node', WASM_TIER, os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mjs, img_p, cp, co],
                              'wasm run (node)', 900)
         print('[build] native %.2f s, wasm emcc %.2f s; [run] native %.3f s, wasm(node) %.3f s; load1 before run %.2f' % (
             t_nat_build, t_wasm_build, t_nat, t_wasm, load))
