@@ -86,7 +86,7 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 - **測定 commit**: `7618e8a56` (測定時の HEAD)。`pe.py` の code は最後に `1b53c5b86` で変わり、`1b53c5b86`..`7618e8a56` の code 差分は 0 件 (`git diff 1b53c5b86 7618e8a56 -- tools/liftdiff/ldlib tools/liftdiff/liftdiff_e2e.sh` の出力は空)。
 - **差分証跡** (WORKFLOW §6): `git diff 7618e8a56 HEAD -- tools/liftdiff` の出力は本節 (REPORT_APPENDIX_LD177.md) と `tools/liftdiff/ld198_recount.py` (新規・内訳の再現用。`liftdiff_e2e.sh` の経路の外) のみ。測定に使った code (`ldlib/`・`liftdiff.py`・`liftdiff_e2e.sh`) の差分は 0 件。
 - **fvm 12 → 41 (+29) と 29 件の差の説明**: fvm 関数は base 12 → HEAD 41 で、新規 29 件・消えた件数 0 件。新規 29 件は上表の resolved 29 件と一致する (その他の 44 件は fvm 対象外のまま)。
-- **測定**: base `1f12b1b6d` と HEAD `7618e8a56` を同一環境で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 1 回ずつ実行。base 198 s PASS・HEAD 191 s PASS (`LIFTDIFF_E2E PASS`)。素材: `fl-win64`・`work-m11` (`m11_gen_ir2.sh` 実行後の `ir_conditions.json`)・`work-liftdiff`。emsdk は `toolchain-emsdk` の素材が無いため、上流から `emsdk install 6.0.12` して `/opt/emsdk` へ symlink した。
+- **測定**: base `1f12b1b6d` と HEAD `7618e8a56` を同一環境で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 1 回ずつ実行。base 198 s PASS・HEAD 191 s PASS (`LIFTDIFF_E2E PASS`)。素材: `fl-win64`・`work-m11` (`m11_gen_ir2.sh` 実行後の `ir_conditions.json`)・`work-liftdiff`。emsdk は `toolchain-emsdk` の素材が無いため、上流から pin 版 6.0.12 を取得して `[EMSDK]` (`docs/REFERENCES.md`) へ置いた。
 
 | run | match / mismatch / unexec | fvm case (native_fault / both_fault / diff / hang) | fvm 関数数 | 所要 |
 |---|---|---|---|---|
