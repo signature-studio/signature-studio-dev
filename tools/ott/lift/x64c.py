@@ -886,7 +886,7 @@ class FnLift:
     def i_fxch(self, ins, ops):
         self.ia32_only('fxch')
         i = self.x87_idx(ins, ops[-1]) if ops else 1   # capstone は fxch st(i) を (st(0), st(i)) の 2 operand で返す
-        self.L('{ double t_ = x87_st(0); x87_set(0, x87_st(%d)); x87_set(%d, t_); }' % (i, i))
+        self.L('x87_fxch(%d);' % i)
 
     def x87_cmp(self, ins, ops, m):
         self.ia32_only(m)
@@ -926,6 +926,17 @@ class FnLift:
         if ops[0].type != X86_OP_MEM or ops[0].size != 2:
             raise Unsup('fldcw')
         self.L('ott_fcw = LD16(%s);' % self.ea(ins, ops[0]))
+
+    def x87_env_op(self, ins, ops, m, fn):
+        self.ia32_only(m)
+        if ops[0].type != X86_OP_MEM:
+            raise Unsup(m)
+        self.L('%s((uint8_t*)A_(%s));' % (fn, self.ea(ins, ops[0])))
+
+    def i_fnstenv(self, ins, ops): self.x87_env_op(ins, ops, 'fnstenv', 'x87_fnstenv')
+    def i_fldenv(self, ins, ops): self.x87_env_op(ins, ops, 'fldenv', 'x87_fldenv')
+    def i_fnsave(self, ins, ops): self.x87_env_op(ins, ops, 'fnsave', 'x87_fnsave')
+    def i_frstor(self, ins, ops): self.x87_env_op(ins, ops, 'frstor', 'x87_frstor')
 
     def i_movsd(self, ins, ops):
         d, s = ops

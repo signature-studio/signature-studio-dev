@@ -102,10 +102,19 @@ def templates():
           dict(name='fiadd', bs=[0xDE, 0x00], form='mem', delta=0, need=1, cmp=False, typ='i2'),
           dict(name='fimul', bs=[0xDA, 0x08], form='mem', delta=0, need=1, cmp=False, typ='i'),
           dict(name='fimul', bs=[0xDE, 0x08], form='mem', delta=0, need=1, cmp=False, typ='i2')]
+    # 状態の保存・復元 (#3688・末尾に追加: 既存の id と主試行列は変えない)。 操作先は envbuf (slot 番号 8)
+    T += [dict(name='fnstenv', bs=[0xD9, 0x30], form='mem', delta=0, need=0, cmp=False, typ='env'),
+          dict(name='fldenv', bs=[0xD9, 0x20], form='mem', delta=0, need=0, cmp=False, typ='envld'),
+          dict(name='fnsave', bs=[0xDD, 0x30], form='mem', delta=0, need=0, cmp=False, typ='save'),
+          dict(name='frstor', bs=[0xDD, 0x20], form='mem', delta=0, need=0, cmp=False, typ='saveld')]
     return T
 
 
 RC_NAMES = {'fld', 'fild', 'fld1', 'fldz', 'fst', 'fstp', 'fist', 'fistp', 'fnstcw', 'fnstsw', 'frndint'}
+ENV_TYPS = {'env', 'envld', 'save', 'saveld'}   # 型名 (typ): fnstenv / fldenv / fnsave / frstor (#3688)
+# env 試行で使う op。 算術と丸め (fst m32・fist 系) は含めない: 値の丸めの差を、環境・タグの一致から分けるため
+ENV_NAMES = {'fld', 'fild', 'fld1', 'fldz', 'fchs', 'fabs', 'fxch', 'fst', 'fstp', 'fcom', 'fcomp', 'fcompp',
+             'ftst', 'fxam', 'fnclex', 'fnstenv', 'fldenv', 'fnsave', 'frstor'}
 
 
 def slot_key(o):
@@ -136,7 +145,7 @@ def lower_lines(bs):
     return fl.out, ins[0].mnemonic + ' ' + ins[0].op_str
 
 
-def write_inc(insts, nega, nega80, path_n, path_l, nega_c1=False):
+def write_inc(insts, nega, nega80, path_n, path_l, nega_c1=False, nega_env=False):
     x64c.IA32 = True
     x64c.PTR = 4
     with open(path_n, 'w') as fn, open(path_l, 'w') as fl:
@@ -160,6 +169,8 @@ def write_inc(insts, nega, nega80, path_n, path_l, nega_c1=False):
                 fl.write('  ' + ln + '\n')
             if nega_c1 and o['name'] == 'fxam':
                 fl.write('  ott_fsw ^= 0x0200u;   /* negative control: C1 (符号) を反転 */\n')
+            if nega_env and o['typ'] in ('env', 'save'):
+                fl.write('  ((uint8_t*)p)[8] ^= 0x55;   /* negative control: 格納した環境の TW を壊す (#3688) */\n')
             fl.write('    } break;\n')
         fn.write('  }\n}\n')
         fl.write('  }\n}\n')
@@ -258,26 +269,41 @@ def gen_trials(insts, n, seed, mode, rc_fixed=None):
             kinds = ['c'] + [rng.choices(['d', 'i', 'q'], [6, 2, 2])[0] for _ in range(5)]
         elif mode == 'rcarith':
             kinds = ['c'] + [rng.choices(KINDS, KIND_W)[0] for _ in range(5)]
+        elif mode == 'env':   # 状態の保存・復元 (#3688): f80 の入力 (e) は外す (f80 の値は f64 に乗らない: ADR D28)
+            kinds = [rng.choices(['d', 'f', 'i', 'q'], [6, 2, 2, 2])[0] for _ in range(6)]
         else:
             kinds = [rng.choices(KINDS, KIND_W)[0] for _ in range(6)]
         pairs = [slot_pair(rng, k, rc_fixed if mode == 'rcarith' else None) for k in kinds] + [(0, 0), (0, 0)]
         slot_of = {k: [s for s in range(6) if kinds[s] == k] for k in set(kinds)}
         ops, depth = [], 0
+        last = None    # env 試行: 直近の環境格納 (typ, 格納時の深さ)。 fldenv / frstor はこれを読む
         if mode in ('rc', 'rcarith'):
             ops.append((fldcw, 0))
         nsteps = rng.randint(2, 7)
         for _ in range(nsteps):
             cand = []
             for o in insts:
+                if mode != 'env' and o['typ'] in ENV_TYPS:       # 既存モードの試行列は変えない
+                    continue
                 if mode == 'rc' and o['name'] not in RC_NAMES:   # RC 試行は丸め (fist/fistp) だけを見る: 算術を含めない
                     continue
                 if mode != 'rc' and o['typ'] == 'c':              # 通常試行・RC 固定試行は RC を動かさない
                     continue
+                if mode == 'env':
+                    if o['name'] not in ENV_NAMES or o['typ'] in ('c', 'w4'):   # fst m32 は丸めを含むので外す
+                        continue
+                    if o['typ'] == 'envld' and (last is None):
+                        continue
+                    if o['typ'] == 'saveld' and (last is None or last[0] != 'save'):   # frstor は fnsave の直後の格納だけ
+                        continue
+                    if o['typ'] in ENV_TYPS and rng.random() < 0.5:
+                        continue                                  # 環境 op の比率を抑える
                 if o['form'] == 'reg' and o['i'] + 1 > depth:
                     continue
                 if o['need'] > depth or not (0 <= depth + o['delta'] <= 8):
                     continue
-                if o['form'] == 'mem' and not o['typ'].startswith('w') and not slot_of.get(slot_key(o)):
+                if o['form'] == 'mem' and not o['typ'].startswith('w') and o['typ'] not in ENV_TYPS \
+                        and not slot_of.get(slot_key(o)):
                     continue
                 if o['form'] == 'reg' and o['name'] == 'fxch' and o['i'] == 0:
                     continue
@@ -285,16 +311,26 @@ def gen_trials(insts, n, seed, mode, rc_fixed=None):
             if not cand:
                 break
             o = rng.choice(cand)
-            if o['form'] == 'mem':
+            if o['typ'] in ENV_TYPS:
+                sl = 8
+            elif o['form'] == 'mem':
                 sl = rng.choice([6, 7]) if o['typ'].startswith('w') else rng.choice(slot_of[slot_key(o)])
             else:
                 sl = -1
             ops.append((o, sl))
-            depth += o['delta']
+            if o['typ'] in ('env', 'save'):
+                last = (o['typ'], depth)
+                depth = 0 if o['typ'] == 'save' else depth   # fnsave は FINIT (深さ 0)
+            elif o['typ'] in ('envld', 'saveld'):             # 復元: 格納時の深さに戻る
+                depth = last[1]
+            else:
+                depth += o['delta']
         if depth == 0:
             o = next(x for x in insts if x['name'] == 'fld1')
             ops.append((o, -1))
             depth = 1
+        if mode == 'env':   # 末尾の環境格納: 最終の CW・SW (CMASK)・TW を比べる (#3688)
+            ops.append((next(x for x in insts if x['name'] == 'fnstenv'), 8))
         tok = ' '.join('%016x %016x' % p for p in pairs)
         body = ' '.join('%d %d' % (o['id'], sl) for o, sl in ops)
         lines.append('%s %d %s %d' % (tok, len(ops), body, depth))
@@ -324,8 +360,10 @@ def compare(nat, low, metas):
         ta, tb = a.split(), b.split()
         iv_a, is_a = ta.index('V'), ta.index('S')
         iv_b, is_b = tb.index('V'), tb.index('S')
-        Fa, Va, Sa = ta[1:iv_a], ta[iv_a + 1:is_a], ta[is_a + 1:]
-        Fb, Vb, Sb = tb[1:iv_b], tb[iv_b + 1:is_b], tb[is_b + 1:]
+        # S の後ろに環境の欄 (E) が付く (env 試行)。 S は E の手前まで
+        ea_, eb_ = (ta.index('E') if 'E' in ta else len(ta)), (tb.index('E') if 'E' in tb else len(tb))
+        Fa, Va, Sa = ta[1:iv_a], ta[iv_a + 1:is_a], ta[is_a + 1:ea_]
+        Fb, Vb, Sb = tb[1:iv_b], tb[iv_b + 1:is_b], tb[is_b + 1:eb_]
         st['trials'] += 1
         fm = [CMASK | (C1BIT if o['cmp'] else 0) for o, _ in ops]
         fok = all((int(x, 16) & m) == (int(y, 16) & m) for x, y, m in zip(Fa, Fb, fm))
@@ -335,6 +373,10 @@ def compare(nat, low, metas):
                     x = int(S[2 * sl], 16)
                     S[2 * sl] = '%016x' % ((x & ~0xffff) | (x & CMASK))
         sok = Sa == Sb
+        # env 試行: 格納した環境 (CW・SW の CMASK・TW) を比べる。 比べる欄は E の後ろ (driver が書く)
+        Ea, Eb = ta[ea_:], tb[eb_:]
+        if Ea != Eb:
+            sok = False
         if not fok:
             st['f_mismatch_trials'] += 1
         if not sok:
@@ -406,6 +448,8 @@ def main():
     ap.add_argument('--rc-arith', type=int, choices=(0, 1, 2, 3), default=None,
                     help='fldcw で RC を固定 (0 nearest / 1 down / 2 up / 3 trunc)。 算術・fst m32 を含む全 op で比べる')
     ap.add_argument('--nega-c1', action='store_true', help='lowered 側の fxam の直後に C1 を反転させる (negative control・#2966)')
+    ap.add_argument('--env', action='store_true', help='状態の保存・復元 (fnstenv/fldenv/fnsave/frstor) の試行 (#3688)')
+    ap.add_argument('--nega-env', action='store_true', help='lowered 側で格納した環境の TW を壊す (negative control・#3688)')
     ap.add_argument('--skip', default='', help='試行の op 表から外す名前 (カンマ区切り。例: fldpi,fldlg2,fldl2e・#2966)')
     ap.add_argument('--roundtrip', action='store_true', help='f80↔f64 変換の往復試験 (--n はクラスごとの件数)')
     ap.add_argument('--skip-build', action='store_true')
@@ -413,7 +457,7 @@ def main():
     if a.roundtrip:
         roundtrip(a.n, a.skip_build)
         return
-    mode = 'rcarith' if a.rc_arith is not None else ('rc' if a.rc else 'main')
+    mode = 'rcarith' if a.rc_arith is not None else ('rc' if a.rc else ('env' if (a.env or a.nega_env) else 'main'))
     if a.nega80:
         tag = 'nega80'
     elif a.nega:
@@ -427,13 +471,15 @@ def main():
         tag += '_skip'
     if a.nega_c1:
         tag = 'nega_c1'
+    if a.nega_env:
+        tag = 'nega_env'
     wd = os.path.join(WORK, tag)
     os.makedirs(wd, exist_ok=True)
     insts = instances(templates())
     trial_insts = [o for o in insts if o['name'] not in skip]
     inc_n = os.path.join(wd, 'x87_native_ops.inc')
     inc_l = os.path.join(wd, 'x87_lowered_ops.inc')
-    write_inc(insts, a.nega, a.nega80, inc_n, inc_l, a.nega_c1)
+    write_inc(insts, a.nega, a.nega80, inc_n, inc_l, a.nega_c1, a.nega_env)
     bn, bl = build_ref(wd, a.skip_build)
     lines, metas = gen_trials(trial_insts, a.n, a.seed, mode, a.rc_arith)
     tf = os.path.join(wd, 'trials.txt')

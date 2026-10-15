@@ -8,6 +8,7 @@ uint64_t ott_gbase;   /* ott_cpu.c の参照先 (本体は ott_glue.c)。 試験
 
 static void ops_init(void) {
     memset(ott_fst, 0, sizeof ott_fst);
+    for (int p = 0; p < 8; p++) ott_tag[p] = 3;
     ott_ftop = 0; ott_fcw = 0x037f; ott_fsw = 0;
 }
 
