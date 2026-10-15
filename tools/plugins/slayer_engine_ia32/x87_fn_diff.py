@@ -347,7 +347,7 @@ def compare(nat, act, scen, quiet=False):
     agg = {}
     for t in TARGETS:
         agg[t['name']] = {'rows': 0, 'eq': 0, 'f32_eq': 0, 'eax_bad': 0, 'eax_nan': 0, 'd_bad': 0, 'effect': 0,
-                          'eaxs': set(), 'st0': {}, 'st0d': {}, 'mem': {}}
+                          'wide_bad': 0, 'wide_eff': 0, 'eaxs': set(), 'st0': {}, 'st0d': {}, 'mem': {}}
     for i, (t, line, init) in enumerate(scen):
         a = agg[t['name']]
         e, w = nat[i], act[i]
@@ -359,7 +359,14 @@ def compare(nat, act, scen, quiet=False):
                 a['eax_bad'] += 1
         if e['d'] != w['d']:
             a['d_bad'] += 1
-        if e['mem'] != init.hex() or e['stk'] != '00' * STK_WIN:
+        # #4924: ecx = WIDE_BASE の行は、image 内の広い範囲の書込み (変化語数と FNV ハッシュ) も非自明性に数える。 native と wasm で一致を要求する。
+        if e.get('wide', '-') != w.get('wide', '-'):
+            a['wide_bad'] += 1
+        wide_changed = e.get('wide', '-') not in ('-', '0000:' + '%08x' % 0x811c9dc5)
+        # 変化語数が 0 のときのハッシュは FNV の初期値のまま (native・wasm とも同じ)。
+        if wide_changed:
+            a['wide_eff'] += 1
+        if e['mem'] != init.hex() or e['stk'] != '00' * STK_WIN or wide_changed:
             a['effect'] += 1
         a['eaxs'].add(e['eax'])
         if e == w:
@@ -379,7 +386,7 @@ def compare(nat, act, scen, quiet=False):
         mixed = sum(a[k].get('nan-num', 0) for k in ('st0', 'st0d', 'mem'))
         # 非自明性: 窓が変わった行があるか、PUSH64 (窓を書かない関数) では戻り値 eax の種類が 2 以上あること。
         nontrivial = a['effect'] > 0 or ((PUSH64 or t.get('nontrivial') == 'eax') and len(a['eaxs']) >= 2)
-        if a['eax_bad'] or a['d_bad'] or not nontrivial or n == 0 or mixed:
+        if a['eax_bad'] or a['d_bad'] or a['wide_bad'] or not nontrivial or n == 0 or mixed:
             ok = False
         if quiet:
             continue
@@ -387,6 +394,8 @@ def compare(nat, act, scen, quiet=False):
             t['name'], t['va'], n, a['eq'], n, 100.0 * a['eq'] / max(n, 1), a['f32_eq'], n))
         print('[compare]   構造: eax 不一致 %d 行 (NaN どうし %d 行は別計上)・x87 深さ不一致 %d 行 (期待 0)・OBJ 窓が変わった行 %d / %d (非自明性)' % (
             a['eax_bad'], a['eax_nan'], a['d_bad'], a['effect'], n))
+        print('[compare]   広い範囲 (ecx 基底 0x%x・%d B): 変わった行 %d / %d・native と wasm の不一致 %d 行 (期待 0)' % (
+            0x10700000, 0x900000, a['wide_eff'], n, a['wide_bad']))
         for key, label in (('st0d', 'ST(0) (float64。 80bit→double 丸め後)'), ('st0', 'ST(0) (float32)'),
                            ('mem', 'OBJ 窓 (float32 語)')):
             h = a[key]

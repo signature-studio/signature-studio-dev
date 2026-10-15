@@ -300,6 +300,7 @@
 | `tools/m11/REPORT_N196.md` | ~90 | #3906 (M11-N196, 親 #3142): set_other 非 imm のスタック slot 読込・frame lea の IR 接続判定 (frame 定数 C と stack_var 対応・分類の件数は REPORT 参照)。load_def の誤判定の修正と負例 (`test_setother_slot_class.py`)。接続の注入と未決の接続先は #3932・#3933。分類器 `m11_setother_slot_class.py` |
 | `tools/m11/REPORT_3932.md` | ~50 | #3932 (M11-N201, 親 #3906): set_other 実値化 25 件の alloca 番地を 0 詰め call 引数へ注入する経路 (`m11_post.py --slots`・`M11_SLOT_ROWS`)。注入の支配条件 (entry block 内・呼出し前)・既定は不変の検証。survey の前後実測は未達 |
 | `tools/m11/REPORT_N202.md` | ~70 | #3933 (M11-N202, 親 #3906): set_other スタック slot 未決 85 件の再測定 (現 HEAD で 112 件・実値化 25・未決 87)・C 規則の IR 突合 (引数単位 0・名前単位 22)。検算 `m11_setother_slot_check.py` |
+| `tools/m11/REPORT_N228.md` | ~60 | #4905 (M11-N228, 親 #4891): set_other 非 imm の gep 17 件の基底 reg を到達定義で分類 (実測 実値化 0・復元不能 0・未決 20・未分類 0)。IR への GEP 接続は未実装。分類器 `m11_setother_gep_global.py --pe` |
 | `tools/m11/REPORT_N229.md` | ~60 | #4906 (M11-N229, 親 #4891): set_other 書込可能グローバル 3 件 (VA 0x15e3a70) の格納元探索 (IR・PE 直接経路の store 0 件・計算ポインタ経由は未決)。分類器 `m11_setother_gep_global.py --pe` |
 | `tools/m11/REPORT_N227.md` | ~50 | #4891 (M11-N227, 親 #3907): set_other 非 imm の gep 17 件と書込可能グローバル 3 件の 3 値判定 (実測 実値化 0・復元不能 0・未決 20・未分類 0)。gep の基底 SSA 対応・global の格納探索は子 #4905・#4906。分類器 `m11_setother_gep_global.py` |
 | `tools/m11/REPORT_N171.md` | ~120 | #3134 (M11-N171, 親 #1154): set_other 非 imm 349 件 (reg 123・mem 150・lea 76) の定義探索と 3 値分類 (件数は REPORT 参照)。接続方式の決定と未決の接続先 (#3140・#3141・#3142)。survey は素材欠落で未測定 (#1154)。分類器 `m11_setother_nonimm_class.py` |
@@ -1031,6 +1032,7 @@
 | `tools/targets/serum2/gui/REPORT_SR58.md` | ~70 | SR-58 (#4097): NODOM 242 件の理由別分類 (間接 jmp 89・back-edge 79・merge 74)・`receiver_this_trace.py --nodom-tsv`。支配判定の変更と偽陰性・偽陽性は未達 (子 issue)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR59.md` | ~95 | SR-59 (#4122, SR-48 残): 所属関数の入口がデータ表 (vtable) に載る RTTI の分類 (`arg_vtable_callers.py`)。ARG の型は未確定 (SC 0 件)。THIS-CHILD の SC 証拠 6 件 (5 関数)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR60.md` | ~110 | SR-60 (#4164, SR-59 残): 表の先頭の探索窓の修正 (64→4096)、直接 call の呼出元の引数の出所 (`arg_caller_types.py`)。ARG の型は未確定 (SC 0 件)。vtable 経由の呼出元と表の境界は子 [SR-82] (#4930)。測定値の正本 |
+| `tools/targets/serum2/gui/REPORT_SR82.md` | ~80 | SR-82 (#4930, SR-60 残): vtable 経由の間接 call の候補の列挙 (`arg_vt_indirect.py`)。候補の列挙 (件数は REPORT_SR82 §2)。宛先は未確定 (disp のみの照合)。ARG・THIS の型と表の境界は未達。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR57.md` | ~73 | SR-57 (#3626, SR-28 受入 3): patch 後の demo 表示経路の静的確認。demo 表示 `0x18004fc9c` は patch 後に関数内で到達不能 (証明)、`0x1800501c0` は汎用ヘルパで非 demo の呼出元が残るため受入文の前提は不成立、overlay_demo_version は呼出元 0 件。解析は `demo_dialog_reach.py` / `demo_dialog_strings.py` |
 | `tools/targets/serum2/gui/REPORT_M7_CANVAS.md` | ~120 | SR-7 (#68) の M7 接続照合 (静的): CanvasFrame を tools/gui の surface・out ring の記号と照合 (`gui/m7_canvas_connect.py`)。設計上は接続可・実装は一部のみ・画素形式が不一致。数値の正本は本体 §0・§2 |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
