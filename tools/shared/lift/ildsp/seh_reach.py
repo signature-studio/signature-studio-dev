@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""WaveformColouring 閉包の SEH except 本体 (0x1b8eb1–0x1b8ec8) と閉包混入 0x1ac9b8 の到達を静的に判定する (T-SH-134 / #5090)。
+"""WaveformColouring 閉包の SEH except 本体 (0x1b8eb1–0x1b8ec9) と閉包混入 0x1ac9b8 の到達を計算する (T-SH-134 / #5090)。
 
 usage: seh_reach.py PE CLOSURE_JSON
   PE           : block24360_PE.bin
-  CLOSURE_JSON : ildsp_closure.py --out で出した JSON (WaveformColouring_CreateInstance の function_rvas を使う)
-出力:
-  A. 0x1b8e68 の SEH スコープ表 (try 範囲・filter・except 本体)
-  B. filter 0x1ccb00 が許可する例外コード
-  C. try 関数 0x1b8e68 の直接呼出元と、呼出時の rdx (= ebx) の値
-  D. 閉包の入口 0x1ac460 → 0x1ac9b0 の経路と、0x1ac9b8 への直接参照
-直接参照は E8/E9 と Jcc/短 jmp のバイト走査で数える (リニア逆アセンブルは同期ずれで取りこぼすため)。
+  CLOSURE_JSON : ildsp_closure.py の出力 (既定 tools/shared/work/raw/ildsp_closure.json)
+出力はすべて計算結果。判定文は出さない (解釈は REPORT に書く)。
+  A. 0x1b8e68 の SEH スコープ表
+  B. filter 0x1ccb00 の cmp 比較値
+  C. try 関数 0x1b8e68 の直接 call 元
+  D. 閉包の根 (export 入口 + vtable slot 先) から、閉包内の直接 edge で到達する命令集合 R
+     - 直接 call/jmp/jcc の先が閉包外なら辿らず記録する。間接 call/jmp は記録して止まる
+  E. except 本体への直接参照 (E8/E9/0F 8x を .text 全体で走査)
+  F. except 本体 RVA / 絶対アドレスを値として持つ 4/8 バイトの出現 (全 section・未判定)
+直接参照は E8/E9 と 0F 8x のバイト走査で数える (リニア逆アセンブルは同期ずれで取りこぼすため)。
 """
 import sys, struct, bisect, json
 import pefile, capstone
@@ -44,8 +47,18 @@ def owner(t):
     return fs[i] if i >= 0 and t < funcs[fs[i]][0] else None
 
 
+def in_clo(t):
+    return t in clo or owner(t) in clo
+
+
 def where(f):
     return "閉包内" if f in clo else "閉包外"
+
+
+def insn(a):
+    for i in md.disasm(bytes(img[a:a + 16]), IB + a):
+        return i
+    return None
 
 
 def direct_refs(targets):
@@ -65,6 +78,38 @@ def direct_refs(targets):
     return out
 
 
+def reach(roots):
+    R, ext, ind = set(), [], []
+    work = list(roots)
+    while work:
+        a = work.pop()
+        if a in R:
+            continue
+        i = insn(a)
+        if i is None:
+            continue
+        R.add(a)
+        m, nxt = i.mnemonic, a + i.size
+        if m in ("ret", "int3", "ud2"):
+            continue
+        if not (m == "call" or m == "jmp" or m.startswith("j")):
+            work.append(nxt)
+            continue
+        if not i.op_str.startswith("0x"):
+            ind.append(a)
+            if m == "call":
+                work.append(nxt)
+            continue
+        t = int(i.op_str, 16) - IB
+        if in_clo(t):
+            work.append(t)
+        else:
+            ext.append((a, m, t))
+        if m != "jmp":
+            work.append(nxt)
+    return R, ext, ind
+
+
 print("## A. SEH スコープ表 (try 関数 0x%x)" % TRY_FN)
 _, u = funcs[TRY_FN]
 flags = img[u] >> 3
@@ -80,46 +125,60 @@ if flags & 1:
 else:
     print("EHANDLER なし")
 
-print("\n## B. filter 0x%x が許可する例外コード" % FILTER)
+print("\n## B. filter 0x%x の cmp 比較値" % FILTER)
 ins = list(md.disasm(bytes(img[FILTER:FILTER + 0x30]), IB + FILTER))
 codes = [i.op_str.split(", ")[1] for i in ins if i.mnemonic == "cmp" and i.op_str.startswith("dword ptr [rax], ")]
-print("cmp 比較値:", codes, "(0xc0000005=ACCESS_VIOLATION, 0xc000001d=ILLEGAL_INSTRUCTION)")
-print("戻り値 1 は上記 2 つのみ。Windows は user mode の #GP を STATUS_ACCESS_VIOLATION (0xc0000005) として渡すため、ldmxcsr の予約 bit 違反も filter は許可する。")
+print("cmp 比較値:", codes)
 
-print("\n## C. try 関数 0x%x の直接呼出元 (rdx = ebx の値)" % TRY_FN)
+print("\n## C. try 関数 0x%x の直接 call 元" % TRY_FN)
 for site, kind in direct_refs({TRY_FN}):
-    if kind != "call":
-        continue
-    f = owner(site)
-    print("call 0x%x (owner 0x%x, %s)" % (site, f or 0, where(f) if f else "pdata 外"))
-print("閉包内の呼出元 0x1c34df・0x1c3727 は mov edx, 0xffc0 の直後に call する (rdx = 0xffc0)。")
-print("try 関数は mov rbx, rdx で ebx = 0xffc0 を保持する。")
-print("ldmxcsr 入力 ecx = ((~ebx | 0xffff807f) & eax) | (edi & ebx)。")
-print("ebx の上位 16 bit = 0 なので、(~ebx | 0xffff807f) の上位 16 bit は全 1、(edi & ebx) の上位 16 bit は 0。")
-print("よって ecx の上位 16 bit = eax の上位 16 bit = stmxcsr の結果 (MXCSR の予約 bit 16–31 は 0 と読める)。")
-print("ldmxcsr は予約 bit (16–31) が 1 のとき #GP を起こす。stmxcsr の結果の bit 16–31 は 0 (MXCSR の予約 bit は ldmxcsr が 0 に保つ)。よって閉包内の経路では #GP は起きない。")
+    if kind == "call":
+        f = owner(site)
+        print("call 0x%x (owner 0x%x, %s)" % (site, f or 0, where(f) if f else "pdata 外"))
 
-print("\n## D. 閉包の入口 0x%x → 0x%x" % (ENTRY, ALLOC))
-for i in md.disasm(bytes(img[ENTRY:ENTRY + 6]), IB + ENTRY):
-    print("  0x%x %s %s" % (i.address - IB, i.mnemonic, i.op_str))
-for i in md.disasm(bytes(img[ALLOC:ALLOC + 6]), IB + ALLOC):
-    print("  0x%x %s %s" % (i.address - IB, i.mnemonic, i.op_str))
-nxt = fs[bisect.bisect_right(fs, ALLOC)]
-print("  0x%x は .pdata の関数先頭でない (次の .pdata 先頭 0x%x まで閉包が近似で数える)" % (ALLOC, nxt))
-print("  0x%x は 0x%x の無条件 jmp の直後で、実行されない (死んだ断片)" % (DEAD, ALLOC))
+print("\n## D. 閉包の根から閉包内の直接 edge で到達する命令集合")
+ROOTS = sorted({int(row["entry_rva"], 16)} | {int(t["target_rva"], 16) for t in row["vtable"]["targets"]})
+print("根: %d 件 (export 入口 %s + vtable slot 先)" % (len(ROOTS), row["entry_rva"]))
+R, ext_edges, indirect = reach(ROOTS)
+print("到達命令数: %d" % len(R))
+print("0x%x (ALLOC) ∈ R: %s" % (ALLOC, ALLOC in R))
+print("0x%x (DEAD) ∈ R: %s" % (DEAD, DEAD in R))
+print("R 内で except 本体 0x%x–0x%x に入る命令: %s" % (EXCEPT_LO, EXCEPT_HI, sorted(hex(x) for x in R if EXCEPT_LO <= x < EXCEPT_HI) or "なし"))
+print("閉包外への直接 call/jmp/jcc: %d 件 (辿らない)" % len(ext_edges))
+for a, m, t in ext_edges[:10]:
+    print("  0x%x %s -> 0x%x" % (a, m, t))
+print("R 内の間接 call/jmp: %d 件" % len(indirect))
+print("ALLOC 0x%x の命令: %s %s" % (ALLOC, insn(ALLOC).mnemonic, insn(ALLOC).op_str))
 
-print("\n## D'. 0x%x への直接参照 (全 .text)" % DEAD)
-refs = direct_refs({DEAD})
-if not refs:
-    print("  なし")
-for site, kind in refs:
-    f = owner(site)
-    print("  0x%x (%s) owner=%s %s" % (site, kind, hex(f) if f else "pdata 外", where(f) if f else ""))
-print("0x%x への直接参照 (全 .text):" % ALLOC)
-for site, kind in direct_refs({ALLOC}):
-    f = owner(site)
-    print("  0x%x (%s) owner=%s %s" % (site, kind, hex(f) if f else "pdata 外", where(f) if f else ""))
+for tgt_name, tgt in (("ALLOC", ALLOC), ("DEAD", DEAD)):
+    print("\n## D'. 0x%x (%s) への直接参照 (全 .text)" % (tgt, tgt_name))
+    refs = direct_refs({tgt})
+    n_in = 0
+    for site, kind in refs:
+        f = owner(site)
+        if site in R or (f in clo):
+            n_in += 1
+        print("  0x%x (%s) owner=%s %s" % (site, kind, hex(f) if f else "pdata 外", where(f) if f else ""))
+    print("%d 件 (うち参照元が閉包内: %d 件)" % (len(refs), n_in))
 
 print("\n## E. except 本体 0x%x–0x%x への直接参照 (全 .text)" % (EXCEPT_LO, EXCEPT_HI))
 ex = direct_refs(set(range(EXCEPT_LO, EXCEPT_HI)))
-print("  %d 件 (SEH の except は scope table 経由でのみ入る)" % len(ex))
+print("%d 件 (call/jmp/jcc のみ)" % len(ex))
+for site, kind in ex:
+    print("  0x%x (%s)" % (site, kind))
+
+print("\n## F. except 本体 RVA / 絶対アドレスを値として持つ 4/8 バイトの出現 (全 section・未判定)")
+hits = []
+for sec in pe.sections:
+    name = sec.Name.rstrip(b"\0").decode(errors="replace")
+    base = sec.VirtualAddress
+    data = bytes(img[base:base + sec.Misc_VirtualSize])
+    for r in range(EXCEPT_LO, EXCEPT_HI):
+        for pat, width in ((struct.pack("<I", r), 4), (struct.pack("<Q", IB + r), 8)):
+            pos = data.find(pat)
+            while pos >= 0:
+                hits.append((name, base + pos, r, width))
+                pos = data.find(pat, pos + 1)
+print("%d 件" % len(hits))
+for name, at, r, width in hits:
+    print("  %s 0x%x: %d byte 値 0x%x" % (name, at, width, r))
