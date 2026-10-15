@@ -778,6 +778,9 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # PM App 起票の対象 (#5462): 未設定だと prepare-event-context.sh が
+          # author=Bot の判定で PM App を許可せず dispatch を拒否する (#5466/#5468)。
+          OC_PM_BOT_LOGIN: ${{ vars.OC_PM_BOT_LOGIN }}
         run: bash .github/scripts/prepare-event-context.sh
 
       - name: Refuse the dispatch
