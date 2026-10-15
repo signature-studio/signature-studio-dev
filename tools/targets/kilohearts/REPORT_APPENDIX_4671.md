@@ -5,7 +5,7 @@
 #### 10-7y. #4671 (KH-106): 関数ポインタ global `_DAT_1813a1d40` の型規則 (部分・9 → 3)
 
 - 結論: 関数ポインタ global 9 件のうち **6 件** を `GTYPE` の型 `FNPTR` (`void (*)()`・到達時 abort) で解消した。census の型不一致は **119 → 113** (`FX=…,gtype,lanes`・同一入力の直前比較)。残りの **3 件** (戻り値を代入する呼出し 3 箇所) は戻り値型が未確定で未解決。型不一致 9 件の 0 件は未達。Gain/Haas/Gate の `.o` は 3 本とも不変。
-- 測定 commit (コードを変えた最後の commit): 本 PR の commit (`git log -1 --format=%h -- tools/targets/kilohearts/ghidra_route` で確認)。測定は作業ツリーの `ghidra_route` (差分込み) で行い、その後 `git commit` した内容と同一。
+- 測定 commit (コードを変えた最後の commit): `c0c75890f` (`git log -1 --format=%h -- tools/targets/kilohearts/ghidra_route` の結果)。測定は作業ツリーの `ghidra_route` (差分込み) で行い、その後 `git commit` した内容と同一。
 - 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)・`toolchain-emsdk` (emcc 6.0.12)・Ghidra 12.1.4 (zip sha256 `ddac49f9…d2db` 一致)・JDK 21 (temurin-21)。すべて `$RUNNER_TEMP/kh` (repo 外)。n=1。
 
 **機械語の確認 (実機 `HeartCore.core_64`)**
@@ -32,7 +32,7 @@
 - 残り 3 件は戻り値を代入する箇所 (`int`・`undefined8` に `void` を代入) の型不一致 (`assigning to ... from incompatible type 'void'`) として残る。
 - prototype なしの呼出し 7 行 (2546・4648・4769・4875・4936・5948・6731) は、emcc では `-Wdeprecated-non-prototype` の warning になり、error 行には数えられない (census は error 行だけを数える)。
 
-**残件 3 件 (未解決・起票先 #3849 [KH-80])**
+**残件 3 件 (未解決・起票先 #4693 [KH-112])**
 
 | delay.c | 行 | 形 | 必要な決定 |
 |---|---|---|---|
@@ -41,7 +41,7 @@
 | 6731 | `uVar1 = (*_DAT_1813a1d40)(param_1)` | `undefined8` 戻り値を返す | 戻り値型 (8 byte) |
 
 - 残件の意味 (CFG dispatch 先の関数) は、呼出元の機械語で rax の行き先を確認すれば決まるが、本 run では 44 箇所の全件確認に至らなかった。
-- 規則案: 3 件とも `FNPTR` の戻り値だけを `ulonglong` にする (`void (*)()` → 戻り値型の付与)。ただし戻り値型を変えると 6 件 (戻り値を捨てる呼出し) の emcc 挙動も変わるため、型を変える前に 6 件の使われ方を機械語で確認する (#3849 の子で扱う)。
+- 規則案: 3 件とも `FNPTR` の戻り値だけを `ulonglong` にする (`void (*)()` → 戻り値型の付与)。ただし戻り値型を変えると 6 件 (戻り値を捨てる呼出し) の emcc 挙動も変わるため、型を変える前に 6 件の使われ方を機械語で確認する (#4693 [KH-112] で扱う)。
 
 **Gain/Haas/Gate の `.o` 不変**
 
