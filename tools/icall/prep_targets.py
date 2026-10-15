@@ -9,6 +9,8 @@ import json, os, pickle, re, struct, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 T = os.path.join(HERE, '..')
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(T, 'shared'))
+from paths import FL_WIN64_DIR
 import audit_icall as A
 W = os.path.join(HERE, 'work'); os.makedirs(W, exist_ok=True)
 
@@ -67,7 +69,7 @@ def ranges_with_ends(img, vas, given=None, chained=False):
 def main():
     # Balance
     d = json.load(open(os.path.join(T, 'plugins/work/closure/block18983.json')))
-    img = A.Image('/home/ubuntu/work/analysis/win64/extracted/block18983_PE.bin')
+    img = A.Image(os.path.join(FL_WIN64_DIR, 'extracted', 'block18983_PE.bin'))
     base = open(os.path.join(T, 'plugins/work/closure/block18983.ranges.txt')).read().strip().split(',')
     given = {int(r.split('-')[0], 16): int(r.split('-')[1], 16) for r in base}
     vas = list(given) + [int(x, 16) for x in d['frontier']]
