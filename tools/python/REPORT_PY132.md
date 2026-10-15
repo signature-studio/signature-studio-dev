@@ -109,6 +109,25 @@ P 真の後:
 
 main 75c48ab21 基準: 実装 155 → 158 (+3)、未実装 280 → 277 (-3)。`pe132` (3 件) を判定に入れた。
 
+## main 取り込み後の再測定 (競合解消)
+
+main `8c23860cd` を merge した (競合は `provider/build.sh`・`provider/fl_engine.c`・`tests/provider_check.mjs` の 3 件。解消は両側の追加を残す方針)。測定 commit: `d8beed07c` (コードを変えた最後の commit)。以後の HEAD のコード差分 `git diff d8beed07c HEAD -- tools/python ':!*.md'` は 0 行。
+
+基準 main `8c23860cd`: 実装 162 → 165 (+3)、未実装 273 → 270 (-3)。
+
+| コマンド | 結果 (d8beed07c) |
+|---|---|
+| `bash provider/build.sh` (emsdk は `[EMSDK]` の pin 6.0.12 を上流から取得) | rc 0・ハンドラ 165・1.66 s |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` (CPython wasm を `build_cpython_wasm.sh` で再ビルド後) | rc 0・6.34 s |
+| `node tests/provider_check.mjs` | PASS (関数 435・実装 165・未実装 270・mcp 静的 60) |
+| `node tests/ui_browser_diff.mjs` | PASS (正常 8・異常 5・diffs 0・browserOp 3) |
+| `node tests/ui_display_diff.mjs` と ui_state・ui・general・mixer・channels・transport・midi_path・ilmcp・arrangement・device の各 diff | 全て PASS (diffs 0) |
+| step_item・note_enum・patterns・patterns_group・playlist・launchmap の各 diff | 全て PASS (diffs 0) |
+| `python3 tests/kwsig_check.py` | OK |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・2.02 s |
+
+実行後の uptime load average: 0.88 / 1.33 / 0.75 (1・5・15 分)。ネガティブコントロールは取り込み前の測定 (`2b72baa3c`) のままで、本節では再実行していない。
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
