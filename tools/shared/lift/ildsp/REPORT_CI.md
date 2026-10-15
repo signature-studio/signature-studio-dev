@@ -2,27 +2,27 @@
 
 親: #2529 (T-SH-39)。範囲縮小の経緯は #3300 本文。wasm 化は [T-SH-65] #3318、native 差分は [T-SH-66] #3320。
 
-既知類型との関係: 該当なし (入力作成と census のみ。wasm 化と差分は未実施。閉包の取りこぼしは §2-2 で未分類の観察として記録)。
-測定 commit: `d69ab303` (census・ci_ranges・ci_lift の最後のコード commit)。`git diff d69ab303 HEAD -- tools/shared/lift/ildsp ':!*.md'` の出力は空 (差分 0)。
+既知類型との関係: DEFECTS D9 と同型 (fe)。検出信号 (`jmp reg` の直前が `lea reg,[rip+…]; mov eax,[reg+idx*4]; add reg,rax`) が一致する。RetDec の IR は計算ジャンプ表の経路 (n = 1〜16) を落としている (§2-2 (b))。入力作成と census のみ。wasm 化と差分は未実施。
+測定 commit: `eb6f0e1c7` (ci_lift.sh の最後のコード commit)。`git diff eb6f0e1c7 HEAD -- tools/shared/lift/ildsp ':!*.md'` の出力は空 (差分 0)。
 
 ## 結論 (1 行)
-closure は 36 関数・961 命令・間接 call 10 件で、RetDec の範囲入力と IR の define 検査は通る。ただし closure は条件分岐と計算ジャンプの先を辿らず、範囲外の直接呼び出し先 1 件と計算ジャンプ表の飛び先 9 件が IR に残る (§2-2)。wasm 化 (#3318) と native 差分 (#3320) が残る。
+closure は 36 関数・961 命令・間接 call 10 件で、RetDec の範囲入力と IR の define 検査は通る。ただし closure は条件分岐と計算ジャンプの先を辿らず、範囲外の直接呼び出し先 1 件が IR に declare のみで残る (§2-2 (a))。IR は計算ジャンプ表の経路 (n = 1〜16) を落とし、その書き込みは IR に無い (§2-2 (b))。census はこれを検出しない。wasm 化 (#3318) と native 差分 (#3320) が残る。
 
 ## 1. 再現
 ```
 FL_WIN64_DIR=<fl-win64 展開先> [RETDEC_BIN=<retdec-decompiler>] bash tools/shared/lift/ildsp/ci_lift.sh
 ```
-- `RETDEC_BIN` 未設定なら PATH の `retdec-decompiler` を使う (外部ツールの場所は docs/REFERENCES.md §4)。
+- `RETDEC_BIN` 未設定なら PATH の `retdec-decompiler` を使う (`[RETDEC]` は docs/REFERENCES.md §1 のローカルツール)。
 - `ci_ranges.py`: entry 0x1aa290 から直接 call と .text 内の直接 jmp を辿る (`ildsp_closure.py` の closure() と同じ規則)。出力は 36 関数・961 命令・間接 call 10 (x86 の capstone 走査)。値が一致しなければ exit 1。範囲内の直接分岐のうち範囲外の飛び先を `outside_targets` に出す (jcc を含む)。
 - `ci_lift.sh`: 範囲 (VA 形式) を `retdec-decompiler --select-ranges --select-decode-only` に渡す。
 - `ci_census.py`: IR (`ci.drc.ll`) の define と宣言を範囲と照合する。範囲の関数が 1 つでも define されていなければ exit 1。declare のみの呼び出し先は、`outside_targets` の飛び先なら「範囲外の直接呼び出し先」、それ以外は「画像内ポインタ」に分ける。
 
-### 実測 (測定 commit `d69ab303`・4 core・n=3)
+### 実測 (測定 commit `eb6f0e1c7`・4 core・n=3)
 | 項目 | 値 |
 |---|---|
-| `ci_lift.sh` の実行時間 (ranges + RetDec + census) | 2.155–2.180 s (min–max。2.179 / 2.155 / 2.180) |
-| load (実行前) | 0.02–0.10 |
-| 3 回の出力 | 3 回とも `cmp` で一致 (rc 0・ALL OK) |
+| `ci_lift.sh` の実行時間 (ranges + RetDec + census。`date` で計測) | 1.943–1.965 s (min–max。1.953 / 1.965 / 1.943) |
+| load (実行前の 1 分平均) | 0.31 (3 回とも。直前に素材を展開した後) |
+| 3 回の出力 | `ci.drc.ll` と stdout が 3 回とも `cmp` で一致 (rc 0・ALL OK) |
 
 ## 2. 結果 (実測)
 | 項目 | 値 | 数え方 |
@@ -45,7 +45,9 @@ FL_WIN64_DIR=<fl-win64 展開先> [RETDEC_BIN=<retdec-decompiler>] bash tools/sh
 ### 2-2. 閉包の取りこぼし (未解決・#3318 で扱う)
 closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が範囲に入らない。どちらも x86 で確認した。
 - **(a) 条件分岐の先の直接呼び出し先 (1 件)**: 0x1aefa7 `jne 0x1801aef40` (閉包関数 0x1aef60 の中)。0x1aef40 は `.pdata` の無い 16 バイトの `rep stosb` ヘルパ (`push rdi; mov eax,edx; mov rdi,rcx; mov rcx,r8; rep stosb; mov rax,r11; pop rdi; ret`)。IR では `declare` だけがあり、0x1aef60 の本体から `call @function_1801aef40` で呼ばれる。`ci_census.py` は「範囲外で define の無い直接呼び出し先」として別行に出す。
-- **(b) 計算ジャンプの表の飛び先 (9 define)**: 0x1af08b `jmp r9`。r9 は 0x1af07a の `mov eax, dword ptr [r9 + r8*4 + 0x442000]` と `add r9, rax` で求める。表 0x442000 (`_RDATA`) の k = 0〜16 の 32 bit 値が RVA の 17 件 (k = 17〜19 は 0。k = 20 以降は別の値で、この表の対象外)。17 件のうち 9 件は RetDec の define の先頭 (`function_1801af090`・`af0a0`・`af0a8`・`af0b0`・`af0c0`・`af0cc`・`af0d0`・`af0e0`・`af0e8`)、残り 8 件は case 本体の途中 (0x1af094・0x1af097・0x1af09b・0x1af09e・0x1af0a4・0x1af0b4・0x1af0c4・0x1af0c7)。したがって 9 define は未到達のバイトではなく、0x1aef60 の計算ジャンプの飛び先である。IR の 0x1aef60 本体に `indirectbr`・`switch`・`unreachable` は無く、9 define はどの `call` からも参照されない (census の「IR 内の call 参照 0 件」)。RetDec がこの表を解いたかは IR から確認できていない (未確認)。
+- **(b) 計算ジャンプの表の経路 (n = 1〜16) を IR が落とす (9 define は未参照)**: x86 では 0x1aef74 `cmp r8,0x10` → 0x1aef78 `jbe 0x1af070` が、n ≤ 16 のとき計算ジャンプへ進み 1〜16 バイトを書く。0x1af070 の `lea r9,[rip-0x1af07a]` は r9 = イメージ基底 (0x180000000) を作り、0x1af07a `mov eax,[r9+r8*4+0x442000]`・0x1af082 `add r9,rax`・0x1af08b `jmp r9` で飛ぶ。表 0x442000 (`_RDATA`) の k = 0〜16 の 32 bit 値は RVA の 17 件 (k = 17〜19 は 0)。17 件のうち 9 件は RetDec の define の先頭 (function_1801af090・af0a0・af0a8・af0b0・af0c0・af0cc・af0d0・af0e0・af0e8)、残り 8 件は case 本体の途中 (0x1af094・0x1af097・0x1af09b・0x1af09e・0x1af0a4・0x1af0b4・0x1af0c4・0x1af0c7)。
+  IR (`ci.drc.ll`) では `@function_1801aef60` の先頭が `%0 = icmp ult i64 %arg3, 17` → `br` で `dec_label_pc_1801af028` (`ret i64 %arg1`) に入る。`1801af070`・`1801af07a` を参照する行は 0 件で、0x1aef60 の本体に `indirectbr`・`switch`・`unreachable` は無い。つまり n = 1〜16 の書き込みは IR に無いまま `ret` する。9 define はどの `call` からも参照されない (census の「IR 内の call 参照 0 件」)。症状は DEFECTS D9 と同じ形 (間接 jmp の経路が `ret` に化け、case ブロックが呼び出し元の無いまま残る)。ret の値は undef ではなく `%arg1`。
+  census はこれを検出しない (define の有無だけを見る)。RetDec 内部でどの段がこの経路を落としたかは未確認。
 - 閉包規則を変える (jcc と計算ジャンプの表を辿る) と 36 関数・961 命令が変わるので、再測定を伴う。判断は #3318 で行う。
 
 ## 3. IR の呼び出し行数と x86 件数
@@ -57,7 +59,7 @@ closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が
 ## 4. ネガティブコントロール
 | 名前 | 壊し方 | 結果 |
 |---|---|---|
-| neg_rename | `ci.drc.ll` の `function_1801ac9c0` の define 名を変更 (`neg.ll`) | `FAIL: 範囲の関数が define されていない: ['function_1801ac9c0']`・rc 1 (測定 commit `d69ab303` の census) |
+| neg_rename | `ci.drc.ll` の `function_1801ac9c0` の define 名を変更 (`neg.ll`) | `FAIL: 範囲の関数が define されていない: ['function_1801ac9c0']`・rc 1 (測定 commit `eb6f0e1c7` の census) |
 
 ## 5. 未解決 (起票先)
 | 未解決 | 影響 | 起票先 |
@@ -65,10 +67,11 @@ closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が
 | IAT 10 種の stub 化の方針 (C 実装か wasm import)。直接 call のサンク 2 種 (0x1b932c・0x1b9334) と末尾 jmp の 2 種 (0x1bb426・0x1bb47a) を含む | wasm 化 | [T-SH-65] #3318 |
 | SSE helper 8 種 (`__asm_`) の C 実装。`gen_helpers.py` は未対応で exit 1 | wasm 化 | [T-SH-65] #3318 |
 | 間接 call 4 件の trap 化 (ac 4) | 正常系の到達 | [T-SH-65] #3318 (到達実測は #3250) |
-| 閉包の取りこぼし: 直接 jcc 先 function_1801aef40 (§2-2 (a))・計算ジャンプ表の 9 define (§2-2 (b))。閉包規則を変えるか。変えれば 36/961 が変わり再測定 | 範囲・wasm 化の意味 | [T-SH-65] #3318 |
+| 閉包の取りこぼし: 直接 jcc 先 function_1801aef40 (§2-2 (a))。閉包規則を変えるか。変えれば 36/961 が変わり再測定 | 範囲・wasm 化の意味 | [T-SH-65] #3318 |
+| 計算ジャンプ表の経路 (n = 1〜16) が IR で `ret` になる (§2-2 (b))。表を解く経路を IR に戻すか、欠落を受入として扱うかを決める。census は検出しないので検出器も対象 | 1〜16 バイトの書き込みの欠落 (silent) | [T-SH-65] #3318 |
 | 全バイト差分・ネガティブコントロール・gate | 受入の残り | [T-SH-66] #3320 |
 | `.pdata` の無い葉 12 件の範囲 (次の `.pdata` 先頭まで) | 命令数は上限側に偏りうる | #161 |
 
 ## 6. 検証範囲 / 範囲外
 - 範囲: 範囲の再現・RetDec の定義生成・census。コードは HEAD で再実行して ALL OK を確認。
-- 範囲外: wasm 化・native 実行・差分・gate (子へ)。RetDec の出力 IR の意味論は未検証。RetDec が計算ジャンプの表を解いたかは未確認 (§2-2 (b))。
+- 範囲外: wasm 化・native 実行・差分・gate (子へ)。RetDec の出力 IR の意味論は未検証。IR が計算ジャンプの表の経路を落とすことは §2-2 (b) で確認した。RetDec 内部の原因は未確認。
