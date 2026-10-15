@@ -72,7 +72,7 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 
 - **測定 commit**: `6a9893ac0` (コードを変えた最後の commit。 `engine_f80_stub.py` は関数名を解釈できないとき exit≠0 で止まり、`engine_f80_subset.sh` は stub 失敗時に古い TSV を読まずに止まる)。 `git diff 6a9893ac0 HEAD -- tools/plugins/reverb_delay/*.py tools/plugins/reverb_delay/*.sh tools/lift tools/p0c` は空 (以降の commit は `.md` のみ)。 lift 鎖は `git diff 42357b73e 6a9893ac0 -- tools/lift tools/p0c tools/plugins/reverb_delay/engine_lift.sh` が空。
 - **方法**: `engine_f80_stub.py` が `e.fixcmp.ll` の `x86_fp80` を含む関数の定義を `declare` に置換する (判定は `define` から対応する `}` までの本体に限る)。 除外は関数単位で、名前・VA・理由を `f80_excluded.tsv` に記録する。 `engine_f80_subset.sh` が部分集合を `emcc -c` し、`engine_f80_gate.sh` が gate を判定する。 gate: rc 0 かつ define 数が除外数だけ減る かつ 除外集合 = 本体に f80 を含む define 集合 (stub と別算法の awk で求める) かつ 部分集合の本体 f80 = 0。 NC は実 IR で `engine_f80_nc.sh <e.fixcmp.ll の絶対パス> <OUT>` を回す。 base (無改変) は PASS、nc1 (件数を保って非 f80 関数を除外名に入れる) と nc2 (除外を 1 件減らす) は FAIL を要求する。
-- **素材**: `$ARTIFACTS_DIR` に `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` が実在することを確認した (2026-10-15 の run)。 `env.sh` が `fl-win64` の PE を展開。 RetDec は `/opt/retdec/bin/retdec-decompiler`、emcc は `/opt/emsdk` (6.0.12。 `docs/REFERENCES.md` の pin と一致) を使った。 toolchain の tarball は展開していない (runner に既存の `/opt` 配置を使用)。
+- **素材**: `$ARTIFACTS_DIR` に `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` が実在することを確認した (2026-10-15 の run)。 `env.sh` が `fl-win64` の PE を展開。 RetDec は [RETDEC] の `retdec-decompiler` (v5.0)、emcc は [EMSDK] (6.0.12。 `docs/REFERENCES.md` の pin と一致) を使った。 toolchain の tarball は展開していない (runner に既存の `/opt` 配置を使用)。
 
 | engine | 条件 | lift rc | define | f80 関数 (本体基準) | NC: 無改変 `emcc -c` | 部分集合 `emcc -c` | 部分集合 define | gate |
 |---|---|--:|--:|--:|--:|--:|--:|---|
@@ -109,12 +109,12 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 
 ```
 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
-EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/plugins/reverb_delay/engine_f80_subset.sh 19000
+EMSDK_ENV="$EMSDK_DIR/emsdk_env.sh" bash tools/plugins/reverb_delay/engine_f80_subset.sh 19000
 bash tools/plugins/reverb_delay/engine_f80_nc.sh "$PWD/tools/plugins/work/reverb_delay/engine19000/e.fixcmp.ll" "$PWD/tools/plugins/work/reverb_delay/nc19000"
 python3 tools/plugins/reverb_delay/avx_bad_ranges.py 19165 > "$PWD/tools/plugins/work/reverb_delay/bad19165.out"
 ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges $PWD/tools/plugins/work/reverb_delay/bad19165.out" ENGINE_TAG=_noipp_nobad bash tools/plugins/reverb_delay/engine_lift.sh 19165 900
-ENGINE_TAG=_noipp_nobad EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/plugins/reverb_delay/engine_f80_subset.sh 19165
+ENGINE_TAG=_noipp_nobad EMSDK_ENV="$EMSDK_DIR/emsdk_env.sh" bash tools/plugins/reverb_delay/engine_f80_subset.sh 19165
 bash tools/plugins/reverb_delay/engine_f80_nc.sh "$PWD/tools/plugins/work/reverb_delay/engine19165_noipp_nobad/e.fixcmp.ll" "$PWD/tools/plugins/work/reverb_delay/nc19165"
 ```
 
-注: `--exclude-ranges` には絶対パスを渡す (`engine_lift.sh` が `tools/plugins` へ cd するため)。 再現には `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` が要る。
+注: `--exclude-ranges` には絶対パスを渡す (`engine_lift.sh` が `tools/plugins` へ cd するため)。 `EMSDK_DIR` は [EMSDK] の展開先。 再現には `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` が要る。
