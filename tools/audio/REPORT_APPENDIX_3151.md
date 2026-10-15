@@ -81,3 +81,26 @@
 - **fake の `default_output`**: `pactl` 接続失敗 (PulseAudio を止めた条件の意図どおり)。null の run は `ci_null`。
 - **NC**: `nc_soak15_negctl` は FAIL (exit 1・underrun 7・silence 3712・ramp mismatch 669952/720896)。期待どおり。
 - **未実施**: Firefox の p99 (子 [AU-37] #3323)・30 分ソークの p99 (#187)。
+
+### 12-4 競合解消後の HEAD の再測定 (測定 commit `fb5a0d69`・n=1)
+
+- **理由**: main (`cf2966030`) と競合したため merge (`ba34d3521`)。競合解消で ctl の配置が変わった: `burst_hist` を `pw_trace` (@388) の後ろ **@16772** へ移し、`FLA_CTL_SIZE` は **16904**。main の既存 offset (`pw_n` @384・`pw_trace` @388) は変えていない。
+- **ABI 照合 (HEAD `fb5a0d69`)**: `flaudio.c` の `g_layout` (C の `offsetof`) と `src/runtime/audio-layout.ts` の `FLA_LAYOUT` を突き合わせた結果、69 フィールド全てが一致 (不一致 0)。`sizeof(fla_ctl_t)` = 16904 = `FLA_CTL_SIZE`。
+- **不具合 (merge 直後の `ba34d3521` で発見・`fb5a0d69` で修正)**: worklet は ctl を `new Int32Array(buf, ctlPtr, 128)` (128 ints 固定) で見ていた。@16772 の `burst_hist` (index 4193〜) は範囲外で、`Atomics.add` は worklet の `run()` の `try/catch` に飲まれ、`burst_hist` は全 run で 0 のまま。`ba34d3521` の 1 rep では **p99 が 6 条件とも 0 で、6/6 PASS** (判定は p99 を見ないため通過)。修正: ビュー長を `processorOptions.ctlSize` (= `FLA_CTL_SIZE`) から取る。
+- **測定**: `AU2_OUT=<tmp> bash tools/audio/au2_matrix.sh 1` (HEAD `fb5a0d69`・`bash tools/audio/build.sh` 直後)。ubuntu runner (4 vCPU)、google-chrome、PulseAudio 16.1 (apt 導入。runner に未導入で、導入前の run は null 条件が `pactl` 不在の rc 127 で止まった)、emsdk 6.0.12 (上流から導入、`EMSDK_ENV` で指定)。行列の全体 4 分 17 秒。
+  - fake: 3/3 PASS・wall 89.2 s・load avg (1/5/15 分) start 0.27/0.15/0.11 → end 0.30/0.22/0.14
+  - null: 3/3 PASS・wall 90.4 s・load avg start 0.27/0.22/0.14 → end 0.08/0.17/0.12。null の sink は `ci_null` (sink-input を 1 秒ごとに採取)
+  - NC (`--soak 15 --inject-hiccup`): FAIL (exit 1・underrun 7・silence 3712・ramp mismatch 669952/720896)。期待どおり
+- **結果 (n=1)**:
+
+| 条件 | シナリオ | PASS | underrun | burst max (f) | p99 (f, bin 上端) | 実 T / T_req (f) |
+|---|---|---|---|---|---|---|
+| Chrome fake シンク | 48k `asio_sine_b256_d2` | 1/1 | 0 | 512 | 1024 | 1536 / 1024 |
+| Chrome fake シンク | 96k `asio_sine_b256_96k` | 1/1 | 0 | 1024 | 1536 | 2816 / 1536 |
+| Chrome fake シンク | 96k `asio_sine_b512_96k` | 1/1 | 0 | 1024 | 1536 | 3072 / 2048 |
+| Chrome PulseAudio null-sink | 48k `asio_sine_b256_d2` | 1/1 | 0 | 1152 | 1536 | 1792 / 1792 |
+| Chrome PulseAudio null-sink | 96k `asio_sine_b256_96k` | 1/1 | 0 | 3456 | 3584 | 4608 / 4608 |
+| Chrome PulseAudio null-sink | 96k `asio_sine_b512_96k` | 1/1 | 0 | 5504 | 3584 | 7680 / 7680 |
+
+- **未実施**: n=3 の全行列の HEAD 再測定 (本節は n=1)。§12-3 の n=3 の値は測定 commit `8310689a` (main 取り込み前) のもので、HEAD の値ではない。rep 間のばらつきは n=1 では見えない。
+- **差分 (測定 commit → HEAD)**: 測定 commit 以降の変更は REPORT のみ。`git diff --stat fb5a0d69 HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は 0 行。
