@@ -42,18 +42,18 @@
 
 - 逆アセンブル: `analysis/flapi/pe_disasm.py <VA> <命令数>` (`FL_WIN64_DIR` 指定)。
 - 検算: `analysis/flapi/pe_py354_probe.py`。5 群を assert する: (1) undo 系の呼出しを `r8d` の即値で列挙、(2) `0xd84680` の out store と `0xfdd2c0` の引数、(3) `0x415610` の +8 オフセットの有無、(4) `0xd843d0` の `[rsi+8]` の 1 箇所、(5) undo 4 関数の `[rbp+0x50]` への mov 無し と、`0xd68dc0` の `out` 渡し。
-- probe の限界: (5) の undo 検査は `[rbp+0x50]` の文字列だけを見る。out を別レジスタへ写した後の store は検出しない。(3b) は `0x415610` の非フレーム store を全件列挙するが、`0x415610` の外 (呼出し先) の書込みは対象外。
+- probe の限界: (5) の undo 検査は `[rbp+0x50]` の文字列だけを見る。out を別レジスタへ写した後の store は検出しない。(3b) は `0x415610` の非フレーム store を全件列挙するが、`0x415610` の外 (呼出し先) の書込みは対象外。種別 10・11 の分岐 (`0x4157b5` へ入る経路) は probe で assert せず、逆アセンブルの目視確認のみ。
 
 ## 検証
 
-- 測定 commit: `3dff75fd4` (`test(python): PY-354 out+8 writer check probe`。probe のコードを変えた最後の commit)。REPORT の文言だけを変える後続 commit は測定に影響しない。
-- 測定 commit から HEAD までの probe 差分: 0 (`git diff 3dff75fd4 HEAD -- tools/python/analysis/flapi/pe_py354_probe.py` の出力は空)。
-- 実測 (測定 commit `3dff75fd4`、素材 fl-win64・展開先 `$FL_WIN64_DIR`):
+- 測定 commit: `38e8ba9bf` (probe のコードを変えた最後の commit)。以降の commit は REPORT の文言だけを変える。
+- 測定 commit から検証 HEAD までの probe 差分: 0 (`git diff 38e8ba9bf HEAD -- tools/python/analysis/flapi/pe_py354_probe.py tools/python/analysis/flapi/pe_py141_probe.py` の出力は空)。
+- 実測 (検証 HEAD `70e4fe460`、素材 fl-win64・展開先 `$FL_WIN64_DIR`):
 
 | コマンド | 結果 | wall | load |
 |---|---|---|---|
-| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py354_probe.py` | PASS (rc 0・全項目 ok) | 3.712 秒 | 0.12 / 0.20 / 0.12 (11:02 UTC) |
-| 既存の検算 `analysis/flapi/pe_py141_probe.py` (回帰確認・素材同じ) | PASS (rc 0・「PASS」行を確認) | 未計測 | 未計測 |
+| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py354_probe.py` | PASS (rc 0・全項目 ok) | 3.45 秒 | 0.22 / 0.14 / 0.06 (11:15 UTC) |
+| 既存の検算 `analysis/flapi/pe_py141_probe.py` (回帰確認・素材同じ) | PASS (rc 0・「PASS」行を確認) | 0.23 秒 | 同上 (11:15 UTC) |
 
 ## 未解決
 
