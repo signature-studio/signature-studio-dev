@@ -12,7 +12,7 @@
 ## 2. 環境
 
 - 測定 commit `12ad05e7b` (PR HEAD、main `7288cd52b` を取り込んだ merge。コードを変えた最後の commit)。変更前 = `7288cd52b` (`origin/main` の現行 HEAD を別 worktree で build)。
-- 素材: `work-icall`・`work-liftlib` (`$ARTIFACTS_DIR`)・`plugins-freshair` (`FA_DL` で `fetch.sh`: `win: 17 files, factory .epf: 8, mac: 0 files`)・`toolchain-emsdk` (`/opt/emsdk` 6.0.12)。`fl-win64` は本測定の経路に無い。
+- 素材: `work-icall`・`work-liftlib` (`$ARTIFACTS_DIR`)・`plugins-freshair` (`FA_DL` で `fetch.sh`: `win: 17 files, factory .epf: 8, mac: 0 files`)・`toolchain-emsdk` ([EMSDK] 6.0.12)。`fl-win64` は本測定の経路に無い。
 - `bash tools/icall/fa_route_build.sh`: 5.8 s、`fa_route.cjs` 生成 (`missing` 4 関数は既存の出力)。wasm route は両 commit で同一物を使う。
 
 ## 3. 実装内容 (`tools/ott/native/ott_native.c`)
