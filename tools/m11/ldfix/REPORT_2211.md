@@ -178,3 +178,62 @@ LIVE-IN の全経路は「関数内で定義されない」 (ENTRY)。DROP の�
 - #3225 [LD-150] 漏出 store の別名判定 (親 #2211)
 - #3228 [LD-151] 漏出関数の call 越え (親 #2211)
 - #3230 [LD-152] 7e48d6 の IR 側確認 (親 #2211)
+
+## 6. #4090 (LD-192): `lea` の結果を frame 派生に入れる修正
+
+親 #2211 の残件。`frame_derived` が `writes_dst` で `lea` を除外していたため、`lea rdx, [rbp+0x60]` の結果が F に入らず、7e45e0 の `call 0x820c80` (rdx = `&[rbp+0x60]`) が漏出と見なされなかった。
+
+### 6.1 変更
+
+- `frame_derived`: 第 1 オペランドが汎用レジスタの `lea` を F への派生として受け入れる (1 行)。
+- `leak_site` は変更しない (最初の漏出のみ)。全漏出は JSON の `fn_info[fn].leaks` に記録する (先頭 8 件)。
+- 判定の規則 (DROP / LIVE-IN / UNDETERMINED の意味) は変えない。
+
+### 6.2 結果 (受入 1)
+
+測定 commit は本節を含む PR の commit (PR 本文に hash)。入力は §1 と同じ (`results/audit_undefload_564_full.json`・`results/f4_564_post.json`・PE `block00031_PE.bin` の指紋 `b2c64da40921cf26`)。修正前の判定器は commit 済みの `results/frame_store_verdict_2211.json` と byte 一致 (`cmp`) を確認した。
+
+- 7e45e0: glk が False → True。`fn_info.leaks` の 4 件目に `7e4613 call 0x820c80 [CALL_ARG]` が出る。受入 1 を満たす。
+- 全体: DROP 3・LIVE-IN 1・UNDETERMINED 44 (#2211 の 3・35・10 から変化)。
+- 修正後の判定を `results/frame_store_verdict_4090.json` に出力した。同じ入力で 2 回実行し byte 一致 (決定的)。
+
+### 6.3 判定の変化 (受入 2)
+
+LIVE-IN 34 関数が UNDETERMINED に移った。DROP 3 関数は変わらない。移った理由は、`rcx` (関数の入力値) が後の `movsxd rcx, esi` (7e4826) で F に入り、関数内の最初の `rcx` の store (7e45ff) が漏出として先に出るため。F は flow-insensitive な不動点なので、この偽陽性は判定器の設計 (flow-insensitive な F) に由来する。UNDETERMINED へ移すのは保守側で、結論を誤って確定させない。
+
+| 関数 | #2211 | #4090 | glk | 最初の漏出 (機械語) | 残る理由 |
+|---|---|---|---|---|---|
+| 103aa50 | LIVE-IN | UNDETERMINED | T | 103aa91 call 0x40c660 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 11e6e20 | LIVE-IN | UNDETERMINED | T | 11e6eb3 mov qword ptr [rbp + 0x40], rax [STORE_PTR] | BARRIER(LEAK_STORE) |
+| 129df10 | LIVE-IN | UNDETERMINED | T | 129df20 mov qword ptr [rbp + 0x30], rcx [STORE_PTR] | BARRIER(ALIAS_FRAME_PTR) |
+| 12cb2e0 | LIVE-IN | UNDETERMINED | T | 12cb316 call 0x12ddaa0 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 4078c0 | LIVE-IN | UNDETERMINED | T | 407919 call 0x407260 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 418b40 | LIVE-IN | UNDETERMINED | T | 418b52 call 0x407260 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 45c170 | LIVE-IN | UNDETERMINED | T | 45c180 call 0x457270 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 45cda0 | LIVE-IN | UNDETERMINED | T | 45cdb0 call 0x457270 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 45d8b0 | LIVE-IN | UNDETERMINED | T | 45d8ba mov qword ptr [rbp + 0x20], rcx [STORE_PTR] | ONLY_ENTRY_AFTER_CALL |
+| 45db40 | LIVE-IN | UNDETERMINED | T | 45db50 call 0x457270 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 45dc20 | LIVE-IN | UNDETERMINED | T | 45dc39 call 0x467910 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 639c70 | LIVE-IN | UNDETERMINED | T | 639c7e call 0x639900 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 695640 | LIVE-IN | UNDETERMINED | T | 695656 mov qword ptr [rbp + 0x78], rdx [STORE_PTR] | ONLY_ENTRY_AFTER_CALL |
+| 6c01a0 | LIVE-IN | UNDETERMINED | T | 6c01c2 mov dword ptr [rbp + 0x90], r8d [STORE_PTR] | BARRIER(ALIAS_FRAME_PTR) |
+| 6c7610 | LIVE-IN | UNDETERMINED | T | 6c762e mov dword ptr [rbp + 0x90], r8d [STORE_PTR] | BARRIER(ALIAS_FRAME_PTR) |
+| 6c7ca0 | LIVE-IN | UNDETERMINED | T | 6c7d48 movss dword ptr [r11], xmm1 [STORE_PTR] | BARRIER(ALIAS_FRAME_PTR) |
+| 6ca580 | LIVE-IN | UNDETERMINED | F | なし | BARRIER(ALIAS_FRAME_PTR) |
+| 6ca6c0 | LIVE-IN | UNDETERMINED | F | なし | BARRIER(ALIAS_FRAME_PTR) |
+| 6ced00 | LIVE-IN | UNDETERMINED | T | 6ced0f call 0x6cec50 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 808930 | LIVE-IN | UNDETERMINED | T | 80893d mov qword ptr [rbp + 0x38], rcx [STORE_PTR] | ONLY_ENTRY_AFTER_CALL |
+| 808c80 | LIVE-IN | UNDETERMINED | T | 808c8f call 0x617920 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 81bfd0 | LIVE-IN | UNDETERMINED | T | 81bfea call 0x424c10 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 81c0d0 | LIVE-IN | UNDETERMINED | T | 81c0f2 call 0x663460 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 820d60 | LIVE-IN | UNDETERMINED | T | 820d82 call 0x820cb0 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 824020 | LIVE-IN | UNDETERMINED | T | 824035 mov byte ptr [rbp + 0x88], r9b [STORE_PTR] | ONLY_ENTRY_AFTER_CALL |
+| 864f80 | LIVE-IN | UNDETERMINED | T | 864f8c call 0x864fa0 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 867220 | LIVE-IN | UNDETERMINED | T | 86723c call 0x4255d0 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| 92ea90 | LIVE-IN | UNDETERMINED | T | 92eaad call qword ptr [rbx] [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| bf8b40 | LIVE-IN | UNDETERMINED | T | bf8b57 call 0xbf89b0 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| c9cf70 | LIVE-IN | UNDETERMINED | T | c9cf8d call qword ptr [rbx] [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| da5400 | LIVE-IN | UNDETERMINED | T | da541d call qword ptr [rbx] [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| da5510 | LIVE-IN | UNDETERMINED | T | da552d call qword ptr [rbx] [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| e8fba0 | LIVE-IN | UNDETERMINED | T | e8fbbc call 0x12dec70 [CALL_ARG] | ONLY_ENTRY_AFTER_CALL |
+| f61710 | LIVE-IN | UNDETERMINED | T | f61720 mov qword ptr [rbp + 0x38], rcx [STORE_PTR] | BARRIER(ALIAS_FRAME_PTR) |
