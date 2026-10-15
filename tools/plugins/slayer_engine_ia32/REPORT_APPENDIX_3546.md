@@ -31,7 +31,7 @@ reloc 位置の命令境界は `reloc_boundary_3546.py` で確かめる: `python
 
 - `0x10010bbf` は pass 2 で roots に入れない (`lift_text.py` の `HOLD_B`)。 被覆はこの区間の分だけ低く出る (86.18%)。 jump table を関数として lift すると silent miscompile になり得るため、保留は安全側。
 - 保留を外す判断 (reloc 全数の確認・区間内の関数先頭 `0x10010bc0` の確認) は子 #4727 で行う。
-- `0x1000eab4` (#4726 の push 即値規則で (b) と分類され roots に入る) は pass 2 で被覆済み。 本 PR では扱わない。
+- `0x1000eab4` は #4726 の push 即値規則で (b) と分類され、pass 2 の roots に入る (#4726 側の扱い。 本 PR では変えない)。
 
 ## 3. (c) 中身あり区間の参照検査 (受入条件 1)
 
