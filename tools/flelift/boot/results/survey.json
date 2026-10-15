@@ -1,8 +1,10 @@
 {
- "units_covered": 895,
+ "units_covered": 942,
  "byCls": {
   "ok": 892,
-  "unlifted": 3
+  "empty": 46,
+  "unlifted": 3,
+  "noproc": 1
  },
  "details": [
   [
@@ -19,6 +21,11 @@
    895,
    "unlifted",
    9924000
+  ],
+  [
+   941,
+   "noproc",
+   0
   ]
  ]
 }
