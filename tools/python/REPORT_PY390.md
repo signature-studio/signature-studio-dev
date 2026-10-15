@@ -49,13 +49,13 @@
 
 ## 5. 検証
 
-測定 commit: `46f190fdc` (`feat(python): findEventID・isDoubleClick の PE 分岐を再確認する解析補助を追加 (PY-390, #4830)`)。コードを変えた最後の commit。
+測定 commit: `60534394a` (`fix(python): pe_py390_probe の展開手順の表記を repo 外パスから外す (PY-390, #4830)`)。コードを変えた最後の commit。
 
-- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/py4830 python3 tools/python/analysis/flapi/pe_py390_probe.py`
+- 再現: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py390_probe.py`
 - 素材: `fl-win64.tar.zst` を `tar --zstd -xf` で展開 (real 9.241 秒・user 2.722 秒・sys 5.471 秒)。
-- 実測: real **0.070 秒**・user 0.053 秒・sys 0.017 秒。実行前後の load average (1 分) は 0.03。確認 14 件 OK・rc 0。
+- 実測: real **0.069 秒**・user 0.052 秒・sys 0.017 秒。実行前の load average (1 分) は 0.00。確認 14 件 OK・rc 0。
 - 逆アセンブル: `analysis/flapi/pe_disasm.py` (capstone + pefile) の方式。
 
 ## 6. 差分
 
-`git diff 46f190fdc HEAD -- tools/python/analysis/flapi/pe_py390_probe.py` は本 REPORT の commit で変わる差分は 0 行 (本 commit は REPORT だけ)。
+`git diff 60534394a HEAD -- tools/python/analysis/flapi/pe_py390_probe.py` の出力は 0 行 (スクリプトは測定 commit と同一)。`git diff 60534394a HEAD -- tools/python/REPORT_PY390.md docs/DOC_MAP.md` は本 REPORT の commit (REPORT と索引) だけ。
