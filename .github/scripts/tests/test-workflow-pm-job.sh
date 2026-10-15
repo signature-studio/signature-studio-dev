@@ -117,6 +117,10 @@ checks() {
   expect "agent-setup, assemble-prompt and the opencode run are all gated on should_run == 'true' ($gated/$total)" $?
   [ -n "$ctxstep" ] && grep -qx '        id: context' "$ctxstep" && grep -q 'GH_TOKEN: ${{ steps.app-token.outputs.token }}' "$ctxstep"
   expect "Prepare event context (id: context) runs with the App token" $?
+  # #5462: pm job の Prepare event context も OC_PM_BOT_LOGIN を受け取る。渡さないと
+  # prepare-event-context.sh が PM App 起票の dispatch を拒否する (#5466/#5468 の受信側判定)。
+  [ -n "$ctxstep" ] && grep -qx '          OC_PM_BOT_LOGIN: ${{ vars.OC_PM_BOT_LOGIN }}' "$ctxstep"
+  expect "Prepare event context (id: context) receives OC_PM_BOT_LOGIN (#5462)" $?
   [ -n "$refuse" ] && grep -qx '          exit 1' "$refuse"
   expect "a rejected dispatch fails the job (should_run != 'true' -> exit 1)" $?
   # token の発行は Prepare event context より前 (対象の取得に GH_TOKEN が要る)
@@ -180,6 +184,7 @@ mutate "job if: widened to every dispatch" "if: github.event_name == 'repository
 mutate "PM App token minted by the reviewer App" "client-id: \${{ vars.OC_PM_APP_CLIENT_ID }}=>client-id: \${{ vars.OC_REVIEW_APP_CLIENT_ID }}" "PM App"
 mutate "PM App token minted by the implementer App" "client-id: \${{ vars.OC_PM_APP_CLIENT_ID }}=>client-id: \${{ vars.OC_APP_CLIENT_ID }}" "PM App"
 mutate "PM App private key replaced by the implementer key" "private-key: \${{ secrets.OC_PM_APP_PRIVATE_KEY }}=>private-key: \${{ secrets.OC_APP_PRIVATE_KEY }}" "OC_PM_APP_PRIVATE_KEY"
+mutate "PM App login dropped from the event context" "          OC_PM_BOT_LOGIN: \${{ vars.OC_PM_BOT_LOGIN }}=>" "receives OC_PM_BOT_LOGIN"
 
 # 他の job への影響: implement の if: に oc-pm を足した workflow では失敗する
 # 置換対象は implement job の if: だけに限定する (#3227)。fixgate など他の job の if: にも
