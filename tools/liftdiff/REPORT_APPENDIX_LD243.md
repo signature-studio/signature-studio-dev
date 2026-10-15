@@ -85,3 +85,58 @@
 `git diff --stat 16d1cc7ef HEAD -- tools/liftdiff` (本 commit の harness 変更と REPORT のみ):
 
 判定の経路 (`ldlib`・`rt`・`liftdiff.py`・`targets`) の差は 0 行。
+
+## 9. 追記: (B) 並び・process 履歴と (C) V8 階層化の分離 (LD-243 2 段目)
+
+- 測定 commit: `3da603ce6` (`origin/main`)。harness `tests/ld183_order_load.py` は本 HEAD に既に `--v8` を持つため変更なし。build `[build] OK`・`wasm_size` 4464620 (同一 HEAD で作り直し)。
+- 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64`、`work-m11` / `work-liftdiff` → worktree の `tools/*/work/` (アーカイブ内のパスは repo 相対のため、展開先は repo ルート)、`toolchain-emsdk` → `$RUNNER_TEMP/emsdk-root/emsdk` (build は `/opt/emsdk` を参照し、runner に既存)。
+- 機: 4 vCPU・15 GiB。run は直列。負荷 0。`--state auto --shards 12` (shards 1 のみ例外)。
+
+### 9.1 各 run の件数 (一致 / 不一致 / 実行不能, 関数 801)
+
+| 並び | shards | V8 | r1 | r2 |
+|---|---|---|---|---|
+| sorted | 12 | default | 359 / 233 / 209 | 359 / 233 / 209 |
+| sorted | 12 | liftoff | 359 / 233 / 209 | 359 / 233 / 209 |
+| shuffle:1 | 12 | default | 351 / 241 / 209 | 351 / 241 / 209 |
+| shuffle:1 | 12 | liftoff | 351 / 241 / 209 | 351 / 241 / 209 |
+| sorted | 1 | default | 343 / 249 / 209 | (未取得) |
+
+### 9.2 case 単位・関数単位の突合 (`tests/ld182_casediff.py`・`tests/ld154_repeat.py`)
+
+| 比較 | 変えた条件 | case 差 | 差のある関数 | 関数判定変化 |
+|---|---|---|---|---|
+| sorted default r1 vs r2 | 反復 | 7 | 3 | 0 |
+| sorted liftoff r1 vs r2 | 反復 | 2 | 2 | 0 |
+| sh1 default r1 vs r2 | 反復 | 2 | 2 | 0 |
+| sh1 liftoff r1 vs r2 | 反復 | 4 | 3 | 0 |
+| sorted default vs liftoff (r1 / r2 それぞれ) | (C) V8 | 54 (r1) / 55 (r2) | 14 | **0** |
+| sh1 default r1 vs liftoff r1 | (C) V8 | 18 | 6 | 0 |
+| sorted default r1 vs sh1 default r1 | (B) 並び | 515 | 119 | **16** (12: match→mismatch, 4: mismatch→match) |
+| sorted liftoff r1 vs sh1 liftoff r1 | (B) 並び (V8 固定) | 514 | 117 | **16** |
+| sorted default r1 vs shards 1 sorted | (B') process 履歴 (shards 12 → 1) | 701 | 150 | **16** |
+
+### 9.3 判定
+
+| 候補 | 判定 | 根拠 |
+|---|---|---|
+| (A) 追加の CPU 競合 | 本 2×2 では未測定 | LD-183 で件数・関数判定は動かなかった (§1 の注は LD-183 付録) |
+| (B) 並び・process 履歴 | **揺れの主因** | 並びを変えると V8 を liftoff に固定しても 514 case・16 関数の判定が変わる。process を 12 → 1 に変えても 701 case・16 関数が変わる |
+| (C) V8 階層化 | **揺れの小さい一因** | V8 の固定で 54〜55 case が動くが、関数判定は 0 件変化。反復の差 (2〜7 case) より大きいが、判定には効かない |
+
+(B) と (C) は今回の 2×2 で分離できた。(B) は V8 の有無に依らず効く。(C) は効くが判定変化 0。
+
+### 9.4 受入条件への対応 (#4887)
+
+| # | 受入条件 | 判定 | 根拠 |
+|---|---|---|---|
+| 1 | (A)(B)(C) のどれが揺れを作るかを REPORT に書く | 達成 (A は未測定) | §9.3。(A) は LD-183 で判定に効かなかったことに依る |
+| 2 | 判定ロジック・timeout 既定値は変えない | 達成 | 本 PR は REPORT のみ。`ldlib`・`rt`・`liftdiff.py`・`targets` は無変更 |
+
+### 9.5 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| (B) の機構: 並びや process 履歴で、どの case がどう変わるか (例: 先行 case が残す状態) | 揺れの修復方針が決まらない | #4887 (修復は別起票) |
+| shards 1 の sorted の反復 (r2) が未取得 | (B') の反復の幅が未確定 | #4887 |
+| (A) 追加 CPU 競合の 2×2 への組み込み | 揺れ要因 (A) の再確認 | #4887 |
