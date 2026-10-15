@@ -73,6 +73,6 @@ FL_WIN64_DIR=<fl-win64 展開先>/extracted $PY312 analysis/extract_pyc_blocks.p
 node tests/loop_starter_unset_probe.mjs
 ```
 
-前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0・4 分 10 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0・22.6 秒・`flpy.wasm` 5,924,680 B)。`extract_pyc_blocks.py` は fl-win64 の DATA block を全件展開しないと `pyscript ... 0 block` の ERROR で失敗した (一部展開時)。全件展開後の再実行で成功。
+前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0・所要時間は未記録)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0・22.6 秒・`flpy.wasm` 5,924,680 B)。`extract_pyc_blocks.py` は fl-win64 の DATA block を全件展開しないと `pyscript ... 0 block` の ERROR で失敗した (一部展開時)。全件展開後の再実行で成功。
 
-測定 commit: `0ccb27aac` (probe の変更を含むコミット)。`git diff 0ccb27aac HEAD -- tools/python ':!*.md'` は 0 行 (測定後のコード変更は無い。本 PR の差分は `tools/python/REPORT_PY297.md` の新規追加と `docs/DOC_MAP.md` の 1 行のみ)。
+測定 commit: `4392aa502` (probe の変更を含む最後のコード commit)。確認: `git diff 4392aa502 HEAD -- tools/python ':!*.md'` の出力は 0 行 (測定後のコード変更は無い。本 PR の差分は `tools/python/REPORT_PY297.md` の新規追加と `docs/DOC_MAP.md` の 1 行のみ)。
