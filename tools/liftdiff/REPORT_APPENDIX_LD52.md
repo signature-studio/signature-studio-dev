@@ -111,7 +111,7 @@ sample:800 (`--shards 12 --state auto`) の判定。`--m11-only` の所要 (実�
   5 files changed, 67 insertions(+), 6 deletions(-)
   ```
   内容: `cases.py` の `0x4256c0: ['i64']` (main 側 #3862)。`ld_core.h` は `ld_int_arg` を追加し、`MultiByteToWideChar`・`WideCharToMultiByte` の int 引数を下位 32bit の符号付きで読む。`ld_ms_call.S` は `LD_STK_ENTRY28` 分岐 (既定のコードは従来と同じ)。`liftdiff_e2e.sh` は `test_ld179` の追加と `LD_STK_ENTRY28` 分岐。
-- 素材: `fl-win64`・`work-m11`・`work-liftdiff`・`toolchain-emsdk`・`toolchain-retdec` を `$ARTIFACTS_DIR` から展開して実測 (`fl-win64` は `$RUNNER_TEMP/fl-win64`・他は worktree の `tools/m11/work`・`tools/liftdiff/work`・`$HOME/emsdk`・`$HOME/retdec`)。wasm は `liftdiff.py build targets/m11.json` で `d6595d4ed` から再 build (`sig_mismatch 0`・`undefined 1`) した後に batch を実行。
+- 素材: `fl-win64`・`work-m11`・`work-liftdiff`・`toolchain-emsdk`・`toolchain-retdec` を実行環境の素材置き場から展開して実測 (`fl-win64` → `[WIN64]`・`toolchain-emsdk` → `[EMSDK]`・`toolchain-retdec` → `[RETDEC]`。`work-m11`・`work-liftdiff` は worktree の `tools/m11/work`・`tools/liftdiff/work`)。wasm は `liftdiff.py build targets/m11.json` で `d6595d4ed` から再 build (`sig_mismatch 0`・`undefined 1`) した後に batch を実行。
 - 同じ head での e2e 2 回は sample:800 で 360 / 235 / 205 (run 間で一致)。前の測定 (`46bc0cd35`) の 361 / 234 / 205 とは 1 件ずれる。このずれの原因は未特定 (`46bc0cd35`..`d6595d4ed` の 67 行の差分 (`ld_core.h`・`ld_ms_call.S` を含む) が効いた可能性を排除していない)。
 - 単体: `python3 tools/liftdiff/tests/test_ld52_machine_sig.py` → `PASS test_ld52_machine_sig`。
 - 現 HEAD で実施した単体の確認 (実測): `python3 tools/liftdiff/tests/test_ld52_machine_sig.py` → PASS、`python3 tools/liftdiff/tests/test_ld179_tagpoint_tr.py` → PASS。
