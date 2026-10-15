@@ -104,8 +104,7 @@ private:
 	CRect deviceRect (const CRect& rect) const;
 	void paintRect (const CRect& rect, const CColor& color, bool blend) const;
 	void strokeRect (const CRect& rect, const CColor& color) const;
-	void plotLine (CPoint from, CPoint to, const CColor& color) const;
-	void plotThickLine (CPoint from, CPoint to, const CColor& color) const;
+	void plotLines (const PointList& points, bool closed, const CColor& color) const;
 	void fillPolygon (const PointList& points, const CColor& color) const;
 	void strokePolyline (const PointList& points, bool closed, const CColor& color) const;
 	CRect clipWithinBitmap (CRect clip) const;

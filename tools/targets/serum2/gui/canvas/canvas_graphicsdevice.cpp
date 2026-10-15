@@ -49,6 +49,52 @@ PixelBox pixelBoxOf (const CRect& rect)
 }
 
 //------------------------------------------------------------------------
+double distanceToSegment (double px, double py, const CPoint& from, const CPoint& to)
+{
+	const auto dx = to.x - from.x;
+	const auto dy = to.y - from.y;
+	const auto lengthSquared = dx * dx + dy * dy;
+	const auto qx = px - from.x;
+	const auto qy = py - from.y;
+	const auto t = lengthSquared > 0. ? std::clamp ((qx * dx + qy * dy) / lengthSquared, 0., 1.) : 0.;
+	const auto ex = qx - t * dx;
+	const auto ey = qy - t * dy;
+	return std::sqrt (ex * ex + ey * ey);
+}
+
+//------------------------------------------------------------------------
+template <typename F>
+void forEachBresenhamPixel (CPoint from, CPoint to, F&& visit)
+{
+	auto x0 = static_cast<int32_t> (std::lround (from.x));
+	auto y0 = static_cast<int32_t> (std::lround (from.y));
+	auto x1 = static_cast<int32_t> (std::lround (to.x));
+	auto y1 = static_cast<int32_t> (std::lround (to.y));
+	auto dx = std::abs (x1 - x0);
+	auto dy = -std::abs (y1 - y0);
+	auto sx = x0 < x1 ? 1 : -1;
+	auto sy = y0 < y1 ? 1 : -1;
+	auto err = dx + dy;
+	while (true)
+	{
+		visit (x0, y0);
+		if (x0 == x1 && y0 == y1)
+			break;
+		auto e2 = 2 * err;
+		if (e2 >= dy)
+		{
+			err += dy;
+			x0 += sx;
+		}
+		if (e2 <= dx)
+		{
+			err += dx;
+			y0 += sy;
+		}
+	}
+}
+
+//------------------------------------------------------------------------
 void writeRGBA (uint8_t* dst, const CColor& color)
 {
 	dst[0] = color.red;
@@ -129,7 +175,7 @@ bool CanvasGraphicsDeviceContext::endDraw () const
 //------------------------------------------------------------------------
 bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 {
-	plotLine (transformPoint (line.first), transformPoint (line.second), frameColor);
+	plotLines ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
 	return true;
 }
 
@@ -137,7 +183,7 @@ bool CanvasGraphicsDeviceContext::drawLine (LinePair line) const
 bool CanvasGraphicsDeviceContext::drawLines (const LineList& lines) const
 {
 	for (const auto& line : lines)
-		plotLine (transformPoint (line.first), transformPoint (line.second), frameColor);
+		plotLines ({transformPoint (line.first), transformPoint (line.second)}, false, frameColor);
 	return true;
 }
 
@@ -431,69 +477,61 @@ void CanvasGraphicsDeviceContext::strokeRect (const CRect& rect, const CColor& c
 }
 
 //------------------------------------------------------------------------
-// 太さ 1 かつ aliasing は 1 px の Bresenham 線 (端点は四捨五入して画素に置く)。それ以外は plotThickLine で描く。
-void CanvasGraphicsDeviceContext::plotLine (CPoint from, CPoint to, const CColor& color) const
+// 太さ 1 かつ aliasing は 1 px の Bresenham 線 (端点は四捨五入して画素に置く)。それ以外は線分の和集合で被覆を求める。
+void CanvasGraphicsDeviceContext::plotLines (const PointList& points, bool closed, const CColor& color) const
 {
-	if (lineWidth > 1. || drawMode.antiAliasing ())
+	if (points.size () < 2)
+		return;
+	const auto segmentCount = closed ? points.size () : points.size () - 1;
+	if (lineWidth <= 1. && !drawMode.antiAliasing ())
 	{
-		plotThickLine (from, to, color);
+		for (size_t i = 0; i < segmentCount; ++i)
+			forEachBresenhamPixel (points[i], points[(i + 1) % points.size ()],
+			                       [&] (int32_t x, int32_t y) { blendPixel (x, y, color); });
 		return;
 	}
-	auto x0 = static_cast<int32_t> (std::lround (from.x));
-	auto y0 = static_cast<int32_t> (std::lround (from.y));
-	auto x1 = static_cast<int32_t> (std::lround (to.x));
-	auto y1 = static_cast<int32_t> (std::lround (to.y));
-	auto dx = std::abs (x1 - x0);
-	auto dy = -std::abs (y1 - y0);
-	auto sx = x0 < x1 ? 1 : -1;
-	auto sy = y0 < y1 ? 1 : -1;
-	auto err = dx + dy;
-	while (true)
-	{
-		blendPixel (x0, y0, color);
-		if (x0 == x1 && y0 == y1)
-			break;
-		auto e2 = 2 * err;
-		if (e2 >= dy)
-		{
-			err += dy;
-			x0 += sx;
-		}
-		if (e2 <= dx)
-		{
-			err += dx;
-			y0 += sy;
-		}
-	}
-}
-
-//------------------------------------------------------------------------
-// 線分から画素中心までの距離で被覆を求める。太さ lineWidth の半分以内を塗る (端は丸い)。
-// aliasing は被覆 0/1 の二値、kAntiAliasing は境界の 1 px を線形に薄めて alpha に掛ける。
-void CanvasGraphicsDeviceContext::plotThickLine (CPoint from, CPoint to, const CColor& color) const
-{
+	// 線分の和集合の被覆を画素ごとに 1 回だけ求め、alpha に掛けて 1 回だけ合成する。
+	// 接合部 (角) で辺が重なっても二重に合成しない。aliasing は標本点の内外、AA は 4x4 標本の被覆率。
 	const auto half = std::max (lineWidth, 1.) / 2.;
 	const bool antiAliasing = drawMode.antiAliasing ();
-	const auto dx = to.x - from.x;
-	const auto dy = to.y - from.y;
-	const auto lengthSquared = dx * dx + dy * dy;
-	auto box = pixelBoxOf (CRect (std::min (from.x, to.x) - half - 1., std::min (from.y, to.y) - half - 1.,
-	                              std::max (from.x, to.x) + half + 1., std::max (from.y, to.y) + half + 1.));
+	const int sub = antiAliasing ? 4 : 1;
+	CRect bounds (points[0].x, points[0].y, points[0].x, points[0].y);
+	for (const auto& p : points)
+	{
+		bounds.left = std::min (bounds.left, p.x);
+		bounds.top = std::min (bounds.top, p.y);
+		bounds.right = std::max (bounds.right, p.x);
+		bounds.bottom = std::max (bounds.bottom, p.y);
+	}
+	bounds.inset (-half - 1., -half - 1.);
+	auto box = pixelBoxOf (bounds);
 	auto clip = pixelBoxOf (clipRect);
 	for (auto y = std::max (box.y0, clip.y0); y < std::min (box.y1, clip.y1); ++y)
 	{
 		for (auto x = std::max (box.x0, clip.x0); x < std::min (box.x1, clip.x1); ++x)
 		{
-			const auto px = x + 0.5 - from.x;
-			const auto py = y + 0.5 - from.y;
-			const auto t = lengthSquared > 0. ? std::clamp ((px * dx + py * dy) / lengthSquared, 0., 1.) : 0.;
-			const auto ex = px - t * dx;
-			const auto ey = py - t * dy;
-			const auto distance = std::sqrt (ex * ex + ey * ey);
-			const auto coverage = antiAliasing ? std::clamp (half + 0.5 - distance, 0., 1.)
-			                                   : (distance <= half ? 1. : 0.);
-			if (coverage <= 0.)
+			int hits = 0;
+			for (int sy = 0; sy < sub; ++sy)
+			{
+				for (int sx = 0; sx < sub; ++sx)
+				{
+					const auto px = x + (sx + 0.5) / sub;
+					const auto py = y + (sy + 0.5) / sub;
+					for (size_t i = 0; i < segmentCount; ++i)
+					{
+						const auto& from = points[i];
+						const auto& to = points[(i + 1) % points.size ()];
+						if (distanceToSegment (px, py, from, to) <= half)
+						{
+							++hits;
+							break;
+						}
+					}
+				}
+			}
+			if (hits == 0)
 				continue;
+			const auto coverage = hits / double (sub * sub);
 			if (auto* dst = pixelAt (x, y))
 				blendRGBA (dst, color, globalAlpha * coverage);
 		}
@@ -541,10 +579,7 @@ void CanvasGraphicsDeviceContext::fillPolygon (const PointList& points, const CC
 void CanvasGraphicsDeviceContext::strokePolyline (const PointList& points, bool closed,
                                                   const CColor& color) const
 {
-	for (size_t i = 0; i + 1 < points.size (); ++i)
-		plotLine (points[i], points[i + 1], color);
-	if (closed && points.size () > 2)
-		plotLine (points.back (), points.front (), color);
+	plotLines (points, closed && points.size () > 2, color);
 }
 
 //------------------------------------------------------------------------
