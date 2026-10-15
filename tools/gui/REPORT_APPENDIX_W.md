@@ -54,3 +54,51 @@
  tools/gui/REPORT_APPENDIX_W.md | 34 ++++++++++++++++++++++++++++++++++
  2 files changed, 37 insertions(+)
 ```
+
+## #3508 [WIN-30]: 関数 VA の切り詰め修正・独立オラクル (測定 commit `51a6881f7`)
+
+上の「発見」「範囲外・未達」の表のうち、関数 VA 切り詰め (WIN-30) と W 版の画素比較は本節で解消した。wasm / Chrome は子 #3509 (WIN-31)、GUI-REACH と `e2e.sh` 組込みは子 #3510 (WIN-32)。
+
+### 結論
+- 受入 1: 関数 VA の 32 bit 切り詰めを後処理で直した。`bash tools/gui/test/native_w_e2e.sh` が PASS (3 回とも)。
+- 受入 2: 最終フレームを `golden/gen_golden_w.py` と比較し EXACT MATCH (0/64,000 px)。オラクルはゲストの描画規約だけから計算し、フォントは `src/gui_font8x8.h` だけを共有する。ネガコン 2 種は下表。
+- 受入 3: 窓・メッセージ系は W 版だけを呼ぶ。`build/lift_w/lifted.c` の API 呼出しに `*A(` は 0 件。
+- 受入 4: 欠陥は RetDec 側。DEFECTS.md 形式の行案は下 (直接編集せず、PM 判断)。
+- 受入 5: 既存の `native_e2e.sh` (gui_app.c) は EXACT MATCH のまま。
+
+### 原因と修正
+1. **関数 VA の切り詰め (RetDec 側)**: `share/retdec/support/generic/types/windows.json` は `LONG_PTR` (型 ID 12922) を `long` (型 ID 15827・32 bit) と定義している。そのため `SetWindowLongPtrW` の第 3 引数が `i32` の IR になり (`call i32 @SetWindowLongPtrW(i64* %2, i32 -4, i32 1073746424)`)、関数 VA 即値 `0x400011f8` の上位 32 bit が欠ける。`retdec.config.json` の `parameters` を `i64` に書き換えても出力は `int32_t` のままだったため、ツール側の上書きは使わなかった。
+   修正: `gui_lift_post.py` の `fix_fn_va`。引数位置の 8 桁即値が、fnmap の関数 VA の下位 32 bit と一致する場合だけ完全 VA へ戻す (`0x400011f8` → `0x1400011f8`)。どの関数 VA とも一致しない即値には触らない。`[post] restored truncated function VA: 1 (0x1400011f8)` を出す。
+2. **W 文字列の幅 (RetDec 側)**: RetDec は W 文字列を `L"..."` で出す。Linux / wasm では `wchar_t` が 4 byte なので、UTF-16 を読む shim の `OutputDebugStringW` が 1 文字目で止まり `[gui] w` だけになった。
+   修正: `gui_lift_post.py` の `fix_wstr`。`L"` を `u"` (char16_t, 2 byte) へ置き換える。
+3. **ゲストの順序 (ゲスト側の不具合)**: `gui_app_w.c` は `ltext` へ文字を入れる前に `UpdateWindow` を呼んでいた。`UpdateWindow` は WM_PAINT を同期で送るので、最初の描画は NUL 12 個を描き、テキストが出なかった。文字の代入を `ShowWindow` の前へ移した。
+4. **harness の穴**: 修正前、`native_w_run` は FAIL 行を出した後も rc 0 で終わった。ゲストの `ExitProcess` が先に走るため。`native_w_e2e.sh` は `PASS` 行を必須にし、オラクル比較も行う。
+
+### 検証 (測定 commit `51a6881f7`・4 vCPU・load 0.32〜0.55・同一 run 内の再測定)
+| 項目 | 結果 | 数え方・条件 |
+|---|---|---|
+| `bash tools/gui/test/native_w_e2e.sh` ×3 | rc 0・PASS ×3・8.37 / 8.36 / 8.37 s | `native_w_run` の `PASS` 行 + オラクル EXACT MATCH |
+| 最終フレーム | `w=320 h=200 bg=182838 nonbg=12625 colors=6403 sha256=6f809bdf4f348903edba334442193a0290cc537721191aaf71088c2eea596bc6` | `native_w_run` の surface 行 (RGB 3 バイト列の sha256) |
+| オラクル比較 `golden/gen_golden_w.py compare` | EXACT MATCH (0/64,000 px) rc 0 | `build/w_actual.ppm` と期待画像の画素比較 |
+| ネガコン 1: 期待画像を 1 画素改竄 | MISMATCH (1/64,000 px) rc 1 | `compare --tamper`。`native_w_e2e.sh` が rc 1 を要求 |
+| ネガコン 2: shim の欠陥 | MISMATCH (290/64,000 px) rc 1 | 作業コピー (`$RUNNER_TEMP`) の `tch()` の wide 添字を `[i + 1]` にずらした。リポジトリは変更せず |
+| `bash tools/gui/test/native_e2e.sh` (gui_app.c) | EXACT MATCH (0/64,000 px) rc 0・8.36 s | 既存の回帰 |
+| W 版ゲストの API 呼出し | `CreateWindowExW` `RegisterClassW` `PeekMessageW` `DispatchMessageW` `DefWindowProcW` ほか W 接尾辞のみ。`*A(` は 0 件 | `grep -oE '\b[A-Za-z]+A\(' build/lift_w/lifted.c` |
+| 既存 PE への影響 | `gui_app.c` `gui_app_ff.c` `gui_nc_app.c` `pe_image_app.c` の 4 PE で、`origin/main` の `gui_lift_post.py` と本 PR の `lifted.c` は sha256 一致 (差 0)。`L"` も `u"` も 0 件、復元 VA 0 件 | 同じ `retdec.c` に両版の後処理を適用して比較 |
+
+測定に使った RetDec は素材 `toolchain-retdec` (v5.0・commit `53e55b4b`) を `$RUNNER_TEMP` に展開したもの。`/opt/retdec` の版と一致。
+
+### RetDec 欠陥の行案 (`docs/DEFECTS.md` 形式・直接編集は PM 判断)
+| ID | 担当 | 区分 | 症状 | 原因 | 検出信号 | 検出器 | 修復 |
+|---|---|---|---|---|---|---|---|
+| D24 (案) | RetDec (Win32 型 DB) | 新規 (#3508 発見) | `LONG_PTR` 引数が 32 bit 扱いになり、関数 VA 即値の上位 32 bit が欠ける。native で SEGV (silent な 1 bit 欠け) | `share/retdec/support/generic/types/windows.json` の `LONG_PTR` → `long` (15827) | `SetWindowLongPtrW(h, -4, 0x400011f8)` (正 `0x1400011f8`)。ASan SEGV at `0x0000400011f8` | `lifted.c` の引数位置の 8 桁即値が fnmap の下位 32 bit と一致 | `gui_lift_post.py` `fix_fn_va` (fnmap 一致時のみ完全 VA へ) |
+| D25 (案) | RetDec (文字列) × Linux/wasm の wchar_t | 新規 (#3508 発見) | W 文字列 `L"..."` が wchar_t (4 B) で出るため、UTF-16 を読む W API が 1 文字目で切れる (silent) | RetDec が W 文字列を `L"..."` で出力 | `OutputDebugStringW` の出力が `[gui] w` (1 文字) | `lifted.c` の `L"` の出現 | `gui_lift_post.py` `fix_wstr` (`u"`) |
+
+D11 (wasm32 の PE VA 切り捨て) とは機構が違うため、D11 の変種にはしていない。
+
+### 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| wasm / Chrome の OffscreenCanvas 読み戻しと native の sha256 一致 (受入の範囲外) | `gui_lift_post.py` の変更の wasm 経路 (`gui_wasm.sh`) は未実行 (emsdk 素材未取得) | #3509 [WIN-31] |
+| GUI-REACH の順序検査と `tools/gui/e2e.sh` への組込み (範囲外) | trace の機械検査は未実施 | #3510 [WIN-32] |
+| D24・D25 の DEFECTS.md への登録 | 行案のみで、表には未登録 | PM 判断 (本 PR では編集しない) |
