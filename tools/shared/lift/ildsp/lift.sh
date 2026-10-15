@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0 / VA 0x1801aa3a0, 42 insns) の lift + native 実機械語との差分テスト。
 #   locate (vtable slot 4 -> 機械語) -> RetDec --select-ranges -> ir_normalize -> emcc -> diff_test (native_ref.c / run_wasm.mjs)
-# usage: FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/ildsp/lift.sh [ok|neg-compare|neg-ir|all]
+# usage: FL_WIN64_DIR=<fl-win64 展開先> [RETDEC_BIN=<[RETDEC] の bin/retdec-decompiler>] [EMSDK_ENV=<[EMSDK] の emsdk_env.sh>] \
+#          bash tools/shared/lift/ildsp/lift.sh [ok|neg-compare|neg-ir|all]   (外部ツールの場所は docs/REFERENCES.md §4)
 #   ok (既定)    : 本検査。全ケース一致かつ gate 充足で exit 0。
 #   neg-compare  : 比較器のネガティブコントロール (wasm 結果 1 バイト反転) -> FAIL を期待。
 #   neg-ir       : IR のネガティブコントロール (ループ2 の buffer store の 0 を 1 に、1 箇所) -> FAIL を期待。
@@ -17,8 +18,8 @@ fi
 PE="${GPS_PE:-$FL_WIN64_DIR/extracted/block24360_PE.bin}"
 [ -f "$PE" ] || { echo "[ildsp] block24360_PE.bin not found: $PE (FL_WIN64_DIR=$FL_WIN64_DIR)"; exit 2; }
 W="$ROOT/work/lift/ildsp/$MODE"; mkdir -p "$W"
-EMSDK="${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"; RETDEC="${RETDEC_BIN:-/opt/retdec/bin/retdec-decompiler}"
-source "$EMSDK" >/dev/null 2>&1
+RETDEC="${RETDEC_BIN:-retdec-decompiler}"
+if [ -n "${EMSDK_ENV:-}" ]; then source "$EMSDK_ENV" >/dev/null 2>&1; fi
 cp "$PE" "$W/GPS.dll"
 python3 "$HERE/locate.py" "$W/GPS.dll" "$W/loc"
 RANGE=$(python3 -c "import json;print(json.load(open('$W/loc/ranges.json'))['range'])")
