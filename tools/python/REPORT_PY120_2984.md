@@ -11,7 +11,7 @@
 - `provider_check` の「実装」に数える 1 件 (`launchMapPages.length`) は、PE の例外経路 (`obj.+0x50 == 0` で code -7) を持たない**仮置きの値** (mock・C とも常に 0 を返す)。確定したのは呼出し経路と戻り型までで、値そのものは確定していない。
 - 残り **11 件は未確定**。読んだ範囲・確定に必要な情報・未確定の理由を下の表 (§保留) に書き、子 issue 3 件に分けた (#3027・#3029・#3030)。
 - issue の範囲を縮めた (受入条件のうち 1 件分を完了単位とし、残りは子へ移した。`Closes #2984`)。
-- 再測定 (測定 commit `c49cf5f7`・§再測定 (5)): main `a9733bbb` を取り込んだ後に測り直した。provider_check は 132/303、差分テスト 15 件・all_tools 48/48・browser / static / MCP / MIDI の各 check・負のコントロールは PASS。64 bit の static は今回未再測定 (§再測定 (5) の未再測定)。
+- 再測定 (測定 commit `565ee264`・§再測定 (6)): main `41623210` (#2994) を取り込んだ後に測り直した。provider_check は 141/294、差分テスト 15 件・all_tools 48/48・static / browser / fulltext / MCP / MIDI の各 check は PASS。pthread 版と 64 bit の再測定は未実行 (§再測定 (6) の未再測定)。旧測定 (§再測定 (5)・`c49cf5f7`) は main 取り込み前の値で、現 head の根拠にならない。
 
 ## 手段
 
@@ -120,7 +120,7 @@
 
 `REPORT_APPENDIX_2984.md` の §検証 (履歴・再取り込み後の再測定 (2)〜(4)) に分割移動 (内容は削除していない)。
 
-### 再測定 (5) (測定 commit `c49cf5f7`・main `a9733bbb` の取り込み)
+### 再測定 (5) (履歴: 測定 commit `c49cf5f7`・main `a9733bbb` の取り込み。現 head の根拠ではない)
 
 main (`a9733bbb`) を取り込んだ merge `c49cf5f7`。競合は 3 ファイル 4 箇所で、解消は両側残し (rebase・force push はしていない):
 - `host/fl_mock.mjs` (2 箇所): state に本件の `launchPages` と main の PY-94 の 7 値 (`undoPos`・`undoCount`・`undoLast`・`safeEdit`・`projTitle`・`projAuthor`・`projGenre`) を両方残した。関数は本件の `launchMapPages.length` と main の PY-94 の 7 関数 (`general.getUndoHistory*`・`general.safeToEdit`・`general.getProject*`) を両方残した。
@@ -153,6 +153,26 @@ $ git diff c49cf5f7 HEAD -- tools/python/host tools/python/provider tools/python
 (空)
 ```
 
+### 再測定 (6) (測定 commit `565ee264`・main `41623210` (#2994 ui-state getters) の取り込み merge)
+
+main (`41623210`) を取り込んだ merge `565ee264`。競合は 3 ファイル (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`) で、全て両側残し (rebase・force push はしていない)。state・C 変数・初期化に本件の `launchPages`・`lm_pages` と main の ui 7 値 (`uiClosing` 等) を両方残した。`tests/provider_check.mjs` の判定集合は main の `pe95` (ui ゲッター 9 件) と本件の `pe120` を両方入れ、期待値は main の 140/295 に本件の 1 件を加えた 141/294。`tests/ui_state_diff.mjs` は main 側の変更が auto-merge (calls 33)。
+
+環境: runner・素材 `fl-win64` の `block00031_PE.bin` と DATA block 4 件を `$RUNNER_TEMP/fl-win64-3039` へ展開。CPython wasm は 32 bit を HEAD で再ビルドした (流用なし)。`mcp_ui_check`・`midi_ui_check` は本体 checkout の `node_modules` を symlink して実行した (commit していない)。
+
+| コマンド | 結果 | wall (s) |
+|---|---|---|
+| `fetch_inputs.sh` / `provider/build.sh` | rc 0 / rc 0 (fl_table.c: 435 関数・ハンドラ 141) | 1 / 1 |
+| `build_cpython_wasm.sh` (32 bit) / `FLPY_SKIP_TABLE=1 build_flpy.sh` / `FLPY_SKIP_TABLE=1 build_flpy_static.sh` | 全て rc 0 | 241 / 6 / 6 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 141 / 未実装 294 / MCP 静的 60) | 0.4 |
+| `*_diff.mjs` 15 件 (arrangement・arrangement_selection・channels・device・general・ilmcp・launchmap・midi_path・mixer・playlist・screen・transport・ui・ui_display・ui_state) | 全て diffs 0、PASS (ui_state calls 33) | 0.04〜0.06 each |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true | 2 |
+| `STATIC_WASM=flpy_static STATIC_MEM64=0 static_subinterp_browser` | STATIC SUBINTERP OK (12/12 PASS) | 30 |
+| `static_check` / `browser_check` / `static_browser_check` / `fulltext_parity` | STATIC CHECK OK / BROWSER OK (tools 48) / STATIC BROWSER OK (sab_host_calls 37,425) / FULLTEXT PARITY OK | 0 / 2 / 3 / 7 |
+| `mcp_ui_check` / `midi_ui_check` | MCP UI OK (tools/list = 48) / MIDI UI OK | 3 / 2 |
+
+- 未再測定 (565ee264 では未実行): pthread 版 (`CPY_PTHREADS=1 build_cpython_wasm.sh`・`CPY_PTHREADS=1 FLPY_SKIP_TABLE=1 build_flpy_static.sh`・`static_mt_check`)、64 bit の CPython と static (`build_cpython_wasm64.sh`・`FLPY_MEMORY64=1 build_flpy_static.sh`)、`static_subinterp_browser` (flpy_static64・MEMORY64=1)。時間枠に入らなかった。測定 commit `71005b39` の FAIL (既知 #2918) は現 head の根拠にならない。起票先は下の未解決表。
+- 負のコントロール (`launchPages` を 1 にして `launchmap_diff`) は main 取り込みで mock の state が変わったため、565ee264 では再実行していない。`c49cf5f7` の結果は §再測定 (5) の履歴。
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
@@ -160,6 +180,7 @@ $ git diff c49cf5f7 HEAD -- tools/python/host tools/python/provider tools/python
 | 残り 11 件の PE 確定 (索引付き読出し 4・状態変更 4・イベント処理 3) | `launchMapPages` の 11/12 が未実装 (provider の未実装扱い) | #3027 (PY-156)・#3029 (PY-138)・#3030 (PY-139) |
 | `length` の件数ヘッダ `[arr-8]` の意味 (件数か容量か)・未初期化経路 (code -7 の例外化の述語)・実行時初期値 (mock・C の 0 は仮置き。provider_check の実装 1 件はこの仮置き値) | 件数の意味は推定。未初期化時の挙動は未モデル。mock・C の値が実機と違う可能性 | #3029 (PY-138) |
 | `0xd843d0` の同一性 (本件と #3001 PY-125 の dispatch) | 下位関数の二重確定の可能性 | #3029・#3030 (未確認) |
-| `static_subinterp_browser` (flpy_static64・MEMORY64=1) の FAIL 1 件 (測定 commit `71005b39`・150 回の反復で wasm メモリが +14.8 MB 増える。c49cf5f7 では未再測定) | 長時間の反復で wasm メモリが増える。本 PR の前から同値 (`REPORT_PY109.md`) | #2918 (既存・PY-108) |
-| 64 bit CPython・flpy_static64 の再測定 (c49cf5f7 で未実行。`71005b39` の FAIL は現 head の根拠にならない) | 64 bit 側の現 head での結果が無い。受入条件 4 件は c49cf5f7 の実測で満たす (64 bit 側は受入条件に含まない) | 既存 #2918 へのコメント (flpy_static64)・親 #2984 への提案 (64 bit CPython。再測定だけの子は作らない) |
+| `static_subinterp_browser` (flpy_static64・MEMORY64=1) の FAIL 1 件 (測定 commit `71005b39`・150 回の反復で wasm メモリが +14.8 MB 増える。565ee264 では未再測定) | 長時間の反復で wasm メモリが増える。本 PR の前から同値 (`REPORT_PY109.md`) | #2918 (既存・PY-108) |
+| 64 bit CPython・flpy_static64 の再測定 (565ee264 で未実行。`71005b39` の FAIL は現 head の根拠にならない) | 64 bit 側の現 head での結果が無い。受入条件 4 件は 565ee264 の実測 (provider_check・diff 15 件・all_tools) で満たす (64 bit 側は受入条件に含まない) | 既存 #2918 へのコメント (flpy_static64)・親 #2984 への提案 (64 bit CPython。再測定だけの子は作らない) |
+| pthread 版 (CPython・flpy_static・`static_mt_check`) と負のコントロールの再測定 (565ee264 で未実行。main #2994 の取り込みで C・mock が変わった) | main 取り込み後の pthread 版の結果が無い。負のコントロールの現 head での結果が無い | 親 #2984 への提案 (再測定だけの子は作らない)。次の run で `CPY_PTHREADS=1 build_cpython_wasm.sh` から再実行する |
 | `static_check` の単発 FAIL (過去測定 (付録) の 12 回中 1 回・FAIL 行は未採取)。今回の 1 回は OK | 原因未特定。再発時に比べられる一次情報が無い | 親 #2984 への提案 (既存の該当 issue は無い。再発時に FAIL 行を採取して #2984 にコメントする。新規子は作らない) |
