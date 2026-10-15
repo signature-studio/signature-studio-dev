@@ -2,7 +2,7 @@
 
 ## 1. 結論
 
-- 受入 1 (`function_448490` → `function_4483f0` の 8 site と `function_448430` の 2 site の機械語判定) を満たした。10 site すべてで、親が `mov rcx, rbp` で親フレームを静的リンクとして渡し、callee が親の `[rbp+0x48]` (IR `-32`・count)・`[rbp+0x4c]` (IR `-28`・loop 変数) を読み書きする形だった (§3)。
+- 受入 1 (`function_448490` → `function_4483f0` の 8 site と `function_448430` の 2 site の機械語判定) を満たした。10 site すべてで、親が `mov rcx, rbp` で親フレームを静的リンクとして渡す。`function_4483f0` の 8 site は callee が親の `[rbp+0x48]` (IR `-32`・count)・`[rbp+0x4c]` (IR `-28`・loop 変数) を読み書きする。`function_448430` の 2 site は `[rbp+0x4c]` の読みと `[rbp+0x70]` のみで、`[rbp+0x48]` には触らない (§3)。
 - 判定の結論は「通常の rbp 渡しではなく、親の局所を callee が書き換える入れ子手続の形」。ただし IR の親 `function_448490` は、この書き換えを親の SSA に戻さない。D23 の機構と整合する。
 - 受入 2 (修復 pass の実装)・3 (OFF/ON 実測)・4 (D23 の「修復」列) は本 run では未実施。前回 `[SHX-T40]` (#3234) は修復 ON で hang・OOB となり既定 OFF のまま main にある (`tools/m11/REPORT_SHX-T40.md`)。修復の設計 (call 前後の同期) は別 issue `[SHX-T45]` #4459 に移す (§5)。
 - 受入 4 のうち、D23 の修復列は未達のため更新しない (`docs/DEFECTS.md` は変えない)。
@@ -34,7 +34,7 @@
 
 - 第 2 引数 (rdx) は、文字・長さ・即値のいずれか。第 1 引数 (rcx) はすべて親の `rbp`。
 - callee `function_4483f0` の先頭: `mov rbx, rcx` で親の `rbp` を保持し、`mov rcx, [rbx+0x70]` (親の引数 home) を `function_413760` へ渡す。続けて `[rbx+0x4c]` を符号拡張して書込み先の添字にし、`[rbx+0x4c]` と `[rbx+0x48]` を +1 する。
-- `0x448578`・`0x448754` は `mov rcx, rbp` の渡しではないので本節の対象外。`0x448578` は `lea rcx, [rbp+0x38]`、`0x448754` は `lea rcx, [rbp+0x30]` で局所の番地を渡す。`0x44873f` の `mov edx, [rbp+0x4c]` は親の読みで、callee へ渡す形ではない。
+- `0x448578`・`0x448754` は `call` 命令で、`mov rcx, rbp` の渡しではないので本節の対象外。直前の引数設定は `0x448570` が `lea rcx, [rbp+0x38]`、`0x44874b` が `lea rcx, [rbp+0x30]` で、局所の番地を渡す。`0x44873f` の `mov edx, [rbp+0x4c]` は親の読みで、callee へ渡す形ではない。
 
 ## 4. 親 IR との突合 (判定の補足)
 
