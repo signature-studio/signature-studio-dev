@@ -1,0 +1,77 @@
+src_va,src_insn,dst_va,dst_class,count,first_run
+0x18000181e,jmp qword ptr [r10 + rax*8],0x180001e00,text,2,thunk:0x180001800
+0x18000184e,jmp qword ptr [r10 + rax*8],0x180001e20,text,2,thunk:0x180001830
+0x18000187e,jmp qword ptr [r10 + rax*8],0x180001f40,text,2,thunk:0x180001860
+0x1800018ae,jmp qword ptr [r10 + rax*8],0x180002240,text,2,thunk:0x180001890
+0x1800018de,jmp qword ptr [r10 + rax*8],0x1800024c0,text,2,thunk:0x1800018c0
+0x18000190e,jmp qword ptr [r10 + rax*8],0x180002640,text,2,thunk:0x1800018f0
+0x18000193e,jmp qword ptr [r10 + rax*8],0x180002b80,text,2,thunk:0x180001920
+0x18000196e,jmp qword ptr [r10 + rax*8],0x1800034c0,text,2,thunk:0x180001950
+0x18000199e,jmp qword ptr [r10 + rax*8],0x180003860,text,2,thunk:0x180001980
+0x1800019ce,jmp qword ptr [r10 + rax*8],0x180003e60,text,2,thunk:0x1800019b0
+0x1800019fe,jmp qword ptr [r10 + rax*8],0x1800043e0,text,2,thunk:0x1800019e0
+0x180001a2e,jmp qword ptr [r10 + rax*8],0x180004960,text,2,thunk:0x180001a10
+0x180001a5e,jmp qword ptr [r10 + rax*8],0x180004ae0,text,2,thunk:0x180001a40
+0x180001a8e,jmp qword ptr [r10 + rax*8],0x180005080,text,2,thunk:0x180001a70
+0x180001abe,jmp qword ptr [r10 + rax*8],0x180005200,text,2,thunk:0x180001aa0
+0x180001aee,jmp qword ptr [r10 + rax*8],0x180005400,text,2,thunk:0x180001ad0
+0x180001b1e,jmp qword ptr [r10 + rax*8],0x180005700,text,2,thunk:0x180001b00
+0x180001b4e,jmp qword ptr [r10 + rax*8],0x180005cc0,text,2,thunk:0x180001b30
+0x180001b7e,jmp qword ptr [r10 + rax*8],0x180006500,text,2,thunk:0x180001b60
+0x180001bae,jmp qword ptr [r10 + rax*8],0x180006740,text,2,thunk:0x180001b90
+0x180001bde,jmp qword ptr [r10 + rax*8],0x180007700,text,2,thunk:0x180001bc0
+0x180001c0e,jmp qword ptr [r10 + rax*8],0x1800092c0,text,2,thunk:0x180001bf0
+0x180001c3e,jmp qword ptr [r10 + rax*8],0x18000a560,text,2,thunk:0x180001c20
+0x180001c6e,jmp qword ptr [r10 + rax*8],0x18000a760,text,2,thunk:0x180001c50
+0x180001c9e,jmp qword ptr [r10 + rax*8],0x18000a920,text,2,thunk:0x180001c80
+0x180001cce,jmp qword ptr [r10 + rax*8],0x18000ab20,text,2,thunk:0x180001cb0
+0x180001cfe,jmp qword ptr [r10 + rax*8],0x18000aca0,text,2,thunk:0x180001ce0
+0x180001d2e,jmp qword ptr [r10 + rax*8],0x18000aec0,text,2,thunk:0x180001d10
+0x180001d5e,jmp qword ptr [r10 + rax*8],0x18000b480,text,2,thunk:0x180001d40
+0x180001d8e,jmp qword ptr [r10 + rax*8],0x18000c180,text,2,thunk:0x180001d70
+0x180001dbe,jmp qword ptr [r10 + rax*8],0x18000d120,text,2,thunk:0x180001da0
+0x180001dee,jmp qword ptr [r10 + rax*8],0x18000da80,text,2,thunk:0x180001dd0
+0x1801bad1e,jmp qword ptr [r10 + rax*8],0x1801bb140,text,2,thunk:0x1801bad00
+0x1801bad87,jmp rax,0x1801bb1c0,text,1,thunk:0x180001aa0:scratch
+0x1801baf07,jmp rax,0x1801d5c40,text,345,thunk:0x180001b30:scratch
+0x1801bb147,jmp rax,0x18025ce20,text,2,thunk:0x1801bad00
+0x1802844e8,call qword ptr [rip + 0x22ebb2],0x100004f0,stub:host.malloc,8,Auftakt_CreateInstance:scratch
+0x1802849a5,call qword ptr [rax],0x180284890,text,1,Declicker_CreateInstance:zero
+0x180284b95,call qword ptr [rax],0x180284a00,text,1,Denoiser_CreateInstance:zero
+0x180284d4c,jmp rcx,0x180284d56,text,1,ElPro_CreateInstance:scratch
+0x180284d4c,jmp rcx,0x180284d74,text,1,ElPro_CreateInstance:zero
+0x180284da9,call qword ptr [rax],0x180284bc0,text,2,ElPro_CreateInstance:zero
+0x180284f2f,call qword ptr [rax],0x180284de0,text,2,ElProDirect_CreateInstance:zero
+0x180284fad,jmp qword ptr [rax + 0x88],0x180284f50,text,2,ElProV3_CreateInstance:zero
+0x1802850f6,call qword ptr [rax],0x180284fa0,text,2,ElProV3_CreateInstance:zero
+0x18028517d,jmp qword ptr [rax + 0xb8],0x180285120,text,2,ElProV3Direct_CreateInstance:zero
+0x1802852cc,call qword ptr [rax],0x180285170,text,2,ElProV3Direct_CreateInstance:zero
+0x180285575,jmp r8,0x1802855ae,text,1,Metering_CreateInstance:zero
+0x1802857d4,call qword ptr [rax],0x1802856c0,text,2,SolPitchAn_CreateInstance:zero
+0x180285e24,call qword ptr [rax + 0x18],0x18028fd90,text,3,Auftakt_CreateInstance:zero
+0x180285eaa,call qword ptr [rax + 0x88],0x180285900,text,2,Auftakt_CreateInstance:zero
+0x1802897e1,call qword ptr [rax],0x18028fb70,text,2,Auftakt_CreateInstance:zero
+0x180289b32,call qword ptr [rax + 0x18],0x18028fd90,text,1,Auftakt_CreateInstance:scratch
+0x180289d76,call qword ptr [rip + 0x22934c],0x1802c4ff0,text,1,Auftakt_CreateInstance:scratch
+0x1802ad8e2,jmp r9,0x1802ad8e5,text,2,Metering_CreateInstance:zero
+0x1802b7248,call qword ptr [rip + 0x1fbe7a],0x1802c4ff0,text,1,Denoiser_CreateInstance:scratch
+0x1802c1619,call qword ptr [rip + 0x1ee611],0x1802844d0,text,8,Auftakt_CreateInstance:scratch
+0x1802c8470,call qword ptr [rip + 0x11fc12],0x10000130,stub:KERNEL32.dll!GetSystemTimeAsFileTime,1,DllMain
+0x1802c847e,call qword ptr [rip + 0x11fbfc],0x10000120,stub:KERNEL32.dll!GetCurrentThreadId,1,DllMain
+0x1802c848a,call qword ptr [rip + 0x11fbe8],0x10000110,stub:KERNEL32.dll!GetCurrentProcessId,1,DllMain
+0x1802c849a,call qword ptr [rip + 0x11fbd0],0x10000100,stub:KERNEL32.dll!QueryPerformanceCounter,1,DllMain
+0x1802caeec,call qword ptr [rip + 0x11d1fe],0x10000200,stub:KERNEL32.dll!RtlPcToFileHeader,8,Auftakt_CreateInstance:scratch
+0x1802caf32,call qword ptr [rip + 0x11d1c8],0x10000220,stub:KERNEL32.dll!RaiseException,8,Auftakt_CreateInstance:scratch
+0x1802ce54d,call qword ptr [rip + 0x119bf5],0x100002b0,stub:KERNEL32.dll!LoadLibraryExW,2,DllMain
+0x1802ce55b,call qword ptr [rip + 0x119ba7],0x10000230,stub:KERNEL32.dll!GetLastError,2,DllMain
+0x1802ce78f,call qword ptr [rip + 0x11989b],0x10000080,stub:KERNEL32.dll!InitializeCriticalSectionAndSpinCount,1,DllMain
+0x1802d61e4,call qword ptr [rip + 0x1120b6],0x1802f5fa0,text,1,Declicker_CreateInstance:scratch
+0x1802d8b4e,call qword ptr [rip + 0x10f614],0x100002f0,stub:KERNEL32.dll!HeapFree,22,Auftakt_CreateInstance:zero
+0x1802d8bb2,call qword ptr [rip + 0x10f5b8],0x10000300,stub:KERNEL32.dll!HeapAlloc,44,Auftakt_CreateInstance:zero
+0x1802d9f27,call qword ptr [rip + 0x10e1db],0x10000230,stub:KERNEL32.dll!GetLastError,2,Declicker_CreateInstance:scratch
+0x1802d9fc7,call qword ptr [rip + 0x10e143],0x10000240,stub:KERNEL32.dll!SetLastError,2,Declicker_CreateInstance:scratch
+0x1802da522,jmp qword ptr [rip + 0x10daf7],0x10000060,stub:KERNEL32.dll!EnterCriticalSection,1,Declicker_CreateInstance:scratch
+0x1802da576,jmp qword ptr [rip + 0x10daab],0x10000070,stub:KERNEL32.dll!LeaveCriticalSection,1,Declicker_CreateInstance:scratch
+0x1802dc3e4,jmp qword ptr [rip + 0x10be15],0x10000420,stub:KERNEL32.dll!FlsSetValue,2,Declicker_CreateInstance:scratch
+0x1802f5f80,jmp rax,0xfdd000000000300f,other,1,Declicker_CreateInstance:scratch
+0x1802f5fa0,jmp qword ptr [rip + 0xf22f2],0x1802f5f80,text,1,Declicker_CreateInstance:scratch

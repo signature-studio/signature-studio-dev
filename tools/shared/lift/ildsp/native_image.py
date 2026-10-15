@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""ildsp (block24360_PE.bin) を native_ref.c が読む RVA 配置イメージと IAT 一覧に変換する。
+"""ildsp (block24360_PE.bin) を native_ref_wc.c が読む RVA 配置イメージと IAT 一覧に変換する。
 
 usage: native_image.py [PE] [--out-dir DIR]
   既定 PE: $FL_WIN64_DIR/extracted/block24360_PE.bin (tools/shared/paths.py)
   既定 DIR: tools/shared/work/raw/ildsp_native (gitignore)
 出力:
   DIR/image.bin : pefile の get_memory_mapped_image() (SizeOfImage 長・RVA 配置。ImageBase は 0x180000000)
-  DIR/iat.txt   : 1 行 1 件 `<IAT の RVA (hex)> <DLL>!<名前>`。native_ref.c は行番号順に stub 番号を振る
+  DIR/iat.txt   : 1 行 1 件 `<IAT の RVA (hex)> <DLL>!<名前>`。native_ref_wc.c は行番号順に stub 番号を振る
 """
 import sys, os, argparse
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -27,7 +27,7 @@ def main():
     pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IMPORT"]])
     base = pe.OPTIONAL_HEADER.ImageBase
     if base != 0x180000000:
-        sys.exit(f"ImageBase {base:#x} != 0x180000000 (native_ref.c は固定配置を前提)")
+        sys.exit(f"ImageBase {base:#x} != 0x180000000 (native_ref_wc.c は固定配置を前提)")
 
     os.makedirs(a.out_dir, exist_ok=True)
     img = pe.get_memory_mapped_image()
