@@ -80,6 +80,18 @@
     - **未達 (本 run では閉じない)**: 表の持ち主と `0x563000` へ至る上流の呼出し経路 → **#3257** (T-SH-55)。i386 `0x410678` の ILT 持ち主 → **#3258** (T-SH-56、静的解析は #3258 の §B 追補で確定、動的は未実施)。
 - **走査スクリプト**: `oss/freetype/callers_scan.sh` を UTF-16LE 走査込みに改訂 (本 run)。`bash oss/freetype/callers_scan.sh <extracted_dir>` が rc 0 で完了することを実測。
 
+- **登録簿と表の同定 (#3369 / T-SH-72, 測定 commit 13236eefb, ws-3369 の HEAD で再現)**:
+  - **登録簿の実体**: `.text` 内の構造体 VA `0x59c280` (RVA `0x19c280`)。DllMain (`0x59c1f0`) が `lea rdx,[rip+0x51]` で渡し、`0x59c240` で `0x419dc0`、その `0x419e54` で `0x40f430` の第 2 引数 (rdx) として渡す。`+0x00` = u32 count = **165**、`+0x08` = 表の先頭 VA `0x59c2b0` (16 B の (first, second) 対 165 組、末尾 `0x59cd00`)。
+  - **書込み元 W1 (実行で確認)**: `0x40f48b` の `mov [r13+0x10],rdx` (関数 `0x40f430`)。r13 = `0x5d0c80` は `0x40f446` の `lea r13,[rip+...]`。実測 (`run_writers.sh` 既定, 1 回): r13 = base+`0x1d0c80`、rdx = base+`0x19c280`、`[0x5d0c90]` before=0 → after = base+`0x19c280`。呼出元の戻り番地 = `0x59c245` (DllMain の `call 0x419dc0`)。base = `0x7bde0000`。rip 相対で `0x5d0c90` を直接書く命令は 0 件 (objdump、既存の結論と一致)。
+  - **書込み元 W2・W3 (静的のみ・実行未到達)**: W2 = `0x40fcf5` の `rep movsq` (`0x40fb80` 内、rdi = `0x5d0c80` (`0x40fce9` の lea)、37 qword 復元で第 3 qword が登録簿)。W3 = `0x40fa6b` の `rep movs` (`0x40fa40` 内、rdi = rcx、`0x40fcb1` が rcx = `0x5d0c80` を渡す)。どちらも保存した旧状態を戻す経路。
+  - **読む側**: `0x40f2f0` (後退走査、second を呼ぶ) と `0x40f390` (前進走査、first を呼ぶ)。count は `[0x5d0c98]` に保存される。
+  - **表 165 組の所属 (静的・`tools/shared/oss/freetype/qfc_gpa_trace/registry_table.py`)**: 全体は `.text` の関数 309 件 (first 154 + second 155)、`.pdata` 関数開始 (lift root) 309/309、途中アドレス 0、`jmp [IAT]` thunk 0、`.reloc` の対象スロット 329/330 (欠けは NULL の 1 スロット)。`.data` を指す no-op 組 10 件 (index 14・39・40・49・50・54・61・70・76・82、first・second とも `0x5add58`。`cmp [fn],0` の判定で飛ばされる)。
+  - **issue の 81 組** (RVA `[0x19c7e0, 0x19ccf0)` = index 83〜163): first・second とも `.text` の `.pdata` 関数開始 (81 + 81、いずれも重複なし)。所属は QuickFontCache 自身の `.text` で、IAT thunk も他 DLL への jmp も無い。lift 対象: `tools/qfclift` の `gen_entries.py` が `.pdata` 関数開始 6,347 件を roots にして lift しており、81 組はその root に含まれる。閉区間 `[0x19c7e0, 0x19ccf0]` では 82 組で、末尾 index 164 は first = NULL・second = `0x59c1e0`。`0x59cac0` (index 129) の組 `(0x563840, 0x563820)` は FT 解決 `0x563000` を呼ぶ組。
+  - **停止点 (計測条件の限界)**: 既定条件 (素材の DllMain を無改変、150 s) では DllMain が `0x40fb96` (`call 0x40faa0`) の先で `0x40fb56` の `call 0x406fb0` に入り、`jmp [0x5dd0f8]` (遅延インポート) = **user32!MessageBoxA** でモーダルの "Runtime error at 0000000000000000" (caption "Error") を出して止まる (rc 124)。このため W2・W3 は観測されない。MessageBoxA を IDOK で即時に戻す変種 (`PROBE_CFLAGS=-DSKIP_MSGBOX=1`) では `0x40fc48` (`call 0x40f2f0`) まで届くが、その後 `LoadLibrary` が err 1114 で戻り (約 14 s, rc 0)、DllMain が 2 回目に入る (W1 の 2 回目も呼出元は `0x59c245`)。2 回目の入り方の原因は未特定。
+  - **再現**: `bash tools/shared/oss/freetype/qfc_gpa_trace/run_writers.sh` (既定) / `PROBE_CFLAGS=-DSKIP_MSGBOX=1 bash .../run_writers.sh` (変種)、表は `python3 tools/shared/oss/freetype/qfc_gpa_trace/registry_table.py work/qfc/writers/extracted/block24350_PE.bin`。環境: nproc=4、wine64 9.0 (apt)、mingw-w64、Xvfb。素材は `fl-win64` の `block24350_PE.bin` のみ。
+  - **限界**: 単一 run (n=1)。load average は測定時に未記録。W2・W3 の実行、2 回目の DllMain の原因は未確定。
+  - **差分証跡**: 測定 commit 13236eefb から本 PR の HEAD までの `git diff 13236eefb HEAD -- tools/shared/oss/freetype/qfc_gpa_trace` の出力は 0 行 (本節は REPORT のみの変更)。
+
 ## 10. 各ライブラリのビルド詳細
 
 ### 10.1 libFLAC 1.5.0 / 1.3.1 (`bash oss/flac/build.sh` + `bash oss/flac/negctl.sh <ver>`)
