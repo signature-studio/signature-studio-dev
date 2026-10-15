@@ -4,6 +4,7 @@
 #include "vstgui/lib/cgraphicstransform.h"
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
 namespace VSTGUI {
 
@@ -143,6 +144,20 @@ CRect CanvasGraphicsPath::getBoundingBox () const
 		r.bottom = std::max (r.bottom, p.y);
 	}
 	return r;
+}
+
+//------------------------------------------------------------------------
+std::vector<std::vector<CPoint>> CanvasGraphicsPath::subpaths () const
+{
+	std::vector<std::vector<CPoint>> result;
+	for (size_t i = 0; i < subpathStarts.size (); ++i)
+	{
+		auto begin = subpathStarts[i];
+		auto end = i + 1 < subpathStarts.size () ? subpathStarts[i + 1] : points.size ();
+		result.emplace_back (points.begin () + static_cast<std::ptrdiff_t> (begin),
+		                     points.begin () + static_cast<std::ptrdiff_t> (end));
+	}
+	return result;
 }
 
 //------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SR-55 #3422: 描画命令 (drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap) を draw_ops_main.cpp で bitmap へ直接描き、
+# SR-61 #4231: drawArc・drawPoint・drawGraphicsPath を追加。SR-55 #3422: 描画命令 (drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap) を draw_ops_main.cpp で bitmap へ直接描き、
 # 各命令が画素を書いたこと (rc=1 かつ nonzero>0) を判定する。fail なら rc=1。
 # 前提: work/vstgui4 (vstgui4_14_3)、work/emsdk/upstream/emscripten (toolchain-emsdk の展開)、node。
 # 出力: work/draw_ops/ (gitignore)。
@@ -55,9 +55,9 @@ if [ -f "$out/draw_ops.js" ]; then
   run_rc=$?
   echo "run: rc=$run_rc" | tee -a "$out/summary.txt"
   [ "$run_rc" -eq 0 ] || rc=1
-  # 期待する命令数 (SR-55 の 5 件 + SR-62 の 4 件 = 9 件、drawBitmap 含む。SR-78 で拡大縮小 3 件を足して 12 件) が揃わなければ fail (欠けた命令が無判定で通るのを防ぐ)。
+  # 期待する命令数 (SR-55 の 5 件 + SR-61 の 3 件 + SR-62 の 4 件 = 12 件、drawBitmap 含む。SR-78 の拡大縮小 3 件を足して 15 件) が揃わなければ fail (欠けた命令が無判定で通るのを防ぐ)。
   n_ops=$(grep -c '^draw_op ' "$out/run.log")
-  [ "$n_ops" -eq 12 ] || { echo "ops: fail (draw_op lines=$n_ops, expected 12)" | tee -a "$out/summary.txt"; rc=1; }
+  [ "$n_ops" -eq 15 ] || { echo "ops: fail (draw_op lines=$n_ops, expected 15)" | tee -a "$out/summary.txt"; rc=1; }
   while read -r _ name ok nz; do
     n=${nz#nonzero=}
     if [ "$ok" = "rc=1" ] && [ "${n:-0}" -gt 0 ]; then
