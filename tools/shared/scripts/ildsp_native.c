@@ -177,6 +177,8 @@ static int load_pe(const char* path) {
 
 typedef MS uint64_t (*Fn0)(void);
 typedef MS uint64_t (*Fn4)(uint64_t, uint64_t, uint64_t, uint64_t);
+typedef MS uint64_t (*Fn1F)(uint64_t, float);                          /* slot 1: 2 番目の引数が xmm1 (float) */
+typedef MS uint64_t (*Fn2F)(uint64_t, uint64_t, float);                /* slot 2: rdx = index, xmm2 = float */
 
 static void dump_changed(const uint8_t* a, const uint8_t* b, size_t n) {
     int first = 1; size_t i = 0;
@@ -236,7 +238,10 @@ int main(int argc, char** argv) {
             uint64_t u0 = unimpl_total();
             uint64_t rdx = (k == 4) ? in : rdx_list[v];
             printf("call k=%d variant=%d rdx=0x%llx wrapper=0x%llx\n", k, v, (unsigned long long)rdx, (unsigned long long)w);
-            uint64_t rax = ((Fn4)fn)(w, rdx, 0, 0);
+            uint64_t rax;
+            if (k == 1) rax = ((Fn1F)fn)(w, 1.0f);
+            else if (k == 2) rax = ((Fn2F)fn)(w, rdx, 1.0f);
+            else rax = ((Fn4)fn)(w, rdx, 0, 0);
             memcpy(after, (void*)in, OBJ_SZ);
             printf("slot k=%d variant=%d rdx=0x%llx fn=0x%llx rax=0x%llx unimpl_calls=%llu",
                    k, v, (unsigned long long)rdx, (unsigned long long)(fn - IMG_BASE), (unsigned long long)rax,
