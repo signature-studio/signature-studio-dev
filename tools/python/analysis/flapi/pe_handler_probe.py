@@ -3,6 +3,7 @@
 RIP 相対で参照する文字列 (PyArg 書式・kwlist 等) を出す (PY-39 の解析補助。方式は analysis/flapi_kwargs.py と同じ)。
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py [名前 ...]
+  FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py 0xd6b700 [0x... ...]   (VA を直接逆アセンブル。cb の確認用)
 """
 import os
 import struct
@@ -18,7 +19,9 @@ HEAD = 40
 
 
 def main():
-    names = sys.argv[1:] or DEFAULT_NAMES
+    args = sys.argv[1:]
+    vas = [int(a, 16) for a in args if a.startswith("0x")]
+    names = [a for a in args if not a.startswith("0x")] or ([] if vas else DEFAULT_NAMES)
     raw = open(PE, "rb").read()
     pe = pefile.PE(data=raw, fast_load=False)
     base = pe.OPTIONAL_HEADER.ImageBase
@@ -59,6 +62,12 @@ def main():
             pos = raw.find(needle, pos + 1)
 
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    for va in vas:
+        print(f"\n[va {va:#x}]")
+        for i, ins in enumerate(md.disasm(raw[v2o(va):v2o(va) + 0x400], va)):
+            print(f"   {ins.address:#x}: {ins.mnemonic} {ins.op_str}")
+            if ins.mnemonic == "ret" or i >= 4 * HEAD:
+                break
     for off in range(0, len(raw) - 32, 8):
         nm = struct.unpack_from("<Q", raw, off)[0]
         if nm not in targets:
