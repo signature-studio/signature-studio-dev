@@ -53,7 +53,7 @@ def main():
                     help='実行前後に表示する qword アドレス')
     ap.add_argument('-R', action='append', default=[], help='読取り監視範囲 lo:hi (hex)。読んだ命令 (rip) ごとに件数を出す')
     ap.add_argument('-S', action='store_true',
-                    help='user32!LoadStringW を PE の .rsrc (RT_STRING) から返す (uID の block は (uID>>4)+1、16 件ずつ。戻り値は文字数。無いと 0)')
+                    help='user32!LoadStringW を PE の .rsrc (RT_STRING) から返す (uID の block は (uID>>4)+1、16 件ずつ。戻り値は文字数。無いと 0)。kernel32!GetLocalTime は 2026-10-14 を書く (全 0 だと Delphi が時刻の例外を投げる)')
     ap.add_argument('-m', type=int, default=2000000, help='最大命令数')
     ap.add_argument('-d', action='append', default=[], help='実行前に書く qword addr=val (hex)')
     ap.add_argument('-t', action='append', default=[], type=lambda s: int(s, 0),
@@ -188,6 +188,8 @@ def main():
                 else:
                     uc_.reg_write(UC_X86_REG_RAX, pool[0])
                     pool[0] += need
+            elif a.S and names[addr].lower() == 'kernel32.dll!getlocaltime':
+                uc_.mem_write(uc_.reg_read(UC_X86_REG_RCX), struct.pack('<8H', 2026, 10, 3, 14, 0, 0, 0, 0))
             elif a.S and names[addr].lower() == 'user32.dll!loadstringw':
                 uid = uc_.reg_read(UC_X86_REG_RDX)
                 buf = uc_.reg_read(unicorn.x86_const.UC_X86_REG_R8)
