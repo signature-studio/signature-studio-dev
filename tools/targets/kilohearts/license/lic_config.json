@@ -324,6 +324,7 @@
     "180054bd0"
    ],
    "shims": {"180f878e0": "new", "180f8791c": "delete", "181384040": "memcpy", "180107430": "getManager"},
+   "excluded_i256": ["180f89cf0", "180fb6124"],
    "raw_va": true,
    "volatile_ret": true,
    "synth_zeroarg": true,

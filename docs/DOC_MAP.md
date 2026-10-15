@@ -623,6 +623,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_3071.md` | ~85 | KH-39 (#3071): Stereo の emcc 残件の機械修復 (emcc 39 → 10 件)・ABI 規則 1〜11・rsqrtps 突合・回帰・in_XMM3 の live-in 判定・未解決 1〜5 の全文 (REPORT_APPENDIX §10-7r の分割移動) |
 | `tools/targets/kilohearts/license/REPORT.md` | ~125 | HeartCore ライセンス層の呼出点特定 |
 | `tools/targets/kilohearts/license/KH9_REPORT.md`・`KH10_REPORT.md`・`KH11_REPORT.md`・`KH249_REPORT.md`・`KH656_REPORT.md`・`VERIFY_CAB247.md` | ~125/105/115/115/80/185 | KH-9/10/11 実施記録・#249 (ブラウザ分類 lift・ctor 47 vs 46 同定)・#656 (分類 module F の閉包展開) と CAB-247 検証 |
+| `tools/targets/kilohearts/license/KH709_REPORT.md` | 66 | #709 (KH-14): ymm (VEX.256) 整数語彙の gen_simd 対応・module F の 2 関数の試行と未解決 (xmm/ymm 別グローバル #3306・SSE 語彙 #3307) |
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
 | `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
