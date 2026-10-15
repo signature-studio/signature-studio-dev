@@ -215,3 +215,4 @@ REPORT §7 (旧 165〜167 行):
 - B-8 の予測 (`oob memory access out of bounds`) とは異なる。B-7 の `oob` run は `FLE_EXTRA_ROOTS=0x6a7b70,0x976da0` で、既定 (同じ root・mode 3) では `exit` だった。B-7 と本 run の差は未切り分け (lift の再生成・build の差の可能性)。
 - 所要 (実測): lift 81 s・clang plain (8 shard) 99〜102 s・boot default 9 s・boot negctl 10〜25 s。load 1.0〜1.95 (4 vCPU)。
 - 未解決: 既定 root 化の survey 破裂 (`survey_drive.sh` 未実施)・unit 895 の `exit` が正常終了か (MessageBoxW 不在の影響か) は未特定。
+- **測定 commit `dec8fa928`** (コードを変えた最後の commit)。HEAD で再測定 (`FLE_BOOT_RUNS="default negctl"`・`FLE_EXTRA_ROOTS` 未指定): 既定 units **895** (GetMem 3,680 / FreeMem 1,499・`exit`)、ネガコン units **209** (1,891 / 776・`exit`)。C-1 と同値。lift 80 s・clang 96 s・boot 9 s / 25 s。`git diff dec8fa928 HEAD -- tools/flelift/boot` は空。
