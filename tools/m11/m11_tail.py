@@ -9,7 +9,9 @@ sys.path.insert(0, os.path.join(SRC, '..', 'm6'))
 from ottlib import Bin, Dis
 
 HERE = os.path.join(SRC, 'work')
-WINF = os.environ.get('M11_PE') or os.path.join(os.environ.get('FL_WIN64_DIR') or '/home/ubuntu/work/analysis/win64', 'extracted', 'block00031_PE.bin')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared'))
+from paths import FL_WIN64_DIR
+WINF = os.environ.get('M11_PE') or os.path.join(FL_WIN64_DIR, 'extracted', 'block00031_PE.bin')
 b = Bin(WINF)
 d = Dis(b)
 gh = {}

@@ -1,0 +1,6 @@
+{
+  "tag": "pe206",
+  "refs": ["#3494"],
+  "note": "PE で device の通知 3 件 (vtbl 呼出し・戻り None)・状態読出し 3 件・設定 1 件を確認した 7 関数 (REPORT_PY206・PY-206 #3494)。idle/midi-out の値は未実測の仮置き、tests/device_diff.mjs が mock と照合",
+  "functions": ["device.createRefreshThread", "device.destroyRefreshThread", "device.fullRefresh", "device.getIdleElapsed", "device.isMidiOutAssigned", "device.getMasterSync", "device.setMasterSync"]
+}
