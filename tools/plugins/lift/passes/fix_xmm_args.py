@@ -134,6 +134,23 @@ def conv_ok(xs, n, sites):
     return True
 
 
+def arity_cause(n, sites):
+    """#2903: arity 不一致の原因を call site ごとに数える (report 用。変換の判定には使わない)。
+    ok = 引数数が n と一致 / short = n 未満 (IR 引数が呼出し側に無い) / xmm = n を超え、超えた分が全て i128 / extra = n を超え、超えた分に i128 以外を含む (余分な引数の型)。"""
+    cnt = {}
+    for al in sites:
+        if len(al) == n:
+            k = 'ok'
+        elif len(al) < n:
+            k = 'short'
+        elif all(a.startswith('i128 ') for a in al[n:]):
+            k = 'xmm'
+        else:
+            k = 'extra'
+        cnt[k] = cnt.get(k, 0) + 1
+    return ','.join('%s:%d' % (k, cnt[k]) for k in ('ok', 'short', 'xmm', 'extra') if k in cnt)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('src')
@@ -202,8 +219,9 @@ def main():
                     elif noncall.get(fname):
                         rep['skipped'][fname] = 'non_call_ref(%d)' % noncall[fname]
                     elif any(c != len(plist) for c in arity.get(fname, ())) and (fname in NO_CONV or not conv_ok(xs, len(plist), argsites.get(fname, []))):
-                        rep['skipped'][fname] = 'call_arity_mismatch(sites=%s, params=%d)' % (
-                            ','.join(str(c) for c in sorted(arity[fname])), len(plist))
+                        rep['skipped'][fname] = 'call_arity_mismatch(sites=%s, params=%d, cause=%s)' % (
+                            ','.join(str(c) for c in sorted(arity[fname])), len(plist),
+                            arity_cause(len(plist), argsites.get(fname, [])))
                     else:
                         snap = copy.deepcopy({k: v for k, v in rep.items() if k not in ('fixed', 'skipped')})
                         h2, b2, c1 = KA.fix_movd_from_zero(header, body, habi, rep, fname)

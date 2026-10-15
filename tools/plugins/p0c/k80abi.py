@@ -23,6 +23,7 @@ operand の位置) で出力する。k80_argfix.py の [C] パターン (placeho
 出力: {VA: {gpr_slots, xmm_slots, stack_args, floats, xmm_insns, scaled_index}} —
 k80_argfix.py / kernel_diff の入力。
 """
+import collections
 import json
 import os
 import struct
@@ -63,6 +64,46 @@ for i in range(16):
             XMM[getattr(x86, 'X86_REG_XMM%d%s' % (i, suf))] = 'xmm%d' % i
         except AttributeError:
             pass
+
+
+RAXF = {x86.X86_REG_RAX, x86.X86_REG_EAX, x86.X86_REG_AX, x86.X86_REG_AL, x86.X86_REG_AH}
+
+
+def xmm_read_width(m):
+    """xmm 入力 (read-before-write) の読み幅 (bit)。scalar double (*sd: addsd・sqrtsd 等) は 64、scalar single (*ss) は 32 (#3641)。
+    packed 整数の *sd (pmaxsd・pminsd、VEX の vpmaxsd 等) は語尾が sd でも 128 bit 演算なので 64 にしない (32)。
+    cvt 系は変換元の幅で決める: cvtsd2ss・cvtsd2si・cvttsd2si は 64、cvtss2sd・cvtss2si は 32。
+    cvtsi2sd・cvtsi2ss は xmm が宛先 (源は GPR) なので従来どおり 32。"""
+    if m.startswith('cvt'):
+        return 64 if 'sd2' in m else 32
+    if (m.endswith('sd') and not m.lstrip('v').startswith('p')) or m.startswith(('movq', 'movsd', 'movapd', 'movupd')):
+        return 64
+    return 32
+
+
+def ret_slot_of(MD, td, tva, va, fend):
+    """戻り値の機械語 slot (#3513)。rax だけ書き xmm0 を書かない → 'rax'。
+    xmm0 だけ書き rax を書かず、メモリへの store を持たない (純粋なスカラ結果) → 'xmm0'。
+    rax も xmm0 も書かない → 'none' (戻り値を書かない: buffer 出力の kernel など)。
+    それ以外 (両方を書く・xmm0 を書いて store を持つ) は 'unknown' (fail-closed)。
+    RetDec IR の ret は xmm0 を表さないため、'xmm0' の戻り値は IR 側で判定できない (REPORT_APPENDIX_I §22)。"""
+    rax_w = x0_w = store = False
+    for i in MD.disasm(td[va - tva:fend - tva], va):
+        for o in i.operands:
+            if o.type == X86_OP_REG and o.access & 2:
+                rax_w |= o.reg in RAXF
+                x0_w |= XMM.get(o.reg) == 'xmm0'
+            elif o.type == X86_OP_MEM and o.access & 2:
+                store = True
+    if os.environ.get('K80_NO_RETSLOT') == '1':
+        return 'unknown'
+    if rax_w and not x0_w:
+        return 'rax'
+    if x0_w and not rax_w and not store:
+        return 'xmm0'
+    if not rax_w and not x0_w:
+        return 'none'
+    return 'unknown'
 
 
 def load_pe(path):
@@ -192,8 +233,7 @@ def scan_function(MD, td, tva, va, fend):
                 xn = XMM[r]
                 if int(xn[3:]) < 4 and xn not in xmm_w and xn not in xmm_arg:
                     xmm_arg.append(xn)
-                    xmm_width[xn] = 64 if (m.startswith('movq') or m.startswith('movsd')
-                                           or m.startswith('movapd') or m.startswith('movupd')) else 32
+                    xmm_width[xn] = xmm_read_width(m)
         for r in writes:
             if r in XMM:
                 xmm_w.add(XMM[r])
@@ -277,10 +317,13 @@ def main():
                         'stack': [{'off': k, 'fp': v[0], 'width': v[1], 'insn': v[2]}
                                   for k, v in sorted(st.items())],
                         'xmm_insns': [[m, regops] for m, regops in xins],
-                        'scaled_index': sci, 'clip_index': cli, 'ptr_struct': ps}
+                        'scaled_index': sci, 'clip_index': cli, 'ptr_struct': ps,
+                        'ret_slot': ret_slot_of(MD, td, tva, va, F[va])}
     os.makedirs(os.path.dirname(outp), exist_ok=True)
     json.dump(out, open(outp, 'w'), indent=1)
     print('[k80abi] kernels=%d -> %s' % (len(out), outp))
+    slots = collections.Counter(v['ret_slot'] for v in out.values())
+    print('  ret_slot=%s xmm0=%s' % (dict(slots), [k for k in sorted(out) if out[k]['ret_slot'] == 'xmm0']))
     for va in ('0x5de3e0', '0x5de820', '0x5dfbe0', '0x5e03f0', '0x5dfa40'):
         a = out[va]
         print(' ', va, 'gpr=%s xmm=%s(w=%s) stack=%s' % (

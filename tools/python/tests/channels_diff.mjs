@@ -174,6 +174,13 @@ const seq = [
   ["channels.getChannelType", ["0"]],
   ["channels.setGridBit", [0, 0, 1]],
   ["channels.setGridBit", [0, 3, 1]],
+  ["channels.setGridBit", [0, 5, 1]],
+  ["channels.getStepParam", [5, 7, 0, 0, 16]],
+  ["channels.getStepParam", [5, 8, 0, 0, 16]],
+  ["channels.getStepParam", [5, 1, 0, 0, 16]],
+  ["channels.getStepParam", [7, 7, 0, 0, 16]],
+  ["channels.getCurrentStepParam", [0, 5, 7]],
+  ["channels.getCurrentStepParam", [0, 5, 6]],
   ["channels.getStepParam", [0, 0]],
   ["channels.getStepParam", [0, 1]],
   ["channels.getStepParam", [0, 2]],
@@ -235,6 +242,24 @@ const seq = [
   ["playlist.setTrackColor", [3, 0xABCDEF]],
   ["playlist.setTrackName", [0, "x"]],
   ["playlist.setTrackColor", [501, 1]],
+  // PY-115 (#2950): soloChannel の value (-1 は反転、他は現在値の下位 1 B と比較して不一致なら反転)・useGlobalIndex (型検査のみ)。isChannelSolo で状態を比べる
+  ["channels.soloChannel", [0, -1]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 1]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 1]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 0]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 2]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 2]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 256]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, -1, 1]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, "x"]],
 ];
 
 const diffs = [];
@@ -248,4 +273,31 @@ assert.deepEqual(diffs, [], `channels/playlist 差分 ${diffs.length} 件`);
 // ネガティブコントロール: index 範囲外の setChannelPitch は両側とも code 4 (Index out of range) になること (差分 0 が空振りでないことの確認)
 assert.deepEqual(run(mock, "channels.setChannelPitch", [9, 0.5]), { code: 4 });
 assert.deepEqual(run(wasm, "channels.setChannelPitch", [9, 0.5]), { code: 4 });
-console.log(JSON.stringify({ calls: seq.length, diffs: 0, PASS: true }));
+
+// PY-218 (#3596): 件数超え (position >= 64) は PE 0x12d3e20 の event 経路。項目 (pattern 1) が無ければ偽、項目を入れると channel 一致・閾値 (position+1)*24・flag 0x20 で 1/0 が決まる
+const gridRun = (eng) => {
+  const out = [];
+  for (const i of [0, 1, 2]) for (const p of [-1, 0, 63, 64, 65, 66, 70, 200, 2147483647, 2147483648]) {
+    out.push([i, p, run(eng, "channels.getGridBit", [i, p]), run(eng, "channels.getGridBitWithLoop", [i, p])]);
+  }
+  return out;
+};
+for (const eng of [mock, wasm]) {
+  assert.equal(eng.gridItemsProbe(1, 0), 0);
+  for (const [, p, a, b] of gridRun(eng)) if (p >= 64) assert.deepEqual([a, b], [{ ok: false }, { ok: false }], `項目無しの件数超え p=${p}`);
+}
+const gridDiffs = [];
+let gridCalls = 0, gridTrue = 0;
+for (const seed of [1, 2, 3, 42, 1234]) for (const n of [1, 5, 40, 256]) {
+  assert.equal(mock.gridItemsProbe(seed, n), n);
+  assert.equal(wasm.gridItemsProbe(seed, n), n);
+  const a = gridRun(mock), b = gridRun(wasm);
+  gridCalls += a.length * 2;
+  gridTrue += a.filter(([, p, x, y]) => p >= 64 && (x.ok === true || y.ok === true)).length;
+  if (JSON.stringify(a) !== JSON.stringify(b)) gridDiffs.push({ seed, n, mock: a, wasm: b });
+}
+assert.deepEqual(gridDiffs, [], `件数超え (event 経路) の差分 ${gridDiffs.length} 件`);
+assert.ok(gridTrue > 0, "件数超えで真になる項目が 1 件も無い (検査が空振り)");
+mock.gridItemsProbe(0, 0);
+wasm.gridItemsProbe(0, 0);
+console.log(JSON.stringify({ calls: seq.length, diffs: 0, grid_calls: gridCalls, grid_true: gridTrue, grid_diffs: gridDiffs.length, PASS: true }));

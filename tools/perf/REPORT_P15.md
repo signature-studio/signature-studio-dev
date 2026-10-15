@@ -93,9 +93,9 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 異なる plugin を 1 Memory に畳む際の VA 衝突・共有 static の汚染 (本計測は同一 OTT の M 個 = 同一 binary の別 state) | 異なる plugin を同居させる場合は未検証 | #2963 [PERF-P20] |
+| 異なる plugin (OTT + Fresh Air) を 1 Memory に畳む際の emcc 静的データ・heap の衝突と、node での署名一致 (本計測は同一 OTT の M 個 = 同一 binary の別 state)。Fresh Air は lift 時に画像窓を分けた (§8) | 畳み込みは未検証。異なる plugin を同居させる場合は未検証 | #3680 [PERF-P23] (#2963 から分割) |
 | AudioWorklet 上の M=130 の instantiate・署名一致 | 解消 (本 PR): §7 で 130/130 一致・instantiate 失敗なし | なし (§7 で解消) |
-| AudioWorklet 上の instantiate 上限 (M=130 を超える M) と worklet 上の setup 時間 (`setup_ms` を出力していない) | M=130 より大きい M の成否は不明。起動時の一括 instantiate の遅延は未測 | #2988 [PERF-P21] (親 #1259) |
+| AudioWorklet 上の instantiate 上限 (M=130 を超える M) | 成功最大 M=130、失敗最小 M=160 (無応答)。131〜159 の境界は未測 (§9) | #2988 [PERF-P21] (親 #1259) |
 | setup 時間 (M=130 で 790〜999 ms、Dedicated Worker・§3) | 起動時の一括 instantiate/setup の遅延。pre-warm の設計が必要 | REPORT_P8 §11 (pre-warm) と同じ経路 |
 
 ## 5. 再現
@@ -177,3 +177,73 @@ node tools/perf/p15/chrome_worklet.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3 
 前提: `oc_artifacts: work-m6-ott` (`tools/ott/work/lift/ottl.wasm`)。
 
 **測定 commit から HEAD までの tools/perf/p15 差分**: 測定コードの差分は空。`git diff --stat 80298b02 HEAD -- tools/perf/p15` は、測定結果 `results/chrome_worklet.jsonl` (9 行) の追加だけを示す。
+
+## 8. 第 2 plugin (Fresh Air GainDsp) の x64c lift と単独 instance の署名 (PERF-P20 / #2963)
+
+**結論**: Fresh Air の `gain::GainDsp::process` (SlateCore `0x180afe090`) を x64c で lift し emcc で wasm 化した。単独 instance の署名は node で `5e5287b5` (400 シナリオ・3 回一致)。同じシナリオで実機機械語 (ms_abi 直接実行) と突き合わせ、**400/400 シナリオ一致**。異なる plugin 2 種の **1 Memory への畳み込みは未実施** で、残りは子 issue #3680 [PERF-P23] に移した。
+
+| 項目 | 結果 (実測) |
+|---|---|
+| 第 2 plugin | Fresh Air。`SlateCore.core_64` (PE32+ DLL、ImageBase `0x180000000`、SizeOfImage `0x2319000`)。素材 `plugins-freshair` の `Fresh Air.Win.zip` を `tools/targets/freshair/fetch.sh` で展開 |
+| lift | `x64c.py --closure 60 --img 0x180000000 --shift 0x17E000000 --img-size 0x2319000`。functions 57、insns 2102、unsup `{}`、traps 0、imports 22、unlifted callees 0 |
+| wasm | `fa.wasm` 2,148,176 B。`emcc -O0 -ffp-contract=off`、compile の warnings 0 / errors 0 |
+| 窓 (lift 時の再配置) | wasm アドレス = VA − `0x17E000000`。画像は wasm `0x02000000`〜`0x04319000`。OTT の画像窓 `0x30000000` (§0 の `shared_worker.mjs`) と重ならない。emcc の静的データ・heap の衝突は未検証 (#3680) |
+| 単独署名 | `fa_gain_sig.mjs` 400 シナリオ・seed 64030: `5e5287b5` (3 回とも一致)。出力が変わったシナリオ 371/400 |
+| 差分 (native) | `fa_native_diff.py` seed 64030: 400/400 一致、比較バッファ 2,800、差分 0、native crash 0、wasm trap 0。seed 7 も 400/400 一致 |
+| NC-1 (入力) | wasm 側だけ seed 64031 のシナリオを流す: 0/400 一致 (400 mismatch) |
+| NC-2 (wasm の 1 命令) | lift C の 1 命令 (`0x180afe195` `addss`→減算、`fle_lifted.c` 行 550) を壊す: 214/400 一致、**186 mismatch**、署名 `5e5287b5`→`5cb40d4b` |
+| 所要 | build 7.40 s (real)、差分 1 本 9.2 s (native 実行 + node) |
+
+- 測定 commit: `e0d62359c` (コードを最後に変えた commit。`git diff e0d62359c HEAD -- tools/perf/p20` の出力は空。本節の追記は `tools/perf/REPORT_P15.md` だけ)。測定時の load average 0.08 (1 分)、CPU は runner の 4 vCPU。
+- 環境: node v22.23.3、emcc は `[EMSDK]` (`toolchain-emsdk`。`EMSDK` に設定して読ませる。`docs/REFERENCES.md` §4)、素材 `plugins-freshair`。
+- 既知類型との関係: 本 lift は x64c (RetDec 非依存)。RetDec 由来の修復 (P1・F7・F2) は適用していない。silent miscompile は差分 harness で検出する。NC-2 で検出力を確認した。
+- 差分 harness の入力: 仕様は `tools/liftlib/specs/fa_gain.json` (vars・buffers) をそのまま使う (`liftlib.harness.spec.build`)。署名 harness (`fa_gain_sig.mjs`) は同じ分布の値を再現し、L/R は一様 [-1, 1] (仕様の sample 定義は使っていない)。署名値は回帰用の ID であり、正しさは差分 harness が担う。
+
+再現 (素材 `plugins-freshair` の展開後。`FA_DL` は zip の置き場):
+
+```sh
+FA_DL=$RUNNER_TEMP/fa bash tools/targets/freshair/fetch.sh
+bash tools/perf/p20/build_fa_gain.sh                                   # §8 の lift・wasm
+node tools/perf/p20/fa_gain_sig.mjs tools/perf/p20/work/fa/fa.cjs 400 64030   # 単独署名
+python3 tools/perf/p20/fa_native_diff.py --n 400 --seed 64030          # native 差分
+python3 tools/perf/p20/fa_native_diff.py --n 400 --seed 64030 --neg-wasm-seed 64031 --out tools/perf/p20/work/fa/diff_neg   # NC-1
+bash tools/perf/p20/fa_negctl.sh                                       # NC-2
+```
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| OTT と Fresh Air を 1 Memory に畳む (emcc 静的データ・heap の衝突、memory import 版の build、畳み込み後の署名一致と静的データ非汚染) | 受入 1 の残り。畳み込みは未検証 | #3680 [PERF-P23] |
+
+## 9. AudioWorklet 上の instantiate 上限・setup 時間・ネガティブコントロール (PERF-P21 / #2988)
+
+受入条件は issue #2988 で「REPORT_P15.md §7 に追記」だが、main の §8 が PERF-P20 に使われたため本節 (§9) に置いた。
+
+**結論**: AudioWorklet 上で 1 instance (Memory 1 本) に畳めた OTT obj は **M=130 まで** (初期化・署名とも 3 run 全て成功、署名 130/130 一致)。**M=160 以上は 3 run 全て無応答** (`Error: eval timeout` まで結果も例外も返らない)。成功最大 M ≥ 130、失敗最小 M ≤ 160。131〜159 は未測。
+
+| 項目 | 結果 |
+|---|---|
+| 成功最大 M / 失敗最小 M | 130 (初期化 3 run・署名 3 run) / 160 (3 run とも eval timeout)。M=176・192・256・288・320・352 も各 3 run とも eval timeout (timeout 値は未記録) |
+| setup_ms | M=1: 17/21/22 (初期化 3 run)、18/20/18 (ネガ 3 run)。M=130: 446〜495 ms (計 9 値、中央値 465) |
+| 署名 (M=130) | 130/130 一致 (`6b1696f0`、`sig_ok=true`、3 run) |
+| ネガティブコントロール | obj 0 の入力振幅を 0.5→0.25 に変更。M=1: 0/1 一致 (3 run)。M=130: 129/130 一致 (3 run)。どちらも `sig_ok=false` |
+
+- **setup_ms の定義**: `shared_worklet.js` の `t0` (instantiate・`__wasm_call_ctors`・`ott_data_install` の後) から、全 obj の ctor・setParam 19 個・resume・入力設定 (入力バッファへの sin N×2 書き込みと入出力ポインタ設定) までのループの所要。`Date.now()` (1 ms 分解能)。issue #2988 の「ctor / setParam / 入力設定」に当たる。
+- **obj 0 の根拠**: 個別 index は記録していない。`sig` は `new Set(sigs)` の挿入順 (obj 番号順) なので、先頭の `d39696f0` は `sigs[0]` = obj 0 の値。`sig_match_n` が 129 なので、残り 1 件 (`d39696f0`) が obj 0。M=1 は obj 0 のみ。
+- **無応答**: constructor が戻らず例外も届かない状態。原因は未切り分け。VA 配置 (stride 0x40000、IN0 = 0x34000000) では obj の基底が IN0 に届くのは M≈192 だが、160 で止まるため配置だけでは説明できない。
+- 測定 commit `e4d2d1799`・検証 HEAD `d064d219d`。`git diff --stat e4d2d1799 d064d219d -- tools/perf/p15` の出力は `rerun_20261015_worklet_{init,negctl,sig}.jsonl` の 3 ファイル (5 行) の追加だけ (コード差分 0)。
+- 環境・生データ: Chrome 155.0.8059.39 (headless=new)、CPU AMD EPYC 9V45 (4 vCPU)、素材 `work-m6-ott`。`results/worklet_init_limit.jsonl` (27 行 = 9 M × 3 run)、`worklet_sig.jsonl` (3 行)、`worklet_negctl.jsonl` (6 行)。HEAD 再現 (`ab6466296`) は `rerun_20261015_worklet_*.jsonl` の 5 行。
+
+再現 (前提 `oc_artifacts: work-m6-ott`。`--timeout` は明示。元 sweep の timeout 値は未記録のため、下の値は再現時の指定。sig・negctl の成功 run は timeout に達しないので結果に影響しない):
+
+```sh
+node tools/perf/p15/chrome_worklet.mjs --init-only --m 1,130,160,176,192,256,288,320,352 --runs 3 --timeout 30000 --out $RUNNER_TEMP/perf/worklet_init_limit.jsonl
+node tools/perf/p15/chrome_worklet.mjs --m 130 --reps 0 --runs 3 --timeout 1500000 --out $RUNNER_TEMP/perf/worklet_sig.jsonl
+node tools/perf/p15/chrome_worklet.mjs --m 1,130 --reps 0 --neg 0 --runs 3 --timeout 1500000 --out $RUNNER_TEMP/perf/worklet_negctl.jsonl
+```
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 元 sweep の eval timeout 値が未記録 (M=160〜352 の判定時間)。生データ・ログに無いため本節は値を書かない | 無応答の判定時間の根拠が無い | #2988 (次 run で `work-m6-ott` を付け、上の再現を実行して記録) |
+| 131〜159 の境界の二分探索 | 上限の正確な値が未確定 (130 と 160 の間) | #2988 |
+| M≥160 の無応答の原因 (例外・ループ・メモリ破壊のどれか) | 上限の意味が未確定 | #2988 |
+| 130 を超える M の署名一致 (成功した M の署名は 130 のみ) | 130 超の正しさは未確認 | #2988 |

@@ -5,6 +5,7 @@
 #define _GNU_SOURCE
 #include "ld_core.h"
 #include <signal.h>
+#include <sched.h>
 #include <setjmp.h>
 #include <ucontext.h>
 #include <sys/mman.h>
@@ -31,6 +32,70 @@ static u8* g_thunks;
 #define MAX_IMP 4096
 static char* g_impname[MAX_IMP];
 static int g_nimp;
+u64 ld_stub_ent;   /* ld_ms_call.S が stub 入口の rsp を入れる ([rsp] = 呼出元の戻り番地) */
+
+/* WIN-34 (#3557): env LD_WINTRACE_OUT=<path> で、窓まわりの import (RegisterClassW・GetClassInfoW・CreateWindowExW) の
+ * 呼出元 VA・引数・戻り値を 1 呼出し 1 行で <path> へ追記する (既定は無効。応答は変えない)。 */
+static const char* g_wt_path; static FILE* g_wt_fp; static int g_wt_init;
+static int wt_on(const char* n) {
+  if (!g_wt_init) { g_wt_init = 1; g_wt_path = getenv("LD_WINTRACE_OUT"); if (g_wt_path && *g_wt_path) g_wt_fp = fopen(g_wt_path, "a"); }
+  if (!g_wt_fp) return 0;
+  return !strcmp(n, "CreateWindowExW") || !strcmp(n, "RegisterClassW") || !strcmp(n, "GetClassInfoW");
+}
+static void wt_str(u64 p, char* out, int max) {
+  if (!p) { snprintf(out, max, "null"); return; }
+  if (p < 0x10000) { snprintf(out, max, "atom:0x%llx", (unsigned long long)p); return; }
+  if (!ld_dst_ok(p, 2)) { snprintf(out, max, "bad:0x%llx", (unsigned long long)p); return; }
+  ld_read_strW(p, out, max);
+}
+static void wt_rec(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk, u64 r) {
+  u64 ent = ld_stub_ent, ret = 0, s[8] = {0};
+  if (ld_dst_ok(ent, 8)) memcpy(&ret, (void*)(uintptr_t)ent, 8);
+  char c1[160], c2[160];
+  fprintf(g_wt_fp, "wt case=%s fn=%s ret_va=0x%llx ret_rva=0x%llx stk_minus_entry=%lld ", ld_case.id, n,
+          (unsigned long long)ret, (unsigned long long)(ret - g_imgbase), (long long)((u64)(uintptr_t)stk - ent));
+  if (!strcmp(n, "CreateWindowExW")) {   /* ms64: 第5〜12引数は entry+0x28 から (shadow 0x20 + 戻り番地 8) */
+    if (ld_dst_ok(ent + 0x28, 64)) memcpy(s, (void*)(uintptr_t)(ent + 0x28), 64);
+    wt_str(a1, c1, sizeof c1); wt_str(a2, c2, sizeof c2);
+    fprintf(g_wt_fp, "ex=0x%llx class=\"%s\" wname=\"%s\" style=0x%llx x=0x%llx y=0x%llx w=0x%llx h=0x%llx parent=0x%llx menu=0x%llx inst=0x%llx param=0x%llx r=0x%llx\n",
+            (unsigned long long)a0, c1, c2, (unsigned long long)a3, (unsigned long long)s[0], (unsigned long long)s[1],
+            (unsigned long long)s[2], (unsigned long long)s[3], (unsigned long long)s[4], (unsigned long long)s[5],
+            (unsigned long long)s[6], (unsigned long long)s[7], (unsigned long long)r);
+  } else if (!strcmp(n, "RegisterClassW")) {   /* WNDCLASSW: style@0 lpfnWndProc@8 hInstance@24 lpszClassName@64 */
+    u32 style = 0; u64 wp = 0, hi = 0, cn = 0;
+    if (ld_dst_ok(a0, 72)) { memcpy(&style, (void*)(uintptr_t)a0, 4); memcpy(&wp, (void*)(uintptr_t)(a0 + 8), 8);
+      memcpy(&hi, (void*)(uintptr_t)(a0 + 24), 8); memcpy(&cn, (void*)(uintptr_t)(a0 + 64), 8); }
+    wt_str(cn, c1, sizeof c1);
+    fprintf(g_wt_fp, "style=0x%x wndproc_rva=0x%llx hinst=0x%llx class=\"%s\" r=0x%llx\n", style,
+            (unsigned long long)(wp - g_imgbase), (unsigned long long)hi, c1, (unsigned long long)r);
+  } else {
+    wt_str(a1, c1, sizeof c1);
+    fprintf(g_wt_fp, "class=\"%s\" r=0x%llx\n", c1, (unsigned long long)r);
+  }
+  fflush(g_wt_fp);
+}
+
+/* LD-161 (#3563): abort helper (case の abortret=<VA>, 例 0x409730) の入口を trace hit で保存する。
+ * helper は必ず abort 経路 (RaiseException は noncontinuable) に入り、その RaiseException で入口の return 状態へ戻す
+ * (rsp+8・rip=戻り先・rax=0・callee-saved と xmm は入口の値)。native 専用 (wasm は trace の int3 を持たない)。 */
+static greg_t g_ab_gr[NGREG]; static struct _libc_fpstate g_ab_fp; static u64 g_ab_va; static int g_ab_valid;
+static void ab_save(ucontext_t* uc, u64 addr) {
+  memcpy(g_ab_gr, uc->uc_mcontext.gregs, sizeof g_ab_gr);
+  g_ab_gr[REG_RIP] = (greg_t)addr; g_ab_gr[REG_EFL] &= ~0x100;
+  g_ab_fp = *uc->uc_mcontext.fpregs; g_ab_valid = 1;
+}
+static void __attribute__((noreturn)) ab_return(void) {
+  ucontext_t uc; memset(&uc, 0, sizeof uc);
+  memcpy(uc.uc_mcontext.gregs, g_ab_gr, sizeof g_ab_gr);
+  greg_t sp = g_ab_gr[REG_RSP];
+  uc.uc_mcontext.gregs[REG_RIP] = *(greg_t*)(uintptr_t)sp;
+  uc.uc_mcontext.gregs[REG_RSP] = sp + 8;
+  uc.uc_mcontext.gregs[REG_RAX] = 0;
+  uc.uc_mcontext.fpregs = &g_ab_fp;
+  g_ab_valid = 0;
+  setcontext(&uc);
+  abort();
+}
 
 u64 ld_stub_c(u64 idx, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk) {
   const char* n = "?bad";
@@ -40,7 +105,10 @@ u64 ld_stub_c(u64 idx, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk) {
   if (stk && (strcmp(n, "MultiByteToWideChar") == 0 || strcmp(n, "WideCharToMultiByte") == 0)) {
     a4 = stk[0]; a5 = stk[1];                          /* MS 第5/6引数 (6引数 API のみ読む) */
   }
-  return ld_stub(n, a0, a1, a2, a3, a4, a5);
+  u64 r = ld_stub(n, a0, a1, a2, a3, a4, a5);
+  if (wt_on(n)) wt_rec(n, a0, a1, a2, a3, stk, r);
+  if (g_ab_valid && (a1 & 1) && strcmp(n, "RaiseException") == 0) ab_return();   /* LD-161: abort (noncontinuable) は入口の return へ */
+  return r;
 }
 
 /* CAB-233: 仮 proc の実行可能 thunk (LD_FAKEPROC_BASE 固定番地 = wasm 側の値と同一)。
@@ -161,7 +229,7 @@ static void step_end(void) {
 
 /* LD-129 (#2770): VA への書込み監視。env LD_WATCH_ADDR=<VA hex>・LD_WATCH_OUT=<path> で有効 (既定は無効)。
  * 監視 page を PROT_READ|PROT_EXEC にし、書込みの SIGSEGV で書込み命令の RIP・書込み先を採る。
- * TF で書込み 1 命令だけ実行させてから page を戻す (書込みはそのまま行う。結果が変わらないことは未確認。REPORT_APPENDIX_2770.md §8.4)。
+ * TF で書込み 1 命令だけ実行させてから page を戻す (書込みはそのまま行う。CPU 固定下の boot 状態は不変: REPORT_APPENDIX_2770.md §8.9。page 保護を変えるため読取りのみではない: #3648)。
  * 記録は書込み先の開始アドレスが va-15..va+7 にあるもの (書込み幅 16 以下を想定)。重ならない書込みも含む superset で、取りこぼしは無い。
  * TF の待ち (g_wp_pend) の間は SIGALRM を block する (timeout で page が RWX のまま残るのを防ぐ)。
  * LD_STEP_N・trace と同時には使わない。 */
@@ -218,6 +286,7 @@ static void on_sig(int sig, siginfo_t* si, void* ucv) {
     if (g_pending) { *g_pending = 0xCC; g_pending = NULL; g[REG_EFL] &= ~0x100; return; }
     u64 addr = (u64)g[REG_RIP] - 1; int k = tr_find(addr);
     if (k >= 0) {
+      if (addr == g_ab_va) ab_save(uc, addr);
       u64 a[8] = {0}, x[4] = {0};
       a[0] = g[REG_RCX]; a[1] = g[REG_RDX]; a[2] = g[REG_R8]; a[3] = g[REG_R9];
       u64* sp = (u64*)g[REG_RSP]; for (int j = 0; j < 4; j++) a[4 + j] = sp[5 + j];   /* [rsp]=ret, +8..+0x20 shadow, +0x28 = 5th */
@@ -283,6 +352,7 @@ static void run_case(char* line) {
     puts(ld_case_end("bad_fn", "fn outside image", 0, 0, 0, 0, 0, 0, 0)); fflush(stdout); return;
   }
   g_sig = 0; g_pending = NULL; g_fault_rsp = 0; g_fault_stk[0] = 0;
+  g_ab_va = ld_case.trace ? ld_case.abortret : 0; g_ab_valid = 0;
   for (int j = 0; j < 8; j++) g_fault_g[j] = 0;
   scrub_stack(ld_case.stkfill);
   step_begin();
@@ -336,6 +406,13 @@ static char* g_line; static size_t g_linecap;
 int main(int argc, char** argv) {
   if (argc < 2) { fprintf(stderr, "usage: ld_native <pe>\n"); return 2; }
   setvbuf(stdout, NULL, _IOFBF, 1 << 20);
+  const char* pin = getenv("LD_PIN_CPU");   /* #2770: boot 状態は実行 CPU 番号に依存する (§8.9)。比較時は env で CPU を固定する */
+  if (pin && *pin) {
+    char* end = NULL; long cpu = strtol(pin, &end, 10);
+    if (*end || cpu < 0 || cpu >= CPU_SETSIZE) { fprintf(stderr, "usage: LD_PIN_CPU=<0..%d>\n", CPU_SETSIZE - 1); return 2; }
+    cpu_set_t cs; CPU_ZERO(&cs); CPU_SET((int)cpu, &cs);
+    if (sched_setaffinity(0, sizeof cs, &cs)) { perror("LD_PIN_CPU"); return 6; }
+  }
   if (load_pe(argv[1])) return 3;
   install_signals();
   wp_arm();

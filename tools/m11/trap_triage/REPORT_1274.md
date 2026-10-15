@@ -243,3 +243,7 @@ index 39480f0a..5a9c1929 100644
 ## 5l. unit 190 の ON 限定 trap の切り分け (#2131 次 run・部分達成)
 
 - 結論 (n=1・強制後 diffPages=0 の同一状態で確認。表と env は APPENDIX §5l): 同じメモリ状態 (unit 189 直後、SP 一致) で ON 専用 code を走らせたときだけ unit 190 が oob になる、と読める。ON 専用 code のうち、410360 の m11_vcall の shortcut 内の icall 計数 (`icall_bump`) だけで OFF の状態から oob が再現し、VMT 読みだけでは再現しない。計数が oob を起こす仕組みは未特定。詳細と測定値は [REPORT_APPENDIX_1274.md](REPORT_APPENDIX_1274.md) §5l。
+
+## 5m. 410360 shortcut の切り分け (現 HEAD `42c6bcfdd`・付録)
+
+- 結論: 表への書込みは原因でなく、shortcut の関数呼出しが残る効果が unit 190 の oob に必要。ON の ok 退行は現既定で 5 件 (101・190・291・296・304)。詳細と表は [REPORT_APPENDIX_1274.md](REPORT_APPENDIX_1274.md) §5m。

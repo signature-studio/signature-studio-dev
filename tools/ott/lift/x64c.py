@@ -554,6 +554,13 @@ class FnLift:
     def i_rol(self, i, o): self.shift(i, o, 'rol')
     def i_ror(self, i, o): self.shift(i, o, 'ror')
 
+    def i_shld(self, ins, ops):
+        self.ia32_only('shld')
+        if ops[0].size != 4:
+            raise Unsup(ins.mnemonic)
+        cnt = self.rd(ins, ops[2], 1)
+        self.L('{ uint32_t a_ = %s; uint32_t b_ = %s; unsigned c_ = (unsigned)(%s) & 31; if (c_) { uint32_t r_ = (a_ << c_) | (b_ >> (32 - c_)); fCF = (a_ >> (32 - c_)) & 1; fOF = ((r_ >> 31) & 1) ^ fCF; SETZSP(32, r_); %s } }' % (self.rd(ins, ops[0]), self.rd(ins, ops[1]), cnt, self.wr(ins, ops[0], 'r_', 4)))
+
     def i_imul(self, ins, ops):
         if len(ops) == 1:
             sz = ops[0].size
@@ -698,10 +705,14 @@ class FnLift:
         m = ins.mnemonic[4:]
         if m.startswith('movs'):
             w = {'b': 1, 'w': 2, 'd': 4, 'q': 8}[m[-1]]
+            if IA32:   # DF=1 (std) は後ろから 1 要素ずつ。DF=0 は従来どおり memmove
+                return self.L('{ uint64_t n_ = R[RCX]; if (fDF) { for (uint64_t k_ = 0; k_ < n_; k_++) ST%d(R[RDI] - k_ * %d, LD%d(R[RSI] - k_ * %d)); R[RDI] -= n_ * %d; R[RSI] -= n_ * %d; } else { memmove((void*)A_(R[RDI]), (void*)A_(R[RSI]), n_ * %d); R[RDI] += n_ * %d; R[RSI] += n_ * %d; } R[RCX] = 0; }' % (w * 8, w, w * 8, w, w, w, w, w, w))
             self.L('{ uint64_t n_ = R[RCX]; memmove((void*)A_(R[RDI]), (void*)A_(R[RSI]), n_ * %d); R[RDI] += n_ * %d; R[RSI] += n_ * %d; R[RCX] = 0; }' % (w, w, w))
         elif m.startswith('stos'):
             w = {'b': 1, 'w': 2, 'd': 4, 'q': 8}[m[-1]]
             v = {1: 'R[RAX] & 0xff', 2: 'R[RAX] & 0xffff', 4: 'R[RAX] & 0xffffffff', 8: 'R[RAX]'}[w]
+            if IA32:
+                return self.L('{ uint64_t n_ = R[RCX]; uint64_t v_ = %s; int64_t s_ = fDF ? -%d : %d; for (uint64_t k_ = 0; k_ < n_; k_++) ST%d(R[RDI] + k_ * s_, v_); R[RDI] += n_ * s_; R[RCX] = 0; }' % (v, w, w, w * 8))
             self.L('{ uint64_t n_ = R[RCX]; uint64_t v_ = %s; for (uint64_t k_ = 0; k_ < n_; k_++) ST%d(R[RDI] + k_ * %d, v_); R[RDI] += n_ * %d; R[RCX] = 0; }' % (v, w * 8, w, w))
         else:
             raise Unsup(ins.mnemonic)
@@ -721,11 +732,11 @@ class FnLift:
             raise Unsup(m)
 
     def ia32_str(self, ins, kind, w):
-        """ia32 の非 rep 文字列命令 (1 要素)。DF=0 前提 (rep() と同じ)。ES/DS は平坦 (ea() 参照)。"""
+        """ia32 の非 rep 文字列命令 (1 要素)。DF は fDF (std/cld で設定)。ES/DS は平坦 (ea() 参照)。"""
         self.ia32_only(ins.mnemonic)
         if kind == 'movs':
-            return self.L('{ uint%d_t v_ = LD%d(R[RSI]); ST%d(R[RDI], v_); R[RSI] += %d; R[RDI] += %d; }' % (w * 8, w * 8, w * 8, w, w))
-        self.L('ST%d(R[RDI], R[RAX]); R[RDI] += %d;' % (w * 8, w))
+            return self.L('{ uint%d_t v_ = LD%d(R[RSI]); ST%d(R[RDI], v_); R[RSI] += fDF ? -%d : %d; R[RDI] += fDF ? -%d : %d; }' % (w * 8, w * 8, w * 8, w, w, w, w))
+        self.L('ST%d(R[RDI], R[RAX]); R[RDI] += fDF ? -%d : %d;' % (w * 8, w, w))
 
     def i_movsb(self, ins, ops): self.ia32_str(ins, 'movs', 1)
     def i_movsw(self, ins, ops): self.ia32_str(ins, 'movs', 2)
@@ -735,7 +746,7 @@ class FnLift:
 
     def repne_scasb(self, ins):
         self.ia32_only('repne scasb')
-        self.L('{ while (R[RCX] != 0) { uint8_t a_ = (uint8_t)R[RAX]; uint8_t b_ = LD8(R[RDI]); FL_SUB(8, a_, b_, (uint8_t)(a_ - b_)); R[RDI] += 1; R[RCX] -= 1; if (fZF) break; } }')
+        self.L('{ while (R[RCX] != 0) { uint8_t a_ = (uint8_t)R[RAX]; uint8_t b_ = LD8(R[RDI]); FL_SUB(8, a_, b_, (uint8_t)(a_ - b_)); R[RDI] += fDF ? -1 : 1; R[RCX] -= 1; if (fZF) break; } }')
 
     def i_sahf(self, ins, ops):
         self.ia32_only('sahf')   # AF は runtime が持たないため未反映 (x87 比較の後の分岐は CF/ZF/PF で足りる)
@@ -851,6 +862,26 @@ class FnLift:
     def i_fldz(self, ins, ops): self.ia32_only('fldz'); self.L('x87_push(0.0);')
     def i_fchs(self, ins, ops): self.ia32_only('fchs'); self.L('x87_set(0, -x87_st(0));')
     def i_fabs(self, ins, ops): self.ia32_only('fabs'); self.L('x87_set(0, fabs(x87_st(0)));')
+    def i_fldl2e(self, ins, ops): self.ia32_only('fldl2e'); self.L('x87_push(1.4426950408889634);')
+    def i_fldlg2(self, ins, ops): self.ia32_only('fldlg2'); self.L('x87_push(0.30102999566398120);')
+    def i_fldpi(self, ins, ops): self.ia32_only('fldpi'); self.L('x87_push(3.141592653589793);')
+    def i_fsqrt(self, ins, ops): self.ia32_only('fsqrt'); self.L('x87_set(0, sqrt(x87_st(0)));')
+    def i_frndint(self, ins, ops): self.ia32_only('frndint'); self.L('x87_set(0, x87_rc(x87_st(0)));')
+    def i_fscale(self, ins, ops): self.ia32_only('fscale'); self.L('x87_fscale();')
+    def i_fxam(self, ins, ops): self.ia32_only('fxam'); self.L('x87_fxam();')
+    def i_ftst(self, ins, ops): self.ia32_only('ftst'); self.L('x87_fcom(x87_st(0), 0.0);')
+    def i_fnclex(self, ins, ops): self.ia32_only('fnclex')   # 例外フラグは模型化しない (ADR D28 制限 4)
+
+    def x87_int_arith(self, ins, ops, m, op):
+        self.ia32_only(m)
+        o = ops[0]
+        t = {2: 'int16_t', 4: 'int32_t'}.get(o.size) if o.type == X86_OP_MEM else None
+        if t is None:
+            raise Unsup(m)
+        self.L('x87_arith(%d, 0, (double)(%s)LD%d(%s), 0);' % (op, t, o.size * 8, self.ea(ins, o)))
+
+    def i_fiadd(self, ins, ops): self.x87_int_arith(ins, ops, 'fiadd', self.X87_BIN['fadd'])
+    def i_fimul(self, ins, ops): self.x87_int_arith(ins, ops, 'fimul', self.X87_BIN['fmul'])
 
     def i_fxch(self, ins, ops):
         self.ia32_only('fxch')
@@ -1218,7 +1249,12 @@ class FnLift:
         if IA32:
             return self.L('R[RSP] = R[RBP]; R[RBP] = LD32(R[RSP]); R[RSP] += 4;')
         self.L('R[RSP] = R[RBP]; R[RBP] = LD64(R[RSP]); R[RSP] += 8;')
-    def i_cld(self, ins, ops): pass
+    def i_cld(self, ins, ops):
+        if IA32:
+            self.L('fDF = 0;')
+    def i_std(self, ins, ops):
+        self.ia32_only('std')
+        self.L('fDF = 1;')
     def i_cpuid(self, ins, ops): self.L('ott_unsup(%s, "cpuid");' % hx(ins.address))
 
     # ---- VEX / AVX (CAB-135) ----
