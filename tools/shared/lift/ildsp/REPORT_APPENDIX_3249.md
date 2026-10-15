@@ -137,7 +137,7 @@
 - 注: 全件実行 (`ildsp_native <PE>`・slot 1〜5) は、既存の表どおり slot 3 rdx=1 で SIGSEGV (rc 139) する。今回の変更で変わっていない。
 
 #### 7.3.1 非 null メンバでの slot 0 (#4154 / T-SH-98)
-- 測定 commit: `<HEAD>` (本 PR の commit。`ildsp_native.c` に `--pre-slot K` と `--s0-members` を追加)。素材 fl-win64 (`26.1.7.5653`)・展開先は `$RUNNER_TEMP`・load average 0.17〜0.31 (4 vCPU)。
+- 測定 commit: `726a4c433` (`ildsp_native.c` に `--pre-slot K` と `--s0-members` を追加)。`git diff 726a4c433 HEAD -- tools/shared/scripts` の出力は本 PR の HEAD 時点で空 (差分 0) を確認する。素材 fl-win64 (`26.1.7.5653`)・展開先は `$RUNNER_TEMP`・load average 0.17〜0.31 (4 vCPU)。
 - 手順: `--pre-slot 1` で slot 1 を create 直後に 1 回呼び、その後 `--slot 0 0` で slot 0 を呼ぶ。`--pre-slot K` の K=2〜5 は、slot 0 の直前に呼んでもメンバが null のままだった (下の注)。
 - 実測 (`--slot 0 0 --pre-slot 1`・n=6・`timeout 15`):
 
