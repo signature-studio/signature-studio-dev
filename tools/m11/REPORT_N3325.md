@@ -107,7 +107,7 @@ unit 40 の前後 (u32 の下位 4B) を LB 別に読んだ値 (`M11_TOLERANT_PE
 
 ## 8. function_4128b0 入口の分岐値の観測 (#4457・受入 1 達成・受入 2/3 は未達)
 
-測定 commit: 本 PR の `M11_INSTR_4128B0` 配線 commit (計測 env の既定は 0)。素材は `fl-win64`・`work-m11`・`toolchain-emsdk` (`/opt/emsdk` 6.0.12)。
+測定 commit: `bcdf045f7` (`M11_INSTR_4128B0` 配線。計測 env の既定は 0)。素材は `fl-win64`・`work-m11`・`toolchain-emsdk` (`[EMSDK]` 6.0.12)。
 
 - 観測点: `function_4128b0` の入口 (`m11_post.py` の wrapper + `m11_ov.c` の `m11_4128b0_obs`)。`M11_INSTR_4128B0=1` のときだけ入る。`function_412770` の強定義 (`m11_ov.c`) は観測点にしない (§2)。
 - 番地 (LB=0 の番地。IR の番地と一致): `[0xFA5008]` (16404488)・`[0x11DADB0]` (18787760)・`[0x11DADDC]` (18787804, GetCurrentThreadId 比較の相手)。LB=0x10000 は +0x10000 (IR で確認: 16470024 / 18853296 / 18853340)。
