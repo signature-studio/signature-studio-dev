@@ -144,12 +144,12 @@ REPORT_PY61 §4-2 のまま変更なし (文言対応・数値非対応)。今�
 
 ## 7. 例外型 `[[[rip+0x85e38a]]]` (0xd82daf) の調査
 
-- 呼出し列: `rcx = *(*(0x15e1140))` (0xd82daf〜0xd82db9)、`rdx = c_str (rax)`、`rbx = *(0x15e49b8)`、`call [rbx]` (0xd82dbf〜0xd82dc6)。`[rbx]` は例外投入 (PyErr_SetString 相当と推定)。
+- 呼出し列: `rcx = [[[0x15e1140]]]` (3 段の load: 0xd82daf・0xd82db6・0xd82db9。PY-106 で訂正)、`rdx = c_str (rax)`、`rbx = [0x15e49b8]` (= 0x16b8408)、`call [rbx]` (0xd82dbf〜0xd82dc6)。`[rbx]` は PyErr_SetString (PY-106 で束縛名を確認)。
 - 参照チェーン: `0x15e1140` (.data) の中身は `0x16b8488` (.bss。ファイルに実体が無い)。その先は実行時に入る値で、静的には型のオブジェクトに到達しない。
 - 文字列の確認: `IndexError` はバイナリに 2 箇所 (file offset 362602・362637、VA 0x45946a 付近)。どちらも Delphi の `EVariantBadIndexError` の一部で、`System.Variants` の文字列と並ぶ。Python の例外名ではない。
 - import 表: 24 DLL、`PyExc_*` の名前は無い。Python の API は実行時に読み込む方式と推定。
 - 参照の確認 (`pe_rip_refs.py 0x15e1140`): 7 件の読込みのみ。`rip` 相対の直接書込みは 0 件。
-- **結論**: 型の名前は静的には確定できない。実行時の値 (`PyExc_IndexError` 等の実体) の確認が要る → #2909 (fl-win64 での実行確認)。
+- **結論**: 型の名前は静的には確定できない。実行時の値 (`PyExc_IndexError` 等の実体) の確認が要る → #2909 (fl-win64 での実行確認)。(PY-106 で束縛名から `PyExc_RuntimeError` と静的に確定。実行時の確認は未達。`REPORT_PY106.md` §1・§2)
 
 ## 8. 変更範囲
 

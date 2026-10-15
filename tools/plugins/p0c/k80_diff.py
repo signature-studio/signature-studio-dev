@@ -446,6 +446,8 @@ def gen_driver(kernels, funcs, cases, proto=None):
         for e in extras:
             out.append('  u64 vX_%s = 0;' % e.replace('.', '_'))
         out.append('  memset(r, 0, sizeof(*r)); r->va = "%s"; r->cls = "%s"; r->ncases = NC; r->status = "ok";' % (va, cls))
+        if K.get('ret_slot') == 'xmm0':
+            out.append('  r->retdiff = -1; /* 戻り値は xmm0 (#3513): 比較対象外 */')
         retmask = ' & 0xffffffffu' if f['ret'] == 'i128' else ''
         out.append('  for (long cs = 0; cs < NC; cs++) {')
         for si in sorted(bufs):
@@ -548,8 +550,11 @@ def gen_driver(kernels, funcs, cases, proto=None):
                 ir_expr.append('0')
         out.append('    u64 rn = nat_%s(%s);' % (va, ', '.join(nat_expr) or '0'))
         out.append('    u64 ri = ir_%s(%s);' % (va, ', '.join(ir_expr) or '0'))
-        out.append('    if ((rn %s) != (ri %s)) { r->retdiff++; if (r->retdiff == 1) fprintf(stderr, "[%s] ret case %%ld nat=%%llx ir=%%llx\\n", cs, (unsigned long long)rn, (unsigned long long)ri); }'
-                   % (retmask, retmask, va))
+        # #3513: 戻り値が xmm0 の kernel は rax (rn) を戻り値として比べない (ret_diff=-1)。
+        # IR の ret は xmm0 を表さないため、その戻り値は ucomi_ret_check.py 等で個別に判定する
+        if K.get('ret_slot') != 'xmm0':
+            out.append('    if ((rn %s) != (ri %s)) { r->retdiff++; if (r->retdiff == 1) fprintf(stderr, "[%s] ret case %%ld nat=%%llx ir=%%llx\\n", cs, (unsigned long long)rn, (unsigned long long)ri); }'
+                       % (retmask, retmask, va))
         cmp_bufs = dict((si, bufs[si]) for si in bufs if si not in struct_slots)
         cmp_bufs.update(extra)
         for si in sorted(cmp_bufs):
@@ -656,7 +661,8 @@ def main():
                        'stacks': ab.get('stack', []),
                        'reads': lay['reads'], 'pids': lay['pids'], 'ptypes': lay['ptypes'],
                        'nparams': lay['nparams'], 'conflict_pid': lay['conflict_pid'],
-                       'clip_index': lay['clip_index'], 'ptr_struct': lay['ptr_struct']}
+                       'clip_index': lay['clip_index'], 'ptr_struct': lay['ptr_struct'],
+                       'ret_slot': ab.get('ret_slot', 'unknown')}
     if a.list_groupb:
         print('GroupB (数値差分対象外 — 外部 helper 呼出):')
         for va, c, h in groupb:
