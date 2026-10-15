@@ -152,6 +152,7 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 | (解消) C 版 (m11_ov.c) と IR 版 (ir414_fix.py) の相互検算 | — | #764 で実施。§9 (5000 case で C 版・IR 版とも機械語と差 0) |
 | gate ON が survey で効果を持たない理由 (C 版の 2 版が同じ結果) | 本 gate の存在意義 | #683 の継続 |
 | `work-m11` が #516/#680 以前の生成物で `ir_conditions.json` 無し (そのままでは build 不可) | 素材の更新 | #729 (survey 測定基準の残課題。work-m11 の R2 再投入を含む) |
+| 280・659 の `6cefb0` 内 OOB (第 3 引数の修復 `fix_r8b815050` 後も残る。§8.1) | 4 対象 unit のうち 2 unit が oob のまま。因果仮説 (引数の ptr 化が原因) は 280/659 で否定 | #3444 |
 
 ### 8.1 #878: 815e10 系 (6cefb0 ← 815050 ← 815e10) の突合と分類
 
@@ -190,3 +191,35 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
   - 後段 (`m11_gen_ir2.sh` の lift 段): `boot1.lift.ll` 118467 行も同じ `ptr nonnull %stack_var_-255`。`m2/ir_normalize.py` と `m5/ir5_patch.py` の該当 call 引数は変えていない (lift 段でも既に alloca)。よって置換は RetDec 段 (`drc`) までに起きていると読め (RetDec 内の pass は未特定)、`m2`/`m5` は除外する。
   - 同じ callee の他 2 call (`0x8208e1` / `0x826406`) は `NULL` を渡す (`drc.ll` 129687 / 134183)。`0x8158f8` だけが alloca アドレスになる。
   - 未確認のまま: RetDec 内のどの型推定 (引数型の推定か、`r8b` の型付けか) が置換を行ったか。修復と 942 unit survey 再測定、因果。これらは親 #1293 (`[M11-N80]`) で扱う (#1081・#878 とも同じ chain を追跡中のため、本 run では新規 issue を起票しない)。
+- **修復と survey (#1448。初回測定は commit `5c43ea98a` (main 取り込み前)、HEAD 再測定は `de8b45c0c`)**:
+  - **修復**: `tools/m11/ldfix/fix_r8b815050.py` (`m11_gen_ir2.sh` の ldfix 後段。既定 ON、`M11_FIX_R8B=0` で外す)。`function_815050` の `call @function_6cefb0(i64 %250, i64 %250, ptr nonnull %stack_var_-255)` の第 3 引数を `ptr inttoptr (i64 1 to ptr)` に置換する。機械語の前提 (`8158f5: mov r8b,1`・`8158f8: call 0x6cefb0`・`6cf021: cmp byte ptr [rcx+0x496], r8b`) を capstone で検査し、IR の想定外は assert で止める。
+  - **根拠 (機械語)**: `r8` は `81550a: lea r8,[rbp+0x1c8]` の後に call (`4255d0` ほか) が挟まり、`8158f5` の直前では呼出しで壊れた値になる (Win64 の揮発性レジスタ)。`6cefb0` は第 3 引数を IR で `icmp slt i64 %0, %29` と `trunc i64 %0 to i8` (`%0 = ptrtoint %arg3`) にしか使わず、機械語も `cmp byte ptr [rcx+0x496], r8b` (8bit 比較) だけ。よって値 1 は機械語の振る舞いと一致する。RetDec 段のどの pass が alloca に置換したかは**未特定** (推定のみ)。
+  - **測定**: `bash tools/m11/trap_triage/neg_1448.sh` (修復 ON / OFF で IR を `m11_gen_ir2.sh` から作り直し、build、942 unit survey)。素材 `work-m11` は再生成 IR (`ldfix=applied`・`ld108=applied`)。gen+build 49 s / survey 7 s / load 0.8 前後。同じ commit で 2 回測定し、結果は一致した (作業ツリー版と `5c43ea98a` で同一)。
+
+表 A (測定 commit `5c43ea98a`、main 取り込み前):
+
+| 構成 (942 unit) | ok | oob | halt0 | miss | noproc | trap |
+|---|--:|--:|--:|--:|--:|--:|
+| OFF (修復なし, A) | 873 | 14 | 7 | 47 | 1 | 21 |
+| ON (修復あり, B, 既定) | 873 | 14 | 7 | 47 | 1 | 21 |
+
+  - **遷移 (A → B)**: 942 unit の kind は全件不変。**ok 退行 0**。icall sites / targets の差 0。
+  - **4 対象 unit**: 149 = oob / 158 = ok / 280 = oob / 659 = oob (OFF = ON)。
+  - **kind 以外の差分 7 unit** (`survey_diff.py`): 280・659 は ON で `va_mb` の項目が出ない (OFF は 120.8 / 21.3 MB)。trap の `msg` は両方とも "memory access out of bounds" で、最上位 frame は `function_6cefb0 ← 815050 ← 815e10` のまま。291・296・302・304・888 は ok のままで、`[m11][VA-big]` の記録上の live 量が ON で約 64 MB (888 は約 85 MB) 少ない。
+  - **結論**: 修復は機械語の値と一致し、kind の退行は 0。しかし 280・659 の `6cefb0` 内 OOB は修復の有無で変わらない。よって「第 3 引数の ptr 化が 6cefb0 の OOB の原因」という因果仮説は 280・659 では成立しない。真因は子 #3444 (6cefb0 内で最初に起きる OOB の場所と、第 1・第 2 引数 (size) の出どころ)。
+  - **鮮度 (現 HEAD)**: 取り込み前の HEAD では `git diff 5c43ea98a HEAD -- tools/m11/ldfix tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/trap_triage/neg_1448.sh` は 0 行だった。main 取り込み (`6b5774526`) 後は 437 行 (8 files、242+/39-。main 側の ld115 (#2447・#2527) の変更と `m11_build.sh` の競合解消)。現 HEAD (`de8b45c0c`) に当たるのは 437 行の方で、0 行は取り込み前の古い値。
+  - **HEAD 再測定 (main 取り込み後、HEAD `de8b45c0c`)**: `bash tools/m11/trap_triage/neg_1448.sh` を foreground で実行。rc=0、所要 2 分 57 秒 (gen+build ON 76.6 s / OFF 74.9 s、survey ON 12.7 s / OFF 13.2 s、loadavg(1 分) 1.03 / 1.06)。素材は `fl-win64` (`$RUNNER_TEMP/fl-win64`、`FL_WIN64_DIR`) と `work-m11` (`tools/m11/work/`)。emsdk は `[EMSDK]` (6.0.12、runner 上の実体) を使い、`toolchain-emsdk` の素材は展開していない。
+  - **鮮度 (HEAD 再測定の対象)**: 測定 commit `de8b45c0c` (検証 HEAD) のコードを変えた最後の commit は `68cd7b86b`。`git diff 68cd7b86b de8b45c0c -- tools/m11/ldfix tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/trap_triage/neg_1448.sh` は 0 行 (`de8b45c0c` は本 REPORT の追記のみ)。`git log --oneline de8b45c0c..HEAD -- <同じ範囲>` が空なら、再測定後に同範囲のコードは変わっていない。
+
+表 B (HEAD `de8b45c0c`、942 unit):
+
+| 構成 (942 unit) | ok | oob | halt0 | miss | noproc | trap |
+|---|--:|--:|--:|--:|--:|--:|
+| OFF (修復なし, A) | 873 | 14 | 7 | 47 | 1 | 21 |
+| ON (修復あり, B, 既定) | 873 | 14 | 7 | 47 | 1 | 21 |
+
+  - **HEAD の結果**: 表 A と全セル一致。942 unit の kind は全件不変、**ok 退行 0**。icall sites / targets の差 0。4 対象 unit は 149 = oob / 158 = ok / 280 = oob / 659 = oob (OFF = ON)。kind 以外の差分 unit は 7 (280・291・296・302・304・659・888) で、表 A の測定と同じ一覧。
+  - **表 A・表 B の絶対値の読み方**: 上記 survey は work-m11 の lift 断片から作り直した IR での OFF / ON の A/B。絶対値は正の基準ではない (次の survey 基準の注記を参照)。
+  - **取り込み後の build gate (本 run、HEAD `6b5774526`)**: `m11_build.sh` の gate 部分だけを一時コピーで検査した (emsdk の参照先のみ差替え。リポジトリは未変更)。ir_conditions.json の組合せ 6 通り: S1 全 applied → gate 通過 (後段の指紋検査で停止)。S2 r8b 記録無し → 拒否。S3 ld115 記録無し → 拒否。S4 r8b=disabled (ALLOW 無し) → 拒否。S5 r8b=disabled + `M11_ALLOW_R8B_DISABLED=1` → WARNING で続行。S6 ld115=disabled (ALLOW 無し) → 拒否。r8b と ld115 の 2 つの検査が独立に効くことを確認。
+- **survey の基準 (#1448)**: 本節の survey は、work-m11 の lift 断片から `m11_gen_ir2.sh` で作り直した IR での OFF / ON の A/B である。`docs/WORKFLOW.md` §11 は work-m11 の snapshot を survey の基準にしないと定めるため、ok 873 などの絶対値は正の基準ではなく、OFF と ON の対比としてのみ読む。
+
