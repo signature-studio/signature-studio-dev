@@ -90,15 +90,14 @@ pnpm install --frozen-lockfile                                 # (a) 現在の l
 
 ## 7. 未解決
 
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| `pnpm add` が既定設定で release-age の違反版を `minimumReleaseAgeExclude` に自動で書き足す (§3 c)。PM agent の判断待ち: pnpm add の既定の自動除外への対応 (a: `pnpm-workspace.yaml` に `minimumReleaseAgeStrict: true` を入れて書き足しを止める / b: 挙動を受け入れ README に注意を残す)・既定案: 挙動は変えず README に 1 行を足す (本 PR で対応済み) | 除外が commit されると既定の拒否が外れる。README『除外しない理由』の前提が pnpm 12 の既定では守られない。既定の挙動・lock は変わらない | #3342 (`needs-user-input` を外す。解決: §8) |
+なし。`pnpm add` が既定設定で違反版を `minimumReleaseAgeExclude` に自動で書き足す問題 (§3 c) は、PM 判断 (a) で解決した (`minimumReleaseAgeStrict: true`・§8)。
+ただし CLI の `--config.minimum-release-age=0` で違反版を通す経路は strict の下でも残る (§8 の結論)。その lock は cutoff までは既定設定の install で止まる。
 
 ## 8. #3342 — `minimumReleaseAgeStrict: true` で `pnpm add` の自動除外を止める (実測)
 
 - 方針: PM 判断 (#3342・2026-10-15) の (a)。`infra/pm-worker/pnpm-workspace.yaml` に `minimumReleaseAgeStrict: true` を入れた。`minimumReleaseAge` の値・lock の版・`package.json` は変えない。
-- 測定 commit: `233b96584` (変更後の HEAD)。変更前は `233b96584~1` (origin/main)。
-- 隔離: 各 project は `packageManager: pnpm@12.10.1` だけの `package.json` と、対象の `pnpm-workspace.yaml` (変更前 / 変更後) を置いた temp dir。`pnpm add` は `</dev/null` の非対話。測定時刻は 2026-10-15 02:00Z 前後。
+- 測定 commit: `233b96584` (strict を入れた commit)。変更前は `233b96584~1` (origin/main)。その後にコードは変えていない (下の差分の証跡)。
+- 隔離: 各 project は `packageManager: pnpm@12.10.1` だけの `package.json` と、対象の `pnpm-workspace.yaml` (変更前 / 変更後) を置いた temp dir。`pnpm add` は `</dev/null` の非対話。測定時刻は 2026-10-15 02:00Z 前後 (表の 1〜5 行) と 02:07Z (表の 6・7 行)。
 
 | 条件 | コマンド | 結果 | `pnpm-workspace.yaml` |
 |---|---|---|---|
@@ -106,8 +105,12 @@ pnpm install --frozen-lockfile                                 # (a) 現在の l
 | 変更後 | `pnpm add -D wrangler@4.151.0` | rc=1。`ERR_PNPM_NO_MATURE_MATCHING_VERSION`。2 版が minimumReleaseAge cutoff を満たさない (`miniflare@5.20261012.0-beta`・`wrangler@4.151.0`) | 変化なし (diff 0)。`package.json` に wrangler なし |
 | 変更後 | `pnpm add -D @cloudflare/vitest-plugin@1.4.2` | rc=1。`ERR_PNPM_NO_MATURE_MATCHING_VERSION`。`@cloudflare/vitest-plugin@1.4.2` と上の 2 版が cutoff 外 | 変化なし (diff 0) |
 | 変更後 | `pnpm add -D wrangler@4.150.0` (公開から 24 時間以上) | rc=0。`+ wrangler 4.150.0` | 変化なし (diff 0)。通常の追加は通る |
+| 変更後 | `pnpm add -D wrangler@4.151.0 --config.minimum-release-age=0` (CLI で cutoff を 0 にする・02:07Z) | rc=0。`+ wrangler 4.151.0` | 変化なし (diff 0)。`package.json` に `"wrangler":"4.151.0"` が入り、lock に違反版が入る。除外への書き足しは無い |
+| 変更後 | 上の行の lock で `rm -rf node_modules && pnpm install --frozen-lockfile` (既定設定・02:07Z) | rc=1。`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`。`2 lockfile entries failed verification` (`miniflare@5.20261012.0-beta`・`wrangler@4.151.0`) | 変化なし (diff 0) |
 | 変更後 | `git archive HEAD infra/pm-worker` を展開し `pnpm install --frozen-lockfile` | rc=0。`Lockfile passes supply-chain policies (verified 1m ago)`・`Lockfile is up to date` | (lock・既定値は変えていない) |
 
-- 結論: strict を入れると `pnpm add` は違反版を除外へ書き足さず、失敗する。通常の版の追加と、現在の lock の `--frozen-lockfile` は変わらない。違反版を使うには、cutoff を過ぎるか、`minimumReleaseAgeExclude` を手で書くしかない (手で書く場合は除外の方針を README『除外しない理由』に従って判断する)。
+- 結論: strict を入れると、`pnpm add` は既定設定で違反版を除外へ書き足さず、失敗する (表の 2・3 行。除外への書き足しが起きるのは、strict なしの変更前の 1 行目だけ)。通常の版の追加と、現在の lock の `--frozen-lockfile` は変わらない。
+- 違反版を通す経路は strict の下でも残る。(i) cutoff を過ぎるまで待つ。(ii) `minimumReleaseAgeExclude` を手で書く。(iii) CLI で `pnpm add -D <pkg>@<版> --config.minimum-release-age=0` を付ける (表の 5 行。README『除外しない理由』が挙げる経路と同じ)。strict は (iii) を止めない。(iii) で入った違反版は、`pnpm-workspace.yaml` を変えずに lock へ入る。その lock は、cutoff までは既定設定の `pnpm install --frozen-lockfile` が `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で rc=1 になる (表の 6 行)。cutoff (§2) を過ぎると、同じ install は通る。
+- (ii)・(iii) は除外や release-age の緩和なので、手で行う場合は README『除外しない理由』に従って判断する。
 - 差分の証跡: `git diff 233b96584 HEAD -- infra/pm-worker/src infra/pm-worker/test infra/pm-worker/package.json infra/pm-worker/pnpm-lock.yaml infra/pm-worker/pnpm-workspace.yaml infra/pm-worker/wrangler.toml` の出力は 0 行 (本節を含む commit の後の HEAD で確認)。
 - 範囲外: Workers Builds の実際の install 結果 (README 既存の注記どおり未確認)。strict の挙動は pnpm 12.10.1 でだけ確認した。
