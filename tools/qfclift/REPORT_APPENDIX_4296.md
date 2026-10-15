@@ -1,0 +1,28 @@
+# tools/qfclift REPORT 付録 #4296 — T-SH-113: FontCache_GetStats / FontCache_CleanUp の直接呼出し
+
+REPORT.md §7.9 の全文 (分割移動)。
+
+## 7.9 FontCache_GetStats / FontCache_CleanUp の直接呼出し (T-SH-113 / #4296)
+
+測定 commit = `c36a9b817` (`qfc_direct.mjs` を追加した commit)。lift・rt・boot 経路は無改変。DllMain を通さず、`fle_data_install` → `fle_init` の後に 2 関数を直接呼んだ。
+引数仕様は REPORT に無いため、逆アセンブルから推定した (推定呼出し)。GetStats = `rcx=buf` (buf に 0x50 byte を書く)、CleanUp = `ecx, edx` の 2 int。
+
+| 版 | 関数 | 引数 (推定) | 結果 | 停止点・根拠 |
+|---|---|---|---|---|
+| strict | FontCache_GetStats (VA `0x57faf0`) | buf (malloc 0x1000) | **trap** (`Aborted`) | 関数先頭の `call qword ptr [rax]` (`0x57fb07`)。`rax = [0x5cae18] = 0x5d8b48` (`.data`)、呼出先 `[0x5d8b48]` は `.bss` (raw 0) で **0 のまま**。`[fle] call to UNLIFTED function 0 ret=0x57fb09` が出て abort |
+| strict | FontCache_CleanUp (VA `0x57f980`) | 0, 0 | ok・rax = `0x0` | 間接呼出しなし。戻り値は引数 (0,0) 依存の可能性あり (未検証) |
+| soft | FontCache_GetStats | buf | **trap** (同じ停止点) | soft 呼出し 0 件 (abort は stub に入る前) |
+| soft | FontCache_CleanUp | 0, 0 | ok・rax = `0x0` | soft 呼出し 0 件 |
+
+- 実行: `QFC_CJS=<work/boot/lift/qfcl.cjs> QFC_OUT=<json> node tools/qfclift/qfc_direct.mjs` (lift は `qfc_boot.sh` の `work/boot/lift/` を使う)。`CleanUp` は `GetStats` の trap 後に別 instance で実行 (trap 後の wasm 状態は信用しないため)。
+- 結論: **`FontCache_GetStats` は DllMain の init を経ないと実行できない**。`0x5d8b48` (`.bss`) の関数ポインタは DllMain 側で設定される前提 (推定。設定箇所は未特定。lifted code に `0x5cae18`/`0x5d8b48` への store は無い)。
+  これは §7.4 の停止点 (DllMain が `0x59c210` の longjmp 継続で完走しない) と同じ前提の欠落で、直接呼出しでは回避できない。
+- `FontCache_CleanUp` の rax = 0 は、引数 (0,0) での単発の値で、実物との一致は未確認。受入の「結果 (rc・戻り値・停止点) を実測で書く」は満たすが、PASS 判定ではない。
+- 受入条件の未達: GetStats は wasm で完走しない。DllMain の完走 (#3411 の rt 実装・#4262 の偽の停止の確定・#4263 の longjmp 条件) が前提。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `0x5d8b48` (.bss 関数ポインタ) を設定する箇所の特定と、DllMain 完走後の値の確認 | GetStats が実行できない | #3411 (T-SH-78) / #4262 (T-SH-106) |
+| CleanUp の rax = 0 が引数 (0,0) 依存か、実物と一致するか | CleanUp の PASS 判定 | #4296 (T-SH-113・継続) |
+| GetStats・CleanUp の引数仕様 (逆アセンブルの推定のみ) | 呼出しの正しさ | #4296 (T-SH-113・継続) |
+

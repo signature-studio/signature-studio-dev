@@ -45,17 +45,12 @@
 | 確定した式 | `*(int32*)([rbp+0x3a8] + (k·17)·8 + 0x1d4 + (key_low16 − 0x70001fd0)·4) = n` (k = (key_low16 − 0x70001fd0) & 7 の符号補正値)。`[rbp+0x580]` と `[rbp+0x568]` の両方が key 由来で、同じ key の 2 つの添字 |
 | 直前の lock | `0x104bf56` で `EnterCriticalSection` |
 
-## 4. 残り 7 枝の状態 (未確定。子 issue へ)
+## 4. 残り 7 枝の状態 (PY-306 で式まで確定。詳細は REPORT_PY306.md)
 
-| 枝 | 候補 store | 未確定の理由 |
-|---|---|---|
-| `0x104ae3d` | `0x104af7f` (`mov [rbp+0x5b8], ecx`) は n の再計算。`0x104b093`・`0x104b305` は別経路 | store 先が `[rbp+0x5b8]` (ローカル) で、外部への書込みは未確認 |
-| `0x104b1fd` | `0x104b3bc` (`mov [rax], ecx`、`rax = [rbp+0x3d8]`)。`[rbp+0x3d8] = [rbp+0x3e0] + ([rbp+0x580])·8 + 0x394` (`0x104b37c`〜`0x104b392`)、`[rbp+0x3e0] = [[rip+0x5953d4]] + ([rbp+0x578]·0x28f)·8` (`0x104b2c5`〜`0x104b2de`) | 式は取れた (store 先の VA は global の実値が要る)。添字 `[rbp+0x580]` の上限は `0x104b2b0` の比較 (`cmp ecx, [[rip+0x596ee1]]`) で、上限の実値が未確定 |
-| `0x104c2a6` | `0x104c335`・`0x104c3ca` (`mov [rax], ecx`)。`rax` は `0x4232e0` の戻り値 (lock 後の global) | 戻り値の global の実値が必要 |
-| `0x104c4af` | 候補なし (`0x104c61b` 付近は関数呼出し) | 格納が呼出し先にある可能性。未確認 |
-| `0x104c64f` | `0x104c6ea` (`mov [rax], ecx`)。`rax` は `[rip+0x59656c]` | global の実値が必要 |
-| `0x104c919` | `0x104c9c0` (`mov [rax], ecx`)。`rax = [rip+0x595f0e]` | global の実値が必要 |
-| `0x104caae` | 終端。`0x104cb89`・`0x104cc10` は `[rax+rcx*8]` の配列 push | n の格納ではなく終端処理 (REPORT_PY181 §3 と同じ) |
+- 7 枝の store 先の式は `tools/python/REPORT_PY306.md` §2 に移した。ここに残るのは訂正 2 点のみ。
+- 訂正: `0x104c4af` は「候補なし」ではない。`call 0x1311030` の内部で n が固定 VA `0x196ec34` (.bss) に書かれる。
+- 訂正: `0x104c2a6` の store の rax は `0x4232e0` の戻り値ではない。`[rip+0x15e36d8]` から取る (静的値 `0x15c26e8`)。
+- 残り (実行時の global 値・呼出し元経路) は REPORT_PY306.md §3 を正本とする。
 
 ## 5. 未解決
 

@@ -108,6 +108,48 @@
 
 `work/` は作業用ディレクトリ (`py53/fn.txt` を置く場所。PY-88 と #3085 と同じ入力)。
 
+## レジスタの合流の閉包 (#4266 / PY-313)
+
+測定 commit: `7bc5dd7b0` (`analysis/py99_closure.py` にレジスタ読みの CFG 到達閉包 `reg_before`・`reg_forward`・`RG[...]` 展開を入れた最後のコード commit)。`git diff 7bc5dd7b0 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
+素材: `fl-win64` の `block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin'`・1.5 秒)。`analysis/py53_dispatch.py` → `fn=4664 dispatch=13 r8d_tests=174`。
+
+- 原因: `0x104bffa` の式の `⚠合流@0x104bd49`・`⚠合流@0x104be63` は、フレーム読みではなくレジスタ読み (`{0x104bd49: …}`) に付いていた。`py88_writes.Slicer.resolve` の合流判定は線形の命令列だけを見るため、レジスタの合流を展開できなかった。共有の `py88_writes.py` は変えず、`py99_closure.py` の中に CFG 到達のレジスタ閉包を足した (A は前向き固定点・B は後ろ向き BFS)。
+- 結果: `0x104bffa` の式から `⚠合流` が消えた (未閉 → 閉。残る葉は `c_in` だけ)。他の 48 件の式は、閉包の表示 (`md`) で変化 0 行。
+
+| 項目 | 前 (`99c7696df`) | 後 (`7bc5dd7b0`) |
+|---|---|---|
+| 残る葉が入口のレジスタ値 (`_in`) だけの書込み | 48/49 | **49/49** |
+| 閉じた書込み (厳格判定・`_in` も未閉に数える) | 0/49 | 0/49 |
+| 未閉の `⚠合流` を含む書込み | 1 件 (`0x104bffa`) | 0 件 |
+| 検算 mismatch (A と B) | 0 | 0 |
+| negctl `--negctl drop-pred` の mismatch | 17・exit 1 | 17・exit 1 |
+
+受入の判定:
+
+- 受入 1 (閉じた書込みの増加): **未達**。`0/49` は増えていない。`0x104bffa` の合流は閉じたが、同じ式に `c_in` が残るため厳格判定では閉じない。増えるのは「入口レジスタ以外の葉だけが残る書込み」の数で、48/49 → 49/49。
+- 受入 2 (検算 mismatch 0 と negctl mismatch 17): **達成**。
+- 受入 3 (入口レジスタ葉の判定): **判定を下した**。`c_in`・`d_in`・`r8_in` は関数 0x1046a30 の入口の値のまま残す (未閉)。呼出し側の値を確定するには呼出しの解析が要り、本節の範囲外。ここでは閉じた式を「入口レジスタ値の式」として扱う。
+
+### 再測定 (`7bc5dd7b0`・コミット済み HEAD)
+
+| 実行 | 結果 | exit | 所要 | load (1 分) |
+|---|---|---|---|---|
+| `analysis/py99_closure.py work/py53/fn.txt` | mismatch 0 (49 件) | 0 | 0.37 秒 | 0.00 → 0.16 |
+| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred` | mismatch 17 | 1 | 0.48 秒 | 0.03 → 0.09 |
+| `analysis/py99_closure.py work/py53/fn.txt --md <out>` の再生成 | commit 済みの `analysis/py99_closure.md` と差分 0 | 0 | — | — |
+
+### 再現
+
+    cd tools/python
+    python3 analysis/py99_closure.py work/py53/fn.txt                      # 終了コード 0 (mismatch 0)
+    python3 analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred   # 終了コード 1 (mismatch 17)
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 入口のレジスタ葉 `c_in`・`d_in`・`r8_in` の呼出し側の値 | 49 件の式が関数の入力のまま。厳格判定の閉じた書込みは 0/49 | #4494 ([PY-334]・親 #4266) |
+
 ## rint 6 件の閉包 (#3913 / 親 #2788・PY-271)
 
 測定 commit: `696fb146a` (`analysis/py99_closure.py --rint` を入れた最後のコード commit)。`git diff 696fb146a HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
@@ -138,7 +180,7 @@
 | `--negctl drop-pred` (49 件) | mismatch 17 件 | 1 | — | — |
 | `--rint --negctl drop-pred` (6 件) | 「寄与を持つ先行辺が無い」で終了 (mismatch は出ない) | 1 | — | — |
 
-- **6 件専用の negative control は作れなかった** (受入 2 の negative control の部分は子 #4332 に移した)。`drop-pred` は 6 件の読みに対して寄与する先行辺を見つけられない。既存の 49 件の negative control (mismatch 17・exit 1) は同じ閉包のコード経路の検出力を示すだけで、6 件の式がそれで検出されるとは言えない。
+- **6 件専用の negative control は `drop-pred` では作れなかった** (#4332 で `--negctl drop-part` を追加し、6 件で mismatch 1・exit 1 を確認。§「rint 6 件の negative control」)。`drop-pred` は 6 件の読みに対して寄与する先行辺を見つけられない。既存の 49 件の negative control (mismatch 17・exit 1) は同じ閉包のコード経路の検出力を示すだけで、6 件の式がそれで検出されるとは言えない。
 - 算法 A と B は、store の式 (`py88_writes.Slicer.def_value` 系) と CFG を共有する。「別の算法」は式の作り方を共有しない意味ではなく、閉包の走査 (前向き固定点と後ろ向き BFS) が別という意味に限る。式の同値性は見ていない (文字列の一致のみ)。
 - 6 件の閉包は `py99_closure.py` の既定の 49 件 (出力は変えていない) と同じ規則。
 
@@ -147,4 +189,38 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 入口レジスタ葉 `c_in` (ecx)・`d_in` (edx) の呼出し側の値 | rint 6 件の式の入力は関数の引数のまま。値の確定は呼出し側の解析が要る | #4266 ([PY-313]・親 #2874) |
-| `--rint` の negative control (6 件に寄与する先行辺が無い・#3913 受入 2 の negctl の原文) | 6 件の閉包の検出力を 6 件で示せない | #4332 ([PY-317]・親 #3913) |
+| `--rint` の negative control (6 件に寄与する先行辺が無い・#3913 受入 2 の negctl の原文) | 6 件の閉包の検出力を 6 件で示せない | 解決 (#4332・§「rint 6 件の negative control」) |
+
+## rint 6 件の negative control (#4332・PY-317)
+
+測定 commit: `150ba28e6` (usage 文言の修正のみ。最後のコード commit)。`--negctl drop-part` の追加は `e4c4099df`。実測は `150ba28e6` で行った (`e4c4099df` からの差は usage 文言 2 行のみ)。`git diff 150ba28e6 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
+素材: `fl-win64` の `extracted/block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst extracted/block00031_PE.bin`)。`analysis/py53_dispatch.py` → `fn=4664 dispatch=13 r8d_tests=174`。
+
+### 既存の `--negctl drop-pred` が 6 件で使えない理由
+
+6 件の書込みの直接の読み (`r0.reads`) は 3 件 (0x1048ea8・0x1049059・0x10491d1)。閉包が辿る読みは 8 件 (`reach_before` で store を再帰に辿った先を含む)。どの合流でも、先行辺ごとの到達 store 集合 S_p が**同一**で、辺 1 本を外しても到達集合が変わらない (`contributing=[]`)。そのため `drop-pred` は「寄与を持つ先行辺が無い」で終了する。
+
+### 追加した辺の選び方 (`--negctl drop-part`)
+
+読みの後ろ向きに辿れる辺のうち、外したときに到達集合が**一部だけ減る** (空にならない) 辺を、VA 順に最初の 1 本選ぶ。合流の先行辺ではなく、経路の途中の辺を対象にする (合流の寄与は重なるため)。`drop-pred` と既定の挙動は変えていない。
+
+### 結果 (commit `e4c4099df`)
+
+| 実行 | 結果 | exit |
+|---|---|---|
+| `analysis/py99_closure.py work/py53/fn.txt` (既定 49 件) | mismatch 0 件 | 0 |
+| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred` (49 件) | 辺 `0x104754a -> 0x104755d` を外す・mismatch 17 件 | 1 |
+| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-part` (49 件) | 辺 `0x1047543 -> 0x104754a` を外す・mismatch 17 件 | 1 |
+| `analysis/py99_closure.py work/py53/fn.txt --rint` (6 件) | mismatch 0 件・閉包の A と B が一致 | 0 |
+| `analysis/py99_closure.py work/py53/fn.txt --rint --negctl drop-pred` (6 件) | 「寄与を持つ先行辺が無い」で終了 (mismatch は出ない) | 1 |
+| `analysis/py99_closure.py work/py53/fn.txt --rint --negctl drop-part` (6 件) | 辺 `0x1047543 -> 0x104754a` を外す・**mismatch 1 件** (書込み `0x1048ed3`・読み `0x1048ea8`・X=0x520 の到達集合が `{0x1047543, 0x1047556}` → `{0x1047556}`) | 1 |
+
+- 6 件の閉包を壊す辺は 1 本 (`0x1047543 → 0x104754a`) で、mismatch = 1・exit 1 を数値で確認した。
+- 他の 5 件 (0x10483d3・0x104906e・0x10491ed・0x104a876・0x104a999) は、この辺を外しても変わらない。
+- 0x1048ed3 の閉包は、この辺を外すと読み 0x1048ea8 の R が 1 件 (`0x1047556`) だけになる。A (前向き) は 2 件のままなので mismatch が出る。
+- 所要: `--rint --negctl drop-part` 実測 3 回とも real 0.38 秒 (rc 1)・load (1 分) 0.04 (測定開始時 `0.04 0.12 0.13`)。
+
+### 再現
+
+    cd tools/python
+    python3 analysis/py99_closure.py work/py53/fn.txt --rint --negctl drop-part   # 終了コード 1 (mismatch 1)
