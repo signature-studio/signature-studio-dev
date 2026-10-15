@@ -207,3 +207,18 @@ node trap_triage/probe1676_watch.mjs                                      # base
 | `function_535c2e` (IR 未定義。RetDec が `535bf2` の末尾 ret を落とした) の既定化 | ON 時の unit 304・555 の abort (併用で解消) | #2521 |
 | 既定 ON 化と回帰ゲートの更新 | — | #2521 |
 | DEFECTS.md への D23 追記 | 横断正本の更新 | PM 判断 (`docs/WORKFLOW.md` §5) |
+
+## 8. #2521: `function_535c2e` の既定化 (`M11_FIX_535BF2` 既定 ON)・unit 144 の trap 経路
+
+既知類型との関係: 該当なし (unit 144 の回帰は原因未特定。§8.2 は trap 位置まで)。
+
+### 8.0 結論
+
+1. **受入 3 (`function_535c2e`・unit 304/555 の abort)**: `M11_FIX_535BF2` の既定を 0 → 1 にした (commit `d80e9909f`)。ON (`M11_FIX_50A830=1`) では unit 304・555 が abort から oob に戻り、OFF の分類と一致する。OFF 経路は unit 単位で不変 (§8.1)。
+2. **受入 1 (unit 144 の回帰の原因)**: 未特定。trap の関数チェーン (§8.2) まで。起票先: #3482。
+3. **受入 2 (ON で unit 144 の回帰を解消)**: 未達。ON の survey ok は 872 (OFF 873 − 1) で「872 以上」は数値上満たすが、unit 144 は ok → oob のまま。起票先: #3482。
+4. **受入 4 (既定 ON 化)**: 未達。`M11_FIX_50A830` は既定 OFF のまま (受入 1・2 が前提)。起票先: #3482。
+5. e2e の rc は既定・ON とも **1**。origin/main `44a7f4465` (変更前) でも同じ値で、ゲートの期待値と実測が合わない (§8.1 の 3 件)。本 PR では期待値を変えていない。
+6. **既定変更の到達先 (付録 §8.4)**: `tools/gui/flengine/build.sh` は `m11_ov.c` を直接コンパイルするため、`-DM11_FIX_535BF2=0` で従来値に固定した (GUI 側の前処理出力は変更前と一致。照合は `tools/gui/flengine/REPORT_APPENDIX_2521.md`)。
+
+§8.1〜§8.4 (実測表・trap 経路・未解決・既定変更の到達先) は付録 `REPORT_APPENDIX_2521.md` に分割移動した (250 行上限)。
