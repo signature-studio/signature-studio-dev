@@ -7,7 +7,7 @@
 
 - **0x45c170 の間接 call `[rax]`** (slot 0x15e3ea8 → セル 0x15f1038) の先は `oleaut32.dll!VariantChangeTypeEx`。
   セルは初期化関数 0x457c70 が `GetProcAddress` で解決して格納する (0x457c9e)。モジュール名 `oleaut32.dll` (0x457c78)、名前 `VariantChangeTypeEx` (0x457c8b)。
-  - 解決関数 0x457c40 は `GetProcAddress` の結果が 0 なら既定値 (r8) を返す。VariantChangeTypeEx の既定値は 0x4572c0 (lea 解決で確定)。0x4572c0 は `cmp r8d, 0x400` で lcid を見て 0x4572b0 (slot 経由の jmp) を呼ぶ shim。実行時に GetProcAddress が 0 を返すかは未確認。
+  - 解決関数 0x457c40 は `GetProcAddress` の結果が 0 なら既定値 (r8) を返す。VariantChangeTypeEx の既定値は 0x4572c0 (lea 解決で確定)。0x4572c0 は `cmp r8d, 0x400` で lcid を見て 0x4572b0 (slot 経由の jmp) を呼ぶ shim、という逆アセ読み (probe では未検証)。実行時に GetProcAddress が 0 を返すかは未確認。
 - **0x45c040 の間接 call `[rax]`** (slot 0x15e4a68 → セル 0x15f10a0) の先は `oleaut32.dll!VarI4FromStr` (推定ではなく、格納箇所 0x457e17 と名前 0x457f8e の照合で確定)。
   - 0x45c040 の `0x7ffdfffb` (`add` 後に 0 判定) は、戻り値 `ebx == 0x80020005` の判定そのもの。`0x80020005` は Win32 の `DISP_E_TYPEMISMATCH` と一致 (定数の一致。用途は推定)。
 - **0x45c1c0 の間接 call `[rip+0x1194f0f]`** (セル 0x15f1100) の先は関数 `0x45a050` (`call 0x459ef0` だけの thunk)。セルは初期化関数 0x467f00 が `lea` で求めた値を格納する (0x467f40 で rcx = 0x45a050)。
@@ -39,6 +39,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x459ef0 (0x45c1c0 の間接先 0x45a050 の本体) の役割。`0x41c820`・`0x448d40`・`0x411e80`・`0x412d60` を読み切っていない | 0x45c1c0 の戻り値 (型 0x101 の式) が変換結果か例外かの確定 | 未起票 (PY-318 の残り。次 round で扱う) |
-| 0x4096d0 → 0x4096b0 → 0x412a40 → 0x4128b0 の末尾 (範囲外時の送出経路) | 0x40f540 (範囲外) の確定。例外送出は推定のまま | 未起票 (同上) |
-| 0x457c70 の GetProcAddress 結果が 0 になる実行時条件 (0x4572c0 の shim へ落ちる経路) | VariantChangeTypeEx が本物か shim かの確定。通常の Windows では本物と推定 | 未起票 (同上) |
+| 0x459ef0 (0x45c1c0 の間接先 0x45a050 の本体) の役割。`0x41c820`・`0x448d40`・`0x411e80`・`0x412d60` を読み切っていない | 0x45c1c0 の戻り値 (型 0x101 の式) が変換結果か例外かの確定 | [PY-338] #4543 |
+| 0x4096d0 → 0x4096b0 → 0x412a40 → 0x4128b0 の末尾 (範囲外時の送出経路) | 0x40f540 (範囲外) の確定。例外送出は推定のまま | [PY-338] #4543 |
+| 0x457c70 の GetProcAddress 結果が 0 になる実行時条件 (0x4572c0 の shim へ落ちる経路) | VariantChangeTypeEx が本物か shim かの確定。通常の Windows では本物と推定 | 本 PR の REPORT §2 (追跡のみ。子は起票しない) |
