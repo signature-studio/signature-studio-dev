@@ -232,7 +232,7 @@ python3 tools/shared/lift/rex/importers.py <fl-win64 展開先> --json OUT.json 
 
 ### 9.3 検証範囲 / 範囲外 / 未解決
 - 検証した: 2 フラグ × 3 回の `all` (本検査・配信物の一覧・`cmp`・sha256・ネガコン 3 種)。独立検算は python の `os.walk` と `hashlib.sha256` (repo 外の一時スクリプト) で一覧とハッシュを再計算し、`sha256sum` と照合。
-- 範囲外: (a) `-sSIDE_MODULE=2` の dlopen 形は作っていない (固定 VA 0x30000000 の画像と grobal 配置の再配置を要する)。本節の side module は「公開 tier と別ファイルの standalone wasm で、フラグで組み込みを切り替える単位」の意味。(b) 公開 tier の配信 (`deploy/`・release guard) への結線は無い。(c) 配信側の host (組み込み先) は未実装。本検査の範囲 (§7.5) は変えていない。
+- 範囲外: (a) `-sSIDE_MODULE=2` の dlopen 形は作っていない (固定 VA 0x30000000 の画像と global 配置の再配置を要する)。本節の side module は「公開 tier と別ファイルの standalone wasm で、フラグで組み込みを切り替える単位」の意味。(b) 公開 tier の配信 (`deploy/`・release guard) への結線は無い。(c) 配信側の host (組み込み先) は未実装。本検査の範囲 (§7.5) は変えていない。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
