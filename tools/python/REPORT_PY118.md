@@ -84,3 +84,53 @@
 ## 7. 差分と検証の鮮度
 
 - 測定 commit `dbfc2a4f` 以降に `tools/python` で変えるのは REPORT のみ (`REPORT_PY118.md`・`REPORT_PY115.md` の文言)。`git diff dbfc2a4f HEAD -- tools/python` は REPORT の 2 ファイルだけで、コードの差分は 0。再測定は不要。
+
+## 8. #3059 (PY-202): 実行時の既定色と wrapper 範囲判定の PE 静的解析 (追記)
+
+受入条件 1・3 を本節で確定し、2 と flpy 部 (受入条件 4) は子 issue に移した (§9)。
+測定 commit (コードを変えた最後の commit): `f4f3375bc` (`fix(python): getTrackColor の範囲外を PE 0xd5ec60 に合わせ int 0 を返す`)。
+
+### 8.1 結論
+
+- **wrapper 0xd5ec60 の範囲判定**: `0 ≤ idx ≤ N-1`。N は qword 大域 `0x15e2198` (.data) の指す先の dword。PE 初期値は `0x14188a8` → dword `0x1f6` = **502**。
+- **範囲外の応答**: PyErr を立てない。初回のみの警告 (`0xd84510`) の後に **int 0** を返す (`0xd5ecea`〜`0xd5ecfd`)。idx < 0 も同じ経路 (`0xd5eca9`・`0xd5ec9c`)。C/mock は RANGE (code 4) を返していたため、本 PR で int 0 に直した。
+- **N の実行時値は未確定**。`trackCount` の 127 (`NMIX`) を据え置き、上限は変えていない (REPORT_PY205・#3553)。
+- **既定色の初期値**: 0x770830 が書く `0xff636c71` (§1)。設定ストアの root (qword `0x13fc3e8`) が PE 初期値 0 で、0x783810 の変換ゲートも 0 のため、**設定 XML が無い状態では 0x78b8e0 は既定値をそのまま返す**。よって未設定時の getTrackColor は `0xff636c71` (C/mock と一致)。ただし 0x111d7e0 の起動経路が未確定のため、起動時に有効かは未確定 (#3805)。
+
+### 8.2 PE の根拠 (VA)
+
+| 項目 | VA | 根拠 |
+|---|---|---|
+| 範囲判定 | `0xd5ec97`〜`0xd5eca9` | `mov rcx,[rip+0x8834fa]` (実効 `0x15e2198`) → `mov ecx,[rcx]` → `sub ecx,1` → `cmp rax,rcx` → `jg` |
+| 範囲外 | `0xd5ecea`〜`0xd5ecfd` | `call 0xd64ca0` → `call 0xd84510` (警告・初回のみ) → esi = 0 → 変換 `call [0x88557a]` → 戻る |
+| 引数解析 | `0xd5ec82` / 失敗 `0xd5ed0a` | `call [0x16b82f0]` (PyArg 相当)。失敗時のみ `0xd82c20` |
+| 未発見判定 | `0x7878c0` | 戻り値 al = 発見フラグ `[rbp+0x57]` (初期 0)。`[rbp+0x88]==0` で 0 のまま返り、`*r8` は書かない |
+| 設定ストア | `0x13fc3e8` (.data) | PE 上 0。書込みは `0x789530` のみ (`0x78954a`・`0x7895f6`・`0x789751`) |
+| ゲート書込み | `0x788150` | 先頭ガード `0x7881cb`: `cmp [0x13fc3e8],0` で root 0 なら何も書かず戻る。呼出し元は `0x789764` (`0x789530` 内) のみ |
+| ゲートの対応 | `0x78865f`・`0x788677`・`0x78868f`・`0x7886a7` | `0x15f69e0` ← "fl.tweaks.hue"、`0x15f69e4` ← "fl.tweaks.saturation"、`0x15f69ec` ← "fl.tweaks.lightness"、`0x15f69e8` ← "fl.tweaks.contrast"。値は設定の整数 (不可なら旧値) |
+| 変換 | `0x783810` (`0x783820`・`0x78383f`) | root 0 のときゲートが全て 0 で恒等 |
+| 0x789530 の呼出し元 | `0x111d882` (`0x111d7e0` 内) | `0x111d7e0` は PE 内に直接参照が無い (間接呼出し)。設定 XML の読込み `0x111b930` は推定 (拡張子 ".xml" の比較は UTF-16 からの推定) |
+| 0x770830 の呼出し元 | `0x111d87a` (`0x111d7e0` 内)・`0x11be297` (`0x11be0a0` 内) | `0x11be0a0` ← `0x1375220` ← `0x1376545` ← export `CreateFruityInstance` (`0x1375990`) |
+
+### 8.3 実測 (コミット済み HEAD)
+
+- build: `EMSDK_ENV=$RUNNER_TEMP/emsdk-art/emsdk/emsdk_env.sh bash tools/python/provider/build.sh`: rc 0、警告 0、real 11.7 s (user 21.8 s / sys 12.6 s)、実行直前 load `0.84 0.34 0.22`。
+- `node tests/mixer_diff.mjs`: `{"calls":69,"diffs":0,"PASS":true}`、real 0.149 s。範囲外 pin (`getTrackColor` の -1・127 → `{ok:0}`、mock と wasm) を含む。
+- `node tests/channels_diff.mjs`: `{"calls":238,"diffs":0,"grid_calls":1200,"grid_true":30,"grid_diffs":0,"PASS":true}`、real 0.063 s。
+- **ネガティブコントロール**: mock の `getTrackColor` を旧版 (`tr(i)` で RANGE) に戻すと `AssertionError` (actual `{ code: 4 }`)、rc 1。修正後は PASS (上の `calls 69`)。
+- `node tests/provider_check.mjs`: 件数検査まで到達後、flpy 部で `work/midi.py` が無く ENOENT (rc 1)。**flpy 部は未実行** (子 #3804)。
+- 差分: `git diff f4f3375bc HEAD -- tools/python` は本節 (REPORT_PY118.md) の追記だけ。コードの差分は 0。
+
+### 8.4 変更の範囲
+
+- `getTrackColor` の範囲外 (idx < 0 または idx ≥ NMIX) のみ、RANGE → int 0 に変わる。範囲内の戻り値は変わらない。
+- 他の mixer 関数 (`MX` マクロ) は変えない。上限 127 は据え置き。
+
+### 9. 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 0x111d7e0 の上位呼出し元 (起動時か遅延か) | 未設定時の既定色 `0xff636c71` が実行時に有効かは未確定 | #3805 (PY-256) |
+| 0x11be297 経路 (`CreateFruityInstance`) の起動時性 | 0x770830 の初期化タイミング | #3805 (PY-256) |
+| provider_check の flpy 部・all_tools (既定・wasm) の実行 | flpy 経路の回帰は未検証 (`dist/flpy.js` と `work/midi.py` が本 run に無い) | #3804 (PY-255) |
+| N = 502 の実行時値 (範囲上限) | getTrackColor・getTrackCount の上限 127 前提 | #3553 (PY-212) |
