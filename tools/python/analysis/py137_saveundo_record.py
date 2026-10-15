@@ -5,7 +5,7 @@
 
 PE は fl-win64 素材の extracted/block00031_PE.bin (ImageBase 0x400000)。
 全検査が通れば PASS を出し、いずれかが外れれば AssertionError で止まる (PE 指紋が変わった時の検出)。
-検査する事実は REPORT_PY124.md §4 の表と 1 対 1 に対応する (履歴 H = [[0x15e1c78]]・record 構造は同 REPORT)。
+検査する事実は REPORT_PY124.md §4-2 の表と 1 対 1 に対応する (履歴 H = [[0x15e1c78]]・record 構造は同 REPORT)。
 """
 import os
 
