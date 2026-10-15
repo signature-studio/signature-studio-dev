@@ -9,7 +9,7 @@
 - **項目 2 (段別 A/B・達成)**: 元の 9 件のうち 53・87・138 は **qstore だけで消える** (ldfix の後に qstore だけを足すと 9→6)。158 は **qstore と alloca の両方が要る** (qstore だけ (c4) も、qstore を外した prod fix (l_no_qstore・alloca あり) も残る)。17 は alloca、56 は guard699 で消える。**ld108・ld115・src412770 は 9 件の集合も本番順の 22 件の集合も変えない** (累積 A/B と leave-one-out の両方で確認。unit 番号の照合は §1-3)。
 - **項目 3 (r8b を含む本番順の判定・達成)**: r8b (`fix_r8b815050.py`・main の `m11_gen_ir2.sh` の既定) を含めても、件数 (survey ok/miss/trap) は r8b 無しと同じ。fix・base とも 872/47/22。fix と base の差は unit 895 (OOB → halt0) の 1 件だけ。r8b は unit 280・659 の trap を消さない (最内 frame は同じ callee `function_6cefb0`。呼出し位置の offset だけが変わる)。
 - **項目 4 (F3c 33→43 の出所・達成)**: commit `f63b5953d` (`fix(ldfix): repair first-deref-not-entry uses dominated by the deref block (refs #1325)`) で F3c 関数が 33 → 43 に増えた。同じ入力 `boot_final3.ll` で、親 (`f63b5953d^`) は 33、この commit は 43 (§4)。
-- **項目 1 (trap 144・149・114 の引き金・部分達成)**: unit 別の最内 frame と段ごとの変化 (§1〜§3)。§8 で commit 済みスクリプトによる引数採取を行った。144 の a1 の書込み元 (`function_653660` 219682 行 ← `function_439550` が `dsp_ippv2.dll` を小文字化) まで特定。149 は `[0x10aa1418]` の書込み元 (`function_4136a0` 119304 行) まで、114 は未採取。PR は `Refs #3608`。
+- **項目 1 (trap 144・149・114 の引き金・部分達成)**: unit 別の最内 frame と段ごとの変化 (§1〜§3)。§8 で commit 済みスクリプトによる引数採取を行った。144 の a1 の書込み元 (`function_653660` 219682 行 ← `function_439550` が `dsp_ippv2.dll` を小文字化) まで特定。149 は `[0x10aa1418]` の書込み元 (`function_4136a0` 119304 行) まで。114 は halt0 の呼出し鎖まで採取 (最内 `function_412770`・呼出し元 `function_4128b0__lifted`。call site は未確定。採取値は §8-3 の注の通り本 run では未再現)。PR は `Refs #3608`。
 
 ## 1. 測定 (測定 commit `e6c940834`・HEAD 再測定済み・`87208313b` と一致 (§6))
 
@@ -146,9 +146,10 @@ git diff 40d3a788d origin/main -- tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_4
 ```
 
 - 上の一覧の範囲で、`e6c940834` から `b959fc472` (= 本 PR が取り込んでいる origin/main) までの差分は `ldfix_e2e.sh` (+3)・`m11_build.sh` (+13/−1)・`m11_gen_ir2.sh` (+10) の main 取り込み由来の差分。件数 (§1) は `b959fc472` 上で再現した (ldfix_e2e rc 0・prod fix 872/47/22)。
-- §8 の採取 (trap 144・149) の測定 commit は `911cd33b2` (head・再採取の値)。`b959fc472..911cd33b2` の `tools/m11` 差分は `trap144_probe_3608.py`・`trap144_read_3608.mjs`・`REPORT_3608.md` の 3 ファイル。測定経路 (§6 の一覧) の既存スクリプトは変えていない。
+- §8 の採取 (trap 144・149) の測定 commit は `911cd33b2` (144・149 の再採取の値)。`b959fc472..911cd33b2` の `tools/m11` 差分は `trap144_probe_3608.py`・`trap144_read_3608.mjs`・`REPORT_3608.md` の 3 ファイル。測定経路 (§6 の一覧) の既存スクリプトは変えていない。
+- §8-3 の halt0 (114 を含む 8 件) の測定 commit は `77ead008e` (reader の halt0 枝が入った commit)。`911cd33b2` の reader には halt 分岐が無く (`git show 911cd33b2:tools/m11/ldfix/trap144_read_3608.mjs` の grep 0 件)、そこでは halt0 の unit は記録されない。`77ead008e` 以降の再採取は本 run では未実施 (§8-3)。
 - §1 の全変種・§1-3 の数値は、測定 commit `87208313b` で得た値と、HEAD `e6c940834` での再測定 (下記) が一致する。同じ経路 (上の一覧) について `git diff 87208313b HEAD --numstat` は 5 ファイル・90 行追加・7 行削除 (`ldfix/ldfix.py` 44 追加・3 削除、`ldfix/ldfix_e2e.sh` 6 追加、`ldfix/fix_site_3372.py` 3 追加・1 削除、`m11_build.sh` 14 追加・3 削除、`m11_gen_ir2.sh` 23 追加)。
-- HEAD `e6c940834` での再測定 (本 run・`$ARTIFACTS_DIR` の `work-m11.tar.zst` と `fl-win64.tar.zst` を展開。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`TMPDIR=$RUNNER_TEMP`):
+- HEAD `e6c940834` での再測定 (前 run の記録。今回の fix run では再実行していない。前 run は `$ARTIFACTS_DIR` の `work-m11.tar.zst` と `fl-win64.tar.zst` を展開。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`・`TMPDIR=$RUNNER_TEMP`):
   - `ldfix_e2e.sh`: rc 0・所要 71.9 秒 (実測 wall)・load 0.78 → 1.16・判定 PASS。stage4 到達 4/6 (base/fix)・survey ok 136 / miss 14 / trap 9 (base/fix)。`STAGE4_JUDGE` の `pass: true`。
   - `prod_order_3608.sh` (HEAD): c0 (ldfix のみ) 136/14/9 (OOB・halt0 = 8・1・units_run 17)。c4_qstore 139/14/6。c5_alloca 871/47/23。h_nor8b (prod fix) 872/47/22。full_r8b 872/47/22。base_r8b 872/47/22。いずれも §1 の表と一致。c0 は実測 13.1 秒。
   - trap 集合も §1-1 と一致 (c0: 17・53・56・87・114・138・144・149・158。prod fix: 114・144・149 など 22 件)。
@@ -188,7 +189,7 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
   3. `python3 tools/m11/ldfix/trap144_probe_3608.py work/p3608/h_nor8b/prod.ll work/t144/probe.ll work/t144/sites.json` (store 54,043 件に計装・3 秒)
   4. `bash tools/m11/ldfix/stage4.sh work/t144/probe.ll t144` (rc 0・units_run 109・init 111・icall_ok 435・dllmain_done True・threw なし)
   5. `S4_NAME=t144 S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap144_read_3608.mjs > work/t144/read.txt` (26 秒)
-- 採取件数: probe 版の trap は 14 件 (全て OOB)。prod fix の OOB 14 件 (144・149・275・280・477・484・492・513・520・659・745・830・880・923) と一致。halt0 8 件は reader の対象外 (kind が OOB のみ採取) のため未採取。
+- 採取件数 (`911cd33b2` の reader・OOB のみ採取の版): probe 版の trap は 14 件 (全て OOB)。prod fix の OOB 14 件 (144・149・275・280・477・484・492・513・520・659・745・830・880・923) と一致。halt0 8 件は `911cd33b2` の reader の対象外で、`77ead008e` で reader に枝を入れた後の再採取は本 run では未実施 (§8-3)。
 - 出力: `tools/m11/ldfix/work/t144/read.txt`・`work/t144/sites.json` (gitignore)。site 番号は `work/t144/sites.json` の `stores[sid-1]` (元 IR の関数名・行番号)。
 
 ### 8-1 unit 144 (OOB・最内 `function_44aeb0`)
@@ -210,7 +211,7 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 
 ### 8-3 unit 114 (halt0・Halt 呼出し元)
 
-- reader に halt0 の枝を入れた (`trap144_read_3608.mjs`・halt0 は kind `halt0->longjmp` で採取)。`911cd33b2` 相当の再採取で halt0 8 件 (114・245・279・314・368・509・647・895) と OOB 14 件を採取。prod fix の trap 22 件 (§1-3) と一致。
+- reader に halt0 の枝を入れた (`trap144_read_3608.mjs`・halt0 は kind `halt0->longjmp` で採取。枝の追加は commit `77ead008e`)。`77ead008e` の reader の出力では halt0 8 件 (114・245・279・314・368・509・647・895) と OOB 14 件を採取した、と前 run で記録された。**ただし本 run では再採取していない**: `$ARTIFACTS_DIR` に `work-m11`・`toolchain-emsdk` が無く、`stage4/` を要する `trap144_read_3608.mjs`・`prod_order_3608.sh` を再実行できないため。halt0 8 件・OOB 14 件の unit 番号と kind の再現は未済 (未解決)。
 - wasm 位置 → IR 名 (`m11_wasmnames.py` で `m11_boot.cjs.wasm` から解決): 114 の最内は `function_412770` (`0x806d16`)、その呼出し元は `function_4128b0__lifted` (`0x2d7a94`) ← `function_4128b0` ← `function_412a40` ← `function_4096b0` ← `function_4096d0`。245・279・509・647 は `function_412a60` ← `function_411d20` の鎖。
 - `function_412770` は `arg1` の領域へ 37 要素を書く関数 (IR 117827 行)。`function_4128b0__lifted` の 2 つの call site (IR 117917 行・118017 行) のうち、どちらが 114 を引いたかは**未確定**。`function_412770` の entry 計数を probe に入れて試したが全 unit で 0 になり、計装の正しさを確認できなかったため撤回した (probe は元の 5 entry に戻した)。
 - 未解決: `function_4128b0__lifted` の分岐条件 (先頭の global 読みと `GetCurrentThreadId` 判定) の trap 時の値は未採取。どの call site かの確定もここから。受入 1 は部分。
@@ -219,5 +220,4 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 
 - 149: `function_412c20` の戻り値 (0) の由来、`0x264208` (`Blend2D.dll`) を `function_6539e0` に渡す上流の呼出し元。
 - 144: `function_6539e0` が `0x2572dc` (`dsp_ippv2.dll`) を選ぶ条件 (呼出し元の分岐)。
-- 114: Halt 呼出し元 (halt0 の probe が未実装)。
-- 採取は `trap144_read_3608.mjs` の reader に halt0 の枝を足す (未実装)。
+- 114: `function_4128b0__lifted` の 2 つの call site のどちらが 114 を引くか (分岐条件の trap 時の値)。受入 1 の残り。reader の halt0 枝は `77ead008e` で入ったが、本 run では再採取していない (§8-3)。
