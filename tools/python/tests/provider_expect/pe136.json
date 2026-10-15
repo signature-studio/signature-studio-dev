@@ -1,0 +1,6 @@
+{
+  "tag": "pe136",
+  "refs": ["#3025"],
+  "note": "PY-136 (#3025): screen 初期化・メニュー系 10 件 (PE 0xd7aa40 ほか。REPORT_PY136)。scr 未生成の経路は仮置き、tests/screen_menu_diff.mjs が mock と照合",
+  "functions": ["screen.init", "screen.setup", "screen.update", "screen.deInit", "screen.keepDisplayActive", "screen.hideMenu", "screen.menuShowing", "screen.menuItemClick", "screen.menuNext", "screen.menuPrev"]
+}

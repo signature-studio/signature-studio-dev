@@ -1,0 +1,6 @@
+{
+  "tag": "pe95",
+  "refs": ["#2831"],
+  "note": "PE で状態読出しと確認した ui ゲッター 9 件 (REPORT_PY95・PY-95 #2831)。値は未実測の仮置き、tests/ui_state_diff.mjs が mock と照合",
+  "functions": ["ui.isClosing", "ui.getTimeDispMin", "ui.isMetronomeEnabled", "ui.isPrecountEnabled", "ui.isStartOnInputEnabled", "ui.isLoopRecEnabled", "ui.getStepEditMode", "ui.isBrowserAutoHide", "ui.getSnapMode"]
+}

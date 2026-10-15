@@ -1,0 +1,95 @@
+[
+ {
+  "fn": "694c80",
+  "store": "695163 mov qword ptr [rax + 0x94], rcx",
+  "base": "rax",
+  "prior_defs_of_base": [
+   "69511e mov rax, qword ptr [rbp + 0x90]",
+   "695140 mov rax, qword ptr [rbp + 0xe0]",
+   "695155 mov rax, qword ptr [rbp + 0xe0]"
+  ],
+  "last_def": "695155 mov rax, qword ptr [rbp + 0xe0]",
+  "slot": "rbp+0xe0",
+  "slot_writes": [
+   "694c98 mov qword ptr [rbp + 0xe0], rcx"
+  ],
+  "slot_other_refs": [
+   "694cce mov rax, qword ptr [rbp + 0xe0]",
+   "694d5b mov rdx, qword ptr [rbp + 0xe0]",
+   "694d67 mov rax, qword ptr [rbp + 0xe0]",
+   "694ee1 mov rax, qword ptr [rbp + 0xe0]",
+   "694f8b mov rax, qword ptr [rbp + 0xe0]",
+   "694f9b mov rax, qword ptr [rbp + 0xe0]",
+   "694fa2 mov rcx, qword ptr [rbp + 0xe0]",
+   "694fca mov rdx, qword ptr [rbp + 0xe0]",
+   "695014 mov rax, qword ptr [rbp + 0xe0]",
+   "695039 mov rax, qword ptr [rbp + 0xe0]",
+   "6950ab mov rdx, qword ptr [rbp + 0xe0]",
+   "695107 mov rdx, qword ptr [rbp + 0xe0]",
+   "695132 mov rcx, qword ptr [rbp + 0xe0]",
+   "695140 mov rax, qword ptr [rbp + 0xe0]",
+   "695155 mov rax, qword ptr [rbp + 0xe0]",
+   "69516a mov rcx, qword ptr [rbp + 0xe0]",
+   "695171 mov rax, qword ptr [rbp + 0xe0]",
+   "695189 mov rcx, qword ptr [rbp + 0xe0]",
+   "69519d mov rcx, qword ptr [rbp + 0xe0]",
+   "6951c1 mov rcx, qword ptr [rbp + 0xe0]"
+  ],
+  "lea_addr_of_frame_at_or_below_slot": [
+   "694d35 lea rcx, [rbp + 0x68]",
+   "694efe lea rdx, [rbp + 0x88]",
+   "694f05 lea r8, [rbp + 0x80]",
+   "6951d6 lea rcx, [rbp + 0x68]",
+   "6951df lea rsp, [rbp + 0xc8]"
+  ],
+  "origin": "see slot_writes"
+ },
+ {
+  "fn": "c3b340",
+  "store": "c3b3f5 mov byte ptr [rcx + 0x20], al",
+  "base": "rcx",
+  "prior_defs_of_base": [
+   "c3b3c8 mov rcx, qword ptr [rip - 0x7bae27]",
+   "c3b3d6 mov rcx, qword ptr [rbp + 0xc0]",
+   "c3b3ee mov rcx, qword ptr [rbp + 0xc0]"
+  ],
+  "last_def": "c3b3ee mov rcx, qword ptr [rbp + 0xc0]",
+  "slot": "rbp+0xc0",
+  "slot_writes": [
+   "c3b368 mov qword ptr [rbp + 0xc0], rcx",
+   "c3b399 mov qword ptr [rbp + 0xc0], rax",
+   "c3b597 mov qword ptr [rbp + 0xc0], rax"
+  ],
+  "slot_other_refs": [
+   "c3b385 mov rcx, qword ptr [rbp + 0xc0]",
+   "c3b3d6 mov rcx, qword ptr [rbp + 0xc0]",
+   "c3b3ee mov rcx, qword ptr [rbp + 0xc0]",
+   "c3b40b mov rcx, qword ptr [rbp + 0xc0]",
+   "c3b457 mov rax, qword ptr [rbp + 0xc0]",
+   "c3b49c mov rax, qword ptr [rbp + 0xc0]",
+   "c3b4c1 mov rax, qword ptr [rbp + 0xc0]",
+   "c3b4ce mov rax, qword ptr [rbp + 0xc0]",
+   "c3b50e mov rcx, qword ptr [rbp + 0xc0]",
+   "c3b51a mov rcx, qword ptr [rbp + 0xc0]",
+   "c3b521 mov rax, qword ptr [rbp + 0xc0]",
+   "c3b55b mov rcx, qword ptr [rbp + 0xc0]",
+   "c3b58b mov rcx, qword ptr [rbp + 0xc0]",
+   "c3b5ab cmp qword ptr [rbp + 0xc0], 0",
+   "c3b5b5 mov rcx, qword ptr [rbp + 0xc0]",
+   "c3b5be mov rax, qword ptr [rbp + 0xc0]",
+   "c3b5cb mov rcx, qword ptr [rbp + 0xc0]",
+   "c3b5dd mov rax, qword ptr [rbp + 0xc0]"
+  ],
+  "lea_addr_of_frame_at_or_below_slot": [
+   "c3b421 lea rcx, [rbp + 0x84]",
+   "c3b453 lea rcx, [rbp + 0x60]",
+   "c3b462 lea r8, [rbp + 0x84]",
+   "c3b475 lea rcx, [rbp + 0x40]",
+   "c3b52d lea rcx, [rbp + 0x30]",
+   "c3b536 lea rcx, [rbp + 0x38]",
+   "c3b574 lea rcx, [rbp + 0x30]",
+   "c3b5e4 lea rsp, [rbp + 0xa8]"
+  ],
+  "origin": "see slot_writes"
+ }
+]
