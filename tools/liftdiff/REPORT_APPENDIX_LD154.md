@@ -100,3 +100,19 @@ timing の `elapsed_s` は、直前の応答 (1 件ずつ送るため送信時�
 | `0x959a40` の判定変化 (timing 無関係、units でも揺れた実績あり) | 原因未特定。wasm / native のどちらの状態かは未確認 | #3423 (LD-157) |
 | units / hybrid のどちらを `liftdiff_e2e.sh` [4/4] の基準にするか | 本付録は件数を記録するのみ。基準値は変えていない | #1464 (親) |
 | units state の precondition が ok=False (`units_run=22/942`) | 既存の状態 (LD-42 で記録済み)。本 PR では変えていない | #1464 (親) |
+
+## 9. main 取り込み後の差分 (測定 commit からの差)
+
+測定 commit は `3427318f1` のまま。その後 `35e49a1e0` で origin/main (`f44264ebe`) を取り込んだ (DOC_MAP の衝突のみ解消)。取り込みで測定対象の runner 側に次の差分が入った:
+
+```
+git diff 3427318f1 HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/rt tools/liftdiff/targets tools/liftdiff/liftdiff_e2e.sh
+ tools/liftdiff/ldlib/build_wasm.py |  2 +-
+ tools/liftdiff/rt/ld_core.h        |  7 +++++
+ tools/liftdiff/rt/ld_native.c      | 52 +++++++++++++++++++++++++++++++++++++++
+ tools/liftdiff/rt/ld_runner.mjs    |  7 ++++-
+ tools/liftdiff/rt/ld_wasm.c        | 44 +++++++++++++++++++++++++++++++-
+ 5 files changed, 109 insertions(+), 3 deletions(-)
+```
+
+よって §1〜§4 の件数は `3427318f1` の値であり、HEAD (`35e49a1e0`) の値ではない。HEAD での再測定は時間切れで未実施。再測定の担い手は検収 run (本付録の units/hybrid 各 2 回の手順を再実行する)。
