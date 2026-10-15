@@ -161,9 +161,22 @@ EXIT=0
 
 - 受入 (SC 側の process VA を特定。特定できなければ理由を REPORT に書く): **特定は未達**。理由 (§4) を REPORT に書いた。受入条件の分岐を満たす。
 
+## §6b. 追加照合 (commit `ce6400502`・#4978 2 回目 run)
+
+- 測定 commit: `ce6400502` (`ks_resonator_fa60.py` に (d) 呼出先の r 列照合を追加した commit)。
+- 実測: `python3 tools/targets/freshair/ks_resonator_fa60.py <HeartCore.core_64> <SlateCore.core_64> out.json`・`real 38.432 s`・`user 38.826 s`・EXIT=0・load 1 分値 0.40 (15:22 時点)。
+- 結果の要点:
+  - vtable 数: KH `ResonatorDsp` 20 slot、SC 17 slot。slot 番号の対応は決められない (前回の「KH slot 14 = process」は、SC 側に対応する slot が無いため未確定)。
+  - SC `ResonatorDsp` slot 14 は共有スタブ `0x1803b4070` (`ret` のみ)。
+  - (d) は KH process の呼出先ごと (`for t in cal`) に r 列 (数値を潰した比較) を SC 全関数 (100〜3000 B) と照合する。process 本体 `0x180743390` の r 列は (d) の対象外で、比較していない。
+  - 呼出先 `0x180fbc1f4` (52 命令・238 B) の SC 側最良候補は `0x181048180` (53 命令・r 列比 0.5905)。この関数は `ecx` による分岐のあるピッチ変換で、呼出先の構造と一致しない。対応とは判定しない。
+  - process 本体 (0x180743390) の r 列は照合していない。そのため process 本体の SC 側対応は、r 列の観点では未確定のまま。
+  - (d) の全出力は本ファイルに貼っていない。(d) を再実行するには `HeartCore.core_64` / `SlateCore.core_64` が要るが、現在の素材 (`fl-win64`) には含まれない。
+- 鮮度: `git diff ce6400502 HEAD -- tools/targets/freshair/ks_resonator_fa60.py` の差分は docstring の 1 行 (「3 つ」→「4 つ」と (d) の説明) だけで、測定に使うコードは不変。測定 commit の結果は有効。
+
 ## §7. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | SC `ResonatorDsp` の vtable 構築経路を静的に読み、KH process の SC 側対応を確定する | Resonator の差分 (C4〜C6) の前提が無い | #4047 (FA-49・親) |
-| Resonator の SC 側実機ハーネス作成 | 同上 (C3 の SC 側) | #52 (残件) |
+| Resonator の SC 側実機ハーネス作成 | 同上 (C3 の SC 側) | #4980 (FA-67・#4047 残件) |
