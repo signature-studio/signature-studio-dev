@@ -109,6 +109,8 @@
 | `tools/liftlib/REPORT_APPENDIX_D.md` | ~214 | liftlib §22 全文 (LIFTLIB-9 #668: RetDec raw lift 出力の非決定性 = uselistorder・ASLR 依存、A7 後は決定的、回帰 gate `lift_determinism_e2e.sh`)。§23 (LIFTLIB-10/11 #695・#887: k80 の alloca 並び = `canon_alloca_order` で決定化、gate 組込み)。本体 §22 は要約のみ |
 | `tools/flelift/REPORT.md` | ~155 | x64c を FLEngine 向けに汎用化 |
 | `tools/flelift/boot/REPORT.md` | ~350 | FLE-2〜FLE-5・FLE-10 (§10): x64c lift による FLEngine boot 連鎖・IPP 停止 mode・既定経路の no-op |
+| `tools/flelift/boot/REPORT_APPENDIX_2700_SHARD.md` | ~35 | REPORT §9 (FLE-9 #2700): 8 shard 化の実測の分割移動 (内容は削除していない)。工程表・shard 別 clang RSS |
+| `tools/flelift/boot/REPORT_APPENDIX_4855.md` | ~40 | #4855: boot_e2e の shard 別 clang peak RSS・秒 (cap 5,000MB/shard)・4 variant の link と boot の結果表 (測定 commit `d956129eb`)。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_2700.md` | ~40 | FLE-8 (#2698) の詳細 (REPORT §9 から移動: E-1 工程の実測・E-2 検証)。FLE-9 の shard 化の実測は REPORT §9 |
 | `tools/flelift/boot/REPORT_APPENDIX_970.md` | ~100 | PERF-P14 (#970) の付録: boot closure の -O0 / -O2 / -O2 -flto 変種の build (wasm bytes・所要時間・ピーク RSS)、node 実行時間 (n=10)・署名の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4004.md` | ~80 | FLE-18 (#4004): 既定経路の dispatch(0) (0x67264b の target 0)・呼出時の `[0x15e0a48]` の実測 (既定 / shim の call-time 表)・0x6b91e8 の第 2 呼出点。REPORT §10 の「唯一の呼出し点」の訂正 |
