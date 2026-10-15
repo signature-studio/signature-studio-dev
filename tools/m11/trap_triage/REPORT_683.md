@@ -208,4 +208,5 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
   - **鮮度**: 測定 commit `5c43ea98a` から HEAD までのコード差分 `git diff 5c43ea98a HEAD -- tools/m11/ldfix tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/trap_triage/neg_1448.sh` の出力は 0 行 (本 REPORT の追記だけが後の変更)。
   - **main 取り込み後 (merge `6b5774526`)**: 上の鮮度の差分は main 側の変更で 0 行でなくなった (`git diff 5c43ea98a HEAD -- ...` は 437 行、8 files、242+/39-。内訳は main 側の ld115 (#2447・#2527) の変更と `m11_build.sh` の競合解消)。上の表は `5c43ea98a` の値で、取り込み後の HEAD では**未再測定** (素材 `work-m11`・`toolchain-emsdk` が本 run に無く、emsdk の実体も無い)。
   - **取り込み後の build gate (本 run、HEAD `6b5774526`)**: `m11_build.sh` の gate 部分だけを一時コピーで検査した (emsdk の参照先のみ差替え。リポジトリは未変更)。ir_conditions.json の組合せ 6 通り: S1 全 applied → gate 通過 (後段の指紋検査で停止)。S2 r8b 記録無し → 拒否。S3 ld115 記録無し → 拒否。S4 r8b=disabled (ALLOW 無し) → 拒否。S5 r8b=disabled + `M11_ALLOW_R8B_DISABLED=1` → WARNING で続行。S6 ld115=disabled (ALLOW 無し) → 拒否。r8b と ld115 の 2 つの検査が独立に効くことを確認。
+- **survey の基準 (#1448)**: 本節の survey は、work-m11 の lift 断片から `m11_gen_ir2.sh` で作り直した IR での OFF / ON の A/B である。`docs/WORKFLOW.md` §11 は work-m11 の snapshot を survey の基準にしないと定めるため、ok 873 などの絶対値は正の基準ではなく、OFF と ON の対比としてのみ読む。
 
