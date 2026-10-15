@@ -112,7 +112,7 @@ main が `ac7ca0637` から `abf0981f7` に進み、PR #3848 は再び競合し�
 
 測定 commit (コードを変えた最後の commit): `8631aa46c` (`fix(python): update provider_check expectation after main merge (PY-215, #3568)`)。`git diff 8631aa46c HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節の commit は REPORT だけ)。main との差分 (`git diff origin/main HEAD -- tools/python/provider tools/python/host tools/python/tests`) は `device.getLinkedChannel` (C・mock・検査) の追加だけ (4 files・+31/−4)。
 
-素材: fl-win64 は `tar --zstd -xf` (6.9 秒) で `$RUNNER_TEMP/pyv3848/win64` に、toolchain-emsdk は同じ親に展開 (10.8 秒)。`FL_WIN64_DIR=<展開先>/win64`。CPython・flpy・provider は各スクリプトの既定の `/opt/emsdk` を使った。
+素材: fl-win64 は `tar --zstd -xf` (6.9 秒) で作業用の展開先 (`<展開先>/win64`) に、toolchain-emsdk は同じ親に展開 (10.8 秒)。`FL_WIN64_DIR=<展開先>/win64`。CPython・flpy・provider は各スクリプトの既定の emsdk (`[EMSDK]`) を使った。
 
 | 検査 | コマンド | rc | 所要 | 結果 |
 |---|---|---|---|---|
