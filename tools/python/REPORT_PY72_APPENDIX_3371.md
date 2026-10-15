@@ -102,3 +102,26 @@
 | `0x1001ef0` の `this` の由来 (呼出し元 4 件) | 受入 2 | #3371 |
 | `0xfe9090` を参照する関数ポインタ表経由の間接呼出し | 受入 2 | #3371 |
 | 一覧 A・B の容器 Q への要素追加箇所と要素型 T | 受入 3 | #3371 |
+
+## 追補 3 (#5205・受入 2 の表経由を確定)
+
+- 表 `0xfe2a90` の slot 0 は `0xfe9090` (reset)。ただし表の先頭 VA `0xfe2a90` を 8 バイト値として格納する箇所は **0 件**、`.text` 内で表の VA を disp (絶対・rip 相対) とする命令も **0 件**。イメージ内の既知の経路で表を読む間接呼出しは見つからない (計算アドレスで読む経路は除外できない)。
+- 結果: `0xfe9090` を呼ぶ経路は直接 `call` 2 件 (`0xffe29b`・`0x1001b7b`) に限られ、表経由の既知の経路は 0 件。どちらの 2 関数も slot 35 の VMT 格納 (前追補) なので、`0xfe9090` が chan で走るかは 151 箇所の受け手の型に依存する。受入 2 は部分達成。
+- 補助 probe `analysis/flapi/pe_fe9090_table.py` を追加した (表の内容・格納・参照を列挙)。
+
+### 測定 (追補 3)
+
+- 測定 commit (`pe_fe9090_table.py` を追加した commit): `d270d6f75`。測定 HEAD はこの追補の commit。`git diff d270d6f75 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (追補の commit は REPORT だけを変える)。
+- 素材: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP --wildcards '*block00031_PE.bin'` (展開先 `$RUNNER_TEMP/extracted/block00031_PE.bin`)。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP python3 analysis/flapi/pe_fe9090_table.py` を 2 回。rc 0・0.23 s (両回)・出力は `cmp` で一致。load (1 分値) は 0.32。
+- 参考: `pe_slot35_sites.py` 11.82 s (rc 0・151 箇所・直接 call 元 `0xffe29b`・`0x1001b7b`)。`pe_slot35_recv_src.py` rc 0 (大域 `0x15e0c40` 起点の連鎖 54 件は前追補と同じ)。
+
+### 未解決 (追補 3 後)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 151 箇所のうち受け手の型 (大域 `0x15e0c40` の初期化経路が未確定) | 受入 2 (`0xfe9090` が chan で走るか) | #5205 |
+| 大域 `0x15e0c40`・`0x15e4790`・`0x15e0ff8` の初期化・格納経路 | 受入 2・3 | #3371 |
+| `0xf48290` の受け手が chan か | 受入 2 | #3371 |
+| `0x1001ef0` の `this` の由来 (呼出し元 4 件) | 受入 2 | #3371 |
+| 一覧 A・B の容器 Q への要素追加箇所と要素型 T | 受入 3 | #3371 |
