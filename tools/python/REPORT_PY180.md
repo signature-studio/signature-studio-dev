@@ -2,7 +2,7 @@
 
 親: #3219 (PY-172)・#1804 (PY-48)。既知類型との関係: 該当なし (lift 作業ではない)。
 前段: `REPORT_PY172.md` (件数 0 の仮置き・索引基準)。子: #4114 (PY-302・`getPatternsInGroup`)。
-測定対象の commit: `9facb33bb` (コードを変えた最後の commit = main 取り込み merge。以後は本 REPORT の追加のみ)。
+測定対象の commit: `6a7d2634e` (コードを変えた最後の commit = main 取り込み merge。以後は本 REPORT の追加のみ)。
 実装の commit は `3c0d1bf47`。main 取り込み後の現 head で全検査を再測定した (§4)。
 
 ## 結論
@@ -47,30 +47,34 @@ PE 上で確定した事項 (REPORT_PY172 §1・§2 と同じ):
 
 ## 4. 実装・検証
 
-測定 HEAD: `9facb33bb` (runner・2026-10-15 07:12〜07:18 UTC)。emsdk は `emsdk install 6.0.12` で入れた (`toolchain-emsdk` 素材は本 run に無い。既定の emsdk 位置には取得した emsdk への symlink を張った。`EMSDK_DIR`・`EMSDK_ENV` で指定可)。
+測定 HEAD: `6a7d2634e` (runner・2026-10-15 07:49〜07:56 UTC。main 取り込み merge の後で、`9facb33bb` から `6a7d2634e` までの `tools/python/{provider,host,tests}` 差分 (11 insertions / 5 deletions) を含む)。emsdk は `emsdk install 6.0.12` で入れ、`/opt/emsdk` に symlink を張った (`toolchain-emsdk` 素材は本 run に無い。`EMSDK_DIR`・`EMSDK_ENV` で指定可)。
 
-| 検査 | 手順 (コマンド) | 結果 (現 HEAD `9facb33bb`) |
+| 検査 | 手順 (コマンド) | 結果 (測定 HEAD `6a7d2634e`) |
 |---|---|---|
-| 素材 | `tar --zstd -xf <artifacts>/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` (`[WIN64]`・`docs/WORKFLOW.md` §11) | rc 0 (9.9 s) |
+| 素材 | `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` (`[WIN64]`・`docs/WORKFLOW.md` §11) | rc 0 (7.7 s) |
 | 入力 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` | rc 0 |
-| CPython wasm | `bash build_cpython_wasm.sh` | rc 0 (3 分 53 秒・初回ビルド) |
-| flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 (5 s) |
-| provider ビルド | `bash provider/build.sh` | rc 0 (1.4 s)。`fl_table.c`: 435 関数・ハンドラ **204**。`flprov.wasm` 71,592 B |
-| all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・1 s・**48/48 ok** (`soft_error` 0・`raised` 0・`no_args` 0・`host_calls` 37425・`callback_roundtrip` true) |
-| provider_check | `node tests/provider_check.mjs` | rc 0・1 s・PASS。`functions` 435・実装 **204** / 未実装 **231**・`mcp_static` 60 |
-| 差分検査 | `FL_ENGINE=wasm node tests/patterns_group_diff.mjs` | rc 0・1 s・14 呼出し・diffs 0・PASS |
+| CPython wasm | `bash build_cpython_wasm.sh` | rc 0 (4 分 59 秒・real) |
+| flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 |
+| provider ビルド | `bash provider/build.sh` | rc 0。`fl_table.c`: 435 関数・ハンドラ **205**。`flprov.wasm` 71,680 B |
+| all_tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・**48/48 ok** (`soft_error` 0・`raised` 0・`no_args` 0・`host_calls` 37425・`callback_roundtrip` true) |
+| provider_check | `node tests/provider_check.mjs` | rc 0・PASS。`functions` 435・実装 **205** / 未実装 **230**・`mcp_static` 60 |
+| 差分検査 | `FL_ENGINE=wasm node tests/patterns_group_diff.mjs` | rc 0・14 呼出し・diffs 0・PASS |
 
-測定時の load average は 0.9〜1.6 (4 コア)。
+注: 直前に `provider/build.sh` と検査を並列実行して `flprov.js` 不在で 2 件が落ちた。順次に直して再実行し、上の表はその結果。測定時の load average は 1.2〜2.3 (4 コア)。
 
-コード差分 (測定 commit 以降): 下記は測定 HEAD `9facb33bb` そのものなので差分 0 行。
-実装 commit `3c0d1bf47` からの main 取り込み分 (参考) は次のとおり。
+コード差分 (測定 commit 以降): `git diff 6a7d2634e HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (本 REPORT のみの変更)。
+参考: 実装 commit `3c0d1bf47` からの main 取り込み分は次のとおり。
 
 ```
-$ git diff --stat 3c0d1bf47 9facb33bb -- tools/python/provider tools/python/host tools/python/tests
- 8 files changed, 134 insertions(+), 9 deletions(-)
+$ git diff --stat 9facb33bb 6a7d2634e -- tools/python/host tools/python/provider tools/python/tests
+ tools/python/host/fl_mock.mjs         | 2 ++
+ tools/python/provider/fl_engine.c     | 2 ++
+ tools/python/tests/provider_check.mjs | 8 ++++----
+ tools/python/tests/ui_state_diff.mjs  | 4 +++-
+ 4 files changed, 11 insertions(+), 5 deletions(-)
 ```
 
-旧 REPORT の 196/239 は `3c0d1bf47` 時点の値。現 HEAD の実測 204/231 で置き換えた。main 単独の 203/232 は watchdog (PR コメント) の報告値で、本 run では測っていない。
+旧 REPORT の 196/239 (`3c0d1bf47` 時点) と、`9facb33bb` 時点の 204/231 は、いずれも現 HEAD の実測 205/230 で置き換えた。
 
 ## 検証範囲 / 範囲外
 
