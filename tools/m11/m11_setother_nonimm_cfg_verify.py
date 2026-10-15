@@ -78,11 +78,13 @@ def cond(mn, fl):
     if fl is None:
         return None
     if fl[0] == 'res':
-        if mn not in ('je', 'jz', 'jne', 'jnz'):
-            raise Unsup('結果 flags で ' + mn)
+        if mn not in ('je', 'jz', 'jne', 'jnz', 'js', 'jns'):
+            return None
         r = fl[1]
         if r is None:
             return None
+        if mn in ('js', 'jns'):
+            return ((r >> (fl[2] - 1)) & 1 == 1) == (mn == 'js')
         return (r == 0) if mn in ('je', 'jz') else (r != 0)
     _, a, b, w = fl
     if a is None or b is None:
@@ -215,6 +217,56 @@ def run(insns, probe, fam):
                 fl = ('res', r, w)
                 i += 1
                 continue
+            if mn in ('shl', 'sal', 'shr') and len(ops) == 2 and ops[0] in REG:
+                dst, src = ops
+                w = REG[dst][1]
+                a = get(st, dst)
+                if src in REG:
+                    if src != 'cl':
+                        raise Unsup('シフト数 ' + src)
+                    c = get(st, 'rcx')
+                    c = None if c is None else c & (0x3f if w == 64 else 0x1f)
+                else:
+                    c = int(src, 0) & (0x3f if w == 64 else 0x1f)
+                if a is None or c is None:
+                    r = None
+                elif mn == 'shr':
+                    r = (a >> c) & msk(w)
+                else:
+                    r = (a << c) & msk(w)
+                put(st, dst, r)
+                fl = None
+                i += 1
+                continue
+            if mn == 'not' and ops and ops[0] in REG:
+                w = REG[ops[0]][1]
+                a = get(st, ops[0])
+                put(st, ops[0], None if a is None else (~a) & msk(w))
+                i += 1
+                continue
+            if mn == 'imul' and len(ops) in (2, 3) and ops[0] in REG:
+                dst, src = ops[0], ops[1]
+                w = REG[dst][1]
+                a = get(st, src) if len(ops) == 3 else get(st, dst)
+                b = src_val(st, ops[2] if len(ops) == 3 else src, w)
+                r = None if a is None or b is None else (a * b) & msk(w)
+                put(st, dst, r)
+                fl = None
+                i += 1
+                continue
+            if mn == 'neg' and ops and ops[0] in REG:
+                w = REG[ops[0]][1]
+                a = get(st, ops[0])
+                r = None if a is None else (-a) & msk(w)
+                put(st, ops[0], r)
+                fl = ('res', r, w)
+                i += 1
+                continue
+            if mn.startswith('set') and len(mn) > 3 and ops and ops[0] in REG:
+                c = cond('j' + mn[3:], fl)
+                put(st, ops[0], None if c is None else int(c))
+                i += 1
+                continue
             if mn in ('movzx', 'movsx', 'movsxd'):
                 dst, src = ops
                 if dst not in REG:
@@ -241,6 +293,15 @@ def run(insns, probe, fam):
             if mn in STRING_OPS and 'xmm' not in x.op_str:
                 for f in ('rsi', 'rdi', 'rcx'):
                     st[f] = None
+                i += 1
+                continue
+            if ops and ops[0].startswith('xmm'):
+                if mn.startswith(('ucomis', 'comis')):
+                    fl = None
+                i += 1
+                continue
+            if mn.startswith('cvt') and ops and ops[0] in REG:
+                put(st, ops[0], None)
                 i += 1
                 continue
             if mn in XMOV and ops:
@@ -286,6 +347,26 @@ def selftest():
         ('K4 call を挟む分岐 (callee が ZF を変えうる)', '31db' '83fb00' 'e800000000' '7405' 'bb01000000' '0fb6d3' 'c3', 6, 'rdx', None, '未決'),
         ('K4 ネガティブ (call 挟む・claim 0x0)', '31db' '83fb00' 'e800000000' '7405' 'bb01000000' '0fb6d3' 'c3', 6, 'rdx', 0x0, 'FAIL'),
         ('K4 対照 (call なし・ZF 確定で 0x0)', '31db' '83fb00' '7405' 'bb01000000' '0fb6d3' 'c3', 5, 'rdx', None, '実値化'),
+        ('S1 shl ebx,3 (1→8)', 'bb01000000c1e3030fb6d3c3', 3, 'rdx', 0x8, 'PASS'),
+        ('S1 ネガティブ (+1)', 'bb01000000c1e3030fb6d3c3', 3, 'rdx', 0x9, 'FAIL'),
+        ('S2 neg ebx (5→0xfb 下位 8bit)', 'bb05000000f7db0fb6d3c3', 3, 'rdx', 0xfb, 'PASS'),
+        ('S2 ネガティブ (0x05)', 'bb05000000f7db0fb6d3c3', 3, 'rdx', 0x5, 'FAIL'),
+        ('S3 shr ebx,4 (0x80→0x8)', 'bb80000000c1eb040fb6d3c3', 3, 'rdx', 0x8, 'PASS'),
+        ('S3 ネガティブ (0x80)', 'bb80000000c1eb040fb6d3c3', 3, 'rdx', 0x80, 'FAIL'),
+        ('S4 shl ebx,cl (1<<4)', 'bb01000000b904000000d3e30fb6d3c3', 4, 'rdx', 0x10, 'PASS'),
+        ('S4 ネガティブ (0x1)', 'bb01000000b904000000d3e30fb6d3c3', 4, 'rdx', 0x1, 'FAIL'),
+        ('S5 sete (cmp 等しい→1)', 'bb00000000b90100000083f9010f94c30fb6d3c3', 5, 'rdx', 0x1, 'PASS'),
+        ('S5 ネガティブ (0x0)', 'bb00000000b90100000083f9010f94c30fb6d3c3', 5, 'rdx', 0x0, 'FAIL'),
+        ('S6 cvtsi2sd・mulss は整数 rbx を変えない', 'bb02000000f2480f2ac3f30f59c80fb6d3c3', 4, 'rdx', 0x2, 'PASS'),
+        ('S6 ネガティブ (0x3)', 'bb02000000f2480f2ac3f30f59c80fb6d3c3', 4, 'rdx', 0x3, 'FAIL'),
+        ('S7 ucomiss で flags 未知・両経路で 0x0/0x1', '31db0f2ec17405bb010000000fb6d3c3', 5, 'rdx', None, '未決'),
+        ('S7 ネガティブ (claim 0x0)', '31db0f2ec17405bb010000000fb6d3c3', 5, 'rdx', 0x0, 'FAIL'),
+        ('S8 jle 結果 flags (OF 不明) は両経路で 0x0/0x1', '31db85db7e05bb010000000fb6d3c3', 5, 'rdx', None, '未決'),
+        ('S8 ネガティブ (claim 0x1)', '31db85db7e05bb010000000fb6d3c3', 5, 'rdx', 0x1, 'FAIL'),
+        ('S9 imul ebx,ebx,5 (3*5=15)', 'bb030000006bdb050fb6d3c3', 3, 'rdx', 0xf, 'PASS'),
+        ('S9 ネガティブ (0x10)', 'bb030000006bdb050fb6d3c3', 3, 'rdx', 0x10, 'FAIL'),
+        ('S10 not ebx (0→0xff 下位 8bit)', 'bb00000000f7d30fb6d3c3', 3, 'rdx', 0xff, 'PASS'),
+        ('S10 ネガティブ (0x00)', 'bb00000000f7d30fb6d3c3', 3, 'rdx', 0x0, 'FAIL'),
     ]
     bad = 0
     for name, hx, probe, fam, claim, expect in cases:
