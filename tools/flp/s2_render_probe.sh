@@ -15,7 +15,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ART="${RUNNER_TEMP:-/tmp}"
 EXT="$ART/fl-win64/extracted"
 INST="$ART/fl-install"
-SRC="$ART/fl-install/Data/System/Render tests"
+SRC="${S2_SRC:-$ART/fl-install/Data/System/Render tests}"
 WORKDIR="$ART/s2"
 NAME="${1:?usage: s2_render_probe.sh <name.flp> [repeat]}"
 REPEAT="${2:-3}"
@@ -51,7 +51,7 @@ for n in $(seq 1 "$REPEAT"); do
   rm -f "$WORKDIR/$base.wav"
   s=$(date +%s)
   rc=0
-  (cd "$INST" && timeout 120 xvfb-run -a wine64 FL64.exe /R "Z:${WINPATH}\\$NAME" > "$WORKDIR/s2_run_$n.log" 2>&1) || rc=$?
+  (cd "$INST" && timeout "${S2_TIMEOUT:-120}" xvfb-run -a wine64 FL64.exe /R "Z:${WINPATH}\\$NAME" > "$WORKDIR/s2_run_$n.log" 2>&1) || rc=$?
   e=$(date +%s)
   cp "$WORKDIR/$base.wav" "$WORKDIR/${base}_run_$n.wav" 2>/dev/null || true
   if [[ "${S2_TRACE_REG:-0}" == 1 ]]; then

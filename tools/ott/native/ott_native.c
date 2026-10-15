@@ -99,6 +99,13 @@ static MS uint32_t k_TlsAlloc(void) { return 0; }
 static void* g_tls[64];
 static MS void* k_TlsGetValue(uint32_t i) { return g_tls[i & 63]; }
 static MS int k_TlsSetValue(uint32_t i, void* v) { g_tls[i & 63] = v; return 1; }
+/* ICALL-52: PC が画像内なら画像基底を返す。範囲外は NULL (見つからず)。 */
+static MS void* k_RtlPcToFileHeader(void* pc, void** base) {
+    uint64_t p = (uint64_t)pc;
+    void* b = (p >= IMG_BASE && p < IMG_BASE + g_imgsize) ? (void*)g_img : NULL;
+    if (base) *base = b;
+    return b;
+}
 
 typedef struct { const char* n; void* f; } Impl;
 static const Impl IMPL[] = {
@@ -113,6 +120,7 @@ static const Impl IMPL[] = {
     {"IsDebuggerPresent", k_IsDebuggerPresent}, {"IsProcessorFeaturePresent", k_IsProcessorFeaturePresent},
     {"Sleep", k_Sleep}, {"TlsAlloc", k_TlsAlloc}, {"TlsGetValue", k_TlsGetValue}, {"TlsSetValue", k_TlsSetValue},
     {"FlsGetValue", k_TlsGetValue}, {"FlsSetValue", k_TlsSetValue},
+    {"RtlPcToFileHeader", k_RtlPcToFileHeader},
     {NULL, NULL}};
 
 static MS void missing_import(uint64_t idx) {

@@ -108,7 +108,17 @@ return np;
 - 本文の実測表の「ok / trap / miss / noproc」は各 tag の `M11_SURVEY` JSON (`m11_survey.mjs` の console 出力) の `ok`・`trap`・`miss`・`noproc` から、「OFF との unit 差」の件数は手順 3 の出力の先頭の数から読む。
 - 本 run では素材が無く未実行 (`tools/m11/work` が無い)。本節の手順は未検証。
 
-## 補足: unit 158 の store watch (未特定。子 #3972 へ移送)
+## 補足: unit 158 の store watch (#3972 で再測定)
 
-- 結論: 書込み元は未特定。計装の数値・派生 script の差分・推定は #3972 のコメントへ移した (数値の移送先)。
-- 本 PR の REPORT には store watch の数値と再現コマンドを載せない (派生 script は未コミットで、本 run では再現できない)。
+- 結論: 書込み元は未特定。store 命令の計装 (全 store) と copy (`409c80`) の入口計装の両方で、文字列の書込みが記録されない。書込みは別経路 (`__asm_rep_movsq_memcpy` 等) の疑い。
+- 再現: `M11_FIX_4136A0=1` の build は `bash tools/m11/trap_triage/store_watch_3972.sh <tag>` (既定は `WATCH_ADDR=0x10aa1428`・`WATCH_UNIT=158`。`WATCH_ALL=1` で全関数の store を計装)。前提: `work-m11`・`fl-win64`・`[EMSDK]`・`bash m11_gen_ir2.sh` 済み。出力は `work/probe3972/<tag>.err`。
+- 測定 (HEAD 時点の commit・1 回ずつ・n=1):
+
+| 条件 | `[aw]` の内訳 | 結果 |
+|---|---|---|
+| 候補関数のみ計装 (既定) | `653660` の入口 0 初期化 3 件 (`0x10aa1428`・`…1430`・`…1438`) | unit 158 `halt0` |
+| `WATCH_ALL=1` (全関数の store) | `653660` の入口 0 初期化 4 件のみ | unit 158 `halt0` |
+| `409c80` 入口の計装 (`M11_CP_ALL=1` で全呼出し) | 呼出し 0 件 | unit 158 `halt0` |
+
+- 文字列の書込み (`"he.d"` の 8 バイト) は、上の計装のどれにも映らなかった。`store` 命令・`409c80` の copy のいずれも経由しないことになる。候補は IR の `__asm_rep_movsq_memcpy` (28 箇所)・`__asm_rep_movsb_memcpy` (1 箇所)・`__asm_rep_stosq_memset` (6 箇所) の経路。次の一手として、これらの入口で `dst` が `[WA, WA+32)` と重なる呼出しを記録する (未実施)。
+- 旧 (#3928 補足節) の `[aw]` 件数 3 件は、候補計装で再現した。派生 script は本 PR で commit した (`store_watch_3972.sh`・`copy_watch_3972.py`・`watch_copy_3972.c`)。

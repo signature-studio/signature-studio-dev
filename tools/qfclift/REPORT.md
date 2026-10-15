@@ -177,7 +177,7 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 | 戻り先 `0x59c210` (setjmp/longjmp 継続) の lift 対応 (FLEngine 同型の override と断片 entry) と、DllMain 側の longjmp 起動元の特定 | DllMain が完走しない | #3410 (T-SH-77) |
 | `ExitProcess(0)` の呼出元と、継続後の進行が正しいか (偽の停止か) の確認 | DllMain の完走 (boot PASS) の判定 | #4262 (T-SH-106) |
 | longjmp の発生条件 (`0x40fa40` の呼出元 `0x40fbd4`・`0x40fcbd` と `[0x5aa000]` の決まり方) | 偽の停止かどうかの切り分け | #4263 (T-SH-107) |
-| rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない | #3411 (T-SH-78) |
+| rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない。直接呼出しの計数は §10 | #3411 (T-SH-78) |
 | GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3434 (T-SH-83。#3412 は closed) |
 
 ### 7.8 longjmp 継続の対応 (T-SH-77 / #3410・部分達成)
@@ -226,35 +226,23 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行は未着手 (子 #3434。DllMain の 0x563000 は #3410・#3411 の後段で未到達)。
 負の `face_index` による `long` 符号拡張は区別できていない (付録 §9.4・§9.5)。
 
-## 10. guest imp_GetProcAddress の結線 (T-SH-83 / #3434)
+## 10. DllMain 経路の import 呼出し計数 (T-SH-78 / #3411)
 
-既知類型との関係 (DEFECTS.md): 該当なし。測定 commit = `ddafc3602` (コードを変えた最後の commit)。`git diff ddafc3602 HEAD -- tools/flelift tools/qfclift/qfc_imp.c tools/qfclift/qfc_lift.sh tools/qfclift/env.sh tools/shared/oss/freetype` の出力は空 (差分 0)。HEAD 側の新規 commit は本節の REPORT 追記のみ。
+測定 commit = `5c79daa2b` (HEAD の計数版 `qfc_count.sh` を実行した commit)。全文 (呼出し回数の表・未解決の詳細) は `REPORT_APPENDIX_3411.md`。
+結論: 直接呼出し `imp_<名>();` で計数された import は 6 件 (`GetCurrentThreadId`・`TlsAlloc`・`LocalAlloc`・`TlsSetValue`・`TlsGetValue`・`ExitProcess`、各 1 回)。すべて rt または `qfc_imp.c` に既存。
+間接経由 (`imp_by_index` → `imp_tab[k]()`) は未計数のため、DllMain 経路で実際に呼ばれる import の全数は未確定。停止点は `ExitProcess(0)` (偽の停止かどうかは #4262 で未確定)。
 
-**前提**: `qfc_lift.sh` の `wasm_build` (`qfc_e2e.sh` / `qfc_boot.sh` を含む全 QFC ビルド) は FreeType wasm32 の成果物 `FT_WASM32_LIB` (`tools/shared/oss/freetype/build.sh` の出力) を必ず link するため、ビルド前にそれを用意する (`env.sh` 参照)。
-
-**結論 (部分達成)**: 受入条件 1 (`imp_GetProcAddress` → `qfc_gpa` の結線) を実装した。受入条件 2 (`FontCache_GetStats` / `FontCache_CleanUp` の wasm 実行) は未達 (DllMain が `0x59c210` の longjmp 継続で止まり、`0x563000` の FT 解決に届かない)。受入条件 2 は子 issue #4296 (`[T-SH-113]`) に移した。
-
-### 10.1 結線の形
-- `tools/flelift/rt/fle_cpu.c` の `imp_GetProcAddress` は、既定 NULL の `fle_gpa_hook (h, nm)` を呼ぶ (hook 未設定 = 従来どおり 0)。FLEngine の既定挙動は変えない。
-- `tools/qfclift/qfc_imp.c` が constructor で `fle_gpa_hook = qfc_gpa_hook` と `fle_ff_hook = qfc_ff` を設定する。`qfc_gpa_hook` は `qfc_gpa(name)` を返す。`qfc_ff` は `unlifted` の VA がトークンなら `qfc_gpa_call` で実行し、Win64 の第 5 引数を `[RSP+0x28]` から読む。トークン以外は従来どおり abort する。
-- 2 つの擬似値の範囲: トークン `0x7F200000+` と IAT pseudo-VA 基準 `IMP_VA_BASE = 0x1D80000` は重ならない。
-
-### 10.2 検証 (実測。e2e `qfc_import_e2e.sh`、DejaVuSans.ttf)
-| 検査 | 結果 |
-|---|---|
-| 既存: 表経由 / トークン経由 (native・wasm32・wasm64) | PASS (TOTAL `6e3c628e7e4a12df` / `d77adc88f7ca92a4`) |
-| 新規: `test_qfc_gpa_hook.c` (imp_GetProcAddress → hook → token → ott_unlifted → qfc_gpa_call → FT_Get_Char_Index) | PASS。`FT_Get_Char_Index('A')` hook=36 = direct=36。表外 `FT_Alloc` は 0 |
-| rt の compile (`fle_cpu.c` / `fle_glue.c`) | OK (gcc -std=gnu11) |
-
-### 10.3 boot (受入条件 2 の前段。`qfc_boot.sh`、HEAD `ddafc3602`・n=1)
-- lift: functions 6,347 / unsup 0 / unlifted 0 / imports 222 (前回と同じ)。
-- strict: `DllMain(PROCESS_ATTACH)` = trap (`[fle] MISSING IMPORT LocalAlloc`)。soft: `[fle] call to UNLIFTED function 0x59c210`。判定 FAIL (前回 §7 と同じ停止点)。
-- strict の `LocalAlloc` 欠落の理由: strict のビルド (`wasm_build` の `lift/qfcl.cjs`) は `qfc_imp.c` を link しない。`imp_LocalAlloc` は `qfc_imp.c` にあり、soft ビルド (`qfcl_soft.cjs`) だけが link する。よって欠落は rt の未実装ではなく、link 対象の差である。soft 側は `qfc_imp.c` で `LocalAlloc` を実装済みのため、§10.4 の「LocalAlloc は qfc_imp.c で実装済み」と一致する。
-- boot 全体 real 50 s、load 開始 0.29 0.55 0.31。
-
-### 10.4 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `FontCache_GetStats` / `FontCache_CleanUp` の wasm 実行 (受入条件 2) | 結線の実行確認が未到達。`0x563000` の FT 解決まで DllMain が届かない | #3410 / #3411 の後に再起票 |
-| 戻り先 `0x59c210` (setjmp 継続) | DllMain 完走の前提 | #3410 (T-SH-77) |
-| rt 未実装の import (LocalAlloc は qfc_imp.c で実装済み。残りは soft stub) | strict の停止 | #3411 (T-SH-78) |
+| 停止点 `ExitProcess(0)` が偽の停止か (longjmp 継続後の進行) | DllMain が完走したか不明 | #4262 (T-SH-106) |
+| longjmp (0x40f9c0) の発生条件と戻り先 `0x59c210` の lift 対応 | 停止点の解釈 | #4263 (T-SH-107) |
+| 間接経由の import 呼出しが未計数 | DllMain 経路の全数が不明 | #4374 (T-SH-121) |
+| rt の `TlsGetValue` (未設定 slot が非 0)・`TlsAlloc` (常に 0) が仕様と異なる | DllMain 後段で TLS 値を読むと結果が変わり得る | #4375 (T-SH-122) |
+| `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | #4280 (T-SH-108) |
+| `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #4296 (T-SH-113) |
+
+## 11. guest imp_GetProcAddress の結線 (T-SH-83 / #3434)
+
+測定 commit = `ddafc3602`。全文 (結線の形・e2e・boot・未解決) は `REPORT_APPENDIX_3434.md`。
+
+**結論 (部分達成)**: 受入条件 1 (`imp_GetProcAddress` → `qfc_gpa` の結線) を実装した。`qfc_import_e2e.sh` の hook 経路 (`imp_GetProcAddress` → hook → token → `qfc_gpa_call`) で `FT_Get_Char_Index` が直接呼出しと一致 (PASS)。受入条件 2 (`FontCache_GetStats` / `CleanUp` の wasm 実行) は未達で、子 issue #4296 (`[T-SH-113]`) に移した (DllMain が `0x59c210` の longjmp 継続で止まり、`0x563000` の FT 解決に届かない)。

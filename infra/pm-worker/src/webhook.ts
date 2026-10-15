@@ -1,7 +1,7 @@
 // webhook 受信の純関数。署名を検証してから状態を変える (未検証の入力では状態を一切変えない)。
 // 永続化 (Durable Object / SQLite) は呼び出し側の責務。ここは state を受け取り、次の state を返すだけ。
 import { verifySignature } from "./hmac.ts";
-import { bodyArtLine } from "./launch.ts";
+import { bodyArtLine, type PrioIssue } from "./launch.ts";
 import { needsPmDecision } from "./needs.ts";
 import { rateMarkRun } from "./ratealert.ts";
 import { closeRefs, mentionRefs, refsOnlyNumbers } from "./refs.ts";
@@ -15,6 +15,7 @@ export const WEBHOOK_EVENTS = [
   "issues",
   "issue_comment",
   "issue_dependencies",
+  "sub_issues",
   "pull_request",
   "pull_request_review",
   "workflow_run",
@@ -85,6 +86,8 @@ export interface Signal {
   killRun?: number;
   // 最新の oc-pm-intent: relaunch (issue コメント)。書き手が実装 App かどうか (bot) と、マーカーの字句 (issue・arts・focus) だけを持つ。検査は engine が行う。
   relaunch?: { at: string; id?: number; bot: boolean; issue: string; arts: string; focus: string | null };
+  // sub-issue の親 (sub_issues の webhook)。n が null は親の取り外し (tombstone。古い追加の配送で戻さないため at を持つ)。区分の継承に使う (#3989)。
+  subParent?: { n: number | null; at: string };
 }
 
 // 打ち切られた run を連続でこの回数数えた issue は、自動で再着手しない (oc:no-pr の reason=killed 相当)。PM agent (oc-pm の no_pr) の判断に回す。
@@ -404,6 +407,28 @@ function applyDependencies(s: PmState, p: Json): PmState {
   return { ...s, blockedBy, issues };
 }
 
+// sub_issues: GitHub の sub-issue (親子) の追加・削除。子 (sub_issue) の親番号を sig.subParent に持つ (#3989)。
+// 本文の『親: #N』が無いときの区分の継承に使う。子の updated_at より古い配送は無視する (追加の再送で削除を戻さない)。
+function applySubIssues(s: PmState, p: Json): PmState {
+  const child = p.sub_issue?.number;
+  if (!Number.isInteger(child)) return s;
+  const adding = p.action === "sub_issue_added" || p.action === "parent_issue_added";
+  const removing = p.action === "sub_issue_removed" || p.action === "parent_issue_removed";
+  if (!adding && !removing) return s;
+  const parent = p.parent_issue?.number;
+  if (adding && !Number.isInteger(parent)) return s;
+  const k = String(child);
+  const at = p.sub_issue?.updated_at ?? new Date(0).toISOString();
+  const cur = s.sig[k]?.subParent;
+  if (cur && Date.parse(at) < Date.parse(cur.at)) return s;
+  return setSig(s, k, { subParent: { n: adding ? parent : null, at } });
+}
+
+// 区分の入力 (effectivePrioMap)。issues の状態に、sig に取り込んだ sub-issue の親を足す (#3989)。closed の親も見られるよう全件を返す。
+export function prioIssues(s: PmState): PrioIssue[] {
+  return Object.values(s.issues).map((i) => ({ number: i.number, state: i.state, labels: i.labels, body: i.body, subParent: s.sig[String(i.number)]?.subParent?.n ?? null }));
+}
+
 // 本文が『Refs #N のみ』か (issue を閉じない merge の判定)。判定は refs.ts の refsOnlyNumbers に一本化 (#2623)。
 export function refsOnlyBody(body: string): boolean {
   return refsOnlyNumbers(body).length > 0;
@@ -547,6 +572,8 @@ export function applyEvent(
       return applyIssueComment(s, payload, botLogin, pmLogins, reviewerLogin, markLogin);
     case "issue_dependencies":
       return applyDependencies(s, payload);
+    case "sub_issues":
+      return applySubIssues(s, payload);
     case "pull_request":
       return clearKillByPr(applyPr(s, payload), payload.pull_request);
     case "pull_request_review":

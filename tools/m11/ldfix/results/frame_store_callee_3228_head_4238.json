@@ -1,0 +1,1454 @@
+{
+ "functions": 48,
+ "by_verdict": {
+  "UNDETERMINED": 44,
+  "DROP": 3,
+  "LIVE-IN": 1
+ },
+ "site_by_verdict": {
+  "UNDETERMINED": 46,
+  "DROP": 3,
+  "LIVE-IN": 1,
+  "PTR_READ": 1
+ },
+ "negctl_transparent": false,
+ "verdict": {
+  "1006ec0": "UNDETERMINED",
+  "103aa50": "UNDETERMINED",
+  "10628a0": "DROP",
+  "11e6e20": "UNDETERMINED",
+  "129df10": "UNDETERMINED",
+  "12cb2e0": "UNDETERMINED",
+  "13105d0": "DROP",
+  "1354630": "UNDETERMINED",
+  "4078c0": "UNDETERMINED",
+  "412160": "LIVE-IN",
+  "418b40": "UNDETERMINED",
+  "441730": "UNDETERMINED",
+  "4488f0": "UNDETERMINED",
+  "454090": "UNDETERMINED",
+  "45c170": "UNDETERMINED",
+  "45cda0": "UNDETERMINED",
+  "45d8b0": "UNDETERMINED",
+  "45db40": "UNDETERMINED",
+  "45dc20": "UNDETERMINED",
+  "5c4dc0": "UNDETERMINED",
+  "5cb210": "UNDETERMINED",
+  "639c70": "UNDETERMINED",
+  "694c80": "UNDETERMINED",
+  "695640": "UNDETERMINED",
+  "6c01a0": "UNDETERMINED",
+  "6c7610": "UNDETERMINED",
+  "6c7ca0": "UNDETERMINED",
+  "6ca580": "UNDETERMINED",
+  "6ca6c0": "UNDETERMINED",
+  "6ced00": "UNDETERMINED",
+  "7e45e0": "UNDETERMINED",
+  "808930": "UNDETERMINED",
+  "808c80": "UNDETERMINED",
+  "81bfd0": "UNDETERMINED",
+  "81c0d0": "UNDETERMINED",
+  "820d60": "UNDETERMINED",
+  "824020": "UNDETERMINED",
+  "864f80": "UNDETERMINED",
+  "867220": "UNDETERMINED",
+  "92ea90": "UNDETERMINED",
+  "bf8b40": "UNDETERMINED",
+  "c38bd0": "DROP",
+  "c3b340": "UNDETERMINED",
+  "c9cf70": "UNDETERMINED",
+  "da5400": "UNDETERMINED",
+  "da5510": "UNDETERMINED",
+  "e8fba0": "UNDETERMINED",
+  "f61710": "UNDETERMINED"
+ },
+ "fn_info": {
+  "1006ec0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "1006ec8 mov qword ptr [rbp + 0x40], rcx [STORE_PTR]",
+   "frame_slots": [
+    "+0x40/8",
+    "+0x48/8"
+   ],
+   "sync": "1006ec5-1007052"
+  },
+  "103aa50": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": true,
+   "leak": "103aa91 call 0x40c660 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "103aa5f-103ae87"
+  },
+  "10628a0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "10628b2 call 0x1062930 [CALL_ARG]",
+   "frame_slots": [
+    "+0x4e/2"
+   ],
+   "sync": "10628a5-10628c5"
+  },
+  "11e6e20": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": true,
+   "leak": "11e6eb3 mov qword ptr [rbp + 0x40], rax [STORE_PTR]",
+   "frame_slots": [
+    "+0x40/8",
+    "+0x38/8"
+   ],
+   "sync": "11e6e2f-11e702f"
+  },
+  "129df10": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "129df20 mov qword ptr [rbp + 0x30], rcx [STORE_PTR]",
+   "frame_slots": [
+    "+0x30/8",
+    "+0x44/4",
+    "+0x3c/4",
+    "+0x50/8",
+    "+0x58/8",
+    "+0x3c/4",
+    "+0x48/4",
+    "+0x4c/4",
+    "+0x40/4",
+    "+0x70/8",
+    "+0x68/8",
+    "+0x64/4",
+    "+0x7c/4",
+    "+0x40/4",
+    "+0x70/8"
+   ],
+   "sync": "129df1d-129e658"
+  },
+  "12cb2e0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "12cb316 call 0x12ddaa0 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "12cb2e2-12cb498"
+  },
+  "13105d0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "13105de mov qword ptr [rbp + 0x80], rcx [STORE_PTR]",
+   "frame_slots": [
+    "+0x80/8",
+    "+0x38/4",
+    "+0x30/4"
+   ],
+   "sync": "13105d8-1310a08"
+  },
+  "1354630": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "13546f9 mov qword ptr [rbp + 0x188], rbp [STORE_PTR]",
+   "frame_slots": [
+    "+0x188/8",
+    "+0x220/8",
+    "+0x168/4",
+    "+0x130/4",
+    "+0x140/8",
+    "+0x110/8",
+    "+0x168/8",
+    "+0x1a8/8",
+    "+0x1a0/8",
+    "+0x1a0/8",
+    "+0xa8/8",
+    "+0xb8/8",
+    "+0xc8/8",
+    "+0xd8/4",
+    "+0xe8/4",
+    "+0x58/4",
+    "+0x68/4",
+    "+0x110/8",
+    "+0x78/8",
+    "+0x50/8",
+    "+0x88/8",
+    "+0x168/8"
+   ],
+   "sync": "1354639-1354d71"
+  },
+  "4078c0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "407919 call 0x407260 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "4078cc-407a3c"
+  },
+  "412160": {
+   "ijmp": false,
+   "glk": false,
+   "leak_ext": false,
+   "leak": null,
+   "frame_slots": [],
+   "sync": "41216d-4122a1"
+  },
+  "418b40": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "418b52 call 0x407260 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "418b45-418b68"
+  },
+  "441730": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": true,
+   "leak": "441738 mov qword ptr [rbp + 0x28], rbp [STORE_PTR]",
+   "frame_slots": [
+    "+0x28/8",
+    "+0x80/8",
+    "+0x88/8"
+   ],
+   "sync": "441735-4418d5"
+  },
+  "4488f0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "4488fe mov qword ptr [rbp + 0x38], rcx [STORE_PTR]",
+   "frame_slots": [
+    "+0x38/8",
+    "+0x48/8",
+    "+0x40/8",
+    "+0x50/4",
+    "+0x60/8",
+    "+0x70/8",
+    "+0x80/8",
+    "+0x90/8",
+    "+0x54/4"
+   ],
+   "sync": "4488fb-448abc"
+  },
+  "454090": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": true,
+   "leak": "45409b mov qword ptr [rbp + 0x38], rbp [STORE_PTR]",
+   "frame_slots": [
+    "+0x38/8",
+    "+0x40/8",
+    "+0x40/8",
+    "+0x48/4"
+   ],
+   "sync": "454098-4547c5"
+  },
+  "45c170": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "45c180 call 0x457270 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "45c176-45c1b8"
+  },
+  "45cda0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "45cdb0 call 0x457270 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "45cda6-45ce36"
+  },
+  "45d8b0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "45d8ba mov qword ptr [rbp + 0x20], rcx [STORE_PTR]",
+   "frame_slots": [
+    "+0x20/8"
+   ],
+   "sync": "45d8b7-45dabf"
+  },
+  "45db40": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "45db50 call 0x457270 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "45db46-45db8d"
+  },
+  "45dc20": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "45dc39 call 0x467910 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "45dc28-45dc76"
+  },
+  "5c4dc0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "5c4dcb mov qword ptr [rbp + 0x28], rbp [STORE_PTR]",
+   "frame_slots": [
+    "+0x28/8",
+    "+0x460/8"
+   ],
+   "sync": "5c4dc8-5c4f02"
+  },
+  "5cb210": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "5cb21e mov qword ptr [rbp + 0x68], rbp [STORE_PTR]",
+   "frame_slots": [
+    "+0x68/8",
+    "+0x180/8",
+    "+0x188/8",
+    "+0x190/8",
+    "+0x198/8",
+    "+0x1a0/8",
+    "+0x118/8",
+    "+0x138/8",
+    "+0x120/8",
+    "+0x120/8",
+    "+0x148/8",
+    "+0x128/8",
+    "+0x120/8",
+    "+0x128/8",
+    "+0x130/8",
+    "+0x88/8",
+    "+0x90/4",
+    "+0x80/8",
+    "+0x94/4",
+    "+0x140/8",
+    "+0x110/8",
+    "+0xa0/8",
+    "+0x78/8"
+   ],
+   "sync": "5cb21b-5cbb17"
+  },
+  "639c70": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "639c7e call 0x639900 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "639c70-639cd4"
+  },
+  "694c80": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": true,
+   "leak": "694c94 mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
+   "frame_slots": [
+    "+0x48/8",
+    "+0xe0/8",
+    "+0xf0/1"
+   ],
+   "sync": "694c89-6951df"
+  },
+  "695640": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "695656 mov qword ptr [rbp + 0x78], rdx [STORE_PTR]",
+   "frame_slots": [
+    "+0x78/8"
+   ],
+   "sync": "69564a-695799"
+  },
+  "6c01a0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "6c01c2 mov dword ptr [rbp + 0x90], r8d [STORE_PTR]",
+   "frame_slots": [
+    "+0x90/4",
+    "+0x98/4"
+   ],
+   "sync": "6c01aa-6c02ee"
+  },
+  "6c7610": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "6c762e mov dword ptr [rbp + 0x90], r8d [STORE_PTR]",
+   "frame_slots": [
+    "+0x90/4",
+    "+0x38/4",
+    "+0x3c/4",
+    "+0x30/8",
+    "+0x30/8",
+    "+0x30/8",
+    "+0x30/8",
+    "+0x30/8",
+    "+0x30/8",
+    "+0x30/8",
+    "+0x30/8",
+    "+0x30/8",
+    "+0x30/8"
+   ],
+   "sync": "6c761a-6c7ac7"
+  },
+  "6c7ca0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "6c7d48 movss dword ptr [r11], xmm1 [STORE_PTR]",
+   "frame_slots": [],
+   "sync": "6c7cad-6c7dc9"
+  },
+  "6ca580": {
+   "ijmp": false,
+   "glk": false,
+   "leak_ext": false,
+   "leak": null,
+   "frame_slots": [],
+   "sync": "6ca588-6ca6af"
+  },
+  "6ca6c0": {
+   "ijmp": false,
+   "glk": false,
+   "leak_ext": false,
+   "leak": null,
+   "frame_slots": [],
+   "sync": "6ca6c8-6ca798"
+  },
+  "6ced00": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "6ced0f call 0x6cec50 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "6ced05-6ced17"
+  },
+  "7e45e0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "7e45f2 movdqa xmmword ptr [rbp + 0x80], xmm7 [STORE_PTR]",
+   "frame_slots": [
+    "+0x80/16",
+    "+0x70/16",
+    "+0x28/8",
+    "+0x60/4",
+    "+0x64/4",
+    "+0x68/4",
+    "+0x6c/4",
+    "+0x4c/4",
+    "+0x40/8"
+   ],
+   "sync": "7e45ef-7e4f1d"
+  },
+  "808930": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "80893d mov qword ptr [rbp + 0x38], rcx [STORE_PTR]",
+   "frame_slots": [
+    "+0x38/8",
+    "+0x70/4",
+    "+0x74/4",
+    "+0x78/4",
+    "+0x50/4",
+    "+0xd0/4"
+   ],
+   "sync": "80893a-808a87"
+  },
+  "808c80": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "808c8f call 0x617920 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "808c85-808caf"
+  },
+  "81bfd0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "81bfea call 0x424c10 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "81bfd0-81c05c"
+  },
+  "81c0d0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": true,
+   "leak": "81c0f2 call 0x663460 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "81c0d6-81c146"
+  },
+  "820d60": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "820d82 call 0x820cb0 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "820d67-820ddf"
+  },
+  "824020": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "824035 mov byte ptr [rbp + 0x88], r9b [STORE_PTR]",
+   "frame_slots": [
+    "+0x88/1"
+   ],
+   "sync": "82402a-824094"
+  },
+  "864f80": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "864f8c call 0x864fa0 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "864f85-864f97"
+  },
+  "867220": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "86723c call 0x4255d0 [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "867220-867251"
+  },
+  "92ea90": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "92eaad call qword ptr [rbx] [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "92ea91-92eb0f"
+  },
+  "bf8b40": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "bf8b57 call 0xbf89b0 [CALL_ARG]",
+   "frame_slots": [
+    "+0x5c/4",
+    "+0x60/4",
+    "+0xb0/4",
+    "+0xb4/4",
+    "+0xb8/4",
+    "+0xbc/4",
+    "+0xc0/4",
+    "+0xc4/4",
+    "+0xc8/4",
+    "+0xcc/4"
+   ],
+   "sync": "bf8b4a-bf8dce"
+  },
+  "c38bd0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "c38beb mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
+   "frame_slots": [
+    "+0x48/8",
+    "+0xa0/8"
+   ],
+   "sync": "c38bd8-c38d45"
+  },
+  "c3b340": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": true,
+   "leak": "c3b364 mov qword ptr [rbp + 0x48], rbp [STORE_PTR]",
+   "frame_slots": [
+    "+0x48/8",
+    "+0xc0/8",
+    "+0xd0/1"
+   ],
+   "sync": "c3b349-c3b5e4"
+  },
+  "c9cf70": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "c9cf8d call qword ptr [rbx] [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "c9cf71-c9cfef"
+  },
+  "da5400": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "da541d call qword ptr [rbx] [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "da5401-da547f"
+  },
+  "da5510": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "da552d call qword ptr [rbx] [CALL_ARG]",
+   "frame_slots": [],
+   "sync": "da5511-da558f"
+  },
+  "e8fba0": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "e8fbbc call 0x12dec70 [CALL_ARG]",
+   "frame_slots": [
+    "+0x40/4",
+    "+0x48/4",
+    "+0x48/4"
+   ],
+   "sync": "e8fba8-e8fc55"
+  },
+  "f61710": {
+   "ijmp": false,
+   "glk": true,
+   "leak_ext": false,
+   "leak": "f61720 mov qword ptr [rbp + 0x38], rcx [STORE_PTR]",
+   "frame_slots": [
+    "+0x38/8",
+    "+0x80/4",
+    "+0x84/4",
+    "+0x80/4",
+    "+0x84/4",
+    "+0x88/4",
+    "+0x8c/4",
+    "+0x78/8",
+    "+0x44/4",
+    "+0x68/8",
+    "+0x78/8",
+    "+0x70/4",
+    "+0x74/4",
+    "+0x80/4",
+    "+0x84/4",
+    "+0x88/4",
+    "+0x8c/4",
+    "+0x78/4",
+    "+0x80/4",
+    "+0x80/4",
+    "+0x88/4",
+    "+0x80/4",
+    "+0x88/4",
+    "+0x58/4",
+    "+0x5c/4",
+    "+0x98/4",
+    "+0x9c/4"
+   ],
+   "sync": "f6171d-f61d34"
+  }
+ },
+ "sites": [
+  {
+   "fn": "1006ec0",
+   "ty": "i32",
+   "addr": "1006fb6",
+   "mnem": "cmp dword ptr [rbp + 0x2c], 1",
+   "slot": "rbp+0x2c",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "1006fa9 call qword ptr [rax + 0x30] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "1006ec0",
+   "ty": "i8",
+   "addr": "1007021",
+   "mnem": "cmp byte ptr [rbp + 0x2b], 0",
+   "slot": "rbp+0x2b",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "100700f call qword ptr [rax + 0x30] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "103aa50",
+   "ty": "i32",
+   "addr": "103ab59",
+   "mnem": "add r14d, dword ptr [rbp + 0x38]",
+   "slot": "rbp+0x38",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "103ab4d call 0x6cec50 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "10628a0",
+   "ty": "i16",
+   "addr": "10628c0",
+   "mnem": "movzx rax, word ptr [rbp + 0x4e]",
+   "slot": "rbp+0x4e",
+   "outcomes": [
+    "STORE"
+   ],
+   "verdict": "DROP",
+   "why": "ALL_PATHS_STORE",
+   "store_addrs": [
+    "10628bc mov word ptr [rbp + 0x4e], ax"
+   ],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "11e6e20",
+   "ty": "i32",
+   "addr": "11e6fdb",
+   "mnem": "movss xmm0, dword ptr [rbp + 0x108]",
+   "slot": "rbp+0x108",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "11e6fd8 call qword ptr [rdi + 0x38] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "129df10",
+   "ty": "i32",
+   "addr": "129e1d6",
+   "mnem": "sub esi, dword ptr [rbp + 0x88]",
+   "slot": "rbp+0x88",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "129e1ce call 0x6cec50 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "12cb2e0",
+   "ty": "i32",
+   "addr": "12cb416",
+   "mnem": "mov r8d, dword ptr [rsp + 0x28]",
+   "slot": "rsp+0x28",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "12cb3fc call 0x1060d70 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "13105d0",
+   "ty": "i32",
+   "addr": "1310837",
+   "mnem": "add eax, dword ptr [rbp + 0x48]",
+   "slot": "rbp+0x48",
+   "outcomes": [
+    "STORE"
+   ],
+   "verdict": "DROP",
+   "why": "ALL_PATHS_STORE",
+   "store_addrs": [
+    "1310826 mov qword ptr [rbp + 0x44], rax"
+   ],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "1354630",
+   "ty": "i16",
+   "addr": "1354784",
+   "mnem": "cmp word ptr [rbp + 0x1d2], 1",
+   "slot": "rbp+0x1d2",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "135477f call 0x12b0020 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "4078c0",
+   "ty": "i64",
+   "addr": "40792b",
+   "mnem": "and qword ptr [rbp + 0x38], 0xffffffffffff0000",
+   "slot": "rbp+0x38",
+   "outcomes": [
+    "BARRIER:CALLEE_NOFN"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_NOFN)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "407919 call 0x407260 [CALLEE_NOFN]"
+   ]
+  },
+  {
+   "fn": "4078c0",
+   "ty": "i32",
+   "addr": "40791e",
+   "mnem": "cmp dword ptr [rbp + 0x40], 0x10000",
+   "slot": "rbp+0x40",
+   "outcomes": [
+    "BARRIER:CALLEE_NOFN"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_NOFN)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "407919 call 0x407260 [CALLEE_NOFN]"
+   ]
+  },
+  {
+   "fn": "412160",
+   "ty": "i32",
+   "addr": "41217d",
+   "mnem": "cmp dword ptr [rbp + 0x170], 2",
+   "slot": "rbp+0x170",
+   "outcomes": [
+    "ENTRY"
+   ],
+   "verdict": "LIVE-IN",
+   "why": "NO_DEF_ON_ANY_PATH",
+   "store_addrs": [],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "418b40",
+   "ty": "i32",
+   "addr": "418b57",
+   "mnem": "cmp dword ptr [rbp + 0x40], 0x1000",
+   "slot": "rbp+0x40",
+   "outcomes": [
+    "BARRIER:CALLEE_NOFN"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_NOFN)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "418b52 call 0x407260 [CALLEE_NOFN]"
+   ]
+  },
+  {
+   "fn": "441730",
+   "ty": "i16",
+   "addr": "44178f",
+   "mnem": "cmp word ptr [rbp + 0x6e], 0",
+   "slot": "rbp+0x6e",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "44177b call 0x441530 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "4488f0",
+   "ty": "i32",
+   "addr": "44892d",
+   "mnem": "cmp dword ptr [rbp + 0xd8], 0x1000",
+   "slot": "rbp+0xd8",
+   "outcomes": [
+    "BARRIER:CALLEE_NOFN"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_NOFN)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "448928 call 0x423d20 [CALLEE_NOFN]"
+   ]
+  },
+  {
+   "fn": "454090",
+   "ty": "i8",
+   "addr": "454637",
+   "mnem": "cmp byte ptr [rbp + 0x16e], 1",
+   "slot": "rbp+0x16e",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "454524 call 0x41c820 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "45c170",
+   "ty": "i32",
+   "addr": "45c1b5",
+   "mnem": "mov eax, dword ptr [rbp + 0x40]",
+   "slot": "rbp+0x40",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "45c1b0 call 0x45a640 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "45cda0",
+   "ty": "i32",
+   "addr": "45cdd9",
+   "mnem": "movsxd rax, dword ptr [rbp + 0x40]",
+   "slot": "rbp+0x40",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "45cdd3 call qword ptr [rax] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "45d8b0",
+   "ty": "i16",
+   "addr": "45da5b",
+   "mnem": "cmp word ptr [rbp + 0x3e], 0",
+   "slot": "rbp+0x3e",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "45da43 call qword ptr [rax] [INDIRECT_FRAMEARG]",
+    "45da13 call qword ptr [rax] [INDIRECT_FRAMEARG]",
+    "45d9e5 call qword ptr [rax] [INDIRECT_FRAMEARG]",
+    "45d970 call qword ptr [rax] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "45db40",
+   "ty": "i16",
+   "addr": "45db85",
+   "mnem": "cmp word ptr [rbp + 0x40], 0",
+   "slot": "rbp+0x40",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "45db80 call 0x45a640 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "45dc20",
+   "ty": "i16",
+   "addr": "45dc69",
+   "mnem": "cmp word ptr [rbp + 0x28], 0",
+   "slot": "rbp+0x28",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "45dc66 call qword ptr [rbx + 0x30] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "5c4dc0",
+   "ty": "i32",
+   "addr": "5c4e43",
+   "mnem": "cmp dword ptr [rbp + 0x58], 0xc0c0c0",
+   "slot": "rbp+0x58",
+   "outcomes": [
+    "BARRIER:CALLEE_NOFN"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_NOFN)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "5c4e3e call 0x424300 [CALLEE_NOFN]"
+   ]
+  },
+  {
+   "fn": "5cb210",
+   "ty": "i64",
+   "addr": "5cb4aa",
+   "mnem": "cmp qword ptr [rbp + 0xc0], 0",
+   "slot": "rbp+0xc0",
+   "outcomes": [
+    "BARRIER:ALIAS_FRAME_PTR"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "5cb47d mov dword ptr [rax + 8], ecx [ALIAS_FRAME_PTR]"
+   ]
+  },
+  {
+   "fn": "639c70",
+   "ty": "i32",
+   "addr": "639c83",
+   "mnem": "mov eax, dword ptr [rsp + 0x2c]",
+   "slot": "rsp+0x2c",
+   "outcomes": [
+    "BARRIER:CALLEE_MAYFRAME"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_MAYFRAME)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "639c7e call 0x639900 [CALLEE_MAYFRAME]"
+   ]
+  },
+  {
+   "fn": "694c80",
+   "ty": "i64",
+   "addr": "6951c8",
+   "mnem": "movsd xmm1, qword ptr [rbp + 0xe8]",
+   "slot": "rbp+0xe8",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG",
+    "STORE"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [
+    "694c9f movsd qword ptr [rbp + 0xe8], xmm1"
+   ],
+   "barrier_addrs": [
+    "6951be call qword ptr [rbx - 0x20] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "695640",
+   "ty": "i64",
+   "addr": "6956f9",
+   "mnem": "cmp qword ptr [rbp + 0x38], 0",
+   "slot": "rbp+0x38",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "6956f4 call 0x691a40 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "6c01a0",
+   "ty": "i128",
+   "addr": "6c0207",
+   "mnem": "mov r9d, dword ptr [rbp + 0x44]",
+   "slot": "rbp+0x44",
+   "outcomes": [
+    "BARRIER:CALLEE_MAYFRAME"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_MAYFRAME)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "6c01ed call 0x6ce490 [CALLEE_MAYFRAME]"
+   ]
+  },
+  {
+   "fn": "6c7610",
+   "ty": "i128",
+   "addr": "6c7665",
+   "mnem": "mov ecx, dword ptr [rbp + 0x44]",
+   "slot": "rbp+0x44",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "6c763c call 0x6ce3f0 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "6c7ca0",
+   "ty": "i128",
+   "addr": "6c7ccc",
+   "mnem": "mov edx, dword ptr [rbp + 0x84]",
+   "slot": "rbp+0x84",
+   "outcomes": [
+    "BARRIER:ALIAS_FRAME_PTR"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "6c7cc2 movsq qword ptr [rdi], qword ptr [rsi] [ALIAS_FRAME_PTR]"
+   ]
+  },
+  {
+   "fn": "6ca580",
+   "ty": "i128",
+   "addr": "6ca5c2",
+   "mnem": "add dword ptr [rbp + 0x64], eax",
+   "slot": "rbp+0x64",
+   "outcomes": [
+    "BARRIER:ALIAS_FRAME_PTR"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "6ca594 movsq qword ptr [rdi], qword ptr [rsi] [ALIAS_FRAME_PTR]"
+   ]
+  },
+  {
+   "fn": "6ca6c0",
+   "ty": "i128",
+   "addr": "6ca702",
+   "mnem": "add dword ptr [rbp + 0x64], eax",
+   "slot": "rbp+0x64",
+   "outcomes": [
+    "BARRIER:ALIAS_FRAME_PTR"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "6ca6d4 movsq qword ptr [rdi], qword ptr [rsi] [ALIAS_FRAME_PTR]"
+   ]
+  },
+  {
+   "fn": "6ced00",
+   "ty": "i32",
+   "addr": "6ced14",
+   "mnem": "mov eax, dword ptr [rbp + 0x28]",
+   "slot": "rbp+0x28",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "6ced0f call 0x6cec50 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "7e45e0",
+   "ty": "i32",
+   "addr": "7e48d6",
+   "mnem": "cvtsi2ss xmm0, dword ptr [rbp + 0x6c]",
+   "slot": "rbp+0x6c",
+   "outcomes": [
+    "BARRIER:ALIAS_FRAME_PTR"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(ALIAS_FRAME_PTR)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "7e48ce movss dword ptr [rax + 0x518], xmm0 [ALIAS_FRAME_PTR]"
+   ]
+  },
+  {
+   "fn": "7e45e0",
+   "ty": "i32",
+   "addr": "7e47b6",
+   "verdict": "PTR_READ"
+  },
+  {
+   "fn": "808930",
+   "ty": "i32",
+   "addr": "80896d",
+   "mnem": "cmp dword ptr [rbp + 0x5c], 3",
+   "slot": "rbp+0x5c",
+   "outcomes": [
+    "BARRIER:CALLEE_NOFN"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_NOFN)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "808960 call 0x424f40 [CALLEE_NOFN]"
+   ]
+  },
+  {
+   "fn": "808c80",
+   "ty": "i32",
+   "addr": "808ca4",
+   "mnem": "cmp dword ptr [rbp + 0x2c], 3",
+   "slot": "rbp+0x2c",
+   "outcomes": [
+    "BARRIER:CALLEE_NOFN"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_NOFN)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "808c9b call 0x424f40 [CALLEE_NOFN]"
+   ]
+  },
+  {
+   "fn": "81bfd0",
+   "ty": "i32",
+   "addr": "81bff3",
+   "mnem": "mov eax, dword ptr [rsp + 0x2c]",
+   "slot": "rsp+0x2c",
+   "outcomes": [
+    "BARRIER:CALLEE_NOFN"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_NOFN)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "81bfea call 0x424c10 [CALLEE_NOFN]"
+   ]
+  },
+  {
+   "fn": "81c0d0",
+   "ty": "i32",
+   "addr": "81c118",
+   "mnem": "mov eax, dword ptr [rbp + 0x2c]",
+   "slot": "rbp+0x2c",
+   "outcomes": [
+    "BARRIER:CALLEE_NOFN"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_NOFN)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "81c10f call 0x663470 [CALLEE_NOFN]"
+   ]
+  },
+  {
+   "fn": "820d60",
+   "ty": "i32",
+   "addr": "820dba",
+   "mnem": "add dword ptr [rbp + 0x30], ecx",
+   "slot": "rbp+0x30",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "820dae call qword ptr [rbx + 0x1b0] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "824020",
+   "ty": "i32",
+   "addr": "824069",
+   "mnem": "add dword ptr [rbp + 0x30], eax",
+   "slot": "rbp+0x30",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "824056 call qword ptr [r13 + 0x1b0] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "864f80",
+   "ty": "i32",
+   "addr": "864f94",
+   "mnem": "sub eax, dword ptr [rbp + 0x20]",
+   "slot": "rbp+0x20",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "864f8c call 0x864fa0 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "867220",
+   "ty": "i32",
+   "addr": "867245",
+   "mnem": "cmp dword ptr [rsp + 0x2c], 0",
+   "slot": "rsp+0x2c",
+   "outcomes": [
+    "BARRIER:CALLEE_NOFN"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_NOFN)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "86723c call 0x4255d0 [CALLEE_NOFN]"
+   ]
+  },
+  {
+   "fn": "92ea90",
+   "ty": "i64",
+   "addr": "92eaaf",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "slot": "rsp+0x48",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "92eaad call qword ptr [rbx] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "bf8b40",
+   "ty": "i32",
+   "addr": "bf8b68",
+   "mnem": "mov eax, dword ptr [rbp + 0xac]",
+   "slot": "rbp+0xac",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "bf8b63 call 0xbf8670 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "c38bd0",
+   "ty": "i64",
+   "addr": "c38c08",
+   "mnem": "cmp qword ptr [rbp + 0x78], 0",
+   "slot": "rbp+0x78",
+   "outcomes": [
+    "STORE"
+   ],
+   "verdict": "DROP",
+   "why": "ALL_PATHS_STORE",
+   "store_addrs": [
+    "c38c04 mov qword ptr [rbp + 0x78], rax"
+   ],
+   "barrier_addrs": []
+  },
+  {
+   "fn": "c3b340",
+   "ty": "i32",
+   "addr": "c3b46f",
+   "mnem": "cmp dword ptr [rbp + 0x60], 0",
+   "slot": "rbp+0x60",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "c3b469 call qword ptr [rip + 0xa7cde1] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "c9cf70",
+   "ty": "i64",
+   "addr": "c9cf8f",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "slot": "rsp+0x48",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "c9cf8d call qword ptr [rbx] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "da5400",
+   "ty": "i64",
+   "addr": "da541f",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "slot": "rsp+0x48",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "da541d call qword ptr [rbx] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "da5510",
+   "ty": "i64",
+   "addr": "da552f",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "slot": "rsp+0x48",
+   "outcomes": [
+    "BARRIER:INDIRECT_FRAMEARG"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(INDIRECT_FRAMEARG)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "da552d call qword ptr [rbx] [INDIRECT_FRAMEARG]"
+   ]
+  },
+  {
+   "fn": "e8fba0",
+   "ty": "i32",
+   "addr": "e8fc08",
+   "mnem": "sub dword ptr [rbp + 0x48], ecx",
+   "slot": "rbp+0x48",
+   "outcomes": [
+    "BARRIER:CALLEE_CALL"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_CALL)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "e8fbde call 0xe85fc0 [CALLEE_CALL]"
+   ]
+  },
+  {
+   "fn": "f61710",
+   "ty": "i32",
+   "addr": "f61ce6",
+   "mnem": "mov r8d, dword ptr [rbp + 0x94]",
+   "slot": "rbp+0x94",
+   "outcomes": [
+    "BARRIER:CALLEE_MAYFRAME"
+   ],
+   "verdict": "UNDETERMINED",
+   "why": "BARRIER(CALLEE_MAYFRAME)",
+   "store_addrs": [],
+   "barrier_addrs": [
+    "f61cd1 call 0x808610 [CALLEE_MAYFRAME]"
+   ]
+  }
+ ]
+}

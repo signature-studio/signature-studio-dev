@@ -155,6 +155,13 @@ MACHINE_ENTRY = {
 }
 
 
+# LD-203 (#4200): 653c80 の間接 call slot (VA 0x15f3480 = RVA 0x11f3480)。boot 状態では null で、call で segv する。
+# 仮 proc の番地 (VMT 域の 0x50012000) を入れると、native / wasm が同じ仮 proc を見る。根拠は REPORT_APPENDIX_LD203.md。
+PATCH_BY_VA = {
+    0x653c80: 'i:0x11f3480:q=0x50012000',
+}
+
+
 def machine_sig(va, sig):
     ps = MACHINE_ENTRY.get(va)
     if ps is None:
@@ -182,6 +189,8 @@ def case_line(va, name_prefix, pattern, sig, trace=True, xfill=True, stkfill=Non
         s += ' wsig=' + ','.join(sig['wsig'])
     if stkfill is not None:
         s += ' stkfill=%x' % stkfill
+    if va in PATCH_BY_VA:
+        extra = (extra + ' ' if extra else '') + 'p=' + PATCH_BY_VA[va]
     if extra:
         s += ' ' + extra
     return s
