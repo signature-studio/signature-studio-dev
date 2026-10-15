@@ -17,7 +17,7 @@ CODELOAD_URL="${ZLIB_CODELOAD_URL:-https://codeload.github.com/madler/zlib/tar.g
 PORTS="$EM_CACHE/ports"
 DEST="$PORTS/zlib"
 TARBALL="$PORTS/zlib.tar.gz"
-MARKER_URL="$TAG_URL"
+MARKER_URL="https://github.com/madler/zlib/archive/refs/tags/v${ZLIB_VER}.tar.gz"   # emcc が照合する URL (取得元の上書きとは独立)
 
 if [ -f "$DEST/.emscripten_url" ] && [ "$(tr -d '\n' < "$DEST/.emscripten_url")" = "$MARKER_URL" ]; then
   echo "fetch_zlib_port: キャッシュ済み ($DEST)"
