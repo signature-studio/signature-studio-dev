@@ -86,7 +86,7 @@ base IR: `%0 = call 4256c0(i64 %arg1)`。修復: `%a1g = load [arg1]` を入れ�
 ### 5.1 HEAD `f87d3389e` (本 PR の結論。測定 commit)
 
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` (前景・1 回・worktree 上)。step 1d は本 PR で追加。
-- 素材: `fl-win64` は `extracted/block00031_PE.bin` (22,227,016 B) のみ展開。`work-m11` は `tools/m11/work/` に展開 (gitignore・読込のみ)。`toolchain-emsdk` は runner の `/opt/emsdk` を使用 (スクリプトの既定)。
+- 素材: `fl-win64` は `extracted/block00031_PE.bin` (22,227,016 B) のみ展開。`work-m11` は `tools/m11/work/` に展開 (gitignore・読込のみ)。`toolchain-emsdk` は runner の emsdk を使用 (`[EMSDK]`。スクリプトの step 2 が既定で読む場所)。
 - 測定 commit: **`f87d3389e`** (コードを変えた最後の commit。`fix_site_3372.py` の 0x44f0f0 照合の追加)。
 - 計時 (`date -u +%s.%N` の差): **rc=0・wall 45.2 s**。load average は実行前 `0.40 0.57 0.27`、実行後 `1.18 0.74 0.35` (1/5/15 分。4 vCPU)。
 - 入力 IR: `tools/m11/work/boot_final3.ll` の sha256 は **`010451add5147d37cd06d8d0043255fcb2e65a536c4eadeff17e7ce43de7cb9e`**。別 REPORT (`tools/m11/REPORT_SHX-T27.md`) が接頭辞 `010451ad…` で記録した boot_final3.ll と一致する。
