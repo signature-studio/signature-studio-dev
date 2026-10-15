@@ -18,8 +18,8 @@ issue 本文の基準「147/53/0/0」は #2181 時点の値。現 HEAD (`9721869
 |---|---|
 | 測定 commit (コードを変えた最後の commit) | `789b8439d` (`fix(liftlib): fold rip-relative lea call args to their VA (#2861)`) |
 | 基準 | HEAD `9721869b7` (変更前) |
-| 素材 | `tools/icall/work/ott_F.txt` (F=281)・`tools/m6/work/ott.drc.ll`・`tools/liftlib/work` は main 側の検証スナップショットを symlink (commit 対象外)・`$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`・`/opt/retdec` |
-| 再現 | `cd tools/liftlib && OTT_DLL=$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll ANALYSIS_DIR=$HOME/analysis python3 -m liftlib leafspec targets/ott_getparam.json --n 200` |
+| 素材 | `tools/icall/work/ott_F.txt` (F=281)・`tools/m6/work/ott.drc.ll`・`tools/liftlib/work` は main 側の検証スナップショットを symlink (commit 対象外)・`[ANALYSIS-PLUGINS]` 配下の OTT_vst2_win64.dll・RetDec (`[RETDEC]`) |
+| 再現 | `cd tools/liftlib && OTT_DLL=<[ANALYSIS-PLUGINS] の OTT_vst2_win64.dll> ANALYSIS_DIR=<[ANALYSIS-DIR]> python3 -m liftlib leafspec targets/ott_getparam.json --n 200` |
 | 単体 | `python3 tests/test_unit.py` → `ALL UNIT TESTS PASS (32)` (07:50:50〜07:56:10 の実測, 5 分 20 秒) |
 
 ## 2. 前後比較 (leafspec 実測)
