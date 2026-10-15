@@ -15,7 +15,7 @@ python3 "$HERE/ci_ranges.py" "$W/pe.bin" "$W/ranges.json"
 RANGES=$(python3 -c "import json;print(','.join(json.load(open('$W/ranges.json'))['ranges_va']))")
 "$RETDEC" "$W/pe.bin" -o "$W/ci.drc.c" --select-ranges "$RANGES" --select-decode-only --timeout 500 > "$W/retdec.log" 2>&1
 echo "[ci] retdec: $(grep -c '^define' "$W/ci.drc.ll") define (範囲 36)"
-python3 "$HERE/ci_census.py" "$W/ci.drc.ll" "$W/ranges.json"
 python3 "$HERE/ci_restore_stores.py" "$W/ci.drc.ll" "$W/ci.rs.ll"
+python3 "$HERE/ci_census.py" "$W/ci.drc.ll" "$W/ranges.json" "$W/ci.rs.ll"
 python3 "$ROOT/lift/libkio/ir_normalize.py" "$W/ci.rs.ll" "$W/ci.rs_norm.ll" > /dev/null
 python3 "$ROOT/lift/libreverb/gen_helpers.py" "$W/ci.rs_norm.ll" "$W/ci_helpers.c"
