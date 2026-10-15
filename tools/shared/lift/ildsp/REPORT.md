@@ -152,7 +152,7 @@ python3 tools/shared/scripts/ildsp_vtable_check.py tools/shared/work/raw/ildsp_v
 ## 5. WaveformColouring_CreateInstance の vcall `0x1a9e2b` の dispatch 先 (#2484 / T-SH-37)
 
 既知類型との関係: 該当なし (逆アセと PE 読みのみ。lift・IR を作らないため D1a〜D23 の検出対象外)。
-検証起点 commit: `80fb2fd0` (origin/main)。測定 commit (コードを変えた最後の commit): `22f9128d` (`tools/shared/scripts/ildsp_wc_dispatch.py` の修正。初版の追加は `8b1e34ac`)。
+検証起点 commit: `80fb2fd0` (PR の基点・merge-base)。測定 commit (コードを変えた最後の commit): `da2ba516` (`tools/shared/scripts/ildsp_wc_dispatch.py`。対象 VA の走査 `fdb8bae0` を追加し、走査を遅延列挙にして実行時間を戻した。初版の追加は `8b1e34ac`)。
 
 ### 結論 (1 行)
 `0x1a9e2b` の `call [rax+0x18]` は sub-object への dispatch ではない。instance 自身 (0x228 B・vptr は +0) の WC vtable slot 3 を呼び、その値は `0x1a9de0` (DIR64 reloc あり) で、**静的に `0x1a9de0` へ確定**する。前提は §5-5 の 1 件 (他 vtable 格納 2 件の書き込み先は §5-4 で解消)。
@@ -169,7 +169,7 @@ Issue 本文の「sub-object の vtable」という前提は誤り。CreateInsta
 |---|---|---|
 | vcall の場所 | `0x1a9e2b`: `call qword ptr [rax+0x18]` (fn `0x1a9e10`) | objdump (検算) |
 | `0x1a9e10` の位置付け | WC vtable slot 2 (RVA `0x3e01c0` の値) | vtable の生値 |
-| 呼び出し元 | 直接 call/jmp は無い (vtable からのみ)。exec セクション全走査 (`ildsp_wc_dispatch.py` の `direct_callers`: `0x1a9e10 <- []`) | スクリプト出力 |
+| 呼び出し元 | 直接 call/jmp は無い。exec セクション全走査 (`ildsp_wc_dispatch.py` の `direct_callers`: `0x1a9e10 <- []`)。8 バイト値の参照は WC vtable の slot 2 (`0x3e01c0`) だけ (`## 対象 VA への参照`) | スクリプト出力 |
 | `this` の vptr 読み | `0x1a9e16`: `mov rax,[rcx]` (rcx = instance) | objdump |
 | vptr の値 | `0x3e01b0` (§5-1) | |
 | slot 番号 | 3 (`0x18` ÷ 8) | |
@@ -196,7 +196,7 @@ Issue 本文の「sub-object の vtable」という前提は誤り。CreateInsta
   - `0x1acfff` (fn `0x1acfe8`、vptr `0x3d2778`): 直接の呼び出し元は `0x1ad011` の 1 件。`0x1ad008` の `lea rcx,[rsp+0x20]` (`0x1ad00c`) の直後にある。`0x1ad008` は `0x1ac9c0` の `0x1ac9f0` から呼ばれる。`0x1ac9c0` は確保関数 (CreateInstance の `0x1ac47b` を含む多数から呼ばれる)。確保が失敗し new handler (`0x1b6f4c`) が 0 を返したとき、`rbx == -1` なら `0x1ad028`、それ以外なら `0x1ad008` へ進む。
   - `0x16475a` (fn `0x164740`、vptr `0x3d27a0`): 直接の呼び出し元は `0x1ad031` (fn `0x1ad028`、`lea rcx,[rsp+0x20]` は `0x1ad02c`) と `0x1647c9` (fn `0x1647c0`、`lea rcx,[rsp+0x20]` は `0x1647c4`) の 2 件。`0x1ad028` は `0x1ac9f6` から呼ばれる。
   - よって 2 件の格納先 `[rcx]` は、どちらの経路でも呼び出し元が直前に作ったスタック上のアドレスで、WC instance (ヒープ上の 0x228 B) ではない。
-  - 範囲: `ildsp_wc_dispatch.py` の `direct_callers` (exec セクション全走査の直接 call/jmp) と、一時走査 (未コミット・RIP 相対の `lea`/`mov` と、データ中の 8 バイト値が対象の VA と一致する箇所を全画像で走査: いずれも 0 件)。レジスタに計算した値からの間接 call は網羅していない。
+  - 範囲: `ildsp_wc_dispatch.py` の `direct_callers` (exec セクション全走査の直接 call/jmp) と `## 対象 VA への参照` 節 (全画像走査の RIP 相対の命令参照と 8 バイト絶対値)。対象 `0x1acfe8`・`0x164740`・`0x1ad008`・`0x1ad028`・`0x1ac9c0` は、RIP 相対 0 件・8 バイト値 0 件。レジスタに計算した値からの参照と、4 バイト相対値のテーブルは網羅していない。
 - `0x1b6f4c` の `0x1b6f6c` は `0x268268` → `0x1cb600` (`jmp [0x268260]`) で、同じ `jmp rax` に至る。`rax` の値は静的に不明。
 - 扱いの案 (未確認・推定): 例外送出の path とみなし、lift では trap を第一候補にする。正常系に到達しないことは子 [T-SH-52] の native 実行で確かめる。
 
@@ -211,14 +211,15 @@ Issue 本文の「sub-object の vtable」という前提は誤り。CreateInsta
 ### 5-6. 検証
 - 再現 (3 コマンド): `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_closure.py` → `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_wc_dispatch.py` → `python3 tools/shared/scripts/ildsp_wc_dispatch_check.py tools/shared/work/raw/ildsp_wc_dispatch.json <PE>`。
 - 入力: `block24360_PE.bin` (sha256 f4b23b0f…)。`ildsp_closure.py` の WaveformColouring 行 (70 関数・2,757 命令・SIMD 23.8%・間接 19) を再現した。
-- 結果: `ildsp_wc_dispatch_check.py` は `ALL OK` (rc 0)。
-- 実測 (測定 commit `22f9128d`、4 core、load average は実行前 0.21 / 実行後 0.39): `ildsp_wc_dispatch.py` 5.400 / 5.385 / 5.368 s、`ildsp_wc_dispatch_check.py` 0.053 / 0.056 / 0.055 s (rc 0 ×3・ALL OK ×3)。`ildsp_wc_dispatch.py` の 3 回の stdout は `cmp` で完全一致。前回 (`8b1e34ac`) の 0.19 s は `direct_callers` の全走査を入れる前の値。
-- ネガティブコントロール (JSON を壊して検算を通すか):
+- 結果: `ildsp_wc_dispatch_check.py` は `ALL OK` (rc 0)。`ildsp_wc_dispatch.py` の `## 対象 VA への参照` 節は、対象 5 関数で RIP 相対 0 件・8 バイト値 0 件。`0x1a9de0`・`0x1a9e10` の 8 バイト値は WC vtable の slot 3 (`0x3e01c8`)・slot 2 (`0x3e01c0`) の 1 件ずつ。
+- 独立の確認 (objdump の `# 0x<VA>` 注釈を数える。スクリプトとは別): 対象 7 VA (`0x1ac9c0`・`0x1ad008`・`0x1ad028`・`0x1acfe8`・`0x164740`・`0x1a9de0`・`0x1a9e10`) の RIP 相対参照は 0 件。陽性対照の WC vtable `0x1803e01b0` は vptr 格納の `lea` で 1 件。
+- 実測 (測定 commit `da2ba516`、4 core。`ildsp_wc_dispatch.py` の 3 回の load average は実行前 0.77 / 実行後 0.82、`ildsp_wc_dispatch_check.py` の実行前は 0.35): `ildsp_wc_dispatch.py` 5.524 / 5.544 / 5.617 s (rc 0 ×3。3 回の stdout は `cmp` で完全一致)、`ildsp_wc_dispatch_check.py` 0.057 / 0.058 / 0.056 s (rc 0 ×3・ALL OK ×3)。比較のため同じ入力で旧版 (`960405ba`) を 2 回実行 (load 0.8 前後): 5.300 / 5.423 s。対象 VA の走査を入れた初版 (`fdb8bae0`) は 17 秒台で、全命令の operands 参照と命令オブジェクトの一覧保持が原因。RIP 判定を `rip` を含む命令に限り、走査を遅延列挙にして (`da2ba516`) 旧版と同等に戻した。
+- ネガティブコントロール (JSON を壊して検算を通すか。測定 commit `da2ba516` の JSON):
 
 | 名前 | 壊し方 | 結果 |
 |---|---|---|
 | neg_target | vcall の target_rva を `0x1a9de1` | `MISMATCH: slot`・rc=1 |
-| neg_store | 格納 vtable を `0x3e01b8` | `MISMATCH: store`・rc=1 |
+| neg_store | 格納 vtable (`stores[0].vtable`) を `0x3e01b8` | `MISMATCH: store`・rc=1 |
 
-- 検算の範囲: 命令は objdump、slot 値と DIR64 reloc は PE の生バイトで照合。closure の完全性と、vptr 格納の網羅は検算していない (他 vtable 格納 2 件の書き込み先は §5-4 の走査で確認)。
-- `git diff 22f9128d HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
+- 検算の範囲: 命令は objdump、slot 値と DIR64 reloc は PE の生バイトで照合。closure の完全性は検算していない。対象 VA の参照は、RIP 相対の命令参照と 8 バイト絶対値だけを見る (レジスタ計算値・4 バイト相対値は対象外。他 vtable 格納 2 件の書き込み先は §5-4 の走査で確認)。
+- `git diff da2ba516 HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
