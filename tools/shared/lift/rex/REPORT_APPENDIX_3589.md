@@ -89,3 +89,12 @@ movnti は memset (`f_18001c8f0`・8 箇所) の大ブロック経路にだけ�
 - 今回の case 数 (296 件・比較 223) は §2 の 248 件・比較 175 と一致しない。原因: `gen_cases.py` が 55fe773b2 以降に変わり (成功経路の case を追加。`git diff 55fe773b2 HEAD -- tools/shared/lift/rex/gen_cases.py`)、その後の `native_ref.c` / `crash_class.py` 等も変わった。§2 の数値は 55fe773b2 の入力に対するもので、現 HEAD の入力では再現しない。現 HEAD の値 (296・223) を正とする。
 - lift 差分 (main `59ca0477f` と本 PR の `x64c.py` を同 DLL・同引数で比較): `fle_lifted.c` は movnti 24 行の `ott_unsup` → `ST64` のみ (48 行)。`lift_meta.json` は movnti 24 サイトの `unsup` / `unsup_sites` の削除のみ (他は不変)。
 - memcpy 16 箇所の間接 call 経路: 未起票。`docs/WORKFLOW.md` §3 の規則で、「未解決の追跡」だけの子は起票しない。本付録 §4 と PR 本文の未解決表で追跡する。
+
+## 5. 境界外 trap の VA (#4358・T-SH-118)
+
+- 原因: `run_wasm.mjs` は trap 時に `rex_unsup_get()` だけを VA として記録する。wasm の境界外 trap では 0 のまま残った (36 件)。
+- 修正: trap の JS スタックの最内側 lift 関数 `f_<VA>` の入口 VA を取る (`wasmTrapVA`)。`rex_unsup_get()` が 0 のときだけ使う。`lift_x64c.sh` は emcc に `--profiling-funcs` を足し、name section に `f_<VA>` を残す。`trap.txt` の形式は変えていない。
+- 精度: VA は関数入口 (`f_<VA>`) であり、faulting 命令の VA ではない。
+- 測定 commit: `c850f8bc2` (コードを変えた最後の commit)。`REX_RUN_CRASHED=1 ... lift_x64c.sh ok` 1 回 (rc 0・PASS・real 5 s・load 0.10 0.17 0.15 → 0.17 0.18 0.16)。`all` 1 回 (rc 0・ALL OK・real 14 s・load 0.18 0.18 0.16 → 0.37 0.22 0.17)。
+- 結果: `trap.txt` は 38 行 (`0x1800011c0` 15 件・`0x180001130` 21 件・`0x18001788f` 2 件)。`trap_kind.txt` は境界外 36 件・unreachable 2 件で不変。`res_wasm.bin` は修正前と byte 一致 (`cmp`)。
+- 残り: `idiv by zero` (VA `0x18001788f`) は子 #4359 [T-SH-119]。境界外の原因は #4324・#4326。

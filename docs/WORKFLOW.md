@@ -122,7 +122,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 
 | 分類 | 判定 (GitHub の事実) | 意味・次の一手 |
 |---|---|---|
-| `user` | `needs-user-input` ラベル、または `pm-apply` ラベル (workflow 変更の適用待ち) が付いている | 依頼者の回答・適用待ち。自動着手しない |
+| `user` | `needs-user-input` ラベル、または `pm-apply` ラベル (workflow 変更の適用待ち) が付いている | 人間オーナーの回答・適用待ち。自動着手しない |
 | `blocked` | open な blocked_by (issue dependencies) がある、本文の依存行 (`依存:`・`blockedBy:` など) が open な issue を指す、`tools/pm/manual_deps.json` の依存 (停止報告に根拠のあるもの) が open、または子 issue を持つ親で PR が無い | blocker が close されるまで着手しない |
 | `started` (着手済み) | open PR が `N-<slug>` ブランチか `Closes/Refs/Fixes #N` で紐づく、または実装 run が稼働中 | 実装・レビュー・修正の途中。二重に着手しない |
 | `stopped` | 直近 24 時間以内の bot の最後のコメントが停止報告で、再投入の素材が無い、または再投入の上限 (2 回) に達した | PM の判断待ち |
@@ -280,9 +280,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
     fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
     作成・検証は `bash tools/plugins/framework/fw_pack_stage1.sh pack` → `artifacts/work-fw-stage1.tar.zst` (`verify` で単独検査も可)。
-    R2 への投入の手順は下の「R2 への投入 (VM 非依存の手順)」。現状は PM が VM 上で行い、VM 退役後の担い手は依頼者とする。
+    R2 への投入の手順は下の「R2 への投入 (VM 非依存の手順)」。現状は PM が VM 上で行い、VM 退役後の担い手は人間オーナーとする。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
-- **R2 への投入 (VM 非依存の手順・#2434)**: 担い手は依頼者 (現状の PM は VM 上で行う。VM 退役後は依頼者が行う)。
+- **R2 への投入 (VM 非依存の手順・#2434)**: 担い手は人間オーナー (現状の PM は VM 上で行う。VM 退役後は人間オーナーが行う)。
   素材の原本の所在は `docs/REFERENCES.md` の「素材の原本と R2 bundle の対応」、投入の頻度は `tools/pm/REPORT.md` §13 が正本。
   1. **権限を昇格**: Cloudflare で R2 の API token の権限を、バケット `signature-studio-artifacts` に限り「Workers R2 Storage Bucket Item Read」から「Read + Write」へ変える。画面上の操作名は `[未確認]`。昇格中は、この token を使う全ての経路が書ける (Actions の `CF_R2_*` が同じ token かは `[未確認]`)。投入は短時間で終える。
   2. **投入**: 梱包した `<name>.tar.zst` を S3 互換 API で置く。大きい object は aws cli が multipart で送る (`tools/plugins/framework/fw_pack_stage1.sh` の注記と同じ形): `aws s3 cp <name>.tar.zst s3://signature-studio-artifacts/artifacts/<name>.tar.zst --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"`。S3 のキーは環境変数で渡し、値を repo・ログ・issue に書かない。
@@ -324,9 +324,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
   応答を終える時は、background で `gh run watch` が 1 本以上走っていること。完了通知を受けたら、
   結果の処理に入る前に、次の watcher を起動し直す。
-- **PM は依頼者の不在 (最大 2 日) を前提とする (依頼者指示 144)**: 依頼者は一度指示すると最低 2 時間、最大 2 日間は不在になり、
-  依頼者の指示がないと進行できない状態はそのまま遅延になる。依頼者の操作が必要な項目は非ブロッキングにする
-  (`needs-user-input` で積み、それを待たずに他の作業を進める)。依頼者の応答を、他の作業の前提条件にしない。
+- **PM は人間オーナーの不在 (最大 2 日) を前提とする (依頼者指示 144)**: 人間オーナーは一度指示すると最低 2 時間、最大 2 日間は不在になり、
+  人間オーナーの指示がないと進行できない状態はそのまま遅延になる。人間オーナーの操作が必要な項目は非ブロッキングにする
+  (`needs-user-input` で積み、それを待たずに他の作業を進める)。人間オーナーの応答を、他の作業の前提条件にしない。
 - **open PR は 2 状態のみ (依頼者指示 119・120・122・123)**: 実装が始まったチケットは merge まで止めない。
   open PR は常に次の **どちらか** であり、「レビューも修正もされていない状態」(IDLE) を 1 秒も作らない。
 
@@ -444,8 +444,8 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次の運用に置き換える (判断: 2026-10-14、#2319。運用の正本はこの節)。
 
 - **(a) 凍結**: VM 退役後は `.github/workflows/` の変更を凍結する。ロジックは `.github/scripts/`・`.github/prompts/` に寄せ、workflow は薄い配線に保つ。
-- **(b) 依頼**: 変更が必要になったら、issue に `pm-apply` と `needs-user-input` を付け、`git apply` できる unified diff をコメントに書いて止まる。diff は `.github/workflows/` の変更だけにする。PM agent は `pm-apply` を付けられない (許可ラベル外。`.github/prompts/pm.md`)。その場合は `needs-user-input` だけを付けて依頼者へ渡し、依頼者が `pm-apply` を付ける。
-- **(c) 適用 (依頼者が手元で行う)**: 依頼者は diff の内容 (特に `permissions:` と `secrets.*` の参照) を確かめてから、コメントの diff を `diff.patch` に保存し、次を実行する。merge は reviewer App が行うため、PAT は要らない。
+- **(b) 依頼**: 変更が必要になったら、issue に `git apply` できる unified diff をコメントに書いて止まる。diff は `.github/workflows/` の変更だけにする。workflow 変更の判断は PM の職権で、`needs-user-input` のゲート対象外。PM agent は `pm-apply` を付けられない (許可ラベル外。`.github/prompts/pm.md`)。新規 secrets・資格情報を扱う変更だけは `needs-user-input` を付けて人間オーナーへ移送し、人間オーナーが `pm-apply` を付ける。
+- **(c) 適用 (人間オーナーが手元で行う)**: 人間オーナーは diff の内容 (特に `permissions:` と `secrets.*` の参照) を確かめてから、コメントの diff を `diff.patch` に保存し、次を実行する。merge は reviewer App が行うため、PAT は要らない。
 
   ```sh
   git fetch origin main && git switch -c <N>-workflow origin/main && git apply diff.patch
@@ -458,19 +458,20 @@ PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次�
 - **退役の条件**: VM の timer・PAT・keyring を止める前に、open の `pm-apply` の issue が 0 件であること (確認: `gh api "repos/<R>/issues?labels=pm-apply&state=open" --jq length`)。
 
 
-## 12. 依頼者不在時の運用 (needs-user-input・assume-and-proceed)
+## 12. 人間オーナー不在時の運用 (needs-user-input・assume-and-proceed)
 
-依頼者は指示後、最低 2 時間・最大 2 日間不在になりうる。依頼者の判断が要る事項は `needs-user-input` で積み、
+エージェント向けの文脈では、人間は「人間オーナー」、判断の担い手は「PM」と書く (判断: 2026-10-15、指示 151・152、#4476)。PM は全権限と判断責任を持つ。
+人間オーナーは最低 2 時間・最大 2 日間不在になりうる。人間オーナーの判断が要る事項 (4 種) は PM が `needs-user-input` で積み、
 他の作業を止めない。規則 R1〜R9 と境界 U1〜U8 の**正本は `.github/prompts/pm.md`** である (本節に複製しない)。
 
 - **書式**: `needs-user-input` を付けた issue の本文先頭に、次の 4 項目を順に書く。
   1. 質問
-  2. 既定案 (依頼者の回答が無いときに採る案)
+  2. 既定案 (人間オーナーの回答が無いときに採る案)
   3. 既定で進むと何が起きるか
   4. 答えを変えたときの戻し方
 - **依存 issue は既定案で進める (assume-and-proceed)**。依存 issue を `blocked_by` にしない。
   依存する側の issue に「仮定で進む」旨をコメントし、既定案のまま実装・PR を進める。
-- **依頼者の回答の検出 (`user_answered`)**: `needs-user-input` の issue に依頼者 (人間) が返したコメントを、
+- **人間オーナーの回答の検出 (`user_answered`)**: `needs-user-input` の issue に人間オーナーが返したコメントを、
   PM agent が読んで反映する。回答は既定案より優先する。値域外 (allowlist 外の素材名など) の部分だけ無視する。
 - **PR 起点の判断待ち (`needs_decision`)**: 対象は `needs-user-input` の issue でなく PR (ref は PR 番号)。reviewer の最新の差し戻し
   (`CHANGES_REQUESTED`) の本文が PM の判断・起票を求めているとき (`review.needs`) に Worker が送る。条件は `infra/pm-worker/src/pm.ts` の `detectPm`。
