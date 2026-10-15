@@ -82,6 +82,11 @@ EXTRA_PARAMS = {
     "playlist.muteTrackLock": [{"name": "value", "type": "int", "default": "-1"}],
 }
 
+# 公開 stub の戻り型の補正 (PY-243 #3745)。stub は int と書くが PE の成功経路は [0x16b82e0] = _Py_NoneStruct を返す (REPORT_PY243)。キーは "<module>.<name>"。
+RETURN_OVERRIDES = {
+    "launchMapPages.setMapItemTarget": "None",
+}
+
 
 # 説明文 (doc) の上書き (#4145・PY-305)。mac rodata では ui.setTimeDispMin が getTimeDispMin の doc を
 # 複写して見える (Win PE では setTimeDispMin の直後に doc が無く getFocused が続く)。本体は toggle (引数なし・None)
@@ -115,6 +120,8 @@ for m, blocks in raw["modules"].items():
         sig = sigs.get(n)
         if sig and f"{m}.{n}" in EXTRA_PARAMS:
             sig = {"params": sig["params"] + EXTRA_PARAMS[f"{m}.{n}"], "returns": sig["returns"], "arity_from": "kwsig"}
+        if sig and f"{m}.{n}" in RETURN_OVERRIDES:
+            sig = {**sig, "returns": RETURN_OVERRIDES[f"{m}.{n}"]}
         ent[n] = {
             "doc": DOC_OVERRIDES.get(f"{m}.{n}", d),
             "sig": sig,

@@ -821,7 +821,7 @@ const fl_desc fl_table[] = {
     /*380*/ {"launchMapPages", "length", 'i', 0, 0, "", h_launchMapPages_length},
     /*381*/ {"launchMapPages", "processMapItem", 'n', 4, 4, "aiii", h_launchMapPages_processMapItem},
     /*382*/ {"launchMapPages", "releaseMapItem", 'n', 2, 2, "ai", h_launchMapPages_releaseMapItem},
-    /*383*/ {"launchMapPages", "setMapItemTarget", 'i', 3, 3, "iii", h_launchMapPages_setMapItemTarget},
+    /*383*/ {"launchMapPages", "setMapItemTarget", 'n', 3, 3, "iii", h_launchMapPages_setMapItemTarget},
     /*384*/ {"launchMapPages", "updateMap", 'n', 1, 1, "i", h_launchMapPages_updateMap},
     /*385*/ {"screen", "addMeter", 'n', 5, 4, "aaaaa", h_screen_addMeter},
     /*386*/ {"screen", "addTextLine", 'n', 5, 5, "siaaa", h_screen_addTextLine},
