@@ -16,15 +16,17 @@
 
 ## 測定
 
-- 測定 commit: `cf29660` (`origin/main` 起点の worktree `ws-3268` の HEAD。解析ツール `tools/python/analysis` は本 issue の変更前。`git diff cf29660 HEAD -- tools/python/analysis` の出力は 0 行 (計測後に commit するのは `pe_owner_thread_probe.py` 1 件のみ))。
+- 測定 commit: `cf29660` (`origin/main` 起点の worktree `ws-3268` の HEAD)。既存の解析ツール 4 件 (`pe_disasm.py`・`pe_xref.py`・`pe_callgraph.py`・`pe_scan_store.py`) は `git diff cf29660 HEAD` の出力 0 行 (変更なし)。`tools/python/analysis` の差分は新規追加の `pe_owner_thread_probe.py` (追加のみ) だけ。
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB) の `extracted/block00031_PE.bin` を repo 外 `${RUNNER_TEMP}/fl-win64` に展開 (2.8 秒・終了 0)。依存 `pefile 2024.8.26`・`capstone 5.0.7` は実在を確認。
-- 所要: 開始 00:35:09 UTC → 終了 (本 REPORT 最終 commit 時) 約 00:55 UTC 程度。load average (1 分値): 開始 0.34 (00:35)、probe 実行前後 0.41〜0.91 (00:44〜00:46)。
-- 使用ツール: `pe_disasm.py` (逆アセ)・`pe_xref.py` (RIP 参照の全走査 3 回、各 62 秒)・`pe_callgraph.py callers` (直接 E8 の呼出し元)。すべて終了 0。ツールの不具合は見つからなかった。
+- 所要: 開始 00:35:09 UTC → 解析完了 00:48:39 UTC (約 14 分。草稿 commit 00:47:53)。load average (1 分値): 開始 0.34 (00:35:09)、終了 0.18 (00:48:39)。probe の実行は 00:44:21〜00:45:26 (load 0.41→0.80)。
+- 使用ツール: `pe_disasm.py` (逆アセ)・`pe_xref.py` (RIP 参照の全走査 3 回、各 62 秒)・`pe_callgraph.py callers` (直接 E8 の呼出し元)。すべて終了 0。
+- 解析に使いにくかった点: `pe_disasm.py` は命令境界でない VA (例 `0x41ce30`) を与えると出力が空になる (関数先頭 `0x41ce10` から読んだ)。`pe_callgraph.py callers` は直接 E8 だけを数え、命令 VA を渡すと「0 件」を返すだけ (関数先頭を渡す必要)。E9 jmp・関数ポインタ経由は数えない。
 - 再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_owner_thread_probe.py` (約 64 秒・RESULT: PASS・終了 0)。
 
 ## 1. 同期比較 `0x525ec0` の入力 (受入 2・3 の前提)
 
 - `0x525ec0` の同期判定 (`0x525ee9` の hook 分岐の後): `0x525f3d call 0x525940` → `0x525f42 mov rcx,[rip+0x10befcf]` (= `*(0x15e4f18)`) → `0x525f49 mov eax,[rax+8]` → `0x525f4c cmp eax,[rcx]` → `0x525f4e jne 0x525faf`。`0x525f50`〜`0x525f5e` で `(r8b & r9b)==0` を見て、成立時は `0x525f60`〜`0x525f7d` で `[task+8]` があれば `call [task+8]`、無ければ `[task+0x18]` を呼ぶ (同期実行)。不成立は `0x525faf` 以降の待ち行列経路 (未読)。
+- 呼出し元 `0x526190` (`0x5261d6 xor r8,r8`・`0x5261d9 xor r9,r9`・`0x5261dc call 0x525ec0`。rdx = item `[rbp+0x30]`、item は `0x525380` で {owner=this, fn・ctx} を作る) で r8=r9=0 を確認。
 - `0x525ee9`: `cmp qword [rip+0x10cc767],0` が非 0 のとき `0x525940` と `[rbx+0x18]` の間接 call を行う (観測用の分岐と推定。未読)。
 
 ## 2. X と `[X+8]`
