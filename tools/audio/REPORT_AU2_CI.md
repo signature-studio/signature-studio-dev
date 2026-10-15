@@ -239,8 +239,12 @@
 - **P1〜P4 の値**: 未測定 (Windows・macOS とも)。初回の dispatch 結果はこの節に記録する (記録は PM)。
 - **Safari (AU-35 #3193)**: `harness/safari.mjs` (safaridriver の WebDriver classic) と `run.mjs --browser safari` を追加した。Safari の P1〜P4 は未測定。WebDriver BiDi 対応は未確定。詳細・検証・未解決は `REPORT_APPENDIX_3193.md` (正本)。Safari 行の yaml は草案 (未適用)。
 
-## 11. P2 の p99 (AU-30 #3151)
+## 11. Windows / macOS 行列への Firefox・Safari 追加 (AU-33 #3168・部分達成)
 
-- **結論**: worklet が連続 `process()` の burst 分布 (`burst_hist`) を公開し、結果 JSON に `burst_p99` を出すようになった。null-sink は全 run PASS (underrun 0)。fake 48k は 1 件 FAIL (未解決・#187)。Firefox の p99 は未配線。
-- 測定 commit・行列・再現手順・未解決の全文は `REPORT_APPENDIX_3151.md` (250 行上限のため分割移動)。
-- 全行列の再測定 (測定 commit `8310689a`・n=3・6 条件を全て測定): null-sink は 3 条件 × 3 rep = 9/9 PASS (underrun 0)。fake は 48k 2/3 (rep 1 の underrun 1 が前回と同じ rep 1 で再現・#187)、96k 2 条件は 6/6 PASS。全文は付録 §11-3。
+- 測定 commit: `9aa9239b` (コード最終)。9/9 はこの commit のコードで測った。HEAD `c89f18db` では Firefox e2e の入力 (`public/worklets/fl-audio-worklet.js`・`src/runtime/audio-shim.ts`) が main の `7c5ee224` (AU-29) で変わったため、HEAD で再測定した (§A・§G)。
+- 結論: Firefox 157.0 (ubuntu・PulseAudio null-sink・n=3) で **9/9 PASS** (HEAD `c89f18db`・rc 0・underrun 0・既定 sink 接続 9/9。9aa9239b でも 9/9)。既定出力の判定を OS 別にした。Safari の経路は #3208 で main に入った (P1〜P4 は未測定・[AU-36] #3207)。Windows / macOS の Firefox 行は未適用・未実行 (#3192 [AU-34])。
+- 差分: 実行コードの範囲 (`build.sh` 入力を含む) は HEAD `c89f18db` で 8 ファイル・225 行追加・9 行削除 (§A (a))。issue 指定の `-- tools/audio` の内訳・変更・再現・NC・未解決の全文は `REPORT_APPENDIX_3168.md` §A〜§G (250 行上限のため分割移動)。
+
+## 12. P2 の p99 (AU-30 #3151)
+
+- **結論**: worklet が連続 `process()` の burst 分布 (`burst_hist`) を公開し、結果 JSON に `burst_p99` を出すようになった。null-sink は全 run PASS (underrun 0)。fake 48k は 1 件 FAIL (未解決・#187)。Firefox の p99 は未配線。 測定 commit・行列・再現手順・未解決の全文は `REPORT_APPENDIX_3151.md` (§12)。

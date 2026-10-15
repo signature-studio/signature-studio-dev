@@ -2,10 +2,14 @@
 """対照 ns (gain) の before 集合 (roots の直接 call/jmp 閉包) を 1 関数 1 行で出す (KH-19e, #1619).
 
 各関数について、閉包に入る根拠 (root からの呼び出し鎖の親と call 位置) を付ける。
-出力は機械生成であり、人手検証の結果ではない (列 verified は常に auto)。
+出力は機械生成であり、人手検証の結果ではない (列 verified は既定 auto)。
+out.tsv が既にあるときは、(func_rva, parent_rva, call_site_rva) が一致する行の verified 値を残す (#2176)。
+保持の前提は同一バイナリでの再生成。size と root_class は照合しないため、別バイナリで再生成すると
+同じ RVA・親・call 位置の古い manual が残り得る。別バイナリの再生成では、manual を付け直す前に
+gain_manual_dump.py と gain_manual_check.py で照合し直すこと。
 usage: gain_before_list.py <HeartCore.core_64> <work/callgraph.pkl> <work/rtti_vtables.json> <ns> <out.tsv>
 """
-import sys, json, pickle, re, collections
+import sys, json, pickle, re, collections, csv, os
 
 import pefile
 import capstone
@@ -51,16 +55,19 @@ def main(corep, cgp, vtp, ns, outp):
                     return i.address - base
         return None
 
+    keep = {}
+    if os.path.exists(outp):
+        keep = {(r['func_rva'], r['parent_rva'], r['call_site_rva']): r['verified']
+                for r in csv.DictReader(open(outp), delimiter='\t')}
     with open(outp, 'w') as fh:
         fh.write('func_rva\tsize\troot_class\tparent_rva\tcall_site_rva\tverified\n')
         for f in sorted(parent):
             p = parent[f]
             cs = call_site(p, f) if p is not None else None
             rc = roots.get(f, (None, None))[0] if f in roots else ''
-            fh.write('%#x\t%d\t%s\t%s\t%s\tauto\n' % (
-                f, res[f]['size'], rc or '',
-                '%#x' % p if p is not None else '',
-                '%#x' % cs if cs is not None else ''))
+            key = ('%#x' % f, '%#x' % p if p is not None else '', '%#x' % cs if cs is not None else '')
+            fh.write('%#x\t%d\t%s\t%s\t%s\t%s\n' % (
+                f, res[f]['size'], rc or '', key[1], key[2], keep.get(key, 'auto')))
     print(json.dumps({'ns': ns, 'before_funcs': len(parent), 'roots': len(roots)}))
 
 

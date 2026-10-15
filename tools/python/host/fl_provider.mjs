@@ -83,5 +83,6 @@ export async function createWasmEngine({ flprovUrl, ids }) {
     midiOutCount: () => M._fl_engine_midi_out_count(),
     gridBit: (c, p) => M._fl_engine_grid_bit(c, p),
     displayTime: () => Number(M._fl_engine_display_time()),
+    stepItemProbe: (prm, v, s0, s1) => M._fl_engine_step_item_probe(prm, v, s0, s1),
   };
 }

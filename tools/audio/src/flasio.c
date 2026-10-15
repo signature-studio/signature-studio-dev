@@ -244,11 +244,17 @@ static void *thread_fn(void *arg) {
         }
         if (rc < 0) break;
         if (rc == 1) continue;
+        double tw = emscripten_get_now();
         uint32_t fill = fla_out_fill();
         if (fill < c->min_fill) c->min_fill = fill;
         c->fill_sum_lo += fill; c->fill_samples++;
         if (fill < FLA_QUANTUM) c->cb_late++;
+        uint32_t w0 = c->out_write, k = (c->pw_n % FLA_PW_N) * 4;
         do_buffer(idx); idx ^= 1;
+        double td = emscripten_get_now();
+        c->pw_trace[k] = w0; c->pw_trace[k + 1] = fill;
+        c->pw_trace[k + 2] = (uint32_t)(uint64_t)(tw * 1000.0); c->pw_trace[k + 3] = (uint32_t)(uint64_t)(td * 1000.0);
+        c->pw_n++;
     }
     return NULL;
 }
