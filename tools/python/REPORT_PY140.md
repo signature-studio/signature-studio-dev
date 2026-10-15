@@ -12,7 +12,7 @@
 
 ## 手段
 
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` を `tar --zstd -xf ... --wildcards '*block00031_PE.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block25159_DATA.bin' '*block24618_DATA.bin'` で展開 (2.8 秒)。`$HOME/artifacts` の実在は展開前に `ls` で確認した。`toolchain-emsdk` は本 PR では使わない (mock/C を変えないため)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf ... --wildcards '*block00031_PE.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block25159_DATA.bin' '*block24618_DATA.bin'` で展開 (2.8 秒)。`$ARTIFACTS_DIR` の実在は展開前に `ls` で確認した。`toolchain-emsdk` は本 PR では使わない (mock/C を変えないため)。
 - 逆アセンブル: `pe_disasm.py fdd2c0 1500` と capstone で `0xfdd2c0`〜`0xfde8ad` (`.pdata` の終端、0x15ed バイト、1269 命令)。
 - 到達解析: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_dispatch_probe.py <op...> --arg <N|-> --mode <N|->`。op (`ecx`)・arg (`edx`)・mode (`r8b`) を具体値で与え、op 由来の `eax` と比較フラグだけを具体値で追う。決まらない分岐 (メモリ・呼出しの戻り値) は両方を辿る。`.data` の定数は読み、`[rip+X]` の 16bit 定数 (修飾子) も PE の静的値で読む。`rcx` の間接テーブル引き (矢印キーの VK) は probe では追わず、テーブル値は手で読んだ (下)。
 - 追加で読んだ値: `0x8186a0` の本体 (`dx` のビットと user32 の thunk)、矢印キーの VK 表、修飾子ワード。
