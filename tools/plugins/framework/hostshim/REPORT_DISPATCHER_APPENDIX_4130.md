@@ -54,7 +54,9 @@
 
 - `hostshim.c` に、これら 11 格納の応答表は無い (`grep` で 0x1328・0x1320e・0x13213・0x1322971 に該当なし)。応答表の変更は行わない。
 - 理由: 8 件の即値は値が確定したが、到達させる gate の入力が PE 外の状態で、表に入れても実行されない。3 件の call 戻り値は受け手の vtable が未確定で、値の供給元を決められない。
-- `hs_e2e.sh` Phase A の回帰 (`dispatch=38 ff=0`) は**本 run では実行していない**。PR 本文に `oc_artifacts: fl-win64 work-fw-stage1` を指定する。本 run の `ARTIFACTS_DIR` には `fl-win64.tar.zst` だけがあり、`work-fw-stage1` は実在しなかった (`ls $ARTIFACTS_DIR` で確認)。`work-fw-stage1` の中身は `fw*.restored.ll`・`fw_map.json`・`fw_icall.dll` 等で、`hs_e2e.sh` が要求する `work/fw/fw_flat4_canon3.ll`・`fw_image.bin`・`fw_rt.c`・`fw_simd.c`・`fw_imports.json`・`fw_rt.h`・`fw_boot.c`・`fw_route.cjs` は含まれない (`hs_e2e.sh` 38 行の前提チェック)。emsdk (`/opt/emsdk/emsdk_env.sh`) も runner に無い。hostshim.c を変えていないため、Phase A の結果は変わらない見込みだが、実測はしていない。
+- `hs_e2e.sh` Phase A の回帰 (`dispatch=38 ff=0`) は**本 run では実行していない**。本 run の `ARTIFACTS_DIR` には `fl-win64.tar.zst` (2.3 GB) と `work-fw-stage1.tar.zst` (23 MB) の 2 件があり、`work-fw-stage1` は存在する。ただし中身は stage-1 の成果物 12 件 (`tools/plugins/work/fw/` の `fw_icall.dll`・`fw_map.json`・`fw0`〜`fw7.restored.ll`・`r2`/`r3.restored.ll`) だけで、`hs_e2e.sh` 38 行の前提チェックが要求する 8 件 (`fw_flat4_canon3.ll`・`fw_simd.c`・`fw_image.bin`・`fw_imports.json`・`fw_rt.c`・`fw_rt.h`・`fw_boot.c`・`fw_route.cjs`) は含まれない。`fl-win64` にも 8 件は無い (`block00031_PE.bin` のみ)。
+- 8 件の供給元: `tools/plugins/framework/fw_stage2.sh` が stage-1 成果物 (`work-fw-stage1`) から生成する (`fw_flat4_canon3.ll`・`fw_simd.c`・`fw_image.bin`・`fw_imports.json`・`fw_table.c`・`fw_route.cjs` 等)。その経路は `[EMSDK]` の `emsdk_env.sh` と emcc を要する。emsdk (`[EMSDK]`) は runner に無く (`emcc` 無し)、素材としても配布されていない。版の pin は `tools/m1/flags.sh` (Emscripten 6.0.12)。
+- 判定: Phase A は本 PR で**実施不能**。次に実施できる条件 = (a) `work-fw-stage1` を展開し `fw_stage2.sh` を走らせて 8 件を作れる環境 (emsdk 6.0.12 の導入を含む)。hostshim.c は変えていないため Phase A の結果は変わらない見込みだが、実測はしていない。
 
 ## 5. 受入 3: 再現
 
