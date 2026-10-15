@@ -37,16 +37,23 @@ for (let c = 0; c < ncase; c++) {
   ex.wc_reset();
   let rax, hits;
   try {
-    // CreateInstance → vtable の slot を順に呼ぶ (wc_native_ref.c と同一の順序・引数・式)
+    // (init) → CreateInstance → vtable の slot を順に呼ぶ (wc_native_ref.c と同一の順序・引数・式)
+    if (L.init_rva) ex.wc_run(BASE + L.init_rva, 0n, 0n, 0n, 0n);
+    if (process.env.WC_TRACE === "1") console.error(`[run_wasm] trace case=${c} stage=init-done`);
     const obj = ex.wc_run(ENTRY, 0n, 0n, 0n, 0n);
+    if (process.env.WC_TRACE === "1") console.error(`[run_wasm] trace case=${c} stage=create-done obj=${obj.toString(16)}`);
     let acc = obj;
     for (const [k, s] of L.slots.slice(0, L.call_slots).entries()) {
-      const r = ex.wc_run(BASE + s, obj, BigInt(ARENA + 0x8000), 0n, 0n);
+      const [a1, a2, a3, a4] = L.call_args[k].map((v) => BigInt(v));
+      if (process.env.WC_TRACE === "1") console.error(`[run_wasm] trace case=${c} slot=${k} rva=${s.toString(16)} args=${[obj, a1, a2, a3, a4].map((v) => v.toString(16)).join(",")}`);
+      const r = ex.wc_run5(BASE + s, obj, a1, a2, a3, a4);
+      if (process.env.WC_TRACE === "1") console.error(`[run_wasm] trace case=${c} slot=${k} done rax=${r.toString(16)}`);
       if ((L.ret_mask >> k) & 1) acc = BigInt.asUintN(64, acc * 31n + r);
     }
     rax = acc;
     hits = ex.wc_hits_get();
   } catch (e) {
+    if (traps === 0) console.error(`[run_wasm] first trap case=${c}: ${e && e.stack ? e.stack.split("\n").slice(0, 3).join(" | ") : e}`);
     traps++;
     rax = 0xdeadn; hits = 0xdeadn;
   }

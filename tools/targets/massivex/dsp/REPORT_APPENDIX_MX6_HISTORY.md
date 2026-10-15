@@ -135,3 +135,23 @@ diff --git a/tools/targets/massivex/dsp/scripts/mx6_fh4.py b/tools/targets/massi
   step 8 の selftest と census は PE が必要で未実行。素材を付けた review run で照合する。
 - 検証 (測定 commit 51953f46d の記録): e2e 全件 PASS・exit 0 (§1a)。NC selftest は step 1 (5/5)・step 4 (9/9)・step 8 (3/3) すべて PASS (記録)。
 
+## A4. 測定 commit 3afa6013d の §1 e2e 表 (旧 REPORT_MX6 §1・§7。62a3fda35 の §1 へ置換するために分割移動)
+
+- 最後に e2e を実測した commit = **3afa6013d** (main 取り込みの merge commit)。再現: `bash tools/targets/massivex/dsp/mx6_e2e.sh` (`MX_PE` で PE を指定)。
+- 3afa6013d から 62a3fda35 までの対象スクリプトの差分: `mx33_xmm03.py` (工程 4) は変更あり。`mx6_vectorcall.py` は返し値 (`cfg`) の追加のみ。`mx6_e2e.sh`・`mx_entry_surface.py`・`mx6_pdata_eh.py`・`mx41_pdata2_census.py`・`mx6_fh4.py`・`mx_rtti.py` は変更なし。
+
+| 工程 (`mx6_e2e.sh`) | 結果 (3afa6013d) |
+|---|---|
+| 1/8 NC selftest (合成バイト列・PE 不要) | 5/5 PASS |
+| 2/8 RTTI + 入口面 | seeds 567 / 1-round 3,226 / pdata 186,960 (`mx_entry_surface.py` が .text 範囲で絞った数。§3 の 187,060 は絞らない 1 本目の全 entry) |
+| 3/8 vectorcall 静的検出 | seeds: pdata 始点 livein xmm4/5 = 0 (566 件) / 1-round: pdata 始点 livein xmm4/5 = 0 (604 件・途中アドレス 302 件は感度用) |
+| 4/8 受入1 (MX-33 #3032) | 17 件 PASS (NC 9/9・判定 scalar 0 / 128bit 0 / 判定不能 17・線形上限 9・包含 OK) |
+| 5/8 .pdata unwind census | 1 本目: entry 187,060 / chained 62,526 / EH 23,293 / 読取不能 160 ・ 2 本目: entry 509 / chained 34 / EH 49 / 読取不能 0 (MX-41) |
+| 6/8 判定 | PASS (pdata 始点の vectorcall livein 0 / 整合 OK / 受入1 の内訳 17 / MX-41: 読取不能 160・ネガコン ±1) |
+| 7/8 positive control | funclet 533 / pdata 始点 529 (期待値どおり) |
+| 8/8 FH4 FuncInfo4 固定部 | NC 3/3 PASS・entry 2,542 / fi 2,117・固定部のポインタが画像外 2 件 (既知) |
+
+- 所要 **48 s** (測定 commit 3afa6013d・同一 PE・`OK elapsed=48s`・exit 0・全 8 工程 PASS)。load average: 0.03 0.22 0.16 → 0.65 0.36 0.22。
+- MX-41 の判定 (工程 5・6): 1 本目 187,060 / 62,526 / 23,293 / 読取不能 160 (`out_of_image` 160) の維持。2 本目 509 / 34 / 49 / 読取不能 0。独立再計算 (pefile): 読取不能の集合一致 (160 = 160)・行ごとの分類一致 160/160・`get_section_by_rva` の None 160/160・読める行の flags 不一致 0。ネガコン: break +1・fix −1 (期待どおり)。
+- 実行: `MX_PE='$RUNNER_TEMP/mx/work/extracted/VST3/Massive X.vst3' MX6_WORK='$RUNNER_TEMP/massivex-mx6' bash tools/targets/massivex/dsp/mx6_e2e.sh` → exit 0。
+

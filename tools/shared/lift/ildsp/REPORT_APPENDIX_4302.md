@@ -10,7 +10,7 @@
 - **slot 3 の native 落ち は、`RDX ≠ 0` が原因だった。** slot 3 は `RDX = 0` が必要。`RDX = 入力` のままでは、`R9` の値によらず落ちる (`R9=入力`: SIGALRM で打ち切り・`R9=4`: SEGV addr 0x4)。`RDX = 0` なら `R9` によらず完走する。前回の `R9=4` は落ち方を変えるだけで、原因ではなかった。
 - 受入 2 (初期化 → slot 1・3 を含む呼出し順で native が落ちない) は、**1 プロセスでの呼出し順 `0,1,2,3,4,5` で満たした** (§4)。
 - 順次呼出しでも、slot 2 の戻り値は実行環境で変わる (§4)。落ちないことは確認したが、値は固定値として扱わない。
-- 受入 3 (native 対 wasm 差分) は**未実施**。差分 harness (`wc_native_ref.c`) は全 slot に同じ引数 (`RDX=作業バッファ`・`R8=R9=0`) を渡すため、slot 1・3 は早期 return する。slot 別の引数を渡せるよう harness を直す作業が要る (§6 の未解決)。
+- 受入 3 (native 対 wasm 差分) は**未達**。harness は slot 別の引数を渡せるようにした (§7・§8)。native は slot 0〜5 を 64/64 完走するが、wasm は全 case が slot 1 で trap する (§7)。
 
 ## 2. 特定の根拠 (受入 1)
 
@@ -98,12 +98,41 @@ slot 3 の引数別の対照 (同一 init・同一 `R8=16`・`S5=出力`):
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 受入 3: slot 1・3 を含む閉包の native 対 wasm 差分 (差分 harness の引数規約を slot 別にする) | 差分の PASS/FAIL 件数が未取得。閉包の全バイト差分が未確定 | #4302 (残件・Refs) |
+| 受入 3: slot 1 を含む閉包の native 対 wasm 差分 (wasm が slot 1 で trap) | 差分 PASS は 0/64。閉包の全バイト差分が未確定 | #4302 (残件・Refs) |
 | 鍵の初期化 `0x1b7d80` の効果 (復号結果 `call` 先の経路) を `.data` 入力で観測 | 初期化の必要性を実測で示せていない (§4) | #4302 (残件) |
 | 初期化関数列の全体 (CRT か) | 「CRT 相当」の断定ができない | #4302 (残件) |
 
-## 7. 検証
+## 7. 受入 3 の差分 harness (未達・途中結果)
 
-- 測定 commit (コードを変えた最後の commit): `e366f3ef9` (`fix(ildsp): slot 3 needs RDX=0; probe adds sequential call row (#4302)`)。素材 `fl-win64` を `work/fl` に展開して実行。
-- `psola_init_probe.sh` (12 実験・RDX=入力の対照 1 件を含む): 3 回実行。各 0.68〜0.70 s・load 0.10・3 回の出力は `cmp` で完全一致。対照行 (`RDX=入力`) のみ落ち、他 11 行は完走 (rc=0)。
-- 差分テスト (`lift_psola.sh`) は未実施 (受入 3)。
+harness を拡張した (`WC_INIT_RVA`・`WC_ARENA_SZ`・`WC_CALL_ARGS` を slot ごとに指定・`wc_run5`)。既定値は従来どおり。測定の正本は §8。
+
+- 結論: init `0x1b7d80` の後の slot 0〜5 を native で呼ぶと 64/64 完走する。wasm は全 64 case が slot 1 (`0x1ab680`) で trap する。受入 3 は未達。
+- slot 0 は wasm でも完走する (rax=1)。slot 1 の thunk は `this+8` を読んで DSP 本体へ飛ぶ。wasm で `this+8` が native と同じ内部状態かは未確認 (trap のため `res_wasm.bin` が残らない)。
+- lift 側は閉包 243 関数・unsup 0・unlifted 0。init・CreateInstance・slot 0 は wasm でも完走する (`WC_TRACE=1` で確認)。
+- よって差分が取れない原因は、閉包の欠落ではなく、wasm 側の実行時状態 (slot 1 の入力 `this` の内部フィールド) と推測する。未確認。
+
+未解決 (受入 3 の残件・#4302 に残す): slot 1 で wasm が trap する原因の特定 (native と wasm の `this` 内部状態の比較)。
+
+## 8. 検証
+
+- 測定 commit: `08fdc1db8` (現 head。コードを変えた最後の commit。前版 `e366f3ef9` からの差分は `tools/shared/lift/ildsp` の 5 files +37/-7 で、既定の差分テストの経路 (`wc_glue.c`・`wc_image.py`・`wc_native_ref.c`・`wc_run_wasm.mjs`・`lift_wc.sh`) を含むため、`e366f3ef9` の値は使わない)。
+- 素材: `fl-win64` の `extracted/block24360_PE.bin` (`work/fl` に展開)、`toolchain-emsdk` は上流 emsdk から 6.0.12 を入れて使った (emcc 6.0.12 を確認)。
+- 既定 `lift_psola.sh ok` (`08fdc1db8`): PASS=64 FAIL=0 wasm trap 0・rc 0・elapsed 2.42 s (emcc 込み)・load 1.23→1.22。
+- `psola_init_probe.sh` (`08fdc1db8`): rc 0・0.547 s (1 回)・load 0.40。§4 の表と一致 (slot 2 の順次呼出し `rax` は環境依存で値は変わるが完走)。
+- 差分 harness の拡張 (§7 の結論): 下のコマンド・`08fdc1db8`・rc 1・elapsed 26.74 s・load 0.76→0.85。native 64/64 完走 (SEGV 0)、wasm traps 64・PASS 0・FAIL 64。WC_ROOTS に `0x1b7d80` を入れない版でも同じく全 case が trap (elapsed 23.88 s)。
+
+再現コマンド (`lift_psola.sh` は `WC_ROOTS`・`WC_CALL_IDX` を固定で export するため、この設定は `lift_wc.sh` を直接呼ぶ。`lift_psola.sh` の既定は変えていない):
+
+```
+WC_ENTRY_RVA=0x1ab540 WC_VTABLE_RVA=0x3e0030 WC_WORK=ildsp-psola-s8 WC_INIT_RVA=0x1b7d80 WC_ARENA_SZ=0x400000 \
+WC_ROOTS="0x1ab540 0x1ab590 0x1ab690 0x1ab6b0 0x1ab800 0x17f700 0x180830 0x1b7d80" \
+WC_CALL_IDX="0 1 2 3 4 5" WC_RET_IDX="0 2 4 5" \
+WC_CALL_ARGS="IN OUT 16 0;IN OUT 16 0;IN OUT 16 0;0 16 IN OUT;IN OUT 16 0;IN OUT 16 0" \
+FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<emsdk_env.sh> bash tools/shared/lift/ildsp/lift_wc.sh ok
+```
+
+- `WC_CALL_ARGS` の並びは slot 0〜5 の順 (`RDX R8 R9 S5`)。slot 3 だけ `RDX=0 R8=16 R9=入力 S5=出力` (probe §4 の規約)。
+- `WC_RET_IDX` の slot 2 は、§4 のとおり環境で `rax` が変わる。native と wasm は同じ実行環境で比べるため、今の結果 (trap) には影響しない。ただし差分を PASS にする段階では、slot 2 を戻り値の畳み込みから外すことを検討する。
+- trap の位置は `WC_TRACE=1 node tools/shared/lift/ildsp/wc_run_wasm.mjs <workdir>` で確認: `init-done`・`create-done`・slot 0 `done rax=1` の後、`slot=1 rva=1ab680` で `unknown import wasi_snapshot_preview1.fd_write`。
+
+未解決 (受入 3 の残件・#4302 に残す): slot 1 で wasm が trap する原因の特定 (native と wasm の `this` 内部状態の比較)。
