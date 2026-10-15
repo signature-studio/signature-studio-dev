@@ -89,7 +89,9 @@ def main():
     def fix_wstr(s):
         # RetDec は W 文字列を `L"..."` で出す。L は wchar_t (Linux/wasm では 4 byte) なので、UTF-16 を読む W API の
         # 引数が 1 文字目で切れる。char16_t の `u"..."` (UTF-16 の 2 byte) へ置き換える (#3508)。
-        return re.sub(r'(?<!\w)L"', 'u"', s)
+        # 狭義の "..."・'...' は素通しする (`"Ctrl+L"` の末尾 L や `'"'` の後ろの文字列を壊さない)。
+        return re.sub(r"""(?<!\w)L"((?:[^"\\\n]|\\.)*)"|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'""",
+                      lambda m: 'u"%s"' % m.group(1) if m.group(1) is not None else m.group(0), s)
 
     # RetDec の Win32 シグネチャは LONG_PTR を long (32 bit) として持つため、引数の関数 VA 即値が上位 32 bit 欠けで出る
     # (SetWindowLongPtrW(h, -4, 0x400011f8)。正しくは 0x1400011f8)。引数位置の 8 桁即値が fnmap の関数 VA の下位 32 bit と
