@@ -20,7 +20,6 @@ rep('void f_59c210(void) {\nL_59c210:;\n', 'void f_59c210(void) {\nL_59c210:;\n 
 rep('  R[RSP] -= 8; ST64(R[RSP], 0x40fce2ULL); imp_ExitProcess();', '  fprintf(stderr, "[probe] pre-ExitProcess site=40fcdd 5aa000=%u\\n", (unsigned)LD32(0x5aa000ULL));\n  R[RSP] -= 8; ST64(R[RSP], 0x40fce2ULL); imp_ExitProcess();')
 open('work/probe/fle_lifted.c', 'w').write(src)
 PY
-source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 source qfc_lift.sh
 wasm_build "$QFC/work/probe" "$QFC/work/probe/qfcl_soft.cjs" "$QFC/work/probe/soft_imp.c" "$QFC/qfc_imp.c" "$QFC/qfc_ov.c"
 sed "s/printErr: (s) => errs.push(String(s))/printErr: (s) => { errs.push(String(s)); console.error(String(s)); }/" qfc_boot.mjs > work/probe/qfc_boot_probe.mjs
