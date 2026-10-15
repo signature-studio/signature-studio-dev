@@ -115,6 +115,27 @@
 - rax 19・rbx 9 の大域 3 種を埋める経路 (`.data` の初期値の読込み側の型と、`.bss`・`.idata` からの書込みの確認は未実施)。
 - rbx の ENTRY 経路の呼出し元 (直接呼出し 0 件の関数は、間接呼出し元の追跡が要る)。`[rbx+0x12b4]` の上流。
 - `[rbp+0x2c]` 2 件の x (rsi/rdx) の上流 (関数ポインタ経由)。
-- COPY 7・AMBIG 8 の基底 (本 PR では未分類)。
+- COPY 7・AMBIG 8 の基底 (1 段目は 6.3)。
 
-**受入は未達** (4 件のうち 1 件を部分達成: 2 段目の分類と `[rbp+0x2c]` の機構の確定。残りは親 #3927 の続きとして #4588 に残す)。
+### 6.3 COPY 7・AMBIG 8 の複製元の基底 (`analysis/flapi/pe_py368_copy_ambig.py`)
+
+測定 commit: `40b6621fa` (スクリプトを追加した commit)。同じ commit で 2 回実行し、TSV は一致 (終了 0・rows=15・36.6 秒)。
+
+- COPY 7 (複製元を 1 段で分類):
+  - ARITH 4: 0x1193bf0 (`and esi, 0xffff`)、0x127d0cc (`sub esi, 2`)、0x12a5868 (`sub eax, 2`)、0x12a86c9 (`add ebx, 1`)。基底は無し。
+  - MEM (rbp スロット) 2: 0x1021826 (`[rbp+0x150]`)、0x12ab8e8 (`[rbp+0xa0]`)。直前 store は本測定の TSV に出ず未追跡 (0x10216ff は REPORT_PY269 §の既存記述のみ・本測定で未検証、0x12ab72f は出典なし)。
+  - MEM (基底あり) 1: 0x12e3b29 ← `[rax+0x258]`、rax = `[rip+0x2fe749]` = VA 0x15e2218 (大域)。
+- AMBIG 8 (主経路の複製元を 1 段で分類):
+  - MEM 3: 0x118a275 ← `[rax+0x258]`、rax = `[rbp+0x38]` (0x118a241)。0x118a3f4 ← `[rax+0x130]`、rax = `[rbp+0x38]` (0x118a362)。0x12e6abe ← `[rax+rbx*4+0xdc]`、rax = `[rbp+0x20]` (0x12e6a22)。
+  - ARITH 1: 0x12abcd6 (`add ebx, 1`)。
+  - IMM 1: 0x12acbc1 (`mov eax, 1`)。
+  - COPY 2: 0xfc820f (主経路 rax ← `movsxd rax, eax`、0xfc81bc)、0x12c6240 (主経路 rax ← `[rip+0x31c1ff]` = VA 0x15e22d8)。
+  - AMBIG 1: 0x12c609e (主経路 `add eax, [rcx+0x94]` の合流が、さらに経路依存)。
+- まとめ (終端の区別):
+  - 値そのものが ARITH・IMM で終わる: 0x1193bf0・0x127d0cc・0x12a5868・0x12a86c9 (COPY)、0x12abcd6・0x12acbc1 (AMBIG 主経路)。
+  - 値が `[rbp+X]` の直読みで終わる: 0x1021826・0x12ab8e8 (COPY)。rbp スロットの直前 store は本測定では未追跡 (TSV の `@0x10217c5`・`@0x12ab885` の load 位置までを確認)。
+  - 値が大域の直読みで終わる: 0x12c6240 (AMBIG 主経路・大域 0x15e22d8)。0x12e3b29 は `[rax+0x258]` で、rax が大域 0x15e2218 の読込み。
+  - 値が `[基底+X]` の読込みで、基底がさらに 1 段必要: 0x118a275・0x118a3f4・0x12e6abe (AMBIG 主経路)。基底 rax は `[rbp+0x38]`・`[rbp+0x20]` (rbp スロット) で、スロットの直前 store は未追跡。0xfc820f は主経路 COPY rax ← ARITH だが、合流元 0xfc81c2→0xfc81c7 の飛び元 rdi が AMBIG のまま。
+  - 未確定: 0x12c609e (主経路は ARITH `add eax, [rcx+0x94]` まで届くが、合流元 0x12c6252 の分岐を未分類)。
+
+**受入は部分達成** (COPY 7・AMBIG 8 は 1 段目の基底まで確定。大域 0x15e2218・0x15e22d8 と rbp スロットの直前値の上流は未追跡)。残りは親 #3927 の続きとして #4588 に残す。
