@@ -33,7 +33,7 @@
 
 - 現行 harness が IAT に敷設しているのは 5 件 (`native_ref.c`: WaitForSingleObject / ReleaseMutex / RtlPcToFileHeader / RaiseException / GetLastError)。名前の完全一致で、DllMain 閉包の import 63 件と重なるのは 3 件。
 - `rex_closure.py` (関数全体で数える) の DllMain 閉包は 130 関数・import 64 件。`writer_chain.py` は到達可能な命令だけを数えるため 129 関数・63 件になる。前回 #4833 コメントの「148 関数・65 件」は、どちらの規則とも一致しない古い数値のため使わない。
-- movnti の到達: DllMain 閉包の 24 箇所のうち 8 箇所は 0x1c8f0 (関数 0x1c8f0)。0x22630 閉包の movnti 8 箇所も同じ 0x1c8f0 にある。0x1c8f0 の直接呼出元は 0x1f4cb (関数 0x1f4b0) のみ。0x1f4b0 の直接呼出元は 0x1f643 と 0x23c20・0x23c71・0x23ccc・0x23cf7・0x23d26 (関数 0x23b78)。
+- movnti の到達: DllMain 閉包の 24 箇所のうち 8 箇所は 0x1c8f0 (関数 0x1c8f0)。0x22630 閉包の movnti 8 箇所も同じ 0x1c8f0 にある。0x1c8f0 の直接呼出元は `.pdata` 関数全体の直接 call/jmp で **23 箇所**。うち DllMain 閉包内の呼出元は **8 箇所** (0x1f4cb・0x202dc・0x25758・0x25846・0x25ba6・0x25c80・0x27214・0x274ab)。0x1f4b0 の直接呼出元は **11 箇所** (閉包内 7 箇所: 0x1f643・0x23c20・0x23c71・0x23ccc・0x23cf7・0x23d26・0x26aca。閉包外 4 箇所: 0x22c9d・0x28264・0x2aef5・0x2af2d)。
 
 ### 12.4 DllMain の実行方法 (受入 1 の決定)
 方式 A (採用): native (`native_ref.c`) と wasm (`rex_glue.c`) の両側で、イメージを読み込んだ後・export を呼ぶ前に DllMain (0x1fd78) を `reason = 1` で 1 回呼ぶ。
@@ -42,7 +42,7 @@
 - IAT: 閉包の import 63 件を敷設対象にする。現行 5 件から 60 件以上の追加になる。
 
 ### 12.5 未確定 (本付録では断定しない)
-- 0x2231c は `xor ecx,ecx` の後に `jmp [rip+0x11e2b]` (スロット 0x3414f) で、この先の値が `.data` に入る (0x1fac2 の `call 0x2231c` の戻り値)。0x3414f は IAT の名前に対応せず、`.rdata` の値 (dword 0x04630c00) の意味は未確定。ここは harness で値を決める必要がある。
+- 0x2231c は `xor ecx,ecx` の後に `jmp [rip+0x11e2b]` (次命令 0x22325 + 0x11e2b = スロット 0x34150) で、この先の値が `.data` に入る (0x1fac2 の `call 0x2231c` の戻り値)。スロット 0x34150 は IAT の `KERNEL32.dll!EncodePointer` のエントリで、値 qword 0x4630c は Hint/Name の RVA (`0x4630c` = 「EncodePointer」の Hint/Name 構造体)。したがって `jmp` の先は EncodePointer の実体で、harness では IAT の敷設 (12.4) で解決される。
 - 0x1fc60 の `call r9` は関数ポインタ `[0x39440]` (`.rdata`) を読む。この slot は静的にゼロで IAT にも無いので、ファイル上では呼出を飛ばして 0x1fb24 に進む。実行時に値が入るかは未確認。
 - 静的閉包は実行経路の上限。`reason == 1` の正常経路で実際にどの分岐を通るかは、動的確認 (#4834 側) が必要。
 - 間接 jmp/call (DllMain 閉包 20・書込経路 9) の先は辿っていない (下限側)。
