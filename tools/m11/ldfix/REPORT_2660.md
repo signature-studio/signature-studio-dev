@@ -190,5 +190,11 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| F3d 58 関数のうち 3 対象以外の 55 関数の機械語・IR 突合と、`audit_lsf_ssa_e2e.sh` の HEAD / F3d 比較 (未実施) | 既定化の判断材料が無い | #3528 (LD-160) |
-| 既定 e2e の pin (STRICT_DONE 56・SURVEY_OK_EXACT 872) と本 snapshot の不一致 (HEAD でも発生) | 既定の e2e が rc=1 で終わる | #3528 (LD-160) の注意欄 |
+| 既定化の判断 (効果の実測・既定化した HEAD の e2e・guard の効く入力の negative control)。55 関数の突合と audit の比較は §10 で完了 | 既定化の判断は見送った (§10)。#2834 の前提が未成立 | #2834 (LD-135) へのコメント (前提は PM が決める) |
+| 既定 e2e の pin (STRICT_DONE 56・SURVEY_OK_EXACT 872) と本 snapshot の不一致 (HEAD でも発生) | 既定の e2e が rc=1 で終わる | #2834 へのコメント (#3528 の本文が「別途扱う」とした件の引継ぎ) |
+
+## 10. LD-160 (#3528): 55 関数の突合・audit の HEAD / F3d 比較・既定化の判断
+
+- 突合: F3d 対象 58 関数 (3 対象を含む) の入口 `movzx word ptr [argN]` と IR の挿入 load の argK は 58/58 で一致した。negative control で NG を検出できることも確かめた。
+- audit: HEAD と F3d の 7 step の出力は同一 (差 0)。ただし audit の母集団に入る F3d 対象は 4 関数だけで、残りは観測できない。
+- 既定化: **しない** (`ldfix.py` の除外は残す)。理由と既定化の条件は `REPORT_3528.md` §4。測定値の正本は `REPORT_3528.md`。
