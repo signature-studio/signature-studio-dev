@@ -64,3 +64,25 @@ entry point として単体で strict 検査したときのエラー数 (降順)
 - `tools/liftlib/tests/test_boolret.py`: 5 tests OK (unittest)。
 - 差分ハーネス (origin/main の liftlib と本変更の liftlib に同一の合成入力を与える): `ir`/`pe`/`remap`/`boolret`/`dataimage`/`icall`/`fp_bind`/`l1_restore`/`lb_layout`/`runtime_lb`/`env` の出力 JSON が一致 (12,801 + 10,926 bytes)。
 - ネガコン: Tier 1 の注釈を 1 箇所わざと壊すと `mypy` が 2 errors で赤 (`Success: no issues found in 12 source files` が壊れる) を確認。
+
+## Func.params() の拒否経路の再測定 (HEAD `194081d19`・review round 2 への対応)
+
+検証 HEAD `194081d19`。`Func.params()` の実行コード差分 (`rpartition` 検査と `ValueError`) の影響を、方法 (b) で確認した。
+
+- 差分ハーネスの元の入力 (`12,801 + 10,926 bytes` の生成に使った合成入力) はリポジトリに残っていない。再実行はできないため、(a) ではなく (b) で確認する。
+- 実 IR (`work/`・RetDec 出力) は runner に無い。`fl-win64` の tar に `.ll` は 0 件 (`tar --zstd -tf ... | grep -c` で実測)。`work-liftlib` は本 run の `oc_artifacts` に含まれない。したがって **実 IR での確認はしていない**。
+- 代わりに、リポジトリ追跡ファイル内の `define` 行 (`git grep -h -E '^\s*define\s'`) を全件集め、旧版 (`325cf6a4d`) と新版 (`HEAD`) の `Func.params()` を比べた。
+
+```
+$ git grep -h -E '^\s*define\s' -- . | sed 's/^\s*//' | sort -u | wc -l
+75                       (重複除去後の define 行)
+DEFINE 正規表現に一致 (params() の入力になり得る行): 66
+新旧で結果が同一: 66 / ValueError 発生: 0 / 結果差分: 0
+```
+
+- 残り 9 行は `define` を含む散文・コメント・1 行の C 風断片で、`DEFINE` に一致しないため `params()` に入らない。
+- 生成側の確認: 仮引数を出力するコード (`inject.py:152`・`f2.py:294`・`iargs.py:338`・`recipes/ott/ir8_valueflow.py:331`・`recipes/ott/ir9_bootstraps.py` 等) は全て `%名前` を付けて出力する。名前の無い仮引数を生成する箇所は見当たらなかった。
+- 境界の確認 (旧版との比較): 通常の属性付き仮引数 (`noundef`・`nocapture`・`byval(...)`・`local_unnamed_addr` 付き define) は新旧同一。名前の無い仮引数・可変長・`{ i64, i64 } %s` のような構造体引数・`%"quoted name"` は、旧版で `('{', 'i64')` 等の壊れたタプルを返していた入力で、新版は `ValueError` になる (意図した変更)。
+- `passes/iargs.py:94` (`[p[0] for p in fns[name].params()]`) は、旧版で名前無し仮引数を型だけ返していた。新版は ValueError。ただし上記の通りリポジトリ内の定義行には該当が無い。実 IR に該当が無いことは未確認 (素材不足)。
+
+結論: 拒否経路はリポジトリ内の全 `define` 行で発火せず、新旧の出力は一致する。実 IR での確認は素材 (`work-liftlib`) を用意して別途行う (未解決)。12 モジュールの差分ハーネスの出力 JSON は `194081d19` で再実行していない。
