@@ -33,13 +33,12 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
 ## 4. 検証
 
 - probe: `tools/python/analysis/flapi/pe_py325_refs.py` (検査 6 件)。
-- 測定 commit: 本 PR の commit (以下の実測は HEAD 上で実行)。
+- 測定 commit (コードを変えた最後の commit): `171ef59ad`。
 - 実行: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py325_refs.py`。
-- 既存 probe (同じ素材・同じ HEAD):
-  - `pe_py320_fire_site.py`: PASS 11 / FAIL 0。
-  - `pe_py268_rdx.py`: 件数 22 / 22。
-  - `pe_py325_refs.py`: PASS 6 / FAIL 0。
-- 実測 (所要時間 real): 実測値は PR 本文に記載。
+- 実測 (HEAD `171ef59ad`・素材 fl-win64 の block00031_PE.bin・load 0.10):
+  - `pe_py325_refs.py`: real 0.133 秒・終了 0・PASS 6 / FAIL 0。
+  - `pe_py320_fire_site.py`: real 42.549 秒・終了 0・PASS 11 / FAIL 0。
+  - `pe_py268_rdx.py`: real 42.633 秒・終了 0・件数 22 / 22。
 
 ## 5. 未解決
 
