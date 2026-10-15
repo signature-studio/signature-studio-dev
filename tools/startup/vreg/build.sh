@@ -7,7 +7,7 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 SHIMX="$HERE/../../shimx"
 B="$HERE/build"; mkdir -p "$B"
-set +u; . /opt/emsdk/emsdk_env.sh >/dev/null 2>&1 || true; set -u
+set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u
 source "$SHIMX/flags.sh"
 SRCS=("$SHIMX"/src/*.c)
 VSRC=("$HERE/src/probe.c")

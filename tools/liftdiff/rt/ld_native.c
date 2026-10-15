@@ -356,9 +356,9 @@ int main(int argc, char** argv) {
     if (cat && *cat) {
       FILE* cf = fopen(cat, "rb");
       if (!cf) { fprintf(stderr, "[ld_native] LD_CATALOG_MO unreadable: %s\n", cat); return 6; }
-      fseek(cf, 0, SEEK_END); ld_cat_len = (u64)ftell(cf); fseek(cf, 0, SEEK_SET);
-      ld_cat_blob = malloc(ld_cat_len ? ld_cat_len : 1);
-      if (!ld_cat_blob || fread(ld_cat_blob, 1, ld_cat_len, cf) != ld_cat_len) { fprintf(stderr, "[ld_native] LD_CATALOG_MO read failed\n"); return 6; }
+      fseek(cf, 0, SEEK_END); ld_cat_blob_len = (u64)ftell(cf); fseek(cf, 0, SEEK_SET);
+      ld_cat_blob = malloc(ld_cat_blob_len ? ld_cat_blob_len : 1);
+      if (!ld_cat_blob || fread(ld_cat_blob, 1, ld_cat_blob_len, cf) != ld_cat_blob_len) { fprintf(stderr, "[ld_native] LD_CATALOG_MO read failed\n"); return 6; }
       fclose(cf);
     } }
   while (getline(&g_line, &g_linecap, stdin) > 0) {
