@@ -132,6 +132,29 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
   - 補足: `build_flpy.sh` は上流 emsdk の `emsdk_env.sh` が `EMSDK_DIR` を unset するため `set -u` で落ちる (23 行目)。再現は `source` 直後の `echo "$EMSDK_DIR"` が unset になること。本測定では `tools/python` と `tools/shared`・`tools/legal` を `/tmp/opencode/pyt/tools/` にコピーし、コピー側の `build_flpy.sh` の 23 行目だけを退避・復元に変えて実行した (`_EMSDK_KEEP="$EMSDK_DIR"; source ...; EMSDK_DIR="$_EMSDK_KEEP"`)。`work/` とリポジトリ内のスクリプトは変えていない。リポジトリの修正は本 PR の範囲外。
 - KPI: 起動・GUI に関わらない PR のため、製品 KPI は記載しない。
 
+## PY-349 (#5249 / 親 #4616): flags & 0x20 ガード内 store の右辺 (固定 4 族)
+
+- 対象: 固定 4 族 (0x40000000・0x40000001・0x40000002・0x40000005) の `flags` ([rbp+0x5c0]) の `test eax, 0x20` ガード内の store 4 件 (0x104c311・0x104c51a・0x104c6ba・0x104c984)。`flags & 0x2` の側は対象外。
+- **確定した式** (4 族で同形。`analysis/py349_flags20_rhs.py` が 4 族とも VA・命令形・定数を assert):
+  - `v` = `[rbp+0x5b8]` (int32)。`a` = `[obj+0x3b8]`・`b` = `[obj+0x3bc]`。
+  - `t` = `(double)(int32)v × C × (double)(int32)(b − a)`。`b − a` は 32 bit (`sub eax, dword ptr [rcx+0x3b8]`)。
+  - `C` = `[0x104ccd8]` = 2^-30 (mulsd の rip 相対先。`0x104ccd8` の 8 byte は `0x3e10000000000000`)。
+  - `r` = `cvtsd2si(t)` (`call 0x40c660` は `cvtsd2si rax, xmm0; ret`・64 bit)。
+  - 格納値 = `low32(a + r)` (`mov ecx, [obj+0x3b8]`・`add ecx, eax`・`mov [rbp+0x5b8], ecx`)。
+- **obj の出所**: 族ごとに `obj = *(*(*G) + off)` (G は .data の pointer 変数・2 段 deref の後に off)。
+
+| 族 | store VA | G (.data) | off | obj 退避先 |
+|---|---|---|---|---|
+| 0x40000000 | 0x104c311 | 0x15e2eb8 | 0x9e0 | [rbp+0x3a0] |
+| 0x40000001 | 0x104c51a | 0x15e14a0 | 0x808 | [rbp+0x398] |
+| 0x40000002 | 0x104c6ba | 0x15e2eb8 | 0xb28 | [rbp+0x390] |
+| 0x40000005 | 0x104c984 | 0x15e2eb8 | 0x778 | [rbp+0x2b8] |
+
+- **未確定** (静的には閉じない): `*(*G)` の実行時値と、`obj` の `[obj+0x3b8]`・`[obj+0x3bc]` の中身 (エンジン状態)。式は `a`・`b`・`v` を変数として残す。
+- 実装 (mock/C の 0x20 分岐) はこの子の範囲外。受入はこの式の確定のみ。親 #4616 に残る。
+- 測定: `FL_WIN64_DIR=<展開先> python3 analysis/py349_flags20_rhs.py` (fl-win64 の block00031_PE.bin・capstone/pefile)。結果は全 assert ok・rc 0。既存の `analysis/py235_process_rec_families.py` も同じ PE で 31 ok・0 FAIL・rc 0 (再実行)。
+- KPI: 起動・GUI に関わらない PR のため、製品 KPI は記載しない。
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
