@@ -28,7 +28,7 @@
 
 **不変 (受入)**: Gain / Haas / Gate の生成 C と sigs.json は、規則の有無で `cmp` 一致 (差分 0)。
 
-**残件 78 件の内訳 (callee 別・本 run の census)**: `FUN_180fc6870` 17・`FUN_180fc6d70` 16・`FUN_180fdc470` 4・`FUN_180f8791c` 3・`FUN_180fdfdb0` 3・`FUN_180fd0ac8` 3・`FUN_180fbc1f4` 2 (#5397 待ち)・他は 1〜2 件。`FUN_180fc6870`・`FUN_180fc6d70` は SIMD 本体を持つ大きな callee で、引数源の確定に機械語の長い追跡が要る。
+**残件 78 件の内訳 (callee 別・測定 commit `fb4b67659` の census)**: `FUN_180fc6870` 17・`FUN_180fc6d70` 16・`FUN_180fdc470` 4・`FUN_180f8791c` 3・`FUN_180fdfdb0` 3・`FUN_180fd0ac8` 3・`FUN_180fbc1f4` 2 (#5397 待ち)・他は 1〜2 件。`FUN_180fc6870`・`FUN_180fc6d70` は SIMD 本体を持つ大きな callee で、引数源の確定に機械語の長い追跡が要る。
 
 **未解決 (起票先付き)**
 
