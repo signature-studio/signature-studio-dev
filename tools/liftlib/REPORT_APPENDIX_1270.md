@@ -1,33 +1,68 @@
-# liftlib #1270 (HB-H29, 部分達成→受入 1〜2・4 達成) — ott_getparam の入口 this/idx 受渡しと switch 表の敷設で leafspec match 1.0 (付録)
+# liftlib #1270 (HB-H29) — ott_getparam の入口 this/idx 受渡しと switch 表の敷設で leafspec match 1.0 (付録)
 
-親: #883 (HB-H21)。前提: #1269 (closed・残件は #1583 / #1586 へ分割済み)。
-既知類型との関係: [DEFECTS.md](../../docs/DEFECTS.md) の D1a〜D23 のどれにも直接は当たらない (silent miscompile の類型名は未確認)。
+親: #883 (HB-H21・closed)。前提: #1269 (closed・残件は #1583 / #1586 へ分割済み・いずれも closed)。
+既知類型との関係: [DEFECTS.md](../../docs/DEFECTS.md) の D1a〜D25 のどれにも直接は当たらない。新規類型の行案は §7 (D26 案)。D5 と近縁だが原因は別 (§7)。
 
 ## 0. 結論
 
-| 受入 (#1270 本文) | 結果 (実測) |
+| 受入 (#1270 本文・縮小後) | 結果 (実測) |
 |---|---|
 | 1. 入力の受渡し方式を決め、根拠を書く | **達成**。方式 (a): 入口の BLK+0x08/+0x10 読みを仮引数 `%arg1` / `%arg2` へ張り替える。根拠は §2 |
-| 2. `leafspec targets/ott_getparam.json --n 200` が rc=0・match 1.0・idx 0..19 × 200・wasm_trap 0 | **達成** (測定 commit `e13cd45c`: rc=0, match 200 / mismatch 0 / native_crash 0 / wasm_trap 0, §4.1) |
-| 3. ネガコン (修正を外すと match が戻る) と jtchain / leafabi の切り分け | **部分**。修正を 1 つずつ外した実測は §4.2 (match 200 → 147 / 11)。jtchain 外しは emcc が落ちるため切り分け不能、leafabi 外しは 15 (§4.3)。`baseline=0` (本文の想定) は実測では 147 (this=0 でも一致する scenario が残る) |
+| 2. `leafspec targets/ott_getparam.json --n 200` が rc=0・match 1.0・idx 0..19 × 200・wasm_trap 0 | **達成** (測定 commit `e13cd45c`: rc=0, match 200 / mismatch 0 / native_crash 0 / wasm_trap 0, §4.1)。以後のコード差分 `6a7010ffc` は未再測定 (§1.1) |
 | 4. `liftlib_e2e.sh` の regress に `ott_getparam` を登録 | **達成** (`liftlib_e2e.sh` の (g) 節。PASS の状態で登録) |
-| 5. #883 の受入 4 件を満たせる状態にする | 本付録の範囲では #883 の残件 (`tools/liftlib` の他 target・#883 本文の受入) は未確認。#1270 は `Refs` で残す |
+
+本 issue の範囲から外した項目 (本 PR では閉じない。起票先は §6):
+- 3. ネガコン: 修正を外した実測は match 147 / 11 (期待値 `0` とは不一致, §4.2)。jtchain 外しは build 不能、leafabi 外しは 15 (§4.3)。
+- 5. #883 の受入 4 件 (#883 は closed。残件は §6)。
 
 ## 1. 測定 config
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit (コードを変えた最後の commit) | `e13cd45c` (`fix(liftlib): ott_getparam の switch 表 (image 内 .text) を線形メモリへ敷設し leafspec match 1.0 (refs #1270)`) |
+| 測定 commit (コードを変えた最後の commit で測定した commit) | `e13cd45c` (`fix(liftlib): ott_getparam の switch 表 (image 内 .text) を線形メモリへ敷設し leafspec match 1.0 (refs #1270)`) |
 | 前段 commit | `896115a7` (入口 this/idx の張り替え)。両 commit は `tools/liftlib/liftlib/{passes/icall.py,pipeline.py}`・`targets/ott_getparam.json`・`liftlib_e2e.sh` のみ |
-| 素材 | `$ARTIFACTS_DIR`: `work-liftlib` (→ `tools/liftlib/work/`)・`work-icall` (→ `tools/icall/work/`、`ott_F.txt`)・`work-m6-ott` (→ `tools/m6/work/` ほか)・`analysis-ott-binaries` (→ `[ANALYSIS-PLUGINS]` の `ott/binaries/OTT_vst2_win64.dll`)・`toolchain-emsdk` (→ `[EMSDK]`)・`toolchain-retdec` (→ `[RETDEC]`)。`fl-win64` は本測定に不要 |
+| 測定後のコード変更 | `6a7010ffc` (`entry_blk_args` の break 正規表現に `tail`/`musttail`/`notail` を追加、`ptr` を `ptrtoint` へ、非対応型を ValueError にする。単体テスト T28〜T31 を追加) |
+| 素材 (測定時 e13cd45c) | `$ARTIFACTS_DIR`: `work-liftlib` (→ `tools/liftlib/work/`)・`work-icall` (→ `tools/icall/work/`、`ott_F.txt`)・`work-m6-ott` (→ `tools/m6/work/` ほか)・`analysis-ott-binaries` (→ `[ANALYSIS-PLUGINS]` の `ott/binaries/OTT_vst2_win64.dll`)・`toolchain-emsdk` (→ `[EMSDK]`)・`toolchain-retdec` (→ `[RETDEC]`)。`fl-win64` は本測定に不要 |
+| 素材 (本 run の検証) | `$ARTIFACTS_DIR` は `fl-win64` のみ。OTT DLL と work 素材が無いため、leafspec は再測定できない |
 | 再現 | `cd tools/liftlib && OTT_DLL=<[ANALYSIS-PLUGINS]>/ott/binaries/OTT_vst2_win64.dll python3 -m liftlib leafspec targets/ott_getparam.json --n 200` |
 | 測定値 | wall 61.98 s (`real 1m1.976s`)・開始時 load 0.74 / 0.83 / 0.57 (runner 4 コア, 単発) |
 
-確認コマンド (測定 commit から HEAD までのコード差分。0 なら測定値は現 HEAD で有効):
+### 1.1 測定後のコード差分 (未再測定)
 
+確認コマンド: `git diff e13cd45c HEAD -- tools/liftlib/liftlib tools/liftlib/targets tools/icall/rt` (HEAD `6a7010ffc`)。差分は **26 行** で、`passes/icall.py` の `entry_blk_args` だけ (`tests/test_unit.py` は測定経路の外):
+
+```diff
+diff --git a/tools/liftlib/liftlib/passes/icall.py b/tools/liftlib/liftlib/passes/icall.py
+index 69266141b..6c644dd5b 100644
+--- a/tools/liftlib/liftlib/passes/icall.py
++++ b/tools/liftlib/liftlib/passes/icall.py
+@@ -91,7 +91,7 @@ def entry_blk_args(fn):
+         if g:
+             gep[g.group(1)] = int(g.group(2))
+     for i, ln in enumerate(lines):
+-        if re.match(r"^\s*(store|br|ret|switch)\b", ln) or (re.match(r"^\s*(%\S+ = )?call\b", ln) and "@__asm_" not in ln):
++        if re.match(r"^\s*(store|br|ret|switch)\b", ln) or (re.match(r"^\s*(%\S+ = )?(tail |musttail |notail )?call\b", ln) and "@__asm_" not in ln):
+             break
+         ld = re.match(r"^(\s*)(%\S+) = load i64, ptr (%\S+), align \d+(.*)$", ln)
+         if not ld or gep.get(ld.group(3)) not in BLK_ARG_SLOT:
+@@ -102,7 +102,11 @@ def entry_blk_args(fn):
+         ty, v = params[k]
+         if ty == "i64":
+             lines[i] = "%s%s = add i64 %s, 0%s" % (ld.group(1), ld.group(2), v, ld.group(4))
+-        else:
++        elif ty == "ptr":
++            lines[i] = "%s%s = ptrtoint ptr %s to i64%s" % (ld.group(1), ld.group(2), v, ld.group(4))
++        elif ty in ("i1", "i8", "i16", "i32"):
+             lines[i] = "%s%s = zext %s %s to i64%s" % (ld.group(1), ld.group(2), ty, v, ld.group(4))
++        else:
++            raise ValueError("entry_blk_args: unsupported param type %r (%s)" % (ty, v))
+         n += 1
+     return n
 ```
-git diff e13cd45c HEAD -- tools/liftlib/liftlib tools/liftlib/targets | wc -l
-```
+
+- 再測定できない理由: 本 run の素材は `fl-win64` のみで、OTT DLL と work 素材が無い。
+- 見立て (推定。根拠付き): `ptr` 分岐は測定の入口 (slot 0 = `i32 %arg1`, slot 1 = `i64 %arg2`) では発火しない。発火すると `zext ptr` の不正 IR で emcc まで落ちるはずで、rc=0 の測定と整合する。break 正規表現の `tail`/`musttail`/`notail` は、raw IR の入口ブロックに tail 付き call が現れたときだけ結果に効く。`grep -rn "tail call\|musttail\|notail" tools/liftlib/liftlib --include=*.py` で tail マーカーを生成するのは `recipes/ott/ir7_argpass_fixed.py` だけで、`ott_getparam` の経路 (`pipeline._repair_ll`) は通らない。RetDec の raw 出力の tail 有無は未確認。
+- 次 run で `oc_artifacts` に `analysis-ott-binaries work-liftlib work-icall work-m6-ott toolchain-emsdk toolchain-retdec` を指定し、§4.1 の leafspec を HEAD で再測定する (§6 の未解決表へ)。
 
 ## 2. 方式 (受入 1): 入口 this/idx は `%arg` から読む
 
@@ -48,23 +83,23 @@ git diff e13cd45c HEAD -- tools/liftlib/liftlib tools/liftlib/targets | wc -l
 
 ## 4. 実測
 
-### 4.1 HEAD `e13cd45c` (受入 2)
+### 4.1 HEAD `e13cd45c` (受入 2・測定 commit)
 
 | 設定 | rc | wall | match / mismatch / native_crash / wasm_trap | gate |
 |---|---|---|---|---|
 | `e13cd45c` (entry_args + image_bytes) | 0 | 61.98 s | **200 / 0 / 0 / 0** | PASS (rate 1.000) |
 
-### 4.2 ネガティブコントロール (修正を 1 つずつ外す)
+### 4.2 ネガティブコントロール (測定 commit `e13cd45c` で JSON のみ変更。測定後に削除)
 
 | 設定 | rc | match / mismatch / native_crash / wasm_trap | gate | 解釈 |
 |---|---|---|---|---|
 | entry_args **off** (image_bytes on) | 1 | 147 / 53 / 0 / 0 | FAIL (0.735) | 表は敷設されるが this=0 のまま。53 件は this に依る戻り値 (xmm0 不一致) |
 | image_bytes **off** (entry_args on) | 1 | 11 / 189 / 0 / 0 | FAIL (0.055) | this は正しいが表が 0 → default 分岐。表の敷設が無いと一致は 11 件のみ |
-| 両方 off (`bb9530a4` 相当の挙動) | 1 | 147 / 53 / 0 / 0 | FAIL (0.735) | #2128・#2181 の測定値と同じ (本付録の再測定と一致) |
+| 両方 off | 1 | 147 / 53 / 0 / 0 | FAIL (0.735) | **未再測定**。`REPORT_APPENDIX_2128.md` の測定 (測定 commit `f8bd2ea0`・2 回とも 147 / 53 / 0 / 0) からの引用。旧版の「bb9530a4 相当・本付録の再測定と一致」は根拠が無いため削除 |
 
-- 本文の想定「修正を外すと match 0」は実測と一致しない (両方 off でも 147。this=0 でも native が 0 を返す scenario は一致する)。上の表の値を正とする。
+- 本文の想定「修正を外すと match 0」は実測と一致しない (両方 off でも 147。this=0 でも native が 0 を返す scenario は一致する)。期待値 `0` は採らず、上の実測を正とする。
 
-### 4.3 jtchain / leafabi の切り分け (受入 3 の残り)
+### 4.3 jtchain / leafabi の切り分け (測定 commit `e13cd45c` で JSON のみ変更)
 
 | 外したもの | 結果 | 解釈 |
 |---|---|---|
@@ -73,14 +108,32 @@ git diff e13cd45c HEAD -- tools/liftlib/liftlib tools/liftlib/targets | wc -l
 
 ## 5. 検証範囲 / 範囲外
 
-- `python3 tests/test_unit.py` (`tools/liftlib`): 27/28 ok。**T6 は FAIL**: `targets/freshair/work/win/...SlateCore.core_64` が無い (`work-liftlib-targets` が本 run の `oc_artifacts` に無い)。本変更とは無関係の既存の素材不足 (#2128 付録の T6 と同じ)。T24 (blk_global) を含む他は ok。
-- `liftlib_e2e.sh` 全体は未実行 (素材 `work-liftlib-targets` 不足のため。(g) 節の leafspec 行は HEAD の単発測定で代替)。
+- `python3 tests/test_unit.py` (`tools/liftlib`・commit `6a7010ffc`・本 run の素材は `fl-win64` のみ): **32 件中 ok 17、FAIL 8** (t1 t2 t3 t4 t6 t7 t9 t26)。FAIL は全て素材不足 (`m6/work`・`liftlib/work`・freshair の DLL・`OTT_vst2_win64.dll` が無い)。新規の T28〜T31 は ok。変更前の `icall.py` に対して T28 (`zext ptr` の不正 IR)・T29 (tail call の後の置換)・T30 (double の素通り) が FAIL することを本 run で確認した。
+- 素材が揃った環境 (測定 commit `e13cd45c` 時点) の記録: 28 件中 27 ok、T6 のみ FAIL。
+- `liftlib_e2e.sh` 全体は未実行 (素材 `work-liftlib-targets` 不足のため。(g) 節の leafspec 行は測定 commit の単発測定で代替)。
 - `ott_route` / `ott_iargs` の出力は未測定 (新フラグは `ott_getparam` の JSON にしか立てていない。コード上は `entry_args` / `image_bytes` が無い cfg で従来の分岐に入る)。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| jtchain の寄与の切り分け (jtchain 外しは入口関数が消えて build 不能。代替の切り分け方法は未検討) | 受入 3 の一部が未達 | #1270 (Refs のまま) |
-| `#883` 本文の残件 (他 target・受入 4 件の充足確認) | #883 は本付録の範囲外 | #883 |
-| `work-liftlib-targets` 素材での T6 (freshair/kilohearts) 回帰 | 既存 recipe の回帰は T1〜T5・T7〜T27 のみ | 次 run で `oc_artifacts` に `work-liftlib-targets` を指定 |
+| ネガコンの期待値 `0` と実測 147 の不一致、jtchain の切り分け (jtchain 外しは入口関数が消えて build 不能。代替の切り分け方法は未検討) | #1270 の受入 3 の一部 (本 issue から外した) | #2859 (ott_getparam の open 残件へコメント) |
+| 測定後のコード差分 `6a7010ffc` の leafspec 再測定と、両方 off の再測定 (§1.1・§4.2) | HEAD の実測が無い | #2859 (同上) |
+| `#883` の残件 (他 target・受入 4 件の充足確認。#883 は closed) | 残件が追跡されていない | #2859 (ott_getparam 系の残件の受け先) |
+| `work-liftlib-targets` 素材での T6 (freshair/kilohearts) 回帰 | 既存 recipe の回帰は T1〜T5・T7〜T27 のみ | #3145 (LIFTLIB-23・liftlib_e2e の再測定の open issue へコメント) |
+| `ott_route` / `ott_iargs` の出力は未測定 (新フラグは `ott_getparam` の JSON のみ) | 他 target への影響は未実測 | #2861 (HB-H49・iargs の open issue) |
+| 新類型 D26 案 (§7) の DEFECTS.md 登録 | DEFECTS.md の編集は PM 判断 (WORKFLOW §5) | #2446 (SHX-T29・DEFECTS への類型記録の open issue へコメント) |
+
+## 7. 新類型の行案 (DEFECTS.md 形式・採番は PM)
+
+D5 (引数の取り違え・xmm 引数) と近縁だが別。D5 は ABI 解析が xmm 引数を整数 reg と取り違える。本件は ABI 解析 (iargs が `%argN` を足す) は正しく、icall_rewrite の「呼出元が BLK へ rcx/rdx を退避する」規約を、呼出元の無い root (harness が直接呼ぶ leaf) の入口へそのまま残すことで起きる。D4 (deref 脱落)・D7 (stack 引数) とも別。
+
+| 項目 | 内容 |
+|---|---|
+| ID | D26 (案。採番は PM) |
+| 種別 / 状態 | fe+ours (icall 規約の適用範囲) / **新規** (#1270 で観測。修復は `6a7010ffc`・測定 `e13cd45c`) |
+| 症状 | 直接呼出し (harness が仮引数で呼ぶ root) の入口が this/idx を BLK+0x08/+0x10 から読み、仮引数 `%arg1`/`%arg2` を読まない。BLK は harness が書かないので 0 が入り、戻り値が静かに狂う (ott_getparam: match 147/200 で FAIL。trap は出ない) |
+| 根本原因 | icall_rewrite は rcx/rdx を「呼出元が BLK へ退避する」前提で、入口にも同じ BLK 読みを残す。呼出元の無い leaf の入口では BLK は未初期化のまま読まれる |
+| 観測 | ott_getparam の入口 `function_18011e5a0` のブロック 0: `getelementptr @__icall_blk, 8/16` の load が store・非 asm call より前にある (置換数 2)。機械語は rcx/rdx を読む |
+| 検出信号 | 入口ブロックで BLK+0x08/+0x10 を読む load が store・非 asm call より前にあり、同じ関数に `%argN` 仮引数がある (`entry_blk_args` と同じ判定) |
+| 修復 | `passes/icall.py` `entry_blk_args`: 入口の BLK 読みを `%argN` へ張り替える (`passes.icall.entry_args: true`・ott_getparam のみ) |
