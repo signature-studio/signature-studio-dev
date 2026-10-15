@@ -106,21 +106,35 @@ boot の変化 (928 → 892) の原因を、修正の内訳を 1 つずつ変え
 
 すべて `liftdiff_e2e.sh --m11-only` を foreground で実行し、LIFTDIFF_E2E PASS。
 
-| run | 関数判定 (一致/不一致/実行不能) | 実時間 | 対 base の verdict 変化 | 対 base の case 差 |
-|---|---|---|---|---|
-| base `fc48aa8a5` (1 回) | 359 / 236 / 206 | 3 分 06 秒 | - | - |
-| head `35c0a5e99` 1 回目 | 360 / 235 / 206 | 3 分 14 秒 | 1 件 (`0x7850d0` mismatch→match) | 34 (9 関数) |
-| head `35c0a5e99` 2 回目 | 360 / 235 / 206 | 3 分 11 秒 | 1 件 (同上) | 32 (8 関数) |
+実行は各回 `liftdiff_e2e.sh --m11-only` (foreground)。生の件数は `batch_sample_800.jsonl` の関数判定と case の outcome を数えた値 (case の総数は全回 8854)。
 
-- head 2 回の間の verdict 変化は 0 件 (`0x7850d0` は base で mismatch・head 2 回で match と安定)。head 2 回の間の case 差は 4 (3 関数)。
-- case 差の数え方: 同じ関数の同じ case 番号で outcome が違うものと、case 数の差の合計。reviewer の再測定とは数え方が異なるため、件数の絶対値は比較しない。
+| run (コード) | 関数判定 一致 / 不一致 / 実行不能 | outcome: equal / diff / both_fault / native_fault / wasm_trap / hang | 壁時計 |
+|---|---|---|---|
+| base `fc48aa8a5` (1 回) | 359 / 236 / 206 | 3369 / 910 / 1797 / 2145 / 340 / 293 | 177 s |
+| head `f5b017c70` (1 回目) | 360 / 235 / 206 | 3370 / 910 / 1792 / 2149 / 339 / 294 | 179 s |
+| head `f5b017c70` (2 回目) | 360 / 235 / 206 | 3370 / 910 / 1792 / 2149 / 339 / 294 | 176 s |
+| head `f5b017c70` (3 回目) | 360 / 235 / 206 | 3370 / 910 / 1792 / 2148 / 339 / 295 | 176 s |
+
+case 差の定義は 1 つだけ: 同じ関数 VA の case を pattern 順に並べ、同じ位置で outcome が違う case の数 (関数数)。
+
+| 比較 | verdict 変化 | case 差 (関数数) |
+|---|---|---|
+| base 対 head 1 回目 | 1 件 (`0x7850d0` mismatch→match) | 13 (5) |
+| base 対 head 2 回目 | 1 件 (同上) | 13 (5) |
+| base 対 head 3 回目 | 1 件 (同上) | 12 (4) |
+| head 1 回目 対 2 回目 | 0 件 | 0 (0) |
+| head 1 回目 対 3 回目 | 0 件 | 1 (1) (`0xd2c5a0` native_fault↔hang) |
+
+- 確実に言えるのは、verdict 1 件 (`0x7850d0` mismatch→match) が head の 3 回で一致し、base では mismatch であること。
+- case 差は実行ごとに揺らぐ (head の間で 0〜1 件)。hang の出現が実行によって変わる case が含まれる。件数は因果の根拠にしない。
 - verdict 変化 1 件 (`0x7850d0`) の原因は未切り分け。`dc6a2d08d` 以降の `PATCH_BY_VA` の番地変更 (`0x50012000`→`0x50018000` 相当) が候補だが、確認していない。
+- 参考 (PR レビュー round 3 の reviewer 再測定・本節とは別の数え方・再現していない): base 対 head 25 / 46、head 2 回の間 25。本節の定義では再現しなかったため、件数は採用しない。
 
 ### 8-3. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| base との verdict 変化 1 件 (`0x7850d0` mismatch→match・head 2 回で再現) の原因。case 差 (base 対 head 32〜34・head 内で 4) の原因。有力候補は `LD_VMT_IDX0=1024` 化に伴う vmt 系の仮 proc 番地の変化 (`PATCH_BY_VA` を `0x50018000` から導くよう修正済み・単体テスト `test_ld203_slot_fill` PASS) | 判定 1 件が base と異なる。「回帰なし」とは書かない。判定の変化が仮 proc 番地由来かは未確認 | 本 PR の範囲外。起票先: 後続 issue (PM 判断) |
+| base との verdict 変化 1 件 (`0x7850d0` mismatch→match・head 3 回で再現) の原因。case 差 (base 対 head 12〜13 件・head の間で 0〜1 件・§8-2 の定義) の原因。有力候補は `LD_VMT_IDX0=1024` 化に伴う vmt 系の仮 proc 番地の変化 (`PATCH_BY_VA` を `0x50018000` から導くよう修正済み・単体テスト `test_ld203_slot_fill` PASS) | 判定 1 件が base と異なる。「回帰なし」とは書かない。判定の変化が仮 proc 番地由来かは未確認 | 本 PR の範囲外。起票先: 後続 issue (PM 判断) |
 | 有効化 route の boot 残りの 3 件 (unit 830 segv・他 2 件) | 928/942 (受入の下限は満たす。全数 942 には届かない) | #3946 系の既存追跡 |
 
 ## 7. 再現
