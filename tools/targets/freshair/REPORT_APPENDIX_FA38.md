@@ -3,7 +3,7 @@
 親 #2739 ([FA-34] Gain 以外への拡大) の子 #3506 の付録。SC 側 Compressor (0x180775220) と KH 側 `compressor::CompressorDsp` (0x1802abc20) の同一入力比較のうち、**KH 側の実機機械語 harness** の結果を置く。
 
 - 結論: KH Compressor process を実機機械語のまま 200 case 実行する harness (`ks_kh_comp_native.c`) は ERR 0/200 で動く (seed 7・11・99 の 3 回)。決定性 (同 seed の 2 回が byte 一致) と感度の負例 (P+0x4 ×2 で 197〜200/200 が変化) を満たす。**SC との bit 比較は未実施** (KH 側 P フィールドの一部が出力に届いていない・未束縛 import の stub 依存があり、判定に使えない。子 #3534 (FA-41))。
-- 測定 commit: `739c90452` (harness コード・作業 dir の分離)。以後の差分は本付録と DOC_MAP の索引行のみ (§5 の確認コマンド参照)。
+- 測定 commit: `4ad994a19` (再測定。nproc=4、load 1 分 0.25〜0.27、seed 7・11・99 とも run1 0.03 s)。harness のコードは `739c90452` から変わったのが `ks_kh_comp_native.c` の根拠コメント 1 行 (REPORT_APPENDIX_FA38 への参照) だけで、実行結果は同一 (§5)。以後の差分は本付録のみ。
 
 ## 1. 対象 VA の確認 (RTTI)
 
@@ -11,7 +11,7 @@
 - リポジトリ内に `0x1802abc20` の記録は無かった (`snapins.json` に Compressor の登録なし)。本付録が初出。
 - 機械語 (`ks_identity.py` の `disasm` = pdata 関数境界): KH 0x1802abc20 = **1,724 B / 337 命令 / 直接 call 10 本**。SC 0x180775220 = 1,664 B / 333 命令 / 直接 call 10 本 + `call [rax+0x60]` (host 値の取得)。
 - 直接 call 先: 0x180fb6830 / 0x180fbc1f4 / 0x180fc3640 (x2+) / 0x180295f20 / 0x18004cf20 (x3)。0x180fc3640 は pow 系の共通基盤 (SC 側の 0x18103fd60 と同系統と見られる。未確認)。
-- 注: 「ID 一致 37 組の process 候補表」は親 #2739 の作業物で、本 PR の範囲外。origin/main には無い (`git log origin/main -S REPORT_APPENDIX_2739` 0 件。表は `origin/2739-freshair-snapin-diff-criteria` にある)。本付録は参照しない。
+- 注: 「ID 一致 37 組の process 候補表」は親 #2739 の作業物で、本 PR の範囲外。この注は 739c90452 時点の記述。main 取り込み後 (4ad994a19) は main の `REPORT_APPENDIX_2739.md` §3 に同じ表がある。本付録は参照しない。
 
 ## 2. 引数・state・param の写像 (機械語の読み)
 
@@ -54,7 +54,7 @@ P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r
   - 件数は seed 7 で 67+67 = 134 (mode=1 の case 数と一致)。mode=1 の出力は stub 依存で、比較に使えない (§5)。
 - **初回の ERR**: 最初の版は `GetLastError` の未束縛 slot (`0x13a1790`) を踏んで 67/200 が SIGSEGV (RIP = addr = `0x286e1e0`、hint/name RVA の値へ飛んだ)。stub 化で ERR 0 になった。
 
-## 4. 実測 (commit `739c90452`・`bash tools/targets/freshair/ks_kh_comp.sh 200 <seed>`)
+## 4. 実測 (再測定 commit `4ad994a19`・`bash tools/targets/freshair/ks_kh_comp.sh 200 <seed>`。元の測定 `739c90452` と数値は同一)
 
 環境: nproc=4、load average (1 分) 0.10〜0.18 (各 run の前後。seed 7 は 0.10、seed 11・99 は 0.18)。実行時間は 200 case の run1 で 0.03 s (seed 7・11・99 とも実測 0.03 s)。
 
@@ -82,8 +82,13 @@ P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r
 ## 5. 検証範囲・限界・確認
 
 - 検証範囲: KH process の機械語を、本 harness の入力 (§2 の写像・乱数) で 200 case × 3 seed 実行。範囲外: SC との bit 比較、P フィールドの意味の確定、未束縛 import の実体の確定、mode=1 の出力の正しさ。
-- 差分確認: `git diff 739c90452 HEAD -- tools/targets/freshair/ks_kh_comp.sh tools/targets/freshair/ks_kh_comp_native.c` (出力 0 行)。
-- 並列実行の確認 (測定 commit で seed 11・99 を `xargs -P 2` で同時実行。両 script の実行区間が重なり、開始時刻の差 0.30 ms、各 script 全体 0.25 s): 両 SUMMARY と kh_a.txt が直列実行と一致 (seed 11 = 200・292・25・136、seed 99 = 198・293・29・102、byte 一致)。
+- 差分確認: `git diff 739c90452 4ad994a19 -- tools/targets/freshair/ks_kh_comp.sh tools/targets/freshair/ks_kh_comp_native.c` の出力は次の 1 行の comment 変更のみ。`git diff 4ad994a19 HEAD -- <同じ範囲>` は 0 行 (測定の後にハーネスは変えていない)。
+
+  ```
+  - * 入力の写像は HeartCore の機械語の読みで決めた (根拠は REPORT_APPENDIX_2739.md §2):
+  + * 入力の写像は HeartCore の機械語の読みで決めた (根拠は REPORT_APPENDIX_FA38.md §2):
+  ```
+- 並列実行の確認 (739c90452 で seed 11・99 を `xargs -P 2` で同時実行。両 script の実行区間が重なり、開始時刻の差 0.30 ms、各 script 全体 0.25 s): 両 SUMMARY と kh_a.txt が直列実行と一致 (seed 11 = 200・292・25・136、seed 99 = 198・293・29・102、byte 一致)。
 - blob 監査: 20 MiB 超の追加なし。`work/` (gitignore) は使用のみ。
 
 ## 6. 未解決
