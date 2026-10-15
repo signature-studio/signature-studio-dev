@@ -33,6 +33,14 @@ TARGETS = [
     {'va': 0x10002EE0, 'name': 'fn_10002ee0', 'gen': 'idx_store'},
     {'va': 0x10005400, 'name': 'fn_10005400', 'gen': 'state_update'},
 ]
+# #4064: 3 本の測定専用 (X87_PROBE=1 で TARGETS に加える)。 ゲートは通さない: 3 本 (0x10009eb5・0x1000b526 は eax が模型の限界で不一致、0x1000bf60 は ST(0) の NaN・ゼロが不一致)。 付録 §1 を参照。
+PROBE = [
+    {'va': 0x10009EB5, 'name': 'fn_10009eb5', 'gen': 'generic'},
+    {'va': 0x1000B526, 'name': 'fn_1000b526', 'gen': 'generic'},
+    {'va': 0x1000BF60, 'name': 'fn_1000bf60', 'gen': 'generic'},
+]
+if os.environ.get('X87_PROBE'):
+    TARGETS = TARGETS + PROBE
 
 
 def pe_image():
@@ -112,6 +120,23 @@ def run(cmd, what, timeout=900):
         sys.stderr.write(r.stdout[-1500:] + r.stderr[-1500:])
         sys.exit('[x87_fn_diff] FAIL: %s rc %d' % (what, r.returncode))
     return time.time() - t0
+
+
+CHUNK = 8000
+
+
+def run_chunked(scen_path, out_path, cmd_for, what, timeout):
+    """native の入出力バッファ (32 MiB) に収まるよう、シナリオを CHUNK 行ずつ実行して出力を連結する。"""
+    lines = [ln for ln in open(scen_path).read().split('\n') if ln.strip()]
+    t, parts = 0.0, []
+    for k in range(0, len(lines), CHUNK):
+        cp = os.path.join(WORK, 'chunk_%s_%d.txt' % (what.split()[0], k))
+        co = cp + '.out'
+        open(cp, 'w').write('\n'.join(lines[k:k + CHUNK]) + '\n')
+        t += run(cmd_for(cp, co), what, timeout=timeout)
+        parts.append(open(co).read())
+    open(out_path, 'w').write(''.join(parts))
+    return t
 
 
 def parse(path):
@@ -373,9 +398,10 @@ def main():
                             '-sGLOBAL_BASE=%d' % 0x11000000, '-sSTACK_SIZE=2097152', '-sINITIAL_MEMORY=%d' % 0x14000000,
                             '-sALLOW_MEMORY_GROWTH=0', '-o', mjs], 'wasm build (emcc)', timeout=900)
         load = os.getloadavg()[0]
-        t_nat = run([nat, os.path.join(WORK, 'image.bin'), scen, nat_out], 'native run', timeout=600)
-        t_wasm = run(['node', os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mjs, os.path.join(WORK, 'image.bin'), scen, wasm_out],
-                     'wasm run (node)', timeout=900)
+        img_p = os.path.join(WORK, 'image.bin')
+        t_nat = run_chunked(scen, nat_out, lambda cp, co: [nat, img_p, cp, co], 'native run', 600)
+        t_wasm = run_chunked(scen, wasm_out, lambda cp, co: ['node', os.path.join(HERE, 'x87_fn_entry_wasm.mjs'), mjs, img_p, cp, co],
+                             'wasm run (node)', 900)
         print('[build] native %.2f s, wasm emcc %.2f s; [run] native %.3f s, wasm(node) %.3f s; load1 before run %.2f' % (
             t_nat_build, t_wasm_build, t_nat, t_wasm, load))
         ok, _ = compare(parse(nat_out), parse(wasm_out), rows)
