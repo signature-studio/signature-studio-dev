@@ -211,11 +211,11 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 | H2 | `1fd48d2ce` | PASS (exit 0) | 67.37 s | 0.83 0.56 0.26 | 0.94 0.65 0.31 |
 | H3 | `1fd48d2ce` | PASS (exit 0) | 67.82 s | 0.94 0.65 0.31 | 0.98 0.72 0.37 |
 | X1 | `ea44afd71` | PASS (exit 0)。**PR #4943 作成者の測定 (fix run では未再現)** | 96.5 s | 0.39 (1 分値のみ) | 1.20 (1 分値のみ) |
-
-- X1 の内容 (作成者の測定値を #4263 の結果コメントから転記。再実行なし): functions 6,347 / unsup 0 / spot diff PASS / ネガコン 3 本 FAIL 検出。insns・unlifted callees・spot の件数 (12/12) と、ネガコン各 case の件数は作成者の記録に無いため空欄。
 | E1 | `f1dc143e5` | PASS (exit 0) | 116.87 s | 0.10 0.23 0.17 | 0.87 0.48 0.28 |
 | E2 | `f1dc143e5` | PASS (exit 0) | 116.97 s | 0.74 0.47 0.27 | 1.14 0.72 0.39 |
 | E3 | `f1dc143e5` | PASS (exit 0) | 116.70 s | 1.14 0.72 0.39 | 1.02 0.82 0.47 |
+
+- X1 の内容 (作成者の測定値を #4263 の結果コメントから転記。再実行なし): functions 6,347 / unsup 0 / spot diff PASS / ネガコン 3 本 FAIL 検出。insns・unlifted callees・spot の件数 (12/12) と、ネガコン各 case の件数は作成者の記録に無いため空欄。
 
 - **min–max (HEAD `1fd48d2ce`、n=3、全 PASS): real 66.43–67.82 s**。load 開始 0.65–0.94。
 - min–max (HEAD `f1dc143e5`、n=3、全 PASS): real 116.70–116.97 s。前回測定 (`5c7a48a`、§6 の P1〜P3: 196.08–196.70 s) との差は未切り分け。
