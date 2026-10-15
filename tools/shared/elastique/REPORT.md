@@ -19,7 +19,7 @@
 ## 1. 対象・素材・測定 commit
 
 - 素材: `fl-win64` (`tar --zstd -xf` 5.6 秒)。`extracted/block24357_PE.bin` (4,997,632 B, sha256 先頭 16 桁 `8551e92209cdd2ce`) を `tools/shared/work/win/elastique_x64.dll` に複製 (gitignore)。
-  PE 情報: ImageBase `0x180000000`、`.text` RVA `0x1000`・vsize `0x2f6550`、**IPPCODE RVA `0x2f8000`・vsize `0xef1c2` (= 979,394 B)**、`.pdata` 1,956 関数 (`.text` 内・pefile 由来。生 `.pdata` の `.text` 内は 4,556 件。出典は `REPORT_4284.md` §0)、export 15 (`Auftakt_CreateInstance` 等)。
+  PE 情報: ImageBase `0x180000000`、`.text` RVA `0x1000`・vsize `0x2f6550`、**IPPCODE RVA `0x2f8000`・vsize `0xef1c2` (= 979,394 B)**、`.pdata` 1,956 関数 (`.text` 内・pefile 由来。pefile は `Unknown UNWIND_CODE` で打ち切るため、生 `.pdata` の `.text` 内は 4,556 件。出典は `REPORT_4284.md` §0・§5)、export 15 (`Auftakt_CreateInstance` 等)。
 - 照合先: `extracted/block24356_PE.bin` (`dsp_ippv2_x64.dll`, ImageBase `0x180000000`, export 446, IPPCODE RVA `0x17e0000`・vsize `0x6dc771`)。
 - 検証起点: `93307cc6a` (origin/main。#3457 の基点。前の検証起点は `f3102162`)。
 - **測定 commit (コードを変えた最後の commit): `7fe2ea865`** (`fix(shared): élastique 静的走査で pdata の無い .text 関数の direct_calls を次の先頭まで辿る (#4535)`)。前の測定 commit は `513791f11` (`fix(shared): élastique 静的走査の即値走査を IPPCODE に広げ、範囲の命令境界を測る (#3457)`)。その前の測定 commit は `c7e0bee8c` (#3457)、`bcab4049` (`fix(shared): élastique 族候補の起点伝播を起点ごとの BFS に直す`)。

@@ -7,7 +7,7 @@
 | 項目 | 結論 (実測) |
 |---|---|
 | 対象件数の定義 | `.text` 内の pdata 関数 **4,556 件**。`.pdata` の生スロット 5,475 件 (`.text` 4,556 / IPPCODE 919) を RVA で直接読んだ値。REPORT_152 §1.1・REPORT_2614 §1 と一致 |
-| `tools/shared/elastique/REPORT.md` の 1,956 | `ipp_entries.py` が pefile の `DIRECTORY_ENTRY_EXCEPTION` で数えた値 (1,956 件しか返らない)。生の `.pdata` (5,475 スロット) と食い違う。pefile が返す件数が少ない原因は未確定 (本 PR では未調査)。以後の lift は生 `.pdata` の 4,556 件を正とする |
+| `tools/shared/elastique/REPORT.md` の 1,956 | `ipp_entries.py` が pefile の `DIRECTORY_ENTRY_EXCEPTION` で数えた値 (1,956 件しか返らない)。生の `.pdata` (5,475 スロット) と食い違う。pefile は `Unknown UNWIND_CODE` で 1,956 件目で打ち切る (§5)。以後の lift は生 `.pdata` の 4,556 件を正とする |
 | RetDec 一括 lift | **失敗**。4,556 件を 1 回で `--select-ranges` に渡すと `[capstone2llvmir]: Should not be possible.` で落ちる |
 | 1 関数ずつの lift | **1,146 件 成功 / 18 件 失敗 / 3,392 件 未実施** (実測・§2) |
 | 受入条件 (4,556 件全件) | **未達**。残りは子 issue に移す (§4) |
@@ -52,6 +52,21 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 - lift 出力 (`.ll`) は `tools/shared/work/` (gitignore)。commit しない。
 
 ## 4. 未解決
+
+## 5. 失敗 18 件の分類・件数の出典 (T-SH-120 / #5179)
+
+測定 commit: 本 PR の commit (`scripts/elastique_fail_classify.py` を追加)。再現: `python3 tools/shared/elastique/scripts/elastique_fail_classify.py tools/shared/work/win/elastique_x64.dll tools/shared/elastique/data/retdec_lift_4284.csv`。
+
+| 項目 | 実測 |
+|---|---|
+| 再実行 (`main` の HEAD `2a3b9c9f9`・並列 4・`timeout 60`) | 61 秒 (wall)。rc=1 14・rc=124 1・rc=137 3 で §2 と一致 |
+| 単独実行 (exact range・1 関数ずつ) | rc=1 の 14 件は各 0.7 秒台・RSS 約 151 MB で `capstone2llvmir: Should not be possible.`。rc=124 の 4 件 (`0x180018fe0`・`0x18001fb40`・`0x180026520`・`0x18002dac0`) は 60 秒で打ち切り、RSS 約 7.5 GB (計測できた 3 件) |
+| rc=137 の見方 | 4 件が並列 4 で同時に約 7.5 GB を使うと 16 GB の runner で SIGKILL されうる (単独では rc=124)。仮説で、OOM と断定はしていない (dmesg 不可) |
+| rc=1 の 14 件の共通点 | 全件に EVEX マスク付き `vpshufd` / `vshufi32x4` (`{k}`) がある。同じ命令を含む関数は成功 1,146 件 (`ok`) の中に 0 件。関連は確認したが、因果は未切り分け (capstone2llvmir の入力を絞る実験は未実施) |
+| 件数の出典 | 生 `.pdata` 5,475 スロット・`.text` 内 4,556・pefile 1,956。pefile の 1,956 は生スロットの先頭 1,956 件 (file 順) の接頭辞。pefile に無い 3,519 件 = `.text` 内 2,600 件 + IPPCODE 919 件 |
+| pefile が 1,956 で止まる原因 | pefile の `parse_exceptions_directory` が `Unknown UNWIND_CODE at 0x4a6038` の警告で打ち切る (`pe._PE__warnings` で確認)。以後の RUNTIME_FUNCTION は読まれない |
+
+注: 本節の CSV は `main` の `data/retdec_lift_4284.csv` (1,164 件・fail 18)。`origin/4363-retdec-pdata-rest` は未 merge で 3,364 件・fail 89 (rc=1 85・124 1・137 3) まで進んでいる。その 89 件は本節の対象外 (未確認)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
