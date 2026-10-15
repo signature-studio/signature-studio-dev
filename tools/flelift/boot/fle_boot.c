@@ -70,8 +70,27 @@ static u32 g_n_dispatch, g_n_disp_getmem, g_n_disp_freemem, g_n_disp_realloc, g_
  * rcx=dst・edx=値・r8=DWORD 個数)。dispatch の冒頭で呼ばれるため、呼出し時点の guest 引数を読める。 */
 #define FILL_LOG_MAX 200
 static u32 g_fill_n;
+/* FLE-15 (#3770): 画素ストア 0x6bbc20 の計数 (計測のみ)。呼出し点 ret = 0x6c9380 (f_6c9280 の 0x6c937a 直後)。
+ * f_6c9280 は rbp+0x2c..0x38 に矩形 (x0,y0,x1,y1・終端排他) を持つ (rbp = R[5])。x = R[2] (rdx)・y = R[8] (r8) は呼出し直前の値。 */
+#define PX_SITE_RET 0x6c9380ull
+static double g_px[16];   /* 0 全呼出し / 1 呼出し点の回数 / 2-5 初回の矩形 / 6-9 直近の矩形 / 10 矩形の変化数 / 11-14 x,y の min/max / 15 他の呼出し点 */
+static int g_px_init;
+static void px_probe(void) {
+    g_px[0] += 1;
+    if (LD64(R[4]) != PX_SITE_RET) { g_px[15] += 1; return; }
+    int x0 = (int)LD32(R[5] + 0x2c), y0 = (int)LD32(R[5] + 0x30), x1 = (int)LD32(R[5] + 0x34), y1 = (int)LD32(R[5] + 0x38);
+    int x = (int)(u32)R[2], y = (int)(u32)R[8];
+    if (!g_px_init) { g_px[2] = x0; g_px[3] = y0; g_px[4] = x1; g_px[5] = y1; g_px[11] = g_px[12] = x; g_px[13] = g_px[14] = y; g_px_init = 1; }
+    else if (g_px[6] != x0 || g_px[7] != y0 || g_px[8] != x1 || g_px[9] != y1) g_px[10] += 1;
+    g_px[6] = x0; g_px[7] = y0; g_px[8] = x1; g_px[9] = y1;
+    if (x < g_px[11]) g_px[11] = x; if (x > g_px[12]) g_px[12] = x;
+    if (y < g_px[13]) g_px[13] = y; if (y > g_px[14]) g_px[14] = y;
+    g_px[1] += 1;
+}
+EMSCRIPTEN_KEEPALIVE double fle_px_stat(int k) { return (k >= 0 && k < 16) ? g_px[k] : -1.0; }
 static void fle_probe_dispatch(u64 t) {
     g_n_dispatch++;
+    if (t == 0x6bbc20u) px_probe();
     if (t == 0x6a7b70u && g_fill_n < FILL_LOG_MAX) {
         /* f_6c7610 の frame (rbp=R[5]): push 5 本 + sub rsp,0x50 のため戻りアドレス = [rbp+0x78]、矩形 = [rbp+0x40..0x50) */
         fprintf(stderr, "[fill6a7b70] #%u ret=0x%llx dst=0x%llx val=0x%llx cnt=0x%llx caller=0x%llx this=0x%llx rect=%d,%d,%d,%d\n",
@@ -224,8 +243,11 @@ static int ipp_call(u64 t) {   /* fle_ff から。処理したら 1 */
     return 1;
 }
 #define IPP_HMOD 0x7F0F0000u   /* wasm メモリ外の擬似 HMODULE */
+#define PY_HMOD 0x7F0E0000u    /* PY-106 (#2909): Python312 の擬似 HMODULE (束縛呼出し中だけ有効) */
+static int g_py_probe = 0; static u32 g_py_hook_n;
 static HMODULE fle_ipp_load_hook(const char* name, DWORD flags) {
     (void)flags;
+    if (g_py_probe && name && strstr(name, "Python312")) { g_py_hook_n++; return (HMODULE)(uintptr_t)PY_HMOD; }
     if (g_ipp_on && name && strstr(name, "dsp_ippv2")) { g_ipp_h = IPP_HMOD; return (HMODULE)(uintptr_t)IPP_HMOD; }
     return 0;
 }
@@ -322,11 +344,36 @@ void imp_ExitProcess(void) {
     fle_throw_kind((long)(intptr_t)"exit", (long)(R[1] & 0xffffffff));
 }
 void imp_TerminateProcess(void) { g_n_exit++; fle_throw_kind((long)(intptr_t)"exit", 3); }
+/* PY-106 (#2909): 束縛関数 0xc395a0 の直接実行 (fle_py_bind_probe) 中だけ、GetProcAddress は名前ごとに
+ * 「データ変数の番地 (cell)」を返し、cell の中身に型トークン (PY_TYPE_TOK + i) を置く。resolver の結果を
+ * slot に格納する束縛と同じ形で、sink 0xd82daf の 3 段 load を実メモリで辿れる。計測のみ (boot 中は無効)。 */
+#define PY_PROBE_MAX 128
+#define PY_TYPE_TOK 0x7F300000u
+static char g_py_nm[PY_PROBE_MAX][64]; static u64 g_py_cell[PY_PROBE_MAX]; static u32 g_py_nm_n;
+static u64 py_probe_cell(const char* nm) {
+    u32 i = g_py_nm_n;
+    if (i >= PY_PROBE_MAX) return 0;
+    strncpy(g_py_nm[i], nm, 63); g_py_nm[i][63] = 0;
+    g_py_cell[i] = PY_TYPE_TOK + i;
+    g_py_nm_n++;
+    return (u64)(uintptr_t)&g_py_cell[i];
+}
 void imp_GetProcAddress(void) {  /* m11 旧 stub 揃え (REPORT §4)。FLE-6: dsp_ippv2 のみトークンを返す */
     u64 h = R[1] & 0xffffffffu, nm = R[2];
     g_n_getproc++; R[4] += 8; R[0] = 0;
+    if (g_py_probe && nm >= 0x10000ull) { R[0] = py_probe_cell((const char*)(uintptr_t)nm); return; }
     if (g_ipp_on && g_ipp_h && h == g_ipp_h && nm >= 0x10000ull) R[0] = ipp_token((const char*)(uintptr_t)nm);
 }
+/* PY-106 (#2909): boot 停止後に束縛関数 0xc395a0 を直接実行する。戻り値 = 束縛された名前の数 (計測のみ) */
+EMSCRIPTEN_KEEPALIVE int fle_py_bind_probe(void) {
+    g_py_nm_n = 0; g_py_hook_n = 0; g_py_probe = 1;
+    fle_run(0xc395a0u, 0, 0, 0, 0, 0, 0, 0, 0);
+    g_py_probe = 0;
+    return (int)g_py_nm_n;
+}
+EMSCRIPTEN_KEEPALIVE int fle_py_bind_hook_n(void) { return (int)g_py_hook_n; }
+EMSCRIPTEN_KEEPALIVE const char* fle_py_bind_name(int i) { return (u32)i < g_py_nm_n ? g_py_nm[i] : ""; }
+EMSCRIPTEN_KEEPALIVE u32 fle_py_bind_cell(int i) { return (u32)i < g_py_nm_n ? (u32)(uintptr_t)&g_py_cell[i] : 0; }
 void imp_LoadStringW(void) {   /* gui_compat.c と同一: buf[0]=0 を書かないと LoadResString が暴走 */
     u64 buf = R[9];
     g_n_loadstr++;

@@ -1,4 +1,5 @@
 // tools/pm/launch_issues.py の規則の移植 (純関数のみ。GitHub へは書き込まない)。
+import { parentOf } from "./refs.ts";
 
 export const DEFAULT_TARGET = 50;
 export const DEFAULT_BATCH = 25;
@@ -160,16 +161,57 @@ export type Prio = "critical" | "normal" | "low";
 export const PRIO_RANK: Record<Prio, number> = { critical: 0, normal: 1, low: 2 };
 
 // 優先の区分。prio:critical が付いていれば critical、prio:low なら low、どちらも無ければ normal (両方付いたら高い方)。
+// 自身のラベルだけを見る。親からの継承を含む区分は effectivePrioMap を使う (#3973)。
 export function prioOf(labels: string[]): Prio {
   if (labels.includes("prio:critical")) return "critical";
   if (labels.includes("prio:low")) return "low";
   return "normal";
 }
 
+// 自身のラベルに明示された区分 (無ければ null)。両方付いたら critical (prioOf と同じ)。
+const explicitPrio = (labels: string[]): Prio | null => (labels.includes("prio:critical") ? "critical" : labels.includes("prio:low") ? "low" : null);
+
+export interface PrioIssue {
+  number: number;
+  state: "open" | "closed";
+  labels: string[];
+  body: string;
+}
+
+// 本文の『親: #N』の親が open の issue として引けるときだけその issue を返す。無い・closed・自己参照なら null。
+function openParentOf(i: PrioIssue, byNo: Map<number, PrioIssue>): PrioIssue | null {
+  const p = parentOf(i.body);
+  if (p === null || p === i.number) return null;
+  const parent = byNo.get(p);
+  return parent?.state === "open" ? parent : null;
+}
+
+// 自身に明示の区分が無い issue の継承 (#3973)。親に明示の区分があればそれ (critical だけ継承し、low は継承しない)。
+// 親に明示の区分が無ければ、親の親 (open) の明示が prio:critical のときだけ critical。それより上はたどらない。
+function inheritedPrio(i: PrioIssue, byNo: Map<number, PrioIssue>): Prio {
+  const parent = openParentOf(i, byNo);
+  if (!parent) return "normal";
+  const p = explicitPrio(parent.labels);
+  if (p !== null) return p === "critical" ? "critical" : "normal";
+  const grand = openParentOf(parent, byNo);
+  return grand && explicitPrio(grand.labels) === "critical" ? "critical" : "normal";
+}
+
+// 区分の実効値 (#3973)。自身の明示の区分があればそれ。無ければ親 (open) からの継承 (inheritedPrio)。
+// closed・無い・自己参照・循環の親からは継承しない (normal)。issues は closed も含めて渡してよい (親の状態を見る)。
+export function effectivePrioMap(issues: Iterable<PrioIssue>): Map<number, Prio> {
+  const byNo = new Map([...issues].map((i) => [i.number, i] as const));
+  const out = new Map<number, Prio>();
+  for (const i of byNo.values()) out.set(i.number, explicitPrio(i.labels) ?? inheritedPrio(i, byNo));
+  return out;
+}
+
 export interface ReadyIssue {
   n: number;
   title: string;
   blocksCount: number;
+  // 区分 (effectivePrioMap の値)。無ければ labels の明示だけを見る。
+  prio?: Prio;
   labels?: string[];
 }
 
@@ -177,7 +219,7 @@ export interface ReadyIssue {
 export function sortReady(ready: ReadyIssue[]): ReadyIssue[] {
   return [...ready].sort(
     (x, y) =>
-      PRIO_RANK[prioOf(x.labels ?? [])] - PRIO_RANK[prioOf(y.labels ?? [])] ||
+      PRIO_RANK[x.prio ?? prioOf(x.labels ?? [])] - PRIO_RANK[y.prio ?? prioOf(y.labels ?? [])] ||
       y.blocksCount - x.blocksCount ||
       Number(x.title.includes("任意")) - Number(y.title.includes("任意")) ||
       x.n - y.n,
@@ -185,9 +227,9 @@ export function sortReady(ready: ReadyIssue[]): ReadyIssue[] {
 }
 
 // oc:no-pr の再着手までの間隔 (ms)。prio:critical は半分にして、臨界経路の再投入を早める。
-export function noPrCooldownMs(labels: string[], cooldownH: number): number {
+export function noPrCooldownMs(prio: Prio, cooldownH: number): number {
   const ms = cooldownH * 3_600_000;
-  return prioOf(labels) === "critical" ? ms / 2 : ms;
+  return prio === "critical" ? ms / 2 : ms;
 }
 
 // prio:low の同時実行の上限 (LOW_CAP)。applied は『着手済みか launch 可能で blocked でない prio:critical が 1 件以上ある』ときだけ真 (engine が決める)。

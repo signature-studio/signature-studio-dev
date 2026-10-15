@@ -118,29 +118,11 @@ runs:
           } >> "$GITHUB_ENV"
           exit 0
         fi
-        endpoint="https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
-
-        # 命名は <prefix>.tar.zst で固定。--recursive の prefix 指定だと fl-win64 が
-        # fl-win64-anything.tar.zst も拾うため、オブジェクトを明示して取得する。
-        missing=""
-        for name in ${R2_ARTIFACTS:-}; do
-          # apt-* は R2 の素材ではない (後段で apt から入れる)
-          case "$name" in apt-*) continue ;; esac
-          key="artifacts/${name}.tar.zst"
-          if aws s3 cp "s3://${R2_BUCKET}/$key" "$artifacts_dir" \
-            --endpoint-url "$endpoint" --only-show-errors; then
-            echo "fetched $key"
-          else
-            missing="$missing $key"
-          fi
-        done
-
-        if [ -n "$missing" ]; then
-          # 何がバケットに実在するかを一緒に出して、認証エラーと「空/命名違い」を
-          # 切り分けられるようにする。
-          echo "::error::missing R2 object(s) in s3://${R2_BUCKET}:$missing"
-          echo "::error::objects actually present under artifacts/ (first 20):"
-          aws s3 ls "s3://${R2_BUCKET}/artifacts/" --endpoint-url "$endpoint" 2>&1 | head -20 || true
+        # 取得の再試行・サイズ突合・missing の判定は fetch-artifacts.sh が行う (#3976)。
+        # ここでは失敗時の扱い (required なら job を落とす) だけを決める。
+        fetch_rc=0
+        bash .github/scripts/fetch-artifacts.sh "$artifacts_dir" || fetch_rc=$?
+        if [ "$fetch_rc" -ne 0 ]; then
           if [ "${R2_REQUIRED:-true}" = 'true' ]; then
             echo "::error::the agent cannot run e2e without these binaries; failing instead of continuing"
             exit 1

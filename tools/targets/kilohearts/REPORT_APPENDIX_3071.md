@@ -85,3 +85,59 @@
 5. **[再測定] 解消 (round 3 review run・測定 HEAD `8043dfcb`)**: decompile 18/18 OK・stereo emcc 10 (`grep -c error:`)・生成 C の gain/haas/gate/stereo 4 関数が `44230a54` と diff 0 行・回帰 Gain/Haas/Gate 各 1000/1000。main 側の thunk 正規化・shim の typedef は stereo の件数と生成 C を変えていない。以降の HEAD が `8043dfcb` から変わる場合は、`git diff 8043dfcb HEAD -- tools/targets/kilohearts/ghidra_route` の差分の分だけ再測定する (`docs/WORKFLOW.md` §6)。
 - 未実施: Stereo の native 突合・ablation・ネガコン (emcc 未通過のため)。
 - 注: REPORT.md 本体への導線 1 行は、commit 範囲 (ghidra_route + REPORT_APPENDIX) の指示どおり未追加。§10-7p は本ファイル群に存在しないため、本節は REPORT_APPENDIX.md の §10-7q (#3072) の後に置いてあったものを分割移動した。
+
+## §KH-74 (#3853): callee FUN_180fdc660 の戻り xmm0 を機械語の式で C 化
+
+- `1227b9e92` 時点の測定 (main 取り込み前)。その後 `2063ac5da` (main 取り込みの merge) で `ghidra_route` が 90 行変わった (`ghidra_shim.h` +17・`ghidra_to_c.py` +36/−3・`patches.py` +40)。そのため本節の『0 行』の主張は `1227b9e92` 時点のものに限る。現 head の測定は下の『再測定』節 (測定 commit `2063ac5da` = コードを変えた最後の commit・`git diff 2063ac5da HEAD -- tools/targets/kilohearts/ghidra_route` は 0 行) を正とする。
+- 素材: `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → `HeartCore.core_64` (76,642,304 B) を手展開。Ghidra 12.1.4 (sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)、emsdk 6.0.12。
+- 式 (capstone 逆アセンブル、180fdc660〜180fdc6d6・ret は 180fdc6d6 の 1 本): `k = fma(x, 2/π, 1.5·2^52) − 1.5·2^52`、`t1 = fma(−k, π/2 上位, x)`、戻り xmm0 (180fdc6c5 `vmovapd xmm0,xmm2`) = `fma(−k, 6.123e−17, t1)`、rax = `int(k) & 3`。定数は PE の `0x18228a860`・`…a8a0`・`…a870`・`…a880` (rip 相対で解決)。
+- (1227b9e92 時点) 突合 (`ghidra_route/xmm0_check.c`・`kh_xmm0.h` を gcc で native 実行と比較): 1,000,000 試行 (乱数ビット・一様・k·π/2 近傍・特殊値) で **rax 不一致 0・xmm0 不一致 0 (PASS)**。NaN 同士の payload 差は 28,623 件 (一致扱いで別計上)。
+- (1227b9e92 時点) ネガティブコントロール: `kM2` の仮数 1 bit を変えた版は 100,000 試行で **xmm0 不一致 23,716 (FAIL・rc=1)**。突合が効くことの確認。
+- (1227b9e92 時点) 生成 C: `ghidra_to_c.py stereo` の出力 `stereo.c` 914 → 934 行 (+20 = `kh_xmm0.h`)。`extraout_XMM0_Qa*` の読出し **6 → 4** (解消 2: 180fcd690 の 82 行・180fce0d0 の 24 行)。残 4 = `FUN_180fdc470` 2 件・`FUN_180fdfdb0` 2 件 (子 issue へ)。
+- (1227b9e92 時点) emcc (`-c -w -O1 -ferror-limit=0`): base (`e03d588ee`) 12 行 → HEAD 12 行。エラーは同一の残件 (KH-45 の V128 演算・SUB168・未関数化 FUN_180fd8aac・行番号のみ +20 シフト)。新規エラー 0。
+- (1227b9e92 時点) 回帰: gain / haas / gate の生成 C は `e03d588ee` の `ghidra_to_c.py` と HEAD の差分 0 行 (3 本とも・sigs.json 一致)。stereo 限定の規則のため。gain/haas/gate の 1000/1000 bit-exact (§10-7r の測定) は生成 C 不変のため引き継ぐ。
+- 未測定: Stereo 全体の native 1000 trial 突合 (#3073)。本節は callee 単体の突合まで。
+- 再測定 (main 取り込み後): 測定 commit `2063ac5da` (`df2f768ea` を merge した commit。コード変更はこの merge だけ)。コミット済み HEAD・作業ツリーはクリーン。`git diff 2063ac5da HEAD -- tools/targets/kilohearts/ghidra_route` は本 commit の時点で 0 行。
+  - 素材: `plugins-kilohearts` の Installer zip → `payload.dat` → `windows.zip/1ccb1df8…` → `HeartCore.core_64` (76,642,304 B)。Ghidra 12.1.4 (zip sha256 先頭 `ddac49f9…` 一致)、emsdk 6.0.12。
+  - decompile: stereo の閉包 `closure.py stereo` = 49 関数・反復 12・FAIL 0 (5 分 23 秒)。gain/haas/gate の 10 関数 = 10/10 OK (analyzeHeadless wall 26.4 s)。
+  - xmm0_check 1,000,000 試行: rax 不一致 0・xmm0 不一致 0 (PASS・NaN 同士の payload 差 28,623 件は別計上)。`kh_xmm0.h`・`xmm0_check.c` は PR の測定 commit `aaf3f6f41` から差分 0 行。
+  - 生成 C (stereo): HEAD 936 行 / `origin/main` 916 行 (`origin/main` = 取り込み元の `df2f768ea`)。差分は `kh_xmm0.h` の 20 行と置換 3 箇所 (本体 1・呼出元 2) のみ。`emcc -c -w -O1 -ferror-limit=0` は HEAD・`origin/main` ともに error 0 (rc 0)。
+  - `extraout_XMM0_Qa*` の読出し件数 (`origin/main` → HEAD): **2 減**。呼出元 2 件の ABI 規則 (`stereo 82 caller 180fcd690`・`stereo 24 caller 180fce0d0`) が各 1 件の `dVar2 = extraout_XMM0_Qa_00;` を `kh_xmm0_180fdc660` に置換する (`ghidra_to_c.py` は ABI 規則ごとに closure 全体の件数 1 を assert)。本体の規則と `stereo 468・502・571・634` は読出しを消さない (lookahead のみ)。生成 C の直接計数は本 run では未実施 (runner に Ghidra 無し)。参考: 『(1227b9e92 時点)』の生成 C 実測で同じ 2 件が 6 → 4。
+  - 生成 C (gain / haas / gate): HEAD と `origin/main` の差分 0 行 ×3・`sigs.json` 一致。`build_cmp.sh` の突合は 1000/1000 bit-exact (gain 4999/4999・haas 5500/5500・gate 4999/4999。wasm 15,161 / 16,878 / 17,367 B。§10-7t と同値)。
+  - stereo の native 突合: HEAD 0/1000・`origin/main` 0/1000 (RESULT 行で確認。HEAD は trial 0 から FAIL・`18080d4d0` @self+0x80)。数値の状態は main と変わらない (#3073 の範囲)。
+
+#### 10-7t. #3108 (KH-45) run: Stereo の emcc 残件 10 件の解消 (emcc 10 → 0 件・Stereo 突合は 0/1000 で未達)
+- 結論: Stereo の emcc は **10 → 0 件** (`grep -c error:` = 0、終了コード 0)。Gain/Haas/Gate は 1000/1000 bit-exact を維持し、生成 C は修復前と diff 0 行。Stereo の数値は突合で **0/1000 bit-exact** (未達)。emcc が通ったことは数値の正しさを示さない (§10-7r の注記どおり)。`FUN_180fd8aac` は関数化せず、到達で abort する stub にした (未解決 2)。
+- 測定 commit: `eb5532ae9` (コード変更: `ghidra_route/ghidra_shim.h`・`patches.py`・`ghidra_to_c.py`)。コミット済み HEAD で再現した。
+- 素材: `plugins-kilohearts` の Installer zip → `payload.dat` → `windows.zip/1ccb1df8…` → `HeartCore.core_64` (76,642,304 B)。Ghidra 12.1.4 = `[GHIDRA]` (zip sha256 先頭 `ddac49f9…` 一致)、JDK 21 (`[JDK21]`)、emsdk 6.0.12 = `[EMSDK]` (runner 同梱の既存導入)。
+- decompile: 19 関数 (gain/haas/gate 10・stereo 8・`FUN_180fd8aac` 1) すべて OK (`analyzeHeadless` wall 34.2 s、n=1)。
+
+**残件 10 件の内訳 (修復前の emcc error 10 件を原因ごとに割り当てた表。件数は `*` を単位に数える)**
+
+| 原因 | 件数 | 修復前の行 (§10-7r の行番号) | 修復 (`V128OPS` の規則・assert 値) |
+|---|---|---|---|
+| `*` (`auVar = auVar * auVar + auVar;` の行。`+` は同じ式内のため別件に数えない) | 2 | 733 (180fdc470 l37)、846 (180fdfdb0 l36) | 規則 1 = 2 件 (`v128_add(v128_mul64(a, b), c)`) |
+| `*` (`SUB168(auVar * auVar, n)` の内側) | 4 | 725・726 (180fdc470 l29・l30)、839・840 (180fdfdb0 l29・l30) | 規則 2 = 4 件 (`v128_mul64(a, b)`) |
+| 未宣言 `SUB168` | 2 | 725 (180fdc470 l29)、839 (180fdfdb0 l29) | shim `SUB168(x, off)` |
+| 未関数化 `FUN_180fd8aac` | 2 | 未確定 (§10-7r に行番号の記録なし。呼出元は 180fdc6d8 l11・180fdc700 l11) | 到達で abort する stub (`SNAPINS['stereo']['stubs']`) |
+| **合計** | **10** | | |
+
+- 件数の根拠 (機械語): `*` は 2 関数 × 3 本 = 6。`180fdc470` は `mul rcx` @180fdc4ba・4c8・4e6 と 128bit 加算 @180fdc4d4〜4d7、`180fdfdb0` は `mul rcx` @180fdfdfa・fe08・fe26 と 128bit 加算 @180fdfe17 (adc)。両オペランドの上位 qword は呼出し直前に 0 (`auVarN._8_8_ = 0`) なので、積は 64×64→128 の符号なし積。lane 型は整数で、`mulps`/`mulpd` ではない。`+` は 128bit 整数加算。
+- 行対応の確度: 件数 (2・4・2・2) は §10-7r の実測と `V128OPS` の assert 値が一致する。`*` の行を規則 1・規則 2 のどちらに割り当てるかは、`V128OPS` コメントの decompile 行 (l29・l30・l36・l37) と §10-7r の行番号の差が関数内で一定 (180fdc470: 725−29 = 726−30 = 733−37 = 696、180fdfdb0: 839−29 = 840−30 = 846−36 = 810) であることからの推定。pre-fix の stereo.c は再生成していない (Ghidra 未展開) ため、emcc による行単位の再照合は未実施。
+- `FUN_180fd8aac` の行番号は未記録のため未確定 (件数 2 は §10-7r の実測)。
+- shim (`ghidra_shim.h`): `v128_mul64` (`unsigned __int128`)・`v128_add`・`SUB168(x, off)` (Ghidra SUBPIECE: `off`=0 で下位 8 バイト、8 で上位)。
+- 書換え表 `patches.py` の `V128OPS['stereo']`: 件数を assert (規則 1 = 2 件・規則 2 = 4 件)。stereo 以外には適用しない。
+- `FUN_180fd8aac` 2 件 (`180fdc6d8` l11・`180fdc700` l11、9 引数): 指数全 1・仮数 0 の入力 (Inf) でのみ到達する FP 例外の報告経路。呼び先は `FUN_180fd622c`・`FUN_180fd89f0`・`FUN_180fd5bcc`・`FUN_180fd5f30`・`FUN_180fd8988`・`FUN_181327120`・`func_0x000180fe2788`。`also` へ足すと閉包が広がる (§10-7j・§10-7l の前例) ため、`SNAPINS['stereo']['stubs']` に `void FUN_180fd8aac() { abort(); }` を置いた (到達で abort し、突合で検出する)。`also` へ足した場合の件数は**未測定** (閉包 7 関数の追加が要る)。
+
+**実測 (測定 commit `eb5532ae9`、コミット済み HEAD で再現。load 0.22 0.30 0.19 → 0.28 0.31 0.19)**
+- Stereo emcc (`emcc -c -w -O1 -ferror-limit=0 -Wno-error=int-conversion`): error 行 **0**、0.18 s。修復前 (`e2cefb36a`) は 10。
+- Gain **1000/1000** bit-exact (calls 4999/4999、wasm 15,161 B、emcc 0.3 s)。
+- Haas **1000/1000** bit-exact (calls 5500/5500、wasm 16,878 B、emcc 0.3 s)。
+- Gate **1000/1000** bit-exact (calls 4999/4999、wasm 17,367 B、emcc 0.3 s)。wasm サイズは §10-7r と一致。
+- 生成 C: `ghidra_to_c.py gain/haas/gate` の出力を修復前 (`work/gr_base/`) と `diff` → **0 行** (sigs.json も一致)。
+- Stereo 突合 (`build_cmp.sh stereo 1000 7 bitcast,intload,stackpair,assoc,concat`): **0/1000 bit-exact** (`exact-region diff`、trial 0 から FAIL)。abort は発火せず、RESULT 行まで完走した。原因は未切り分け (KH-46 の多値戻り (xmm0/xmm1) の未モデルが有力。未解決 1)。
+- 測定 commit 以降のコード差分: `git diff eb5532ae9 HEAD -- tools/targets/kilohearts/ghidra_route` は本節の追記 commit の時点で 0 行 (REPORT のみ)。
+
+**未解決**
+1. Stereo の数値突合 0/1000 (未一致の原因の切り分けは未実施。KH-46 の多値戻りが有力) → #3109 (KH-46)。
+2. `FUN_180fd8aac` は関数化せず abort stub (閉包 7 関数の追加と件数の測定が未実施) → #3821 [KH-69]。

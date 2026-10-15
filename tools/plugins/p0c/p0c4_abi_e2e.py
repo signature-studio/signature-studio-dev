@@ -43,7 +43,8 @@ UCOMI_FIX = ['0x5e12b0']  # #3439: ucomiss の被演算子・flags を接続 (k8
 FIX18 = ['0x5de620', '0x5dea40', '0x5dec40', '0x5dedb0', '0x5dee20', '0x5dee50', '0x5df340',
          '0x5dfae0', '0x5dfbe0', '0x5dfc90', '0x5dfdb0', '0x5dffc0', '0x5dfff0', '0x5e0300',
          '0x5e0350', '0x5e03f0', '0x5e12c0', '0x5e1490']
-HB_N = 15  # k80_hand_bodies.py の BODIES 14 + GLOBAL_INITS 1 (#2182)
+HB_N = 14  # k80_hand_bodies.py の BODIES 14 (#2182)
+PE_N = 2  # k80_pe_globals.py の置換対象 (0x6fffb0 = (0.5, 0.5) #2182 / 0x6fc26c = 同種の i128 0 初期化 #3281)
 EXT_FUNCS = 'function_5dfc90,function_5dfbe0,function_5dfd30,function_5dfdb0'
 EXT_CHOPF = 'function_5dfbe0,function_5dfc90,function_5dfdb0'
 EXT_CHOPR = '5dfbe0:5dfc0a-5dfc7c,5dfc90:5dfcb5-5dfd1e,5dfdb0:5dfded-5dfe40'
@@ -139,12 +140,27 @@ def main():
     # #2182 (P0c-17): census の buf_diff≠0 18 kernel の修復。
     #  (a) 4 kernel は x87 拡張精度 (80-bit) の dd エミュレーション (p0c4_e2e.py と同じ ext pass)
     #  (b) 残りは k80_hand_bodies.py で機械語どおりの本体に差し替え (関数シグネチャ不変)
+    #  (c) 0 初期化の整数 global は k80_pe_globals.py が PE の .data の実値に置き換える (#3281)
     ext = os.path.join(d3, 'k80.ext.ll')
     run(['python3', os.path.join(HERE, 'f80_lower.py'), dfx, ext,
          '--ext', '--ext-funcs', EXT_FUNCS, '--chop-funcs', EXT_CHOPF, '--chop-ranges', EXT_CHOPR])
+    pe1 = os.path.join(d3, 'k80.pe.ll')
+    pe1j = os.path.join(d3, 'k80.pe.json')
+    run(['python3', os.path.join(HERE, 'k80_pe_globals.py'), ext, pe1, '--report', pe1j])
+    pe2 = os.path.join(d3, 'k80.pe2.ll')
+    pe2j = os.path.join(d3, 'k80.pe2.json')
+    run(['python3', os.path.join(HERE, 'k80_pe_globals.py'), pe1, pe2, '--report', pe2j])
+    if open(pe1, 'rb').read() != open(pe2, 'rb').read():
+        raise SystemExit('[FAIL] k80_pe_globals not idempotent')
+    for j in (pe1j, pe2j):
+        ents = json.load(open(j))['replaced']
+        if len(ents) != PE_N:
+            raise SystemExit('[FAIL] k80_pe_globals 置換件数 %d (期待 %d)' % (len(ents), PE_N))
+        if '0x6fffb0' not in [x['va'] for x in ents]:
+            raise SystemExit('[FAIL] k80_pe_globals @global_var_6fffb0 が置換対象に無い')
     hb = os.path.join(d3, 'k80.hb.ll')
     hbj = os.path.join(d3, 'k80.hb.json')
-    run(['python3', os.path.join(HERE, 'k80_hand_bodies.py'), ext, hb, '--report', hbj])
+    run(['python3', os.path.join(HERE, 'k80_hand_bodies.py'), pe1, hb, '--report', hbj])
     hb2 = os.path.join(d3, 'k80.hb2.ll')
     hb2j = os.path.join(d3, 'k80.hb2.json')
     run(['python3', os.path.join(HERE, 'k80_hand_bodies.py'), hb, hb2, '--report', hb2j])
@@ -153,7 +169,7 @@ def main():
     for j in (hbj, hb2j):
         n = len(json.load(open(j))['replaced'])
         if n != HB_N:
-            raise SystemExit('[FAIL] k80_hand_bodies 置換件数 %d (期待 %d = BODIES 14 + GLOBAL_INITS 1)' % (n, HB_N))
+            raise SystemExit('[FAIL] k80_hand_bodies 置換件数 %d (期待 %d = BODIES 14)' % (n, HB_N))
     run(['llvm-as', hb, '-o', os.path.join(d3, 'k80.hb.bc')])
 
     print('== [5] 差分試験 (native vs 修復後 IR, %d case/kernel, fork 隔離) ==' % cases)

@@ -12,6 +12,11 @@
   "rax": "0x0",
   "longjmp": 0,
   "stage": 1,
+  "diag_nullfill": {
+   "on": false,
+   "skip": 0,
+   "pass": 0
+  },
   "getmem": 2314,
   "freemem": 1199,
   "va_calls": 20,
@@ -37,6 +42,120 @@
    "safe_obj_0x98": null,
    "safe_obj_0x88": null
   },
+  "py_events": {
+   "n": 9,
+   "over": 0,
+   "events": [
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e1c78",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x16bb068",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e4790",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x141d6b8",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b82e0",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x15e1140",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x16b8488",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b8488",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 0,
+     "site": 0,
+     "slot": "0x16b8250",
+     "proc": "0x0",
+     "old": "0x0",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 209,
+     "site": 8,
+     "slot": "0x15e1c78",
+     "proc": "0x74",
+     "old": "0x16bb068",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 209,
+     "site": 8,
+     "slot": "0x15e4790",
+     "proc": "0x74",
+     "old": "0x141d6b8",
+     "new": "0x0",
+     "aux": "0x0"
+    },
+    {
+     "unit": 209,
+     "site": 8,
+     "slot": "0x15e1140",
+     "proc": "0x74",
+     "old": "0x16b8488",
+     "new": "0x0",
+     "aux": "0x0"
+    }
+   ]
+  },
+  "py_snap": {
+   "last": {
+    "unit": 0,
+    "pos": 0,
+    "count": 0,
+    "mgr": "0x16bb068",
+    "safe_g": "0x141d6b8",
+    "safe_obj": "0x0",
+    "f98": "0x0",
+    "f88": "0x0",
+    "sing": "0x0"
+   },
+   "trace": [
+    {
+     "unit": 0,
+     "pos": 0,
+     "count": 0,
+     "mgr": "0x16bb068",
+     "safe_g": "0x141d6b8",
+     "safe_obj": "0x0",
+     "f98": "0x0",
+     "f88": "0x0",
+     "sing": "0x0"
+    }
+   ],
+   "over": 0
+  },
   "ipp_ptr_15F34A0": "0x0",
   "ipp_ptr_15F40E8": "0x0",
   "ipp_total": 2,
@@ -59,6 +178,16 @@
    ]
   ],
   "stopped_at_1based": 209
+ },
+ "outmem": {
+  "mem_bytes": 905969664,
+  "stack": {
+   "base": "0x11dbcac0",
+   "end": "0x115bcac0"
+  },
+  "full": "ca01803101fdb87020a5e0e988dc8c28010c7f2a481db4f2fad3d96fe6de36ce",
+  "no_cstack": "4b52f3e5d9c6344f1fad21d78a58d2513beebacd8f27652d9c49fabcaf1232c4",
+  "sections": {}
  },
  "survey": null,
  "tolerant": {
@@ -12510,6 +12639,43 @@
    "0x1375990"
   ],
   "soft_called": []
+ },
+ "log_cap": {
+  "cap": 0,
+  "time_cap_s": 0,
+  "quiet_bin": false,
+  "bytes": 0,
+  "lines": 0,
+  "bin_lines": 0,
+  "bin_bytes": 0,
+  "hit": null,
+  "elapsed_ms": null,
+  "head": [],
+  "tail": []
+ },
+ "px6bbc20": {
+  "calls_all": 0,
+  "calls_site_6c9380": 0,
+  "first_rect_x0_y0_x1_y1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "last_rect_x0_y0_x1_y1": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "rect_changes": 0,
+  "x_min_max_y_min_max": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "calls_other_ret": 0
  },
  "soft_top": [
   "268448949:21",

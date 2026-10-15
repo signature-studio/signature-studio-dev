@@ -20,6 +20,40 @@ const BOOT_ONLY = process.argv.includes('--boot-only');
 const SURVEY = process.argv.includes('--survey') || !BOOT_ONLY;
 const TRACE = process.env.FLE_BOOT_TRACE === '1';
 
+// FLE-15 (#3770): 有界実行。FLE_BOOT_LOG_CAP (bytes・既定 0 = 無効) を超えた console 出力 (stdout/stderr) で
+// 例外を投げ、boot を抜けて結果 JSON を出す (診断 route は反復出力で 20GB 級になるため #3491)。
+// 停止は boot 内の JS 例外 (fle_throw_kind と同じ経路)。時間上限は fle6_measure.sh の timeout が担う。
+// FLE_BOOT_TIME_CAP (秒・既定 0 = 無効): 出力の度に経過を見て、超えたら同じ経路で抜ける (出力が途切れない反復の打ち切り)。
+// FLE_BOOT_QUIET_BIN=1: U+FFFD・制御文字を含む行 (ガストの生バイト列の反復) は表示せず数えるだけにし、上限の計数に入れない。
+const LOG_CAP = Number(process.env.FLE_BOOT_LOG_CAP || 0);
+const TIME_CAP = Number(process.env.FLE_BOOT_TIME_CAP || 0);
+const QUIET_BIN = process.env.FLE_BOOT_QUIET_BIN === '1';
+const LOG_T0 = Date.now();
+const logCap = { cap: LOG_CAP, time_cap_s: TIME_CAP, quiet_bin: QUIET_BIN, bytes: 0, lines: 0, bin_lines: 0, bin_bytes: 0, hit: null, elapsed_ms: null, head: [], tail: [] };
+if (LOG_CAP > 0 || TIME_CAP > 0) {
+    for (const k of ['log', 'error']) {
+        const orig = console[k].bind(console);
+        console[k] = (...a) => {
+            const s = a.map(String).join(' ');
+            const el = Date.now() - LOG_T0;
+            if (!logCap.hit && TIME_CAP > 0 && el > TIME_CAP * 1000) {
+                logCap.hit = 'time'; logCap.elapsed_ms = el;
+                throw new Error('FLE_BOOT_LOG_CAP exceeded (time ' + TIME_CAP + ' s)');
+            }
+            const bin = /\uFFFD|[\x00-\x08\x0e-\x1f]/.test(s);
+            if (QUIET_BIN && bin) { logCap.bin_lines++; logCap.bin_bytes += Buffer.byteLength(s) + 1; return; }
+            logCap.bytes += Buffer.byteLength(s) + 1; logCap.lines++;
+            if (logCap.head.length < 40) logCap.head.push(s.slice(0, 240));
+            logCap.tail.push(s.slice(0, 240)); if (logCap.tail.length > 40) logCap.tail.shift();
+            if (!logCap.hit && LOG_CAP > 0 && logCap.bytes > LOG_CAP) {
+                logCap.hit = 'bytes'; logCap.elapsed_ms = el;
+                throw new Error('FLE_BOOT_LOG_CAP exceeded (' + LOG_CAP + ' bytes)');
+            }
+            orig(...a);
+        };
+    }
+}
+
 const mod = await import(cjs);
 let m = await (mod.default ? mod.default() : mod());
 const U8 = m.HEAPU8;
@@ -46,6 +80,7 @@ function classify(e) {
     }
     const s = String(e && e.message || e);
     if (/out of bounds/.test(s)) return { cls: 'oob', msg: s.slice(0, 160) };
+    if (/FLE_BOOT_LOG_CAP/.test(s)) return { cls: 'log_cap', msg: s.slice(0, 160) };
     return { cls: 'trap', msg: s.slice(0, 160) };
 }
 
@@ -331,6 +366,9 @@ const softs = [];
 for (let i = 0; i < Number(m._fle_n_soft_uniq()); i++) softs.push(`${m._fle_soft_name(i)}:${m._fle_soft_count(i)}`);
 softs.sort((a, b) => Number(b.split(':')[1]) - Number(a.split(':')[1]));
 
+// FLE-15 (#3770): 画素ストア 0x6bbc20 の計数 (fle_boot.c px_probe)。呼出し点 ret=0x6c9380 (f_6c9280 の 0x6c937a 直後) の回数と矩形
+const pxRaw = typeof m._fle_px_stat === 'function' ? Array.from({ length: 16 }, (_, k) => m._fle_px_stat(k)) : null;
+const px6bbc20 = pxRaw && { calls_all: pxRaw[0], calls_site_6c9380: pxRaw[1], first_rect_x0_y0_x1_y1: pxRaw.slice(2, 6), last_rect_x0_y0_x1_y1: pxRaw.slice(6, 10), rect_changes: pxRaw[10], x_min_max_y_min_max: pxRaw.slice(11, 15), calls_other_ret: pxRaw[15] };
 const summary = {
     variant: process.env.FLE_BOOT_VARIANT || 'plain',
     wasm_size: (() => { try { return readFileSync(cjs + '.wasm').size; } catch { return null; } })(),
@@ -339,6 +377,8 @@ const summary = {
     survey,
     tolerant: TOLERANT ? { mode: TOL_MODE, started: tol.started, hook_ran: tol.hook_ran, kinds: tol.kinds, skipped_n: tol.skipped.length, restored: tol.restored, skipped: tol.skipped, miss_units: tol.miss_units, units: tol.units } : null,
     cfi,
+    log_cap: logCap,
+    px6bbc20,
     soft_top: softs.slice(0, 40),
     ipp: { mode: IPP_MODE, on: IPP_ON, ptr_15F34A0: boot.ipp_ptr_15F34A0, ptr_15F40E8: boot.ipp_ptr_15F40E8, total: boot.ipp_total, called: boot.ipp_called, stop: boot.ipp_stop, token_at: boot.ipp_token_at, call_slot: boot.ipp_call_slot },
     notes: {
@@ -357,6 +397,8 @@ writeFileSync(outPath, JSON.stringify(summary, null, 1));
 console.log('FLEBOOT_RESULT ' + JSON.stringify({
     units_run: boot.units_run, units_total: boot.units_total, stopped_at: boot.stopped_at_1based,
     boot_threw: boot.threw && (boot.threw.cls + (boot.threw.msg ? ' ' + boot.threw.msg : '')),
+    log_cap: LOG_CAP || TIME_CAP ? { hit: logCap.hit, bytes: logCap.bytes, lines: logCap.lines, bin_lines: logCap.bin_lines, elapsed_ms: logCap.elapsed_ms } : null,
+    px6bbc20,
     longjmp: boot.longjmp, getmem: boot.getmem, freemem: boot.freemem,
     va_calls: boot.va_calls, va_bytes: boot.va_bytes, exit: boot.exit,
     survey: survey && survey.byCls ? survey.byCls : (survey && survey.prologue_threw || null),
@@ -366,6 +408,41 @@ console.log('FLEBOOT_RESULT ' + JSON.stringify({
     cfi: cfi && { rc: cfi.rc, threw: cfi.threw && cfi.threw.cls, longjmp: cfi.longjmp, exit: cfi.exit },
 }));
 console.log('FLEBOOT_UNDO ' + JSON.stringify(undoProbe));
+// PY-106 (#2909): 束縛関数 0xc395a0 を boot 停止後に直接実行し、resolver が引いた名前と slot の値を読む (FLE_PY106_BIND=1 のときだけ。
+// summary の書出しの後で行うので boot の計数・outmem には影響しない)。sink 0xd82daf と同じ 3 段 load を実メモリで辿る。
+if (process.env.FLE_PY106_BIND === '1') {
+    const SLOT_HEAD = 0x15e1140, SLOT_EXC = 0x16b8488, SLOT_SETSTR = 0x16b8408, SLOT_NEWINTERP = 0x16b8250;
+    const hx = (v) => '0x' + BigInt.asUintN(64, BigInt(v)).toString(16);
+    const rd64 = (a) => new DataView(m.HEAPU8.buffer).getBigUint64(Number(a), true);
+    const head0 = rd64(SLOT_HEAD);
+    const getproc0 = m._fle_n_getproc();
+    let threw = null;
+    try { m._fle_py_bind_probe(); } catch (e) { threw = classify(e); }
+    // throw (exit) の経路でも C 側の計数と名前表を読む。読みは戻り値に頼らず、名前表は空文字まで、計数は前後差で取る
+    const getproc_calls = m._fle_n_getproc() - getproc0, hook_calls = m._fle_py_bind_hook_n();
+    const ringTail = []; for (let k = 96; k < 128; k++) ringTail.push('0x' + (Number(m._fle_ring_at(k)) >>> 0).toString(16));
+    console.log('FLEBOOT_PY106RING ' + JSON.stringify(ringTail));
+    const names = [];
+    for (let i = 0; i < 128; i++) { const nm = m.UTF8ToString(m._fle_py_bind_name(i)); if (nm === '') break; names.push({ i, name: nm, cell: BigInt(m._fle_py_bind_cell(i)) }); }
+    const n = names.length;
+    const nameOf = (v) => { const x = names.find((y) => y.cell === BigInt.asUintN(64, BigInt(v))); return x ? x.name : null; };
+    const slotExc = rd64(SLOT_EXC);
+    // boot 停止時の head は 0 (unit 209 で 0 化)。sink と同じ load を辿るため、head を PE の値 (SLOT_EXC) に戻してから読む
+    new DataView(m.HEAPU8.buffer).setBigUint64(SLOT_HEAD, BigInt(SLOT_EXC), true);
+    const v1 = rd64(SLOT_HEAD), v2 = rd64(v1), v3 = rd64(v2);
+    const tok = Number(v3) - 0x7f300000;
+    const pyB = {
+        probe: { threw, names_n: n, getproc_calls, hook_calls },
+        head_at_stop: hx(head0), slot_exc_after_bind: hx(slotExc), name_of_slot_exc: nameOf(slotExc),
+        slot_setstr_after_bind: hx(rd64(SLOT_SETSTR)), name_of_slot_setstr: nameOf(rd64(SLOT_SETSTR)),
+        slot_newinterp_after_bind: hx(rd64(SLOT_NEWINTERP)), name_of_slot_newinterp: nameOf(rd64(SLOT_NEWINTERP)),
+        head_restored: hx(SLOT_EXC),
+        chain: { load1_head: hx(v1), load2: hx(v2), load3_type_tok: hx(v3), type_name: names[tok] ? names[tok].name : null },
+        names: names.map((x) => [x.i, x.name, hx(x.cell)]),
+    };
+    writeFileSync(outPath.replace(/\.json$/, '_py106bind.json'), JSON.stringify(pyB, null, 1));
+    console.log('FLEBOOT_PY106B ' + JSON.stringify({ threw: pyB.probe.threw, names_n: n, getproc_calls, hook_calls, head_at_stop: pyB.head_at_stop, name_of_slot_exc: pyB.name_of_slot_exc, name_of_slot_setstr: pyB.name_of_slot_setstr, name_of_slot_newinterp: pyB.name_of_slot_newinterp, type_name: pyB.chain.type_name, load3: pyB.chain.load3_type_tok }));
+}
 // FLE-6 ネガコン判定: shim 無し (既定 / FLE_IPP=0) なら 0x15F34A0 = 0、shim 有り (FLE_IPP=1) なら非 0 でなければならない。
 // mode 2 (#2702) は停止を測る測定モードなので判定しない (ok の値は出すが終了コードは変えない)。
 const ippPtrOk = IPP_ON ? !/^0x0+$/.test(boot.ipp_ptr_15F34A0) : /^0x0+$/.test(boot.ipp_ptr_15F34A0);

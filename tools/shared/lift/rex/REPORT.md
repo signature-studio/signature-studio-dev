@@ -122,7 +122,7 @@ REXGetCreatorInfo / REXGetInfo の閉包 (x64c で 35 関数・982 命令) を l
 | 元の機械語が落ちる 67 件 (SIGSEGV/SIGBUS 66・時間切れ 1)。fault アドレスは 0x10000 未満 38 件 (NULL 付近の参照と推定)・arena/image 内 0 件・その他 28 件。a0 の範囲との関係: a0 が arena 外の入力 122 件のうち 40 件、arena 内の 78 件のうち 27 件が落ちる。率はほぼ同じで、a0 の範囲外は原因として支持されない。a0 範囲別の fault 内訳は、外が NULL 付近 28・その他 12、内が NULL 付近 10・その他 16・時間切れ 1 (stderr 行と `cases.bin` から手で再集計)。原因は未切り分け | 比較数が 133/200 | 子 #2870 [T-SH-46] (受入 3) |
 | side module 化・ビルドフラグ除外 (受入 5) | §10 で部分実装 (standalone wasm の複製とフラグ。SIDE_MODULE 形式は未達。公開 tier への結線は未実施) | 子 #3630 [T-SH-91] (SIDE_MODULE 形式・PM 判断待ち)。親 #2896 [T-SH-47] |
 | release guard の deny-list 追加 (D11)。子 #2896 の範囲外 | 同上 | PM (#2896 本文の「範囲外の PM 作業」・D11) |
-| `movnti` 24 箇所の x64c 対応 | 閉包内で未到達。到達すると fail-fast | 子 #2870 [T-SH-46] |
+| `movnti` の x64c 対応 | memset の 8 箇所は a1 ≥ 0x70000 の入力で到達 (fail-fast)。memcpy の 16 箇所は直接 call では到達しない (静的読み。間接 call 経路は未確認) | 付録 `REPORT_APPENDIX_3589.md` (#3589)。子 #3893 [T-SH-93] (memset の x64c 対応)・#3894 [T-SH-94] (info 4 件の trap)・#3895 [T-SH-95] (REX_RUN_CRASHED=1 の停止) |
 | REXCreate 以下の中核閉包の lift | REX 読込の実機能が未実装 | #2734 (T-SH-45) |
 
 ### 7.7 再現
@@ -211,7 +211,7 @@ python3 tools/shared/lift/rex/importers.py <fl-win64 展開先> --json OUT.json 
 
 ## 9. 成功経路 (戻り値 1 / 3) と書込の一致 — T-SH-46 (#2870, 部分達成)
 
-結論: 成功経路 (戻り値 1 / 3) に入る入力を追加し、比較対象に成功経路を含めた。arena 書込は元の機械語と全件一致。`.data` の一致・落ちる case の分類・movnti は未解決。測定 commit `80c5ff7a`。数値・未解決は付録 `REPORT_APPENDIX_2870.md` の §9.1・§9.3・§9.4 が正本 (§9 全文)。
+結論: 成功経路 (戻り値 1 / 3) に入る入力を追加し、比較対象に成功経路を含めた。arena 書込は元の機械語と全件一致。`.data` の一致・movnti は未解決。落ちる 73 件は全件分類した (T-SH-89・#3588。付録 `REPORT_APPENDIX_3588.md`)。測定 commit `80c5ff7a`。数値・未解決は付録 `REPORT_APPENDIX_2870.md` の §9.1・§9.3・§9.4 が正本 (§9 全文)。同 §9 の成功経路の続き (REXGetInfo fn=1 の成功経路。測定 commit `142df3b53`) は付録 `REPORT_APPENDIX_3587.md` §11 が正本で、`.data` の書込は DllMain の初期化で起きて export 経由では到達しない (子 #3850)。
 
 ## 10. 所有者限定 tier の side module 分離とビルドフラグ除外 — T-SH-47 (#2896)
 

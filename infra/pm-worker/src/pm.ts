@@ -1,6 +1,6 @@
 // PM agent (oc-pm) を起こすべき終端状態の検出と、送信の抑止。どちらも純関数 (時刻・保管先は呼び出し側が渡す)。
 // 検出に LLM は使わない。自由文は解析しない: ラベル・マーカー・番号の正規表現だけ (needs.ts・refs.ts)。issue / PR の自由文は payload に入れない。
-import { PRIO_RANK, prioOf, type Prio } from "./launch.ts";
+import { effectivePrioMap, PRIO_RANK, prioOf, type Prio } from "./launch.ts";
 import { parentNumbers } from "./refs.ts";
 import { ASSOC_OK, hasOpenPr, KILLED_STOP_AT, NEEDS_USER_LABEL, type PmState, type PrState } from "./webhook.ts";
 
@@ -37,7 +37,7 @@ export interface PmTarget {
   ref: number;
   // 検出の根拠になった時刻 (停止コメント・outcome・review・ユーザーのコメント)
   at: string;
-  // 優先の区分 (launch の prioOf と同じ規則)。送る順の先頭のキー (selectDispatch)。
+  // 優先の区分 (launch の effectivePrioMap と同じ規則。親からの継承を含む)。送る順の先頭のキー (selectDispatch)。
   prio: Prio;
 }
 
@@ -51,9 +51,14 @@ export interface HistoryEntry {
 
 // 抑止の上限 (同じ (kind, ref) は 60 分に 1 回、全体で 1 時間に 24 起動、同じ ref に 24 時間で 3 回)。
 export const PM_LIMITS = { dupMs: 60 * 60_000, hourMs: 3_600_000, hourMax: 24, dayMs: 24 * 3_600_000, refDayMax: 3 };
-// 種類ごとの上限 (PM_LIMITS に加えて効く)。refs_orphan は同じ N に 24 時間 1 回、1 日 10 件まで。
+// 種類ごとの毎時の最低配分 (#3704)。毎時の枠 (PM_LIMITS.hourMax) のうち、その kind に送れる対象がある間は N 件を残す。
+// 残した枠は他の kind に使わせない (送れる対象が無い・抑止で送れない分は他の kind に回す)。最低配分より先に送る kind は MIN_EXEMPT_KINDS。
+export const KIND_MIN_PER_HOUR: Partial<Record<DetectedKind, number>> = { refs_orphan: 3 };
+export const MIN_EXEMPT_KINDS: readonly string[] = ["user_answered"];
+// 種類ごとの上限 (PM_LIMITS に加えて効く)。refs_orphan は同じ N に 24 時間 1 回、1 日 24 × 最低配分 (= 72) まで。
+// 1 日の上限が最低配分を 24 時間続けられる値。これより小さいと、最低配分は 1 日の上限で途中から止まる (#3704)。
 export const KIND_LIMITS: Partial<Record<DetectedKind, { dupMs: number; dayMax: number }>> = {
-  refs_orphan: { dupMs: 24 * 3_600_000, dayMax: 10 },
+  refs_orphan: { dupMs: 24 * 3_600_000, dayMax: 24 * (KIND_MIN_PER_HOUR.refs_orphan ?? 0) },
 };
 
 // 対象の起票者が MEMBER / OWNER / COLLABORATOR か許可 bot か。未設定 (古い保存値) は許可しない。
@@ -78,22 +83,23 @@ const t = (s: string | undefined): number => (s ? Date.parse(s) : NaN);
 // PM 応答が根拠より後にあるか (厳密に後。同時刻は応答とみなさない)
 const answeredAfter = (pmAt: string | undefined, at: string): boolean => !!pmAt && t(pmAt) > t(at);
 
-// PR 起点の区分: PR 自体のラベルと、PR が指す issue のラベルの高い方 (critical > normal > low)。指す issue は、ブランチ名の先頭の番号・Closes/Refs・本文の #N。
+// PR 起点の区分: PR 自体のラベルと、PR が指す issue の区分 (effectivePrioMap。親からの継承を含む) の高い方 (critical > normal > low)。指す issue は、ブランチ名の先頭の番号・Closes/Refs・本文の #N。
 // 引けない issue は数えない (PR 自体のラベルも無ければ normal)。
-const prPrio = (s: PmState, p: PrState): Prio => {
+const prPrio = (s: PmState, p: PrState, prios: Map<number, Prio>): Prio => {
   const head = /^(\d+)-/.exec(p.ref);
   const nums = [...(head ? [Number(head[1])] : []), ...(p.closes ?? []), ...(p.mentions ?? [])];
-  const linked = nums.flatMap((n) => (s.issues[String(n)] ? [prioOf(s.issues[String(n)].labels)] : []));
+  const linked = nums.flatMap((n) => (s.issues[String(n)] ? [prios.get(n) ?? "normal"] : []));
   return [prioOf(p.labels ?? []), ...linked].reduce((a, b) => (PRIO_RANK[b] < PRIO_RANK[a] ? b : a));
 };
 
 export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
   const out: PmTarget[] = [];
+  const prios = effectivePrioMap(Object.values(s.issues));
   for (const p of Object.values(s.prs)) {
     if (p.state !== "open" || !authorAllowed(p, o.bots)) continue;
     const sig = s.sig[String(p.number)];
     if (!sig) continue;
-    const prio = prPrio(s, p);
+    const prio = prPrio(s, p, prios);
     if (p.labels?.includes(STUCK_LABEL) && sig.stop && sig.stop.intent !== null && !answeredAfter(sig.pmAt, sig.stop.at)) {
       out.push({ kind: "stuck", ref: p.number, at: sig.stop.at, prio });
     }
@@ -107,7 +113,7 @@ export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
     const sig = s.sig[k];
     if (!sig) continue;
     const oc = sig.outcome;
-    const prio = prioOf(i.labels);
+    const prio = prios.get(i.number) ?? "normal";
     if (i.labels.includes(NO_PR_LABEL) && !i.labels.some((l) => HOLD_LABELS.includes(l)) && oc && !answeredAfter(sig.pmAt, oc.at)) {
       // split / stop は即。unknown は、Worker が再投入した後の run (outcome が最新の launch より後) でも終わった場合だけ。
       // artifact は、新しい素材が無く unknown の枠を使い切った (または上限に達した) 後の run でも終わった場合だけ (新しい素材がある分は Worker が足して 1 回再投入する)。
@@ -144,14 +150,14 @@ export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
       const parent = s.issues[String(n)];
       if (orphans.has(n) || !parent || parent.state !== "open" || parents.has(n) || !authorAllowed(parent, o.bots)) continue;
       orphans.add(n);
-      out.push({ kind: "refs_orphan", ref: n, at: p.updatedAt, prio: prioOf(parent.labels) });
+      out.push({ kind: "refs_orphan", ref: n, at: p.updatedAt, prio: prios.get(n) ?? "normal" });
     }
   }
   const rank = (k: string): number => (DETECTED_KINDS as readonly string[]).indexOf(k);
   return out.sort((a, b) => rank(a.kind) - rank(b.kind) || a.ref - b.ref);
 }
 
-export type SkipWhy = "dup" | "hour" | "ref" | "kind";
+export type SkipWhy = "dup" | "hour" | "ref" | "kind" | "reserve";
 
 // 送ってよいものを順に選ぶ。選んだものは履歴に加えたものとして次を判定する (1 回の tick で上限を超えない)。
 // targets は優先順 (detectPm の戻り値)。
@@ -170,14 +176,34 @@ export function selectDispatch(
   const ordered = [...targets].sort(
     (a, b) => PRIO_RANK[a.prio] - PRIO_RANK[b.prio] || lastSent(a) - lastSent(b) || (order.get(a) as number) - (order.get(b) as number),
   );
-  for (const tg of ordered) {
-    const within = (ms: number) => hist.filter((h) => now - h.at < ms);
+  const within = (ms: number) => hist.filter((h) => now - h.at < ms);
+  // 枠以外の抑止 (同じ (kind, ref) の再送・同じ ref の 24 時間の上限・kind の 1 日の上限)。hist は送るたびに増えるだけなので、抑止された対象は同じ tick で送られない。
+  const blocked = (tg: PmTarget): SkipWhy | null => {
     const kl = KIND_LIMITS[tg.kind];
+    if (within(kl?.dupMs ?? PM_LIMITS.dupMs).some((h) => h.kind === tg.kind && h.ref === tg.ref)) return "dup";
+    if (within(PM_LIMITS.dayMs).filter((h) => h.ref === tg.ref).length >= PM_LIMITS.refDayMax) return "ref";
+    if (kl && within(PM_LIMITS.dayMs).filter((h) => h.kind === tg.kind).length >= kl.dayMax) return "kind";
+    return null;
+  };
+  // 他の kind の最低配分の残り。まだ足りない分 (今の窓での送信数との差) を、後ろにあって今送れる対象の数で頭打ちにする (送れる対象が無ければ予約しない)。
+  const reservedFor = (kind: string, idx: number): number => {
+    let n = 0;
+    for (const [k, min] of Object.entries(KIND_MIN_PER_HOUR)) {
+      const owed = (min ?? 0) - within(PM_LIMITS.hourMs).filter((h) => h.kind === k).length;
+      if (k === kind || owed <= 0) continue;
+      const open = ordered.slice(idx + 1).filter((t) => t.kind === k && !blocked(t)).length;
+      n += Math.min(owed, open);
+    }
+    return n;
+  };
+  for (let i = 0; i < ordered.length; i++) {
+    const tg = ordered[i];
+    const cap = blocked(tg);
     let why: SkipWhy | null = null;
-    if (within(kl?.dupMs ?? PM_LIMITS.dupMs).some((h) => h.kind === tg.kind && h.ref === tg.ref)) why = "dup";
+    if (cap === "dup") why = "dup";
     else if (within(PM_LIMITS.hourMs).length >= PM_LIMITS.hourMax) why = "hour";
-    else if (within(PM_LIMITS.dayMs).filter((h) => h.ref === tg.ref).length >= PM_LIMITS.refDayMax) why = "ref";
-    else if (kl && within(PM_LIMITS.dayMs).filter((h) => h.kind === tg.kind).length >= kl.dayMax) why = "kind";
+    else if (cap) why = cap;
+    else if (!MIN_EXEMPT_KINDS.includes(tg.kind) && within(PM_LIMITS.hourMs).length + 1 + reservedFor(tg.kind, i) > PM_LIMITS.hourMax) why = "reserve";
     if (why) {
       skipped.push({ kind: tg.kind, ref: tg.ref, why });
       continue;

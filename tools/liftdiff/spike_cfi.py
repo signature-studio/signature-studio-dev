@@ -81,7 +81,7 @@ def astr(r, base, addr, n=0x200):
 def model_names():
     """rt/ld_core.h の ld_model_call で明示的に応答を決めている import 名 (それ以外は既定の 0 応答)。"""
     txt = open(os.path.join(HERE, 'rt', 'ld_core.h'), encoding='utf-8').read()
-    txt = re.sub(r'    if \(ld_cat_on\(\)\) \{.*?\n    \}\n', '', txt, flags=re.S)   # LD_CATALOG_MO 実験分は既定の応答に含めない
+    txt = re.sub(r'    if \(!ld_cat_blob && ld_cat_on\(\)\) \{.*?\n    \}\n', '', txt, flags=re.S)   # LD_CATALOG_MO 実験分は既定の応答に含めない
     return set(re.findall(r'ld_streq\(n, "([^"]+)"\)', txt))
 
 
@@ -142,8 +142,15 @@ def read_wintrace(path):
 
 def main():
     target = sys.argv[1] if len(sys.argv) > 1 else 'targets/flelift.json'
-    subprocess.run(['gcc', '-O1', '-g', '-Wall', '-Wno-unused-function', '-o', 'work/ld_native',
-                    'rt/ld_native.c', 'rt/ld_ms_call.S', '-lm'], check=True)
+    if os.environ.get('LD_GUI_HL') == '1':   # WIN-35 (#3618): 窓 import を tools/gui の shim へ向けたビルド (既定の build は変えない)
+        gsrc = ['../gui/src/gui_platform.c', '../gui/src/gui_reach.c', '../gui/src/gui_core.c', '../gui/src/gui_gdi.c',
+                '../gui/src/gui_headless.c', '../gui/src/gui_hl_stats.c', 'rt/ld_gui.c']
+        subprocess.run(['gcc', '-O1', '-g', '-Wall', '-Wno-unused-function', '-DLD_GUI_HL', '-pthread',
+                        '-I../gui/src', '-I../gui/include', '-o', 'work/ld_native',
+                        'rt/ld_native.c', 'rt/ld_ms_call.S'] + gsrc + ['-lm'], check=True)
+    else:
+        subprocess.run(['gcc', '-O1', '-g', '-Wall', '-Wno-unused-function', '-o', 'work/ld_native',
+                        'rt/ld_native.c', 'rt/ld_ms_call.S', '-lm'], check=True)
     wt_path = os.path.join(HERE, 'work', 'flelift', 'spike_wintrace.txt')
     os.makedirs(os.path.dirname(wt_path), exist_ok=True)
     open(wt_path, 'w').close()

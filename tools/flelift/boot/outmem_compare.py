@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # outmem_compare.py — PERF-P22 (#3330): boot 停止時点の出力メモリ sha256 を変種間で比べる。
-#   python3 tools/flelift/boot/outmem_compare.py <variant dir> --dump <dir> --pe <PE> --labels plain o2 o2lto --negctl plain_negctl
+#   python3 tools/flelift/boot/outmem_compare.py <variant dir> --dump <dir> --pe <PE> --labels plain o2 o2lto --negctl plain_negctl plain_tolerant
 # 入力: <variant dir> の boot_<label>_r<i>.json のトップレベル outmem (fle_boot.mjs: 停止時の C スタック範囲と各範囲の sha256)。
 #       <dir> の outmem_boot_<label>_r<i>.bin (FLE_OUTMEM_DUMP で書いた線形メモリ全体)。
 # 計算は Python hashlib で dump から範囲を読み直す (node:crypto 版との二重計算。full / no_cstack が両者で一致しないと FAIL)。
@@ -11,7 +11,7 @@
 # 判定 (rc): 受入 1 だけで決める。変種 (--labels) の全 run で image_writable と各書込み可能セクションが一致し、
 #           node 版と python 版の full / no_cstack が一致すること。
 #           full / no_cstack の変種間・run 間の一致は参考表示 (C heap・C data の非決定と変種差がここに出る)。rc には入れない。
-#           ネガコン (--negctl) の判別結果は別行で出す (受入 2)。rc には入れない。
+#           ネガコン (--negctl・複数可) の判別結果は別行で出す (受入 2)。rc には入れない。
 import glob, hashlib, json, os, re, struct, sys
 
 IMG = 0x400000
@@ -50,14 +50,15 @@ def compute(dump, secs, stack):
 def main():
     args = sys.argv[1:]
     vdir = args.pop(0)
-    labels, negctl, dump, pe = [], None, None, os.environ.get("FL_WIN64_DIR", "") + "/extracted/block00031_PE.bin"
+    labels, negctl, dump, pe = [], [], None, os.environ.get("FL_WIN64_DIR", "") + "/extracted/block00031_PE.bin"
     while args:
         k = args.pop(0)
         if k == "--labels":
             while args and not args[0].startswith("--"):
                 labels.append(args.pop(0))
         elif k == "--negctl":
-            negctl = args.pop(0)
+            while args and not args[0].startswith("--"):
+                negctl.append(args.pop(0))
         elif k == "--dump":
             dump = args.pop(0)
         elif k == "--pe":
@@ -71,7 +72,7 @@ def main():
         if not m:
             continue
         label = m.group(1); run = m.group(2) if m.lastindex == 2 else "1"
-        if label not in labels and label != negctl:
+        if label not in labels and label not in negctl:
             continue
         om = json.load(open(p)).get("outmem")
         if om is None:
@@ -92,7 +93,6 @@ def main():
         print(f"| {label} | {run} | {py['mem_bytes']} | {py['full'][:16]} | {py['no_cstack'][:16]} | {py['image_writable'][:16]} |")
     print()
     var = [r for r in runs if r[0] in labels]
-    neg = [r for r in runs if r[0] == negctl]
     # 受入 1 (rc を決める)
     vals = {r[3]["image_writable"] for r in var}
     print(f"image_writable: 変種 {','.join(labels)} の全 run で一致 = {len(vals) == 1} (異なる値 {len(vals)} 件)")
@@ -105,11 +105,12 @@ def main():
     for key in ("no_cstack", "full"):
         vals = {r[3][key] for r in var}
         print(f"参考 {key}: 変種 {','.join(labels)} の全 run で一致 = {len(vals) == 1} (異なる値 {len(vals)} 件)")
-    # 受入 2 (ネガコン・rc に入れない): FLE_IPP=0 で image_writable が変種と異なれば判別力あり
-    if negctl:
-        base = {r[3]["image_writable"] for r in var}
+    # 受入 2 (ネガコン・rc に入れない): 出力を変える入力で image_writable が変種と異なれば判別力あり
+    base = {r[3]["image_writable"] for r in var}
+    for nl in negctl:
+        neg = [r for r in runs if r[0] == nl]
         changed = bool(neg) and all(r[3]["image_writable"] not in base for r in neg)
-        print(f"negctl {negctl}: image_writable が変種と異なる = {changed} (受入 2 {'達成' if changed else '未達'})")
+        print(f"negctl {nl}: image_writable が変種と異なる = {changed} (受入 2 {'達成' if changed else '未達'})")
     print("RESULT", "PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)
 
