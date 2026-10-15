@@ -3,9 +3,15 @@
  * guest 補助 (TEB 等) は fle_cpu.c の FLE_* 定数 (0x1D00000 付近) を使う。 */
 #include "fle_cpu.h"
 
+#include <string.h>
+
 static uint8_t guest_stack[1 << 16] __attribute__((aligned(16)));
 #define STACK_TOP ((uint64_t)(uintptr_t)guest_stack + sizeof(guest_stack) - 0x100)
 static uint64_t rex_hits;
+static uint64_t rex_unsup_addr;
+
+static void rex_ff(const char *kind, uint64_t a) { if (strcmp(kind, "unsup") == 0) rex_unsup_addr = a; }
+uint64_t rex_unsup_get(void) { return rex_unsup_addr; }
 
 uint64_t rex_run(uint32_t va, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3) {
     R[RSP] = STACK_TOP;
@@ -23,6 +29,8 @@ void rex_reset(void) {
     x87_cw = 0x037f; x87_sw = 0; mxcsr = 0x1f80;
     fle_install_teb();
     rex_hits = 0;
+    rex_unsup_addr = 0;
+    fle_ff_hook = rex_ff;
 }
 
 uint64_t rex_hits_get(void) { return rex_hits; }
