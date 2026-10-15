@@ -59,7 +59,7 @@
   同ディレクトリの `pe_k_struct_probe.py` (main 取り込みで入った #3443 の解析・469 行) はこの解析が使わないので、差分の範囲に含めない。
 - 直前の script 変更 (`git diff ee18182d9 f7489f0f8`・51 行追加 6 行削除): C5・C8 の表題の修正、`passed-other` の記録、`cfg_from` (callee 検査用) の切出し、C10〜C12 の追加。`window_explore` は変更していない。
 - 実測時間 (1 プロセス・単一スレッド。4 core。実行中の loadavg は未採取で、uptime の 1 分平均は 0.3〜1.0):
-  - `--check`: 172.6 s (C11 の判定を直す前の 1 回目の値。13/14 で、C11 だけが FAIL。C11 の判定を直した後の 14/14 は `--dump` と並行して走ったため時間を採らない)
+  - `--check`: 172.6 s (C11 の判定を直す前の 1 回目の値。13/14 で、C11 だけが FAIL)。14/14 の時間は `f7489f0f8` の段階では未採取 (`--dump` と並行して走ったため)。HEAD `a0f25d5ff` で単独に再実行: 14/14 PASS・97.5 s (real 1m37.5s・実行開始時 loadavg 0.20・`fl-win64` の `block00031_PE.bin`)
   - `--dump`: 86.8 s (`truncated=0`)
   - `--method window`: 85.0 s (`truncated=0`)
   - 比較: `pe_rip_refs.py 15e26a0` は 34.2 s (同じ `.text` の線形走査。`ee18182d9` で採取。本 PR で変更していない)
