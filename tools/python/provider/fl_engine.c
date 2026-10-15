@@ -54,6 +54,11 @@ static int scr_blanked, scr_unblank, scr_active;
 static int scr_alive, scr_menu_show, scr_dirty;
 static int64_t scr_setup_l;
 static int scr_setup_t[5];
+/* PY-224 (#3628): getGridBitWithLoop の loop 行 T[G1] (G1 = 1・G2 = 24)。行の作成経路 (0x12da6d0・PY-223) は未モデルで、既定は行なし (.bss の 0)。テストは fl_engine_loop_set / fl_engine_loop_add で置く */
+#define LP_N 8
+#define LP_G2 24
+static int lp_row, lp_flag49e, lp_flag54, lp_n;
+static int64_t lp_cid[LP_N], lp_f4[LP_N], lp_len[LP_N];
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -94,6 +99,7 @@ void fl_engine_reset(void) {
     scr_alive = 0; scr_menu_show = 0; scr_dirty = 0; scr_setup_l = 0; for (int i = 0; i < 5; i++) scr_setup_t[i] = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
     midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
+    lp_row = lp_flag49e = lp_flag54 = lp_n = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
 int fl_engine_channel_count(void) { return nch; }
@@ -111,6 +117,22 @@ int fl_engine_browser_op(void) { return browser_op; }
 int fl_engine_grid_bit(int c, int p) {
     if (c < 0 || c >= nch || p < 0 || p >= NSTEP) return -1;
     return ch[c].steps[p];
+}
+/* 検査用: 行 T[1] の有無・flag49e・flag54 を置き、record を消す。record は fl_engine_loop_add で追加。上限 LP_N 件を超えた追加は 0 を返して捨てる (mock は setLoop で throw) */
+void fl_engine_loop_set(int row, int flag49e, int flag54) { lp_row = row != 0; lp_flag49e = flag49e != 0; lp_flag54 = flag54 != 0; lp_n = 0; }
+int fl_engine_loop_add(int cid, int f4, int len) { if (lp_n >= LP_N) return 0; lp_cid[lp_n] = cid; lp_f4[lp_n] = f4; lp_len[lp_n] = len; lp_n++; return 1; }
+/* PE 0x12d3ff0 の loop 分岐 (REPORT_PY224)。行 T[1] と flag49e・flag54 が非 0 で、channel ci の最初の record (f4 != 0) が L = len / 24 を与えるとき、p < L は base(p)、それ以外は base(p mod L) (1 なら 2・0 なら 0 で、戻り値は bool に写る) */
+static int grid_bit(int64_t index, const Chan *k, int32_t p);
+static int grid_bit_loop(int64_t ci, const Chan *k, int32_t p) {
+    int base = grid_bit(ci, k, p);
+    if (!lp_row || !lp_flag49e || !lp_flag54) return base;
+    for (int r = 0; r < lp_n; r++) {
+        if (lp_cid[r] != ci || lp_f4[r] == 0) continue;
+        int64_t L = lp_len[r] / LP_G2;
+        if (L <= 0 || p < L) return base;
+        return grid_bit(ci, k, (int32_t)(p % L)) ? 2 : 0;
+    }
+    return base;
 }
 
 #define WRONGN() return fl_err(c, FL_E_WRONG_PARAM, "Wrong number of function parameters or wrong parameter type")
@@ -142,8 +164,8 @@ static int grid_bit(int64_t index, const Chan *k, int32_t p) {
 FL_H(channels, getGridBit) { CH(0); return fl_ret_b(c, grid_bit(_i, k, (int32_t)A_INT(1, 0))); }
 /* PE 0xd5b360: grid (+0x7ac) は channel 生成 0xff5aa0 が直接 call する 0xff63f0 で作られ非 null。null の経路 (status 0) は直接 call の範囲では到達しない (間接呼出しは未走査・REPORT_PY101) */
 FL_H(channels, isGridBitAssigned) { CH(0); (void)k; (void)A_INT(1, 0); return fl_ret_b(c, 1); }
-/* PE 0xd5bc10 → 0x12d3ff0: loop 記録の分岐は未モデル (行テーブル T は .bss で起動直後は 0・REPORT_PY112)。base 0x12d3e20 と同じ読出し。件数以上は getGridBit と同じく 0 */
-FL_H(channels, getGridBitWithLoop) { CH(0); return fl_ret_b(c, grid_bit(_i, k, (int32_t)A_INT(1, 0))); }
+/* PE 0xd5bc10 → 0x12d3ff0: loop 分岐は grid_bit_loop。base は grid_bit (件数以上の event 経路 PY-218) */
+FL_H(channels, getGridBitWithLoop) { CH(0); return fl_ret_b(c, grid_bit_loop(_i, k, (int32_t)A_INT(1, 0))); }
 /* 選択の並びで offset 番目 (0 = 先頭)、超えたら最後の選択。負の offset は先頭扱い (stub に記述なし・仮置き)。無選択は canBeNone で -1 / 0 */
 FL_H(channels, channelNumber) {
     int64_t none = A_INT(0, 0), off = A_INT(1, 0), n = 0, pick = -1;
@@ -555,6 +577,11 @@ FL_H(general, setUndoHistoryLast) { NARGS(1, 1); undo_last = (int)A_INT(0, 0); r
 /* ---- launchMapPages (1 of 12, PY-120 #2984) ---- PE 0xd791b0: obj.+0x50 の配列 (+0x3c0) の件数を返す。件数は仮置き 0 (REPORT_PY120_2984)。
  * obj.+0x50 == 0 の経路 (0xd82c20 に code -7 = "Device not assigned") は未モデル (例外化の述語が実行時値のため) */
 FL_H(launchMapPages, length) { NARGS(0, 0); return fl_ret_i(c, lm_pages); }
+/* ---- launchMapPages (3 of 12, PY-138 #3029) ---- PE init 0xd79020 (sii)・updateMap 0xd79290 (i)・createOverlayMap 0xd7a130 (iiii) は書式と成功時の戻り (定数 = None) を確定。
+ * page 配列への副作用は未確定のため状態を変えない (REPORT_PY138)。setMapItemTarget は戻り型の食い違いが未解決のため未実装 */
+FL_H(launchMapPages, init) { NARGS(3, 3); (void)A_STR(0); (void)A_INT(1, 0); (void)A_INT(2, 0); return fl_ret_none(c); }
+FL_H(launchMapPages, updateMap) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
+FL_H(launchMapPages, createOverlayMap) { NARGS(4, 4); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
 
 /* ---- arrangement (4, PY-96 #2832) ---- PE 0xd786e0/0xd78700/0xd78500 が obj+0xd74/+0xd78 を読み、0xd78720 は 0xe43e80 (両方 >= 0) を bool で返す。初期値 -1 は未実測の仮置き */
 FL_H(arrangement, selectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_start); }
@@ -563,13 +590,29 @@ FL_H(arrangement, liveSelectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_star
 FL_H(arrangement, selectionIsActive) { NARGS(0, 0); return fl_ret_b(c, sel_start >= 0 && sel_end >= 0); }
 /* ---- arrangement (6) ---- PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定。個数は fl_table (stub 由来・必須 2) に合わせた暫定で、
  * jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。currentTime は仮置きの状態 arr_time を返す。
- * 選択・マーカーの 5 件は副作用が未同定のため状態を変えず、引数検査だけ行う (REPORT_PY152) */
+ * 選択の 2 件は sel_set (PE 0xe43d30 の規則・PY-144 #3043) で状態を変える。マーカー・liveSelection・jumpToMarker の 3 件は副作用が未同定のため状態を変えず、引数検査だけ行う (REPORT_PY152) */
+static void sel_set(int x, int y) { sel_start = x; sel_end = y; if (x == y) sel_end = -1; else if (x > y) { sel_start = y; sel_end = x; } }
 FL_H(arrangement, currentTime) { (void)A_INT(0, 0); return fl_ret_i(c, arr_time); }
-FL_H(arrangement, selectionClear) { NARGS(0, 0); return fl_ret_none(c); }
-FL_H(arrangement, selectionSet) { NARGS(2, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(arrangement, selectionClear) { NARGS(0, 0); sel_set(-1, -1); return fl_ret_none(c); }
+FL_H(arrangement, selectionSet) { NARGS(2, 5); int64_t x = A_INT(0, 0), y = A_INT(1, 0); for (int i = 2; i < 5; i++) (void)A_INT(i, 0); sel_set((int)x, (int)y); return fl_ret_none(c); }
 FL_H(arrangement, liveSelection) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 FL_H(arrangement, addAutoTimeMarker) { (void)A_INT(0, 0); (void)A_STR(1); return fl_ret_none(c); }
 FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
+/* ---- arrangement (2) ---- PY-143 (#3041): PE 0xd78030 (getMarkerName)・0xd785a0 (currentTimeHint) の呼出し構造と戻り str は REPORT_PY143 で確定。
+ * マーカー表は件数 0 の仮置き (addAutoTimeMarker の副作用は未同定のため登録しない)。範囲外は空文字。
+ * currentTimeHint の BBT 分解 (PE 0x1312080) は未同定のため、PPQ 96・4 拍子の仮置きで bar:beat:tick を返す (mock と同じ) */
+FL_H(arrangement, getMarkerName) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_s(c, ""); }
+FL_H(arrangement, currentTimeHint) {
+  NARGS(2, 4);
+  (void)A_INT(0, 0);
+  int64_t t = A_INT(1, 0);
+  (void)A_INT(2, rec_ppq);
+  int zb = A_INT(3, 0) == 1;
+  int64_t per = 4 * 96, bar = t / per, beat = (t % per) / 96, tick = t % 96;
+  char b[64];
+  snprintf(b, sizeof b, "%lld:%lld:%lld", (long long)(bar + !zb), (long long)(beat + !zb), (long long)tick);
+  return fl_ret_s(c, b);
+}
 /* ---- patterns (2 of 4, PY-172 #3219): PE 0xd67000 は配列 null で 0・非 null で ptr-8 の件数を返す。0xd67030 は索引 [0, 件数-1] の外を status -4。
  * グループ配列の実状態は未実測のため、件数 0 (null の経路) を仮置きする。件数 0 では全索引が範囲外 (REPORT_PY172) */
 #define PGRP_N 0
