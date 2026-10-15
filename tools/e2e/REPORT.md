@@ -162,6 +162,7 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 - 遷移: `booting` → `running` (GUI フレーム 1 枚以上) / `error` (window `error`・`unhandledrejection`・`fail()`)。`error` は終端で最初のエラーを保持、`frames` は単調増加。
 - frames の供給: `GuiHost.attach({ onFrame })` の累計フレーム数を `controller.setFrames()` に渡す (`src/runtime/gui.ts`)。
   **実 FL の GuiHost 接続は未実装** (FL 本体がページに統合されていないため。ハーネスのテストフレームは計上しない)。
+- `guest: 'fl' | 'test'` (#3461): 載せたゲストの種別。`setGuest` まで契約に現れない。`/?gui=wasm` のテストゲストは `test` で、`fl-boot` は `guest === 'fl'` を要求する (テストゲストで PASS させない: D5)。
 - e2e: `webstudio-contract` は常時 (形状)、`fl-boot` は `E2E_REQUIRE_FL=1` で `state==='running' && frames>0` を 180s 待ち、canvas の画素を検査 (#32 の受入に接続)。
   FL 未統合の現状では `E2E_REQUIRE_FL=1` は FAIL する (意図通り)。
 - 実測 (HEAD 8bf83d9、Chrome 154、node v22.23.3): `--driver both --targets preview,edge-sim,dev` = **PASS 50 / FAIL 0 / SKIP 10** (28.1s、`webstudio-contract` 6/6 PASS = `{"state":"booting","frames":0}`、fl-boot 6 SKIP + edge-policy 4 SKIP)。
@@ -171,6 +172,27 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
   - 環境: `toolchain-emsdk` 素材は本 run の `$ARTIFACTS_DIR` に無い。最初の run は `tools/audio/build.sh` の `[audio] emcc not found` で停止 (5 s・rc 1・fl-boot 未到達)。上流 emsdk 6.0.12 を `$RUNNER_TEMP/emsdk` へ `emsdk install 6.0.12` (28 s) で入れ、`EMSDK_ENV` で指定して再実行した。
 - 単体テスト: `node --test tools/e2e/webstudio_state.test.mjs` (遷移 6 ケース)。
 - 未実施: `agent-browser diff screenshot` による FL 画面のスクリーンショット差分 (基準画像となる FL 起動画面が無いため。#32 後)。
+
+## gui=wasm: 製品ページへのテストゲスト結線 (WIN-24 #3461)
+`/?gui=wasm&glue=<app.js>&app=<descriptor>` で、FL ではない検証用ゲスト (`tools/gui/test/text_wasm_app.c`・`GUI_NO_FT=1` = 内蔵 8x8) を chunked descriptor (64 KiB part × 2、sha256 検証) から読み、GuiHost 経由で専用 canvas `#gui-canvas` に描く。`window.__webstudio` は `running` / `frames=1` / `guest='test'`。1 byte 改竄した part は `state=error`・`frames=0` で止まる。実装は `src/runtime/gui_guest.ts`、ゲストのビルドは `tools/gui/e2e/build_guest.sh`。
+- 経路: `fetchCompile` (chunked・sha256) → glue `createGuiApp` (`instantiateWasm` で compile 済み Module を注入。`loader_boot.ts` の `createEmscriptenPthreadModule` と同じ方式) → `GuiHost.attach` (専用 canvas・`onFrame` → `webstudio.setFrames`) → `window.__guiGuest` (e2e が `readback()` で画素を読む)。
+- 設計: 起動はメインスレッド (`text_main.js` の経路を踏襲)。fl-runtime Worker への移管は未了 (#2717 受入 2)。入力経路 (PumpInput ↔ GuiShared 入力リング) は未結線 (#174・#32 の決定待ち)。`gui=wasm` では `#screen` に縞を描かない。契約 `guest` は `setGuest` まで現れない (既存の `webstudio-contract` の形状を変えない)、`fl-boot` は `guest === 'fl'` を要求する (D5)。
+
+**測定** (測定 commit `c56c734d0` = コードを変えた最後の commit。Chrome 154.0.8037.97、node v22.23.3、emsdk 6.0.12、mingw-w64 11.0.1、開始時 load average 0.45 / 1 分)
+| 検査 (ms。`drv.open` を含む検査全体) | preview / agent-browser | preview / puppeteer-core | edge-sim / agent-browser | edge-sim / puppeteer-core |
+|---|---|---|---|---|
+| `gui-guest-boot` (`state==='running'`, `frames=1`, lit 38400 px, 色 ≥7) | 401 | 197 | 410 | 198 |
+| `gui-guest-tamper` (`state==='error'`, `frames=0`) | 144 | 53 | 155 | 47 |
+
+- `EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/e2e/run.sh --driver both --targets preview,edge-sim`: **PASS 42 / FAIL 0 / SKIP 6**、wall 14 s、rc 0。前の基準 (`75131c60`) は PASS 34 / FAIL 0 / SKIP 6。増分 8 = 新検査 2 件 × 4 組。
+- 同系列の別 run (`3b1370f0f`・`9a3e4f520`) でも PASS 42 / 0 / 6、`gui-guest-boot` は 197〜424 ms。`open → running` は検査の所要が上限値 (`drv.open` を含む)。180 s の予算に対して十分小さい。FL の wasm での値は未計測。
+- 単体テスト `node --test tools/e2e/webstudio_state.test.mjs`: 7 PASS (新規 1 件: `setGuest` 前は契約に guest が無い・設定後は保持)。`pnpm typecheck` rc 0。
+
+**ネガコン (d) の原因同定**: ブラウザの `error` は `WebAssembly compilation aborted: Network error: Failed to read from a ReadableStream.` (Chrome が stream 内の例外を包む)。同じ改竄 descriptor を node で `chunkedStream` に通すと `ChunkIntegrityError: part の sha256 不一致` (正常版は 120669 B を読み切る)。page 側に原因文言を出すのは #3497。
+
+**素材・環境**: `toolchain-emsdk` (`[EMSDK]`) を使用。`gen_api.py` は `x86_64-w64-mingw32-gcc` を要する。`build_guest.sh` は mingw が無ければ apt で導入する (`gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev`)。CI の `E2E / local` ジョブは mingw を入れていないため、この導入に依存する。`fl-win64` は使わない。
+
+**未実施 (子 issue)**: オラクル画素の完全一致とネガコン (a)(b)(c)・`text_wasm_e2e.sh` 回帰 → #3495 (WIN-27)。GUI-REACH trace → #3496 (WIN-28)。D5 のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
 
 ## ユーザ依頼事項
 1. **公開ホスト名** (例: `studio.<既存ゾーン>`)。案 S の既定は workers.dev (`deploy/README.md` §移行で自前ドメインへ)。
