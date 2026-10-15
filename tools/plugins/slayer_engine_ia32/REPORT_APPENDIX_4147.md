@@ -54,7 +54,7 @@
 ## 5. 検証の手順 (再現)
 
 ```
-export PATH=/opt/emsdk/upstream/emscripten:$PATH   # emcc 6.0.12 (pin)
+export PATH=$EMSDK/upstream/emscripten:$PATH   # emcc 6.0.12 (pin。 [EMSDK] の展開先)
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64          # extracted/block22434_PE.bin を展開済み
 cd tools/plugins/slayer_engine_ia32
 python3 lift_text.py
