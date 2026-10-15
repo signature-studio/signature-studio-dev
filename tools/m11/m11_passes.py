@@ -402,6 +402,49 @@ def pass_m2v_fn40fcf0_arg1(text, report):
     return text
 
 
+def pass_m2v_fn40fcf0_addref(text, report):
+    """[M2v] function_40fcf0 の AddRef 呼出し `call [rax+8]` (機械語 40fd31-40fd3a) を復元 (#5359 / #4011 段 3).
+    40fd31: `mov rax,[rdi]; mov rcx,rax; mov rax,[rax]; call [rax+8]` (rdi = 出力ポインタ, 非 0 のときだけ)。
+    RetDec の IR はこの呼出しを落としていた (戻り値は [rdi] の非 0 判定で決まるため影響は無い)。
+    この関数の 1 箇所だけを対象にする。既定 OFF (M11_M2V=1 で有効)。"""
+    head = 'define i64 @function_40fcf0('
+    i = text.find(head)
+    j = text.find('\n}\n', i) if i >= 0 else -1
+    if i < 0 or j < 0:
+        stage('M2v', 'function_40fcf0 AddRef restore: 0 sites (function absent)')
+        report['m2v_fn40fcf0_addref'] = 0
+        return text
+    body = text[i:j]
+    old = ('  %9 = icmp eq i64 %8, 0\n'
+           '  %spec.select = select i1 %9, i64 0, i64 %arg3\n'
+           '  store i64 %spec.select, ptr %rax.0.reg2mem\n'
+           '  br label %dec_label_pc_40fd7c\n')
+    new = ('  %9 = icmp eq i64 %8, 0\n'
+           '  br i1 %9, label %dec_label_pc_40fd22z, label %dec_label_pc_40fd22a\n'
+           '\n'
+           'dec_label_pc_40fd22z:\n'
+           '  store i64 0, ptr %rax.0.reg2mem\n'
+           '  br label %dec_label_pc_40fd7c\n'
+           '\n'
+           'dec_label_pc_40fd22a:\n'
+           '  %arvtp = inttoptr i64 %8 to ptr\n'
+           '  %arvt = load i64, ptr %arvtp, align 8\n'
+           '  %arslot = add i64 %arvt, 8\n'
+           '  %arslotp = inttoptr i64 %arslot to ptr\n'
+           '  %arfn = load i64, ptr %arslotp, align 8\n'
+           '  %arret = call i64 @m11_icall(i64 %arfn, i64 %8, i64 0, i64 0, i64 0, i64 0, i64 0, i64 0, i64 0)\n'
+           '  store i64 %arg3, ptr %rax.0.reg2mem\n'
+           '  br label %dec_label_pc_40fd7c\n')
+    n = body.count(old)
+    if n == 1:
+        text = text[:i] + body.replace(old, new) + text[j:]
+        if 'declare i64 @m11_icall(' not in text:
+            text = text.replace(head, 'declare i64 @m11_icall(i64, i64, i64, i64, i64, i64, i64, i64, i64)\n' + head, 1)
+    stage('M2v', 'function_40fcf0 AddRef restore: %d sites' % n)
+    report['m2v_fn40fcf0_addref'] = n
+    return text
+
+
 def pass_m2b(text, report):
     n = [0]
 
@@ -908,6 +951,7 @@ def main():
     if os.environ.get('M11_M2V') == '1':   # #4011: 既定 OFF (runtime 確認まで有効化しない)
         text = pass_m2s_fn41a800_vtable0(text, report)
         text = pass_m2v_fn40fcf0_arg1(text, report)
+        text = pass_m2v_fn40fcf0_addref(text, report)
     if os.environ.get('M11_M2P') == '1':   # #417: 既定 OFF (有効化すると unit 503 で survey がハング, REPORT 参照)
         text = pass_m2p_dec_inttoptr(text, report)
     text = pass_m2c(text, report)
