@@ -3,7 +3,10 @@
 
   python3 gap_func_4729.py <block22434_PE.bin> <分類表.md> --md
 
-分類表は gap_classify.py --md の出力 (`| n | 0xVA | B | c | ... |`)。 gap_indirect.py と同じ区間の読み方をする。
+分類表は次のどちらか (区間の VA・B を読む。0 行なら失敗する):
+  - gap_classify.py --md の出力 (`| n | 0xVA | B | c | ... |`)
+  - GAP_INDIRECT_4729.md (`| n | 0xVA | B | T | I | R | n | ret | bytes |`。 c 区間だけの 34 行)
+C の走査は線形 decode で不正バイトを 1 B 飛ばして続行する (X と同じ走査)。
 根拠 (区間ごと):
   P  先頭 4 B が関数の prologue (push ebp; mov ebp,esp / push reg / sub esp / mov reg,[esp+d])。
   C  .text 内の直接 call/jmp rel32 が区間の先頭 VA を指す数 (呼ばれている = 関数の強い根拠)。
@@ -28,8 +31,12 @@ def gap_rows(md_path):
     rows = []
     for line in open(md_path, encoding='utf-8'):
         m = re.match(r'\| (\d+) \| 0x([0-9a-f]+) \| (\d+) \| (\w) \| (.*?) \|', line)
-        if m and m.group(4) == 'c' and not m.group(5).startswith('padding'):
-            rows.append(dict(no=int(m.group(1)), va=int(m.group(2), 16), size=int(m.group(3))))
+        g = m and m.group(4) == 'c' and not m.group(5).startswith('padding')
+        if not g:
+            m = re.match(r'\| (\d+) \| 0x([0-9a-f]+) \| (\d+) \| \d+ \| \d+ \| \d+ \| \d+ \| \d+ \| `', line)
+            if not m:
+                continue
+        rows.append(dict(no=int(m.group(1)), va=int(m.group(2), 16), size=int(m.group(3))))
     return rows
 
 
@@ -46,11 +53,18 @@ def main():
     md = Cs(CS_ARCH_X86, CS_MODE_32); md.detail = True
 
     regs = gap_rows(md_path)
+    if not regs:
+        sys.exit('error: 区間が 0 行 (入力形式を確認: %s)' % md_path)
     starts = {r['va']: r for r in regs}
     for r in regs:
         r['C'] = []
-    # C: 直接 call/jmp rel32 の先頭
-    for ins in md.disasm(code, T0):
+    # C: 直接 call/jmp rel32 の先頭 (不正バイトは 1 B 飛ばして続行。 線形掃引が途中で止まらないようにする)
+    pos = 0
+    while pos < len(code):
+        ins = next(md.disasm(bytes(code[pos:pos + 16]), T0 + pos, 1), None)
+        if ins is None:
+            pos += 1; continue
+        pos += ins.size
         if ins.mnemonic in ('call', 'jmp') and ins.operands and ins.operands[0].type == X86_OP_IMM:
             t = ins.operands[0].imm & 0xffffffff
             if t in starts:
