@@ -68,6 +68,7 @@
 - 測定 commit: `9d4a6d5c0` (コードを変えた最後の commit)。
 - `check_line_width.sh` real 26.19 s (変更後)、変更前 25.58 s。load (開始時) 2.16。
 - `check_draw_ops.sh` real 27.60 s (変更後・初回の canvas 再コンパイル込み)。
+- review 対応後の HEAD: `git diff 9d4a6d5c0 HEAD -- tools/targets/serum2/gui/canvas` は file mode の変更 (`check_line_width.sh` 100644 → 100755) のみ。コードの内容差分は 0。実行権限の付与だけなので、再測定は行っていない。
 
 ### 2-4. 未解決
 | 未解決 | 影響 | 起票先 |
