@@ -53,11 +53,22 @@ runs:
         # 'The runner has received a shutdown signal' (exit 143) で打ち切られることがあり、そのときは
         # 後続の always() step も走らず、打ち切り直前の状態が残らない。標準出力へ直接出せば、
         # step が落ちてもログに残る。プロセスは comm (コマンド名のみ) を出し、引数は出さない。
+        # 平常は OC_SAMPLE_SECS (既定 60 秒) おき。mem 使用率 70% 超か上位プロセスの RSS 4GB 超のときは
+        # 5 秒おきにし、[sys][WARN] を出す (CI-177。clang は 11〜36 秒で 10GB を超えるため 60 秒では間に合わない)。
         sys_sampler() {
+          local used total top_kb top_comm top_mb secs
           while :; do
+            read -r used total <<< "$(free -m | awk '/^Mem:/{print $3, $2}')"
+            read -r top_kb top_comm <<< "$(ps -eo rss=,comm= --sort=-rss | head -1)"
+            top_mb=$(( ${top_kb:-0} / 1024 ))
+            secs="${OC_SAMPLE_SECS:-60}"
             echo "[sys] $(date -u +%H:%M:%S) mem=$(free -m | awk '/^Mem:/{printf "%d/%dMB", $3, $2}') swap=$(free -m | awk '/^Swap:/{printf "%dMB", $3}') disk=$(df --output=pcent / | tail -1 | tr -d ' ') load=$(cut -d' ' -f1-3 /proc/loadavg)"
             ps -eo rss=,etimes=,comm= --sort=-rss | head -3 | awk '{printf "[sys]   rss=%dMB up=%ds %s\n", $1 / 1024, $2, $3}'
-            timeout "${OC_SAMPLE_SECS:-60}" tail -f /dev/null
+            if [ "$(( ${total:-1} > 0 ? used * 100 / total : 0 ))" -gt 70 ] || [ "$top_mb" -gt 4096 ]; then
+              echo "[sys][WARN] mem=${used}/${total}MB top=${top_comm} rss=${top_mb}MB"
+              secs=5
+            fi
+            timeout "$secs" tail -f /dev/null
           done
         }
         stop_sampler() {
@@ -71,6 +82,22 @@ runs:
         sampler_pid=$!
         trap stop_sampler EXIT
 
+        # メモリ上限 (CI-177): opencode のプロセス木を cgroup v2 の scope に入れ、RAM の 85% を超えた
+        # 子プロセス (clang など) だけを kill する。OOMPolicy=continue で scope 全体は止めず、step は続く。
+        # sudo が使えない・cgroup の scope を作れない runner では上限を付けず、従来どおり起動する (失敗にしない)。
+        # sudo -E は PATH を secure_path に戻すため、PATH は env で渡す。opencode は絶対パスで起動する。
+        oc_bin="$(command -v opencode)"
+        mem_cap_mb="${OC_MEM_CAP_MB:-$(( $(awk '/^MemTotal:/{print $2}' /proc/meminfo) / 1024 * 85 / 100 ))}"
+        mem_wrap=()
+        if sudo -n systemd-run --scope --quiet -p "MemoryMax=${mem_cap_mb}M" -p MemorySwapMax=0 \
+             -p OOMPolicy=continue -- true >/dev/null 2>&1; then
+          mem_wrap=(sudo -n -E systemd-run --scope --quiet -p "MemoryMax=${mem_cap_mb}M" -p MemorySwapMax=0
+            -p OOMPolicy=continue --uid "$(id -u)" --gid "$(id -g)" --)
+          echo "opencode memory cap: ${mem_cap_mb}MB (cgroup scope)"
+        else
+          echo "::notice::cgroup scope unavailable; running opencode without a memory cap"
+        fi
+
         rc=1
         attempt=1
         wait_s=15
@@ -81,7 +108,7 @@ runs:
           # setsid -w: opencode を別セッションで起動する。エージェントが後始末で `kill 0` や
           # `kill -- -PGID` を実行しても、この step の bash に SIGTERM が届かない (届くと exit 143 で
           # step が落ち、rc の記録・リトライ・後続の診断 step が全て走らない。#744)。
-          setsid -w opencode run --standalone --auto \
+          setsid -w "${mem_wrap[@]}" env PATH="$PATH" "$oc_bin" run --standalone --auto \
             --model "$OC_MODEL" --agent "$OC_AGENT" \
             --format json --print-logs \
             < "$OC_PROMPT_FILE" \
