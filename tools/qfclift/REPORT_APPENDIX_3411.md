@@ -74,3 +74,14 @@
 計数の限界 (変わらず): 計数は直接呼出しだけ。間接経由は #4374 で未計数。TLS の戻り値の差 (`TlsAlloc` の割当値・未割当 index の last error など) は計数に現れないため、#4375 の範囲。
 
 boot (`qfc_boot.sh`、HEAD・`QFC_BOOT_REBUILD=1`、実測 51.6 s、load 0.21 → 0.71): strict は `MISSING IMPORT LocalAlloc`、soft は `ExitProcess(0)` で DllMain が止まった (前回 REPORT と同じ停止点)。
+
+## 未解決 (REPORT §10 から分割移動・#4525 で更新)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `ExitProcess(0)` の偽の停止は #4262 で判定、#4510 で修正済み (停止点は `FontCache_GetStats` へ進んだ) | DllMain は完走。boot は FAIL のまま | #4510 (T-SH-126) |
+| longjmp (0x40f9c0) の発生条件と戻り先 `0x59c210` の lift 対応 | 停止点の解釈 | #4263 (T-SH-107) |
+| 間接経由の import 呼出しが未計数 | DllMain 経路の全数が不明 | #4374 (T-SH-121) |
+| HEAD の rt の TLS 系の残る差 (`GetLastError` 常に 0・`imp_TlsFree` 不在・`TlsAlloc` の割当値) | DllMain 後段で TLS 値・last error を読むと結果が変わり得る | #4375 (T-SH-122) |
+| `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | #4280 (T-SH-108) |
+| `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #4296 (T-SH-113) |

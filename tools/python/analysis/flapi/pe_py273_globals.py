@@ -53,8 +53,10 @@ def main():
                 t = nxt + d
             if t == g and m.startswith("mov") and E.split_ops(o)[0].find("[rip") >= 0:
                 writes.append(hex(a))
-        print(f"G 0x{g:x}\tsection={name}\tinit={init}\trip_writes={len(writes)}")
-        ok = ok and name == ".data"
+        imm = [hex(a) for a, m, o in E.INS if "[rip" not in o and f"0x{g:x}" in o.lower()]
+        lea = [hex(a) for a, m, o in E.INS if m == "lea" and f"0x{g:x}" in o.lower()]
+        print(f"G 0x{g:x}\tsection={name}\tinit={init}\trip_writes={len(writes)}\timm_hits={len(imm)}\tlea={len(lea)}")
+        ok = ok and name == ".data" and not writes and not imm and not lea
     for c in SLOT_SITES:
         fn = E.func_of(c)
         s, i = E.ADDR_IDX[fn], E.ADDR_IDX[c]
