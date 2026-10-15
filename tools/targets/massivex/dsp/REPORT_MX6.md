@@ -133,7 +133,7 @@
 
 ### 8.1 結論 (先出し)
 
-1. **U4d(1) 由来**: `.text` の E8/E9 一致 (全 FH3 funclet 36,533 件が対象) は 213 件。命令境界で見ると **179 件は call/jmp rel32 (長さ 5、宛先一致)**、**34 件は別命令の途中** (NC: 境界判定で除外)。537 母数 (REPORT §4) に当たる **4 件は全て命令境界の call/jmp**。4 件の囲む関数 (pdata begin) は linear・flow いずれの closure にも入らず、由来は「closure 非到達の関数の中の直接辺」。
+1. **U4d(1) 由来**: `.text` の E8/E9 一致 (全 FH3 funclet 36,533 件が対象) は 213 件。命令境界で見ると **179 件は call/jmp rel32 (長さ 5、宛先一致)**、**34 件は別命令の途中** (境界判定で除外)。537 母数 (REPORT §4) に当たる **4 件は全て命令境界の call/jmp**。4 件の囲む関数 (pdata begin) は linear・flow いずれの closure にも入らず、由来は「closure 非到達の関数の中の直接辺」。
 2. **U4d(2) 深い closure**: 2 round 以上で funclet は到達する (ただし少数)。537 母数では **2 件 (0x118c780・0x118d1f0) のみ**で、どちらも深さ 3 (元の入口は深さ 2)。残り 535 件は固定点でも到達しない。全 FH3 funclet 36,533 件では固定点で linear 119 件・flow 82 件のみ到達 (表 8.2)。
 3. **U4e 取り込み**: §8.4 に方式を記録 (x64c の追加 root + #228 と同じ SjLj 形の呼出し)。実装は子 issue **[MX-43] (#3838)**。
 
@@ -184,6 +184,23 @@
 
 ### 8.6 検証 (docs/WORKFLOW.md §6)
 
-- 測定 commit = **bb4ce18b2**。`git diff bb4ce18b2 HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx39_e2e.sh` は本 REPORT の commit の後も **0 行** (docs のみ)。
-- positive control: `mx6_e2e.sh` を HEAD で再実行し PASS (35 s、NC 5/5、seeds 567 / 1-round 3,226、funclet 537・直接参照 4 は §1 と一致)。
-- NC: 境界判定の負例として E8/E9 一致 34 件 (別命令の途中) を除外。mx6 の合成バイト列 NC は 5/5 PASS (§5)。
+- 測定 commit = **bb4ce18b2** (§8.1〜8.3 の数値はこの commit の実測)。
+- コード差分 (`git diff --stat bb4ce18b2 HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx39_e2e.sh tools/targets/massivex/dsp/mx6_e2e.sh` の出力):
+
+  ```
+   tools/targets/massivex/dsp/mx6_e2e.sh                  |  33 +++-
+   tools/targets/massivex/dsp/scripts/mx33_xmm03.py       | 207 +++++++++++++++++++++
+   tools/targets/massivex/dsp/scripts/mx6_vectorcall.py   |   5 +-
+   tools/targets/massivex/dsp/scripts/mx_closure.py       | 109 +++++++++--
+   tools/targets/massivex/dsp/scripts/mx_flow_recheck.py  | 165 +++++++++++++++-
+   5 files changed, 491 insertions(+), 28 deletions(-)
+  ```
+
+  - 差分は main 側の commit (MX-33 #3032・MX-29 の ENTRY 対応) を merge `098c7118c` で取り込んだ分。mx39_e2e.sh と mx39_funclet_reach.py は bb4ce18b2 から 0 行。
+  - 本 PR の commit (`bb4ce18b2..edafe4d7`) の範囲では、scripts と mx39_e2e.sh の差分は 0 行 (docs のみ)。
+- **HEAD での再測定は未実施**: 検証 run の `$ARTIFACTS_DIR` には `fl-win64.tar.zst` のみがあり、`plugins-massivex` が無い。`Massive X.vst3` を展開できず、`mx6_e2e.sh`・`mx39_e2e.sh` は PE 不在で exit 2 (FATAL)。下の数値は HEAD の値ではない。
+- 測定 (bb4ce18b2、main 取り込み前):
+  - `mx6_e2e.sh`: PASS, 35 s。NC selftest 5/5、seeds 567 / 1-round 3,226。assert (step 7) は seeds の funclet 533 と pdata 始点 529 のみ。
+  - `mx39_e2e.sh`: 422 s, exit 0。FH3 funclet 母数 36,533 (棄却 355)、537 母数 = 537、E8/E9 一致 213 件 (命令境界 179 件)。537 と直接参照 4 は `mx6_e2e.sh` の assert 対象外で、`mx39_e2e.sh` の出力 (`round-1 母数` 行・`537 母数への一致` 行) で確認する。
+- HEAD で実行したもの (素材不要): `mx6_vectorcall.py --selftest` PASS、`py_compile` (mx_closure.py・mx39_funclet_reach.py・mx6_vectorcall.py・mx_flow_recheck.py・mx33_xmm03.py) OK、`bash -n` (mx39_e2e.sh・mx6_e2e.sh) OK。
+- 境界判定による除外: E8/E9 一致 213 件のうち、命令境界でない 34 件 (別命令の途中) を除いた。これは負例ではない。負例の合成バイト列は §5 の 5/5 PASS。
