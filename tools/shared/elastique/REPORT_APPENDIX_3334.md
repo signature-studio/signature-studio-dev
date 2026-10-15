@@ -97,7 +97,7 @@ tools/shared/work/venv/bin/python tools/shared/elastique/dyn_trace.py   # 実測
 - 差分 (測定後のコード範囲): `git diff 50050cc23 HEAD -- tools/shared/elastique/dyn_trace.py tools/shared/elastique/data/runtime_indirect.csv` → 出力 0 行 (本節の追記は REPORT だけ)。
 - 陽性対照: `DYN_POSCTRL=1` で、STUB 領域に `movabs rax, <枠の番地>; mov rax, [rax]; ret` を置いて 1 run (`posctrl:slot_read`) 実行する。既定の実行 (環境変数なし) では置かない。
   - 結果 (HEAD `50050cc23`・実測 real 16.43 秒): `thunk_slot_readers_distinct_rip` = **1** (`0x100fff0a` が枠 `0x1804afc60` を読む。thunk 頭 `0x180001800`)。hook は枠読みを検出する。
-- 既定の測定 (HEAD `50050cc23`・実測 real 16.34 秒・load average 0.17): 実行 190 run・命令 32,170,989・実行した間接サイト 77・IPPCODE 入口ヒット 0・枠読み 0 件 (`slot_readers.csv` は見出しのみ)・`indirect_edges_to_thunk_heads` 0。`#3396` の測定 (`982e50c69`) と同じ数値。
+- 既定の測定 (HEAD `50050cc23`・実測 real 16.34 秒・load average 0.17): 実行 190 run・命令 32,170,989・実行した間接サイト 77・IPPCODE 入口ヒット 0・枠読み 0 件 (`slot_readers.csv` は見出しのみ)・`indirect_edges_to_thunk_heads` 0。本節の数値は今回の測定値だけで、比較元の記録は無い (比較は行わない)。
 - 再現:
 
 ```sh
@@ -108,4 +108,4 @@ DYN_POSCTRL=1 tools/shared/work/venv/bin/python tools/shared/elastique/dyn_trace
 ```
 
 - 到達元 (受入 2): 実行経路に枠読みが現れないため、呼出箇所・読んだ枠の宛先は**記録なし**。読み手は計算アドレス経由と推定 (未確定)。読み手の同定は子 #3386 (T-SH-73: 引数規約の同定) の結果に依存する。
-- 限界: 合成引数で実行した範囲 (export 15 件 + thunk 頭 33 本・各 3 種の引数) に限る。FL の実呼出しでの読みは未確認。
+- 限界: 合成引数で実行した範囲 (export 15 件 + thunk 頭 33 本) に限る。引数は 3 グループ (`base`・`rate48k`・`obj`) で、`base` は zero・scratch の 2 変種を含むため計 4 引数パターン。FL の実呼出しでの読みは未確認。
