@@ -144,57 +144,73 @@ rbx = callback の第 1 引数 (ctx)。ctx のフィールドは使い方から�
 | `0x425210` (ids `0x550`・`0x562`)、`0x526190` (同期/非同期) | 受入条件 2 の残り | [PY-77] |
 | C provider / mock の状態モデル | 推測で実装しない | [PY-76] #2563 (本節の結論を入力にする) |
 
-## 追加解析 (PY-77 / #3214): 通知 0x550・0x562 の送信元と hwnd の由来、N 既定値・一覧 A/B・0x525ec0 の確認
+## 追加解析 (PY-77 / #3214): 通知 0x550・0x562 の送信元と hwnd の由来 (要約)
 
 既知類型との関係: 該当なし (lift 作業ではない。PE の逆アセ解析)。親: #2576 (PY-77)。本 issue #3214 (PY-171) は受入 3 (通知の送信元と hwnd) を達成し、受入 1・2・4 を子へ移送した: #3267 (PY-177)・#3268 (PY-178)。
 
+- 0x550 は単位 2 の callback (`0xd5a958`) から、0x562 は task 生成 `0xd843d0` から、`user32!PostMessageW` (`0x425210`) で送られる。hwnd は `0x617920(obj)` (= `[obj+0x45c]`)。受け手 (WndProc の分岐先) は未確定 (理由は付録の節 1)。
+- 節の全文・測定・受入の判定は `REPORT_PY72_APPENDIX_3214.md` に分割移動した。
+
+## 追加解析 (PY-77 / #2576): guard・効果関数本体・N 既定値の PE 確定
+
+既知類型との関係: 該当なし (lift 作業ではない。PE の逆アセ解析)。親: #2562 (PY-75)・#2542 (PY-72)。
+
+### 結論
+
+- 確定: pickupMode は `ctx+0x30`、useGlobalIndex は `ctx+0x38` (B)。値検査の分類 8 は NaN (D)。`0x425210` は `user32!PostMessageW` の thunk (D)。`0x526190` は呼出しスレッドが所有者なら callback を同期実行 (D)。flags `0x3fd` の 0x20・0x10・0x4 の作用 (C)。N の既定値 2 (reset 関数 `0xfe9090` 内、E)。
+- 一部確定: guard の O は `G(0x15e4790) → 0x141d6b8 → Q → O=Q+8` の鎖まで確定。O の実体と vtable `+0x98` は未確定 (A)。status -2 の経路は 2 つ確定 (A・B)。
+- 未確定: O の生成元と vtable 本体、効果関数 `0x1046a30` の書込み先、message 0x550/0x562 の意味、同期性の所有者スレッド値 (実行時)。下表。
+
+### 受入 A: guard の O と status -2 の条件
+
+- G = `0x15e4790` は `.data` (静的値 `0x141d6b8`)。`pe_xref.py` で G への store は 0 件。
+- callback guard (`0xd5a73b`〜`0xd5a74f`): `rax=[G]` (= スロット `0x141d6b8` の番地) → `Q=[0x141d6b8]` → `O=[Q+8]` → `call [[O]+0x98]` (rcx=O)。
+- Q (`0x141d6b8`) への store は 2 件のみ: `0x976aad` (`0x976a90` の遅延生成。`0x976b60` の戻り値を格納) と `0x976b10` (`0x976af0` の解放で 0)。
+- Q の ctor `0x976b60` は `[Q+8]=0` を `0x976b9c` で書く。非 0 の O 書込みは `pe_slot_writers.py 141d6b8 8` で候補 0 件。この tool は RIP 直接読みの直後の `[reg+8]` store だけを検出するため、間接経路は検出外。**O の生成元は未確定**。vtable `+0x98` の本体も O が未確定のため未読。
+- status -2 のまま終わる経路 (どちらも文言は `Operation unsafe at current time`):
+  1. guard 偽: `0xd5a755` `test al,al`・`0xd5a757 je 0xd5a9cf` (status は -2 のまま)。
+  2. task を作らない早期終了: `0xd843e9` で `out=-2`。`[this+0x50]≠0` かつ `0xd84f30([this+0x50])=0` なら `0xd84403 je 0xd84500` で out=-2 のまま戻る (callback は呼ばれない)。
+
+### 受入 B: ctx の格納元と `0xd84f30`
+
+- 呼出し側 `0xd5ab04`〜`0xd5ab42` の stack 引数: 5 番目 `[rbp+0xa8]` (index)、6 番目 `&[rbp+0xac]` (value)、7 番目 `[rbp+0xa4]` (pitchUnit)、8 番目 `[rbp+0xa0]` (pickupMode)、9 番目 `[rbp+0x9c]` (useGlobalIndex)、10 番目 0、11 番目 byte 1。
+- `0xd843d0` の格納 (`0xd84430`〜`0xd84467`): `task+0x18`←5、`+0x20`←6、`+0x28`←7、`+0x30`←8、`+0x38`←9、`+0x40`←10、`+0x58`←r8 (callback)。
+- よって **ctx+0x30 = pickupMode** (callback は `0xf81ce0(esi, byte[ctx+0x30])` の第 2 引数で 1 byte 読む)、**ctx+0x38 = useGlobalIndex** (`0xd5a768` `cmp qword[rbx+0x38],0; setg dl`)。flapi 署名の順 `(int, float, int=0, int=PIM_None, bool)` と一致。
+- `0xd84f30(X)` (X = `[this+0x50]`) の戻り al は `[X+0x410]≠0 ∨ ([X+0x2d8]=0 ∧ [X+0x3b8]=0 ∧ [X+0x2da]≠0 ∧ [X+0x2d9]≠0)` (`0xd84f30`〜`0xd84f63`)。
+- `this` は `0xd5aa65` `mov rbx,[rax]` (rax = `0xd5e620(self)`)。`0xd5e620` は `call [rip+0x881f8d]` の間接呼出しで、実体は実行時値。**this・X の実体は未確定**。
+
+### 受入 C: 効果関数の本体 (flags `0x3fd` の作用)
+
+- `0x1051c90(rbp, n)` (flags & 0x20 の経路): 条件は `key ≤ 0x0fffffff` (`0x1051ca4`)・`key&0xffff == 4` (`0x1051caf`)・`flags&0x20` (`0x1051cb7`)・`0 ≤ key>>16 < 件数` (`0x1051cc5`〜`0x1051cd6`)。`chan = 0xfe8bb0(配列, key>>16)` (`0x1051ce7`)。満たせば `n2 = 0x661450(n−0x20000000, [chan+0x2f4], 0x30) + 0x20000000` (`0x1051cf7`〜`0x1051d09`)。`0x661450` は `imul rdx`・`idiv r8` の符号付き `(a·b)/c`。**N (`[chan+0x2f4]`) はピッチ範囲 (半音) で、0x30=48 は unit 2 の clamp 上限と一致**。
+- `0xf824b0(ptr, n)`: `ptr=0` なら n をそのまま返す (`0xf824b4`〜`0xf8250b`)。効果関数の 7 番目引数 (ptr) は本経路で 0 なので n1 = n。
+- `0x104cf90(key, n2, flags)`: `edi = 0x1046a30(key, n2, flags & ~0x14)` (`0x104cfa5`)、戻り値は edi。`flags&0x10` で `0x6667f0(…, edx=6, r8=key, r9=0)` (`0x104cfae`〜`0x104cfca`)。`flags&4` で `0x6667f0(…, edx=0x13, r8=key, r9=edi)` (`0x104cfd5`〜`0x104cfec`)。flags=0x3fd は 0x10・0x4 を両方含むので、イベント 6 と 0x13 (値 edi) を発行する。イベントの受け手は未確定。
+- flags `0x3fd` は param id ではなく bit 集合。0x20 は N 換算の gate (`0x1051cb7`)、0x10・0x4 はイベント発行。`0x1046a30` へは 0x3e9 が渡る。0x4000 は節 3 のとおり key −33/−32 変換でのみ参照。
+- `0x1046a30` (n の書込み先): 0x590 バイトのフレームで key の型により分岐し、`0xfe8bb0` を 7 箇所以上で呼び、`call [rbx+0x1f0]` の仮想呼出しを持つ。全量は未読。先頭 700 命令の範囲に `[reg+0x2f4]` への直接 store は無い (grep 目視)。**n の最終書込み先は未確定**。
+- `0xf81ce0(key, pickupMode)` (`0xf81ce0`〜`0xf81d58`): `al = 0xf8ecd0([0xf81cef], key)` (登録判定)。登録済みで mode=0 → `0xf8eb10(…, key)`、mode≠0 → 変更なし。未登録で mode=1 → `0xf8ea80(…, key, …)`、mode=2 かつ `byte [[[0x65f68f]]+0xf30+0x49e]≠0` → 登録、それ以外は変更なし。`0xf8ecd0`・`0xf8eb10`・`0xf8ea80` の本体は未読 (役割名は推定)。
+- `0xf824b0`・`0x1051c90` は本節で確定。`0x1051720` は `0x1046a30(key, 0, 2)` を呼ぶ読取り相当の経路 (推定)。戻り値判定の全量は未読。
+
+### 受入 D: 値検査・PostMessage・task 登録
+
+- `0x450c10(&value)` (上位 16bit `cx` と全体を見る) の戻り al: 0=+0、1=−0 (`0x80000000`)、2=+subnormal (`cx≤0x7f`)、3=−subnormal (`0x8000≤cx≤0x807f`)、4=+normal (`0x0080≤cx≤0x7f7f`)、5=−normal (`0x8080≤cx≤0xff7f`)、6=+inf (`0x7f800000`)、7=−inf (`0xff800000`)、**8=それ以外 = NaN** (`0x450c8f`)。`0x477180` は `al==8` (`0x477194`〜`0x477196`)。よって値 −1 は NaN のみ。
+- `0x425210` は `jmp [0x1970b10]` = **user32!PostMessageW** の thunk。`0xd84495` の `(…, 0x562, 0, 0)` と pitchUnit 2 の `(…, 0x550, chan+0x794, 0)` は PostMessageW(hwnd, msg, wParam, lParam)。**非同期** (メッセージ投入)。msg 0x550・0x562 の意味 (window proc の分岐先) は未読。
+- `0x526190`: item = {owner=this, fn=`0xd84290`, ctx=task} を作り `0x525ec0(sched, &item, r8=0, r9=0)` (`0x526190`〜`0x5261dc`)。`0xd84290` は `call [task+0x58]` (rcx=task、`0xd8429b`) なので callback を呼ぶ。`0x525ec0`: `0x525940` の戻り値 +8 と `[[rip+0x10befcf]]` を比較 (`0x525f42`〜`0x525f4e`)。一致し r8&r9=0 なら `0x525f60`〜`0x525f7d` で `fn(ctx)` を**同期**実行。不一致なら `0x525faf` 以降でキュー投入 (非同期)。`0xd844d7` が直後に status を読むので同期が前提の設計。**`[[rip+0x10befcf]]` は実行時値で、Python 呼出しが所有者スレッドかは未確定**。
+
+### 受入 E: N の既定値と一覧 A/B
+
+- N の既定値: `0xfe9090(obj)` (reset 関数) の `0xfe948d` で `mov dword [obj+0x2f4], 2` (同時に `0xfe9486` で `[obj+0x6f4]=1.0`)。wrapper は `0xffe290` (`[obj+0x79d]=0`、`0xffe2a0`) と `0x1001b70` (`[obj+0x2f0]=-1`、`0x1001b80`)。**既定値 2 は reset 内で確定**。obj が chan (`0xfe8bb0` の要素) と同一か、channel 生成時に reset が呼ばれるかは**未確定** (推定: +0x794・+0x79d と同じ構造体)。
+- `dword [reg+0x2f4]` への store は 30 件 (`0x609339`・`0x60f096`・`0x60f120`・`0x722024`・`0xd1c434`・`0xd5a97c`・`0xe8c98d`・`0xfe948d` 他)。構造体型は各件未確認。走査は `pe_scan_store.py` の dword 版 (リポジトリ外の一時複製で正規表現の型だけ変更)。
+- 一覧 A (`[rip+0x5dcad3]`系) と B (`[rip+0x5da9a8]`系): `0x1005730` (`0x100573e`〜`0x10057a8`) が `0xfe8bb0(配列, idx)` を呼ぶ。`0xfe8bb0` は `[obj+0x10]` = 件数−1 で範囲検査し、`[obj+8][idx]` を返す (`0xfe8bbc`〜`0xfe8bcd`)。**要素は 8 byte ポインタ**。要素の構造体型 (chan と推定) は未確定。
+
 ### 測定
 
-- 測定 commit: `44235515` (`pe_scan_store.py` に dword/qword の指定を追加。コードを変えた最後の commit)。以降の commit は本節の REPORT だけ。`git diff 44235515 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
-- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin` (1.6 秒。`--wildcards` は使わない)。素材は `$ARTIFACTS_DIR` の実在を確認してから使った (`fl-win64.tar.zst` 2.3 GB)。展開先は repo 外。
-- 実行: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <N>`・`pe_xref.py <VA>`・`pe_callgraph.py callers <VA>`・`pe_scan_store.py 0x2f4 dword` (30 hits・19.5 秒)。`pe_xref.py 0x1001b70,0xffe290` は instructions=5,022,467 hits=0 stores=0 (34.2 秒)。`pe_callgraph.py callers 0xffe290,0x1001b70` は直接 call 0 件。
-- 補助 (repo 外の一時スクリプト): `.text` の即値 0x550・0x562・0x150・0x162 の走査 (capstone・IMM オペランド)、`.data` の 8 バイト絶対ポインタ走査 (`.data` 内の .text を指す値 12,894 件)。
-
-### 結論 (PE 実測で確定した範囲)
-
-#### 1. 通知 0x550・0x562 の送信元と hwnd の由来 (受入 3 の本体)
-
-| 項目 | PE 実測 |
-|---|---|
-| 0x550 の送信 | 単位 2 (`0xd5a958`〜): `[chan+0x2f4] = clamp(…)` (`0xd5a97c`) → `0x117baa0(chan)` の戻り値を rbx (`0xd5a982`)。rbx≠0 かつ `0x40fe90(rbx, [0xf55e80])`≠0 のとき `0x617920(rbx)` の戻り値を hwnd にする (`0xd5a9a5`・`0xd5a9aa`)。`mov edx,0x550` (`0xd5a9ad`)・`r8 = movsxd [chan+0x794]` (`0xd5a9b6`)・`r9 = 0`・`call 0x425210` (`0xd5a9c0`) |
-| 0x562 の送信 | task 生成 `0xd843d0` の中 (`0xd84486`〜`0xd844a3`): `obj = *(*(0x15e0ff8))` → `0x617920(obj)` → `mov edx,0x562`・`r8 = r9 = 0`・`call 0x425210` |
-| 送信の実体 | `0x425210` は `jmp [0x1970b10]` (`.idata` の IAT。pefile の import 表で `user32.dll!PostMessageW`)。引数はそのまま PostMessageW(hwnd, msg, wParam, lParam) に渡る |
-| hwnd の由来 | `0x617920(obj)` = `0x6178e0(obj)` のあと `return [obj+0x45c]`。`0x6178e0` は `[obj+0x45c]==0` なら、親 `[obj+0x78]` があればそれを先に処理し、`call [vtbl(obj)+0x1d0]` を呼ぶ (window 生成とみられる仮想呼出し。`+0x1d0` の実装は未読)。hwnd は `obj+0x45c` の qword |
-| obj の由来 | 0x550: `0x117baa0(chan)` (分岐の一部だけ読了)。0x562: 大域 `*(*(0x15e0ff8))` |
-
-- 受け手 (WndProc の分岐先): **未確定**。理由: (a) 即値走査 (`cmp`・`sub`・`add`・`mov`・`lea`) で、msg の即値 0x550・0x562 を持つ受け手の比較は無い。0x550 は `0xd5a9ad` (送信)・`add r12,0x550` (`0x5ebb81`)・`add rdx,0x550` (`0x5ebd5e`)・`sub rsp,0x550` (`0xd18133`) の 4 件で、受け手の分岐ではない。0x562 は `0xd84498` (送信) の 1 件だけ。(b) WM_USER 相対 (0x150・0x162) の比較も無い (`0x632c99` は `0x425390` の引数、`0x1040d41` は範囲の clamp)。(c) WndProc は window クラスの `lpfnWndProc` (RegisterClassEx) か `+0x1d0` の生成先で決まるが、本 run では未読。次段は未解決表に書く (子は作らない)。
-
-#### 2. N 既定値 (受入 1 の一部。子 #3267)
-
-- N (`[obj+0x2f4]`) の既定値 2 の書込みは `0xfe948d` `mov dword ptr [rcx+0x2f4], 2`。関数 `0xfe9090` (object の初期化) の中で、直前の `0xfe9486` `mov qword ptr [rcx+0x6f4], rax` (`rax = 0x3ff0000000000000` = 1.0 double。`0xfe9478`) と並ぶ。`0xfe9090` の object は引数 rcx で、`[rbp+0x20]` に保存される (`0xfe9099`)。
-- `.text` の dword 書込み走査 (`pe_scan_store.py 0x2f4 dword`): 30 件。`mov dword ptr [rcx+0x2f4], 2` は `0xfe948d` の 1 件だけ。他は `eax`・`ecx` の値、`add … , 1`、`0` (別構造体・スタック)、`0x434c0000`・`0x437f0000` (float 定数の別構造体への書込み。対象の型は未確定)。単位 2 の書込みは `0xd5a97c` (`eax`)。
-- `0xfe9090` の直接 call 元は 2 件: `0xffe29b` (関数 `0xffe290`: `rbx=rcx` の後に呼び、`byte [rbx+0x79d]=0`) と `0x1001b7b` (関数 `0x1001b70`: 呼出し後に `dword [rbx+0x2f0]=-1`)。
-- 上の 2 関数の呼出し経路は **未確定**。`pe_callgraph.py callers` の直接 call 0 件、`pe_xref.py` の RIP 相対参照 0 件、`.data` の 8 バイト絶対ポインタ 0 件。`.data` には .text を指す絶対ポインタが 12,894 件あり vtable は存在するので、この 2 関数だけが静的に載っていない。動的に決まる呼出し (関数ポインタの格納元・動的 vtable) と推定する。よって「reset が chan に呼ばれるか」と「呼ばれない場合の N 既定値の適用元」は本 run では確定しない。
-
-#### 3. 一覧 A/B の要素型 (受入 2 の一部。子 #3267)
-
-- 一覧 A の大域 slot = `0x15e2218` (`0x100573e`・`dl≠0`)、一覧 B = `0x15e0128` (`0x1005779`・`dl=0`)。slot の値 P の指す値 Q (`*(*slot)`) が容器 (`0x100575e`〜`0x10057a8`)。
-- `0xfe8bb0(Q, idx)` (`0xfe8bb0`〜`0xfe8bd5`): `0 ≤ idx ≤ dword [Q+0x10] − 1` のとき `qword [[Q+8] + idx*8]`、範囲外・負値は 0。よって要素は 8 バイトのポインタ `T*` である。
-- T の構造体型名は未確定。callback は `[chan+0x794]`・`[chan+0x2f4]` を読む (`0xd5a9b6`・`0xd5a97c`) ので、T は chan と整合する。ただし Q への要素追加・件数更新の箇所は本 run で列挙していない。
-
-#### 4. 0x525ec0 の比較対象 (受入 4 の一部。子 #3268)
-
-- 比較 (`0x525f42`〜`0x525f4e`): `rcx = *(0x15e4f18)` (RIP 相対 load)、`eax = dword [X+8]` (X = `0x525940()`)、`cmp eax, dword [rcx]`。
-- X: `0x525940` は `*(0x41d110() + 0x238)` を返す (未生成なら `0x522710` で作る)。`0x41d110` は `mov rax, gs:[0x58]` で TLS 配列から引くので、スレッドごとに異なる値。
-- 同期の条件: `eax == dword [*(0x15e4f18)]` (同じスレッド) かつ `(r8b & r9b) == 0` (`0x525f58`・`0x525f5e`) のとき、`[task+8]≠0` なら `call [task+8]` (rcx=`[task+0x10]`)、そうでなければ `[task+0x18]` を使う (`0x525f60`〜`0x525faa`)。それ以外は `0x525faf` 以降の待ち行列経路へ (後段は未読)。
-- 比較対象の初期化元は **未確定**。`0x15e4f18` は RIP 相対で 23 件すべて load (`mov rcx,[rip+..]`)、直接 store は 0 件。レジスタ経由の store は本 run では追っていない。
-
-### 受入条件の判定 (#3214 の本文は受入 3 だけに縮めた)
-
-- [x] 受入 3: hwnd の由来を確定 (`0x617920` → `[obj+0x45c]`・`0x6178e0` の生成経路)。受け手の分岐先は未確定で、理由は 1 に記載。「確定できない場合は理由を書く」を満たす。
-- 移送 (旧 受入 1): N 既定値の書込み箇所 (`0xfe948d`) は確定。reset が chan に呼ばれるかは未確定 → #3267。
-- 移送 (旧 受入 2): 容器と要素ポインタ (`0xfe8bb0`) は確定。T の型名は未確定 → #3267。
-- 移送 (旧 受入 4): 同期条件は確定。比較対象の初期化元は未確定 → #3268。
+- 測定 commit: `25d323ca` (記録直前の HEAD)。解析対象は未変更: `git diff 25d323ca HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行。
+- 実測コマンド (`FL_WIN64_DIR=<worktree>/tools/python/work/fl`):
+  - `pe_disasm.py 0xd5a720 200`: 0.067 秒 (終了 0)。
+  - `pe_xref.py 15e4790,141d6b8`: 47.2 秒 (命令 5,022,467・hits 2,428・store 2)。
+  - `pe_slot_writers.py 141d6b8 8`: 48.4 秒 (slot_loads 3・candidates 0)。
+  - dword 版 `0x2f4` 走査 (`pe_scan_store.py` の複製): 27.2 秒 (hits 30)。
+  - `pe_callgraph.py func / callers`、`pe_disasm.py` 他は所要を測っていない (1 件ずつ数秒未満)。
+- load average (1 分値): 開始時 0.23 (23:28 UTC)、終了時 0.56 (23:41 UTC)。
 
 ### 未解決
 
@@ -204,3 +220,7 @@ rbx = callback の第 1 引数 (ctx)。ctx のフィールドは使い方から�
 | 一覧 A/B の要素追加箇所と要素型 T の構造体名 | 要素の型 | #3267 (PY-177) |
 | `*(0x15e4f18)` の初期化元 (owner thread id)・X の `[X+8]` の設定元 | `0x525ec0` の同期判定の入力 | #3268 (PY-178) |
 | 受け手 WndProc の分岐先 (0x550・0x562)・`obj+0x1d0` (window 生成) の実装 | 通知の受け手が決まらない | 子は作らない (本表に記載。次の PY 課題で扱う) |
+| O (`[Q+8]`) の生成元と vtable `+0x98` の本体 | guard 偽 (status -2) の条件が PE だけで確定しない | [PY-169] #3212 |
+| `0x1046a30` の書込み先 (n が `[chan+0x2f4]` か) | 効果関数の状態モデル | [PY-170] #3213 |
+| `0xf8ecd0`・`0xf8eb10`・`0xf8ea80`・`0x1051720` の本体 | pickupMode の登録・イベント受け手の意味 | [PY-170] #3213 |
+| `this` (`0xd5e620` の間接先) と X (`[this+0x50]`) の実体 | `0xd84f30` の入力 | [PY-169] #3212 |
