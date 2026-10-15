@@ -3,7 +3,7 @@
 > **正本の分担**: 結論と数値の表は `tools/hostbridge/wrapper_lift/REPORT.md` §14 (未解決表)。本付録は表に無い値 (観測ログ・呼出の形・再現手順・未解決) の正本。
 
 測定 commit: `22625fe8c` (harness コードを変えた最後の commit。差し戻し後の修正で host 領域を PE イメージの外へ移した)。前回の測定 commit `e702caa14` は host を PE の `.text` 内 (`0x600000`) に置いていたため、停止原因の切り分けには使えない。検証起点: `origin/main` @ `72d5f3cc0` (作業ブランチ `2653-fruity-cpi-complete`、差し戻し対応の worktree `ws-3599`)。
-環境: 上流 emsdk 6.0.12 (`emsdk install 6.0.12` で `$RUNNER_TEMP` に導入。`[EMSDK]` (`/opt/emsdk`) は本 run に無かった。`docs/REFERENCES.md` §4)・`fl-win64` の `extracted/block19091_PE.bin`・`block23676_PE.bin`・node v22.23.3。4 vCPU。全段直列 (並列 1)。
+環境: 上流 emsdk 6.0.12 (`emsdk install 6.0.12` で `$RUNNER_TEMP` に導入。`[EMSDK]` の素材は本 run に無かった。`docs/REFERENCES.md` §4)・`fl-win64` の `extracted/block19091_PE.bin`・`block23676_PE.bin`・node v22.23.3。4 vCPU。全段直列 (並列 1)。
 
 ## 1. 受入条件の対応
 
