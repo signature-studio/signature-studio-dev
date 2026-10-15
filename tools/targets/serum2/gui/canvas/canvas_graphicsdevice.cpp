@@ -33,6 +33,29 @@ PointList ellipsePoints (const CRect& rect)
 }
 
 //------------------------------------------------------------------------
+// 円弧は角度 (ラジアン) を正の向きに掃引する。開始角と終了角の間の弧長に比例して辺数を取り、上限を置く。
+PointList arcPoints (const CRect& rect, double startAngle, double endAngle)
+{
+	auto cx = (rect.left + rect.right) / 2.;
+	auto cy = (rect.top + rect.bottom) / 2.;
+	auto rx = (rect.right - rect.left) / 2.;
+	auto ry = (rect.bottom - rect.top) / 2.;
+	auto sweep = endAngle - startAngle;
+	while (sweep < 0.)
+		sweep += 2. * M_PI;
+	sweep = std::min (sweep, 2. * M_PI);
+	auto count = static_cast<int32_t> (std::clamp (std::ceil (sweep * (rx + ry)), 2., 1024.));
+	PointList points;
+	points.reserve (static_cast<size_t> (count) + 1);
+	for (int32_t i = 0; i <= count; ++i)
+	{
+		auto rad = startAngle + sweep * i / count;
+		points.push_back (CPoint (cx + rx * std::cos (rad), cy + ry * std::sin (rad)));
+	}
+	return points;
+}
+
+//------------------------------------------------------------------------
 struct PixelBox
 {
 	int32_t x0;
@@ -148,7 +171,7 @@ bool CanvasGraphicsDeviceContext::drawPolygon (const PointList& polygonPointList
 	if (polygonPointList.size () < 2)
 		return false;
 	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
-		fillPolygon (polygonPointList, fillColor);
+		fillRings ({polygonPointList}, fillColor, true);
 	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
 		strokePolyline (polygonPointList, true, frameColor);
 	return true;
@@ -165,14 +188,16 @@ bool CanvasGraphicsDeviceContext::drawRect (CRect rect, PlatformGraphicsDrawStyl
 }
 
 //------------------------------------------------------------------------
+// 塗りは弧と弦で囲んだ領域 (cairo_arc の fill と同じ)。線は弧だけを描く。
 bool CanvasGraphicsDeviceContext::drawArc (CRect rect, double startAngle1, double endAngle2,
                                            PlatformGraphicsDrawStyle drawStyle) const
 {
-	(void)rect;
-	(void)startAngle1;
-	(void)endAngle2;
-	(void)drawStyle;
-	return false;
+	auto points = arcPoints (rect, startAngle1, endAngle2);
+	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
+		fillRings ({points}, fillColor, true);
+	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
+		strokePolyline (points, false, frameColor);
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -180,18 +205,19 @@ bool CanvasGraphicsDeviceContext::drawEllipse (CRect rect, PlatformGraphicsDrawS
 {
 	auto points = ellipsePoints (rect);
 	if (drawStyle != PlatformGraphicsDrawStyle::Stroked)
-		fillPolygon (points, fillColor);
+		fillRings ({points}, fillColor, true);
 	if (drawStyle != PlatformGraphicsDrawStyle::Filled)
 		strokePolyline (points, true, frameColor);
 	return true;
 }
 
 //------------------------------------------------------------------------
+// 1 画素を、端点と同じく四捨五入した位置に置く。
 bool CanvasGraphicsDeviceContext::drawPoint (CPoint point, CColor color) const
 {
-	(void)point;
-	(void)color;
-	return false;
+	blendPixel (static_cast<int32_t> (std::lround (point.x)), static_cast<int32_t> (std::lround (point.y)),
+	            color);
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -238,14 +264,31 @@ bool CanvasGraphicsDeviceContext::clearRect (CRect rect) const
 }
 
 //------------------------------------------------------------------------
+// 全 subpath を対象にする。塗りは Filled (非零) / FilledEvenOdd (偶奇) で切り替える。線は各 subpath を閉じずに描く (閉じる場合は path 側で終点を置く)。
 bool CanvasGraphicsDeviceContext::drawGraphicsPath (IPlatformGraphicsPath& path,
                                                     PlatformGraphicsPathDrawMode mode,
                                                     TransformMatrix* transformation) const
 {
-	(void)path;
-	(void)mode;
-	(void)transformation;
-	return false;
+	auto* source = dynamic_cast<CanvasGraphicsPath*> (&path);
+	if (!source)
+		return false;
+	auto subpaths = source->subpaths ();
+	if (transformation)
+	{
+		for (auto& subpath : subpaths)
+		{
+			for (auto& p : subpath)
+				transformation->transform (p.x, p.y);
+		}
+	}
+	if (mode != PlatformGraphicsPathDrawMode::Stroked)
+		fillRings (subpaths, fillColor, mode == PlatformGraphicsPathDrawMode::FilledEvenOdd);
+	else
+	{
+		for (const auto& subpath : subpaths)
+			strokePolyline (subpath, false, frameColor);
+	}
+	return true;
 }
 
 //------------------------------------------------------------------------
@@ -459,38 +502,63 @@ void CanvasGraphicsDeviceContext::plotLine (CPoint from, CPoint to, const CColor
 }
 
 //------------------------------------------------------------------------
-// 画素中心 (y + 0.5) で偶奇則の走査線塗りを行う。辺は閉じているものとして扱う。
-void CanvasGraphicsDeviceContext::fillPolygon (const PointList& points, const CColor& color) const
+// 画素中心 (y + 0.5) で走査線塗りを行う。各輪郭の辺は閉じているものとして扱い、輪郭どうしの交点はまとめて数える。
+// evenOdd が false のときは非零巻き数則 (Winding)。
+void CanvasGraphicsDeviceContext::fillRings (const std::vector<PointList>& rings,
+                                             const CColor& color, bool evenOdd) const
 {
-	if (points.size () < 3)
-		return;
-	double minY = points[0].y;
-	double maxY = points[0].y;
-	for (const auto& p : points)
+	bool any = false;
+	double minY = 0.;
+	double maxY = 0.;
+	for (const auto& ring : rings)
 	{
-		minY = std::min (minY, p.y);
-		maxY = std::max (maxY, p.y);
+		if (ring.size () < 3)
+			continue;
+		for (const auto& p : ring)
+		{
+			minY = any ? std::min (minY, p.y) : p.y;
+			maxY = any ? std::max (maxY, p.y) : p.y;
+			any = true;
+		}
 	}
-	std::vector<double> crossings;
+	if (!any)
+		return;
+	std::vector<std::pair<double, int>> crossings;
 	for (auto y = static_cast<int32_t> (std::floor (minY)); y < static_cast<int32_t> (std::ceil (maxY)); ++y)
 	{
 		auto yc = y + 0.5;
 		crossings.clear ();
-		for (size_t i = 0, j = points.size () - 1; i < points.size (); j = i++)
+		for (const auto& points : rings)
 		{
-			const auto& a = points[j];
-			const auto& b = points[i];
-			if ((a.y <= yc) == (b.y <= yc))
+			if (points.size () < 3)
 				continue;
-			crossings.push_back (a.x + (yc - a.y) * (b.x - a.x) / (b.y - a.y));
+			for (size_t i = 0, j = points.size () - 1; i < points.size (); j = i++)
+			{
+				const auto& a = points[j];
+				const auto& b = points[i];
+				if ((a.y <= yc) == (b.y <= yc))
+					continue;
+				auto x = a.x + (yc - a.y) * (b.x - a.x) / (b.y - a.y);
+				crossings.emplace_back (x, b.y > a.y ? 1 : -1);
+			}
 		}
 		std::sort (crossings.begin (), crossings.end ());
-		for (size_t k = 0; k + 1 < crossings.size (); k += 2)
+		int winding = 0;
+		double spanStart = 0.;
+		for (const auto& [x, dir] : crossings)
 		{
-			auto xStart = static_cast<int32_t> (std::ceil (crossings[k] - 0.5));
-			auto xEnd = static_cast<int32_t> (std::ceil (crossings[k + 1] - 0.5));
-			for (auto x = xStart; x < xEnd; ++x)
-				blendPixel (x, y, color);
+			auto wasInside = evenOdd ? (winding & 1) != 0 : winding != 0;
+			winding = evenOdd ? winding + 1 : winding + dir;
+			auto isInside = evenOdd ? (winding & 1) != 0 : winding != 0;
+			if (!wasInside && isInside)
+				spanStart = x;
+			else if (wasInside && !isInside)
+			{
+				auto xStart = static_cast<int32_t> (std::ceil (spanStart - 0.5));
+				auto xEnd = static_cast<int32_t> (std::ceil (x - 0.5));
+				for (auto px = xStart; px < xEnd; ++px)
+					blendPixel (px, y, color);
+			}
 		}
 	}
 }

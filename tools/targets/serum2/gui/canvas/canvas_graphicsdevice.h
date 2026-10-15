@@ -1,7 +1,8 @@
 // SR-39 #2107: canvas platform (wasm) の IPlatformGraphicsDevice* 実装。
 // SR-50 #3260: drawRect (塗り・線 1px)・clearRect・drawString (canvas_font.cpp) は bitmap へ画素を書く。
 // SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap (1:1 転写) も bitmap へ画素を書く。
-// 他の描画命令 (drawArc・drawPoint・drawGraphicsPath・gradient・9 分割・fillRectWithBitmap) は no-op で false を返す。
+// SR-61 #4231: drawArc (弧の塗り・線)・drawPoint (1 画素)・drawGraphicsPath (path の塗り・線) も bitmap へ画素を書く。
+// 他の描画命令 (gradient・9 分割・fillRectWithBitmap) は no-op で false を返す。
 // 状態設定は lineWidth (1px 固定で描く)・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha だけ値を保持し、他 (lineStyle・drawMode・transformMatrix・global state の save/restore) は何もしない。
 
 #pragma once
@@ -97,7 +98,7 @@ private:
 	void paintRect (const CRect& rect, const CColor& color, bool blend) const;
 	void strokeRect (const CRect& rect, const CColor& color) const;
 	void plotLine (CPoint from, CPoint to, const CColor& color) const;
-	void fillPolygon (const PointList& points, const CColor& color) const;
+	void fillRings (const std::vector<PointList>& rings, const CColor& color, bool evenOdd) const;
 	void strokePolyline (const PointList& points, bool closed, const CColor& color) const;
 	CRect clipWithinBitmap (CRect clip) const;
 

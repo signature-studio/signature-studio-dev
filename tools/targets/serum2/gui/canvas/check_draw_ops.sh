@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SR-55 #3422: 描画命令 (drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap) を draw_ops_main.cpp で bitmap へ直接描き、
+# SR-61 #4231: drawArc・drawPoint・drawGraphicsPath を追加。SR-55 #3422: 描画命令 (drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap) を draw_ops_main.cpp で bitmap へ直接描き、
 # 各命令が画素を書いたこと (rc=1 かつ nonzero>0) を判定する。fail なら rc=1。
 # 前提: work/vstgui4 (vstgui4_14_3)、work/emsdk/upstream/emscripten (toolchain-emsdk の展開)、node。
 # 出力: work/draw_ops/ (gitignore)。
