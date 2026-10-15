@@ -13,7 +13,7 @@ uint32_t ott_call32x(uint32_t va, uint32_t ecx, uint32_t a0, uint32_t a1, uint32
     R[RSP] = GUEST_STACK_TOP;
     for (int i = 5; i >= 0; i--) { R[RSP] -= 4; ST32(R[RSP], args[i]); }
     R[RSP] -= 4; ST32(R[RSP], 0xdead0000u);
-    R[RCX] = ecx; R[RAX] = 0; R[RDX] = 0;
+    R[RCX] = ecx; R[RAX] = 0; R[RDX] = 0; R[RBP] = 0x10EFFF00ull;
     memset(ott_fst, 0, sizeof ott_fst);
     ott_ftop = 0; ott_fsw = 0; ott_fcw = 0x037f;
     ott_dispatch(va);

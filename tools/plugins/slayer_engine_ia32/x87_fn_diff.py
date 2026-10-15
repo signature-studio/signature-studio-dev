@@ -29,10 +29,17 @@ SEED = 2989
 # va: 入口 VA。 gen: 引数と OBJ 窓の初期値の作り方 (ecx = OBJ)。 どちらも leaf で x87 を含み、import・未 lift の call が無い。
 #   fn_10002ee0: thiscall (ecx = this、float a0、int a1 = 添字 0..15) ret 8。 [ecx+a1*4+0xb0..0x1f4] を読み書きし、ST(0) を残して返る。
 #   fn_10005400: thiscall (ecx = this、float a0..a2) ret 0xc。 fcomp・fnstsw・fdivr を含み、[ecx+0x4fc..0x518] を更新する。 gen が積む a3・a4 (と a5 = 0) は本体が読まない余りの引数。
+#   fn_1000b6c1・fn_1000b936: OBJ 窓を書かず、ebp 相対のスタック (STK_LO..STK_LO+STK_WIN) だけを書く leaf (#4146)。 引数は gen_rows の既定を使う。
+#     どちらも入口で空の ST(0) を読まない (fstp st(0) で捨てるだけ) ので、空スタックの underflow に依らない。
+#   fn_1000b8a2 は TARGETS に入れない (#4146): 入口の fstp TBYTE が空の ST(0) を読み、native は -qNaN 不定値・wasm は 0 を返す (underflow 類型)。
 TARGETS = [
     {'va': 0x10002EE0, 'name': 'fn_10002ee0', 'gen': 'idx_store'},
     {'va': 0x10005400, 'name': 'fn_10005400', 'gen': 'state_update'},
+    {'va': 0x1000B6C1, 'name': 'fn_1000b6c1', 'gen': 'state_update'},
+    {'va': 0x1000B936, 'name': 'fn_1000b936', 'gen': 'state_update'},
 ]
+STK_LO = 0x10F00000 - 0x200
+STK_WIN = 0x1E0
 
 
 def pe_image():
@@ -187,17 +194,17 @@ def compare(nat, act, scen, quiet=False):
                 a['eax_bad'] += 1
         if e['d'] != w['d']:
             a['d_bad'] += 1
-        if e['mem'] != init.hex():
+        if e['mem'] != init.hex() or e['stk'] != '00' * STK_WIN:
             a['effect'] += 1
         if e == w:
             a['eq'] += 1
-        if e['st0'] == w['st0'] and e['mem'] == w['mem'] and e['eax'] == w['eax']:
+        if e['st0'] == w['st0'] and e['mem'] == w['mem'] and e['stk'] == w['stk'] and e['eax'] == w['eax']:
             a['f32_eq'] += 1
         for key, x, y in (('st0', int(e['st0'], 16), int(w['st0'], 16)),
                           ('st0d', int(e['st0d'], 16), int(w['st0d'], 16))):
             c = dword_class(x, y) if key == 'st0d' else word_class(x, y)
             a[key][c] = a[key].get(c, 0) + 1
-        for x, y in zip(words(e['mem']), words(w['mem'])):
+        for x, y in zip(words(e['mem']) + words(e['stk']), words(w['mem']) + words(w['stk'])):
             c = word_class(x, y)
             a['mem'][c] = a['mem'].get(c, 0) + 1
     for t in TARGETS:

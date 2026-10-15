@@ -11,8 +11,11 @@ typedef unsigned int u32;
 #ifndef OBJ_WIN
 #define OBJ_WIN 0x540u
 #endif
-#define IBUF_SZ (1u << 25)
-#define OBUF_SZ (1u << 25)
+#define GUEST_STACK_TOP 0x10F00000u
+#define STK_LO (GUEST_STACK_TOP - 0x200u)
+#define STK_WIN 0x1E0u
+#define IBUF_SZ (1u << 26)
+#define OBUF_SZ (1u << 26)
 
 static long sc3(long n, long a, long b, long c) {
     long r;
@@ -42,8 +45,9 @@ __asm__(
     " push %ebp\n mov %esp,%ebp\n push %ebx\n push %esi\n push %edi\n"
     " mov 8(%ebp),%edi\n mov 12(%ebp),%edx\n mov 16(%ebp),%esi\n"
     " movl %esp,g_sp\n"
+    " mov $0x10F00000,%esp\n"
     " pushl 20(%esi)\n pushl 16(%esi)\n pushl 12(%esi)\n pushl 8(%esi)\n pushl 4(%esi)\n pushl (%esi)\n"
-    " mov %edx,%ecx\n xor %eax,%eax\n xor %edx,%edx\n"
+    " mov %edx,%ecx\n xor %eax,%eax\n xor %edx,%edx\n mov $0x10EFFF00,%ebp\n"
     " call *%edi\n"
     " movl g_sp,%esp\n"
     " pop %edi\n pop %esi\n pop %ebx\n pop %ebp\n ret\n");
@@ -89,6 +93,7 @@ void entry_main(u32 *sp) {
         while (i < n && ibuf[i] != '\n') i++;
         int e = i; i++;
         if (e - s < 10) continue;
+        if (ofs > (int)OBUF_SZ - 8192) { sc3(4, fd_out, (long)obuf, ofs); ofs = 0; }
         /* 行: va ecx a0 a1 a2 a3 a4 a5 init(hex, OBJ_WIN バイト) */
         u32 f[8]; int k = 0, p = s;
         while (k < 8) {
@@ -103,6 +108,7 @@ void entry_main(u32 *sp) {
             ((unsigned char *)OBJ_ADDR)[b] = (unsigned char)hexval(ibuf + p + 2 * b, 2);
         }
         u32 a[6] = {f[2], f[3], f[4], f[5], f[6], f[7]};
+        for (u32 b = 0; b < STK_WIN; b++) ((volatile unsigned char *)STK_LO)[b] = 0;
         __asm__ volatile("fninit" ::: "memory");
         u32 r = call_guest(f[0], f[1], a);
         unsigned short sw;
@@ -124,6 +130,8 @@ void entry_main(u32 *sp) {
         ohex((u32)(st0du.u >> 32), 8); ohex((u32)st0du.u, 8);
         oput(" d=", 3); ohex(depth, 1); oput(" mem=", 5);
         for (int b = 0; b < (int)OBJ_WIN; b++) ohex(((unsigned char *)OBJ_ADDR)[b], 2);
+        oput(" stk=", 5);
+        for (u32 b = 0; b < STK_WIN; b++) ohex(((unsigned char *)STK_LO)[b], 2);
         obuf[ofs++] = '\n';
         line++;
     }
