@@ -27,7 +27,7 @@
 ## §3. 振り分け結果 (測定 commit `c3fef51c7`)
 
 - 再現: `python3 tools/targets/freshair/ks_identity.py <HeartCore.core_64> <SlateCore.core_64> ident.json` → `python3 tools/targets/freshair/ks_candidate_triage.py ident.json` (素材 `work-liftlib-targets`)。
-- 実測: `ks_identity.py` 単体 2.9 s (EXIT=0、load 1 分値 0.05)。`c3fef51c7` の worktree で再生成した `ident.json` と振り分け表は、main 作業ツリー (`670c91ef6`) で作った版と **byte 一致**。`git diff 670c91ef6 674c8831f -- tools/targets/freshair tools/targets/kilohearts/snapins` は 0 行。
+- 実測 (実装 run): `ks_identity.py` 単体 2.9 s (EXIT=0、load 1 分値 0.05)。`c3fef51c7` の worktree で再生成した `ident.json` と、そこから作った振り分け表は本節の表と **byte 一致**。fix run (差し戻し対応) では素材 `work-liftlib-targets` が実行環境に無く、`ks_identity.py` は再実行していない (振り分け規則の再現は下記の注記を参照)。
 - 振り分け表 (クラスは `ident.json` の `process_pair`。KH slot 14 と SC の対応 slot):
 
 | クラス | KH VA | SC VA | KH B | SC B | ratio_M | 区分 | 欠けている側 |
@@ -46,7 +46,7 @@
 | Filter | 0x1804655e0 | 0x180b6f050 | 969 | 818 | 0.3351 | SC のみ | KH (snapins.json に key 無し) |
 | Flanger | 0x18049bb50 | 0x180f7a600 | 6754 | 6368 | 0.1159 | なし | SC と KH の両方 |
 | FrequencyShifter | 0x1804a6a20 | 0x1803df070 | 2776 | 907 | 0.1530 | なし | SC と KH の両方 |
-| Gain | 0x1804b0380 | 0x180afe090 | 609 | 446 | 0.4753 | 両側 | - (§A3 で測定済み) |
+| Gain | 0x1804b0380 | 0x180afe090 | 609 | 446 | 0.4753 | 両側 | - |
 | Gate | 0x1804c2f50 | 0x1804ce700 | 1703 | 1599 | 0.2425 | KH のみ | SC (実機機械語ハーネス無し) |
 | GraphicEq | 0x18037d210 | 0x180a59700 | 4413 | 3402 | 0.2613 | なし | SC と KH の両方 |
 | Haas | 0x1804d0280 | 0x180498cd0 | 1175 | 981 | 0.3333 | KH のみ | SC (実機機械語ハーネス無し) |
@@ -71,6 +71,11 @@
 | VocalFilter | 0x18085a730 | 0x1808e1f30 | 614 | 109 | 0.1951 | KH のみ | SC (実機機械語ハーネス無し) |
 
 対象 37: KH のみ 10 / SC のみ 2 / stub 2 / なし 22 / 両側 1
+
+表の注記 (表は機械出力のまま。注記は手書き):
+
+- **SC VA `0x1803df070` (907 B) の 8 組** (Chorus・CombFilter・Faturator・FrequencyShifter・Ladder・Resonator・TranceGate・Unison) は、process の対応として成立しない。この VA は制御層から呼ばれる共有関数で、`lift2/build_ctl.sh` の ICALLS と `lift2/build_ctrl.sh` の `--icall` 一覧にも現れる。`ks_identity.py` は「全 SC slot のうち M 比が最大の slot」を process_pair にするため、この共有関数が候補に選ばれた (ratio_M 0.14〜0.25)。この 8 組の SC 側 process は未特定で、判定基準 C1 の max-ratio 規則では対応が決まらない。規則を直すときは §1 の版を上げ、理由を書く。区分 (なし / KH のみ) はハーネスの有無だけで決まるので、§4 の結論は変わらない。
+- **Gain 行**: 「§A3 で測定済み」は表の機械出力に無い手書きの注記。Gain の差分結果は [REPORT_APPENDIX_FA5.md](REPORT_APPENDIX_FA5.md) §A3 を参照。
 
 ## §4. 差分実行の結論 (C3 を満たす組)
 
