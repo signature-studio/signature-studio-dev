@@ -20,7 +20,7 @@
 #define ROOT_NAME "Plugin database"
 
 /* pv / spv: plugin パラメータの値 (インスタンスごと。channel の generator と mixer track の insert slot)。PY-228 (#3656) */
-typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; int64_t pitch_n; double pv[NPARAM]; } Chan;
+typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; uint8_t vel[NSTEP]; int64_t pitch_n; double pv[NPARAM]; } Chan;
 typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; double spv[NSLOT][NPARAM]; int act[NMIX]; double lvl[NMIX]; } Mix;
 typedef struct { char name[NAME]; int64_t color; uint8_t lock; double act; int loop, trig_mode, pos_snap, trig_snap; } Pl;
 
@@ -35,6 +35,8 @@ static int playing;
 static int64_t hl_cb;
 static int n_pr, n_run;
 static int dev_port, midi_out_n;
+static double idle_elapsed;
+static int midi_out_assigned, master_sync;
 /* PY-227 (#3655): midiOutMsg が送った 32bit word の列。dev_assigned=0 は -7・link_assigned=0 は -6 (PE 0xd747f0) */
 #define NMIDI 256
 static uint32_t midi_words[NMIDI];
@@ -46,7 +48,7 @@ static int lm_pages;
 static int ui_closing, ui_time_disp_min, ui_start_on_input, ui_loop_rec, ui_step_edit, ui_browser_auto_hide, ui_snap_mode;
 static int undo_pos, undo_count, undo_last, safe_edit;
 static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
-static int sel_start, sel_end;
+static int sel_start, sel_end, live_anchor;
 static int64_t disp_time;
 static int browser_op;
 static int64_t arr_time;
@@ -96,11 +98,12 @@ void fl_engine_reset(void) {
     ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
     undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
     set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
-    sel_start = -1; sel_end = -1;
+    sel_start = -1; sel_end = -1; live_anchor = -1;
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
     scr_alive = 0; scr_menu_show = 0; scr_dirty = 0; scr_setup_l = 0; for (int i = 0; i < 5; i++) scr_setup_t[i] = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0; browser_op = 0;
+    idle_elapsed = 0; midi_out_assigned = 0; master_sync = 0;
     midi_word_n = 0; dev_assigned = 1; link_assigned = 1;
     lp_row = lp_flag49e = lp_flag54 = lp_n = 0;
 }
@@ -220,7 +223,7 @@ FL_H(channels, setTargetFxTrack) { CH(0); k->fx = (int)A_INT(1, 0); return fl_re
 FL_H(channels, setGridBit) {
     CH(0); int64_t p = A_INT(1, 0), v = A_INT(2, 0);
     if (p < 0 || p >= NSTEP) RANGE();
-    k->steps[p] = v ? 1 : 0; return fl_ret_none(c);
+    k->steps[p] = v ? 1 : 0; if (v) k->vel[p] = 100; return fl_ret_none(c);
 }
 FL_H(channels, quickQuantize) { CH(0); (void)k; return fl_ret_none(c); }
 FL_H(channels, selectedChannel) {
@@ -228,12 +231,13 @@ FL_H(channels, selectedChannel) {
     return fl_ret_i(c, sel_chan + off);
 }
 FL_H(channels, fillEachNSteps) {
-    CH(0); int64_t st = A_INT(1, 1), off = A_INT(2, 0), vel = A_INT(3, 0);
-    (void)vel; (void)A_INT(4, 0);
+    CH(0); int64_t st = A_INT(1, 1), off = A_INT(2, 0), vel = A_INT(3, 100);
+    (void)A_INT(4, 0);
+    if (vel < 0) vel = 0; else if (vel > 127) vel = 127;
     if (st < 1) RANGE();
     int64_t p = off;
     if (p < 0) { p %= st; if (p < 0) p += st; }
-    while (p < NSTEP) { k->steps[p] = 1; if (st > NSTEP - p) break; p += st; }
+    while (p < NSTEP) { k->steps[p] = 1; k->vel[p] = (uint8_t)vel; if (st > NSTEP - p) break; p += st; }
     return fl_ret_none(c);
 }
 FL_H(channels, showEditor) { CH(0); (void)k; return fl_ret_none(c); }
@@ -264,7 +268,7 @@ FL_H(channels, focusEditor) {
 static const int64_t step_def[9] = {60, 100, 64, 120, 64, 128, 128, 0, 0};
 static int64_t step_param(const Chan *k, int64_t pos, int64_t prm) {
     if (pos < 0 || pos >= NSTEP || !k->steps[pos] || prm < 0 || prm > 8) return -1;
-    return prm == 7 ? pos * 24 : step_def[prm];
+    return prm == 7 ? pos * 24 : prm == 1 ? k->vel[pos] : step_def[prm];
 }
 /* PE 0xd5bb30: 引数を読んでから index を検査 (範囲外は Index out of range)。useGlobalIndex は未モデル (グループ無し) */
 FL_H(channels, getCurrentStepParam) {
@@ -634,7 +638,8 @@ static void sel_set(int x, int y) { sel_start = x; sel_end = y; if (x == y) sel_
 FL_H(arrangement, currentTime) { (void)A_INT(0, 0); return fl_ret_i(c, arr_time); }
 FL_H(arrangement, selectionClear) { NARGS(0, 0); sel_set(-1, -1); return fl_ret_none(c); }
 FL_H(arrangement, selectionSet) { NARGS(2, 5); int64_t x = A_INT(0, 0), y = A_INT(1, 0); for (int i = 2; i < 5; i++) (void)A_INT(i, 0); sel_set((int)x, (int)y); return fl_ret_none(c); }
-FL_H(arrangement, liveSelection) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
+static void live_sel(int a, int flag) { int anc = live_anchor; if (flag && anc >= 0 && anc != a) sel_set(anc, a); else sel_set(-1, -1); live_anchor = flag ? -1 : a; }
+FL_H(arrangement, liveSelection) { NARGS(2, 2); int64_t a = A_INT(0, 0), b = A_INT(1, 0); live_sel((int)a, b == 1); return fl_ret_none(c); }
 FL_H(arrangement, addAutoTimeMarker) { (void)A_INT(0, 0); (void)A_STR(1); return fl_ret_none(c); }
 FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 /* ---- arrangement (2) ---- PY-143 (#3041): PE 0xd78030 (getMarkerName)・0xd785a0 (currentTimeHint) の呼出し構造と戻り str は REPORT_PY143 で確定。
@@ -704,6 +709,13 @@ static int midi_send(fl_call *c, uint32_t w) {
     if (midi_word_n < NMIDI) midi_words[midi_word_n++] = w;
     return fl_ret_none(c);
 }
+FL_H(device, createRefreshThread) { return fl_ret_none(c); }
+FL_H(device, destroyRefreshThread) { return fl_ret_none(c); }
+FL_H(device, fullRefresh) { return fl_ret_none(c); }
+FL_H(device, getIdleElapsed) { return fl_ret_d(c, idle_elapsed); }
+FL_H(device, isMidiOutAssigned) { return fl_ret_b(c, midi_out_assigned); }
+FL_H(device, getMasterSync) { return fl_ret_b(c, master_sync); }
+FL_H(device, setMasterSync) { master_sync = A_INT(0, 0) == 1; return fl_ret_none(c); }
 /* PE 0xd748e0 (書式 ii・既定値なし)。送るのは第 1 引数の word。第 2 引数は送出先テーブルの添字 (PE 0xfdc8a0)。値の変化検出は未実装 (REPORT_PY231 §4) */
 FL_H(device, forwardMIDICC) { int64_t msg = A_INT(0, 0); (void)A_INT(1, 1); return midi_send(c, (uint32_t)msg); }
 /* PE 0xd747f0 (書式 i|iiii)。channel ≤ -1 は message だけ、channel ≥ 0 は arg4 を bit 24–31 に入れた word を送る */

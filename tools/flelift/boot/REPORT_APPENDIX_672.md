@@ -100,3 +100,70 @@ REPORT §7 (旧 165〜167 行):
 ```
 
 訂正 (#672・FLE-12 の実測): 「`f_414ec0` は out = 0 を返す」は誤認で、`f_414ec0` は `UStrCopy` である。`f_653f40` の早期 return は VCL リソース読み出しの失敗ではなく、`dsp_ippv2_x64.dll` の `LoadLibraryW` 失敗 (host shim の欠落) による。`0x15F34A0` = `ippsZero_8u` (`REPORT_APPENDIX_2702.md` §E・§10)。
+
+## §B. 分岐入力の判定と ILTools 分岐入力の実験 (2026-10-15・PM 改訂 2 の『次の 1 手』)
+
+> 静的判定の出典: `python3 tools/flelift/boot/fle672_static.py <PE>` (PE = `$FL_WIN64_DIR/extracted/block00031_PE.bin`)。
+> 動的: `FL_WIN64_DIR=<fl-win64> SS_EMSDK_ENV=<emsdk_env.sh> FLE_BOOT_TAG=fle672ilt FLE_BOOT_RUNS="shim negctl ilt" bash tools/flelift/boot/fle6_measure.sh`。
+> 結果 JSON: `results/boot_summary_fle672ilt{,_negctl,_ilt}.json`。
+
+### B-1 結論 (先出し)
+
+- **仮説 B が成立 (判定 (2))**。2^20 × 2^20 の面は `f_815050` が作る。その呼出元 `f_815e10` (`0x815e10`) の分岐 `0x815e86`〜`0x815e8d` は、
+  `[VA 0x15F6F88]` が 0 のとき `f_815050` (2^20 面) に入り、非 0 なら代替経路 (`call [0x15F6F88]`・`0x815e96`) に入る。
+  `[0x15F6F88]` = `GetProcAddress(LoadLibraryW("ILTools"), "CreateCursorFromFont")` の戻り値 (`0x815e52`・`0x815e38`)。
+  lift の stub は LoadLibraryW・GetProcAddress とも 0 を返すため、**lift だけが 2^20 面の経路に入る** (推定: native は ILTools_x64.dll を読めて非 0 になる。`tools/iltools/REPORT.md` の対象 DLL。読込成功の native 実測は未実施)。
+- **実測**: ILTools の擬似モジュール (`FLE_IPP=3`・本 PR で追加) で分岐入力を非 0 にすると、**units_run 209 → 851 (942 中)**。fill (`0x6a7b70`) 6 回 → 0 回、空の `MessageBoxA` → `exit(0)` は出ない。ネガコン (`FLE_IPP=0`) と shim (`FLE_IPP=1`) は 209 のまま (同じ lift・同じバイナリで mode だけ変えた差)。
+- **仮説 A は支持されない**。`f_6b8fa0` のサイズは 32bit `imul` で 0 (mod 2^32) になり GetMem(0) → nil。native の `System._GetMem` も size ≤ 0 で nil (`0x409410`・`0x40941a`) で、ホストの `fle_ov_getmem` と一致する (GetMem の差ではない)。この経路に入れば native も buf = 0 のまま fill する。したがって例外回復の捕捉先を探す必要は、分岐を回避できた今は無い。
+- **既定経路は不変** (FLE_IPP 未指定・0 = 209 / 1,891・776)。opt-in の `FLE_IPP=3` だけが変わる。よって PR は `Refs #672` (`Closes` の条件『診断なしの既定経路で units_run > 209』は未達)。
+
+### B-2 静的判定 (`fle672_static.py` の出力の要点)
+
+| 関数 | VA | pdata flags | EH scope | 判定への意味 |
+|---|---|---|---|---|
+| `f_815050` (2^20 面を作る) | 0x815050 | 2 (UHANDLER のみ) | なし | 自身に try/except は無い |
+| `f_815e10` (分岐) | 0x815e10 | 0 | なし | 分岐入力の源 (B-1) |
+| `f_11c2d80` (`f_815e10` の呼出元) | 0x11c2d80 | 3 | kind 2 は `0x11c3adf`〜`0x11c3b0f` のみ。呼出し `0x11c3713` は kind 0 (後始末) の範囲 | 捕捉なし |
+| `f_6b8fa0` / `f_6cefb0` / `f_6c7610` | — | 0 | なし | 確保・取得・fill に EH は無い |
+| `f_4120c0` (System.InitUnits) | 0x4120c0 | 3 | kind 2 `0x4120ed`〜`0x412135` | unit 209 の後の `MessageBoxA` 経路 (`0x4128b0`→`0x412a12`) の上位 (参考) |
+
+分岐の要点 (`fle672_static.py` §2):
+- `0x815e1e` の `cmp [0x15F6F90]` が 0 の初回だけ初期化 (`f_6539e0` = LoadLibraryW → `[0x15F6F80]`、`f_4235f0` = GetProcAddress → `[0x15F6F88]`)。
+- `0x815e60`〜`0x815e6b`: `[0x15F6F91] = ([0x15F6F88] != 0)`。`0x815e8d` で 0 なら `0x815eb5` → `call 0x815050` (2^20 面)。
+- 名前 (UTF-16): `L"ILTools"` (`0x815edc`)・`L"CreateCursorFromFont"` (`0x815eec`)。`ILTools_x64.dll` の export にあたる (`tools/iltools/REPORT.md`)。
+- `f_815050` の寸法: `movabs rax, 0x4130000000000000` = 1048576.0 (`0x81571b`・`0x81572c`)。`W = f(c1) + SPI + f(2^20 + c2) + 4·SPI` で、定数 2^20 は stub 値に依らない。**寸法 2^20 は stub の誤りではない**。誤るのは『その面を作る分岐に入ること』。
+
+### B-3 実測 (同一 lift・clang 1 回。`fle6_measure.sh` の route)
+
+| route | FLE_IPP | units_run | GetMem / FreeMem | fill `0x6a7b70` | 空の MessageBoxA | 停止 (threw) | CreateCursorFromFont 呼出し | `ptr_15F34A0` |
+|---|--:|--:|--:|--:|--:|---|--:|---|
+| shim (既定の shim) | 1 | 209 | 2,314 / 1,199 | 6 | 1 | `exit(0)` @0x412a12 | 0 | 0x0 (IPP 判定 NG = 既知) |
+| ネガコン | 0 | 209 | 1,891 / 776 | 6 | 1 | `exit(0)` @0x412a12 | 0 | 0x0 (OK) |
+| **ILTools 分岐入力 (本 PR)** | **3** | **851** | 3,139 / 1,490 | **0** | **0** | `unlifted 0x976da0` (呼出元 `0x92d24e`・`f_92d150` 内) | **64** (0x815e9c・fail-soft 0) | 0x7f10001c (OK) |
+
+- ILT route のログには `MessageBoxW text='QuickFontCache DLL not found!'` が出る (既知の T-SH 系の別件・B-4)。
+- 製品 KPI (既定経路): units 209 → **209 (変化なし)**。最初のウィンドウ: 未達 (ILT route の停止は unit 851 の unlifted 0x976da0)。
+- 検証範囲: 1 本の lift (`closure 2`・root `0x6a7b70`)。n = 1。範囲外: native 実行による ILTools の読込・CreateCursorFromFont の戻り値の突合。
+
+### B-4 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| ILT route の停止 `unlifted 0x976da0` (呼出元 `0x92d24e`・`f_92d150`) | 最初のウィンドウ未達 | 子 issue (本 PR で起票) |
+| `CreateCursorFromFont` の戻り値 0 (fail-soft) と代替経路の後続 (`0x866290`) の値の正しさ | 851 の内容が未検証 | 子 issue (同上) |
+| ILT 分岐入力を既定 (`FLE_IPP` 未指定) にするか | KPI の既定経路 (209 → 851) | PM 判断 (本 PR は opt-in のまま) |
+| `ILTools` の native 読込成功 (DLL の存在と LoadLibraryW の結果) は未実測 | 分岐入力の native 値の前提 (推定) | 子 issue (同上) |
+| `QuickFontCache DLL not found!` (MessageBoxW) | 別の停止要因の可能性 | 既存 T-SH 系 (#3410・#3412・#3434) |
+| `f_6cefb0` の rect fill で buf = 0 の書込み (shim・ネガコン) が native で AV になるか | 分岐回避のため現時点では影響なし | 本 PR では未扱い (下の D27 案) |
+
+### B-5 欠陥類型の候補 (`docs/DEFECTS.md` 形式の行案・直接編集は PM 判断)
+
+| ID (案) | 種別 | 症状 | 根本原因 | 観測 | 検出信号 | 修復 |
+|---|---|---|---|---|---|---|
+| D26 (案) | ours (shim) | 条件分岐が native と別の計算経路 (2^20 面) に入り、後続 unit が止まる | 外部 API の soft stub の既定戻り値 0 (LoadLibraryW・GetProcAddress) が分岐入力に入る | 本 PR: FLE_IPP=3 で 209 → 851 (mode 1 は 209) | 分岐入力に入る API 戻り値を native 値と突合 | 分岐入力を native 相当の非 0 にする擬似モジュール (本 PR・opt-in) |
+| D27 (案) | ours (harness) | buf = 0 の fill が AV にならず、native の例外経路を通らない (推定) | guest メモリは平坦で 0 番地への書込みが AV にならない | shim・ネガコン で fill 6 回 (buf = 0) | buf = 0 の fill 呼出し (`FLE_DIAG_NULLFILL` の計数) | 未実装 (経路回避で当面見えない) |
+
+### B-6 旧判定の訂正
+
+- §1-2 (`REPORT_APPENDIX_3090.md`) の『native では面の生成が失敗して別経路に入る (推定)』は、**別経路 = 代替経路 (`f_815e10` の flag != 0) への分岐**であり、面の確保失敗 (仮説 A) ではない。
+- `REPORT_APPENDIX_3090.md` §1-2 の『`[this+0x50]` buf = 0 のまま』は、2^20 面の経路に入った lift の結果であり、native の状態ではない (B-1)。

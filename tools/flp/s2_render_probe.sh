@@ -20,7 +20,7 @@ WORKDIR="$ART/s2"
 NAME="${1:?usage: s2_render_probe.sh <name.flp> [repeat]}"
 REPEAT="${2:-3}"
 export WINEPREFIX="$ART/wineprefix" WINEARCH=win64
-if [[ "${S2_TRACE_REG:-0}" == 1 ]]; then export WINEDEBUG="+reg"; else export WINEDEBUG="-all"; fi
+if [[ "${S2_TRACE_REG:-0}" == 1 ]]; then export WINEDEBUG="+reg"; else export WINEDEBUG="${S2_WINEDEBUG:--all}"; fi
 export PATH="/usr/lib/wine:$PATH"
 
 [[ -d "$INST" ]] || { echo "missing $INST (先に s1_wine_probe.sh)" >&2; exit 2; }
