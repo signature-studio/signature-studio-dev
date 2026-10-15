@@ -12,10 +12,10 @@
 
 - 対象は chunk 0 の 1 関数 `0x5d19e0` (sample:800 の 0〜399 件目の唯一の対象)。
 - **native を作り直し、wasm の C 静的変数 (`sta`) だけを SNAPSHOT 時点へ戻すと match** (n=2・11/11 case equal)。
-- 対照 (`native=0, none`) と wasm 単独の候補 (`stk`・`sta`・`img`・`all`、native は作り直さない) は、いずれも mismatch。ただし `none`・`stk`・`sta`・`all` は n=1 のみ (`img` だけ n=2)。
+- 対照 (`native=0, none`) と wasm 単独の候補 (`stk`・`sta`・`img`・`all`、native は作り直さない) は、いずれも mismatch (n=2 で揃えた。§8)。
 - native 作り直し + wasm `none`・`stk`・`img`・`all` は n=2 で mismatch。`all` が `sta` の効果を消すことは、`REPORT_APPENDIX_LD126.md` の chunk 1 の結果 (`all` で 18/18 mismatch) と同じ向き。
 - LD-121 の「両側作り直しで match」を本 driver で再現する行は無い (`native=1, none` は mismatch・n=2)。本付録の `native=1, sta` の match は、LD-121 の both 条件とは別の条件 (wasm の sta だけ戻す) の結果。
-- 残りの未達 (native 側の候補単位の戻し) は未実装。§5 の子 issue に移す。n=2 の残り・both 再確認・RESET の効きの証跡は未実施 (§4・PR 本文の未解決表)。
+- native 側の候補単位の戻しは、別 issue で実施済み: #4305 (LD-209・`REPORT_APPENDIX_LD209.md`) で stk・sta・img、#4631 (LD-229・`REPORT_APPENDIX_LD229.md`) で anon mmap。どちらも closed。本付録の残りは §4 の証跡と both 再確認のみ。
 
 ## 1. 測定条件
 
@@ -35,12 +35,11 @@
 
 | native | wasm RESET | n | verdict | case equal |
 |---|---|---|---|---|
-| 0 (作り直しなし) | none | 1 | mismatch | 0/11 |
-| 0 | stk | 1 | mismatch | 0/11 |
-| 0 | sta | 1 | mismatch | 0/11 |
-| 0 | img | 1 | mismatch | 0/11 |
-| 0 | all | 1 | mismatch | 0/11 |
+| 0 (作り直しなし) | none | 2 | mismatch | 0/11 |
+| 0 | stk | 2 | mismatch | 0/11 |
+| 0 | sta | 2 | mismatch | 0/11 |
 | 0 | img | 2 | mismatch | 0/11 |
+| 0 | all | 2 | mismatch | 0/11 |
 | 1 (作り直し) | none | 2 | mismatch | 0/11 |
 | 1 | stk | 2 | mismatch | 0/11 |
 | 1 | **sta** | **2** | **match** | **11/11** |
@@ -54,16 +53,14 @@
 
 - **RESET が実際にメモリを戻したかは未確認**。戻したバイト数・snapshot との差分の証跡は取っていない (`REPORT_APPENDIX_LD126.md` §4 と同じ未解決)。`sta` だけ match で他が mismatch になるのは、戻しが効いた結果とも、戻さない候補の偶然とも区別できていない。
 - `sta` は heap 高水位の管理変数 (`ld_heap_hw`・`ld_heap_used`) を含むため、C 静的変数の中身と heap 高水位は分かれていない (LD-126 §2 と同じ)。
-- native 側の持ち越し (native の静的領域・スタック) の候補単位の戻しは未実装。よって「両側の組合せ」の切り分けは、native 作り直し (both 相当) の 1 種類だけで、native の候補ごとの切り分けは無い。
-- `sta` の native=0 (作り直しなし) は n=1 のみ。native 作り直しを加えたときだけ match するかは、この測定では確かめていない (n=1 の mismatch だけ)。
-- `none`・`stk`・`all` (native=0) も n=1 のみ。`native=0, img` だけ n=2。受入条件 1 の「n=2 以上」は未達。
+- native 側の候補単位の戻しは本付録では扱わない。`--native-reset` を使う切り分けは #4305 (LD-209)・#4631 (LD-229) の付録で行った (§5)。
 - LD-121 の both 条件 (`native=1` と wasm の作り直し) を本 driver で流した行は無い。driver は wasm 側を作り直さず、`RESET` だけで候補を戻す (LD-121 の both とは別物)。both の再確認は未実施。
-- 再測定に必要な素材 (`work-m11`・`work-liftdiff`・`toolchain-emsdk`) は本 run の素材置き場 (`docs/WORKFLOW.md` §11 の取得対象) に無く、wasm を作り直せなかった (`fl-win64` のみ実在)。上記の n=2・both の追加測定は、素材を指定した別 run で行う。
+- both (LD-121 の条件: wasm も作り直す) の再確認は未実施。§8 の n=2 測定では素材 4 種を展開して wasm を作り直したが、both の経路は driver に無い。
 - main 側の `tools/liftdiff/ldlib/session.py` は、測定 commit 以降に fvm の候補多重・ret 断片の対象外化を入れている (LD-177)。本測定は `0de02db4e` の `session.py` で行った。main を取り込んだ後の判定は未確認。
 
 ## 5. 子 issue (受入条件 2 の残り)
 
-- native 側の候補単位の戻し (native の静的領域・スタックを SNAPSHOT 時点へ戻す RESET)。`rt/ld_native.c` に候補別 SNAPSHOT/RESET の機構が無いため、実装が要る。子 issue は本 PR の PR 本文に番号を書く。
+- native 側の候補単位の戻し: #4305 (LD-209) と #4631 (LD-229) で実施済み・closed (§4 の参照)。残る mapping 単位の切り分けは #4631 の付録で保留になっている。
 - RESET の効きの証跡 (戻したバイト数・snapshot との差分) は取っていない。これは測定の追加であり子 issue にしない。本 PR の未解決表に残す (§4)。
 
 ## 6. 再現
