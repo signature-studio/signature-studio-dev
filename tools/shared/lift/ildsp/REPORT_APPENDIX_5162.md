@@ -13,7 +13,7 @@
 
 ## 2. 13 件目の確保 (受入 1 の根拠)
 
-測定 commit: `c552566e3` (main 取り込み直後)。診断の追加は本 PR の commit。
+測定 commit: `b2f7cee49` (診断コードを含む)。`c552566e3` からの差分は本診断 (`wc_glue.c`・`wc_native_ref.c`・`wc_run_wasm.mjs`・`lift_wc.sh`) のみ。`c552566e3` は診断追加前のため、13 件目の診断値はこの commit でしか得られない。
 
 | 項目 | native | wasm |
 |---|---|---|
@@ -38,7 +38,7 @@ FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<emsdk_env.sh> bash tools/shared/lif
 ```
 
 - native 側は `[heap] tag=... n=... sz=... ret=... g3f5b80=...` を stderr に出す。wasm 側は `wc_glue.c` (`WC_HEAP_LOG` 定義時) で同形式を `fd_write` 経由で出す。
-- 測定値 (`c552566e3` + 本診断): 差分 harness rc 1・elapsed 42.0 s・load 0.57→0.80。PASS=0 FAIL=64 (§1 の前回値と一致)。
+- 測定値 (測定 commit `b2f7cee49`): 差分 harness rc 1・elapsed 42.0 s・load 0.57→0.80。PASS=0 FAIL=64 (§1 の前回値と一致)。
 
 ## 4. 未解決
 
