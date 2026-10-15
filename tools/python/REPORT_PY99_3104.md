@@ -191,36 +191,40 @@
 | 入口レジスタ葉 `c_in` (ecx)・`d_in` (edx) の呼出し側の値 | rint 6 件の式の入力は関数の引数のまま。値の確定は呼出し側の解析が要る | #4266 ([PY-313]・親 #2874) |
 | `--rint` の negative control (6 件に寄与する先行辺が無い・#3913 受入 2 の negctl の原文) | 6 件の閉包の検出力を 6 件で示せない | 解決 (#4332・§「rint 6 件の negative control」) |
 
+
 ## rint 6 件の negative control (#4332・PY-317)
 
-測定 commit: `150ba28e6` (usage 文言の修正のみ。最後のコード commit)。`--negctl drop-part` の追加は `e4c4099df`。実測は `150ba28e6` で行った (`e4c4099df` からの差は usage 文言 2 行のみ)。`git diff 150ba28e6 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
-素材: `fl-win64` の `extracted/block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst extracted/block00031_PE.bin`)。`analysis/py53_dispatch.py` → `fn=4664 dispatch=13 r8d_tests=174`。
+結論: `--negctl drop-part` を追加し、6 件の閉包で mismatch 1・exit 1 を確認 (解決)。詳細・実測・再現は `REPORT_PY99_3104_APPENDIX_4332.md`。
 
-### 既存の `--negctl drop-pred` が 6 件で使えない理由
+## 入口レジスタ葉 c_in・d_in・r8_in の呼出し側 (#4494 / PY-334)
 
-6 件の書込みの直接の読み (`r0.reads`) は 3 件 (0x1048ea8・0x1049059・0x10491d1)。閉包が辿る読みは 8 件 (`reach_before` で store を再帰に辿った先を含む)。どの合流でも、先行辺ごとの到達 store 集合 S_p が**同一**で、辺 1 本を外しても到達集合が変わらない (`contributing=[]`)。そのため `drop-pred` は「寄与を持つ先行辺が無い」で終了する。
+測定 commit: `27463195a` (main `4f3c0ad46` を merge した後の tree。merge 由来で `analysis/flapi/pe_py316_p_vtable.py`・`analysis/py264_cell_callers.py` が main から入ったため、merge commit を測定 commit とする。`py99_closure.py`・`py334_entry_source.py` は main 側で変更なし)。`git diff 27463195a HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
+素材: `fl-win64` の `block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst -C work/py334 --wildcards '*block00031_PE.bin'`・1.5 秒)。`analysis/py53_dispatch.py` → `fn=4664 dispatch=13 r8d_tests=174`。
 
-### 追加した辺の選び方 (`--negctl drop-part`)
+### 結論 (受入 1・2・3 の判定)
 
-読みの後ろ向きに辿れる辺のうち、外したときに到達集合が**一部だけ減る** (空にならない) 辺を、VA 順に最初の 1 本選ぶ。合流の先行辺ではなく、経路の途中の辺を対象にする (合流の寄与は重なるため)。`drop-pred` と既定の挙動は変えていない。
+- 3 葉の出どころは呼出し鎖で確定した。`c_in` (ecx) = eventId・`d_in` (edx) = value・`r8_in` (r8d) = flags。Python の PyArg `Iii` (0xd69f00 が `[rbp+0x7c]`・`[rbp+0x78]`・`[rbp+0x74]` へ書き出し、`0xd69f65`〜`0xd69f74` で wrapper 0xd84740 へ渡す) → wrapper 0xd84740 → dispatch 0xd843d0 (`job+0x18`・`+0x20`・`+0x28` へ複写) → callback 0xd846e0 (ecx・edx・r8d へ読む) → 0x1046a30 の入口 (`[rbp+0x5b0]`・`[rbp+0x5b8]`)。`analysis/py334_entry_source.py` が PE から 22 命令 (PyArg 側 7 件 + wrapper 以降 15 件) を assert する (全件 ok)。
+- 呼出し側で確定する範囲: 3 葉の値は呼び出す Python スクリプトが渡す実行時の引数であり、バイナリの中に定数は無い。1 件の呼出しでも値は呼出しごとに違いうる。よって binary の解析だけでは確定できない。確定には、Python 側の呼出しの実値 (実行時の観測・スクリプト集合) が要る。本節の範囲では確定しない (判定: **未閉のまま**)。
+- 厳格判定の閉じた書込み: **0/49 のまま** (増減 0)。残る葉が入口のレジスタ値だけの書込みは **49/49** (#4266 の合流の閉包で `0x104bffa` の `⚠合流` が消えた後の値)。
+- 検算: 算法 A と B の mismatch **0** (49 件)。negctl `--negctl drop-pred` は mismatch **17**・exit 1 (維持)。
 
-### 結果 (commit `e4c4099df`)
+### 実測 (commit `27463195a`・load average 0.07 (09:58))
 
-| 実行 | 結果 | exit |
+素材: `fl-win64` の `extracted/block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst -C work/py334 --wildcards '*block00031_PE.bin'`・1.5 秒)。入力は `analysis/py53_dispatch.py work/py334/extracted/block00031_PE.bin work/py53` (0.06 秒) で作った `work/py53/fn.txt`。
+
+| 実行 | 結果 | exit | 所要 (real) |
+|---|---|---|---|
+| `analysis/py99_closure.py work/py53/fn.txt` | `_in` だけの書込み 49/49・閉じた書込み (B) 0/49・(A) 0/49・mismatch 0 | 0 | 0.387 秒 |
+| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred` | mismatch 17 | 1 | 0.502 秒 |
+| `FL_WIN64_DIR=work/py334 analysis/py334_entry_source.py` | 呼出し鎖 22 命令・全件 ok | 0 | 0.056 秒 |
+
+### 限界
+
+- 呼出し側の値を Python 側の全呼出しに当てはめていない (呼出し箇所は外部スクリプトで、リポジトリ内に網羅はない)。
+- 閉包の式の同値性は見ていない (文字列の一致のみ・従来どおり)。
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `analysis/py99_closure.py work/py53/fn.txt` (既定 49 件) | mismatch 0 件 | 0 |
-| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred` (49 件) | 辺 `0x104754a -> 0x104755d` を外す・mismatch 17 件 | 1 |
-| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-part` (49 件) | 辺 `0x1047543 -> 0x104754a` を外す・mismatch 17 件 | 1 |
-| `analysis/py99_closure.py work/py53/fn.txt --rint` (6 件) | mismatch 0 件・閉包の A と B が一致 | 0 |
-| `analysis/py99_closure.py work/py53/fn.txt --rint --negctl drop-pred` (6 件) | 「寄与を持つ先行辺が無い」で終了 (mismatch は出ない) | 1 |
-| `analysis/py99_closure.py work/py53/fn.txt --rint --negctl drop-part` (6 件) | 辺 `0x1047543 -> 0x104754a` を外す・**mismatch 1 件** (書込み `0x1048ed3`・読み `0x1048ea8`・X=0x520 の到達集合が `{0x1047543, 0x1047556}` → `{0x1047556}`) | 1 |
-
-- 6 件の閉包を壊す辺は 1 本 (`0x1047543 → 0x104754a`) で、mismatch = 1・exit 1 を数値で確認した。
-- 他の 5 件 (0x10483d3・0x104906e・0x10491ed・0x104a876・0x104a999) は、この辺を外しても変わらない。
-- 0x1048ed3 の閉包は、この辺を外すと読み 0x1048ea8 の R が 1 件 (`0x1047556`) だけになる。A (前向き) は 2 件のままなので mismatch が出る。
-- 所要: `--rint --negctl drop-part` 実測 3 回とも real 0.38 秒 (rc 1)・load (1 分) 0.04 (測定開始時 `0.04 0.12 0.13`)。
-
-### 再現
-
-    cd tools/python
-    python3 analysis/py99_closure.py work/py53/fn.txt --rint --negctl drop-part   # 終了コード 1 (mismatch 1)
+| 入口レジスタ葉 `c_in`・`d_in`・`r8_in` の値 (Python 側の呼出しの実値) | 49 件の式が関数の入力のまま。厳格判定の閉じた書込みは 0/49 | PM agent の判断待ち: 3 葉の実値を実行時観測で取るか / 既定案: 観測計画は起票せず本節を未閉のまま残す |

@@ -169,14 +169,17 @@ static int eh_walk(UCtx c) {
     return -3;
 }
 
-static MS void k_RaiseException(uint32_t code, uint32_t fl, uint32_t n, const void* a) {
-    (void)fl; (void)n; (void)a;
+static MS void k_RaiseException(uint32_t code, uint32_t fl, uint32_t n, const uint64_t* a) {
+    (void)fl;
     if (code == 0xe06d7363) {
         /* 呼び出し元 (guest) の状態: この関数は frame pointer を持つ (__builtin_frame_address) ので、
          * rbp が保存した guest rbp を指し、戻りアドレスは rbp+8、呼び出し元の rsp は rbp+16。 */
         uint64_t* fp = (uint64_t*)__builtin_frame_address(0);
         UCtx c; memset(&c, 0, sizeof c);
         c.r[4] = (uint64_t)fp + 16; c.r[5] = fp[0]; c.rip = (uint64_t)__builtin_return_address(0);
+        if (n >= 3)
+            fprintf(stderr, "[ott_native] RaiseException(0xe06d7363) magic=%#llx obj=%#llx throwinfo=%#llx throw_site_rva=%#llx\n",
+                    (unsigned long long)a[0], (unsigned long long)a[1], (unsigned long long)a[2], (unsigned long long)(c.rip - IMG_BASE));
         int d = eh_walk(c);
         if (d >= 0) fprintf(stderr, "[ott_native] RaiseException(0xe06d7363): frame #%d に handler あり。__CxxFrameHandler の dispatch は未実装 — fail-fast\n", d);
         else fprintf(stderr, "[ott_native] RaiseException(0xe06d7363): handler が見つからない (walk=%d) — fail-fast\n", d);
@@ -222,6 +225,21 @@ static MS void* k_RtlPcToFileHeader(void* pc, void** base) {
     return b;
 }
 
+/* ICALL-100: RtlCaptureContext。x64 CONTEXT (0x4d0 B) の制御部だけを埋める。
+ * 呼び出し元の rip/rsp は呼び出し時のフレームから取る。汎用レジスタ (Rax..R15)・XMM は native 側から
+ * 取れない (ゲストの実レジスタは ott_ms_call の外に無い) ためゼロ。ContextFlags に含まれる範囲だけを意味がある値として扱う。 */
+static MS void k_RtlCaptureContext(uint8_t* ctx) {
+    uint64_t* fp = (uint64_t*)__builtin_frame_address(0);
+    memset(ctx, 0, 0x4d0);
+    *(uint32_t*)(ctx + 0x30) = 0x10001f;      /* ContextFlags = CONTEXT_AMD64 | CONTROL|INTEGER|SEGMENTS|FLOAT|DEBUG_REGISTERS */
+    *(uint32_t*)(ctx + 0x34) = 0x1f80;        /* MxCsr 既定値 */
+    *(uint16_t*)(ctx + 0x38) = 0x33;          /* SegCs (64bit code) */
+    *(uint16_t*)(ctx + 0x42) = 0x2b;          /* SegSs */
+    *(uint32_t*)(ctx + 0x44) = 0x202;         /* EFlags (IF) */
+    *(uint64_t*)(ctx + 0xf8) = fp[1];         /* Rip = 戻り先 */
+    *(uint64_t*)(ctx + 0x98) = (uint64_t)fp + 16; /* Rsp = 呼び出し元の rsp */
+}
+
 typedef struct { const char* n; void* f; } Impl;
 static const Impl IMPL[] = {
     {"GetProcessHeap", k_GetProcessHeap}, {"HeapAlloc", k_HeapAlloc}, {"HeapFree", k_HeapFree},
@@ -237,6 +255,7 @@ static const Impl IMPL[] = {
     {"FlsGetValue", k_TlsGetValue}, {"FlsSetValue", k_TlsSetValue},
     {"RtlPcToFileHeader", k_RtlPcToFileHeader},
     {"RtlLookupFunctionEntry", k_RtlLookupFunctionEntry}, {"RtlVirtualUnwind", k_RtlVirtualUnwind},
+    {"RtlCaptureContext", k_RtlCaptureContext},
     {NULL, NULL}};
 
 static MS void missing_import(uint64_t idx) {

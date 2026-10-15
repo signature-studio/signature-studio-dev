@@ -13,21 +13,19 @@
 
 ## 1. rep 文字列の宛先 rdi の由来 (ext A・受入 1)
 
-後ろ向きの追跡 (直前 300 命令・深さ 3)。`mov reg, reg` と `lea reg, [reg+...]` は元のレジスタへ辿る。250 件の内訳 (`ext A` の出力そのまま):
+後ろ向きの追跡 (関数先頭まで・深さ 3)。`mov reg, reg` と `lea reg, [reg+...]` は元のレジスタへ辿る。250 件の内訳 (`ext A` の出力そのまま):
 
 | 由来 (ext A の分類) | 件数 |
 |---|---|
-| スタック (`lea` rbp/rsp 相対 83・`pop` 20・load-stack 系 130 のうち一部を含む合計) | 130 |
-| 領域外の大域・即値 (`lea rip`・load-rip・imm。領域外と判定) | 6 |
+| スタック (`lea-stack` 126・`load-stack` 7・`mov>lea-stack` 18・`lea-reg>load-stack` 28) | 179 |
+| 領域外の大域 (`lea-rip-other` 2・`lea-reg>lea-rip-other` 1・`lea-reg>load-rip-other` 2) | 5 |
 | 領域 (`lea rip`・絶対即値・load-rip-region) | **0** |
-| `insb`・`insd` (rep ins 系が rdi を書く) | 11 |
-| ポインタの load・index 付き lea (追跡せず) | 17 |
-| 演算 (`xor`・`add`・`sub`・`shr`・`imul`) | 5 |
-| 深さ上限 (3) で停止 | 1 |
-| 未確定: 300 命令内・連鎖内で rdi の書込みが見つからない | 80 |
+| 間接ポインタ (`lea-indexed` 17・`mov>load-ptr` 2・`lea-reg>load-ptr` 11) | 30 |
+| 関数内で rdi の書込みなし (`unwritten-300` 2・`mov>unwritten-300` 8・`mov>mov>unwritten-300` 8・`lea-reg>unwritten-300` 5・`lea-reg>mov>unwritten-300` 13) ※ `-300` は旧窓名の残り。実際の窓は関数先頭まで | 36 |
 
 - 領域を宛先とする rep は **0 件**。
-- 未確定は **81 件** (未確定 80 件と深さ上限 1 件)。前段の 167 件 (粗い分類) からは減ったが、0 件にはならない。残件は #3504 に残す。
+- 未確定は **36 件** (関数内で rdi の書込みが見つからないもの)。前回 (80 件・窓 300 命令) からの減りは窓を関数先頭まで広げたため。
+- 関数内で書込みが無い 36 件は、Win64 ABI では rdi が非揮発で呼出し元から渡されるため、値は呼出し側に依る。呼出し側を追わない限り宛先は確定しない。残件は #3504 に残す。
 
 ## 2. 戻り値の領域ポインタ 7 件の呼出し側 (ext B・受入 2)
 
@@ -56,16 +54,17 @@
 
 ## 4. 測定
 
-- 測定 commit (コードを変えた最後の commit): `5d5216087`。`git diff 5d5216087 HEAD -- tools/python/analysis` は 0 行。
-- 実行: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_k_struct_probe.py 2`。
-  - 拡張前 (ext 追加前の版): 終了 0・73.2 秒 (線形走査 72.1 秒)・load 0.3 (開始時)。
-  - 測定 commit `5d5216087` (ext 追加後): 終了 0・155.3 秒・load 0.45 (開始時) / 0.96 (終了時)。
-- 拡張前後で `direct_K_writes=0 direct_K_reads=2`・正の対照 V 書込み 3 件 (`0xf82b80`・`0xf82c55`・`0xf82c5f`)・`returned pointers=7`・`alias accesses=38 K writes=0` は一致。
+- 測定 commit (コードを変えた最後の commit): `66510c88c` (rep rdi の追跡窓を関数先頭まで広げた版)。
+  `git diff 5d5216087 66510c88c -- tools/python/analysis/flapi/pe_k_struct_probe.py` は、追跡窓の 1 関数 (`src_of`) の差分だけ (この probe は他の analysis ファイルを import しない)。`tools/python/analysis` 全体では他の差分 (19 ファイル) があるが、本測定の probe は読まない。
+- 実行: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_k_struct_probe.py 2` (`<展開先>` は `fl-win64` の `block00031_PE.bin` を `extracted/` に展開した親)。
+  - 測定 commit `66510c88c`: 終了 0・149.1 秒 (scan 69.3 秒)・load 0.40 (開始時) / 0.95 (終了時)。
+  - 直前の commit `5d5216087` (窓 300 命令): 終了 0・153.6 秒。
+- 窓の変更の前後で `direct_K_writes=0 direct_K_reads=2`・正の対照 V 書込み 3 件・`returned pointers=7`・`alias accesses=38 K writes=0`・`ret-origin accesses=2528 K-covering=0` は一致。変わったのは rep rdi の分類だけ。
 
 ## 5. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| rep 文字列の rdi 由来 80 件 (§1) | K 領域への bulk copy の有無が未確定 | #3504 [PY-207] |
+| rep 文字列の rdi 由来 36 件 (§1) | K 領域への bulk copy の有無が未確定 | #3504 [PY-207] |
 | 戻り値の領域ポインタの呼出し側: 先の関数 (深さ 1 以上) | 呼出し側経由の K 書込みの有無が未確定 | #3504 [PY-207] |
 | K を含む構造体の大きさ (§3) | 受入 3 | #3504 [PY-207] |
