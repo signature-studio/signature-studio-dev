@@ -18,7 +18,7 @@ typedef unsigned long long ulonglong;
 typedef unsigned int uint;
 typedef unsigned char byte;
 typedef unsigned short ushort;
-typedef void code;
+typedef longlong (*code)();
 typedef unsigned char undefined;
 typedef signed char sbyte;
 
@@ -98,4 +98,21 @@ static inline V128 vpsrldq_avx(V128 s, int n) {
     for (int i = 0; i + n < 16; i++) r.b[i] = s.b[i + n];
     return r;
 }
+/* x86 `mul r64` (rdx:rax = rax × r64) を 128bit ベクタの `*` と印字した形 (stereo 180fdc470・180fdfdb0)。
+ * 呼出し直前に両オペランドの上位 qword は 0 (`_8_8_ = 0`) なので、積は 64×64→128 の符号なし積。 */
+static inline V128 v128_mul64(V128 a, V128 b) {
+    unsigned __int128 p = (unsigned __int128)a._0_8_ * b._0_8_;
+    V128 r; memcpy(r.b, &p, 16);
+    return r;
+}
+/* 128bit 整数加算 (機械語の add/adc の繰上がりを含む)。 */
+static inline V128 v128_add(V128 a, V128 b) {
+    unsigned __int128 x, y;
+    memcpy(&x, a.b, 16); memcpy(&y, b.b, 16);
+    x += y;
+    V128 r; memcpy(r.b, &x, 16);
+    return r;
+}
+/* Ghidra SUBPIECE: SUB168(x, 0) = 下位 8 バイト, SUB168(x, 8) = 上位 8 バイト。 */
+static inline ulonglong SUB168(V128 v, int off) { ulonglong r; memcpy(&r, v.b + off, 8); return r; }
 #endif

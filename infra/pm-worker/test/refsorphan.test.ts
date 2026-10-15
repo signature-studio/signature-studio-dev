@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { configuredApp, j, markFresh, T0, type Call } from "./helpers.ts";
 import { HUMAN, IMPL_BOT, OUTSIDER, type Author, at, commentEv, issueEv, prEv, send, type Ctx } from "./pm_helpers.ts";
 import { parentNumbers, refsOnlyNumbers } from "../src/refs.ts";
+import { KIND_LIMITS } from "../src/pm.ts";
 
 const pmCalls = (calls: Call[]) => calls.filter((c) => c.method === "POST" && c.url.endsWith("/dispatches") && c.body?.event_type === "oc-pm");
 const sendAll = async (ctx: Ctx, items: Array<[string, unknown]>) => {
@@ -108,15 +109,21 @@ test("送信: refs_orphan の payload は kind と ref だけ。本文の文字�
   assert.deepEqual(d[0].body, { event_type: "oc-pm", client_payload: { kind: "refs_orphan", ref: 150 } });
 });
 
-test("ネガコン (d): refs_orphan は 1 日 10 件まで。11 件目は送らない (全体の上限に加えて効く)", async () => {
-  const ctx = await live();
-  const nums = Array.from({ length: 11 }, (_, i) => 200 + i);
+test("ネガコン (d): refs_orphan は 1 日 KIND_LIMITS.dayMax (24 × 最低配分 = 72) 件まで。73 件目は送らない (全体の上限に加えて効く)", async () => {
+  const clock = { t: T0 };
+  const ctx = await live(clock);
+  const day = KIND_LIMITS.refs_orphan!.dayMax;
+  const nums = Array.from({ length: day + 1 }, (_, i) => 200 + i);
   for (const n of nums) await sendAll(ctx, [["issues", parent(n)], ["pull_request", merged(n + 100, `Refs #${n}`)]]);
-  await markFresh(ctx);
-  await ctx.app.engine.pmDispatch(await (ctx.app.engine as any).d.gh());
+  const gh = await (ctx.app.engine as any).d.gh();
+  for (let h = 0; h < 4; h++) {
+    clock.t = T0 + h * 3_600_000;
+    await markFresh(ctx);
+    await ctx.app.engine.pmDispatch(gh);
+  }
   const sent = pmCalls(ctx.m.calls).map((c) => c.body.client_payload.ref);
-  assert.deepEqual(sent, nums.slice(0, 10));
-  assert.ok(!sent.includes(210), "11 件目は送らない");
+  assert.deepEqual(sent, nums.slice(0, day), "毎時 24 件の枠で 3 時間に 72 件。4 時間目は 1 日の上限で送らない");
+  assert.ok(!sent.includes(nums[day]), "73 件目は送らない");
 });
 
 test("ネガコン (e): 同じ N は 24 時間に 1 回まで。24 時間たてば送る", async () => {
