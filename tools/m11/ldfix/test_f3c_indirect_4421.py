@@ -19,9 +19,8 @@ CS = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 CS.detail = True
 
 # (名前, 機械語 (hex の列), 最初の deref の命令 index, 期待 (True = 置換しない))
-# 'mov rax,[rdi]' = 488b07 / 'call rax' = ffd0 / 'call 0x2000' = e8fb0f0000 (rel32 0x1000+5+0xffb... は即値 call)
+# 'mov rax,[rdi]' = 488b07 / 'call rax' = ffd0 / 'call rel32 0' = e800000000 (即値の直接 call)
 # 'call qword ptr [rip+0]' = ff1500000000 (間接 call、c40420 の形)
-# 'mov [rsi+0x14],0' = 48c7461400000000 (memory write)
 CASES = [
     ('間接 call (レジスタ) の後に deref', ['ffd0', '488b07'], 1, True),
     ('間接 call (メモリ経由) の後に deref', ['ff1500000000', '488b07'], 1, True),
