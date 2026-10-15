@@ -81,9 +81,17 @@ static MS void* k_HeapReAlloc(void* h, uint32_t f, void* p, uint64_t sz) {
 static uint32_t g_lasterr;
 static MS uint32_t k_GetLastError(void) { return g_lasterr; }
 static MS void k_SetLastError(uint32_t e) { g_lasterr = e; }
-static MS void k_RaiseException(uint32_t code, uint32_t fl, uint32_t n, const void* a) {
-    (void)fl; (void)n; (void)a;
-    fprintf(stderr, "[ott_native] RaiseException(0x%x) 到達 — fail-fast\n", code); exit(97);
+/* ICALL-103: C++ 例外 (0xe06d7363) の到達位置を記録する。unwind 本体は未実装 (fail-fast のまま)。 */
+static MS void k_RaiseException(uint32_t code, uint32_t fl, uint32_t n, const uint64_t* a) {
+    (void)fl;
+    uint64_t ret = (uint64_t)__builtin_return_address(0);
+    if (code == 0xe06d7363 && n >= 3) {
+        fprintf(stderr, "[ott_native] RaiseException(0xe06d7363) 到達 — fail-fast (unwind 未実装) magic=%#llx obj=%#llx throwinfo=%#llx throw_site_rva=%#llx\n",
+                (unsigned long long)a[0], (unsigned long long)a[1], (unsigned long long)a[2], (unsigned long long)(ret - IMG_BASE));
+    } else {
+        fprintf(stderr, "[ott_native] RaiseException(0x%x) 到達 — fail-fast\n", code);
+    }
+    exit(97);
 }
 static MS int k_QPC(int64_t* v) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); *v = t.tv_sec * 1000000000LL + t.tv_nsec; return 1; }
 static MS int k_QPF(int64_t* v) { *v = 1000000000LL; return 1; }

@@ -3,6 +3,7 @@
  * TEB (gs) 敷設, alloc log, IAT pseudo-VA index 参照。 */
 #include "fle_cpu.h"
 #include <stdio.h>
+#include "fle_approx.inc"
 uint64_t R[16];
 X128 X[16];
 X128 YL[16];
@@ -282,3 +283,14 @@ void imp_CoCreateInstance(void) { R[RAX] = (uint64_t)-1; IMP_RET(); }
 void imp_CoTaskMemAlloc(void) { void* p = fle_alloc(R[RCX], 1); R[RAX] = (uint64_t)(uintptr_t)p; IMP_RET(); }
 void imp_CoTaskMemFree(void) { IMP_RET(); }
 void imp_PropVariantClear(void) { R[RAX] = 0; IMP_RET(); }
+
+/* rsqrtps の実機近似 (gen_simd.py の kh_rsqrt_exact と同一式・同一表)。
+ * 指数則 (実測): rsqrtps 190-((e+1)>>1)。奇偶で別表 (√2 因子)。rcpps は x64c.py が生成 C 内の kh_rcp_exact を使う。 */
+uint32_t fle_rsqrt_exact(uint32_t x) {
+    uint32_t s = x & 0x80000000u, e = (x >> 23) & 0xff, man = x & 0x7fffffu;
+    if (e == 0) return s | 0x7f800000u;
+    if (e == 0xff) return man ? (s | 0x7f800000u | (man | 0x400000u)) : (s ? 0xffc00000u : 0u);
+    if (s) return 0xffc00000u;
+    return (((uint32_t)(190 - (int)((e + 1) >> 1)) << 23) | ((e & 1) ? kh_at_rsq_odd[(x >> 11) & 0xfffu]
+                                                                : kh_at_rsq_even[(x >> 11) & 0xfffu]));
+}
