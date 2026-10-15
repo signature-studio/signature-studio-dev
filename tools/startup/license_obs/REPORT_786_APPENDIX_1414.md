@@ -112,3 +112,33 @@ g1 の dword (`0x14f852c`) を rip 相対で直接指す命令は 0 件 (既知)
 
 - 子 issue の本文には、#1414 の原文の受入 (userContentEdits の 2026-10-13T21:57:43Z の版) を原文のまま載せた。原文にない項目は「新規」と明記した。
 - 依頼者の .reg 素材 (#785) は本件の入力には使わない。
+
+## 9. #3727 受入 2: 0x10d3a30 の上流 (呼出し元の遡及・本 PR で追記)
+
+再現: `python probe_1414_callers.py --dyn --write` (結果 `results/probe_1414_callers.json`)。静的は rel32 の `call` のみ。
+
+| 段 | 呼出し元 (直接・rel32) | 件数 | 6 入力で到達 |
+|---|---|---|---|
+| 0x10d3a30 | 0x10cf498 (0x10c7cd0 内・g6 gate)・0x11fd457・0x11fe627 (0x11fc770 内) | 3 | 0 (0x10c7cd0 の entry のみ 6 入力で到達) |
+| 0x11fc770 | 0xc4e49e (0xc4dba0 内)・0xd1a996 (0xd18130 内)・0xed7c32 (0xed7c00 内) | 3 | 0 |
+| 0xc4dba0 | 0xc4f32e (0xc4ecf0 内) | 1 | 0 |
+| 0xd18130 | 0xd1d656 (0xd1d3d0 内)・0xd1f026 (0xd1efd0 内) | 2 | 0 |
+| 0xed7c00 | 0 (rel32 の call/jmp 参照は無し。0xed7c00 は 0xed83c5 で 0xd1efd0 を call する側。0xd1efd0 は 0xd18130 の呼出し元) | 0 (直接) | 0 |
+
+- 深さは呼出し辺の数で数える。0x10d3a30 ← 0x11fc770 (1) ← 0xc4dba0・0xd18130 (2) ← 0xc4ecf0・0xd1d3d0・0xd1efd0 (3)。深さ 3 までを列挙し、深さ 3 の関数の呼出し元は遡っていない (0xd1efd0 の呼出し元は 0xed83c5 (0xed7c00 内) だが、表の深さ外)。
+- 上の表は `probe_1414_callers.py --dyn --write` の出力 (`results/probe_1414_callers.json`) から作った。
+
+- 6 入力 (`probe_1414.CASES`) の unicorn code hook: 0x10d3a30・0x11fc770・0xc4dba0・0xd18130・0xed7c00 は 6 入力とも未到達 (hit 0)。到達したのは 0x10c7cd0 の entry (6 入力とも 1 回) のみ。
+- 0x10d3a30 の入口 (条件 1) の実機経路は未特定。0xed7c00 は直接呼出し 0 件のため、関数ポインタ経由と推定 (未確認)。
+- 静的 `probe_1414_tables.py` の再現 (本 PR で再測定): 間接 call 298・動的 `dyn_union` 41・未実行 257・vtable hit 0 (6 入力)。前回の値と一致。
+- 再測定 (測定 commit: `837e2034b` = コードを変えた最後の commit。検証 HEAD: `76ae9dc76`): `probe_1414_callers.py --dyn --write` 57.7 秒 (e4df3d7ec)・58 秒 (fa53f686a)・43.5 秒 (76ae9dc76)・rc 0・load average 1 分値 0.16 → 0.31。出力 JSON は commit 済みのものと一致。実行コードの差分は `git diff 837e2034b 76ae9dc76 -- tools/startup/license_obs/probe_1414_callers.py probe_1414.py emu_reg.py peidx.py run_cases.py` と `tools/shared/paths.py` で 0 行。main 取り込みで追加された `probe_3725_*` (#3725 の 4 ファイル) は本測定の実行対象外。
+- 受入 1 (0x11cb000 / 0x10d50d0 の起動元) は未達。表 T1/T2 の基底を指す参照は静的に 0 件 (§5 と同じ)。6 入力では 0x10c7cd0 の間接 call が表を引かない。
+- 未実行 257 件の入力条件は、本探索では特定していない (6 入力の seed からは未到達)。
+
+## 10. 未解決 (#3727 残り)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 0x11cb000・0x10d50d0 の起動元 (表 T1/T2 の由来・未実行の間接 call 257 件の入力条件) | 受入 1 未達 | #3727 (部分達成のため Refs) |
+| 0xed7c00 の起動元 (直接呼出し 0 件・関数ポインタ経由と推定) | 0x10d3a30 の上流の終端が未確定 | #3727 |
+| 0x10d3a30 の入口に実機経路で届く入力 (6 入力では 0x11fc770 系が未到達) | 受入 2 の入力条件が未確定 | #3727 |

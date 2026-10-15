@@ -31,7 +31,7 @@ def main():
     ap.add_argument("--neg", action="store_true")
     a = ap.parse_args()
     build()
-    cmd = [BIN, a.pe, "--slot", "0", "0"] + (["--neg-lea"] if a.neg else [])
+    cmd = [BIN, a.pe, "--create-only"] + (["--neg-lea"] if a.neg else [])
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         rc, out = p.returncode, p.stdout
