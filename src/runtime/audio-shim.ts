@@ -90,7 +90,8 @@ export class FlAudioShim {
   controlPanelCalls = 0;
   lastCapture: FlCaptureSpec | null = null;
   workletErrors: string[] = [];
-  clockJumpLog: { q: number; d: number; frame: number; prev: number; ms: number }[] = [];
+  /** clock_jump 1 件ごと (上限 256 件)。ct = AudioContext.currentTime、pn = performance.now() (worklet 側、不可なら -1)、cb = producer の bufferSwitch 通し番号 */
+  clockJumpLog: { q: number; d: number; frame: number; prev: number; ms: number; ct: number; pn: number; cb: number }[] = [];
   commandsHandled = 0;
   private refPts: { x: number; y: number }[] = [];
 
@@ -268,9 +269,9 @@ export class FlAudioShim {
       },
     });
     node.port.onmessage = (e: MessageEvent) => {
-      const d = e.data as { type: string; message?: string; q?: number; d?: number; frame?: number; prev?: number; ms?: number };
+      const d = e.data as { type: string; message?: string; q?: number; d?: number; frame?: number; prev?: number; ms?: number; ct?: number; pn?: number; cb?: number };
       if (d.type === "error") { this.workletErrors.push(d.message ?? "?"); this.log(`worklet error: ${d.message}`); }
-      if (d.type === "clock_jump") this.clockJumpLog.push({ q: d.q ?? -1, d: d.d ?? 0, frame: d.frame ?? -1, prev: d.prev ?? -1, ms: d.ms ?? 0 });
+      if (d.type === "clock_jump") this.clockJumpLog.push({ q: d.q ?? -1, d: d.d ?? 0, frame: d.frame ?? -1, prev: d.prev ?? -1, ms: d.ms ?? 0, ct: d.ct ?? -1, pn: d.pn ?? -1, cb: d.cb ?? -1 });
     };
     node.connect(ctx.destination);
     this.node = node;

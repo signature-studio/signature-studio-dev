@@ -202,11 +202,13 @@ if [ ! -f fw_route.cjs ]; then
   #    invalid cast opcode for cast from 'i64' to 'i128' — 実測は REPORT §参照)
   # llvm-as は runner に無いため、emsdk 同梱 clang の .ll 入力で同等の検証を行う (CAB-195 #195 run)
   clang -x ir -c fw_flat4_canon3.ll -o tmp/fw_canon3.bc -w || { echo "[s2] IR 検証失敗 (clang -x ir)" >&2; exit 1; }
+  # EXIT_RUNTIME=0: RestoreContext の exit(0) の後も fw_*_count 等の情報関数を呼べるようにする (#3186)。
+  #   1 だと exit 後の呼出しが "called after runtime exit" で assert し、情報値が 0 になる。
   emcc fw_flat4_canon3.ll fw_simd.c fw_table.c fw_rt.c fw_boot.c "$HERE/hostshim/hostshim.c" \
     -I. -I"$HERE/hostshim" -I"$T/tools/liftlib/liftlib/simd" \
     -w -O0 -g -ffp-contract=off -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB \
     -sGLOBAL_BASE=$((0x10000000)) -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=createModule \
-    -sEXIT_RUNTIME=1 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
+    -sEXIT_RUNTIME=0 -sERROR_ON_UNDEFINED_SYMBOLS=0 \
     -sEXPORTED_FUNCTIONS=_function_6c13a0,_function_4189c0,_function_6bdde0,_fw_dispatch_count,_fw_last_site,_fw_last_target,_fw_ff_count,_fw_ff_msg,_fw_va_calls,_fw_va_used,_fw_alloc_count,_fw_alloc_bytes,_fw_call_cur,_fw_hs_host,_fw_hs_host_va,_fw_hs_install,_fw_hs_fold_cell,_fw_hs_trace,_fw_hs_reset,_fw_hs_count,_fw_hs_records,_fw_hs_installed,_fw_hs_fle_impl \
     -sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPU32,HEAPF32,HEAPF64,wasmExports \
     -Wl,--initial-memory=$((0x14000000)) -Wl,--max-memory=$((0x80000000)) \

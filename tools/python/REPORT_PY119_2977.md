@@ -60,10 +60,10 @@
 
 ## 実装
 
-- `host/fl_mock.mjs`: 6 関数。範囲外は `RANGE("Range error")` (code 4)。undo 3 件は値を `st.undoHistoryPos/Count/Last` に記録。既定値 `numerator 4`・`denominator 4`・undo 0 は仮置き。
+- `host/fl_mock.mjs`: 6 関数。範囲外は `RANGE("Range error")` (code 4)。undo 3 件は値を getter と同じ `st.undoPos/undoCount/undoLast` に記録 (PY-94 #2830 との取り込みで統一。C は `undo_pos/undo_count/undo_last`)。既定値 `numerator 4`・`denominator 4`・undo 0 は仮置き。
 - `provider/fl_engine.c`: 同じ 6 関数。`RANGE_MSG(m)` マクロを追加 (文言を変えるため)。`fl_table.c` は再生成していない (weak 宣言が既にある)。
 - `tests/provider_check.mjs`: この PR の追加は `pe119set` 集合 6 件 (general setter) のみ。main 取り込み後の件数は 実装 97 → 103、未実装 338 → 332 (総数 435 は不変)。基準の 97 は main の `pe121` (screen 5 件・#2985) と ui の `pe119` (6 件・#2980) を含む。
-- `tests/general_diff.mjs`: 呼出し 21 件 (setRecPPQ 4・setNumerator 4・setDenominator 4・undo 4 と既存 5) + 引数個数違い 4 件 = 計 25。
+- `tests/general_diff.mjs`: 呼出し 21 件 (setRecPPQ 4・setNumerator 4・setDenominator 4・undo 4 と既存 5) + 引数個数違い 4 件 = 計 25 (本 PR 時点の件数)。PY-94 (#2830) 取り込み後の件数は `tools/python/REPORT_PY94.md` の `## 検証` 節。
 
 ## 検証
 
