@@ -158,10 +158,12 @@ def analyze(md, code, va, end_va, read_abs):
                 work.append(s)
     livein = 0
     live_at = []
+    undef03 = []
     for k in range(n):
         if must[k] is not None:
             hit = eff[k][0] & ~must[k] & 0x30
             livein |= eff[k][0] & ~must[k] & 0xFFFF
+            undef03 += [(insns[k], j) for j in range(4) if eff[k][0] & ~must[k] & 1 << j]
             if hit:
                 live_at.append(insns[k].address)
     # may-def (いずれかの経路で書かれた集合・call の clobber は除く): 呼出側の引数準備
@@ -188,7 +190,8 @@ def analyze(md, code, va, end_va, read_abs):
         rd, wr = effects(md, ins)
         anyref |= (rd | wr) & 0x30
     return {'insns': n, 'livein': livein, 'live_at': live_at[:8], 'anyref': anyref,
-            'unknown_flow': unknown, 'jt_resolved': jt_resolved, 'call_args': call_args}
+            'unknown_flow': unknown, 'jt_resolved': jt_resolved, 'call_args': call_args,
+            'undef_reads03': undef03}
 
 
 def bits(m):
