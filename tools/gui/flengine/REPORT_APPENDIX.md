@@ -190,7 +190,7 @@ CreateFileW の 1 呼出し = printErr の 1 行 `SHIMOPEN {json}`。json は `o
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 呼出元 VA (wasm function index → `function_<VA>`) | 受入 1 の「呼出元 VA」が未取得 | [WIN-14] #2964 |
+| 呼出元 VA (wasm function index → `function_<VA>`) | 解決済み (WIN-14・§8-7)。build 側の name section 追加は行っていない | 解決: [WIN-14] #2964 |
 | 実 trace の採取 (EnterCriticalSection 修復後)・asset 集合・実 FL との差 | 受入 2 未達。実 trace が 0 件 | [WIN-15] #2965 (依存 #2880) |
 | shimx 側 (`tools/shimx`) は構造化 trace を出さない (未変更) | assettrace REPORT §4 の shimx 行は残る | PR 本文の未解決表のみ |
 
@@ -201,6 +201,30 @@ CreateFileW の 1 呼出し = printErr の 1 行 `SHIMOPEN {json}`。json は `o
 | `bash tools/shim/test.sh` | exit 0 (18 s)・shim 53 API × MT/ST・全 PASS |
 | `gcc -Wall -c tools/shim/src/file.c` (native) | 警告 0 |
 | 再現 | `bash tools/gui/flengine/e2e.sh` / `node tools/gui/flengine/cfi_probe.mjs --out <json> --trace-out <jsonl>` / `node tools/gui/flengine/open_trace_posctl.mjs` |
+
+### 8-7. 呼出元 VA の解決 (WIN-14 #2964)
+
+測定 commit: `b26633d5` (コードを変えた最後の commit)。後続の commit は本節の追記のみ (`git diff b26633d5 HEAD -- tools/gui/flengine tools/shim tools/m11 ':!tools/gui/flengine/REPORT_APPENDIX.md'` の出力は空)。
+
+仕組み: name section が無い wasm では V8 のスタックが `wasm-function[N]` (N = function index) しか出さない。
+`tools/gui/flengine/wasm_fnnames.mjs` が `<cjs>.wasm` の export section (`--export-all` で全 lift 関数が export 済み) から {index → 名前} の表を作り、SHIMOPEN の `frames` を引いて最初の `function_<VA>` を `caller` に入れる。
+build (wasm) と `tools/shim/src/file.c` は変えない (既定 build の出力は不変)。表の件数は `cfi_probe.mjs` の `fnmap` (`n` 16332・`lift` 7434 = 既定 build の実測)。
+表の正しさの確認: 実測スタックの `wasm-function[14995]` は表で `CreateFileW` に解決された。
+
+正の対照 (`open_trace_posctl.mjs`・既定 build `m11_gui.cjs` (`-O0 -pthread`)・`bash tools/gui/flengine/build.sh` 17 s):
+
+| 対照 | 呼出し | SHIMOPEN 行 | `caller` | path | err | 判定 |
+|---|---|---|---|---|---|---|
+| direct | JS から `_CreateFileW` | 1 | 空 (期待どおり: lift 関数の外から) | `C:\nonexistent\x.txt` | 2 (ENOENT) | PASS |
+| lifted | `_function_423230` (lift 関数・中で `CreateFileW` を呼ぶ。stack の `wasm-function[2277]`) | 1 | `function_423230` | 同 | 2 | PASS |
+
+exit 0・`pass: true` (`node tools/gui/flengine/open_trace_posctl.mjs`)。lifted の stack: `shim_open_trace_js` → `wasm-function[14997]` (open_trace) → `wasm-function[14995]` (CreateFileW) → `wasm-function[2277]` (`function_423230`) → JS。
+
+回帰確認 (`cfi_probe.mjs`):
+- この素材 (`work-m11` 展開直後の `tools/m11/work`) は boot7 取込前で `_CreateFruityInstance` が export されない。そのため §8-3 の起動経路 (CreateFruityInstance) は再現できず、trace 0 件は §8-3 と同じ扱いで記録する。
+- HEAD 版 `cfi_probe.mjs` と同じ wasm で比べ、`boot`・`reach`・`icall_miss`・`icall_miss_targets`・`open_trace`・`errs_n`・`host` は一致。`call` は両方とも `_CreateFruityInstance is not a function` (差は実行パスの表示のみ)。
+
+未解決: 実 FL の起動 trace の採取 (CreateFruityInstance 経路で CreateFileW に到達する実測) は [WIN-15] #2965。
 
 ## 9. WIN-11 (#2880): EnterCriticalSection の失敗 CS と初期化経路 (部分達成)
 
