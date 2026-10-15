@@ -23,17 +23,19 @@
 
 | 区分 | HEAD | run 数 | 結果 | 備考 |
 |---|---|---|---|---|
-| hunt (変更前) | `f44264ebe` (origin/main 起点) | 1 + 41 | 42/42 PASS・exit 0 | 判定行 (e2e.mjs) は作業ツリーの版 (`cw_at_underrun=[none]`)。hunt 上限 480 s |
+| hunt (変更前) | `f44264ebe` (本 PR の基点) | 41 | **41/41 PASS・exit 0・FAIL 0** | 13/13 PASS・wall 11〜12 s (run 1 のみ 15 s)・1 分 load 0.43〜2.66 (`hunt.sh` の summary.txt)。回数上限 41 run・時間上限 900 s |
 | hunt (変更後) | `2367066a5` | 36 | **36/36 PASS・exit 0・FAIL 0** | 13/13 PASS・wall 11〜12 s・1 分 load 0.75〜2.87。hunt 上限 420 s |
 
-- 測定 commit: `2367066a5` (コードを変えた最後の commit)。`git diff 2367066a5 HEAD -- public/worklets src/runtime tools/audio/integration tools/audio/src` は、本節の commit 時点で 0 行 (本節は文書のみ)。
+- 変更前 hunt の再測定 (`f44264ebe`・2026-10-15 01:47〜01:55 UTC): 旧版の『1 + 41 / 42/42 PASS』は、内訳 (1 の扱い) を裏付けるログが残っておらず確認できなかった。同じ手順で取り直した 41 run の値に置き換える。worktree を detached で `f44264ebe` に作り、`EMSDK_ENV` は上流 tag `6.0.12` (`tools/m1/flags.sh` の pin・CI と同版。R2 の `toolchain-emsdk` は本 run の `$ARTIFACTS_DIR` に無かった) を `emsdk install` / `activate` したもの。`bash tools/audio/integration/hunt.sh 41 900` (foreground)。判定は `f44264ebe` 自身の `e2e.mjs` (cw 行なし)。`2367066a5` の `e2e.mjs` の差分は `loc` に `cwInfo` を足すだけで、PASS 判定式は変わらない。
+- 型検査・build (測定 HEAD `bdd211295`・foreground): `pnpm typecheck` (= `tsc --noEmit`) rc=0、`pnpm build` (= `tsc --noEmit && vite build`) rc=0 (`built in 116ms`)。build の `INEFFECTIVE_DYNAMIC_IMPORT` 警告 (`src/runtime/gui_proto.ts`) は本 PR の差分に含まれないファイルの警告。
+- 測定 commit: `2367066a5` (コードを変えた最後の commit)。`git diff 2367066a5 bdd211295 -- public/worklets src/runtime tools/audio/integration tools/audio/src` は 0 行 (本 fix 時点で確認。以降の commit は文書のみ)。
 - 本 run の PASS 判定行: dev:tone `max_err=1.49e-8`・`zero_runs=0`・`underrun_cap=0`・`first_err_frame=-1`・`cw_at_underrun=[none]`・`pw_lat_max_us` / `pw_gap_max_us` は §30 と同程度。
 
 ### 通算
 
-- §19〜§30 の 5 件 / 560 run に本節の PASS 78 run (42 + 36) を加えて **5 件 / 638 run** (0.78%)。強制 underrun の 1 run は通算に入れない。
+- §19〜§30 の 5 件 / 560 run に本節の PASS 77 run (41 + 36) を加えて **5 件 / 637 run** (0.78%)。強制 underrun の 1 run は通算に入れない。
 - 失敗の捕獲は本節でも 0 件。よって producer (wasm 出力遅延) と consumer (worklet rebuffer) の切り分けは**未達**。consumer 側の同時刻の記録 (本節) は、次の失敗で突き合わせられるようになった、という段階にとどまる。
 
 ### 未解決 (追跡 **#863**。新規 issue は起票していない)
 
-(a) 実失敗の捕獲 (0 件のため切り分けは未了)。(b) 再現条件の特定 (頻度 5/638)。(c) 目標充填 T を判定行へ出す (連続起床の間隔との比較のため)。(d) 初回 run 仮説 (キャッシュ状態との切り分け)。(e) 通知は 1 processor あたり先頭 8 件まで・直近 64 quantum。2 件目以降の underrun は通知されない (失敗の 1 件目は取れる)。
+(a) 実失敗の捕獲 (0 件のため切り分けは未了)。(b) 再現条件の特定 (頻度 5/638)。(c) 目標充填 T を判定行へ出す (連続起床の間隔との比較のため)。(d) 初回 run 仮説 (キャッシュ状態との切り分け)。(e) 通知は 1 processor あたり先頭 8 件まで・直近 64 quantum。2 件目以降の underrun は通知されない (失敗の 1 件目は取れる)。(f) worklet の `trN` (記録リング) は `gen` の変更 (start 毎) でリセットされない。`p` は run ごとに 0 から数え直すため、2 回目以降の start の underrun では直近 64 件と `cw_at_underrun` の末尾 6 件に前 run の `p` が混ざりうる。e2e は 1 page 1 start のため現在の判定には影響しない。対応は `gen` 変更の分岐で `this.trN = 0` を入れること (コード変更のため、差分分の再測定が要る)。worklet のコメントは変えていない (測定 commit のコード差分を 0 に保つため)。

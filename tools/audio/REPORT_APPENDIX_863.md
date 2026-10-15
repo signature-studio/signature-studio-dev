@@ -3,6 +3,7 @@
 > **ナビゲーション**: 本ファイルは `tools/audio/REPORT.md` の分割移動節の付録。
 > 正本の索引は `REPORT.md`。250 行上限 (`docs/DOC_MAP.md` §1) のため、§20 の全文をここへ移した。
 > 内容は削除していない (Git 履歴にも残る)。
+> §31 以降 (consumer 側の quantum 履歴と underrun 通知) は [REPORT_APPENDIX_863_CONSUMER.md](REPORT_APPENDIX_863_CONSUMER.md) にある。
 
 ## 20. AU-15 (#863) 現 HEAD での再試行 (失敗 0 件)
 
