@@ -21,7 +21,7 @@ SNAP="$W/snap"; rm -rf "$SNAP"; mkdir -p "$SNAP"
 cp -a "$GF_M11" "$SNAP/m11" && cp -a "$GF_M11/../shared" "$SNAP/shared" && cp -a "$GF_M11/../shim" "$SNAP/shim" || { S "検証スナップショットの複製に失敗"; exit 2; }
 export GF_M11="$SNAP/m11"; M="$GF_M11"; S "検証スナップショット: $M (元の tools/m11 は読取のみ)"
 
-export GF_SURVEY_RESET=1   # survey の全実行 (base / ff / soft) で、各 unit を boot 直後の全メモリ状態から始める。chained 実行だと前 unit の副作用で base と soft の結果が食い違う (REPORT_APPENDIX_1635.md)
+export GF_SURVEY_RESET=1   # survey の全実行 (base / ff / soft) で、各 unit を boot 直後の wasm 線形メモリの状態から始める。chained 実行だと前 unit の副作用で base と soft の結果が食い違う (REPORT_APPENDIX_1635.md)
 S "0/6 複製: tools/m11 + tools/shim + tools/shared → $TREE (m11_build.sh の相対参照を保つ)"
 rm -rf "$TREE"; mkdir -p "$TREE"; cp -a "$SRC" "$GF_GUI/../shim" "$GF_GUI/../shared" "$GF_GUI/../m2" "$GF_GUI/../m5" "$TREE/"   # m2/m5: m11_lift.sh が ../m2/ir_normalize.py・../m5/ir5_patch.py を呼ぶ
 mkdir -p "$TREE/m6" && cp -a "$GF_GUI/../m6/ottlib.py" "$TREE/m6/"   # m11_wndclass_scan.py は ../m6/ottlib.py を import する

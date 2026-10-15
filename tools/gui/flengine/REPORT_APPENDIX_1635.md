@@ -10,7 +10,7 @@
 |---|---|
 | 原因 (304/555) | **測定済み**: survey は unit を chained に流し、正常終了した unit の後で線形メモリを戻さない。単独実行 (§2-3) では base と soft がともに `halt0->longjmp` で一致し、chain 実行でだけ差が出る (順序依存)。**未解明**: どの前 unit のどの状態が base の abort を作るか (#1426)。base と soft の前 unit の振る舞いの違いが shim の有無によるかは **推定で、未測定** |
 | 101/291/296 | 現 IR では base/soft とも同じ結果。unit 単位の比較 (§2-4) で差は 304/555 の 2 件のみ |
-| 隔離条件の統一 | `GF_SURVEY_RESET=1` を base / ff / soft の全 survey に適用。各 unit の開始時に wasm 線形メモリを boot 直後の内容へ戻し、boot 後に伸びた領域はゼロ埋めする (§2-5)。**範囲は wasm 線形メモリだけ**。JS 側の状態 (`errs` の蓄積・`perUnit`・`kinds` などの JS 変数) と wasm 外の状態は対象外 |
+| 隔離条件の統一 | `GF_SURVEY_RESET=1` を base / ff / soft の全 survey に適用。各 unit の開始時に wasm 線形メモリを boot 直後の内容へ戻し、boot 後に伸びた領域はゼロ埋めする (§2-5)。reset は線形メモリの**内容**を戻すが、長さ (`memory.size`) は戻せない (伸長後の値のまま)。**範囲は wasm 線形メモリだけ**。JS 側の状態 (`errs` の蓄積・`perUnit`・`kinds` などの JS 変数) と wasm 外の状態は対象外 |
 | 判定式 | S1 (totals の一致) は変更なし。S3 (unit 単位の base/soft 一致・942 件) を追加し、HEAD で PASS (§2-4)。R2 の floor 19 は不変 |
 | S1 の判定条件 (範囲) | 隔離版の到達は **12 種** (trap 131)。chain の soft は **33 種** (trap 21)。S1 は GUI API の 12/33 しか通らない条件で判定される。既定にしてよいかは **PM agent の判断待ち** (§4) |
 | R2 (到達 floor) | 入力は chain 実行 `survey_soft_chain.json` (873/21・到達 33 種)。pre-PR の `survey_soft.json` (`git show f46330b13:tools/gui/flengine/results/survey_soft.json`) と、`ok/noproc/miss/trap/clobber`・`kinds`・`failfast_units`・reach 名の集合 (33 種)・`reach_summary` が一致する (§2-6)。survey 辞書の全体比較は、新キー `mem_boot_bytes`・`mem_grown_units`・`mem_end_bytes` の 3 件が増えたため一致しない。R2 の意味は変わっていない |
@@ -88,7 +88,7 @@ unit 差 (unit ごとの `[status, kind]` の組の比較): **0 件** (judge の
 | soft 隔離 (`survey_soft.json`) | 301989888 | 1 | 362414080 |
 | soft chain (`survey_soft_chain.json`・`GF_SURVEY_RESET=0`) | 301989888 | 9 | 1578237952 |
 
-`mem_grown_units` は、実行の前後で線形メモリの長さが増えた unit 数。隔離実行では 1 件 (伸ばした領域は縮まないため、以後の unit では増えない)。boot 時には存在しない領域は `mem_end − mem_boot` = 60424192 bytes (57.6 MiB) で、reset のたびにゼロ埋めされる。**B1 の修正前後で S1 は変わらなかった** (修正前 `7f54678a7` の S1 = 本 HEAD の S1 = `764/1/46/131/0`)。この測定では伸長による結果の差は出ていない。
+`mem_grown_units` は、実行の前後で線形メモリの長さが増えた unit 数。隔離実行では 1 件 (伸ばした領域は縮まないため、以後の unit では増えない)。boot 時には存在しない領域は `mem_end − mem_boot` = 60424192 bytes (57.6 MiB) で、reset のたびにゼロ埋めされる。reset は内容を boot 直後に戻すが、長さは伸長後の `mem_end` のまま (内容は boot 直後と同じ、長さは伸長後)。**B1 の修正前後で S1 は変わらなかった** (修正前 `7f54678a7` の S1 = 本 HEAD の S1 = `764/1/46/131/0`)。この測定では伸長による結果の差は出ていない。
 
 ### 2-6. reset 後の集計値の意味 (review m2・本 HEAD で確認)
 
@@ -131,7 +131,7 @@ R2 の一致 (`f46330b13` の `survey_soft.json` と `survey_soft_chain.json`): 
 | `tools/startup/boot_metric.py` の `m11-gui-survey` 記録は `GUI_SURVEY` = `results/survey_soft.json` を出典にする。本 PR で同ファイルは隔離版 (`ok/trap` 873/21 → 764/131・到達 33 → 12) に変わる。generator は `tools/m11/REPORT.md` の `de50ffa` 行が無いため停止する (origin/main でも同じ・既存の不具合) | `boot_metric.json` の該当 record は本 PR の後も旧値のまま。generator を直すまで再生成できない。出典を `survey_soft_chain.json` に向けるかは PM の判断 | PM agent の判断 + generator の修復。追跡のみの子は規約 (AGENTS §1 の規範 11) により本 PR では起票しない。PM が整理時に起票 |
 | `tools/m11/work/` (work-m11) は `docs/WORKFLOW.md` §11 で「survey の基準には使わない」(#680)。本 e2e の IR 素材もこれに当たる | 本 e2e の前提 (既存の e2e と同じ素材)。素材の扱いの判断が要る | PM agent の判断 |
 | IR 指紋の run 間変動 (§2-7) の原因 (環境差か非決定性か) | 指紋を素材の provenance に使えない。S1・S3 には効いていない | 追跡のみ (未起票)。PM が要否を判断 |
-| `e2e.sh` 24 行目のコメントの「全メモリ状態」は範囲の記述として古い (実態は wasm 線形メモリ・§1)。コメントだけの修正は、測定後のコード差分になるため本 round では行わない | 挙動には影響しない | 次の修正 commit (コメントのみ) |
+| `e2e.sh` 24 行目のコメントの「全メモリ状態」は範囲の記述として古かった (実態は wasm 線形メモリ・§1)。コメントのみを修正 (round 3 m1・測定後の差分は 1 行のコメント。実行されない) | 挙動には影響しない | 対応済み (本 HEAD) |
 | 304/555 の真因 (どの前 unit のどの状態が base の abort を作るか) | 順序依存の原因。隔離版の判定には影響しない | #1426 (`[M11-N91]`・304/555/923 の OOB 実値採取) |
 | base と soft の前 unit の振る舞いの違いが shim の有無によるか (推定・未測定) | 結論に含めていない | #1426 (同上) |
 | reset の範囲は wasm 線形メモリだけ。JS 側の状態は対象外 | JS 側の状態が前 unit の結果に効いていれば、隔離は完全ではない | #1426 (隔離の範囲を同じ調査で扱う) |
