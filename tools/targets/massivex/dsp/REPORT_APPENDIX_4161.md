@@ -37,13 +37,70 @@ MX-45 (#4161) の受入 1 (FH3 FuncInfo の funclet walk の C 移植) の実測
 
 ### 3.2 コード差分 (測定 commit から HEAD まで)
 
-`git diff e1c5152ac HEAD -- tools/shimx` の出力 (commit `d896246c4` の差分):
+`git diff e1c5152ac HEAD -- tools/shimx` の実出力 (HEAD = 取り込み後の merge commit `35bdbaf4d`・`d896246c4` を含む):
+
+```diff
+diff --git a/tools/shimx/src/seh_fh3.c b/tools/shimx/src/seh_fh3.c
+index 4569a076e..33b499cb6 100644
+--- a/tools/shimx/src/seh_fh3.c
++++ b/tools/shimx/src/seh_fh3.c
+@@ -10,6 +10,7 @@
+ #define SHX_FH3_CAP_TRY    0x1000u
+ #define SHX_FH3_CAP_CATCH  0x100u
+ 
++/* 4 byte 読みが画像末尾を跨ぐ場合は、範囲外の byte を 0 として読む */
+ static uint32_t fh3_rd32(const uint8_t* img, uint32_t img_size, uint32_t rva) {
+     uint32_t v = 0;
+     for (uint32_t i = 0; i < 4; i++) {
+diff --git a/tools/shimx/src/shimx.h b/tools/shimx/src/shimx.h
+index 7c46299d5..36dadb38d 100644
+--- a/tools/shimx/src/shimx.h
++++ b/tools/shimx/src/shimx.h
+@@ -1184,7 +1184,9 @@ void shimx_seh_set_typed_matcher(int (*fn)(const EXCEPTION_RECORD64* rec, uint32
+ const EXCEPTION_RECORD64* shimx_seh_current_exception(void);           /* 直近に捕捉/巻き戻し中の例外 (スレッド毎) */
+ unsigned shimx_seh_depth(void);                                        /* 登録中 frame 数 (スレッド毎) */
+ /* MX-45 (#4161): FH3 FuncInfo (RVA 形) の funclet RVA 集合。img は RVA で引ける平坦バッファ。
+- * 戻り値 = 重複を除いた件数 (out_cap を超えても件数は返す)。FuncInfo 不正・上限超過は -1。 */
++ * out には先頭 out_cap 件まで書く。戻り値 n は、n <= out_cap なら重複を除いた件数 (正確)。
++ * n > out_cap なら out は先頭 out_cap 件のみ有効で、n は真の件数の上界 (重複を含みうる)。
++ * 呼出し側は n > out_cap のとき cap を増やして再呼出しする。FuncInfo 不正・上限超過は -1。 */
+ int shimx_fh3_funclets(const uint8_t* img, uint32_t img_size, uint32_t fi_rva, uint32_t* out, uint32_t out_cap);
+ HMODULE shimx_module_register(const char* name, HMODULE base, const char* winPath);
+ int  shimx_proc_register(HMODULE m, const char* name, DWORD ordinal, void* fn);
+diff --git a/tools/shimx/test/test_fh3.c b/tools/shimx/test/test_fh3.c
+index 8b5319ecf..32a371373 100644
+--- a/tools/shimx/test/test_fh3.c
++++ b/tools/shimx/test/test_fh3.c
+@@ -39,6 +39,22 @@ static void t_walk(void) {
+ 
+     /* 画像外の FuncInfo は棄却 */
+     CHECK(shimx_fh3_funclets(img, sizeof img, 0xFF0, out, 16) == -1);
++
++    /* out_cap 超過: try 間で共有する handler RVA {0x500, 0x600} を 2 try × 2 catch で置く。
++     * cap=16 では正確に 2。cap=1 では out は先頭 1 件のみ有効で、戻り値は真の件数 (2) の上界。
++     * 現実装は 3 を返すが、契約は「2 以上で cap (1) を超える」のみを保証する。 */
++    memset(img, 0, sizeof img);
++    put32(img, 0x100, 0x19930520u); put32(img, 0x104, 0); put32(img, 0x108, 0);
++    put32(img, 0x10C, 2); put32(img, 0x110, 0x300);
++    put32(img, 0x30C, 2); put32(img, 0x310, 0x340);
++    put32(img, 0x320, 2); put32(img, 0x324, 0x360);
++    put32(img, 0x340 + 12, 0x500); put32(img, 0x350 + 12, 0x600);
++    put32(img, 0x360 + 12, 0x500); put32(img, 0x370 + 12, 0x600);
++    CHECK(shimx_fh3_funclets(img, sizeof img, 0x100, out, 16) == 2);
++    CHECK(out[0] == 0x500 && out[1] == 0x600);
++    int n1 = shimx_fh3_funclets(img, sizeof img, 0x100, out, 1);
++    CHECK(n1 >= 2);
++    CHECK(out[0] == 0x500);
+ }
+ 
+ void run_fh3_tests(void) {
+```
 
 - `seh_fh3.c`: `fh3_rd32` の上にコメント 1 行 (実行コードは不変)。
 - `shimx.h`: 宣言コメントを out_cap 超過の契約に直す (宣言は不変)。
 - `test/test_fh3.c`: out_cap 超過の期待値を追加 (テストのみ)。
 
-オブジェクト差分: `clang -O1` で `seh_fh3.c` の旧版 (`e1e11d8ad`) と新版をビルドし、`.text` を比べた。`.text` は 965 バイトで完全一致。
+オブジェクト差分: `clang -O1` で `seh_fh3.c` の旧版 (`e1e11d8ad`) と新版 (`35bdbaf4d` の同ファイル) をビルドし、`.text` を比べた。`.text` は 965 バイトで完全一致。
 
 ### 3.3 単体テスト
 
