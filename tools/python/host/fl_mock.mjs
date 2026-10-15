@@ -358,7 +358,8 @@ export function createMockEngine() {
     "mixer.getTrackPan": (i) => F(tr(i).pan),
     "mixer.setTrackPan": (i, v) => { tr(i).pan = v; },
     "mixer.setTrackColor": (i, c) => { const t = tr(i); t.color = (swapRb(c) | 0xff000000) >>> 0; t.colorSet = true; },
-    "mixer.getTrackColor": (i) => { const t = tr(i); return (swapRb(t.colorSet ? t.color : swapRb(MIX_DEFAULT_COLOR)) | 0xff000000) >>> 0; },
+    // PE 0xd5ec60: idx < 0 は例外でなく int 0 (警告は初回のみ。mock は表示しない)。idx ≥ 127 は RANGE (C と同じ)
+    "mixer.getTrackColor": (i) => { if (i < 0) return 0; const t = tr(i); return (swapRb(t.colorSet ? t.color : swapRb(MIX_DEFAULT_COLOR)) | 0xff000000) >>> 0; },
     "mixer.isTrackSelected": (i) => tr(i).sel,
     "mixer.muteTrack": (i, v) => { tr(i).mute = tog(tr(i).mute, v); },
     "mixer.soloTrack": (i) => { tr(i).solo = !tr(i).solo; },
@@ -410,6 +411,9 @@ export function createMockEngine() {
     "ui.showNotification": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
     "ui.closeAllMenu": (...a) => { arity(a, 0, 0); },
     "ui.closeActivePopupMenu": (...a) => { arity(a, 0, 0); },
+    // PY-133 (#3014): PE で PyArg 書式を確定した showPicker・openEventEditor (REPORT_PY133)。作用先は未モデルで、個数と型だけ検査して None
+    "ui.showPicker": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, -1); },
+    "ui.openEventEditor": (...a) => { arity(a, 2, 3); argI(a, 0, 0); argI(a, 1, 0); argI(a, 2, 0); },
     // PY-132 (#3013): toggleBrowserNode は PE の書式 '|i' (既定 -1)。値 -1/0/1 の分岐 (0xa89690 → 0xa26190 / 0xa07d00) だけを st.browserOp に残す (1 切替・2 閉じる・3 開く・0 なし)。
     // selectBrowserMenuItem・previewBrowserMenuItem は NOARGS。作用 (0xfdd2c0 のキー送出) は未モデル
     "ui.toggleBrowserNode": (...a) => { arity(a, 0, 1); const v = argI(a, 0, -1); st.browserOp = v === -1 ? 1 : v === 0 ? 2 : v === 1 ? 3 : 0; },

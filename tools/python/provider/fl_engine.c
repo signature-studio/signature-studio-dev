@@ -438,8 +438,10 @@ FL_H(mixer, setTrackVolume) { MX(0); t->vol = A_DBL(1, 0); return fl_ret_none(c)
 FL_H(mixer, getTrackPan) { MX(0); return fl_ret_d(c, t->pan); }
 FL_H(mixer, setTrackPan) { MX(0); t->pan = A_DBL(1, 0); return fl_ret_none(c); }
 FL_H(mixer, setTrackColor) { MX(0); t->color = fl_swap_rb((uint32_t)A_INT(1, 0)) | 0xff000000u; t->color_set = 1; return fl_ret_none(c); }
+/* PE 0xd5ec60: idx < 0 は例外を立てず int 0 を返す (警告は初回のみ・REPORT_PY118 §8.1)。idx ≥ NMIX は従来どおり RANGE (PE 上限 N-1 の実行時値は #3553) */
 FL_H(mixer, getTrackColor) {
-    MX(0); uint32_t u = t->color_set ? (uint32_t)t->color : fl_swap_rb(MIX_DEFAULT_COLOR);
+    int64_t _m = A_INT(0, 0); if (_m < 0) return fl_ret_i(c, 0); if (_m >= NMIX) RANGE();
+    Mix *t = &mx[_m]; uint32_t u = t->color_set ? (uint32_t)t->color : fl_swap_rb(MIX_DEFAULT_COLOR);
     return fl_ret_i(c, (int64_t)(fl_swap_rb(u) | 0xff000000u));
 }
 FL_H(mixer, isTrackSelected) { MX(0); return fl_ret_b(c, t->sel); }
@@ -527,6 +529,10 @@ FL_H(ui, miDisplayDockRect) { NARGS(4, 4); int64_t v[4]; for (int i = 0; i < 4; 
 FL_H(ui, showNotification) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(ui, closeAllMenu) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(ui, closeActivePopupMenu) { NARGS(0, 0); return fl_ret_none(c); }
+/* PE 0xd6f2e0 (showPicker 'i|i'): 1 個目は必須、2 個目は既定 -1。署名なし (np=-1) のため個数と型はここで検査。作用先 (picker の vtbl[0x48]) は未モデル。戻り None */
+FL_H(ui, showPicker) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, -1); return fl_ret_none(c); }
+/* PE 0xd6ef80 (openEventEditor 'Ii|i'): 型と個数は fl_table の 'iib' (2..3) が検査する。作用先 (0xe34450) は未モデル。戻り None (PE の 0xd82c20 に status 0 を渡す経路) */
+FL_H(ui, openEventEditor) { return fl_ret_none(c); }
 /* PY-132 (#3013): PE 0xd6dcd0 (toggleBrowserNode '|i'・既定 -1)。作用先 0xa89690 は値 -1/0/1 で 0xa26190・0xa07d00(0)・0xa07d00(1) に分岐し、他の値は何もしない (分岐のみ。ノード状態は未モデル) */
 FL_H(ui, toggleBrowserNode) { NARGS(0, 1); int64_t v = A_INT(0, -1); browser_op = v == -1 ? 1 : v == 0 ? 2 : v == 1 ? 3 : 0; return fl_ret_none(c); }
 /* PE 0xd6e170 (selectBrowserMenuItem)・0xd6e330 (previewBrowserMenuItem): NOARGS。作用 (0xfdd2c0 のキー送出) は未モデル */
