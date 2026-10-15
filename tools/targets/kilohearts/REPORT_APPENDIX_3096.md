@@ -11,7 +11,7 @@
 
 **① 環境 (repo 外で作業。`work/` は使わない)**
 - 素材 `plugins-kilohearts` (`tar --zstd --occurrence=1 -xf` で `Kilohearts Offline Installer.zip` 3,833,108,300 B のみ取り出し → `payload.dat` → `windows.zip/1ccb1df8…` → `HeartCore.core_64` 76,642,304 B)。
-- [GHIDRA] 12.1.4 (zip 569,649,598 B・sha256 `ddac49f9…d2db` 一致・repo 外に展開)、[JDK21] `temurin-21-jdk-amd64`、[EMSDK] emcc 6.0.12 (`/opt/emsdk`)。
+- [GHIDRA] 12.1.4 (zip 569,649,598 B・sha256 `ddac49f9…d2db` 一致・repo 外に展開)、[JDK21] `temurin-21-jdk-amd64`、[EMSDK] emcc 6.0.12。
 - `fl-win64` は本 run で未使用 (Delay の emcc 経路に不要)。
 - decompile: lift 141 件 → **141/141 OK** (analyzeHeadless wall 34.3 s, n=1)。C 化: `delay.c` 7,248 行。
 
