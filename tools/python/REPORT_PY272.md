@@ -71,7 +71,7 @@
 
 ## 1. 検証
 
-測定 commit: (下の commit 欄を参照。本 round で probe を変えた commit)。
+測定 commit: `a85ba88a8` (本 round で probe を変えた最後の commit)。
 
 - probe: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py272_probe.py` → 41/41 PASS・終了 0 (前 round は 27 項目)。
   - 追加 14 項目: 型ワード 65536 語の飛び先が全て決まること・飛び先集合 38 個・VT_NULL の大域バイト判定・0x10/0x11/0x13/0x100/0x101/0x102/0x4002/0x400c/0x4000/0x0a の各 case。
