@@ -35,14 +35,26 @@ def data_init(pe, raw, va):
     return name, hex(int.from_bytes(raw[off:off + 8], "little"))
 
 
+def reloc_rvas(pe):
+    pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_BASERELOC"]])
+    return {e.rva for bl in pe.DIRECTORY_ENTRY_BASERELOC for e in bl.entries if e.type}
+
+
 def main():
     B.setup()
     raw = open(cg.PE, "rb").read()
     pe = pefile.PE(data=raw, fast_load=True)
     txt = {a: f"{m} {o}".strip() for a, m, o in E.INS}
     ok = True
+    base = pe.OPTIONAL_HEADER.ImageBase
+    relocs = reloc_rvas(pe)
     for g in GLOBALS:
         name, init = data_init(pe, raw, g)
+        init_sec = None
+        if init and init.startswith("0x"):
+            iv = int(init, 16)
+            init_sec = next((s.Name.rstrip(b"\0").decode() for s in pe.sections
+                             if s.VirtualAddress <= iv - base < s.VirtualAddress + s.Misc_VirtualSize), None)
         writes = []
         for a, m, o in E.INS:
             t = None
@@ -55,7 +67,7 @@ def main():
                 writes.append(hex(a))
         imm = [hex(a) for a, m, o in E.INS if "[rip" not in o and f"0x{g:x}" in o.lower()]
         lea = [hex(a) for a, m, o in E.INS if m == "lea" and f"0x{g:x}" in o.lower()]
-        print(f"G 0x{g:x}\tsection={name}\tinit={init}\trip_writes={len(writes)}\timm_hits={len(imm)}\tlea={len(lea)}")
+        print(f"G 0x{g:x}\tsection={name}\tinit={init}\tinit_section={init_sec}\treloc={(g - base) in relocs}\trip_writes={len(writes)}\timm_hits={len(imm)}\tlea={len(lea)}")
         ok = ok and name == ".data" and not writes and not imm and not lea
     for c in SLOT_SITES:
         fn = E.func_of(c)
