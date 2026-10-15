@@ -4,8 +4,9 @@ target (例: slot 17 `0x1800c9680`・Splice 生成 `0x180498090`) の direct 逆
 併せて、C 内の間接 call の形と宛先の定義元、R の関数ポインタ (.rdata/.data の 8 byte スロット) の vtable head と index、
 vtable head を rip 相対で指す箇所 (ctor 候補) を出す。
 限界: 間接 call の宛先は解決しない。C の外へ出る間接 call は「宛先未解決」として数える (非到達の証明にはならない)。
+  --disp <hex>: [reg+disp] の間接 call のうち disp が一致する箇所を C 内で列挙し、受信レジスタの定義元を出す。
   --offset <hex>: そのオブジェクト offset を [reg+off] で読む/書く命令を全 .text から列挙する (demo bit 0x22792 の参照関数との対照つき)。
-usage: slot_reach.py <pe> <root_va_hex> [--target <va_hex>]... [--vtable-head <va_hex>]... [--offset <hex>]...
+usage: slot_reach.py <pe> <root_va_hex> [--target <va_hex>]... [--vtable-head <va_hex>]... [--offset <hex>]... [--disp <hex>]...
 """
 import bisect
 import re
@@ -22,6 +23,7 @@ root = int(args[1], 16)
 targets = []
 heads = []
 offsets = []
+disps = []
 i = 2
 while i < len(args):
     if args[i] == "--target":
@@ -30,6 +32,8 @@ while i < len(args):
         heads.append(int(args[i + 1], 16))
     elif args[i] == "--offset":
         offsets.append(int(args[i + 1], 16))
+    elif args[i] == "--disp":
+        disps.append(int(args[i + 1], 16))
     else:
         raise SystemExit(f"unknown arg {args[i]}")
     i += 2
@@ -74,6 +78,19 @@ REG_RE = re.compile(r"^(r[a-z0-9]+)$")
 WRITE = {"mov", "movabs", "lea", "movzx", "movsxd", "movsx", "xchg", "pop", "cmove", "cmovne",
          "add", "sub", "xor", "and", "or", "shl", "shr", "sar", "imul", "neg", "not", "inc", "dec"}
 
+def recv_def(ins_list, idx, reg):
+    for j in range(idx - 1, -1, -1):
+        p = ins_list[j]
+        if p.mnemonic == "call":
+            return "call-ret"
+        if p.mnemonic in ("cmp", "test", "ret", "jmp") or p.mnemonic.startswith("j"):
+            continue
+        parts = [x.strip() for x in p.op_str.split(", ", 1)]
+        if parts[0] == reg and p.mnemonic in WRITE:
+            return re.sub(r"0x[0-9a-f]+", "N", p.mnemonic + " " + p.op_str)
+    return "entry"
+
+
 fwd = defaultdict(set)
 rev = defaultdict(set)
 ind = defaultdict(list)  # f -> [(va, kind, reg, disp, op, src)]
@@ -112,7 +129,10 @@ for lo, hi in funcs:
         mm = mem_re.match(op)
         if mm:
             disp = int(mm.group(2), 0) if mm.group(2) else 0
-            ind[lo].append((ins.address, "mem", mm.group(1), disp, op, "-"))
+            src = "-"
+            if disp in disps:
+                src = recv_def(ins_list, idx, mm.group(1))
+            ind[lo].append((ins.address, "mem", mm.group(1), disp, op, src))
             continue
         if REG_RE.match(op):
             src = "entry"
@@ -203,6 +223,10 @@ for f in sorted(C):
         if kind in ("reg", "stack"):
             print(f"    {va:#x} in {f:#x}: call {op}  <- {src}")
 
+for va_f in sorted(C):
+    for va, kind, reg, disp, op, src in ind.get(va_f, ()):
+        if kind == "mem" and disp in disps:
+            print(f"call [reg+{disp:#x}] site {va:#x} in {va_f:#x}: call {op}  receiver def <- {src}")
 total88 = sum(1 for f in funcs for va, kind, reg, disp, op, src in ind.get(f[0], ()) if kind == "mem" and disp == 0x88)
 in_c88 = sum(1 for f in C for va, kind, reg, disp, op, src in ind.get(f, ()) if kind == "mem" and disp == 0x88)
 print(f"call [reg+0x88] sites: whole .text {total88}, in C {in_c88}")
