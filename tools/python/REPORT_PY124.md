@@ -98,6 +98,29 @@
 
 **実装への含意**: ring の Pos・Count・Last は PE の式どおりに決まった。`mock` と C で数値だけ更新すると、`general.getUndoHistory*` の 3 件 (H の `+0x1c`・`+0x20`・`+0x24` を読む) は PE と一致しうる。ただし、ring 方式のスロット取得のたびに ring の要素のうち `+0x34 != 0` のものが `0x101d180` で reset される (共有の経路。要素は ring と同じ record)。この reset は数値だけの mock では再現されず、`+0x34` の意味が未確定なので再現条件も決まらない。後処理 loop 自体は H の `+0x1c`・`+0x20`・`+0x24` を書かない (前半の `0x1016ca0` で書き終わる)。ただし loop が呼ぶ `0x101d180` 経由の子 object 解放 (`0x12df0f0`・`0x102ba00` など) の本体は未読なので、子が H を書くかは未確定。一方、record の中身 (カテゴリごとの保存) は未確定なので、中身の無い履歴は `restoreUndo` 系で別の結果になる。よって、中身を再現できるまで `saveUndo` は実装しない (no-op の成功も返さない)。
 
+## 4-2b. #4770 (PY-378) の追補: 未確定一覧の PE 確定
+
+検査: `analysis/py4770_saveundo_open.py` (PASS。§6)。#3733 の一覧を 1 項ずつ書く。「確定」は PE の VA から事実を読めたもの、「部分」は一部だけ、「未確定」は理由を付けて残したもの。
+
+| 項目 (#3733 の一覧) | 結果 | VA と事実 | 残り (理由) |
+|---|---|---|---|
+| カテゴリ c の索引 | 部分 | `0x102bb20(registry, c, &out)` は `0x102b6c0` (ハッシュ。`vtbl+0x20` の戻りを `&0x7fffffff`・`+1`・`&0x7fffffff`。c に依らない) と `0x102b610` (16 バイト要素の線形探索。dword key がハッシュと一致し、`vtbl+0x18(registry+0x18 の object, entry の byte, c)` が真になった位置の索引を返す。空の key (-1) に当たると負の値を返す) で索引を取り、`0x102bb20` は索引が負なら NULL、そうでなければ要素の `+8` を返す | `vtbl+0x18` の実体と、c の値から名前への対応は未読 |
+| registry 要素の型 | 未確定 | 要素は `0x102bb20` が返す object。`0x102ca60` が各カテゴリを `0x102b8b0` で登録し、`0x448ee0` で作る (`[0x15e4c18]` の global 経由) | 要素の型記述子・vtbl は未特定 (`0x448ee0` 未読) |
+| `vtbl+0x10` (`0x101b780` 内、`(elem, r9b)`) の書込み内容 | 未確定 | 呼出し位置 `0x101b8f6`・`0x101bc18` 付近。r9b は `0x1017ad0` が渡す `updateHistory == 1` の真偽 (§2) | 呼ぶ vtbl の実体を未読 |
+| `vtbl+0x40` (`record+0x0c`・`+0x14` の object、`0x101b98e`・`0x101b9d4`) | 部分 | 引数は `record+0x28` (系列番号・`0x15e4018` の dword) を 192 バイト (24 qword) 間隔で索引した global `0x15e2aa0` の要素 | 呼ぶ vtbl の実体と、`+0x0c`・`+0x14` の object の型は未読 |
+| 大配列 `0x12f9ed0`・`0x416750` の意味 | 未確定 | `0x12f9ed0` は `[0x196eb60]` (.bss。実行時に埋まる配列) の要素数 (`[arr-8]`)。`0x12f9ec0` は同配列の要素。`0x416750` は `+0x80` の配列へ書く関数 | 配列の中身は .bss のため PE だけでは決まらない。`0x416750` 本体未読 |
+| mask ゲート `(mask & A) == B` の A・B | **確定** | `0x101b9e2`・`0x101b9e9` が `.text` 内の定数 (RIP 相対 `0x101bd54`・`0x101bd5c`。`.text` は読取専用) を読む。A = `0x10000000004` (bit 2 と bit 40)、B = `0`。`je 0x101bb0c` (`(mask & A) == B` のとき `+0x80` への書込みを飛ばす) | — |
+| `0x1019e30` (record ctor) | 部分 | `+0x48`・`+0x64`・`+0x7c`〜`+0x7f`・`+0x68` を 0、`+0x35` を 1、`+0x34` を 0、`+0x0c`・`+0x14`・`+0x40` に object を入れる (`0x105f460`・`0x10601e0`・`0x102c9b0`) | `0x105f460`・`0x10601e0` 未読 |
+| `0x102c9b0` (registry 生成) | 部分 | `0x102ca60` を呼び、bit 0 (`test al,1`) と bit 1 (`test al,2`) の 2 経路で `0x448ee0` を呼ぶ | `0x102b8b0` 未読 |
+| `0x1019dd0` (record+0x20 項目解放) | **確定** | 配列の件数 `[arr-8]` の各要素に `0x40faa0` (`[vtbl-0x20](obj, 1)` = 仮想削除) を呼び、`0x418190` で配列を破棄 | — |
+| `0x40faa0` | **確定** | `[vtbl-0x20](obj, 1)` (仮想削除) | — |
+| `0x418210` (配列の代入) | **確定** | `src` が NULL または `[src-0xc] >= 0` なら `0x418260` で共有 (refcount +1)、そうでなければ `0x418000` で複写。その後 `0x418190(dst)` で旧値を破棄し、`dst = src` | — |
+| `0x418190` (配列の参照解放) | **確定** | `dst` を 0 にし、refcount を `lock xadd -1`。旧 refcount が 1 のとき要素を `0x416230` で破棄し、`0x409440` で解放 | — |
+| `0x41c6e0` (char* → name object) | 部分 | 引数 `char*` が NULL か空なら `0x412d60`。そうでなければ `0x413660` で長さを得て、`0x414ad0`・`0x414850`・`0x41c360` で複写 | 所有権と寿命 (`0x41c360`・`0x414ad0` 未読)。§5 の未解決 |
+| `+0x34` フラグ (ring 後処理の (a)) | 部分 | `.text` 全体の `+0x34` への byte 書込みを検索 (69 件)。record に関わるのは 2 箇所: `0x101a5f0` (独立した関数。`mov byte [rcx+0x34], 0; ret`。呼び出し元は `0x101d180` 内の `0x101d49c`)、`0x101b516` (関数の途中の断片。直前のバイトが関数の区切りではないので、先頭は特定していない。`cmp [rcx+0x34],0; sete cl; mov [rax+0x34], cl`。ループで `0x101a6e0` を呼んだ後に書く) | 意味 (dirty 等) は未確定。`0x101b516` の含む関数の先頭と `0x101a6e0` は未読 |
+
+**この一覧で確定しなかった理由の要約**: 残りは (1) vtbl の実体 (`+0x10`・`+0x18`・`+0x40` が指す型)、(2) 大配列 `0x196eb60` の中身 (.bss)、(3) 未読の子 object (`0x448ee0`・`0x105f460`・`0x10601e0`・`0x102b8b0`・`0x416750`・`0x414ad0`・`0x41c360`)。(1)(3) は逆アセンブル範囲を広げれば読めるが、本 issue の範囲外として #3733 の子 [PY-242] へ移す。(2) は PE だけでは決まらず、実機での観測が要る。
+
 ## 5. 未確定と起票先
 
 | 未解決 | 影響 | 起票先 |
@@ -118,6 +141,8 @@
 - 測定 commit: `3a53c9f9` (`analysis/py124_saveundo.py` を追加した commit。コードを変えた最後の commit)。`git diff 3a53c9f9 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 REPORT の commit 前後で実行して確認)。HEAD との差分は REPORT と DOC_MAP だけ。
 - PY-137 (#3026) の検証: 測定 commit `5f4caf673` (`analysis/py137_saveundo_record.py` の docstring だけを直した commit。コードの最後の変更はこの commit)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/py137_saveundo_record.py` → `PASS: py137 saveUndo record PE facts` (実測 0.082 秒。`uptime` の load average 0.08 / 0.16 / 0.10)。ネガティブコントロール: `(1 << c)` の判定の期待行 `idiv ecx` を `idiv edx` に変えたコピー → `AssertionError: pos = (pos + ebx + len) % len` (実測)。`git diff 5f4caf673 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (HEAD は本 REPORT を含む commit。その hash は同じ commit の中には書けないため、PR 本文に記載)。
 - 逆アセンブル補助 (PY-137): `python3 analysis/py41_disasm.py <block00031_PE.bin> 1016ca0 1017ad0 101b780 101d180 418210 418190 418000 418030 418260 1019da0 1019dd0 1016e00 fdef70` (`py41_disasm.py` は各 VA から最初の `ret` で止まる。`0x1016ca0` の後処理 loop は最初の `ret` (`0x1016dd1`) より前にある)。
+- #4770 (PY-378) の検証: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/py4770_saveundo_open.py` → `PASS: py4770 saveUndo open facts` (実測 0.1 秒以下)。確定した A・B の定数 (`0x10000000004`・`0`) と、registry flags (`byte[0x1019f70] = 2`)、`0x40faa0`・`0x418190`・`0x418210`・`0x102bb20` の本体の形を assert する。`capstone` は `lock xadd` を mnemonic `'lock xadd'` として出すので、検査はその文字列で照合している。
+- #4770 の未実施: `[H+8]`・`0x101d180` の実行時の挙動、大配列 `0x196eb60` の中身は PE だけでは決まらないので、実機で観測しないと確定しない。
 - PY-137 の未実施: `tests/general_diff.mjs`・`provider_check.mjs`・`all_tools.mjs` は本 PR で `host/`・`provider/`・`tests/` を変えていないので未実行。`saveUndo` の実機での挙動は未実測。
 
 ## 7. 子 issue
