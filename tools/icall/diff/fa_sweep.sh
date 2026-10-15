@@ -7,7 +7,7 @@ set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 T="$HERE/../.."
 N="${1:-8}"; TO="${2:-60}"
-MAP="$HERE/../work/rt_freshair-core/map.json"
+MAP="${FA_MAP:-$HERE/../work/rt_freshair-core/map.json}"
 OUT="$HERE/../work/fa_route/sweep.jsonl"; : > "$OUT"
 for va in $(python3 -c "import json,sys;print(' '.join(k[2:] for k in json.load(open(sys.argv[1]))['func_map']))" "$MAP"); do
   line="$(timeout "$TO" python3 "$HERE/fa_cmp.py" "$va" --n "$N" 2>/dev/null | tail -1)"

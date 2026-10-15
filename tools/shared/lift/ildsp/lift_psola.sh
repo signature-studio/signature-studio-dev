@@ -9,4 +9,7 @@
 set -euo pipefail
 export WC_ENTRY_RVA=0x1ab540 WC_VTABLE_RVA=0x3e0030 WC_WORK=ildsp-psola
 export WC_ROOTS="0x1ab540 0x1ab590 0x1ab690 0x1ab6b0 0x1ab800" WC_CALL_IDX="0 2 4 5" WC_RET_IDX="5"
+# T-SH-115 (#4303): WC_COV=1 で到達計測 (basic block)。WC_CASE_MODE=ref で .data の参照窓だけを変える case にする。
+# 既定 (WC_COV 未設定) は従来の差分テストのまま。
+
 exec bash "$(dirname -- "$0")/lift_wc.sh" "$@"
