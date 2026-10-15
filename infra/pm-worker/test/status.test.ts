@@ -7,10 +7,15 @@ import { REST_REMAINING_MIN, parseRateHeaders, restGuardOn } from "../src/rateli
 import { redact } from "../src/redact.ts";
 import { signBody } from "../src/hmac.ts";
 import { BOT, STORE_KEY, T0, WH_SECRET, commentPayload, configuredApp, issuePayload, j, markFresh, runPayload, send, type Call } from "./helpers.ts";
+import { outcomeBody } from "./pm_helpers.ts";
+import { BOT_COMMENT_WINDOW_H } from "../src/classify.ts";
 
 type Ctx = Awaited<ReturnType<typeof configuredApp>>;
 
 const R = "/repos/signature-studio/signature-studio-dev";
+const MIN = 60_000;
+const H = 60 * MIN;
+const iso = (ms: number) => new Date(ms).toISOString();
 const comments = (calls: Call[]) => calls.filter((c) => c.method === "POST" && /\/issues\/\d+\/comments$/.test(c.url));
 const dispatches = (calls: Call[]) => calls.filter((c) => c.method === "POST" && c.url.endsWith("/dispatches"));
 const gets = (calls: Call[]) => calls.filter((c) => c.method === "GET" && !c.url.includes("/app/"));
@@ -88,6 +93,8 @@ const ADDED_KEYS = [
   "launch_blocked", "imported_at",
   // launch を止めている区間と、15 分以上止まっている (#2795)
   "launch_halted", "launch_halted_overdue",
+  // 保留中の issue の理由と解除見込み (#5110)
+  "launch_holds",
   // Worker の自動着手を見送る oc:hold の issue の数 (#2651)
   "hold",
   // 率制限の判定 (#2345・CI-66)。alert と、直近の評価の窓 (30 分) の件数・割合
@@ -116,6 +123,33 @@ test("/status (d): 既存のキーは全て残り、追加するキーだけが�
   // 公開 (detail なし) は集計だけ: 従来どおり 3 キーを除き、追加したキーは全て出る
   const pub = (await (await get(ctx)).json()) as any;
   assert.deepEqual(Object.keys(pub).sort(), [...EXISTING_KEYS, ...ADDED_KEYS].filter((k) => !["log", "would_launch_now", "last_error"].includes(k)).sort());
+});
+
+test("/status.launch_holds (#5110): 保留の無い状態では空の配列", async () => {
+  const s = (await (await get(await configuredApp())).json()) as any;
+  assert.deepEqual(s.launch_holds, []);
+});
+
+test("/status.launch_holds (#5110): engine の status() 経由で、bot コメントの保留が理由と解除見込みつきで出る", async () => {
+  const ctx = await configuredApp();
+  await send(ctx.app, "issues", issuePayload(50, { labels: [] }));
+  await send(ctx.app, "issue_comment", commentPayload(50, BOT, "作業を開始しました", iso(T0 - 10 * MIN)));
+  const s = (await (await get(ctx)).json()) as any;
+  assert.deepEqual(s.launch_holds, [
+    { n: 50, row: "recent", reason: "bot-comment", until: iso(T0 - 10 * MIN + BOT_COMMENT_WINDOW_H * H) },
+  ]);
+});
+
+test("/status.launch_holds (#5110): engine の status() 経由で、stopped の oc:no-pr (split) は時間で解けない (until は null)", async () => {
+  const ctx = await configuredApp();
+  await send(ctx.app, "issues", issuePayload(51, { labels: ["oc:no-pr"] }));
+  await send(ctx.app, "issue_comment", commentPayload(51, BOT, outcomeBody("split"), iso(T0 - 2 * H)));
+  const s = (await (await get(ctx)).json()) as any;
+  const h = s.launch_holds.find((x: any) => x.n === 51);
+  assert.ok(h, "issue 51 が launch_holds に出る");
+  assert.equal(h.row, "stopped");
+  assert.equal(h.reason, "split");
+  assert.equal(h.until, null);
 });
 
 test("/status: 観測の初期値は null / 0 (残量を 0 と誤読しない)", async () => {

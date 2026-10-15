@@ -148,7 +148,7 @@ def classify(rec, mach, irf, sig, route='ir'):
 
 
 def verdict(rec):
-    cs = [c for c in rec.get('cases', []) if not c.get('fvm_held')]
+    cs = rec.get('cases', [])
     if any(c['outcome'] in ('diff', 'wasm_trap') for c in cs):
         return 'mismatch'
     if any(c['outcome'] == 'equal' for c in cs):

@@ -377,6 +377,31 @@ def pass_m2s_fn41a800_vtable0(text, report):
     return text
 
 
+def pass_m2v_fn40fcf0_arg1(text, report):
+    """[M2v] function_40fcf0 の function_40fd90 呼出しの第 1 引数を [arg1] (VMT) にする (#4011 段 2).
+    機械語 40fd0b: `mov rcx,[rbx]` (rbx=self) で [self] を渡す。RetDec の IR は self をそのまま渡していたため、
+    function_40fd90 が [rcx-0xc0] を self-0xc0 から読み範囲外へ出た (trap wasm 0x14e5b0)。
+    この呼出し 1 箇所だけを対象にする。既定 OFF (M11_M2V=1 で有効)。"""
+    head = 'define i64 @function_40fcf0('
+    i = text.find(head)
+    j = text.find('\n}\n', i) if i >= 0 else -1
+    if i < 0 or j < 0:
+        stage('M2v', 'function_40fcf0 arg1 VMT: 0 sites (function absent)')
+        report['m2v_fn40fcf0_arg1'] = 0
+        return text
+    body = text[i:j]
+    old = '  %1 = call i64 @function_40fd90(i64 %arg1, i64 %arg2)\n'
+    new = ('  %vmt0p = inttoptr i64 %arg1 to ptr\n'
+           '  %vmt0 = load i64, ptr %vmt0p, align 8\n'
+           '  %1 = call i64 @function_40fd90(i64 %vmt0, i64 %arg2)\n')
+    n = body.count(old)
+    if n == 1:
+        text = text[:i] + body.replace(old, new) + text[j:]
+    stage('M2v', 'function_40fcf0 arg1 VMT: %d sites' % n)
+    report['m2v_fn40fcf0_arg1'] = n
+    return text
+
+
 def pass_m2b(text, report):
     n = [0]
 
@@ -882,6 +907,7 @@ def main():
         text = pass_m2s_fn40fd90_iid(text, report)
     if os.environ.get('M11_M2V') == '1':   # #4011: 既定 OFF (runtime 確認まで有効化しない)
         text = pass_m2s_fn41a800_vtable0(text, report)
+        text = pass_m2v_fn40fcf0_arg1(text, report)
     if os.environ.get('M11_M2P') == '1':   # #417: 既定 OFF (有効化すると unit 503 で survey がハング, REPORT 参照)
         text = pass_m2p_dec_inttoptr(text, report)
     text = pass_m2c(text, report)
