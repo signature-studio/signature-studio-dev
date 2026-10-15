@@ -41,6 +41,8 @@ if [ "${SKIP_NATIVE:-0}" != "1" ]; then
   echo "[gui-e2e] 2b/6 結合準備 native (到達 API ログ / wasm32 署名 adapter / ハンドル 31bit / 改名 selftest; CAB-156)"; bash "$HERE/test/reach_test.sh" 2>&1 | grep -E "passed|FAIL"
   echo "[gui-e2e] 2c/6 W 版 Win32 ゲスト (Unicode API): native 通し・統計・EXACT MATCH (独立オラクル) + 到達ログ順序検査 (RegisterClassW < CreateWindowExW < WM_PAINT < BitBlt; ネガコン: 旧 shim で FAIL) (#3460/#3510)"
   bash "$HERE/test/native_w_e2e.sh" 2>&1 | grep -E "native_w|golden_w|reach_order|negctl|FAIL"
+  echo "[gui-e2e] 2d/6 headless surface 統計 (gui_hl_stats) と SHA-256 の単体テスト + ネガコン (#3460 受入 2)"
+  bash "$HERE/test/stats_test.sh" 2>&1 | grep -E "passed|FAIL"
 fi
 echo "[gui-e2e] 1c/6 GUI-5 wasm SIMD128 行カーネル (scalar と画素完全一致 + 故意欠陥 4 種を検出 + v128 命令の有無; bench 省略)"
 BENCH=0 bash "$HERE/test/simd_e2e.sh" | grep -E "OK|FAIL|ALL PASS|v128|cases"
