@@ -62,6 +62,12 @@ if [ "$(python3 m11_cond.py --get ldfix)" = applied ]; then
   elif [ "$(python3 m11_cond.py --get ld108)" != applied ]; then
     echo "[m11build] ERROR: work/ir_conditions.json に ld108=applied の記録無し (現在: '$(python3 m11_cond.py --get ld108)')。m11_gen_ir2.sh で IR を作り直すこと (fix_ld108 無しで測るなら M11_FIX_LD108=0 で作り直し、M11_ALLOW_LD108_DISABLED=1)" >&2; exit 2
   fi
+  # #2447 (LD-115) / #2527 (LD-117): fix_ld115 (666a60 のループ回数・ループ内 store) の適用記録も要る。M11_FIX_LD115=0 で作った IR (ld115=disabled) は A/B 測定用で、明示 opt-in のときだけ build する
+  if [ "$(python3 m11_cond.py --get ld115)" = disabled ] && [ "${M11_ALLOW_LD115_DISABLED:-0}" = 1 ]; then
+    echo "[m11build] WARNING: M11_ALLOW_LD115_DISABLED=1: fix_ld115 無しの IR で build する (ir_conditions.json ld115=disabled)" >&2
+  elif [ "$(python3 m11_cond.py --get ld115)" != applied ]; then
+    echo "[m11build] ERROR: work/ir_conditions.json に ld115=applied の記録無し (現在: '$(python3 m11_cond.py --get ld115)')。m11_gen_ir2.sh で IR を作り直すこと (fix_ld115 無しで測るなら M11_FIX_LD115=0 で作り直し、M11_ALLOW_LD115_DISABLED=1)" >&2; exit 2
+  fi
 fi
 # #680 (review): 記録の無い差替え (正規 pass を経ない IR の書換え) を拒否する。正規 pass は直後に --bind で指紋を更新する
 if ! python3 m11_cond.py --check work/boot_final.ll; then
