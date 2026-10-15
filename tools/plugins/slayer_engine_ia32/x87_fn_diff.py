@@ -293,6 +293,22 @@ def main():
     nat_out = os.path.join(WORK, 'native_out.txt')
     wasm_out = os.path.join(WORK, 'wasm_out.txt')
     mjs = os.path.join(WORK, 'wasm_x87.cjs')
+    if '--nega-nan' in sys.argv:
+        nat_p, wasm_p = parse(nat_out), parse(wasm_out)
+        ok0, agg0 = compare(nat_p, wasm_p, rows, quiet=True)
+        pick = next(i for i in range(len(rows)) if is_nan(int(nat_p[i]['st0'], 16)) and is_nan(int(wasm_p[i]['st0'], 16)))
+        fn = rows[pick][0]['name']
+        before = sum(agg0[fn][k].get('nan-num', 0) for k in ('st0', 'st0d', 'mem'))
+        wasm_p[pick]['st0'] = '%08x' % f32(1.0)
+        ok1, agg1 = compare(nat_p, wasm_p, rows, quiet=True)
+        after = sum(agg1[fn][k].get('nan-num', 0) for k in ('st0', 'st0d', 'mem'))
+        print('[nega-nan] 行 %d (%s) の wasm ST(0) の NaN を 3f800000 に置換: nan-num %d → %d、 突合の判定 ok=%s' % (
+            pick, fn, before, after, ok1))
+        if after != before + 1 or ok1:
+            print('[nega-nan] FAIL: nan-num が 1 件増えず、判定が FAIL しなかった')
+            sys.exit(1)
+        print('[nega-nan] 判定 FAIL (本体の gate は exit 1) を検出。 ネガコン OK')
+        sys.exit(0)
     if not nega:
         t_nat_build = run(['gcc', '-m32', '-O1', '-fno-pic', '-fno-pie', '-fno-stack-protector', '-fcf-protection=none',
                            '-fno-asynchronous-unwind-tables', '-ffreestanding', '-nostdlib', '-static', '-no-pie',
