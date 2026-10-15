@@ -242,7 +242,7 @@ writes 空 (pw_n=0)
 ### 通算
 
 - 旧 `287655cf` の 31 run (全 PASS) と本節の 9 run を加え、§19〜§29 の 4 件 / 520 run に対して **5 件 / 560 run** (0.89%)。
-- 2 測定の間の `src` 差分は `flaudio.h` の定数 2 行のみ (`git diff 287655cf 89b10538 --stat -- tools/audio/src` = `flaudio.h | 4 +-`、`FLA_PW_N` 256→1024・`FLA_CTL_SIZE` 4488→16776)。`flasio.c` は不変で、窓と ctl サイズの違いは pw_* の保持範囲にだけ効く。
+- 2 測定の間の `src` 差分は `flaudio.h` の定数 2 行のみ (`git diff 287655cf 89b10538 --stat -- tools/audio/src` = `flaudio.h | 4 ++--`、`FLA_PW_N` 256→1024・`FLA_CTL_SIZE` 4488→16776)。`flasio.c` は不変で、窓と ctl サイズの違いは pw_* の保持範囲にだけ効く。
 
 ### 未解決 (追跡 **#863**。新規 issue は起票していない)
 
