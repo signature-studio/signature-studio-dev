@@ -470,6 +470,7 @@
 | `tools/m11/ldfix/REPORT_2388.md` | ~75 | LD-109 (#2388): cf3790 の spill 宛 未判定 15 site を全て OK_LOAD と判定 (機械語・IR の行を `ld109_cf3790_verify.py` が照合して生成)・slot 名の式の独立確認 (#2389 と同じ `stack_var_(disp-0x1d8)`)・基底が上流の脱落値由来で汚染される注意。静的突合のみ |
 | `tools/m11/ldfix/REPORT_3426.md` | ~95 | CI-157 (#3426・親 #3416): `0x412fc0` の呼出規約の機械語↔IR 対応表 (5 番目引数の既定値分岐・レジスタ引数 rcx〜r9 の欠落・スタック部は一致) と D5 系の分類 (D7 は非該当)。検査器 `verify_abi_3426.py` (NC 5/5 拒否)。修復は子 #3450 (CI-163)・#3451 (CI-164) |
 | `tools/m11/ldfix/REPORT_4521.md` | ~70 | CI-191 (#4521・親 #3451): `function_412fc0` の 3→5 引数化と 5 番目既定値 (0x15e6a28) の分岐。機械照合 `--fixed412` と negctl 4 件 |
+| `tools/m11/ldfix/REPORT_4522.md` | ~76 | CI-192 (#4522・親 #3451): 0x413340 の 2 site の r8 (arg2)・r9 (zext arg3) を機械語の値へ接続 (`fix_abi_4522.py`・機械照合・negctl 2 件)。e2e 実測 |
 | `tools/m11/ldfix/REPORT_3450.md` | ~100 | CI-163 (#3450・親 #3426): `function_41c8c0` (WideCharToMultiByte の薄いラッパ) を 8 引数化し、呼出元 4 site を機械語の rcx〜r9 と照合して接続。e2e 実測 (stage4・survey 不変)・DEFECTS D26 の行案 |
 | `tools/m11/ldfix/REPORT_3088.md` | ~70 | LD-146 (#3088): unexec 4 関数 (5c1030 / 737d10 / 7ff6e0 / d243c0) の native 実行条件。古い `work/ld_native` (vmslot 無し) を `ensure_native` で作り直し、this 疑似オブジェクトを与えて 4/4 を突合 (判定 mismatch・icall_drop = D15) |
 | `tools/m11/ldfix/REPORT_3195.md` | ~90 | LD-149 (#3195): #1325 の見送り 10 組の不能理由を本体 `Machine` で判定し直して関数ごとに記録 (修復 0 組)。6905f0 の理由を訂正 (前段パスではなく生の使用の位置)。判定は `residual_3195.py` |

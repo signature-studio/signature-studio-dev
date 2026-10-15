@@ -32,12 +32,12 @@ r9 の残件 (`0x412fc0` の rcx・r9 の接続) は #3450・#4521 の時点で�
 
 ## 3. 検証
 
-測定 commit: **`085e89285`** (コード変更の最後の commit。`fix(m11): 0x413340 の 2 site の r8・r9 を機械語の値へ接続 (CI-192)`)。
-本 commit 以後の差分 (verify_abi_3426.py・fix_abi_4522.py の検査追加) は測定に影響しない (修復 IR は同一。§3.3 で確認)。
+測定 commit: **`164b087aa`** (コード変更の最後の commit。`fix(m11): 4521 の照合 (C412) を 4521 の形へ戻す ...`)。
+`git diff 164b087aa HEAD -- tools/m11/ldfix/` は空 (測定後の commit は本 REPORT のみ)。
 
 ### 3.1 e2e (`ldfix_e2e.sh`・rc 0)
 
-`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` (commit `085e89285`・wall 72 s・load 0.56 (15:56 時点)):
+`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` (commit `164b087aa`・wall 60 s・load 0.63 → 0.87 (16:01〜16:02)):
 
 | 指標 | base | fix | 判定 |
 |---|--:|--:|---|
@@ -51,7 +51,7 @@ r9 の残件 (`0x412fc0` の rcx・r9 の接続) は #3450・#4521 の時点で�
 
 ### 3.2 GetMem の +1 の切り分け
 
-fix 側の GetMem が 16 → 17 になったのは本 PR の変更 (r8・r9 の接続) によるもの。同じ前段チェーンで 1e3 (4522) だけ外して比べた。
+fix 側の GetMem が 16 → 17 になったのは本 PR の変更 (r8・r9 の接続) によるもの。同じ前段チェーンで 1e3 (4522) だけ外して比べた (15:58〜16:00 の作業ツリー。修復 IR の内容は `164b087aa` と同一)。
 
 | 版 | fix の GetMem | fix の FastMM_GetMem | icall_ok | survey ok |
 |---|--:|--:|--:|--:|
@@ -63,8 +63,9 @@ fix 側の GetMem が 16 → 17 になったのは本 PR の変更 (r8・r9 の�
 ### 3.3 照合
 
 - `fix_abi_4522.py` (機械照合 13 項目 OK・IR 2 行置換 OK)。
-- `verify_abi_3426.py --fixed412` (4522 後の IR を `s4522b.ll` で照合): 照合 OK 35 項目。`C412` を 4522 形へ更新した。
+- `verify_abi_3426.py --fixed412` (4521 の IR を照合): 照合 OK 35 項目。`C412` は 4521 の形のまま (4522 の照合は `fix_abi_4522.py` の `check_ir` へ分離)。
 - `fix_abi_4522.py --negctl` (修復後 IR に対する N5・N6 の 2 件): 拒否 OK 2 件・NG 0 件。
+- `verify_abi_3426.py --negctl` (4521 の IR): NG 0 件。
 - 4522 後の IR に修復 pass を再適用すると行が無く停止する (二重適用の防止)。
 
 ## 4. 未解決
