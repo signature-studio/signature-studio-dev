@@ -120,11 +120,18 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 注: `ci_census.py` は第 3 引数 (復元後 IR) を渡すと、SSE helper の件数 (movups 3・movntps 8・movaps 7・movapd 1)・復元後の `store i128` 件数 (= 復元前 + movups/movntps)・復元後に helper 呼び出しが残らないこと を検査する (#4293)。store の欠落は NC1 (restore 側の件数検査) と NC3 (census 側) の 2 段で FAIL する。`ci_lift.sh` は census を restore の後に走らせる。
 
 ### 7-6. census の store 照合 (T-SH-112 #4293)
-- 測定 commit: 本 PR の HEAD (`ci_census.py`・`ci_lift.sh` を変えた最後の commit)。
+- 測定 commit: `82c802c7b` (`ci_census.py`・`ci_lift.sh` を変えた最後の commit)。
 - 期待値 (x86 から数えた件数・§7-1 と一致): movups 3・movntps 8・movaps 7・movapd 1。
 - 正常系 (`ci_lift.sh`・rc 0・ALL OK): 復元前の `store i128` 8 → 復元後 19 (movups/movntps の 11 件が増える。movaps/movapd は sext の store を置き換えるだけで件数は変わらない)。helper 呼び出しは census の検査で期待値 3/8/7/1 と一致し、復元後に 0 件。
-- NC3 は §7-3 の表を参照。
-- 実行時間 (`date` で計測・4 core・`ci_lift.sh` 全体): 2 s (正常系の 1 回目)。
+- 実行: `FL_WIN64_DIR=<fl-win64> RETDEC_BIN=<retdec> bash tools/shared/lift/ildsp/ci_lift.sh` (commit `82c802c7b`・4 core・n=3)。
+  | 項目 | 値 |
+  |---|---|
+  | 実行時間 (`date` で計測) | 2.271 / 2.275 / 2.282 s |
+  | load (実行前の 1 分平均) | 0.40 (`uptime`) |
+  | 3 回の stdout | `cmp` で 3 回とも一致。rc 0・ALL OK |
+  | 生成物 (`ci.rs.ll`) | md5 `4811e83e9e4343ad70e6ec883023641f` (§7-2 と同一) |
+  | 生成物 (`ci_helpers.c`) | md5 `497d886223a0625f2b236d105c7df119` (§7-2 と同一) |
+- NC3 は §7-3 の表を参照 (commit `82c802c7b`・rc 1)。
 
 ### 7-4. 既知の制約
 - 0x1aefa9 の書き込み先は、RetDec の alloca 経由 (`bitcast i64* %rcx to i128*`) の load である。`store i64 %arg1, i64* %rcx` が関数入口の 1 回だけであることを確認して `%arg1` を値として使った。書き込み直前まで rcx に他の store が無い形なので、この 1 箇所だけに当てはまる。pass は、その形以外では exit 1 で止まる。
