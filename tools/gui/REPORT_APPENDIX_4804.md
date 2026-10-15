@@ -9,8 +9,8 @@
 - 未達 (子 issue): W 版ゲストの統計を 2c の出力に入れる → #4821 (WIN-57)。wasm W 版の sha256 一致を e2e に組込む → #4822 (WIN-58)。
 
 ## 2. 検証 (この run で実測)
-- 測定 commit: `c06575782` (コードを変えた最後の commit。`git diff c06575782 HEAD -- tools/gui` は 0 行 = 差分 0)。
-- 検証 HEAD: 本 REPORT 更新の commit (本付録の追記 commit)。コード差分は 0 のまま。
+- 測定 commit: `c06575782` (コードを変えた最後の commit)。`git diff c06575782 HEAD -- tools/gui ':!*.md'` は 0 行 (文書のみの差分は除く。`tools/gui/REPORT.md` と本付録の 2 ファイルの文書差分は残る)。
+- 検証 HEAD: 本付録を含む最終 commit (hash は PR のコメントに記す)。コード差分は 0 のまま。
 - `bash tools/gui/test/stats_test.sh`: `[stats_test] 21 passed, 0 failed`、0.27 秒、rc 0。
 
 ## 3. 再現できなかった項目 (この run の環境)
