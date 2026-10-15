@@ -862,6 +862,26 @@ class FnLift:
     def i_fldz(self, ins, ops): self.ia32_only('fldz'); self.L('x87_push(0.0);')
     def i_fchs(self, ins, ops): self.ia32_only('fchs'); self.L('x87_set(0, -x87_st(0));')
     def i_fabs(self, ins, ops): self.ia32_only('fabs'); self.L('x87_set(0, fabs(x87_st(0)));')
+    def i_fldl2e(self, ins, ops): self.ia32_only('fldl2e'); self.L('x87_push(1.4426950408889634);')
+    def i_fldlg2(self, ins, ops): self.ia32_only('fldlg2'); self.L('x87_push(0.30102999566398120);')
+    def i_fldpi(self, ins, ops): self.ia32_only('fldpi'); self.L('x87_push(3.141592653589793);')
+    def i_fsqrt(self, ins, ops): self.ia32_only('fsqrt'); self.L('x87_set(0, sqrt(x87_st(0)));')
+    def i_frndint(self, ins, ops): self.ia32_only('frndint'); self.L('x87_set(0, x87_rc(x87_st(0)));')
+    def i_fscale(self, ins, ops): self.ia32_only('fscale'); self.L('x87_fscale();')
+    def i_fxam(self, ins, ops): self.ia32_only('fxam'); self.L('x87_fxam();')
+    def i_ftst(self, ins, ops): self.ia32_only('ftst'); self.L('x87_fcom(x87_st(0), 0.0);')
+    def i_fnclex(self, ins, ops): self.ia32_only('fnclex')   # 例外フラグは模型化しない (ADR D28 制限 4)
+
+    def x87_int_arith(self, ins, ops, m, op):
+        self.ia32_only(m)
+        o = ops[0]
+        t = {2: 'int16_t', 4: 'int32_t'}.get(o.size) if o.type == X86_OP_MEM else None
+        if t is None:
+            raise Unsup(m)
+        self.L('x87_arith(%d, 0, (double)(%s)LD%d(%s), 0);' % (op, t, o.size * 8, self.ea(ins, o)))
+
+    def i_fiadd(self, ins, ops): self.x87_int_arith(ins, ops, 'fiadd', self.X87_BIN['fadd'])
+    def i_fimul(self, ins, ops): self.x87_int_arith(ins, ops, 'fimul', self.X87_BIN['fmul'])
 
     def i_fxch(self, ins, ops):
         self.ia32_only('fxch')
