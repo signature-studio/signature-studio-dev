@@ -149,4 +149,4 @@
 - decompile: `DecompEach.java` で 8/8 OK (`analyzeHeadless` wall 25.0 s)。`MapLines.java` で `tokens.tsv` 1,183 行を生成 (wall 18.3 s)。
 - 分類: `classify_ulonglong.py` の `main()` を `kind_of()` 呼び出しに変えた (`any` 判定を廃止)。`kind_of` に同一レジスタ同士の XOR (ゼロ化イディオム) を要確認とする規則を追加。実行結果は 98 行、ビット再解釈 84・要確認 14。表の「分類」列 98 行と `kind_of` の出力が一致 (差は 252 の機械語列の注記のみ)。
 - 対応づけの照合: 上記 5077-3 の既知の制約の通り (`CAST` 103・非 `CAST` 4 (すべて要確認)・誤対応 1 (252))。
-- 測定 commit: 本 run の HEAD (`classify_ulonglong.py` の修正 commit)。前版 `143f481db` → `dc1fd4b9a` は REPORT 1 行、`dc1fd4b9a` → `bcfcfb4c6` は分類規則 (`classify_ulonglong.py`) と REPORT。
+- 測定 commit: `721cf8042` (コード変更 commit = `kind_of` 呼び出しと ZERO 規則。REPORT の差分のみ後続)。前版 `143f481db` → `dc1fd4b9a` は REPORT 1 行、`dc1fd4b9a` → `bcfcfb4c6` は分類規則 (`classify_ulonglong.py`) と REPORT。
