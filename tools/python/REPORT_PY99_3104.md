@@ -107,3 +107,44 @@
     python3 analysis/py99_closure.py work/py53/fn.txt --md analysis/py99_closure.md  # 表の再生成
 
 `work/` は作業用ディレクトリ (`py53/fn.txt` を置く場所。PY-88 と #3085 と同じ入力)。
+
+## rint 6 件の閉包 (#3913 / 親 #2788・PY-271)
+
+測定 commit: `696fb146a` (`analysis/py99_closure.py --rint` を入れた最後のコード commit)。`git diff 696fb146a HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本節の commit で 0 行。
+素材: `fl-win64` の `block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin'`)。`analysis/py53_dispatch.py` → `fn=4664 dispatch=13 r8d_tests=174`。
+
+### 結果 (6 件)
+
+| 書込み VA | 閉じた式 (rint の引数・書込み前の経路別 store) | 残る葉 |
+|---|---|---|
+| 0x10483d3 | `rint((f64({0x1046d6b: d_in}) * M64[G[0x104cce0]]))` | `d_in` (入口 edx) |
+| 0x1048ed3 | `rint(f64(M32[M64[{0x1047543: …} \| 0x1047556: M64[M64[G[0x15e2200]]]} +0x1048] +0x3bc]))` (2 経路。0x1047543 側の添字は `shr(c_in, 0x10)`) | `c_in` (入口 ecx) |
+| 0x104906e | `rint(M32[{0x10474d8: …shr(c_in, 0x10)…} +0x2e4])` | `c_in` |
+| 0x10491ed | `rint((M64[{0x10474d8: …shr(c_in, 0x10)…} +0x324] * M64[G[0x104cce8]]))` | `c_in` |
+| 0x104a876 | `rint((f64({0x1046d6b: d_in}) * M64[G[0x104cd00]]))` | `d_in` |
+| 0x104a999 | `rint((f64({0x1046d6b: d_in}) * M64[G[0x104cd00]]))` | `d_in` |
+
+- 式の全文は `work/py3913/rint6.md` (`analysis/py99_closure.py work/py53/fn.txt --rint --md <out>`・gitignore・生成のみ)。
+- 0x104a876 の `ACC?⚠合流@0x104a5b6` は、REPORT_PY163 §1 の訂正どおり、読み 0x104a861 の到達 store が入口の `d_in` の 1 件だけ (閉包の R が `{0x1046d6b}`)。
+- 閉じた数: 「式に未確定の葉 (⚠合流・SLOT・ACC・CALL 等) を含まない」の厳格判定では **0/6**。残る葉が入口レジスタ (`c_in`・`d_in`) だけの書込みは **6/6**。未閉は 0 件。
+- 6 件中の `⚠合流` 残り: 0 件 (A・B とも)。`--rint` の内部件数: 入口レジスタ読み 2 件・多経路の読み 1 件 (0x1048ed3 の 0x1047556)。
+
+### 検算
+
+| 実行 | 結果 | exit | 所要 | load (1 分) |
+|---|---|---|---|---|
+| `analysis/py99_closure.py work/py3913/py53/fn.txt --rint` | mismatch 0 件 (6 件)・閉包の A と B が一致 | 0 | 0.22 秒 | 0.12 |
+| 既定 (49 件・既存の出力) | mismatch 0 件 (49 件) | 0 | 0.39 秒 | 0.12 |
+| `--negctl drop-pred` (49 件) | mismatch 17 件 | 1 | — | — |
+| `--rint --negctl drop-pred` (6 件) | 「寄与を持つ先行辺が無い」で終了 (mismatch は出ない) | 1 | — | — |
+
+- **6 件専用の negative control は作れなかった**。`drop-pred` は 6 件の読みに対して寄与する先行辺を見つけられない。既存の 49 件の negative control (mismatch 17・exit 1) は同じ閉包のコード経路の検出力を示すだけで、6 件の式がそれで検出されるとは言えない。
+- 算法 A と B は、store の式 (`py88_writes.Slicer.def_value` 系) と CFG を共有する。式の同値性は見ていない (文字列の一致のみ)。
+- 6 件の閉包は `py99_closure.py` の既定の 49 件 (出力は変えていない) と同じ規則。
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 入口レジスタ葉 `c_in` (ecx)・`d_in` (edx) の呼出し側の値 | rint 6 件の式の入力は関数の引数のまま。値の確定は呼出し側の解析が要る | #4266 ([PY-313]・親 #2874) |
+| `--rint` の negative control (6 件に寄与する先行辺が無い) | 6 件の閉包の検出力を 6 件で示せない | 本 PR 内で限界として記載 (追加の作業は不要と判断) |
