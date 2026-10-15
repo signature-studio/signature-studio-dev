@@ -857,6 +857,8 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1098.md` | ~95 | Slayer_Engine.dll (block22434) の .text の ia32 lift (#1098、測定 commit `fc2e70be`): 関数境界の根拠、被覆、jump table・IAT の実データ照合、x64 回帰、未被覆域の区間内訳と未解決 (子 #2814)。 測定値の正本は付録 §2・§3 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2814.md` | ~106 | Slayer_Engine.dll (block22434) の未被覆 `.text` 区間の 3 類分類 (#2814)・(b) 5 区間の追加 lift・`std`/`shld`/DF の試験・判定保留 2 区間。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/GAP_CLASSES_2814.md` | ~243 | 未被覆 `.text` 239 区間の分類表 (自動生成: `gap_classify.py --json ... --md`)。 人手編集禁止 |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4729.md` | ~75 | Slayer_Engine.dll の未被覆 (c) 中身あり 34 区間の間接参照検査 (#4729 / #3546): 表引き call/jmp・即値・reloc の参照 0 件。 判定は (c) 据え置き・限界と再生成手順。 測定値の正本 |
+| `tools/plugins/slayer_engine_ia32/GAP_INDIRECT_4729.md` | ~37 | (c) 中身あり 34 区間の間接参照・線形 decode の表 (自動生成: `gap_indirect.py ... --md`)。 人手編集禁止 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1099.md` | 116 | x87 subset の ia32 lowering (#1099、測定 commit `ce0f0872`)。 実 x87 との差分試験 (`x87_diff.py`)・ネガコン・lift の before/after・x64 回帰。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_3688.md` | ~110 | x87 の状態の保存・復元 (fnsave・frstor・fnstenv・fldenv) の ia32 lowering (#3688 PLG-G2-30 の部分達成、検証 HEAD `36dd4f614`)。 env の差分試験 (`x87_diff.py --env`・ネガコン)・既存試験の不変 (main 第 2 親との比較)・lift の unsup (0 件)・x64 回帰。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2966.md` | ~116 | x87 の整数・比較・状態・定数・丸め命令の ia32 lowering (#2966 PLG-G2-23 の部分達成、測定 commit `c508291cf`)。 差分試験 (`x87_diff.py` の op 表・RC・C1 のネガコン)・定数の寄与・lift の before/after・x64 回帰。 測定値の正本 |
