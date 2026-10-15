@@ -841,6 +841,87 @@ GITHUB_STEP_SUMMARY="$TMP/summary-w.md" wd
 grep -q '^worker=ok' "$TMP/summary-w.md"
 expect "worker status is written to the step summary" $?
 
+# 33i〜. launch の停止 (#CI-135)。/status の launch_halted (reason・since) と launch_halted_overdue を読み、overdue なら障害 issue に理由と起点を追記する
+lh() { printf '"launch_halted":{"reason":"%s","since":"%s"},"launch_halted_overdue":%s' "$1" "$2" "$3"; } # lh <reason> <since> <overdue>: /status に足す launch_halted の JSON 片
+S20="$(agoz 20)"
+
+# 33i. 健全な Worker で launch が 15 分以上止まっている (overdue)・障害 issue が無い -> [CI-62] PM Worker launch 停止 を起票する。理由と起点を本文に書く
+worker_setup
+worker true true true "$(ago 1)" "$(lh no-import "$S20" true)"
+wd; rc=$?
+[ "$rc" = 0 ] && logged 'label create pm-worker-down' && logged "issue create --repo o/r --title \[CI-62\] PM Worker launch 停止 ($TODAY) --body-file .* --label pm-worker-down" && not_logged 'issue close' && not_logged 'issue reopen' && grep -q 'launch=halted (reason=no-import' "$TMP/out"
+expect "launch overdue on a healthy worker, no outage issue -> [CI-62] PM Worker launch 停止 (label pm-worker-down)" $?
+grep -q 'launch が止まっています' "$BODY" && grep -q '"reason": "no-import"' "$BODY" && grep -q "$S20" "$BODY" && grep -q '@pycabbage' "$BODY"
+expect "the launch issue body has the reason, the start time and @pycabbage" $?
+
+# 33i2. 障害 issue が開いていれば、理由と起点を追記するだけ。新規 0 件・close しない
+worker_setup
+worker true true true "$(ago 1)" "$(lh no-import "$S20" true)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+logged 'issue comment 77 .*--body-file' && not_logged 'issue create' && not_logged 'issue close' && grep -q 'launch はまだ止まっています' "$BODY" && grep -q 'reason=no-import' "$BODY" && grep -q "$S20" "$BODY" && grep -q 'oc-worker-down-note' "$BODY"
+expect "launch overdue + open outage issue -> note with reason and start, no new issue, not closed" $?
+
+# 33i3. 止まってから 5 分 (overdue でない) -> 追記も close もしない。止まっている間は回復としない
+worker_setup
+worker true true true "$(ago 1)" "$(lh rate-guard "$(agoz 5)" false)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+not_logged 'issue close' && not_logged 'issue comment' && not_logged 'issue create'
+expect "launch halted 5 min (not overdue) -> the open outage issue is kept (no close, no note)" $?
+
+# 33i4. review-only は意図した停止なので障害として扱わない。overdue でも追記・起票しない。開いた障害 issue は回復として close する
+worker_setup
+worker true true true "$(ago 1)" "$(lh review-only "$(agoz 60)" true)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+logged 'issue close 77' && not_logged 'issue create' && not_logged 'issue comment'
+expect "review-only (overdue) -> no note and no new issue; an open outage issue is recovered (closed)" $?
+worker_setup
+worker true true true "$(ago 1)" "$(lh review-only "$(agoz 60)" true)"
+wd
+no_worker_writes
+expect "review-only (overdue) with no open outage issue -> no write" $?
+
+# 33i5. launch_halted が null に戻った -> 既存の回復の規則のまま、開いた障害 issue に回復を書いて close する
+worker_setup
+worker true true true "$(ago 1)" '"launch_halted":null,"launch_halted_overdue":false'
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+wd
+logged 'issue close 77 .*--comment .*回復.*oc-worker-recovered' && not_logged 'issue create'
+expect "launch_halted back to null -> recovery comment and close on the open outage issue" $?
+
+# 33i6. 追記の間隔は CI-49 と同じ (直近 10 分に追記済みなら追記しない。同じ marker を数える)
+worker_setup
+worker true true true "$(ago 1)" "$(lh stale "$S20" true)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' "[$(note 10)]"
+wd
+not_logged 'issue comment' && not_logged 'issue create'
+expect "launch overdue, a note 10 min ago -> no further note (shared throttle)" $?
+
+# 33i7. launch_halted の形が読めない -> 警告だけ。追記も起票もせず、開いた障害 issue も回復とみなして close しない
+for bad in '"launch_halted":"no-import","launch_halted_overdue":true' '"launch_halted":{"reason":"no-import","since":"x"},"launch_halted_overdue":"yes"'; do
+  worker_setup
+  worker true true true "$(ago 1)" "$bad"
+  open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+  wd; rc=$?
+  [ "$rc" = 0 ] && not_logged 'issue close' && not_logged 'issue create' && not_logged 'issue comment' && grep -q 'unexpected shape' "$TMP/out"
+  expect "unreadable launch_halted ($bad) -> warning only, the open issue is kept" $?
+done
+
+# 33i8. ネガコン: /status が読めなければ launch の判定はせず、PR の点検は続く
+worker_setup
+base "[$(pr 6 fff666 false "$OLD")]"
+detail 6 true "[$(review "$REVIEWER" oldhead COMMENTED)]"
+worker true true true "$(ago 1)" "$(lh no-import "$S20" true)"
+FAKE_CURL_FAIL=28 wd; rc=$?
+[ "$rc" = 0 ] && logged 'pr reopen 6' && grep -q 'could not read' "$TMP/out" && not_logged 'issue create' && not_logged 'issue comment'
+expect "status unreadable -> no launch action, the PR pass still reopens #6 (exit 0)" $?
+
 # 34〜. 暫定の oc-pm 起動 (#CI-50)。停止 PR (oc:stuck) は issues/<N>/comments、oc:no-pr の issue は issue list、記録の一覧は issues/comments (fixture)。
 tcm() { jq -nc --arg l "$1" --arg t "$2" --arg b "$3" '{user:{login:$l,type:$t},body:$b}'; } # tcm <login> <type> <body>
 ago_s() { date -u -d "@$(($(date -u +%s) - $1))" +%Y-%m-%dT%H:%M:%SZ; }                    # ago_s <秒前>: GitHub の時刻の形

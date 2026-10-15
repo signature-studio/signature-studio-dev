@@ -1,97 +1,68 @@
 #!/usr/bin/env python3
-"""#3499: strict_evidence.tsv のデータ行 lo..hi (1 始まり, ヘッダ除く) の件ごとに判定用の文脈を出す.
+"""#3502: strict_evidence.tsv のデータ行 lo..hi (1 始まり, ヘッダ除く) の件ごとの判定文脈をダンプする (判定はしない).
 
-機械語 (jcc 前後・脱出先 T・back-edge)・IR の帰属ブロック B・ループ先頭 L・T・T への preds・関数内の icmp/br i1 数を出す.
-判定はしない (同じ値の同一性は人が確かめる)。judge_dump.py の出力を補う。
-使い方: LD_M11_PE=<block00031_PE.bin> python3 judge_ctx.py <IR.ll> <evidence.tsv> <lo> <hi> [IR 行数上限=30]
+各行について: 機械語 (jcc 前後 8 命令) / IR の帰属ブロック B の本文 / ループ先頭 L の本文 /
+脱出先 T の有無と先頭 / T・B への参照元 (B の直前ブロックの終端と末尾 6 行) を出す。
+使い方: python3 judge_ctx.py <IR.ll> <evidence.tsv> <PE.bin> <lo> <hi>
 """
 import csv
 import os
-import re
 import sys
 
-import capstone
-
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, '..', 'ldfix'))
-from ldmach import Machine  # noqa: E402
-
-
-# judge_dump.fn_body は見つからないと '' を返す (件数 0 で黙って進む)。ここでは例外にするため import せず複製している。
-def fn_body(text, name):
-    m = re.search(r'^define [^@\n]*@%s\(' % re.escape(name), text, re.M)
-    end = text.index('\n}', m.end()) + 2
-    return text[m.start():end]
-
-
-def split_blocks(body):
-    blocks, cur = {}, None
-    for ln in body.split('\n'):
-        m = re.match(r'^([A-Za-z0-9_.]+):', ln)
-        if m:
-            cur = m.group(1)
-            blocks[cur] = []
-        elif cur is not None:
-            blocks[cur].append(ln)
-    return blocks
-
-
-def show(blocks, bn, n):
-    lines = [x for x in blocks.get(bn, []) if x.strip()]
-    if bn not in blocks:
-        print('   [no block %s]' % bn)
-        return
-    print('   [%s] (%d lines)' % (bn, len(lines)))
-    for x in lines[:n]:
-        print('     ' + x)
-    if len(lines) > n:
-        print('     ... (%d more)' % (len(lines) - n))
+GUARD = os.path.join(os.path.dirname(HERE), 'guard699')
+LDFIX = os.path.join(os.path.dirname(HERE), 'ldfix')
+sys.path.insert(0, GUARD)
+sys.path.insert(0, LDFIX)
+sys.path.insert(0, HERE)
+from ldmach import Machine, FnMach  # noqa: E402
+import scan_guard as sg  # noqa: E402
+from strict_evidence import fn_text, block_lines  # noqa: E402
 
 
 def main():
-    ir, tsv, lo, hi = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-    cap = int(sys.argv[5]) if len(sys.argv) > 5 else 30
-    m = Machine(os.environ['LD_M11_PE'])
-    cs = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    ir, tsv, pe, lo, hi = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), int(sys.argv[5])
     text = open(ir, errors='replace').read()
     rows = list(csv.DictReader(open(tsv), delimiter='\t'))
+    mach = Machine(pe)
     for i in range(lo, hi + 1):
         r = rows[i - 1]
         name = r['fn']
+        body = fn_text(text, name)
+        blocks = sg.parse_blocks(body)
+        own, _ = sg.owners(blocks)
+        lines = block_lines(body)
         va = int(name[len('function_'):], 16)
-        jcc = int(r['jcc'], 16)
-        T = int(r['target'], 16)
-        L = int(r['loop_head'], 16)
-        print('=' * 100)
-        print('#%d %s jcc=%s %s -> T=%s L=%s B=%s' % (i, name, r['jcc'], r['mnemonic'], r['target'], r['loop_head'], r['block']))
-        rva, size = m.fns[va]
-        ins = list(cs.disasm(m.read(rva, size), va))
-        idx = next(k for k, x in enumerate(ins) if x.address == jcc)
-        print('-- MACH (jcc 前 14 命令 ～ jcc 後 6 命令)')
-        for x in ins[max(0, idx - 14):idx + 7]:
-            mark = '  <== jcc' if x.address == jcc else ''
-            print('  %x: %s %s%s' % (x.address, x.mnemonic, x.op_str, mark))
-        tI = [x for x in ins if x.address >= T][:5]
-        print('-- MACH at T: ' + ' ; '.join('%x %s %s' % (x.address, x.mnemonic, x.op_str) for x in tI))
-        back = ['%x %s' % (x.address, x.mnemonic) for x in ins
-                if x.mnemonic.startswith('j') and x.op_str.strip() == '0x%x' % L]
-        print('-- MACH back-edges to L: %s' % back)
-        body = fn_body(text, name)
-        blocks = split_blocks(body)
-        print('-- IR block B:')
-        show(blocks, 'dec_label_pc_' + r['block'].replace('dec_label_pc_', ''), cap)
-        print('-- IR block L (loop head):')
-        show(blocks, 'dec_label_pc_%x' % L, cap)
-        print('-- IR preds of T (blocks that br to T):')
-        tgt = 'dec_label_pc_%x' % T
-        for bn, lines in blocks.items():
-            if any(('label %' + tgt) in x for x in lines):
-                print('   ' + bn)
-        print('-- IR block T:')
-        show(blocks, tgt, 8)
-        lines = body.split('\n')
-        print('-- IR icmp / br i1 in function: %d / %d' % (
-            sum(1 for x in lines if ' icmp ' in x), sum(1 for x in lines if 'br i1' in x)))
+        fv = FnMach(mach, va, list(own.keys()))
+        A = int(r['jcc'], 16)
+        idx = next(k for k, x in enumerate(fv.ins) if x.address == A)
+        print('=' * 80)
+        print('#%d %s jcc=%s %s -> %s  L=%s B=%s' % (i, name, r['jcc'], r['mnemonic'], r['target'], r['loop_head'], r['block']))
+        print('-- MACH (jcc 前後)')
+        for x in fv.ins[max(0, idx - 8):idx + 4]:
+            mark = '>>' if x.address == A else '  '
+            print('  %s %x: %s %s' % (mark, x.address, x.mnemonic, x.op_str))
+        bname = r['block']
+        lname = own.get(int(r['loop_head'], 16), '')
+        tname = own.get(int(r['target'], 16), '')
+        print('-- IR B=%s term: %s' % (bname, blocks[bname]['term'].strip()))
+        for ln in lines.get(bname, [])[:60]:
+            print('   B| ' + ln.rstrip()[:220])
+        print('-- IR L=%s (ループ先頭)' % lname)
+        for ln in lines.get(lname, [])[:60]:
+            print('   L| ' + ln.rstrip()[:220])
+        print('-- IR T=%s (脱出先) 有無: %s' % (tname, 'あり' if tname in blocks else 'なし'))
+        if tname in blocks:
+            for ln in lines.get(tname, [])[:12]:
+                print('   T| ' + ln.rstrip()[:220])
+        refs_T = [n for n in blocks if int(r['target'], 16) in blocks[n]['succ']]
+        print('-- IR 脱出先 %s への参照元: %s' % (r['target'], refs_T))
+        preds_B = [n for n in blocks if int(bname.split('.')[0], 16) in blocks[n]['succ']]
+        print('-- IR B への参照元 (succ に含む): %s' % preds_B[:10])
+        for p in preds_B[:4]:
+            print('   P=%s term: %s' % (p, blocks[p]['term'].strip()[:200]))
+            for ln in lines.get(p, [])[-6:]:
+                print('     P| ' + ln.rstrip()[:200])
 
 
 if __name__ == '__main__':

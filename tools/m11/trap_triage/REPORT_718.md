@@ -129,60 +129,62 @@
 - 試作した自動突合は、レジスタ名の一致だけで偽陽性にしてしまうためコミットしていない。
 - 残作業: 95 件の件ごと判定 (受入条件 1・2)。本 issue (#1654) の範囲として未解決のまま残す。
 
-## 4g. 証拠表の行 36〜66 (#3499・部分達成: 母数 31・判定 25 件 (真陽性 25・偽陽性 0)・保留 6 件)
+## 4g. 証拠表の行 67〜98 (#3502・部分達成: 確定 2 / 32・保留 30)
 
-- 測定 commit: `4b6ec01b0` (origin/main。本 PR の基点)。`git diff 4b6ec01b0 HEAD -- tools/m11/guard699/ tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py` = 0 行。本 PR は `tools/m11/trap_triage/judge_ctx.py` (文脈ダンプ) を追加するだけで、既存の走査・証拠表・ダンプのコードは変えない。
-- 入力 (本 run で展開): `work-m11` の `boot_final.ll` (19,787,837 B・sha256 `69c774de…`。§4a・§4d・§4e・§4f と一致)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
-- 再現 (本 run で実行): `scan_guard.py --report` で fn 6969 / jcc 25618 / dropped 1380 / dropped_target_not_label 6868 / strict 288 (§3 の最終版と一致)。`strict_evidence.py --out` で TSV 288 行 (ヘッダ除く)。`judge_dump.py <IR> <TSV> 36 66` と `judge_ctx.py <IR> <TSV> 36 66` で文脈を出した。TSV とダンプは `tools/m11/work/` (gitignore・未コミット)。
-- 判定方法 (件ごと。機械語と IR の突合):
-  1. 機械語: jcc 直前の cmp の被演算子・条件コード・脱出先 T。
-  2. IR: 帰属ブロック B は無条件 `br` で L (ループ先頭) に入る。T へ `br` するブロック (T の preds) を列挙する。
-  3. 真陽性 = 機械語の被演算子と同じ値を比べる入口判定が IR の B→L 経路に無く、T へ抜ける経路が L の出口側にしか無い。偽陽性 = 同じ値の同等判定が IR 側にある。本範囲では偽陽性を示す同等判定は見つからなかった。
-  4. 機械語の被演算子が IR の何段の参照に当たるかは件ごとに違う (注 2)。偽陽性の判定には同一値の確認が要る。
-- 確度: 「2 系統」= 独立した 2 系統の判定が一致、または本 run で IR を直接確認。「単独」= 1 系統のみで、本 run では未照合。
-- 判定の経緯: 並列の判定 2 系統 (A: 行 36〜50、B: 行 36〜66) を取った。A は依頼文に範囲が無かったため 36〜50 のみ判定した。B の一部 (行 40・45・46) は本 run で IR を直接確認して採った。判定が割れた件は、上記の直接確認か保留で扱った。
-- 行 41 の扱い: 行 41 は A の範囲 (36〜50) にも入るが、A の判定記録に行 41 の結論が残っていない。A が行 41 を判定しなかったのか、判定を記録し損ねたのかは、この記録からは確定できない。A と B の結論が割れたという記録も無い。そのため行 41 は B の 1 系統だけの『単独』とし、2 系統目の照合を #3564 に残す。
-- 差し戻し対応の run では `work-m11` が展開されず、IR 側 (B・L・T の preds) を再確認していない。上記の件数 (真陽性 25・偽陽性 0・保留 6、うち 2 系統か直接確認 10・単独 15) は変えていない。
+- 測定 commit: `043720c53` (origin/main `01f1b7e51` の取り込み merge。競合なし)。判定に使うコード (`tools/m11/guard699/`・`tools/m11/ldfix/ldmach.py`・`tools/m11/trap_triage/strict_evidence.py`・`judge_ctx.py`・`judge_dump.py`) は、判定ダンプを追加した `e82d0c9ff` から変わっていない: `git diff e82d0c9ff 043720c53 -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py tools/m11/trap_triage/judge_dump.py` = 0 行。main 側で変わった `tools/m11/ldfix/ldfix.py`・`fix_r8b815050.py` は判定の import 経路の外。
+- 入力 (本 fix run で実測): `work-m11` の `boot_final.ll` (19,787,837 B・sha256 `69c774de…`)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。`work-m11` は `tools/m11/work/` に展開した (gitignore)。
+- 実行 (`043720c53`・foreground・各 1 回): `scan_guard.py --report` 4.3 s (strict 288・dropped 1380・jcc 25618。§3 と一致)、`strict_evidence.py` 12.2 s (TSV 288 行)、`judge_ctx.py <IR> <TSV> <PE> 67 98` 0.9 s (32 件・rc 0)。load average (1 分値) は開始 0.41・終了 0.58 (`/proc/loadavg`)。
+- 判定方法 (件ごと): `judge_ctx.py` で、機械語の jcc 直前の命令列 (cmp の被演算子・条件コード)、帰属ブロック B・ループ先頭 L・脱出先 T の IR 本文、B の参照元の終端を出す。機械語の被演算子を、reg2mem の store/load を遡って IR の判定の被演算子と同じ SSA 値に結べた件だけを確定する。
+  - 真陽性 (確定の条件): 同じ値の入口判定が IR に無く、jcc の脱出先に相当する経路がある。
+  - 偽陽性 (確定の条件): jcc が到達しない (機械語の命令列だけで決まる)、または同じ値の同等判定が IR の直前にある。
+  - 保留: 同じ値かの SSA 追跡が終わらないもの。名前 (`%21`・`sgt %113,8` 等) の一致も不一致も根拠にしない (§4c)。
+- 判定件数: **確定 2 / 32** (真陽性 0・偽陽性 2)。保留 30。偽陽性率は保留が残るため書かない。
+- 前版 (本節の旧版) の真陽性 21 件 (行 67〜71・73〜76・82〜87・91・93・95〜98) は、SSA 追跡を行わず入口判定の有無だけで確定したため撤回し、保留に戻した。
 
-| 行 | 関数 | jcc → T | 判定 | 確度 | 根拠 |
-|---|---|---|---|---|---|
-| 36 | function_1251960 | 12519ba jg → 1251a47 | 真陽性 | 2 系統 | B `1251960` は無条件 br で L `12519c7` に入る。機械語の入口判定 (ebx=0 > r14d=N-1) に当たる判定が IR に無い。T の preds は L のみ |
-| 37 | function_125da90 | 125e022 jg → 125e06d | 真陽性 | 2 系統 | B `125e00b` → L `125e034` に入口判定無し。T の preds は L のみ。注 1 |
-| 38 | function_125da90 | 125e0c6 jg → 125e111 | 真陽性 | 2 系統 | B `125e0af` → L `125e0d8` に入口判定無し。T の preds は L のみ |
-| 39 | function_1274260 | 12742fa jg → 127433e | 保留 | 2 系統 | L `1274303` に同系の `icmp ult` があるが、head 判定か否か未確定。偽側の `47a250` 呼出しの意味も未確認 |
-| 40 | function_127bc80 | 127bcfc jg → 127bd31 | 真陽性 | 直接確認 | B `127bce6` → L `127bd03` に N≤0 の判定無し。T の preds は `127bd27` のみ。注 2 |
-| 41 | function_127bc80 | 127be05 jg → 127beaf | 真陽性 | 単独 | 行 40 と同型 (B `127bdef` → L `127be10`)。T の preds は `127bea1` のみ。注 2 |
-| 42 | function_127cea0 | 127cf07 jg → 127cf60 | 保留 | 2 系統 | 機械語 esi の源が未確認。IR の counter との同一性を確定できない |
-| 43 | function_1280530 | 1285e80 jg → 1285ebc | 保留 | 2 系統 | IR の count は定数 501。機械語 ebx の源が未確認 |
-| 44 | function_129f140 | 129f179 jg → 129f1f2 | 真陽性 | 2 系統 | B が同じ global を読む。入口判定無し。T の preds は L のみ |
-| 45 | function_12a3ff0 | 12a415e jg → 12a41b6 | 真陽性 | 直接確認 | 機械語の count は call 12f9ed0 の戻り値 (eax−1)。B `12a414e` も同じ戻り値を count に使う。L `12a4165` に icmp 無し。T の preds は `12a41ab` (本体末尾) のみ |
-| 46 | function_12a4450 | 12a4621 jg → 12a4671 | 真陽性 | 直接確認 | 機械語 r13d=[[G]+0x10]−1 (3 段参照) と IR (B `12a45fe`) の 3 段参照が一致。L `12a462a` の icmp は counter 判定のみ。T の preds は `12a4665` のみ |
-| 47 | function_12a75e0 | 12a760d jg → 12a7685 | 保留 | 2 系統 | L の icmp は探索判定 (`==arg`)。T の preds が 3 本あり、入口判定の有無を確定できない |
-| 48 | function_12b51d0 | 12b51ea jg → 12b5216 | 真陽性 | 2 系統 | B `12b51d0` → L `12b51f1` に入口判定無し。T の preds は L のみ |
-| 49 | function_12b5220 | 12b523a jg → 12b5269 | 真陽性 | 2 系統 | 行 48 と同型 |
-| 50 | function_12b5280 | 12b529a jg → 12b52c9 | 真陽性 | 2 系統 | 行 48 と同型 |
-| 51 | function_12b52e0 | 12b52fa jg → 12b5329 | 真陽性 | 単独 | 行 48 と同型 |
-| 52 | function_12b5390 | 12b53aa jg → 12b53d9 | 真陽性 | 単独 | 行 48 と同型 |
-| 53 | function_12b53f0 | 12b540a jg → 12b5439 | 真陽性 | 単独 | 行 48 と同型 |
-| 54 | function_12b5450 | 12b5479 jg → 12b54bc | 真陽性 | 単独 | 2 段で N を読み入口判定無し。T は counter 判定の後段のみ |
-| 55 | function_12b54d0 | 12b54ec jg → 12b5536 | 真陽性 | 単独 | 行 54 と同型 |
-| 56 | function_12ca540 | 12ca5cd jg → 12ca629 | 真陽性 | 単独 | L に N 判定無し。T は本体内からのみ |
-| 57 | function_12ca640 | 12ca666 jg → 12ca73e | 真陽性 | 単独 | L に N 判定無し。T は本体内からのみ |
-| 58 | function_12ca770 | 12ca79a jg → 12caaaf | 真陽性 | 単独 | L に N 判定無し。T は本体内からのみ |
-| 59 | function_12cab20 | 12cad0f jg → 12cad72 | 真陽性 | 単独 | 2 段で一致。T は本体末尾からのみ |
-| 60 | function_12cab20 | 12cad89 jg → 12cae48 | 真陽性 | 単独 | 2 段で一致。T は counter 判定の後段のみ |
-| 61 | function_12cab20 | 12cadcb jg → 12cae11 | 真陽性 | 単独 | 2 段で一致。T は L 内の本体後の分岐のみ |
-| 62 | function_12cab20 | 12caeec jg → 12cafaf | 真陽性 | 単独 | 2 段で一致。T は本体末尾からのみ |
-| 63 | function_12cab20 | 12caf23 jg → 12caf7d | 保留 | 単独 | 単独判定は「IR の call 戻り値と同一」としたが、機械語の被演算子 `[rbx+0x10]` の rbx は call 12df530 の戻り値 (rsi) と別で、同一性の根拠が合わない。注 3 |
-| 64 | function_12cb680 | 12cb76b jg → 12cb796 | 真陽性 | 単独 | 同じ `call 12f9ed0` の戻り値が count。T は L 末尾からのみ |
-| 65 | function_12cb680 | 12cb803 jg → 12cb8a9 | 保留 | 単独 | 機械語 2 段 (`[[G]]`) に対し IR は 1 段の参照。同一性を確認できない。注 3 |
-| 66 | function_12cb680 | 12cbb59 jg → 12cbb9f | 真陽性 | 単独 | 行 64 と同型。T は本体内からのみ |
+| 行 | 関数 | jcc → 脱出先 / L | 判定 | 理由 |
+|---|---|---|---|---|
+| 67 | function_12cfce0 | 12cfd97 → 12cfdb7 / 12cfd9e | 保留 | 機械語 `cmp 0, edx` (`ecx` は `xor` で 0、`edx` = `[rax+0x10]`−1)。IR の直前判定 P (12cfd48) の `%21` (`load [%17−8]`) と、B の count (`i32 @18752024`+16 の load) の同一性が未追跡 |
+| 68 | function_12cfce0 | 12cfdcb → 12cfe2f / 12cfdd4 | 保留 | 機械語 `cmp ebx, r13d` の `r13d` の出所と、L の判定 (`%62` の i8 比較) の同一性が未追跡。B (12cfdb7) に icmp は無い |
+| 69 | function_12d0090 | 12d00d4 → 12d0318 / 12d00df | 保留 | 機械語 `cmp ecx, esi` の被演算子 (`esi`) と、L の判定 (`%11` の i8 比較) の同一性が未追跡 |
+| 70 | function_12d0b20 | 12d0b40 → 12d0b7b / 12d0b47 | 保留 | 機械語 `cmp esi, edi` の被演算子と、L の `icmp eq %19, %8` (ポインタ同値) の同一性が未追跡 |
+| 71 | function_12d2df0 | 12d2e2f → 12d2f0c / 12d2e3a | 保留 | 機械語 `cmp [rbp+0x5c], ebx` (stack 変数) を store/load で追う作業が未了。B の null 判定 (`%15`・`%17`・`%19`) との同一性も未確認 |
+| 72 | function_12d3da0 | 12d3dea → 12d3e0c / 12d3df1 | 保留 | T=12d3e0c は検索ループの続行ブロック。機械語 `ebx > count-1` と IR の添字 (rax.0 / rcx.0) の SSA 同一性が未追跡 |
+| 73 | function_12d4480 | 12d4500 → 12d454e / 12d450b | 保留 | 機械語 `cmp [rbp+0x20], esi` (stack 変数) を追う作業が未了。B の参照元 P の `icmp eq i8 %3, 0` と、L の `icmp eq %15, 0` の同一性も未確認 |
+| 74 | function_12d6730 | 12d6771 → 12d6859 / 12d677e | 保留 | 機械語 `cmp ebx, r13d` の被演算子と、L の `icmp eq i8 %20, 0` (バイト判定) の同一性が未追跡 |
+| 75 | function_12dd6a0 | 12dd6fa → 12dd735 / 12dd703 | 保留 | 機械語 `cmp edi, r14d` の被演算子と、L の `icmp eq %20, %15` (i32) の同一性が未追跡。T の判定 `%40` も未確認 |
+| 76 | function_12df9d0 | 12df9f7 → 12dfa18 / 12dfa00 | 保留 | 比較値は `xor ecx,ecx` で定数 0 (`eax` = 0)。被演算子は `r14d` = `[rbx+0x14]`−1 (`sub r14d,1` の後)。IR 側は B の `%0 = arg1+20` の i32 load → zext → `r14.0` (count)。両者が同じ count と言えるには、機械語の `rbx` と IR の `%arg1` が関数入口で対応する必要があり、これは未確認。L は count−1 の末尾判定 (`%4`・`%7`) で、入口判定ではない |
+| 77 | function_12dfe90 | 12dfeca → 12dff38 / 12dfed3 | 保留 | L の入口判定 `slt %29,0` の %29 の出所が未追跡 (戻り値由来の可能性) |
+| 78 | function_12e21a0 | 12e227e → 12e22b7 / 12e2285 | 保留 | B 直前の P (12e221e) の `slt %15,1` と、機械語の count (`call ea6e30` の戻り値) の同一性が未追跡。12e22d2 の後続も未確認 |
+| 79 | function_12f9730 | 12f97a4 → 12f98e1 / 12f97b1 | 保留 | L の入口判定 (2 ロードの比較) の値が count か未追跡 |
+| 80 | function_1306d60 | 1306e51 → 1306e85 / 1306e63 | 保留 | B (1306df4) に結果未使用の `slt %28, %storemerge23` があり、機械語の `1 vs count` との対応が未確認 |
+| 81 | function_1310300 | 13103e8 → 1310460 / 13103f1 | 保留 | L の入口判定が複数 icmp の合成 (%74・%77 等)。count 由来かの追跡が未完 |
+| 82 | function_1311050 | 13110b2 → 1311118 / 13110bb | 保留 | 機械語 `cmp ebx(=ecx), r13d` と、L の判定 (`sle`・`sgt`・`icmp eq %20`) の被演算子の同一性が未追跡。参照元 1311050 の `eq %1,0` は根拠にしない |
+| 83 | function_13114d0 | 1311555 → 13115b7 / 131155c | 保留 | 機械語 `cmp [rbp+0x3c], esi` (stack 変数) の store/load を追う作業が未了。L の `icmp eq i64 %37, 0` (ポインタ null 判定) との同一性も未確認 |
+| 84 | function_13114d0 | 1311737 → 1311784 / 131173e | 保留 | 機械語 `cmp [rbp+0x3c], esi` (83 と同じ stack 変数) と、L の `icmp eq i32 %157, 0` の同一性が未追跡 |
+| 85 | function_4088d0 | 408901 → 40895b / 408908 | 保留 | 機械語 `cmp eax(=ecx), edx` の被演算子と、L の `icmp eq i64 %13, %arg1` (ポインタ同値) の同一性が未追跡。参照元の `eq i8 %3, 0` は根拠にしない |
+| 86 | function_40ed10 | 40ed23 → 40ed40 / 40ed2c | 保留 | 機械語 `cmp ecx(=r9d), r10d` と、L の `icmp eq i32 %8, 0` の被演算子の同一性が未追跡。T の `slt %11, 0` も未確認 |
+| 87 | function_40edd0 | 40ede0 → 40ee04 / 40ede9 | 保留 | 機械語 `cmp eax(=r9d), r10d` と、L の `icmp eq i32 %14, 0` の被演算子の同一性が未追跡 |
+| 88 | function_410820 | 410878 → 4108e5 (jle) / 41087a | 保留 | 機械語の被演算子は `test r13d,r13d` (ループ内の再判定)。B に結果未使用の `icmp sgt/eq %.reload` がある。r13 との同一性が未確認 |
+| 89 | function_4144a0 | 4144cb → 414519 / 4144d2 | 保留 | L の入口判定 `eq %7,0` の %7 が count か未追跡 |
+| 90 | function_416a50 | 416abd (jb) → 416ae3 / 416abf | **偽陽性** | 機械語の `sub ebx,1` の直後の `test ebx,ebx` が CF を 0 にするため `jb` は成立しない (jcc は到達しない) |
+| 91 | function_419400 | 4194b2 → 4194d5 / 4194b9 | 保留 | 機械語 `cmp [rbp+0x34], ecx` (stack 変数) と、L の `icmp eq i16 %33, 0` (i16 ロード) の同一性が未追跡。参照元の `eq i64 %24, 0` は根拠にしない |
+| 92 | function_41b7c0 | 41b7df → 41b82e / 41b7e1 | **偽陽性** | 直前の `test r10d,r10d; jle 41b834` (IR の 41b7c0 `slt %2,1`) が count>0 を保証し、`0 > count-1` は成立しない |
+| 93 | function_41b850 | 41b866 → 41b887 / 41b86d | 保留 | 機械語 `cmp esi(=eax), edi` と、L の `icmp eq i32 %19, 0` の被演算子の同一性が未追跡 |
+| 94 | function_44a8c0 | 44a8d5 → 44a926 / 44a8df | 保留 | L (44a8df) は 44a8e8 へ無条件に進むため、入口判定は 44a8e8 の追跡が必要 |
+| 95 | function_44bc50 | 44c04a → 44c083 / 44c053 | 保留 | 機械語 `cmp eax(=edx), r8d` と、L の末尾判定 `icmp eq i32 %165, 0` の同一性が未追跡。参照元 44c022 の `sgt %113,8` は根拠にしない |
+| 96 | function_44bc50 | 44c19f → 44c1cd / 44c1a6 | 保留 | 機械語 `cmp eax(=ecx), edx` と、L の `icmp eq i32 %235, 0` の同一性が未追跡。参照元 44c18b の `sgt %202,8` は根拠にしない |
+| 97 | function_44bc50 | 44c2cd → 44c2fb / 44c2d4 | 保留 | 機械語 `cmp eax(=ecx), edx` と、L の `icmp eq i32 %301, 0` の同一性が未追跡。参照元の `sgt %268,8` は根拠にしない |
+| 98 | function_44bc50 | 44c407 → 44c435 / 44c40e | 保留 | 機械語 `cmp eax(=ecx), edx` と、L の `icmp eq i32 %367, 0` の同一性が未追跡。参照元の `sgt %334,8` は根拠にしない |
 
-- 集計: 真陽性 25 件 (2 系統か直接確認 10 件: 36・37・38・40・44・45・46・48・49・50。単独 15 件)、偽陽性 0 件、保留 6 件 (39・42・43・47・63・65)。偽陽性率は書かない (母数 288 のうち判定は 31 件のみ)。
-- 注 1: 行 37 は N が 0x40 の定数とされ、jcc は実行時に成立しない可能性が高い。実害は未確認。
-- 注 2: 行 40・41 は、機械語が `[[G]+0x10]` (3 段参照)、IR が `sext(i32 [G])+16` (2 段) で参照経路が一致しない。入口判定が IR に無いことは B・L を直接見て確認した。経路の差は別の lift 欠陥の疑いで、未確定。
-- 注 3: 行 63・65 は、同一性の根拠が機械語と IR で一致しないため保留。
-- 未解決: 保留 6 件と単独判定 15 件の 2 系統目の照合。起票先: #3564 (`[M11-N188]`・親 #3499)。
+- 偽陽性 2 件 (行 90・92) の根拠は機械語の命令列だけで決まる (行 90: `test` が CF を消すため `jb` は成立しない。行 92: 直前ガードで `count-1 >= 0` が成り立つため `jg` は成立しない)。jcc が到達しないので、IR の対応は判定に使っていない。
+- 保留 30 件 (行 67〜89・91・93〜98): 同じ値かの SSA 追跡 (reg2mem の store/load を遡る) が未了。起票先: #3502 (Refs。子 issue は新規に起票しない・本 PR の未解決表)。
+- 真陽性の構造判定 (IR に count の入口判定が無い) の到達可能性 (count が 0 や負になる経路の有無) は未測定。`docs/DEFECTS.md` の類型への対応は PM 判断。
+- 再現: `python3 tools/m11/guard699/scan_guard.py <boot_final.ll> --pe <block00031_PE.bin> --report strict.json` → `python3 tools/m11/trap_triage/strict_evidence.py <IR> --pe <PE> --report strict.json --out strict_evidence.tsv` → `python3 tools/m11/trap_triage/judge_ctx.py <IR> strict_evidence.tsv <PE> 67 98`。
+
+## 4h. 証拠表の行 36〜66 (#3499・部分達成)
+
+- 結論の正本: 件ごとの判定表・根拠・注 1〜3・未解決は `REPORT_APPENDIX_3499.md` の §4h。250 行上限のため分割移動した (内容は削除していない)。
+- 判定ツール `tools/m11/trap_triage/judge_ctx_3499.py` は、main の `judge_ctx.py` (#3502) と名前が衝突したため改名した。
 
 ## 5. 再現
 
