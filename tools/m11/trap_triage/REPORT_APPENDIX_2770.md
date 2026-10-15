@@ -143,7 +143,7 @@ grep -c '^wp ' work/wp_F.txt; tail -1 work/wp_F.txt     # wp 件数・wpsum
 
 - 測定 commit: `bf9f349f4` (本 fix 前の検証 HEAD)。`tools/liftdiff` は `e7cff966b` と差分 0 (`git diff e7cff966b bf9f349f4 -- tools/liftdiff` の出力は空)。ビルドは §8.1 と同じ `gcc -O1 -g -Wall -Wno-unused-function` (警告 3 件は `rt/ld_core.h` 由来)。素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)、`work-m11`・`work-liftdiff` (リポジトリ直下に展開)。作業 dir は `ws-3421` (worktree)。
 - entry の rsp は env 長 (`LD_PAD`・`LD_WATCH_*` の有無) と作業 dir の長さで決まる。この環境の rsp は §8.2・§8.7 と違う。比べるのは entry の rsp が同じ組だけ。`cmp_img_2770.py` は rsp が違うと `DIFFERENT: not comparable`、取れないと `UNKNOWN: not comparable` と出す。
-- 測定: `LD_PAD` (140 文字) の有無と `LD_WATCH_ADDR` を変えて `liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild` を 23 run (直列 21 run と strace 付き 2 run。表 1 の全行)。全 run で units_run 928/942、img 215 要素。img の byte 数 (要素の byte 数の合計。§8.2 と同じ定義) は cmp の集計で 48,532 byte と出た。§8.2 の X0 は同じ 215 要素で 48,484 byte と byte 数が違う。要素の内容 (pristine と異なる byte を含む区間の範囲と値) が違うため。
+- 測定: `LD_PAD` (140 文字) の有無と `LD_WATCH_ADDR` を変えて `liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild` を 23 run (直列 21 run と strace 付き 2 run。表 1 の全行)。全 run で units_run 928/942、img 215 要素。img の byte 数 (要素の byte 数の合計。§8.2 と同じ定義) は cmp の集計で 48,532 byte と出た。§8.2 の X0 は同じ 215 要素で 48,484 byte と byte 数が違う。この差の原因は未確認 (どの要素のどの区間が違うかは比べていない)。
 
 表 1 (`0x11e69bf` と監視の集計。rsp の群ごと)
 
