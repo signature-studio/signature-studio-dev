@@ -99,6 +99,7 @@ SITES = [
             (0x44f095, 'call', '0x44aeb0'),
             (0x44f0cb, 'mov', 'r9, qword ptr [rsp + 0x60]'),
             (0x44f0d0, 'mov', 'r9, qword ptr [r9]'),
+            (0x44f0f0, 'mov', 'r8, r9'),
             (0x44f0f6, 'call', '0x44ec40'),
         ],
         'edits': edits_44f040,
