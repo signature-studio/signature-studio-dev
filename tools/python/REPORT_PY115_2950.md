@@ -19,7 +19,7 @@
   - `node tests/device_diff.mjs` → `{"calls":8,"rejects":4,"midi_out":5,"diffs":0,"PASS":true}`
   - `node tests/sig_arity_probe.mjs` → `{"kwsig_targets":24,"fails":0,"PASS":true}`
 - 比較 (前 run の WIP `3e754b8b`、#2927 未 merge の表): `channels_diff`・`mixer_diff` は追加引数が code 5 で FAIL していた。#2956 merge 後の main の表では PASS。
-- flpy (CPython wasm): `bash build_cpython_wasm.sh` real 3 分 21 秒 rc 0 → `FLPY_SKIP_TABLE=1 EMSDK_DIR=/opt/emsdk bash build_flpy.sh` real 4.789 s rc 0 (`FLPY_SKIP_TABLE=1` で追跡済みの `flapi_table.json` を再生成しない)。
+- flpy (CPython wasm): `bash build_cpython_wasm.sh` real 3 分 21 秒 rc 0 → `FLPY_SKIP_TABLE=1 EMSDK_DIR=<emsdk 展開先> bash build_flpy.sh` real 4.789 s rc 0 (`FLPY_SKIP_TABLE=1` で追跡済みの `flapi_table.json` を再生成しない)。
 - `node tests/provider_check.mjs` → `{"functions":435,"implemented":155,"unimplemented":280,"mcp_static":60,"PASS":true}`、real 0.275 s。
 - `FL_ENGINE=wasm node tests/all_tools.mjs` → `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}`、real 1.303 s。
 
