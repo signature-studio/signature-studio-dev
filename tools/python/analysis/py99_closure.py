@@ -48,53 +48,9 @@ class Tag(p99.Rec):
         return self.cfg.preds(a)
 
     def resolve(self, fam, pos, depth=0):
-        res = self.resolve_joined(fam, pos, depth)
+        res = p88.Slicer.resolve(self, fam, pos, depth)
         if res.startswith(f"{fam}_in"):
             self.reg_in.add((fam, self.order[pos]))
-        return res
-
-    def resolve_joined(self, fam, pos, depth):
-        """py88_writes.Slicer.resolve と同じ線形の遡り。合流の判定だけを range(i + 1, pos + 1) にする
-        (読み命令 pos 自身が分岐先の場合を含める。py88 の範囲は共有のため変えない・#3858 指摘 1)。"""
-        key = (fam, pos)
-        if key in self.memo:
-            return self.memo[key]
-        if depth > p88.DEPTH_LIMIT:
-            return "…"
-        i = pos - 1
-        res = None
-        while i >= 0:
-            a = self.order[i]
-            m, ops_s = self.ins[a]
-            ops = p88.parse_ops(ops_s)
-            if m == "call":
-                if fam == "a":
-                    res = self.call_expr(i, depth + 1)
-                    break
-                if fam in p88.CALLER_SAVED:
-                    res = f"clob@{a:#x}"
-                    break
-            elif m in ("cmp", "test", "jmp", "ret", "nop") or m.startswith("j"):
-                pass
-            elif m.startswith("cmov") and ops and p88.FAM.get(ops[0]) == fam:
-                res = f"CMOV@{a:#x}({self.ev(ops[1], i, depth + 1)})"
-                break
-            elif self.writes_fam(m, ops) == fam or (ops and m in p88.FLOATOP and ops[0].startswith("xmm") and p88.FAM.get(ops[0]) == fam):
-                res = self.def_value(i, depth + 1)
-                break
-            elif m in ("cvtsi2sd",) and ops and p88.FAM.get(ops[0]) == fam:
-                res = self.def_value(i, depth + 1)
-                break
-            i -= 1
-        if res is None:
-            res = f"{fam}_in"
-        for j in range(i + 1, pos + 1):
-            if self.order[j] in self.targets:
-                res = res + f" ⚠合流@{self.order[j]:#x}"
-                break
-        if len(res) > 400:
-            res = res[:400] + "…"
-        self.memo[key] = res
         return res
 
     def reg_def_reaches(self, fam, pos_addr):
