@@ -188,7 +188,7 @@ flags=1 の 12 行で予測との mismatch = 0。al=1 になるのは (a78,a18)=
 
 - 検証範囲: block00031 の機械語と unicorn 単独実行 (callee は stub)。範囲外: 実行時の HostTag・Index・第 5 引数・object・callee の実値、callee の実行 (0xe34190 ほか)。範囲外の主張は本付録では行わない。
 - 到達表 (0x1318e3e・0x1321a1b など) は zero-page の HostTag (= TAG)、第 5 引数の既定値、stub の戻り値 0 の上で得た結果。経路 B の値は測っていない。
-- main 取り込み後の再測定 (`461cfe434`): 上表の全項目 (`disp` 256 ID・`sweep11ffde0` 19 行・`verify` 36 行 + 集計行・`word41`・`hs_disp_emu.py 0x01 0x13 0x26 0x41 0x46`・fill 0xff の `disp 0x01 0x41`) を再実行し、到達 ID・rax・mismatch 0 が取り込み前と一致した。
+- main 取り込み後の再測定 (`461cfe434`): 上表の全項目 (`disp` 256 ID・`sweep11ffde0` 19 行・`verify` 36 行 + 集計行・`word41`・`hs_disp_emu.py 0x01 0x13 0x26 0x41 0x46`・fill 0xff の `disp 0x01 0x41` と `hs_disp_emu.py` の fill 0xff 0x01 0x41) を再実行し、到達 ID・rax・mismatch 0 が取り込み前と一致した。repo 外の一回限りのスクリプト (表の「`hs_disp_emu.py` の slot 読出し」行) は再実行していない。
   `git diff 461cfe434 HEAD -- tools/plugins/framework/hostshim ':!*.md'` の出力は空。
 - 検収向けの別算法: 経路の逆追跡 (`path_dump`)・機械語の直読 (`hs_callee_disasm.py`) と、単独実行 (`fn`/`verify`/`word41`) の結果が一致することを確認した (§2.2 の arm と sweep の一致、§4.1 の式と verify の一致)。
 
