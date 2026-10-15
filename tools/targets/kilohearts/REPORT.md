@@ -96,7 +96,7 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 | 14-24 | Trance Gate, Phaser, Reverb, Limiter, Chorus, Ensemble, Dynamics, Dual Delay, Tape Stop, Freq Shifter, Delay | 2.8〜5.9K | 358〜1033 | 10〜28 | 0〜63 | 中位 |
 | 25-35 | Transient Shaper(IAT 6), Bitcrush, Ring Mod, Compactor, Flanger, Shaper, Shaper Table, Distortion, Convolver(AVX 346), Filter, Pitch Shifter | 3.2〜10.8K | 606〜2222 | 14〜27 | 0〜346 | SIMD 量大 (Convolver の VEX-256/AVX 346 は畳込み kernel と推定) |
 | 36-41 | Phase Dist., Nonlinear Filter(IAT 6), Faturator, Ladder, Slice EQ, Filter Table | 7.8〜19.2K | 1413〜2804 | 16〜43 | 0〜427 | 重い (固有コード大・SIMD 多) |
-| 42 | Carve EQ | 50,109 | 2,032 | 41 | 145 | 127 関数・IAT 19 (用途未調査) |
+| 42 | Carve EQ | 50,109 | 2,032 | 41 | 145 | 固有 127 関数 (`own_funcs`・固有 B と同集合) / unique 142 関数 (`unique_funcs`・census 対象)・IAT 19 (用途と扱いは `snapins/REPORT_APPENDIX_781.md`) |
 | 43-45 | Snap Heap / Multipass / Phase Plant | 50K/64K/153K | 3.3K/4.4K/15.4K | 46/48/62 | 145〜177 | ホスト/シンセ。最難 |
 
 ## 5. 認証 blocker の切り分け (DSP 側)
@@ -241,3 +241,10 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 #### 10-7g. #1215 (KH-23) 再 run: 呼出名 `func_0x…` の統一 (部分)
 - 結論: `ghidra_to_c.py` の呼出名統一で emcc error 31 → 25 件。Resonator は依然未通過。Gain/Haas/Gate 1000/1000 bit-exact (回帰なし)。詳細と実測は付録 `REPORT_APPENDIX.md` §10-7g。
 - #1405 (KH-25) の 1 単位: `rcpps` 代入形の固定と converter ガード、`GetLastError`/`SetLastError` の stub。Resonator は依然未通過。Gain/Haas/Gate 1000/1000 bit-exact。件数・実測・測定 commit は付録 `REPORT_APPENDIX.md` §10-7o。
+
+#### 10-7p. #1216 (KH-24) run: Stereo / Delay の Ghidra 実ビルド試行 (部分)
+- 結論: decompile は Stereo 8/8・Delay 141/141 OK。emcc の clang error は Stereo **12** 件・Delay **577** 件 (merge `2a17665f`。旧 `6f5e17fa` は 39・601。内訳は REPORT_APPENDIX_3075 §10-7p-3)。本体の呼出 `thunk_FUN_<X>` は飛び先 `FUN_<X>` に写す (差し戻し B1 の一意性規則は実データの Delay で停止するため撤回)。Gain/Haas/Gate/Stereo/Delay の C 出力は main と byte 一致。Stereo/Delay の 1000 trial 突合は未実施 (#3073)。詳細は付録 `REPORT_APPENDIX.md` §10-7p・§10-7p-2。
+
+#### 10-7q. #3072 (KH-40) run: Delay の Ghidra 変換 (型名・LOCK・Win API stub・thunk 正規化) (部分)
+- 結論: Delay の lift 141 関数 decompile OK。thunk 正規化を列 0 の定義行だけに限定 (本体の自己呼出しを解消、旧版は 1 関数で発生)。emcc clang 診断 **601 件** (測定 commit `7d1d0e2e`。旧記載の 526 は再現せず)。LOCK/UNLOCK は no-op (単一スレッド)、Win API 21 件は fail-fast stub。Gain/Haas/Gate 1000/1000 bit-exact (回帰なし)。残件 601 件の内訳と起票先は付録 `REPORT_APPENDIX.md` §10-7q。
+

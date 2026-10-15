@@ -214,7 +214,7 @@ static void *thread_fn(void *arg) {
     fla_go();
     __atomic_store_n(&A.ready, 1, __ATOMIC_SEQ_CST);
     wake32(&A.ready);
-    /* 目標充填 T の動的調整: (1) worklet が観測した最長バースト + 25% + B を下限に (2) underrun 毎に +B (上限 ring-2B)。
+    /* 目標充填 T の動的調整: (1) worklet が観測した最長バースト × FLA_BURST_PCT% + B を下限に (2) underrun 毎に +B (上限 ring-2B)。
      * (3) underrun が FLASIO_SHRINK_STABLE_MS 続いたら +B を 1 段ずつ戻す (下限 (1) は下げない = 拡張とのヒステリシス)。
      * 変更時はホストへ kAsioLatenciesChanged (既定 OFF = A.notify_lat)。 */
     uint32_t T = A.depth * A.B, T0 = T, esc = 0, last_u = 0;
@@ -222,7 +222,7 @@ static void *thread_fn(void *arg) {
     double quiet_t0 = emscripten_get_now();
     while (!A.stop) {
         uint32_t burst = LD(c->burst_obs);
-        uint32_t need = (burst + burst / 4 + A.B + A.B - 1) / A.B * A.B;
+        uint32_t need = (uint32_t)(((uint64_t)burst * FLA_BURST_PCT / 100 + A.B + A.B - 1) / A.B * A.B);
         uint32_t u = LD(c->underruns);
         double now = emscripten_get_now();
         if (u != last_u) { esc += A.B; last_u = u; quiet_t0 = now; }
@@ -244,11 +244,17 @@ static void *thread_fn(void *arg) {
         }
         if (rc < 0) break;
         if (rc == 1) continue;
+        double tw = emscripten_get_now();
         uint32_t fill = fla_out_fill();
         if (fill < c->min_fill) c->min_fill = fill;
         c->fill_sum_lo += fill; c->fill_samples++;
         if (fill < FLA_QUANTUM) c->cb_late++;
+        uint32_t w0 = c->out_write, k = (c->pw_n % FLA_PW_N) * 4;
         do_buffer(idx); idx ^= 1;
+        double td = emscripten_get_now();
+        c->pw_trace[k] = w0; c->pw_trace[k + 1] = fill;
+        c->pw_trace[k + 2] = (uint32_t)(uint64_t)(tw * 1000.0); c->pw_trace[k + 3] = (uint32_t)(uint64_t)(td * 1000.0);
+        c->pw_n++;
     }
     return NULL;
 }

@@ -193,27 +193,9 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 | `unreached_unique.py` | exit 0、2.66 s。 正の対照 7/7 |
 | 前提 inventory (初回のみ、`work/` 無しから) | 533 s (`win_scan`〜`kernel_table`。 `win_funcs.py` が並列 14 プロセス / 4 core で大半)。 `block_manifest.json` が tarball に無く `nsis_names.py` が動かないため、`mk_blockmap.py` が `PLUGIN_MATRIX.json` から代替の blockmap (182 record) を合成 |
 
-### gate の設計 (#506 の reviewer 指摘への対応)
+### gate の設計・ネガティブコントロール
 
-- 判定は `judge.py` に切り出し、不合格が 1 件でもあれば **exit 1** (入力不正は exit 2)。 `sampler_e2e.sh` は `set -e` で判定の直後に中断し、`[sampler_e2e] OK` は全工程を通った時だけ出る。
-- `declares_unimpl` も判定に含める。 許容は `targets.py` の `ALLOW_UNIMPL` と名前の許可リストで、本 PR では両方空 (#629 で `rep_stosb_memset` が消えたため)。 未実装 helper が 1 件でもあれば不合格。 -1 (計測不能)・非整数・行欠落・header のみ・空は全て不合格。
-- lift 実行時は、その run が `work/batch/status.csv` に追記した行だけを判定する (過去 run の合格行で通さない)。
-- 突合 (`matrix_check.py` / `ids_crosscheck.py` / `unreached_unique.py`) は期待件数と照合した件数が一致しなければ不合格 (facts が空・欠落でも vacuous に通さない)。 `unreached_unique.py` は正の対照が落ちると exit 1。
-- engine の判定 = lift_rc 0 / defines>0 / pdata>0 / 行が揃う / 最終 IR の `emcc -c` rc 0 (`emcc_c_rc_after_f80`) / `missing_ref` 0。 不合格は exit 1 (NC8 で 1 列ずつ壊して確認)。
-
-### ネガティブコントロール (`sampler_nega.sh`、exit 0、10.49 s、HEAD 53c2eb6)
-
-| NC | 内容 | 対照 → 壊した入力 (実測) |
-|---|---|---|
-| NC1 | FL Keys の `final.ll` の関数 1 つの `ret` を除去 → `emcc -c` | rc 0 → **rc 1** |
-| NC2 | FL Keys の閉包 ranges の末尾 1 つを落として再 lift | 落とした関数 `function_7268d0` が 1 → **0**、define 29 → 27 |
-| NC3 | `judge.py shells` に合成 CSV 10 種 (emcc_c_rc=1 / lift_rc=1 / f80=3 / 許容 0 の block に未実装 1 / 許容 1 の block に未実装 2 / 未実装 -1 / 許可外の helper 名 / FPC の行欠落 / 全行欠落 / header 不正) | 対照 rc 0 → 9 種が **rc 1**、header 不正が **rc 2** |
-| NC4 | e2e 本体 (`--skip-lift --judge-only`) に `emcc_c_rc=1` の行を足した status.csv を渡す | 対照 rc 0 → **rc 1**、不合格側の出力に `[sampler_e2e]` 行 0 本 (OK 行が出ない) |
-| NC5 | `matrix_check.py` に壊した入力 4 種 (FPC の closure_funcs +1 / Slicex の facts 欠落 / 空 facts / FL Keys の batch emcc_c_rc=1) | 対照 rc 0 → **4 種とも rc 1** |
-| NC6 | `ids_crosscheck.py` に taint 側の ID 件数を +1 (FL Keys ID 2: 1 → 2) した facts | 対照 rc 0 → **rc 1** |
-| NC7 | `judge.py engines` に lift_rc=1 の行 / 末尾行欠落の engines.csv | 対照 rc 0 → **2 種とも rc 1** |
-
-NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 0」と同じ入力 (emcc_c_rc=1 の追記) で、本 PR は exit 1 になる。
+全文は [REPORT_APPENDIX_GATE.md](REPORT_APPENDIX_GATE.md) (gate の判定条件・NC1〜NC7 の表)。
 
 検証範囲: 閉包の機械的な到達性 (RetDec+pass 鎖 → `emcc -c`)、host / kernel 依存の静的な数え上げ、閉包外の固有関数の静的な数え上げ。
 範囲外 (本書は何も主張しない): wasm のリンクと実行、native との出力比較、framework / host shim との結合、Render test .flp、
@@ -240,9 +222,10 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | 本 PR で DOC_MAP §3 に `REPORT.md`・`REPORT_INDIRECT.md` の 2 行を追記して解消 (REPORT 側の PM 追記は不要) |
 | `ALLOW_UNIMPL` (`rep_stosb_memset` 用の許容) の撤去 | 撤去後も既存 CSV に対する judge は PASS 7/7 (`--skip-lift`)。 stub が戻れば FAIL する | 本 PR で撤去 (main 8d883c3 以降の実測で 7 block とも `declares_unimpl` 0) |
 | lowering (f80→f64) の bit-exact 差分 (3 block) | 通過 ≠ 正しさ。 差分試験の対象外 | #197 にコメント済み (REPORT_LEA.md §7b) |
-| VEX の `vcomisd` / `vucomisd` / `vucomiss` (`__asm_v*comis*`) が未実装 stub のまま (19252: 3 件、19048: 4 件。 flag 未反映) | 2 engine の unimpl が 5 件ずつ残る。 stub は abort ではなく 0 返却のため silent な flag 欠落経路 | [PLG-F3-12] #1582 (本 PR で方式を決定、実装は子 issue) → 子 [PLG-F3-14] (起票) |
+| VEX の `vcomisd` / `vucomisd` / `vucomiss` (`__asm_v*comis*`) の flag が未反映 (同一ブロック内の読みのみ反映 #1774。 残りは消費条件が IR に無い) | 2 engine の unimpl に VEX の stub が残る (件数・内訳は [REPORT_APPENDIX_3242.md](REPORT_APPENDIX_3242.md) §1・§2)。 stub は 0 返却のため silent な flag 欠落経路 | 子 [PLG-F3-33] #3241 (open)。 非 VEX は [PLG-F3-34] #3242 (本 PR) |
 
 - §7b の実測と方式 (#1582 [PLG-F3-12]・VEX comis/ucomis の flag 方式の検討 2 案) は [REPORT_APPENDIX_1582.md](REPORT_APPENDIX_1582.md) §7b。
+- §7c の実測 (#1774 [PLG-F3-14]: 同一ブロック内の flag 反映 pass・機械語の消費命令と IR の参照・icall 別案の不採用理由) は [REPORT_APPENDIX_1774.md](REPORT_APPENDIX_1774.md) §7c。
 ## 8. DEFECTS.md 行案 (候補・追加の可否は PM 判断)
 
 | 類型 | 症状 | 観測 | 検出信号 | 修復 |

@@ -1,5 +1,5 @@
-// playlist 確定 8 関数 (REPORT_PY61 §2・PY-62 #2027) の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と
-// C provider (provider/fl_engine.c) に流し、各呼出しの戻り値・エラー code が一致することを確認する。
+// playlist 系の差分検査 (確定 8 関数 REPORT_PY61 §2・PY-62 #2027 / muteTrackLock の value 引数 PY-102 #2883): 同じ呼出し列を
+// JS mock (host/fl_mock.mjs) と C provider (provider/fl_engine.c) に流し、各呼出しの戻り値・エラー code が一致することを確認する。
 //   node tests/playlist_diff.mjs     (前提: provider/build.sh 済み)
 import fs from "node:fs";
 import assert from "node:assert/strict";
@@ -76,6 +76,34 @@ const seq = [
   ["playlist.setTrackColor", [3, 0xFF0000FF]],
   ["playlist.getTrackColor", [3]],
   ["playlist.getTrackColor", [1]],
+  // PY-102 (#2883): muteTrackLock の value 引数 (表 np=2・nmin=1)。2 個呼出しは表の dispatch を通り、handler が値を読む
+  ["playlist.trackCount", []],
+  ["playlist.muteTrackLock", [1, 1]],
+  ["playlist.muteTrackLock", [1, 0]],
+  ["playlist.muteTrackLock", [1, -1]],
+  ["playlist.muteTrackLock", [1, 2]],
+  ["playlist.muteTrackLock", [1, 256]],
+  ["playlist.muteTrackLock", [1, -2]],
+  ["playlist.muteTrackLock", [1, true]],
+  // 1 個呼出し・value 省略 (None) は既定 -1 (反転)
+  ["playlist.muteTrackLock", [1]],
+  ["playlist.muteTrackLock", [1, null]],
+  ["playlist.muteTrackLock", [500, -1]],
+  // 範囲外 index は両者とも code 4 (RANGE)
+  ["playlist.muteTrackLock", [0, 1]],
+  ["playlist.muteTrackLock", [501, 1]],
+  ["playlist.muteTrackLock", [-1, -1]],
+  // 引数個数違反 (np=2・nmin=1) と型違い (dispatch が先に見るため index 範囲より優先) は code 5
+  ["playlist.muteTrackLock", []],
+  ["playlist.muteTrackLock", [1, 1, 1]],
+  ["playlist.muteTrackLock", ["1", 1]],
+  ["playlist.muteTrackLock", [1, "x"]],
+  ["playlist.muteTrackLock", [1, 0.5]],
+  ["playlist.muteTrackLock", [501, "x"]],
+  // 同じ playlist の隣接 API が壊れていないこと
+  ["playlist.getTrackName", [1]],
+  ["playlist.setTrackName", [1, "Drums"]],
+  ["playlist.getTrackName", [1]],
 ];
 
 const diffs = [];
@@ -93,4 +121,14 @@ for (const eng of [mock, wasm]) {
   eng.call("playlist.setTrackColor", [3, 0xff0000ff]);
   assert.equal(eng.call("playlist.getTrackColor", [3]), 0xff0000ff);
 }
-console.log(JSON.stringify({ calls: seq.length, diffs: 0, PASS: true }));
+// mock 単体の状態遷移 (C 側は状態を外部に出していないため、意味論の確認は mock だけで行う)
+// 0 → 1 (反転) → 0 (明示 0) → 1 (明示 1) → 反転 0 → 2 (下位 1 byte) → 256 (下位 byte 0) → -2 (254) → 反転 0
+const m2 = createMockEngine();
+const steps = [[1, null, 1], [1, 0, 0], [1, 1, 1], [1, -1, 0], [1, 2, 2], [1, 256, 0], [1, -2, 254], [1, undefined, 0]];
+for (const [i, v, want] of steps) {
+  if (v === undefined) m2.call("playlist.muteTrackLock", [i]); else m2.call("playlist.muteTrackLock", [i, v]);
+  assert.equal(m2.state.playlist[i - 1].lock, want, `mock lock (v=${v})`);
+}
+assert.equal(m2.state.playlist[1].lock, 0, "他 track は不変");
+
+console.log(JSON.stringify({ calls: seq.length, diffs: 0, mock_state_steps: steps.length, PASS: true }));

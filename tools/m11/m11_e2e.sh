@@ -7,7 +7,7 @@
 # 使い方:
 #   M11_EXPECT_STAGE=5 M11_EXPECT_SURVEY_OK=850 bash tools/m11/m11_e2e.sh  # 期待値の上書き (既定は e2e_expect.env)。下回れば exit 1 (#715)
 #   bash tools/m11/m11_e2e.sh           # work/ の成果物があれば再利用 (無ければ自動で全再生成), build は増分
-#   bash tools/m11/m11_e2e.sh --full    # RetDec lift から全再生成 (scan→bounds→lift 4chunk→tail 固定点→IR→build; 約 10 分)
+#   bash tools/m11/m11_e2e.sh --full    # RetDec lift から全再生成 (scan→functions_dll.csv (無ければ Ghidra 12.1.4 で作成)→bounds→lift 4chunk→tail 固定点→IR→build; 実測 約 22 分 (Ghidra での CSV 作成 約 10 分を含む。REPORT_N3172 §3))
 #   bash tools/m11/m11_e2e.sh --trace   # icall / unit init のトレースを stderr に出す
 #   M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh   # LVA = RVA + 0x10000 (#222; 既定 0 = 従来 LVA=RVA). 変更時は --full 推奨 (IR の VA→LVA remap が変わる)
 # 前提: /opt/emsdk, /opt/retdec, node(v26: ~/.local/share/pnpm/bin), analysis/win64/extracted/block00031_PE.bin
@@ -51,6 +51,7 @@ PE_SHA="$(sha256sum "$PE" | cut -d' ' -f1)"   # #728: lift 成果物を生成し
 if [ $FULL = 1 ] || [ $need_lift = 1 ]; then
   step "全再生成モード (scan → bounds → lift → tail 固定点 → IR)"
   [ -f work/scan_index.json ] && [ $FULL = 0 ] || must "m11_scan" python3 m11_scan.py
+  must "functions_dll.csv (Ghidra 12.1.4)" bash m11_ghidra_dll.sh   # #3172: 素材に無い中間物。無ければ作る (有れば即 0)
   must "m11_bounds" python3 m11_bounds.py
   must "lift 4 chunks (RetDec)" bash m11_lift_all.sh
   for it in 1 2 3; do
@@ -86,6 +87,7 @@ if python3 -c 'import pefile' 2>/dev/null; then  # #222: LB_BASE 適用の静的
   must "lb_check (M11_LB_BASE=${M11_LB_BASE:-0})" python3 lb_check.py "$PE" work/m11_image.bin "${M11_LB_BASE:-0}"
 fi
 must "build (emcc 増分)" bash m11_build.sh
+must "ptrclass (#3113 分類 B の定数集合)" python3 m11_ptrclass.py "work/boot_final.ll" --pe "$PE"
 
 if [ ! -f work/m11_boot.cjs.wasm ]; then
   step "wasm 未生成: build ログ ($LOG) 末尾"; tail -15 "$LOG"
@@ -93,9 +95,9 @@ if [ ! -f work/m11_boot.cjs.wasm ]; then
 fi
 
 step "実行 A: 通常起動 (DllMain attach → InitUnits ループ)"
-M11_TRACE=$TRACE M11_PTRCHECK_MAX_NEW="${M11_EXPECT_PTR_NEW_MAX:-}" timeout 300 node m11_run.mjs > work/e2e_full.out 2>&1; rc_run=$?
+M11_TRACE=$TRACE M11_PTRCHECK_MAX_NEW="${M11_EXPECT_PTR_NEW_MAX:-}" M11_PTRCHECK_UNREMAP_MAX="${M11_EXPECT_PTR_UNREMAP_MAX:-}" timeout 300 node m11_run.mjs > work/e2e_full.out 2>&1; rc_run=$?
 step "実行 B: unit survey (942 unit を try/catch 隔離)"
-M11_PTRCHECK_SURVEY_MAX_NEW="${M11_EXPECT_PTR_SURVEY_NEW_MAX:-}" timeout 600 node m11_survey.mjs > work/e2e_survey.out 2>&1; rc_survey=$?
+M11_PTRCHECK_SURVEY_MAX_NEW="${M11_EXPECT_PTR_SURVEY_NEW_MAX:-}" M11_PTRCHECK_SURVEY_UNREMAP_MAX="${M11_EXPECT_PTR_SURVEY_UNREMAP_MAX:-}" timeout 600 node m11_survey.mjs > work/e2e_survey.out 2>&1; rc_survey=$?
 step "実行 C: 寛容起動 (InitUnits を逐次 942 unit・失敗 unit は skipped として続行; #2714)"
 M11_TOLERANT_OUT=work/tolerant_units.json timeout 600 node m11_tolerant.mjs > work/e2e_tolerant.out 2>&1 || true
 

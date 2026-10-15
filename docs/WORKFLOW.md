@@ -146,7 +146,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 2. 同一チケット / 同一 dir に open PR (`started`) か稼働中の実装 run があれば**着手せず報告**。
 3. lift / 逆アセ / IR pass / ハーネス系は `docs/DEFECTS.md` を先に読み、REPORT 冒頭に
    「既知類型との関係: 該当 ID / 該当なし」を 1 行書く。
-   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D23 と `tools/icall/REPORT.md` §4 の D1〜D13 は
+   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D25 (D24 は無い) と `tools/icall/REPORT.md` §4 の D1〜D13 は
    **別体系**。参照時は `(DEFECTS.md)` / `(icall §4)` を必ず併記。
 4. **担当 dir 以外の未コミット変更は他担当の WIP**: 触らない・commit に含めない・stash/checkout/clean しない。
 5. ユーザへ追加アーティファクトを依頼する前に必ず検証する (`docs/REFERENCES.md` `[DOWNLOADS]` と
@@ -197,6 +197,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   `feat(kh): add DecompAt2 ghidra postScript`。
 - PR は `--base main` を基本 (repo の既定ブランチ = `main`)。body に `Closes #N`・受入条件・検証結果を書く。
 - **起動・GUI・ウィンドウに関わる PR は、本文に製品 KPI の前後 (FLEngine 起動の dispatch 数・通過 unit 数 (`tools/flelift/boot/REPORT.md`)、最初のウィンドウの有無) を書く。動かせなかったときは『動かしていない』と書く。** 起動・GUI に関わらない PR は KPI を書かなくてよい。
+- **起動結果を変える PR** (`tools/m11/REPORT.md`・`tools/flelift/boot/REPORT.md`・`tools/gui/flengine/**`・`tools/startup/**` を変える PR) は、(1) `python3 tools/startup/boot_metric.py` で `tools/startup/boot_metric.json` を再生成し同じ PR に含める (手で編集しない)、(2) `docs/STATUS.md` 先頭の「FL のウィンドウ」行の最終到達ステップを更新した record の値に合わせる、(3) STATUS には測定値を書かず REPORT に書く、(4) pr-lint が `boot-metric:` を出したら再生成するか、起動結果を変えない変更なら本文に `boot_metric: unchanged (<理由>)` を書く (#3191)。
 - **docs だけの PR を作らない。** 調査・測定の結果は、それを必要とした実装 PR か issue コメントに入れる。REPORT の更新は、実装と同じ PR に含める。例外: 規約・ADR・PM の判断の記録。定期 STATUS 同期の自動 PR (`docs(status): sync merged PRs`、`tools/pm/status_sync.py`) も例外 (`docs/STATUS.md` の status-auto 節の内側だけを変える PR に限る)。
 - **1 チケット = 1 subagent。** チケット化されていない作業も subagent 委任する。
   10 回以上の tool call が必要になる作業は必ず subagent に委任すること。
@@ -271,7 +272,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     (gitignore 対象の検証スナップショット。commit しない)。`work-m11` は #516 qstore 以前の生成
     (`qstore_report.json`・`ir_conditions.json` 無し) で現 main の生成手順と一致しない (#680)。survey の基準には使わない。
     IR の正は `bash tools/m11/m11_e2e.sh --full` (RetDec から再生成) の出力とする。`--full` は head `2e128c5c` で rc 0 まで通る (633 秒・素材 + Ghidra 再生成が前提。`tools/m11/REPORT_N27.md` §12・#728)。ただし reached_stage は 4 で trap が残る。IR の sha256 は A7 の空行除去 (#1664) より前は実行ごとに変わった (原因と修正後の一致は `tools/m11/REPORT_APPENDIX_960.md` §19)。
-    `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
+    `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る (`bash tools/m11/m11_e2e.sh --full` は無ければ `tools/m11/m11_ghidra_dll.sh` が Ghidra を取得・検査して作る・#3172)。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
     **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
     Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup が `~/.local/agent-py` の venv に `pefile` `capstone` `numpy` を入れる (#893)。版と hash は `.github/actions/agent-setup/requirements-py.txt` で固定し、`--require-hashes` で入れる (#2621)。venv の bin は PATH に載せず、`python` / `python3` を venv の python へ委譲するラッパーの dir (`~/.local/agent-py-shim`) を PATH 先頭に置く。venv 無しで動かす場合は同じ venv を手で作る。
@@ -366,8 +367,10 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     ラベルを外すと再開し、次の差し戻しから数え直す (停止前の件数を持ち越さない)。停止コメントの無いラベル (手動付与・reopen 失敗) は
     数える起点が無く全期間を数えるため、外すと即座に再停止しうる (扱いは #719 で決める)。
   - **起動主体は完全一致**: fix を起動する reviewer (`oc-reviewer-for-signature-studio[bot]`、`user.type == 'Bot'`) と、
-    停止コメント・完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
+    完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
     (前方一致だと別名のアカウントでも write 権限の fix が起動し、停止コメントを偽装して数え直しもできてしまう)。
+    停止コメント (`oc-fix-limit`) の作者は job の GITHUB_TOKEN = `github-actions[bot]` だけ (型 `Bot` も見る。#2622・#2639)。
+    PM Worker (`infra/pm-worker` の `MARK_LOGIN`) と oc-pm の文脈 (`prepare-event-context.sh`) も同じ作者で見る。
   - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fix / verify / reopen) と `test-watchdog.sh` (watchdog の判定と操作)
     と `test-dispatch-context.sh` (dispatch・投稿者の入力検証) と `test-run-outcome.sh` (implement 終了時の記録・review の打ち切りの再起動) を、fake gh で `.github/workflows/scripts-test.yaml` が `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の
     変更ごとに実行する。
@@ -410,8 +413,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     issue にラベル `oc:no-pr` と構造化コメント `<!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> [cause=rate_limit] run=<run id> -->` を残す。`cause=rate_limit` は、opencode の JSONL の error 行に率制限 (`rate_limit_error`・HTTP 429) があったときだけ付く (`detect-rate-limit.sh`。text 行の語は数えない。annotation `oc-rate-limit` も出る。#2344)。
     率制限を検知したときは `notify-rate-limit.sh` が、直近 30 分に `cause=rate_limit` の run が 5 件以上かつ完了した opencode の run の 30% 以上なら、ラベル `oc:rate-limit` の issue に通知する (open があればコメント (60 分に 1 回)、無ければ `[CI] 率制限: ...` を起票 (6 時間に 1 件))。`OC_MODEL_ID` は自動で変えない (切替は指示 126 の範囲で PM が行う。#2346)。
     PM Worker はコメント本文を解析せず、**ラベルとマーカー**で扱う。`oc:no-pr` は、次の run が PR を出す (または issue が close・明示的な状態になる) と、この script が外す。
-    `state:*` ラベルは作らない。reason は agent の最終回答の語彙で決める (`tools/pm/launch_issues.py` の `stop_re`・`NEED_RE` と同じ。優先順 artifact > blocked > split > stop):
-    `artifact` 素材不足・`blocked` 依存 issue・前提 PR 未 merge・`split` 1 run に収まらない・`stop` 判断待ち/停止報告/着手不可・`unknown` 上のどれでもない (着手報告のみ・run の失敗)。
+    `state:*` ラベルは作らない。reason は agent の最終回答の語彙で決める。分類規則の正本は `.github/scripts/run-outcome-reason.sh` (`tools/pm/launch_issues.py` の `stop_re`・`NEED_RE` と同じ語彙。優先順 artifact > blocked > split > stop。#3184):
+    `artifact` 素材不足・`blocked` 依存 issue・前提 PR 未 merge・`split` 1 run に収まらない・`stop` 判断待ち/停止報告/着手不可・`unknown` 上のどれでもない (着手報告のみ・run の失敗・判定できない停止)。
+    `artifact` は、allowlist の素材名が、句 (。 、 ； で区切った節) の中で『無い・足りない・不足・必要・未配置・未展開』と肯定の文脈で挙がるときだけ。『素材』『oc_artifacts』の語だけでは数えず、素材名の無い『素材不足』も数えない。否定 (『不足は無い』『不足なし』『必要ではない』) は数えず、`oc_artifacts` を含む節の『必要』は次の run への指定として数えない (『無い』『足りない』は数える)。
     コメント本文に起動コマンド (行頭の `/oc`) は書かない (自分のコメントで implement を起動しないため)。
   - **review の打ち切り** (`review-recover.sh`、`review-recover` job): review job が runner の打ち切り (job の annotation が `shutdown signal`・`exit code 143`・
     `exceeded the maximum execution time`) で cancelled になると、job 内の verify step は走らない (#1420: 同じ head で 7 回連続)。新しい runner の
@@ -424,6 +428,8 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     (一度でも稼働に入った Worker) で、`fresh` が false または `last_tick` が 15 分より古ければ、題名 `[CI-n] PM Worker 停止 (<日付>)`・ラベル `pm-worker-down` の issue を起票する
     (本文は `/status` の写しと `@pycabbage`。`needs-user-input` は付けない)。**`configured:false` / `installed:false` (`/setup` 未了) では起票しない。**
     重複排除: ラベル付きの open issue があれば追記のみ (1 時間に 1 回まで)、24 時間以内に close した issue は reopen して追記する。
+  - **PM Worker の率制限 alert** (`watchdog.sh`、#CI-142): `fresh` が true の `/status` で、`rate_limit_alert` が true (Worker が 30 分の窓で 5 件以上かつ 30% 以上を 2 回連続と判定。`ratealert.ts`) または `rest_remaining` が 1500 未満 (`ratelimit.ts`) なら、ラベル `oc:rate-limit` の open issue があれば追記のみ (60 分に 1 回まで)、無ければ題名 `[CI-n] PM Worker 率制限 alert (<日付>)` を起票する (本文は `@pycabbage`・rate-guard の説明・率制限の項目の写し)。
+    ラベルは `notify-rate-limit.sh` (run 側) と共有するので、同じ率制限を二重の issue にしない。open の issue が無くても、6 時間以内に閉じた `oc:rate-limit` の issue があれば起票しない (人が close した直後の再起票を防ぐ。reopen はしない。`notify-rate-limit.sh` と同じ 6 時間の窓。6 時間後も alert が続けば新しい issue を立てる)。同じ issue への追記は watchdog (`oc-rate-limit-note`) と `notify-rate-limit.sh` (`oc-rate-limit-notify`) がそれぞれ 60 分に 1 回書くので、1 時間に最大 2 件のコメントになりうる (run 側の集計と `/status` の判定は別の根拠。意図どおり)。`fresh` が false の間の値は使わない (停止は `pm-worker-down` が扱う)。回復時の close は自動ではない。
     回復 (`fresh` が true かつ `last_tick` が 5 分以内) で、open の障害 issue にコメントして close する。ファイルが無い・取得失敗・JSON 不正は警告だけで何もしない (終了コードは変えない)。
   - **bot の `/oc`** (#1949): PM 用 GitHub App の `/oc` は `vars.OC_PM_BOT_LOGIN` との完全一致 + `user.type == 'Bot'` で許可する (`.github/README.md`)。
 

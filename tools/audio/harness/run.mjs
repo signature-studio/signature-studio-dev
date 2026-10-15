@@ -1,24 +1,41 @@
 // シナリオ行列ランナー: 1 つの headless Chrome で全シナリオを順に実行し、結果 JSON と判定を出力する。
-// 使い方: node harness/run.mjs [--quick] [--only name,name] [--out results/results.json]
+// 使い方: node harness/run.mjs [--quick] [--only name,name] [--out results/results.json] [--browser chrome|edge|safari]
 //        node harness/run.mjs --soak30   # 30 分ソークのみ (AU-10)
+//        --browser safari: safaridriver (WebDriver classic) で測る (AU-35 #3193)。macOS では既定出力が BlackHole 2ch でなければ終了 2
 import { withChrome } from "./chrome.mjs";
+import { withSafari } from "./safari.mjs";
 import path from "node:path"; import fs from "node:fs"; import os from "node:os"; import { fileURLToPath } from "node:url";
+import { spawn, execFileSync } from "node:child_process";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const quick = args.includes("--quick");
+const browser = args.includes("--browser") ? args[args.indexOf("--browser") + 1] : "chrome";
+if (!["chrome", "edge", "safari"].includes(browser)) { console.error("--browser には chrome / edge / safari のいずれかを指定してください"); process.exit(2); }
+const withBrowser = browser === "safari" ? withSafari : withChrome;
+// 既定出力の名前 (macOS = CoreAudio の既定出力 / Linux = PulseAudio の既定 sink)。それ以外の OS では測らない (null)
+const defaultOutput = () => {
+  const cmd = process.platform === "darwin" ? ["SwitchAudioSource", ["-t", "output", "-c"]] : process.platform === "linux" ? ["pactl", ["get-default-sink"]] : null;
+  if (!cmd) return null;
+  try { return execFileSync(cmd[0], cmd[1], { encoding: "utf8", timeout: 5000 }).trim(); } catch (e) { return "ERR " + e.message; }
+};
 const only = args.includes("--only") ? args[args.indexOf("--only") + 1].split(",") : null;
 const S = (full, q) => (quick ? q : full);
 // AU-10 (#191): 長時間ソーク。既定の全シナリオ実行には含めない (--soak30 / --soak <秒> 指定時のみ、そのシナリオだけを実行する)。
 //   --soak30        : 1800 秒 (30 分) ランプ・ソーク (B=256, 48kHz, 全フレーム bit-exact 照合)
 //   --soak <秒>     : 秒数指定 (短縮確認・ネガコン用)
 //   --inject-hiccup : ネガティブコントロール。60ms の強制ブロックを混入し、gate が FAIL (exit 1) することを確認する用
+//   --busy <N>      : 負荷下ソーク (AU-21 #1570)。soak と同時に busy ループ N 本 (sh の while ループ) を並走させ、終了後に PID 指定で止める
 const soakSecs = args.includes("--soak30") ? 1800 : args.includes("--soak") ? +args[args.indexOf("--soak") + 1] : 0;
 if (args.includes("--soak") && !(soakSecs > 0)) { console.error("--soak には 1 以上の秒数が必要です"); process.exit(2); }
 const injectHiccup = args.includes("--inject-hiccup");
 if (injectHiccup && !(soakSecs > 0)) { console.error("--inject-hiccup は --soak30 / --soak <秒> と併用してください"); process.exit(2); }
-// 既定の results/results.json (全シナリオの記録) を soak 単独実行で上書きしない: soak は results/soak_<秒>[_negctl].json
+const busyN = args.includes("--busy") ? +args[args.indexOf("--busy") + 1] : 0;
+if (args.includes("--busy") && !(busyN > 0)) { console.error("--busy には 1 以上の本数が必要です"); process.exit(2); }
+if (busyN > 0 && !(soakSecs > 0)) { console.error("--busy は --soak30 / --soak <秒> と併用してください"); process.exit(2); }
+const soakTag = `${busyN > 0 ? `_busy${busyN}` : ""}${injectHiccup ? "_negctl" : ""}`;
+// 既定の results/results.json (全シナリオの記録) を soak 単独実行で上書きしない: soak は results/soak_<秒>[_busy<N>][_negctl].json
 const outFile = args.includes("--out") ? args[args.indexOf("--out") + 1]
-  : path.join(here, "../results", soakSecs > 0 ? `soak_${soakSecs}${injectHiccup ? "_negctl" : ""}.json` : "results.json");
+  : path.join(here, "../results", soakSecs > 0 ? `soak_${soakSecs}${soakTag}.json` : "results.json");
 
 // expect: 判定関数 (r) => [ok:boolean, msg]
 const underrunFree = (r) => [r.stats.underruns === 0 && r.stats.silence_frames === 0, `underruns=${r.stats.underruns} silence=${r.stats.silence_frames}`];
@@ -148,15 +165,19 @@ if (soakSecs > 0) {
   const wall = (r) => [(r.secs_wall ?? 0) >= soakSecs, `secs_wall=${r.secs_wall} ≥ ${soakSecs}`];
   const noWorkletErr = (r) => [(r.workletErrors ?? []).length === 0 && !r.aborted && r.exit === 1, `workletErrors=${(r.workletErrors ?? []).length} aborted=${!!r.aborted} exit=${r.exit}(1=完了, 2=エラー)`];
   // 合格条件 (全て AND): underrun 0 / silence 0 / ランプ全フレーム bit-exact / 実フレーム ≥ 公称 99% / 実時間 ≥ 公称 / worklet エラー 0
-  scenarios.push({ name: `asio_ramp_b256_soak${soakSecs}${injectHiccup ? "_negctl" : ""}`,
+  scenarios.push({ name: `asio_ramp_b256_soak${soakSecs}${soakTag}`,
     q: `api=asio&mode=ramp&buf=256&depth=2&secs=${soakSecs}${injectHiccup ? "&hiccup_ms=60&hiccup_every=200" : ""}`,
     expect: all(underrunFree, rampExact, covered, wall, noWorkletErr) });
 }
 const sel = scenarios.filter((s) => !only || only.includes(s.name));
+const outDev = defaultOutput();
+if (process.platform === "darwin" && outDev !== "BlackHole 2ch") { console.error(`既定出力が BlackHole 2ch ではない (${outDev})。SwitchAudioSource -s "BlackHole 2ch" で切り替えてから実行してください`); process.exit(2); }
 const loadStart = os.loadavg(), tStart = Date.now();
 const results = [];
 let failed = 0;
-await withChrome({ root: path.join(here, "../build/web"), page: "index.html?" + sel[0].q, log: () => {} }, async (cdp) => {
+const busy = Array.from({ length: busyN }, () => spawn("sh", ["-c", "while :; do :; done"], { stdio: "ignore" }));
+process.on("exit", () => { for (const p of busy) p.kill(); });
+await withBrowser({ root: path.join(here, "../build/web"), page: "index.html?" + sel[0].q, log: () => {} }, async (cdp) => {
   let first = true;
   for (const sc of sel) {
     if (!first) await cdp.navigate("index.html?" + sc.q);
@@ -173,11 +194,12 @@ await withChrome({ root: path.join(here, "../build/web"), page: "index.html?" + 
     const st = r?.stats ?? {};
     if (r && (r.aborted || r.codes)) { console.log(`${ok ? "PASS" : "FAIL"} ${sc.name.padEnd(28)} ${msg}`); continue; }
     console.log(`${ok ? "PASS" : "FAIL"} ${sc.name.padEnd(28)} ${msg}` +
-      (r ? `\n       clock_jump_log=${(r.clockJumpLog ?? []).map((e) => `q${e.q}:${e.d > 0 ? "+" : ""}${e.d}@f${e.frame}`).join(" ") || "-"}\n       cb=${st.cb_count ?? st.fills} late=${st.cb_late ?? "-"} cb_max=${st.cb_max_us ?? st.fill_max_us}us burst=${st.burst_obs ?? "-"} T=${st.T ?? "-"} (${st.T ? (st.T * 1000 / r.sr).toFixed(1) : "-"}ms) lat_changes=${st.latency_changes ?? "-"} wake_hist=${JSON.stringify(st.wake_hist)} ` +
+      (r ? `\n       clock_jump_log=${(r.clockJumpLog ?? []).map((e) => `q${e.q}:${e.d > 0 ? "+" : ""}${e.d}@f${e.frame} ct=${e.ct.toFixed(4)}s pn=${e.pn.toFixed(1)}ms cb=${e.cb}`).join("\n         ") || "-"}\n       cb=${st.cb_count ?? st.fills} late=${st.cb_late ?? "-"} cb_max=${st.cb_max_us ?? st.fill_max_us}us burst=${st.burst_obs ?? "-"} T=${st.T ?? "-"} (${st.T ? (st.T * 1000 / r.sr).toFixed(1) : "-"}ms) lat_changes=${st.latency_changes ?? "-"} wake_hist=${JSON.stringify(st.wake_hist)} ` +
         `dev_fill[min/avg/max]=${r.verify?.device_fill?.min}/${r.verify?.device_fill?.avg?.toFixed(0)}/${r.verify?.device_fill?.max} ` +
         `jumps=${r.snapshot?.clock_jumps}/${r.snapshot?.clock_jump_frames}f (skip=${r.snapshot?.clock_skip_frames}f dup=${r.snapshot?.clock_dup_frames}f max=${r.snapshot?.clock_jump_max}f@q${r.snapshot?.clock_jump_max_q} first=${dq(r.snapshot?.clock_first_q)} last=${dq(r.snapshot?.clock_last_q)}) cb_max_q=${r.snapshot?.cb_max_q ?? "-"} lat(in/out)=${r.reported?.lat_in ?? "-"}/${r.reported?.lat_out ?? "-"} clock=${r.clock?.rate_hz?.toFixed(1) ?? "-"}Hz` : ""));
   }
 });
+for (const p of busy) p.kill();
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 let merged = results;
 if (only && fs.existsSync(outFile)) {   // 部分再実行: 既存結果へ名前単位でマージ
@@ -188,6 +210,6 @@ if (only && fs.existsSync(outFile)) {   // 部分再実行: 既存結果へ名�
 for (const x of results) x.ran_at = new Date().toISOString();
 const hostInfo = { load_start: loadStart, load_end: os.loadavg(), wall_s: (Date.now() - tStart) / 1000, nproc: os.cpus().length };
 console.log(`host: load avg start=${loadStart.map((v) => v.toFixed(2))} end=${hostInfo.load_end.map((v) => v.toFixed(2))} wall=${hostInfo.wall_s.toFixed(1)}s nproc=${hostInfo.nproc}`);
-fs.writeFileSync(outFile, JSON.stringify({ date: new Date().toISOString(), quick, chrome: "headless google-chrome 154", note: "ran_at は部分再実行時のシナリオ単位時刻", host: hostInfo, results: merged }, null, 1));
+fs.writeFileSync(outFile, JSON.stringify({ date: new Date().toISOString(), quick, browser, chrome: browser === "safari" ? null : "headless google-chrome 154", default_output: outDev, note: "ran_at は部分再実行時のシナリオ単位時刻", host: hostInfo, results: merged }, null, 1));
 console.log(`\n${results.length - failed}/${results.length} PASS -> ${outFile}${only ? " (部分実行: 既存結果へマージ)" : ""}`);
 process.exit(failed ? 1 : 0);

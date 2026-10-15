@@ -9,7 +9,7 @@
     "build": "bun build src/index.ts --target=browser --format=esm --external 'node:*' --minify --outfile=dist/index.js",
     "metadata": "node scripts/metadata.mjs",
     "test:unit": "vitest run --config vitest.unit.config.ts",
-    "test:mutation": "node scripts/mutation_halt.mjs"
+    "test:mutation": "node scripts/mutation_halt.mjs && node scripts/mutation_no_pr.mjs"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.4.1",

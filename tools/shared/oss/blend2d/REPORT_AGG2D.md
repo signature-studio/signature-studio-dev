@@ -180,7 +180,7 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 |---|---|---|
 | (a) 221 関数の Blend2D 内部 / Agg2D glue の帰属 (upstream blend2d fc827d5 との照合) | lift か C++ 再実装かの判断の中心 | #146 (次の測定候補) |
 | (a) 方針 (lift / C++ 再実装) の決定。指示 54 の当てはめの確認。**PM agent の判断待ち: lift か C++ 再実装か (指示 54 の当てはめ)・既定案: glue のみ C++ 再実装 (Blend2D 本体は upstream build 済みを使う)** | 実装に入れない。既定案の前提 (glue の範囲) は帰属の測定が要り、未検証 | #146 (PM/ユーザ判断) |
-| x64c の CFG rax-in 対応 (§10)・未対応 33 種 (§9) | lift 採用時の必須項目。silent 経路の恐れ | #146 (方針決定後に子 issue 化) |
+| x64c の CFG rax-in 対応 (§10)・未対応 mnemonic (§9) | §15 で再測定 (付録 §15)。rax-in は `--cfg-rax` で opt-in 実装 (`bbf86210`)。既定化と reg 経由 2 site は子 issue | 子 issue (T-SH-50・T-SH-51) |
 | (b) FL 実描画経路の画素比較 harness | 受入条件 (b) 未達 | #146 |
 | (c) symbol 集合比較の手段 | 受入条件 (c) 未達 | #146 |
 
@@ -192,3 +192,49 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 ## 13. AggCreateInstance の呼び出し元の手がかり
 
 結論: block18797 に lazy 初期化 loader がある。消費側は未特定。測定値は `REPORT_APPENDIX_AGG2D.md` §13。
+
+## 14. vtable の所属クラス (MSVC RTTI の COL)
+
+> 測定 commit: `bef37ac3` (`agg2d_rtti.py` に vtable 書き込み箇所の走査を追加した commit)。`git diff bef37ac3 HEAD -- tools/shared/oss/blend2d/*.py '*.sh'` の出力は 0 行 (以後の変更は本ファイル・`tools/shared/REPORT.md`・`REPORT_SIMD.md` の文言のみ)。
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_rtti.py [出力 JSON]` (依存: `pefile`・`capstone`)。所要はプロセス全体の wall で n=3 の min–max **129–130 ms** (load average 1 分値 0.12、nproc 4、各回の前後で同値)。出力の既定は `tools/shared/work/agg2d_rtti.json` (gitignore)。vtable VA は `agg2d_vtable.py` の検出関数を流用。
+
+| 項目 | 値 | 根拠 |
+|---|---|---|
+| vtable VA | `0x1801dbec0` (§5 と一致) | `agg2d_vtable.py` の検出 |
+| COL VA (`vtable[-1]`) | `0x1801e29b8` | x64 COL (signature = 1) |
+| 所属クラス | `.?AVAgg2D@?A0x604ded79@@` (Agg2D、無名名前空間) | COL → TypeDescriptor |
+| 基底クラス | `.?AVAgg2DIntf@@` の 1 個 | ClassHierarchyDescriptor |
+| 同じ COL を指す vtable | **1 個** (本 vtable 自身のみ。その vtable は 130 slot) | `.rdata` 全 qword 走査 |
+| `Agg2DIntf` の COL / 独立 vtable | **0 / 0** | 同上 |
+| vtable を書く RIP 相対 `lea` | **2 か所**: `0x1800568b2` (ctor `0x1800568a0` 内、§5 の箇所)・`0x180056add` (関数 `0x180056ad0` 内) | `.text` のバイト走査 (`rip_lea_hits`: REX.W `8d` の disp が vtable を指すもの) を capstone で `lea` と確認 |
+
+**ネガティブコントロール** (WORKFLOW §5): vtable VA を +8 した scratch (`git archive bef37ac3` の複製、出力は `$RUNNER_TEMP`) で `agg2d_rtti.py` を実行すると **rc=1** で `vtable[-1] = 0x180056700 が .rdata 外。COL ではない` と終了し、JSON は出ない。書き込み走査も VA `0x1801dbec8` (+8) で **0 件** (VA は 2 件)。
+
+**判明**:
+- 130 slot の vtable は Agg2D 具象クラスの vtable で、DLL 内で COL を指す vtable は 1 個。`AggCreateInstance` が返すオブジェクトの vtable はこれに限られる。vtable を書くのは **2 か所** (ctor `0x1800568b2`、`0x180056ad0` の関数)で、どちらも同じ vtable `0x1801dbec0` を書く (RIP 相対 lea の走査による。絶対アドレスによる書き込みは本測定の対象外で、未検証)。
+- `0x180056ad0` (先頭命令 `mov [rsp+8],rbx` から関数の先頭と見なした) は、先頭で `[rcx]` に vtable を書き、続けて `mov rcx,[rcx+0x160]` の後に `lock xadd [rcx-0x10]` を行う。デストラクタ等の可能性があるが、役割は未検証。
+- (a) の glue の範囲の上限は、この vtable の **実体 81 slot (unique 78 関数)**。残り 49 slot は同一の `ret 0` (`0x18000c530`、`REPORT_APPENDIX_AGG2D.md` §12)。
+- `Agg2DIntf` は独立 vtable を持たない。FL 側がどのインタフェース型で呼ぶかは、Agg2D vtable の slot 順に依る (単一継承の slot 順は未検証)。
+
+**未判明**:
+- FL 本体がどの slot を実際に呼ぶか。静的には消費側 (vtable の呼び出し箇所) を特定できていない (§13)。
+- 78 関数の役割と、各関数が呼ぶ Blend2D API の名前 (export・シンボル無し)。
+
+**判断への影響**: (a) の既定案 (glue のみ C++ 再実装) の範囲は「FL が呼ぶ slot 集合」と「各 slot の呼び先 Blend2D 内部関数」で決まる。前者は静的測定では決まらず、実行時の vtable 呼び出し記録が要る。その記録は FLEngine の boot が最初のウィンドウに届くことが前提で (`tools/flelift/boot/REPORT.md` §9 は unit 209 で停止)、(b) の画素比較と同じ依存。(a) と (b) は boot の進行に依存し、本 issue 単独では前進しない。
+
+## 15. CFG rax-in の実装 (opt-in) と #3065 取り込み後の残り
+
+> 測定 commit: `bbf86210`。測定値は付録 §15 (`REPORT_APPENDIX_AGG2D.md`)。
+
+**判明**:
+- x64c の CFG 間接 call / tail jmp の宛先は rax で渡される (thunk `jmp rax` 経由)。x64c は slot の値 (thunk 自身) を dispatch していたため、閉包内の直接形を rax-in に変える `--cfg-rax` を入れた (既定 OFF。既定の出力は変わらない: 付録 §15.3)。
+- #3065 の取り込みで、閉包 50 の未対応 site は §9 の件数から大きく減った (付録 §15.2)。
+- 残りは子 issue へ: T-SH-50 (未対応 site の被覆)、T-SH-51 (レジスタ経由 CFG 形と既定化・boot KPI の前後)。
+
+**未判明・未検証**: 生成 C の実行 (rax-in の正しさ・dispatch 表の挙動)。harness (b) が要る。
+
+**方針の当てはめ (PM 判断待ち)**: `docs/pm/DIRECTIVES.md` 指示 54 は「upstream からビルドできるものはビルドし、難しいものは lift」。`tools/shared/REPORT.md` (libblend2d 行) は Agg2D glue を「FL 独自」と分類しており、upstream の build 対象ではない。指示 54 に当てはめると glue は lift が既定で、C++ 再実装は lift が不可と示された場合だけになる。この当てはめは PM の確認が要る。Blend2D 内部と glue の帰属は未判定 (§11)。
+
+## 16. x64c の未対応 6 mnemonic の被覆 (#3138)
+
+結論: 閉包 50 の unsup_sites は **13 → 0**。差分試験は 44 PASS / 0 FAIL (新規 9 件)。FLEngine の lift 出力は変更前後でバイト一致。製品 KPI (起動・GUI) は未測定。閉包別の表・ネガティブコントロール・diff の詳細は `REPORT_APPENDIX_AGG2D.md` §16。`origin/main` (`6cfa2e8a`) の取り込み後 (測定 commit `5fc307db`) も同じ結果で、統合後の再測定は付録 §16 の「統合後の再測定」。

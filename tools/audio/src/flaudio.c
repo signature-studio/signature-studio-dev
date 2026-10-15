@@ -34,7 +34,7 @@ static const fla_layout_entry_t g_layout[] = {
     OFF(ref_ctx_time_bits), OFF(ref_epoch_ms_bits), OFF(ref_seq), OFF(out_latency_us), OFF(base_latency_us),
     OFF(cmd_seq), OFF(cmd_op), OFF(cmd_arg), OFF(ack_seq), OFF(ack_status), OFF(ack_res), OFF(ctrl_ready),
     OFF(cb_count), OFF(cb_late), OFF(cb_max_us), OFF(cb_sum_us_lo), OFF(wake_count), OFF(wait_timeouts),
-    OFF(in_underflows), OFF(min_fill), OFF(fill_sum_lo), OFF(fill_samples),
+    OFF(in_underflows), OFF(min_fill), OFF(fill_sum_lo), OFF(fill_samples), OFF(pw_n), OFF(pw_trace),
 };
 const fla_layout_entry_t *fla_layout_offsets(int *count) {
     *count = (int)(sizeof g_layout / sizeof g_layout[0]);
@@ -104,7 +104,7 @@ int fla_open(uint32_t sr, uint32_t out_ch, uint32_t in_ch, uint32_t buffer_frame
     if (burst < FLA_QUANTUM) burst = FLA_QUANTUM;
     /* 目標充填 T: worklet は burst (= baseLatency 相当, 通常 128..1024; 96kHz では 2048..4096) フレームを連続で引く。
      * T >= burst + buffer_frames でないと 1 回の burst で枯渇する (PROTOCOL.md §4) */
-    uint64_t need = ((uint64_t)burst + burst / 4 + buffer_frames + buffer_frames - 1) / buffer_frames;
+    uint64_t need = ((uint64_t)burst * FLA_BURST_PCT / 100 + buffer_frames + buffer_frames - 1) / buffer_frames;
     if (need > depth) depth = (uint32_t)need;
     /* depth の固定上限は置かない。制約は ring 容量のみ: 動的 T 拡張 (flasio, 上限 ring-2B) の余地を含め
      * (depth+2)*B <= FLA_MAX_RING が必要。超過はホストを落とさずエラー返却 (呼び側が CreateBuffers エラーに写像) */
@@ -174,6 +174,7 @@ void fla_reset_indexes(void) {
     c->cb_count = c->cb_late = c->cb_max_us = c->cb_sum_us_lo = c->wake_count = c->wait_timeouts = 0;
     c->in_underflows = 0; c->min_fill = 0xffffffffu; c->fill_sum_lo = 0; c->fill_samples = 0;
     memset(c->wake_hist, 0, sizeof c->wake_hist);
+    c->pw_n = 0;
 }
 
 void fla_go(void) {

@@ -24,6 +24,8 @@
 
 未解決 (起票先付き): 受入条件 1 は #1426 (304/555/923 の OOB 実値採取)。S1 の 3 unit は #1635 `[GUI-22]`。現 HEAD の S1 FAIL (`870/1/47/24/0` vs `867/1/47/27/0`) は本 PR で解消しない (`Refs #1442`)。
 
+WIN-21 (#3352) の現 HEAD の実測と S1 の unit 再測定は [REPORT_APPENDIX_3352.md](REPORT_APPENDIX_3352.md) §6k (測定 commit `c3ee6daa7`) を正とする。
+
 ## 6j. GetMonitorInfoW / EnumDisplayMonitors の重複定義 (#1559 / M11-N102)
 
 **測定 commit `60932d35` (main)。実行コードの差分 0** (`git diff 60932d35 HEAD -- tools/gui tools/m11 tools/shim tools/shared ':!*/results/*' ':!*.md'` が 0 行)。
@@ -199,3 +201,7 @@ CreateFileW の 1 呼出し = printErr の 1 行 `SHIMOPEN {json}`。json は `o
 | `bash tools/shim/test.sh` | exit 0 (18 s)・shim 53 API × MT/ST・全 PASS |
 | `gcc -Wall -c tools/shim/src/file.c` (native) | 警告 0 |
 | 再現 | `bash tools/gui/flengine/e2e.sh` / `node tools/gui/flengine/cfi_probe.mjs --out <json> --trace-out <jsonl>` / `node tools/gui/flengine/open_trace_posctl.mjs` |
+
+## 9. WIN-11 (#2880): EnterCriticalSection の失敗 CS と初期化経路 (部分達成)
+
+結論: fail-fast の CS は `0x12bd390` (実測・動的引数)。呼出元 VA と boot の trap 地点は未特定 (子 issue #3077 [WIN-16])。測定 commit `ae963e28`。実測と未解決の全文は [REPORT_APPENDIX_2880.md](REPORT_APPENDIX_2880.md)。

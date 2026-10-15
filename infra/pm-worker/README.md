@@ -24,7 +24,8 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 2. open な子 (`親: #N`) を持つ親 issue は着手対象から外す。
 3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。最後の `oc-run-outcome` の reason で再着手を決める (`plan()` の `noPr`)。cooldown (既定 6 時間。`NO_PR_COOLDOWN_H`) の間は着手しない。`prio:critical` の issue は cooldown を半分 (3 時間) にする (`noPrCooldownMs`。意図の投稿の判定 `intentGate` も同じ)。cooldown の後は次のとおり。
    - `unknown`: 1 回だけ再着手する。
-   - `artifact`: 直前の報告 (`botReport`。run-outcome と PM のマーカーを含むコメントを除く) が停止報告 (`STOP_RE`) で、その報告に前回の `oc_artifacts` に無い allowlist 内の素材があるときだけ 1 回再着手する (増えなければ再投入しない)。
+   - `artifact`: 直前の報告 (`botReport`。run-outcome と PM のマーカーを含むコメントを除く) に、前回の `oc_artifacts` (無ければ既定の行) に無い allowlist 内の素材があり、その報告が停止報告 (`STOP_RE`) のときは、素材を足して 1 回再着手する。
+     新しい素材が無い (報告が無い古い保存値を含む) `artifact` は `unknown` と同じ扱い (#3185): cooldown の後に 1 回だけ、`unknown` の枠で再着手する。素材は前回の行のまま。本文に『前回の停止の理由を再確認し、素材が足りない以外の理由 (分割要・依存・判断待ち) なら、その種類の手順に従ってください』の 1 行を足す (artifact 由来の再投入だけ。`buildLaunchBody` の `recheck`)。その再投入の後の run も素材なしの `artifact` で終われば、`no_pr` として oc-pm に回す (再投入しない)。再投入の上限 (`NO_PR_MAX_RELAUNCH`) に達している素材なしの `artifact` は、unknown の枠を使わず (再投入せず)、上限に達した後の run が素材なしで終われば同じく oc-pm に回す。
    - `stop`・`split`: 再投入せず、PM agent (`oc-pm`・下の oc-pm 節) に回す。
    - `blocked`: blocker (`blocked_by`・本文の依存) が open の間は `blocked` の行に置き、再着手しない。blocker が 0 になった tick で、**その blocked の報告 (`run-outcome` の時刻) につき 1 回だけ**再着手する (`np:<n>.blocked` に報告の時刻を残す。連続する tick では二重に投稿しない)。
      解除後の扱い: 同じ報告のまま blocker が再び付いて解除されても、再着手しない (`stopped` に `oc:no-pr blocked 再着手済み` と残る)。新しい blocked の報告が出れば、その報告につき 1 回だけ再着手する。blocker を持たない blocked の報告は、報告につき 1 回だけ cooldown の後に再着手する (依存が一覧に無いので、解消したとみなして試す)。
@@ -38,7 +39,7 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 6. **room の基準は opencode.yaml の全 run の総数**: `room = max(0, target_eff - active_all)` (`target_eff` は上の『同時実行の上限の推定』で決まり、推定が無ければ `TARGET`)。`active_all` は `workflow_run.path` が `opencode.yaml` の未完了の run (in_progress・queued・pending・waiting・requested) を **event を問わず** 全て数える (`src/active.ts`)。VM 版の `active_runs` は実装・fix の run (`issue_comment` `workflow_dispatch` `pull_request_review` と題名が `oc-fix` の `repository_dispatch`) だけを数え、review (`pull_request`)・oc-pm・watchdog を数えなかった。同時実行の上限 (Team プランで 60) はこれらを含む opencode.yaml の全 run が共有するので、旧い数え方では `room` が過大になり、上限を超えて queued が出た (実測は #2625)。別 workflow (`scripts-test.yaml` `terms-watch.yaml`) の run は別枠で数えない。`path` を持たない run (この版より前の保存値) は opencode.yaml として数える (過大に数える側)。reconcile (5 分ごと) が REST の `path` で埋める。TARGET の既定は **58** (上限 60 から 2 を残す)。推定の観測 (`running` / `queued`) は従来どおり workflow を問わない (同時実行の上限は repo の全 workflow の job が共有するため)。
 7. ラベル `oc:hold` の open な issue (Worker の自動着手を見送る印。#2651) は `hold` 行に置き、着手 (picks) も再投入の意図 (`oc-pm-intent`) も投稿しない。判定は `needs-user-input` の次で、`blocked`・`started` より前 (付いていれば、ほかの行を見ない)。詳細は下の『oc:hold ラベル』の節。
 
-`/oc` コメントの本文は固定テンプレートで、可変なのは `oc_artifacts:` 行と、再投入の意図に `focus=K` があるときの受入条件 1 行だけ。素材名は `.github/scripts/prepare-event-context.sh` の `ARTIFACT_RE` と同じ集合 (`ALLOW_ARTS`) を通ったものだけ。webhook の自由文 (タイトル・本文・コメント) は指示文に入らない。素材行の既定は、PM の `oc_artifacts` 行 → issue 本文の最終の `oc_artifacts` 行 (allowlist 検証済み。先頭 4,000 字から抽出・同期時に保存。`fl-win64` が無ければ先頭に補う) → 題名・ラベルからの推定 (#2758)。
+`/oc` コメントの本文は固定テンプレートで、可変なのは `oc_artifacts:` 行と、再投入の意図に `focus=K` があるときの受入条件 1 行だけ。素材名は `.github/scripts/prepare-event-context.sh` の `ARTIFACT_RE` と同じ集合 (`ALLOW_ARTS`) を通ったものだけ。webhook の自由文 (タイトル・本文・コメント) は指示文に入らない。素材行の既定は、PM の `oc_artifacts` 行と issue 本文の最終の `oc_artifacts` 行 (allowlist 検証済み。先頭 4,000 字から抽出・同期時に保存。`fl-win64` が無ければ先頭に補う) の**素材名の和集合** (#3050。PM の行の名前の後に本文の行の名前を並べる。片方が `none` なら名前の側だけ。両方 `none` なら `none`)。どちらも無効なら題名・ラベルからの推定 (#2758)。取り込んだ `pm_art` は書き換えない (読み出し側で和集合を作る)。
 
 再投入の意図 (`<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->`、#2475): issue ごとに最新の意図マーカーを保持する。実装 App の意図は第三者の意図より優先する。意図のコメントは bot の投稿でも `botLast` (停止報告の窓) を動かさない。次を**全て**通ったときだけ `/oc` を投稿する。
   - 検査 (`src/launch.ts` の `checkRelaunchIntent`): 書き手は実装 App・`issue=` がコメントの issue と一致・`arts` が `ALLOW_ARTS` の部分集合・`focus` は 1〜9 (任意)・同じ issue に 24 時間で 3 回まで。
@@ -71,8 +72,8 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 
 | kind | 検出 (すべて open の対象。起票者は後述の絞り込みを通ったものだけ) |
 |---|---|
-| `stuck` | `oc:stuck` の PR で、最新の停止コメント (`<!-- oc-fix-limit -->`、bot 投稿) に `<!-- oc-pm-intent: stuck pr=N ... -->` がある (`pr=` が当該 PR の番号) |
-| `no_pr` | `oc:no-pr` の issue で、最後の `<!-- oc-run-outcome: no-pr reason=... -->` が `split` / `stop`、または `unknown` で Worker が再投入済み (再投入の後の run でも `unknown`)。または実装 run の打ち切りが連続して自動の再着手を止めた issue (『実装 run の打ち切りの連続』。`oc:no-pr` の標識は付かない) |
+| `stuck` | `oc:stuck` の PR で、最新の停止コメント (`<!-- oc-fix-limit -->`、作者は `github-actions[bot]` (型 Bot) だけ。`MARK_LOGIN` で変更可。#2639) に `<!-- oc-pm-intent: stuck pr=N ... -->` がある (`pr=` が当該 PR の番号) |
+| `no_pr` | `oc:no-pr` の issue で、最後の `<!-- oc-run-outcome: no-pr reason=... -->` が `split` / `stop`、または `unknown` で Worker が再投入済み (再投入の後の run でも `unknown`)。または `artifact` で新しい素材が無く、unknown の枠で Worker が再投入済み (再投入の後の run でも素材なしの `artifact`)、または再投入の上限 (`NO_PR_MAX_RELAUNCH`) に達している (上限に達した後の run も素材なしの `artifact`)。#3185 の `artSpent`。または実装 run の打ち切りが連続して自動の再着手を止めた issue (『実装 run の打ち切りの連続』。`oc:no-pr` の標識は付かない) |
 | `needs_decision` | reviewer の最新の verdict が CHANGES_REQUESTED で、本文が `NEEDS_KEY` (`src/needs.ts`。`tools/pm/pm_needs.py` の `KEY` と同じ正規表現・同じ行分割) に一致し、その後に PM 応答が無い |
 | `user_answered` | `needs-user-input` の issue に、ラベルが付いた後に非 bot のユーザーのコメントが付いた (コメント者が `MEMBER` / `OWNER` / `COLLABORATOR` のものだけ。第三者のコメントでは起こさない #2461) |
 | `refs_orphan` | `Refs #N` のみ (閉じキーワード `Closes` / `Fixes` / `Resolves` の系が無い) で merge された PR の N が open で、本文に `親: #N` を持つ open の子が無い。`ref` は親 N (`src/refs.ts`。merge 時点の本文から番号だけを `prs[PR].refsOnlyNums` に残す) |
@@ -156,7 +157,7 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `ready_by_prio` | `{critical, normal, low}`: 着手待ち (`ready`) の件数を優先の区分別に数えた値。`prio:critical`・`prio:low` のラベルで決まり、無ければ normal。合計は `ready` と一致する |
 | `active_by_prio` | `{critical, normal, low}`: 未完了の opencode.yaml の run (`active_all` と同じ集合) を優先の区分別に数えた値。対応の取れない run は normal。合計は `active_all` と一致する (#2721) |
 | `low_cap` | `{cap, running, applied}`: prio:low の上限 (`LOW_CAP`)・実行中の low の run 数・上限が効いているか (critical が着手済みか launch 可能な間だけ真。投稿の直後は、投稿した critical が recent に移るので偽になり得る) (#2721) |
-| `refs_only_merge_rate_24h` | `{merged, refs_only, rate}`: 直近 24 時間に merge された PR の件数 (`merged`) と、そのうち本文が `Refs #N` のみ (`Closes` / `Fixes` / `Resolves` が 1 つでもあれば数えない) の件数 (`refs_only`) と率。0 件なら `rate` は `null`。merge 済み PR の『Refs のみ』は merge 時点の本文から取った真偽値だけを持つ (本文は保存しない)。導入前に merge された PR は、次の全体同期 (6 時間以内) で埋まる |
+| `refs_only_merge_rate_24h` | `{merged, refs_only, rate}`: 直近 24 時間に merge された PR の件数 (`merged`) と、そのうち本文が『Refs のみ』 (`refsOnlyNumbers`・`src/refs.ts`。`Closes` / `Fixes` / `Resolves` の系が 1 つでもあれば数えない。`Closes:#N`・`Closes owner/repo#N` も閉じ方として数える。`Refs #N`・`Refs:#N` は数え、`Refs owner/repo#N` と 8 桁の番号は数えない) の件数 (`refs_only`) と率。0 件なら `rate` は `null`。merge 済み PR の『Refs のみ』は merge 時点の本文から取った真偽値だけを持つ (本文は保存しない)。導入前に merge された PR は、次の全体同期 (6 時間以内) で埋まる |
 | `open_issues_delta_24h` | 現在の open issue 数から、24 時間前以前で最も新しい 1 時間ごとの点 (`meta/openHist`、最大 48 点) の数を引いた差。点が無い (履歴が 24 時間分に満たない) ときは `null`。同期が古い間と一覧を打ち切った間は点を残さない |
 | `pm_dispatch_1h` | 直近 1 時間の `oc-pm` の送信数 (dry-run の would を含む。`pmHistory` と同じ live / dry-run の別) |
 | `launch_halted` | launch を止めている区間 `{reason, since}` (止まっていなければ `null`)。`reason` は先頭の理由、`since` は止まり始めた時刻。詳細は下の『launch の停止と通知』 (#2795) |
@@ -184,7 +185,7 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 - **区間**: 止まった時刻を `meta.halt.since` に保存する。止まり続けている間は起点を変えない。全ての条件が無くなると区間を消す (次の停止の起点に使い回さない)。
 - **/status**: `launch_halted` (`{reason, since}`。止まっていなければ `null`) と `launch_halted_overdue` (15 分以上止まり、かつ `ready` と `room` がある間は `true`)。
 - **PM agent への通知** (30 分継続で 1 回): 新しい kind は作らず、`oc-pm` の `digest` (`ref` 0) を送る。同じ停止区間では 1 回だけ (失敗した試行も数える)。`pmHistory` の上限 (同じ digest#0 は 60 分に 1 回、全体は 1 時間に 12 件) に従う。`LIVE_DISPATCH` が `"1"` のときだけ送り、そうでなければ `counters.wouldDispatchPm` に数える。降格中 (`demoted_reason` がある間) は送らず、区間の 1 回も使わずに保留する (解除の後に送る。降格中の would は 60 分に 1 回まで数える)。
-- **限界**: `digest` の PM run が受け取るのは kind と ref だけで、`/status` は読まない (oc-pm の workflow に `PM_WORKER_URL` は無い)。そのため通知を受けた PM agent は『launch が止まっている』とは分からず、通常の digest の集計をする。停止の理由を通知に載せるには、CI 側 (`.github/scripts/watchdog.sh` が `/status` を読んで障害 issue を起票する経路) への接続が要る。この PR の範囲外 (未解決の表に起票先を書く)。
+- **限界**: `digest` の PM run が Worker から受け取るのは kind と ref だけで、`launch_halted` (停止の理由と時刻) は読まない。そのため通知を受けた PM agent は『launch が止まっている』とは分からず、通常の digest の集計をする。率制限は別で、digest の PM run は緊急の判定に `tools/pm/worker_url` の `/status` を `curl` で読む (`rate_limit_alert`・`rest_remaining`。#2539・`.github/prompts/pm.md` の digest 節)。停止の理由を通知に載せる経路 (`.github/scripts/watchdog.sh` が `/status` を読んで障害 issue を起票する経路への接続) は CI-135 (#2848) の範囲で、この README の範囲外。
 - **変異テスト**: `npm run test:mutation` が、既定値・閾値・区間の起点・解消・重複抑止・降格中の通知 (降格ゲートと保留) の 9 か所を 1 つずつ壊し、テストが落ちることを確かめる (`scripts/mutation_halt.mjs`)。
 
 ## /oc 投稿の観測 (#2342)
@@ -483,8 +484,9 @@ Workers Builds (Cloudflare 側に repo を接続し、main への merge で自�
   - `infra/pm-worker/package.json` に npm の `packageManager` を書かない。pnpm 12 は npm 指定のプロジェクトで実行を拒否する (`ERR_PNPM_OTHER_PM_EXPECTED`)。
 - 確認の手順: `cd infra/pm-worker && pnpm install --frozen-lockfile && pnpm exec wrangler deploy --dry-run --outdir work/dryrun` (認証なしで通る。install が `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で落ちたら、下の release-age の項)。
 - 2026-10-14 の時点で、Workers Builds の install 段は上の 2 点 (npm 指定と lockfile の無さ) で失敗していた (#2585)。merge 後の Workers Builds の結果は、この README では確認していない。
-- **pnpm 12 の release-age (`minimumReleaseAge` = 1440 分)**: 公開から 24 時間未満の版は既定で install を拒否する。2026-10-14 05:43Z〜05:55Z 公開の `miniflare@5.20261012.0-beta`・`wrangler@4.151.0`・`@cloudflare/vitest-plugin@1.4.2` は、既定設定の `pnpm install --frozen-lockfile` を `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で落とした (#2691 で実測)。そこで範囲を `wrangler` `^4.150.0`・`@cloudflare/vitest-plugin` `^1.4.1` に下げ、公開から 24 時間以上たつ版の組 (`wrangler@4.150.0` が依存する `miniflare@5.20261006.2-beta`・`workerd@1.20261006.1`) で lock を作り直した。
+- **pnpm 12 の release-age (`minimumReleaseAge` = 1440 分)**: 公開から 24 時間未満の版は既定で install を拒否する。その版 (一覧は付録 §2) を含む lock は、その版のうち最も新しいものの公開から 24 時間が過ぎるまで、既定設定の `pnpm install --frozen-lockfile` が失敗する。公開時刻・違反の内訳・範囲を下げた経緯と再現の結果は [`tools/pm/REPORT_APPENDIX_2653.md`](../../tools/pm/REPORT_APPENDIX_2653.md)。
   - 除外しない理由: `minimumReleaseAgeExclude` や `--config.minimum-release-age=0` で通すと、公開直後の版が Workers Builds の token (権限が広い) で入る。このポリシーが防ぐ侵害の入口になるので、ポリシーは変えない。
+  - `pnpm add` は既定設定でも、違反版を `minimumReleaseAgeExclude` に自動で書き足す (付録 §3 c。追跡 #3342)。`pnpm add` の後は `pnpm-workspace.yaml` の差分を確かめる。
   - 版の選び方: `pnpm view <pkg> time --json` で公開時刻を見て、24 時間以上たつ最新版を範囲に書く。lock に古い版が残ると範囲を書き換えても残るので、`pnpm remove <pkg>` の後に `pnpm add -D <pkg>@^<版>` で解決し直す。推移的な依存 (miniflare・workerd) も同じ確認の対象。
   - Workers Builds の install の結果 (merge 後) は、この README では確認していない (PM が確認する)。
 
