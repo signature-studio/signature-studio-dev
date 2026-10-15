@@ -93,16 +93,16 @@ REPORT §11 の付録。指定の見出しは `## 10.` だが、既存の PERF-P
 
 ## 12. #3661 (CI-173): `EMSDK_ENV` で emsdk を指定し、素材 `toolchain-emsdk` で e2e before / after
 
-- **変更**: `fle_e2e.sh`・`fle_lift.sh` は `EMSDK_ENV` で `emsdk_env.sh` の場所を指定する (既定は `[EMSDK]` の `emsdk_env.sh`。未設定時の挙動は従来どおり)。ファイルが無ければ rc=2 で止まる。`fle_e2e.sh` は `emsdk_env.sh` の source 後に `EMSDK_ENV` を再 export する。`emsdk_env.sh` は source 時に `EMSDK_ENV` を unset するため、子の `fle_lift.sh` へ渡すのに必要。測定 commit `a85ca628d`。
+- **変更**: `fle_e2e.sh`・`fle_lift.sh` は `EMSDK_ENV` で `emsdk_env.sh` の場所を指定する (既定は `[EMSDK]` の `emsdk_env.sh`。未設定時の挙動は従来どおり)。ファイルが無ければ rc=2 で止まる。`fle_e2e.sh` は `emsdk_env.sh` の source 後に `EMSDK_ENV` を再 export する。`emsdk_env.sh` は source 時に `EMSDK_ENV` を unset するため、子の `fle_lift.sh` へ渡すのに必要。測定 commit `9e5f7f9f6` (最後にコードを変えた commit。以降の commit は REPORT のみ)。
 - **素材**: `fl-win64` と `toolchain-emsdk` を `$RUNNER_TEMP` に展開 (`toolchain-emsdk` の最上位は `emsdk/`)。素材の emcc は 6.0.12 (commit `5488e0871d46`)。runner 既設の `[EMSDK]` と同一 commit。
-- **素材が実際に使われたこと**: 素材版 run の間に、素材側 `upstream/emscripten/cache` の 1,729 ファイルが更新され、`[EMSDK]` 側の更新は 0 件 (mtime 比較)。
+- **素材が使われたこと**: `command -v emcc` で素材の `upstream/emscripten/emcc` が解決することを確認。初回 (`a85ca628d`) の素材版 run では素材側 `upstream/emscripten/cache` の 1,729 ファイルが更新され、`[EMSDK]` 側の更新は 0 件 (mtime 比較)。最終 HEAD の素材版 run は cache が暖まっており mtime の変化は出ないため、この確認は初回 run による。
 
-| 項目 | before (`512b09ffa`・既定 `[EMSDK]`) | after 既定 (`a85ca628d`・未設定) | after 素材 (`a85ca628d`・`EMSDK_ENV`=素材) |
+| 項目 | before (`512b09ffa`・既定 `[EMSDK]`) | after 既定 (`9e5f7f9f6`・未設定) | after 素材 (`9e5f7f9f6`・`EMSDK_ENV`=素材) |
 |---|--:|--:|--:|
-| 所要 (s) | 121 | 120 | 128 |
-| load average (1 分) 開始 → 終了 | 0.82 → 1.00 | 0.47 → 0.93 | 0.79 → 1.18 |
+| 所要 (s) | 121 | 119 | 120 |
+| load average (1 分) 開始 → 終了 | 0.82 → 1.00 | 0.23 → 0.92 | 0.85 → 1.00 |
 | 終了コード / 結果行 | rc=0 / `[fle_e2e] PASS` | rc=0 / PASS | rc=0 / PASS |
-| lift 所要 (ログ) | lift 15 s、emcc 31 s、合計 46 s | lift 15 s、emcc 32 s、合計 47 s | lift 15 s、emcc 41 s、合計 56 s |
+| lift 所要 (ログ) | lift 15 s、emcc 31 s、合計 46 s | lift 15 s、emcc 31 s、合計 46 s | lift 15 s、emcc 31 s、合計 46 s |
 | lift | 7,018 関数 / 340,761 命令 / unsup 0 / unlifted callee 0 | 同左 | 同左 |
 | spot diff | 7 関数 / 16 case / equal 16 | 同左 | 同左 |
 | D9 | rip-rel 136,333 site / mismatch 0 | 同左 | 同左 |
