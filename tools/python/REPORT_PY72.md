@@ -216,7 +216,7 @@ rbx = callback の第 1 引数 (ctx)。ctx のフィールドは使い方から�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `0xffe290`・`0x1001b70` の受け手 (仮想呼出し slot 35 の 151 箇所) | N 既定値 2 が chan に適用されるか。格納元は VMT `TPublicChannel`・`TPreviewChannel` の slot 35 と確定 (付録 `REPORT_PY72_APPENDIX_3267.md`) | #3371 (PY-190) |
+| `0xffe290`・`0x1001b70` の受け手 (仮想呼出し slot 35 の受け手) | N 既定値 2 が chan に適用されるか。格納元は VMT `TPublicChannel`・`TPreviewChannel` の slot 35 と確定 (付録 `REPORT_PY72_APPENDIX_3267.md`) | #3371 (PY-190) |
 | 一覧 A/B の要素追加箇所と要素型 T の構造体名 | 要素の型 | #3371 (PY-190) |
 | `*(0x15e4f18)` の初期化元 (owner thread id)・X の `[X+8]` の設定元 | `0x525ec0` の同期判定の入力 | #3268 (PY-178) |
 | 受け手 WndProc の分岐先 (0x550・0x562)・`obj+0x1d0` (window 生成) の実装 | 通知の受け手が決まらない | 子は作らない (本表に記載。次の PY 課題で扱う) |
@@ -238,4 +238,4 @@ rbx = callback の第 1 引数 (ctx)。ctx のフィールドは使い方から�
 既知類型との関係: 該当なし (PE の逆アセ解析)。親: #3214 (PY-171)。詳細は付録 `REPORT_PY72_APPENDIX_3267.md` (全文)。
 
 - 確定 (受入 1): `0xffe290` と `0x1001b70` は、VMT `TPublicChannel` (VA `0xfe2cf8`) と `TPreviewChannel` (VA `0xfe2fc8`) の slot 35 (VMT+0x118)。格納元は `.text` 内の静的な VMT。
-- 未確定 (受入 2・3): slot 35 への仮想呼出し 151 箇所の受け手の型、一覧 A/B の要素型と追加箇所。子 #3371 (PY-190) へ移送。
+- 未確定 (受入 2・3): slot 35 への仮想呼出しの受け手の型、一覧 A/B の要素型と追加箇所 (件数と測定は付録 `REPORT_PY72_APPENDIX_3267.md`)。子 #3371 (PY-190) へ移送。

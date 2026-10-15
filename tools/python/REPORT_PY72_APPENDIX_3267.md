@@ -6,7 +6,7 @@
 
 - 受入 1 (達成): `0xffe290` と `0x1001b70` は、Delphi の仮想メソッド表 (VMT) の slot 35 (VMT+0x118) に入っている関数。VMT は `TPublicChannel` (VA `0xfe2cf8`) と `TPreviewChannel` (VA `0xfe2fc8`) で、クラス名は VMT-0x88 が指す ShortString から読んだ。
 - 格納元は `.text` 内の静的な VMT。`.rdata` は 0x45 バイトしかなく、VMT は `.text` に置かれている。従来の「`.data` の絶対ポインタ 0 件」は、この配置による。
-- 呼出し: `0xffe290`・`0x1001b70` への直接 call は 0 件 (従来どおり)。slot 35 は仮想呼出し `call qword ptr [reg+0x118]` で呼ばれ、この形の呼出しは 151 箇所ある。slot 35 は VMT を持つ全クラスで共有される位置なので、箇所ごとの受け手の型は未確定 (子 #3371)。
+- 呼出し: `0xffe290`・`0x1001b70` への直接 call は 0 件 (従来どおり)。slot 35 は仮想呼出し `call qword ptr [reg+0x118]` で呼ばれ、disp 0x118 の形の呼出しは `.text` 全体で 151 箇所ある。slot 35 は VMT を持つ全クラスで共有される位置なので、箇所ごとの受け手の型は未確定 (子 #3371)。
 - 受入 2・3 は未確定 (子 #3371 へ移送)。`0xfe9090` の直接 call 元は、上の 2 関数 (それぞれ `0xffe29b`・`0x1001b7b`) だけ。一覧 A (`0x15e2218`)・B (`0x15e0128`) の要素型は未確定。TPreviewChannel を生成して格納する大域 `0x16bcae8` は A/B と別の参照元で、A/B との関係は未確定。
 
 ## 解析 (PY-177 #3267)
@@ -23,7 +23,7 @@
 | slot 35 の関数 | `0xffe290` | `0x1001b70` |
 | VMT 値を持つ 8 バイトのスロット | `0xfe2c30`・`0xfe2ed8` | `0xfe2f00`・`0xfe31a9` |
 | 上のスロットを RIP 相対で読む命令 | 75 件 (`0xfe2c30` 側の型判定・生成を含む) | 4 件 |
-| `call qword ptr [reg+0x118]` (仮想呼出し、slot 35) | 151 件 (両表で同じ集合。slot 35 を呼ぶ全箇所) | 同左 |
+| `call qword ptr [reg+0x118]` (仮想呼出し、slot 35) | 151 件 (disp 0x118 の全箇所。VMT に依らない) | 同左 |
 
 - VMT-0x80 の値は `0x8a8` (TPublicChannel) と `0x7d8` (TPreviewChannel)。インスタンスサイズと推定 (未確認)。
 
@@ -33,7 +33,7 @@
 - TPreviewChannel の生成: `0x1190dee` が `mov rcx, [0xfe2f00]`・`mov dl, 1`・`call 0x1001620` (関数 `0x1190d20`) を行い、直後の `0x1190e03` が `mov [rcx+rsi*8], rax` で結果を配列へ格納する。`rcx` は `[0x16bcae8]`。さらに `0x1190e12` で `[rax+0x168] = 1` を書く。
 - `0x11c3809` (関数 `0x11c2d80`) も同じ `call 0x1001620` を行い、結果を大域 `[rip+...]` に格納する。
 - `0x1001620` の直接 call 元は 2 件 (`0x1190df7`・`0x11c3812`)。
-- `0x16bcae8` の参照: 読出し 16 件、直接の書込み 0 件 (`pe_xref.py 0x16bcae8`)。
+- `0x16bcae8` の参照: 16 件 (lea によるアドレス取得 2 件を含む)、直接の書込み 0 件 (`pe_xref.py 0x16bcae8`)。
 
 ### 3. 受入 2・3 の判定 (移送)
 
@@ -43,12 +43,31 @@
 ### 測定
 
 - 測定 commit: `f13b104c1` (`pe_vmt_probe.py` を追加した commit。コードを変えた最後の commit)。
-- 差分の証跡: `git diff f13b104c1 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本付録の commit は `tools/python/REPORT_PY72*.md` と `docs/DOC_MAP.md` だけを変える)。
-- 実行 (測定 commit `f13b104c1` のワークツリー・展開 `tools/python/work/fl`・load average (1 分値) は開始 0.46 / 終了 0.54):
-  - `pe_vmt_probe.py 0xfe2cf8 0xfe2e10 --disp 0x118`: 7.3 秒・終了 0 (TPublicChannel)。
-  - `pe_vmt_probe.py 0xfe2fc8 0xfe30e0 --disp 0x118`: 7.4 秒・終了 0 (TPreviewChannel)。
-  - 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/fl --wildcards '*block00031_PE.bin'` (1.6 秒。`extracted/block00031_PE.bin` に展開)。
+- 検証 HEAD: `1ff8ee111` (コミット済み・作業ツリー clean)。`git diff f13b104c1 1ff8ee111 -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。本付録の commit は `tools/python/REPORT_PY72*.md` と `docs/DOC_MAP.md` だけを変える。
+- 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-3267 --wildcards '*block00031_PE.bin'` (2.3 秒。`extracted/block00031_PE.bin` に展開。repo 外)。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-3267 python3 analysis/flapi/pe_vmt_probe.py <VMT> <slot> --disp 0x118` を同一 HEAD で連続 3 回 (n=3)。終了コードは 6 回すべて 0。出力は 3 回ともバイト単位で同一 (md5 一致)。
+
+| 対象 (`<VMT> <slot>`) | 所要 (n=3・min–max) | load (1 分値・各回の 開始→終了) |
+|---|---|---|
+| `0xfe2cf8 0xfe2e10` (TPublicChannel) | 8.20–8.36 秒 | 0.94→1.03・1.03→1.19・1.19→1.31 |
+| `0xfe2fc8 0xfe30e0` (TPreviewChannel) | 8.27–8.29 秒 | 1.31→1.49・1.49→1.45・1.45→1.38 |
+
+- 所要は負荷で変わる。レビュアの独立再実行 (load 0.71) では 13.4 秒・13.9 秒だった。秒数は参考値で、性能の主張には使わない。
+- 前回の n=1 の値 (load 0.46 での 7.3 秒・7.4 秒) は、上の n=3 の値に置き換えた。
 - 補助 (測定対象外・repo 外の一時スクリプト): PE 全体の 8 バイト値 (`0xffe290`・`0x1001b70`・`0xfe9090`) と 4 バイト値 (VA・RVA) の走査。`.text` の 1 件ずつ (VMT slot)、`.pdata` の関数 RVA の 1 件ずつ。
+
+### ネガティブコントロール
+
+同じ HEAD・同じ素材で 1 件ずつ入力を壊し、検査が期待どおりに落ちることを確認した (n=1)。
+
+| 検査 | 入力 | 実測 (終了コード) | 判定 |
+|---|---|---|---|
+| slot の 8 の倍数検査 | `0xfe2cf8 0xfe2e11` | `slot 0xfe2e11: not a slot of this VMT` (0) | slot として扱わない |
+| 誤った VMT (VMT-8) | `0xfe2cf0 0xfe2e10` | vmtClassName のポインタが `0x0` で `ValueError: 0x0 is not in a file-backed section` (1) | クラス名を読めない |
+| 誤った VMT (値スロット) | `0xfe2c30 0xfe2e10` | `ValueError: 0x74c0000 is not in a file-backed section` (1) | クラス名を読めない |
+| 使われない disp | `0xfe2cf8 --disp 0x119` | `call [reg + 0x119] (virtual slot 35): 0` (0) | 0 件 |
+
+- 注: `--disp 0x119` の表示ラベル「virtual slot 35」は `disp // 8` の表示で、8 の倍数でない disp では意味を持たない。件数 0 の判定には影響しない。
 
 ### 未解決
 
