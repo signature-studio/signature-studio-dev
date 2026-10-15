@@ -113,7 +113,7 @@ static MS void* k_RtlPcToFileHeader(void* pc, void** base) {
 static MS void k_RtlCaptureContext(uint8_t* ctx) {
     uint64_t* fp = (uint64_t*)__builtin_frame_address(0);
     memset(ctx, 0, 0x4d0);
-    *(uint32_t*)(ctx + 0x30) = 0x10001f;      /* ContextFlags = CONTEXT_AMD64 | CONTROL|INTEGER|SEGMENTS|FLOAT */
+    *(uint32_t*)(ctx + 0x30) = 0x10001f;      /* ContextFlags = CONTEXT_AMD64 | CONTROL|INTEGER|SEGMENTS|FLOAT|DEBUG_REGISTERS */
     *(uint32_t*)(ctx + 0x34) = 0x1f80;        /* MxCsr 既定値 */
     *(uint16_t*)(ctx + 0x38) = 0x33;          /* SegCs (64bit code) */
     *(uint16_t*)(ctx + 0x42) = 0x2b;          /* SegSs */
