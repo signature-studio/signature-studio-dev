@@ -662,6 +662,7 @@ FL_H(arrangement, currentTimeHint) {
 #define PGRP_N 0
 FL_H(patterns, getPatternGroupCount) { NARGS(0, 0); return fl_ret_i(c, PGRP_N); }
 FL_H(patterns, getPatternGroupName) { NARGS(1, 1); int64_t i = A_INT(0, 0); if (i < 0 || i >= PGRP_N) RANGE(); return fl_ret_s(c, ""); }
+FL_H(patterns, getActivePatternGroup) { NARGS(0, 0); return fl_ret_i(c, -1); }
 /* ---- patterns (4, PY-179 #3271): 述語 pred の E = 0x193fce0+i*0xc0 は .bss で未投入 (全 0) のため pred は偽。patternCount は ¬pred を i=1..999 で数えて 999。
  * patternNumber は slot 0x15e4018 → 0x15d51a0 の dword の PE 初期値 1 (1 始まり)。isPatternDefault の範囲外は status -4 = FL_E_RANGE。
  * isPatternSelected は G = [[0x15e35c8]+0xd34] の静的値 0 (null) で [0x16b82e0] (.bss 0) を返す = 偽。値は未実測の仮置き (REPORT_PY179) */
