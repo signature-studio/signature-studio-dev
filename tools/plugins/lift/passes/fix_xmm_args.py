@@ -84,19 +84,60 @@ def close_paren(s, i):
     return -1
 
 
-def count_args(s):
-    """call の引数列 (括弧の外で区切る) の個数。"""
+def split_args(s):
+    """call の引数列を括弧の外で区切って返す (空なら [])。"""
     if not s.strip():
-        return 0
-    depth = n = 0
+        return []
+    out, depth, cur = [], 0, ''
     for c in s:
         if c in '([{<':
             depth += 1
         elif c in ')]}>':
             depth -= 1
         elif c == ',' and depth == 0:
-            n += 1
-    return n + 1
+            out.append(cur.strip())
+            cur = ''
+            continue
+        cur += c
+    out.append(cur.strip())
+    return out
+
+
+# #2762: 呼出し側の xmm 値を変換して渡すと survey が退行する callee (unit 149・158)。原因未特定のため変換を外し、arity 不一致のまま skip する (原因の特定は #2902)
+NO_CONV = {'function_40c650'}
+
+
+def conv_ok(xs, n, sites):
+    """#2762: arity 不一致の callee を xmm 枠へ変換できるか。
+    枠は IR 引数の直後に隙間なく並ぶこと (pad 無し)。各呼出しは IR 引数数 n と一致するか、
+    n + 枠数 で枠の位置の引数が全部 i128 (RetDec の xmm 値; 変換して渡す) であること。"""
+    ss = sorted(xs, key=lambda s: int(s[3:]))
+    if any(int(s[3:]) != n + j for j, s in enumerate(ss)):
+        return False
+    for al in sites:
+        if len(al) == n:
+            continue
+        if len(al) == n + len(ss) and all(a.startswith('i128 ') for a in al[n:]):
+            continue
+        return False
+    return True
+
+
+def arity_cause(n, sites):
+    """#2903: arity 不一致の原因を call site ごとに数える (report 用。変換の判定には使わない)。
+    ok = 引数数が n と一致 / short = n 未満 (IR 引数が呼出し側に無い) / xmm = n を超え、超えた分が全て i128 / extra = n を超え、超えた分に i128 以外を含む (余分な引数の型)。"""
+    cnt = {}
+    for al in sites:
+        if len(al) == n:
+            k = 'ok'
+        elif len(al) < n:
+            k = 'short'
+        elif all(a.startswith('i128 ') for a in al[n:]):
+            k = 'xmm'
+        else:
+            k = 'extra'
+        cnt[k] = cnt.get(k, 0) + 1
+    return ','.join('%s:%d' % (k, cnt[k]) for k in ('ok', 'short', 'xmm', 'extra') if k in cnt)
 
 
 def main():
@@ -126,17 +167,22 @@ def main():
             noncall[m.group(1)] = noncall.get(m.group(1), 0) + 1
     # 呼出し側の引数個数 (#954): 個数が callee の既存 IR 引数数と違う call site があれば、末尾への xmm 0 追加は位置が合わないので適用しない
     arity = {}
+    argsites = {}
     for ln in text.split('\n'):
         if ln.startswith('define '):
             continue
         for m in re.finditer(r'call [^@\n]*@(function_[0-9a-f]+)\(', ln):
             e = close_paren(ln, m.end())
             if e >= 0:
-                arity.setdefault(m.group(1), set()).add(count_args(ln[m.end():e]))
+                al = split_args(ln[m.end():e])
+                arity.setdefault(m.group(1), set()).add(len(al))
+                argsites.setdefault(m.group(1), []).append(al)
     rep = {'fixed': {}, 'skipped': {}, 'movd_sites': {}, 'movd_fixed': 0, 'orphan_float_fixed': 0,
            'orphan_gpr_fixed': 0, 'helper_xmm_fixed': 0, 'struct_copy_fixed': 0}
     out = [head]
     added = {}
+    nparams = {}
+    cvt = {}
     for header, body, inter in chunks:
         fname = KA.func_name(header)
         if fname and fname.startswith('function_') and fname not in skip:
@@ -155,9 +201,10 @@ def main():
                         rep['skipped'][fname] = 'slot_occupied(%s, IR params=%d)' % (','.join(occ), len(plist))
                     elif noncall.get(fname):
                         rep['skipped'][fname] = 'non_call_ref(%d)' % noncall[fname]
-                    elif any(c != len(plist) for c in arity.get(fname, ())):
-                        rep['skipped'][fname] = 'call_arity_mismatch(sites=%s, params=%d)' % (
-                            ','.join(str(c) for c in sorted(arity[fname])), len(plist))
+                    elif any(c != len(plist) for c in arity.get(fname, ())) and (fname in NO_CONV or not conv_ok(xs, len(plist), argsites.get(fname, []))):
+                        rep['skipped'][fname] = 'call_arity_mismatch(sites=%s, params=%d, cause=%s)' % (
+                            ','.join(str(c) for c in sorted(arity[fname])), len(plist),
+                            arity_cause(len(plist), argsites.get(fname, [])))
                     else:
                         snap = copy.deepcopy({k: v for k, v in rep.items() if k not in ('fixed', 'skipped')})
                         h2, b2, c1 = KA.fix_movd_from_zero(header, body, habi, rep, fname)
@@ -193,20 +240,25 @@ def main():
                             header, body = set_params(h3, full), b3
                             rep['fixed'][fname] = {'params': full, 'callers': callers.get(fname, 0)}
                             added[fname] = full[len(plist):]
+                            nparams[fname] = len(plist)
+                            cvt[fname] = fname not in NO_CONV and conv_ok(xs, len(plist), argsites.get(fname, []))
                             snap = None
                         if snap is not None:     # 適用しなかった関数: k80_argfix が数えた件数を戻す
                             for k, v in snap.items():
                                 rep[k] = v
         out.append(header + body + '\n}\n' + inter)
     res = ''.join(out)
-    zero = 0
+    zero = cv_sites = cvn = 0
     for fn, extra in added.items():
         zs = ', '.join('%s %s' % (p.split()[0], '0.0' if p.split()[0] in ('float', 'double') else '0') for p in extra)
+        n = nparams[fn]
         lines = res.split('\n')
-        for i, ln in enumerate(lines):
+        rebuilt = []
+        for ln in lines:
             if ln.startswith('define '):
+                rebuilt.append(ln)
                 continue
-            new, pos, hit = [], 0, 0
+            new, pos, hit, pre = [], 0, 0, []
             for m in re.finditer(r'call [^@\n]*@%s\(' % re.escape(fn), ln):
                 if m.start() < pos:
                     continue
@@ -214,13 +266,32 @@ def main():
                 if e < 0:
                     raise SystemExit('unbalanced call to %s: %s' % (fn, ln[:120]))
                 args = ln[m.end():e]
-                new.append(ln[pos:m.end()] + (args + ', ' if args.strip() else '') + zs)
+                al = split_args(args)
+                if cvt[fn] and len(al) == n + len(extra):
+                    # #2762: 呼出し側の枠の i128 (xmm 実値) を float/double 枠へ変換して渡す (枠は変換済みの値)
+                    vs = []
+                    for j, p in enumerate(extra):
+                        ty = p.split()[0]
+                        w = 64 if ty == 'double' else 32
+                        cvn += 1
+                        t = '%%xmmcv.%d' % cvn
+                        pre += ['  %s.i = trunc i128 %s to i%d' % (t, al[n + j][len('i128 '):], w),
+                                '  %s.f = bitcast i%d %s.i to %s' % (t, w, t, ty)]
+                        vs.append('%s %s.f' % (ty, t))
+                    new.append(ln[pos:m.end()] + ', '.join(al[:n] + vs))
+                    cv_sites += 1
+                else:
+                    new.append(ln[pos:m.end()] + (args + ', ' if args.strip() else '') + zs)
+                    zero += 1
                 pos, hit = e, hit + 1
             if hit:
-                lines[i] = ''.join(new) + ln[pos:]
-                zero += hit
-        res = '\n'.join(lines)
+                rebuilt.extend(pre)
+                rebuilt.append(''.join(new) + ln[pos:])
+            else:
+                rebuilt.append(ln)
+        res = '\n'.join(rebuilt)
     rep['callsite_zero_args'] = zero
+    rep['callsite_xmm_converted'] = cv_sites
     open(a.dst, 'w').write(res)
     if a.report:
         json.dump(rep, open(a.report, 'w'), ensure_ascii=False, indent=1)

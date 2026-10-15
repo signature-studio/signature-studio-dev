@@ -71,4 +71,20 @@ NC2RC=$?; set -e
 NC2F=$(grep -o 'RESULT pass=[0-9]* fail=[0-9]*' "$W/nc2.log" | head -1 | sed 's/.*fail=//')
 echo "[coexist] NC2 (host 無し): exit=$NC2RC C 側 fail=${NC2F:-?} (期待: exit!=0, fail>0)" | tee -a "$NCOUT"
 [ "$NC2RC" -ne 0 ] && [ "${NC2F:-0}" -gt 0 ] || { echo "[coexist] NC2 FAIL"; exit 1; }
+# NC3 (#958): handles.c の CloseHandle から file close hook 呼出しを外す → 閉じた save 先が自動では反映されない
+rm -rf "$W/sx_nc3_src" "$W/sx_nc3_obj"; mkdir -p "$W/sx_nc3_src" "$W/sx_nc3_obj"; cp "$W"/sx_obj/*.o "$W/sx_nc3_obj/"; cp "$SX/src/handles.c" "$W/sx_nc3_src/"
+sed -i 's/if (g_file_close_hook \&\& /if (0 \&\& /' "$W/sx_nc3_src/handles.c"
+grep -q 'if (0 && o->type == OBJ_FILE' "$W/sx_nc3_src/handles.c" || { echo "[coexist] NC3 の sed が当たらない"; exit 1; }
+emcc -c "${SHIMX_CLANG_FLAGS[@]}" -pthread -I "$SX/src" "$W/sx_nc3_src/handles.c" -o "$W/sx_nc3_obj/handles.o"
+set +e
+emcc "${SHIMX_EMCC_COMMON[@]}" -pthread -sPTHREAD_POOL_SIZE=8 -sPROXY_TO_PTHREAD=1 -sMODULARIZE=1 -sEXPORT_NAME=coexist -sSTACK_SIZE=1MB \
+  -sEXPORTED_RUNTIME_METHODS=FS,UTF8ToString,HEAPU8,wasmMemory -sEXPORTED_FUNCTIONS=$EXPORTS -Wno-pthreads-mem-growth \
+  "$W"/gui_obj/*.o "$W"/sx_nc3_obj/*.o "$W/t_gui.o" "$W/t_main.o" -o "$W/nc3.js" > "$W/nc3.log" 2>&1
+NC3LINK=$?
+mv "$W/nc3.js" "$W/nc3.cjs" 2>/dev/null
+node --experimental-strip-types --no-warnings "$HERE/run.mjs" "$W/nc3.cjs" > "$W/nc3-run.log" 2>&1
+NC3RC=$?; set -e
+NC3F=$(grep -c '^FAIL host: save: FL が閉じた' "$W/nc3-run.log" || true)
+echo "[coexist] NC3 (CloseHandle の file close hook を外す): link rc=$NC3LINK run exit=$NC3RC 自動反映の検査 FAIL=$NC3F (期待: 全て非 0 / FAIL=1)" | tee -a "$NCOUT"
+[ "$NC3LINK" -eq 0 ] && [ "$NC3RC" -ne 0 ] && [ "$NC3F" -eq 1 ] || { echo "[coexist] NC3 FAIL"; exit 1; }
 echo "[coexist] ALL PASS"

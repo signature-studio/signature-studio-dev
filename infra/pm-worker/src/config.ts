@@ -1,6 +1,6 @@
 import manualDepsJson from "../../../tools/pm/manual_deps.json" with { type: "json" };
 import { DEFAULT_BATCH } from "./launch.ts";
-import { DEFAULT_REVIEWER_LOGIN } from "./webhook.ts";
+import { DEFAULT_MARK_LOGIN, DEFAULT_REVIEWER_LOGIN } from "./webhook.ts";
 
 // 既定の TARGET は 58: 同時に走らせる opencode.yaml の run の総数 (実装・review・fix・oc-pm・watchdog の全て。active.ts) の上限。
 // GitHub の同時実行の上限 (60) から 2 を残す (oc-pm・watchdog と、投稿直後でまだ run が現れていない分の余裕)。
@@ -15,6 +15,8 @@ export const DEFAULT_COMMENT_WINDOW_H = 24;
 export const DEFAULT_COMMENT_MAX_PAGES = 80;
 // oc:no-pr の再着手の間隔 (時間)。最後の報告・/oc の投稿からこの時間が過ぎるまで再着手しない。wrangler.toml の NO_PR_COOLDOWN_H と揃える (test/active.test.ts が両方を見る)。
 export const DEFAULT_NO_PR_COOLDOWN_H = 6;
+// prio:low の issue の未完了の run の上限 (LOW_CAP)。wrangler.toml の LOW_CAP と揃える (test/active.test.ts が両方を見る)。
+export const DEFAULT_LOW_CAP = 10;
 
 export interface Env {
   PM: { idFromName(n: string): unknown; get(id: unknown): { fetch(r: Request): Promise<Response> } };
@@ -39,11 +41,15 @@ export interface Env {
   LIVE_REDELIVER?: string;
   // 実装 App (bot) のログイン。bot_last (最後の報告) の判定に使う。
   BOT_LOGIN?: string;
+  // 停止印 (oc-fix-limit) の作者。型 Bot でこの login の投稿だけを停止として信じる (既定 github-actions[bot]。#2639)。
+  MARK_LOGIN?: string;
   // PM の人間アカウント (PAT)。PM App の bot ログインは slug から自動で加える。
   PM_LOGINS?: string;
   WATCHDOG_INTERVAL_S?: string;
   RECONCILE_INTERVAL_S?: string;
   NO_PR_COOLDOWN_H?: string;
+  // prio:low の未完了の run の上限 (既定 10。空・非数・負は既定に戻す)。prio:critical が着手済みか launch 可能な間だけ効く (launch.ts の LowCap)。
+  LOW_CAP?: string;
   // 全体同期でコメントを読む窓 (時間。24 未満は 24 に切り上げる) と、コメント一覧のページ上限 (1 ページ 100 件)。
   COMMENT_WINDOW_H?: string;
   COMMENT_MAX_PAGES?: string;
@@ -51,7 +57,8 @@ export interface Env {
   STUCK_HIGH?: string;
   // reviewer App の bot ログイン。review の verdict とマーカー付きコメントの信頼に使う。
   REVIEWER_LOGIN?: string;
-  // "0" のときだけ、VM の状態 (launched・relaunch・phase・pm_art) を取り込む前でも launch する (#2343)。既定は取り込むまで launch しない。
+  // "1" のときだけ、VM の状態 (launched・relaunch・phase・pm_art) を取り込むまで launch しない (#2343)。既定は取り込みを求めない (#2795)。
+  // wrangler.toml の [vars] には置かない (本番で既定のまま止まる事故の再発防止)。
   IMPORT_REQUIRED?: string;
   // デプロイした commit hash (`wrangler deploy --var BUILD_COMMIT:<hash>`)。wrangler.toml の [vars] には置かない (渡さなければ未設定)。/status の build に出す。
   BUILD_COMMIT?: string;
@@ -77,11 +84,13 @@ export interface Config {
   watchdogIntervalS: number;
   reconcileIntervalS: number;
   noPrCooldownH: number;
+  lowCap: number;
   commentWindowH: number;
   commentMaxPages: number;
   stuckHigh: number;
   reviewerLogin: string;
-  // VM の状態を取り込むまで launch しない (#2343)。IMPORT_REQUIRED=0 のときだけ false。
+  markLogin: string;
+  // VM の状態を取り込むまで launch しない (#2343)。IMPORT_REQUIRED=1 のときだけ true (#2795 で既定を false に反転)。
   importRequired: boolean;
   // oc-pm の対象にしてよい bot の起票者。人は author_association (OWNER / MEMBER / COLLABORATOR) で絞る。
   pmTargetBots: string[];
@@ -119,12 +128,14 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     watchdogIntervalS: num(env.WATCHDOG_INTERVAL_S, 300),
     reconcileIntervalS: num(env.RECONCILE_INTERVAL_S, 300),
     noPrCooldownH: num(env.NO_PR_COOLDOWN_H, DEFAULT_NO_PR_COOLDOWN_H),
+    lowCap: Math.floor(num(env.LOW_CAP?.trim(), DEFAULT_LOW_CAP)),
     // classify が見る bot の報告は 24 時間以内。窓がそれより短いと、取りこぼした報告で誤って着手する。
     commentWindowH: Math.max(MIN_COMMENT_WINDOW_H, num(env.COMMENT_WINDOW_H, DEFAULT_COMMENT_WINDOW_H)),
     commentMaxPages: Math.max(1, Math.floor(num(env.COMMENT_MAX_PAGES, DEFAULT_COMMENT_MAX_PAGES))),
     stuckHigh: num(env.STUCK_HIGH, 40),
     reviewerLogin: env.REVIEWER_LOGIN ?? DEFAULT_REVIEWER_LOGIN,
-    importRequired: env.IMPORT_REQUIRED !== "0",
+    markLogin: env.MARK_LOGIN ?? DEFAULT_MARK_LOGIN,
+    importRequired: env.IMPORT_REQUIRED === "1",
     pmTargetBots: ["opencode-for-signature-studio[bot]", "oc-reviewer-for-signature-studio[bot]"],
     build: buildCommit(env.BUILD_COMMIT),
     manualDeps,

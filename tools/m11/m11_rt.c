@@ -252,6 +252,15 @@ void m11_p134_put(unsigned int f, unsigned long long v) {
 }
 EMSCRIPTEN_KEEPALIVE double m11_p134_n(void) { return (double)g_p134_n; }
 EMSCRIPTEN_KEEPALIVE double m11_p134_get(int k, int f) { return (k >= 0 && f >= 0 && f < 4) ? (double)g_p134[k % M11_P134_N][f] : -1.0; }
+/* #2780 (計測専用; M11_PROBE_2780=1 の IR probe (trap_triage/probe2780_ir.py) からだけ呼ばれる): function_4473f0 の記録 (tag, 値) を 256 件の環状配列に残す */
+#define M11_P2780_N 256
+static unsigned long long g_p2780[M11_P2780_N][2];
+static unsigned long long g_p2780_n;
+void m11_p2780_put(unsigned int f, unsigned long long v) {
+    g_p2780[g_p2780_n % M11_P2780_N][0] = f; g_p2780[g_p2780_n % M11_P2780_N][1] = v; g_p2780_n++;
+}
+EMSCRIPTEN_KEEPALIVE double m11_p2780_n(void) { return (double)g_p2780_n; }
+EMSCRIPTEN_KEEPALIVE double m11_p2780_get(int k, int f) { return (k >= 0 && f >= 0 && f < 2) ? (double)g_p2780[k % M11_P2780_N][f] : -1.0; }
 /* #944 (計測専用; M11_INSTR_413060=1 のときだけ有効): function_413060 呼出し後の dest の値を畳んだ指紋 (OFF/ON/ネガコンの比較用)。
  * M11_NEG_413060=1 のときだけ dest に +0x40 を書く既知変更 (b) を入れる。既定 build には含めない */
 #ifndef M11_INSTR_413060
@@ -272,7 +281,42 @@ EMSCRIPTEN_KEEPALIVE double m11_p134_get(int k, int f) { return (k >= 0 && f >= 
 #ifndef M11_RT_NODATA
 #define M11_RT_NODATA 0
 #endif
-#if M11_RT_NODATA
+#ifndef M11_RT_NODATA_BODY
+#define M11_RT_NODATA_BODY 0
+#endif
+#if M11_RT_NODATA_BODY
+/* #2275 (既定 0): m11_dest_obs の本体 (dest の読出し・指紋の更新・rec の store) は残し、名前付きの静的状態 (g_dest_h・g_dest_n・g_rec_*) を外す。
+ * 状態は呼出しごとのスタック上の volatile 変数に置く (store・load の命令は残る)。
+ * 静的領域の大きさは元と同じ (g_pad_nd_h 8B・g_pad_nd_n 8B と g_pad_nd_rec 16384B の合計 16392B) なので、後続の配置と heap 開始位置は動かさない。 */
+static unsigned long long g_pad_nd_h __attribute__((used)) = 1469598103934665603ULL;
+static unsigned long long g_pad_nd_n __attribute__((used));   /* g_dest_n と同じ 8B */
+static unsigned long long g_pad_nd_rec[2048] __attribute__((used));   /* g_rec_* 4 本分 (16B 整列は g_rec_st と同じ) */
+void m11_dest_obs(unsigned long long dest) {
+    volatile unsigned long long dh = 1469598103934665603ULL, dn = 0, rst = 0, rlen = 0, rrc = 0, rh = 0;
+    unsigned long long v = *(volatile unsigned long long*)(uintptr_t)dest;
+    dh = (dh ^ v) * 1099511628211ULL; dn = dn + 1;
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long h = 1469598103934665603ULL, len = 0, rc = 0, st = 0;
+    if (v == 0) st = 0;
+    else if (v < 8 || v + 4 > heap) st = 2;
+    else {
+        len = *(volatile unsigned int*)(uintptr_t)(v - 4);
+        rc = *(volatile unsigned int*)(uintptr_t)(v - 8);
+        if (len > (1ull << 24) || v + len * 2 > heap) st = 2;
+        else {
+            for (unsigned long long j = 0; j < len * 2; j++)
+                h = (h ^ *(volatile unsigned char*)(uintptr_t)(v + j)) * 1099511628211ULL;
+            st = 1;
+        }
+    }
+    rst = st; rlen = len; rrc = rc; rh = h;
+    (void)dh; (void)dn; (void)rst; (void)rlen; (void)rrc; (void)rh;
+}
+EMSCRIPTEN_KEEPALIVE double m11_dest_rec(int k, int field) { (void)k; (void)field; return -1.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_n(void) { return 0.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hhi(void) { return 0.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hlo(void) { return 0.0; }
+#elif M11_RT_NODATA
 void m11_dest_obs(unsigned long long dest) { (void)*(volatile unsigned long long*)(uintptr_t)dest; }
 EMSCRIPTEN_KEEPALIVE double m11_dest_rec(int k, int field) { (void)k; (void)field; return -1.0; }
 EMSCRIPTEN_KEEPALIVE double m11_dest_obs_n(void) { return 0.0; }

@@ -225,7 +225,8 @@ sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_
 ## 14. L1 復元 pass (#1009 / SR-12, 追跡 #823)
 
 - 結論: `tools/liftlib/liftlib/passes/l1_restore.py` は raw IR の `je` (0x1800c2d69) の null 枝を新設ブロック `dec_label_pc_1800c2ef4` へ戻し、脱落していた辺・block・`insn.addr` 被覆を復元する。e2e チェーンには未組込みのため e2e は不変確認のみ。正とする pass は本 pass (PR #1227 の別 pass は撤回)。
-- 測定値 (census 表・e2e の 23/23 と warm 4.78 s・ネガコン・LF 束縛の詳細) は `REPORT_APPENDIX.md` §14b に分割移動した。未達 (復元 call の実行時 ABI・e2e 組込み・#1030 SR-14) も同節。
+- 測定値 (census 表・e2e の 23/23 と warm 4.78 s・ネガコン・LF 束縛の詳細) は `REPORT_APPENDIX.md` §14b に分割移動した。icall #228 界面 (BLK 前段 store) は #1663 (SR-22) で整合済み (§14e)。
+- 受入 2・3 (前後 site 数表・ネガコン・再計算手順): `l1_recompute.py` と `REPORT_APPENDIX_1009.md` §14f (測定 commit `054a94b5`・e2e 23/23 PASS・再計算 OK)。未解決 (実行時 BLK の wasm 実測・e2e 組込み): #1228。
 
 ## 13b. L1 脱落条件の特定 (#823)
 

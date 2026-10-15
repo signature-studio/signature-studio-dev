@@ -1,6 +1,6 @@
 # #1588 (LD-55): m11 wasm_trap OOB 残 2 件の原因切り分け — tools/m11/trap_triage/
 
-**判定: 部分達成。受入条件 1 は「分岐点の特定まで」、受入条件 2 は「不再現の再現」の結論が前回記録と逆。受入条件 3 は達成。受入条件 4 は本 PR 後に #307 へコメント。**
+**判定: 達成 (縮小後の #1588)。受入条件 1 は「分岐点の特定まで」(分岐の上流は #2769・#2770 へ移管)、受入条件 2 は「不再現」の前回結論を訂正して wasm OOB を再現、受入条件 3 は達成。受入条件 4 (#307 へのコメント) は #307 が CLOSED のため対象外 (結果は #1588 のコメントに記載)。**
 
 親: #307 / 関連: #865 (`tools/liftdiff/REPORT_APPENDIX_865.md`)、#1463 (`REPORT_1463.md`)。
 
@@ -43,7 +43,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `410320` の `rax` (vtable) が native と wasm で異なる理由 (入口値 / `6525b0` の `&slot` 経路) | 0x6525b0 の非到達原因の確定 | 本 issue #1588 の残り (本 PR で未達) |
+| `410320` の `rax` (vtable) が native と wasm で異なる理由 (入口値 / `6525b0` の `&slot` 経路) | 0x6525b0 の非到達原因の上流 (分岐の入力スロット `0x5ac308` の書込み元) | #2769 (wasm 側)・#2770 (native 側) へ移管 (縮小後の #1588 の範囲外) |
 | `REPORT_APPENDIX_865.md` の「0x66ea90 再走で trap 無し」の訂正 | 記録の正確性 | 本 PR で REPORT_APPENDIX_865 に訂正を入れる (§5) |
 
 ## 4.5 追加調査 (受入条件 1 の続き、run 2)
@@ -61,3 +61,20 @@
 
 - `tools/liftdiff/REPORT_APPENDIX_865.md` §冒頭: 「0x66ea90 は再走で trap せず both_fault」→ 「both_fault (native segv・wasm OOB trap)。再走 2 回とも wasm OOB を再現」。
 - `tools/liftdiff/results/m11_oob_414ad0_27.md` は自動生成 (`oob_414ad0_27.py`) のため人手で編集しない。生成元の `tests/oob_414ad0_27.py:27` の `NO_TRAP:` 表示を直すのは別コミットで行う (本 PR では扱わない)。
+
+## 6. run 4: 現 HEAD での再現と生成物の修正 (LD-55)
+
+- 測定 commit (再現・27 件再走): `26f90ada` (origin/main)。worktree `ws-1588`、branch `1588-m11-trap-oob-residual-3`。素材は `fl-win64` (`$RUNNER_TEMP/fl-win64`)・`work-m11`・`work-liftdiff` を展開 (`toolchain-*` は本節では未使用)。
+- `repro_1588.sh` (18.2 s、開始時 load 0.97): p01 = mismatch、`first divergence index=5`、wasm 最上位 `function_4133f0` (`6525b0 → 652830 → 414c70 → 4133f0`)。0x66ea90 は z・2 回とも `unexec` (`native_null_deref_all_patterns`)、case outcome は `both_fault`、wasm 最上位 `function_414ad0`。§1・§2 と一致。
+- 27 件再走 (`tests/rerun_414ad0_27.sh`、2 分 40 秒、全 rc 0) の出力を、既存の生成元 (`tests/oob_414ad0_27.py`) にそのまま通すと commit 済み md と完全一致した。
+- 生成元の誤り: 同スクリプトは `outcome == 'wasm_trap'` だけを集計し、`both_fault` (native fault かつ wasm trap、`ldlib/compare.py:212`) を `NO_TRAP:both_fault` と表示していた。`wasm_trap` と `both_fault` を集計するよう 1 行修正。
+- 修正後の再生成: 0x66ea90 の行は `function_414ad0 | 有 | 21`、集計は 26/27 (修正前 25/27)。`results/m11_oob_414ad0_27.md` は修正後の生成元で再生成し、差分は該当行と集計行のみ。`REPORT_APPENDIX_865.md`・`docs/DOC_MAP.md` の 25/27 を 26/27 に揃えた。`REPORT_APPENDIX.md` の 25/27 (行 133) と 0x66ea90 の記述 (行 151) は未修正: 同ファイルは main で 385 行 (上限 250) のため、分割移動の後に直す (PR 本文の未解決表)。
+- コード差分 (測定 commit `26f90ada` から HEAD まで、REPORT と results を除く): `git diff 26f90ada HEAD -- tools/liftdiff tools/m11 ':(exclude)*REPORT*' ':(exclude)*results*'` の出力は次の 1 行 (`tests/oob_414ad0_27.py`)。
+
+```diff
+-    cs = [c for c in r['cases'] if c['outcome'] == 'wasm_trap']
++    cs = [c for c in r['cases'] if c['outcome'] in ('wasm_trap', 'both_fault')]
+```
+
+- `results/m11_oob_414ad0_27.md` の差分は 0x66ea90 の行と集計行の 2 箇所のみ (`diff` の出力: 行 20 と行 36)。
+- 受入条件の判定: 1 = 最上位 frame・入口経路・分岐点 (index 5) は実測済み。分岐の上流 (`0x5ac308` の書込み元) は本 issue の範囲から外し、#2769 (wasm 側) と #2770 (native 側) へ移管した (縮小後の範囲では達成)。2 = 達成 (不再現ではなく wasm OOB を再現。表示の誤りを本節で修正)。3 = 達成。4 = 対象の #307 は CLOSED のため、結果は #1588 の issue コメントに記載。

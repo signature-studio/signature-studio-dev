@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SR-5 (#73): 実 DLL・実 wine64 なしで ref_render.sh / ref_harness.sh の制御経路だけを確かめる補助確認。
 # 偽 wine64 が決定的な合成 WAV を書く。実 DLL の測定ではない (再測定の代わりにならない)。
-# usage: bash ref_stub_check.sh   期待: render rc 伝播 OK・harness は ref_manifest.json 照合のみ NG (NG=1)
+# usage: bash ref_stub_check.sh   期待: render rc 伝播 OK・harness は ref_manifest.json 照合 (main) と preset 素材の不在のみ NG (NG=2)
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FLP="$(cd "$HERE/../../../flp" && pwd)"
@@ -49,9 +49,10 @@ S2REF_CONTENT="$T/none" bash "$S/host/ref_render.sh" "$T/onone" 60 >/dev/null 2>
 echo "== harness 全体 (stub WAV。ref_manifest.json 照合のみ NG が正) =="
 hout="$(bash "$S/host/ref_harness.sh" 2>&1)"; hrc=$?
 printf '%s\n' "$hout" | sed 's/^/  | /' | cut -c1-120
-chk "ref_harness.sh の exit (pin 不一致の NG=1)" "$hrc" 1
-printf '%s' "$hout" | grep -q '結果: NG=1 ' && echo "  [OK] NG=1" || { echo "  [NG] NG 数が 1 でない"; FAIL=$((FAIL+1)); }
-printf '%s' "$hout" | grep -q '\[NG\] 参照 sha256 が ref_manifest.json (main) と不一致' && echo "  [OK] NG は manifest 照合のみ" || { echo "  [NG] manifest 照合の NG が出ていない"; FAIL=$((FAIL+1)); }
+chk "ref_harness.sh の exit (NG=2)" "$hrc" 1
+printf '%s' "$hout" | grep -q '結果: NG=2 ' && echo "  [OK] NG=2" || { echo "  [NG] NG 数が 2 でない"; FAIL=$((FAIL+1)); }
+printf '%s' "$hout" | grep -q '\[NG\] 参照 sha256 が ref_manifest.json (main) と不一致' && echo "  [OK] NG に manifest 照合 (main) を含む" || { echo "  [NG] manifest 照合の NG が出ていない"; FAIL=$((FAIL+1)); }
+printf '%s' "$hout" | grep -q '\[NG\] preset が無い' && echo "  [OK] NG に preset 素材の不在を含む (stub には素材が無い)" || { echo "  [NG] preset 不在の NG が出ていない"; FAIL=$((FAIL+1)); }
 
 echo "== 結果: FAIL=$FAIL =="
 [ "$FAIL" -eq 0 ]

@@ -2,9 +2,8 @@
 # kh_route_build.sh — Kilohearts Gain (HeartCore closure, icall 経路) の復元後 IR → wasm ビルド (ICALL-17 #1025)。
 #   入力: work/rt_kilohearts-gain/after.0.restored.ll (rewrite + RetDec decode-only 済み。ICALL-12 #853 の成果物)
 #   出力: work/kh_route/kh_route.{cjs,wasm}
-#   範囲: 復元後 IR → fix_mask/fix_vstore → normalize/ir5 → flatten → SIMD/VEX helper → emcc。
-#   未了: PE data 敷設 (ott_data_install は空)・差分実行 (native 比較) は本スクリプトに含まれない。
-#         前回 run で wasm 実行は 61/61 シナリオが memory access out of bounds で trap (#1025 コメント参照)。
+#   範囲: 復元後 IR → fix_mask/fix_vstore → normalize/ir5 → flatten → SIMD/VEX helper → PE data 敷設 (data_gen.py) → emcc。
+#   差分実行 (native 比較) は kh_route_run.sh。実行時は _ott_data_install() で .rdata/.data を敷設してから走らせる (#1025)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 T="$HERE/.."

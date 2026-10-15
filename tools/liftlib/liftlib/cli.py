@@ -8,10 +8,11 @@
   simd gen <ll...> -o out.c [--canon]   __asm_* 宣言から C helper 生成
   simd test                             生成 helper を実機 inline asm と bit 突合 (KH census 205 mnemonic の全 form)
   simd report                           KH mnemonic census の被覆 before/after
-  ott [--auto f7|p1|f7,p1|none]         OTT を liftlib 側だけで再現 (m10_e2e 相当)。--auto 既定 = f7,p1 (CAB-238)。
+  ott [--auto f2|f7|p1|f2,f7,p1|none]   OTT を liftlib 側だけで再現 (m10_e2e 相当)。--auto 既定 = f2,f7,p1 (CAB-238・LIFTLIB-3)。
   inject-eval                           パターン注入による検出器の検出力/偽陽性評価
   specgen <image> <func_va>             機械語から harness spec の雛形を生成 (ポインタ/フィールド推定)
   regress                               OTT / FA Gain / KH Gain の回帰 (liftlib_e2e.sh から呼ぶ)
+  boolret <in.ll> <out.ll>              call i1 @F の結果の sext i1→i64 を zext にする (LD-147 / #3180・件数を出力)
 """
 import argparse
 import json
@@ -128,7 +129,7 @@ def simd_report():
 # してから f7/p1 を流すと, p1 の dropped 領域で `bind xmm0/xmm1` が成功するようになり
 # 残留 21 → 15 / bind xmm0 6 → 1 に減る (census・checks・SHA は不変)。
 OTT_AUTO_DEFAULT = "f2,f7,p1"
-# CAB-238 検収②: auto f7,p1 の census[0x248]=0 junkHi 実測値 (m10 参照 175 から改善)。悪化 (超過) は FAIL。
+# CAB-238 検収②: auto f7,p1 で census[0x248]=0 junkHi を 175 → 104 に改善 (既定 f2,f7,p1 でも 104)。悪化 (超過) は FAIL。
 OTT_AUTO_JUNKHI_MAX = 104
 
 
@@ -333,6 +334,16 @@ def cmd_specgen(a):
     return specgen.main([a.image, a.va] + (["--name", a.name] if a.name else []))
 
 
+def cmd_boolret(a):
+    from .passes import boolret
+    with open(a.src, encoding="utf-8") as f:
+        new, n = boolret.apply(f.read())
+    with open(a.dst, "w", encoding="utf-8") as f:
+        f.write(new)
+    print(n)
+    return 0
+
+
 def main(argv=None):
     env.ensure()
     ap = argparse.ArgumentParser(prog="liftlib")
@@ -365,6 +376,8 @@ def main(argv=None):
     p = sp.add_parser("leafspec")
     p.add_argument("cfg"); p.add_argument("--n", type=int); p.add_argument("--workdir"); p.add_argument("--timeout", type=int, default=300)
     p.set_defaults(fn=cmd_leafspec)
+    p = sp.add_parser("boolret")
+    p.add_argument("src"); p.add_argument("dst"); p.set_defaults(fn=cmd_boolret)
     p = sp.add_parser("regress")
     p.set_defaults(fn=cmd_regress)
     a, rest = ap.parse_known_args(argv)

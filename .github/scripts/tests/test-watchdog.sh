@@ -841,6 +841,87 @@ GITHUB_STEP_SUMMARY="$TMP/summary-w.md" wd
 grep -q '^worker=ok' "$TMP/summary-w.md"
 expect "worker status is written to the step summary" $?
 
+# 33i〜. launch の停止 (#CI-135)。/status の launch_halted (reason・since) と launch_halted_overdue を読み、overdue なら障害 issue に理由と起点を追記する
+lh() { printf '"launch_halted":{"reason":"%s","since":"%s"},"launch_halted_overdue":%s' "$1" "$2" "$3"; } # lh <reason> <since> <overdue>: /status に足す launch_halted の JSON 片
+S20="$(agoz 20)"
+
+# 33i. 健全な Worker で launch が 15 分以上止まっている (overdue)・障害 issue が無い -> [CI-62] PM Worker launch 停止 を起票する。理由と起点を本文に書く
+worker_setup
+worker true true true "$(ago 1)" "$(lh no-import "$S20" true)"
+wd; rc=$?
+[ "$rc" = 0 ] && logged 'label create pm-worker-down' && logged "issue create --repo o/r --title \[CI-62\] PM Worker launch 停止 ($TODAY) --body-file .* --label pm-worker-down" && not_logged 'issue close' && not_logged 'issue reopen' && grep -q 'launch=halted (reason=no-import' "$TMP/out"
+expect "launch overdue on a healthy worker, no outage issue -> [CI-62] PM Worker launch 停止 (label pm-worker-down)" $?
+grep -q 'launch が止まっています' "$BODY" && grep -q '"reason": "no-import"' "$BODY" && grep -q "$S20" "$BODY" && grep -q '@pycabbage' "$BODY"
+expect "the launch issue body has the reason, the start time and @pycabbage" $?
+
+# 33i2. 障害 issue が開いていれば、理由と起点を追記するだけ。新規 0 件・close しない
+worker_setup
+worker true true true "$(ago 1)" "$(lh no-import "$S20" true)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+logged 'issue comment 77 .*--body-file' && not_logged 'issue create' && not_logged 'issue close' && grep -q 'launch はまだ止まっています' "$BODY" && grep -q 'reason=no-import' "$BODY" && grep -q "$S20" "$BODY" && grep -q 'oc-worker-down-note' "$BODY"
+expect "launch overdue + open outage issue -> note with reason and start, no new issue, not closed" $?
+
+# 33i3. 止まってから 5 分 (overdue でない) -> 追記も close もしない。止まっている間は回復としない
+worker_setup
+worker true true true "$(ago 1)" "$(lh rate-guard "$(agoz 5)" false)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+not_logged 'issue close' && not_logged 'issue comment' && not_logged 'issue create'
+expect "launch halted 5 min (not overdue) -> the open outage issue is kept (no close, no note)" $?
+
+# 33i4. review-only は意図した停止なので障害として扱わない。overdue でも追記・起票しない。開いた障害 issue は回復として close する
+worker_setup
+worker true true true "$(ago 1)" "$(lh review-only "$(agoz 60)" true)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+logged 'issue close 77' && not_logged 'issue create' && not_logged 'issue comment'
+expect "review-only (overdue) -> no note and no new issue; an open outage issue is recovered (closed)" $?
+worker_setup
+worker true true true "$(ago 1)" "$(lh review-only "$(agoz 60)" true)"
+wd
+no_worker_writes
+expect "review-only (overdue) with no open outage issue -> no write" $?
+
+# 33i5. launch_halted が null に戻った -> 既存の回復の規則のまま、開いた障害 issue に回復を書いて close する
+worker_setup
+worker true true true "$(ago 1)" '"launch_halted":null,"launch_halted_overdue":false'
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+wd
+logged 'issue close 77 .*--comment .*回復.*oc-worker-recovered' && not_logged 'issue create'
+expect "launch_halted back to null -> recovery comment and close on the open outage issue" $?
+
+# 33i6. 追記の間隔は CI-49 と同じ (直近 10 分に追記済みなら追記しない。同じ marker を数える)
+worker_setup
+worker true true true "$(ago 1)" "$(lh stale "$S20" true)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' "[$(note 10)]"
+wd
+not_logged 'issue comment' && not_logged 'issue create'
+expect "launch overdue, a note 10 min ago -> no further note (shared throttle)" $?
+
+# 33i7. launch_halted の形が読めない -> 警告だけ。追記も起票もせず、開いた障害 issue も回復とみなして close しない
+for bad in '"launch_halted":"no-import","launch_halted_overdue":true' '"launch_halted":{"reason":"no-import","since":"x"},"launch_halted_overdue":"yes"'; do
+  worker_setup
+  worker true true true "$(ago 1)" "$bad"
+  open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+  wd; rc=$?
+  [ "$rc" = 0 ] && not_logged 'issue close' && not_logged 'issue create' && not_logged 'issue comment' && grep -q 'unexpected shape' "$TMP/out"
+  expect "unreadable launch_halted ($bad) -> warning only, the open issue is kept" $?
+done
+
+# 33i8. ネガコン: /status が読めなければ launch の判定はせず、PR の点検は続く
+worker_setup
+base "[$(pr 6 fff666 false "$OLD")]"
+detail 6 true "[$(review "$REVIEWER" oldhead COMMENTED)]"
+worker true true true "$(ago 1)" "$(lh no-import "$S20" true)"
+FAKE_CURL_FAIL=28 wd; rc=$?
+[ "$rc" = 0 ] && logged 'pr reopen 6' && grep -q 'could not read' "$TMP/out" && not_logged 'issue create' && not_logged 'issue comment'
+expect "status unreadable -> no launch action, the PR pass still reopens #6 (exit 0)" $?
+
 # 34〜. 暫定の oc-pm 起動 (#CI-50)。停止 PR (oc:stuck) は issues/<N>/comments、oc:no-pr の issue は issue list、記録の一覧は issues/comments (fixture)。
 tcm() { jq -nc --arg l "$1" --arg t "$2" --arg b "$3" '{user:{login:$l,type:$t},body:$b}'; } # tcm <login> <type> <body>
 ago_s() { date -u -d "@$(($(date -u +%s) - $1))" +%Y-%m-%dT%H:%M:%SZ; }                    # ago_s <秒前>: GitHub の時刻の形
@@ -1022,22 +1103,22 @@ wd
 logged 'client_payload\[ref\]=60'
 expect "ネガコン: records by others are not counted (only the 2 by the reviewer bot count)" $?
 
-# 38. 1 時間に 12 件まで。12 件済みなら次は送らない (ネガコン)。11 件なら送る
+# 38. 1 時間に 24 件まで。24 件済みなら次は送らない (ネガコン)。23 件なら送る
 reset
 pm_base
-m=(); for i in $(seq 900 911); do m+=("$(mk "$i" 600)"); done
+m=(); for i in $(seq 900 923); do m+=("$(mk "$i" 600)"); done
 ledger "$(IFS=,; echo "${m[*]}")"
 wd
-not_logged 'dispatches' && grep -q 'deferred (reached 12 in the last hour)' "$TMP/out"
-expect "12 dispatches in the last hour -> no dispatch (deferred)" $?
+not_logged 'dispatches' && grep -q 'deferred (reached 24 in the last hour)' "$TMP/out"
+expect "24 dispatches in the last hour -> no dispatch (deferred)" $?
 
 reset
 pm_base
-m=(); for i in $(seq 900 910); do m+=("$(mk "$i" 600)"); done
+m=(); for i in $(seq 900 922); do m+=("$(mk "$i" 600)"); done
 ledger "$(IFS=,; echo "${m[*]}")"
 wd
 logged 'client_payload\[ref\]=60'
-expect "11 dispatches in the last hour -> still dispatched" $?
+expect "23 dispatches in the last hour -> still dispatched" $?
 
 # 39. 1 回の点検で送るのは 3 件まで。17 件の停止 PR を DRY=1 で点検すると 3 件だけ計画され、何も送らない
 reset
@@ -1081,6 +1162,184 @@ nopr ''; ledger ''
 wd
 logged 'client_payload\[ref\]=66' && grep -q '#65 oc-pm: failed to read comments' "$TMP/out"
 expect "a stuck PR whose comments cannot be read is skipped, the others continue" $?
+
+# 40〜. PM Worker の率制限 alert (#CI-142)。rate_limit_alert (true) か rest_remaining (1500 未満) で、ラベル oc:rate-limit の issue に載せる。
+#       fresh=false の値は古いかもしれないので使わない。open があれば追記のみ (60 分に 1 回まで)。open が無くても 6 時間以内に閉じた issue があれば起票しない。
+rate_setup() { # rate_setup <open の oc:rate-limit issue の JSON (無ければ空)> [閉じた issue の JSON (無ければ空)]
+  worker_setup
+  fx 'issue-list?state=open&label=oc:rate-limit' "[${1:-}]"
+  fx 'issue-list?state=closed&label=oc:rate-limit' "[${2:-}]"
+}
+RATE_BODY="$TMP/oc-rate-limit-body.md"
+rnote() { printf '{"user":{"login":"%s","type":"%s"},"created_at":"%s","body":"[watchdog] x <!-- oc-rate-limit-note -->"}' "${2:-$REVIEWER}" "${3:-Bot}" "$(agoz "$1")"; } # rnote <分前> [login] [type]
+no_rate_calls() { ! grep -q 'oc:rate-limit' "$LOG"; } # 何もしない判定では、oc:rate-limit を含む gh 呼び出し (読みも書きも) が 0 件
+
+# 40a. rate_limit_alert=true (fresh) で open の oc:rate-limit が無い -> ラベルを用意して [CI-62] の issue を起票する
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1800'
+wd; rc=$?
+[ "$rc" = 0 ] && logged 'api -X POST repos/o/r/labels' && logged "issue create --repo o/r --title \[CI-62\] PM Worker 率制限 alert ($TODAY) --body-file .* --label oc:rate-limit" && grep -q '^rate=alert (rate_limit_alert=true)' "$TMP/out"
+expect "rate_limit_alert=true (fresh) -> issue [CI-62] with label oc:rate-limit" $?
+grep -q '@pycabbage' "$RATE_BODY" && grep -q '"rest_remaining": 1800' "$RATE_BODY" && grep -q 'rate-guard' "$RATE_BODY"
+expect "the rate issue body has @pycabbage, the /status rate fields and the rate-guard note" $?
+
+# 40b. rest_remaining が 1499 (1500 未満) なら、rate_limit_alert が false でも起票する
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":false,"rest_remaining":1499'
+wd
+logged "issue create --repo o/r --title \[CI-62\] PM Worker 率制限 alert" && grep -q 'rest_remaining=1499 (< 1500)' "$TMP/out"
+expect "rest_remaining 1499 (< 1500) with no alert -> issue" $?
+
+# 40c. ネガコン (境界): rest_remaining が 1500 ちょうどで rate_limit_alert が false なら何もしない
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":false,"rest_remaining":1500'
+wd
+no_rate_calls && grep -q '^rate=ok (rate_limit_alert=false, rest_remaining=1500)' "$TMP/out"
+expect "ネガコン: rest_remaining 1500 (boundary, not below) -> nothing" $?
+
+# 40d. ネガコン: 値が null (未観測) なら起票しない。rate の項目が無い古い Worker も同じ
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":false,"rest_remaining":null'
+wd
+no_rate_calls && grep -q '^rate=ok (rate_limit_alert=false, rest_remaining=null)' "$TMP/out"
+expect "ネガコン: rest_remaining null and no alert -> nothing" $?
+rate_setup ''
+worker true true true "$(ago 1)"
+wd
+no_rate_calls && grep -q '^rate=ok' "$TMP/out"
+expect "ネガコン: no rate fields at all (older Worker) -> nothing" $?
+
+# 40e. ネガコン: rate_limit_alert が真偽値の true でない (文字列) なら alert と認めない
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":"true","rest_remaining":null'
+wd
+no_rate_calls
+expect "ネガコン: rate_limit_alert as a string is not an alert" $?
+
+# 40f. ネガコン: fresh=false の値は古いかもしれないので使わない (alert でも rate の呼び出しは無い)
+rate_setup ''
+worker true true false "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1000'
+wd
+no_rate_calls && grep -q '^rate=skipped (fresh=false' "$TMP/out"
+expect "ネガコン: fresh=false -> the stale rate values are not used" $?
+
+# 40g. ネガコン: /status が取れない・JSON 不正なら何もしない (終了コードは 0)
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":100'
+FAKE_CURL_FAIL=28 wd; rc=$?
+[ "$rc" = 0 ] && no_rate_calls && grep -q '^rate=skipped (no status)' "$TMP/out"
+expect "ネガコン: /status unreachable -> nothing for rate, exit 0" $?
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":true'
+printf '<html>502</html>' > "$FAKE_STATUS"
+wd; rc=$?
+[ "$rc" = 0 ] && no_rate_calls && grep -q '^rate=skipped (no status)' "$TMP/out"
+expect "ネガコン: /status is not JSON -> nothing for rate, exit 0" $?
+
+# 40h. 既存の open の oc:rate-limit issue があれば追記のみ。新規 0 件
+rate_setup '{"number":91,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/91/comments' '[]'
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+wd
+logged 'issue comment 91 .*--body-file' && [ "$(grep -c 'issue create' "$LOG")" = 0 ] && grep -q 'oc-rate-limit-note' "$RATE_BODY"
+expect "open oc:rate-limit issue -> note only, 0 new issues" $?
+
+# 40i. ネガコン: 直近 10 分に追記 (oc-rate-limit-note) があれば、追記も見送る (5 分ごとの点検でコメントを水増ししない)
+rate_setup '{"number":91,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/91/comments' "[$(rnote 10)]"
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+wd
+not_logged 'issue comment 91' && [ "$(grep -c 'issue create' "$LOG")" = 0 ] && grep -q 'already reported' "$TMP/out"
+expect "ネガコン: a note 10 min ago -> no further note (throttled)" $?
+
+# 40j. 61 分前の追記なら、また追記する。別アカウントが偽装した追記は数えない
+rate_setup '{"number":91,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/91/comments' "[$(rnote 61)]"
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+wd
+logged 'issue comment 91 ' && [ "$(grep -c 'issue create' "$LOG")" = 0 ]
+expect "a note 61 min ago -> another note" $?
+rate_setup '{"number":91,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/91/comments' "[$(rnote 1 someone-else User)]"
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+wd
+logged 'issue comment 91 '
+expect "ネガコン: a spoofed note from another account does not throttle" $?
+
+# 40k. ネガコン: 起票して間もない (10 分前) open の issue は、追記マーカーが無くても追記しない
+rate_setup "{\"number\":91,\"createdAt\":\"$(agoz 10)\"}"
+fx 'repos/o/r/issues/91/comments' '[]'
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+wd
+not_logged 'issue comment 91' && [ "$(grep -c 'issue create' "$LOG")" = 0 ]
+expect "ネガコン: an open issue created 10 min ago -> no note yet" $?
+
+# 40l. ネガコン (fail-closed): 一覧が取れなければ何もしない。起票も追記もしない
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+FAKE_FAIL='issue-list?state=open&label=oc:rate-limit' wd; rc=$?
+[ "$rc" = 0 ] && [ "$(grep -c 'issue create' "$LOG")" = 0 ] && grep -q 'failed to list oc:rate-limit issues' "$TMP/out"
+expect "ネガコン: open oc:rate-limit list fails -> nothing filed (fail-closed), exit 0" $?
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+FAKE_FAIL='issue-list?state=all' wd
+[ "$(grep -c 'issue create' "$LOG")" = 0 ] && grep -q 'failed to count' "$TMP/out"
+expect "ネガコン: CI title list fails -> nothing filed (fail-closed)" $?
+
+# 40m. DRY=1 は起票の計画だけを出す (ラベル作成も起票もしない)
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+DRY=1 wd
+not_logged 'issue create' && not_logged 'api -X POST repos/o/r/labels' && grep -q "DRY: file '\[CI-62\] PM Worker 率制限 alert ($TODAY)' with label oc:rate-limit" "$TMP/out"
+expect "DRY=1 plans the rate-limit issue without filing" $?
+
+# 40n. 健全な値 (alert false・rest_remaining 1500 以上) では oc:rate-limit の gh 呼び出しが 0 件
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":false,"rest_remaining":4000'
+wd
+no_rate_calls && grep -q '^rate=ok' "$TMP/out"
+expect "healthy rate values -> no rate call at all" $?
+
+# 40o. 題名の採番 (pm-worker-down と同じ [CI-n]) が上限に達したら、起票しない (fail-closed)
+rate_setup ''
+fx 'issue-list?state=all' "$(jq -n '[range(3000) | {title: "[DOCS-1] x"}]')"
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+wd
+[ "$(grep -c 'issue create' "$LOG")" = 0 ] && grep -q 'reached the limit' "$TMP/out"
+expect "ネガコン: title list at the limit -> rate-limit issue not filed" $?
+
+# 40p. 結果は step summary にも出る
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":false,"rest_remaining":1200'
+GITHUB_STEP_SUMMARY="$TMP/summary-rate.md" wd
+grep -q '^rate=alert (rest_remaining=1200 (< 1500))' "$TMP/summary-rate.md"
+expect "rate result is written to the step summary" $?
+
+# 40q. 閾値の一致: watchdog の REST_REMAINING_MIN は ratelimit.ts と一致し、5 件・30%・2 回連続は ratealert.ts の値 (Worker が判定する)
+grep -q '^REST_REMAINING_MIN=1500$' "$SCRIPTS/watchdog.sh" && grep -qx 'export const REST_REMAINING_MIN = 1500;' "$SCRIPTS/../../infra/pm-worker/src/ratelimit.ts" &&
+  grep -qx 'export const RATE_MIN_COUNT = 5;' "$SCRIPTS/../../infra/pm-worker/src/ratealert.ts" && grep -qx 'export const RATE_MIN_PERCENT = 30;' "$SCRIPTS/../../infra/pm-worker/src/ratealert.ts" && grep -qx 'export const RATE_STREAK = 2;' "$SCRIPTS/../../infra/pm-worker/src/ratealert.ts"
+expect "thresholds match infra/pm-worker (REST 1500; alert 5 runs / 30% / 2 streak)" $?
+
+# 40r. ネガコン: 人が close した oc:rate-limit issue が 1 時間前にあれば、alert が続いても起票しない (再起票の抑止。reopen もしない)
+rate_setup '' "{\"number\":90,\"closedAt\":\"$(agoz 60)\"}"
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+wd; rc=$?
+[ "$rc" = 0 ] && [ "$(grep -c 'issue create' "$LOG")" = 0 ] && not_logged 'issue reopen' && not_logged 'issue comment' && grep -q 'was closed within 6 hours' "$TMP/out"
+expect "ネガコン: a rate issue closed 1 hour ago -> no new issue, no reopen (6-hour hold)" $?
+
+# 40s. 25 時間前に閉じた oc:rate-limit issue なら、もう新しい issue を起票する
+rate_setup '' "{\"number\":90,\"closedAt\":\"$(agoz 1500)\"}"
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+wd; rc=$?
+[ "$rc" = 0 ] && logged "issue create --repo o/r --title \[CI-62\] PM Worker 率制限 alert ($TODAY) --body-file .* --label oc:rate-limit"
+expect "a rate issue closed 25 hours ago -> a new [CI-62] issue is filed" $?
+
+# 40t. ネガコン (fail-closed): 閉じた oc:rate-limit issue の一覧が取れなければ起票しない。終了コードは 0
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+FAKE_FAIL='issue-list?state=closed&label=oc:rate-limit' wd; rc=$?
+[ "$rc" = 0 ] && [ "$(grep -c 'issue create' "$LOG")" = 0 ] && grep -q 'failed to list closed oc:rate-limit issues' "$TMP/out"
+expect "ネガコン: closed oc:rate-limit list fails -> nothing filed (fail-closed), exit 0" $?
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]

@@ -346,6 +346,8 @@ void* GetProcAddress(HMODULE h, LPCSTR name) {
     }
     if (!fn && !byOrd && (!strcmp(name, "DWriteCreateFactory") || !strcmp(name, "DWriteCoreCreateFactory")))
         shim_unimplemented("DWriteCreateFactory (DirectWrite 未対応: Kilohearts Skia の動的ロード。KH-20 方針 = 明示 fail-fast)");
+    if (!fn && !byOrd && (!strcmp(name, "SHBrowseForFolderA") || !strcmp(name, "SHBrowseForFolderW")))
+        shim_unimplemented("SHBrowseForFolder");
     if (!fn) {
         char nb[64];
         if (byOrd) { snprintf(nb, sizeof nb, "#%u", ord); name = nb; }

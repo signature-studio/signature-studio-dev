@@ -243,3 +243,7 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - 所要・load の run ごとの値は未記録 (生ログ未保存)。min–max は未確定。
 - 残件 (n≥10 連続 rc 0・6h 原因・修正前 ASan ログ) は #1217 (GUI-20) へ移管。
 - 再現: `bash tools/gui/e2e.sh` (連続は for ループ)。
+
+## 21. WIN-23 (#3460): FL 非依存の W 版 Win32 テストゲストと headless surface 統計
+既知類型との関係: `docs/DEFECTS.md` D11 (wasm32 の PE VA 切り捨て) とは機構が別。本件は RetDec の Win32 型 DB が `LONG_PTR` を 32 bit で持つことによる関数 VA 即値の切り詰め (新規類型の行案は付録 W、#3508)。
+- 結論: W 版ゲスト `gui_app_w.c` は後処理の修正 (関数 VA 復元・UTF-16 リテラル) で native PASS し、独立オラクル (`golden/gen_golden_w.py`) と EXACT MATCH。wasm / Chrome 比較は子 #3509、GUI-REACH は子 #3510 (全文は [REPORT_APPENDIX_W.md](REPORT_APPENDIX_W.md) の #3508 節)。

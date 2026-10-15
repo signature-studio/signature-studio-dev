@@ -38,7 +38,6 @@ mod._gui_headless_attach(800, 600);
 const bridge = new HostCallBridge(mod.wasmMemory, mod._gui_hostcall_ptr(), env);
 if (process.env.COEXIST_NC !== "nohost") bridge.start();   // NC: host 無しなら C 側の dialog/ShellExecute テストが落ちること
 const code = await Promise.race([done, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout 60s")), 60000))]).catch((e) => { console.log("HOST ERROR", e.message); return 99; });
-const nflush = await bridge.flushSaves();
 await bridge.stop();
 
 const m = /RESULT pass=(\d+) fail=(\d+)/.exec(out);
@@ -52,7 +51,7 @@ ck("filter → types 変換 (WAV only; *.* は無制限)", () => assert.deepEqua
 ck("multi フラグ", () => assert.deepEqual(dialogs.filter((d) => d.kind === "open").map((d) => d.multiple), [false, false, true, false, false]));
 ck("ステージング: kick.wav の内容", () => assert.deepEqual(Array.from(mod.FS.readFile(UTF() + "/kick.wav")), [1, 2, 3]));
 ck("ステージング: multi 3 本", () => assert.deepEqual(["a.wav", "b.wav", "c.mid"].map((n) => Array.from(mod.FS.readFile(UTF() + "/" + n))), [[10], [11], [12]]));
-ck("save: FL が書いた内容が実体 (mock handle) へ反映", () => { assert.equal(nflush, 1); assert.deepEqual(saved, [Array.from(new TextEncoder().encode("FLP-DATA"))]); });
+ck("save: FL が閉じた save 先 (CloseHandle) の内容が実体 (mock handle) へ自動で反映 (flushSaves の手動呼出し無し)", () => { assert.deepEqual(saved, [Array.from(new TextEncoder().encode("FLP-DATA"))]); });
 ck("host log に想定外エラー無し (想定: blocked 1 + picker failure 1)", () => assert.deepEqual(bridge.log.filter((l) => !/blocked|simulated/.test(l)), []));
 function UTF() { const mm = /^STAGE (.*)$/m.exec(out); assert.ok(mm, "STAGE 行無し"); return mm[1]; }
 

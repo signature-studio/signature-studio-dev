@@ -68,7 +68,7 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 
 ## #1269 (HB-H28) BLK 配置の実測 (HEAD b1d2fe82 / 測定 commit 604e900f, コード変更なし)
 
-素材 (展開実測): `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (OTT_vst2_win64.dll)、`work-liftlib`・`work-m6-ott`・`work-icall` → 各 `tools/*/work/`。`fl-win64`・`toolchain-*` は本 run では不使用。
+素材 (展開実測): `analysis-ott-binaries` → `$ANALYSIS_DIR/plugins/ott/binaries/` (OTT_vst2_win64.dll)、`work-liftlib`・`work-m6-ott`・`work-icall` → 各 `tools/*/work/`。`fl-win64`・`toolchain-*` は本 run では不使用。
 
 | 項目 | 結果 |
 |---|---|
@@ -91,7 +91,7 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 ### 残作業 (#1269 の受入条件のうち未達)
 
 1. (a) の実装と `leafspec` の wasm_trap 0 の確認 (match の判定は #1270 の受入条件)。
-2. `icall_e2e.sh` の前後測定。`ANALYSIS_DIR` は既定値が環境依存のため、環境変数で指定する (本 run では `$HOME/analysis` を指定)。また `tools/ott/work/` (`ott_e2e.sh` の成果物) が前提で、本 run では未展開。
+2. `icall_e2e.sh` の前後測定。`ANALYSIS_DIR` は既定値が環境依存のため、環境変数で指定する (本 run では `$ANALYSIS_DIR` を指定)。また `tools/ott/work/` (`ott_e2e.sh` の成果物) が前提で、本 run では未展開。
 3. ネガコン (修正を外すと wasm_trap 200 に戻る) の実測。
 
 ## 再現
@@ -103,7 +103,7 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 20
 
 ## #883 run (測定 commit 9f336206, コード変更なし): shift 併用の実測
 
-素材: `analysis-ott-binaries` / `work-liftlib` / `work-m6-ott` を展開 (`$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`)。`gen_ott_getparam_F.sh` → F.txt `0x18011e5a0-0x18011e76c` (460 bytes)。
+素材: `analysis-ott-binaries` / `work-liftlib` / `work-m6-ott` を展開 (`$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll`)。`gen_ott_getparam_F.sh` → F.txt `0x18011e5a0-0x18011e76c` (460 bytes)。
 
 | 設定 (leafspec `--n 200`) | rc | 時間 | match / mismatch / wasm_trap |
 |---|---|---|---|
@@ -128,7 +128,7 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 20
 
 ## #1583 (HB-H33) run: blk_global 単独の実測 (測定 commit 5f0a8ce9, origin/main 起点 worktree)
 
-素材: `fl-win64` 以外の要求素材を展開 (`analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/`、`work-liftlib`・`work-icall`・`work-m6-ott` → 各 `tools/*/work/`)。`gen_ott_getparam_F.sh` → F.txt `0x18011e5a0-0x18011e76c` (460 bytes)。
+素材: `fl-win64` 以外の要求素材を展開 (`analysis-ott-binaries` → `$ANALYSIS_DIR/plugins/ott/binaries/`、`work-liftlib`・`work-icall`・`work-m6-ott` → 各 `tools/*/work/`)。`gen_ott_getparam_F.sh` → F.txt `0x18011e5a0-0x18011e76c` (460 bytes)。
 
 | 設定 (leafspec `--n 200`) | rc | 時間 | match / mismatch / wasm_trap |
 |---|---|---|---|
@@ -144,3 +144,98 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 20
 - よって BLK の張り替え (受入条件 1) 単独では wasm trap は消えず、画像 VA 側の shift が要る。
 
 修正方針 (未実装・子 issue へ): `remap.shift_va` に加算定数 (`add ... , <image VA>`) を含める拡張、または leaf 側に `passes.shift` を入れて `newbase` を wasm 線形メモリ内へ移す。いずれも ott 既存 recipe (`recipes/ott.py` の `shift_va`) の出力に影響しうるため、ott_route / ott_iargs の前後一致を確認してから入れる。
+
+## #1583 の受入判定と実測 (HB-H33・2026-10-14)
+
+依存だった #2128 (PR #2162) と子 #1770・#1873 は merge / close 済み。BLK の張り替え (本付録 §「方式の判定」(a)) は `passes.icall.blk_global` として実装済みで、本節はその受入を実測で判定する。
+
+### 測定 config
+
+| 項目 | 値 |
+|---|---|
+| 測定 commit | `26f90ada` (origin/main・測定時の HEAD)。配線の最後のコード変更は `f8bd2ea0` (PR #2162) |
+| 素材 | `analysis-ott-binaries` → `$ANALYSIS_DIR/plugins/ott/binaries/`、`work-m6-ott`・`work-liftlib`・`work-icall` → 各 `tools/*/work/`。`OTT_DLL=$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll bash tools/liftlib/gen_ott_getparam_F.sh` で F.txt (`0x18011e5a0-0x18011e76c`、460 bytes) |
+| toolchain | runner 既存の [EMSDK] (`emsdk_env.sh` を source)・[RETDEC] (`docs/REFERENCES.md` §4 の環境変数で解決)。素材 `toolchain-emsdk`・`toolchain-retdec` は取得・展開していない (oc_artifacts に含めない) |
+| 負荷 | 測定時の load average 0.2〜0.8 (4 コア) |
+
+### 受入条件の判定
+
+| # | 受入条件 (#1583 本文) | 判定 | 根拠 |
+|---|---|---|---|
+| 1 | BLK 参照を module-local global へ | 部分達成 (leaf 経路のみ。route 側は子 #2865 へ切り出し、#1583 本文から外した) | restore 後 IR (`ott_getparam.drc.restored.ll`) の BLK 範囲 inttoptr 135 件 (offset 0x00〜0x98。`+0x80` 29 件・`+0x88` 23 件を含む) → `ott_getparam_fixed.ll` では BLK 範囲の inttoptr 0 件、`@__icall_blk` の GEP 135 件 (宣言 1 行を含めて 136 行)。`blk_global` 置換数は `pipeline_report.json` の `icall_blk_global` = 135 |
+| 2 | opt-in (既定 off) か `ott_getparam` 限定 | 達成 | `pipeline.py` は `passes.icall.blk_global` が真のときだけ置換。有効化しているのは `targets/ott_getparam.json` の 1 箇所 (`grep` で他 target に無し)。`icall_rt.c` の変更は `ICALL_BLK_GLOBAL` の `#ifdef` 内で、未定義時は `BLK_ADDR = ICALL_BLK` (従来と同値)。`ott_route` は当該フラグを定義せず、icall_e2e の matrix が全 cell 一致 |
+| 3 | `test_icall.py` と `icall_e2e.sh` が PASS・前後の実測 | 達成 | 下の「icall_e2e」表 |
+| 4 | leafspec の wasm_trap 0 | 達成 | 200 → 0 (下の「leafspec」表) |
+| 5 | ネガコン | 達成 | 配線を外すと wasm_trap 200 に戻る (下の表) |
+
+route 側の `ir_icall_restore.py` が出す `blk+0xb0` の load は、この leaf の IR には現れない (0 件)。route 側の BLK は `0x34308000` で、`ott_route` の初期メモリ `0x36000000` の内側にあり trap しない。route の張り替えは受入 2 の「`ott_route` の出力を変えない」と衝突するため行わず、子 #2865 (HB-H50) へ切り出した。#1583 本文の受入 1 は leaf 経路の範囲に縮めた。
+
+### leafspec (`python3 -m liftlib leafspec targets/ott_getparam.json --n 200`)
+
+| 設定 | rc | wall | match / mismatch / native_crash / wasm_trap | gate |
+|---|---|---|---|---|
+| 配線あり (HEAD `26f90ada`) | 1 | 3.8 s | 147 / 53 / 0 / **0** | FAIL (rate 0.735, thr 1.00。残りは xmm0 不一致 53 件・#1270 の範囲) |
+| ネガコン: 配線を外す (`f8bd2ea0` の 5 ファイル `tools/icall/rt/icall_rt.c`・`tools/liftlib/liftlib/passes/icall.py`・`tools/liftlib/liftlib/pipeline.py`・`tools/liftlib/targets/ott_getparam.json`・`tools/liftlib/tests/test_unit.py` を親 `f8bd2ea0^` の版へ一時的に差し替え。測定後に作業前の版へ戻し、`git status` が空であることを確認) | 1 | 1.6 s | 0 / 200 / 0 / **200** | FAIL (rate 0.000) |
+
+ネガコンで差し替えた 5 ファイルは `f8bd2ea0` 以降に変更が無いことを `git log f8bd2ea0..HEAD -- <5 files>` (0 件) で確認してから行った。`base.py`・`simd/gen.py` の後続差分は配線と無関係で、両方の測定で同じに残した。
+
+### icall_e2e (`ANALYSIS_DIR=$ANALYSIS_DIR PLUGINS_DIR=$ANALYSIS_DIR/plugins bash tools/icall/icall_e2e.sh`)
+
+| 段 | 結果 |
+|---|---|
+| [1/4] route build | OK (`ott_route.sh`・約 95 s 全体) |
+| [2/4] unit / rewriter | `test_icall.py`: RESULT PASS (0 failed) |
+| [3/4] 監査 (OTT closure F・282 関数) | 非 IAT 間接 call 81: RetDec 素通しの落ち **70 → 0** (復元後)。tail-jmp 11: **11 → 0**。jump table 8: RetDec 未解決 1 → cmp/je 列へ 8 展開。判定 PASS (基準: 落ち >= 60 → <= 8 かつ tail-jmp 落ち 0) |
+| [4/4] matrix (89 scenario) | failed **0**・cells 50236・bit-equal **50236**・max_ulp 0・state_diff_qwords 0 |
+| CRT 関数単位 gate | PASS (SSE2 経路 6 関数・FMA3 経路・負入力・override 4/4 すべて xmm0 bit-equal 600/600) |
+| 最終 | `[icall_e2e] PASS` (rc 0) |
+
+注: `icall_e2e.sh` は `targets/ott_route.json` だけを通す。`ICALL_BLK_GLOBAL` は `ott_getparam.json` でしか定義されないため、[3/4] の非 IAT 間接 call の落ち 70 → 0 (RetDec 素通し → 復元後) は restore の効果であり、blk_global の効果ではない。blk_global の効果を測ったのは leafspec (wasm_trap 200 → 0) のみ。
+
+注: 1 回目 (run1) は `tools/ott/work/libottnative.so` (素材 `work-m6-ott` 同梱・2026-10-12 build) が `ott_enc_slots` を欠き、matrix 89 件 FAIL・CRT gate FAIL になった。`bash tools/ott/native/build.sh` で再ビルド (`ott_enc_slots` を export) してから run2 で PASS した。監査表の FA・KH・FLEngine の行は `audit_*.json` の保存値で、この run では再測定していない。
+
+### 差分 0 の確認
+
+測定 commit `26f90ada` から、この PR の HEAD までのコード差分 (測定経路・REPORT を除く) は 0 行。
+
+```
+$ git diff 26f90ada HEAD -- tools/icall tools/liftlib/liftlib tools/liftlib/targets tools/liftlib/tests | wc -l
+0
+```
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| route 側 (`ir_icall_restore.py` の `blk+0xb0`・`ott_route` の BLK 参照) の張り替え | route は trap しない (matrix 全一致)。張り替えると受入 2 の出力不変と衝突する | #2865 (HB-H50・親 #1583) |
+| `work-m6-ott` 同梱の `libottnative.so` が旧 build (`ott_enc_slots` 欠落)。icall_e2e の前提は `bash tools/ott/native/build.sh` での再ビルド | 再ビルドしないと matrix 89 件と CRT gate が FAIL | PM agent の判断待ち: 素材 `work-m6-ott` を再梱包するか。既定案: 再梱包せず、再ビルド手順を本節の前提に残す (記載済み)。起票先: #1583 (親への提案) |
+| leafspec の gate FAIL (match 147/200、xmm0 不一致 53 件) | 受入 4 は wasm_trap のみ。gate は未達 | #1270 (HB-H29) |
+| dispatch 表が根 1 関数のみ・FAIL-FAST 未検証 | 間接 call の target 解決が未検証 | #2161 (HB-H44) |
+| #1586 (HB-H34) の前提「`__icall_dispatch` が trap stub」は f8bd2ea0 で変わった (`tools/icall/rt/icall_rt.c:54` が定義し、`tools/liftlib/liftlib/pipeline.py:222` で stub から除外)。本節の leaf 実測で #1586 の受入が満たされるかは未判定 | #1586 の受入 1〜3 の判定が残る | #1586 (既存 issue にコメントで前提の変化を通知) |
+| 本節は REPORT への実測記録のみ (docs-only)。受入 3 が REPORT への記録を指定している | `docs/WORKFLOW.md` §7 の docs-only 禁止との関係 | PM agent の判断待ち: 例外として merge してよいか。既定案: 例外として扱う。起票先: #1583 |
+
+## #2865 (HB-H50) route 側 BLK 張り替え (opt-in・既定 off) の実測 (2026-10-14)
+
+測定 commit `a2daca6b` (コード変更の最後の commit)。base は `217ceb3e` (origin/main)。
+`git diff a2daca6b HEAD -- tools/icall tools/liftlib/liftlib tools/liftlib/targets tools/liftlib/tests | wc -l` → `0` (測定後は REPORT 追記のみ)。
+
+置換点: `ott_route.sh` は `ICALL_BLK_GLOBAL=1` のときだけ、normalize・ir5_patch 後・flatten 前の `oi.p1.ll` で、BLK 範囲 `[0x184308000, +0x200)` の `inttoptr` を `getelementptr inbounds i8, ptr @__icall_blk, i64 off` へ張り替える (`tools/icall/ir_blk_global.py` が leaf と同じ `blk_global_text` を呼ぶ)。runtime は `-DICALL_BLK_GLOBAL` で `icall_rt.c`・`icall_ovr.c`・`ir_flatten.py` 生成の table.c が同じ `__icall_blk` を使う。
+範囲: 置換は BLK 範囲の参照を全て対象にする。restore の `+0x80`・`+0xb0` だけを置くと、body の固定 VA と runtime の global で BLK が二重になる。`ir_icall_restore.py`・`passes/icall.py`・`targets/ott_route.json` は無変更 (`ott_route.sh` は `ott_route.json` を読まない)。
+
+| 項目 | 既定 (置換なし) | opt-in (`ICALL_BLK_GLOBAL=1`) |
+|---|---|---|
+| 置換数 (`blk_global.json`) | 0 | 13243 |
+| BLK 範囲の固定 VA `inttoptr` (`oi.p1.ll`) | 13243 | 0 |
+| `@__icall_blk` の GEP (+0x80: 914 / +0xb0: 238) | 0 | 13243 (全 BLK 参照) |
+| `oi.flat.ll` sha256 | `ab84339a…` (変更前と一致) | `c82a97bd…` |
+| `ott_route.wasm` の非 custom section | 変更前 (`af19ecbd…`) と一致 (差は DWARF の行情報のみ) | 未比較 |
+| `icall_e2e.sh` | PASS 98.7 s | PASS 99.3 s |
+| unit (`test_icall.py`) | RESULT PASS (0 failed) | 同左 |
+| 監査 (OTT F 282 関数) | 非IAT間接 call 落ち 70→0・tail-jmp 11→0・jump table 1/8→8 | 同左 |
+| matrix | 89 scenario・0 failed・50236 cell bit-equal・max_ulp 0・state_diff 0 | 同左 |
+| CRT gate | PASS (SSE2・FMA3・負入力・override 4/4) | 同左 |
+
+- 変更前の route build: rc 0・35.4 s (load 未記録)。変更前の完全 e2e は本 run では未実行 (既定版の flat IR と wasm の非 custom section が変更前と一致するため、同じ結果とみなす)。load は既定 e2e 開始前 0.49、opt-in 開始前 1.03 (4 コア)。
+- ネガコン 1: `icall_ovr.c` の固定 VA を残し、置換だけ入れた opt-in では CRT gate `1801a9a6c` が xmm0 bit-equal 0/600 で FAIL (実測)。`icall_ovr.c` を揃えて PASS。
+- ネガコン 2: 既定 (置換なし) の flat IR・wasm 非 custom section が変更前と一致 = 置換を外すと元の出力に戻る。
+- `ott_iargs`: liftlib 経路 (`passes/icall.py`・`pipeline.py`) は無変更で、`ir_flatten.py`・`icall_ovr.c`・`ott_route.sh` を参照しない (`grep -rln` で確認)。再測定はしていない。

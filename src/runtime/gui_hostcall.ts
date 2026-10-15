@@ -14,7 +14,7 @@ export const HC = {
 export const HC_MAGIC = 0x43484749;
 export const HC_IN = 2048;
 export const HC_OUT = 4096;
-export const HC_OP = { openUrl: 1, openFile: 2, saveFile: 3, openHelp: 4, fetchFont: 5 } as const;
+export const HC_OP = { openUrl: 1, openFile: 2, saveFile: 3, openHelp: 4, fetchFont: 5, fileClosed: 6 } as const;
 /** host 側エラーの result 値 (wasm 側の -1/-2/-3 と衝突しない) */
 export const HC_ERR = -16;
 
@@ -120,7 +120,8 @@ export class HostCallBridge {
       else if (op === HC_OP.openFile || op === HC_OP.saveFile) {
         const r = await this.dialog(op === HC_OP.saveFile, flags, fields);
         result = r.result; out = r.out;
-      } else { result = HC_ERR; this.log.push(`unknown op ${op}`); }
+      } else if (op === HC_OP.fileClosed) result = (await this.fileClosed(fields[0] ?? "")) ? 1 : 0;
+      else { result = HC_ERR; this.log.push(`unknown op ${op}`); }
     } catch (e) {
       result = HC_ERR; this.log.push(`op ${op} failed: ${(e as Error).message}`);
     }
@@ -178,12 +179,20 @@ export class HostCallBridge {
   /** FL が書き終えた save 先を実ファイルへ反映する。反映した件数を返す (FS に無い/失敗は log に残して継続) */
   async flushSaves(): Promise<number> {
     let n = 0;
-    for (const [path, t] of this.pendingSaves) {
-      const bytes = this.env.fs.readFile(path);
-      if (!bytes) { this.log.push(`flush skipped (no file): ${path}`); continue; }
-      try { await t.write(bytes); n++; } catch (e) { this.log.push(`flush failed ${path}: ${(e as Error).message}`); }
-    }
+    for (const [path, t] of this.pendingSaves) if (await this.flushOne(path, t)) n++;
     return n;
+  }
+
+  /** shimx が書込み用 file を CloseHandle した (#958)。保存待ちの先なら、その時点で実体へ反映する。対象外は false */
+  private async fileClosed(path: string): Promise<boolean> {
+    const t = this.pendingSaves.get(path);
+    return t ? this.flushOne(path, t) : false;
+  }
+
+  private async flushOne(path: string, t: SaveTarget): Promise<boolean> {
+    const bytes = this.env.fs.readFile(path);
+    if (!bytes) { this.log.push(`flush skipped (no file): ${path}`); return false; }
+    try { await t.write(bytes); return true; } catch (e) { this.log.push(`flush failed ${path}: ${(e as Error).message}`); return false; }
   }
 }
 

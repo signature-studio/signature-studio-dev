@@ -9,7 +9,7 @@
  *   - AudioContext の状態変化を dev_events で wasm へ通知 (ASIO kAsioResetRequest の元)
  * 設計: tools/audio/docs/PROTOCOL.md
  */
-import { FLA_CMD, FLA_EV, FLA_LAYOUT, verifyLayout, type FlaField } from "./audio-layout";
+import { FLA_CMD, FLA_CTL_SIZE, FLA_EV, FLA_LAYOUT, FLA_PW_N, verifyLayout, type FlaField } from "./audio-layout";
 import type { FlAudioInput } from "./audio-input";
 
 /** wasm モジュールへの薄い口 (Emscripten Module / 自前 instance いずれからも作れる) */
@@ -29,6 +29,35 @@ export interface FlCaptureSpec {
   inCh: number;
   /** true なら frames 容量の ring として扱う (絶対フレーム p は p % frames へ書く。照合側が未照合区間を畳み込む) */
   ring?: boolean;
+}
+
+/** producer の write 1 件 (ctl.pw_trace): 書き込み開始 frame / 起床時の充填 / 起床時刻・完了時刻 (µs, 下 32bit) */
+export interface ProducerWrite {
+  w: number;
+  fill: number;
+  wake_us: number;
+  done_us: number;
+}
+
+/** producer (ASIO bufferSwitch 側の fla_out_wait_fill_le) の起床統計。wake_hist は worklet の notify から producer 起床までの遅延 (ms: <1,<2,<4,<8,<16,>=16) */
+export interface ProducerStats {
+  wake_hist: number[];
+  wake_count: number;
+  wait_timeouts: number;
+  cb_count: number;
+  cb_max_us: number;
+  cb_max_q: number;
+  /** write の通算数 (writes はその直近 FLA_PW_N 件・古い順) */
+  pw_n: number;
+  writes: ProducerWrite[];
+}
+
+/** worklet 側の underrun 通知。recs は underrun 直前の直近 64 quantum の [p, rd, wr, wl, dms] (古い順)。p = run 内位置・rd/wr = out_read/out_write・wl = 0 IDLE / 1 BUFFERING / 2 PLAYING・dms = 前 quantum からの Date.now 差 (ms, 初回 -1) */
+export interface ConsumerUnderrun {
+  p: number;
+  consumed: number;
+  rebuf: number;
+  recs: number[][];
 }
 
 export interface FlAudioShimOptions {
@@ -80,6 +109,9 @@ export class FlAudioShim {
   controlPanelCalls = 0;
   lastCapture: FlCaptureSpec | null = null;
   workletErrors: string[] = [];
+  /** clock_jump 1 件ごと (上限 256 件)。ct = AudioContext.currentTime、pn = performance.now() (worklet 側、不可なら -1)、cb = producer の bufferSwitch 通し番号 */
+  clockJumpLog: { q: number; d: number; frame: number; prev: number; ms: number; ct: number; pn: number; cb: number }[] = [];
+  underrunLog: ConsumerUnderrun[] = [];
   commandsHandled = 0;
   private refPts: { x: number; y: number }[] = [];
 
@@ -99,7 +131,7 @@ export class FlAudioShim {
     const n = this.api.layoutCount();
     verifyLayout(n, (i) => this.api.layoutOff(i), (i) => this.api.layoutName(i));
     this.ctlPtr = this.api.ctlPtr();
-    this.i32 = new Int32Array(this.api.getBuffer(), this.ctlPtr, 96);
+    this.i32 = new Int32Array(this.api.getBuffer(), this.ctlPtr, FLA_CTL_SIZE >> 2);
     this.st("ctrl_ready", 1);
     Atomics.notify(this.i32, this.ix("ctrl_ready"));
     this.offInput = this.opts.input?.on((e) => {
@@ -252,13 +284,16 @@ export class FlAudioShim {
       processorOptions: {
         buffer: this.api.getBuffer(),   // fla_open の malloc 後 (= ring 確保後) の最新 SAB
         ctlPtr: this.ctlPtr,
+        ctlSize: FLA_CTL_SIZE,
         layout,
         capture: this.lastCapture,
       },
     });
     node.port.onmessage = (e: MessageEvent) => {
-      const d = e.data as { type: string; message?: string };
+      const d = e.data as { type: string; message?: string; q?: number; d?: number; frame?: number; prev?: number; ms?: number; ct?: number; pn?: number; cb?: number; p?: number; consumed?: number; rebuf?: number; recs?: number[][] };
       if (d.type === "error") { this.workletErrors.push(d.message ?? "?"); this.log(`worklet error: ${d.message}`); }
+      if (d.type === "clock_jump") this.clockJumpLog.push({ q: d.q ?? -1, d: d.d ?? 0, frame: d.frame ?? -1, prev: d.prev ?? -1, ms: d.ms ?? 0, ct: d.ct ?? -1, pn: d.pn ?? -1, cb: d.cb ?? -1 });
+      if (d.type === "underrun_trace") this.underrunLog.push({ p: d.p ?? -1, consumed: d.consumed ?? -1, rebuf: d.rebuf ?? -1, recs: d.recs ?? [] });
     };
     node.connect(ctx.destination);
     this.node = node;
@@ -338,6 +373,38 @@ export class FlAudioShim {
     Atomics.store(i, this.ix("ref_epoch_ms_bits"), this.i64u[0] | 0);
     Atomics.store(i, this.ix("ref_epoch_ms_bits") + 1, this.i64u[1] | 0);
     Atomics.add(i, this.ix("ref_seq"), 1);
+  }
+
+  /** worklet 側の underrun 通知 (先頭 8 件まで・発生順) */
+  consumerStats(): ConsumerUnderrun[] {
+    return this.underrunLog;
+  }
+
+  /** producer の起床統計 (ctl の wake_hist[6] / wake_count / wait_timeouts) */
+  producerStats(): ProducerStats {
+    const base = this.ix("wake_hist");
+    const n = this.ld("pw_n") >>> 0;
+    const pw = this.ix("pw_trace");
+    const writes: ProducerWrite[] = [];
+    for (let k = n - Math.min(n, FLA_PW_N); k < n; k++) {
+      const e = pw + (k % FLA_PW_N) * 4;
+      writes.push({
+        w: Atomics.load(this.i32, e) >>> 0,
+        fill: Atomics.load(this.i32, e + 1) >>> 0,
+        wake_us: Atomics.load(this.i32, e + 2) >>> 0,
+        done_us: Atomics.load(this.i32, e + 3) >>> 0,
+      });
+    }
+    return {
+      wake_hist: [0, 1, 2, 3, 4, 5].map((k) => Atomics.load(this.i32, base + k) >>> 0),
+      wake_count: this.ld("wake_count") >>> 0,
+      wait_timeouts: this.ld("wait_timeouts") >>> 0,
+      cb_count: this.ld("cb_count") >>> 0,
+      cb_max_us: this.ld("cb_max_us") >>> 0,
+      cb_max_q: this.ld("cb_max_q") >>> 0,
+      pw_n: n,
+      writes,
+    };
   }
 
   /** ctl の統計スナップショット (テスト/診断用) */

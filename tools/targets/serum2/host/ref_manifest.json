@@ -36,5 +36,30 @@
       "nonzero_samples": 16380,
       "total_samples": 16384
     }
+  },
+  "presets": {
+    "SY - Action Hero": {
+      "file": "Presets/Factory/Synth/SY - Action Hero.SerumPreset",
+      "preset_file_sha256": "ff95babb414ecee7b8102f8a3931d01aa6f05ecb3d90bd51427839362cdf36bd",
+      "format": {
+        "tag": "IEEE float",
+        "bits": 32,
+        "channels": 2,
+        "sample_rate": 48000
+      },
+      "frames": 8192,
+      "content": "work/content_full (installer 全展開)。state = preset を seed (Init) DOM に重ねた processor_state (host/preset_state.py overlay)",
+      "state": "processor = preset DOM overlay on seed (Init) DOM (preset_state.py overlay)。controller = Init",
+      "midi": "NoteOn pitch=60 block 0 / NoteOff block 24 (既定と同じ)",
+      "command": "bash tools/targets/serum2/host/ref_render.sh <outdir> 60 'tools/targets/serum2/work/content_full/Presets/Factory/Synth/SY - Action Hero.SerumPreset'",
+      "sha256_data": "ecfdc2668f33322022244747af1d794afb79b1f4e97432a92464341389b223d7",
+      "sha256_file": "cd6ed718a4399d5ed3d136174f1054a8b53f6572d8a45f904340497ef823113e",
+      "metrics": {
+        "peak": 0.631184,
+        "rms": 0.212365,
+        "nonzero_samples": 16240,
+        "total_samples": 16384
+      }
+    }
   }
 }

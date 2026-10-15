@@ -105,6 +105,8 @@ def main():
             print('[hs_irfix] %s が body に残存' % g); sys.exit(1)
     lines[lo:hi + 1] = body
     fix_414390(lines)
+    fix_40c4d0(lines)
+    fix_40b3f0(lines)
     open(dst, 'w').write('\n'.join(lines))
     print('[hs_irfix] function_6bdde0 patched: %d 置換 (Host=%s Tag=%s; signature+2x(Host,Tag)+Tag_r8+Host_r9+Tag_rdx素) -> %s' % (n[0], H, T, dst))
 
@@ -170,6 +172,91 @@ def fix_414390(lines):
         if g in rest:
             print('[hs_irfix] function_414390 に %s が残存' % g); sys.exit(1)
     print('[hs_irfix] function_414390 patched: 入力 rcx=%s rdx=%s r8=%s を BLK+0x08/+0x10/+0x18 から読む' % (rcx, rdx, r8))
+
+
+def fix_40c4d0(lines):
+    # #2534: native 0x40c4d0 は rcx=this で、[rcx] の VMT から [vt-0x80] の offset を読んで
+    # once-init の slot を参照する。lift 版は rcx を文字列定数 @1 ("$") に畳み、[rcx] の読みも
+    # 定数 -92 になっている (fold 元は "$" = 0x24 の 1 byte)。rcx は caller が積む BLK+0x08 から、
+    # [rcx] は実メモリから読む。rdx/r8 は関数内で書換えないため、定数 store を消して caller の値を素通しにする。
+    lo = hi = None
+    for i, l in enumerate(lines):
+        if l.startswith('define ') and '@function_40c4d0(' in l:
+            lo = i
+        elif lo is not None and l == '}':
+            hi = i
+            break
+    if lo is None:
+        print('[hs_irfix] function_40c4d0 が見つからない'); sys.exit(1)
+    rules = [
+        ('%ce5n11_function_40c4d0 = inttoptr i64 -92 to ptr', 1,
+         '%hs40c_rcx = load i64, ptr inttoptr (i64 9048072 to ptr), align 8\n'
+         '  %hs40c_vtp = inttoptr i64 %hs40c_rcx to ptr\n'
+         '  %hs40c_vt = load i64, ptr %hs40c_vtp, align 8\n'
+         '  %hs40c_vtm = add i64 %hs40c_vt, -128\n'
+         '  %ce5n11_function_40c4d0 = inttoptr i64 %hs40c_vtm to ptr'),
+        ('%ce6n11_function_40c4d0 = ptrtoint ptr @1 to i64', 1,
+         '%ce6n11_function_40c4d0 = add i64 %hs40c_rcx, 0'),
+        ('store ptr getelementptr inbounds ([2 x i8], ptr @1, i64 0, i64 0), ptr inttoptr (i64 9048072 to ptr), align 8', 1,
+         'store i64 %hs40c_rcx, ptr inttoptr (i64 9048072 to ptr), align 8'),
+        ('store ptr getelementptr inbounds ([2 x i8], ptr @2, i64 0, i64 0), ptr inttoptr (i64 9048080 to ptr), align 8', 1, ''),
+        ('store ptr getelementptr inbounds ([2 x i8], ptr @4, i64 0, i64 0), ptr inttoptr (i64 9048088 to ptr), align 8', 2, ''),
+    ]
+    for old, expect, new in rules:
+        cnt = 0
+        for i in range(lo, hi + 1):
+            if old in lines[i]:
+                lines[i] = lines[i].replace(old, new)
+                cnt += 1
+        if cnt != expect:
+            print('[hs_irfix] function_40c4d0 置換数不一致 (%d != %d): %s' % (cnt, expect, old[:80])); sys.exit(1)
+    rest = '\n'.join(lines[lo:hi + 1])
+    if re.search(r'ptr @[124]\b|i64 -92 ', rest):
+        print('[hs_irfix] function_40c4d0 に定数 (@1/@2/@4・-92) が残存'); sys.exit(1)
+    print('[hs_irfix] function_40c4d0 patched: rcx を BLK+0x08 から読み [rcx] を実メモリから読む (rdx/r8 は素通し)')
+
+
+def fix_40b3f0(lines):
+    # #2534: native 0x40b3f0 は (rcx=this, dl=flag) を取り、flag≠0 なら 40bce0 (rcx, rdx=flag) を呼ぶ。
+    # lift 版は this を "$" 定数 @594、flag を "$" 定数 @593 に畳み、分岐と 40bce0 の引数が固定される。
+    # this は BLK+0x08、flag は BLK+0x10 の下位 1 byte を entry で 1 回だけ読む (40bce0 が後で BLK+0x10 を書くため)。
+    lo = hi = None
+    for i, l in enumerate(lines):
+        if l.startswith('define ') and '@function_40b3f0(' in l:
+            lo = i
+        elif lo is not None and l == '}':
+            hi = i
+            break
+    if lo is None:
+        print('[hs_irfix] function_40b3f0 が見つからない'); sys.exit(1)
+    rules = [
+        ('store ptr getelementptr inbounds ([2 x i8], ptr @594, i64 0, i64 0), ptr %.reg2mem', 1,
+         '%ce5n11_function_40b3f0 = load i64, ptr inttoptr (i64 9048072 to ptr), align 8\n'
+         '  %hs40b_this = inttoptr i64 %ce5n11_function_40b3f0 to ptr\n'
+         '  store ptr %hs40b_this, ptr %.reg2mem'),
+        ('%ce5n11_function_40b3f0 = ptrtoint ptr @594 to i64', 1, ''),
+        ('%ce8n11_function_40b3f0 = ptrtoint ptr @594 to i64', 1, '%ce8n11_function_40b3f0 = add i64 %ce5n11_function_40b3f0, 0'),
+        ('%ce6n11_function_40b3f0 = ptrtoint ptr @593 to i64', 1,
+         '%ce6n11_function_40b3f0 = load i64, ptr inttoptr (i64 9048080 to ptr), align 8'),
+        ('%ce7n11_function_40b3f0 = ptrtoint ptr @593 to i8', 1,
+         '%ce7n11_function_40b3f0 = load i8, ptr inttoptr (i64 9048080 to ptr), align 1'),
+        ('%ce9n11_function_40b3f0 = ptrtoint ptr @593 to i8', 1, '%ce9n11_function_40b3f0 = add i8 %ce7n11_function_40b3f0, 0'),
+        ('%ce17n11_function_40b3f0 = ptrtoint ptr @593 to i8', 1, '%ce17n11_function_40b3f0 = add i8 %ce7n11_function_40b3f0, 0'),
+        ('%ce18n11_function_40b3f0 = ptrtoint ptr @593 to i8', 1, '%ce18n11_function_40b3f0 = add i8 %ce7n11_function_40b3f0, 0'),
+        ('store ptr getelementptr inbounds ([2 x i8], ptr @592, i64 0, i64 0), ptr inttoptr (i64 9048088 to ptr), align 8', 2, ''),
+    ]
+    for old, expect, new in rules:
+        cnt = 0
+        for i in range(lo, hi + 1):
+            if old in lines[i]:
+                lines[i] = lines[i].replace(old, new)
+                cnt += 1
+        if cnt != expect:
+            print('[hs_irfix] function_40b3f0 置換数不一致 (%d != %d): %s' % (cnt, expect, old[:80])); sys.exit(1)
+    rest = '\n'.join(lines[lo:hi + 1])
+    if re.search(r'ptr @59[234]\b', rest):
+        print('[hs_irfix] function_40b3f0 に定数 (@592/@593/@594) が残存'); sys.exit(1)
+    print('[hs_irfix] function_40b3f0 patched: this を BLK+0x08、flag を BLK+0x10 (entry 1 回) から読む')
 
 
 if __name__ == '__main__':

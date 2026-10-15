@@ -1,0 +1,17 @@
+<!doctype html><meta charset="utf-8"><title>p19 worklet</title>
+<script>
+window.runWorklet = async (msg) => {
+  const wasm = await fetch('/w/ottl.wasm').then((r) => r.arrayBuffer());
+  const Q = 1000 + 300 + msg.reps * msg.blk + 16;
+  const ctx = new OfflineAudioContext({ numberOfChannels: 1, length: 128 * Q, sampleRate: 44100 });
+  await ctx.audioWorklet.addModule('/l/web/shared_worklet.js');
+  const node = new AudioWorkletNode(ctx, 'p19-shared', { numberOfInputs: 0, numberOfOutputs: 1, processorOptions: { wasm, m: msg.m, blk: msg.blk, reps: msg.reps } });
+  node.connect(ctx.destination);
+  const done = new Promise((res, rej) => {
+    node.port.onmessage = (ev) => (ev.data.ok ? res(ev.data.r) : rej(new Error(ev.data.error)));
+    node.onprocessorerror = () => rej(new Error('processorerror'));
+  });
+  ctx.startRendering();
+  return done;
+};
+</script>

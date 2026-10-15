@@ -35,6 +35,8 @@
 | fail-fast (未 lift、呼ばれると停止) | 34 | 0x180005000 0x180005c30 0x180005c50 0x18000caf0 0x18000f590 0x180021490 0x1800219b0 0x180021d40 0x1800448e0 0x1800541b0 0x18006ac50 0x18006c040 0x18010b6c0 **0x180112a30 (入口経路の先頭)** 0x18012e420 0x18012fba0 0x180130560 0x18013b9e0 0x18013c9c0 0x18024b2e0 0x1803965a0 0x180396b00 0x180396f40 0x18065bbd0 0x180c433b0 0x180c44b50 0x180c44d20 0x180c44d30 0x180c44d50 0x180c47b50 0x180ef8ef0 0x180ef92b0 0x180ef9b70 0x180fb5f5c |
 | **合計 (未 lift 扱い)** | **40** | (元 41 − lift 追加 2 + 新規出現 1 `18000caf0`) |
 
+注 (#709 で追記): 上表の「AVX2 (lift 不可)」「gen_simd 未対応」は基底 `8303a813` 時点の語彙による分類。#709 で gen_simd に ymm 整数語彙 (vpcmpeqb/w/d・vpmovmskb・vinsertf128) が加わり、2 件は i256 経路で emit されるようになった (ただし SSE 語彙不足で abort スタブとなり未 lift のまま。`KH709_REPORT.md` §3)。
+
 注: `0x180021490` (key_init) と `0x1800219b0` (apply_key) は module A/E で C stub の seam (`lic_config.json` の stubs) として扱われている。module F では lift も stub もされず fail-fast。F の経路で実際に到達するかは未確認。
 
 ## 3. 実測 (コミット HEAD で実行。環境: nproc=4)
@@ -190,3 +192,59 @@ round 5 の扱い (確認結果):
 | 313 関数 lift 時の入口 `memory access out of bounds` | 閉包を広げた状態の実行検証不能 | #1821 [KH-29] |
 | ymm (AVX2) 2 件 `0x180f89cf0` / `0x180fb6124` の lift | 閉包を広げると build 失敗 (記録上。round 5 の原因は未確認) | #709 (KH-14・既存) |
 | 0x180ef7fc0 の native oracle (ctx-fuzz) | bit 照合不可 | #1761 継続 |
+
+## 9. 閉包の各ラウンドの入口経路 (#3591 / KH-58、実測)
+
+注: §8 の表は 313 集合の旧記録 (round 5 = 313 lift・build 失敗) で、lift 集合が本節の round 5 (314 lift・build 成功) と異なる。
+測定 commit: `5db386d26` (`kh656_closure.py` に各ラウンドの入口結果 `entry_check()` を追加。`lic_build.py`・`lic_config.json`・`kh249_check.mjs` は HEAD と同一)。
+その後のコード変更: commit `5bab5649c` の 1 件のみ。`entry_check()` に `subprocess.TimeoutExpired` の分岐 (`entry: 'timeout'` を記録) を追加した。正常系の処理は変えていない。
+コード差分 (本節を除く): `git diff 5db386d26 HEAD -- tools/targets/kilohearts ':!*KH656_REPORT.md'` の出力:
+
+```diff
+diff --git a/tools/targets/kilohearts/license/scripts/kh656_closure.py b/tools/targets/kilohearts/license/scripts/kh656_closure.py
+index c59421af9..7ac5ec4bf 100644
+--- a/tools/targets/kilohearts/license/scripts/kh656_closure.py
++++ b/tools/targets/kilohearts/license/scripts/kh656_closure.py
+@@ -66,7 +66,10 @@ def run_build():
+ 
+ def entry_check():
+     """入口 function_180ef7fc0 の実行結果 (kh249_check.mjs)。受入 2 の判定値: 最初の未 lift callee か trap 文言"""
+-    r = subprocess.run(['node', os.path.join(LIC, 'kh249_check.mjs')], cwd=LIC, capture_output=True, text=True, timeout=300)
++    try:
++        r = subprocess.run(['node', os.path.join(LIC, 'kh249_check.mjs')], cwd=LIC, capture_output=True, text=True, timeout=300)
++    except subprocess.TimeoutExpired:
++        return {'entry': 'timeout', 'check': None}
+     out = r.stdout + r.stderr
+     e = re.search(r'entry run -> (.*)', out)
+     s = re.search(r'kh249_check ok=\d+ ng=\d+', out)
+```
+
+環境: nproc=4・load average 0.6〜0.8。素材 `plugins-kilohearts` は installer zip (`HeartCore.core_64` 76,642,304 B) と `product_index.json` (46 plugins) を展開。
+
+実行: `python3 scripts/kh656_closure.py --rounds 6` を 2 回 (1 回目は `kh656_closure.py` の変更を未コミットのまま、2 回目は `5db386d26` で実行)。所要 2 分 12 秒・load average 0.6〜0.8 は 2 回の実行 (n=2) の値で、WORKFLOW §5 の min–max レンジ (n≥3) は掲載しない。`work/kh656_rounds.json` に各ラウンドの結果を記録 (`work/` は gitignore のため commit されていない)。
+
+| ラウンド (lift 集合の数) | 未 lift callee | wasm B (sha256 先頭 8 桁) | undefined import | 入口 `function_180ef7fc0` | `kh249_check` |
+|---|---|---|---|---|---|
+| 1 (HEAD 相当・8) | 40 | 54,394 (`7ba79e65`) | 0 | `unlifted callee 0x180112a30` | ok=17 ng=0 |
+| 2 (42) | 44 | 192,136 (`0dac597b`) | 0 | `unlifted callee 0x1801d3b60` | ok=16 ng=1 |
+| 3 (80) | 92 | 436,971 (`907a34bc`) | 0 | `unlifted callee 0x180138750` | ok=16 ng=1 |
+| 4 (166) | 154 | 876,222 (`b7de032a`) | 0 | `unlifted callee 0x180138a30` | ok=16 ng=1 |
+| 5 (314) | 144 | 1,687,866 (`ac0dc441`) | 0 | `memory access out of bounds` | ok=16 ng=1 |
+| 6 (452・試行) | — | build 失敗 | — | — | — |
+
+- sha256 の 64 桁は本記録に保存されていない (round 1 の 64 桁は §3)。作者の 2 回の実行では wasm sha256 が一致したと記録されているが、64 桁が無いため本 REPORT では照合できない。
+- 本 fix run は素材 (`plugins-kilohearts`・`toolchain-emsdk`) が無く、閉包と HEAD の再測定を行っていない。`5bab5649c` の変更は stub 試験のみで確認した (`TimeoutExpired` で `{'entry': 'timeout', 'check': None}`。通常出力では `entry` と `check` を従来どおり抽出)。
+- `ng=1` は `kh249_check.mjs` [2] の期待値 (`0x180112a30` で止まること) が、ラウンド 2 以降で外れたための判定。check 自体は変えていない。
+
+**受入 2 の判定: 既定を適用して達成**。issue #3591 本文の既定 (入口が分類本体へ届かない場合は、最初の未 lift callee を REPORT に記録して終える) に従う。
+- 入口 `0x180112a30` を越えた: 達成 (ラウンド 2〜4 で越える)。
+- 分類本体への到達: **未達**。越えた先の最初の未 lift callee は、ラウンド 2 `0x1801d3b60`・ラウンド 3 `0x180138750`・ラウンド 4 `0x180138a30`。ラウンド 5 (314 lift) は `memory access out of bounds`。既定に従い上の表に記録した。trap VA は本節では再測定していない (#1821 の §7.6 を参照。ラウンド 5 の memset `1813846e0` は lift 扱いで、#1821 の 313 集合 (shim 版) とは wasm が異なる。入口の症状は一致)。
+
+**ラウンド 6 の失敗 (#3590 の範囲)**: `dropped_i256` が 452 件で、ラウンド 5 の lift 314 + 新規 138 の全件に当たる。i256 判定 (`i256_defs()`) が機能しておらず、失敗時の自動除外が lift 集合を空にする。本 run では `lic_config.json` を HEAD に戻して測定した。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 入口経路の未 lift callee (`0x1801d3b60`・`0x180138750`・`0x180138a30`) の lift/shim 化 | 分類本体への到達 (受入 2) | #3590 (閉包の収束) |
+| ラウンド 5 (314 lift) の入口 OOB の trap VA と原因 | 受入 2 の残り | #1821 |
+| `i256_defs()` の全件誤判定と、失敗時に lift 集合が空になる自動除外 | 閉包の収束 (受入 1) | #3590 |
+| `5bab5649c` 以降の HEAD での閉包再測定と、64 桁 sha256 の記録 | 測定値の照合 (本 fix run は素材不足で未実施) | 本 PR の review run (`oc_artifacts` 付き) |

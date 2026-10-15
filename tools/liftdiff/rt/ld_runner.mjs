@@ -44,6 +44,7 @@ function putStr(s, extra = []) {
 }
 const sp_get = mod._emscripten_stack_get_current;
 const sp_restore = mod.__emscripten_stack_restore || exp.emscripten_stack_restore || mod._emscripten_stack_restore;
+let spSnap = 0;   // LD-126: SNAPSHOT 時の SP (RESET で戻す)
 
 const dv = new DataView(new ArrayBuffer(8));
 const toF64 = (b) => { dv.setBigUint64(0, BigInt.asUintN(64, b), true); return dv.getFloat64(0, true); };
@@ -51,8 +52,8 @@ const toF32 = (b) => { dv.setUint32(0, Number(BigInt.asUintN(32, b)), true); ret
 const f64bits = (x) => { dv.setFloat64(0, x, true); return dv.getBigUint64(0, true); };
 const f32bits = (x) => { dv.setFloat32(0, x, true); return BigInt(dv.getUint32(0, true)); };
 const fnCache = new Map();
-function getFn(va) {
-  const nm = 'function_' + va.toString(16);
+function getFn(va, tr) {
+  const nm = (tr ? 'm11_tr_' : '') + 'function_' + va.toString(16);
   if (fnCache.has(nm)) return fnCache.get(nm);
   const f = exp[nm] || mod['_' + nm] || null;
   fnCache.set(nm, f);
@@ -73,15 +74,16 @@ function coerce(ty, b, kind) {
 
 function runCase(line) {
   // JS 専用トークン sig= rt= を抜く (C 側は未知キーを無視)
-  let sig = [], rt = 'i64';
+  let sig = [], rt = 'i64', tr = false;
   for (const t of line.split(/\s+/)) {
     if (t.startsWith('sig=')) sig = t.slice(4) ? t.slice(4).split(',') : [];
     else if (t.startsWith('rt=')) rt = t.slice(3);
+    else if (t === 'tr=1') tr = true;   // LD-158: i128 戻りの関数を m11_tr_ (i64 返し = 下位 64bit) 経由で呼ぶ
   }
   putStr(line);
   mod._ld_w_case_begin();
   const va = mod._ld_w_fn();
-  const f = getFn(va);
+  const f = getFn(va, tr);
   const sp0 = sp_get();
   let status = 'ok', detail = '', rax = 0n, x0 = 0n, hasRet = 1;
   if (!f) {
@@ -93,12 +95,13 @@ function runCase(line) {
       const v = i < na ? mod._ld_w_arg(i) : 0n;
       args.push(coerce(sig[i], v, i < na ? mod._ld_w_arg_kind(i) : 0));
     }
+    if (tr) while (args.length < 8) args.push(0n);
     try {
       globalThis.__ld_call = () => f(...args);
       const r = vm.runInThisContext('__ld_call()', { timeout: wasmTimeoutMs });
       if (rt === 'void') hasRet = 0;
-      else if (rt === 'double') x0 = f64bits(r);
-      else if (rt === 'float') x0 = f32bits(r);
+      else if (rt === 'double') x0 = tr ? BigInt.asUintN(64, r) : f64bits(r);
+      else if (rt === 'float') x0 = tr ? BigInt.asUintN(32, r) : f32bits(r);
       else if (typeof r === 'bigint') rax = BigInt.asUintN(64, r);
       else if (typeof r === 'number') rax = BigInt(r >>> 0);
     } catch (e) {
@@ -129,7 +132,11 @@ for await (const l of rl) {
     const [a, b] = l.slice(3).split(' ');
     mod._ld_w_add_wr(BigInt('0x' + a), BigInt('0x' + b));
   } else if (l === 'SNAPSHOT') {
-    mod._ld_w_snapshot(); out('{"ready":true}');
+    mod._ld_w_snapshot(img.length); spSnap = mod._emscripten_stack_get_current(); out('{"ready":true}');
+  } else if (l.startsWith('RESET ')) {
+    const m = Number(l.slice(6));
+    if (m & 9) sp_restore(spSnap);   // 1 (stk) と 8 (sp) のどちらでも SP を戻す
+    mod._ld_w_reset(m);
   } else if (l.startsWith('BLOB ')) {
     const k = l.indexOf(' ', 5); putStr(l.slice(5, k), [l.slice(k + 1)]); mod._ld_w_blob();
   } else if (l.startsWith('FIX ')) {

@@ -230,3 +230,20 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 - `emcc -c` (toolchain-emsdk 6.0.12): rc 0、object 5,836 B。 所要 0.15 s (lift wall)。
 - 範囲: これは closure 2 (8 関数) のみ。 受入 1 の「.text 全体 (73,002 B)」は未達 (#1098)。 x87 の意味論は未実装 (#1099)。 gate C1〜C4 は本節では通していない。
 - 注意: `0x10001300` (opcode dispatcher) を root にした場合の jump table 検証は `tools/ott/REPORT.md` §14 を参照。
+
+## 11. .text の ia32 lift (#1098、測定 commit `fc2e70be`)
+
+- 結論: `.text` の大部分を ia32 x64c で lift した (起点は export・関数ポインタ・code 即値、直接 call の再帰降下)。 「全体」は未達で、残りの未被覆域は子 #2814 (PLG-G2-22) へ。
+- 未解決の `sahf` の AF 未反映と `fs:` の 0 埋め模型は silent divergence の候補で、#1223 へ送る (付録 §7)。
+- 測定値・区間内訳・再現手順は [REPORT_APPENDIX_1098.md](REPORT_APPENDIX_1098.md) (数値の正本は付録 §2・§3)。
+- 子 #2814 (PLG-G2-22): 未被覆域を (a)(b)(c) に分類し、(b) の区間を追加 lift した。 結論と測定値は [REPORT_APPENDIX_2814.md](REPORT_APPENDIX_2814.md) (§6)。 残りは子 #3546 (PLG-G2-28)。
+
+## 12. x87 subset の ia32 lowering と差分試験 (#1099、測定 commit `ce0f0872`)
+
+- 結論: x87 subset を ia32 で lower し、実 x87 との差分は主に 1 ulp。 x64 の出力は不変。 残りの x87 (超越関数ほか) は未 lower。
+- 方式 `docs/DECISIONS.md` D28 (f80→f64)。 測定値・ネガコン・検算・未解決は [REPORT_APPENDIX_1099.md](REPORT_APPENDIX_1099.md) (正本)。
+
+## 13. native vs wasm の差分試験 (#1223、測定は付録)
+
+- 結論: leaf 関数 4 本 (`0x10001b40`・`0x10009300`・`0x1000d77e`・`0x10008630`) を native 機械語と wasm (ia32 lift) で実行し、eax と OBJ 領域 128 B を bit 単位で突合した。 全件一致。 ネガコン 1 bit で FAIL を確認。 export `main` (子 #3127)・x87 関数 (#2989) は未達。 実行時の間接 call・sahf の AF・fs: の TEB は未検証 (子 #3128)。
+- 測定値・方式・制約・再現は [REPORT_APPENDIX_1223.md](REPORT_APPENDIX_1223.md) (正本)。

@@ -1,0 +1,214 @@
+{
+ "wasm": "m11_gui.cjs",
+ "boot": {
+  "ok": true,
+  "err": "[object Object]"
+ },
+ "host": {
+  "ptr": "0x38b99868",
+  "version": 1,
+  "flags": 0,
+  "name_ptr": "0x38b91848",
+  "cmd_ptr": "0x38b91860",
+  "iface_out": "0x38b998a8"
+ },
+ "call": {
+  "returned": false,
+  "err": "mod._CreateFruityInstance is not a function",
+  "failfast": false,
+  "ms": 0
+ },
+ "reach": [
+  {
+   "order": 1,
+   "name": "LoadStringW",
+   "calls": 3,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 2,
+   "name": "GetDC",
+   "calls": 3,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 3,
+   "name": "GetDeviceCaps",
+   "calls": 3,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 4,
+   "name": "ReleaseDC",
+   "calls": 3,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 5,
+   "name": "CreatePalette",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "2"
+  },
+  {
+   "order": 6,
+   "name": "GetStockObject",
+   "calls": 7,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 7,
+   "name": "LoadIconW",
+   "calls": 2,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 8,
+   "name": "RegisterWindowMessageW",
+   "calls": 4,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 9,
+   "name": "GetSystemMetrics",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 10,
+   "name": "FindWindowW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 11,
+   "name": "LoadCursorW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 12,
+   "name": "LoadImageW",
+   "calls": 21,
+   "kind": "IMPL",
+   "prio": "2"
+  },
+  {
+   "order": 13,
+   "name": "GetKeyboardLayout",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 14,
+   "name": "EnumDisplayMonitors",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 15,
+   "name": "SystemParametersInfoW",
+   "calls": 2,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 16,
+   "name": "DeleteObject",
+   "calls": 6,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 17,
+   "name": "GetIconInfo",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 18,
+   "name": "GetObjectW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 19,
+   "name": "CharNextW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 20,
+   "name": "CharLowerW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "2"
+  },
+  {
+   "order": 21,
+   "name": "GetClassInfoW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 22,
+   "name": "RegisterClassW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 23,
+   "name": "CreateWindowExW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 24,
+   "name": "SetWindowLongPtrW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  }
+ ],
+ "errs_tail": [
+  "[gui] GUI-REACH 14 EnumDisplayMonitors 1 IMPL P1",
+  "[gui] GUI-REACH 15 SystemParametersInfoW 2 IMPL P0",
+  "[gui] GUI-REACH 16 DeleteObject 6 IMPL P0",
+  "[gui] GUI-REACH 17 GetIconInfo 1 IMPL P1",
+  "[gui] GUI-REACH 18 GetObjectW 1 IMPL P0",
+  "[gui] GUI-REACH 19 CharNextW 1 IMPL P1",
+  "[gui] GUI-REACH 20 CharLowerW 1 IMPL P2",
+  "[gui] GUI-REACH 21 GetClassInfoW 1 IMPL P0",
+  "[gui] GUI-REACH 22 RegisterClassW 1 IMPL P0",
+  "[gui] GUI-REACH 23 CreateWindowExW 1 IMPL P0",
+  "[gui] GUI-REACH 24 SetWindowLongPtrW 1 IMPL P0",
+  "[gui] GUI-REACH-SUMMARY reached=24 impl=24 stub=0"
+ ],
+ "iface": "0x0",
+ "open_trace": [],
+ "errs_n": 46,
+ "icall_miss": 7,
+ "icall_miss_targets": [
+  "0x457860",
+  "0xfa9390",
+  "0x85df70"
+ ]
+}

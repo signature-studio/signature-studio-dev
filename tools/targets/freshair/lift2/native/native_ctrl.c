@@ -74,6 +74,55 @@ static void* __attribute__((ms_abi)) ca1480_probe(void* C, void* out, void* key)
               fprintf(stderr, "FA9OBJ S%d out0_is_Z=%d obj=%llx obj+0x10=%llx\n", g_trSidx, isZ, (unsigned long long)o0, (unsigned long long)o16); }
     return r;
 }
+/* FA-31 (#2207): FA_CTL31=1 は controller 側の挿入候補 0x180caa820 (this=controller, [this+0xa8] を lookup し node を作る) の
+ * 呼出回数と、呼出後の [this+0xa8] 木のノード数を記録する。既定 OFF。ノード数は header=this+0xa8, head=[header+8], root=[head+8]。 */
+typedef void* (__attribute__((ms_abi)) *caa820_t)(void*, void*, void*);
+static unsigned char g_sv_caa[12]; static unsigned char* g_p_caa; static int g_caa_n;
+static int tree_nodes(unsigned char* node, unsigned char* head, int depth) {
+    if (!node || node == head || node[0x19] || depth > 64) return 0;
+    uint64_t l, r; memcpy(&l, node, 8); memcpy(&r, node + 0x10, 8);
+    return 1 + tree_nodes((unsigned char*)(uintptr_t)l, head, depth + 1) + tree_nodes((unsigned char*)(uintptr_t)r, head, depth + 1);
+}
+static void* __attribute__((ms_abi)) caa820_probe(void* T, void* out, void* key) {
+    unsigned char tmp[12]; memcpy(tmp, g_sv_caa, 12); memcpy(g_p_caa, tmp, 12);
+    uint32_t k = 0xffffffffu; if (key) { uint16_t k16; memcpy(&k16, key, 2); k = k16; }
+    g_caa_n++;
+    void* r = ((caa820_t)(g_p_caa))(T, out, key);
+    patch12(g_p_caa, (const void*)&caa820_probe, g_sv_caa);
+    unsigned char* head = NULL; uint64_t hp; memcpy(&hp, (char*)T + 0xb0, 8); head = (unsigned char*)(uintptr_t)hp;
+    uint64_t rp = 0; if (head) memcpy(&rp, head + 8, 8);
+    fprintf(stderr, "CAA31 S%d n=%d T=%p key=%u ret=%p tree=%d\n", g_trSidx, g_caa_n, T, k, r,
+            head ? tree_nodes((unsigned char*)(uintptr_t)rp, head, 0) : -1);
+    return r;
+}
+/* FA-31: 陽性対照 (0x180ca7db0 = map lower_bound。map 経路で必ず呼ばれる) と、仮想関数 0x180e13590 の呼出回数 */
+static unsigned char g_sv_lb[12]; static unsigned char* g_p_lb; static int g_lb_n;
+static void* __attribute__((ms_abi)) lb_probe(void* H, void* out, void* key) {
+    unsigned char tmp[12]; memcpy(tmp, g_sv_lb, 12); memcpy(g_p_lb, tmp, 12);
+    g_lb_n++;
+    void* r = ((caa820_t)(g_p_lb))(H, out, key);
+    patch12(g_p_lb, (const void*)&lb_probe, g_sv_lb);
+    return r;
+}
+static unsigned char g_sv_e13[12]; static unsigned char* g_p_e13; static int g_e13_n;
+static void* __attribute__((ms_abi)) e13_probe(void* a, void* b, float c) {
+    unsigned char tmp[12]; memcpy(tmp, g_sv_e13, 12); memcpy(g_p_e13, tmp, 12);
+    g_e13_n++; fprintf(stderr, "E13_31 S%d n=%d\n", g_trSidx, g_e13_n);
+    void* r = ((void* (__attribute__((ms_abi)) *)(void*, void*, float))(g_p_e13))(a, b, c);
+    patch12(g_p_e13, (const void*)&e13_probe, g_sv_e13);
+    return r;
+}
+/* FA-31: 上流の呼出回数だけを数える汎用 probe (引数はポインタ 4 個まで転送。float 引数は扱わない) */
+#define CNT31(NAME, SV, PTR, CNT) \
+static unsigned char SV[12]; static unsigned char* PTR; static int CNT; \
+static void* __attribute__((ms_abi)) NAME(void* a, void* b, void* c, void* d) { \
+    unsigned char tmp[12]; memcpy(tmp, SV, 12); memcpy(PTR, tmp, 12); CNT++; \
+    void* r = ((void* (__attribute__((ms_abi)) *)(void*, void*, void*, void*))(PTR))(a, b, c, d); \
+    patch12(PTR, (const void*)&NAME, SV); return r; }
+CNT31(cnt_d8c4f0, sv_d8c4f0, p_d8c4f0, n_d8c4f0)
+CNT31(cnt_d8ae60, sv_d8ae60, p_d8ae60, n_d8ae60)
+CNT31(cnt_e15030, sv_e15030, p_e15030, n_e15030)
+CNT31(cnt_e12f20, sv_e12f20, p_e12f20, n_e12f20)
 typedef void (__attribute__((ms_abi)) *set9_t)(void*, int, float, void*);
 static unsigned char g_sv_set[12]; static unsigned char* g_p_set;
 static void __attribute__((ms_abi)) set9_probe(void* C, int id, float v, void* key) {
@@ -89,6 +138,10 @@ static void __attribute__((ms_abi)) da6c00_probe(void* T, int id, int idx, int r
     ((da6c00_t)(g_p_da))(T, id, idx, r9);
     patch12(g_p_da, (const void*)&da6c00_probe, g_sv_da);
 }
+/* FA-32 (#2306) FA_NODE1_ZOBJ 用の偽オブジェクトの slot (host 関数。guest の call [vtbl+0x50] / [vtbl+0x18] から呼ばれる) */
+static unsigned char* g_fz_out; static unsigned char* g_fz_ctl;   /* out = shared_ptr {obj, ctrl} (16B) */
+static void __attribute__((ms_abi)) fz_set(void* self, void** out, int id) { (void)self; (void)id; out[0] = g_fz_out; out[1] = g_fz_ctl; }
+static void __attribute__((ms_abi)) fz_ret(void* self, void** out) { (void)self; out[0] = NULL; out[1] = NULL; }
 #define W64(b, o, v) do { uint64_t _t = (uint64_t)(uintptr_t)(v); memcpy((b) + (o), &_t, 8); } while (0)
 #define W32(b, o, v) do { uint32_t _t = (uint32_t)(v); memcpy((b) + (o), &_t, 4); } while (0)
 static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsigned char** Ck, unsigned char** Wk,
@@ -129,7 +182,12 @@ static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsi
         /* FA-16: 1 ノードを木に入れる (FA_NODE1=1 のときのみ。既定 OFF = 既存 baseline found=0 を維持)。
          * map 経路の探索 key は keycnt (0x180ca1499 の edx) なので node key = 1。
          * node: +0 left, +8 parent, +0x10 right, +0x19 isnil, +0x20 key(u16), +0x28 value, +0x30 blk */
-        if (getenv("FA_NODE1")) { unsigned char* N = gr_alloc(0x40); unsigned char* Z = gr_alloc(0x40); unsigned char* NB = gr_alloc(0x30);
+        /* FA-32 (#2306): FA_NODE1_ZBIG=1 は node 値 Z を 0x2400 (zero 埋め) にする診断、FA_NODE1_ZOBJ=1 はさらに Z+0x2c0 に
+         * vtable 付きの偽オブジェクト (slot +0x50/+0x18 = host の no-op) を置く診断。既定 OFF (REPORT_APPENDIX_FA32.md §2) */
+        if (getenv("FA_NODE1")) { unsigned char* N = gr_alloc(0x40); unsigned char* Z = gr_alloc(getenv("FA_NODE1_ZBIG") || getenv("FA_NODE1_ZOBJ") ? 0x2400 : 0x40); unsigned char* NB = gr_alloc(0x30);
+          if (getenv("FA_NODE1_ZOBJ") && k == 0) { static uint64_t vtf[32]; vtf[0x50 / 8] = (uint64_t)(uintptr_t)&fz_set; vtf[0x18 / 8] = (uint64_t)(uintptr_t)&fz_ret;
+            unsigned char* FO = calloc(1, 0x40); W64(FO, 0, vtf); W64(Z, 0x2c0, FO); g_fz_out = calloc(1, 0x40); W64(g_fz_out, 0, vtf);
+            static uint64_t vtcb[4]; vtcb[1] = vtcb[2] = 0x1803b4070ULL; g_fz_ctl = calloc(1, 0x30); W64(g_fz_ctl, 0, vtcb); W32(g_fz_ctl, 8, 0x40); W32(g_fz_ctl, 0xc, 0x40); }
           memset(N, 0, 0x40); memset(Z, 0, 0x40); memset(NB, 0, 0x30);
           unsigned short k1 = 1; memcpy(N + 0x20, &k1, 2);
           W64(N, 0x00, C + 0x21b8); W64(N, 0x08, C + 0x21b8); W64(N, 0x10, C + 0x21b8);
@@ -185,6 +243,15 @@ int main(int argc, char** argv) {
     if (getenv("FA_PROBE9")) {
         g_p_ca = im + (0x180ca1480ULL - 0x180000000ULL); g_p_da = im + (0x180da6c00ULL - 0x180000000ULL);
         patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca); patch12(g_p_da, (const void*)&da6c00_probe, g_sv_da);
+    }
+    if (getenv("FA_CTL31")) {
+        g_p_caa = im + (0x180caa820ULL - 0x180000000ULL); patch12(g_p_caa, (const void*)&caa820_probe, g_sv_caa);
+        g_p_lb = im + (0x180ca7db0ULL - 0x180000000ULL); patch12(g_p_lb, (const void*)&lb_probe, g_sv_lb);
+        g_p_e13 = im + (0x180e13590ULL - 0x180000000ULL); patch12(g_p_e13, (const void*)&e13_probe, g_sv_e13);
+        p_d8c4f0 = im + (0x180d8c4f0ULL - 0x180000000ULL); patch12(p_d8c4f0, (const void*)&cnt_d8c4f0, sv_d8c4f0);
+        p_d8ae60 = im + (0x180d8ae60ULL - 0x180000000ULL); patch12(p_d8ae60, (const void*)&cnt_d8ae60, sv_d8ae60);
+        p_e15030 = im + (0x180e15030ULL - 0x180000000ULL); patch12(p_e15030, (const void*)&cnt_e15030, sv_e15030);
+        p_e12f20 = im + (0x180e12f20ULL - 0x180000000ULL); patch12(p_e12f20, (const void*)&cnt_e12f20, sv_e12f20);
     }
     volatile int* fma = (int*)0x1813070f8ULL;
     int fma_v = argc > 3 ? atoi(argv[3]) : 0;
@@ -285,5 +352,7 @@ int main(int argc, char** argv) {
         fflush(stdout);
     }
     if (abi_viol || guard_viol_total) fprintf(stderr, "ABI violations=%d guard violations=%d\n", abi_viol, guard_viol_total);
+    if (getenv("FA_CTL31")) fprintf(stderr, "CTL31 summary: caa820=%d ca7db0=%d e13590=%d d8c4f0=%d d8ae60=%d e15030=%d e12f20=%d\n",
+                                    g_caa_n, g_lb_n, g_e13_n, n_d8c4f0, n_d8ae60, n_e15030, n_e12f20);
     return (abi_viol || guard_viol_total) ? 3 : 0;
 }

@@ -1,0 +1,102 @@
+{
+ "variant": "plain",
+ "boot": {
+  "rc": null,
+  "threw": {
+   "cls": "unlifted",
+   "target": 6978416
+  },
+  "units_run": 209,
+  "units_total": 942,
+  "units_empty": 37,
+  "rax": "0x0",
+  "longjmp": 0,
+  "stage": 1,
+  "getmem": 1890,
+  "freemem": 776,
+  "va_calls": 20,
+  "va_bytes": 15470544,
+  "getproc": 88,
+  "exit": 0,
+  "cb_calls": 0,
+  "soft_calls": 64,
+  "soft_uniq": 21,
+  "mm_after": {
+   "getmem": "0x407a50",
+   "freemem": "0x407e20",
+   "realloc": "0x408040",
+   "slot3": "0x4083b0"
+  },
+  "undo_probe": {
+   "slot_0x15e1c78": "0x16bb068",
+   "pos_0x20": 0,
+   "count_0x24": 0,
+   "ret_singleton_0x16b82e0": "0x0",
+   "slot_0x15e4790": "0x141d6b8",
+   "safe_obj": "0x0",
+   "safe_obj_0x98": null,
+   "safe_obj_0x88": null
+  },
+  "ipp_ptr_15F34A0": "0x0",
+  "ipp_ptr_15F40E8": "0x0",
+  "ipp_total": 0,
+  "ipp_called": [],
+  "ipp_call_slot": {
+   "slot_15e0a48": "0x15f34a0",
+   "obj_first_qword": "0x0"
+  },
+  "ipp_stop": null,
+  "ipp_token_at": [],
+  "stopped_at_1based": 209
+ },
+ "survey": null,
+ "tolerant": null,
+ "cfi": null,
+ "soft_top": [
+  "268448949:21",
+  "268437183:7",
+  "268438499:5",
+  "268449538:3",
+  "268437897:3",
+  "268449569:3",
+  "268448822:3",
+  "268448562:3",
+  "268448292:3",
+  "268448679:2",
+  "268441291:1",
+  "268448494:1",
+  "268436613:1",
+  "268437861:1",
+  "268448548:1",
+  "268448334:1",
+  "268448061:1",
+  "268448424:1",
+  "268448707:1",
+  "268437838:1",
+  "268437274:1"
+ ],
+ "ipp": {
+  "mode": 0,
+  "on": false,
+  "ptr_15F34A0": "0x0",
+  "ptr_15F40E8": "0x0",
+  "total": 0,
+  "called": [],
+  "stop": null,
+  "token_at": [],
+  "call_slot": {
+   "slot_15e0a48": "0x15f34a0",
+   "obj_first_qword": "0x0"
+  }
+ },
+ "notes": {
+  "entry": "0x1376820",
+  "longjmp_target": "0x1376840",
+  "init_table": "0x13768b0",
+  "baseline_retdec": {
+   "boot_units": "17 dispatched (16 completed), raise 0xEEDFADE in unit#17 (0x454090)",
+   "survey": "m11 sx 純リンク baseline (tools/m11/work/shimx_link/baseline/m11_boot.survey.json): ok 800 / oob 50 / halt0 44 / closure外 46 / abort 1 / noproc 1。なお --fix 変種は ok 800 / oob 41 / halt0 53 (CAB-129 halt0 対応表適用)。",
+   "route_diff": "results/verdict_boot.jsonl (gen_verdict.py: baseline を native 側、x64c を wasm 側に対応)"
+  }
+ }
+}

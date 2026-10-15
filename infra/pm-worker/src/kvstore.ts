@@ -11,6 +11,7 @@ export type Bucket =
   | "sig"
   | "relaunch"
   | "launchObs"
+  | "rateRuns"
   | "meta";
 
 export interface Store {

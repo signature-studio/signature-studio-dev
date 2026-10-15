@@ -27,6 +27,7 @@ const seq = [
   ["channels.getChannelName", [3]],
   ["channels.setChannelName", [1, "Clap"]],
   ["channels.getChannelName", [1]],
+  ["channels.soloChannel", [0, true, false]],
   ["channels.isChannelSelected", [0]],
   ["channels.selectChannel", [1, true]],
   ["channels.isChannelSelected", [1]],
@@ -60,6 +61,19 @@ const seq = [
   ["channels.getChannelPan", [2]],
   ["channels.setChannelPan", [2, -0.5]],
   ["channels.getChannelPan", [2]],
+  ["channels.setChannelPitch", [0, 0.5]],
+  ["channels.setChannelPitch", [1, -2.5, 1]],
+  ["channels.setChannelPitch", [2, 47.5, 2]],
+  ["channels.setChannelPitch", [2, 0.5, 2]],
+  ["channels.setChannelPitch", [2, 1e30, 2]],
+  ["channels.setChannelPitch", [2, 1, 2, 0, true]],
+  ["channels.setChannelPitch", [0, 1, 7]],
+  ["channels.setChannelPitch", [0, NaN, 2]],
+  ["channels.setChannelPitch", [9, NaN, 2]],
+  ["channels.setChannelPitch", [9, 0.5]],
+  ["channels.setChannelPitch", [0, "x"]],
+  ["channels.setChannelPitch", [0]],
+  ["channels.setChannelPitch", [0, 1, 0, 0, 0, 0]],
   ["channels.setChannelColor", [1, 0x123456]],
   ["channels.getTargetFxTrack", [0]],
   ["channels.setTargetFxTrack", [0, 5]],
@@ -72,6 +86,37 @@ const seq = [
   ["channels.fillEachNSteps", [1, 0]],
   ["channels.quickQuantize", [0]],
   ["channels.showEditor", [0]],
+  ["channels.closeGraphEditor", [1]],
+  ["channels.closeGraphEditor", [0]],
+  ["channels.closeGraphEditor", [-1]],
+  ["channels.closeGraphEditor", [true]],
+  ["channels.closeGraphEditor", ["1"]],
+  ["channels.closeGraphEditor", []],
+  ["channels.closeGraphEditor", [1, 2]],
+  ["channels.updateGraphEditor", []],
+  ["channels.updateGraphEditor", [0]],
+  ["channels.showGraphEditor", [true, 0, 0, 1, true]],
+  ["channels.showGraphEditor", [true, 0, 0, 1]],
+  ["channels.showGraphEditor", [false, 2, 16, 2, false]],
+  ["channels.showGraphEditor", [true, 0, 0, 3, true]],
+  ["channels.showGraphEditor", [true, 0, 0, -1]],
+  ["channels.showGraphEditor", [true, 0, 0, 1.5]],
+  ["channels.showGraphEditor", [true, 0, 0, "1"]],
+  ["channels.showGraphEditor", [true, 0, 0]],
+  ["channels.showGraphEditor", [true, 0, 0, 0, 1, 2]],
+  ["channels.showGraphEditor", [true, 0, 0, 0, "x"]],
+  ["channels.showCSForm", [0]],
+  ["channels.showCSForm", [1, 2, true]],
+  ["channels.showCSForm", [3]],
+  ["channels.showCSForm", [0, "x"]],
+  ["channels.showCSForm", [0, 1, 1.5]],
+  ["channels.showCSForm", []],
+  ["channels.focusEditor", [0]],
+  ["channels.focusEditor", [2, true]],
+  ["channels.focusEditor", [3]],
+  ["channels.focusEditor", [-1, false]],
+  ["channels.focusEditor", [0, 1.5]],
+  ["channels.focusEditor", []],
   ["channels.selectedChannel", [0, 0, 0]],
   ["channels.selectedChannel", [0, 2, 0]],
   ["channels.getChannelName", [-1]],
@@ -85,6 +130,15 @@ const seq = [
   ["channels.getGridBit", [0, -1]],
   ["channels.getGridBit", [9, 0]],
   ["channels.getGridBit", [0]],
+  ["channels.isGridBitAssigned", [0]],
+  ["channels.isGridBitAssigned", [0, true]],
+  ["channels.isGridBitAssigned", [9]],
+  ["channels.isGridBitAssigned", [-1, 0]],
+  ["channels.getGridBitWithLoop", [0, 3]],
+  ["channels.getGridBitWithLoop", [0, 64]],
+  ["channels.getGridBitWithLoop", [0, -1]],
+  ["channels.getGridBitWithLoop", [9, 0]],
+  ["channels.getGridBitWithLoop", [0]],
   ["channels.isChannelMuted", [0]],
   ["channels.isChannelMuted", [2]],
   ["channels.isChannelMuted", [7]],
@@ -109,6 +163,68 @@ const seq = [
   ["channels.channelNumber", [false]],
   ["channels.muteChannel", [2]],
   ["channels.isChannelMuted", [2]],
+  ["channels.getChannelType", [0]],
+  ["channels.getChannelType", [1]],
+  ["channels.getChannelType", [2]],
+  ["channels.getChannelType", [2, true]],
+  ["channels.getChannelType", [2, false]],
+  ["channels.getChannelType", [9]],
+  ["channels.getChannelType", [-1]],
+  ["channels.getChannelType", []],
+  ["channels.getChannelType", ["0"]],
+  ["channels.setGridBit", [0, 0, 1]],
+  ["channels.setGridBit", [0, 3, 1]],
+  ["channels.getStepParam", [0, 0]],
+  ["channels.getStepParam", [0, 1]],
+  ["channels.getStepParam", [0, 2]],
+  ["channels.getStepParam", [0, 3]],
+  ["channels.getStepParam", [0, 4]],
+  ["channels.getStepParam", [0, 5]],
+  ["channels.getStepParam", [0, 6]],
+  ["channels.getStepParam", [0, 7]],
+  ["channels.getStepParam", [0, 8]],
+  ["channels.getStepParam", [0, -1]],
+  ["channels.getStepParam", [1, 0]],
+  ["channels.getStepParam", [3, 0]],
+  ["channels.getStepParam", [3, 0, 0, 3]],
+  ["channels.getStepParam", [5, 0, 0, -3]],
+  ["channels.getStepParam", [16, 0]],
+  ["channels.getStepParam", [16, 0, 1]],
+  ["channels.getStepParam", [-16, 0]],
+  ["channels.getStepParam", [0, 0, 0, 0, 0]],
+  ["channels.getStepParam", [0, 0, 5]],
+  ["channels.getStepParam", [0, 0, 0, 0, 4]],
+  ["channels.getStepParam", [0, 0, 0, 0, -16]],
+  ["channels.getStepParam", [0, 0, 0, 0, 16, true]],
+  ["channels.getStepParam", [0]],
+  ["channels.getStepParam", ["0", 0]],
+  ["channels.getCurrentStepParam", [0, 0, 0]],
+  ["channels.getCurrentStepParam", [0, 0, 1, false]],
+  ["channels.getCurrentStepParam", [0, 1, 0]],
+  ["channels.getCurrentStepParam", [0, 3, 3, true]],
+  ["channels.getCurrentStepParam", [0, 64, 0]],
+  ["channels.getCurrentStepParam", [0, 0, -1]],
+  ["channels.getCurrentStepParam", [2, 0, 0]],
+  ["channels.getCurrentStepParam", [9, 0, 0]],
+  ["channels.getCurrentStepParam", [-1, 0, 0]],
+  ["channels.getCurrentStepParam", [0, 0, 0, 1, 2]],
+  ["channels.getCurrentStepParam", [0, 0]],
+  ["channels.getCurrentStepParam", ["0", 0, 0]],
+  ["channels.getChannelIndex", [0]],
+  ["channels.getChannelIndex", [2]],
+  ["channels.getChannelIndex", [9]],
+  ["channels.getChannelIndex", [-1]],
+  ["channels.getChannelIndex", [true]],
+  ["channels.getChannelIndex", [0, 1]],
+  ["channels.getChannelIndex", []],
+  ["channels.getChannelIndex", ["0"]],
+  ["channels.getChannelMidiInPort", [0]],
+  ["channels.getChannelMidiInPort", [2, true]],
+  ["channels.getChannelMidiInPort", [2, false]],
+  ["channels.getChannelMidiInPort", [9]],
+  ["channels.getChannelMidiInPort", [-1, true]],
+  ["channels.getChannelMidiInPort", [0, "x"]],
+  ["channels.getChannelMidiInPort", []],
   ["playlist.trackCount", []],
   ["playlist.getTrackName", [1]],
   ["playlist.getTrackName", [500]],
@@ -129,4 +245,34 @@ for (const [name, args] of seq) {
 }
 
 assert.deepEqual(diffs, [], `channels/playlist 差分 ${diffs.length} 件`);
-console.log(JSON.stringify({ calls: seq.length, diffs: 0, PASS: true }));
+// ネガティブコントロール: index 範囲外の setChannelPitch は両側とも code 4 (Index out of range) になること (差分 0 が空振りでないことの確認)
+assert.deepEqual(run(mock, "channels.setChannelPitch", [9, 0.5]), { code: 4 });
+assert.deepEqual(run(wasm, "channels.setChannelPitch", [9, 0.5]), { code: 4 });
+
+// PY-218 (#3596): 件数超え (position >= 64) は PE 0x12d3e20 の event 経路。項目 (pattern 1) が無ければ偽、項目を入れると channel 一致・閾値 (position+1)*24・flag 0x20 で 1/0 が決まる
+const gridRun = (eng) => {
+  const out = [];
+  for (const i of [0, 1, 2]) for (const p of [-1, 0, 63, 64, 65, 66, 70, 200, 2147483647, 2147483648]) {
+    out.push([i, p, run(eng, "channels.getGridBit", [i, p]), run(eng, "channels.getGridBitWithLoop", [i, p])]);
+  }
+  return out;
+};
+for (const eng of [mock, wasm]) {
+  assert.equal(eng.gridItemsProbe(1, 0), 0);
+  for (const [, p, a, b] of gridRun(eng)) if (p >= 64) assert.deepEqual([a, b], [{ ok: false }, { ok: false }], `項目無しの件数超え p=${p}`);
+}
+const gridDiffs = [];
+let gridCalls = 0, gridTrue = 0;
+for (const seed of [1, 2, 3, 42, 1234]) for (const n of [1, 5, 40, 256]) {
+  assert.equal(mock.gridItemsProbe(seed, n), n);
+  assert.equal(wasm.gridItemsProbe(seed, n), n);
+  const a = gridRun(mock), b = gridRun(wasm);
+  gridCalls += a.length * 2;
+  gridTrue += a.filter(([, p, x, y]) => p >= 64 && (x.ok === true || y.ok === true)).length;
+  if (JSON.stringify(a) !== JSON.stringify(b)) gridDiffs.push({ seed, n, mock: a, wasm: b });
+}
+assert.deepEqual(gridDiffs, [], `件数超え (event 経路) の差分 ${gridDiffs.length} 件`);
+assert.ok(gridTrue > 0, "件数超えで真になる項目が 1 件も無い (検査が空振り)");
+mock.gridItemsProbe(0, 0);
+wasm.gridItemsProbe(0, 0);
+console.log(JSON.stringify({ calls: seq.length, diffs: 0, grid_calls: gridCalls, grid_true: gridTrue, grid_diffs: gridDiffs.length, PASS: true }));

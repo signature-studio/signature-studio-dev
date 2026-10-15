@@ -190,6 +190,30 @@ static void test_heap(void) {
 }
 
 /* ---------------------------------------------------------------
+ * heap: wasm linear memory の外の値 (LD-132 / #2802)
+ *   範囲外のポインタは読まずに扱い、trap しない。HeapFree は native 参照と同じ TRUE (#2821)
+ * --------------------------------------------------------------- */
+static void test_heap_out_of_range(void) {
+    static const uintptr_t bad[] = { 0x1u, 0x3u, 0xFFFFFFF0u, 0xFFFFFFFCu };
+    HEAP_HANDLE heap = HeapCreate(0, 0, 0);
+    CHECK(heap != NULL);
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+        void* p = (void*)bad[i];
+        SetLastError(ERROR_SUCCESS);
+        CHECK(HeapFree(heap, 0, p) == TRUE);
+        CHECK(GetLastError() == ERROR_SUCCESS);
+        CHECK(GlobalLock((HGLOBAL)p) == NULL);
+        CHECK(HeapReAlloc(heap, 0, p, 64) == NULL);
+        CHECK(GlobalFree((HGLOBAL)p) == (HGLOBAL)p);
+    }
+    /* 範囲内だが割当てのない p (magic 不一致): 解放せず TRUE (#2821) */
+    static unsigned char nonheap[64];
+    SetLastError(ERROR_SUCCESS);
+    CHECK(HeapFree(heap, 0, nonheap + 32) == TRUE);
+    CHECK(GetLastError() == ERROR_SUCCESS);
+}
+
+/* ---------------------------------------------------------------
  * CRITICAL_SECTION / Interlocked (§3 #4)
  *   共通部: 再帰・TryEnter・Interlocked (単一スレッド部分)
  * --------------------------------------------------------------- */
@@ -400,6 +424,7 @@ int main(void) {
     test_timer();
     test_file();
     test_heap();
+    test_heap_out_of_range();
     test_critical_section_common();
     test_event_basic();
     test_tls_common();

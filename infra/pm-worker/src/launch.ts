@@ -43,10 +43,66 @@ export function inferArtifacts(title: string, labels: string[]): string {
   return ART_PREFIX + " " + a.join(" ");
 }
 
+// issue 本文の素材行を読む先頭の字数 (#2758)。これより後ろの行は見ない。
+export const BODY_ART_CHARS = 4000;
+const BODY_ART_RE = /^\s*`?(oc_artifacts:[^`]*)`?\s*$/;
+
+// 素材名の並びに fl-win64 を先頭から補う (既に有れば位置はそのまま)。既定で取得されるのは fl-win64 のみ。
+const withFlWin64 = (names: string[]): string[] => (names.includes("fl-win64") ? names : ["fl-win64", ...names]);
+
+// issue 本文の先頭 BODY_ART_CHARS 字の、最後の oc_artifacts: 行を検証済みの 1 行にする。
+// allowlist 外の名前は落とし、残りが 1 つ以上ならその行を返す。残りが 0 なら null (呼び出し側は推定に戻る)。
+// `oc_artifacts: none` は単独の行のときだけ有効 (validateArtLine と同じ)。最後の行だけを見る (前の行には戻らない)。
+// 字数で切った境界をまたぐ行 (改行で終わっていない末尾の行) は見ない。
+// fl-win64 が無ければ先頭に補う (addArts と同じ。本文の行が素材を明示していないときも既定の fl-win64 を取る)。
+export function bodyArtLine(body: string): string | null {
+  const chars = Array.from(body ?? "");
+  const lines = chars.slice(0, BODY_ART_CHARS).join("").split(/\r\n|\r|\n/);
+  if (chars.length > BODY_ART_CHARS) lines.pop();
+  let last: string | null = null;
+  for (const l of lines) {
+    const m = BODY_ART_RE.exec(l);
+    if (m) last = m[1];
+  }
+  if (last === null) return null;
+  const names = last.slice(ART_PREFIX.length).trim().split(/\s+/).filter(Boolean);
+  if (names.length === 1 && names[0] === "none") return ART_PREFIX + " none";
+  const keep = [...new Set(names.filter((a) => ALLOW_ARTS.includes(a)))];
+  if (keep.length === 0) return null;
+  const line = ART_PREFIX + " " + withFlWin64(keep).join(" ");
+  return validateArtLine(line) ? line : null;
+}
+
+// 素材行 line に、allowlist 内の素材名 extra のうち、まだ無いものを足した行 (足すものが無ければ null)。
+// `none` は素材 0 件とみなして外す (none と他の名前は混在できない)。足すときは fl-win64 を先頭に補う (既定で取得されるのは fl-win64 のみ)。
+// extra に fl-win64 があって line に無い場合も、補った先頭と足す分で二重にしない (重複は除く)。
+export function addArts(line: string, extra: string[]): string | null {
+  const names = line.replace(ART_PREFIX, "").trim().split(/\s+/).filter((a) => a && a !== "none");
+  const add = extra.filter((a) => ALLOW_ARTS.includes(a) && !names.includes(a));
+  if (add.length === 0) return null;
+  const out = ART_PREFIX + " " + [...new Set([...withFlWin64(names), ...add])].join(" ");
+  return validateArtLine(out) ? out : null;
+}
+
+const artNames = (line: string): string[] => line.slice(ART_PREFIX.length).trim().split(/\s+/).filter((a) => a && a !== "none");
+
+// launch の素材行の既定: PM の行 (検証済み) と issue 本文の行 (検証済み) の素材名の和集合 → 題名・ラベルからの推定。
+// 名前を持つ行が 1 つだけならその行をそのまま返す。両方が名前を持つときは PM の行の名前の後に本文の行の名前を並べ、fl-win64 を先頭に補う。
+// none は名前を持たない側とみなす (両方 none なら none)。pm_art の保存値は書き換えず、読み出し側でだけ和集合を作る (#3050)。
+export function defaultArtLine(pmLine: string | null | undefined, bodyLine: string | null | undefined, title: string, labels: string[]): string {
+  const lines = [pmLine, bodyLine].filter((l): l is string => !!l && validateArtLine(l));
+  if (lines.length === 0) return inferArtifacts(title, labels);
+  const named = lines.filter((l) => artNames(l).length > 0);
+  if (named.length === 0) return ART_PREFIX + " none";
+  if (named.length === 1) return named[0];
+  return ART_PREFIX + " " + withFlWin64([...new Set(named.flatMap((l) => artNames(l)))]).join(" ");
+}
+
 const BODY_LINES = [
   "/oc oc_actions_allow_write",
   "{art}",
   "PM が着手を依頼します (1 issue = 1 run)。この issue は、ブロックしている open な issue が無く、未着手です。",
+  "{recheck}",
   "{focus}",
   "1. issue 本文と該当 REPORT・過去コメントを読み、**未達の受入条件を特定**してください。",
   "   - 全て達成済みなら、根拠 (PR・commit・実測) をコメントして issue を close してください。",
@@ -56,12 +112,20 @@ const BODY_LINES = [
   "3. 素材が足りない場合は、必要な `oc_artifacts` 名を報告して停止してください。他の issue に依存することが分かった場合も、その issue 番号を報告して停止してください (PM が blocked_by を設定します)。",
 ];
 
+// 新しい素材の無い artifact の再投入 (#3185) だけに足す。前回の停止の理由が素材不足でない可能性がある。
+const RECHECK_LINE = "前回の停止の理由を再確認し、素材が足りない以外の理由 (分割要・依存・判断待ち) なら、その種類の手順に従ってください。";
 // 固定テンプレート。可変なのは素材行と focus (受入条件の番号 1〜9) だけで、allowlist を通ったものと数字しか入らない。
-export function buildLaunchBody(artLine: string, focus?: number): string {
+export function buildLaunchBody(artLine: string, focus?: number, recheck = false): string {
   if (!validateArtLine(artLine)) throw new Error(`invalid artifacts line: ${artLine}`);
   if (focus !== undefined && !(Number.isInteger(focus) && focus >= 1 && focus <= 9)) throw new Error(`invalid focus: ${focus}`);
   const focusLine = `この issue の受入条件 ${focus} だけを実装して PR を出してください。他の条件は子 issue にしてください。`;
-  return BODY_LINES.flatMap((l) => (l === "{focus}" ? (focus === undefined ? [] : [focusLine]) : [l === "{art}" ? artLine : l])).join("\n") + "\n";
+  return (
+    BODY_LINES.flatMap((l) => {
+      if (l === "{focus}") return focus === undefined ? [] : [focusLine];
+      if (l === "{recheck}") return recheck ? [RECHECK_LINE] : [];
+      return [l === "{art}" ? artLine : l];
+    }).join("\n") + "\n"
+  );
 }
 
 // PM の再投入の意図 (<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->) を、Worker が /oc として投稿してよいか。
@@ -126,24 +190,45 @@ export function noPrCooldownMs(labels: string[], cooldownH: number): number {
   return prioOf(labels) === "critical" ? ms / 2 : ms;
 }
 
+// prio:low の同時実行の上限 (LOW_CAP)。applied は『着手済みか launch 可能で blocked でない prio:critical が 1 件以上ある』ときだけ真 (engine が決める)。
+// 真の間は、未完了の prio:low の run (running) を数えて、新しい prio:low の launch を cap までに抑える。実行中の run は止めない。
+export interface LowCap {
+  cap: number;
+  running: number;
+  applied: boolean;
+}
+
+// 新しく launch してよい prio:low の残り。上限が効かないときは無限。
+export function lowAllowance(low: LowCap): number {
+  return low.applied ? Math.max(0, low.cap - low.running) : Infinity;
+}
+
 export interface LaunchInput {
   ready: ReadyIssue[];
   relaunch: number[];
   active: number;
   target?: number;
   batch?: number;
+  low?: LowCap & { isLow: (n: number) => boolean };
 }
 
 // 1 tick の枠: room = TARGET - active、枠 = min(room, BATCH, relaunch + ready)。relaunch も枠に入り、残りを ready が使う。
 // relaunch は枠 (room・BATCH) を超えても全件出す。枠を ready の件数で頭打ちにする launch_issues.py の式とは、
 // relaunch がある tick で最大 relaunch 件だけ差が出る。
-// picks = (relaunch + ready)[: max(枠, len(relaunch))]
+// picks = (relaunch + ready)[: max(枠, len(relaunch))]。prio:low の上限 (low) に達した分は、枠に入る前に落とす (並びの末尾なので他を遊ばせない)。
 export function planLaunch(input: LaunchInput): { room: number; picks: number[] } {
   const target = input.target ?? DEFAULT_TARGET;
   const batch = input.batch ?? DEFAULT_BATCH;
   const room = Math.max(0, target - input.active);
-  const relaunch = input.relaunch.length;
-  const frame = Math.min(room, batch, relaunch + input.ready.length);
-  const order = [...input.relaunch, ...sortReady(input.ready).map((r) => r.n)];
-  return { room, picks: order.slice(0, Math.max(frame, relaunch)) };
+  let left = input.low ? lowAllowance(input.low) : Infinity;
+  const admit = (n: number): boolean => {
+    if (!input.low?.isLow(n)) return true;
+    if (left <= 0) return false;
+    left--;
+    return true;
+  };
+  const relaunch = input.relaunch.filter(admit);
+  const ready = sortReady(input.ready).map((r) => r.n).filter(admit);
+  const frame = Math.min(room, batch, relaunch.length + ready.length);
+  return { room, picks: [...relaunch, ...ready].slice(0, Math.max(frame, relaunch.length)) };
 }

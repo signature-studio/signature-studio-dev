@@ -6,47 +6,58 @@
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd55ba0"
+    "fn_va": "0xd55ba0",
+    "outs": null
    },
    "getTrackName": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd55bc0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setTrackName": {
     "flags": 1,
     "fmt": "is",
     "kwlist": null,
     "fn_va": "0xd55d40",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getTrackColor": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd55ea0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setTrackColor": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd56040",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isTrackMuted": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd56160",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "muteTrack": {
     "flags": 3,
@@ -57,32 +68,40 @@
      "inGroup"
     ],
     "fn_va": "0xd56330",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "isTrackMuteLock": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd56490",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "muteTrackLock": {
     "flags": 1,
     "fmt": "i|i",
     "kwlist": null,
     "fn_va": "0xd565c0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isTrackSolo": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd566f0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "soloTrack": {
     "flags": 3,
@@ -93,66 +112,81 @@
      "inGroup"
     ],
     "fn_va": "0xd56830",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "isTrackSelected": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd56a40",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "selectTrack": {
     "flags": 1,
     "fmt": "i|i",
     "kwlist": null,
     "fn_va": "0xd56b60",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "selectAll": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd56d00"
+    "fn_va": "0xd56d00",
+    "outs": null
    },
    "deselectAll": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd56dd0"
+    "fn_va": "0xd56dd0",
+    "outs": null
    },
    "getTrackActivityLevel": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd56ea0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getTrackActivityLevelVis": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd56f10",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getDisplayZone": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd56f80"
+    "fn_va": "0xd56f80",
+    "outs": null
    },
    "lockDisplayZone": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd57030",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "liveDisplayZone": {
     "flags": 3,
@@ -165,40 +199,50 @@
      "duration"
     ],
     "fn_va": "0xd57200",
+    "outs": 5,
     "required": 4,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "getLiveLoopMode": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd57370",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getLiveTriggerMode": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd573e0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getLivePosSnap": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd57450",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getLiveTrigSnap": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd574c0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getLiveBlockStatus": {
     "flags": 3,
@@ -209,8 +253,10 @@
      "mode"
     ],
     "fn_va": "0xd57550",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getLiveStatus": {
     "flags": 3,
@@ -220,16 +266,20 @@
      "mode"
     ],
     "fn_va": "0xd57670",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getLiveBlockColor": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd57740",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "triggerLiveClip": {
     "flags": 3,
@@ -241,108 +291,132 @@
      "velocity"
     ],
     "fn_va": "0xd57860",
+    "outs": 4,
     "required": 2,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "refreshLiveClips": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd57a20"
+    "fn_va": "0xd57a20",
+    "outs": null
    },
    "incLivePosSnap": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd57b50",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "incLiveTrigSnap": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd57cd0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "incLiveLoopMode": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd57e50",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "incLiveTrigMode": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd57fd0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getVisTimeBar": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd580f0"
+    "fn_va": "0xd580f0",
+    "outs": null
    },
    "getVisTimeTick": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd58110"
+    "fn_va": "0xd58110",
+    "outs": null
    },
    "getVisTimeStep": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd58130"
+    "fn_va": "0xd58130",
+    "outs": null
    },
    "liveTimeToBlockNum": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd58150",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "liveBlockNumToTime": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd581a0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getSongStartTickPos": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd581f0"
+    "fn_va": "0xd581f0",
+    "outs": null
    },
    "scrollTo": {
     "flags": 1,
     "fmt": "iiii",
     "kwlist": null,
     "fn_va": "0xd58490",
+    "outs": 4,
     "required": 4,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "getPerformanceModeState": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd585d0"
+    "fn_va": "0xd585d0",
+    "outs": null
    },
    "selectTool": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd58670",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    }
   },
   "channels": {
@@ -351,16 +425,20 @@
     "fmt": "Iii",
     "kwlist": null,
     "fn_va": "0xd58e00",
+    "outs": 3,
     "required": 3,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "incEventValue": {
     "flags": 1,
     "fmt": "Ii|d",
     "kwlist": null,
     "fn_va": "0xd58ef0",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "channelNumber": {
     "flags": 3,
@@ -370,8 +448,10 @@
      "offset"
     ],
     "fn_va": "0xd58f80",
+    "outs": 2,
     "required": 0,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "selectedChannel": {
     "flags": 3,
@@ -382,16 +462,20 @@
      "indexGlobal"
     ],
     "fn_va": "0xd59020",
+    "outs": 3,
     "required": 0,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "channelCount": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd590c0",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getChannelName": {
     "flags": 3,
@@ -401,8 +485,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd59150",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setChannelName": {
     "flags": 3,
@@ -413,8 +499,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd59310",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getChannelColor": {
     "flags": 3,
@@ -424,8 +512,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd594b0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setChannelColor": {
     "flags": 3,
@@ -436,8 +526,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd59630",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "isChannelMuted": {
     "flags": 3,
@@ -447,8 +539,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd59790",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "muteChannel": {
     "flags": 3,
@@ -459,8 +553,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd59910",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "isChannelSolo": {
     "flags": 3,
@@ -470,8 +566,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd59a80",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "soloChannel": {
     "flags": 3,
@@ -482,8 +580,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd59bf0",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getChannelVolume": {
     "flags": 3,
@@ -494,8 +594,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd59d70",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "setChannelVolume": {
     "flags": 3,
@@ -507,8 +609,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5a060",
+    "outs": 4,
     "required": 2,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "getChannelPan": {
     "flags": 3,
@@ -518,8 +622,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5a1e0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setChannelPan": {
     "flags": 3,
@@ -531,8 +637,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5a470",
+    "outs": 4,
     "required": 2,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "getChannelPitch": {
     "flags": 3,
@@ -543,8 +651,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5a600",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "setChannelPitch": {
     "flags": 3,
@@ -557,8 +667,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5aa30",
+    "outs": 5,
     "required": 2,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "getChannelType": {
     "flags": 3,
@@ -568,8 +680,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5abc0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isChannelSelected": {
     "flags": 3,
@@ -579,8 +693,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5ac70",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "selectChannel": {
     "flags": 3,
@@ -591,8 +707,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5add0",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "selectOneChannel": {
     "flags": 3,
@@ -602,20 +720,24 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5afc0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "selectAll": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd5b150"
+    "fn_va": "0xd5b150",
+    "outs": null
    },
    "deselectAll": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd5b270"
+    "fn_va": "0xd5b270",
+    "outs": null
    },
    "getChannelMidiInPort": {
     "flags": 3,
@@ -625,16 +747,20 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5bcd0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getChannelIndex": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd5bd60",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getTargetFxTrack": {
     "flags": 3,
@@ -644,8 +770,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5be00",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setTargetFxTrack": {
     "flags": 3,
@@ -656,8 +784,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5bf70",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getRecEventId": {
     "flags": 3,
@@ -667,8 +797,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5c0f0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isGridBitAssigned": {
     "flags": 3,
@@ -678,8 +810,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5b360",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getGridBit": {
     "flags": 3,
@@ -690,8 +824,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5b420",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "setGridBit": {
     "flags": 3,
@@ -703,8 +839,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5b580",
+    "outs": 4,
     "required": 3,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "getStepParam": {
     "flags": 3,
@@ -717,8 +855,10 @@
      "padsStride"
     ],
     "fn_va": "0xd5ba00",
+    "outs": 5,
     "required": 4,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "getCurrentStepParam": {
     "flags": 3,
@@ -730,8 +870,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5bb30",
+    "outs": 4,
     "required": 3,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "fillEachNSteps": {
     "flags": 3,
@@ -744,8 +886,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5b7b0",
+    "outs": 5,
     "required": 2,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "getGridBitWithLoop": {
     "flags": 3,
@@ -756,8 +900,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5bc10",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "showCSForm": {
     "flags": 3,
@@ -768,8 +914,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5c270",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "showEditor": {
     "flags": 3,
@@ -780,8 +928,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5c470",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "focusEditor": {
     "flags": 3,
@@ -791,14 +941,17 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5c660",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isHighLighted": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd5c7a0"
+    "fn_va": "0xd5c7a0",
+    "outs": null
    },
    "midiNoteOn": {
     "flags": 3,
@@ -810,28 +963,34 @@
      "channel"
     ],
     "fn_va": "0xd5c800",
+    "outs": 4,
     "required": 3,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "isGraphEditorVisible": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd5c8f0"
+    "fn_va": "0xd5c8f0",
+    "outs": null
    },
    "updateGraphEditor": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd5c980"
+    "fn_va": "0xd5c980",
+    "outs": null
    },
    "closeGraphEditor": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd5cab0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "showGraphEditor": {
     "flags": 3,
@@ -844,8 +1003,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5cc90",
+    "outs": 5,
     "required": 4,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "setStepParameterByIndex": {
     "flags": 3,
@@ -859,8 +1020,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5cec0",
+    "outs": 6,
     "required": 5,
-    "max": 6
+    "max": 6,
+    "ptrs": 6
    },
    "getActivityLevel": {
     "flags": 3,
@@ -870,8 +1033,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5d060",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "quickQuantize": {
     "flags": 3,
@@ -882,8 +1047,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5d1d0",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "rerollLoopStarterLoop": {
     "flags": 3,
@@ -893,8 +1060,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5dab0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "rerollLoopStarterSteps": {
     "flags": 3,
@@ -904,8 +1073,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5d810",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "rerollLoopStarterSample": {
     "flags": 3,
@@ -915,22 +1086,27 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd5d490",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getSwing": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd5dbf0"
+    "fn_va": "0xd5dbf0",
+    "outs": null
    },
    "setSwing": {
     "flags": 1,
     "fmt": "f",
     "kwlist": null,
     "fn_va": "0xd5dcd0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    }
   },
   "mixer": {
@@ -938,15 +1114,18 @@
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd5e6a0"
+    "fn_va": "0xd5e6a0",
+    "outs": null
    },
    "getTrackInfo": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd5e8d0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setTrackNumber": {
     "flags": 3,
@@ -956,14 +1135,17 @@
      "flags"
     ],
     "fn_va": "0xd5e770",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "trackCount": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd5e8b0"
+    "fn_va": "0xd5e8b0",
+    "outs": null
    },
    "getTrackName": {
     "flags": 3,
@@ -973,56 +1155,70 @@
      "maxLen"
     ],
     "fn_va": "0xd5e970",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setTrackName": {
     "flags": 1,
     "fmt": "is",
     "kwlist": null,
     "fn_va": "0xd5eb00",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getTrackColor": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd5ec60",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setTrackColor": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd5edd0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getSlotColor": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd5eef0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setSlotColor": {
     "flags": 1,
     "fmt": "iii",
     "kwlist": null,
     "fn_va": "0xd5f0d0",
+    "outs": 3,
     "required": 3,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "isTrackArmed": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd5f200",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "armTrack": {
     "flags": 3,
@@ -1032,16 +1228,20 @@
      "value"
     ],
     "fn_va": "0xd5f3a0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isTrackSolo": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd5f4e0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "soloTrack": {
     "flags": 3,
@@ -1052,24 +1252,30 @@
      "mode"
     ],
     "fn_va": "0xd5f650",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "isTrackAutomationEnabled": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd5fe10",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isTrackEnabled": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd5f7b0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "enableTrack": {
     "flags": 3,
@@ -1079,16 +1285,20 @@
      "value"
     ],
     "fn_va": "0xd5f8c0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isTrackMuted": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd5fa00",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "muteTrack": {
     "flags": 3,
@@ -1098,32 +1308,40 @@
      "value"
     ],
     "fn_va": "0xd5fab0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isTrackMuteLock": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd5fc10",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getTrackPluginId": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd5fcb0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isTrackPluginValid": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd5fd50",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getTrackVolume": {
     "flags": 3,
@@ -1133,8 +1351,10 @@
      "flag"
     ],
     "fn_va": "0xd5fed0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setTrackVolume": {
     "flags": 3,
@@ -1145,16 +1365,20 @@
      "pickupMode"
     ],
     "fn_va": "0xd601b0",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getTrackPan": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd60300",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setTrackPan": {
     "flags": 3,
@@ -1165,16 +1389,20 @@
      "pickupMode"
     ],
     "fn_va": "0xd60570",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getTrackStereoSep": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd606c0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setTrackStereoSep": {
     "flags": 3,
@@ -1185,16 +1413,20 @@
      "pickupMode"
     ],
     "fn_va": "0xd60930",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getPluginMixLevel": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd60a80",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setPluginMixLevel": {
     "flags": 3,
@@ -1206,16 +1438,20 @@
      "pickupMode"
     ],
     "fn_va": "0xd60f70",
+    "outs": 4,
     "required": 3,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "getPluginMuteState": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd60b40",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setPluginMuteState": {
     "flags": 3,
@@ -1226,16 +1462,20 @@
      "value"
     ],
     "fn_va": "0xd60ce0",
+    "outs": 3,
     "required": 3,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "isTrackSelected": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd610d0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "selectTrack": {
     "flags": 3,
@@ -1245,66 +1485,81 @@
      "value"
     ],
     "fn_va": "0xd61250",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "selectAll": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd61400"
+    "fn_va": "0xd61400",
+    "outs": null
    },
    "deselectAll": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd614d0"
+    "fn_va": "0xd614d0",
+    "outs": null
    },
    "setRouteTo": {
     "flags": 1,
     "fmt": "iii|i",
     "kwlist": null,
     "fn_va": "0xd617d0",
+    "outs": 4,
     "required": 3,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "setRouteToLevel": {
     "flags": 1,
     "fmt": "iif",
     "kwlist": null,
     "fn_va": "0xd61a00",
+    "outs": 3,
     "required": 3,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getRouteToLevel": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd61b50",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getRouteSendActive": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd61bf0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "afterRoutingChanged": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd61ce0"
+    "fn_va": "0xd61ce0",
+    "outs": null
    },
    "setActiveTrack": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd61630",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getEventValue": {
     "flags": 3,
@@ -1315,8 +1570,10 @@
      "smoothTarget"
     ],
     "fn_va": "0xd61dd0",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "remoteFindEventValue": {
     "flags": 3,
@@ -1326,8 +1583,10 @@
      "flags"
     ],
     "fn_va": "0xd61e70",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getEventIDName": {
     "flags": 3,
@@ -1337,16 +1596,20 @@
      "shortName"
     ],
     "fn_va": "0xd61ef0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getEventIDValueString": {
     "flags": 1,
     "fmt": "Ii",
     "kwlist": null,
     "fn_va": "0xd61fe0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getAutoSmoothEventValue": {
     "flags": 3,
@@ -1356,8 +1619,10 @@
      "locked"
     ],
     "fn_va": "0xd62090",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "automateEvent": {
     "flags": 3,
@@ -1371,32 +1636,40 @@
      "res"
     ],
     "fn_va": "0xd62140",
+    "outs": 6,
     "required": 3,
-    "max": 6
+    "max": 6,
+    "ptrs": 6
    },
    "getTrackPeaks": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd62210",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getTrackRecordingFileName": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd62430",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "linkTrackToChannel": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd625a0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "linkChannelToTrack": {
     "flags": 3,
@@ -1407,68 +1680,84 @@
      "select"
     ],
     "fn_va": "0xd62820",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getSongStepPos": {
     "flags": 1,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd62970"
+    "fn_va": "0xd62970",
+    "outs": 0
    },
    "getCurrentTempo": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd62990",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setCurrentTempo": {
     "flags": 1,
     "fmt": "f|i",
     "kwlist": null,
     "fn_va": "0xd62ab0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getRecPPS": {
     "flags": 1,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd62be0"
+    "fn_va": "0xd62be0",
+    "outs": 0
    },
    "getSongTickPos": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd62c00",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getLastPeakVol": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd62ce0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getTrackDockSide": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd62d60",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "isTrackSlotsEnabled": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd63340",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "enableTrackSlots": {
     "flags": 3,
@@ -1478,16 +1767,20 @@
      "value"
     ],
     "fn_va": "0xd63490",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isTrackRevPolarity": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd62e00",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "revTrackPolarity": {
     "flags": 3,
@@ -1497,30 +1790,37 @@
      "value"
     ],
     "fn_va": "0xd62f60",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "focusEditor": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd63690",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getActiveEffectIndex": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd637b0"
+    "fn_va": "0xd637b0",
+    "outs": null
    },
    "isTrackSwapChannels": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd630a0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "swapTrackChannels": {
     "flags": 3,
@@ -1530,14 +1830,17 @@
      "value"
     ],
     "fn_va": "0xd63200",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getEqBandCount": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd63870"
+    "fn_va": "0xd63870",
+    "outs": null
    },
    "getEqGain": {
     "flags": 3,
@@ -1548,16 +1851,20 @@
      "mode"
     ],
     "fn_va": "0xd638a0",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "setEqGain": {
     "flags": 1,
     "fmt": "iif",
     "kwlist": null,
     "fn_va": "0xd63a80",
+    "outs": 3,
     "required": 3,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getEqFrequency": {
     "flags": 3,
@@ -1568,38 +1875,47 @@
      "mode"
     ],
     "fn_va": "0xd63bc0",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "setEqFrequency": {
     "flags": 1,
     "fmt": "iif",
     "kwlist": null,
     "fn_va": "0xd63df0",
+    "outs": 3,
     "required": 3,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getEqBandwidth": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd63f20",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setEqBandwidth": {
     "flags": 1,
     "fmt": "iif",
     "kwlist": null,
     "fn_va": "0xd640a0",
+    "outs": 3,
     "required": 3,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getTrackCount": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd641d0"
+    "fn_va": "0xd641d0",
+    "outs": null
    }
   },
   "patterns": {
@@ -1607,91 +1923,112 @@
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd64d20"
+    "fn_va": "0xd64d20",
+    "outs": null
    },
    "patternCount": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd64d40"
+    "fn_va": "0xd64d40",
+    "outs": null
    },
    "patternMax": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd64d90"
+    "fn_va": "0xd64d90",
+    "outs": null
    },
    "getPatternName": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd64db0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setPatternName": {
     "flags": 1,
     "fmt": "is",
     "kwlist": null,
     "fn_va": "0xd64f30",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getPatternColor": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd65090",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setPatternColor": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd651e0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getPatternLength": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd657e0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setPatternLength": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd653a0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "duplicatePatternData": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd65540",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "incrementPatternLength": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd65670",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getBlockSetStatus": {
     "flags": 1,
     "fmt": "iiii",
     "kwlist": null,
     "fn_va": "0xd658a0",
+    "outs": 4,
     "required": 4,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "ensureValidNoteRecord": {
     "flags": 3,
@@ -1701,16 +2038,20 @@
      "playNow"
     ],
     "fn_va": "0xd65930",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "jumpToPattern": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd65a10",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "findFirstNextEmptyPat": {
     "flags": 3,
@@ -1721,40 +2062,50 @@
      "y"
     ],
     "fn_va": "0xd65ba0",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getChannelLoopStyle": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd65d00",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setChannelLoop": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd65e00",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isPatternSelected": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd65ff0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "isPatternDefault": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd66060",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "selectPattern": {
     "flags": 3,
@@ -1765,44 +2116,54 @@
      "preview"
     ],
     "fn_va": "0xd66230",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "selectAll": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd66430"
+    "fn_va": "0xd66430",
+    "outs": null
    },
    "deselectAll": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd66560"
+    "fn_va": "0xd66560",
+    "outs": null
    },
    "clonePattern": {
     "flags": 1,
     "fmt": "|ii",
     "kwlist": null,
     "fn_va": "0xd66b80",
+    "outs": 2,
     "required": 0,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "clearPattern": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd66d50",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "movePattern": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd66ec0",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "burnLoop": {
     "flags": 3,
@@ -1813,8 +2174,10 @@
      "updateUi"
     ],
     "fn_va": "0xd666d0",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "setLoopStarterRootNote": {
     "flags": 3,
@@ -1823,36 +2186,44 @@
      "rootNoteNum"
     ],
     "fn_va": "0xd668c0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getPatternGroupCount": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd67000"
+    "fn_va": "0xd67000",
+    "outs": null
    },
    "getActivePatternGroup": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd66fe0"
+    "fn_va": "0xd66fe0",
+    "outs": null
    },
    "getPatternGroupName": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd67030",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getPatternsInGroup": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd67110",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    }
   },
   "transport": {
@@ -1866,52 +2237,62 @@
      "flags"
     ],
     "fn_va": "0xd67730",
+    "outs": 4,
     "required": 2,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "start": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd678c0"
+    "fn_va": "0xd678c0",
+    "outs": null
    },
    "stop": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd67980"
+    "fn_va": "0xd67980",
+    "outs": null
    },
    "record": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd67a40"
+    "fn_va": "0xd67a40",
+    "outs": null
    },
    "isRecording": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd67b00"
+    "fn_va": "0xd67b00",
+    "outs": null
    },
    "getLoopMode": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd67b30"
+    "fn_va": "0xd67b30",
+    "outs": null
    },
    "setLoopMode": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd67b50"
+    "fn_va": "0xd67b50",
+    "outs": null
    },
    "getSongPos": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd67c10",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setSongPos": {
     "flags": 3,
@@ -1921,14 +2302,17 @@
      "mode"
     ],
     "fn_va": "0xd67e70",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getSongPosHint": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd67fb0"
+    "fn_va": "0xd67fb0",
+    "outs": null
    },
    "rewind": {
     "flags": 3,
@@ -1938,30 +2322,37 @@
      "flags"
     ],
     "fn_va": "0xd68080",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "setPlaybackSpeed": {
     "flags": 1,
     "fmt": "d",
     "kwlist": null,
     "fn_va": "0xd68210",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "fastForward": {
     "flags": 1,
     "fmt": "i|i",
     "kwlist": null,
     "fn_va": "0xd68330",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "isPlaying": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd68430"
+    "fn_va": "0xd68430",
+    "outs": null
    },
    "markerJumpJog": {
     "flags": 3,
@@ -1971,8 +2362,10 @@
      "flags"
     ],
     "fn_va": "0xd68460",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "markerSelJog": {
     "flags": 3,
@@ -1982,38 +2375,47 @@
      "flags"
     ],
     "fn_va": "0xd68570",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getHWBeatLEDState": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd68680"
+    "fn_va": "0xd68680",
+    "outs": null
    },
    "continuousMovePos": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd686f0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "continuousMove": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd68860",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getSongLength": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd68980",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    }
   },
   "general": {
@@ -2021,101 +2423,121 @@
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd68dc0"
+    "fn_va": "0xd68dc0",
+    "outs": null
    },
    "undoUp": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd68e80"
+    "fn_va": "0xd68e80",
+    "outs": null
    },
    "undoDown": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd68f40"
+    "fn_va": "0xd68f40",
+    "outs": null
    },
    "undoUpDown": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd69000",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "restoreUndo": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd68dc0"
+    "fn_va": "0xd68dc0",
+    "outs": null
    },
    "restoreUndoLevel": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd69140",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getUndoLevelHint": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd69260"
+    "fn_va": "0xd69260",
+    "outs": null
    },
    "getRecPPB": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd69310"
+    "fn_va": "0xd69310",
+    "outs": null
    },
    "getRecPPQ": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd69330"
+    "fn_va": "0xd69330",
+    "outs": null
    },
    "setRecPPQ": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd693c0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setNumerator": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd69550",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setDenominator": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd696e0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getChangedFlag": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd69800"
+    "fn_va": "0xd69800",
+    "outs": null
    },
    "getUseMetronome": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd69820"
+    "fn_va": "0xd69820",
+    "outs": null
    },
    "getPrecount": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd69840"
+    "fn_va": "0xd69840",
+    "outs": null
    },
    "saveUndo": {
     "flags": 3,
@@ -2126,64 +2548,78 @@
      "updateHistory"
     ],
     "fn_va": "0xd69900",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getUndoHistoryPos": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd69a90"
+    "fn_va": "0xd69a90",
+    "outs": null
    },
    "getUndoHistoryCount": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd69ab0"
+    "fn_va": "0xd69ab0",
+    "outs": null
    },
    "getUndoHistoryLast": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd69ad0"
+    "fn_va": "0xd69ad0",
+    "outs": null
    },
    "setUndoHistoryPos": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd69b80",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setUndoHistoryCount": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd69ca0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setUndoHistoryLast": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd69dc0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getVersion": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd69ee0"
+    "fn_va": "0xd69ee0",
+    "outs": null
    },
    "processRECEvent": {
     "flags": 1,
     "fmt": "Iii",
     "kwlist": null,
     "fn_va": "0xd69f00",
+    "outs": 3,
     "required": 3,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "dumpScoreLog": {
     "flags": 3,
@@ -2193,38 +2629,45 @@
      "silent"
     ],
     "fn_va": "0xd6a060",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "clearLog": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6a1f0"
+    "fn_va": "0xd6a1f0",
+    "outs": null
    },
    "safeToEdit": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6a2c0"
+    "fn_va": "0xd6a2c0",
+    "outs": null
    },
    "getProjectTitle": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6a2f0"
+    "fn_va": "0xd6a2f0",
+    "outs": null
    },
    "getProjectAuthor": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6a3a0"
+    "fn_va": "0xd6a3a0",
+    "outs": null
    },
    "getProjectGenre": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6a450"
+    "fn_va": "0xd6a450",
+    "outs": null
    }
   },
   "ui": {
@@ -2233,506 +2676,615 @@
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6a960",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "jog2": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6aa50",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "strip": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6ab40",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "stripJog": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6ac30",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "stripHold": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6ad20",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "previous": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6ae10"
+    "fn_va": "0xd6ae10",
+    "outs": null
    },
    "next": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6aed0"
+    "fn_va": "0xd6aed0",
+    "outs": null
    },
    "moveJog": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6af90",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "up": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd6b080",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "down": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd6b170",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "left": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd6b260",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "right": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd6b350",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "horZoom": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6b440",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "verZoom": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6b530",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "snapOnOff": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6b620"
+    "fn_va": "0xd6b620",
+    "outs": null
    },
    "getSnapMode": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6b6e0"
+    "fn_va": "0xd6b6e0",
+    "outs": null
    },
    "setSnapMode": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6b7b0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "snapMode": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6b8d0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "cut": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6b9c0"
+    "fn_va": "0xd6b9c0",
+    "outs": null
    },
    "copy": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6ba80"
+    "fn_va": "0xd6ba80",
+    "outs": null
    },
    "paste": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6bb40"
+    "fn_va": "0xd6bb40",
+    "outs": null
    },
    "insert": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6bc00"
+    "fn_va": "0xd6bc00",
+    "outs": null
    },
    "delete": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6bcc0"
+    "fn_va": "0xd6bcc0",
+    "outs": null
    },
    "enter": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6bd80"
+    "fn_va": "0xd6bd80",
+    "outs": null
    },
    "escape": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6be40"
+    "fn_va": "0xd6be40",
+    "outs": null
    },
    "yes": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6bf00"
+    "fn_va": "0xd6bf00",
+    "outs": null
    },
    "no": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6bfc0"
+    "fn_va": "0xd6bfc0",
+    "outs": null
    },
    "nextWindow": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6c080"
+    "fn_va": "0xd6c080",
+    "outs": null
    },
    "selectWindow": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6c140",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "isClosing": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6c230"
+    "fn_va": "0xd6c230",
+    "outs": null
    },
    "getProgTitle": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6c250"
+    "fn_va": "0xd6c250",
+    "outs": null
    },
    "getVersion": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd6c2f0",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getHintMsg": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6c4c0"
+    "fn_va": "0xd6c4c0",
+    "outs": null
    },
    "setHintMsg": {
     "flags": 1,
     "fmt": "s",
     "kwlist": null,
     "fn_va": "0xd6c5b0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "showNotification": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6c8b0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getFocusedFormCaption": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6c9d0"
+    "fn_va": "0xd6c9d0",
+    "outs": null
    },
    "getFocusedFormID": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6ca80"
+    "fn_va": "0xd6ca80",
+    "outs": null
    },
    "getFocusedPluginName": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6cab0"
+    "fn_va": "0xd6cab0",
+    "outs": null
    },
    "getHintValue": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd6cb60",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getTimeDispMin": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6cc40"
+    "fn_va": "0xd6cc40",
+    "outs": null
    },
    "setTimeDispMin": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6ccb0"
+    "fn_va": "0xd6ccb0",
+    "outs": null
    },
    "getFocused": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6cd80",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "setFocused": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6ce50",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getVisible": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6cf70",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "showWindow": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6d050",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "hideWindow": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6d170",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "scrollWindow": {
     "flags": 1,
     "fmt": "ii|i",
     "kwlist": null,
     "fn_va": "0xd6d300",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "launchAudioEditor": {
     "flags": 1,
     "fmt": "isiss",
     "kwlist": null,
     "fn_va": "0xd6d540",
+    "outs": 5,
     "required": 5,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "isInPopupMenu": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6d6b0"
+    "fn_va": "0xd6d6b0",
+    "outs": null
    },
    "closeAllMenu": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6d7c0"
+    "fn_va": "0xd6d7c0",
+    "outs": null
    },
    "closeActivePopupMenu": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6d8e0"
+    "fn_va": "0xd6d8e0",
+    "outs": null
    },
    "isMetronomeEnabled": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6d6d0"
+    "fn_va": "0xd6d6d0",
+    "outs": null
    },
    "isStartOnInputEnabled": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6d6f0"
+    "fn_va": "0xd6d6f0",
+    "outs": null
    },
    "isPrecountEnabled": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6d710"
+    "fn_va": "0xd6d710",
+    "outs": null
    },
    "isLoopRecEnabled": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6d730"
+    "fn_va": "0xd6d730",
+    "outs": null
    },
    "crDisplayRect": {
     "flags": 1,
     "fmt": "iiiii|i",
     "kwlist": null,
     "fn_va": "0xd6e860",
+    "outs": 6,
     "required": 5,
-    "max": 6
+    "max": 6,
+    "ptrs": 6
    },
    "miDisplayRect": {
     "flags": 1,
     "fmt": "iii|i",
     "kwlist": null,
     "fn_va": "0xd6ea40",
+    "outs": 4,
     "required": 3,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "miDisplayDockRect": {
     "flags": 1,
     "fmt": "iiii",
     "kwlist": null,
     "fn_va": "0xd6ebf0",
+    "outs": 4,
     "required": 4,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "navigateBrowser": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd6dad0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "toggleBrowserNode": {
     "flags": 1,
     "fmt": "|i",
     "kwlist": null,
     "fn_va": "0xd6dcd0",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "navigateBrowserTabs": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6ded0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "navigateBrowserMenu": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd6dad0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "selectBrowserMenuItem": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6e170"
+    "fn_va": "0xd6e170",
+    "outs": null
    },
    "previewBrowserMenuItem": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6e330"
+    "fn_va": "0xd6e330",
+    "outs": null
    },
    "getFocusedNodeFileType": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6e400"
+    "fn_va": "0xd6e400",
+    "outs": null
    },
    "getFocusedNodeCaption": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6e470"
+    "fn_va": "0xd6e470",
+    "outs": null
    },
    "isBrowserAutoHide": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6ed40"
+    "fn_va": "0xd6ed40",
+    "outs": null
    },
    "setBrowserAutoHide": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6ee00",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "openEventEditor": {
     "flags": 1,
     "fmt": "Ii|i",
     "kwlist": null,
     "fn_va": "0xd6ef80",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getStepEditMode": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd6f0c0"
+    "fn_va": "0xd6f0c0",
+    "outs": null
    },
    "setStepEditMode": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd6f170",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "showPicker": {
     "flags": 1,
     "fmt": "i|i",
     "kwlist": null,
     "fn_va": "0xd6f2e0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    }
   },
   "device": {
@@ -2741,16 +3293,20 @@
     "fmt": "i|iiii",
     "kwlist": null,
     "fn_va": "0xd747f0",
+    "outs": 5,
     "required": 1,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "midiOutNewMsg": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd748e0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "sendMsgGeneric": {
     "flags": 3,
@@ -2762,24 +3318,30 @@
      "offset"
     ],
     "fn_va": "0xd74990",
+    "outs": 4,
     "required": 3,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "midiOutSysex": {
     "flags": 1,
     "fmt": "y*",
     "kwlist": null,
     "fn_va": "0xd74bb0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "processMIDICC": {
     "flags": 1,
     "fmt": "O",
     "kwlist": null,
     "fn_va": "0xd74d90",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "forwardMIDICC": {
     "flags": 3,
@@ -2789,136 +3351,166 @@
      "forwardTo"
     ],
     "fn_va": "0xd75120",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "directFeedback": {
     "flags": 1,
     "fmt": "O",
     "kwlist": null,
     "fn_va": "0xd75260",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "dispatch": {
     "flags": 1,
     "fmt": "ii|y*",
     "kwlist": null,
     "fn_va": "0xd753b0",
+    "outs": 3,
     "required": 2,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "dispatchReceiverCount": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd75690"
+    "fn_va": "0xd75690",
+    "outs": null
    },
    "dispatchGetReceiverPortNumber": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd75820",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "isAssigned": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd75a00"
+    "fn_va": "0xd75a00",
+    "outs": null
    },
    "isMidiOutAssigned": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd75a40"
+    "fn_va": "0xd75a40",
+    "outs": null
    },
    "getPortNumber": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd75a80"
+    "fn_va": "0xd75a80",
+    "outs": null
    },
    "getName": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd75ac0"
+    "fn_va": "0xd75ac0",
+    "outs": null
    },
    "findEventID": {
     "flags": 1,
     "fmt": "i|i",
     "kwlist": null,
     "fn_va": "0xd75b60",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getLinkedValue": {
     "flags": 1,
     "fmt": "I",
     "kwlist": null,
     "fn_va": "0xd75bc0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getLinkedValueString": {
     "flags": 1,
     "fmt": "I",
     "kwlist": null,
     "fn_va": "0xd75c40",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getLinkedChannel": {
     "flags": 1,
     "fmt": "I",
     "kwlist": null,
     "fn_va": "0xd75d30",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getLinkedParamName": {
     "flags": 1,
     "fmt": "I",
     "kwlist": null,
     "fn_va": "0xd75de0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getLinkedInfo": {
     "flags": 1,
     "fmt": "I",
     "kwlist": null,
     "fn_va": "0xd75ed0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "createRefreshThread": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd75f40"
+    "fn_va": "0xd75f40",
+    "outs": null
    },
    "destroyRefreshThread": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd75f80"
+    "fn_va": "0xd75f80",
+    "outs": null
    },
    "fullRefresh": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd75fc0"
+    "fn_va": "0xd75fc0",
+    "outs": null
    },
    "isDoubleClick": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd76060",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "repeatMidiEvent": {
     "flags": 3,
@@ -2929,56 +3521,68 @@
      "rate"
     ],
     "fn_va": "0xd762f0",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "stopRepeatMidiEvent": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd764a0"
+    "fn_va": "0xd764a0",
+    "outs": null
    },
    "setHasMeters": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd765c0"
+    "fn_va": "0xd765c0",
+    "outs": null
    },
    "baseTrackSelect": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd76700",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "hardwareRefreshMixerTrack": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd76860",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getIdleElapsed": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd76980"
+    "fn_va": "0xd76980",
+    "outs": null
    },
    "setMasterSync": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd76a60",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getMasterSync": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd76b80"
+    "fn_va": "0xd76b80",
+    "outs": null
    },
    "linkToLastTweaked": {
     "flags": 3,
@@ -2990,26 +3594,31 @@
      "eventID"
     ],
     "fn_va": "0xd76c90",
+    "outs": 4,
     "required": 2,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "getDeviceID": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd76ef0"
+    "fn_va": "0xd76ef0",
+    "outs": null
    },
    "flrMidiNote": {
     "flags": 3,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd77180"
+    "fn_va": "0xd77180",
+    "outs": 0
    },
    "flrMidiCC": {
     "flags": 3,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd77400"
+    "fn_va": "0xd77400",
+    "outs": 0
    },
    "releaseCC": {
     "flags": 3,
@@ -3019,8 +3628,10 @@
      "cc"
     ],
     "fn_va": "0xd775f0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    }
   },
   "arrangement": {
@@ -3032,78 +3643,95 @@
      "select"
     ],
     "fn_va": "0xd77eb0",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getMarkerName": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd78030",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "addAutoTimeMarker": {
     "flags": 1,
     "fmt": "is",
     "kwlist": null,
     "fn_va": "0xd781e0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "liveSelection": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd783c0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "liveSelectionStart": {
     "flags": 1,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd78500"
+    "fn_va": "0xd78500",
+    "outs": 0
    },
    "currentTime": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd78520",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "currentTimeHint": {
     "flags": 1,
     "fmt": "ii|ii",
     "kwlist": null,
     "fn_va": "0xd785a0",
+    "outs": 4,
     "required": 2,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "selectionStart": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd786e0"
+    "fn_va": "0xd786e0",
+    "outs": null
    },
    "selectionEnd": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd78700"
+    "fn_va": "0xd78700",
+    "outs": null
    },
    "selectionIsActive": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd78720"
+    "fn_va": "0xd78720",
+    "outs": null
    },
    "selectionClear": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd787b0"
+    "fn_va": "0xd787b0",
+    "outs": null
    },
    "selectionSet": {
     "flags": 3,
@@ -3116,8 +3744,10 @@
      "scroll"
     ],
     "fn_va": "0xd78940",
+    "outs": 5,
     "required": 2,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    }
   },
   "launchMapPages": {
@@ -3126,92 +3756,114 @@
     "fmt": "sii",
     "kwlist": null,
     "fn_va": "0xd79020",
+    "outs": 3,
     "required": 3,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "length": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd791b0"
+    "fn_va": "0xd791b0",
+    "outs": null
    },
    "updateMap": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd79290",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getMapItemColor": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd793d0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getMapCount": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd79560",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getMapItemChannel": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd796b0",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getMapItemAftertouch": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd79810",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "processMapItem": {
     "flags": 1,
     "fmt": "Oiii",
     "kwlist": null,
     "fn_va": "0xd79bc0",
+    "outs": 4,
     "required": 4,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "releaseMapItem": {
     "flags": 1,
     "fmt": "Oi",
     "kwlist": null,
     "fn_va": "0xd79d10",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "checkMapForHiddenItem": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd79fe0"
+    "fn_va": "0xd79fe0",
+    "outs": null
    },
    "createOverlayMap": {
     "flags": 1,
     "fmt": "iiii",
     "kwlist": null,
     "fn_va": "0xd7a130",
+    "outs": 4,
     "required": 4,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "setMapItemTarget": {
     "flags": 1,
     "fmt": "iii",
     "kwlist": null,
     "fn_va": "0xd7a3a0",
+    "outs": 3,
     "required": 3,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    }
   },
   "screen": {
@@ -3220,202 +3872,247 @@
     "fmt": "iiiiii",
     "kwlist": null,
     "fn_va": "0xd7aa40",
+    "outs": 6,
     "required": 6,
-    "max": 6
+    "max": 6,
+    "ptrs": 6
    },
    "setup": {
     "flags": 1,
     "fmt": "Liiiii",
     "kwlist": null,
     "fn_va": "0xd7ab00",
+    "outs": 6,
     "required": 6,
-    "max": 6
+    "max": 6,
+    "ptrs": 6
    },
    "addTextLine": {
     "flags": 1,
     "fmt": "siiii",
     "kwlist": null,
     "fn_va": "0xd7abb0",
+    "outs": 6,
     "required": 5,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "removeTextLine": {
     "flags": 1,
     "fmt": "i|i",
     "kwlist": null,
     "fn_va": "0xd7ad00",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "addMeter": {
     "flags": 1,
     "fmt": "iiii|i",
     "kwlist": null,
     "fn_va": "0xd7ada0",
+    "outs": 6,
     "required": 4,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "fillRect": {
     "flags": 1,
     "fmt": "iiiii",
     "kwlist": null,
     "fn_va": "0xd7ae80",
+    "outs": 5,
     "required": 5,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "drawRect": {
     "flags": 1,
     "fmt": "iiiii",
     "kwlist": null,
     "fn_va": "0xd7af40",
+    "outs": 5,
     "required": 5,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "deInit": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7b000"
+    "fn_va": "0xd7b000",
+    "outs": null
    },
    "update": {
     "flags": 1,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7b0a0"
+    "fn_va": "0xd7b0a0",
+    "outs": null
    },
    "menuShowing": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7b170"
+    "fn_va": "0xd7b170",
+    "outs": null
    },
    "hideMenu": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7b1f0"
+    "fn_va": "0xd7b1f0",
+    "outs": null
    },
    "findTextLine": {
     "flags": 1,
     "fmt": "iiii",
     "kwlist": null,
     "fn_va": "0xd7b2d0",
+    "outs": 4,
     "required": 4,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "displayBar": {
     "flags": 1,
     "fmt": "iisdi",
     "kwlist": null,
     "fn_va": "0xd7b690",
+    "outs": 5,
     "required": 5,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "displayText": {
     "flags": 1,
     "fmt": "iiisi|i",
     "kwlist": null,
     "fn_va": "0xd7ba80",
+    "outs": 6,
     "required": 5,
-    "max": 6
+    "max": 6,
+    "ptrs": 6
    },
    "drawText": {
     "flags": 1,
     "fmt": "isiiii",
     "kwlist": null,
     "fn_va": "0xd7bcb0",
+    "outs": 6,
     "required": 6,
-    "max": 6
+    "max": 6,
+    "ptrs": 6
    },
    "eraseRect": {
     "flags": 1,
     "fmt": "iiii",
     "kwlist": null,
     "fn_va": "0xd7bec0",
+    "outs": 4,
     "required": 4,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "displayTimedText": {
     "flags": 1,
     "fmt": "s|i",
     "kwlist": null,
     "fn_va": "0xd7c290",
+    "outs": 2,
     "required": 1,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "animateText": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd7c460",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "blank": {
     "flags": 1,
     "fmt": "ii",
     "kwlist": null,
     "fn_va": "0xd7c600",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "unBlank": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd7c740",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "isBlanked": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7c7e0"
+    "fn_va": "0xd7c7e0",
+    "outs": null
    },
    "isUnBlank": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7c830"
+    "fn_va": "0xd7c830",
+    "outs": null
    },
    "getScreenActiveCounter": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7c880"
+    "fn_va": "0xd7c880",
+    "outs": null
    },
    "setScreenActiveCounter": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd7c8c0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "menuItemClick": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7c9a0"
+    "fn_va": "0xd7c9a0",
+    "outs": null
    },
    "menuNext": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7cac0"
+    "fn_va": "0xd7cac0",
+    "outs": null
    },
    "menuPrev": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7cbe0"
+    "fn_va": "0xd7cbe0",
+    "outs": null
    },
    "keepDisplayActive": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd7ccb0"
+    "fn_va": "0xd7ccb0",
+    "outs": null
    }
   },
   "plugins": {
@@ -3428,8 +4125,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd7ee70",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getPluginName": {
     "flags": 3,
@@ -3441,8 +4140,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd7efb0",
+    "outs": 4,
     "required": 1,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "getParamCount": {
     "flags": 3,
@@ -3453,8 +4154,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd7f330",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getParamName": {
     "flags": 3,
@@ -3466,8 +4169,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd7f490",
+    "outs": 4,
     "required": 2,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "getParamValue": {
     "flags": 3,
@@ -3479,8 +4184,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd7fda0",
+    "outs": 4,
     "required": 2,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "getParamValueString": {
     "flags": 3,
@@ -3492,8 +4199,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd7f940",
+    "outs": 4,
     "required": 2,
-    "max": 4
+    "max": 4,
+    "ptrs": 4
    },
    "setParamValue": {
     "flags": 3,
@@ -3507,8 +4216,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd80160",
+    "outs": 6,
     "required": 3,
-    "max": 6
+    "max": 6,
+    "ptrs": 6
    },
    "nextPreset": {
     "flags": 3,
@@ -3519,8 +4230,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd80510",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "prevPreset": {
     "flags": 3,
@@ -3531,14 +4244,24 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd806f0",
+    "outs": 3,
     "required": 1,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    },
    "getPresetCount": {
     "flags": 1,
-    "fmt": null,
-    "kwlist": null,
-    "fn_va": "0xd808d0"
+    "fmt": "i|ii",
+    "kwlist": [
+     "index",
+     "slotIndex",
+     "useGlobalIndex"
+    ],
+    "fn_va": "0xd808d0",
+    "outs": 3,
+    "required": 1,
+    "max": 3,
+    "ptrs": 3
    },
    "getColor": {
     "flags": 3,
@@ -3551,8 +4274,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd80a40",
+    "outs": 5,
     "required": 1,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "getName": {
     "flags": 3,
@@ -3565,8 +4290,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd80d60",
+    "outs": 5,
     "required": 1,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "getPadInfo": {
     "flags": 3,
@@ -3579,8 +4306,10 @@
      "useGlobalIndex"
     ],
     "fn_va": "0xd811c0",
+    "outs": 5,
     "required": 1,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    }
   },
   "ilmcp": {
@@ -3589,68 +4318,84 @@
     "fmt": "sss|Op",
     "kwlist": null,
     "fn_va": "0xd9aa30",
+    "outs": 5,
     "required": 3,
-    "max": 5
+    "max": 5,
+    "ptrs": 5
    },
    "forwardTutorialEvent": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd9aba0"
+    "fn_va": "0xd9aba0",
+    "outs": null
    },
    "storePRScript": {
     "flags": 1,
     "fmt": "ss",
     "kwlist": null,
     "fn_va": "0xd9ac10",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "runPRScript": {
     "flags": 1,
     "fmt": "s",
     "kwlist": null,
     "fn_va": "0xd9add0",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "addChannel": {
     "flags": 1,
     "fmt": "|s",
     "kwlist": null,
     "fn_va": "0xd9b140",
+    "outs": 1,
     "required": 0,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "removeChannel": {
     "flags": 1,
     "fmt": "i",
     "kwlist": null,
     "fn_va": "0xd9b290",
+    "outs": 1,
     "required": 1,
-    "max": 1
+    "max": 1,
+    "ptrs": 1
    },
    "getBrowserNames": {
     "flags": 1,
     "fmt": "sp",
     "kwlist": null,
     "fn_va": "0xd9b510",
+    "outs": 2,
     "required": 2,
-    "max": 2
+    "max": 2,
+    "ptrs": 2
    },
    "getHighlightNames": {
     "flags": 4,
     "fmt": null,
     "kwlist": null,
-    "fn_va": "0xd9b850"
+    "fn_va": "0xd9b850",
+    "outs": null
    },
    "addEffect": {
     "flags": 1,
     "fmt": "sii",
     "kwlist": null,
     "fn_va": "0xd9b930",
+    "outs": 3,
     "required": 3,
-    "max": 3
+    "max": 3,
+    "ptrs": 3
    }
   }
  },

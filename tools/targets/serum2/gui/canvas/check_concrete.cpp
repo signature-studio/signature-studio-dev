@@ -4,9 +4,11 @@
 #include "canvas_font.h"
 #include "canvas_graphicsdevice.h"
 #include "canvas_platformfactory.h"
+#include "canvas_string.h"
 #include <memory>
 #include <type_traits>
 
+static_assert(!std::is_abstract_v<VSTGUI::CanvasString>);
 static_assert(!std::is_abstract_v<VSTGUI::CanvasFontPainter>);
 static_assert(!std::is_abstract_v<VSTGUI::CanvasFont>);
 static_assert(!std::is_abstract_v<VSTGUI::CanvasGraphicsDeviceFactory>);
@@ -18,6 +20,6 @@ int main ()
 {
 	VSTGUI::CanvasFont font {"sans", 12.};
 	auto device = std::make_shared<VSTGUI::CanvasGraphicsDevice> ();
-	VSTGUI::CanvasGraphicsDeviceContext context {device};
+	VSTGUI::CanvasGraphicsDeviceContext context {device, VSTGUI::PlatformBitmapPtr {}};
 	return font.getPainter () ? 0 : 1;
 }

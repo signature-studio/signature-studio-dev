@@ -1,7 +1,7 @@
 // tools/pm/launch_issues.py の graph / started_map / needed_arts / classify の移植 (純関数のみ)。
 // GitHub・現在時刻・ローカルファイルは読まず、呼び出し側が ClassifyInput で渡す。
 // Python の defaultdict のキー挿入順を保つ (循環除去の結果が順序に依るため)。
-import { ALLOW_ARTS, inferArtifacts, sortReady } from "./launch.ts";
+import { ALLOW_ARTS, addArts, defaultArtLine, sortReady } from "./launch.ts";
 import type { LaunchState } from "./launchobs.ts";
 import { parentOf } from "./refs.ts";
 import { DIGEST_ROLLING_RE, OC_HOLD_LABEL } from "./pm.ts";
@@ -11,6 +11,8 @@ export interface SnapIssue {
   title: string;
   labels: string[];
   body: string;
+  // 本文の検証済み素材行 (engine の snapshot が入れる)。無ければ未設定。
+  artLine?: string;
   deps?: { total_blocked_by?: number } | null;
 }
 export interface SnapPr {
@@ -180,8 +182,12 @@ function startedMap(d: Snapshot, iss: Map<number, SnapIssue>): Map<number, strin
 }
 
 export function neededArts(n: number, input: ClassifyInput): string[] {
+  return neededArtsOf(input.reportBody[String(n)] ?? "");
+}
+// 報告本文から、不足と書かれた行の allowlist 内の素材名を取る (neededArts の本体。engine の oc-pm 検出も使う)。
+export function neededArtsOf(body: string): string[] {
   const out: string[] = [];
-  for (const line of lines(input.reportBody[String(n)] ?? "")) {
+  for (const line of lines(body)) {
     if (!NEED_RE.test(line)) continue;
     for (const a of ALLOW_ARTS) if (wordBounded(a).test(line) && !out.includes(a)) out.push(a);
   }
@@ -213,7 +219,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
   const blocksCount = new Map<number, number>();
   for (const bs of blockers.values()) for (const b of bs) blocksCount.set(b, (blocksCount.get(b) ?? 0) + 1);
 
-  const artifactsFor = (n: number, i: SnapIssue): string => d.pm_art[String(n)]?.line ?? inferArtifacts(i.title, i.labels);
+  const artifactsFor = (n: number, i: SnapIssue): string => defaultArtLine(d.pm_art[String(n)]?.line, i.artLine, i.title, i.labels);
   const rlOf = (n: number): RelaunchState => input.relaunch[String(n)] ?? { count: 0, art: null };
 
   for (const [n, i] of [...iss].sort((a, b) => a[0] - b[0])) {
@@ -255,8 +261,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
         const rl = rlOf(n);
         const baseLine = artifactsFor(n, i);
         const base = artTokens(baseLine);
-        const extra = material ? neededArts(n, input).filter((a) => !base.includes(a)) : [];
-        let cand: string | null = extra.length ? "oc_artifacts: " + [...base, ...extra].join(" ") : null;
+        let cand: string | null = material ? addArts(baseLine, neededArts(n, input)) : null;
         if (!cand && material && newArts(rep?.art, base).length) cand = rep?.art ?? null;
         if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
         else rows.stopped.push([n, head90(bl.head)]);

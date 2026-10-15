@@ -43,12 +43,21 @@
 #   open の障害 issue があれば追記のみ (OC_WORKER_NOTE_MIN 分に 1 回まで)。24 時間以内に close した障害 issue は reopen して追記する。
 #   fresh が true で last_tick が 5 分以内なら、open の障害 issue にコメントして close する。
 #   ファイルが無い・取得失敗・JSON 不正は警告だけ出して何もしない (終了コードは変えない)。OC_WORKER_URL_FILE で URL のファイルを差し替えられる (テスト用)。
+#   launch の停止 (#CI-135): /status の launch_halted (区間 {reason, since}) が止まっていて launch_halted_overdue が true (15 分以上止まり、着手待ちと空き枠がある) なら、
+#   障害 issue に理由と止まり始めを追記する (無ければ上と同じ規則で起票。題名は『PM Worker launch 停止』)。reason が review-only (意図した停止) なら追記しない。
+#   止まっている間 (review-only を除く) や形の読めない launch_halted の間は、fresh でも回復として close しない。launch_halted が無い・null なら従来どおり。
+#
+# PM Worker の率制限 alert (#CI-142): fresh=true の /status で、rate_limit_alert が true (Worker が 5 件・30%・2 回連続と判定。ratealert.ts)
+#   または rest_remaining が 1500 未満 (ratelimit.ts) なら、ラベル oc:rate-limit の open issue があれば 60 分に 1 回まで追記、無ければ
+#   題名 `[CI-n] PM Worker 率制限 alert (日付)` を起票する。ただし 6 時間以内に閉じた oc:rate-limit の issue があれば起票しない (人が close した直後の再起票を防ぐ。reopen はしない)。
+#   同じラベルは notify-rate-limit.sh (run 側) も使うので、二重に起票しない。
+#   fresh=false の間の値は古いかもしれないので使わない (停止は pm-worker-down が扱う)。
 #
 # 暫定の oc-pm 起動 (#CI-50): Worker が live になるまで、PM agent の判断待ちの対象を repository_dispatch (oc-pm) で起動する。
-#   stuck : oc:stuck の PR で、最新の oc-fix-limit コメント (実装 App の投稿) に、当該 PR の oc-pm-intent: stuck がある (fix-progress.sh の停止印)
+#   stuck : oc:stuck の PR で、最新の oc-fix-limit コメント (github-actions[bot] の投稿) に、当該 PR の oc-pm-intent: stuck がある (fix-progress.sh の停止印)
 #   no_pr : oc:no-pr の open issue で、最後の oc-run-outcome の reason が split か stop (pm-apply・needs-user-input の付いた issue は除く)
 #   送るのは kind と ref の 2 つだけ。送る前に対象へ <!-- oc-pm-dispatch:<ref> ts=... --> を残す (残せなければ送らない)。
-#   上限は 1 回の点検で 3 件、1 時間に 12 件、同じ ref に 24 時間で 3 件 (記録のコメントを数える。記録は REVIEWER_LOGIN の Bot だけ数える)。
+#   上限は 1 回の点検で 3 件、1 時間に 24 件、同じ ref に 24 時間で 3 件 (記録のコメントを数える。記録は REVIEWER_LOGIN の Bot だけ数える)。
 #   Worker の /status が mode=live かつ fresh=true なら送らない。/status が取れないときは live でないとみなして送る。
 #   記録の一覧が読めないときは送らない (fail-closed)。DRY=1 は計画だけ表示する。
 #
@@ -158,6 +167,7 @@ WORKER_NOTE_MIN="${OC_WORKER_NOTE_MIN:-60}" # 既存の障害 issue への追記
 WORKER_TITLE_LIMIT=3000 # [CI-n] の採番に読む題名の件数 (gh の既定値では足りない)。これに達したら一覧が欠けうるので起票しない
 worker_line="worker=unknown"
 worker_status_json=""
+launch_state=none launch_reason="" launch_since="" launch_overdue=false
 worker_open_issues() { # open で pm-worker-down ラベルの issue を「番号 作成時刻」で新しい順に出す。一覧が取れなければ失敗 (REST の一覧は PR だけを返す場合があるため gh issue list を使う)
   local raw
   raw="$(gh issue list --repo "$R" --state open --label "$WORKER_LABEL" --limit 200 --json number,createdAt,closedAt)" || return 1
@@ -166,19 +176,26 @@ worker_open_issues() { # open で pm-worker-down ラベルの issue を「番号
 worker_status_copy() { # worker_status_copy <status json>: /status の写し。秘密を示す名前のキーは念のため除く
   jq -S 'walk(if type == "object" then with_entries(select(.key | test("token|secret|key|private|password|pem|jwt|credential"; "i") | not)) else . end)' <<< "$1"
 }
-worker_body() { # worker_body <kind: new|note> <理由> <status json>
-  local at
+worker_body() { # worker_body <kind: new|note> <理由> <status json> [what: worker (既定) | launch]
+  local at what="${4:-worker}"
   at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  if [ "$1" = new ]; then
+  if [ "$1" = new ] && [ "$what" = launch ]; then
+    printf '%s\n' "PM Worker (\`signature-studio-pm\`) は稼働していますが、launch が止まっています。watchdog.sh が \`/status\` を読んで検知しました (${at})。" ""
+    printf '%s\n' "- 判定: $2" "- 条件: \`launch_halted\` があり、\`launch_halted_overdue\` が true (15 分以上止まり、着手待ち (ready) と空き枠 (room) がある。\`review-only\` は除く)" ""
+  elif [ "$1" = new ]; then
     printf '%s\n' "PM Worker (\`signature-studio-pm\`) が停止している可能性があります。watchdog.sh が \`/status\` を読んで検知しました (${at})。" ""
     printf '%s\n' "- 判定: $2" "- 条件: \`configured\` と \`installed\` がともに true (一度でも稼働に入った Worker) で、\`fresh\` が false、または \`last_tick\` が 15 分より古い" ""
+  elif [ "$what" = launch ]; then
+    printf '%s\n' "[watchdog] launch はまだ止まっています (${at})。判定: $2" ""
   else
     printf '%s\n' "[watchdog] PM Worker はまだ回復していません (${at})。判定: $2" ""
   fi
   printf '%s\n' "## /status の写し (集計のみ。秘密を含まない)" '```json'
   worker_status_copy "$3"
   printf '%s\n' '```' ""
-  if [ "$1" = new ]; then
+  if [ "$1" = new ] && [ "$what" = launch ]; then
+    printf '%s\n' "確認すること: \`launch_halted.reason\` の条件 (infra/pm-worker/README.md『launch の停止と通知』の表)。止まりが解けると (\`launch_halted\` が null に戻り、\`fresh\` が true かつ \`last_tick\` が 5 分以内) watchdog.sh がこの issue にコメントして close します。" "" "@pycabbage" "<!-- oc-worker-down -->"
+  elif [ "$1" = new ]; then
     printf '%s\n' "確認すること: cron / Durable Object alarm の停止・例外、GitHub App (PM) の失効。回復すると (\`fresh\` が true かつ \`last_tick\` が 5 分以内) watchdog.sh がこの issue にコメントして close します。" "" "@pycabbage" "<!-- oc-worker-down -->"
   else
     printf '%s\n' "<!-- oc-worker-down-note -->"
@@ -190,8 +207,22 @@ worker_file() { # worker_file <title> <body file>
   gh label create "$WORKER_LABEL" --repo "$R" --color B60205 --description "PM Worker (signature-studio-pm) stopped; filed by watchdog.sh" --force > /dev/null 2>&1 || true
   gh issue create --repo "$R" --title "$1" --body-file "$2" --label "$WORKER_LABEL"
 }
-worker_down() { # worker_down <status json> <理由>
-  local body="$1" reason="$2" open target created cm last closed all allpr maxn f="${RUNNER_TEMP:-/tmp}/oc-worker-down-body.md"
+ci_next_title_n() { # ci_next_title_n: [CI-n] の次の番号 (題名の最大 + 1) を ci_next_n に入れる。読めない・上限に達したときは 1 を返す (起票しない)
+  local all allpr maxn
+  if ! all="$(gh issue list --repo "$R" --state all --limit "$WORKER_TITLE_LIMIT" --json title)" ||
+    ! allpr="$(gh pr list --repo "$R" --state all --limit "$WORKER_TITLE_LIMIT" --json title)"; then
+    echo "::warning::failed to count [CI-n] titles; no issue is filed"
+    return 1
+  fi
+  if [ "$(jq length <<< "$all")" -ge "$WORKER_TITLE_LIMIT" ] || [ "$(jq length <<< "$allpr")" -ge "$WORKER_TITLE_LIMIT" ]; then
+    echo "::warning::[CI-n] title list reached the limit ($WORKER_TITLE_LIMIT); no issue is filed"
+    return 1
+  fi
+  maxn="$(jq -s -r '[.[][] | (.title // "") | capture("^\\[CI-(?<n>[0-9]+)[a-z]?\\]") | .n | tonumber] | max // 0' <<< "$all"$'\n'"$allpr")"
+  ci_next_n=$((maxn + 1))
+}
+worker_down() { # worker_down <status json> <理由> [what: worker (既定) | launch]
+  local body="$1" reason="$2" what="${3:-worker}" open target created cm last closed title f="${RUNNER_TEMP:-/tmp}/oc-worker-down-body.md"
   if ! open="$(worker_open_issues)"; then
     echo "::warning::failed to list $WORKER_LABEL issues; no issue is filed or updated"
     return 0
@@ -211,7 +242,7 @@ worker_down() { # worker_down <status json> <理由>
       echo "worker: #$target is already reported (last note ${last}); no new note"
       return 0
     fi
-    worker_body note "$reason" "$body" > "$f"
+    worker_body note "$reason" "$body" "$what" > "$f"
     do_it "add a note to the open $WORKER_LABEL issue #$target" worker_note "$target" "$f"
     return 0
   fi
@@ -222,23 +253,15 @@ worker_down() { # worker_down <status json> <理由>
   target="$(jq -r --argjson sec "$WORKER_REOPEN_SEC" \
     '[.[] | select(.pull_request == null and .closedAt != null and (.closedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > (now - $sec))] | sort_by(.closedAt) | last | .number // empty' <<< "$closed")"
   if [ -n "$target" ]; then
-    worker_body note "$reason" "$body" > "$f"
+    worker_body note "$reason" "$body" "$what" > "$f"
     do_it "reopen #$target (closed within 24h) and add a note" worker_reopen "$target" "$f"
     return 0
   fi
-  if ! all="$(gh issue list --repo "$R" --state all --limit "$WORKER_TITLE_LIMIT" --json title)" ||
-    ! allpr="$(gh pr list --repo "$R" --state all --limit "$WORKER_TITLE_LIMIT" --json title)"; then
-    echo "::warning::failed to count [CI-n] titles; no issue is filed"
-    return 0
-  fi
-  if [ "$(jq length <<< "$all")" -ge "$WORKER_TITLE_LIMIT" ] || [ "$(jq length <<< "$allpr")" -ge "$WORKER_TITLE_LIMIT" ]; then
-    echo "::warning::[CI-n] title list reached the limit ($WORKER_TITLE_LIMIT); no issue is filed"
-    return 0
-  fi
-  maxn="$(jq -s -r '[.[][] | (.title // "") | capture("^\\[CI-(?<n>[0-9]+)[a-z]?\\]") | .n | tonumber] | max // 0' <<< "$all"$'\n'"$allpr")"
-  worker_body new "$reason" "$body" > "$f"
-  do_it "file '[CI-$((maxn + 1))] PM Worker 停止 ($(date -u +%Y-%m-%d))' with label $WORKER_LABEL" \
-    worker_file "[CI-$((maxn + 1))] PM Worker 停止 ($(date -u +%Y-%m-%d))" "$f"
+  ci_next_title_n || return 0
+  title="[CI-$ci_next_n] PM Worker 停止 ($(date -u +%Y-%m-%d))"
+  [ "$what" = launch ] && title="[CI-$ci_next_n] PM Worker launch 停止 ($(date -u +%Y-%m-%d))"
+  worker_body new "$reason" "$body" "$what" > "$f"
+  do_it "file '$title' with label $WORKER_LABEL" worker_file "$title" "$f"
 }
 worker_recovered() { # worker_recovered <last_tick> <age 秒>: open の障害 issue にコメントして close する
   local open line
@@ -251,6 +274,32 @@ worker_recovered() { # worker_recovered <last_tick> <age 秒>: open の障害 is
     do_it "close #${line%% *} (PM Worker recovered)" gh issue close "${line%% *}" --repo "$R" \
       --comment "[watchdog] PM Worker が回復しました (fresh=true、last_tick=$1、$(($2 / 60)) 分前)。この issue を close します。24 時間以内に再び停止した場合は reopen します。<!-- oc-worker-recovered -->"
   done <<< "$open"
+}
+launch_parse() { # launch_parse <status json>: launch_halted の形を読む (#CI-135)。launch_state は none (止まっていない) / halted / unknown (形が読めない)
+  launch_state=none launch_reason="" launch_since="" launch_overdue=false
+  launch_state="$(jq -r '
+    if (.launch_halted_overdue // false | type) != "boolean" then "unknown"
+    elif .launch_halted == null then "none"
+    elif (.launch_halted | type) == "object" and (.launch_halted.reason | type) == "string" and (.launch_halted.since | type) == "string" then "halted"
+    else "unknown" end' <<< "$1")" || launch_state=unknown
+  case "$launch_state" in
+    halted)
+      launch_reason="$(jq -r .launch_halted.reason <<< "$1")"
+      launch_since="$(jq -r .launch_halted.since <<< "$1")"
+      launch_overdue="$(jq -r '.launch_halted_overdue // false' <<< "$1")"
+      ;;
+    none) ;;
+    *)
+      launch_state=unknown
+      echo "::warning::/status launch_halted has an unexpected shape; launch check skipped"
+      ;;
+  esac
+}
+launch_abnormal() { [ "$launch_state" = halted ] && [ "$launch_reason" != review-only ]; } # 止まっている launch (意図した review-only を除く)
+launch_hold() { [ "$launch_state" = unknown ] || launch_abnormal; }                       # 止まっている間・形が読めない間は、fresh でも回復として close しない
+worker_launch() { # 止まっている launch が overdue (15 分以上・着手待ちと空き枠あり) なら、障害 issue に理由と起点を追記する (起票・重複排除は worker_down の規則)
+  launch_abnormal && [ "$launch_overdue" = true ] || return 0
+  worker_down "$worker_status_json" "launch が止まっています (reason=$launch_reason、止まり始め $launch_since)" launch
 }
 worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返す
   local url body cfg inst fresh tick age="" ts reason=""
@@ -277,6 +326,7 @@ worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返
     return 0
   fi
   worker_status_json="$body"
+  launch_parse "$body"
   cfg="$(jq -r .configured <<< "$body")"
   inst="$(jq -r .installed <<< "$body")"
   fresh="$(jq -r .fresh <<< "$body")"
@@ -287,7 +337,11 @@ worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返
   fi
   if [ "$fresh" = true ] && [ -n "$age" ] && [ "$age" -le "$WORKER_RECOVER_SEC" ]; then
     worker_line="worker=ok (fresh=true last_tick=${age}s ago)"
-    worker_recovered "$tick" "$age"
+    if launch_hold; then
+      worker_launch
+    else
+      worker_recovered "$tick" "$age"
+    fi
   elif [ "$cfg" != true ] || [ "$inst" != true ]; then
     worker_line="worker=not-set-up (configured=$cfg installed=$inst; no issue is filed)"
   elif [ "$fresh" = false ]; then
@@ -303,7 +357,105 @@ worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返
     worker_down "$body" "$reason"
   else
     worker_line="worker=ok (fresh=true last_tick=${age}s ago)"
+    worker_launch
   fi
+  if [ "$launch_state" = halted ]; then
+    worker_line="$worker_line launch=halted (reason=$launch_reason、止まり始め $launch_since、overdue=$launch_overdue)"
+  fi
+  return 0
+}
+
+# --- PM Worker の率制限 alert (#CI-142) ---
+# 判定の数値 (5 件・30%・2 回連続) は Worker (ratealert.ts) が計算し、rate_limit_alert に入れる。ここは真偽を読むだけ。
+# rest_remaining は ratelimit.ts の REST_REMAINING_MIN と同じ値を置く (test-watchdog.sh が一致を確かめる)。
+RATE_LABEL=oc:rate-limit
+REST_REMAINING_MIN=1500
+RATE_NOTE_MIN="${OC_RATE_NOTE_MIN:-60}"
+RATE_CLOSE_SEC=21600 # 閉じた issue の後は新しい issue を立てない時間 (notify-rate-limit.sh の 6 時間と同じ)
+rate_line="rate=unknown"
+rate_body() { # rate_body <kind: new|note> <理由> <status json>
+  local at
+  at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  if [ "$1" = new ]; then
+    printf '%s\n' "@pycabbage PM Worker (\`signature-studio-pm\`) の GitHub REST の率制限が危険域にあることを、watchdog.sh が \`/status\` を読んで検知しました (${at})。" ""
+    printf '%s\n' "- 判定: $2" "- 条件: \`rate_limit_alert\` が true (直近 30 分の \`cause=rate_limit\` の run が 5 件以上かつ完了 run の 30% 以上を 2 回連続)、または \`rest_remaining\` が ${REST_REMAINING_MIN} 未満" "- 影響: \`rest_remaining\` が ${REST_REMAINING_MIN} 未満の間、PM Worker は launch を止めます (理由 \`rate-guard\`)。" ""
+    printf '%s\n' "この issue は自動では close しません (率制限は時間で戻る。確認のあとに人が close する)。close から 6 時間は新しい issue を立てません。続報は 60 分に 1 回まで、この issue へのコメントで届きます。" ""
+  else
+    printf '%s\n' "[watchdog] 率制限の危険域がまだ続いています (${at})。判定: $2 <!-- oc-rate-limit-note -->" ""
+  fi
+  printf '%s\n' "## /status の率制限の項目 (集計のみ)" '```json'
+  jq -S '{fresh, last_tick, rate_limit_alert, rate_limit_30m, rest_remaining, rest_used, rest_reset_at}' <<< "$3"
+  printf '%s\n' '```'
+}
+rate_file() { # rate_file <題名> <本文ファイル>: 通知のラベルを (無ければ) 作って起票する
+  gh api -X POST "repos/$R/labels" -f name="$RATE_LABEL" -f color=D93F0B \
+    -f description="rate-limit notices (notify-rate-limit.sh / watchdog.sh)" > /dev/null 2>&1 || true
+  gh issue create --repo "$R" --title "$1" --body-file "$2" --label "$RATE_LABEL"
+}
+rate_down() { # rate_down <理由>: 同じラベルの open issue があれば追記のみ (RATE_NOTE_MIN 分に 1 回まで)。無ければ、閉じた issue が RATE_CLOSE_SEC 以内に無いことを確かめてから [CI-n] の題名で起票する
+  local open target created cm last title closed recent f="${RUNNER_TEMP:-/tmp}/oc-rate-limit-body.md"
+  if ! open="$(gh issue list --repo "$R" --state open --label "$RATE_LABEL" --limit 200 --json number,createdAt)"; then
+    echo "::warning::failed to list $RATE_LABEL issues; no issue is filed or updated"
+    return 0
+  fi
+  open="$(jq -r 'map(select(.pull_request == null)) | sort_by(.createdAt) | reverse | .[] | "\(.number) \(.createdAt)"' <<< "$open")"
+  target="${open%%$'\n'*}"
+  if [ -n "$target" ]; then
+    created="${target#* }"
+    target="${target%% *}"
+    if ! cm="$(gh api --paginate "repos/$R/issues/$target/comments")"; then
+      echo "::warning::failed to read comments of #$target; no note is added"
+      return 0
+    fi
+    last="$(jq -s -r --arg who "$REVIEWER_LOGIN" --arg c "$created" \
+      '[.[][] | select(.user.login == $who and .user.type == "Bot" and ((.body // "") | contains("oc-rate-limit-note"))) | .created_at] + [$c] | max' <<< "$cm")"
+    if [ "$(age_min "$last")" -lt "$RATE_NOTE_MIN" ]; then
+      echo "rate: #$target is already reported (last note ${last}); no new note"
+      return 0
+    fi
+    rate_body note "$1" "$worker_status_json" > "$f"
+    do_it "add a note to the open $RATE_LABEL issue #$target" worker_note "$target" "$f"
+    return 0
+  fi
+  if ! closed="$(gh issue list --repo "$R" --state closed --label "$RATE_LABEL" --limit 200 --json number,closedAt)"; then
+    echo "::warning::failed to list closed $RATE_LABEL issues; no issue is filed"
+    return 0
+  fi
+  recent="$(jq -r --argjson sec "$RATE_CLOSE_SEC" \
+    '[.[] | select(.closedAt != null and (.closedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > (now - $sec))] | sort_by(.closedAt) | last | .number // empty' <<< "$closed")"
+  if [ -n "$recent" ]; then
+    echo "rate: #$recent was closed within $((RATE_CLOSE_SEC / 3600)) hours: no new issue is filed"
+    return 0
+  fi
+  ci_next_title_n || return 0
+  title="[CI-$ci_next_n] PM Worker 率制限 alert ($(date -u +%Y-%m-%d))"
+  rate_body new "$1" "$worker_status_json" > "$f"
+  do_it "file '$title' with label $RATE_LABEL" rate_file "$title" "$f"
+}
+rate_check() { # 結果の 1 行を rate_line に入れる。常に 0 を返す。/status が読めていなければ何もしない (worker_check の後に呼ぶ)
+  local alert rem fresh reason=""
+  if [ -z "$worker_status_json" ]; then
+    rate_line="rate=skipped (no status)"
+    return 0
+  fi
+  fresh="$(jq -r .fresh <<< "$worker_status_json")"
+  if [ "$fresh" != true ]; then
+    rate_line="rate=skipped (fresh=false; the rate values may be stale)"
+    return 0
+  fi
+  alert="$(jq -r '.rate_limit_alert == true' <<< "$worker_status_json")"
+  rem="$(jq -r '.rest_remaining | if type == "number" then . else "" end' <<< "$worker_status_json")"
+  if [ "$alert" = true ]; then
+    reason="rate_limit_alert=true"
+  elif [[ "$rem" =~ ^[0-9]+$ ]] && [ "$rem" -lt "$REST_REMAINING_MIN" ]; then
+    reason="rest_remaining=$rem (< $REST_REMAINING_MIN)"
+  fi
+  if [ -z "$reason" ]; then
+    rate_line="rate=ok (rate_limit_alert=false, rest_remaining=${rem:-null})"
+    return 0
+  fi
+  rate_line="rate=alert ($reason)"
+  rate_down "$reason"
   return 0
 }
 
@@ -541,10 +693,12 @@ echo "$stuck_line"
 
 worker_check
 echo "$worker_line"
+rate_check
+echo "$rate_line"
 
 # --- 暫定の oc-pm 起動 (#CI-50)。判定と上限は冒頭の説明を正とする ---
 PM_PASS_MAX=3
-PM_HOUR_MAX=12
+PM_HOUR_MAX=24
 PM_REF_DAY_MAX=3
 pm_dispatch() { # pm_dispatch <kind> <ref>: 記録のコメントを残してから oc-pm を送る。記録できなければ送らない (payload は kind と ref だけ)
   local ts
@@ -647,6 +801,8 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     echo "$floating_line"
     echo
     echo "$worker_line"
+    echo
+    echo "$rate_line"
     echo
     echo "$pm_line"
     echo

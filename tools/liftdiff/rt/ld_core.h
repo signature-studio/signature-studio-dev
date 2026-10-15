@@ -241,6 +241,27 @@ static u64 ld_heap_alloc(u64 size, u64 align, int zero) {
 }
 static int ld_streq(const char* a, const char* b) { return strcmp(a, b) == 0; }
 
+/* WIN-9 (#2760): LD_CATALOG_MO=<.mo の path> 指定時だけ、*.moe の属性・open・seek・read を実カタログで応答する (実験).
+ * 未指定と wasm (__EMSCRIPTEN__) は従来の応答のまま。既定の 0 応答では size 0 → 確保 NULL → rip 0x4e0fab の null 読み
+ * (tools/liftdiff/REPORT_WIN7_2718.md §1.2)。 */
+#define LD_CAT_H 0x65000001ull
+static u8* ld_cat_buf; static u64 ld_cat_len, ld_cat_pos; static int ld_cat_tried;
+static int ld_cat_on(void) {
+#ifndef __EMSCRIPTEN__
+  if (!ld_cat_tried) {
+    const char* p = getenv("LD_CATALOG_MO"); FILE* f = p ? fopen(p, "rb") : NULL; long l = 0;
+    ld_cat_tried = 1;
+    if (f) {
+      fseek(f, 0, SEEK_END); l = ftell(f); fseek(f, 0, SEEK_SET);
+      if (l > 0) { ld_cat_buf = (u8*)malloc((size_t)l); if (ld_cat_buf && fread(ld_cat_buf, 1, (size_t)l, f) == (size_t)l) ld_cat_len = (u64)l; else { free(ld_cat_buf); ld_cat_buf = NULL; } }
+      fclose(f);
+    }
+  }
+#endif
+  return ld_cat_buf != NULL;
+}
+static int ld_cat_path(u64 a) { char nm[160]; u64 l = ld_read_strW(a, nm, sizeof nm); return l >= 4 && strcmp(nm + l - 4, ".moe") == 0; }
+
 /* name = import 名 (kernel32 等の区別はしない), a[] = 位置引数 (ms64 先頭 4 つ) */
 static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5) {
   (void)a4; (void)a5;   /* 第5/6引数: 6引数 API (MultiByteToWideChar 等) が CAB-233 で使用 */
@@ -298,6 +319,24 @@ static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, 
       if (n[strlen(n) - 1] == 'A') { if (a1 && a2 && ld_dst_ok(a1, l + 2)) { u64 nn = l < a2 - 1 ? l : a2 - 1; memcpy((void*)(uintptr_t)a1, s, nn); ((char*)(uintptr_t)a1)[nn] = 0; return nn; } return 0; }
       if (a1 && a2 && ld_dst_ok(a1, l * 2 + 2)) { u64 nn = l < a2 - 1 ? l : a2 - 1; for (u64 k = 0; k < nn; k++) ((uint16_t*)(uintptr_t)a1)[k] = (uint16_t)s[k]; ((uint16_t*)(uintptr_t)a1)[nn] = 0; return nn; }
       return 0;
+    }
+    if (ld_cat_on()) {   /* WIN-9 (#2760) 実験: LD_CATALOG_MO 指定時のみ */
+      if (ld_streq(n, "GetFileAttributesW") && ld_cat_path(a0)) return 0x80;   /* FILE_ATTRIBUTE_NORMAL */
+      if (ld_streq(n, "CreateFileW") && ld_cat_path(a0)) { ld_cat_pos = 0; return LD_CAT_H; }
+      if (ld_streq(n, "SetFilePointer") && (u32)a0 == (u32)LD_CAT_H) {
+        u32 m = (u32)a3; u64 np = m == 0 ? (u64)(int64_t)(int32_t)a1 : m == 1 ? ld_cat_pos + (u64)(int64_t)(int32_t)a1 : ld_cat_len + (u64)(int64_t)(int32_t)a1;
+        ld_cat_pos = np;
+        if (a2 && ld_dst_ok(a2, 4)) *(u32*)(uintptr_t)a2 = 0;
+        return (u32)np;
+      }
+      if (ld_streq(n, "ReadFile") && (u32)a0 == (u32)LD_CAT_H) {
+        u64 k = ld_cat_pos < ld_cat_len ? ld_cat_len - ld_cat_pos : 0;
+        if (k > (u32)a2) k = (u32)a2;
+        if (a1 && k && ld_dst_ok(a1, k)) memcpy((void*)(uintptr_t)a1, ld_cat_buf + ld_cat_pos, k);
+        ld_cat_pos += k;
+        if (a3 && ld_dst_ok(a3, 4)) *(u32*)(uintptr_t)a3 = (u32)k;
+        return 1;
+      }
     }
     if (ld_streq(n, "GetFileAttributesW") || ld_streq(n, "GetFileAttributesA")) return (u64)-1;   /* FILE NOT FOUND */
     if (ld_streq(n, "GetFileAttributesExW") || ld_streq(n, "GetFileAttributesExA")) {
@@ -420,10 +459,14 @@ static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, 
      * 実測 (CAB-233): (1) INVALID_HANDLE_VALUE (-1) にすると entry が unit 159 の別地点 (0x2690dc) に落ち
      * 906/942 に後退、(2) CreateFileW 仮ハンドル (0x65000001) + ReadFile 失敗 (0) でも unit 830/895/898 の
      * .moe loader (rip 0x4e0fab) は救えない (= ReadFile が実バイトを返せないのが根源)。
-     * (3) 実カタログ供給実験 (win64extracted/block25158_DATA.bin = gettext .mo 先頭 magic 0x950412de, 47,405B を
-     *     CreateFileW→仮 handle + ReadFile で読ませる): magic check (0x4e1a3c) は通るが、catalog iteration loop
-     *     (0x513da9 の VMT 仮想 call Get(i)) から rbp ごと破壊されて戻る (rbp=0x7fff00000000, rdx=.mo の host バッファ)
-     *     → unit 830/895/898 は embodiment 深层の stub ギャップが残る。0 応答で 928/942 が最良。
+     * (3) 旧実験 (実カタログ供給。revert 済みで commit に残らない記録): win64extracted/block25158_DATA.bin (gettext .mo 先頭
+     *     magic 0x950412de, 47,405B) を CreateFileW→仮 handle + ReadFile で読ませた。magic check (0x4e1a3c) は通るが、catalog
+     *     iteration loop (rva 0x513da9 = call *0x18(%rdi)・VMT 仮想 call Get(i)) から rbp ごと破壊されて戻ったとの記録がある
+     *     (rbp=0x7fff00000000)。旧応答の詳細 (SetFilePointer 等) は残っていない。
+     *     → unit 830/895/898 は embodiment 深層の stub ギャップが残る。0 応答で 928/942 が最良。
+     *     WIN-9 (#2760) の LD_CATALOG_MO 分岐 (ld_cat_on) は別の応答 (GetFileAttributesW=0x80・SetFilePointer の size 応答) で
+     *     同じ .mo を供給し、magic 検査の後の範囲検査 (rva 0x17bcd) まで進む。新しい応答で 0x513da9 の rbp 破壊が起きるかは未確認
+     *     (tools/liftdiff/REPORT_WIN7_2718.md §5.3)。
      * 真正ファイル I/O 接続 (System/Languages/LC_MESSAGES/default.moe = block25158) は下流タスクへ。 */
   }
   if (ld_streq(n, "VirtualAlloc")) { if (a0) return a0; return ld_heap_alloc((u32)a1 ? (a1 & 0xffffffffull) : 0x1000, 0x10000, 1); }
@@ -496,7 +539,14 @@ static void ld_fakeproc_vmt_init(void) {
     }
   }
 }
+/* LD-153: 仮 proc の thunk は GetProcAddress 登録時にしか敷かれない。boot state を別プロセスへ移送すると、
+ * 状態中の仮 proc 値 (index<LD_VMT_IDX0) が未生成の 0 埋めページを指し、実行で addr 0 に segv する。
+ * snapshot 時に GetProcAddress 域の thunk も全部敷く (名前は別プロセスでは "?freeproc" になる)。 */
+static void ld_fakeproc_thunks_init(void) {
+  for (u64 i = 0; i < LD_VMT_IDX0; i++) ld_fake_ptr(i);
+}
 static void ld_snapshot(void) {
+  ld_fakeproc_thunks_init();
   ld_fakeproc_vmt_init();
   for (int i = 0; i < ld_nwr; i++) {
     free(ld_wr[i].pristine);
@@ -559,6 +609,7 @@ typedef struct {
   int nargs; char kind[16]; u64 val[16];   /* 位置引数: kind 'i'(int/ptr) 'd'(f64 bits) 'f'(f32 bits) */
   u64 rax;
   int trace, xfill, stkfill, keep, blk, audit;
+  u64 abortret;         /* LD-161 (#3563): native のみ。trace で入る abort helper の VA (例 0x409730)。その入口の状態を保存し、noncontinuable RaiseException で入口の return 状態へ戻す */
   u64 left_n, left_first, left_last;   /* LD-96 (#2258): audit=1 のとき case 開始時に、高水位より外側へ残った heap の非 0 バイト数 */
   int npatch; struct { int region; u64 off; u8 data[64]; int len; } patch[16];
   char abi[16];
@@ -614,6 +665,7 @@ static int ld_parse_case(char* line) {
     else if (!strcmp(t, "abi")) snprintf(ld_case.abi, sizeof ld_case.abi, "%s", v);
     else if (!strcmp(t, "rax")) ld_case.rax = strtoull(v, NULL, 0);
     else if (!strcmp(t, "trace")) ld_case.trace = atoi(v);
+    else if (!strcmp(t, "abortret")) ld_case.abortret = strtoull(v, NULL, 16);
     else if (!strcmp(t, "stkfill")) ld_case.stkfill = (int)strtol(v, NULL, 16);
     else if (!strcmp(t, "keep")) ld_case.keep = atoi(v);
     else if (!strcmp(t, "blk")) ld_case.blk = atoi(v);

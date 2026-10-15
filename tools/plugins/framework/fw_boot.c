@@ -88,7 +88,10 @@ static uint64_t fw_ov_InitLib(uint64_t ctx, uint64_t pkg, uint64_t tblctx, uint6
             reason, (unsigned long long)r13, (unsigned long long)hooks, (unsigned long long)dllproc);
     if (reason == 1 || reason == 2) {
         uint64_t proc = Q(hooks + (uint64_t)reason * 8);
+        fprintf(stderr, "[fw][ov] hooks[%u]=0x%llx\n", reason, (unsigned long long)proc);
         if (proc) fw_call_cur((uint32_t)proc);
+        fprintf(stderr, "[fw][ov] hooks[%u] done: tls_idx=%d tls_7162d0=0x%llx\n", reason,
+                (int)D(0x6d6e70), (unsigned long long)Q(0x7162d0));
     }
     if (dllproc) {
         Q(BLK + 8) = reason;             /* ecx = reason */

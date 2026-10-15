@@ -24,9 +24,9 @@ M11_RT_INSTR="${M11_RT_INSTR:-$M11_INSTR_413060}"   # #1701: rt.o をコンパ�
 M11_OV_INSTR="${M11_OV_INSTR:-$M11_INSTR_413060}"   # #1701: ov.o をコンパイルする時の M11_INSTR_413060 値 (既定は同じ)。1 を 0 にすると ov.o だけ計測 OFF
 M11_LINK_INSTR="${M11_LINK_INSTR:-$M11_INSTR_413060}"   # #1701: リンク時の EXPORTS (_m11_dest_obs_* 等) を足すか。既定は M11_INSTR_413060 と同じ
 M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (指紋) を止める。読出しが挙動を変えるかの切り分け用。既定 1
-M11_FIX_535BF2="${M11_FIX_535BF2:-0}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現); 0 = lift 版 (既定)
+M11_FIX_535BF2="${M11_FIX_535BF2:-1}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現; 既定 #2521); 0 = lift 版
 M11_FIX_50A830="${M11_FIX_50A830:-0}"   # #2439: 1 = m11_ov.c の function_50a830 転記 (list Add の Grow/Notify 復元 + Grow 実体 50aac0/50ade0 の転記); 0 = lift 版 (既定)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_FIX_50A830=$M11_FIX_50A830 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_DEST_GUARD=${M11_DEST_GUARD:-0} -DM11_INSTR_40F960=${M11_INSTR_40F960:-0} -DM11_INSTR_40FFE0=${M11_INSTR_40FFE0:-0} -DM11_INSTR_60A270=${M11_INSTR_60A270:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_NOVCALL=${M11_NOVCALL:-0} -DM11_RT_PADPRE=${M11_RT_PADPRE:-0} -DM11_RT_PADPOST=${M11_RT_PADPOST:-0} -DM11_RT_EMPTY=${M11_RT_EMPTY:-0} -DM11_PRINT_DEST_2118=${M11_PRINT_DEST_2118:-0} -DM11_RT_NODATA=${M11_RT_NODATA:-0}"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_FIX_50A830=$M11_FIX_50A830 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_DEST_GUARD=${M11_DEST_GUARD:-0} -DM11_INSTR_40F960=${M11_INSTR_40F960:-0} -DM11_INSTR_40FFE0=${M11_INSTR_40FFE0:-0} -DM11_INSTR_60A270=${M11_INSTR_60A270:-0} -DM11_PROBE_2400=${M11_PROBE_2400:-0} -DM11_INSTR_412770=${M11_INSTR_412770:-0} -DM11_INSTR_E3EF60=${M11_INSTR_E3EF60:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_NOVCALL=${M11_NOVCALL:-0} -DM11_RT_PADPRE=${M11_RT_PADPRE:-0} -DM11_RT_PADPOST=${M11_RT_PADPOST:-0} -DM11_RT_EMPTY=${M11_RT_EMPTY:-0} -DM11_PRINT_DEST_2118=${M11_PRINT_DEST_2118:-0} -DM11_RT_NODATA=${M11_RT_NODATA:-0} -DM11_RT_NODATA_BODY=${M11_RT_NODATA_BODY:-0}"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -61,6 +61,18 @@ if [ "$(python3 m11_cond.py --get ldfix)" = applied ]; then
     echo "[m11build] WARNING: M11_ALLOW_LD108_DISABLED=1: fix_ld108 無しの IR で build する (ir_conditions.json ld108=disabled)" >&2
   elif [ "$(python3 m11_cond.py --get ld108)" != applied ]; then
     echo "[m11build] ERROR: work/ir_conditions.json に ld108=applied の記録無し (現在: '$(python3 m11_cond.py --get ld108)')。m11_gen_ir2.sh で IR を作り直すこと (fix_ld108 無しで測るなら M11_FIX_LD108=0 で作り直し、M11_ALLOW_LD108_DISABLED=1)" >&2; exit 2
+  fi
+  # #1448: fix_r8b815050 (6cefb0 第 3 引数の即値 1) は M11_FIX_R8B=0 で外した IR を A/B 測定用に opt-in でだけ build する
+  if [ "$(python3 m11_cond.py --get r8b)" = disabled ] && [ "${M11_ALLOW_R8B_DISABLED:-0}" = 1 ]; then
+    echo "[m11build] WARNING: M11_ALLOW_R8B_DISABLED=1: fix_r8b815050 無しの IR で build する (ir_conditions.json r8b=disabled)" >&2
+  elif [ "$(python3 m11_cond.py --get r8b)" != applied ]; then
+    echo "[m11build] ERROR: work/ir_conditions.json に r8b=applied の記録無し (現在: '$(python3 m11_cond.py --get r8b)')。m11_gen_ir2.sh で IR を作り直すこと (fix_r8b815050 無しで測るなら M11_FIX_R8B=0 で作り直し、M11_ALLOW_R8B_DISABLED=1)" >&2; exit 2
+  fi
+  # #2447 (LD-115) / #2527 (LD-117): fix_ld115 (666a60 のループ回数・ループ内 store) の適用記録も要る。M11_FIX_LD115=0 で作った IR (ld115=disabled) は A/B 測定用で、明示 opt-in のときだけ build する
+  if [ "$(python3 m11_cond.py --get ld115)" = disabled ] && [ "${M11_ALLOW_LD115_DISABLED:-0}" = 1 ]; then
+    echo "[m11build] WARNING: M11_ALLOW_LD115_DISABLED=1: fix_ld115 無しの IR で build する (ir_conditions.json ld115=disabled)" >&2
+  elif [ "$(python3 m11_cond.py --get ld115)" != applied ]; then
+    echo "[m11build] ERROR: work/ir_conditions.json に ld115=applied の記録無し (現在: '$(python3 m11_cond.py --get ld115)')。m11_gen_ir2.sh で IR を作り直すこと (fix_ld115 無しで測るなら M11_FIX_LD115=0 で作り直し、M11_ALLOW_LD115_DISABLED=1)" >&2; exit 2
   fi
 fi
 # #680 (review): 記録の無い差替え (正規 pass を経ない IR の書換え) を拒否する。正規 pass は直後に --bind で指紋を更新する
@@ -102,6 +114,9 @@ if ! cmp -s work/boot_final.ll work/boot_final.alloca.tmp.ll; then mv work/boot_
 #   M11_GUARD699=off で脱落状態に戻す (ネガコン)。M11_GUARD699_COND で条件を差し替え (ネガコン: 常に不成立)。
 python3 guard699/m11_guard699.py work/boot_final.ll work/boot_final.guard699.tmp.ll --mode "${M11_GUARD699:-on}" --cond "${M11_GUARD699_COND:-icmp sle i32 %9, 0}" --report work/guard699_report.json
 if ! cmp -s work/boot_final.ll work/boot_final.guard699.tmp.ll; then mv work/boot_final.guard699.tmp.ll work/boot_final.ll; else rm -f work/boot_final.guard699.tmp.ll; fi
+# #2773: 4fa210 (件数 0 の線形探索) の入口ガードを IR に復元 (D19 同型・冪等)。M11_GUARD4FA210=off で脱落状態に戻す (ネガコン)。
+python3 guard4fa210/m11_guard4fa210.py work/boot_final.ll work/boot_final.guard4fa210.tmp.ll --mode "${M11_GUARD4FA210:-on}" --report work/guard4fa210_report.json
+if ! cmp -s work/boot_final.ll work/boot_final.guard4fa210.tmp.ll; then mv work/boot_final.guard4fa210.tmp.ll work/boot_final.ll; else rm -f work/boot_final.guard4fa210.tmp.ll; fi
 # #912: 4fb090 の 4fa070 呼出し第 2 引数 dl を機械語 (mov dl,1) どおりに戻す (冪等)。既定 0 (OFF)。M11_FIX_912=1 で有効化。
 #   現 head (M2q 込み IR) では ON/OFF の survey 差 0 (REPORT_912 §10)。旧 IR (a5e9c1ed) では 101/291/296 の oob を解消した (REPORT_912 §7-旧)。
 python3 fix912/m11_fix912.py work/boot_final.ll work/boot_final.fix912.tmp.ll --mode "$([ "${M11_FIX_912:-0}" = 1 ] && echo on || echo off)" --report work/fix912_report.json
@@ -118,9 +133,21 @@ echo "$S_INSTR" > work/instr_413060.stamp
 S_INSTR40="${M11_INSTR_40FF70:-0}:${M11_INSTR_40FFE0:-0}:${M11_INSTR_60A270:-0}"
 if [ "$(cat work/instr_40ff70.stamp 2>/dev/null || echo none)" != "$S_INSTR40" ]; then rm -f work/boot_final3.ll; fi
 echo "$S_INSTR40" > work/instr_40ff70.stamp
+# #3325: function_412770 観測 probe の ON/OFF で post 結果と ov.o を作り直す (stamp)
+if [ "$(cat work/instr_412770.stamp 2>/dev/null || echo 0)" != "${M11_INSTR_412770:-0}" ]; then rm -f work/boot_final3.ll work/obj/ov.o; fi
+echo "${M11_INSTR_412770:-0}" > work/instr_412770.stamp
+# #2400: function_e3ef60 の 60a270 呼出し probe の ON/OFF で post 結果と ov.o を作り直す (stamp)
+if [ "$(cat work/instr_2400.stamp 2>/dev/null || echo 0)" != "${M11_PROBE_2400:-0}" ]; then rm -f work/boot_final3.ll work/obj/ov.o; fi
+echo "${M11_PROBE_2400:-0}" > work/instr_2400.stamp
+# #2407: function_e3ef60 観測 probe の ON/OFF で post 結果と ov.o を作り直す (stamp)
+if [ "$(cat work/instr_e3ef60.stamp 2>/dev/null || echo 0)" != "${M11_INSTR_E3EF60:-0}" ]; then rm -f work/boot_final3.ll work/obj/ov.o; fi
+echo "${M11_INSTR_E3EF60:-0}" > work/instr_e3ef60.stamp
 S_P134="${M11_PROBE_134:-0}"   # #134: 1 = 計測用 IR probe (8c5eb0 の arg2・R・list; trap_triage/probe134_ir.py) を boot_final3.ll に入れる。既定 0 では入れない
 if [ "$(cat work/instr_134.stamp 2>/dev/null || echo 0)" != "$S_P134" ]; then rm -f work/boot_final3.ll; fi
 echo "$S_P134" > work/instr_134.stamp
+S_P2780="${M11_PROBE_2780:-0}"   # #2780: 1 = 計測用 IR probe (function_4473f0 の各反復値; trap_triage/probe2780_ir.py) を boot_final3.ll に入れる。既定 0 では入れない
+if [ "$(cat work/instr_2780.stamp 2>/dev/null || echo 0)" != "$S_P2780" ]; then rm -f work/boot_final3.ll; fi
+echo "$S_P2780" > work/instr_2780.stamp
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
 # #954 (M11-N54): M11_XMM_ARGS=1 = 機械語が xmm0..3 を入力に読む callee の IR 署名へ float/double 引数を復元する (fix_xmm_args.py, #547)。
 #   既定 0 (従来どおり復元しない)。1 のときだけ post (m11_post) の入力を boot_final.xa.ll に差し替える。切替えは stamp で post 結果を無効化する。
@@ -150,6 +177,8 @@ if [ ! -f work/boot_final3.ll ] || [ "$POST_IN" -nt work/boot_final3.ll ] || [ m
   fi
 fi
 if [ "$S_P134" = 1 ]; then python3 trap_triage/probe134_ir.py work/boot_final3.ll || exit 1; fi   # #134 計測専用 (既定 0 では何もしない)
+if [ "$S_P2780" = 1 ]; then python3 trap_triage/probe2780_ir.py work/boot_final3.ll || exit 1; fi   # #2780 計測専用 (既定 0 では何もしない)
+if [ "${M11_PROBE_2400:-0}" = 1 ]; then python3 trap_triage/probe2400_ir.py work/boot_final3.ll || exit 1; fi   # #2400 計測専用 (既定 0 では何もしない)
 # SIMD helper (C) は IR の declare から署名駆動で再生成 (m11_simd2.py)
 if [ ! -f work/m11_simd.c ] || [ work/boot_final.ll -nt work/m11_simd.c ] || [ m11_simd2.py -nt work/m11_simd.c ]; then
   python3 m11_simd2.py work/boot_final.ll > work/m11_simd.c 2> work/simd2.log
@@ -171,7 +200,7 @@ cc() { # cc <src> <obj> [extra deps...]
 }
 # 別 TU (tools/shim, m11_rt/ov/win) が定義する Win32 API は winstubs から除外 (duplicate symbol 回避)
 for f in heap failfast file timer sync; do cc ../shim/src/$f.c work/obj/shim_$f.o; done
-S_NEG="$M11_NEG_413060-$M11_DEST_READ-$M11_INSTR_413060-rt$M11_RT_INSTR$( [ "${M11_RT_PADPRE:-0}${M11_RT_PADPOST:-0}${M11_RT_EMPTY:-0}${M11_RT_NODATA:-0}" = 0000 ] || echo "-pre${M11_RT_PADPRE:-0}-post${M11_RT_PADPOST:-0}-empty${M11_RT_EMPTY:-0}-nodata${M11_RT_NODATA:-0}" )$( [ "${M11_DEST_GUARD:-0}" = 0 ] || echo "-guard${M11_DEST_GUARD}" )"   # #1952: 対照 knob (既定 0 のときは従来の stamp と同一)。#1547: DEST_GUARD も rt.o の作り直し判定 (既定 0 は従来と同一)
+S_NEG="$M11_NEG_413060-$M11_DEST_READ-$M11_INSTR_413060-rt$M11_RT_INSTR$( [ "${M11_RT_PADPRE:-0}${M11_RT_PADPOST:-0}${M11_RT_EMPTY:-0}${M11_RT_NODATA:-0}" = 0000 ] || echo "-pre${M11_RT_PADPRE:-0}-post${M11_RT_PADPOST:-0}-empty${M11_RT_EMPTY:-0}-nodata${M11_RT_NODATA:-0}" )$( [ "${M11_DEST_GUARD:-0}" = 0 ] || echo "-guard${M11_DEST_GUARD}" )$( [ "${M11_RT_NODATA_BODY:-0}" = 0 ] || echo "-nodatabody${M11_RT_NODATA_BODY}" )"   # #1952: 対照 knob (既定 0 のときは従来の stamp と同一)。#1547: DEST_GUARD も rt.o の作り直し判定 (既定 0 は従来と同一)
 if [ "$(cat work/neg_413060.stamp 2>/dev/null || echo none)" != "$S_NEG" ]; then rm -f work/obj/rt.o; fi
 echo "$S_NEG" > work/neg_413060.stamp
 # #1176: work-m11 同梱の rt.o/win.o は古い snapshot のことがある (mtime だけでは判定できない: 同梱 obj が source より新しく見える)。
@@ -221,6 +250,9 @@ echo "$S_INSTR40" > work/ov_instr_40ff70.stamp
 if [ "$(cat work/ov_instr_40f960.stamp 2>/dev/null || echo none)" != "${M11_INSTR_40F960:-0}" ]; then rm -f work/obj/ov.o; fi
 echo "${M11_INSTR_40F960:-0}" > work/ov_instr_40f960.stamp
 echo "$M11_FIX_535BF2" > work/ov_535bf2.stamp
+# M11_FIX_50A830 が変わったら ov.o だけ無効化 (#2439: ON/OFF の切替で古い ov.o を再リンクしない)
+if [ "$(cat work/ov_50a830.stamp 2>/dev/null || echo none)" != "$M11_FIX_50A830" ]; then rm -f work/obj/ov.o; fi
+echo "$M11_FIX_50A830" > work/ov_50a830.stamp
 CF="${CF_BASE//-DM11_INSTR_413060=$M11_INSTR_413060/-DM11_INSTR_413060=$M11_OV_INSTR}" cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
 cc work/m11_data.c work/obj/data.o
 
@@ -233,7 +265,7 @@ emcc work/obj/*.o -o work/m11_boot.cjs.tmp \
   -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEXIT_RUNTIME=1 \
   --no-entry -Wl,--export-all \
   -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPF32,HEAP32,HEAPF64,HEAPU32,HEAP64,wasmTable,addFunction \
-  -sEXPORTED_FUNCTIONS=$EXPORTS$( [ "$M11_LINK_INSTR" = 1 ] && echo ,_m11_dest_obs_n,_m11_dest_obs_hhi,_m11_dest_obs_hlo,_m11_dest_rec )$( [ "$S_P134" = 1 ] && echo ,_m11_p134_n,_m11_p134_get )$( [ "${M11_ENTRY_PROBE:-0}" = 1 ] && echo ,_m11_fe_get,_m11_fe_clear ) \
+  -sEXPORTED_FUNCTIONS=$EXPORTS$( [ "$M11_LINK_INSTR" = 1 ] && echo ,_m11_dest_obs_n,_m11_dest_obs_hhi,_m11_dest_obs_hlo,_m11_dest_rec )$( [ "$S_P134" = 1 ] && echo ,_m11_p134_n,_m11_p134_get )$( [ "$S_P2780" = 1 ] && echo ,_m11_p2780_n,_m11_p2780_get )$( [ "${M11_ENTRY_PROBE:-0}" = 1 ] && echo ,_m11_fe_get,_m11_fe_clear ) \
   -Wl,--initial-memory="$INITMEM" -Wl,--max-memory="$MAXMEM" $( [ -n "${M11_LINK_MAP:-}" ] && echo -Wl,-Map="$M11_LINK_MAP" ) 2> work/link.log || { tail -30 work/link.log; exit 1; }
 mv work/m11_boot.cjs.tmp work/m11_boot.cjs
 python3 m11_postjs.py work/m11_boot.cjs 2>/dev/null

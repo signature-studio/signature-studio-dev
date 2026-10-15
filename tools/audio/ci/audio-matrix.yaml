@@ -1,0 +1,100 @@
+# AU-32 (#3164): Windows / macOS runner で AU-2 の代理指標 (P1〜P4) を測る行列。
+# 適用先は .github/workflows/audio-matrix.yaml (実装 App は .github/workflows/ を push できない: docs/WORKFLOW.md §11(d))。
+# 適用は PM が行う: `cp tools/audio/ci/audio-matrix.yaml .github/workflows/audio-matrix.yaml` (§11(c))。
+# 未検証: この file は Windows / macOS の runner で一度も実行していない。仮想オーディオ (VB-CABLE / BlackHole) の導入と
+#   既定出力への切替、Edge の CHROME 指定は初回 dispatch で確かめる。BlackHole の cask は再起動を要求する (formulae.brew.sh)。
+name: audio-matrix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: emsdk (tools/audio/build.sh の emcc)
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '6.0.12'
+      - run: pnpm install --frozen-lockfile
+      - run: bash tools/audio/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audio-web
+          path: tools/audio/build/web
+          retention-days: 1
+
+  measure:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            browser: chrome
+            chrome: 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+          - os: windows-latest
+            browser: edge
+            chrome: 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+          - os: macos-latest
+            browser: chrome
+            chrome: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+          - os: macos-latest
+            browser: safari
+            chrome: ''
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: audio-web
+          path: tools/audio/build/web
+      - name: 仮想オーディオ VB-CABLE を既定の再生デバイスにする (Windows・未検証)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install vb-cable -y --no-progress
+          Install-Module -Name AudioDeviceCmdlets -Force -Scope CurrentUser
+          $d = Get-AudioDevice -List | Where-Object { $_.Type -eq 'Playback' -and $_.Name -like '*CABLE Input*' } | Select-Object -First 1
+          if (-not $d) { throw 'VB-CABLE の再生デバイスが見つからない' }
+          Set-AudioDevice -Index $d.Index
+      - name: 仮想オーディオ BlackHole 2ch を既定の出力にする (macOS・未検証)
+        if: runner.os == 'macOS'
+        run: |
+          brew install --cask blackhole-2ch
+          brew install switchaudio-osx
+          sudo killall coreaudiod || true
+          sleep 5
+          SwitchAudioSource -s "BlackHole 2ch"
+          SwitchAudioSource -c
+      - name: Safari の remote automation を許可 (macOS・Safari 行のみ・未検証)
+        if: matrix.browser == 'safari'
+        run: sudo safaridriver --enable
+      - name: P1〜P4 の測定 (AU-2 の 3 シナリオ × n=3)
+        shell: bash
+        env:
+          CHROME: ${{ matrix.chrome }}
+        run: |
+          mkdir -p audio-results
+          rc=0
+          for rep in 1 2 3; do
+            node tools/audio/harness/run.mjs --browser ${{ matrix.browser }} --only asio_sine_b256_d2,asio_sine_b256_96k,asio_sine_b512_96k \
+              --out "audio-results/${{ matrix.os }}_${{ matrix.browser }}_r${rep}.json" || rc=1
+          done
+          exit $rc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audio-au2-${{ matrix.os }}-${{ matrix.browser }}
+          path: audio-results

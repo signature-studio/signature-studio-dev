@@ -1,0 +1,44 @@
+PE: extracted/block00031_PE.bin  (ImageBase 0x400000, functions(.pdata)=57816, imports=795, dlls=33)
+class             api                                dll                        sites funcs
+blocking_wait     EnterCriticalSection               kernel32.dll                 699   550
+blocking_wait     Sleep                              kernel32.dll                  33    25
+blocking_wait     WaitForSingleObject                kernel32.dll                  16    16
+blocking_wait     MsgWaitForMultipleObjects          user32.dll                     3     3
+blocking_wait     SwitchToThread                     kernel32.dll                   3     3
+blocking_wait     WaitForMultipleObjectsEx           kernel32.dll                   3     3
+blocking_wait     MsgWaitForMultipleObjectsEx        user32.dll                     1     1
+blocking_wait     SignalObjectAndWait                kernel32.dll                   1     1
+blocking_wait     WaitForMultipleObjects             kernel32.dll                   1     1
+nonblocking_sync  LeaveCriticalSection               kernel32.dll                 799   635
+nonblocking_sync  DeleteCriticalSection              kernel32.dll                  65    48
+nonblocking_sync  InitializeCriticalSection          kernel32.dll                  65    48
+nonblocking_sync  CreateEventW                       kernel32.dll                  17    14
+nonblocking_sync  SetEvent                           kernel32.dll                  17    17
+nonblocking_sync  ResetEvent                         kernel32.dll                   8     7
+thread_attr       GetCurrentThreadId                 kernel32.dll                  51    47
+thread_attr       SetProcessAffinityMask             kernel32.dll                   9     6
+thread_attr       TlsGetValue                        kernel32.dll                   4     3
+thread_attr       GetThreadPriority                  kernel32.dll                   2     2
+thread_attr       ResumeThread                       kernel32.dll                   2     2
+thread_attr       TlsSetValue                        kernel32.dll                   2     2
+thread_attr       ExitThread                         kernel32.dll                   1     1
+thread_attr       SetThreadPriority                  kernel32.dll                   1     1
+thread_attr       SuspendThread                      kernel32.dll                   1     1
+thread_attr       TlsAlloc                           kernel32.dll                   1     1
+thread_attr       TlsFree                            kernel32.dll                   1     1
+thread_create     SetTimer                           user32.dll                    13    13
+thread_create     CreateThread                       kernel32.dll                   3     3
+thread_create     CreateTimerQueueTimer              kernel32.dll                   1     1
+
+## class summary (distinct_functions = クラス内のいずれかの API を呼ぶ関数の和集合)
+  thread_create     apis=  3 call_sites=   17 distinct_functions=   17
+  blocking_wait     apis=  9 call_sites=  760 distinct_functions=  594
+  nonblocking_sync  apis=  6 call_sites=  971 distinct_functions=  759
+  atomic            apis=  0 call_sites=    0 distinct_functions=    0
+  thread_attr       apis= 11 call_sites=   75 distinct_functions=   65
+
+## gate
+  PASS CreateThread call_sites=3 (want >= 1)
+  PASS WaitForSingleObject call_sites=16 (want >= 1)
+  PASS SetEvent call_sites=17 (want >= 1)
+  PASS Sleep call_sites=33 (want >= 1)

@@ -69,6 +69,7 @@ R2 の bundle (`artifacts/<name>.tar.zst`) と、その原本の所在。原本�
 | `[EMSDK]` | `/opt/emsdk` | Emscripten 6.0.12 (pin。`tools/m1/flags.sh`) |
 | `[RETDEC]` | `/opt/retdec` | RetDec v5.0 (歴史的。現行の主力 lifter は x64c / flelift / liftlib。DESIGN 参照 `docs/DECISIONS.md` D5) |
 | `[GHIDRA]` | `/opt/ghidra` | Ghidra 12.1.4 (解析支援) |
+| `[JDK21]` | `/usr/lib/jvm/temurin-21-jdk-amd64` (runner 同梱。`JAVA_HOME_21` で上書き) | Temurin OpenJDK 21。Ghidra 12.1.4 headless の実行 (`tools/m11/m11_ghidra_dll.sh` の既定) |
 | `[_TEST]` | `/opt/_test/` | toolchain E2E 実証のスクラッチ領域 (`tools/m1` が参照) |
 | `[PNPM-HOME]` | `/home/ubuntu/.local/share/pnpm/bin` | pnpm (と同梱 node) のユーザローカル配置 (`tools/shared`・`tools/audio/asio` が参照) |
 | `[APT-MINGW]` | `/usr/bin/x86_64-w64-mingw32-gcc` (apt 導入の MinGW-w64 クロスコンパイラ) | 版は未記録 (`tools/gui/flengine/REPORT_APPENDIX.md` §6i の実行で使用。再現時は `x86_64-w64-mingw32-gcc --version` の出力を REPORT に残す) |

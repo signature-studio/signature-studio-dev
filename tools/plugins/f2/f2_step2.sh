@@ -24,5 +24,8 @@ echo "== 閉包統計 (defines = closure の assert を含む)"
 python3 f2/closure_stats.py --json work/f2_stats.json $BLOCKS
 echo "== 回帰ゲート: IR の間接 call が機械語の非 IAT 間接 call site を全て覆う (f2/icall_gate.py)"
 python3 f2/icall_gate.py --json work/f2/gate.json $BLOCKS
+echo "== waiver 18979 0x741035 の機械検証 (f2/waiver_proof.py。窓モード。全数検査は --domain full)、そのネガコン"
+python3 f2/waiver_proof.py
+python3 f2/nc_waiver_proof.py
 echo "== 別算法検算: 機械語の線形 sweep vs icall_rewrite.py (recursive descent) の dispatch 化 site"
 python3 f2/xcheck_rewriter.py $BLOCKS

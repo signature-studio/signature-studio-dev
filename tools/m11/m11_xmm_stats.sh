@@ -18,9 +18,10 @@ import sys
 src, dst, p0c = sys.argv[1:4]
 t = open(src).read()
 a = "sys.path.insert(0, os.path.join(HERE, '..', '..', 'p0c'))"
-b = ("                    elif any(c != len(plist) for c in arity.get(fname, ())):\n"
-     "                        rep['skipped'][fname] = 'call_arity_mismatch(sites=%s, params=%d)' % (\n"
-     "                            ','.join(str(c) for c in sorted(arity[fname])), len(plist))\n")
+b = ("                    elif any(c != len(plist) for c in arity.get(fname, ())) and (fname in NO_CONV or not conv_ok(xs, len(plist), argsites.get(fname, []))):\n"
+     "                        rep['skipped'][fname] = 'call_arity_mismatch(sites=%s, params=%d, cause=%s)' % (\n"
+     "                            ','.join(str(c) for c in sorted(arity[fname])), len(plist),\n"
+     "                            arity_cause(len(plist), argsites.get(fname, [])))\n")
 assert t.count(a) == 1 and t.count(b) == 1
 open(dst, 'w').write(t.replace(a, "sys.path.insert(0, %r)" % p0c).replace(b, ''))
 EOF
@@ -47,6 +48,8 @@ print('[表3] 検査なし: fixed=%d skipped=%d' % (len(nr['fixed']), len(nr['sk
 ar = sorted(n for n in wr['skipped'] if wr['skipped'][n].startswith('call_arity_mismatch'))
 print('[arity] 検査あり call_arity_mismatch=%d: 検査なしでの判定 %s' % (
     len(ar), dict(collections.Counter(why(nr, n) for n in ar))))
+for n in ar:
+    print('  [arity] %s %s' % (n, wr['skipped'][n]))
 xs = set(nr['fixed']) - set(wr['fixed'])
 print('[arity] 検査なしで復元される arity skip 件数 (= 49 - 34 の内訳) = %d' % len(xs))
 rows = fx['site_detail']

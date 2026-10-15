@@ -155,6 +155,7 @@ window.__done = new Promise((resolveAll, rejectAll) => {
         }
         result.snapshot = shim.snapshot();
         result.workletErrors = shim.workletErrors;
+        result.clockJumpLog = shim.clockJumpLog;
         result.cfg = cfg;
         if (refLog.length > 4) { // contextTime(s) vs epochMs の傾き: 1.0 ならオーディオクロック = 壁時計
           const n = refLog.length, x0 = refLog[0].epochMs, y0 = refLog[0].ctxTime;

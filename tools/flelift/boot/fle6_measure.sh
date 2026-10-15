@@ -17,12 +17,18 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 FLE="$(cd "$HERE/.." && pwd)"
 source "$HERE/../../shared/env.sh"
-W="$FLE/work/boot"
+W="${FLE_BOOT_WORK:-$FLE/work/boot}"   # route ごとに分ける (#2702: 既定経路は別 work で lift する)
 LIFT="$W/lift"
 PE="${FLE_PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 SS_EMSDK_ENV="${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"  # emsdk_env.sh は EMSDK_ENV を unset するので別名にする
 [ -f "$SS_EMSDK_ENV" ] || { echo "[fle6] emsdk_env.sh not found: $SS_EMSDK_ENV (SS_EMSDK_ENV で指定)"; exit 2; }
-export FLE_EXTRA_ROOTS="${FLE_EXTRA_ROOTS:-0x6a7b70}"
+# `-` (`:-` ではない): FLE_EXTRA_ROOTS= と空を渡すと root を足さない既定経路になる (#2702)
+export FLE_EXTRA_ROOTS="${FLE_EXTRA_ROOTS-0x6a7b70}"
+TAG="${FLE_BOOT_TAG:-fle6}"   # results/ の出力名の接頭 (既定 fle6 = 従来の名前)
+RUNS="${FLE_BOOT_RUNS:-shim negctl ipp2}"   # shim=FLE_IPP=1 / negctl=FLE_IPP=0 / ipp2=FLE_IPP=2 / default=FLE_IPP 未指定
+# diag_shim / diag_negctl (#672): FLE_DIAG_NULLFILL=1 (root 無しの fill で buf=0 の呼出しを戻す診断)。root 無しの lift で測る (FLE_EXTRA_ROOTS=)。
+# lifted C は N 本 (fle_lifted_s<k>.c) に分けて並列 clang する (FLE-9, #2700)。1 にすると単一 TU (cap 11000MB で打ち切り)。
+export FLE_SHARDS="${FLE_SHARDS:-8}"
 export TMPDIR="$W/tmp"
 mkdir -p "$W/tmp" "$W/obj" "$HERE/results"
 set +u; source "$SS_EMSDK_ENV" > /dev/null 2>&1; set -u
@@ -41,7 +47,7 @@ python3 "$HERE/rss_cap.py" --cap-mb "${FLE_RSS_CAP_MB:-13800}" --log "$W/rss_lif
   python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$LIFT" --closure "${FLE_LIFT_CLOSURE:-2}" \
   --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000 \
   --override 0x4126f0=fle_ov_longjmp --override 0x409410=fle_ov_getmem \
-  --override 0x409440=fle_ov_freemem --override 0x4120c0=fle_ov_initunits | tail -3
+  --override 0x409440=fle_ov_freemem --override 0x4120c0=fle_ov_initunits --shards "$FLE_SHARDS" | tail -3
 python3 "$FLE/fle_data_gen.py" "$PE" "$LIFT/fle_data.c" "$LIFT/lift_meta.json" > /dev/null
 python3 "$HERE/gen_boot.py" --pe "$PE" --meta "$LIFT/lift_meta.json" --out "$W" > /dev/null
 elapsed "lift" "$T"
@@ -51,22 +57,32 @@ bash "$HERE/build.sh" plain
 elapsed "clang-plain" "$T"
 
 # 判定は exit code で行う (|| true で握り潰さない)。結果 JSON・判定行が無い、または判定 NG なら即失敗する。
-# $1=label  $2=out.json  $3=FLE_IPP (1: shim 有 / 0: ネガコン)
+# $1=label  $2=out.json  $3=FLE_IPP (1: shim 有 / 0: ネガコン / 2: shim 有 + ippsZero_8u 以外で停止 / 空: 既定)
 run_boot() {
-  local log="$W/run_fle6_$1.log"
+  local log="$W/run_${TAG}_$1.log"
   local rc=0
-  FLE_IPP="$3" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
+  FLE_IPP="$3" FLE_TOLERANT="${4:-0}" FLE_DIAG_NULLFILL="${5:-0}" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
   grep 'FLEBOOT_RESULT' "$log" || true
   grep 'FLEBOOT_IPP_CHECK' "$log" || { echo "[fle6] $1: FLEBOOT_IPP_CHECK 行が無い ($log)"; exit 4; }
   [ -s "$2" ] || { echo "[fle6] $1: 結果 JSON が無い ($2)"; exit 4; }
-  [ "$rc" = 0 ] || { echo "[fle6] $1: fle_boot.mjs が rc=$rc で終了 (IPP 判定 NG なら 3) ($log)"; exit "$rc"; }
+  # 判定 NG (rc=3) でも shim 有・ネガコンの両方を採取してから最後に非 0 で終わる (片方の数値を欠かさない)。
+  [ "$rc" = 0 ] || { echo "[fle6] $1: fle_boot.mjs が rc=$rc で終了 (IPP 判定 NG なら 3) ($log)"; FAIL_RC="$rc"; }
 }
 
-T=$(date +%s); stage "boot"
-run_boot shim "$HERE/results/boot_summary_fle6.json" 1
-elapsed "boot" "$T"
-
-T=$(date +%s); stage "negctl (FLE_IPP=0)"
-run_boot negctl "$HERE/results/boot_summary_fle6_negctl.json" 0
-elapsed "negctl" "$T"
+for r in $RUNS; do
+  T=$(date +%s); stage "boot $r"
+  case "$r" in
+    shim)    run_boot shim    "$HERE/results/boot_summary_${TAG}.json"        1 ;;
+    negctl)  run_boot negctl  "$HERE/results/boot_summary_${TAG}_negctl.json" 0 ;;
+    ipp2)    run_boot ipp2    "$HERE/results/boot_summary_${TAG}_ipp2.json"   2 ;;
+    default) run_boot default "$HERE/results/boot_summary_${TAG}_default.json" "" ;;
+    tol)     run_boot tol     "$HERE/results/boot_summary_${TAG}_tol.json"    1 1 ;;   # 寛容起動 (#2719): shim 有 + 逐次 unit 寛容 + CreateFruityInstance 観測
+    tol2)    run_boot tol2    "$HERE/results/boot_summary_${TAG}_tol2.json"   1 2 ;;   # 診断: 失敗 unit の後で InitTable を起動時の値へ戻す (補修。既定ではない)
+    diag_shim)   run_boot diag_shim   "$HERE/results/boot_summary_${TAG}_diag_shim.json"   1 0 1 ;;   # #672 診断: shim 有 + buf=0 の fill を戻す
+    diag_negctl) run_boot diag_negctl "$HERE/results/boot_summary_${TAG}_diag_negctl.json" 0 0 1 ;;   # #672 診断: ネガコン + buf=0 の fill を戻す
+    *) echo "[fle6] unknown run: $r"; exit 2 ;;
+  esac
+  elapsed "boot $r" "$T"
+done
 echo "[fle6] end $(date -u +%H:%M:%S)"
+[ -z "${FAIL_RC:-}" ] || exit "$FAIL_RC"

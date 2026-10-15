@@ -45,8 +45,13 @@ void OleUninitialize(void) { CoUninitialize(); }
 LPVOID CoTaskMemAlloc(SIZE_T n) { return malloc(n ? n : 1); }
 LPVOID CoTaskMemRealloc(LPVOID p, SIZE_T n) { return realloc(p, n ? n : 1); }
 void CoTaskMemFree(LPVOID p) { free(p); }
+static const GUID clsid_FileOpenDialog = { 0xDC1C5A9C, 0xE88A, 0x4DDE, { 0xA5, 0xA1, 0x60, 0xF8, 0x2A, 0x20, 0xAE, 0xF7 } };
+static const GUID clsid_FileSaveDialog = { 0xC0B4E2F3, 0xBA21, 0x4773, { 0x8D, 0xBA, 0x33, 0x5E, 0xC9, 0x46, 0xEB, 0x8B } };
 HRESULT CoCreateInstance(uint64_t clsid, LPVOID outer, DWORD ctx, const GUID* iid, LPVOID* out) {   /* 第1引数は RetDec 署名 (i64) に合わせる */
-    (void)clsid; (void)outer; (void)ctx; (void)iid;
+    (void)outer; (void)ctx; (void)iid;
+    const GUID* g = (const GUID*)(uintptr_t)clsid;   /* guest の CLSID へのポインタ */
+    if (g && IsEqualGUID(g, &clsid_FileOpenDialog)) shim_unimplemented("CoCreateInstance(FileOpenDialog)");   /* SHX-T33 #2916: IFileDialog 未対応 = 明示 fail-fast */
+    if (g && IsEqualGUID(g, &clsid_FileSaveDialog)) shim_unimplemented("CoCreateInstance(FileSaveDialog)");
     if (out) *out = NULL;
     return REGDB_E_CLASSNOTREG;
 }

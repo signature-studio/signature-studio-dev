@@ -7,8 +7,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'ott', 'n
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import capstone
 from capstone import x86
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'shared'))
+from paths import PLUGINS_DIR
 import audit_icall as A
-DLL = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
+DLL = os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
 mod = sys.argv[1]
 F = os.path.join(os.path.dirname(mod), 'F.txt')
 img = A.Image(DLL)

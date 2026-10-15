@@ -1,0 +1,14 @@
+<!doctype html><html><body><pre id="out">pending</pre>
+<script>
+// PY-80 (#2633): 静的版 wasm の validate をブラウザ (headless Chrome) で確認する。実行 (instantiate) はしない。
+//   google-chrome --headless=new --no-sandbox --disable-gpu --allow-file-access-from-files --virtual-time-budget=15000 --dump-dom file://$PWD/tests/memory64_validate_chrome.html
+const files = ["flpy_static.wasm", "flpy_static64.wasm", "flpy_static64l.wasm"];
+Promise.all(files.map(async (f) => {
+  try {
+    const buf = await (await fetch("../dist/" + f)).arrayBuffer();
+    return f + " validate=" + WebAssembly.validate(buf) + " bytes=" + buf.byteLength;
+  } catch (e) { return f + " error=" + String(e).slice(0, 120); }
+})).then((r) => {
+  document.getElementById("out").textContent = "RESULT " + JSON.stringify(r) + " ua=" + navigator.userAgent.match(/Chrome\/[\d.]+/)[0];
+});
+</script></body></html>

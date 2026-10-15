@@ -3,7 +3,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { refsOnlyBody } from "../src/webhook.ts";
-import { BOT, REPO, T0, commentPayload, configuredApp, issuePayload, j, markFresh, runPayload, send, type Call } from "./helpers.ts";
+import { PM_LIMITS } from "../src/pm.ts";
+import { refsOnlyNumbers } from "../src/refs.ts";
+import { BOT, MARK, REPO, T0, commentPayload, configuredApp, issuePayload, j, markFresh, runPayload, send, type Call } from "./helpers.ts";
 import { outcomeBody, stopBody } from "./pm_helpers.ts";
 
 type Ctx = Awaited<ReturnType<typeof configuredApp>>;
@@ -54,7 +56,7 @@ function syncWorld() {
 async function seedStuck(ctx: Ctx, prs: number[]) {
   for (const n of prs) {
     await send(ctx.app, "pull_request", prPayload(n, { labels: ["oc:stuck"], updatedAt: T0 - 5 * MIN }));
-    await send(ctx.app, "issue_comment", commentPayload(n, BOT, stopBody(n), iso(T0 - 10 * MIN)));
+    await send(ctx.app, "issue_comment", commentPayload(n, MARK, stopBody(n), iso(T0 - 10 * MIN)));
   }
 }
 
@@ -74,7 +76,7 @@ test("自律運転の指標: 空の状態では件数は 0、率・差・起点�
 test("stuck / stuck_age_max_min: oc:stuck の open PR。起点は最新の停止コメント (更新時刻ではない)。closed と他のラベルは数えない", async () => {
   const ctx = await configuredApp();
   await send(ctx.app, "pull_request", prPayload(10, { labels: ["oc:stuck"], updatedAt: T0 - 5 * MIN }));
-  await send(ctx.app, "issue_comment", commentPayload(10, BOT, stopBody(10), iso(T0 - 120 * MIN)));
+  await send(ctx.app, "issue_comment", commentPayload(10, MARK, stopBody(10), iso(T0 - 120 * MIN)));
   await send(ctx.app, "pull_request", prPayload(11, { labels: ["oc:stuck"], updatedAt: T0 - 45 * MIN }));
   await send(ctx.app, "pull_request", prPayload(12, { labels: ["oc:ready"], updatedAt: T0 - 900 * MIN }));
   await send(ctx.app, "pull_request", prPayload(13, { state: "closed", labels: ["oc:stuck"], updatedAt: T0 - 900 * MIN }));
@@ -155,6 +157,31 @@ test("pm_dispatch_1h: live は実際に送った件数を数える (POST は送�
   assert.equal(ctx.m.calls.filter((c) => c.method === "POST" && c.url.endsWith("/dispatches")).length, 2);
 });
 
+test("pm_dispatch_cap / pm_skipped_hour_24h: 毎時上限で見送った件数は tick ごとに増え、24 時間の窓を過ぎると 0 になる (#3462)", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock });
+  await seedStuck(ctx, Array.from({ length: PM_LIMITS.hourMax + 2 }, (_, i) => 10 + i));
+  const gh = await (ctx.app.engine as any).d.gh();
+  const tickAt = async (ms: number) => {
+    clock.t = ms;
+    await markFresh(ctx);
+    await ctx.app.engine.pmDispatch(gh);
+  };
+  await tickAt(T0);
+  let s = await status(ctx);
+  assert.equal(s.pm_dispatch_cap, 24);
+  assert.equal(s.pm_dispatch_1h, PM_LIMITS.hourMax, "上限まで送る");
+  assert.equal(s.pm_skipped_hour_24h, 2, "上限を超えた 2 件は見送る");
+  await tickAt(T0 + MIN);
+  assert.equal((await status(ctx)).pm_skipped_hour_24h, 4, "次の tick も上限の内。送った 24 件は重複で見送り、残りの 2 件が毎時上限で見送られる");
+  clock.t = T0 + 23 * H;
+  assert.equal((await status(ctx)).pm_skipped_hour_24h, 4, "24 時間の窓の内は残る");
+  clock.t = T0 + 24 * H + MIN;
+  s = await status(ctx);
+  assert.equal(s.pm_skipped_hour_24h, 0, "24 時間を過ぎた見送りは数えない");
+  assert.equal(s.pm_dispatch_cap, PM_LIMITS.hourMax);
+});
+
 // ---------------------------------------------------------------------------------------------------------------- 受入 1 (判定) と (c)
 test("refsOnlyBody: Refs #N のみだけ true。Closes / Fixes が 1 つでもあれば false (併記を含む)", () => {
   assert.equal(refsOnlyBody("Refs #1"), true);
@@ -170,6 +197,19 @@ test("refsOnlyBody: Refs #N のみだけ true。Closes / Fixes が 1 つでも�
   assert.equal(refsOnlyBody("本文なし"), false, "参照が無い");
   assert.equal(refsOnlyBody(""), false);
   assert.equal(refsOnlyBody("Refs #x"), false, "番号でない");
+});
+
+test("Refs のみの判定の統一 (#2623): 指標の refsOnlyBody と refs_orphan の refsOnlyNumbers が表の 4 入力で同じ値", () => {
+  const cases: Array<[string, boolean]> = [
+    ["Closes:#6 Refs #5", false],
+    ["Refs owner/repo#5", false],
+    ["Refs:#5", true],
+    ["Refs #12345678", false],
+  ];
+  for (const [body, refsOnly] of cases) {
+    assert.equal(refsOnlyBody(body), refsOnly, `指標: ${body}`);
+    assert.equal(refsOnlyNumbers(body).length > 0, refsOnly, `refs_orphan: ${body}`);
+  }
 });
 
 test("refs_only_merge_rate_24h: 直近 24 時間に merge された PR のうち、本文が Refs のみの件数と率", async () => {
@@ -257,7 +297,7 @@ test("ネガコン (a): 題名・本文・コメント・ブランチ名・run �
   await send(ctx.app, "issue_comment", commentPayload(1, "pycabbage", evil));
   await send(ctx.app, "issue_comment", commentPayload(2, "pycabbage", evil));
   await send(ctx.app, "pull_request", prPayload(10, { labels: ["oc:stuck"], title: evil, body: evil, updatedAt: T0 - 5 * MIN }));
-  await send(ctx.app, "issue_comment", commentPayload(10, BOT, `${stopBody(10)} ${evil}`, iso(T0 - 20 * MIN)));
+  await send(ctx.app, "issue_comment", commentPayload(10, MARK, `${stopBody(10)} ${evil}`, iso(T0 - 20 * MIN)));
   await send(ctx.app, "pull_request", prPayload(11, { state: "closed", mergedAt: T0 - 30 * MIN, body: `Refs #1 ${evil}`, title: evil }));
   await send(ctx.app, "workflow_run", runPayload(7, "in_progress", { title: evil }));
   const text = await (await ctx.app.handle(new Request("https://pm.example/status"))).text();

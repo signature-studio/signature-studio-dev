@@ -15,6 +15,7 @@
                  NaN 同士は nandiff に分離し buf_diff には数えない (k80_diff.py の実装どおり)
   ret_diff      = 戻り値 (i64) の不一致 case 数 ( native が rax を放置する kernel では
                  200/200 など意味のない値になる。合否は buf_diff のみで判定)
+                 ret_slot=xmm0 の kernel は -1 (rax と比べない。戻り値は [5b] ucomi_ret_check.py で判定 · #3513)
   crash 4       = 0x5de710 / 0x5df610 / 0x5e05b0 / 0x5e0d80 (CAB-253 起点の sig11 4 kernel)
 
 このスクリプトは独立再計算 (規則 37): e2e (p0c3_e2e.sh) を呼ばずに
@@ -36,6 +37,16 @@ NINE = ['0x5de820', '0x5dedf0', '0x5dfb60', '0x5df210', '0x5df240', '0x5e0760',
         '0x5e0b70', '0x5e0bb0', '0x5e1590', '0x5e1780', '0x5e0330']
 CRASH4 = ['0x5de710', '0x5df610', '0x5e05b0', '0x5e0d80']
 B6 = ['0x5dee90', '0x5df040', '0x5e09f0', '0x5e0a70', '0x5e0b10', '0x5e1210']
+UCOMI_FIX = ['0x5e12b0']  # #3439: ucomiss の被演算子・flags を接続 (k80_argfix [C]・[D])
+# #2182 (P0c-17): census の buf_diff≠0 だった 18 kernel。修復後は 2000 case で全て buf_diff=0
+# (10000 case では 0x5dffc0 のみ buf_diff=3: REPORT_APPENDIX_H §19.1・#3280)
+FIX18 = ['0x5de620', '0x5dea40', '0x5dec40', '0x5dedb0', '0x5dee20', '0x5dee50', '0x5df340',
+         '0x5dfae0', '0x5dfbe0', '0x5dfc90', '0x5dfdb0', '0x5dffc0', '0x5dfff0', '0x5e0300',
+         '0x5e0350', '0x5e03f0', '0x5e12c0', '0x5e1490']
+HB_N = 15  # k80_hand_bodies.py の BODIES 14 + GLOBAL_INITS 1 (#2182)
+EXT_FUNCS = 'function_5dfc90,function_5dfbe0,function_5dfd30,function_5dfdb0'
+EXT_CHOPF = 'function_5dfbe0,function_5dfc90,function_5dfdb0'
+EXT_CHOPR = '5dfbe0:5dfc0a-5dfc7c,5dfc90:5dfcb5-5dfd1e,5dfdb0:5dfded-5dfe40'
 
 
 def run(cmd, **kw):
@@ -125,9 +136,29 @@ def main():
         raise SystemExit('[FAIL] k80_argfix not idempotent')
     print('   idempotent OK')
 
+    # #2182 (P0c-17): census の buf_diff≠0 18 kernel の修復。
+    #  (a) 4 kernel は x87 拡張精度 (80-bit) の dd エミュレーション (p0c4_e2e.py と同じ ext pass)
+    #  (b) 残りは k80_hand_bodies.py で機械語どおりの本体に差し替え (関数シグネチャ不変)
+    ext = os.path.join(d3, 'k80.ext.ll')
+    run(['python3', os.path.join(HERE, 'f80_lower.py'), dfx, ext,
+         '--ext', '--ext-funcs', EXT_FUNCS, '--chop-funcs', EXT_CHOPF, '--chop-ranges', EXT_CHOPR])
+    hb = os.path.join(d3, 'k80.hb.ll')
+    hbj = os.path.join(d3, 'k80.hb.json')
+    run(['python3', os.path.join(HERE, 'k80_hand_bodies.py'), ext, hb, '--report', hbj])
+    hb2 = os.path.join(d3, 'k80.hb2.ll')
+    hb2j = os.path.join(d3, 'k80.hb2.json')
+    run(['python3', os.path.join(HERE, 'k80_hand_bodies.py'), hb, hb2, '--report', hb2j])
+    if open(hb, 'rb').read() != open(hb2, 'rb').read():
+        raise SystemExit('[FAIL] k80_hand_bodies not idempotent')
+    for j in (hbj, hb2j):
+        n = len(json.load(open(j))['replaced'])
+        if n != HB_N:
+            raise SystemExit('[FAIL] k80_hand_bodies 置換件数 %d (期待 %d = BODIES 14 + GLOBAL_INITS 1)' % (n, HB_N))
+    run(['llvm-as', hb, '-o', os.path.join(d3, 'k80.hb.bc')])
+
     print('== [5] 差分試験 (native vs 修復後 IR, %d case/kernel, fork 隔離) ==' % cases)
     out = run(['python3', os.path.join(HERE, 'k80_diff.py'),
-               '--ir', dfx, '--cases', str(cases)])
+               '--ir', hb, '--cases', str(cases)])
     rows = {}
     for ln in out.split('\n'):
         f = ln.split(',')
@@ -137,6 +168,10 @@ def main():
     for k in sorted(rows):
         f = rows[k]
         print('   %-10s %-9s %8s %8s %9s %s' % (f[0], f[1], f[3], f[4], f[6][:9], f[7]))
+
+    # #3439 (P0c-21): 0x5e12b0 は書き込みを持たず buf_diff が自明に 0 になるため、戻り値 (xmm0) を native と比べる
+    print('== [5b] 戻り値試験 (0x5e12b0: native vs 修復後 IR, #3439) ==')
+    print('   ' + run(['python3', os.path.join(HERE, 'ucomi_ret_check.py'), hb]).strip())
 
     print('== [6] 検算: status センサス ==')
     ok = [k for k in rows if rows[k][7] == 'ok']
@@ -149,12 +184,20 @@ def main():
         r = rows.get(k)
         if r is None or r[4] != '0':
             fails.append('%s buf_diff=%s (期待 0)' % (k, r[4] if r else 'not-run'))
+    for k in FIX18:
+        r = rows.get(k)
+        if r is None or r[4] != '0':
+            fails.append('%s buf_diff=%s (期待 0: #2182)' % (k, r[4] if r else 'not-run'))
+    # #2182 の回帰 (受入 2): CSV に出た全 kernel (67) が buf_diff=0 のまま
+    for k in sorted(rows):
+        if rows[k][4] != '0':
+            fails.append('%s buf_diff=%s (期待 0: 回帰)' % (k, rows[k][4]))
     for k in CRASH4:
         r = rows.get(k)
         if r is None or r[7].startswith('sig'):
             fails.append('%s %s (期待: sig なし)' % (k, r[7] if r else 'not-run'))
     # #277: native crash (sig) の kernel が 0 / 対象 B の 6 kernel が ok モデルで CSV に出る
-    # (0x5e12b0 は RetDec が ucomiss のフラグと被演算子を落とすため引数接続では救えない: REPORT §14)
+    # (0x5e12b0 は #3439 で ucomiss の被演算子・flags を接続して ok になった: REPORT_APPENDIX_I §21)
     for k in sorted(rows):
         if rows[k][7].startswith('sig'):
             fails.append('%s %s (期待: sig なし)' % (k, rows[k][7]))
@@ -162,11 +205,26 @@ def main():
         r = rows.get(k)
         if r is None or r[7] != 'ok':
             fails.append('%s %s (期待: ok モデル)' % (k, r[7] if r else 'not-run'))
+    # #3439 (P0c-21): 0x5e12b0 は xmm0/xmm1 の引数と ucomiss flags を持ち、ok で CSV に出る (buf_diff=0)
+    for k in UCOMI_FIX:
+        r = rows.get(k)
+        if r is None or r[7] != 'ok' or r[4] != '0':
+            fails.append('%s %s buf_diff=%s (期待: ok かつ buf_diff=0: #3439)' % (
+                k, r[7] if r else 'not-run', r[4] if r else '-'))
+    # #3513: 戻り値が xmm0 の kernel (k80abi.py ret_slot) は、戻り値試験 [5b] の対象と一致しなければ FAIL
+    # (IR の ret は xmm0 を表さないため rax 比較の ret_diff は -1 にして、戻り値は [5b] で判定する)
+    xmm0 = sorted(k for k in abi if abi[k].get('ret_slot') == 'xmm0')
+    for k in sorted(set(xmm0) - set(UCOMI_FIX)):
+        fails.append('%s xmm0 戻り値だが戻り値試験 [5b] で判定していない (#3513)' % k)
+    for k in sorted(set(UCOMI_FIX) - set(xmm0)):
+        fails.append('%s 戻り値試験 [5b] の対象だが ret_slot が xmm0 でない (#3513)' % k)
     if fails:
         for f in fails:
             print('   [FAIL]', f)
         raise SystemExit('[FAIL] 受入基準未達')
+    print('   ⑤ xmm0 戻り値 kernel %d 件 (ret_slot=xmm0) = 戻り値試験 [5b] の対象: %s' % (len(xmm0), ' '.join(xmm0)))
     print('   ① 回帰 %d kernel buf_diff=0: %s' % (len(NINE), ' '.join(NINE)))
+    print('   ① #2182 修復 %d kernel buf_diff=0 / CSV 全 %d kernel buf_diff=0' % (len(FIX18), len(rows)))
     print('   ② crash 4 (0x5de710/0x5df610/0x5e05b0/0x5e0d80) すべて sig なしで CSV に出る')
     print('   ③ 冪等性 (x87fix / k80_argfix 2 回適用 byte 一致) 維持')
     print('   ④ llvm-as 通過')

@@ -665,6 +665,7 @@ shimx_set_command_line
 shimx_set_cs_null_ok
 shimx_set_exe_path
 shimx_set_exit_hook
+shimx_set_file_close_hook
 shimx_set_intptr_limit
 shimx_set_load_hook
 shimx_set_locale
