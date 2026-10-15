@@ -197,6 +197,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   `feat(kh): add DecompAt2 ghidra postScript`。
 - PR は `--base main` を基本 (repo の既定ブランチ = `main`)。body に `Closes #N`・受入条件・検証結果を書く。
 - **起動・GUI・ウィンドウに関わる PR は、本文に製品 KPI の前後 (FLEngine 起動の dispatch 数・通過 unit 数 (`tools/flelift/boot/REPORT.md`)、最初のウィンドウの有無) を書く。動かせなかったときは『動かしていない』と書く。** 起動・GUI に関わらない PR は KPI を書かなくてよい。
+- **起動結果を変える PR** (`tools/m11/REPORT.md`・`tools/flelift/boot/REPORT.md`・`tools/gui/flengine/**`・`tools/startup/**` を変える PR) は、(1) `python3 tools/startup/boot_metric.py` で `tools/startup/boot_metric.json` を再生成し同じ PR に含める (手で編集しない)、(2) `docs/STATUS.md` 先頭の「FL のウィンドウ」行の最終到達ステップを更新した record の値に合わせる、(3) STATUS には測定値を書かず REPORT に書く、(4) pr-lint が `boot-metric:` を出したら再生成するか、起動結果を変えない変更なら本文に `boot_metric: unchanged (<理由>)` を書く (#3191)。
 - **docs だけの PR を作らない。** 調査・測定の結果は、それを必要とした実装 PR か issue コメントに入れる。REPORT の更新は、実装と同じ PR に含める。例外: 規約・ADR・PM の判断の記録。定期 STATUS 同期の自動 PR (`docs(status): sync merged PRs`、`tools/pm/status_sync.py`) も例外 (`docs/STATUS.md` の status-auto 節の内側だけを変える PR に限る)。
 - **1 チケット = 1 subagent。** チケット化されていない作業も subagent 委任する。
   10 回以上の tool call が必要になる作業は必ず subagent に委任すること。
