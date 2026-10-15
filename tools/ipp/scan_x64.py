@@ -5,7 +5,7 @@
    CHECK: cmp [VAR],0 / test/ cmp after mov"""
 import sys, os, json, struct
 import numpy as np
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/shared/scripts')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared', 'scripts'))
 from macho_util import MachO
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86_const import *

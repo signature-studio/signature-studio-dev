@@ -11,6 +11,7 @@ unsigned long ott_x87_dom_hits;   /* 定義域外の fsin/fcos/f2xm1 の呼び�
 
 static void ops_init(void) {
     memset(ott_fst, 0, sizeof ott_fst);
+    for (int p = 0; p < 8; p++) ott_tag[p] = 3;
     ott_ftop = 0; ott_fcw = 0x037f; ott_fsw = 0;
 }
 

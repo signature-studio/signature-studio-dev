@@ -7,6 +7,24 @@
 win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を RetDec で lift し、`ucomiss` flags 修復 (1 pass) + SSE scalar helper 生成で wasm 化。
 **native 実機械語 vs wasm の全バイト比較 240/240 一致** (ネガコン 4 件は全て FAIL = ゲートは効く)。**実インスタンス (CreateReverbInstance) 駆動は未達**: 生成直後の状態では `Process_Fruity` が SIGSEGV (§7 → [T-SH-71] #3361)。**ildsp は未達**: WaveformColouring は #3216 (CLOSED・部分達成。残りは #3274・#3275・#3276)。GeneralPitchShifter の残件は #3318・#3320。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance は未起票で #161 に残す (§6)。
 
+## 0. gen_helpers の未対応 op 全数 (#3316・ildsp 0x161fc0 closure)
+
+測定 commit: `2ae10ac85` (`gen_helpers.py` の変更。ildsp 側の lift 入力は `c5bd6af6e` の `lift_vtable.sh 0x161fc0`)。
+- 変更: 未対応の宣言を即 exit せず**全数列挙**してから exit 1 にする。`i8` (psrldq/psrlq/psllq 等の即値) を型写像に追加 (従来は KeyError で落ちていた)。対応済み 7 種の出力は変えない。
+- 件数の定義 (本節の数字はこの 3 つだけを指す。他の節・PR 本文はこれを参照する):
+
+| 記号 | 定義 | 値 | 出典 |
+|---|---|---|---|
+| (a) declare 行数 | `norm_raw.ll` のうち `^declare` かつ `@__asm_*` を持つ行数 | 未再測定 (本 run に `toolchain-retdec` が無く、`.ll` も無い) | — |
+| (b) distinct op 名数 | `grep '^declare' norm_raw.ll \| grep -oE '@__asm_[a-z0-9]+' \| sort -u \| wc -l` (対応済み op を含む closure 全体) | 54 | [ildsp REPORT_LIFT §3](ildsp/REPORT_LIFT.md) (`f180a18d4`・toolchain-retdec v5.0) |
+| (c) 未対応シグネチャ数 | `gen_helpers.py` が未対応として列挙した declare 行数 (rc=1) | 62 (2ae10ac85 での実行結果。本 run では再現していない) | 本節の測定 |
+
+- (b) は対応済み 7 種 (movss/movaps/addss/subss/mulss/xorps/ucomiss) を含む全 op 名の数。したがって未対応の op 名の数は「(b) − 7 以上・(b) 以下」で、(b) そのものを未対応の数とは読めない。(c) は gen_helpers の対応表で弾かれた declare 行の数。旧記述「declare 62 件が未対応 (op 名 54 種)」は (b) と (c) を取り違えていた。
+- issue #3316 の題名の「49 種」は古い数字で、本文の「54 種」が (b) と一致する。
+- 未対応の op 名の例: `cvttss2si`・`movd`・`cvtdq2ps`・`divss`・`vfmadd231sd`・`ucomisd`。
+- 未再測定の扱い: (a) と (c) は、`toolchain-retdec` の素材を付けた run (`oc_artifacts: fl-win64 toolchain-retdec`) で `lift_vtable.sh 0x161fc0` を再実行して確定する。それまでは上の値を「過去の記録」として扱う。
+- `gen_helpers.py` の rc=1。残りの wasm 化 (helper の C 実装) は [T-SH-65] #3318、native 差分は [T-SH-64] #3317 が持つ。
+
 ## 1. 対象の再特定 (mac の 0x25c0-0x2f87 は win では使えない)
 `python3 locate.py <Reverb.dll> <out>` が export stub → 実体 → `.pdata` の連鎖で範囲を求める (RVA, 範囲内に base reloc 0 件・外部 call 0 件)。
 

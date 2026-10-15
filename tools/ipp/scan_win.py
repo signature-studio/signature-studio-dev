@@ -5,7 +5,8 @@ from multiprocessing import Pool
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import scan_x64
 HERE = os.path.dirname(os.path.abspath(__file__))
-EXT = '/home/ubuntu/work/analysis/win64/extracted'
+sys.path.insert(0, os.path.join(HERE, '..', 'shared')); from paths import FL_WIN64_DIR
+EXT = f'{FL_WIN64_DIR}/extracted'
 mods = json.load(open(f'{HERE}/work/win_modules.json'))
 def work(f):
     try: return f, scan_x64.analyze(f'{EXT}/{f}', 'pe')

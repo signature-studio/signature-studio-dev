@@ -9,6 +9,7 @@
 #include <string.h>
 
 static uint64_t slots[8][2] __attribute__((aligned(16)));
+uint8_t envbuf[128] __attribute__((aligned(16)));   /* 環境・fnsave 領域 (slot 番号 8 で指す。 lowered の inc が extern で参照) */
 
 static uint64_t dbits(double v) { uint64_t u; memcpy(&u, &v, 8); return u; }
 
@@ -26,16 +27,26 @@ int main(void) {
             if (scanf("%d %d", &ids[k], &sl[k]) != 2) return 1;
         if (scanf("%d", &d) != 1) return 1;
         ops_init();
+        memset(envbuf, 0, sizeof envbuf);
+        unsigned rec[16][3];
         printf("F");
         for (k = 0; k < n; k++) {
-            ops_exec(ids[k], sl[k] >= 0 ? (void*)&slots[sl[k]][0] : NULL);
+            void* p = sl[k] == 8 ? (void*)envbuf : sl[k] >= 0 ? (void*)&slots[sl[k]][0] : NULL;
+            ops_exec(ids[k], p);
             printf(" %04x", ops_fsw() & 0x7f00u);
+            if (sl[k] == 8) {   /* 環境の格納値のうち比べる欄だけ (CW・SW の CMASK・TW)。 FIP/FOO 等は実アドレスなので除く */
+                uint16_t cw, sw, tw;
+                memcpy(&cw, envbuf, 2); memcpy(&sw, envbuf + 4, 2); memcpy(&tw, envbuf + 8, 2);
+                rec[k][0] = cw; rec[k][1] = sw & 0x7d00u; rec[k][2] = tw;
+            }
         }
         ops_final(out, d);
         printf(" V");
         for (k = 0; k < d; k++) printf(" %016llx", (unsigned long long)dbits(out[k]));
         printf(" S");
         for (k = 0; k < 8; k++) printf(" %016llx %016llx", (unsigned long long)slots[k][0], (unsigned long long)slots[k][1]);
+        for (k = 0; k < n; k++)
+            if (sl[k] == 8) printf(" E %04x %04x %04x", rec[k][0], rec[k][1], rec[k][2]);
         printf("\n");
     }
 }
