@@ -46,11 +46,11 @@
 
 - 測定 commit: `3dff75fd4` (`test(python): PY-354 out+8 writer check probe`。probe のコードを変えた最後の commit)。REPORT の文言だけを変える後続 commit は測定に影響しない。
 - 測定 commit から HEAD までの probe 差分: 0 (`git diff 3dff75fd4 HEAD -- tools/python/analysis/flapi/pe_py354_probe.py` の出力は空)。
-- 実測 (測定 commit `3dff75fd4`、素材 fl-win64・展開先 `/tmp/opencode/fl`):
+- 実測 (測定 commit `3dff75fd4`、素材 fl-win64・展開先 `$FL_WIN64_DIR`):
 
 | コマンド | 結果 | wall | load |
 |---|---|---|---|
-| `FL_WIN64_DIR=/tmp/opencode/fl python3 analysis/flapi/pe_py354_probe.py` | PASS (rc 0・全項目 ok) | 3.712 秒 | 0.12 / 0.20 / 0.12 (11:02 UTC) |
+| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py354_probe.py` | PASS (rc 0・全項目 ok) | 3.712 秒 | 0.12 / 0.20 / 0.12 (11:02 UTC) |
 | 既存の検算 `analysis/flapi/pe_py141_probe.py` (回帰確認・素材同じ) | PASS (rc 0・「PASS」行を確認) | 未計測 | 未計測 |
 
 ## 未解決
