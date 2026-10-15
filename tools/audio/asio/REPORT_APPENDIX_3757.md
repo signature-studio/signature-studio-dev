@@ -41,3 +41,45 @@
 - 測定 commit: `1622a5648` (計装を入れた最後の commit)。同一 HEAD で build.sh 直後に `com_ramp_b256_d2` を 3 回: 3/3 PASS (underrun 0・silence 0・min_fill 896・T 1536・write 間隔の最大 14.4 ms)。load 0.28 (開始) → 0.90 (終了)。
 - `git diff 68c6cbb75 1622a5648 -- tools/audio/asio/harness` の差分は `com_page.mjs` の計装 11 行のみ (判定ロジックは未変更)。
 - 全 e2e (`bash tools/audio/asio/e2e.sh`) は本 run では未実行 (時間上限のため)。`com_ramp_b256_d2` の単独測定のみ。
+
+## 6. 2 回目の run: probed_burst の記録と FAIL 時の時系列
+
+計装: `harness/com_page.mjs` が shim の `OPEN` 行 (`probed_burst`) を結果 JSON の `shim_open` に入れる。判定には使わない。
+
+### 6-1. 負荷なし (同一 HEAD・単独)
+
+- 単独 1 回 (r1): **FAIL** (underrun 1・silence 1792・T 1792・min_fill 256)。trace で、index 128 の 1 件だけ `done − wake` が **63.5 ms** (callback 側 = `fill` と `do_buffer` の区間)。その直前の待ち (前回 done → wake) は 10 ms で正常。fill は 1024 → 256 へ落ちた。
+  - 読み: この FAIL の遅れは **callback 側**。負荷下の FAIL (6-2) とは経路が違う。
+- 連続 10 回 (s1〜s10): 10/10 PASS (underrun 0)。min_fill 512〜896。`probed_burst` は 896〜1024。write 間隔の最大 12.0〜29.9 ms。
+
+### 6-2. 負荷下 (`yes` × 4・同一 HEAD・10 回)
+
+| run | 結果 | underrun | min_fill | T | probed_burst | write 間隔の最大 (ms) | 遅い区間 |
+|---|---|---|---|---|---|---|---|
+| l3 | FAIL | 1 | 0 | 5376 | 896 | 87.8 | wait |
+| l5 | FAIL | 1 | 0 | 3072 | 1024 | 48.9 | wait |
+| l6 | FAIL | 1 | 0 | 2304 | 896 | 85.9 | wait |
+| l9 | FAIL | 1 | 0 | 1792 | 896 | 56.1 | wait |
+| 他 6 回 | PASS | 0 | 256〜896 | 1536〜3328 | 896〜2432 | 18.3〜66.7 | — |
+
+- 4/10 で FAIL。4 回とも遅れは **待ち区間** (前回 done → 今回 wake。`fla_out_wait_fill_le` を含む) にある。callback 内 (done − wake) の最大は 0.1〜20.9 ms で、待ちの遅れを説明しない。
+- FAIL 時の fill は直前の 1152〜1664 から 0 へ落ちる。`wait_timeouts` は 1〜2、`wake_hist` の遅い区間 (16 ms 以上) に件数あり。
+- 読み: 負荷下の停止は **起床の遅れ** (wasm スレッドが CPU を得られなかった可能性)。JS 側の bufferSwitch 呼出し時刻は未計装のため、JS と wasm のどちらが先かは分けられていない。
+
+### 6-3. 2 つの経路 (現時点の切り分け)
+
+| 経路 | 観測 | 遅れの場所 |
+|---|---|---|
+| A: callback 側 | 負荷なし r1 (1/11) | done − wake 63.5 ms (fill・do_buffer 区間) |
+| B: 起床側 | 負荷下 (4/10) | wake − 前回 done 49〜88 ms (wait 区間) |
+
+- `probed_burst` は FAIL と PASS で 896〜1024 に重なり、depth の振り分けが FAIL を分けていない。
+- 本節の計 21 回: 負荷なし 11 回 (r1 + s1〜s10。FAIL 1 回) + 負荷下 10 回 (l1〜l10。FAIL 4 回)。
+
+### 6-4. 未解決 (本 PR 時点)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 経路 A の主因 (callback 内 63.5 ms の中身: host の bufferSwitchTimeInfo か fla_out_write か) | 原因未特定。host 側の区間を未計装 | #3757 |
+| 経路 B の主因 (wasm 側の OS 先取り or JS 側の呼出し遅れ) | 原因未特定。JS 側の bufferSwitch 呼出し時刻を未計装 | #3757 |
+| 負荷なしの FAIL 頻度 (本節 11 回中 1 回) | 母数不足 | #3757 |
