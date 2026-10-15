@@ -173,6 +173,8 @@
 - 残件の未解決: 間接 call 先の引数幅 (解析外)・`vcvtsd2ss` 規則 (0x11830)・`movddup` 後の上位追跡 (0x7dce90 等)。いずれも本 issue 範囲の追加実装が要る。
 - `follow()` の A 理由は分類結果を変えない。`classify_fn` は merge の A 理由を記録するように変えた (件数 scalar 1 / 128 bit 0 / 判定不能 16 は不変)。
 
+- 受入 2〜4 (U3d・U3e・U3g) の感度測定 (#4989): 付録 `REPORT_APPENDIX_4989.md` (結論は同付録 §0)。
+
 ## 7. 既知類型との関係
 
 - `docs/DEFECTS.md` の D1a〜D23 (lift の silent miscompile 類型) と `tools/icall/REPORT.md` §4 の D1〜D13 (ICALL 系) は別体系で、本件は解析モデルの問題 (merge と複写の扱い)。
