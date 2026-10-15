@@ -73,11 +73,31 @@
 |---|---|---|
 | 入口のレジスタ葉 `c_in`・`d_in`・`r8_in` (3 種) が式に残る | 48 件の式は関数の入力 (ecx・edx・r8d) の式になる。値の確定は呼出し側の解析が要る | #2874 (PY-99 の残り・呼出し側) |
 | `0x104bffa` が未閉 (読み `0x104bd49`・`0x104be63` の合流が式に残る) | 閉じた書込み 48/49。この式は jns の経路で値が違うため、経路別の場合分けに閉じる作業が要る (閉包の拡張・本節では未着手) | #2874 (PY-99 の残り) |
-| 共有の `py88_writes.Slicer.resolve` の合流判定 `range(i + 1, pos)` (読み命令自身の分岐先を見ない) | 本節は `Tag.resolve_joined` で回避済み。PY-88 (#2788) など同じ基盤の他 REPORT に同じ誤りが及ぶかは未確認 | #3877 (`[PY-263]`・共有の修復と他 REPORT の再測定) |
+| 共有の `py88_writes.Slicer.resolve` の合流判定 (読み命令自身の分岐先を見ない) | 解決済み (#3877・`5247253e6`)。下の「合流判定の共有修正 (#3877)」節 | — |
+| 本節の「閉じた書込み 48/49」を現行スクリプトで再現できない | 下の「合流判定の共有修正 (#3877)」節の (c)。修正前後とも `閉じた書込み (B) 0/49` を出す | 未起票 (原因の切り分けが要る。PY-99 の閉の定義と本節の記述の差) |
 | CFG の順次仮定 (noreturn の呼出しを見ていない)・独立な逆アセンブラとの照合 | 到達集合が過大になる方向の誤りの有無は未確認 | #2874 (PY-99) |
 | 2 本の PY-99 script の統合 (`py99_slot_paths.py` と `py99_merge_sets.py`) | #3085 節の未解決 (判断待ち) | `REPORT_PY99_3085.md` の未解決表 (本節では扱わない) |
 
 前段 `REPORT_PY99_3085.md` の未解決表の 4 行のうち、ACC?⚠合流・CFG 到達・CFG 構築は本節で解決した。閉じた書込みは 48/49 (残る 1 件は上の未解決表)。数値は本節だけに書く。
+
+### 合流判定の共有修正 (#3877 / PY-263)
+
+測定 commit: `5247253e6` (`analysis/py88_writes.py` の合流判定を `range(i + 1, pos + 1)` に直し、`py99_closure.py` の `resolve_joined` の複製を外した最後のコード commit)。`git diff 5247253e6 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行。
+
+- 再測定の対象: `py88_writes` を import する REPORT は `REPORT_PY41_APPENDIX.md` (PY-88 節)・`REPORT_PY159.md`・`REPORT_PY161.md`・`REPORT_PY163.md`・`REPORT_PY99_3085.md`・`REPORT_PY99_APPENDIX.md`・`REPORT_PY99_3104.md`。数値が変わったものは無く、「再測定: 変化なし」 (`py99_merge_sets.py` の注記 2 行を除く)。
+- 修正前 `origin/main` (`a49a0b9c3`) と修正後で、`py88_writes` を使う 9 本の出力を同じ入力 (`work/py53/fn.txt`) で比べた。差分が出たのは `py99_merge_sets.py` の `⚠合流` 注記 2 行だけ (`0x104bd49` の store 値と `0x104be66` の式)。件数・S_p・mismatch は変わらない。
+- `py88_writes.py` の 65 件の式表 (PY-88・PY-159・PY-161・PY-163 の表の元) は、修正前後で出力差分 0 行。既存の `⚠合流` 30 件は、読み命令より前の位置で検出済みだったため変わらない。
+- `py99_merge_sets.md` は再生成し、注記 2 行 (`⚠合流@0x104bd49`・`⚠合流@0x104be63`) が入った。`py99_closure.md` は差分 0。
+- (c) 本節 (上の結論) の「閉じた書込み 48/49」は、修正前の `origin/main` でも現行の `py99_closure.py` は `閉じた書込み (B) 0/49・(A) 0/49` を出した。`0x104bffa` の式に `⚠合流` が付く点は両方で同じ。48/49 の数え方は、この節の記述の時点のスクリプトと一致しない。原因の切り分けは未了。
+
+| 実測 (commit `5247253e6`・`work` 入力 `fn.txt` 4664 命令) | 結果 | 所要 | load (1 分) |
+|---|---|---|---|
+| `analysis/py99_closure.py work/py53/fn.txt` | mismatch 0 (49 件)・exit 0 | 0.43 秒 | 0.00 |
+| `analysis/py99_closure.py work/py53/fn.txt --negctl drop-pred` | mismatch 17・exit 1 | 0.54 秒 | 0.00 |
+| `analysis/py99_merge_sets.py work/py53/fn.txt` | mismatch 0 (対象 77 件)・exit 0 | 0.35 秒 | 0.00 |
+| `py99_closure.py --md` / `py99_merge_sets.py --md` の再生成 | 差分 0 (パス行を除く) | — | — |
+
+素材: `fl-win64` の `block00031_PE.bin` (`tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin'`・1.7 秒)。`analysis/py53_dispatch.py` の出力 `fn=4664 dispatch=13 r8d_tests=174`。
 
 ### 再現
 
