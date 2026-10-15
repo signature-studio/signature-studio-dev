@@ -66,7 +66,8 @@ FL_WIN64_DIR=<fl-win64 展開先> SS_EMSDK_ENV=<emsdk_env.sh> bash tools/flelift
 
 ## 6. 検証
 
-測定 commit: `242418d70` (probe 追加 = `tools/flelift/boot/py5215_g_init_probe.sh` の追加)。`9dbad80b1` は文書のみ (`REPORT_APPENDIX_5215.md` の emsdk 参照 1 行の修正) で、実行されるコードの差分は無い。`git diff 242418d70 HEAD -- tools/flelift` は文書 1 行のみ。
+測定 commit: `242418d70` (probe 追加 = `tools/flelift/boot/py5215_g_init_probe.sh` の追加)。`9dbad80b1` は文書のみ (`REPORT_APPENDIX_5215.md` の emsdk 参照 1 行の修正)。レビュー対応の commit (`8762fe294`) は文書の修正と、`py5215_g_init_probe.sh` の挿入数検査 (挿入数が 6 でなければ exit 3) の追加。検査は計測の観測値を変えない (観測点は同じ・失敗時に止まるだけ)。ただし測定後のコード変更なので、差分を下に示す。
+`git diff 242418d70 HEAD -- tools/flelift` の出力: `tools/flelift/boot/py5215_g_init_probe.sh` (+3 −1 行: 挿入数 `INS` の検査追加・`echo` の変数化)・`REPORT_APPENDIX_5215.md` (文書)。
 
 | 項目 | 実測 |
 |---|---|
