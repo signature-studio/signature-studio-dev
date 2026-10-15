@@ -582,6 +582,7 @@
 | `tools/python/REPORT_PY115_2950.md` | ~79 | PY-115 (#2950): flapi 表の追加引数のうち `mixer.getTrackName` の `maxLen` (mask 外の文字の削除) を PE (`0x12be470`) で確定し C/mock に実装。`channels.soloChannel` の `value` は -1 の反転呼出しのみ PE で確認し、`value ≠ -1` の比較対象は未同定 (推定で実装)。差分検査の結果は REPORT §1。残りは子 #3654・#3655・#3656 |
 | `tools/python/REPORT_PY120_2984.md` | ~186 | PY-120 (#2984): launchMapPages 12 件のうち `length` 1 件を PE (0xd791b0) で確定・mock/C 差分 0 (件数は仮置き 0)。残り 11 件は子 #3027・#3029・#3030 |
 | `tools/python/REPORT_APPENDIX_2984.md` | ~184 | PY-120 (#2984) の付録: REPORT §検証 から分割移動した過去の測定節 (初回〜merge `a2a56bf8`)。内容は削除していない。正本は `REPORT_PY120_2984.md` |
+| `tools/python/REPORT_PY130_3007.md` | ~80 | PY-130 (#3007): ui の setter 2 件 (setBrowserAutoHide・setStepEditMode) と ui 版 getVersion の PE 確定・mock/C 差分 0 (ui_state_diff 58 呼出し)・値は仮置き。setTimeDispMin は保留 (子 issue)。wasm 経路の provider_check・all_tools は未実行 |
 | `tools/python/REPORT_PY119_2977.md` | ~100 | PY-119 (#2977): general の setter 6 件 (setRecPPQ / setNumerator / setDenominator / setUndoHistoryPos / Count / Last) の PE 確定 (範囲・status 文言の VA・undo 書込み先)・mock/C 差分 0・ゲート (G = 0x15e4790)・例外型・既定値は未確定 (親 #2830 にコメント)。解析補助 `analysis/flapi/pe_cstr.py` |
 | `tools/python/REPORT_PY121.md` | 72 | PY-121 (#2979): general の log・rec 系 4 件 (clearLog・dumpScoreLog・processRECEvent・getRecPPB) の PE 根拠 (entry・fn VA・書式・呼出し鎖)。戻り値の意味は未確定で実装なし。残りは #3001・#3002・#3003 |
 | `tools/python/REPORT_PY121_2982.md` | ~90 | PY-121 (#2982): ui の表示・メニュー 15 件の PE 書式と時間引数の頭打ち (0x7d0)。6 件を mock/C 差分 0 で実装 (表示矩形 3・通知 1・メニューを閉じる 2)。残り 9 件は #3012・#3013・#3014 |
