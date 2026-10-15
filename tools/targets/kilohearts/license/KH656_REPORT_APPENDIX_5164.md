@@ -7,7 +7,8 @@
 - 生成: `python3 tools/targets/kilohearts/license/scripts/kh5164_name_map.py` (`emcc -g2` で name section を出す。`-sEMIT_NAME_SECTION` は内部設定で指定できない)。
 - 素材: `fl-win64` / `plugins-kilohearts` (installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `work/winpkg/HeartCore.core_64`) / `toolchain-emsdk` (emcc) / `toolchain-retdec`。
 - wasm (name 付き・`-g2`): off 56,278 B・sha256 `7d799b40…a122` / on 56,371 B・sha256 `deb15155…d3de`。name 無し build (既存) は off 54,394 B・`7ba79e65…8c7707` / on 54,487 B・`3d2bc6fd…e77287` (sha 一致は script が `code 本体は name 無し build と一致: True` (on/off とも・関数 96) で確認)。
-- 測定 commit: `ffc8840a9` (script を追加した commit)。以降のコード差分は `REPORT` 参照。
+- 測定 commit: `ffc8840a9` (script を追加した commit)。
+- コード差分の証跡: `git diff ffc8840a9 HEAD -- tools/targets/kilohearts/license/lift tools/targets/kilohearts/license/lic_build.py tools/targets/kilohearts/license/lic_config.json tools/targets/kilohearts/license/scripts` の出力は 0 行 (本 run・HEAD `9cdce47c7` 時点)。測定から HEAD までの変更は本付録と `KH656_REPORT_APPENDIX_1821.md`・`docs/DOC_MAP.md` の文書のみ。
 - 実測 (本 run・HEAD `90c42bcf4` 上で実行・rc=0): 壁時計 1 分 13.9 秒 (`time`・内訳は user 1 分 22 秒)。load 平均は実行後の `uptime` で 0.14 / 0.39 / 0.20 (実行中の load は未採取)・nproc 4・RAM 15 GB。
 
 ## 2. 区分別の集計 (表から数え直した値)
