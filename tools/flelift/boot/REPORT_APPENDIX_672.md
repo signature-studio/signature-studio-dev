@@ -239,8 +239,9 @@ REPORT §7 (旧 165〜167 行):
 
 ### E. #4782 (FLE-24): 既定経路の unit 895 と B-7 `oob` の切り分け (2026-10-15)
 
-- **E-1 既定経路 (`FLE_BOOT_RUNS=default`・`FLE_EXTRA_ROOTS` 未指定・lift を新規に再生成)**: units **895**・GetMem 3,680 / FreeMem 1,499・`exit` (code 0・call site `0x412a12`)。`oob` は出ない。ログに `out of bounds` は 0 件で、trap 箇所は無い (停止は unit 895 の後の正常な exit 経路)。`MessageBoxW` `QuickFontCache DLL not found!` は 1 件 (自動 IDOK・#3410 系)。
-- **E-2 同一 binary の再実行**: 同じ `fleboot_plain.cjs` を 2 回再実行 (`FLE_IPP` 未指定・`FLE_BOOT_LOG_CAP=0`) は、どちらも 895・`exit`。`FLE_BOOT_LOG_CAP=268435456` (B-7 の run の値) でも 895・`exit`。実行は決定的で、ログ上限は効いていない。
+- 測定 commit: `8a61b584f` (origin/main。コードを変えた最後の commit)。結果 JSON は `results/boot_summary_fle24def_default.json` と `results/boot_summary_b7re_ilt.json` の 2 件。`git diff 8a61b584f HEAD -- tools/flelift/boot/*.c tools/flelift/boot/*.mjs tools/flelift/boot/*.py tools/flelift/boot/*.sh tools/flelift/boot/boot_roots.json` は空。
+- **E-1 既定経路 (`FLE_BOOT_RUNS=default`・`FLE_EXTRA_ROOTS` 未指定・lift を新規に再生成)**: units **895**・GetMem 3,680 / FreeMem 1,499・`threw` = `exit` (code 0)。`oob` 無しの根拠は `threw.cls = exit` (code 0) と `units_run = 895` だけ。**ログは保存していない** (`log_cap.cap = 0`・`bytes = 0`・`head`/`tail` 空)。そのため、ログ件数 (`out of bounds`・`MessageBoxW`) と trap 箇所 (call site) は根拠にしない。trap 箇所は特定していない。`exit` が正常終了かは未判定 (子 issue #4970 [FLE-36])。
+- **E-2 同一 binary の再実行**: 同じ `fleboot_plain.cjs` を 2 回再実行 (`FLE_IPP` 未指定・`FLE_BOOT_LOG_CAP=0`) と、`FLE_BOOT_LOG_CAP=268435456` (B-7 の run の値) の 1 回は、いずれも 895・`exit` と記録した。**結果 JSON は残していない** (成果物なし・件数の記録のみ)。決定性の根拠としては検証できない記録として扱う。
 - **E-3 B-7 構成を B-7 の commit で再現**: `e64581479` (B-7 の文書化 commit) を別 worktree で lift・build し、`FLE_EXTRA_ROOTS=0x6a7b70,0x976da0 FLE_BOOT_RUNS=ilt` を実行。結果は 895・`exit` (oob なし)。結果 JSON: `results/boot_summary_b7re_ilt.json`。B-7 の `oob` run の build は残っていない (成果物未 commit) ため、当時の build を再現できない。
 - **E-4 切り分けの結果**: `oob` は現在の lift・build・同一構成のどれでも再現しない。B-7 と既定の `exit` の差の原因は**未切り分け**。候補は、当時の lift・clang の差 (成果物が無い) と、当時の emsdk の版の差 (今回は `toolchain-emsdk` 6.0.12 を使い、当時の版は未確認)。
 - 所要 (実測): lift 80 s・clang plain 8 shard 114 s・boot default 10 s・全体 3m30s。load 0.99〜2.28 (4 vCPU)。素材: `fl-win64`・`toolchain-emsdk` (6.0.12)。
