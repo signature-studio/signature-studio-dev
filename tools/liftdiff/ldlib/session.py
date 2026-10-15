@@ -7,6 +7,9 @@ from .pe import PE, Analyzer
 from .runners import Runner, ROOT, env
 
 REPO = build_wasm.REPO
+TIMEOUT_STATUSES = ('timeout', 'hang', 'crash')
+# rt/ld_native.c run_case: setitimer(ITIMER_REAL) の初回値 {1, 500000} = 1.5 s (SIGALRM → status timeout)
+NATIVE_ITIMER_S = 1.5
 
 
 class Session:
@@ -81,19 +84,33 @@ class Session:
         vas = []
         return 'TRACESET ' + ','.join('%x' % v for v in vas)
 
+    def recv_limits(self):
+        """Runner の応答待ち上限 (秒): (native, wasm)。make_runners と timing の記録で同じ値を使う。"""
+        return self.timeout, max(self.timeout, self.wasm_timeout_ms / 1000.0 + 5.0)
+
     def make_runners(self):
         from .boot import state_lines_for
         ln, lw = [], []
         if self.state:
             ln, _ = state_lines_for('native', self.state['state'], self)
             lw, _ = state_lines_for('wasm', self.state['state'], self)
+        nat_recv, was_recv = self.recv_limits()
         nat = Runner('native', ['setarch', '-R', os.path.join(ROOT, 'work/ld_native'), self.t['pe']],
-                     self.init_lines('native') + ln + [self.tracelines()], timeout=self.timeout)
+                     self.init_lines('native') + ln + [self.tracelines()], timeout=nat_recv)
         was = Runner('wasm', ['node', '--stack-size=4000', os.path.join(ROOT, self.runner_js), self.wasm_js, self.t.get('image') or '-',
                               '%x' % self.origin, '%x' % self.delta, '--init=' + ','.join(self.t.get('init_exports', [])),
                               '--timeout-ms=%d' % self.wasm_timeout_ms], self.init_lines('wasm') + lw,
-                  timeout=max(self.timeout, self.wasm_timeout_ms / 1000.0 + 5.0))
+                  timeout=was_recv)
         return nat, was
+
+    def _mark_timing(self, c, n, w):
+        """timeout/hang/crash を含む case に、判定に使った上限秒数と実測秒を `timing` として付ける (通常の case には付けない)。
+        wasm の elapsed_s が None の場合は native timeout の後で wasm を実行しなかった (skipped)。"""
+        if n.get('status') not in TIMEOUT_STATUSES and w.get('status') not in TIMEOUT_STATUSES:
+            return
+        nat_recv, was_recv = self.recv_limits()
+        c['timing'] = {'native': {'status': n.get('status'), 'elapsed_s': n.get('_elapsed_s'), 'limit_s': NATIVE_ITIMER_S, 'recv_limit_s': nat_recv},
+                       'wasm': {'status': w.get('status'), 'elapsed_s': w.get('_elapsed_s'), 'limit_s': self.wasm_timeout_ms / 1000.0, 'recv_limit_s': was_recv}}
 
     def thunks(self):
         """import thunk (先頭が jmp [rip+IAT]) の VA 集合: lift 側では import 直呼びになるため entry トレース比較から除外"""
@@ -170,6 +187,7 @@ class Session:
             c['native_status'] = n.get('status')
             c['wasm_status'] = w.get('status')
             c['_n'] = n; c['_w'] = w
+            self._mark_timing(c, n, w)
             rec['cases'].append(c)
         if not any(c['outcome'] in ('equal', 'diff', 'wasm_trap') for c in rec['cases']):
             rec['cases'] += self._fvm_cases(nat, was, va, sig, rec['cases'])
@@ -187,6 +205,9 @@ class Session:
                         c['wasm_uninit_dependent'] = not same
                     elif len(a) == 2 and a[0].get('status') != a[1].get('status'):
                         c['wasm_uninit_dependent'] = True
+                    if any(x.get('status') in TIMEOUT_STATUSES for x in a):
+                        c['refine_timing'] = {'statuses': [x.get('status') for x in a], 'elapsed_s': [x.get('_elapsed_s') for x in a],
+                                              'limit_s': self.wasm_timeout_ms / 1000.0, 'recv_limit_s': self.recv_limits()[1]}
         return rec
 
     def _fvm_cases(self, nat, was, va, sig, cases_done):
@@ -219,6 +240,7 @@ class Session:
             c['native_status'] = n.get('status')
             c['wasm_status'] = w.get('status')
             c['_n'] = n; c['_w'] = w
+            self._mark_timing(c, n, w)
             out.append(c)
         return out
 

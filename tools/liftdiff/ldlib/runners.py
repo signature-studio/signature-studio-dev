@@ -63,7 +63,8 @@ class Runner:
 
     def run_cases(self, lines, ids, chunk=16):
         """lines: CASE 行 (プレフィクスなし)。戻り値: [結果 dict]。ハング/クラッシュは status=hang/crash の dict。
-        badjson (壊れた応答行) はランナ再起動 + 1 回だけ再試行する (モジュール状態の汚染に対応、CAB-232)。"""
+        badjson (壊れた応答行) はランナ再起動 + 1 回だけ再試行する (モジュール状態の汚染に対応、CAB-232)。
+        各結果には `_elapsed_s` (直前の応答または chunk 送信からその応答までの秒。応答が来なかった case は recv 待ちの秒) を付ける。"""
         out = []
         i = 0
         while i < len(lines):
@@ -76,22 +77,30 @@ class Runner:
                 pass
             got = []
             bad = []
+            waited = None
+            t_prev = time.monotonic()
             for k, l in enumerate(part):
                 r = self._recv(self.timeout)
+                now = time.monotonic()
                 if r is None:
+                    waited = round(now - t_prev, 3)
                     break
+                el = round(now - t_prev, 3)
+                t_prev = now
                 try:
-                    got.append(json.loads(r))
+                    d = json.loads(r)
                 except Exception:
-                    got.append({'id': ids[i + k], 'status': 'badjson', 'detail': r[:200], 'calls': [], 'mem': []})
+                    d = {'id': ids[i + k], 'status': 'badjson', 'detail': r[:200], 'calls': [], 'mem': []}
                     bad.append(k)
+                d['_elapsed_s'] = el
+                got.append(d)
             out.extend(got)
             if len(got) < len(part):
                 # 失敗した case = got の次. ハング/クラッシュとして記録して再起動
                 k = len(got)
                 alive = self.p.poll() is None
                 out.append({'id': ids[i + k], 'status': 'hang' if alive else 'crash', 'detail': 'runner %s' % self.name,
-                            'calls': [], 'mem': []})
+                            'calls': [], 'mem': [], '_elapsed_s': waited})
                 self.kill()
                 self.restarts += 1
                 self.start()
@@ -107,9 +116,11 @@ class Runner:
                     try:
                         self._send('CASE ' + part[k])
                         self.p.stdin.flush()
+                        t0 = time.monotonic()
                         r = self._recv(self.timeout)
                         if r is not None:
                             out[base + k] = json.loads(r)
+                            out[base + k]['_elapsed_s'] = round(time.monotonic() - t0, 3)
                     except Exception:
                         pass
                 i += len(part)
