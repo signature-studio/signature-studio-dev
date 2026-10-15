@@ -1,0 +1,6 @@
+{
+  "tag": "pl61",
+  "refs": ["#2027"],
+  "note": "REPORT_PY61 §2 で型・範囲 code を確定した playlist 取得系 7 件 (PY-62 #2027・REPORT_PY62。muteTrackLock は pe102)",
+  "functions": ["playlist.getTrackColor", "playlist.isTrackMuteLock", "playlist.getTrackActivityLevelVis", "playlist.getLiveLoopMode", "playlist.getLiveTriggerMode", "playlist.getLivePosSnap", "playlist.getLiveTrigSnap"]
+}

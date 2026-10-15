@@ -1,0 +1,6 @@
+{
+  "tag": "pe96",
+  "refs": ["#2832"],
+  "note": "PE で選択範囲の読出しと確認した arrangement 4 件 (REPORT_PY96・PY-96 #2832)。値は未実測の仮置き、tests/arrangement_selection_diff.mjs が mock と照合",
+  "functions": ["arrangement.selectionStart", "arrangement.selectionEnd", "arrangement.liveSelectionStart", "arrangement.selectionIsActive"]
+}

@@ -60,6 +60,15 @@ class RaxSourceTest(unittest.TestCase):
         # mov rax, qword ptr [rax+0x18]; bt rax, 3; call [rip+0]
         self.assertEqual(classify(bytes.fromhex('488b4018' + '480fbae003') + CALL_RIP), ('vtable_cfg', 0x18))
 
+    def test_call_return_is_call_ret(self):
+        # call [rip+0] (戻り値が rax に入る); call [rip+0]  (2 つ目の guard call の直前の rax)
+        ins = list(MD.disasm(CALL_RIP + CALL_RIP, ADDR))
+        self.assertEqual(vc.rax_source(ins, 1, BASE, {}), ('call_ret', None))
+
+    def test_reg_copy_from_r11_is_reg_copy(self):
+        # mov rax, r11; call [rip+0]  (r11 の出所は追わない)
+        self.assertEqual(classify(bytes.fromhex('4c89d8') + CALL_RIP), ('reg_copy', None))
+
     def test_lea_rip_to_function_head(self):
         # lea rax, [rip+0x10]; call [rip+0]  (target = ADDR+7+0x10 が res の関数先頭)
         res = {ADDR + 7 + 0x10 - BASE: {'size': 1, 'calls': [], 'jmps': []}}
