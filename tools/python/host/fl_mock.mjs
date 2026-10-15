@@ -256,6 +256,10 @@ export function createMockEngine() {
       if (idx < 0 || idx >= st.channels.length) throw RANGE();
     },
     "mixer.trackCount": () => st.mixer.length,
+    // PE 0xd641d0: ポインタ大域 0x15e2198 の指す先の dword を読んで −2 (trackCount 0xd5e8b0 と同じ読み方・REPORT_PY205)
+    "mixer.getTrackCount": () => st.mixer.length - 2,
+    // PE 0xd63870: ecx=3 を変換スロット 0x15e4280 に渡すのみ (REPORT_PY205)
+    "mixer.getEqBandCount": () => 3,
     "mixer.getTrackName": (i) => tr(i).name,
     "mixer.setTrackName": (i, n) => { tr(i).name = n; },
     "mixer.getTrackVolume": (i, mode) => F(mode ? 20 * Math.log10(Math.max(tr(i).vol, 1e-6) / 0.8) : tr(i).vol),
