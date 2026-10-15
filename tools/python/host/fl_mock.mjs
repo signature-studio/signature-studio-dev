@@ -344,6 +344,10 @@ export function createMockEngine() {
     "ui.getFocusedPluginName": (...a) => { arity(a, 0, 0); return ""; },
     "ui.getHintMsg": (...a) => { arity(a, 0, 0); return ""; },
     "ui.isInPopupMenu": (...a) => { arity(a, 0, 0); return false; },
+    // PY-129 (#3006): PE で呼出し経路を確定した ui setter 3 件 (REPORT_PY129)。状態は持たない (仮置き)。書込み先と書込み値の読出し経路は未確定。範囲外の挙動も未確認
+    "ui.setHintMsg": (...a) => { arity(a, 1, 1); str(a[0]); },
+    "ui.setFocused": (...a) => { arity(a, 1, 1); ix(a[0]); },
+    "ui.setSnapMode": (...a) => { arity(a, 1, 1); ix(a[0]); },
     "plugins.isValid": (i, slot = -1) => (slot < 0 ? !!st.channels[i] : !!st.mixer[i]?.slots[slot]),
     "plugins.getPluginName": (i, slot = -1, userName) => (slot < 0 ? ch(i).plugin : (tr(i).slots[slot] ?? "")),
     "plugins.getParamCount": () => st.params.length,

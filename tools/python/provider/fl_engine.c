@@ -469,6 +469,10 @@ FL_H(ui, getFocusedFormCaption) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getFocusedPluginName) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getHintMsg) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, isInPopupMenu) { NARGS(0, 0); return fl_ret_b(c, 0); }
+/* PY-129 (#3006): PE 0xd6c5b0 (setHintMsg 's')・0xd6ce50 (setFocused 'i')・0xd6b7b0 (setSnapMode 'i') は呼出し経路を確定 (REPORT_PY129)。状態は持たない (仮置き) */
+FL_H(ui, setHintMsg) { NARGS(1, 1); (void)A_STR(0); return fl_ret_none(c); }
+FL_H(ui, setFocused) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
+FL_H(ui, setSnapMode) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
 
 /* ---- general (1) ---- mock と同じ MIDI scripting API バージョン (実機値は未実測) */
 FL_H(general, getVersion) { NARGS(0, 0); return fl_ret_i(c, 1); }
