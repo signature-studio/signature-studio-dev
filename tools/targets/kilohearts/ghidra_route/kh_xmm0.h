@@ -22,7 +22,7 @@ static inline unsigned kh_fn_180fdc660(double x) {
 
 
 /* FUN_180fdfdb0 (KH-77・#3885): 三角関数の引数縮約。ret は 180fdffb6 の 1 本。戻り rax = 四分象限 (k & 3)、戻り xmm0 = 縮約値。
- * 戻り xmm1 (残差・1e-19 台) は未対応 (子 issue。呼出元 180fcd9c8・180fce43e が movapd で読む)。
+ * 戻り xmm1 (残差・1e-19 台) は kh_xmm1_180fdfdb0 として式だけ持つ (KH-114・#4705)。呼出元 180fcd9c8・180fce43e への配線は未対応 (子 issue)。
  * 機械語 132 命令の順で写す。table = PE 0x18228ac50 の 168 B。定数 (c1 = 0x18228ab30・c2 = ...ab40・c3 = ...ab50) は bit パターンで置く。
  * 入力は ABS (符号 0)。m = 仮数 + 暗黙の 1。table の 3 語 (A, Bl, Bh) と m の 64×64→128 積を 128bit 整数で足し、正規化して d0 (上 53bit) と rr (下位) を作る。 */
 static const unsigned char kh_tab_180fdfdb0[168] = {
@@ -41,7 +41,7 @@ static const unsigned char kh_tab_180fdfdb0[168] = {
     0x10, 0x39, 0xb9, 0x0d, 0xe6, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0xa5, 0x3f,
 };
-static double kh_xmm0_180fdfdb0;
+static double kh_xmm0_180fdfdb0, kh_xmm1_180fdfdb0;
 static inline uint64_t kh_bits(double d) { uint64_t u; memcpy(&u, &d, 8); return u; }
 static inline double kh_dbl(uint64_t u) { double d; memcpy(&d, &u, 8); return d; }
 static inline uint64_t kh_bsr64(uint64_t v) { return v ? 63 - (uint64_t)__builtin_clzll(v) : 0; }
@@ -105,5 +105,6 @@ static inline unsigned kh_fn_180fdfdb0(double x) {
     t = t + kPiB * ll;
     t = t + v;
     kh_xmm0_180fdfdb0 = x0 + t;
+    kh_xmm1_180fdfdb0 = t + (x0 - kh_xmm0_180fdfdb0);
     return (unsigned)quad;
 }
