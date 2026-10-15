@@ -7,7 +7,7 @@
 | 項目 | 結論 (実測) |
 |---|---|
 | 対象件数の定義 | `.text` 内の pdata 関数 **4,556 件**。`.pdata` の生スロット 5,475 件 (`.text` 4,556 / IPPCODE 919) を RVA で直接読んだ値。REPORT_152 §1.1・REPORT_2614 §1 と一致 |
-| `tools/shared/elastique/REPORT.md` の 1,956 | `ipp_entries.py` が pefile の `DIRECTORY_ENTRY_EXCEPTION` で数えた値 (1,956 件しか返らない)。生の `.pdata` (5,475 スロット) と食い違う。pefile が返す件数が少ない原因は未確定 (本 PR では未調査)。以後の lift は生 `.pdata` の 4,556 件を正とする |
+| `tools/shared/elastique/REPORT.md` の 1,956 | `ipp_entries.py` が pefile の `DIRECTORY_ENTRY_EXCEPTION` で数えた値 (1,956 件しか返らない)。生の `.pdata` (5,475 スロット) と食い違う。pefile は `Unknown UNWIND_CODE` で 1,956 件目で打ち切る (§5)。以後の lift は生 `.pdata` の 4,556 件を正とする |
 | RetDec 一括 lift | **失敗**。4,556 件を 1 回で `--select-ranges` に渡すと `[capstone2llvmir]: Should not be possible.` で落ちる |
 | 1 関数ずつの lift | **4,467 件 成功 / 89 件 失敗 / 0 件 未実施** (実測・§2。CSV 4,556 行・重複 0) |
 | 受入条件 1 (4,556 件の lift) | **未達**。4,467 件 lift 済み・89 件 失敗 (rc=1 85・rc=124 1・rc=137 3)。失敗 89 件は lift できていない (§2・§4) |
@@ -16,7 +16,7 @@
 ## 1. 対象・素材・測定 commit
 
 - 素材: `fl-win64` の `extracted/block24357_PE.bin` (4,997,632 B) を `tools/shared/work/win/elastique_x64.dll` に複製 (gitignore)。RetDec: `toolchain-retdec` (RetDec v5.0・`retdec-decompiler --version` で確認)。
-- 測定 commit (コードと CSV を変えた最後の commit): `4961b8e1e` (#5178)。`e068b5dea` (範囲表の生成と rc の記録) 以降、lift 経路の `scripts/` は変わっていない。`e068b5dea..4961b8e1e` の `data/` 差分は 2 つ: `data/entries.csv` の 166 行 (commit `7fe2ea865`・#4535 の direct_calls 修正) と `data/retdec_lift_4284.csv` の追記 (3,392 行・§2)。鮮度の確認: `git diff --stat 4961b8e1e HEAD -- tools/shared/elastique/scripts tools/shared/elastique/data` は 0 行 (本 REPORT の更新は `scripts/`・`data/` を変えない)。
+- 測定 commit (コードと CSV を変えた最後の commit): `4961b8e1e` (#5178)。`e068b5dea` (範囲表の生成と rc の記録) 以降、lift 経路の `scripts/` は変わっていない。`e068b5dea..4961b8e1e` の `data/` 差分は 2 つ: `data/entries.csv` の 166 行 (commit `7fe2ea865`・#4535 の direct_calls 修正) と `data/retdec_lift_4284.csv` の追記 (3,392 行・§2)。鮮度の確認: lift 経路 (`scripts/elastique_retdec_lift.sh`・`scripts/elastique_pdata_ranges.py`・`data/`) は `git diff --stat 4961b8e1e HEAD -- <それらのパス>` が 0 行。`scripts/elastique_fail_classify.py` だけが 69 行追加されている (`cddf68a89`・分類専用で lift 経路の外)。
 - 件数の確認は `pdata_funcs` (`scripts/elastique_facts.py`) で行った: 生スロット 5,475・`.text` 内 4,556。
 
 ## 2. 再現と実測
@@ -44,8 +44,8 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
   合計 2,200 行 (ok 2,129・fail rc=1 71)。既存 1,164 行 (ok 1,146・fail 18) と合わせて 3,364 行。実行条件と時間: 3 commit のメッセージと #4363 のコメントには実測時間の記録が無く、未測定。#4363 の方針は 1 関数 1 プロセス・4 並列・`timeout 60` (計画の記載)。
 - 3 回目 (#5178): 未実施の 1,192 件 (= 4,556 − 3,364 行) を並列 8・`timeout 60`・`timeout 900` で実行。実測 **8 分 23 秒** (load average 6.9〜7.8・4 コア)。結果 1,192 件 全て ok。`.ll` の空ファイル 0。CSV の合計は **ok 4,467・fail 89 (rc=1 85・rc=124 1・rc=137 3)**・重複 0・未実施 0。
 - 測定 commit: 本 PR の最後のコード・CSV 変更の commit。差分は `git diff <測定 commit> HEAD -- tools/shared/elastique` で確認する。
-- 失敗 18 件の再実行 (本 PR の HEAD で実測・並列 4・`RETDEC` を指定): 61 秒。内訳は rc=1 14 件・rc=124 (60 秒 timeout) 1 件・rc=137 (SIGKILL・原因未確認) 3 件。CSV の status には `fail rc=N` を記録した (旧記載の rc=124 2 件は、この再実行と一致しなかったため訂正)。
-- 実測の load average は 4 並列で 3.9〜4.1 (4 コア・`uptime`)。1 関数あたりの時間は計測していない (合計の所要時間のみ)。
+- 失敗の内訳は CSV の status (`fail rc=N`・計 89 件: rc=1 85・rc=124 1・rc=137 3) を正とする。本 PR では RetDec 本体による失敗件の再実行を行っていないため、再実行の時間・load・RSS は未計測 (§5)。
+- 旧記載 (18 件の再実行 61 秒・load average 3.9〜4.1) は本 PR の HEAD では再現していない。削除した。
 
 ## 2.5 D5 (x64c 主役) との比較
 
@@ -69,4 +69,23 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 |---|---|---|
 | lift 出力の意味検証 (受入 2。`.ll` 4,467 件の D11・D14・D15 判定) | 受入 2 未達。lift の正しさは未確認 | #5178 (受入 2 のまま残す) |
 | 失敗 89 件 (rc=1 85・rc=124 1・rc=137 3) の原因分類 (decoder の `Should not be possible.`・timeout・kill) | 受入 1 未達。完全な lift にならない | #5179 (子・`親: #4363`。本文の「18 件」は CSV の 89 件に読み替える) |
-| `ipp_entries.py` の 1,956 (pefile) と生 `.pdata` の 4,556 (`.text` 内) の件数の出典合わせ | REPORT.md の件数が生 PE と合わない | #5179 (子・同上) |
+| rc=1 の因果 (EVEX マスク付き `vpshufd`・`vshufi32x4` の切り分け) | 原因未確定 (相関のみ) | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
+| rc=124 / rc=137 の原因 (メモリ・時間) | 原因未確定 | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
+| pefile の `Unknown UNWIND_CODE` の原因 | pefile 側の原因は未調査 (件数の出典は確定) | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
+
+## 5. 失敗 89 件の分類・件数の出典 (T-SH-141 / #5179)
+
+再現: `python3 tools/shared/elastique/scripts/elastique_fail_classify.py tools/shared/work/win/elastique_x64.dll tools/shared/elastique/data/retdec_lift_4284.csv`
+(入力 DLL は `fl-win64` の `block24357_PE.bin` を `tools/shared/work/win/elastique_x64.dll` に複製。sha256 先頭 16 桁 `8551e92209cdd2ce`)。
+入力 CSV は main 取り込み後の 4,556 行 (ok 4,467・fail 89)。
+
+| 項目 | 実測 |
+|---|---|
+| 件数 | 生 `.pdata` 5,475・`.text` 内 4,556・pefile 1,956 |
+| fail 行の内訳 (CSV の `status`) | 計 89 件・互いに素: rc=1 85 件・rc=124 1 件 (`0x18001fb40`)・rc=137 3 件 (`0x180018fe0`・`0x180026520`・`0x18002dac0`) |
+| rc=1 85 件と EVEX マスク付き命令 | 82 件に `vpshufd` / `vshufi32x4` (`{k}`) がある。3 件には無い。ok 4,467 件のうち同命令を含むものは 0 件。因果は未切り分け (capstone2llvmir の入力を絞る実験は未実施) |
+| rc=124・137 の 4 件と EVEX マスク付き命令 | 4 件とも同命令は無い (スクリプトで確認)。原因は未確認 |
+| 再実行の時間・load・RSS | **未計測**。本 run の環境で RetDec 本体を使った再実行は行わなかった。時間は §2 の 3 回目 (#5178) の実測のみを正とする |
+| rc=137 の原因 | 未確認 (OOM と断定しない。dmesg 不可) |
+| 件数の出典 | 生 `.pdata` 5,475 スロット・`.text` 内 4,556・pefile 1,956。pefile の 1,956 は生スロットの先頭 1,956 件 (file 順) の接頭辞。pefile に無い 3,519 件 = `.text` 内 2,600 件 + IPPCODE 919 件 |
+| pefile が 1,956 で止まる原因 | pefile の `parse_exceptions_directory` が `Unknown UNWIND_CODE at 0x4a6038` の警告で打ち切る。以後の RUNTIME_FUNCTION は読まれない。確認 (本 run で実行): `pe = pefile.PE(dll, fast_load=True)`・`pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]])`・`pe._PE__warnings` → `['Unknown UNWIND_CODE at 0x4a6038']`、`len(pe.DIRECTORY_ENTRY_EXCEPTION)` → 1956 (pefile 2024.8.26) |
