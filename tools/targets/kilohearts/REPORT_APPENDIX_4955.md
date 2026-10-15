@@ -5,7 +5,7 @@
 ## 結論
 
 - `FUN_1802ecfc0` の `param_3`・`param_4` は、生成 C で `float *` だったが、機械語では 16 byte の `V128` オペランドである。`DELAY_RULES` 4 件 (宣言 1・本体 2・呼出元 1) で `V128 *` に直した。
-- emcc の型不一致 2 件 (`delay.c:1271`・宣言の不一致) は消えた。delay の emcc census は **418 → 416** (型不一致 171 → 170、レーン 167 → 166)。
+- emcc の error は 2 件減った (delay の emcc census は **418 → 416**)。内訳は表の実測差分のとおり、演算・代入・ポインタの型不一致が 1 件 (171 → 170)、128bit レーン型が 1 件 (167 → 166)。
 - 本体の lane 読みは、(float) の数値変換から、ビット列 (`u2f`) へ直した。機械語の `addps` は lane のビットを float として加算するため。
 - ホスト gcc で、機械語 (`addps`・`movlps`) と生成 C 本体の突合 200,000 試行 **mismatches 0**。ネガティブコントロール (減算に変えた誤実装) は **117,490 件** で FAIL を検出した。
 
@@ -45,7 +45,7 @@
 | **合計 (census)** | **418** | **416** |
 | emcc error 行 (`error:`) | 418 | 416 |
 
-- 消えた 2 件: `delay.c:1271` (引数の型不一致) と宣言の型不一致 (`delay.c:669`・`1763` 相当)。
+- 消えた 2 件の内訳: 演算・代入・ポインタの型不一致 1 件 (171 → 170) と 128bit レーン型 1 件 (167 → 166)。**行番号は未確認**。census の入力 (`plugins-kilohearts` の `HeartCore.core_64`) が本 run の素材に無く、diff 前後の `error:` 行を取り直せなかったため、どの行が消えたかは特定していない。特定は census の再実行 (素材が揃った run) で行う。
 - 注: この census は `main` (`0f5bcaa89`) の decompile から作ったもので、#4687 §9 の 441 件とは取り方が違う (decompile の集合・規則が main の進みで変わった)。差分の比較は同じ条件 (本 PR と基準) の値で行った。
 
 ## 回帰 (Gain/Haas/Gate への影響)
@@ -56,7 +56,7 @@
 
 ## 単体突合 (機械語 vs 生成 C 本体)
 
-- 検証スクリプト: `work/kh136/check.c` (`ghidra_shim.h` + 生成 C の `FUN_1802ecfc0` 本体)。
+- 検証スクリプト: `work/kh136/check.c` (`ghidra_shim.h` + 生成 C の `FUN_1802ecfc0` 本体)。`work/` は gitignore 対象のため repo に無い。突合は repo から再現できない状態で、本 PR の範囲では再現していない (未解決の表を参照)。再現手順は次のとおり: (1) `ghidra_route/ghidra_shim.h` を include し、`ghidra_to_c.py delay` で生成した `FUN_1802ecfc0` 本体を `check.c` に貼る。(2) 入力は乱数で、`param_1` は 1 KB のメモリ、`param_3`・`param_4` は 16 byte。(3) 参照側は `addps`・`movlps` の C 再現 (下位 2 lane の float 加算と 8 byte 書込み)。(4) 200,000 試行で両者の出力 (`param_1` の 1 KB) を比較する。
 - 参照: 機械語 `addps`・`movlps` を C で再現 (下位 2 lane の float 加算と 8 byte 書込み)。入力は乱数 (`param_1` の 1 KB メモリ・`param_3`/`param_4` の 16 byte)。
 - 結果: **mismatches 0 / 200,000** (rc 0)。
 - ネガティブコントロール (`param_3` の lane 0 の加算を減算に変更): **mismatches 117,490 / 200,000** (rc 1)。
@@ -68,3 +68,5 @@
 | Delay の native 突合 (1000 trial bit-exact) | 宣言型の正しさは機械語の読みと単体突合で示したが、Delay 全体の出力は未確認 | #3073 [KH-41] |
 | Gain/Haas/Gate の `.o` の cmp (本 PR の規則の非影響の実測) | 規則のガードで影響しないと判断。実測は未実施 | 本 PR の範囲外 (規則は delay ガード内) |
 | 残件 416 (レーン 166・引数数不一致 80・型不一致 170) | Delay の emcc が通らない | #3801 [KH-65]・#3808 [KH-67]・#3809 [KH-68]・#3844 [KH-79]・#3847 [KH-73] (既存の起票先) |
+| 消えた 2 件の行番号 (census の diff 前後の `error:` 行) | 内訳は分類差分のみ確認。行の特定は未実施 | 本 PR の範囲外 (census 素材が揃った run で再測定) |
+| 突合 `work/kh136/check.c` の repo 外 (gitignore) | 200,000 試行の突合を repo から再現できない | 本 PR の範囲外 (突合スクリプトの追跡化は別 issue) |
