@@ -4,8 +4,10 @@
 //   署名検証 (S14) は shim の WinVerifyTrust=0 / CertGetNameStringW="Image Line NV" で通す (shim 側の既存実装)。
 //   node cfi_probe.mjs [--wasm path.cjs] [--out cfi.json] [--flags 0] [--trace-out open_trace.jsonl]
 //   open_trace: CreateFileW の呼出し (WIN-13 #2905・shim/src/file.c の SHIMOPEN 行) を assettrace の trace 形式 v1 で保存する
+//   caller: wasm function index を <cjs>.wasm の export 表で function_<VA> に解決する (WIN-14 #2964・wasm_fnnames.mjs)
 import fs from 'fs';
 import path from 'path';
+import { wasmFuncNames, fillCaller } from './wasm_fnnames.mjs';
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const M11 = process.env.GF_M11 || path.resolve(HERE, '../../m11');
 const args = process.argv.slice(2);
@@ -19,7 +21,7 @@ mod.HEAPU8.set(fs.readFileSync(M11 + '/work/m11_image.bin'), 0);
 const out = { wasm: path.basename(wasmCjs), boot: null, host: null, call: null, reach: [], errs_tail: [] };
 const sp0 = mod._emscripten_stack_get_current();
 try { mod._m11_boot_enter(0n, 1n); out.boot = { ok: true }; }
-catch (e) { out.boot = { ok: !!(e && e.m11_dllmain_done !== undefined), err: ((e && e.message) || String(e)).split('\n')[0] }; }
+catch (e) { out.boot = { ok: !!(e && e.m11_dllmain_done !== undefined), err: ((e && e.message) || String(e)).split('\n')[0], stack: String(e && e.stack).split("\n").slice(0, 16) }; }
 mod.__emscripten_stack_restore(sp0);
 const dv = () => new DataView(mod.HEAPU8.buffer);
 // THostInstance: vtable (dummy, 0x40 B) / version=1 / flags / parent hwnd=0 / "FL Studio" (ANSI, NUL) / cmdline buffer 0x8000 B
@@ -40,12 +42,14 @@ try {
   out.call = { returned: true, ret: Number(BigInt.asIntN(64, r)), ms: Date.now() - t0 };
 } catch (e) {
   mod.__emscripten_stack_restore(sp1);
-  out.call = { returned: false, err: ((e && e.message) || String(e)).split('\n')[0], failfast: !!(e && e.gui_failfast), ms: Date.now() - t0 };
+  out.call = { returned: false, err: ((e && e.message) || String(e)).split('\n')[0], failfast: !!(e && e.gui_failfast), ms: Date.now() - t0, stack: String(e && e.stack).split("\n").slice(0, 16) };
 }
 out.iface = '0x' + dv().getBigUint64(iface, true).toString(16);
 mod._gui_reach_dump();
 for (const l of errs) { const m = /GUI-REACH (\d+) (\w+) (\d+) (IMPL|STUB) P(\S+)$/.exec(l); if (m) out.reach.push({ order: +m[1], name: m[2], calls: +m[3], kind: m[4], prio: m[5] }); }
-out.open_trace = errs.filter((s) => s.startsWith('SHIMOPEN ')).map((s) => JSON.parse(s.slice(9)));
+const fnNames = wasmFuncNames(wasmCjs + '.wasm');
+out.open_trace = errs.filter((s) => s.startsWith('SHIMOPEN ')).map((s) => fillCaller(JSON.parse(s.slice(9)), fnNames));
+out.fnmap = { n: fnNames.size, lift: [...fnNames.values()].filter((n) => /^function_[0-9a-fA-F]+$/.test(n)).length };
 const tr = opt('--trace-out', null);
 if (tr) fs.writeFileSync(tr, out.open_trace.map((o) => JSON.stringify(o)).join('\n') + (out.open_trace.length ? '\n' : ''));
 out.errs_n = errs.length;

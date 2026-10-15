@@ -1,5 +1,5 @@
-// mixer 系 19 関数の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と C provider (provider/fl_engine.c) に流し、
-// 各呼出しの戻り値・エラー code が一致することを確認する。mock に定義が無い mixer 関数 (56 件) は対象外。
+// mixer 系 21 関数の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と C provider (provider/fl_engine.c) に流し、
+// 各呼出しの戻り値・エラー code が一致することを確認する。mock に定義が無い mixer 関数 (54 件 = flapi 表 75 − 21) は対象外。
 //   node tests/mixer_diff.mjs     (前提: provider/build.sh 済み)
 import fs from "node:fs";
 import assert from "node:assert/strict";
@@ -79,12 +79,24 @@ const seq = [
   ["mixer.setCurrentTempo", [150000]],
   ["mixer.getCurrentTempo", [0]],
   ["mixer.getCurrentTempo", [1]],
+  // PE 確定 (REPORT_PY205): getTrackCount = trackCount − 2・getEqBandCount = 3
+  ["mixer.trackCount", []],
+  ["mixer.getTrackCount", []],
+  ["mixer.getEqBandCount", []],
   // 範囲外 index は両者とも code 4 (RANGE)
   ["mixer.getTrackName", [127]],
   ["mixer.getTrackColor", [127]],
   ["mixer.getTrackColor", [-1]],
   ["mixer.getTrackVolume", [-1, 0]],
   ["mixer.setTrackPan", [200, 0]],
+  // PY-115 (#2950): getTrackName の maxLen (>0 のとき末尾の mask 外文字を削って先頭 maxLen 文字へ切る。0・既定 -1 は全文)
+  ["mixer.getTrackName", [0, 3]],
+  ["mixer.getTrackName", [1, 4]],
+  ["mixer.getTrackName", [1, 0]],
+  ["mixer.getTrackName", [1]],
+  ["mixer.getTrackName", [1, 100]],
+  ["mixer.getTrackName", [0, 1]],
+  ["mixer.getTrackName", [1, "x"]],
 ];
 
 const diffs = [];

@@ -13,4 +13,11 @@ gcc -O1 -g -w -fsanitize=address,undefined -pthread -I "$ROOT/include" -I "$BUIL
 gcc -O1 -g -w -fsanitize=address,undefined -pthread -I "$ROOT/include" -I "$ROOT/src" -I "$BUILD" \
   "$BUILD/lift_w/lifted.o" "$BUILD/lift_w/lift_main.o" "$ROOT"/src/gui_platform.c "$ROOT"/src/gui_reach.c "$BUILD"/gui_reach_tab.c "$ROOT"/src/gui_core.c "$ROOT"/src/gui_gdi.c \
   "$ROOT"/src/gui_headless.c "$ROOT"/src/gui_hl_stats.c "$BUILD"/gui_stubs.c "$HERE/native_w_run.c" -o "$BUILD/native_w_run" -lm
-(cd "$BUILD" && ./native_w_run "$BUILD/w_actual.ppm")
+(cd "$BUILD" && ./native_w_run "$BUILD/w_actual.ppm" 2>&1 | tee "$BUILD/native_w_run.log")
+# ゲストの ExitProcess が先に走ると native_w_run は FAIL を出す前に終わり rc 0 になる (#3508)。PASS 行を必須にする。
+grep -q '^\[native_w_run\] PASS' "$BUILD/native_w_run.log" || { echo "[native_w_e2e] FAIL: PASS 行が無い" >&2; exit 1; }
+# 独立オラクル (shim と無関係に描画規約から計算した期待画像) と画素比較。ネガコン: 1 画素改竄した期待画像では必ず不一致 (#3508)
+python3 "$ROOT/golden/gen_golden_w.py" compare "$BUILD/w_actual.ppm"
+tamper_log="$(python3 "$ROOT/golden/gen_golden_w.py" compare "$BUILD/w_actual.ppm" --tamper || true)"
+echo "$tamper_log"
+grep -q '^\[golden_w\] MISMATCH' <<< "$tamper_log" || { echo "[native_w_e2e] FAIL: ネガコン (改竄オラクル) が MISMATCH を出さなかった (例外・終了コードだけでは判定しない)" >&2; exit 1; }
