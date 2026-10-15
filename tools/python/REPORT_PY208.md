@@ -15,7 +15,7 @@
 
 - 測定 commit: `853874e67` (origin/main 起点・worktree `ws-3522`・branch `3522-py208-pattern-select-semantics`)。コード変更 0 件 (追加は本 REPORT と `docs/DOC_MAP.md` の 1 行)。
 - コード差分 (測定 commit から HEAD まで、コード範囲): `git diff 853874e67 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (PR 作成直前に確認)。
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` (`oc_artifacts: fl-win64`)。展開: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C tools/python/work/py208 --wildcards '*block00031_PE.bin'` (実測 2.44 秒・`real 0m2.442s`)。展開先 `tools/python/work/py208/extracted/` は gitignore。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (`oc_artifacts: fl-win64`)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/py208 --wildcards '*block00031_PE.bin'` (実測 2.44 秒・`real 0m2.442s`)。展開先 `tools/python/work/py208/extracted/` は gitignore。
 - 逆アセンブル: `python3 analysis/py41_disasm.py work/py208/extracted/block00031_PE.bin 0xd65a10 0xd65ba0 0xd66230 0xd66430 0xd66560 0xd66ec0 0xd659c0 0xd67690 0xd82c20` (実測・rc 0)。callback 群 (`0xd66e70 0xd66390 0xd66500 0xd660e0 0xd65b30`)・`0x12d8af0`・`0xd843d0` も同じ方式。
 - 文字列・kwlist・RIP 相対の参照先は、capstone で関数先頭から `ret` まで走査して読んだ (一時スクリプトは `work/py208/`・未コミット)。
 - 実行時の値 (グローバル変数の中身) は静的解析では得られない。以下の「P」「O」は構造だけを書く。
