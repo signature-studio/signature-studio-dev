@@ -10,18 +10,22 @@
 - `CanvasGradient` (`canvas_gradient.h`、新規) を追加し、`CanvasPlatformFactory::createGradient` が `nullptr` でなく実体を返すようにした。これが無いと gradient を作れない。
 
 ### 1-2. 測定 commit と検証
-- 測定 commit: `42b81b0d7` (main 取り込みの merge。canvas のコードを変えた最後の commit。SR-68 #4427 の線幅・drawMode を含む)。検証は同 commit で実施し、結果はすべて実測値。
+- 測定 commit: `021b79922` (main 取り込みの merge。canvas のコードを変えた最後の commit。SR-62 の実装と main の SR-69 (#4428) を含む)。検証 HEAD も `021b79922`。
+- 前版 (round 3 まで) の測定 commit `42b81b0d7` と「差分 0 行」の記述は誤りだった。`42b81b0d7` から `021b79922` までに canvas の差分があったため、全検証を `021b79922` で取り直した。
 - 判定 harness: `canvas/draw_ops_main.cpp` (SR-62 の 4 命令を追加)。判定スクリプト `canvas/check_draw_ops.sh` に次を追加した。
   - 期待する `draw_op` 行数 (9 件) が揃わなければ fail。
   - コンパイル失敗が 1 件でもあれば fail (従来は失敗 src を外して link し、op 行が 0 件でも rc=0 で通っていた)。
   - gradient は異なる色が 2 以上であること (一色の塗りを通さない)。
+- 測定方法: 5 本を直列に 1 本ずつ実行 (各 run は前の run の終了後に開始)。開始前に load が 1 分平均で 1.15 まで下がるのを待った。各 run は `xargs -P 4` で 4 core を使うため、load は run 自身で上がる。2 本を同時に走らせた試行 (load 6.05・所要 65.9 s) は比較対象から外した。
 
-| 検証 | 結果 (rc) | 所要 (real) | load (開始時 1 分平均) |
+| 検証 | 結果 (rc) | 所要 (real) | load (開始 → 終了・1 分平均) |
 |---|---|---|---|
-| `check_canvas_syntax.sh` | **0** (8 ファイル全て rc=0) | 4 s | 0.50 |
-| `check_draw_ops.sh` | **0** (link rc=0・compile fail=0・run rc=0) | 17 s | 0.42 (終了時 1.29) |
-| `check_render_poc.sh` | **0** (nonzero_after=12000 text_px=112・compile 71/71 ok) | 17 s | 未記録 (run 中の計測なし) |
-| `check_line_width.sh` | **0** (4 check pass・w4_aa partial=136 full=199) | 16 s | 未記録 |
+| `check_canvas_syntax.sh` | **0** (8 ファイル全て rc=0・errors=0) | 7.1 s | 1.15 → 1.21 |
+| `check_draw_ops.sh` | **0** (link rc=0・compile fail=0・run rc=0・9 op pass) | 31.9 s | 1.21 → 2.31 |
+| `check_render_poc.sh` | **0** (compile 71/71 ok・nonzero_after=12000・text_px=112) | 31.8 s | 2.31 → 2.98 |
+| `check_line_width.sh` | **0** (4 check pass・w4_aa partial=136 full=199) | 32.0 s | 2.98 → 3.43 |
+
+`check_transform.sh` (main 由来の SR-69 の判定) の実測は `REPORT_EFFORT_APPENDIX_4428.md` §1-6 に置いた。
 
 `check_draw_ops.sh` の op 別結果 (`work/draw_ops/summary.txt`・op 別の所要は計っていない):
 
@@ -38,16 +42,16 @@
 | fillRectWithBitmap | pass (nonzero=900) |
 
 - drawLine / drawLines の既存判定は、SR-68 の線幅変更 (`plotThickLine` 分岐) の後も nonzero=49 / 26 で、前測定 (`c7c3a7ffc` 時点) と同値。判定は変わらない。
-- 測定条件: vstgui4_14_3 (commit `b1e823550e23067c5adee67f05ac3ddaba7a25c9`、`git clone --filter=blob:none --no-checkout https://github.com/steinbergmedia/vstgui.git` → `git checkout vstgui4_14_3`)。toolchain-emsdk: 上流 emsdk を `git clone --depth 1 --branch 6.0.12 https://github.com/emscripten-core/emsdk.git` し `./emsdk install 6.0.12` → `./emsdk activate 6.0.12` で `work/emsdk` に展開 (`tools/m1/flags.sh` の pin と一致)。素材 `toolchain-emsdk` は本 run の `$ARTIFACTS_DIR` に無く、上流から取得した。`work/` は gitignore。
-- 初回の draw run は素材展開と vstgui4 clone を含むため、所要の比較対象にしない。実測は素材を取得した後の 2 回目以降の run。
+- 測定条件・素材: toolchain-emsdk は `$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` (実在を `ls` で確認) を `tar --zstd -xf` で `work/` に展開した (`work/emsdk/upstream/emscripten`・展開 3.7 s)。上流 emsdk の clone と install は行っていない。vstgui4_14_3 は上流を `git clone --filter=blob:none --no-checkout` して `git checkout vstgui4_14_3` (commit `b1e82355`)。`work/` は gitignore。
 
 ### 1-3. 画素数の意味
 - 非ゼロ画素数は描いたかの判定にだけ使う。描いた範囲の大きさではない。
 - 9 分割とタイル塗りは、ソースが一様色 (青) のため distinct を見ていない。gradient だけ色の変化を見る。
 
 ### 1-4. コード差分
-- 測定 commit `42b81b0d7` から HEAD までの canvas のコード差分は 0 行 (この付録の commit は REPORT のみで canvas に触れない)。
-- 参考: 旧測定 commit `c7c3a7ffc` から `42b81b0d7` までは SR-68 (#4427) の取り込みで差分がある (`git diff --stat c7c3a7ffc 42b81b0d7 -- tools/targets/serum2/gui/canvas` = 4 files, 183 insertions(+), 3 deletions(−)。内訳は `canvas_graphicsdevice.cpp` 42 行変更、`canvas_graphicsdevice.h` 5 行変更、`check_line_width.sh` 70 行追加、`line_width_main.cpp` 69 行追加)。このため上記の再測定を 42b81b0d7 で行った。
+- `git diff 021b79922 HEAD -- tools/targets/serum2/gui/canvas` の出力は 0 行 (測定 commit = 検証 HEAD)。この付録を含む commit は REPORT のみで canvas に触れない。
+- 参考: 旧測定 commit `42b81b0d7` から `021b79922` までの canvas 差分は main 側の SR-69 (#4428) の取り込み分。`git diff --stat 42b81b0d7 021b79922 -- tools/targets/serum2/gui/canvas` = 5 files, 200 insertions(+), 12 deletions(−) (`canvas_font.cpp`・`canvas_graphicsdevice.{cpp,h}`・`check_transform.sh`・`transform_check_main.cpp`)。判定結果に効き得るため、上の表は全て `021b79922` で取り直した値。
+- 参考: 旧々測定 commit `c7c3a7ffc` から `42b81b0d7` までは SR-68 (#4427) の取り込みで差分がある (4 files, 183 insertions(+), 3 deletions(−))。
 
 ### 1-5. 未解決
 | 未解決 | 影響 | 起票先 |
@@ -55,5 +59,5 @@
 | drawArc・drawPoint・drawGraphicsPath (path 描画・円弧・点) | 円弧・点・path が no-op のまま | [SR-61] #4231 |
 | gradient の楕円形の放射・アルファ付き停止点の厳密な合成 | 円形以外の radial と色の細部が近似 | #4550 [SR-77] |
 | 拡大縮小・quality の bilinear (drawBitmap / 9 分割 / fillRectWithBitmap) | 1:1 のみ | #4551 [SR-78] |
-| `count_canvas_noop.py` の入れ子の波括弧 | 計数が不正確 | 別件 (本 issue の範囲外) |
+| `count_canvas_noop.py` の入れ子の波括弧 | 計数が不正確 | 未起票 (`count_canvas_noop` を含む issue は 0 件。起票要否は PM 判断) |
 | 起動 (FLEngine) の KPI 前後 | 本 PR では動かしていない | 本 PR 本文に明記 |
