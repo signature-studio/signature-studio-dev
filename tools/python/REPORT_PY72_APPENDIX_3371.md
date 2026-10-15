@@ -102,3 +102,30 @@
 | `0x1001ef0` の `this` の由来 (呼出し元 4 件) | 受入 2 | #3371 |
 | `0xfe9090` を参照する関数ポインタ表経由の間接呼出し | 受入 2 | #3371 |
 | 一覧 A・B の容器 Q への要素追加箇所と要素型 T | 受入 3 | #3371 |
+
+## 追補 3 (#5205・受入 2 の表経由: 復号できた範囲で 0 件・部分達成)
+
+- 表 `0xfe2a90` の slot 0 は `0xfe9090` (reset)。表の先頭 VA `0xfe2a90` を 8 バイト値として格納する箇所は **0 件** (4 バイト値では `0xfe2a90` 自身の 1 件のみ)。
+- `.text` 内で表の VA を disp (絶対・rip 相対) とする命令は **0 件**。ただし走査範囲は限定されている。`pe_fe9090_table.py` は `.text` を線形に復号し、復号不能バイトは 1 バイト飛ばして再同期する方式に直した (修正前は `md.disasm` を 1 回だけ呼んで先頭 4 命令で止まっていた)。走査は **命令 5,022,299 件・復号不能 161,366 バイト** (`.text` 16,397,488 バイト中)。この範囲の外にある命令は見ていない。
+- 結果: `0xfe9090` を呼ぶ直接 `call` は 2 件 (`0xffe29b`・`0x1001b7b`)。`.text` の `E9` (jmp rel32) での直接ジャンプは 0 件。表の VA を格納する 8 バイト値・表の VA を disp とする命令は、上記の走査範囲で 0 件。よって表経由の経路は、**復号できた範囲では見つからなかった**。復号不能 161,366 バイトの中に表参照があるかは、この方式では確定できない。「表経由の経路は 0 件と確定」とは書かない。受入 2 は部分達成。
+- 同じ逆アセンブル方式の欠落確認: `analysis/flapi/pe_decode_coverage.py` で slot 35 の 151 箇所を確認。`.text` の線形復号は 5,022,299 命令・復号不能 161,366 バイト (上と同じ)。151 箇所は全て、含む関数の先頭から単独に復号したときに箇所へ正しく届き (届かない 0 件)、含む関数 98 件の中に復号不能バイトは 0 件。よって `pe_slot35_sites.py` の 151 箇所と `pe_slot35_recv_src.py` の 54 件 (連鎖の形) は、復号欠落の影響を受けていない。
+- 補助 probe `analysis/flapi/pe_fe9090_table.py` を追加した (表の内容・格納・参照を列挙)。
+
+### 測定 (追補 3)
+
+- 測定 commit (コードを変えた最後の commit。`pe_fe9090_table.py` の修正 `353a8e950` と main 取り込みの merge `bd7a1a17c`): `bd7a1a17c`。`git diff bd7a1a17c HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (この commit の後は REPORT だけを変える)。
+- 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-5212 --wildcards '*block00031_PE.bin'` (展開先 `$RUNNER_TEMP/fl-5212/extracted/block00031_PE.bin`)。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-5212 python3 analysis/flapi/pe_fe9090_table.py` を 2 回。rc 0・25.70 s (1 回目の wall 時間)・出力は `cmp` で一致。load (1 分値) は 0.36。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-5212 python3 analysis/flapi/pe_decode_coverage.py` rc 0 (出力は上記の値)。
+- 参考: `pe_slot35_sites.py` と `pe_slot35_recv_src.py` は本 PR では再実行していない (両者の復号方式は `pe_decode_coverage.py` で確認済み)。
+
+### 未解決 (追補 3 後)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 151 箇所のうち受け手の型 (大域 `0x15e0c40` の初期化経路が未確定) | 受入 2 (`0xfe9090` が chan で走るか) | #5205 |
+| 表 `0xfe2a90` 経由の間接呼出し: 復号不能 161,366 バイトの中の表参照は未検査 (線形走査は復号できた 5,022,299 命令の範囲のみ) | 受入 2 | #3371 |
+| 大域 `0x15e0c40`・`0x15e4790`・`0x15e0ff8` の初期化・格納経路 | 受入 2・3 | #3371 |
+| `0xf48290` の受け手が chan か | 受入 2 | #3371 |
+| `0x1001ef0` の `this` の由来 (呼出し元 4 件) | 受入 2 | #3371 |
+| 一覧 A・B の容器 Q への要素追加箇所と要素型 T | 受入 3 | #3371 |
