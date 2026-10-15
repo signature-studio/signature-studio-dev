@@ -31,7 +31,7 @@
 |---|---|---|---|---|---|---|
 | **0** | **15/15 PASS** | `764/1/46/131/0` = base `764/1/46/131/0` | **942/942 units・差 0 件** | reached 33 ≥ 19 (`missing=[]`) | 512 passed / 0 failed | **N1〜N10 すべて期待どおり FAIL** |
 
-他の gate (PASS): L1 (ff・soft とも `0/0/0`)・A1 (declare 193 = adapter 193・impl 174・stub 19)・B1 (units_run 109 = base 109・GetMem 761・FreeMem 24・icall_miss 7)・R1 (最初の API `LoadStringW` ×3 IMPL・boot の到達 24 種)・S2・P1〜P5・W1 (WNDCLASS 11・fn WNDPROC 8・最終 IR 外 0)。`__pe_image` の parity と e2e も PASS。
+他の gate (PASS): L1 (ff・soft とも `0/0/0`)・A1 (declare 193 = adapter 193・impl 174・stub 19)・B1 (units_run 109 = base 109・GetMem 761・FreeMem 24・icall_miss 7)・R1 (最初の API `LoadStringW` ×3 IMPL・boot の到達 24 件 (名前も 24 種))・S2・P1〜P5・W1 (WNDCLASS 11・fn WNDPROC 8・最終 IR 外 0)。`__pe_image` の parity と e2e も PASS。
 
 ネガコン (期待どおり FAIL): N1 R1 (plain) / N2 B1 (期待 23) / N3 R2 (`NoSuchGuiApi` 追加) / N4 S1 (ok→trap) / N5 selftest (`GetDC(NULL)` を fail-fast に戻した shim・rc 134) / N6 W1 走査 (`--check`) / N7 W1 (judge) / N8 走査 floor +1 / N9 P5 (hwnd NULL) / N10 S3 (soft の 1 unit を ok→trap)。
 
@@ -120,7 +120,7 @@ R2 の一致 (`f46330b13` の `survey_soft.json` と `survey_soft_chain.json`): 
 | `tools/gui/flengine/REPORT_APPENDIX.md` | §6i の 1 文に「#1442 時点の記述」と明記 (m1) |
 | `docs/DOC_MAP.md` | 本付録の行数を実数に合わせ、測定の参照先を §2-0 にした (m3) |
 
-`tools/gui/gen_api.py` は変更していない。e2e が実行するが、IMPORTS の「実到達」列は `survey_soft_chain.json` (chain 実行) を読むため、隔離版への変更の影響を受けない。
+`tools/gui/gen_api.py` (1 行・`7f54678a7`): IMPORTS の「実到達」列の survey 入力を `survey_soft.json` (隔離版) から `survey_soft_chain.json` (chain 実行) に変えた。隔離版の到達は 12 種で、列の意味 (従来の chain 値) を保つため。`e2e.sh` が実行する `gen_api.py` の出力 (IMPORTS.md) は、この測定で変わらなかった (git status に差分なし)。
 
 ## 4. 未解決 (起票先付き)
 
