@@ -13,21 +13,21 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit (コードを最後に変えた commit) | `2d4c7ae52` (`fix(python): poc_mcp の値検査を channel の pv に直し、mock の引数型検査を C と揃える (PY-228)`)。初版の測定 commit は `a84a424ad` (round 1 の前) |
+| 測定 commit (コードを最後に変えた commit) | `6ee6d1401` (`Merge remote-tracking branch 'origin/main' into 3656-plugins-getparamvaluestring`)。コード変更は `2d4c7ae52` (round 1 の修正) と main (`dadf1884b`) の取り込み。取り込み後に全項目を再測定。初版の測定 commit は `a84a424ad` (round 1 の前) |
 | 素材 | `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (real 5.355 s)。emsdk は runner 同梱のもの (`EMSDK_DIR` の既定値) を使い、`toolchain-emsdk` は展開していない |
 | 入力 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/python/fetch_inputs.sh` (midi.py・utils.py・fl-stubs を取得。real 0.522 s) |
 | flpy | `bash tools/python/build_cpython_wasm.sh` (native + wasm の CPython 3.12.1。rc 0・real 4 m 05 s)、`FL_WIN64_DIR=… bash tools/python/build_flpy.sh` (rc 0・real 7.074 s。`dist/flpy.{js,wasm,data}`)。`analysis/flapi` の追跡物は再生成後も差分なし |
 | build (provider) | `bash tools/python/provider/build.sh`。rc 0。警告 0 |
-| flpy 経由 (MCP) | `node tests/poc_mcp.mjs` → `POC OK` (rc 0・real 1.497 s)。tools 48・host_calls 20563・roundtrip 37 µs/call。`set_plugin_parameter_value` → `Set 'Cutoff' … to 0.9000`、続く `get_plugin_parameter_value` → `Normalized Value: 0.9000, String Value: '90.0 %'`。channel 2 の `pv[0]` = 0.9、channel 0 の `pv[0]` = 0.5 |
+| flpy 経由 (MCP) | `node tests/poc_mcp.mjs` → `POC OK` (rc 0・real 1.277 s)。tools 48・host_calls 20563・roundtrip 49 µs/call (init 153 ms)。`set_plugin_parameter_value` → `Set 'Cutoff' … to 0.9000`、続く `get_plugin_parameter_value` → `Normalized Value: 0.9000, String Value: '90.0 %'`。channel 2 の `pv[0]` = 0.9、channel 0 の `pv[0]` = 0.5 |
 | 修正前 (参考) | 同じ flpy で `poc_mcp.mjs` を `7608e7950` の状態 (旧 assert) で実行 → `AssertionError` (`tests/poc_mcp.mjs:69`・`params[0].v` が 0.5 のまま)。指摘どおり |
-| provider 経由 | `node tests/provider_check.mjs` → `{"functions":435,"implemented":155,"unimplemented":280,"mcp_static":60,"PASS":true}` (real 0.366 s)。`FL_ENGINE=wasm node tests/all_tools.mjs` → total 48・ok 48・soft_error 0・raised 0・host_calls 37425 (real 2.012 s。既存 REPORT_APPENDIX の 37,425 と一致) |
+| provider 経由 | `node tests/provider_check.mjs` → `{"functions":435,"implemented":162,"unimplemented":273,"mcp_static":60,"PASS":true}` (real 0.358 s。main 取り込みで実装数 155 → 162)。`FL_ENGINE=wasm node tests/all_tools.mjs` → total 48・ok 48・soft_error 0・raised 0・host_calls 37425 (real 2.102 s。既存 REPORT_APPENDIX の 37,425 と一致) |
 | 差分 (新規) | `node tests/plugins_diff.mjs` → `{"calls":56,"diffs":0,"PASS":true}` (real 0.050 s。初版は 46 呼出し) |
-| PE 解析 | `FL_WIN64_DIR=… python3 analysis/flapi/plugins_paramvalue_facts.py`。PASS 20 / FAIL 0 / rc 0。経路別の VA 絞り込み版 (§2)。real 0.088 s |
-| 差分 (既存・回帰) | `mixer_diff` 62・diffs 0 (0.053 s) / `channels_diff` 214・grid_calls 1200・diffs 0 (0.076 s) / `device_diff` 8・diffs 0 (0.059 s) / `ilmcp_diff` 32・diffs 0 (0.065 s) / `ilmcp_e2e` PASS (0.494 s)。mock の `all_tools.mjs` は 48/48・host_calls 37425 (2.162 s) |
+| PE 解析 | `FL_WIN64_DIR=… python3 analysis/flapi/plugins_paramvalue_facts.py`。PASS 20 / FAIL 0 / rc 0。経路別の VA 絞り込み版 (§2)。real 0.089 s |
+| 差分 (既存・回帰) | `mixer_diff` 62・diffs 0 (0.051 s) / `channels_diff` 214・grid_calls 1200・diffs 0 (0.066 s) / `device_diff` 8・diffs 0 (0.049 s) / `ilmcp_diff` 32・diffs 0 (0.061 s) / `ilmcp_e2e` PASS (0.438 s)。mock の `all_tools.mjs` は 48/48・host_calls 37425 (2.204 s) |
 | arity 検査 | `node tests/sig_arity_probe.mjs` → fails 0・PASS (実装済み 8 関数に `plugins.getParamValueString` を含む)。real 0.062 s |
-| load | 測定の直前 `load average 0.27 1.16 0.77` (4 core) |
+| load | 測定の直前 `load average 0.39 0.70 0.66` (4 core) |
 
-測定は worktree `ws-3656` (PR 枝 `3656-plugins-getparamvaluestring`) で行った。`git diff 2d4c7ae52 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` の出力は 0 行 (測定 commit の後は docs のみの commit)。
+測定は worktree `ws-3656` (PR 枝 `3656-plugins-getparamvaluestring`) で、main 取り込み後の `6ee6d1401` に対して行った。`git diff 6ee6d1401 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` の出力は 0 行 (測定 commit の後は docs のみの commit)。
 
 ## 2. PE の逆アセンブル (根拠)
 
@@ -96,7 +96,8 @@ MCP の呼出し形は `analysis/mcp/tool_coverage.json` の実測で `getParamV
 
 ## 6. 差分の確認と未実行
 
-- `git diff 2d4c7ae52 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` は本 REPORT の commit 後も**差分 0** (本 REPORT と `docs/DOC_MAP.md` の登録だけが後の commit)。
+- `git diff 6ee6d1401 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` は本 REPORT の commit 後も**差分 0** (本 REPORT と `docs/DOC_MAP.md` の登録だけが後の commit)。
+- main (`dadf1884b`) の取り込み (`6ee6d1401`): `provider/fl_engine.c` の衝突は `Pl` 構造体だけ。main 側の `Pl` (`act`・`loop`・`trig_mode`・`pos_snap`・`trig_snap`) を採り、`Chan`・`Mix` は本 PR の `pv`・`spv` を残した。取り込み後に `build_flpy.sh` (real 6.911 s) と `provider/build.sh` を再実行し、§1 の全項目を再測定した。
 - round 1 (review) で「未実行」だった `provider_check.mjs`・`all_tools.mjs` (FL_ENGINE=wasm)・`poc_mcp.mjs` を、flpy (§1) を作って実行した。いずれも PASS。`ilmcp_e2e.mjs` も PASS。
 - `poc_mcp.mjs` は flpy (CPython wasm) と **mock** の flapi を使う (C provider は通らない)。C provider の値 API は `plugins_diff.mjs` (C と mock の差分 0) と `FL_ENGINE=wasm all_tools.mjs` (48/48・host_calls 37425。既存の追跡値と一致) で確認した。
 
