@@ -224,13 +224,14 @@ FL_H(channels, focusEditor) {
     if (idx < 0 || idx >= nch) RANGE();
     return fl_ret_none(c);
 }
-/* PY-100 (#2879): PE 0xd5b930 の readout。構造体は grid bit が立つ step にあるとみなす (生成条件は未確定)。
- * 既定値は stub の並び (param 0..7 = pitch 60・velocity 100・release 64・fine pitch 120・pan 64・mod X 64・mod Y 64・ticks 0)。
- * 構造体が無い・param が 0..7 の外は -1 (PE: 構造体 NULL で -1)。param 8 (PE: byte +0x11) は既定値未確定のため未モデル (-1) */
-static const int64_t step_def[8] = {60, 100, 64, 120, 64, 64, 64, 0};
+/* PY-100 (#2879): PE 0xd5b930 の readout。構造体は grid bit が立つ step にあるとみなす。
+ * PY-111 (#2929): 生成経路を PE で確認 (REPORT_PY111.md)。setGridBit の note は 0x12d4100 の creation path で作られ、
+ * param 0 = 60 (0x1062200)・1 = 100 (setGridBit が 100 を渡す)・2/3/4 = 64/120/64 (init 0x1062210)・5/6 = 128 (同 G の byte 2/3)・
+ * 7 = 開始 tick = step × V (V 静的 24)・8 = 0 (0x12d42ac)。構造体が無い・param が 0..8 の外は -1 (PE: 構造体 NULL で -1) */
+static const int64_t step_def[9] = {60, 100, 64, 120, 64, 128, 128, 0, 0};
 static int64_t step_param(const Chan *k, int64_t pos, int64_t prm) {
-    if (pos < 0 || pos >= NSTEP || !k->steps[pos] || prm < 0 || prm > 7) return -1;
-    return step_def[prm];
+    if (pos < 0 || pos >= NSTEP || !k->steps[pos] || prm < 0 || prm > 8) return -1;
+    return prm == 7 ? pos * 24 : step_def[prm];
 }
 /* PE 0xd5bb30: 引数を読んでから index を検査 (範囲外は Index out of range)。useGlobalIndex は未モデル (グループ無し) */
 FL_H(channels, getCurrentStepParam) {
