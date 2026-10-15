@@ -7,6 +7,7 @@
           must-def に入れない。入口の xmm_k の上位が残るため、後続の読みを livein として数える。
 
 usage: mx4989_probe.py <pe> <vectorcall.json> <out.json>
+       mx4989_probe.py --selftest   (partial_dst の単体判定・PE 不要)
 """
 import bisect
 import json
@@ -19,9 +20,6 @@ from capstone import x86
 
 from mx6_vectorcall import analyze, bits, effects, _regidx
 from mx33_xmm03 import follow, upper_flow_dst
-
-PARTIAL = {'movss', 'movsd', 'movlps', 'movlpd', 'movhps', 'movhpd', 'movhlps', 'movlhps'}
-
 
 def base_mnem(ins):
     m = ins.mnemonic
@@ -38,16 +36,57 @@ def partial_dst(md, ins):
     if d is None:
         return None
     nreg = sum(1 for o in ops if o.type != x86.X86_OP_IMM)
-    if b in PARTIAL and nreg == 2 and ops[1].type == x86.X86_OP_REG:
+    if b in ('movlps', 'movhps', 'movlpd', 'movhpd', 'movhlps', 'movlhps') and nreg in (2, 3):
         return d
-    if nreg == 3 and (b.startswith('cvtsi2') or b.endswith(('ss', 'sd'))):
-        return d
-    if b.startswith('cvtsi2') and nreg == 2:
+    if b in ('movss', 'movsd'):
+        return d if nreg in (2, 3) and ops[-1].type == x86.X86_OP_REG else None
+    if b.startswith(('ucomi', 'comi')):
+        return None
+    if nreg in (2, 3) and (b.startswith('cvtsi2') or b.endswith(('ss', 'sd'))):
         return d
     return None
 
 
-def must_partial_off(md, insns, succ, eff_w, eff_r):
+PARTIAL_CASES = [
+    ('movlps xmm0,[rax]', b'\x0f\x12\x00', True),
+    ('movlps xmm0,xmm1', b'\x0f\x12\xc1', True),
+    ('movhps xmm0,[rax]', b'\x0f\x16\x00', True),
+    ('movlpd xmm0,[rax]', b'\x66\x0f\x12\x00', True),
+    ('movhpd xmm0,[rax]', b'\x66\x0f\x16\x00', True),
+    ('vmovlps xmm0,xmm1,[rax]', b'\xc5\xf0\x12\x00', True),
+    ('vmovhps xmm0,xmm1,[rax]', b'\xc5\xf0\x16\x00', True),
+    ('movss xmm0,xmm1', b'\xf3\x0f\x10\xc1', True),
+    ('movss xmm0,[rax]', b'\xf3\x0f\x10\x00', False),
+    ('movsd xmm0,xmm1', b'\xf2\x0f\x10\xc1', True),
+    ('movsd xmm0,[rax]', b'\xf2\x0f\x10\x00', False),
+    ('vmovss xmm0,xmm1,xmm2', b'\xc5\xf2\x10\xc2', True),
+    ('vmovss xmm0,[rax]', b'\xc5\xfa\x10\x00', False),
+    ('addss xmm0,xmm1', b'\xf3\x0f\x58\xc1', True),
+    ('addss xmm0,[rax]', b'\xf3\x0f\x58\x00', True),
+    ('ucomiss xmm0,xmm1', b'\x0f\x2e\xc1', False),
+    ('comisd xmm0,xmm1', b'\x66\x0f\x2f\xc1', False),
+    ('vucomiss xmm0,xmm1', b'\xc5\xf8\x2e\xc1', False),
+    ('cvtsi2sd xmm0,rax', b'\xf2\x48\x0f\x2a\xc0', True),
+    ('cvtss2sd xmm0,xmm1', b'\xf3\x0f\x5a\xc1', True),
+    ('movaps xmm0,xmm1', b'\x0f\x28\xc1', False),
+    ('movups xmm0,[rax]', b'\x0f\x10\x00', False),
+]
+
+
+def selftest():
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    md.detail = True
+    bad = 0
+    for label, code, want in PARTIAL_CASES:
+        ins = list(md.disasm(code, 0x1000))[0]
+        got = partial_dst(md, ins) is not None
+        bad += got != want
+        print('ok ' if got == want else 'NG ', label, 'partial' if got else 'full')
+    print('partial_dst selftest: cases=%d bad=%d' % (len(PARTIAL_CASES), bad))
+    return 1 if bad else 0
+
+
+def must_partial_off(insns, succ, eff_w):
     """must-def を計算。部分書込は must に入れない (宛先の上位保持を読みとして残す)。"""
     n = len(insns)
     must = [None] * n
@@ -75,7 +114,7 @@ def livein_u3d(md, r):
         pd = partial_dst(md, ins)
         part.append(pd)
         eff_w.append(wr & ~(1 << pd) if pd is not None else wr)
-    must = must_partial_off(md, insns, succ, eff_w, eff_r)
+    must = must_partial_off(insns, succ, eff_w)
     lin = 0
     where = []
     for k in range(n):
@@ -201,4 +240,4 @@ def main(pe_path, vc_p, out_p):
 
 
 if __name__ == '__main__':
-    sys.exit(main(*sys.argv[1:4]))
+    sys.exit(selftest() if sys.argv[1:] == ['--selftest'] else main(*sys.argv[1:4]))
