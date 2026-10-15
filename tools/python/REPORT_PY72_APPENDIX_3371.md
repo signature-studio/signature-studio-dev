@@ -16,7 +16,7 @@
 
 - 測定 commit: `dcb38d210` (`pe_slot35_sites.py` を追加した commit。コードを変えた最後の commit)。
 - 測定 HEAD: `dcb38d210`。`git diff dcb38d210 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本付録の commit は REPORT と `docs/DOC_MAP.md` だけを変える)。
-- 素材: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-3371 --wildcards '*block00031_PE.bin'` (2.9 秒。`extracted/block00031_PE.bin`。repo 外)。
+- 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-3371 --wildcards '*block00031_PE.bin'` (2.9 秒。`extracted/block00031_PE.bin`。repo 外)。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-3371 python3 analysis/flapi/pe_slot35_sites.py` を同一 HEAD で連続 3 回。終了コード 3 回とも 0。出力は 3 回ともバイト単位で同一 (md5 `7d1816a0a5a7f324cef8a441d450d400`)。
 
 | 回 | 所要 | load (1 分値・開始時) |

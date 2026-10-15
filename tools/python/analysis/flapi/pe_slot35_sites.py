@@ -6,7 +6,7 @@
 
 - refs 列は「箇所を含む関数の中に、その型の VMT 値・RIP 相対のクラス参照スロットが直接現れる」かどうかだけを示す。
   受け手の実行時の型は決めない (呼出し元をたどる解析は行わない)。
-- 展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
+- 展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
 """
 import bisect
 import os
