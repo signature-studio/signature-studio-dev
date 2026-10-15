@@ -32,7 +32,11 @@
 | その他 | 2 | 2 |
 | **合計** | **555** | **533** |
 
-- 注: baseline の `code` 間接呼出しは 0 件 (main で解消済み。`REPORT_APPENDIX_3075.md` の 21 件は旧値)。3075 の 577 件との差は decompile 集合 (149 対 151) と main 側の変更による。
+- 注: baseline の `code` 間接呼出しは 0 件 (main で解消済み。`REPORT_APPENDIX_3075.md` の 21 件は旧値)。3075 の 577 件との差は、推定 (未検証): decompile 集合 (149 対 151) と main 側の変更による。
+- **再集計 (検証 HEAD `f6ff6ec2`・n=1)**: 旧 `emcc.log` は保存していなかったため、同 HEAD の `ghidra_route` で再生成した。手順は `DecompEach` (149/149 OK) → `ghidra_to_c.py delay --fix bitcast,intload,stackpair,assoc,concat` → `emcc -c -ferror-limit=0 -I ghidra_route`。delay の emcc error は **533 件**で、`emcc_census.py` の内訳は上表の `288494e23` 列と一致 (6・190・86・46・0・0・17・186・2)。gain 2・haas 0・gate 20・stereo 12 (`-w` 無し)。
+- **引数数不一致 86 件の呼出先** (emcc 行の番号 → 源の呼出し行で callee を特定。1 行に呼出しは複数無し): 33 種。
+  - `FUN_180fc6870` 17 件 (too few)・`FUN_180fc6d70` 16 件 (too many) → 子 #3844。
+  - 残り **53 件 = 呼出先 31 種**: 4 件 1 種 (`FUN_180fdc470`)・3 件 3 種・2 件 13 種・1 件 14 種 (計 4+9+26+14 = 53)。→ 子 #3847 (本文の内訳を本数で訂正)。
 
 **Gain / Haas / Gate / Stereo の不変 (受入 3)**
 - 生成 C: `cmp` で baseline と **byte 一致** (gain・haas・gate・stereo の 4 本、差分 0 行)。
@@ -57,6 +61,6 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 引数数不一致の残り 33 件 (呼出先 `FUN_180fc6870` 17・`FUN_180fc6d70` 16) | Delay の emcc 不通過 (wasm 不成立) | [KH-72] #3844 (本 PR で起票) |
-| 引数数不一致の残り 53 件 (呼出先 33 種・stereo と同じ callee 族を含む) | 同上 | [KH-73] #3847 (本 PR で起票) |
+| 引数数不一致の残り 53 件 (呼出先 31 種・stereo と同じ callee 族を含む) | 同上 | [KH-73] #3847 (本 PR で起票) |
 | Delay の数値未検証 (1000 trial・ネガコン・第二 oracle) | emcc 通過だけでは値の正しさは言えない | #3073 [KH-41] (open・既存) |
-| gain (error 2)・gate (error 20) の `-w` 無し emcc error | build_cmp.sh は `-w` で通す。本 PR で変化なし | 既存の挙動。本 PR の範囲外として記録のみ |
+| gain (error 2)・gate (error 20) の `-w` 無し emcc error | build_cmp.sh は `-w` で通す。本 PR で変化なし (既存の挙動) | 本 PR の未解決表に残す (WORKFLOW §3: 未解決の追跡だけの項目は子を起票しない。親 #3096 は CLOSED のためコメントでは追えない) |
