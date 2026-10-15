@@ -22,7 +22,7 @@
 |---|---|---|---|
 | `fw_prep.py` | F.ranges 作成 | 20.1 s | — |
 | `icall_rewrite.py` (blk `8a1000`) | rewrote 11,736 funcs / 6,159 sites・`errors {}`・section +5,924,861 B | 21.2 s | — |
-| `fw_lift.sh` (RetDec 8 chunk・restore・merge) | rc 0・`fw_all.restored.ll` 1,542,337 行 / 11,939 defines | 5 分 42 秒 | 1.46 2.30 1.35 |
+| `fw_lift.sh` (RetDec 8 chunk・restore・merge) | rc 0・`fw_all.restored.ll` 1,542,337 行 / 11,939 defines (同じ head の再実行 (レビュー run) では 1,542,326 行・defines は一致。分類 §3.2 には影響しない) | 5 分 42 秒 | 1.46 2.30 1.35 |
 
 - `fw_lift.sh` の所要は前回の測定 (10 分 16 秒) と違う。原因は未切り分け (実行環境の差を含む)。
 - 前回の測定の section 値 (+5,924,861 B) は本 run の `icall_rewrite.py` と一致する (§5 の 624fca112 の行)。
