@@ -4,9 +4,9 @@
 
 ## 結論 (1 行)
 
-転送先 0x161fc0 を body 基準で選定した。closure は直接 call と関数外への直接 jmp の辺で求める (67 関数・2,609 命令)。閉包内に間接 call 18・間接 jmp 6 があり、trap 化は未実装 (§2・§4)。RetDec 段はこの run で再実行できず、前回値は無効 (§3)。
+転送先 0x161fc0 を body 基準で選定した。closure は直接 call と関数外への直接 jmp の辺で求める (67 関数・2,609 命令)。閉包内に間接 call 18・間接 jmp 6 があり、trap 化は未実装 (§2・§4)。RetDec 段は 69 関数まで lift でき、gen_helpers は `__asm_cvttss2si` の未対応で止まる (§3)。
 
-測定 commit: `9c096c56` (`closure_select.py`・`lift_vtable.sh`・`ildsp_vtable.py` を含む最後のコード commit)。`git diff 9c096c56 HEAD -- tools/shared/lift/ildsp` は本ファイルの差分のみ。
+測定 commit: `ef510445` (`closure_select.py`・`lift_vtable.sh`・`ildsp_vtable.py` を含む最後のコード commit。main 取り込みの merge)。`git diff ef510445 HEAD -- tools/shared/lift/ildsp tools/shared/scripts/ildsp_vtable.py` の出力は本ファイルの差分のみ。
 
 ## 1. 選定 (3 候補の実測)
 
@@ -34,22 +34,24 @@ issue の 4 件 (`0x1aedc0` の 3 件と `0x1b6f4c` の 1 件) の到達経路 (
 
 扱い: この PR では trap 化しない。子 issue [T-SH-70] #3346 に移す (§4)。wasm 化の前に、これらを lift が黙って通すことを防ぐ必要がある。
 
-## 3. 再現と実測 (測定 commit `9c096c56`)
+## 3. 再現と実測 (測定 commit `ef510445`)
 
 ```sh
-FL_WIN64_DIR=<fl-win64 展開先> ILDSP_WORK=<作業先> bash tools/shared/lift/ildsp/lift_vtable.sh 0x161fc0
+FL_WIN64_DIR=<fl-win64 展開先> ILDSP_WORK=<作業先> RETDEC_BIN=/opt/retdec/bin/retdec-decompiler bash tools/shared/lift/ildsp/lift_vtable.sh 0x161fc0
 ```
 
-- `ildsp_vtable_check.py`: `ALL OK`。
+- `ildsp_vtable_check.py`: `ildsp_vtable_check: ALL OK`。
 - `closure_select.py`: `body_insn=324`・`closure functions=67 insn=2609 direct_call_edges=84 direct_jmp_edges=7 unresolved_edges=0`・`indirect_calls=18 indirect_jmps=6`。
-- RetDec 段: RetDec 本体 (`RETDEC_BIN`) が無く、`toolchain-retdec` 素材も無いため、この run では実行できない (`rc=127`)。**RetDec・ir_normalize・gen_helpers の結果は、新しい closure について未測定。** 前回 (`372bbe95`) の `13 functions lifted`・`declare @__asm_*` の種類数 49・`cvttss2si` での停止は旧 closure の値で、無効。
-- 所要 (lift.sh の RetDec 前段まで): 0.38 秒 (1 回・時間計測のみ)。
+- RetDec 段 (RetDec v5.0。runner 同梱の `/opt/retdec`。`toolchain-retdec` 素材は不要): `--select-ranges` (ranges 1,608 B) で `[ildsp] retdec: 69 functions lifted`。
+- `[ildsp] declared helper op names (declare @__asm_*): 54 distinct`。
+- `gen_helpers.py`: `[gen_helpers] unsupported helper: declare i32 @__asm_cvttss2si(i128)` で終了 (rc=1)。gen_helpers は最初の未対応 op で exit するため、残りの未対応の全数は未測定。`helpers ok` は出ない (意図した停止点)。
+- 所要 (lift_vtable.sh 全体・rc=1 まで): 1.85 秒 (n=1・load 0.49)。前回 (`372bbe95`) の `13 functions lifted`・declare 49 種は旧 closure の値で、無効。
 
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| RetDec・ir_normalize・gen_helpers を新しい closure の ranges で再実行 (`toolchain-retdec` が必要) | 新 closure の lift 結果が無い | 本 PR の再起動 (`oc_artifacts: fl-win64 toolchain-retdec`) |
+| `gen_helpers.py` が `__asm_cvttss2si(i128)` で停止 (他の未対応 op の全数は未測定) | 新 closure の wasm 化に進めない | [T-SH-63] #3316 |
 | 閉包内の間接 call 18 件・間接 jmp 6 件 (うち issue の 4 件) の扱い (trap 化または静的解決) | 未処理のまま lift すると黙って誤変換する恐れ | 子 [T-SH-70] #3346 |
 | `gen_helpers.py` が扱えない SSE/AVX 命令 (lift 出力の宣言 op 名は旧 closure で 49 種) | wasm 化に進めない | [T-SH-63] #3316 |
 | native と wasm の差分テスト・gate・ネガティブコントロール | 同一性の検証が無い | [T-SH-64] #3317 |
@@ -61,7 +63,7 @@ FL_WIN64_DIR=<fl-win64 展開先> ILDSP_WORK=<作業先> bash tools/shared/lift/
 | 受入条件 (#3299) | この PR の状態 |
 |---|---|
 | 3 転送先から最小の closure を選ぶ (根拠を REPORT に) | 達成 (§1。基準の不一致は未解決) |
-| RetDec → ir_normalize → gen_helpers → emcc で wasm 化 | 未達 (RetDec 段を新 closure で再測定できず・gen_helpers 以降は未達) |
+| RetDec → ir_normalize → gen_helpers → emcc で wasm 化 | 未達 (RetDec 段は 69 関数まで実測。gen_helpers が `cvttss2si` で停止し、以降は未達) |
 | native と wasm の全バイト比較 | 未達 ([T-SH-64] #3317) |
 | ネガティブコントロールと gate | 未達 ([T-SH-64] #3317) |
 | 間接 call 4 件の扱い | 扱いは未実装。子 [T-SH-70] #3346 に移した (§2) |
