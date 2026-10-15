@@ -68,3 +68,23 @@
   - `mx6_e2e.sh`: exit 0・**42.3 s**・8 step すべて完了 (log の PASS 行: step 4 受入1 PASS・step 6 判定 PASS・step 7 positive control 533 / 529 PASS・step 8 FH4 NC 3/3 PASS)。load 0.52 0.33 0.14 → 0.75 0.41 0.18。
   - `mx39_e2e.sh`: exit 0・**389 s**・load 0.69 0.40 0.18 → 1.03 0.91 0.50。FH3 funclet 母数 36,533 (棄却 355)・537 母数 = 537・linear 到達 119 (深さ≤2: 9、≤3: 44)・flow 到達 82 (深さ≤2: 5、≤3: 9)・E8/E9 一致 213 件 (命令境界 179)・537 母数への一致 4 件 (命令境界 4 件)。bb4ce18b2 の §9.1〜9.3 の値と一致。
 - 境界判定による除外: E8/E9 一致 213 件のうち、命令境界でない 34 件 (別命令の途中) を除いた。これは負例ではない。負例の合成バイト列は §5 の 5/5 PASS。
+
+### 9.7 MX-43 (#3838) 受入 1: 追加 root の lift 件数
+
+- 測定 commit = **6f676dbb4** (コードを変えた最後の commit = `dsp/scripts/mx43_funclet_roots.py` の整数 VA 修正 + `dsp/mx43_e2e.sh`)。再現: `MX_PE=<Massive X.vst3> MX39_WORK=<mx39 作業dir> bash tools/targets/massivex/dsp/mx43_e2e.sh` (前提: `mx39_e2e.sh` 実行済み)。
+- 母数: FH3 funclet universe 36,533 − flow 到達 82 = **36,451**。うち `.text` の外を指す **211 件を除外** (RVA 0〜0x188 のヘッダ部 8 件・`.text` より上 203 件。FH3 walk の誤読と見て lift 対象から外した。原因は未確認 → 下の表)。**root = 36,240**。
+- 実測 (6f676dbb4・素材 `plugins-massivex` 展開 md5 `622993e7…`):
+  - `mx39_e2e.sh` (前提・従来値): exit 0・**240 s**・FH3 universe 36,533・棄却 355・linear 到達 119・flow 到達 82・537 母数一致 4。
+  - `mx43_e2e.sh`: exit 0・**46 s**・lift 関数 36,240 (blocks 36,240)・insns 1,764,126・`ott_unsup` を含まない関数 **35,221**・含む関数 **1,019** (unsup サイト 7,056)。
+  - unsup の上位 (サイト数): `vbroadcastss` ymm 552・`vpextrd` 339・`vinsertps` 299・`in` 292・`out` 277・`vpslld` 227・`vpermilps` ymm 208・`vblendvps` ymm 196。x64c の既存語彙の外で、MX-43 の変更とは無関係。
+- 受入 1 の判定: 未到達 36,451 件の root 化は行った。成功・棄却の内訳は上の数字 (lift 成功 35,221 関数 / unsup を含む 1,019 関数 / `.text` 外 211 件を除外)。「棄却」は `ott_unsup` を含む関数として数える (棄却と成功の区別は未実装)。
+- 注意: x64c の `--entries` は整数 VA を要求する (文字列だと `bytes_at` で TypeError)。`roots` は base 加算済みの VA。
+
+### 9.8 MX-43 の未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `.text` 外を指す FH3 funclet 候補 211 件 (RVA 0〜0x188 の 8 件・`.text` より上 203 件) の由来 | root から除外した。FH3 walk の誤読か、別の FuncInfo 形かは未確認 | [MX-43] (#3838) の残件 (MX-45 の前提確認) |
+| SjLj 形の runtime と FH3 FuncInfo walk の C 実装 (受入 2 の残り) | funclet は lift されるが呼べない | [MX-45] (#4161) |
+| native vs wasm の通し一致・ネガティブコントロール (受入 3 の残り) | 未実測 | [MX-46] (#4162) |
+| U4f (上限棄却 355 件の妥当性)・U4g (4 件の共有)・U4h (EH 専用 block の位置)・U4i (呼出し ABI の実機確認) | §9.5 のとおり | [MX-43] (#3838) → 子 #4161・#4162 で扱う |
