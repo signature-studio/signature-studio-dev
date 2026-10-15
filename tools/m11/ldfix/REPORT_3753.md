@@ -19,16 +19,16 @@
 | 判定不能 | 27 | **23** (-4) |
 | 未判定 | 1 | 1 |
 
-  本 PR が変えたのは上記 4 行のみ (`git diff f592bd2aa 14a4a50e0 -- tools/m11/ldfix/results` で確認。1284dab の行は UNDETERMINED のまま)。
+  本 PR が変えた TSV の行は上記 4 行のみ (`git diff f592bd2aa 9357a8fdd -- tools/m11/ldfix/results/spill178_1161.tsv` で確認。1284dab の行は UNDETERMINED のまま)。
 
 ## 2. 測定条件
 
-- 測定 commit: `14a4a50e0` (`Merge remote-tracking branch 'origin/main' into 3753-ld175-spill-sites`)。コードと結果を変えた最後の commit。
-  前回の測定 commit は `91d5c5ca4` (main 取り込み前)。以後の commit は本 REPORT (と `docs/DOC_MAP.md`) のみ。
+- 測定 commit: `9357a8fdd` (`fix(m11): limit ld175 IR cell read to iN and correct cmp addresses (#3753)`)。コードと結果を変えた最後の commit。
+  前回の測定 commit は `14a4a50e0` (レビュー前・main 取り込み後)。以後の commit は本 REPORT のみ。
 - 差分 0 の証跡 (本 REPORT を書いた時点の HEAD で実行): §8。
 - 素材: `work-m11` と `work-liftdiff` を `tar --zstd -xf` で展開 (gitignore 対象の `tools/m11/work/`・`tools/liftdiff/work/`)。
   判定は `m11_image.bin`・`boot_final3.ll`・`boot*.drc.config.json` だけを使う。fl-win64 (PE) は使わない。
-- 測定実行: worktree `ws-3794` (branch `3753-ld175-spill-sites`) の HEAD で `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` を前景で 1 回。
+- 測定実行: worktree `ws-3794` (branch `3753-ld175-spill-sites`) の HEAD で `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` を前景で 2 回 (件数・cmp の確認と計時。両回とも rc 0)。
   `M11_WORK`・`LD_WORK` は主 worktree の展開先を指す。`TMPDIR=$RUNNER_TEMP`。
 
 ## 3. 判定の根拠 (site ごと)
@@ -50,15 +50,16 @@ IR は `boot_final3.ll` の行番号 (1 始まり)。消費ブロックは直前
 
 ## 4. 検証
 
-- e2e (測定 commit `14a4a50e0`・前景 1 回・`TMPDIR=RUNNER_TEMP`): `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` → **rc 0**・**real 104 s**・load average (uptime 1 分) 0.65 (開始) → 1.00 (終了)。
+- e2e (測定 commit `9357a8fdd`・前景・計時回・`TMPDIR=RUNNER_TEMP`): `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` → **rc 0**・**real 176 s**・load average (uptime 1 分) 0.89 (開始) → 1.04 (終了)。
   `cmp` の一致: 6/7 の `drops_510.tsv`、7/7 `spill_classify_1161.py` の出力が `results/spill178_1161.tsv` と一致、8/8 (LD-143 修復後 IR の再生成) も一致。
   7/7 の件数: `{'確定': 154, '判定不能': 23, '未判定': 1}`。
   同 e2e の `negctl_510.sh` (NC0〜NC7) は全て出力し、`FAIL` は 0 件 (`grep -c FAIL` = 0)。
-  前回測定 (`91d5c5ca4`・main 取り込み前・前景 1 回): rc 0・real 180 s・load 0.91 → 1.01。
-- 突合スクリプト: `python3 tools/m11/ldfix/ld175_site_link.py` (約 1 s・素材は work-m11 のみ。`14a4a50e0` で再実行)。
-  出力の要約 (測定 commit):
+  前回測定 (`14a4a50e0`・前景 1 回): rc 0・real 104 s・load 0.65 → 1.00。その前 (`91d5c5ca4`・main 取り込み前・前景 1 回): rc 0・real 180 s・load 0.91 → 1.01。
+- 突合スクリプト: `python3 tools/m11/ldfix/ld175_site_link.py` (real 2.4 s・load 0.88 → 0.88・素材は work-m11 のみ。`9357a8fdd` で実行)。
+  出力の要約 (測定 commit `9357a8fdd`):
   - 128d495 / dcdeee / c3460e / 12900c4: `機械語 2 段=True / 機械語の消費ブロックが IR に無い: なし -> TRUE_DROP 候補`
   - 1284dab: `機械語の消費ブロックが IR に無い: 1284dc1 12857c8 1285907 1285a0a 1285dba 1285e8e -> UNDETERMINED`
+  - c3460e の IR 側は `行 383953 %100 = load i32`・使用ブロック `c345c4` を表示する (修正前の正規表現は `load ptr` の行 383950 も拾っていた)。
 - ネガティブコントロール: 判定式は 4 site を TRUE_DROP 候補にする一方、1284dab は消費 6 ブロックの欠落で UNDETERMINED になる
   (判定式が常に TRUE_DROP を返すわけではないことの確認)。
 
@@ -95,8 +96,8 @@ bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh         # 7/7・8/8 の TSV 一致を�
 本 REPORT の測定 commit からの差分 (コード・結果の範囲):
 
 ```
-$ git diff 14a4a50e0 HEAD -- 'tools/m11/ldfix/*.py' 'tools/m11/ldfix/*.sh' tools/m11/ldfix/results | wc -l
+$ git diff 9357a8fdd HEAD -- 'tools/m11/ldfix/*.py' 'tools/m11/ldfix/*.sh' tools/m11/ldfix/results | wc -l
 0
 ```
 
-測定 commit から HEAD までの変更ファイルは本 REPORT の 1 つだけ (`git diff --name-only 14a4a50e0 HEAD`)。
+測定 commit から HEAD までの変更ファイルは本 REPORT の 1 つだけ (`git diff --name-only 9357a8fdd HEAD`)。
