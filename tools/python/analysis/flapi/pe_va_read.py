@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""指定 VA の PE ファイル上の値を読む (PY-169 / #3212 の解析補助)。所属セクション・ファイル上の 8/4 バイト整数・C 文字列を出す。
+"""指定 VA の PE ファイル上の値を読む (PY-169 / #3212 の解析補助)。所属セクション・ファイル上の 8/4 バイト整数・C 文字列・UTF-16LE 文字列を出す。
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_va_read.py <VA(16進)>[,<VA(16進)>...]
 
@@ -14,6 +14,16 @@ import sys
 import pefile
 
 PE = os.path.join(os.environ["FL_WIN64_DIR"], "extracted", "block00031_PE.bin")
+
+
+def wstr(raw, fo):
+    out = []
+    for i in range(fo, min(fo + 128, len(raw) - 1), 2):
+        c = raw[i] | raw[i + 1] << 8
+        if not 0x20 <= c < 0x7f:
+            break
+        out.append(chr(c))
+    return "".join(out)
 
 
 def main():
@@ -43,7 +53,7 @@ def main():
         d = struct.unpack("<I", raw[fo:fo + 4])[0]
         s = raw[fo:fo + 48].split(b"\0")[0]
         print(hex(va), f"section={name} file_off={hex(fo)} qword={hex(struct.unpack('<Q', q.ljust(8, b'\0'))[0])}"
-              f" dword={d} cstr={s!r}")
+              f" dword={d} cstr={s!r} wstr={wstr(raw, fo)!r}")
 
 
 if __name__ == "__main__":
