@@ -92,6 +92,22 @@ def pos_kind(sc, kh, p, q):
     return 'dbl_pair' if ok and dp * dq > 0 else 'other'
 
 
+def strs(blob):
+    return [m.decode('latin1') for m in re.findall(rb'[\x20-\x7e]{3,}', blob)]
+
+
+def content_strings(sc, kh, allw, win):
+    """content 語の指す先 (win B) の印字可能文字列の集合を SC/KH で比べる。"""
+    c = collections.Counter()
+    for w in allw:
+        if w['label'] != 'content':
+            continue
+        P, Q = sec_of(sc, int(w['sc'], 16)), sec_of(kh, int(w['kh'], 16))
+        a, b = strs(sc.rva_bytes(P[2], win)), strs(kh.rva_bytes(Q[2], win))
+        c['set_equal' if set(a) == set(b) else 'set_differ'] += 1
+    return dict(c)
+
+
 def short(root):
     m = re.match(r'\.\?AV(\w+?)Dsp', root)
     return m.group(1) if m else root
@@ -185,6 +201,8 @@ def main(kp, sp, cls_json, ident_json, out, win=64, depth=3):
         allw.extend(dict(w, fn=s) for w in words)
     use = usage_map(sc, sp, ident, fns)
     total = dict(tally(allw))
+    cstr = content_strings(sc, kh, allw, win)
+    print('content_strings', json.dumps(cstr, sort_keys=True))
     def key(w):
         i = w['info']
         return w['label'] + (':' + (i if isinstance(i, str) else i[0]) if i else '')
@@ -210,7 +228,7 @@ def main(kp, sp, cls_json, ident_json, out, win=64, depth=3):
         print(s, v['kh_va'], len(v['words']), json.dumps(v['tally'], sort_keys=True), '|', u['label'] if u else '')
     for k, v in sens.items():
         print('sens', k, json.dumps(v, sort_keys=True))
-    json.dump(dict(win=win, depth=depth, total=total, cross={'%s|%s' % k: v for k, v in cross.items()},
+    json.dump(dict(win=win, depth=depth, total=total, content_strings=cstr, cross={'%s|%s' % k: v for k, v in cross.items()},
                    funcs=per, usage=use, sensitivity=sens), open(out, 'w'), indent=1, sort_keys=True,
               default=str)
 
