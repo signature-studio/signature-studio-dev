@@ -38,7 +38,8 @@ const cvtSi64 = (x) => {
 };
 const WRONG = (m) => new FlError(m || "Wrong number of function parameters or wrong parameter type", 5);
 // PY-235 (#3701): processRECEvent の成功経路の family (REPORT_PY235)。eventId は uint32。戻り値 = value になるのは R-other かつ (eventId & 0xffff) != 8 のとき
-const recPassFamily = (e) => (e & 0xffff) !== 8 && ((e >= 0x10000000 && e < 0x40000000) || (e >= 0x40000003 && e <= 0x40000004) || (e > 0x40000005 && e < 0x70000000) || e >= 0xf0000000);
+// 固定 4 族 (0x40000000/1/2/5) は flags & 0x22 == 0 のとき store 0 件で value を返す (REPORT_PY252)。flags & 0x22 の分岐は engine 状態依存のため未確定
+const recPassFamily = (e, f) => (e & 0xffff) !== 8 && ((e >= 0x10000000 && e < 0x40000000) || (e >= 0x40000003 && e <= 0x40000004) || (e > 0x40000005 && e < 0x70000000) || e >= 0xf0000000 || ([0x40000000, 0x40000001, 0x40000002, 0x40000005].includes(e) && (f & 0x22) === 0));
 // mixer の色の R/B 入替え (REPORT_PY115.md §2)。既定色は FL の .bss 0x15f6774 の初期値 (REPORT_PY118)
 const swapRb = (v) => ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
 const MIX_DEFAULT_COLOR = 0xff636c71;
@@ -186,19 +187,16 @@ export function createMockEngine() {
     return [pv, p];
   };
   const tog = (cur, v) => (v === undefined || v === -1 ? !cur : !!v);
-  // PE 0x12be470 (maxLen > 0 のみ): 長さが maxLen を超えるとき末尾から mask 外の文字 (母音・記号・空白) を削り、先頭 maxLen 文字へ切る (C provider の track_name_fit と同一・ASCII 前提)
+  // PE 0x12be470 (maxLen > 0 のみ): JS 文字列は PE と同じ UTF-16 code unit で数える。長さが maxLen を超える間、末尾から mask 外の unit (母音・記号・空白・非 ASCII) を 1 unit ずつ削り、先頭 maxLen unit へ切る。切れた境界の孤立サロゲートは U+FFFD (C provider の track_name_fit と同一)
   const KEEP = new Set("0123456789BCDFGHJKLMNPQRSTVWXYZ");
   const fitName = (s, m) => {
     if (m <= 0 || s.length <= m) return s;
     let t = s;
-    for (let i = t.length; i >= 1; i--) {
+    for (let i = t.length; i >= 1 && t.length > m; i--) {
       const c = t[i - 1];
-      if (!KEEP.has(c >= "a" && c <= "z" ? c.toUpperCase() : c)) {
-        t = t.slice(0, i - 1) + t.slice(i);
-        if (t.length <= m) break;
-      }
+      if (!KEEP.has(c >= "a" && c <= "z" ? c.toUpperCase() : c)) t = t.slice(0, i - 1) + t.slice(i);
     }
-    return t.slice(0, m);
+    return t.slice(0, m).replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, "\uFFFD");
   };
   // fl_provider の引数検査 (fl_dispatch.c type_ok / fl_a_int) と同じ: None は既定値、bool と整数のみ可、他は code 5
   const argI = (a, i, def) => {
@@ -520,7 +518,7 @@ export function createMockEngine() {
     "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
     "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
     // PY-235 (#3701): 成功経路 (gate 0 を仮定) は戻り値 = value (int32)。他の family は未確定のため code 2 (C provider と同じ未実装 error)
-    "general.processRECEvent": (...a) => { arity(a, 3, 3); const e = ix(a[0]) >>> 0; const v = ix(a[1]) | 0; ix(a[2]); if (!recPassFamily(e)) throw new FlError("Unspecified error (not implemented: general.processRECEvent)", 2); return v; },
+    "general.processRECEvent": (...a) => { arity(a, 3, 3); const e = ix(a[0]) >>> 0; const v = ix(a[1]) | 0; const f = ix(a[2]); if (!recPassFamily(e, f)) throw new FlError("Unspecified error (not implemented: general.processRECEvent)", 2); return v; },
     // PY-96 (#2832): 選択範囲の読出し 4 件。PE 0xd786e0/0xd78700/0xd78500 は obj+0xd74 (start)・obj+0xd78 (end) を読み、
     // 0xd78720 は 0xe43e80 (start>=0 かつ end>=0) を bool で返す。未選択は負値。初期値 -1 は未実測の仮置き (provider/fl_engine.c と同じ)
     "arrangement.selectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },

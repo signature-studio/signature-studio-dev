@@ -53,8 +53,8 @@ if [ -f "$out/transform_check.js" ]; then
   timeout 60 node "$out/transform_check_run.cjs" > "$out/run.log" 2>&1
   run_rc=$?
   t5=$(date +%s%N)
-  echo "run: rc=$run_rc secs=$(( (t5 - t4) / 1000000 ))ms $(grep transform_check "$out/run.log" | head -1)" | tee -a "$out/summary.txt"
-  grep -q 'result=pass' "$out/run.log" || rc=1
+  echo "run: rc=$run_rc secs=$(( (t5 - t4) / 1000000 ))ms $(grep -h 'transform_' "$out/run.log" | tr '\n' ' ')" | tee -a "$out/summary.txt"
+  [ "$(grep -c 'result=pass' "$out/run.log")" -eq 2 ] || rc=1
   [ "$run_rc" -eq 0 ] || rc=1
 else
   echo "run: skipped (no transform_check.js)" | tee -a "$out/summary.txt"

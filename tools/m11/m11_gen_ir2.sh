@@ -71,6 +71,15 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
     mv work/boot_final.ld115.ll work/boot_final.ll
     python3 m11_cond.py ld115=applied
   fi
+  # #4675 (LD-236): function_1046a30 の上流 X (cell→C→[C]) の 1 段不足。既定 OFF (本番 IR は変えない・unit 結果は未測定)。
+  #   M11_FIX_LD236=1 のときだけ適用する (ir_conditions.json ld236=applied)。想定外の入力は assert で止まる。
+  if [ "${M11_FIX_LD236:-0}" = 1 ]; then
+    python3 ldfix/fix_ld236.py work/boot_final.ll work/boot_final.ld236.ll
+    mv work/boot_final.ld236.ll work/boot_final.ll
+    python3 m11_cond.py ld236=applied
+  else
+    python3 m11_cond.py ld236=not-applied
+  fi
   # #3296: function_412770 の rep movsq 源 (機械語 mov rsi,[rax] の load が lift で脱落し ptr null)。想定外の入力は assert で止まる (fail-closed)。
   python3 ldfix/fix_src412770.py work/boot_final.ll work/boot_final.src412770.ll
   mv work/boot_final.src412770.ll work/boot_final.ll

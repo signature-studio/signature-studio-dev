@@ -93,11 +93,14 @@ const result = {
   mode: survey ? 'survey' : 'boot',
   dllmain_done: dllmainDone, boot_threw: bootThrew, boot_failfast: bootFailfast,
   units_total: num(mod._m11_units_total), units_run: num(mod._m11_units_run), init_count: num(mod._m11_init_count),
+  units_dispatched: num(mod._m11_units_run),   // 製品 KPI の dispatch 数 = dispatch した unit 数 (tools/flelift/boot/fle_boot.mjs の定義と同じ。m11_ov.c の g_units_run)
   survey: survey ? { ...res, kinds, failfast_units: ffUnits } : null,
   reach, reach_summary: sum && sum.replace(/^.*GUI-REACH-SUMMARY /, ''),
   failfast_apis: failfast, softstub_apis: softstub, failfast_count: num(mod._gf_failfast_count),
   gui_icall_calls: num(mod._gf_icall_count), gui_ring_discarded: num(mod._gf_ring_discarded),
-  icall_miss: num(mod._m11_icall_miss), m11_stub_total: num(mod._m11_stub_total), m11_stubs: stubs, probes,
+  icall_miss: num(mod._m11_icall_miss), icall_miss_uniq: num(mod._m11_icall_miss_uniq),
+  icall_miss_targets: Array.from({ length: num(mod._m11_icall_miss_uniq) || 0 }, (_, i) => '0x' + (mod._m11_icall_miss_at(i) >>> 0).toString(16)),
+  m11_stub_total: num(mod._m11_stub_total), m11_stubs: stubs, probes,
   va_calls: num(mod._m11_va_calls), va_bytes: num(mod._m11_va_used),
 };
 const json = JSON.stringify(result);

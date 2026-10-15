@@ -14,11 +14,12 @@ emscripten の initial-heap 既定 16MiB が加算されて "initial memory too 
 """
 
 
-def up(v, a):
+def up(v: int, a: int) -> int:
     return (v + a - 1) // a * a
 
 
-def layout(base=0x10000, image_size=0x308000, arena_size=0x100000, init_mib=16, max_mib=64, check=True):
+def layout(base: int = 0x10000, image_size: int = 0x308000, arena_size: int = 0x100000,
+           init_mib: int = 16, max_mib: int = 64, check: bool = True) -> dict[str, int]:
     assert base % 0x10000 == 0 and base >= 0x10000, 'LB_BASE は 64KiB 境界かつ >= 0x10000 (序数誤認回避)'
     img_end = base + image_size
     arena = up(img_end, 0x10000)

@@ -304,6 +304,12 @@ def round_checks():
           rip_target(0x440E9D) == 0x13AB320 and struct_int(0x13AB320) == 10)
     check("0x440d30 の繰上げ (0x440eb7 add word [rax],1) は 1e18 以上のときだけ (0x440ea5 divsd)",
           ins_at(0x440EAA).mnemonic == "divsd" and ins_at(0x440EB3).op_str == "rax, qword ptr [rbx + 0x30]")
+    check("0x440d30 は精度 18 桁固定 (0x440e72 mov edx, 0x12)",
+          ins_at(0x440E72).op_str == "edx, 0x12")
+    ldm = RAW[v2o(0x40A36C):v2o(0x40A36C) + 7]
+    ldm_va = 0x40A36C + 7 + struct_int(0x40A36C + 3)
+    check("0x40a36c の ldmxcsr の参照先は MXCSR 大域 0x13a5054・既定値 0x1f80 は RC (bit 13-14) = 0 (最近接・偶数)",
+          ldm[:3] == b"\x0f\xae\x15" and ldm_va == 0x13A5054 and (struct_int(0x13A5054) & 0x6000) == 0)
     check("0x440d30 → 0x440c10 呼出し (0x440ec7) と 0x440c10 内の 0x40c660 (0x440c50)",
           ins_at(0x440EC7).op_str == "0x440c10" and ins_at(0x440C50).op_str == "0x40c660")
     check("0x440c10 の 18 桁 BCD 化 (10 進 9 桁 × 2 の除算マジック 0x440c66 ... 0x440cf3)",
