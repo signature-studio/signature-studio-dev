@@ -353,6 +353,9 @@ void imp_ExitProcess(void) {
     g_n_exit++;
     fprintf(stderr, "[fleboot][exit] code=%u call_site=0x%llx\n", (unsigned)(R[1] & 0xffffffff), (unsigned long long)LD64(R[4]));
     py_watch(4, (u32)LD64(R[4]), R[1] & 0xffffffffu);
+#ifdef FLE_UNITLOG   /* #4984 診断: 直前 20 の dispatch target (古→新。ott_dispatch 経由の呼出しのみ) */
+    for (int k = 20; k > 0; k--) fprintf(stderr, "[exit-ring] -%d 0x%x\n", k, (unsigned)g_ring[(g_ring_n + PROBE_RING - (u32)k) % PROBE_RING]);
+#endif
     for (int i = 0; i < 40; i++) { u64 v = LD64(R[4] + 8ull * i); if (v >= 0x401000ull && v < 0x13a44b0ull) fprintf(stderr, "[py123][exit-stack] +%d 0x%llx\n", i, (unsigned long long)v); }
     fle_throw_kind((long)(intptr_t)"exit", (long)(R[1] & 0xffffffff));
 }
@@ -728,6 +731,9 @@ void fle_ov_initunits(void) {
         R[1] = 0; R[2] = 0; R[8] = 0; R[9] = 0;
         ott_dispatch(proc);
         py_watch(2, (u32)proc, 0);
+#ifdef FLE_UNITLOG   /* #4984 診断 (FLE_EXTRA_CCF=-DFLE_UNITLOG のときだけ): unit 境界の目印 */
+        fprintf(stderr, "[unit] i=%u va=0x%x w13a5000=0x%x\n", i, (u32)proc, (u32)LD32(0x13a5000ull));
+#endif
     }
 }
 

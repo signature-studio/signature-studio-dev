@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """RetDec の出力 (ci.drc.ll) を ci_ranges.py の範囲と照合し、CreateInstance closure の census を出す (T-SH-62 #3300)。
 
-usage: ci_census.py <ci.drc.ll> <ranges.json>
+usage: ci_census.py <ci.drc.ll> <ranges.json> [ci.rs.ll]
 検査 (欠けると exit 1): 範囲の 36 関数が全て define されていること (entry は export 名 GeneralPitchShifter_CreateInstance で出る)。
+  ci.rs.ll (ci_restore_stores.py の出力) を渡したときは、書き込み系 helper (movups・movntps・movaps・movapd) の件数が
+  x86 の期待値と一致すること、復元後の `store i128` が「復元前 + movups/movntps の件数」と一致すること (movaps/movapd は
+  既存の store を置き換えるだけで件数は変わらない)、復元後に helper の呼び出しが残らないこと。
 出力: 範囲外の追加 define・外部宣言の内訳・範囲内の呼び出し行の件数。
       declare のみの呼び出し先は、x86 の範囲外直接分岐 (ranges.json の outside_targets) の飛び先なら「直接呼び出し先」、そうでなければ「画像内ポインタ」に分ける。
 注: 呼び出し行数は x86 の件数と一致しない。例: FlsSetValue の IR 5 行 = function_1801b8820 の 4 行 (x86 の call 4 箇所と一致) + サンク本体 function_1801b9334 の 1 行。
@@ -72,5 +75,24 @@ rc = 0
 if missing:
     print(f"[census] FAIL: 範囲の関数が define されていない: {missing}")
     rc = 1
+
+if len(sys.argv) > 3:
+    EXPECT = {"movups": 3, "movntps": 8, "movaps": 7, "movapd": 1}
+    rs = open(sys.argv[3]).read()
+    st_drc = len(re.findall(r"^\s*store i128 ", ll, re.M))
+    st_rs = len(re.findall(r"^\s*store i128 ", rs, re.M))
+    cnt = {op: len(re.findall(r"call [^@\n]*@__asm_" + op + r"\(", ll)) for op in EXPECT}
+    left = {op: len(re.findall(r"call [^@\n]*@__asm_" + op + r"\(", rs)) for op in EXPECT}
+    print(f"[census] SSE helper 呼び出し (復元前・期待 movups 3 / movntps 8 / movaps 7 / movapd 1): " + ", ".join(f"{op} {cnt[op]}" for op in EXPECT))
+    print(f"[census] 復元後の store i128: {st_rs} (復元前 {st_drc} + movups/movntps {cnt['movups'] + cnt['movntps']} = {st_drc + cnt['movups'] + cnt['movntps']})")
+    if cnt != EXPECT:
+        print(f"[census] FAIL: SSE helper の件数が期待値と違う: {cnt}")
+        rc = 1
+    if st_rs != st_drc + EXPECT["movups"] + EXPECT["movntps"]:
+        print(f"[census] FAIL: 復元後の store i128 が期待値と違う (store 欠落の疑い)")
+        rc = 1
+    if any(left.values()):
+        print(f"[census] FAIL: 復元後も SSE helper の呼び出しが残る: {left}")
+        rc = 1
 print("[census] ALL OK" if rc == 0 else "[census] FAIL")
 sys.exit(rc)
