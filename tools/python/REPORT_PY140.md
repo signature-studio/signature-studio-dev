@@ -8,7 +8,7 @@
 - `0xfdd2c0` (UI 側ディスパッチャ) の op 別 leaf を VA 付きで特定した。27 関数のうち **15 関数は、送出する仮想キー (VK)・修飾・回数が PE から確定**した。どの leaf も `0x8186a0` (キー入力列を作って `user32!SendInput` に渡す関数) を呼ぶ。
 - 15 関数の**送出の成否** (leaf に入るか) は、leaf の手前のゲート (`0x60c220`・`0x728f50`・`0xfdeaf0`) と mode の源 (`0xfdd270`) の戻り値で決まり、その値は未確定。よって作用の意味 (FL 側でそのキーが何をするか) は未確定。
 - 12 関数は送出 leaf に到達しない、または別経路で未追跡。`ui.scrollWindow` は `0xd843d0` 経路 (REPORT_PY120 の保留) のまま。
-- mock・C は**未変更** (作用の意味が未確定のため、根拠のない値を入れない。PY-87・PY-120 と同じ方針)。mock/C の実装は子 #3759、ゲートと mode 源は子 #3758、残り 12 関数は子 #3761 に分けた。
+- 15 関数の mock・C の実装は子 #3759 (PY-246) で入れた (`a0fc92492`)。本 PR の commit は REPORT だけを変える (コード差分 0)。作用の意味が未確定の点は PY-87・PY-120 と同じ方針で、送出の成否は子 #3758、残り 12 関数は子 #3761 に分けた。
 
 ## 手段
 
@@ -87,19 +87,23 @@
 
 ## 検証
 
-- 測定 commit: `ca104e569` (`analysis/flapi/pe_ui_dispatch_probe.py` を最後に変えた commit)。旧版の `cond()` は `test` 後の符号付き分岐 (`jle`・`jg` など) を判定できず両方を辿っていたため、到達しない経路 (selectWindow の Shift 経路など) を出していた。ca104e569 でフラグを演算幅から求めるように直した。
-- コマンドと結果 (測定 commit `ca104e569`、以降のコード変更は無し):
+- 本 REPORT の数値は PY-246 の実装 commit `a0fc92492` (tools/python のコードを最後に変えた commit) で測定した。`9b57a83cd` 以降の差分は REPORT のみ。
+- 解析 probe (`analysis/flapi/pe_ui_dispatch_probe.py`) の測定 commit は `ca104e569`。旧版の `cond()` は符号付き分岐 (`jle`・`jg`) を判定できず到達しない経路を出していたため、ca104e569 でフラグを演算幅から求めるように直した。以下の probe 出力は ca104e569 以降のコードによる。
+- 測定 commit `a0fc92492` (HEAD `9b57a83cd` と tools/python のコード同一) で実行したコマンドと結果:
 
 | コマンド | 結果 | wall |
 |---|---|---|
 | `python3 -m py_compile analysis/flapi/pe_ui_dispatch_probe.py` | rc 0 | — |
 | `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_dispatch_probe.py <26 op> --arg 1 --mode 2` | rc 0。送出 call (`0x8186a0` を呼ぶ VA) は 12 VA。矢印 4 op → `0xfde110`、nextWindow → `0xfde0a5`、selectWindow → `0xfde0c9` (rdx=0x0) の 1 VA、cut・copy・paste・insert・delete・enter・escape・yes・no → 各 1 VA。`0xfde0e6` (selectWindow の Shift 経路) は出ない | 0.19 秒 |
 | 同 `--arg 0 --mode 2` | rc 0。送出 call は 2 VA。`0xfde110` (矢印 4 op。`r8d ≤ 0` のため `0x8186a0` は何もしない) と `0xfde0e6` (selectWindow・rdx=0x1)。arg>0 で送出する 10 op (nextWindow と cut〜no) と `0xfde0c9` は出ない | 0.18 秒 |
+| `bash tools/python/provider/build.sh` (emsdk 6.0.12・`$RUNNER_TEMP` に上流から導入) | rc 0。`dist/flprov.{js,wasm}` 生成 | 2.07 秒 |
+| `node tests/ui_keys_diff.mjs` | rc 0。`{"calls":26,"diffs":0,"PASS":true}` | 0.049 秒 |
+| ネガティブコントロール: `host/fl_mock.mjs` の `ui.selectWindow` の符号を反転して `node tests/ui_keys_diff.mjs` | rc 1。`ui 送出キー差分 4 件` (selectWindow の arg 1・0 などで mock と C が食い違う)。検証後に mock を元へ戻し、`git diff` は 0 行 | — |
+| `node tests/provider_check.mjs` | rc 1。§1・§2 (表の整合・エラー code) のアサートは通過。§3 で `work/midi.py` が無く ENOENT (`work/` は gitignore の素材置き場。`fetch_inputs.sh` 未実行)。受入 4・5 の未達は未解決表 (#4579) のとおり | — |
 
 - 修飾子 (`rdx`) の値: 上の出力では cut/copy/paste = 0x4、selectWindow の arg≤0 = 0x1、他 = 0x0。PE の静的値と一致。
-- 差分の証跡 (`docs/WORKFLOW.md` §6): `git diff ca104e569 HEAD -- tools/python ':!*.md'` の出力は 0 byte (本 REPORT の commit だけが後に続く)。
-- mock・C (`host/fl_mock.mjs`・`provider/fl_engine.c`) は変えていない。`node tests/provider_check.mjs` と `FL_ENGINE=wasm node tests/all_tools.mjs` は変更がないため本 PR では再測定しない (受入 4・5 は子 #3759 で扱う)。
-- ネガティブコントロール: 実装を入れないため、本 PR では `ui_diff` の差分検査は無い。
+- 差分の証跡 (`docs/WORKFLOW.md` §6): `git diff a0fc92492 HEAD -- tools/python ':!*.md'` の出力は 0 byte (コード差分 0。再測定は不要)。
+- `FL_ENGINE=wasm node tests/all_tools.mjs` は本 PR では実行していない (受入 5 は子 #4579 で扱う)。
 
 ## 未解決
 
