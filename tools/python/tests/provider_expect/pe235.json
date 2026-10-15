@@ -1,0 +1,6 @@
+{
+  "tag": "pe235",
+  "refs": ["#3701"],
+  "note": "PE で成功経路 (R-other・low16 != 8) の戻り値 = value を確定した general.processRECEvent 1 件 (REPORT_PY235・PY-235 #3701)。他の family は未実装 error。tests/general_diff.mjs が mock と照合",
+  "functions": ["general.processRECEvent"]
+}
