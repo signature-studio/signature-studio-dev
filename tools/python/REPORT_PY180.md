@@ -48,7 +48,7 @@ PE 上で確定した事項 (REPORT_PY172 §1・§2 と同じ):
 
 | 検査 | 手順 (コマンド) | 結果 |
 |---|---|---|
-| 素材 | `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` | rc 0 |
+| 素材 | `tar --zstd -xf <artifacts>/fl-win64.tar.zst -C <展開先>` (`[WIN64]`・素材の取得は `docs/WORKFLOW.md` §11) | rc 0 |
 | 入力 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` | rc 0 |
 | CPython wasm | `bash build_cpython_wasm.sh` | rc 0 |
 | flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 |
