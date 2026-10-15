@@ -39,19 +39,24 @@ const oldRefsOnly = (body: string): boolean => OLD_REFS_RE.test(body) && !OLD_CL
 type Pr = { number: number; body: string; mergedAt: string };
 
 // REST の pulls 一覧を updated の降順に読む。窓内で merge された PR は updated_at が merged_at 以降なので、末尾の updated_at が窓の始点より前になった所で止める。
+// 読んでいる途中に更新された PR はページの先頭へ移るので、同じ PR を二度読むことがある。番号で重複を除き、除いた件数を出す。
 const mergedSince = (startIso: string): Pr[] => {
-  const out: Pr[] = [];
+  const byNumber = new Map<number, Pr>();
+  let dup = 0;
   for (let page = 1; page <= 300; page++) {
     const items = JSON.parse(
       execFileSync("gh", ["api", "-X", "GET", `repos/${R}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`], { encoding: "utf8", maxBuffer: 1 << 28 }),
     ) as Array<{ number: number; body: string | null; merged_at: string | null; updated_at: string }>;
     if (!items.length) break;
     for (const it of items) {
-      if (it.merged_at && it.merged_at > startIso && it.merged_at <= END) out.push({ number: it.number, body: it.body ?? "", mergedAt: it.merged_at });
+      if (!it.merged_at || it.merged_at <= startIso || it.merged_at > END) continue;
+      if (byNumber.has(it.number)) dup++;
+      byNumber.set(it.number, { number: it.number, body: it.body ?? "", mergedAt: it.merged_at });
     }
     if (items[items.length - 1].updated_at < startIso) break;
   }
-  return out;
+  console.log(`REST の重複 (ページ送り中の更新で二度読んだ PR) ${dup} 件を除いた (窓 ${startIso} 〜 ${END})`);
+  return [...byNumber.values()];
 };
 
 const SHAPES: Array<[string, RegExp]> = [
