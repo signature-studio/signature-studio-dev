@@ -550,10 +550,11 @@ FL_H(arrangement, liveSelectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_star
 FL_H(arrangement, selectionIsActive) { NARGS(0, 0); return fl_ret_b(c, sel_start >= 0 && sel_end >= 0); }
 /* ---- arrangement (6) ---- PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定。個数は fl_table (stub 由来・必須 2) に合わせた暫定で、
  * jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。currentTime は仮置きの状態 arr_time を返す。
- * 選択・マーカーの 5 件は副作用が未同定のため状態を変えず、引数検査だけ行う (REPORT_PY152) */
+ * 選択の 2 件は sel_set (PE 0xe43d30 の規則・PY-144 #3043) で状態を変える。マーカー・liveSelection・jumpToMarker の 3 件は副作用が未同定のため状態を変えず、引数検査だけ行う (REPORT_PY152) */
+static void sel_set(int x, int y) { sel_start = x; sel_end = y; if (x == y) sel_end = -1; else if (x > y) { sel_start = y; sel_end = x; } }
 FL_H(arrangement, currentTime) { (void)A_INT(0, 0); return fl_ret_i(c, arr_time); }
-FL_H(arrangement, selectionClear) { NARGS(0, 0); return fl_ret_none(c); }
-FL_H(arrangement, selectionSet) { NARGS(2, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(arrangement, selectionClear) { NARGS(0, 0); sel_set(-1, -1); return fl_ret_none(c); }
+FL_H(arrangement, selectionSet) { NARGS(2, 5); int64_t x = A_INT(0, 0), y = A_INT(1, 0); for (int i = 2; i < 5; i++) (void)A_INT(i, 0); sel_set((int)x, (int)y); return fl_ret_none(c); }
 FL_H(arrangement, liveSelection) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 FL_H(arrangement, addAutoTimeMarker) { (void)A_INT(0, 0); (void)A_STR(1); return fl_ret_none(c); }
 FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
