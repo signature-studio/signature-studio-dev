@@ -30,7 +30,7 @@
 
 | wasm RESET | native RESET | n | verdict | case equal | native diff (B) | wasm diff (B) |
 |---|---|---|---|---|---|---|
-| sta | mmap | 2 | **match (11/11 ×2)** | 11 | 39891 | 343847 |
+| sta | mmap | 2 | **match (verdict ×2)** | equal 10 (r1)・equal 10 (r2) | 39890・39891 | 343847 |
 | none | mmap | 1 | mismatch (0/11) | 0 | 39891 | – |
 | sta | none | 1 | mismatch (0/11) | 0 | – | 343847 |
 
@@ -63,4 +63,4 @@ python3 ld156_chunk0_carryover.py --native 0 --reset sta --native-reset none --o
 
 ## 7. 測定 commit 以降の差分 (`git diff f6af8ce45 HEAD -- tools/liftdiff`)
 
-本付録と `results/ld229_raw/` の追加のみ。`rt/`・`ld156_chunk0_carryover.py` は測定 commit から変更なし。
+`git diff f6af8ce45 HEAD -- tools/liftdiff/rt tools/liftdiff/ld156_chunk0_carryover.py` = 0 行 (測定 commit から rt・driver は不変)。HEAD 側の追加は本付録・`results/ld229_native_reset.tsv`・`results/ld229_raw/` のみ。
