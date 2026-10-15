@@ -112,7 +112,7 @@
 | U3a | xmm0〜3 のみの vectorcall (HVA / `__m128` の register 渡し) を Win64 と区別する判定 | seeds 17 / 1-round 17 (pdata 始点) が保留 | [MX-33] (#3032) |
 | U3b | 間接 jmp テーブルの残り (seeds 12 / 1-round 14 の pdata 始点が過大近似のまま。解決器は MSVC の lea 形のみ) | 陰性の保守性は保つが精度は未確定 | [MX-33] (#3032) |
 | U3c | 1-round の root 3,226 のうち解析できない 118 件 (先頭命令のデコード 0 件) の由来 | 118 件は vectorcall 判定の対象外 (陰性の結果は 3,108 関数の範囲に限る) | [MX-33] (#3032) |
-| U4a | FH4 (`__CxxFrameHandler4`・符号化 FuncInfo) の funclet 未解析 (1 本目 .pdata 全体 2,542 entry・入口 1 / 1-round 5) | FH4 の landing pad が一覧に入らない | [MX-33] (#3032) |
+| U4a | FH4 (`__CxxFrameHandler4`・符号化 FuncInfo) の funclet 未解析 (1 本目 .pdata 全体 2,542 entry・入口 1 / 1-round 5)。固定部は §8 で復号済み、可変長整数・table 中身が未了 | FH4 の landing pad が一覧に入らない | [MX-42] (#3807・親 #3791) |
 | U4b | `.pdata` 2 本目 (158,952 B・`.xdata` と VA 重なり) が census の対象外・読取不能 160 件の原因未確定 | 1 本目 .pdata 全体の数値は下界 | [MX-33] (#3032) |
 | U4c | IAT 外の handler (direct) 6,354 件 (1 本目 .pdata 全体) の同定 | 別 handler の EH 構造が未確認 | [MX-33] (#3032) |
 | U4d | funclet を指す E8/E9 一致候補 4 件の由来 (命令境界を確認して、どの関数から来るか) と、深い closure での到達 | #228 同型の判定を closure 拡張で確定できない | [MX-33] (#3032) |
@@ -124,3 +124,27 @@
 - `git diff fbc9971f HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は **0 行**
   (本 REPORT の commit は docs のみ。コードの変更は無い)。
 - 検証: e2e は測定 commit fbc9971f で実行し PASS (§1)。差し戻し後の修正 run では `plugins-massivex` が無く PE を展開できず、e2e は再実行していない。NC selftest は修正後の HEAD で再実行し 5/5 PASS。
+
+## 8. FH4 FuncInfo4 の固定部 (U4a・#3791 部分)
+
+- 測定 commit = **81573d876** (`scripts/mx6_fh4.py` と `mx6_e2e.sh` を最後に変えた commit)。再現: `bash tools/targets/massivex/dsp/mx6_e2e.sh` (step 6/6)。
+- 構造の出典: MSVC 公式記事 "Making C++ Exception Handling Smaller On x64" (C++ Team Blog, 2019-03-07) の FuncInfo4 定義 (`ehdata4_export.h` の抜粋)。
+  header 1 byte の bit は LSB から isCatch / isSeparated / BBT / UnwindMap / TryBlockMap / EHs / NoExcept / reserved。
+  bbtFlags (可変長・BBT のとき)、dispUnwindMap (UnwindMap のとき)、dispTryBlockMap (TryBlockMap のとき)、dispIPtoStateMap (常に)、dispFrame (可変長・isCatch のとき・末尾) の順。
+  記事は整数の符号化と各 table の中身を書いていない (→ 未解決)。
+- 実測 (`.pdata` 1 本目の FH4 entry 2,542 件・`mx6_fh4.py`):
+
+| 項目 | 結果 |
+|---|--:|
+| FH4 entry / 相異なる FuncInfo (fi) | 2,542 / 2,117 (425 件は他と fi を共有) |
+| header bit の組 (件数) | UnwindMap,EHs 2,094 / UnwindMap,EHs,NoExcept 154 / UnwindMap,TryBlockMap 119 / EHs,NoExcept 100 / UnwindMap,TryBlockMap,EHs 47 / isCatch,UnwindMap,TryBlockMap 10 / isCatch,UnwindMap,EHs,NoExcept 8 / UnwindMap,TryBlockMap,EHs,NoExcept 6 / isCatch,UnwindMap,EHs 4 |
+| BBT が立つ entry | 0 件 (固定部の位置は全件で決まる) |
+| dispIPtoStateMap (UnwindMap・TryBlockMap なしの 100 件) | fi+5 (直後) 99 件・他所 1 件 |
+| dispUnwindMap | fi+9 (直後) 1,489 件・前方 35 件・後方または共有 918 件 |
+| 固定部のポインタが画像外 | **2 件** (fi `0x64cbbe0`・`0x659b6e0`、header `0x28`、dispUnwindMap = `0xa0d2a1e9`・`0xadda9ce9`)。原因未確定 → [MX-42] (#3807) |
+
+- NC (`mx6_fh4.py --selftest`): 3/3 PASS。(a) 正例: 既知の 2 件以外が全て通る。(b) 負例: 問題の無い 1 件の dispIPtoStateMap を 0 に壊すと `dispIPtoStateMap_outside_image` で FAIL。(c) 負例: BBT ビットを立てた合成ヘッダは固定部未解決として扱われる (位置を推測しない)。
+- 実行: `MX_PE='$RUNNER_TEMP/mx/work/extracted/VST3/Massive X.vst3' MX6_WORK='$RUNNER_TEMP/massivex-mx6' bash tools/targets/massivex/dsp/mx6_e2e.sh` → exit 0。step 1-5 の判定は §1 と同一 (NC 5/5・livein 0・FH3 funclet 533 / 529)。
+- 素材: `plugins-massivex` の `Native Instruments Massive X v1.7.1.exe` を展開し既存パーサで `Massive X.vst3` = 95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca` (§0 の記録値と一致)。
+- 未解決 (起票先): 可変長整数の符号化、unwind map / try map / IP-to-state map の中身、funclet RVA の全数取り出し、独立再計算、2 件の画像外ポインタ → [MX-42] (#3807・親 #3791)。
+- 検証差分 (docs/WORKFLOW.md §6): `git diff 81573d876 HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は **0 行** (REPORT の変更のみ)。
