@@ -37,6 +37,11 @@ const seq = [
   ["screen.fillRect", [0, 0, 10, 10, 255]], ["screen.drawRect", [1, 2, 3, 4, 5]], ["screen.eraseRect", [1, 2, 3, 4]],
   ["screen.addMeter", [0, 1, 2, 3]], ["screen.addMeter", [0, 1, 2, 3, 4]], ["screen.displayBar", [0, 1, "bar", 0.5, 3]],
   ["screen.drawText", [0, "txt", 1, 2, 3, 4]], ["screen.drawText", [0, "txt", 1, 2, 3, true]],
+  // #5328: addTextLine は scr 未生成では副作用なし (PE 0xd7ac54 で呼出し自体を飛ばす)。init 後は activeCounter を scr+0x1dc から戻し unBlank を真にする
+  ["screen.addTextLine", ["a", 1, 2, 3, 4]], ["screen.isUnBlank", []],
+  ["screen.init", [0, 0, 0, 0, 0, 0]], ["screen.setScreenActiveCounter", [9]], ["screen.unBlank", [0]],
+  ["screen.addTextLine", ["a", 1, 2, 3, 4]], ["screen.isUnBlank", []], ["screen.getScreenActiveCounter", []],
+  ["screen.addTextLine", ["a", 1, 2, 3, 4, 5]], ["screen.addTextLine", ["b", true, 2, 3, 4]],
 ];
 // 引数個数違い: mock と C は共に code 5 (Wrong number of parameters)
 const arity = [
@@ -68,6 +73,9 @@ const typed = [
   [["screen.addMeter", [0, 1, 2, 3]], { ok: null }], [["screen.isUnBlank", []], { ok: true }], [["screen.getScreenActiveCounter", []], { ok: 0 }],
   [["screen.unBlank", [0]], { ok: null }], [["screen.setScreenActiveCounter", [5]], { ok: null }],
   [["screen.addMeter", [0, 1, 2, "3"]], { code: 5 }], [["screen.addMeter", [0, 1, 2, 3, 4, 5]], { code: 5 }],
+  // #5328: addTextLine は s (str) と i (int・bool) の型違いを code 5 で返し、状態を変えない
+  [["screen.addTextLine", [1, 2, 3, 4, 5]], { code: 5 }], [["screen.addTextLine", ["a", 1.5, 2, 3, 4]], { code: 5 }],
+  [["screen.addTextLine", ["a", 1, 2, 3, 4]], { ok: null }], [["screen.isUnBlank", []], { ok: false }],
   [["screen.isUnBlank", []], { ok: false }], [["screen.getScreenActiveCounter", []], { ok: 5 }],
   [["screen.addMeter", [0, 1, 2, 3, 4]], { ok: null }], [["screen.isUnBlank", []], { ok: true }], [["screen.getScreenActiveCounter", []], { ok: 0 }],
 ];
