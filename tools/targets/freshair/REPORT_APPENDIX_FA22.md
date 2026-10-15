@@ -83,7 +83,9 @@ setter `0x180c9d700` 内の間接 call で落ちる。本付録は**機械語の
 | 条件 | 呼出 | C | out[0] | found |
 |---|---|---|---|---|
 | probe 無し (`FA_OUT0=1 FA_NODE1=1`) | 2 回目 | 未測定 | 未測定 | (probe 無し) |
-| `fa32_node1.sh` C 行 (HEAD, **`FA_PROBE9=1` 併用**) | 2 回目 | C==Z 8/8 | `out0==C+0x2b0` 8/8 | – |
+| `fa32_node1.sh` C 行 (`f5160903f`, **`FA_PROBE9=1` 併用**) | 2 回目 | C==Z 8/8 | `out0==C+0x2b0` 8/8 | – |
+
+- 上の「probe 無し」行は未測定。前回実測 (`63d53758b`) は、その後 `tools/targets/freshair/lift2` 他 17 ファイルが変わったため採らない。HEAD で取り直すには素材 `plugins-freshair` が要る。`$ARTIFACTS_DIR` には `fl-win64` しか無く、本 run では展開できなかった。取り直しは素材追加後の別作業とする。
 | `FA_NODE1 FA_SET9 FA_PROBE9 FA_P9GUARD` (HEAD `f5160903f`, S900〜S906 同形) | 1 回目 (map 経路) | C=C0 | 0 | 0 |
 | 同 | 2 回目 (nokey 経路) | C=Z (S900: `0x555947237750`) | `Z+0x2b0` (S900: `out0-C=0x2b0`) | 1 |
 
