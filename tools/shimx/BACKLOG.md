@@ -199,7 +199,7 @@
 | P0 | UnhandledExceptionFilter | kernel32 | 1 |  | ● | FL64/FreshAir/OTT/Serum2 | 機能実装 | seh.c |  |
 | P0 | VariantCopyInd | oleaut32 | 1 | ● |  |  | 機能実装 | ole.c |  |
 | P0 | VirtualQueryEx | kernel32 | 1 | ● |  |  | 機能実装 | heap.c |  |
-| P0 | midiOutShortMsg | winmm | 1 | ● |  |  | スタブ(エラー/無し返却) | net.c |  |
+| P0 | midiOutShortMsg | winmm | 1 | ● |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
 | P0 | GetConsoleMode | kernel32 | 0 |  | ● | FL64/FreshAir/OTT/Serum2 | スタブ(エラー/無し返却) | ini.c |  |
 | P0 | GetFinalPathNameByHandleW | kernel32 | 0 | ● |  |  | 機能実装 | file.c |  |
 | P0 | GetLogicalProcessorInformation | kernel32 | 0 | ● |  |  | 機能実装 | env.c |  |
@@ -274,8 +274,8 @@
 | P2 | SetThreadExecutionState | kernel32 | 4 |  |  |  | スタブ(エラー/無し返却) | thread.c |  |
 | P2 | WinVerifyTrust | wintrust | 4 |  |  | FL64 | スタブ(エラー/無し返却) | net.c | NOSIGNATURE (shimx_set_trust_ok で成功化) |
 | P2 | WritePrivateProfileStringW | kernel32 | 4 |  |  |  | 機能実装 | ini.c |  |
-| P2 | midiOutGetDevCapsW | winmm | 4 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiOutGetNumDevs | winmm | 4 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
+| P2 | midiOutGetDevCapsW | winmm | 4 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
+| P2 | midiOutGetNumDevs | winmm | 4 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
 | P2 | CreateILockBytesOnHGlobal | ole32 | 3 |  |  |  | スタブ(エラー/無し返却) | ole.c |  |
 | P2 | GetExitCodeProcess | kernel32 | 3 |  |  |  | 機能実装 | thread.c |  |
 | P2 | GetProcessAffinityMask | kernel32 | 3 |  |  |  | 機能実装 | thread.c |  |
@@ -291,7 +291,7 @@
 | P2 | ShellExecuteExW | shell32 | 3 |  |  |  | スタブ(エラー/無し返却) | shell.c |  |
 | P2 | StgCreateDocfileOnILockBytes | ole32 | 3 |  |  |  | スタブ(エラー/無し返却) | ole.c |  |
 | P2 | WaitForMultipleObjectsEx | kernel32 | 3 |  |  |  | 機能実装 | wait.c |  |
-| P2 | midiInGetNumDevs | winmm | 3 |  |  |  | スタブ(エラー/無し返却) | net.c | デバイス 0 台 (weak; Web MIDI は下流) |
+| P2 | midiInGetNumDevs | winmm | 3 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c | デバイス 0 台 (weak; Web MIDI は下流) |
 | P2 | CertFindCertificateInStore | crypt32 | 2 |  |  | FL64 | スタブ(エラー/無し返却) | net.c |  |
 | P2 | CertFreeCertificateContext | crypt32 | 2 |  |  | FL64 | スタブ(エラー/無し返却) | net.c |  |
 | P2 | ClosePrinter | winspool.drv | 2 |  |  |  | スタブ(エラー/無し返却) | shell.c |  |
@@ -320,9 +320,9 @@
 | P2 | acmStreamConvert | msacm32 | 2 |  |  |  | スタブ(エラー/無し返却) | shell.c |  |
 | P2 | acmStreamPrepareHeader | msacm32 | 2 |  |  |  | スタブ(エラー/無し返却) | shell.c |  |
 | P2 | acmStreamSize | msacm32 | 2 |  |  |  | スタブ(エラー/無し返却) | shell.c |  |
-| P2 | midiInAddBuffer | winmm | 2 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiInGetDevCapsW | winmm | 2 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiInPrepareHeader | winmm | 2 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
+| P2 | midiInAddBuffer | winmm | 2 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
+| P2 | midiInGetDevCapsW | winmm | 2 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
+| P2 | midiInPrepareHeader | winmm | 2 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
 | P2 | AddVectoredExceptionHandler | kernel32 | 1 |  |  |  | 機能実装 | seh.c |  |
 | P2 | AssignProcessToJobObject | kernel32 | 1 |  |  |  | スタブ(エラー/無し返却) | env.c |  |
 | P2 | CLSIDFromString | ole32 | 1 |  |  |  | 機能実装 | ole.c |  |
@@ -403,19 +403,19 @@
 | P2 | acmStreamMessage | msacm32 | 1 |  |  |  | スタブ(エラー/無し返却) | shell.c |  |
 | P2 | acmStreamOpen | msacm32 | 1 |  |  |  | スタブ(エラー/無し返却) | shell.c |  |
 | P2 | acmStreamUnprepareHeader | msacm32 | 1 |  |  |  | スタブ(エラー/無し返却) | shell.c |  |
-| P2 | midiInClose | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
+| P2 | midiInClose | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
 | P2 | midiInGetErrorTextW | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiInOpen | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiInReset | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiInStart | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiInStop | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiInUnprepareHeader | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiOutClose | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
+| P2 | midiInOpen | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
+| P2 | midiInReset | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
+| P2 | midiInStart | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
+| P2 | midiInStop | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
+| P2 | midiInUnprepareHeader | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
+| P2 | midiOutClose | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
 | P2 | midiOutGetErrorTextW | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiOutLongMsg | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiOutOpen | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiOutPrepareHeader | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
-| P2 | midiOutUnprepareHeader | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | net.c |  |
+| P2 | midiOutLongMsg | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
+| P2 | midiOutOpen | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
+| P2 | midiOutPrepareHeader | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
+| P2 | midiOutUnprepareHeader | winmm | 1 |  |  |  | スタブ(エラー/無し返却) | midi_conv.c |  |
 | P2 | GetOpenFileNameW | comdlg32 | 0 |  |  |  | スタブ(エラー/無し返却) | shell.c | キャンセル扱い (Web ファイル選択は下流) |
 | P2 | GetSaveFileNameW | comdlg32 | 0 |  |  |  | スタブ(エラー/無し返却) | shell.c |  |
 | P3 | AcquireSRWLockExclusive | kernel32 | 0 |  |  | OTT/Serum2 | 機能実装 | locks.c |  |
