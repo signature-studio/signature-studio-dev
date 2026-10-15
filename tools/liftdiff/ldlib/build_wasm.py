@@ -110,7 +110,8 @@ def build(t, force=False):
                         alldef.add(m.group('name'))
         src, names, skipped = irtool.gen_stubs(ir, alldef | extra_defined)
         open(stubs_c, 'w').write(src)
-        json.dump({'stubs': names, 'skipped': skipped, 'widths': irtool.gen_stubs.widths}, open(W + '/stubs.json', 'w'))
+        json.dump({'stubs': names, 'skipped': skipped, 'widths': irtool.gen_stubs.widths,
+                   'slots': irtool.gen_stubs.slots}, open(W + '/stubs.json', 'w'))
         print('[build] stubs: %d (skipped %d: %s)' % (len(names), len(skipped), skipped[:5]))
     # simd helper
     objs = []

@@ -52,7 +52,8 @@ class Session:
                 raise KeyError('ret_override: %s が sigs.json に無い (名前の typo を疑う)' % name)
             self.sigs[name] = dict(self.sigs[name], ret=rt, tr=True)
         st = json.load(open(W + '/stubs.json'))
-        self.stub_info = {n: {'widths': st.get('widths', {}).get(n, [32] * 4)} for n in st['stubs']}
+        self.stub_info = {n: {'widths': st.get('widths', {}).get(n, [32] * 4),
+                              'slots': st.get('slots', {}).get(n)} for n in st['stubs']}
         self.pe = PE(self.t['pe'])
         self.origin = int(str(self.t.get('wasm_origin', '0x0')), 16)
         self.delta = self.pe.base - self.origin

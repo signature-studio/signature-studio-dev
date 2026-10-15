@@ -136,6 +136,15 @@ def cmp_ret(n, w, ctx):
     return None if (a & mask) == (b & mask) else {'native_rax': hex(a), 'wasm_rax': hex(b), 'width': width, 'mask': hex(mask)}
 
 
+def native_arg(na, k, slots):
+    """wasm 引数 k に対応する native 値。slots[k] = (reg, シフト量) (LD-253 #5032: 8 byte struct の要素は
+    1 レジスタの上下 32bit)。slots が無いとき (旧 stubs.json) は従来どおり na[k]。"""
+    if not slots or k >= len(slots) or slots[k] is None:
+        return int(na[k], 16)
+    reg, sh = slots[k]
+    return (int(na[reg], 16) >> sh) & M64
+
+
 def cmp_calls(n, w, ctx, stub_info):
     cn, cw = n.get('calls', []), w.get('calls', [])
     for i in range(max(len(cn), len(cw))):
@@ -147,9 +156,11 @@ def cmp_calls(n, w, ctx, stub_info):
             return {'index': i, 'native': a['n'], 'wasm': b['n'], 'kind': 'call_name'}
         info = stub_info.get(a['n'], {})
         widths = info.get('widths', [32] * 4)
+        slots = info.get('slots')
         for k in range(min(4, len(widths))):
-            if not ctx.eq(int(a['a'][k], 16), int(b['a'][k], 16), widths[k]):
-                return {'index': i, 'name': a['n'], 'arg': k, 'native': a['a'][k], 'wasm': b['a'][k], 'kind': 'call_arg'}
+            vn, vw = native_arg(a['a'], k, slots), int(b['a'][k], 16)
+            if not ctx.eq(vn, vw, widths[k]):
+                return {'index': i, 'name': a['n'], 'arg': k, 'native': hex(vn), 'wasm': b['a'][k], 'kind': 'call_arg'}
     return None
 
 
