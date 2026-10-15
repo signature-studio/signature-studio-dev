@@ -148,3 +148,47 @@
 - 前回値の参照先 `REPORT_1161.md` は PR #2661 (未 merge) にあり、本 run は main 基点の TSV/JSONL から値を取り直した。
 - 実施順の注記 (#2245・#2288・#2583・#2253・#2679 (LD-120)) について: 本 issue の 9 site の関数 (41ba50・41bfa0・41e490・45b170・45c290・45d0a0・45d610・45f560) は、各 issue の本文に現れないことを確認した。#2253 の 7 site は別の関数 (128c320・1280530・dcdde0・c343f0・128f9e0) で、#2679 の 128f9e0 (12 site) とも重ならない。
 - `REPORT_2438.md` §5 は xor 0 の類型をコメントで #2253 に残す方針だったが、#2253 は別の 7 site の担当で修復を扱わない。上流 xor 0 の追跡は LD-127 (#2745) に置く。
+
+## 9. LD-134 (#2833): F3d 適用 IR の build・e2e 実測と既定化の判断
+
+- 結論: F3d を適用した IR (58 関数) は build でき、e2e の主要値 (到達 stage・survey ok・通過 unit・trap) は HEAD と同一だった。wasm は +525 B。**既定化しない** (`ldfix.py` の `if tag == 'f3d' and passes is None` の除外は残す。理由は §9.3)。
+- 測定 commit: HEAD 側 `554303875` (origin/main・F3d 無効)、F3d 側 `dabf01a96` (F3d の引数欠落 guard を含むコード commit)。本節を足した commit は docs のみで、`git diff dabf01a96 HEAD -- tools/m11/ldfix/results tools/m11/ldfix/*.py` は 0 行。
+- 素材の扱い: `work-m11` を worktree `ws-2833` の `tools/m11/work/` に展開し、`fl-win64` の `extracted/block00031_PE.bin` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)。素材に `work/lift_pe.sha256` が無いため、素材の PE の sha256 (`b2c64da4…f9496d`) を記録して全再生成を避けた。素材に無い boot5 は RetDec で lift し直し、`m11_data.c`・`m11_image.bin` は PE から生成し直した。
+
+### 9.1 実測 (`bash tools/m11/m11_e2e.sh`・前景・timeout 1200 s)
+
+| 項目 | HEAD (`554303875`) | F3d (`dabf01a96`・58 関数) |
+|---|---|---|
+| IR 生成 | `m11_gen_ir2.sh` (boot5 を lift し直し) | `LDFIX_ARGS="--passes f1,f1v,f2,f3a,f3b,f3c,f3d,f4" bash m11_gen_ir2.sh` 50.8 s・`f3d_fns`=58 |
+| build (emcc 増分) | ok | ok |
+| e2e 所要 (wall) | 3 m 09.4 s (`time`) | gen + e2e 合計 125 s (`date` 01:57:51 → 01:59:56) |
+| rc | 1 | 1 |
+| 到達 stage | 4 (期待 4 を満たす) | 4 |
+| survey ok / trap / miss | 873 / 22 / 46 | 873 / 22 / 46 |
+| 通常起動 units | 98 / 942 | 98 / 942 |
+| 通常起動の trap | memory access out of bounds @ function_535c11 | 同じ |
+| wasm bytes | 6047712 | 6048237 (+525) |
+| rc=1 の内容 | tolerant gate: 通常起動完了 101 ≠ 期待 56・survey ok 873 ≠ 期待 872 (exact) | 同じ |
+
+- rc=1 は HEAD でも同じ (`e2e_expect.env` の pin と本 snapshot の不一致。F3d の影響ではない)。pin は変えていない。
+- load: 測定中の採取はしていない。記録時点の loadavg 0.97 / 0.87 / 0.57・nproc 4。
+- gen を含むため、所要の HEAD と F3d の差は直接比較しない。
+
+### 9.2 引数欠落の欠陥 (本節で修正)
+
+- 初版の F3d (`fix_f3d`・guard 無し) は、`function_42d290`・`function_45b8b0` (IR は `define i64 @functionX()` で仮引数 0) の入口に `load i16, ptr %arg1` を挿入した。`argN` の存在を確かめていなかったため、`boot_final3.ll:134179` で `use of undefined value '%arg1'` となり **build が失敗** した (`m11_build.sh` の cc 段・fail-closed)。
+- 修正: 仮引数の数が `argN` に足りないときは適用せず `f3d_arg_missing` を数える (`ldfix.py` `fix_f3d`・commit `dabf01a96`)。対象は 60 → 58 関数。3 対象 (45b170・45d0a0・45f560) と判定は変わらない。
+- 既定経路 (`--passes` 無し) では F3d は走らないため無変更 (`git diff 554303875 dabf01a96 -- tools/m11/ldfix` は 1 ファイル・5 行追加・5 行削除)。
+
+### 9.3 既定化の判断: しない
+
+1. e2e の主要値が HEAD と同一で、既定化の効果 (到達 stage・通過 unit の増加) を示せない。
+2. 受入条件の「57 関数の機械語・IR 突合」は未了。`fix_f3d` の guard (base の argN 解決・入口の movzx word 1 本・xor 候補 1 本) は機械的な一致判定で、独立した突合ではない。確認できない関数は既定化から外す規則に従うと、既定化の根拠が無い。
+3. 初版は guard の漏れで build を壊していた。guard に対する negative control (効く入力での FAIL) は未測定。
+
+### 9.4 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| F3d 58 関数のうち 3 対象以外の 55 関数の機械語・IR 突合と、`audit_lsf_ssa_e2e.sh` の HEAD / F3d 比較 (未実施) | 既定化の判断材料が無い | #3528 (LD-160) |
+| 既定 e2e の pin (STRICT_DONE 56・SURVEY_OK_EXACT 872) と本 snapshot の不一致 (HEAD でも発生) | 既定の e2e が rc=1 で終わる | #3528 (LD-160) の注意欄 |

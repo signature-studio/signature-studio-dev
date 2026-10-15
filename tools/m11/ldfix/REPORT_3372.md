@@ -8,7 +8,7 @@
   書き換えは `fix_site_3372.py` (新規)。機械語 9 + 8 + 4 = **21 命令を capstone で照合**し、一致しなければ止める。IR は書き換える行が 1 件ずつ在るときだけ書く。
   - 「3 箇所を修復」は **base IR (`boot_final3.ll`) 上の数**。このうち 0x6074b0 と 0x44f040 の (a) は `ldfix.py` (F1 系) が既に直す (`%ldfxu24`・`%ldfxu14`) ので、`fix_site_3372.py` はその形を据え置く。e2e の fix 側で新たに入るのは **0x44f040 の (b)(c) の 2 行と 0x47cf10 の 2 行 (計 4 行。IR edits 4)**。
 - `ldfix_e2e.sh` に step 1d (本 pass) を配線した。**HEAD `f87d3389e` で完走した (rc=0・judge PASS・wall 45.2 s。§5.1)**。
-  stage4 は base / fix とも到達 4/6・同じ trap (`memory access out of bounds`)。survey は 23 キーのうち `top_frame_idx` (IR 行番号) の 5 キーだけが base と異なり、件数は全て一致。**観測上の変化は無し**。wasm サイズは base 6025281 → fix 6025498 (+217 B)。
+  stage4 は base / fix とも到達 4/6・同じ trap (`memory access out of bounds`)。survey は 23 キーのうち `top_frame_idx` (wasm 関数インデックス) の 5 キーだけが base と異なり、件数は全て一致。**観測上の変化は無し**。wasm サイズは base 6025281 → fix 6025498 (+217 B)。
 - 測定 commit は **`f87d3389e`** (コードを変えた最後の commit)。前回の測定 commit `dd8894202` (main の step 1c を含まない pipeline) の値は §5.2 に残す。
 - 一次分類 (`verify_deref_sites_2555.py`・17 行): base は OTHER 9 / ADDR 5 / MISMATCH 2 / SCAN_MISS 1、修復後は **LOAD 3** を加え OTHER 7 / ADDR 4 / MISMATCH 2 / SCAN_MISS 1。HEAD で再計算して同じ値 (§4)。
 - 残りの誤り箇所の現状: 0x413340・0x44fb40・0x450420・0x4506e0・0x7888f0 は main の #3326 (PR #3400・main `bb4443c19`) で修復済み (step 1c)。0x413340 の 3 番目引数の判定は #3416 [CI-154] (CLOSED) で済み、その修復は #3426 [CI-157] (OPEN)。0x47b4a0・0xc40770 (複雑型) は #3418 [CI-156] (OPEN)。
@@ -103,7 +103,7 @@ base IR: `%0 = call 4256c0(i64 %arg1)`。修復: `%a1g = load [arg1]` を入れ�
 | judge (`judge_e2e.py`) | `STAGE4_JUDGE {"pass": true, "stage_base": 4, "stage_fix": 4, …}` | | PASS |
 
 - step 1d の出力は `fix_site_3372: machine checks 21 ok (3 sites), IR edits 4 applied`。base 入力での 7 件のうち (a) と 0x6074b0 の 3 件は、step 1 の `ldfix.py` が既に直しているため数えない。
-- survey の 23 キーの比較 (base と fix の `M11_SURVEY` JSON): 22 キーは同一。`top_frame_idx` のみ、IR 行番号のキーが +1〜+2 ずれた
+- survey の 23 キーの比較 (base と fix の `M11_SURVEY` JSON): 22 キーは同一。`top_frame_idx` のみ、wasm 関数インデックスのキーが +1 ずれた (キーは `tools/m11/m11_survey.mjs:116` の `wasm-function[N]` の N。IR 行番号ではない・#3450 で訂正)
   (`1877`→`1878`、`5265`→`5266`、`14877`→`14878`・`14879`→`14880`・`14881`→`14882`)。件数は同じ。修復で IR の行数が増えたことによる。
 - 観測上の変化が無いことは、修復した 3 箇所が stage4・survey の trap を消していないことを意味する。`memory access out of bounds` (stage4 の dllmain と survey の oob 8 件) の原因は、本 PR の 3 箇所には無い。
   本 PR の変更の意味は「機械語と IR の一致を 3 箇所で取り戻した」ことに限る。stage4 の trap の原因の切り分けは別件 (#942 系)。

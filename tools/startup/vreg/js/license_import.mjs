@@ -60,6 +60,23 @@ export class LicenseImport {
     });
   }
 
+  /**
+   * 取込を取り消す。取込バイト列を消し、HKCU を seed の既定 (登録済み placeholder) に戻す。
+   * 取込由来の seed 外のキーも消えるよう、プロファイルの記録ごと作り直す。MachineGuid は保持する。
+   * 取込が無ければ何もせず false を返す。
+   */
+  revertUserReg() {
+    return this._serial(async () => {
+      if (!this.userReg) return false;
+      const guid = this.vreg.machineGuid;
+      await this.o.store.delete(userKey(this.profile));
+      await this.o.store.delete(this.profile);
+      this.machineGuid = guid;
+      await this._reopen();
+      return true;
+    });
+  }
+
   /** MachineGuid をユーザ指定にする (8-4-4-4-12 の 16 進)。以後の boot でも保存値が使われる。 */
   setMachineGuid(guid) {
     if (!GUID_RE.test(guid)) throw new Error('MachineGuid は xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx 形式で指定してください');

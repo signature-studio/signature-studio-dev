@@ -1128,11 +1128,11 @@ def fix_f3d(fn, mach, rep, ctr):
     xi, xm = cands[0]
     xname = xm.group(2)
     hd = re.match(r'^define [^@]*@function_[0-9a-f]+\(([^)]*)\)', fn.body)
-    pty = 'ptr'
-    if hd:
-        ps = [p.strip().split() for p in hd.group(1).split(',') if p.strip()]
-        if len(ps) >= argn and len(ps[argn - 1]) >= 1:
-            pty = ps[argn - 1][0]
+    ps = [p.strip().split() for p in hd.group(1).split(',') if p.strip()] if hd else []
+    if len(ps) < argn or len(ps[argn - 1]) < 1:
+        rep['f3d_arg_missing'] = rep.get('f3d_arg_missing', 0) + 1
+        return 0
+    pty = ps[argn - 1][0]
     aptr = '%%arg%d' % argn if pty == 'ptr' else None
     pre = []
     ctr[0] += 1

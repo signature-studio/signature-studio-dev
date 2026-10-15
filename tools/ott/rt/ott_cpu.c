@@ -4,7 +4,7 @@
 uint64_t R[16];
 X128 X[16];
 X128 XH[16];   /* CAB-135: ymm 上位 128bit (VEX.256 / VEX zeroing 用) */
-uint8_t fZF, fSF, fCF, fOF, fPF;
+uint8_t fZF, fSF, fCF, fOF, fPF, fDF;
 uint64_t ott_xrip;
 uint32_t ott_mxcsr = 0x1f80u;   /* x86 既定 (全例外 mask, round-nearest)。ldmxcsr/stmxcsr はこの shadow を読み書き */
 /* CAB-135: gs/fs shadow TEB (gs:[0x10] StackLimit 等の最小 emulate — 全 0 = 溢れなし)。
