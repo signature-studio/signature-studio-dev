@@ -6,28 +6,28 @@
 
 1. **PE の確定**: `plugins.getParamValueString` (`0xd7f940`) の `slotIndex != -1` 経路 (`0xd7fb34`〜) を読み、戻り値の組立てと範囲検査を確定した (§2・§3)。同じ解決の並びは `getParamValue` (`0xd7fda0`) と `setParamValue` (`0xd80160`) にもある (§2・§5)。
 2. **C・mock**: 値を **channel ごと・mixer track の insert slot ごと** に持つ。`setParamValue` が書き、`getParamValue` と `getParamValueString` が読む (読み書きを揃えた。読出し側だけを変えると MCP の set→get が壊れるため)。範囲外は code 4、空 slot は code 8 (`Plugin not valid`)、挿入で既定値に戻る。
-3. **差分検査**: `tests/plugins_diff.mjs` を追加。56 呼出し・差分 0・PASS (review round 1 で型検査 10 件を追加)。初版のネガティブコントロールで空 slot の判定を外すと **4 件の差分で FAIL** (初版 46 呼出しの測定。§4)。
+3. **差分検査**: `tests/plugins_diff.mjs` を追加。56 呼出し・差分 0・PASS (review round 1 で型検査 10 件を追加)。空 slot の判定を外すと **4 件の差分で FAIL**、戻すと 56/0 PASS (56 呼出し版で再測定。§5)。
 4. **flpy 経由**: round 1 で `tests/poc_mcp.mjs` の値の検査を channel の `pv` に直し、`get_plugin_parameter_value` の set→get (`90.0 %`) も検査した。flpy (CPython wasm) を作って実行し PASS (§1・§6)。`provider_check.mjs` と `all_tools.mjs` (FL_ENGINE=wasm) も PASS。親 #2950 の受入の一部はこれで確認した。
 
 ## 1. 測定
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit (コードを最後に変えた commit) | `6ee6d1401` (`Merge remote-tracking branch 'origin/main' into 3656-plugins-getparamvaluestring`)。コード変更は `2d4c7ae52` (round 1 の修正) と main (`dadf1884b`) の取り込み。取り込み後に全項目を再測定。初版の測定 commit は `a84a424ad` (round 1 の前) |
-| 素材 | `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (real 5.355 s)。emsdk は runner 同梱のもの (`EMSDK_DIR` の既定値) を使い、`toolchain-emsdk` は展開していない |
-| 入力 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/python/fetch_inputs.sh` (midi.py・utils.py・fl-stubs を取得。real 0.522 s) |
-| flpy | `bash tools/python/build_cpython_wasm.sh` (native + wasm の CPython 3.12.1。rc 0・real 4 m 05 s)、`FL_WIN64_DIR=… bash tools/python/build_flpy.sh` (rc 0・real 7.074 s。`dist/flpy.{js,wasm,data}`)。`analysis/flapi` の追跡物は再生成後も差分なし |
+| 測定 commit (コードを最後に変えた commit) | `656d01e7d` (`Merge remote-tracking branch 'origin/main' into 3656-plugins-getparamvaluestring`。main `1ccf20c6a` を取り込んだ merge)。取り込みで `tools/python/host/fl_mock.mjs` が衝突 (§6)。取り込み後に全項目を再測定。前回の測定 commit は `6ee6d1401` (main `dadf1884b` の取り込み。round 2 の前) |
+| 素材 | `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (real 5.570 s)。emsdk は `/opt/emsdk` (runner 同梱。`EMSDK_DIR` の既定値)。`toolchain-emsdk` は展開していない |
+| 入力 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/python/fetch_inputs.sh` (midi.py・utils.py・fl-stubs を取得。real 0.417 s)。`build_flpy.sh` は stubs を要するため、これを先に実行する |
+| flpy | `bash tools/python/build_cpython_wasm.sh` (native + wasm の CPython 3.12.1。rc 0・real 4 m 08 s)、`FL_WIN64_DIR=… bash tools/python/build_flpy.sh` (rc 0・real 7.092 s。`dist/flpy.{js,wasm,data}`)。`analysis/flapi` の追跡物は再生成後も差分なし |
 | build (provider) | `bash tools/python/provider/build.sh`。rc 0。警告 0 |
-| flpy 経由 (MCP) | `node tests/poc_mcp.mjs` → `POC OK` (rc 0・real 1.277 s)。tools 48・host_calls 20563・roundtrip 49 µs/call (init 153 ms)。`set_plugin_parameter_value` → `Set 'Cutoff' … to 0.9000`、続く `get_plugin_parameter_value` → `Normalized Value: 0.9000, String Value: '90.0 %'`。channel 2 の `pv[0]` = 0.9、channel 0 の `pv[0]` = 0.5 |
+| flpy 経由 (MCP) | `node tests/poc_mcp.mjs` → `POC OK` (rc 0・real 1.28 s)。tools 48・host_calls 20563・roundtrip 37 µs/call (init 161 ms)。`set_plugin_parameter_value` → `Set 'Cutoff' … to 0.9000`、続く `get_plugin_parameter_value` → `Normalized Value: 0.9000, String Value: '90.0 %'`。channel 2 の `pv[0]` = 0.9、channel 0 の `pv[0]` = 0.5 |
 | 修正前 (参考) | 同じ flpy で `poc_mcp.mjs` を `7608e7950` の状態 (旧 assert) で実行 → `AssertionError` (`tests/poc_mcp.mjs:69`・`params[0].v` が 0.5 のまま)。指摘どおり |
-| provider 経由 | `node tests/provider_check.mjs` → `{"functions":435,"implemented":162,"unimplemented":273,"mcp_static":60,"PASS":true}` (real 0.358 s。main 取り込みで実装数 155 → 162)。`FL_ENGINE=wasm node tests/all_tools.mjs` → total 48・ok 48・soft_error 0・raised 0・host_calls 37425 (real 2.102 s。既存 REPORT_APPENDIX の 37,425 と一致) |
-| 差分 (新規) | `node tests/plugins_diff.mjs` → `{"calls":56,"diffs":0,"PASS":true}` (real 0.050 s。初版は 46 呼出し) |
-| PE 解析 | `FL_WIN64_DIR=… python3 analysis/flapi/plugins_paramvalue_facts.py`。PASS 20 / FAIL 0 / rc 0。経路別の VA 絞り込み版 (§2)。real 0.089 s |
-| 差分 (既存・回帰) | `mixer_diff` 62・diffs 0 (0.051 s) / `channels_diff` 214・grid_calls 1200・diffs 0 (0.066 s) / `device_diff` 8・diffs 0 (0.049 s) / `ilmcp_diff` 32・diffs 0 (0.061 s) / `ilmcp_e2e` PASS (0.438 s)。mock の `all_tools.mjs` は 48/48・host_calls 37425 (2.204 s) |
-| arity 検査 | `node tests/sig_arity_probe.mjs` → fails 0・PASS (実装済み 8 関数に `plugins.getParamValueString` を含む)。real 0.062 s |
-| load | 測定の直前 `load average 0.39 0.70 0.66` (4 core) |
+| provider 経由 | `node tests/provider_check.mjs` → `{"functions":435,"implemented":165,"unimplemented":270,"mcp_static":60,"PASS":true}` (real 0.37 s。main 取り込みで実装数 162 → 165)。`FL_ENGINE=wasm node tests/all_tools.mjs` → total 48・ok 48・soft_error 0・raised 0・host_calls 37425 (real 2.09 s。既存 REPORT_APPENDIX の 37,425 と一致) |
+| 差分 (新規) | `node tests/plugins_diff.mjs` → `{"calls":56,"diffs":0,"PASS":true}` (real 0.05 s。初版は 46 呼出し) |
+| PE 解析 | `FL_WIN64_DIR=… python3 analysis/flapi/plugins_paramvalue_facts.py`。PASS 20 / FAIL 0 / rc 0。経路別の VA 絞り込み版 (§2)。real 0.088 s |
+| 差分 (既存・回帰) | `mixer_diff` 69・diffs 0 (0.05 s) / `channels_diff` 238・grid_calls 1200・diffs 0 (0.07 s) / `device_diff` 11・diffs 0 (0.05 s) / `ilmcp_diff` 32・diffs 0 (0.06 s) / `ilmcp_e2e` PASS (0.47 s)。mock の `all_tools.mjs` は 48/48・host_calls 37425 (2.00 s) |
+| arity 検査 | `node tests/sig_arity_probe.mjs` → fails 0・PASS (実装済み関数に `plugins.getParamValueString` を含む)。real 0.05 s |
+| load | 測定の直前 `load average 0.39 1.27 0.77` (4 core・uptime 04:03)。ビルド開始時は `0.24 0.29 0.14` |
 
-測定は worktree `ws-3656` (PR 枝 `3656-plugins-getparamvaluestring`) で、main 取り込み後の `6ee6d1401` に対して行った。`git diff 6ee6d1401 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` の出力は 0 行 (測定 commit の後は docs のみの commit)。
+測定は worktree `ws-3656` (PR 枝 `3656-plugins-getparamvaluestring`) で行った。`git diff 656d01e7d HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` の出力は 0 行 (測定 commit の後は REPORT と `docs/DOC_MAP.md` の commit だけ)。
 
 ## 2. PE の逆アセンブル (根拠)
 
@@ -51,21 +51,25 @@
 | getParamValue | `0xd7fda0` | 同じ解決の並び (`call 0x1005730`・`call 0x132f780`・件数の `sub eax,1`・`cmp rax, 9`)。値の取得は `0x1331340` 経由の vtable 呼出し (`call [rax+0x20]`・`call [rax+0x30]`)・`0xd7fd40` で、**値の核は未読** |
 | setParamValue | `0xd80160` | `call 0x1005730`・`call 0x132f780`・`call 0x12be250` の並び。書込み前に `call 0xf81ce0`・`call 0x40c660`・`mov r8d, 0x3fd`・`call 0x1051d20` の検査があり、**その意味は未読** |
 
-## 3. 解決順と戻り値 (確定)
+## 3. 解決順と戻り値 (PE で確定した部分と、未確認のモデルの置き)
 
-PE の順に従う (C・mock も同じ順)。
+PE の順に従う (C・mock も同じ順)。置き (未確認) の行は表の後の注と §7 に分けた。
 
 | 順 | 判定 | 失敗時 (code) |
 |---|---|---|
-| 1 | `slotIndex == -1`: `index` を channel として解決 / `slotIndex != -1`: `index` を mixer track として `[0, 127)` で検査 | -4 → 4 (`Index out of range`) |
+| 1 | `slotIndex == -1`: `index` を channel として解決 / `slotIndex != -1`: `index` を mixer track として検査 (PE は `[0, [0x15e2198])`。モデルは `[0, 127)` と置く) | -4 → 4 (`Index out of range`) |
 | 2 | `slotIndex != -1` のとき `slotIndex ∈ [0, 9]` | -4 → 4 |
-| 3 | 有効性: channel は常に有効 / slot は中身があること (`mx[i].slots[s][0] != 0`) | -8 → 8 (`Plugin not valid`) |
+| 3 | 有効性 (`0x132f780` = `[obj+0x64] >= 0`): PE は channel 経路 (`d7fa41`) と slot 経路 (`d7fbaf`) の両方で検査する。モデルは channel を常に有効、slot は `mx[i].slots[s][0] != 0` で代用 (置き) | -8 → 8 (`Plugin not valid`) |
 | 4 | `paramIndex ∈ [0, 3)` | -4 → 4 |
 | 5 | 値の所在: channel は `ch[index].pv[paramIndex]` / slot は `mx[index].spv[slot][paramIndex]` | — |
 
 - 文字列は `"%.1f %%"` で値 × 100 を整形する (既存の書式を維持)。PE 側の書式 (`0x104d2b0`) は**未読**。
 - `useGlobalIndex` は `dl` として解決に渡すだけで、group 配列の実値が無いため結果は変えない (identity)。子 #3684 で扱う。
-- **channel の有効性 (round 1)**: PE は slot -1 経路でも `0x132f780` (`[obj+0x64] >= 0`) を検査し、偽なら code -8 を返す。モデルは「`index` が範囲内の channel は常に有効」と置く。この置きの根拠 (channel の plugin obj で `[obj+0x64] >= 0` が常に成り立つこと) は**未確認**。モデルの channel は追加・削除で列挙が変わるだけで、偽になる状態は作れない。未解決表に入れる。
+- **有効性と範囲の置き (未確認)**: 
+  - channel: PE は slot -1 経路でも `0x132f780` (`[obj+0x64] >= 0`) を検査し、偽なら code -8 を返す。モデルは「`index` が範囲内の channel は常に有効」と置く。この根拠 (channel の plugin obj で `[obj+0x64] >= 0` が常に成り立つこと) は**未確認**。モデルの channel は追加・削除で列挙が変わるだけで、偽になる状態は作れない。
+  - slot: `0xd7fbaf` の `0x132f780` が偽のとき code -8 を返すこと (`0xd7fbaf` → `0xd7fc87`) までを PE で確かめた。空 slot の obj が `[obj+0x64] < 0` を取ることは読んでいない。モデルの `slots[s][0] != 0` は置き。C の `pinst()` は `slots[s][0]` の 0 判定だけで、`[obj+0x64]` は読まない。
+  - track の範囲: PE は `[0x15e2198]-1` (mixer 件数) の実行時比較で、`127` はモデルの置き。
+  - いずれも §7 の未解決表に入れる。
 
 ## 4. C・mock の変更
 
@@ -82,7 +86,7 @@ MCP の呼出し形は `analysis/mcp/tool_coverage.json` の実測で `getParamV
 
 ## 5. 差分検査の内容と期待値
 
-`tests/plugins_diff.mjs` の 46 呼出しは次を含む (mock と C の戻り値・code が一致することを確認)。
+`tests/plugins_diff.mjs` の 56 呼出し (初版 46 + round 1 の型検査 10) は次を含む (mock と C の戻り値・code が一致することを確認)。
 
 - channel: 既定値 (`50.0 %`・`20.0 %`・`80.0 %`)、set 後の値 (`25.0 %`)、他 channel への非波及 (`50.0 %`)、`useGlobalIndex=1` の identity、6 引数の set (`12.5 %`)。
 - 範囲外: paramIndex 3・-1、channel index 3・-1 → code 4。slot 10・-2、track 127 → code 4。
@@ -92,12 +96,13 @@ MCP の呼出し形は `analysis/mcp/tool_coverage.json` の実測で `getParamV
 
 期待値の直接検査 (差分 0 だけでは両方が同じに誤る場合を防ぐ): mock と C の両方で `25.0 %`・`50.0 %`・`12.5 %`・`75.0 %` 等を assert し PASS。
 
-**ネガティブコントロール**: `pinst()` の空 slot 判定 (`mx[index].slots[slot][0]` の検査) を一時的に外して再ビルドし、`node tests/plugins_diff.mjs` → `plugins 差分 4 件` で FAIL。元に戻して再ビルドし PASS を確認 (`{"calls":46,"diffs":0,"PASS":true}`)。
+**ネガティブコントロール** (56 呼出し版・測定 commit `656d01e7d` で取り直し): `pinst()` の空 slot 判定 (`if (!mx[index].slots[slot][0]) return fl_err(… "Plugin not valid")`) を一時的に外して `bash tools/python/provider/build.sh` (rc 0・警告 0) で再ビルドし、`node tests/plugins_diff.mjs` → `plugins 差分 4 件` で FAIL (rc 1)。判定を元に戻して再ビルド (rc 0・警告 0) し、`{"calls":56,"diffs":0,"PASS":true}` (rc 0) を確認。戻した後の `git diff 656d01e7d -- tools/python/provider` は 0 行。初版 (46 呼出し・測定 commit `a84a424ad`) の PASS 46/0 は参考値。
 
 ## 6. 差分の確認と未実行
 
-- `git diff 6ee6d1401 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` は本 REPORT の commit 後も**差分 0** (本 REPORT と `docs/DOC_MAP.md` の登録だけが後の commit)。
-- main (`dadf1884b`) の取り込み (`6ee6d1401`): `provider/fl_engine.c` の衝突は `Pl` 構造体だけ。main 側の `Pl` (`act`・`loop`・`trig_mode`・`pos_snap`・`trig_snap`) を採り、`Chan`・`Mix` は本 PR の `pv`・`spv` を残した。取り込み後に `build_flpy.sh` (real 6.911 s) と `provider/build.sh` を再実行し、§1 の全項目を再測定した。
+- `git diff 656d01e7d HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` は本 REPORT の commit 後も**差分 0** (本 REPORT と `docs/DOC_MAP.md` の登録だけが後の commit)。
+- main (`1ccf20c6a`) の取り込み (`656d01e7d`): `tools/python/host/fl_mock.mjs` の衝突は step 定義の行 (`STEP_DEF`・`stepParam`) だけ。main 側 (PY-111: `prm` は 8 まで・`prm === 7` は `pos * STEP_V`) を採り、本 PR の `PARAM_DEFAULT` を残した。`provider/fl_engine.c` は自動マージ。取り込み後に `fetch_inputs.sh`・`build_cpython_wasm.sh`・`build_flpy.sh`・`provider/build.sh` を再実行し、§1 の全項目を再測定した。
+- 前回の取り込み (`6ee6d1401`、main `dadf1884b`): `provider/fl_engine.c` の衝突は `Pl` 構造体だけ。main 側の `Pl` を採り、`Chan`・`Mix` は本 PR の `pv`・`spv` を残した。
 - round 1 (review) で「未実行」だった `provider_check.mjs`・`all_tools.mjs` (FL_ENGINE=wasm)・`poc_mcp.mjs` を、flpy (§1) を作って実行した。いずれも PASS。`ilmcp_e2e.mjs` も PASS。
 - `poc_mcp.mjs` は flpy (CPython wasm) と **mock** の flapi を使う (C provider は通らない)。C provider の値 API は `plugins_diff.mjs` (C と mock の差分 0) と `FL_ENGINE=wasm all_tools.mjs` (48/48・host_calls 37425。既存の追跡値と一致) で確認した。
 
@@ -112,3 +117,4 @@ MCP の呼出し形は `analysis/mcp/tool_coverage.json` の実測で `getParamV
 | `setParamValue` の pickupMode (kwlist 5 番目・`fii\|iii`) | C・mock は型検査だけで値を読んで捨てる (効果は未読)。useGlobalIndex は 6 番目 | #2950 へコメント |
 | `setParamValue` の paramValue の書式 `f` (float32) | C・mock は double のまま (`A_DBL`)。PE の float32 丸めの差は未確認。`%.1f` 表示では差が出ない | #2950 へコメント |
 | channel の有効性 `[obj+0x64] >= 0` (`0x132f780`) の根拠 | モデルは範囲内の channel を常に有効と置く (§3)。偽になる channel 状態は作れない | #2950 へコメント |
+| slot の有効性 (空 slot の obj が `[obj+0x64] < 0` を取る条件) と track 範囲の件数 `[0x15e2198]` | モデルは slot の空判定を `slots[s][0] != 0`、track の範囲を 127 と置く (§3)。偽になる条件と件数の出所は未読 | #2950 へコメント |
