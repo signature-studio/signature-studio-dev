@@ -45,12 +45,19 @@ echo "link: rc=$link_rc" | tee "$out/summary.txt"
 
 rc=0
 [ "$link_rc" -eq 0 ] || rc=1
+# コンパイルに失敗した src があれば fail (失敗したものを外して link すると、そのまま通ってしまうため)。
+n_compile_fail=$(awk '$1!=0' "$out/compile_rc.txt" | wc -l)
+echo "compile: fail=$n_compile_fail" | tee -a "$out/summary.txt"
+[ "$n_compile_fail" -eq 0 ] || rc=1
 if [ -f "$out/draw_ops.js" ]; then
   cp "$out/draw_ops.js" "$out/draw_ops_run.cjs"
   timeout 60 node "$out/draw_ops_run.cjs" > "$out/run.log" 2>&1
   run_rc=$?
   echo "run: rc=$run_rc" | tee -a "$out/summary.txt"
   [ "$run_rc" -eq 0 ] || rc=1
+  # 期待する命令数 (SR-55 の 5 件 + SR-62 の 4 件 = 9 件、drawBitmap 含む) が揃わなければ fail (欠けた命令が無判定で通るのを防ぐ)。
+  n_ops=$(grep -c '^draw_op ' "$out/run.log")
+  [ "$n_ops" -eq 9 ] || { echo "ops: fail (draw_op lines=$n_ops, expected 9)" | tee -a "$out/summary.txt"; rc=1; }
   while read -r _ name ok nz; do
     n=${nz#nonzero=}
     if [ "$ok" = "rc=1" ] && [ "${n:-0}" -gt 0 ]; then
@@ -60,6 +67,19 @@ if [ -f "$out/draw_ops.js" ]; then
       rc=1
     fi
   done < <(grep '^draw_op ' "$out/run.log")
+  # gradient は一様な色で塗られていないこと (異なる色が 2 以上)。nonzero>0 だけでは一色の塗りを通してしまう。
+  while read -r _ name distinct; do
+    d=${distinct#distinct=}
+    case "$name" in
+      name=fillLinearGradient|name=fillRadialGradient)
+        if [ "${d:-0}" -ge 2 ]; then
+          echo "color $name: pass ($distinct)" | tee -a "$out/summary.txt"
+        else
+          echo "color $name: fail ($distinct)" | tee -a "$out/summary.txt"
+          rc=1
+        fi ;;
+    esac
+  done < <(grep '^draw_color ' "$out/run.log")
 else
   echo "run: skipped (no draw_ops.js)" | tee -a "$out/summary.txt"
   rc=1

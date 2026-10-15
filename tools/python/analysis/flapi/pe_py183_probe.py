@@ -204,6 +204,7 @@ def main():
     desc_checks()
     typecheck_checks()
     pct_fmt_checks()
+    round_facts_checks()
     print(f"summary: {'OK' if not FAILS else str(len(FAILS)) + ' FAIL'}")
     return 1 if FAILS else 0
 
@@ -308,6 +309,28 @@ def round_checks():
     check("0x440c10 の 18 桁 BCD 化 (10 進 9 桁 × 2 の除算マジック 0x440c66 ... 0x440cf3)",
           ins_at(0x440C66).op_str == "rax, 0xa3d70a3d70a3d70b" and ins_at(0x440CF3).op_str == "r8d, 1"
           and ins_at(0x440D00).op_str == "0x440c60")
+
+
+def round_facts_checks():
+    # PY-335 (#4513): %.2f の桁出力 0x43f580 は丸め命令を持たない・桁取得 0x43f550 は 0 埋め・
+    # 0x40ef40 は MXCSR の下位マスク 0x800 (UM) だけを扱う (RC 未変更)
+    kinds = []
+    va = 0x43F580
+    while va < 0x43F6C8:
+        ins = ins_at(va)
+        if ins is None:
+            break
+        kinds.append(ins.mnemonic)
+        va += ins.size
+    check("0x43f580 (桁出力) に cvt/round 系命令が無い", not any(
+        k.startswith("cvt") or k.startswith("round") for k in kinds))
+    check("0x43f550 (桁取得) の空桁は '0' 埋め (mov al, 0x30 at 0x43f567)",
+          ins_at(0x43F567).op_str == "al, 0x30")
+    check("0x40ef40 が MXCSR 設定 0x40a2c0 を ecx=0x800, edx=0x800 で呼ぶ (0x40ef56〜0x40ef60)",
+          ins_at(0x40EF56).op_str == "ecx, 0x800" and ins_at(0x40EF5B).op_str == "edx, 0x800"
+          and ins_at(0x40EF60).op_str == "0x40a2c0")
+    check("0x40a2c0 の変更マスクは 0x1f80 (0x40a2cb)", ins_at(0x40A2CB).op_str == "esi, 0x1f80")
+    check("0x440d30 の精度 0x12 (18 桁) は 0x440e72 で固定", ins_at(0x440E72).op_str == "edx, 0x12")
 
 
 def struct_double(va):

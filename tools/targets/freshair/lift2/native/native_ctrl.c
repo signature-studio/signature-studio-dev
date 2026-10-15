@@ -233,6 +233,9 @@ int main(int argc, char** argv) {
       unsigned char* q = im + (0x18100c738ULL - 0x180000000ULL); if (q[0] == 0x73) q[0] = 0xEB; }
     if (getenv("FA_HEAP_ZERO")) g_heap_zero = 1;   /* FA-2c: machine heap 0 初期化 (wasm 側と determinism 揃え) */
     patch_iat(getenv("FA_IAT") ? getenv("FA_IAT") : "iat_slots.txt");
+    /* FA-53 (#4389): FA_UI31 経路は iat_slots.txt に無い import (KERNEL32!GetTickCount 0x1810c4208 等) を通る。
+     * 未束縛 slot は生の hint-name RVA (0x125afc6) を指し、呼出で SEGV する。全 IAT を shim / nat_unk0 に束縛する (既定 OFF)。 */
+    if (getenv("FA_UI31")) patch_iat_all();
     patch_pokes(getenv("FA_POKES") ? getenv("FA_POKES") : "pokes.txt");
     if (getenv("FA_MAP_TRACE")) {   /* mov rax, imm64 ; jmp rax */
         unsigned char* h = im + (0x180c9d700ULL - 0x180000000ULL); uint64_t t = (uint64_t)(uintptr_t)&map_hook;

@@ -131,6 +131,7 @@ export function createMockEngine() {
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
     launchPages: 0,
     uiClosing: false, uiTimeDispMin: false, uiStartOnInput: false, uiLoopRec: false, uiStepEdit: false, uiBrowserAutoHide: false, uiSnapMode: 0,
+    keys: [],
     undoPos: 0, undoCount: 0, undoLast: 0, safeEdit: true, projTitle: "", projAuthor: "", projGenre: "",
     selStart: -1, selEnd: -1, liveAnchor: -1,
     arrTime: 0,
@@ -209,6 +210,8 @@ export function createMockEngine() {
     throw WRONG();
   };
   const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
+  // PY-246 (#3759): 送出キーの記録 (C の key_send と同じ: 回数 <= 0 は送出 leaf に入らない)
+  const sendKey = (vk, mod, count) => { if (count > 0) st.keys.push({ vk, mod, count: Math.min(count, 0x7fffffff) }); };
   // PyArg "i" 相当 (C provider の 'I'/'B' のみ可): None・文字列・実数は code 5
   const pyInt = (v) => { if (typeof v === "boolean") return +v; if (Number.isInteger(v)) return v; throw WRONG(); };
   // float 引数 (fl_a_dbl と同じ: None は 0、bool・整数・実数は可、他は code 5)。PE の書式 'f' は float32 に丸める
@@ -466,6 +469,23 @@ export function createMockEngine() {
     "ui.setTimeDispMin": (...a) => { arity(a, 0, 0); st.uiTimeDispMin = !st.uiTimeDispMin; },
     // mode 0..3 は int、4..6 は str、他は int 0 (PE 0xd6c2f0 の分岐表)。既定 mode 4 (|i)
     "ui.getVersion": (...a) => { arity(a, 0, 1); const m = argI(a, 0, 4); return m >= 4 && m <= 6 ? "" : 0; },
+    // PY-246 (#3759): 送出キー 15 関数 (PE 0xfdd2c0 の leaf → 0x8186a0。REPORT_PY140)。戻り値は PY-141 で未確定の仮置き 0。送出の成否のゲートは PY-245 で未確定
+    "ui.up": (...a) => { arity(a, 0, 1); sendKey(0x26, 0, argI(a, 0, 1)); return 0; },
+    "ui.down": (...a) => { arity(a, 0, 1); sendKey(0x28, 0, argI(a, 0, 1)); return 0; },
+    "ui.left": (...a) => { arity(a, 0, 1); sendKey(0x25, 0, argI(a, 0, 1)); return 0; },
+    "ui.right": (...a) => { arity(a, 0, 1); sendKey(0x27, 0, argI(a, 0, 1)); return 0; },
+    "ui.cut": (...a) => { arity(a, 0, 0); sendKey(0x58, 4, 1); return 0; },
+    "ui.copy": (...a) => { arity(a, 0, 0); sendKey(0x43, 4, 1); return 0; },
+    "ui.paste": (...a) => { arity(a, 0, 0); sendKey(0x56, 4, 1); return 0; },
+    "ui.insert": (...a) => { arity(a, 0, 0); sendKey(0x2d, 0, 1); return 0; },
+    "ui.delete": (...a) => { arity(a, 0, 0); sendKey(0x2e, 0, 1); return 0; },
+    "ui.enter": (...a) => { arity(a, 0, 0); sendKey(0x0d, 0, 1); return 0; },
+    "ui.escape": (...a) => { arity(a, 0, 0); sendKey(0x1b, 0, 1); return 0; },
+    "ui.yes": (...a) => { arity(a, 0, 0); sendKey(0x59, 0, 1); return 0; },
+    "ui.no": (...a) => { arity(a, 0, 0); sendKey(0x4e, 0, 1); return 0; },
+    "ui.nextWindow": (...a) => { arity(a, 0, 0); sendKey(0x09, 0, 1); return 0; },
+    // PE: arg > 0 で修飾 0 (Tab)、arg <= 0 で Shift (修飾 1) + Tab。stub の引数名 shift と符号が逆 (REPORT_PY140 の未解決)
+    "ui.selectWindow": (...a) => { arity(a, 1, 1); sendKey(0x09, argI(a, 0, 0) > 0 ? 0 : 1, 1); return 0; },
     "plugins.isValid": (i, slot = -1) => (slot < 0 ? !!st.channels[i] : !!st.mixer[i]?.slots[slot]),
     "plugins.getPluginName": (i, slot = -1, userName) => (slot < 0 ? ch(i).plugin : (tr(i).slots[slot] ?? "")),
     "plugins.getParamCount": () => st.params.length,
@@ -495,6 +515,8 @@ export function createMockEngine() {
     "launchMapPages.init": (...a) => { arity(a, 3, 3); str(a[0]); argI(a, 1, 0); argI(a, 2, 0); },
     "launchMapPages.updateMap": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
     "launchMapPages.createOverlayMap": (...a) => { arity(a, 4, 4); for (let i = 0; i < 4; i++) argI(a, i, 0); },
+    // PY-243 (#3745): PE 0xd7a3a0 は書式 iii (0xd7a3d8)・成功時の戻り [0x16b82e0] = _Py_NoneStruct (None、REPORT_PY243)。項目書込み (0xd7a280) は項目の状態を持たないため状態を変えない
+    "launchMapPages.setMapItemTarget": (...a) => { arity(a, 3, 3); for (let i = 0; i < 3; i++) argI(a, i, 0); },
     // PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない
     "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
     "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
@@ -639,5 +661,9 @@ export function createMockEngine() {
       st.loop = { row: !!row, flag49e: !!flag49e, flag54: !!flag54, recs: recs.map(([cid, f4, len]) => ({ cid, f4, len })) };
     },
     gridItemsProbe: (seed, n) => { st.gridItems = gridGen(seed, n); return st.gridItems.length; },
+    // PY-246 (#3759): 送出キーの記録の読出し口 (C の fl_engine_key_* と同じ)。f: 0 = vk・1 = 修飾・2 = 回数
+    keyClear: () => { st.keys = []; },
+    keyN: () => st.keys.length,
+    keyGet: (i, f) => { const k = st.keys[i]; return k ? [k.vk, k.mod, k.count][f] : -1; },
   };
 }

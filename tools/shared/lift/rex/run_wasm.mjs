@@ -111,6 +111,7 @@ if (isMainThread) {
       trap = ex.rex_unsup_get().toString(16);   // trap した case と未対応命令の VA (movnti_check.py が読む)。境界外等の wasm trap は 0
       kind = String(e && e.message).replace(/\s+/g, " ");
       if (trap === "0") trap = wasmTrapVA(e);   // 境界外等: 最内側の lift 関数 (f_<VA>) の入口 VA (wasm の name section 由来)
+      else kind = `unsup 0x${trap}`;   // 未対応命令 (ott_unsup) の trap は、境界外等・他の unreachable と区別して VA ごと記録する
       rax = 0xdeadn; hits = 0xdeadn;
     }
     const head = Buffer.alloc(16);

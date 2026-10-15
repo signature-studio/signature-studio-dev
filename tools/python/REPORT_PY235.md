@@ -8,7 +8,7 @@
 - **戻り値は `[rbp+0x5b8]` (int32) で、入口の `edx` (value) が初期値**。0x104cc65 で `[rbp+0x584]` へ複写されて返る。`-1` は初期値で、出口 0x104cc72 へ直接飛ぶ経路で返る。
 - **成功経路の式を確定 (R-other 族)**: 共通 gate `*(0x15e1890)` が 0、eventId が R-other 族 (下の表)、かつ `(eventId & 0xffff) != 8` のとき、戻り値 = value。根拠: R-other 族の entry 0x104caae から到達する `[rbp+0x5b8]` の store は 0 件、アドレス渡し (`lea` 0x104a924) に到達せず、0x104cc65 を通らずに ret・0x104cc72 へ行く辺も無い (CFG)。
 - **mock/C に実装** (`host/fl_mock.mjs` の `recPassFamily`・`provider/fl_engine.c` の `rec_pass_family`)。成功経路だけ value を返し、未確定の族と `(eventId & 0xffff) == 8` は code 2 (未実装 error) を返す。
-- **未確定** (子 issue へ): gate の意味 (#3777)・`(eventId & 0xffff) == 8` の -1 条件 (#3777)・固定 eventId 4 族の式 (#3778)・0x70000000 族と index 族の式 (#3779。アドレス渡し先 `0xc61250` が値を書換えるかが要る)。
+- **未確定** (子 issue へ): gate の意味 (#3777)・`(eventId & 0xffff) == 8` の -1 条件 (#3777)・固定 eventId 4 族の式 (#3778)・0x70000000 族と index 族の式 (#3779。`0xc61250` の書換え式は #4585 で確定 (下記)。残りは表と仮想呼出しの runtime 値)。
 
 ## 族の分岐 (PE VA)
 
@@ -27,10 +27,34 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
 - 固定 4 族の store 右辺 (例: 0x104c4d4〜0x104c51a) は `flags & 0x20` の分岐で `cvtsi2sd` (value)・`mulsd` (定数 `[rip+0x7f4]`)・`[obj+0x3bc]−[obj+0x3b8]`・`call 0x40c660`・`[obj+0x3b8]+eax` の式になる。`flags & 0x2` の分岐は global の読出し (0x104c56d)。どちらも engine 状態 (`obj`・`[0x…]`) に依存するため、静的な式は #3778 で閉じる。
 - R-other 族の entry 0x104caae は、`[rbp+0x52f]`・`[rbp+0x5c0]` (flags) の分岐を含むが、store を持たない (CFG で 0 件)。flags は戻り値に影響しない。
 
+## `0xc61250` の書換え (#4585 / 親 #3779 受入 1)
+
+- **呼出し元**: 0x104a92b の 1 箇所。`edx` = eventId (`[rbp+0x5b0]`)、`rcx` = obj (`*(0x15e3510)`)、**`r8` は書込み先のアドレス** (`lea r8, [rbp+0x5b8]` の結果 `&[rbp+0x5b8]`)。書換え値は `r8` の値に依存しない。
+- **書換えの有無と値**: `T = [obj+0x30]`、`0xc62db0(T, eventId, &[rbp+0x28])` の戻り `al` (= `idx >= 0`) が真 (found) のとき、`[rbp+0x5b8]` = `[rbp+0x2c]` = **hi32(arr[idx].value)**。`arr = [T+8]`、value の qword は `[arr + 16*idx + 8]`。`[rbp+0x2c]` は `0xc62db0` が書いた qword の上位 dword。後続の vtable 呼出し (`call [rbx+8]`) へは rcx = obj しか渡されず、`&[rbp+0x2c]` は渡されない (ただし callee が obj 経由で任意の内容を書く可能性は別途未確定)。caller は `al != 0` で 0x104a9cd へ飛び、0x104a938 の `vt[+0x30]` 呼出しを通らない。
+- **not found** (`idx < 0`): `0xc61250` は書かない。caller は `al == 0` で 0x104a938 へ進み、`vt[+0x30]` の戻りで `[rbp+0x5b8]` を置き換える。
+- **`0xc62db0`** (呼出し先は `0xc626e0`・`0xc62630` の 2 つだけ): `K = 0xc626e0(T)`、`idx = 0xc62630(T, eventId, K)`。`idx >= 0` なら `[rdi]` = qword `[arr + 16*idx + 8]`、else `[rdi]` = 0。
+- **`0xc62630`** (`T` の hash 表): `arr = [T+8]`、`n = [arr-8]`、`slot0 = sext32(K) & (n-1)`、線形探査。`key` (u32 `[entry+0]`) == -1 で `~slot` (負) を返す。`key == K` かつ `Y.vt[+0x18](Y, [entry+4], eventId)` が真で `slot` を返す。`n == 0` は `-2^63`。
+- **`0xc626e0`**: `Y = [T+0x18]`、`K = ((Y.vt[+0x20]() & 0x7fffffff) + 1) & 0x7fffffff`。
+- **閉じない部分** (runtime 値): (a) `Y.vt[+0x20]` の戻り (K)、(b) `Y.vt[+0x18]` の照合結果、(c) hash 表 `T` の内容、(d) `[obj+0x38]` の `vt[0]` (lookup 前に呼ばれ、戻りは捨てられる)・`vt[+8]` (write 前に呼ばれ、戻りは捨てられる) が `T` を書換えるか。式は `T` と `Y` の vtable 戻り値を含み、edx だけでは閉じない。
+- **0xc62780 は本経路に入らない**: 本体内の `call 0xc62780` は 0xc62e49 の 1 件のみで、0xc61250 の直接の子ではない (`0xc62720` は挿入側で、同じく本経路の子ではない)。
+- 検証: `analysis/py235_0xc61250_write.py` (33 ok・0 FAIL・rc 0)。入力は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'`)。測定 commit `8d15d54d4` (スクリプトを追加した最後のコード commit)。`git diff 8d15d54d4 HEAD -- tools/python/analysis tools/python/host tools/python/provider tools/python/tests` は REPORT の変更のみで空。load avg `0.00 0.05 0.05`。
+
 ## 早期 exit (-1 の出口)
 
-- **gate** (0x1046d83〜0x1046d8d): `rax = [0x15e1890]` (pointer)・`cmp byte [rax], 0`・`jne 0x104cc72` で -1。`block00031_PE.bin` 全体で `0x15e1890` を RIP 相対で読む命令は 58 件 (`objdump -d -M intel` の線形走査。`mov r64, [rip+X]` の形で、内訳は `mov rax, [rip+X]` が 56 件・`mov rdx` と `mov r8` が各 1 件。RIP 相対の解決は次命令 + disp)。意味と書込み元は未確定 (#3777)。
-- **`(eventId & 0xffff) == 8` の経路** (0x10471b6〜0x10471f9): index ≥ 0 かつ `0x663bf0` の戻り値・`[0x59b752]`・`0xffac50(obj)` の真偽が揃うと -1 (`jmp 0x104cc72`)。runtime 条件つきのため、成功経路の式からは外した (#3777)。
+- **gate** (0x1046d83〜0x1046d8d): `rax = [0x15e1890]` (pointer)・`cmp byte [rax], 0`・`jne 0x104cc72` で -1。
+  - 実体: `.data` の pointer 変数 `0x15e1890` の初期値は `0x13e7628`。そこが gate フラグ本体の 1 byte で、初期値は 0 (ファイル内の値で確認)。
+  - 参照: `objdump -d -M intel` の線形走査で `# 0x15e1890` を読む命令は 58 件 (`mov rax` 56・`mov rdx` 1・`mov r8` 1)。58 件すべて読出しで、RIP 相対の store は 0 件 (`analysis/py251_gate_refs.py` §1)。
+  - 書込み (フラグ本体への store): 2 箇所。どちらも `mov byte [rax], 1` で、0 を書く store は無い。
+    - 0x11c7615 (`mov rax,[0x41a274]; mov byte [rax],1`)。含む関数は 0x11c71b0 (`push rbp` から)。呼出し元は 0x11c88d3 (`call 0x11c71b0`) の 1 件。
+    - 0x1262970 (`mov rax,[0x37ef19]; mov byte [rax],1; ret`)。直接の call・RIP 相対参照・data 内の qword 参照はいずれも 0 件。呼出し元は間接 (vtable 等) と推定するが未確定。
+  - 意味: フラグは 1 を書く store しか持たず、PE 上は 0→1 の一方向に見える。`general.processRECEvent` の全 eventId を -1 にする (`0x1046d8d`)。フラグ 1 の意味 (処理停止・再入ガード等) は、0x11c71b0 の vtable 呼出し先と 0x11c88d3 の周辺の意味づけが要るため未確定。
+- **`(eventId & 0xffff) == 8` の -1 経路** (0x10471b6〜0x10471f9)。PE の分岐から、次の 5 条件がすべて真のとき -1 (`jmp 0x104cc72`) になる (`analysis/py251_gate_refs.py` §2 で assert)。
+  1. 0x104711f〜0x1047129: `[0x15e2878]` のフラグが非 0 (`je 0x1047294` を取らない)。
+  2. 0x104714b: `0x663bf0(...)` の戻り値が負 (0x1047150 `jge 0x1047288` を取らない)。
+  3. 0x1047158〜0x104718c: index (`eventId >> 16` 相当。範囲外は -1) が 0 以上 (`jl 0x10471fe` を取らない)。
+  4. 0x10471b4: `0xffac50(obj)` が真 (`je 0x10471fe` を取らない)。`obj` は `0xfe8bb0(index)` の戻り値。
+  5. 0x10471c4: `(eventId & 0xffff) == 8` (`jne 0x10471fe` を取らない)。
+  - 未確定: `0x663bf0` と `0xffac50` の中身の条件、`[0x15e2878]` の意味・書込み元。runtime 値が要るため、成功経路の式からは外したまま (#3777)。
 - 共通 prefix (入口〜0x1047424) の -1 出口は上の 2 箇所だけ (CFG)。prefix からの store は入口の 1 件のみ。
 
 ## 手段
@@ -107,6 +131,7 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| gate `*(0x15e1890)` の意味と書込み元・`(eventId & 0xffff) == 8` の -1 条件 (`0x663bf0`・`[0x59b752]`・`0xffac50`) | gate 0 を仮定した成功経路の前提。実行時に gate が 1 の場合の挙動が未確定 | #3777 (PY-251) |
+| gate フラグ (0x13e7628) の意味 (1 を書く 2 箇所のうち 0x1262970 の呼出し元が間接で未確定)・`0x663bf0`・`0xffac50`・`[0x15e2878]` の中身 | gate 0 を仮定した成功経路の前提。実行時に gate が 1 の場合の挙動が未確定 | #3777 (PY-251、残り) |
 | 固定 eventId 4 族の `flags & 0x22 != 0` の右辺 (`obj+0x3b8`・`obj+0x3bc`・global・定数 2^-30) | `flags & 0x22 == 0` の成功経路だけ実装。0x20/0x2 のとき code 2 | #4616 (PY-349) |
-| 0x70000000 族・index 族 (eventId < 0x10000000) の戻り値式・`0xc61250` の書換え有無 | 2 族が code 2 (未実装) | #3779 (PY-253) |
+| 0x70000000 族・index 族 (eventId < 0x10000000) の戻り値式 (`0xc61250` の書換え式は #4585 で確定。残りは `T` の表内容と vtable 戻り値) | 2 族が code 2 (未実装) | #3779 (PY-253) |
+
