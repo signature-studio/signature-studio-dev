@@ -123,6 +123,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_3090.md` | ~80 | FLE-12 (#3090) の詳細: 0x6a7b70 への dispatch の呼出元 (0x6c7923 ← 0x815920)・幅 r8 の源 (即値 2^20 由来の推定)・未修復の理由・0x15F34A0 書込み元の未了。REPORT §0 から参照 |
 | `tools/flelift/boot/REPORT_APPENDIX_3770.md` | ~110 | FLE-15 (#3770) の詳細: 診断 route の有界実行 (時間・ログ上限)・呼出点 0x6c9380 の呼出し回数と矩形 (0,0,2^20,2^20)・既定経路の再実測。測定値の正本。REPORT §0 から参照 |
 | `tools/flelift/boot/REPORT_APPENDIX_2702.md` | ~80 | FLE-10 (#2702) の付録: 工程の実測 (§A)・再現コマンド (§B)・IPP 呼出しと slot の実測 (§C)・停止点 (§D)・旧 REPORT §10 (FLE-6 #672) の全文 (§E。250 行上限のため分割移動) |
+| `tools/flelift/boot/REPORT_APPENDIX_4984.md` | ~90 | #4984 (親 #4970): 既定 boot の unit 境界 (`FLE_UNITLOG`) と ExitProcess(0) の判定。exit は unit 895 の中ではなく全 unit dispatch 後 (最後 i=940)。`[0x13a5000]` の書込み元 (`f_4096b0` の 4 呼出し元)・正常終了の根拠。未確認: 呼出し元の実行有無 |
 | `tools/flelift/boot/REPORT_APPENDIX_4783.md` | ~75 | #4783 (ILT 既定変更の影響): 受入 1 の survey (942 unit・mode 0/3)・ILTools native 読込 (未達)・他経路 (strict/nosx)・再現。`REPORT_APPENDIX_672.md` §D から分割移動 |
 | `tools/flelift/boot/REPORT_APPENDIX_672.md` | ~110 | FLE-672 (#672) の付録: buf = 0 の fill を戻す診断 (`FLE_DIAG_NULLFILL=1`) の結果表 (5 route)・仮説 ①②③ の成否・停止点 `unlifted 0x6bbc20`・既定経路の不変の証跡。REPORT §11 と §A (旧記述の移動) から参照 |
 | `tools/flelift/boot/REPORT_APPENDIX_2719.md` | ~190 | #2719 (WIN-8) の付録: x64c 寛容起動 (`FLE_TOLERANT` 1/2) の 942 unit 逐次試行の結果表・skip 一覧 (84)・survey との差 (77)・silent miscompile のリスク評価・CreateFruityInstance (0x1375990) の観測 (oob 即時・API 0 件) |
@@ -949,7 +950,7 @@
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_3428.md` | ~120 | ildsp PSOLA_CreateInstance 閉包の x64c lift (T-SH-82 #3428) の全文: 再現・unsup の before → after (2,472 → 0)・ymm 算術の実装・差分テスト 88 件の内訳・lift_wc 回帰・実測・未解決 (閉包単位の native 差分は子 issue)。REPORT §9 から参照。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_LIFT.md` | ~100 | ildsp vtable 転送先 0x161fc0 の closure lift の前段 (T-SH-61 #3299): 3 候補の選定実測・RetDec 範囲指定・gen_helpers の停止点。wasm 化と差分テストは子 issue。測定値の正本。再現は `lift_vtable.sh` |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_3276.md` | ~65 | ildsp WaveformColouring の native 確定 (T-SH-59 #3276)。結論・手順・実測・ネガティブコントロール・未解決の全文 (`REPORT.md` §5-4・§5-5 から参照)。harness は `native_ref_wc.c` (入力は `native_image.py`)。測定値の正本 |
-| `tools/shared/lift/ildsp/REPORT_APPENDIX_4230.md` | ~55 | ildsp CreateInstance 間接 call 4 件の到達 (T-SH-103 #4230・部分達成): 正の対照 (`0x1ac9ce`・`0x1aedc0` 入口) つきの実測、alloc 失敗注入と巨大 rdx の結果、既定入力の発火の非決定性、未解決の起票先 (#4289)。REPORT_CLOSURE.md §4.5 から参照。測定値の正本 |
+| `tools/shared/lift/ildsp/REPORT_APPENDIX_4230.md` | ~75 | ildsp CreateInstance 間接 call 4 件の到達 (T-SH-103 #4230・部分達成): 正の対照 (`0x1ac9ce`・`0x1aedc0` 入口) つきの実測、alloc 失敗注入と巨大 rdx の結果、既定入力の発火の非決定性、未解決の起票先 (#4289)。REPORT_CLOSURE.md §4.5 から参照。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_CI.md` | ~70 | ildsp GeneralPitchShifter_CreateInstance 単独 closure の RetDec 入力・census・閉包の取りこぼし・ネガティブコントロール (T-SH-62 #3300)。測定値の正本 |
 | `tools/shared/lift/rex/REPORT.md` | ~75 | REX Shared Library (win `block24351_PE.bin`) の export 14 本の閉包測定 (T-SH-11 #153): 関数数・命令数・間接 call・import・`.pdata` 無しの近似。lift は未実施 (#2733・#2734)。測定値の正本。再現は `rex_closure.py` |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2870.md` | ~50 | rex REPORT §9 全文 (T-SH-46 #2870: 成功経路 (戻り値 1 / 3) と arena 書込の一致・落ちる case の分類・未解決) |

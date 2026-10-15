@@ -45,6 +45,60 @@ FAMILY_EXACT = {
     'IParameterFinder',
 }
 MAXFN = 0x8000
+LOCKABLE = {'adc', 'add', 'and', 'btc', 'btr', 'bts', 'cmpxchg', 'cmpxchg8b', 'cmpxchg16b', 'dec', 'inc',
+            'neg', 'not', 'or', 'sbb', 'sub', 'xadd', 'xchg', 'xor'}
+LEGACY_PFX = {0x66, 0x67, 0x2e, 0x36, 0x3e, 0x26, 0x64, 0x65, 0xf2, 0xf3}
+
+
+def insn_sdm_ok(raw, mn, ops):
+    # SDM の LOCK 規則と REX 規則。raw = 命令のバイト列、mn/ops = capstone の出力 (disasm_lite)。
+    #   REX: REX の直後の F0 は #UD。REX の後に別の接頭辞が来ると REX は無視される (F3 などは不正としない)。
+    #   LOCK: ロック可能命令・宛先 (Intel 形の先頭オペランド) がメモリ・REP (F2/F3) と併用しない。
+    #         HLE 形 (xacquire / xrelease) は F2 / F3 を使うので、その形だけ許す。
+    lock, rep, rex = False, [], False
+    for b in raw:
+        if b == 0xf0:
+            if rex:
+                return False
+            lock = True
+        elif 0x40 <= b <= 0x4f:
+            rex = True
+            continue
+        elif b in LEGACY_PFX:
+            if b in (0xf2, 0xf3):
+                rep.append(b)
+        else:
+            break
+        rex = False
+    if not lock:
+        return True
+    toks = mn.split()
+    if 'lock' not in toks or toks[-1] not in LOCKABLE or '[' not in ops.split(',')[0]:
+        return False
+    if len(rep) > 1:
+        return False
+    if rep:
+        hle = 'xacquire' if rep[0] == 0xf2 else 'xrelease'
+        return hle in toks
+    return True
+
+
+def block_ok(md, chunk, va):
+    # 入口から最初の ret / jmp まで (最大 32 命令) を不正命令なしでデコードできるか。
+    # capstone は不正命令で出力を止めるので、ret / jmp に達せず止まったら不正。
+    n = 0
+    try:
+        for ea, iz, mn, ops in md.disasm_lite(chunk, va):
+            if mn in UNDOC:
+                return False
+            if not insn_sdm_ok(chunk[ea - va:ea - va + iz], mn, ops):
+                return False
+            n += 1
+            if 'ret' in mn.split() or 'jmp' in mn.split() or n >= 32:
+                return True
+    except capstone.CsError:
+        return False
+    return False
 
 
 def main(path, vtp, outp):
@@ -163,21 +217,6 @@ def main(path, vtp, outp):
                 pass
         return cs, cl, nb, ni, un, wh
 
-    def first_block_ok(tg):
-        # 入口から最初の ret / jmp まで (最大 32 命令) を不正命令なしでデコードできるか。
-        # capstone は不正命令で出力を止めるので、ret / jmp に達せず止まったら不正。
-        n = 0
-        try:
-            for ea, iz, mn, ops in md.disasm_lite(data[off(tg):off(tg) + 480], base + tg):
-                if mn in UNDOC:
-                    return False
-                n += 1
-                if 'ret' in mn.split() or 'jmp' in mn.split() or n >= 32:
-                    return True
-        except capstone.CsError:
-            return False
-        return False
-
     LEAF = {}
 
     def leaf_ok(tg):
@@ -185,7 +224,7 @@ def main(path, vtp, outp):
             if inwin(tg) >= 0:
                 LEAF[tg] = 'win'
             else:
-                LEAF[tg] = 'ok' if first_block_ok(tg) else 'bad'
+                LEAF[tg] = 'ok' if block_ok(md, data[off(tg):off(tg) + 480], base + tg) else 'bad'
         return LEAF[tg] == 'ok'
 
     # ---- recursive descent over entry points only
