@@ -2,8 +2,8 @@
 # m8_quickbuild.sh: m7_build 相当に ir8 前処理 + m8_rt.c を追加した高速 build (実験用。
 # 整備品は m8_build.sh)。入力 IR は $1 (既定 work/ott_vf0.ll)、出力は work/ott_m8.cjs。
 set -euo pipefail
-M6="/home/ubuntu/work/webstudio/tools/m6"
 M8="$(cd -- "$(dirname -- "$0")" && pwd)"
+M6="$M8/../m6"
 cd "$M6"
 source ../m1/flags.sh 2>/dev/null || true
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1

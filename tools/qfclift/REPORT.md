@@ -180,6 +180,8 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 | rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない。直接呼出しの計数は §10 | #3411 (T-SH-78) |
 | GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3434 (T-SH-83。#3412 は closed) |
 
+(§7.9 直接呼出し (#4296): `GetStats` は DllMain の init 無しで trap、`CleanUp` は rax=0。測定 commit `c36a9b817`。詳細は `REPORT_APPENDIX_4296.md`)
+
 ### 7.8 longjmp 継続の対応 (T-SH-77 / #3410・部分達成)
 
 - override `qfc_ov_longjmp` (FLEngine `fle_ov_longjmp` と同型) と boot 専用の戻り先 root `0x59c210` を追加。e2e の entries と assert (6,347) は不変。

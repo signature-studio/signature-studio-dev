@@ -1742,6 +1742,17 @@ def f3c_use_dom_at(fn, fv, first, rep_idx):
     return starts[bi] + 1
 
 
+def f3c_indirect_call_before(fv, first):
+    """機械語の基本ブロック先頭 (f3c_use_dom_at と同じ bstart) から最初の deref (first) の直前までに、呼出先が即値でない call (間接 call) があれば True。
+    間接 call は任意のコードを実行しうるため、その間に argN の指す先が書き換わる可能性を否定できない。即値の直接 call は対象外 (REPORT_1325 §9 の 806740)。#4421"""
+    lead = _f3c_leaders(fv.ins)
+    bstart = max([x for x in lead if x <= first], default=None)
+    if bstart is None:
+        return False
+    return any(i.mnemonic == 'call' and i.operands and i.operands[0].type != 2
+               for i in fv.ins if bstart <= i.address < first)
+
+
 ctr_f3cu = [0]             # fix_f3c_use 専用 counter
 
 
@@ -1788,6 +1799,9 @@ def fix_f3c_use(fn, fv, rep, ctr):
         keep = len(raws)
         rep_idx = idx[keep:]
         if not rep_idx:
+            continue
+        if f3c_indirect_call_before(fv, first):
+            rep['f3c_use_indirect_call'] = rep.get('f3c_use_indirect_call', 0) + 1
             continue
         if first in blk0:
             entry_end = next((k for k in range(2, len(lines)) if re.match(r'^[\w.$-]+:', lines[k])), len(lines))

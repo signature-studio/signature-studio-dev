@@ -7,7 +7,7 @@
  * - 現状の producer は tools/audio のテスト wasm (fla_test: 440/660Hz 正弦)。FL 本体 wasm の接続時は
  *   loadToneWasm を差し替えるだけでよい (FlAudioWasmApi の 5 関数が接点)。
  */
-import { FlAudioShim, type ConsumerUnderrun, type FlAudioWasmApi, type FlCaptureSpec, type ProducerStats } from "./audio-shim";
+import { FlAudioShim, type ConsumerUnderrun, type FlAudioWasmApi, type FlCaptureSpec, type ProducerStats, type ProducerWrite } from "./audio-shim";
 
 /** vite の base が / 以外でも解決できるよう document.baseURI 基準にする (public/worklets/ を配置) */
 export const WORKLET_URL = new URL("worklets/fl-audio-worklet.js", document.baseURI).href;
@@ -138,10 +138,35 @@ export interface ToneCheck {
   /** audio callback 間隔の最大 (ms) と 20ms 超の回数 (consumer 側の停止の観測) */
   cb_gap_max_ms: number;
   cb_gap_over20_count: number;
+  /** 最初の underrun の壁時計 (epoch ms・worklet の Date.now) と、producer の write 区間 (pw_trace) との重なり判定 */
+  first_underrun_ms: number;
+  underrun_write_overlap: UnderrunWriteOverlap | null;
+}
+
+/** 最初の underrun 時刻 T と producer の write 区間 [wake, done] の関係 (単位 µs)。gap_us = 0 なら T は区間内、>0 なら区間より後、<0 なら区間より前 */
+export interface UnderrunWriteOverlap {
+  overlaps: boolean;
+  gap_us: number;
+  w: number;
+  wake_us: number;
+  done_us: number;
+}
+
+/** 最初の underrun 時刻 (worklet 記録の epoch µs 下 32bit) を producer の write 区間へ照合する。pw_trace は emscripten_get_now (epoch 基準の µs 下 32bit) */
+export function matchUnderrunWrite(underrunUs: number, writes: { w: number; wake_us: number; done_us: number }[]): UnderrunWriteOverlap | null {
+  let best: UnderrunWriteOverlap | null = null;
+  for (const e of writes) {
+    const toWake = (underrunUs - e.wake_us) | 0;
+    const toDone = (underrunUs - e.done_us) | 0;
+    const overlaps = toWake >= 0 && toDone <= 0;
+    const gap = overlaps ? 0 : toWake < 0 ? toWake : toDone;
+    if (!best || Math.abs(gap) < Math.abs(best.gap_us)) best = { overlaps, gap_us: gap, w: e.w, wake_us: e.wake_us, done_us: e.done_us };
+  }
+  return best;
 }
 
 /** capture ダンプを 440Hz(L)/660Hz(R) 振幅 0.5 の理論値と照合する (tools/audio/test/page.mjs verify と同じ式) */
-export function verifyToneCapture(cap: FlCaptureSpec, sr: number): ToneCheck {
+export function verifyToneCapture(cap: FlCaptureSpec, sr: number, writes: ProducerWrite[] = []): ToneCheck {
   const hdr = new Int32Array(cap.sab, 0, 16);
   const covered = Atomics.load(hdr, 0);
   const out = new Float32Array(cap.sab, 64, cap.frames * cap.outCh);
@@ -175,5 +200,7 @@ export function verifyToneCapture(cap: FlCaptureSpec, sr: number): ToneCheck {
     underrun_count: uc, first_underrun_frame: uc ? q0 * 128 : -1, last_underrun_frame: uc ? Atomics.load(hdr, 5) * 128 : -1,
     fill_at_first_underrun: fillAt, fill_min_before_first_underrun: fillMin, fill_trace_before_first_underrun: trace,
     cb_gap_max_ms: Atomics.load(hdr, 14), cb_gap_over20_count: Atomics.load(hdr, 12) + Atomics.load(hdr, 13),
+    first_underrun_ms: uc ? Atomics.load(hdr, 7) : -1,
+    underrun_write_overlap: uc && writes.length ? matchUnderrunWrite(Atomics.load(hdr, 7), writes) : null,
   };
 }

@@ -77,6 +77,13 @@ for k in "${KEYS[@]}"; do
   done
 done
 
+# 子 issue の prio 規則 (#4509 [DOCS-35]): 実装 run は子に prio:* を付けない。旧規則 (親の prio を引き継ぐ) は残さない。
+if grep -qF -- '子 issue に `prio:*` を付けない' "$IMPL" && ! grep -qF -- '親が `prio:critical` なら起票時' "$IMPL"; then
+  ok "子 prio 規則: 実装 run は子に prio:* を付けない (旧・継承規則は無い)"
+else
+  ng "子 prio 規則: implementer.md の子 prio 規則が旧規則のままか、新規則が無い"
+fi
+
 echo
 echo "test-implementer-rules: pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]
