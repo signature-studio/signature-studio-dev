@@ -6,7 +6,7 @@
 
 - **実装**: `tools/plugins/lift/passes/vex_comis_flags.py` を `lift_ranges.sh` の `fix_avx256` の後・`m11_simd2` の前に追加。 同一ブロック内で呼び出し後に読まれる `%cf/zf/pf.N.reload` (ブロック先頭の load = 古い値) を、呼び出し直後の fcmp 由来の flag (CF = lt∨uno, ZF = eq∨uno, PF = uno) に差し替える。 呼び出し自体は残す (helper は未実装 stub のまま unimpl に出る)。 対象は `vcomis*`/`vucomis*` のみ (非 VEX は範囲外)。
 - **fail-open の修正** (`16a8af8f`): `625be6bb` までの `lift_ranges.sh` は `vex_comis_flags.py ... && mv ...` だった。 `set -e` は `&&` の左辺の失敗を止めないため、pass が落ちても未反映の `final.ll` が黙って後段へ渡っていた。 2 行に分けて停止するようにした (120–122 行目)。 合成入力での確認は §7c.4。
-- **測定** (現 head `a4e22079`): `bash tools/plugins/sampler/engine_lift.sh <block>` を前景で実行。 base は `573a4697` (PR の merge-base) を detached worktree に展開し、同じ素材・同じ手順で実行。 素材は `fl-win64` (R2)。 RetDec は `/opt/retdec/bin/retdec-decompiler`、emsdk は `/opt/emsdk` (runner の既存。 `toolchain-retdec`・`toolchain-emsdk` は展開していない)。 summary.csv の列順は `engine_lift.sh` 49 行目 (列 6 = unimpl、列 10 = lift_s)。
+- **測定** (現 head `a4e22079`): `bash tools/plugins/sampler/engine_lift.sh <block>` を前景で実行。 base は `573a4697` (PR の merge-base) を detached worktree に展開し、同じ素材・同じ手順で実行。 素材は `fl-win64` (R2)。 RetDec は [RETDEC]、emsdk は [EMSDK] (いずれも runner の既存。 `toolchain-retdec`・`toolchain-emsdk` は展開していない)。 summary.csv の列順は `engine_lift.sh` 49 行目 (列 6 = unimpl、列 10 = lift_s)。
 
 | engine | 版 | summary.csv | unimpl (列 6) | emcc -c rc (素 / fixcmp 後 / f80 後) | lift_s (列 10) |
 |---|---|---|---|---|---|
