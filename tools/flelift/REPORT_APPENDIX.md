@@ -127,3 +127,40 @@ REPORT §11 の付録。指定の見出しは `## 10.` だが、既存の PERF-P
    読む経路が他にあれば fail-fast で顕在化する。
 6. FastMM boot (`_InitLib` 8 引数含む unit init 連鎖) は未実施 — M11 (CAB-5) の領域。本 ticket は lift 基盤。
 7. native spot diff は single-thread 前提 (lock 系非 atomic)。
+
+## 14. #4234 (T-SH-104): rt の Win32 TLS import (TlsAlloc・TlsGetValue・TlsSetValue) を Windows 仕様に合わせる
+
+- 変更前の実装: `TlsAlloc` は常に 0。`TlsGetValue` は `FLE_TLSARRAY` (gs:[0x58] の配列) を読むため、`fle_install_teb` で非 0 を入れた未設定 slot でも非 0 を返す。
+- 変更後 (`rt/fle_cpu.c`): `TlsAlloc` は 0,1,2,… の連番 (上限 64 で超過は 0xFFFFFFFF)。Win32 TLS は `g_tls_val[64]` (0 初期化) に別管理し、未割当・未設定の slot は 0。`TlsSetValue` は割当済み slot のみ TRUE。gs:[0x58] の TLS 配列 (コンパイラ生成 TLS 用) と `fle_install_teb` は変えない。
+- `GetCurrentThreadId` は変えない (実物の値の根拠が無いため。未確認のまま)。
+
+### 14.1 e2e (`bash tools/flelift/fle_e2e.sh`、素材 `fl-win64`・`toolchain-emsdk`)
+
+| 測定 commit | real | load (開始→終了) | lift | spot diff | D9 | 判定 |
+|---|---|---|---|---|---|---|
+| `9c0dfadc9` (変更前 = 当時の main、変更なし) | 158 s | 0.61 → 1.12 | 7,018 関数 / unsup 0 | equal 16/16 | mismatch 0 | PASS |
+| 作業ツリー (変更後) | 141 s | 0.23 → 0.93 | 同上 | equal 16/16 | mismatch 0 | PASS |
+| **`973b85aca` (測定 commit、コミット済み HEAD)** | 142 s | 0.58 → 0.96 | 7,018 / unsup 0 | equal 16/16 | mismatch 0 | PASS |
+
+spot diff の 16 case は TlsAlloc 系を呼ばないため、この e2e では TLS の挙動変化は見えない (下の 14.2 で直接確認)。
+
+### 14.2 TLS の直接確認 (`tools/flelift/rt/fle_cpu.c` を単体リンクした C harness)
+
+| 検査 | 結果 |
+|---|---|
+| 割当前の `TlsGetValue(0)` | 0 |
+| `TlsAlloc` 2 回 | 0, 1 (連番) |
+| `TlsSetValue(0, 0xdeadbeef)` → `TlsGetValue(0)` | TRUE → 0xdeadbeef |
+| 割当済みで未設定の slot | 0 |
+| 未割当 slot の `TlsGetValue` | 0 |
+| 未割当 slot の `TlsSetValue` | FALSE |
+
+harness は `fle_glue.c` を含めない (`ott_dispatch` が未定義で link できないため)。`fle_cpu.c` の TLS 関数だけを検査した。
+
+### 14.3 DllMain 経路 (issue が挙げた `tools/qfclift/qfc_count.sh`)
+
+- issue 本文の `qfc_count.sh` は repo に存在しない。`tools/qfclift/REPORT.md` にも §10 は無い (§9 まで)。代わりに DllMain 経路の実測として `tools/qfclift/qfc_boot.sh` を使った。
+- 測定 commit `973b85aca` (`QFC_BOOT_REBUILD=1`、素材 `fl-win64`・`toolchain-emsdk`、real 43 s、load 0.80 → 0.55):
+  - strict: `DllMain(PROCESS_ATTACH)=trap`・`[fle] MISSING IMPORT LocalAlloc`・soft 0 件 → FAIL
+  - soft: `DllMain=trap`・`[fle] call to UNLIFTED function 0x59c210`・soft 呼出し 0 件 → FAIL
+- REPORT §7.3 (HEAD `1fd48d2ce`) と停止点・停止理由が一致。TLS 変更で DllMain の停止点は変わらない。
