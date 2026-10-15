@@ -14,7 +14,7 @@
 | 走査されたポインタ | `0x1813d2203` = PE `.rdata` の文字列リテラル `"invalid hash bucket count"` の生 VA |
 | 原因の分類 | **lift の命令変換の誤りではない**。メモリ配置の問題: PE の絶対 VA (生 VA 定数) を wasm32 のポインタとして使い、切り捨てで線形メモリ外を指す |
 | DEFECTS 類型 | **D11** (`PE VA リテラル (i64 0x18…) が wasm32 で切り捨て → OOB`)。loud (trap)。silent miscompile ではない |
-| 解消 | 未。子 #3866 (KH-75) (§6) |
+| 解消 | **#3866 で解消** (§8)。入口の OOB は消え、次の trap は未 lift callee `0x180fc61dc` |
 
 ## 2. 呼び出し経路 (IR と実行時スタックの照合)
 
@@ -64,7 +64,7 @@ kh_stack base 0x39a0
 |---|---|---|---|
 | `0x1813a493a` | "string too long" | `kh_180f884ac` の呼び出し元で `rcx` 定数として現れる | 作者の IR 観察 (`n1s.ll`)。IR は repo に未保存で、本 run では再確認不可 |
 | `0x1813a9c7c` | "vector too long" | 同上 | 同上 |
-| `0x1813d21e8` | 未記録 | 未記録 | **未確認**。HEAD と全履歴 (`git grep`・`git log -S`) に記録が無い。出所と経路は #3866 の作業で確認する |
+| `0x1813d21e8` | "unordered_map/set too long" | `kh_18011feb0`・`kh_18012a280`・`kh_180138750` が `store i64 ptrtoint (@global_var_1813d21e8), ptr @rcx` で渡す (313 集合の IR・§8) | 実測 (#3866): `.rdata` の文字列を PE から読んで確認。窓化後は `global_var_1813d21e8` が 116 窓の一つ |
 | `0x1813d2203` | "invalid hash bucket count" | 経由する: §2.2 の段 1〜3 (`kh_180138a30` が `store i64 6463234563, ptr @rcx` → `kh_180f884ac` → `kh_180f88394`) | 実測 (§2.2 のプローブ・trap 時の `kh_stack`) |
 | `0x1813d3b6c` | "map/set too long" | `kh_180f884ac` の呼び出し元で `rcx` 定数として現れる | 作者の IR 観察。本 run では再確認不可 |
 
@@ -94,8 +94,8 @@ kh_stack base 0x39a0
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `.rdata` の文字列リテラル等 (`lea` 由来の生 VA) を wasm 線形メモリで参照可能にする (D11 既定修正 `global_var_<VA>` 窓 + PE 実データを、生 VA ポインタの参照へ広げる) | 313 集合の入口 OOB (原因は確定、解消は未) | #3866 (KH-75) |
-| `0x1813d21e8` の出所と呼び出し経路 (§3) | #3866 受入 2 の 5 件のうち 1 件が未確認 | #3866 (KH-75) |
+| 次の trap: 未 lift callee `0x180fc61dc` (入口から到達) | 313 集合の入口がこの callee で止まる | #4254 (KH-92) |
+| `.rdata` の文字列以外の生 VA (vtable・関数ポインタの「値」) の窓化は行わない (`raw_va` の byte parity を保つため) | 文字列以外の生 VA を deref する経路が将来現れたら OOB になり得る | #4257 (KH-93) |
 | 閉包の収束・round 6 の `dropped_i256` 誤判定 (`1813846e0`)・313 の memset shim 登録 (F) | 閉包の自動化・313 の config | #1817 (KH-28・既存) |
 
 ## 7. コード差分の確認 (測定 commit からの差分)
@@ -105,3 +105,27 @@ git diff a65a71ed1 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md
 ```
 
 本 commit 時点の出力は 0 行 (コード差分なし)。REPORT 系の追記だけが HEAD までの差分。
+
+## 8. #3866 の実測 (D11 の窓化・`rdata_str`)
+
+測定 commit: `56254af13` (コードを変えた最後の commit。`kh_lower.py` の `--rdata-str`・`lic_build.py` の配線・`lic_config.json` の `rdata_str`)。
+素材 (本 run で展開): `plugins-kilohearts` (`extract_core.sh` sha256 一致)・`toolchain-emsdk`・`toolchain-retdec`。環境: nproc=4・RAM 15 GB。
+
+**方式**: `--raw-va` の既定は素の VA リテラルを生のまま残す (vtable・関数ポインタの値を native と byte 一致させるため)。その中で、`.rdata` の NUL 終端・印字可能な文字列 (2〜63 字) を指す VA だけを窓 `@global_var_<VA>` へ置換する。窓の中身は `gen_globals.py` が PE の実バイトから埋める (`--window 64`)。文字列以外の VA は従来どおり生のまま。文字列の窓化で `raw_va` の値 store が変わらないかは未検証 (313 集合の sha 変化は +3,196 B。内訳は未測定)。
+
+| 集合 | 条件 | wasm sha256 | bytes | globals | 入口 `function_180ef7fc0` の結果 |
+|---|---|---|---|---|---|
+| 313 (修正前) | `rdata_str` 無し | `8935ad14…287c6e` | 1,543,853 | 82 | `memory access out of bounds` |
+| 313 (修正後) | `rdata_str` 有り | `68936e80…42e1e` | 1,547,049 | 116 | 未 lift callee `0x180fc61dc` |
+| 313 (ネガコン) | 修正後の build から `rdata_str` を外す | `8935ad14…287c6e` | 1,543,853 | 82 | `memory access out of bounds` (戻る) |
+| lift-8 (HEAD 集合) | `rdata_str` 無し | `7ba79e65…7707` | 54,394 | 未記録 | (未測定) |
+| lift-8 (HEAD 集合) | `rdata_str` 有り | `3d2bc6fd…e77287` | 54,487 | 10 | (未測定) |
+
+- 受入 1: 入口の `memory access out of bounds` は消えた。次に現れる trap は未 lift callee `0x180fc61dc` (`kh249_check.mjs` の `NG 入口実行が最初の未 lift callee 0x180112a30 に到達しない` の理由に表示される)。`0x180fc61dc` の lift は本 issue の範囲外 (#4254)。
+- 受入 2: 付録 §3 の 5 件 (`0x1813a493a` "string too long"・`0x1813a9c7c` "vector too long"・`0x1813d21e8` "unordered_map/set too long"・`0x1813d2203` "invalid hash bucket count"・`0x1813d3b6c` "map/set too long") は全て `.rdata` の文字列で、全て窓化された。`0x1813d21e8` の出所は `kh_18011feb0`・`kh_18012a280`・`kh_180138750` の `store ... @rcx` (§3)。
+- 受入 3 (未達・子 #4272 へ移管): lift-8 の sha は `7ba79e65…` から `3d2bc6fd…` へ変わる (+93 B、実測)。`globals.c` の件数は on 側で 10 件。off 側の件数と、sha 差分の内訳 (窓の追加・文字列 VA の置換の別) は未測定。本 run では `plugins-kilohearts`・`toolchain-retdec`・`toolchain-emsdk` が実行環境に無く、再測定できなかった。
+- 受入 4: ネガコン済み (上表)。`rdata_str` を外すと入口は OOB に戻る。
+
+**kh249_check の前提**: `product_index.json` は `KH_SRC=<素材の展開先>` で `scripts/kh249_product_index.py` を走らせて生成する (素材の所在は既定 `~/ダウンロード`)。
+
+測定 commit から HEAD までのコード差分 (`git diff 56254af13 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md'`) は本 commit 時点で 0 行。

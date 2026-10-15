@@ -1,0 +1,6 @@
+{
+  "tag": "pe152",
+  "refs": ["#2983"],
+  "note": "PE の PyArg 書式で呼出し構造を確定し、個数は fl_table に合わせた arrangement 6 関数 (REPORT_PY152・PY-152 #2983。jumpToMarker は PE と個数不一致の未解決)。副作用は未同定、tests/arrangement_diff.mjs が mock と照合",
+  "functions": ["arrangement.currentTime", "arrangement.selectionClear", "arrangement.selectionSet", "arrangement.liveSelection", "arrangement.addAutoTimeMarker", "arrangement.jumpToMarker"]
+}

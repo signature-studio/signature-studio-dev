@@ -454,6 +454,8 @@ export function createMockEngine() {
     // PY-130 (#3007): PE で書込み経路を確定した ui setter 2 件と getVersion (ui)。値は未実測の仮置き (provider/fl_engine.c と同じ・REPORT_PY130_3007)
     "ui.setBrowserAutoHide": (...a) => { arity(a, 1, 1); st.uiBrowserAutoHide = argI(a, 0, 0) === 1; },
     "ui.setStepEditMode": (...a) => { arity(a, 1, 1); st.uiStepEdit = argI(a, 0, 0) === 1; },
+    // PY-236 (#3706): PE 0xd6cc60 は引数を読まず、gate 真なら byte [0x16bc9f2] を反転する (REPORT_PY236_3706)
+    "ui.setTimeDispMin": (...a) => { arity(a, 0, 0); st.uiTimeDispMin = !st.uiTimeDispMin; },
     // mode 0..3 は int、4..6 は str、他は int 0 (PE 0xd6c2f0 の分岐表)。既定 mode 4 (|i)
     "ui.getVersion": (...a) => { arity(a, 0, 1); const m = argI(a, 0, 4); return m >= 4 && m <= 6 ? "" : 0; },
     "plugins.isValid": (i, slot = -1) => (slot < 0 ? !!st.channels[i] : !!st.mixer[i]?.slots[slot]),

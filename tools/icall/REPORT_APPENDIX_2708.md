@@ -112,3 +112,41 @@ bash tools/icall/diff/fa_sweep.sh 8 60                            # 期待 (base
 ```
 
 注: `fa_cmp.py` は複数 VA を 1 プロセスで回すと native の SIGSEGV で止まる。`fa_sweep.sh` が 1 関数ずつ別プロセスで回すのはこのため。
+
+## 8. 子 #3198 (ICALL-87) の実装結果 (オプトイン `FA_FALL_FRAG=1`・既定 OFF)
+
+- 修正: `icall_rewrite.py` に、非断片関数の末尾が断片先頭へ fall-through するとき、その断片を複製する経路を入れた。既定 OFF (`FA_FALL_FRAG=1` で有効)。断片内の分岐先は closure か断片 (`in_closure`) に無いものを含むときは複製しない。
+- **既定 (OFF) の rewriter 出力と `origin/main` の byte 一致 (`fc3779a8c` で実測)**:
+  - 比較: `68d5cb3c4` の main (reviewer 指定) と PR head `fc3779a8c`。main 側は `origin/main` = `09d6e4b84` で測った (`git diff 68d5cb3c4 09d6e4b84 -- tools/icall/icall_rewrite.py` は空。rewriter は両者で同一)。
+  - 入力: `SlateCore.core_64` (`plugins-freshair` を `FA_DL=... tools/targets/freshair/fetch.sh` で展開。36,285,952 B) と `F.ranges` (`work-icall` の `tools/icall/work/rt_freshair-core/F.ranges`、sha256 `99f09d3b…`)。
+  - 実行: `env -u FA_FALL_FRAG python3 tools/icall/icall_rewrite.py --pe <SlateCore.core_64> --funcs F.ranges --out rw.dll --map map.json`。
+  - 結果: `rw.dll` の sha256 `cc921929f54c92a9…` が両 commit で一致し、`cmp` も一致 (**byte 一致**)。`rewrite.txt` は出力パス以外一致。
+  - `map.json` は PE の絶対パスを含むため、sha256 は作業ディレクトリに依存する (両者とも `pe` と出力先以外の内容は一致、パスを除いた sha256 `431fbab6…` 同一)。reviewer 報告の `map.json` sha256 `01bb1da0…` とは作業ディレクトリが違うため一致しない。
+  - 従って、既定 OFF の rewriter 出力は main と同一。`fall_target` の `FALL` gate により、既定 OFF で fall-through 複製経路に入らないことも出力で確認した。
+- 指摘対応 (reviewer round 1): `fall_target` を `FALL` で gate した (既定 OFF の fall-through 複製経路を封じた)。ON 時の経路は変えていないので、上の ON の数値は `a58d24e87` の測定値のまま。既定 OFF の rewriter 出力は main と byte 一致 (上記)。
+- **再測定 (reviewer round 3 B1)**: 既定 OFF の `fa_cmp` / `fa_sweep` を測定 commit `c2c9ab08d` で実施した。素材は上流取得: `toolchain-retdec` = RetDec v5.0 Linux Release (GitHub `avast/retdec` の release asset。install tree を `[RETDEC]` に置いた)、`toolchain-emsdk` = emsdk 6.0.12 (`tools/m1/flags.sh` の pin、`emsdk install/activate`。展開先 `[EMSDK]`)。素材 `plugins-freshair` (`Fresh Air.Win.zip`) は `fetch.sh` で `SlateCore.core_64` に展開。
+  - 手順: `env -u FA_FALL_FRAG icall_rewrite.py` → `retdec-decompiler --select-decode-only` (`after.0.drc.ll`) → `ir_icall_restore.py` (comis 14 / dispatch 93 / sites 98 で前回と一致) → `fa_route_build.sh` (OK) → `fa_cmp 180da4030 --n 8` → `fa_sweep 8 60`。
+  - 作業ディレクトリ: 生成物は `tools/icall/work/rt_remeasure/` (gitignore 対象)。次回の再測定は `work/` 以外で行う (AGENTS §4.4 に当たるため。今回は diff 外の生成物として minor 扱い)。`fa_route_build` / `fa_cmp` は固定の `tools/icall/work/rt_freshair-core/` を読むため、その中身を本 run の生成物で置き換えた (元の `work-icall` 展開物は別名で退避)。`rw.dll` の sha256 は `cc921929…` で、前回 §8 の値と一致。
+  - `map.json` の sha256 差の説明: 元 `work-icall` 展開物の `map.json` は `pe` が別マシンの作業場所 (repo 外) を指し、`section_size` 75565・`ncomis` 9 で、本 run の `section_size` 80477・`ncomis` 14 と一致しない。`rw.dll` も本 run は sha256 `cc921929…` (reviewer 報告・本文と一致)、元の展開物は `2098d2f3…`。つまり元の展開物は現 HEAD の rewriter 出力ではない (古い生成物)。`map.json` は PE の絶対パスを含むため、作業ディレクトリ `tools/icall/work/rt_remeasure/` (本 run) と元の展開物の作業場所の差は sha256 の差として残る。
+- 測定 (`c2c9ab08d`・既定 OFF): `0x180da4030` は match 0 / mismatch 8 (期待どおり)。sweep は bit 一致 54 (前回 55)・不一致 2 (前回 1)。不一致の増分は `0x1803dee20` で、`fa_cmp` は match 0 / mismatch 8。この関数は前版 (REPORT_APPENDIX_2696 §4) から揺れている既知の関数 (#2302 で追跡。§6)。`0x1803de190` の wasm_err は OFF で出る (同一パイプラインの OFF 値)。
+- gate の影響の切り分け: `a58d24e87` の `icall_rewrite.py` で既定 OFF の rw.dll を作ると sha256 `cc921929…` で、現 head と一致する (gate は OFF の出力を変えない)。同じ入力で sweep を 2 回取ると 54/65/10/2 で安定した。
+- 測定 (同一パイプライン: rewrite → RetDec decode-only → ir_icall_restore → fa_route_build → fa_cmp / fa_sweep 8 60。native は `tools/ott/native/build.sh`)
+
+| 条件 | fa_cmp 180da4030 --n 8 | fa_sweep 8 60 (bit一致/crash/wasm_err/不一致) |
+|---|---|---|
+| 既定 (OFF)・`a58d24e87` で測定 (gate 前) | match 0 / mismatch 8 | 55 / 65 / 10 / 1 |
+| 既定 (OFF)・`c2c9ab08d` (現 head・再測定) | match 0 / mismatch 8 | 54 / 65 / 10 / 2 (sweep 73 s) |
+| `FA_FALL_FRAG=1` | **match 8 / mismatch 0** | 55 / 65 / 11 / 0 |
+
+- 既定 OFF と ON の per-function 差 (同一パイプライン): `0x180da4030` mismatch → match (受入 2 を達成)。`0x180c99430` match → wasm_err (`memory access out of bounds`)。**回帰 1 件が未解決。**
+- 旧 artifact 基準 (`work-icall` の sweep.jsonl・本 run 前の route) は 56/65/9/1 (REPORT の 55/65/9/2 と違う)。
+- 回帰の機構 (未確定): 断片を複製すると、断片内の `jcc` 先が closure 外の関数の先頭になる経路がある (`0x1803de190` は `function_1803de22d` 欠落で確認)。`in_closure` の判定で一部だけ防いだ。`0x180c99430` の out-of-bounds は未調査。
+- 受入 3 (A 型 11 件の判定の再実施) と受入 4 の `0x180ca1480` は未実施。
+
+## 9. 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `FA_FALL_FRAG=1` で `0x180c99430` が wasm_err (out-of-bounds) | 既定 OFF なので現行の出力は変わらない。ON にすると 1 関数回帰する | #3198 (本 PR は Refs) |
+| A 型 11 件の判定の再実施・`0x180ca1480` の判定 | 受入 3・4 の残り | #3198 |
+| 既定 ON 化の判断 | 回帰解消まで既定 OFF | #3198 |
