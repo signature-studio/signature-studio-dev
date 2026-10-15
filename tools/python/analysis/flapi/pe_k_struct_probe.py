@@ -336,7 +336,13 @@ def main():
     for (p, tgt), v in ver.items():
         if v[1] == "lea" and LO <= tgt < HI:
             roots.add((v[0], REG64.get(v[2].split(",")[0].strip()), tgt))
-    print("lea roots: linear=%d byte-verified=%d union=%d" % (len(lea_roots), sum(1 for v in ver.values() if v[1] == "lea"), len(roots)))
+    byte_roots = set()
+    for (p, tgt), v in ver.items():
+        if v[1] == "lea" and LO <= tgt < HI:
+            byte_roots.add((v[0], REG64.get(v[2].split(",")[0].strip()), tgt))
+    print("lea roots: linear=%d byte-verified=%d union=%d only_linear=%s only_byte=%s" % (
+        len(set(lea_roots)), len(byte_roots), len(roots),
+        sorted(hex(r[0]) for r in set(lea_roots) - byte_roots), sorted(hex(r[0]) for r in byte_roots - set(lea_roots))))
     for addr, dst, tgt in sorted(roots, key=lambda r: (r[2], r[0])):
         if dst:
             track(next_va(addr), {dst: tgt}, 0, ("lea", addr, dst, tgt))
