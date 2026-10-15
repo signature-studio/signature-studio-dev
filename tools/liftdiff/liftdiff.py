@@ -143,14 +143,21 @@ def print_record(r, verbose=False):
                 print('        wasm: %s' % (c.get('wasm_detail') or '')[:300])
 
 
+def sample_vas(allv, n):
+    """sample:N。random.Random(1) の抽出 (従来の N 件) に、OBJ_PATTERNS を持つ VA (LD-225 / #4561) を足す。
+    OBJ_PATTERNS の VA は closure に居れば必ず入るため、単発で判定に入った関数が batch の数値から漏れない。"""
+    rnd = random.Random(1)
+    base = set(rnd.sample(allv, min(n, len(allv))))
+    base |= {v for v in cases.OBJ_PATTERNS if v in set(allv)}
+    return sorted(base)
+
+
 def select_set(sess, spec, irfeats):
     allv = sess.closure_vas()
     if spec == 'closure':
         vas = allv
     elif spec.startswith('sample:'):
-        n = int(spec.split(':')[1])
-        rnd = random.Random(1)
-        vas = sorted(rnd.sample(allv, min(n, len(allv))))
+        vas = sample_vas(allv, int(spec.split(':')[1]))
     elif spec.startswith('file:'):
         vas = [int(l.split()[0], 16) for l in open(spec[5:]) if l.strip() and not l.startswith('#')]
     else:

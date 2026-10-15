@@ -27,7 +27,7 @@ M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (
 M11_FIX_535BF2="${M11_FIX_535BF2:-1}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現; 既定 #2521); 0 = lift 版
 M11_FIX_50A830="${M11_FIX_50A830:-0}"   # #2439: 1 = m11_ov.c の function_50a830 転記 (list Add の Grow/Notify 復元 + Grow 実体 50aac0/50ade0 の転記); 0 = lift 版 (既定)
 M11_FIX_4136A0="${M11_FIX_4136A0:-0}"   # #3928: 1 = m11_ov.c の function_4136a0 転記 (UniqueString の *s deref 脱落の補正); 0 = lift 版 (既定)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_FIX_50A830=$M11_FIX_50A830 -DM11_FIX_4136A0=$M11_FIX_4136A0 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_DEST_GUARD=${M11_DEST_GUARD:-0} -DM11_INSTR_40F960=${M11_INSTR_40F960:-0} -DM11_INSTR_40FFE0=${M11_INSTR_40FFE0:-0} -DM11_INSTR_60A270=${M11_INSTR_60A270:-0} -DM11_PROBE_2400=${M11_PROBE_2400:-0} -DM11_INSTR_412770=${M11_INSTR_412770:-0} -DM11_INSTR_E3EF60=${M11_INSTR_E3EF60:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_PROBE_LIST=${M11_PROBE_LIST:-0} -DM11_NOVCALL=${M11_NOVCALL:-0} -DM11_RT_PADPRE=${M11_RT_PADPRE:-0} -DM11_RT_PADPOST=${M11_RT_PADPOST:-0} -DM11_RT_EMPTY=${M11_RT_EMPTY:-0} -DM11_PRINT_DEST_2118=${M11_PRINT_DEST_2118:-0} -DM11_RT_NODATA=${M11_RT_NODATA:-0} -DM11_RT_NODATA_BODY=${M11_RT_NODATA_BODY:-0}"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_FIX_50A830=$M11_FIX_50A830 -DM11_FIX_4136A0=$M11_FIX_4136A0 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_DEST_GUARD=${M11_DEST_GUARD:-0} -DM11_INSTR_40F960=${M11_INSTR_40F960:-0} -DM11_INSTR_40FFE0=${M11_INSTR_40FFE0:-0} -DM11_INSTR_60A270=${M11_INSTR_60A270:-0} -DM11_PROBE_2400=${M11_PROBE_2400:-0} -DM11_INSTR_412770=${M11_INSTR_412770:-0} -DM11_INSTR_4128B0=${M11_INSTR_4128B0:-0} -DM11_INSTR_E3EF60=${M11_INSTR_E3EF60:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_PROBE_LIST=${M11_PROBE_LIST:-0} -DM11_NOVCALL=${M11_NOVCALL:-0} -DM11_RT_PADPRE=${M11_RT_PADPRE:-0} -DM11_RT_PADPOST=${M11_RT_PADPOST:-0} -DM11_RT_EMPTY=${M11_RT_EMPTY:-0} -DM11_PRINT_DEST_2118=${M11_PRINT_DEST_2118:-0} -DM11_RT_NODATA=${M11_RT_NODATA:-0} -DM11_RT_NODATA_BODY=${M11_RT_NODATA_BODY:-0}"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -137,6 +137,9 @@ echo "$S_INSTR40" > work/instr_40ff70.stamp
 # #3325: function_412770 観測 probe の ON/OFF で post 結果と ov.o を作り直す (stamp)
 if [ "$(cat work/instr_412770.stamp 2>/dev/null || echo 0)" != "${M11_INSTR_412770:-0}" ]; then rm -f work/boot_final3.ll work/obj/ov.o; fi
 echo "${M11_INSTR_412770:-0}" > work/instr_412770.stamp
+# #4457: function_4128b0 観測 probe の ON/OFF で post 結果と ov.o を作り直す (stamp)
+if [ "$(cat work/instr_4128b0.stamp 2>/dev/null || echo 0)" != "${M11_INSTR_4128B0:-0}" ]; then rm -f work/boot_final3.ll work/obj/ov.o; fi
+echo "${M11_INSTR_4128B0:-0}" > work/instr_4128b0.stamp
 # #2400: function_e3ef60 の 60a270 呼出し probe の ON/OFF で post 結果と ov.o を作り直す (stamp)
 if [ "$(cat work/instr_2400.stamp 2>/dev/null || echo 0)" != "${M11_PROBE_2400:-0}" ]; then rm -f work/boot_final3.ll work/obj/ov.o; fi
 echo "${M11_PROBE_2400:-0}" > work/instr_2400.stamp
@@ -150,6 +153,9 @@ S_P2780="${M11_PROBE_2780:-0}"   # #2780: 1 = 計測用 IR probe (function_4473f
 if [ "$(cat work/instr_2780.stamp 2>/dev/null || echo 0)" != "$S_P2780" ]; then rm -f work/boot_final3.ll; fi
 echo "$S_P2780" > work/instr_2780.stamp
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
+# M11-N201 (#3932): M11_SLOT_ROWS=<mem_class_rows.json> のとき、実値化 (lea_alloca) の alloca 番地を 0 詰め引数へ入れる (既定は空 = 入れない)
+if [ "$(cat work/slot_rows.stamp 2>/dev/null || echo)" != "${M11_SLOT_ROWS:-}" ]; then rm -f work/boot_final3.ll; fi
+echo "${M11_SLOT_ROWS:-}" > work/slot_rows.stamp
 # #954 (M11-N54): M11_XMM_ARGS=1 = 機械語が xmm0..3 を入力に読む callee の IR 署名へ float/double 引数を復元する (fix_xmm_args.py, #547)。
 #   既定 0 (従来どおり復元しない)。1 のときだけ post (m11_post) の入力を boot_final.xa.ll に差し替える。切替えは stamp で post 結果を無効化する。
 #   M11_XMM_SKIP=f1,f2 は復元から外す関数 (fix_xmm_args.py の --skip-funcs。退行の二分探索用)。
@@ -172,9 +178,11 @@ if [ ! -f work/boot_final3.ll ] || [ "$POST_IN" -nt work/boot_final3.ll ] || [ m
     python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json --pads work/sigfix_pads.json
     FIXES="${M11_SIGFIX_FIXES:-work/sigfix_fixes.json}"
     [ -n "${M11_SIGFIX_FIXES:-}" ] || python3 m11_argrecover.py work/sigfix_pads.json --pe "$PE" --lb "$M11_LB_BASE" --out "$FIXES"
-    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json --fixes "$FIXES"
+    SLOT_ARG=""; [ -n "${M11_SLOT_ROWS:-}" ] && SLOT_ARG="--slots $M11_SLOT_ROWS"
+    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json --fixes "$FIXES" $SLOT_ARG
   else
-    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json
+    SLOT_ARG=""; [ -n "${M11_SLOT_ROWS:-}" ] && SLOT_ARG="--slots $M11_SLOT_ROWS"
+    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json $SLOT_ARG
   fi
 fi
 if [ "$S_P134" = 1 ]; then python3 trap_triage/probe134_ir.py work/boot_final3.ll || exit 1; fi   # #134 計測専用 (既定 0 では何もしない)

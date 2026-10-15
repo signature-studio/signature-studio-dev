@@ -4,7 +4,7 @@
 
 
 測定 commit = `5c79daa2b` (HEAD。`qfc_count.sh` を HEAD で link・実行して得た値)。再現は `tools/qfclift/qfc_count.sh` (前提: `qfc_boot.sh` で lift 済み)。判定はしない。
-計数は直接呼出し `imp_<名>();` だけ。間接経由 (`imp_by_index` → `imp_tab[k]()`・`ott_missing_import`) は含まない (未計数。§10.3 → #4374)。
+間接経由も計数した (§4374: 停止点まで 0 件)。停止後の間接呼出しは未計数 (#4262)。
 
 ### 10.1 呼出し回数 (直接呼出し・DllMain(PROCESS_ATTACH) → 停止点まで、n=1)
 
@@ -24,7 +24,7 @@
 
 - 直接呼出しとして計数された import は 6 件で、すべて rt・`qfc_imp.c` に既存。よって直接経路で新たに実装が必要な import は **0 件**。`qfc_imp.c` と rt は変更していない。
 - `qfc_count.sh` の emcc 行を `qfc_lift.sh` の `wasm_build` と同じ入力集合 (`qfc_ov.c`・`qfc_import.c`・`FT_WASM32_LIB`・`-I` 群) に揃えた (commit `5c79daa2b`)。一時版の手修正は使っていない。
-- 間接経由の import 呼出しは未計数のため、「DllMain 経路で実際に呼ばれる import は 6 件」とは言えない (§10.3 の未解決 → #4374)。
+- 停止点までの間接呼出しは 0 件。直接呼出しの件数は §4374 (HEAD 計測) の 5 件が正本。§10.1 の 6 件は `5c79daa2b` 時点の値で HEAD と一致しない (差の原因は未特定・§10.3 の未解決表)。停止後は #4262 で扱う。
 - 受入 2 の「soft 呼出し 0 件にする」は満たさない (soft 呼出し 0 件は元から満たしていた)。停止点の解釈 (偽の停止か) は #4262 の範囲。
 
 ### 10.3 未解決
@@ -33,10 +33,24 @@
 |---|---|---|
 | 停止点 `ExitProcess(0)` が偽の停止か (longjmp 継続後の進行) | DllMain が完走したか不明 | #4262 (T-SH-106) |
 | longjmp (0x40f9c0) の発生条件と戻り先 `0x59c210` の lift 対応 | 停止点の解釈 | #4263 (T-SH-107) |
-| 間接経由 (`imp_by_index` → `imp_tab[k]()`・`ott_missing_import`) の import 呼出し | 計数は直接呼出しの 6 件だけ。DllMain 経路の間接呼出しは未計数 | #4374 (T-SH-121) |
+| 停止後の間接呼出し | 停止点までは 0 件 (§4374)。停止後は未計数 | #4262 (T-SH-106) |
 | HEAD の rt の TLS 系の残る差: `GetLastError` が常に 0 (`TlsGetValue`・`TlsSetValue` の未割当 index で last error が立たない)・`TlsFree` の実装が無い (`imp_TlsFree` 不在。import された場合の扱いは未確認)・`TlsAlloc` の割当値が実物と違う | DllMain 後段で TLS 値・last error を読むと結果が変わり得る。FLEngine の既存結果への影響は未確認 | #4375 (T-SH-122) |
 | `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | #4280 (T-SH-108) |
 | `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #4296 (T-SH-113) |
+
+## 4374 間接経由 import 呼出しの計数 (T-SH-121 / #4374)
+
+測定 commit = `0f43b7741` (計測した code。`origin/main` 取り込み後の HEAD)。`git diff 0f43b7741 HEAD -- tools/qfclift tools/flelift/rt tools/shared/oss/freetype tools/flelift/x64c.py ':!*.md'` の出力は 0 行 (以後の commit は REPORT の md のみ)。
+前回の測定 commit `71b77279b` は main 取り込みで code が入ったため、その後の `0f43b7741` で再測定した (`71b77279b..0f43b7741` の code 差分は `tools/flelift/rt` 4 ファイル・`x64c.py`・`qfc_probe_4262.sh` で 1107 行追加)。
+手順: `QFC_BOOT_REBUILD=1 qfc_boot.sh` → `qfc_count.sh` (いずれも foreground)。素材: `fl-win64` と `toolchain-emsdk` (emcc 6.0.12)・FreeType 2.7 wasm32 を `tools/shared/work/` に作成。
+- boot: rc 1 (FAIL)。lift は functions 6348・unsup 0・unlifted 0・imports 222。strict `MISSING IMPORT LocalAlloc`・soft は `DllMain` rc=0x1 の後 `FontCache_GetStats` で trap。wall 28.3 s・load 1.12 → 1.15。
+- 実行 `qfc_count.sh`: rc 0・wall 11.2 s・load 1.15 → 1.12。
+- 生成: imp_tab 行 223 (used 222)。直接呼出し書換え 1681 箇所 (名前別 222 種)。
+- 停止点まで: `[step] DllMain` → 直接呼出し 5 件 (GetCurrentThreadId 1・TlsAlloc 1・LocalAlloc 1・TlsSetValue 1・TlsGetValue 1) → `[trap] DllMain`。`ExitProcess` は出ない。
+- 間接経由 (`(ind)`) の呼出し: **0 件**。soft 呼出し: **0 件**。
+- 戻り値・副作用: 計数行は stderr の `[fle] CALL <名>` のみ。行き先は元の imp_<名> をそのまま呼ぶ。
+- 未達のまま残る点: 停止後の進行 (偽の停止か) は #4262 で扱う。停止後の間接呼出しは現時点で未計数。
+- 旧計測 (`93fde48ab`・直接 6 件・停止点 `ExitProcess(0)`) は、その後の `tools/qfclift` の変更で HEAD と一致しなくなった。原因は未特定 (§10.3)。
 
 ### 10.4 TLS 変更の前後の計数 (#4307 / T-SH-116)
 
@@ -62,3 +76,14 @@
 計数の限界 (変わらず): 計数は直接呼出しだけ。間接経由は #4374 で未計数。TLS の戻り値の差 (`TlsAlloc` の割当値・未割当 index の last error など) は計数に現れないため、#4375 の範囲。
 
 boot (`qfc_boot.sh`、HEAD・`QFC_BOOT_REBUILD=1`、実測 51.6 s、load 0.21 → 0.71): strict は `MISSING IMPORT LocalAlloc`、soft は `ExitProcess(0)` で DllMain が止まった (前回 REPORT と同じ停止点)。
+
+## 未解決 (REPORT §10 から分割移動・#4525 で更新)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `ExitProcess(0)` の偽の停止は #4262 で判定、#4510 で修正済み (停止点は `FontCache_GetStats` へ進んだ) | DllMain は完走。boot は FAIL のまま | #4510 (T-SH-126) |
+| longjmp (0x40f9c0) の発生条件と戻り先 `0x59c210` の lift 対応 | 停止点の解釈 | #4263 (T-SH-107) |
+| 間接経由の import 呼出しが未計数 | DllMain 経路の全数が不明 | #4374 (T-SH-121) |
+| HEAD の rt の TLS 系の残る差 (`GetLastError` 常に 0・`imp_TlsFree` 不在・`TlsAlloc` の割当値) | DllMain 後段で TLS 値・last error を読むと結果が変わり得る | #4375 (T-SH-122) |
+| `GetCurrentThreadId` (固定 1) の実物との対応が未確認 | 値を使う経路で結果が変わり得る | #4280 (T-SH-108) |
+| `FontCache_GetStats` / `CleanUp` の実行と DllMain の戻り値 | PASS 判定が未到達 | #4296 (T-SH-113) |

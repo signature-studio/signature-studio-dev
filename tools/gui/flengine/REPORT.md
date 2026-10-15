@@ -4,6 +4,7 @@
 **自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **32 種**が shim に到達 (実装済み 31 / fail-fast stub 1 = `LoadImageW`)。
 `CreateWindowExW` は survey で **1 回だけ自然到達**したが、直前の `RegisterClassW` は呼ばれず (`GetClassInfoW` の後に直行)、窓は生成されない (§5-2 の lift 欠陥)。受入条件 1 の意図する「実登録を経た窓生成の自然到達」は未達。
 実 WNDCLASS を JS から指向呼出した場合は `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。
+**#4447 (LD-219)**: 起動の dispatch 数 (`units_dispatched` = 109) を e2e JSON に出すようにした。`a4a620a9^` / `a4a620a9` の前後比較は基準環境 (`fl-win64` の PE あり・IR 再生成) で両側 dispatch 109 = 109 (差 0・基準 109 を再現)。詳細は `REPORT_APPENDIX_4447.md`。
 前回 FAIL だった S2 は、`SystemParametersInfoW` の未対応 action を fail-fast から `FALSE` 返却へ変えて解消した (§5-5)。S2 の判定式は `8a6dcf4b` (main 取り込み済み) で旧式から新式に変更済みで、本 PR は判定式を変えていない (詳細は REPORT_APPENDIX §6i)。S1 の判定式も変えていない。
 再現: `bash tools/gui/flengine/e2e.sh` (gate 12 + ネガコン 5。FAIL なら exit 1)。
 
@@ -235,6 +236,14 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
 | `tools/m11/m11_e2e.sh` が PE パスを `[ANALYSIS-DIR]` の固定既定値で持つ (`[WIN64]` 経由にしていない)。`m11_gen_ir2.sh` は本 PR で `FL_WIN64_DIR` 参照に変更済み | `m11_e2e.sh` を直接使うと runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `m11_gen_ir2.sh` (FL_WIN64_DIR 経由) を使う | m11_e2e.sh に `FL_WIN64_DIR` 参照を入れる件は PM 起票依頼 (#132 の未解決と同件) |
 | 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (433/0 ×3)。HEAD 7d44c033 の 1 回 (500/0) でも再現せず。main 側の #489 系 (headless surface UAF) の merge を含む HEAD での結果。再現率の定量確認は未実施 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
+
+### GUI-25 (#4420): B1 の GetMem 不一致の切り分け
+
+- 切り分け: GetMem の 761 対 760 は shim ではなくビルド条件。比較元 `m11_run.mjs` は非 pthread の wasm、GUI 結合は `-pthread`。同じ `-pthread` の shim 無し base (`run.mjs --wasm m11_base.cjs`) は GetMem 760 (2 回再現)、非 pthread は 761 (2 回再現)。
+- 修正: boot の比較元を `-pthread` の base に揃えた (`e2e.sh` / `judge.py` の `threw` キー名も `boot_threw` に揃えた。判定条件は緩めていない)。
+- 記録値の変化: main の `results/boot.json` は GetMem 761 (FastMM_GetMem 782)。`696d3f18b` の記録も 761。`309a38d0e` (results のみの記録 commit) で GetMem 760 (FastMM_GetMem 781) に変わった。変わった原因は未確認 (再測定は未実施。本 PR の commit で GUI ビルド入力は変わっていない)。よって「GetMem 760 は変更前後で同じ」とは言えない。
+- 残件: `icall_miss` GUI 7 対 base 6。差分の宛先は `0x85df70` 1 件。これは `EnumDisplayMonitors` の callback (#1096 / #1331 / #1507 / #881 で確定済み)。GUI では `EnumDisplayMonitors` が IMPL のため callback が呼ばれる。子 #4645 で解消する。
+- 測定 (HEAD `696d3f18b`・foreground 1 回): e2e rc 1 / 432 s / judge 14/15 (FAIL は B1 のみ: `icall_miss` 7 対 6)。ネガコン N1〜N10 は期待どおり FAIL。
 
 ## 6e〜6h・6f (付録へ分割移動)
 

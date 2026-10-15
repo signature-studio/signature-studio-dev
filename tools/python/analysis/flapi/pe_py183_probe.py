@@ -204,6 +204,7 @@ def main():
     desc_checks()
     typecheck_checks()
     pct_fmt_checks()
+    round_facts_checks()
     print(f"summary: {'OK' if not FAILS else str(len(FAILS)) + ' FAIL'}")
     return 1 if FAILS else 0
 
@@ -271,6 +272,14 @@ def spec_checks():
           rip_target(0x43DD6B) == 0x15EC3B0 and rip_target(0x43DDC4) == 0x15EC3B0)
     check("slot 0x15ec3b0 は .bss (SizeOfRawData 0)・PE 上に初期値の実体無し",
           section_of(0x15EC3B0).Name.rstrip(b"\0") == b".bss" and section_of(0x15EC3B0).SizeOfRawData == 0)
+    check("0x43dfd0 は r9d == -1 のとき 0x413680 で NUL 終端長を求める (0x43dffb・0x43e000)",
+          ins_at(0x43DFF7).op_str == "r9d, -1" and ins_at(0x43E000).op_str == "0x413680")
+    check("0x43eb71 は 'S' 文字列を r9d = -1 (NUL 終端まで) で 0x43dfd0 へ渡す (0x43eb6d)",
+          ins_at(0x43EB6D).op_str == "r9d, 0xffffffff")
+    check("0x414850 は rcx 非 0 ならそれを返し、0 なら [0x13a8040]+0x10 (0x414858・0x41485f)",
+          ins_at(0x414858).op_str.startswith("rax, qword ptr [rip") and ins_at(0x41485F).op_str == "rax, [rax + 0x10]")
+    check("0x13a8040 の静的内容は .text (0x413fec) を指し、文字列ではない (fallback の先は PE 上で確定できない)",
+          rip_target(0x414858) == 0x13A8040 and section_of(0x13A8040).Name.rstrip(b"\0") == b".data")
     reads = []
     va = 0x43E240
     while va < 0x43F1D0:
@@ -303,11 +312,39 @@ def round_checks():
           rip_target(0x440E9D) == 0x13AB320 and struct_int(0x13AB320) == 10)
     check("0x440d30 の繰上げ (0x440eb7 add word [rax],1) は 1e18 以上のときだけ (0x440ea5 divsd)",
           ins_at(0x440EAA).mnemonic == "divsd" and ins_at(0x440EB3).op_str == "rax, qword ptr [rbx + 0x30]")
+    check("0x440d30 は精度 18 桁固定 (0x440e72 mov edx, 0x12)",
+          ins_at(0x440E72).op_str == "edx, 0x12")
+    ldm = RAW[v2o(0x40A36C):v2o(0x40A36C) + 7]
+    ldm_va = 0x40A36C + 7 + struct_int(0x40A36C + 3)
+    check("0x40a36c の ldmxcsr の参照先は MXCSR 大域 0x13a5054・既定値 0x1f80 は RC (bit 13-14) = 0 (最近接・偶数)",
+          ldm[:3] == b"\x0f\xae\x15" and ldm_va == 0x13A5054 and (struct_int(0x13A5054) & 0x6000) == 0)
     check("0x440d30 → 0x440c10 呼出し (0x440ec7) と 0x440c10 内の 0x40c660 (0x440c50)",
           ins_at(0x440EC7).op_str == "0x440c10" and ins_at(0x440C50).op_str == "0x40c660")
     check("0x440c10 の 18 桁 BCD 化 (10 進 9 桁 × 2 の除算マジック 0x440c66 ... 0x440cf3)",
           ins_at(0x440C66).op_str == "rax, 0xa3d70a3d70a3d70b" and ins_at(0x440CF3).op_str == "r8d, 1"
           and ins_at(0x440D00).op_str == "0x440c60")
+
+
+def round_facts_checks():
+    # PY-335 (#4513): %.2f の桁出力 0x43f580 は丸め命令を持たない・桁取得 0x43f550 は 0 埋め・
+    # 0x40ef40 は MXCSR の下位マスク 0x800 (UM) だけを扱う (RC 未変更)
+    kinds = []
+    va = 0x43F580
+    while va < 0x43F6C8:
+        ins = ins_at(va)
+        if ins is None:
+            break
+        kinds.append(ins.mnemonic)
+        va += ins.size
+    check("0x43f580 (桁出力) に cvt/round 系命令が無い", not any(
+        k.startswith("cvt") or k.startswith("round") for k in kinds))
+    check("0x43f550 (桁取得) の空桁は '0' 埋め (mov al, 0x30 at 0x43f567)",
+          ins_at(0x43F567).op_str == "al, 0x30")
+    check("0x40ef40 が MXCSR 設定 0x40a2c0 を ecx=0x800, edx=0x800 で呼ぶ (0x40ef56〜0x40ef60)",
+          ins_at(0x40EF56).op_str == "ecx, 0x800" and ins_at(0x40EF5B).op_str == "edx, 0x800"
+          and ins_at(0x40EF60).op_str == "0x40a2c0")
+    check("0x40a2c0 の変更マスクは 0x1f80 (0x40a2cb)", ins_at(0x40A2CB).op_str == "esi, 0x1f80")
+    check("0x440d30 の精度 0x12 (18 桁) は 0x440e72 で固定", ins_at(0x440E72).op_str == "edx, 0x12")
 
 
 def struct_double(va):

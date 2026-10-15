@@ -1,0 +1,6 @@
+{
+  "tag": "pe243",
+  "refs": ["#3745"],
+  "note": "PE で成功時の戻り (None) と引数書式 iii を確定した launchMapPages.setMapItemTarget 1 件 (REPORT_PY243・PY-243 #3745)。項目書込みは状態を持たないため変えない、tests/launchmap_diff.mjs が mock と照合",
+  "functions": ["launchMapPages.setMapItemTarget"]
+}

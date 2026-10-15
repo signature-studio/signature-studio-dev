@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SR-55 #3422: 描画命令 (drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap) を draw_ops_main.cpp で bitmap へ直接描き、
+# SR-61 #4231: drawArc・drawPoint・drawGraphicsPath を追加。SR-55 #3422: 描画命令 (drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap) を draw_ops_main.cpp で bitmap へ直接描き、
 # 各命令が画素を書いたこと (rc=1 かつ nonzero>0) を判定する。fail なら rc=1。
 # 前提: work/vstgui4 (vstgui4_14_3)、work/emsdk/upstream/emscripten (toolchain-emsdk の展開)、node。
 # 出力: work/draw_ops/ (gitignore)。
@@ -45,12 +45,19 @@ echo "link: rc=$link_rc" | tee "$out/summary.txt"
 
 rc=0
 [ "$link_rc" -eq 0 ] || rc=1
+# コンパイルに失敗した src があれば fail (失敗したものを外して link すると、そのまま通ってしまうため)。
+n_compile_fail=$(awk '$1!=0' "$out/compile_rc.txt" | wc -l)
+echo "compile: fail=$n_compile_fail" | tee -a "$out/summary.txt"
+[ "$n_compile_fail" -eq 0 ] || rc=1
 if [ -f "$out/draw_ops.js" ]; then
   cp "$out/draw_ops.js" "$out/draw_ops_run.cjs"
   timeout 60 node "$out/draw_ops_run.cjs" > "$out/run.log" 2>&1
   run_rc=$?
   echo "run: rc=$run_rc" | tee -a "$out/summary.txt"
   [ "$run_rc" -eq 0 ] || rc=1
+  # 期待する命令数 (SR-55 の 5 件 + SR-61 の 3 件 + SR-62 の 4 件 = 12 件、drawBitmap 含む。SR-78 の拡大縮小 3 件を足して 15 件) が揃わなければ fail (欠けた命令が無判定で通るのを防ぐ)。
+  n_ops=$(grep -c '^draw_op ' "$out/run.log")
+  [ "$n_ops" -eq 15 ] || { echo "ops: fail (draw_op lines=$n_ops, expected 15)" | tee -a "$out/summary.txt"; rc=1; }
   while read -r _ name ok nz; do
     n=${nz#nonzero=}
     if [ "$ok" = "rc=1" ] && [ "${n:-0}" -gt 0 ]; then
@@ -60,6 +67,42 @@ if [ -f "$out/draw_ops.js" ]; then
       rc=1
     fi
   done < <(grep '^draw_op ' "$out/run.log")
+  # SR-78 #4551: 拡大縮小と bilinear は画素数で判定する。
+  # 8x8 → 32x32 の拡大は 1024 画素、9 分割 (dest 20x20) は 400 画素。bilinear は中間階調が出て、最近傍は出ない。
+  expect_exact () {
+    local name="$1" want="$2"
+    local got
+    got=$(grep "^draw_op name=$name " "$out/run.log" | sed -E 's/.*nonzero=([0-9]+).*/\1/')
+    if [ "${got:-x}" = "$want" ]; then
+      echo "op $name: pass (nonzero=$got, want=$want)" | tee -a "$out/summary.txt"
+    else
+      echo "op $name: fail (nonzero=${got:-none}, want=$want)" | tee -a "$out/summary.txt"
+      rc=1
+    fi
+  }
+  expect_exact fillRectWithBitmap_scale 1024
+  expect_exact drawBitmapNinePartTiled_scale 400
+  bil=$(grep '^draw_op name=fillRectWithBitmap_bilinear ' "$out/run.log" | sed -E 's/.*nonzero=([0-9]+).*/\1/')
+  nea=$(grep '^mid_tone name=fillRectWithBitmap_nearest ' "$out/run.log" | sed -E 's/.*count=([0-9]+).*/\1/')
+  if [ "${bil:-0}" -gt 0 ] && [ "${nea:-1}" -eq 0 ]; then
+    echo "op fillRectWithBitmap_interp: pass (bilinear_mid=$bil, nearest_mid=$nea)" | tee -a "$out/summary.txt"
+  else
+    echo "op fillRectWithBitmap_interp: fail (bilinear_mid=${bil:-none}, nearest_mid=${nea:-none})" | tee -a "$out/summary.txt"
+    rc=1
+  fi
+  # gradient は一様な色で塗られていないこと (異なる色が 2 以上)。nonzero>0 だけでは一色の塗りを通してしまう。
+  while read -r _ name distinct; do
+    d=${distinct#distinct=}
+    case "$name" in
+      name=fillLinearGradient|name=fillRadialGradient)
+        if [ "${d:-0}" -ge 2 ]; then
+          echo "color $name: pass ($distinct)" | tee -a "$out/summary.txt"
+        else
+          echo "color $name: fail ($distinct)" | tee -a "$out/summary.txt"
+          rc=1
+        fi ;;
+    esac
+  done < <(grep '^draw_color ' "$out/run.log")
 else
   echo "run: skipped (no draw_ops.js)" | tee -a "$out/summary.txt"
   rc=1
