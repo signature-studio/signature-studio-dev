@@ -1,6 +1,6 @@
 # tools/flelift/boot 付録 (#4855): boot_e2e の shard 別 clang RSS と variant 実測
 
-> 正本: 本ファイル。REPORT.md には索引を置かない (REPORT.md は main の 250 行上限ちょうどのため。付録の索引は `docs/DOC_MAP.md`)。本付録は shard 別の全数値。測定 commit = HEAD `96723a2ed` (main `ceb5a0ba6` を取り込んだ後の本 PR の HEAD。コードを変えた最後の commit。前回の測定 `d956129eb` は main 取り込み前で、`fle_boot.mjs`・`survey_drive.sh` が変わったため再測定)。`boot_e2e.sh` を 1 回 (foreground・素材 `fl-win64` 展開・emsdk 6.0.12)。
+> 正本: 本ファイル。REPORT.md は 1 行索引のみ (REPORT.md は main の 250 行上限ちょうどのため。付録の索引は `docs/DOC_MAP.md`)。本付録は shard 別の全数値。測定 commit = HEAD `96723a2ed` (main `ceb5a0ba6` を取り込んだ後の本 PR の HEAD。コードを変えた最後の commit)。`boot_e2e.sh` を 1 回 (foreground・素材 `fl-win64` 展開・emsdk 6.0.12)。
 
 ## A. shard 別 clang の peak RSS (MB, cap 5,000MB/shard・超過 0 件)
 
@@ -11,7 +11,7 @@
 | nosx | 2500 | 2580 | 2280 | 2370 | 2299 | 2146 | 2491 | 2417 | 2580 |
 | chk | 2825 | 2978 | 2577 | 2707 | 2627 | 2448 | 2847 | 2769 | 2978 |
 
-全 variant の最大は 2978MB。前回の測定 (`d956129eb`・取り込み前) は最大 2,975MB (RSS は実行ごとに数十 MB 揺れる)。
+全 variant の最大は 2978MB (RSS は実行ごとに数十 MB 揺れる)。
 
 ## B. shard 別 clang の秒 (elapsed)
 
