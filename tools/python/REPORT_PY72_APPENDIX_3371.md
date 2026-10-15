@@ -45,14 +45,16 @@
 
 ## 追補 (2026-10-15 run・受入 2 の後半を確定)
 
-- `0xfe9090` (reset) の直接 `call rel32` 元は **2 件のみ**: `0xffe29b` (関数 `0xffe290`)・`0x1001b7b` (関数 `0x1001b70`)。`.text` 全体の `E8` 走査で確認。
+- `0xfe9090` (reset) の直接 `call rel32` (E8) 元は **2 件のみ**: `0xffe29b` (関数 `0xffe290`)・`0x1001b7b` (関数 `0x1001b70`)。`.text` 全体の `E8` 走査で確認。`jmp rel32` (E9) による `0xfe9090` への直接ジャンプは 0 件。
 - その 2 関数は、それぞれ TPublicChannel (VMT `0xfe2cf8`) の slot 35 (スロット `0xfe2e10`) と TPreviewChannel (VMT `0xfe2fc8`) の slot 35 (スロット `0xfe30e0`) に、VMT 値のみで格納されている。`0xfe2e10` / `0xfe30e0` の格納は各 VMT の slot 35 の 1 箇所だけ。
-- よって `0xfe9090` が chan に呼ばれるのは、slot 35 の仮想呼出し (151 箇所) の受け手が chan の場合に限られる。この経路以外の直接呼出しは無い。N=2 の適用元の確定には、151 箇所の受け手の型が要る (未確定)。
+- 上記 2 関数を経由して chan に届く経路は、slot 35 の仮想呼出し (151 箇所) の受け手が chan の場合に限られる。受け手の型は未確定。
+- **未検証**: `0xfe9090` は `.text` 内の関数ポインタ表 (先頭 VA `0xfe2a90`) の slot 0 に絶対アドレスで格納されている。この表を経由する間接呼出しは本付録では検査していない。よって「`0xfe9090` が chan に呼ばれるか」の経路は確定していない。
 - `pe_slot35_sites.py` に、`0xfe9090` の直接 call 元の列挙を追加した (受入 2 の確定に使う)。
 
 ### 測定 (追補)
 
-- 測定 commit: 本 PR で `tools/python/analysis/flapi/pe_slot35_sites.py` を変えた最後の commit (hash は PR 本文と issue コメントに記載)。
+- 測定 commit: `a53ed0561` (本 PR で `tools/python/analysis/flapi/pe_slot35_sites.py` を変えた最後の commit)。
+- 測定 commit から本付録の commit までの差分: `git diff a53ed0561 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行。`tools/python` 全体では本付録 (REPORT) の変更だけが差分になる (`git diff --stat a53ed0561 HEAD -- tools/python`)。
 - 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-3371 --wildcards '*block00031_PE.bin'` (2.27 s)。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-3371 python3 analysis/flapi/pe_slot35_sites.py` を同一ワークツリーで 3 回。終了コード 3 回とも 0。出力は `/usr/bin/time` の時間行を除いてバイト単位で同一。
 
@@ -71,4 +73,5 @@
 | 151 箇所のうち 149 箇所の受け手の型 | 受入 2 (N=2 の適用元) | #3371 |
 | `0xf48290` の受け手が chan か | 受入 2 | #3371 |
 | `0x1001ef0` の `this` の由来 (呼出し元 4 件) | 受入 2 | #3371 |
+| `0xfe9090` を参照する関数ポインタ表 (先頭 VA `0xfe2a90`・19 エントリ) 経由の間接呼出し | 受入 2 (`0xfe9090` が chan に呼ばれるかの経路) | #3371 |
 | 一覧 A・B の容器 Q への要素追加箇所と要素型 T | 受入 3 | #3371 |
