@@ -176,7 +176,7 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 |---|---|---|
 | 戻り先 `0x59c210` (setjmp/longjmp 継続) の lift 対応 (FLEngine 同型の override と断片 entry) と、DllMain 側の longjmp 起動元の特定 | DllMain が完走しない | #3410 (T-SH-77) |
 | `ExitProcess(0)` の偽の停止 (判定済み #4262。修正は #4510 で landed。`ExitProcess` は出なくなった) | DllMain の完走 (boot PASS) の判定 | #4262 (T-SH-106)・修正 #4510 (T-SH-126) |
-| longjmp の発生条件 (呼出元は `0x40fb80` 内の `0x40fbcf`・`0x40fcb8`。`[0x5aa000]` の書込みは setter `0x40fd10` のみ。発火経路 A/B の静的解析は付録 `REPORT_APPENDIX_4263.md`。経路 B の flag `[0x5d0cb0]` の書込み元は未特定) | 偽の停止かどうかの切り分け | #4263 (T-SH-107・部分達成) |
+| longjmp の発生条件 (呼出元は `0x40fb80` 内の `0x40fbcf`・`0x40fcb8`。`[0x5aa000]` の書込みは setter `0x40fd10` のみ。経路 B の flag `[0x5d0cb0]` は `0x40f4eb` で reason+1 を書かれ、reason 1 では静的に発火 (実行時は未トレース)。付録 `REPORT_APPENDIX_4263.md` §5) | 偽の停止かどうかの切り分け | #4263 (T-SH-107・経路 A の reason ≥2 は未測定) |
 | rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない。直接呼出しの計数は §10 | #3411 (T-SH-78) |
 | GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3434 (T-SH-83。#3412 は closed) |
 
