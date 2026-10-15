@@ -139,3 +139,20 @@
   - 未確定: 0x12c609e (主経路は ARITH `add eax, [rcx+0x94]` まで届くが、合流元 0x12c6252 の分岐を未分類)。
 
 **受入は部分達成** (COPY 7・AMBIG 8 は 1 段目の基底まで確定。大域 0x15e2218・0x15e22d8 と rbp スロットの直前値の上流は未追跡)。残りは親 #3927 の続きとして #4588 に残す。
+
+### 6.4 #5407: 大域 3 種の入り方・rbx ENTRY の呼出し元・`[rbx+0x12b4]` の上流
+
+測定 commit: `c44281a3e` (`pe_py273_globals.py` に reloc・初期値の節を足した最後のコード変更 commit)。`git diff c44281a3e HEAD -- tools/python/analysis/flapi` は 0 行。素材は `fl-win64` の `block00031_PE.bin` (展開 3.3 秒)。
+
+- **大域 3 種** (`pe_py273_globals.py` 終了 0・57 秒・load 1.35):
+  - 3 種とも `.data` の 8 バイトスロットで、初期値は `.bss` (0x193fa10・0x16bafc8・0x16bd450) を指す。
+  - 3 スロットとも base relocation の対象 (`reloc=True`)。ローダが load 時にアドレスを書く。`.text` の書込みは 0 件 (`rip_writes=0`)。
+  - 含意: `.data` 初期値は `.bss` の実アドレスで、値の中身は `.bss` の実行時書込みで決まる。その書込み元は静的には未特定。
+- **rbx ENTRY の呼出し元** (`pe_callgraph.py callers`): ENTRY 5 件のうち 0xd5e6c0・0xd615a0・0xd626c0・0x1185840 は直接呼出し 0 件。0x12e3a60 は直接呼出し 2 件 (0x12e8487・0x12eebe2、6.1 の通り)。`.text` 外の 8 バイト関数ポインタ参照は、この 4 関数について見つからなかった。このため間接呼出し元は未特定。
+- **`[rbx+0x12b4]` の上流**:
+  - `[rbx+0x12b4]` を読むのは関数 0xf5c340 (`mov rbx, rcx` で、rbx は関数の第 1 引数)。`[reg+0x12b4]` への store は静的に 0 件 (`store-to-0x12b4 count 0`)。
+  - 0xf5c340 の直接呼出し元は 0xf5b101 (in 0xf5ae50) と 0xf5c6e8 (in 0xf5c5f0)。
+  - 0xf5b101: rcx ← `rbx` (0xf5b0fe)。rbx の経路依存 (AMBIG、主経路 `MEM [rbx+0x7b4]` @0xf5b0eb)。
+  - 0xf5c6e8: rcx ← `[rbp+0x28]` (0xf5c6e4)。rsi ← `MEM [rax+0x12b4]` (0xf5c6c1) まで確定。
+
+**受入は未達** (#5407 の 3 項目のうち、大域 3 種の `.bss` 書込み元と ENTRY 4 件の間接呼出し元は未特定。`[rbx+0x12b4]` は 1 段の呼出し元まで確定)。残りは親 #4588 の続きとして残す。
