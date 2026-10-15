@@ -147,7 +147,7 @@ IAT 名の内訳 (件数):
 - 結論・測定値・表: `REPORT_APPENDIX_3249.md` (§7 の全文を分割移動)。受入 1・4 は #2528 で満たして `Closes`。受入 2 (slot 役割) は #3249、受入 3 は #3250。非 null メンバでの slot 0 (#4154) の実測は `REPORT_APPENDIX_3249.md` §7.3.1。
 
 ### 7.1 slot 3 (0x162f90) が上書きする `+0xc4`・`+0x114` の依存 (T-SH-131 / #5070・部分達成)
-- 測定 commit: PR 本文の「測定 commit」行を正とする (本節と同じ commit には自身の hash を書けないため)。逆アセンブルと書込み元の列挙は `tools/shared/scripts/ildsp_field_writers.py` (`dis` / `writers` / `const`)。素材 fl-win64 (`26.1.7.5653`)・`block24360_PE.bin`・`ildsp_native_check.py` ALL OK。
+- 測定 commit: `8e920869e` (コードを変えた最後の commit。以後の差分はこの節の文のみ)。逆アセンブルと書込み元の列挙は `tools/shared/scripts/ildsp_field_writers.py` (`dis` / `writers` / `const`)。素材 fl-win64 (`26.1.7.5653`)・`block24360_PE.bin`・`ildsp_native_check.py` ALL OK。
 - 静的に確定したこと:
   1. `0x16340e` は `[this+i*4+0xc4] ← [this+0x44]`、`0x16341c` は `[this+i*4+0x114] ← [this+0x44]` (`i = [this+0x68]`)。slot 3 の中で `[+0x44]` は読むだけで書かない。この 2 命令は `0x162f90` の全経路で通るわけではなく、`0x163252`・`0x1632d2` の `jge` が `0x163423` へ飛ぶ経路では飛ばされる。
   2. `+0xc4[i]`・`+0x114[i]` の値は、呼び出し前に外から与えた値ではなく `[this+0x44]` の値で決まる (書かれる経路では上書きされる)。
