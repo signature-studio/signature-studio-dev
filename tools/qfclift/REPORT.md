@@ -218,9 +218,11 @@ guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行�
 
 ## 10. guest imp_GetProcAddress の結線 (T-SH-83 / #3434)
 
-既知類型との関係 (DEFECTS.md): 該当なし。測定 commit = `ddafc3602` (コードを変えた最後の commit)。
+既知類型との関係 (DEFECTS.md): 該当なし。測定 commit = `ddafc3602` (コードを変えた最後の commit)。`git diff ddafc3602 HEAD -- tools/flelift tools/qfclift/qfc_imp.c tools/qfclift/qfc_lift.sh tools/qfclift/env.sh tools/shared/oss/freetype` の出力は空 (差分 0)。HEAD 側の新規 commit は本節の REPORT 追記のみ。
 
-**結論 (部分達成)**: 受入条件 1 (`imp_GetProcAddress` → `qfc_gpa` の結線) を実装した。受入条件 2 (`FontCache_GetStats` / `FontCache_CleanUp` の wasm 実行) は未達 (DllMain が `0x59c210` の longjmp 継続で止まり、`0x563000` の FT 解決に届かない)。
+**前提**: `qfc_lift.sh` の `wasm_build` (`qfc_e2e.sh` / `qfc_boot.sh` を含む全 QFC ビルド) は FreeType wasm32 の成果物 `FT_WASM32_LIB` (`tools/shared/oss/freetype/build.sh` の出力) を必ず link するため、ビルド前にそれを用意する (`env.sh` 参照)。
+
+**結論 (部分達成)**: 受入条件 1 (`imp_GetProcAddress` → `qfc_gpa` の結線) を実装した。受入条件 2 (`FontCache_GetStats` / `FontCache_CleanUp` の wasm 実行) は未達 (DllMain が `0x59c210` の longjmp 継続で止まり、`0x563000` の FT 解決に届かない)。受入条件 2 は子 issue #4296 (`[T-SH-113]`) に移した。
 
 ### 10.1 結線の形
 - `tools/flelift/rt/fle_cpu.c` の `imp_GetProcAddress` は、既定 NULL の `fle_gpa_hook (h, nm)` を呼ぶ (hook 未設定 = 従来どおり 0)。FLEngine の既定挙動は変えない。
@@ -237,6 +239,7 @@ guest の `imp_GetProcAddress` 結線と FontCache_GetStats / CleanUp の実行�
 ### 10.3 boot (受入条件 2 の前段。`qfc_boot.sh`、HEAD `ddafc3602`・n=1)
 - lift: functions 6,347 / unsup 0 / unlifted 0 / imports 222 (前回と同じ)。
 - strict: `DllMain(PROCESS_ATTACH)` = trap (`[fle] MISSING IMPORT LocalAlloc`)。soft: `[fle] call to UNLIFTED function 0x59c210`。判定 FAIL (前回 §7 と同じ停止点)。
+- strict の `LocalAlloc` 欠落の理由: strict のビルド (`wasm_build` の `lift/qfcl.cjs`) は `qfc_imp.c` を link しない。`imp_LocalAlloc` は `qfc_imp.c` にあり、soft ビルド (`qfcl_soft.cjs`) だけが link する。よって欠落は rt の未実装ではなく、link 対象の差である。soft 側は `qfc_imp.c` で `LocalAlloc` を実装済みのため、§10.4 の「LocalAlloc は qfc_imp.c で実装済み」と一致する。
 - boot 全体 real 50 s、load 開始 0.29 0.55 0.31。
 
 ### 10.4 未解決
