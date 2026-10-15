@@ -250,6 +250,9 @@ echo "$S_INSTR40" > work/ov_instr_40ff70.stamp
 if [ "$(cat work/ov_instr_40f960.stamp 2>/dev/null || echo none)" != "${M11_INSTR_40F960:-0}" ]; then rm -f work/obj/ov.o; fi
 echo "${M11_INSTR_40F960:-0}" > work/ov_instr_40f960.stamp
 echo "$M11_FIX_535BF2" > work/ov_535bf2.stamp
+# M11_FIX_50A830 が変わったら ov.o だけ無効化 (#2439: ON/OFF の切替で古い ov.o を再リンクしない)
+if [ "$(cat work/ov_50a830.stamp 2>/dev/null || echo none)" != "$M11_FIX_50A830" ]; then rm -f work/obj/ov.o; fi
+echo "$M11_FIX_50A830" > work/ov_50a830.stamp
 CF="${CF_BASE//-DM11_INSTR_413060=$M11_INSTR_413060/-DM11_INSTR_413060=$M11_OV_INSTR}" cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
 cc work/m11_data.c work/obj/data.o
 
