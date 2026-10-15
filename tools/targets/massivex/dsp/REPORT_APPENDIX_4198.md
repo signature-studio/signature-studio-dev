@@ -51,7 +51,7 @@
 
 ## 6. 検証 (本 run・コミット済み HEAD)
 
-- 測定 commit: `74375c75a` (本節の e2e・negctl を実行した HEAD。以降の commit は本ファイルのみ)。
+- 実行 HEAD: `74375c75a` (本節の e2e・negctl を実行した commit。以降のコード差分は 0)。
 - `bash dsp/e2e.sh` (n=1・素材 `work/extracted` の PE・rc 0): `OK elapsed=27s load start=[0.43 0.32 0.14] end=[0.66 0.39 0.17]`。
 - `bash dsp/negctl.sh` (n=1): NC1 `unsup=5` / NC2 `unsup=285` / NC3 `insns=31 unsup=0` → 3 件とも `FAIL<期待>`。
 - 親 18 件の内訳は §5 を参照 (同じ 1 回の実測。ここには書かない)。
