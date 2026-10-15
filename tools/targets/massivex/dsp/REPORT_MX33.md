@@ -189,3 +189,51 @@
 - 測定 (#3774・`mx6_e2e.sh`・MX_PE = 展開 `Massive X.vst3`・md5 `622993e7…` 一致): **exit 0・elapsed 48 s・load 0.08 0.06 0.09 → 0.64 0.21 0.14**。受入 1 の件数は scalar 1 / 128 bit 0 / 判定不能 16 (前版 0 / 0 / 17)。
   `git diff 1083467fe HEAD -- tools/targets/massivex/dsp` の差分は本 REPORT の修正 (docs のみ・測定対象外)。
 - MX-6 測定 commit (`fbc9971f`) からの変更 (`mx6_vectorcall.py` の +4/−1 行・`mx6_e2e.sh`) は、MX-6 の表示値を変えないことを e2e (§5) で確認した。
+
+## 7. MX-54 (#5019): U3e (引数転送の xmm4/5) と U3g (非 vectorcall float の感度)
+
+- 実装: `scripts/mx54_u3e.py` (`mx6_vectorcall` の `analyze`・`effects` を再利用)。入力は `mx6_e2e.sh` が生成する `surface_seeds_x64c.json`。`mx6_e2e.sh` は `mx54_u3e.py` を呼ばないため、§7.3 の e2e は本節の測定を含まない。
+- 測定 commit = **`ee794bcc31952f75f41fe3ef9c32ed33e4a49268`** (`feat(massivex): MX-54 U3e probe ...`。コードを変えた最後の commit)。測定 commit から HEAD までのコード差分 `git diff ee794bcc3 HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は 0 行 (HEAD の差分は本 REPORT の docs 修正のみ)。
+- 素材: `plugins-massivex` の `Massive X.vst3` (md5 `622993e76565f49c094063a2b717d6ca`)。
+
+### 7.1 U3e: F が xmm4/5 を読まず direct call/jmp で G へ渡す形
+
+- 母集団: seeds の pdata 始点 566 件 (`mx6_vectorcall` の rows と同じ)。F ごとに、F 内の direct call/jmp (即値) の site を数える。
+- 判定 (script の実装どおり): site の直前で、いずれの経路でも xmm4/5 が F 内で定義されていない (may-def = 0) かつ、いずれの経路にも call が無い (call は xmm0〜5 を clobber しうるため、入口値との同一性を示せない) とき、G (転送先) の入口 livein xmm4/5 が 1 以上なら候補。転送前の全経路で xmm4/5 の定義がなく、かつ前段に call が無いことが、転送元の値が F の入口値と同一であることの根拠。
+
+| 項目 | 件数 |
+|---|--:|
+| 解析した F (pdata 始点 seeds) | 566 |
+| 直接 call/jmp (即値) を持つ F | 480 |
+| 到達可能な direct site | 2,657 |
+| うち転送前に F 内で xmm4/5 定義済み (いずれかの経路) | 821 |
+| うち前段に call を含むため除外 (定義なし) | 1,453 |
+| うち転送前に xmm4/5 未定義・前段に call なし | 383 |
+| &emsp;うち G の入口 livein xmm4/5 ≠ 0 (候補) | **42 site / 42 F** |
+| &emsp;うち G の入口 livein xmm4/5 = 0 | 315 |
+| &emsp;うち G 解析不能 (画像外など) | 26 |
+| G が pdata 始点 | 0 |
+
+- 段の合計: 2,657 = 821 + 1,453 + 383 (到達可能 = 定義済み + call 除外 + 未定義)。383 = 42 + 315 + 26 (未定義の内訳)。
+- 件数の差 (appendix の 47 との差): `REPORT_APPENDIX_4989.md` と `mx4989_probe.py` は main に無く、`origin/4989-massivex-xmm-merge-call` (commit `2fc5debe2`・`3146df45d`・`601a3ecc7`・`c0209641a`) にある。appendix の 47 (pdata 始点)・193 (全 F) は probe の `u3e` の値。本 run では `plugins-massivex` が無く PE が無いため、47 も 193 も再現していない。抽出方法の違い (コードの読みによる。件数は未測定):
+  1. 母集団: probe は seeds と one_round の行を対象にし、本 script は seeds の pdata 始点 566 のみ。
+  2. F の入口 livein: probe は F の `livein45` = 0 で絞る。本 script は絞らない (注 a)。
+  3. call 前段: probe は除外しない。本 script は除外する。
+  4. 判定: probe は must-def に入らない site を F ごとに最初の 1 件で打ち切る。本 script は may-def = 0 の site を全件数える。
+  向き: 1・3 は本 script の件数を小さくし、2・4 は大きくする。差し引きで 42 と 47 の大小が決まるため、切り分けは PE が要り未実施。
+- 注 (未確認):
+  - (a) 本 script は F の入口 livein = 0 のフィルタを掛けていない。`for F` ループに判定が無く、docstring の「入口 livein xmm4/5 = 0 の母集団」は実装と一致しない。よって 42 は F が入口で xmm4/5 を読む関数を含みうる。フィルタ付きの件数は未測定。
+  - (b) 「42 件の G は全て pdata 範囲内」は script で判定していない (未確認)。G が pdata 始点でないことのみ `G_pdata_begin` で数えた (0)。
+  - (c) G は線形・CFG 解析で入口 livein が立つと判定されたもので、G が実際の関数入口かは未確認 (例: `0x8020e3` は `or eax, ...` で始まる)。
+  - (d) F→G の site 3 件 (`0xfb13`・`0x6ba2ba`・`0x6da2ae`) の E8/E9 と rel32 の照合は前 run の記録で、本 run では再確認していない。
+
+### 7.2 U3g: 既知の非 vectorcall float 関数での scalar 落ち
+
+- VST3 の import 名 282 件に libm / CRT の float 関数は無い。内部の既知形 (定数テーブルを持つ float 関数) の同定は未着手で、本 PR では測定していない。
+- **結論: 同定できず、scalar 落ちの確認は未実施** (子 #5030 へ移す)。
+
+### 7.3 e2e と再現 (前 run の記録。本 run では再実行していない)
+
+- e2e `tools/targets/massivex/dsp/mx6_e2e.sh` (MX_PE = 展開 `Massive X.vst3`・md5 `622993e7…` 一致): **exit 0・elapsed 57 s・load 0.79 0.36 0.14 → 0.92 0.47 0.19** (測定 commit `ee794bcc3`)。出典は PR 本文の前 run の記録で、本 run は `plugins-massivex` が `$ARTIFACTS_DIR` に無く再実行できなかった。e2e は `mx54_u3e.py` を実行しない。
+- `mx54_u3e.py` 単体の実行時間は 5.7 s (前 run の記録。e2e の 57 s とは別)。
+- 再現: `python3 scripts/mx54_u3e.py "<Massive X.vst3>" <surface_seeds_x64c.json> <out.json>`。素材の展開: `plugins-massivex` (素材名の正本は `docs/WORKFLOW.md` §11) を `tar --zstd -xf` で展開 → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key`。
