@@ -1,37 +1,160 @@
 {
  "image_functions": 57816,
  "iat_names_resolved": 738,
- "string_vas": [
-  "0x103f6fc",
-  "0x10b5b68",
-  "0x10c2f90",
-  "0x10d0a2c",
-  "0x10d34b6",
-  "0x11806be",
-  "0x11ae362",
-  "0x11c20ac",
-  "0x11db29c",
-  "0x11e5bd2",
-  "0x11fe820",
-  "0x121f1ba",
-  "0x125e82c",
-  "0x128a894",
-  "0xbfa518",
-  "0xbfbb38",
-  "0xbfe080",
-  "0xbff378",
-  "0xf02356",
-  "0xf05596",
-  "0xf34a08",
-  "0xf44bbc",
-  "0xf54358",
-  "0xffdb70"
- ],
+ "strings": {
+  "MachineGuid.A": {
+   "occurrences": 0,
+   "ref_functions": 0,
+   "ref_insns": 0,
+   "ref_mnemonics": {},
+   "vas": []
+  },
+  "MachineGuid.W": {
+   "occurrences": 24,
+   "ref_functions": 24,
+   "ref_insns": 25,
+   "ref_mnemonics": {
+    "lea": 25
+   },
+   "vas": [
+    "0x103f71c",
+    "0x10b5b88",
+    "0x10c2fb0",
+    "0x10d0a4c",
+    "0x10d34d6",
+    "0x11806de",
+    "0x11ae382",
+    "0x11c20cc",
+    "0x11db2bc",
+    "0x11e5bf2",
+    "0x11fe840",
+    "0x121f1da",
+    "0x125e84c",
+    "0x128a8b4",
+    "0xbfa538",
+    "0xbfbb58",
+    "0xbfe0a0",
+    "0xbff398",
+    "0xf02376",
+    "0xf055b6",
+    "0xf34a28",
+    "0xf44bdc",
+    "0xf54378",
+    "0xffdb90"
+   ]
+  },
+  "Cryptography.A": {
+   "occurrences": 24,
+   "ref_functions": 24,
+   "ref_insns": 25,
+   "ref_mnemonics": {
+    "lea": 25
+   },
+   "vas": [
+    "0x103f6fc",
+    "0x10b5b68",
+    "0x10c2f90",
+    "0x10d0a2c",
+    "0x10d34b6",
+    "0x11806be",
+    "0x11ae362",
+    "0x11c20ac",
+    "0x11db29c",
+    "0x11e5bd2",
+    "0x11fe820",
+    "0x121f1ba",
+    "0x125e82c",
+    "0x128a894",
+    "0xbfa518",
+    "0xbfbb38",
+    "0xbfe080",
+    "0xbff378",
+    "0xf02356",
+    "0xf05596",
+    "0xf34a08",
+    "0xf44bbc",
+    "0xf54358",
+    "0xffdb70"
+   ]
+  },
+  "SHGetFolderPathW.W": {
+   "occurrences": 24,
+   "ref_functions": 24,
+   "ref_insns": 25,
+   "ref_mnemonics": {
+    "lea": 25
+   },
+   "vas": [
+    "0x103f6da",
+    "0x10b5b46",
+    "0x10c2f6e",
+    "0x10d0a0a",
+    "0x10d3494",
+    "0x118069c",
+    "0x11ae340",
+    "0x11c208a",
+    "0x11db27a",
+    "0x11e5bb0",
+    "0x11fe7fe",
+    "0x121f198",
+    "0x125e80a",
+    "0x128a872",
+    "0xbfa4f6",
+    "0xbfbb16",
+    "0xbfe05e",
+    "0xbff356",
+    "0xf02334",
+    "0xf05574",
+    "0xf349e6",
+    "0xf44b9a",
+    "0xf54336",
+    "0xffdb4e"
+   ]
+  },
+  "SHFolder.dll.W": {
+   "occurrences": 24,
+   "ref_functions": 24,
+   "ref_insns": 25,
+   "ref_mnemonics": {
+    "lea": 25
+   },
+   "vas": [
+    "0x103f6c0",
+    "0x10b5b2c",
+    "0x10c2f54",
+    "0x10d09f0",
+    "0x10d347a",
+    "0x1180682",
+    "0x11ae326",
+    "0x11c2070",
+    "0x11db260",
+    "0x11e5b96",
+    "0x11fe7e4",
+    "0x121f17e",
+    "0x125e7f0",
+    "0x128a858",
+    "0xbfa4dc",
+    "0xbfbafc",
+    "0xbfe044",
+    "0xbff33c",
+    "0xf0231a",
+    "0xf0555a",
+    "0xf349cc",
+    "0xf44b80",
+    "0xf5431c",
+    "0xffdb34"
+   ]
+  }
+ },
  "n_G3f": 26,
  "n_G40": 80,
+ "nonrip_indirect_calls": {
+  "all": 42633,
+  "in_H6": 1682
+ },
  "rows": [
   {
-   "def": "H1 GCN+SHF",
+   "def": "H1 GCN+SHF (IAT 直接)",
    "n": 0,
    "in_G3f": 0,
    "in_G40": 0,
@@ -39,7 +162,7 @@
    "G3f_not_in_H": 26
   },
   {
-   "def": "H2 GCN+REG",
+   "def": "H2 GCN+REG (IAT 直接)",
    "n": 24,
    "in_G3f": 3,
    "in_G40": 6,
@@ -55,7 +178,7 @@
    "G3f_not_in_H": 23
   },
   {
-   "def": "H4 GCN",
+   "def": "H4 GCN (IAT 直接)",
    "n": 25,
    "in_G3f": 3,
    "in_G40": 6,
@@ -63,17 +186,33 @@
    "G3f_not_in_H": 23
   },
   {
-   "def": "H5 SHF",
+   "def": "H5 SHF (IAT 直接)",
    "n": 4,
    "in_G3f": 0,
    "in_G40": 0,
    "only_H_not_G3f": 4,
    "G3f_not_in_H": 26
+  },
+  {
+   "def": "H6 DYN",
+   "n": 24,
+   "in_G3f": 3,
+   "in_G40": 6,
+   "only_H_not_G3f": 21,
+   "G3f_not_in_H": 23
+  },
+  {
+   "def": "H7 GCN+SHF (IAT 直接 or DYN)",
+   "n": 24,
+   "in_G3f": 3,
+   "in_G40": 6,
+   "only_H_not_G3f": 21,
+   "G3f_not_in_H": 23
   }
  ],
  "H": {
-  "H1 GCN+SHF": [],
-  "H2 GCN+REG": [
+  "H1 GCN+SHF (IAT 直接)": [],
+  "H2 GCN+REG (IAT 直接)": [
    "0x103ca70",
    "0x10b4700",
    "0x10c2010",
@@ -125,7 +264,7 @@
    "0xf51fd0",
    "0xffbff0"
   ],
-  "H4 GCN": [
+  "H4 GCN (IAT 直接)": [
    "0x103ca70",
    "0x10b4700",
    "0x10c2010",
@@ -152,11 +291,63 @@
    "0xf51fd0",
    "0xffbff0"
   ],
-  "H5 SHF": [
+  "H5 SHF (IAT 直接)": [
    "0x5a09f0",
    "0x5a0c90",
    "0x63b880",
    "0x81bca0"
+  ],
+  "H6 DYN": [
+   "0x103ca70",
+   "0x10b4700",
+   "0x10c2010",
+   "0x10c7cd0",
+   "0x10d1ab0",
+   "0x117f850",
+   "0x11a57c0",
+   "0x11bfc10",
+   "0x11d9340",
+   "0x11dd800",
+   "0x11fc770",
+   "0x121d7e0",
+   "0x125da90",
+   "0x12875a0",
+   "0xbf94e0",
+   "0xbfade0",
+   "0xbfcfc0",
+   "0xbfe2b0",
+   "0xf00d10",
+   "0xf03cb0",
+   "0xf2dbb0",
+   "0xf40840",
+   "0xf51fd0",
+   "0xffbff0"
+  ],
+  "H7 GCN+SHF (IAT 直接 or DYN)": [
+   "0x103ca70",
+   "0x10b4700",
+   "0x10c2010",
+   "0x10c7cd0",
+   "0x10d1ab0",
+   "0x117f850",
+   "0x11a57c0",
+   "0x11bfc10",
+   "0x11d9340",
+   "0x11dd800",
+   "0x11fc770",
+   "0x121d7e0",
+   "0x125da90",
+   "0x12875a0",
+   "0xbf94e0",
+   "0xbfade0",
+   "0xbfcfc0",
+   "0xbfe2b0",
+   "0xf00d10",
+   "0xf03cb0",
+   "0xf2dbb0",
+   "0xf40840",
+   "0xf51fd0",
+   "0xffbff0"
   ]
  }
 }

@@ -4,17 +4,24 @@
 定義 (PE の import 解決と文字列参照だけを使う。逆アセンブルは peidx.Image の共通部品):
   API  = 関数内の call 先が指す import 名。直接 call は宛先の thunk (`jmp qword ptr [rip+IAT]`) を 1 段たどる。
          `call qword ptr [rip+..]` は IAT スロットを直接指すときだけ解決する (.data の関数ポインタ表は解決しない)
-  STR  = rip 相対で `MachineGuid` / `SOFTWARE\\Microsoft\\Cryptography` の ASCII 文字列 VA を指す命令を持つ
-  H1   = API に GetComputerNameExW と SHGetFolderPathW を両方含む
+  STR  = rip 相対で `MachineGuid` (ASCII・UTF-16LE) / `SOFTWARE\\Microsoft\\Cryptography` (ASCII) を指す命令を持つ
+  DYN  = rip 相対で UTF-16LE の `SHGetFolderPathW` / `SHFolder.dll` (終端 NUL 付き) を指す命令を持つ
+         (LoadLibraryW で SHFolder.dll を読み、名前で関数を解決する動的呼出しの目印)
+  NIND = rip 相対でない間接 call (`call reg`・`call [reg+..]`) の件数 (逆アセンブル数)
+  H1   = API に GetComputerNameExW と SHGetFolderPathW (IAT 直接) を両方含む
   H2   = API に GetComputerNameExW と (RegOpenKeyExA|W・RegQueryValueExW のいずれか) を含む
-  H3   = STR を持つ
+  H3   = STR
+  H4   = API に GetComputerNameExW を含む
+  H5   = API に SHGetFolderPathW (IAT 直接) を含む
+  H6   = DYN
+  H7   = API に GetComputerNameExW を含み、かつ SHGetFolderPathW を IAT 直接または DYN で使う
   G3f  = gradeChar (`[[[0x15e4790]]+0xd0]`) を `cmp ..., 0x3f` で比較する関数 (results/flag_sites.json の grade_sites)
   G40  = 同 `cmp ..., 0x40`
 
 再現: FL_WIN64_DIR=<fl-win64 展開先> python3 tools/startup/license_obs/probe_hwid.py
 出力: results/probe_hwid.json (自動生成)。
 """
-import collections, json, os, struct, sys
+import collections, json, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -22,7 +29,21 @@ from peidx import Image, rip_target  # noqa: E402
 import pefile  # noqa: E402
 
 RES = os.path.join(HERE, 'results')
-STRINGS = [b'MachineGuid\x00', b'SOFTWARE\\Microsoft\\Cryptography\x00']
+
+
+def w16(s):
+    return (s + '\x00').encode('utf-16-le')
+
+
+STRINGS = [
+    ('MachineGuid.A', b'MachineGuid\x00'),
+    ('MachineGuid.W', w16('MachineGuid')),
+    ('Cryptography.A', b'SOFTWARE\\Microsoft\\Cryptography\x00'),
+    ('SHGetFolderPathW.W', w16('SHGetFolderPathW')),
+    ('SHFolder.dll.W', w16('SHFolder.dll')),
+]
+STR_KEYS = ('MachineGuid.A', 'MachineGuid.W', 'Cryptography.A')
+DYN_KEYS = ('SHGetFolderPathW.W', 'SHFolder.dll.W')
 GCN = 'GetComputerNameExW'
 SHF = 'SHGetFolderPathW'
 REG = {'RegOpenKeyExA', 'RegOpenKeyExW', 'RegQueryValueExW'}
@@ -54,13 +75,14 @@ def thunk_name(im, iat, va, cache):
 
 
 def string_vas(im):
-    out = set()
-    for s in STRINGS:
+    out = {}
+    for label, s in STRINGS:
+        vas = set()
         i = im.raw.find(s)
         while i >= 0:
-            rva = im.pe.get_rva_from_offset(i)
-            out.add(im.base + rva)
+            vas.add(im.base + im.pe.get_rva_from_offset(i))
             i = im.raw.find(s, i + 1)
+        out[label] = vas
     return out
 
 
@@ -69,7 +91,8 @@ def main():
     iat = iat_map(im)
     svas = string_vas(im)
     api = collections.defaultdict(set)
-    strf = set()
+    refs = {label: collections.defaultdict(list) for label, _ in STRINGS}
+    nind = collections.defaultdict(int)
     cache = {}
     n = 0
     for lo, hi, ins in im.iter_insns():
@@ -83,10 +106,13 @@ def main():
                     nm = iat.get(t)
                 else:
                     nm = None
+                    nind[lo] += 1
                 if nm:
                     api[lo].add(nm)
-            if t is not None and t in svas:
-                strf.add(lo)
+            if t is not None:
+                for label, vas in svas.items():
+                    if t in vas:
+                        refs[label][lo].append((i.address, i.mnemonic))
     cmp_sets = {'0x3f': set(), '0x40': set()}
     flagged = json.load(open(os.path.join(RES, 'flag_sites.json')))
     for g in flagged['grade_sites']:
@@ -94,12 +120,17 @@ def main():
             cmp_sets['0x3f'].add(g['func'])
         if g.get('op', '').startswith('cmp imm 0x40'):
             cmp_sets['0x40'].add(g['func'])
+    strf = {f for label in STR_KEYS for f in refs[label]}
+    dyn = {f for label in DYN_KEYS for f in refs[label]}
+    gcn = {f for f in api if GCN in api[f]}
     H = {
-        'H1 GCN+SHF': {f for f in api if GCN in api[f] and SHF in api[f]},
-        'H2 GCN+REG': {f for f in api if GCN in api[f] and api[f] & REG},
+        'H1 GCN+SHF (IAT 直接)': {f for f in gcn if SHF in api[f]},
+        'H2 GCN+REG (IAT 直接)': {f for f in gcn if api[f] & REG},
         'H3 STR': strf,
-        'H4 GCN': {f for f in api if GCN in api[f]},
-        'H5 SHF': {f for f in api if SHF in api[f]},
+        'H4 GCN (IAT 直接)': gcn,
+        'H5 SHF (IAT 直接)': {f for f in api if SHF in api[f]},
+        'H6 DYN': dyn,
+        'H7 GCN+SHF (IAT 直接 or DYN)': {f for f in gcn if SHF in api[f] or f in dyn},
     }
     g3f, g40 = cmp_sets['0x3f'], cmp_sets['0x40']
     rows = []
@@ -112,15 +143,28 @@ def main():
     out = {
         'image_functions': n,
         'iat_names_resolved': len(iat),
-        'string_vas': sorted(hex(v) for v in svas),
+        'strings': {
+            label: {
+                'occurrences': len(svas[label]),
+                'ref_functions': len(refs[label]),
+                'ref_insns': sum(len(v) for v in refs[label].values()),
+                'ref_mnemonics': dict(collections.Counter(m for v in refs[label].values() for _, m in v)),
+                'vas': sorted(hex(v) for v in svas[label]),
+            }
+            for label, _ in STRINGS
+        },
         'n_G3f': len(g3f), 'n_G40': len(g40),
+        'nonrip_indirect_calls': {'all': sum(nind.values()), 'in_H6': sum(nind[f] for f in dyn)},
         'rows': rows,
         'H': {k: sorted(hex(v) for v in s) for k, s in H.items()},
     }
     os.makedirs(RES, exist_ok=True)
     with open(os.path.join(RES, 'probe_hwid.json'), 'w') as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
-    print(f'functions={n} iat_resolved={len(iat)} string_vas={len(svas)} G3f={len(g3f)} G40={len(g40)}')
+    print(f'functions={n} iat_resolved={len(iat)} G3f={len(g3f)} G40={len(g40)}')
+    for label, _ in STRINGS:
+        print(f'string {label}: occurrences={len(svas[label])} ref_functions={len(refs[label])}')
+    print(f'nonrip_indirect_calls all={sum(nind.values())} in_H6={sum(nind[f] for f in dyn)}')
     for r in rows:
         print(r)
 
