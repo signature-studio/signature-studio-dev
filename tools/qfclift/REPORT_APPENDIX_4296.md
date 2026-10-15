@@ -52,7 +52,7 @@ REPORT.md §7.9 の全文 (分割移動)。
 | strict | DllMain(PROCESS_ATTACH) = trap | `[fle] MISSING IMPORT LocalAlloc` (rt 未実装 import。DllMain 完走せず) |
 | soft | FontCache_GetStats = trap | `[fle] call to UNLIFTED function 0 ret=0x57fb09`。soft 呼出し 0 件 (DllMain は ok・rax=0x1) |
 
-- 判定: strict / soft とも **FAIL** (PASS 条件を満たさない)。soft の停止点は §7.4 と同じ GetStats。strict の停止点は `LocalAlloc` で、soft と異なる。
+- 判定: strict / soft とも **FAIL** (PASS 条件を満たさない)。soft の停止点は付録 2 の既存記録 (GetStats) と同じ。strict の停止点は `LocalAlloc` で、soft と異なる。
 - 所要: real 50 s・load `1.88 1.02 0.43 → 1.43 1.03 0.47` (nproc 4)。`qfc_boot.sh` の終了コード 1 (FAIL)。
 
 ### 付録 2.2 FT 解決 (0x563000) の再測定 (同 HEAD・n=1)
