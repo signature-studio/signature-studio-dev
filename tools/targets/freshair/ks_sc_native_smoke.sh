@@ -7,7 +7,8 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; L="$HERE/lift2"
 CORE="${SC_CORE:-$HERE/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64}"
 N="${1:-20}"; out="${2:-${RUNNER_TEMP:-${TMPDIR:-/tmp}}/ks_sc_smoke}"
 [ -f "$CORE" ] || { echo "missing: $CORE (work-liftlib-targets を展開する)" >&2; exit 2; }
-mkdir -p "$out"; cd "$out"; source "$L/env.sh"
+mkdir -p "$out"; cd "$out"
+set +e; source "$L/env.sh"; set -e  # env.sh は emsdk を読むが、この smoke は emsdk を使わない。emsdk の無い環境では読み込みの失敗だけ無視する
 POKES=(); while read -r va sz val; do [[ "$va" == \#* || -z "$va" ]] && continue; POKES+=(--poke "$va:$sz:$val"); done < "$L/pokes.txt"
 clang -O1 -w -o native_comp "$L/native/native_comp.c"
 clang -O1 -w -o native_filter "$L/native/native_filter.c"
