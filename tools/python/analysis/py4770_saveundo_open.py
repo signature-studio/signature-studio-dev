@@ -99,9 +99,29 @@ def main():
 
     arr_rel = insns(ARR_RELEASE, 0x80)
     assert any(i.mnemonic == "lock xadd" for i in arr_rel), "0x418190 refcount"
-    arr_asg = insns(ARR_ASSIGN, 0x60)
-    assert any(i.mnemonic == "call" and i.op_str == "0x418000" for i in arr_asg), "0x418210 copy path"
-    print("array: 0x418190 = refcount release / 0x418210 = share or copy")
+    arr_asg = {i.address: i for i in insns(ARR_ASSIGN, 0x60)}
+
+    def expect(va, mnemonic, op_str):
+        ins = arr_asg[va]
+        assert ins.mnemonic == mnemonic and ins.op_str == op_str, (hex(va), ins.mnemonic, ins.op_str)
+
+    expect(0x418223, "je", "0x41823b")
+    expect(0x418229, "jge", "0x41823b")
+    expect(0x418234, "call", "0x418000")
+    assert arr_asg[0x418239].mnemonic == "jmp" and arr_asg[0x418239].op_str == "0x418251", "0x418239 jump"
+    expect(0x41823E, "call", "0x418260")
+    expect(0x418249, "call", "0x418190")
+    expect(0x41824E, "mov", "qword ptr [rbx], rsi")
+    print("array assign: 共有経路 (0x41823b→0x418260→0x418190→dst=src) と複写経路 (0x418000→0x418239→0x418251)")
+
+    rel = {i.address: i for i in insns(0x1019DD0, 0x60)}
+    assert rel[0x1019DD0].mnemonic == "push", "0x1019dd0 head"
+    assert rel[0x1019DDA].mnemonic == "mov" and rel[0x1019DDA].op_str == "rax, qword ptr [rbx + 0x20]", "0x1019dd0 arr"
+    assert rel[0x1019DE3].mnemonic == "mov" and rel[0x1019DE3].op_str == "rax, qword ptr [rax - 8]", "0x1019dd0 count"
+    assert rel[0x1019E03].mnemonic == "call" and rel[0x1019E03].op_str == "0x40faa0", "0x1019dd0 loop call"
+    assert rel[0x1019E13].mnemonic == "lea" and rel[0x1019E13].op_str == "rcx, [rbx + 0x20]", "0x1019dd0 release arg"
+    assert rel[0x1019E1E].mnemonic == "call" and rel[0x1019E1E].op_str == "0x418190", "0x1019dd0 release call"
+    print("0x1019dd0 = [arr-8] 件数分の 0x40faa0 の後に 0x418190")
 
     dele = insns(DELETE_OBJ, 0x30)
     assert any(i.mnemonic == "call" and "[rbx - 0x20]" in i.op_str for i in dele), "0x40faa0 vtbl-0x20"
