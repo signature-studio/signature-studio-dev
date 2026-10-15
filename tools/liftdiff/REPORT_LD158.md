@@ -1,7 +1,7 @@
 # liftdiff LD-158 (#3470) — ret=i128 39 関数の実戻りレジスタの実測と、xmm0 戻り 8 関数の署名修正
 
 > 親 #976 (LD-24) の子 (前段 [`REPORT_LD38.md`](REPORT_LD38.md) §1 の『推定』を実測で置き換える)。
-> 既知類型との関係: 該当なし (case 生成と署名型の問題)。副次観測の xmm 入力欠落は tag `xmm_arg_drop` (`docs/DEFECTS.md` 既存類型) と一致。
+> 既知類型との関係: 該当なし (case 生成と署名型の問題)。副次観測の xmm 入力欠落は tag `xmm_arg_drop` と一致 (類型表は `tools/liftdiff/docs/FORMAT.md` の 107 行、判定は `tools/liftdiff/ldlib/classify.py`。`docs/DEFECTS.md` には該当類型が無い)。
 > 測定 commit: `f61e06d49` (コード差分の最終 commit。以後は本 REPORT のみ変更)。
 
 ## 1. 結論
@@ -72,7 +72,26 @@
 | `cc3660` | `i64` | `movapd xmm0, xmm1` / `mulsd xmm0, [rcx+0x10a8]` / `ret` |
 
 - 8 件とも ret 直前は xmm0 への演算で、第 2 引数 (double) は xmm1 から読まれる (`cc32f0` 等)。IR 署名には xmm 引数が無い。
-- `ld38` 窓 3 でも 8 件とも `xmm0` (§3.2)。dsm 抜粋は `python3` の直接読み (`ld38` と同じ dsm、`tools/m11/work/boot*.drc.dsm`)。
+- `ld38` 窓 3 でも 8 件とも `xmm0` (§3.2)。ret 直前の抜粋は `tools/m11/work/boot1.drc.dsm` (`6957d0` `6957f0` `695930` `695960` `812df0` `812e70`) と `boot2.drc.dsm` (`cc32f0` `cc3660`) の実測行。
+
+### 3.3b 入口の xmm 入力 (IR と dsm の対応)
+
+関数先頭の 1 命令 (入口命令) は 8 件とも `movapd xmm0, xmm1` または `movaps xmm0, xmm1` で、xmm1 を読み、xmm0 を読む前に上書きする。IR では、この xmm1 の入口値が次のように置かれている。
+
+| 関数 | dsm の入口命令 (ファイル・アドレス) | IR の入口 xmm1 値 (`tools/m11/work/boot_final3.ll` の行) | 入力 slot |
+|---|---|---|---|
+| `6957d0` | `66 0f 28 c1` movapd xmm0, xmm1 (boot1 `0x6957d0`) | `sext i64 %arg1 to i128` (249856) | xmm1 |
+| `6957f0` | `66 0f 28 c1` movapd xmm0, xmm1 (boot1 `0x6957f0`) | `sext i64 %arg1 to i128` (249870) | xmm1 |
+| `695930` | `66 0f 28 c1` movapd xmm0, xmm1 (boot1 `0x695930`) | `xor i128 0, 0` (249885) | xmm1 |
+| `695960` | `66 0f 28 c1` movapd xmm0, xmm1 (boot1 `0x695960`) | `xor i128 0, 0` (249905) | xmm1 |
+| `812df0` | `0f 28 c1` movaps xmm0, xmm1 (boot1 `0x812df0`) | `sext i64 %arg1 to i128` (317295) | xmm1 |
+| `812e70` | `0f 28 c1` movaps xmm0, xmm1 (boot1 `0x812e70`) | `sext i64 %arg1 to i128` (317322) | xmm1 |
+| `cc32f0` | `66 0f 28 c1` movapd xmm0, xmm1 (boot2 `0xcc32f0`) | `sext i64 %arg1 to i128` (396310) | xmm1 |
+| `cc3660` | `66 0f 28 c1` movapd xmm0, xmm1 (boot2 `0xcc3660`) | `sext i64 %arg1 to i128` (396505) | xmm1 |
+
+- 表の IR 行は、`define` の後で最初に `movapd` / `movaps` (`__asm_movapd` 等) の元になる値の定義行。`xor i128 0, 0` の 2 件は xmm0 ではなく、この movapd の元 (xmm1) の値が 0 に置換されている。
+- `sext i64 %arg1` の 6 件は、xmm1 の入口値が整数引数 arg1 の値 (下位 64bit のビット列) に置換されている。どちらの場合も double 引数の値は IR に届いていない。
+- 入力 slot は dsm の ModRM で判定した (`c1` = reg が xmm0、rm が xmm1)。
 
 - 同じ 8 関数の IR は `define weak i128 @function_X(i64 %arg1)` で、本体は `__asm_movapd` と `__asm_mulsd` の i128 演算 (`tools/m11/work/boot_final3.ll`)。
   IR が xmm 値を i128 として持つことが、戻り型の誤りの原因と読める。
@@ -133,8 +152,8 @@
 - 効果 (`liftdiff.py run targets/m11.json --fn <8 件> --nobuild --state auto`、測定 commit): 8/8 が `verdict=mismatch` で実行可能になった (修正前: `unsupported_sig`)。
   case 集計 `diff` 53・`equal` 11・`native_fault` 24 (8 × 11 = 88 件)。
 - 陽性対照: 修正後の wasm 戻り `x0` が非零の case は 21 件 (raw 記録 53 件中)。`tr=1` 経路が値を返すことを示す。
-- 注意: 8 関数の `diff` の多くは入力側の欠落と読める。8 件とも第 2 引数 (double) を xmm1 から読むが、IR 署名に xmm 引数が無いため case 生成は xmm1 を投入しない。native は xfill で xmm1 = 2.25 (`0x4002000000000000`) を入れる。
-  tag `xmm_arg_drop` と一致する。戻り型の修正だけでは一致判定は通らない。これは本 issue の範囲外 (§6)。
+- 注意: 8 関数の `diff` の多くは入力側の欠落と読める。8 件とも第 2 引数 (double) を入口の xmm1 から読む (§3.3b)。IR 署名に xmm 引数が無いため、wasm 側には xmm1 の値が渡らず、IR の入口 xmm1 は `sext(%arg1)` (6 件) または 0 (2 件) になる。native は `rt/ld_native.c` の xfill で xmm1 = 2.25 (`0x4002000000000000`) を入れる。
+  両者の入力が一致しないため、tag `xmm_arg_drop` と一致する (判定条件は `ldlib/classify.py`: 機械語が読む xmm 入力の最大 slot + 1 > IR の fp 引数数)。戻り型の修正だけでは一致判定は通らない。これは本 issue の範囲外 (§6)。
 
 ## 5. 検証
 
@@ -167,5 +186,14 @@
 
 ## 8. 測定 commit からの差分 (差分 0 の証跡)
 
-- `git diff f61e06d49 HEAD -- tools/liftdiff tools/m11 docs/DOC_MAP.md` は、本 REPORT と DOC_MAP・REPORT_LD38 の文書だけを含む (コード差分 0)。
-  コマンドの出力は PR 本文に転記する。
+- `git diff --stat f61e06d49 b5f534339 -- tools/liftdiff tools/m11 docs/DOC_MAP.md` (レビュー対象の文書 commit 時点の出力):
+
+  ```
+   docs/DOC_MAP.md                |   3 +
+   tools/liftdiff/REPORT_LD158.md | 171 +++++++++++++++++++++++++++++++++++++++++
+   tools/liftdiff/REPORT_LD38.md  |   1 +
+   3 files changed, 175 insertions(+)
+  ```
+
+- コード差分 (REPORT と DOC_MAP を除く) は 0 行 (`git diff --stat f61e06d49 b5f534339 -- tools/liftdiff tools/m11 ':!tools/liftdiff/REPORT_*.md' ':!docs/DOC_MAP.md'` の出力は空)。
+- 本節を含むレビュー指摘の修正 commit は文書のみ (本 REPORT の追記と修正)。`f61e06d49` から最新 HEAD までの出力は PR 本文に転記する。
