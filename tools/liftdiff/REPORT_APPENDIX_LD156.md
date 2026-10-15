@@ -58,7 +58,7 @@
 - `sta` の native=0 (作り直しなし) は n=1 のみ。native 作り直しを加えたときだけ match するかは、この測定では確かめていない (n=1 の mismatch だけ)。
 - `none`・`stk`・`all` (native=0) も n=1 のみ。`native=0, img` だけ n=2。受入条件 1 の「n=2 以上」は未達。
 - LD-121 の both 条件 (`native=1` と wasm の作り直し) を本 driver で流した行は無い。driver は wasm 側を作り直さず、`RESET` だけで候補を戻す (LD-121 の both とは別物)。both の再確認は未実施。
-- 再測定に必要な素材 (`work-m11`・`work-liftdiff`・`toolchain-emsdk`) はこの run の `$HOME/artifacts` に無く、wasm を作り直せなかった (`fl-win64` のみ実在)。上記の n=2・both の追加測定は、素材を指定した別 run で行う。
+- 再測定に必要な素材 (`work-m11`・`work-liftdiff`・`toolchain-emsdk`) は本 run の素材置き場 (`docs/WORKFLOW.md` §11 の取得対象) に無く、wasm を作り直せなかった (`fl-win64` のみ実在)。上記の n=2・both の追加測定は、素材を指定した別 run で行う。
 - main 側の `tools/liftdiff/ldlib/session.py` は、測定 commit 以降に fvm の候補多重・ret 断片の対象外化を入れている (LD-177)。本測定は `0de02db4e` の `session.py` で行った。main を取り込んだ後の判定は未確認。
 
 ## 5. 子 issue (受入条件 2 の残り)
