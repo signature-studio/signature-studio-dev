@@ -9,8 +9,8 @@
 - **`blank` (0xd7c600) は isBlanked と activeCounter の効果を確定した**: 第 1 引数が 1 なら `isBlanked` (`scr+0x1d0`) を真に書く。真→偽の解除では `scr+0x1cc ← scr+0x1dc` (activeCounter の復元) を行う。`scr+0x1dc` の初期値は未実測のため仮置き 0。偽の経路の `0xd7e330` 呼出し (`[scr+0x1c4]` 側。観測対象を変えるかは未確定) は mock/C に含めていない (未解決 (d))。
 - **`addMeter` (0xd7ada0) は観測できる状態を変える (PE で確定。round 1 で追加)**: 書式解析が成功 (rc>0) し `scr≠0` のとき `0xd7d9e0` が呼ばれ、その分岐なしの経路で `isUnBlank` (`scr+0x1d1`) を真に、`activeCounter` (`scr+0x1cc`) を `scr+0x1dc` (仮置き 0) にする。mock と C はこの遷移を持ち、`tests/screen_diff.mjs` の期待値で検査する。
 - **残り 5 件** (`displayBar`・`fillRect`・`drawRect`・`drawText`・`eraseRect`) は、**API から観測できる状態を変えないと推定**する。根拠は本体と dispatch callback の先頭 1200 命令に `scr+0x1c?`・`+0x1d?` への直接の書込みが無かったことだけで、本体の全経路と下位呼出しは未確認 (未解決 (a)〜(d))。mock と C は引数検査と None だけを模す (`arrangement.selectionSet` 等と同じ扱い)。描画の引数の意味 (矩形の書式 x/y/w/h か l/t/r/b か) は保留。
-- 実装・未実装の件数は main (`68eb512cd`) の 175/260 (main の `tests/provider_check.mjs` の期待値) → **182/253** (`fl_table.c` 435 関数。本 PR の 7 件を加えた。`provider/build.sh` のハンドラ 182 と一致)。`tests/screen_diff.mjs` は 87 呼出しで mock と C の差分 0、期待値の不一致 0。
-- 測定 commit: `52d3a660a` (コードを変えた最後の commit。main `68eb512cd` を取り込んだ merge)。e2e はすべて PASS (下の検証表)。
+- 実装・未実装の件数は main (`acd2efdc3`) の 176/259 (main の `tests/provider_check.mjs` の期待値。PY-235 の `general.processRECEvent` 1 件を含む) → **183/252** (`fl_table.c` 435 関数。本 PR の 7 件を加えた。`provider/build.sh` のハンドラ 183 と一致)。`tests/screen_diff.mjs` は 87 呼出しで mock と C の差分 0、期待値の不一致 0。
+- 測定 commit: `cad48bf70` (コードを変えた最後の commit。main `acd2efdc3` を取り込んだ merge)。e2e はすべて PASS (下の検証表)。
 
 ## PE 根拠 (VA)
 
@@ -74,19 +74,19 @@
 
 ## 検証
 
-測定 commit: `52d3a660a` (`Merge remote-tracking branch 'origin/main' into 3022-py135-screen-draw-pe`。main `68eb512cd` を取り込んだ merge。コードを変えた最後の commit)。以下は同じ commit のクリーンな作業ツリーで実行した。これより前の測定は main 取り込みで無効になったため、本節が新しい測定。
+測定 commit: `cad48bf70` (`Merge remote-tracking branch 'origin/main' into 3022-py135-screen-draw-pe`。main `acd2efdc3` を取り込んだ merge。コードを変えた最後の commit)。以下は同じ commit のクリーンな作業ツリーで実行した。これより前の測定 (`52d3a660a`) は main 取り込みで無効になったため、本節が新しい測定。
 
-環境: runner 4 core。load average (1 分値) 0.01 (測定開始時)。emsdk は `[EMSDK]` の 6.0.12 (`tools/m1/flags.sh` の pin と一致。runner に既存)。`toolchain-emsdk` の素材 (`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst`) は展開していない。fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (5 秒)、`FL_WIN64_DIR` はその展開先。前提生成物: `fetch_inputs.sh` (`FL_WIN64_DIR` 指定、rc 0)・`build_cpython_wasm.sh` (rc 0、wall 4 分 05 秒。`5edad7cc6` の生成物を再利用。入力の `build_cpython_wasm.sh`・`src/` は main の取り込みで変わっていない)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (`f3a053289` で再実行、rc 0、wall 5.9 秒)。main `d39241f69` (`5edad7cc6`) の取り込みで衝突したのは `tests/provider_check.mjs` の 1 箇所 (条件行と件数) だけで、PR 側 `pe135` と main 側 `pe143` の両方を残した。main `58ed035cf` (`f3a053289`) の取り込みも同じ 1 箇所で、main 側 `pe133` と PR 側 `pe135` の両方を残し、件数は実測の 182 / 253 にした。main `68eb512cd` (`52d3a660a`) の取り込みは衝突せず、main 側の変更は REPORT と解析スクリプトだけだった。
+環境: runner 4 core。load average (1 分値) 1.23 (`uptime` の測定時点)。emsdk は `[EMSDK]` の 6.0.12 (`tools/m1/flags.sh` の pin と一致。runner に既存)。`toolchain-emsdk` の素材 (`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst`) は展開していない。前提生成物は本 run で作り直した: fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (5.5 秒)、`FL_WIN64_DIR` はその展開先。`fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、wall 4 分 06 秒。生成物が無いため新規ビルド)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、wall 6.4 秒)。main `acd2efdc3` の取り込みで衝突したのは `tests/provider_check.mjs` の 1 箇所 (条件行と件数) だけで、PR 側 `pe135` と main 側 `pe235` (#3701 `general.processRECEvent`) の両方を残し、件数は実測の 183 / 252 にした。これより前の取り込み (`d39241f69`・`58ed035cf`・`68eb512cd`) の衝突の記録は Git 履歴 (`52d3a660a` 以前) を参照。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・`fl_table.c: 435 関数, ハンドラ 182`・警告 0 | 1.079 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 182 / 未実装 253 / MCP 静的 60) | 0.351 秒 |
-| `node tests/screen_diff.mjs` | calls 87、diffs 0、PASS | 0.050 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.978 秒 |
-| `node tests/*_diff.mjs` (22 本。main 由来の差分テストを含む。22 本の合計) | 22/22 rc 0 | 1.977 秒 |
+| `bash provider/build.sh` | rc 0・`fl_table.c: 435 関数, ハンドラ 183`・警告 0 | 1.079 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 183 / 未実装 252 / MCP 静的 60) | 0.381 秒 |
+| `node tests/screen_diff.mjs` | calls 87、diffs 0、PASS | 0.053 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.188 秒 |
+| `node tests/*_diff.mjs` (22 本。main 由来の差分テストを含む。22 本の合計) | 22/22 rc 0 | 2.155 秒 |
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5)。`59dac085f` では `blank` の解除時の復元 (1) と `drawText` の文字列検査 (2) を外して FAIL を確かめた。addMeter の状態遷移は次の 2 件で確かめ、どちらも `52d3a660a` で再実行した (改変 → FAIL → 元の内容に戻して PASS。戻した内容は `cmp` で元と一致を確認)。
+ネガティブコントロール (`docs/WORKFLOW.md` §5)。`59dac085f` では `blank` の解除時の復元 (1) と `drawText` の文字列検査 (2) を外して FAIL を確かめた。addMeter の状態遷移は次の 2 件で確かめ、どちらも `cad48bf70` で再実行した (改変 → FAIL → 元の内容に戻して PASS。戻した内容は `cmp` で元と一致を確認)。
 
 - (3) mock の `addMeter` から `isUnBlank`・`activeCounter` の書込みを外す → `AssertionError: screen 型違い 期待値と不一致 5 件`、rc 1 (FAIL)。戻すと PASS (calls 87)。
 - (4) C の `addMeter` から同じ書込みを外す → 同じ 5 件、rc 1 (FAIL)。戻すと PASS (calls 87)。
@@ -95,7 +95,7 @@
 コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 52d3a660a HEAD -- tools/python ':!*.md'
+$ git diff cad48bf70 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
