@@ -122,8 +122,34 @@ function pyAssets(): Plugin {
   };
 }
 
+/**
+ * vreg wasm (`tools/startup/vreg/build.sh module` の生成物・gitignore) が無い checkout でも vite build を通す。
+ * 無いときは `?license=import` の取込入口が読む createModule を「未生成」を投げるスタブに差し替え、build 時に警告を出す。
+ * 生成物があれば実物を使う (製品 build・e2e_product_import とも同じ経路)。
+ */
+function vregWasmOptional(): Plugin {
+  const SPEC = /\/vreg\/build\/vreg_wasm\.mjs$/;
+  const STUB = "\0vreg-wasm-missing";
+  return {
+    name: "vreg-wasm-optional",
+    enforce: "pre",
+    resolveId(source, importer) {
+      if (!importer || !SPEC.test(source)) return null;
+      const abs = path.resolve(path.dirname(importer), source);
+      if (existsSync(abs)) return null;
+      this.warn(`vreg wasm 未生成 (${path.relative(here, abs)}): ?license=import は動かない。生成: bash tools/startup/vreg/build.sh module`);
+      return STUB;
+    },
+    load(id) {
+      return id === STUB
+        ? 'export default async function createVregModule() { throw new Error("vreg wasm 未生成: bash tools/startup/vreg/build.sh module を実行してください"); }'
+        : null;
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [crossOriginIsolation(), wasmAssets(), pyAssets(), thirdPartyNotices()],
+  plugins: [crossOriginIsolation(), wasmAssets(), pyAssets(), vregWasmOptional(), thirdPartyNotices()],
   server: {
     // tools/ 配下は巨大な work/ を多数抱える (inotify watch 枯渇 ENOSPC の原因)。HMR 対象外にする
     watch: { ignored: ["**/tools/**", "**/deploy/**", "**/dist/**", "**/node_modules/**"] },
