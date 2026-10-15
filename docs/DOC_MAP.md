@@ -163,7 +163,7 @@
 | `tools/liftdiff/REPORT_APPENDIX_LD182.md` | ~110 | liftdiff LD-182 (#3881): units / hybrid 2 回連続の件数・関数単位の判定は一致。case 単位の揺れの結論と切り分けは付録の §結論・§4 を参照。突合は `tests/ld182_casediff.py` |
 | `tools/liftdiff/REPORT_APPENDIX_LD183.md` | ~120 | liftdiff LD-183 (#3935): case 単位の揺れの切り分け。追加の busy 競合の有無では件数・関数判定は動かず (無負荷ベースラインではない)、case の並び (履歴) は件数・関数判定を動かす。V8 階層化は未切り分け。harness は `tests/ld183_order_load.py` |
 | `tools/liftdiff/REPORT_APPENDIX_LD248.md` | ~60 | liftdiff LD-248 (#4975): 機械語入口型 double の i128 引数を xmm に記録し、cmp_trace の i128 位置の除外を外した結果。11 関数の偽の不一致は 0 件、sample:800 の判定は base と同一 (359/236/206) |
-| `tools/liftdiff/REPORT_APPENDIX_LD243.md` | ~90 | liftdiff LD-243 (#4887): case 単位の揺れの V8 階層化 (C) の切り分け。`--liftoff-only` で case 差 38〜43 (反復は 2〜3)、関数判定は動かず。(B) と (C) の分離は未達。`--v8 liftoff` は `tests/ld183_order_load.py` |
+| `tools/liftdiff/REPORT_APPENDIX_LD243.md` | ~90 | liftdiff LD-243 (#4887): case 単位の揺れの切り分け。(B) 並び・process 履歴が主因、(C) V8 階層化は判定 0 変化。詳細は §9。`--v8 liftoff` は `tests/ld183_order_load.py` |
 | `tools/liftdiff/REPORT_APPENDIX_LD165.md` | ~120 | liftdiff LD-165 (#3585): units / hybrid の case 単位の揺れ (本 run の判定は 4 回とも不変・case 単位 16 件のうち 15 件が wasm の trap ↔ timeout 等、1 件が native ms の 50 ms 跨ぎ)、shard ごとの起点、単独 replay。揺れの候補 (A 負荷による 1.0 s 上限の内外・B wasm runner の履歴依存・C V8 階層化・D native ms の 50 ms 跨ぎ) と未確定の点。再現性の受入は子 LD-182 へ。突合は `tests/ld165_flip_origin.py`・replay は `tests/ld165_replay.py` |
 | `tools/liftdiff/REPORT_APPENDIX_LD96.md` | ~168 | liftdiff LD-96 (#2258): sample:800 shard 1 の件数揺れの切り分け (部分達成)。高水位外の heap 残存の計測は §8 (測定値は `results/ld96_heap_residue*.tsv`)。未解明の残作業は #2258 |
 | `tools/liftdiff/REPORT_APPENDIX_LD122.md` | ~104 | liftdiff LD-122 (#2682): 0x959a40 の全体 run 限定 diff の出所 (同 runner で先行する 0x50abe0 の case 列の切り分け)。切り分け表は `results/ld122_959a40_origin.tsv` (driver `ld122_origin.py`)。機構は #2723 へ移管。要否・揺れの残件は PM agent の判断待ち (§5) |
@@ -359,7 +359,7 @@
 | `tools/m11/trap_triage/REPORT_APPENDIX_3499.md` | ~60 | #3499: REPORT_718 §4j (証拠表の行 36〜66 の件ごとの判定・根拠・注・未解決) の全文。250 行上限のため分割移動。判定ツールは `judge_ctx_3499.py` |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3564.md` | ~150 | #3564: strict 候補の残り (証拠表の行 36〜66 の保留 6・単独 15) の件ごと判定 (真陽性 12・偽陽性 1・保留 8)。REPORT_718 §4i の全文・判定補助 `judge_src.py`・機械語側のネガティブコントロール `negctl_3564.py` (付録 §7)・行 37 の偽陽性と保留 8 件の機構 (§8。列挙ツール `frame_ops_3564.py`) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3502.md` | ~85 | #3502: 証拠表の行 67〜98 の保留 30 件の件ごと再判定 (真陽性 9・偽陽性 4・保留 19・判定基準・照合範囲・未解決)。REPORT_718 §4k の正本 |
-| `tools/m11/trap_triage/REPORT_APPENDIX_4885.md` | ~60 | #4885: 証拠表の行 67・68・71〜74 の件ごとの判定 (母数 6・真陽性 4・偽陽性 0・保留 2)。REPORT_718 §4l の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_4885.md` | ~90 | #4885: 証拠表の行 67・68・71〜74 の件ごとの判定 (母数 13・真陽性 6・偽陽性 0・保留 7)。REPORT_718 §4l の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` | ~79 | #3498 (PR #3567): strict 候補の証拠表 行 4〜35 (32 件) の件ごとの表・判定規則・未解決 (REPORT_718 §4h の全文。REPORT_718.md の 250 行上限のため分割移動)。判定の内訳は付録 §4h が正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3823.md` | ~67 | #3823: 923 の obj 0x10bd3960 への書込み (全 store 計装・unit 830/880 の 0 書込み)。呼出し鎖は未確定 |
