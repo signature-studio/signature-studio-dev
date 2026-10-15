@@ -47,7 +47,7 @@
 - 実行 (測定 commit `f13b104c1` のワークツリー・展開 `tools/python/work/fl`・load average (1 分値) は開始 0.46 / 終了 0.54):
   - `pe_vmt_probe.py 0xfe2cf8 0xfe2e10 --disp 0x118`: 7.3 秒・終了 0 (TPublicChannel)。
   - `pe_vmt_probe.py 0xfe2fc8 0xfe30e0 --disp 0x118`: 7.4 秒・終了 0 (TPreviewChannel)。
-  - 素材: `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C tools/python/work/fl --wildcards '*block00031_PE.bin'` (1.6 秒。`extracted/block00031_PE.bin` に展開)。
+  - 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/fl --wildcards '*block00031_PE.bin'` (1.6 秒。`extracted/block00031_PE.bin` に展開)。
 - 補助 (測定対象外・repo 外の一時スクリプト): PE 全体の 8 バイト値 (`0xffe290`・`0x1001b70`・`0xfe9090`) と 4 バイト値 (VA・RVA) の走査。`.text` の 1 件ずつ (VMT slot)、`.pdata` の関数 RVA の 1 件ずつ。
 
 ### 未解決
