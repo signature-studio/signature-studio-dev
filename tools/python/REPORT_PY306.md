@@ -16,8 +16,8 @@
 
 - 測定 commit: `2fefc9072` (解析スクリプト `pe_py306_slot_writers.py` の最後のコード変更)。基点は `origin/main` = `c2f0e7ebf`。
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2,324,302,252 バイト) から `extracted/block00031_PE.bin` (22,227,016 バイト) のみ展開。
-- 走査: `analysis/flapi/pe_py306_slot_writers.py`。`.text` の全命令 (5,183,833 件)。測定 (commit `2fefc9072` 上で再実行、`/tmp/opencode/py306_run.txt`): real 1m3.187s・user 58.889s・sys 4.287s・load 1 コア。終了 0。
-- 逆アセ: `analysis/flapi/pe_disasm.py` と、解決用の一時 probe (`work/py306/`・gitignore 対象)。
+- 走査: `analysis/flapi/pe_py306_slot_writers.py`。`.text` の全命令 (5,183,833 件)。測定 (commit `2fefc9072` 上で再実行、走査の出力は本 REPORT の値として記録・ログは保存しない): real 1m3.187s・user 58.889s・sys 4.287s・load 1 コア。終了 0。
+- 逆アセ: `analysis/flapi/pe_disasm.py`。
 
 ## 1. 静的初期値 (`.data`)
 
