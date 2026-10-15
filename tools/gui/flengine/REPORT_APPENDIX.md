@@ -209,6 +209,7 @@ CreateFileW の 1 呼出し = printErr の 1 行 `SHIMOPEN {json}`。json は `o
 仕組み: name section が無い wasm では V8 のスタックが `wasm-function[N]` (N = function index) しか出さない。
 `tools/gui/flengine/wasm_fnnames.mjs` が `<cjs>.wasm` の export section (`--export-all` で全 lift 関数が export 済み) から {index → 名前} の表を作り、SHIMOPEN の `frames` を引いて最初の `function_<VA>` を `caller` に入れる。
 build (wasm) と `tools/shim/src/file.c` は変えない (既定 build の出力は不変)。表の件数は `cfi_probe.mjs` の `fnmap` (`n` 16332・`lift` 7434 = 既定 build の実測)。
+解決は先頭 8 フレームまで (`file.c` は `frames` を 8 件しか記録しない)。9 フレーム目以降にしか lift 関数が無い呼出しは `caller` が空のままになる。
 表の正しさの確認: 実測スタックの `wasm-function[14995]` は表で `CreateFileW` に解決された。
 
 正の対照 (`open_trace_posctl.mjs`・既定 build `m11_gui.cjs` (`-O0 -pthread`)・`bash tools/gui/flengine/build.sh` 17 s):
