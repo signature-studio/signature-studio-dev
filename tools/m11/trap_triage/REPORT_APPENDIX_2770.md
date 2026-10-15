@@ -95,6 +95,7 @@ grep -c '^wp ' work/wp_F.txt; tail -1 work/wp_F.txt     # wp 件数・wpsum
 - 本 PR (受入の範囲を縮めた再測定): `rt/ld_native.c` に opt-in の `LD_PIN_CPU` (`sched_setaffinity`) を足した (`b90d87438`。未指定時の動作は変えない)。`cmp_img_2770.py` に state・detail の一致判定を足した (`d94083396`)。CPU 固定下の測定は §8.9。読取りのみの監視 (page 保護を変えない方式) は子 #3648 に移した。
 - レビュー round 2 の fix (差し戻し): §8.8 の run 数を 23 run (直列 21 run と strace 付き 2 run) に直した。表 1 の bc80 行の env を「LD_PAD なし」に直した。216 要素の扱いと img の列挙の定義を書き直した。§8.1 の EFAULT の記述から「確認した」を外した。`cmp_img_2770.py` は rsp が取れない時に `UNKNOWN: not comparable` と出す。DOC_MAP の行を本付録の現行の内容に合わせた。`rt/ld_native.c` は変えていない。
 - 今回の差し戻し (oc-review round=1) への fix: §8.9 を全 12 run で `97c4bc87c` から取り直した。`0x15e69bf` の監視 (W0・W2) を表と再現手順に足し、窓内 wp 3 件の記述を wp 行の範囲 (8 byte) に合わせた。結論行の因果断定を「一致する (因果は未特定)」に直した。閉じた #2769 を起票先にした行を「起票なし (表で追跡)」に直した。`rt/ld_native.c` の `LD_PIN_CPU` を strtol で検証し、`cmp_img_2770.py` の JSON を `with open` で読むようにした。
+- レビュー round 2 の fix (差し戻し): §8.9 の wp 段落の記録条件を `rt/ld_native.c` の `wp_fault` (`g_wp_hit`: 開始アドレスが `[va-15, va+7]`) に合わせた。round 1 の「wp 行の範囲 (8 byte) に合わせた」は誤りだった。W0・W2 を HEAD で取り直し、wp 行と `0x11e69bf` の値 (00・02) を照合した。DOC_MAP の行数と節を直した。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
@@ -222,8 +223,8 @@ python3 ../m11/trap_triage/cmp_img_2770.py work/probe/C_state.json work/probe/X6
 | 3 | F3p | `5ac308` | 0 / 0 | 03 |
 
 - 比較 (`cmp_img_2770.py`): 同じ CPU 内の arm 対 unarm (F0a・F0b・C0・W0 対 X0a、F2・C2・W2 対 X2、F3p 対 X3) と unarm 同士 (X0b 対 X0a) は全て `byte_diff=0`・`heap_eq=True`・`state_eq=True`・`detail_eq=True`。img 215 要素・48,484 byte。
-- `0x15e69bf` の窓内 wp は W0・W2 とも 3 件 (窓は `[va-15, va+7]`。`0x15e69bf`〜`c6` に重なるのは (2) だけ): (1) `rip_rva=0xf4db` addr `0x15e69b0` (`0x15e69bf` は不変)、(2) `rip_rva=0xf4d9` addr `0x15e69b8` (`0x15e69bf` は CPU 0 で `00→00`、CPU 2 で `00→02`)、(3) `rip_rva=0xf4db` addr `0x15e69c0` (`0x15e69bf` は不変、`c0`〜`c6` が変わる)。`0xf4d9`・`0xf4db` は `movsq` (`48 a5`)。CPU 2 で `0x11e69bf` が 02 になったのは (2) の 1 回の書込みである。
-- 未特定: 監視は `0x15e69bf`〜`c6` の 8 byte だけを記録するので、`0x11e69b8`〜`be` の値 (run 終了時 `11 0f a1 00 00 08 10`、両 CPU で同じ) は wp に出ない。(2) の movsq の写し元 (rsi 側の値。CPUID 由来かを含む) は未確認。wpsum faults 801 は同じ page への書込み fault の総数で、窓内は 3 件。
+- `0x15e69bf` の窓内 wp は W0・W2 とも 3 件 (記録は書込み先の開始アドレスが `[va-15, va+7]` のもの。`old`・`new`・`chg` は `va` から 8 byte (`0x15e69bf`〜`c6`) の前後比較。`0x15e69bf` に重なるのは (2) だけ、`c0`〜`c6` に重なるのは (3)): (1) `rip_rva=0xf4db` addr `0x15e69b0` (`0x15e69bf` は不変)、(2) `rip_rva=0xf4d9` addr `0x15e69b8` (`0x15e69bf` は CPU 0 で `00→00`、CPU 2 で `00→02`)、(3) `rip_rva=0xf4db` addr `0x15e69c0` (`0x15e69bf` は不変、`c0`〜`c6` が変わる)。`0xf4d9`・`0xf4db` は `movsq` (`48 a5`)。CPU 2 で `0x11e69bf` が 02 になったのは (2) の 1 回の書込みである。
+- 未特定: 記録は開始アドレスが `[va-15, va+7]` の書込みだけなので、それより前から始まる書込みは `0x11e69b8`〜`be` に届いても行に出ない。run 終了時の `0x11e69b8`〜`be` は、本 fix の再取得 (W0・W2、両 CPU で同じ) では `21 0f b0 00 00 08 10` だった。前回の記載 `11 0f a1 00 00 08 10` とは一致せず、差の原因は未確認。(2) の movsq の写し元 (rsi 側の値。CPUID 由来かを含む) は未確認。wpsum faults 801 は同じ page への書込み fault の総数で、窓内は 3 件。
 - 結論 (この環境の範囲): CPU を固定すると、`0x5ac308` の監視 (F) も陽性対照 (C・W) も boot 状態 (img・heap・unit の detail) を変えない。F の 4 run で `0x5ac308` への書込みの記録は 0 件 (監視 page への書込み fault も 0 回)。C の窓内は 248 件、W は 3 件 (検出器が働く)。
 - 残り (この節では確認していない): trace (呼出し列) の比較。CPU 固定下の 11 byte 差 (旧 216 要素環境) は C0 でも出なかった (§8.2b)。X は CPU 2・3 で 1 run ずつ (繰返しは CPU 0 のみ)。
 - 読取りのみの監視 (ハードウェア watchpoint) は未着手: `perf_event_open` は本 runner で `EACCES` (`perf_event_paranoid=4`、kernel 6.17)。子 #3648 で子プロセス + ptrace 方式を検討する。
