@@ -204,6 +204,7 @@
 | `tools/icall/REPORT_APPENDIX_2310.md` | ~180 | icall #2310 (ICALL-72): BLK+0 (0x36319008) 書込み store の wasm オフセット対応の付録。route/lift 分類は §6 で完了 (受入条件 2)。脱落 store の修復は #2427 → #2514 (merge 済み)、残件は #2508。`fa_sweep.sh 8 60` の実測 (bit 一致 46 / 値の不一致 10) は 1998 §4 の 47 / 9 が正本で、±1 揺れは #2302 で追跡 |
 | `tools/icall/REPORT_APPENDIX_2079.md` | ~62 | icall #2079 (ICALL-56): closure 外 indirect target `0x1810806a0` の扱い (closure root に追加・152 関数)。`fa_sweep.sh` の実測と、`0x1810553d0` の値の不一致が未解消であること (#2120 で追跡) |
 | `tools/icall/REPORT_APPENDIX_1921.md` | ~72 | icall #1921 (ICALL-51): SlateCore の encoded 関数ポインタ表・cookie の特定と、native loader の enc(NULL)=cookie 初期化 (`FA_ENC_INIT=1`)。受入条件 1・2 は部分達成 (wasm 側と api-set 表は #2009・#1922 へ移管)。`fa_sweep.sh 8 60` の件数変化の実測を含む |
+| `tools/icall/REPORT_APPENDIX_1844.md` | ~80 | icall #1844 (ICALL-43): Fresh Air 残落ち間接 call 6 件が RetDec の decode 段 (pass 001) で消えることの実測と、消去の機構 (`Decoder::resolvePseudoCalls()` の `Undefined` 経路) の読み取り。SymbolicTree の確定・警告との対応・`lost 0` は子 #4206 (ICALL-95) |
 | `tools/icall/REPORT_APPENDIX_1838.md` | ~50 | icall #1838 (ICALL-41): CHAININFO 断片による Fresh Air 範囲の伸長 (`prep_targets.py` の `chain_end`・親同一性チェック)。実 PE での伸長件数・roundtrip の再測定は素材待ち (本付録 §3 に状態を記す) |
 | `tools/icall/REPORT_APPENDIX_1067.md` | ~71 | icall REPORT §13 (#1026: Fresh Air 残落ち 6 件) の全文 (`REPORT_APPENDIX.md` §13 から分割移動) と、#1067 (ICALL-20) の段別切り分け。段別の主張は推定・既存記録のみで、dump 再生成は未実施 (素材 `work-icall`・`plugins-freshair` が要る) |
 | `tools/icall/REPORT_APPENDIX_1451.md` | ~70 | icall #1451 (ICALL-28): Fresh Air SlateCore closure 131 関数の wasm route (`fa_route_build.sh`) と native xmm0 bit 比較の付録。内訳 bit 一致 41 / native crash 66 / wasm のみ err 15 / 値不一致 9 (`fa_sweep.sh` 出力が正本)。未了は子 #1606・#1632・#1633 |
@@ -838,6 +839,7 @@
 | `tools/targets/serum2/gui/REPORT_SR24.md` | ~111 | SR-24 (#1710): Splice テンプレート実体化分岐の静的解析。sub-controller 振り分け `0x1804a1950` まで特定、demo bit 書込元・demo ダイアログ呼出元を列挙。分岐の特定は未達 (子 #1917) |
 | `tools/targets/serum2/gui/REPORT_SR28.md` | ~110 | SR-28 (#1917): Splice テンプレートの選択経路 (vtable 0x180a86b88 の設定元まで)・demo ダイアログ呼出元の vtable 位置。選択関数と demo bit 結線は未達 (SR-30 で訂正) |
 | `tools/targets/serum2/gui/REPORT_SR30.md` | ~100 | SR-30 (#2000): REPORT_SR28 の vtable 0x180a86b88 前提の訂正 (RTTI は SerumEditor の sub-object)。Splice 生成の直接呼出元と demo bit 読書 (0x1800c2b50 / 0x1800c6090) を列挙。選択 state 条件と間接経路は未達 (子 #2053〜#2055) |
+| `tools/targets/serum2/gui/REPORT_SR59.md` | ~95 | SR-59 (#4122, SR-48 残): 所属関数の入口がデータ表 (vtable) に載る RTTI の分類 (`arg_vtable_callers.py`)。ARG の型は未確定 (SC 0 件)。THIS-CHILD の SC 証拠 6 件 (5 関数)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR57.md` | ~73 | SR-57 (#3626, SR-28 受入 3): patch 後の demo 表示経路の静的確認。demo 表示 `0x18004fc9c` は patch 後に関数内で到達不能 (証明)、`0x1800501c0` は汎用ヘルパで非 demo の呼出元が残るため受入文の前提は不成立、overlay_demo_version は呼出元 0 件。解析は `demo_dialog_reach.py` / `demo_dialog_strings.py` |
 | `tools/targets/serum2/gui/REPORT_M7_CANVAS.md` | ~120 | SR-7 (#68) の M7 接続照合 (静的): CanvasFrame を tools/gui の surface・out ring の記号と照合 (`gui/m7_canvas_connect.py`)。設計上は接続可・実装は一部のみ・画素形式が不一致。数値の正本は本体 §0・§2 |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
@@ -847,6 +849,7 @@
 | `tools/targets/serum2/gui/REPORT_SR44.md` | ~154 | SR-44 (#2175): slot 7 (getState) の direct 呼出閉包と slot 17 / Splice 生成の逆閉包 (`slot_reach.py`)。direct 閉包の範囲で経路なし (C 291 関数・BFS 深さ max 15)・閉包内の `call [reg+0x88]` 0 件 (新版 917e48fc7 の Serum2 実測)。閉包から出る非開始点宛の辺 174 件は未解決。デモ bit とゲート入力は別フィールド。間接 call の受信型は未解決 (子 #3398・#3399)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_2065.md` | ~99 | SR-36 (#2065): 描画試行 harness と no-op 静的計数の付録。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_3260.md` | ~129 | SR-50 (#3260): canvas の IPlatformString・drawRect/clearRect/drawString と bitmap 結線 (手書き 5x7 placeholder フォント)・render 判定 (`text_px` 追加)・no-op 計数の変化。測定値の正本 |
+| `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_3422.md` | ~70 | SR-55 (#3422): canvas の線・多角形・楕円・bitmap 描画 (drawLine/drawLines/drawPolygon/drawEllipse/drawBitmap の 1:1 転写)。判定 harness `check_draw_ops.sh`。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_EFFORT_APPENDIX_3261.md` | ~100 | SR-51 (#3261): wasm の初期化経路。`platformfactory.cpp` の WASM 分岐 (patch) と upstream `init()` 経路化、harness の代替 2 点の除去。構文・compile/link/run の実測と負の対照 3 件。測定値の正本 |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
 | `tools/targets/massivex/REPORT_APPENDIX.md` | ~244 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017・§12.9 の対照と一貫性 #3154) |
@@ -884,7 +887,11 @@
 | `tools/targets/kilohearts/license/KH3307_REPORT.md` | 74 | #3307 (KH-52): gen_simd の SSE 整数語彙 6 件の追加と bit 突合・module F の 2 関数の試行。2 関数の実機突合と product 登録は #4153 (KH-91) |
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3256.md` | ~82 | KH-48 (#3256): vmovaps ymm・FMA3 scalar 7 語彙の検証 (`ymm_vocab_check.py` / `fma_vocab_check.py`) の生出力全行 |
+| `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3358.md` | ~44 | KH-54 (#3358): vmovaps store 形を 32B store へ復元する検証 (`vmovaps_store_check.py`) の生出力・ネガコン・コード差分。要約は REPORT.md §16 |
+| `tools/targets/kilohearts/snapins/REPORT_APPENDIX_779.md` | ~9 | KH-16 (#779) 第 2 弾: ymm 語彙 vaddps / vsubps / vmulps の検証 (REPORT.md §12-1 の全文を分割移動) |
+| `tools/targets/kilohearts/snapins/REPORT_APPENDIX_1116.md` | ~7 | #1116: HeapAlloc 0 返却規約のホスト同型性試験 (REPORT.md の 1116 節の全文を分割移動) |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3707.md` | ~100 | KH-59 (#3707): emcc 段の RSS cap (`rss_cap.py`) の実測。変更前後の sha256 一致・ネガコン・snapins 14 本 + module F の emcc ピーク RSS 表・cap 超過 4 本の未解決 |
+| `tools/targets/kilohearts/snapins/REPORT_APPENDIX_3756.md` | ~50 | KH-62 (#3756): `gen_globals.py` の BSS 0 埋め膨張の原因 (宣言長超えの 0 埋め・19〜25 件) と修正。phaser/limiter/khbase bit-exact 200/200・delay FAIL 155/200 の未解決 |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_780.md` | 65 | KH-17 (#780): Ladder Filter (ksla) の process 閉包を x64c で測る。数え方・測定値・ネガコン・測定 commit は付録 §1〜§3 が正本。未解決は §5 |
 | `tools/targets/kilohearts/snapins/REPORT_APPENDIX_781.md` | 86 | KH-18 (#781): Carve EQ (ksge) の IAT 呼出 site 19 件の扱い (判定は付録 §2 が正本)・process 経路 (slot 14) の unique 側 25 関数に IAT 0 件 (共通基盤 120 関数は未集計)・間接 call の下限。測定 commit `fcf3a630` |
 | `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
@@ -894,7 +901,7 @@
 | `tools/targets/freshair/REPORT_APPENDIX_FA5_VALUE.md` | ~40 | freshair REPORT §11 (FA-5 #52) の付録の分割移動分: `value` 17 件の内訳 (§A4, `ks_rdata_detail.py`) と語単位の切り分け (§A5, `ks_rdata_value.py`)。250 行上限のため FA5 から無変更で分割 |
 | `tools/targets/freshair/REPORT_APPENDIX_2739.md` | ~110 | freshair #2739 (FA-34, 親 #52): Gain 以外の snap-in への差分実行の判定基準 (§1, 実測前に確定)・振り分け規則 (§2)・ID 一致 37 組の振り分け結果 (§3, `ks_candidate_triage.py`)・差分実行の結論 (§4)・SC 側ハーネスの smoke (§5, `ks_sc_native_smoke.sh`)・受入対応 (§6)・未解決 (§7)。測定値の正本 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA44.md` | ~70 | freshair #3740 (FA-44, 親 #52): KH のみ snap-in 4 組 (Delay・Disperser・Phaser・QuickEq) の SC 側実機機械語ハーネス smoke (§3, `ks_fa44_native_smoke.sh`)・KH 登録の確認 (§2)・差分実行の見通しと param 写像の未確定 (§4)・未解決 (§5)。測定値の正本 |
-| `tools/targets/freshair/REPORT_APPENDIX_FA22.md` | ~60 | freshair FA-22 (#1578) の付録。FA_NODE1=1 時の setter 0x180c9d74c の失敗形 (逆アセンブル・実測)。部分達成で、判定は子 #1789・#1791 に分割 |
+| `tools/targets/freshair/REPORT_APPENDIX_FA22.md` | ~85 | freshair FA-22 (#1578) の付録。FA_NODE1=1 時の setter 0x180c9d74c の失敗形 (逆アセンブル・実測)。部分達成で、判定は子 #1789 (観測点) と #4223 (FA-52。#1791 の残件) に分割 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA45.md` | 61 | freshair FA-45 (#3741, 親 #52): KH のみ snap-in の SC 側実機ハーネス (Stereo・VocalFilter・Resonator)。VocalFilter は smoke ERR 0 (`native_vocalfilter.c`・`ks_sc_vf_smoke.sh`)。Stereo は子 #4046・Resonator は子 #4047。測定値の正本 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA39.md` | ~110 | freshair FA-39 (#3507) の付録。Filter の SC ⇄ KH 同一シナリオ native 比較。KH 0x1804655e0 の機械語読み・SC/KH の呼出し先の対応表・FMA の確認 (`ks_semantic_filter_scen.sh`・`ks_filter_scen_cmp.py`)。判定: 差分あり・未解決。数値は付録 §3 が正本。判定基準の `REPORT_APPENDIX_2739.md` は main に無い (付録冒頭に記載) |
 | `tools/targets/freshair/REPORT_APPENDIX_FA32.md` | ~95 | freshair FA-32 (#2306) の付録。`FA_NODE1=1` の setter ERR 8 行の原因は harness の注入 node 配線 (値オブジェクト Z が 0x40 のため `Z+0x2c0` を guard・非正準アドレスで読む)。issue 本文の `rip=74c addr=50` は ALT9 の署名。偽オブジェクト (`FA_NODE1_ZOBJ`) で ERR 0/8。実機の `C+0x2b0` の中身は未判定 (#2207) |

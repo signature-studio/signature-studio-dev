@@ -100,6 +100,25 @@ ildsp の規模測定 (命令数・call 数・export closure 表) と未解決�
 - 未特定 (子 [T-SH-71] #3361 の対象): コンストラクタが作るのは 2 本だけ。vtable の先頭 6 slot (RVA 0x28d0・0x3270・0x2980・0x3f80・0x3f90・0x2950) のうち、slot 1 (0x3270・665 命令) は float パラメータ (`this+0x20`・`0x200`・`0x208`) を読むが、確保の call を含まない。slot 3 (0x3f80) は `this+0x10` を返す getter、slot 4 (0x3f90) は `ret 0`。`qword ptr [reg+disp]` 形の 14 本への書き込みは静的走査で見つからなかった (`dword` の書き込みは 0xd0〜0x14c にあり、遅延線の index 更新と見られる)。
 - 検証範囲: 静的な書き込み命令の走査と、生成直後の 1 状態 (引数 NULL) での実行。ポインタを埋めた状態で Fruity が通るかは未実施 (子 #3361)。
 
+### 14 本の書き込み元の観測 (#4194 / 親 #3361)
+
+測定 commit: `866c93ed0` (`inst_probe.c` の書き込み観測・対照モードを追加。HEAD までのコード差分は 0 行)。
+手順: 4096 B 境界の領域を PROT_READ にして書き込みを SIGSEGV で捕まえ、TF で 1 命令だけ進めて RIP と書き込み後の値を記録する。
+
+| モード | 対象 | 結果 (`WRITES_PTR` = `this+0xbc+8i` への書き込み) |
+|---|---|---|
+| `ctor` | `CreateReverbInstance` 1 回 | `WRITES_TOTAL=58 WRITES_OBJ=44 WRITES_PTR=0`・`PTR14_ZERO=14` (呼び出し後も 14/14 が 0) |
+| `noctor` (陰性対照) | CreateReverbInstance を呼ばない空の状態 | `WRITES_TOTAL=0 WRITES_PTR=0` |
+| `selftest` (陽性対照) | C 側から 14 本へ書く | `WRITES_PTR=14`・RIP が image 外で 14 件。観測手段は書き込みを見逃さない |
+| `vt` | vtable slot 0〜5 を ctor 後の object に対して 1 つずつ実行 | slot 0: `this+0` の vptr 書き込みのみ / slot 1: 書き込み後に SIGSEGV / slot 2・4: 書き込み 0 / slot 3: SIGSEGV / slot 5: object 外へ 2048 件・object 内 0 |
+| `fruity` | ctor 後の object に `Process_Fruity` (n=4) | 書き込み 3 件 (`this+0x6c`・`0x70`・`0x74` = 値 0) の後に SIGSEGV。`this+0xbc+8i` への書き込みは無い |
+
+- 読み: 14 本の書き込み元は、`CreateReverbInstance` (0x3fa0 からの直接 call 網) にも、vtable slot 0〜5 にも、`Process_Fruity` の経路にも無い。
+  静的走査でも `[reg+0xbc+8i]` 形の qword 書き込みは 0 件 (`mov word [rax+0xbc]` の 2 件は 16 bit 書き込みで別物)。
+- `0x27c0` (RVA 0x27c0–0x2853) は遅延線 2 本を `this+0x290`・`0x298` に作るコンストラクタで、`0x1000` を 2 回呼ぶ。`0x27c0` は直接 call の呼び出し元が無く (間接 call の経路は未確認)、`[rbx+0x10]` に vptr `0x5dbec` を書くため、この object の ctor かどうかは未確定。
+- 未特定: 14 本を埋めるのは、ctor より後に呼ばれる別の entry (ホストの初期化など) と見られる。entry の候補は未列挙。
+- 観測の限界: 観測は `this` 直下の書き込みだけを見る。14 本を別オブジェクトや間接的な経路で書くなら、`this` 直下の観測では見えない。
+
 ### 実測 (4 core・3 回)
 
 | 検査 | 測定 commit | 所要 (s) | load (開始前 1 分値) | 結果 |

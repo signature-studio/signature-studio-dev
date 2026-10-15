@@ -513,6 +513,13 @@ def main():
     fns = sorted(fnl)
     for d in a.func_end_from_dsm:
         ranges_given.update(A.parse_dsm_ranges(d))
+    FALL = os.environ.get('FA_FALL_FRAG', '0') == '1'
+    fall_frag = set()
+    for f in (fns if FALL else []):
+        rg = img.func_range(f)
+        if rg and rg[1] in img.pdata_chained and rg[1] not in fnl:
+            fall_frag.add(rg[1])
+    fns = sorted(fnl | fall_frag)
     img.set_extra_starts(fns)
     dis = A.Disasm(img)
     sec_end = max(lo + len(data) for lo, rva, data, name, ch in img.secs)
@@ -552,10 +559,54 @@ def main():
     frags = {f for f in funcs if f in img.pdata_chained}
     lomap_needed = {}
     nfrag = 0
+    def in_closure(x):
+        if any(lo <= x < hi for lo, hi, _ in funcs.values()):
+            return True
+        return any(s <= x < img.func_range(s)[1] for s in img.pdata_chained if img.func_range(s))
+    def frag_ok(t):
+        fs_, fe_, its = funcs[t]
+        for it in its:
+            ins = it.ins
+            if it.kind != 'ins' or not (ins.mnemonic.startswith('j') or ins.mnemonic.startswith('call')):
+                continue
+            if ins.operands and ins.operands[0].type == x86.X86_OP_IMM and not in_closure(ins.operands[0].imm):
+                return False
+        return True
+    def fall_target(f):
+        if not FALL:
+            return None
+        fs_, fe_, its = funcs[f]
+        ins_items = [it for it in its if it.kind == 'ins']
+        if not ins_items:
+            return None
+        last = max(ins_items, key=lambda it: it.va)
+        m = last.ins.mnemonic
+        if last.va + last.ins.size != fe_ or m.startswith('ret') or m in ('jmp', 'ud2', 'int3', 'hlt'):
+            return None
+        if fe_ not in frags or not frag_ok(fe_):
+            return None
+        return fe_
     for f in [x for x in funcs if x not in frags]:
         fs, fe, items = funcs[f]
         pending = [it for it in items if it.kind == 'ins']
         done = set()
+        def add_frag(t, nxt):
+            nonlocal nfrag
+            done.add(t); nfrag += 1
+            for it2 in funcs[t][2]:
+                c = Item(it2.kind, it2.va, it2.ins, it2.raw, it2.site)
+                c.copy = True
+                items.append(c)
+                if c.kind == 'ins':
+                    nxt.append(c)
+            ft = fall_target(t)
+            if ft is not None and ft not in done:
+                add_frag(ft, nxt)
+        ft0 = fall_target(f)
+        if ft0 is not None and ft0 not in done:
+            nxt0 = []
+            add_frag(ft0, nxt0)
+            pending += nxt0
         while pending:
             nxt = []
             for it in pending:
@@ -563,13 +614,7 @@ def main():
                 if ins.mnemonic.startswith('j') and ins.operands and ins.operands[0].type == x86.X86_OP_IMM:
                     t = ins.operands[0].imm
                     if t in frags and t not in done and not (fs <= t < fe):
-                        done.add(t); nfrag += 1
-                        for it2 in funcs[t][2]:
-                            c = Item(it2.kind, it2.va, it2.ins, it2.raw, it2.site)
-                            c.copy = True
-                            items.append(c)
-                            if c.kind == 'ins':
-                                nxt.append(c)
+                        add_frag(t, nxt)
             pending = nxt
     for g in frags:
         del funcs[g]

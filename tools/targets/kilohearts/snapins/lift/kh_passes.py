@@ -463,6 +463,27 @@ def pass_storelow(cx, fn, mf):
         pre.append('%sstore %s %%%s.v, %s* %s, align 1%s' % (ind, ty, t, ty, ptr, m.group(6) or ''))
         fn.sub[k] = '\n'.join(pre)
         st['patched'] += 1
+    # VEX.256 vmovaps の store 形 (`vmovaps ymmword ptr [m], ymm`): gen_simd は void 2 引数を abort スタブのままにするため、
+    # 呼出を 32B store へ直接復元する (#3358 / KH-54)。old は `load i256, i256* %p` の値。
+    cre256 = re.compile(r'^(\s*)call void @__asm_vmovaps(?:__\d+|\.\d+)?\(i256 (%[\w.\-]+), i256 ([^)]+)\)(, !insn\.addr !\d+)?$')
+    for k in range(fn.start, fn.end + 1):
+        m = cre256.match(lines[k])
+        if not m:
+            continue
+        ind, old, val = m.group(1), m.group(2), m.group(3)
+        pat = re.compile(r'^\s*' + re.escape(old) + r' = load i256, i256\* (%[\w.\-]+)')
+        ptr = None
+        for j in range(k - 1, fn.start, -1):
+            mm = pat.match(lines[j])
+            if mm:
+                ptr = mm.group(1)
+                break
+        if ptr is None:
+            st.setdefault('unfixed', []).append('%x line %d: no load for %s (vmovaps256)' % (fn.va, k, old))
+            continue
+        fn.sub[k] = '%sstore i256 %s, i256* %s, align 1%s' % (ind, val, ptr, m.group(4) or '')
+        st['patched'] += 1
+        st['vmovaps256'] = st.get('vmovaps256', 0) + 1
 
 
 # ---------------------------------------------------------------- trace (report only)
