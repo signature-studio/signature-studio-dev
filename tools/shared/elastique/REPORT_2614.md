@@ -80,15 +80,15 @@ python3 tools/shared/elastique/scripts/elastique_iat.py tools/shared/work/win/el
 
 | 分類 | API と wasm 側の写像 (提案) |
 |---|---|
-| A メモリ | HeapAlloc → malloc (flags の 8 = HEAP_ZERO_MEMORY は calloc)・HeapFree → free・HeapReAlloc → realloc (flags 0x10 は §5-1)・HeapSize → サイズ表・HeapQueryInformation と GetProcessHeap → 固定値 |
-| B 同期・イベント | EnterCriticalSection・LeaveCriticalSection・InitializeCriticalSectionAndSpinCount・DeleteCriticalSection・InterlockedFlushSList・InitializeSListHead → no-op。SetEvent・ResetEvent・CreateEventW・WaitForSingleObjectEx → 固定の偽ハンドルと戻り値 (WaitForSingleObjectEx の戻り値の分岐は未確認) |
+| A メモリ | HeapAlloc → malloc (flags の 8 = HEAP_ZERO_MEMORY は calloc)・HeapFree → free・HeapReAlloc → realloc (flags 0x10 は §5-1)・HeapSize → サイズ表・HeapQueryInformation → 固定値・GetProcessHeap → 非 NULL の固定ハンドル |
+| B 同期・イベント | EnterCriticalSection・LeaveCriticalSection・DeleteCriticalSection → no-op。InitializeCriticalSectionAndSpinCount → no-op (0 を返す)。InitializeSListHead → 先頭を 0 に初期化。InterlockedFlushSList → 0 を返す。SetEvent・ResetEvent → 成功 (1) を返す。CreateEventW → 固定の偽ハンドル。WaitForSingleObjectEx → WAIT_OBJECT_0 を返す (戻り値の分岐は未確認) |
 | C TLS/FLS | TlsAlloc・TlsGetValue・TlsSetValue・TlsFree と FlsAlloc・FlsGetValue・FlsSetValue・FlsFree → インスタンス内の表 |
-| D 例外・unwind | RtlCaptureContext・RtlLookupFunctionEntry・RtlVirtualUnwind・RtlUnwindEx → trap。RtlPcToFileHeader → NULL。RaiseException → trap (§5-4)。UnhandledExceptionFilter・SetUnhandledExceptionFilter → 登録のみ。IsDebuggerPresent → 0 |
+| D 例外・unwind | RtlCaptureContext・RtlLookupFunctionEntry・RtlVirtualUnwind・RtlUnwindEx → trap。RtlPcToFileHeader → NULL。RaiseException → trap (§5-4)。UnhandledExceptionFilter → 0 を返す。SetUnhandledExceptionFilter → NULL を返す (登録のみ)。IsDebuggerPresent → 0 を返す |
 | E 動的ロード | GetModuleHandleW・GetModuleHandleExW・GetProcAddress・LoadLibraryExW → NULL (常に失敗)。FreeLibrary → 1。GetModuleFileNameW → 0 (§5-3) |
 | F ファイル・コンソール | CreateFileW・WriteConsoleW・WriteFile・SetFilePointerEx・FindFirstFileExW・FindNextFileW → 失敗。CloseHandle・FlushFileBuffers・SetStdHandle・FindClose → 成功。GetStdHandle → NULL。GetFileType・GetConsoleMode → 0。GetConsoleOutputCP → 固定値。wasm は host の I/O を持たない (§5-6) |
-| G プロセス・エラー状態 | GetCurrentProcessId・GetCurrentThreadId・GetStartupInfoW・GetCommandLineA・GetCommandLineW・GetEnvironmentStringsW・FreeEnvironmentStringsW → 固定値 (空)。GetCurrentProcess → 擬似ハンドル。EncodePointer → 恒等写像。GetLastError・SetLastError → wasm 内の変数。ExitProcess・TerminateProcess → trap |
+| G プロセス・エラー状態 | GetCurrentProcessId・GetCurrentThreadId → 固定値。GetStartupInfoW → 0 埋め。GetCommandLineA・GetCommandLineW → 空文字列。GetEnvironmentStringsW → 空の環境ブロック。FreeEnvironmentStringsW → 成功 (1) を返す。GetCurrentProcess → 擬似ハンドル (-1)。EncodePointer → 恒等写像。GetLastError・SetLastError → wasm 内の変数。ExitProcess・TerminateProcess → trap |
 | H 時刻・性能カウンタ | QueryPerformanceCounter・GetSystemTimeAsFileTime → 決定的な値。DSP 出力へ入らないことを確認してから固定する (§5-5) |
-| I CPU・コードページ・文字列 | IsProcessorFeaturePresent → 0 (§5-2)。GetACP・GetOEMCP・IsValidCodePage・GetCPInfo・GetStringTypeW・LCMapStringW → 固定値。MultiByteToWideChar・WideCharToMultiByte → UTF-8/ASCII の最小実装 |
+| I CPU・コードページ・文字列 | IsProcessorFeaturePresent → 0 (§5-2)。GetACP・GetOEMCP・IsValidCodePage・GetCPInfo・GetStringTypeW → 固定値。LCMapStringW → 入力をそのまま返す。MultiByteToWideChar・WideCharToMultiByte → UTF-8/ASCII の最小実装 |
 | J バイトオーダ | WS2_32 序数 8 (htonl)・序数 14 (ntohl) → bswap32 |
 
 ## 5. 判断が要る項目 (未確認)
