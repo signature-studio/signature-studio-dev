@@ -1,0 +1,46 @@
+/* shimx 単体テスト (fh3): __CxxFrameHandler3 FuncInfo の funclet walk (MX-45 #4161)。
+ * 合成 FuncInfo で期待値を固定する。Python 正本 (mx6_pdata_eh.funclets_fh3) と同じ規則:
+ *   unwind action (disp_unwind の 2 番目の DWORD) と catch handler (handler の 4 番目 DWORD) を集める。 */
+#include "test_common.h"
+
+static void put32(uint8_t* img, uint32_t at, uint32_t v) {
+    for (int i = 0; i < 4; i++) img[at + i] = (uint8_t)(v >> (8 * i));
+}
+
+static void t_walk(void) {
+    static uint8_t img[0x1000];
+    memset(img, 0, sizeof img);
+    /* FuncInfo @0x100: magic, maxState=2, dispUnwind=0x200, nTry=1, dispTry=0x300 */
+    put32(img, 0x100, 0x19930520u); put32(img, 0x104, 2); put32(img, 0x108, 0x200);
+    put32(img, 0x10C, 1); put32(img, 0x110, 0x300);
+    /* unwind map: state0 = {prev=-1, action=0x400}, state1 = {prev=0, action=0} (action 0 は除外) */
+    put32(img, 0x200, 0xFFFFFFFFu); put32(img, 0x204, 0x400);
+    put32(img, 0x208, 0);           put32(img, 0x20C, 0);
+    /* try map: tryLow=0 tryHigh=0 catchHigh=0 nCatch=2 dispCatch=0x340 */
+    put32(img, 0x300, 0); put32(img, 0x304, 0); put32(img, 0x308, 0);
+    put32(img, 0x30C, 2); put32(img, 0x310, 0x340);
+    /* handler 0: {adjective,type,fp,handler=0x500}、handler 1: handler=0x400 (unwind と重複 → 1 件) */
+    put32(img, 0x340 + 12, 0x500); put32(img, 0x340 + 16 + 12, 0x400);
+
+    uint32_t out[16];
+    int n = shimx_fh3_funclets(img, sizeof img, 0x100, out, 16);
+    CHECK(n == 2);
+    CHECK(out[0] == 0x400 && out[1] == 0x500);
+
+    /* magic 不一致 (FH4 符号化形 0x19930523) は棄却 */
+    put32(img, 0x100, 0x19930523u);
+    CHECK(shimx_fh3_funclets(img, sizeof img, 0x100, out, 16) == -1);
+    put32(img, 0x100, 0x19930520u);
+
+    /* 上限超過 (nCatch > 0x100) は棄却 */
+    put32(img, 0x30C, 0x101);
+    CHECK(shimx_fh3_funclets(img, sizeof img, 0x100, out, 16) == -1);
+    put32(img, 0x30C, 2);
+
+    /* 画像外の FuncInfo は棄却 */
+    CHECK(shimx_fh3_funclets(img, sizeof img, 0xFF0, out, 16) == -1);
+}
+
+void run_fh3_tests(void) {
+    t_walk();
+}
