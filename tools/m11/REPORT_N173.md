@@ -136,6 +136,7 @@ IR 型は `work/boot_final.ll` の callee の define 行 (仮引数 pos 番目)�
 - 実 PE の測定 commit: `7e5261ce4` (§2〜§4 の数値)。その後の分類器の変更は `257c3dd51` (rip 相対) と `fa7cd079d` (`movzx`/`movsx` の部分レジスタ書込みを未決 `partial_ext` に戻す・review 指摘の修正) の 2 件。
 - `fa7cd079d` の実 PE 再測定は**未実施** (`work-m11` の素材が本 run の `$ARTIFACTS_DIR` に無く、`boot_final.ll`・`final3_base.ll` を用意できない)。§2〜§4 の数値は `7e5261ce4` の実測のままで、`fa7cd079d` の下での値は未確認。
 - 素材 (`work-m11`) が揃えば `m11_setother_controls.py`・`m11_setother_repro.py`・`m11_argrecover_verify.py` を再実行して、測定 commit を更新する (#4015 の未解決に含める)。
+- review round 2 の fix run は素材を `fl-win64` のみで起動された (`work-m11` 不在)。PR 本文に `oc_artifacts: fl-win64 work-m11` を追加し、次の review run で再測定できるようにした。
 - 対照検査 `m11_setother_controls.py` と再現 `m11_setother_repro.py` は `4a35c7868` で追加し、`7e5261ce4` で対照 1 件を足した。
 - main の取り込み (merge `26ccd7658`) で `m11_argrecover.py`・`ldfix/` など他の m11 ファイルが変わったため、その取り込み後の tree で §2 の手順 1〜5 を再実行した (数値は取り込み前と同じ)。
 
