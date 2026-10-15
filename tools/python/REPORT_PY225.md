@@ -153,7 +153,7 @@
 |---|---|---|
 | 起動時 (空 project) の L の実行時の値。行 `+0x20` (callback)・flag `[0x15d529f]` の実行時の値・`0x12d1760` と `0x11862e0` の起動時の順序 | 静的連鎖の 384 (n = 16) が実行時に成り立つかは未確定。NSTEP の決定の根拠 | PR #3967 の未解決表 (子は起票しない) |
 | 件数の複製経路 (`0x418030`・`min(n, S-start)`) | 旧配列がある場合の件数 | PR #3967 の未解決表 (子は起票しない) |
-| NSTEP の変更 (64 → 静的既定 16 か L 由来) と event 境界 (`p >= n`) | 上の確定の後に直す。確定前に変えると、L を未確定のまま mock/C を変えることになる | #3985 ([PY-288]) |
+| 実行時 L の確認 (静的既定 16 との一致) | PY-288 節の既定案 (16) が実行時に成り立つかは未確認。違えば境界の定数 1 箇所 (`GRID_N`) を直す | PR #3967 の未解決表 (子は起票しない) |
 
 ### 再現
 
@@ -161,3 +161,44 @@
 - 連鎖の計算: `python3 analysis/flapi/pe_py230_l_default.py` (`--expect-n 16` で PASS、`64` で FAIL)。
 - 逆アセンブル: `pe_disasm.py 12d1760 60`・`12d19bd 30`・`1062840 20`・`10627f0 12`・`1062930 96`・`1062890 3`・`1062c50 39`。呼出し元: `pe_callgraph.py callers 12d1760`。
 - 静的値: `pe_va_read.py 15e39c0,15e37c8,15e1c70,15e25f8,15e27f0,15d8988,15d529f`。
+
+## PY-288 (#3985): 読出し境界 `p >= 件数` を静的既定の件数 16 に合わせた
+
+既知類型との関係: 該当なし (件数の定数の変更。`docs/DEFECTS.md` の類型には当たらない)。
+
+### 決定の根拠 (既定 16 を採る)
+
+- 静的連鎖 (`analysis/flapi/pe_py230_l_default.py`): N=4・C=4・D=4・flag=0・f=4・V=24・X=96・r13=384・L=384・**n=16**。`--expect-n 16` PASS、`--expect-n 64` FAIL。
+- 実行時の L (行 `+0x20`・flag `[0x15d529f]`・`0x12d1760` と `0x11862e0` の起動時の順序) は **未確認** (実行環境が無い。本 run は Linux)。既定 16 は静的連鎖だけに基づく。PM の再投入 (oc-pm-intent relaunch) で既定案として採った。
+
+### 変更
+
+- `provider/fl_engine.c`: `#define GRID_N 16` を追加し、`grid_bit` の境界 `p >= NSTEP` を `p >= GRID_N` に変更。
+- `host/fl_mock.mjs`: `const GRID_N = 16`。`gridBit` の境界 `p >= 64` を `p >= GRID_N` に変更。
+- `tests/channels_diff.mjs`: 件数超えの検査の境界 `p >= 64` を `p >= 16` に変更 (ラベルとコメントも同じ)。
+- **変えていない**: `NSTEP` (64) の保存配列長、`setGridBit` / `fillEachNSteps` の範囲 (`p >= NSTEP` の RANGE)、`getCurrentStepParam` の範囲 (PE 未照合・REPORT_PY112)。これらは PE で件数と結び付いていない。
+
+### 測定
+
+- 測定 commit: `93d202284` (コードを変えた最後の commit)。
+- 素材: `fl-win64` を `tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` で展開 (2.229 秒)。`toolchain-emsdk` は `$HOME/artifacts/toolchain-emsdk.tar.zst` を `$RUNNER_TEMP/emsdk-x` に展開 (2.742 秒) し、`emsdk_env.sh` で `provider/build.sh` を実行。
+
+| 検査 | コマンド | 結果 | 所要 |
+|---|---|---|---|
+| provider ビルド | `EMSDK_ENV=<emsdk>/emsdk/emsdk_env.sh bash tools/python/provider/build.sh` | rc 0 | 12.081 秒 |
+| channels 差分 | `cd tools/python && node tests/channels_diff.mjs` | `calls 238・loop_cases 9・diffs 0・grid_calls 1200・grid_diffs 0・grid_true 38・PASS true` | 0.300 秒 |
+| MIDI 経路 | `node tests/midi_path_diff.mjs` | `cases 30・diffs 0・PASS true` | 0.043 秒 |
+| 静的連鎖 (正) | `pe_py230_l_default.py --expect-n 16` | PASS (rc 0) | — |
+| 静的連鎖 (負) | `pe_py230_l_default.py --expect-n 64` | FAIL (rc 1) | — |
+| ネガティブコントロール | `fl_mock.mjs` の境界を `p >= 64` に戻して `channels_diff` | `channels/playlist 差分 48 件` (rc 1)。元に戻すと PASS | — |
+
+- 環境: runner 4 core、load average 0.64 (14:35 UTC)。
+- 差分 (測定 commit 以降): `git diff 93d202284 HEAD -- tools/python` は本 REPORT の commit (docs のみ) を含むため、コード範囲は `git diff 93d202284 HEAD -- tools/python/provider tools/python/host tools/python/tests` で 0 行 (本 REPORT の commit 時点で確認)。
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実行時 L の確認 (静的既定 16 との一致。行 `+0x20`・flag `[0x15d529f]`・起動時の順序) | 16 と違えば、mock/C の件数が実機とずれる。修正は `GRID_N` の 1 箇所 | PR #3967 の未解決表 (子は起票しない) |
+| `NSTEP` (64) の保存長・`setGridBit` 範囲の PE 照合 | 件数 16 以上の書込みが PE で受理されるかは未確認。今回は据え置き | PR #3967 の未解決表 (PY-112 の範囲) |
+| 件数の複製経路 (`0x418030`・`min(n, S-start)`) | 旧配列がある場合の件数 | PR #3967 の未解決表 (子は起票しない) |
