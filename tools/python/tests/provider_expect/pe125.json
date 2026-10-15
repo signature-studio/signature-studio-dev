@@ -1,0 +1,6 @@
+{
+  "tag": "pe125",
+  "refs": ["#3001"],
+  "note": "PE で dispatch 0xd843d0 経由の戻り値 None を確定した 2 関数 (REPORT_PY125・PY-125 #3001)。効果と述語偽の経路 (-2) は未確定 (REPORT_PY125)",
+  "functions": ["general.clearLog", "general.dumpScoreLog"]
+}

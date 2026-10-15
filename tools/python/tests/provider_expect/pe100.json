@@ -1,0 +1,6 @@
+{
+  "tag": "pe100",
+  "refs": [],
+  "note": "",
+  "functions": ["channels.getStepParam", "channels.getCurrentStepParam"]
+}

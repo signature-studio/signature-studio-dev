@@ -1,0 +1,6 @@
+{
+  "tag": "pe94",
+  "refs": ["#2830"],
+  "note": "PE で状態読出しと確認した general ゲッター 7 件 (REPORT_PY94・PY-94 #2830)。値は未実測の仮置き、tests/general_diff.mjs が mock と照合",
+  "functions": ["general.getUndoHistoryPos", "general.getUndoHistoryCount", "general.getUndoHistoryLast", "general.safeToEdit", "general.getProjectTitle", "general.getProjectAuthor", "general.getProjectGenre"]
+}

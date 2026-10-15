@@ -142,21 +142,17 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 - **xmm FMA (`vf*`) 計 27 件** (Ladder 11 / Filter Table 6 / Slice EQ 10 = 上表の `vf*` 行の合計)。
 - **語彙の対象 (f354504c の census 結果に基づく・PM 判断 2026-10-13 に従う)**: census で `vblend*` / `vperm*` は 0 件と確定したため、#779 の語彙追加対象から外し、**ymm (`vaddps` / `vmulps` / `vsubps` / `vmovaps`・Convolver と Filter Table のみ) と vfmadd 系 (xmm・scalar) に絞る**。
 - **lift 対応 (#3256 で追加)**: `gen_simd.py` の `gen256` が ymm の vaddps / vsubps / vmulps (3 引数) と vmovaps (1 引数) を IR で定義する (void の store 形は stub のまま)。vfmadd 系 xmm は `gen()` の declare 駆動で C 化し、bit-exact 検証は [REPORT_APPENDIX.md §12-2](REPORT_APPENDIX.md)。vfmadd の ymm 形は census 0 件。
-- **受入条件の残り**: 既存 14 snap-in のハッシュ不変 (#3259・結果は [REPORT_APPENDIX_3259.md](REPORT_APPENDIX_3259.md): B=80fb2fd00 と H=origin/main で emcc 前 5 項目は 14 本すべて一致、wasm は 10 本一致・phaser/delay/limiter/khbase の 4 本は emcc RSS cap 超過で未測定 (#3756))・store 形の lift (下表)。語彙の bit-exact とネガコンは §12-2 で実施。**2026-10-14 に #779 を縮小 (§12-1)**。後続: #709 (KH-14) は #779 完了後に着手 (PM が `blocked_by` 登録済み)。
+- **受入条件の残り**: 既存 14 snap-in のハッシュ不変 (#3259・結果は [REPORT_APPENDIX_3259.md](REPORT_APPENDIX_3259.md): B=80fb2fd00 と H=origin/main で emcc 前 5 項目は 14 本すべて一致、wasm は 10 本一致・phaser/delay/limiter/khbase の 4 本は emcc RSS cap 超過で未測定 (#3756))。語彙の bit-exact は §12-2、store 形は §16 (#3358)。**2026-10-14 に #779 を縮小 (§12-1)**。後続: #709 (KH-14) は #779 完了後に着手 (PM が `blocked_by` 登録済み)。
 
-### 12-1. ymm 語彙 vaddps / vsubps / vmulps の実装と単体検証 (#779 第 2 弾)
+### 12-1. ymm 語彙 vaddps / vsubps / vmulps (#779 第 2 弾) — 結論 1 行
 
-- **生成形 (実測)**: `retdec-decompiler -m raw -a x86-64 -e little` に `c5 f4 58 c2` (vaddps ymm0,ymm1,ymm2) を通すと `call i256 @__asm_vaddps(i256 src1, i256 src2)`。`gen_simd.py` は i256 宣言を `OUT.c.i256.ll` の LLVM IR 定義 (bitcast i256→`<8 x float>`・fadd/fsub/fmul・bitcast 戻し) で出す。C に i256 の正体型が無いため IR で定義し、呼出側と ABI を揃える。`build.py` は `.i256.ll` がある時だけ emcc 入力に加える。未対応の i256 宣言は `undefined` に報告し、`abort()` スタブを出す (SSE の未対応と同じ扱い。呼ばれたら abort)。vsubps / vmulps の ymm 生成形は未実測で、引数順 (src1 = 第 1 引数 → `a0 - a1`) は xmm 版の前提を継承する。
-- **本検証** `python3 snapins/scripts/ymm_vocab_check.py 20000 1` (測定 commit `428eef1a`・oracle = ホスト AVX2 `_mm256_*_ps`・32B 全 bit 比較・NaN 含む): vaddps / vsubps / vmulps 各 20,000 call・160,000 lane **mismatch 0**。数え方は §12 の census (ymm 計 40 件)。wall 1.26 秒・load 0.21 0.24 0.11 (nproc=4)。
-- **ネガコン**: (a) 語彙定義を外す → リンク失敗 (FAIL)。(b) vaddps の fadd を fsub に変える → mismatch **19,971 / 20,000** (FAIL)。(c) 未対応 `declare i256 @__asm_vfmadd231ps(i256, i256, i256)` → `undefined(abort stub) 1`・呼出で abort (rc=-6・FAIL)。
-- **回帰**: i256 を含まない 8 宣言 (SSE 系) の入力で、main と新 `gen_simd.py` の C 出力・標準出力が `cmp` 一致。HEAD で build が通る 14 本は i256 宣言を含まない (旧版は i256 宣言で `KeyError` して落ちるため。推論)。**14 snap-in のハッシュ照合 (`run_all.sh`) は未実施**: run で取得したのは `fl-win64` のみ (`plugins-kilohearts` / `toolchain-emsdk` / `toolchain-retdec` は無い)。
-- **測定 commit `428eef1a` → HEAD のコード差分** (`git diff 428eef1a HEAD -- tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/snapins/harness tools/targets/kilohearts/snapins/scripts`): 0 行 (`git diff --stat 428eef1a HEAD` は REPORT.md のみ)。
+ymm 3 語彙 mismatch 0・ネガコン FAIL (詳細・再現・回帰は [REPORT_APPENDIX_779.md](REPORT_APPENDIX_779.md))。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 14 snap-in のハッシュ不変 (run_all.sh) 未実行 | 構造上は不変 (推論)・実測なし | #3259 (KH-49) |
 | ~~vmovaps (1 引数) と vfmadd 系 xmm 7 語彙の語彙・bit-exact~~ → **解決** (§12-2: vmovaps 20,000 call mismatch 0 / FMA 7 語彙 128bit 全 bit (NaN 含む) mismatch 0) | 解決済み | #3256 (KH-48) |
-| vmovaps の **store 形** (`declare void @__asm_vmovaps(i256, i256)`・メモリ書込みが IR に現れない) は定義せず abort スタブのまま | 定義すると store が黙って消える。census は ymm 40 件を load/store で分けていない | #3358 (KH-54) |
+| ~~vmovaps の **store 形** (`declare void @__asm_vmovaps(i256, i256)`)~~ → **解決** (§16: `pass_storelow` が 32B `store i256` に復元・全 bit 突合 mismatch 0) | 解決済み | #3358 (KH-54) |
 | ymm 語彙を snap-in の lift へ接続 (kh_lower の 256-bit 表現・Convolver/Filter Table) | 難 snap-in は未 lift | #709 (KH-14) |
 
 ## 13. KH-6 第 2 弾 (CAB-258 続, 2026-10-11) — rcpps/rsqrtps 実機近似表で Resonator/Stereo/Delay が bit-exact 化
@@ -243,8 +239,12 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 | /tmp (tmpfs 3.7GB) の emscripten_temp が `Disk quota exceeded` で一括再実行が失敗 (TMPDIR=`work/tmp` で解消)・一括 1000 trial は globals.c 1.25GB で稀に SIGKILL | 個別 build の和で担保 | 親 CAB-53 にコメント |
 | 検証範囲外: 別 CPU での strict 比較は未実施 (§13-4 の「wasm helper は C テーブル lookup・SIMD 近似命令不使用」も適用。legacy gate の再現は HEAD 版 compare.mjs を `work/` に展開する形・work/ は gitignore) | — | — |
 
-### 1116 HeapAlloc 過大要求・領域超過の 0 返却 (未検証の残り)
+## 16. #3358 (KH-54): vmovaps の store 形を 32B store へ復元 (2026-10-15)
 
-- 変更: `lift/gen_stubs_sigs.py` の `HEAP_C` と `harness/scen_khmath.h` `n_HeapAlloc` / `scen_khmaster.h` `khb_HeapAlloc` を同じ規約 (1MiB 超・領域超過で `return 0`、cursor 不変) に揃えた。
-- 実測 (HEAD 19cdf357、gcc -O0 x86_64 ホスト): `python3 tools/targets/kilohearts/snapins/harness/heap_alloc_diff.py` → `total=32 mismatches=0` (exit 0)。
-- 未実施: `run_all.sh` による 13 本 + khmrel/khmaster/khmring の bit-exact 突合、RetDec lift、emcc 再ビルド。理由は素材不足 (`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ = FL Studio インストーラー 1 本。`plugins-kilohearts` / `toolchain-retdec` / `toolchain-emsdk` 無し)。#1116 で継続。
+- **結論**: `void @__asm_vmovaps(i256, i256)` (store 形) を `pass_storelow` が 32B `store i256 %val, align 1` へ復元する。32B 全 bit をホスト AVX2 と突合 **mismatch 0** (20,000 call・seed 1)。ネガコン (a) pass 無し・(b) 復元 store を no-op は FAIL。接尾辞なし `@__asm_vmovaps` の case も同じ結果 (m2)。
+- **測定 commit**: `40000edd8` (`test(kh): cover unsuffixed __asm_vmovaps ...`。コードを変えた最後の commit・以降 REPORT のみ)。コマンド `python3 tools/targets/kilohearts/snapins/scripts/vmovaps_store_check.py 20000 1`・rc=0・real 4.48 s・load 0.27 0.28 0.12 (nproc=4)。
+- **既知の差 (m1)**: 復元 store は `align 1`。元の VEX `vmovaps` は 32B 境界を要求し、非整列なら #GP になる。復元はそれを黙って許す (64/32bit 形と同じ扱い)。整列違反時の挙動は元と異なる。**未検証**: 実 RetDec IR での再実行 (`toolchain-retdec` 無し)・14 snap-in の lift 結果の変化 (#3259)。生出力・差分は [REPORT_APPENDIX_3358.md](REPORT_APPENDIX_3358.md)。
+
+### 1116 HeapAlloc 0 返却規約 — 結論 1 行
+
+ホスト同型性試験 `heap_alloc_diff.py` mismatch 0。14 本・khmrel/khmaster/khmring の bit-exact 突合は素材不足で未実施 (全文: [REPORT_APPENDIX_1116.md](REPORT_APPENDIX_1116.md)・#1116 で継続)。

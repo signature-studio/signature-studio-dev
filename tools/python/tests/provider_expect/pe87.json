@@ -1,0 +1,6 @@
+{
+  "tag": "pe87",
+  "refs": ["#2738"],
+  "note": "PE で状態読出しと確認した general ゲッター 4 件 (REPORT_PY87・PY-87 #2738)。値は未実測の仮置き、tests/general_diff.mjs が mock と照合",
+  "functions": ["general.getChangedFlag", "general.getUseMetronome", "general.getPrecount", "general.getRecPPQ"]
+}
