@@ -11,8 +11,20 @@ win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を
 
 測定 commit: `2ae10ac85` (`gen_helpers.py` の変更。ildsp 側の lift 入力は `c5bd6af6e` の `lift_vtable.sh 0x161fc0`)。
 - 変更: 未対応の宣言を即 exit せず**全数列挙**してから exit 1 にする。`i8` (psrldq/psrlq/psllq 等の即値) を型写像に追加 (従来は KeyError で落ちていた)。対応済み 7 種の出力は変えない。
-- 実測: `declare` 62 件が未対応 (op 名 54 種。`cvttss2si`・`movd`・`cvtdq2ps`・`divss`・`vfmadd231sd`・`ucomisd` など)。`gen_helpers.py` の rc=1。残りの wasm 化 (helper の C 実装) は [T-SH-65] #3318、native 差分は [T-SH-64] #3317 が持つ。
-- 回帰: `lift.sh ok` (libreverb、同 worktree・同 commit) は **240/240 PASS**・wasm 18,769 B・所要 23.3 秒 (`real`)。
+- 件数の定義 (本節の数字はこの 3 つだけを指す。他の節・PR 本文はこれを参照する):
+
+| 記号 | 定義 | 値 | 出典 |
+|---|---|---|---|
+| (a) declare 行数 | `norm_raw.ll` のうち `^declare` かつ `@__asm_*` を持つ行数 | 未再測定 (本 run に `toolchain-retdec` が無く、`.ll` も無い) | — |
+| (b) distinct op 名数 | `grep '^declare' norm_raw.ll \| grep -oE '@__asm_[a-z0-9]+' \| sort -u \| wc -l` (対応済み op を含む closure 全体) | 54 | [ildsp REPORT_LIFT §3](ildsp/REPORT_LIFT.md) (`f180a18d4`・toolchain-retdec v5.0) |
+| (c) 未対応シグネチャ数 | `gen_helpers.py` が未対応として列挙した declare 行数 (rc=1) | 62 (2ae10ac85 での実行結果。本 run では再現していない) | 本節の測定 |
+
+- (b) は対応済み 7 種 (movss/movaps/addss/subss/mulss/xorps/ucomiss) を含む全 op 名の数。したがって未対応の op 名の数は「(b) − 7 以上・(b) 以下」で、(b) そのものを未対応の数とは読めない。(c) は gen_helpers の対応表で弾かれた declare 行の数。旧記述「declare 62 件が未対応 (op 名 54 種)」は (b) と (c) を取り違えていた。
+- issue #3316 の題名の「49 種」は古い数字で、本文の「54 種」が (b) と一致する。
+- 未対応の op 名の例: `cvttss2si`・`movd`・`cvtdq2ps`・`divss`・`vfmadd231sd`・`ucomisd`。
+- 未再測定の扱い: (a) と (c) は、`toolchain-retdec` の素材を付けた run (`oc_artifacts: fl-win64 toolchain-retdec`) で `lift_vtable.sh 0x161fc0` を再実行して確定する。それまでは上の値を「過去の記録」として扱う。
+- 回帰 (過去の記録・未再測定): `lift.sh ok` (libreverb) は 2ae10ac85 の時点で 240/240 PASS と記録された。本 run は `toolchain-retdec` / `toolchain-emsdk` が無く再実行していない。
+- `gen_helpers.py` の rc=1。残りの wasm 化 (helper の C 実装) は [T-SH-65] #3318、native 差分は [T-SH-64] #3317 が持つ。
 
 ## 1. 対象の再特定 (mac の 0x25c0-0x2f87 は win では使えない)
 `python3 locate.py <Reverb.dll> <out>` が export stub → 実体 → `.pdata` の連鎖で範囲を求める (RVA, 範囲内に base reloc 0 件・外部 call 0 件)。
