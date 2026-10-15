@@ -183,10 +183,10 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate      
 
 ### PY-264 第 6 run (#3888): 全 313 block の算術経路走査 (受入 2・部分達成)
 
-- 測定: 素材 `fl-win64` の 313 PE block (1.26GB) を展開 (3.2 秒)。`analysis/py264_arith_scan.py` を block ごとに 1 プロセスで、4 並列・block 単位の timeout 900 秒で走査。第 5 run の『全 block 未完走』を解消するための分割。
+- 測定: 素材 `fl-win64` の 313 PE block (1.26GB) を展開 (3.2 秒)。`analysis/py264_arith_scan.py` を block ごとに 1 プロセスで、4 並列・block 単位の timeout 1200 秒で走査。第 5 run の『全 block 未完走』を解消するための分割。
 - 測定 commit: `ba4bc73f8` (origin/main での測定)。スクリプトは `ec6b96de2` から変更なし。
 - 結果: 313 block 全て rc=0 で完走 (全 block の命令数 240,526,119・候補の算術格納 0 件)。陽性対照 (`block00031` に候補 `0x13acb88`) は再実行で 1 件検出 (`0x44a86e`・rc 0・67.1 秒・n=1)。
-- 測定: `analysis/py264_arith_scan_all.sh` (block ごとに 1 プロセス・4 並列・block 単位の timeout 1200 秒) で 313 block を全て再測定。
+- 所要 (実測・本 run の再測定 = `analysis/py264_arith_scan_all.sh`): `real 19m03.8s`・user 74m17s・実行後の load average `3.67 3.92 2.96` (4 コア・並列数 4)。313 block 全て rc=0・命令数合計 240,526,119・hits 0。
 - 限界: 直線区間の定数伝播のみ。関数をまたぐ値・メモリ経由の値は追わない。`0xed0bb0` の関数単位の全経路確認は未達。
 
 ## PY-266 (#3890): flag `+0x49e` の書込み元 (部分達成)
