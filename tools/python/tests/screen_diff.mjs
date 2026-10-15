@@ -63,6 +63,13 @@ const typed = [
   [["screen.drawText", [0, "t", 1, 2, 3, 4.5]], { code: 5 }], [["screen.drawText", [0, "t", 1, 2, 3, 4]], { ok: null }],
   [["screen.blank", [1.5, 0]], { code: 5 }], [["screen.blank", ["1", 0]], { code: 5 }],
   [["screen.blank", [true, 0]], { ok: null }], [["screen.isBlanked", []], { ok: true }],
+  // PY-135 (#3022 round 1): addMeter の成功経路 (rc>0・scr≠0) は PE 0xd7d9e0 で isUnBlank を真にし、activeCounter を scr+0x1dc (仮置き 0) にする。解析失敗 (rc≤0) は状態を変えない
+  [["screen.setScreenActiveCounter", [8]], { ok: null }], [["screen.getScreenActiveCounter", []], { ok: 9 }], [["screen.isUnBlank", []], { ok: false }],
+  [["screen.addMeter", [0, 1, 2, 3]], { ok: null }], [["screen.isUnBlank", []], { ok: true }], [["screen.getScreenActiveCounter", []], { ok: 0 }],
+  [["screen.unBlank", [0]], { ok: null }], [["screen.setScreenActiveCounter", [5]], { ok: null }],
+  [["screen.addMeter", [0, 1, 2, "3"]], { code: 5 }], [["screen.addMeter", [0, 1, 2, 3, 4, 5]], { code: 5 }],
+  [["screen.isUnBlank", []], { ok: false }], [["screen.getScreenActiveCounter", []], { ok: 5 }],
+  [["screen.addMeter", [0, 1, 2, 3, 4]], { ok: null }], [["screen.isUnBlank", []], { ok: true }], [["screen.getScreenActiveCounter", []], { ok: 0 }],
 ];
 
 const diffs = [];

@@ -439,8 +439,9 @@ export function createMockEngine() {
     "screen.getScreenActiveCounter": (...a) => { arity(a, 0, 0); return st.screenActiveCounter; },
     "screen.setScreenActiveCounter": (...a) => { arity(a, 1, 1); st.screenActiveCounter = (st.screenActiveCounter + argI(a, 0, 0)) | 0; },
     "screen.unBlank": (...a) => { arity(a, 1, 1); st.screenUnBlank = argI(a, 0, 0) === 1; },
-    // PY-135 (#3022): 描画・メーター系 6 件 (PE 0xd7ada0・0xd7b690・0xd7ae80・0xd7af40・0xd7bcb0・0xd7bec0)。描画先は API から観測できないため引数検査と None だけを模す (REPORT_PY135)
-    "screen.addMeter": (...a) => { arity(a, 4, 5); for (let i = 0; i < 4; i++) argI(a, i, 0); argI(a, 4, 0); },
+    // PY-135 (#3022): 描画・メーター系 6 件 (PE 0xd7ada0・0xd7b690・0xd7ae80・0xd7af40・0xd7bcb0・0xd7bec0)。addMeter 以外は引数検査と None だけを模す (REPORT_PY135)。
+    // addMeter は書式解析が成功 (rc>0) かつ scr≠0 のとき PE 0xd7d9e0 が isUnBlank (scr+0x1d1) を真にし、activeCounter を scr+0x1dc (仮置き 0) にする。解析失敗は状態を変えない
+    "screen.addMeter": (...a) => { arity(a, 4, 5); for (let i = 0; i < 4; i++) argI(a, i, 0); argI(a, 4, 0); st.screenUnBlank = true; st.screenActiveCounter = st.screenDefaultCounter; },
     "screen.displayBar": (...a) => { arity(a, 5, 5); argI(a, 0, 0); argI(a, 1, 0); str(a[2]); argF(a, 3); argI(a, 4, 0); },
     "screen.fillRect": (...a) => { arity(a, 5, 5); for (let i = 0; i < 5; i++) argI(a, i, 0); },
     "screen.drawRect": (...a) => { arity(a, 5, 5); for (let i = 0; i < 5; i++) argI(a, i, 0); },
