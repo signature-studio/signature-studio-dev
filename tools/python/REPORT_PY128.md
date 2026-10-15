@@ -32,32 +32,32 @@
 
 ## 検証
 
-測定 commit: `ecc8c3315` (コードを変えた最後の commit。`origin/main` (`549edb5ea`) の取り込み merge の 7 回目)。
+測定 commit: `ad4642cf2` (M。`origin/main` (`592f4c8e0`) を取り込んだ merge commit。コードを変えた最後の commit)。この REPORT を含む commit (H) は `tools/python/REPORT_PY128.md` のみを変える。
 
-main 取り込みは 7 回あった。1 回目 (`bb6bdcf41` → `43b9e5614`): `fl_mock.mjs`・`fl_engine.c`・`provider_check.mjs`・`ui_state_diff.mjs` が衝突。2 回目 (`1d04852b0` → `a440164c4`): main に PY-132 (#3013) の `pe132` (ui ブラウザ 3 件) が入り、`provider_check.mjs` が衝突。3 回目 (`b6e93d6ac` → `4e8e1dac7`): 競合なし (main 側の `fl_engine.c`・`fl_mock.mjs`・`ilmcp.mjs`・`plugins_diff.mjs` (PY-228) 等)。4 回目 (`93202140d` → `20fef1b35`): 競合なし (main 側の `static64_growth` 系テストの追加のみ。provider・mock・検証テストの本体は変わらない)。衝突はいずれも main 側の追加 (PY-130・#3007 / PY-132・#3013) と本 PR (PY-128) の追加なので両方を残した。`provider_check` の期待値は main 168 / 267 から本 PR の 2 件を足して 170 / 265 (3 回目・4 回目の取り込み後も同じ)。5 回目 (`d39241f69`・PY-138 #3029 の `pe138` 3 件と PY-143 #3041 の `pe143` 2 件): `provider_check.mjs` が衝突。main 側の `pe138`・`pe143` と本 PR の `pe128` を両方残し、件数は main 173 / 262 に本 PR の 2 件を足して 175 / 260 (総数 435 は不変)。6 回目 (`3e55552c1`・PY-133 #3014 の `pe133` 2 件を含む main 59 commit 分): `provider_check.mjs` が衝突。main 側の `pe133` と本 PR の `pe128` を両方残し、件数は main 175 / 260 に本 PR の 2 件を足して 177 / 258 (総数 435 は不変)。7 回目 (`3e55552c1` → `549edb5ea`。main 146 commit 分・PY-235 #3701 の `pe235` 1 件を含む): `provider_check.mjs` のみ衝突。main 側の `pe235` (if 条件と内訳コメントの両方) と本 PR の `pe128` を両方残し、件数は main 176 / 259 に本 PR の 2 件を足して 178 / 257 (総数 435 は不変)。
+main 取り込みは 8 回あった。1 回目 (`bb6bdcf41` → `43b9e5614`): `fl_mock.mjs`・`fl_engine.c`・`provider_check.mjs`・`ui_state_diff.mjs` が衝突。main 側 (PY-130・#3007 の setter 2 件と ui 版 getVersion) と本 PR (PY-128 の 2 件) の追加なので両方を残した。2 回目 (`1d04852b0` → `a440164c4`): main に PY-132 (#3013) の `pe132` (ui ブラウザ 3 件) が入り、`provider_check.mjs` が衝突。3 回目 (`b6e93d6ac` → `4e8e1dac7`): 競合なし (main 側の `fl_engine.c`・`fl_mock.mjs`・`ilmcp.mjs`・`plugins_diff.mjs` (PY-228) 等)。4 回目 (`93202140d` → `20fef1b35`): 競合なし (main 側の `static64_growth` 系テストの追加のみ。provider・mock・検証テストの本体は変わらない)。衝突はいずれも main 側の追加 (PY-130・#3007 / PY-132・#3013) と本 PR (PY-128) の追加なので両方を残した。`provider_check` の期待値は main 168 / 267 から本 PR の 2 件を足して 170 / 265 (3 回目・4 回目の取り込み後も同じ)。5 回目 (`d39241f69`・PY-138 #3029 の `pe138` 3 件と PY-143 #3041 の `pe143` 2 件): `provider_check.mjs` が衝突。main 側の `pe138`・`pe143` と本 PR の `pe128` を両方残し、件数は main 173 / 262 に本 PR の 2 件を足して 175 / 260 (総数 435 は不変)。6 回目 (`3e55552c1`・PY-133 #3014 の `pe133` 2 件を含む main 59 commit 分): `provider_check.mjs` が衝突。main 側の `pe133` と本 PR の `pe128` を両方残し、件数は main 175 / 260 に本 PR の 2 件を足して 177 / 258 (総数 435 は不変)。7 回目 (`3e55552c1` → `549edb5ea`。main 146 commit 分・PY-235 #3701 の `pe235` 1 件を含む): `provider_check.mjs` のみ衝突。main 側の `pe235` (if 条件と内訳コメントの両方) と本 PR の `pe128` を両方残し、件数は main 176 / 259 に本 PR の 2 件を足して 178 / 257 (総数 435 は不変)。8 回目 (`09bbc6684` → `ad4642cf2`。main `592f4c8e0` の 132 commit 分・PY-136 #3025 の `pe136` (screen 初期化・メニュー 10 件) を含む): 競合は `tests/provider_check.mjs` のみ (`git merge-tree` で事前確認。`docs/DOC_MAP.md`・`host/fl_mock.mjs`・`provider/fl_engine.c` は auto-merge)。main 側の `pe136` と本 PR の `pe128` を両方残し (if 条件に `pe136` を追加。内訳コメントにも追記)、件数は main 186 / 249 に本 PR の 2 件を足して 188 / 247 (総数 435 は不変)。
 
-環境: runner 4 core、load average 0.74 (05:20:29)。`FL_WIN64_DIR` は素材 `artifacts/fl-win64.tar.zst` (R2 由来) を `$RUNNER_TEMP/fl-win64` に `tar --zstd -xf` で展開 (7.6 秒。`extracted/` を含む)。`toolchain-emsdk` は展開せず [EMSDK] (既存。`docs/REFERENCES.md`) を使用。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、206 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、4.7 秒)。この run の runner には CPython と flpy の生成物が無かったため、3 つを新規に作った。provider は `bash provider/build.sh` で再ビルド。
+環境: runner 4 core (load average は M の測定では未記録)。`FL_WIN64_DIR` は素材 `artifacts/fl-win64.tar.zst` (R2 由来) を `$RUNNER_TEMP/fl-win64` に `tar --zstd -xf` で展開 (8.0 秒。`extracted/` を含む)。`toolchain-emsdk` は展開せず [EMSDK] (既存。`docs/REFERENCES.md`) を使用。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、207 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、4.9 秒)。M の測定 run の runner には `work/` と `dist/` が無かったため、これらを新規に作った。provider は `bash provider/build.sh` で再ビルド。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 178 (main 176 + 2) | 0.98 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 178 / 未実装 257 / MCP 静的 60) | 0.28 秒 |
+| `bash provider/build.sh` | rc 0・ハンドラ 188 (main 186 + 2) | 1.2 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 188 / 未実装 247 / MCP 静的 60) | 0.28 秒 |
 | `node tests/ui_state_diff.mjs` | calls 81、diffs 0、PASS | 0.04 秒 |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.32 秒 |
 
-隣接の差分テスト: `tests/*_diff.mjs` の 22 本と `tests/poc_mcp.mjs` を全て実行し、node の rc は全て 0 (出力に `"PASS":true` が付く。`poc_mcp` は POC OK)。`tests/channels_diff.mjs` は calls 238・diffs 0、`tests/device_diff.mjs` は calls 11・diffs 0、`tests/playlist_diff.mjs` は calls 72・diffs 0、`tests/launchmap_diff.mjs` (PY-138) は calls 15・diffs 0、`tests/arrangement_diff.mjs` は calls 39・diffs 0、`tests/ui_browser_diff.mjs` (PY-132) は ok_calls 8・bad_calls 5・diffs 0、`tests/plugins_diff.mjs` (PY-228) は calls 56・diffs 0、`tests/ui_editor_diff.mjs` (main 側の PY-133) は ok_calls 6・bad_calls 8・diffs 0。隣接テストの wall は未計測 (rc と PASS のみ)。
+wall 列は測定 commit `ad4642cf2` での計測 (表の 4 コマンドは同じ commit で実行)。
+
+隣接の差分テスト: `tests/*_diff.mjs` の 23 本 (`ui_state_diff` を含む) と `tests/poc_mcp.mjs` を全て実行し、node の rc は全て 0。各出力の判定は全て PASS (`poc_mcp` は `POC OK`)。主要値: `channels_diff` calls 238・diffs 0、`device_diff` calls 11・diffs 0、`playlist_diff` calls 72・diffs 0、`launchmap_diff` calls 15・diffs 0、`arrangement_diff` calls 39・diffs 0、`ui_browser_diff` ok_calls 8・bad_calls 5・diffs 0、`plugins_diff` calls 56・diffs 0、`ui_editor_diff` ok_calls 6・bad_calls 8・diffs 0、`note_enum_diff` calls 33,264・diffs 0。wall は各 1 回の実行の実測 (0.04〜0.82 秒。`poc_mcp` 0.82 秒が最大)。
 
 mock と C の値 (同一): `getProgTitle()` = `FL Studio 2026`、`getHintValue(50,100)` = `50%`、`(-1,100)` = `-1%`、`(1,8)` = `12%` (12.5 は偶数側)、`(5,0)` と `(0,0)` = `-9223372036854775808%`、`(2147483647,1)` = `-100%` (int32 折返し)、`(None,1)` = code 5。
 
-ネガティブコントロール (`ecc8c3315` で再測定): `host/fl_mock.mjs` 438 行の係数 `100` (`Math.imul(v, 100)`) を `10` に変えると `node tests/ui_state_diff.mjs` は `ui 状態ゲッター差分 9 件` で rc 1 (FAIL)。元に戻すと calls 81・diffs 0・PASS (元ファイルと `cmp` で同一を確認)。
+ネガティブコントロール (M で再測定): `host/fl_mock.mjs` (588 行。旧記録の 438 行は main 取り込み前) の 440 行目の係数 `Math.imul(v, 100)` を `Math.imul(v, 10)` に変えると、`node tests/ui_state_diff.mjs` は `ui 状態ゲッター差分 9 件` (出力の内訳は全て `ui.getHintValue`) で rc 1 (FAIL)。元に戻すと calls 81・diffs 0・PASS (rc 0)。元に戻した後、編集前に取ったバックアップと sha256 が一致し、`git diff --stat -- host/fl_mock.mjs` は空。
 
-wall 列は `ecc8c3315` での計測 (表の 4 コマンドは同じ commit で実行)。
-
-コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
+コード差分 (測定 commit から H まで、`tools/python` の .md 以外):
 
 ```
-$ git diff ecc8c3315 HEAD -- tools/python ':!*.md'
-(空)
+$ git diff ad4642cf2 HEAD -- tools/python ':!*.md'
+(空。0 バイト)
 ```
 
 ## 未解決
