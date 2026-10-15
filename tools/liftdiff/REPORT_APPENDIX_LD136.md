@@ -7,7 +7,7 @@
 - 受入 1 (trap の消失): 測定 commit `6ead9dcc1` で `targets/ott_old.json` (既定)・`ott_old_blk.json` (計装)・`ott_old_site.json` (site 計装) を build し、`1801c5e84` の vm0・u16 を測った。raw を持つ 8 case はすべて wasm `status = ok` (trap 0)。LD-83 の `wasm_trap` (u16) は消えた。
 - 受入 2 (site trace): u16 の wasm 側は HeapFree の call site `C801c0b71` を **5 回** 記録する。native の HeapFree も 5 回 (`native_calls 5`)。各回の戻り br `J801c0b71.1=1` (TRUE) の後は `B1801c0ba8` へ進み、`1c5eb8 → 1c0b6c` のループを経て `B1801c5ecc` で終わる。trap 地点の後続 block は欠けずに取れる。
 - 受入 3 (12 case): `results/ld67/compare_blk.py` で既定 vs 計装 (`ott_old_blk`) と既定 vs site (`ott_old_site`) を r1・r2 とも `cases=12 diff=0`。site trace の JSON は r1 と r2 でバイト一致 (`cmp`)。
-- 受入 4 (製品 KPI の前後): **動かしていない** (§5)。
+- 受入 4 (製品 KPI の前後): gui flengine の e2e を `a4a620a9^` (前) と `a4a620a9` (後) で各 1 回測った。前後で KPI は変わらない (§5・§7)。
 
 ## 1. 測定条件
 
@@ -51,15 +51,34 @@
 - 測定 commit: `6ead9dcc1`。
 - `git diff 6ead9dcc1 HEAD -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/targets tools/liftdiff/results tools/shim tools/ott/rt tools/m6` の出力: 0 行 (本 PR は REPORT 付録と `docs/DOC_MAP.md` の 1 行だけ)。よって測定値の再測定は要らない。
 
-## 5. 受入 4 (製品 KPI の前後) — 未実施
+## 5. 受入 4 (製品 KPI の前後) — 実施 (§7)
 
-- 理由: 修正 `a4a620a9` と `7278e8571` は `tools/shim/src/heap.c` にあり、`tools/flelift/boot` の build (`build.sh`・`boot_e2e.sh`) は shimx を使い heap.c を取り込まない (`grep heap.c tools/flelift/boot/*.sh` で 0 件)。前後の KPI を測るには、heap.c を取り込む `tools/gui/flengine` (e2e 1 回 459〜466 秒 · `tools/gui/flengine/REPORT.md` §6) の前後 2 回が要る。
-- 本 run では前後 2 回 (`a4a620a9^` と HEAD) の準備と実行を行わなかった (§6 の未解決として残す)。
+前後の値は §7。修正 `a4a620a9` は `tools/shim/src/heap.c` にあり、`tools/flelift/boot` の build (shimx) は heap.c を取り込まないため、boot 経路の KPI では効果を測れない (`grep heap.c tools/flelift/boot/*.sh` で 0 件)。本付録は `tools/gui/flengine/e2e.sh` (heap.c を取り込む) で測った。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 受入 4: 製品 KPI の前後 (FLEngine 起動の dispatch 数・通過 unit 数・最初のウィンドウ) | 修正の製品効果が未確認 | #2841 に残す (Refs)。次回 run で `tools/gui/flengine/e2e.sh` を `a4a620a9^` と HEAD で各 1 回 |
 | 命令単位の完全 trace (RetDec IR に命令 VA が無い) | site 単位の対応まで | #2801 (LD-131) |
 | 本測定は `--notrace` のため wasm 側の `calls` 欄が空。import 呼出しの対比は site 記録の `C` で代用 | wasm 側の HeapFree 引数・戻り値の直接比較は未実施 | 本付録の §2 のみ (起票無し) |
+
+## 7. 製品 KPI の前後 (受入 4・gui flengine の e2e)
+
+- 前: `a4a620a9^` = `740344ccc`。後: `a4a620a9` (#2802 の差分は `tools/shim/src/heap.c` +6/−1 と `tools/shim/test/test_main.c` +20 だけ)。
+- 実行: 各 commit の detached worktree で `ANALYSIS_DIR=<RUNNER_TEMP> FL_WIN64_DIR=<RUNNER_TEMP>/fl-win64 EMSDK_ENV=[EMSDK]/emsdk_env.sh RETDEC=[RETDEC]/bin/retdec-decompiler bash tools/gui/flengine/e2e.sh` を foreground で 1 回ずつ。`fl-win64` は 1 回だけ展開した (19 秒)。
+
+| 項目 | 前 (`740344ccc`) | 後 (`a4a620a9`) |
+|---|---|---|
+| e2e の done 行 | 405 s (rc 1) | 398 s (rc 1) |
+| judge | 13/14 (S1 FAIL: 872/1/47/22/0 対 base 870/1/47/24/0) | 同じ |
+| B1 boot parity (`units_run`・GetMem・FreeMem・icall_miss) | 52 (base 52) · 560 · 20 · 5 | 同じ |
+| R2 reach floor | 33 (floor 19) | 同じ |
+| P4 TApplication の window (hwnd) | created PASS `0x110000f` | 同じ |
+| P5 TLightweightLayeredControl の window (hwnd) | created PASS `0x110000e` | 同じ |
+| native selftest | 506 passed / 0 failed | 同じ |
+| ネガティブコントロール N1〜N9 | 期待どおり FAIL | 同じ |
+| baseline の `wasm_size` | 6914481 | 6914538 (+57 B) |
+
+- rc 1 は S1 gate の FAIL による。前後とも同じ FAIL で、修正由来ではない (REPORT `tools/gui/flengine/REPORT.md` §6 の 14/14 は別 HEAD の値)。
+- 解釈: 最初のウィンドウ (P4・P5 の window 作成) と通過 unit 数 (52) は修正の前後で変わらない。dispatch 数は e2e の出力に無く、本測定では取っていない。`tools/flelift/boot` の 209 dispatch は shimx の経路で、本修正の影響は無い。
+- 起動の進み方は同じ。製品の起動を変える効果は、この gui 経路では確認できなかった。
