@@ -5,18 +5,19 @@
 ## 結論
 
 - **受入 1 (委譲先の本体)**: 3 関数の本体の所在を PE 解析箇所つきで確定した (「委譲先の本体」)。**副作用の本体** (vtable `+0x1f0`・`+0x108` の呼出し先) は未確定で、子 #3558 (PY-213) に移す。
-- **受入 2 (範囲外 index)**: **暫定決定**。パターン番号は 1..999。範囲外は**何もせず None を返す** (例外も呼出しもしない)。根拠は movePattern の O=NULL 経路が範囲外を呼ばずに返すこと (0xe33efe–0xe33f0e)。jumpToPattern の本体には範囲検査が無く、実機での挙動は未確認 (#3558)。
+- **受入 2 (範囲外 index)**: **暫定決定**。パターン番号は 1..999。範囲外は**何もせず None を返す** (例外も呼出しもしない)。根拠は弱い。jumpToPattern の本体には範囲検査が無く、表を引く前 (0x12d8b30) に生の index を vtable `+0x1f0` へ渡すため、範囲外で何もしないかは呼出し先が範囲外を無視するかに依る (未確定 → #3558)。movePattern の O=NULL 経路が範囲外の呼出しを省く (0xe33efe–0xe33f0e) のは確定だが、jumpToPattern の根拠にはならない。
 - **受入 3 (index 基準)**: パターン番号は **1 始まり**。jumpToPattern・findFirstNextEmptyPat は Python 値をそのまま使う。selectPattern だけ Python 値から 1 を引く (0xd662e1) ので 0 始まりの選択位置になる。**movePattern の引数は番号ではなく相対量** (移動先 = 現在番号 + 引数。既定 1)。
 - **前段 `REPORT_PY208.md` の訂正 3 点** (「前段 REPORT_PY208 の訂正」): 表と G の番地は rip 相対の変位 (disp) で VA ではない / 表の要素幅は 24 B ではなく **192 B** / `0x409c80` は flags 変換ではなく **1 バイト複写**。
 
 ## 測定
 
-- 測定 commit: `574c37c36` (検査スクリプト `tools/python/analysis/py211_pattern_jump_move.py` を追加した commit)。この後のコード範囲の差分は 0 行 (`git diff 574c37c36 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力 0 行、PR 作成直前に確認)。
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (`oc_artifacts: fl-win64`)。展開: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C work/py211 --wildcards '*block00031_PE.bin'` (実測 2.758 秒・`real 0m2.758s`)。展開先 `tools/python/work/py211/extracted/` は gitignore。
-- 検査: `python3 analysis/py211_pattern_jump_move.py work/py211/extracted/block00031_PE.bin` → **18/18 PASS**・rc 0・実測 `real 0m0.126s`。load average は同じ検査の直前 (uptime 02:18:43 UTC) で `0.00 0.06 0.09` (1/5/15 分値)。
-- ネガティブコントロール: `--mutate` (movePattern の上限 `cmp eax, 0x3e7` の即値を `0x3e8` に書き換えたメモリ上の複製で検査) → `FAIL move.upper_bound_999`・`FAIL crosscheck.bytes_3e7_jg`、16/18 PASS・rc 1。検査は効いている。
+- 測定 commit: `496323632` (検査スクリプト `tools/python/analysis/py211_pattern_jump_move.py` を最後に変えた commit。検査名の修正と検査 5 件の追加)。この後のコード範囲の差分は 0 行 (`git diff 496323632 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力 0 行、PR 更新直前に確認)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (`oc_artifacts: fl-win64`)。展開: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C work/py211 --wildcards '*block00031_PE.bin'`。所要は n=3 の実測 2.657・2.804・2.749 秒 (min–max 2.657–2.804 秒)。展開先 `tools/python/work/py211/extracted/` は gitignore。
+- 検査: `python3 analysis/py211_pattern_jump_move.py work/py211/extracted/block00031_PE.bin` → **23/23 PASS**・rc 0。所要は n=5 の実測 0.136・0.129・0.133・0.131・0.129 秒 (min–max 0.129–0.136 秒)。load average (1/5/15 分) は上記の展開と検査を含む測定区間の前後 uptime で `0.06 0.30 0.17` → `0.30 0.34 0.18`。並列数 1 (単一プロセス・直列)。
+- ネガティブコントロール: `--mutate` (movePattern の上限 `cmp eax, 0x3e7` の即値を `0x3e8` に書き換えたメモリ上の複製で検査) → `FAIL move.upper_bound_999`・`FAIL crosscheck.bytes_3e7_jg`、21/23 PASS・rc 1。追加した検査は、本体の 1 命令を書き換えた複製 (リポジトリ外の一時ファイル) で 1 件ずつ確かめた: `0x12d8c85` の `jne`→`je` で `find.bit2_early_ret` が FAIL (22/23)、`0x12d8afe` の `jne`→`je` で `jump.index_cmp_eq_only` が FAIL (22/23)、`0x12d8b88` の `mov ecx, 0x14` の即値を `0x3e7` にすると `jump.no_999_imm` が FAIL (22/23)。検査は効いている。
 - 別算法の検算: capstone の逆アセンブルとは独立に、機械語の並び `3d e7 03 00 00` + `jg` (7f / 0f 8f) を .text のファイル上で正規表現で数えた。出現 26 件の中に 0xe33f09 がある (同形は他関数にもあるため、番地の包含だけを見る)。
 - 解析方法: capstone で関数先頭から ret までを逆アセンブルし、rip 相対の参照は「次命令の VA + disp」で VA に解決した (`decode()`)。表 (`0x193fcf8` 付近) の所在は `.bss` (ファイル上に初期値が無く、実行時に埋まる)。要素数は PE から決まらない。
+- `analysis/py41_disasm.py` を使わなかった理由: #3539 の『検証の前提』はこれを指定するが、同スクリプトは rip 相対の参照を変位のまま出し (例: `[rip + 0x2fc591]`)、VA に解決しない。前段 PY-208 の番地の取り違え (下の訂正 1) を繰り返さないため、VA 解決を入れた本スクリプトにした。
 
 ## 委譲先の本体 (受入 1)
 
@@ -38,7 +39,7 @@
 | 0x12d8b51〜0x12d8b6f | `[[0x15e1610]]` の byte が非 0 なら `0x11e84a0(dword E(i))` (役割は未同定) |
 | 0x12d8b74〜0x12d8b8f | `0x12ddaa0([0x15d51a0])`。`0x1046710()` が非 0 なら `0xbd68e0(0x14, 0)` |
 | 0x12d8b94〜0x12d8bc5 | `[[0x15e2478]] ≠ 0` かつ `[[[0x15e2478]]+0x9e8]` の byte (+0xa9) が非 0 なら `0xe55c80` |
-| 0x12d8bd0 | ret。**index の上限・下限の検査は無い** |
+| 0x12d8bd0 | ret。**index の上限・下限の検査は無い** (index を比較するのは 0x12d8af8 の現在番号との等号だけ。検査 `jump.index_cmp_eq_only`・`jump.no_999_imm`) |
 
 ### movePattern 本体 `0xe33e20` (引数 ecx = 相対量 ebx)
 
@@ -61,9 +62,14 @@
 | 0x12d8c15〜0x12d8c39 | 候補 cand = ((r14 + k − 1) mod 999) + 1 (k = 1..1000、`cmp r13d, 0x3e8` at 0x12d8d0a)。`imul` の魔法数 0x83340521 で 999 の剰余を取る。**cand ∈ [1, 999]** |
 | 0x12d8c3e〜0x12d8c5e | flags の bit3 (8) が立つと、dword E(cand) ≥ 1 の候補を捨てる (空きだけを採る) |
 | 0x12d8c64〜0x12d8c75 | `0x12d8d30(cand, dl=1, r8b=0, r9b=0)` (空き判定の述語) が偽なら次の候補 |
-| 0x12d8c85〜0x12d8c8d | bit2 (4) が立たないなら `0x12d8af0(cand)` = jumpToPattern の本体を呼ぶ |
-| 0x12d8c98〜0x12d8cae | bit1 (2) が立たないなら `0x12e21a0(x, y, −1, word)` |
-| 0x12d8d18 | 見つからなければ −1 のまま。戻り値は callback が捨てる |
+| 0x12d8c85 | bit2 (4) が立つなら `jne 0x12d8d18`: jump も後段も省き、cand をそのまま返す (早期 return。検査 `find.bit2_early_ret`) |
+| 0x12d8c8b〜0x12d8c8d | bit2 が立たないなら `0x12d8af0(cand)` = jumpToPattern の本体を呼ぶ |
+| 0x12d8c98〜0x12d8cae | bit1 (2) が立たないなら `0x12e21a0(x, y, −1, word)`。word = `[0x12d8d28]` の 2 バイト (ファイル上 0000 → 0。検査 `find.word_zero`) |
+| 0x12d8cb3〜0x12d8cc7 | Q = `[0x15e35c8]`、O = `[[Q]+0xd34]`。O が NULL なら 0x12d8d17 へ (後段を省く) |
+| 0x12d8cc9〜0x12d8cd1 | O ≠ NULL: `0xea7ae0(O, dl=1, r8=0)` を呼ぶ (役割は未同定 → 未解決表) |
+| 0x12d8cd6〜0x12d8ce0 | P = `[0x15e1748]`。`byte [P]` が 0 なら 0x12d8d17 へ |
+| 0x12d8ce2〜0x12d8cff | O を読み直し (`[[Q]+0xd34]`)、`0xea6b30(O, dl=1, r8d=[0x15d51a0], r9b=1)` を呼ぶ (役割は未同定 → 未解決表)。後段の 2 呼出しは検査 `find.post_calls` で確認 |
+| 0x12d8d17〜0x12d8d18 | 戻り値 = esi。候補が見つかれば cand、見つからなければ −1 (0x12d8bf6 の初期値)。戻り値は callback が捨てる |
 
 ### flags の変換 `0x409c80` (memmove: dst = rdx、src = rcx、n = r8)
 
@@ -74,7 +80,7 @@
 
 | 関数 | 本体の検査 | 決定 | 根拠 |
 |---|---|---|---|
-| jumpToPattern | 無し (`0x12d8af0`) | **暫定**: 範囲外 (1..999 の外) は何もせず None | 同系の movePattern (O = NULL) が範囲外を呼ばずに返す。callback・wrapper に範囲外用のエラー経路が無い |
+| jumpToPattern | 無し (`0x12d8af0`) | **暫定**: 範囲外 (1..999 の外) は何もせず None | **根拠は弱い**。生の index を `0x12d8b30` で vtable `+0x1f0` に渡すため、範囲外の挙動は呼出し先次第 (#3558)。callback・wrapper に範囲外用のエラー経路が無い |
 | movePattern (O = NULL) | あり (0xe33efe〜0xe33f0e) | **確定** (native どおり): 移動先が 1..999 の外なら何もしない | 実測の分岐 |
 | movePattern (O ≠ NULL) | 無し | **暫定**: jumpToPattern と同じく何もしない (実機未確認 → #3558) | 本体は全選択を vtable `+0x108` に渡すだけ。範囲の判定は呼出し先次第 |
 | findFirstNextEmptyPat | index は無い | 探索は 1..999 を wrap。空きが無ければ −1 で何もしない | 候補式 (0x12d8c18〜0x12d8c3b) |
@@ -112,6 +118,7 @@
 | jumpToPattern の副作用本体 (vtable `+0x1f0`・Z の型) と、範囲外の実機の挙動 | jumpToPattern の副作用・暫定決定の確度 | #3558 (PY-213) |
 | movePattern の副作用本体 (vtable `+0x108`)・O ≠ NULL の範囲外の挙動 | movePattern の副作用・暫定決定の確度 | #3558 (PY-213) |
 | 空き判定 `0x12d8d30`・`0x12e21a0`・`0xe5af80`・`0x11e84a0`・`0x12ddaa0`・`0xe55c80` の本体 | findFirst・jump の副作用の細部 | #3558 (補助)・#3536 (構造体 E) |
+| `0xea7ae0`・`0xea6b30` (findFirst の、bit2 が立たない経路の後段の呼出し先。ガード `[0x15e1748]` の意味も未同定)。同じ VA の `0xea7ae0` は tools/m11/ldfix/REPORT_2794.md にも『対応未決 (C)』の関数として別の呼出し元で出る | 候補が見つかった後の副作用 (findFirst の副作用の細部) | #3558 (補助) |
 | `[0x15d51a0]` と `[[0x15e4018]]` が同じ現在番号か (1 始まりの根拠の強さ) | index 基準の根拠 (推定) | 本 REPORT に推定として残す (追跡のみで子は起票しない) |
 | E(0) が実行時に未使用か | 0 を範囲外とする決定の根拠 | 同上 |
 
@@ -124,10 +131,10 @@ python3 analysis/py211_pattern_jump_move.py work/py211/extracted/block00031_PE.b
 python3 analysis/py211_pattern_jump_move.py work/py211/extracted/block00031_PE.bin --mutate
 ```
 
-- 第 1 行: 18/18 PASS・rc 0。第 2 行: FAIL 2 件・rc 1 (ネガティブコントロール)。
+- 第 1 行: 23/23 PASS・rc 0。第 2 行: FAIL 2 件・21/23・rc 1 (ネガティブコントロール)。
 
 ## 検証範囲 / 範囲外
 
-- 範囲内: 上記の VA の逆アセンブル (capstone) と 18 件の検査。
-- 範囲外: 実行時の値 (表の中身・現在番号の実値・オブジェクトの型)、呼出し先 (vtable `+0x1f0`・`+0x108` など) の本体。範囲外に関わる結論は「暫定」と書いた。
+- 範囲内: 上記の VA の逆アセンブル (capstone) と 23 件の検査。
+- 範囲外: 実行時の値 (表の中身・現在番号の実値・オブジェクトの型)、呼出し先 (vtable `+0x1f0`・`+0x108` など、`0xea7ae0`・`0xea6b30` を含む) の本体。範囲外に関わる結論は「暫定」と書いた。
 - provider・host の実装は変えていない (推測実装は禁止・実装は本 issue の範囲外)。
