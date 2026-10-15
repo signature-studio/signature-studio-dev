@@ -16,7 +16,7 @@ const mock = createMockEngine();
 const run = (eng, name, args) => {
   try {
     const v = eng.call(name, args);
-    return { ok: v === undefined ? null : v };
+    return { ok: v === undefined ? null : (v?.t === "D" ? v.v : v) };
   } catch (e) {
     return { code: e.flCode ?? null };
   }
@@ -34,6 +34,17 @@ const seq = [
   ["device.midiOutMsg", [0x90, 1, 60, 100, 127]],
   ["device.midiOutMsg", [0xB0, -1, 1, 2, 9]],
   ["device.midiOutMsg", [0x1FF, 0x0F, 300, 40000, -1]],
+  // PY-206 (#3494): PE で確定した 7 関数。getIdleElapsed・isMidiOutAssigned の値は仮置きで、mock と C が同じ値を返すことだけを見る
+  ["device.createRefreshThread", []],
+  ["device.destroyRefreshThread", []],
+  ["device.fullRefresh", []],
+  ["device.getIdleElapsed", []],
+  ["device.isMidiOutAssigned", []],
+  ["device.getMasterSync", []],
+  ["device.setMasterSync", [true]],
+  ["device.getMasterSync", []],
+  ["device.setMasterSync", [false]],
+  ["device.getMasterSync", []],
 ];
 
 // mock は引数の個数・型を検査しない (既知の差)。C 側は署名どおりに拒否する (code 5) ことだけを wasm 単独で確認。
@@ -43,6 +54,15 @@ const rejects = [
   ["device.forwardMIDICC", [1, "x"]],
   ["device.midiOutMsg", [0xB0, 2, 1, 127, 9, 9]],
   ["device.midiOutMsg", [0xB0, "x"]],
+  ["device.getLinkedChannel", []],
+  ["device.getLinkedChannel", [1, 2]],
+  ["device.getLinkedChannel", ["x"]],
+  ["device.createRefreshThread", [1]],
+  ["device.getIdleElapsed", [1]],
+  ["device.getMasterSync", [0]],
+  ["device.isMidiOutAssigned", ["x"]],
+  ["device.setMasterSync", []],
+  ["device.setMasterSync", ["x"]],
 ];
 const rejectDiffs = rejects.map(([name, args]) => ({ name, args, wasm: run(wasm, name, args) }))
   .filter((r) => r.wasm.code !== 5);
@@ -84,6 +104,7 @@ const mockOut = mock.state.midiOut.length;
 const wasmOut = wasm.midiOutCount();
 if (mockOut !== wasmOut) diffs.push({ state: "midiOut count", mock: mockOut, wasm: wasmOut });
 
+assert.equal(wasm.call("device.getIdleElapsed", []).t, "D", "getIdleElapsed の戻りは float (D タグ)");
 // 送った word 列 (midiOutMsg と forwardMIDICC の第 1 引数、呼出し順)。期待値は式の手計算 (両側が同じ誤りを持つ場合も落とす)
 const expectWords = [0x0A643C90, 0xB0, 0x643C90, 0xB0, 0x097F01B2, 0x7F643C91, 0xB0, 0x9B412DFF, 0x643C91, 0x097F01B2, 0x0A643C90];
 const mockWords = mock.state.midiOut.map((m) => (m.api === "midiOutMsg" ? m.word : Number(m.message) >>> 0));
@@ -92,10 +113,28 @@ if (JSON.stringify(mockWords) !== JSON.stringify(wasmWords)) diffs.push({ state:
 if (JSON.stringify(wasmWords) !== JSON.stringify(expectWords)) diffs.push({ state: "midi word expect", expect: expectWords, wasm: wasmWords });
 if (JSON.stringify(linkCodes) !== JSON.stringify(linkExpectCodes)) diffs.push({ state: "link codes", expect: linkExpectCodes, wasm: linkCodes });
 
+// PY-215 (#3568): getLinkedChannel (PE 0xd75d30)。-6/-7 の経路が無いので割当 [dev, link] の両方 (assigned・unassigned) で同じ戻り値。-1 → -1、連動表が空の index ≥ 0 → None (仮置き)
+const linkedIdx = [-1, 0, 7];
+const linkedRes = [];
+for (const [dev, link] of [[1, 1], [0, 0]]) {
+  mock.state.devAssigned = !!dev;
+  mock.state.linkAssigned = !!link;
+  wasm.setDeviceLink(dev, link);
+  for (const idx of linkedIdx) {
+    const name = "device.getLinkedChannel", args = [idx];
+    const a = run(mock, name, args);
+    const b = run(wasm, name, args);
+    linkedRes.push("code" in b ? `code ${b.code}` : b.ok);
+    if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ name, args, dev, link, mock: a, wasm: b });
+  }
+}
+const linkedExpect = [-1, null, null, -1, null, null];
+if (JSON.stringify(linkedRes) !== JSON.stringify(linkedExpect)) diffs.push({ state: "linked channel expect", expect: linkedExpect, wasm: linkedRes });
+
 assert.deepEqual(diffs, [], `device 差分 ${diffs.length} 件`);
 assert.deepEqual(rejectDiffs, [], `署名違反が code 5 で拒否されない ${rejectDiffs.length} 件`);
 console.log(JSON.stringify({
   calls: seq.length, link_calls: linkSeq.length, rejects: rejects.length, midi_out: wasmOut,
-  midi_words: wasmWords.map((w) => w.toString(16).padStart(8, "0")), link_codes: linkCodes,
+  midi_words: wasmWords.map((w) => w.toString(16).padStart(8, "0")), link_codes: linkCodes, linked_channel: linkedRes,
   diffs: 0, PASS: true,
 }));
