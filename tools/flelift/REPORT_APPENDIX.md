@@ -133,7 +133,7 @@ load average: after 完了時 0.97、HEAD 完了時 1.00 (before は未採取)�
 
 | 項目 | 値 |
 |---|---|
-| 環境 | Actions runner (4 vCPU)。`fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (7.1 秒) し `FL_WIN64_DIR` で指定。emsdk は runner 既設の `/opt/emsdk` |
+| 環境 | Actions runner (4 vCPU)。`fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (7.1 秒) し `FL_WIN64_DIR` で指定。emsdk は runner 既設の `[EMSDK]` (`tools/flelift/fle_lift.sh` が source) |
 | load average | 開始 0.56 → 完了 1.02 |
 | 総所要 (real) | 1 分 37.1 秒 |
 | 判定 | `[fle_e2e] PASS` (rc=0) |
