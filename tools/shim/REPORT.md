@@ -18,7 +18,7 @@
 ## 2. 影響範囲 (shim は全 target 共通)
 
 - `block_ok` を使う関数 (heap.c 内の全 user): GlobalLock・GlobalUnlock・GlobalFree・LocalReAlloc・HeapReAlloc・HeapFree。
-- 変わるのは範囲外の値だけ。`[sizeof(ShimMemHdr), memory.size]` の値は旧と同じ magic 比較。範囲外は旧コードでは wasm trap (`memory access out of bounds`) し、新コードでは FALSE/NULL。範囲外の境界付近 (`memory.size < u <= memory.size + 8`) だけは、旧コードでも読めてしまい magic 比較が走っていた。
+- 変わるのは範囲外の値だけ。`[sizeof(ShimMemHdr), memory.size]` の値は旧と同じ magic 比較。範囲外は旧コードでは wasm trap (`memory access out of bounds`) し、新コードでは FALSE/NULL (HeapFree だけは §6 で TRUE に変更)。範囲外の境界付近 (`memory.size < u <= memory.size + 8`) だけは、旧コードでも読めてしまい magic 比較が走っていた。
 - heap.c を取り込む・参照する build (grep 実測・29 件。各 build を実行しての個別確認はしていない):
   - コマンド: `grep -rl "shim/src" tools --include=*.sh --include=*.json --include=*.py --include=*.mjs --include=*.ts --include=*.js | grep -v "/work/\|/results/\|REPORT\|batch\|/build/"`
   - GUI・m11 本流 (製品経路): `tools/gui/flengine/build.sh`・`tools/m11/m11_build.sh`・`tools/m11/ldfix/stage4.sh`・`tools/m11/m11_genstubs.py`・`tools/plugins/lift/passes/m11_genstubs.py`
@@ -58,5 +58,53 @@ fix round 1 (reviewer 指摘 1: emcc が無く test.sh を独立に再実行で�
 |---|---|---|
 | 修正後の ott_old wasm で `1801c5e84` u16 の trap が消えることの実測・trap 後の site trace・12 case 比較 (差 0) | LD-132 の受入 2・3 が未確認。素材 `work-m6-ott`・`plugins-ott`・`analysis-ott-binaries` が本 run に無い | #2841 (LD-136) |
 | 製品 KPI の前後 (FLEngine 起動の dispatch 数・通過 unit 数・最初のウィンドウ) | GUI・m11 本流の shim を変えたが、効果は未測定 | #2841 (LD-136) |
-| HeapFree の範囲外の応答 (本 PR は FALSE)。native 参照 `tools/liftdiff/rt/ld_core.h:430` は常に 1 を返すため、応答表の揃え方が未決 | 応答表が決まるまで native と wasm の HeapFree 応答は一致しない | #2821 (LD-133) |
+| HeapFree の割当てのない p の応答は §6 で native 参照に揃えて TRUE に変更した。変更後の block 列の一致 (LD-133 受入 2・3) は未測定 | 1c5e84・1c621c・1c682c・1c69cc の block 列が native と一致するかは未確認 | #2821 (LD-133) |
+| shimx の M4 互換 (`tools/shimx/test.sh` step 5) が `test_main.c:203` (割当てのない p の HeapFree → TRUE) で FAIL。shimx の HeapFree は `tools/shimx/src/heap.c:79` で FALSE・ERROR_INVALID_PARAMETER | 既に FAIL していた gate の状態は変わらない (従来は `:204`)。「割当てのない p の HeapFree は TRUE」は shimx の要件として残る (§6) | #3023 (SHX-T35) |
 | `tools/liftdiff/REPORT_APPENDIX_LD83.md` と `targets/ott_old_site.json` が本 checkout に無い (#2192 が参照) | site trace の再現材料が無い | #2841 (LD-136) |
+
+## 6. HeapFree の応答を native 参照に揃える (LD-133 / #2821)
+
+既知類型との関係: 該当なし (D24 の行案は `tools/liftdiff/REPORT_APPENDIX_LD84.md` §4。`docs/DEFECTS.md` への登録は PM 判断)。
+
+### 決定
+
+- **native 参照 (`tools/liftdiff/rt/ld_core.h:430`: HeapFree は引数を見ず 1) に wasm を揃えた**。割当てのない p (`block_ok` が偽) は解放せず TRUE を返し、範囲外の値は読まない (#2802 の方式を維持)。割当て済み p は旧と同じく解放して TRUE。
+- 理由: liftdiff は native を参照側にする。`ld_core.h` の「native/wasm で同じ応答を返す」の意図は、native の応答表 (HeapFree は常に 1) を wasm が写すことで満たせる。逆に wasm を FALSE に揃えるには、native 側が「どの p が割当て済みか」の表を持つ必要があり、`ld_core.h` にその表は無い。
+- 変更は `tools/shim/src/heap.c` の HeapFree 1 関数と、`tools/shim/test/test_main.c` の `test_heap_out_of_range` (HeapFree の期待値。範囲内で割当てのない p の検査を commit `26bb47cc` で追加) だけ。GlobalLock・GlobalFree・HeapReAlloc の範囲外の応答は変えていない。
+- 変わるのは「割当てのない p の HeapFree」だけ (旧 FALSE → 新 TRUE・解放なし)。
+- 実機 Windows の応答は未検証。実機が無効 p に FALSE を返すという想定は推定で、この決定の根拠にしていない (LD-133 受入の「根拠を示すか未検証として残す」)。
+
+### 検証 (測定 commit `26bb47cc`)
+
+測定 commit は、コードを変えた最後の commit (`test(shim): cover in-range unallocated pointer in HeapFree (#2821)`)。以後の commit はこの REPORT だけ。
+
+| 検証 | 結果 |
+|---|---|
+| `bash tools/shim/test.sh` (commit `26bb47cc`・ワークツリー clean・emsdk は `[EMSDK]` (docs/REFERENCES.md §4) を使用) | rc=0・所要 2.49 s (wall)・load average 0.65 / 0.41 / 0.17 (21:31 UTC)。MT `ALL PASS`・ST `ALL PASS`・fail-fast PASS (exit=1・stderr に関数名) |
+| ネガティブコントロール: 旧 `heap.c` (`7278e857^`) + 新 `test_main.c` を `tools/shim` の一時コピーで実行 | rc=1・`[M4-test] FAIL ...test_main.c:203: HeapFree(heap, 0, p) == TRUE` (最初のループで止まる。下の範囲内の検査には届かない) |
+| `git diff 26bb47cc HEAD -- tools/shim/src tools/shim/test` | 0 行 (確認した code の HEAD = `26bb47cc`。以後の commit は REPORT のみ) |
+| 20 MiB 超の blob (`find tools/shim -type f -size +20M -not -path '*/work/*'`) | 0 件 |
+
+範囲内で割当てのない p (magic 不一致) の HeapFree TRUE は、新検査 (`nonheap + 32`) で確認。この検査だけの陰性対照は取っていない (旧 `heap.c` の陰性対照は範囲外の検査で先に止まるため)。
+
+### shimx 側 (M4 互換・step 5)
+
+| 検証 (commit `26bb47cc`・`bash tools/shimx/test.sh --quick`) | 結果 |
+|---|---|
+| step 1–4 PASS、step 5 (M4 互換 MT) で中断 rc=1。所要 17.96 s (wall) | `[M4-test] FAIL ...tools/shim/test/test_main.c:203: HeapFree(heap, 0, p) == TRUE`。従来は `:204` (`GetLastError() == ERROR_INVALID_FUNCTION`) で FAIL (#3023) |
+
+shimx の HeapFree は無効 p で FALSE・ERROR_INVALID_PARAMETER を返す (`tools/shimx/src/heap.c:79`)。shim 側を TRUE に変えたため、shimx の M4 互換には「割当てのない p の HeapFree は TRUE」という要件が生じた。step 5 は `:203` で止まるので、`:204` 以降 (GetLastError・GlobalLock・HeapReAlloc・GlobalFree・範囲内の検査) を shimx が満たすかは未確認。gate の状態 (既に FAIL) は変わらない。起票先は §5 (#3023)。
+
+### 未実行 (受入 2・3)
+
+- `tools/liftdiff/results/ld84/ld84_block_map.py` による 1c5e84・1c621c・1c682c・1c69cc の再測定は**未実行**。`targets/ott_old.json` の build は `tools/ott/work/ott.ll`・`tools/m6/work/*`・`${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll` を要求する。本 run の `$ARTIFACTS_DIR` には `work-m6-ott`・`analysis-ott-binaries` が無いため、heap 変更後の wasm を build できない (`work-liftdiff` の既存 ott_old は旧 heap のまま)。
+- 必要な素材: `oc_artifacts: toolchain-emsdk work-m6-ott analysis-ott-binaries work-liftdiff` (issue #2821 本文の行と同じ)。
+
+### 製品 KPI (`docs/WORKFLOW.md` §7)
+
+- 動かしていない。shim は `tools/gui/flengine/build.sh`・`tools/m11/m11_build.sh` が取り込むため、FLEngine 起動の dispatch 数・通過 unit 数・最初のウィンドウの有無は未測定。
+- 変わるのは「割当てのない p の HeapFree」だけ。製品でこの経路が出る頻度は未測定 (推定: 製品の HeapFree は shim 割当て由来の p が普通なので小さい)。
+
+### 残り (本件の範囲外)
+
+- native stub の他の応答との揃え。`ld_core.h:436` の GlobalFree・LocalFree は常に 0 を返し、shim の GlobalFree は無効 p で `h` を返す。本件は HeapFree に限るため、必要なら別 issue。

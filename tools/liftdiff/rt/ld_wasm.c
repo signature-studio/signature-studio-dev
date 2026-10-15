@@ -45,7 +45,49 @@ EMSCRIPTEN_KEEPALIVE void ld_w_init(u64 origin, u64 delta) {
   ld_arena = g_arena; ld_arena_size = ARENA_SIZE; ld_heap = g_heap; ld_heap_size = HEAP_SIZE;
 }
 EMSCRIPTEN_KEEPALIVE void ld_w_add_wr(u64 rva, u64 len) { ld_add_wr(rva, len); }
-EMSCRIPTEN_KEEPALIVE void ld_w_snapshot(void) { ld_snapshot(); }
+/* LD-126 (#2723): case 間で持ち越す wasm 側の状態を候補ごとに snapshot 時点へ戻す (RESET mask)。
+ * 1 = wasm スタック (SP は JS 側で戻す)・2 = C 静的変数 (g_heap・g_inbuf・g_arena を除く data/bss)・4 = image 全体 (線形 0 番地から imglen)。 */
+extern char __global_base[];
+#define LD_RST_STK 1
+#define LD_RST_STA 2
+#define LD_RST_IMG 4
+typedef struct { int cat; u8* lo; u64 n; u8* pr; } ld_rst_t;
+static ld_rst_t ld_rst[8];
+static int ld_nrst;
+/* 複製は全 malloc の後にまとめて行う (C 静的変数の複製には dlmalloc の管理情報と ld_rst 表自体が含まれるため) */
+static void ld_rst_add(int cat, void* lo, u64 n) {
+  ld_rst_t* r = &ld_rst[ld_nrst++];
+  r->cat = cat; r->lo = (u8*)lo; r->n = n;
+  r->pr = n ? (u8*)malloc(n) : 0;
+}
+static void ld_rst_take(void) {
+  for (int i = 0; i < ld_nrst; i++) if (ld_rst[i].n) memcpy(ld_rst[i].pr, ld_rst[i].lo, ld_rst[i].n);
+}
+static void ld_rst_sta(void) {
+  u8* big[3] = { (u8*)g_heap, (u8*)g_inbuf, (u8*)g_arena };
+  u64 bn[3] = { HEAP_SIZE, sizeof g_inbuf, ARENA_SIZE };
+  for (int i = 0; i < 3; i++) for (int j = i + 1; j < 3; j++) if (big[j] < big[i]) {
+    u8* t = big[i]; big[i] = big[j]; big[j] = t; u64 k = bn[i]; bn[i] = bn[j]; bn[j] = k;
+  }
+  u8* cur = (u8*)__global_base;
+  for (int i = 0; i < 3; i++) {
+    if (big[i] > cur) ld_rst_add(LD_RST_STA, cur, (u64)(big[i] - cur));
+    if (big[i] + bn[i] > cur) cur = big[i] + bn[i];
+  }
+  u8* end = (u8*)(uintptr_t)emscripten_stack_get_end();
+  if (end > cur) ld_rst_add(LD_RST_STA, cur, (u64)(end - cur));
+}
+EMSCRIPTEN_KEEPALIVE void ld_w_snapshot(int imglen) {
+  ld_snapshot();
+  ld_nrst = 0;
+  ld_rst_add(LD_RST_STK, (u8*)(uintptr_t)emscripten_stack_get_end(), (u64)(emscripten_stack_get_base() - emscripten_stack_get_end()));
+  ld_rst_sta();
+  ld_rst_add(LD_RST_IMG, (u8*)(uintptr_t)ld_img, (u64)imglen);
+  ld_rst_take();
+}
+EMSCRIPTEN_KEEPALIVE void ld_w_reset(int mask) {
+  for (int i = 0; i < ld_nrst; i++) if ((mask & ld_rst[i].cat) && ld_rst[i].n) memcpy(ld_rst[i].lo, ld_rst[i].pr, ld_rst[i].n);
+}
 /* inbuf に "name\0payload\0" を置いて呼ぶ */
 EMSCRIPTEN_KEEPALIVE void ld_w_blob(void) { ld_cmd_blob(g_inbuf, g_inbuf + strlen(g_inbuf) + 1); }
 EMSCRIPTEN_KEEPALIVE void ld_w_fix(void) { ld_cmd_fix(g_inbuf, g_inbuf + strlen(g_inbuf) + 1); }

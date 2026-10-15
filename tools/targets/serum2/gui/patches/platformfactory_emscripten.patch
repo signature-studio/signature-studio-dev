@@ -1,0 +1,14 @@
+diff --git a/vstgui/lib/platform/platformfactory.cpp b/vstgui/lib/platform/platformfactory.cpp
+index 6da5c1d..2cb63b0 100644
+--- a/vstgui/lib/platform/platformfactory.cpp
++++ b/vstgui/lib/platform/platformfactory.cpp
+@@ -13,6 +13,9 @@ using VSTGUIPlatformFactory = VSTGUI::Win32Factory;
+ #elif LINUX
+ #include "linux/linuxfactory.h"
+ using VSTGUIPlatformFactory = VSTGUI::LinuxFactory;
++#elif WASM
++#include "canvas_platformfactory.h"
++using VSTGUIPlatformFactory = VSTGUI::CanvasPlatformFactory;
+ #endif
+ 
+ //-----------------------------------------------------------------------------

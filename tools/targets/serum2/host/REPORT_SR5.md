@@ -59,7 +59,7 @@ git diff 8680cf44 f108211e -- tools/targets/serum2/host ':(exclude)*.md'
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | wasm 候補 (SR-4 の WAV) との比較 | 受入 4。入力口は `ref_harness.sh <candidate.wav> <class>` で用意済み。判定結果は §5 に追記する (§4 は SR-47) | #2383 [SR-45] (親: #73) |
-| 参照は既定 Init state のみ (ファクトリ preset 未使用) | 「固定 state (preset 1〜数本)」の受入に届かない。Init 合成は preset 未取得時の許容 | #2384 [SR-46] (親: #73) |
+| (解決済み) 参照は既定 Init state のみだった | SR-46 (#2384) で factory preset 参照 (SY - Action Hero) を追加。§5 | — (#2384 で完了) |
 | (解決済み) content 条件の正 | 全展開を正と決定 (§4)。空 dir は `content_empty` として残す | — (#2414 [SR-47] で完了) |
 | C/D 許容閾値は暫定 (ORACLE §7) | ネイティブ FL の golden 待ち。Serum 2 の閾値は本件で再校正していない | ORACLE §7 (既存) |
 
@@ -106,5 +106,57 @@ git diff 8680cf44 f108211e -- tools/targets/serum2/host ':(exclude)*.md'
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | wasm 候補 (SR-4 の WAV) との比較 (判定は §5 に追記) | 受入 4 (SR-5) | #2383 [SR-45] (親: #73) |
-| 固定 factory preset での参照 (Init 以外) | 「固定 state」の受入。全展開の `Presets/` を使う | #2384 [SR-46] (親: #73) |
+| (解決済み) 固定 factory preset での参照 | SR-46 (#2384)。§5 | — (#2384 で完了) |
 | 全展開 content を読む wasm 本体の接続 (FS shim → Serum 2 本体) | 比較条件の前提が実物の wasm で成立するかは未確認 (SR-6 §5 の未実施項目) | #2383 の比較時に確認 |
+
+## 5. SR-46 (#2384) 固定 factory preset の参照 (Init 以外)
+
+- 日付: 2026-10-14 / 測定 commit: `008f14d7` (コード差分の最後の commit)。再現: `bash tools/targets/serum2/host/ref_content.sh && bash tools/targets/serum2/host/ref_harness.sh`。
+- 結論: 固定 preset `Synth/SY - Action Hero.SerumPreset` を実 DLL の processor に復元して参照を取った。3 回の file SHA-256 は一致し、self-test は bit-exact、別 preset と「preset が復元されない」の 2 種のネガコンは FAIL。受入 1〜3 を満たす。
+- ただし **preset 描画は常に決定的ではなかった** (§5.2)。決定的だった 1 本だけを参照に採り、非決定の preset は参照にしない。
+- 前提 (runner): `wine64` (apt の `wine64` `libwine`。`/usr/lib/wine/wine64` を `ref_render.sh` が使う。素材 `apt-mingw` には含まれない)。実測の wine は 9.0。
+
+### 5.1 state の作り方 (実測)
+
+- `.SerumPreset` は `XferJson\0` + meta JSON (`fileType: SerumPreset`・`component` キー無し) + 容器 (`u32` 展開後長・`u32` 版本 2・zstd(CBOR))。DOM は processor の DOM とほぼ同じキー集合 (preset 175 key・既定 processor 164 key・共通 161)。
+- preset ファイルをそのまま `processor_state.json` に渡すと `component->setState` = `kResultFalse` で復元されず、出力は既定 Init と同一 (`b4fd6d64…`)。これを負例 `S2REF_PRESET_MODE=exact` として harness に入れた。
+- 採用 (`host/preset_state.py overlay`): meta は既定 Init の processor meta、DOM は既定 Init の DOM に preset の DOM を重ねる (`fileType` は除く)。`component->setState`・`setComponentState`・`controller->setState` が全て `kResultOk`。
+- `controller_state.json` は既定 Init の controller state (`saved_controller_state.bin`。`ref_render.sh` が `work/init_ctrl/` に作る) を使う。
+
+### 5.2 参照の決定性 (実測。n = 描画回数)
+
+| 対象 | n | 一致 (file SHA-256) | 不一致の内容 |
+|---|---|---|---|
+| 既定 Init (`ref_render.sh` 既定) | 31 | 31/31 (`b4fd6d64…`) | — |
+| `SY - Action Hero` (採用) | 23 | 23/23 (`cd6ed718…`) | — |
+| `KY - Additive` (不採用) | 11 | 11/11 (`9af5d746…`) | — |
+| `LD - Analog Crispy Cotton` (不採用) | 26 | 24/26 | 2 回。1 回の詳細比較: 最初の差は sample 3612 (block 28)・36 block・最大差 0.0159 |
+| `PL - Harp Wire` (不採用) | 9 | 6/9 | 3 回が別の SHA (`91eaea…` `7c8e5c…` `79041f…`)。差は block 1 から 63 block・最大差 0.0024 |
+
+- n の内訳: harness 9 回 (各回に既定 Init を 3 回・preset を 3 回) と単発の描画。Init は harness 9 × 3 + seed 1 + 確認 3 = 31。Harp Wire は初回 harness 3 + 単発 6 = 9。LD は harness 4 回 × 3 + 単発 14 = 26。不一致 2 回はいずれも harness の run (4 回中 2 回) で、単発 14 回は全て一致。KY・SY の単発は各 11 回 (SY は harness 4 回を含め 23)。
+- 非決定の原因は**未特定** (乱数位相・スレッド・非同期の読込などは未検証)。
+- 許容クラス D の self-test で救えるかを試した: LD の不一致 1 回を `pre_1` にしたとき、D-spectral の self-test は FAIL (rmsDiff −38.7 dB。閾値 −60 dB 超え。STFT 1427/2288 bin が 0.1 dB 超え)。暫定閾値 (ORACLE §7) では非決定を吸収できないため、非決定の preset は参照にしない。
+
+### 5.3 harness の結果 (測定 commit `008f14d7`・コミット済み HEAD)
+
+| 項目 | 結果 |
+|---|---|
+| `ref_harness.sh` (既定 = 全展開) | NG=0。3 回実行: 31.3 s / 30.8 s / 30.9 s。load 0.05〜0.38 |
+| `[1]` 既定 Init 3 回 | 一致 `b4fd6d64…` = pin |
+| `[5]` 参照 `SY - Action Hero` 3 回 | 一致 `cd6ed718a4399d5e…` = `ref_manifest.json` の `presets` pin |
+| `[5]` self-test (pre_1 vs pre_2, A-exact) | PASS (bit-exact) |
+| `[5]` ネガコン 別 preset `PD - 1970s String Machine` (D-spectral) | FAIL: rmsDiff 1.1 dB・peakDiff −3.210 dB・STFT 13449/13484 bin |
+| `[5]` ネガコン preset 未復元 (`exact`・`setState=kResultFalse` 1 件) (D-spectral) | FAIL: rmsDiff 3.9 dB・peakDiff 0.788 dB・STFT 13476/13484 bin |
+| `ref_stub_check.sh` (偽 wine64) | FAIL=0。harness は manifest 照合 (main) と preset 素材の不在 (`stub` には素材が無い) の 2 件だけ NG (NG=2) |
+| 採用 preset の描画 (`SY - Action Hero`) | peak 0.631184・rms 0.212365・非ゼロ 16,240/16,384 |
+
+- 追加の検査: `e2e.sh` (SR-1 の 62 本) は `ref_` を呼ばず、`vst3host.cpp` と合わせて無変更のため、この PR では再実行していない。
+- 差分の確認 (測定 commit 以降の host のコード差分。md を除く): `git diff 008f14d7 HEAD -- tools/targets/serum2/host ':(exclude)*.md'` → 出力 0 行 (本 REPORT の commit は md のみ)。
+
+### 5.4 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| preset 描画の非決定 (LD 2/26・Harp Wire 3/9 で不一致)。原因は未特定 | 非決定な preset は bit 比較の参照にできない。参照は決定的だった `SY - Action Hero` 1 本だけ | #73 (SR-5 親。wasm 比較の判定クラスと参照 preset を決める時に扱う) |
+| 参照 preset は 1 本 (`SY - Action Hero`) | 「固定 preset 1〜数本」の 1 本分のみ。他カテゴリの確認は未実施 | #73 (親) |
+| wasm 候補 (SR-4 の WAV) との比較 | 受入 4 (SR-5)。入力口 `ref_harness.sh <candidate.wav> <class>` は既存 | #2383 [SR-45] (親: #73) |

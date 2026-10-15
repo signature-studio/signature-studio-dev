@@ -262,11 +262,35 @@ test("本文の素材行 (#2758): 行の途中に出る語や自然文は素材�
   assert.equal(bodyArtLine(""), null);
 });
 
-test("素材行の既定 (#2758): PM の行 → 本文の行 → 推定の順。無効な行は飛ばす", () => {
-  assert.equal(defaultArtLine("oc_artifacts: fl-win64 plugins-ott", "oc_artifacts: fl-win64 work-m11", "[CI-1] t", []), "oc_artifacts: fl-win64 plugins-ott");
+test("素材行の既定 (#2758): 名前を持つ行が 1 つだけなら、その行。無効な行は飛ばす", () => {
   assert.equal(defaultArtLine("oc_artifacts: evil", "oc_artifacts: fl-win64 work-m11", "[CI-1] t", []), "oc_artifacts: fl-win64 work-m11");
   assert.equal(defaultArtLine(null, "oc_artifacts: none", "[CI-1] t", []), "oc_artifacts: none");
   assert.equal(defaultArtLine(undefined, null, "[SR-1] serum", []), inferArtifacts("[SR-1] serum", []));
+});
+
+test("素材行の和集合 (#3050): PM の行と本文の行の名前を足す。本文だけの名前が加わり、PM だけの名前は残る", () => {
+  assert.equal(defaultArtLine("oc_artifacts: fl-win64 plugins-ott", "oc_artifacts: fl-win64 work-m11", "[CI-1] t", []), "oc_artifacts: fl-win64 plugins-ott work-m11");
+  assert.equal(defaultArtLine("oc_artifacts: fl-win64 plugins-ott", "oc_artifacts: fl-win64", "[CI-1] t", []), "oc_artifacts: fl-win64 plugins-ott");
+  assert.equal(defaultArtLine("oc_artifacts: fl-win64 plugins-ott", "oc_artifacts: fl-win64 plugins-ott work-m11", "[CI-1] t", []), "oc_artifacts: fl-win64 plugins-ott work-m11", "重複は 1 件にする");
+  assert.equal(defaultArtLine("oc_artifacts: plugins-ott", "oc_artifacts: work-m11", "[CI-1] t", []), "oc_artifacts: fl-win64 plugins-ott work-m11", "fl-win64 は先頭に補う");
+  assert.equal(
+    defaultArtLine("oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff", "[WIN-11] t", []),
+    "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff",
+    "#2880 の形: 本文の行にだけある work-m11 work-liftdiff が加わる",
+  );
+});
+
+test("素材行の和集合 (#3050): none は名前を持たない側とみなす。両方 none なら none", () => {
+  assert.equal(defaultArtLine("oc_artifacts: none", "oc_artifacts: fl-win64 work-m11", "[CI-1] t", []), "oc_artifacts: fl-win64 work-m11");
+  assert.equal(defaultArtLine("oc_artifacts: fl-win64 plugins-ott", "oc_artifacts: none", "[CI-1] t", []), "oc_artifacts: fl-win64 plugins-ott");
+  assert.equal(defaultArtLine("oc_artifacts: none", "oc_artifacts: none", "[CI-1] t", []), "oc_artifacts: none");
+  assert.equal(defaultArtLine("oc_artifacts: none", null, "[CI-1] t", []), "oc_artifacts: none");
+});
+
+test("素材行の和集合 (#3050): allowlist 外の名前は落ちる (本文側は名前ごと、PM 側は行ごと無効)", () => {
+  assert.equal(defaultArtLine("oc_artifacts: fl-win64 plugins-ott", bodyArtLine("oc_artifacts: fl-win64 evil work-m11\n"), "[CI-1] t", []), "oc_artifacts: fl-win64 plugins-ott work-m11");
+  assert.equal(defaultArtLine("oc_artifacts: fl-win64 plugins-ott evil", "oc_artifacts: fl-win64 work-m11", "[CI-1] t", []), "oc_artifacts: fl-win64 work-m11");
+  assert.equal(defaultArtLine("oc_artifacts: evil", "oc_artifacts: evil2", "[SR-1] serum", []), inferArtifacts("[SR-1] serum", []));
 });
 
 test("本文の素材行 (#2758): 字数の境界をまたぐ末尾の行は採らない (改行で終わる行だけ見る)", () => {

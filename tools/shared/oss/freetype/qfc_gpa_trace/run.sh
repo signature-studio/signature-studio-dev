@@ -1,18 +1,30 @@
 #!/usr/bin/env bash
-# #2190 / T-SH-34: QuickFontCache の GetProcAddress 引数を Wine の relay で記録する。
+# #2190 / T-SH-34, #2220: QuickFontCache の GetProcAddress 引数を Wine の relay で記録する。
+# 既定は素材の DllMain をそのまま使う (#2220)。FT 解決 (0x563000) は DllMain の PROCESS_ATTACH 経路で走る。
+# DllMain はその後ウィンドウ処理で戻らないため timeout で打ち切り、relay の記録から範囲判定する。
 # 素材 (fl-win64.tar.zst) の block24350_PE.bin を複製して使い、素材本体は変更しない。
 # 出力は work/qfc/ (gitignore 対象)。
+# PATCH_ENTRY=0 (既定。QFC_PATCH_ENTRY=0 と同じ): DllMain を無改変で実行する (#2220・#3257 の実測はこの設定)。
+# PATCH_ENTRY=1 (QFC_PATCH_ENTRY=1): entry point を「EAX=1; RET」に置換する (#2190 の旧方式)。
+#   DllMain が実行されないため、この設定の 0 件は「FT 解決に到達しない」の根拠にならない (#3257 で判明・訂正)。
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ART="${ARTIFACTS_DIR:-$HOME/artifacts}"
 W="$(git rev-parse --show-toplevel)/work/qfc"
+WINE="${WINE_BIN:-$(dpkg -L wine64 2>/dev/null | grep -m1 '/wine64$')}"
+PATCH_ENTRY="${PATCH_ENTRY:-${QFC_PATCH_ENTRY:-0}}"
+PROBE_TIMEOUT="${PROBE_TIMEOUT:-${QFC_TIMEOUT:-150}}"
 mkdir -p "$W/extracted"
 cd "$W"
-export WINEDEBUG="${WINEDEBUG_OVERRIDE:-+relay}" WINEPREFIX="$W/wpfx"
+export WINEPREFIX="$W/wpfx"
 rm -rf "$WINEPREFIX"
 
 tar --zstd -xf "$ART/fl-win64.tar.zst" -C "$W" extracted/block24350_PE.bin
-python3 "$HERE/patch_entry.py" extracted/block24350_PE.bin QuickFontCache_x64.dll
+if [ "$PATCH_ENTRY" = 1 ]; then
+  python3 "$HERE/patch_entry.py" extracted/block24350_PE.bin QuickFontCache_x64.dll
+else
+  cp extracted/block24350_PE.bin QuickFontCache_x64.dll
+fi
 x86_64-w64-mingw32-gcc -shared -O1 -o dsp_ippv2_x64.dll "$HERE/stub.c" -Wl,--subsystem,windows
 x86_64-w64-mingw32-gcc -shared -O1 -o freetype_x64.dll "$HERE/stub.c" -Wl,--subsystem,windows
 x86_64-w64-mingw32-gcc -O0 -o probe.exe "$HERE/probe.c"
@@ -20,21 +32,36 @@ x86_64-w64-mingw32-gcc -O0 -o probe.exe "$HERE/probe.c"
 Xvfb :77 -screen 0 1024x768x24 >/dev/null 2>&1 &
 XPID=$!
 sleep 3
+# prefix の作成は probe の時間制限・relay の記録に含めない
+DISPLAY=:77 WINEDEBUG=-all timeout 240 "$WINE" wineboot -i > wineboot.txt 2>&1 || true
+export WINEDEBUG="${WINEDEBUG_OVERRIDE:-+relay}"
 set +e
-DISPLAY=:77 timeout 60 wine probe.exe > probe_out.txt 2> trace.log
+DISPLAY=:77 timeout "$PROBE_TIMEOUT" "$WINE" probe.exe > probe_out.txt 2> trace.log
 RC=$?
 set -e
 kill "$XPID" 2>/dev/null || true
 
-echo "wine rc=$RC"
+echo "PATCH_ENTRY=$PATCH_ENTRY wine rc=$RC (124 = 時間切れ)"
 cat probe_out.txt
 echo "relay lines: $(wc -l < trace.log)"
 # 範囲判定は LoadLibrary の基底 (実測 7bde0000) と PE の SizeOfImage から行う (filter_gpa.py)。
-# 件数は Call 行のみ。陽性対照として probe.exe (ImageBase 0x140000000) の呼出しを同じ判定器に通す。
+# DllMain が返らず probe が出力しない場合 (既定の無改変 DllMain) は relay の PROCESS_ATTACH 行の module= から基底を取る。
 QFC_BASE="$(sed -n 's/^LoadLibrary=\([0-9a-f]*\) .*/\1/p' probe_out.txt)"
-[ -n "$QFC_BASE" ] && [ "$QFC_BASE" != "0000000000000000" ] || { echo "LoadLibrary 失敗: 範囲判定不可"; exit 1; }
+if [ -z "$QFC_BASE" ] || [ "$QFC_BASE" = "0000000000000000" ]; then
+  QFC_BASE="$(grep -m1 'PE DLL (.*L"QuickFontCache_x64.dll",reason=PROCESS_ATTACH' trace.log | sed -n 's/.*module=\([0-9A-Fa-f]*\) .*/\1/p' || true)"
+fi
+[ -n "$QFC_BASE" ] && [ "$QFC_BASE" != "0000000000000000" ] || { echo "基底が取れない (LoadLibrary も PROCESS_ATTACH 行も無い): 範囲判定不可"; exit 1; }
 python3 "$HERE/filter_gpa.py" trace.log QuickFontCache_x64.dll "$QFC_BASE" > qfc_gpa_calls.txt || true
-python3 "$HERE/filter_gpa.py" trace.log probe.exe 140000000 'CreateVST3Instance|InitDll' > probe_pos_ctrl.txt || true
+python3 "$HERE/filter_gpa.py" trace.log QuickFontCache_x64.dll "$QFC_BASE" 'FT_' > qfc_ft_calls.txt || true
+# 陽性対照: probe.exe (ImageBase 0x140000000) の呼出しを同じ判定器に通す
+python3 "$HERE/filter_gpa.py" trace.log probe.exe 140000000 'GetLastError|CreateVST3Instance|InitDll' > probe_pos_ctrl.txt || true
 python3 "$HERE/filter_gpa.py" trace.log probe.exe 140000000 > probe_pos_all.txt || true
+python3 "$HERE/attrib_gpa.py" trace.log QuickFontCache_x64.dll "$QFC_BASE" > attrib.txt
+python3 "$HERE/static_qfc.py" extracted/block24350_PE.bin > static.txt
 echo "QuickFontCache 内からの GetProcAddress 呼出し (Call): $(wc -l < qfc_gpa_calls.txt) 件"
-echo "陽性対照 probe (InitDll/CreateVST3Instance): $(wc -l < probe_pos_ctrl.txt) 件 / probe 全体: $(wc -l < probe_pos_all.txt) 件"
+echo "  うち FT_ 名: $(wc -l < qfc_ft_calls.txt) 件"
+echo "  うち名前でない (序数など): $(grep -cvE ',[0-9a-f]+ "[^"]*"\) ret=' qfc_gpa_calls.txt || true) 件"
+echo "  うち欠落 17 本の名前 (引用符付きで完全一致): $(grep -cFf <(sed 's/.*/"&"/' "$HERE/missing17.txt") qfc_gpa_calls.txt || true) 件"
+cat attrib.txt
+cat static.txt
+echo "陽性対照 probe (GetLastError/InitDll/CreateVST3Instance): $(wc -l < probe_pos_ctrl.txt) 件 / probe 全体: $(wc -l < probe_pos_all.txt) 件"

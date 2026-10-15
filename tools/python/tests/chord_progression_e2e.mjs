@@ -61,15 +61,11 @@ await py.run(`
 import sys, types, json
 import fl_rt, flpianoroll, fl_api
 fl_rt.install_flapi()
-flcpt = types.ModuleType('flcpt')
+import flcpt
 flrack = types.ModuleType('flrack')
+# flcpt.cpt の 4 メンバは src/flcpt.py (根拠あり: REPORT_PY30 §2)。型名は空の dummy。
 # mock 値 (根拠なし)。import 時に参照される名前だけを満たす。
-flcpt.cpt = types.SimpleNamespace()
-flcpt.ChordMarker = type('ChordMarker', (), {})
-flcpt.ChordAlternative = type('ChordAlternative', (), {})
 flcpt.chordPool = types.SimpleNamespace()
-flcpt.CPT = type('CPT', (), {})
-flcpt.ChordPool = type('ChordPool', (), {})
 import json as _json
 _lsc = _json.load(open('/fl/Tools/Chord progression/Notes/genres', encoding='utf-8'))
 _lsc = {'mock': True, 'note': 'mock (根拠なし): FL 実機の loop_starter_config ではない。同梱 drum patterns の genres を流用', 'version': _lsc.get('version'), 'compatible_from': _lsc.get('compatible_from'), 'genres': _lsc.get('genres', {}), 'loops': []}

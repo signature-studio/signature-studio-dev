@@ -1,0 +1,52 @@
+PE: extracted/block00031_PE.bin  (ImageBase 0x400000, functions(.pdata)=57816, imports=738, thunks=832)
+entry: 0xc56ae0 (VA)  pdata 関数先頭: True
+到達集合 (直接 call + tail jmp の BFS): 関数 4433 / 命令 295499 / 範囲外の目標 10
+到達集合内の call/jmp 箇所 (分母。関数内の無条件 jmp は除く):
+  関数宛て直接                    22568
+  API 呼出し                    1106
+  間接 (下表)                    3801  (13.8% of 27475)
+  合計                        27475
+未追跡の間接 call/jmp (到達集合内の箇所数。命令形の内訳。vtable 呼出しとの対応は推定):
+  call [mem]                 3593
+  call [rip-data]             157
+  call reg                     49
+  jmp [mem]                     2
+  合計                         3801
+
+## 到達集合内の API 呼出し (分類別: call 箇所 / 呼出し関数の distinct 数)
+  thread_create     call_sites=    4 distinct_functions=    4
+  blocking_wait     call_sites=  188 distinct_functions=  121
+  nonblocking_sync  call_sites=  201 distinct_functions=  131
+  atomic            call_sites=    0 distinct_functions=    0
+  thread_attr       call_sites=   18 distinct_functions=   15
+
+## 上位 API (到達集合内の call 箇所数)
+  kernel32.dll     LeaveCriticalSection             178
+  kernel32.dll     EnterCriticalSection             170
+  oleaut32.dll     VariantInit                       36
+  user32.dll       PostMessageW                      25
+  gdi32.dll        DeleteObject                      22
+  kernel32.dll     CloseHandle                       20
+  kernel32.dll     GetLastError                      19
+  user32.dll       IntersectRect                     15
+  advapi32.dll     RegCloseKey                       14
+  kernel32.dll     GetCurrentThreadId                13
+  advapi32.dll     RegQueryValueExW                  13
+  winmm.dll        timeGetTime                       12
+  advapi32.dll     RegOpenKeyExW                     12
+  kernel32.dll     Sleep                             11
+  gdi32.dll        OffsetRgn                         11
+  kernel32.dll     UnmapViewOfFile                   10
+  gdi32.dll        SetWindowOrgEx                    10
+  gdi32.dll        CombineRgn                         9
+  user32.dll       IsWindowVisible                    9
+  kernel32.dll     GetModuleFileNameW                 8
+  user32.dll       GetCapture                         8
+  kernel32.dll     QueryPerformanceCounter            7
+  kernel32.dll     GetTickCount                       7
+  gdi32.dll        CreateRectRgn                      7
+  kernel32.dll     CompareStringW                     7
+
+## gate
+  PASS entry_is_pdata_start
+  PASS known_edge_timeGetTime_reached got=12

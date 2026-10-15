@@ -18,6 +18,12 @@
 #define FLA_QUANTUM    128u        /* AudioWorklet render quantum (固定) */
 #define FLA_MAX_CH     8u          /* コンパイル時上限 (FL ILWASAPI 実測は 2in/2out) */
 #define FLA_MAX_RING   (1u << 15)  /* ring_frames 上限 (2 の冪) */
+#define FLA_PW_N       1024u       /* producer の write 記録リングの件数 (fla_ctl_t.pw_trace)。256 frame/write で 5.5 s 分 (3 s の e2e は約 566 件で全件保持) */
+/* 目標充填 T の安全係数 (%): T の下限 = burst × FLA_BURST_PCT/100 + 2B。OPEN 較正 (flaudio.c) と実行中の拡張 (flasio.c) で共用。
+ * 既定 125 は AU-24 (#2541) の実測で維持 (130/150 は grows と遅延を増やし、grows 0 にならなかった)。 */
+#ifndef FLA_BURST_PCT
+#define FLA_BURST_PCT 125u
+#endif
 
 /* ctl.state */
 enum { FLA_ST_CLOSED = 0, FLA_ST_OPENED = 1, FLA_ST_RUNNING = 2 };
@@ -27,7 +33,9 @@ enum { FLA_WL_IDLE = 0, FLA_WL_BUFFERING = 1, FLA_WL_PLAYING = 2 };
 enum { FLA_EV_SUSPENDED = 1u << 0, FLA_EV_CLOSED = 1u << 1, FLA_EV_RATE_CHANGED = 1u << 2, FLA_EV_RESUMED = 1u << 3,
        FLA_EV_INPUT_CHANGED = 1u << 4 /* 入力デバイスの喪失/切替 (ASIO kAsioResetRequest の元) */ };
 /* ctl.flags */
-enum { FLA_F_DECLICK = 1u << 0, FLA_F_INPUT = 1u << 1 };
+enum { FLA_F_DECLICK = 1u << 0, FLA_F_INPUT = 1u << 1,
+       FLA_F_T_FLOOR = 1u << 2 /* 初期 T >= FLA_T_FLOOR_FRAMES (burst 探査に依らない下限) */ };
+#define FLA_T_FLOOR_FRAMES 1536u
 
 /* コマンド (wasm → main thread JS)。FLEngine 側は AudioContext/MIDI/getUserMedia に触れられない
  * (worker に AudioContext は無い) ため、制御面は全て main thread に委譲する。 */
@@ -125,9 +133,17 @@ typedef struct fla_ctl {
     uint32_t fill_samples;     /* 356 */
     /* 360..383 */
     uint32_t wake_hist[6];     /* 360 wake 遅延ヒストグラム (ms): <1,<2,<4,<8,<16,>=16 (Date.now 分解能 ±1ms) */
+    /* ---- line6 @384: producer の write 単位の記録 (FLA_PW_N 件のリング)。件 k = [w (write 開始 frame), fill (起床時の充填),
+     * 起床時刻 µs, 完了時刻 µs] (performance.now の下 32bit)。pw_n は通算数 (添字 = pw_n % FLA_PW_N) ---- */
+    uint32_t pw_n;             /* 384 */
+    uint32_t pw_trace[FLA_PW_N * 4]; /* 388 */
+    /* ---- @16772: worklet が書く (AU-30 #3151)。main の既存 offset を動かさないため pw_trace の後ろに置く ---- */
+    uint32_t burst_hist[32];   /* 16772 バースト長ヒストグラム: 連続 process() (Date.now 差 <=1ms) の 1 run が終わるごとに bin=floor(len/512) を +1。末尾 bin は >=15872 f を含む */
 } fla_ctl_t;
 
-#define FLA_CTL_SIZE 384u
+#define FLA_CTL_SIZE 16904u
+#define FLA_BURST_BIN 512u         /* burst_hist の bin 幅 (frames)。worklet は同じ値を持つ (fl-audio-worklet.js) */
+#define FLA_BURST_BINS 32u
 
 /* ---- ABI 自己検証用: JS が同じ配列を持つ (audio-layout.ts) ---- */
 typedef struct { const char *name; uint32_t off; } fla_layout_entry_t;
@@ -140,7 +156,8 @@ uintptr_t  fla_ctl_ptr(void);
 int  fla_cmd(uint32_t op, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t res[4], uint32_t timeout_ms);
 /* ring 確保 + ctl 初期化。成功 0。失敗は負値 (abort しない):
  *   -1 = RPC 失敗/タイムアウト, FLA_E_BURST_TOO_LARGE = OPEN 較正 burst が大きすぎ ring に収まらない
- *   ((depth+2)*B > FLA_MAX_RING。depth は burst から自動算出し固定上限なし。AudioContext は閉じて CLOSED に戻す) */
+ *   ((depth+2)*B > FLA_MAX_RING。depth は burst から自動算出し固定上限なし。AudioContext は閉じて CLOSED に戻す)
+ *   flags の FLA_F_T_FLOOR を立てると、初期 T を FLA_T_FLOOR_FRAMES 以上に上げる (burst 探査の結果に依らない下限) */
 #define FLA_E_BURST_TOO_LARGE (-100)
 #define FLA_E_NO_PANEL (-3)   /* CONTROL_PANEL の ack_status: main に UI が登録されていない */
 int  fla_open(uint32_t sr, uint32_t out_ch, uint32_t in_ch, uint32_t buffer_frames, uint32_t depth, uint32_t flags);

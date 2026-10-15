@@ -1,0 +1,8 @@
+# 0bdd046d (同一環境で再ビルド) と HEAD の boot_final3.ll の差 (diff の通常形式。行番号は各側)
+180816c180816,180819
+<   br label %dec_label_pc_4fa248
+---
+>   %g4fa = icmp eq i32 %9, 0
+>   br i1 %g4fa, label %dec_label_pc_4fa210_g4fa, label %dec_label_pc_4fa248
+> dec_label_pc_4fa210_g4fa:
+>   ret i64 0

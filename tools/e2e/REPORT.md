@@ -34,7 +34,7 @@
 | check | 内容 |
 |---|---|
 | headers-isolation | `/` と worklet が COOP `same-origin` / COEP `require-corp` |
-| edge-policy | (edge-sim / 実 URL) CORP・Cache-Control・Content-Type・br 圧縮・index rewrite・R2 同様の素の 404 を `edge-policy.json` と突合 |
+| edge-policy | (edge-sim / 実 URL) CORP・Cache-Control・Content-Type・br 圧縮・index rewrite・R2 同様の素の 404 を `edge-policy.json` と突合。`/index.html` は edge-sim で 200、実 URL で `307 -> /` (#3526) |
 | page-load | ページ起動、title、ハーネスの起動表示 |
 | cross-origin-isolated | `crossOriginIsolated===true`、`new SharedArrayBuffer()` 生成可、secure context |
 | wasm-load | アプリ内 smoke (`add(40,2)=42`) + `WebAssembly.instantiateStreaming(fetch('/__e2e__/add.wasm'))` で MIME `application/wasm` を検査 |
@@ -93,14 +93,16 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
 
 ## CI 化 (#66, `tools/e2e/ci/e2e.yaml.proposed` → `.github/workflows/e2e.yaml`)
 
+2026-10-15 に PR #3292 で配置済み。以下は経緯。
+
 **配置の制約**: Actions の GitHub App には `workflows` 権限が無く、`.github/workflows/` への push は拒否された
 (`refusing to allow a GitHub App to create or update workflow ... without workflows permission`、実測 1 回)。
-そのため workflow 本体は `tools/e2e/ci/e2e.yaml.proposed` に置いた。有効化は `git mv tools/e2e/ci/e2e.yaml.proposed .github/workflows/e2e.yaml` を
-`workflows` 権限のあるユーザ/PM が行う (actionlint 1.7.7 で配置後の内容を検査済み = エラー 0)。
+そのため workflow 本体は当初 `tools/e2e/ci/e2e.yaml.proposed` に置いた。`workflows` 権限のあるユーザ/PM が `.github/workflows/e2e.yaml` へ移し
+(actionlint 1.7.7 で配置後の内容を検査済み = エラー 0)、`.proposed` は PR #3292 で削除した (Git 履歴に残る)。
 
 既知類型との関係: 該当なし (lift/IR 系ではない)。検証起点: `origin/main` 2847625。
 
-- `local` ジョブ: PR / main push (src・vite 設定・tools/e2e・deploy/config 等の path のみ) / 手動で
+- `local` ジョブ: PR / main push (src・vite 設定・tools/e2e・deploy/config 等の path のみ。tools/audio・tools/legal/notices・tools/m1/flags.sh は未登録 = #3335) / 手動で
   `run.sh --driver both --targets preview,edge-sim`。結果 JSON・スクリーンショット・ログを artifact (14 日)、表を job summary に出す
   (`tools/e2e/suite/summary.mjs`)。
 - `remote` ジョブ: 週次 (月曜 03:17 UTC) / 手動 (`remote=true`) で `run.sh --url "$E2E_URL" --driver both`。
@@ -117,14 +119,41 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
   `shell: bash` 明示の根拠: `bash -e -c 'false 2>&1 | tee /dev/null'` は exit 0、`bash -eo pipefail -c` は exit 1。同じ COEP 除去 run (edge-sim のみ) を
   `-e` のみ (pipefail 無し) で流すと exit 0 (= step が緑のまま FAIL を握り潰す) ことも確認。`shell:` 無指定の `run` は
   `bash -e {0}` で実行されるため、両 E2E step に `shell: bash` (= `bash --noprofile --norc -eo pipefail {0}`) を明示した。
-- 範囲外: GitHub Actions 上での workflow 実行結果 (workflow は `.proposed` のため PR の check では実行されない。`.github/workflows/e2e.yaml` へ配置後に確認)、実 URL への `--url` (Access 保護下の実 token での実行は未実施 =
-  `E2E_URL` と secrets の登録はユーザ操作)。
+- 範囲外: 実 URL への `--url` (Access 保護下の実 token での実行は未実施 = `E2E_URL` と secrets の登録はユーザ操作。残件は #3303 [E2E-9])。Actions 上の local ジョブは下の適用節で確認済み。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| workflow の `.github/workflows/e2e.yaml` への配置 (workflows 権限が必要) | 配置まで CI は動かない | #66 へコメント (PM/ユーザ作業) |
-| repo variable `E2E_URL` と secrets `E2E_ACCESS_CLIENT_ID/SECRET` の登録 | 週次 remote ジョブは登録まで skip | 本 issue (#66) へコメント (ユーザ/PM 作業。token secret は `deploy/work/secrets/` にしか無い) |
-| 実 URL に対する週次ジョブの初回実績 | remote の PASS 未確認 | #66 (登録後に `gh workflow run e2e.yaml -f remote=true`) |
+| repo variable `E2E_URL` と secrets `E2E_ACCESS_CLIENT_ID/SECRET` の登録 | 週次 remote ジョブは登録まで skip | #3302 [E2E-8] (PM/ユーザ作業。token secret は `deploy/work/secrets/` にしか無い) |
+| 実 URL に対する週次ジョブの初回実績 | remote の PASS 未確認 | #3303 [E2E-9] (登録後に `gh workflow run e2e.yaml -f remote=true`) |
+| path filter (`on.pull_request.paths`・`on.push.paths`) に `tools/audio/**`・`tools/legal/notices/**`・`tools/m1/flags.sh` が無い | これだけを変えた PR では workflow が起動せず、merge 前に E2E で検証されない | #3335 [E2E-10] (PM / 依頼者が依頼コメントの diff を適用。#3292 の merge 後) |
+
+### 適用 (#66。PM が PAT で `.github/workflows/e2e.yaml` へ配置。検証起点 `origin/main` `7c85004e` に本 PR を載せたクリーン worktree・node v24.19.0・Chrome 154.0.8037.97・emsdk 6.0.12 (`[EMSDK]`))
+
+- Actions 結果 (PR #3292 head `4c89a7b0`): run 38659352731 (`E2E / local` success・job 70 s (00:19:24 → 00:20:34Z)、`E2E / remote` skipped = `vars.E2E_URL` 未登録)。
+- Actions 結果 (PR #3292 head `75131c60`): Actions run 38658202074 (head 75131c60・job local success・SUMMARY PASS=34 FAIL=0 SKIP=6・emsdk install 26 s・job 所要 72 s・n=1)。`E2E / local` (job 116172905176、00:07:39 → 00:08:51Z)。runner は Ubuntu 24.04.5・Chrome 154.0.8037.97・node v26.10.0・pnpm 12.10.1。remote ジョブは `vars.E2E_URL` 未登録のため skip。
+- 測定 commit = `75131c60`。`git diff 75131c60 HEAD -- src public tools/e2e tools/audio tools/m1 deploy/config deploy/lib ':(exclude)tools/e2e/REPORT.md' ':(exclude)tools/e2e/ci'` は 0 行 (実行パスに差分なし。以後の差分は本 REPORT・`deploy/README.md`・`.proposed` の削除のみ)。
+- 停止報告 (2026-10-14 17:24Z) の diff を `git apply` で適用した (140 行・新規 1 ファイル)。`.proposed` は PR #3292 の fix で削除した (適用後は `.github/workflows/e2e.yaml` が正)。
+- 差分からの変更 2 点: (1) remote ジョブの `if` に `&& vars.E2E_URL != ''` を足した (PM 判断。実デプロイ #36 の後に `E2E_URL` と secrets を登録するまで、週次でも skip)。(2) local ジョブに emsdk の install step を足した (下記)。
+- local ジョブと同じ `bash tools/e2e/run.sh --driver both --targets preview,edge-sim`: exit 0・**PASS=34 FAIL=0 SKIP=6**・12.2 s (build 込み・n=1)。SKIP 6 = `fl-boot` (FL 未統合) 4 + `edge-policy` の preview 側 (strict 限定) 2。
+- emcc が無い環境の再現: 同じコマンドを `EMSDK_ENV=/nonexistent/emsdk_env.sh` で実行すると exit 1・`[audio] emcc not found` (`run.sh` → `tools/audio/integration/stage_app.sh` → `tools/audio/build.sh`)。`ubuntu-latest` (Ubuntu 24.04 image 20261004.327.1) の Readme に Emscripten の記載は無いため、(2) の step (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` を `emsdk install`、`EMSDK_ENV` で `build.sh` に渡す) を足した。同じ方式の `emsdk install 6.0.12` は「FL 起動契約 (#65)」節の #2744 の再測定で 28 s だった。
+- (2) の step は Actions run 38658202074 で成功 (上記)。この sandbox では実行できなかった (python の `urlopen` が `CERTIFICATE_VERIFY_FAILED`。環境固有)。remote ジョブは未実行 (`E2E_URL` と secrets が無い)。
+
+## remote edge-policy: /index.html の 307 -> / (#3526)
+- 実機 (Workers Static Assets、既定 `html_handling: auto-trailing-slash`) は `/index.html` を `307 -> /` で返す (`deploy/EDGE-SIM.md` §A-2)。旧 `checks.mjs` は 3xx を Access ログイン扱いで例外にしていたため、remote (strict) の `edge-policy` が FAIL していた。
+- 修正 (`tools/e2e/suite/checks.mjs`): `url` ターゲットの `/index.html` だけ `redirect: "manual"` で取得し、`assertIndexHtmlRedirect` で `status === 307` かつ `Location` が origin の `/` であることを assert。Access のログイン 302 は 307 でないため FAIL のまま。edge-sim の `/index.html` は従来どおり 200 + policy ヘッダ。
+- 単体: `node --test tools/e2e/edge_policy.test.mjs` = **4 テスト PASS** (307 の相対・絶対 Location は PASS、302・Location `/index`・Location 無しは FAIL)。
+- 実機相当の再現 (コミットしないモック): `/index.html` だけ 307 -> `/` を返し、他は edge-sim と同じ policy で配信するサーバを立て、`E2E_URL` に向けて `tools/e2e` 内で `node suite/run.mjs --targets url --driver agent-browser`。
+  - 修正前 (origin/main の checks.mjs): edge-policy **FAIL** `/index.html: リダイレクト 307 -> / (...)` (issue の症状を再現)。
+  - 修正後: edge-policy **PASS** `probes=5 br=null /index.html=307->/`。url 全体 **PASS=9 FAIL=0 SKIP=1** (fl-boot)、rc 0、3 s、load 1.68 → 1.54 (n=1)。
+  - ネガティブコントロール (COEP キーを除いた policy を `EDGE_POLICY_FILE` で与える): **PASS=5 FAIL=4 SKIP=1**、rc 1。FAIL は headers-isolation・cross-origin-isolated・audioworklet・console-clean (edge-sim の従来測定と同じ 4 check)。
+- edge-sim (ローカル、CI の local ジョブと同じ `bash tools/e2e/run.sh --driver both --targets preview,edge-sim`): **PASS=34 FAIL=0 SKIP=6**、rc 0、13 s (build 込み)、load 1.31 → 1.68 (n=1)。edge-policy (edge-sim) は 2 driver とも PASS `probes=5 br=br`。
+- edge-sim のネガティブコントロール (COEP 除去、`EDGE_POLICY_FILE=… E2E_SKIP_BUILD=1 bash tools/e2e/run.sh --driver both --targets edge-sim`): **PASS=10 FAIL=8 SKIP=2**、rc 1 (4 check × 2 driver。従来どおり)。
+- 単体テスト・e2e の測定はすべて commit 済み HEAD (コード変更の commit) で実施。測定 commit = `955892848`。`git diff 955892848 HEAD -- tools/e2e/suite tools/e2e/edge_policy.test.mjs deploy/lib deploy/config src` の出力は **0 行** (以後の差分は本 REPORT と `deploy/` の docs のみ)。
+- 注意: 本 REPORT §実測結果の `url (ローカル edge-sim を --url で指定)` 行は、本変更後は再現しない (url ターゲットの `/index.html` は 307 を要求するため、200 を返すホストは FAIL する)。ローカル edge-sim は `--targets edge-sim` で検証する。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実 URL (`E2E_URL`) に対する `gh workflow run e2e.yaml -f remote=true` の結果記録 (#3526 受入 3) | remote の PASS 実績が未確認 | #3303 [E2E-9] (前提 #3302 [E2E-8]: repo variable と secrets の登録は依頼者作業) |
 
 ## 839 E2E-5: dummy-worklet 参照の差し替え後の再測定 (#839・#1010)
 `/worklets/dummy-worklet.js` の参照を `/worklets/fl-audio-worklet.js` へ差し替えた後 (commit `8e27b776` → 修正 commit は PR head を参照)、
@@ -150,6 +179,7 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
 - 遷移: `booting` → `running` (GUI フレーム 1 枚以上) / `error` (window `error`・`unhandledrejection`・`fail()`)。`error` は終端で最初のエラーを保持、`frames` は単調増加。
 - frames の供給: `GuiHost.attach({ onFrame })` の累計フレーム数を `controller.setFrames()` に渡す (`src/runtime/gui.ts`)。
   **実 FL の GuiHost 接続は未実装** (FL 本体がページに統合されていないため。ハーネスのテストフレームは計上しない)。
+- `guest: 'fl' | 'test'` (#3461): 載せたゲストの種別。`setGuest` まで契約に現れない。`/?gui=wasm` のテストゲストは `test` で、`fl-boot` は `guest === 'fl'` を要求する (テストゲストで PASS させない)。
 - e2e: `webstudio-contract` は常時 (形状)、`fl-boot` は `E2E_REQUIRE_FL=1` で `state==='running' && frames>0` を 180s 待ち、canvas の画素を検査 (#32 の受入に接続)。
   FL 未統合の現状では `E2E_REQUIRE_FL=1` は FAIL する (意図通り)。
 - 実測 (HEAD 8bf83d9、Chrome 154、node v22.23.3): `--driver both --targets preview,edge-sim,dev` = **PASS 50 / FAIL 0 / SKIP 10** (28.1s、`webstudio-contract` 6/6 PASS = `{"state":"booting","frames":0}`、fl-boot 6 SKIP + edge-policy 4 SKIP)。
@@ -159,6 +189,30 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
   - 環境: `toolchain-emsdk` 素材は本 run の `$ARTIFACTS_DIR` に無い。最初の run は `tools/audio/build.sh` の `[audio] emcc not found` で停止 (5 s・rc 1・fl-boot 未到達)。上流 emsdk 6.0.12 を `$RUNNER_TEMP/emsdk` へ `emsdk install 6.0.12` (28 s) で入れ、`EMSDK_ENV` で指定して再実行した。
 - 単体テスト: `node --test tools/e2e/webstudio_state.test.mjs` (遷移 6 ケース)。
 - 未実施: `agent-browser diff screenshot` による FL 画面のスクリーンショット差分 (基準画像となる FL 起動画面が無いため。#32 後)。
+
+## gui=wasm: 製品ページへのテストゲスト結線 (WIN-24 #3461)
+`/?gui=wasm&glue=<app.js>&app=<descriptor>` で、FL ではない検証用ゲスト (`tools/gui/test/text_wasm_app.c`・`GUI_NO_FT=1` = 内蔵 8x8) を chunked descriptor (64 KiB part × 2、sha256 検証) から読み、GuiHost 経由で専用 canvas `#gui-canvas` に描く。`window.__webstudio` は `running` / `frames=1` / `guest='test'`。part 0 の 1 バイト改竄は `state=error`・`frames=0` で止まる。`/?gui=wasm` の glue と app は同一オリジンの URL だけ読む (`src/runtime/same_origin.ts`。別オリジン・`data:`・`//host` は読まず `state=error`)。実装は `src/runtime/gui_guest.ts`、ゲストのビルドは `tools/gui/e2e/build_guest.sh`。
+- 経路: `fetchCompile` (chunked・sha256) → glue `createGuiApp` (`instantiateWasm` で compile 済み Module を注入。`loader_boot.ts` の `createEmscriptenPthreadModule` と同じ方式) → `GuiHost.attach` (専用 canvas・`onFrame` → `webstudio.setFrames`) → `window.__guiGuest` (e2e が `readback()` で画素を読む)。
+- 設計: 起動はメインスレッド (`text_main.js` の経路を踏襲)。fl-runtime Worker への移管は未了 (#2717 受入 2)。入力経路 (PumpInput ↔ GuiShared 入力リング) は未結線 (#174・#32 の決定待ち)。`gui=wasm` では `#screen` に縞を描かない。契約 `guest` は `setGuest` まで現れない (既存の `webstudio-contract` の形状を変えない)、`fl-boot` は `guest === 'fl'` を要求する (テストゲストでは PASS させない)。
+
+**測定** (測定 commit `4185fd4c9` = 同一オリジン検査・instantiate 失敗の伝播・D5 引用の除去を入れた commit。前の測定 commit `0d614c059` の後にコードを変えた。Chrome 155.0.8059.39 (puppeteer-core)・agent-browser 0.39.0、node v22.23.3、emsdk 6.0.12、mingw-w64 11.0.1、開始時 load average 0.59 / 1 分)
+| 検査 (ms。`drv.open` を含む検査全体) | preview / agent-browser | preview / puppeteer-core | edge-sim / agent-browser | edge-sim / puppeteer-core |
+|---|---|---|---|---|
+| `gui-guest-boot` (`state==='running'`, `frames=1`, lit 38400 px, 色 ≥7) | 624 | 245 | 486 | 212 |
+| `gui-guest-tamper` (`state==='error'`, `frames=0`) | 186 | 56 | 183 | 57 |
+| `gui-guest-origin` (別オリジン・`data:`・`//host` の 3 件まとめ。全件 `state==='error'` かつ同一オリジンの検査で停止、glue 未実行、別オリジンの script 要素なし) | 777 | 169 | 791 | 148 |
+
+- `EMSDK_ENV=<emsdk の emsdk_env.sh> bash tools/e2e/run.sh --driver both --targets preview,edge-sim`: **PASS 46 / FAIL 0 / SKIP 6**、wall 34 s (vite build・ゲストの emcc build を含む)、rc 0。増分 4 = `gui-guest-origin` × 4 組。前の基準 (`4185fd4c9` の直前 = `0d614c059`) は PASS 42 / FAIL 0 / SKIP 6。
+- ネガコン (ガードの検出力): `src/runtime/gui_guest.ts` の `resolveSameOriginUrl(glueParam, …)` を `glueParam` に置き換えた一時 mutant (preview / puppeteer-core) で `gui-guest-origin` が **FAIL** (`data:` 案: `同一オリジンの検査で止まっていない` — glue が読まれて `createGuiApp` 不在で止まった)。ソースは commit の状態に戻し、`git diff --stat` が空であることを確認した (ログ: `tools/e2e/work/logs/mutant-noguard.log`)。
+- 単体テスト `node --test tools/e2e/same_origin.test.mjs tools/e2e/webstudio_state.test.mjs`: **9 PASS / 0 FAIL** (同一オリジン解決 1 件・別オリジン / `data:` / `javascript:` / `//host` / ポート違いのネガコン 1 件・`setGuest` 1 件ほか)。`pnpm typecheck` rc 0。
+- `open → running` は検査の所要が上限値 (`drv.open` を含む)。180 s の予算に対して十分小さい。FL の wasm での値は未計測。
+
+**ネガコン (d) の原因同定**: ブラウザの `error` は `WebAssembly compilation aborted: Network error: Failed to read from a ReadableStream.` (Chrome が stream 内の例外を包む)。同じ改竄 descriptor を node で `chunkedStream` に通すと `ChunkIntegrityError: part の sha256 不一致` (正常版は 120669 B を読み切る)。page 側に原因文言を出すのは #3497。ブラウザ側の文言は任意の stream 失敗 (404 など) でも同じなので、`gui-guest-tamper` が確かめるのは「compile が中断され `state=error`・`frames=0`」までで、sha256 不一致の同定は node 側の結果に依る。
+
+**素材・環境**: `toolchain-emsdk` は本 run の素材展開先 (素材置き場の取得対象) に無かったため、`e2e.yaml` の Emscripten step と同じ手順 (`emsdk install <tools/m1/flags.sh の pin>` ・ `activate`) で `$RUNNER_TEMP` に入れた。`gen_api.py` は `x86_64-w64-mingw32-gcc` を要する。`build_guest.sh` は mingw が無ければ apt で導入する (`gcc-mingw-w64-x86-64 mingw-w64-x86-64-dev`)。CI の `E2E / local` ジョブは mingw を入れていないため、この導入に依存する。`fl-win64` は使わない。
+**e2e の PNG**: `ctx.shot("gui-guest")` は `e2e.yaml` が `tools/e2e/work/shots` を upload する。#3461 本文の「e2e の PNG を Actions artifact に上げない」とは食い違う。方針は PM 判断 (`pm-decision`)。
+
+**未実施 (子 issue)**: オラクル画素の完全一致とネガコン (a)(b)(c)・`text_wasm_e2e.sh` 回帰 → #3495 (WIN-27)。GUI-REACH trace → #3496 (WIN-28)。`fl-boot` のネガコン (テストゲストで `E2E_REQUIRE_FL=1` が FAIL) と原因文言 → #3497 (WIN-29)。`text_wasm_e2e.sh` は FreeType の wasm32 ビルドと font 取得が要るため本 run では未実行 (`tools/gui/lift/gui_wasm.sh`・`text_wasm_app.c` は未変更)。
 
 ## ユーザ依頼事項
 1. **公開ホスト名** (例: `studio.<既存ゾーン>`)。案 S の既定は workers.dev (`deploy/README.md` §移行で自前ドメインへ)。

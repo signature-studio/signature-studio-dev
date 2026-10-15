@@ -154,12 +154,13 @@ def main():
     r, _ = sh('python3 %s/gen_stubs_sigs.py %s %s %s %s' % (HERE, P('final.ll'), P('stubs.c'), P('sigs.json'), P('shims.json')))
     stat['stubs'] = r.stdout.strip()
     extra_c = [P('lowered.ll.icall.c')] if os.path.exists(P('lowered.ll.icall.c')) else []
+    extra_ll = [P('simd.c.i256.ll')] if os.path.exists(P('simd.c.i256.ll')) else []
     sig = json.load(open(P('sigs.json')))
     exports = ','.join(['_function_' + k for k in sig] + ['_malloc', '_free'])
     # 4) emcc
     r, dt = sh('source %s >/dev/null 2>&1; emcc -w %s -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=96MB -sENVIRONMENT=node -sMODULARIZE=1 '
                '-sEXPORT_NAME=KhSnap -sERROR_ON_UNDEFINED_SYMBOLS=0 --no-entry -sEXPORTED_FUNCTIONS=%s -sEXPORTED_RUNTIME_METHODS=HEAPU8 '
-               '-Wl,--no-gc-sections -I%s %s %s %s %s %s -o %s' % (EMSDK, a.opt, exports, HERE, P('final.ll'), P('simd.c'), P('globals.c'), P('stubs.c'), ' '.join(extra_c), P('mod.cjs')),
+               '-Wl,--no-gc-sections -I%s %s %s %s %s %s -o %s' % (EMSDK, a.opt, exports, HERE, P('final.ll'), P('simd.c'), P('globals.c'), P('stubs.c'), ' '.join(extra_c + extra_ll), P('mod.cjs')),
                log=P('emcc.log'))
     stat['emcc_sec'] = round(dt, 1)
     stat['wasm_bytes'] = os.path.getsize(P('mod.wasm'))

@@ -104,3 +104,72 @@ vfmadd231ps xmm  n=1 old=1 new=1 | vfmadd231ps
 blob n=7 old_detect=3 new_detect=7
 new only: ['vaddps', 'vblendps', 'vblendvps', 'vpermilps']
 ```
+
+## 12-2. (#3256 / KH-48) vmovaps (ymm・1 引数) と FMA3 scalar 7 語彙の bit-exact 検証
+
+- **対象**: REPORT §12 の未解決 = vmovaps ymm (census 40 件) と vfmadd 系 xmm scalar。依頼文は「8 mnemonic」だが列挙は 7 件 (census 表の vf 行は 7 mnemonic・計 27 件) のため、7 件を対象とした。store 形の lift は本 run の範囲外 (下記)。
+- **測定条件**: 基準 commit `7a30d228` (origin/main) の上に本変更。nproc=4・clang 18.1.3。census の再測定 (plugins 素材の展開を含む) は**本 run では実施していない** (census は §12 の f354504c の値を引く)。
+- **測定 commit**: `0c1345d4f` (main 取り込み merge・コードを変えた最後の commit。その tree で ymm / fma の 4 本を再測定)。以降に積んだ commit は docs のみで、`git diff 0c1345d4f HEAD -- tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/snapins/harness tools/targets/kilohearts/snapins/scripts` の出力は 0 行 (下の差分節)。
+- **RetDec 生 IR (実装 session の実測の転記。本 fix run では `toolchain-retdec` 素材が無く、再実行していない)**:
+  - `vmovaps ymm0, ymm1` (c5 fc 28 c1) / `vmovaps ymm0, ymmword ptr [rdi]` (c5 fc 28 07): `declare i256 @__asm_vmovaps(i256) local_unnamed_addr`
+  - `vmovaps ymmword ptr [rdi], ymm0` (c5 fc 29 07・store 形): `declare void @__asm_vmovaps(i256, i256)` (メモリ書込みが IR に現れない)
+  - `vfmadd213ss xmm0,xmm1,xmm2` (c4 e2 71 a9 c2): `declare i128 @__asm_vfmadd213ss(i128, i128, i128)`
+  - 引数の意味 (Intel 順): 第 1 = op1 (dest)、第 2 = op2、第 3 = op3。
+- **変更**:
+  - `lift/gen_simd.py` `gen256`: `vmovaps` かつ `ret i256` かつ引数 `[i256]` の時だけ `define i256 @NAME(i256 %a0) { ret i256 %a0 }` を返す (+2 行)。void 2 引数の store 形は None のまま = `abort()` スタブ (既存の `stub256` の挙動)。
+  - `harness/ymm_vocab_harness.c` / `scripts/ymm_vocab_check.py`: vmovaps を 4 語彙目に追加。store 形の宣言も入れ、`undefined(abort stub) 1` と定義が無いことを判定に加えた。ネガコン (d) を追加。
+  - `harness/fma_vocab_harness.c` / `scripts/fma_vocab_check.py` (新規): 7 語彙の宣言を 1 ファイル (`work/fma_vocab/decl.ll`) にまとめ、`gen_simd.py` で C 化して `clang -O1 -mfma -mavx2 -ffp-contract=off` でホストビルドする。oracle はホスト FMA3 (`_mm_fmadd_ss` 等)。上位 lane は dest (`_mm_move_ss` / `_mm_move_sd`)。vfmadd132sd の oracle だけは同じ命令形の inline asm (検証 C)。
+  - 生成 C の `<emscripten.h>` 依存は `work/fma_vocab/inc/emscripten.h` (`#define EMSCRIPTEN_KEEPALIVE` のみ) で解決 (ホスト検証専用・gitignore)。
+- **回帰**: i256 を含まない宣言 (本 run の FMA 宣言 = i128 のみ 7 件) を、基準 commit `7a30d228` 版と新版の `gen_simd.py` に通し、C 出力と標準出力を `cmp` で比較 → 両方一致。
+- **入力**: 各 op 20,000 call・seed 1。値は 1/4 特殊値 (±0・±Inf・NaN・非正規・1.0 等)、1/4 任意 bit、1/2 指数を 1 付近に寄せた通常域 (単精度・倍精度の丸め差が出やすい)。
+- **判定**: 128bit 全 bit (NaN payload を含む)。NaN payload の差を除外・別計上する処理は持たない (旧版の除外は検証 C で撤回した)。
+
+### 検証 A: `python3 snapins/scripts/ymm_vocab_check.py 20000 1`
+- 結論 (測定 commit `0c1345d4f`): 4 語彙 mismatch 0・ネガコン (a)〜(d) FAIL・store 形の abort スタブ OK → **PASS**。
+- 実行条件・生出力の全行: [REPORT_APPENDIX_3256.md](REPORT_APPENDIX_3256.md)。
+
+### 検証 B: `python3 snapins/scripts/fma_vocab_check.py 20000 1`
+- 結論 (測定 commit `0c1345d4f`): 7 語彙すべて 128bit 全 bit mismatch 0 (NaN payload を含む)・ネガコン (a)(b)(c) FAIL → **PASS**。seed 2・3 も PASS。
+- 実行条件・生出力の全行 (seed 1): [REPORT_APPENDIX_3256.md](REPORT_APPENDIX_3256.md)。
+
+### 検証 C: vfmadd132sd の NaN payload 差 (旧 31 件) の原因と修正
+- **旧 oracle**: `ref_132sd` は `_mm_fmadd_sd(D, s3, s2)` だった。clang -O1 -mfma はこれを `vfmadd213sd` にコンパイルした (旧 harness の `objdump -d` で `vfmadd213sd` が 2 箇所: `ref_213sd` と `ref_132sd`)。RetDec が宣言した `vfmadd132sd` と命令の被演算子の役割が違うため、両方 NaN の時の結果の NaN 選択が変わり、旧 harness では seed 1 で NaN payload だけの差 **31 件** (`mismatch=31 nan_only=31`) になった。修正前 HEAD `86126ccc` で同コマンドを再実行し、この 31 件を再現した。
+- **生成 C 側は変更していない**: `__asm_vfmadd132sd` の生成 C は clang で `vfmadd231sd` にコンパイルされる (`objdump -d work/fma_vocab/simd.o`)。命令形が違っても、新 oracle と 128bit 全 bit で一致した (検証 B)。
+- **修正** (commit `d7603d630`): oracle を `__asm__("vfmadd132sd %2, %1, %0" : "+x"(d) : "x"(s2), "x"(s3))` に置き換えた。判定から `nan_only` の除外を外した。
+- **結果** (修正 commit `d7603d630` の時点・seed 1・20,000 call): `vfmadd132sd` mismatch **31 → 0**。7 語彙すべて mismatch 0。seed 2・3 も全 bit 一致 (検証 B)。
+
+### ネガコン一覧 (判定のみ・生出力は REPORT_APPENDIX_3256.md)
+
+| 対象 | 改変 / 除去 | 判定 |
+|---|---|---|
+| ymm (a) | 語彙定義 (`.i256.ll`) を外す | FAIL |
+| ymm (b) | vaddps の fadd → fsub | FAIL |
+| ymm (c) | 未対応 `vfmadd231ps` 宣言 (abort スタブ) | FAIL (呼出で abort) |
+| ymm (d) | vmovaps 定義を `ret i256 0` に改変 | FAIL |
+| ymm store | `void __asm_vmovaps.2(i256,i256)` | OK (定義されず abort スタブのまま) |
+| fma (a) | 語彙定義 (simd.c) を外す | FAIL |
+| fma (b) | vfmadd213ss の `fmaf(s2,d,s3)` → `(s2*d)+s3` (単精度 2 段丸め) | FAIL |
+| fma (c) | vfmadd213ss の被演算子順を 231 形 `fmaf(s2,s3,d)` に | FAIL |
+
+- ネガコン (b)(c) は全 bit 比較の不一致が 0 でないことで FAIL とする。
+
+### 未解決 (本 run の範囲外)
+- **store 形 `void __asm_vmovaps(i256, i256)`**: 定義しない (abort スタブ)。メモリ書込みが IR に現れず、定義すると store が黙って消える。`kh_passes.py` の store 欠陥類型と同じ形で、lift 対応は子 issue (#3358 KH-54) で行う。
+- census の再測定 (plugins 素材の展開を含む) は未実施。
+- 14 snap-in のハッシュ不変 (`run_all.sh`) は未実施 (#3259)。
+
+### 差分 (基準 commit `7a30d228` → 本 PR のコード変更の最後 `d7603d630`・測定対象のコード)
+- main 取り込み merge `0c1345d4f` で測定対象範囲に入ったのは main 側の `scripts/carve_iat_census.py` (新規・#781) のみ。ymm / fma の check はこれを使わない (参照は自身と REPORT_APPENDIX_781.md だけ)。
+- `git diff --stat 7a30d228 d7603d630 -- tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/snapins/harness tools/targets/kilohearts/snapins/scripts`:
+
+```
+ .../kilohearts/snapins/harness/fma_vocab_harness.c | 119 +++++++++++++++++
+ .../kilohearts/snapins/harness/ymm_vocab_harness.c |  13 +-
+ tools/targets/kilohearts/snapins/lift/gen_simd.py  |   2 +
+ .../kilohearts/snapins/scripts/fma_vocab_check.py  | 143 +++++++++++++++++++++
+ .../kilohearts/snapins/scripts/ymm_vocab_check.py  |  50 ++++---
+ 5 files changed, 307 insertions(+), 20 deletions(-)
+```
+
+- `git diff 0c1345d4f HEAD -- tools/targets/kilohearts/snapins/lift tools/targets/kilohearts/snapins/harness tools/targets/kilohearts/snapins/scripts` (測定 commit → HEAD): 出力 0 行。
+- `git diff 7a30d228 -- tools/targets/kilohearts/snapins/lift/gen_simd.py` の全文 (他 4 ファイルは新規・変更の本文を commit で確認): `+` 2 行 = vmovaps の 1 引数分岐 (`if b == 'vmovaps' and ret == 'i256' and ptys == ['i256']:` と `return 'define i256 @%s(i256 %%a0) {\n  ret i256 %%a0\n}' % name`)。

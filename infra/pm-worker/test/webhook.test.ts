@@ -89,6 +89,25 @@ test("botReport: run-outcome と PM のマーカーを含む bot コメントは
   assert.equal(s.botReport["7"]?.body, "報告 2");
 });
 
+test("停止印 (oc-fix-limit): 作者は型 Bot かつ github-actions[bot] (markLogin) だけ。実装 App・reviewer・型 User の偽印は信じない (#2639)", () => {
+  const c = (login: string, type: string, at = "2026-10-14T10:00:00Z") => ({
+    action: "created",
+    issue: { number: 7, pull_request: {} },
+    comment: { user: { login, type }, created_at: at, body: "上限 <!-- oc-fix-limit --> <!-- oc-pm-intent: stuck pr=7 reason=ceiling -->" },
+  });
+  const stopOf = (s: PmState) => s.sig["7"]?.stop;
+  assert.equal(stopOf(send(EMPTY_STATE, "issue_comment", c(BOT, "Bot")).state), undefined, "実装 App 名義の偽印は信じない");
+  assert.equal(stopOf(send(EMPTY_STATE, "issue_comment", c("oc-reviewer-for-signature-studio[bot]", "Bot")).state), undefined, "reviewer 名義の印は信じない");
+  assert.equal(stopOf(send(EMPTY_STATE, "issue_comment", c("github-actions[bot]", "User")).state), undefined, "型 User は信じない");
+  assert.deepEqual(stopOf(send(EMPTY_STATE, "issue_comment", c("github-actions[bot]", "Bot")).state), { at: "2026-10-14T10:00:00Z", intent: "ceiling" });
+  const withMark = (payload: unknown, markLogin: string) => {
+    const body = JSON.stringify(payload);
+    return handleWebhook(EMPTY_STATE, { secret: SECRET, event: "issue_comment", signature: signBody(SECRET, body), body, botLogin: BOT, markLogin }).state;
+  };
+  assert.equal(stopOf(withMark(c("github-actions[bot]", "Bot"), "oc-mark-test[bot]")), undefined, "markLogin を変えたら既定の作者は信じない");
+  assert.deepEqual(stopOf(withMark(c("oc-mark-test[bot]", "Bot"), "oc-mark-test[bot]")), { at: "2026-10-14T10:00:00Z", intent: "ceiling" });
+});
+
 test("pull_request / pull_request_review: PR を増分に反映する", () => {
   const pr = (number: number, updatedAt: string, state: string, merged: boolean) => ({
     action: "synchronize",

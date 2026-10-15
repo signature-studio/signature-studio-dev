@@ -23,6 +23,7 @@ import argparse, json, re
 
 BLK_R8_GV = '8a1018'        # @global_var_8a1018 = BLK+0x18 (r8 slot)
 BLK_R9_CONST = '9048096'    # BLK+0x20 (r9 slot) の即値
+BLK_R8_SLOT = '9048088'     # BLK+0x18 (r8 slot) の即値 (BLK 域が 0 埋めの新 IR で使う)
 
 
 def main():
@@ -81,6 +82,16 @@ def main():
     if r9_i is not None:
         lines[r9_i] = re.sub(r'store i64 [^,]+, ptr ', 'store i64 %arg2, ptr ', lines[r9_i], count=1)
         n9 = 1
+    # 新 IR (BLK 域を 0 埋めで再配置した版): spill 値は BLK slot の load (rcx/rdx の復元) のまま残る。
+    # native の mov r8,[rbp+0x30] / mov r9d,[rbp+0x3c] に合わせて %arg1 / %arg2 へ直接結ぶ。
+    if n8 == 0:
+        for i in range(call_i - 1, max(lo, call_i - 60), -1):
+            m = re.search(r'store i64 %[\w.-]+, ptr (%ce[\w.-]+)\b', lines[i])
+            if m and any(re.match(r'\s*%s = inttoptr i64 %s to ptr' % (re.escape(m.group(1)), BLK_R8_SLOT), lines[j])
+                         for j in range(i - 1, max(lo, i - 80), -1)):
+                lines[i] = re.sub(r'store i64 %[\w.-]+,', 'store i64 %arg1,', lines[i], count=1)
+                n8 = 1
+                break
     out = '\n'.join(lines)
     open(a.dst, 'w').write(out)
     rep = {'entry': a.entry, 'site_call': a.site_call, 'r8_fixed': n8, 'r9_fixed': n9}

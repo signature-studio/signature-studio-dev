@@ -86,11 +86,59 @@ for pair in '素材不足のため着手できません。plugins-ott が必要�
   expect "answer '${pair%|*}' -> reason=${pair#*|}" $?
 done
 
-# 2b. 優先順 artifact > blocked > split > stop
-reset; ev_issue; issue open '[]'; prs '[]'; answer '素材不足で、依存 issue もあり、1 run に収まらないので停止します'
+# 2b. 優先順 artifact > blocked > split > stop (素材名を伴う不足だけが artifact)
+reset; ev_issue; issue open '[]'; prs '[]'; answer '素材 fl-win64 が無く、依存 issue もあり、1 run に収まらないので停止します'
 outcome
 reason_is artifact
-expect "priority: artifact wins over blocked/split/stop" $?
+expect "priority: artifact (named allowlisted material, missing) wins over blocked/split/stop" $?
+reset; ev_issue; issue open '[]'; prs '[]'; answer '素材不足で、依存 issue もあり、1 run に収まらないので停止します'
+outcome
+reason_is blocked
+expect "priority: 素材不足 without an allowlisted name is not artifact -> blocked" $?
+
+# 2c. artifact の判定 (#3184): allowlist の素材名と肯定の不足語が同じ節にあるときだけ。語の一致だけでは数えない
+. "$SCRIPTS/run-outcome-reason.sh"
+for pair in \
+  '素材 fl-win64 が無いため停止します|artifact' \
+  'plugins-ott が足りないので着手できません|artifact' \
+  '`toolchain-emsdk` が見つからず停止|artifact' \
+  '素材 fl-win64 は未展開です|artifact' \
+  'fl-win64 は実在しません|artifact' \
+  '素材 plugins-massivex・toolchain-retdec が必要です|artifact' \
+  '素材不足は無い。依存 issue: #1976|blocked' \
+  '素材 fl-win64 は揃っている。停止します|stop' \
+  '`oc_artifacts` の追加指定は不要。分割案です|split' \
+  'fl-win64 の素材不足は無い|unknown' \
+  '素材 plugins-ott は実在します（不足なし）|unknown' \
+  '素材 fl-win64 は揃っていて、plugins-ott の不足は無い|unknown' \
+  'foo-bar が無い。停止します|stop' \
+  'plugins-ott-x が無い|unknown' \
+  'fl-win64 の必要はない|unknown' \
+  'fl-win64 は使わない方針。影響は無い|unknown' \
+  '必要な `oc_artifacts`: `plugins-massivex toolchain-retdec toolchain-emsdk`|unknown' \
+  '再起動時に必要な素材: `oc_artifacts: fl-win64` (本文のとおり)|unknown' \
+  '素材 fl-win64 が無いため停止します。oc_artifacts に追加してください|artifact'; do
+  [ "$(run_outcome_reason "${pair%|*}")" = "${pair#*|}" ]
+  expect "reason: '${pair%|*}' -> ${pair#*|}" $?
+done
+for f in watchdog.sh prepare-event-context.sh; do
+  [ "$(sed -n "s/^ARTIFACT_RE='\(.*\)'\$/\1/p" "$SCRIPTS/$f" | head -n1)" = "^$ARTIFACT_NAME\$" ]
+  expect "allowlist in run-outcome-reason.sh == $f ARTIFACT_RE" $?
+done
+# 標本 (#1977・#1804・#2965 の実報告。素材は実在するが、報告は『不足は無い』『必要な oc_artifacts』『実在』を含む) -> artifact にならない
+FX3184="$HERE/fixtures"
+reset; ev_issue; issue open '[]'; prs '[]'; answer "$(cat "$FX3184/run-outcome-3184-1977-blocked.md")"; outcome
+{ [ $RC = 0 ] && reason_is blocked && logged 'labels\[\]=oc:no-pr'; }
+expect "sample #1977 report (素材不足は無い・必要な oc_artifacts は次回の指定) -> blocked, not artifact" $?
+reset; ev_issue; issue open '[]'; prs '[]'; answer "$(cat "$FX3184/run-outcome-3184-1804-split.md")"; outcome
+{ [ $RC = 0 ] && reason_is split; }
+expect "sample #1804 report (oc_artifacts の追加指定は不要・分割案) -> split, not artifact" $?
+reset; ev_issue; issue open '[]'; prs '[]'; answer "$(cat "$FX3184/run-outcome-3184-2965-blocked.md")"; outcome
+{ [ $RC = 0 ] && reason_is blocked; }
+expect "sample #2965 report (素材は実在・依存 #3077 未達) -> blocked, not artifact" $?
+reset; ev_issue; issue open '[]'; prs '[]'; answer '素材 fl-win64 が無いため停止します。plugins-ott が必要です'; outcome
+reason_is artifact
+expect "record: named allowlisted material missing -> artifact" $?
 
 # 3. 出力ファイルが無い (setup 失敗・cancel) でも記録する (reason=unknown)
 reset; ev_issue; issue open '[]'; prs '[]'; rm -f "$TMP/oc.jsonl"

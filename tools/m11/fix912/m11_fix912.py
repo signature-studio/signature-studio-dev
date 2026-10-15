@@ -12,10 +12,13 @@ RetDec の IR (function_4fb090) はこの dl を定数 1 ではなく、スタ�
 """
 import argparse
 import json
+import os
 import sys
 
-OLD = '%39 = call i64 @function_4fa070(ptr nonnull inttoptr (i64 994072 to ptr), i64 %37, ptr %38)'
-NEW = '%39 = call i64 @function_4fa070(ptr nonnull inttoptr (i64 994072 to ptr), i64 1, ptr %38)'
+LB = int(os.environ.get('M11_LB_BASE', '0'), 0)   # #222: VMT 定数の LVA = 994072 + LB_BASE (IR の VA→LVA remap と同じ)
+VMT = 'ptr nonnull inttoptr (i64 %d to ptr)' % (994072 + LB)
+OLD = '%39 = call i64 @function_4fa070(' + VMT + ', i64 %37, ptr %38)'
+NEW = '%39 = call i64 @function_4fa070(' + VMT + ', i64 1, ptr %38)'
 
 
 def main():

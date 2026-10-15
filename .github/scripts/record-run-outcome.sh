@@ -13,9 +13,10 @@
 # PM Worker はコメント本文を解析せず、ラベルとマーカーで判断する。oc:no-pr は次の run が PR を出したときこの script が外す。
 # 率制限 (opencode の error 行の rate_limit_error / HTTP 429) は detect-rate-limit.sh で判定し、annotation を出して cause=rate_limit を入れる (#2344)。
 #
-# reason は agent の最終回答 (opencode の JSONL の最後の text) から決める。語彙は tools/pm/launch_issues.py の stop_re / NEED_RE と同じ:
-#   artifact : 素材不足 (素材名・oc_artifacts の要求)    blocked : 依存 issue・前提 PR 未 merge・ブロック
-#   split    : 1 run に収まらない・分割                  stop    : 判断待ち・停止報告・着手不可
+# reason は agent の最終回答 (opencode の JSONL の最後の text) から決める。分類規則の正本は run-outcome-reason.sh (#3184)。語彙は tools/pm/launch_issues.py の stop_re / NEED_RE と同じ:
+#   artifact : allowlist の素材名が不足と肯定の文脈で挙がるときだけ (否定・『oc_artifacts』の語だけでは数えない)
+#   blocked  : 依存 issue・前提 PR 未 merge・ブロック    split : 1 run に収まらない・分割
+#   stop     : 判断待ち・停止報告・着手不可
 #   unknown  : 上のどれでもない (着手報告のみ・run の失敗/cancel を含む)   優先順は artifact > blocked > split > stop。
 #
 # この script は run を失敗させない (観測用)。読み取り・書き込みに失敗したら警告だけ出して 0 で終わる。
@@ -24,6 +25,7 @@
 # コメント本文に agent を起動する語 (行頭の slash + oc 等) を入れない (自分のコメントで implement を起動しないため)。
 set -uo pipefail
 export LC_ALL=C.UTF-8
+. "$(dirname "$0")/run-outcome-reason.sh"
 
 NOPR_LABEL="${OC_NOPR_LABEL:-oc:no-pr}"
 DRY="${DRY:-0}"
@@ -53,21 +55,6 @@ if [ -z "${GH_TOKEN:-}" ]; then
   echo "::warning::no token: the run outcome is not recorded"
   exit 0
 fi
-
-classify() { # classify <text> -> reason
-  local t="$1"
-  if grep -qE '素材不足|素材.{0,12}(無い|ない|不足|未配置|未展開|欠|足りな)|oc_artifacts|素材名' <<< "$t"; then
-    echo artifact
-  elif grep -qE '依存 ?issue|依存.{0,8}#[0-9]+|前提.{0,20}(未 ?merge|未マージ|未完)|blockedBy|ブロッカー|ブロック|先行 PR|先行.{0,6}#[0-9]+' <<< "$t"; then
-    echo blocked
-  elif grep -qE '1 ?run に収まらない|収まらない|上限に(達|収)|分割|子 issue' <<< "$t"; then
-    echo split
-  elif grep -qE '着手不可|着手できません|着手に必要|停止します|停止報告|PM に.*依頼|判断を|判断待ち' <<< "$t"; then
-    echo stop
-  else
-    echo unknown
-  fi
-}
 
 remove_label() { # 付いていれば外す (外す必要が無ければ API を呼ばない)
   jq -e --arg l "$NOPR_LABEL" '[.labels[].name] | index($l) != null' <<< "$issue" > /dev/null || return 0
@@ -145,7 +132,7 @@ fi
 f="${OC_OUTPUT_FILE:-${RUNNER_TEMP:-/tmp}/oc-output.jsonl}"
 text=""
 [ -s "$f" ] && text="$(jq -Rrs '[split("\n")[] | fromjson? | select(.type == "text") | .part.text // empty] | last // "" | .[0:6000]' "$f" 2> /dev/null || true)"
-reason="$(classify "$text")"
+reason="$(run_outcome_reason "$text")"
 status="${OC_JOB_STATUS:-unknown}"
 run="${GITHUB_RUN_ID:-0}"
 url="${GITHUB_SERVER_URL:-https://github.com}/$R/actions/runs/$run"

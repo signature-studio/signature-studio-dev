@@ -2,6 +2,7 @@
 # pr-lint.sh — push 前に差し戻しの上位原因を決定的に検査する (#2322)。
 # 検査: (a) REPORT 行数上限 (b) 追加行の repo 外絶対パス (c) Closes/Refs と受入の整合 (STATUS 自動節だけの自動 PR は除く)
 #       (d) oc_artifacts の値域 (watchdog.sh の ARTIFACT_RE) (e) 新規 REPORT の DOC_MAP 登録
+#       (f) 起動結果を変えうる変更に boot_metric.json の更新、または本文の boot_metric: unchanged (理由)
 # 使い方: bash .github/scripts/pr-lint.sh --base <ref> --head <ref> --body-file <PR 本文ファイル>
 # 既定は警告のみ (終了 0)。OC_LINT_STRICT=1 で違反があれば終了 1。
 # 出力: <file>:<line>: <rule>: <message>
@@ -86,6 +87,16 @@ if [ -n "$hit" ]; then
       printf '%s' "$name" | grep -qE "$ARTIFACT_RE" || report "$BODY" "$ln" "oc-artifacts" "oc_artifacts の名前 '$name' は許可リスト (watchdog.sh ARTIFACT_RE) にない"
     done
   fi
+fi
+
+# (f) 起動結果を変えうる変更は tools/startup/boot_metric.json の更新を伴う (#3191 WIN-18)。
+#     逃し弁は本文の「boot_metric: unchanged (<理由>)」行 (理由必須)。
+BOOT_RE='^(tools/m11/REPORT\.md|tools/flelift/boot/REPORT\.md|tools/gui/flengine/|tools/startup/)'
+changed="$(git diff --name-only "$BASE...$HEAD_REF")"
+boot_src="$(grep -E "$BOOT_RE" <<< "$changed" || true)"
+if [ -n "$boot_src" ] && ! grep -qx 'tools/startup/boot_metric.json' <<< "$changed" \
+  && ! grep -qE '^[[:space:]]*boot_metric: unchanged[[:space:]]*\([[:space:]]*[^[:space:])]' "$BODY"; then
+  report "$(head -n1 <<< "$boot_src")" 1 "boot-metric" "起動結果を変えうる変更に tools/startup/boot_metric.json の更新が無い。python3 tools/startup/boot_metric.py で再生成して同じ PR に含める。起動結果を変えない変更は本文に boot_metric: unchanged (<理由>)"
 fi
 
 # (e) 新規 REPORT は docs/DOC_MAP.md に登録する

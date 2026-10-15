@@ -138,6 +138,20 @@ def main():
             "indirect_dispatch": indirect_dispatch(src, pe, base),
         }
 
+    rax_dir = os.path.join(WORK, "agg2d_lift_c50_cfgrax")
+    subprocess.run(
+        [sys.executable, X64C, "--pe", path, "--entries", roots_path, "--out", rax_dir,
+         "--closure", str(DEPTHS[-1]), "--img", hex(base), "--shift", "0", "--img-size", hex(size),
+         "--impbase", "0x1D80000", "--cfg-rax"],
+        check=True, capture_output=True, text=True,
+    )
+    with open(os.path.join(rax_dir, "fle_lifted.c")) as fh:
+        rax_src = fh.read()
+    result["cfg_rax_closure_%d" % DEPTHS[-1]] = {
+        "rax_in_dispatch_sites": rax_src.count("ott_dispatch(R[RAX]);"),
+        "indirect_dispatch": indirect_dispatch(rax_src, pe, base),
+    }
+
     with open(os.path.join(WORK, "agg2d_lift_c%d" % DEPTHS[-1], "fle_lifted.c")) as fh:
         body = dispatch_body(fh.read())
     control = {"known_0x180009ea0_in_table": in_dispatch_table(body, 0x180009EA0),
@@ -156,6 +170,10 @@ def main():
     for addr, v in last.items():
         print("indirect dispatch slot %s: value %s bytes %s in_table=%s reads=%d sites=%d" % (
             addr, v["slot_value"], v["target_bytes"], v["value_in_dispatch_table"], v["reads"], v["sites"]))
+    rax = result["cfg_rax_closure_%d" % DEPTHS[-1]]
+    print("cfg-rax closure=%d rax_in_dispatch_sites=%d remaining=%s" % (
+        DEPTHS[-1], rax["rax_in_dispatch_sites"],
+        {a: (v["direct"], v["via_reg"]) for a, v in rax["indirect_dispatch"].items()}))
     print("control", control)
     print("wrote", out)
 

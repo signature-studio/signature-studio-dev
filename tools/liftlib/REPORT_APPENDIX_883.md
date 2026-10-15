@@ -213,3 +213,29 @@ $ git diff 26f90ada HEAD -- tools/icall tools/liftlib/liftlib tools/liftlib/targ
 | dispatch 表が根 1 関数のみ・FAIL-FAST 未検証 | 間接 call の target 解決が未検証 | #2161 (HB-H44) |
 | #1586 (HB-H34) の前提「`__icall_dispatch` が trap stub」は f8bd2ea0 で変わった (`tools/icall/rt/icall_rt.c:54` が定義し、`tools/liftlib/liftlib/pipeline.py:222` で stub から除外)。本節の leaf 実測で #1586 の受入が満たされるかは未判定 | #1586 の受入 1〜3 の判定が残る | #1586 (既存 issue にコメントで前提の変化を通知) |
 | 本節は REPORT への実測記録のみ (docs-only)。受入 3 が REPORT への記録を指定している | `docs/WORKFLOW.md` §7 の docs-only 禁止との関係 | PM agent の判断待ち: 例外として merge してよいか。既定案: 例外として扱う。起票先: #1583 |
+
+## #2865 (HB-H50) route 側 BLK 張り替え (opt-in・既定 off) の実測 (2026-10-14)
+
+測定 commit `a2daca6b` (コード変更の最後の commit)。base は `217ceb3e` (origin/main)。
+`git diff a2daca6b HEAD -- tools/icall tools/liftlib/liftlib tools/liftlib/targets tools/liftlib/tests | wc -l` → `0` (測定後は REPORT 追記のみ)。
+
+置換点: `ott_route.sh` は `ICALL_BLK_GLOBAL=1` のときだけ、normalize・ir5_patch 後・flatten 前の `oi.p1.ll` で、BLK 範囲 `[0x184308000, +0x200)` の `inttoptr` を `getelementptr inbounds i8, ptr @__icall_blk, i64 off` へ張り替える (`tools/icall/ir_blk_global.py` が leaf と同じ `blk_global_text` を呼ぶ)。runtime は `-DICALL_BLK_GLOBAL` で `icall_rt.c`・`icall_ovr.c`・`ir_flatten.py` 生成の table.c が同じ `__icall_blk` を使う。
+範囲: 置換は BLK 範囲の参照を全て対象にする。restore の `+0x80`・`+0xb0` だけを置くと、body の固定 VA と runtime の global で BLK が二重になる。`ir_icall_restore.py`・`passes/icall.py`・`targets/ott_route.json` は無変更 (`ott_route.sh` は `ott_route.json` を読まない)。
+
+| 項目 | 既定 (置換なし) | opt-in (`ICALL_BLK_GLOBAL=1`) |
+|---|---|---|
+| 置換数 (`blk_global.json`) | 0 | 13243 |
+| BLK 範囲の固定 VA `inttoptr` (`oi.p1.ll`) | 13243 | 0 |
+| `@__icall_blk` の GEP (+0x80: 914 / +0xb0: 238) | 0 | 13243 (全 BLK 参照) |
+| `oi.flat.ll` sha256 | `ab84339a…` (変更前と一致) | `c82a97bd…` |
+| `ott_route.wasm` の非 custom section | 変更前 (`af19ecbd…`) と一致 (差は DWARF の行情報のみ) | 未比較 |
+| `icall_e2e.sh` | PASS 98.7 s | PASS 99.3 s |
+| unit (`test_icall.py`) | RESULT PASS (0 failed) | 同左 |
+| 監査 (OTT F 282 関数) | 非IAT間接 call 落ち 70→0・tail-jmp 11→0・jump table 1/8→8 | 同左 |
+| matrix | 89 scenario・0 failed・50236 cell bit-equal・max_ulp 0・state_diff 0 | 同左 |
+| CRT gate | PASS (SSE2・FMA3・負入力・override 4/4) | 同左 |
+
+- 変更前の route build: rc 0・35.4 s (load 未記録)。変更前の完全 e2e は本 run では未実行 (既定版の flat IR と wasm の非 custom section が変更前と一致するため、同じ結果とみなす)。load は既定 e2e 開始前 0.49、opt-in 開始前 1.03 (4 コア)。
+- ネガコン 1: `icall_ovr.c` の固定 VA を残し、置換だけ入れた opt-in では CRT gate `1801a9a6c` が xmm0 bit-equal 0/600 で FAIL (実測)。`icall_ovr.c` を揃えて PASS。
+- ネガコン 2: 既定 (置換なし) の flat IR・wasm 非 custom section が変更前と一致 = 置換を外すと元の出力に戻る。
+- `ott_iargs`: liftlib 経路 (`passes/icall.py`・`pipeline.py`) は無変更で、`ir_flatten.py`・`icall_ovr.c`・`ott_route.sh` を参照しない (`grep -rln` で確認)。再測定はしていない。

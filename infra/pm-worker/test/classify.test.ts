@@ -193,6 +193,31 @@ test("分類 (#2758): 素材の再投入の基準は本文の oc_artifacts 行 (
   assert.deepEqual(inferred.relaunch, [[90, "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk plugins-serum2"]], "対照: 本文の行が無ければ推定値が基準");
 });
 
+test("分類 (#3050): 再投入の基準は pm_art の行と本文の行の和集合 (pm_art だけの名前は残し、本文だけの名前も加える)", () => {
+  const now = Date.parse("2026-10-14T12:00:00Z");
+  const at = new Date(now - 5 * 3_600_000).toISOString();
+  const head = "素材不足: plugins-serum2 が無い";
+  const snap: Snapshot = {
+    issues: [{ number: 93, title: "[CI-93] t93", labels: [], body: "", deps: null, artLine: "oc_artifacts: fl-win64 work-m11" }],
+    prs: [],
+    runs: [],
+    bot_last: { "93": { at, head, art: null } },
+    bot_report: { "93": { at, head, art: null } },
+    pm_art: { "93": { at, line: "oc_artifacts: fl-win64 plugins-ott" } },
+  };
+  const input: ClassifyInput = {
+    nowMs: now,
+    launched: {},
+    relaunch: {},
+    manualDeps: {},
+    liveBlockers: {},
+    fullBotBody: { "93": head },
+    reportBody: { "93": head },
+    outcomeReason: { "93": "artifact" },
+  };
+  assert.deepEqual(classify(snap, input).rows.relaunch, [[93, "oc_artifacts: fl-win64 plugins-ott work-m11 plugins-serum2"]]);
+});
+
 test("分類 (#2758): 本文が oc_artifacts: none なら、不足素材は none を外して fl-win64 を補って足す (none と混在させない)", () => {
   const now = Date.parse("2026-10-14T12:00:00Z");
   const at = new Date(now - 5 * 3_600_000).toISOString();

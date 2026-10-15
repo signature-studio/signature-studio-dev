@@ -20,8 +20,8 @@ BLK_SHIFTED="$(python3 -c "import json,sys;m=json.load(open(sys.argv[1]));print(
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 # 1. 復元後 IR の後処理
 # ICALL-70: cookie global (0x18125eaa8) の load 幅 i32 → i64 (RetDec の global 型決定段が i32 と型付け、#2262 付録 §3)
-# 既定 OFF: 初期値 COOKIE_INIT の出所が未確認のため (REPORT_APPENDIX_2280 §3)。検証する run だけ FA_FIX_COOKIE=1 で有効化する
-if [ "${FA_FIX_COOKIE:-0}" = "1" ]; then
+# 既定 ON (#2302): 初期値 COOKIE_INIT は SlateCore.core_64 の .data 実値 (VA 0x18125eaa8 = 0x2b992ddfa232) と一致する。FA_FIX_COOKIE=0 で従来の i32 に戻す (REPORT_APPENDIX_2302 §2)
+if [ "${FA_FIX_COOKIE:-1}" = "1" ]; then
   python3 "$HERE/ir_fix_cookie.py" "$SRC" "$W/cookie_fixed.ll" > "$W/fix_cookie.json"; SRC_FIX="$W/cookie_fixed.ll"
 else
   SRC_FIX="$SRC"

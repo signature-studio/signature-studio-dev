@@ -4,9 +4,11 @@
 # Chrome 側の行列は au2_matrix.sh (別スクリプト。results/au2 の fake_r*・null_r* を使う)。
 # 使い方: bash tools/audio/au2_firefox_matrix.sh [n=3]    終了コード 0 = 全 rep の全条件 PASS
 # PASS = underrun 0・sine 一致・ctx.sampleRate 一致・worklet エラー 0 に加え、sink-input が既定 sink (ci_null) に接続したこと
+# 出力先は AU2_OUT で変える (既定 tools/audio/results/au2)。Windows・macOS の判定は harness/au2.mjs を workflow から直接呼ぶ (この script は Linux 専用)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 N="${1:-3}"
+OUT="${AU2_OUT:-$HERE/results/au2}"
 command -v pactl >/dev/null || { echo "pactl not found (apt: pulseaudio-utils)" >&2; exit 1; }
 if ! pactl info >/dev/null 2>&1; then
   pulseaudio -D --exit-idle-time=-1
@@ -15,10 +17,10 @@ fi
 pactl list short sinks | awk -F'\t' '$2=="ci_null"{f=1} END{exit !f}' || pactl load-module module-null-sink sink_name=ci_null >/dev/null
 pactl set-default-sink ci_null
 [ -f "$HERE/build/web/fla_test.js" ] || bash "$HERE/build.sh"
-mkdir -p "$HERE/results/au2"
+mkdir -p "$OUT"
 rc=0
 for rep in $(seq 1 "$N"); do
-  node "$HERE/harness/au2.mjs" --rep "$rep" --out "$HERE/results/au2/firefox_r$rep.json" || rc=1
+  node "$HERE/harness/au2.mjs" --rep "$rep" --out "$OUT/firefox_r$rep.json" || rc=1
 done
-node "$HERE/au2_firefox_summary.mjs" || rc=1
+node "$HERE/au2_firefox_summary.mjs" "$OUT" || rc=1
 exit $rc

@@ -1191,6 +1191,7 @@ void shimx_set_resource_provider(const void* (*fn)(HMODULE m, const WCHAR* name,
 void shimx_set_shell_execute_hook(int (*fn)(const char* verb, const char* file, const char* params));
 /* GUI 連携 (#172 SHX-T5): gui が user32 側 (MsgWait* / WM_DROPFILES) から呼ぶ口 */
 void shimx_set_notify_hook(void (*fn)(void));                  /* kernel object の状態変化ごとに呼ぶ (任意スレッド・shx_lock 外) */
+void shimx_set_file_close_hook(void (*fn)(const char *));      /* #958: 書込み用 file handle を CloseHandle したとき posix path で呼ぶ (shx_lock 外) */
 int  shimx_drag_accepts(HWND w);                               /* DragAcceptFiles(w, TRUE) 済みか */
 HANDLE shimx_hdrop_create(const WCHAR* const* wpaths, DWORD n, int x, int y, int nc);   /* DROPFILES を作り HDROP を返す (DragFinish で解放) */
 const uint8_t* shimx_hdrop_bytes(HANDLE drop, size_t* sz);                              /* HDROP の生ブロックと大きさ (IDataObject::GetData のコピー元)。無効は NULL */

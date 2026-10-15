@@ -34,6 +34,8 @@ PR_TITLE_FILE="$RUNNER_TEMP/opencode-pr-title.txt"
 PR_BODY_FILE="$RUNNER_TEMP/opencode-pr-body.txt"
 MAX_CHARS="${OC_COMMENT_MAX_CHARS:-20000}"
 PM_TARGET_FILE="$RUNNER_TEMP/opencode-pm-target.txt"
+# 停止印 (oc-fix-limit) を信じる作者。fix-progress.sh が job の GITHUB_TOKEN で投稿する (watchdog.sh と同じ。#2639)。
+MARK_LOGIN="${OC_MARK_LOGIN:-github-actions[bot]}"
 
 log() { printf '%s\n' "$*"; }
 
@@ -125,9 +127,9 @@ oc_pm_prepare() {
       printf '%s' "$reviews" | jq -r '[.[] | (.body // "")] | .[length - 5:] | map(.[0:4000]) | join("\n\n---\n\n")'
     fi
     printf '\n\n### コメント (%s)\n' "$kind"
-    printf '%s' "$comments" | jq -r --arg kind "$kind" --argjson n "$n" '
+    printf '%s' "$comments" | jq -r --arg kind "$kind" --argjson n "$n" --arg mark "$MARK_LOGIN" '
       [ .[] | select(
-          if $kind == "stuck" then (.user.type == "Bot" and ((.body // "") | contains("<!-- oc-fix-limit -->")))
+          if $kind == "stuck" then (.user.type == "Bot" and .user.login == $mark and ((.body // "") | contains("<!-- oc-fix-limit -->")))
           elif $kind == "no_pr" then (.user.type == "Bot" and ((.body // "") | contains("<!-- oc-run-outcome:")))
           elif $kind == "user_answered" then true
           else (.user.type == "Bot") end) ]
