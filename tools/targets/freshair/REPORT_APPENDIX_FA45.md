@@ -27,7 +27,7 @@
 
 ### §3.1 P+0x9f88 の書込み順 (#5011 実測・測定 commit `52c7e0ca0`)
 
-- 書込み: `0x1805ec9f0` の `mov [rax+0x9f88], rcx` (`rcx = this`)。この命令は関数 `0x1805cb150` (構築関数・`this` を `rcx` で受けて 0x9f90 の object を組む) の内側にある。逆アセンブルの確認で `0x1805cb150` 先頭から 80 KB 以内に書込み命令は無い (範囲外で 0x1805ec9f0 に在る)。
+- 書込み: `0x1805ec9f0` の `mov [rax+0x9f88], rcx` (`rcx = this`)。`0x1805cb150` (構築関数・`this` を `rcx` で受けて 0x9f90 の object を組む) から約 122 KB 先に在る。静的な逆アセンブルだけでは `0x1805cb150` の実行がこの命令に届くかは確定しない。届くことは下の実行で確かめた (ctor=1 で `[P+0x9f88]==P` が 20/20)。
 - ハーネス: `tools/targets/freshair/lift2/native/native_stereo.c` (`ctor=1` は `0x1805cb150(P, A)` を先に実行し、`[P+0x9f88] == P` を確かめてから `0x1805ee2a0` を実行。`ctor=0` は構築を飛ばす対照)。
 - 前提の修正: `0x1805cb150` の先頭の `__chkstk` (`0x18100c710`) が `gs:[0x10]` で SIGSEGV する (Linux は gs_base=0)。`native_ctrl.c` と同じく `0x18100c72c` の gs 読みを `xor r11,r11` + nop に差替えた (wasm 側 `@fa_teb=0` と同値)。
 - 実測 (commit `52c7e0ca0`・`bash tools/targets/freshair/ks_sc_stereo_smoke.sh 20`・load 1 分値 0.07・nproc=4):
