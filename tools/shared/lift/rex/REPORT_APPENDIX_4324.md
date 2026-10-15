@@ -12,7 +12,7 @@ reach 16 件 (fn=0・a1 ∈ [0x70000, 0x80000)) は、movnti モードの arena 
 - 理由: memset の a1 ≥ 0x70000 は 64 KiB の arena を越える。reach を arena 内で完了させるには、arena を 0x80000 に広げ、木の検索 (0x12a50) とロック経路 (0x16030) の入力を揃える必要があった。0x16039 (`[rcx]` の NULL 参照) はロック構造が無いことが原因だった。
 - 限界: これは harness の入力モデルの変更で、x64c の lift の正しさの検証ではない。reach の a1 は memset の書込が arena 内に収まる範囲に限った。a1 < 0x70000 の sweep (表示のみ・#3894) は判定に入れていない。
 
-## 3. 実測 (測定 commit `7d591151b`・`bash tools/shared/lift/rex/lift_x64c.sh all`・`FL_WIN64_DIR` は `fl-win64` 展開先・`EMSDK_ENV` は runner の `/opt/emsdk/emsdk_env.sh`)
+## 3. 実測 (測定 commit `7d591151b`・`bash tools/shared/lift/rex/lift_x64c.sh all`・`FL_WIN64_DIR` は `fl-win64` 展開先・`EMSDK_ENV` は `toolchain-emsdk` の `emsdk_env.sh`。エントリ ID は `docs/REFERENCES.md` の `[EMSDK]` を参照)
 
 | 項目 | 値 |
 |---|---|
