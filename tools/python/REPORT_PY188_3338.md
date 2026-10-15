@@ -18,7 +18,7 @@
 
 - **受入 1 (Self の出所)**: 5 件すべて、Self は「呼出し元が dl = 1 で渡した大域の class ref (VMT) から `0x410320` (NewInstance 相当) が作ったインスタンス」まで確定した。5 件とも Self の型は大域 V のクラス。`0xc9e07c` だけ 3 段 (L1 → L2 `0xca24e0` の入口 rcx をそのまま渡す → L3 `0xca4713` の大域)。
 - **受入 2 (VMT と chan 判定)**: VMT 5/5 確定 (`py71_vmt.py` で自己ポインタ・TypeInfo 名・クラス名の 3 者一致、§5)。5/5 とも親鎖は `TBaseAudioPlugin → TObject` (`0xca15d0` のみ `TBridgedPlugin → TBaseAudioPlugin → TObject`)。親鎖に `TChannel` は現れない。よって **5 件とも非 chan → 除外**。
-- **受入 1・2 の判定**: 達成 (5/5)。ただし残る限界 (§7 未解決) は「この経路が実行時に到達するか」と「`NewInstance` が `[obj] = VMT` を書くか」。前者は L2 の直接呼出し元が 4 件無いため未確認。後者は `0x40fb40` を読んでいないため推定。どちらも VMT の確定には不要な段で、結論 (非 chan) を覆す根拠は見つかっていない。
+- **受入 1・2 の判定**: 達成 (5/5)。ただし残る限界 (§7 未解決) は「この経路が実行時に到達するか」と「`NewInstance` が `[obj] = VMT` を書くか」。前者は L2 の直接呼出し元が 4 件無いため未確認。後者は `0x40fb40` を読んで確認済み (§1 末尾)。残るのは前者 (到達性) だけで、VMT の確定には不要な段。結論 (非 chan) を覆す根拠は見つかっていない。
 - `REPORT_PY67_2159.md` §2 の「5 件とも Self 未確定」は本 REPORT で置き換える。
 
 ## 1. 経路・根拠 (1 件ずつ)
@@ -27,7 +27,8 @@
 
 - `0x410320`: `mov rax, rcx; test dl, dl; jl ...; mov rcx, rax; call [rax-0x30]`。dl ≥ 0 のとき rcx の値 (VMT) で VMT-0x30 のスロットを呼ぶ。
 - 5 件の VMT (と `TARPlugin`) は、すべて VMT-0x30 のスロットが `0x40f960` (`py71_vmt.py ... 0x30` で 5 件とも同値)。
-- `0x40f960`: `mov rbx, rcx; movsxd rcx, [rbx-0x80] (インスタンスサイズ); call 0x409410 (GetMem 相当); mov rcx, rbx; mov rdx, rax; call 0x40fb40`。`rbx` に VMT が残るので、確保したインスタンスは VMT 由来のサイズで作られる。`0x40fb40` が `[obj] = VMT` を書くかは未確認 (§7)。
+- `0x40f960`: `mov rbx, rcx; movsxd rcx, [rbx-0x80] (インスタンスサイズ); call 0x409410 (GetMem 相当); mov rcx, rbx; mov rdx, rax; call 0x40fb40`。`rbx` に VMT が残るので、確保したインスタンスは VMT 由来のサイズで作られる。
+- `0x40fb40` (`py59_func.py $P 0x40fb40 dump`): `0x40fb4b: mov rbx, rcx` (第 1 引数 = VMT)、`0x40fb4e: mov rsi, rdx` (第 2 引数 = obj)、`0x40fb66: mov [rsi], rdi` (rdi = rbx = VMT)。よって `[obj] = VMT` を書く。Self の型 = 大域 V のクラス、の前提はこれで確認した。
 
 各 G1 呼出し元 (L1) の共通形: 入口で `mov [rbp+K], rcx` (K = 上表の slot)。dl != 0 なら `call 0x410320` の戻り値を K に格納。直後に `xor edx, edx` (dl = 0) で `call 0x8ecbc0` (G1)。G1 の Self = `mov rcx, [rbp+K]`。
 
@@ -125,6 +126,7 @@ L2 の 4 件 (`0xad0260`・`0xb64880`・`0xb69c90`・`0xb75f40`) は直接呼出
   python3 analysis/py71_vmt.py "$P" 0xebef68 0x30
   python3 analysis/py67_qword.py "$P" 0xac2640,0xb448d8,0xb65500,0xb6a280,0xca1508
   python3 analysis/py67_callers.py "$P" 0xac4b50,0xb4b5b0,0xb664d0,0xb6db00,0xc9dfd0
+  python3 analysis/py59_func.py "$P" 0x40fb40 dump
   ```
 
 - `py71_vmt.py` の 5 件 (測定値): `0xac2708` TVSTPlugin (instsize `0x9e0`)・`0xb449a0` TVST3Plugin (`0x980`)・`0xb655c8` TGenericPlugin (`0x7c0`)・`0xb6a348` TCLAPPlugin (`0x9c8`)・`0xca15d0` TARPlugin (`0x808`)。5 件とも自己 OK・名前 OK。VMT-0x30 は 5 件とも `0x40f960`。親鎖: 4 件は `0x8ec050` (TBaseAudioPlugin)、`0xca15d0` は `0xc9d290` (TBridgedPlugin → TBaseAudioPlugin → TObject)。
@@ -135,11 +137,10 @@ L2 の 4 件 (`0xad0260`・`0xb64880`・`0xb69c90`・`0xb75f40`) は直接呼出
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | L2 の 4 件 (`0xad0260`・`0xb64880`・`0xb69c90`・`0xb75f40`) に直接呼出し元が無い。絶対 8 バイト参照だけあり (ファイル offset `0x6ce858`・`0x7627c8`・`0x7682e8`・`0x7717a0`、`py67_qword.py ... find`)。参照の種類 (VMT スロット・関数ポインタ表) は未確認 | VMT 確定には影響しない。この経路が実行時に `0x8ed012` まで届くか (到達性) は未確定 | #2701 |
-| `NewInstance` (`0x40f960`) が呼ぶ `0x40fb40` が `[obj] = VMT` を書くかは未読 (`0x40f960` は `0x40fb40(VMT, obj)` を呼ぶことのみ確認) | 「Self の型 = 大域 V のクラス」の前提。書かれないなら Self の型は確定しない | #2701 |
-| L3 `0xca4713` (関数 `0xca43a0`) の呼出し元は未追跡 | `0xc9e07c` の 3 段目より上 (この経路の到達性) | #2701 |
+| | L3 `0xca4713` (関数 `0xca43a0`) の呼出し元は未追跡 | `0xc9e07c` の 3 段目より上 (この経路の到達性) | #2701 |
 | 大域 (VMT 自己ポインタ slot、`0xac2640` 等) への書込み参照の有無は未確認 (`py66_riprefs.py` の全走査が必要。約 60 秒) | 大域の値が実行時に変わらない前提 (`.text` 配置から推定) | #2701 |
 
-- 本 REPORT は Self の VMT と chan 判定 (受入 1・2) を達成した。上表の 4 件は、結論 (非 chan) の根拠ではなく、経路の実行到達性と格納の前提に関する残り。子 issue は起票しない (実装作業ではなく検証の残り)。
+- 本 REPORT は Self の VMT と chan 判定 (受入 1・2) を達成した。上表の 3 件は、結論 (非 chan) の根拠ではなく、経路の実行到達性と大域の不変性に関する残り。子 issue は起票しない (実装作業ではなく検証の残り)。
 - 受入 4 (`#2701` の本文) の判定: 達成 (5/5 の VMT 確定と非 chan 判定)。ただし上の残りを「達成の条件」にするかは親の判断。
 
 ## 8. 作業の注記
