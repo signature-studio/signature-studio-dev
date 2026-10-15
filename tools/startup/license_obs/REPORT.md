@@ -205,7 +205,7 @@ gradeChar の連続形 196 ロード/89 関数 (**下限**) とレジスタ追�
 | ILRegKey 非空で button ID が 3 になる経路 (無し/空は 0) の原因 | UI 表示分岐の理解 | #107 コメント |
 | 「常に登録済み」を満たす手段の設計: gradeChar を `A` 以上に確定させる (有効書式の ILRegKey は #116 のユーザ .reg / ホスト側後処理 / vreg での合成) と、期限切れ `?` への書換え 2 経路 (`0x10d3a30`・`0x11cb000`) の抑止 | 現 seed のままでは Trial 扱い (推定) | **#526** `[ST-T16]` (+ #116 へコメント) |
 | gradeChar の参照サイトの網羅: 退避アドレス (`lea reg,[obj+0xd0]`) 経由の間接アクセスとポインタ張り替え (追跡形 266 ロード/102 関数、うち 13 関数は連続形の 89 関数の外)。`== 0x40` 判定を持つ関数は 89 より多い可能性が高く、`?` 書込み経路の列挙 (3 関数) も下限 | Trial 制限範囲 (§5) と #526 の範囲 2・選択肢 (b) が下限の上に立つ | **#526** (2026-10-13 コメントで追記済み: ポインタ張り替え 71 箇所/20 関数 (レビュワー実測)・`?` 書込み経路は 3 関数分のみ)。退避アドレスのデータフロー追跡による網羅は #107 に残 |
-| `== 0x3f` を比較する inline 関数が 26 (本調査) と 24 (GATES/ilreg) で不一致 | G04 補足の「24 関数」の根拠再確認 | #107 コメント |
+| ~~`== 0x3f` を比較する inline 関数が 26 (本調査) と 24 (GATES/ilreg) で不一致~~ | **解消 (§9)**: 26 は gradeChar の比較、24 は HWID コードで母集団が違う (重なり 3)。SHGetFolderPathW は 24 と同一関数で共起しない | — |
 | bit の意味ラベル (bit1=Fire、bit2=Fire 鍵免除) と tier キー 31000/31005/31010/31020 の製品対応 | G04 の記述は「推定」止まり | #107 コメント (#213 は closed。後継の ST-T14 番号は #39 に使用済みのため新規番号は PM 確定) |
 | 経路ごとの機能的な Trial 制限の全容 (文字列を持たない分岐 43 ロード等) | Trial 制限範囲は「見える範囲」 | #525 + FLEngine boot 後の動的観測 (#107 に残) |
 
@@ -237,3 +237,23 @@ gradeChar の連続形 196 ロード/89 関数 (**下限**) とレジスタ追�
 - #786 — gradeChar の読み書きを退避アドレス経由も含めて網羅し、`?` 書込みの発火条件と `0x10d50d0` のループを確認する。
 
 **本 issue の範囲外として残すもの**: 有効書式の鍵の判定結果 (#785)、退避アドレス経由の網羅 (#786)、有効鍵の下での `?` 抑止の要否 (#785・#786 の結果による)。
+
+## 9. #107 残項目: 「inline HWID ×24」と「`== 0x3f` 比較 26」の突合 (`probe_hwid.py`; 結果 `results/probe_hwid.json`)
+
+目的: §6 の未解決「`== 0x3f` 26 (本調査) と 24 (GATES/ilreg) の不一致」を解消し、GATES G04 の「MachineGuid+GetComputerNameExW+SHGetFolderPathW を読む同型コード ×24」の定義を機械的に確認する。
+定義 (プローブ内): API = 関数内の call 先の import 名 (直接 call は宛先の thunk `jmp qword ptr [rip+IAT]` を 1 段たどる。`call [rip+IAT]` は IAT を直接指すときだけ解決)。STR = rip 相対で `MachineGuid`・`SOFTWARE\Microsoft\Cryptography` の ASCII 文字列を指す命令を持つ。G3f = gradeChar を `cmp ..., 0x3f` で比較する関数 (`results/flag_sites.json`)。
+
+| 定義 | 関数数 n | G3f (26) との重なり |
+|---|---:|---:|
+| H1 GetComputerNameExW と SHGetFolderPathW を同一関数で呼ぶ | 0 | 0 |
+| H2 GetComputerNameExW と RegOpenKeyExA/W・RegQueryValueExW を同一関数で呼ぶ | 24 | 3 |
+| H3 MachineGuid / Cryptography 文字列を参照する | 24 | 3 |
+| H4 GetComputerNameExW を呼ぶ | 25 | 3 |
+| H5 SHGetFolderPathW を呼ぶ | 4 | 0 |
+
+- **H2 = H3 (同一集合 24 件・差 0)**。API と文字列の独立な 2 定義が一致した。0x10c7cd0・0xf2dbb0・0x11dd800 は 24 に入る。0x10c7530 は 24 に入らない (GATES が別項目で挙げる関数で、HWID 側の所属は未確認)。
+- **「SHGetFolderPathW との共起」は成立しない (H1 = 0)**。SHGetFolderPathW を呼ぶ 4 関数 (0x5a09f0・0x5a0c90・0x63b880・0x81bca0) は 24 のいずれにも入らない。よって GATES G04 補足・startup REPORT §1 の「MachineGuid+GetComputerNameExW+SHGetFolderPathW を読む同型コード ×24」は、同一関数内の共起としては誤り。24 の構成は GetComputerNameExW + Reg 系 (+ MachineGuid 文字列) である。文書を訂正した (GATES.md 補足・startup REPORT §1)。
+- **「26 vs 24」は数の食い違いではなく母集団の違い**。26 は gradeChar (`[[[0x15e4790]]+0xd0]`) の `== 0x3f` 比較関数 (§3.2)、24 は HWID コードである。重なりは 3 件 (0xf2dbb0・0x11dd800・0x11a57c0) のみ。§6 の該当行は解消。
+
+限界 (未解決): (a) 関数ポインタ表 (`.data` 内の関数アドレス) 経由の call は解決していない (493 件の `call [rip+..]` の大半が該当し、IAT 直接はその一部)。よって H1・H5 の 0 件・4 件は下限。(b) SHGetFolderPathW の呼出元 (AppData 取得) は未特定。
+検証: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/startup/license_obs/probe_hwid.py` を 1 回実行 (5.8 s・4 コア・1 分 load は実行前後で未計測)。出力: functions=57,816・IAT 解決 738 名・STR 参照 VA 24・G3f=26。

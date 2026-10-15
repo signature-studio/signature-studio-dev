@@ -26,7 +26,7 @@ FL が元々持つオフライン経路 (`error-offline.html`、"Not signed in"�
 
 ## 補足 (事実整理のみ)
 
-- ライセンス検査は単一関数ではなく、`MachineGuid`+`GetComputerNameExW`+`SHGetFolderPathW` を読む同型コードが **24 関数にインライン展開**されている
+- ライセンス検査は単一関数ではなく、`MachineGuid`+`GetComputerNameExW` を読む同型コードが **24 関数にインライン展開**されている (2 定義で同一集合: `GetComputerNameExW`+`RegOpenKeyExA/W`・`RegQueryValueExW` を同一関数で呼ぶ / `MachineGuid` 文字列を参照する。`SHGetFolderPathW` は同一関数で共起しない: `tools/startup/license_obs/REPORT.md` §9)
   (例: `0xf2dbb0` 25 KB, `0x10c7cd0` 32 KB, `0x11dd800` 30 KB。難読化文字列 `hfg\`U`/`%s:%s:` を共有)。lift 後に**これらが同じ shim 面 (RegOpenKeyExA/RegQueryValueExW/GetComputerNameExW) を叩く**ことが
   スタブ要件。ライセンスの実効的な内容 (どの機能が Trial で制限されるか) は #107 (T11) で文字列が見える範囲を列挙済み (`tools/startup/license_obs/REPORT.md` §3.2)。lift 後の動的観測は FLEngine boot の突破待ち。
 - 署名検査 (G03) は Authenticode の検証をバイパスする shim であり、Image-Line 署名物の改変を意味しない (WebStudio は wasm 再ビルド物のため署名自体が成立しない)。EULA 上の評価は行わない。
