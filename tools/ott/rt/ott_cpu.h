@@ -66,6 +66,14 @@ void ott_vexhit(uint64_t va);
 #define OTT_VEXCOV_HIT(a) ((void)0)
 #endif
 
+/* LD-185: 命令単位の実行 VA 記録 (計装 build = -DOTT_INSNTRACE のみ本体を持つ。x64c の OTT_INSNTRACE=1 出力が呼ぶ) */
+#ifdef OTT_INSNTRACE
+void ott_insnhit(uint64_t va);
+#define OTT_INSN_HIT(a) ott_insnhit(a)
+#else
+#define OTT_INSN_HIT(a) ((void)0)
+#endif
+
 #define PAR8(x) (!__builtin_parity((uint8_t)(x)))
 #define SETZSP(W, r) do { fZF = ((uint##W##_t)(r) == 0); fSF = (((uint##W##_t)(r)) >> (W - 1)) & 1; fPF = PAR8(r); } while (0)
 #define FL_ADD(W, a, b, r) do { fCF = ((uint##W##_t)(r) < (uint##W##_t)(a)); fOF = (((~((a) ^ (b))) & ((a) ^ (r))) >> (W - 1)) & 1; SETZSP(W, r); } while (0)
