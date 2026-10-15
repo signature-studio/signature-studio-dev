@@ -5,7 +5,7 @@
 ## 結論
 
 - **型名 (静的に確定)**: sink 0xd82daf の例外型は `[[[0x15e1140]]]` (load 3 段)。束縛関数 0xc395a0 が slot `0x16b8488` に格納する名前は **`PyExc_RuntimeError`** (`lea` 0xc39ceb → resolver 0x4235f0 → store 0xc39cf7)。呼出しは `[rbx]` (slot `0x16b8408` = `PyErr_SetString`)。
-- **実行時の観測 (受入 1): 未達**。lift した FLEngine の boot (unit 209 で停止) では束縛関数が走らず、slot `0x16b8488` は停止時点まで 0。型名を実行時に読めていない (§2)。
+- **実行時の観測 (受入 1): 未達**。lift した FLEngine の boot (unit 209 で停止) では束縛関数が走らず、slot `0x16b8488` は停止時点まで 0。型名を実行時に読めていない (§2)。boot 停止後に束縛関数を直接走らせる試み (§2-2) も、LoadLibrary 経路で止まり未達。
 - **RANGE (-4) の照合 (受入 2): 不一致**。repo の写像 `fl_api.h:35` (FL_E_RANGE → IndexError) は、FL の sink の型 (静的に RuntimeError) と一致しない。sink は -1〜-9 の全分岐で共通なので、FL は code によって型を変えない (§3)。
 - 実装は行わない (受入 3)。変更は検算スクリプト・boot の監視 slot の追加・REPORT 系のみ。
 
@@ -32,6 +32,8 @@
 
 - 型の読み方: `0x16b8488` は束縛で resolver の戻り値が入る slot。sink の 3 段 load は、その戻り値が**型変数の番地**であること (2 段目で `[R]` を読んで型オブジェクトを得る) を要求する。resolver 0x4235f0 の data 名に対する挙動は未読 (推定)。
 - 検算: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/exc_type_chain.py` → 5 項目 `OK`・`RESULT PASS fails=0` (real 0.09 s、n=3)。
+- 直接実行の測定 (§2-2): 測定 commit `f4d462ad5` (プローブ追加のみ。boot の経路は不変)。`FLE_PY106_BIND=1 FLE_BOOT_TAG=py106 FLE_BOOT_RUNS=negctl bash tools/flelift/boot/fle6_measure.sh` → rc 0。lift 82 s・clang plain 102 s・boot 24 s (boot 開始時 load `1.82 1.18 0.71`)。units_run 209/942・IPP 判定 ok。`FLEBOOT_PY106B` は exit・名前 0 件 (§2-2)。
+- 測定 commit から本 REPORT の commit までのコード差分: `git diff f4d462ad5 HEAD -- tools/flelift/boot tools/python/analysis/flapi` の出力は 0 行 (本 commit は REPORT のみ)。
 - 束縛関数 0xc395a0 の呼出し元は `0xc3b3a2` の 1 件 (`.text` 全域の `e8` rel32 走査)。その上位の起動経路は未追跡。
 - **REPORT_PY91 §7 の訂正**: 同節の `rcx = *(*(0x15e1140))` は 2 段と書いたが、実際は 3 段 (上表)。PY91 §7 は式だけ直した。
 
@@ -52,6 +54,16 @@
 
 - 読み: (a) 監視 slot の初期値は PE の値どおり (`0x15e1140 → 0x16b8488`)。(b) 束縛 slot `0x16b8488`・`0x16b8250` は boot の unit 1〜209 で一度も書かれない。束縛関数 0xc395a0 は boot で走っていない。(c) unit 209 で `0x15e1140` が 0 になる。PY-123 §2-2 の undo 管理 global (`0x15e1c78`・`0x15e4790`) と**同じ時点・同じ site** で、同じ fill 経路 (PY-123 §2-5 の `f_6a7b70`) と推定 (直接の書込み元は未特定)。
 - **結論**: この harness では型名の実行時の値は観測できない。束縛の前提 (0xc395a0 の実行) が boot の外にあるためで、停止点を越えて Python 初期化まで進める必要がある (§6)。
+
+### 2-2. 束縛関数の直接実行 (試行・未達)
+
+- 方法: `fle_boot.c` の `fle_py_bind_probe` が boot 停止後 (summary の書出しの後) に `fle_run(0xc395a0)` を 1 回実行する。プローブ中だけ (a) `LoadLibraryW("Python312")` の load hook が擬似 hmod `0x7f0e0000` を返し、(b) `GetProcAddress` は名前ごとに cell (データ変数の番地) を返す。cell の中身は型トークン `0x7f300000 + i`。束縛された名前は `fle_py_bind_name` で読む。`FLE_PY106_BIND=1` のときだけ動き、boot の経路は変えない。出力は `results/boot_summary_<tag>_<label>_py106bind.json` (`FLEBOOT_PY106B`・`FLEBOOT_PY106RING`)。
+- 結果 (測定 commit `f4d462ad5`): `FLEBOOT_PY106B` は `threw: exit (code 0)`、束縛された名前は 0 件。`GetProcAddress` に 1 度も届かず、slot `0x16b8488` は 0 のまま。`FLEBOOT_PY106RING` (直近 dispatch) の末尾は `0xc395a0` の 1 件だけで、以後の dispatch は無い。
+- 読み (PE の逆アセンブルと実測): `0xc395a0` は先頭で `[0x16b85c8]` (hmod) を見て、0 なら `0x6539e0` (Python312 のローダ) を呼ぶ。ローダは内部の `0x653660` で、post-boot の状態では null の関数ポインタを踏む (`[fleboot][ff] dispatch(0) -> ret 0`)。そのあと `MessageBoxA` → `exit` (site `0x412a12`) に入る。load hook は 1 度も呼ばれない。
+- 別案 (不成立): ローダを飛ばして `0xc395d1` (hmod 判定の後) から始める試みは、`0xc395d1` が lift の関数入口でないため `unlifted` (target `0xc395d1`) で止まった。
+- 結論: 束縛を boot の外で走らせる経路は、ローダ内部の null 呼出しで塞がれている。型名の実行時の値は、この段階では得られない (受入 1 は未達のまま)。
+
+
 
 ## 3. RANGE (-4) と repo の写像 (受入 2)
 
@@ -84,7 +96,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実行時の型名 (`PyExc_*` の実体) の観測 (受入 1 の残り) | 静的には `PyExc_RuntimeError` と確定したが、実行時の確認は未達 | #2909 (open のまま残す。再開条件: 束縛関数 0xc395a0 (呼出し元 `0xc3b3a2`) を含む Python 初期化が boot で走る、または束縛を直接走らせる harness) |
+| 実行時の型名 (`PyExc_*` の実体) の観測 (受入 1 の残り) | 静的には `PyExc_RuntimeError` と確定したが、実行時の確認は未達。直接実行 (§2-2) はローダ 0x653660 の null 呼出しで止まる | #2909 (open のまま残す。再開条件: (a) ローダ 0x6539e0 → 0x653660 の post-boot の null 呼出し元を特定して解消する、または (b) boot 中に束縛関数 0xc395a0 (呼出し元 `0xc3b3a2`) へ到達する) |
 | repo の RANGE → IndexError (`fl_api.h:35`・`fl_api.py:18`・`provider_check.mjs:171`) と FL の型 (RuntimeError) の不一致 | Python 側で RANGE の型が FL と食い違う。直すと tests も直す | 実行時の確認 (上の行) の後に、写像の修正を別 issue で扱う (PM 判断)。未確定の段階では直さない |
 | boot の unit 209 で `.data` の `0x15e1140` が 0 になる (PY-123 の undo global と同じ時点) | 停止点で chain を読めない | `tools/python/REPORT_PY123.md` §2-5 (fill 経路。#3090 が追う) |
 | FL の status (-1〜-9) と repo の code (1〜8) の数値対応 | 写像の根拠 | `tools/python/REPORT_PY61.md` §4-2 (#2026) の既存の未解決 |
