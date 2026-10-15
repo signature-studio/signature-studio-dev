@@ -12,6 +12,9 @@
   "miss": 46,
   "trap": 131,
   "clobber": 0,
+  "mem_boot_bytes": 301989888,
+  "mem_grown_units": 1,
+  "mem_end_bytes": 362414080,
   "kinds": {
    "memory access out of bounds": 122,
    "halt0->longjmp": 9
