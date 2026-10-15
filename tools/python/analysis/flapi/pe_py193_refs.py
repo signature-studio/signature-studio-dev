@@ -61,7 +61,7 @@ def main():
                             hits.append((ins.address, "abs", ins.mnemonic, ins.op_str, m.disp))
                         elif m.base != 0 and lo <= m.disp < hi:
                             hits.append((ins.address, "dsp", ins.mnemonic, ins.op_str, m.disp))
-            off = end + 1 if end > off else off + 1
+            off = end if end > off else off + 1
     for addr, kind, mn, ops, tgt in hits:
         print(f"0x{addr:x} {kind:9s} {mn} {ops} -> 0x{tgt:x}")
     counts = {}
