@@ -84,10 +84,29 @@ eventId は `[rbp+0x5b0]` (0x1046d65 で入口から格納)。分岐は `0x10474
   - `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` (rc 0・2 秒)。`general.processRECEvent` を呼ぶ箇所は `tests/` に無い (grep)。
 - KPI: 起動・GUI に関わらない PR のため、製品 KPI は記載しない。
 
+## PY-252 (#3778): 固定 4 族の戻り値式
+
+- 固定 4 族 (0x40000000→0x104c2a6・0x40000001→0x104c4af・0x40000002→0x104c64f・0x40000005→0x104c919) の `[rbp+0x5b8]` の store 8 件は、すべて `flags` (`[rbp+0x5c0]`・3 番目の引数 r8d) のガードの内側にある。
+  - `0x20` ガード: 0x104c2c4/0x104c4cd/0x104c672/0x104c91f。右辺は `cvtsi2sd(value)`・`mulsd`・`[obj+0x3bc]−[obj+0x3b8]`・`call 0x40c660` (`cvtsd2si`)・`[obj+0x3b8]+eax`。
+  - `0x2` ガード: 0x104c3e0/0x104c564/0x104c760/0x104c9d0。右辺は global の読出し (0x104c3ee・0x104c56b・0x104c767・0x104c9dd)。
+  - 右辺の store VA: 0x104c311・0x104c3f0 (0x40000000)・0x104c51a・0x104c56d (0x40000001)・0x104c6ba・0x104c769 (0x40000002)・0x104c984・0x104c9e6 (0x40000005)。
+- **確定した式**: `flags & 0x22 == 0` のとき 4 族は store 0 件で 0x104cc65 → ret に届き、戻り値 = value。CFG で固定 4 族の到達集合 (503 VA) に `lea 0x104a924` は無い。
+- **未確定**: `flags & 0x22 != 0` の右辺は engine 状態 (`obj+0x3b8`・`obj+0x3bc`・global) と定数 `0x104ccd8` (= 2^-30) に依存するため、静的な式は閉じられない。これらは code 2 (未実装) のまま。
+- 実装: `host/fl_mock.mjs` の `recPassFamily(e, f)`・`provider/fl_engine.c` の `rec_pass_family(e, f)` (3 番目の引数 flags を読む)。`tests/general_diff.mjs` に固定 4 族の境界を追加 (flags 0x1c・0x1 は `& 0x22 == 0` で成功、0x2・0x20 は code 2)。mock と C の一致を見る差分テストで、戻り値の値そのものは検査しない。
+- 測定 commit: `ce6b07dfb`。main 取り込みなし。load avg は測定中 `2.08`〜`2.31` (4 コア)。
+  - `bash provider/build.sh`: rc 0 (1.7 秒)。`fl_table.c: 435 関数, ハンドラ 208` (main の取り込み分を含む)。
+  - `build_cpython_wasm.sh`: rc 0 (4 分 1 秒) → `FLPY_SKIP_TABLE=1 build_flpy.sh`: rc 0 (6.2 秒)。
+  - `node tests/general_diff.mjs`: `{"calls":56,"diffs":0,"PASS":true}`。
+  - `node tests/provider_check.mjs`: `{"functions":435,"implemented":208,"unimplemented":227,"mcp_static":60,"PASS":true}`。件数は 208 のまま (処理関数は既に implemented に数えられている)。
+  - `node tests/ui_state_diff.mjs`: `{"calls":109,"diffs":0,"PASS":true}`。`ui_browser_diff.mjs`: `{"ok_calls":8,"bad_calls":5,"diffs":0,"browserOp":3,"PASS":true}`。`channels_diff.mjs`: `"calls":238,"grid_diffs":0,"PASS":true`。
+  - `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` (rc 0)。
+  - `analysis/py235_process_rec_families.py` (`FL_WIN64_DIR` の PE): 31 ok・0 FAIL・rc 0 (固定 4 族のアドレス渡し非到達を assert に追加)。
+- KPI: 起動・GUI に関わらない PR のため、製品 KPI は記載しない。
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | gate `*(0x15e1890)` の意味と書込み元・`(eventId & 0xffff) == 8` の -1 条件 (`0x663bf0`・`[0x59b752]`・`0xffac50`) | gate 0 を仮定した成功経路の前提。実行時に gate が 1 の場合の挙動が未確定 | #3777 (PY-251) |
-| 固定 eventId 4 族 (0x40000000・0x40000001・0x40000002・0x40000005) の store 8 件の右辺 | 4 族が code 2 (未実装)。provider_check の件数はこの族を含まない | #3778 (PY-252) |
+| 固定 eventId 4 族の `flags & 0x22 != 0` の右辺 (`obj+0x3b8`・`obj+0x3bc`・global・定数 2^-30) | `flags & 0x22 == 0` の成功経路だけ実装。0x20/0x2 のとき code 2 | #4616 (PY-349) |
 | 0x70000000 族・index 族 (eventId < 0x10000000) の戻り値式・`0xc61250` の書換え有無 | 2 族が code 2 (未実装) | #3779 (PY-253) |
