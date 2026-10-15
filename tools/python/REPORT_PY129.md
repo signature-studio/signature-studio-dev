@@ -41,7 +41,7 @@
 
 測定 commit: `195ae347d` (コードを変えた最後の commit。`feat(python): ui setter 3 件の PE 呼出し経路を確定し mock と C provider に実装 (#3006)`)。以降の commit は `tools/python/REPORT_PY129.md` と `docs/DOC_MAP.md` (md のみ)。
 
-環境: runner 4 core。`load` は `uptime` の 1 分平均。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。`toolchain-emsdk` は `[EMSDK]` (`docs/REFERENCES.md` の既定位置) に既にインストール済みで、`emcc --version` は 6.0.12 (pin と一致)。同じ版の `$HOME/artifacts/toolchain-emsdk.tar.zst` (`emsdk/upstream/emscripten/emscripten-version.txt` = "6.0.12") と一致を確認したので、上書き展開はしていない。
+環境: runner 4 core。`load` は `uptime` の 1 分平均。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。`toolchain-emsdk` は `[EMSDK]` (`docs/REFERENCES.md` の既定位置) に既にインストール済みで、`emcc --version` は 6.0.12 (pin と一致)。artifact `toolchain-emsdk` の `emsdk/upstream/emscripten/emscripten-version.txt` (= "6.0.12") と一致を確認したので、上書き展開はしていない。
 
 | コマンド | 結果 | wall | load |
 |---|---|---|---|
