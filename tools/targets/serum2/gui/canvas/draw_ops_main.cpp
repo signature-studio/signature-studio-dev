@@ -76,5 +76,58 @@ int main ()
 	ctx->setClipRect (CRect (0, 0, kWidth, kHeight));
 	bool rc = ctx->drawBitmap (*source, CRect (10., 10., 18., 18.), CPoint (0., 0.), 1., BitmapInterpolationQuality::kLow);
 	std::printf ("draw_op name=drawBitmap rc=%d nonzero=%zu\n", rc ? 1 : 0, countNonZeroPixels (canvasBitmap->data (), byteCount));
+
+	// 8x8 の source を 32x32 へ拡大する。拡大後の被覆は 32*32 画素 (scale 判定)。
+	auto runStretch = [&] (const char* name, BitmapInterpolationQuality quality) {
+		auto* out = new CanvasBitmap (kWidth, kHeight);
+		PlatformBitmapPtr outPtr (out);
+		auto outCtx = device->createBitmapContext (outPtr);
+		auto* octx = static_cast<CanvasGraphicsDeviceContext*> (outCtx.get ());
+		octx->setClipRect (CRect (0, 0, kWidth, kHeight));
+		bool ok = octx->fillRectWithBitmap (*source, CRect (0., 0., 8., 8.), CRect (10., 10., 42., 42.), 1., quality);
+		std::printf ("draw_op name=%s rc=%d nonzero=%zu\n", name, ok ? 1 : 0,
+		             countNonZeroPixels (out->data (), byteCount));
+		return out;
+	};
+	auto* scaled = runStretch ("fillRectWithBitmap_scale", BitmapInterpolationQuality::kLow);
+	delete scaled;
+
+	// 白黒 2x2 を bilinear で拡大すると中間階調が出る。kLow は出ない。
+	auto* checker = new CanvasBitmap (2, 2);
+	PlatformBitmapPtr checkerPtr (checker);
+	for (size_t i = 0; i < 4 * 4; i += 4)
+	{
+		const uint8_t v = (i / 4) % 2 ? 255 : 0;
+		checker->data () [i] = v;
+		checker->data () [i + 1] = v;
+		checker->data () [i + 2] = v;
+		checker->data () [i + 3] = 255;
+	}
+	auto countMid = [&] (BitmapInterpolationQuality quality) {
+		auto* out = new CanvasBitmap (kWidth, kHeight);
+		PlatformBitmapPtr outPtr (out);
+		auto outCtx = device->createBitmapContext (outPtr);
+		auto* octx = static_cast<CanvasGraphicsDeviceContext*> (outCtx.get ());
+		octx->setClipRect (CRect (0, 0, kWidth, kHeight));
+		octx->fillRectWithBitmap (*checker, CRect (0., 0., 2., 2.), CRect (0., 0., 32., 32.), 1., quality);
+		size_t mid = 0;
+		for (size_t i = 0; i < byteCount; i += 4)
+		{
+			if (out->data () [i + 3] && out->data () [i] > 0 && out->data () [i] < 255)
+				++mid;
+		}
+		return mid;
+	};
+	std::printf ("draw_op name=fillRectWithBitmap_bilinear rc=1 nonzero=%zu\n", countMid (BitmapInterpolationQuality::kMedium));
+	std::printf ("mid_tone name=fillRectWithBitmap_nearest count=%zu\n", countMid (BitmapInterpolationQuality::kLow));
+
+	// 9 分割: 8x8 の source を枠 2 px・中央を伸ばして 20x20 へ描く。被覆は dest の 20*20 画素。
+	auto* nineOut = new CanvasBitmap (kWidth, kHeight);
+	PlatformBitmapPtr nineOutPtr (nineOut);
+	auto nineCtx = device->createBitmapContext (nineOutPtr);
+	auto* nctx = static_cast<CanvasGraphicsDeviceContext*> (nineCtx.get ());
+	nctx->setClipRect (CRect (0, 0, kWidth, kHeight));
+	bool nineRc = nctx->drawBitmapNinePartTiled (*source, CRect (10., 10., 30., 30.), CNinePartTiledDescription (2., 2., 2., 2.), 1., BitmapInterpolationQuality::kLow);
+	std::printf ("draw_op name=drawBitmapNinePartTiled rc=%d nonzero=%zu\n", nineRc ? 1 : 0, countNonZeroPixels (nineOut->data (), byteCount));
 	return 0;
 }

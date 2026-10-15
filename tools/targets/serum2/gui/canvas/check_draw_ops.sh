@@ -60,6 +60,29 @@ if [ -f "$out/draw_ops.js" ]; then
       rc=1
     fi
   done < <(grep '^draw_op ' "$out/run.log")
+  # SR-78 #4551: 拡大縮小と bilinear は画素数で判定する。
+  # 8x8 → 32x32 の拡大は 1024 画素、9 分割 (dest 20x20) は 400 画素。bilinear は中間階調が出て、最近傍は出ない。
+  expect_exact () {
+    local name="$1" want="$2"
+    local got
+    got=$(grep "^draw_op name=$name " "$out/run.log" | sed -E 's/.*nonzero=([0-9]+).*/\1/')
+    if [ "${got:-x}" = "$want" ]; then
+      echo "op $name: pass (nonzero=$got, want=$want)" | tee -a "$out/summary.txt"
+    else
+      echo "op $name: fail (nonzero=${got:-none}, want=$want)" | tee -a "$out/summary.txt"
+      rc=1
+    fi
+  }
+  expect_exact fillRectWithBitmap_scale 1024
+  expect_exact drawBitmapNinePartTiled 400
+  bil=$(grep '^draw_op name=fillRectWithBitmap_bilinear ' "$out/run.log" | sed -E 's/.*nonzero=([0-9]+).*/\1/')
+  nea=$(grep '^mid_tone name=fillRectWithBitmap_nearest ' "$out/run.log" | sed -E 's/.*count=([0-9]+).*/\1/')
+  if [ "${bil:-0}" -gt 0 ] && [ "${nea:-1}" -eq 0 ]; then
+    echo "op fillRectWithBitmap_interp: pass (bilinear_mid=$bil, nearest_mid=$nea)" | tee -a "$out/summary.txt"
+  else
+    echo "op fillRectWithBitmap_interp: fail (bilinear_mid=${bil:-none}, nearest_mid=${nea:-none})" | tee -a "$out/summary.txt"
+    rc=1
+  fi
 else
   echo "run: skipped (no draw_ops.js)" | tee -a "$out/summary.txt"
   rc=1
