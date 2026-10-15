@@ -513,7 +513,7 @@ static void run_case(char* line) {
 
 /* LD-209 (#4305): native 側の候補別 SNAPSHOT/RESET (ld_wasm.c の ld_w_snapshot/ld_w_reset と同じ mask: 1=stk・2=sta・4=img)。
  * stk: SNAPSHOT 時の sp より下 [sp-128K, sp-8K) (run_case の scrub 域。RESET の呼出し枠より下の 8K 帯は含めない)。
- * sta: 実行器の data/bss [__data_start, _end) から、ld_heap 管理変数・ld_blks・入力行 buffer・TRACESET の状態を除いた残り。
+ * sta: 実行器の data/bss [__data_start, _end) から、ld_heap 管理変数・ld_blks・入力行 buffer・TRACESET・nrst 自身の管理表 (g_nrst/g_nnrst) の状態を除いた残り。
  * img: PE image [ld_img, ld_img+SizeOfImage)。 */
 extern char __data_start[], _end[];
 #define NRST_STK_TOP (8u << 10)
@@ -532,7 +532,7 @@ static void __attribute__((noinline)) nrst_snap(void) {
   g_nnrst = 0;
   u8* sp = (u8*)&probe;
   nrst_add(1, sp - NRST_STK_LEN, NRST_STK_LEN - NRST_STK_TOP);
-  u8* ex[16]; u64 exn[16]; int nx = 0;
+  u8* ex[32]; u64 exn[32]; int nx = 0;
 #define NRST_EX(p, n) do { ex[nx] = (u8*)(p); exn[nx] = (n); nx++; } while (0)
   NRST_EX(&ld_heap_used, sizeof ld_heap_used); NRST_EX(&ld_heap_hw, sizeof ld_heap_hw);
   NRST_EX(&ld_heap_pristine, sizeof ld_heap_pristine); NRST_EX(&ld_heap_pristine_len, sizeof ld_heap_pristine_len);
@@ -542,6 +542,7 @@ static void __attribute__((noinline)) nrst_snap(void) {
   NRST_EX(&g_line, sizeof g_line); NRST_EX(&g_linecap, sizeof g_linecap);
   NRST_EX(&g_tr_va, sizeof g_tr_va); NRST_EX(&g_tr_orig, sizeof g_tr_orig);
   NRST_EX(&g_ntr_set, sizeof g_ntr_set);
+  NRST_EX(&g_nrst, sizeof g_nrst); NRST_EX(&g_nnrst, sizeof g_nnrst);
   /* 除外区間を番地順に並べて、その間を sta として登録する */
   for (int i = 1; i < nx; i++) for (int j = i; j > 0 && ex[j] < ex[j - 1]; j--) {
     u8* t = ex[j]; ex[j] = ex[j - 1]; ex[j - 1] = t; u64 k = exn[j]; exn[j] = exn[j - 1]; exn[j - 1] = k;

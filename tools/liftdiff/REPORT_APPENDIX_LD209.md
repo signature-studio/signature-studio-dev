@@ -2,15 +2,16 @@
 
 親 #3385 (LD-156)。前提は `REPORT_APPENDIX_LD156.md` (`native=1, sta` で match・n=2 だが、native 側の候補単位の戻しが未実装だった)。
 
-測定 commit: **`7ac689777`** (コードを変えた最後の commit。`rt/ld_native.c` と `ld156_chunk0_carryover.py`)。
-この commit 以降に入るのは本付録と `results/ld209_native_reset.tsv`・`results/ld209_raw/` だけ。
+測定 commit: **`7ac689777`** (表の数値を出したときのコード。`rt/ld_native.c` と `ld156_chunk0_carryover.py`)。
+**注意 (レビュー指摘 1 の修正後)**: 以降の commit で `rt/ld_native.c` の sta 除外リストに `g_nrst`・`g_nnrst` を加えた。このため `7ac689777` の数値は、修正後のコードでは**無効** (未再測定)。`native sta`・`native all` を含む行 (`native_reset_diff` 339) は特に影響を受ける。修正後の再測定は #4305 の範囲で保留 (素材 `toolchain-emsdk`・`work-m11`・`work-liftdiff` が当該 run で `$ARTIFACTS_DIR` に無く、未実施)。
 
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の類型とは別。runner の case 間の持ち越し)。
 
 ## 結論
 
 - **native 側の候補別 RESET を実装した** (`rt/ld_native.c` の `NRESET <mask>`・mask は wasm の RESET と同じ 1=stk・2=sta・4=img)。`ld156_chunk0_carryover.py --native-reset <cand>` で指定できる。
-- **native の候補を戻しても `0x5d19e0` は match しない。** wasm を `sta` で戻した条件で、native 側の `none`・`stk`・`sta`・`img`・`all` を戻したときの verdict は、いずれも mismatch (0/11) で n=2 を揃えた。
+- **修正前のコード (`7ac689777`) では、native 側の候補を戻しても `0x5d19e0` は match しなかった** (wasm `sta` の条件で `none`・`stk`・`sta`・`img`・`all`、いずれも mismatch 0/11)。ただし `sta`・`all` の行は、レビュー指摘 1 (`g_nrst`/`g_nnrst` の複製で `all` が img を戻さない) の修正前の数値で、修正後のコードでは未再測定。`all` を含めた結論は再測定まで保留する。
+- 修正後の `all` 行の再測定は、本 run では素材不足で未実施 (§3 の注意)。
 - LD-156 の `native=1, sta` (native を作り直す) の match は、native 作り直しだけに依存する。native の候補単位の戻しでは再現しなかった。native 作り直しが消している持ち越しは、この 3 種 (stk・sta・img) の戻しでは捉えられていない。
 
 ## 1. 測定条件
@@ -42,8 +43,9 @@
 | sta | all | 1・2 | mismatch | 0/11 | 339 | 343847 |
 
 - `native=1` (作り直し) + wasm `sta` の match (LD-156) とは、native 側の条件が違う (作り直しと、候補単位の戻し)。
-- native の `stk`・`img` は diff 0。この 0 は、`0x5d19e0` が stk・img に残存を持たない (LD-96 の残存 0 と一致) ことの再確認。
-- native の `sta` (339 B) は戻しが効いている (diff > 0)。ただし verdict は変わらない。
+- 修正前の `native stk`・`img` は diff 0。この 0 は、`0x5d19e0` が stk・img に残存を持たない (LD-96 の残存 0 と一致) ことと整合する。stk・img の戻しは sta 領域に触れないので、修正の影響は受けないと見ている (未再測定)。
+- 修正前の `native sta` (339 B) は、`g_nrst`/`g_nnrst` の複製を含んでいたため、戻し量の数値を信用しない (修正後は変わる)。
+- `none/none` と `none/sta` は n=1。受入の候補測定は n=2 (`sta/all`・`sta/stk`・`sta/sta`・`sta/img` の n=2 は修正前の数値)。
 
 ## 4. 未確認
 
@@ -55,7 +57,8 @@
 
 ## 5. 子 issue
 
-- native 作り直しが戻す持ち越し (プロセス全体・libc の内部状態) の切り分け。`0x5d19e0` の残りの原因はここにあると見ている。受入条件 2 の残り (作り直し条件との差) は、この子の範囲。子 issue は本 PR の PR 本文に番号を書く。
+- native 作り直しが戻す持ち越し (プロセス全体・libc の内部状態) の切り分け。`0x5d19e0` の残りの原因はここにあると見ている。受入条件 2 の残り (作り直し条件との差) は、この子の範囲。
+- 子 issue: **#4631** (`[LD-229]`・親 #3385)。PR 本文の未解決表に同じ番号を書く。
 
 ## 6. 再現
 
@@ -68,7 +71,8 @@ python3 ld156_chunk0_carryover.py --native 0 --reset sta --native-reset sta --ou
 
 ## 7. 測定 commit 以降の差分 (`git diff 7ac689777 HEAD -- tools/liftdiff`)
 
-測定 commit 以降に追加したのは本付録と `results/ld209_native_reset.tsv`・`results/ld209_raw/` のみ。コード (`rt/ld_native.c`・`ld156_chunk0_carryover.py`) は測定 commit から不変。
+測定 commit 以降に `rt/ld_native.c` が変わった (レビュー指摘 1 の修正)。`ld156_chunk0_carryover.py` は変わっていない。
 
-- `git diff 7ac689777 HEAD -- tools/liftdiff/rt/ld_native.c` = 0 行
+- `git diff 7ac689777 HEAD -- tools/liftdiff/rt/ld_native.c` = 修正 commit の差分 (`g_nrst`・`g_nnrst` の除外 2 行 + `ex[]` 配列を 32 へ・注釈 1 行)。**測定と一致しない** (冒頭の注意)。
 - `git diff 7ac689777 HEAD -- tools/liftdiff/ld156_chunk0_carryover.py` = 0 行
+- 修正後の `ld_native` は `gcc -O1 -g -Wall -Wno-unused-function` でコンパイル成功 (警告は既存の `ld_core.h` のもの)。動作の再測定は未実施。
