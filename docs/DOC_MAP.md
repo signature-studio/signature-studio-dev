@@ -507,6 +507,7 @@
 | `tools/startup/license_obs/REPORT.md` | ~235 | 登録フラグ byte[0x14f84a8] の全サイト列挙 + gradeChar のサイト列挙 (連続形/レジスタ追跡形; 下限) + 0x10c7cd0 の実機械語実行 (ST-T11 #107) + unit 初期化後の ILRegKey 非空観測 (ST-T15 #525) + gradeChar 確定手段の選定 (ST-T16 #526 §8) |
 | `tools/startup/license_obs/REPORT_786_APPENDIX_1492.md` | ~48 | REPORT_786 §13・§14 全文 (#1492 callee 越し解析の表・未追跡の内訳・限界・未解決表)。REPORT_786 本体は 250 行上限のため分割移動 |
 | `tools/startup/license_obs/REPORT_786_APPENDIX_1640.md` | ~54 | #1640 間接 call 0x40944e の行き先 (静的スロット 0x13a5c98 → 0x407e20)・再帰打切り 10 件の不動点・`--no-rec-summary` アブレーション (345 件) の付録。測定 commit は本文に記載 |
+| `tools/startup/license_obs/probe_4764_widen.py` | ~70 | #4764: 0x10c7cd0 の間接 call の実行サイト和集合を 13 入力 (GUID・ComputerName・AppData・IL 長・cl) に広げて測る。結果は `results/probe_4764_widen.json`。 |
 | `tools/startup/license_obs/probe_1414_callers.py` | ~80 | #3727: 0x10d3a30 → 0x11fc770 → 3 直接呼出し元の遡及 (rel32 の call 静的) と 6 入力の code hook (`--dyn`)。結果は `results/probe_1414_callers.json` |
 | `tools/startup/license_obs/REPORT_786_APPENDIX_1414.md` | ~140 | #1414 (#786 受入 2) の付録: 0x10d3a30 の gradeChar 書込み条件 (g3・g4 は g1 と同一 dword、0x10c7850 の戻り値 ≤ 0 で書込み)・戻り値スタブ W1〜W7・測定。REPORT_786 §12 の続き |
 | `tools/startup/license_obs/REPORT_786_APPENDIX_3725.md` | ~70 | #3725 (ST-1) の付録: 0x10c7850 の戻り値の式 (v98 = min(v88,v90) 系・trunc(v98 - trunc(G)))・11 ケース一致 (probe_3725_retformula.py)・実機 6 入力の観測 (probe_3725_observe.py)。g1 の意味は未確定 |
