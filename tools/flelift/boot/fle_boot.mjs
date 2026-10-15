@@ -47,6 +47,7 @@ if (LOG_CAP > 0 || TIME_CAP > 0) {
             logCap.tail.push(s.slice(0, 240)); if (logCap.tail.length > 40) logCap.tail.shift();
             if (!logCap.hit && LOG_CAP > 0 && logCap.bytes > LOG_CAP) {
                 logCap.hit = 'bytes'; logCap.elapsed_ms = el;
+                // #5027: この throw は Emscripten の tty write (FS) が EIO に変換して飲むため boot を止めない (下の分類で報告する)。
                 throw new Error('FLE_BOOT_LOG_CAP exceeded (' + LOG_CAP + ' bytes)');
             }
             orig(...a);
@@ -146,6 +147,14 @@ try {
 } catch (e) {
     boot.threw = classify(e);
     if (e && e.stack) boot.threw.stack = e.stack.split('\n').slice(0, 6).join('\n');
+}
+// #5027: cap 超過 (logCap.hit) の後も guest は走り続け、boot の停止理由は cap の例外ではなく後続の exit になる
+// (cap の throw は Emscripten の tty write が EIO に変換して飲む)。上限超過は log_cap として報告し、生の停止理由は threw_raw に残す。
+if (logCap.hit === 'bytes' && boot.threw) {
+    boot.threw_raw = boot.threw;
+    boot.threw = { cls: 'log_cap', msg: 'FLE_BOOT_LOG_CAP exceeded (' + LOG_CAP + ' bytes); raw=' + boot.threw.cls };
+} else if (logCap.hit === 'bytes' && !boot.threw) {
+    boot.threw = { cls: 'log_cap', msg: 'FLE_BOOT_LOG_CAP exceeded (' + LOG_CAP + ' bytes); raw=returned' };
 }
 boot.units_run = Number(m._fle_units_run()); boot.units_total = Number(m._fle_units_total()); boot.units_empty = Number(m._fle_units_empty());
 boot.longjmp = Number(m._fle_n_longjmp());
@@ -405,6 +414,7 @@ writeFileSync(outPath, JSON.stringify(summary, null, 1));
 console.log('FLEBOOT_RESULT ' + JSON.stringify({
     units_run: boot.units_run, units_total: boot.units_total, stopped_at: boot.stopped_at_1based,
     boot_threw: boot.threw && (boot.threw.cls + (boot.threw.msg ? ' ' + boot.threw.msg : '')),
+    boot_threw_raw: boot.threw_raw ? boot.threw_raw.cls : null,
     log_cap: LOG_CAP || TIME_CAP ? { hit: logCap.hit, bytes: logCap.bytes, lines: logCap.lines, bin_lines: logCap.bin_lines, elapsed_ms: logCap.elapsed_ms } : null,
     px6bbc20,
     longjmp: boot.longjmp, getmem: boot.getmem, freemem: boot.freemem,
