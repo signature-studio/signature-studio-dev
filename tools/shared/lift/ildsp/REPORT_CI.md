@@ -65,7 +65,7 @@ closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | IAT 10 種の stub 化の方針 (C 実装か wasm import)。直接 call のサンク 2 種 (0x1b932c・0x1b9334) と末尾 jmp の 2 種 (0x1bb426・0x1bb47a) を含む | wasm 化 | [T-SH-65] #3318 |
-| SSE helper 8 種 (`__asm_`) の C 実装。`gen_helpers.py` は未対応で exit 1 | wasm 化 | [T-SH-65] #3318 |
+| SSE helper 8 種 (`__asm_`) の C 実装 | wasm 化 | 解消: §7 (#4229) |
 | 間接 call 4 件の trap 化 (ac 4) | 正常系の到達 | [T-SH-65] #3318 (到達実測は #3250) |
 | 閉包の取りこぼし: 直接 jcc 先 function_1801aef40 (§2-2 (a))。閉包規則を変えるか。変えれば 36/961 が変わり再測定 | 範囲・wasm 化の意味 | [T-SH-65] #3318 |
 | 計算ジャンプ表の経路 (n = 1〜16) が IR で `ret` になる (§2-2 (b))。表を解く経路を IR に戻すか、欠落を受入として扱うかを決める。census は検出しないので検出器も対象 | 1〜16 バイトの書き込みの欠落 (silent) | [T-SH-65] #3318 |
@@ -75,3 +75,58 @@ closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が
 ## 6. 検証範囲 / 範囲外
 - 範囲: 範囲の再現・RetDec の定義生成・census。コードは HEAD で再実行して ALL OK を確認。
 - 範囲外: wasm 化・native 実行・差分・gate (子へ)。RetDec の出力 IR の意味論は未検証。IR が計算ジャンプの表の経路を落とすことは §2-2 (b) で確認した。RetDec 内部の原因は未確認。
+
+## 7. SSE ストアの復元と helper 生成 (T-SH-103 #4229)
+
+結論: RetDec は `movups`・`movntps` のストアを IR の store に出さない (11 箇所)。`ci_restore_stores.py` で 19 箇所すべてを `store i128` に戻し、残りの SSE helper 5 種を `gen_helpers.py` で C 実装した。`ci_lift.sh` は rc=0 (ALL OK)。
+
+測定 commit: `56ec5cf11` (ci_restore_stores.py・gen_helpers.py・ci_lift.sh を含む最後のコード commit)。`git diff 56ec5cf11 HEAD -- tools/shared/lift/ildsp tools/shared/lift/libreverb ':!*.md'` の出力は空 (差分 0)。
+
+### 7-1. 書き込みの全数 (x86 の命令と IR の対応・測定 commit `56ec5cf11`)
+x86 の書き込み先は全件 `[rcx …]` (xmm0 を書く) (capstone で逆アセンブルして確認)。IR の書き込み先 (復元後) の基準と offset は、x86 の operand と目視で照合した (19 件)。機械照合はしていない。
+
+| RVA | x86 | IR の元の形 | 復元後 |
+|---|---|---|---|
+| 0x1aefa9 | `movups [rcx], xmm0` | `call void @__asm_movups` (書き込みなし) | `store i128` 先は `%arg1` (関数入口の rcx の値) |
+| 0x1aefd0・d3・de・e2・e9・ed・f1 | `movaps [rcx±…], xmm0` (7 件) | `call i64 @__asm_movaps` + `sext` + `store i128` | `store i128 %5` (sext を除去) |
+| 0x1aeff5 | `movapd [rcx-0x10], xmm0` | `call i64 @__asm_movapd` + `sext` + `store` | `store i128 %5` |
+| 0x1af010 | `movups [rcx], xmm0` | `call void @__asm_movups` (書き込みなし) | `store i128` |
+| 0x1af022 | `movups [rcx+r8-0x10], xmm0` | `call void @__asm_movups` (書き込みなし) | `store i128` |
+| 0x1af030・33・3e・42・49・4d・51・55 | `movntps [rcx±…], xmm0` (8 件) | `call void @__asm_movntps` (書き込みなし) | `store i128` |
+
+件数: movups 3・movntps 8・movaps 7・movapd 1 (計 19)。`store i128` は 8 件 → 19 件。
+
+movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bit だけを `i64` で返す (`__asm_movaps(i128) -> i64`)。その後の `sext i64 → i128` は下位 64bit の最上位ビットで上位 64bit を埋めるため、xmm0 の上位が 0 でないと別の値を書く。`movaps [m], xmm` は xmm 全体 (128bit) を書くので、store の値は xmm (`%5`) そのものにする。
+
+### 7-2. 検証
+- 実行: `FL_WIN64_DIR=<fl-win64> RETDEC_BIN=<retdec> bash tools/shared/lift/ildsp/ci_lift.sh` (commit `56ec5cf11`・4 core・n=3)
+  | 項目 | 値 |
+  |---|---|
+  | 実行時間 (`date` で計測) | 2.017 / 1.995 / 1.990 s |
+  | load (実行前の 1 分平均) | 0.03 / 0.11 / 0.11 |
+  | 3 回の stdout | `cmp` で 3 回とも一致。rc 0・ALL OK |
+  | 生成物 (`ci.rs.ll`) | md5 `4811e83e9e4343ad70e6ec883023641f` |
+  | 生成物 (`ci_helpers.c`) | md5 `497d886223a0625f2b236d105c7df119` |
+- 生成した helper: `int3:1, movq:1, punpcklbw:1, sfence:1` (4 種)。`movapd` の分岐は実装したが、復元後の IR には `movapd` が残らないので生成されない。
+- `ci_helpers.c` は `cc -c` が通る (警告は `-Wunused-function` の `fb`・`setl` のみ)。
+
+### 7-3. ネガティブコントロール
+| 名前 | 壊し方 | 結果 |
+|---|---|---|
+| NC1 drop-one | `ci_restore_stores.py --drop-one` (movups/movntps の 1 箇所を復元しない) | `[restore] movups: 2 件 (期待 3)`・rc 1 |
+| NC2 未対応 | `declare i64 @__asm_cvttss2si(i128)` を `gen_helpers.py` に入れる | `1 unsupported helper signatures`・rc 1 |
+
+注: `ci_census.py` は store の有無を見ない。store の欠落を FAIL させるのは `ci_restore_stores.py` の件数検査 (NC1) で、`ci_lift.sh` は非 0 で終わる。census 側の store 検査は未実装 (受入条件 3 の文言「census か差分」に対しては未達。§7-5 で残す)。
+
+### 7-4. 既知の制約
+- 0x1aefa9 の書き込み先は、RetDec の alloca 経由 (`bitcast i64* %rcx to i128*`) の load である。`store i64 %arg1, i64* %rcx` が関数入口の 1 回だけであることを確認して `%arg1` を値として使った。書き込み直前まで rcx に他の store が無い形なので、この 1 箇所だけに当てはまる。pass は、その形以外では exit 1 で止まる。
+- 復元の正しさは IR の構造と x86 の命令の照合で確かめた。wasm 実行と native 差分は未実施 (#3320)。
+- 閉包の取りこぼし (§2-2 (a)(b)) と IAT stub は変えていない (#3318)。
+
+### 7-5. 未解決 (起票先)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| census に store の検査を入れる (受入条件 3 の「census か差分で FAIL」の census 側)。現状は復元 pass の件数検査だけ | store 欠落の検出器が 1 つだけ | #4229 の残り (下の子 issue) |
+| 0x1aefa9 の `%arg1` 解決は「入口 store が 1 回だけ」の前提。一般の形は未対応 (pass が exit 1 で止まる) | 別の CreateInstance 形に当たると止まる | #3318 |
+| 差分 (native と wasm の全バイト比較・gate) | 復元の意味論が未検証 | [T-SH-66] #3320 |
+| IAT stub・閉包の取りこぼし・emcc | wasm 化 | [T-SH-65] #3318 |
