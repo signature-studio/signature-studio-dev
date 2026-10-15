@@ -464,8 +464,9 @@ def main():
     for k in list(range(4)) + list(range(6, 16)):
         if f'xmm{k}' not in used:
             regs.append(f'@xmm{k} = global i128 0')
+    # wrapper の ymm_sync (abicheck の xmm6-15・float 引数の xmm0-3) は used の集計より後に @ymmN を参照するため、ymm_on では 0-15 を全て宣言する
     for k in range(32):
-        if f'ymm{k}' in used:
+        if f'ymm{k}' in used or (ymm_on and k < 16):
             regs.append(f'@ymm{k} = global i256 0')
     for f in FLAGS:
         regs.append(f'@{f} = global i1 false')

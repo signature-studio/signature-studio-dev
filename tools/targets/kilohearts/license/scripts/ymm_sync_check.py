@@ -7,6 +7,8 @@ clang で実行して xmm2 と ymm2 の整合を見る。
 
   on  : 同期規則あり (既定) → OK (rc 0) を期待
   off : `--skip ymmsync` (規則を外す = ネガティブコントロール) → MISMATCH (rc 1) を期待
+  one : vzeroupper を含まず ymm 参照が 1 つだけの 2 関数 (A と B) → kh_lower rc 0 かつ `clang -c` 成功 (rc 0) を期待。
+        wrapper の ymm_sync が参照する @ymmN の宣言漏れ (未宣言なら `use of undefined value`) を検出する
 
   usage: python3 scripts/ymm_sync_check.py   (license/ で実行。成果物は license/work/ymm_sync/ = gitignore)
 """
@@ -59,6 +61,8 @@ define i64 @function_180fb6130() {
 """ + ''.join('  store i256 undef, i256* @ymm%d\n' % k for k in range(32)) + """  ret i64 undef
 }
 """
+
+S1 = S0.split('define i64 @function_180fb6130()')[0]
 
 HELPERS = """define i128 @__asm_vmovd(i32 %a) {
   %z = zext i32 %a to i128
@@ -115,7 +119,16 @@ def main():
             'ymm_store_undef_lt16': len([l for l in ir.split('\n') if 'store i256 undef, i256* @ymm' in l and int(l.rsplit('@ymm', 1)[1]) < 16]),
             'xmm_loads_in_zero': ir.count('load i128, i128* @xmm'),
         }
-    ok = res['on']['rc'] == 0 and res['on']['out'].startswith('OK') and res['off']['rc'] == 1 and res['off']['out'].startswith('MISMATCH')
+    d = os.path.join(W, 'one')
+    os.makedirs(d)
+    s1 = os.path.join(d, 's1.ll')
+    open(s1, 'w').write(S1)
+    low = os.path.join(d, 'lowered.ll')
+    r = run([sys.executable, KH_LOWER, s1, low, '--core', CORE, '--lift', '180f89cf0,180fb6124', '--skip', 'icall'])
+    c = run(['clang', '-c', '-w', '-o', os.path.join(d, 'lowered.o'), low])
+    res['one'] = {'lower_rc': r.returncode, 'clang_c_rc': c.returncode, 'clang_err': c.stderr.strip()[-300:]}
+    ok = (res['on']['rc'] == 0 and res['on']['out'].startswith('OK') and res['off']['rc'] == 1 and res['off']['out'].startswith('MISMATCH')
+          and res['one']['lower_rc'] == 0 and res['one']['clang_c_rc'] == 0)
     print(json.dumps(res, ensure_ascii=False, indent=1))
     print('RESULT', 'PASS' if ok else 'FAIL')
     return 0 if ok else 1
