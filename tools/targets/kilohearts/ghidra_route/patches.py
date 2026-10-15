@@ -147,6 +147,10 @@ ABI = {
         #   2521 = 180fb5f35 (rcx=rbp, rdx=rsi, r8=rdi, r9=ebx, [rsp+0x20]=rax)、2547 = 180fb5f85 (全部 0)。
         ('delay 2521 FUN_180fb5f8c 5 args dropped (180fb5f35)', r'(?:func_0x000|FUN_)180fb5f8c\(param_1,param_2,param_3,param_4,param_5\);', 'FUN_180fb5f8c();'),
         ('delay 2547 FUN_180fb5f8c 5 args dropped (180fb5f85)', r'(?:func_0x000|FUN_)180fb5f8c\(0,0,0,0,0\);', 'FUN_180fb5f8c();'),
+        # #5401 (KH-160): FUN_180fe3510 (longlong 1 引数・rcx 入力) の呼出し 1 件 (FUN_180fd2f20 内 5129 行)。
+        #   機械語: 180fd2f2a `mov rdi,rcx` → 180fd2f30 `mov rcx,[rcx+0x90]` → 180fd2f3c `call 180fe3510`。rcx = [param_1+0x90]。
+        #   callee 180fe3510 は入口で rcx を読む (test rcx,rcx・[rcx+0x10])。よって引数は *(param_1+0x90)。
+        ('delay 5129 FUN_180fe3510 rcx=[param_1+0x90] (180fd2f3c)', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x90\) != 0\) \{\n\s*)FUN_180fe3510\(\);', r'\1FUN_180fe3510(*(longlong *)(param_1 + 0x90));'),
     ],
 }
 # stereo 閉包 (#4871 KH-124) も、同じ 3 呼出元 (FUN_180fe3690・FUN_180fe3310・FUN_180fe3cd0。VA と機械語が delay と同一) を含む。
