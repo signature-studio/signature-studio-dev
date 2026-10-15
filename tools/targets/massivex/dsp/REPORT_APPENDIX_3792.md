@@ -1,6 +1,6 @@
 # Massive X MX-41 (#3792) 付録: 1 本目 .pdata の読取不能 160 件の全件表
 
-- 測定 commit = **0dbf9a54d** (`dsp/scripts/mx41_pdata2_census.py` と `dsp/mx6_e2e.sh` の最後の変更 commit)。本付録は同 commit の e2e の出力 (`mx41_unreadable.tsv`・160 行) と全項目一致 (照合の差 0 件)。本文の結論は `REPORT_MX6.md` §3。
+- 測定 commit = **3afa6013d** (`dsp/scripts/mx41_pdata2_census.py` と `dsp/mx6_e2e.sh` を最後に変えた commit)。本付録は同 commit の e2e の出力 (`mx41_unreadable.tsv`・160 行) と全項目一致 (照合の差 0 件)。本文の結論は `REPORT_MX6.md` §3。
 - 読み方: `st` = 関数の開始 RVA、`ui` = RUNTIME_FUNCTION の UnwindInfoAddress (欄の値そのもの)。`所属 section` は `ui` を含む section (VA 範囲で判定)。全 160 件で `-` (どの section にも入らない)。`raw` は raw 有無 (全件 False)。`ui 先頭` は欄の最下位バイト、`st 先頭` は関数先頭の 1 バイト (ファイル上の位置は pefile の get_offset_from_rva)。
 
 | # | st (RVA) | e (RVA) | ui (RVA・画像外) | 所属 section | raw | ui 先頭 | st 先頭 |

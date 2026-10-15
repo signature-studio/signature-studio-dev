@@ -58,6 +58,18 @@
 
 fbc9971f は 51953f46d の祖先だが、e2e の step 構成が違う (旧 5 step・`mx33_xmm03.py` 無し)。下表の値を 51953f46d の値として扱わない。
 
+| 工程 | 結果 |
+|---|---|
+| NC selftest (合成バイト列) | 5/5 PASS |
+| RTTI + 入口面 | seeds 567 / 1-round 3,226 (`dsp/REPORT.md` §2 注の e2e 再現値。同注の mx_closure.py 実測 3,227 とは 1 件違う) / pdata 186,960 (`mx_entry_surface.py` が .text 範囲と `e <= t_hi` で絞った数。§3 の 187,060 は絞らない 1 本目の全 entry で、差 100) |
+| vectorcall 検出 | seeds: pdata 始点 livein45 = 0 / one-round: pdata 始点 livein45 = 0 |
+| unwind census | 1 本目の .pdata 全体: entry 187,060 / chained 62,526 / EH 23,293 / 読取不能 160 |
+| funclet | seeds 533 / 和集合 537 / 線形直接参照 4 |
+| 判定 | PASS (pdata 始点の vectorcall livein 0 かつ整合 OK) |
+
+- 所要 **28.0 s** (測定 commit fbc9971f・同一 PE)。load average: 0.31 0.37 0.36 → 0.54 0.42 0.37。
+- 実行: `MX_PE='$RUNNER_TEMP/.../Massive X.vst3' MX6_WORK='$RUNNER_TEMP/massivex-mx6' bash tools/targets/massivex/dsp/mx6_e2e.sh` → exit 0。
+
 ## A3. 51953f46d → 62e3aefbe の §7 記録 (main 側の旧 REPORT_MX6 §7)
 
 - 測定 commit = **51953f46d** (main 取り込み後の merge・e2e 記録の commit・§1a)。
