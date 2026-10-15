@@ -7,6 +7,7 @@
 
 - 6 件の entry・fn VA・書式 (flapi 表と一致)・引数の割当て・呼出し先は PE (`block00031_PE.bin`) から確定した。
 - **確定したのは「戻り値の式」の形まで**。値の意味 (戻り値が何を返すか・範囲 code の意味) は 6 件とも未確定。
+  - `0xd82c20(code)` の戻り値は、code ≠ 0 なら `[0x16b82e0]`、code == 0 で `[0x860485]` が非 null なら 0、code == 0 で null なら `[0x16b82e0]` (§3)。`findTextLine` の成功経路 (`rax > 0`) は `0xd82c20` を通らず、`[0x15e4280]` の変換のみ。
   - `removeTextLine`・`addTextLine` の戻り値は、削除・追加の結果ではなく **解析の戻り値 (`ebx`) を `0xd82c20` に渡した結果**。
   - `findTextLine` の戻り値は `0xd7dc70` の戻り値の変換で、`0xd7dc70` の意味が要る。
   - `displayText`・`displayTimedText`・`animateText` の戻り値は `0xd843d0` の out の下位 32bit を `0xd82c20` に渡した結果。`0xd843d0` が out を書く箇所は REPORT_PY121 で未確認のまま。
@@ -63,11 +64,15 @@
 
 ## 3. 範囲 code (`0xd82c20` の分岐) の読み方
 
-REPORT_PY121 の `0xd82c20` の分岐 (a)(b)(c) をそのまま使う。6 件の戻り値は全て `0xd82c20(code)` を経由する。
+REPORT_PY121 の `0xd82c20` の分岐 (a)(b)(c) をそのまま使う。`0xd82c20` を経由するのは 5 件 (`addTextLine`・`removeTextLine`・`displayText`・`displayTimedText`・`animateText`) と、`findTextLine` の失敗経路 (`0xd7b3c2`) だけ。`findTextLine` の成功経路 (`rax > 0`) は `0xd82c20` を通らず、`0xd7b3ad` で `[0x15e4280]` を呼んで `0xd7b3ba` → `0xd7b3cc` と進む (逆アセンブル確認済み)。
 
-- `code ≥ 0`: `0xc38bc0` → `[0x16b82e0]` を返す (REPORT_PY173 と同じ読み。None と推定、確定はしない)。
+`0xd82c20(code)` の書き分け (逆アセンブル `0xd82c20`〜`0xd82c4a` で確認):
+
+- `code ≥ 0` かつ `code ≠ 0`: `0xc38bc0` → `[0x16b82e0]` を返す (REPORT_PY173 と同じ読み。None と推定、確定はしない)。
+- `code == 0` かつ `[0x860485]` が非 null: `0xc38bc0` を呼ばず戻り値 0 を返す (`0xd82c4a`)。
+- `code == 0` かつ `[0x860485]` が null: `0xc38bc0` → `[0x16b82e0]` を返す (`0xd82c55`〜`0xd82c5c`)。
 - `code < 0`: `this` の `vtbl[+0x88]()` が真なら code 別のメッセージを設定して 0 を返す。偽なら `0xc38bc0`。
-- **このため 6 件の「成功時の戻り値」は全て `[0x16b82e0]` (推定 None) になり、値を持たない**。`findTextLine` だけは `0xd7dc70` の戻り値を変換して返す。
+- **このため 5 件の「成功時の戻り値」は code の値により `[0x16b82e0]` (推定 None) か 0 のどちらかになり、値を持たない**。`findTextLine` の成功経路だけは `0xd7dc70` の戻り値を `[0x15e4280]` で変換した値を返す。
 
 code (= 解析の戻り値・`0xd843d0` の out) が 0 / 負のどの値を取るかは、解析関数と dispatch の仕様が要る。
 
@@ -100,4 +105,4 @@ code (= 解析の戻り値・`0xd843d0` の out) が 0 / 負のどの値を取�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 6 件の戻り値の値・範囲 code の意味 (§4 の 1〜6) | 6 件とも mock/C 実装ができない | 後続の子 issue (起票先は PR 本文の表を正とする) |
+| 6 件の戻り値の値・範囲 code の意味 (§4 の 1〜6) | 6 件とも mock/C 実装ができない | #3021 (コメント追記) |
