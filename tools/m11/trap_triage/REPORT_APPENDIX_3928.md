@@ -11,6 +11,7 @@
 - 測定 commit: `2267e738e` (コード変更の最後の commit。`git diff 2267e738e HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は 0 行)。基点 `549edb5ea` (origin/main)。
 - 素材: `work-m11` (展開先 `tools/m11/work`)・`fl-win64` の `extracted/block00031_PE.bin` (`$RUNNER_TEMP/win64`)・emsdk (`[EMSDK]`)。
 - IR: `bash m11_gen_ir2.sh` (41 s)。`ir_sha256` 生成直後 `597757f4…` (#3643 と同じ)。build 後 `362e47a9…`。
+- n=1 の限界: 144 (trap→ok)・158 (ok→oom) の反転は各条件 n=1 に基づく。survey の ok 数は環境で 872〜874 に動く (`tools/m11/REPORT_3520.md`)。
 - survey は直列 1 本、各条件 n=1。`node m11_survey.mjs` は約 12 s。build は `rm -f work/obj/ov.o` の後に実行 (約 22 s)。uptime load 0.8〜1.2 (1 分値)。
 
 ## 実測
@@ -28,7 +29,7 @@
 | `M11_FIX_4136A0=1 M11_OV_414AD0=1` | 873 / 21 / 47 / 1 | 2 件 (144・158 は上と同じ) |
 | `M11_FIX_4136A0=1 M11_FIX_652500=1` | 873 / 21 / 47 / 1 | 3 件 (144 ok・158 oom・895 halt0→memory access out of bounds) |
 
-- 既定 OFF の survey は #3643 (873/21/47/1・unit 144 trap) と一致。
+- 既定 OFF の survey は #3643 (873/21/47/1・unit 144 trap) と集計値で一致。**unit 単位の突合 (再現手順 3) は未実施** (本 run で `work-m11` が無く survey を再生成できない)。unit 差 0 は未確認。
 - 158 の回帰は `414ad0` と `652500` の deref 補正では消えない。
 
 ## 転記の内容 (`m11_ov.c` `function_4136a0`、`M11_FIX_4136A0` で有効)
@@ -107,9 +108,7 @@ return np;
 - 本文の実測表の「ok / trap / miss / noproc」は各 tag の `M11_SURVEY` JSON (`m11_survey.mjs` の console 出力) の `ok`・`trap`・`miss`・`noproc` から、「OFF との unit 差」の件数は手順 3 の出力の先頭の数から読む。
 - 本 run では素材が無く未実行 (`tools/m11/work` が無い)。本節の手順は未検証。
 
-## 補足: unit 158 の store watch (未特定。子 #3972 へ)
+## 補足: unit 158 の store watch (未特定。子 #3972 へ移送)
 
-- 監視: `trap_triage/store_watch_2408.sh` の派生 (`work/sw3928.sh`、コミットしない。run 部を unit 0〜157 の計装なしにし、unit 158 だけ `_m11_watch_on(1)`)。`WATCH_ADDR=0x10aa1428`、`M11_FIX_4136A0=1`。監視関数は `653660`・`43c4c0`・`414c70`・`414bb0`・`414ad0`・`413760`・`4136a0`・`414850`・`44f5d0`・`43c8f0`・`652500`・`43c5e0`・`6535a0`・`413480`・`44f040`・`43c870`・`43ba70`・`409c80`・`412c20`・`6539e0`・`653f40`・`65c540` (IR)。派生 script は未コミットのため再現コマンドは無い。本節の数値は作成時の実測の転記で、再現は未確認 (#3972 の受入に移す)。
-- 結果: unit 158 の `[aw]` は 3 件。いずれも `653660` の入口の 0 初期化 (`0x10aa1428`・`…1430`・`…1438`)。文字列の中身を書いた store は記録されなかった。unit 158 は `halt0` (survey の oom と同じ)。
-- 記録されなかった理由 (推定): `409c80` (IR 版の copy) は `__asm_movups` (16 バイト `store i128`) で書くため、store watch の計装 (`store i64`・`store i8` 系) に映らない。copy 先が `0x10aa1428` になる呼出しが、text を書いた候補。`413760` の戻り値 (FIX 版の `4136a0` は `p` を返す) が `s` に一致する経路は未確認。
-- 次の一手 (#3972): `409c80` の入口で `dst` が `[WA, WA+32)` と重なる呼出しを記録し、呼出し元 (`43c4c0`・`414bb0`・`414c70` のどれか) と `dst`・`src`・`n` を採る。
+- 結論: 書込み元は未特定。計装の数値・派生 script の差分・推定は #3972 のコメントへ移した (数値の移送先)。
+- 本 PR の REPORT には store watch の数値と再現コマンドを載せない (派生 script は未コミットで、本 run では再現できない)。
