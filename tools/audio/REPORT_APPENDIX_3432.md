@@ -5,7 +5,7 @@
 ## 1. 測定 commit と差分 0 の証跡
 
 - 測定 commit: `4d97f703e` (`feat(audio): AU-2 行列の PASS 判定に burst_runs > 0 を加える (#3432)`)
-- 検証 HEAD: 本付録を含む commit (fix-up 後の PR head)。
+- 検証 HEAD: `68971573d` (main 取り込みの merge commit)。`tools/audio` のコード差分は main 取り込み前後で 0 (`git diff 4d97f703e 68971573d -- tools/audio ':!*.md'` = 0 バイト)。
 - `git diff 4d97f703e HEAD -- tools/audio ':!*.md'` (コード・テスト・スクリプト) の出力: **0 バイト**。
 - `git diff 4d97f703e HEAD -- tools/audio` の全体は md のみの差分 (本付録の新規追加 39 行と、`REPORT_AU2_CI.md` §12 のリンク 1 行)。
   測定対象のコードは測定時と同一で、差分は文書だけ。
