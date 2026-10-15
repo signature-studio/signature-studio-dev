@@ -10,7 +10,7 @@
 ## 1. 測定条件
 
 - 測定 commit: `e7131890b` (変更は `tools/m11/e2e_expect.env` のみ)。base: origin/main `512b09ffa`。worktree: `../ws-3647`・branch `3647-m11-e2e-rc1-cause`。
-- 素材: `work-m11` を `tools/m11/work/` に、`work-liftdiff` を `tools/liftdiff/work/` に展開。`fl-win64` は `extracted/block00031_PE.bin` (sha256 `b2c64da4…`) のみ展開。toolchain (`/opt/emsdk`・`/opt/retdec`) は runner に既に有り (emcc 6.0.12・retdec-decompiler 有り)。
+- 素材: `work-m11` を `tools/m11/work/` に、`work-liftdiff` を `tools/liftdiff/work/` に展開。`fl-win64` は `extracted/block00031_PE.bin` (sha256 `b2c64da4…`) のみ展開。toolchain ([EMSDK]・[RETDEC]) は runner に既に有り (emcc 6.0.12・retdec-decompiler 有り)。
 - **参考値の範囲**: `tools/m11/work/lift_pe.sha256` と `ir_conditions.json` が素材に無い。そのため `m11_e2e.sh` の既定経路は全再生成 (Ghidra + RetDec 4 chunk) に入る。全再生成は行わず、`M11_SKIP_LIFT_FP=1` で指紋検査だけを迂回した (#2779 の参考値経路)。代わりに、snapshot の `m11_image.bin` は現 PE から `m11_image_gen.py` で再生成したものとバイト一致 (LB=0・`cmp` 一致)。lift 自体の指紋は確認していない。
 - IR: `m11_gen_ir2.sh` で再生成 (31 秒・ldfix/ld108/ld115/r8b applied)。e2e 内で boot5 を足すと `ir_sha256` は `9a9cfa06…` になった (以後の測定はすべてこの IR)。
 - 負荷: 測定時の `uptime` の 1 分 load 0.58〜0.76・並列 1 (4 コア)。
