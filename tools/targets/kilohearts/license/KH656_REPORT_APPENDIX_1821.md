@@ -143,11 +143,25 @@ driver は #4670 で LIFT8 の 8 件固定に修正済み (`lic_config.json` の
 
 HEAD `e49a091a7` で `lift8 off/on` を再測定: off 54,394 B・`7ba79e65…8c7707`・globals 9 / on 54,487 B・`3d2bc6fd…e77287`・globals 10 (driver `lift8`・`rdata_raw_allow` 付き。測定 commit `091c68915` の値と一致)。
 
-section 単位の内訳: **未測定**。
+section 単位の内訳 (#4547 実測。HEAD で `lift8 off/on` を再生成した wasm を `scripts/kh4547_section_diff.py` で比較):
 
-- 前版の section 表 (global +209 / export +23 / code 0 / data +64) は撤回した。section 合計が wasm 全体と一致せず、on 側の section 合計が wasm 全体を超えていたため、表の値は実測として成立しない。
-- 再パースには `work/m4272_lift8_{off,on}` の wasm が要る。この run には素材 (`plugins-kilohearts`・`toolchain-emsdk`・`toolchain-retdec`) が展開されておらず、wasm を再生成できなかった。素材を付けた再実行で測る。
-- sha 差の原因 (窓の追加・文字列 VA の置換の別、global・code の寄与) も未測定。
+| section (id) | off | on | 差 |
+|---|---|---|---|
+| 6 global | 80 | 86 | +6 |
+| 7 export | 1,383 | 1,406 | +23 |
+| 10 code | 50,025 | 50,025 | 0 |
+| 11 data | 2,460 | 2,524 | +64 |
+| 合計 (wasm 全体) | 54,394 | 54,487 | **+93** |
+
+- **global (+6 B) = 窓 1 件 (+6 B) + 並べ替え (0 B)**: 窓 1 件は型 2 B + init (`i32.const 0x640`) 4 B = 6 B で、差 +6 B と一致する。並べ替えは寄与 0 B: off の global 値に `≥0x640` で +0x40 を加えて窓 (`0x640`) を外すと、on の多重集合と一致する (13 件)。on 側で値 `0x640` の位置が 7 番目なのが窓 1 件の挿入位置。
+- **data (+64 B) = 窓 64 B の挿入**: data segment は `0x400`(576 B→640 B) の後ろに続く。off では `0x640` に 4 B の段があり、on ではその 4 B 段が `0x680` に移る (+0x40)。以降の `0x644`(1,859 B)→`0x684` も同じ +0x40 ずれ。差 +64 B (= 0x40) と一致。
+- **export (+23 B) = 追加 1 件**: `global_var_1813d47fe` (`kind 3`・index 11) の追加。name 20 B + len 1 + kind 1 + index 1 = 23 B で一致。既存 export の index は繰り下げ (`__start_em_asm`・`__stop_em_asm` ほか)。`final.ll` の差は `@global_var_1813d47fe = external global i8` の 1 行だけ。
+- **code (0 B・内容は 71 関数で変化)**: 関数 96 件の長さは全て一致。差分 3,771 B は全て命令の即値の中 (メモリ offset 3,672 B・`i32.const` 99 B)。`i32.const` の対 3,762 組を見ると、3,691 組は不変、71 組は `on = off + 0x40` (data/global の絶対アドレスが +0x40 ずれた分)、その他 0 組。opcode は変わらない。
+  - export 名 `function_<VA>` で VA が引けたのは 41 関数。差分の大きい上位: `180ef7fc0` (101 B)・`18004c780` / `1800524e0` / `1800b4ac0` / `1800b4b10` (各 101 B)・`1800b4ae0` (69 B)・`180045130` (57 B)・`180054bd0` (6 B)。lift 8 件のうち `180045130`・`18004c780`・`1800524e0`・`180054bd0`・`1800b4ac0`・`1800b4ae0`・`1800b4b10`・`180ef7fc0` の 8 件は全て差分あり。
+  - export されていない 30 関数は VA を引けない (名前 section も無い)。この 30 関数の差分は 3,079 B。VA は未対応 (未測定)。
+- **sha 差の原因の切り分け**: 窓の追加 (data の +0x40 ずれと global の値の移動) が code の即値を動かし、それが 93 B の大半を作る。文字列 VA の置換 (raw_va の値 store 84 行) とは別経路。
+
+**未測定 (残り)**: export されていない 30 関数の VA (name section 無し・差分 3,079 B)。
 
 ### 8.2 #4272: 313 集合の on/off と raw_va の値 store (測定 commit `091c68915` 時点の値。HEAD は未測定 (集合の定義元 `work/kh656_rounds.json` が repo に無い))
 
@@ -183,7 +197,7 @@ section 単位の内訳: **未測定**。
 ### 8.4 #4272: 検証の範囲と未解決
 
 - 受入 1: lift-8 の off 側 globals (9 件) を記録 (§8.1)。
-- 受入 2: 未達。sha 差分の section 単位の内訳・global の寄与・code の差の位置は未測定 (§8.1)。残りは #4547 へ移す。
+- 受入 2: #4547 で測定 (§8.1)。section 内訳・global の寄与 (窓 6 B + 並べ替え 0 B)・code の差の位置 (71 関数・即値のみ) を実測。export されていない 30 関数の VA は name section が無いため未対応 (未測定と明記)。
 - 受入 3: 313 で `raw_va` の値 store の比較 (§8.2)。文字列 VA の 84 行だけが変わる。
 - 受入 4: 未測定の箇所は本文に未測定と明記した。未測定の範囲: lift-8 の `56254af13` での値 (`gen_simd.py` の lift-8 への影響の有無)・sha 差の section 内訳。結論に使うのは測定 commit `091c68915` 時点の値だけ (HEAD `e71682521` での再測定は未実施)。
 - `kh656_closure.py --rounds 4` は収束せず `FAIL` になる (`lic_config.json` の F ブロックを書き換えた状態で終わるため、測定後は HEAD に戻した)。収束の再確認は本 issue の範囲外。
