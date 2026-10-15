@@ -16,7 +16,8 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 WORK="$HERE/work"
 
 # mac 版 FLEngine universal2 の実パス (analysis/mac/REPORT.md §2 より変更なし)。
-FAT_INPUT="${FAT_INPUT:-/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib}"
+source "$HERE/../shared/env.sh"
+FAT_INPUT="${FAT_INPUT:-$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib}"
 
 [ -f "$FAT_INPUT" ] || { echo "[M2] FAIL: 入力 universal2 が見つかりません: $FAT_INPUT" >&2; exit 1; }
 

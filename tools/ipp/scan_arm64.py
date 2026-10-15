@@ -4,7 +4,7 @@
    参照分類: CALL (ldr Rt,[VAR]; blr Rt) / CHECK (ldr; cbz|cmp #0) / OTHER。ローダ関数内は除外。"""
 import sys, os, json, struct
 import numpy as np
-sys.path.insert(0, '/home/ubuntu/work/webstudio/tools/shared/scripts')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared', 'scripts'))
 from macho_util import MachO
 
 def u16str(m, va):
