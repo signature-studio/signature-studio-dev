@@ -47,7 +47,7 @@ setter `0x180c9d700` 内の間接 call で落ちる。本付録は**機械語の
 
 | 受入 | 状態 | 根拠 |
 |---|---|---|
-| 1. setter addr=0x50 の原因 (obj・vtable の構築状態) | 部分 | 機械語 (§1) は確定。実測の `rcx` 値 (§2) が想定と合わず未解決 |
+| 1. setter addr=0x50 の原因 (obj・vtable の構築状態) | 部分 → si_addr 不一致は解消 (§9.1)。obj は node Z の `+0x2c0` (poison) で、addr=0x50 は negative control のみ | §1・§9.1 |
 | 2. native と wasm が同一原因か (観測点の決定) | 未達 | wasm の found 観測点が無い (§4)。native の `found` と `out[0]` の関係も未照合 (§3) |
 | 3. 判定基準 (run_fa9 (a) の期待値) を変えない | 達成 | 変更なし (GATE PASS) |
 | 4. 測定 commit と実測値を REPORT に残す | 達成 | §5 |
@@ -56,10 +56,51 @@ setter `0x180c9d700` 内の間接 call で落ちる。本付録は**機械語の
 
 | 項目 | 状態 | 起票先 |
 |---|---|---|
-| `si_addr` (addr=0) と fault 時 rcx (a5a5…) の不一致、想定 (`0x180c9d74c`・addr=0x50) との不一致 | 未解決 | #4223 (FA-52。#1791 (FA-25) は PR #2103 で部分達成のまま CLOSED) |
+| `si_addr` (addr=0) と fault 時 rcx (a5a5…) の不一致 | 解消 (§9)。非正準アドレスの #GP で `si_addr=0` | #4223 (FA-52。#1791 (FA-25) は PR #2103 で部分達成のまま CLOSED) |
+| 想定 (`0x180c9d74c`・addr=0x50) との不一致 | 解消 (§9)。`0x74c` で落ちるのは静的分岐の negative control (R2) のみ | #4223 (FA-52) |
 | `out[0]` と probe の `found` の対応、node `Z` との照合 | 未解決 | #4223 (FA-52) |
 | wasm の found・vtable 観測点の追加 (`ctrl_harness.mjs`) と同一原因の判定 | 観測点追加済み・判定は未 (§8) | #1789 (FA-24) |
 | 0x180da6c00 到達と Filter 出力比較 | 未着手 | #1182 (FA-16) |
+
+## 9. FA-52 (#4223): si_addr 不一致の原因と out[0]・found・node Z の対応
+
+測定 commit: `f5160903f` (origin/main, worktree `ws-4223`)。以下は HEAD で取り直した実測。コード変更は無く、測定 commit から HEAD までのコード差分は 0。
+
+### 9.1 si_addr=0 と rcx=a5a5… の不一致 (受入 1: 解消)
+
+- 原因: 注入 node の `Z+0x2c0` が poison (`0xa5a5a5a5a5a5a5a5`) を読み、そのアドレスの読みが非正準アドレスの #GP になる。Linux は非正準アドレスの #GP で `si_addr=0` (`code=128`) を返す。`rip=0x180c9d741` (`mov rax,[rcx]`) で落ちるため、`rcx=a5a5…` と `addr=0` が同時に出る。
+- 独立の最小プログラム (`gcc` の `sigaction` 付き、kernel 6.17.0-1022-azure) で確認:
+  - `*(0xa5a5a5a5a5a5a5a5)`: `sig=11 code=128 si_addr=(nil)`
+  - `*(0x50)`: `sig=11 code=1 si_addr=0x50`
+  - `*(0x7ffe00000050)`: `sig=11 code=1 si_addr=0x7ffe00000050`
+- 想定の `rip=0x180c9d74c`・`addr=0x50` は静的分岐の negative control (`FA_ALT9=1`, R2) でのみ出る。FA_NODE1 の実際の ERR は `rip=0x180c9d741`。
+- 実測 (HEAD `f5160903f`, `fa32_node1.sh`): R1 ERR 8/8 (先頭 `rip=180c9d741 addr=0 rcx=a5a5…`)・R2 ERR 8/8 (`rip=180c9d74c addr=50`)・G1 ERR 8/8 (`rcx=0`)・G5 ERR 0/8・C ERR 8/8 (先頭 `rip=180c9d741 addr=0 rcx=a5a5…`)。
+- P_noguard ERR 8/8 (`rip=5646fa066772 addr=0 rcx=39`) は PIE 内で落ちる (§3 と同じ probe trampoline の経路)。根拠に使わない。
+
+### 9.2 out[0]・found・node Z の対応 (受入 2)
+
+| 条件 | 呼出 | C | out[0] | found |
+|---|---|---|---|---|
+| probe 無し (`FA_OUT0=1 FA_NODE1=1`, 前回実測 `63d53758b`) | 2 回目 | C=Z | `Z+0x2b0` (8/8) | (probe 無し) |
+| `fa32_node1.sh` C 行 (HEAD) | 2 回目 | C==Z 8/8 | `out0==C+0x2b0` 8/8 | – |
+| `FA_NODE1 FA_SET9 FA_PROBE9 FA_P9GUARD` (HEAD `f5160903f`, S900〜S906 同形) | 1 回目 (map 経路) | C=C0 | 0 | 0 |
+| 同 | 2 回目 (nokey 経路) | C=Z (S900: `0x555947237750`) | `Z+0x2b0` (S900: `out0-C=0x2b0`) | 1 |
+
+- `out[0]=Z+0x2b0` は `C+0x2b0` (`0x180ca1651`) の式どおり。node Z 自身の値ではない。`[out0+0x10]=Z+0x2c0` が poison と一致し、ERR の直接原因になる。
+- `found` は `out[0]!=0` で定義する (§8 の `out+0x10` 判定は誤り)。1 回目 0・2 回目 1。
+- 1 回目 (map) と 2 回目 (nokey) の両方で `out0` を観測できたのは probe 有り (`FA_P9GUARD`) の実測のみ。probe 無しの表 (C=Z・`Z+0x2b0` 8/8) と probe 下の 2 回目の値は同じ式 (`C+0x2b0`) に一致する。
+
+### 9.3 測定 (受入 3)
+
+測定 commit: `f5160903f`。
+- `bash tools/targets/freshair/lift2/run_fa9.sh`: wall 39 s (`build_ctrl.sh` を内部で実行した時間を含む)、load 0.53→0.82、**GATE PASS**。(a) base ERR=0・ca1480=72・path=map・eq=1・found=0・da6c00=0 / (b) alt ERR=8/8 / (b-wasm) ERR=8/8 / (c) pert 差分 395 トークン・差分 0 呼出。
+- `bash tools/targets/freshair/lift2/run_ctrl.sh 2 5` (run_fa9 内で実行): wall 3 s、load 0.82 付近、**BIT-EXACT 15/15** (fma0・fma1)、rc=0。
+- 素材: `plugins-freshair` を `$RUNNER_TEMP/plugins-freshair` に展開し `FA_DL=... fetch.sh` (factory .epf 8 本)。`fl-win64` は未使用。`toolchain-emsdk` / `toolchain-retdec` は runner 既存の `/opt/emsdk`・`/opt/retdec/bin` を使用 (展開せず)。
+
+### 9.4 残り
+
+- 実機の `C+0x2b0` に vtable 付きの下位オブジェクトが実在するか (2 段目の再帰の実機挙動): #2207 (FA-31)。
+- wasm 側の 2 回目入場の判定 (§8 の「同一原因かは未判定」): #1789 (FA-24)。
 
 ## 8. FA-24 (#1789): wasm 側の found・obj 観測点 (既定 OFF) と初期比較
 
