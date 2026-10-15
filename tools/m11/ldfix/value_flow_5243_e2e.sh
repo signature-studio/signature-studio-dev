@@ -12,12 +12,14 @@ IR="$W/boot_final3.ll"; IMG="$W/m11_image.bin"; CFG="$W/boot*.drc.config.json"
 step() { echo "[value_flow_5243_e2e] $*"; }
 
 step "1/3 audit (修復前)"
-"$PY" "$HERE/audit_lsf_ssa.py" "$IR" "$IMG" "$CFG" --json "$OUT/ssa_base.json" | head -1 || exit 1
+"$PY" "$HERE/audit_lsf_ssa.py" "$IR" "$IMG" "$CFG" --json "$OUT/ssa_base.json" > "$OUT/audit.log" || exit 1
+head -1 "$OUT/audit.log"
 n=2
 for r in base rmw; do
   step "$n/3 value_flow ($r)"
   n=$((n + 1))
-  AUDIT_JSON="$OUT/ssa_base.json" "$PY" "$HERE/value_flow_5243.py" "$IR" "$IMG" "$CFG" --use-rule "$r" --json "$OUT/vf_$r.json" | head -1 || exit 1
+  AUDIT_JSON="$OUT/ssa_base.json" "$PY" "$HERE/value_flow_5243.py" "$IR" "$IMG" "$CFG" --use-rule "$r" --json "$OUT/vf_$r.json" > "$OUT/vf_$r.log" || exit 1
+  head -1 "$OUT/vf_$r.log"
 done
 "$PY" - "$OUT" <<'EOF'
 import json, sys, collections
