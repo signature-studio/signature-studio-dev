@@ -16,13 +16,13 @@ lines.forEach((l, idx) => {
     const f = l.trim().split(/\s+/);
     const [va, ecx, a0, a1, a2, a3, a4, a5] = f.slice(0, 8).map((h) => parseInt(h, 16));
     const init = Buffer.from(f[8], 'hex');
-    M.HEAPU8.set(init, OBJ_ADDR);
+    M.HEAPU8.set(init, ecx);
     M.HEAPU8.fill(0, STK_LO, STK_LO + STK_WIN);
     const eax = M._ott_call32x(va, ecx, a0, a1, a2, a3, a4, a5) >>> 0;
     const st0 = M._ott_x87_st0() >>> 0;
     const st0d = hex(M._ott_x87_st0d_hi(), 8) + hex(M._ott_x87_st0d_lo(), 8);
     const depth = M._ott_x87_depth() >>> 0;
-    const mem = Buffer.from(M.HEAPU8.subarray(OBJ_ADDR, OBJ_ADDR + OBJ_WIN)).toString('hex');
+    const mem = Buffer.from(M.HEAPU8.subarray(ecx, ecx + OBJ_WIN)).toString('hex');
     const stk = Buffer.from(M.HEAPU8.subarray(STK_LO, STK_LO + STK_WIN)).toString('hex');
     out.push(`${idx.toString(16).padStart(4, '0')} va=${hex(va, 8)} eax=${hex(eax, 8)} st0=${hex(st0, 8)} st0d=${st0d} d=${depth.toString(16)} mem=${mem} stk=${stk}`);
 });
