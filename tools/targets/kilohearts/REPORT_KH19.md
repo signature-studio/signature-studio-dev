@@ -86,7 +86,7 @@
   - `0x1813a1d40` → `jmp [rip+0x1dee2]` → `0x1813a1d38` (上と同じ slot を経由)
 - **結論: rip_data の読み出し解決で確定できた候補は 0 件。** after と after_rip は全条件で一致し、rip_data の件数は closure を広げない。
 - 過程の誤り (記録): 初版は初期値の先 (thunk) を関数とみなして `static_fn` 判定し、after_rip を +2 関数と出した。thunk の先頭命令を見て `trampoline` 判定を足したところ、確定 0 件になった。この 2 本を関数として扱うのは誤り。
-- 残りの未解決 (本 PR 後): rip_data call 件数 8〜56 件/ns は、すべて上記 2 本 (load config の CFG/XFG dispatch ポインタ) 経由で、呼び先は直前の `rax` で決まる。`rax` の出所の追跡は #849 の再試行で行った: [REPORT_APPENDIX_849.md](REPORT_APPENDIX_849.md) (vtable 形 40/54 は候補確定・閉包は不変、残り 14 件は #3363)。
+- 残りの未解決 (本 PR 後): rip_data call 件数 8〜56 件/ns は、すべて上記 2 本 (load config の CFG/XFG dispatch ポインタ) 経由で、呼び先は直前の `rax` で決まる。`rax` の出所の追跡 (#849 の再試行) の結論と測定値は [REPORT_APPENDIX_849.md](REPORT_APPENDIX_849.md) §0 を正本とする。
 - 対象外 (明記): res 外 (sweep されなかった関数) が S へ書き込む可能性は未確認。store 走査は `callgraph.pkl` の res 内関数だけ。
 
 ## 5. 未解決
@@ -94,7 +94,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 型を追う (this の型追跡) による正確な closure。現在は slot 番号一致の過大評価 | after 表が真値でない | #848 |
-| `rip_data` の呼び先 `rax` (#849 の再試行): vtable 形 40/54 は候補確定 (閉包は不変)。残り 14 件 (対照 Gain・all) は呼び出し戻り値等で未確定 | 14 件の呼び先が閉包に入らない | #3363 (KH-55) |
+| `rip_data` の呼び先 `rax` (#849 の再試行): 未確定の件数は REPORT_APPENDIX_849 §0 を参照 | 未確定の呼び先が閉包に入らない | #3363 (KH-55) |
 | 確定 closure の lift / build 最初の失敗点 | 受入 2 未達 | #850 |
 | 人手の検収 (lift 結果の bit-exact 化は本 issue の範囲外) | — | — |
 
