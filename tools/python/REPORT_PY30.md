@@ -152,7 +152,7 @@ node tests/chord_progression_call_probe.mjs                   # 呼べた 3/9
 
 | 項目 | 変更前 (`32e6f8b46`) | 変更後 |
 |---|---|---|
-| `node tests/chord_progression_e2e.mjs` | 41/41 PASS (0.5 s) | 41/41 PASS (0.5 s) |
+| `node tests/chord_progression_e2e.mjs` | 41/41 PASS (0.5 s) | 41/41 PASS (0.6 s) |
 | `node tests/chord_progression_e2e.mjs --neg` | 34/41・FAIL 7・exit 1 | 34/41・FAIL 7・exit 1 |
 | `node tests/chord_progression_call_probe.mjs` (呼べた数) | 3/9 | 3/9 (増えない) |
 | probe の `text_to_chord` | `AttributeError: 'ChordMarker' has no attribute 'alternativeCount'` | `AttributeError: 'NoneType' object has no attribute 'locked'` |
