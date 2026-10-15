@@ -45,7 +45,7 @@ static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
 static int sel_start, sel_end;
 static int64_t disp_time;
 static int64_t arr_time;
-static int scr_blanked, scr_unblank, scr_active;
+static int scr_blanked, scr_unblank, scr_active, scr_dflt;
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -81,7 +81,7 @@ void fl_engine_reset(void) {
     set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
     sel_start = -1; sel_end = -1;
     arr_time = 0;
-    scr_blanked = 0; scr_unblank = 0; scr_active = 0;
+    scr_blanked = 0; scr_unblank = 0; scr_active = 0; scr_dflt = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -537,6 +537,15 @@ FL_H(screen, isUnBlank) { NARGS(0, 0); return fl_ret_b(c, scr_unblank); }
 FL_H(screen, getScreenActiveCounter) { NARGS(0, 0); return fl_ret_i(c, scr_active); }
 FL_H(screen, setScreenActiveCounter) { NARGS(1, 1); scr_active = (int)((unsigned)scr_active + (unsigned)A_INT(0, 0)); return fl_ret_none(c); }
 FL_H(screen, unBlank) { NARGS(1, 1); scr_unblank = A_INT(0, 0) == 1; return fl_ret_none(c); }
+/* ---- screen 描画・メーター系 (7) ---- PY-135 (#3022): PE 0xd7ada0・0xd7b690・0xd7ae80・0xd7af40・0xd7bcb0・0xd7bec0・0xd7c600 (REPORT_PY135)。描画は観測できないため状態を持たない */
+FL_H(screen, addMeter) { NARGS(4, 5); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); (void)A_INT(4, 0); return fl_ret_none(c); }
+FL_H(screen, displayBar) { NARGS(5, 5); (void)A_INT(0, 0); (void)A_INT(1, 0); (void)A_STR(2); (void)A_DBL(3, 0); (void)A_INT(4, 0); return fl_ret_none(c); }
+FL_H(screen, fillRect) { NARGS(5, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(screen, drawRect) { NARGS(5, 5); for (int i = 0; i < 5; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(screen, drawText) { NARGS(6, 6); (void)A_INT(0, 0); (void)A_STR(1); for (int i = 2; i < 6; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+FL_H(screen, eraseRect) { NARGS(4, 4); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+/* blank: 第 1 引数が 1 なら isBlanked を真に書く。真→偽の解除では activeCounter を scr+0x1dc (仮置き 0) から戻す (REPORT_PY135) */
+FL_H(screen, blank) { NARGS(2, 2); int b = A_INT(0, 0) == 1; (void)A_INT(1, 0); if (b != scr_blanked) { if (!b) scr_active = scr_dflt; scr_blanked = b; } return fl_ret_none(c); }
 
 /* ---- device (5, MIDI scripting 用の最小面) ---- mock と同じ: forwardMIDICC / midiOutMsg は呼出しを数える */
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }

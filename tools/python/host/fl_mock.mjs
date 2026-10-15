@@ -113,7 +113,7 @@ export function createMockEngine() {
     selStart: -1, selEnd: -1,
     arrTime: 0,
     numerator: 4, denominator: 4,
-    screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
+    screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0, screenDefaultCounter: 0,
     selectedChannel: 0,
     gridItems: [],
     channels: [
@@ -407,6 +407,15 @@ export function createMockEngine() {
     "screen.getScreenActiveCounter": (...a) => { arity(a, 0, 0); return st.screenActiveCounter; },
     "screen.setScreenActiveCounter": (...a) => { arity(a, 1, 1); st.screenActiveCounter = (st.screenActiveCounter + argI(a, 0, 0)) | 0; },
     "screen.unBlank": (...a) => { arity(a, 1, 1); st.screenUnBlank = argI(a, 0, 0) === 1; },
+    // PY-135 (#3022): 描画・メーター系 6 件 (PE 0xd7ada0・0xd7b690・0xd7ae80・0xd7af40・0xd7bcb0・0xd7bec0)。描画先は API から観測できないため引数検査と None だけを模す (REPORT_PY135)
+    "screen.addMeter": (...a) => { arity(a, 4, 5); for (let i = 0; i < 4; i++) argI(a, i, 0); argI(a, 4, 0); },
+    "screen.displayBar": (...a) => { arity(a, 5, 5); argI(a, 0, 0); argI(a, 1, 0); str(a[2]); argF(a, 3); argI(a, 4, 0); },
+    "screen.fillRect": (...a) => { arity(a, 5, 5); for (let i = 0; i < 5; i++) argI(a, i, 0); },
+    "screen.drawRect": (...a) => { arity(a, 5, 5); for (let i = 0; i < 5; i++) argI(a, i, 0); },
+    "screen.drawText": (...a) => { arity(a, 6, 6); argI(a, 0, 0); str(a[1]); for (let i = 2; i < 6; i++) argI(a, i, 0); },
+    "screen.eraseRect": (...a) => { arity(a, 4, 4); for (let i = 0; i < 4; i++) argI(a, i, 0); },
+    // blank (PE 0xd7c600 → callback 0xd7c5a0 → 0xd7d110): 第 1 引数が 1 なら isBlanked (scr+0x1d0) を真に書く。真→偽の解除では activeCounter を scr+0x1dc から戻す (初期値は未実測の仮置き 0)
+    "screen.blank": (...a) => { arity(a, 2, 2); const b = argI(a, 0, 0) === 1; argI(a, 1, 0); if (b !== st.screenBlanked) { if (!b) st.screenActiveCounter = st.screenDefaultCounter; st.screenBlanked = b; } },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
