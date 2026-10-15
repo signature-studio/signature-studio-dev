@@ -81,7 +81,7 @@ for (const id of ids) {
   notImpl ? unimpl++ : impl++;
 }
 // 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 引数書式・範囲 5 (pe40・#1529) + PE 確定 1 (pe102・#2883) + stub 確定 6 (stub41) + PE 確定 2 (pe101) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 7 (pe94・#2830) + PE 確定 9 (pe95・#2831) + PE 確定 4 (pe96・#2832) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + ui PE 確定 6 (pe119・#2980) + ui PE 確定 3 (pe130・#3007) + general PE 確定 6 (pe119set・#2977) + arrangement PE 呼出し 6 (pe152・#2983) + ui 表示・メニュー 6 (pe121_2982・#2982) + general PE 確定 2 (pe125・#3001) + launchMapPages PE 確定 1 (pe120・#2984) + launchMapPages 書式・戻り 3 (pe138・#3029) + channels PE 判定順 1 (pe76・#2563) + patterns グループ 2 (pe172・#3219) + PY61 確定 7 (pl61・#2027) + patterns 数え・選択 4 (pe179・#3271) + mixer PE 確定 2 (pe205・#3493)
-assert.equal(impl, 165); assert.equal(unimpl, 270);
+assert.equal(impl, 168); assert.equal(unimpl, 267);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);
