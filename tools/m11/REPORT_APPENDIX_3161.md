@@ -39,3 +39,21 @@
 - IR sha: LB=0x10000 = `31bcfaa2b145`・LB=0 = `a58ac284416b`。
 - 観測した事実: unit 296 は LB=0x10000 の LVA `0x456130` で、LB=0 の `0x446130` と同じ PE 位置 (+0x10000 ずれ)。
 - 未特定: 無限ループか極端な遅さかの区別、LB 依存で挙動が変わる機構。`m11_survey.mjs` に `M11_SURVEY_PROGRESS=1` (unit ごとの begin/end を stderr へ同期出力) を追加して測定に使った。
+
+## 10-7 unit 296 の機構 (#5274・2026-10-15 実測・部分)
+
+測定: `FL_WIN64_DIR=<展開先> M11_SURVEY_PROGRESS=1 bash tools/m11/m11_lb_matrix.sh 0 1 <LB>` (fl-win64・work-m11 を展開した snapshot・runner 4 core・load 0.8〜1.7)。
+
+| 条件 | 結果 | IR sha (先頭12) | gen / build / run / survey 秒 |
+|---|---|---|---|
+| boot5=0 ld108=1 LB=0x10000 | rc_survey=124 (600 s 打ち切り)・`unit 296 0x456130 begin` の後 `end` 無し | 400a8b7b2780 | 47 / 24 / 1 / 600 |
+| boot5=0 ld108=1 LB=0 | rc_survey=0・942 unit 完走 (unit 296 は `0x446130` で begin/end) | af3e9e05e8e1 | 46 / 24 / 1 / 12 |
+
+- IR sha は §10-6 の値 (31bcfaa2b145・a58ac284416b) と違う。`ir_conditions.json` が生成時の PE パスを記録するため、展開先が違うと sha も変わる (推定。未確認)。
+- 単独再現: `M11_SURVEY_END=297 M11_TRACE=1` で unit 0〜296 だけを流すと、unit 296 が begin の後 120 s 戻らない (unit 0〜295 は 0.4 s)。前の unit の副作用ではない。
+- アドレス対応: unit の proc は LVA `0x456130`。LVA = RVA + LB (LB=0x10000) なので RVA `0x446130`、VA `0x846130`。LB=0 の unit 296 (LVA `0x446130`) も同じ VA。IR に `function_846130` が存在する (67 行の one-shot 初期化、ガードは `[0x1200...]`)。
+- unit 296 の呼出し先のうち、ループを持つのは 2 つ: `function_4123c0` (カウンタ `rdi` で必ず終わる) と `function_4fb780` (連結リストの走査。終了は番兵 `icmp eq i64 %…, 5028360` (VA `0x4cba08`) との一致か、`function_4fb000` の戻り値)。
+- 番兵の仮説を 1 行だけ試した: `icmp eq ... 5028360` を LVA `5093896` (+0x10000) に置いて build・survey → **unit 296 は依然として戻らない** (survey rc=124・300 s 打ち切り)。番兵だけが原因ではない。
+- 観測した事実: `pass_m2`・`pass_m2p`・`pass_m2b` (m11_passes.py) は `inttoptr`・`store`・`add`/`sub` の即値 VA だけを LVA に remap し、`icmp` の即値は remap しない。LB=0x10000 の IR で、image 範囲の `icmp eq/ne i64 … , <即値>` は 49 件 (うち `0x4cba08` は 1 件)。残り 48 件が非ポインタの比較か (未確認)。
+- 未解決: 止まっている関数 (`function_4fb780` か `function_4123c0` か、それ以外か) と停止の機構。次に要るもの: 停止中の呼出しスタック (`M11_SURVEY_STACK` 相当を unit 296 だけに効かせた trap 取得、または `4fb780` の反復回数の計測)。この run では時間が足りず打ち切った。
+- 測定の副産物: `tools/m11/m11_survey.mjs` に `M11_SURVEY_FROM`・`M11_SURVEY_END` (既定 0・942。既定の挙動は不変) を追加した。単独再現に使った。
