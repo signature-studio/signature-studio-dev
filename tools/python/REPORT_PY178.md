@@ -86,9 +86,9 @@
 | (vi) スロット RIP 参照 load 23・store 0、生値 `0x15e6080` | 一致 | OK 2 件 |
 | (vii) `0x15e6080` への dword store 1 件 (`0x41cee9`)・直前 call `0x406f90` (GetCurrentThreadId) | 一致 | OK 3 件 |
 
-結果: HEAD `e4cc24cd4` で `RESULT: PASS`・終了 0 (全 24 件 OK)。
+結果: HEAD `2334ecfce` (main 取り込み後の再測定) で `RESULT: PASS`・終了 0 (全 24 件 OK・64 秒)。
 
-ネガティブコントロール (期待値を実測と違えて FAIL することを確認。両方とも終了 1):
+ネガティブコントロール (HEAD `2334ecfce` で再測定。期待値を実測と違えて FAIL することを確認。両方とも終了 1):
 
 - `--expect-jne-target 0x5254d0` (旧版の読み: `0x525489` が CreateThread 経路へ飛ぶ) → `FAIL 0x525489 jne → 0x525557 (期待 0x5254d0)`・`RESULT: FAIL (1)`。
 - `--expect-owner-stores 2` (store 件数の期待を変える) → `FAIL 0x15e6080 への dword store が 1 件 (期待 2)`・`RESULT: FAIL (1)`。
