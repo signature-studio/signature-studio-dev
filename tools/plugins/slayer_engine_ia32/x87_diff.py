@@ -10,6 +10,8 @@
 - --nega: lowered 側の `fsub st(i), st(0)` (DC E8+i) を `fsubr` (DC E0+i) に取り違えて FAIL が出ることを確かめる。
 - --rc: fldcw で RC を変え、fist/fistp の丸めだけを比べる (算術を含まない試行。ADR の制限 (5))。
 - --skip: 試行の op 表から指定の名前を外す (寄与の切り分け用。例: --skip fldpi,fldlg2,fldl2e)。 機械語の id は変えない。
+- --nega-c1: lowered 側の fxam の直後に C1 を反転させ、C1 の比較で FAIL が出ることを確かめる (negative control)。
+- C1: native では丸めの上向きフラグ等になるため、比べるのは fxam と比較命令 (cmp=True) の直後だけ (ott_x87.h の制限 (6))。
 生成物は work/x87/ (gitignore 対象)。 依存: gcc・capstone・x64c (tools/ott/lift)。
 """
 import argparse, math, os, random, struct, subprocess, sys, time
@@ -22,7 +24,8 @@ import x64c  # noqa: E402
 from capstone import Cs, CS_ARCH_X86, CS_MODE_32  # noqa: E402
 
 WORK = os.path.join(HERE, 'work', 'x87')
-CMASK = 0x7d00
+CMASK = 0x7d00      # 比べる FSW bit: C3/C2/C0/TOP (C1 は cmp 命令の直後だけ C1BIT で比べる)
+C1BIT = 0x0200
 
 # (名前, 機械語の先頭, 種別, delta(スタック深さの増減), 必要な深さ, 入力型 or 出力型, cmp か)
 #   種別: 'reg' = 末尾バイトに i を足して ST(i) を取る / 'none' = オペランド無し / 'mem' = [eax] (入力 slot 型)
@@ -121,7 +124,7 @@ def lower_lines(bs):
     return fl.out, ins[0].mnemonic + ' ' + ins[0].op_str
 
 
-def write_inc(insts, nega, path_n, path_l):
+def write_inc(insts, nega, path_n, path_l, nega_c1=False):
     x64c.IA32 = True
     x64c.PTR = 4
     with open(path_n, 'w') as fn, open(path_l, 'w') as fl:
@@ -141,6 +144,8 @@ def write_inc(insts, nega, path_n, path_l):
             fl.write('    case %d: { /* %s */\n' % (o['id'], dis.replace('*/', '* /')))
             for ln in lines:
                 fl.write('  ' + ln + '\n')
+            if nega_c1 and o['name'] == 'fxam':
+                fl.write('  ott_fsw ^= 0x0200u;   /* negative control: C1 (符号) を反転 */\n')
             fl.write('    } break;\n')
         fn.write('  }\n}\n')
         fl.write('  }\n}\n')
@@ -258,7 +263,8 @@ def compare(nat, low, metas):
         Fa, Va, Sa = ta[1:iv_a], ta[iv_a + 1:is_a], ta[is_a + 1:]
         Fb, Vb, Sb = tb[1:iv_b], tb[iv_b + 1:is_b], tb[is_b + 1:]
         st['trials'] += 1
-        fok = Fa == Fb
+        fm = [CMASK | (C1BIT if o['cmp'] else 0) for o, _ in ops]
+        fok = all((int(x, 16) & m) == (int(y, 16) & m) for x, y, m in zip(Fa, Fb, fm))
         for o, sl in ops:   # fnstsw m16 の格納値は PE/C1 等の未モデル化の例外フラグを含むため、CMASK で比べる (ADR 制限 4)
             if o['name'] == 'fnstsw' and o['form'] == 'mem':
                 for S in (Sa, Sb):
@@ -272,7 +278,7 @@ def compare(nat, low, metas):
         for k, (o, _) in enumerate(ops):
             if o['cmp']:
                 st['cmp_ops'] += 1
-                if (int(Fa[k], 16) & 0x4500) == (int(Fb[k], 16) & 0x4500):
+                if (int(Fa[k], 16) & 0x4700) == (int(Fb[k], 16) & 0x4700):
                     st['cmp_match'] += 1
         mx = 0
         for x, y in zip(Va, Vb):
@@ -298,19 +304,22 @@ def main():
     ap.add_argument('--nega', action='store_true', help='lowered 側に fsub/fsubr の取り違えを入れる (negative control)')
     ap.add_argument('--rc', action='store_true', help='fldcw で RC を変え fist/fistp の丸めだけを比べる')
     ap.add_argument('--skip', default='', help='試行の op 表から外す名前 (カンマ区切り)')
+    ap.add_argument('--nega-c1', action='store_true', help='lowered 側の fxam の直後に C1 を反転させる (negative control)')
     ap.add_argument('--skip-build', action='store_true')
     a = ap.parse_args()
     tag = 'nega' if a.nega else ('rc' if a.rc else 'main')
     skip = set(x for x in a.skip.split(',') if x)
     if skip:
         tag += '_skip'
+    if a.nega_c1:
+        tag = 'nega_c1'
     wd = os.path.join(WORK, tag)
     os.makedirs(wd, exist_ok=True)
     insts = instances(templates())
     trial_insts = [o for o in insts if o['name'] not in skip]
     inc_n = os.path.join(wd, 'x87_native_ops.inc')
     inc_l = os.path.join(wd, 'x87_lowered_ops.inc')
-    write_inc(insts, a.nega, inc_n, inc_l)
+    write_inc(insts, a.nega, inc_n, inc_l, a.nega_c1)
     bn = os.path.join(wd, 'x87_native')
     bl = os.path.join(wd, 'x87_lowered')
     if not a.skip_build:
@@ -345,7 +354,7 @@ def main():
         st['ulp_hist'][0], st['ulp_hist'][1], st['ulp_hist'][2], st['ulp_hist'][3], st['ulp_max']))
     print('[x87_diff] per-value ulp: values %d; 0=%d 1=%d 2=%d >=3=%d' % (
         st['vals'], st['vals_ulp_hist'][0], st['vals_ulp_hist'][1], st['vals_ulp_hist'][2], st['vals_ulp_hist'][3]))
-    print('[x87_diff] compare ops %d, C0/C2/C3 match %d' % (st['cmp_ops'], st['cmp_match']))
+    print('[x87_diff] compare ops %d, C0-C3 match %d' % (st['cmp_ops'], st['cmp_match']))
     print('[x87_diff] FSW(masked) mismatch trials %d, slot mismatch trials %d, ulp cross-check bad %d' % (
         st['f_mismatch_trials'], st['s_mismatch_trials'], st['ulp_step_bad']))
 

@@ -1,6 +1,6 @@
 /* x87_diff_main.h — x87 差分試験の共通 driver (native / lowered の両方が include する)。
  * 入力 (stdin, 1 trial = 1 行): 8 個の slot 値 (16 桁 hex u64) + n + n 組の (op id, slot 番号 or -1) + d (終了時のスタック深さ)。
- * 出力 (stdout, 1 trial = 1 行): F (op ごとの FSW & 0x7d00 の hex 4 桁) V (ST(0..d-1) の double bits) S (slot 8 個の u64)。
+ * 出力 (stdout, 1 trial = 1 行): F (op ごとの FSW & 0x7f00 (C3/C2/C1/C0/TOP) の hex 4 桁) V (ST(0..d-1) の double bits) S (slot 8 個の u64)。
  * 呼び出し側は ops_init() / ops_exec(id, p) / ops_fsw() / ops_final(out, d) を定義する。 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,7 +28,7 @@ int main(void) {
         printf("F");
         for (k = 0; k < n; k++) {
             ops_exec(ids[k], sl[k] >= 0 ? (void*)&slots[sl[k]] : NULL);
-            printf(" %04x", ops_fsw() & 0x7d00u);
+            printf(" %04x", ops_fsw() & 0x7f00u);
         }
         ops_final(out, d);
         printf(" V");

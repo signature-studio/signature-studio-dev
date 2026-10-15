@@ -2,7 +2,9 @@
  * 方針 (docs/DECISIONS.md の x87 ADR): f80 を持たず、スタック要素は double (f80→f64 lowering)。
  * 制限 (ADR): (1) 精度制御 PC は f64 固定 (2) fst m32 の丸めは C の cast (nearest) 固定
  * (3) fild m64 で |v|>2^53 は丸まる (4) スタック over/underflow と x87 例外は模型化しない
- * (5) RC (FCW bits 10-11) は fist/fistp の丸めにだけ適用する。 */
+ * (5) RC (FCW bits 10-11) は fist/fistp の丸めにだけ適用する。
+ * (6) C1 は fxam (符号) と比較命令 (0) の後だけ模型化する。 他の命令の C1 は native では丸めの上向きフラグになるが、
+ *     f64 は丸め方向を持たないので模型化しない (C1 は直前の fxam/比較の値を persist する)。 */
 #ifndef OTT_X87_H
 #define OTT_X87_H
 #include "ott_cpu.h"
@@ -12,7 +14,7 @@ static unsigned ott_ftop;          /* TOP */
 static uint16_t ott_fcw = 0x037f;  /* FCW (既定値) */
 static uint16_t ott_fsw;           /* C0 (bit 8) / C2 (bit 10) / C3 (bit 14) のみ。TOP は ott_ftop から合成 */
 
-#define OTT_X87_CMASK 0x4500u      /* C3|C2|C0 */
+#define OTT_X87_CMASK 0x4700u      /* C3|C2|C1|C0 */
 
 static inline double x87_st(unsigned i) { return ott_fst[(ott_ftop + i) & 7]; }
 static inline void x87_set(unsigned i, double v) { ott_fst[(ott_ftop + i) & 7] = v; }
@@ -75,7 +77,7 @@ static inline void x87_arith(int op, unsigned di, double b, int pop) {
     if (pop) x87_pop();
 }
 
-/* 比較 → C3/C2/C0 (SDM: > は 000、< は 001、= は 100、unordered は 111) */
+/* 比較 → C3/C2/C0 (SDM: > は 000、< は 001、= は 100、unordered は 111)。 C1 は 0 (native 実測: 比較命令の後の C1 は常に 0) */
 static inline void x87_fcom(double a, double b) {
     uint16_t c;
     if (a != a || b != b) c = 0x4500;
@@ -85,7 +87,7 @@ static inline void x87_fcom(double a, double b) {
     ott_fsw = (uint16_t)((ott_fsw & ~OTT_X87_CMASK) | c);
 }
 
-/* FXAM: 分類を C3/C2/C0 へ (SDM: NaN 001・有限 010・inf 011・zero 100)。 C1 (符号) は未モデル化。
+/* FXAM: 分類を C3/C2/C0 へ (SDM: NaN 001・有限 010・inf 011・zero 100)、符号を C1 へ。
  * double の非正規は f80 では正規値なので 010 にする */
 static inline void x87_fxam(void) {
     double v = x87_st(0);
@@ -94,6 +96,7 @@ static inline void x87_fxam(void) {
     else if (isinf(v)) c = 0x0500;
     else if (v == 0) c = 0x4000;
     else c = 0x0400;
+    if (signbit(v)) c |= 0x0200;
     ott_fsw = (uint16_t)((ott_fsw & ~OTT_X87_CMASK) | c);
 }
 

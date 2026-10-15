@@ -51,11 +51,12 @@ print('[crosscheck] (a) 精度由来の C0/C2/C3 不一致 (native と lowered �
 for i, (a, b) in enumerate(zip(nat, low)):
     fa = a.split(' V ')[0].split()[1:]
     fb = b.split(' V ')[0].split()[1:]
-    if fa == fb:
-        continue
     tk = tr[i].split()
     n = int(tk[8])
     ops = [(byid[int(tk[9 + 2 * j])], int(tk[10 + 2 * j])) for j in range(n)]
+    mk = [0x7d00 | (0x0200 if o['cmp'] else 0) for o, _ in ops]
+    if all((int(x, 16) & m) == (int(y, 16) & m) for x, y, m in zip(fa, fb, mk)):
+        continue
     names = [o['name'] for o, _ in ops]
     if names[:5] != ['fld', 'fsubr', 'fist', 'fsubr', 'fnstsw']:
         continue
