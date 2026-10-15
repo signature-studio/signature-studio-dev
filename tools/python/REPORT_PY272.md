@@ -10,25 +10,49 @@
   - 戻り値は全経路で `[rbp+0x3c]` 経由 (ret は 0x45c8d0 と 0x45c8ed の 2 箇所、0x45c8c8 で `mov eax, [rbp+0x3c]`)。
 - **型ごとの写像** (0x45c290 内の確定した命令):
 
-  | 型 (word) | 戻り値の式 | 備考 |
+  | 型 (word) | 飛び先 | 戻り値の式 (eax) |
   |---|---|---|
-  | 0 (VT_EMPTY) | 0 | 0x45c3d8 |
-  | 2 (VT_I2) | `movsx rax, word [arg+8]` | 0x45c406 |
-  | 3 (VT_I4) | `mov eax, [arg+8]` | 0x45c417 |
-  | 1 (VT_NULL) | 0 を返す。フラグ付きなら 0x459f60 (エラー経路、推定) を呼んでから 0 | 0x45c3e4 |
-  | 4 (R4) | `cvtss2sd` → 0x40c660 (`cvtsd2si`) → 32bit 符号つき範囲を検査、外れたら 0x40f540 | 0x45c426 |
-  | 5 (R8) | 同上 (`movsd` → 0x40c660) | 0x45c455 |
-  | 6 (CY) | `[arg+8]` を整数として 0x40c670 (10000 で割る形、推定) → 範囲検査 | 0x45c483 |
-  | 7 (DATE) | `movsd` → 0x40c660 → 範囲検査 | 0x45c4b0 |
-  | 0xb (VT_BOOL) | `movsx rax, word [arg+8]` | 0x45c4ef |
-  | 0xc (VT_VARIANT) | 内側の `Variant*` ([arg+8]) を再帰的に 0x45c290 へ | 0x45c58f |
-  | 8 (VT_BSTR) | 0x45c040 | 0x45c4e2 |
-  | 9・0xd | 0x45c170 | 0x45c5a8 |
-  | 0x11 (VT_UI1) | `movzx rax, byte [arg+8]` | 0x45c511 |
-  | 0x12 (VT_UI2) | `movzx eax, word [arg+8]` | 0x45c522 |
-  | 0x14 (VT_I8) | 範囲検査、外れたら 0x40f540 | 0x45c54a |
-  | 0x15 (VT_UI8) | `cmp rax, 0x7fffffff`、外れたら 0x40f540 | 0x45c572 |
-  | 未知の型 | 0x45c230 で判定、だめなら 0x45c170 | 0x45c889 |
+  | 0 (VT_EMPTY) | 0x45c3d8 | 0 |
+  | 1 (VT_NULL) | 0x45c3e4 | 0 (先に大域バイト `[rip+0xf522d3]` が非 0 なら 0x459f60 を呼ぶ。型フラグではない) |
+  | 2 (VT_I2) | 0x45c406 | `movsx rax, word [arg+8]` |
+  | 3 (VT_I4) | 0x45c417 | `mov eax, [arg+8]` |
+  | 4 (R4) | 0x45c426 | `cvtss2sd` → 0x40c660 (`cvtsd2si`) → 32bit 符号つき範囲を検査、外れたら 0x40f540 |
+  | 5 (R8) | 0x45c455 | `movsd` → 0x40c660 → 同上 |
+  | 6 (CY) | 0x45c483 | `[arg+8]` を rcx に渡して 0x40c670 → 同上 |
+  | 7 (DATE) | 0x45c4b0 | `movsd` → 0x40c660 → 同上 |
+  | 8 (VT_BSTR) | 0x45c4de | 0x45c040 の戻り値 |
+  | 9・0xd | 0x45c5a4 | 0x45c170 の戻り値 |
+  | 0xa・0xe・0xf・0x16〜 (フラグ無しの未知の型、計 32746 語) | 0x45c889 | `0x45c230(src, &out)` が真なら 0x45c8c8 へ (戻り値は `out`)、偽なら 0x45c170 の戻り値。0x45c230 の内部は未確認 |
+  | 0xb (VT_BOOL) | 0x45c4ef | `movsx rax, word [arg+8]` |
+  | 0xc (VT_VARIANT) | 0x45c58f | 内側の `Variant*` ([arg+8]) を 0x45c290 へ再帰 |
+  | 0x10 (VT_I1) | 0x45c500 | `movsx rax, byte [arg+8]` |
+  | 0x11 (VT_UI1) | 0x45c511 | `movzx rax, byte [arg+8]` |
+  | 0x12 (VT_UI2) | 0x45c522 | `movzx eax, word [arg+8]` |
+  | 0x13 (VT_UI4) | 0x45c532 | `mov eax, [arg+8]`。負なら 0x40f540 (`test`/`jge`) |
+  | 0x14 (VT_I8) | 0x45c54a | `mov rax, [arg+8]` → 32bit 符号つき範囲を検査、外れたら 0x40f540 |
+  | 0x15 (VT_UI8) | 0x45c572 | `mov rax, [arg+8]`、`cmp rax, 0x7fffffff`、外れたら 0x40f540 |
+  | 0x100 | 0x45c5b5 | 0x45c040 の戻り値 (`rcx` = `Variant*`) |
+  | 0x101 | 0x45c5d7 | 0x45c1c0 の戻り値 |
+  | 0x102 | 0x45c5c6 | 0x45c040 の戻り値 |
+  | 0x4000 のフラグ付きで byref 表に無い語 (0x4000・0x4001・0x4009・…、計 32753 語) | 0x45c87b | 0x45c170 の戻り値 (0x45c230 は通らない) |
+  | 0x4002 (VT_I2\|byref) | 0x45c6bf | `movsx rax, word [[arg+8]]` |
+  | 0x4003 (VT_I4\|byref) | 0x45c6d3 | `mov eax, [[arg+8]]` |
+  | 0x4004 (R4\|byref) | 0x45c6e5 | `cvtss2sd` ([[arg+8]]) → 0x40c660 → 範囲検査、外れたら 0x40f540 |
+  | 0x4005 (R8\|byref) | 0x45c717 | `movsd` ([[arg+8]]) → 0x40c660 → 同上 |
+  | 0x4006 (CY\|byref) | 0x45c748 | `[[arg+8]]` を rcx に渡して 0x40c670 → 同上 |
+  | 0x4007 (DATE\|byref) | 0x45c778 | `movsd` ([[arg+8]]) → 0x40c660 → 同上 |
+  | 0x4008 (VT_BSTR\|byref) | 0x45c7a9 | 0x45c040 の戻り値 |
+  | 0x400b (VT_BOOL\|byref) | 0x45c7ba | `movsx rax, word [[arg+8]]` |
+  | 0x4010 (VT_I1\|byref) | 0x45c7ce | `movsx rax, byte [[arg+8]]` |
+  | 0x4011 (VT_UI1\|byref) | 0x45c7e2 | `movzx rax, byte [[arg+8]]` |
+  | 0x4012 (VT_UI2\|byref) | 0x45c7f6 | `movzx eax, word [[arg+8]]` |
+  | 0x4013 (VT_UI4\|byref) | 0x45c809 | `mov eax, [[arg+8]]`。負なら 0x40f540 |
+  | 0x4014 (VT_I8\|byref) | 0x45c824 | `mov rax, [[arg+8]]` → 範囲検査、外れたら 0x40f540 |
+  | 0x4015 (VT_UI8\|byref) | 0x45c84c | `mov rax, [[arg+8]]`、`cmp rax, 0x7fffffff`、外れたら 0x40f540 |
+  | 0x400c (VT_VARIANT\|byref) | 0x45c869 | 内側 `Variant*` ([arg+8]) を 0x45c290 へ再帰 |
+
+  - 飛び先の集合は 38 個 (0x45c3d8〜0x45c889)。上の全 65536 語の飛び先は、分岐 (`cmp`/`sub`/`test`・`je`/`jne`/`jg`/`jmp`) を追跡して求めた (`pe_py272_probe.py` の `landing`、未決定 0 件)。
+  - 0x45c040・0x45c170・0x45c1c0 の式は「その呼び先の戻り値をそのまま eax にする」(確定)。呼び先の中身は未解決 (下の表)。
 
 - **+0 / +8 のフィールド**: `+0` は型ワード (word) として読まれ、`+8` は値部として読まれる (型により整数・double・ポインタ)。読み出し位置から読める事実だけで、Win32 VARIANT の配置との一致は推定。
 - **0x40f540 / 0x40f560**: `mov cl, 4 / 5` の後 `0x4096d0` へ入るだけの薄いラッパ。範囲外の結果で呼ばれるので、例外送出 (範囲外エラー) と見られる (推定)。0x4096d0 の中身は未確認。
@@ -47,9 +71,10 @@
 
 ## 1. 検証
 
-測定 commit: `f14ee5553` (probe と本 REPORT を追加した commit)。
+測定 commit: (下の commit 欄を参照。本 round で probe を変えた commit)。
 
-- probe: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py272_probe.py` → 27/27 PASS・終了 0。
+- probe: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py272_probe.py` → 41/41 PASS・終了 0 (前 round は 27 項目)。
+  - 追加 14 項目: 型ワード 65536 語の飛び先が全て決まること・飛び先集合 38 個・VT_NULL の大域バイト判定・0x10/0x11/0x13/0x100/0x101/0x102/0x4002/0x400c/0x4000/0x0a の各 case。
 - ネガティブ対照: 型 2 の式を型 3 の式と誤認した期待・0x40f540 の cl を 5 と誤認した期待の 2 件は偽として数える (PASS は「誤認が偽」を意味する)。
 - 既存 probe は触らない。`pe_py203_probe.py` (27 件) と `pe_py221_chain.py` (17 項目) は PY-272 の変更の影響を受けない (flapi 直下の既存ファイルを変えていない)。
 
@@ -59,3 +84,4 @@
 |---|---|---|
 | 0x45c170・0x45c040・0x45c1c0 の間接 call 先 (`[rax]`・`[rip+...]` の関数ポインタ) の実体。IAT に無いので、初期化箇所で書かれる値を追う必要がある | 0x45c170 の VariantChangeTypeEx 形の確定、0x45c040 の数値化 API、0x45c1c0 の解放・複製の確定 | [PY-318] (子 issue) |
 | 0x40f540・0x40f560 → 0x4096d0 の役割 (例外送出か) と、0x7ffdfffb の意味 | 範囲外時の戻り値 (0x40f540 は戻らない想定) の確定 | [PY-318] (子 issue) |
+| 0x45c230 の内部 (フラグ無しの未知の型で最初に呼ぶ判定。型ワードを 0x467910 に渡し、その結果 `dil` で真偽を決める) | 0x45c889 系 (計 32746 語) の戻り値が 0x45c230 の真偽でどちらに分岐するか | [PY-318] (子 issue) |
