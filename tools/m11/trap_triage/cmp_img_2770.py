@@ -21,8 +21,13 @@ def main():
     keys = sorted(set(ma) | set(mb))
     diff = [k for k in keys if ma.get(k) != mb.get(k)]
     heap_eq = sa.get('heap') == sb.get('heap')
-    print('%s vs %s: entry_rsp %s/%s (%s)' % (a_path.split('/')[-1], b_path.split('/')[-1], ra, rb,
-          'same' if ra == rb else 'DIFFERENT: not comparable'))
+    if ra is None or rb is None:
+        rsp_note = 'UNKNOWN: not comparable'
+    elif ra == rb:
+        rsp_note = 'same'
+    else:
+        rsp_note = 'DIFFERENT: not comparable'
+    print('%s vs %s: entry_rsp %s/%s (%s)' % (a_path.split('/')[-1], b_path.split('/')[-1], ra, rb, rsp_note))
     print('img elements %d/%d, bytes %d/%d, only_in_a=%d only_in_b=%d' % (
         len(sa['img']), len(sb['img']), na, nb, len(ea - eb), len(eb - ea)))
     print('byte_diff=%d heap_eq=%s heap_used=%s/%s hw=%s/%s' % (
