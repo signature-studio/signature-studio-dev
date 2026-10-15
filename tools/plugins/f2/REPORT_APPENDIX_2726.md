@@ -119,7 +119,7 @@ python3 tools/plugins/f2/xmm_slot_probe.py "$FL_WIN64_DIR/extracted/block18982_P
   - 前提 `f2_step1.sh` rc 0 (**576 秒**)。V1 lift (`PLUG_XMMARG=1 PLUG_LDFIX=1 PLUG_ICALL=0`、11 block): rc 0 ×11 (**47.5 秒**)。
   - `leaf_diff.sh`: rc 0、`LEAF_DIFF elapsed 146 s` (load 0.83)、最終判定 **一致 15 / 不一致 8 / 実行不能 0** (変更前の 2 回の数値 (§8 旧) と同じ判定)。
   - `xmm_slot_probe.py` (block18982 0x6b0ef0、block19013 0x6ca5c0): (a0) k80abi = `xmm2`、(a) pass = `xmm1,xmm2,xmm3`、(b) pe.py 素 = `xmm1,xmm2,xmm3`。(a) と (b) は定義上ゼロ化除外分だけ異なる関係で、差し替えの正しさの証拠ではない (根拠は下の lift 結果)。
-  - `nc_leaf.py`: 下の「未実施」を参照。
+  - `nc_leaf.py` (受入 4): 修正 commit `2eadbacd7` の lift 結果に対して実行。rc 0、181 秒 (2026-10-15 03:12:18 〜 03:15:19 UTC)。store_drop 4/4、load_drop 11/11、offset_shift 11/11 (変異後 mismatch = 検出)、未検出 0、unexec 0。
 - before の作り方: 旧 pass (`01f1b7e51` の `fix_xmm_args.py`) を、同じ入力 (`work/batch/<b>/p.ldfix.ll`、V1 lift の LDFIX 出力) に当てて `report` を作った。after は V1 lift の `p.xa.json`。入力は両者で同一。
 
 ### 8-1. 全体の集計
@@ -172,6 +172,6 @@ fixed + skipped は 71 → 62 (9 件減)。減った 9 件は次の 8-2 の「�
 
 ### 8-4. 未実施・未解決
 
-- `nc_leaf.py` (受入 4、未検出 0): 本 run で実行していない (下の追記を参照)。
+- `nc_leaf.py` (受入 4): 実行済み (上の「測定」項目を参照)。未検出 0。
 - XMMARG 単独 arm (`PLUG_XMMARG=1 PLUG_LDFIX=0`) と LDFIX 単独の A/B: 未測定 (§5 の起票先のまま)。
 - `REPORT_APPENDIX_2726.md` §8 の状態変化 (8-2) の原因は、`recovered` の変化 (0x6c86b0) と 0x6c54c0 の `no_placeholder` を除いて、機械的に確認したもの (slot 集合の差から導いた)。placeholder 接続の内部までは追っていない。
