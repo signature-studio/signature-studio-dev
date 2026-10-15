@@ -40,4 +40,4 @@
 
 ## 5. 測定 commit
 
-- 測定 commit: 本 PR で最後にコードを変えた commit (`tools/liftdiff/tests/ld263_ret_type.py` の追加)。
+- 測定 commit: `d53969e98`。
