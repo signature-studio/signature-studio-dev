@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
     int dfdb0 = argc > 4 && strcmp(argv[4], "dfdb0") == 0;
     int f470 = argc > 4 && strcmp(argv[4], "470") == 0;
     const u64 fn = dfdb0 ? 0x180fdfdb0ULL : f470 ? 0x180fdc470ULL : 0x180fdc660ULL;
-    long mis_rax = 0, mis_x = 0, nan_both = 0, nan_payload = 0, skipped = 0;
+    long mis_rax = 0, mis_x = 0, mis_x1 = 0, nan_both = 0, nan_payload = 0, skipped = 0;
     for (long t = 0; t < n; t++) {
         double x = f470 ? gen470() : gen((int)(t % 5));
         if (dfdb0) {
@@ -106,9 +106,17 @@ int main(int argc, char** argv) {
             if (isnan(gx) && isnan(nx)) { nan_both++; if (gxb != fr.xmm0) nan_payload++; }
             else mis_x++;
         }
+        if (dfdb0) {
+            double g1 = kh_xmm1_180fdfdb0, n1;
+            u64 g1b; memcpy(&g1b, &g1, 8);
+            memcpy(&n1, &fr.xmm1, 8);
+            if (g1b != fr.xmm1) {
+                if (isnan(g1) && isnan(n1)) nan_both++; else mis_x1++;
+            }
+        }
     }
-    printf("xmm0_check %s: trials %ld | rax mismatch %ld | xmm0 mismatch %ld | NaN both (bit differs %ld) | skipped %ld\n",
-           f470 ? "470" : dfdb0 ? "dfdb0" : "660", n, mis_rax, mis_x, nan_payload, skipped);
-    printf("kh_xmm0_check RESULT: %s\n", (mis_rax == 0 && mis_x == 0) ? "PASS" : "FAIL");
-    return (mis_rax == 0 && mis_x == 0) ? 0 : 1;
+    printf("xmm0_check %s: trials %ld | rax mismatch %ld | xmm0 mismatch %ld | xmm1 mismatch %ld | NaN both (bit differs %ld) | skipped %ld\n",
+           f470 ? "470" : dfdb0 ? "dfdb0" : "660", n, mis_rax, mis_x, mis_x1, nan_payload, skipped);
+    printf("kh_xmm0_check RESULT: %s\n", (mis_rax == 0 && mis_x == 0 && mis_x1 == 0) ? "PASS" : "FAIL");
+    return (mis_rax == 0 && mis_x == 0 && mis_x1 == 0) ? 0 : 1;
 }

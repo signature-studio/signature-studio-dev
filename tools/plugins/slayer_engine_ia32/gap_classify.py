@@ -152,22 +152,28 @@ def classify(env):
     for n, (a, b) in enumerate(gaps):
         bs = bytes(img[text.VirtualAddress + a:text.VirtualAddress + b])
         jt = sum(jtm[a:b])
+        head = bs[:2]
+        k = 0
+        while k < len(bs) and bs[k] in PAD:
+            k += 1
+        fbs = bs[k:]
+        fva = T0 + a + k
         entries = sorted({t for t, _ in cref[n] if func_end(md, bytes(img[t - IMG:t - IMG + 512]), t) is not None})
         if set(bs) <= PAD:
             cls, why = 'c', 'padding (90/cc/00 のみ)'
         elif jt * 2 >= (b - a):
             cls, why = 'a', 'jt 表と重なる (%d/%d B)' % (jt, b - a)
+        elif fbs[:3] == b'\x55\x8b\xec' or fbs[:5] == b'\x8b\xff\x55\x8b\xec' or fbs[:2] in (b'\x83\xec', b'\x81\xec'):
+            cls = 'b'
+            why = 'prologue %s (先頭 pad %d B の後)' % (fbs[:6].hex(' '), k)
         elif entries and not heads[n] and bs[0] in PAD:
             cls = 'b'
             why = 'コード側の即値が指す関数 %s (prologue なし・ret まで逆アセンブル可、区間先頭は pad)' % ','.join('0x%x' % x for x in entries[:3])
         elif len(relo[n]) >= 2:
             cls, why = 'a', '.text 内の reloc 値 %d 本 (ポインタ表とみなす)' % len(relo[n])
-        elif (heads[n] and bs[0] not in PAD) or bs[:3] == b'\x55\x8b\xec' or bs[:5] == b'\x8b\xff\x55\x8b\xec' or bs[:2] in (b'\x83\xec', b'\x81\xec'):
+        elif heads[n] and bs[0] not in PAD:
             cls = 'b'
-            if heads[n]:
-                why = '区間先頭への直接 call/jmp (参照元 %s)' % ','.join('0x%x' % x for x in heads[n][:3])
-            else:
-                why = 'prologue %s' % bs[:6].hex(' ')
+            why = '区間先頭への直接 call/jmp (参照元 %s)' % ','.join('0x%x' % x for x in heads[n][:3])
         else:
             cls = 'c'
             if heads[n]:
@@ -177,7 +183,7 @@ def classify(env):
             else:
                 why = '参照なし・prologue なし'
             why += (' (reloc %d 本)' % len(relo[n]) if relo[n] else '')
-        rows.append(dict(va=T0 + a, size=b - a, cls=cls, why=why, jt=jt,
+        rows.append(dict(va=T0 + a, fva=fva, size=b - a, cls=cls, why=why, jt=jt,
                          ncall=len(calls[n]), nhead=len(heads[n]), nreloc=len(relo[n]),
                          calls=['0x%x' % x for x in calls[n][:3]], relocs=['0x%x' % x for x in relo[n][:3]],
                          entries=entries if cls == 'b' else [], head=bs[:8].hex(' ')))

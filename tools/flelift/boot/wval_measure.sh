@@ -24,7 +24,7 @@ NODE="$(command -v node)"
 T=$(date +%s)
 OBJW=()
 [ "${WVAL_OBJWATCH:-0}" = 1 ] && OBJW=(--objwatch)
-python3 "$HERE/wval_lift.py" --src "$LIFT" --out "$W/lift_wv" --value "$VAL" "${OBJW[@]}"
+python3 "$HERE/wval_lift.py" --src "$LIFT" --out "$W/lift_wv" --value "$VAL" --fixobj "${WVAL_FIXOBJ:-0x12d7a090}" "${OBJW[@]}"
 echo "[wval] patch done in $(( $(date +%s) - T ))s"
 
 T=$(date +%s)

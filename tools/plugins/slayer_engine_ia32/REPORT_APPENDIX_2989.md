@@ -94,7 +94,7 @@ index 72a788e2c..80d069f06 100644
 | 残りの leaf x87 関数 36 本 (lift 済み・import と call が無い) の差分試験 | 対象の 2 本以外の x87 の命令組合せは未確認。 本付録の 2 本で受入は満たす | #3715 (PLG-G2-31・子。親 #2989) |
 | 超越関数・`frndint`・`fscale`・`fprem` 等を含む関数 (lift が `ott_unsup` のまま) | 対象外 | #2966 (PLG-G2-23) |
 | `fld`/`fstp` m80 の差分試験 | 80bit メモリ経路は未試験 | #2967 (PLG-G2-24) |
-| 例外値 (NaN・inf・非正規・±0) の NaN どうしのビット差 (符号・ペイロード)。 数値どうしは float32 で全行一致 (§7) | NaN の値そのものは一致しない。 本試験は後段の値を検査していないので、この差が後段の結果を変えるかは判定していない | #4756 (PLG-G2-60・親 #4743。原因切り分けと許容の判断。既定案は許容。#142 の許容は IPP の話で x87 には当てはまらない) |
+| 例外値 (NaN・inf・非正規・±0) の NaN どうしのビット差 (符号・ペイロード)。 数値どうしは float32 で全行一致 (§7) | NaN の値そのものは一致しない。 本試験は後段の値を検査していないので、この差が後段の結果を変えるかは判定していない。 残課題は §10 | #4817 (PLG-G2-63・分割元 #4756 PLG-G2-60・親 #4743)。 PM agent の判断待ち: NaN どうしのビット差を許容するか・既定案: 許容 (非決定の源は §9.1 で特定済み。#142 の許容は IPP の話で x87 には当てはまらない) |
 | export `main`・import を通る関数・実行時の間接 call・`sahf` の AF・`fs:` (TEB) | 関数単位の残り (x87 以外も含む) | #3127 / #3128 |
 | f80→f64 の丸め差 (ST(0) の double で 1 ulp 以上。分布は §1 参照) | float32 結果には伝播しなかった。 方式の帰結 | ADR D28 (方式)。 行案 D24 (案) は `REPORT_APPENDIX_1099.md` §6 |
 
@@ -139,6 +139,7 @@ index 72a788e2c..80d069f06 100644
 - ネガコン (通常): `--nega` (bit 一致 7,295 → 7,294、exit 0)、`--nega-lower` (`f_10002ee0` の演算取り違えで float32 不一致 4,000 / 4,000、exit 0) とも検出。
 - ネガコン (例外値): `--special --nega-nan` で wasm の NaN 1 語 (行 0 の ST(0)) を 1.0 に置換 → `nan-num` 0 → 1、判定 FAIL (exit 0 = 検出)。 測定 commit `661530759` (§7 の先頭行)。
 - 判定器の誤りを 1 件修正した: 初版は NaN どうしの差も構造の不一致として数えたため、特殊値モードが FAIL した。 数値の差と NaN どうしの差を分けて、この FAIL を解消した (判定の変更は `18a5dced7`)。 NaN と数値の混在は 0 件で、判定はこれで通す。
+- NaN どうしの差の切り分け (#4756 PLG-G2-60): 源は §9.1 (#4775)、残課題は §10。
 
 ## 9. 特殊値の不一致行の分類 (#4743 PLG-G2-58)
 
@@ -152,4 +153,34 @@ index 72a788e2c..80d069f06 100644
 | `0x10005d20` | 506 | 0 | 506 |
 
 - 判定の数値 (PASS・構造・nan-num 0) は前節 §7 と同じ。 NaN どうしのビット差は判定に入れず、本節の分類で別計上する。
-- 残り (NaN どうしのビット差の原因切り分け・後段への伝播) は子 #4756 (PLG-G2-60)。
+- 残り (NaN どうしのビット差の原因切り分け・後段への伝播) は #4756 (PLG-G2-60)。 後段の未検査は子 #4817 (PLG-G2-63)。
+
+### 9.1 揺れの源 (#4775 PLG-G2-61)
+
+- 測定 commit `a4f7e12f0` (`x87_fn_diff.py` の `WASM_TIER` 固定を入れた最後のコード commit)。 `python3 x87_fn_diff.py --special` (exit 0、wall 19.5 s、load1 0.46)。 通常モード・`--nega`・`--special --nega-nan` も同じ commit で exit 0 (ネガコン検出)。
+- 揺れの再現 (修正前、tier 未固定): 同じ `scen.txt` の先頭 8,000 行を同じ wasm・同じ image で 6 回実行すると、出力の md5 が 5 種に割れた (6 回中 2 回は一致)。 揺れは行単位で、同じ行が `ffc00000` と `7fc00001` を返す。 数値 (非 NaN) の差は 0 件。
+- 切り分け (先頭からの接頭辞ではなく、単独の probe で ops ごとに確認した):
+  - probe の原本: `probes/nanprobe/probe_tier.mjs` (追跡対象・依存なし。wasm のバイト列を直接組み立てる)。 実行: `node --liftoff-only probes/nanprobe/probe_tier.mjs > liftoff.txt` と `node --no-liftoff probes/nanprobe/probe_tier.mjs > turbofan.txt` の後に `diff liftoff.txt turbofan.txt` (emcc 不要。node 22.23.3 で実測)。
+  - 実測 (`probe_tier.mjs`・入力は float32 の 8 値 (NaN 5 種 = qNaN・-qNaN・sNaN・ペイロード違い・0xffffffff、1.0、±0) の全組、f32 add/sub/mul/div と f64 add/sub/mul、promote・demote・neg): 出力 467 行、Liftoff と TurboFan で 72 行が違う。 違いは f32_add・f32_mul・f64_add・f64_mul の 18 行ずつで、すべて両オペランドが NaN の行 (NaN 以外の入力を含む行は 0 件)。 `sub`・`div`・単項・変換は両 tier で一致。 LDF32 と `(float)` 変換は源ではない。
+  - 6 回の再現: 同じ probe を `--liftoff-only` で 6 回実行すると md5 `5c49732b…` が 6/6 同一。 `--no-liftoff` でも 3/3 同一 (md5 `1e471b8b…`、Liftoff とは別の値)。
+  - 結論: 源は V8 の tier 切替で、NaN×NaN の返す NaN の選び方が tier で違う。 wasm の NaN の符号・ペイロードは仕様で未規定。
+- 固定の確認 (受入の「同じ入力で 6 回以上」): 全 20,000 行の run を `--liftoff-only` で 6 回 (単独の node 実行) すると、6 回すべて同じ md5 (`23fc7196…`)。 `--no-liftoff` でも 6/6 同一 (`5254ee…` は別の tier の値)。
+  - 入力の出所: `scen.txt`・`image.bin` は `x87_fn_diff.py --special` が seed 2989 と素材 `block22434_PE.bin` (`FL_WIN64_DIR`、`fl-win64` の `extracted/`) から毎回生成する (`work/x87fn_special/`、gitignore)。 生成は決定的で、同じ素材・同じ seed なら同じ `scen.txt` になる。 `wasm_out.txt` の md5 `23fc7196…` は測定時の `work/` 上の出力で、`toolchain-emsdk` (emcc) が無いこの fix run では再実行できていない。 再現手順は `x87_fn_diff.py --special` を実行し、その `work/x87fn_special/wasm_out.txt` を 6 回取り直す。
+  - fix run での再確認: 20,000 行の md5 の再取得は未実施 (wasm 側の lift に emcc が要り、この runner には無い)。 代わりに同じ tier 固定の効果を単独 probe で 6 回測定した (上の probe の項)。 両 tier は NaN ビットだけが違い、native 対 liftoff の NaN 以外の差は 0 件 (8,000 行で確認)。 harness の `wasm_out.txt` は chunk 分割の結果で、行番号を除くと単独 run と一致 (0 行差)。
+- 修正前後の判定への影響: 判定 (PASS・構造・nan-num 0) は変わらない。 mismatch 分類の件数は run ごとに揺れた。 固定後の基準値 (`a4f7e12f0`、2 回とも一致): `fn_10002ee0` NaN どうし 858・f80 2 行、`fn_10005400` NaN どうし 701・f80 28 行、`fn_10005d20` NaN どうし 458。
+- 後段への伝播 (固定後の wasm 対 native。 NaN どうしの差のみ。 非 NaN の差は全関数 0 件):
+  - `fn_10005400`: `eax` の NaN どうし 622 行。 OBJ 窓の NaN どうし 4,134 語 (うち `[0x508..0x518)` の範囲は 1,948 語)。
+  - `fn_10002ee0`: ST(0) の NaN どうし 461 行、OBJ 窓 906 語。 `fn_10005d20`: ST(0) 284 行、OBJ 窓 1,320 語。
+  - 分岐 (`fcomp`→`fnstsw`→`test ah`) への影響は未検査。 NaN との比較は符号に依らず unordered になる想定だが、この harness では確認していない。 値を読む後段の演算は未検査 (子 #4817 が受ける)。
+- 判断案 (PM の判断が要る): **許容** を推す。 理由: (1) 揺れの源は wasm の NaN 符号の未規定と V8 の tier で、ロジックの誤りではない。 (2) 非 NaN の値は全件一致。 (3) tier 固定で再現する。 ただし `eax` の NaN どうしと OBJ 窓の NaN どうしが実 FL の値と一致するかは未確認。 本件の判断は #4756 (PLG-G2-60) に残し、未検査の実測は子 #4817 (PLG-G2-63) が受ける。
+- 注: 受入の「先頭から揺れた行までの接頭辞での再現」は、接頭辞の二分探索ではなく ops 単位の probe で代えた。 揺れの源は ops で確定したので、接頭辞の再現は行わなかった。
+- 再測定 (#4756 レビュー対応・測定 commit `3bf12f0c2`・emsdk 6.0.12 を上流から導入して実 emcc で実行): `x87_fn_diff.py --special` を 2 回。 exit 0・PASS、wall 16.1 s / 16.9 s、分類は両回とも `fn_10002ee0` NaN どうし 858・f80 2、`fn_10005400` 701・28、`fn_10005d20` 458。 wasm 出力の md5 は 2 回とも `5254ee2f…` (§9.1 の 20,000 行の値と一致)、native は `cca1f57e…`。 `--special --nega-nan` (exit 0、nan-num 0 → 1、判定 FAIL = 検出)。 通常モード (exit 0、`fn_10002ee0` bit 一致 3,890/4,000、`fn_10005400` 3,405/4,000)。 `--nega` (exit 0、bit 一致 15,495 → 15,494、検出)。 `--nega-lower` (exit 0、OBJ 窓が変わった行 4,000/4,000)。 ※ `--nega` は通常モードの出力 (`work/x87fn/`) を前提にするため、先に通常モードを実行した。
+- lift 経路 (`lift_text.py`、実 emcc): 70b68ebc9 は第 2 パスの追加 roots 5 個 (`ott_lifted.c` 2,384,521 B)、`3bf12f0c2` は 9 個 (2,400,299 B)。 増えた 4 個 (`0x1000ea92`・`0x1000eaac`・`0x1000eab4`・`0x1000eb8c`) で関数 355 行が追加された。 対象 3 関数 (`f_10002ee0`・`f_10005400`・`f_10005d20`) の本体は md5 が両版で一致。 `x87_fn_diff.py --special` の分類件数は両版で同じ (上の再測定)。
+
+## 10. NaN どうしのビット差の残課題 (#4756 PLG-G2-60)
+
+源の特定 (V8 の tier 切替) と 6 回の固定の確認は §9.1 (#4775・PR #4795) が正。 本節は残る未検査の範囲と判断だけを書く。 未検査の範囲の起票先は #4817 (PLG-G2-63)。
+
+- 未検査: 分岐 (`fcomp`→`fnstsw`→`test ah`) への NaN の伝播 (NaN との比較は unordered になる想定で、この harness では未確認)。 起票先 #4817。
+- 未検査: `eax` の NaN どうし (`fn_10005400` で 622 行) と OBJ 窓の NaN どうし (§9.1) が、実 FL の値と一致するか。 native 側は決定的で、一致の基準は native (x87 実機の規則) である。 起票先 #4817。
+- PM agent の判断待ち: NaN どうしのビット差 (符号・ペイロード) を許容するか (実 FL の x87 の値と一致させるか)。 既定案は許容 (IPP の #142 の許容は x87 には当てはまらない)。 判断材料は §9.1 の判断案と上の未検査の範囲。

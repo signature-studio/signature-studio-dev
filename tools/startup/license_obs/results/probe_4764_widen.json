@@ -1,0 +1,111 @@
+{
+ "static_sites": 298,
+ "executed_union": 41,
+ "unexecuted": 257,
+ "cases": [
+  {
+   "case": "A1 no-IL cl0",
+   "status": "ok",
+   "sites_executed": 33,
+   "new_vs_previous": 33,
+   "union_so_far": 33,
+   "sec": 5.0
+  },
+  {
+   "case": "A2 no-IL cl1",
+   "status": "ok",
+   "sites_executed": 33,
+   "new_vs_previous": 0,
+   "union_so_far": 33,
+   "sec": 5.3
+  },
+  {
+   "case": "A2b no-IL cl2",
+   "status": "ok",
+   "sites_executed": 33,
+   "new_vs_previous": 0,
+   "union_so_far": 33,
+   "sec": 5.7
+  },
+  {
+   "case": "A3 no-IL other-PC",
+   "status": "ok",
+   "sites_executed": 32,
+   "new_vs_previous": 0,
+   "union_so_far": 33,
+   "sec": 6.0
+  },
+  {
+   "case": "A4 no-IL no-GUID",
+   "status": "ok",
+   "sites_executed": 31,
+   "new_vs_previous": 0,
+   "union_so_far": 33,
+   "sec": 6.2
+  },
+  {
+   "case": "B1 seed cl0",
+   "status": "ok",
+   "sites_executed": 37,
+   "new_vs_previous": 8,
+   "union_so_far": 41,
+   "sec": 8.0
+  },
+  {
+   "case": "B2 seed cl1",
+   "status": "ok",
+   "sites_executed": 37,
+   "new_vs_previous": 0,
+   "union_so_far": 41,
+   "sec": 7.9
+  },
+  {
+   "case": "B2b seed cl2",
+   "status": "ok",
+   "sites_executed": 37,
+   "new_vs_previous": 0,
+   "union_so_far": 41,
+   "sec": 7.9
+  },
+  {
+   "case": "B3 seed other-PC",
+   "status": "ok",
+   "sites_executed": 36,
+   "new_vs_previous": 0,
+   "union_so_far": 41,
+   "sec": 7.7
+  },
+  {
+   "case": "D1 128hex cl1",
+   "status": "ok",
+   "sites_executed": 37,
+   "new_vs_previous": 0,
+   "union_so_far": 41,
+   "sec": 8.3
+  },
+  {
+   "case": "D2 empty cl1",
+   "status": "ok",
+   "sites_executed": 33,
+   "new_vs_previous": 0,
+   "union_so_far": 41,
+   "sec": 5.7
+  },
+  {
+   "case": "D3 8hex cl0",
+   "status": "ok",
+   "sites_executed": 37,
+   "new_vs_previous": 0,
+   "union_so_far": 41,
+   "sec": 7.9
+  },
+  {
+   "case": "D3 8hex cl1",
+   "status": "ok",
+   "sites_executed": 37,
+   "new_vs_previous": 0,
+   "union_so_far": 41,
+   "sec": 7.5
+  }
+ ]
+}

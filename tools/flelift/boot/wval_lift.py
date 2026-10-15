@@ -123,7 +123,7 @@ OBJ_ENTRY = {'L_6ba1f0:;': 0x6ba1f0, 'L_6cd520:;': 0x6cd520}
 OBJ_SET = {'L_6ba25b:;': 0x6ba25b}
 
 
-def patch(lines, value, cap, objwatch=False, fixobj=0x12d6a090):
+def patch(lines, value, cap, objwatch=False, fixobj=0x12d7a090):
     out = []
     va = 0
     hooked = False
@@ -171,7 +171,7 @@ def main():
     ap.add_argument('--value', default='0x6bbc20', help='監視する書込み値 (既定 0x6bbc20)')
     ap.add_argument('--cap', type=int, default=400, help='1 TU あたりの出力上限')
     ap.add_argument('--objwatch', action='store_true', help='obj+0xc4 (mode) への全幅 store を宛先一致で監視する (--value は使わない)')
-    ap.add_argument('--fixobj', default='0x12d6a090', help='確保前から監視する obj の既定値 (確保内の store を拾う。前回実測の obj)')
+    ap.add_argument('--fixobj', default='0x12d7a090', help='確保前から監視する obj の既定値 (確保内の store を拾う。前回実測の obj)')
     a = ap.parse_args()
     value = int(a.value, 16)
     os.makedirs(a.out, exist_ok=True)
