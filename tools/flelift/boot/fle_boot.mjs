@@ -162,6 +162,24 @@ const pyEvents = (() => {
 })();
 boot.py_events = pyEvents;
 console.log('FLEBOOT_PY123 ' + JSON.stringify(pyEvents));
+// PY-201 (#3028): unit dispatch 直前の undo 状態 (fle_boot.c の py_snap_undo・64 B/件)。last = 最後に記録した unit 直前、trace = 値が変わった unit
+const pySnap = (() => {
+    const dv = new DataView(m.HEAPU8.buffer);
+    const hx = (v) => '0x' + v.toString(16);
+    const rd = (b) => ({
+        unit: dv.getUint32(b, true), pos: dv.getUint32(b + 4, true), count: dv.getUint32(b + 8, true),
+        mgr: hx(dv.getBigUint64(b + 16, true)), safe_g: hx(dv.getBigUint64(b + 24, true)),
+        safe_obj: hx(dv.getBigUint64(b + 32, true)), f98: hx(dv.getBigUint64(b + 40, true)),
+        f88: hx(dv.getBigUint64(b + 48, true)), sing: hx(dv.getBigUint64(b + 56, true)),
+    });
+    const last = rd(Number(m._fle_py_snap_last_ptr()));
+    const n = Number(m._fle_py_snap_trace_n()), p = Number(m._fle_py_snap_trace_ptr());
+    const trace = [];
+    for (let i = 0; i < n; i++) trace.push(rd(p + 64 * i));
+    return { last, trace };
+})();
+boot.py_snap = pySnap;
+console.log('FLEBOOT_PY201 ' + JSON.stringify(pySnap));
 // FLE-6: dsp_ippv2 GetProcAddress 結果 (0x15F34A0 = ippsZero_8u の登録値) と IPP 呼出の証跡
 boot.ipp_ptr_15F34A0 = rd64(0x15F34A0);
 boot.ipp_ptr_15F40E8 = rd64(0x15F40E8);

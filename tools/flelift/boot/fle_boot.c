@@ -107,7 +107,34 @@ static const u32 g_py_watch[PY_WATCH_N] = { 0x15e1c78u, 0x15e4790u, 0x16b82e0u }
 static u64 g_py_last[PY_WATCH_N];
 static py_ev g_py_ev[PY_EV_MAX];
 static u32 g_py_ev_n, g_py_ev_over;
+/* PY-201 (#3028): unit dispatch 直前の undo 状態 (計測のみ)。値が 0 に戻る前の最後の状態を last に残し、
+ * 値が変わった unit を trace に残す。mgr = [0x15e1c78]・pos/count = [mgr+0x20]/[mgr+0x24]・
+ * safe_obj = [[0x15e4790]+8]・f98/f88 = [safe_obj+0x98]/[+0x88]・sing = [0x16b82e0]。 */
+typedef struct { u32 unit, pos, count, pad; u64 mgr, safe_g, safe_obj, f98, f88, sing; } py_snap;   /* 64 B (JS 側の読出しと一致) */
+#define PY_TRACE_MAX 32
+static py_snap g_py_snap_last, g_py_snap_trace[PY_TRACE_MAX];
+static u32 g_py_snap_trace_n;
+static int py_snap_same(const py_snap* a, const py_snap* b) {
+    return a->mgr == b->mgr && a->pos == b->pos && a->count == b->count && a->safe_g == b->safe_g &&
+           a->safe_obj == b->safe_obj && a->f98 == b->f98 && a->f88 == b->f88 && a->sing == b->sing;
+}
+static void py_snap_undo(void) {
+    py_snap s;
+    s.unit = g_units_run; s.pad = 0;
+    s.mgr = LD64(0x15e1c78u);
+    if (!s.mgr) return;
+    s.pos = LD32(s.mgr + 0x20); s.count = LD32(s.mgr + 0x24);
+    s.safe_g = LD64(0x15e4790u);
+    s.safe_obj = s.safe_g ? LD64(s.safe_g + 8) : 0;
+    s.f98 = s.safe_obj ? LD64(s.safe_obj + 0x98) : 0;
+    s.f88 = s.safe_obj ? LD64(s.safe_obj + 0x88) : 0;
+    s.sing = LD64(0x16b82e0u);
+    g_py_snap_last = s;
+    if (g_py_snap_trace_n == 0 || (g_py_snap_trace_n < PY_TRACE_MAX && !py_snap_same(&s, &g_py_snap_trace[g_py_snap_trace_n - 1])))
+        g_py_snap_trace[g_py_snap_trace_n++] = s;
+}
 static void py_watch_snap(void) {
+    py_snap_undo();
     for (u32 k = 0; k < PY_WATCH_N; k++) {
         g_py_last[k] = LD64(g_py_watch[k]);
         if (g_py_ev_n < PY_EV_MAX) {
@@ -131,6 +158,9 @@ static void py_watch(u32 site, u32 proc, u64 aux) {
 EMSCRIPTEN_KEEPALIVE unsigned fle_py_ev_ptr(void) { return (unsigned)(uintptr_t)g_py_ev; }
 EMSCRIPTEN_KEEPALIVE int fle_py_ev_n(void) { return (int)g_py_ev_n; }
 EMSCRIPTEN_KEEPALIVE int fle_py_ev_over(void) { return (int)g_py_ev_over; }
+EMSCRIPTEN_KEEPALIVE unsigned fle_py_snap_last_ptr(void) { return (unsigned)(uintptr_t)&g_py_snap_last; }
+EMSCRIPTEN_KEEPALIVE unsigned fle_py_snap_trace_ptr(void) { return (unsigned)(uintptr_t)g_py_snap_trace; }
+EMSCRIPTEN_KEEPALIVE int fle_py_snap_trace_n(void) { return (int)g_py_snap_trace_n; }
 /* strict variant は link 構成として fail-fast 化 (-DFLEBOOT_STRICT=1)。実行時切替も可。 */
 #if FLEBOOT_STRICT
 unsigned char fle_g_strict = 1;
@@ -596,6 +626,7 @@ void fle_ov_initunits(void) {
         if (!proc) continue;
         if (LD64(proc) == 0) { g_units_empty++; continue; }   /* 実機と同じ [proc]!=0 check (.text 窓) */
         g_units_run++;
+        py_snap_undo();
         py_watch(1, (u32)proc, 0);
         R[4] -= 8; ST64(R[4], 0x412129ull);   /* 実機の call [rbp+0x38] (0x412126, 3B) の復帰点 */
         R[1] = 0; R[2] = 0; R[8] = 0; R[9] = 0;
