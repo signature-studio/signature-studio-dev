@@ -7,7 +7,8 @@
   ShortString) が読めるものだけを対象にする。DMT ポインタは VMT-0x90 (Delphi x64 の vmtDynamicTable)。
 - DMT の形式: Word count、Word msgid[count]、QWORD handler[count] (絶対 VA)。命令 0x40ff70 の検索と一致する。
 - --chain: VMT の継承鎖を出す。vmtParent (VMT-0x78) は親 VMT へのポインタの番地なので、一段デリファレンスして読む。
-  各 VMT の slot 0x1d0 (窓生成の仮想呼出し先) と 0x288 (窓プロシージャ) を出す。
+  各 VMT の slot 0x1d0 (窓生成の仮想呼出し先) と 0x288 (窓プロシージャ) を出す。VMT の長さは PE に無いので、
+  先頭から連続する .text を指す QWORD の本数を表の長さとみなし、表の外の slot は値を出さず (表の外) と印字する。
 
 展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin
 """
@@ -46,7 +47,15 @@ def load():
         s = raw[o + 1:o + 1 + raw[o]]
         return s.decode("latin1") if all(32 <= c < 127 for c in s) else None
 
-    return raw, base, secs, v2o, q, cname
+    text = [(lo, lo + sz) for lo, sz, _, _, name in secs if name == ".text"]
+
+    def table_len(vmt):
+        n = 0
+        while n < 4096 and any(lo <= q(vmt + 8 * n) < hi for lo, hi in text):
+            n += 1
+        return n
+
+    return raw, base, secs, v2o, q, cname, table_len
 
 
 def named_vmts(raw, base, secs, cname):
@@ -72,7 +81,7 @@ def main():
         chain_vmt = int(args[i + 1], 16)
         del args[i:i + 2]
     msgs = [int(a, 16) for a in args]
-    raw, base, secs, v2o, q, cname = load()
+    raw, base, secs, v2o, q, cname, table_len = load()
     vmts = named_vmts(raw, base, secs, cname)
     print(f"named VMTs (self-pointer + class name): {len(vmts)}")
     total = 0
@@ -97,7 +106,10 @@ def main():
             if not v or not cname(v):
                 break
             pp = q(v - 0x78)
-            print(f"  {cname(v)} VMT {v:#x} slot0x1d0 {q(v + 0x1d0):#x} slot0x288 {q(v + 0x288):#x}")
+            n = table_len(v)
+            s1 = f"{q(v + 0x1d0):#x}" if 0x1d0 // 8 < n else "(表の外)"
+            s2 = f"{q(v + 0x288):#x}" if 0x288 // 8 < n else "(表の外)"
+            print(f"  {cname(v)} VMT {v:#x} 表 {n} 本 slot0x1d0 {s1} slot0x288 {s2}")
             v = q(pp) if pp else 0
 
 
