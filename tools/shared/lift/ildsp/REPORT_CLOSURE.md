@@ -138,7 +138,7 @@ IAT 名の内訳 (件数):
 | GPS CreateInstance 単体の命令数: 本節 961 命令 (closure の和集合)、`REPORT.md` §4-5 は 924 命令 (同じ 36 関数)。計算規則の差の有無は未確認 | §4.2 と §4-5 のどちらを正にするか | #161 (PM 判断) |
 | REPORT.md §1 の SIMD 比 30.7% の出典 | 旧 REPORT 値の再現 | #161 |
 
-### 7. CreateInstance の native 実行 (#2528 / T-SH-38・#3249 slot 役割・#4117 slot 0)
+### 7. CreateInstance の native 実行 (#2528 / T-SH-38・#3249 slot 役割・#4116 slot 3 引数・#4117 slot 0)
 - 結論・測定値・表: `REPORT_APPENDIX_3249.md` (§7 の全文を分割移動)。受入 1・4 は #2528 で満たして `Closes`。受入 2 (slot 役割) は #3249、受入 3 は #3250。
 
 ### 8. 0x161fc0 閉包の間接 call / jmp (T-SH-70 #3346)

@@ -129,6 +129,29 @@ static void on_trap(int sig, siginfo_t* si, void* vuc) {
     g[REG_RIP] = tgt;
 }
 
+static void on_segv(int sig, siginfo_t* si, void* vuc) {
+    (void)sig;
+    ucontext_t* uc = vuc; greg_t* g = uc->uc_mcontext.gregs;
+    printf("segv_rip=0x%llx addr=0x%llx rdx=%lld rcx=%lld r8=%lld r9=%llx r12=%llx\n",
+           (unsigned long long)((uint64_t)g[REG_RIP] - IMG_BASE), (unsigned long long)si->si_addr,
+           (long long)g[REG_RDX], (long long)g[REG_RCX], (long long)g[REG_R8], (unsigned long long)g[REG_R9], (unsigned long long)g[REG_R12]);
+    uint8_t* o = (uint8_t*)g[REG_RBX];
+    for (int i = 0; i < 4; i++) printf("xmm%d=%g ", i, (double)*(float*)&uc->uc_mcontext.fpregs->_xmm[i]);
+    printf("\nobj flag74=%d,%d,%d,%d c4=%d,%d 114=%d,%d 204=%d 28=%d 68=%d\n",
+           *(int32_t*)(o + 0x74), *(int32_t*)(o + 0x78), *(int32_t*)(o + 0x7c), *(int32_t*)(o + 0x80),
+           *(int32_t*)(o + 0xc4), *(int32_t*)(o + 0xc8), *(int32_t*)(o + 0x114), *(int32_t*)(o + 0x118),
+           *(int32_t*)(o + 0x204), *(int32_t*)(o + 0x28), *(int32_t*)(o + 0x68));
+    fflush(stdout); _exit(98);
+}
+
+static void on_alarm(int sig, siginfo_t* si, void* vuc) {
+    (void)sig; (void)si;
+    ucontext_t* uc = vuc; greg_t* g = uc->uc_mcontext.gregs;
+    printf("alarm_rip=0x%llx rdx=%lld rcx=%lld rax=%lld\n", (unsigned long long)((uint64_t)g[REG_RIP] - IMG_BASE),
+           (long long)g[REG_RDX], (long long)g[REG_RCX], (long long)g[REG_RAX]);
+    fflush(stdout); _exit(97);
+}
+
 static void install_hooks(void) {
     struct sigaction sa; memset(&sa, 0, sizeof sa);
     sa.sa_sigaction = on_trap; sa.sa_flags = SA_SIGINFO;
@@ -189,6 +212,7 @@ typedef MS uint64_t (*Fn0)(void);
 typedef MS uint64_t (*Fn4)(uint64_t, uint64_t, uint64_t, uint64_t);
 typedef MS uint64_t (*Fn1F)(uint64_t, float);                          /* slot 1: 2 番目の引数が xmm1 (float) */
 typedef MS uint64_t (*Fn2F)(uint64_t, uint64_t, float);                /* slot 2: rdx = index, xmm2 = float */
+typedef MS uint64_t (*Fn5)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
 
 static void dump_changed(const uint8_t* a, const uint8_t* b, size_t n) {
     int first = 1; size_t i = 0;
@@ -207,9 +231,10 @@ static uint64_t unimpl_total(void) { uint64_t t = 0; for (int i = 0; i < g_nunim
 int main(int argc, char** argv) {
     if (argc < 2) { fprintf(stderr, "usage: ildsp_native <PE> [--neg-lea]\n"); return 2; }
     setvbuf(stdout, NULL, _IOLBF, 0);
-    int neg = 0, only_k = -1, only_v = -1, create_only = 0;
+    int neg = 0, only_k = -1, only_v = -1, s3bufs = 0, create_only = 0;
     for (int i = 2; i < argc; i++) {
         if (!strcmp(argv[i], "--neg-lea")) neg = 1;
+        else if (!strcmp(argv[i], "--s3-bufs")) s3bufs = 1;
         else if (!strcmp(argv[i], "--create-only")) create_only = 1;
         else if (!strcmp(argv[i], "--slot") && i + 2 < argc) { only_k = atoi(argv[i + 1]); only_v = atoi(argv[i + 2]); i += 2; }
     }
@@ -259,7 +284,48 @@ int main(int argc, char** argv) {
             uint64_t rax;
             if (k == 1) rax = ((Fn1F)fn)(w, 1.0f);
             else if (k == 2) rax = ((Fn2F)fn)(w, rdx, 1.0f);
-            else rax = ((Fn4)fn)(w, rdx, 0, 0);
+            else if (k == 3 && s3bufs) {
+                /* slot 3 (Process 候補): r8=ch 数, r9=入力 float 配列, 第 5 引数=出力 float 配列 (逆アセンブル #2528 追記) */
+                uint64_t ch = 2, n = rdx * ch + 4;
+                float* ibuf = (float*)k_HeapAlloc(NULL, 0, n * 4);
+                float* obuf = (float*)k_HeapAlloc(NULL, 0, n * 4);
+                for (uint64_t j = 0; j < n; j++) ibuf[j] = 0.25f;
+                /* 内部 buffer と count を張る (REPORT_APPENDIX_2529 の diff_test と同じ方針) */
+                float* ring = (float*)k_HeapAlloc(NULL, 0, 64 * 4);
+                float* cur = (float*)k_HeapAlloc(NULL, 0, 64 * 4);
+                float* rb = (float*)k_HeapAlloc(NULL, 0, 64 * 4);
+                uint8_t* tmp = (uint8_t*)in;
+                *(uint64_t*)(tmp + 0x208) = (uint64_t)ibuf;
+                *(uint64_t*)(tmp + 0x258) = (uint64_t)ring;
+                *(uint64_t*)(tmp + 0x260) = (uint64_t)cur;
+                *(uint64_t*)(tmp + 0x10) = (uint64_t)rb;
+                *(uint64_t*)(tmp + 0x18) = (uint64_t)rb;
+                *(uint64_t*)(tmp + 0x20) = (uint64_t)rb;
+                *(int32_t*)(tmp + 0x244) = 64;
+                *(int32_t*)(tmp + 0x248) = 0;
+                *(int32_t*)(tmp + 0x24c) = 0;
+                *(int32_t*)(tmp + 0x250) = 0;
+                *(int32_t*)(tmp + 0x254) = 1;
+                *(int32_t*)(tmp + 0x204) = 64;
+                for (int j = 0; j < 20; j++) { *(int32_t*)(tmp + 0xc4 + 4 * j) = 1; *(int32_t*)(tmp + 0x114 + 4 * j) = 1; }
+                *(int32_t*)(tmp + 0xc4) = 1; *(int32_t*)(tmp + 0x114) = 1;
+                *(int32_t*)(tmp + 0x28) = 1;
+                *(int32_t*)(tmp + 0x2c) = 0;
+                for (int j = 0; j < 64; j++) ring[j] = cur[j] = 0.0f;
+                printf("s3_obj set 0x208=ibuf 0x244=64 0x254=1 0x258=ring 0x260=cur\n");
+                struct sigaction sa2; memset(&sa2, 0, sizeof sa2);
+                sa2.sa_sigaction = on_alarm; sa2.sa_flags = SA_SIGINFO;
+                sigaction(SIGALRM, &sa2, NULL);
+                struct sigaction sg; memset(&sg, 0, sizeof sg);
+                sg.sa_sigaction = on_segv; sg.sa_flags = SA_SIGINFO;
+                sigaction(SIGSEGV, &sg, NULL);
+                alarm(3);
+                rax = ((Fn5)fn)(w, rdx, ch, (uint64_t)ibuf, (uint64_t)obuf);
+                alarm(0);
+                printf("s3_out first=%f,%f last=%f\n", obuf[0], obuf[1], obuf[(rdx * ch) - 1]);
+            } else {
+                rax = ((Fn4)fn)(w, rdx, 0, 0);
+            }
             memcpy(after, (void*)in, OBJ_SZ);
             printf("slot k=%d variant=%d rdx=0x%llx fn=0x%llx rax=0x%llx unimpl_calls=%llu heapfree_calls=%llu",
                    k, v, (unsigned long long)rdx, (unsigned long long)(fn - IMG_BASE), (unsigned long long)rax,
