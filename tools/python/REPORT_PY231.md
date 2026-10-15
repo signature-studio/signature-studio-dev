@@ -90,7 +90,7 @@ ba4a31: call 0x663430
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 値の変化検出 (0xfdc8a0 の cmp/je)・テーブル初期値・添字の範囲 | 同じ値・同じ添字の連続 forwardMIDICC を、C・mock は毎回送出として数える (PE は送らない) | #3949 (PY-276) |
-| 第 2 引数の既定値 1 (stub 由来)・1 引数呼出し | PE の `"ii"` は両方必須。C・mock は 1 引数を既定 1 で受ける。解析失敗の観測 (例外・戻り code) は未確定 | #3950 (PY-277) |
+| 第 2 引数の既定値 1 (stub 由来)・1 引数呼出し | PE の `"ii"` は PyArg 規則上は両方必須 (解析関数は未同定)。C・mock は 1 引数を既定 1 で受ける。解析失敗の観測 (例外・戻り code) は未確定 | #3950 (PY-277) |
 | 送出先 HMIDIOUT (`[obj+0x7c]`)・無効フラグ (`[obj+0x84]`) の由来 (下流は winmm `midiOutShortMsg`・§1) | 送出先 port を C・mock の送出記録は持たない (どの MIDI 出力かは未確定) | #3981 (PY-287) |
 | `provider_check` (flpy 未 build) | 同梱 script の forwardMIDICC 経路を flpy 経由で未確認 | #3804 (PY-255) |
 | `midi_bundled_device`・`midi_rpc_split` (flpy 未 build) | #3804 の本文 (`provider_check`・`all_tools`) の範囲外。同梱 script の forwardMIDICC 経路を flpy 経由で未確認 | #3804 (範囲追加をコメントで依頼) |
