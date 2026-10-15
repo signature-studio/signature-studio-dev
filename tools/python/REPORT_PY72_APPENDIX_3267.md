@@ -43,7 +43,7 @@
 ### 測定
 
 - 測定 commit: `f13b104c1` (`pe_vmt_probe.py` を追加した commit。コードを変えた最後の commit)。
-- 検証 HEAD: `1ff8ee111` (コミット済み・作業ツリー clean)。`git diff f13b104c1 1ff8ee111 -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。本付録の commit は `tools/python/REPORT_PY72*.md` と `docs/DOC_MAP.md` だけを変える。
+- 検証 HEAD: `1ff8ee111` (コミット済み・作業ツリー clean。n=3 の測定時点)。後続の docs 修正 `4585eb2e4` でも 2 probe を各 1 回再現し、出力は md5 一致 (TPublicChannel `35b0e0dc`・TPreviewChannel `b0ef6841`)、終了 0。`git diff f13b104c1 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。本付録の commit は `tools/python/REPORT_PY72*.md` と `docs/DOC_MAP.md` だけを変える。
 - 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-3267 --wildcards '*block00031_PE.bin'` (2.3 秒。`extracted/block00031_PE.bin` に展開。repo 外)。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-3267 python3 analysis/flapi/pe_vmt_probe.py <VMT> <slot> --disp 0x118` を同一 HEAD で連続 3 回 (n=3)。終了コードは 6 回すべて 0。出力は 3 回ともバイト単位で同一 (md5 一致)。
 
@@ -52,7 +52,7 @@
 | `0xfe2cf8 0xfe2e10` (TPublicChannel) | 8.20–8.36 秒 | 0.94→1.03・1.03→1.19・1.19→1.31 |
 | `0xfe2fc8 0xfe30e0` (TPreviewChannel) | 8.27–8.29 秒 | 1.31→1.49・1.49→1.45・1.45→1.38 |
 
-- 所要は負荷で変わる。レビュアの独立再実行 (load 0.71) では 13.4 秒・13.9 秒だった。秒数は参考値で、性能の主張には使わない。
+- 所要は負荷では説明できない。load 0.37〜1.49 の範囲で 8.2〜8.6 秒 (本 run の n=3 と、後続の HEAD `4585eb2e4` での 2 回)。レビュアの独立再実行 (load 0.71) では 13.4 秒・13.9 秒で、原因は未確認。秒数は参考値で、性能の主張には使わない。
 - 前回の n=1 の値 (load 0.46 での 7.3 秒・7.4 秒) は、上の n=3 の値に置き換えた。
 - 補助 (測定対象外・repo 外の一時スクリプト): PE 全体の 8 バイト値 (`0xffe290`・`0x1001b70`・`0xfe9090`) と 4 バイト値 (VA・RVA) の走査。`.text` の 1 件ずつ (VMT slot)、`.pdata` の関数 RVA の 1 件ずつ。
 
