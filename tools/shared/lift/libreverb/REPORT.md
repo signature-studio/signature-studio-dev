@@ -7,6 +7,24 @@
 win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を RetDec で lift し、`ucomiss` flags 修復 (1 pass) + SSE scalar helper 生成で wasm 化。
 **native 実機械語 vs wasm の全バイト比較 240/240 一致** (ネガコン 4 件は全て FAIL = ゲートは効く)。**実インスタンス (CreateReverbInstance) 駆動は未達**: 生成直後の状態では `Process_Fruity` が SIGSEGV (§7 → [T-SH-71] #3361)。**ildsp は未達**: WaveformColouring は #3216 (CLOSED・部分達成。残りは #3274・#3275・#3276)。GeneralPitchShifter の残件は #3318・#3320。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance は未起票で #161 に残す (§6)。
 
+## 0. gen_helpers の未対応 op 全数 (#3316・ildsp 0x161fc0 closure)
+
+測定 commit: `2ae10ac85` (`gen_helpers.py` の変更。ildsp 側の lift 入力は `c5bd6af6e` の `lift_vtable.sh 0x161fc0`)。
+- 変更: 未対応の宣言を即 exit せず**全数列挙**してから exit 1 にする。`i8` (psrldq/psrlq/psllq 等の即値) を型写像に追加 (従来は KeyError で落ちていた)。対応済み 7 種の出力は変えない。
+- 件数の定義 (本節の数字はこの 3 つだけを指す。他の節・PR 本文はこれを参照する):
+
+| 記号 | 定義 | 値 | 出典 |
+|---|---|---|---|
+| (a) declare 行数 | `norm_raw.ll` のうち `^declare` かつ `@__asm_*` を持つ行数 | 未再測定 (本 run に `toolchain-retdec` が無く、`.ll` も無い) | — |
+| (b) distinct op 名数 | `grep '^declare' norm_raw.ll \| grep -oE '@__asm_[a-z0-9]+' \| sort -u \| wc -l` (対応済み op を含む closure 全体) | 54 | [ildsp REPORT_LIFT §3](ildsp/REPORT_LIFT.md) (`f180a18d4`・toolchain-retdec v5.0) |
+| (c) 未対応シグネチャ数 | `gen_helpers.py` が未対応として列挙した declare 行数 (rc=1) | 62 (2ae10ac85 での実行結果。本 run では再現していない) | 本節の測定 |
+
+- (b) は対応済み 7 種 (movss/movaps/addss/subss/mulss/xorps/ucomiss) を含む全 op 名の数。したがって未対応の op 名の数は「(b) − 7 以上・(b) 以下」で、(b) そのものを未対応の数とは読めない。(c) は gen_helpers の対応表で弾かれた declare 行の数。旧記述「declare 62 件が未対応 (op 名 54 種)」は (b) と (c) を取り違えていた。
+- issue #3316 の題名の「49 種」は古い数字で、本文の「54 種」が (b) と一致する。
+- 未対応の op 名の例: `cvttss2si`・`movd`・`cvtdq2ps`・`divss`・`vfmadd231sd`・`ucomisd`。
+- 未再測定の扱い: (a) と (c) は、`toolchain-retdec` の素材を付けた run (`oc_artifacts: fl-win64 toolchain-retdec`) で `lift_vtable.sh 0x161fc0` を再実行して確定する。それまでは上の値を「過去の記録」として扱う。
+- `gen_helpers.py` の rc=1。残りの wasm 化 (helper の C 実装) は [T-SH-65] #3318、native 差分は [T-SH-64] #3317 が持つ。
+
 ## 1. 対象の再特定 (mac の 0x25c0-0x2f87 は win では使えない)
 `python3 locate.py <Reverb.dll> <out>` が export stub → 実体 → `.pdata` の連鎖で範囲を求める (RVA, 範囲内に base reloc 0 件・外部 call 0 件)。
 
@@ -81,6 +99,25 @@ ildsp の規模測定 (命令数・call 数・export closure 表) と未解決�
 - 読み: Fruity は `qword [this+0xbc+8i]` を 13 本 (0xbc〜0x11c。例 0x13a7 `rax, qword ptr [r10+0xbc]`) 読み、UF は加えて 0x124 を読む (計 14 本)。NULL をそのままたどる。遅延線 1 本のレイアウトは、逆アセンブル (0x1220・0x1180) から `+4` = buffer ポインタ・`+0x10` = index・`+0x14` = mask と推定 (2 本の実測値と一致)。
 - 未特定 (子 [T-SH-71] #3361 の対象): コンストラクタが作るのは 2 本だけ。vtable の先頭 6 slot (RVA 0x28d0・0x3270・0x2980・0x3f80・0x3f90・0x2950) のうち、slot 1 (0x3270・665 命令) は float パラメータ (`this+0x20`・`0x200`・`0x208`) を読むが、確保の call を含まない。slot 3 (0x3f80) は `this+0x10` を返す getter、slot 4 (0x3f90) は `ret 0`。`qword ptr [reg+disp]` 形の 14 本への書き込みは静的走査で見つからなかった (`dword` の書き込みは 0xd0〜0x14c にあり、遅延線の index 更新と見られる)。
 - 検証範囲: 静的な書き込み命令の走査と、生成直後の 1 状態 (引数 NULL) での実行。ポインタを埋めた状態で Fruity が通るかは未実施 (子 #3361)。
+
+### 14 本の書き込み元の観測 (#4194 / 親 #3361)
+
+測定 commit: `866c93ed0` (`inst_probe.c` の書き込み観測・対照モードを追加。HEAD までのコード差分は 0 行)。
+手順: 4096 B 境界の領域を PROT_READ にして書き込みを SIGSEGV で捕まえ、TF で 1 命令だけ進めて RIP と書き込み後の値を記録する。
+
+| モード | 対象 | 結果 (`WRITES_PTR` = `this+0xbc+8i` への書き込み) |
+|---|---|---|
+| `ctor` | `CreateReverbInstance` 1 回 | `WRITES_TOTAL=58 WRITES_OBJ=44 WRITES_PTR=0`・`PTR14_ZERO=14` (呼び出し後も 14/14 が 0) |
+| `noctor` (陰性対照) | CreateReverbInstance を呼ばない空の状態 | `WRITES_TOTAL=0 WRITES_PTR=0` |
+| `selftest` (陽性対照) | C 側から 14 本へ書く | `WRITES_PTR=14`・RIP が image 外で 14 件。観測手段は書き込みを見逃さない |
+| `vt` | vtable slot 0〜5 を ctor 後の object に対して 1 つずつ実行 | slot 0: `this+0` の vptr 書き込みのみ / slot 1: 書き込み後に SIGSEGV / slot 2・4: 書き込み 0 / slot 3: SIGSEGV / slot 5: object 外へ 2048 件・object 内 0 |
+| `fruity` | ctor 後の object に `Process_Fruity` (n=4) | 書き込み 3 件 (`this+0x6c`・`0x70`・`0x74` = 値 0) の後に SIGSEGV。`this+0xbc+8i` への書き込みは無い |
+
+- 読み: 14 本の書き込み元は、`CreateReverbInstance` (0x3fa0 からの直接 call 網) にも、vtable slot 0〜5 にも、`Process_Fruity` の経路にも無い。
+  静的走査でも `[reg+0xbc+8i]` 形の qword 書き込みは 0 件 (`mov word [rax+0xbc]` の 2 件は 16 bit 書き込みで別物)。
+- `0x27c0` (RVA 0x27c0–0x2853) は遅延線 2 本を `this+0x290`・`0x298` に作るコンストラクタで、`0x1000` を 2 回呼ぶ。`0x27c0` は直接 call の呼び出し元が無く (間接 call の経路は未確認)、`[rbx+0x10]` に vptr `0x5dbec` を書くため、この object の ctor かどうかは未確定。
+- 未特定: 14 本を埋めるのは、ctor より後に呼ばれる別の entry (ホストの初期化など) と見られる。entry の候補は未列挙。
+- 観測の限界: 観測は `this` 直下の書き込みだけを見る。14 本を別オブジェクトや間接的な経路で書くなら、`this` 直下の観測では見えない。
 
 ### 実測 (4 core・3 回)
 
