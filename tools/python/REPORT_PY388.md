@@ -16,8 +16,8 @@ KPI: 起動・GUI の実装変更は無い (逆アセンブルの解析のみ)�
 
 - 測定 commit (コードを変えた最後の commit): `6668dc1c4` (origin/main の取り込み先。本 PR はコードを変えず、解析は既存の `pe_disasm.py` のみを使う)。
 - 差分の証跡: `git diff 6668dc1c4 HEAD -- tools/python/analysis/flapi/` の出力は 0 行 (本 PR は REPORT の追加だけ)。
-- 素材: `fl-win64` を `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl --wildcards '*block00031_PE.bin'` で展開 (real 6.368 s・1 回)。展開先の `extracted/block00031_PE.bin` (22,227,016 B) の実在を `ls -la` で確認。`FL_WIN64_DIR=$RUNNER_TEMP/fl`。
-- 再現 (VA は全て `pe_disasm.py` の出力で確認): `FL_WIN64_DIR=$RUNNER_TEMP/fl python3 tools/python/analysis/flapi/pe_disasm.py <VA> <命令数>`。
+- 素材: `[WIN64]` の `fl-win64` を展開 (展開先は `FL_WIN64_DIR`。展開コマンドは `docs/WORKFLOW.md` §11)。展開物 `extracted/block00031_PE.bin` (22,227,016 B) の実在を `ls -la` で確認 (展開 real 6.368 s・1 回)。
+- 再現 (VA は全て `pe_disasm.py` の出力で確認): `FL_WIN64_DIR=<[WIN64] の展開先> python3 tools/python/analysis/flapi/pe_disasm.py <VA> <命令数>`。
 - 実測: `pe_disasm.py 12e7f80 40` 0.080 s (real)。並列 1。`/proc/loadavg` は計測前の確認を省略 (逆アセ 1 回は 0.1 s 未満)。e2e ではない。
 - ネガティブ・コントロール: なし (逆アセンブルの表示のみ。FAIL 判定を持たない)。
 
