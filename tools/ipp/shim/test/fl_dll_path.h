@@ -6,18 +6,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define FL_DLL_DEFAULT_ANALYSIS_DIR "/home/ubuntu/work/analysis"
-
 static const char *fl_ipp_dll_path(void) {
   static char buf[4096];
   const char *d = getenv("FL_WIN64_DIR");
-  if (d && *d) {
-    snprintf(buf, sizeof buf, "%s/extracted/block24356_PE.bin", d);
-    return buf;
+  if (!d || !*d) {
+    fprintf(stderr, "FL_WIN64_DIR が未設定 (tools/shared/env.sh を source する)\n");
+    exit(2);
   }
-  const char *a = getenv("ANALYSIS_DIR");
-  if (!a || !*a) a = FL_DLL_DEFAULT_ANALYSIS_DIR;
-  snprintf(buf, sizeof buf, "%s/win64/extracted/block24356_PE.bin", a);
+  snprintf(buf, sizeof buf, "%s/extracted/block24356_PE.bin", d);
   return buf;
 }
 #endif

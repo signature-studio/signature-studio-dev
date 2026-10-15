@@ -147,3 +147,10 @@ FFT (`ipp_fft.c`, 倍精度基数2 の素朴実装): ippsFFTGetSize/Init/Fwd_RTo
 - 署名 420/420 導出 (確度 A 43 / B+ 157 / B- 220)。win 全モジュール 19,018 呼出箇所で型・個数の矛盾 0。同クラス引数の順序は未検証 (B 系)。
 - thunk 経路 (本物の MS x64 呼出 → レジスタブロック → dispatch) で §4 の 24 関数 5,184 ケースを再実行: 直呼び・既存 baseline と全統計一致、実 IPP に 21 関数 bit-exact (§0/§4 と同数)。wasm・FFT も同結果。
 - 残: icall ブロックへ +0x48 (第 5 引数ポインタ) 追加、使用集合 239 のうち stub 198 (win 静的呼出 28.7% が stub 宛) は CAB-136 で実装。
+
+## 12. 付録: `/home/ubuntu` 直書きの除去 (#3830)
+
+- 対象 21 件 (`tools/ipp`・`tools/startup`・`tools/m2`) を `tools/shared` の `REPO_ROOT`・`FL_WIN64_DIR`・`FL_MAC_DIR` 経由へ置換。`grep -rn /home/ubuntu tools/ipp tools/startup tools/m2 --exclude-dir=work` は 0 件。既定値は `env.sh`・`paths.py` が従来値を保つ (`tools/shared/test_paths.sh` 4/4 PASS)。
+- `shim/test/fl_dll_path.h` は既定値を持たず、`FL_WIN64_DIR` 未設定なら exit 2。呼び出し元 (`shim_e2e.sh` 系) は `env.sh` を source する。
+- win 側 before/after (`resize_oracle`, fl-win64 `block24356_PE.bin`, `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`): before (origin/main `68d5cb3c4`) と after で `cases.hash` が一致 (`cmp` 同一)。SUM `cases 82056, case_diff 359, byte_diff 55588` は両者で同一 (既存の差分で本変更の影響なし)。
+- 未検証: `ipp_e2e.sh`・`startup.sh`・`m2` の全体 run は mac 素材 (`FL_MAC_DIR`・#293) と Ghidra/emsdk (`/opt/ghidra`・`/opt/emsdk`) が runner に無いため実行せず。構文 (`bash -n`) と `py_compile` のみ確認。
