@@ -52,6 +52,14 @@ class RaxSourceTest(unittest.TestCase):
         # mov rax, rcx; call [rip+0]
         self.assertEqual(classify(bytes.fromhex('4889c8') + CALL_RIP), ('reg_copy', None))
 
+    def test_push_rax_does_not_write_rax(self):
+        # mov rax, qword ptr [rax+0x18]; push rax; call [rip+0]
+        self.assertEqual(classify(bytes.fromhex('488b4018' + '50') + CALL_RIP), ('vtable_cfg', 0x18))
+
+    def test_bt_rax_does_not_write_rax(self):
+        # mov rax, qword ptr [rax+0x18]; bt rax, 3; call [rip+0]
+        self.assertEqual(classify(bytes.fromhex('488b4018' + '480fbae003') + CALL_RIP), ('vtable_cfg', 0x18))
+
     def test_lea_rip_to_function_head(self):
         # lea rax, [rip+0x10]; call [rip+0]  (target = ADDR+7+0x10 が res の関数先頭)
         res = {ADDR + 7 + 0x10 - BASE: {'size': 1, 'calls': [], 'jmps': []}}

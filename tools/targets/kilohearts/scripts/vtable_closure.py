@@ -181,7 +181,7 @@ def rax_source(ins, idx, base, res):
         if writes_rax_implicitly(w, ops):
             return 'other_write:' + w.mnemonic, None
         first = ops[0] if ops else ''
-        if first in RAX_NAMES and w.mnemonic not in ('cmp', 'test'):
+        if first in RAX_NAMES and w.mnemonic not in ('cmp', 'test', 'push', 'bt'):
             src = w.op_str.split(',', 1)[1].strip() if ',' in w.op_str else ''
             m = MEM_BASE_DISP.fullmatch(src)
             if w.mnemonic == 'mov' and m and m.group(1) != 'rip':
