@@ -37,8 +37,9 @@ REPORT §10 は「終了時の `[0x15e0a48]` は shim 有で 0」と記したが
 
 - 既定経路の 0x67264b は icall-miss で `ret 0` に戻るため、`ippsZero_8u` 相当の処理は走らない (len 0 の呼出しは実害なし)。
 - 0x6b91e8 の呼出しは 40 バイトのゼロ埋めを飛ばす。`dst=0x12d677d0` のバッファを後で読むかは**未確認**。
-  よって「silent miscompile が起きる」とは言えない (未確定)。出力メモリの全体 hash は既定と shim で異なる
-  (`boot_summary_fle4004_default.json` / `boot_summary_fle4004.json` の `outmem.full`) が、GetMem 数の差 (1,890 / 2,313) も含むため、この差を 0 埋めの影響とは切り分けていない。
+  よって「silent miscompile が起きる」とは言えない (未確定)。
+- 出力メモリの hash (`outmem.full`) は**同じコードの 2 回の実行で変わった** (既定: `fc3ef797…` → `b6aaf6c2…`)。
+  そのため出力の一致・不一致を影響の根拠に使えない。出力の正しさの判定は本付録の範囲外。
 
 ## 5. KPI (起動・GUI の PR)
 
