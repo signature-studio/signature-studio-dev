@@ -1,8 +1,9 @@
 """Delphi VMT のクラス名を PE 内の RTTI (TypeInfo) から読む (PLG-F3-44 / #4950)。
 
-TypeInfo の並び: [kind=0x07 (tkClass)][名前 ShortString: len, bytes][ClassType dword][ParentInfo dword]...
+TypeInfo の並び: [kind=0x07 (tkClass)][名前 ShortString: len, bytes][ClassType ptr][ParentInfo ptr]...
+ptr 幅は PE の Magic で決める (PE32+ は 8 バイト、PE32 は 4 バイト)。
 ClassType dword が指定の VMT を指す TypeInfo を PE 全体から探し、その名前をクラス名とする。
-ParentInfo が指す TypeInfo の名前も読み、継承関係を出す。
+ParentInfo は PPTypeInfo (親 TypeInfo へのポインタのポインタ) なので、一段間接参照して親の名前を読む。
 
 使い方:
   python vmt_class_name.py <PE> <VMT(16進)>
@@ -18,6 +19,7 @@ def main():
     vmt = int(sys.argv[2], 16)
     pe = pefile.PE(path, fast_load=True)
     base = pe.OPTIONAL_HEADER.ImageBase
+    psz = 8 if pe.OPTIONAL_HEADER.Magic == 0x20B else 4
     data = open(path, "rb").read()
 
     def va_to_off(va):
@@ -57,9 +59,12 @@ def main():
                     ti_va = off_to_va(start)
                     found += 1
                     print("TypeInfo at 0x%x: kind=tkClass name=%r ClassType=0x%x" % (ti_va, raw.decode(), vmt))
-                    parent_off = idx + 4
-                    parent = struct.unpack_from("<I", data, parent_off)[0]
-                    print("ParentInfo=0x%x parent_name=%r" % (parent, type_name(parent)))
+                    fmt = "<Q" if psz == 8 else "<I"
+                    parent_pp = struct.unpack_from(fmt, data, start + 2 + n + psz)[0]
+                    parent_off = va_to_off(parent_pp) if parent_pp else None
+                    parent = struct.unpack_from(fmt, data, parent_off)[0] if parent_off is not None else 0
+                    parent_name = type_name(parent) if parent else None
+                    print("ParentInfo(PPTypeInfo)=0x%x parent_TypeInfo=0x%x parent_name=%r" % (parent_pp, parent, parent_name))
                 break
         idx = data.find(pat, idx + 1)
 
