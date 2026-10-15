@@ -17,7 +17,7 @@
 
 - 素材: `$ARTIFACTS_DIR` の `work-m11.tar.zst` (→ `tools/m11/work/`)・`toolchain-emsdk.tar.zst` (→ `/tmp/opencode/tc/emsdk`)・`toolchain-retdec.tar.zst` (→ `/tmp/opencode/tc/retdec`)。
 - **未入手**: `fl-win64` (`block00031_PE.bin`) が runner に無い。`find /` でも見つからず。そのため import thunk 表は空 (`build.sh` の WARNING 経路)。`boot_final.ll` からの `m11_gen_ir2.sh` / `m11_wndseed.sh` も本 run では回していない (素材の `work/boot_final*.ll` をそのまま使用)。
-- HEAD: `d922d6fac` (コード差分は `run.mjs` 0。`git diff 9bfcc26a3 d922d6fac -- tools/gui/flengine/run.mjs tools/shim tools/m11` は空)。
+- HEAD: `d922d6fac` (コード差分は `run.mjs` 0。`git diff 9bfcc26a3 d922d6fac -- tools/gui/flengine/run.mjs tools/shim tools/m11` は空)。現在の head `8f54cf433` でも同じ (`git diff d922d6fac 8f54cf433 -- tools/gui/flengine/run.mjs tools/shim tools/m11` は空。差分は文書と `results/boot.json` のみ)。
 - 差し替え: `tools/shim/src/heap.c` のみ。`git rev-parse` で blob を確認: `a4a620a9^` = `cde475fbc`、`a4a620a9` = `45ba1484e`、HEAD = `01bfe4b01`。
 - 手順: 各側で `EMSDK_ENV=<emsdk_env.sh> PATH=<retdec/bin>:$PATH bash tools/gui/flengine/build.sh` → `node tools/gui/flengine/run.mjs --out <json>`。
 
