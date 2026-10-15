@@ -24,6 +24,7 @@ IMG_BASE = 0x10000000
 OBJ = 0x10F80000
 OBJ_WIN = 0x540
 N_PER_TARGET = 4000
+N_PER_MIXED = 200
 SEED = 2989
 
 # va: 入口 VA。 gen: 引数と OBJ 窓の初期値の作り方 (ecx = OBJ)。 どちらも leaf で x87 を含み、import・未 lift の call が無い。
@@ -37,6 +38,10 @@ TARGETS = [
     {'va': 0x10005400, 'name': 'fn_10005400', 'gen': 'state_update'},
     {'va': 0x1000B6C1, 'name': 'fn_1000b6c1', 'gen': 'state_update'},
     {'va': 0x1000B936, 'name': 'fn_1000b936', 'gen': 'state_update'},
+    # #3715 (PLG-G2-31): lift 済みの残り leaf x87 関数 (call・間接分岐・未対応命令を含まず、x87 を含む)。
+    # 引数の型は関数ごとに分からないので、a0 は float、a1..a5 は 0..15 の整数 (gen 'mixed')。 行数は N_PER_MIXED。
+    # 1000b3a2・10001290 は OBJ 窓もスタックも書かず ST(0) だけを返すため、main の非自明性の判定 (effect) を通らず、範囲から外した (REPORT_APPENDIX_3715.md §5)。
+    {'va': 0x10005D20, 'name': 'fn_10005d20', 'gen': 'mixed'},
 ]
 # ebp = 0x10F00000 - 0x1000 (x87_fn_native.c・x87_fn_glue.c)。 窓は ebp-0x100 から ebp+0xE0 (旧 ebp 0x10EFFF00 と同じ相対位置)。
 STK_LO = 0x10F00000 - 0x1100
@@ -76,10 +81,12 @@ def gen_rows(seed, n):
     rng = random.Random(seed)
     rows = []
     for t in TARGETS:
-        for _ in range(n):
+        for _ in range(n if t['gen'] != 'mixed' else N_PER_MIXED):
             init = b''.join(struct.pack('<f', rng.uniform(-1000, 1000)) for _ in range(OBJ_WIN // 4))
             if t['gen'] == 'idx_store':
                 a = [f32(rng.uniform(-1000, 1000)), rng.randrange(16), 0, 0, 0, 0]
+            elif t['gen'] == 'mixed':
+                a = [f32(rng.uniform(-100, 100))] + [rng.randrange(16) for _ in range(5)]
             else:
                 a = [f32(rng.uniform(-100, 100)) for _ in range(5)] + [0]
             line = '%08x %08x %s %s' % (t['va'], OBJ, ' '.join('%08x' % v for v in a), init.hex())
