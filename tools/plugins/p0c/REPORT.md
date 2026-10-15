@@ -146,6 +146,7 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 | §19 | #2182: 18 kernel の buf_diff 0 化 (修復と検証) | `REPORT_APPENDIX_H.md` |
 | §20 | #197: 未測定 13 kernel と Group B 12 kernel の分類 | `REPORT_APPENDIX_H.md` |
 | §21 | #3439: 0x5e12b0 の ucomiss 被演算子・flags を接続し census に入れる (測定 commit `14731ce2c`・戻り値 2001/2001) | `REPORT_APPENDIX_I.md` |
+| §22 | #3513: 戻り値の機械語 slot (`ret_slot`) を分類し、xmm0 の kernel を戻り値試験 [5b] の gate に入れる (測定 commit `9c38a83e4`・xmm0 1 件・負論対照 2 本 FAIL) | `REPORT_APPENDIX_I.md` |
 
 ## 17. #1366 (CI-26): lift 段の alloca 並び正規化と before/after 一致
 

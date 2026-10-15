@@ -16,8 +16,8 @@ NODE_BIN="$(command -v node || true)"; [ -n "$NODE_BIN" ] || NODE_BIN="$(ls /opt
 export NODE="$NODE_BIN" PATH="$(dirname "$NODE_BIN"):$PATH"
 MODE="${1:-}"
 RC=0
-ANALYSIS_DIR="${ANALYSIS_DIR:-/home/ubuntu/work/analysis}"
-OTT_DLL="$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll"
+source "$T/shared/env.sh"
+OTT_DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 [ -f "$OTT_DLL" ] || { echo "[icall_e2e] $OTT_DLL 無し" >&2; exit 2; }
 [ -f "$T/ott/work/lift/lift_meta.json" ] && [ -f "$T/ott/work/libottnative.so" ] || { echo "[icall_e2e] 先に bash tools/ott/ott_e2e.sh を実行してください (native 参照と coverage が必要)" >&2; exit 2; }
 
@@ -59,13 +59,13 @@ tail -16 "$HERE/work/crt_fn_gate.log"
 
 if [ "$MODE" = "--small" ] || [ "$MODE" = "--full" ]; then
   echo "[+] 小規模 target の監査 (before/after)"
-  bash "$HERE/roundtrip.sh" "$ANALYSIS_DIR/win64/extracted/block18983_PE.bin" "$HERE/work/bal_ranges.txt" fruity-balance > /dev/null 2>&1 || echo "      (balance 失敗)"
+  bash "$HERE/roundtrip.sh" "$FL_WIN64_DIR/extracted/block18983_PE.bin" "$HERE/work/bal_ranges.txt" fruity-balance > /dev/null 2>&1 || echo "      (balance 失敗)"
   bash "$HERE/roundtrip.sh" "$T/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64" "$HERE/work/fa_ranges.txt" freshair-core > /dev/null 2>&1 || echo "      (freshair 失敗)"
   bash "$HERE/roundtrip.sh" "$T/targets/kilohearts/work/winpkg/HeartCore.core_64" "$HERE/work/kh_gain_ranges.txt" kilohearts-gain > /dev/null 2>&1 || echo "      (kilohearts 失敗)"
 fi
 if [ "$MODE" = "--full" ]; then
   echo "[+] FLEngine_x64.dll (M11 closure 7,421 関数)"
-  CHUNKS=4 bash "$HERE/roundtrip.sh" "$ANALYSIS_DIR/win64/extracted/block00031_PE.bin" "$HERE/work/fle_F.txt" flengine > "$HERE/work/rt_flengine.log" 2>&1 || echo "      (flengine 失敗)"
+  CHUNKS=4 bash "$HERE/roundtrip.sh" "$FL_WIN64_DIR/extracted/block00031_PE.bin" "$HERE/work/fle_F.txt" flengine > "$HERE/work/rt_flengine.log" 2>&1 || echo "      (flengine 失敗)"
 fi
 python3 "$HERE/audit_table.py" 2>/dev/null || true
 [ "$RC" = "0" ] && echo "[icall_e2e] PASS" || echo "[icall_e2e] FAIL"
