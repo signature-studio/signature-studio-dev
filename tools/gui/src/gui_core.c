@@ -1459,6 +1459,32 @@ API LoadCursorA(I64 hi, I64 name) { (void)hi; return name < 0x10000 ? (0x7F00000
 API LoadCursorW(I64 hi, I64 name) { return LoadCursorA(hi, name); }
 API LoadIconA(I64 hi, I64 name) { (void)hi; return name < 0x10000 ? (0x7E000000 + name) : 0x7E000001; }
 API LoadIconW(I64 hi, I64 name) { return LoadIconA(hi, name); }
+int64_t LoadBitmapW(int64_t, int64_t);   /* gui_gdi.c */
+int64_t GetObjectW(int64_t, int64_t, int64_t);
+/* LoadImageW: IMAGE_BITMAP (0) は LoadBitmapW へ委譲 (拡縮なし)、IMAGE_ICON (1) / IMAGE_CURSOR (2) は hinst=0 の擬似ハンドルのみ (name の ID 制限なしは LoadIconW / LoadCursorW と同じ)。
+   LR_SHARED / LR_DEFAULTSIZE は擬似ハンドルが共有で既定寸 (32x32) のため無視してよい。それ以外は未実装として fail-fast。 */
+static GUI_NORETURN void liw_fail(const char *why, I64 hinst, I64 name, I64 type, I64 cx, I64 cy, I64 load) {
+  char m[192];
+  snprintf(m, sizeof m, "%s (hinst=0x%llx name=0x%llx type=%lld cx=%lld cy=%lld load=0x%llx)", why, (unsigned long long)hinst, (unsigned long long)name,
+           (long long)type, (long long)cx, (long long)cy, (unsigned long long)load);
+  gui_failfast("LoadImageW", m);
+}
+API LoadImageW(I64 hinst, I64 name, I64 type, I64 cx, I64 cy, I64 load) {
+  if ((U64)name >= 0x10000) liw_fail("string resource name", hinst, name, type, cx, cy, load);
+  if (load & ~(I64)(0x0040 /* LR_DEFAULTSIZE */ | 0x8000 /* LR_SHARED */)) liw_fail("load flags", hinst, name, type, cx, cy, load);
+  if (type == 0 /* IMAGE_BITMAP */) {
+    I64 h = LoadBitmapW(hinst, name);
+    if (h && (cx || cy)) {
+      WBITMAP bm; GetObjectW(h, sizeof bm, (I64)(uintptr_t)&bm);
+      if ((cx && cx != bm.bmWidth) || (cy && cy != bm.bmHeight)) liw_fail("IMAGE_BITMAP scaling", hinst, name, type, cx, cy, load);
+    }
+    return h;
+  }
+  if (type != 1 /* IMAGE_ICON */ && type != 2 /* IMAGE_CURSOR */) liw_fail("unknown image type", hinst, name, type, cx, cy, load);
+  if (hinst) liw_fail("module icon/cursor resource (RT_GROUP_ICON decode not implemented)", hinst, name, type, cx, cy, load);
+  if ((cx && cx != 32) || (cy && cy != 32)) liw_fail("icon/cursor scaling (native size 32x32)", hinst, name, type, cx, cy, load);
+  return type == 1 ? LoadIconW(0, name) : LoadCursorW(0, name);
+}
 static I64 g_cur;
 API SetCursor(I64 c) {
   I64 old = g_cur; g_cur = c;

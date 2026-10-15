@@ -18,6 +18,9 @@
             D15 (DEFECTS.md) を機械語から復元し kh_icall(slot) 間接呼出へ (snapins 5d30dff と同型)
   [rdata]   `inttoptr (i64 <PE VA> ...)` / `i64 <PE VA>` リテラルを DLL 実データ窓 (global_var_<VA>) へ
   [abi]     入口 wrapper: rcx/rdx/r8/r9 + xmm0-3 引数 → レジスタグローバル, 戻り値 rax / xmm0 (F2 相当を ABI 仕様で解決)
+  [ymmsync] モジュール内に ymm の参照があるとき、xmmN (下位 128bit) と ymmN を同一の状態にする (KH-51 #3306)。
+            xmm 書込みは ymm 下位を更新 (VEX-128 は上位 0・legacy は上位保持)、ymm 書込みは xmm を更新、
+            vzeroupper の undef は ymmN := zext(xmmN)。--skip ymmsync で外せる (ネガティブコントロール用)
 usage: kh_lower.py stage0.ll OUT.ll --core HeartCore.core_64 --lift va,va,... [--abi json] [--skip a,b]
 """
 import argparse
@@ -41,6 +44,10 @@ COMIS = re.compile(r'^(\s*)call void @__asm_(?:v)?u?comis(s|d)(?:\.\d+)?\(i128 (
 MERGE = re.compile(r'^(\s*)(%[\w.\-]+) = call i128 @__asm_(cvtsi2ss|cvtsi2sd|cvtss2sd|cvtsd2ss|sqrtsd|sqrtss)(?:\.\d+)?\(([^)]*)\)\s*$')
 FN_DEF = re.compile(r'^define \S+ @function_([0-9a-f]+)\(\) \{$')
 LIT = re.compile(r'(?<![\w%.@])(\d{10,11})(?![\w.])')
+VEX_DEF = re.compile(r'^\s*(%[\w.\-]+) = call i128 @__asm_v[\w.]*\(')
+XMM_ST = re.compile(r'^(\s*)store i128 (%[\w.\-]+|-?\d+|undef), i128\* @xmm(\d+)\s*$')
+YMM_ST = re.compile(r'^(\s*)store i256 (%[\w.\-]+|-?\d+|undef), i256\* @ymm(\d+)\s*$')
+YMM_HI = ((1 << 256) - 1) ^ ((1 << 128) - 1)
 
 
 def next_block_addr(lines, i, nxt=None, cur=None):
@@ -233,6 +240,48 @@ def lower_body(lines, cfg, skip, uid, rep, volatile_ret=False, icalls=None, nxt=
     return out
 
 
+def ymm_sync(lines, rep):
+    """xmmN の下位 128bit と ymmN を同一の状態として扱う (KH-51 #3306)。
+    xmm への store は ymm の下位も更新する。VEX-128 (`__asm_v*` 由来) は上位を 0、非 VEX (legacy SSE) は上位を保持。
+    ymm への store は xmm を更新する。vzeroupper の `store i256 undef, @ymmN` (N<16) は上位だけを 0 にするので、
+    ymmN := zext(xmmN) とし xmm の値を壊さない (N>=16 は従来どおり)。"""
+    vex = {m.group(1) for m in (VEX_DEF.match(l) for l in lines) if m}
+    out, k = [], 0
+    for l in lines:
+        m = XMM_ST.match(l)
+        if m:
+            ind, v, n = m.groups()
+            k += 1
+            t = 'kys%d' % k
+            out.append(l)
+            if v in vex:
+                out += [f'{ind}%{t}.z = zext i128 {v} to i256', f'{ind}store i256 %{t}.z, i256* @ymm{n}']
+            else:
+                out += [f'{ind}%{t}.o = load i256, i256* @ymm{n}', f'{ind}%{t}.k = and i256 %{t}.o, {YMM_HI}',
+                        f'{ind}%{t}.z = zext i128 {v} to i256', f'{ind}%{t}.m = or i256 %{t}.k, %{t}.z',
+                        f'{ind}store i256 %{t}.m, i256* @ymm{n}']
+            rep['ymmsync'] = rep.get('ymmsync', 0) + 1
+            continue
+        m = YMM_ST.match(l)
+        if m:
+            ind, v, n = m.groups()
+            k += 1
+            t = 'kys%d' % k
+            if v == 'undef':
+                if int(n) < 16:
+                    out += [f'{ind}%{t}.x = load i128, i128* @xmm{n}', f'{ind}%{t}.z = zext i128 %{t}.x to i256',
+                            f'{ind}store i256 %{t}.z, i256* @ymm{n}']
+                    rep['ymmzero'] = rep.get('ymmzero', 0) + 1
+                else:
+                    out.append(l)
+                continue
+            out += [l, f'{ind}%{t}.l = trunc i256 {v} to i128', f'{ind}store i128 %{t}.l, i128* @xmm{n}']
+            rep['ymmsync'] = rep.get('ymmsync', 0) + 1
+            continue
+        out.append(l)
+    return out
+
+
 def find_load_ptr(out, old, ty):
     pat = re.compile(r'^\s*' + re.escape(old) + r' = load ' + ty + r', ' + ty + r'\* (%[\w.\-]+)')
     for k in range(len(out) - 1, max(-1, len(out) - 40), -1):
@@ -349,7 +398,12 @@ def main():
                                 icalls['%x' % ins.address] = ('__rip__', tgt if (ok and IMG_LO <= tgt < IMG_HI) else -slot)
     n_icall = len(icalls)
     icall_sites_snap = sorted(icalls)   # lower_body が pop で消費する前にスナップショット
-    texts = {v: '\n'.join(lower_body(bodies[v], jt, skip, uid, rep, volatile_ret, icalls, nxt)) for v in vas}
+    # xmm/ymm の同期は、モジュール内に ymm の参照がある時だけ行う (無い時は出力を従来とバイト一致させる)
+    ymm_on = 'ymmsync' not in skip and any(re.search(r'@ymm\d+\b', l) for v in vas for l in bodies[v])
+    texts = {}
+    for v in vas:
+        body = lower_body(bodies[v], jt, skip, uid, rep, volatile_ret, icalls, nxt)
+        texts[v] = '\n'.join(ymm_sync(body, rep) if ymm_on else body)
     # ---- functor clone (0x18005b430) の offset 字段 (+0x18) を 0 確定にする wasm 側対化。
     # native 側 (scen_em.h) は `mov rcx,[rcx+0x18]` を `xor ecx,ecx` にパッチしており、ここでは
     # 同じ機械語ブロック (0x18005b445) の rcx store を 0 に置換する。invoke thunk (0x18003f7f0) は
@@ -410,8 +464,9 @@ def main():
     for k in list(range(4)) + list(range(6, 16)):
         if f'xmm{k}' not in used:
             regs.append(f'@xmm{k} = global i128 0')
-    for k in range(16):
-        if f'ymm{k}' in used:
+    # wrapper の ymm_sync (abicheck の xmm6-15・float 引数の xmm0-3) は used の集計より後に @ymmN を参照するため、ymm_on では 0-15 を全て宣言する
+    for k in range(32):
+        if f'ymm{k}' in used or (ymm_on and k < 16):
             regs.append(f'@ymm{k} = global i256 0')
     for f in FLAGS:
         regs.append(f'@{f} = global i1 false')
@@ -503,7 +558,7 @@ def main():
         else:
             w += ['  ret void']
         w += ['}', '']
-        final += w
+        final += ymm_sync(w, rep) if ymm_on else w
     open(a.out, 'w').write('\n'.join(final) + '\n')
     # ---- kh_icall (D15 [icall]): アリーナ内 vtable の実値 → 既知 callee へ dispatch。
     #      PE .rdata の vtable slot (slot addr → 中身が lift 対訳関数) も build 時に静的解決する。

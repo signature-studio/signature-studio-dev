@@ -1,5 +1,6 @@
 // SR-39 #2107: canvas platform (wasm) の IPlatformFont / IFontPainter 実装。
-// グリフ資源を持たないため、メトリクスは upstream の「未対応」値 (-1) を返し、描画・幅は空。
+// SR-50 #3260: 文字は同梱の 5x7 ビットマップフォント (canvas_glyph5x7.h) で描き、幅は 1 字 6 px 固定。
+// フォントサイズ・ascent・descent 等のメトリクスは未対応のため upstream の「未対応」値 (-1) を返す。
 
 #pragma once
 

@@ -21,6 +21,8 @@ FN = re.compile(r'^define [^\n]*@function_666a60\(.*?\n}\n', re.M | re.S)
 HEAD = 'define i64 @function_666a60(i64 %arg1, '
 ENTRY = re.compile(r'^dec_label_pc_666a60:[^\n]*\n(.*?)(?=^dec_label_pc_|\Z)', re.M | re.S)
 LOOP = re.compile(r'^dec_label_pc_666aeb:[^\n]*\n(.*?)(?=^dec_label_pc_|\Z)', re.M | re.S)
+NPTR = re.compile(r'^  %15 = inttoptr i64 %\w+ to ptr\n', re.M)
+N_STORE = '  store i32 %10, ptr %15, align 4\n'
 CNT_ST = '  store i64 0, ptr %rdx.0.reg2mem\n'
 CNT_NEW = ('  %ldfx115c = load i32, ptr %15, align 4\n'
            '  %ldfx115z = zext i32 %ldfx115c to i64\n'
@@ -35,7 +37,7 @@ def patch_count(fn):
     m = ENTRY.search(fn)
     assert m, 'dec_label_pc_666a60 が無い'
     body = m.group(1)
-    assert '  %15 = inttoptr i64 %ldfxu18 to ptr\n' in body, 'N のポインタ %15 が entry に無い'
+    assert NPTR.search(body) and N_STORE in body, 'N のポインタ %15 (arg2 の書込み先) が entry に無い'
     assert body.count(CNT_ST) == 1, 'rdx の初期化行が想定と違う (%d 件)' % body.count(CNT_ST)
     body2 = body.replace(CNT_ST, CNT_NEW)
     return fn[:m.start(1)] + body2 + fn[m.end(1):]

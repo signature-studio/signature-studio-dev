@@ -1,6 +1,7 @@
 // SR-39 #2107: canvas platform (wasm) の IPlatformGraphicsDevice* 実装。
-// 描画命令はラスタライザを持たないため、描画系は false (未描画) を返す。
-// 状態設定は lineWidth・clipRect・fillColor・frameColor・globalAlpha だけ値を保持し、他 (lineStyle・drawMode・transformMatrix・global state の save/restore) は何もしない。
+// SR-50 #3260: drawRect (塗り・線 1px)・clearRect・drawString (canvas_font.cpp) は bitmap へ画素を書く。
+// 他の描画命令 (drawLine・drawPolygon・drawEllipse・drawArc・drawPoint・drawBitmap・drawGraphicsPath・gradient・9 分割・bitmap 合成) は no-op で false を返す。
+// 状態設定は lineWidth (1px 固定で描く)・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha だけ値を保持し、他 (lineStyle・drawMode・transformMatrix・global state の save/restore) は何もしない。
 
 #pragma once
 
@@ -9,9 +10,12 @@
 #include "vstgui/lib/cdrawdefs.h"
 #include "vstgui/lib/crect.h"
 #include "vstgui/lib/platform/iplatformgraphicsdevice.h"
+#include <cstdint>
 #include <memory>
 
 namespace VSTGUI {
+
+class CanvasBitmap;
 
 //------------------------------------------------------------------------
 class CanvasGraphicsDeviceFactory : public IPlatformGraphicsDeviceFactory
@@ -34,7 +38,8 @@ class CanvasGraphicsDeviceContext : public IPlatformGraphicsDeviceContext,
                                     public IPlatformGraphicsDeviceContextBitmapExt
 {
 public:
-	explicit CanvasGraphicsDeviceContext (std::shared_ptr<const CanvasGraphicsDevice> device) noexcept;
+	CanvasGraphicsDeviceContext (std::shared_ptr<const CanvasGraphicsDevice> device,
+	                             PlatformBitmapPtr bitmap) noexcept;
 
 	const IPlatformGraphicsDevice& getDevice () const override;
 	PlatformGraphicsPathFactoryPtr getGraphicsPathFactory () const override;
@@ -82,8 +87,18 @@ public:
 	bool fillRectWithBitmap (IPlatformBitmap& bitmap, CRect srcRect, CRect dstRect, double alpha,
 	                         BitmapInterpolationQuality quality) const override;
 
+	// 文字列描画 (canvas_font.cpp) から呼ぶ。1 画素を globalAlpha 付きの source-over で合成する。クリップ外・bitmap 外は書かない。
+	void blendPixel (int32_t x, int32_t y, const CColor& color) const;
+
 private:
+	CanvasBitmap* canvas () const noexcept;
+	uint8_t* pixelAt (int32_t x, int32_t y) const noexcept;
+	void paintRect (const CRect& rect, const CColor& color, bool blend) const;
+	void strokeRect (const CRect& rect, const CColor& color) const;
+	CRect clipWithinBitmap (CRect clip) const;
+
 	std::shared_ptr<const CanvasGraphicsDevice> device;
+	PlatformBitmapPtr bitmap;
 	mutable double globalAlpha {1.};
 	mutable CColor fillColor {};
 	mutable CColor frameColor {};

@@ -7,11 +7,11 @@ LD-133 付録 (`REPORT_APPENDIX_LD133.md`) は main に取り込み済み (本�
 ## 結論
 
 - **受入 1 (型決定が rax の差を生むか、`work/` の外で実測): 生む。** `ott.ll` を無改変で複製した orig では、対象 6 case で native `rax=0x1`・wasm `rax=0xffffffffffffffff` (§2)。HeapFree 直後の 1 行 (`sext`→`zext`) だけを変えた複製 hf_zext では、その 6 case の rax が一致した。残る 2 case (1c621c) は別の差で、LD-84 付録 §4 (c) と同じ。
-- **受入 2 (修復経路): 決めた。修復は入れず、PM 判断に上げて止める。** 修復箇所は RetDec 産の `ott.ll` の 3 行だけで、RetDec 路線への新規修正は D5 で禁じられる。x64c・flelift・liftlib 側には同じ型決定が見当たらない (import の戻り値は runtime が `RAX` に直接書く)。§5。
-- **受入 3 (修復後の 12 case 差 0): 未達。** 修復を入れていないため、修復後の値は未測定。現 HEAD の基準は `cases=12 diff=0` (§3)。
+- **受入 2 (修復経路): 決めた。** liftlib の repair pass `boolret` で修復する (§8)。修復箇所は測定用 IR の `sext` 3 行で、RetDec chain (`tools/ott/ott_build.sh`・`tools/m*`) と `ott.ll` は変えない (D5)。本番 chain への組込みは PM 判断として本 PR では行わない。§5 は修復前の検討 (候補 A/B)。
+- **受入 3 (修復後の 12 case 差 0): 達成。** `boolret` を当てた複製で `results/ld67/compare_blk.py` が `cases=12 diff=0` (既定 build と計装 build)。rax は 1c5e84・1c682c・1c69cc の 6 case が native `0x1` と一致 (§8)。1c621c の 2 case は別件で残る。
 - **受入 4 (BOOL 以外の戻り値の列挙): 完了。** `call i1 @` は 18 件・13 関数・11 API。BOOL 以外は **0 件**。rax へ直接 `sext` されるのは 3 件 (TerminateProcess・HeapFree・TlsSetValue)。§4。
 
-**判定: 部分達成 (受入 1・2・4 達成、受入 3 未達)。** PR は `Refs #3180` (issue の指示どおり)。
+**判定: 全受入を満たす (受入 1・2・3・4)。** PR は `Closes #3180`。outcome の残り (8 case は 3 変種・`boolret` とも `diff`) と 1c621c の rax 差は未解決 (§7)。
 
 ## 1. 測定条件
 
@@ -115,7 +115,77 @@ PM への選択肢 (案):
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 修復経路の決定 (§5 の A/B・選択肢 1〜3)。受入 3 (修復後の 12 case 差 0) は未達。再測定には `oc_artifacts: toolchain-emsdk analysis-ott-binaries work-m6-ott` が要る (本 run には無い) | D25 の修復が止まる | PM 判断 (#3180 のコメント) |
+| 本番 OTT chain への `boolret` 組込み (D5 上 PM 判断。本 PR では行わない)。修復は測定用 IR (§8) にだけ当たり、本番 OTT の挙動は未変更 | D25 の本番修復が止まる | PM 判断 (PR 本文) |
 | 1c621c の rax 差 (2 case・別件 (c)) | 2 case の rax が一致しない | #3180 (PM 判断。LD-84 の #2193 は CLOSED・後継 open issue 無し) |
 | outcome の残り (計装上の import 記録の差・§2 (a)) | 8 case が `diff` のまま | #3180 (PM 判断。LD-83 の #2192 は CLOSED・後継 open issue 無し) |
 | 直接 `sext` しない 15 件の BOOL 結果の rax への到達 | 影響の有無が未検証 | 修復経路の決定後に PM が判断 (#3180) |
+
+## 8. 修復の実測 (受入 2・3): liftlib repair pass `boolret`
+
+### 8.1 修復経路
+
+- 修復: liftlib の IR テキスト pass `boolret` (`tools/liftlib/liftlib/passes/boolret.py`・測定 commit `86fb219f5`)。規則は 1 つだけ: 同一関数内で `%V = call i1 @F(...)` と定義された `%V` を `sext i1 %V to i64` している行を `zext i1 %V to i64` に変える。`icmp`・`select`・`phi` の i1 は対象外。
+- 起動: `python3 -m liftlib boolret <in.ll> <out.ll>` (変えた行数を標準出力)。CLI は `tools/liftlib/liftlib/cli.py` の 1 subcommand。
+- RetDec chain (`tools/ott/ott_build.sh`・`tools/m*`) と `tools/ott/work/ott.ll` は変更しない。sha256 は測定前後とも `989cf685e9091c0a…`。pass は測定用の IR (`$RUNNER_TEMP/ld147/ott_boolret.ll`) を作る段で当てる。
+- 単体テスト `tools/liftlib/tests/test_boolret.py` (5 件・合成 IR): `call i1` の sext が zext に変わる・icmp/select/phi の sext は変わらない・件数 (3)・関数の境界・`call i1` が無い入力は無変更。ネガティブコントロール: 規則を外して全 sext を zext に差し替えると 3 件が FAIL。
+
+### 8.2 変更行 (`ott.ll` の ir 行番号)
+
+`boolret` の出力と `ott.ll` の差は 3 行だけ (`diff` の結果)。
+
+| ir 行 | 変更前 | 変更後 | 呼出し元 |
+|---|---|---|---|
+| 6331 | `%5 = sext i1 %4 to i64` | `%5 = zext i1 %4 to i64` | `TerminateProcess` (function_1801aa5dc) |
+| 11891 | `%5 = sext i1 %4 to i64` | `%5 = zext i1 %4 to i64` | `HeapFree` (function_1801c0b6c) |
+| 15185 | `%6 = sext i1 %5 to i64` | `%6 = zext i1 %5 to i64` | `TlsSetValue` (function_1801c3dc8) |
+
+`boolret` の出力は §2 の手作業の `all_zext` 変種と byte 一致 (`cmp`)。
+
+### 8.3 rax の実測 (受入 2・3)
+
+`native` は x64 機械語を直接実行した rax (liftdiff の native 側)、`wasm` は lift 後の wasm の rax。`vm0` と `u16` は値が同じだった。
+
+| 関数 | native rax | wasm rax (orig) | wasm rax (boolret) | boolret で一致 |
+|---|---|---|---|---|
+| 1c5e84 | `0x1` | `0xffffffffffffffff` | `0x1` | yes |
+| 1c621c | `0x1720f22a0` | `0x1801c5e84` | `0x1801c5e84` | no (別件・§7) |
+| 1c682c | `0x1` | `0xffffffffffffffff` | `0x1` | yes |
+| 1c69cc | `0x1` | `0xffffffffffffffff` | `0x1` | yes |
+| 1ab1d0・1ab258 | — | equal (raw 未記録) | equal | — |
+
+- rax 不一致 (raw を持つ 8 case): orig **8** / hf_zext **2** / all_zext **2** / boolret **2** (残りは 1c621c の 2 case)。
+- outcome は 4 変種とも 8 case が `diff` のまま (§2 (a) の import 記録の差は未検証)。
+
+### 8.4 既定 build と計装 build の比較 (受入 3)
+
+`python3 tools/liftdiff/results/ld147/bool_sext_probe.py compare` (= `results/ld67/compare_blk.py` を変種ごとに実行。既定 build と `ott_old_blk` 相当の計装 build の 12 case を、outcome・diffs・wasm_status・wasm の rax/x0 で比べる)。
+
+| 変種 | compare_blk |
+|---|---|
+| orig | `cases=12 diff=0` |
+| hf_zext | `cases=12 diff=0` |
+| all_zext | `cases=12 diff=0` |
+| **boolret** | **`cases=12 diff=0`** |
+
+### 8.5 測定条件・所要
+
+- 測定 commit: `86fb219f5` (`feat(liftlib): add boolret pass for call i1 sext (LD-147, #3180)`)。pass・CLI・単体テスト・probe の変更を含む最後のコード commit。以後の commit は docs (本 §8・`docs/DEFECTS.md`・`docs/DOC_MAP.md`) だけ。
+- 素材: `tools/{ott,m6,m8,m9,m10}/work/` は main checkout の展開済み dir への symlink (commit していない)。`tools/liftdiff/work/` は空の出力先として作成 (gitignore 対象)。初回 run は出力先が無く liftdiff のリンクが失敗 (rc=1) したため、作成して全 8 run を取り直した (以下の値は取り直した分)。
+- 所要: 8 run (4 変種 × 既定/計装・並列数 1) の合計 72 s。各 wall 8.7〜9.3 s (n=1 の参考値)。load average は実行前 `0.10 0.15 0.09` (01:21:30 UTC)。
+- 再現 (`$RUNNER_TEMP` は作業用 scratch):
+
+```
+(cd tools/liftlib && python3 -m liftlib boolret ../ott/work/ott.ll $RUNNER_TEMP/ld147/ott_boolret.ll)
+python3 tools/liftdiff/results/ld147/bool_sext_probe.py variants --out $RUNNER_TEMP/ld147
+python3 tools/liftdiff/results/ld147/bool_sext_probe.py run --out $RUNNER_TEMP/ld147
+python3 tools/liftdiff/results/ld147/bool_sext_probe.py rax --out $RUNNER_TEMP/ld147
+python3 tools/liftdiff/results/ld147/bool_sext_probe.py compare --out $RUNNER_TEMP/ld147
+```
+
+### 8.6 測定に使ったコードの差分
+
+`git diff 86fb219f5 HEAD -- tools/liftlib/liftlib tools/liftdiff/results/ld147 tools/liftdiff/liftdiff.py tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/targets tools/ott/rt tools/shim/src` の出力は **0 行**。範囲のコードは測定から変わっていない。REPORT・`docs/DEFECTS.md`・`docs/DOC_MAP.md` は範囲外 (docs commit)。
+
+### 8.7 未解決
+
+§7 の表を参照。本番 OTT chain への組込み (PM 判断)・1c621c の rax 差 (2 case)・outcome の残り (8 case) の 3 件。

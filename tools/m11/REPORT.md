@@ -212,35 +212,7 @@ commit 別の測定表 (`2c23bef`〜`b760fa2`・NC) と注記は [REPORT_APPENDI
 機械語 `mov qword [rbp+X], imm` (8B) が IR で `store ptr null` / `store i32 imm` (wasm32 で 4B) に縮み、上位 4B 未初期化のまま C 転記 `Q(dest)` が読んで OOB (idx 87 = `418190`, idx 898 = `412d60`, idx 58–63 = `417b70` の `Q(a)`、後者は `function_8cbb00` の 2 site)。`qstore/m11_qstore.py` が 279 site / 158 関数を `store i64` に戻す (`M11_QSTORE=0` で無効)。**#513 取り込み後の HEAD `8e5f760` の実測 (n=3 一致)**: survey NC 856/38/46/1 (clobber 1) → 修復 864/31/46/1 (clobber 0)、ラベル差 9 unit (58–63・87・898 が trap→ok、144 が clobber→trap)。58–63 は `8cbb00` の 2 site だけを除外すると trap に戻り (858/37/46/1) qstore の効果と確定、144 は別 site (未切り分け)。数値・site 一覧・再現・未解決は [qstore/REPORT.md](qstore/REPORT.md)。
 
 ## 14. #134 [M11-N5]: unit 23 の IntToStr 表構築 OOB を解消 (通常起動 22→53 unit), judge を Halt0 早期終了と分離
-
-既知類型: DEFECTS.md D4 (1 段 deref 脱落) 2 件 = 414ad0 `_LStrSetLength` (`[rbx]`) / 43a3f0 IntToStr 書込み (`mov r8,[rbx]`)。D15 の 467c40 間接 call は 4c3baa4 で復元 (#490)。
-**起点** `13e8962` (= origin/main `8d883c3` + 本 PR)。4 vCPU, PE=`FL_WIN64_DIR` の block00031_PE.bin, work-m11 展開, capstone+pefile venv, node v22.23.3。
-
-| 構成 | units_run | 停止 | survey ok/trap(oom)/miss/noproc | 所要 s / load |
-|---|---|---|---|---|
-| main + PE パス修正のみ (n=1) | 22 | unit 23 例外→Halt0 | 864/31(1)/46/1 | 45.2 / 0.33→0.76 |
-| + 4c3baa4 + BSTR 割当 (n=1) | 22 | OOB 414ad0←43a3f0←467c40 | 864/31(1)/46/1 | 26.7 |
-| `6654322` (+414ad0・43a3f0 転記, n=3) | **53** | unit 57 (0x16fde0) 後に Halt0 | **866/29(2)/46/1** | 26.3–26.9 / 0.39→0.98 |
-| `6654322` 再測 (n=1, gen_ir2・boot5 lift 込み) | 53 | 同 | 866/29(2)/46/1 | 84.7 / 0.35→0.97 |
-| `de50ffa` (指摘対応 3 点, n=1, 増分 build) | 53 | 同 | 866/29(2)/46/1 (不変) | 32.5 / 0.16→0.69 |
-| NC: `6654322` から 2 転記を IR 版へ | 22 | OOB (boot threw) | 未測 | — |
-
-**数え方** (`m11_ov.c` `function_4120c0`): `units_run` は Init が例外も間接 call miss も無く完了した unit 数。miss が 1 回でも出た unit は `units_skipped` に入り `units_run` には入らない (その unit の init は呼ばれている)。Halt0 までに実行を終えた unit は `units_run + units_skipped` = 53 + 3 = **56**、停止したのは 1-based で 57 番目 (VA 0x16fde0)。
-
-**units_skipped = 3 の内訳**: `icall_miss_targets` は `0xfa9390` の 1 種 (`icall_miss=3`)。unit 30・39・40 の Init 値が 0xfa9390 で、呼出し site は `InitUnits` の `ICALL_AT(0x412126)`。0xfa9390 は PE `.text` (RVA 0xba9390) の関数先頭ではなく、直前の `jg rel32` の直後にある中間アドレス (先頭 bytes `00 44 2b f0`)。closure 外のため miss → ret 0 で skip される。関数名は未特定。PE の .data/.rdata に同じ 8B 値のポインタは無く (LE 検索 0 件)、この値の出所は未確認 (未解決)。
-
-**stage 6 の `skip 0`**: judge は `units_skipped` が非 0 なら 6 にしない (`m11_judge.py` の stage 6 条件)。Halt0 が無くても本 HEAD は skip 3 のため未達。
-
-機構: 43a3f0 は `call 414ad0` の後 `mov r8,[rbx]` で `*s` を読むが, IR は deref を落として `r8=&s` とし, 桁を変数自身 (a[0]) に書いた。次反復で文字列本体を文字列ポインタとして読み, `Move` が長さ -2012213261 で OOB。414ad0 も rcx=&s の `[rbx]` 脱落。機械語を 1 命令ずつ突合し C 転記 (桁ペア表 PE 0x13aaa68 の 100 entry は "00".."99" と一致)。BSTR は faee5b6 の m11_win.c 部分のみ採用 (m11_ov.c 部分は main の 417b70/409470 と重複のため不採用)。
-指摘対応 (`de50ffa`): 467c40 の translated call 2 箇所 (0x467cc9 / 0x467d5d) は `ICALL_AT` で元 call-site VA を渡す (#494 telemetry の site 計上; 数値は不変)。`SysReAllocStringLen` は NULL src 時に旧 prefix を min(旧長, 新長) 文字保持する (shimx `ole.c` と同じ; この経路の到達は本 e2e で未計測)。`SysFreeString` コメントの未記録の測定値は削除。
-
-judge: stage 6 は Halt0/longjmp 無し・全 942 unit 実行・skip 0・DllMain rc=1 の時のみ。`--require-stage N` で未達を exit 1 (既定は報告のみ exit 0)。N は 1〜6 の整数のみ受け付け、0・7・x・欠落は usage (exit 2)。ネガコン実測 (`de50ffa`): `--require-stage 6` → `reached 4/6`, exit 1 / `--require-stage 4` → exit 0 / 不正値 4 種 → exit 2。合成入力 (`M11_JUDGE_WORK`) 942 完走 → 6/6 exit 0 / Halt0 経由で 942/942 → 5/6 exit 1 (`6654322` で実測)。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| unit 57 (0x16fde0) の 0xf960 (GetMem+40fb40) ↔ 0x79b10 反復後の Halt0 (未読) | 53/942 (完了 56) で停止, stage 5/6 未達 | 起票依頼 (PM 判断: 子 issue 新設 or #134 コメント)。#490 は本 PR が範囲 (unit 23 の間接 call 復元・boot5・BSTR) を取り込み済みのため積み増し先として不適 |
-| unit 30/39/40 の Init 値 0xfa9390 (.text の関数途中・closure 外・skip 3)。skip は ret 0 のため当該 3 unit の init は未実行 | stage 6 の `skip 0` 未達。出所未確認 | 上と同じ (起票依頼 PM 判断) |
-| D4 同型 (`mov r64,[reg]` の 1 段 deref 脱落) の他サイトの全数 | 他 unit の silent 誤動作の恐れ | DEFECTS.md 行案 (PM 判断) |
+通常起動 22→53 unit。judge は Halt0 早期終了と正常終了を分離 (`--require-stage`)。本文・数値表は [REPORT_N134.md](REPORT_N134.md) §14。
 
 ## 15. #680: survey 測定基準の固定化 (ldfix/qstore の fail-closed・PE パス env 化) → 本文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §15
 
@@ -248,3 +220,6 @@ judge: stage 6 は Halt0/longjmp 無し・全 942 unit 実行・skip 0・DllMain
 
 ## 17. #748 [M11-N41]: 652500 の 1 段 deref 復元 (gate 付き, 既定 0, 部分達成)
 unit 149 は OFF/ON とも oob のまま。ON で kind が変わるのは unit 895 (halt0 → oob) の 1 件のみ (N748 の再測定で訂正)。既定 0 のまま。測定値・未解決・起票先は [REPORT_N748.md](REPORT_N748.md)。
+
+## 18. #134 [M11-N5]: main `93307cc6a` の停止点 (unit 101 = VA 0x5de960 の 535c11 OOB) と e2e 期待値の更新 (部分達成)
+通常起動 98 unit + skip 3 = 101 で停止 (stage 4/6)。e2e 期待値 (完了 56→101・survey 872→873) を実測へ更新。本文・切り分け・未解決は [REPORT_N134.md](REPORT_N134.md) §18。

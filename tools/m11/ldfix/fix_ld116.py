@@ -17,6 +17,8 @@ import sys
 FN = re.compile(r'^define [^\n]*@function_666a60\(.*?\n}\n', re.M | re.S)
 HEAD = 'define i64 @function_666a60(i64 %arg1, '
 ENTRY = re.compile(r'^dec_label_pc_666a60:[^\n]*\n(.*?)(?=^dec_label_pc_|\Z)', re.M | re.S)
+NPTR = re.compile(r'^  %15 = inttoptr i64 %\w+ to ptr\n', re.M)
+N_STORE = '  store i32 %10, ptr %15, align 4\n'
 BR = '  br label %dec_label_pc_666aeb\n'
 BR_NEW = ('  %ldfx116c = load i32, ptr %15, align 4\n'
           '  %ldfx116d = sub i32 %ldfx116c, 1\n'
@@ -32,7 +34,7 @@ def patch_entry(fn):
     m = ENTRY.search(fn)
     assert m, 'dec_label_pc_666a60 が無い'
     body = m.group(1)
-    assert '  %15 = inttoptr i64 %ldfxu18 to ptr\n' in body, 'N のポインタ %15 が entry に無い'
+    assert NPTR.search(body) and N_STORE in body, 'N のポインタ %15 (arg2 の書込み先) が entry に無い'
     assert body.count(BR) == 1, 'entry の br 行が想定と違う (%d 件)' % body.count(BR)
     body2 = body.replace(BR, BR_NEW)
     return fn[:m.start(1)] + body2 + fn[m.end(1):]

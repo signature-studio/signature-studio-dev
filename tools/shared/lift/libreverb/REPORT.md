@@ -5,7 +5,7 @@
 
 ## 結論 (1 行)
 win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を RetDec で lift し、`ucomiss` flags 修復 (1 pass) + SSE scalar helper 生成で wasm 化。
-**native 実機械語 vs wasm の全バイト比較 240/240 一致** (ネガコン 4 件は全て FAIL = ゲートは効く)。**ildsp は未着手 (サイズ調査のみ)** → #161 は Closes にしない。
+**native 実機械語 vs wasm の全バイト比較 240/240 一致** (ネガコン 4 件は全て FAIL = ゲートは効く)。**実インスタンス (CreateReverbInstance) 駆動は未達**: 生成直後の状態では `Process_Fruity` が SIGSEGV (§7 → [T-SH-71] #3361)。**ildsp は未達**: WaveformColouring は #3216 (CLOSED・部分達成。残りは #3274・#3275・#3276)。GeneralPitchShifter の残件は #3318・#3320。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance は未起票で #161 に残す (§6)。
 
 ## 1. 対象の再特定 (mac の 0x25c0-0x2f87 は win では使えない)
 `python3 locate.py <Reverb.dll> <out>` が export stub → 実体 → `.pdata` の連鎖で範囲を求める (RVA, 範囲内に base reloc 0 件・外部 call 0 件)。
@@ -51,14 +51,46 @@ win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を
 
 ## 6. ildsp (`block24360_PE.bin`) 調査のみ (lift 未実施)
 ildsp の規模測定 (命令数・call 数・export closure 表) と未解決は [lift/ildsp/REPORT.md](ildsp/REPORT.md) が正本。
+追跡先 (いずれも実在): WaveformColouring は #3216 (CLOSED・部分達成。残りは #3274 [T-SH-57]・#3275 [T-SH-58]・#3276 [T-SH-59])。GeneralPitchShifter は #2483 の子 #2528・#2529・#3300 (いずれも CLOSED)。その残件は CreateInstance closure の wasm 化 #3318 [T-SH-65] と全バイト差分 #3320 [T-SH-66]、vtable slot 1–3 は #3299 [T-SH-61]、slot 5 は #3404。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance (LimiterLite・Limiter・LowFreqEnhancer・Shimmer・StereoEnhancer・TransientLooper・Transmitter) は子 issue が未起票のため、親 #161 に残す (一覧は #161 のコメント)。
 
 ## 検証範囲 / 範囲外
 - 範囲: win 版 Process_Fruity/UF の**合成状態** (乱数 + 境界値) に対する wasm と native 機械語のビット一致。
-- 範囲外: ① `CreateReverbInstance` で作った実インスタンス状態での駆動 ② Process_UF 以外の Reverb 内関数 ③ mac slice ④ ildsp lift ⑤ wasm の性能。
+- 範囲外: ① 実インスタンス状態での駆動 (§7 で実測: 未達 → #3361) ② Process_UF 以外の Reverb 内関数 ③ mac slice ④ ildsp lift ⑤ wasm の性能。
 
 ## 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実インスタンス (CreateReverbInstance → Process) の駆動検証 | 状態レイアウトの意味づけ (14 delay line の長さ制約) は乱数/境界値で代替 | #161 継続 or 別チケット (PM 判断) |
+| 実インスタンス (CreateReverbInstance → Process) の駆動検証。生成直後の状態は Process_Fruity が SIGSEGV (§7) | 14 本の遅延線ポインタの割付け元が未特定。状態レイアウトの意味づけは乱数/境界値で代替したまま | [T-SH-71] #3361 |
 | D1a 変種「分岐条件が直前の無関係な add の parity/zero flag」の DEFECTS.md 反映 | カタログ未反映 | 行案は §3。DEFECTS.md の編集は PM 判断 |
-| ir_normalize / fix pass が `libkio` 配下の流用 (汎用化されていない) | 他 lib 転用時にコピーが増える | #(T-SH-16 汎用 pass 化) にコメント |
+| ir_normalize / fix pass が `libkio` 配下の流用 (汎用化されていない) | 他 lib 転用時にコピーが増える | [T-SH-16] #144 |
+
+## 7. 実インスタンス (CreateReverbInstance) の native 実行 — 生成直後の状態は Process_Fruity が落ちる
+
+測定 commit: `ccea76aeb` (HeapAlloc / HeapFree の呼び出し回数の出力を追加。`git diff ccea76aeb HEAD -- tools/shared/lift/libreverb ':!tools/shared/lift/libreverb/REPORT.md'` の出力は空)。
+手順: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/libreverb/inst_probe.sh` (locate.py → `inst_probe.c` を gcc で build → 実行 → 期待値と照合。期待値と違えば exit 1)。
+
+| 項目 | 実測 |
+|---|---|
+| `CreateReverbInstance` (RVA 0x3fa0) | 171 B・47 命令。直接 call は alloc ラッパ 0x404c (60 B)・memset 0x5300 (400 B)・遅延線初期化 0x1000 (88 B) ×2 |
+| IAT の到達 (ctor 経路・実測) | HeapAlloc (IAT 0x60130) は **5 回**、HeapFree (0x60138) は **0 回** 呼ばれる (出力 `HEAPALLOC_CALLS` / `HEAPFREE_CALLS`)。この 2 件を C 実装 (calloc / free) に差し替えると完走。ctor 以外の経路 (`Process_*` など) での到達は未計測 |
+| 返り値 | 非 NULL・vptr = img+0x603c0 (RVA)・0x2a0 B のうち 18 B が非 0 |
+| 遅延線 2 本 (`this+0x290`・`this+0x298`) | 両方確保済み。buffer 非 NULL・index 0・mask 0xfff (4096 float) |
+| 遅延線ポインタ 14 本 (`this+0xbc+8i`, i=0..13) | **14/14 が 0** |
+| `Process_Fruity_32FM_32FS` (n=4) を実インスタンスに対して 1 回 | **SIGSEGV (11)** |
+
+- 読み: Fruity は `qword [this+0xbc+8i]` を 13 本 (0xbc〜0x11c。例 0x13a7 `rax, qword ptr [r10+0xbc]`) 読み、UF は加えて 0x124 を読む (計 14 本)。NULL をそのままたどる。遅延線 1 本のレイアウトは、逆アセンブル (0x1220・0x1180) から `+4` = buffer ポインタ・`+0x10` = index・`+0x14` = mask と推定 (2 本の実測値と一致)。
+- 未特定 (子 [T-SH-71] #3361 の対象): コンストラクタが作るのは 2 本だけ。vtable の先頭 6 slot (RVA 0x28d0・0x3270・0x2980・0x3f80・0x3f90・0x2950) のうち、slot 1 (0x3270・665 命令) は float パラメータ (`this+0x20`・`0x200`・`0x208`) を読むが、確保の call を含まない。slot 3 (0x3f80) は `this+0x10` を返す getter、slot 4 (0x3f90) は `ret 0`。`qword ptr [reg+disp]` 形の 14 本への書き込みは静的走査で見つからなかった (`dword` の書き込みは 0xd0〜0x14c にあり、遅延線の index 更新と見られる)。
+- 検証範囲: 静的な書き込み命令の走査と、生成直後の 1 状態 (引数 NULL) での実行。ポインタを埋めた状態で Fruity が通るかは未実施 (子 #3361)。
+
+### 実測 (4 core・3 回)
+
+| 検査 | 測定 commit | 所要 (s) | load (開始前 1 分値) | 結果 |
+|---|---|---|---|---|
+| `lift.sh all` (本検査 + ネガコン 4 件) | `2de7679d` | 36.30 / 36.23 / 36.49 | 0.54 / 0.74 / 1.17 | rc 0・PASS 240/240・ネガコン 4 件 FAIL (期待通り) |
+| `inst_probe.sh` | `ccea76aeb` | 0.234 / 0.234 / 0.232 | 0.13 | rc 0・期待値と一致・`HEAPALLOC_CALLS=5 HEAPFREE_CALLS=0` (ctor 状態で Fruity が SIGSEGV) |
+
+- `lift.sh all` は fix 環境に `toolchain-retdec` / `toolchain-emsdk` が無く、再実行していない (上の行は `2de7679d` の実測)。`2de7679d` から HEAD までの lift の入力 (`lift.sh`・`locate.py`・`fix_rv.py`・`gen_helpers.py`・`diff_test.py`・`native_ref.c`・`run_wasm.mjs`) の差分は 0 行。
+- `inst_probe.sh` の実測は fix 環境で `fl-win64` の `extracted/block24352_PE.bin` だけを展開して行った (他のファイルは使わない)。
+- ネガティブコントロール: 期待値 `FRUITY_SIGNAL=11` を `10` に変えた一時コピーの `inst_probe.sh` は `MISMATCH`・rc 1 (実測。一時コピーは削除済み)。
+
+- `lift.sh all` の所要は §5 (24.8〜28.1 s) より長い (36.2〜36.5 s)。load は §5 と同程度 (0.5〜1.2) で、原因は未確認。判定 (PASS / FAIL の内容) には影響しない。

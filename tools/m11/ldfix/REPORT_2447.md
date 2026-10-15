@@ -2,7 +2,7 @@
 
 親: #2402 (LD-112)。前段: #1091 (LD-33、CLOSED)、#2316 (LD-108) の範囲外。
 
-**判定: 達成** (受入条件 4 件すべて)。修復は `fix_ld115.py` の検証用単独パッチで、本番の IR 生成経路 (`m11_gen_ir2.sh`) には未配線 (配線は子 #2527 (LD-117))。
+**判定: 達成** (受入条件 4 件すべて)。修復は `fix_ld115.py` の検証用単独パッチで、本番の IR 生成経路 (`m11_gen_ir2.sh`) への配線は #2527 (LD-117) で行った (REPORT_2527.md)。
 
 既知類型との関係 (DEFECTS.md): **D20** (wrong-value reuse) の 666a60 への延長 (ループ内 store、§2.2)。加えて同関数のループ回数の初期値が 0 に化ける別の欠陥を見つけた (§2.3。D20 とは別の候補、§7)。
 
@@ -58,7 +58,7 @@
 
 `tools/m11/ldfix/fix_ld115.py` (標準ライブラリのみ。`fix_ld108.py` と同じ単独パッチ方式)。入力 IR は `ldfix/ldfix.py` の出力に `fix_ld108.py` を掛けた IR (`work/boot_final.prealloca.ll` から。本番 `m11_gen_ir2.sh` と同じ順序)。2 箇所を直す。
 
-本番配線の現況: #2402 (LD-112) は 14:42 に COMPLETED で閉じ、`fix_ld108.py` は `m11_gen_ir2.sh` に配線済み (main `3dbb35e0`、`ld108=applied` を `m11_build.sh` が要求)。`fix_ld115.py` は未配線 (子 #2527)。
+本番配線の現況: #2402 (LD-112) は 14:42 に COMPLETED で閉じ、`fix_ld108.py` は `m11_gen_ir2.sh` に配線済み (main `3dbb35e0`、`ld108=applied` を `m11_build.sh` が要求)。`fix_ld115.py` は #2527 で配線済み (REPORT_2527.md)。
 
 - **count**: entry の `store i64 0, ptr %rdx.0.reg2mem` を、`load i32 [%15]` (N.count を読み直す。機械語の `mov edx,[r14]` と同じ) の zext に置換。
 - **store**: ループ本体の `store i64 %29, ptr %36` を、ループ内で読む `load i64 [%arg1]` の値 (`*P` = N) に置換。
@@ -129,6 +129,7 @@ D20 の行に、666a60 の 2 箇所 (ループ内 store は確定、回数の初
 - 差分 0 の証跡: `git diff f049fe44 HEAD -- tools/m11/ldfix/fix_ld115.py tools/m11/ldfix/dyn_ld115.mjs tools/m11/ldfix/ld115_e2e.sh` の出力は空 (0 行、本文執筆時点の HEAD)。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/ldfix/ld115_e2e.sh` (前提: `tools/m11/work` に work-m11、`[EMSDK]`、`capstone`・`pefile`)。
 - 所要: **138.0 s** (`f049fe44`、2m18.019s。並列数 1、4 コア)。同じ検証を `7d0c3cc9` (`f049fe44` の直前、差分はコメント 1 行) で 137.1 s (2m17.097s)、fix_ld108 を入れる前の順序 `3b783145` で 137.2 s と 137.1 s (2m17.238s・2m17.146s) で実行し、DYN 行と survey の数値は全回で同一だった。load average は実行ごとに 0.06〜0.39 から 1.17 程度。
+- 注 (#2527): `ld115_e2e.sh` は #2527 で本番経路 (`m11_gen_ir2.sh` → `m11_build.sh`) の A/B に組み替えた (`4ec81912`)。本 §4・§5 の数値は組替え前の測定 (prealloca 起点の IR)。組替え後の数値は REPORT_2527.md。
 - 出力: BASE / MID / AFTER の DYN 行 (§4)、survey 2 本 (§5) は `f049fe44` の実行で §4・§5 の値と一致。
 - 20 MiB 超の blob: `find tools/m11/ldfix -type f -size +20M -not -path '*/work/*'` は空 (実行済み)。
 - 検証範囲: work-m11 の snapshot (`boot_final.prealloca.ll`、2026-10-10 生成、ir_conditions 無し) から現行 ldfix で作った IR。本番の `m11_gen_ir2.sh` 全体 (RetDec からの再生成) は未実施。`ir_sha256` の照合は snapshot に ir_conditions が無いので不可 (`m11_build.sh` は ir_conditions に `ldfix=applied` と指紋を記録してから build した)。
@@ -140,7 +141,7 @@ D20 の行に、666a60 の 2 箇所 (ループ内 store は確定、回数の初
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 回数 0 の早期脱出 (機械語 `666ae0`〜`666ae4`) が IR に無い (§2.4) | arg2=0 で wasm が trap する。実際の呼び出し元の arg2 分布は未調査 | 子 #2513 (LD-116) |
-| `fix_ld115.py` の本番配線 (`m11_gen_ir2.sh` の fix_ld108 直後。`ld115=applied` の記録と build の要件を含む) | 通常 build の wasm は 666a60 が未修復 | 子 #2527 (LD-117) |
+| `fix_ld115.py` の本番配線 (`m11_gen_ir2.sh` の fix_ld108 直後。`ld115=applied` の記録と build の要件を含む) | (解消) #2527 で配線済み。本番経路の wasm で 666a60 PASS (REPORT_2527.md §3) | 解消済み (#2527) |
 | 欠陥の根本原因 (RetDec のどの段で、値番号付けか・ループ回数の load が落ちるか) | 修復は後追いの単独パッチ。同型の別関数の探索は未実施。既存の追跡先 #911・#1091 は CLOSED | 本 PR の未解決表で追跡 (起票せず。原因調査のみのため) |
 | survey で 666a60 が実行されない (REPORT_509 §4.3) ため、修復の波及を測れない | ok 退行 0 は「関数が実行されない」ことによる。`reach_509.sh` の再測定は未実施 | 本 PR の未解決表で追跡 (起票せず。再測定のみのため) |
 | `audit_lsf_disp.py` / `audit_lsf.py` が 666a60 の 2 欠陥を検出しない (既存の検出信号の外) | 回帰の自動検出が無い | 本 PR の未解決表で追跡 (#2396 は CLOSED。検出信号の追加は実装に直結するが、今回の受入条件外) |

@@ -174,6 +174,8 @@ static int run_asio(char *j, size_t jn) {
     double elapsed = emscripten_get_now() - t0;
     flasio_stats_t st;
     flasio_get_stats(&st);
+    char hb[32 * 12];
+    for (size_t n = 0, k = 0; k < 32; k++) n += (size_t)snprintf(hb + n, sizeof hb - n, "%s%u", k ? "," : "", st.burst_hist[k]);
     flasio_get_latencies(&lin, &lout);
     flasio_stop();
     double rate = 0, offs = 0, rr = 0;
@@ -185,7 +187,7 @@ static int run_asio(char *j, size_t jn) {
         "\"reported\":{\"nin\":%d,\"nout\":%d,\"min\":%d,\"max\":%d,\"pref\":%d,\"gran\":%d,\"lat_in\":%d,\"lat_out\":%d,\"lat_out0\":%d,\"olat_us0\":%u,\"ch_type\":%d},"
         "\"stats\":{\"cb_count\":%u,\"cb_late\":%u,\"cb_max_us\":%u,\"cb_avg_us\":%u,\"underruns\":%u,\"silence_frames\":%u,"
         "\"in_overruns\":%u,\"in_underflows\":%u,\"min_fill\":%u,\"avg_fill\":%u,\"wake_count\":%u,\"wait_timeouts\":%u,"
-        "\"ring_frames\":%u,\"quanta\":%u,\"reset_requests\":%u,\"wake_hist\":[%u,%u,%u,%u,%u,%u],\"latency_changes\":%u,\"T\":%u,\"burst_obs\":%u,\"timeinfo_cb\":%u,\"grows\":%u,\"shrinks\":%u,\"T_max\":%u,\"T0\":%u},\"timeinfo\":{\"calls\":%u,\"bad\":%u,\"st_n\":%u,\"st_invalid\":%u,\"st_nonmono\":%u,\"st_dmin\":%d,\"st_dmax\":%d},"
+        "\"ring_frames\":%u,\"quanta\":%u,\"reset_requests\":%u,\"wake_hist\":[%u,%u,%u,%u,%u,%u],\"latency_changes\":%u,\"T\":%u,\"burst_obs\":%u,\"timeinfo_cb\":%u,\"grows\":%u,\"shrinks\":%u,\"T_max\":%u,\"T0\":%u,\"burst_hist\":[%s]},\"timeinfo\":{\"calls\":%u,\"bad\":%u,\"st_n\":%u,\"st_invalid\":%u,\"st_nonmono\":%u,\"st_dmin\":%d,\"st_dmax\":%d},"
         "\"clock\":{\"samples\":%d,\"fit_ok\":%d,\"rate_hz\":%.3f,\"audible_minus_now_ms\":%.3f,\"monotonic\":%d},"
         "\"produced_frames\":%llu,\"resets_seen\":%u,\"rate_changes\":%u,\"panel_code\":%d}",
         name, P.buf, st.depth, P.sr, P.mode, elapsed / 1000.0,
@@ -193,7 +195,7 @@ static int run_asio(char *j, size_t jn) {
         st.cb_count, st.cb_late, st.cb_max_us, st.cb_avg_us, st.underruns, st.silence_frames,
         st.in_overruns, st.in_underflows, st.min_fill, st.avg_fill, st.wake_count, st.wait_timeouts,
         st.ring_frames, st.quanta, st.reset_requests,
-        st.wake_hist[0], st.wake_hist[1], st.wake_hist[2], st.wake_hist[3], st.wake_hist[4], st.wake_hist[5], st.latency_changes, st.T, st.burst_obs, st.timeinfo_cb, st.grows, st.shrinks, st.T_max, st.T0, g_ti_n, g_ti_bad,
+        st.wake_hist[0], st.wake_hist[1], st.wake_hist[2], st.wake_hist[3], st.wake_hist[4], st.wake_hist[5], st.latency_changes, st.T, st.burst_obs, st.timeinfo_cb, st.grows, st.shrinks, st.T_max, st.T0, hb, g_ti_n, g_ti_bad,
         g_st_n, g_st_invalid, g_st_nonmono, g_st_n ? g_st_dmin : 0, g_st_n ? g_st_dmax : 0,
         ns, fit == 0, rate, offs, mono, (unsigned long long)g_n, g_resets, g_rate_changes, g_panel_code);
     return 0;

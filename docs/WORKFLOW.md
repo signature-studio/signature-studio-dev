@@ -272,7 +272,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     (gitignore 対象の検証スナップショット。commit しない)。`work-m11` は #516 qstore 以前の生成
     (`qstore_report.json`・`ir_conditions.json` 無し) で現 main の生成手順と一致しない (#680)。survey の基準には使わない。
     IR の正は `bash tools/m11/m11_e2e.sh --full` (RetDec から再生成) の出力とする。`--full` は head `2e128c5c` で rc 0 まで通る (633 秒・素材 + Ghidra 再生成が前提。`tools/m11/REPORT_N27.md` §12・#728)。ただし reached_stage は 4 で trap が残る。IR の sha256 は A7 の空行除去 (#1664) より前は実行ごとに変わった (原因と修正後の一致は `tools/m11/REPORT_APPENDIX_960.md` §19)。
-    `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
+    `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る (`bash tools/m11/m11_e2e.sh --full` は無ければ `tools/m11/m11_ghidra_dll.sh` が Ghidra を取得・検査して作る・#3172)。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
     **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
     Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup が `~/.local/agent-py` の venv に `pefile` `capstone` `numpy` を入れる (#893)。版と hash は `.github/actions/agent-setup/requirements-py.txt` で固定し、`--require-hashes` で入れる (#2621)。venv の bin は PATH に載せず、`python` / `python3` を venv の python へ委譲するラッパーの dir (`~/.local/agent-py-shim`) を PATH 先頭に置く。venv 無しで動かす場合は同じ venv を手で作る。
@@ -372,7 +372,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     停止コメント (`oc-fix-limit`) の作者は job の GITHUB_TOKEN = `github-actions[bot]` だけ (型 `Bot` も見る。#2622・#2639)。
     PM Worker (`infra/pm-worker` の `MARK_LOGIN`) と oc-pm の文脈 (`prepare-event-context.sh`) も同じ作者で見る。
   - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fix / verify / reopen) と `test-watchdog.sh` (watchdog の判定と操作)
-    と `test-dispatch-context.sh` (dispatch・投稿者の入力検証) と `test-run-outcome.sh` (implement 終了時の記録・review の打ち切りの再起動) を、fake gh で `.github/workflows/scripts-test.yaml` が `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の
+    と `test-dispatch-context.sh` (dispatch・投稿者の入力検証) と `test-run-outcome.sh` (implement 終了時の記録・review の打ち切りの再起動) を、fake gh で `.github/workflows/scripts-test.yaml` が `.github/scripts/**`・`.github/actions/**`・`.github/prompts/**`・`.github/workflows/opencode.yaml`・`.github/workflows/scripts-test.yaml`・`tools/pm/**` の
     変更ごとに実行する。
   - **並行制御**: implement job は `opencode-impl-<N>`、review job は `opencode-review-<N>` と group を分ける。
     同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
@@ -428,6 +428,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     (一度でも稼働に入った Worker) で、`fresh` が false または `last_tick` が 15 分より古ければ、題名 `[CI-n] PM Worker 停止 (<日付>)`・ラベル `pm-worker-down` の issue を起票する
     (本文は `/status` の写しと `@pycabbage`。`needs-user-input` は付けない)。**`configured:false` / `installed:false` (`/setup` 未了) では起票しない。**
     重複排除: ラベル付きの open issue があれば追記のみ (1 時間に 1 回まで)、24 時間以内に close した issue は reopen して追記する。
+  - **PM Worker の launch 停止** (`watchdog.sh`、#CI-135): `/status` の `launch_halted` (`reason`・`since`) と `launch_halted_overdue` を読む。`launch_halted_overdue` が true (15 分以上止まり、着手待ち (ready) と空き枠 (room) がある) なら、障害 issue (`pm-worker-down`) に理由と止まり始めを追記する (無ければ題名 `[CI-n] PM Worker launch 停止 (<日付>)` で起票。重複排除と 60 分の間隔は停止検知と同じ)。`reason` が `review-only` (意図した停止) のときは追記しない。止まっている間 (`review-only` を除く) は、fresh でも回復の close をしない。`launch_halted` が null に戻ると、従来の回復の処理で回復を書いて close する。`launch_halted` の形が読めないときは警告だけ出し、追記も回復もしない。`launch_halted` が無い `/status` では従来どおり。測定は `tools/pm/REPORT_2848.md`。
   - **PM Worker の率制限 alert** (`watchdog.sh`、#CI-142): `fresh` が true の `/status` で、`rate_limit_alert` が true (Worker が 30 分の窓で 5 件以上かつ 30% 以上を 2 回連続と判定。`ratealert.ts`) または `rest_remaining` が 1500 未満 (`ratelimit.ts`) なら、ラベル `oc:rate-limit` の open issue があれば追記のみ (60 分に 1 回まで)、無ければ題名 `[CI-n] PM Worker 率制限 alert (<日付>)` を起票する (本文は `@pycabbage`・rate-guard の説明・率制限の項目の写し)。
     ラベルは `notify-rate-limit.sh` (run 側) と共有するので、同じ率制限を二重の issue にしない。open の issue が無くても、6 時間以内に閉じた `oc:rate-limit` の issue があれば起票しない (人が close した直後の再起票を防ぐ。reopen はしない。`notify-rate-limit.sh` と同じ 6 時間の窓。6 時間後も alert が続けば新しい issue を立てる)。同じ issue への追記は watchdog (`oc-rate-limit-note`) と `notify-rate-limit.sh` (`oc-rate-limit-notify`) がそれぞれ 60 分に 1 回書くので、1 時間に最大 2 件のコメントになりうる (run 側の集計と `/status` の判定は別の根拠。意図どおり)。`fresh` が false の間の値は使わない (停止は `pm-worker-down` が扱う)。回復時の close は自動ではない。
     回復 (`fresh` が true かつ `last_tick` が 5 分以内) で、open の障害 issue にコメントして close する。ファイルが無い・取得失敗・JSON 不正は警告だけで何もしない (終了コードは変えない)。

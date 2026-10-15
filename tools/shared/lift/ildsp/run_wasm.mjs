@@ -1,9 +1,9 @@
 // lift 済み wasm (fn.wasm) を node で実行。cases.bin (native_ref.c と同一形式) を読み、同形式の res_wasm.bin を書く。
-// usage: node run_wasm.mjs <workdir> <export 名>
+// usage: node run_wasm.mjs <workdir> <export 名> [ret]   (ret=1: 戻り値の下位 32 bit を record の ret 欄に書く)
 import { readFileSync, writeFileSync } from "node:fs";
-const W = process.argv[2], FN = process.argv[3];
+const W = process.argv[2], FN = process.argv[3], RETC = process.argv[4] === "1";
 const INNER = 0x2f8, NB = 5, BUFN = 64, PTR = [0x10, 0x18, 0x20, 0x258, 0x260];
-const REC = 4 + INNER + 16 + NB * BUFN * 4;
+const REC = 8 + INNER + 16 + NB * BUFN * 4;
 const inst = await WebAssembly.instantiate(await WebAssembly.compile(readFileSync(`${W}/fn.wasm`)), {});
 const f = inst.exports[FN];
 const cases = readFileSync(`${W}/cases.bin`);
@@ -22,14 +22,16 @@ for (let c = 0; c < ncase; c++) {
   mem.set(inner0, inner); mem.set(wrap0, wrap);
   bufs.forEach((a, i) => { mem.set(bufs0[i], a); dv.setBigUint64(inner + PTR[i], BigInt(a), true); });
   dv.setBigUint64(wrap + 8, BigInt(inner), true);
+  let rv = 0;
   try {
-    f(BigInt(wrap), 0n, 0n, 0n);
+    const r = f(BigInt(wrap), 0n, 0n, 0n);
+    if (RETC) rv = Number(BigInt.asUintN(32, BigInt(r)));
   } catch (e) {
     const t = Buffer.alloc(REC); t.writeUInt32LE(1, 0); outs.push(t); continue;
   }
   for (let i = 0; i < NB; i++) dv.setBigUint64(inner + PTR[i], 0n, true);
   dv.setBigUint64(wrap + 8, 0n, true);
-  const h = Buffer.alloc(4);
+  const h = Buffer.alloc(8); h.writeUInt32LE(rv, 4);
   outs.push(Buffer.concat([h, mem.slice(inner, inner + INNER), mem.slice(wrap, wrap + 16), ...bufs.map((a) => mem.slice(a, a + BUFN * 4))]));
 }
 writeFileSync(`${W}/res_wasm.bin`, Buffer.concat(outs));

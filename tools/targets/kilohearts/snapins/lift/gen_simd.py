@@ -381,6 +381,8 @@ def gen256(name, ret, params):
     引数順は VEX 3 operand 形と同じ (a0 = src1, a1 = src2) で、lane 0 = bit [31:0]。"""
     b = base_of(name)
     ptys = [p.split()[0] for p in params]
+    if b == 'vmovaps' and ret == 'i256' and ptys == ['i256']:
+        return 'define i256 @%s(i256 %%a0) {\n  ret i256 %%a0\n}' % name
     if b not in V256_OPS or ret != 'i256' or ptys != ['i256', 'i256']:
         return None
     return ('define i256 @%s(i256 %%a0, i256 %%a1) {\n'
