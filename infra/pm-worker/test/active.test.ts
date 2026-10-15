@@ -220,11 +220,11 @@ test("LOW_CAP: 既定は 10。空・空白・非数・負は既定に戻し、0 
 
 test("active: 未完了の opencode.yaml の run を区分別に数える。合計は all と一致し、対応の取れない run は normal (#2721)", () => {
   const issues = [
-    { title: "[A-1] a", labels: ["prio:low"] },
-    { title: "[A-2] b", labels: ["prio:critical"] },
-    { title: "[A-3] c", labels: [] },
-    { title: "[A-4] dup", labels: ["prio:low"] },
-    { title: "[A-4] dup", labels: [] },
+    { title: "[A-1] a", prio: "low" as const },
+    { title: "[A-2] b", prio: "critical" as const },
+    { title: "[A-3] c", prio: "normal" as const },
+    { title: "[A-4] dup", prio: "low" as const },
+    { title: "[A-4] dup", prio: "normal" as const },
   ];
   const run = (id: number, event: string, title: string, status: string, wf?: string) =>
     ({ id, event, title, status, conclusion: null, updatedAt: "2026-10-14T11:00:00Z", ...(wf ? { wf } : {}) }) as RunState;

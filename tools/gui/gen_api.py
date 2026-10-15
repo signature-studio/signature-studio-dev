@@ -189,7 +189,7 @@ def main():
         d = per_dll.setdefault(r["dll"], [0, 0]); d[0] += 1; d[1] += r["xref"]
     # GUI-3 (#174): 実 FLEngine lift で shim に実到達した API (tools/gui/flengine/e2e.sh が results/*.json を更新する)
     reach = {}; reach_kind = {}
-    for fn, tag in (("boot.json", "起動"), ("survey_soft.json", "survey"), ("probe.json", "probe")):
+    for fn, tag in (("boot.json", "起動"), ("survey_soft_chain.json", "survey"), ("probe.json", "probe")):
         try:
             for e in json.load(open(os.path.join(HERE, "flengine", "results", fn)))["reach"]:
                 reach.setdefault(e["name"], []).append(tag)
