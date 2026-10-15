@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 source ../shared/env.sh   # FL_WIN64_DIR (環境変数で指定)
 PE="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"
-python3 m11_cond.py --reset ldfix=pending qstore=not-applied ld108=not-applied pe="$PE"   # #680: IR 生成条件を記録 (work/ir_conditions.json)
+python3 m11_cond.py --reset ldfix=pending qstore=not-applied ld108=not-applied ld115=not-applied pe="$PE"   # #680: IR 生成条件を記録 (work/ir_conditions.json)
 CH="work/boot0.lift.ll work/boot1.lift.ll work/boot2.lift.ll work/boot3.lift.ll"
 [ -f work/boot4.lift.ll ] && CH="$CH work/boot4.lift.ll"
 # boot5 = 間接 call 先の fallback 実装 (m11_extra_ranges5.txt; #132 unit #23)
@@ -60,6 +60,20 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
     mv work/boot_final.ld108.ll work/boot_final.ll
     python3 m11_cond.py ld108=applied
   fi
+  # ld115 (#2447, D20 の 666a60 への延長): 回数の初期値 (機械語 666ada) とループ内 store (機械語 666b13) を直す。fix_ld108 の後に掛ける (ld115_e2e.sh と同じ順序)。
+  #   1 関数だけを書き換え、想定と違う IR は assert で止める (set -e で fail-closed)。
+  #   M11_FIX_LD115=0 は適用前の IR を明示的に取る A/B 検証用 (ld115_e2e.sh)。ir_conditions.json に ld115=disabled を残し、build は M11_ALLOW_LD115_DISABLED=1 でしか通さない。
+  if [ "${M11_FIX_LD115:-1}" = 0 ]; then
+    python3 m11_cond.py ld115=disabled
+    echo "[gen_ir2] M11_FIX_LD115=0: fix_ld115 を適用しない (ir_conditions.json ld115=disabled; build は M11_ALLOW_LD115_DISABLED=1 が要る)" >&2
+  else
+    python3 ldfix/fix_ld115.py work/boot_final.ll work/boot_final.ld115.ll
+    mv work/boot_final.ld115.ll work/boot_final.ll
+    python3 m11_cond.py ld115=applied
+  fi
+  # #3296: function_412770 の rep movsq 源 (機械語 mov rsi,[rax] の load が lift で脱落し ptr null)。想定外の入力は assert で止まる (fail-closed)。
+  python3 ldfix/fix_src412770.py work/boot_final.ll work/boot_final.src412770.ll
+  mv work/boot_final.src412770.ll work/boot_final.ll
 else
   python3 m11_cond.py ldfix=skipped
   echo "[gen_ir2] ERROR: ldfix skip (PE 無し: $PE / capstone・pefile 無し) — fail-closed で失敗" >&2

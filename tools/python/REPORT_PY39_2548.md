@@ -115,7 +115,7 @@ RIP 相対の参照先 (次命令アドレス + disp) を計算し直すと、`0
 - pattern: 0 ≤ patNum ≤ 998 (`0x3e6`) で、`[[0x15e2aa0] + patNum*192 + 0x28]` が非 null。
 - note: `0x12df320(pattern, &cursor, step' + V)` を戻り値 0 まで反復。各 note で `start = (note[0] / V) * V`、`end = max(0x105f2e0(note), start + V - 1)` を求め、`start <= step' < end` かつ `word [note+6] == chanId` のとき `0x417fc0` で list に push する。
 
-未確定: `0x12df320`・`0x105f2e0`・`0x417fc0`・`0xfe8bb0` の実体、note 構造体の字段 (長さを含む)、V の意味 (→ #3309・#3310)。
+未確定だった `0x12df320`・`0x105f2e0`・`0x417fc0`・`0xfe8bb0` の実体、note 構造体の字段は下の PY-184 節 (#3309) で確定。V の意味は #3310。
 
 ### 述語・登録 (未確定。#3311)
 
@@ -130,6 +130,85 @@ callback `0xd5ce00` の `[vtable+0x98]`、早期 return の述語 `0xd84f30` (ct
 - 規則を崩すと落ちることの確認: param 3 の clamp を `0xf0` から `0xf1` に変えて build すると `step_item_diff` が AssertionError で落ち、戻すと PASS した。
 - 差分 0 の確認: `git diff add61c2c HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0` (本節以降の変更は本 REPORT だけ)。
 - `FL_ENGINE=wasm node tests/all_tools.mjs`: 未実行。CPython 3.12.1 の wasm build (`build_cpython_wasm.sh`) と `fetch_inputs.sh` の入力が worktree に無く、本 run では回らなかった。本 commit は dispatch 表と既存 handler を変えない (追加は export 1 件と内部関数のみ)。
+- 後日: 上の未実行は PY-184 節の受入 3 で解消 (`FL_ENGINE=wasm node tests/all_tools.mjs` 48/48)。
+
+## PY-184 追補 (#3309): 項目列挙 (PE 0x130f200) の未確定関数と note 構造体の確定
+
+- 親: #2581 (PY-78)。本節の範囲は未確定の 4 関数と note 構造体の確定、note 列挙の判定式の mock / C 照合。V (PE の量子 `[0x15e25f8]`) の値と意味は子 PY-185 (#3310) で、本節では引数として扱う。
+- 測定 (PE 逆アセンブル): `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>` (各 1 回・終了 0)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (2.8 秒)。命令数: 0x12df320 = 90・0x105f2e0 = 60・0x417fc0 = 70・0xfe8bb0 = 50・0x130f200 = 130・0x417b70 = 45・0x418190 = 30。
+
+### 関数の実体 (PE 実測)
+
+| VA | 実体 | PE の読み |
+|---|---|---|
+| `0x12df320` | note の反復子 | cursor `[rdx]`・件数 `[rcx+0x14]`・data `[rcx+8]`・stride `[rcx+0x10]`。`data + cursor*stride` の先頭 dword が閾値 `r8d` 未満なら cursor を 1 進めて要素を返す。件数以上・閾値以上なら 0 (`0x12df320`〜`0x12df34a`) |
+| `0x105f2e0` | note の終端 | `[note+0] + max(sext [note+8], 1)` (32bit 加算・下限 1)。`0x105f2e0`〜`0x105f2f5` |
+| `0x417fc0` | list への push (薄い thunk) | `0x417b70` (参照数つき配列の再確保) を `r9 = 件数+1` で呼ぶ。呼出し側 `0x130f394` の後で `[data + 件数*8] = note` を書く (`0x130f3a3`)。配列ヘッダは件数 qword `[data-8]`・参照数 dword `[data-0xc]` (`0x417b70` 先頭より) |
+| `0xfe8bb0` | ポインタ配列の添字参照 | 件数 dword `[rcx+0x10]`・data `[rcx+8]` (8 byte 要素)。0 ≤ i < 件数 なら `data[i]`、外れは 0 (`0xfe8bb0`〜`0xfe8bd5`) |
+| `0x418190` | list の解放 (空にする) | `[slot] = 0`。参照数を `lock xadd` で 1 減らし、0 になれば解放 (`0x418190`〜`0x4181c8`)。`0x130f21f` で list を空にする。後半は未読 |
+
+### note 構造体 (項目 = note)
+
+PY-78 節の項目と同一。列挙に使う字段:
+
+| 字段 | 型 | 意味 | PE |
+|---|---|---|---|
+| +0 | dword (符号付き) | 開始 tick (start)。反復子の閾値比較・量子化に使う。param 7 の書換え先 | `0x130f31a`・`0x12df33a` |
+| +6 | word (ゼロ拡張) | channel ID。channel 構造体 `+0x794` と一致する note だけ列挙 | `0x130f35c`・`0x130f361` |
+| +8 | dword (符号付き) | 長さ。終端 = start + max(長さ, 1) | `0x105f2e0` |
+| +0xc・+0x10〜+0x17 | word・byte | param 0〜6・8 の書換え先 (PY-78 節の表) | `0x130f4f6`〜`0x130f699` |
+
+stride は反復子が `[container+0x10]` から読む実行時の値。mock / C は StepItem の大きさ 24 B で固定する。24 B 以上は PY-78 の最大字段 `+0x17` (byte) から言える。実機の stride は未実測・作成元は未調査。
+
+### 列挙の判定式 (`0x130f200`・確定)
+
+```
+note を pattern の container から 0x12df320 で反復 (閾値 thr = step' + V、V = [0x15e25f8])
+  sq  = (note[0] / V) * V                        (idiv: 0 方向へ切捨て・32bit)
+  end = max(note_end(note) [0x105f2e0], sq + V - 1)
+  採用 ⇔ sq <= step' < end  かつ  word note[+6] == chanId
+```
+
+- 反復子は最初の start >= thr で止まる。note 配列は start 昇順が前提。
+- 未モデル (glue): channel 探索 (`[[0x15e2218]]` の件数を走査し `channel[i]+0x794 == chanId`・無ければ空)、patNum の範囲 [0, 998]、pattern null 判定 `[[0x15e2aa0] + patNum*192 + 0x28]`。mock / C の列挙は note 配列と chanId を直接受ける。
+- 件数 0 の channel 探索は PE 読みからの推定 (`0x130f22b`〜`0x130f25d`): i = 0 を `0xfe8bb0` で引いて null を参照し得る。実機の件数は 0 にならない前提で、未確認。
+- `0x417b70` の参照数 (COW) は未モデル (単一参照を仮定)。
+
+### 実装と検証 (測定 commit `dd12402917ba2a3ab6f42b02501bcf192b0a2167`)
+
+- `provider/fl_engine.c`: StepItem の `p1[8]` を `p4[2]`・`ch` (+6)・`len` (+8) に分割 (大きさ 24 B・既存字段の位置は不変)。`note_next`・`note_end`・`note_enum` (判定式)・`fl_engine_note_enum_probe(seed, n, chan, step, V)` (seed の LCG で n 件 (<= 256) を作り start 昇順に並べて列挙)・`fl_engine_note_enum_out`。
+- `host/fl_mock.mjs`: `noteGen`・`noteEnum` (C と同一の式)・`noteEnumProbe`・`noteEnumNotes` (spot 用)。`host/fl_provider.mjs`: `noteEnumProbe`。`provider/build.sh`: export 2 件を追加。
+- `tests/note_enum_diff.mjs` (新規): spot 3 件 (手計算の期待値を mock で固定) と 33264 呼出し (seed 8 × n 7 × chan 6 × step 9 × V 11) の mock / wasm 照合。spot の入力は start 昇順 (反復子は start >= 閾値で止まるため、非昇順の入力は後続が読まれない)。
+  - spot 1: `[[0,0,1],[5,1,1],[6,10,2],[7,1,1],[9,1,1],[10,1,1]]`・chan 1・step 6・V 4 → `[1,3]`。note 0 は終端 3 で外れ、note 1 は start_q 4・終端 7 で入り、note 2 は ch 違い、note 3 (start 7) は start_q 4・終端 8 で入り、note 4 は start_q 8 で外れ、note 5 (start 10) で反復が止まる。
+  - spot 2: `[[-5,2,1],[-2,1,1]]`・chan 1・step -5・V 4 → `[]` (0 方向への切捨て)。
+  - spot 3: `[[7,0,3],[7,-3,3],[7,1,3]]`・chan 3・step 7・V 1 → `[0,1,2]` (len <= 0 は長さ 1 とみなす)。
+
+### 実測 (commit `dd124029`・wasm)
+
+- 環境: emsdk 6.0.12 (`tools/m1/flags.sh` の pin・上流から取得)。`EMSDK_ENV=<emsdk>/emsdk_env.sh bash provider/build.sh` が exit 0。load average 1.25 (測定時 00:53)。
+- `node tests/note_enum_diff.mjs` → `{"calls":33264,"nonempty":5869,"spot":3,"diffs":0,"PASS":true}` (0.857 秒)。nonempty は列挙が 1 件以上の呼出し数 (検査の力の確認)。
+- ネガティブコントロール: `int64_t l = it->len < 1 ? 1 : it->len;` を `int64_t l = it->len;` にして build → `note 列挙の差分 48 件` で AssertionError。元に戻して build → PASS。
+- 既存: `node tests/step_item_diff.mjs` → `{"calls":5929,"spot":5,"diffs":0,"PASS":true}`。`node tests/channels_diff.mjs` → `{"calls":170,"diffs":0,"PASS":true}`。
+- 受入 3: `FL_ENGINE=wasm node tests/all_tools.mjs` → `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` (1.98 秒)。入力は `fetch_inputs.sh` (FL_WIN64_DIR の DATA block 4 件)、`build_cpython_wasm.sh` (CPython 3.12.1 wasm・約 4.5 分)、`build_flpy.sh` (flpy.js)。
+
+### 実測 (測定 commit `1de44df73`・spot 1 の入力を昇順に修正後)
+
+- 修正: spot 1 の入力を start 昇順 `[0,5,6,7,9,10]` に直し、期待値 `[1]` を `[1,3]` に直した。非昇順の入力では反復子が start=10 で止まり、note 3 (start 7) を読まないため `[1]` になっていた。
+- 環境: emsdk 6.0.12 (上流から `./emsdk install 6.0.12`・`tools/shim/REPORT.md` の手順)。`EMSDK_ENV=<emsdk>/emsdk_env.sh bash provider/build.sh` が exit 0。provider の C は本 commit で無変更。load average 0.15 (測定時 01:05)。
+- `node tests/note_enum_diff.mjs` → `{"calls":33264,"nonempty":5869,"spot":3,"diffs":0,"PASS":true}` (0.867 秒)。
+- `node tests/step_item_diff.mjs` → `{"calls":5929,"spot":5,"diffs":0,"PASS":true}`。`node tests/channels_diff.mjs` → `{"calls":170,"diffs":0,"PASS":true}`。
+- C 側の spot 照合 (リポジトリ外の一時ハーネス・`fl_engine.c` を include・`gcc -Wall -Wextra -fsanitize=undefined,address`・報告 0): spot 1 → `[1,3]`、spot 2 → `[]`、spot 3 → `[0,1,2]` (mock と一致)。旧の非昇順 spot 1 → `[1]`。
+- `FL_ENGINE=wasm node tests/all_tools.mjs` は再測定していない。dd124029 以降の変更は `tests/note_enum_diff.mjs` のみで、provider・host・`tests/all_tools.mjs` は無変更のため、dd124029 の 48/48 を維持する。
+- 差分の証跡: `git diff dd124029 1de44df73 --stat -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` は `tests/note_enum_diff.mjs` の 1 件のみ (2 行)。`git diff 1de44df73 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` = 0 (本 commit 時点)。
+
+### 未解決
+
+- V (PE `[0x15e25f8]`) の値と意味・書込み元: PY-185 (#3310) の範囲。
+- `channels.setStepParameterByIndex` の handler への接続: #3311 (未接続のまま)。
+- 件数 0 の channel 探索 (NULL 参照の可能性・PE 推定): 本 PR では未モデル (件数 1 以上を仮定)。起票先: #3311 へのコメント (a) https://github.com/signature-studio/signature-studio-dev/issues/3311#issuecomment-6181995465
+- 参照数 (COW): 本 PR では未モデル (単一参照を仮定)。起票先: #3311 へのコメント (b) (同上 URL)
+- `0x418190` の後半 (参照数 0 になった後の解放処理): 未読。起票先: #3311 へのコメント (c) (同上 URL)
+- 実機の note stride: mock / C は 24 B 固定 (24 B 以上は確定・実機は未実測)。起票先: #3311 へのコメント (d) (同上 URL)
 
 ## PY-185 (#3310): 換算値 V (slot 0x15e25f8) の確定
 

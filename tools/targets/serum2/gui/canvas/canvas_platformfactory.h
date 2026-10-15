@@ -1,6 +1,6 @@
 // SR-42 #2139 (親 #2064): canvas platform (wasm) の IPlatformFactory 実装。
 // 既存の canvas 実装 (bitmap / font / frame / graphicsdevice / graphicspath) を組み合わせる。
-// 資源の読込み・文字列・タイマー・クリップボードなどの実体を持たない関数は nullptr・false・空値を返す。
+// SR-50 #3260: 文字列は CanvasString (UTF-8 保持) を返す。資源の読込み・タイマー・クリップボードなどの実体を持たない関数は nullptr・false・空値を返す。
 
 #pragma once
 
@@ -13,6 +13,8 @@ namespace VSTGUI {
 class CanvasPlatformFactory : public IPlatformFactory
 {
 public:
+	explicit CanvasPlatformFactory (PlatformInstanceHandle) noexcept {}
+
 	uint64_t getTicks () const noexcept override;
 
 	PlatformFramePtr createFrame (IPlatformFrameCallback* frame, const CRect& size, void* parent,
