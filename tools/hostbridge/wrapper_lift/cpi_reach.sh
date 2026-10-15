@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # cpi_reach.sh: x64c で生成した Fruity Wrapper の C を wasm (node 用 MODULARIZE) にし、CreatePlugInstance への入場と完走を確認する (#829 受入 2・#2653)。
 #   usage: FL_WIN64_DIR=<fl-win64>/extracted EM_CONFIG=... PATH=<emsdk>/upstream/emscripten:$PATH \
-#          bash tools/hostbridge/wrapper_lift/cpi_reach.sh block19091_PE.bin <work> [entry VA 16進 (既定 0x86ab10)] [a0 16進 (既定 0x600000 = host)]
+#          bash tools/hostbridge/wrapper_lift/cpi_reach.sh block19091_PE.bin <work> [entry VA 16進 (既定 0x86ab10)] [a0 16進 (既定 0xa00000 = host)]
 #   <work>/x64c/ott_lifted.c は x64c_wrapper.py の出力 (先に生成しておく)。出力は <work>/probe/ と <work>/cpi.cjs。
 #   判定: node cpi_reach.mjs の JSON。entered=true で入場ログ ([cpi] enter <entry>) を確認。ret が null なら trap を記録する。
 #   CPI_NOENTER=1 で cpi_enter 行を入れない複製を作る (強い NC: entered が false になることを見る)。
 # 注意: 複製 C を使う (<work>/probe/ 配下のみ。repo には書かない)。entry 関数の先頭に cpi_enter を、各命令コメント行の後に cpi_at(VA) を挿入し、
 #       直近 256 命令を wasm メモリの ring に残す (trap 後も node から読める)。
-#       host を再構成する cpi_host.c (cpi_host_setup・cpi_miss・cpi_miss_imp) を link し、ott_dispatch の default 分岐 (記録して返す) と
+#       host を再構成する cpi_host.c (cpi_host_setup (PE 範囲と交差したら 0)・cpi_miss・cpi_miss_imp) を link し、ott_dispatch の default 分岐 (記録して返す) と
 #       ott_missing_import の先頭 (記録して返す) を sed で差し込む。lift 出力と rt (tools/ott/rt) は変更しない。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -15,7 +15,7 @@ REPO="$(cd -- "$HERE/../../.." && pwd)"
 BLOCK="$1"
 W="$2"
 ENTRY="${3:-0x86ab10}"
-A0="${4:-0x600000}"
+A0="${4:-0xa00000}"
 ENTRY_HEX="${ENTRY#0x}"
 mkdir -p "$W/probe"
 BASE="$(python3 "$HERE/cpi_image.py" "$FL_WIN64_DIR/$BLOCK" "$W/image.bin")"

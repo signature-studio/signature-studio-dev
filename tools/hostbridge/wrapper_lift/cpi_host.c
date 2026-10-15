@@ -3,21 +3,25 @@
  * cpi_reach.sh が複製 C の ott_dispatch の default 分岐と ott_missing_import の先頭から呼ぶ。
  * host = CPI_HOST の qword[0] が vtable (CPI_VT)。vtable の各スロットは CPI_STUB + 8*i の仮想 VA を指し、
  * lift 側の間接 call がそこへ来たら、記録して CPI_OBJ (qword[0] が同じ vtable を指す fake object) を rax に返す。
- * slot 6 は 6 番目の引数 (&out) に空文字列の番地 CPI_STR を書き、rax = 1 を返す (観測した呼出しの形に合わせた最小の応答)。 */
+ * slot 6 は 6 番目の引数 (&out) に空文字列の番地 CPI_STR を書き、rax = 1 を返す (観測した呼出しの形に合わせた最小の応答)。
+ * host 領域 (CPI_HOST〜CPI_END) は PE イメージ [ImageBase, ImageBase+SizeOfImage) の外に置く (0x600000 台は .text 内で定数データを壊した: #2653 差し戻し)。 */
 #include "ott_cpu.h"
 #include <stdio.h>
 
-#define CPI_HOST 0x600000ULL
+#define CPI_HOST 0xA00000ULL
 #define CPI_VT (CPI_HOST + 0x1000ULL)
 #define CPI_STUB 0x7ff00000ULL
 #define CPI_NSLOT 128
-#define CPI_OBJ 0x640000ULL
-#define CPI_STR 0x641000ULL
+#define CPI_OBJ (CPI_HOST + 0x40000ULL)
+#define CPI_STR (CPI_HOST + 0x41000ULL)
+#define CPI_END (CPI_STR + 0x1000ULL)
 
-void cpi_host_setup(void) {
+int cpi_host_setup(unsigned long long img_lo, unsigned long long img_hi) {
+    if (CPI_HOST < img_hi && CPI_END > img_lo) return 0;
     ST64(CPI_HOST, CPI_VT);
     for (unsigned i = 0; i < CPI_NSLOT; i++) ST64(CPI_VT + 8 * i, CPI_STUB + 8 * i);
     ST64(CPI_OBJ, CPI_VT);
+    return 1;
 }
 
 int cpi_miss(uint64_t t) {
