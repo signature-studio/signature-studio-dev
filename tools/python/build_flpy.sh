@@ -2,9 +2,10 @@
 # libpython3.12.a + flpy.c(+_flhost) を ES module 形式 (flpy.js / flpy.wasm / flpy.data) にリンクする。
 # 前提: bash build_cpython_wasm.sh 済み。出力: tools/python/dist/ (gitignore)
 # 入力 (環境変数。既定は従来どおり。詳細は analysis/flapi_table.py 冒頭):
-#   EMSDK_DIR (既定 /opt/emsdk。EMSDK_ENV=<emsdk_env.sh> を渡した場合は未指定時にその dirname) / FL_WIN64_DIR・FL_WIN_PE (win PE) / FL_STUBS_DIR (既定 work/fl-stubs) /
+#   EMSDK_DIR (既定 /opt/emsdk) / FL_WIN64_DIR・FL_WIN_PE (win PE) / FL_STUBS_DIR (既定 work/fl-stubs) /
 #   FL_ENGINE_DYLIB (mac dylib。無ければ flapi_table.json の既存値を引き継ぐ) / FLAPI_OUT_DIR (既定 analysis/flapi)
 #   FLPY_TABLE_ONLY=1: flapi_table.json / flapi_ids.json / FLAPI.md の再生成だけして終了 (emsdk・CPython wasm 不要)
+#   EMSDK_ENV=<emsdk_env.sh> を渡し EMSDK_DIR を未指定にすると、EMSDK_DIR はその dirname になる (build_cpython_wasm.sh と同じ指定)
 #   FLPY_SKIP_TABLE=1: 上の再生成をせず、FLAPI_OUT_DIR の追跡済み flapi_table.json をそのまま使う (win PE / fl-stubs が無い環境で link だけ試す用。表は更新されない)
 #   FLPY_C=<flpy.c の path (既定 src/flpy.c)> FLPY_OUT=<出力 dir (既定 dist)>  (tests/subinterp_negcontrol_old.sh が修正前 flpy.c を別 dir にビルドするのに使う)
 # 入力が欠けていれば flapi_table.py が理由を出して exit 2 し、この script も非 0 で止まる (成果物は書き換えない)。
