@@ -68,7 +68,7 @@ REPORT_PY42 は「署名の不一致 3 件 (getPatternGroupName・getPatternsInG
 
 | 検査 | 手順 (コマンド) | 結果 |
 |---|---|---|
-| 素材 | `tar --zstd -xf fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` | rc 0・5.98 秒。`toolchain-emsdk` は R2 素材に無かったため、上流 `emscripten-core/emsdk` の tag `6.0.12` を `./emsdk install 6.0.12` (date 差 25 秒) と `./emsdk activate 6.0.12` で取得し `/opt/emsdk` に置いた |
+| 素材 | `tar --zstd -xf fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` | rc 0・5.98 秒。`toolchain-emsdk` は R2 素材に無かったため、上流 `emscripten-core/emsdk` の tag `6.0.12` を `./emsdk install 6.0.12` (date 差 25 秒) と `./emsdk activate 6.0.12` で取得し [EMSDK] に置いた |
 | 入力 | `FL_WIN64_DIR=<展開先> bash fetch_inputs.sh` | rc 0 |
 | CPython wasm | `bash build_cpython_wasm.sh` | rc 0・254 秒 (wall) |
 | flpy リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0・6 秒 |
