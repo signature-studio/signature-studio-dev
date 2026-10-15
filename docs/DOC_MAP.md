@@ -246,6 +246,7 @@
 | `tools/m11/REPORT_N15.md` | ~16 | m11 REPORT §16 (#490 main HEAD の 4c3baa4 / faee5b6 状態の実測・ネガコン) の付録 (250 行上限のため分割) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` | ~244 | #2770 (LD-129): native 側 0x5ac308 の書込み監視 (`rt/ld_native.c` の `LD_WATCH_ADDR`)。REPORT_1783.md の旧 §8 を 250 行上限のため分割移動した節 (§8.1〜§8.9)。分割後に §8.2・§8.4・§8.6・§8.8 を再測定・改訂したので、測定値と判定の正本は本付録 |
 | `tools/m11/REPORT_APPENDIX_1430.md` | ~60 | m11 #1430 の基準 (before) 節の全文 (`REPORT_APPENDIX.md` §9 の後続。xmm 引数の callee 署名復元の前測定 (survey 基準 ok/trap/miss/noproc の実測)・`work-m11` 由来の 7 カテゴリ (和 1,963)。全再生成 IR の測定は #1532) |
+| `tools/m11/REPORT_APPENDIX_3122.md` | ~111 | m11 #3122 (M11-N169): 基準 7e149974 全再生成 IR の unit 別 survey (ok 872 / trap 23 / miss 46 / noproc 1) と本 A/B (main 既定・opt-in) の unit 別対応付け (差 1 件: unit 56)・対応付けスクリプト `m11_unit_map.py`・unit 別 JSON (`xmm_unit_3122/`) |
 | `tools/m11/REPORT_APPENDIX.md` | ~238 | m11 REPORT §8 (LB_BASE=0x10000 適用 #222)・§9 (sigfix 0 詰め #131)・§10a (#132 commit 別測定表と注記)・§10b (#132 真因・修正 4 点・NC・次 blocker・外した内容)・§12 の一部 (#513 新規類型の行案)・§12b (#513 巨大 VirtualAlloc の n の出所) の全文 (250 行上限のため本体から無変更で分割移動) |
 | `tools/m11/REPORT_N1318.md` | ~69 | #1318 (N82): 10 進 inttoptr 4364 件の VA→LVA 仕分け表 (分類件数・判定規則・QPF 整数定数 1 件の誤 remap)・再現 `m11_inttoptr_class.py` |
 | `tools/m11/REPORT_N54.md` | 108 | #954: xmm を読む callee の IR 署名復元 (opt-in `M11_XMM_ARGS=1`)・34/49 件復元・survey 差 0・全件復元時の退行の二分探索表・`fix_xmm_args.py` の呼出し引数個数検査 |
