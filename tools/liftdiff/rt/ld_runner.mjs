@@ -138,7 +138,7 @@ for await (const l of rl) {
   } else if (l.startsWith('RESET ')) {
     const m = Number(l.slice(6));
     if (m & 9) sp_restore(spSnap);   // 1 (stk) と 8 (sp) のどちらでも SP を戻す
-    mod._ld_w_reset(m);
+    out(JSON.stringify({ reset: m, diff: mod._ld_w_reset(m) }));
   } else if (l.startsWith('BLOB ')) {
     const k = l.indexOf(' ', 5); putStr(l.slice(5, k), [l.slice(k + 1)]); mod._ld_w_blob();
   } else if (l.startsWith('FIX ')) {

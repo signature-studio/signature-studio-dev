@@ -19,7 +19,8 @@ from ldlib.session import Session
 
 TSV = os.path.join(HERE, 'results', 'ld58_m11_sample800_shards_t1.tsv')
 TARGET = os.path.join(HERE, 'targets', 'm11.json')
-MASK = {'none': 0, 'stk': 1, 'sta': 2, 'img': 4, 'all': 7, 'sp': 8, 'sta_img': 6, 'sta_sp': 10}
+MASK = {'none': 0, 'stk': 1, 'sta': 2, 'img': 4, 'all': 7, 'sp': 8, 'sta_img': 6, 'sta_sp': 10,
+        'heapmgr': 16, 'inbuf': 32, 'mallocvar': 64}
 
 
 def read_19():
@@ -58,12 +59,17 @@ def main():
 
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     out = open(a.out, 'w')
+    diffs = []
     t0 = time.time()
     try:
         for va in part:
             if va in aud and mask:
                 was._send('RESET %d' % mask)
                 was.p.stdin.flush()
+                ack = was._recv(30.0)
+                if ack is None or '"reset"' not in ack:
+                    raise RuntimeError('RESET 応答なし (%r)' % ack)
+                diffs.append([hex(va), json.loads(ack)['diff']])
             if va not in aud:
                 sess._run_one(nat, was, va, cases.PATTERN_NAMES, True)
                 continue
@@ -78,6 +84,8 @@ def main():
         out.close()
         nat.close()
         was.close()
+    with open(a.out + '.reset.json', 'w') as f:
+        json.dump(diffs, f)
     print('[ld126] done %.0fs -> %s' % (time.time() - t0, a.out), flush=True)
 
 

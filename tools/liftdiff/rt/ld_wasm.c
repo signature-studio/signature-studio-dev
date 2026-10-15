@@ -48,11 +48,15 @@ EMSCRIPTEN_KEEPALIVE void ld_w_add_wr(u64 rva, u64 len) { ld_add_wr(rva, len); }
 /* LD-126 (#2723): case 間で持ち越す wasm 側の状態を候補ごとに snapshot 時点へ戻す (RESET mask)。
  * 1 = wasm スタック (SP は JS 側で戻す)・2 = C 静的変数 (g_heap・g_inbuf・g_arena を除く data/bss)・4 = image 全体 (線形 0 番地から imglen)。 */
 extern char __global_base[];
+/* LD-155 (#3384): 16 heapmgr (ld_heap_used/hw/pristine 系 4 変数)・32 inbuf (g_inbuf)・64 mallocvar (ld_blks/ld_nblk) は sta から外して単独で戻せる */
 #define LD_RST_STK 1
 #define LD_RST_STA 2
 #define LD_RST_IMG 4
+#define LD_RST_HEAPMGR 16
+#define LD_RST_INBUF 32
+#define LD_RST_MALLOCVAR 64
 typedef struct { int cat; u8* lo; u64 n; u8* pr; } ld_rst_t;
-static ld_rst_t ld_rst[8];
+static ld_rst_t ld_rst[32];
 static int ld_nrst;
 /* 複製は全 malloc の後にまとめて行う (C 静的変数の複製には dlmalloc の管理情報と ld_rst 表自体が含まれるため) */
 static void ld_rst_add(int cat, void* lo, u64 n) {
@@ -63,16 +67,28 @@ static void ld_rst_add(int cat, void* lo, u64 n) {
 static void ld_rst_take(void) {
   for (int i = 0; i < ld_nrst; i++) if (ld_rst[i].n) memcpy(ld_rst[i].pr, ld_rst[i].lo, ld_rst[i].n);
 }
+/* 区間 [__global_base, stack_end) から、除外する区間 (g_heap・g_arena・g_inbuf・別カテゴリの変数) を引いた残りを STA として登録する。
+ * g_inbuf は INBUF として別に登録する (sta から外す)。 */
 static void ld_rst_sta(void) {
-  u8* big[3] = { (u8*)g_heap, (u8*)g_inbuf, (u8*)g_arena };
-  u64 bn[3] = { HEAP_SIZE, sizeof g_inbuf, ARENA_SIZE };
-  for (int i = 0; i < 3; i++) for (int j = i + 1; j < 3; j++) if (big[j] < big[i]) {
-    u8* t = big[i]; big[i] = big[j]; big[j] = t; u64 k = bn[i]; bn[i] = bn[j]; bn[j] = k;
+  struct { u8* lo; u64 n; int cat; } x[12];
+  int nx = 0;
+  x[nx].lo = (u8*)g_heap; x[nx].n = HEAP_SIZE; x[nx].cat = 0; nx++;
+  x[nx].lo = (u8*)g_arena; x[nx].n = ARENA_SIZE; x[nx].cat = 0; nx++;
+  x[nx].lo = (u8*)g_inbuf; x[nx].n = sizeof g_inbuf; x[nx].cat = LD_RST_INBUF; nx++;
+  x[nx].lo = (u8*)&ld_heap_used; x[nx].n = sizeof ld_heap_used; x[nx].cat = LD_RST_HEAPMGR; nx++;
+  x[nx].lo = (u8*)&ld_heap_hw; x[nx].n = sizeof ld_heap_hw; x[nx].cat = LD_RST_HEAPMGR; nx++;
+  x[nx].lo = (u8*)&ld_heap_pristine_len; x[nx].n = sizeof ld_heap_pristine_len; x[nx].cat = LD_RST_HEAPMGR; nx++;
+  x[nx].lo = (u8*)&ld_heap_pristine_used; x[nx].n = sizeof ld_heap_pristine_used; x[nx].cat = LD_RST_HEAPMGR; nx++;
+  x[nx].lo = (u8*)&ld_blks; x[nx].n = sizeof ld_blks; x[nx].cat = LD_RST_MALLOCVAR; nx++;
+  x[nx].lo = (u8*)&ld_nblk; x[nx].n = sizeof ld_nblk; x[nx].cat = LD_RST_MALLOCVAR; nx++;
+  for (int i = 0; i < nx; i++) for (int j = i + 1; j < nx; j++) if (x[j].lo < x[i].lo) {
+    u8* t = x[i].lo; x[i].lo = x[j].lo; x[j].lo = t; u64 k = x[i].n; x[i].n = x[j].n; x[j].n = k; int c = x[i].cat; x[i].cat = x[j].cat; x[j].cat = c;
   }
   u8* cur = (u8*)__global_base;
-  for (int i = 0; i < 3; i++) {
-    if (big[i] > cur) ld_rst_add(LD_RST_STA, cur, (u64)(big[i] - cur));
-    if (big[i] + bn[i] > cur) cur = big[i] + bn[i];
+  for (int i = 0; i < nx; i++) {
+    if (x[i].lo > cur) ld_rst_add(LD_RST_STA, cur, (u64)(x[i].lo - cur));
+    if (x[i].cat) ld_rst_add(x[i].cat, x[i].lo, x[i].n);
+    if (x[i].lo + x[i].n > cur) cur = x[i].lo + x[i].n;
   }
   u8* end = (u8*)(uintptr_t)emscripten_stack_get_end();
   if (end > cur) ld_rst_add(LD_RST_STA, cur, (u64)(end - cur));
@@ -85,8 +101,14 @@ EMSCRIPTEN_KEEPALIVE void ld_w_snapshot(int imglen) {
   ld_rst_add(LD_RST_IMG, (u8*)(uintptr_t)ld_img, (u64)imglen);
   ld_rst_take();
 }
-EMSCRIPTEN_KEEPALIVE void ld_w_reset(int mask) {
-  for (int i = 0; i < ld_nrst; i++) if ((mask & ld_rst[i].cat) && ld_rst[i].n) memcpy(ld_rst[i].lo, ld_rst[i].pr, ld_rst[i].n);
+/* 戻す前に、選んだ区間のうち現在の内容が snapshot と違う byte 数を返す (戻しの証跡) */
+EMSCRIPTEN_KEEPALIVE int ld_w_reset(int mask) {
+  int diff = 0;
+  for (int i = 0; i < ld_nrst; i++) if ((mask & ld_rst[i].cat) && ld_rst[i].n) {
+    for (u64 k = 0; k < ld_rst[i].n; k++) diff += ld_rst[i].lo[k] != ld_rst[i].pr[k];
+    memcpy(ld_rst[i].lo, ld_rst[i].pr, ld_rst[i].n);
+  }
+  return diff;
 }
 /* inbuf に "name\0payload\0" を置いて呼ぶ */
 EMSCRIPTEN_KEEPALIVE void ld_w_blob(void) { ld_cmd_blob(g_inbuf, g_inbuf + strlen(g_inbuf) + 1); }
