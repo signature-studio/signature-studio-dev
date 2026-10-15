@@ -122,6 +122,10 @@ static inline uint8_t sat_u8(int v) { return v < 0 ? 0 : (v > 255 ? 255 : (uint8
 static inline uint16_t sat_u16(uint32_t v) { return v > 0xffff ? 0xffff : (uint16_t)v; }
 static inline int16_t sat_i16(int32_t v) { return v < -32768 ? -32768 : (v > 32767 ? 32767 : (int16_t)v); }
 
+/* 近似命令 (rcpps / rsqrtps): 実機 (9950X) の 12bit 近似表で bit 一致する。実体は fle_cpu.c */
+uint32_t fle_rcp_exact(uint32_t x);
+uint32_t fle_rsqrt_exact(uint32_t x);
+
 /* SSE compare → EFLAGS (comis/ucomis: ZF/PF/CF 由来, OF/SF/AF は 0 — HW も 0 を返す) */
 static inline void comis_f(double a, double b, int unordered_ok) {
     (void)unordered_ok;

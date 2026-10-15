@@ -1027,11 +1027,13 @@ class FnLift:
             'vmovsd': ('movsd', False), 'vmovss': ('movss', False),
             'vcvtsd2ss': ('cvtsd2ss', False), 'vcvtsi2ss': ('cvtsi2ss', False),
             'vcvtss2sd': ('cvtss2sd', False), 'vcvtsi2sd': ('cvtsi2sd', False), 'vsqrtsd': ('sqrtsd', False),
-            'vmovhpd': ('movhpd', False)}
+            'vmovhpd': ('movhpd', False), 'vpsrld': ('psrld', False), 'vpslld': ('pslld', False),
+            'vandps': ('andps', True)}
     VEX2 = {'vmovd': 'movd', 'vmovq': 'movq', 'vcvtdq2pd': 'cvtdq2pd', 'vcvtps2pd': 'cvtps2pd',
             'vcvtpd2dq': 'cvtpd2dq', 'vcvttpd2dq': 'cvttpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd',
-            'vpmovsxdq': 'pmovsxdq'}
-    VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
+            'vpmovsxdq': 'pmovsxdq', 'vrcpps': 'rcpps', 'vrsqrtps': 'rsqrtps', 'vcvtdq2ps': 'cvtdq2ps'}
+    VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vcomiss': 'comiss',
+            'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
 
     def vex_leg(self, ins, ops, m):
         if any(o.type == X86_OP_REG and self.isymm(ins, o.reg) for o in ops):
@@ -1368,6 +1370,18 @@ class FnLift:
     def i_sqrtps(self, ins, ops):
         di = self.xd(ins, ops[0])
         self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 4; k_++) X[%d].f[k_] = sqrtf(b_.f[k_]); }' % (self.xs(ins, ops[1], 'x128'), di))
+
+    def i_haddps(self, ins, ops):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 b_ = %s; X128 a_ = X[%d]; X128 r_; r_.f[0] = a_.f[0] + a_.f[1]; r_.f[1] = a_.f[2] + a_.f[3]; r_.f[2] = b_.f[0] + b_.f[1]; r_.f[3] = b_.f[2] + b_.f[3]; X[%d] = r_; }' % (self.xs(ins, ops[1], 'x128'), di, di))
+
+    def i_rcpps(self, ins, ops):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 4; k_++) X[%d].d[k_] = fle_rcp_exact(b_.d[k_]); }' % (self.xs(ins, ops[1], 'x128'), di))
+
+    def i_rsqrtps(self, ins, ops):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 4; k_++) X[%d].d[k_] = fle_rsqrt_exact(b_.d[k_]); }' % (self.xs(ins, ops[1], 'x128'), di))
 
     def bitw(self, ins, ops, op):
         di = self.xd(ins, ops[0])
