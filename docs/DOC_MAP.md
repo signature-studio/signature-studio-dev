@@ -611,7 +611,7 @@
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
 | `tools/targets/kilohearts/REPORT_KH19.md` | 70 | KH-19 (#782) ホスト 3 種 (Snap Heap / Multipass / Phase Plant) の vtable 間接 call 込み closure 再計算 (下界・過大評価の参考値・限界) |
 | `tools/targets/kilohearts/REPORT_KH19D.md` | ~96 | KH-19d (#850): 対照 Gain の未確定 before 160 閉包の x64c lift と build の最初の失敗点 (FLEngine 固有の VA 窓)。結論は REPORT §0 |
-| `tools/targets/kilohearts/REPORT_APPENDIX_849.md` | ~190 | KH-19c (#849): rip_data 参照先 2 slot の CFG/XFG dispatch 同定 (load config) と、呼び先 rax の出所の分類 (未確定の件数は子 #3363)。修正前の実測と、修正後の再測定の保留の記録。測定値の正本 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_849.md` | 68 | KH-19c (#849): rip_data 参照先 2 slot の CFG/XFG dispatch 同定 (load config) と、呼び先 rax の出所の分類 (未確定の件数は子 #3363)。修正後 (`5e1162712`) の 8 条件の実測 (修正前と全 8 条件一致)。測定値の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_2176.md` | 125 | KH-35 (#2176): 対照 Gain の before 160 関数の AI 判定 (人手検証ではない。`verified` 列は 160 行とも auto のまま。人手確認は #3254)・検算 `gain_manual_check.py` とネガティブコントロール・ROOT 27 行の vtable slot・保持規則の限界。測定値の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3064.md` | ~36 | KH-37 (#3064): 対照 Gain の x64c 閉包 148 と `gain_before_160.tsv` 160 行の数え方の差 12 件 (iat_thunk 2・tail_absorbed 9・SEH 着地点 1) と、`0xfd0995` が SEH の `__except` 着地点である実測 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3065.md` | ~90 | KH-38 (#3065) 対照 Gain before 160 closure の unsup 285 site / 48 種 → 0 (flelift x64c の VEX/FMA/rcr 被覆)。before/after の測定値の正本。再測定 `scripts/lift_closure_x64c.sh`、差分テスト `tools/flelift/tests/x64c_vex_diff.py`、rcr 実機照合 `tools/flelift/tests/rcr_native_check.py` |
