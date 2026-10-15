@@ -81,6 +81,6 @@ Ghidra ログ: `DumpFunctions: 59009 functions`、image base `00400000`。
 - minor (JDK 21 の絶対パス): `docs/REFERENCES.md` §1 のローカルツール表に `[JDK21]` を追加。script の既定 JDK は `[JDK21]` と同じ install 先を直書きし、`JAVA_HOME_21` で上書きする (round 2 でヘッダ注記を揃えた)。
 
 ## 11. 未実施: 修正後 HEAD の `--full` 再測定
-- **未実施** (round 1 の fix run に続き、round 2 の fix run でも未実施)。素材置き場 (`$HOME/artifacts`) には `fl-win64.tar.zst` しか無い。`toolchain-emsdk`・`toolchain-retdec`・`work-m11` は PR 本文の `oc_artifacts:` 行で指定しないと取得されず、差し戻し run の本文には当時この行が無かった (WORKFLOW §11)。`[EMSDK]`・`[RETDEC]` が無いまま全再生成 (約 21 分) を行うと、差し戻し run の上限 (40 分) に収まらない。
+- **未実施** (round 1 の fix run に続き、round 2 の fix run でも未実施)。ランナーの素材ディレクトリには `fl-win64.tar.zst` しか無い。`toolchain-emsdk`・`toolchain-retdec`・`work-m11` は PR 本文の `oc_artifacts:` 行で指定しないと取得されず、差し戻し run の本文には当時この行が無かった (WORKFLOW §11)。`[EMSDK]`・`[RETDEC]` が無いまま全再生成 (約 21 分) を行うと、差し戻し run の上限 (40 分) に収まらない。
 - §3〜§6 の数値は測定 commit `de8a34d5` (修正前 script) の実測。修正後の script (`29cdb2ab`) では測っていない。修正後の script の検証は §10 (分岐・Ghidra 単体の 2 回) のみ。
 - 対応: PR 本文に `oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec work-m11` を入れた run で `bash tools/m11/m11_e2e.sh --full` を fresh (`functions_dll.csv`・`lift_pe.sha256` 無し) で実行し、本節・§3・§5 の commit と数値を更新する。受入 1 の `[ ]` は rc 0 が出てから `[x]` にする。merge はその後。
