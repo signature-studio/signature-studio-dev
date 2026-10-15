@@ -218,7 +218,7 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 
 ## 10. #3161: boot5 × ld108 × LB の切り分け (`--full` の IR・指紋込み。6/8 通り実測)
 
-測定主体: 本 run (2026-10-15, runner 1 台, load 1.0〜1.2)。測定 commit: `7a91a358e` (driver `tools/m11/m11_lb_matrix.sh` を取り込んだ commit。以後 REPORT のみ変更)。 素材: fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11 (snapshot)。`work/lift_pe.sha256` 無しのため `M11_LB_BASE=0 bash tools/m11/m11_e2e.sh --full` で lift・IR を全再生成 (05:38→06:00, 約 22 分, Ghidra 12.1.4 取得込み)。
+測定主体: 本 run (2026-10-15, runner 1 台, load 1.0〜1.2)。測定 commit: `7a91a358e` (driver `tools/m11/m11_lb_matrix.sh` を取り込んだ commit。以後 REPORT のみ変更)。素材: fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11 (snapshot)。`work/lift_pe.sha256` 無しのため `M11_LB_BASE=0 bash tools/m11/m11_e2e.sh --full` で lift・IR を全再生成 (05:38→06:00, 約 22 分, Ghidra 12.1.4 取得込み)。
 `--full` の IR `ir_sha256` = `1f1134e339…`。PM 追記の `d8738edd…` (e2e 経路) と `ecbd43c1…` (repro 経路) のどちらとも一致しない (どちらが正かは未確定)。`--full` の終了 rc は 1 (run A の `memory access out of bounds` 停止が理由と見られる。judge の詳細は未確認)。
 
 ### 10-1 実測 (`bash tools/m11/m11_lb_matrix.sh <boot5> <ld108> <LB>`)
@@ -231,8 +231,8 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 | 0 | 0 | 0 | 30cedfcc9fa1 | 109 | 873 / 1 / 47 / 21 | dllmain_done, Halt0 1, longjmp 1 |
 | 1 | 1 | 0x10000 | ac603a4672d1 | 37 | 870 / 1 / 46 / 25 | Halt0 1 (早期終了) |
 | 1 | 0 | 0x10000 | 620f99806e7b | 37 | 870 / 1 / 46 / 25 | Halt0 1 (早期終了) |
-| 0 | 1 | 0x10000 | — 未測定 | — | — | 300 s 打ち切り (下記) |
-| 0 | 0 | 0x10000 | — 未測定 | — | — | 300 s 打ち切り (下記) |
+| 0 | 1 | 0x10000 | — 未測定 | — | — | LBM_RESULT 行なし (段は未確認。下記) |
+| 0 | 0 | 0x10000 | — 未測定 | — | — | LBM_RESULT 行なし (段は未確認。下記) |
 
 - ld108 の有無 (boot5 固定): survey の ok/miss/trap は変わらない (LB=0 も 0x10000 も)。IR 指紋と wasm_size は変わる。
 - boot5 の有無 (ld108 固定): LB=0 は ok 873 のまま、miss +1・trap −1 (47/21)。通常起動は boot5 無しの方が units_run 109 で Halt0 に入る (boot5 有りは OOB で boot が throw)。
@@ -246,5 +246,5 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 
 ### 10-3 未測定と原因
 
-- LB=0x10000 の boot5=0 の 2 通り (`b50_ld1_lb010000`・`b50_ld0_lb010000`): `m11_lb_matrix.sh` が 300 s の timeout で打ち切られ、`LBM_RESULT` 行が出なかった。driver の標準出力を grep で絞っていたため、gen_ir2 / build / run のどの段で止まったかは未確認 (ログ `work/lbm/b50_ld*_lb010000/` に残っている可能性あり)。次の run で再測定する。
-- 受入 3: 未達。`--full` の IR での値 (LB=0 873/21・LB=0x10000 870/25) は #403 の引用値と異なる。
+- LB=0x10000 の boot5=0 の 2 通り (`b50_ld1_lb010000`・`b50_ld0_lb010000`): `LBM_RESULT` 行が出なかった。原因は未確認。`m11_lb_matrix.sh` は `timeout 300` を `node m11_run.mjs` にだけ掛け、survey の後にも `LBM_RESULT` を出す。よって `LBM_RESULT` 無しは gen_ir2・data/image・lb_check・build のいずれかが `FAILED` で exit 1 した場合に限られる。どの段で止まったかは、`work/lbm/b50_ld*_lb010000/` のログ (gen.log・build.log・run.out の末尾) が残っていれば確認できる (本 runner には無い)。次の run で再測定する。
+- 受入 3: 未達。`--full` の IR での値 (LB=0 873/21・LB=0x10000 870/25) は #403 の引用値と異なる。所要時間・寛容起動との関係・結論の全文は `REPORT_APPENDIX_3161.md`。
