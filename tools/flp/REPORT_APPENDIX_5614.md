@@ -61,7 +61,7 @@ probe: `tools/flp/s10_setter_hit_probe.sh` (gdb `-x tools/flp/s10_setter_hit.gdb
 ## 6. 再現
 
 ```sh
-mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
+mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
 sudo apt-get install -y wine64 gdb && sudo sysctl -w kernel.yama.ptrace_scope=0
 bash tools/flp/s1_wine_probe.sh          # $RUNNER_TEMP/fl-win64/extracted を読み、$RUNNER_TEMP/fl-install を組む
 WAIT_SEC=200 bash tools/flp/s10_setter_hit_probe.sh   # 出力: $RUNNER_TEMP/s10_gdb_session.txt
