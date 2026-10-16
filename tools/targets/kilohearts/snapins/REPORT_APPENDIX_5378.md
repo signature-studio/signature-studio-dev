@@ -6,11 +6,15 @@
 
 ## 0. 結論
 
-- process 直接 closure (slot 14 = RVA `0x37d210`) は **145 関数** = unique **25** + infra **120**。
-  再現: `python3 snapins/scripts/carve_process_split.py work/callgraph.pkl work/closures_sets.pkl snapins/snapins.json`。
-- unique 25 の IAT 呼出は **0 件**。infra 120 の IAT 呼出は **60 件** (`callgraph.pkl` の `iat`。名前付き 51 + CFG 間接 9。REPORT_APPENDIX_781 §5 と同じ)。
-- unique 25 を `carveproc` (snapins.json) として既存 lift 経路 (`build.py carveproc --path s0 --no-compare`) で lift した。結果: **20 関数**を wasm 化、`undefined_imports = []`。
-- 残り 5 callgraph ノード (`0x18037e63f`・`0x180c23e02`・`0x180c23f28`・`0x180c2419a`・`0x180c243df`) は、RetDec の `--select-ranges` が関数入口として扱えず (`stage0 に関数が無い`) 入力から外した。5 件とも `.pdata` の関数開始点ではなく、lift した 20 関数のいずれかの末尾からの **jmp の先** (`0x18037e5e0`→`0x18037e63f`、`0x180c23d90`→`0x180c23e02`、`0x180c23ec0`→`0x180c23f28`、`0x180c240c0`→`0x180c2419a`、`0x180c242c0`→`0x180c243df`)。RetDec 単独では、tail jump 先の共有部か単独関数かを判定できない (実測 n=5)。
+> **状態: 未再現 (fix run)。** 本 fix run では素材 `plugins-kilohearts` (`HeartCore.core_64`) が取得できず、
+> `carve_process_split.py` と lift を再実行できなかった。以下の数値は **前 run の記録** で、本 run では確認していない。
+> 再現には `oc_artifacts: fl-win64 plugins-kilohearts` を付けて起動し直す必要がある。
+
+- process 直接 closure (slot 14 = RVA `0x37d210`) は **145 関数** = unique **25** + infra **120** (前 run の記録・未再現)。
+  再現コマンド: `python3 snapins/scripts/carve_process_split.py work/callgraph.pkl work/closures_sets.pkl snapins/snapins.json`。
+- unique 25 の IAT 呼出は **0 件**、infra 120 の IAT 呼出は **60 件** (前 run の記録・未再現)。
+- unique 25 を `carveproc` (snapins.json) として既存 lift 経路 (`build.py carveproc --path s0 --no-compare`) で lift した前 run の結果: **20 関数**を wasm 化、`undefined_imports = []` (未再現)。
+- 残り 5 callgraph ノード (`0x18037e63f`・`0x180c23e02`・`0x180c23f28`・`0x180c2419a`・`0x180c243df`) は、RetDec の `--select-ranges` が関数入口として扱えず入力から外した (前 run の記録)。前 run は、これらを lift した 20 関数のいずれかの末尾からの **jmp の先** と記した (`0x18037e5e0`→`0x18037e63f`、`0x180c23d90`→`0x180c23e02`、`0x180c23ec0`→`0x180c23f28`、`0x180c240c0`→`0x180c2419a`、`0x180c242c0`→`0x180c243df`)。**jmp 辺の callgraph 出力は本 run で未確認**。`.pdata` 開始点でないことも未確認。
 - bit-exact 比較は行っていない (`--no-compare`)。受入 1 の bit-exact は親 #4863 の受入 1。
 
 ## 1. lift 結果 (実測)
@@ -30,7 +34,7 @@
 
 ## 2. infra 120 の判定表
 
-unique 側 25 から呼ばれる infra 関数 (= 11 件)。`carve_process_split.py` の出力 (実測):
+unique 側 25 から呼ばれる infra 関数 (= 11 件)。以下は前 run の `carve_process_split.py` の出力 (**未再現**・本 run では確認していない):
 
 | callee | khbase lift 対象か | 呼出元 (unique) | 本 lift での扱い |
 |---|---|---|---|
@@ -50,7 +54,7 @@ unique 側 25 から呼ばれる infra 関数 (= 11 件)。`carve_process_split.
 - memmove (`0x181384040`) は `abort` の stub。unique 側の `0x37d210`・`0x389700` が memmove を呼ぶため、wasm 実行時はこの経路で必ず trap する。wasm 動作は未検証で、memmove の shim 方針は後続 #4863 で決める。
 - unique 25 が直接呼ぶ callee は 11 件 (khbase 対象 6・khbase 外 5 = `carve_process_split.py` の出力)。khbase 外の 5 件は本 lift で stub (`abort`)。
 - stub 11 件を呼ぶ unique 関数は `0x37d210`・`0x389700`・`0x38a510`・`0x38a680`・`0xbacaa0`・`0xfd4d48`。これらの経路は wasm 実行時に `abort()` で止まる。bit-exact の対象にできるのは stub を解消した後。
-- infra 120 の判定 (実測・`carve_process_split.py` の末尾に集計を追加):
+- infra 120 の判定 (前 run の記録・未再現。`carve_process_split.py` の末尾集計の出力):
 
 | 区分 | 件数 | size B | IAT 呼出 | 判定 |
 |---|---|---|---|---|
@@ -59,8 +63,8 @@ unique 側 25 から呼ばれる infra 関数 (= 11 件)。`carve_process_split.
 | 合計 | 120 | 20,715 | 60 | 全件が `closures_sets.pkl` の `infra` (到達 snap-in 数 ≥ `INFRA_K` = 8) に含まれる |
 
 - 「共有か個別か」の判定: 120 件とも到達 snap-in 数 ≥ 8 の共有基盤 (`infra_all` 188 件の一部) である。したがって process 専用の個別関数ではなく、snap-in 間で共有される基盤。内訳の khbase 対象 / 対象外は、khbase の lift 集合に入るかどうかの区分。
-- 検証: `closures_sets.pkl` の `infra` と突き合わせ、120 件すべてが含まれることを確認。`khbase.lift` の 116 件のうち 98 件が infra 120 に入る。
-- 前版の 98 / 22・10,044 B / 10,671 B は本 run で再現した (入力 `work/callgraph.pkl`・`work/closures_sets.pkl` は素材 `plugins-kilohearts` から再生成)。
+- 検証 (前 run の記録・未再現): `closures_sets.pkl` の `infra` と突き合わせ、120 件すべてが含まれたとされる。
+- 98 / 22・10,044 B / 10,671 B は **未再現**。本 run では素材が無く、再生成できなかった。判定表は未確定として扱う。
 
 ## 3. 未解決 (起票先)
 
