@@ -22,16 +22,18 @@ import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
 from capstone.x86 import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
 
+# キーは全て RVA (ImageBase 0x180000000 からの差)。照合は全て RVA で行う。
 TARGETS = {
     0x17B680: 'F_scalar',
     0x17B460: 'F_caller_of_scalar',
-    0x180198700: 'P1',
-    0x1801E47C0: 'P2',
-    0x1801EF4B0: 'P3',
-    0x1801F36A0: 'P4',
-    0x1803BEF80: 'P5',
-    0x18104AEA0: 'P6',
+    0x198700: 'P1',
+    0x1E47C0: 'P2',
+    0x1EF4B0: 'P3',
+    0x1F36A0: 'P4',
+    0x3BEF80: 'P5',
+    0x104AEA0: 'P6',
 }
+PN = sorted((v, k) for k, v in TARGETS.items() if v.startswith('P'))
 VTABLES = [0x183976038, 0x1841836A8]
 
 
@@ -66,7 +68,7 @@ def main(pe_path):
 
     print('== vtable slots (.rdata 8 byte 照合) ==')
     for name, T in [('scalar', base + 0x17B680), ('caller', base + 0x17B460)] + [
-        ('P%d' % (i + 1), base + t) for i, t in enumerate(sorted(TARGETS)[2:])
+        (n, base + k) for n, k in PN
     ]:
         for va in range(rd_lo, rd_hi - 7, 8):
             if rq(va) != T:
@@ -140,7 +142,7 @@ def main(pe_path):
     d_hi = d_lo + min(dt.Misc_VirtualSize, dt.SizeOfRawData)
     d_raw = dt.PointerToRawData
     for name, rva in [('F_caller_of_scalar', 0x17B460), ('F_scalar', 0x17B680)] + [
-        ('P%d' % (i + 1), t) for i, t in enumerate(sorted(TARGETS)[2:])
+        (n, k) for n, k in PN
     ]:
         T = base + rva
         rd_hits = [va for va in range(rd_lo, rd_hi - 7, 8) if rq(va) == T]
