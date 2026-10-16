@@ -2,12 +2,13 @@
 # #5695: e3ef60 の arg1 (0x12ba808) の +0x778〜+0x814 への書込みを、IR store (watch_arg1_5695.c・`[a1]`)・
 #   copy 関数 409c80 の入口 (`[a1cp]`)・rep 系 helper の入口 (`[a1rp]`) の 3 経路で全 unit (survey) に対して監視する.
 #   store_watch_1783.sh の派生。監視は読取りのみ (IR の値・分岐は不変)。C の runtime (m11_rt/m11_win) 内の直接 store は映らない。
-#   usage: store_watch_5695.sh <tag>   (前提: 素材 work-m11 を展開済み・EMSDK_ENV を設定 (既定 /opt/emsdk/emsdk_env.sh))
+#   usage: store_watch_5695.sh <tag>   (前提: 素材 work-m11 を展開済み・EMSDK_ENV を設定 ([EMSDK]・docs/REFERENCES.md §4))
 #   出力: work/probe5695/<tag>.err (`[a1]` `[a1cp]` `[a1rp]` 行), work/probe5695/<tag>.out (survey 結果), work/probe5695/sites.json
 #   終了時に work/obj/boot.o を元の boot_final3.ll から再生成し、計装の .o を消す (trap で必ず復元)。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
-source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" > /dev/null 2>&1   # [EMSDK] (docs/REFERENCES.md)
+: "${EMSDK_ENV:?EMSDK_ENV を設定してください ([EMSDK]・docs/REFERENCES.md §4)}"
+source "$EMSDK_ENV" > /dev/null 2>&1
 LO=${WATCH_LO:-0x12ba808}   # 陽性対照では WATCH_LO=0x10aa1428 WATCH_SPAN=32 のように差し替える
 SPAN=${WATCH_SPAN:-$((0x814 - 0x778))}
 BASE=${WATCH_BASE:-0x778}
