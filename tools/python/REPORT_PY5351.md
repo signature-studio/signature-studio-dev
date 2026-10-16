@@ -13,7 +13,7 @@
 ## 2. PE の逆アセンブル (根拠)
 
 `block00031_PE.bin` を capstone で読んだ。VA は ImageBase 基準。
-`analysis/flapi/plugins_padinfo_facts.py` が下表の 45 行を assert する (実行結果: PASS 45 / FAIL 0)。
+`analysis/flapi/plugins_padinfo_facts.py` が下表の 47 行を assert する (実行結果: PASS 47 / FAIL 0)。
 
 | 対象 | VA | 逆アセンブルの事実 |
 |---|---|---|
