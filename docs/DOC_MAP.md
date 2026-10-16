@@ -115,6 +115,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_4855.md` | ~40 | #4855: boot_e2e の shard 別 clang peak RSS・秒 (cap 5,000MB/shard)・4 variant の link と boot の結果表 (測定 commit `96723a2ed`)。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_970.md` | ~100 | PERF-P14 (#970) の付録: boot closure の -O0 / -O2 / -O2 -flto 変種の build (wasm bytes・所要時間・ピーク RSS)、node 実行時間 (n=10)・署名の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4983.md` | ~70 | FLE-37 (#4983): 既定経路 `run_boot default` で `FLE_BOOT_LOG_CAP` が効かない不具合の修正 (`${6:-0}` → 環境変数を読む式)・修正前後の `log_cap` の実測・上限超過時の `hit` の実測。測定値の正本 |
+| `tools/flelift/boot/REPORT_APPENDIX_5177.md` | ~70 | FLE-43 (#5177): 既定経路の出力 hash 非決定 (8 run・非決定 9 バイトの VA)・判定指標 (`image_writable` から非決定位置を除いた値・`outmem_judge.py`)。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5215.md` | ~70 | PY-4887 (#5215): 選択リスト G の初期化 `0xe38870` の既定 boot での実起動確認 (G・isPatternSelected・呼出元 5 観測点は未到達・制御 1 件発火)。probe は `py5215_g_init_probe.sh` |
 | `tools/flelift/boot/REPORT_APPENDIX_5027.md` | ~80 | FLE-40 (#5027): `FLE_BOOT_LOG_CAP` 超過の例外が Emscripten の tty write で飲まれ `exit` に残る経路の特定・超過を `boot.threw` の `log_cap` として報告する修正・cap の有無での実測差。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5058.md` | ~70 | FLE-41 (#5058): cap 超過後の次の dispatch で `log_cap` の例外を投げて boot を止める修正・既定 cap 4096 の停止 (units 13) と cap 0 の対照 (units 895)・規則検査の変異。測定値の正本 |
