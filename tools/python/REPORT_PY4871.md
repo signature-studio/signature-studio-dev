@@ -56,7 +56,7 @@
 |---|---|---|
 | vt+0x100 (clearPattern)・vt+0xe8 / vt+0xf0 (clonePattern)・vt+0x1f0 (setChannelLoop) の vtable の型と中身 (副作用の書込み先) | 3 関数の副作用が決まらない | #5130 (本 issue を Refs で残す) |
 | burnLoop の obj が NULL のときの挙動 (core に NULL 判定無し・`0x1063c40` 入口の `[obj+0x54]` 判定は読了) | 未登録 pattern に burnLoop を呼んだときの振る舞い | #5130 |
-| `0x11e7430` 後段 (`0x11c8eb0` 以降・`0x11e7652` 以降の走査)・`0x663bf0` / `0x1046a30` の意味 | ensureValidNoteRecord の playNow 側の副作用 | #5130 |
+| `0x11e7430` 後段 (`0x11c8eb0` 以降)・`0x1046a30` / `0x6667f0` の意味 | ensureValidNoteRecord の playNow 側の副作用 | #5130 |
 | `0xdc0cc0` 後段 `0xdc2ed0`・`[0x87af0b]` の flag の正体・即値 `0xc3bfb9` (Python コード片) を `0x6682f0` が何に使うか | setLoopStarterRootNote の no-op 条件と表示の意味 | #5130 |
 | 変換器 `[0x87e8e1]` の型 | ensureValidNoteRecord の戻り値の型 (値 0 は確定) | #5130 |
 
@@ -81,3 +81,6 @@
 - **`0x11e7430` 前半**: `[0x87…]` の 1000 件 (stride 0xc0) に `+0x6c = 0x80000001` (0x11e74ce)・`+0x70 = 0x7fffffff` (0x11e74d5) を設定 (0x11e74bf〜0x11e74e8)。後段は 0x11e7652 以降で、record の `+0x4` と `+0x8` を使って `0x663bf0` (比較) と `0x1046a30` を呼ぶ。意味は未確定。
 - **setLoopStarterRootNote の後段 `0xdc0cc0` → `0xdc0700`**: `0xdc0700` は `table[cur].+0xa4 != 0` のとき `+0xa8 - 1` を `0x661dc0` に渡し、`[0x87…]+0x9c0` 系の値を `0x413480` に渡す (0xdc0757〜0xdc0779)。その後 `0x6682f0(obj+0x340, 0xc3bfb9)` を呼ぶ (0xdc07a3〜0xdc07b3)。即値 `0xc3bfb9` は UTF-16LE の Python コード片 (`spec_from_file_location('imported_code', …)` で始まる) で、表示文字列ではない。`0x6682f0` の用途は未確定。
 - **注意**: 前 run の「`0xdc0700` は表示用の文字列経路と推定」は誤り。上の記述で置き換える。
+- **`0x663bf0` (読了・PY-5329 の run で追加)**: `[rcx+8]` のポインタ配列 (`[rcx+0x10]` 件) を先頭から `== rdx` で線形探索し、見つかった index を返す。見つからなければ `-1` (`or eax, 0xffffffff`)。
+- **`0x11e7430` 後段の走査 (0x11e7652〜0x11e76d0・読了)**: `[rbp+0x48]` の配列 (stride 12、件数は `[..-8]`) を走査。各要素の `+8` を `0x663bf0` に渡し、負なら `0x1046a30(+8, +4, 1)` を呼ぶ。その後 `[global]` の flag が 0 のとき `0x6667f0(…, 6, +8, 0)` を呼ぶ。`0x1046a30` と `0x6667f0` の中身は未読。
+- **`0x11e7430` の後段 (0x11e7673 以降)**: 0x11e76dc で `0x11e6e20(rbp)` を呼んだ後、0x11e76ec 以降で `[global]` の配列 (`[rax+8]`・stride 8) を走査し、各 record の `+0x20`・`+0x29` を書く。`0x12df210` を呼ぶ分岐あり (意味は未確定)。
