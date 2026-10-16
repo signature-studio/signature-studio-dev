@@ -42,7 +42,7 @@ def main():
         fo = v2o(va)
         return [(i.address, f"{i.mnemonic} {i.op_str}".strip()) for _, i in zip(range(n), md.disasm(raw[fo:fo + n * 12], va))]
 
-    body = insns(0xD80B40, 40) + insns(0xD80C60, 30)
+    body = insns(0xD80B3F, 41) + insns(0xD80C60, 30)
     text = {a: s for a, s in body}
     results = []
     for va in CALLS:
@@ -66,6 +66,9 @@ def main():
     results.append(("getColor channel obj from 0x1005730", "call 0x1005730" in full))
     results.append(("0x132f780 = cmp [obj+0x64], 0 (setge)", any(s == "cmp dword ptr [rcx + 0x64], 0" for _, s in insns(0x132F780, 2))))
     results.append(("slot path obj = [mixer + index*0x28f*8 + slot*8 + 0x134c]", "imul rcx, rcx, 0x28f" in full and "mov rsi, qword ptr [rax + rcx*8 + 0x134c]" in full))
+    results.append(("0xd80b3f loads obj out pointer [rbp+0x90] as 64 bit", text.get(0xD80B3F) == "mov rcx, qword ptr [rbp + 0x90]"))
+    arr = insns(0xFE8BB0, 16)
+    results.append(("0xfe8bb0 bounds-checks [rcx+0x10] and reads element [rcx+8][edx]", arr[0][1] == "mov eax, dword ptr [rcx + 0x10]" and any(s == "mov rax, qword ptr [rcx + 8]" for _, s in arr) and any(s == "mov rax, qword ptr [rax + rdx*8]" for _, s in arr)))
 
     ok = True
     for name, passed in results:
