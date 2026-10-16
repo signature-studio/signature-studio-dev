@@ -77,6 +77,10 @@ EXPANDED += [
     (0x104b5aa, f"*(*(0x15e06a0) + imul({S578},0x28f)*8 + (and(c_in,0xffff) + 0x70000000 - 0x70002000)*8 + 0x394)"),
     (0x104b94e, f"*(*(0x15e06a0) + imul({S578},0x28f)*8 + 0x384 + (and(c_in,0xffff) + 0x70000000 - 0x70001fc0)*4)"),
 ]
+# G6 (PY-4909): 0x104bebf。[rbp+0x580] = (and(c_in,0xffff)+0x70000000) − 0x70001fd0 (0x104bd2d、合流なし)。
+# P = *(*(0x15e1810) + [rbp+0x580]*8) (0x104bd61)。ACC は 0x104be79 の読みで、届く store は 0x1046d6b の d_in 1 本。
+G6_P = "*(*(0x15e1810) + (and(c_in,0xffff) + 0x70000000 - 0x70001fd0)*8)"
+EXPANDED += [(0x104bebf, G23_F.format(p=G6_P))]
 
 TOKEN = re.compile(r"\s*(\*\(|0x[0-9a-fA-F]+|\d+|[A-Za-z_][A-Za-z0-9_]*|[()+\-*·,])")
 FUNCS = ("shl", "imul", "and", "shr")  # 1〜2 引数の関数形 (#5905)
