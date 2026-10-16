@@ -220,6 +220,10 @@
 ## 4m. 証拠表の行 159〜193 (#5661・部分達成: 確定 6 件 (真陽性 5・偽陽性 1)・保留 29 (母数 35)。#5685 で 168・169 を確定)
 件ごとの表・根拠・測定 commit (`f195a93a9`)・未解決は `REPORT_APPENDIX_5661.md` が正本。
 
+## 4n. 証拠表の行 226〜232 (#5750・母数 7: 真陽性 2 (構造)・保留 5)
+
+- 件ごとの表・根拠・測定 commit (`58ee21f1e`)・未解決は `REPORT_APPENDIX_5750.md` が正本。
+
 ## 5. 再現
 
 本 PR の再現手段は `guard699/scan_guard.py`・`trap_triage/strict_evidence.py`・`trap_triage/judge_entry_check.py` で、入力は `work-m11` の `boot_final.ll` を要する (`oc_artifacts: fl-win64 work-m11`)。`block00031_PE.bin` は `fl-win64` 素材に入っている。
