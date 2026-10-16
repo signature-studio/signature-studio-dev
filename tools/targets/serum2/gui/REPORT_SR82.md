@@ -44,6 +44,16 @@
 
 `receiver_this_trace.py --vtable 0x180a2bf58` の分類件数 (`cat_strict`): THIS 69・THIS-CHILD 197・ARG 240・ARG-CHILD 68 (`REPORT_SR60.md` §3 の不一致 (THIS 67→69、THIS-CHILD 191→197) は、本 run でも同じ値)。原因は未確認。
 
+**SC 伝播の拡張 (本 run・`sc_widen.py`)**: 起点 = `receiver_this_trace.py` の SC 閉包 (strict, 21 関数)。そこから直接 call の宛先へ、rcx が this のものを strict で、strict で外れたものは loose で伸ばし、不動点まで繰り返した。
+
+- 伝播で追加された関数 = 0 (strict 0・loose 0)。閉包は 21 関数のまま飽和した。これは独立の拡張検証ではなく、`receiver_this_trace.py` の `sc_closure()` と同じ不動点計算の再確認である (構造上 0 になる)。
+- THIS 69 件 (所属関数 65 個): SC 証拠 0 件 (SC 閉包の関数 0)。
+- THIS-CHILD 197 件 (所属関数 142 個): SC 証拠 1 件 (所属関数 `0x1800a9f40`)。
+
+読み方: THIS の SC 証拠 0 は「SC 閉包に未到達」であることしか示さない。THIS が SerumController の this でないとは断定しない。所属関数の vtable RTTI による照合は本 run で再現していないため、結論には使わない (RTTI 由来の数値は削除)。受入 2 の前提「THIS = SerumController の this」の見直しは、RTTI 照合を再現してから行う。THIS-CHILD の SC 証拠は 1 件のみで、件数 (SC 証拠 6 件 / 5 関数, §6 (b)) の前提を揃える必要がある。
+
+再現: `venv/bin/python $P/sc_widen.py Serum2_win64.vst3 trace.tsv --tsv widen.tsv`。測定 commit は `224202d55` (本 PR の変更 commit)。md5 `a949316a…`・real 23.5 s / 22.8 s・load 0.20 → 0.43 は前 run の記録であり、入力 `Serum2_win64.vst3` が無い本 run では再測定していない (§5 の未解決 (f) を参照)。
+
 ## 4. 表の境界 (受入 3)
 
 決め方 (本 run で決定): 1 つの表 (run) を、その表の先頭 h (COL 直後の slot の直前、`find_head` の戻り値) で同定する。出現数は「slot 件数」ではなく「distinct な h の件数」で数える。同じ表の中の複数 slot (例: `num_get` の 9 件が同じ h) は 1 run として数える。
@@ -88,6 +98,7 @@ venv/bin/python $P/arg_vt_indirect.py Serum2_win64.vst3 trace.tsv --tsv vt_ind.t
 | (a) 間接 call の候補の宛先 (reg の指す object) の型を確定する。候補 118,222 件は disp のみの照合で、SC 関数内の 19 件も受け手は未確定 | 受入 1 | #4930 (本 issue 残・親 #4164 の子) |
 | (b) THIS 69・THIS-CHILD 197 の SC 伝播と、THIS-CHILD の SC 証拠 (6 件 / 5 関数) の定義を揃えた再集計 | 受入 2 | #4930 (本 issue 残) |
 | (c) 表の境界の決め方 (§4 で決定・達成) | 受入 3 | 閉じた (§4) |
-| (d) `receiver_this_trace.py` の TSV md5 が SR60 (`ea2d93a2…`) と不一致。現 head では `1e1f5500…` で再現 (SR49・SR58 と一致)。SR60 側の差の原因は未確認 | 再現性 | #4930 (本 issue 残) |
+| (d) `receiver_this_trace.py` の TSV md5 が SR60 (`ea2d93a2…`) と不一致。本 PR の測定 (`224202d55`) では `1e1f5500…` で、REPORT_SR49・REPORT_SR58 の既定 TSV md5 と**一致する** (SR60 の `ea2d93a2…` とは不一致)。SR60 側の差の原因は未確認 | 再現性 | #4930 (本 issue 残) |
+| (f) RTTI 照合 (THIS 所属関数の vtable RTTI・THIS-CHILD の SC RTTI 6 関数) は本 run で未再現。入力 `Serum2_win64.vst3` (`plugins-serum2` 素材) が本 run の `$ARTIFACTS_DIR` に無い | 受入 2 の前提見直し | #4930 (本 issue 残・次 run で `oc_artifacts: plugins-serum2` を指定して再照合) |
 
 (e) は §5 の再測定で閉じた (`arg_vt_indirect.py` を HEAD で 2 回実行、118,222 件・md5 `42bcf98b…` で一致)。

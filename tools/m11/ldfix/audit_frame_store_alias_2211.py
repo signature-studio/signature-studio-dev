@@ -27,6 +27,8 @@ frame アドレスを自分の frame に書く store (`mov [rbp+X], rbp`) も漏
       LEAK_STORE と数えない (NONFRAME)。引数値は呼び出し元の生きたポインタで、この frame (戻り番地より下) を指さない。
       slot の書きが全て frame 派生でない値の store で、入口まで未定義の経路が無いときだけ成立する。
       call を越える経路は透過する (仮定: 呼び出し先が caller の frame slot を書かない。上記の仮定と同じ)。
+       (#5143) 同じ NONFRAME の store は、基底が F 派生 (流れ不問) でも ALIAS_FRAME_PTR で打ち切らない。
+       打ち切りは後続の store・読みの位置 (LEAK_STORE など) に移る。
 
 使い方: python3 audit_frame_store_alias_2211.py PE.bin AUDIT.json F4.json OUT.json [--negctl-glk] [--negctl-nosync] [--negctl-noprov]
   --negctl-glk:    全関数の glk を強制 True にする (ネガティブコントロール: 漏出規則が効いていることの確認用)
