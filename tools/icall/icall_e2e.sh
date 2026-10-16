@@ -27,6 +27,9 @@ bash "$HERE/ott_route.sh" > "$HERE/work/route_build.log" 2>&1 || { tail -20 "$HE
 tail -1 "$HERE/work/route_build.log"
 echo "[2/4] unit / rewriter 回帰"
 python3 "$HERE/tests/test_icall.py" | tail -3 || RC=1
+echo "      stack 引数 12 語の値一致 gate (tests/stk_value_gate.sh: 正常 12/12 + ネガコン 0/12 FAIL)"
+bash "$HERE/tests/stk_value_gate.sh" > "$HERE/work/stk_value_gate.log" 2>&1 || RC=1
+tail -1 "$HERE/work/stk_value_gate.log"
 
 echo "[3/4] 監査 (OTT closure F: 元 PE を RetDec decode した IR vs 書換え→復元後 IR)"
 bash "$HERE/roundtrip.sh" "$OTT_DLL" "$HERE/work/route/F.txt" ott-F "$HERE/work/rt_ott-F" > "$HERE/work/rt_ott.log" 2>&1 || RC=1

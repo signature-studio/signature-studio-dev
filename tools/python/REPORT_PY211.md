@@ -117,10 +117,37 @@
 |---|---|---|
 | jumpToPattern の副作用本体 (vtable `+0x1f0`・Z の型) と、範囲外の実機の挙動 | jumpToPattern の副作用・暫定決定の確度 | #3558 (PY-213) |
 | movePattern の副作用本体 (vtable `+0x108`)・O ≠ NULL の範囲外の挙動 | movePattern の副作用・暫定決定の確度 | #3558 (PY-213) |
-| 空き判定 `0x12d8d30`・`0x12e21a0`・`0xe5af80`・`0x11e84a0`・`0x12ddaa0`・`0xe55c80` の本体 | findFirst・jump の副作用の細部 | #3558 (補助)・#3536 (構造体 E) |
+| 空き判定 `0x12d8d30`・`0xe55c80` の本体・`0x12ddb20` の callback `[rbp+0x68]` の中身 | findFirst・jump の副作用の細部 (補助 4 関数の役割は下の節で確定) | #3558 (補助)・#3536 (構造体 E) |
 | `0xea7ae0`・`0xea6b30` (findFirst の、bit2 が立たない経路の後段の呼出し先。ガード `[0x15e1748]` の意味も未同定)。同じ VA の `0xea7ae0` は tools/m11/ldfix/REPORT_2794.md にも『対応未決 (C)』の関数として別の呼出し元で出る | 候補が見つかった後の副作用 (findFirst の副作用の細部) | #3558 (補助) |
 | `[0x15d51a0]` と `[[0x15e4018]]` が同じ現在番号か (1 始まりの根拠の強さ) | index 基準の根拠 (推定) | 本 REPORT に推定として残す (追跡のみで子は起票しない) |
 | E(0) が実行時に未使用か | 0 を範囲外とする決定の根拠 | 同上 |
+
+## 補助 4 関数の役割 (#4532・PY-365)
+
+PE の逆アセンブル (capstone・rip 相対は VA 解決) で 1 行ずつ確定した。検査は `helper.*` の 4 件 (`analysis/py211_pattern_jump_move.py`)。
+
+| 関数 | 役割 (PE 上の根拠) | 確度 |
+|---|---|---|
+| `0xe5af80` | `ret` 1 命令のみ。jumpToPattern は `[0x15d51a0] == index` のとき `call 0xe5af80` を呼ぶ (`0x12d8b0f`) が、何もしない。直後も vcall (`0x12d8b30`) へ進む | 確定 |
+| `0x11e84a0` (引数 ecx = index) | 件数 `[[0x15e2218]+0x10] - 1` に対し `0 ≤ index ≤ 件数-1` の外なら `0x11e85fc` (エピローグ) へ直接 return (`jl 0x11e85fc`・`jg 0x11e85fc`)。範囲内は `0xfe8bb0` で要素を取り、要素の byte `+0x32d` が立つなら return。以後は全要素の byte `+0x32c` を『番号 == index』に揃え (`0xff8a90` で書換え)、`0xea6b30`・`0x1306d60` を呼ぶ。**範囲外の return 先は確定** (推定だった `jl`・`jg` の戻り先 = `0x11e85fc`) | 範囲外の return は確定。範囲内の副作用の細部は読解 |
+| `0x12ddaa0` | `rcx = [0x196eb00]` (.bss) を this、`r8d = ecx` (index)、`dl = [0x12ddac4] = 1` (ファイル上の byte) を渡して `0x12ddb20` へ転送する薄い wrapper | 確定 (dl は常に 1) |
+| `0x12e21a0` (引数 r8d = index) | `index == -1` なら `0x12e21f7` へ (`0xea6e30` で件数を取り、各要素を `0xea66b0` で埋める経路。件数の意味は推定)。それ以外は `0x417fc0` で 1 要素だけ書く。`0x12e21f7` 側の `obj+0x6f7` が立たなければ `0x12e22d2` で `0xe5af90` (現在パターンの min/max 取得) を経て `0x417fc0`。最後に `[[0x15e4790]+0x10]` の vtable `+0x110` を呼ぶ (`0x12e23a9`)。 **#3558 の『r8d ≠ -1 のとき 0x417fc0』と一致** | 分岐は確定。`+0x110` の本体は未読 |
+
+### `0x12ddb20` (未同定の本体の読解)
+
+- 引数: rcx = this・dl = flag・r8d = index。`0x12ddaa0` から dl = 1 で呼ばれる。
+- `[this+8]` が NULL か、flag の bit0 が 0 なら何もしない (`0x12ddb54`・`0x12ddb65`)。
+- 立つと `0x12de780` (`[0x12cd190]` を引数に取る) の戻りを `[rbp+0x78]` に置き、その `+8` の列を `+0x10` 件数で走査し、各要素で callback `[rbp+0x68]` (`[rbp+0x70]`・`[rbp+0x58]` 等を引数に) を呼ぶ (`0x12ddbe5`)。
+- 走査後に `[rbp+0x78]->vtable[-0x20]` を呼ぶ (`0x12ddc2d`)。
+- **未確認**: 走査の要素型・callback の中身 (`0x12ddb20` の callback 引数に入る `[rbp+0x68]` は `0x12ddb90` の直前で作られるが、そのポインタ先の関数は本節で同定していない)。
+
+測定 (#4532): 測定 commit `b1db12e97` (検査スクリプトを最後に変えた commit)。`python3 analysis/py211_pattern_jump_move.py <extracted>/block00031_PE.bin` → 28/28 PASS・rc 0。ネガティブコントロール `--mutate-helper` (0x11e84c2 の `jl`→`jge`) → `FAIL helper.11e84a0.range_guard`・27/28・rc 1。既存の `--mutate` → 26/28・rc 1。
+
+### 受入 1 (jumpToPattern の範囲外) への含意
+
+- jumpToPattern 本体 (`0x12d8af0`) には範囲検査が無い。raw index は `0x12d8b30` の vcall へ渡り、表の引きも `[table + idx*192]` (`0x12d8b4b`) を無検査で読む。
+- `0x11e84a0` の範囲検査 (0 ≤ index ≤ 件数-1) は **別の object (`[0x15e2218]`) の件数** に対するもので、1..999 の検査ではない。また `0x11e84a0` は表の要素が 0 以上 (`jl 0x12d8b74` を通らない) のときだけ呼ばれる。
+- したがって『範囲外を無視するか』は vtable `+0x1f0` (Z の型) の本体で決まる。**受入 1 は未達のまま**。#4531 の結果を待つ。
 
 ## 再現
 

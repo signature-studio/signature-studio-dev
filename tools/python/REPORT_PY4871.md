@@ -11,12 +11,12 @@
 
 ## 測定
 
-- 測定 commit (コードを最後に変えた commit): `dc31ff4c8` (`tools/python/analysis/flapi/pattern_write_semantics.py` の追加と本 REPORT の訂正)。
-- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を確認)。展開: `tools/python` で `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py5130 --wildcards '*block00031_PE.bin'` (実測 real 2.910 s)。展開先は `work/py5130/extracted/` (gitignore・commit しない)。
-- 再現 (1 コマンド): `cd tools/python && python3 analysis/flapi/pattern_write_semantics.py work/py5130/extracted/block00031_PE.bin` (HEAD `dc31ff4c8` で実測 real 0.086 s・user 0.069 s・sys 0.018 s、n=1。実行直前の load average は `0.09 0.19 0.08`。結果 `RESULT OK fail=0 total=11`)。
+- 測定 commit (コードを最後に変えた commit): `60aadd62b` (PY-5329: `0x663bf0` の判定と `0x11e7430` 後段の判定を `pattern_write_semantics.py` に追加)。
+- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を確認)。展開: `tools/python` で `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py5130 --wildcards '*block00031_PE.bin'` (実測 real 2.845 s)。展開先は `work/py5130/extracted/` (gitignore・commit しない)。
+- 再現 (1 コマンド): `cd tools/python && python3 analysis/flapi/pattern_write_semantics.py work/py5130/extracted/block00031_PE.bin` (HEAD `60aadd62b` で実測 real 0.088 s・user 0.064 s・sys 0.025 s、n=1。実行直前の load average は `0.57 0.37 0.16`。結果 `RESULT OK fail=0 total=13`)。
 - 前段の再現: `cd tools/python && python3 analysis/flapi/pattern_write_cores.py work/py5130/extracted/block00031_PE.bin` (実測 real 0.060 s・user 0.044 s・sys 0.016 s、n=1。`pattern_write_cores.py` は `317a10e46` で追加・変更なし)。
 - 逆アセンブル: `python3 analysis/py41_disasm.py work/py5130/extracted/block00031_PE.bin <VA...>` (`pe_disasm.py` と同じ capstone + pefile の方式)。
-- コード差分 (測定 commit から HEAD まで): `git diff dc31ff4c8 HEAD -- tools/python/analysis tools/python/provider tools/python/host` の出力は 0 行 (C provider・mock・テストは変えない。`all_tools.mjs` は再測定しない: `docs/WORKFLOW.md` §6)。
+- コード差分 (測定 commit から HEAD まで): `git diff 60aadd62b HEAD -- tools/python/analysis tools/python/provider tools/python/host` の出力は 0 行 (C provider・mock・テストは変えない。`all_tools.mjs` は再測定しない: `docs/WORKFLOW.md` §6)。
 
 ## 1. 共通の呼び出し形
 
@@ -56,7 +56,7 @@
 |---|---|---|
 | vt+0x100 (clearPattern)・vt+0xe8 / vt+0xf0 (clonePattern)・vt+0x1f0 (setChannelLoop) の vtable の型と中身 (副作用の書込み先) | 3 関数の副作用が決まらない | #5130 (本 issue を Refs で残す) |
 | burnLoop の obj が NULL のときの挙動 (core に NULL 判定無し・`0x1063c40` 入口の `[obj+0x54]` 判定は読了) | 未登録 pattern に burnLoop を呼んだときの振る舞い | #5130 |
-| `0x11e7430` 後段 (`0x11c8eb0` 以降・`0x11e7652` 以降の走査)・`0x663bf0` / `0x1046a30` の意味 | ensureValidNoteRecord の playNow 側の副作用 | #5130 |
+| `0x11e7430` 後段 (`0x11c8eb0` 以降)・`0x1046a30` / `0x6667f0` の意味 | ensureValidNoteRecord の playNow 側の副作用 | #5130 |
 | `0xdc0cc0` 後段 `0xdc2ed0`・`[0x87af0b]` の flag の正体・即値 `0xc3bfb9` (Python コード片) を `0x6682f0` が何に使うか | setLoopStarterRootNote の no-op 条件と表示の意味 | #5130 |
 | 変換器 `[0x87e8e1]` の型 | ensureValidNoteRecord の戻り値の型 (値 0 は確定) | #5130 |
 
@@ -67,7 +67,7 @@
 
 - `pattern_write_cores.py` の出力は、§2 の handler・fmt・core VA と一致する (実測)。
 - 5 コアの入口 (`[rbx+0x60]` = -2 → 準備判定) は `0xd65d60`・`0xd66cb0`・`0xd669f0`・`0xd66630`・`0xd66830` で確認した。
-- `pattern_write_semantics.py` (§6 の読解を VA ごとに命令順で判定): 11 件 PASS・0 件 FAIL (実測 `RESULT OK fail=0 total=11`)。
+- `pattern_write_semantics.py` (§6 の読解を VA ごとに命令順で判定): 13 件 PASS・0 件 FAIL (実測 `RESULT OK fail=0 total=13`)。
 - 負の対照: ハンドラ以外の VA (`0xd843d0` 等) を `pattern_write_cores.py` の対象に入れていない。書式抽出は `FMT` (英字と `|` のみ) で判定しており、文字列でない場合は除外される。
 
 ## 6. 読解の証跡 (本 PR で読み直した事実・VA と命令)
@@ -81,3 +81,6 @@
 - **`0x11e7430` 前半**: `[0x87…]` の 1000 件 (stride 0xc0) に `+0x6c = 0x80000001` (0x11e74ce)・`+0x70 = 0x7fffffff` (0x11e74d5) を設定 (0x11e74bf〜0x11e74e8)。後段は 0x11e7652 以降で、record の `+0x4` と `+0x8` を使って `0x663bf0` (比較) と `0x1046a30` を呼ぶ。意味は未確定。
 - **setLoopStarterRootNote の後段 `0xdc0cc0` → `0xdc0700`**: `0xdc0700` は `table[cur].+0xa4 != 0` のとき `+0xa8 - 1` を `0x661dc0` に渡し、`[0x87…]+0x9c0` 系の値を `0x413480` に渡す (0xdc0757〜0xdc0779)。その後 `0x6682f0(obj+0x340, 0xc3bfb9)` を呼ぶ (0xdc07a3〜0xdc07b3)。即値 `0xc3bfb9` は UTF-16LE の Python コード片 (`spec_from_file_location('imported_code', …)` で始まる) で、表示文字列ではない。`0x6682f0` の用途は未確定。
 - **注意**: 前 run の「`0xdc0700` は表示用の文字列経路と推定」は誤り。上の記述で置き換える。
+- **`0x663bf0` (読了・PY-5329 の run で追加)**: `[rcx+8]` のポインタ配列 (`[rcx+0x10]` 件) を先頭から `== rdx` で線形探索し、見つかった index を返す。見つからなければ `-1` (`or eax, 0xffffffff`)。
+- **`0x11e7430` 後段の走査 (0x11e7652〜0x11e76d0・読了)**: `[rbp+0x48]` の配列 (stride 12、件数は `[..-8]`) を走査。各要素の `+8` を `0x663bf0` に渡し、負なら `0x1046a30(+8, +4, 1)` を呼ぶ。その後 `[global]` の flag が 0 のとき `0x6667f0(…, 6, +8, 0)` を呼ぶ。`0x1046a30` と `0x6667f0` の中身は未読。
+- **`0x11e7430` の後段 (0x11e7673 以降)**: 0x11e76dc で `0x11e6e20(rbp)` を呼んだ後、0x11e76ec 以降で `[global]` の配列 (`[rax+8]`・stride 8) を走査し、各 record の `+0x20`・`+0x29` を書く。`0x12df210` を呼ぶ分岐あり (意味は未確定)。

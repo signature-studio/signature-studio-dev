@@ -208,7 +208,8 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 
 ### 受入 2: equal / wasm_trap へ遷移しうる件数 (未確定)
 
-- **実測の遷移: 0 件** (本 run。match 360 は前回と同じ)。
+- **実測の遷移 (batch 本体): 0 件** (本 run。match 360 は前回と同じ)。以下の §12.1.5 で this を埋めた case を実測した。
+- 受入 2 の数: 上限の候補は wasm_trap 24 件・equal 18 件 (下記の分類からの推定)。実測は §12.1.5 を正とする。
 - `compare_case` (`ldlib/compare.py`) の遷移の経路 (分類からの候補。個別の再測定はしていない):
   - **wasm_trap へ遷移する経路** (`n_ok and not w_ok`): wasm が fault している件が、native を ok にした case で `wasm_trap` になりうる。候補は `both_fault` 24 件 (`wasm_stub_unreach` 15・`wasm_oob` 8・`wasm_other` 1)。
   - **equal へ遷移する経路** (native ok・wasm ok で差分 0): 候補は `native_fault` 15 件 (`native_null_field` 10・`native_noaddr` 4・`native_cand_arg` 1。native が ok になれば wasm は ok のまま) と `diff` 3 件 (差分が消えた場合)。計 18 件。
@@ -226,7 +227,11 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 - 修正: `liftdiff_e2e.sh` の `[0/4]` が `test_ld259_patch_p` (LD-259) より先に wasm をビルドするようにした (`09dd25790`)。`--nobuild` の既存テストが wasm を要するため、build を先に行う必要があった。
 - 前回 (LD-177 HEAD `f7d5abbfa`・LD-199 `b3a33a3fa`) との verdict の差 (360/233/207 等) の原因は**未切り分け**。本 run は作業 worktree の素材を新たに展開して測ったもので、コード差分の範囲外の揺らぎかは確認していない。
 
+### 12.1.5 #5406 受入 2 (this を埋めた blob での再実行)
+
+- 結論と表は `REPORT_APPENDIX_LD5406.md` (#5406・測定 commit `6884c0829`)。
+
 ### 差分証跡 (WORKFLOW §6)
 
-- `git diff 5a103d883 09dd25790 -- tools/liftdiff ':!tools/liftdiff/REPORT*'` の出力 (本 PR の code 範囲): `liftdiff_e2e.sh` (順序の修正)・`ld5406_fvm_classify.py` (新規)。
-- 測定 commit `09dd25790` と HEAD の差分は、本 REPORT の追記だけ。
+- 測定 commit `6884c0829` からの code 差分: `git diff 6884c0829 HEAD -- tools/liftdiff ':!tools/liftdiff/REPORT*'` (本 PR の code 範囲は `ld5406_fvm_fill.py` の新規のみ・§12.1.4 の差分は `09dd25790` 以降)。
+- 測定 commit と HEAD の差分は、本 REPORT の追記だけ。
