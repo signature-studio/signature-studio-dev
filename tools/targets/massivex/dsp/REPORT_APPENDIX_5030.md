@@ -168,6 +168,8 @@
 
 ### 3.9 追補 (MX-61 #5656・`scripts/mx61_entry_xmm2_paths.py`・実測)
 
+- **注意 (表は旧値)**: 以下の表と結論は `int3` 詰め物の修正 (`88577641f`) より前の script の出力。§3.10 で結論を撤回した。表の値は HEAD で再測定していない (未実施・素材 `plugins-massivex` が run に無かった)。
+- 測定 commit (表の値): `3c6e8d460`。script は `88577641f` で変更済みのため、現在の script の出力とは一致しない。
 - 測定条件: `plugins-massivex` を `$RUNNER_TEMP/mx` に展開 (6.5 秒) → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` (11.1 秒・`md5-ok 0/125` は既知事象) → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` 一致。
 - 方法: 関数入口の xmm2 (呼出元の値) を、経路上で読むか・残したまま call するか・上書きするかを辿る。直接 call は callee を深さ 2 まで同じ判定にかける。間接 call (`call [reg+...]`) は target 不明として pass に数える。
 - 測定: `python3 mx61_entry_xmm2_paths.py "<vst3>" 0x18017b460 0x18017b680 0x180198700 0x1801e47c0 0x1801ef4b0 0x1801f36a0 0x1803bef80 0x18104aea0` (exit 0・0.15 s)。
@@ -183,11 +185,11 @@
 | `0x3bef80` | 0 | 1 (間接 `[rax+0x100]`) | 0 | 間接 call で target 不明 |
 | `0x104aea0` | 0 | 1 (間接 `[rax+0x100]`) | 0 | 間接 call で target 不明 |
 
-- **受入 1 の結論 (`0x18017b460`)**: 入口の xmm2 はどの経路でも読まれない。`0x18017b4a1` の `movss xmm2, [rsp+0x2c]` が上書きしてから `call [rax+0x100]` に届く。`0x18038dfe8` (唯一、入口 xmm2 が残る call) は深さ 2 まで xmm2 を読まない。よって呼出元が xmm2 に float を載せても載せなくても `0x17b460` の結果は変わらない。**「呼出元が xmm2 に float を渡さない」は、この関数に限って確定**。
+- ~~**受入 1 の結論 (`0x18017b460`)**: 入口の xmm2 はどの経路でも読まれない。…「呼出元が xmm2 に float を渡さない」は、この関数に限って確定。~~ **§3.10 で撤回 (旧値)**。`0x18038dfe8` は詰め物 `int3` の上にあり、本体 `0x18038dff0` の解析が漏れていた。
 - **受入 1 の未確定 (`livein_passthrough` 6 関数)**: 入口 xmm2 は間接 call (`[rax+0x100]` など) にそのまま渡る。読むかどうかは target の関数次第で、target は object の型 (vtable) で決まる。静的に型を確定していない。`0x1e47c0` は直接 call 先 `0x1803caf83` の解析が未解決 (unknown 4)。
 - 注意 (解析の限界): 分岐は両方の経路を辿るが、loop の不動点や間接分岐の先は見ない。`mx55_callers_fn.py` と同じく線形寄りの判定。callee の深さは 2 で打ち切り、打ち切りは unknown に数える。
 - 解析不能の残り: `0x1803caf83` の unknown 4 件、6 関数の間接 call 先 (vtable slot 32 の object 型)。いずれも次の run の対象 (受入 1 の残り・受入 2)。
-- 測定 commit: 本節を含む commit (`mx61_entry_xmm2_paths.py` を追加した commit)。以後 scripts は変えない。
+- 測定 commit (表の値): `3c6e8d460`。以後の script 変更は `88577641f` (§3.10)。
 
 ### 3.10 訂正 (MX-61 #5656・§3.9 の「入口 xmm2 は読まれない」を撤回)
 

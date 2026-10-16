@@ -4,7 +4,7 @@
 forward に経路を辿る (jmp/jcc を追う・ret で止める)。入口の xmm2 がまだ上書きされていない状態を
 「entry」とし、次の 3 つを記録する:
   read:  entry の xmm2 を読む命令 (capstone の regs_read に xmm2 を含む)
-  pass:  entry の xmm2 が残ったまま call する箇所 (引数として渡りうる)。callee は 1 段だけ同じ判定をする
+  pass:  entry の xmm2 が残ったまま call する箇所 (引数として渡りうる)。直接 call の callee は DEPTH 段まで同じ判定をする
   write: xmm2 を上書きする命令 (以降の経路は entry でなくなる)。call は Win64 の揮発レジスタとして
          xmm2 を上書きするものとみなす
 範囲外 (pdata 不正・間接 call/jmp) は unknown に数える。
