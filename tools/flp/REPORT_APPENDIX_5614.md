@@ -29,7 +29,7 @@ probe: `tools/flp/s10_setter_hit_probe.sh` (gdb `-x tools/flp/s10_setter_hit.gdb
 | 呼出し元 (戻り先) | `0x7aa6d107` (= VA `0x73d107`・直接 call 元 `0x73d102`) 14,609 回・`0x7aa6d2a7` (= VA `0x73d2a7`・直接 call 元 `0x73d2a2`) 60 回 |
 | 静的解析との対応 | `tools/python/REPORT_PY388.md` §5b の直接 call 元 `0x73d102`・`0x73d2a2` と一致。`0x79fd44` は 1 回も命中しなかった |
 
-**`dl` × 呼出し元の交差表** (本 run の `$RUNNER_TEMP/s10_gdb_session.txt` の `HIT` 行を集計。命中の合計 9,479):
+**`dl` × 呼出し元の交差表** (本 run の `$RUNNER_TEMP/s10_gdb_session.txt` の `HIT` 行を集計。命中の合計 14,669):
 
 | dl | 呼出し元 `0x73d102` (ret `0x7aa6d107`) | 呼出し元 `0x73d2a2` (ret `0x7aa6d2a7`) | 計 |
 |---|---|---|---|
