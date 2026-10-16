@@ -1,16 +1,16 @@
 # liftdiff LD-291 (#5973 / 親 #5970) — 13 件の戻り経路の間接 call の解決方式の比較
 
-> 結論: **採用方式は決められなかった。候補は 4 方式すべてで 0 件**。`ret_override` は変えていない。
+> 結論: **採用方式は決められなかった。健全な方式 (S0・S1) の候補は 0 件。非健全な上限 S2 だけ 2 件 (7ce2e0・12657b0 の xmm0。非健全のため採用不可)**。`ret_override` は変えていない。
 > 判定を前に進めるには、間接 call の解決より前に、呼出し先の解析 (深さ・経路の打ち切り) を組み直す必要がある。
 > 受入 1・2 は未達。採用方式の子 issue は起票せず、**#5970 に戻す** (§6)。
 
 ## 1. 結論
 
-- 13 件の戻り経路で止まる間接 call は **IAT を指さない**。`call [rip+disp]` の 25 件はすべて IAT の外、IAT 内の参照は 0 件。IAT 解決 (S1) は効く箇所が無い。
+- 13 件の戻り経路で止まる間接 call は **IAT を指さない**。未確定の理由に現れる `call [rip+disp]` の呼出し命令は 4 件 (VA `40944e`・`4094c5`・`40941e`・`40a143`) で、すべて IAT の外。IAT 内の参照は 0 件。IAT 解決 (S1) は効く箇所が無い (単位は §3.3・§7)。
 - 呼出し元の継続の間接 call 68 件 (`call [reg+disp]`) は、どの方式でも未確定のまま。
 - 呼出し先の中の間接 call 538 件は、素通し (S3・S4) にすると消える。ただし、これは「解決した」ことにはならない (非健全)。
 - 残る主因は呼出し先の**深さ超過** (S4 で 282 件) と、呼出し元の間接 call 68 件。深さ 16・予算 20000 に上げても深さ超過 282 件は変わらなかった (§3.2)。間接 jmp は S0 で 46 件あり、S4 では捨てる扱いにした。
-- 結論として、間接 call の解決方式を 1 つ選んでも 13 件の候補は 0 件のまま。方式選定より前に、呼出し先の解析の打ち切りを決める必要がある。
+- 結論として、健全な方式 (S0・S1) では 13 件の候補は 0 件のまま。非健全な上限 S2 でだけ 2 件 (xmm0) が出るが、非健全のため判定の根拠にはできない。方式選定より前に、呼出し先の解析の打ち切りを決める必要がある。
 
 ## 2. 比較した方式
 
@@ -20,12 +20,12 @@
 |---|---|---|---|
 | S0 (現行) | `ld215_retprop.py --callee-arg` と同じ。間接 call は未確定 | 健全 | 0 |
 | S1 | IAT 参照の `call [rip+disp]` だけを外部 API とみなす (戻りは rax 上書き・rdx / xmm0 は引数読み) | 健全 (近似) | 0 |
-| S2 | 呼出し元の継続の間接 call だけを素通し | 非健全 (上限) | 0 |
+| S2 | 呼出し元の継続の間接 call だけを素通し | 非健全 (上限) | 2 件 (7ce2e0・12657b0 の xmm0。非健全のため採用不可) |
 | S3 | 呼出し先の間接 call も素通し | 非健全 (上限) | 0 |
 | S4 | S3 + 呼出し先の間接 jmp の経路を捨てる | 非健全 (上限) | 0 |
 
 - S1 が S0 と同じになった理由: IAT を指す間接 call は 0 件 (§3.3)。
-- S2〜S4 は『その間接 call を解決できれば』の上限。候補が出ないので、どの解決方式も 13 件の戻り型の判定には届かない。
+- S2〜S4 は『その間接 call を解決できれば』の上限。S2 の 2 件は非健全な上限の結果で、S3・S4 は 0 件。どの解決方式も 13 件の戻り型の判定を健全には確定できない。
 
 ## 3. 実測 (素材 fl-win64 26.1.7.5653 の `block00031_PE.bin`)
 
@@ -65,15 +65,16 @@ S4 の `must` が空になる関数 (12657b0・442670・5b0970・442890・4421d0
 
 ### 3.3 IAT の確認
 
-- 13 件の経路に含まれる `call [rip+disp]` 25 件は、すべて IAT の外を指す。IAT 内 0 件。
+- 未確定の理由に現れる `call [rip+disp]` の**呼出し命令の数は 4 件** (distinct VA `40944e`・`4094c5`・`40941e`・`40a143`)。すべて IAT の外を指す (`[rip+0xf9c844]` → `0x13a5c98` など)。IAT 内 0 件。
+- §3.2 の `call [rip+disp]` 26 は**レジスタ単位・経路単位の重み付き数** (`reason[...] += len(left)`)。呼出し命令の数ではない。上の 4 件の命令が、この 26 を生んでいる。
 - `call [reg+disp]` の形 (`rbx - 0x50`・`rbx + 0x210` など) は IAT の形ではないため、IAT 解決では届かない。
 
 ## 4. 採用方式と理由
 
-- **採用なし**。4 方式とも 13 件の候補は 0 件。
+- **採用なし**。健全な S0・S1 は 13 件の候補が 0 件。非健全な上限 S2 だけ 2 件 (7ce2e0・12657b0 の xmm0、未確定 0 件)、S3・S4 は 0 件。
 - 採用しなかった理由:
   1. S1 (IAT) は効く箇所が 0 件。
-  2. S2〜S4 (上限) でも候補は 0 件。間接 call の解決方式が完全でも、13 件の判定は進まない。
+  2. 非健全な上限 S2 の 2 件は採用の根拠にならない。S3・S4 (上限) は 0 件で、間接 call の解決方式が完全でも 13 件の判定は進まない。
   3. 主因は深さ超過 (282 件) と、呼出し元の間接 call 68 件。どちらも間接 call の解決方式とは別の問題。
 
 ## 5. 検証
@@ -105,7 +106,16 @@ python3 tools/liftdiff/tests/ld291_schemes.py $FL_WIN64_DIR/extracted/block00031
 python3 tools/liftdiff/tests/ld291_schemes.py $FL_WIN64_DIR/extracted/block00031_PE.bin --scheme S4 --maxdepth 16 --budget 20000 --reasons
 ```
 
+呼出し命令の数 (§3.3 の 4 件) は、`ld291_schemes.py` の `callee_why` で `callee-indcall:` の理由に呼出し命令の VA (`@<va>`) を付けた一時コピーで数える (リポジトリには入れない)。
+
+```sh
+sed -e "s#return 'callee-indcall:' + form(ins)#return 'callee-indcall:' + form(ins) + '@%x' % va#" \
+    -e "s#^import ld215_retprop as R#sys.path[0:0] = ['tools/liftdiff/tests', 'tools/liftdiff']; import ld215_retprop as R#" \
+    tools/liftdiff/tests/ld291_schemes.py > $RUNNER_TEMP/ld291_probe.py
+python3 $RUNNER_TEMP/ld291_probe.py $FL_WIN64_DIR/extracted/block00031_PE.bin --scheme S0 --reasons | grep -o 'rip-mem@[0-9a-f]*' | sort -u | wc -l   # => 4
+```
+
 ## 8. 測定 commit からの差分
 
 - 測定 commit: `8f62b8eef`。この版で S0・S4 を取り直し、§3 の数値と一致した。
-- 測定 commit 以降の差分は REPORT の追記・DOC_MAP の登録のみ (コードは変えていない)。PR 本文に `git diff 8f62b8eef HEAD -- tools/liftdiff` の出力を添える。
+- 測定 commit 以降の差分は REPORT の追記・訂正、`tests/ld291_schemes.py` の docstring (`--scheme` に S4 を追記。判定ロジックは変えていない)、DOC_MAP の行数表記のみ。PR 本文に `git diff 8f62b8eef HEAD -- tools/liftdiff` の出力を添える。

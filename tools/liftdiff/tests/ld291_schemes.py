@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """LD-291 (#5973): 13 件の戻り経路で止まる間接 call の解決方式を、同じ判定器に適用して比べる。
 
-  python3 tools/liftdiff/tests/ld291_schemes.py <PE> --scheme S0|S1|S2|S3 [--reasons]
+  python3 tools/liftdiff/tests/ld291_schemes.py <PE> --scheme S0|S1|S2|S3|S4 [--reasons]
 
   S0: 現行 (ld215_retprop.py --callee-arg と同じ。間接 call は未確定)。
   S1: IAT 参照の call [rip+disp] だけを外部 API とみなす。戻りは rax 上書き、rdx / xmm0 は引数読みとみなす。
