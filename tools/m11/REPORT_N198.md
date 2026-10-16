@@ -166,3 +166,16 @@
 ### 9-2. 測定 commit 以降の差分
 
 `git diff 51df584bd HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行 (本節の追記は REPORT のみ)。
+
+## 10. #5563: 1 オペランド形 `imul r/m` の対応 (測定 commit `1f834b4f5`)
+
+- 対応を追加: `imul r/m32`・`imul r/m64` (1 オペランド形)。`edx:eax` (`rdx:rax`) へ符号付き積を書く。宛先 reg の幅が 8/16 bit・メモリ・除数が未知は判定不能 (類付き)。
+- 合成検査 (`--selftest`): 58 件 → **68 件・不一致 0** (rc 0)。I1〜I4 は PASS とネガティブ控え、I5・I6 は判定不能。
+- 実データ (`fl-win64` `block00031_PE.bin`・`work-m11` 展開・台帳は `m11_sigfix_stats.sh` → `m11_setother_nonimm_class.py` → `m11_setother_nonimm_cfg.py` で再生成。`fixes 33: match 33 / mismatch 0`): 34 件を `--all` で照合。
+  - 判定: **判定不能 33・未決 1・実値化 0・PASS 0・FAIL 0** (rc 0・5.15 秒)。対応前 (`origin/main` の照合器) も同じ判定 (5.22 秒)。判定は変わらなかった。
+- `function_ddf630` → `function_6bed60` pos 1: 対応前は `判定不能 Stop: step 上限`、対応後も同じ。`Unsup` (未対応命令) は対応前後とも 0 件で、台帳 34 件のどれにも 1 オペランド `imul` で止まる経路は無い。`function_ddf630` 本体には 1 オペランド `imul` が 2 箇所 (`ecx`・`edi`) あるが、どちらも到達前の打ち切りで、未対応の理由にはならない。
+- **結論**: issue #5563 の前提 (未対応の `imul` 1 オペランド形が原因) は実データで成り立たない。受入 1 (判定が未対応以外になる) は **未達**。原因は step 上限 (探索が収束しない) で、命令対応ではない。残件は #5553 の子 #5562 (step 上限 5 件の併合) と既存の step 上限の扱いに移す。
+
+### 10-1. 測定 commit 以降の差分
+
+`git diff 1f834b4f5 HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行 (本節の追記は REPORT のみ)。
