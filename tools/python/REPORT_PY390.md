@@ -71,7 +71,7 @@
 | 登録の名前 | 0xc3a292 | UTF-16 文字列 `PyLong_FromLong` |
 | 名前解決の経路 | 0x4235f0 → 0x4235e0 | 0x4235e0 は IAT slot 0x1971600 (`kernel32.dll!GetProcAddress`) の jmp |
 
-結論: 未発見時の findEventID は **-1** を PyLong で返す (変換器 = `PyLong_FromLong`)。
+結論: 表 0x16bacb8 の中身が空と仮定すると、未発見時の findEventID は **-1** を PyLong で返す (変換器 = `PyLong_FromLong`)。0xf77340 の未発見時の戻りは未確認のため、この結論は前提付き (下段)。
 
 前提の範囲 (未発見の -1 がどこに依存するか): 0xf784c0 の未発見時の -1 は、3 箇所の表検索 0xf78660 (0xf7850e・0xf78551・0xf7856d) がいずれも 0 を返すことに依存する。0xf78660 は `call 0xf77340` の戻りが 0 なら rbx=0 のまま返す (0xf78681〜0xf78689)。0xf77340 の未発見時の戻りは本 probe で固定していない (未確認)。したがって「表の中身に依らない」とは言わない。表の中身が見つかる場合の値域は §4 の未解決のとおり。
 
@@ -85,12 +85,18 @@ PE で確定した分だけを `provider/fl_engine.c` と `host/fl_mock.mjs` に
 
 | 関数 | 実装 | 根拠 | 未確定 (仮置き) |
 |---|---|---|---|
-| findEventID (fl_table 331) | 引数 1〜2 (`i\|i`) の型だけ見て **-1** を返す。device・link の割当は見ない | §7 (未発見の -1 は PE 確定) | 表 0x16bacb8 の供給元が空と仮定。見つかった場合の値域は未確定 (§4) |
+| findEventID (fl_table 331) | 引数 1〜2 (`i\|i`) の型だけ見て **-1** を返す。device・link の割当は見ない | §7 (表 0x16bacb8 の中身が空と仮定した上での PE 確定。0xf77340 の未発見時の戻りは未確認) | 表 0x16bacb8 の中身が空と仮定 (上記の前提)。見つかった場合の値域は未確定 (§4) |
 | isDoubleClick (fl_table 348) | device 無し (`dev_assigned` 0) → **-7** ("Device not assigned")。device 有りは Unspecified error (code 2) | §1・§2 (-7 は PE 確定) | 準備判定 0x11d1430 は真と仮定。device 有りの値 (plugin の vtbl+0x80) は未実装 |
 
 - 検査: `tests/device_diff.mjs` に両関数の呼出し (device 割当 1/0 × 引数有無) を追加し、mock と C の code・戻り値が一致することを見る。期待値は PE 確定の code で固定。
 - 件数: `tests/provider_expect/pe390.json` を追加 (2 関数)。`provider_check` の implemented は PE 件数から導出される。
 - 測定 commit: `839cfc5e4` (コードを変えた最後の commit)。
+- 実測値 (測定 commit `839cfc5e4` 時点の PR 本文の記録。コマンドは `tools/python/` 配下で実行):
+  - `node tests/device_diff.mjs`: diffs 0・PASS (calls 21・link 9・rejects 13・midi_out 10)
+  - `node tests/provider_check.mjs`: PASS (functions 435・implemented 231・unimplemented 204・mcp_static 60)
+  - `FL_ENGINE=wasm node tests/all_tools.mjs`: 48/48 ok (host_calls 37425)。mock 経路も 48/48 ok
+- 再現状況: 上の数値は修正 run (round 1) では再実行していない。`toolchain-emsdk` が取得できず `dist/` が未ビルドのため。再測定は emsdk を素材に含めた run で行う。
+- 差分: `839cfc5e4..HEAD` の provider / host / tests / analysis 差分は 0 (REPORT_PY390.md の 1 行のみ)。
 
 ## 6. 差分 (PY-390 時点)
 
