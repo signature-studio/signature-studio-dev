@@ -63,6 +63,7 @@ KPI (起動に関わる変更ではないが、boot 実行の前後を記録): u
 
 - lift・root: `env -u FLE_EXTRA_ROOTS FLE_BOOT_TAG=py304root FLE_BOOT_RUNS=default bash tools/flelift/boot/fle6_measure.sh` (既定 root `0x6a7b70` + boot_roots `0x976da0`)。lift 81 s・clang-plain 81 s・boot 10 s。
 - 判定 (既定 root): `units_run` **895 / 942**・停止 `exit` (code 0)・`FLEBOOT_IPP_CHECK` `ok:true` (ptr `0x7f10001c`)。§C-2 と一致。`FLE_EXTRA_ROOTS=` (root 無し) で同じ boot を流すと units は 895 (`py304def`)。
+- 測定 commit: `e20037cc9` (`PY301_IPP` 切替えを入れた commit。probe はこの commit の `py301_undo_obj_probe.sh` で実行した)。`git diff e20037cc9 HEAD -- tools/flelift` の出力は空 (main 取り込み後も同じ)。`20224099e` は切替え前の commit なので測定 commit ではない。
 - probe: `PY301_IPP= bash tools/flelift/boot/py301_undo_obj_probe.sh`。`probes: 3 (expect 3)`・`PY301 行: 6`・`fle_wwatch` 1 件 (`0x141d6b8`: 0 → `0x12d15e20`)・陽性対照 `[PY301-c] 0x412a0d n=1` あり。
 
 | 観測 | 既定経路 (units 895) | shim 有 (units 209・§2-6・§2-7) |
@@ -78,5 +79,6 @@ KPI (起動に関わる変更ではないが、boot 実行の前後を記録): u
 
 - 既定経路では **作成呼出し `0x976b60` まで実行される**。shim 有では実行されなかったので、「設定経路が停止点までに未実行」は shim 有の停止点の性質で、既定経路では当てはまらない。
 - ただし `obj` (`[0x141d6c0]`) は既定経路でも boot 終了まで **0 のまま**。`0x976b60` の作成結果を `obj` に入れる書込みは、WWATCH (ST* 系の書込み監視) で捕まっていない。`obj` を書く経路は ST* 以外 (直接の memory 書込み・別関数の内部) か、作成が NULL を返しているかのどちらか。ここでは区別できない。
+- WWATCH 1 件 (`0x141d6b8`: 0 → `0x12d15e20`) は、`0x141d6b8` (Q スロット) の値が `0x12d15e20` になった書込みで、隣接 slot (`0x141d6c0` = obj) の書込みではない。書込み元の命令は本 run では特定していない (WWATCH の出力に呼出し元の情報が無い)。`0x12d15e20` の実体も未確認。「不明」として残す。
 - singleton `[0x16b82e0]` は boot 終了時点で 0 (NULL)。ただし Python の `None` は別の静的オブジェクトのアドレスで、0 は「未設定」と同じ。受入 2 の『`None` か』は、この値では判定できない (`None` の VA の特定が要る)。
 - unit 895 の `exit` は、付録 672 §C-2 の未解決 (#4782 [FLE-24]・MessageBoxW 不在の影響か) と同じ停止。fill の 0 化 (`py_events` の unit 209 の 3 件) は既定経路では起きない。
