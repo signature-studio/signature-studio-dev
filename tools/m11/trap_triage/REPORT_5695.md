@@ -142,10 +142,10 @@ diff --git a/tools/m11/trap_triage/store_watch_5695.sh b/tools/m11/trap_triage/s
 ## 8. 4 回目 run: C 側の一部の直接 store まで含めた書込み監視 (結論: 計装範囲では 0 件。未計装経路は未判定)
 
 測定 commit: `474f2d120` (本 run の HEAD)。計装コードは `70f9ac915` から変えていない (`git diff 70f9ac915 474f2d120 -- tools/m11/m11_ov.c` は空)。
-素材: `fl-win64`・`work-m11`・`toolchain-emsdk` を本 run で展開 (`$RUNNER_TEMP/fl-win64`・`tools/m11/work`・`/opt/emsdk`)。`m11_gen_ir2.sh` rc=0・52 s (ldfix applied)。
+素材: `fl-win64`・`work-m11`・`toolchain-emsdk` を本 run で展開 (`$FL_WIN64_DIR`・`tools/m11/work`・[EMSDK])。`m11_gen_ir2.sh` rc=0・52 s (ldfix applied)。
 `emcc` 6.0.12。
 
-手順: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 EMSDK_ENV=/opt/emsdk/emsdk_env.sh [WATCH_LO=… WATCH_BASE=… WATCH_SPAN=…] bash trap_triage/store_watch_5695.sh <tag>` を 1 本ずつ直列に実行。
+手順: `FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<[EMSDK] の emsdk_env.sh> [WATCH_LO=… WATCH_BASE=… WATCH_SPAN=…] bash trap_triage/store_watch_5695.sh <tag>` を 1 本ずつ直列に実行。
 2 本を並列に走らせた最初の試行は `work/obj` と `work/probe5695` を共有して壊れたため破棄した (近傍の 0 件は汚染で、数値として使わない)。
 集計: `work/probe5695/<tag>.aw` の行数 (`grep -c`)。`[a1c]` は `m11_ov.c` の `Q`/`D`/`B` マクロ経由の**読取りと書込みの両方**を数える (`m11_cwatch` は区別しない)。`[a1]`・`[a1cp]`・`[a1rp]` は書込みの判定。
 
