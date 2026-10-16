@@ -183,15 +183,15 @@ EXIT=0
 
 ## §8. 関数ポインタ表 0x1810d7430 の reader 特定 (#5694 / FA-80・親 #5682・#5628)
 
-- 測定 commit: `3b84592b7` (`ks_vtable_reader.py` を追加した commit)。
-- 素材: `work-liftlib-targets` の `SlateCore.core_64` (36,285,952 B、`tools/targets/freshair/work/win/Fresh Air/`)。HEAD 測定用。
-- 実測: `python3 tools/targets/freshair/ks_vtable_reader.py <SlateCore.core_64> 0x1810d7430 0x1810d7340`・EXIT=0・load 1 分値 0.4 程度・所要は測定 run の時間内 (逐次 3.8 M 命令の走査)。
+- 測定 commit: `51664ee93` (`ks_vtable_reader.py` の近傍集計を含む最後のコード commit)。
+- 素材: `work-liftlib-targets` の `SlateCore.core_64` (36,285,952 B、`tools/targets/freshair/work/win/Fresh Air/`)。
+- 実測: `python3 tools/targets/freshair/ks_vtable_reader.py <SlateCore.core_64> 0x1810d7430 0x1810d7340`・EXIT=0・`real 52.75 s`・`user 52.64 s`・load 1 分値 0.78 (測定前 0.50)。
 - 表 = vtable A (`0x1810d7340`) の `+0xf0` (slot 30)。検索形式ごとの結果:
   - 絶対値 qword (`0x1810d7430`)・RVA dword (`0x10d7430`)・vtable 絶対値・即値・disp の絶対値・rip 相対 ea: **0 件** (表を直接指す参照は無い)。
   - rip 相対 `lea` で vtable を指すもの (vptr 設定): 3 件。`0x1805ede78` (ctor `0x1805ede50`)・`0x1805edf5a` (`0x1805edf50`)・`0x1805edfba` (`0x1805edfb0`)。いずれも ea = `0x1810d7340` (vtable A の先頭)。
   - vtable A を設定する ctor の呼出元: `0x1805caef1` (`call 0x1805ede50`) のみ。
   - `[reg+0xf0]` の読み: 3,090 件 (any base)。うち間接 `call`/`jmp`: 56 件。`0x1805ede50`・`0x1805edf50`・`0x1805edfb0` の内部には `[reg+0xf0]` の間接 call は無い (`0x1805edf1f` の `mov dword ptr [rsi+0xf0], 0x3f800000` は書込み)。
-  - 表近傍 `±0x200` の rip 相対参照 51 件はすべて浮動小数定数 (`movsd`・`addsd`・`mulsd`) の読みで、表の読みではない。
+  - 表近傍 `±0x200` の rip 相対参照 51 件 (`lea` 9・`movsd` 14・`mulsd` 14・`addsd` 3・`movss` 8・`maxss` 2・`addss` 1)。`lea` 9 件の ea は `0x1810d7290`・`0x1810d7258`・`0x1810d72c8`・`0x1810d7340`・`0x1810d73d0`・`0x1810d7478`・`0x1810d7580` で、表 `0x1810d7430` 本体は指さない。浮動小数の読みも表 `0x1810d7430` の値ではない (ea は `…7460`・`…7468` 等の別スロット)。
 - 結論: 表 `0x1810d7430` を**直接**読む reader は、rip 相対・即値・基底+添字の静的形では 0 件で特定できない。読み手は vptr (`this` の vtable 経由) による `[reg+0xf0]` の間接 call/load のみ。reader の関数名は、呼出元が vptr の型 (オブジェクト) に依存するため、静的だけでは確定しない。
 - 限界: `[reg+0xf0]` 3,090 件のうち、どの object の vtable を読んでいるかは未追跡 (型推定なし)。`mov reg,[reg+0xf0]` の直後の `call reg` は (逐次 4 命令以内) 0 件。
 - 未解決 (起票先): vptr の型推定 (どのオブジェクトが vtable A を持つか) → #5628 (FA-78) の実行順測定に渡す。
