@@ -3,6 +3,9 @@
  * TEB (gs) 敷設, alloc log, IAT pseudo-VA index 参照。 */
 #include "fle_cpu.h"
 #include <stdio.h>
+#ifdef FLE_WWATCH_JS
+#include <emscripten.h>
+#endif
 #include "fle_approx.inc"
 uint64_t R[16];
 X128 X[16];
@@ -61,6 +64,12 @@ void fle_wwatch(uint64_t a, uint32_t n, const void* src, const char* file, int l
         nlog++;
         fprintf(stderr, "[fle_wwatch] ret=%p slot=%#llx a=%#llx n=%u old=%#llx new=%#llx at %s:%d\n", __builtin_return_address(0),
                 (unsigned long long)w, (unsigned long long)a, n, (unsigned long long)ov, (unsigned long long)nv, file, line);
+#ifdef FLE_WWATCH_JS
+        if (nv == 0 && ov != 0) {
+            /* 書込み時点の wasm 呼出し連鎖 (--profiling-funcs の関数名 f_xxxx)。診断のみ・既定無効。 */
+            EM_ASM({ console.error("[fle_wwatch_js] slot=" + ($0 >>> 0).toString(16) + "\n" + new Error().stack.split("\n").slice(0, 40).join("\n")); }, (int)w);
+        }
+#endif
 #ifdef FLE_WWATCH_STACK
         if (nv == 0 && ov != 0) {
             fprintf(stderr, "[fle_wwatch_stack] slot=%#llx xrip=%#llx", (unsigned long long)w, (unsigned long long)ott_xrip);
