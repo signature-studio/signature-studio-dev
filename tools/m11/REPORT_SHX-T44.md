@@ -147,6 +147,16 @@ python3 tools/m11/frame_share/callsite_audit.py tools/m11/work/m11_image.bin 0x6
 - 再現: `python3 tools/m11/frame_share/callsite_audit.py tools/m11/work/m11_image.bin 0x690580 0x6905f0:0x690763` の出力 (上表) は本検証と一致。
 - 限界: 関数外の `jmp reg` が `0x6906d7` を飛び先にする可能性は、画像全体の表復元をしていないため完全には排除していない。関数 `0x6905f0` 内からの到達は、間接 jmp 0 件により無い。
 
+### SHX-T56 表復元 (画像全体, 2 回目の run)
+
+- 測定 commit: 本 PR のコード変更は `tools/m11/frame_share/scan_table_refs.py` の追加のみ。`git diff 739b46e2d HEAD -- tools/m11/frame_share` で確認する。
+- 素材: `work-m11` の `m11_image.bin` (22515781 byte) を使い、`objdump -D -b binary -m i386:x86-64 -M intel` で全体 6111956 行に展開した。
+- 間接 `jmp reg` は 612 件 (`jmp <reg>` 形式・`ff /4`)。`jmp QWORD/DWORD PTR [...]` 形式は別途 3299 件を数えたが、`call` の `FWORD` 等を含むため、表経由の飛び先の判定は `jmp reg` を基準にした。
+- 方法 A (jmp と表の対応づけ): 各 `jmp reg` の直前 40 命令の窓で `movsxd/movsx/movzx/mov` の添字読み出しと rip 相対 `lea` の基底を対応づけ、基底 + 相対値 (1/2/4 byte・scale 1〜8・先頭 512 エントリ) を復元した。`0x6906d7` を指すエントリは **0 件**。
+- 方法 B (全基底の総当たり): rip 相対参照の target 55889 種類のうち画像内の 38330 件を基底として、同じ形式で `0x6906d7` を指すエントリを検索 (`tools/m11/frame_share/scan_table_refs.py`)。候補は 4 件で、すべて基底 `0x688f88` の 16bit・scale 1 の一致。`0x688f88` は `addsd xmm0,QWORD PTR [rip+0x20]` の倍精度定数読み出しで、表ではない (偶然一致)。
+- 結論: 画像内の表から `0x6906d7` を指すエントリは検出されなかった (方法 A 0 件・方法 B は偶然一致のみ)。関数内からの到達も無い (前節)。この範囲で「表経由の到達は無い」と扱う。ただし上の限界の範囲 (窓外の間接ジャンプ・表でない計算による飛び先) は残るため、確定ではなく「未検出」の結論とする。
+- 限界: 方法 A は直前 40 命令の窓に依存する。方法 B は偶然一致を含みうる (本件は 4 件とも表でないと確認)。線形逆アセンブルのずれも残る。機械的に復元しきれない間接ジャンプ (関数ポインタ・テーブル以外の計算) は対象外。
+
 ### 検証 (本 run・合成バイナリ)
 
 - 入力: `as` / `ld` で作った 0x400000 配置の小さな ELF (call 4 件、直前が `jmp`・`ret` の入口なしケースと、直接 `jmp` で入る入口ありケースを含む)。
