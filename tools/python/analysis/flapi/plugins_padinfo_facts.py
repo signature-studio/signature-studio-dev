@@ -8,7 +8,7 @@
 - slotIndex == -1 の経路: 0x1005730 で channel を解決し、0x132f780 で有効性を見る
 - slotIndex != -1 の経路 (0xd81374〜): 件数検査・slot 0..9 の検査・mixer 配列 (stride 0x28f*8、オフセット 0x134c) から plugin を取る
 - 値の取得: 0x1331340 → [obj]->vtbl[+0x20] → 得た obj の vtbl[+8](0x35, paramIndex, paramOption)
-- paramOption == 2 のときだけ eax の byte0 と byte2 を入れ替える (0xff00ff・0xff00ff00)
+- 組替えの条件は経路で違う: slotIndex == -1 は paramOption ([rbp+0xa0]) == 2 (0xd812f8)、slotIndex != -1 は paramIndex ([rbp+0xa4]) == 2 (0xd8141e)。どちらの真でも eax の byte0 と byte2 を入れ替える (0xff00ff・0xff00ff00)
 - 戻り値: 整数を [0x15e4280] の指すオブジェクトの vtbl[0] に渡す (0xd8135d。[0x15e4280] は import ではない)
 - 0xd82c20 (code 受け): code >= 0 は 0xc38bc0 で値を返す。code < 0 は [obj]->vtbl[+0x88] の判定後にコード別のメッセージを作り、例外経路 (0xd82da6 以降) に入る
 - 範囲外・空 slot の code: -4 (0xfffffffffffffffc)・-8 (0xfffffffffffffff8)。PyArg 失敗は ebx そのまま (0 以下) を 0xd82c20 へ
@@ -41,7 +41,7 @@ EXPECT = [
     (0xD812B6, "call 0x132f780"),
     (0xD812CE, "call 0x1331340"),
     (0xD812DE, "call qword ptr [rax + 0x20]"),
-    (0xD812F8, "cmp dword ptr [rbp + 0xa0], 2"),
+    (0xD812F8, "cmp dword ptr [rbp + 0xa0], 2"),           # slot -1 の組替え条件は paramOption
     (0xD81304, "mov edx, 0x35"),
     (0xD8131A, "call qword ptr [rax + 8]"),
     (0xD8131F, "and ecx, 0xff00ff"),
@@ -53,6 +53,8 @@ EXPECT = [
     (0xD813B3, "cmp rax, 9"),
     (0xD813CB, "imul rcx, rcx, 0x28f"),
     (0xD813DD, "mov rsi, qword ptr [rax + rcx*8 + 0x134c]"),
+    (0xD8141E, "cmp dword ptr [rbp + 0xa4], 2"),           # slot != -1 の組替え条件は paramIndex
+    (0xD81425, "jne 0xd8145e"),
     (0xD8135D, "call qword ptr [rax]"),                   # 戻り値の変換 (0x15e4280)
     (0xD81492, "mov ecx, ebx"),
     (0xD81494, "call 0xd82c20"),
