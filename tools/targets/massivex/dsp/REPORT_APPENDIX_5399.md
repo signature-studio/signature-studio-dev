@@ -5,7 +5,7 @@ REPORT_MX25 の本体は上限直前のため、判定の正本はここに置�
 
 ## 1. 結論
 
-- 未分類 (mismatch 24) は **全件を理由別に分類した** (§3)。内訳は REX 直後 F0 17 件 (REX→F2→F0 1 件を含む)・capstone 不正 6 件・`(bad)`/rex2 1 件。
+- 未分類 (mismatch 24) は **全件を理由別に分類した** (§3)。内訳は REX 直後 F0 16 件・REX→F2→F0 1 件 (REX 直後 F0 系は計 17 件)・capstone 不正 5 件 (EVEX 2・連続 REX 1・0x81a740 1・`0f ff` 1)・境界ずれ 1 件・`(bad)`/rex2 1 件 = 24。
 - **REX 直後 F0 の正否は「未確認」のまま**。SDM Vol.2 §2.2.1 (REX 節) の本文を取得できなかった。
 - 実機 (AMD EPYC 9V74) では、REX 直後の F0 は #UD にならず、REX.W も無視された (§2)。これは `mx_closure.py` の規則 (REX→F0 は #UD) と合わない。ただし Intel の挙動とは別の可能性があり、規則変更の根拠としては扱わない。
 - `mx_closure.py` の規則・既定 `ENTRY=any` は変えていない。規則を変えると pdata_call の入口数が変わるため、SDM 本文の取得後に別 PR で判断する。
@@ -41,7 +41,7 @@ REPORT_MX25 の本体は上限直前のため、判定の正本はここに置�
 | REX→F2→F0 (`41 f2 f0`) | 1 | 0x1a2b67a | **未確認**。REP と LOCK の併用に加え REX。実機の対照は `rex_f2_lock` (非 #UD) |
 | capstone 不正・objdump 受理 (`57 ff c4 62`) | 1 | 0x81a740 | 先頭 `57` (push rdi) は復号できるが、先頭ブロック内のどこかで capstone が不正 (失敗位置は未特定)。後続の EVEX `62` の形が疑わしい |
 | EVEX 形 (`62 02 41 b8`) | 2 | 0x2486788・0x2486bc8 | capstone 不正 (復号不能)。objdump は受理 |
-| `0f ff` (ud0) | 1 | 0x32c176a | capstone は `ud0` として受理 (#UD を示す命令)。objdump は受理 |
+| `0f ff` (ud0) | 1 | 0x32c176a | capstone は `ud0` と復号する (#UD を示す命令)。判定 (REPORT_MX25 §5.5) では capstone 不正扱い。objdump は受理 |
 | 連続 REX (`4e 4e 4e …`) | 1 | 0x35cd1ff | capstone 不正・objdump 受理。REX が連続する形は SDM 上の 1 命令ではない |
 | 境界ずれの疑い (先頭 `00 00 00`) | 1 | 0x2abfc59 | 途中から始まる番地。入口候補の根拠が無い |
 | `(bad)`/rex2 (`02 f9 fb 46`) | 1 | 0x2470627 | capstone 受理 (`add bh, cl`)・objdump `(bad)`。表データの可能性 |
@@ -50,7 +50,7 @@ REPORT_MX25 の本体は上限直前のため、判定の正本はここに置�
 
 ### 注意 (issue 本文・前回停止報告との差)
 
-- issue 本文は「capstone 不正 6 件 (EVEX 2・`0f ff`/`57 ff` 2・連続 REX 1・REP+LOCK 1)」とする。実測では REP+LOCK の 0x1a2b67a は capstone が受理するため、capstone 不正は 5 件。残る 1 件は前回 run と同じく REX→F2→F0 として数えた。
+- issue 本文は「capstone 不正 6 件 (EVEX 2・`0f ff`/`57 ff` 2・連続 REX 1・REP+LOCK 1)」とする。本表では capstone 不正を 5 件 (EVEX 2・連続 REX 1・0x81a740 1・`0f ff` 1) と数える。REP+LOCK の 0x1a2b67a は capstone が受理するため、REX→F2→F0 として REX 直後 F0 系に数えた。境界ずれ 0x2abfc59 は capstone 不正に入れない (先頭 `00 00 00` は capstone が `add` と復号する。途中から始まる番地という別の理由で除外)。
 - 前回停止報告の内訳 (REX 直後 F0 16・REX→F2→F0 1・capstone 不正 5・境界ずれ 1・(bad) 1) と本表は同じ。
 
 ## 4. 判定できない理由
@@ -64,5 +64,5 @@ REPORT_MX25 の本体は上限直前のため、判定の正本はここに置�
 | 残件 | 受入 | 起票先 |
 |---|---|---|
 | REX 直後 F0 17 件の規則番号付き判定 (SDM REX 節の本文が必要) | 1 | 本 issue #5399 (受入 1 のまま) |
-| capstone LOCK 規則の残件・capstone 不正 6 件の capstone 側修正 | 1 | #4068 [MX-44] (既存の子) |
+| capstone LOCK 規則の残件・capstone 不正 5 件の capstone 側修正 | 1 | #4068 [MX-44] (既存の子) |
 | mx_closure.py の REX 規則を変えるか | 2 | PM 判断 (SDM 本文の取得後) |
