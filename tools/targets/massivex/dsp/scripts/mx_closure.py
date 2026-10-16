@@ -52,24 +52,20 @@ LEGACY_PFX = {0x66, 0x67, 0x2e, 0x36, 0x3e, 0x26, 0x64, 0x65, 0xf2, 0xf3}
 
 def insn_sdm_ok(raw, mn, ops):
     # SDM の LOCK 規則と REX 規則。raw = 命令のバイト列、mn/ops = capstone の出力 (disasm_lite)。
-    #   REX: REX の直後の F0 は #UD。REX の後に別の接頭辞が来ると REX は無視される (F3 などは不正としない)。
+    #   REX: SDM Vol.2 2.2.1 (p.2-8)。REX は直後が opcode (または 0F) でないと無視される。REX の後の F0 は REX を無視するだけで #UD ではない。
     #   LOCK: ロック可能命令・宛先 (Intel 形の先頭オペランド) がメモリ・REP (F2/F3) と併用しない。
     #         HLE 形 (xacquire / xrelease) は F2 / F3 を使うので、その形だけ許す。
-    lock, rep, rex = False, [], False
+    lock, rep = False, []
     for b in raw:
         if b == 0xf0:
-            if rex:
-                return False
             lock = True
         elif 0x40 <= b <= 0x4f:
-            rex = True
             continue
         elif b in LEGACY_PFX:
             if b in (0xf2, 0xf3):
                 rep.append(b)
         else:
             break
-        rex = False
     if not lock:
         return True
     toks = mn.split()

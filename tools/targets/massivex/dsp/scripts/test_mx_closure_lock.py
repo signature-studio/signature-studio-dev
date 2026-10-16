@@ -46,9 +46,9 @@ class LockRule(unittest.TestCase):
 
 
 class RexRule(unittest.TestCase):
-    def test_rex_then_f0_rejected(self):
-        self.assertFalse(mc.insn_sdm_ok(bytes.fromhex('45 f0 01 07'), 'lock add', 'dword ptr [rdi], eax'))
-        self.assertFalse(mc.insn_sdm_ok(bytes.fromhex('45 f0 03 00'), 'lock add', 'eax, dword ptr [rax]'))
+    def test_rex_then_f0_not_rejected(self):
+        self.assertTrue(mc.insn_sdm_ok(bytes.fromhex('45 f0 01 07'), 'lock add', 'dword ptr [rdi], eax'))   # SDM 2.2.1: REX が無視されるだけ
+        self.assertFalse(mc.insn_sdm_ok(bytes.fromhex('45 f0 03 00'), 'lock add', 'eax, dword ptr [rax]'))   # 宛先がレジスタ: LOCK 規則で不可
 
     def test_rex_then_f3_not_rejected(self):
         self.assertTrue(rule('40 f3 0f 7f 00'))   # REX の後の F3: REX が無視されるだけで #UD ではない
