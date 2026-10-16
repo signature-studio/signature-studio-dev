@@ -70,6 +70,27 @@ abs8 pointer to 0xd76c90: 1
 | 動的 run (受入 2)・boot build の clang RSS cap | 採取道具が動くかは未確認 | #5771 の再 run。build の分割 (shard の cc 対応) は既存 `boot_e2e.sh` の制約 (REPORT_APPENDIX_4783) |
 | wine64 (lane b) の apt 導入可否 | runner 環境の変更 | PM 判断 (本 issue のコメントで依頼) |
 
+## 6. 動的 run (受入 2・#5771 の再 run)
+
+道具: `tools/flelift/boot/fle6_measure.sh` に `FLE_TRAP_VA` を追加 (x64c `--trap`)。指定 VA は lift せず `ott_unsup` の trap stub にする。呼ばれると `boot_threw=unsup` で止まる。
+測定 commit: `075a23d42` (`feat(flelift): fle6_measure.sh に FLE_TRAP_VA を足す`)。HEAD で再現。素材 `fl-win64` + `toolchain-emsdk` 6.0.12。shard 8・既定経路 (`FLE_IPP` 未指定 = mode 3)・`FLE_EXTRA_ROOTS=` (root 無し)。
+
+実行: `FLE_TRAP_VA=0xd76c90 FLE_BOOT_RUNS=default FLE_SHARDS=8 FL_WIN64_DIR=<展開先の親> bash tools/flelift/boot/fle6_measure.sh`
+
+| 実行 | 結果 (`FLEBOOT_RESULT`) | 所要 (real) | load (開始時) |
+|---|---|---|---|
+| `0xd76c90` を trap (測定) | units 895・`boot_threw=exit`・`unsup` 0 件 | 2 分 34 秒 | 1.9 |
+| 陽性対照 `0x976da0` を trap (一時コピーの sed・repo 外) | units 851・`boot_threw=unsup` | 未記録 (time の出力を取り損ねた) | 1.9 |
+
+- 陽性対照で trap が検出されることを確認した (unit 851 で `unsup`)。このため「`0xd76c90` が 0 件」は trap が効かなかった結果ではない。
+- 既定経路の boot (`0xd76c90` trap 版) の値は、trap なしの既定経路 (§D-1・units 895・exit) と一致する。
+
+### 判定
+
+- **受入 1 の結論: 既定経路の boot では `linkToLastTweaked` (`0xd76c90`) は呼ばれない。** 観測: units 895 まで進み `exit` で終わり、trap に到達しない。この判定は既定経路 (ILTools 擬似なし・mode 3) に限る。
+- 他の IPP mode・survey 経路・`FLE_IPP=0` では未確認。
+- lane (a) (boot 経路への記録の追加) は、この経路では観測対象が呼ばれないため不要。lane (b) (wine64 + watchpoint) の要否は PM 判断。
+
 ## コミット
 
 - 本 PR のコード変更: `tools/python/analysis/flapi/py5388_refs_probe.py` と `tools/python/REPORT_PY5388.md`・`docs/DOC_MAP.md` の登録行 (同一 commit)。
