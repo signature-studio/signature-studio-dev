@@ -73,7 +73,7 @@ abs8 pointer to 0xd76c90: 1
 ## 6. 動的 run (受入 2・#5771 の再 run)
 
 道具: `tools/flelift/boot/fle6_measure.sh` に `FLE_TRAP_VA` を追加 (x64c `--trap`)。指定 VA は lift せず `ott_unsup` の trap stub にする。呼ばれると `boot_threw=unsup` で止まる。
-測定 commit: `075a23d42` (`feat(flelift): fle6_measure.sh に FLE_TRAP_VA を足す`)。HEAD で再現。素材 `fl-win64` (`$ARTIFACTS_DIR` の実在を確認)。emsdk の環境は本 run の runner には `/opt/emsdk` が無く、この run では確認していない。shard 8・既定経路 (`FLE_IPP` 未指定 = mode 3)・`FLE_EXTRA_ROOTS=` (root 無し)。
+測定 commit: `075a23d42` (`feat(flelift): fle6_measure.sh に FLE_TRAP_VA を足す`)。HEAD で再現。素材 `fl-win64` (`$ARTIFACTS_DIR` の実在を確認)。emsdk (`[EMSDK]`) は本 run で未確認 (素材に無く、使っていない)。shard 8・既定経路 (`FLE_IPP` 未指定 = mode 3)・`FLE_EXTRA_ROOTS=` (root 無し)。
 
 実行: `FLE_TRAP_VA=0xd76c90 FLE_BOOT_RUNS=default FLE_SHARDS=8 FL_WIN64_DIR=<展開先の親> bash tools/flelift/boot/fle6_measure.sh`
 
