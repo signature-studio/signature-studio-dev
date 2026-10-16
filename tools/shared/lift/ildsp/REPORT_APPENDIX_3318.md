@@ -20,7 +20,7 @@
 
 ## 3. 実測 (測定 commit `374feea46`・RetDec v5.0・emsdk 6.0.12・4 core・n=3)
 素材: `fl-win64` (`fl-win64` の tarball を `tar --zstd -xf` で展開、`extracted/block24360_PE.bin`)。
-RetDec は `RetDec-v5.0-Linux-Release.tar.xz` (GitHub release)、emsdk は `emsdk install 6.0.12`。この 2 つは **台帳外の取得** で、`docs/REFERENCES.md` の `toolchain-retdec`・`toolchain-emsdk` の取得元欄には反映していない (両方とも `[未確認]` のまま)。runner の `/opt/` に無かったので、上の手順で用意した。
+RetDec は `RetDec-v5.0-Linux-Release.tar.xz` (GitHub release)、emsdk は `emsdk install 6.0.12`。この 2 つは **台帳外の取得** で、`docs/REFERENCES.md` の `toolchain-retdec`・`toolchain-emsdk` の取得元欄には反映していない (両方とも `[未確認]` のまま)。runner の既定の場所 (`[EMSDK]`・`[RETDEC]` の想定先) に無かったので、上の手順で用意した。
 
 本表の値は測定 run 1–3 の 1 組だけ。PR 本文の検証結果はこの値を引く (別の組は書かない)。
 
