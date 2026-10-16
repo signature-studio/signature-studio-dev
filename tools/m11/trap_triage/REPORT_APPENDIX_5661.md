@@ -150,3 +150,22 @@ python3 trap_triage/judge_ctx.py work/boot_final.ll work/strict_evidence_5661.ts
 - 未解決 (保留 7 件: 179・180・183・185・191・192・193): 起票先は #5687 (本 issue・Refs。判定だけの残作業のため子 issue は新規に起票しない)。
 - 素材: `oc_artifacts: fl-win64 work-m11` で取得した run (run 3) で、`boot_final.ll` (sha256 `69c774de…`) と `block00031_PE.bin` (22,227,016 B) を読んだ。上記 179 の機械語と IR の行番号はこの run の読み。
 - 再現: 本節の §5 と同じ手順。`disasm_fn.py` の既定 PE パスは環境に合わせて `LD_M11_PE=<block00031_PE.bin>` で指定する。
+
+## 9. #5725: 行 191〜193 (母数 3 件) の件ごとの判定
+
+- 母数 3 件 (行 191・192・193)。確定 1 (真陽性 (構造) 1・偽陽性 0)、保留 2 (192・193)。判定件数は 1 / 3。§8 の 191 (保留) を本節で確定に変える (下記 191 の理由)。
+- 測定 commit: `95883aa04` (origin/main)。本節はコードを変えていない。`git diff 95883aa04 HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py tools/m11/trap_triage/disasm_fn.py` = 0 行。
+- 入力: `work-m11` の `boot_final.ll` (sha256 `69c774de…`・19,787,837 B)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
+- 実行 (foreground・各 1 回): `scan_guard.py` rc 0 (strict 288)、`strict_evidence.py` 288 行、`judge_ctx.py <IR> <TSV> <PE> 191 193` rc 0 (167 行の文脈ダンプ)、`disasm_fn.py c3c830 efe0` (機械語)。
+- 件数の数え直し (`ir_loop_head_icmp` 列・行 179〜193 の 15 行): 0 件 1 (185) / 1 件 3 (181・188・193) / 2 件 10 (180・182〜184・186・187・189〜192) / 3 件 1 (179)。§8 の内訳と一致 (修正なし)。
+- 判定方法: 機械語 (`disasm_fn.py`) の jcc 直前の cmp 被演算子と count 源を、IR の同じ load 連鎖と突合する。(a) 引数: `arg1`=rcx、`arg4`=r9 を関数先頭の `mov [rbp+x], rcx/r9` で対応づけた。(b) `[rip+…]` 先の値は PE から読んで IR の定数と照合した。(c) 機械語の間接呼び出しは、呼び出し先のアドレスがファイルのどの節に入るかで静的に決まるかを見た。判定は手で行い、スクリプトでは判定しない。
+
+| 行 | 関数 | jcc → 脱出先 / L | 判定 | 理由 |
+|---|---|---|---|---|
+| 191 | function_c3c830 | c3c8c8 → c3c907 / c3c8da | **真陽性 (構造)** | count 源は `[rbp+0xa8]` (= entry の `r9`=`arg4`。書き込みは `c3c85a` の 1 回のみ)。機械語の入口判定は 2 つ。`c3c89b` の `jle c3c923` (64 bit の `arg4+1 ≤ 0`) は IR の P の `icmp slt (arg4+1) 1` → `c3c923` と一致する。問題の `c3c8c8` は 32 bit の `cmp 0, ebx` (ebx = low32(arg4)) で、負なら `c3c907` (post-loop の `call 50a830`) へ直行する。IR の P→B→L は入口で 32 bit 判定を持たず、B `c3c8a1` は L `c3c8da` へ無条件に入る。末尾は L の後判定 (`icmp eq trunc(%11),0`)。c3c8c8 に届くのは arg4+1 ≥ 1 の場合だけなので、差が出るのは arg4 ≥ 0 かつ low32(arg4) < 0 (arg4 mod 2^32 ∈ [2^31, 2^32)) の場合。この範囲で、機械語は本体を 0 回、IR は low32(arg4+1) 回回る。回数は未計算。到達性 (該当する arg4 の実行時到達) は未測定 |
+| 192 | function_c3c830 | c3c94a → c3c972 / c3c951 | 保留 | count 源の同一性は確定: `[rbp+0x68]` = `call 40f9e0(rcx=[rip-0x772d71] → VA 0x4c9af8 の値 0x4c9bc0 = IR の定数 826304, dl=1)` = IR の `%4`。count は `[%4+0x10]`−1 で一致する。未解決は `c3c92e` の `call [rip+0xa7ba2c]` (間接呼び出し): IR の B (`c3c923`) に対応する call が無い。呼び出し先のスロットは RVA 0x12b8360 (`.bss` 内・raw 0 バイト) で、ファイルからは静的に決まらない。この呼び出しが `[%4+0x10]` を書き換えないことを確認できていない。count = 0 の挙動 (機械語は c3c972 へ直行、IR は本体を回る) は 191 と同型で、到達性は未測定 |
+| 193 | function_c3efe0 | c3f020 → c3f04f / c3f027 | 保留 | count 源は `[[rbx+0x10]+0x10]`。`rbx = rcx = arg1` (`c3efe7`) で、IR の B `%10`〜`%15` と段数・オフセット・幅が一致する。未解決は `c3f00d` の `call [rsi+0x10]` (仮想呼び出し、`rsi` = `[[arg1+0x24]]`): IR の P→B (`c3f010`) に対応する呼び出しが無い。呼び出し先は実行時のオブジェクトの vtable で決まり、ファイルからは確定できない。この呼び出しが `[arg1+0x10]` の先の count を書き換えないことを確認できていない。count = 0 の挙動 (機械語は `c3f04f` へ直行、IR は回る) は 192 と同型で、到達性は未測定 |
+
+- 未解決 (保留 2 件: 192・193): 両件の未解決は「間接呼び出し先が実行時にしか決まらない」点。静的な判定は打ち切り、件数の追加はしない。起票先は #5725 (本 issue・Refs)。子 issue は新規に起票しない (判定だけの残作業のため)。
+- 191 の確定の範囲: 真陽性の根拠は脱出の不一致 (32 bit 判定) で、到達性 (low32(arg4) < 0 の実行時到達) は未測定。count の範囲を測らずに真陽性とする根拠は、構造上の差だけである。
+- 注: 本節の判定は §8 の 191 (保留) を覆す。§8 の件数 (5/12) は本節で 6/12 (確定 6・真陽性 6・偽陽性 0)。
