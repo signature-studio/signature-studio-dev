@@ -148,3 +148,18 @@ scratch は `work/scratch/` (gitignore) に複製し、本体は変えない。
   - `py99_slot_paths.py` の突合は不変: `U check n=57 match=57 mismatch=0`・`forward cross-check n=172 mismatch=0`。
   - `py64_check_expr.py`: `n=8 mismatch=0`・`expanded n=1 mismatch=0`・exit 0 (不変)。
 - 未完 (受入 3・4 の残り): py64 の HAND 表に 0x104aba9・0x104ad2e・0x104af7f・0x104b093 を入れるには、手計算式を `shl`・`and`・`imul` を含む文法で書く必要がある (`py64_check_expr.py` の文法は `+ - * · rint f64 ACC d_in` のみ)。この run では文法を拡張しなかった (Refs #5926 の残り)。
+
+## 10. PY-5409 (#5980): 符号付き /8・%8 の畳みと 0x104bffa の式照合 (受入 1 の残り 1 点)
+
+- 測定 commit: `92764f7ba` (`analysis/py99_slot_paths.py`・`analysis/py64_check_expr.py` を変えた最後の commit)。入力: `fl-win64` の `block00031_PE.bin` → `py53_dispatch.py work/py53` (`fn=4664 dispatch=13 r8d_tests=174`)。load average 0.00 (測定時 22:33 UTC)。
+- 変更: `ExpSlicer` が符号付き `/8` (`test eax,eax`/`jns`/`add eax,7`/`sar eax,3`) と符号付き `%8` (`and eax,0x80000007`/`jns`/`sub 1`/`or 0xfffffff8`/`add 1`) を命令列の型で照合し、`div8(·)`・`mod8(·)` の関数ノードに畳む。型は、途中に他の分岐先が無く、`jns` の飛び先が合流先と一致するときだけ適用する。`py64_check_expr.py` は `div8`・`mod8` を関数形として解析し、0x104bffa の式を `EXPANDED` 表に加えた。
+- 式 (手計算・`EXPANDED` の 0x104bffa): `*(*(0x15e06a0) + imul(S578,0x28f)*8 + 0x1d4 + (shl(mod8(v),4) + mod8(v))*8 + div8(v)*4)`、`v = and(c_in,0xffff) + 0x70000000 − 0x70001fd0`、`S578 = shr(shr(c_in − 0x70000000, 0x10), 6)`。添字の出どころは 0x104bfbe〜0x104bff7 の lea・mov (`rax + (m*16+m)*8`、`eax = [rax + d*4]`、m = [rbp+0x568]、d = [rbp+0x580])。
+- 機械展開 (`py99_slot_paths.expand`): 0x104bffa は `left=[]` (従来 `left=['⚠']`)。`⚠合流@0x104bd49`・`⚠合流@0x104be63` は `mod8`・`div8` に置き換わった。
+- 測定 (HEAD `92764f7ba`):
+  - `py64_check_expr.py work/py53/fn.txt`: `# n=8 mismatch=0`・`# expanded n=9 mismatch=0` (0x104bffa 一致)・exit 0。
+  - `py64_sign_branch_check.py`: `n=85536 div8 mismatch=0 mod8 mismatch=0`・exit 0 (0.08 秒)。
+  - `py99_slot_paths.py work/py53/fn.txt`: `U check n=57 match=57 mismatch=0`・`forward cross-check n=172 mismatch=0` (0.46 秒)。従来の値と同じ。
+- ネガティブコントロール (`EXPANDED` の 0x104bffa の式を書換えて突合): `div8` を `mod8` に換える → 不一致。`div8*4` を `*8` にする → 不一致。どちらも展開式と一致しない。
+- 受入 (#5980): 0x104b305・0x104b5aa・0x104b94e・0x104bebf・0x104bffa の 5 地点が `EXPANDED` の突合で mismatch 0。不一致 0 (VA と手計算式の書換え対象なし)。
+- 限界: 畳みは命令列の型一致で判定する。型は同じ逆アセンブル (`fl-win64` の `block00031_PE.bin`) でだけ確認している。符号分岐の全入力の一致は `py64_sign_branch_check.py` が担保する。
+- 測定 commit から HEAD までの差分: 0 (測定 commit = HEAD)。
