@@ -63,3 +63,38 @@
 - 再測定の状況: 指摘対応の run (review fix) では `plugins-massivex` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、上の 2 つは再実行していない。上の値は測定 commit の run の記録。
 - E8/E9 の 0 件: 上の 2 スクリプトは `ff /2` の間接 call だけを数える。E8/E9 の rel32 の件数は、この記録からは再確認できない (未了)。
 - 測定 commit から HEAD までのコード差分: `git diff 97d274d5e HEAD -- tools/targets/massivex/dsp/scripts` は 0 バイト (出力なし)。`git diff 97d274d5e HEAD -- tools/targets/massivex` は本付録の文書追記のみ。
+
+## 3. 残件の確定 (MX-60 #5498・`scripts/mx60_callers.py`)
+
+- 測定 commit: **`15c79a54d`** (`feat(massivex): decode-based callers scan ... (MX-60 #5498)`)。コードを変えた最後の commit。
+- 素材: `plugins-massivex` → `Native Instruments Massive X v1.7.1.exe` → `parse_setup_headers.py` / `extract_massivex.py <exe> <work> key` で `Massive X.vst3` (95,356,824 B、md5 `622993e76565f49c094063a2b717d6ca` 一致)。展開先は `$RUNNER_TEMP` (repo 外)。
+- 再現: `python3 tools/targets/massivex/dsp/scripts/mx60_callers.py '<展開先>/VST3/Massive X.vst3'` (約 2 分 21 秒・単一プロセス・出力は `grep` で整理)。
+
+### 3.1 受入 3: 直接 E8/E9 の再確認 (確定)
+
+- 命令デコード (capstone・.pdata の全関数) と生バイト scan (E8/E9 rel32) の両方で、`0x17b460`・`0x17b680`・P1〜P6 への直接 call/jmp は **0 件**。
+- 2 つの方法が一致したので、§2 の「E8/E9 は .text 全体で 0 件」は確定扱いにしてよい (元の記録の確認スクリプトは残っていなかった)。
+
+### 3.2 受入 2 の一部: `rbx` の vtable 候補 (未確定)
+
+- `0x17b460` は `.rdata` の vtable `0x1841836a8` の **index 30** だけに登録 (`.rdata` 8 byte 照合・`.data` は 0 件)。もう一方の `0x183976038` には無い。
+- `0x17b680` は両 vtable の index 32。
+- 未確定の理由: `0x17b460` を呼ぶ側 (`call [reg+0xf0]` の 17 関数) のオブジェクトの動的型を、どの vtable が指すかまでは追っていない。よって `rbx` の型 (2 候補のどちらか) は確定できない。
+
+### 3.3 受入 1 の一部: 呼出元の確定
+
+- `0x17b460`: 直接参照 0 件・RIP 相対の関数ポインタ 0 件。vtable 経由のみ (index 30)。その呼出元 (`call [reg+0xf0]`) は **17 関数・全 17 サイト**で、線形判定により呼出し時点の xmm2 は **有効でない** (xmm2_live=False が 27 行・True は 0 行。全 27 サイトは `mx60.out` の `call site` 行)。
+  - よって「`0x17b460` の呼出元が xmm2 に float を載せて渡す」は、この線形判定の範囲では支持されない。
+- 重要な訂正: §2 の `0x18017b4af` (xmm2 を書く呼出し) は **`0x17b460` の内部**にある (`movss xmm2, [rsp+0x2c]` → `call [rax+0x100]` = index 32 = `0x17b680`)。つまり xmm2 は外部の呼出元から渡されたものではなく、`0x17b460` が自分のローカル値を `0x17b680` に渡している。「非 vectorcall の float 引数」の根拠を、外部呼出元の引数ではなく内部の計算に読み替える必要がある。
+- P1〜P6 (`0x180198700`・`0x1801e47c0`・`0x1801ef4b0`・`0x1801f36a0`・`0x1803bef80`・`0x18104aea0`): 直接 call 0 件・RIP 相対 0 件・`.rdata`/`.data` の slot 0 件。**静的に参照する箇所が見つからない**。呼出元は未確定 (ヒープや計算で作られる関数ポインタの可能性)。
+  - これは「呼出元 0 件」ではなく「静的に追える参照が 0 件」。確定扱いにしない。
+
+### 3.4 未了 (残件・起票先)
+
+| 未了 | 理由 | 次の確認 |
+|---|---|---|
+| `rbx` の動的型 (受入 2) | 呼出元 17 関数のオブジェクト型を追っていない | `0x17b460` を呼ぶ 17 関数それぞれの `this` の出所を解析 |
+| P1〜P6 の呼出元 (受入 1 の残り) | 静的参照 0 件 | 実行時の関数ポインタ登録の追跡 (動的解析 or 文字列/初期化の追跡) |
+| 線形判定の穴 | 分岐を跨ぐ xmm2 の書込みを落とす可能性 | CFG 上の合流を見る版 (`mx55_callers_fn.py` と同じ限界) |
+
+- 非 vectorcall の確定 (受入 1) は **未達**。上の表の 3 件が残る。
