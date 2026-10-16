@@ -1123,7 +1123,8 @@ def _f80b_to_image(ind, dst, src, p):
 
 def _f80b_from_image(ind, dst, src, p):
     """x87 80-bit 像 i80 src → double (dst)。 仮数 64 bit を 53 bit に最近接偶数丸め。
-    double の指数範囲外は inf / 0 に丸める (subnormal の結果は 0 に落とす: 精度の制限)。"""
+    subnormal の結果は 2^-1074 の格子に最近接偶数丸めする (丸め位置は carry 前の指数 E0 で決める)。
+    double の指数上限を超えるものは inf、下限を下回るものは 0 に丸める。"""
     L = []
 
     def o(name, rhs):
@@ -1153,12 +1154,12 @@ def _f80b_from_image(ind, dst, src, p):
     o(p + 'E0', 'sub i64 %sex, 15360' % p)
     o(p + 'E', 'add i64 %sE0, %scarz' % (p, p))
     o(p + 'inf', 'icmp sge i64 %sE, 2047' % p)
-    o(p + 'low', 'icmp sle i64 %sE, 0' % p)
+    o(p + 'low', 'icmp sle i64 %sE0, 0' % p)
     o(p + 'fb', 'shl i64 %sE, 52' % p)
     o(p + 'frac', 'and i64 %skeep3, 4503599627370495' % p)
     o(p + 'bn', 'or i64 %sfb, %sfrac' % (p, p))
     o(p + 'bi', 'select i1 %sinf, i64 9218868437227405312, i64 %sbn' % (p, p))
-    o(p + 'sn', 'sub i64 1, %sE' % p)
+    o(p + 'sn', 'sub i64 1, %sE0' % p)
     o(p + 'snok', 'icmp sle i64 %ssn, 52' % p)
     o(p + 'snc', 'select i1 %ssnok, i64 %ssn, i64 1' % (p, p))
     o(p + 'sh2', 'add i64 %ssnc, 11' % p)
