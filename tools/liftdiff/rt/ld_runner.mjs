@@ -44,7 +44,35 @@ function putStr(s, extra = []) {
 }
 const sp_get = mod._emscripten_stack_get_current;
 const sp_restore = mod.__emscripten_stack_restore || exp.emscripten_stack_restore || mod._emscripten_stack_restore;
-let spSnap = 0;   // LD-126: SNAPSHOT 時の SP (RESET で戻す)
+// LD-240 (#4801): 戻しは JS で行う。戻す区間の中に wasm 側の戻り処理のフレームが入ると、戻し中に値が壊れるため。
+// 区間表と SNAPSHOT 時の SP (spS) は、init 時に取った番地からメモリを直接読む。RESET の間は wasm の関数を呼ばない
+// (呼ぶと、そのフレームが SP より下の hi 区間 [spS, stack_base) を書き換える)。
+const infoAddr = mod._ld_w_info_addr();   // struct { int nrst; u32 spS; u32 base; u32 end; }
+const rstAddr = mod._ld_w_rst_addr();     // struct { int cat; u8* lo; u32 n; u8* pr; } x 32
+const rdU32 = (addr) => new DataView(mod.HEAPU8.buffer).getUint32(addr, true);
+// LD-126: SNAPSHOT が戻った後のトップレベル SP (RESET で戻す)。SNAPSHOT 内の spS とは別の点 (LD-240 #4801)
+let spSnap = 0;
+// SNAPSHOT 関数の内側で記録した SP (hi 区間の下端)。RESET の間に wasm 関数を呼ばずに読む
+const snapSp = () => rdU32(infoAddr + 4);
+// 戻し前に選んだ区間の現在値と複製の差 (byte 数) を数えて返す。
+function resetRegions(m) {
+  const H = mod.HEAPU8;
+  let diff = 0;
+  const n = rdU32(infoAddr);
+  const rs = [];
+  for (let i = 0; i < n; i++) {
+    const r = rstAddr + i * 16;
+    const cat = rdU32(r), lo = rdU32(r + 4), len = rdU32(r + 8), pr = rdU32(r + 12);
+    if (!(m & cat) || !len) continue;
+    rs.push([lo, pr, len]);
+  }
+  for (const [lo, pr, len] of rs) {
+    const a = H.subarray(lo, lo + len), b = H.subarray(pr, pr + len);
+    for (let k = 0; k < len; k++) if (a[k] !== b[k]) diff++;
+    a.set(b);
+  }
+  return diff;
+}
 
 const dv = new DataView(new ArrayBuffer(8));
 const toF64 = (b) => { dv.setBigUint64(0, BigInt.asUintN(64, b), true); return dv.getFloat64(0, true); };
@@ -138,7 +166,7 @@ for await (const l of rl) {
   } else if (l.startsWith('RESET ')) {
     const m = Number(l.slice(6));
     if (m & 9) sp_restore(spSnap);   // 1 (stk) と 8 (sp) のどちらでも SP を戻す
-    out(JSON.stringify({ reset: m, diff: mod._ld_w_reset(m) }));
+    out(JSON.stringify({ reset: m, diff: resetRegions(m) }));
   } else if (l.startsWith('BLOB ')) {
     const k = l.indexOf(' ', 5); putStr(l.slice(5, k), [l.slice(k + 1)]); mod._ld_w_blob();
   } else if (l.startsWith('FIX ')) {
@@ -158,5 +186,8 @@ for await (const l of rl) {
   } else if (/^(SIMG|SHEAP|SMODEL) /.test(l) || l === 'SSNAP') {
     const parts = l.split(' ');
     putStr(parts[0], [parts[1] || '', parts[2] || '']); mod._ld_w_state();
+  } else if (l === 'STK') {
+    // snap_sp: SNAPSHOT 関数内の spS (hi 区間の下端)。top: SNAPSHOT が戻った後の SP (RESET で戻す値)。base/end は stack 両端
+    out(JSON.stringify({ snap_sp: snapSp(), top: Number(spSnap), base: rdU32(infoAddr + 8), end: rdU32(infoAddr + 12) }));
   } else if (l === 'QUIT') break;
 }

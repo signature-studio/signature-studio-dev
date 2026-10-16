@@ -556,7 +556,7 @@ static void run_case(char* line) {
   fflush(stdout);
 }
 
-/* LD-209 (#4305): native 側の候補別 SNAPSHOT/RESET (ld_wasm.c の ld_w_snapshot/ld_w_reset と同じ mask: 1=stk・2=sta・4=img)。
+/* LD-209 (#4305): native 側の候補別 SNAPSHOT/RESET (ld_wasm.c の ld_w_snapshot と ld_runner.mjs の resetRegions と同じ mask: 1=stk・2=sta・4=img)。
  * stk: SNAPSHOT 時の sp より下 [sp-128K, sp-8K) (run_case の scrub 域。RESET の呼出し枠より下の 8K 帯は含めない)。
  * sta: 実行器の data/bss [__data_start, _end) から、ld_heap 管理変数・ld_blks・入力行 buffer・TRACESET・nrst 自身の管理表 (g_nrst/g_nnrst) の状態を除いた残り。
  * img: PE image [ld_img, ld_img+SizeOfImage)。 */
