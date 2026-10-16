@@ -112,29 +112,37 @@
 
 ## 5b. function_6905f0 → function_690580 の call site 突合 (#5587 / SHX-T50)
 
-- 親 #5576・測定 commit は本節を含む PR の直前の main (`ee40eb02f`)。IR は `tools/m11/work/` (非コミット) の `boot1.drc.ll`・`boot_final3.ll`。イメージは `m11_image.bin` (22,515,781 B・file = VA − 0x400000)。
-- 生 grep (`boot1.drc.ll`):
+- 対象: `function_6905f0` (0x6905f0〜0x690763) の中で `call function_690580` の site。
+  `function_690763` 所属の site (`0x690804`・`0x6908b3`・`0x6909d4`) は対象外で、子 SHX-T57 に移す。
+- 判定スクリプト: `tools/m11/frame_share/callsite_audit.py`。画像全体の `e8 rel32` を走査して callee を指す site を抽出し、所属関数を `objdump` で線形逆アセンブルする。site を含む基本ブロック B の入口は、(a) B の直前命令が `ret`・`jmp`・`ud2`・`hlt` でなければ fall-through で到達しうる、(b) B と site への直接分岐・絶対参照の件数、の 2 点で判定する。
+- 状態: **未確定**。前版の「入口なし → 機械語として到達しない」の結論は撤回する。根拠は直接分岐・絶対参照の 0 件だけで、直前命令が無条件転送かを確認していなかった (レビュー指摘 1)。前版の表の数値も `tools/m11/work/` の再実行で確かめていない (指摘 5)。
+- 本 run の素材: `work-m11` が `$ARTIFACTS_DIR` に無く、`tools/m11/work/m11_image.bin` で実行できなかった。実画像の表は次の run で得る (下記)。
+- IR 側: `boot1.drc.ll` の `@function_690580(` の call は 2 件 (`!14278` = `0x69073b`・`!14369` = `0x6909d4`)。`0x69073b` のみが `function_6905f0` 内。`boot_final3.ll` の 513910 行の call は trampoline wrapper (`@m11_tr_function_690580`) の中で、site ではない。
+
+### 再現 (次の run で `oc_artifacts: work-m11` を指定して実行)
 
 ```
-$ grep -n '@function_690580(' boot1.drc.ll
-48923:define i64 @function_690580(i64 %arg1, i32 %arg2) local_unnamed_addr {
-49064:  %31 = call i64 @function_690580(i64 %27, i32 %30), !insn.addr !14278
-49384:  %143 = call i64 @function_690580(i64 %3, i32 %142), !insn.addr !14369
-$ grep -E '^!(14278|14369) = ' boot1.drc.ll
-!14278 = !{i64 6883131}   -> 0x69073b
-!14369 = !{i64 6883796}   -> 0x6909d4
+python3 tools/m11/frame_share/callsite_audit.py tools/m11/work/m11_image.bin 0x690580 0x6905f0:0x690763
 ```
 
-- `boot_final3.ll` は 4 件。うち 244849・245171 行が上記 2 call の実体。513910 行は `@m11_tr_function_690580` (trampoline の wrapper) の中の call で、site ではない。
+出力の表 (site・所属関数・直前命令・直接参照/絶対参照・判定) をここに貼り、結論を確定する。
+`0x6906ec` の site が入口なしと判定された場合でも、直前ブロックの fall-through 元が switch テーブル経由である可能性は残る (SHX-T56)。
 
-| site | 所属関数 (DSM) | IR | 直前ブロック → 入口 (`callsite_audit.py`) |
-|---|---|---|---|
-| `0x6906ec` | function_6905f0 | 無し | `0x6906d7` → 直接分岐 0・絶対参照 0 (入口なし) |
-| `0x69073b` | function_6905f0 | `%31` | IR に残る (判定対象外) |
-| `0x690804` | function_690763 | 無し | `0x6907f7` → 0・0 (入口なし) |
-| `0x6908b3` | function_690763 | 無し | `0x6908a4` → 0・0 (入口なし) |
-| `0x6909d4` | function_690763 | `%143` | IR に残る (判定対象外) |
+### 検証 (本 run・合成バイナリ)
 
-- 結論: 欠落の疑いのある 3 site は、直接分岐・絶対参照の範囲では入口を持たない (機械語として到達しない)。lift 段の欠落ではないと判断し、修復は行わない。
-- 限界: switch テーブル (相対オフセット方式) による飛び先は走査していない。「到達しない」は直接分岐・絶対参照の範囲での結論。
-- 再現: `python3 tools/m11/frame_share/callsite_audit.py <m11_image.bin>`。
+- 入力: `as` / `ld` で作った 0x400000 配置の小さな ELF (call 4 件、直前が `jmp`・`ret` の入口なしケースと、直接 `jmp` で入る入口ありケースを含む)。
+- 出力: 4 site のうち `0x400009` (直前 `jmp`・参照 0) と `0x40001a` (直前 `ret`・参照 0) は「入口なし」、`0x400014` (直接分岐 1 件) は「到達しうる」と判定。`0x400000` は関数先頭で「到達しうる」。
+- 本 run で直したもの: `objdump` の分岐先が `0x` 接頭辞の形で、call の確認が常に失敗していた。
+
+### 限界
+
+- switch テーブル (相対オフセット方式) による飛び先は走査していない (SHX-T56)。「到達しない」は直接分岐・絶対参照・無条件転送の範囲での結論に過ぎず、結論は「未確定」のまま。
+- 線形逆アセンブルはデータ混在で同期がずれうる。ずれの有無は実画像の出力で確認する。
+
+未解決 (起票先):
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `0x6906ec` の switch テーブル経由の到達性 | 「入口なし」の結論の根拠 (実画像の表の判定を含む) | #5640 (SHX-T56) |
+| `function_690763` 所属の 3 site (`0x690804`・`0x6908b3`・`0x6909d4`) の判定 | 欠落の有無 (本 PR の対象外) | #5641 (SHX-T57) |
+| 実画像 `m11_image.bin` での表の実測 (素材 `work-m11`) | 結論を未確定から確定へ上げるための生出力 | #5587 (本 PR の再実行で貼る) |
