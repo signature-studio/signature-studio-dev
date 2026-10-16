@@ -108,3 +108,35 @@ python3 trap_triage/judge_ctx.py work/boot_final.ll work/strict_evidence_5661.ts
 
 - 本付録の変更は `REPORT_APPENDIX_5661.md` の §1・§4・§6 の文言と件数の修正だけ (#5685)。`tools/m11/guard699/`・`tools/m11/ldfix/ldmach.py`・`tools/m11/trap_triage/` のコードは変更していない。
 - 20 MiB 超の blob: 追加なし。
+
+## 8. #5687: 保留 12 件 (行 179〜187・191〜193) の件ごとの判定
+
+- 母数 12 件。真陽性 (構造) 5・偽陽性 0・保留 7。判定件数は 5 + 0 = 5 / 12 (確定)。
+- 行 188〜190 は §3 で確定済みのため対象外。
+- 測定 commit: `739b46e2d` (origin/main)。コードは変えていない。`git diff 739b46e2d HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行 (本 PR は付録のみ)。
+- 入力: `work-m11` の `boot_final.ll` (sha256 `69c774de…`、記録と一致)・`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
+- 実行 (foreground・各 1 回): `scan_guard.py` 4.8 s (strict 288)、`strict_evidence.py` 15.2 s (TSV 288 行)、`judge_ctx.py <IR> <TSV> <PE> 179 193` (rc 0・1,034 行の文脈ダンプ)。
+- 件数の数え直し (`ir_loop_head_icmp` 列・行 179〜193 の 15 行): 0 件 1 (行 185) / 1 件 3 (181・188・193) / 2 件 10 (180・182〜184・186・187・189〜192) / 3 件 1 (179)。
+- 判定方法: 機械語の jcc 直前の cmp 被演算子の count 源を、IR の同じ load 連鎖 (ベース・段数・オフセット・幅) と突合する。ベースは関数先頭の命令 (`mov [rbp+x], rcx` 等) で引数 (`arg1`=rcx 等) と対応づけた。`rip` 先は PE の VA と IR のアドレスの差 (イメージ基底 `0x400000`) で換算した。入口判定の有無と脱出先の一致を見る。判定は手で行い、スクリプトでは判定しない。
+- 真陽性 (構造) の基準は §4k と同じ: count 源が同一で、IR に count の入口判定が無く、末尾が後判定 (do-while) なら、count = 0 で IR は本体を 1 回回るが機械語は脱出先へ直行する。count = 0 の到達性は未測定。
+
+| 行 | 関数 | jcc → 脱出先 / L | 判定 | 理由 |
+|---|---|---|---|---|
+| 179 | function_8d0580 | 8d05ec → 8d066a / 8d05f5 | 保留 | count は `call 8cfb90` の戻り値 −1 (`mov r8d,eax; sub r8d,1`)。IR の B に同じ call (`%7`) があるが、`%8 = %7 + 2^32` で、機械語の −1 に当たる項が無い。L の count 利用箇所を追えていない |
+| 180 | function_8e6150 | 8e6237 → 8e63b6 / 8e6248 | 保留 | count は間接呼び出し `call [rax+0x28]` の戻り値 −1 (`[rbp+0x24]`)。IR 側で `[rbp+0x24]` 相当の値 (`%stack_var_-132`) の store 元と、機械語の間接呼び出しの戻り値との対応を確認できていない |
+| 181 | function_92d9d0 | 92da0e → 92da78 / 92da17 | 真陽性 (構造) | count = `[[[arg1+0x78]*8+arg1+0x3c]+0x10]` の i32 (`rdx`=`arg1` は先頭の `mov [rsp+0x28],rcx`)。IR の B `%5`〜`%16` (+120・×8・+60・+16、i32) と段数・幅・オフセットが一致。L の `icmp ult %23,%26` は index と qword の境界判定で count 判定ではない。L から T への直接の脱出は無く、T (92da78) の preds は `92da4d` (内側) と末尾 `92da6c` の 2 件。入口判定は無い |
+| 182 | function_9cef00 | 9cef21 → 9cef57 / 9cef2a | 真陽性 (構造) | count = `[[rip+0xc8a954]+0x10]` の i32。`rip` 先 VA `0x1659868` は IR のアドレス `19241064` (`0x1259868`) に当たる (基底差 `0x400000`)。IR の `%0 = load [19241064]`、`%3 = load i32 [%0+16]` と一致。L に入口判定無し、末尾 `%22` が後判定 |
+| 183 | function_a96620 | a9672f → a96899 / a9673a | 保留 | count は `[[rbp+0x38]+0x18]` (2 段)。IR の L は入口で `rbx > stack_var_-1356 ∨ (関数戻り値 %54 == 0)` の分岐 (`or.cond`) を持ち、count 源 (`%48`) との同一性を確認できていない |
+| 184 | function_a968f0 | a96988 → a96a4c / a96995 | 真陽性 (構造) | count = `[[arg1+0xb0]+0x18]` の i32 (`[rbp+0x20]`=`arg1` は `mov [rbp+0x20],rcx`)。IR の B `%11`〜`%28` (+176・+24、i32) と一致。L に入口判定無し、末尾 `%77` が後判定。T=`a96a4c` の preds は末尾 `a96a37` のみ |
+| 185 | function_a968f0 | a96a7e → a96adf / a96a85 | 保留 | count の chain は 184 と同じ (B `%92`〜`%94` で一致)。ただし IR の L に count==0 の入口分岐 `br %cf.1 → a96abf` (`cf.1 = icmp eq %94,0`) があり、真陽性の基準「入口判定無し」を満たさない。`a96abf` は `rdi−1` を経由して `a96a85` へ戻る経路を持つ。count = 0 の挙動は未追跡。到達性未測定 |
+| 186 | function_a96b10 | a96cc0 → a96d07 / a96cc9 | 真陽性 (構造) | count = `[arg1+0x18]` の i32 (`[rbp+0xb0]`=`arg1` は `mov [rbp+0xb0],rcx`、`mov rcx,[rbp+0xb0]; mov r13d,[rcx+0x18]`)。IR の `%16`〜`%99` (arg1+24、i32) と一致。機械語・IR とも `call a968f0` の後で読む。L に入口判定無し、末尾 `%121` が後判定 |
+| 187 | function_a96d40 | a96d80 → a96db6 / a96d89 | 真陽性 (構造) | count = `byte [[[arg1+0x50]+0x90]+0x1c]+0x74]` (`rbx`=`rcx`=`arg1`)。IR の B `%7`〜`%18` (+80・+144・+28・+116、i8) と一致。L に入口判定無し、末尾 `%29` が後判定。T の preds は `a96d89` のみ |
+| 191 | function_c3c830 | c3c8c8 → c3c907 / c3c8da | 保留 | count = `[rbp+0xa8]` = エントリの `r9` (`arg4`)。機械語は count<0 で c3c907 (post-loop の `call 50a830`) へ抜ける。IR の P `%7 = icmp slt (arg4+1) 1` は同じ条件で `c3c923` へ直接抜け、`call 50a830` を飛ばす。脱出先が一致しない。到達性は未確認 |
+| 192 | function_c3c830 | c3c94a → c3c972 / c3c951 | 保留 | count = `[[rbp+0x68]+0x10]`−1。`[rbp+0x68]` は `call 40f9e0` の戻り値。機械語は第 1 引数に `[rip+…]` の値 (load) を渡すが、IR の `%4 = call 40f9e0(ptrtoint 826304, …)` は定数アドレスを渡す。引数の形が一致せず、戻り値の同一性を確認できていない |
+| 193 | function_c3efe0 | c3f020 → c3f04f / c3f027 | 保留 | count = `[[rbx+0x10]+0x10]` (`rbx`=`arg1`)。IR の B `%11`〜`%15` と一致する。ただし機械語は非 null 経路で `call [rsi+0x10]` (c3f00d) を経てから count を読むのに対し、IR の P→B (c3f010) にはこの呼び出しが無い。呼び出しが count 源を書き換えないことを確認できていない |
+
+- 保留 7 件 (179・180・183・185・191・192・193) の型: (i) count 源が間接呼び出し・関数戻り値で、IR の同じ callee・引数の一致が未確認 (179・180・192)。(ii) IR に入口判定があり、真陽性の基準を満たさない (183・185・191)。(iii) IR が機械語の呼び出しを 1 つ欠く経路がある (193)。
+- 注: 185 の `a96abf` 経路 (count = 0) は IR 上 `rdi−1` の wrap を経由する。これが実際に count = 0 で走るかは未測定。
+- 偽陽性率は母数 288 の判定が終わるまで書かない。
+- 未解決 (保留 7 件): 起票先は #5687 (本 issue・Refs。判定だけの残作業のため子 issue は新規に起票しない)。
+- 再現: 本節の §5 と同じ手順。`disasm_fn.py` の既定 PE パスは環境に合わせて `LD_M11_PE=<block00031_PE.bin>` で指定する。
