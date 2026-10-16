@@ -15,7 +15,7 @@
 |---|---|
 | 測定 commit | `e18d02f22` (`tools/python/wine_fl_probe.sh` のコード変更を含む最後の commit) |
 | wine | `wine-9.0 (Ubuntu 9.0~repack-4build3)` (`/usr/lib/wine/wine64`) |
-| 素材 | `fl-win64` (`$HOME/artifacts/fl-win64.tar.zst`、展開 9 秒) |
+| 素材 | `fl-win64` (`oc_artifacts: fl-win64` の `.tar.zst`、展開 9 秒) |
 | インストーラ | `wineboot --init` 12.7 秒 (rc 0)。`flstudio_win64_26.1.7.5653.exe /S` 272 秒 (rc 199。DLL は展開済み) |
 | DLL 同一性 | `flengine_sha256_16 installed=b2c64da40921cf26 block00031=b2c64da40921cf26` (一致) |
 | probe 所要 | 1 分 30 秒 (`FL_SECS=90`) |
