@@ -15,7 +15,7 @@ BEGIN {
 {
   if (rem > 0) { print "    " $0; rem-- }
   key = $1; sub(/:$/, "", key)
-  if ((key in want) && index($0, "call   " want[key] " ") > 0) {
+  if ((key in want) && $2 == "call" && ($3 == "0x" want[key] || $3 == want[key])) {
     print "== " key " call " want[key]; print "    " $0; rem = 6
   }
 }'
