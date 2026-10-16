@@ -34,3 +34,28 @@
 ## 製品 KPI
 
 動かしていない: FLEngine の起動 (dispatch 数・通過 unit 数) は未測定。`tools/flelift/boot/REPORT.md` の値は変えていない。
+
+## 2回目 (受入 2 の切り分け): LoadLibrary 完了の前に止まる
+
+前回の「LoadLibrary 完了が未観測」を、relay ログ (457,847 行) で切り分けた。
+
+| 順 | 事象 (relay ログ行) | 結果 |
+|---|---|---|
+| 1 | `CreateFileW(FLEngine_x64.dll)` (6143) | 成功 |
+| 2 | `CryptSIPRetrieveSubjectGuid` (6159)・`CryptSIPGetSignedDataMsg` 2 回 | 成功 |
+| 3 | `WinVerifyTrust` の呼出し 1 (5645 で開始、戻り 23042) | 戻り値 `0x80096004` |
+| 4 | `WinVerifyTrust` の呼出し 2 (23043 で開始、戻り 23264) | 戻り値 `0` |
+| 5 | `MessageBoxA("The validity of the program could not be verified...")` (23271) | modal。以降ログは戻らず停止 |
+
+- probe の集計: `winverifytrust_ret=80096004 00000000`・`msgbox_unverified=1`・`loadlibrary_flengine=0`。
+- 事実: FLEngine の `LoadLibrary` 完了 (DllMain) はログに出ず、RVA `0x15e4280` の watch を張る前提は成立しない。停止は MessageBox の modal で起きる。
+- 未確定: どの `WinVerifyTrust` 呼出しが MessageBox を出したか (呼出し元が別のため、5 の順序だけでは因果を言えない)。
+- `WINEDEBUG=+crypt,+wintrust,+err` (90 秒・383 行): `fixme:cryptasn:CryptDecodeObjectEx Unsupported decoder for lpszStructType 1.3.6.1.4.1.311.2.1.4` が 2 件。SPC インダイレクトデータの decode 未対応で、検証結果との因果は未確認。
+- 署名検証の結果を書き換えて読み込ませる迂回は、製品の署名確認を外す操作のため本 issue では行わない。
+
+### 次の run への引継ぎ
+- 候補 1: `CryptDecodeObjectEx` の `1.3.6.1.4.1.311.2.1.4` デコード未対応が署名検証失敗の原因かを、wine 側の decoder の有無で確定する (wine 9.0 の対象外か、別版で通るかの比較)。
+- 候補 2: 署名検証を通す経路の要否を PM が判断する (迂回は本 issue では行わない)。判断が出るまで受入 2 は未達。
+
+### 製品 KPI (2回目)
+動かしていない: FLEngine は署名検証で棄却され、起動 (dispatch 数・通過 unit 数) は 0 のまま。
