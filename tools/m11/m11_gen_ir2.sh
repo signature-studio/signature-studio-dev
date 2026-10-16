@@ -93,6 +93,9 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
   # #3296: function_412770 の rep movsq 源 (機械語 mov rsi,[rax] の load が lift で脱落し ptr null)。想定外の入力は assert で止まる (fail-closed)。
   python3 ldfix/fix_src412770.py work/boot_final.ll work/boot_final.src412770.ll
   mv work/boot_final.src412770.ll work/boot_final.ll
+  # #5358 (FLE-44): function_409c80 の 0x409d2d `jae 0x409c40` は tail jump。lift の call+fall-through を tail call に直す (想定外の入力は assert で止まる)。
+  python3 ldfix/fix_tail409c80.py work/boot_final.ll work/boot_final.tail409c80.ll
+  mv work/boot_final.tail409c80.ll work/boot_final.ll
   # #1448 (#683 §8.1): function_815050 の 6cefb0 第 3 引数は機械語 `mov r8b,1` の即値 1 (RetDec 段で alloca アドレスになる)。
   #   M11_FIX_R8B=0 は適用前の IR を明示的に取る A/B 検証用 (ir_conditions.json r8b=disabled。build は M11_ALLOW_R8B_DISABLED=1 でしか通さない)。
   if [ "${M11_FIX_R8B:-1}" = 0 ]; then
