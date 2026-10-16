@@ -165,7 +165,7 @@
 - `0x86a470` は `rax = obj; call [rax-0x30]` (`rcx = obj`) の戻り値を `*(&0x16b6d80)` に書く (`0x86a4cf`〜`0x86a4e1`)。よって global の値 = **G1 の値 (obj) の動的型の VMT スロット `-0x30` の戻り値**。
 - G1 `0xbd0ba0`: RIP 相対の参照は `.text` 全域で 1 件 (`0x11be436`・読出しのみ)。`.data` に VA `0xbd0ba0` を値として持つ箇所は 0 件。書込みは RIP 相対では見つからない (間接書込みの可能性)。
 - 結論: 型は**引き続き未確定**。G1 (`0xbd0ba0`) に入る object の生成元が次の未確定点。
-- 測定: `analysis/py5493_rcx.py <PE.bin>` (新規・real 1 分 19 秒・n=1・load 1.11 / 0.92 / 0.51)。素材 `block00031_PE.bin` (`fl-win64`)。`py5493_writer.py --dis 86a470`・`--dis 11c8950` (`--nins 60/45`) の逆アセンブルも併せて確認。
+- 測定: `analysis/py5493_rcx.py <PE.bin>` (新規・測定 commit `2b293f938`・real 1 分 20.4 秒・exit 0・n=1・load 0.68 → 0.92 (測定前後の `/proc/loadavg`)。出力: G1 `0xbd0ba0` の参照 1 件)。素材 `block00031_PE.bin` (`fl-win64`)。前回測定 (commit `5593cbad3`・real 1 分 19 秒) は docstring の手順 3 を削る前のもの。`py5493_writer.py --dis 86a470`・`--dis 11c8950` (`--nins 60/45`) の逆アセンブルも併せて確認。
 
 ## 6. 群 C の受け手 (#5144) — 未達
 
