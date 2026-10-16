@@ -438,6 +438,32 @@ struct HostMsg : public IMessage {
 };
 
 // --- HostApplication (IHostApplication) -------------------------------------
+// S2HOST_FRAME=1 (SR-99 #5958): editor に IPlugFrame を渡す。resizeView で親 HWND を実寸にし、onSize を返す
+struct PlugFrame : public IPlugFrame {
+  uint32_t refc = 1;
+  HWND parent = nullptr;
+  IPlugView* lastView = nullptr;
+  tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
+    if (memcmp(_iid, IPlugFrame_iid, sizeof(TUID)) == 0 || memcmp(_iid, FUnknown_iid, sizeof(TUID)) == 0) {
+      *obj = (IPlugFrame*)this;
+      addRef();
+      return kResultOk;
+    }
+    *obj = nullptr;
+    return kNoInterface;
+  }
+  uint32_t PLUGIN_API addRef() override { return ++refc; }
+  uint32_t PLUGIN_API release() override { return --refc; }
+  tresult PLUGIN_API resizeView(IPlugView* view, ViewRect* newSize) override {
+    if (!newSize) return kInvalidArgument;
+    L("[frame] resizeView (%d,%d)-(%d,%d)", newSize->left, newSize->top, newSize->right, newSize->bottom);
+    if (parent) SetWindowPos(parent, nullptr, 0, 0, newSize->right - newSize->left, newSize->bottom - newSize->top, SWP_NOMOVE | SWP_NOZORDER);
+    tresult r = view ? view->onSize(newSize) : kInvalidArgument;
+    L("[frame] onSize = %s", tresName(r));
+    return kResultOk;
+  }
+};
+
 struct HostApp : public IHostApplication {
   uint32_t refc = 1;
   tresult PLUGIN_API queryInterface(const TUID _iid, void** obj) override {
@@ -919,6 +945,13 @@ int main(int argc, char** argv) {
         L("[attach] getSize=%s rect=(%d,%d)-(%d,%d)", tresName(rg), vr.left, vr.top, vr.right, vr.bottom);
         if (rg == kResultTrue && vr.right > vr.left && vr.bottom > vr.top)
           SetWindowPos(parent, nullptr, 0, 0, vr.right - vr.left, vr.bottom - vr.top, SWP_NOMOVE | SWP_NOZORDER);
+        PlugFrame* pf = nullptr;
+        if (getenv("S2HOST_FRAME")) {
+          pf = new PlugFrame();
+          pf->parent = parent;
+          tresult rf = view->setFrame(pf);
+          L("[frame] setFrame(PlugFrame) = %s", tresName(rf));
+        }
         tresult ra = view->attached((void*)parent, kPlatformTypeHWND);
         L("[attach] parent=%p isPlatformTypeSupported=%s attached=%s", parent, tresName(rs), tresName(ra));
         {
