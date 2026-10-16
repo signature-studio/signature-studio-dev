@@ -39,6 +39,7 @@ export class PmDO {
       now: () => Date.now(),
       fetch: (i, init) => fetch(i, init),
       scheduleSoon: () => this.schedule(2000),
+      ae: env.AE_METRICS,
     });
   }
 

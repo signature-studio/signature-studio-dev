@@ -4,6 +4,7 @@ import { bearerToken, canPushRepo } from "./admin.ts";
 import type { Config } from "./config.ts";
 import { openText, randomToken, safeEqual, sealText } from "./crypto.ts";
 import { Engine } from "./engine.ts";
+import type { AeSink } from "./metrics.ts";
 import { appJwt, Gh, InstallationAuth, type FetchFn } from "./github.ts";
 import type { Store } from "./kvstore.ts";
 import { MAX_IMPORT_BYTES, parseVmState } from "./vmstate.ts";
@@ -28,6 +29,8 @@ export interface AppDeps {
   fetch: FetchFn;
   // webhook 後に Engine.tick を早める (DO の alarm)。
   scheduleSoon: () => Promise<void>;
+  // Workers Analytics Engine の書き込み口 (CI-230)。未設定なら書かない。
+  ae?: AeSink;
 }
 
 const html = (body: string, status = 200): Response =>
@@ -81,6 +84,7 @@ export class PmApp {
         const pemLines = pem.split("\n").filter((l) => l.length >= 20 && !l.startsWith("-----"));
         return [this.wh, pem, ...pemLines, d.storeKey, this.auth?.current()].filter((x): x is string => !!x);
       },
+      ae: d.ae,
     });
   }
 

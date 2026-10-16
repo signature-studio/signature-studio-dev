@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { configuredApp, markFresh, T0 } from "./helpers.ts";
-import { METRICS_KEYS, metricsRow, missingMetricsKeys } from "../src/metrics.ts";
+import { AE_BLOBS, AE_DOUBLES, AE_INDEXES, METRICS_KEYS, aePoint, metricsRow, missingMetricsKeys, type AeDataPoint } from "../src/metrics.ts";
 
 const status = {
   fresh: true,
@@ -70,6 +70,69 @@ test("tick: 1 tick につき metrics 行が 1 行出て、必須キーが揃う"
     assert.deepEqual(missingMetricsKeys(row), []);
     assert.equal(row.ts, new Date(T0).toISOString());
     assert.equal(row.mode, "dry-run");
+  } finally {
+    console.log = orig;
+  }
+});
+
+test("AE: 1 tick につき 1 データポイントが書かれ、doubles は仕様の順序どおり (順序を変えると落ちる = ネガコン)", async () => {
+  const points: AeDataPoint[] = [];
+  const ctx = await configuredApp({ ae: { writeDataPoint: (p) => void points.push(p) } });
+  await markFresh(ctx);
+  await ctx.app.engine.tick();
+  assert.equal(points.length, 1);
+  const p = points[0];
+  assert.deepEqual(p.indexes, ["pm"]);
+  assert.deepEqual(p.blobs, ["dry-run", "launch"]);
+  assert.equal(p.doubles.length, AE_DOUBLES.length);
+  assert.deepEqual(AE_DOUBLES, [
+    "active", "active_impl", "active_other", "active_critical", "active_normal", "active_low",
+    "target", "target_eff", "room", "ready", "would_launch_now", "holds", "runs_running", "runs_queued",
+  ]);
+  assert.ok(p.doubles.every((v) => Number.isFinite(v)));
+  assert.ok(AE_DOUBLES.length <= 20);
+});
+
+test("AE: aePoint は行の値を固定順序の doubles に写し、欠けた値は 0 にする", () => {
+  const row: Record<string, unknown> = { mode: "live", phase: "launch", active: 5, target: 58, room: null, holds: 2 };
+  const p = aePoint(row);
+  assert.deepEqual(p.blobs, ["live", "launch"]);
+  assert.equal(p.doubles[AE_DOUBLES.indexOf("active")], 5);
+  assert.equal(p.doubles[AE_DOUBLES.indexOf("target")], 58);
+  assert.equal(p.doubles[AE_DOUBLES.indexOf("room")], 0);
+  assert.equal(p.doubles[AE_DOUBLES.indexOf("holds")], 2);
+});
+
+test("AE: バインディング無しでも tick は落ちず、metrics 行は従来どおり 1 行出る", async () => {
+  const logs: string[] = [];
+  const orig = console.log;
+  console.log = (...a: unknown[]) => void logs.push(a.map(String).join(" "));
+  try {
+    const ctx = await configuredApp();
+    await markFresh(ctx);
+    await ctx.app.engine.tick();
+    assert.equal(logs.filter((l) => l.includes('"m":"metrics"')).length, 1);
+  } finally {
+    console.log = orig;
+  }
+});
+
+test("AE: 書き込みが例外を投げても tick は完了し、metrics 行は出る", async () => {
+  const logs: string[] = [];
+  const orig = console.log;
+  console.log = (...a: unknown[]) => void logs.push(a.map(String).join(" "));
+  try {
+    const ctx = await configuredApp({
+      ae: {
+        writeDataPoint: () => {
+          throw new Error("ae down");
+        },
+      },
+    });
+    await markFresh(ctx);
+    await ctx.app.engine.tick();
+    assert.equal(logs.filter((l) => l.includes('"m":"metrics"')).length, 1);
+    assert.equal(ctx.app.engine.meta.lastError, undefined);
   } finally {
     console.log = orig;
   }

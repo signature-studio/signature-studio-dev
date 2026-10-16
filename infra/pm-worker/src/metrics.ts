@@ -54,3 +54,34 @@ export function metricsRow(s: Record<string, any>, ts: string, demoted: boolean,
 export function missingMetricsKeys(row: Record<string, unknown>): string[] {
   return METRICS_KEYS.filter((k) => !(k in row));
 }
+
+// Workers Analytics Engine (AE) へ書く 1 データポイントの写像 (CI-230)。AE の上限は indexes 1 / blobs 20 / doubles 20。
+// 順序は README の『Analytics Engine』表と一致させる (test/metrics.test.ts が順序を固定する)。
+export const AE_INDEXES = ["pm"] as const;
+export const AE_BLOBS = ["mode", "phase"] as const;
+export const AE_DOUBLES = [
+  "active", "active_impl", "active_other", "active_critical", "active_normal", "active_low",
+  "target", "target_eff", "room", "ready", "would_launch_now", "holds", "runs_running", "runs_queued",
+] as const;
+
+export interface AeDataPoint {
+  indexes: string[];
+  blobs: string[];
+  doubles: number[];
+}
+
+export interface AeSink {
+  writeDataPoint(p: AeDataPoint): void;
+}
+
+// 行を AE の 1 データポイントにする。null や欠けた数値は 0 (AE は数値のみ受けるため)。
+export function aePoint(row: Record<string, unknown>): AeDataPoint {
+  return {
+    indexes: [...AE_INDEXES],
+    blobs: AE_BLOBS.map((k) => String(row[k] ?? "")),
+    doubles: AE_DOUBLES.map((k) => {
+      const v = row[k];
+      return typeof v === "number" && Number.isFinite(v) ? v : 0;
+    }),
+  };
+}
