@@ -5,11 +5,20 @@
 #### 10-7aa. #5385 (KH-159): `FUN_180fdc700`・`FUN_180fdc6d8` の呼出し 4 件を規則化 (`FUN_180fcd400` の 2 件は未確定)
 
 - **結論**: 呼出し 6 件のうち **4 件を規則化** (`FUN_180fdc700` 2 件・`FUN_180fdc6d8` 2 件)。残り 2 件 (`FUN_180fcd400` ← `FUN_180fcce40`) は機械語の源が未確定のため規則にしない。受入 1 (6 件の源の確定) と受入 2 (規則 1 件 = 呼出し 1 件) は **部分達成**。
-- **測定の状態 (再測定は未実施)**: 規則追加後の値 (error 339・引数数不一致 65) は実装 run の記録 (測定 commit `e0aff674f`・素材 `plugins-kilohearts` の `HeartCore.core_64` sha256 先頭 `d55ce8b4`・Ghidra 12.1.4・JDK 21・emcc 6.0.12・n=1)。レビュー fix run では `plugins-kilohearts` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、`HeartCore.core_64` を再取得できなかったため、規則の regex 一致・emcc 件数・`ABI rule hit 1` の assert は再実行していない。PR 本文に `oc_artifacts: plugins-kilohearts` を追加し、次の review run で同条件の再測定を行う。
-  - **規則追加前の値 (error 343・引数数不一致 69) は採用しない**。この値に対応する測定 commit が記録されておらず、`REPORT_APPENDIX_5384.md` §10-7z の同じ系列 (`5f52f1368` 時点の 401・71) とも整合しない。`git diff 5f52f1368 006ba2cc7 -- tools/targets/kilohearts/ghidra_route` は #5401 の規則 2 件 (8 行・delay の call 2 箇所) だけで、58 件の差は説明できない。このため「−4 = 本 PR の規則 4 件」という差分の主張は未確認である。
-  - 再測定の条件 (次 run で行うこと): 測定 commit を `origin/main` (`a0b804faf`) と追加後 (head) の 2 つに固定し、同じ FX `bitcast,intload,stackpair,assoc,concat`・同じ閉包で `emcc -c -ferror-limit=0` の error と引数数不一致を両方取る。その差と、`git diff <main の commit> <head> -- tools/targets/kilohearts/ghidra_route` の出力を本付録に書く。
-  - 生成 C の差分は 4 行のみ (4232・4295・4512・4545 の呼出しの引数追加)。前 run の `diff` 記録による (未再確認)。
-  - 件数 assert: 4 規則とも件数 1 で通過 (`ABI rule hit 1`) という前 run の記録。再実行の出力は未取得。
+- **再測定 (本 fix run・同一条件・n=1)**: 測定 commit は 2 点。`origin/main` `a0b804faf` (規則なし) と head (`ghidra_route` は `e0aff674f` と同一・`git diff e0aff674f HEAD -- tools/targets/kilohearts/ghidra_route` は 0 行)。両方とも素材 `plugins-kilohearts` の `HeartCore.core_64` (sha256 先頭 `d55ce8b4`)・Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致)・emcc 6.0.12 (emsdk 上流 `6.0.12`)・FX `bitcast,intload,stackpair,assoc,concat`・閉包 `closure.py delay` (139 関数・反復 1・FAIL 0 を両方で確認)。
+  - 判定: `ghidra_to_c.py delay --fix bitcast,intload,stackpair,assoc,concat` は両方とも rc 0 で通過 (head で `ABI rule hit 1` の 4 規則の assert が通ったことを示す)。
+
+| 測定 commit | emcc `-c -ferror-limit=0` error 総数 | 引数数不一致 | 128bit レーン型 | 演算・代入・ポインタ型不一致 |
+|---|---|---|---|---|
+| `origin/main` `a0b804faf` (規則なし) | 399 | 69 | 166 | 164 |
+| head (`e0aff674f` と同一の `ghidra_route`) | 395 | 65 | 166 | 164 |
+| 差 (head − main) | **−4** | **−4** | 0 | 0 |
+
+  - 差は引数数不一致の −4 のみ。生成 C の差分は 4 行 (4232・4295・4512・4545 の `FUN_180fdc700()`・`FUN_180fdc6d8()` に `d2u(param_1)` を追加)。`diff` で確認した。
+  - `git diff a0b804faf HEAD -- tools/targets/kilohearts/ghidra_route` は `patches.py` の 9 行追加 (規則 4 件と、そのコメント)。
+  - 件数 assert: 規則 4 件はいずれも `ABI rule hit 1` を満たした (head の `ghidra_to_c.py` が rc 0)。
+  - 前 run の 343 / 69 (採用しない値) は今回の測定対象外で、撤回のまま。
+  - 素材の注記: 本 fix run では `$ARTIFACTS_DIR` に `plugins-kilohearts.tar.zst` が存在した (前の fix run では無かった)。`toolchain-emsdk` は `$HOME/artifacts` に無かったため、上流 emsdk から `6.0.12` を取得した (`emsdk install 6.0.12`)。Ghidra 12.1.4 は公式 zip を取得し sha256 を検査して `GHIDRA_HOME` で指定した。
 - **機械語の源 (capstone 逆アセンブル)**:
 
 | 呼出元 (C 行 → 機械語の call) | 呼出先 | 引数の源 (呼出し直前の xmm0) | 根拠 |
@@ -25,7 +34,7 @@
 - **規則の正規表現**: 生成 C は `func_0x000180fdc700()` の形と `FUN_180fdc700()` の形の両方を出すため、既存規則と同じく `(?:func_0x000|FUN_)` で受けた。
 - **数値の扱い**: emcc 通過は値の正しさを示さない。delay の wasm は全体で未成立 (引数数不一致 65・型不一致 115 が残る) のため、1000 trial 突合は未実施 (#3073 [KH-41] が担当)。
 
-**測定 commit** (コードを変えた最後の commit): 規則追加後の値は `e0aff674f` (本 PR の規則 4 件を入れた commit)。規則追加前の測定 commit は未記録 (上の「測定の状態」参照)。`git diff e0aff674f HEAD -- tools/targets/kilohearts/ghidra_route` は 0 行 (fix run の変更は本付録と PR 本文のみ)。
+**測定 commit** (コードを変えた最後の commit): 規則追加の commit は `e0aff674f`。再測定の 2 点は `origin/main` `a0b804faf` (規則なし) と head (`ghidra_route` は `e0aff674f` と同一)。`git diff a0b804faf HEAD -- tools/targets/kilohearts/ghidra_route` は `patches.py` の 9 行追加 (上の表の差の由来)。
 
 **残件の起票先** (本 issue の受入 1・2 の残り):
 
