@@ -21,6 +21,7 @@
 | licensed | authstub | `cases/licensed` | createView のみ・64 block | 0 / 0 / 0 | 0 件 |
 | demo | authstub | `cases/demo` | createView のみ・64 block | 0 / 0 / 0 | 0 件 |
 
+- seed 行の実測 (`S2HOST_SLOT=1` 付き・無改変 DLL・state なし・4 block。測定 commit `b32db38c6`、測定時の HEAD `4554feee6` は host コード差分 0): `[slot] 0x1817bf760 before createView = 0` / `after createView = 0` / `before process = 0`、`[watch] hit` 0 件、`[audio] blocks=4 frames=512 nonzero_cells=1020/1024 peak=0.548306`。コマンド: `S2HOST_SLOT=1 wine64 work/build/vst3host.exe 'Z:…\work\Serum2_win64.vst3' - 'Z:…\host\work\out_seed_slot' 4 'Z:…\work\content_full'` (`Z:…` はリポジトリ絶対パス。`WINEPREFIX=work/wineprefix WINEDEBUG=-all`)。
 - 書込 watch は 8 byte 幅 (`0x17bf760`〜`+7`、DR7 LEN=10b) の結果。
 - 再実行の手順: `ref_content.sh` (素材 `plugins-serum2`) → `build.sh` → `mpatch.py` (authstub、原 bytes 6/6 OK) → `synth_state.py` → seed run (`S2HOST_SLOT=1`・`-`・4 block) → `make_cases.py work/state work/out_seed work/cases` → licensed・demo (`S2HOST_SLOT=1`・64 block)。
 - 3 条件とも process は完走 (licensed: `blocks=64 frames=8192 nonzero_cells=16380/16384 peak=0.691102`、demo: 同値)。
