@@ -682,7 +682,7 @@
 | `tools/python/REPORT_PY99_APPENDIX.md` | ~127 | PY-99 (#2874) 付録: `call 0x10469f0` の本体式 `edx + rint(2^-30·ecx·(r8d−edx))` と、その 7 件の戻り値式 (ecx は入口 edx)。後ろ向き CFG 経路列挙の節 (`[rbp+X]` 読み 171 件の到達 store)。`REPORT_PY41_APPENDIX.md` の 250 行上限のため別置き |
 | `tools/python/REPORT_PY159.md` | 134 | PY-159 (#3086): PY-88 の 65 件の `[rbp+0x5b8]` 書込みの全件表 (VA・式・未確定印)。手計算突合 (SLOT 非依存の 7 件) とネガティブコントロールを実施。結果は `REPORT_PY159.md` §4。残りの SLOT 依存 55 件と ACC 合流は #2874 (PY-99) |
 | `tools/python/REPORT_PY163.md` | 97 | PY-163 (#3135): PY-88 の VCALL 3 件の呼出し先・引数・戻り値式 (CFG 到達定義による式。呼出し先は実行時データで未確定)。結果は `REPORT_PY163.md` §1・§3〜§5。解析は `analysis/py163_vcall.py` |
-| `tools/python/REPORT_PY359.md` | 55 | PY-359 (#4703): py88 式の手計算照合。G8 の 2 地点 (0x104c51a・0x104c56d) を `py64_check_expr.py` の HAND 表に加えて mismatch 0。親 #3101 の受入 1 の残り 9 地点は子 #4712 (PY-360) |
+| `tools/python/REPORT_PY359.md` | 67 | PY-359 (#4703): py88 式の手計算照合。G8 の 2 地点 (0x104c51a・0x104c56d) を `py64_check_expr.py` の HAND 表に加えて mismatch 0。親 #3101 の受入 1 の残り 9 地点は子 #4712 (PY-360)。§6 (PY-4909・#5800): py99 の SLOT・CALL 展開 (`ExpSlicer`) を突合に接続し、0x104b305 の 1 地点を mismatch 0 で照合 |
 | `tools/python/REPORT_PY161.md` | 94 | PY-161 (#3101): py88 の movabs 対応 (65 件の式表の変化は 1 件・0x104b843 の edx・r8d)、表引きの整数演算による検算 (`analysis/py161_movabs_check.py`)、0x104a945 の r8d の到達集合。結果は `REPORT_PY161.md` §3〜§5。残りの受入 (G11・vtbl・T ポインタ・戻り値式) は #3101 |
 | `tools/python/REPORT_PY355.md` | 70 | PY-355 (#4696): G11 の 55 件の型別分類 (`analysis/py355_g11.py`)。G2〜G6・G8 の py88 式の手計算照合は未着手 (子 issue に分割)。親 #3101 の受入 1 の一部 |
 | `tools/python/REPORT_PY280.md` | ~110 | PY-280 (#3978): `tests/provider_check.mjs` の per-PR 期待集合を `tests/provider_expect/<tag>.json` (1 PR = 1 ファイル) に移し、件数を集合から導出する方式に変えた。移行前後の差分・疑似ブランチの競合実測 (新旧比較) は REPORT のみ |

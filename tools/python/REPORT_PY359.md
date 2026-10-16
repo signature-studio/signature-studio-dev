@@ -53,3 +53,15 @@ python3 analysis/py53_dispatch.py work/py64/extracted/block00031_PE.bin work/py5
 python3 analysis/py64_check_expr.py work/py53/fn.txt          # n=8 mismatch=0・exit 0
 python3 analysis/py64_check_expr.py work/py53/fn.txt --negctl p2   # exit 1
 ```
+
+## 6. PY-4909 (#5800): SLOT・CALL の展開を突合に接続 (0x104b305 の 1 地点)
+
+親 #5313 の 5 地点のうち、0x104b305 (G4) だけを機械照合に接続した。
+
+- 展開: `analysis/py99_slot_paths.py` に `ExpSlicer` と `expand()` を追加した。py88 の式の `SLOT[rbp+X]?` は、届く store が 1 件・入口へ届かない・到達不能なしの 3 条件を満たすときだけ、その store の値で置き換える。`CALL[0x10469f0]` は `edx + rint(M64[G[0x1046a20]] · ecx · (r8d − edx))` (`py99_call10469f0.py` で PASS 済みの式) に置き換える。
+- 0x104b305 の展開結果: `(0 + rint(M64[G[0x1046a20]] · (d_in)@0x1046d6b · (0x3e80 − 0)))@0x104b300`。未解決印は 0。
+- 手計算の式: `0 + rint(*(0x1046a20) · d_in · (0x3e80 − 0))`。`ecx` は `[rbp+0x5b8]` の読み (0x104b2f2) で、届く store は `0x1046d6b` の 1 本だけ。`d_in` は入口の edx。0x104b099〜0x104b2f2 の `[rbp+0x5b8]` の書込み 3 件 (0x104b0cf・0x104b16b・0x104b1e1) は 0x104b2f2 に届かないことを前向き CFG で確かめた。`edx` は 0x104b2f8 の `xor` で 0 になるため、式の `edx` は 0。
+- 突合: `analysis/py64_check_expr.py` の `expanded_check()` で 0x104b305 を比べた。`mismatch=0`。ネガティブコントロール (手計算式の `d_in` を定数 `0x3e80` に置換) では `mismatch=1`・関数の戻り値 1。
+- 注意: 手計算の `d_in` と機械側の `d_in` は同じ記号の名前一致で、値の一致は示していない (入口の edx が `0x1046d6b` の store で `[rbp+0x5b8]` に入る、という関係の手計算による確認まで)。機械側の展開が正しいかの独立検算は未了。
+
+残り 4 地点 (0x104b5aa・0x104b94e・0x104bebf・0x104bffa) は展開しても `SLOT`・`…` (深さ上限) が残る。分岐を越える経路を手で追う必要があり、本 run では式を確定していない。子 issue に分けて残す。
