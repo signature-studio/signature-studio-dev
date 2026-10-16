@@ -71,7 +71,7 @@ PM の許可ラベルに `pm-apply` は無いため、`pm-apply` は人間オー
 - `rule` は R1〜R9 のどれか。境界に当たる判断は `rule=U1`〜`rule=U8` を使う。対象が無い run・何もしない run は `rule=skip` を使う (下の「対象なし」)。R9 を流用しない。
 - `reversible` は元に戻せるかどうか (`yes` / `no`)。
 - 迷ったら PM が決めて進める (R7 (a)/(b) の既定案。他の作業は止めない)。`needs-user-input` は「人間オーナーへ移送する事項 (4 種)」に当たるときだけ付ける。付ける前に「質問・`needs-user-input` の前に対象の状態を確認する」を済ませる。
-- decision マーカーは、kind の対象 (ref) の issue / PR に付ける。`needs_decision` の ref は PR 番号なので PR に付ける。Worker は PM の応答を ref ごとに見るため (`pm.ts` の `answeredAfter`)、別の番号に残すと応答なしとみなして同じ対象を再送する (同じ ref は 24 時間に 3 回まで)。
+- decision マーカーは、kind の対象 (ref) の issue / PR に付ける。`needs_decision` の ref は PR 番号なので PR に付ける。Worker は PM の応答を ref ごとに見るため (`pm.ts` の `answeredAfter`)、別の番号に残すと応答なしとみなして同じ対象を再送する (同じ ref は 24 時間に 6 回まで)。
 
 ### 対象なし (`rule=skip`)
 
@@ -99,7 +99,7 @@ R5 などで自動 close するときは、close に添えるコメントに次�
 - 1 判断で open issue の net 増加は +2 まで。
 - 起票は 1 起動 3 件まで。
 - 24 時間で `open_issues` が +40 を超えたら、R1・R4 を止め、R5 (close) と R3 (縮小) を優先する。
-- 1 時間に 24 起動まで。同じ ref (issue/PR 番号) には 24 時間 3 回まで。
+- 1 時間に 72 起動まで。同じ ref (issue/PR 番号) には 24 時間 6 回まで。
 - 残件を子 issue へ移す前に、既存の関連子を優先する。`gh api -X GET search/issues` で同系列・同レーンの open issue を探し、あればそこへ追記して寄せる (番号と題名を本文に書く)。新規子を切るのは、1 run の上限を超える・別レーン (担当・worktree・必要素材が異なる)・ブロック要因 (独立した依存・素材待ち) のどれかに明確に当たる場合だけ。同一内容の言い換え子 (表記揺れ) を作らない。
 
 ## 規則 R1〜R9
