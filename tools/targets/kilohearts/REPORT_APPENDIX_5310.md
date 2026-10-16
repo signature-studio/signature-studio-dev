@@ -34,7 +34,7 @@
 
 ## 素材
 
-- この fix run の `ARTIFACTS_DIR` (`$HOME/artifacts`) には `fl-win64`・`plugins-kilohearts`・`toolchain-emsdk` の 3 点が実在した。3 点とも `tar --zstd -xf` で展開して使った。
+- この fix run の `ARTIFACTS_DIR` には `fl-win64`・`plugins-kilohearts`・`toolchain-emsdk` の 3 点が実在した。3 点とも `tar --zstd -xf` で展開して使った。
 - `void_ret_check.sh` の実出力 (下の表) は本 fix run で `HeartCore.core_64` に対して再実行し、表と一致した。
 - 再現に要る素材: `oc_artifacts: fl-win64 plugins-kilohearts toolchain-emsdk` (PR 本文に記載)。
 
