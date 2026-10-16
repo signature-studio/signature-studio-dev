@@ -632,6 +632,15 @@ export function createMockEngine() {
       throw new FlError("Unspecified error (not implemented: device.isDoubleClick assigned)", 2);
     },
     // PY-206 (#3494): PE 0xd75f40・0xd75f80・0xd75fc0 は assigned 機器 (obj.+0x50) の vtbl 先を呼び、戻り status 0 で None を返す (REPORT_PY206)。vtbl 先の効果は未読のため状態を持たない
+    // PY-5407 (#5947): PE 0xd762f0 (repeatMidiEvent・書式 "O|ii") と 0xd764a0 (stopRepeatMidiEvent・引数なし)。assigned 無し → -7 (PE 確定)。述語は真と仮定。vtbl 先の効果は未読のため状態を持たない (C provider と同じ)
+    "device.repeatMidiEvent": (...a) => {
+      arity(a, 1, 3); argI(a, 1, 300); argI(a, 2, 300);
+      if (!st.devAssigned) throw new FlError("Device not assigned", 7);
+    },
+    "device.stopRepeatMidiEvent": (...a) => {
+      arity(a, 0, 0);
+      if (!st.devAssigned) throw new FlError("Device not assigned", 7);
+    },
     "device.createRefreshThread": (...a) => { arity(a, 0, 0); },
     "device.destroyRefreshThread": (...a) => { arity(a, 0, 0); },
     "device.fullRefresh": (...a) => { arity(a, 0, 0); },
