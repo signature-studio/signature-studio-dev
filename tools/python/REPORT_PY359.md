@@ -85,37 +85,32 @@ python3 analysis/py64_check_expr.py work/py53/fn.txt --negctl p2   # exit 1
 
 - 文法: `py64_check_expr.py` の `TOKEN`・`Parser` に `shl(` `imul(` `and(` `shr(` (1〜2 引数の関数形)・`c_in`・`,` を加えた。`machine_norm` は `&M64[`/`&M8[` の `&` を落とす。
 - 手計算式 (展開版 `EXPANDED`): 0x104aba9・0x104af7f は `F` 型 (`[P+0x3b8] + rint(*(0x104ccd8) · d_in · ([P+0x3bc] − [P+0x3b8]))`)、0x104ad2e・0x104b093 は表引き (M8 型・M32 型)。`c_in` は入口の ecx (0x1046d65 の store)、`[rbp+0x574]`・`[rbp+0x578]` は 0x104aacd・0x104aabe の式 (`and(shr(X,0x10),0x3f)`・`shr(shr(X,0x10),6)`、X = c_in − 0x70000000)。
-- 測定 commit: 本 PR の code commit (`tools/python/analysis/py64_check_expr.py`)。入力: `work/py53/fn.txt` (`fl-win64` の `block00031_PE.bin`・`py53_dispatch.py` で 4664 命令)。
-- 結果 (実測): `python3 analysis/py64_check_expr.py work/py53/fn.txt` → 既存 HAND 8 点 `mismatch=0` (受入 1 を満たす)。展開版 `expanded n=5 mismatch=4`・exit 1。
+- 測定 commit: `6d69e896d` (main (#5927) を取り込んだ merge commit = 検証 HEAD)。入力: `work/py53/fn.txt` (`fl-win64` の `block00031_PE.bin` を `work/py64/extracted/` に展開 → `py53_dispatch.py` で 4664 命令・`fn=4664 dispatch=13 r8d_tests=174`)。
+- 結果 (現 HEAD 実測): `python3 analysis/py64_check_expr.py work/py53/fn.txt` → HAND 8 点 `n=8 mismatch=0`・展開版 `expanded n=5 mismatch=0`・exit 0。`--negctl p2` → HAND `n=8 mismatch=3`・展開版 `expanded n=5 mismatch=0`・exit 1 (HAND 側で失敗する negative control)。
+- 取り込み前の値 (`99065f2cb`・#5927 の前): 展開版 `expanded n=5 mismatch=4`・exit 1。4 点とも不一致だった。取り込み前の analysis は `git archive 99065f2cb tools/python/analysis` で別ディレクトリに出して再実行し、同じ値を再現した。
 
-| VA | 結果 | 原因 |
-|---|---|---|
-| 0x104aba9 (G2・F 型) | 不一致 (parse error) | base は py88 の 400 字上限 (`py88_writes.py` の `res[:400]`) で式が `…` に切れ、parse error。上限を 4000 にした scratch では py64 の展開照合が一致する (下の「再現手順」の 2 行目)。py88 の上限修正が必要 (#5926) |
-| 0x104af7f (G3・F 型) | 不一致 (parse error) | base は 0x104aba9 と同じ `…` で parse error。上限を 4000 にした scratch では一致する。py88 の上限修正が必要 (#5926) |
-| 0x104ad2e (G2・M8 型) | 不一致 | py88 の `ARITH` は 2 オペランドのときだけ源を出す。`imul rcx, rcx, 0x28f` (3 オペランド) が `imul((…)*8)` になり 655 (0x28f) が落ちる。手計算式は 655 を保持 |
-| 0x104b093 (G3・M32 型) | 不一致 | 0x104ad2e と同じ (`imul` の 0x28f 欠落) |
+| VA | 現 HEAD (`6d69e896d`) の展開照合 | 取り込み前 (`99065f2cb`) の結果 | 取り込み前の原因 |
+|---|---|---|---|
+| 0x104aba9 (G2・F 型) | 一致 | 不一致 (parse error) | base が py88 の 400 字上限 (`res[:400]`) で `…` に切れた。#5927 で上限を `RES_LIMIT = 4000` に上げて解消 |
+| 0x104af7f (G3・F 型) | 一致 | 不一致 (parse error) | 0x104aba9 と同じ `…` 切れ。#5927 で解消 |
+| 0x104ad2e (G2・M8 型) | 一致 | 不一致 | `imul rcx, rcx, 0x28f` (3 オペランド) の 0x28f 源が落ちていた。#5927 で `op(a, b)` の形で出すよう修正し解消 |
+| 0x104b093 (G3・M32 型) | 一致 | 不一致 | 0x104ad2e と同じ (`imul` の 0x28f 欠落)。#5927 で解消 |
 
-- 手計算式の確からしさ: 0x104ad2e の `imul` を落とした形の手計算式は機械式と一致しないままだった (`hand-without-0x28f == mach` が False)。0x104aba9 は展開の `…` を超えて比べられない。このため手計算式そのものの正しさは本 run では確定していない。
-- 不一致の VA と手計算式: 上の 4 点。受入 3 (不一致があれば VA と手計算式を REPORT に書く) を満たす。
-- 未解決の追跡 (本 PR の範囲外): (1) `py88_writes.ARITH` の 3 オペランド `imul` の源欠落、(2) `resolve()` の 400 字上限による `…` 切れ (0x104aba9・0x104af7f)、(3) py88 の生の出力に `SLOT?`・`ACC?⚠合流` が残る (ExpSlicer 経路では照合を妨げない。上限 4000 の scratch の py64 出力に `SLOT` は 0 件)。(1)(2) は `py88_writes.py` の修正になり、py88・py99 の既存測定値 (§6・§7・REPORT_PY99 系) が動く。子 #5926 で扱う。
+- 手計算式の確からしさ: 現 HEAD では 4 点とも機械式と一致する (展開版 `mismatch=0`)。ただし HAND 表 (手計算の正本) への登録はまだ無い。HAND 表の 8 点は変えていない。4 地点の HAND 登録は子 #5926 の範囲。
+- 未解決 (本 PR の範囲外・子 #5926): (1) 4 地点の HAND 表入り (手計算式は `shl`・`and`・`imul` を含む文法で書く必要がある)。(2) py88 の生の出力 (`py88_writes.py` 直接) に `SLOT?`・`ACC?⚠合流` が残る。ExpSlicer 経路の展開照合 (`py64_check_expr.py`) では `SLOT` は 0 件で、照合を妨げない。
 
-#### 再現手順 (§8 の `…` 検証・測定 commit `c9430d6a2`)
+#### 再現手順 (現 HEAD `6d69e896d` と、取り込み前の再現)
 
-scratch は `work/scratch/` (gitignore) に複製し、本体は変えない。結果は 2 経路で分けて書く。
+scratch は `work/scratch/` (gitignore) に複製し、本体は変えない。
 
-- (a) py88 の生の出力 (`py88_writes.py` を直接実行): 本体 (変更なし) の 0x104aba9・0x104af7f は `…` 0 件・`SLOT?` 6 件。上限 4000 (`sed -i 's/if len(res) > 400:/if len(res) > 4000:/; s/res\[:400\]/res[:4000]/'`) でも、`DEPTH_LIMIT` を外す (`sed -i 's/if depth > DEPTH_LIMIT:/if depth > 10**6:/'`) でも `…` 0 件。`SLOT?` は残る。
-- (b) py64 の展開照合 (`py64_check_expr.py work/py53/fn.txt`、ExpSlicer を通る):
-  - 本体: `n=8 mismatch=0`・`expanded n=5 mismatch=4`・exit 1。0x104aba9・0x104af7f の機械式に `…` が入り、未解決 `['…']`。
-  - 上限 4000 の scratch: `expanded n=5 mismatch=2`・exit 1。0x104aba9 と 0x104af7f は **一致**。残る不一致は 0x104ad2e・0x104b093 (`imul` の源欠落・#5926)。py64 出力に `SLOT` は 0 件。
-  - `DEPTH_LIMIT` を外した scratch: `expanded n=5 mismatch=4`。`…` は本体と同じ 6 件が残る (py64 経路の `…` は深さ上限とは別で、上限 400 字の切れによるもの)。
-- つまり上限 4000 で F 型 2 点は py64 の照合が通る。`SLOT?` は py88 の生の出力 (a) にだけ残り、py64 の照合を妨げない。
-- 既存点への影響: `py99_slot_paths.py` と `py88_writes.py` は変更していない。`py159_check_hand.py` は `py64_check_expr` の `parse_canon`・`machine_norm` を使うが、文法追加は既存式の解釈を変えない。
+- 現 HEAD (本体・変更なし): `python3 analysis/py64_check_expr.py work/py53/fn.txt` → `n=8 mismatch=0`・`expanded n=5 mismatch=0`・exit 0。`python3 analysis/py88_writes.py work/py53/fn.txt` の出力は `…` 0 件・`SLOT[rbp+0x574]?` 4 件 (0x104aba9・0x104af7f の行に残る)。
+- 取り込み前の再現 (`99065f2cb` の analysis を別ディレクトリに出す): `git archive 99065f2cb tools/python/analysis | tar -x -C work/scratch_pre` → `python3 work/scratch_pre/tools/python/analysis/py64_check_expr.py work/py53/fn.txt` → `expanded n=5 mismatch=4`・exit 1。`--negctl p2` は `n=8 mismatch=3`・`expanded n=5 mismatch=4`・exit 1。
+- 上限だけ 400 に戻す検証 (現 HEAD の `RES_LIMIT` を 400 に下げた scratch `work/scratch_400/`): `expanded n=5 mismatch=2`・exit 1。0x104aba9・0x104af7f が不一致になる (`…` による parse error)。これが取り込み前の F 型 2 点の不一致の原因だった。
+- 既存点への影響: 現 HEAD で `py99_slot_paths.py`・`py159_check_hand.py` は exit 0 (`U check n=57 match=57 mismatch=0`・`forward cross-check n=172 mismatch=0`・`n=7 mismatch=0`)。
 
 ### 差分 (測定 commit から HEAD まで)
 
-測定 commit は `c9430d6a2` (`tools/python/analysis` を変えた最後の commit)。鮮度: `git diff c9430d6a2 HEAD -- tools/python/analysis` は 0 行 (本 PR の検証 HEAD 時点)。`e54706dec` (PY-5361 の `flapi/plugins_getcolor_facts.py`) は測定 commit より前の commit で、G2・G3 の式照合 (`py64_check_expr.py`・`py88_writes.py`・`py99_slot_paths.py`) の入力には影響しない。
-
-`git diff 53ab89b54 HEAD -- tools/python/analysis` は本 PR の commit 後の差分 (本 §7 の追記時点で 0 行)。
+測定 commit は `6d69e896d` (main 取り込み後の検証 HEAD・`tools/python/analysis` を変えた最後の commit)。鮮度: `git diff 6d69e896d HEAD -- tools/python/analysis` は 0 行。
 
 
 ## 9. PY-5404 (#5926): `imul` の源と `resolve()` の 400 字切れ (受入 1・2・4 の部分)
