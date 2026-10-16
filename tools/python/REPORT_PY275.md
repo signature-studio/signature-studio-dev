@@ -92,8 +92,9 @@
 | `pe_py275_map_slot1.py` の自動追跡が候補ゼロ | 自動化の信頼性。結論には使っていない | #4995 |
 
 - 検証: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_map_slot1.py` → Q1〜Q5 ALL PASS、終了 0、所要 36.7 秒 (n=1、load average 0.70、HEAD `613bc9143` で再測定)。
+- 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py275_map_slot1.py` → Q1〜Q5 ALL PASS、終了 0、所要 36.7 秒 (n=1、load average 0.82)。
 
-## 7. #5471: 3 関数の受け手の追跡 (関数内で確定・関数をまたぐ箇所は未確定)
+## 7a. #5471: 3 関数の受け手の追跡 (関数内で確定・関数をまたぐ箇所は未確定)
 
 - 本節の probe: `pe_py275_receivers.py` (R1〜R12)。対象は 0x69b640・0x8c9d20・0xb70190 の 3 関数。関数の範囲は次の int3 パディングまで (0x69b640..0x69be16・0x8c9d20..0x8ca20e・0xb70190..0xb702eb)。
 - 関数内の命令だけで確定した事実:
@@ -108,3 +109,23 @@
 - 検査の限界: R6 は呼出し直前 3 命令の文字列一致だけを見る。別レジスタ経由の受け渡しは対象外。
 - 所見の訂正: 途中の確認で `0x8c9cc0` の範囲を誤って 0x8c9d20 の後半まで含めた。本 probe は int3 パディングで関数の末尾を決めるので、この誤りは解消。
 - 検証: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py275_receivers.py` → R1〜R12 ALL PASS、終了 0、所要 38.1 秒 (n=1、単独実行)。素材は `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB) から `block00031_PE.bin` (22,227,016 バイト) を 2.9 秒で展開。
+
+## 7. #5472: 4 関数の読出し値と slot 1 receiver の流れ (関数内で確認)
+
+- 本節の逆アセ (`pe_callgraph.py around`・`pe_py5472_slot1_receivers.py`) は子 #5472 の結果。関数内のスロット流れだけを見る (関数境界を越える流れは見ない)。
+- 確認の対象は、`[map+8]` の読出し値の格納先スロットと、slot 1 呼出し直前の `mov rbx, [reg]` の元 (receiver の取得元) が関数内で交わるか。
+
+| 関数 | 読出し値の格納先と後続 | slot 1 呼出し (receiver の取得元) | 判定 |
+|---|---|---|---|
+| 0xc3b930 | 0xc3b9fd → `[rbp+0x78]` → 0xc3bb38・0xc3bb49 の rip 相対 call の引数のみ | 0xc3bb2e (`[rbp+0x98]` = `[[rbp+0xd0]+0x10]`)。0xc3bbac は `0xc3bb80` 側 (別関数) | 読出し値は receiver にならない (関数内) |
+| 0xc3bc00 | 0xc3bcb4 → `[rbp+0x60]` → 0xc3bd9b の rip 相対 call の引数・0xc3bd78 の格納のみ | 0xc3bd98 (`[rbp+0x78]` = `[[rbp+0xa0]+0x10]`)・0xc3bde3 (`[rdx+0x78]` = `[[rdx+0xa0]+0x10]`。0xc3bdc0 側の別関数) | 読出し値は receiver にならない (関数内) |
+| 0xd328f0 | 読出し 4 件 (0xd329b2・0xd32a32・0xd32a94・0xd32b50) はいずれも引数・データコピー・`[rbp+0x90]`→`[rbp+0x88]` の rip 相対 call 引数。`[rbp+0x78]` は 0xd32b7a の 1 件 (receiver 用) | 0xd32b89 (`[rbp+0x78]` = `[[rbp+0xe0]+0xb0]`)。0xd32b89 は 0xd328f0 側に属する | 読出し値は receiver にならない (関数内) |
+| 0x1046a30 | 0x104ab4f → `[rbp+0x508]` → 0x104ab73〜0x104ad77 の field 読出し・0x104ad67 の引数・`[rbx+0x1f0]` の receiver (0x104ad81) | slot 1 (0x1048636・0x104b583) の receiver は `[rip+x]` 由来 `[rax+0x5c]` (グローバルの `+0x5c`)。読出し値は slot 1 の receiver にならない | 読出し値は slot 1 の receiver にならない (関数内) |
+
+- 4 関数とも、読出し値が slot 1 の receiver として渡る経路は関数内に無い。0x1046a30 は `[rbp+0x508]` を receiver とする間接 call が `[rbx+0x1f0]` (slot 1 ではない) の 1 件 (0x104ad81)。
+- **未確定 (受入条件の「同インスタンス確定」は 0 件)**: 関数内の流れは確認したが、読出し値が関数の外 (引数として渡った先 0x417fc0・0x40c660・0xd32560 等) で格納され receiver に戻る経路は未追跡。receiver の `[[reg+0xa0/0xb0/0xd0]+0x10]` が TUndoEvent_MovedFXTracks を指すかも未確定。
+- 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py5472_slot1_receivers.py` → `EXPECT` の逆アセ行 28 件 (読出し・格納・receiver 取得・slot 1 呼出し) と `[rbp+0x508]` 格納の 1 件 (0x1046a30 内) の計 29 行が完全一致 ALL PASS、終了 0。測定 commit `c11573df5` (修正前 HEAD で実測。所要 36.98 秒、n=1、load average 1.02 (測定直後))。probe は文字列の完全一致を固定するだけで、同一インスタンス性は確定しない。
+- probe が固定していない手読みの結論 (probe 行には無い。上の表の記述はこれらを含むが、文字列としては固定していない):
+  - 0xd328f0: 読出し 4 件のうち 0xd329b2・0xd32a32・0xd32a94・0xd32b50 は probe に無い (引数・コピー先の手読み)。
+  - 0xc3b930: 0xc3bb38・0xc3bb49 (rip 相対 call の引数) は probe に無い。0xc3bb16 の `rax` の元 (`[[rbp+0xd0]+0x10]`) は手読み (probe の `mov [rbp+0x98], rax` は格納のみ)。
+  - 0x1046a30: receiver の根 `[rip+x]` 側は probe に無い。probe が固定するのは `mov rax, [rax]` 以降の `[rax+0x5c]` (2 段) までで、`[rip+x]` の具体的な命令は手読み。
