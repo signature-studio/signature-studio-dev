@@ -42,9 +42,9 @@
 - THIS 系の所属関数 = 201 個 / データ表に現れる = 114 個 / 現れない = 87 個。
 - RTTI が SerumController の表に現れる関数 = 6 個。
 
-`receiver_this_trace.py --vtable 0x180a2bf58` の分類件数 (`cat_strict`): THIS 69・THIS-CHILD 197・ARG 240・ARG-CHILD 68 (`REPORT_SR60.md` §3 の不一致 (THIS 67→69、THIS-CHILD 191→197) は、本 run でも同じ値)。原因は未確認。
+`receiver_this_trace.py --vtable 0x180a2bf58` の分類件数 (`cat_strict`): THIS 69・THIS-CHILD 197・ARG 240・ARG-CHILD 68 (前 run の記録。本 run 未再現)。`REPORT_SR60.md` §3 の不一致 (THIS 67→69、THIS-CHILD 191→197) の原因は未確認。
 
-**SC 伝播の拡張 (本 run・`sc_widen.py`)**: 起点 = `receiver_this_trace.py` の SC 閉包 (strict, 21 関数)。そこから直接 call の宛先へ、rcx が this のものを strict で、strict で外れたものは loose で伸ばし、不動点まで繰り返した。
+**SC 伝播の拡張 (前 run の記録・`sc_widen.py`。本 run 未再現)**: 起点 = `receiver_this_trace.py` の SC 閉包 (strict, 21 関数)。そこから直接 call の宛先へ、rcx が this のものを strict で、strict で外れたものは loose で伸ばし、不動点まで繰り返した。
 
 - 伝播で追加された関数 = 0 (strict 0・loose 0)。閉包は 21 関数のまま飽和した。これは独立の拡張検証ではなく、`receiver_this_trace.py` の `sc_closure()` と同じ不動点計算の再確認である (構造上 0 になる)。
 - THIS 69 件 (所属関数 65 個): SC 証拠 0 件 (SC 閉包の関数 0)。
@@ -95,10 +95,39 @@ venv/bin/python $P/arg_vt_indirect.py Serum2_win64.vst3 trace.tsv --tsv vt_ind.t
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (a) 間接 call の候補の宛先 (reg の指す object) の型を確定する。候補 118,222 件は disp のみの照合で、SC 関数内の 19 件も受け手は未確定 | 受入 1 | #4930 (本 issue 残・親 #4164 の子) |
+| (a) 間接 call の候補の宛先 (reg の指す object) の型を確定する。候補 118,222 件は disp のみの照合 (§5 で再測定済み)。SC 関数内の候補 14 件の受け手は §7 で出所を分類済みだが、型は未確定 | 受入 1 | #4930 (本 issue 残・親 #4164 の子) |
 | (b) THIS 69・THIS-CHILD 197 の SC 伝播と、THIS-CHILD の SC 証拠 (6 件 / 5 関数) の定義を揃えた再集計 | 受入 2 | #4930 (本 issue 残) |
 | (c) 表の境界の決め方 (§4 で決定・達成) | 受入 3 | 閉じた (§4) |
 | (d) `receiver_this_trace.py` の TSV md5 が SR60 (`ea2d93a2…`) と不一致。本 PR の測定 (`224202d55`) では `1e1f5500…` で、REPORT_SR49・REPORT_SR58 の既定 TSV md5 と**一致する** (SR60 の `ea2d93a2…` とは不一致)。SR60 側の差の原因は未確認 | 再現性 | #4930 (本 issue 残) |
-| (f) RTTI 照合 (THIS 所属関数の vtable RTTI・THIS-CHILD の SC RTTI 6 関数) は本 run で未再現。入力 `Serum2_win64.vst3` (`plugins-serum2` 素材) が本 run の `$ARTIFACTS_DIR` に無い | 受入 2 の前提見直し | #4930 (本 issue 残・次 run で `oc_artifacts: plugins-serum2` を指定して再照合) |
+| (f) RTTI 照合 (THIS 所属関数の vtable RTTI・THIS-CHILD の SC RTTI 6 関数) は未実施。入力 `Serum2_win64.vst3` は §7 の測定で用意できた (`plugins-serum2`) | 受入 2 の前提見直し | #4930 (本 issue 残) |
 
 (e) は §5 の再測定で閉じた (`arg_vt_indirect.py` を HEAD で 2 回実行、118,222 件・md5 `42bcf98b…` で一致)。
+
+## 7. SC 関数内の候補の受け手型 (受入 1 の残り)
+
+`recv_sc_sites.py` (新規): §2 の候補のうち、呼出元が SC の関数で disp が候補の表と一致する call について、受け手 (reg) の出所を `receiver_this_trace.receiver()` で strict / loose の両方で分類する。`sc_slot_stores.py` (新規): SC の関数内で `this+off` に vtable 先頭を書く `mov` を列挙する。`sc_slot_stores.py` は rcx の定義を追う際、`lea` を含む rcx への書込みで追跡を止め、`call` で打ち切る (レビュー指摘の rcx 誤記録を修正)。
+
+**実測 (入力 `plugins-serum2` → `Serum2_win64.vst3`・sha256 `501e7bb3…`・19,236,864 B・測定 commit `d60bd796c`)**:
+
+入力は `tar --zstd -xf "$ARTIFACTS_DIR/plugins-serum2.tar.zst" --wildcards '*Install_Xfer_Serum2_2.1.5.exe'` で `Install_Xfer_Serum2_2.1.5.exe` (1,313,084,056 B) を取り出し、`7z x` で `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` を展開して作った (作業 dir は `$RUNNER_TEMP/serum2_4930`・リポジトリ外)。
+
+| ツール | 出力 | md5 | real (s) |
+|---|---|---|---|
+| `receiver_this_trace.py --vtable 0x180a2bf58 --tsv` | cat_strict の TSV 1053 行 | `1e1f5500…` | 23.6 |
+| `arg_vt_indirect.py` | 候補 118,222 件・うち呼出元が SC の関数 19 件 | `42bcf98b…` | 28.3 |
+| `recv_sc_sites.py` | SC 関数内の候補 call = 14 件 | `367f06dc…` | 24.2 |
+| `sc_slot_stores.py` | 5 行 (this+0x0・+0x10・+0x18・+0x30・+0x38 → vtable 5 本) | `961c1d7f…` | 23.4 |
+
+- load (1 分値): 1 本目の開始前 0.96、`arg_vt_indirect.py` 終了後 1.26、`recv_sc_sites.py` 終了後 1.31、`sc_slot_stores.py` 終了後 1.15。逐次実行。
+- `recv_sc_sites.py` の 14 件の内訳 (strict / loose):
+  - strict: this 3 (+0x10・+0x18・+0x40)・arg 1・stack 2・nodom 3 (+0x10・+0xc8・なし)・R-nodom 1・callret 3 (+0x118・+0xc8・なし)・stackslot 1
+  - loose: this 6 (+0x10・+0x18・+0x40、および `this+0x22388`+0x10・`this+0x22798`+0xc8・`this+0x22798`)・arg 1・stack 2・stackslot 2・callret 3
+- 同じ入力のレビュー側実測 (`d60bd796c`) と、4 本すべての md5 が一致した。
+- `sc_slot_stores.py` の rcx 追跡修正は合成入力でも確認した: `lea rcx` の後の `mov [rcx+8], rdx` は this+8 として記録されない。rcx 以外への `lea` を経由する store (`lea rdx` → `mov [rcx+0x10], rdx`) は正しい vtable 先で記録される。実バイナリでは §7 の 5 行が上記の結果。
+
+測れたこと: 受け手 (reg) の出所の分類 (strict / loose の件数と内訳)、SC 関数内で this+off に vtable 先頭を書く 5 箇所。
+
+測れていないこと:
+- 受け手の型 (基底 `EditController` か別 object か) は未確定。`receiver()` は出所を分類するだけで型を決めない。
+- RTTI 照合 (THIS 所属関数・THIS-CHILD の SC RTTI) は未実施 (§6 (f))。
+- 受入 1 の宛先型の確定は、この方法では閉じていない。`this+off` の値の書込みを追う簡易版の限界による。
