@@ -208,6 +208,13 @@ class Slicer:
                 terms.append(sign + tok)
         return " ".join(terms) if terms else inner
 
+    def rmw_expr(self, j, depth):
+        """命令 j (`shr dword ptr [rbp+X], imm` など、同じスロットへの ARITH の RMW) が書く値。j 実行前のスロットの値を式に含める。"""
+        m, o = self.ins[self.order[j]]
+        ops = parse_ops(o)
+        args = [self.ev(ops[0], j, depth + 1)] + ([self.ev(ops[1], j, depth + 1)] if len(ops) == 2 else [])
+        return f"{m}({', '.join(args)})"
+
     def mem_read(self, addr, size, pos, depth):
         size_name = {"byte": "M8", "word": "M16", "dword": "M32", "qword": "M64"}[size]
         if addr.startswith("rbp"):
@@ -250,6 +257,8 @@ class Slicer:
                 ops = parse_ops(o)
                 if m == "mov" and ops[1] in FAM and not joined:
                     return self.resolve(FAM[ops[1]], j, depth + 1)
+                if m in ARITH and not joined:
+                    return self.rmw_expr(j, depth + 1)
                 return f"SLOT[rbp+{offv:#x}]?@{self.order[j]:#x}"
         if addr.startswith("rip"):
             return f"{size_name}[G]"

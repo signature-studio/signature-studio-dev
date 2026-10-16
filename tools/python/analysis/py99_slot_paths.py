@@ -40,6 +40,8 @@ def store_value(sl, a):
     ops = w.parse_ops(o)
     if m in w.MOVLIKE and len(ops) == 2:
         return sl.ev(ops[1], sl.idx[a], 0)
+    if m in w.ARITH and ops and ops[0].startswith(SIZES):
+        return sl.rmw_expr(sl.idx[a], 0)
     return f"OP:{m} {o}"
 
 
