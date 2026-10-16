@@ -94,7 +94,7 @@ FL_WIN64_DIR=<展開先> python3 hs_store_supplier.py # REPORT_4130 §2 の 11 �
 
 ## 8. #5547 (PLG-P0b-60) の追記: 生バイト検索と再測定
 
-測定 commit: `9364022b4` (`hs_glob_bytes.py` を追加した commit。`hs_disp_emu.py`・`hostshim.c` は変更なし)。素材: `fl-win64` (`extracted/*_PE.bin` 313 件)。`work-fw-stage1` は展開したが、本測定では使わない (`fw_stage2.sh` の前提で、emsdk は未使用)。
+測定 commit: `4a70740b7` (`hs_glob_bytes.py` の docstring のみ変更。`git diff 9364022b4 4a70740b7 -- tools/plugins/framework/hostshim/ ':!*.md'` は docstring 1 行。`hs_disp_emu.py`・`hostshim.c` は変更なし)。素材: `fl-win64` (`extracted/*_PE.bin` 313 件)。`work-fw-stage1` は展開したが、本測定では使わない (`fw_stage2.sh` の前提で、emsdk は未使用)。
 
 - `hs_glob_bytes.py` (生バイト検索): `G = 0x15e4790` と `P0 = 0x141d6b8` の 4 バイト LE を全 313 PE ブロックの全セクションで検索 → 0x15e4790 の hit は `block00031_PE.bin` の `.data` (0x15e4790 自身の値 `P0`) の 1 件だけ。`.text` 内の hit は 0 件。実測 real 1.8 秒。
 - 相対形式 (`G - ImageBase` 等) の検索: 未検証 (本 run では実施していない。受入 1 の根拠に使わない)。
