@@ -106,5 +106,21 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 - boot: `FLE_CFI_SEED=1 FLE_CFI_RECV=1 FLE_IPP=1 FLE_TOLERANT=1` を 2 回 (rc 0)。stack 付きの 2 回目で `[fle_wwatch] ret=0x2ec1dc7 slot=0x5ac308 old=0x40f960 new=0`・`slot=0x976410 old=0x9764d8 new=0`。1 回目の診断無し版では `ret=0x2ec1de6`。§14 の `ret=0x2ec1f06`・§15 の `ret=0x2ec1dc7` とは番地が違う (ビルドのたびに wasm の code 位置が変わる)。
 - wasm の対応 (自作の code section 解析): `0x2ec1dc7`・`0x2ec1de6` はどちらも wasm 関数 `STX` (`fle_cpu.h:79` の 16B store ヘルパ) の範囲 `0x2ec1d98`〜`0x2ec1df6` に入る。ヘルパは呼出し元ではないため、guest 側の書込み元は `R[RSP]` の走査からしか引けない。
 - 走査の結果: `[1]=0x6c7923`・`[3]=0x6cf116`・`[5]=0x15eac01`・`[15]=0x15eac80`・`[17]=0x815920`・`[23]=0x5af36a`・`[25]=0x4130b4`。lift の関数範囲で引くと `0x5af36a` は `f_5af330`、`0x4130b4` は `f_413060` の中。ただし走査は古いスタック語を含むため、実行中の呼出し連鎖とは断定できない。
-- 所見: `fill6a7b70` の書込み範囲 (`dst`・`cnt`) は両 slot を覆わないので、0 書込みは fill 以外の guest 16B store。走査の候補 `f_5af330`・`f_413060` は呼出し連鎖の一部で、書込みを行うと断定できる根拠は無い。`f_409c80` は候補にしない (16B store を含むが、0 を書く経路は未確認)。書込み元の guest 関数は未確定。
+- 訂正 (§17): 上の「`fill6a7b70` の書込み範囲は両 slot を覆わない」は誤り。`[fill6a7b70]` の `dst`・`cnt` は呼出し時の引数で、実際の 16B 書込みは `f_6a7b70` の本体内 (§17 で確定)。
+- 所見: 0 書込みは fill 以外の guest 16B store と読んでいた (誤り・訂正は上の行)。走査の候補 `f_5af330`・`f_413060` は呼出し連鎖の一部で、書込みを行うと断定できる根拠は無い。`f_409c80` は候補にしない (16B store を含むが、0 を書く経路は未確認)。書込み元の guest 関数は未確定。
 - 未解決 (起票先: #5337 に残す): (1) 走査でなく実行中の呼出し連鎖を取る (`ott` の call 深さ追跡)。(2) `f_409c80` を呼ぶ 20 件の呼出し元のどれが unit 245 の後で動くかの確定。(3) 実機の loader が `0x5ac308` に充填する値 (#4384 は CLOSED)。
+- 注 (§17 で更新): (1)(2) は §17 で書込み元 `f_6a7b70` が確定したため、`f_409c80` の確認は不要になった。
+
+## 17. 書込み元の確定: `f_6a7b70` の本体 (#5337・診断 knob `FLE_WWATCH_JS`・既定無効)
+
+- 追加: `fle_cpu.c` に `-DFLE_WWATCH_JS` (既定無効)。`fle_wwatch` が監視 slot の非 0 → 0 を見たとき、`EM_ASM` で書込み時点の wasm 呼出し連鎖 (`new Error().stack`・`--profiling-funcs` の `f_xxxx` 名) を出す。既定経路は変えない (`#include <emscripten.h>` も `FLE_WWATCH_JS` 下のみ)。
+- なお §16 で使った `ott_xrip` は、lift 側でどこにも代入されていない (`fle_cpu.c`・`ott_cpu.c` の宣言と出力だけ)。そのため §16 の `xrip` 欄は使えない。
+- 測定: `FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_JS -DFLE_WWATCH_SLOTS=0x5ac308ull,0x976410ull" FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0・所要 2 分 52 秒 (`time` real 2m51.737s・開始 14:15:58 UTC・lift 65 s・clang plain 81 s・boot tol 20 s)。load 1.26〜2.05 (4 vCPU)。測定の検証 HEAD `253b0c654` (測定 commit `fbdbaf681` と `tools/flelift/rt` の差分 0)。計数は dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob`・exit 0 (§11 と一致)。
+- 測定の出所: 実行ログは `tools/flelift/work/boot/run_fle6_tol.log` (gitignore・未 commit)・同じ工程の標準出力は `tools/flelift/boot/work/fle6_measure_5864_253b0c654.log` (同じく gitignore)。GitHub Actions run `38914053862` (PR #5864 の fix モード) で取得。書込み連鎖は上記ログの `[fle_wwatch_js]` 2 件 (`fill6a7b70` #1・#2 の直後) で、本節の連鎖と一致。
+- 書込みの時点 (1 回の boot・ログ順):
+  1. `[fill6a7b70] #1` (dst=0x400000) → `[fle_wwatch] ret=0x2ec1e19 slot=0x5ac308 old=0x40f960 new=0` → `[fle_wwatch_js]` の連鎖: `fle_wwatch` ← `STX` (`fle_cpu.h:79`) ← **`f_6a7b70`** ← `ott_dispatch` ← `f_6c7610` ← `f_815050` ← `f_815e10`。
+  2. 同じ連鎖で `slot=0x976410 old=0x9764d8 new=0` (`[fill6a7b70] #2` の直後)。
+  3. 以降、`f_976a90` が `0x976410=0` を読む → `f_976b60 rcx=0` → `f_410320` が rcx=0 で oob (§15 と一致)。
+- 結論: 両 slot を 0 にする書込み元は `f_6a7b70` の本体 (`fill6a7b70` と同じ関数)。`f_6a7b70` は `FLE_EXTRA_ROOTS` で root 化した関数。#3060 の「`f_6a7b70` 広域ゼロ埋め」と同じ関数であることは STX の連鎖で確認したが、#3060 の記述との一致は本節では未確認。
+- §16 の走査候補 `f_5af330`・`f_413060` と `f_409c80` は、この連鎖にも書込み元にも含まれない (候補から外す)。
+- 残り (#5337 に残す): (1) `f_6a7b70` の本体のどの store が `0x5ac308`・`0x976410` を指すか (ループの添字と範囲。`dst`/`cnt` は呼出し引数で範囲を表さない)。(2) `f_410320` が rcx=0 で oob になる直接原因 (`rax` 未計測)。(3) 実機の loader が `0x5ac308` に充填する値 (#4384 は CLOSED)。

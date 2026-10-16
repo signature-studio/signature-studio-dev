@@ -81,3 +81,32 @@
 - 呼出し元 `180cb6965`・`180cb6a76` (関数 `180cb68e0`・`180cb6a20` 付近) の control block の出どころ。(呼出し元 6 件の列挙は §7 で実測済み。)
 - 格納 47 関数の全数の control block の具象型。
 - 間接 `180cbba21`・`180cbba36` の `r13` 保存 (受入 2 の残り・受入 3 の判定材料)。
+
+## 9. 間接 call の具象型の上界 (#5843 / ICALL-119)
+
+- 測定 commit: `0469f6e6d` (`vtable_r13.py` の判定修正。`tools/icall/vtable_r13.py` の最後のコード変更 commit)。
+  前 commit: `66d518bf9` (旧判定)。
+  測定 commit から HEAD までのコード差分: `git diff 0469f6e6d HEAD -- tools/icall/vtable_r13.py` の出力は 0 バイト (差分 0。後続の commit は本 REPORT のみ)。
+- 素材: `plugins-freshair` の `Fresh Air.Win.zip` から展開した `SlateCore.core_64` (36,285,952 B・sha256 `2cf759f712adf955a56684df4b24454690ac878105d4433de16c88626a45dd3b`・一致)。
+- 測定手順: `objdump -d -M intel <SlateCore.core_64> > tools/icall/work/core64.dsm` (全量 4,553,159 行・real 4.782 s・user 4.586 s・測定前 load average 0.28)。続けて `python3 tools/icall/vtable_r13.py <SlateCore.core_64> tools/icall/work/core64.dsm` (real 7.619 s・user 7.163 s・測定後 load average 0.39)。
+- 実測 (`vtable_r13.py`・測定 commit `0469f6e6d`):
+  - vtable を書き込む箇所 (`lea reg,[rip+X]` の直後の `mov [reg],reg`): 2,457 件
+  - slot1・slot2 が両方コードを指す vtable: 1,625 件
+  - その slot 関数 (distinct): 635 件
+  - うち `push r13` も rsp 退避も無く `r13` へ書く関数: **0 件**
+  - うち `mov [rsp±X],r13` で退避する関数 (`push r13` 無し): 1 件 (`180e2c460`)
+
+### 9.1 旧判定 (51 件) の訂正
+
+- 旧判定 (`66d518bf9`) の「`r13` を push/pop 無しで書く 51 件」は誤り。判定が `push r13` の有無を見ていなかったため、保存済みの関数を数えていた。
+- 残った 1 件 `180e2c460` は、`push r13` ではなく `mov QWORD PTR [rsp+0x150],r13` (`180e2c561`) で退避し、`mov r13,QWORD PTR [rsp+0x150]` (`180e2ca3e`) で戻す。
+  全 `ret` 経路の確認 (手作業・`objdump` 出力): `ret` は `180e2ca6a` の 1 箇所。`180e2c561` より前の分岐 `180e2c55b` (`jne 180e2ca46`) は退避を飛ばすが、`r13` を変えずに `ca46` へ入る。`ca3e` を通らずに `ret` へ行く経路は無い。
+  よって `180e2c460` は `r13` を保存している (受入 2 の判定上、未保存とはしない)。
+- `.rdata`/`.data` の関数ポインタ 7,127 件 (うち `r13` 未保存 490 件) の数値は取り下げる。この数値の再現手段が REPORT に無く、vtable に限らないため上界として使えない (`vtable_r13.py` の対象外)。
+
+### 9.2 結論
+
+- 間接 call の具象型は、vtable 候補 635 関数のいずれも `r13` を未保存で書かない。
+  したがって vtable 候補からは「`r13` 未保存の具象型」は出ない。
+- ただし具象型は 1 つに絞れていない。呼出し元 `180cbb930` の間接 `180cbba21`・`180cbba36` の具象型と、`0x18040e0e0` の引数 `rdx` の出どころは未確定。
+- 受入 2 は未達のまま。残件は `180cbba21`・`180cbba36` の具象型の特定と、呼出し元 `180cbc770` 経由の到達判定。
