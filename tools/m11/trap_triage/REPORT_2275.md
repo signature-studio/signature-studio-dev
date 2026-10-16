@@ -191,3 +191,24 @@
 - NODATA_BODY (静的データを無くした構成) も 2017。静的データを外しても値が変わらないので、この 2017 は静的データの配置ではなく、関数本体または IR の側から来ている可能性が高い。ただし A_default 等は f195a93a9 で未測定のため、判定は保留。
 - 生値: `table_2275_f195.tsv` (6 行・ヘッダ無し)、`addr_2275_f195.txt` (6 行)。`.data`・`.bss` の VA と大きさは C_noren と NODATA_BODY で同一 (`.data=10250ff0+1ac`・`.bss=10251740+53df4`)。
 - 既定値 (870/24/0) は変えていない。
+
+## 11. 測定の決定性 (#5955 = [M11-N281], 親 #5946)
+
+- 測定 commit: **`32c1f5d9c`** (origin/main。`tools/m11` のコードは変えていない。本節は REPORT の追記のみ)。`git diff 32c1f5d9c HEAD -- tools/m11` の差分は本節の追記だけ (コード差分 0)。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` に設定。`work-m11` を worktree の `tools/m11/work/` に展開。`m11_gen_ir2.sh` rc=0・52.9 秒 (ldfix applied)。`[EMSDK]` は runner の `/opt/emsdk` (pin 6.0.12)。
+- 手順: `bash trap_triage/repro_1952_rt_mech.sh 3 A_default C_noren` (直列・foreground・rc=0・計 3 分 18 秒。内訳は C_noren 1 分 42.3 秒・A_default 1 分 35.8 秒)。開始時 load average 1 分平均 0.88 (4 vCPU)。
+- 測定した 6 セル:
+
+| 構成 | 回数 | boot_final3.ll md5 | undefined symbol | ok/trap/clobber | getmem | fastmm_getmem_impl |
+|---|--:|---|--:|--:|--:|--:|
+| A_default | 3 | e5023e8e | 0 | 873/21/0 | 2017 | 2095 |
+| C_noren | 3 | e5023e8e | 0 | 873/21/0 | 2017 | 2095 |
+
+- 同一 IR・同一構成の 3 回で、getmem・survey 出力 (全行)・link map の md5 が一致した (`map_*_r*.txt` は構成ごとに 1 種類、`ir_*_r*.ll` は全 6 本が同一)。survey の出力も 3 回で同一。
+- 候補の切り分け: (a) survey の乱数 — `m11_survey.mjs` に乱数は無い (`Date.now` は `M11_SURVEY_PROGRESS=1` の進捗ログだけ)。(b) link 順序 — map の md5 が 3 回で一致し、順序は変わっていない。(c) 並列 load — 本節の 6 セルは全て直列で、並列 load は測っていない (未確認)。
+- 2006/2012 の分岐は、本 run では再現しなかった。IR md5 `4c792075` は repo (`tools/`) のどこにも記録されておらず、この IR も再生成できていない (本 run の IR は `e5023e8e`)。よって issue の「同一 IR `4c792075` で 2006 と 2012」は、本 run の入力では確かめられない。
+- 本 run の値は 2017。これは §10.1 (`f195a93a9`・`e5023e8e`) と一致し、§10 (`bb8aaf1d5`・`8b4461e0`・2008) とは違う。同じ runner 上で `bb8aaf1d5` と `32c1f5d9c` を並べて測ってはいないので、commit 差か runner 差かは未確定。
+- 決定性の判定基準 (受入 2): **同一 commit・同一 IR md5・直列 foreground で、`repro_1952_rt_mech.sh` の getmem が n=3 で一致すること**。本 run では満たした (2017 × 3)。bisect の判定はこの値を基準にする。
+- 既定の基準 (受入 3): 変えていない。ただし本 run の既定 (A_default) は 873/21/0・getmem 2017 で、§0 の 870/24/0 や §10 の 2008 とは違う。基準の差し替えは PM 判断 (§5)。
+- 生値: `table_2275_5955.tsv` (6 行・ヘッダ無し)、`addr_2275_5955.txt` (6 行)。
+- 未解決 (#5955 に残す): (1) 2006/2012 の分岐の再現 (IR `4c792075` の再生成、または `bb8aaf1d5`・`f195a93a9` を同一 runner で並べて測る)。(2) 並列 load での決定性 (未測定)。(3) 本 run の 2017 と §10 の 2008 の差の原因 (commit か runner か)。
