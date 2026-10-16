@@ -262,7 +262,7 @@ Ghidra の計数 (`computed_call_sites=51`) の内訳は次のとおり。
 
 - 反復の総時間: 3 回で **48.95 秒** (real・Ghidra 2 回 + Python 解析を含む・runner 4 vCPU・load average 約 1.1)。
 - 収束時の閉包 (`out/sr85_xferonoff_upper_closure.tsv`・sha256 `b9f034be…cc25`)、root 集合 (`gui/xferonoff_upper2_fns.tsv`・sha256 `fcafc8df…82f9`)、候補 (`out/sr85_own_vt_iter3.tsv`)。
-- 収束時の間接 call 107 箇所の内訳: IAT・外部 import 48 箇所 (候補 1 件・閉包の外)、own vtable で候補化 (未解決 0) 52 箇所、**未解決 6 箇所** (下表)。
+- 収束時の間接 call 107 箇所の内訳: IAT・外部 import 48 箇所 (閉包の外)、own vtable で候補化 46 箇所 (未解決 0)、INT 系 7 箇所 (呼出しではない)、**未解決 6 箇所** (下表)。48 + 46 + 7 + 6 = 107。
 - 未解決 6 箇所 (収束後も候補化できなかったもの):
 
 | 関数 | 命令 | 理由 |
