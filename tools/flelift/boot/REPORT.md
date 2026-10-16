@@ -15,7 +15,6 @@
 - **既定経路の更新 (#672・PM 判断 2026-10-15)**: 既定 (`FLE_IPP` 未指定) = ILT 分岐入力 (mode 3) + 停止点 `0x976da0` の既定 root 化で **units 209 → 895** (ネガコン `FLE_IPP=0` は 209)。詳細と実測は `REPORT_APPENDIX_672.md` §C。
 - **FLE-15 (#3770・診断 route の有界実行)**: 0x6bbc20 root の診断 route は時間上限 300 s で units 209 のまま停止せず (呼出し 6,559,882 回・矩形 (0,0,2^20,2^20))。既定経路 (root 0x6a7b70) は不変。詳細は `REPORT_APPENDIX_3770.md`。FLE-37 (#4983): 既定経路の `FLE_BOOT_LOG_CAP` 無効化を修正 (`REPORT_APPENDIX_4983.md`)。FLE-40 (#5027): cap 超過の例外は Emscripten の tty write で飲まれ `exit` に残る経路を特定し、超過を `boot.threw` の `log_cap` として報告する (`REPORT_APPENDIX_5027.md`)。FLE-41 (#5058): 超過後は次の dispatch で止める (既定 cap 4096 で units 13 で停止・cap 0 は 895 のまま) (`REPORT_APPENDIX_5058.md`)。
 - **FLE-16 (#3771)**: `0x6bbc20` を `[obj+0x118]` へ書く命令は `f_6bc010` の `0x6bc1af` (4・8・16 byte の store の監視で実行時 1 件・obj = `0x12d6a090`。1・2 byte の store は未監視)。役割は画素の store/blend 関数の登録 (推定)。呼出しは `f_6c9280` の `0x6c937a`。詳細は `REPORT_APPENDIX_3771.md`。
-- **#5897**: slot 35 の実行時 VMT 採取は 0 件 (units 895 止まりで未到達)。判定は #5205 → `REPORT_APPENDIX_5897.md`。
 - **PERF-P14 (#970)**: boot closure を -O0 / -O2 / -O2 -flto で build・実行 (node n=10)。3 変種の署名は計数と ipp 状態が一致 (出力メモリは未比較)・units 209 据え置き。ネガコン (`FLE_IPP=0`) で署名は変わる。LTO の結論は shim (-O1 固定) を含まない範囲に限る。実測値・範囲は `REPORT_APPENDIX_970.md`。
 
 ## 1. 成果物 (tools/flelift/boot/)
