@@ -110,3 +110,16 @@
   したがって vtable 候補からは「`r13` 未保存の具象型」は出ない。
 - ただし具象型は 1 つに絞れていない。呼出し元 `180cbb930` の間接 `180cbba21`・`180cbba36` の具象型と、`0x18040e0e0` の引数 `rdx` の出どころは未確定。
 - 受入 2 は未達のまま。残件は `180cbba21`・`180cbba36` の具象型の特定と、呼出し元 `180cbc770` 経由の到達判定。
+
+## 追補 (#5843 run・測定 commit `0c5fae751`)
+- 測定 commit: `0c5fae751` (`tools/icall/cb_vtable_superset.py` の追加。`vtable_r13.py` は未変更)。基点 `fa06aaee4`。
+- 素材: `plugins-freshair` の `SlateCore.core_64` (sha256 `2cf759f7…` 一致)。`objdump -d -M intel` 全量 4,553,159 行 (real 3.5 s)。
+- 上界の測定 (`python3 tools/icall/cb_vtable_superset.py <SlateCore.core_64> <core64.dsm>`・real 5.9 s・load 0.43):
+  - コード中の任意の `lea reg,[rip+X]` の参照先 X を候補にした数: 12,738 件 (`vtable_r13.py` の「lea 直後に格納」より広い)
+  - slot1・slot2 が両方とも関数開始の候補: 1,724 件 (`vtable_r13.py` は 1,625 件)
+  - その slot 関数 (重複除去): 745 件 (`vtable_r13.py` は 635 件)
+  - うち push/pop 無しで `r13` を書く関数: **0 件**
+  - `r13` を書く slot 関数: 56 件。うち `push r13` あり 55 件、rsp 退避のみ 1 件 (`180e2c460`・§9 で保存を確認済み)
+- 読み: 上界でも、slot 関数が `r13` を未保存で書く形は無い。ただし「`push r13` がある = 全 `ret` 経路で復元される」は確認していない (push と pop の個数は一致しない関数があり、関数ごとの全経路確認は未実施)。
+- 未達 (受入 2 の残り): `180cbba21`・`180cbba36` の具象型は未特定のまま。`0x18040e0e0` の戻り値 (`rax`) は `180cbb930` の `[rdi+0xa80]` の出どころにつながる。`180cbc770` の格納 47 関数のうち、どの control block が実際に届くかは未確定。
+- 再現: `python3 tools/icall/vtable_r13.py <SlateCore.core_64> <core64.dsm>` と `python3 tools/icall/cb_vtable_superset.py <SlateCore.core_64> <core64.dsm>`。
