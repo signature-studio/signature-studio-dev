@@ -167,7 +167,7 @@ c_ea7 = find(0x12D8BE0, "call", "0xea7ae0")
 c_ea6 = find(0x12D8BE0, "call", "0xea6b30")
 guard = find(0x12D8BE0, "mov", "rax, qword ptr [rip", 0x15E1748)
 check("find.post_calls", c_ea7 is not None and c_ea6 is not None and guard is not None,
-      f"後段: call 0xea7ae0 at {c_ea7 and hex(c_ea7)}・ガード [0x15e1748] at {guard and hex(guard)}・call 0xea6b30 at {c_ea6 and hex(c_ea6)} (役割は未同定 → #3558)")
+      f"後段: call 0xea7ae0 at {c_ea7 and hex(c_ea7)}・ガード [0x15e1748] at {guard and hex(guard)}・call 0xea6b30 at {c_ea6 and hex(c_ea6)} (役割は未同定 → #5822)")
 w = 0x12D8D28
 check("find.word_zero", data[foff(w):foff(w) + 2] == b"\x00\x00", f"movzx r9 の word [0x12d8d28] はファイル上 {bytes(data[foff(w):foff(w) + 2]).hex()}")
 
