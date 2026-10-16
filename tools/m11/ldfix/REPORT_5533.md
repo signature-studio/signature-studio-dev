@@ -23,6 +23,17 @@
 - 原因の切り分け: boot 前に `0x11FFF000` へ `0xdeadbeef` を書くと、boot 後に `0` になる。boot 中に heap が `0x12000000` から `0x36d80000` まで伸び、このアドレスをプログラムが使う。`m11_image.bin` の中にもこのアドレスは無い。よって値は観測前に消えている。
 - `function_407a50` の entry probe を入れた build は stage4 の結果が変わった (`stage4=false`・`reached_stage 3`)。フックの存在が boot を変えている。
 
+## 3b. 再検証 (2 回目の run・診断計装を JS 配列方式に変更)
+
+- 素材: `work-m11` を `tools/m11/work/` に展開 (tar の内部パスは `tools/m11/work/…` のため `-C tools/m11` では二重になる。展開先に注意)。`fl-win64` は `$RUNNER_TEMP/fl-win64`。
+- 現 IR (`M11_FIX_LD236=1`・`m11_gen_ir2.sh` rc 0): `ir_sha256` `667bbb…` (前 run の `c572d427…` と異なる。生成経路の差分は未切り分け)。
+- 同じ IR での `m11_e2e.sh`: survey ok=875・miss=46・trap=20・clobber=0 (前 run と一致)。gate の期待値 873 との不一致も同じ (既存の状態)。
+- 計装を linear memory の固定リングから JS 配列 (`globalThis.__m11_wv`・EM_JS) に変更。shim は `obj/shim_*.o` として手で compile する必要がある (`stage4.sh` は `shim_*.o` を `emcc -c` しない)。
+- watch build: 成功 (`signature mismatch: 0`・`undefined symbol: 0`)。入力は `work/boot_final3.ll` (`boot_final.ll` を入力にすると `duplicate symbol` で link が落ちる)。
+- **survey 経路の観測**: `m11_wv_push` の呼出し回数は boot で 0・942 unit 全てで 0 (`total_calls 0 units 0`)。`function_1046a30` は survey の unit 実行中に一度も実行されない。
+
+結論: 前 run の「heap による上書き」は誤りではないが、主因ではない。**主因は、survey 経路で `function_1046a30` に到達しないこと**。したがって、計装の記録先をどう変えても X・P の値は survey からは取れない。到達させるには unit の実行経路を変える必要があり、これは計装の範囲を超える。
+
 ## 4. 未達の受入
 
 | 受入 | 状態 | 理由 |
@@ -35,7 +46,8 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 値の観測方式: 固定リングを使えない。boot の heap と衝突する。代替は heap 外の観測 (例: 呼出し先の戻り値経由・専用の別 region の mmap) | X・P の値が取れず、10479c7 が判定不能のまま | #4749 (親)・#5533 の続き |
-| `watch5533` の ring 上書きの原因の確定 (`0x11FFF000` を使う他の書込み元の特定) | 方式の選択に必要 | 同上 |
+| `function_1046a30` が survey 経路 (boot と 942 unit) で実行されない原因の特定 (到達させる unit・経路の選定) | 値を取る前提が立たない。X・P の観測は survey では不可能 | #4749 (親)・#5533 の続き |
+| `0x11FFF000` の上書き元の特定 (前 run の観測。到達の問題より優先度は低い) | 固定リングの方式を捨てたので影響は小さい | 同上 |
 
 ## 6. 再現
 
