@@ -25,7 +25,7 @@
 
 - 測定 commit: `dc0eba1f9` (本 PR の HEAD 時点のコード。以降のコード差分は無し)。
 - 素材: fl-win64 (`block00031_PE.bin`)・work-m11・toolchain-emsdk を展開。`apt-mingw` は使用せず (未実在)。`toolchain-retdec` は未使用。
-- 実行: `bash tools/m11/m11_gen_ir2.sh` → `bash tools/m11/m11_build.sh` → `tools/gui/flengine/build.sh` → `node tools/gui/flengine/boot_halt_probe.mjs` (`M11_M2V` は 0 / 1)。emsdk は `source /opt/emsdk/emsdk_env.sh`。
+- 実行: `bash tools/m11/m11_gen_ir2.sh` → `bash tools/m11/m11_build.sh` → `tools/gui/flengine/build.sh` → `node tools/gui/flengine/boot_halt_probe.mjs` (`M11_M2V` は 0 / 1)。emsdk は toolchain-emsdk の `emsdk_env.sh` を source する (`docs/REFERENCES.md` `[EMSDK]`)。
 
 | 構成 | 所要 | units_run | init | icall_miss | last_unit | threw |
 |---|---|---|---|---|---|---|
