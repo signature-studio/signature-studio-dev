@@ -696,7 +696,7 @@ def selftest():
         ok = st == expect
         bad += not ok
         print('[selftest] %-44s 期待 %-6s 判定 %-6s 類 %s %s' % (name, expect, st, lab, 'OK' if ok else 'NG'))
-    n = len(cases) + len(prune_cases) + len(lab_cases)
+    n = len(cases) + len(prune_cases) + len(merge_cases) + len(lab_cases)
     print('[selftest] %d 件 / 不一致 %d' % (n, bad))
     return bad
 
