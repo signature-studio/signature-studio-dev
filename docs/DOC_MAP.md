@@ -1100,6 +1100,7 @@
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_5030.md` | ~60 | MX-55 (#5030) 付録: 0x17b680 の同定 (scalar 読み・入口 xmm2)・vtable slot 32 の呼出元 1 件 (xmm2 に float)・測定値の正本。REPORT_MX33 §9 から分割移動 |
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_5546.md` | ~60 | KH-168 (#5546): HeartCore.core_64 の Wine 実行環境。LoadLibrary・export 144/144 解決は成功、ACFStartup は page fault で未達 (子 KH-169)。測定値の正本 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_5556.md` | ~60 | KH-169 (#5556): HeartCore.core_64 の ACFStartup page fault の原因切り分け。直接原因は loader の引数未指定 (NULL で戻り・1 で fault)。正しい引数仕様は未確定。測定値の正本 |
 | `tools/targets/kilohearts/REPORT_KH19.md` | 70 | KH-19 (#782) ホスト 3 種 (Snap Heap / Multipass / Phase Plant) の vtable 間接 call 込み closure 再計算 (下界・過大評価の参考値・限界) |
 | `tools/targets/kilohearts/REPORT_KH19D.md` | ~96 | KH-19d (#850): 対照 Gain の未確定 before 160 閉包の x64c lift と build の最初の失敗点 (FLEngine 固有の VA 窓)。結論は REPORT §0 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_849.md` | 68 | KH-19c (#849): rip_data 参照先 2 slot の CFG/XFG dispatch 同定 (load config) と、呼び先 rax の出所の分類 (未確定の件数は子 #3363)。修正後 (`5e1162712`) の 8 条件の実測 (修正前と全 8 条件一致)。測定値の正本 |
