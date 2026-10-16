@@ -65,7 +65,10 @@ strict / loose の分類 (reg 単位・57 対):
 | ARG 240 | 12 | 9 | 3 | 228 |
 | ARG-CHILD 68 | 60 | 56 | 4 | 8 |
 
-(内訳の 2 列は重ならない (9 + 3 = 12、56 + 4 = 60)。証拠あり 72 行は、直接呼出元か vtable 候補のどちらかを持つ行。)
+(内訳の 2 列の重なりは未確認。「重ならない」は前提であり、結合の出力では示していない。証拠あり 72 行は、直接呼出元か vtable 候補のどちらかを持つ行。)
+
+**本 HEAD で §2.2 は再現していない。** 行単位の結合を行うコードは `arg_vt_args.py` に無い。`arg_caller_types.py` は集計だけを出す。表の 9 / 3 / 56 / 4 を作った手順は REPORT に書かれていない。
+再現には `plugins-serum2` の PE が要る。本 run では素材が無く、実行していない。結合の手順は未確定で、素材を取得できる run で確定する (§3 (d))。
 
 ## 3. 未解決 (起票先)
 
@@ -74,8 +77,29 @@ strict / loose の分類 (reg 単位・57 対):
 | (a) vtable 候補 (disp のみの照合) の受け手の型 (reg の指す object の class) を確定する。型が決まれば、F の所属 class と一致するかで確定・非確定を分けられる | 受入 1 の確定 0 件の理由。確定件数を出すための前提 | #5612 (本 issue 残) |
 | (b) 呼出元の SC 判定 (SerumController の関数集合) の境界 | SC 19 件・14 箇所の母集団 | #4930 (親・REPORT_SR82 §6 (b)) |
 | (c) 直接呼出元・vtable 候補のいずれにも証拠が無い 236 行 | 確定の母集団が 72 行に限られる | #5612 (本 issue 残) |
+| (d) §2.2 の結合 (行単位で trace と直接呼出元・vtable 候補を突き合わせ、重なりを確認する) が無い。本 HEAD では再現していない | 証拠あり 72 行の内訳が未検証 | #5612 (本 issue 残) |
 
 ## 4. 測定 commit と差分
 
-- 測定 commit: `arg_vt_args.py` を追加した commit (§6 の commit hash)。コードを変えたのはこの commit だけ。
-- 鮮度 (`docs/WORKFLOW.md` §6): 測定 commit から HEAD までの差分は、PR 内で `git diff <測定 commit> HEAD -- tools/targets/serum2/gui` で確認する。
+- 測定 commit: `7390a5a4c` (`arg_vt_args.py` を追加した commit。§2 の 4 表の数値はこの版の入力で得た)。
+- 測定 commit 以降の変更: `de3045f12` (`arg_vt_args.py` から未使用の `targets` を削除)。出力に影響しない見込みだが、本 run では再測定していない。
+- 鮮度の証跡 (`git diff 7390a5a4c HEAD -- tools/targets/serum2/gui`):
+
+```
+diff --git a/tools/targets/serum2/gui/arg_vt_args.py b/tools/targets/serum2/gui/arg_vt_args.py
+@@ -32,14 +32,12 @@ with contextlib.redirect_stdout(io.StringIO()):
+ REGS = ("rdx", "r8", "r9")
+ ind_re = re.compile(r"qword ptr \[(\w+)(?: \+ (0x[0-9a-f]+|\d+))?\]")
+ 
+-targets = set()
+ trace_rows = []
+ with open(tsv_trace) as f:
+     next(f)
+     for line in f:
+         cols = line.rstrip("\n").split("\t")
+         if cols[4] in ("vptr:ARG", "vptr:ARG-CHILD"):
+-            targets.add(int(cols[1], 16))
+             trace_rows.append((cols[4], int(cols[1], 16)))
+```
+
+- 結論: 差分は `targets` の削除だけ。`arg_caller_types.py` などの測定ツールは変わっていない。再測定は未実施 (入力の PE が本 run に無い)。
