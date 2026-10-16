@@ -1257,6 +1257,49 @@ void m11_4128b0_obs(void) {
 }
 #endif
 
+/* #5666 計測専用 (M11_INSTR_412BR=1 のときだけ有効): function_4128b0 の 412770 (IR 117895 行) 直前で、分岐 1-3 の値を stderr に出す。
+ *   分岐 1 [0xFA5008] は呼出し時点で再読する。分岐 2 ([18787760] = v2)・分岐 3 (GetCurrentThreadId と [0x11EADDC] の u32) は IR の SSA 値を渡す。 */
+#ifndef M11_INSTR_412BR
+#define M11_INSTR_412BR 0
+#endif
+#if M11_INSTR_412BR
+static int g_412br_n;
+void m11_412770_br_obs(unsigned long long v2, unsigned int tid, unsigned int v3) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long a1 = R(0xfa5008), v1 = 0;
+    if (a1 + 8 <= heap) v1 = *(volatile unsigned long long*)(uintptr_t)a1;
+    if (g_412br_n++ < 256)
+        fprintf(stderr, "[m11][412br] #%d b1=[0x%llx]=0x%llx b2=0x%llx b3:tid=0x%x [0x%llx]=0x%x\n",
+                g_412br_n, a1, v1, v2, tid, R(0x11eaddc), v3);
+}
+#endif
+#if M11_INSTR_412BR == 3
+static int g_412gate_n;
+void m11_412770_gate_obs(unsigned long long v2) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long a1 = R(0xfa5008), a3 = R(0x11eaddc), v1 = 0;
+    unsigned int v3 = 0;
+    if (a1 + 8 <= heap) v1 = *(volatile unsigned long long*)(uintptr_t)a1;
+    if (a3 + 4 <= heap) v3 = *(volatile unsigned int*)(uintptr_t)a3;
+    if (g_412gate_n++ < 256)
+        fprintf(stderr, "[m11][412gate] #%d b1=[0x%llx]=0x%llx b2=0x%llx [0x%llx]=0x%x\n",
+                g_412gate_n, a1, v1, v2, a3, v3);
+}
+#endif
+#if M11_INSTR_412BR == 2
+void m11_412770_br2_obs(void) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long a1 = R(18787504), a2 = R(18787464), a3 = R(16404480);
+    unsigned long long v1 = 0, v2 = 0, v3 = 0;
+    if (a1 + 1 <= heap) v1 = *(volatile unsigned char*)(uintptr_t)a1;
+    if (a2 + 8 <= heap) v2 = *(volatile unsigned long long*)(uintptr_t)a2;
+    if (a3 + 4 <= heap) v3 = *(volatile unsigned int*)(uintptr_t)a3;
+    if (g_412br_n++ < 256)
+        fprintf(stderr, "[m11][412br2] #%d [0x%llx]=0x%llx [0x%llx]=0x%llx [0x%llx]=0x%llx\n",
+                g_412br_n, a1, v1, a2, v2, a3, v3);
+}
+#endif
+
 /* #2407 計測専用 (M11_INSTR_E3EF60=1 のときだけ有効): function_e3ef60 (#2373 の unit 895 経路で 60a270 を呼ぶ caller) の入口で
  * arg1 (this = rcx) と [arg1+0] (u64) を stderr に出す。線形メモリ外は読まない (address 0 は線形メモリ内なので読む)。既定 0 では何も入らない。 */
 #ifndef M11_INSTR_E3EF60
