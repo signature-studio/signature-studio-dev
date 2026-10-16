@@ -44,6 +44,17 @@
 
 `receiver_this_trace.py --vtable 0x180a2bf58` の分類件数 (`cat_strict`): THIS 69・THIS-CHILD 197・ARG 240・ARG-CHILD 68 (`REPORT_SR60.md` §3 の不一致 (THIS 67→69、THIS-CHILD 191→197) は、本 run でも同じ値)。原因は未確認。
 
+**SC 伝播の拡張 (本 run・`sc_widen.py`)**: 起点 = `receiver_this_trace.py` の SC 閉包 (strict, 21 関数)。そこから直接 call の宛先へ、rcx が this のものを strict で、strict で外れたものは loose で伸ばし、不動点まで繰り返した。
+
+- 伝播で追加された関数 = 0 (strict 0・loose 0)。閉包は 21 関数のまま飽和した。
+- THIS 69 件 (所属関数 65 個): 証拠 0 件 (SC の関数 0)。
+- THIS-CHILD 197 件 (所属関数 142 個): SC 証拠 1 件 (所属関数 `0x1800a9f40`)。
+- 所属関数の vtable RTTI (`arg_vtable_callers.py` の出力を照合): THIS の 65 個のうち SerumController の RTTI を持つもの 0 個。大半は別クラス (PitchQuantizer・XferFilter・GranularOscState 等)、または表に現れない (25 個)。THIS-CHILD の 142 個のうち SerumController の RTTI は 6 関数 (件数 7)。
+
+読み方: 受入 2 の前提「THIS = SerumController の this」は、SC 伝播を広げても成り立たない。THIS の 69 件は SC の this ではなく、他クラスの this (vtable に載る別クラス) である可能性が高い。THIS-CHILD の SC 証拠は 1 件のみで、件数 (SC 証拠 6 件 / 5 関数, §6 (b)) の前提を揃える必要がある。
+
+再現: `venv/bin/python $P/sc_widen.py Serum2_win64.vst3 trace.tsv --tsv widen.tsv` (測定 commit は本 PR の変更 commit。2 回実行で md5 `a949316a…` 一致、real 23.5 s / 22.8 s、2 回目の load 0.20 → 0.43)。
+
 ## 4. 表の境界 (受入 3)
 
 決め方 (本 run で決定): 1 つの表 (run) を、その表の先頭 h (COL 直後の slot の直前、`find_head` の戻り値) で同定する。出現数は「slot 件数」ではなく「distinct な h の件数」で数える。同じ表の中の複数 slot (例: `num_get` の 9 件が同じ h) は 1 run として数える。
