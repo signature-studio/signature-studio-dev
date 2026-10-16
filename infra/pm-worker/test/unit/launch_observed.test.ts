@@ -49,14 +49,14 @@ describe("観測済み launch の分類 (#2645)", () => {
     expect(r.started).toEqual([[61, ["run7"]]]);
   });
 
-  it("(b) 観測済み・完了から 3 時間以内・報告なし → recent (投稿からは 3 時間を過ぎていても recent)", () => {
-    const r = classify(snap(), input({ launchedAt: T0 - 3.5 * H, state: "observed", doneAt: T0 - H })).rows;
+  it("(b) 観測済み・完了から 1 時間以内・報告なし → recent (投稿からは 3 時間を過ぎていても recent)", () => {
+    const r = classify(snap(), input({ launchedAt: T0 - 3.5 * H, state: "observed", doneAt: T0 - 0.5 * H })).rows;
     expect(bucket(r)).toEqual(["recent"]);
-    expect(r.recent).toEqual([[61, "run finished 1.0h ago"]]);
+    expect(r.recent).toEqual([[61, "run finished 0.5h ago"]]);
   });
 
-  it("(c) 観測済み・完了から 3 時間を過ぎたら候補 (ready) に戻る (投稿からは 3 時間以内でも戻る)", () => {
-    const r = classify(snap(), input({ launchedAt: T0 - H, state: "observed", doneAt: T0 - 3 * H - MIN })).rows;
+  it("(c) 観測済み・完了から 1 時間を過ぎたら候補 (ready) に戻る (投稿からは 3 時間以内でも戻る)", () => {
+    const r = classify(snap(), input({ launchedAt: T0 - H, state: "observed", doneAt: T0 - H - MIN })).rows;
     expect(bucket(r)).toEqual(["ready"]);
   });
 
@@ -64,6 +64,12 @@ describe("観測済み launch の分類 (#2645)", () => {
     const r = classify(snap(), input({ launchedAt: T0 - H, state: "observed" })).rows;
     expect(bucket(r)).toEqual(["recent"]);
     expect(r.recent).toEqual([[61, "launched 1.0h ago"]]);
+  });
+
+  it("(d1') 観測済み・完了時刻の無い launch → 投稿から 2 時間前でも recent のまま (launch の窓は 3 時間。run 完了の 1 時間ではない)", () => {
+    const r = classify(snap(), input({ launchedAt: T0 - 2 * H, state: "observed" })).rows;
+    expect(bucket(r)).toEqual(["recent"]);
+    expect(r.recent).toEqual([[61, "launched 2.0h ago"]]);
   });
 
   it("(d2) 観測済み・完了時刻の無い launch → 投稿から 3 時間を過ぎたら ready", () => {

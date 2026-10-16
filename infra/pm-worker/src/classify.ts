@@ -7,8 +7,12 @@ import { parentOf } from "./refs.ts";
 import { DIGEST_ROLLING_RE, OC_HOLD_LABEL } from "./pm.ts";
 
 // recent の窓 (時間)。holdinfo.ts の解除見込みも同じ値を使う (#5110)。
-export const BOT_COMMENT_WINDOW_H = 1.5;
-export const RUN_WINDOW_H = 3;
+// BOT_COMMENT_WINDOW_H は OC_DOUBLE_MS (30 分) と同値。RUN_WINDOW_H は run 完了の窓と engine.ts の dry-run の再掲間隔も兼ねる (#5596)。
+// LAUNCH_WINDOW_H は投稿からの窓 (完了時刻の無い launch・観測前の launch)。run 完了の窓とは別の値 (#5596 の差し戻し)。
+// prio:critical の issue は bot コメントの窓と run 完了の窓の対象外 (#5596)。
+export const BOT_COMMENT_WINDOW_H = 0.5;
+export const RUN_WINDOW_H = 1;
+export const LAUNCH_WINDOW_H = 3;
 
 export interface SnapIssue {
   number: number;
@@ -55,7 +59,7 @@ export interface ClassifyInput {
   launched: Record<string, string>;
   // 投稿の観測状態 (launchobs.ts)。無い issue は観測記録の無い古い launch (従来の 3 時間判定)。
   launchState?: Record<string, LaunchState>;
-  // 観測済み launch の、観測した run の完了時刻 (launchobs.ts の doneAt)。ある観測済み launch は完了から 3 時間を recent の基準にする。無ければ投稿から 3 時間。
+  // 観測済み launch の、観測した run の完了時刻 (launchobs.ts の doneAt)。ある観測済み launch は完了から RUN_WINDOW_H (1 時間) を recent の基準にする。無ければ投稿から LAUNCH_WINDOW_H (3 時間)。
   launchDoneAt?: Record<string, string>;
   relaunch: Record<string, RelaunchState>;
   // manual_deps.json (キーは issue 番号の文字列)。
@@ -235,6 +239,8 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
 
   const blocksCount = new Map<number, number>();
   for (const bs of blockers.values()) for (const b of bs) blocksCount.set(b, (blocksCount.get(b) ?? 0) + 1);
+  // 区分は親からの継承を含む (#3973)。snapshot は open な issue だけなので、closed の親は引けず継承しない (engine の prioMap と同じ値)。
+  const prios = effectivePrioMap(d.issues.map((i) => ({ number: i.number, state: "open" as const, labels: i.labels, body: i.body, subParent: i.subParent ?? null })));
 
   const artifactsFor = (n: number, i: SnapIssue): string => defaultArtLine(d.pm_art[String(n)]?.line, i.artLine, i.title, i.labels);
   const rlOf = (n: number): RelaunchState => input.relaunch[String(n)] ?? { count: 0, art: null };
@@ -263,17 +269,19 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
       const repStop = !!rep && STOP_HEAD_RE.test(rep.head);
       const material = repStop && input.outcomeReason[k] === "artifact";
       const ls = input.launchState?.[k];
-      // 観測済みで完了を見た run があれば、その完了から 3 時間を recent にする (run が進行中は started が先に効く)。
+      // 観測済みで完了を見た run があれば、その完了から RUN_WINDOW_H を recent にする (run が進行中は started が先に効く)。
       const doneAt = ls === "observed" ? input.launchDoneAt?.[k] : undefined;
+      // prio:critical は bot コメントの窓と run 完了の窓の対象外 (#5596)。投稿直後の窓 (launch 未観測・投稿からの窓) は残す。
+      const critical = prios.get(n) === "critical";
       // 観測できなかった投稿は再投稿しない (stopped で止める)。観測するまでは recent (run が現れれば started になる)。
       if (ls === "failed") {
         rows.stopped.push([n, "launch-unobserved"]);
         stopBasis.set(n, "launch 観測 failed");
       } else if (isLaunched && ls === "launched" && !reported) {
         rows.recent.push([n, `launch not observed yet (${fmt1(ageH(launchedAt) * 60)} min)`]);
-      } else if (isLaunched && doneAt !== undefined && ageH(doneAt) < RUN_WINDOW_H && !reported) {
+      } else if (isLaunched && doneAt !== undefined && ageH(doneAt) < RUN_WINDOW_H && !reported && !critical) {
         rows.recent.push([n, `run finished ${fmt1(ageH(doneAt))}h ago`]);
-      } else if (isLaunched && doneAt === undefined && ls !== "launched" && ageH(launchedAt) < RUN_WINDOW_H && !reported) {
+      } else if (isLaunched && doneAt === undefined && ls !== "launched" && ageH(launchedAt) < LAUNCH_WINDOW_H && !reported) {
         rows.recent.push([n, `launched ${fmt1(ageH(launchedAt))}h ago`]);
       } else if (bl && reported && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);
@@ -286,7 +294,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
           rows.stopped.push([n, head90(bl.head)]);
           stopBasis.set(n, STOP_BASIS_HEAD);
         }
-      } else if (bl && ageH(bl.at) < BOT_COMMENT_WINDOW_H && !pmAnswered(input.pmAt?.[k], bl.at)) {
+      } else if (bl && !critical && ageH(bl.at) < BOT_COMMENT_WINDOW_H && !pmAnswered(input.pmAt?.[k], bl.at)) {
         rows.recent.push([n, `bot comment ${fmt1(ageH(bl.at))}h ago`]);
       } else if (bl && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);
@@ -302,8 +310,6 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
     }
   }
 
-  // 区分は親からの継承を含む (#3973)。snapshot は open な issue だけなので、closed の親は引けず継承しない (engine の prioMap と同じ値)。
-  const prios = effectivePrioMap(d.issues.map((i) => ({ number: i.number, state: "open" as const, labels: i.labels, body: i.body, subParent: i.subParent ?? null })));
   const ready = rows.ready.map((n) => ({ n, title: iss.get(n)?.title ?? "", blocksCount: blocksCount.get(n) ?? 0, prio: prios.get(n) ?? "normal" }));
   rows.ready = sortReady(ready).map((r) => r.n);
   return {

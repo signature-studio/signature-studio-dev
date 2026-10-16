@@ -49,8 +49,8 @@ test("分類: 固定 JSON で TS の classify が期待どおりの行に振り�
     [17, "## 停止報告 素材不足: work-m11 が無い"],
   ]);
   assert.deepEqual(rows.recent, [
-    [11, "launched 1.0h ago"],
-    [14, "bot comment 1.0h ago"],
+    [11, "launched 0.2h ago"],
+    [14, "bot comment 0.2h ago"],
   ]);
   // 被ブロック数の多い順 (1,6,8,10,18 は各 1 件)、同数は番号順。0 件の 15,20 が後ろ。
   assert.deepEqual(rows.ready, [1, 6, 8, 10, 18, 15, 20]);
@@ -92,7 +92,7 @@ test("分類: TS と Python (tools/pm/launch_issues.py の classify) が同じ r
 
 test("分類 (#5111): 停止は見出し『## 停止報告』の構造化マーカーだけで判定する。散文の語 (ブロック・停止します・素材不足) では停止にしない", () => {
   const now = Date.parse("2026-10-14T12:00:00Z");
-  const at = new Date(now - 30 * 60_000).toISOString();
+  const at = new Date(now - 10 * 60_000).toISOString();
   const outcome = "## 停止報告\n理由の分類: artifact=素材不足\n<!-- oc-run-outcome: no-pr reason=artifact run=1 -->";
   const snap = (body: string): Snapshot => ({
     issues: [{ number: 70, title: "[X-1] t", labels: ["oc:no-pr"], body: "", deps: null }],
@@ -124,7 +124,7 @@ test("分類 (#5111): 停止は見出し『## 停止報告』の構造化マー�
   assert.deepEqual(withOutcome.recent.map(([n]) => n), [70]);
 });
 
-test("分類 (#5226): PM の判断 (bot の最後のコメント以降の PM 応答) で bot コメントの窓 1.5h を解く", () => {
+test("分類 (#5226): PM の判断 (bot の最後のコメント以降の PM 応答) で bot コメントの窓 (BOT_COMMENT_WINDOW_H) を解く", () => {
   const now = Date.parse("2026-10-16T12:00:00Z");
   const botAt = new Date(now - 10 * 60_000).toISOString();
   const snap: Snapshot = {
