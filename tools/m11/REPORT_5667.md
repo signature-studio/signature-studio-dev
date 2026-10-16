@@ -1,6 +1,6 @@
 # LB 依存 trap 7 件の wasm offset → IR 命令の特定 (#5667・親 #3389・M11-N255)
 
-測定主体: 本 PR の作業 runner (2026-10-16 UTC)。素材は `fl-win64` (`extracted/block00031_PE.bin` 22,227,016 B のみ展開)・`work-m11` (`tools/m11/work/` に展開・233 件)・`toolchain-emsdk` (`/opt/emsdk` emsdk 6.0.12、既存)。
+測定主体: 本 PR の作業 runner (2026-10-16 UTC)。素材は `fl-win64` (`extracted/block00031_PE.bin` 22,227,016 B のみ展開)・`work-m11` (`tools/m11/work/` に展開・233 件)・`toolchain-emsdk` (`[EMSDK]` emsdk 6.0.12、既存)。
 測定 commit: `f195a93a9` (main。コードは変更していない)。`git diff f195a93a9 HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` の出力は空。
 
 ## 1. 結論
@@ -66,11 +66,11 @@
 ## 7. 再現
 
 ```
-export FL_WIN64_DIR=$HOME/analysis/win64
+# 事前に FL_WIN64_DIR を設定 (値は docs/REFERENCES.md の [WIN64]・環境変数表に従う)
 M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=291,296,304,555,745 bash tools/m11/m11_lb_tolerant_repro.sh 0 work/lb0
 M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=40,153,158 bash tools/m11/m11_lb_tolerant_repro.sh 0x10000 work/lb10000
 python3 tools/m11/m11_wasmnames.py tools/m11/work/m11_boot.cjs.wasm <idx>   # 関数名
-/opt/emsdk/upstream/bin/llvm-objdump -d --start-address=<off-48> --stop-address=<off+8> <wasm>   # 逆アセンブル
+[EMSDK]/upstream/bin/llvm-objdump -d --start-address=<off-48> --stop-address=<off+8> <wasm>   # 逆アセンブル
 ```
 
 - wasm と IR は build ごとに変わる。`work/lb0/`・`work/lb10000/` に退避した `boot_final.ll`・`m11_boot.cjs.wasm` を使う (`work/boot_final.ll` は後の run で上書きされる)。
