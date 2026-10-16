@@ -48,4 +48,4 @@ FL 系の関連 DLL (同じ `extracted/` の PE・export 名で確認):
 
 ## 検証
 
-- 再現: `bash tools/plugins/framework/hostshim/hs_flengine_list.sh` (素材 `$HOME/artifacts/fl-win64.tar.zst` 必要)。
+- 再現: `bash tools/plugins/framework/hostshim/hs_flengine_list.sh` (素材 `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst`) が必要)。
