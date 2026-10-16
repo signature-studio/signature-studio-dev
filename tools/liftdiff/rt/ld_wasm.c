@@ -59,13 +59,17 @@ extern char __global_base[];
 #define LD_RST_STKDEEP 128
 #define LD_RST_STKHI 256
 #define LD_RST_STKWIN 512
-typedef struct { int cat; u8* lo; u64 n; u8* pr; } ld_rst_t;
+/* RESET 時に JS が DataView で直接読むため、wasm32 の配置 (16 byte・各 field 4 byte) を固定する */
+typedef struct { int cat; u8* lo; u32 n; u8* pr; } ld_rst_t;
+_Static_assert(sizeof(ld_rst_t) == 16, "ld_rst_t layout is read by ld_runner.mjs");
 static ld_rst_t ld_rst[32];
 static int ld_nrst;
+/* SNAPSHOT 時の値。RESET の度に wasm 関数を呼ぶと、その frame が hi 区間 [spS, stack_base) を書き換えるため、JS は番地を init 時に 1 度だけ取って読む */
+static struct { int nrst; u32 spS; u32 base; u32 end; } ld_info;
 /* 複製は全 malloc の後にまとめて行う (C 静的変数の複製には dlmalloc の管理情報と ld_rst 表自体が含まれるため) */
 static void ld_rst_add(int cat, void* lo, u64 n) {
   ld_rst_t* r = &ld_rst[ld_nrst++];
-  r->cat = cat; r->lo = (u8*)lo; r->n = n;
+  r->cat = cat; r->lo = (u8*)lo; r->n = (u32)n;
   r->pr = n ? (u8*)malloc(n) : 0;
 }
 static void ld_rst_take(void) {
@@ -109,15 +113,13 @@ EMSCRIPTEN_KEEPALIVE void ld_w_snapshot(int imglen) {
   ld_rst_add(LD_RST_STK | LD_RST_STKHI, spS, (u64)(stbase - spS));
   ld_rst_sta();
   ld_rst_add(LD_RST_IMG, (u8*)(uintptr_t)ld_img, (u64)imglen);
+  ld_info.nrst = ld_nrst; ld_info.spS = (u32)(uintptr_t)spS; ld_info.base = (u32)(uintptr_t)stbase; ld_info.end = (u32)(uintptr_t)stend;
   ld_rst_take();
 }
 /* RESET の戻しと差分数えは JS 側 (ld_runner.mjs の resetRegions) で行う。wasm 側で戻すと hi 区間の差分が 5.8 億 B になった (LD-240 #4801)。
- * ここは区間情報を読むゲッターだけにする。 */
-EMSCRIPTEN_KEEPALIVE int ld_w_nrst(void) { return ld_nrst; }
-EMSCRIPTEN_KEEPALIVE int ld_w_rst_cat(int i) { return ld_rst[i].cat; }
-EMSCRIPTEN_KEEPALIVE u8* ld_w_rst_lo(int i) { return ld_rst[i].lo; }
-EMSCRIPTEN_KEEPALIVE u8* ld_w_rst_pr(int i) { return ld_rst[i].pr; }
-EMSCRIPTEN_KEEPALIVE int ld_w_rst_n(int i) { return (int)ld_rst[i].n; }
+ * JS はこの 2 つの番地を init 時に 1 度だけ取り、RESET では wasm の関数を呼ばずにメモリを読む (呼ぶと frame が hi 区間を書き換える)。 */
+EMSCRIPTEN_KEEPALIVE u32 ld_w_info_addr(void) { return (u32)(uintptr_t)&ld_info; }
+EMSCRIPTEN_KEEPALIVE u32 ld_w_rst_addr(void) { return (u32)(uintptr_t)ld_rst; }
 /* inbuf に "name\0payload\0" を置いて呼ぶ */
 EMSCRIPTEN_KEEPALIVE void ld_w_blob(void) { ld_cmd_blob(g_inbuf, g_inbuf + strlen(g_inbuf) + 1); }
 EMSCRIPTEN_KEEPALIVE void ld_w_fix(void) { ld_cmd_fix(g_inbuf, g_inbuf + strlen(g_inbuf) + 1); }

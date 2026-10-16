@@ -3,8 +3,8 @@
 
   python3 ld240_hi_probe.py > work/ld240/probe.json
 
-wasm ランナだけを起動し (native は使わない)、snapshot 時点の SP を STK 行で読む。
-hi 区間 [SP, stack_base) の長さ・全区間の RESET 差分 (mask 1 / 256 / 512 / 128 / 7) を出す。
+wasm ランナだけを起動し (native は使わない)、SNAPSHOT 関数の内側で記録した SP (snap_sp) を STK 行で読む。
+hi 区間 [snap_sp, stack_base) の長さ・全区間の RESET 差分 (mask 1 / 256 / 512 / 128 / 7) を出す。
 RESET は 1 回ごとに SNAPSHOT 時点へ戻すため、各 mask は別プロセスで測る。
 """
 import json, os, sys
@@ -58,8 +58,8 @@ def main():
         stk, diff = run_mask(sess, m)
         stk0 = stk0 or stk
         res[str(m)] = diff
-    sp, base, end = stk0['sp'], stk0['base'], stk0['end']
-    out = {'sp': hex(sp), 'stack_base': hex(base), 'stack_end': hex(end),
+    sp, top, base, end = stk0['snap_sp'], stk0['top'], stk0['base'], stk0['end']
+    out = {'snap_sp': hex(sp), 'top_after_snapshot': hex(top), 'stack_base': hex(base), 'stack_end': hex(end),
            'stack_bytes': base - end, 'hi_bytes': base - sp, 'deep_bytes': sp - end,
            'reset_diff': res, 'idem_diff_6_6_2_2_4_4': idem(sess)}
     print(json.dumps(out, indent=1))
