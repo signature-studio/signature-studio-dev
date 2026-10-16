@@ -55,3 +55,30 @@ node trap_triage/probe5695_nz.mjs                # 0x12ba808 近傍の非 0 バ�
 ### 4.2 未解決の起票先
 
 - e2e の全再生成 (`lift_pe.sha256` / `functions_dll.csv` 不在): #5190 (`[M11-N235]` work-m11 の素材を作り直す)。
+
+## 5. 2 回目 run: IR store 計装による arg1 の書込み監視 (結論: IR store の書込みは 0 件)
+
+測定 commit: `086abd95a` (コードを変えた最後の commit。`trap_triage/watch_arg1_5695.c` の追加のみ)。
+`git diff 086abd95a HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行 (測定時のコードと HEAD が一致)。
+
+手順: `m11_gen_ir2.sh` (ldfix applied) → `ALLOCA_SKIP=1 M11_WATCH_SRC=trap_triage/watch_arg1_5695.c bash trap_triage/store_watch_1783.sh <tag>`
+(全 store 計装 15,028 site・survey は全 942 unit を順に実行)。`[a1]` は範囲 `[0x12ba808+0x778, 0x12ba808+0x814)` と store の範囲が重なる書込み。
+
+| 測定 | 値 | 備考 |
+|---|---|---|
+| HEAD `086abd95a` の survey (計装 ON) | 62 s・ok 873 / miss 47 / halt0 6 / oob 15 / noproc 1・`[a1]` 0 件 | load 0.94 (開始前)・0.94 (終了後) |
+| 陽性対照 `0x10aa1428` (4B 範囲) | `[a1]` 20 件 (unit -1 / 134 / 144 ほか) | 監視 C の範囲だけを変えた (非コミット)。監視関数は動いている |
+| 陰性対照 `0x10a9f910` (REPORT_1046 の番地) | `[a1]` 0 件 | この build では書込みが観測されない (REPORT_1046 の番地は本 build の対照にならない) |
+| 範囲 `[0x12ba808, +0x1000)` | `[a1]` 88 件。store offset は 0x818・0x81c・0x820・0x840・0x848・0x850・0x858・0x868・0x878・0x888 | 5 フィールド (+0x778・+0x7d8・+0x7f0・+0x808・+0x810) への書込みは 0 件 |
+
+解釈:
+- 監視の仕組みは動いている (陽性対照で検出)。5 フィールドは全 942 unit の survey 中に **IR の store 命令では 1 回も書かれていない**。
+- つまり「フィールドが書込みで 0 になる」という前提は本 build では成り立たない。`initial= 0 0 0 0 0` (boot 後) から 0 のまま。書込み元の特定は、書込みの無い対象に対しては行えない。
+- 残る書込み経路は C 側 (`memcpy`・`rep movs` 等の runtime 関数)。store 計装 (`watch_store_682.py`) はそれを映さない (`rep_watch_3972.py` の注記)。C 側を見るには `m11_rt`/`m11_win` の copy に監視を入れる必要がある (未実施)。
+- 本 build の survey (ok 873 / oob 15) は PR #5707 の測定 (ok 875 / oob 14) と一致しない。`m11_gen_ir2.sh` を作り直したためで、計装の影響ではない (計装 OFF の基準は未測定)。
+
+## 6. 次の一手 (未解決)
+
+1. `e3ef60` の arg1 (0x12ba808) を誰が確保・初期化するか (boot 中の alloc / 0 初期化の位置)。フィールドが「0 のまま」なら、e3ef60 が非 0 を期待する根拠の側を見る。
+2. C 側 (`memcpy`・`rep movs`) の書込みを監視する (`rep_watch_3972.py` の方式)。
+3. `40ffe0` の引数 (リスト先頭) の出所 (受入の残り)。
