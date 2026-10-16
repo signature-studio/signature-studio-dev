@@ -1,4 +1,4 @@
-# 付録: icall #5889 (ICALL-122) — itr_dump の正常終了経路と、6 関数の戻り値-分岐関係の単歩確認 (部分達成)
+# 付録: icall #5889 (ICALL-122) — itr_dump の正常終了経路と、6 関数の戻り値-分岐関係の単歩確認 (達成)
 
 > 親: #5887 (ICALL-121)。前付録: `REPORT_APPENDIX_3089.md` §9.2・§11.1・§11.2。
 > 測定 commit: `749a27433` (origin/main 時点の HEAD)。コード変更は `tools/icall/diff/slot_trace.c` のみ (本 PR)。
