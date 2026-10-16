@@ -1,5 +1,16 @@
 {
  "GetComputerNameExW": {"p0": "zext", "ret": "zext", "why": "p0 = COMPUTER_NAME_FORMAT (非負 enum), ret = BOOL (0/1)"},
  "GetFileAttributesExW": {"p1": "zext", "why": "p1 = GET_FILEEX_INFO_LEVELS (非負 enum)"},
- "SHGetFolderPathW": {"ret": "sext", "why": "ret = HRESULT (符号付き 32bit)。実 IR の呼び元 function_81bca0 は trunc i32 後に 0 比較のみ"}
+ "SHGetFolderPathW": {"ret": "sext", "why": "ret = HRESULT (符号付き 32bit)。実 IR の呼び元 function_81bca0 は trunc i32 後に 0 比較のみ"},
+ "HeapFree": {"ret": "zext", "why": "ret = BOOL (0/1, shimx heap.c は TRUE/FALSE のみ返す)。非負のため sext と結果は同じ。IR 側 call は trunc i32 後に比較のみ"},
+ "IsProcessorFeaturePresent": {"ret": "zext", "why": "ret = BOOL (0/1, shimx env.c は TRUE/FALSE のみ返す)。非負。IR 側は trunc i32 後に and / 比較で使用"},
+ "TerminateProcess": {"ret": "zext", "why": "ret = BOOL (shimx env.c は ExitProcess か失敗時 FALSE のみ)。非負"},
+ "UnhandledExceptionFilter": {"ret": "zext", "why": "ret = LONG で EXCEPTION_EXECUTE_HANDLER (1) 固定 (shimx seh.c)。非負"},
+ "LoadLibraryExW": {"ret": "zext", "why": "ret = HMODULE (shimx load_utf8 は 0 か wasm32 の 32bit 擬似ベース)。上位 32bit は常に 0。非負"},
+ "GetLastError": {"ret": "zext", "why": "ret = DWORD (非負 32bit, shimx teb.c は TEB 値を返す)"},
+ "IsDebuggerPresent": {"ret": "zext", "why": "ret = BOOL。shimx env.c は FALSE 固定 (0)。非負"},
+ "FreeLibrary": {"ret": "zext", "why": "ret = BOOL (0/1, shimx module.c)。非負"},
+ "GetModuleHandleW": {"ret": "zext", "why": "ret = HMODULE (shimx module.c は 0 か 32bit 擬似ベース)。非負"},
+ "GetModuleHandleExW": {"ret": "zext", "why": "ret = BOOL (0/1, shimx module.c)。非負"},
+ "FlsSetValue": {"ret": "zext", "why": "ret = BOOL (0/1, shimx teb.c)。非負"}
 }
