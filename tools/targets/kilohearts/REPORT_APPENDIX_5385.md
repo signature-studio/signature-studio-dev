@@ -18,7 +18,7 @@
   - `git diff a0b804faf HEAD -- tools/targets/kilohearts/ghidra_route` は `patches.py` の 9 行追加 (規則 4 件と、そのコメント)。
   - 件数 assert: 規則 4 件はいずれも `ABI rule hit 1` を満たした (head の `ghidra_to_c.py` が rc 0)。
   - 前 run の 343 / 69 (採用しない値) は今回の測定対象外で、撤回のまま。
-  - 素材の注記: 本 fix run では `$ARTIFACTS_DIR` に `plugins-kilohearts.tar.zst` が存在した (前の fix run では無かった)。`toolchain-emsdk` は `$HOME/artifacts` に無かったため、上流 emsdk から `6.0.12` を取得した (`emsdk install 6.0.12`)。Ghidra 12.1.4 は公式 zip を取得し sha256 を検査して `GHIDRA_HOME` で指定した。
+  - 素材の注記: 素材は `plugins-kilohearts` (`HeartCore.core_64`) と `toolchain-emsdk` (`[EMSDK]`) を使った。emsdk の版 6.0.12 の emcc で測定した。Ghidra 12.1.4 は公式 zip を取得し sha256 を検査して使った。
 - **機械語の源 (capstone 逆アセンブル)**:
 
 | 呼出元 (C 行 → 機械語の call) | 呼出先 | 引数の源 (呼出し直前の xmm0) | 根拠 |
