@@ -35,9 +35,25 @@
 | index < 0 | 0xd7a318 | `pm+0x3d4` を `0x416750` の第 2 引数に渡す |
 | index ≥ 0 | 0xd7a2f5〜0xd7a300 | `[pm+0x3c0] + index×32` を渡す。**件数 (`[arr-8]`) との比較は無い** |
 | 項目書込み | 0xd7a32f〜0xd7a348 | `item = holder`・`itemIndex × 0xb` の位置 +1 に `target` (1 バイト) を書く。**itemIndex の範囲検査は無い** |
-| 0x416750 | 0x416750〜 | 型記述子 (r8) の tag `0x16` で分岐する汎用マーシャリング。tag 0x16 の枝は `[rbx+0x19]` の関数ポインタを呼ぶ。全分岐は読み切っていない |
+| 0x416750 | 0x416750〜 | 型記述子 (r8) に従って src から dst へ値を写す汎用処理。詳細は下の「0x416750 の意味 (PY-4902)」 |
 
-- 0x416750 の意味 (holder に何を写すか) は未確定。REPORT_PY120_2984・REPORT_PY139_3030 の `getMapItemColor` と同じ要素取得の関数として扱う。
+- 0x416750 の意味は PY-4902 (#5287) で VA 根拠により確定した (下節)。`r8` の型記述子は tag `0x16` ではなく `0x0e` (struct `TLaunchMap`) である。
+
+## 0x416750 の意味 (PY-4902・#5287)
+
+検証: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B) を `tar --zstd -xf` で展開。イメージベース `0x400000`・`.text` 0x401000〜。`FL_WIN64_DIR=<展開先> python3 tools/python/pe_py4902_va.py dis|desc <VA>` で再現する (capstone)。
+
+| 項目 | VA | 根拠 |
+|---|---|---|
+| 呼出し側の記述子 | 0xd7a304 | `r8 = [0xfd5518]` → 記述子 `0xfd5520`。`desc 0xfd5520` は tag `0x0e`、名前 `TLaunchMap`、項目 1 (tag `0x11`・`0xfd54d8`) |
+| 既存 REPORT の誤り | 0x416750 の 0x416773〜0x416777 | `cmp byte [r8], 0x16` は存在するが、この記述子は `0x0e` なので tag `0x16` の枝には入らない |
+| 分岐 | 0x4167ae〜0x416a0d | tag `0x0e` は既定の struct 走査。項目ごとに 0x4169e8 で `0x418210` (refcount 付きポインタ代入) を呼ぶ |
+| 項目書込み先 | 0xd7a32f〜0xd7a348 | `item = holder ([rbp+0x30])`・`[pm+0x20]×0xb` の位置 +1 に `target` (1 バイト) を書く |
+| holder の取得 | 0xd7a2d7〜0xd7a311 | 基点 `rax = [[pm+8]+0x50]`。`[rax+0x3c0] + index×32` を 0x416750 の dst に渡し、`[rbp+0x30]` の記述子を読む。index < 0 は `rax+0x3d4` (0xd7a318〜0xd7a32a) |
+| 範囲検査 | 0xd7a2e8〜0xd7a348 | `index` の件数 (`[arr-8]`) との比較は無い。`index < 0` の判定 (0xd7a2ef) のみ。`itemIndex` の比較・分岐は無い |
+
+- 結論: 0x416750 は `(dst, src, 型記述子)` を取り、記述子の項目ごとに src の値を dst へ写す (呼出しは `dst = &[rbp+0x30]`・`src = 配列要素`・`r8 = 0xfd5518`)。tag `0x0e` の struct では、tag `0x11` の項目を `0x418210` (refcount 付きポインタ代入) で写す。`setMapItemTarget` は、写した holder の先頭ポインタ `[rbp+0x30]` を基点に `itemIndex×0xb+1` へ `target` を書く。`index` と `itemIndex` の範囲検査は PE に無い。
+- 未確定: `[rax+0x3c0]` の配列要素の型 (`index×32` の要素が何か) と、`+1` 書込みの前後で他の項目が変わるか。`0x415610`・`0x415c30` (acquire/release 相当) の対応は読み切っていない。
 
 ## 実装
 
