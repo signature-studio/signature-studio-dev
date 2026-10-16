@@ -7,6 +7,8 @@
 
 main 起点で stage-1 を再生成して stage-2 を再現すると REPORT_3120 と同じ `Runtime error 203 at 0000000000000001` (InitUnits 中・smoke.log 27 行目) で FAIL した。203 を書く定数 store は、named 形のポインタだけを解決した集計で 0 件。inline 定数式のポインタ (`ptr inttoptr (i64 N to ptr)`) の store は測定時のスクリプトが数えておらず未集計で、書込み元は未特定 (受入 1・2 は未達)。after-exit の情報値 0 の原因は `fw_stage2.sh:209` の `EXIT_RUNTIME=1` と特定 (受入 3)。加えて `fw_smoke_check` の `runerr` 判定が今回の失敗を数えていない (正規表現の不一致) ことを確認した。
 
+> **注 (#5836 で追記・現行 main との照合)**: 本 REPORT の `203` 記述は `8d8d0e6a` 時点の旧測定値で、現行 main の失敗形ではない。現行 main の stage-2 smoke は `Runtime 268436792 at 0000000010000710` (`init_reach=16`) で、`203` の Error 行は出ない。動的ダンプでも BLK+0x10 に `203` は 0 件 (REPORT_4143 §2)。§0・§3・§6・§7 の `203` 記述は、この注を前提に読むこと。現行の失敗値 `0x10000538` の書込み元と RunError 経路は REPORT_4143 §2・REPORT_5836 §1 を参照。
+
 ## 1. 測定
 
 - 測定 commit: **`8d8d0e6a`** (origin/main・枝 `3150-plg-p0b-31-blk-writers` の起点。パイプラインのコードは変更していない)。
@@ -36,7 +38,7 @@ main 起点で stage-1 を再生成して stage-2 を再現すると REPORT_3120
 
 - **測定時のスクリプトは named 形 (`%p = inttoptr i64 N to ptr` の後の `store ..., ptr %p`) だけを解決していた。** inline 定数式 (`store ..., ptr inttoptr (i64 N to ptr)`) は数えていなかった。以下の数値は named 形のみの集計で、inline 形の分は含まない。
 - named 形の BLK+0x8 (9048072)・BLK+0x10 (9048080) への store: 71,904 件 (下限)。
-- named 形の集計では定数 `i64 203` の store は 0 件。inline 形は未集計のため、203 が定数として書かれていないとは言えない。「203 は実行時に計算された値」は仮説であり、受入 1 の根拠にしない。
+- named 形の集計では定数 `i64 203` の store は 0 件。inline 形は未集計。ただし現行 main では BLK+0x10 の実行時の値に `203` は 1 件も無い (動的ダンプ 99 件・REPORT_4143 §2)。`203` は現行の失敗の値ではなく、「203 は実行時に計算された値」は仮説のままで、受入 1 の根拠にしない。
 - named 形の定数 `1` の store: BLK+0x8 が 15 件、BLK+0x10 が 487 件。237 関数に分散しており、BLK は全関数共通のスクラッチとして使われる可能性がある (単一の書込み元には絞れない)。
 - エラーコード格納先 `7155720` (BLK+0x10 の値を読んで格納するのは `function_4072b0`・10041 行。REPORT_3120 §4 の静的読み。引用の `ptr inttoptr (7155720)` は inline 形)。`function_40e420` (39490 行〜) は `%arg1` を格納して `function_40e400` を呼ぶ (39512 行)。
 - 動的 trace の直前に呼ばれた `function_405670` (`FastMM_GetMem`・2384〜3202 行) の named 形の BLK store は 14 件。値は全て計算結果で、定数ではない。候補 (未検証): 2716 行 (`and %157, 4294967295` → BLK+0x10)・3118 行 (`zext i32 %342` → BLK+0x10)・2883/3169 行 (`and %11, 536870911` → BLK+0x10)。どれが 203 を運ぶかは、実行時に値をダンプするまで確定できない。inline 形の store は未集計。
