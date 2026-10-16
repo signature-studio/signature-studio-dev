@@ -131,7 +131,7 @@
 
 | 残件 | 受入 | 起票先 |
 |---|---|---|
-| `pdata_call` の mismatch 117 → mismatch 0 と取りこぼし 0 の確認。内訳: capstone の LOCK 規則 109 件 (宛先レジスタ 80・LOCK 不可命令 29)・objdump 受理 capstone 不正 5 件 (単独デコードで 4 件確認・1 件未特定)・原因未確定 3 件 | 2 | #4068 [MX-44] (子 issue。本 issue から移管) |
+| `pdata_call` の mismatch 117 → mismatch 0 と取りこぼし 0 の確認 (MX-58 #5399 の分類は `REPORT_APPENDIX_5399.md`: 最新 head の mismatch 24 件を理由別に分類・REX 直後 F0 17 件は SDM 未確認)。内訳: capstone の LOCK 規則 109 件 (宛先レジスタ 80・LOCK 不可命令 29)・objdump 受理 capstone 不正 5 件 (単独デコードで 4 件確認・1 件未特定)・原因未確定 3 件 | 2 | #4068 [MX-44] (子 issue。本 issue から移管) |
 | `pdata_call` を既定にするか (数値は §5.2・§5.3。既定は `any` のまま) | 2 | PM 判断 (#1987 本文 5) |
 
 ### 5.6 #4979 の追記 (測定 commit `00c7332c1`・素材の無い run の記録)
