@@ -177,7 +177,7 @@
 ### 10.1 f195a93a9 での C_noren / NODATA_BODY の計測 (#5945)
 
 - 測定 commit: **`f195a93a9`** (= origin/main の merge #5651)。`tools/m11` のコードは変えていない (`git diff f195a93a9 -- tools/m11` は本節の追記だけ)。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` に設定。`work-m11` を `tools/m11/work/` に展開。`toolchain-emsdk` は展開せず runner の `/opt/emsdk` を使った (`emcc` = `6.0.12 (5488e0871d46)` = pin)。`toolchain-retdec` は展開せず `/opt/retdec` を使った。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` に設定。`work-m11` を `tools/m11/work/` に展開。`toolchain-emsdk` は展開せず runner の `[EMSDK]` を使った (`emcc` = `6.0.12 (5488e0871d46)` = pin)。`toolchain-retdec` は展開せず `[RETDEC]` を使った。
 - IR 再生成: `m11_gen_ir2.sh` rc=0・43.8 秒 (`work/ir_conditions.json` の `ldfix` 有り)。
 - 計測: `bash tools/m11/trap_triage/repro_1952_rt_mech.sh 3 C_noren NODATA_BODY` (rc=0・直列・foreground・2 分 40.9 秒)。開始時 load average 1 分 1.33。
 
