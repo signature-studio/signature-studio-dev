@@ -1,6 +1,6 @@
 # tools/plugins/p0c REPORT 付録 M2 — #5832 の鮮度の証跡 (付録 M §4 の差分全文)
 
-測定 commit = `ce3872372`。 差分は `git diff ce3872372 HEAD -- tools/plugins/p0c` を HEAD `5f7d24dbb` で取った出力 (全文)。 本付録は測定値を含まない。
+測定 commit = `ce3872372`。 差分 (repo 外の絶対パス 1 箇所は `[EMSDK]` 参照に置換) は `git diff ce3872372 HEAD -- tools/plugins/p0c` を HEAD `5f7d24dbb` で取った出力 (全文)。 本付録は測定値を含まない。
 
 ```diff
 diff --git a/tools/plugins/p0c/REPORT.md b/tools/plugins/p0c/REPORT.md
@@ -186,7 +186,7 @@ index 88f66f1b8..ad8183eab 100644
  P0C="$(cd "$HERE/.." && pwd)"
  ROOT="$(cd "$HERE/../../../.." && pwd)"
  W="$ROOT/work/f80b_rt"
--EMCC="${EMCC:-$(command -v emcc || echo /opt/emsdk/upstream/emscripten/emcc)}"
+-EMCC="${EMCC:-$(command -v emcc || echo <EMSDK 既定パス: docs/REFERENCES.md [EMSDK]>/upstream/emscripten/emcc)}"
 +EMCC="${EMCC:-$(command -v emcc || echo "${EMSDK:?EMSDK に emsdk のルートを指定する (docs/REFERENCES.md [EMSDK])}/upstream/emscripten/emcc")}"
  mkdir -p "$W"
  cd "$W"
