@@ -44,7 +44,28 @@ python3 tools/m11/ldfix/mismatch_5436.py OUT.ll --pe <PE> --judge J.json
 
 残 IR_FEWER 6 件は `0xf552a0` (`12df530` 6 件・機械 6 / IR 5) で、本 issue の範囲外 (#5688 の未解決)。
 
-## 4. 到達性計測 (#5715 / CI-238)
+## 4. wasm unit 比較 (#5700) と既定 ON 判断
+
+測定: `tools/m11/ldfix/fix_439f90_e2e.sh` (HEAD `292fc08ec`)。`toolchain-emsdk` (emcc 6.0.12) で既定 IR と `M11_FIX_439F90=1` の IR をそれぞれ wasm にし、942 unit を survey した。
+
+| 項目 | 既定 IR | fix IR (`M11_FIX_439F90=1`) |
+|---|---|---|
+| IR 行数 | 490790 | 490876 (差分 258 行) |
+| ir_sha256 | b202c157… | 578dd958… |
+| wasm build | rc 0 (22 秒) | rc 0 |
+| survey (ok / miss / halt0 / oob / noproc) | 873 / 47 / 6 / 15 / 1 | 873 / 47 / 6 / 15 / 1 |
+
+- `survey_diff.py`: 遷移は全て同種 (ok→ok 873・miss→miss 47 ほか)。**ok 退行 0**。kind 以外の差分 0。icall の総数 [ok, miss] 差 0。
+- e2e 全体: fail=0、所要 2 分 30 秒 (load 0.46 → 0.96、nproc 4)。
+
+**解釈の限界**: unit 結果が一致したのは、`function_439f90` の差し替えが survey の 942 unit の結果に現れなかったことを示すだけ。
+関数が unit から実際に呼ばれたかは**未測定**。呼出し元は `function_510750` (1 箇所) で、そこへの到達は静的に確認できなかった。
+既存の計数手段 (`PROBES` 固定 index・`M11_INSTR_*`) に 439f90 の計測点は無く、足すと既定 build の出力が変わるため、本 run では計測 build を作らなかった。
+
+**既定 ON の判断**: 既定 OFF のまま据え置く。理由は (1) 到達性が未確定で、差分が効いたかどうか分からない、(2) 機械語との突合は呼出し件数 (IR_FEWER 3→0) による近似で block 単位の完全一致は未確認、の 2 点。
+既定 ON への変更は、到達性の計測 (wasm の `function_439f90` の入口計数) の結果を見てから別 PR で判断する。到達性の計測は #5715 ([CI-238]・親 #5700) で行う。
+
+## 4b. 到達性計測 (#5715 / CI-238)
 
 計測 build は opt-in (`M11_FIX_439F90=1`)。既定 build と既定 IR は変えていない。
 
