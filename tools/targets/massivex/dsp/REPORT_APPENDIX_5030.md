@@ -126,7 +126,7 @@
 - 素材: `plugins-massivex` を `$RUNNER_TEMP/mx` に展開 → `parse_setup_headers.py` → `extract_massivex.py <exe> work key` で `Massive X.vst3` を取得。md5 `622993e7…` 一致 (exit 0)。展開 6 秒・抽出 11 秒。
 - `mx60b_xrefs.py` の再実行 (exit 0・2 分 33 秒): 直接 E8/E9 の呼出元は 3 対象 (`0x17a4b0`・`0x17b460`・`0x17a2ac0`) とも 0 件。`vt_IInstrument` の vptr 書込みは `0x17a4b0` の 1 箇所のみ (§3.5 と同じ)。
 - `mx60c_slot30.py` (exit 0・1 分 11 秒):
-  - `call qword ptr [reg+0xf0]` (index 30) は .text 全体で **27 件** (17 関数ではなく 27 箇所)。大半は vtable の汎用呼出しで、呼出元の `this` が `vt_IInstrument` か別の vtable かは区別していない。
+  - `call qword ptr [reg+0xf0]` (index 30) は .text 全体で **27 箇所**。本 script は呼出し箇所を列挙するだけで、呼出元の `this` の型による分類はしていない (分類は未測定)。出力は呼出し箇所ごとに `in fn` の行を持つが、本 run では出力を保存しておらず、関数数は未確認。§3.3 の「17 関数・27 サイト」は前回の `mx60_callers.py` の測定値。
   - `0x17b460` の関数ポインタを値として持つ非実行セクションの位置は **`.rdata` RVA `0x4183798` の 1 件のみ** (`vt_IInstrument` `0x41836a8` の index 30)。よって `0x17b460` への間接経路は、この vtable slot を経由するものに限られる。
   - `0x17b460` の入口: `rcx` → `rbx` (this)、`edx` → `edi`、`r9` → `rsi`。`xmm2` は入口で読まれない (§3.5 と同じ)。
 - **結論**:
