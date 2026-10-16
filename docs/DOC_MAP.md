@@ -392,7 +392,8 @@
 | `tools/m11/trap_triage/REPORT_APPENDIX_5660.md` | ~90 | #5660: 証拠表の行 119〜158 (母数 40) の件ごとの突合表。判定 0 件・保留 40 (保留の型 (i)〜(iv))。REPORT_718 §4l の行 119〜158 の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5751.md` | ~60 | #5751: 証拠表の行 233〜240 (母数 8) の件ごとの判定 (真陽性 6・偽陽性 0・保留 2 (236・237))。REPORT_718 §4m の行 233〜240 の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5689.md` | ~90 | #5689: 証拠表の行 139〜158 (母数 20) の件ごとの判定。確定 0・保留 20 (140・141・143 は別ビルド dsm のみを根拠にしたため保留)。REPORT_718 §4l の行 139〜158 の正本 |
-| `tools/m11/trap_triage/REPORT_APPENDIX_5750.md` | ~110 | #5750: 証拠表の行 226〜232 (母数 7) の件ごとの判定。確定 3 (226・227・232 真陽性 (構造))・保留 4 (228〜231)。REPORT_718 §4n の行 226〜232 の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_5773.md` | ~60 | #5773: 証拠表の行 228・230・231 (母数 3) の件ごとの判定 (真陽性 2 (230・231)・保留 1 (228))。REPORT_APPENDIX_5750 §3 の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_5750.md` | ~110 | #5750: 証拠表の行 226〜232 (母数 7) の件ごとの判定。確定 5 (226・227・232 は本付録、230・231 は #5773 付録で真陽性 (構造))・保留 2 (228・229)。REPORT_718 §4n の行 226〜232 の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5712.md` | ~60 | #5712: 親 #5689 付録 §8 の保留 8 件 (139・149・151・152・154・156・157・158) の再判定。真陽性 1 (139)・保留 7。母数 20 の正本は #5689 付録 §8 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` | ~79 | #3498 (PR #3567): strict 候補の証拠表 行 4〜35 (32 件) の件ごとの表・判定規則・未解決 (REPORT_718 §4h の全文。REPORT_718.md の 250 行上限のため分割移動)。判定の内訳は付録 §4h が正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
@@ -913,6 +914,7 @@
 | `tools/plugins/framework/REPORT_3121.md` | 155 | PLG-P0b-30 (#3121): 修正前 IR の `ptrtoint @1` 123 行を BLK 読みへの値の流れで分類 (修正版: BLK 106・NOBLK 0・UNK 9・MISS 8。旧版 104・11・8 は無効)・修正後 IR で `function_40ea20` の入口分岐が定数式でないことを確認・section 伸び `+0x45970` B の内訳 (#2584 は +752 B、大半は icall の後続 merge)。結論・実測は本文 |
 | `tools/plugins/framework/REPORT_3150.md` | ~90 | PLG-P0b-31 (#3150): stage-2 smoke の `Runtime error 203 at 0x1` の書込み元の IR 上の候補 (named 形のポインタだけの集計で定数 203 の store は 0 件。inline 定数式の store は未集計)・after-exit で情報値が 0 になる原因 (`fw_stage2.sh` の `EXIT_RUNTIME=1`)・`fw_smoke_check` の runerr 判定の漏れ。結論・実測は本文 |
 | `tools/plugins/framework/REPORT_3120.md` | ~100 | PLG-P0b-29 (#3120): stage-2 smoke の InitUnits 中の `Runtime error 203 at 0x1` の発生経路を静的 IR で `4070f0`→`4072b0`→`40e400` まで絞った (書込み元は未特定・BLK 修正との因果は未切り分け)。修正前素材との比較 (n=1) の数値は `REPORT_3120.md` §3 が正本。 |
+| `tools/plugins/framework/REPORT_4143.md` | ~60 | PLG-P0b-44 (#4143): 現行 main の stage-2 失敗 `268436792 at 0x10000710` の書込み元 (7155712 への `store i32`・36405 行) と、BLK+0x10 に 203 が書かれないこと (動的ダンプ・34,596 probe)。結論・実測は本文 |
 | `tools/plugins/framework/REPORT_4270.md` | 156 | PLG-P0b-46 (#4270): RetDec が BLK slot を `constant` にする条件の最小再現 (`fw_blk_const_repro.sh`・1 回の実測)。BLK の値の内容に依ると読める。WRITE 属性の影響は未検証。RetDec 内部の判定条件は未確定。結論・実測は本文 |
 | `tools/plugins/framework/REPORT_3186.md` | ~90 | PLG-P0b-32 (#3186): smoke 判定の RunError 正規表現 (`Runtime error N at` を数える) と `EXIT_RUNTIME=0`。修正前後の stage-2 実測 (150a83fa・8d8d0e6a の 2 基点) は判定・情報値とも不変。#3150 の 203 と情報値 0 は本素材の stage-1 では再現せず、実ログの確認は #3186 に残す |
 | `tools/plugins/framework/REPORT_2571.md` | ~75 | PLG-P0b-22 (#2571): hs_e2e Phase B に TLS 初期化 (`[0x7162d8]=1` → `0x418120`) を CreatePlugInstance の前に通す方式・対照との実測 (n=1)・注釈 `0x4181e0` の判定 (外せない)。Phase B は依然 OOB |
