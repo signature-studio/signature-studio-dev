@@ -12,13 +12,17 @@ Phase A 回帰 (`dispatch=38 ff=0`) は子 #5185 で PASS 済み。本ファイ�
 ## 2. 測定条件 (受入 3)
 
 - 測定 commit: `7ffd8bd40` (origin/main・本ブランチの起点。測定はこの commit のコードで行った)。`hs_disp_emu.py` の最後の変更は `6d46d9bcd`、`hs_store_supplier.py` は `9f225f5e0`。`4130` の測定 commit `9f225f5e0` 以後も、`hs_disp_emu.py` と `hs_store_supplier.py` は変わっている (§5)。
-- 素材: `fl-win64` の `extracted/block00031_PE.bin` 1 件のみ。`tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" --wildcards '*block00031_PE.bin'` で `$RUNNER_TEMP/fl4443` に展開。`work-fw-stage1` は本測定では使わない (受入 1・3 は PE 静的解析のみ)。
+- 素材: `fl-win64` の `extracted/block00031_PE.bin` 1 件のみ。`$ARTIFACTS_DIR/fl-win64.tar.zst` (`docs/WORKFLOW.md` §11) から `block00031_PE.bin` を `$RUNNER_TEMP/fl4443` に展開。`work-fw-stage1` は本測定では使わない (受入 1・3 は PE 静的解析のみ)。
 - Python: venv に `unicorn==2.1.4`・`pefile`・`capstone==5.0.7`。
 - load: 測定開始時 0.65〜0.94 (1 分平均)。実行は n=1。
 
 ## 3. 再現コマンドと実測値
 
 ```
+# 素材展開 (WORKFLOW §11。$ARTIFACTS_DIR に fl-win64.tar.zst がある前提)
+mkdir -p $RUNNER_TEMP/fl4443 && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C $RUNNER_TEMP/fl4443 --wildcards '*block00031_PE.bin'
+# venv 作成
+uv venv $RUNNER_TEMP/venv4443 && uv pip install -p $RUNNER_TEMP/venv4443 unicorn==2.1.4 pefile capstone==5.0.7
 export FL_WIN64_DIR=$RUNNER_TEMP/fl4443 PYTHONPATH=$RUNNER_TEMP/venv4443/lib/python3.14/site-packages
 cd tools/plugins/framework/hostshim
 HS_DISP_PATH=1 HS_DISP_OUT=$RUNNER_TEMP/hs4443/base.json python3 hs_disp_emu.py   # 基準 run
@@ -29,6 +33,7 @@ python3 hs_store_supplier.py                                                    
 | 手順 | 結果 (実測) | 4130 の値 |
 |---|---|---|
 | `hs_disp_emu.py` (基準・256 ID・既定 callee 戻り値 0) | exit 0・real 1 分 12.9 秒 (`time` real 72.8 秒) | 1 分 12.8 秒 |
+| 同上 (別 run・レビューアの再測定) | exit 0・real 51.7 秒。72.8 秒は本件のレビュー run では再現せず、負荷差と推定 (レビューアの測定値) | — |
 | 基準 distinct (rax, path) | 109 / IDs 256 | 109 |
 | unmapped | 61 ID・5,340 件・200 組・197 ページ | 同じ |
 | `hs_store_cov.py` | 静的 69・基準被覆 30・未実行 39・no-case-store 202 | 同じ |
