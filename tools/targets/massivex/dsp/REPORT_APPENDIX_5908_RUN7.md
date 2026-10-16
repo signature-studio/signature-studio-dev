@@ -53,35 +53,39 @@
 
 ## 10. run 8: 転送 site の xmm4/5 生存判定 (`mx63_g_xmm_live.py`)
 
-- **状態 (round 1 fix)**: 下の表と判定は測定 commit `4beb1179b` の旧 script の出力。round 1 で script を次のとおり直した。直後の HEAD は未測定で、表は HEAD に対して無効。
-  - (a) 転送 site は、pdata 関数を先頭から線形復号して命令先頭と一致する `call`/`jmp` のみ採る (`not_insn_boundary` に分ける)。
-  - (b) 入口から site への到達性 (`F_reach_no`) を別に数え、到達する site だけを `F_undef` / `F_defined` に分ける。到達しない site は未判定。
-  - (c) docstring の regs_read/regs_write の記述を、実装の明示オペランド access に合わせた。
-  - 線形復号は、関数内にデータが混ざると命令境界がずれ得る。その場合は `not_insn_boundary` に出る。
-- 再測定: 未実施。`plugins-massivex` が R2 素材として取得されていない (`$ARTIFACTS_DIR` に `fl-win64` のみ)。`Massive X.vst3` md5 `622993e7…` は確認していない。PR 本文の `oc_artifacts: fl-win64 plugins-massivex` で review run に再測定を任せる。
-- 旧出力の md5 は記録していない (旧出力ファイルが残っていない)。「cmp で同一」は REPORT にも PR 本文にも書かない。
-- 検算 (旧 run の記録): `mx63_u3e_split.py` population 604・E 43 (前 run と一致)。
-- 方法: E 43 件の転送先 G について、(a) 転送元 F の入口から転送 site まで、全経路で xmm4/5 が未定義か (`F_must_undef`)、(b) G の入口から書き込み前に xmm4/5 を読む経路があるか (`G_livein_read`)。capstone の `regs_read`/`regs_write` は VEX 命令で空を返す (25/25 件) ため使わず、明示オペランドの access で読む。
+- **測定 (HEAD 実測)**: 測定 commit = 本 fix の HEAD (`mx63_g_xmm_live.py` は `a725746bc` から pdata 範囲フィルタを追加)。素材 `plugins-massivex` から再生成した `Massive X.vst3` (95,356,824 B・md5 `622993e76565f49c094063a2b717d6ca` 一致) に対して実行した。
+  - 素材: `tar --zstd -xf plugins-massivex.tar.zst` → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` (extract の `md5-ok 0/125` は既知事象)。PE は repo 外。
+  - 対象 G: `mx6_e2e.sh` (rc 0・57 s・load 0.86 → 0.95) の vectorcall.json から `mx63_u3e_split.py` を実行し、E 43 件の転送先 G (RVA。`cat == "E"` の site の `G`・重複 0)。
+  - 実行: `mx63_g_xmm_live.py <PE> <out.json> <G 43 件>` rc 0・5.3 s・load 0.41 → 0.41。
+- **script の修正 (本 fix)**: pdata に `.text` 外へ広がる不正な範囲が 100 件あり (最大約 4 GB)。それを関数として採ると `insn_starts` が範囲全体を復号してメモリを使い切った (修正前の script で E 43 件を一括実行すると rc 137 で kill)。`.text` 外の pdata 範囲は関数として採らないよう直した。
+  - 影響: 43 件のうち 1 件 (G `0x180cdfa85`) のみ結果が変わった。修正前は不正範囲 `0x180123920` 内と判定して `G_livein_read=True` としていたが、修正後は pdata 外として未判定にした。残り 42 件は修正前後で同一 (同じ入力で比較)。
+- 検算: `mx63_u3e_split.py` population 604・E 43・D 825・C 1549・G0 351・G 26 (`mx6_e2e.sh` の vectorcall.json から再実行・HEAD で一致)。
+- 旧 commit `4beb1179b` の 43/43・40/43・3/43 は HEAD の結果ではないため、この表から外した。
 
-| 判定 | 件数 |
+| 判定 (HEAD・E 43 G) | 件数 |
 |---|---|
-| F の入口 xmm4/5 が転送 site まで全経路で未定義 | 43 / 43 |
-| G が書き込み前に xmm4/5 を読む (G 入口で値を要求) | 40 / 43 |
-| G の入口が命令として読めない (`hlt`・`jmp [mem]`・`pop` 等で始まる) | 3 / 43 (`0x180a2b0d0`・`0x180c92cf2`・`0x180e91af5`) |
+| 転送 site (命令先頭の call/jmp・G へ直接) | 43 (候補 43・命令境界外 0・pdata 外 0) |
+| 入口から site まで到達しない (`F_reach_no`) | 0 |
+| F の入口 xmm4/5 が転送 site まで全経路で未定義 (`F_undef`) | 43 / 43 |
+| G の先頭から xmm4/5 を書かずに G へ届く (`G_reach_undef=True`) | 32 / 43 |
+| G が書き込み前に xmm4/5 を読む (`G_livein_read=True`) | 39 / 43 |
+| G が pdata 外で `G_livein_read` 未判定 | 1 / 43 (`0x180cdfa85`) |
 
-- 40 件の G は入口から読む命令があり、転送された値を入口で要求する。**F の入口値が G の入口 livein に届く**ことの証拠になる。
-- 3 件は G の先頭がデータ・非命令境界のため判定不能。`livein_read=False` を「依存なし」と読んではならない。
-- 先頭から到達する 4 件 (`0x180850d80`・`0x18086d66c`・`0x180a2e5d0`・`0x180d0c546`) は、先頭から G までの経路上で xmm4/5 が書かれる (`G_reach_undef=False`)。G 入口の値が F の入口値と同一とは言えない。ただし G の入口からの livein は読まれる。
+- `G_livein_read=True` の 39 件は、G の入口から書き込みより前に xmm4/5 を読む経路がある。転送された値を入口で要求し得る。
+- `G_livein_read=False` の 3 件 (`0x180a2b0d0`・`0x180c92cf2`・`0x180e91af5`) は、先頭が `hlt`・`jmp qword ptr [rsi+0x66]`・`pop rcx` で、読みが終端 (終端命令・間接 jmp・pop) まで届かない。**「依存なし」とは読まない**。命令としては復号できる。
+- 先頭から到達する 4 件 (`0x180850d80`・`0x18086d66c`・`0x180a2e5d0`・`0x180d0c546`) は `G_livein_read=True`・`G_reach_undef=False`。先頭から G までの経路で xmm4/5 が書かれるため、G 入口の値が F の入口値と同一とは言えない。
+- レビュー側の 7 G の実測 (head `a725746bc`) と、本 HEAD の値は、転送 site・`G_reach_undef`・`G_livein_read` が全 7 件で一致する。
 
 ### 判定 (受入 1)
 
-- 源側 (F の入口値が転送 site に届く): 43 件で確認。
-- G 側: 40 件で G が入口で値を読むことを確認。3 件は G が関数入口でないため未判定。
-- 受入 1 の判定 (MX-6 入口 livein 0 の陰性が過小検出か) は、3 件の G の同定が残るため確定しない。
+- 源側 (F の入口値が転送 site に届く): 43 件すべて `F_undef` = 43 (到達も確認: `F_reach_no` = 0)。
+- G 側: 39 件で G が入口から書き込み前に xmm4/5 を読む。3 件は読みが終端命令まで届かず判定不能。1 件は pdata 外のため判定不能。
+- 受入 1 の判定 (MX-6 入口 livein 0 の陰性が過小検出か) は、G 側の 4 件 (`0x180a2b0d0`・`0x180c92cf2`・`0x180e91af5`・`0x180cdfa85`) が残るため確定しない。
 
 ### 未解決 (run 8)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| G 3 件 (`0x180a2b0d0`・`0x180c92cf2`・`0x180e91af5`) の入口が命令として読めない | 3 件の U3e 判定 | #5908 (残件) |
+| G 4 件 (`0x180a2b0d0`・`0x180c92cf2`・`0x180e91af5`・`0x180cdfa85`) の入口 livein が未確定 | 4 件の U3e 判定 | #5908 (残件) |
+| pdata 外の不正範囲 100 件 (script は除外。その範囲に入る関数を正しく読めるかは未確認) | 不正範囲に G が入る場合の判定 | #5908 (残件) |
 | 件数の正 (47 / 42) | 両方記録。正は PM 判断 | #5908 |

@@ -8,8 +8,8 @@
   - F_undef:     F_reach かつ、その経路のどれも xmm4/5 を書かない (= site での xmm4/5 が F の入口値の可能性がある)
                  F_reach=False の site は「未判定」として別に数える (未定義の証拠にしない)
   - G_livein:    G から書き込みより前に xmm4/5 を読む経路がある (= G が入口で値を要求する可能性がある)
-  - G_reach:     F_G (G を含む pdata 関数) の先頭から、xmm4/5 を書かずに G へ到達できる経路がある
-判定は経路の存在による over/under の混在を含む。間接 jmp・call の飛び先は追わない。
+  - G_reach:     F_G (G を含む pdata 関数) の先頭から、xmm4/5 を書かずに G へ到達できる経路がある (出力キーは G_reach_undef)
+判定は経路の存在による over/under の混在を含む。間接 jmp・call の飛び先は追わない。.text 外へ広がる pdata 範囲は関数として採らない。
 usage: mx63_g_xmm_live.py <pe> <out.json> <G_rva_hex>... (G は RVA)
 """
 import json
@@ -34,7 +34,9 @@ def main(pe_path, out_p):
     for i in range(0, len(praw) - 11, 12):
         st = int.from_bytes(praw[i:i + 4], 'little')
         e = int.from_bytes(praw[i + 4:i + 8], 'little')
-        if st and e > st:
+        # .text 外へ広がる不正な pdata 範囲 (最大 4 GB・100 件) は関数として採らない。
+        # 採ると insn_starts が範囲全体を復号してメモリを使い切る (実測: G 0x1a11e00 で kill)。
+        if st and e > st and t_lo <= st and e <= t_lo + t_size:
             funcs[st] = e
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     md.detail = True
