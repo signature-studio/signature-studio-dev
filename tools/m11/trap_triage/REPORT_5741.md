@@ -26,7 +26,7 @@
 | `probe5741_elem.mjs` (275 直前の base/count と this) | `base=0`・`count=1`。`mem[0]=0x2fa020`、`mem[8]=0x2fa360`、`mem[0x10]=0x30e588`、添字 10 で `this=0x100000000` (範囲外) |
 | `probe5741_trace275.mjs` (275 の icall 行) | unit 275 の icall は `0x40e170` → `0x85df70` (callback) → `0xf960`。callback 後に count 1→2 |
 | `probe5741_loop275.mjs` | 275 前 `count=1`、275 後 `count=2`・`base=0`・`mem[8]=0x10bd5280` (REPORT_1507 §10 と一致) |
-| `store_watch_5741.sh A full` (全 IR store を unit 0..274 で計装、`WATCH_ADDR=0x0`) | `[0,32)` への書込み 117 件、全て `function_50a830` (IR line 185815、`store i64 %arg2, ptr %8`)。unit 114・157・188・189 ほかで発生 |
+| 全 IR store の計装 (unit 0..274、`WATCH_ADDR=0x0`。計装スクリプトは work/ 内の非 commit、本 PR には含めない) | `[0,32)` への書込み 117 件、全て `function_50a830` (IR line 185815、`store i64 %arg2, ptr %8`)。unit 114・157・188・189 ほかで発生。**この表の 117 件は本 PR のスクリプトでは再現できない** (再現手順は §7 に書かない) |
 
 ## 3. 静的 (disasm)
 
@@ -39,8 +39,8 @@
 
 - e2e rc=1 (ゲート期待値 873 と不一致。main の既存状態。本 issue のコードは変えていない)。
 - survey n=2 で unit 275 の `oob` を再現。ON 反証の結果も §1 のとおり。
-- 測定 commit: 本 PR で追加するのは `trap_triage/` の probe 5 本と `store_watch_5741.sh` と本 REPORT のみ。`tools/m11` の実行経路 (`m11_*.sh`・`m11_win.c`・`survey_units.mjs`) の差分は 0。
-- 差分確認コマンド: `git diff origin/main HEAD -- tools/m11 ':!tools/m11/trap_triage'` (0 行の見込み。PR 作成時に実行して結果を PR 本文に貼る)。
+- 測定 commit: 本 PR で追加するのは `trap_triage/` の probe 5 本と本 REPORT のみ。`tools/m11` の実行経路 (`m11_*.sh`・`m11_win.c`・`survey_units.mjs`) の差分は 0。
+- 差分確認コマンド: `git diff origin/main HEAD -- tools/m11 ':!tools/m11/trap_triage'`。
 
 ## 5. DEFECTS 行案 (未確定。PM 判断)
 
@@ -55,8 +55,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `80e040` の loop 上限と添字の関係 (count=1 のはずで idx≥1 を読む) の機構。loop 内の値を直接取る計装が要る (`m11_trace` は icall 行のみ) | DEFECTS 行案の確定 (候補 A/B の区別) | 子 issue (親 #5741 の続き) |
-| `5dca40` (`864fe0` の呼出し先) の VA 対応 (`disasm_fn.py` が KeyError。関数表に無い) | `864fe0` の trap 位置の確定 | 上と同じ子 issue |
+| `80e040` の loop 上限と添字の関係 (count=1 のはずで idx≥1 を読む) の機構。loop 内の値を直接取る計装が要る (`m11_trace` は icall 行のみ) | DEFECTS 行案の確定 (候補 A/B の区別) | #5761 (`[M11-36]`、親 #5741) |
+| `5dca40` (`864fe0` の呼出し先) の VA 対応 (`disasm_fn.py` が KeyError。関数表に無い) | `864fe0` の trap 位置の確定 | #5761 (同上) |
 | e2e ゲート期待値 873 と main の実測 875 の不一致 (原因未調査) | e2e rc=1 (本 issue のコード変更は無い) | PM 判断 (起票先は未決) |
 | DEFECTS.md への行追加 | 横断正本の更新 | PM 判断 (`docs/WORKFLOW.md` §5) |
 
@@ -70,8 +70,8 @@ bash m11_e2e.sh                                    # rc=1 (ゲート 873 不一�
 SV_RAW=1 node trap_triage/survey_units.mjs work/trap_triage/s.json   # unit 275 = oob
 node trap_triage/probe5741_elem.mjs                # base=0・count=1 (275 直前)
 node trap_triage/probe5741_loop275.mjs             # 275 の前後 count 1→2
-WATCH_ALL=1 WATCH_ADDR=0x0 bash trap_triage/store_watch_5741.sh A full   # [0,32) への書込み 117 件
 M11_FIX_50A830=1 bash m11_e2e.sh                   # ON: 275 は oob のまま、144 回帰
 ```
 
-注意: `store_watch_5741.sh` は実行後に `m11_build.sh` で wasm を復元する。`M11_FIX_50A830` を使うときは `rm -f work/obj/ov.o` を先に行う (REPORT_2408 §7.3)。
+注意: `M11_FIX_50A830` を使うときは `rm -f work/obj/ov.o` を先に行う (REPORT_2408 §7.3)。
+`[0,32)` への書込み 117 件 (§2) は、この再現手順には含まれない (計装スクリプトは未 commit。§2 の表を参照)。
