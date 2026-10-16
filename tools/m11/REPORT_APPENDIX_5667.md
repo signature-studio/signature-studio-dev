@@ -2,7 +2,7 @@
 
 `tools/m11/REPORT_5667.md` の付録。REPORT の本文は結論と表だけを持ち、ここに生の証拠を置く。
 
-測定 commit: `739b46e2d`。本付録の追加はコードを変えない (`git diff 739b46e2d HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` は空)。
+測定 commit: `95249ebbc` (origin/main)。本付録の追加はコードを変えない (`git diff 95249ebbc HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` は空)。
 測定主体: 作業 runner (2026-10-16 UTC)。素材は `fl-win64` (`extracted/block00031_PE.bin`)・`work-m11`・`toolchain-emsdk` (`[EMSDK]`)。
 展開先は detached worktree (`$RUNNER_TEMP`) で、repo の `tools/m11/work/` には触れていない。
 
@@ -163,7 +163,8 @@ sha256sum work/m11_boot.cjs.wasm
 
 ## 6. 745 の IR 突合 (`function_407e20__lifted`・LB=0・指紋 `d6274222`)
 
-逆アセンブルは `llvm-objdump -d work/lb0/m11_boot.cjs.wasm` の関数本体 (`0x13d52c` から)。faulting は `0x13d5e1`。
+逆アセンブルは `llvm-objdump -d work/lb0/m11_boot.cjs.wasm` の関数本体 (`0x13d52c` から) の**抜粋**。`13d5a1`→`13d5de` の間は省略している。faulting は `0x13d5e1`。
+`0x13d593`〜`0x13d598` (`local 3` の `i64.load [arg-8]` → `local.set 3`) は本抜粋に含まれない。この範囲の根拠は未掲載 (`work/lb0` を再生成して確認するまで、`local 3` の出所は未確定)。
 
 ```
   13d598: 21 03        	local.set	3

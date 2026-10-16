@@ -18,7 +18,7 @@ trap 行: unit 555 (`va=0x7f2500`)・unit 745 (`va=0xabb3b0`)。291・296・304 
 | unit | trap の wasm 関数 (offset) | 関数名 | faulting 命令 | IR 対応 (`work/lb0/boot_final.ll`) |
 |---|---|---|---|---|
 | 555 | `[14890]:0x353a06` | `function_535c11` | `i64.load 0` (直前 `i64.load 8; i64.const 8; i64.sub; i32.wrap_i64`。その前に `local.get 1; i64.load 8; i64.const 0; i64.ne; i32.and 1` の分岐) | `%5 = load [%2+8]`・`icmp eq %5, 0` → `%7 = add %5,-8` → `%9 = load i64 [%8]`。**一致 (高)** |
-| 745 | `[1877]:0x13d5e1` | `function_407e20__lifted` | `i64.load 0` (直前 `local.get 3; i32.wrap_i64`。`local 3` は `0x13d593`〜`0x13d598` の `i64.load [arg-8]` の結果) | `function_407e20` (`boot_final.ll:104752`) の `%2 = load [arg1-8]`・`%8 = inttoptr %2`・`%9 = load i64 [%8]` (`boot_final.ll:104775`)。**一致 (中)。** 分岐経路 (`%4`・`%5`・`%7`) は一致したが、`%9` の到達経路の全体は未突合 |
+| 745 | `[1877]:0x13d5e1` | `function_407e20__lifted` | `i64.load 0` (直前 `local.get 3; i32.wrap_i64`。`local 3` は `0x13d593`〜`0x13d598` の `i64.load [arg-8]` の結果と推定。この範囲の逆アセンブルは付録 §6 に未掲載で、根拠は未確認) | `function_407e20` (`boot_final.ll:104752`) の `%2 = load [arg1-8]`・`%8 = inttoptr %2`・`%9 = load i64 [%8]` (`boot_final.ll:104775`)。**一致 (中)。** 分岐経路 (`%4`・`%5`・`%7`) は一致したが、`%9` の到達経路の全体は未突合 |
 
 - unit 555 の呼出し鎖: `function_535c11` ← `function_4fad10` ← `function_4fb910` ← `m11_icall`。
 - unit 745 の呼出し鎖: `function_407e20__lifted` ← `function_407e20` ← `function_409440__lifted` ← `function_409440` ← `function_666bb0` ← `function_7745a0` ← `function_ebb3b0`。
