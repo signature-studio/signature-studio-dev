@@ -124,6 +124,17 @@ P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r
 - 出力差 (既定 vs `FLS_IDX=0`、`kh_a.txt` の行比較): seed 7・11・99 とも 0/200。`negative control` (`CHECK_NEG=1 NEG_OFF=0x4 NEG_MUL=2.0`) は seed 7 で 197/200、seed 11 で 200/200、seed 99 で 198/200 の case が変化 (感度あり)。
 - 残存 site の同定 (IAT は PE 解析で確認): `UNRES` の表示は `ra − 5` (`e8` 前提)。`180fd5222` は実際には `0x180fd5221` の `ff 15 21 c5 3c 00` (`call [rip+0x3cc521]` = slot `0x1813a1748`) の戻り先 (ra=`0x180fd5227`) で、slot `0x1813a1748` は **KERNEL32!HeapAlloc**。`FLS_IDX=0` で残る未束縛呼び出しは HeapAlloc (戻り 0 の stub) だけ。
 - 同定の補足: `0x182989860` は `.data` セクション (VA `0x182870000`〜`0x18436df0c`) の内側。ただし DLL 初期化がここに index を書く経路は未確認。
+- 書き込み経路 (機械語・FA-57 第 2 run): `0x182989860` へ書くのは `0x180fd32dc` (`mov [rip+..],eax`) の 1 箇所。`0x180fd32cc` (FLS 初期化) の直接 call/jmp は `.text` に無く、絶対ポインタとして `.rdata` の関数表 `0x182284b90`〜`0x182284c90` (`0x182284c00` に格納) に 1 箇所だけ載る。この表は `0x180fd1a3c`・`0x180fd1a92` が `leaq` で参照し、`0x180fe2394` (表を順に回す共通ルーチン) に渡す。表から DLL エントリ `0x180f87c6c` までの到達は未確定 (表の呼び出し元 `0x180f875dd` を含む `0x180f87xxx` 系の経路は、DLL エントリから `0x180f87b38`・`0x180f88124` を介して見えるが、`0x180fd1a3c` までの連鎖は未確認)。よって既定の index を harness で決めることは、推定に基づく変更になるため行わない。
+- `HEAP_IMPL` 追加 (FA-57 第 2 run・測定 commit `1e2be573a`): `HeapAlloc` (IAT `0x1813a1748`) を `calloc` に差し替える実体。`HEAP_IMPL` 指定時だけ有効 (既定は従来 stub)。`FLS_IDX=0 HEAP_IMPL=1 bash tools/targets/freshair/ks_kh_comp.sh 200 <seed>` の結果 (3 seed とも `determinism: run1 == run2` byte 一致・`RESULT: ... ERR 0`・既定との出力差 0/200):
+
+| seed | 経路 | SUMMARY (cases・err・audio_changed・notify_total・no_notify・unresolved) | FLS | HEAP | 負例 (P+0x4 ×2 で変化) |
+|---|---|---|---|---|---|
+| 7 | FLS_IDX=0 HEAP_IMPL=1 | cases=200 err=0 audio_changed_cases=197 notify_total=294 no_notify_cases=25 unresolved_import_calls=4 | fls_set_calls=2 fls_set_ok=2 | heap_alloc_calls=1 | 197/200 |
+| 11 | FLS_IDX=0 HEAP_IMPL=1 | cases=200 err=0 audio_changed_cases=200 notify_total=292 no_notify_cases=25 unresolved_import_calls=4 | fls_set_calls=2 fls_set_ok=2 | heap_alloc_calls=1 | 200/200 |
+| 99 | FLS_IDX=0 HEAP_IMPL=1 | cases=200 err=0 audio_changed_cases=198 notify_total=293 no_notify_cases=29 unresolved_import_calls=4 | fls_set_calls=2 fls_set_ok=2 | heap_alloc_calls=1 | 198/200 |
+
+- 残存の未束縛呼び出し (4 件・3 seed とも同じ site `180fd2c27`・`180fd2c3f`・`180fd2ca7`・`180fd2cc5`): 内部 thunk `0x180fd1f30`・`0x180fd1f84` が IAT slot `0x1813a1268` (`KERNEL32!EnterCriticalSection`)・`0x1813a1280` (`KERNEL32!DeleteCriticalSection`) へ tail jump する。受入 2 経路 (FlsSetValue・SetLastError) の外。
+- 注意: `HEAP_IMPL=1` では `fls_set_calls` が 134/136/102 → 2 に減る (HeapAlloc の戻りが非 0 になり、FlsSetValue を通る経路が変わる)。出力は既定と変わらない (0/200 差) が、`FLS_IDX` の値の意味は HeapAlloc 実体化の後で測り直す必要がある。
 
 ## 7. 未解決
 

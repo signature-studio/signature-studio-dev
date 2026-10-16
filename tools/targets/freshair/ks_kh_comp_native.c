@@ -56,6 +56,13 @@ static uint64_t __attribute__((ms_abi)) fls_get(uint32_t idx) {
     return fls_val[idx];
 }
 static uint64_t __attribute__((ms_abi)) set_lasterr(uint32_t e) { g_lasterr = e; return 0; }
+/* HeapAlloc (FA-57 / #4622): HEAP_IMPL 指定時だけ実体化する。常に 0 初期化 (決定性のため)。 */
+static uint64_t heap_calls;
+static uint64_t __attribute__((ms_abi)) heap_alloc(void* h, uint32_t flags, size_t n) {
+    (void)h; (void)flags;
+    heap_calls++;
+    return (uint64_t)(uintptr_t)calloc(1, n ? n : 1);
+}
 
 /* IAT の未束縛スロット (ファイル上は hint/name RVA のまま) を stub に差替える。
  * GetLastError は 0 を返す (fault 経路で呼ばれる)。他の import を呼んだら unres_hits を増やす。 */
@@ -70,11 +77,12 @@ static void patch_iat(uint8_t* m, uint32_t pe) {
             if (!ent) break;
             void* fp = (void*)stub_unres;
             if (!(ent >> 63) && !strcmp((const char*)m + (uint32_t)ent + 2, "GetLastError")) fp = (void*)stub_ret0;
-            if (getenv("FLS_IDX") && !(ent >> 63)) {
+            if (!(ent >> 63)) {
                 const char* nm = (const char*)m + (uint32_t)ent + 2;
-                if (!strcmp(nm, "FlsSetValue")) fp = (void*)fls_set;
-                else if (!strcmp(nm, "FlsGetValue")) fp = (void*)fls_get;
-                else if (!strcmp(nm, "SetLastError")) fp = (void*)set_lasterr;
+                if (getenv("FLS_IDX") && !strcmp(nm, "FlsSetValue")) fp = (void*)fls_set;
+                else if (getenv("FLS_IDX") && !strcmp(nm, "FlsGetValue")) fp = (void*)fls_get;
+                else if (getenv("FLS_IDX") && !strcmp(nm, "SetLastError")) fp = (void*)set_lasterr;
+                else if (getenv("HEAP_IMPL") && !strcmp(nm, "HeapAlloc")) fp = (void*)heap_alloc;
             }
             uint64_t v = (uint64_t)(uintptr_t)fp;
             memcpy(m + ft + 8 * k, &v, 8);
@@ -223,6 +231,7 @@ int main(int argc, char** argv) {
     }
     fprintf(stderr, "SUMMARY cases=%d err=%d audio_changed_cases=%d notify_total=%d no_notify_cases=%d unresolved_import_calls=%llu\n", nc, err, changed, nvec_total, nzero, (unsigned long long)unres_hits);
     if (getenv("FLS_IDX")) fprintf(stderr, "FLS fls_set_calls=%llu fls_set_ok=%llu\n", (unsigned long long)fls_set_calls, (unsigned long long)fls_set_ok);
+    if (getenv("HEAP_IMPL")) fprintf(stderr, "HEAP heap_alloc_calls=%llu\n", (unsigned long long)heap_calls);
     for (int i = 0; i < 8 && unres_site[i]; i++)
         fprintf(stderr, "UNRES site=%llx count=%llu\n", (unsigned long long)unres_site[i] - 5, (unsigned long long)unres_cnt[i]);
     return err ? 1 : 0;
