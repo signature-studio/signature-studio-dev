@@ -105,7 +105,7 @@ rax 格納の直前書込み (VA 付き、`hs_store_src27.py` の出力):
 | `6` / `0x40fe90:one` | 4 (0x1320fc4・0x13210ae・0x13211a1・0x132206e) | 4 (0x1320fda・0x13210e8・0x1321225・0x13226dd) | 2 (0x132206e・0x1320fc4) |
 | `6` / `0x40fe90:one,0x40ae70:one` | 4 (同上) | 4 (同上) | 2 (0x132206e・0x1320fc4) |
 
-- 受入 2 の判定: **0/11**。0x132206e と 0x1320fc4 は実行されたが、どちらも「供給元の値を与えた」実行ではない。
+- 受入 2 の判定: **0/11** (※ 本節の時点の判定。#5422 で `HS_DISP_RET_SPEC` に xmm0 を与える `VA:x<値>` を追加し判定を更新。現在の判定は §5.1.2 を参照)。0x132206e と 0x1320fc4 は実行されたが、どちらも「供給元の値を与えた」実行ではない。
   - 0x132206e: 実行は `Index=6` (`[rbp+0x1878]` の分岐を通すため) と `0x40fe90:one` (`0x1321e19` を通すため) による。格納値は `call 0x40ae70` の xmm0 由来だが、`HS_DISP_RET_SPEC` は xmm0 を設定しないため値は 0 のまま (`-42333333`)。
   - 0x1320fc4: 供給元の `[rbp+0xbb8]` の起点 `0x1320f8c` の rax が窓外で、値を与えていない。
 - 必要な作業: `HS_DISP_RET_SPEC` に xmm0 を与える mode (例: `xmm0:<float>`) を追加する。ただし 0x40ae70 の戻り値の意味 (倍率・定数変換の前段) が確定していないので、先に 0x40ae70 の戻り値の由来を確定する必要がある。
@@ -119,6 +119,43 @@ rax 格納の直前書込み (VA 付き、`hs_store_src27.py` の出力):
 - 変更 `HS_DISP_INDEX=6 HS_DISP_RET_SPEC=0x40fe90:one`: real 64.99 秒、load 0.89。
 - 変更 `HS_DISP_INDEX=6 HS_DISP_RET_SPEC=0x40fe90:one,0x40ae70:one`: real 67.68 秒、load 0.86。
 - `hs_store_src11.py` の再実行は §5.1 のとおり (解析のみ)。
+
+#### 5.1.2 xmm0 戻り値の mode 追加と Index 別の実測 (#5422 の続き)
+
+`hs_disp_emu.py` の `HS_DISP_RET_SPEC` に `VA:x<浮動小数>` を追加した (xmm0 に double を入れて返す。rax は 0 のまま。既定動作は不変)。0x40ae70 の戻り値 xmm0 は `movsd [rbp+0x60]` 経由の libm 型の計算で、0x1322020〜0x1322053 で `(xmm0 - C) * k` の後に `[rbp+0xb30]` へ入る。
+
+- 0x40ae70 は関数外の `call 0x40a1c0` を含み、既定の stub (戻り値 0) では xmm0 = 0 のまま。`x` mode で値を与えると、格納 0x132206e の値が変わる (ID 76・`Index=6`): `x0` → `-42333333` / `x2.0` → `0x3dcccccd` / `x5.0` → `0x3ecccccd`。
+- 0x40ae70 の戻り値 xmm0 の真値は未確定 (上記の由来は VA 付きで追跡済みだが、戻り値の意味と供給元の値は未確定)。ここでの `x2.0`・`x5.0`・`x0` は非 0 の仮値であり、供給元の値を与えたものではない。
+- 変更 run (`Index=6`・`0x40fe90:one`・`0x40ae70:x2.0`) では 0x132206e が ID 76 で実行され、格納値は xmm0 の仮値に応じて変わった。範囲は「供給元の真値は未確定。非 0 の仮値 2.0 を与えて 0x132206e の格納が実行されることを確認した」ことに限る。この範囲で受入 2 の 1/11 と判定する (供給元の真値での実行とは見なさない)。
+- 0x13220b2 は `Index=7` で実行されるが、格納値は `0x0` (`x2.0` を与えても変わらず)。格納値の要因 (`[rbp+0x109c]` の経路) は未追跡。供給元の値を与えた実行とは言えないので 0/11 扱い。
+- 0x13221be は、どの Index (0〜9) でも実行されなかった (基準の path に 0x13221a0〜0x13221c8 は現れない)。
+
+Index 別の実測 (`hs_store_cov.py`・基準 `base.json` 対比・`HS_DISP_RET_SPEC=0x40fe90:one,0x40ae70:x2.0`):
+
+| `HS_DISP_INDEX` | 11 行のうち新規実行 | 基準比の distinct (rax, path) |
+|---|---|---|
+| 0 | 0 | 109 |
+| 1 | 0x1321f0e (ほか 0x1320fc4) | 109 |
+| 2 | 0x1321f34 (ほか 0x1320fc4) | 109 |
+| 3 | 0x1321f6c (ほか 0x1320fc4) | 109 |
+| 4 | 0x1321fc2 (ほか 0x1320fc4) | 109 |
+| 5 | 0x1320fc4 のみ | 109 |
+| 6 | 0x132206e・0x1320fc4 | 109 |
+| 7 | 0x13220b2・0x1320fc4 (格納値 0) | 109 |
+| 8 | 0x1320fc4 のみ | 109 |
+| 9 | 0x1320fc4 のみ | 109 |
+
+- Index 1〜4 で入る 4 行 (0x1321f0e・0x1321f34・0x1321f6c・0x1321fc2) は、供給元 (フィールド・グローバル・比較) の値を与えていない。実行されるだけで、受入 2 の『供給元の値を与えた実行』には数えない。
+- 0x1320fc4 は全 Index で実行されるが、供給元 `[rbp+0xbb8]` の起点 (0x1320f8c) の rax は窓外のまま。値を与えていない。
+- Index の走査 (表) は、`6d46d9bcd` と実行コードが同一の作業ツリーで実施 (測定時はコメント 1 行の差を含む未コミット状態)。`7b047c121` の HEAD で表の再現を確認済み。
+
+受入 2 の判定: **1/11** (0x132206e のみ。範囲は上記のとおり、供給元の真値は未確定で、非 0 の仮値 `2.0` を xmm0 に与えて格納の実行を確認したもの)。残り 10 行は未実測。
+
+測定 commit: `6d46d9bcd` (`hs_disp_emu.py` に `VA:x<値>` を追加した commit)。素材 `fl-win64` の `extracted/block00031_PE.bin` を `$RUNNER_TEMP/fl` に `tar --zstd -xf` で当該 1 件展開。Python venv: `unicorn 2.1.4`・`pefile`・`capstone 5.0.7`。
+
+- 基準 `HS_DISP_PATH=1` (既定・全 256 ID): real 42.36 秒、rc=0、終了時 load 1.30 (`uptime` の 1 分平均)。`distinct (rax, path) = 109`・unmapped 61 (main と一致)。
+- 変更 `HS_DISP_INDEX=6 HS_DISP_RET_SPEC=0x40fe90:one,0x40ae70:x2.0`: real 39.38 秒、終了時 load 1.11。`distinct = 109`。
+- Index 0〜9 の走査は各 run を 4 並列で実施し、全 10 件の完了を確認 (個別の real は未計測。終了時 load 最大 2.84)。
 
 ### 5.2 #5421 (PLG-P0b-58) — call 戻り値経路の 5 行
 
@@ -177,6 +214,8 @@ FL_WIN64_DIR=<展開先> PYTHONPATH=<unicorn,pefile,capstone> python3 hs_store_b
 FL_WIN64_DIR=<展開先> HS_DISP_PATH=1 HS_DISP_OUT=base.json python3 hs_disp_emu.py
 FL_WIN64_DIR=<展開先> PYTHONPATH=<...> python3 hs_store_cov.py base.json
 FL_WIN64_DIR=<展開先> PYTHONPATH=<...> python3 hs_store_src11.py
+FL_WIN64_DIR=<展開先> HS_DISP_PATH=1 HS_DISP_INDEX=6 HS_DISP_RET_SPEC=0x40fe90:one,0x40ae70:x2.0 HS_DISP_OUT=h_x6.json python3 hs_disp_emu.py
+FL_WIN64_DIR=<展開先> PYTHONPATH=<...> python3 hs_store_cov.py h_base.json h_x6.json
 ```
 
 §5.1 の path 集計 (`base.json` は `HS_DISP_PATH=1` の出力。`path` は VA の list):
