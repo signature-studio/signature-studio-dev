@@ -5,7 +5,7 @@
 あるかを調べる。ある → 呼出元の xmm2 (float 引数) が使われうる。
 無い → 呼出元が xmm2 に float を載せる必要は無い (受入 1 の判定)。
 
-間接 jmp・関数外への jmp は保守的に「読む」扱いにする。
+間接 jmp・関数外への jmp は解析できない箇所として数え、読む経路が見つからないときは判定保留にする。
 call は引数の読みを capstone の regs_read が表さないため、xmm2 を書く前に到達する call は
 保守的に「読む」扱いにする (呼出先の解析は行わない)。
 
@@ -34,17 +34,19 @@ def main(pe_path, entry_rva):
     for k in range(ex.Size // 12):
         b, e = struct.unpack_from('<II', data, ex_off + k * 12)[:2]
         funcs[base + b] = base + e
-    fs = base + entry_rva
-    if fs not in funcs:
-        print('entry %#x is not a pdata function start' % fs)
+    a_in = base + entry_rva
+    cand = [b for b, e in funcs.items() if b <= a_in < e]
+    if not cand:
+        print('entry %#x is not inside a pdata function' % a_in)
         return 1
+    fs = max(cand)
     fe = funcs[fs]
     md = Cs(CS_ARCH_X86, CS_MODE_64)
     md.detail = True
     code = blob[fs - t_lo:fe - t_lo]
     ins = {i.address: i for i in md.disasm(code, fs)}
     order = sorted(ins)
-    print('== 0x%x: %d 命令 (%#x-%#x) ==' % (entry_rva, len(order), fs - base, fe - base))
+    print('== 0x%x (関数先頭 %#x): %d 命令 (%#x-%#x) ==' % (entry_rva, fs - base, len(order), fs - base, fe - base))
 
     reads_before_def = []
     seen = set()
@@ -94,8 +96,12 @@ def main(pe_path, entry_rva):
     print('== 制御が解析できない箇所: %d 件 ==' % len(unknown))
     for a in unknown:
         print('   %#x' % (a - base))
-    verdict = 'xmm2 を読む経路あり (呼出元の float 引数が使われうる)' if reads_before_def else \
-        'xmm2 を読む経路なし (呼出元の xmm2 は使われない)'
+    if reads_before_def:
+        verdict = 'xmm2 を読む経路あり (呼出元の float 引数が使われうる)'
+    elif unknown:
+        verdict = '判定保留 (制御が解析できない箇所があり、xmm2 を読む経路の有無を示せない)'
+    else:
+        verdict = 'xmm2 を読む経路なし (呼出元の xmm2 は使われない)'
     print('== 判定: %s ==' % verdict)
     return 0
 
