@@ -309,6 +309,7 @@
 | `tools/m11/REPORT_N228.md` | ~60 | #4905 (M11-N228, 親 #4891): set_other 非 imm の gep 17 件の基底 reg を到達定義で分類 (実測 実値化 0・復元不能 0・未決 20・未分類 0)。IR への GEP 接続は未実装。分類器 `m11_setother_gep_global.py --pe` |
 | `tools/m11/REPORT_N229.md` | ~60 | #4906 (M11-N229, 親 #4891): set_other 書込可能グローバル 3 件 (VA 0x15e3a70) の格納元探索 (IR・PE 直接経路の store 0 件・計算ポインタ経由は未決)。分類器 `m11_setother_gep_global.py --pe` |
 | `tools/m11/REPORT_N244.md` | ~70 | #5449 (M11-N244, 親 #4906・#4891): set_other 書込可能グローバル 3 件 (VA 0x15e3a70) の IR 全体の SSA 連鎖探索 (VA への直接 store 0 件・計算ポインタ 10,774 件は未決)。分類器 `m11_global_store_alias.py` |
+| `tools/m11/REPORT_N245.md` | ~55 | #5481 (M11-N245, 親 #5425): sigfix40c 4 variant (only40c・ctlB・ctlC・sigzero) の clean build 2 回の再現性 (ok 135 で一致)・base 873 との差の残件 (#5482)・xmm stamp による variant 取り違えの落とし穴。再現は `m11_sigfix_repro.sh` |
 | `tools/m11/REPORT_N227.md` | ~50 | #4891 (M11-N227, 親 #3907): set_other 非 imm の gep 17 件と書込可能グローバル 3 件の 3 値判定 (実測 実値化 0・復元不能 0・未決 20・未分類 0)。gep の基底 SSA 対応・global の格納探索は子 #4905・#4906。分類器 `m11_setother_gep_global.py` |
 | `tools/m11/REPORT_N171.md` | ~120 | #3134 (M11-N171, 親 #1154): set_other 非 imm 349 件 (reg 123・mem 150・lea 76) の定義探索と 3 値分類 (件数は REPORT 参照)。接続方式の決定と未決の接続先 (#3140・#3141・#3142)。survey は素材欠落で未測定 (#1154)。分類器 `m11_setother_nonimm_class.py` |
 | `tools/m11/REPORT_N198.md` | ~90 | #3916 (M11-N198, 親 #3140): set_other の CFG 実値化を独立に照合する。具体実行で呼出し点の全経路の値を列挙する照合器 `m11_setother_nonimm_cfg_verify.py` (`--selftest` と実データ)。前提の実値化 1 件は未決 (経路で 0x0 と 0x1)。判定不能 33 件 (未対応命令) |
