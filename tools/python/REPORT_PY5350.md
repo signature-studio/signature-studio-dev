@@ -81,8 +81,19 @@
 - 本 issue では C provider と mock を変えていない (受入の実装は親 #5106 の範囲)。
 - #5106 で実装するときの前提: 解決順 (§2) と経路の分岐 (§3) は確定。**戻り値の中身は未確認**なので、§4 の 1 と 2 を確定させてから名前を実装する。推測で名前を置かない。
 
+## 6. PY-5355 (#5529) の追記: 戻り値の中身を決める経路の PE 上の確認
+
+戻り値の文字列の中身を決める経路を、`0x12b69b0` (flag == 6) と `0xd80f36` (flag != 6) について機械語で確かめた。結論は「中身は静的な PE だけでは確定できない」。
+
+- **flag == 6 (`0x12b69b0`)**: `0x1331340` (`0x12b6a2c`) で sub-object の参照を得て、その vtable `+0x20` を `edx = 6` で呼ぶ (`0x12b6a3c`・`0x12b6a56`・`0x12b6a71`)。戻る名前は `0x413a60` (`0x12b6a88`、長さ上限 0x1000) で読み、`0x41c650` (`0x12b6a95`) で `[rbp+0x60]` に代入する。`0x1331340` は REPORT_PY2887 と REPORT_PY163 の入口と同じ関数。
+- **flag != 6 (`0xd80f36`)**: `obj.vt[+0x20](obj, flag, paramIndex, 0, &buf)` を呼ぶ (§3 の既述)。
+- **未確定**: 両経路の `+0x20` の実体は、呼ばれる object の具体的な class (vtable) で決まる。その class は `0x1331340` の `[this+0x38]` の値 (PY163 で未確定) に依存し、PE の静的な読みでは確定しない。よって戻り値の中身 (何の名前か) と flag 1〜5・7 以上の意味は、本 PR では「未確認」のまま。推測で名前を実装しない。
+- 検査 (`analysis/flapi/plugins_getname_facts.py`) に、上の呼出し経路 4 件を assert として加えた (27 項目 PASS)。
+
+受入条件 1 (戻り値の中身の確定) は**未達**。残りは §4 の 1・2 (vtable 先の実体と flag の意味) で、親 #5106 が扱う。
+
 ## 関連
 
-- `tools/python/analysis/flapi/plugins_getname_facts.py` (本 REPORT の根拠 23 件を assert)
+- `tools/python/analysis/flapi/plugins_getname_facts.py` (本 REPORT の根拠 27 件を assert)
 - `tools/python/REPORT_PY228.md` (`getParamValueString`・同じ解決の並び。§2・§3)
 - `tools/python/REPORT_PY16.md` (`plugins.getName` の既定値 `midi.FPN_Param`・許可表)
