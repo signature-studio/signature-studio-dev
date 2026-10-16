@@ -27,7 +27,7 @@ win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を
 
 ### 0-2. 対応表の拡張 (#3316 受入 1 の実装)
 
-測定 commit: 本 PR の HEAD。main `732795918` の `gen_helpers.py` からの変更。
+測定 commit: `fc7465982` (コードを変えた最後の commit。main `732795918` の `gen_helpers.py` からの変更)。
 
 - 結果: `lift_vtable.sh 0x161fc0` は **rc=0**・`[ildsp] helpers ok`。`declare @__asm_*` の 73 行を全て対応 (distinct op 54 名のうち、既存の対応 6 名を除く 48 名を新たに追加。内訳は `[gen_helpers]` 行の op 別件数)。C 出力 161 行を clang -c で通した。
 - 追加した対応: cvt 系 (cvttss2si/cvttsd2si/cvttpd2dq/cvtdq2ps/cvtdq2pd/cvtps2pd/cvtsd2ss)・movd/movsd/movq/vmovq/vmovsd・movlhps/movhlps・packed (mulpd・psrldq/psrlq/psllq・xorpd/vxorpd/vandpd/movapd/movdqa/movdqu)・scalar 倍精度 (add/sub/mul/div sd・divss)・FMA (vfmadd/vfnmadd/vfmsub の sd 版)。
