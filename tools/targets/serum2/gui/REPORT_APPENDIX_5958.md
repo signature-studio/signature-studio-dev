@@ -1,7 +1,7 @@
 # REPORT 付録 — SR-99 (#5958) slot `0x1817bf760` の runtime 観測
 
 - 親: #5957 (SR-98)。前段: `REPORT_APPENDIX_5935.md` §2.1・§4 (slot 由来 5 箇所・PE 上 WRITE 0 件・READ 289 件)。
-- 日付: 2026-10-16 / 測定 commit (コードを変えた最後の commit): 本 PR の commit (下記 §4 で記録)。
+- 日付: 2026-10-16 / 測定 commit (コードを変えた最後の commit): `71c51d3d5`。
 - 入力: `Serum2_win64.vst3` (sha256 `501e7bb3…5283` / 19,236,864 B、`ref_content.sh` で展開し sha256 一致を確認)。`Serum2_win64.authstub.vst3` は `license/authstub/mpatch.py` で作成 (原 bytes 照合 6/6 OK)。
 - 観測手段: `host/vst3host.cpp` (wine64 9.0 / mingw-w64 上の最小 VST3 host、SR-1 資産)。`S2HOST_SLOT=1` で DR0 に slot の 4 byte 書込 watch を張る (`S2HOST_WATCH` と同じ仕組み)。`[slot]` 行で createView 前後・process 前の値を記録する。
 - 環境: Ubuntu runner, 4 core, wine 9.0 (`apt install wine64`, `/usr/lib/wine/wine64`)。
