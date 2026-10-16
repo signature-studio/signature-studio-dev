@@ -191,6 +191,12 @@ DELAY_RULES = [
     ('1250 FUN_1802ed7f0 uVar19 = fVar31 sign bits', r'uVar19 = \(uint\)fVar31 \^ _UNK_1813d1a84;', 'uVar19 = f2u(fVar31) ^ _UNK_1813d1a84;', 1),
     ('1254 FUN_1802ed7f0 auVar6 hi = fVar31 bits', r'auVar6\._4_4_ = uVar19 & \(uint\)fVar31;', 'auVar6._4_4_ = uVar19 & f2u(fVar31);', 1),
     ('1255 FUN_1802ed7f0 auVar6 lo = fVar26 bits', r'auVar6\._0_4_ = uVar21 & \(uint\)fVar26;', 'auVar6._0_4_ = uVar21 & f2u(fVar26);', 1),
+    # #5664 (KH-174): FUN_180fc6870・FUN_180fc6d70 の入口 float の指数判定 4 件。`if` の条件は float のビット列 (movd → and) で読む。
+    #   値変換 (uint) では指数マスク 0x7f800000 の比較が成立しないため、f2u() に直す。直後の呼出し (uVar1・uVar25 = FUN_180fdc6ec・844) は ABI 規則が扱う。
+    ('3594 FUN_180fc6870 if (fVar3 bits) (#5664)', r'\(uint\)fVar3 (& _DAT_1822822a0\) == _DAT_1822822a0\) \{\n\s*)(?=uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);)', r'f2u(fVar3) \1', 1),
+    ('3653 FUN_180fc6870 if (fVar3 bits) (#5664)', r'\(uint\)fVar3 (& 0x7f800000\) == 0x7f800000\) \{\n\s*)(?=uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);)', r'f2u(fVar3) \1', 1),
+    ('3784 FUN_180fc6d70 if (fVar22 bits) (#5664)', r'\(uint\)fVar22 (& _DAT_182282360\) == _DAT_182282360\) \{\n\s*)(?=uVar25 = (?:func_0x000|FUN_)180fdc844\(\);)', r'f2u(fVar22) \1', 1),
+    ('3909 FUN_180fc6d70 if (fVar22 bits) (#5664)', r'\(uint\)fVar22 (& 0x7f800000\) == 0x7f800000\) \{\n\s*)(?=uVar25 = (?:func_0x000|FUN_)180fdc844\(\);)', r'f2u(fVar22) \1', 1),
     # #4838 (KH-119): 代入の pointer⇔整数 5 行。機械語で確定 (REPORT_APPENDIX_3801.md の P6 の現 HEAD 残件)。
     #   FUN_180f88084・FUN_180f880a4・FUN_180fd2d38: 初期化の 8 byte スロットへ leaq で得た番地を movq で書く。
     #   値はそのアドレス (&UNK_<va>) のビット列。整数型スロットへ同ビットを明示キャストで書く (数値変換にしない)。
