@@ -65,3 +65,22 @@ python3 analysis/py64_check_expr.py work/py53/fn.txt --negctl p2   # exit 1
 - 注意: 手計算の `d_in` と機械側の `d_in` は同じ記号の名前一致で、値の一致は示していない (入口の edx が `0x1046d6b` の store で `[rbp+0x5b8]` に入る、という関係の手計算による確認まで)。機械側の展開が正しいかの独立検算は未了。
 
 残り 4 地点 (0x104b5aa・0x104b94e・0x104bebf・0x104bffa) は展開しても `SLOT`・`…` (深さ上限) が残る。分岐を越える経路を手で追う必要があり、本 run では式を確定していない。親 #5313 の本文に残す (新しい子 issue は作らない)。
+
+## 7. RMW store の式化 (PY-5399 / #5904・#5312 の単位 A)
+
+- 対象: 直前の store が同じスロットへの ARITH の RMW (`shr dword ptr [rbp+0x31c], 0x10` at 0x104aaae) のとき、`py88_writes.py` の `mem_read` は `SLOT[rbp+0x31c]?` で止まり、`py99_slot_paths.py` の `store_value` は `OP:shr` を返していた。
+- 変更: `py88_writes.Slicer.rmw_expr` を追加し、分岐合流がないときは RMW 直前の値 `op(prev, imm)` を式にする。`py99_slot_paths.store_value` も同じ `rmw_expr` を使う。コミット `53ab89b54`。
+- 測定 commit: `53ab89b54` (コードを変えた最後の commit)。入力: `work/py53/fn.txt` (`fl-win64` の `block00031_PE.bin`・`py53_dispatch.py` で 4664 命令)。
+- 0x104aaa8〜0x104aacd の式 (修正後): `0x104aaae` の store は `0x10`、`0x104aabe` は `shr(shr((SLOT[rbp+0x5b0]?@0x1046d65 - 0x70000000), 0x10), 6)`、`0x104aacd` は `and(shr((SLOT[rbp+0x5b0]?@0x1046d65 - 0x70000000), 0x10), 0x3f)`。`SLOT[rbp+0x31c]?` は式に残らない。
+- 残る `SLOT[rbp+0x5b0]?@0x1046d65` は RMW とは別件 (入口の edx 相当の store 1 件への SLOT 参照)。本 PR の範囲外。
+- 既定 65 件 (`py88_writes.py`): 修正前後で差は 0x1049f24 の 1 行のみ (`SLOT[rbp+0x570]?`・`SLOT[rbp+0x564]?` の RMW 連鎖の式化)。対象 11 件 (G2〜G8) は変わらず。
+- py99 の突合 (修正前 → 修正後): `py99_slot_paths.py` 既定: `U n=55 match=55 mismatch=0; forward n=170 mismatch=0` → `U n=57 match=57 mismatch=0; forward n=172 mismatch=0`。`reads` は 170 → 172。mismatch は 0 のまま。
+- 受入条件の `U n=6 match=6`・`forward n=14` は再現できなかった。0x104aaa8〜0x104aacd の 4 点を対象にすると `U n=3 match=3 mismatch=0; forward n=6 mismatch=0` (修正後)。修正前は `U n=0`・`forward n=4` (読みは全部 T)。`U n=6`/`forward n=14` の対象集合は issue に書かれていないため、ここでは同じ数字を作れていない。
+- 依存スクリプトの出力差 (修正前 → 修正後・`py99_closure.py` 既定): 閉じた frame 葉の SLOT? 104 → 100・X の種数 24 → 23。`py99_merge_sets.py` は 49 件のまま、mismatch 0。
+- 依存スクリプトの突合 (修正後): `py64_check_expr.py` `n=8 mismatch=0`・展開版 `expanded n=1 mismatch=0`・`py159_check_hand.py` 一致・`py163_vcall.py` 全件一致・`py161_movabs_check.py` `mismatch=0`。
+- 実時間: `py88_writes.py` 4 点 0.02 秒・`py99_slot_paths.py` 既定 0.35 秒。load average 0.25 (`uptime`・測定直前)。
+- 未解決: 4 地点 (0x104b5aa・0x104b94e・0x104bebf・0x104bffa) の展開は本 PR の範囲外 (既存の未解決として §6 の残り 4 地点と同じ)。
+
+### 差分 (測定 commit から HEAD まで)
+
+`git diff 53ab89b54 HEAD -- tools/python/analysis` は本 PR の commit 後の差分 (本 §7 の追記時点で 0 行)。
