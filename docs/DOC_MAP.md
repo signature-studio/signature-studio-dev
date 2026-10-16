@@ -452,6 +452,7 @@
 | `tools/m11/ldfix/REPORT_4330.md` | ~70 | LD-210 (#4330, 親 #4204): 対照と区別できるネガコン `--negctl-noglk` (対照で glk=True の 45 関数を glk=False に落とす)。関数 verdict 34 件・site 36 件が対照と異なる。判定器の規則は未変更。結果 JSON `results/frame_store_alias_4330_ctl.json`・`results/negctl_alias_4330_noglk.json`・`results/negctl_alias_4330_glk.json` |
 | `tools/m11/ldfix/REPORT_4238.md` | ~73 | LD-205 (#4238, 親 #4204): `407a50` の戻り値の機械語追跡 (import thunk `4073c0` 系が PE 外のため未達)・`5cb210` `5cb4aa` の読み基底が `rbp` で `rdi` ではないことの訂正・判定器 3228 の起動修正 (`a2.leak_site` 改名)・HEAD のネガコン。残件は子 issue |
 | `tools/m11/ldfix/REPORT_5141.md` | ~72 | LD-257 (#5141, 親 #4288): `407a50` の `ret` に入る exit 9 本の `rax` の出どころ分類。import thunk `4073c0` (VirtualAlloc) の戻り値を「未確定 (外部)」とする方式。判定器 3228 の HEAD 出力は #4238 と byte 一致 |
+| `tools/m11/ldfix/REPORT_5143.md` | ~50 | LD-258 (#5143, 親 #4288): 判定器 2211 の NONFRAME store を ALIAS_FRAME_PTR で打ち切らない 1 行修正 (判定は全関数・全 site 不変、`5cb4aa` の打ち切りは LEAK_STORE に移る)。`5cb4aa` の残り打ち切り (`rdi` = `409410` の import 戻り値) は未確定 (外部)。旧 3228 JSON は旧値のまま残す |
 | `tools/m11/ldfix/REPORT_4167.md` | ~70 | LD-197 (#4167 / 親 #3225 子 B): 694c80・c3b340 の打ち切り store (LEAK_STORE) の基底の出どころを機械語で追った証拠 (`alias_evidence_4167.py`)。判定は両 site とも未判定のまま。残件は #3225 (LD-150)・#3228 (LD-151)。ネガコン 1 種 |
 | `tools/m11/ldfix/REPORT_4676.md` | ~68 | LD-237 (#4676 / 親 #3675 子): `10479c7` の再判定 ((ii)(iii) 確認・判定不能維持。本番 IR の上流 X が 1 段不足のため)・`spill178_1161.tsv` 再生成 (既存と一致)・本番 unit e2e の参考値 (OFF/ON で unit 結果一致・ゲート失敗は環境要因の疑い) |
 | `tools/m11/ldfix/REPORT_4675.md` | ~95 | LD-236 (#4675 / 親 #3675 子): `1046a30` の上流 X (cell→C→[C]) の 1 段不足の機械語照合と修復 pass `fix_ld236.py` (既定 OFF・`M11_FIX_LD236=1`)。受入 2 (10479c7 再判定)・3 (unit e2e) は未達で子へ |
@@ -964,6 +965,7 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4064.md` | ~60 | x87 leaf 3 本 (`0x10009eb5`・`0x1000b526`・`0x1000bf60`) の eax・ST(0) の差の切り分け (#4064 PLG-G2-40): 模型 (`ott_x87.h`) の例外フラグ・C1 の限界。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_5464.md` | ~45 | `0x10003fe0` の書込み経路に入る入力 (wide_patch・#5464 / 親 #4924)。 行末の書込みの harness 対応と、書込み経路に入ったこと・eax 不一致の測定 (測定専用)。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_5423.md` | ~60 | `0x100085a0` の辿るポインタ (窓の外 `ecx+0x520cc8`) の位置 (受入 1) と、窓の外の 1 語に有効な番地を書いた複製プローブの native・wasm 2000 行突合 (#5423 PLG-G2-78)。 既存 harness は変えず、プローブの複製で測定。 測定値の正本 |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4922.md` | ~70 | `0x100096d0` の引数 a0・a1 が指す先 (窓の外・受入 1) と、引数の指す先を wide 領域に置いた複製プローブの native・wasm 2000 行突合 (#4922 PLG-G2-67)。 既存 harness は変えず、`@addr=hex` の書込みで測定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4923.md` | ~50 | `0x1000ba05` の引数 edx の形 (指す先の 8 B の double・Inf/NaN 分岐) と、edx に有効な番地を渡した native・wasm の 2000 行突合 (#4923 PLG-G2-68)。 既存 harness の edx=0 は変えず、プローブの複製で測定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4105.md` | ~60 | `0x1000bf60` の ST(0) の NaN・ゼロの食い違いの分類 (#4105 PLG-G2-47): 非 normal オペランド (denorm・unnorm) で模型の限界 (例外処理)、normal 系は一致。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_5264.md` | ~60 | NaN どうしのビット差の後段の算術への伝播 (#5264 PLG-G2-73): 四則・符号・絶対値・比較・連鎖 144 組で native (x87 命令) と wasm を突合。 NaN ビットの差は非 NaN の結果と比較に伝播せず 0 件。 PM の許容判断は未決。 測定値の正本 |
