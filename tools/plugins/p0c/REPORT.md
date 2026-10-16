@@ -154,7 +154,7 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 
 ## 26. #5832 (E7): x86_fp80 ↔ i80 bitcast の展開
 
-- **結論**: `bitcast x86_fp80 ↔ i80` を整数のビット演算へ展開する (`expand_f80_bitcasts`)。 `f80b_rt/run.sh` で double → x87 像 200,000 件・x87 像 → double 200,003 件 (固定ベクタ 3 件込み) が emcc 版で 0 不一致。 subnormal の carry の誤りは `842bc5ac3` で直した。 19165 は E7 が消え、次の類型 (`fp_extend` の libcall) で止まる (受入 1 未達)。
+- **結論**: `bitcast x86_fp80 ↔ i80` を整数のビット演算へ展開する (`expand_f80_bitcasts`)。 bit 一致・subnormal の修正・19165 の測定は `REPORT_APPENDIX_M.md` §1〜§3。 19165 は E7 が消え、次の類型 (`fp_extend` の libcall) で止まる (受入 1 未達)。
 - 詳細・測定値・未解決: `REPORT_APPENDIX_M.md`。
 
 ## 17. #1366 (CI-26): lift 段の alloca 並び正規化と before/after 一致
