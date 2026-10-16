@@ -14,7 +14,7 @@ Fresh Air (`fa_` 改名版・impbase `0x1F00000`) と OTT (`tools/ott` の lift 
 | NC-1 (Fresh Air の入力 `ga`+0.5) | FA `40290578` (不一致)・OTT `6b1696f0` (一致)。FA だけ FAIL |
 | NC-2 (OTT のパラメタ 0.5→0.6) | FA `5e5287b5` (一致)・OTT `2ff0390` (不一致)。OTT だけ FAIL |
 | malloc 領域 (400 回確保) | `0x10d73178`〜`0x113b3df0`。OTT の画像窓 `0x30000000`〜 とも、FA の画像窓 `0x02000000`〜`0x04319000` とも重ならない |
-| 静的データ | `GLOBAL_BASE` = `0x10000000`。FA の `.rdata`〜`.reloc` は FA の画像窓の内側、OTT は `ott_data.c` を別 TU で持つ。両者の署名一致で、共有 static の汚染が無いことを見る |
+| 静的データ | 共有 static の汚染は、両者の署名が単独基準と一致したことで間接的に見た (受入 2 の定義どおり)。静的データを直接比べる差分は取っていない。NC 2 種が FAIL することで検出力を確かめた (`GLOBAL_BASE` = `0x10000000`) |
 
 - 測定 commit: `4ac8fab85` (`tools/perf/p20/build_fold.sh`・`fold_sig.mjs` を追加した commit。測定コードはこの commit で確定)。`git diff 4ac8fab85 HEAD -- tools/perf/p20` は本 PR の時点で空。
 - 環境: node v22.23.3、emcc は `/opt/emsdk` (`toolchain-emsdk`)。素材 `plugins-freshair` (Fresh Air.Win.zip)・`work-m6-ott` (`tools/ott/work/lift`)。CPU は runner の 4 vCPU、測定時の load average 0.10。
