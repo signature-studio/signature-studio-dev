@@ -216,3 +216,23 @@ bash tools/plugins/reverb_delay/engine_f80_nc.sh "$PWD/tools/plugins/work/reverb
 - **`obj` の実体は静的に未確定**: 18999 の `obj` (0x6dcb80 の rcx) は `mov rcx,[0x6dad80]` (0x6e9a12) で読み、その値 `0x6dae48` は `.text` 内 (セクションフラグ 0x60000020 = 読み取り専用) の表を指す。 実行時にそれが書込み可能な object かは確認できない。 ただし (e)(f) の鎖は全て `obj` 相対 (`obj+0x98+0x20e`) なので、`obj` の値によらず「`obj+0x2a6` = `R+0x20e`」は成り立つ。
 - **検証範囲**: 静的な逆アセンブルのみ。 実行 (Wine 等) はしていない。 `dir` の実値、`obj` の実値、LoadLibraryW の成否は範囲外。
 - **測定 commit と差分**: 測定は 69ddd3081 (`loadpath_trace.py` を追加した commit)。 `git diff 69ddd3081 HEAD -- tools/plugins/reverb_delay/shell_bind.py tools/plugins/reverb_delay/loadpath_trace.py` の出力は 0 行。
+
+## 19. #5039 (PLG-F4-8) f80 → f64 lowering の既定化と 19000 / 19165 の全件 `emcc -c` (2026-10-16 · 実測 · 到達性のみ)
+
+- **測定 commit**: `3376c8471` (`engine_lift.sh` の既定を `PLUG_F80_LOWER=1` にした commit。 コードを変えた最後の commit)。 起点は main `36cb9906b` (E7 修正 #5858 取り込み済み)。
+- **方式**: `p0c/f80_lower.py` による x86_fp80 → f64 lowering (D28 と同系列。 `docs/DECISIONS.md`)。 **精度**: f80 の 64 bit 仮数を 53 bit に下げる。 native x87 とビット一致しない。 この精度差は gate の外の記録であり、正しさは未検証 (到達性のみ)。
+- **変更**: `tools/plugins/reverb_delay/engine_lift.sh` で `PLUG_F80_LOWER` を既定 1 にした (従来は未設定で 0)。 dynamics / distortion と同じ既定。 `PLUG_F80_LOWER=0` を明示すれば従来の経路 (19000 rc 1、19165 は E7 / segfault) に戻る。
+- **素材**: `fl-win64` / `toolchain-retdec` ([RETDEC]) / `toolchain-emsdk` ([EMSDK]) を使用。
+
+| engine | 条件 | lift rc | define | f80 関数 (本体基準) | `emcc -c` rc | lift 秒 | gate (`engine_f80_subset.sh`) |
+|---|---|--:|--:|--:|--:|--:|---|
+| 19000 Delay 3 | 全 3,632 関数 (既定 `PLUG_F80_LOWER=1`) | 0 | 4,107 | 0 | **0** | 105 | PASS (除外 0) |
+| 19165 Multiband Delay | IPPCODE 除外 + AVX 系 78 除外 (既定 `PLUG_F80_LOWER=1`) | 0 | 2,608 | 0 | **0** | 374 | PASS (除外 0) |
+
+- **除外 (受入 1 の「除外理由と VA」)**: 19165 は IPPCODE 272 関数 (`--exclude IPPCODE`。 扱いは #3445) と AVX 系 78 関数 (理由は E5 = AVX2/AVX-512 命令の変換未実装。 起票先は #3447 受入 4 / #5040)。 78 範囲の VA は追跡ファイル `tools/plugins/reverb_delay/avx_excluded_19165.tsv` (`avx_bad_ranges.py 19165` の出力と同一。 `engine_ranges.py --exclude-ranges` がそのまま読む)。 19000 は除外なし。
+- **測定コマンド** (`source tools/plugins/reverb_delay/env.sh` の後。 「既定」= `PLUG_F80_LOWER` 未指定で 1、`ENGINE_RANGE_ARGS` 未指定で全 section):
+  - 19000: `bash tools/plugins/reverb_delay/engine_lift.sh 19000 800`
+  - 19165: `ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges $PWD/tools/plugins/reverb_delay/avx_excluded_19165.tsv" ENGINE_TAG=_noipp_nobad bash tools/plugins/reverb_delay/engine_lift.sh 19165 900`
+- **gate の NC 列 (意味の変化)**: `summary_sub.csv` の `nc_emcc_c_rc_unmodified` は `summary.csv` 第 9 列 (`erc2`) を読む。 既定 1 の下では lowering 後の rc なので、無改変の NC を示さない (値 0 は lowering 後の rc)。 無改変の emcc rc は `PLUG_F80_LOWER=0` の実行で別途取る (本 PR では未実施)。
+- **unimpl helper (受入 5 の一部)**: 本 commit の既定経路の実測は 19000 = 17、19165 = 136 (`summary.csv` 第 6 列)。 §15 の 241・§16 の 148 は別の測定構成の値で、構成差はまだ切り分けていない。 受入 5 は未完。
+- **未達**: 受入 3 (精度影響) は未測定。 19000 の lowering 前の f80 関数は 1 本 (`function_1800bcb00`)。 確認方法: `PLUG_F80_LOWER=0` と `=1` で `engine_lift.sh 19000` を回し、両方の `e.final.ll` の同関数本体を比較する (差があれば f64 化の精度影響が出ている)。 次 run に残す (#5039)。 19165 の 78 関数の lift (受入 4 相当) は #3447 / 子 PLG-F4-9。
