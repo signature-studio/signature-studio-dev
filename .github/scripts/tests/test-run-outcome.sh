@@ -25,12 +25,17 @@ while [ $# -gt 0 ]; do
     --paginate) ;;
     -X) method="$2"; shift ;;
     --jq) jq_expr="$2"; shift ;;
-    -f | -F) shift ;;
+    -f | -F)
+      case "$2" in body=*) printf '%s' "${2#body=}" > "$FAKE_LOG.body" ;; esac
+      shift ;;
     repos/*) path="$1" ;;
   esac
   shift
 done
-[ "$method" != GET ] && exit 0
+if [ "$method" != GET ]; then
+  if [ -n "${FAKE_POST_FAIL:-}" ] && [[ "$path" == *"$FAKE_POST_FAIL"* ]]; then exit 1; fi
+  exit 0
+fi
 if [ -n "${FAKE_FAIL:-}" ] && [[ "$path" == *"$FAKE_FAIL"* ]]; then exit 1; fi
 f="$FAKE_FIX/${path//\//_}"
 [ -f "$f" ] || { echo "fake gh: no fixture for $path" >&2; exit 1; }
@@ -48,7 +53,8 @@ not_logged() { ! grep -q -- "$1" "$LOG"; }
 fx() { printf '%s' "$2" > "$FIX/${1//\//_}"; }
 
 # ------------------------------------------------------------------ record-run-outcome.sh
-reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; unset FAKE_FAIL; }
+reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; rm -f "$LOG.body"; unset FAKE_FAIL FAKE_POST_FAIL; }
+posted() { [ -f "$LOG.body" ] && grep -q -- "$1" "$LOG.body"; } # 投稿された報告 (body) に $1 を含む
 # issue <state> <labels json> [blocked_by]
 issue() { fx repos/o/r/issues/42 "{\"state\":\"$1\",\"labels\":$2,\"issue_dependencies_summary\":{\"blocked_by\":${3:-0}}}"; }
 RECENT_BASE='repos/o/r/pulls?state=all&sort=updated&direction=desc&per_page=100&page='
@@ -143,8 +149,27 @@ expect "record: named allowlisted material missing -> artifact" $?
 # 3. 出力ファイルが無い (setup 失敗・cancel) でも記録する (reason=unknown)
 reset; ev_issue; issue open '[]'; prs '[]'; rm -f "$TMP/oc.jsonl"
 outcome
-{ [ $RC = 0 ] && reason_is unknown && logged 'labels\[\]=oc:no-pr'; }
-expect "no agent output (setup failed / cancelled) -> still recorded (reason=unknown)" $?
+{ [ $RC = 0 ] && reason_is unknown && logged 'labels\[\]=oc:no-pr' && posted '取得できませんでした'; }
+expect "no agent output (setup failed / cancelled) -> still recorded (reason=unknown) and a report is posted" $?
+
+# 3b. (#CI-240) PR も無い run の報告は agent の最終回答そのものを含む (分類の本文ではなく)
+reset; ev_issue; issue open '[]'; prs '[]'; answer '調査の結果、PM への提案は 3 件です。提案 A: 分割。'
+outcome
+{ [ $RC = 0 ] && posted '調査の結果、PM への提案は 3 件です。提案 A: 分割。' && logged 'api -X POST repos/o/r/issues/42/comments'; }
+expect "no-PR run -> the report contains the agent's final answer (CI-240 acceptance 1)" $?
+
+# 3c. (#CI-240) 報告の中の /oc は全角の斜線に置き換える (次の /oc run を起こさない)
+reset; ev_issue; issue open '[]'; prs '[]'; answer '次は /oc を付けて再起動してください'
+outcome
+{ [ $RC = 0 ] && posted '次は ∕oc を付けて' && ! grep -q '/oc' "$LOG.body"; }
+expect "report with '/oc' -> neutralized so it cannot retrigger the agent" $?
+
+# 3d. (#CI-240 受入 2) 報告の投稿に失敗したら run を失敗させる (success で隠さない)
+reset; ev_issue; issue open '[]'; prs '[]'; answer '着手報告のみ'
+FAKE_POST_FAIL='issues/42/comments' outcome
+{ [ $RC != 0 ] && grep -q 'the run is failed' "$TMP/out"; }
+expect "posting the report fails -> run fails (exit != 0)" $?
+
 
 # 4. この issue を指す open PR がある (ブランチ名) -> 何もしない
 reset; ev_issue; issue open '[]'; prs '[{"head":{"ref":"42-fix-x"},"body":""}]'; answer '完了'
@@ -212,19 +237,19 @@ expect "no page reaches the run start within 10 pages -> warn, no write, exit 0"
 for lab in oc:stuck needs-user-input blocked; do
   reset; ev_issue; issue open "[{\"name\":\"$lab\"}]"; prs '[]'; answer '停止します'
   outcome
-  { [ $RC = 0 ] && not_logged 'api -X POST'; }
-  expect "label $lab -> explicit state, nothing recorded" $?
+  { [ $RC = 0 ] && not_logged 'labels' && logged 'api -X POST repos/o/r/issues/42/comments' && posted '停止します'; }
+  expect "label $lab -> explicit state: no label or marker, the report is posted" $?
 done
 reset; ev_issue; issue open '[]' 1; prs '[]'; answer '停止します'
 outcome
-{ [ $RC = 0 ] && not_logged 'api -X POST'; }
-expect "open blocker (issue dependencies) -> blocked, nothing recorded" $?
+{ [ $RC = 0 ] && not_logged 'labels' && posted '停止します'; }
+expect "open blocker (issue dependencies) -> blocked: the report is posted, no label" $?
 
-# 6. closed の issue -> 何もしない
+# 6. closed の issue -> 報告だけ投稿 (ラベル・マーカーは残さない)
 reset; ev_issue; issue closed '[]'; prs '[]'; answer '完了'
 outcome
-{ [ $RC = 0 ] && not_logged 'api -X POST'; }
-expect "closed issue -> nothing recorded" $?
+{ [ $RC = 0 ] && not_logged 'labels' && posted '完了'; }
+expect "closed issue -> the report is posted, no label or marker" $?
 
 # 7. oc:no-pr は、次の run が PR を出したら外す (着手済み・closed・明示的な状態でも外す)
 reset; ev_issue; issue open '[{"name":"oc:no-pr"}]'; prs '[{"head":{"ref":"42-z"},"body":""}]'; answer '完了'
