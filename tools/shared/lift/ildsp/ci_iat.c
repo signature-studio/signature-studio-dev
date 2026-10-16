@@ -1,7 +1,8 @@
 /* ci_iat.c: ildsp CreateInstance closure の IAT 10 種の stub (T-SH-151 #5747)。
  * 規約は REPORT_APPENDIX_3276.md と同じ: HeapAlloc は calloc、RtlPcToFileHeader は ImageBase、
  * RaiseException は記録して停止 (非 0 終了)、それ以外は 0 を返して呼出し回数を数える。
- * 引数と戻り値の型は ci.rs.ll の declare に合わせる (i64* は wasm32 では pointer)。 */
+ * 引数と戻り値の型は ci.rs.ll の declare に合わせて書いたが、IR の declare との型一致は未検証
+ * (ci_lift.sh は名前の照合のみ。REPORT_APPENDIX_3318 §5-1)。 */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
