@@ -25,6 +25,7 @@
 
 - 再現: `gcc -O1 -g -Wall -Wextra -o tools/icall/work/stk_value_check tools/icall/tests/stk_value_check.c tools/ott/native/ms_call.S && ./tools/icall/work/stk_value_check && NEG=1 ./tools/icall/work/stk_value_check` (警告 0)。
 - 測定 commit 以降のコード差分: 無し (本付録の追加のみ)。
+- ICALL-115 (#5339) の gate 実測: 測定 commit `73fee519e` (`tools/icall/tests/stk_value_gate.sh` を gcc でビルドして判定)。`bash tools/icall/tests/stk_value_gate.sh` が rc=0 で、正常注入 `RESULT PASS matched=12/12`、ネガコン `RESULT FAIL (negative control) matched=0/12` (rc=1 を期待どおり判定)、`[stk_value_gate] PASS`。real 0.203 s・user 0.067 s・sys 0.042 s、load 1 分値 0.97 (開始時 01:08 の uptime)。素材は gcc のみ。
 
 ## 4. 未解決
 
