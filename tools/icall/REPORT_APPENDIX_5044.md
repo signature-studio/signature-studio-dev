@@ -73,7 +73,6 @@
 - 呼出し元の数え方: `python3 tools/icall/cb_writers.py <core64.dsm> 180cbc770` が、`call` と `jmp` の直接参照を呼出し元の位置と関数開始つきで列挙する。修正前は `0x` 付きの objdump 出力を読めず 0 件だった (`0x` 対応は `4fa3a2cd4`)。
 - 前 run の記録 (測定の値としての根拠にしない): 前 run の `objdump` real 2.650 s。前 run の 6 件の処理は下記のとおり未確定。
 - 6 件の処理 (未確認の記述): `180cb60cb`・`180cbaf0b`・`180cbafc4`・`180cbb147` は `rdx` に作った pair をゼロで渡し control block が NULL になる、と読んだ。`180cb6965`・`180cb6a76` は `rdx` が `0x18040e0e0` の戻り値とされ、この 2 件は未確定。
-- 前 run の 6 件の処理 (未確認の記述): `180cb60cb`・`180cbaf0b`・`180cbafc4`・`180cbb147` は `rdx` に作った pair をゼロで渡し control block が NULL になる、と読んだ。`180cb6965`・`180cb6a76` は `rdx` が `0x18040e0e0` の戻り値とされ、この 2 件は未確定。
 - 近似の注記: 関数境界は「ret の直後の int3 パディング」のみで切る。パディング無しで隣の関数が続く場合は一つにまとまるため、関数 20,701 件は近似の結果である。
 - 具象型の全数 (control block の vtable が指す `_Destroy`・`_Delete_this`) は未確定。`.rdata`・`.data` の関数ポインタ並びは 26,149 件あるが、vtable の候補への対応付けは未実施。
 
