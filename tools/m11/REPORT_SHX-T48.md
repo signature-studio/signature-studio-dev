@@ -83,6 +83,7 @@ reviewer の指摘 (`no_ir_call` の根拠を引数型を問わない生 grep �
 - 必要な `work/boot_final3.ll` は `m11_gen_ir2.sh` で作るが、その入力 (`work-m11`・`toolchain-retdec`) が本 run の素材の展開先 (`ARTIFACTS_DIR`) に無い (`fl-win64.tar.zst` のみ)。
 - したがって `grep -c '@function_40b290(' work/boot_final3.ll` 等の出力は、本 REPORT には無い。確定は子 #5586・#5587 で行う。
 - review round 2 の fix でも素材の再確認を行った: `ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ、`tools/m11/work/` は無く、RetDec の実行環境も無い (`toolchain-retdec` 未展開)。`oc_artifacts: fl-win64 work-m11 toolchain-retdec` を PR 本文に足したが、本 run では展開できないため、§3・§4 の再測定は未実施のまま。
+- review round 3 の fix (9c91b2265 → 次の commit): 素材を再確認した。`ARTIFACTS_DIR` (`/home/runner/artifacts`) は `fl-win64.tar.zst` (2.3 GB) のみ。`work-m11`・`toolchain-retdec` は無く、`/opt/retdec` も無い。`tools/m11/work/` も無いため、`boot_final3.ll` の再生成・現コードの `unmatched_check.py` の再実行・生 grep (`grep -c '@function_40b290(' work/boot_final3.ll` 等) は本 run では実施できない。判定の確定は子 #5586・#5587 で行う。
 - 代わりに、`unmatched_check.py` の `no_ir_call` 判定を、引数型を限定しない `call` 行の数 (`raw_calls`) に変えた。`raw_calls == 0` のときだけ `no_ir_call` とする。`raw_calls > 0` で引数が取れないものは `arg_type_unmatched` として分ける。`rbp_entry` が取れない site は `no_rbp_entry`、`callee_access` が空の site は `no_callee_access` に分けた (`max` の空ガード)。
 - **この変更は実データで再実行していない** (`boot_final3.ll` が無いため)。§3・§4 の表の数は、変更前のコードで得た値のままである。新しいコードの出力は、子 #5586・#5587 の生 grep と合わせて確認する。
 
