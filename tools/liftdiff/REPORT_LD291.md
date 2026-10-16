@@ -80,7 +80,7 @@ S4 の `must` が空になる関数 (12657b0・442670・5b0970・442890・4421d0
 
 | 項目 | 値 |
 |---|---|
-| 素材 | fl-win64 (`$HOME/artifacts/fl-win64.tar.zst` から `block00031_PE.bin` のみ `tar --zstd` で展開) |
+| 素材 | fl-win64 (`fl-win64` 素材 ([WIN64] 系・`docs/REFERENCES.md`) から `block00031_PE.bin` のみ `tar --zstd` で展開) |
 | 測定 commit | `8f62b8eef` (`tests/ld291_schemes.py` を最後に変えた commit。S3/S4・`--maxdepth`・`--budget` を含む。数値はこの版で取った) |
 | 基点 | `befbc8265` (origin/main) |
 | 所要 (wall) | S0 0.5 秒 / S4 (深さ 16・予算 20000) 1.5 秒 |
