@@ -208,7 +208,12 @@ KPI (`docs/WORKFLOW.md` §7・起動に関わる PR): FLEngine 起動の dispatc
 - `LD_STEP_MEM=3e1ace8` (= Stream `0x3e1acd0` + 0x18 = Position) の trace で、Position の変化は `113b72` (Move 内の `add [rbx+0x18],rsi`) の 1 回だけ。旧値 `0` → 新値 `4`。
 - 作者の trace (`LD_STEP_MEM=3e1ace8`) では、Position の**最初の変化**が `113b72` (Move 内の `add [rbx+0x18],rsi`) で、その旧値は `0`、新値は `4`。読取り (`0x4d862a`・`113b90`。`113b90` は §3 の仮想呼出し先 `call [rbx+0x40]` → `Move`) は、この変化より前に行われる。Read の返り値 4 B は blob 先頭 (magic) と一致。
 - よって **読取り呼出元は Position 0 で magic を読んでいる**と読める。ただし、この根拠は 1 本の trace で最初に変化したときの旧値であり、初期値の証明ではない。
-- 未記載: 読取り行と `113b72` 行の trace 行番号と MEM 行の抜粋。`win33_pos_probe.sh` が `pos.cfi` を最後に削除するため、作者の trace は PR に残っていない。本 fix run では素材 (`work-m11`・`work-liftdiff`・`toolchain-emsdk`) が展開されず trace を再取得できなかった。素材を指定した次の run で再取得して行番号を書く。
+- trace 行番号 (`win33_pos_probe.sh` の `pos.cfi` の行番号 = `grep -n` の値。head `a749480af` の review run で再取得・実測):
+  - 呼出連鎖: `4e1879` (step 8817586) → `4e13f0` (8817587) → `4e146b` (8819562) → `4d85d0` (8819563)
+  - 読取り: `4d862a` (step 8819582)・`113b90` (8819583)。`113b90` は仮想呼出し `call [rbx+0x40]` → `Move`
+  - Position の変化: `113b72` (step 8819627)。MEM 行: `MEM writer_last_img_rva=113b72 old=0 new=4 step=8819627 rip_now=113b76` (step 8819628)
+  - 読取り (8819582) は変化 (8819627) より前。読取りの返り値は `950412de` (magic)
+  - 同じ run の既定 spike 以外に、実カタログ spike で `CreateFruityInstance` が `segv rip_rva=0x12a25` (作者の実カタログ spike と一致)。units 928/942・first_fail 895 はこの run の出力に含めていない。
 
 ### 10.4 未解決 (起票先)
 
@@ -219,7 +224,7 @@ KPI (`docs/WORKFLOW.md` §7・起動に関わる PR): FLEngine 起動の dispatc
 ### 10.5 受入条件の判定
 
 - 受入 1 (呼出元 VA の同定・読む対象): **達成**。呼出元 `0x4e146b`→`0x4d85d0` は trace で実測。読む対象は逆アセンブルで確認した (`.moe` の拡張子判定: `0x3c8f0` → `0x39550` → `0x414e70`。§10.2)。magic 一致は trace で確認した。
-- 受入 2 (Position の確認・位置 0 の根拠): **一部達成**。`LD_STEP_MEM` で Position の最初の変化の旧値 0 を作者の run で測定した。読取りと変化の trace 行番号は未記載 (§10.3 の未記載の項目)。本 fix run では再測定していない。PEEK は trace の MEM 行で代替。
+- 受入 2 (Position の確認・位置 0 の根拠): **達成**。`LD_STEP_MEM` で Position の最初の変化の旧値 0 を trace で測定し、読取り行と変化行の trace 行番号を §10.3 に記載した (review run で再取得)。
 - 既定 spike の不変: 928/942・830・`0x4e0fab`・35 import (変化なし)。`ld_core.h` は変更していない。
 - 製品 KPI (起動): FLEngine 起動の dispatch 数・通過 unit 数は既定で不変 (928/942)。最初のウィンドウは動かしていない。
 - 注: `count` 側 (範囲検査へ至る経路) の仕様は受入条件に含まれない。#3636 に残す。
