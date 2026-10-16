@@ -184,7 +184,7 @@
 - 前 run の「capstone 境界 7 対 objdump 境界 4」は、比べた母集団が違った。
   - capstone の境界 7 は **E 42 件** (境界/非境界の全体) 中の数。
   - objdump の境界 4 は **非境界 35 件** 中の数。
-- 同じ非境界 35 件で比べると: objdump が境界と判定する 4 件は、すべて capstone が (bad) で停止する G (`cs_stop_before_G`)。食い違いの原因は「(bad) を挟んだ後の再同期の扱い」で、capstone は (bad) で止まり、objdump は (bad) を飛ばして再同期する。
+- 同じ非境界 35 件で比べると: objdump が境界と判定する 4 件は、すべて capstone が (bad) で停止する G (`cs_stop_before_G`)。食い違いの原因は、(bad) の後の再同期の扱いの違いと推定する (仮説・未確認。objdump 側の再同期規則は本 run で確認していない)。
 
 | 非境界 35 件の内訳 (HEAD `60a688535`) | capstone | objdump | 件数 |
 |---|---|---|---|
