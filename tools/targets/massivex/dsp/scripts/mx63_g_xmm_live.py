@@ -207,7 +207,9 @@ def main(pe_path, out_p):
         if gfn is not None:
             glo, ghi = gfn
             row['F_G'] = hex(glo + base)
-            row['G_reach_undef'] = must_undef(glo, glo, ghi, g)
+            g_reach = reachable(glo, glo, ghi, g)
+            row['G_reach_no'] = not g_reach
+            row['G_reach_undef'] = g_reach and must_undef(glo, glo, ghi, g)
             row['G_livein_read'] = livein_read(g, glo, ghi)
         row['counts'] = {
             'candidates': len(cands),
