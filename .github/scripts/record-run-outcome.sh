@@ -19,7 +19,8 @@
 #   stop     : 判断待ち・停止報告・着手不可
 #   unknown  : 上のどれでもない (着手報告のみ・run の失敗/cancel を含む)   優先順は artifact > blocked > split > stop。
 #
-# この script は run を失敗させない (観測用)。読み取り・書き込みに失敗したら警告だけ出して 0 で終わる。
+# PR が無い run (closed・明示的な終了状態・PR も push も無い) では、agent の最終回答を含む報告コメントを必ず 1 件投稿する (#CI-240)。
+# 報告の投稿に失敗したら run を失敗させる (success で隠さない)。それ以外の読み取り・ラベルの書き込みの失敗は警告だけ出して 0 で終わる。
 # 入力 (env): GH_TOKEN (issues:write の App token), OC_REPO, OC_ISSUE_NUMBER, GITHUB_RUN_ID, GITHUB_EVENT_NAME, GITHUB_EVENT_PATH
 # 任意 (env): OC_JOB_STATUS (job.status), OC_OUTPUT_FILE (既定 $RUNNER_TEMP/oc-output.jsonl), OC_NOPR_LABEL (既定 oc:no-pr), DRY=1
 # コメント本文に agent を起動する語 (行頭の slash + oc 等) を入れない (自分のコメントで implement を起動しないため)。
@@ -67,21 +68,54 @@ remove_label() { # 付いていれば外す (外す必要が無ければ API を
   fi
 }
 
+# PR も push も無い run は、agent の最終回答を含む報告を issue に必ず 1 件残す (#CI-240)。
+# 報告に /oc を含めると次の /oc run を起こしうるため、/oc を全角の斜線に置き換える。
+f="${OC_OUTPUT_FILE:-${RUNNER_TEMP:-/tmp}/oc-output.jsonl}"
+full=""
+[ -s "$f" ] && full="$(jq -Rrs '[split("\n")[] | fromjson? | select(.type == "text") | .part.text // empty] | last // ""' "$f" 2> /dev/null || true)"
+text="${full:0:6000}"
+run="${GITHUB_RUN_ID:-0}"
+url="${GITHUB_SERVER_URL:-https://github.com}/$R/actions/runs/$run"
+status="${OC_JOB_STATUS:-unknown}"
+
+report_body() { # report_body <本文の先頭>: 先頭に続けて agent の最終回答を付ける
+  local r="${full:0:50000}"
+  [ -n "$r" ] || r="(エージェントの最終回答を取得できませんでした。出力ファイルが無いか、text を含まない run です)"
+  r="${r//\/oc/∕oc}"
+  r="${r//<!--/＜!--}"
+  printf '%s\n\n---\nエージェントの最終報告:\n\n%s' "$1" "$r"
+}
+
+post_comment() { # post_comment <本文>。投稿に失敗したら run を失敗させる (#CI-240)
+  if [ "$DRY" = 1 ]; then
+    echo "DRY: comment on #$N: $(head -c 200 <<< "$1")"
+    return 0
+  fi
+  gh api -X POST "repos/$R/issues/$N/comments" -f body="$1" > /dev/null && return 0
+  echo "::error::could not post the run report on #$N: the run is failed (#CI-240)"
+  exit 1
+}
+
+report_only() { # report_only <issue の状態>: 状態の印 (ラベル・マーカー) は残さず、報告だけを投稿する
+  post_comment "$(report_body "[run-outcome] この run ($url, job status: $status) は PR も push も出さずに終了しました。issue の状態: $1。")"
+  exit 0
+}
+
 if ! issue="$(gh api "repos/$R/issues/$N")"; then
   echo "::warning::could not read issue #$N: the run outcome is not recorded"
   exit 0
 fi
 
 if [ "$(jq -r .state <<< "$issue")" != open ]; then
-  echo "issue #$N is closed: nothing to record"
+  echo "issue #$N is closed: no label or marker, the report is posted"
   remove_label
-  exit 0
+  report_only closed
 fi
 
 if jq -e '([.labels[].name] | any(. == "oc:stuck" or . == "needs-user-input" or . == "blocked")) or ((.issue_dependencies_summary.blocked_by // 0) > 0)' <<< "$issue" > /dev/null; then
-  echo "issue #$N is in an explicit state (oc:stuck / needs-user-input / blocked): nothing to record"
+  echo "issue #$N is in an explicit state (oc:stuck / needs-user-input / blocked): no label or marker, the report is posted"
   remove_label
-  exit 0
+  report_only "明示的な終了状態 (oc:stuck / needs-user-input / blocked / 依存 issue)"
 fi
 
 if ! prs_raw="$(gh api --paginate "repos/$R/pulls?state=open&per_page=100")"; then
@@ -129,28 +163,23 @@ if jq -s -e --argjson n "$N" --arg start "$start" '[.[][] | select(((.head.ref /
 fi
 
 # --- ここから: PR も push も無く、明示的な終了状態でもない -> oc:no-pr と構造化コメント ---
-f="${OC_OUTPUT_FILE:-${RUNNER_TEMP:-/tmp}/oc-output.jsonl}"
-text=""
-[ -s "$f" ] && text="$(jq -Rrs '[split("\n")[] | fromjson? | select(.type == "text") | .part.text // empty] | last // "" | .[0:6000]' "$f" 2> /dev/null || true)"
 reason="$(run_outcome_reason "$text")"
-status="${OC_JOB_STATUS:-unknown}"
-run="${GITHUB_RUN_ID:-0}"
-url="${GITHUB_SERVER_URL:-https://github.com}/$R/actions/runs/$run"
 cause_field=""
 [ -n "$cause" ] && cause_field="cause=$cause "
 marker="<!-- oc-run-outcome: no-pr reason=$reason ${cause_field}run=$run -->"
 rl_note=""
 [ -n "$cause" ] && rl_note=" opencode の error 行に率制限 (rate_limit_error / HTTP 429) があり、cause=rate_limit を付けました。"
-body="[run-outcome] この run ($url, job status: $status) は PR も push も出さずに終了しました。理由の分類: $reason (stop=判断待ち・停止, split=1 run に収まらない, blocked=依存, artifact=素材不足, unknown=不明)。$rl_note この issue は blocked でも着手済みでもないため、ラベル \`$NOPR_LABEL\` を付けました。PM はコメント本文でなく、ラベルとこのマーカーで扱ってください (次の run が PR を出すとラベルは自動で外れます)。
+head_text="[run-outcome] この run ($url, job status: $status) は PR も push も出さずに終了しました。理由の分類: $reason (stop=判断待ち・停止, split=1 run に収まらない, blocked=依存, artifact=素材不足, unknown=不明)。$rl_note この issue は blocked でも着手済みでもないため、ラベル \`$NOPR_LABEL\` を付けました。PM はコメント本文でなく、ラベルとこのマーカーで扱ってください (次の run が PR を出すとラベルは自動で外れます)。
 $marker"
 
 echo "issue #$N ended without a PR: reason=$reason status=$status run=$run"
 if [ "$DRY" = 1 ]; then
   echo "DRY: label $NOPR_LABEL + comment: $marker"
+  post_comment "$(report_body "$head_text")"
   exit 0
 fi
 gh api -X POST "repos/$R/labels" -f name="$NOPR_LABEL" -f color=D93F0B \
   -f description="the last implement run ended without a PR or a push (PM Worker relaunches or decides)" > /dev/null 2>&1 || true
 gh api -X POST "repos/$R/issues/$N/labels" -f "labels[]=$NOPR_LABEL" > /dev/null || echo "::warning::could not add $NOPR_LABEL to #$N"
-gh api -X POST "repos/$R/issues/$N/comments" -f body="$body" > /dev/null || echo "::warning::could not post the run-outcome comment on #$N"
+post_comment "$(report_body "$head_text")"
 exit 0

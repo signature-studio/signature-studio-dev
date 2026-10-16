@@ -409,9 +409,11 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   どちらでもなければ明示的な終了状態 (`oc:no-pr`・`needs-user-input`・`oc:stuck`) を持つ。実測では implement run (issue_comment) の約 70% が
   PR を出さずに終わっていた (着手報告のみ・停止報告・1 run に収まらない・素材不足)。
 
-  - **implement の終了時** (`record-run-outcome.sh`、`opencode.yaml` の最終 step。`always()` で、agent の失敗・cancel の後も走る。job は失敗させない):
-    issue の `/oc` run が、open PR も (run の開始以降に作成・merge された PR を含む。#2590)、明示的な終了状態 (`oc:stuck`・`needs-user-input`・`blocked`・open な依存) も残さずに終わったら、
-    issue にラベル `oc:no-pr` と構造化コメント `<!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> [cause=rate_limit] run=<run id> -->` を残す。`cause=rate_limit` は、opencode の JSONL の error 行に率制限 (`rate_limit_error`・HTTP 429) があったときだけ付く (`detect-rate-limit.sh`。text 行の語は数えない。annotation `oc-rate-limit` も出る。#2344)。
+  - **implement の終了時** (`record-run-outcome.sh`、`opencode.yaml` の最終 step。`always()` で、agent の失敗・cancel の後も走る。報告の投稿に失敗したときだけ job を失敗させ、それ以外の読み取り・ラベルの失敗は警告のみ (#CI-240)):
+    issue の `/oc` run が PR も push も残さずに終わったら、agent の最終回答を含む報告コメントを必ず 1 件投稿する (#CI-240)。
+    closed の issue や、明示的な終了状態 (`oc:stuck`・`needs-user-input`・`blocked`・open な依存) の issue でも、報告だけは投稿する (ラベルとマーカーは付けない)。報告の中の `/oc` は全角の斜線に、引用部の `<!--` は `＜!--` に置き換える (`/oc` で implement を起動せず、マーカーとして数えられないため)。
+    open PR も (run の開始以降に作成・merge された PR を含む。#2590)、明示的な終了状態 (`oc:stuck`・`needs-user-input`・`blocked`・open な依存) も残さずに終わったら、
+    issue にラベル `oc:no-pr` と構造化コメント `<!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> [cause=rate_limit] run=<run id> -->` を残す (この no-pr の場合だけマーカーとラベルが付く)。`cause=rate_limit` は、opencode の JSONL の error 行に率制限 (`rate_limit_error`・HTTP 429) があったときだけ付く (`detect-rate-limit.sh`。text 行の語は数えない。annotation `oc-rate-limit` も出る。#2344)。
     率制限を検知したときは `notify-rate-limit.sh` が、直近 30 分に `cause=rate_limit` の run が 5 件以上かつ完了した opencode の run の 30% 以上なら、ラベル `oc:rate-limit` の issue に通知する (open があればコメント (60 分に 1 回)、無ければ `[CI] 率制限: ...` を起票 (6 時間に 1 件))。`OC_MODEL_ID` は自動で変えない (切替は指示 126 の範囲で PM が行う。#2346)。
     PM Worker はコメント本文を解析せず、**ラベルとマーカー**で扱う。`oc:no-pr` は、次の run が PR を出す (または issue が close・明示的な状態になる) と、この script が外す。
     `state:*` ラベルは作らない。reason は agent の最終回答の語彙で決める。分類規則の正本は `.github/scripts/run-outcome-reason.sh` (`tools/pm/launch_issues.py` の `stop_re`・`NEED_RE` と同じ語彙。優先順 artifact > blocked > split > stop。#3184):
