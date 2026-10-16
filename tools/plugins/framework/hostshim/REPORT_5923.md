@@ -14,7 +14,7 @@
 
 ## 展開手段の選定
 
-- 採用: **素材の `extracted/` をそのまま使う** (展開不要)。tar を `tar --zstd -xf` で展開 (約 14 秒・展開先 2.3GB)。
+- 採用: **素材の `extracted/` をそのまま使う** (展開不要)。tar を `tar --zstd -xf` で展開 (展開先 2.3GB・時間は下記 §検証)。
   NSIS payload の再展開は不要。素材の block 切り出しは `[WIN64]` (`tools/nsis_extract.py`) が済ませている。
 - 不採用: NSIS の専用ツール・runner での FL Studio インストール。素材に既に切り出し済みの実体があり、
   インストール・wine 実行は受入 1 の範囲外。
@@ -25,7 +25,7 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | `0de90193c` (コードを変えた最後の commit) |
+| 測定 commit | `c81ec8a8c` (コードを変えた最後の commit) |
 | PE block 件数 | 313 (合計 1,262,116,832 B) |
 | `FLEngine_x64.dll` | `block00031_PE.bin` / 22,227,016 B / sha256 `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d` / export 3 件 |
 
@@ -49,4 +49,5 @@ FL 系の関連 DLL (同じ `extracted/` の PE・export 名で確認):
 ## 検証
 
 - 再現: `ARTIFACTS_DIR=<素材 dir> bash tools/plugins/framework/hostshim/hs_flengine_list.sh` (素材 `fl-win64` = `fl-win64.tar.zst` が必要)。
-- 測定 (commit `0de90193c`・load 1.48・展開込み 8.0 秒): PE blocks 313・`FLEngine_x64.dll` 1 件・`pe_list.tsv` の sha256 先頭 16 桁 `3d2a043167b7d96c` (2 回の測定で一致)。
+- 測定 (commit `c81ec8a8c`・展開先 `$RUNNER_TEMP/flw` を消してから全量展開し直し・開始時 load 1.09 (uptime 1 分平均)・6.4 秒): PE blocks 313・`FLEngine_x64.dll` 1 件 (`block00031_PE.bin`・22,227,016 B・sha256 `b2c64da4…9496d`)・`pe_list.tsv` の sha256 先頭 16 桁 `3d2a043167b7d96c`。
+- 展開完了の目印: `$RUNNER_TEMP/flw/.extract_done`。目印が無いときは `extracted/` を消して展開し直す (途中失敗の残骸を使わない)。
