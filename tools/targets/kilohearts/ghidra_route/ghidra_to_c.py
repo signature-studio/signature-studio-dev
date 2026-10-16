@@ -180,6 +180,13 @@ DELAY_RULES = [
      'u2f(f2u(_DAT_182286958) ^ _DAT_1813d1a80)', 1),
     # #5664 (KH-174): FUN_1802ed7f0 の 1249・1254 行 (1250・1255 の同形を含む)。機械語 1802ee03d: movaps xmm2,xmm0 → xorps [1813d1a80] → andps xmm2,xmm0。
     #   float レジスタへの符号マスク XOR と AND なので、(uint)fVar は数値変換ではなくビット列 f2u() で読む。
+    # #5664 (KH-174): FUN_180fbc1f4 の符号判定。機械語 180fbc2c1: test WORD PTR [rsp+0x42],0x8000 (float の上位 16bit の符号)。
+    #   (uint)float は値変換 (負の float で未定義) なので、ビット列 f2u() で符号ビットを読む。
+    ('2766 FUN_180fbc1f4 sign bit of afStackX_8[0] (ビット列)', r'if \(\(\(uint\)afStackX_8\[0\] & 0x80000000\) != 0\) \{',
+     'if (((f2u(afStackX_8[0])) & 0x80000000) != 0) {', 1),
+    # #5664 (KH-174): FUN_180fc61e4 (float 1 引数) の同形の符号判定。機械語 180fc6223: test WORD PTR [rsp+0x32],ax (0x8000)。
+    ('3549 FUN_180fc61e4 sign bit of afStackX_8[0] (ビット列)', r'if \(\(\(uint\)afStackX_8\[0\] & 0x80000000\) == 0\) \{',
+     'if (((f2u(afStackX_8[0])) & 0x80000000) == 0) {', 1),
     ('1249 FUN_1802ed7f0 uVar21 = fVar26 sign bits', r'uVar21 = \(uint\)fVar26 \^ _DAT_1813d1a80;', 'uVar21 = f2u(fVar26) ^ _DAT_1813d1a80;', 1),
     ('1250 FUN_1802ed7f0 uVar19 = fVar31 sign bits', r'uVar19 = \(uint\)fVar31 \^ _UNK_1813d1a84;', 'uVar19 = f2u(fVar31) ^ _UNK_1813d1a84;', 1),
     ('1254 FUN_1802ed7f0 auVar6 hi = fVar31 bits', r'auVar6\._4_4_ = uVar19 & \(uint\)fVar31;', 'auVar6._4_4_ = uVar19 & f2u(fVar31);', 1),
