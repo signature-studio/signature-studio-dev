@@ -57,7 +57,7 @@
 - 判定: `ir_truncated` (base 一致・callee の最大端 E > alloca 幅 S)・`ir_covers` (E ≤ S)・`unmatched` (IR に該当 call が無い)・`no_prologue` (prologue のパターンに合わず未判定)。`base_mismatch` は 0 件。
 - 注: 「IR の `stack_var_N` は entry rsp 基準の N」という対応は §6 の推定 (REPORT_SHX-T28 §6) をそのまま使う。`base_check.py` はこの推定を site 全体に当てはめただけで、推定そのものは未確認。
 - 機械語で確認したのは「親の rbp の位置」と「IR の alloca 名」の一致だけ。call 直前の引数と callee の読み先の site 単位の突合は、`function_448490` の 10 site (§3) だけ行った。残り 291 site は base の一致のみ。
-- 残り 291 site を `frame_share/site_check.py --sites` で機械語から一括抽出した (301 件すべて取得)。callee の rbp 基準アクセスを 3 区分に分けた (線型走査の粗い分類・真の D23 の確定ではない): `write_local` 121 (callee が親の局所 `+0x70` 未満へ書く)・`read_local` 106 (読むだけ)・`arg_home_only` 74 (`+0x70` 以上の引数 home だけ)。site 単位の表は `REPORT_SHX-T44_APPENDIX.md`。
+- 残り 291 site を `frame_share/site_check.py --sites` で機械語から一括抽出した (301 件すべて取得)。callee の rbp 基準アクセスを 3 区分に分けた (線型走査の粗い分類・真の D23 の確定ではない): `write_local` 121 (callee が親の局所 `+0x70` 未満へ書く)・`read_local` 106 (読むだけ)・`arg_home_only` 74 (`+0x70` 以上の引数 home だけ)。site 単位の表は `REPORT_SHX-T44_APPENDIX.md` と `REPORT_SHX-T44_APPENDIX_2.md`。
 - IR 突合との関係: `ir_truncated` 204 のうち `arg_home_only` は 67。引数 home だけを読む site は親の局所の書換えを示さないので、alloca 幅だけで D23 とみなすと過大に数える。`ir_covers` 38 のうち `write_local` は 8 で、偽陽性とは言い切れない。
 - 前回 run (#4189 の停止) の `ir_truncated 242 / ir_covers 0` は、素材 `work-m11` を `-C tools/m11` で展開して誤配置したことが原因。`-C .` (リポジトリ直下) で展開すると §10 と一致する (204/38/56/3)。
 - 未了 (本 issue で追跡): `write_local` と `read_local` の site ごとの「call 直前の引数が親の rbp 由来か」の確定 (線型走査の分岐無視を解消する必要がある)・`unmatched` 56 と `no_prologue` 3 の判定。
