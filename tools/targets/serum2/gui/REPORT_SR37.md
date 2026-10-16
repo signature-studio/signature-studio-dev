@@ -168,3 +168,70 @@ analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scri
 | 0x180a13668 | FUN_180a13668 | 50 | 0 |
 
 - 注: `FUN_180118150`・`FUN_180118070`・`FUN_1801085b0`・`FUN_1801382a0` など、§4.2 の役割で参照した関数の中身は本 REPORT では読解していない。名前の付与は別 issue。
+
+## 5. [SR-85 #5034] 間接 call 51 箇所の候補列挙と閉包の上限
+
+- 日付: 2026-10-16 / 親: #5005 (SR-83) / 前段: §4 (下限 87 関数・10,194 B・間接 call 51)
+- 測定 commit: 本 §5 と `gui/indirect_sr85_own_vt.py`・`gui/ghidra_xferonoff_indirect.java` を追加した commit (PR 本文の測定 commit 欄参照)。以後このディレクトリのコードは未変更。
+- 入力: §1 と同じ (sha256 `501e7bb3…4e5283` / 19,236,864 B)。Ghidra 12.1.4 を repo 外 (作業用 `/tmp`) に展開、JDK 21 (`/usr/lib/jvm/temurin-21-jdk-amd64`)。
+- 出力: `work/own_vt_sites.tsv` (gitignore 対象)。decompile の C 本文は commit しない (`docs/LEGAL.md`)。
+
+### 5.1 再現手順・実測 (n=1、runner 上、逐次)
+
+```sh
+cd tools/targets/serum2/work                     # gitignore 対象
+tar --zstd -xf "$ARTIFACTS_DIR/plugins-serum2.tar.zst" Install_Xfer_Serum2_2.1.5.exe
+7z x -y Install_Xfer_Serum2_2.1.5.exe '$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' -oexe
+cp -f 'exe/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' Serum2_win64.vst3
+python3 ../gui/vtable_fn_addrs.py Serum2_win64.vst3 XferOnOffButton > xferonoff_fns.tsv
+export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64 PATH=$JAVA_HOME/bin:$PATH FN_ADDRS_TSV=$PWD/xferonoff_fns.tsv OUT_DIR=$PWD/closure
+analyzeHeadless ghproj xo -import Serum2_win64.vst3 -overwrite -scriptPath ../gui -postScript ghidra_fn_size.java
+analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scriptPath ../gui -postScript ghidra_xferonoff_closure.java   # 下限 (87 関数)
+analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scriptPath ../gui -postScript ghidra_xferonoff_indirect.java > indirect_ghidra.log   # 間接 call の 1 件ずつ
+python3 ../gui/indirect_sr85_own_vt.py Serum2_win64.vst3 indirect_ghidra.log aa9750,aa96b0,aa9770 > own_vt_sites.tsv
+# 上限: own vtable の候補 16 関数を root に加えて閉包を取り直す (xferonoff_upper_fns.tsv)
+FN_ADDRS_TSV=$PWD/xferonoff_upper_fns.tsv OUT_DIR=$PWD/closure_upper analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scriptPath ../gui -postScript ghidra_xferonoff_closure.java
+```
+
+- 実測時間: import + 自動解析 (`ghidra_fn_size.java`) **19 分 25 秒** (real)。下限の閉包 `-process` **6.5 秒**。間接 call 列挙 `-process` **7.0 秒**。上限の閉包 `-process` **6.6 秒**。Python 解析 (`indirect_sr85_own_vt.py`) 約 4 秒。測定時の負荷は 4 vCPU の runner で他ジョブなし (load average 1 分値 1.08)。
+- 境界の再確認: 8 件すべて `start_eq=true`・未対応 0・合計 **507 B** (§2 と一致)。
+
+### 5.2 受入 1: 間接 call 51 箇所の呼出し先候補
+
+Ghidra の計数 (`computed_call_sites=51`) の内訳は次のとおり。
+
+| 種別 | 件数 | 候補の出し方 |
+|---|---|---|
+| IAT 経由 (`call qword ptr [0x180fe....]`・`ref=EXTERNAL:…KERNEL32.DLL::…`) | **27** | 参照先が import 名に一意に解決 (候補 1 件・外部 import。本体は閉包の外) |
+| レジスタ経由 `call [reg+disp]` (own vtable の slot に一致) | **21** | COL `0xaa9750`・`0xaa96b0`・`0xaa9770` (XferOnOffButton の 3 種) の vtable slot から候補化。候補 1〜3 件 |
+| `INT3` / `INT 0x29` | 3 | 呼出しではない。Ghidra が computed flow として数えたもの (候補なし) |
+
+- 数え方: 間接 call の実数は **48 件** (51 − INT 系 3)。§4.3 の 51 は INT 系を含む計数。
+- レジスタ経由の間接 call 21 件は、全件が own vtable の COL 3 種の slot で候補化できた (未解決 0 件)。`[R8]`・`[RAX]` の 2 件は disp 無し = slot 0。
+- 候補の列挙: 候補関数は `work/own_vt_sites.tsv` の `result` 列 (VA)。候補の総数は重複除去後 **16 関数** (`0x180136bf0`・`0x1801428d0`・`0x180142180`・`0x180142150`・`0x1801470d0`・`0x180142540`・`0x18000d920`・`0x1804b6690`・`0x18018e4b0`・`0x1800181c0`・`0x18018f2e0`・`0x180138180`・`0x18018e800`・`0x18018f290`・`0x180622780`・`0x180622840`)。
+- 限界: 候補は「XferOnOffButton の vtable の同じ slot の関数」であり、実行時の動的型は未確認。同じ slot を持つ別クラスの vtable は見ていない (`this` の型を追跡していない)。
+- 解決の対象外: `call reg` (レジスタ値) は本 run の閉包内では 0 件。
+
+### 5.3 受入 2: 上限 (閉包の候補込み、1 段)
+
+| 集合 | 関数数 | 本体合計 (外部 import 除く) | computed call 計数 (INT 系を含む) |
+|---|---|---|---|
+| 下限 (§4.3・SR-83) | 87 (外部 import 16・thunk 8・通常 63) | **10,194 B** | 51 (うち INT 系 3) |
+| 上限 (本 §5・1 段) | 157 (外部 import 24・thunk 8・通常 125) | **22,227 B** | 100 (うち INT 系 7・実 call 93: レジスタ経由 39・IAT 49 ほか) |
+
+- 上限の内訳: 通常 125 関数 = 22,182 B、thunk 8 件 = 45 B (合計 22,227 B)。下限との差は **+12,033 B** (+118%)。
+- 注: 上限は 1 段 (own vtable の候補 16 関数を root に足した閉包)。新たに到達した 70 関数の中の間接 call は候補化していない。**真の上限ではない**。上限を閉じるには、新規到達分の間接 call の候補化を繰り返す必要がある (未実施)。
+
+### 5.4 受入 3: 下限と上限の差
+
+- 差分: 関数数 **+70** (157 − 87)、本体合計 **+12,033 B** (22,227 − 10,194)。
+- 差分の内訳: 候補 16 関数 (own vtable 由来) が 1 段目。そこから到達した追加の関数 70 件 (本体 +12,033 B) が 2 段目以降。
+- 差分の由来は上限の 1 段目 (16 関数の閉包) であり、真の上限との差は未測定。
+- 対応物: 本 REPORT §4.4 の canvas 側の対応物なしの判定は変えない (本 §5 は閉包の大きさだけを測る)。
+
+### 5.5 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 上限 (2 段目以降) の間接 call の候補化 | 上限が 1 段のみ。真の上限は未測定 | 別 issue (本 issue の範囲外・子 issue 起票は下記) |
+| 同じ slot を持つ別クラス vtable の候補 (型未追跡) | 候補が XferOnOffButton の vtable に限定 | 同上 |
