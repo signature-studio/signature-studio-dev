@@ -9,7 +9,7 @@ import sys
 
 LINE = re.compile(r'^\s*([0-9a-f]+):\t(?:[0-9a-f]{2} ?)+\s+(.*)$')
 STORE = re.compile(r'^mov\s+QWORD PTR \[(r[a-z0-9]+)\+0xa80\],')
-CALLJMP = re.compile(r'^(?:call|jmp)\s+([0-9a-f]+)\b')
+CALLJMP = re.compile(r'^(?:call|jmp)\s+(?:0x)?([0-9a-f]+)\b')
 
 funcs = []
 cur = None
