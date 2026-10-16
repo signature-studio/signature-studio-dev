@@ -29,12 +29,12 @@ echo "flengine_sha256_16 installed=$a block00031=$b"
 
 # FL64.exe を一定時間起動し、FLEngine_x64.dll への CreateFileW / LoadLibrary を記録する
 cd "$FL_DIR" || exit 2
-WINEDEBUG=+relay timeout "${FL_SECS:-90}" xvfb-run -a "$WINE" FL64.exe > "$W/fl_relay.log" 2>&1
+WINEDEBUG=+relay,+crypt,+wintrust,+err timeout "${FL_SECS:-90}" xvfb-run -a "$WINE" FL64.exe > "$W/fl_relay.log" 2>&1
 echo "fl64_rc=$?"
 echo "createfile_flengine=$(grep -c 'KERNEL32.CreateFileW(.*FLEngine_x64.dll' "$W/fl_relay.log")"
 echo "sip_guid_flengine=$(grep -c 'CryptSIPRetrieveSubjectGuid(.*FLEngine_x64.dll' "$W/fl_relay.log")"
 echo "loadlibrary_flengine=$(grep -c 'LoadLibraryW(.*FLEngine' "$W/fl_relay.log")"
 echo "winverifytrust_ret=$(grep -o 'Ret  wintrust.WinVerifyTrust() retval=[0-9a-f]*' "$W/fl_relay.log" | sed 's/.*retval=//' | tr '\n' ' ')"
 echo "msgbox_unverified=$(grep -c 'MessageBoxA(.*could not be verified' "$W/fl_relay.log")"
-echo "unsupported_spc_decoder=$(grep -c 'CryptDecodeObjectEx Unsupported decoder for 1.3.6.1.4.1.311.2.1.4' "$W/fl_relay.log" || true)"
+echo "unsupported_spc_decoder=$(grep -c 'CryptDecodeObjectEx Unsupported decoder for lpszStructType 1.3.6.1.4.1.311.2.1.4' "$W/fl_relay.log" || true)"
 echo "log=$W/fl_relay.log"

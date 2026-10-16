@@ -50,7 +50,10 @@
 - probe の集計: `winverifytrust_ret=80096004 00000000`・`msgbox_unverified=1`・`loadlibrary_flengine=0`。
 - 事実: FLEngine の `LoadLibrary` 完了 (DllMain) はログに出ず、RVA `0x15e4280` の watch を張る前提は成立しない。停止は MessageBox の modal で起きる。
 - 未確定: どの `WinVerifyTrust` 呼出しが MessageBox を出したか (呼出し元が別のため、5 の順序だけでは因果を言えない)。
-- `WINEDEBUG=+crypt,+wintrust,+err` (90 秒・383 行): `fixme:cryptasn:CryptDecodeObjectEx Unsupported decoder for lpszStructType 1.3.6.1.4.1.311.2.1.4` が 2 件。SPC インダイレクトデータの decode 未対応で、検証結果との因果は未確認。
+- 表の行番号 (6143・5645・23042 など) は前回 run の relay ログ (リポジトリに保存なし) に基づく。下の再実行と行番号は一致しない。
+- 再現 (今回の実測・集計と同じ条件): `WINEDEBUG=+relay,+crypt,+wintrust,+err` で FL64 を 90 秒起動 (`bash tools/python/wine_fl_probe.sh`, `WINE=/usr/lib/wine/wine64`)。ログは `$RUNNER_TEMP/fl5838/fl_relay.log` (458,361 行)。
+- 同条件の実測: `unsupported_spc_decoder=2` (ログ 15123 行・15405 行。`fixme:cryptasn:CryptDecodeObjectEx Unsupported decoder for lpszStructType 1.3.6.1.4.1.311.2.1.4`)。`winverifytrust_ret=80096004 00000000`、`msgbox_unverified=1` (23785 行)、`loadlibrary_flengine=0`。
+- SPC インダイレクトデータの decode 未対応で、検証結果との因果は未確認。
 - 署名検証の結果を書き換えて読み込ませる迂回は、製品の署名確認を外す操作のため本 issue では行わない。
 
 ### 次の run への引継ぎ
