@@ -28,10 +28,29 @@
 - demo と licensed が同値になることの扱い: demo と licensed は同じ authstub DLL・同じ 64 block・同じ host 経路で、差は state (`cases/demo` / `cases/licensed`) のみ。出力が 6 桁まで一致したことは、この 16384 cell の集計では state の差が音に現れていないことを示すが、「同一音声」の証明ではない。ログは host の `<out>/log.txt` (`gLogFile`) に出力され、`<out>` は実行時の出力先 (`work/` 配下・gitignore)。本 REPORT には行を残していない。
 - slot は 3 条件・全段階で 0 のまま。書込 watch は 0 件。
 
+## 2b. GUI 経路の観測 (S2HOST_ATTACH / S2HOST_CLICKS)
+
+`host/vst3host.cpp` に opt-in を追加 (既定経路は無変更)。
+
+- `S2HOST_ATTACH=1`: `createView('editor')` で取った view に対し、不可視の親 HWND を作って `isPlatformTypeSupported(kPlatformTypeHWND)` と `attached` を呼ぶ。`attached` 後・30 回の message pump 後に slot を読み、`removed` で閉じる。
+- `S2HOST_CLICKS=1` (`S2HOST_ATTACH` 併用): 親の client 領域を 64px 格子 (15×15 = 225 点) で `WM_LBUTTONDOWN`/`UP` を送り、点ごとに slot が 0 以外になったら出す。
+
+実測 (無改変 DLL・既定 state・4 block・`xvfb-run -a`・wine64 9.0。測定 commit `6fc5b4cc7` (HEAD で再現・7 秒・load 0.21)。`git diff 42fad4a17 6fc5b4cc7 -- tools/targets/serum2/host` は本節の opt-in 差分のみ):
+
+| 条件 | slot (createView 後 / attached 後 / pump 後 / 格子クリック後 / process 前) | 書込 watch hit | 子ウィンドウ数 (attached 後) |
+|---|---|---|---|
+| attach + 格子 225 点 (`S2HOST_ATTACH=1 S2HOST_CLICKS=1`) | 0 / 0 / 0 / 0 / 0 | 0 件 | 1 |
+
+- attach のみ (格子なし) の行は、測定 commit のログで再取得していないため削除した (素材 `plugins-serum2` が無く、測定 commit 由来の値を示せない)。
+- `attached` は `kResultTrue`。子ウィンドウ 1 件が生成されており、editor は実際に開いている。
+- 格子クリックは 225 回すべて送信。非 0 になった点は無し。
+- 完走: `blocks=4 frames=512 nonzero_cells=1020/1024 peak=0.548306` (§2 の seed と同値)。
+
 ## 3. 判定と未達
 
-- 観測の範囲: **GUI を開かず** (`IPlugView::attached` を呼ばず)、`createView` と process のみ。slot 由来 5 箇所 (`0x180136bf0` 3 箇所・`0x180138180`・`0x180142540`) の呼出し経路は、XferOnOffButton 操作 (= editor open + 入力) で通る可能性があり、本観測には入っていない。
-- したがって「slot は runtime でも 0 」は、**GUI 非操作の 3 条件では確認できた**が、受入の「slot 由来 5 箇所の呼出し先の確定」は未達。
+- 観測の範囲: §2 の 3 条件 (GUI 非操作) と §2b の 2 条件 (editor を attach し格子クリック) で、slot `0x1817bf760` は**全て 0・書込 0 件**。
+- 未達: 格子クリックは XferOnOffButton の座標を特定していない (掃引)。ボタンの位置を指定した操作は未実施。したがって「XferOnOffButton 操作で slot が書かれない」の確定は、ボタンを狙った操作の観測が要る。
+- 受入の「slot 由来 5 箇所の呼出し先の確定」は未達。
 
 ## 4. 未解決 (起票先)
 

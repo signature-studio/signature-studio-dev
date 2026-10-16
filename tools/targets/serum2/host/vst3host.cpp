@@ -908,6 +908,52 @@ int main(int argc, char** argv) {
       unsigned char* cbv = (unsigned char*)ctrl;
       L("[probe] ctrl iface+0xdc after createView = %d", *(int*)(cbv + 0xdc));
       SI("gate_0xdc_after_createview", *(int*)(cbv + 0xdc));
+      // S2HOST_ATTACH=1 (SR-99 #5958): 不可視の親ウィンドウに attached して editor を開く。XferOnOffButton 観測の経路
+      if (getenv("S2HOST_ATTACH")) {
+        HWND parent = CreateWindowExA(0, "STATIC", "s2host", WS_POPUP, 0, 0, 1024, 768, nullptr, nullptr,
+                                      GetModuleHandleA(nullptr), nullptr);
+        tresult rs = view->isPlatformTypeSupported(kPlatformTypeHWND);
+        tresult ra = view->attached((void*)parent, kPlatformTypeHWND);
+        L("[attach] parent=%p isPlatformTypeSupported=%s attached=%s", parent, tresName(rs), tresName(ra));
+        {
+          int nChild = 0;
+          for (HWND c = GetWindow(parent, GW_CHILD); c; c = GetWindow(c, GW_HWNDNEXT)) nChild++;
+          L("[attach] direct child windows after attached = %d", nChild);
+        }
+        L("[slot] 0x1817bf760 after attached = %lld", (long long)*(volatile long long*)(gDllBase + 0x17bf760));
+        for (int i = 0; i < 30; i++) {
+          MSG msg;
+          while (PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&msg); DispatchMessageA(&msg); }
+          Sleep(100);
+        }
+        L("[slot] 0x1817bf760 after pump = %lld", (long long)*(volatile long long*)(gDllBase + 0x17bf760));
+        // S2HOST_CLICKS=1: editor 内を格子状にクリックする (XferOnOffButton の位置は未確定のため掃引)
+        if (getenv("S2HOST_CLICKS")) {
+          int hits = 0;
+          for (int gy = 1; gy <= 15; gy++) {
+            for (int gx = 1; gx <= 15; gx++) {
+              POINT pt = {gx * 64, gy * 48};
+              HWND target = ChildWindowFromPointEx(parent, pt, CWP_SKIPINVISIBLE);
+              if (!target) target = parent;
+              POINT cpt = pt;
+              ClientToScreen(parent, &cpt);
+              ScreenToClient(target, &cpt);
+              LPARAM lp = MAKELPARAM(cpt.x, cpt.y);
+              SendMessageA(target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+              SendMessageA(target, WM_LBUTTONUP, 0, lp);
+              hits++;
+              for (int k = 0; k < 2; k++) {
+                MSG m;
+                while (PeekMessageA(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageA(&m); }
+              }
+              long long sv = *(volatile long long*)(gDllBase + 0x17bf760);
+              if (sv != 0) L("[slot] nonzero after click (%d,%d) = %lld", pt.x, pt.y, sv);
+            }
+          }
+          L("[clicks] grid sent=%d slot_final=%lld", hits, (long long)*(volatile long long*)(gDllBase + 0x17bf760));
+        }
+        view->removed();
+      }
       view->release();  // open/setFrame はしない (headless 維持)
     }
   }
