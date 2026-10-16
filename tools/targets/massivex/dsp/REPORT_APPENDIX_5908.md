@@ -19,7 +19,10 @@
   - G0: G の入口 livein xmm4/5 = 0 / G: G が解析不能・text 外
 - 実行: 3.8 s。site 数 D 825・C 1549・G0 351・G 26・E 43。
 - `scripts/mx63_g_containment.py`: E 43 件の G の所在を調べる。実行: 4 s。
-- 検算: E 43 件の site の E8/E9 rel32 の再計算値は、分類の G と 43/43 一致 (命令は正しく復号されている)。
+- 検算 (E8/E9 rel32 の再計算): 本 PR では未実施。再計算を行う script は本 PR に含めていない。よって「命令は正しく復号されている」は本 PR の根拠に含めない (§4 の判定は依らない)。
+- 出力の出所: 以下の件数は、著者が測定 commit `dba7c5908` で実行したと記した値 (PR 本文の記載)。`plugins-massivex` 素材が無い run では再実行していない。
+  - `python3 scripts/mx63_u3e_split.py <PE> <vectorcall.json> <out.json>`: population 604・E 43・site_cat D 825・C 1549・G0 351・G 26。
+  - `python3 scripts/mx63_g_containment.py <PE> <split.json> <out.json>`: counts = pdata 始点 0・途中・命令境界 7・途中・命令境界でない 35・範囲外 1。
 
 ## 2. 47 件と 42 件の突合
 
