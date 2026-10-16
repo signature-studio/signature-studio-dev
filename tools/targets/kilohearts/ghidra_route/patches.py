@@ -180,8 +180,7 @@ ABI = {
         # #5385 (KH-159): stereo ABI 族の後半 callee (FUN_180fdc700・FUN_180fdc6d8) の呼出し 4 件。callee 宣言は ulonglong (入力 double の bit 列 = d2u)。
         #   FUN_180fdc700 2 件 ← FUN_180fcd690: 4232 は 180fcd9e5 (`movq xmm0,rdx`・rdx = 入口 param_1 の bit)、4295 は 180fcdbf0 (分岐 180fcdab7 は vmovq xmm0,r9 より前・xmm0 は入口のまま)。
         #   FUN_180fdc6d8 2 件 ← FUN_180fce0d0: 4512 は 180fce455 (`movq xmm0,rdx`・rdx = 入口 param_1)、4545 は 180fce640 (flag≠0 の 180fce460 系で xmm0 は入口のまま)。
-        #   未規則化 2 件 (FUN_180fcd400 ← FUN_180fcce40 の 4048・4060): 4048 (180fccee6) は xmm0 = 入口 param_1 だが、callee は double 2 引数 + int を取り xmm1・r8 の源 (0.0・0) の扱いを未決のため規則にしない。
-        #   4060 (180fcd074) は xmm0 が reduction 後の値 (subsd の結果) で、C 側の対応式が未確定。
+        #   未規則化 1 件 (FUN_180fcd400 ← FUN_180fcce40 の 4060): 4060 (180fcd074) は xmm0 が reduction 後の値 (subsd の結果) で、C 側の対応式が未確定。
         ('delay 4232 FUN_180fdc700 xmm0 = param_1 (180fcd9e5)', r'(if \(\(ulonglong\)_DAT_1822829d0 <= \(ulonglong\)dVar2\) \{\n\s*)dVar2 = \(double\)(?:func_0x000|FUN_)180fdc700\(\);', r'\1dVar2 = (double)FUN_180fdc700(d2u(param_1));'),
         ('delay 4295 FUN_180fdc700 xmm0 = param_1 (180fcdbf0)', r'(\n    \}\n)    dVar2 = \(double\)(?:func_0x000|FUN_)180fdc700\(\);', r'\1    dVar2 = (double)FUN_180fdc700(d2u(param_1));'),
         ('delay 4512 FUN_180fdc6d8 xmm0 = param_1 (180fce455)', r'(return \(double\)\(\(ulonglong\)dVar4 \^ uVar1\);\n      \}\n      )dVar2 = \(double\)(?:func_0x000|FUN_)180fdc6d8\(\);', r'\1dVar2 = (double)FUN_180fdc6d8(d2u(param_1));'),
