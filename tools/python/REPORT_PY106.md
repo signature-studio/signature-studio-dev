@@ -67,6 +67,17 @@
 - 別案 (未コミットの試行・出力なし): ローダを飛ばして `0xc395d1` (hmod 判定の後) から始める試みを行った。ただしその試行のコード・出力・手順はこの PR (commit・results・§7) に残っていない。したがって「`0xc395d1` は lift の関数入口でなく `unlifted` で止まった」という結果は、この PR では裏付けられない (未検証の記録)。
 - 結論: この probe では、束縛関数は GetProcAddress にも Python312 の load hook にも届かず、null 呼出しの後に `MessageBoxA` → `exit` で終わる。型名の実行時の値は、この段階では得られない (受入 1 は未達のまま)。null 呼出しの位置 (推定の経路) は #2909 の再開条件 (a) で追う。
 
+### 2-3. GetMem 関数ポインタ (`0x13a5c90`) の監視と復元 (4 回目の run・未達)
+
+- 方法: 監視 slot に `0x13a5c90` (`MM_TABLE`。GetMem の間接 call `0x40941e` の pointer slot) を追加 (`g_py_watch` 6 → 7 件)。`FLE_PY106_MM=1` のときだけ、束縛の直前に `0x13a5c90` を boot 初期値 `0x407a50` に戻す (計測のみ)。
+- 測定 commit: **`aad243e64`** (`feat(flelift): watch GetMem table slot 0x13a5c90 and add optional restore before bind probe (PY-106, #2909)`)。コードを変えた最後の commit。`git diff aad243e64 HEAD -- tools/flelift/boot` の出力は 0 行。
+- 実測 (`FLE_PY106_BIND=1 FLE_BOOT_TAG=py106h FLE_BOOT_RUNS=negctl bash tools/flelift/boot/fle6_measure.sh`・load 開始時 `1.14 1.02 0.52`): real 1 分 54.4 秒 (lift・clang plain・boot を含む)。rc 0。boot は units 209 / 942 で停止 (前回と同じ)。IPP 判定 ok。
+- 監視 events (`FLEBOOT_PY123`・unit 209・site 8 = GetMem(0x74) 直前): `0x15e1c78`・`0x15e4790`・`0x15e1140` と同じ時点で、`0x13a5c90` が `0x407a50 → 0x0` に変わる。unit 1〜208 では `0x13a5c90` は `0x407a50` のまま。
+- 束縛 (復元なし・`FLE_PY106_BIND=1`): `threw exit (code 0)`、束縛名 0 件、`getproc_calls 0`、`hook_calls 0`。束縛は走らない (§2-2 と同じ)。
+- 束縛 (復元あり・`FLE_PY106_BIND=1 FLE_PY106_MM=1`・同 commit): `FLEBOOT_PY106MM` で `0x0 → 0x407a50` に戻ったことを確認。束縛は `threw oob (memory access out of bounds)`、束縛名 0 件、`getproc_calls 0`、`hook_calls 0`。`0x13a5c90` だけを戻しても、束縛は GetProcAddress に届かない。
+- 読み: GetMem の関数ポインタの 0 化は、`0x15e1140` や undo 系 global の 0 化と同じ unit 209 の fill 経路で起きる。束縛関数を走らせる前に、この fill の原因 (PY-123 §2-5 と同じ経路) を解消しないと、型名の観測には届かない。
+- 結論: 受入 1 は未達のまま。型名の実行時の値は、この harness では得られない。
+
 ## 3. RANGE (-4) と repo の写像 (受入 2)
 
 | 対象 | 写像・文言 | 出典 |
@@ -98,13 +109,14 @@
   - `tools/flelift/boot/build.sh`: `EXPORTS` に `_fle_py_bind_probe`・`_fle_py_bind_name`・`_fle_py_bind_cell`・`_fle_py_bind_hook_n` の 4 件を追加。
   - `tools/flelift/boot/results/boot_summary_py106_negctl.json`・`boot_summary_py106_negctl_py106bind.json`: 測定 commit の出力。
   - 既知の残り: throw (exit) の経路では `g_py_probe` が 1 のまま戻らない。後続の呼出しは無く、計測結果には影響しない。
+- 4 回目の run で変更 (測定 commit `aad243e64`): `tools/flelift/boot/fle_boot.c` (`g_py_watch` を 6 → 7 件・`0x13a5c90` を追加)、`tools/flelift/boot/fle_boot.mjs` (`FLE_PY106_MM=1` の復元と `FLEBOOT_PY106MM` 行)、`tools/flelift/boot/results/boot_summary_py106h_negctl*.json`・`boot_summary_py106hm_negctl*.json` (測定の出力)。計測のみ。
 - 変更なし: `provider/`・`host/`・`tests/`・`src/` (受入 3)。
 
 ## 6. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実行時の型名 (`PyExc_*` の実体) の観測 (受入 1 の残り) | 静的には `PyExc_RuntimeError` と確定したが、実行時の確認は未達。直接実行 (§2-2) は GetProcAddress・load hook に届かず、null 呼出し (最後の呼出し元 0x409424) の後に exit する。ローダ経路の関与は推定のみ | #2909 (open のまま残す。再開条件: (a) post-boot の null 呼出しの位置 (ローダ 0x653660 の関与を含む) を特定して解消する、または (b) boot 中に束縛関数 0xc395a0 (呼出し元 `0xc3b3a2`) へ到達する) |
+| 実行時の型名 (`PyExc_*` の実体) の観測 (受入 1 の残り) | 静的には `PyExc_RuntimeError` と確定したが、実行時の確認は未達。直接実行 (§2-2) は GetProcAddress・load hook に届かず、null 呼出し (最後の呼出し元 0x409424) の後に exit する。GetMem 関数ポインタ `0x13a5c90` の 0 化 (unit 209) を戻しても束縛は進まない (§2-3) | #2909 (open のまま残す。再開条件: (a) unit 209 の fill 経路 (`0x15e1140`・`0x13a5c90`・undo global の同時 0 化) の原因を特定して解消する、または (b) boot 中に束縛関数 0xc395a0 (呼出し元 `0xc3b3a2`) へ到達する) |
 | repo の RANGE → IndexError (`fl_api.h:35`・`fl_api.py:18`・`provider_check.mjs:171`) と FL の型 (RuntimeError) の不一致 | Python 側で RANGE の型が FL と食い違う。直すと tests も直す | #2909。PM 判断: 写像は現状維持。修正の要否は #2909 受入 1 の後に判断 (2026-10-15 PM 決定) |
 | boot の unit 209 で `.data` の `0x15e1140` が 0 になる (PY-123 の undo global と同じ時点) | 停止点で chain を読めない | `tools/python/REPORT_PY123.md` §2-5 の fill 経路 (#3112 [FLE-13] が追う)・停止点は #3060 [FLE-11] |
 | FL の status (-1〜-9) と repo の code (1〜8) の数値対応 | 写像の根拠 | `tools/python/REPORT_PY61.md` §4-2 (#2026) の既存の未解決 |
