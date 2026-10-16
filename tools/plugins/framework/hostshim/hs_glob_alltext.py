@@ -25,6 +25,13 @@ P0 = 0x141d6b8
 RIP_RE = re.compile(r'\[rip ([+-]) (0x[0-9a-f]+)\]')
 
 
+def sweep(md, code, va):
+    # 線形 sweep。skipdata で不正バイトを .byte として飛ばし、section 末尾まで流す
+    # (capstone.disasm は既定では最初の不正バイトで止まる)。
+    md.skipdata = True
+    return md.disasm(code, va)
+
+
 def main():
     d = os.path.join(os.environ['FL_WIN64_DIR'], 'extracted')
     files = sorted(glob.glob(os.path.join(d, '*_PE.bin')))
@@ -40,7 +47,7 @@ def main():
                 continue
             ntext += 1
             tva = base + s.VirtualAddress
-            for ins in md.disasm(s.get_data(), tva):
+            for ins in sweep(md, s.get_data(), tva):
                 op = ins.op_str
                 m = RIP_RE.search(op)
                 if m:
