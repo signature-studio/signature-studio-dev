@@ -19,3 +19,9 @@ python3 "$HERE/ci_restore_stores.py" "$W/ci.drc.ll" "$W/ci.rs.ll"
 python3 "$HERE/ci_census.py" "$W/ci.drc.ll" "$W/ranges.json" "$W/ci.rs.ll"
 python3 "$ROOT/lift/libkio/ir_normalize.py" "$W/ci.rs.ll" "$W/ci.rs_norm.ll" > /dev/null
 python3 "$ROOT/lift/libreverb/gen_helpers.py" "$W/ci.rs_norm.ll" "$W/ci_helpers.c"
+# emcc (LLVM 21 系) は RetDec 出力の use-list 指令 (順序メタ情報・意味なし) を受け付けない。除いてから IR→obj まで通す (REPORT_CI §8)。
+source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1
+grep -v '^ *uselistorder ' "$W/ci.rs_norm.ll" > "$W/ci.emc.ll"
+emcc -c -O1 -w "$W/ci.emc.ll" -o "$W/ci.emc.o"
+emcc -c -O1 -w "$W/ci_helpers.c" -o "$W/ci_helpers.o"
+echo "[ci] emcc obj OK (uselistorder 除去後の IR と helper)"
