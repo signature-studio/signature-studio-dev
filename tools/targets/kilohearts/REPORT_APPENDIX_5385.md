@@ -5,11 +5,11 @@
 #### 10-7aa. #5385 (KH-159): `FUN_180fdc700`・`FUN_180fdc6d8` の呼出し 4 件を規則化 (`FUN_180fcd400` の 2 件は未確定)
 
 - **結論**: 呼出し 6 件のうち **4 件を規則化** (`FUN_180fdc700` 2 件・`FUN_180fdc6d8` 2 件)。残り 2 件 (`FUN_180fcd400` ← `FUN_180fcce40`) は機械語の源が未確定のため規則にしない。受入 1 (6 件の源の確定) と受入 2 (規則 1 件 = 呼出し 1 件) は **部分達成**。
-- **測定 (n=1・素材 `plugins-kilohearts` の `HeartCore.core_64` sha256 先頭 `d55ce8b4`・Ghidra 12.1.4 (公式 zip sha256 `ddac49f9…` 一致)・JDK 21・emcc 6.0.12)**:
-  - 規則追加前 (`ghidra_to_c.py delay --fix bitcast,intload,stackpair,assoc,concat`・閉包 139 関数・FAIL 0): `emcc -c` error **343** (引数数不一致 **69**・合計 343)。
-  - 規則追加後: error **339** (引数数不一致 **65**)。差分 −4 = 規則 4 件。
-  - 生成 C の差分は 4 行のみ (4232・4295・4512・4545 の呼出しの引数追加。`diff` で確認)。
-  - 件数 assert: 4 規則とも件数 1 で通過 (`ABI rule hit 1`)。
+- **測定の状態 (再測定は未実施)**: 規則追加後の値 (error 339・引数数不一致 65) は実装 run の記録 (測定 commit `e0aff674f`・素材 `plugins-kilohearts` の `HeartCore.core_64` sha256 先頭 `d55ce8b4`・Ghidra 12.1.4・JDK 21・emcc 6.0.12・n=1)。レビュー fix run では `plugins-kilohearts` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、`HeartCore.core_64` を再取得できなかったため、規則の regex 一致・emcc 件数・`ABI rule hit 1` の assert は再実行していない。PR 本文に `oc_artifacts: plugins-kilohearts` を追加し、次の review run で同条件の再測定を行う。
+  - **規則追加前の値 (error 343・引数数不一致 69) は採用しない**。この値に対応する測定 commit が記録されておらず、`REPORT_APPENDIX_5384.md` §10-7z の同じ系列 (`5f52f1368` 時点の 401・71) とも整合しない。`git diff 5f52f1368 006ba2cc7 -- tools/targets/kilohearts/ghidra_route` は #5401 の規則 2 件 (8 行・delay の call 2 箇所) だけで、58 件の差は説明できない。このため「−4 = 本 PR の規則 4 件」という差分の主張は未確認である。
+  - 再測定の条件 (次 run で行うこと): 測定 commit を `origin/main` (`a0b804faf`) と追加後 (head) の 2 つに固定し、同じ FX `bitcast,intload,stackpair,assoc,concat`・同じ閉包で `emcc -c -ferror-limit=0` の error と引数数不一致を両方取る。その差と、`git diff <main の commit> <head> -- tools/targets/kilohearts/ghidra_route` の出力を本付録に書く。
+  - 生成 C の差分は 4 行のみ (4232・4295・4512・4545 の呼出しの引数追加)。前 run の `diff` 記録による (未再確認)。
+  - 件数 assert: 4 規則とも件数 1 で通過 (`ABI rule hit 1`) という前 run の記録。再実行の出力は未取得。
 - **機械語の源 (capstone 逆アセンブル)**:
 
 | 呼出元 (C 行 → 機械語の call) | 呼出先 | 引数の源 (呼出し直前の xmm0) | 根拠 |
@@ -25,7 +25,7 @@
 - **規則の正規表現**: 生成 C は `func_0x000180fdc700()` の形と `FUN_180fdc700()` の形の両方を出すため、既存規則と同じく `(?:func_0x000|FUN_)` で受けた。
 - **数値の扱い**: emcc 通過は値の正しさを示さない。delay の wasm は全体で未成立 (引数数不一致 65・型不一致 115 が残る) のため、1000 trial 突合は未実施 (#3073 [KH-41] が担当)。
 
-**測定 commit** (コードを変えた最後の commit): 本 PR の commit。`git diff <測定 commit> HEAD -- tools/targets/kilohearts/ghidra_route` は 0 行 (測定後の変更は本付録のみ)。
+**測定 commit** (コードを変えた最後の commit): 規則追加後の値は `e0aff674f` (本 PR の規則 4 件を入れた commit)。規則追加前の測定 commit は未記録 (上の「測定の状態」参照)。`git diff e0aff674f HEAD -- tools/targets/kilohearts/ghidra_route` は 0 行 (fix run の変更は本付録と PR 本文のみ)。
 
 **残件の起票先** (本 issue の受入 1・2 の残り):
 
