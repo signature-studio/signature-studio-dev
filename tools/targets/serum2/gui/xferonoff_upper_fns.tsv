@@ -1,0 +1,22 @@
+# 上限の閉包の root 集合 (REPORT_SR37.md §5.1): §2 の下限 root 8 件 + §5.2 の候補 16 件の union 19 件 (重複 5 件除去)
+# 形式は vtable_fn_addrs.py の出力と同じ (先頭列が RVA)。ghidra_xferonoff_closure.java は先頭列だけを読む。
+# 列 3 の source: §2 = 下限 root (REPORT_SR37 §2)、cand = own vtable 候補 (§5.2)、dup = 両方
+0x18f290	0x18018f290	dup
+0x18f2e0	0x18018f2e0	dup
+0x4b5670	0x1804b5670	§2
+0x4b6690	0x1804b6690	dup
+0x4b66a0	0x1804b66a0	§2
+0x622780	0x180622780	dup
+0x6227b0	0x1806227b0	§2
+0x622840	0x180622840	dup
+0x136bf0	0x180136bf0	cand
+0x1428d0	0x1801428d0	cand
+0x142180	0x180142180	cand
+0x142150	0x180142150	cand
+0x1470d0	0x1801470d0	cand
+0x142540	0x180142540	cand
+0xd920	0x18000d920	cand
+0x18e4b0	0x18018e4b0	cand
+0x181c0	0x1800181c0	cand
+0x138180	0x180138180	cand
+0x18e800	0x18018e800	cand
