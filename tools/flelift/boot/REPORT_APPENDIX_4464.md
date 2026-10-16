@@ -115,7 +115,7 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 
 - 追加: `fle_cpu.c` に `-DFLE_WWATCH_JS` (既定無効)。`fle_wwatch` が監視 slot の非 0 → 0 を見たとき、`EM_ASM` で書込み時点の wasm 呼出し連鎖 (`new Error().stack`・`--profiling-funcs` の `f_xxxx` 名) を出す。既定経路は変えない (`#include <emscripten.h>` も `FLE_WWATCH_JS` 下のみ)。
 - なお §16 で使った `ott_xrip` は、lift 側でどこにも代入されていない (`fle_cpu.c`・`ott_cpu.c` の宣言と出力だけ)。そのため §16 の `xrip` 欄は使えない。
-- 測定: `FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_JS -DFLE_WWATCH_SLOTS=0x5ac308ull,0x976410ull" FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0・所要 3 分 41 秒 (13:54:28〜13:58:09)。計数は dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob`・exit 0 (§11 と一致)。
+- 測定: `FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_JS -DFLE_WWATCH_SLOTS=0x5ac308ull,0x976410ull" FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0・所要 3 分 38 秒 (13:59:37〜14:03:15・測定 commit `fbdbaf681` の commit 時刻 13:59:28Z の後)。計数は dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob`・exit 0 (§11 と一致)。
 - 書込みの時点 (1 回の boot・ログ順):
   1. `[fill6a7b70] #1` (dst=0x400000) → `[fle_wwatch] ret=0x2ec1e19 slot=0x5ac308 old=0x40f960 new=0` → `[fle_wwatch_js]` の連鎖: `fle_wwatch` ← `STX` (`fle_cpu.h:79`) ← **`f_6a7b70`** ← `ott_dispatch` ← `f_6c7610` ← `f_815050` ← `f_815e10`。
   2. 同じ連鎖で `slot=0x976410 old=0x9764d8 new=0` (`[fill6a7b70] #2` の直後)。
