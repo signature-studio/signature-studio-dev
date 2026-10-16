@@ -32,9 +32,19 @@
 2. その呼出し側で `CreatePlugInstance` の第 2 引数 (rdx) を作る命令を、直前の書込みから逆向きに出す。
 3. 得た供給元の値で `hs_disp_emu.py` の `TAG` を差し替えて再測定する (HostTag 依存の r8d・応答への影響を見る)。
 
-## 6. 逆向き追跡 (本 run, 測定 commit: origin/main e5261de58)
+## 5. 使い方
 
-スクリプト: `hs_tag_chain.py` (生バイト走査 + capstone の線形逆アセンブル。`0x132c711` の周辺は関数先頭から再逆アセンブルして確認)。
+```
+FL_WIN64_DIR=<fl-win64 展開先> PYTHONPATH=<pefile・capstone・unicorn 入り lib> \
+  python3 tools/plugins/framework/hostshim/hs_disp_callers.py
+FL_WIN64_DIR=... PYTHONPATH=... python3 tools/plugins/framework/hostshim/hs_disp_refs.py
+```
+
+## 6. 逆向き追跡 (測定 commit: 8a96c570c・base: origin/main e5261de58)
+
+測定 commit `8a96c570c` (`hs_tag_chain.py` の段 1 表示を直した commit。コードを変えた最後の commit)。base (main) は `e5261de58`。`git diff 8a96c570c HEAD -- tools/plugins/framework/hostshim ':!*.md'` は 0 行。測定出力は `hs_tag_chain.py` 再実行で 65 行・rc=0 (直前の `6d540293c` の版は段 1 が `LOADER_FN` 先頭だけを出していた)。
+
+スクリプト: `hs_tag_chain.py` (生バイト走査 + capstone の線形逆アセンブル。`0x132c711` は呼出し箇所から逆アセンブルして確認)。
 
 | 段 | 確定した事実 | 根拠 |
 |---|---|---|
@@ -46,7 +56,7 @@
 
 ### 訂正
 
-前 run の「`[rbp+0x30]` が Tag の候補 (定数・文字列の可能性)」は中間段の値で、実値の候補ではない。引数の対応は次のとおり (段 1〜4 の逆アセンブルで確認)。
+以前の版の「`[rbp+0x30]` が Tag の候補 (定数・文字列の可能性)」は中間段の値で、実値の候補ではない。引数の対応は次のとおり (段 1〜4 の逆アセンブルで確認)。
 
 - `0x132c680` の引数: rcx → `[rbp+0x20]`、rdx → `[rbp+0x28]`、r8 → `[rbp+0x30]`。
 - 段 1 の `call rax` は rcx = `[rip+0x6425f7]` (Host 相当の大域)、rdx = `[rbp+0x30]` (= 第 3 引数 r8)。よって Tag 候補は `0x132c680` の第 3 引数。
@@ -58,14 +68,8 @@
 1. **5 件の呼出元 (段 5) の rcx** が何の object か。4 件 (`0x10f2372`・`0x10f24b2`・`0x10f2cc4`・`0x10f2d90`) は rcx が `[rbp+0x98]` / `[rbp+0x88]` / `[rbp+0x90]` 系の実行時ローカルか、`[rax+0x134c]` 等のグローバル由来で、ファイル内の定数では決まらない。
 2. `0x132f43f` は rcx = `[rbp+0x20]`、rdx = `[rbp+0x38]` (`call 0x41c650` の結果)。`[rbp+0x20]` の供給元は未追跡。
 3. `0x4235f0` が GetProcAddress 相当であることは、名前引数の使い方からの推定。IAT 参照としては未検証。
-4. 前 run の `0xd8cb86` (`lea rdx,[rip+0x361]`) 経路は、今回の追跡対象に入れていない。
+4. `0xd8cb86` (`lea rdx,[rip+0x361]`) 経路は、今回の追跡対象に入れていない。
 
 よって受入 2 の「実値の供給元」は、**機械語上は段 5 の 5 件の呼出元まで特定**し、その先の object の生成元は上記 1〜2 を未確定として残す。
 
-## 5. 使い方
 
-```
-FL_WIN64_DIR=<fl-win64 展開先> PYTHONPATH=<pefile・capstone・unicorn 入り lib> \
-  python3 tools/plugins/framework/hostshim/hs_disp_callers.py
-FL_WIN64_DIR=... PYTHONPATH=... python3 tools/plugins/framework/hostshim/hs_disp_refs.py
-```
