@@ -12,7 +12,8 @@
   - `ci.emc.ll` を `-c` で obj 化、`ci_helpers.c` も obj 化。
   - 間接 call 2 件の宛先 `function_1801cb5e0`・`function_1801cb600` の declare を検査し、`uint64_t f(uint64_t a){ (void)a; __builtin_trap(); }` を `ci_traps.c` に生成して obj 化。検査は `^declare i64 @<name>\(i64\) ` (引数 1 個の i64) に限る。declare が無い・引数の型や個数が違う場合は exit 1。
   - RetDec 出力の実際の declare は `declare i64 @function_1801cb5e0(i64) local_unnamed_addr` と `...cb600(i64)` で、引数は 1 個の `i64` (直前の `()` 版は実 IR と合わず exit 1 になった。§4 の NC-B)。
-- 測定 commit: `374feea46` (検査を `i64(i64)` に直し、trap の定義を引数付きにした。コードを変えた最後の commit)。以降の変更は `ci_census.py` の orphan 検査 `7cbb217a6` (#5749。`ci_lift.sh` の census を rc 1 にする) と docs。§3 の実測は、この検査を含む現 head `63f896abe` (`0e1000df5` に `origin/main` を merge) で取った値。`git diff 0e1000df5 HEAD -- tools/shared/lift` は空。`0e1000df5` 以降の `tools/shared/lift` の実行経路の差分は 0。
+- コードを変えた最後の commit: `374feea46` (検査を `i64(i64)` に直し、trap の定義を引数付きにした)。以降の変更は `ci_census.py` の orphan 検査 `7cbb217a6` (#5749。`ci_lift.sh` の census を rc 1 にする) と docs。
+- §3 の実測 commit: `63f896abe` (`0e1000df5` に `origin/main` を merge。この検査を含む)。`git diff 0e1000df5 63f896abe -- tools/shared/lift` は空。`63f896abe` 以降の文言の差分は §3 の値に影響しない。
 - trap 化の理由: 間接 call の 2 件は CFG/XFG dispatch を経由し、宛先は実行時の `rax` で決まる。IR の固定名 declare (`function_1801cb5e0`・`function_1801cb600`) からは宛先が一意に決まらないため、IR の呼出しを実行するとどの宛先かを決められず、到達時に止める形 (`__builtin_trap`) にした。
   - slot `0x268260` (`GuardCFDispatchFunctionPointer`): 呼出し元 `0x1aedf6` (helper `0x1aedc0`)。file 値 `0x1cb5e0` は `jmp rax`。`rax` は引数から辿る vtable の index 8 で、オブジェクトは実行時の値。
   - slot `0x268268` (`GuardXFGDispatchFunctionPointer`): 呼出し元 `0x1b6f6c` (helper `0x1b6f4c`)。file 値 `0x1cb600` は `jmp [0x268260]`。`rax` は `0x1b6f88` の戻り値で、実行時の値。
