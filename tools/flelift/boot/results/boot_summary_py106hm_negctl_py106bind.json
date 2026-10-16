@@ -1,0 +1,26 @@
+{
+ "probe": {
+  "threw": {
+   "cls": "oob",
+   "msg": "memory access out of bounds"
+  },
+  "names_n": 0,
+  "getproc_calls": 0,
+  "hook_calls": 0
+ },
+ "head_at_stop": "0x0",
+ "slot_exc_after_bind": "0x0",
+ "name_of_slot_exc": null,
+ "slot_setstr_after_bind": "0x0",
+ "name_of_slot_setstr": null,
+ "slot_newinterp_after_bind": "0x0",
+ "name_of_slot_newinterp": null,
+ "head_restored": "0x16b8488",
+ "chain": {
+  "load1_head": "0x16b8488",
+  "load2": "0x0",
+  "load3_type_tok": "0x0",
+  "type_name": null
+ },
+ "names": []
+}
