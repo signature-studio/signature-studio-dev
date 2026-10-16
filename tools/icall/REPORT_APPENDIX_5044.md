@@ -60,8 +60,8 @@
 
 - 測定 commit: `4fa3a2cd4` (`cb_writers.py` の `0x` 対応。`r13_callee_check.sh` は `8fb7ea222` から変更なし)。
 - 判定関数の確認: `bash tools/icall/r13_callee_check.sh --selftest` → `selftest: 書込み 3 件 (期待 3) / push r13 1 件 (期待 1) / pop r13 1 件 (期待 1)`。手書きの入力での確認で、objdump 実出力での確認ではない。
-- 実 binary での再測定 (本 run・`SlateCore.core_64` sha256 `2cf759f712adf955a56684df4b24454690ac878105d4433de16c88626a45dd3b`・36,285,952 B、`plugins-freshair` の `Fresh Air.Win.zip` から展開): `bash tools/icall/r13_callee_check.sh <SlateCore.core_64> tools/icall/work/core64.dsm` → `180cbb930`・`180cbcd90`・`180cb9890` の `r13` 書込み 0 件 (push 0 / pop 0)。間接 2 件は具象型未特定。`+0xa80` 格納箇所 48 件。所要 `real 8.140 s`・`user 7.735 s` (load average 0.62 付近)。
-- `cb_writers.py` の実 binary 実行: `real 11.350 s`・`user 11.004 s`。出力は §7 のとおり (関数 20,701・格納関数 47・格納 48・呼出し元 6)。
+- 実 binary での再測定 (本 run・`SlateCore.core_64` sha256 `2cf759f712adf955a56684df4b24454690ac878105d4433de16c88626a45dd3b`・36,285,952 B、`plugins-freshair` の `Fresh Air.Win.zip` から展開): `bash tools/icall/r13_callee_check.sh <SlateCore.core_64> tools/icall/work/core64.dsm` → `180cbb930`・`180cbcd90`・`180cb9890` の `r13` 書込み 0 件 (push 0 / pop 0)。間接 2 件は具象型未特定。`+0xa80` 格納箇所 48 件。所要 `real 8.746 s`・`user 8.475 s` (load average 0.69 付近。計測ごとに揺れる)。
+- `cb_writers.py` の実 binary 実行: `real 6.441 s`・`user 6.116 s` (計測ごとに揺れる)。出力は §7 のとおり (関数 20,701・格納関数 47・格納 48・呼出し元 6)。
 - 前 run の値 (5.78 秒・`objdump` 2.650 秒) は、本付録の数値の根拠にしない。
 
 ## 7. 格納元の集計 (#5843 / ICALL-119)
