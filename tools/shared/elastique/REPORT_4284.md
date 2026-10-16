@@ -9,8 +9,8 @@
 | 対象件数の定義 | `.text` 内の pdata 関数 **4,556 件**。`.pdata` の生スロット 5,475 件 (`.text` 4,556 / IPPCODE 919) を RVA で直接読んだ値。REPORT_152 §1.1・REPORT_2614 §1 と一致 |
 | `tools/shared/elastique/REPORT.md` の 1,956 | `ipp_entries.py` が pefile の `DIRECTORY_ENTRY_EXCEPTION` で数えた値 (1,956 件しか返らない)。生の `.pdata` (5,475 スロット) と食い違う。pefile は `Unknown UNWIND_CODE` で 1,956 件目で打ち切る (§5)。以後の lift は生 `.pdata` の 4,556 件を正とする |
 | RetDec 一括 lift | **失敗**。4,556 件を 1 回で `--select-ranges` に渡すと `[capstone2llvmir]: Should not be possible.` で落ちる |
-| 1 関数ずつの lift | **4,467 件 成功 / 89 件 失敗 / 0 件 未実施** (実測・§2。CSV 4,556 行・重複 0) |
-| 受入条件 1 (4,556 件の lift) | **未達**。4,467 件 lift 済み・89 件 失敗 (rc=1 85・rc=124 1・rc=137 3)。失敗 89 件は lift できていない (§2・§4) |
+| 1 関数ずつの lift | **4,471 件 成功 / 85 件 失敗 / 0 件 未実施** (実測・§6 で 4 件を ok に更新。CSV 4,556 行・重複 0。更新前は 4,467 / 89・§2) |
+| 受入条件 1 (4,556 件の lift) | **未達**。4,471 件 lift 済み・85 件 失敗 (全て rc=1)。rc=124・137 の 4 件は §6 で lift できた (タイムアウト・メモリ起因) |
 | 受入条件 2 (lift 出力の意味検証・D11/D14/D15 判定) | **未達**。本 PR では未実施 (§4) |
 
 ## 1. 対象・素材・測定 commit
@@ -68,9 +68,8 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | lift 出力の意味検証 (受入 2。`.ll` 4,467 件の D11・D14・D15 判定) | 受入 2 未達。lift の正しさは未確認 | #5178 (受入 2 のまま残す) |
-| 失敗 89 件 (rc=1 85・rc=124 1・rc=137 3) の原因分類 (decoder の `Should not be possible.`・timeout・kill) | 受入 1 未達。完全な lift にならない | #5179 (子・`親: #4363`。本文の「18 件」は CSV の 89 件に読み替える) |
-| rc=1 の因果 (EVEX マスク付き `vpshufd`・`vshufi32x4` の切り分け) | 原因未確定 (相関のみ) | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
-| rc=124 / rc=137 の原因 (メモリ・時間) | 原因未確定 | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
+| rc=1 85 件 (`Should not be possible.`) の lift 不能 | 受入 1 未達。完全な lift にならない。§6 で 64 件はマスク除去の診断で通るが、マスク除去は意味を変えるので修正にならない | 本 issue #5686 の残り (修正方式は未決。親 #4363 へ報告) |
+| rc=1 の結果が実行ごとに揺れる (`0x1801cd3aa` `0x1801e8d3f` `0x1801cbe40`) | 同じ入力で成否が変わる。単純な決定的な失敗とは言えない | 親 #4363 へのコメント (追跡のみ) |
 | pefile の `Unknown UNWIND_CODE` の原因 | pefile 側の原因は未調査 (件数の出典は確定) | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
 
 ## 5. 失敗 89 件の分類・件数の出典 (T-SH-141 / #5179)
@@ -89,3 +88,41 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 | rc=137 の原因 | 未確認 (OOM と断定しない。dmesg 不可) |
 | 件数の出典 | 生 `.pdata` 5,475 スロット・`.text` 内 4,556・pefile 1,956。pefile の 1,956 は生スロットの先頭 1,956 件 (file 順) の接頭辞。pefile に無い 3,519 件 = `.text` 内 2,600 件 + IPPCODE 919 件 |
 | pefile が 1,956 で止まる原因 | pefile の `parse_exceptions_directory` が `Unknown UNWIND_CODE at 0x4a6038` の警告で打ち切る。以後の RUNTIME_FUNCTION は読まれない。確認 (本 run で実行): `pe = pefile.PE(dll, fast_load=True)`・`pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]])`・`pe._PE__warnings` → `['Unknown UNWIND_CODE at 0x4a6038']`、`len(pe.DIRECTORY_ENTRY_EXCEPTION)` → 1956 (pefile 2024.8.26) |
+
+## 6. #5686: rc=124・137 の 4 件の解消と rc=1 の切り分け
+
+測定 commit: `360197018` (コードと CSV を変えた最後の commit)。`git diff 360197018 HEAD -- tools/shared/elastique` の出力は空 (本 REPORT の追記は文書のみ)。
+
+### 6.1 rc=124・137 (4 件): timeout と並列メモリが原因。解消
+
+- 単独 1 件 (60 秒上限): `0x18001fb40` rc=124、`0x180026520` rc=124 (いずれも 60 秒で打ち切り)。`0x18002dac0` は単独で rc=0 (30 秒)。
+- 上限だけ延ばした単独 lift: `0x18001fb40` rc=0 (69 秒)・`0x180018fe0` rc=0 (69 秒)・`0x180026520` rc=0 (68 秒)。
+- 4 並列 (`LIFT_TIMEOUT=300`): `0x18001fb40`・`0x180026520`・`0x18002dac0` が rc=137 (SIGKILL)。`0x180018fe0` は ok。
+- ピークメモリ: `0x180026520` を単独 lift したとき maxrss 7,304 MiB (`getrusage` の RUSAGE_CHILDREN)。4 並列は 16 GiB の runner で超える。
+- 直列 (並列 1・`LIFT_TIMEOUT=300`): `0x18001fb40`・`0x180018fe0`・`0x180026520`・`0x18002dac0` が全て rc=0 (2 回目の実行で `0x18002dac0` 1,213,510 B の `.ll` を確認)。
+- 結論: 4 件は timeout と並列メモリの問題で、lift の不能ではない。CSV を `ok` に更新 (`360197018`)。`elastique_retdec_lift.sh` に `LIFT_TIMEOUT` (既定 60) を追加。
+
+### 6.2 rc=1 (85 件): capstone2llvmir の `Should not be possible.`。マスク付き EVEX が関与、ただし実行ごとに揺れる
+
+- 1 件の切り分け: `0x1800c2920` の関数 (1,769 命令) は 261 命令目の `vpshufd zmm1 {k6}, zmm17, 0xb1` (`62 b1 7d 4e 70 c9 b1`) で落ちる。0〜260 番目は通る。
+- 診断: 対象関数内の EVEX マスク付き `vpshufd`/`vshufi32x4` (288 件) の `aaa` ビットを 0 にした診断用 DLL (`work/` 内・commit なし) では rc=0 (137,765 B の `.ll`)。
+- マスク除去は命令の意味を変えるため、修正ではなく原因の切り分けに限る。
+- 85 件の一括確認 (`scripts/elastique_mask_probe.py`・1 件ずつ・各 120 秒上限): 元の rc=1 のまま 64 件 (マスク除去で rc=0 に変わる件)、マスク除去でも rc=1 が 18 件、元から rc=0 の件が 3 件。内訳と件数の再現は `elastique_mask_probe.py` の出力 (`work/` の TSV)。
+
+| 区分 (実測・85 件中) | 件数 | 注 |
+|---|---|---|
+| 元 rc=1 → マスク除去で rc=0 | 64 | マスク付き EVEX が原因の候補。修正方式は未決 |
+| 元 rc=1 → マスク除去でも rc=1 | 18 | マスク以外の原因。未切り分け |
+| 元 rc=1 だが単独では rc=0 | 3 (`0x1801cbe40`・`0x1801cd3aa`・`0x1801e8d3f`) | 再実行で揺れる (下記) |
+
+- 揺れ (同じ入力・同じ条件): `0x1801cd3aa` は 2 回とも rc=1、`0x1801e8d3f` は直列の再走では rc=1 だが直接の 2 回は rc=0、`0x1801cbe40` は 1 回目 rc=1・2 回目 rc=0。単純な決定的失敗とは言えない。
+- 本 run で CSV の rc=1 85 件は `fail` のまま。揺れを含むため、rc=1 の行を ok に変えるのは測定の根拠が足りない。
+- 受入 1 (4,556 件の ok) は未達。4,471 件 ok・85 件 fail。
+
+### 6.3 検証
+
+- 再現コマンド: `RETDEC=<retdec> LIFT_TIMEOUT=300 bash tools/shared/elastique/scripts/elastique_retdec_lift.sh tools/shared/work/win/elastique_x64.dll <ranges> <outdir> 1`。
+- DLL: `fl-win64` の `block24357_PE.bin` を `tools/shared/work/win/elastique_x64.dll` に複製。sha256 先頭 16 桁 `8551e92209cdd2ce`。
+- RetDec v5.0 (`toolchain-retdec`・commit `53e55b4b26e9b843787f0e06d867441e32b1604e`)。
+- 負の対照: 既知 ok の `0x180001000` と `0x180001080` を同じ手順で lift し、rc=0 を確認。
+- 未検証: 85 件の揺れの原因、rc=1 の 18 件の原因、RetDec 本体のバグか入力 (EVEX) の扱いか。lift 出力の意味検証 (受入 2) は未実施。
