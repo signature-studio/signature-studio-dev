@@ -70,6 +70,11 @@ def main():
     arr = insns(0xFE8BB0, 16)
     results.append(("0xfe8bb0 bounds-checks [rcx+0x10] and reads element [rcx+8][edx]", arr[0][1] == "mov eax, dword ptr [rcx + 0x10]" and any(s == "mov rax, qword ptr [rcx + 8]" for _, s in arr) and any(s == "mov rax, qword ptr [rax + rdx*8]" for _, s in arr)))
 
+    pre = dict(insns(0xD80B1B, 2))
+    results.append(("channel obj out to [rbp+0x90] via 0x1005730", pre.get(0xD80B1B) == "lea r8, [rbp + 0x90]" and pre.get(0xD80B22) == "call 0x1005730"))
+    results.append(("0x1331340 out = &[rbp+0x78] with obj from [rbp+0x90]", text.get(0xD80B46) == "lea rdx, [rbp + 0x78]" and text.get(0xD80B4F) == "mov rcx, qword ptr [rbp + 0x78]"))
+    results.append(("obj2 = [rbp+0x78]->vtbl[+0x20]() before vtbl[+8]", text.get(0xD80B5A) == "call qword ptr [rax + 0x20]" and text.get(0xD80B8D) == "call qword ptr [rax + 8]"))
+
     ok = True
     for name, passed in results:
         print(("PASS" if passed else "FAIL"), name)
