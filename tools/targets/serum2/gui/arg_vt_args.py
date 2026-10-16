@@ -32,14 +32,12 @@ with contextlib.redirect_stdout(io.StringIO()):
 REGS = ("rdx", "r8", "r9")
 ind_re = re.compile(r"qword ptr \[(\w+)(?: \+ (0x[0-9a-f]+|\d+))?\]")
 
-targets = set()
 trace_rows = []
 with open(tsv_trace) as f:
     next(f)
     for line in f:
         cols = line.rstrip("\n").split("\t")
         if cols[4] in ("vptr:ARG", "vptr:ARG-CHILD"):
-            targets.add(int(cols[1], 16))
             trace_rows.append((cols[4], int(cols[1], 16)))
 
 cand_disp = defaultdict(set)
