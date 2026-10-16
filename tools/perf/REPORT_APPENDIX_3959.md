@@ -228,11 +228,44 @@ node tools/perf/p15/ctor_vtable_ring.mjs tools/ott/work/lift/ottl_rc.wasm
 - 145 回目までの ctor で heap が image に届かない理由、146 回目でだけ届く理由は未確定。
 - 「image の領域を calloc が返し、そこに vtable がある」ことが停止の原因かは、停止後の再現 (vtable を別の場所に置く等) で確かめていない。
 
+## 3i. 子 #5403 (PERF-P28) の停止原因: sbrk の break が image 基底を越える (Node・同期・`fd_write` nwritten 版)
+
+測定 commit: `320bb129a` (`tools/perf/p15/ctor_brk_trace.mjs` を追加した commit。`tools/perf/p15` の既存ファイルは §3h の `7156a4b3e` から変更なし)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を計装なしで使った。harness は `ctor_calloc_image.mjs` と同じく `fd_write` が `nwritten` を書く版。
+
+wasm func 123 は sbrk 相当で、break 値を線形メモリ `269004816` (`0x1008AFD0`) の i32 に持つ。初期値は `0x1038D520` (global 0 と同じ)。image (`0x30000000`〜`0x30284124`) は線形メモリの固定位置にあり、break の上限は `memory.size` だけで見て image を避けない。
+
+| 測定 (HEAD `320bb129a`) | 結果 |
+|---|---|
+| `ctor_brk_trace.mjs 146` ×3 | 3/3 同一。ctor 1〜145 完走・break は単調増加。146 で `Error: abort`。145 完走後の break `0x2ff94000` (image 基底の手前)、trap 時 `0x30314000` (image 基底を超える) |
+| ctor ごとの break 増分 | 最小 3670016 B・最大 3674112 B (3670016 = 14 × 262144。差 4096 B は割り当て境界の差と読める)。ctor 1〜145 の全増分がこの範囲 |
+| `ctor_brk_trace.mjs 146 33554432` (shift 32 MiB) ×1 | trap は ctor 137 (completed 136)。break 最後 `0x3000b000`、image 内に入った完了 ctor は 136 のみ |
+| 同 shift 64 MiB ×1 | trap は ctor 128 (completed 127)。completed 127 は image 内 (`0x30083000`) |
+| 同 shift 128 MiB ×1 | trap は ctor 109 (completed 108)。break は image の手前 (`0x2fdf1000`) で止まる |
+
+分かったこと:
+- 停止の機構: ctor 1 回ごとに break が約 3.5 MiB (増分 3670016〜3674112 B) 押し上げられ、解放は break に戻されない (break は単調増加)。145 回目の終わりで break は image 基底 `0x30000000` の直前まで来る。増分が 14 × 262144 B と一致するのは算術上の一致で、割り当て個数は未計数 (推測)。146 回目の ctor 内で break が image に入り、calloc が image 内の領域を返す (§3h の 10 件)。その 8 番目 `0x301d3e40` の 262144 B が vtable `0x30203BD0` を覆って 0 にする (§3g)。vtable が 0 になった後で `call [rax+0x38]` (`18011d9f9`) が VA 0 を呼び、abort する (§3e)。
+- 機構の鎖は、break が image に届く → calloc が image 内を返す → 0 埋めで vtable が壊れる → 間接呼び出しが 0 へ飛ぶ、で閉じる。
+- 起動直後の break 押し上げ量と trap する ctor 番号が直線的 (shift 0 / 32 / 64 / 128 MiB で 146 / 137 / 128 / 109)。1 ctor あたり約 3.5 MiB を使うことと整合する。
+- 「146 で止まる」は ctor の番号の性質ではなく、break と image 基底の距離 (`0x30000000 − 0x2ff94000` = 約 3.5 MiB、145 回目までの積み上げ) の結果と読める。
+
+未確定:
+- 1 ctor が約 3.5 MiB を解放せず積む理由 (割り当ての個数・解放経路は未計数。ctor 側の leak か、同一 instance に繰り返し呼ぶ harness の前提の違いかは未確定)。実機 (Chrome・AudioWorklet) で同じ積み上げが起きるかは未確認。
+- image が固定 `0x30000000` に置かれ、heap の上限検査がそれを避けない点は、lift の配置の問題。修正方針 (image を heap の上に置く・break の上限を image 基底にする・ctor の解放を入れる) は本 run では選んでいない。
+- VA `0x18011d400` ↔ wasm 関数番号の対応表は未作成 (本 run は関数番号で語った)。
+
+再現コマンド (素材展開後。`tools/ott/work/lift/` 配下に出力):
+
+```sh
+wasm2wat tools/ott/work/lift/ottl.wasm -o tools/ott/work/lift/ottl.wat
+node tools/perf/p15/ctor_brk_trace.mjs tools/ott/work/lift/ottl.wasm 146
+node tools/perf/p15/ctor_brk_trace.mjs tools/ott/work/lift/ottl.wasm 146 33554432
+```
+
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ctor (`0x18011d400`) が同一 instance で 146 回目に戻らない原因 | 上限 145 の意味が未確定。M=146 を通す修正方針が立たない。§3g で、計装済みの store のうち vtable 範囲を覆うのは f75 の `memory.fill` 1 箇所 (直接 store は未監視)。f75 の引数 dest の由来は未確定 | #4392 [PERF-P26] |
+| ctor (`0x18011d400`) が同一 instance で 146 回目に戻らない原因 | §3i で機構 (break が image 基底 `0x30000000` を越える) を特定。未確定は、1 ctor が 14 個の 262144 B を解放しない理由と、Chrome で同じ積み上げが起きるか。§3g の vtable 0 化の store (func 75 の memory.fill) はこの機構の結果 | #4392 [PERF-P26] |
 | Chrome の M=147・149〜151・153〜159 と M=2〜129・131〜144 の成否 (単調性) | 成功最大 145 と失敗最小 146 の範囲外は未確認 | #4392 (コメントで追加) |
 | Node 掃引の再測定と生データの commit (§1) | 掃引の数値が根拠にならない | #4392 (コメントで追加) |
 | §3b の監視プローブ (145 回までの data hash 不変・`next_span_overlaps_data`) が commit 外・再現未整備 | §3b の (a) は再現できない。`ctor_heap_probe.mjs` の 3673848 (`next_span_overlaps_data` の判定定数) と観測 `bytes_per_ctor` 3673793 の 55 B 差は判定に影響しないが、由来は未記録 | #4392 (次の run で commit) |
