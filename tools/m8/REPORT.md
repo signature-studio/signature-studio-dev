@@ -162,8 +162,8 @@ tools/m7 REPORT §3-(a) pattern C (xmm 引数は i32 raw-bits + `__asm_*` 疑似
 
 ## 8. #4218 置換の同一性実測 (2026-10-16, issue #4465)
 
-- 対象: `171b28c2a` (`/home/ubuntu` 直書きを REPO_ROOT 相対に置換: m7/m6_e2e.sh・m8/m8_e2e.sh・m8/m8_quickbuild.sh)。
-- 方法: 置換前 `171b28c2a^` と置換後 `171b28c2a` の detached worktree で `bash tools/m8/m8_e2e.sh` を各 1 回実行し、`tools/m8/work/e2e_result.json` と stdout を比較。両 worktree で `/home/ubuntu/work/webstudio` を各々の worktree に、`/home/ubuntu/work/analysis` を `$HOME/analysis` (analysis-ott-binaries 展開先) に symlink。素材は work-m6-ott / analysis-ott-binaries / toolchain-emsdk (emcc 6.0.12)。
+- 対象: `171b28c2a` (絶対パス直書きを REPO_ROOT 相対に置換: m7/m6_e2e.sh・m8/m8_e2e.sh・m8/m8_quickbuild.sh)。
+- 方法: 置換前 `171b28c2a^` と置換後 `171b28c2a` の detached worktree で `bash tools/m8/m8_e2e.sh` を各 1 回実行し、`tools/m8/work/e2e_result.json` と stdout を比較。両 worktree では測定 worktree の repo 直下を repo root とし、解析 dir (`[ANALYSIS-DIR]`) を `$ANALYSIS_DIR` (analysis-ott-binaries 展開先) として参照。素材は work-m6-ott / analysis-ott-binaries / toolchain-emsdk (emcc 6.0.12)。
 - 両回とも `m8_build.sh` が emcc を実行して `ott_m8.cjs` を再生成 (タイムスタンプが実行時刻)。
 
 | 項目 | 置換前 (`171b28c2a^`) | 置換後 (`171b28c2a`) |
@@ -178,4 +178,4 @@ tools/m7 REPORT §3-(a) pattern C (xmm 引数は i32 raw-bits + `__asm_*` 疑似
 
 ### 差分確認 (測定 commit `171b28c2a` → HEAD)
 
-`git diff 171b28c2a HEAD -- tools/m7 tools/m8` の出力は 0 行 (`git log 171b28c2a..HEAD -- tools/m7 tools/m8` も空)。main 取り込み後の再測定は不要 (`docs/WORKFLOW.md` §6)。
+測定 commit `171b28c2a` から PR head `a11ae4f4e` までの `git diff 171b28c2a a11ae4f4e -- tools/m7 tools/m8` は REPORT.md の追記 (文書のみ) の 20 行だけで、実行されるファイル (`*.sh`・`*.py`・ソース) の差分は 0 行。`git log 171b28c2a..a11ae4f4e -- tools/m7 tools/m8` は REPORT 追記の commit のみ。main 取り込み後の再測定は不要 (`docs/WORKFLOW.md` §6)。
