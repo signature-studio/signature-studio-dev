@@ -46,9 +46,11 @@ def disasm(base, code, lo, hi):
 
 def main():
     base, code = load()
-    print('[1] loader fn %s: CreatePlugInstance 呼出し周辺' % hex(LOADER_FN))
+    print('[1] CreatePlugInstance 呼出し周辺 %s (loader fn %s の内側)' % (hex(LOADER_CALL), hex(LOADER_FN)))
+    disasm(base, code, LOADER_CALL, LOADER_CALL + 0x30)
+    print('    (rdx=[rbp+0x30] を CreatePlugInstance の Tag として call rax)')
+    print('    loader fn 先頭:')
     disasm(base, code, LOADER_FN, LOADER_FN + 0x10)
-    print('    (0x132c711 の後: rdx=[rbp+0x30] を CreatePlugInstance の Tag として call rax)')
     print('[2] loader fn の直接呼出元 (Tag = その rcx/r8)')
     for c in callers(base, code, LOADER_FN):
         print('  caller', hex(c))
