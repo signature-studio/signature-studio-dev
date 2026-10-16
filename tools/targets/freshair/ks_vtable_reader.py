@@ -32,7 +32,7 @@ def owner(x):
     return None
 
 
-abs_hits, rva_hits, vt_writes, slot_reads = [], [], [], []
+abs_hits, rva_hits, vt_writes, slot_reads, near = [], [], [], [], []
 for s in pe.sections:
     if not (s.Characteristics & 0x20000000):
         continue
@@ -64,8 +64,10 @@ for s in pe.sections:
                         abs_hits.append(ins)
                 if m.base != X86.X86_REG_RIP and m.index == 0 and (m.disp & M64) == slot_disp:
                     slot_reads.append(ins)
-        if len(ins.operands) == 1 and ins.operands[0].type == X86.X86_OP_IMM:
-            pass
+                if m.base == X86.X86_REG_RIP:
+                    ea = (ins.address + ins.size + m.disp) & M64
+                    if a.table - 0x200 <= ea <= a.table + 0x200:
+                        near.append(ins)
 
 rva = struct.pack("<I", (a.table - base) & 0xFFFFFFFF)
 print(f"table {a.table:#x} vtable {a.vtable:#x} slot_disp {slot_disp:#x}")
@@ -89,3 +91,6 @@ print("  inside vtable-writer functions:", len(inside))
 for ins in inside:
     print(f"    {ins.address:#x}: {ins.mnemonic} {ins.op_str}")
 print("  distinct functions containing a slot read:", len({owner(i.address) for i in slot_reads}))
+print("rip-relative refs within +-0x200 of table:", len(near), "(non-table-read check: mnemonics)")
+from collections import Counter
+print("  mnemonics:", dict(Counter(i.mnemonic for i in near)))
