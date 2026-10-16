@@ -4,7 +4,8 @@
 
 **結論**: `ABI['delay']` に規則 2 件を追加 (件数 1 を assert・通過)。測定 commit `74cee7ec5` で Delay の emcc error は **312** (引数数不一致 **63**)。origin/main (`e5261de58`) は 314 (引数数不一致 65)。Gain / Haas / Gate の生成 C と sigs.json は origin/main と cmp 0 差分。
 
-**測定 commit**: `74cee7ec5` (`ghidra_route` を変える最後の commit)。
+**測定 commit**: `74cee7ec5` (測定経路 `patches.py`・`ghidra_to_c.py`・`closure.py` を変える最後の commit)。
+その後の `6f499e318` は `ghidra_route/callsite_disasm.py` の usage 表示 2 行だけ (レビュー minor への対応)。この道具は測定経路から import されない (`grep` で確認)。測定経路の差分は 0 行: `git diff 74cee7ec5 HEAD -- tools/targets/kilohearts/ghidra_route/{patches,ghidra_to_c,closure,emcc_census}.py` = 0 行。`callsite_disasm.py` の差分は `git diff 74cee7ec5 HEAD -- tools/targets/kilohearts/ghidra_route/callsite_disasm.py` = `+2 行` (`if len(sys.argv) != 4: sys.exit(usage)`)。
 **比較対象**: `e5261de58` (origin/main)。同じ素材 (`HeartCore.core_64` 76,642,304 B)・同じ Ghidra 12.1.4・同じ emcc で測定。
 **差分**: `git diff e5261de58 74cee7ec5 -- tools/targets/kilohearts/ghidra_route` = `patches.py` 5 行追加・`callsite_disasm.py` 新規 28 行 (逆アセンブル用の道具)。
 
