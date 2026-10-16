@@ -111,7 +111,7 @@ python3 trap_triage/judge_ctx.py work/boot_final.ll work/strict_evidence_5661.ts
 
 ## 8. #5687: 保留 12 件 (行 179〜187・191〜193) の件ごとの判定
 
-- 母数 12 件。真陽性 (構造) 5・偽陽性 0・保留 7。判定件数は 5 + 0 = 5 / 12 (確定)。
+- 母数 12 件。真陽性 (構造) 6・偽陽性 0・保留 6。判定件数は 6 + 0 = 6 / 12 (確定)。(run 1 で確定 5 (181・182・184・186・187)、run 2 で 179 を追加確定。)
 - 行 188〜190 は §3 で確定済みのため対象外。
 - 測定 commit: `739b46e2d` (origin/main)。コードは変えていない。`git diff 739b46e2d HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行 (本 PR は付録のみ)。
 - 入力: `work-m11` の `boot_final.ll` (sha256 `69c774de…`、記録と一致)・`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
@@ -122,7 +122,7 @@ python3 trap_triage/judge_ctx.py work/boot_final.ll work/strict_evidence_5661.ts
 
 | 行 | 関数 | jcc → 脱出先 / L | 判定 | 理由 |
 |---|---|---|---|---|
-| 179 | function_8d0580 | 8d05ec → 8d066a / 8d05f5 | 保留 | count は `call 8cfb90` の戻り値 −1 (`mov r8d,eax; sub r8d,1`)。IR の B に同じ call (`%7`) があるが、`%8 = %7 + 2^32` で、機械語の −1 に当たる項が無い。L の count 利用箇所を追えていない |
+| 179 | function_8d0580 | 8d05ec → 8d066a / 8d05f5 | 真陽性 (構造) | count は `call 8cfb90` の戻り値 `ret`。機械語は `r8d = ret−1` を入口で `cmp 0, r8d; jg` と判定し、`ret = 0` で本体を飛ばす。IR の B の `%7` が同じ call。`%8 = %7 + 2^32` が `ret` を持ち、L 末尾の `%40 = r8 + (2^32−1)` の後判定 (`icmp eq ... 0`) が −1 の役を担う。`%8` の下位 32 bit は `ret` のまま (`+2^32` は上位 bit のみ)。`ret ≥ 1` では本体が `ret` 回回り機械語と一致する。`ret = 0` では IR の末尾判定が `r8−1 = 0xFFFFFFFF` で抜けず、32 bit の wrap で約 2^32 回回る (機械語は飛ばす)。`ret = 0` の実行時到達は未測定 |
 | 180 | function_8e6150 | 8e6237 → 8e63b6 / 8e6248 | 保留 | count は間接呼び出し `call [rax+0x28]` の戻り値 −1 (`[rbp+0x24]`)。IR 側で `[rbp+0x24]` 相当の値 (`%stack_var_-132`) の store 元と、機械語の間接呼び出しの戻り値との対応を確認できていない |
 | 181 | function_92d9d0 | 92da0e → 92da78 / 92da17 | 真陽性 (構造) | count = `[[[arg1+0x78]*8+arg1+0x3c]+0x10]` の i32 (`rdx`=`arg1` は先頭の `mov [rsp+0x28],rcx`)。IR の B `%5`〜`%16` (+120・×8・+60・+16、i32) と段数・幅・オフセットが一致。L の `icmp ult %23,%26` は index と qword の境界判定で count 判定ではない。L から T への直接の脱出は無く、T (92da78) の preds は `92da4d` (内側) と末尾 `92da6c` の 2 件。入口判定は無い |
 | 182 | function_9cef00 | 9cef21 → 9cef57 / 9cef2a | 真陽性 (構造) | count = `[[rip+0xc8a954]+0x10]` の i32。`rip` 先 VA `0x1659868` は IR のアドレス `19241064` (`0x1259868`) に当たる (基底差 `0x400000`)。IR の `%0 = load [19241064]`、`%3 = load i32 [%0+16]` と一致。L に入口判定無し、末尾 `%22` が後判定 |
