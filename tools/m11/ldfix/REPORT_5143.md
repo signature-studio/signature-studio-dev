@@ -3,7 +3,7 @@
 ## 1. 結論
 
 - 受入 1 (`407a50` の戻り値 `rax` の全経路) は #5141 (PR #5152・merge 済み) で達成済み。本 PR では扱わない (REPORT_5141 §3)。
-- 判定器 `audit_frame_store_alias_2211.py` の `effect()` で、NONFRAME の store (規則 6) を `ALIAS_FRAME_PTR` で打ち切らないようにした (1 行)。判定 (DROP / LIVE-IN / UNDETERMINED) は全 48 関数・全 site で変わらない。変わったのは `5cb210` `5cb4aa` の打ち切り理由だけ (`BARRIER(ALIAS_FRAME_PTR)` → `BARRIER(LEAK_STORE)`)。
+- 判定器 `audit_frame_store_alias_2211.py` の `effect()` で、NONFRAME の store (規則 6) を `ALIAS_FRAME_PTR` で打ち切らないようにした (1 行)。判定 (DROP / LIVE-IN / UNDETERMINED) は全 48 関数・全 51 site で変わらない。打ち切り位置が変わったのは 3 site (`5cb4aa` は why も変化、`7e48d6` `f61ce6` は why 不変で barrier 位置のみ変化。§3.1)。
 - `5cb4aa` は UNDETERMINED のまま。残りの打ち切り `5cb456 movsq [rdi],[rsi]` (LEAK_STORE) の `rdi` は `5cb3d3 call 0x409410` の戻り値で、`409410` の戻り値は `call qword ptr [rip+0xf9c86c]` (import) の戻り値 `rbx` に依存する。import の先は PE 外なので、#5141 §5 の方式で「未確定 (外部)」になる。NONFRAME 規則を call 戻り値へ広げる実装は本 PR では行っていない。その場合でも、この `rdi` 経路は「未確定 (外部)」で止まると推定する (未実測・§3.2)。
 - 旧 JSON `frame_store_callee_3228.json` (3 / 35 / 10) は書き換えず旧値のまま残す (§3.3)。
 
@@ -24,7 +24,7 @@
 |---|---|
 | 関数判定 (`verdict`) 変更前 vs 変更後 | 差分 0 (48 関数) |
 | site 判定 (`verdict`) | 差分 0 (DROP 3・LIVE-IN 1・UNDETERMINED 44 関数。site は UNDETERMINED 46・DROP 3・LIVE-IN 1・PTR_READ 1) |
-| `5cb210` `5cb4aa` の `why` | `BARRIER(ALIAS_FRAME_PTR)` → `BARRIER(LEAK_STORE)` (barrier は `5cb47d` → `5cb456`) |
+| 打ち切り位置 (`barrier_addrs`・`outcomes`・`why`) | 3 site のみ変化 (`verdict` は不変)。(a) `5cb210` `5cb4aa`: `why` `BARRIER(ALIAS_FRAME_PTR)` → `BARRIER(LEAK_STORE)`、barrier `5cb47d` → `5cb456`。(b) `7e45e0` `7e48d6`: barrier `7e48ce movss` → `7e4629 movsq`、`store_addrs` 0 → 1 (`7e4659`)、`outcomes` 1 → 2。`why` は `ALIAS_FRAME_PTR` のまま。(c) `f61710` `f61ce6`: barrier `f61c6b` → `f6192b movsq`、`outcomes` 1 → 2。`why` は `ALIAS_FRAME_PTR` のまま |
 | 判定器 3228 の出力 | `results/frame_store_callee_3228_head_4238.json` と byte 一致 |
 | `--negctl-noprov` (規則 6 を無効化) | 変更前 HEAD の出力と byte 一致 (規則 6 が効いていることの確認。規則 6 を消すと変更前の判定に戻る) |
 
@@ -45,16 +45,21 @@
 
 - 決定: 旧 JSON は書き換えず残す。HEAD の値とは別物として扱う (REPORT_4238 §3.1 と同じ)。差が出る理由は #4090 の `lea` 修正 (判定器の変更) による。
 
-### 3.4 既存の結果ファイルとの不一致 (変更前から)
+### 3.4 既存の結果ファイルとの不一致 (変更前・変更後)
 
-- HEAD の `audit_frame_store_alias_2211.py` 既定出力は `results/frame_store_verdict_4090.json` と一致しない (site 5 件の `why` が違う: `1006ec0 1007021`・`5cb210 5cb4aa`・`694c80 6951c8`・`7e45e0 7e48d6`・`f61710 f61ce6`)。この不一致は本 PR の変更前から存在する (本 PR は `frame_store_verdict_4090.json` を書き換えない)。
+`results/frame_store_verdict_4090.json` (#4090 時点の出力) と site 単位で比べた結果 (`verdict` は top-level・全 site で一致):
+
+- 変更前 (`5c5351a31^`): 不一致 2 site。`1006ec0 1007021` は `why` が違う (4090 `BARRIER(LEAK_STORE)`・変更前 `ONLY_ENTRY_AFTER_CALL`)。`694c80 6951c8` は `barrier_addrs` のみ違う (`why` は同じ)。この 2 件は本 PR より前から存在する。
+- 変更後 (HEAD): 不一致 5 site。上の 2 件に加え、本 PR の変更で `5cb210 5cb4aa` (`why` 変化)・`7e45e0 7e48d6`・`f61710 f61ce6` (打ち切り位置変化) が増えた。
+- `fn_info` は 4090 JSON に `nonframe_stores` キーが無いため、48 関数すべてで差分がある (キーの追加のみ。判定には無関係。変更前の判定器の出力にも同じキーがある)。
+- 本 PR は `frame_store_verdict_4090.json` を書き換えない。不一致の扱いは §4。
 
 ## 4. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `5cb4aa` の判定 (`rdi` = `409410` の戻り値 = import `[rip+0xf9c86c]` の先) | `5cb4aa` は UNDETERMINED のまま。NONFRAME 規則の call 戻り値への拡張 (受入 2 の後半) は、import の先が PE 外のため「未確定 (外部)」で止まる | 親 #4288 の本文に追記 (受入 2 の後半) |
-| `frame_store_verdict_4090.json` と HEAD の 5 site の不一致 | 既存の結果ファイルの扱い。判定 (verdict) は一致 | 親 #4288 の本文に追記 |
+| `5cb4aa` の判定 (`rdi` = `409410` の戻り値 = import `[rip+0xf9c86c]` の先) | `5cb4aa` は UNDETERMINED のまま。NONFRAME 規則の call 戻り値への拡張 (受入 2 の後半) は、import の先が PE 外のため「未確定 (外部)」で止まる | 子 #5527 ([LD-276]) |
+| `frame_store_verdict_4090.json` との site 不一致 (§3.4) | 既存の結果ファイルの扱い。判定 (verdict) は一致 | 起票なし (文言のみ。本 PR で記録) |
 
 ## 5. 差分 (WORKFLOW §6)
 
