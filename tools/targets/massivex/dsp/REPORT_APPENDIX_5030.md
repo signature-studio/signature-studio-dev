@@ -165,3 +165,18 @@
 - 結論: `0x17b460` は保守的判定で xmm2 を読みうる (call 経由を含む)。したがって**呼出元の xmm2 が使われうる**。「渡さないこと」は示せない。受入 1 の xmm2 判定は**確定不能**のまま (保守的判定で「使われない」とは言えない)。
 - `0x1807568e8` は解析不能 5 件があるため「判定保留」。docstring の「保守的に読む扱い」と判定ロジックの食い違いは、このコミットで「判定保留」を出すよう直した。
 - 未解決: `0x18038dfe8` 以降の解析不能箇所の詳細、pdata 不正範囲の修正、index 30 の 27 箇所の `this` 型。いずれも #5498 の次の run で行う。
+
+### 3.9 追補 (MX-62 #5657・`scripts/mx62_vtable_slots.py`・測定 commit `5a4380377`)
+
+- 素材: `plugins-massivex` を `$RUNNER_TEMP/mx62` に展開 (6.3 秒) → `parse_setup_headers.py` (0.3 秒) → `extract_massivex.py <exe> work key` (10.5 秒・`md5-ok 0/125` は既知事象 §8.1)。`Massive X.vst3` = 95,356,824 B、md5 `622993e76565f49c094063a2b717d6ca` 一致。展開先は repo 外。
+- 測定: `python3 tools/targets/massivex/dsp/scripts/mx62_vtable_slots.py "<vst3>"` (exit 0・0.25 s・load 0.35 → 0.60 の単発)。出力:
+  - `vt_IInstrument` (VA `0x1841836a8`): slot 30 = RVA `0x17b460`、slot 32 = RVA `0x17b680`。
+  - `vt_main` (VA `0x183976038`): slot 30 = RVA `0x106a0`、slot 32 = RVA `0x17b680`。
+  - `0x17b460` を値として持つ 8 バイト位置: `.rdata` RVA `0x4183798` の 1 件のみ。`0x17a4b0`: 0 件。
+- **受入 2 (`rbx` の動的型) の判定**: `rbx` = `this` の vptr は **`0x1841836a8` (`vt_IInstrument`)**。
+  1. `0x17b460` は呼出元が `call [reg+0xf0]` (index 30) で呼ぶ (直接 E8/E9 は 0 件・§3.5)。`this` の vptr を `V` とすると `[V+0xf0] = 0x17b460` である必要がある。
+  2. 静的データ内で `[V+0xf0] = 0x17b460` となる vtable は `vt_IInstrument` のみ (上記)。`vt_main` の slot 30 は `0x106a0` で一致しない。slot 30 だけが型を分ける。
+  3. 注記: `0x17b460` 内の `call [rax+0x100]` (slot 32 = `0x17b680`) は両 vtable で同じ値のため、型の判定には使えない。
+  - **前提と限界**: 判定は静的データ (.rdata/.data) の vtable に限る。実行時に作られる vtable (ヒープ上) に `0x17b460` が入る場合は対象外。`0x17a4b0` (vptr 書込み) の生成元は未確定だが、型の判定には不要。
+- **受入 4 (確定できない箇所)**: `0x17b460` を呼ぶ 27 箇所の各 `this` が実際に `vt_IInstrument` 系のオブジェクトかの個別確認は未了。上の判定は「どの呼出でも、vptr が静的 vtable なら `vt_IInstrument`」の論理による。
+- 測定 commit `5a4380377` から HEAD までのコード差分 (`git diff 5a4380377 HEAD -- tools/targets/massivex/dsp/scripts`) は 0 バイト (本節は文書のみの追記)。
