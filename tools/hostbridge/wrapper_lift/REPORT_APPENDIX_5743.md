@@ -90,6 +90,17 @@
 - 判定 (測定の範囲に留める): 注釈の消失は VarDefStmtOptimizer 単独 (11 組) と、VarDefStmtOptimizer + WhileTrueToWhileCondOptimizer (0x44abe0) の disable で戻る。VarDef 単独の disable では `not in loop` の件数は減らない。これ以上の結論 (VarDef が原因ではない等) は、件数を減らす別の段・組み合わせを測っていないので言えない。
 - 未検証: 最小集合の C を wasm 実行して bit 一致を確認すること (未実施)。全 disable 32 種は `--backend-disabled-opts` に全名を渡しており、名前の全件が有効であることは未確認 (存在しない名前は無視される)。
 
+## 4c. 0x683120 (`0x6835cb`) の測定 (本 run。測定 commit は本 PR のコード commit)
+
+- 素材: `toolchain-retdec` (RetDec v5.0)・`toolchain-emsdk` (6.0.12)・`fl-win64` (`extracted/block19091_PE.bin`)。`$RUNNER_TEMP` に展開。emcc は `PATH` に通した (通さないと `emcc` が見つからず、`not in loop` が 0 と誤読される)。
+- 範囲: `0x683120-0x6835ff` (lift 可能。前 run の `NORANGE` の解消。`--backend-no-opts` で注釈 1 件)。
+- 全 32 種 disable: 注釈 0 → 1 (戻る)、`not in loop` 1 → 0。
+- VarDefStmtOptimizer 単独: 注釈 0 → 1 (戻る)、`not in loop` は 1 のまま (`notloop_vardef.sh`)。
+- 注釈を戻す最小集合 (`notloop_minset.sh`・所要 88.7 s): `VarDefStmtOptimizer` 単独。
+- `not in loop` を 0 にする最小集合 (`notloop_minset_err.sh`・所要 93.0 s。本 run 新規): `WhileTrueToWhileCondOptimizer` 単独。
+- 判定: この組では、注釈を戻す段 (VarDef) と `not in loop` を消す段 (WhileTrueToWhileCond) が**一致しない**。前 run までの「注釈の段 = エラーの段」という前提は、この組では成り立たない。
+- 未測定: 0x683120 の C を wasm 実行して bit 一致を見ること (未実施)。残り 12 組の `not in loop` の最小集合 (範囲の確定が要るため未実施。0x408770 は範囲を推定で `0x4087ff` と置いて測ったが、範囲の根拠が無いため結果は採らない)。
+
 ## 5. 採らなかった方式
 
 - 両方 disable した C を既定に採用する: 制御構造が既定と変わる。13 組は戻らないため、採用しても 27 件は解消しない。
