@@ -76,6 +76,15 @@
 - 近似の注記: 関数境界は「ret の直後の int3 パディング」のみで切る。パディング無しで隣の関数が続く場合は一つにまとまるため、関数 20,701 件は近似の結果である。
 - 具象型の全数 (control block の vtable が指す `_Destroy`・`_Delete_this`) は未確定。`.rdata`・`.data` の関数ポインタ並びは 26,149 件あるが、vtable の候補への対応付けは未実施。
 
+## 9. 間接 call の具象型の上界 (#5843 / ICALL-119・本 run)
+
+- 測定 commit: `cf486ff00` (本 run の基点。`tools/icall/` は `4f39f1c18` 以降変更なし)。素材: `plugins-freshair` の `SlateCore.core_64` (sha256 `2cf759f7…`・一致)。dsm は `objdump -d -M intel` 全量 (4,553,159 行・real 4.840 s)。
+- 呼出し元 `180cbb930` は `r13` を書かない・push/pop も無い。間接 `180cbba21` (`[rax+0x8]`)・`180cbba36` (`[rax+0x10]`) の `rbx`・`rcx` は control block (`[rdi+0xa80]`)。
+- 呼出し元 `180cb6965`・`180cb6a76` の control block は `0x18040e0e0` の戻り値 (shared_ptr の move 補助。`[rdx+0x8]` の control block を `[rax+0x8]` に移す)。この 2 件の具象型は、`0x18040e0e0` の引数 `rdx` の出どころを追うまで未確定。
+- 具象型の候補を広く取る検査 (`.rdata`/`.data` の関数ポインタ 7,127 件のうち `r13` を push/pop 無しで書く関数 490 件) は、vtable に限らないため上界として役に立たない。
+- 実際に vtable を書き込む箇所 (`python3 tools/icall/vtable_r13.py <SlateCore.core_64> <core64.dsm>`) (`lea reg,[rip+X]` の直後の `mov [reg],reg`) の 2,457 件から、slot1・slot2 が両方コードを指す vtable 1,625 件・関数 635 件を集めた。そのうち `r13` を push/pop 無しで書く関数は 51 件 (例: `180321fe0` は 31 箇所)。ここでも具象型は 1 つに絞れていない。
+- 結論: 間接 call の `r13` 保存は、上記 51 件の関数が呼出し元 (`180cbc770` 経由) から実際に到達するかで決まる。到達判定は未実施。受入 2 は未達のまま。
+
 ## 8. 検証のみで未了の項目
 
 - 呼出し元 `180cb6965`・`180cb6a76` (関数 `180cb68e0`・`180cb6a20` 付近) の control block の出どころ。(呼出し元 6 件の列挙は §7 で実測済み。)
