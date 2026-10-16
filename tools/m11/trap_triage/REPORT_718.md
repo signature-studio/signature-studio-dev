@@ -220,7 +220,7 @@
 - 入力: `work-m11` の `boot_final.ll` (sha256 `69c774de…`。`597757f4…` の系統は未使用)・`fl-win64` の `block00031_PE.bin`。scan 288・TSV 288 行を再現。
 - 偽陽性率は母数 288 の判定が終わるまで書かない。
 
-## 4m. 証拠表の行 159〜193 (#5661・部分達成: 確定 4 件 (真陽性 3・偽陽性 1)・保留 31)
+## 4m. 証拠表の行 159〜193 (#5661・部分達成: 確定 6 件 (真陽性 5・偽陽性 1)・保留 29 (母数 35)。#5685 で 168・169 を確定)
 件ごとの表・根拠・測定 commit (`f195a93a9`)・未解決は `REPORT_APPENDIX_5661.md` が正本。
 
 ## 5. 再現
@@ -246,6 +246,5 @@ python3 trap_triage/judge_entry_check.py <boot_final.ll> strict_evidence.tsv 4 3
 
 ## 7. 範囲
 
-- 本 REPORT のみ変更。`tools/m11/guard699/` は変更しない。
+- 本 REPORT の範囲と 20 MiB 超の blob は `REPORT_APPENDIX_5661.md` §7 に分割移動した (250 行上限・内容は削除していない)。
 - 範囲外: `m11_ov.c`・`docs/DEFECTS.md` (PM 判断)。
-- 20 MiB 超の blob: 追加なし。
