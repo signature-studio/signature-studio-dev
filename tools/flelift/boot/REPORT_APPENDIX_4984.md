@@ -117,7 +117,10 @@
   - `FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` (`FLE_BOOT_TAG=fle46x`): units 895・exit・IPP ok・rc 0。所要 2 分 36 秒 (`time` 実測)。工程 lift 70 s・clang-plain 71 s・boot 8 s・load 最大 2.29。JSON: `boot_summary_fle46x_default.json` (本 run の出力)。
   - probe 版 (`fle46_412acf_probe.sh`・上の `fle46x` の lift を再利用): probe 3 件着床・units 895・exit・IPP ok・rc 0。スクリプト全体 1 分 26 秒 (`time` 実測)。
   - 注: `boot_summary_fle46_default.json` は旧測定 (`5e9d18bf6`) のファイルで、今回の run の値ではない。
-  - 差分 0 の証跡 (boot ビルド入力・`tools/flelift/rt` を含む): `git diff --stat e178472e4 b53105d23 -- tools/flelift/rt tools/flelift/boot tools/flelift/x64c.py tools/shared` は空。`git diff --stat 35dbc7734 b53105d23 -- 同範囲` の出力は `tools/flelift/rt/fle_cpu.c | 2 +-` (`9b8a0426c`・#5337)。このため `35dbc7734` の値 (旧 probe・旧 JSON) は現 HEAD の値ではなく、上の再測定値を採る。
+  - 差分 0 の証跡 (実行コードのみの pathspec: `tools/flelift/rt tools/flelift/x64c.py tools/shared 'tools/flelift/boot/*.sh' 'tools/flelift/boot/*.py' 'tools/flelift/boot/*.c' 'tools/flelift/boot/*.mjs'`・文書と結果 JSON は除く):
+    - `git diff --stat e178472e4 b53105d23 -- <上の pathspec>` → 出力なし (差分 0)
+    - `git diff --stat 35dbc7734 e178472e4 -- <上の pathspec>` → `tools/flelift/rt/fle_cpu.c | 2 +-` (`9b8a0426c`・#5337)
+    - このため `35dbc7734` の値 (旧 probe・旧 JSON) は現 HEAD の値ではなく、上の再測定値を採る。
 
 ### 6.2 `f_4096b0` の 4 呼出し元 (#5028 の受入条件 2・FLE-42)
 
