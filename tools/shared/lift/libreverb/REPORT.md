@@ -25,6 +25,19 @@ win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を
 - 未再測定の扱い: (a) と (c) は、`toolchain-retdec` の素材を付けた run (`oc_artifacts: fl-win64 toolchain-retdec`) で `lift_vtable.sh 0x161fc0` を再実行して確定する。それまでは上の値を「過去の記録」として扱う。
 - `gen_helpers.py` の rc=1。残りの wasm 化 (helper の C 実装) は [T-SH-65] #3318、native 差分は [T-SH-64] #3317 が持つ。
 
+### 0-2. 対応表の拡張 (#3316 受入 1 の実装)
+
+測定 commit: 本 PR の HEAD。main `732795918` の `gen_helpers.py` からの変更。
+
+- 結果: `lift_vtable.sh 0x161fc0` は **rc=0**・`[ildsp] helpers ok`。`declare @__asm_*` の 73 行を全て対応 (distinct op 54 名のうち、既存の対応 6 名を除く 48 名を新たに追加。内訳は `[gen_helpers]` 行の op 別件数)。C 出力 161 行を clang -c で通した。
+- 追加した対応: cvt 系 (cvttss2si/cvttsd2si/cvttpd2dq/cvtdq2ps/cvtdq2pd/cvtps2pd/cvtsd2ss)・movd/movsd/movq/vmovq/vmovsd・movlhps/movhlps・packed (mulpd・psrldq/psrlq/psllq・xorpd/vxorpd/vandpd/movapd/movdqa/movdqu)・scalar 倍精度 (add/sub/mul/div sd・divss)・FMA (vfmadd/vfnmadd/vfmsub の sd 版)。
+- **trap にした命令**: `comiss`・`ucomisd`・`ldmxcsr`・`stmxcsr`・`int`。EFLAGS / MXCSR を IR に繋がない (D1a 変種。`ucomiss` の no-op 化と同じ危険)。黙って no-op にせず `__builtin_trap()` にした。実行されれば trap で止まる。closure の実行経路で trap が出るかは未確認 (受入 2・3 の範囲)。
+- 既存の 7 種 (movss/movaps/addss/subss/mulss/xorps/ucomiss) の出力は変えていない (下の回帰で確認)。
+- 回帰: `libreverb/lift.sh ok` 240/240 PASS (15.0 s, load 0.67)。`neg-helper` (mulss→add) は 39/240 で FAIL し、ゲートは効いている。
+- CreateInstance (`ci_lift.sh` の gen_helpers 段) は、入力 `ci.rs_norm.ll` で 4 helper (int3・movq・punpcklbw・sfence) を rc=0 で通す。ただし `ci_lift.sh` 全体は census の段 (`function_1801af090` 等の参照されない define) で FAIL する。これは `origin/main` (732795918) でも同じ結果で、本 PR の変更ではない。
+
+未達 (本 PR では扱わない): gen_helpers の未対応 0 件は達成。emcc の standalone wasm と 67 関数 export は [T-SH-65] #3318 の残件、IAT・全バイト差分は #3317。
+
 ## 1. 対象の再特定 (mac の 0x25c0-0x2f87 は win では使えない)
 `python3 locate.py <Reverb.dll> <out>` が export stub → 実体 → `.pdata` の連鎖で範囲を求める (RVA, 範囲内に base reloc 0 件・外部 call 0 件)。
 
