@@ -385,6 +385,29 @@ test("統合 (M3 順序): 第三者の意図を処理した後に、より古い
   assert.equal(focusPosts(ctx).length, 1, "実装 App の意図は時刻に依らず処理される");
 });
 
+// #5728 の deploy 前に処理済みにした意図 (seen = bot:時刻 / user:時刻) は、識別子の表記が変わっても再計数・再投稿しない (CI-242: intentRejected.author の一括増加)。
+test("互換 (CI-242): deploy 前の処理済み (seen = bot:/user:) の意図は、表記が変わっても再計数も再投稿もしない", async () => {
+  for (const [bot, seen] of [
+    [false, `user:${at(5)}`],
+    [true, `bot:${at(5)}`],
+  ] as const) {
+    const ctx = await stopped({ LIVE_LAUNCH: "1" });
+    assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(5)))).status, 202);
+    const sig = ctx.app.engine.s.sig["21"] as any;
+    sig.relaunch = { at: at(5), bot, issue: "21", arts: "fl-win64 plugins-ott", focus: "3" };
+    ctx.store.put("relaunch", "it:21", { seen });
+    await tickNow(ctx);
+    assert.equal((ctx.app.engine.status() as any).counters.intentRejected, undefined, `bot=${bot} の旧 seen は再計数しない`);
+    assert.equal(postsTo(ctx, 21).length, 0, `bot=${bot} の旧 seen は再投稿しない`);
+  }
+  // 旧 seen (user:) のまま、修復で PM App 名義に上がった意図は、処理済みとして捨てず投稿する (受入 2・4)。
+  const ctx = await stopped({ LIVE_LAUNCH: "1" });
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, PM_BOT, GOOD, at(5)))).status, 202);
+  ctx.store.put("relaunch", "it:21", { seen: `user:${at(5)}` });
+  await tickNow(ctx);
+  assert.equal(focusPosts(ctx).length, 1, "旧 seen の区分と一致しない PM App の意図は再評価して投稿する");
+});
+
 // 取り込み前 (IMPORT_REQUIRED=1) は、再投入の意図でも /oc を投稿しない (picks と同じ停止。round 6 B1)。意図は処理済みにせず、取り込み後の tick で投稿する。
 test("統合 (取り込み前): 実装 App の意図は、VM の状態を取り込むまで投稿 0 回 (launch_blocked=no-import)。取り込んだ後の tick で 1 回投稿する", async () => {
   const ctx = await stopped({ LIVE_LAUNCH: "1", IMPORT_REQUIRED: "1" });

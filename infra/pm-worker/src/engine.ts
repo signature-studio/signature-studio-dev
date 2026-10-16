@@ -1272,7 +1272,11 @@ export class Engine {
       const at = Date.parse(r.at);
       // 処理済みかは、いまの意図 (issue ごとの 1 枠) の識別子で比べる。時刻で比べると、先に処理した第三者の意図より後に届く bot の古い意図が捨てられる。
       const ident = `${relaunchAuthorOf(r)}:${r.id ?? r.at}`;
-      if (st.seen === ident) continue;
+      // 旧表記 (bot:/user:) の処理済みは、同じ id (無ければ at) かつ書き手の区分が変わっていないときだけ処理済みとみなす。
+      // 表記の移行で一括再計数しない (CI-242)。区分が修復で pm/impl に変わった意図は、再評価して解放する。
+      const legacy = /^(bot|user):(.*)$/.exec(st.seen ?? "");
+      const legacySeen = !!legacy && legacy[2] === String(r.id ?? r.at) && relaunchAuthorOf(r) === (legacy[1] === "bot" ? "impl" : "other");
+      if (st.seen === ident || legacySeen) continue;
       // 最後の /oc より前に出た意図は捨てる (PM の手動の /oc を含む)。
       if ((Date.parse(this.s.launchedAt[k] ?? "") || 0) >= at) {
         this.d.store.put("relaunch", key, { ...st, seen: ident });
