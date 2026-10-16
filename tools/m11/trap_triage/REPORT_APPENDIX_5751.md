@@ -15,7 +15,7 @@
 - 判定時の入力 (展開の事実): `tools/m11/work/boot_final.ll` (19,787,837 B・sha256 `69c774de…`)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。`ir_conditions.json` は work-m11 に無く、判定では使っていない。
 - 再現 (2 回目 run・foreground): `scan_guard.py --report` 4.671 s (`time` の real) で strict 288 (fn・jcc は §3 と一致)。`strict_evidence.py --out` で TSV 288 行 (ヘッダ除く)。`judge_ctx.py <IR> <TSV> <PE> 236 237` は rc 0 (121 行)。関数 `function_e25550` の全命令を `ldmach.Machine` で逆アセンブルし、`[rbp+0xa8]`・`[rbp+0xbc]`・`[rbp+0x30]`・`[rbp+0x34]` の読み書きを確認した。
 - 測定 commit: `58ee21f1e` (origin/main)。判定に使ったコード (`tools/m11/guard699/`・`tools/m11/ldfix/ldmach.py`・`tools/m11/trap_triage/strict_evidence.py`・`judge_ctx.py`) は `git diff 58ee21f1e origin/main` で 0 行。
-- 再現の所在: 上記の再現は 2 回目 run (前の run) で行った実測。修正 run (レビュー差し戻し対応) では `work-m11` が `$HOME/artifacts` に無く、`tools/m11/work/` が無いため再実行していない。判定コード・判定入力の commit は変えていない (`git diff 58ee21f1e HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行)。レビュー run が `oc_artifacts` の素材で独立に再現する。
+- 再現の所在: 2 回目 run (前の run) で行った実測。差し戻し後の fix run (`47d15dfe2` の後) では `work-m11` が `$ARTIFACTS_DIR` に実在したので、展開して再現した: `tools/m11/work/boot_final.ll` の sha256 = `69c774de…` (一致)、`strict` 288、`strict_evidence.py` の TSV 288 行、`judge_ctx.py <IR> <TSV> <PE> 236 237` rc 0 (121 行)。IR の back-edge counter は `stack_var_-184` (`e257ac`) と `stack_var_-180` (`e259eb`) で、判定どおり。判定コード・判定入力の commit は変えていない (`git diff 58ee21f1e HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行)。
 - 作業ファイルは `tools/m11/work/` (gitignore・未コミット)。
 
 ## 3. 件ごとの判定
