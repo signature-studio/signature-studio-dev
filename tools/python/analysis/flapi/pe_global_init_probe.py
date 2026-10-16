@@ -3,6 +3,7 @@
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_global_init_probe.py <大域 VA(16進)> [<大域 VA> ...]
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_global_init_probe.py <大域 VA(16進)> --near   (±0x40 の RIP 相対参照を番地ごとに数える)
+  FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_global_init_probe.py <格納位置 VA(16進)> --reloc   (.reloc の DIR64 再配置対象か)
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_global_init_probe.py <大域 VA(16進)> --base   (既知の定数を基底とする [reg+disp] 書込みを T-0x100..T+8 で列挙)
 
 方式:
@@ -102,9 +103,18 @@ def base_store_scan(raw, base, text, funcs, T, span):
         print("  fn=%s at=%s %s %s ea=%s" % r)
 
 
+def reloc_check(pe, base, T):
+    """T の格納位置が .reloc の DIR64 再配置対象か (ローダが初期値を書くか) を確認する。"""
+    pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_BASERELOC"]])
+    rva = T - base
+    hits = [(hex(b.struct.VirtualAddress), e.type) for b in pe.DIRECTORY_ENTRY_BASERELOC for e in b.entries if e.rva == rva]
+    print("reloc %x: entries=%s (type 10 = DIR64)" % (T, hits))
+
+
 def main():
     near = "--near" in sys.argv
     based = "--base" in sys.argv
+    reloc = "--reloc" in sys.argv
     targets = [int(a, 16) for a in sys.argv[1:] if not a.startswith("--")]
     if not targets:
         print("usage: pe_global_init_probe.py <VA> [<VA> ...]", file=sys.stderr)
@@ -112,6 +122,10 @@ def main():
     raw = open(PE, "rb").read()
     pe = pefile.PE(data=raw, fast_load=True)
     base = pe.OPTIONAL_HEADER.ImageBase
+    if reloc:
+        for T in targets:
+            reloc_check(pe, base, T)
+        return 0
     sec = {s.Name.rstrip(b"\0"): s for s in pe.sections}
     print("sections:", " ".join("%s=%x..%x" % (k.decode(), base + s.VirtualAddress, base + s.VirtualAddress + s.Misc_VirtualSize)
                                 for k, s in sec.items() if k in (b".text", b".data", b".rdata")))
