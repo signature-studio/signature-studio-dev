@@ -3,6 +3,7 @@
 # backend 最適化の最小集合を 1-minimal で求める (notloop_minset.sh は注釈の復帰を見る)。
 # 件数は「RetDec が成功し e.c が生成され、emcc が実行できた」ときだけ数える。失敗時は中止する。
 # 使い方 (cwd=リポジトリルート。emcc は PATH に通すこと):
+# opts 一覧ファイルは CamelCase のクラス名 1 行 1 名 (既製: retdec_opt_names.txt。snake_case は無視される)。
 #   RETDEC_BIN=<retdec>/bin/retdec-decompiler TMP=<作業dir> \
 #     bash tools/hostbridge/wrapper_lift/notloop_minset_err.sh <fl-win64 PE> <lo-hi> <opts 一覧ファイル>
 set -u

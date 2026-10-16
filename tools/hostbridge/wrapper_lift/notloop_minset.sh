@@ -4,7 +4,8 @@
 # 使い方 (cwd=リポジトリルート):
 #   RETDEC_BIN=<retdec>/bin/retdec-decompiler TMP=<作業dir> \
 #     bash tools/hostbridge/wrapper_lift/notloop_minset.sh <fl-win64 PE> <lo-hi> <飛び先 VA> <opts 一覧ファイル>
-# opts 一覧ファイル: 1 行 1 名 (例: BitOpToLogOpOptimizer)。RetDec のヘッダ名 (retdec/llvmir2hll/optimizer/optimizers/*.h) から作る。
+# opts 一覧ファイル: 1 行 1 名の CamelCase クラス名 (例: EmptyStmtOptimizer)。snake_case の *.h 名は RetDec が無視する (付録 REPORT_APPENDIX_5743.md §4d)。
+# 既製の一覧は tools/hostbridge/wrapper_lift/retdec_opt_names.txt (32 件)。
 set -u
 : "${RETDEC_BIN:?}" "${TMP:?}"
 PE=$1; RANGE=$2; T=$3; OPTS=$(paste -sd, "$4")
