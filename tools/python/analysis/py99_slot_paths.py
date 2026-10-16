@@ -10,6 +10,7 @@
 - --negctl fallthrough: 分岐辺を全部落として列挙する (変わる読みの件数で検出力を見る)。
 - --negctl expect: U の先頭 1 件の期待式を書き換える (不一致 1 で exit 1 になるはず)。
 - --lea-write: lea [rbp+X] を間接書込み (may-write) とみなし、そこから直接の store を経ずに届く [rbp+X] の読みを数える (診断のみ・exit に影響しない)。
+- expand((ins, order), vas): PY-4909 (#5800)。py88 の式の SLOT[rbp+X]? を届く store が 1 件の値で置換し、CALL[0x10469f0] を本体式に置換する (ExpSlicer)。未解決の印が残れば left に返す。
 - 突合の不一致が 1 件以上なら exit 1。経路の列挙結果は stdout、集計は stderr に出す。
 """
 import os
@@ -134,6 +135,70 @@ def classify(sl, stores):
     if "_in" in v:
         return "store 1 件・値は入口レジスタに帰着"
     return "store 1 件で確定"
+
+
+EXP_CALL = 0x10469F0  # edx + rint(2^-30 · ecx · (r8d − edx))。py99_call10469f0.py で PASS 済み
+UNRESOLVED_EXP = ("SLOT[", "ACC?⚠", "clob@", "IN[", "⚠", "OP:", "CALL[", "VCALL", "…")
+
+
+class ExpSlicer(w.Slicer):
+    """py88 の式の SLOT[rbp+X]? と CALL[0x10469f0] を展開する。
+
+    SLOT は届く store が 1 件・入口へ届かない・到達不能なし、の 3 条件を全部満たすときだけ、その store の値で置き換える
+    (合流を越えても経路が 1 本に定まる場合のみ)。置換の後ろに `@<store の VA>` を付け、どの store から来たかを式に残す。
+    届く store が複数 (分岐で値が割れる) なら置換せず、印をそのまま残す。
+    """
+
+    def __init__(self, ins, order, cfg, entry):
+        super().__init__(ins, order)
+        self.cfg = cfg
+        self.entry = entry
+        self.active = set()
+
+    def mem_read(self, addr, size, pos, depth):
+        r = super().mem_read(addr, size, pos, depth)
+        mm = re.fullmatch(r"rbp \+(0x[0-9a-f]+)", addr)
+        if not mm or not r.startswith(("SLOT[", "ACC?⚠")):
+            return r
+        X = int(mm.group(1), 16)
+        if (pos, X) in self.active:
+            return r
+        stores, inn, unreach = reach(self, self.cfg, self.order[pos], X, self.entry)
+        if inn or unreach or len(stores) != 1:
+            return r
+        (s,) = stores
+        self.active.add((pos, X))
+        try:
+            v = store_value(self, s)
+        finally:
+            self.active.discard((pos, X))
+        if v.startswith("OP:"):
+            return r
+        return f"({v})@{s:#x}"
+
+    def call_expr(self, i, depth):
+        a = self.order[i]
+        m, o = self.ins[a]
+        if w.TARGET_RE.fullmatch(o.strip()) and int(o, 16) == EXP_CALL:
+            d = self.resolve("d", i, depth + 1)
+            c = self.resolve("c", i, depth + 1)
+            r8 = self.resolve("r8", i, depth + 1)
+            return f"({d} + rint(M64[G[0x1046a20]] · {c} · ({r8} − {d})))@{a:#x}"
+        return super().call_expr(i, depth)
+
+
+def expand(path_or_lines, vas):
+    """VA ごとに展開後の式と未解決印の一覧を返す。戻り値: [(va, expr, [未解決印])]。"""
+    ins, order = path_or_lines
+    cfg = build(ins, order, True)
+    sl = ExpSlicer(ins, order, cfg, order[0])
+    out = []
+    for va in vas:
+        m, o = ins[va]
+        expr = sl.ev(w.parse_ops(o)[1], sl.idx[va], 0)
+        left = sorted({t for t in UNRESOLVED_EXP if t in expr})
+        out.append((va, expr, left))
+    return out
 
 
 def main():

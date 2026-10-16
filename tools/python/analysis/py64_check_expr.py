@@ -33,6 +33,12 @@ P4 = {  # G8 (PY-359): 3 段 (機械スライスと一致する正しい鎖)
     "0x104c51a": "*(*(*(0x15e14a0))+0x808)",
 }
 
+# G4 (PY-4909): 0x104b305 は CALL[0x10469f0](ecx, edx, r8d) の戻り値。edx=0 (xor)・ecx=[rbp+0x5b8] の読み (0x104b2f2)・
+# r8d=0x3e80。[rbp+0x5b8] は届く store が 0x1046d6b の 1 本だけで (py99 の CFG 到達定義)、その値は入口の edx (d_in)。
+# 機械側は py99_slot_paths.ExpSlicer で展開した式を比べる (raw の py88 は CALL[...] のまま)。
+G4 = "0 + rint(*(0x1046a20) · d_in · (0x3e80 − 0))"
+EXPANDED = [(0x104b305, G4)]  # 展開版 (ExpSlicer) で突合する地点
+
 
 def F(p):
     return f"*({p}+0x3b8) + rint(*(0x104ccd8) · ACC · (*({p}+0x3bc) − *({p}+0x3b8)))"
@@ -121,8 +127,8 @@ class Parser:
             e = self.expr()
             self.take(")")
             return ("rint", e)
-        if t == "ACC":
-            return ("ACC",)
+        if t in ("ACC", "d_in"):
+            return (t,)
         raise ValueError(f"未知のトークン {t!r}")
 
 
@@ -158,6 +164,7 @@ def parse_canon(s):
 
 def machine_norm(s):
     s = re.sub(r"ACC\?⚠合流@0x[0-9a-f]+", "ACC", s)
+    s = re.sub(r"(?<=[\w)\]])@0x[0-9a-f]+", "", s)
     s = re.sub(r"\bM(8|16|32|64)\[", "*(", s)
     s = s.replace("G[", "(").replace("[", "(").replace("]", ")")
     return s
@@ -196,7 +203,26 @@ def main():
         mism += 0 if ok else 1
         print(f"{va:#x}: {'一致' if ok else '不一致'}{detail}")
     print(f"# n={len(hand)} mismatch={mism} ACC?⚠合流 (機械側・ACC と同一視) = {acc_join}", file=sys.stderr)
-    sys.exit(1 if mism else 0)
+    emis = expanded_check(ins, order, s)
+    sys.exit(1 if mism or emis else 0)
+
+
+def expanded_check(ins, order, s):
+    """PY-4909: py99_slot_paths の展開式 (SLOT・CALL[0x10469f0] を置換した式) と手計算式を突合する。"""
+    import py99_slot_paths as p99
+    mism = 0
+    for va, h in EXPANDED:
+        (_, mach, left), = p99.expand((ins, order), [va])
+        try:
+            ok = parse_canon(h) == parse_canon(machine_norm(mach)) and not left
+            detail = "" if ok else f"\n    hand={h!r}\n    mach={mach!r} 未解決={left}"
+        except ValueError as e:
+            ok = False
+            detail = f"\n    parse error: {e}\n    mach={mach!r} 未解決={left}"
+        mism += 0 if ok else 1
+        print(f"{va:#x} (展開版): {'一致' if ok else '不一致'}{detail}")
+    print(f"# expanded n={len(EXPANDED)} mismatch={mism}", file=sys.stderr)
+    return mism
 
 
 if __name__ == "__main__":
