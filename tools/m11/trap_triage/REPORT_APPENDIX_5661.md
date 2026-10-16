@@ -1,0 +1,80 @@
+# #5661 付録: 証拠表の行 159〜193 (35 件) の件ごとの判定
+
+本付録が #5661 の判定の正本。結論は `REPORT_718.md` §4m に要約する。
+
+## 1. 結果
+
+- 母数 35 件 (証拠表 `strict_evidence.tsv` のデータ行 159〜193)。
+- 真陽性 3 件: 行 178 (`function_8c5eb0`・既知の positive control)、行 189 (`function_a9ece0`)、行 190 (`function_bb5fd0`)。
+- 偽陽性 1 件: 行 188 (`function_a97930`)。
+- 保留 31 件。偽陽性率は母数 288 の判定が終わるまで書かない。
+
+## 2. 測定
+
+- 測定 commit: `f195a93a9` (origin/main)。本 PR はコードを変えない (REPORT と付録のみ)。
+  `git diff f195a93a9 HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行。
+- 入力: `work-m11` の `boot_final.ll` (19,787,837 B・sha256 `69c774de…`。REPORT の記録と一致)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
+- 実行 (foreground・各 1 回): `scan_guard.py --report` 4.3 s (strict 288)、`strict_evidence.py` 13.0 s (TSV 288 行)、`judge_ctx.py <IR> <TSV> <PE> 159 193` (rc 0・2,330 行の文脈ダンプ)。
+- 件数の数え直し (`ir_loop_head_icmp` 列・行 159〜193): 0 件 2 / 1 件 12 / 2 件 18 / 3 件 1 / 5 件 1 / 6 件 1 (計 35)。
+  本 run は 35 件の範囲だけを数え直した。旧記録 (§4c・行 99〜193 の 95 件の内訳) とは範囲が違うため照合していない。
+- 判定方法: 機械語 (`ldmach` の逆アセンブル) の jcc 直前の cmp 被演算子と、count 源 (`[reg+off]` の load・関数戻り値) を、IR の同じ load 連鎖 (段数・幅・オフセット) と突合する。入口判定の有無と脱出先の一致を見る。判定は手で行い、スクリプトでは判定しない。
+- 引数対応 (Win64): `arg1`=rcx、`arg3`=r8、`arg4`=r9 を、関数先頭の命令と IR の使い方の両方で確認した (`function_a96d40`・`function_bb5fd0`・`function_821210`・`function_a968f0` の先頭命令)。
+
+## 3. 件ごとの判定
+
+| 行 | 関数 | jcc → 脱出先 / L | 判定 | 理由 |
+|---|---|---|---|---|
+| 159 | function_78b010 | 78b251 → 78b301 / 78b25c | 保留 | 機械語の count は `call 5281a0` の戻り値 −1。IR の L の判定は `call 40fe90` の結果で、count 源との対応が未確認 |
+| 160 | function_78b010 | 78b417 → 78b449 / 78b41e | 保留 | 機械語の count は `[[rbp+0x80]+0x10]`−1。IR の B (78b402) の `%143` (load i32 `%72`) との同一性が未確認 |
+| 161 | function_78b4f0 | 78b61e → 78b686 / 78b625 | 保留 | 機械語の被演算子は `ecx`=0 と `esi`=`eax`−1。IR の L の判定は `icmp eq %44,0` (関数戻り値) で、入口 count との対応が未確認 |
+| 162 | function_78c110 | 78c88b → 78f9ae / 78c89c | 保留 | 機械語の count は `call [rax+0x28]` の戻り値 −1。IR の L の `icmp` は `stack_var_-1128` の 0 判定で、count 源との対応が未確認 |
+| 163 | function_78c110 | 78cde7 → 78ceba / 78cdf2 | 保留 | 機械語の count は `[[[rbp+0x30]+0x57c]+0x10]`−1。IR の B の `%292` (load `%112`+16) との同一性が未確認 |
+| 164 | function_7a0b50 | 7a0ba2 → 7a0be7 / 7a0ba9 | 保留 | 機械語の count は min(`ecx`, `rax`) の結果。IR の B の `%9` (`spec.select`+1) との対応は未確認 |
+| 165 | function_80e040 | 80e094 → 80e133 / 80e09f | 保留 | 機械語は `[rip+…]` の 2 段 load、IR は `load [18762880]` の 1 段。rip 先アドレスの一致が未確認 |
+| 166 | function_81a710 | 81a9b5 → 81aa57 / 81a9c0 | 保留 | 機械語の count は `call [rax+0x28]` の戻り値。IR の B の count 源 (`%69`) との対応が未確認 |
+| 167 | function_81a710 | 81aac4 → 81ab19 / 81aacb | 保留 | 機械語の count は `call [rax+0x28]`。IR の B の `%93` (load `%91`) との同一性が未確認 |
+| 168 | function_821210 | 821226 → 821253 / 82122d | 保留 | count は `[arg1+16]` で IR の B の `%4` と一致。L の `icmp eq %15,0` は要素の null 判定で count 判定ではない。back-edge の `rsi` 更新を未確認 |
+| 169 | function_821550 | 821571 → 8216db / 82157e | 保留 | count は `[arg1+16]` (IR の B の `%2`)。L の判定は `icmp eq %12, arg2` (要素比較)。count 判定の対応が未確認 |
+| 170 | function_824460 | 8244f0 → 82462a / 8244fb | 保留 | count は `call 611430` の戻り値。機械語の引数 `[rsp+0x28]` と IR の `arg1` の対応が未確認 |
+| 171 | function_825fc0 | 8260a1 → 82616e / 8260ae | 保留 | count は `[[rsi+0x370]+0x10]`−1 。IR の L の判定は `call 81fed0` の戻り値で、対応が未確認 |
+| 172 | function_8261a0 | 82682d → 8268a0 / 826836 | 保留 | count は `[[rbp+0x80]+8]`−1。IR の B の `%284` (load `%282`+8) との同一性が未確認 |
+| 173 | function_8261a0 | 8269cf → 826aef / 8269dc | 保留 | count は `ebx`−1。IR の L の判定が複合 `icmp` (`%or.cond40`) で、count 源との対応が未確認 |
+| 174 | function_8261a0 | 826b4d → 826c58 / 826b58 | 保留 | count は `[rbp+0xa4]` (機械語の 1 段 load)。IR の L の判定は `call 424660` の結果で、対応が未確認 |
+| 175 | function_85dfb0 | 85dfea → 85e026 / 85dff3 | 保留 | 機械語の count は `call 8657d0` の戻り値。IR の B の `%8` (`call 8657d0`) との同一性が未確認 |
+| 176 | function_867540 | 867569 → 8675a5 / 867572 | 保留 | count は `call 8657d0`。IR の L の exit は `call 865020` の結果で、count 判定の対応が未確認 |
+| 177 | function_86b300 | 86b31e → 86b380 / 86b325 | 保留 | count は `call 865850`。IR の B の `%2` と同じ callee だが、機械語は `[rip+…]` 経由で引数の一致が未確認 |
+| 178 | function_8c5eb0 | 8c5f18 → 8c6066 / 8c5f23 | 真陽性 | count = `[[rbp+0x58]+0x14]`。IR の B の `%7`・`%9` (offset 20) と一致。B → L の直接分岐で、入口の count 判定が IR に無い (`switch` のみ)。既知の positive control と一致 |
+| 179 | function_8d0580 | 8d05ec → 8d066a / 8d05f5 | 保留 | count は `call 8cfb90` の戻り値 −1。IR の B の `%7` (`call 8cfb90`) と一致するが、`eax` の符号拡張と L の `%16` の対応が未確認 |
+| 180 | function_8e6150 | 8e6237 → 8e63b6 / 8e6248 | 保留 | count は `call [rax+0x28]` の戻り値 −1。IR の L の判定は `call 4150d0` の結果で、対応が未確認 |
+| 181 | function_92d9d0 | 92da0e → 92da78 / 92da17 | 保留 | count は `[[rdx+rcx*8+0x3c]+0x10]`。IR の B の `%13`/`%16` の段数は一致するが、機械語の `rdx` と IR の `arg1` の対応が未確認 |
+| 182 | function_9cef00 | 9cef21 → 9cef57 / 9cef2a | 保留 | count は `[[rip+…]+0x10]`。IR の B の `%0` (load `[19241064]`) と rip 先アドレスの一致が未確認 |
+| 183 | function_a96620 | a9672f → a96899 / a9673a | 保留 | count は `[[rbp+0x38]+0x18]`。IR の L の判定は `icmp eq %54,0` (ポインタ) と `icmp sgt` の複合で、count 源との対応が未確認 |
+| 184 | function_a968f0 | a96988 → a96a4c / a96995 | 保留 | count は `[[rbp+0x20]+0xb0]+0x18`−1。IR の B の `%25`・`%28` (`[arg1+176]`+24) と段数は一致するが、機械語の `rbp+0x20` と `arg1` の対応が未確認 |
+| 185 | function_a968f0 | a96a7e → a96adf / a96a85 | 保留 | 184 と同じ count 源。IR の B の `%96` と L の `%98` の対応が未確認 |
+| 186 | function_a96b10 | a96cc0 → a96d07 / a96cc9 | 保留 | count は `[[rbp+0xb0]+0x18]`−1。IR の L の count 源 (`%r13.0`) の同一性が未確認 |
+| 187 | function_a96d40 | a96d80 → a96db6 / a96d89 | 保留 | count は `[[rbx+0x50]+0x90]`の 2 段 load。IR の B の `%12`・`%15` (段数 3) との対応が未確認 |
+| 188 | function_a97930 | a97a90 → a9812e / a97a96 | **偽陽性** | `a97a77` で `[rbp+0xc4]`=3 を書いた直後に `a97a89` の `cmp` があり、その間に分岐の着地点が無い (`jcc` の着地点は `a97a61`・`a97a38`・`a98128` のみ)。よって `jle` は常に不成立 |
+| 189 | function_a9ece0 | a9ecf6 → a9ed11 / a9ecff | **真陽性** (構造) | count は `r8d` (`arg3`=r8)。IR の B は `store arg3 → r8.0` で直接 L に入り、L には入口判定が無い (L の判定は末尾の `icmp eq`)。機械語は count=0 で `a9ed11` へ抜ける。到達性 (count=0 の実行時到達) は未測定 |
+| 190 | function_bb5fd0 | bb5ff2 → bb601d / bb5ffb | **真陽性** (構造) | count は `[[arg1+928]+16]` (`rbx`=`rcx`=`arg1`、`0x3a0`=928)。IR の B の `%2`・`%5` と一致。B → L の直接分岐で入口判定が無い。機械語は count=0 で `bb601d` へ抜ける。到達性は未測定 |
+| 191 | function_c3c830 | c3c8c8 → c3c907 / c3c8da | 保留 | count は `[rbp+0xa8]`。IR の L の count 源 (`stack_var_-88`) と一致する根拠が未確認 |
+| 192 | function_c3c830 | c3c94a → c3c972 / c3c951 | 保留 | count は `[[rbp+0x68]+0x10]`−1。IR の B の `%17` (load `%4`+16) と段数は一致するが、`rbp+0x68` と `%4` の対応が未確認 |
+| 193 | function_c3efe0 | c3f020 → c3f04f / c3f027 | 保留 | count は `[[rbx+0x10]+0x10]`。IR の B の `%11` (`arg1`+16) との対応は、`rbx` = `arg1` の確認が要る |
+
+## 4. 保留 31 件の未解決
+
+- 型: count 源の段数・オフセットは IR と一致するが、機械語のベースレジスタ (`rbp+…`・`rip+…`・`rbx`) と IR の SSA 値 (`arg1`・load 先) の同一性が未確認 (159・160・163・165・177・181・182・184・185・192・193 ほか)。
+- 型: count 源が関数戻り値 (`call 8657d0`・`call 865850`・`call [rax+0x28]` ほか) で、IR の同じ callee の引数の一致が未確認 (166・167・175・176・179・180)。
+- 型: count 源が stack 変数 (`[rbp+0xa8]` 等) で、store/load の追跡が未了 (191)。
+- 起票先: #5661 (本 issue・Refs)。子 issue は新規に起票しない (判定だけの残作業のため。規約上の『未解決の追跡』に当たる)。
+
+## 5. 再現
+
+```sh
+cd tools/m11
+python3 guard699/scan_guard.py work/boot_final.ll --pe <block00031_PE.bin> --report work/strict_5661.json
+python3 trap_triage/strict_evidence.py work/boot_final.ll --pe <block00031_PE.bin> --report work/strict_5661.json --out work/strict_evidence_5661.tsv
+python3 trap_triage/judge_ctx.py work/boot_final.ll work/strict_evidence_5661.tsv <block00031_PE.bin> 159 193
+```
+
+- 入力は `oc_artifacts: fl-win64 work-m11` で展開する (`tools/m11/work/` 配下・gitignore)。
+- 出力の文脈ダンプは `tools/m11/work/judge_5661.txt` (gitignore・未コミット)。
