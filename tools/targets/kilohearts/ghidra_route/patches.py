@@ -160,10 +160,10 @@ ABI = {
         #   FUN_180fdc858 は引数 1 件宣言 (ulonglong)。4042 (180fccf08) は入口 param_1 の bit を保持した経路 (movq rdx,xmm0・movaps xmm6,xmm0) で xmm0 = 入口 param_1 = d2u(param_1)。
         #   4136 (180fcd3da) は flag≠0 側。180fcd1a7 の jae は vmovq xmm0,r9 (180fcd1b3) より前に分岐するため、xmm0 は入口のまま = 入口 param_1 = d2u(param_1)。
         #   呼出し 6 件の機械語 (capstone): 180fc6b39・180fc6d65 (= 180fc6870 の 3595・3653 の順)・180fc7100・180fc745c (= 180fc6d70 の 3785・3909 の順)・180fccf08・180fcd3da (= 180fcce40 の 4042・4136 の順)。
-        ('delay 3595 FUN_180fc6870 uVar1 = FUN_180fdc6ec (xmm0 = float 入力)', r'(if \(\(\(uint\)fVar3 & _DAT_1822822a0\) == _DAT_1822822a0\) \{\n\s*)uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);', r'\1uVar1 = FUN_180fdc6ec(f2u(fVar3));'),
-        ('delay 3653 FUN_180fc6870 uVar1 = FUN_180fdc6ec (xmm0 = float 入力)', r'(if \(\(\(uint\)fVar3 & 0x7f800000\) == 0x7f800000\) \{\n\s*)uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);', r'\1uVar1 = FUN_180fdc6ec(f2u(fVar3));'),
-        ('delay 3785 FUN_180fc6d70 uVar25 = FUN_180fdc844 (xmm0 = float 入力)', r'(if \(\(\(uint\)fVar22 & _DAT_182282360\) == _DAT_182282360\) \{\n\s*)uVar25 = (?:func_0x000|FUN_)180fdc844\(\);', r'\1uVar25 = FUN_180fdc844(f2u(fVar22));'),
-        ('delay 3909 FUN_180fc6d70 uVar25 = FUN_180fdc844 (xmm0 = float 入力)', r'(if \(\(\(uint\)fVar22 & 0x7f800000\) == 0x7f800000\) \{\n\s*)uVar25 = (?:func_0x000|FUN_)180fdc844\(\);', r'\1uVar25 = FUN_180fdc844(f2u(fVar22));'),
+        ('delay 3595 FUN_180fc6870 uVar1 = FUN_180fdc6ec (xmm0 = float 入力)', r'(if \(\(f2u\(fVar3\) & _DAT_1822822a0\) == _DAT_1822822a0\) \{\n\s*)uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);', r'\1uVar1 = FUN_180fdc6ec(f2u(fVar3));'),
+        ('delay 3653 FUN_180fc6870 uVar1 = FUN_180fdc6ec (xmm0 = float 入力)', r'(if \(\(f2u\(fVar3\) & 0x7f800000\) == 0x7f800000\) \{\n\s*)uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);', r'\1uVar1 = FUN_180fdc6ec(f2u(fVar3));'),
+        ('delay 3785 FUN_180fc6d70 uVar25 = FUN_180fdc844 (xmm0 = float 入力)', r'(if \(\(f2u\(fVar22\) & _DAT_182282360\) == _DAT_182282360\) \{\n\s*)uVar25 = (?:func_0x000|FUN_)180fdc844\(\);', r'\1uVar25 = FUN_180fdc844(f2u(fVar22));'),
+        ('delay 3909 FUN_180fc6d70 uVar25 = FUN_180fdc844 (xmm0 = float 入力)', r'(if \(\(f2u\(fVar22\) & 0x7f800000\) == 0x7f800000\) \{\n\s*)uVar25 = (?:func_0x000|FUN_)180fdc844\(\);', r'\1uVar25 = FUN_180fdc844(f2u(fVar22));'),
         ('delay 4042 FUN_180fcce40 dVar2 = FUN_180fdc858 (xmm0 = param_1)', r'(if \(\(ulonglong\)_DAT_1822828a0 <= \(ulonglong\)dVar2\) \{\n\s*dVar2 = \(double\))(?:func_0x000|FUN_)180fdc858\(\);', r'\1FUN_180fdc858(d2u(param_1));'),
         ('delay 4136 FUN_180fcce40 dVar2 = FUN_180fdc858 (xmm0 = param_1)', r'\n  dVar2 = \(double\)(?:func_0x000|FUN_)180fdc858\(\);\n  return dVar2;', '\n  dVar2 = (double)FUN_180fdc858(d2u(param_1));\n  return dVar2;'),
         # KH-154 (#5362): FUN_18004cf20 (vector の再確保・memmove) の呼出し 3 箇所 (18004d008・18004d01a・18004d035) は、d・s をアドレスの整数値 (rcx・rdx) で渡す。

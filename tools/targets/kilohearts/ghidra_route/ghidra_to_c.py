@@ -170,6 +170,33 @@ DELAY_RULES = [
      'uVar19 = f2u(auVar20._0_4_) & 0x3f;', 1),
     ('auVar20._0_4_ - uVar19: vcvtpd2dq の下位 lane をビット列で読む (#4900)', r'uVar3 = \(int\)\(auVar20\._0_4_ - uVar19\) >> 6;',
      'uVar3 = (int)(f2u(auVar20._0_4_) - uVar19) >> 6;', 1),
+    # #5664 (KH-174): float のグローバルの符号反転 (`xorps` 0x1813d1a80) を、値変換 (float)(uint) ではなくビット列で行う 2 行。
+    #   FUN_180fbbfb8 0x180fbc06f〜0a7: movss xmm2,[182286970] (float) → movaps → xorps [1813d1a80] → comiss。
+    #   2684 は `(float)((uint)_DAT_182286970 ^ M)` (値変換で 2^-25 が 0 になる)。機械語の値は bit 列の XOR なので u2f(f2u(X) ^ M)。
+    #   2707 は FUN_180fbc14f の `movss xmm1,[182286958]` → `xorps [1813d1a80]` (同形)。
+    ('2684 _DAT_182286970 ^ sign: float の符号反転をビット列で (#5664)', r'\(float\)\(\(uint\)_DAT_182286970 \^ _DAT_1813d1a80\)',
+     'u2f(f2u(_DAT_182286970) ^ _DAT_1813d1a80)', 1),
+    ('2707 _DAT_182286958 ^ sign: float の符号反転をビット列で (#5664)', r'\(float\)\(\(uint\)_DAT_182286958 \^ _DAT_1813d1a80\)',
+     'u2f(f2u(_DAT_182286958) ^ _DAT_1813d1a80)', 1),
+    # #5664 (KH-174): FUN_1802ed7f0 の 1249・1254 行 (1250・1255 の同形を含む)。機械語 1802ee03d: movaps xmm2,xmm0 → xorps [1813d1a80] → andps xmm2,xmm0。
+    #   float レジスタへの符号マスク XOR と AND なので、(uint)fVar は数値変換ではなくビット列 f2u() で読む。
+    # #5664 (KH-174): FUN_180fbc1f4 の符号判定。機械語 180fbc2c1: test WORD PTR [rsp+0x42],0x8000 (float の上位 16bit の符号)。
+    #   (uint)float は値変換 (負の float で未定義) なので、ビット列 f2u() で符号ビットを読む。
+    ('2766 FUN_180fbc1f4 sign bit of afStackX_8[0] (ビット列)', r'if \(\(\(uint\)afStackX_8\[0\] & 0x80000000\) != 0\) \{',
+     'if (((f2u(afStackX_8[0])) & 0x80000000) != 0) {', 1),
+    # #5664 (KH-174): FUN_180fc61e4 (float 1 引数) の同形の符号判定。機械語 180fc6223: test WORD PTR [rsp+0x32],ax (0x8000)。
+    ('3549 FUN_180fc61e4 sign bit of afStackX_8[0] (ビット列)', r'if \(\(\(uint\)afStackX_8\[0\] & 0x80000000\) == 0\) \{',
+     'if (((f2u(afStackX_8[0])) & 0x80000000) == 0) {', 1),
+    ('1249 FUN_1802ed7f0 uVar21 = fVar26 sign bits', r'uVar21 = \(uint\)fVar26 \^ _DAT_1813d1a80;', 'uVar21 = f2u(fVar26) ^ _DAT_1813d1a80;', 1),
+    ('1250 FUN_1802ed7f0 uVar19 = fVar31 sign bits', r'uVar19 = \(uint\)fVar31 \^ _UNK_1813d1a84;', 'uVar19 = f2u(fVar31) ^ _UNK_1813d1a84;', 1),
+    ('1254 FUN_1802ed7f0 auVar6 hi = fVar31 bits', r'auVar6\._4_4_ = uVar19 & \(uint\)fVar31;', 'auVar6._4_4_ = uVar19 & f2u(fVar31);', 1),
+    ('1255 FUN_1802ed7f0 auVar6 lo = fVar26 bits', r'auVar6\._0_4_ = uVar21 & \(uint\)fVar26;', 'auVar6._0_4_ = uVar21 & f2u(fVar26);', 1),
+    # #5664 (KH-174): FUN_180fc6870・FUN_180fc6d70 の入口 float の指数判定 4 件。`if` の条件は float のビット列 (movd → and) で読む。
+    #   値変換 (uint) では指数マスク 0x7f800000 の比較が成立しないため、f2u() に直す。直後の呼出し (uVar1・uVar25 = FUN_180fdc6ec・844) は ABI 規則が扱う。
+    ('3594 FUN_180fc6870 if (fVar3 bits) (#5664)', r'\(uint\)fVar3 (& _DAT_1822822a0\) == _DAT_1822822a0\) \{\n\s*)(?=uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);)', r'f2u(fVar3) \1', 1),
+    ('3653 FUN_180fc6870 if (fVar3 bits) (#5664)', r'\(uint\)fVar3 (& 0x7f800000\) == 0x7f800000\) \{\n\s*)(?=uVar1 = (?:func_0x000|FUN_)180fdc6ec\(\);)', r'f2u(fVar3) \1', 1),
+    ('3784 FUN_180fc6d70 if (fVar22 bits) (#5664)', r'\(uint\)fVar22 (& _DAT_182282360\) == _DAT_182282360\) \{\n\s*)(?=uVar25 = (?:func_0x000|FUN_)180fdc844\(\);)', r'f2u(fVar22) \1', 1),
+    ('3909 FUN_180fc6d70 if (fVar22 bits) (#5664)', r'\(uint\)fVar22 (& 0x7f800000\) == 0x7f800000\) \{\n\s*)(?=uVar25 = (?:func_0x000|FUN_)180fdc844\(\);)', r'f2u(fVar22) \1', 1),
     # #4838 (KH-119): 代入の pointer⇔整数 5 行。機械語で確定 (REPORT_APPENDIX_3801.md の P6 の現 HEAD 残件)。
     #   FUN_180f88084・FUN_180f880a4・FUN_180fd2d38: 初期化の 8 byte スロットへ leaq で得た番地を movq で書く。
     #   値はそのアドレス (&UNK_<va>) のビット列。整数型スロットへ同ビットを明示キャストで書く (数値変換にしない)。

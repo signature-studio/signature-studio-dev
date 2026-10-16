@@ -305,6 +305,7 @@
 | `tools/m11/REPORT_SHX-T44_APPENDIX.md` | ~250 | #4189: mov 渡し 301 site の site 単位の表 (call・callee 読み先・access_class・IR 突合)。前半 (250 行まで)。REPORT_SHX-T44 §6 の付録 |
 | `tools/m11/REPORT_SHX-T44_APPENDIX_2.md` | ~60 | #4189: 上記付録の続き (site 表の後半) |
 | `tools/m11/REPORT_SHX-T51.md` | ~50 | #5588 (SHX-T51): base_mismatch 53 site (SSA 値渡し・18 組) の修復範囲の判定 (`frame_share/neighbor_gap.py`)。13 組は alloca 拡幅 (R8) で覆えず、5 組は gap 未測定 (暫定) |
+| `tools/m11/REPORT_SHX-T58.md` | ~115 | #5690 (SHX-T58): SSA 値渡しの残件 5 組 (d26460・e4f310・977f50・441380・6905f0) の修復範囲の確定 (`frame_share/frame_bound.py`)。5 組とも R8 では覆えない (枠超過または親の rbp 域との衝突) |
 | `tools/m11/REPORT_SHX-T48.md` | ~90 | #5576 (SHX-T48): D23 301 site のうち `unmatched` 56・`no_prologue` 3 の site 単位判定 (`frame_share/unmatched_check.py`)。`no_prologue` 3 は `ir_truncated`、`unmatched` 3 は call 欠落 (`function_40b620`)、残りは SSA 値渡し。制御フロー付き走査は子 [SHX-T48] #5575 |
 | `tools/m11/REPORT_SHX-T49.md` | ~70 | #5586 (SHX-T49, 親 #5576): `function_40b620` → `function_40b290` の call 欠落 3 site の機械語・生 grep・RetDec 単体再現による原因特定。機械語は本 run で再確認、IR 側は未再現。修復は子 [SHX-T52] #5591 |
 | `tools/m11/REPORT_N196.md` | ~90 | #3906 (M11-N196, 親 #3142): set_other 非 imm のスタック slot 読込・frame lea の IR 接続判定 (frame 定数 C と stack_var 対応・分類の件数は REPORT 参照)。load_def の誤判定の修正と負例 (`test_setother_slot_class.py`)。接続の注入と未決の接続先は #3932・#3933。分類器 `m11_setother_slot_class.py` |
@@ -331,7 +332,8 @@
 | `tools/m11/REPORT_N3113.md` | 103 | #3113 (M11-N168): 新規範囲内 word の 4 類分類 (A 関数 VA / B 未 remap 疑い / D イメージ由来の LVA コピー / C 他)・分類 B の基準 (run は f3aa9450 で 0 で合格・注入で FAIL)・D の block copy 根拠 (`m11_ptrclass.py`)・survey と `--survey` の negctl 未実行の理由 (wasm が survey 用 export を持たない)・測定 commit からの差分 (§8) |
 | `tools/m11/REPORT_N3129.md` | 106 | #3129 (M11-N170): fresh 再生成 IR (ir_conditions 付き・boot5 込み) で survey 用 wasm (`_m11_set_va_unit_budget` 付き) の survey・run の分類を実測し、分類 B の基準を設定。件数の不一致は #3958。数値は REPORT の §3 が正本 |
 | `tools/m11/REPORT_N3958.md` | 90 | #3958 (M11-N204): run の ptrcheck 件数 69,669 と基準の差を切り分け、`m11_e2e.sh --full` (全再生成) で 69,669 を実測。基準は変えず。数値は REPORT の §2 が正本 |
-| `tools/m11/REPORT_5667.md` | ~76 | #5667 (M11-N255): LB 依存 trap 7 件の wasm offset → 関数名 → faulting 命令 (LB=0 / LB=0x10000 の両 build)・IR 行の対応 (158・745 は未確定)・address 0 の判定は未確定 |
+| `tools/m11/REPORT_5667.md` | ~76 | #5667 (M11-N255): LB 依存 trap 7 件の wasm offset → 関数名 → faulting 命令。291・296・304 は 555 と同じ `function_535c11` の load で、LB=0x10000 でも再現。745・158 の IR 行は未確定。address 0 の判定は未確定 |
+| `tools/m11/REPORT_APPENDIX_5667.md` | ~162 | #5667 の付録: build 指紋 (LB 別の wasm sha256)・`llvm-objdump` 生出力 (555・291・296・304・153・158)・stack 実測の生行・`function_535c11` の IR 差分 0 行の記録・再現コマンド |
 | `tools/m11/REPORT_N3325.md` | 106 | #3325 (M11-N181): LB 依存 unit 差 8 件の切り分け。function_412770 の IR 本体は build で未実行 (手書き C 版 `m11_ov.c` が優先)・unit 40 の halt 分岐の入口・trap 関数 (build ごとの wasm 名) |
 | `tools/m11/REPORT_N189.md` | ~110 | #3574 (M11-N189, 親 #3492): strict 証拠表の行 270・271 (`function_f5cf40`・`function_f5d510`) を真陽性と判定 (間接 call の戻り値に対応する IR 値が無く、件数は vtable ポインタ由来 = D15 の変種)。行 255 の前提は 1060d20・12df530 を確認、区間の間接 call `ea8ad9` は遷移先未確定 (未解決)。判定材料 `trap_triage/judge_3574.py` |
 | `tools/m11/REPORT_N2768.md` | ~185 | #2768 (M11-N155): 寛容起動で skip した unit が trap までに heap へ書いた範囲 (72 unit の表)・上位のリスク評価 (推定)・PR #2752 との環境差。heap 範囲の結論は REPORT §0 を参照。集計は `m11_tolerant_heap.py`・測定は `m11_tolerant.mjs` の `M11_HEAP_FROM`/`M11_HEAP_OUT` |
@@ -387,6 +389,7 @@
 | `tools/m11/trap_triage/REPORT_APPENDIX_5661.md` | ~100 | #5661: strict 候補の証拠表 行 159〜193 (35 件) の件ごとの判定 (真陽性 3・偽陽性 1・保留 31・機械語と IR の突合・未解決)。REPORT_718 §4m の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_4885.md` | ~90 | #4885: 証拠表の行 67・68・71〜74 の件ごとの判定 (母数 13・真陽性 6・偽陽性 0・保留 7)。REPORT_718 §4l の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5660.md` | ~90 | #5660: 証拠表の行 119〜158 (母数 40) の件ごとの突合表。判定 0 件・保留 40 (保留の型 (i)〜(iv))。REPORT_718 §4l の行 119〜158 の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_5689.md` | ~90 | #5689: 証拠表の行 139〜158 (母数 20) の件ごとの判定。確定 0・保留 20 (140・141・143 は別ビルド dsm のみを根拠にしたため保留)。REPORT_718 §4l の行 139〜158 の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` | ~79 | #3498 (PR #3567): strict 候補の証拠表 行 4〜35 (32 件) の件ごとの表・判定規則・未解決 (REPORT_718 §4h の全文。REPORT_718.md の 250 行上限のため分割移動)。判定の内訳は付録 §4h が正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3823.md` | ~67 | #3823: 923 の obj 0x10bd3960 への書込み (全 store 計装・unit 830/880 の 0 書込み)。呼出し鎖は未確定 |
@@ -441,6 +444,7 @@
 | `tools/m11/ldfix/REPORT_484.md` | ~130 | ldfix が 5c0270 の D4 脱落を検出できなかった理由 (F3c の門 G1〜G5) と load→store 脱落の全数監査 (#484) |
 | `tools/m11/ldfix/REPORT_509.md` | ~165 | F3c 門の拡張と LSF 脱落 8 関数 / 11 site の IR 修復、消費者形 (`fix_f3c_use`) の監査、残存誤り (41a670 / 666a60) (#509) |
 | `tools/m11/ldfix/REPORT_510.md` | ~150 | base が引数由来でない load→store (370 site / 169 関数) の判定軸: SSA 対応の静的判定 vs liftdiff 動的差分の実測比較と脱落数 (#510) |
+| `tools/m11/ldfix/REPORT_5693.md` | ~60 | function_439f90 (0x439f90) の IR を機械語どおりに組み直す opt-in pass (`fix_439f90.py`)。judge MISMATCH 13→10 の実測。unit 結果は未測定 (#5693) |
 | `tools/m11/ldfix/REPORT_564.md` | ~60 | escape 済み stack_var 内部 read の undef 化 (AllocateHWnd 52a7f0 の `cmp [TempClass.lpfnWndProc]`)。ldfix F4 の修復 10 関数と RegisterClassW 到達の実測・全数走査 (#564) |
 | `tools/m11/ldfix/REPORT_968.md` | ~50 | D17 修復 pass (rip 相対セルの 2 段 deref 潰れ) の部分達成: 単一 load の 24 関数を修復、残りは子 issue (#968) |
 | `tools/m11/ldfix/REPORT_930.md` | ~100 | 消費者形 pure 残 23 関数 (24 引数) の残件分類 (first-deref-not-entry 18 関数 ほか) とネガコン。survey 到達数は再現未了 (#930) |
@@ -1122,6 +1126,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_4687.md` | ~50 | KH-110 (#4687): Delay の BINOP 残件のうち `_DAT_` グローバル 4 件 (`184162118`・`184162a88`・`184162a98`・`182989380`) を `GTYPE` の `ulonglong` に直した規則 (型不一致 110 → 104・emcc 363 → 357・Gain/Haas/Gate の `.o` 不変)・残件の分類と起票先。測定の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4955.md` | ~50 | KH-136 (#4955): Delay の `FUN_1802ecfc0` (tap_add) の宣言 `param_3`・`param_4` を機械語 (`addps` の 16 byte オペランド) どおり `V128 *` に (`DELAY_RULES` 4 件)。emcc 418 → 416 (型不一致 2 件消滅)・ホスト突合 200,000 試行 mismatches 0・ネガコン FAIL。測定の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4835.md` | ~50 | KH-118 (#4835): Delay の引数数不一致のうち呼出元 `FUN_180fbbfb8` → `FUN_180fbdfcc` の ABI 規則 (`delay 2666`) の根拠 (機械語・callee 宣言)。`FUN_180fcdbfc` → `FUN_180fbde90` は callee 宣言が未確認のため規則にしない (未解決)。根拠の正本 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_5664.md` | ~80 | KH-174 (#5664): Delay の float の符号判定・符号反転 (`(uint)fVar`・`_DAT_182286970`・`_DAT_182286958`) を機械語で 1 件ずつ確認し、ビット列 (`f2u`/`u2f`) で読む `DELAY_RULES` 12 件。emcc error 315 → 315 (silent miscompile のため件数は変わらない)・Gain/Haas/Gate の `.o` 不変。測定の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4900.md` | ~50 | KH-132 (#4900): Delay の `FUN_180fc4590` の `vcvtpd2dq` 下位 lane (`auVar20._0_4_`) を `int` で読む `DELAY_RULES` 2 件 (機械語で確定)。emcc error 343 → 342・型不一致 90 → 89・Gain/Haas/Gate の `.o` 不変。測定の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3849.md` | ~45 | KH-80 (#3849): Delay の型不一致 残件のうち Win API 戻り値 9 件 (`HeapAlloc`・`GetCurrentProcess`・`RtlLookupFunctionEntry`・`RtlPcToFileHeader`) を shim の戻り型 `longlong` で解消 (119 → 110)・Gain/Haas/Gate の `.o` 不変。残り 23 件 (関数ポインタ 9・void 戻り値 7・BINOP 7) は子 issue へ。結果の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3801.md` | ~84 | KH-65 (#3801): Delay の型不一致 187 件の規則。`_DAT_` グローバル 13 件の C 型規則 `GTYPE` (機械語の参照幅で確認) で 187 → 119 (emcc 507 → 439)・Gain/Haas/Gate の `.o` 不変・ネガティブコントロール (NC0/NC1/NC2) は現行値で再測定済み・残件 119 の分類と起票先 (#3837・#3849)。§10-7x の正本 |

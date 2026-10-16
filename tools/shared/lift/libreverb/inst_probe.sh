@@ -29,5 +29,6 @@ grep -qx 'CREATE_NONNULL=1' "$W/inst_probe.out" \
   && grep -q '^SUB_290_NONNULL=1 BUF_NONNULL=1 IDX=0 MASK=0xfff$' "$W/inst_probe.out" \
   && grep -q '^SUB_298_NONNULL=1 BUF_NONNULL=1 IDX=0 MASK=0xfff$' "$W/inst_probe.out" \
   && grep -qx 'FRUITY_SIGNAL=11' "$W/inst_probe.out" \
+  && grep -qx 'OTHER_WRITES=14 PTRVAL_WRITES=4 REGIONS=5' "$W/inst_probe.out" \
   && { echo "[inst] OK: 実測値は REPORT §7 の期待値と一致 (ctor 状態では Process_Fruity が落ちる)"; exit 0; }
 echo "[inst] MISMATCH: REPORT §7 の期待値と違う"; exit 1
