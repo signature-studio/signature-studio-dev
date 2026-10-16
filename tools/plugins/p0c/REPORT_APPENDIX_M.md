@@ -29,7 +29,7 @@
 
 emsdk を導入し (`git clone --depth 1 https://github.com/emscripten-core/emsdk.git` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12`。`tools/m1/flags.sh` の pin と同じ版)、`EMSDK` を設定して `run.sh` を実行した。
 
-- 測定 commit: `2481d3a0e` (HEAD。`EMSDK=/opt/emsdk bash tools/plugins/p0c/f80b_rt/run.sh` を今回の run で実行)
+- 測定 commit: `2481d3a0e` (HEAD。`EMSDK=<[EMSDK] のルート> bash tools/plugins/p0c/f80b_rt/run.sh` を今回の run で実行)
 - `to: n=200000 fail=0`
 - `from: n=200003 fail=0`
 - rc 0・所要 3.2 s real (load 1.1 前後、4 core)
