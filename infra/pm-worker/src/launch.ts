@@ -131,7 +131,7 @@ export function buildLaunchBody(artLine: string, focus?: number, recheck = false
 
 // PM の再投入の意図 (<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->) を、Worker が /oc として投稿してよいか。
 // 書き手の区分 (author): impl = 実装 App、pm = PM App (oc-pm の run の identity。#5146 以降の PM agent)、other = 第三者 (拒否する)。
-// 2026-10-16 の実測 (#5722): #5146 で oc-pm の投稿が実装 App から PM App に変わり、PM の意図が author で全件拒否されていた (counters.intentRejected.author = 70)。
+// #5722: #5146 で oc-pm の投稿が実装 App から PM App に変わり、PM の意図が author で拒否されていた。測定の所在は #5722 の PM 判断コメント。
 export type RelaunchAuthor = "impl" | "pm" | "other";
 // 保存値の互換: 旧版 (#5146 まで) の値は bot (実装 App の投稿か) だけを持つ。author が無ければ bot=true を impl とし、それ以外は other (第三者と同じ扱い)。
 export const relaunchAuthorOf = (r: { author?: RelaunchAuthor; bot?: boolean }): RelaunchAuthor => r.author ?? (r.bot ? "impl" : "other");

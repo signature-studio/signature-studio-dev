@@ -25,7 +25,7 @@ NO_PR_COOLDOWN_H = "1"
 # prio:low の issue の未完了の run の上限 (既定 10。config.ts の DEFAULT_LOW_CAP と同じ)。prio:critical が着手済みか launch 可能な間だけ効く。実行中の run は止めない。
 LOW_CAP = "10"
 # 停止行 (run-outcome の reason が stop / split の issue) を oc-pm の判断キューへ 1 時間に送る件数の上限 (#5722。既定 24)。
-# 滞留する停止行 (2026-10-16: split 333・stop 74 = 407 件) を 1 巡 ~17 時間で判断キューに載せる値。oc-pm の全体の枠 (PM_LIMITS.hourMax = 72) 内で、厳しくするなら 12 などに下げる。
+# 値の根拠と測定は #5722 の PM 判断コメント。oc-pm の全体の枠 (PM_LIMITS.hourMax) の内で、厳しくするなら下げる。
 STOPPED_INTAKE_PER_H = "24"
 # コメントの全体同期は新しい順に 24 時間分を読む。窓内の件数は実測で既定の上限 (80 ページ = 8,000 件) を超える
 # (tools/pm/REPORT_APPENDIX_2380.md) ので、そのままだと全体同期のたびに打ち切りになる。余裕を見て 150 ページ (15,000 件) にする。

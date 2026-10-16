@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { configuredApp, j, markFresh, T0, type Call } from "./helpers.ts";
 import { HUMAN, IMPL_BOT, PM_BOT, at, commentEv, issueEv, outcomeBody, prEv, send, type Ctx } from "./pm_helpers.ts";
-import { DEFAULT_STOPPED_INTAKE_PER_H, PM_INTAKE_GRACE_MS, STOPPED_REF_DAY_MAX, selectDispatch, type HistoryEntry, type PmTarget } from "../src/pm.ts";
+import { DEFAULT_STOPPED_INTAKE_PER_H, STOPPED_REF_DAY_MAX, selectDispatch, type HistoryEntry, type PmTarget } from "../src/pm.ts";
 
 // 停止行 (run-outcome が stop / split) を oc-pm の判断キューへ回す (CI-239・#5722)。
 // (a) 検出: 停止行を oldest-first で回す。no_pr と二重に送らない。実行中・PR あり・親・保留は回さない。
@@ -40,11 +40,13 @@ test("検出 (a): oc:no-pr の未回答は no_pr のまま (二重に送らな�
   assert.equal(t.find((x) => x.kind === "stopped_report")?.at, at(10), "根拠は停止の時刻");
 });
 
-test("検出: PM の回答が猶予 (PM_INTAKE_GRACE_MS = 1 時間) の内側なら stopped_report に回さない", async () => {
-  const ctx = await live();
-  await stopped(ctx, 503, { answerMin: 110 }); // 回答は 10 分前
-  assert.equal(PM_INTAKE_GRACE_MS, 3_600_000);
-  assert.deepEqual(ctx.app.engine.detectPmTargets(), []);
+test("検出: PM の回答から猶予 (PM_INTAKE_GRACE_MS) の内側なら stopped_report に回さず、ちょうど明けたら回す", async () => {
+  const inside = await live();
+  await stopped(inside, 503, { answerMin: 61 }); // 回答は 59 分前 (猶予の内)
+  assert.deepEqual(inside.app.engine.detectPmTargets(), []);
+  const edge = await live();
+  await stopped(edge, 504, { answerMin: 60 }); // 回答は 60 分前 (猶予の明け)
+  assert.deepEqual(edge.app.engine.detectPmTargets().map((x) => `${x.kind}#${x.ref}`), ["stopped_report#504"]);
 });
 
 test("検出: 停止の後に /oc を投稿済み (実行中)・open PR あり・open な子を持つ親・保留ラベルは回さない", async () => {
@@ -105,7 +107,7 @@ test("送信 (b ネガコン): 同じ issue は 24 時間に 3 件まで。4 件
   assert.equal(await step(0), 1, "1 件目");
   assert.equal(await step(61), 2, "61 分後 (同じ (kind, ref) は 60 分に 1 回)");
   assert.equal(await step(61), 3, "122 分後 (3 件目)");
-  assert.equal(await step(61), 3, "183 分後。op:no-pr ではない上限 (STOPPED_REF_DAY_MAX = 3) で止まる");
+  assert.equal(await step(61), 3, "183 分後。停止行の issue 上限 (同じ issue に 24 時間で STOPPED_REF_DAY_MAX = 3 件) で止まる");
   clock.t += 24 * 3_600_000;
   assert.equal(await step(0), 4, "24 時間たてば送る");
 });
