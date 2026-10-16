@@ -19,6 +19,7 @@ static uint64_t g_gpr[4];
 
 #define ITRN 300000
 static uint64_t g_trace_fn, g_trace_on, g_itr_n, g_trace_orig;
+static volatile int g_trace_stop;
 static greg_t g_itr[ITRN][19];
 
 static void itr_record(ucontext_t* uc) {
@@ -43,6 +44,12 @@ static void itr_dump(void) {
     fclose(f);
 }
 
+static void dump_at_exit(void) {
+    if (!g_trace_on) return;
+    g_trace_stop = 1;
+    itr_dump();
+}
+
 static void record(uint64_t a, uint64_t rip) {
     for (int i = 0; i < g_nacc; i++)
         if (g_acc_addr[i] == a && g_acc_rip[i] == rip) { g_acc_cnt[i]++; return; }
@@ -53,6 +60,7 @@ static void on_acc(int sig, siginfo_t* si, void* uc_) {
     ucontext_t* uc = (ucontext_t*)uc_;
     greg_t* g = uc->uc_mcontext.gregs;
     uint64_t a = (uint64_t)si->si_addr;
+    if (sig == SIGTRAP && g_trace_stop) { g[REG_EFL] &= ~0x100; return; }
     if (sig == SIGTRAP && g_trace_fn && !g_trace_on && g[REG_RIP] == g_trace_fn + 1) {
         g_trace_on = 1;
         *(uint8_t*)g_trace_fn = (uint8_t)g_trace_orig;
@@ -131,6 +139,7 @@ int main(int argc, char** argv) {
         mprotect((void*)pg, 4096, PROT_READ | PROT_WRITE | PROT_EXEC);
         g_trace_orig = *(uint8_t*)g_trace_fn;
         *(uint8_t*)g_trace_fn = 0xcc;
+        atexit(dump_at_exit);
     }
     mprotect((void*)ZLO, ZHI - ZLO, PROT_NONE);
     sigaction(SIGSEGV, &sa, NULL);
