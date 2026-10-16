@@ -180,3 +180,21 @@ EXIT=0
 |---|---|---|
 | SC `ResonatorDsp` の vtable 構築経路を静的に読み、KH process の SC 側対応を確定する | Resonator の差分 (C4〜C6) の前提が無い | #4047 (FA-49・親) |
 | Resonator の SC 側実機ハーネス作成 | 同上 (C3 の SC 側) | #4980 (FA-67・#4047 残件) |
+
+## §8. 関数ポインタ表 0x1810d7430 の reader 特定 (#5694 / FA-80・親 #5682・#5628)
+
+- 状態 (2026-10-16 fix): 改修後のスクリプトを実測した。**測定 commit `9f4efb7c9`** (スクリプトの commit。`git diff 9f4efb7c9 HEAD -- tools/targets/freshair/ks_vtable_reader.py` は 0 行)。
+- 旧測定 commit: `51664ee93` (改修前のスクリプトで測った最後のコード commit。旧版はデータセクションを検索せず、`call reg` の近接検査も無かった)。
+- 素材: `work-liftlib-targets` の `SlateCore.core_64` (36,285,952 B、`tools/targets/freshair/work/win/Fresh Air/`)。`$ARTIFACTS_DIR` に `work-liftlib-targets.tar.zst` が実在し、展開して測った。
+- 実測 (`9f4efb7c9`): `python3 ks_vtable_reader.py SlateCore.core_64 0x1810d7430 0x1810d7340`・EXIT=0・`real 66.26 s`・測定直後の load 1 分値 0.96 (測定前 5 分値 0.25)。
+- 表 = vtable A (`0x1810d7340`) の `+0xf0` (slot 30)。検索形式ごとの結果 (`9f4efb7c9` の出力):
+  - 生バイト検索 (全セクション・絶対 qword `0x1810d7430`/`0x1810d7340`・RVA dword `0x10d7430`/`0x10d7340`): **0 件** (`raw byte hits (all sections: abs qword / RVA dword): 0`)。
+  - 実行セクションの絶対値・即値・disp・rip 相対 ea で表を指す命令: **0 件**。
+  - `mov reg,[reg+0xf0]` の直後 4 命令以内の `call reg`: **0 件**。
+  - rip 相対 `lea` で vtable を指すもの (vptr 設定): 3 件。`0x1805ede78` (ctor `0x1805ede50`)・`0x1805edf5a` (`0x1805edf50`)・`0x1805edfba` (`0x1805edfb0`)。いずれも ea = `0x1810d7340` (vtable A の先頭)。
+  - vtable A を設定する ctor の呼出元: `0x1805caef1` (`call 0x1805ede50`) のみ。
+  - `[reg+0xf0]` の読み: 3,090 件 (any base)。うち間接 `call`/`jmp`: 56 件。`0x1805ede50`・`0x1805edf50`・`0x1805edfb0` の内部には `[reg+0xf0]` の間接 call は無い (`0x1805edf1f` の `mov dword ptr [rsi+0xf0], 0x3f800000` は書込み)。
+  - 表近傍 `±0x200` の rip 相対参照 51 件 (`lea` 9・`movsd` 14・`mulsd` 14・`addsd` 3・`movss` 8・`maxss` 2・`addss` 1)。`lea` 9 件の ea は `0x1810d7290`・`0x1810d7258`・`0x1810d72c8`・`0x1810d7340`・`0x1810d73d0`・`0x1810d7478`・`0x1810d7580` で、表 `0x1810d7430` 本体は指さない。浮動小数の読みも表 `0x1810d7430` の値ではない (ea は `…7460`・`…7468` 等の別スロット)。
+- 結論: 表 `0x1810d7430` を**直接**読む reader は、rip 相対・即値・基底+添字の静的形では 0 件で特定できない。読み手は vptr (`this` の vtable 経由) による `[reg+0xf0]` の間接 call/load のみ。reader の関数名は、呼出元が vptr の型 (オブジェクト) に依存するため、静的だけでは確定しない。
+- 限界: `[reg+0xf0]` 3,090 件のうち、どの object の vtable を読んでいるかは未追跡 (型推定なし)。`mov reg,[reg+0xf0]` の直後 4 命令以内の `call reg` は 0 件 (`9f4efb7c9` の実測。旧スクリプトには検査が無かった)。
+- 未解決 (起票先): vptr の型推定 (どのオブジェクトが vtable A を持つか) → #5628 (FA-78) の実行順測定に渡す。
