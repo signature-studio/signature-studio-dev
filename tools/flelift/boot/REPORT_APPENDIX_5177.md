@@ -52,7 +52,7 @@ r1 対 r2 で差が出た 4 KiB ページは 11 枚。image 内 4 枚 (`0x13a500
 |---|---|---|
 | 非決定 9 バイトの書込み元 (関数) の特定 | マスクの根拠が測定値だけで、なぜ非決定かは不明 | #5830 (FLE-48) |
 | C heap / C スタックの非決定ページ (11 枚) の扱い | `full`・`no_cstack` は判定に使えない (従来どおり) | #5830 (FLE-48) |
-| shim 有 (`FLE_IPP=1`) 経路の同じ 8 run 測定 | マスク後の指標が shim 有でも一致するかは未確認 | #5830 (FLE-48) |
+| ~~shim 有 (`FLE_IPP=1`) 経路の同じ 8 run 測定~~ | 解消 (§7・#5865) | — |
 
 受入条件は「原因特定 または 判定指標の策定」の選言で、本 PR は後者を満たす。原因特定は子 issue #5830 (FLE-48、親 #5177) に分離した。
 
@@ -66,3 +66,29 @@ r1 対 r2 で差が出た 4 KiB ページは 11 枚。image 内 4 枚 (`0x13a500
 - 注記: 判定指標の絶対値は、この build (`f39730d3…`) と PR 初版の測定 build (`7aa20126…`) で異なる。build 間で一致する値ではない。判定は run 間一致と検出力で行う。
 - dst buffer `0x12d677d0` (長さ 0x28): 新規 10 run で全 0 (同一)。全 8 run の比較は §4 のとおり未確認で、補助指標は「候補 (未検証)」扱い。
 - `full` の sha256: 新規 10 run で 10 通り (従来どおり判定に使わない)。
+
+## 7. shim 有 (`FLE_IPP=1`) 経路の 8 run 一致 (#5865)
+
+測定 commit: `cf486ff00` (origin/main・コード変更なし。本 PR は REPORT のみ)。
+工程: `fle6_measure.sh` (`FLE_BOOT_RUNS=shim`・`FLE_BOOT_TAG=fle5865`・`FLE_EXTRA_ROOTS` 既定 = 0x6a7b70) で build → `fle_boot.mjs` を `FLE_IPP=1` で 8 回 (r1〜r8)・`FLE_OUTMEM_DUMP`。dump は gitignore の `tools/flelift/boot/work/` に置き、commit していない。素材: `fl-win64` (block00031_PE.bin のみ展開)。emsdk は runner 同梱の `/opt/emsdk` を使用 (`toolchain-emsdk` 素材は展開していない)。判定: `outmem_judge.py` を §4 と同じ NONDET・同じ検出力の確認で実行。
+
+| 項目 | 値 |
+|---|---|
+| build (gen-A / lift / clang-plain) | 5 s / 63 s / 75 s。`fle6_measure.sh` の shim 段は rc 3 (下記) |
+| boot 前の load | 2.07 (clang-plain 完了時) |
+| boot 結果 (8 run 全て同一) | units_run 209・units_total 942・stopped_at 209・boot_threw `exit`・`ipp_ptr_15F34A0=0x0` |
+| IPP 判定 | NG (rc 3)。`REPORT.md` の既知 (shim 有 + root 有の IPP 判定 NG) と同じ |
+| 線形メモリ | 905,969,664 B / run |
+
+判定結果 (`outmem_judge.py`):
+
+- 8 run の判定指標は全て `891b29801d1bd50a` で一致 (`全 8 run で一致 = True`)。
+- 検出力: マスク外 `0x13a5020` の 1 バイト反転で指標が変わる (`True`)。
+- `RESULT PASS` (rc 0)。
+
+注記:
+
+- 判定指標の絶対値は build ごとに違う (§4・§6 の `7aa20126…`・`f39730d3…` と別値)。run 間一致と検出力だけを根拠にする。
+- 停止点 (units 209) は shim 有の既知の値で、本 PR で変えていない。既定経路の 895 units とは別経路 (shim 有は 209 で停止する)。
+- 製品 KPI: 起動の進行 (FLEngine dispatch・通過 unit) は本 PR で変えていない。測定は shim 経路の再現で、既定経路の KPI は動かしていない。
+- `full` (線形メモリ全体) は shim 有でも判定に使わない (従来どおり)。
