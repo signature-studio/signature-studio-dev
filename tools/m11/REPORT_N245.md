@@ -40,12 +40,12 @@
 | 全関数変換 (`M11_XMM_ARGS=1`・fixed=46) | 2 | 873 | 21 | 47 | 1 | 0 |
 
 - base と全関数変換は 2 回ずつ一致し、どちらも 873。
-- sigfix40c の 4 variant は 135。同じ IR 系統でも、only40c の差し替えを入れた build だけが 135 に落ちる。
+- sigfix40c の 4 variant とも 135。base 873 との差の原因は未特定 (§4 参照)。
 
 ## 4. 落とし穴 (計測中に見つけたこと)
 
-- `m11_build.sh` は `work/xmm_args.stamp` が `M11_XMM_ARGS` の値と合わないと `boot_final.xa.ll` を `fix_xmm_args.py` の全関数変換版で作り直す (171 行付近の `xmm_args.stamp` 判定)。差し替えた variant をそのまま `boot_final.xa.ll` に置いて build すると、variant ではなく全関数変換の IR で build される。最初に取った `873/1/47/21/0` の値は、この全関数変換の IR によるものだった (ログに `fix_xmm_args] fixed=46` が出る)。以後の値 (135) は差し替えた variant の IR で build したもの。
-- 対策: `m11_sigfix_repro.sh` は build 前に `xmm_args.stamp` を `1:` に合わせ、build 後に `cmp` で `boot_final.xa.ll` が variant と一致することを確認する (不一致なら `ERROR` を出す)。ERROR は本測定では出ていない。
+- `m11_build.sh` は `work/xmm_args.stamp` が `M11_XMM_ARGS` の値と合わないと `boot_final.xa.ll` を `fix_xmm_args.py` の全関数変換版で作り直す (171 行付近の `xmm_args.stamp` 判定)。差し替えた variant をそのまま `boot_final.xa.ll` に置いて build すると、variant ではなく全関数変換の IR で build される。最初に取った `873/1/47/21/0` の値は、この全関数変換の IR によるものだった (ログに `fix_xmm_args] fixed=46` が出る)。以後の値 (135) は差し替えた variant の IR で build したもの。最初に取った 873 が全関数変換の IR によるものだったという点は、ログ未保存のため未確認。
+- 対策: `m11_sigfix_repro.sh` は build 前に `xmm_args.stamp` を `1:` に合わせ、build 後に `cmp` で `boot_final.xa.ll` が variant と一致することを確認する (不一致なら `ERROR` を出す)。ERROR は本測定では出ていない (ログ未保存のため未確認)。
 - only40c の IR は素材系 IR と 5,692 行違う。スタック変数の alloca 型 (`[40 x i64]` → `i64` 等) まで変わっており、`fix_xmm_args.py --only-funcs` の変換が想定より広く効いている可能性がある。変換範囲は #5482 で明記してから比較する。
 - 4 variant の survey が unit 単位まで同一で IR sha は互いに異なるため、variant の差し替えが survey に効いていない可能性がある。本 REPORT の数値だけでは切り分けられない (#5482 で確認する)。
 
