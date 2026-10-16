@@ -117,7 +117,7 @@ FL_WIN64_DIR=<展開先> python3 hs_store_supplier.py # REPORT_4130 §2 の 11 �
 
 ## 9. #5626 (PLG-P0b-62) の追記: `[0x141d6b8]` の書込み元 (PE 内)
 
-測定 commit: `a8c9a2199` (`hs_init_callers.py` を追加した commit)。素材: `fl-win64` (`extracted/*_PE.bin` 313 件)。
+測定 commit: `0b58ea911` (`hs_init_callers.py` を追加した commit)。素材: `fl-win64` (`extracted/*_PE.bin` 313 件)。
 
 - `pe_xref.py 141d6b8,15e4790` (全 `.text*`・5,022,467 命令・real 62.6 秒): `0x15e4790` への格納は 0 件 (参照は load 2,422 件)。`0x141d6b8` への格納は **2 件**: `0x976aad` (`mov [rip+0xaa6c04],rax`) と `0x976b10` (`mov [rip+0xaa6b9d],0`)。
 - `0x976aad` は `0x976a90` (初期化関数) の中で、作成関数 `0x976b60` の戻り値を格納する。`0x976b10` は `0x976af0` (teardown 側) で 0 を格納する。
