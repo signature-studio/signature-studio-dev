@@ -75,6 +75,7 @@
 | `tools/perf/PERF.md` | ~150 | 性能の設計メモ (bit-exact 版の実測は `tools/perf/REPORT.md` §2.1・完走路の正本は `tools/ott/REPORT.md`) |
 | `tools/perf/REPORT_APPENDIX_3959.md` | ~70 | PERF-P25 (#3959): AudioWorklet 上の instantiate 掃引 (Chrome 154 で M=145 成功・M=146 無応答 3 run)。#3959 の受入の正本。146 回目の ctor (`0x18011d400`) が同一 instance で戻らない (原因は未特定、子 #4392)。147 以上の単調性・Node 掃引は未確認 |
 | `tools/perf/REPORT_P15.md` | ~180 | PERF-P15 (#990): 実 OTT の Chrome Memory 本数上限 (124〜125) に対する instance 数の設計。1 Memory に plugin 処理オブジェクトを畳み込む方式 (a) を採り、M=130 を 1 instance で駆動 (署名 130/130 一致)。AudioWorklet 上の M=130 駆動を §7 で実測 (#1259)。異なる plugin の同居は #2963 [PERF-P20] |
+| `tools/perf/REPORT_APPENDIX_3680.md` | ~50 | PERF-P23 (#3680): Fresh Air と OTT を 1 link・1 Memory の wasm に畳む (`build_fold.sh`)。畳み込み後の署名 `5e5287b5` / `6b1696f0` 一致・NC 2 種・定義シンボルの重なり 0 件。REPORT_P15 §8 の付録 |
 | `tools/perf/REPORT_APPENDIX_4732.md` | ~40 | PERF-P27 (#4732): Fresh Air の再 lift (impbase `0x1F00000`・`fa_` 改名)。単独署名 `5e5287b5` 一致・定義シンボルが OTT と重ならない。REPORT_P15 §8 の付録 |
 | `tools/perf/REPORT_P8.md` | ~230 | PERF-P8 (#166): plugin 別 module/instance/memory vs MAIN/SIDE_MODULE 動的リンクの合成カーネル比較 (node + Chrome 154 Worker)。`tools/perf/REPORT.md` §5 項目 7 から参照 |
 | `tools/perf/REPORT_P7.md` | ~60 | PERF-P7 (#165, 部分達成): Chrome headless/headful(Xvfb)/Firefox 157 の compile・上限・code cache・AudioWorklet 駆動の実測 + 実機未測の起票依頼 |
@@ -1035,7 +1036,7 @@
 | `tools/shared/lift/ildsp/REPORT_LIFT.md` | ~100 | ildsp vtable 転送先 0x161fc0 の closure lift の前段 (T-SH-61 #3299): 3 候補の選定実測・RetDec 範囲指定・gen_helpers の停止点。wasm 化と差分テストは子 issue。測定値の正本。再現は `lift_vtable.sh` |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_3276.md` | ~65 | ildsp WaveformColouring の native 確定 (T-SH-59 #3276)。結論・手順・実測・ネガティブコントロール・未解決の全文 (`REPORT.md` §5-4・§5-5 から参照)。harness は `native_ref_wc.c` (入力は `native_image.py`)。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_4230.md` | ~75 | ildsp CreateInstance 間接 call 4 件の到達 (T-SH-103 #4230・部分達成): 正の対照 (`0x1ac9ce`・`0x1aedc0` 入口) つきの実測、alloc 失敗注入と巨大 rdx の結果、既定入力の発火の非決定性、未解決の起票先 (#4289)。REPORT_CLOSURE.md §4.5 から参照。測定値の正本 |
-| `tools/shared/lift/ildsp/REPORT_CI.md` | ~150 | ildsp GeneralPitchShifter_CreateInstance 単独 closure の RetDec 入力・census・閉包の取りこぼし・ネガティブコントロール (T-SH-62 #3300)。§7 は SSE store の復元 (T-SH-103 #4229)、§8 は emcc の obj 化と間接 call 2 件の trap 化 (T-SH-65 #3318) の結論 1 行と付録への参照。測定値の正本 |
+| `tools/shared/lift/ildsp/REPORT_CI.md` | ~150 | ildsp GeneralPitchShifter_CreateInstance 単独 closure の RetDec 入力・census・閉包の取りこぼし・ネガティブコントロール (T-SH-62 #3300)。§7 は SSE store の復元 (T-SH-103 #4229)、§8 は方針の決定と census の検出 (T-SH-153 #5749)、§9 は wasm リンクと外部グローバル (T-SH-152 #5748)、§10 は emcc の obj 化と間接 call 2 件の trap 化 (T-SH-65 #3318) の結論 1 行と付録への参照。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_3318.md` | ~70 | ildsp CreateInstance (T-SH-65 #3318・部分達成) の付録: `uselistorder` 除去と emcc obj 化の gate・間接 call 2 件の trap 化・ネガティブコントロール・リンク時の未解決シンボル 14 件の内訳。測定値の正本 |
 | `tools/shared/lift/rex/REPORT.md` | ~75 | REX Shared Library (win `block24351_PE.bin`) の export 14 本の閉包測定 (T-SH-11 #153): 関数数・命令数・間接 call・import・`.pdata` 無しの近似。lift は未実施 (#2733・#2734)。測定値の正本。再現は `rex_closure.py` |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2870.md` | ~50 | rex REPORT §9 全文 (T-SH-46 #2870: 成功経路 (戻り値 1 / 3) と arena 書込の一致・落ちる case の分類・未解決) |

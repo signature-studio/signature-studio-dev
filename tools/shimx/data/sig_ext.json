@@ -12,5 +12,6 @@
  "FreeLibrary": {"ret": "zext", "why": "ret = BOOL (0/1, shimx module.c)。非負"},
  "GetModuleHandleW": {"ret": "zext", "why": "ret = HMODULE (shimx module.c は 0 か 32bit 擬似ベース)。非負"},
  "GetModuleHandleExW": {"ret": "zext", "why": "ret = BOOL (0/1, shimx module.c)。非負"},
- "FlsSetValue": {"ret": "zext", "why": "ret = BOOL (0/1, shimx teb.c)。非負"}
+ "FlsSetValue": {"ret": "zext", "why": "ret = BOOL (0/1, shimx teb.c)。非負"},
+ "GetCurrentProcess": {"ret": "sext", "why": "ret = 擬似ハンドル (HANDLE)-1 (shimx thread.c)。native 側は rax = 0xffffffffffffffff (tools/targets/kilohearts/snapins/lift/gen_stubs_sigs.py) の 64bit -1 で、sext が保つ。zext だと 0x00000000FFFFFFFF となり native と不一致。呼出 site (phaser/delay/limiter) は全件、rax→rcx 経由で TerminateProcess の第 1 引数 (handle, i32 trunc) に渡るだけで、下位 32bit は sext/zext で同じ 0xFFFFFFFF"}
 }

@@ -173,6 +173,44 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 | 計算ジャンプ表の経路 (n = 1〜16) を IR に戻す (RetDec 内部の段は未確認) | 1〜16 バイトの書込みの欠落 (census は FAIL で検出中) | [T-SH-65] #3318 |
 | 直接 jcc 先 function_1801aef40 の誤モデル (jcc を call として扱う) | 範囲・意味論。閉包を変えると wasm 化の前提が変わる | [T-SH-65] #3318 |
 
-## 9. emcc の obj 化と間接 call 2 件の trap 化 (T-SH-65 #3318・部分達成)
+## 9. wasm リンクと外部グローバル (T-SH-152 #5748)
+
+結論: `ci_lift.sh` の出力を wasm にリンクすると、未解決は IAT 10 種 (#5747) と直接/画像内の呼び出し先 2 種 (閉包の取りこぼし #5749) の集合だけになる。外部グローバル 2 種と `__stack_pointer` はリンクが通った。ただし外部グローバルの画像上の敷設は未決 (§9-2)。
+
+### 9-1. 実測 (`ci_link.sh`・rc 1 = 期待どおりの未解決)
+- 測定 commit: `9f3c2a969` (コードを変えた最後の commit。`ci_link.sh` のコメント 1 行と本節の更新)。`ci_lift.sh`・`ci_link.sh` はこの HEAD で実行した。`git diff 332faf055 9f3c2a969 -- tools/shared/lift/ildsp tools/shared/lift/libreverb` の差分は `ci_link.sh` のコメント 1 行のみ (実行されるコードは同じ)。
+- 旧 head `5afe607d0` の値 (main 取り込み前・census 検査なし): `ci_lift.sh` rc 0 (ALL OK)・`ci_link.sh` 1.09 s。現 head では成り立たない。
+- 素材: 素材置き場に `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` の 3 件が実在した。`tar --zstd -xf` で `$RUNNER_TEMP/art` に展開 (`extracted/block24360_PE.bin`・`retdec/bin/retdec-decompiler`・`emsdk/emsdk_env.sh` の実在を確認)。
+- 入力の生成 (手順): ① `FL_WIN64_DIR=$RUNNER_TEMP/art RETDEC_BIN=$RUNNER_TEMP/art/retdec/bin/retdec-decompiler bash tools/shared/lift/ildsp/ci_lift.sh` → **rc 1** (2.9 s)。census の `[census] FAIL` (範囲外 define 9 件が IR の call から未参照) で止まり、`ci.rs_norm.ll`・`ci_helpers.c` は作られない。`ci.rs.ll` までは作られる。② 続けて次の 2 行を流す (`ci_lift.sh` の残り手順と同じコマンド):
+  ```
+  python3 tools/shared/lift/libkio/ir_normalize.py tools/shared/work/lift/ci/ci.rs.ll tools/shared/work/lift/ci/ci.rs_norm.ll
+  python3 tools/shared/lift/libreverb/gen_helpers.py tools/shared/work/lift/ci/ci.rs_norm.ll tools/shared/work/lift/ci/ci_helpers.c
+  ```
+  → 両方 rc 0 (`[gen_helpers] 4 helpers (int3:1, movq:1, punpcklbw:1, sfence:1)`)。
+- census の出力 (現 head): `範囲 36 関数 / define 45 (範囲外の追加 define 9・IR 内の call 参照 0 件)`・`FAIL: 範囲外の define が IR のどの call からも参照されない` (9 件: function_1801af090 ほか 8 件)。
+- 未設定時: `env -u EMSDK_ENV bash tools/shared/lift/ildsp/ci_link.sh` → rc 1 (`EMSDK_ENV を設定` のエラーで停止し、リンクは走らない・現 head で確認)。
+- `ci_link.sh` (`EMSDK_ENV=$RUNNER_TEMP/art/emsdk/emsdk_env.sh`) → **exit 0**・wasm-ld rc 1 (期待どおりの未解決) / 想定外 0 件。実行 (commit `9f3c2a969`): 0.69 s (`ci.o` 等を再生成)。初回 (旧 `332faf055` の作業ツリーで実行) は 14.0 s で、emsdk の sysroot キャッシュ生成を含む。
+- `ci_lift.sh` (`9f3c2a969`) → rc 1 (census FAIL・§8-2 で意図どおり)。`ci.o` の未定義シンボルは `llvm-nm -u` で 19 件 (IAT 10・呼び出し先 2・`__asm_*` 4・`__stack_pointer`・`global_var_1803f6610`・`__unnamed_1`)。
+- 手順: `grep -v '^  uselistorder'` で行頭 2 空白の 137 行を除く (IR 全体の uselistorder は 174 行)。emcc 6.0.12 の LLVM が `uselistorder` を読めず `wrong number of indexes, expected 4` で止まるため。`ci.ll` → `emcc -c -O1` → `ci.o`。`ci_helpers.c` → `helpers.o`。
+- 未解決の一覧 (`link.log` の `undefined symbol` 行の件数。計 153 行): IAT (EnterCriticalSection 11・FlsGetValue 2・FlsSetValue 4・GetLastError 53・HeapAlloc 3・HeapFree 52・LeaveCriticalSection 11・RaiseException 5・RtlPcToFileHeader 5・SetLastError 1 = 10 種 147 行)、呼び出し先 (function_1801aef40 1・function_1801cb600 5 = 2 種 6 行)。
+- `ci.o` の未定義シンボル (`llvm-nm -u`、emsdk 同梱。ホストの `nm` は wasm を読めない) は 19 件: IAT 10 種・呼び出し先 2 種・`__asm_int3`/`__asm_movq`/`__asm_punpcklbw`/`__asm_sfence` 4 種・`__stack_pointer`・`global_var_1803f6610`・`__unnamed_1`。旧記述の内訳 (20 件) は `__unnamed_1` を外部グローバル 2 種 (`global_var_1803f6610`・`__unnamed_1`) とは別に数えて二重計上していた。正しくは 19 件。
+- `__asm_*` 4 種が EXPECT に無いのに exit 0 になる根拠: `helpers.o` (`ci_helpers.c` から gen_helpers.py が生成) が `__asm_int3`・`__asm_movq`・`__asm_punpcklbw`・`__asm_sfence` を `T` (定義) で持つ (`llvm-nm --defined-only helpers.o`)。よって wasm-ld の未解決は出ず、`undefined.txt` にも現れない。`__stack_pointer` は emcc が供給、`global_var_1803f6610`・`__unnamed_1` は shim.o が定義 (`llvm-nm --defined-only shim.o`)。
+- 検証: `ci_link.sh` の判定は wasm-ld のリンクエラー行だけを数える。期待集合 (IAT 10 種 + 2 種) 以外が出ると exit 1、出なければ exit 0。
+
+### 9-2. 外部グローバルの意味 (未決)
+- `global_var_1803f6610` (`external global i64`): VA `0x1803f6610` = RVA `0x3f6610` は `.data` の中。`.data` の初期値は 8 byte `0x1803f66a8` (`.data` 内の `global_var_1803f66a8` を指すポインタ)。IR は `icmp eq i64 %4, ptrtoint (ptr @global_var_1803f6610 to i64)` と `load i64, ptr @global_var_1803f6610` で読む。つまり画像内の 1 cell として敷設すれば、IR の意味 (cell の内容 = ポインタ値) と一致する。RetDec が `.data` の他のグローバルを `global` として出すのと同じ形。
+- `@0` (`external global i32`): `ret i64 ptrtoint (ptr @0 to i64)` が 3 箇所 (`function_1801aedc0`・`function_1801bb414`・`function_1801bb468` の末尾)。IR に定義が無い。画像上の該当 VA は未特定。
+- 敷設方式 (案・未実装): `wc_image.py` は PE 全体を VA 0x30000000 に敷設するので、`global_var_1803f6610` の cell (RVA 0x3f6610) は画像の中に既にある。C 側で別の cell を作ると、画像の `.data` の値 (`0x1803f66a8`) と食い違う。よって IR の `@global_var_1803f6610` を「画像基底 + 0x3f6610」に置き換える方式を案とする。`@0` は画像上の VA が未特定のため、同じ方式は決められない (実体の特定が先)。実装は ir_normalize の段で行う必要があり、本 run では行っていない。
+- 仮置きの効果: shim は cell を 0 初期化 (`global_var_1803f6610` は 0)。したがって仮置きのままでは `icmp eq` の比較対象が変わる。**リンクが通ることと、意味が正しいことは別**。意味の確認 (native との差分) は #3320 の範囲。
+
+### 9-3. 残り (起票先)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 外部グローバル 2 種の画像敷設 (`global_var_1803f6610` は `.data` の cell、`@0` は実体未特定) | リンクは通るが、仮置きの値で意味が変わりうる | 本 issue の範囲 (敷設方式を決めるのは次の子 or #3318) |
+| `uselistorder` 行 (174 行) を emcc が読めない | ci_link.sh は行を除いて回避。ir_normalize の対応が必要 | [T-SH-65] #3318 |
+| IAT 10 種 | 未解決 (リンクエラー) | #5747 |
+| 閉包の取りこぼし (function_1801aef40・function_1801cb600) | 未解決 (リンクエラー) | #5749 |
+
+## 10. emcc の obj 化と間接 call 2 件の trap 化 (T-SH-65 #3318・部分達成)
 
 結論: `uselistorder` (順序メタ情報) を除いた IR は emcc で obj 化でき、間接 call 2 件 (`function_1801cb5e0`・`function_1801cb600`) は trap 定義を入れた (検査は実 RetDec 出力の `declare i64 @<name>(i64)` に合わせた)。wasm のリンク・実行は未実施で、IAT 10 種 (#5747)・外部グローバル 2 種 (#5748)・範囲外の直接 call 先と計算ジャンプ表 (#5749) が残る。trap 化の理由: 2 件の宛先は CFG/XFG dispatch 経由で実行時の `rax` になり、IR の固定名 declare からは一意に決まらない (slot 0x268260・0x268268、呼出し元 0x1aedf6・0x1b6f6c。到達実測は #3250)。詳細と実測は `REPORT_APPENDIX_3318.md`。現 head `63f896abe` では `ci_lift.sh` 全体は census の orphan 検査で rc 1 (§8-2 の意図した結果)。census 以降の後段は単独実行で rc 0 (付録 §3)。
