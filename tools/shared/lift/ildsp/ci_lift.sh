@@ -41,3 +41,16 @@ with open(sys.argv[2], "w") as fh:
 print("[ci] traps: " + ", ".join(names))
 PY
 emcc -c -O1 -w "$W/ci_traps.c" -o "$W/ci_traps.o"
+# IAT 10 種の stub (REPORT_APPENDIX_3276 と同じ規約)。IR に宣言があるかを名前で照合してから obj 化する (T-SH-151 #5747)。型は照合しない (REPORT_APPENDIX_3318 §5-1)。
+python3 - "$W/ci.emc.ll" "$HERE/ci_iat.c" <<'PY'
+import re, sys
+ir = open(sys.argv[1]).read()
+names = ["GetLastError", "SetLastError", "EnterCriticalSection", "LeaveCriticalSection", "HeapAlloc",
+         "HeapFree", "FlsGetValue", "FlsSetValue", "RaiseException", "RtlPcToFileHeader"]
+for n in names:
+    if not re.search(r"^declare \S+ @%s\(" % n, ir, re.M):
+        sys.exit("[ci] IAT not declared in IR: %s" % n)
+print("[ci] iat stubs (名前の照合のみ): " + ", ".join(names))
+PY
+emcc -c -O1 -w "$HERE/ci_iat.c" -o "$W/ci_iat.o"
+echo "[ci] iat obj OK"

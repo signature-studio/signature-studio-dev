@@ -65,6 +65,15 @@ trap 検査部分 (`ci_lift.sh` の python ブロックそのもの) を、現 h
 
 注: 間接 call の宛先 2 件 (`function_1801cb5e0`・`function_1801cb600`) は `ci_traps.o` の trap で定義済み。リンクは未実施 (wasm 化は #3318 に残す)。
 
+## 5-1. IAT 10 種の stub (T-SH-151 #5747)
+- 方針: C 実装の stub (`ci_iat.c`)。wasm import にはしない。規約は `REPORT_APPENDIX_3276.md` と同じ: `HeapAlloc` は calloc、`RtlPcToFileHeader` は ImageBase (`ci_iat_set_image_base` で設定。未設定の間は NULL)、`RaiseException` は記録して非 0 終了 (exit 3) で停止、それ以外は 0 を返して呼出し回数を数える (`ci_iat_count`)。`GetProcessHeap` は stub に含めない (本 closure の IAT 10 種の外)。
+- 0x1aee04 (RtlPcToFileHeader)・0x1aee4a (RaiseException) の扱い: `REPORT_APPENDIX_3346.md` §3 の既定案のとおり IAT 静的として IAT stub 側で扱い、trap の対象からは外す。ただし **PM agent の判断待ち**: #3318 の受入 3 から 0x1aee04・0x1aee4a を外してよいか。既定案は IAT 静的 (trap 対象外)。判断の記録は repo に無い (本 PR の時点で未決)。
+- 宣言の照合: `ci_lift.sh` は IR の宣言を名前で照合する (`^declare \S+ @<name>\(`)。型は照合していない。IR の declare 10 件の型と `ci_iat.c` の型の一致は、RetDec 出力 (`ci.rs.ll`) を要する実測のため本 runner では未検証。
+- 受入 3 の thunk 4 件: IR 上で `function_1801b932c`・`function_1801b9334`・`function_1801bb414`・`function_1801bb468` は IAT 名 (`FlsGetValue`・`FlsSetValue`・`EnterCriticalSection`・`LeaveCriticalSection`) を直接呼ぶ。IAT stub の対象に含まれる。
+- `RaiseException` の停止は、`wc_glue.c` の `imp_RaiseException` (`STUB_RET(0)`) とは別経路 (ildsp CreateInstance 側)。`wc_glue.c` は変えていない (WaveformColouring の既存の測定値を変えないため)。
+- 実測 (`ci_lift.sh` 手動段・`$RUNNER_TEMP` の展開物): census 以降の段 (`ir_normalize.py`・`gen_helpers.py`・uselistorder 除去・`emcc -c`・trap 検査・`ci_iat.c` の宣言照合と obj 化) を順に実行し、すべて rc 0。未解決シンボルは §5 の表を参照 (IAT 10 種は解決済み)。
+- `ci_lift.sh` 全体は census の FAIL (§3 実測 1・計算ジャンプ表の経路の欠落) で rc 1 のまま。修復は #3318 の未解決 (このスクリプトの変更は census より後段のみ)。
+
 ## 6. 検証範囲 / 範囲外
 - 範囲: IR を emcc で obj 化できること・trap 定義の生成と検査。
 - 範囲外: wasm のリンク・実行、IAT の意味、閉包の取りこぼし (a)(b)、分岐複製の扱い (受入 4)、native 差分。
