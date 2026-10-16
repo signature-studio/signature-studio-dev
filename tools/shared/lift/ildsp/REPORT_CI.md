@@ -180,7 +180,7 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 ### 9-1. 実測 (`ci_link.sh`・rc 1 = 期待どおりの未解決)
 - 測定 commit: `9f3c2a969` (コードを変えた最後の commit。`ci_link.sh` のコメント 1 行と本節の更新)。`ci_lift.sh`・`ci_link.sh` はこの HEAD で実行した。`git diff 332faf055 9f3c2a969 -- tools/shared/lift/ildsp tools/shared/lift/libreverb` の差分は `ci_link.sh` のコメント 1 行のみ (実行されるコードは同じ)。
 - 旧 head `5afe607d0` の値 (main 取り込み前・census 検査なし): `ci_lift.sh` rc 0 (ALL OK)・`ci_link.sh` 1.09 s。現 head では成り立たない。
-- 素材: `$HOME/artifacts` に `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` の 3 件が実在した。`tar --zstd -xf` で `$RUNNER_TEMP/art` に展開 (`extracted/block24360_PE.bin`・`retdec/bin/retdec-decompiler`・`emsdk/emsdk_env.sh` の実在を確認)。
+- 素材: 素材置き場に `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` の 3 件が実在した。`tar --zstd -xf` で `$RUNNER_TEMP/art` に展開 (`extracted/block24360_PE.bin`・`retdec/bin/retdec-decompiler`・`emsdk/emsdk_env.sh` の実在を確認)。
 - 入力の生成 (手順): ① `FL_WIN64_DIR=$RUNNER_TEMP/art RETDEC_BIN=$RUNNER_TEMP/art/retdec/bin/retdec-decompiler bash tools/shared/lift/ildsp/ci_lift.sh` → **rc 1** (2.9 s)。census の `[census] FAIL` (範囲外 define 9 件が IR の call から未参照) で止まり、`ci.rs_norm.ll`・`ci_helpers.c` は作られない。`ci.rs.ll` までは作られる。② 続けて次の 2 行を流す (`ci_lift.sh` の残り手順と同じコマンド):
   ```
   python3 tools/shared/lift/libkio/ir_normalize.py tools/shared/work/lift/ci/ci.rs.ll tools/shared/work/lift/ci/ci.rs_norm.ll
