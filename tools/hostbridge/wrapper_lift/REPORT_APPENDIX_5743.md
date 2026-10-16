@@ -104,9 +104,9 @@
 
 ## 4d. disable 名の形式の訂正 (#5911)
 
-- 測定 commit: 本 PR のコード commit (`retdec_opt_names.txt` と `notloop_*.sh` の注記)。素材 `toolchain-retdec` (RetDec v5.0)・`toolchain-emsdk` (6.0.12)・`fl-win64` (`extracted/block19091_PE.bin`)。`$RUNNER_TEMP` に展開。
-- 名前の形式: `--backend-disabled-opts` は `getId()` 由来の CamelCase に `Optimizer` を付けたクラス名 (`EmptyStmtOptimizer` など) を受け付ける。snake_case の `*.h` 名 (`empty_stmt_optimizer` など) は無視され、無効化が効かない。
-- 32 種の出どころ: `include/retdec/llvmir2hll/optimizer/optimizers/` の `class <Name>Optimizer` 宣言 (`Sub` 付きの 11 種は別クラスなので除外)。`retdec_opt_names.txt` に収録。`LLVMIntrinsicsOptimizer`・`WhileTrueToUForLoopOptimizer` は `getId()` の綴り (`LLVMIntrinsics`・`WhileTrueToUForLoop`) と、クラス宣言の綴りが一致する。
+- 測定 commit: `57ab526a0` (本 PR のコード commit。測定後のコード変更なし)。素材 `toolchain-retdec` (RetDec v5.0)・`toolchain-emsdk` (6.0.12)・`fl-win64` (`extracted/block19091_PE.bin`)。`$RUNNER_TEMP` に展開。
+- 名前の形式: `--backend-disabled-opts` は CamelCase のクラス名 (`EmptyStmtOptimizer` など) を受け付ける。snake_case の `*.h` 名 (`empty_stmt_optimizer` など) は無視され、無効化が効かない。クラス名は `getId()` の値に `Optimizer` を付けたもの (例: `LLVMIntrinsics` → `LLVMIntrinsicsOptimizer`、`WhileTrueToUForLoop` → `WhileTrueToUForLoopOptimizer`)。
+- 32 種の出どころ: GitHub master の `optimizers/` 直下の `class <Name>Optimizer` 宣言 32 件 (`Sub` 付きの 11 種は別クラスなので除外)。`retdec_opt_names.txt` に収録。本 run で確認できたのはこの 32 件の一致のみで、RetDec v5.0 の `*.h` 直接の照合は行っていない。
 - 実測 (同 commit・単一 range、件数は `emcc -fsyntax-only` の `not in loop`):
 
 | 組 | 変種 | 注釈 `// <飛び先>` | `not in loop` |
@@ -120,9 +120,10 @@
 | 同 | snake_case 32 種 全 disable | 0 | 1 |
 | 同 | VarDefStmtOptimizer 単独 | 1 | 1 |
 
-- `notloop_minset.sh` (CamelCase 32 種・所要 75.3 s): 0x732ae0 → `EmptyStmtOptimizer,WhileTrueToWhileCondOptimizer`。0x408770 → `VarDefStmtOptimizer` (範囲 `0x408770-0x4087f3` は本測定での推定。§4b の範囲とは別)。
+- `notloop_minset.sh` (CamelCase 32 種・所要 75.3 s): 0x732ae0 → `EmptyStmtOptimizer,WhileTrueToWhileCondOptimizer`。0x408770 は範囲 (`lo-hi`) が未確定のため結果は採らない (§4b line 103 と同じ扱い)。
 - `notloop_minset_err.sh` (CamelCase 32 種・所要 81.9 s): 0x732ae0 → `WhileTrueToWhileCondOptimizer` 単独。
-- 解釈: 注釈の消失は、CamelCase で渡せば §4b の結論どおり (0x732ae0 は 2 段の組み合わせ、0x683120 は VarDef 単独で戻る)。snake_case で渡した過去の測定は無効。§4b の全 disable 結果 (12/12 戻る) は、§4b が渡した形式を確認していなかったため、再確認が要る (下記)。
+- 解釈: 注釈の消失は、CamelCase で渡せば §4b の結論どおり (0x732ae0 は 2 段の組み合わせ、0x683120 は VarDef 単独で戻る)。snake_case は無視されるので、snake_case で渡した測定は無効化が効いていない。
+- 過去の測定の有効性: 全 32 種の過去測定 (§4b の 12/12) は、渡した形式が未確定のため有効性は未確定。単一名の過去測定 (`dis_empty` = `EmptyStmtOptimizer`、`dis_wtwc` = `WhileTrueToWhileCondOptimizer`、`notloop_vardef.sh` = `VarDefStmtOptimizer`) は CamelCase で渡しており有効。VarDef 単独で注釈が戻る結果 (§4c・§4d) も、この形式で得られた。
 - 過去 PR (#5833・#5872・#5890) の diff には名前一覧が含まれず、渡した形式は diff からは確定できない。
 - 未確認: 残り 16 種 (§3 の 48 個との差) の名前。`WhileTrueToUForLoop` 等の綴りの扱いは、クラス宣言と `getId()` の両方で一致したが、RetDec の内部一覧 (`optimizerManager`) 自体は未読。12 組の入力範囲は未収録のまま。
 
