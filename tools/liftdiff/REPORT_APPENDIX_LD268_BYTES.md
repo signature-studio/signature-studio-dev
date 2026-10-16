@@ -12,7 +12,7 @@
 
 ## 1. 測定条件
 
-- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開・`FL_WIN64_DIR`)。`work-m11`・`work-liftdiff` は worktree 内へ tar で展開。`toolchain-emsdk` は `$RUNNER_TEMP/emsdk` にも展開したが、build は `/opt/emsdk` (`[EMSDK]`) を使った。
+- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開・`FL_WIN64_DIR`)。`work-m11`・`work-liftdiff` は worktree 内へ tar で展開。`toolchain-emsdk` は `$RUNNER_TEMP/emsdk` にも展開したが、build は `[EMSDK]` (エントリ ID) の上流 emsdk を使った。
 - wasm は `build_wasm.build(t, force=True)` で作り直した (`wasm_size` 4464620・`sig_mismatch` 0・`undefined` 0。LD-261 と同値)。
 - native は `ensure_native()` で rt/ の現版から作り直した。
 - 対象は chunk 0 の `0x5d19e0` 1 件 (`sample:800` の 0〜399 件目)。各 run は 1 本逐次 (2 本並列は行わず)。load 0.5〜1.0 (4 vCPU)。
