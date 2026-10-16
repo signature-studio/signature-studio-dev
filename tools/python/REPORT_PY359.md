@@ -120,6 +120,13 @@ scratch は `work/scratch/` (gitignore) に複製し、本体は変えない。
 測定 commit は `6d69e896d` (main 取り込み後の検証 HEAD・`tools/python/analysis` を変えた最後の commit)。鮮度: `git diff 6d69e896d HEAD -- tools/python/analysis` は 0 行。
 
 
+## 9.1 PY-4909 (#5313) G6: 0x104bebf の照合
+
+- 式 (手計算): `[rbp+0x580]` = `(and(c_in,0xffff)+0x70000000) − 0x70001fd0` (0x104bd2d・合流なし) を使い、`P = *(*(0x15e1810) + [rbp+0x580]*8)` (0x104bd61)。`ACC` は 0x104be79 の読みで、届く store は 0x1046d6b の `d_in` 1 本 (`py160_reach.py` で `reach={0x1046d6b}`)。式 = `*(P+0x3b8) + rint(*(0x104ccd8) · d_in · (*(P+0x3bc) − *(P+0x3b8)))`。
+- 突合: `py64_check_expr.py` の `EXPANDED` に加えた。`# expanded n=8 mismatch=0`・`0x104bebf (展開版): 一致`・exit 0。ネガティブコントロール (定数 `0x70001fd0` を `0x70001fc0` に変えた版) は不一致になることを確認した。
+- 注意: 手計算と機械側は同じ記号の名前一致で、`d_in` の値は独立に検算していない (§6.1 と同じ扱い)。
+- 0x104bffa は未達。`⚠合流@0x104bd49` (`[rbp+0x580]` の符号付き剰余 `%8` の分岐) と `⚠合流@0x104be63` (符号付き除算 `/8` の分岐) が残るため、式を確定していない。次 run で、0x104bd49 の `jns` と 0x104be63 の `jns` を分けて書く (`sar`・`and 0x80000007` の文法を py64 に足す)。
+
 ## 9. PY-5404 (#5926): `imul` の源と `resolve()` の 400 字切れ (受入 1・2・4 の部分)
 
 - 測定 commit: `6f9c59646` (`analysis/py88_writes.py` のコードを変えた最後の commit)。入力: `fl-win64` の `block00031_PE.bin` → `py53_dispatch.py` (`fn=4664 dispatch=13 r8d_tests=174`)。load average 0.12 (測定時 17:02 UTC)。
