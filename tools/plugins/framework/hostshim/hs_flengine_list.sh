@@ -15,8 +15,10 @@ OUT="$ROOT/tools/plugins/framework/hostshim/work/flengine"
 
 [ -f "$SRC" ] || { echo "hs_flengine_list: 素材が無い: $SRC" >&2; exit 2; }
 mkdir -p "$TMP" "$OUT"
-if [ ! -d "$TMP/extracted" ]; then
+if [ ! -f "$TMP/.extract_done" ]; then
+  rm -rf "$TMP/extracted"
   (cd "$TMP" && tar --zstd -xf "$SRC")
+  touch "$TMP/.extract_done"
 fi
 
 python3 - "$TMP/extracted" "$OUT/pe_list.tsv" <<'EOF'
