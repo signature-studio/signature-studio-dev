@@ -1169,7 +1169,9 @@ export class Engine {
     // 意図で扱った issue (投稿・dry-run の記録) は picks から外す。停止中 (review-only・stuck・rate-guard・取り込み前の no-import) は picks も空なので、意図も処理しない (処理済みにせず次の tick に回す)。
     // prio:low の枠 (LOW_CAP) は、意図の投稿と picks で共有する。意図が先に枠を使えば、picks の low はその分を除く。
     const lowGate = { left: lowAllowance(plan.low_cap) };
-    const intent = plan.phase.review_only || plan.stop || plan.blocked ? { halted: false, handled: new Set<number>() } : await this.relaunchIntents(gh, !!live, planned, { rows, unknown, children }, lowGate);
+    // 1 tick の枠 = min(room, BATCH)。再投入の意図と ready の picks が共有する。relaunch の picks は枠を超えても出す (planLaunch と同じ)。
+    const frame = { left: Math.min(plan.room, this.d.cfg.batch) };
+    const intent = plan.phase.review_only || plan.stop || plan.blocked ? { halted: false, handled: new Set<number>() } : await this.relaunchIntents(gh, !!live, planned, { rows, unknown, children }, lowGate, frame);
     const prios = this.prioMap();
     for (const p of intent.halted ? [] : picks) {
       if (intent.handled.has(p.n)) continue;
@@ -1180,6 +1182,8 @@ export class Engine {
         this.pushLog({ kind: "skip", n: p.n, note: "invalid artifacts line" });
         continue;
       }
+      // relaunch は枠を超えても全件出す (planLaunch と同じ)。新規の picks は意図が残した枠の中だけ。
+      if (!p.relaunch && frame.left <= 0) continue;
       if (prios.get(p.n) === "low") {
         if (lowGate.left <= 0) continue;
         lowGate.left--;
@@ -1188,12 +1192,14 @@ export class Engine {
         // dry-run: 同じ issue を RUN_WINDOW_H の間は再掲しない (計画の変化だけを残す)。投稿はしない。
         if (this.d.now() - (planned[String(p.n)] ?? 0) < RUN_WINDOW_H * 3_600_000) continue;
         planned[String(p.n)] = this.d.now();
+        frame.left--;
         this.meta.counters.wouldLaunch++;
         this.pushLog({ kind: "would-launch", n: p.n, art: p.art, note: p.relaunch ? "relaunch" : undefined });
         continue;
       }
       // 投稿の応答で残量が下がるので、1 件ごとに見直す。
       if (restGuardOn(this.meta.rest?.remaining)) break;
+      frame.left--;
       try {
         await gh!.comment(p.n, body);
       } catch (e) {
@@ -1244,8 +1250,10 @@ export class Engine {
     planned: Record<string, number>,
     ctx: { rows: Rows; unknown: Set<number>; children: Record<string, number[]> },
     lowGate: { left: number },
+    frame: { left: number },
   ): Promise<{ halted: boolean; handled: Set<number> }> {
     const nowMs = this.d.now();
+    // handled は picks から外す issue。枠 (frame) で待たせた意図の issue も入れる (picks が先に投稿すると、意図が focus なしで処理済みになるため)。
     const handled = new Set<number>();
     const prios = this.prioMap();
     const placed = new Map<number, { row: keyof Rows; why: string; openPr: boolean }>();
@@ -1298,6 +1306,11 @@ export class Engine {
         reject(gate.reason);
         continue;
       }
+      // 1 tick の枠 (picks と共有)。枠が尽きた意図は投稿せず、picks が bare の /oc を出さないように handled に入れる。処理済みにはしないので次の tick に回る。
+      if (frame.left <= 0) {
+        handled.add(n);
+        continue;
+      }
       // prio:low の上限に達していれば、処理済みにせず次の tick に回す (picks と同じ枠)。
       if (prios.get(n) === "low") {
         if (lowGate.left <= 0) continue;
@@ -1308,11 +1321,13 @@ export class Engine {
         // dry-run: launch の計画と同じく、同じ issue は RUN_WINDOW_H の間は再掲しない。
         if (nowMs - (planned[key] ?? 0) < RUN_WINDOW_H * 3_600_000) continue;
         planned[key] = nowMs;
+        frame.left--;
         c.intentWouldLaunch = (c.intentWouldLaunch ?? 0) + 1;
         this.pushLog({ kind: "would-launch", n, art: v.art, note: "relaunch intent" });
         continue;
       }
       if (restGuardOn(this.meta.rest?.remaining)) return { halted: true, handled };
+      frame.left--;
       try {
         await gh!.comment(n, buildLaunchBody(v.art, v.focus));
       } catch (e) {

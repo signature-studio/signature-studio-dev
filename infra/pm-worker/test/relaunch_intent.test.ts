@@ -408,6 +408,24 @@ test("互換 (CI-242): deploy 前の処理済み (seen = bot:/user:) の意図�
   assert.equal(focusPosts(ctx).length, 1, "旧 seen の区分と一致しない PM App の意図は再評価して投稿する");
 });
 
+// 一括解放 (CI-242 受入 4): 停止報告の issue が枠 (min(room, BATCH)) を超えて一度に解放されても、1 tick の /oc は枠の件数まで。残りは処理済みにせず次の tick に回す。
+test("統合 (枠): 意図が枠 (BATCH=2) を超えて届いても、1 tick の意図の投稿は 2 件まで。残りは次の tick で投稿する", async () => {
+  const ctx = await configuredApp({ env: { LIVE_LAUNCH: "1", TARGET: "50", BATCH: "2" }, handlers: writeHandlers });
+  const nums = [21, 22, 23, 24];
+  for (const n of nums) {
+    assert.equal((await send(ctx.app, "issues", issuePayload(n))).status, 202);
+    assert.equal((await send(ctx.app, "issue_comment", commentEv(n, IMPL_BOT, REPORT, at(0)))).status, 202);
+    assert.equal((await send(ctx.app, "issue_comment", commentEv(n, IMPL_BOT, GOOD.replace(/issue=21/, `issue=${n}`), at(5)))).status, 202);
+  }
+  await tickNow(ctx);
+  const first = nums.filter((n) => postsTo(ctx, n).length === 1);
+  assert.equal(first.length, 2, "1 tick の意図の投稿は枠 (BATCH=2) の件数まで");
+  assert.equal((ctx.app.engine.status() as any).counters.intentLaunched, 2);
+  await tickNow(ctx);
+  const rest = nums.filter((n) => postsTo(ctx, n).length === 1);
+  assert.equal(rest.length, 4, "枠で待たせた意図は、次の tick で投稿される (処理済みにしていない)");
+});
+
 // 取り込み前 (IMPORT_REQUIRED=1) は、再投入の意図でも /oc を投稿しない (picks と同じ停止。round 6 B1)。意図は処理済みにせず、取り込み後の tick で投稿する。
 test("統合 (取り込み前): 実装 App の意図は、VM の状態を取り込むまで投稿 0 回 (launch_blocked=no-import)。取り込んだ後の tick で 1 回投稿する", async () => {
   const ctx = await stopped({ LIVE_LAUNCH: "1", IMPORT_REQUIRED: "1" });
