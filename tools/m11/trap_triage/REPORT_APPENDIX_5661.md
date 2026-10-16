@@ -80,6 +80,11 @@ python3 trap_triage/judge_ctx.py work/boot_final.ll work/strict_evidence_5661.ts
 - 入力は `oc_artifacts: fl-win64 work-m11` で展開する (`tools/m11/work/` 配下・gitignore)。
 - 出力の文脈ダンプは `tools/m11/work/judge_5661.txt` (gitignore・未コミット)。
 
+## 7. 範囲 (REPORT_718.md から分割移動)
+
+- 本 REPORT のみ変更。`tools/m11/guard699/` は変更しない。
+- 20 MiB 超の blob: 追加なし。
+
 ## 6. #5685 (行 159〜177・母数 19 件): 確定 2 件・保留 17 件
 
 - 測定 commit: `739b46e2d` (origin/main)。本 PR はコードを変えない。`git diff 739b46e2d HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/` = 0 行。

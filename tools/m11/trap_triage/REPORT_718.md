@@ -246,6 +246,5 @@ python3 trap_triage/judge_entry_check.py <boot_final.ll> strict_evidence.tsv 4 3
 
 ## 7. 範囲
 
-- 本 REPORT のみ変更。`tools/m11/guard699/` は変更しない。
+- 本 REPORT の範囲と 20 MiB 超の blob は `REPORT_APPENDIX_5661.md` §7 に分割移動した (250 行上限・内容は削除していない)。
 - 範囲外: `m11_ov.c`・`docs/DEFECTS.md` (PM 判断)。
-- 20 MiB 超の blob: 追加なし。
