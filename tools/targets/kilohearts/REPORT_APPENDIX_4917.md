@@ -41,4 +41,4 @@ callee の宣言は既に `void FUN_180fb5dd0(void)`。本体 (180fb5dd0〜180fb
 4. Gain / Haas / Gate は `closure.py` → `ghidra_to_c.py` の生成 C と sigs.json を origin/main と `cmp`。全件 0 差分。
 5. 逆アセンブルは `ghidra_route/callsite_disasm.py <core> <start> <end>` (capstone)。
 
-素材: `fl-win64`・`plugins-kilohearts`・`toolchain-emsdk` (`$HOME/artifacts`)。`fl-win64` は本 PR の測定では使っていない。
+素材: `plugins-kilohearts`・`toolchain-emsdk` (R2 素材。`docs/REFERENCES.md` の `[EMSDK]` 等で参照)。`fl-win64` は本 PR の測定では使っていない。
