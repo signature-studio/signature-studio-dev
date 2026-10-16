@@ -2,6 +2,12 @@
 
 > 測定値の正本。親 #5027 (FLE-40)。REPORT.md §0 から参照。
 
+## 0. log_cap の経緯 (REPORT.md §0 から分割移動・#5897 で移動)
+
+- FLE-37 (#4983): 既定経路の `FLE_BOOT_LOG_CAP` 無効化を修正 (`REPORT_APPENDIX_4983.md`)。
+- FLE-40 (#5027): cap 超過の例外は Emscripten の tty write で飲まれ `exit` に残る経路を特定し、超過を `boot.threw` の `log_cap` として報告する (`REPORT_APPENDIX_5027.md`)。
+- FLE-41 (#5058): 超過後は次の dispatch で止める (既定 cap 4096 で units 13 で停止・cap 0 は 895 のまま) (本付録)。
+
 既知類型との関係: 該当なし (計測側の例外の伝播。lift の類型は判定していない)。
 
 ## 1. 結論

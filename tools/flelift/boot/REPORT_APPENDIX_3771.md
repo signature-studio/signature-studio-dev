@@ -5,6 +5,7 @@
 
 ## A. 結論
 
+- (REPORT.md §0 から分割移動 #5897) FLE-16 (#3771): `0x6bbc20` を `[obj+0x118]` へ書く命令は `f_6bc010` の `0x6bc1af` (4・8・16 byte の store の監視で実行時 1 件・obj = `0x12d6a090`。1・2 byte の store は未監視)。役割は画素の store/blend 関数の登録 (推定)。呼出しは `f_6c9280` の `0x6c937a`。
 - **書込み命令 = `0x6bc1af`** (`f_6bc010` 内): `mov qword ptr [rcx+0x118], rax`。`rax` は直前の `0x6bc1a8: lea rax,[rip-0x58f]` で `0x6bbc20` (= 0x6bc1af − 0x58f)。4・8・16 byte の store の監視で観測した書込みは **1 件** (診断 route・shim 有・停止まで。1・2 byte の store は監視していない・§F)。
 - **obj** = `rcx` = `0x12d6a090`。宛先 `0x12d6a1a8` = obj + 0x118 (一致)。
 - **後段の呼出し** = `0x6c937a` (`f_6c9280`) の `call qword ptr [rbx+0x118]`。target `0x6bbc20`、`R1 = R3 = 0x12d6a090` (同じ obj)。その後 unlifted で停止 (既知の停止点)。

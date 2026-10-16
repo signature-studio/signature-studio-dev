@@ -116,6 +116,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_970.md` | ~100 | PERF-P14 (#970) の付録: boot closure の -O0 / -O2 / -O2 -flto 変種の build (wasm bytes・所要時間・ピーク RSS)、node 実行時間 (n=10)・署名の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4983.md` | ~70 | FLE-37 (#4983): 既定経路 `run_boot default` で `FLE_BOOT_LOG_CAP` が効かない不具合の修正 (`${6:-0}` → 環境変数を読む式)・修正前後の `log_cap` の実測・上限超過時の `hit` の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5177.md` | ~70 | FLE-43 (#5177): 既定経路の出力 hash 非決定 (8 run・非決定 9 バイトの VA)・判定指標 (`image_writable` から非決定位置を除いた値・`outmem_judge.py`)。測定値の正本 |
+| `tools/flelift/boot/REPORT_APPENDIX_5897.md` | ~60 | #5897 (PY-5398): slot 35 (`call [reg+0x118]` 151 箇所) の実行時 VMT 採取 probe (`slot35_vmt_probe.sh`)。採取 0 件・陽性対照の発火・未解決 (boot を 895 より先へ)。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5215.md` | ~70 | PY-4887 (#5215): 選択リスト G の初期化 `0xe38870` の既定 boot での実起動確認 (G・isPatternSelected・呼出元 5 観測点は未到達・制御 1 件発火)。probe は `py5215_g_init_probe.sh` |
 | `tools/flelift/boot/REPORT_APPENDIX_5027.md` | ~80 | FLE-40 (#5027): `FLE_BOOT_LOG_CAP` 超過の例外が Emscripten の tty write で飲まれ `exit` に残る経路の特定・超過を `boot.threw` の `log_cap` として報告する修正・cap の有無での実測差。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4806.md` | ~60 | FLE-29 (#4806) A1: opt-in 経路 (FLE_IPP=1) の dsp_ippv2 load hook は非 0 を返す (前提の「0 を返す」は不成立)。`0x15F34A0` は unit 132 で登録され unit 209 の 16B store (ret `0x1078570`) で 0 に戻る。store 元の関数は未特定 |
@@ -221,6 +222,7 @@
 | `tools/liftdiff/tests/ld158_ret_probe.py` | ~110 | LD-158 (#3470) の動的プローブ: i128 戻り関数を 11 pattern × xfill {1,0} で native 実行し、戻り後 rax / rdx / xmm0 の書換えを記録 (`work/ld158_probe.json`)。`--names` で陰性対照の関数を指定できる |
 | `tools/liftdiff/tests/ld158_summarize.py` | ~70 | LD-158 (#3470) の集計: 動的分類・静的 dsm 判定 (窓 3 / 8) の件数と、`ret_override` と動的 xmm0 のみ集合の一致を出す (`work/ld158_table.tsv`) |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
+| `tools/icall/REPORT_APPENDIX_5843.md` | ~60 | icall #5843 (ICALL-119): slot 関数の r13 保存分類 (`tools/icall/ret_r13_check.py`・件数は付録)。間接 `180cbba21`・`180cbba36` の具象型は未特定 (部分達成・残件は #5843) |
 | `tools/icall/REPORT_APPENDIX_5044.md` | ~50 | icall #5044 (ICALL-108): 180cbb930 の直接呼出し 2 件 (`180cbcd90`・`180cb9890`) が `r13` を書かないことの機械判定 (`tools/icall/r13_callee_check.sh`)。間接呼出し `180cbba21`・`180cbba36` の具象型は未特定 (部分達成・残件は #5044) |
 | `tools/icall/REPORT_APPENDIX_5125.md` | ~60 | icall #5125 (親 #4245): icall 代表 e2e の before (`706147914`) / after (`e5261de58`) 一致の実測 (両方 PASS・所要・監査/matrix/crt gate の値)・前提素材の展開手順・`/opt` 直書きと `libottnative.so` の注意。REPORT §0 の参照先 |
 | `tools/icall/REPORT_APPENDIX_5889.md` | ~90 | icall #5889 (ICALL-122): `slot_trace` の単歩を fatal・正常経路で dump。6 関数の `RtlPcToFileHeader` の戻り値が `_CxxThrowException` の magic 選択 (`0x19930520`/`0x1994000`) に効くことを単歩と逆アセンブルで確認。`18100cc50` の `RtlCaptureContext` 戻り値は未使用・分岐は `RtlLookupFunctionEntry` で決まる。issue 本文の rc=99 は現 main で rc=97 |
