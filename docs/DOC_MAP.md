@@ -75,6 +75,7 @@
 | `tools/perf/PERF.md` | ~150 | 性能の設計メモ (bit-exact 版の実測は `tools/perf/REPORT.md` §2.1・完走路の正本は `tools/ott/REPORT.md`) |
 | `tools/perf/REPORT_APPENDIX_3959.md` | ~70 | PERF-P25 (#3959): AudioWorklet 上の instantiate 掃引 (Chrome 154 で M=145 成功・M=146 無応答 3 run)。#3959 の受入の正本。146 回目の ctor (`0x18011d400`) が同一 instance で戻らない (原因は未特定、子 #4392)。147 以上の単調性・Node 掃引は未確認 |
 | `tools/perf/REPORT_P15.md` | ~180 | PERF-P15 (#990): 実 OTT の Chrome Memory 本数上限 (124〜125) に対する instance 数の設計。1 Memory に plugin 処理オブジェクトを畳み込む方式 (a) を採り、M=130 を 1 instance で駆動 (署名 130/130 一致)。AudioWorklet 上の M=130 駆動を §7 で実測 (#1259)。異なる plugin の同居は #2963 [PERF-P20] |
+| `tools/perf/REPORT_APPENDIX_3680.md` | ~50 | PERF-P23 (#3680): Fresh Air と OTT を 1 link・1 Memory の wasm に畳む (`build_fold.sh`)。畳み込み後の署名 `5e5287b5` / `6b1696f0` 一致・NC 2 種・定義シンボルの重なり 0 件。REPORT_P15 §8 の付録 |
 | `tools/perf/REPORT_APPENDIX_4732.md` | ~40 | PERF-P27 (#4732): Fresh Air の再 lift (impbase `0x1F00000`・`fa_` 改名)。単独署名 `5e5287b5` 一致・定義シンボルが OTT と重ならない。REPORT_P15 §8 の付録 |
 | `tools/perf/REPORT_P8.md` | ~230 | PERF-P8 (#166): plugin 別 module/instance/memory vs MAIN/SIDE_MODULE 動的リンクの合成カーネル比較 (node + Chrome 154 Worker)。`tools/perf/REPORT.md` §5 項目 7 から参照 |
 | `tools/perf/REPORT_P7.md` | ~60 | PERF-P7 (#165, 部分達成): Chrome headless/headful(Xvfb)/Firefox 157 の compile・上限・code cache・AudioWorklet 駆動の実測 + 実機未測の起票依頼 |
