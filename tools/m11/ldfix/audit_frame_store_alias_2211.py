@@ -127,11 +127,35 @@ NONFRAME = set()
 CALLER_SAVED = ('rax', 'rcx', 'rdx', 'r8', 'r9', 'r10', 'r11')
 
 
+MACH = None
+
+
+def call_ret_nonframe(cs, seq, j, depth):
+    """call 命令 seq[j] の戻り値 rax が frame 派生でないと示せるか (#5527)。
+    呼び出し先が PE 外 (IAT 経由の import) なら「未確定 (外部)」として False。
+    PE 内の関数なら、その全 ret の rax が frame 派生でない (reg_nonframe) ときだけ True。"""
+    op = seq[j].operands[0] if seq[j].operands else None
+    if op is None or op.type != capstone.CS_OP_IMM or MACH is None:
+        return False
+    fn = MACH.fns.get(op.imm)
+    if fn is None:
+        return False
+    seq2 = MACH.disasm_fn(op.imm) or []
+    if not seq2:
+        return False
+    preds2, _ = v1.build_preds(cs, seq2, op.imm, fn[1])
+    rets = [i for i, x in enumerate(seq2) if x.mnemonic.startswith('ret')]
+    if not rets:
+        return False
+    return all(reg_nonframe(cs, seq2, preds2, i, 'rax', depth - 1) for i in rets)
+
+
 def reg_nonframe(cs, seq, preds, idx, reg, depth):
     """命令 idx の直前で reg の値が frame 派生でないことを、到達する全定義から示せるか (流れ依存)。
     定義の追跡: 単純な mov reg, reg / mov reg, [rbp+D] (スロットの定義を再帰で追う)。
     入口まで定義が無い引数レジスタは、呼び出し前から存在する値なので frame 派生でないとする。
-    それ以外 (演算・call の戻り値・未知) は示せないので False。"""
+    call の戻り値 (rax) は呼び出し先の ret の rax を同じ規則で追う (#5527)。PE 外の import は未確定 (外部) で False。
+    それ以外 (演算・未知) は示せないので False。"""
     if depth <= 0:
         return False
     outs = []
@@ -146,6 +170,11 @@ def reg_nonframe(cs, seq, preds, idx, reg, depth):
         m = ins.mnemonic
         ops = ins.operands
         if m.startswith('call'):
+            if reg == 'rax':
+                if not call_ret_nonframe(cs, seq, j, depth):
+                    return False
+                outs.append(j)
+                continue
             if reg in CALLER_SAVED:
                 return False
             stack.extend((p, j) for p in preds.get(j, []))
@@ -354,7 +383,9 @@ def main():
     NO_PROV = '--negctl-noprov' in args
     args = [a for a in args if not a.startswith('--')]
     pe, audit_path, f4_path, out = args[:4]
+    global MACH
     mach = Machine(pe)
+    MACH = mach
     audit = json.load(open(audit_path))
     f4 = set(json.load(open(f4_path))['f4_vas'])
     rows = [s for s in audit['frame_in_escaped'] if s['fn'] not in f4]
