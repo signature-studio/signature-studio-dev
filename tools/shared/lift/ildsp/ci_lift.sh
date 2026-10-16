@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # GeneralPitchShifter_CreateInstance (0x1aa290) 単独 closure (36 関数・961 命令) の RetDec 入力作成と census (T-SH-62 #3300)。
-#   ci_ranges.py (closure 範囲・x86 照合) -> RetDec --select-ranges -> ci_census.py (define 検査・IR の内訳)
+#   ci_ranges.py (closure 範囲・x86 照合) -> RetDec --select-ranges -> ci_restore_stores.py -> ci_census.py -> gen_helpers.py
+#   -> emcc obj 化 (uselistorder 除去) と間接 call 2 件の trap (#3318)
 # usage: FL_WIN64_DIR=<fl-win64 展開先> [RETDEC_BIN=<[RETDEC] の bin/retdec-decompiler>] bash tools/shared/lift/ildsp/ci_lift.sh   (外部ツールの場所は docs/REFERENCES.md §1 の [RETDEC])
-# 出力: tools/shared/work/lift/ci/ (gitignore)。wasm 化・native 差分は未実装 (REPORT_CI.md §5)。
+# 出力: tools/shared/work/lift/ci/ (gitignore)。wasm のリンク・実行・native 差分は未実装 (REPORT_CI.md §5・§8)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."
 source "$ROOT/env.sh"
