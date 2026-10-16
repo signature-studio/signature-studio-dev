@@ -14,6 +14,7 @@
 #include "scen_phaser.h"
 #include "scen_delay.h"
 #include "scen_limiter.h"
+#include "scen_ladder.h"
 Scenario SCEN_LIST[] = {
     {"matrix", trial_matrix, 6},
     {"gain", trial_gain, 6},
@@ -37,5 +38,6 @@ Scenario SCEN_LIST[] = {
     {"phaser", trial_phaser, 6},
     {"delay", trial_delay, 6},
     {"limiter", trial_limiter, 6},
+    {"ladder", trial_ladder, 6},
     {0, 0, 0},
 };
