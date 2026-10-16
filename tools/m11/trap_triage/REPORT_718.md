@@ -227,8 +227,7 @@
 ## 4n. 証拠表の行 226〜232 (#5750・母数 7: 真陽性 5 (構造)・保留 2)。正本は `REPORT_APPENDIX_5750.md`。行 226 は #5780 で真陽性 (構造) に確定。行 230・231 は #5773 で真陽性 (構造) に確定 (`REPORT_APPENDIX_5773.md`)。行 228・229 は保留のまま
 
 ## 5. 再現
-
-本 PR の再現手段は `guard699/scan_guard.py`・`trap_triage/strict_evidence.py`・`trap_triage/judge_entry_check.py` で、入力は `work-m11` の `boot_final.ll` を要する (`oc_artifacts: fl-win64 work-m11`)。`block00031_PE.bin` は `fl-win64` 素材に入っている。
+再現手段は `guard699/scan_guard.py`・`trap_triage/strict_evidence.py`・`trap_triage/judge_entry_check.py`。入力は `work-m11` の `boot_final.ll` (`oc_artifacts: fl-win64 work-m11`)。
 
 ```sh
 cd tools/m11
@@ -237,8 +236,7 @@ python3 trap_triage/strict_evidence.py <boot_final.ll> --pe <block00031_PE.bin> 
 python3 trap_triage/judge_entry_check.py <boot_final.ll> strict_evidence.tsv 4 35
 ```
 
-- 期待する出力 (`judge_entry_check.py`): 32 行。行 i の形式は `#<i> <関数> jcc=<jcc の VA> target=<target の VA> | jcc ブロック終端: ... | 脱出先 preds: ...`。先頭行は `#4 function_100bb90 jcc=100bcf4 target=100bd4d` で、以降の各行の関数・jcc・target は上の表の行 i と一致する (前版の記録。IR が無いと照合できない)。
-- 形式の確認 (本 run): 合成 IR (`function_100bb90` を模した 1 関数) と TSV の 1 行で `judge_entry_check.py <IR> <TSV> 1 1` を実行し、rc 0 で `#1 function_100bb90 jcc=100bcf4 target=100bd4d | ...` の形式で出ることを確かめた。IR の実データは使っていない。
+- 期待する出力と形式確認の詳細は `REPORT_APPENDIX_3498.md` §4h。
 
 ## 6. 未解決 (子 issue に分割)
 
@@ -249,5 +247,4 @@ python3 trap_triage/judge_entry_check.py <boot_final.ll> strict_evidence.tsv 4 3
 
 ## 7. 範囲
 
-- 本 REPORT の範囲と 20 MiB 超の blob は `REPORT_APPENDIX_5661.md` §7 に分割移動した (250 行上限・内容は削除していない)。
-- 範囲外: `m11_ov.c`・`docs/DEFECTS.md` (PM 判断)。
+- 範囲外: `m11_ov.c`・`docs/DEFECTS.md` (PM 判断)。範囲と 20 MiB 超の blob は `REPORT_APPENDIX_5661.md` §7 (分割移動)。
