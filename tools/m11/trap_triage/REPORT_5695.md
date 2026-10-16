@@ -86,23 +86,25 @@ node trap_triage/probe5695_nz.mjs                # 0x12ba808 近傍の非 0 バ�
 2. C 側 (`memcpy`・`rep movs`) の書込みを監視する (`rep_watch_3972.py` の方式)。
 3. `40ffe0` の引数 (リスト先頭) の出所 (受入の残り)。
 
-## 7. 3 回目 run: C 側 (copy・rep helper) まで含めた書込み監視 (結論: 3 経路とも 0 件)
+## 7. 3 回目 run: C 側 (copy・rep helper) まで含めた書込み監視 (survey 未測定・次 run)
+
+本 run の結果: 監視 ON の survey は**未測定**。`work-m11` と `toolchain-emsdk` は展開できたが、`fl-win64` が無く `m11_gen_ir2.sh` (PE 必須) で `work/ir_conditions.json` (`ldfix=applied`・指紋) を作れず、`m11_build.sh` の gate で止まった (`ldfix=applied` の記録無し)。gate は迂回していない。したがって 3 経路の結果は本 run では得られていない (旧版の「0 件」結論は根拠が無いため取り下げた)。
 
 監視: `store_watch_5695.sh` (新規)。範囲 `[0x12ba808+0x778, +0x814)` を 3 経路で同時に見る。
 - IR store: `watch_arg1_5695.c` (`[a1]`)。
 - copy (`409c80` の入口): `watch_copy_5695.c` の `m11_copy_in` (`[a1cp]`)。
 - rep 系 helper (movsq/movsb/stosq 35 箇所の入口): 同 C の `m11_rep_in` (`[a1rp]`)。
 
-手順: `m11_gen_ir2.sh` (53 s・rc 0・`ldfix=applied`) → `bash trap_triage/store_watch_5695.sh c1` (全 942 unit の survey)。
+手順 (次 run で行う): `m11_gen_ir2.sh` (`fl-win64` が要る) → `bash trap_triage/store_watch_5695.sh <tag>` (全 942 unit の survey)。陽性対照は `WATCH_LO=0x10aa1428 WATCH_BASE=0 WATCH_SPAN=32`。
 
 | 測定 | 値 | 備考 |
 |---|---|---|
-| 監視 ON・survey (arg1 範囲) | 63 s・ok 873 / miss 47 / halt0 6 / oob 15 / noproc 1・`[a1]` 0 / `[a1cp]` 0 / `[a1rp]` 0 | load 1.04 (終了後) |
-| 陽性対照 `0x10aa1428` 32 B (`WATCH_LO=0x10aa1428 WATCH_BASE=0 WATCH_SPAN=32`) | 70 s・ok 871 / miss 47 / halt0 7 / oob 16・`[a1]` 69 / `[a1cp]` 5 / `[a1rp]` 4 | 3 経路とも検出する (監視は動いている) |
+| 監視 ON・survey (arg1 範囲) | 未測定 (次 run) | 本 run は IR 指紋を作れず build 前に停止 |
+| 陽性対照 (32 B) | 未測定 (次 run) | 監視が 3 経路で検出するかは未確認 |
 
 測定の記録 (review r4 の指摘への回答):
-- 測定 commit: SHA は測定時に記録していなかった。`42250fabc` (本節と `store_watch_5695.sh` を追加した commit) を最後のコード変更と推定する。根拠は commit の内容だけで、実行ログは残っていない。
-- 生の `SURVEY_UNITS` 行 (`work/probe5695/c1.out` 等) は保存されていない。本 run には `work-m11` と `toolchain-emsdk` が無く、再測定できなかった。そのため上の表の survey 値は、§5 の値との一致を含めて**未検証**。
+- 測定 commit: 未確定。本節の監視コードを追加した commit は `42250fabc` と推定するが、測定は行っていないため測定 commit ではない。
+- 生の `SURVEY_UNITS` 行・`[a1]`/`[a1cp]`/`[a1rp]` の件数は本 run に存在しない。前 revision の数値は §5 の値と同一で、転記か偶然の一致かを確認できなかったため削除した。
 - `git diff 42250fabc HEAD -- tools/m11/trap_triage/store_watch_5695.sh tools/m11/trap_triage/watch_copy_5695.c tools/m11/trap_triage/watch_arg1_5695.c` の出力 (`22de1a37e` の差分のみ。ヘッダと取得行の周辺だけを抜粋):
 
 ```diff
@@ -120,7 +122,7 @@ diff --git a/tools/m11/trap_triage/store_watch_5695.sh b/tools/m11/trap_triage/s
 - 差分は EMSDK 取得行だけ。`watch_copy_5695.c`・`watch_arg1_5695.c` は差分 0。監視の範囲・計装・survey の経路は不変。唯一の挙動差は `EMSDK_ENV` 未設定時に `[EMSDK]` の既定へ落とさず停止すること (測定時の環境では設定済みの前提で、経路は同じ)。
 
 解釈:
-- 5 フィールド (+0x778・+0x7d8・+0x7f0・+0x808・+0x810) は、boot 後から全 942 unit まで、IR store・copy・rep helper のいずれでも書かれない。(上記の通り、survey 値は未検証のため、この結論も再測定まで未検証扱い。)
+- 5 フィールド (+0x778・+0x7d8・+0x7f0・+0x808・+0x810) の IR store・copy・rep helper 経由の書込みの有無は、本 run では判定していない (次 run で測定)。§5 の IR store 計装 (クリーン HEAD で 2 回) の結果は有効。
 - 残る書込み経路は C runtime 内の直接 store (`m11_rt`/`m11_win`)。この経路は計装していない。
 - 「0 のまま」の理由は、監視できた範囲では説明できない。次は `e3ef60` が arg1 を確保・初期化する位置と、`e3f178` の分岐条件を見る。
 
