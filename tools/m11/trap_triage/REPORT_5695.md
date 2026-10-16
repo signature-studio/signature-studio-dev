@@ -138,3 +138,37 @@ diff --git a/tools/m11/trap_triage/store_watch_5695.sh b/tools/m11/trap_triage/s
 - C runtime 内の直接 store (`m11_rt`/`m11_win`) の監視: 親 #882 の続き。
 - `e3ef60` → `60a270` の `arg2` の由来と `e3f178` の分岐条件: 親 #882 の続き。
 - DEFECTS.md 行案 (受入 (c)): 書込み元と `arg2` の由来が未確定のため未判定。
+
+## 8. 4 回目 run: C 側の一部の直接 store まで含めた書込み監視 (結論: 計装範囲では 0 件。未計装経路は未判定)
+
+測定 commit: `474f2d120` (本 run の HEAD)。計装コードは `70f9ac915` から変えていない (`git diff 70f9ac915 474f2d120 -- tools/m11/m11_ov.c` は空)。
+素材: `fl-win64`・`work-m11`・`toolchain-emsdk` を本 run で展開 (`$FL_WIN64_DIR`・`tools/m11/work`・[EMSDK])。`m11_gen_ir2.sh` rc=0・52 s (ldfix applied)。
+`emcc` 6.0.12。
+
+手順: `FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<[EMSDK] の emsdk_env.sh> [WATCH_LO=… WATCH_BASE=… WATCH_SPAN=…] bash trap_triage/store_watch_5695.sh <tag>` を 1 本ずつ直列に実行。
+2 本を並列に走らせた最初の試行は `work/obj` と `work/probe5695` を共有して壊れたため破棄した (近傍の 0 件は汚染で、数値として使わない)。
+集計: `work/probe5695/<tag>.aw` の行数 (`grep -c`)。`[a1c]` は `m11_ov.c` の `Q`/`D`/`B` マクロ経由の**読取りと書込みの両方**を数える (`m11_cwatch` は区別しない)。`[a1]`・`[a1cp]`・`[a1rp]` は書込みの判定。
+
+| 測定 | env (指定した `WATCH_*`) | SURVEY_UNITS ok/miss/halt0/oob/noproc | `[a1]` | `[a1c]` (読み書き) | `[a1cp]` | `[a1rp]` | 所要 (script 全体) |
+|---|---|---|---|---|---|---|---|
+| 本命 (5 フィールド範囲) | なし (既定: LO=0x12ba808・BASE=0x778・SPAN=0x9c) | 873/47/6/15/1 | 0 | 0 | 0 | 0 | 61.3 s |
+| 陽性対照 近傍 4 KB | `WATCH_LO=0x12ba808 WATCH_BASE=0 WATCH_SPAN=4096` | 871/47/7/16/1 | 88 | 0 | 5 | 0 | 70.3 s |
+| 陽性対照 64 MB | `WATCH_LO=0x12000000 WATCH_BASE=0 WATCH_SPAN=67108864` | 871/47/7/16/1 | 20000 (値が 20000 で止まる。上限の由来は未確認) | 1 | 5 | 0 | 69.9 s |
+
+- 本命の `SURVEY_UNITS` は §5 の 2 回の実測 (873/47/6/15/1・871/47/7/16/1) の範囲内。
+- 負荷 (load) は本 run では記録していない。
+- 全アドレス対照 (`WATCH_SPAN` 全域) は本 run では未実行。旧表の値は再現していない。
+
+### 8.1 解釈
+
+- 計装した経路 (IR store・copy・rep helper・`m11_ov.c` の Q/D/B と 3 関数入口) では、5 フィールド範囲へのアクセスは 942 unit で 0 件 (`[a1]`・`[a1c]`・`[a1cp]`・`[a1rp]` すべて 0)。
+- 監視は効いている: 同じ判定式の陽性対照 (近傍 4 KB) で `[a1]` 88・`[a1cp]` 5 を検出する。
+- ただし 0 件は**計装範囲内**の結論。`m11_rt.c`・`m11_win.c` の直接 store と、`m11_ov.c` の Q/D/B を通さない raw store (`:154`・`:866`・`:962`・`:1096`) は未計装で、その経路の書込みは判定していない。
+- PE の `.data` は `0x13a5000` 以降で、arg1 `0x12ba808` は `.text` 内の低いアドレス。arg1 は PE の静的データではなく、実行時の確保先である。初期値は確保・初期化の時点で決まる。
+- `e3ef60` (IR 443418) は arg1 `+0x304` (772) → `+0xb4` (180) → `+0xc` を読む。`+0x778` は読み取り側の入口で、0 のまま読まれるのが通常経路かは未確認。
+
+### 8.2 未解決 (起票先: 親 #882 の続き)
+
+- 受入 (a): 計装範囲では 942 unit で書込みは 0 件。書込み元の特定は、未計装経路 (`m11_rt`・`m11_win`・raw store) を計装するまで進まない。「書込み元がある」前提を再定義するかは PM 判断。
+- 受入 (a'): `40ffe0` の引数 (`60a270` の arg2 の上位 16 bit) の由来と `e3ef60` の分岐 (`e3f178`) の条件。
+- 受入 (b): DEFECTS.md 行案は (a)(a') が決まるまで判定しない。
