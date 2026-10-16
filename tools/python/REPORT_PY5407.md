@@ -41,18 +41,32 @@ callback の `[obj+0x50] == 0` で `task+0x60 = -7` (0xd762c2 / 0xd76450 の `0x
 
 ## 5. 検証 (commit は本 PR の HEAD)
 
-| 検査 | 結果 |
+測定 commit: `816f0bd36` (コードを変えた最後の commit)。環境: Linux runner・emsdk latest・CPython 3.12.1 (`build_cpython_wasm.sh` → `build_flpy.sh`)。
+
+| 検査 | 結果 (実測) |
 |---|---|
 | `bash provider/build.sh` | 警告・エラー 0 で `dist/flprov.{js,wasm}` 生成 |
-| `node tests/device_diff.mjs` | `diffs: 0`・`PASS: true` (呼出し 21 件・送出 10 件・新規 6 件を含む) |
-| `node tests/provider_check.mjs` | 未実施 (`dist/flpy.js` (CPython wasm) が必要。下記) |
-| `FL_ENGINE=wasm tests/all_tools.mjs` (48/48) | 未実施 (同上) |
+| `node tests/device_diff.mjs` | `diffs: 0`・`PASS: true`・呼出し 21 件・送出 10 件・新規 repeat 系 6 件を含む (実行 18:53:53 〜 18:53:54) |
+| `node tests/provider_check.mjs` | `functions: 435`・`implemented: 233`・`mcp_static: 60`・`PASS: true` (18:53:45 〜 18:53:46) |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | `total: 48`・`ok: 48`・`soft_error: 0`・`raised: 0`・`host_calls: 37425`・`callback_roundtrip: true` (18:53:48 〜 18:53:50) |
+| `node tests/all_tools.mjs` (mock) | `total: 48`・`ok: 48`・`host_calls: 37425` (18:53:53 〜 18:53:55) |
+
+load: 本 run は単独の runner 上で実行 (他ジョブとの併走なし)。CPython wasm build は 18:50:42 〜 18:53:27 (約 3 分)・`build_flpy.sh` は 18:53:36 〜 18:53:43。
+
+測定 commit 以降のコード差分 (`git diff 816f0bd36 HEAD -- tools/python` の対象は本 REPORT のみ。コード差分 0):
+
+```
+git diff 816f0bd36 HEAD -- tools/python/provider tools/python/host tools/python/tests
+(出力なし: コード差分 0)
+```
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `dist/flpy.js` (CPython wasm) の build と `provider_check`・`all_tools` 48/48 の実測 | 受入条件の 2 項目が未検証 | 本 PR で実施 (下記の結果を追記) |
-| 述語 `0x11d1430` の真偽 | 真と仮定 | #2926 |
+| 述語 `0x11d1430` の真偽 | 真と仮定 (device 系 handler と同じ仮定) | #2926 |
+| repeat/stop の vtbl 先の効果・record の中身 (`0xd87a90` 先) | 状態を持たない | 親 #4658 の追跡 |
+| `FlMidiMsg` の bridge 表現 (object 型) | eventData の型違いを wasm で検査できない (`Uint8Array` で代用) | 親 #4658 の追跡 |
+| `tools/python/REPORT_PY5407.md` の VA 表の runtime 検証 (動的 run) | PE 静的確定のみ。動的 run は未実施 | 親 #4658 の追跡 |
 | repeat/stop の vtbl 先の効果・record の中身 | 状態を持たない | 親 #4658 の追跡 |
 | `FlMidiMsg` の bridge 表現 (object 型) | eventData の型違いを wasm で検査できない | 親 #4658 の追跡 |
