@@ -15,7 +15,7 @@
 ## 2. 測定条件
 
 - 測定 commit: `765b669c4` (本 PR の前 commit)。コード変更は `tools/m11/frame_share/frame_bound.py` (§6)。
-- 素材: `fl-win64.tar.zst` の `extracted/block00031_PE.bin` のみ。`work-m11` (`tools/m11/work/`) と `toolchain-retdec` は ARTIFACTS_DIR (`/home/runner/artifacts`) に無く、IR (`boot_final3.ll`) を再生成できなかった。
+- 素材: `fl-win64.tar.zst` の `extracted/block00031_PE.bin` のみ。`work-m11` (`tools/m11/work/`) と `toolchain-retdec` は ARTIFACTS_DIR に無く、IR (`boot_final3.ll`) を再生成できなかった。
 - 実行したコマンド:
   - `ls $ARTIFACTS_DIR` → `fl-win64.tar.zst` のみ
   - `ls tools/m11/work` → 無し
