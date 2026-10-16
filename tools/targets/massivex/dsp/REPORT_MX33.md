@@ -232,9 +232,9 @@
   2. F の入口 livein: probe は F の `livein45` = 0 で絞る。本 script は絞らない (注 a)。
   3. call 前段: probe は除外しない。本 script は除外する。
   4. 判定: probe は must-def に入らない site を F ごとに最初の 1 件で打ち切る。本 script は may-def = 0 の site を全件数える。
-  向き: 1・3 は本 script の件数を小さくし、2・4 は大きくする。差し引きで 42 と 47 の大小が決まるため、切り分けは PE が要り未実施。
+  向き: 1・3 は本 script の件数を小さくし、2・4 は大きくする。差し引きで 42 と 47 の大小が決まるため、切り分けは PE が要り未実施。**(本 run で実測: 同一 PE で probe 47・mx54 42。mx54 の 42 は probe の 47 の真部分集合。差 5 件のうち 3 件は前段 call 除外、2 件は未切り分け。詳細は `REPORT_APPENDIX_5019.md`)**
 - 注 (未確認):
-  - (a) 本 script は F の入口 livein = 0 のフィルタを掛けていない。`for F` ループに判定が無く、docstring の「入口 livein xmm4/5 = 0 の母集団」は実装と一致しない。よって 42 は F が入口で xmm4/5 を読む関数を含みうる。フィルタ付きの件数は未測定。
+  - (a) 本 script は F の入口 livein = 0 のフィルタを掛けていない。ただし 42 候補 F の入口 livein xmm4/5 は全て 0 (42/42) で、フィルタ付きの件数も 42 と一致する (`REPORT_APPENDIX_5019.md` §4)。
   - (b) 「42 件の G は全て pdata 範囲内」は script で判定していない (未確認)。G が pdata 始点でないことのみ `G_pdata_begin` で数えた (0)。
   - (c) G は線形・CFG 解析で入口 livein が立つと判定されたもので、G が実際の関数入口かは未確認 (例: `0x8020e3` は `or eax, ...` で始まる)。
   - (d) F→G の site 3 件 (`0xfb13`・`0x6ba2ba`・`0x6da2ae`) の E8/E9 と rel32 の照合は前 run の記録で、本 run では再確認していない。
