@@ -131,16 +131,63 @@ def cond(mn, fl):
     return t[mn]
 
 
-def run(insns, probe, fam, prune=False, stats=None):
+FAMS = {f for f, _ in REG.values()}
+
+
+def atoms(*ss):
+    """類の文字列 (原子を / で連結したもの) の和集合を、正規形 (ソート済み・重複なし) で返す。"""
+    return '/'.join(sorted({a for s in ss if s for a in s.split('/')}))
+
+
+def join(s1, f1, s2, f2):
+    """併合: 同じ ip に届く 2 つの状態の上界を返す。値が一致しない reg・flags は未知にし、類は和集合にする。
+    片方にだけある reg は、入口から書かれていなければ 入力引数。スタックの深さが違えば併合できないので Unsup。
+    値の集合は有限 (int か未知) で、未知は戻らない。類の原子も有限なので、併合の列は必ず止まる。"""
+    s1s, s2s = s1.get('__stk', ()), s2.get('__stk', ())
+    if len(s1s) != len(s2s):
+        raise Unsup('併合: スタックの深さが違う')
+    out = {}
+    for k in FAMS:
+        if k not in s1 and k not in s2:
+            continue
+        a, b = s1.get(k), s2.get(k)
+        if a is not None and a == b:
+            out[k] = a
+            continue
+        la = None if a is not None else s1.get('#' + k, '入力引数' if k not in s1 else 'その他')
+        lb = None if b is not None else s2.get('#' + k, '入力引数' if k not in s2 else 'その他')
+        out[k] = None
+        out['#' + k] = atoms(la, lb, 'その他' if a is not None and b is not None else None)
+    for k in set(s1) | set(s2):
+        if k.startswith('#') and k[1:] not in FAMS:
+            out[k] = atoms(s1.get(k, 'その他'), s2.get(k, 'その他'))
+    if s1s:
+        slots = []
+        for (v1, l1), (v2, l2) in zip(s1s, s2s):
+            if v1 is not None and v1 == v2:
+                slots.append((v1, None))
+            else:
+                slots.append((None, atoms(None if v1 is not None else (l1 or 'その他'),
+                                          None if v2 is not None else (l2 or 'その他'),
+                                          'その他' if v1 is not None and v2 is not None else None)))
+        out['__stk'] = tuple(slots)
+    return out, (f1 if f1 == f2 else None)
+
+
+def run(insns, probe, fam, prune=False, stats=None, merge=False):
     """probe に届く全経路で fam の値を集める。値は int か None (未知)。
     戻り値: (vals, labs)。labs は値が未知の経路の源の類の集合。
     prune=True: 分岐先 (fork の先・ジャンプ先) に、同じ状態 (ip・レジスタ・flags・スタック) で再訪した経路を切る。
       切った先は初回訪問で既に辿られているので、値の集合は変わらない (健全)。
-      切断の種類: 後方の再訪 = ループ、前方の再訪 = 未知分岐の合流 (diamond)。stats に件数を積む。"""
+      切断の種類: 後方の再訪 = ループ、前方の再訪 = 未知分岐の合流 (diamond)。stats に件数を積む。
+    merge=True: prune の代わりに、分岐先の到達を同じ ip の状態への併合 (join) にする。
+      状態が増えた (併合で変わった) ときだけ再探索するので、有限回で止まる。併合後の状態は全到達状態の上界なので健全。
+      値が一致しない reg は未知になる (未決にはならず判定不能)。カウンタの付くループは 1 周で未知になる (精度は落ちる)。"""
     idx = {x.address: i for i, x in enumerate(insns)}
     vals, labs, steps = set(), set(), 0
     stats = {} if stats is None else stats
     seen = set()
+    joined = {}
 
     def cut(t, st, fl, src):
         if not prune:
@@ -152,6 +199,22 @@ def run(insns, probe, fam, prune=False, stats=None):
         k = '刈り込み(ループ)' if t <= src else '刈り込み(分岐の合流)'
         stats[k] = stats.get(k, 0) + 1
         return True
+
+    def arrive(t, st, fl, src):
+        """分岐先 t に状態 (st, fl) が届いた。続けるべき状態を返す。None なら、その先は辿らない。"""
+        if not merge:
+            return None if cut(t, st, fl, src) else (st, fl)
+        if t not in joined:
+            joined[t] = (dict(st), fl)
+            return dict(st), fl
+        ns, nf = join(joined[t][0], joined[t][1], st, fl)
+        if ns == joined[t][0] and nf == joined[t][1]:
+            stats['併合で停止'] = stats.get('併合で停止', 0) + 1
+            return None
+        joined[t] = (ns, nf)
+        k = '併合(ループ)' if t <= src else '併合(分岐の合流)'
+        stats[k] = stats.get(k, 0) + 1
+        return dict(ns), nf
 
     stack = [(0, {}, None)]
     while stack:
@@ -176,6 +239,13 @@ def run(insns, probe, fam, prune=False, stats=None):
                 continue
             if mn == 'jmp':
                 t = idx[int(ops[0], 0)]
+                if merge:
+                    r = arrive(t, st, fl, i)
+                    if r is None:
+                        break
+                    st, fl = r
+                    i = t
+                    continue
                 if cut(t, st, fl, i):
                     break
                 i = t
@@ -185,6 +255,12 @@ def run(insns, probe, fam, prune=False, stats=None):
                 c = cond(mn, fl)
                 if c is None:
                     stats['未知分岐'] = stats.get('未知分岐', 0) + 1
+                    if merge:
+                        for t2 in (tgt, i + 1):
+                            r = arrive(t2, st, fl, i)
+                            if r is not None:
+                                stack.append((t2, r[0], r[1]))
+                        break
                     if not cut(tgt, st, fl, i):
                         stack.append((tgt, dict(st), fl))
                     if cut(i + 1, st, fl, i):
@@ -451,17 +527,20 @@ def run(insns, probe, fam, prune=False, stats=None):
     return vals, labs
 
 
-def verify(insns, probe, fam, claim=None, prune=False):
+def verify(insns, probe, fam, claim=None, prune=False, merge=False):
     """戻り値: (判定, 詳細)。判定は 実値化 / 未決 / PASS / FAIL / 判定不能 のいずれか。
     prune=True で step 上限の打ち切りを刈り込みで収束させる (既定は False = 従来の判定)。
+    merge=True は prune の代わりに同じ ip の状態を併合する (run の説明を参照)。
     判定不能 (値が未知の経路) の詳細は末尾の '類=' に未知の源の類を付ける。"""
     stats = {}
     try:
-        vals, labs = run(insns, probe, fam, prune, stats)
+        vals, labs = run(insns, probe, fam, prune, stats, merge)
     except (Unsup, Stop, KeyError, ValueError) as e:
-        if isinstance(e, Stop) and prune:
-            return '判定不能', '刈り込み後も step 上限 (未知分岐 %d・刈り込み %d)' % (
-                stats.get('未知分岐', 0), sum(v for k, v in stats.items() if k.startswith('刈り込み')))
+        if isinstance(e, Stop) and (prune or merge):
+            return '判定不能', '%s後も step 上限 (未知分岐 %d・%s %d)' % (
+                '併合' if merge else '刈り込み', stats.get('未知分岐', 0),
+                '併合' if merge else '刈り込み',
+                sum(v for k, v in stats.items() if k.startswith('併合' if merge else '刈り込み')))
         return '判定不能', '%s: %s' % (type(e).__name__, e)
     if not vals:
         return '判定不能', 'probe に到達しない'
@@ -470,6 +549,9 @@ def verify(insns, probe, fam, claim=None, prune=False):
         if prune and stats.get('刈り込み(ループ)', 0) + stats.get('刈り込み(分岐の合流)', 0):
             cut_txt = ' (刈り込み ループ %d・分岐の合流 %d)' % (
                 stats.get('刈り込み(ループ)', 0), stats.get('刈り込み(分岐の合流)', 0))
+        if merge and stats.get('併合(ループ)', 0) + stats.get('併合(分岐の合流)', 0):
+            cut_txt = ' (併合 ループ %d・分岐の合流 %d)' % (
+                stats.get('併合(ループ)', 0), stats.get('併合(分岐の合流)', 0))
         return '判定不能', '値が未知の経路がある%s 類=%s' % (cut_txt, '/'.join(sorted(labs)))
     if len(vals) > 1:
         return ('FAIL' if claim is not None else '未決'), '経路で値が違う: ' + ','.join(hex(v) for v in sorted(vals))
@@ -573,6 +655,27 @@ def selftest():
         ok = got == expect
         bad += not ok
         print('[selftest] %-44s 期待 %-6s 判定 %-6s %s %s' % (name, expect, got, det, 'OK' if ok else 'NG'))
+    # 併合 (--merge) の検査: 同じ ip の状態を値ごとに併合する。値が一致すれば保つ・違えば未知にする。
+    #   M1 分岐 1 つ・両経路同値 (K1 と同じ): 併合でも 0x0 (PASS)。claim 0x1 は FAIL。
+    #   M2 ループ内に未知分岐 (P3 と同じ・rbx は一定): 併合で収束して PASS (rbx=5)。claim 0x6 は FAIL。
+    #   M3 出口なし無限ループ (P4 と同じ): 併合で同じ状態に戻り止まり、rdx=0 で実値化。
+    #   M4 カウンタ付きループ (K2 と同じ・条件は確定): 確定分岐は併合の対象外で具体実行のまま PASS (rdx=1)。
+    merge_cases = [
+        ('M1 分岐 1 つ・併合 (両経路 0x0)', '31db83ff007405' '31d2' 'eb03' '90' '31d2' 'c3', 7, 'rdx', 0x0, 'PASS'),
+        ('M1 ネガティブ (併合・claim 0x1)', '31db83ff007405' '31d2' 'eb03' '90' '31d2' 'c3', 7, 'rdx', 0x1, 'FAIL'),
+        ('M2 未知分岐を出口に持つループ・併合 (rbx=5)', 'bb05000000' 'e800000000' '7402' 'ebf7' 'c3', 4, 'rbx', 0x5, 'PASS'),
+        ('M2 ネガティブ (併合・claim 0x6)', 'bb05000000' 'e800000000' '7402' 'ebf7' 'c3', 4, 'rbx', 0x6, 'FAIL'),
+        ('M3 出口なしループ・併合 (rdx=0 で実値化)', '31d2' 'ebfe', 1, 'rdx', None, '実値化'),
+        ('M3 ネガティブ (併合・claim 0x1 は FAIL)', '31d2' 'ebfe', 1, 'rdx', 0x1, 'FAIL'),
+        ('M4 カウンタ付きループ・併合 (確定分岐は具体実行 rdx=1)', '31db' '89da' '83c301' '83fb02' '75f6' 'c3', 5, 'rdx', 0x1, 'PASS'),
+        ('M4 ネガティブ (併合・claim 0x0)', '31db' '89da' '83c301' '83fb02' '75f6' 'c3', 5, 'rdx', 0x0, 'FAIL'),
+    ]
+    for name, hx, probe, fam, claim, expect in merge_cases:
+        insns = list(md.disasm(bytes.fromhex(hx), B))
+        got, det = verify(insns, probe, fam, claim, merge=True)
+        ok = got == expect
+        bad += not ok
+        print('[selftest] %-44s 期待 %-6s 判定 %-6s %s %s' % (name, expect, got, det, 'OK' if ok else 'NG'))
     # 未知の源の類 (値が未知の経路の 類=)。PASS = 類が一致 / FAIL = 類が違う (ネガティブコントロール)。
     lab_cases = [
         ('L1 入力引数 (esi は入口で未知)', '89f30fb6d3c3', 2, 'rdx', '入力引数', 'PASS'),
@@ -594,12 +697,12 @@ def selftest():
         ok = st == expect
         bad += not ok
         print('[selftest] %-44s 期待 %-6s 判定 %-6s 類 %s %s' % (name, expect, st, lab, 'OK' if ok else 'NG'))
-    n = len(cases) + len(prune_cases) + len(lab_cases)
+    n = len(cases) + len(prune_cases) + len(merge_cases) + len(lab_cases)
     print('[selftest] %d 件 / 不一致 %d' % (n, bad))
     return bad
 
 
-def real(rows_path, pe, all_rows=False, prune=False):
+def real(rows_path, pe, all_rows=False, prune=False, merge=False):
     sys.path.insert(0, os.path.join(HERE, 'ldfix'))
     sys.path.insert(0, HERE)
     import ldmach
@@ -618,7 +721,7 @@ def real(rows_path, pe, all_rows=False, prune=False):
         calls = [i for i, x in enumerate(insns) if x.mnemonic == 'call' and x.op_str.startswith('0x')
                  and int(x.op_str, 0) == tva]
         claim = None if r.get('value') is None else int(r['value'], 0)
-        got, det = verify(insns, calls[r['k']], r['fam'], claim, prune)
+        got, det = verify(insns, calls[r['k']], r['fam'], claim, prune, merge)
         cnt[got] += 1
         if got == '判定不能' and '類=' in det:
             kinds[det.split('類=', 1)[1]] += 1
@@ -635,9 +738,10 @@ if __name__ == '__main__':
     ap.add_argument('--selftest', action='store_true')
     ap.add_argument('--all', action='store_true', help='class によらず全行を照合する (claim なし)')
     ap.add_argument('--prune', action='store_true', help='同一状態の再訪 (ループ・分岐の合流) を刈り込む (既定は従来どおり)')
+    ap.add_argument('--merge', action='store_true', help='分岐の合流を、同じ ip の状態の併合で収束させる (既定は従来どおり)')
     a = ap.parse_args()
     if a.selftest:
         sys.exit(1 if selftest() else 0)
     if not a.rows or not a.pe:
         ap.error('ROWS と --pe を指定する (合成検査は --selftest)')
-    sys.exit(1 if real(a.rows, a.pe, a.all, a.prune) else 0)
+    sys.exit(1 if real(a.rows, a.pe, a.all, a.prune, a.merge) else 0)
