@@ -97,9 +97,9 @@
 - 全 32 種 disable: 注釈 0 → 1 (戻る)、`not in loop` 1 → 0。
 - VarDefStmtOptimizer 単独: 注釈 0 → 1 (戻る)、`not in loop` は 1 のまま (`notloop_vardef.sh`)。
 - 注釈を戻す最小集合 (`notloop_minset.sh`・所要 88.7 s): `VarDefStmtOptimizer` 単独。
-- `not in loop` を 0 にする最小集合 (`notloop_minset_err.sh`・所要 93.0 s。本 run 新規): `WhileTrueToWhileCondOptimizer` 単独。**この結果は旧版スクリプト (測定 commit `a34f768e7`) によるもの。** 旧版は RetDec 失敗時に前候補の `e.c` が残る・emcc の終了コードを見ない、という偽陽性の余地があったため、この値は検証されていない。
+- `not in loop` を 0 にする最小集合 (旧版 `notloop_minset_err.sh`・所要 93.0 s・測定 commit `a34f768e7`): `WhileTrueToWhileCondOptimizer` 単独。**旧版の値で、未検証 (旧版)。** 旧版は RetDec 失敗時に前候補の `e.c` が残る・emcc の終了コードを見ない偽陽性の余地があった。修正版 (`885a2b627`) では未実測 (`toolchain-retdec`・`toolchain-emsdk` が素材に無いため)。
 - 修正版 (本 PR の HEAD): 候補ごとに `e.c` を消し、RetDec の終了コード・`e.c` の存在・emcc の終了コードを確認する。既定 C で `not in loop` が 0 なら中止する (正対照)。この修正版での再測定は素材 (`toolchain-retdec`・`toolchain-emsdk`) が無く未実施。修正版の分岐は偽の RetDec / emcc で確認済み (正常系・RetDec 失敗で中止・emcc 無しで中止)。
-- 判定 (旧版の結果を前提にした場合): この組では、注釈を戻す段 (VarDef) と `not in loop` を消す段 (WhileTrueToWhileCond) が**一致しない**。前 run までの「注釈の段 = エラーの段」という前提は、この組では成り立たない。ただし上記のとおり、この結論は修正版で再測定するまで確定ではない。
+- 判定: 未確定 (旧版の値のみ・未検証)。注釈を戻す段 (VarDef 単独) と、旧版が出した `not in loop` を消す段 (WhileTrueToWhileCond 単独) が一致するかは、修正版で再測定するまで言えない。「注釈の段 = エラーの段」という前提が成り立たないかどうかも、この時点では判断しない。
 - 未測定: 0x683120 の C を wasm 実行して bit 一致を見ること (未実施)。残り 12 組の `not in loop` の最小集合 (範囲の確定が要るため未実施。0x408770 は範囲を推定で `0x4087ff` と置いて測ったが、範囲の根拠が無いため結果は採らない)。
 
 ## 5. 採らなかった方式
