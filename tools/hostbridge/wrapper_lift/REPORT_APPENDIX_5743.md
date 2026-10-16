@@ -65,7 +65,7 @@
 ## 4b. 12 組の全 disable と VarDefStmtOptimizer 単独 (本 run)
 
 - 測定 commit: `112cdcf32` (main 取り込み済み。`notloop_minset.sh`・`notloop_vardef.sh` と測定値を同 commit に含む)。素材・RetDec・emcc は §1 と同じ。
-- **母集団**: §4b の全 disable と 1-minimal は、`--backend-disabled-opts` に渡した **ヘッダ名 32 種** の範囲でのみ成り立つ。ヘッダ名は本 run に展開した RetDec の `optimizers/*.h` のファイル名から `.h` を除いたもの (32 件)。§3 の「既定の 48 個」との差 16 種は、§4b では探索していない。差の 16 種が RetDec の名前として渡せるかは未確認 (本 run に RetDec が無く、ヘッダ名一覧もリポジトリに無い)。したがって下記の結論は「32 種の中での最小」であり、全 optimizer の中での最小ではない。件数 32 は再計数していない (素材が無い)。
+- **母集団 (§4d で訂正)**: `--backend-disabled-opts` が受け付ける名前は CamelCase のクラス名 (`EmptyStmtOptimizer` など) である。snake_case (`empty_stmt_optimizer` 等の `*.h` のファイル名) は無視され、無効化が効かない (§4d)。本節の母集団は「ヘッダ名 32 種」と書いたが、実際に渡した名前の形式は未確認だった。§4d の CamelCase 32 種 (`tools/hostbridge/wrapper_lift/retdec_opt_names.txt`) で再測定し、§4b の代表 2 組は一致した。§3 の「既定の 48 個」との差 16 種は、§4b・§4d のどちらも探索していない。したがって下記の結論は「32 種の中での最小」であり、全 optimizer の中での最小ではない。
 - 全 disable (32 種): 表の未特定 13 行のうち、関数範囲を取れた 12 行で注釈が戻る (12/12)。0x683120 は当時 `NORANGE` で未測定だったが、§4c で範囲を取得して測定済み (注釈は戻る)。
 - 1 組の最小集合 (`notloop_minset.sh`): 0x732ae0 は `EmptyStmtOptimizer,WhileTrueToWhileCondOptimizer` (§3 と一致)。
 
@@ -101,6 +101,30 @@
 - 修正版 (本 PR の HEAD): 候補ごとに `e.c` を消し、RetDec の終了コード・`e.c` の存在・emcc の終了コードを確認する。既定 C で `not in loop` が 0 なら中止する (正対照)。この修正版での再測定は素材 (`toolchain-retdec`・`toolchain-emsdk`) が無く未実施。修正版の分岐は偽の RetDec / emcc で確認済み (正常系・RetDec 失敗で中止・emcc 無しで中止)。
 - 判定: 未確定 (旧版の値のみ・未検証)。注釈を戻す段 (VarDef 単独) と、旧版が出した `not in loop` を消す段 (WhileTrueToWhileCond 単独) が一致するかは、修正版で再測定するまで言えない。「注釈の段 = エラーの段」という前提が成り立たないかどうかも、この時点では判断しない。
 - 未測定: 0x683120 の C を wasm 実行して bit 一致を見ること (未実施)。残り 12 組の `not in loop` の最小集合 (範囲の確定が要るため未実施。0x408770 は範囲を推定で `0x4087ff` と置いて測ったが、範囲の根拠が無いため結果は採らない)。
+
+## 4d. disable 名の形式の訂正 (#5911)
+
+- 測定 commit: 本 PR のコード commit (`retdec_opt_names.txt` と `notloop_*.sh` の注記)。素材 `toolchain-retdec` (RetDec v5.0)・`toolchain-emsdk` (6.0.12)・`fl-win64` (`extracted/block19091_PE.bin`)。`$RUNNER_TEMP` に展開。
+- 名前の形式: `--backend-disabled-opts` は `getId()` 由来の CamelCase に `Optimizer` を付けたクラス名 (`EmptyStmtOptimizer` など) を受け付ける。snake_case の `*.h` 名 (`empty_stmt_optimizer` など) は無視され、無効化が効かない。
+- 32 種の出どころ: `include/retdec/llvmir2hll/optimizer/optimizers/` の `class <Name>Optimizer` 宣言 (`Sub` 付きの 11 種は別クラスなので除外)。`retdec_opt_names.txt` に収録。`LLVMIntrinsicsOptimizer`・`WhileTrueToUForLoopOptimizer` は `getId()` の綴り (`LLVMIntrinsics`・`WhileTrueToUForLoop`) と、クラス宣言の綴りが一致する。
+- 実測 (同 commit・単一 range、件数は `emcc -fsyntax-only` の `not in loop`):
+
+| 組 | 変種 | 注釈 `// <飛び先>` | `not in loop` |
+|---|---|---|---|
+| 0x732ae0 → 0x732b75 | 既定 | 0 | 2 |
+| 同 | CamelCase 32 種 全 disable | 1 | 0 |
+| 同 | snake_case 32 種 全 disable | 0 | 2 |
+| 同 | VarDefStmtOptimizer 単独 | 0 | 2 |
+| 0x683120 → 0x6835cb | 既定 | 0 | 1 |
+| 同 | CamelCase 32 種 全 disable | 1 | 0 |
+| 同 | snake_case 32 種 全 disable | 0 | 1 |
+| 同 | VarDefStmtOptimizer 単独 | 1 | 1 |
+
+- `notloop_minset.sh` (CamelCase 32 種・所要 75.3 s): 0x732ae0 → `EmptyStmtOptimizer,WhileTrueToWhileCondOptimizer`。0x408770 → `VarDefStmtOptimizer` (範囲 `0x408770-0x4087f3` は本測定での推定。§4b の範囲とは別)。
+- `notloop_minset_err.sh` (CamelCase 32 種・所要 81.9 s): 0x732ae0 → `WhileTrueToWhileCondOptimizer` 単独。
+- 解釈: 注釈の消失は、CamelCase で渡せば §4b の結論どおり (0x732ae0 は 2 段の組み合わせ、0x683120 は VarDef 単独で戻る)。snake_case で渡した過去の測定は無効。§4b の全 disable 結果 (12/12 戻る) は、§4b が渡した形式を確認していなかったため、再確認が要る (下記)。
+- 過去 PR (#5833・#5872・#5890) の diff には名前一覧が含まれず、渡した形式は diff からは確定できない。
+- 未確認: 残り 16 種 (§3 の 48 個との差) の名前。`WhileTrueToUForLoop` 等の綴りの扱いは、クラス宣言と `getId()` の両方で一致したが、RetDec の内部一覧 (`optimizerManager`) 自体は未読。12 組の入力範囲は未収録のまま。
 
 ## 5. 採らなかった方式
 
