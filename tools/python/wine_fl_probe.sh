@@ -17,7 +17,7 @@ mkdir -p "$W" && cd "$W" || exit 2
 
 if [ ! -f "$FL_DIR/FLEngine_x64.dll" ]; then
   [ -d "$P/drive_c" ] || timeout 120 "$WINE" wineboot --init >/dev/null 2>&1
-  # インストーラは PowerShell 段階で timeout するが、展開は完了する (#5838 で確認)。
+  # インストーラは PowerShell 段階で timeout することがある。展開の完了は保証されない (#5838・REPORT_PY5392.md 参照)。
   timeout 150 xvfb-run -a "$WINE" flstudio_win64_26.1.7.5653.exe /S >/dev/null 2>&1
 fi
 [ -f "$FL_DIR/FLEngine_x64.dll" ] || { echo "NO_FLENGINE_EXTRACTED" >&2; exit 3; }
