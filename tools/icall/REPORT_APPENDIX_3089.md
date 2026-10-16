@@ -139,3 +139,44 @@ bash tools/icall/diff/index_table_scan_selftest.sh
 FA_DL="$RUNNER_TEMP/fa" bash tools/targets/freshair/fetch.sh   # $RUNNER_TEMP/fa に plugins-freshair を展開した後
 SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh            # n=3 で実行
 ```
+
+## 11. rc=99 が 9 から 2 に減った commit の bisect (#5869 / ICALL-120)
+
+### 11.1 結論
+
+- **特定: 2 段の変化。** 9 → 3 は `b64cb3ae3` (ICALL-52・KERNEL32 `RtlPcToFileHeader` を IMPL に追加)、3 → 2 は `a16424be0` (merge `origin/main into 4565-icall-cxx-eh-unwind`)。
+- `b64cb3ae3` で rc=99 から外れた 6 関数 (`1803b3fc0`・`1803b5b60`・`180cbd860`・`18100cf60`・`181011058`・`18102f728`) は、§11.2 の集合差で特定した。§9.3 の「`RtlPcToFileHeader` ×6」と件数が一致するが、`RtlPcToFileHeader` との機構対応は未確認。
+- `a16424be0` で rc=99 から外れたのは `18100cc50` の 1 件。この merge が持ち込んだ `k_RtlCaptureContext` (ICALL-100) との関係は相関のみで、機構は未確認。
+- 残る 2 件 (`18100ca28`・`18103d218`) は `e5261de58` まで残る。
+
+### 11.2 測定 (bisect の各点・slot_trace の既定条件・`SLOT_ENC_INIT=1`・foreground)
+
+| commit | 役割 | rc=99 | rc 分布 (funcs 131) | 再測定 |
+|---|---|---|---|---|
+| `adda5c027` | 始点 (9 件) | 9 | rc=0: 69・rc=95: 44・rc=98: 8・rc=99: 9・rc=124: 1 | 2 回 (9・9) |
+| `ee2883ab8` | `b64cb3ae3` の親 | 9 | (同上) | 2 回 (9・9) |
+| `b64cb3ae3` | 9 → 3 の境界 | 3 | rc=0: 69・rc=95: 44・rc=97: 6・rc=98: 8・rc=99: 3・rc=124: 1 | 2 回 (3・3) |
+| `bb549b385` | `a16424be0` の第 1 親 | 3 | (同上) | 2 回 (3・3) |
+| `3996275dd` | `a16424be0` の第 2 親 | 3 | (同上) | 1 回 (3) |
+| `a16424be0` | 3 → 2 の境界 (merge) | 2 | rc=0: 70・rc=95: 44・rc=97: 6・rc=98: 8・rc=99: 2・rc=124: 1 | 2 回 (2・2) |
+| `e5261de58` | 終点 (2 件) | 2 | rc=0: 70・rc=95: 44・rc=97: 6・rc=98: 8・rc=99: 2・rc=124: 1 | 1 回 (2) |
+| `cf486ff00` (main HEAD) | 本 run の測定 commit | 2 | rc=0: 70・rc=95: 44・rc=97: 6・rc=98: 8・rc=99: 2・rc=124: 1・既知 12 中 hit 3 | 3 回 (2・2・2) |
+
+- 測定 load (1 分値・開始時): 0.76〜1.13。real 12.39〜12.46 s (HEAD の 3 回)。load の値は測定時の記録を正とする (生ログは本 run で再確認できず、記録値の広い方の範囲を採る)。
+- 9 件の集合: `1803b3fc0`・`1803b5b60`・`180cbd860`・`18100ca28`・`18100cc50`・`18100cf60`・`181011058`・`18102f728`・`18103d218`。
+- 各 commit の rc=99 の集合 (`b64cb3ae3`): `18100ca28`・`18100cc50`・`18103d218` (3 件)。`e5261de58`: `18100ca28`・`18103d218` (2 件)。
+
+### 11.3 方法と注意
+
+- bisect は `slot_trace.sh` の rc=99 件数で判定し、`git bisect run` で二分探索した。
+- 1 回目の bisect は判定の向きを取り違え、結果 (`e5261de58`) は誤りだった。この結果は採用しない。
+- 2 回目は「件数 9 = good、それ以外 = bad」の 1 軸で行い、`b64cb3ae3` を得た。3 → 2 の範囲は「件数 3 = good、2 = bad」で `a16424be0` を得た。
+- bisect の途中で件数が 9 → 3 → 2 と単調でない点がある (例: `187ef98d7` 2、`7df348b8c` 3)。境界の前後は各 2 回測って安定を確かめた (§11.2)。
+- 測定 commit `cf486ff00` (= HEAD) から HEAD までの対象差分 `git diff cf486ff00 HEAD -- tools/icall/diff tools/ott tools/targets/freshair` は 0 行 (本 PR は REPORT のみを変える)。
+
+### 11.4 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `b64cb3ae3` と `a16424be0` で外れた関数の機構 (`RtlPcToFileHeader`・`RtlCaptureContext` の戻り値と、guest の分岐のどこが変わったか) | 相関のみ。機構未確認 | #5887 (ICALL-121。機構の調査と記録。`ott_native.c` を変える場合は別 PR) |
+| 残る 2 件 (`18100ca28`・`18103d218`) の rc=99 の原因 | baseline の 2 件 | #4881 の判断 (PM) |
