@@ -387,6 +387,7 @@
 | `tools/m11/trap_triage/REPORT_APPENDIX_5661.md` | ~100 | #5661: strict 候補の証拠表 行 159〜193 (35 件) の件ごとの判定 (真陽性 3・偽陽性 1・保留 31・機械語と IR の突合・未解決)。REPORT_718 §4m の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_4885.md` | ~90 | #4885: 証拠表の行 67・68・71〜74 の件ごとの判定 (母数 13・真陽性 6・偽陽性 0・保留 7)。REPORT_718 §4l の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5660.md` | ~90 | #5660: 証拠表の行 119〜158 (母数 40) の件ごとの突合表。判定 0 件・保留 40 (保留の型 (i)〜(iv))。REPORT_718 §4l の行 119〜158 の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_5689.md` | ~90 | #5689: 証拠表の行 139〜158 (母数 20) の件ごとの判定。確定 0・保留 20 (140・141・143 は別ビルド dsm のみを根拠にしたため保留)。REPORT_718 §4l の行 139〜158 の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` | ~79 | #3498 (PR #3567): strict 候補の証拠表 行 4〜35 (32 件) の件ごとの表・判定規則・未解決 (REPORT_718 §4h の全文。REPORT_718.md の 250 行上限のため分割移動)。判定の内訳は付録 §4h が正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3823.md` | ~67 | #3823: 923 の obj 0x10bd3960 への書込み (全 store 計装・unit 830/880 の 0 書込み)。呼出し鎖は未確定 |
@@ -1122,6 +1123,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_4687.md` | ~50 | KH-110 (#4687): Delay の BINOP 残件のうち `_DAT_` グローバル 4 件 (`184162118`・`184162a88`・`184162a98`・`182989380`) を `GTYPE` の `ulonglong` に直した規則 (型不一致 110 → 104・emcc 363 → 357・Gain/Haas/Gate の `.o` 不変)・残件の分類と起票先。測定の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4955.md` | ~50 | KH-136 (#4955): Delay の `FUN_1802ecfc0` (tap_add) の宣言 `param_3`・`param_4` を機械語 (`addps` の 16 byte オペランド) どおり `V128 *` に (`DELAY_RULES` 4 件)。emcc 418 → 416 (型不一致 2 件消滅)・ホスト突合 200,000 試行 mismatches 0・ネガコン FAIL。測定の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4835.md` | ~50 | KH-118 (#4835): Delay の引数数不一致のうち呼出元 `FUN_180fbbfb8` → `FUN_180fbdfcc` の ABI 規則 (`delay 2666`) の根拠 (機械語・callee 宣言)。`FUN_180fcdbfc` → `FUN_180fbde90` は callee 宣言が未確認のため規則にしない (未解決)。根拠の正本 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_5664.md` | ~80 | KH-174 (#5664): Delay の float の符号判定・符号反転 (`(uint)fVar`・`_DAT_182286970`・`_DAT_182286958`) を機械語で 1 件ずつ確認し、ビット列 (`f2u`/`u2f`) で読む `DELAY_RULES` 12 件。emcc error 315 → 315 (silent miscompile のため件数は変わらない)・Gain/Haas/Gate の `.o` 不変。測定の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4900.md` | ~50 | KH-132 (#4900): Delay の `FUN_180fc4590` の `vcvtpd2dq` 下位 lane (`auVar20._0_4_`) を `int` で読む `DELAY_RULES` 2 件 (機械語で確定)。emcc error 343 → 342・型不一致 90 → 89・Gain/Haas/Gate の `.o` 不変。測定の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3849.md` | ~45 | KH-80 (#3849): Delay の型不一致 残件のうち Win API 戻り値 9 件 (`HeapAlloc`・`GetCurrentProcess`・`RtlLookupFunctionEntry`・`RtlPcToFileHeader`) を shim の戻り型 `longlong` で解消 (119 → 110)・Gain/Haas/Gate の `.o` 不変。残り 23 件 (関数ポインタ 9・void 戻り値 7・BINOP 7) は子 issue へ。結果の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3801.md` | ~84 | KH-65 (#3801): Delay の型不一致 187 件の規則。`_DAT_` グローバル 13 件の C 型規則 `GTYPE` (機械語の参照幅で確認) で 187 → 119 (emcc 507 → 439)・Gain/Haas/Gate の `.o` 不変・ネガティブコントロール (NC0/NC1/NC2) は現行値で再測定済み・残件 119 の分類と起票先 (#3837・#3849)。§10-7x の正本 |
