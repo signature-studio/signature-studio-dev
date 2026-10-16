@@ -3,7 +3,7 @@
 親 #3384 (LD-155)。前提は `REPORT_APPENDIX_LD126.md` §3・§3.1 (sta_img で match 4 件、スタック復元 (`all`) で 0 件)。
 LD-240 (#4801) で hi 区間の測定誤りを直した (下の §0)。
 
-測定 commit: **`0a7e580f8` (本 PR の最終 HEAD)**。コードを変えた最後の commit は本 PR の `rt/ld_runner.mjs` (resetRegions の順序) と `rt/ld_native.c` (コメント)。
+測定 commit: **`253902726`** (コードを変えた最後の commit。`rt/ld_runner.mjs`・`rt/ld_native.c`・`ld240_hi_probe.py`)。
 
 ## 0. 前回の誤り (LD-240 で修正)
 
@@ -22,7 +22,7 @@ LD-240 (#4801) で hi 区間の測定誤りを直した (下の §0)。
 
 ## 2. SNAPSHOT 直後の実測 (probe)
 
-`ld240_hi_probe.py` (repo 内・`work/ld240/probe.json` に出力) の出力 (HEAD `0a7e580f8`、wasm は §1 のビルド):
+`ld240_hi_probe.py` (repo 内・`work/ld240/probe.json` に出力) の出力 (HEAD `253902726`、wasm は §1 のビルド):
 
 | 項目 | 値 |
 |---|---|
@@ -34,7 +34,7 @@ LD-240 (#4801) で hi 区間の測定誤りを直した (下の §0)。
 | deep 区間 `[stack_end, SP)` | 8,388,608 B |
 
 - SP = stack_base なので、hi 区間は 0 B。受入条件の「hi 区間が 8 MiB 以内」は満たす (0 B)。
-- probe の RESET 差分 (各 mask を別プロセスで、SNAPSHOT 直後に 1 回 RESET): `reset 1` (stk) = 5・`reset 256` (hi) = 4・`reset 512` (win) = 1・`reset 128` (deep) = 0・`reset 7` (all) = 5。
+- probe の RESET 差分 (各 mask を別プロセスで、SNAPSHOT 直後に 1 回 RESET): `reset 1` (stk) = 5・`reset 256` (hi) = 4・`reset 512` (win) = 1・`reset 128` (deep) = 0・`reset 7` (all) = 5。連続 RESET (`6,6,2,2,4,4`) の差分は全て 0 (冪等)。
 - 実行コマンド: `cd tools/liftdiff && ANALYSIS_DIR=$HOME/work/analysis python3 ld240_hi_probe.py > work/ld240/probe.json` (27 s)。
 - 修正前の値 (`reset 256 diff 575469632`) は、戻し処理の frame の書き換えで壊れた値。この PR の修正後は 4 になった。
 
@@ -48,8 +48,10 @@ LD-240 (#4801) で hi 区間の測定誤りを直した (下の §0)。
 | `sta_img_hi` (6+256) | 4 | 13 | 15,321,083 / 14,699,540 / 9,682 / 193,722 |
 | `all` (7) | 4 | 13 | 15,451,894 / 14,699,831 / 9,987 / 324,314 |
 
+(上表は本測定 (`253902726`)。`0a7e580f8` 時の 2 件目以降は `sta_img_hi` で 39,757 B だった。)
+
 - 5 条件とも match 4 件は `0x4bf600`・`0x50ab90`・`0x7850d0`・`0xb77200`。全件の verdict は `results/ld226_sta_img_stack.tsv`。
-- RESET 差分の 2 件目以降は、前の case の実行で書き換わった分を戻したもの。RESET は case の直前に送るため、1 件目の値は事前の case に由来する (この値は snapshot との差ではなく、その時点までの持ち越し量)。
+- RESET 差分の列は、対象 17 件の各 RESET で戻した byte 数 (`*.reset.json` の先頭 4 件)。RESET は対象 case の直前に送るため、各値は「その時点までに case が書き換えた量」で、snapshot からの累積ではない。同じ HEAD (`253902726`) を 2 回流した (`0a7e580f8` 時の 1 回目と本測定) ところ、verdict 19 件は一致し、`sta_img_hi` の 1 件目の差分も 15,321,083 B で一致した。2 件目以降の差分は測定ごとに変わった (`0a7e580f8` 時は `sta_img_hi` の 2 件目が 39,757 B、本測定は 14,699,540 B)。原因は未特定で、この列は n=2 でしか確認していない (未解決 → #3384)。
 - 前版 (誤った差分) からの変化は、`sta_img_hi` と `all` で `0x4bf600`・`0x50ab90`・`0x7850d0`・`0xb77200` の 4 件が mismatch → match になったこと。他の値は変わらない。
 - 同じ wasm で `RESET 6`・`RESET 2`・`RESET 4` を連続で送った直接確認では、いずれも `diff 0` (戻し後の 2 回目は差分なし)。戻しは冪等。
 
