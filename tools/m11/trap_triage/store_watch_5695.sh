@@ -25,7 +25,7 @@ mv work/probe5695/boot_sw_rp.ll work/probe5695/boot_sw_cp.ll
 emcc -c work/probe5695/boot_sw_cp.ll -o work/obj/boot.o $CF || exit 1
 emcc -c trap_triage/watch_arg1_5695.c -o work/obj/sw5695.o $CF || exit 1
 emcc -c trap_triage/watch_copy_5695.c -o work/obj/cp5695.o $CF || exit 1
-emcc -c m11_ov.c -o work/obj/ov.o $CF -DM11_FIX_682=1 -DM11_NOTIFY_682=0 || exit 1
+emcc -c m11_ov.c -o work/obj/ov.o $CF -DM11_FIX_682=1 -DM11_NOTIFY_682=0 -DM11_WATCH_C5695=1 -DM11_WATCH_LO=${LO}+${BASE} -DM11_WATCH_HI=${LO}+${BASE}+${SPAN} || exit 1
 bash m11_build.sh > work/probe5695/build_$tag.log 2>&1 || { tail -5 work/probe5695/build_$tag.log; exit 1; }
 SV_PROG=1 SV_ERR_LOG=work/probe5695/$tag.aw node trap_triage/survey_units.mjs work/probe5695/$tag.json > work/probe5695/$tag.out 2> work/probe5695/$tag.err || { echo "[store_watch_5695] survey failed (rc=$?)" >&2; exit 1; }
 grep -a -o "^SURVEY_UNITS .\{0,160\}" work/probe5695/$tag.out
