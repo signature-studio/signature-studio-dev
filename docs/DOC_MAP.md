@@ -1038,7 +1038,8 @@
 | `tools/shared/lift/ildsp/REPORT_LIFT.md` | ~100 | ildsp vtable 転送先 0x161fc0 の closure lift の前段 (T-SH-61 #3299): 3 候補の選定実測・RetDec 範囲指定・gen_helpers の停止点。wasm 化と差分テストは子 issue。測定値の正本。再現は `lift_vtable.sh` |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_3276.md` | ~65 | ildsp WaveformColouring の native 確定 (T-SH-59 #3276)。結論・手順・実測・ネガティブコントロール・未解決の全文 (`REPORT.md` §5-4・§5-5 から参照)。harness は `native_ref_wc.c` (入力は `native_image.py`)。測定値の正本 |
 | `tools/shared/lift/ildsp/REPORT_APPENDIX_4230.md` | ~75 | ildsp CreateInstance 間接 call 4 件の到達 (T-SH-103 #4230・部分達成): 正の対照 (`0x1ac9ce`・`0x1aedc0` 入口) つきの実測、alloc 失敗注入と巨大 rdx の結果、既定入力の発火の非決定性、未解決の起票先 (#4289)。REPORT_CLOSURE.md §4.5 から参照。測定値の正本 |
-| `tools/shared/lift/ildsp/REPORT_CI.md` | ~70 | ildsp GeneralPitchShifter_CreateInstance 単独 closure の RetDec 入力・census・閉包の取りこぼし・ネガティブコントロール (T-SH-62 #3300)。測定値の正本 |
+| `tools/shared/lift/ildsp/REPORT_CI.md` | ~150 | ildsp GeneralPitchShifter_CreateInstance 単独 closure の RetDec 入力・census・閉包の取りこぼし・ネガティブコントロール (T-SH-62 #3300)。§7 は SSE store の復元 (T-SH-103 #4229)、§8 は方針の決定と census の検出 (T-SH-153 #5749)、§9 は wasm リンクと外部グローバル (T-SH-152 #5748)、§10 は emcc の obj 化と間接 call 2 件の trap 化 (T-SH-65 #3318) の結論 1 行と付録への参照。測定値の正本 |
+| `tools/shared/lift/ildsp/REPORT_APPENDIX_3318.md` | ~70 | ildsp CreateInstance (T-SH-65 #3318・部分達成) の付録: `uselistorder` 除去と emcc obj 化の gate・間接 call 2 件の trap 化・ネガティブコントロール・リンク時の未解決シンボル 14 件の内訳。測定値の正本 |
 | `tools/shared/lift/rex/REPORT.md` | ~75 | REX Shared Library (win `block24351_PE.bin`) の export 14 本の閉包測定 (T-SH-11 #153): 関数数・命令数・間接 call・import・`.pdata` 無しの近似。lift は未実施 (#2733・#2734)。測定値の正本。再現は `rex_closure.py` |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2870.md` | ~50 | rex REPORT §9 全文 (T-SH-46 #2870: 成功経路 (戻り値 1 / 3) と arena 書込の一致・落ちる case の分類・未解決) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2896.md` | ~41 | rex REPORT §10 の旧版全文 (T-SH-47 #2896: REX_SIDE フラグと owner/rex_side.wasm の旧測定 (測定 commit `105733875`・133 件版)。最新は REPORT §10) |

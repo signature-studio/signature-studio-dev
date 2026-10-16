@@ -210,3 +210,7 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 | `uselistorder` 行 (174 行) を emcc が読めない | ci_link.sh は行を除いて回避。ir_normalize の対応が必要 | [T-SH-65] #3318 |
 | IAT 10 種 | 未解決 (リンクエラー) | #5747 |
 | 閉包の取りこぼし (function_1801aef40・function_1801cb600) | 未解決 (リンクエラー) | #5749 |
+
+## 10. emcc の obj 化と間接 call 2 件の trap 化 (T-SH-65 #3318・部分達成)
+
+結論: `uselistorder` (順序メタ情報) を除いた IR は emcc で obj 化でき、間接 call 2 件 (`function_1801cb5e0`・`function_1801cb600`) は trap 定義を入れた (検査は実 RetDec 出力の `declare i64 @<name>(i64)` に合わせた)。wasm のリンク・実行は未実施で、IAT 10 種 (#5747)・外部グローバル 2 種 (#5748)・範囲外の直接 call 先と計算ジャンプ表 (#5749) が残る。trap 化の理由: 2 件の宛先は CFG/XFG dispatch 経由で実行時の `rax` になり、IR の固定名 declare からは一意に決まらない (slot 0x268260・0x268268、呼出し元 0x1aedf6・0x1b6f6c。到達実測は #3250)。詳細と実測は `REPORT_APPENDIX_3318.md`。現 head `63f896abe` では `ci_lift.sh` 全体は census の orphan 検査で rc 1 (§8-2 の意図した結果)。census 以降の後段は単独実行で rc 0 (付録 §3)。
