@@ -25,3 +25,18 @@ grep -v '^ *uselistorder ' "$W/ci.rs_norm.ll" > "$W/ci.emc.ll"
 emcc -c -O1 -w "$W/ci.emc.ll" -o "$W/ci.emc.o"
 emcc -c -O1 -w "$W/ci_helpers.c" -o "$W/ci_helpers.o"
 echo "[ci] emcc obj OK (uselistorder 除去後の IR と helper)"
+# 間接 call 2 件 (0x1aedf6 → slot 0x268260 / 0x1b6f6c → slot 0x268268)。IR は固定名 (画像内ポインタ) で呼ぶが、宛先は実行時の rax。trap 化 (REPORT_CI §8)。
+python3 - "$W/ci.emc.ll" "$W/ci_traps.c" <<'PY'
+import re, sys
+ir = open(sys.argv[1]).read()
+names = ["function_1801cb5e0", "function_1801cb600"]
+for n in names:
+    if not re.search(r"^declare i64 @%s\b" % n, ir, re.M):
+        sys.exit("[ci] indirect call target not declared as i64: %s" % n)
+with open(sys.argv[2], "w") as fh:
+    fh.write("#include <stdint.h>\n")
+    for n in names:
+        fh.write("uint64_t %s(void) { __builtin_trap(); return 0; }\n" % n)
+print("[ci] traps: " + ", ".join(names))
+PY
+emcc -c -O1 -w "$W/ci_traps.c" -o "$W/ci_traps.o"
