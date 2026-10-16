@@ -15,6 +15,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from elastique_facts import parse_pe  # noqa: E402
 
 
+def run_rc(cmd):
+    try:
+        return subprocess.run(cmd, capture_output=True, timeout=120).returncode
+    except subprocess.TimeoutExpired:
+        return "timeout"
+
+
 def main():
     dll, csv, ranges, work = sys.argv[1:5]
     rd = os.environ["RETDEC"]
@@ -37,15 +44,13 @@ def main():
         b, e = int(k, 16), int(rng[k], 16)
         ins = list(md.disasm(bytes(image[b - base:e - base]), b))
         masked = [i for i in ins if i.mnemonic in ("vpshufd", "vshufi32x4") and "{" in i.op_str]
-        r1 = subprocess.run([rd, dll, "--select-ranges", f"{k}-{rng[k]}", "--select-decode-only", "-o", out],
-                            capture_output=True, timeout=120).returncode
+        r1 = run_rc([rd, dll, "--select-ranges", f"{k}-{rng[k]}", "--select-decode-only", "-o", out])
         sec = next(s for s in sections if s["va"] + base <= b < s["va"] + base + s["vsize"])
         buf = bytearray(raw)
         for i in masked:
             buf[sec["rawptr"] + (i.address - base - sec["va"]) + 3] &= ~0x07
         open(diag, "wb").write(buf)
-        r2 = subprocess.run([rd, diag, "--select-ranges", f"{k}-{rng[k]}", "--select-decode-only", "-o", out],
-                            capture_output=True, timeout=120).returncode
+        r2 = run_rc([rd, diag, "--select-ranges", f"{k}-{rng[k]}", "--select-decode-only", "-o", out])
         print(f"{k}\t{len(masked)}\t{r1}\t{r2}", flush=True)
 
 

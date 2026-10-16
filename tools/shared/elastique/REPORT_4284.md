@@ -67,12 +67,12 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| lift 出力の意味検証 (受入 2。`.ll` 4,467 件の D11・D14・D15 判定) | 受入 2 未達。lift の正しさは未確認 | #5178 (受入 2 のまま残す) |
+| lift 出力の意味検証 (受入 2。`.ll` 4,467 件の D11・D14・D15 判定) | 受入 2 未達。lift の正しさは未確認 | #5574 (T-SH-145 が担当。#5178 は CLOSED) |
 | rc=1 85 件 (`Should not be possible.`) の lift 不能 | 受入 1 未達。完全な lift にならない。§6 で 64 件はマスク除去の診断で通るが、マスク除去は意味を変えるので修正にならない | 本 issue #5686 の残り (修正方式は未決。親 #4363 へ報告) |
-| rc=1 の結果が実行ごとに揺れる (`0x1801cd3aa` `0x1801e8d3f` `0x1801cbe40`) | 同じ入力で成否が変わる。単純な決定的な失敗とは言えない | 親 #4363 へのコメント (追跡のみ) |
+| rc=1 の結果が実行ごとに揺れる (`0x1801e8d3f` `0x1801cbe40`。`0x1801cd3aa` は rc=1 のみの記録で未確定) | 同じ入力で成否が変わる。単純な決定的な失敗とは言えない | 親 #4363 へのコメント (追跡のみ) |
 | pefile の `Unknown UNWIND_CODE` の原因 | pefile 側の原因は未調査 (件数の出典は確定) | 親 #4363 へのコメント (追跡のみ・子は起票しない) |
 
-## 5. 失敗 89 件の分類・件数の出典 (T-SH-141 / #5179)
+## 5. 失敗 89 件の分類・件数の出典 (履歴: #5179 時点の CSV。現在は §6 で 85 件)
 
 再現: `python3 tools/shared/elastique/scripts/elastique_fail_classify.py tools/shared/work/win/elastique_x64.dll tools/shared/elastique/data/retdec_lift_4284.csv`
 (入力 DLL は `fl-win64` の `block24357_PE.bin` を `tools/shared/work/win/elastique_x64.dll` に複製。sha256 先頭 16 桁 `8551e92209cdd2ce`)。
@@ -91,14 +91,14 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 
 ## 6. #5686: rc=124・137 の 4 件の解消と rc=1 の切り分け
 
-測定 commit: `360197018` (コードと CSV を変えた最後の commit)。`git diff 360197018 HEAD -- tools/shared/elastique` の出力は空 (本 REPORT の追記は文書のみ)。
+測定 commit: `360197018` (lift 経路のコードと CSV を変えた最後の commit)。鮮度: `git diff 360197018 HEAD -- tools/shared/elastique/scripts/elastique_retdec_lift.sh tools/shared/elastique/scripts/elastique_pdata_ranges.py tools/shared/elastique/data` は 0 行。`scripts/elastique_mask_probe.py` だけは `TimeoutExpired` の捕捉を足す変更 (診断用・lift 経路の外。§6.2 の数値はこの変更の前の版で測った)。
 
 ### 6.1 rc=124・137 (4 件): timeout と並列メモリが原因。解消
 
 - 単独 1 件 (60 秒上限): `0x18001fb40` rc=124、`0x180026520` rc=124 (いずれも 60 秒で打ち切り)。`0x18002dac0` は単独で rc=0 (30 秒)。
 - 上限だけ延ばした単独 lift: `0x18001fb40` rc=0 (69 秒)・`0x180018fe0` rc=0 (69 秒)・`0x180026520` rc=0 (68 秒)。
 - 4 並列 (`LIFT_TIMEOUT=300`): `0x18001fb40`・`0x180026520`・`0x18002dac0` が rc=137 (SIGKILL)。`0x180018fe0` は ok。
-- ピークメモリ: `0x180026520` を単独 lift したとき maxrss 7,304 MiB (`getrusage` の RUSAGE_CHILDREN)。4 並列は 16 GiB の runner で超える。
+- ピークメモリ: `0x180026520` を単独 lift したとき maxrss 7,304 MiB (`getrusage` の RUSAGE_CHILDREN)。4 並列では同程度の件が同時に走ると rc=137 (SIGKILL) が出た (実測: 上の並列 4 の結果)。
 - 直列 (並列 1・`LIFT_TIMEOUT=300`): `0x18001fb40`・`0x180018fe0`・`0x180026520`・`0x18002dac0` が全て rc=0 (2 回目の実行で `0x18002dac0` 1,213,510 B の `.ll` を確認)。
 - 結論: 4 件は timeout と並列メモリの問題で、lift の不能ではない。CSV を `ok` に更新 (`360197018`)。`elastique_retdec_lift.sh` に `LIFT_TIMEOUT` (既定 60) を追加。
 
@@ -107,15 +107,19 @@ RETDEC=<retdec-decompiler> bash tools/shared/elastique/scripts/elastique_retdec_
 - 1 件の切り分け: `0x1800c2920` の関数 (1,769 命令) は 261 命令目の `vpshufd zmm1 {k6}, zmm17, 0xb1` (`62 b1 7d 4e 70 c9 b1`) で落ちる。0〜260 番目は通る。
 - 診断: 対象関数内の EVEX マスク付き `vpshufd`/`vshufi32x4` (288 件) の `aaa` ビットを 0 にした診断用 DLL (`work/` 内・commit なし) では rc=0 (137,765 B の `.ll`)。
 - マスク除去は命令の意味を変えるため、修正ではなく原因の切り分けに限る。
-- 85 件の一括確認 (`scripts/elastique_mask_probe.py`・1 件ずつ・各 120 秒上限): 元の rc=1 のまま 64 件 (マスク除去で rc=0 に変わる件)、マスク除去でも rc=1 が 18 件、元から rc=0 の件が 3 件。内訳と件数の再現は `elastique_mask_probe.py` の出力 (`work/` の TSV)。
+- 85 件の一括確認 (`scripts/elastique_mask_probe.py`・1 件ずつ・各 120 秒上限、時間切れは `timeout` と記録) の旧記録: 元の rc=1 のまま 64 件、マスク除去でも rc=1 が 18 件、rc=0 が 3 件。この内訳の TSV は保存しておらず、RetDec 本体が本 run の runner に無いため再確認できない。
 
-| 区分 (実測・85 件中) | 件数 | 注 |
-|---|---|---|
-| 元 rc=1 → マスク除去で rc=0 | 64 | マスク付き EVEX が原因の候補。修正方式は未決 |
-| 元 rc=1 → マスク除去でも rc=1 | 18 | マスク以外の原因。未切り分け |
-| 元 rc=1 だが単独では rc=0 | 3 (`0x1801cbe40`・`0x1801cd3aa`・`0x1801e8d3f`) | 再実行で揺れる (下記) |
+下表は、REPORT に記録されている 3 件の rc を全て書いたもの。「未記録」は記録が無いこと。
 
-- 揺れ (同じ入力・同じ条件): `0x1801cd3aa` は 2 回とも rc=1、`0x1801e8d3f` は直列の再走では rc=1 だが直接の 2 回は rc=0、`0x1801cbe40` は 1 回目 rc=1・2 回目 rc=0。単純な決定的失敗とは言えない。
+| 件 (CSV の status は全て `fail rc=1`) | 直接 1 回目 | 直接 2 回目 | 直列の再走 |
+|---|---|---|---|
+| `0x1801cbe40` | rc=1 | rc=0 | 未記録 |
+| `0x1801e8d3f` | rc=0 | rc=0 | rc=1 |
+| `0x1801cd3aa` | rc=1 | rc=1 | 未記録 |
+
+**分類 (3 件とも同じ基準): 「同じ入力で rc=0 と rc=1 の両方が記録されたもの」を揺れ、それ以外を未確定とする。** この基準で、揺れは `0x1801cbe40` と `0x1801e8d3f` の 2 件。`0x1801cd3aa` は記録上 rc=1 のみで、旧記録の「rc=0」とは食い違うため未確定 (probe の旧 rc=0 報告は再現できない)。
+
+- 揺れ 2 件は決定的失敗とは言えない。
 - 本 run で CSV の rc=1 85 件は `fail` のまま。揺れを含むため、rc=1 の行を ok に変えるのは測定の根拠が足りない。
 - 受入 1 (4,556 件の ok) は未達。4,471 件 ok・85 件 fail。
 
