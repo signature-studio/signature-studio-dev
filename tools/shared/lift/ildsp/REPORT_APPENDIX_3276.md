@@ -81,3 +81,15 @@
 - 方針への影響: `imp_RaiseException` の据え置き (§10) は変えない。0x1b8e68 の except 本体が 0xe06d7363 の catch 先でないことは、§10 の停止規約の統一の判断材料になる。
 - 道具: `tools/shared/lift/ildsp/seh_catch_check.py` (`FL_WIN64_DIR` の PE を読み、0x1b8e68 の scope・filter の許可コード・0x1aedc0 の rel32 呼出元 8 件を出す)。
 - 実測 (素材 `fl-win64` 26.1.7.5653 の `block24360_PE.bin`): 出力は `UNWIND 0x3f2d94 EHANDLER handler=0x1aebb4 scope_count=1` / `SCOPE try=[0x1b8eaa,0x1b8eb1) ... target=0x1b8eb1` / `FILTER 0x1ccb00 accepts codes: 0xc0000005, 0xc000001d` / `FILTER accepts 0xe06d7363: False` / `DIRECT rel32 call/jmp to 0x1aedc0 ... 8`。
+
+## 12. handler `0x1acf00` の解読 — T-SH-158 (#5859)
+- 結論: **`0x1acf00` は EH の scope 表ではなく `/GS` の cookie 検査 wrapper**。`0x1afbd4`・`0x1b009c` の catch 先は、本節の範囲では確定していない。
+  - `0x1acf00` は `sub rsp,0x28` → `call 0x1acf20` (cookie 検査の本体・`r8=[r9+0x38]` を使う) → `mov eax,1` (ExceptionContinueSearch) → `ret`。例外を捕まえず、常に「探索を続ける」を返す。
+  - `0x1afbd4` の unwind は `flags=EH|UH`・`handler=0x1acf00`・データ先頭 `0x110` (cookie オフセット)。`0x1b009c` は `0x170`。どちらも scope 表の形式ではない。
+  - `0x1acf20` は末尾で `jmp 0x1acee0`。`0x1acee0` は GS 検査の tail で、条件を満たさなければ `jmp 0x1ad668`。`0x1ad668` は `/GS` 失敗通知 (`ecx=0x17`・`0xc0000409`・`int 0x29`) で、EH dispatch ではない。
+  - よって「`0x1ad668` 以降の EH dispatch と scope 表」は、この handler の経路には存在しない (受入条件の前提が誤りだった)。
+- 上位の経路 (未確定): `0x1afbd4` の直接呼出元は `0x1b0d24` (`0x1b0f30`)、`0x1b009c` の直接呼出元は `0x1b0f5c` (`0x1b11c3`)。両者とも EHANDLER を持たない。`0x1b0d24`・`0x1b0f5c` は直接 call されず、`.data+0x3fcb88`・`.data+0x3fcb94` の関数ポインタ表 (12 byte 間隔: `0x1b0d22`・`0x3f27d8`・`0x1b0d24`・…) から参照される。この表を読む間接 call 元は未特定。したがって、例外を捕まえる上位フレームと、その catch 先は未確定。
+- 道具: `tools/shared/lift/ildsp/seh_dispatch_probe.py` (本 commit で追加。`FL_WIN64_DIR` の PE を読み、上の 4 項目を出す)。
+- 実測 (測定 commit `e457357aa`・素材 `fl-win64` 26.1.7.5653): `python3 tools/shared/lift/ildsp/seh_dispatch_probe.py` → rc 0・0.37 s・load 0.09 → 0.09。出力は `handler 0x1acf00 ... pdata: no handler` / `0x1afbd4 handler=0x1acf00 data=['0x110', ...]` / `0x1b0d24 直接 call 元: ['0x1ae894', '0x1cc6d3']` / `0x1b0d24 の関数ポインタ参照 (データ): ['.data+0x3fcb88', '.pdata+0x43e988']`。
+- コード差分の証跡: `git diff e457357aa HEAD -- tools/shared/lift/ildsp` は 0 行 (本節の追記は REPORT のみ)。`docs/WORKFLOW.md` §6 により、再測定は不要。
+- 未解決 (起票先 #5793 の残件・本 issue の受入は未達): `.data` の関数ポインタ表 (`0x3fcb80` 付近) を読む間接 call 元と、その上位の catch 先。`seh_dispatch_probe.py` の範囲外。
