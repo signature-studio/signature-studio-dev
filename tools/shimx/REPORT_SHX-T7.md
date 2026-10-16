@@ -134,6 +134,7 @@
 - 正規化前の mismatch: gain / matrix / haas / clipper / gate / quickeq / resonator / stereo / disperser / formant は `正規化前 0 件` (sig_gate 情報行を確認)。phaser / delay / limiter は `sig_normalize --strict` が raw 検証より前に止まるため **未測定**。
 - `data/sig_ext.json` に 11 API を追記 (根拠は各 `why`)。`ret` = `zext`: `HeapFree` / `IsProcessorFeaturePresent` / `TerminateProcess` / `UnhandledExceptionFilter` / `LoadLibraryExW` / `GetLastError` / `IsDebuggerPresent` / `FreeLibrary` / `GetModuleHandleW` / `GetModuleHandleExW` / `FlsSetValue` (shimx 定義の値域が非負: BOOL / DWORD / HMODULE)。既存は `GetComputerNameExW` / `GetFileAttributesExW` / `SHGetFolderPathW`。
 - **未解決 (本 issue の残件)**: `GetCurrentProcess` の `ret` 符号。shimx 定義は擬似ハンドル `(HANDLE)-1` を返すため、zext (4294967295) と sext (-1) で値が変わる。呼出側 IR の用途を読んで決める必要があり、本 run では確定できず silent に決めなかった。phaser / delay / limiter はこの 1 件で止まっている (他の未解決は全て解決)。
+  - 追記 (#5762): 上記の残件は、下記 175 行以降の 13 本の実測で解決した (`ret = sext`)。
 - `sig_test.sh` ALL PASS は HEAD で再現 (24.6 s)。
 - 受入条件「SlateCore の未測 lift 対象」は本 run で未実測 (素材 `work-liftlib-targets` は SlateCore の lift IR を含まない。`plugins-freshair` の `tools/targets/freshair/` 側の build は未着手)。
 - 除外: `tools/liftlib/work/cab238/p1_only/work/ott_m8.ll` は正規化前の時点で `%p1r_1801209c9_cl1` が未定義 (clang error)。診断用の派生物で正規の成果物ではないため対象外。
@@ -171,3 +172,16 @@
 - **注意 1 (手作業の前処理)**: Gain (HeartCore) の RetDec 出力は `function_18004cf20` の `declare` が同一内容で 2 回出ており、`emcc` が `invalid redefinition` で落ちた。同一行の 2 つ目を除く (awk で完全一致行のみ) ことで解消した。これは既存の lift パイプライン (`ir5_patch` / `kh_lower`) に無い手作業であり、恒常化するなら該当 pass への組み込みが必要 (#1170 の受入条件 5 項目目に起票済み)。
 - **注意 2**: Fresh Air gain は `gain_e2e.sh` 同様の修復 pass (`fa_fix_gain`) を通した IR で検証した。修復前の生 RetDec IR は `emcc` で 'linking' 段が失敗するため、gate の対象は修復後 IR。
 - **未実測 (受入条件の残り)**: SlateCore / HeartCore の snap-in 残り (Kilohearts 42 効果のうち gain・matrix・haas・clipper・gate 以外、SlateCore の他 snap-in) は本節では未実測 (#1170 に起票済み)。`sig_test.sh` ALL PASS は HEAD cf0a08bf で再現した (25 s, load 0.77→0.85)。
+
+**Kilohearts snap-in 13 本の sig_gate 完走 (#5762 / SHX-T59, 2026-10-16, Actions runner, 測定 commit = 1d7d6d6e5 (本 PR の code 変更は sig_ext.json の 1 行のみ), `lift/build.py <n> --path s0 --tag s0 --trials 200 --seed 1`, `sig_gate.sh work/<n>/s0/final.ll <n>`, 素材 plugins-kilohearts / toolchain-retdec / toolchain-emsdk / fl-win64 展開済み (installer は `KH_SRC` 指定で `extract_installer.sh` 抽出), `native_ref` は `run_all.sh` と同じ cc 行で再ビルド)**:
+
+| snap-in | build compare (native 突合) | 正規化前 mismatch | adapter | unresolved | 正規化後 mismatch | sig_gate |
+|---|---|---|---|---|---|---|
+| matrix / gain / haas / clipper / gate / quickeq / resonator / stereo / disperser / formant | 200/200 bit-exact | 0 | 0 | 0 | **0** | exit 0 |
+| phaser | 200/200 bit-exact (calls 1100/1100) | 17 | 17 | 0 | **0** | exit 0 |
+| delay | 200/200 bit-exact (calls 1299/1299) | 25 | 25 | 0 | **0** | exit 0 |
+| limiter | 200/200 bit-exact (calls 1100/1100) | 25 | 25 | 0 | **0** | exit 0 |
+
+- **残件 (`GetCurrentProcess` の `ret` 符号) の決定**: `data/sig_ext.json` に `GetCurrentProcess` の `ret = sext` を根拠付きで登録した。根拠: (1) shimx 定義 `thread.c` は擬似ハンドル `(HANDLE)-1` を返す。(2) native 側の定数 `gen_stubs_sigs.py` は `rax = 0xffffffffffffffff` (64bit の -1)。sext は native と一致し、zext は `0x00000000FFFFFFFF` となり不一致。(3) 呼出 site は phaser 1 + delay 3 + limiter 3 の計 7 件で、全件が `rax → rcx` 経由で `TerminateProcess(handle, code)` の第 1 引数に渡るだけ (値の用途は他に無い)。`sig_test.sh` は ALL PASS (1d7d6d6e5, 19.3 s, load average 0.69 → 0.82)。
+- **適用範囲の限界**: `sig_ext.json` は API 単位の global 設定。`tools/shimx/data/inventory.csv` では `GetCurrentProcess` は 31 site (FL64 / FreshAir / OTT / Serum2) に現れるが、本節の根拠は 13 本の内の 7 site (phaser / delay / limiter) のみ。他 plugin の 24 site は未測定で、sext は ABI 根拠 (HANDLE の -1) から適用している。
+- **受入条件 2 (`gain` の `declare` 重複)**: 今回の RetDec 出力では重複が再現しなかった。`stage0.ll` (declare 427 行)・`build.py` の n1 段 (gain 17 行)・最終 `final.ll` の完全一致重複と名前重複は、全 13 本で 0 件。手作業経路 `ir_normalize.py` → `ir5_patch.py` (declare 427 → 427、重複 0) でも 0 件。既存の pass は `build.py` の declare 重複除去 (`lift/build.py` 「declare 重複除去」節、s0 経路で有効) と `ir5_patch.py` の C1 段の重複除去 (`uniq` / `seen_d`) の 2 つで、#966 の awk 前処理は不要になっている。恒常化は既存 pass で満たすため、新規の pass は追加していない。
