@@ -70,7 +70,7 @@
 ### 2-3. GetMem 関数ポインタ (`0x13a5c90`) の監視と復元 (4 回目の run・未達)
 
 - 方法: 監視 slot に `0x13a5c90` (`MM_TABLE`。GetMem の間接 call `0x40941e` の pointer slot) を追加 (`g_py_watch` 6 → 7 件)。`FLE_PY106_MM=1` のときだけ、束縛の直前に `0x13a5c90` を boot 初期値 `0x407a50` に戻す (計測のみ)。
-- 測定 commit: **`aad243e64`** (`feat(flelift): watch GetMem table slot 0x13a5c90 and add optional restore before bind probe (PY-106, #2909)`)。コードを変えた最後の commit。`git diff aad243e64 HEAD -- tools/flelift/boot` の出力は 0 行。
+- 測定 commit: **`aad243e64`** (`feat(flelift): watch GetMem table slot 0x13a5c90 and add optional restore before bind probe (PY-106, #2909)`)。コードを変えた最後の commit。`git diff aad243e64 HEAD -- tools/flelift/boot ':!tools/flelift/boot/results'` の出力は 0 行 (後の commit は測定の出力 JSON の追加だけ)。
 - 実測 (`FLE_PY106_BIND=1 FLE_BOOT_TAG=py106h FLE_BOOT_RUNS=negctl bash tools/flelift/boot/fle6_measure.sh`・load 開始時 `1.14 1.02 0.52`): real 1 分 54.4 秒 (lift・clang plain・boot を含む)。rc 0。boot は units 209 / 942 で停止 (前回と同じ)。IPP 判定 ok。
 - 監視 events (`FLEBOOT_PY123`・unit 209・site 8 = GetMem(0x74) 直前): `0x15e1c78`・`0x15e4790`・`0x15e1140` と同じ時点で、`0x13a5c90` が `0x407a50 → 0x0` に変わる。unit 1〜208 では `0x13a5c90` は `0x407a50` のまま。
 - 束縛 (復元なし・`FLE_PY106_BIND=1`): `threw exit (code 0)`、束縛名 0 件、`getproc_calls 0`、`hook_calls 0`。束縛は走らない (§2-2 と同じ)。
