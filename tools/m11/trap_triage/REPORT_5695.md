@@ -55,3 +55,33 @@ node trap_triage/probe5695_nz.mjs                # 0x12ba808 近傍の非 0 バ�
 ### 4.2 未解決の起票先
 
 - e2e の全再生成 (`lift_pe.sha256` / `functions_dll.csv` 不在): #5190 (`[M11-N235]` work-m11 の素材を作り直す)。
+
+## 5. 2 回目 run: IR store 計装による arg1 の書込み監視 (結論: IR store の書込みは 0 件)
+
+測定 commit: `09ceb363a` (HEAD のクリーン worktree `git worktree add --detach` で測定。コードを変えた最後の commit は `086abd95a`)。
+`git diff 086abd95a HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行 (実行コードの差分 0)。
+
+手順 (すべてコミット済み HEAD の内容。`work-m11` ・`toolchain-*`・`fl-win64` は本 run の素材から展開):
+`m11_gen_ir2.sh` (52 s・rc 0・ldfix applied) → `ALLOCA_SKIP=1 M11_WATCH_SRC=trap_triage/watch_arg1_5695.c bash trap_triage/store_watch_1783.sh <tag>`
+(全 store 計装 15,028 site・survey は全 942 unit を順に実行)。`[a1]` は範囲 `[0x12ba808+0x778, 0x12ba808+0x814)` と store の範囲が重なる書込み。
+
+| 測定 | 値 | 備考 |
+|---|---|---|
+| クリーン HEAD・計装 ON・survey 1 回目 | 60 s・ok 873 / miss 47 / halt0 6 / oob 15 / noproc 1・`[a1]` 0 件 | load 0.78 (開始前) |
+| 同・survey 2 回目 | 69 s・ok 871 / miss 47 / halt0 7 / oob 16 / noproc 1・`[a1]` 0 件 | load 1.08 (終了後) |
+| 陽性対照 `0x10aa1428` (4B・コミット済み `watch_addr_1046.c` に `M11_WATCH_1783=0x10aa1428`) | `[aw]` 22 件 (unit -1 / 134 / 830 ほか)・ok 870 / oob 17 | HEAD の内容のみで再現 |
+| 陰性対照 `0x10a9f910` (同) | `[aw]` 0 件・ok 871 / oob 16 | HEAD の内容のみで再現 |
+| 範囲 `[0x12ba808, +0x1000)` の `[a1]` 88 件 | 未再現 | 前 run の値は非コミットの C 由来。本 PR では数値を書かない |
+
+解釈 (クリーン HEAD で 2 回実測):
+- 監視の仕組みは動いている (陽性対照で検出、陰性対照で 0 件)。5 フィールドは本 build の survey 中に **IR store では 1 回も書かれない** (2 回とも `[a1]` 0 件)。
+- survey の内訳は実行ごとに揺れる (ok 871〜873、oob 15〜17)。基準値は 1 点ではなく、この幅で読む。
+- `initial= 0 0 0 0 0` (boot 後) から 0 のまま。IR store に書込みが無いので、書込み元の特定は IR store 計装の範囲では行えない。
+- 残る書込み経路は C 側 (`memcpy`・`rep movs` 等の runtime 関数)。store 計装 (`watch_store_682.py`) はそれを映さない (`rep_watch_3972.py` の注記)。C 側を見るには `m11_rt`/`m11_win` の copy に監視を入れる必要がある (未実施)。
+- PR #5707 の測定 (ok 875 / oob 14) とは一致しない (e2e・build の差。計装 OFF の基準は未測定)。
+
+## 6. 次の一手 (未解決)
+
+1. `e3ef60` の arg1 (0x12ba808) を誰が確保・初期化するか (boot 中の alloc / 0 初期化の位置)。フィールドが「0 のまま」なら、e3ef60 が非 0 を期待する根拠の側を見る。
+2. C 側 (`memcpy`・`rep movs`) の書込みを監視する (`rep_watch_3972.py` の方式)。
+3. `40ffe0` の引数 (リスト先頭) の出所 (受入の残り)。
