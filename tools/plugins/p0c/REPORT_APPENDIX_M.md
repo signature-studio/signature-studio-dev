@@ -59,7 +59,7 @@ emsdk を導入し (`emsdk install latest`・`activate latest`)、`EMSDK` を設
 
 ## 4. 鮮度: `ce3872372` から HEAD までの差分
 
-`git diff ce3872372 HEAD -- tools/plugins/p0c` (PR 本文作成時点の HEAD `9418e1050`):
+差分の全文は `REPORT_APPENDIX_M2.md` (`git diff ce3872372 HEAD -- tools/plugins/p0c` の出力)。 要点:
 
 - `f80b_rt/run.sh` の 1 行 (`EMCC` の解決を `$EMSDK` 必須にする変更)。 `EMCC` 変数は `command -v emcc` が先なので、 測定値は影響を受けない (`run.sh` の検査内容は変わらない)。 harness の変更であり、 測定対象の変換は変わらない。
 - 続けて `842bc5ac3` の修正 (`f80_lower.py` の `sn` / `low` と `gen_cases.c` の固定ベクタ)。 これは測定対象の変換を変える。 §1.1 の再検査で置換後の値を取った。 §2・§3 は未再測定。
