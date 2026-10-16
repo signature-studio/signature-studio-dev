@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # engine 分離型 2 本 (T3: Delay 3 / Multiband Delay) の C++ engine DLL 全 .pdata 関数を RetDec+pass 鎖で lift → emcc -c (到達性のみ; 正しさは別)
 #   bash tools/plugins/reverb_delay/engine_lift.sh <block> [timeout_sec]      例: 19000 (Delay 3 engine) / 19165 (Multiband Delay engine)
-# 従来鎖 (PLUG_ICALL=0 を明示) で lift する。
+# 従来鎖 (PLUG_ICALL=0 を明示) で lift する。 f80 は PLUG_F80_LOWER=1 (x86_fp80 → f64、精度は 53 bit に下がる。 REPORT_APPENDIX.md §19) を既定とする。
 # 出力: work/reverb_delay/engine<block>/ と 1 行サマリ (block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,
 #   missing_define,missing_bytes,missing_ref,extra_inside,function_defines  ← engine_defs.py)
 set -uo pipefail
@@ -13,7 +13,7 @@ B="$1"; TMO="${2:-1200}"
 OUT="work/reverb_delay/engine$B${ENGINE_TAG:-}"; mkdir -p "$OUT/tmp"
 python3 reverb_delay/engine_ranges.py "$B" ${ENGINE_RANGE_ARGS:-} > "$OUT/ranges.txt" 2> "$OUT/ranges.info"
 t0=$(date +%s)
-PLUG_ICALL=0 bash lift/lift_ranges.sh "$FL_WIN64_DIR/extracted/block$(printf %05d "$B")_PE.bin" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
+PLUG_ICALL=0 PLUG_F80_LOWER=${PLUG_F80_LOWER:-1} bash lift/lift_ranges.sh "$FL_WIN64_DIR/extracted/block$(printf %05d "$B")_PE.bin" "$OUT/ranges.txt" "$OUT" e "$TMO" > "$OUT/lift.log" 2>&1
 rc=$?
 t1=$(date +%s)
 DEF=$(grep -c '^define' "$OUT/e.final.ll" 2>/dev/null || echo 0)
