@@ -162,6 +162,32 @@ PERF_FD_WRITE=1 node tools/perf/p15/ctor_loop_trace.mjs tools/ott/work/lift/ottl
 
 出力 JSON の `fd_text` に `fd_write` の書込み内容 (最大 4000 字) が入る。`perCtor` は完走した ctor と trap した ctor (`trapped: true`) の loop 別回数と `budget_left` を持つ。
 
+## 3f. 子 #5403 の再測定と vtable の書き換え窓 (Node・同期・`fd_write` 書込み版と stub の両方)
+
+測定 commit: `42fad4a17` (origin/main 取り込み後の HEAD)。`tools/perf/p15` は `545bec77b` から変更なし (`git diff 545bec77b 42fad4a17 -- tools/perf/p15` が 0 行)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を展開し、`wasm2wat` → `instr_loops.py` → `wat2wasm` で計装した (wabt は npm で `/tmp/opencode/wabt` に一時導入・commit 外)。
+
+| 測定 (HEAD `42fad4a17`) | 結果 |
+|---|---|
+| `node_init_sweep.mjs --m 145,146 --timeout 15000` (計装なし) ×1 | M=145 ok (setup 796 ms)・M=146 timeout。前 run と同じ |
+| `ctor_loop_trace.mjs 145` (計装) ×1 | 完走 (`completed: 145`)。wall 2.8 s |
+| `ctor_loop_trace.mjs 146` (計装) ×3 | 3/3 `unreachable`。loop 170 = 399,163,510 回 (99.09%)。前 run と同値 |
+| `PERF_FD_WRITE=1 ctor_loop_trace.mjs 146` ×3 | 3/3 `Error: abort`。loop 170 = 2 回。`fd_text` は前 run と同じ |
+| `ctor_vtable_ring.mjs` (`instr_ring.py` で計装) ×3 | 3/3 同じ。ctor 146 の関数入り 418 回のうち、vtable (`0x30203BD0`) 先頭語が 0 と最初に観測されるのは entry 305 (func 23 の入口)。直前 12 entry は `123,122,23,75,119,123,122,23,75,119,123,122,23` |
+
+分かったこと:
+- ctor 146 の前、vtable `0x30203BD0` (`slot(145).obj` の vptr の指し先) は `3011de10 00000000 30127800 ...` (16 words) で、146 の trap 時には 16 words すべて 0。書換えは ctor 146 の内部で起きる。
+- 最初の 0 の観測は func 23 の入口。直前に走った関数は func 122 (`memory.size << 16` の leaf) → func 123 の順。func 123 は `call 122` の後に heap 上端 (`269004816`) を動かす割り当て関数で、`call 4` (`emscripten_resize_heap` の stub) を含む。書換えそのものは func 123 の本体 (`call 122` の後) か、その後の stub 呼び出しの前後のどこかに絞られる。書込みの store は未特定。
+- したがって「壊れた vtable を書いた store」は、func 123 の `call 122` 後から func 23 入口の間に限られる。これは §3e の「heap が data 領域に届いた後で vtable が壊れる」仮説と整合するが、store そのものを記録したわけではない。
+
+再現コマンド (素材展開後):
+
+```sh
+wasm2wat tools/ott/work/lift/ottl.wasm -o tools/ott/work/lift/ottl.wat
+python3 tools/perf/p15/instr_ring.py tools/ott/work/lift/ottl.wat tools/ott/work/lift/ottl_rc.wat
+wat2wasm tools/ott/work/lift/ottl_rc.wat -o tools/ott/work/lift/ottl_rc.wasm
+node tools/perf/p15/ctor_vtable_ring.mjs tools/ott/work/lift/ottl_rc.wasm
+```
+
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
