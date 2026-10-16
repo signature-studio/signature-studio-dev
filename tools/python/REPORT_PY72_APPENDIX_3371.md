@@ -129,3 +129,34 @@
 | `0xf48290` の受け手が chan か | 受入 2 | #3371 |
 | `0x1001ef0` の `this` の由来 (呼出し元 4 件) | 受入 2 | #3371 |
 | 一覧 A・B の容器 Q への要素追加箇所と要素型 T | 受入 3 | #3371 |
+
+## 追補 4 (#5580・受入 1 の初期化経路を確定: ローダの再配置・コードによる store は 0 件)
+
+- 大域 `0x15e0c40` は `.data` (`0x13a5000`〜) の 8 バイト値 `0x16babe8` を持つ静的なポインタ。`0x16babe8` は `.bss` (`0x15e6000`〜) 内のオブジェクトを指す。
+- `.reloc` に `0x15e0c40` の DIR64 再配置 (type 10・page `0x11e0000`) が 1 件ある。よって初期値はローダが再配置で書き、コードによる store は要らない。
+- コードによる格納は 0 件。確認したこと (`pe_global_init_probe.py`):
+  - RIP 相対の参照: load 308 件・store 0 件・`lea` 0 件 (`0x15e0c40` 本体)。
+  - 近傍 ±0x40 の RIP 相対参照: `0x15e0c00`〜`0x15e0c80` の全番地で store 0 件。
+  - 既知の定数 (`lea rip` と `mov reg, imm`) を基底とする `[reg+disp]` 書込み: `0x15e0c40-0x100`〜`+8` の範囲で 0 件。
+  - 絶対 index 付き `[disp+reg*s]` (`disp` が `0x15e0c40±0x400`): 0 件。
+  - `.text` 内の即値・8 バイト値・rva32 として `0x15e0c40` を持つ命令: 0 件。
+  - 指し先 `0x16babe8` への RIP 相対 store: 0 件。基底付き書込み: 0 件。
+- 制限: 逆アセンブルは `.pdata` の関数単位。`.text` の復号不能 161,366 バイト (追補 3) の中は見ていない。`rep movs`・`memcpy` 等の一括コピーで `.data` の範囲を書く経路は未検査。基底が関数内で既知の定数にならない `[reg+disp]` も未検査。
+- 受入 1 の判定: 「大域 `0x15e0c40` の初期化・格納経路を PE で確定する」は、上記の範囲で満たす。初期化はローダの再配置で、格納は 0 件。151 箇所の受け手の型 (受入 2) は、この結論だけでは決まらない。その判定は #5205 の受入 1 に残す。
+
+### 測定 (追補 4)
+
+- 測定 commit (コードを変えた最後の commit。`pe_global_init_probe.py` の `--reloc` 追加): `5456dc8c8`。`git diff 5456dc8c8 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (この commit の後は本付録だけを変える)。
+- 素材: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-5580 --wildcards '*block00031_PE.bin'` (2.71 s。`extracted/block00031_PE.bin`。repo 外)。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-5580 python3 analysis/flapi/pe_global_init_probe.py 15e0c40` を 2 回 (wall 37.96 s・37.64 s、rc 0、出力は `cmp` で一致)。load (1 分値・開始時) 0.92〜0.96。
+- 実行 (同一 commit): `--near` (rc 0)・`--base` (rc 0)・`--reloc` (rc 0)・`16babe8 --base` (rc 0)。
+
+### 未解決 (追補 4 後)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 151 箇所のうち受け手の型 (大域 `0x15e0c40` の初期化は確定。受け手の型は未決) | 受入 2 | #5205 |
+| `.text` 復号不能 161,366 バイト・一括コピー・非定数基底の `[reg+disp]` による `.data` 書込みは未検査 | 受入 1 の確定範囲の外 | #5205 |
+| `0xf48290` の受け手が chan か | 受入 2 | #3371 |
+| `0x1001ef0` の `this` の由来 (呼出し元 4 件) | 受入 2 | #3371 |
+| 一覧 A・B の容器 Q への要素追加箇所と要素型 T | 受入 3 | #3371 |
