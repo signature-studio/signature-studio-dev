@@ -37,7 +37,7 @@
 - `180cbba21`: `ff 50 08` = `call QWORD PTR [rax+0x8]`。直前は `mov rax,[rbx]`・`rbx` = `[rsp+0x28]` (= `[rdi+0xa80]` の control block 相当)。
 - `180cbba36`: `ff 50 10` = `call QWORD PTR [rax+0x10]`。直前は `mov rax,[rcx]` (同上)。
 
-`[rdi+0xa80]` の格納箇所は、全量 dsm で 48 件 (`mov QWORD PTR [r*+0xa80],` の数。`grep -c 'mov.*+0xa80'` は 133 件でこれは別の数え方)。格納元の関数 `180cbc77c` は直接の `call` が 0 件 (tail jump 等で呼ばれる)。`180cb5d3e` は `+0xa80` に `rbp` (0) を書く初期化。具象型の特定には、control block の vtable を辿って `[vtable+0x8]`・`[vtable+0x10]` の関数を確定する必要があり、この run では未着手。
+`[rdi+0xa80]` の格納箇所は、全量 dsm で 48 件 (`mov QWORD PTR [r*+0xa80],` の数。`grep -c 'mov.*+0xa80'` は 133 件でこれは別の数え方)。格納は 47 関数に分かれる (`tools/icall/cb_writers.py`・§7)。格納元の関数 `180cbc77c` は、関数 `180cbc770` の内側の位置で、直接の `call`・`jmp`・絶対アドレスの参照が 0 件。`180cbc770` への呼出しは 6 箇所 (§7)。`180cb5d3e` は `+0xa80` に `rbp` (0) を書く初期化。
 
 ## 4. 前 run との関係
 
@@ -61,3 +61,18 @@
 - 判定関数の確認: `bash tools/icall/r13_callee_check.sh --selftest` → `selftest: 書込み 3 件 (期待 3) / push r13 1 件 (期待 1) / pop r13 1 件 (期待 1)`。手書きの入力での確認で、objdump 実出力での確認ではない。
 - 実 binary での再測定 (`SlateCore.core_64` sha256 `2cf759f712adf955a56684df4b24454690ac878105d4433de16c88626a45dd3b`・36,285,952 B、`plugins-freshair` と `work-icall` の素材を使用): `bash tools/icall/r13_callee_check.sh <SlateCore.core_64> tools/icall/work/core64.dsm` → `180cbb930`・`180cbcd90`・`180cb9890` の `r13` 書込み 0 件 (push 0 / pop 0)。間接 2 件は具象型未特定。`+0xa80` 格納箇所 48 件。
 - 前 run の 5.78 秒・前 run の値は、本付録の数値の根拠にしない。
+
+## 7. 格納元の集計 (#5843 / ICALL-119)
+
+- 素材: `plugins-freshair` の `Fresh Air.Win.zip` → `SlateCore.core_64` (sha256 `2cf759f712adf955a56684df4b24454690ac878105d4433de16c88626a45dd3b` で一致)。全量 dsm は `tools/icall/work/core64.dsm` (gitignore)。
+- `objdump -d -M intel` の全量生成: real 2.650 s・user 2.501 s (load は測定時点で低い)。
+- `bash tools/icall/r13_callee_check.sh <core_64> <dsm>` → `180cbb930`・`180cbcd90`・`180cb9890` の `r13` 書込み 0 件 (push 0 / pop 0)。`+0xa80` の格納 48 件。前付録 §3 と一致。
+- `python3 tools/icall/cb_writers.py tools/icall/work/core64.dsm` → 関数 20,701 件を境界で切り、`mov QWORD PTR [r*+0xa80],` を含む関数は 47 件・格納 48 件。`180cbc770` (`180cbc77c` を含む) が 2 件 (`180cbc7e0`・`180cbc963`)。
+- `180cbc770` の呼出し元 6 件 (`call 0x180cbc770` / `jmp` の合計): `180cb60cb`・`180cb6965`・`180cb6a76`・`180cbaf0b`・`180cbafc4`・`180cbb147`。直前の処理を見ると、`180cb60cb`・`180cbaf0b`・`180cbafc4`・`180cbb147` は `rdx` に作った pair をゼロで渡し、格納される control block は NULL になる。`180cb6965`・`180cb6a76` は `rdx` が `0x18040e0e0` の戻り値で、その関数は `[rdx+0x8]` を読んで `[rdi]` に書く (control block の値は呼出し元に依る)。この 2 件は未確定。
+- 具象型の全数 (control block の vtable が指す `_Destroy`・`_Delete_this`) は未確定。`.rdata`・`.data` の関数ポインタ並びは 26,149 件あるが、vtable の候補への対応付けは未実施。
+
+## 8. 検証のみで未了の項目
+
+- 呼出し元 `180cb6965`・`180cb6a76` (関数 `180cb68e0`・`180cb6a20` 付近) の control block の出どころ。
+- 格納 47 関数の全数の control block の具象型。
+- 間接 `180cbba21`・`180cbba36` の `r13` 保存 (受入 2 の残り・受入 3 の判定材料)。
