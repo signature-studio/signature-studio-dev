@@ -56,7 +56,7 @@ bash tools/liftdiff/liftdiff_e2e.sh --m11-only                                  
 
 ## 6. 測定 commit からの差分
 
-測定 commit `e4f07955d` 以降のコード差分は無し (本 REPORT の追加のみ)。`git diff e4f07955d HEAD -- tools/liftdiff` の出力は本 PR の最後の commit 時点で空。
+`git diff e4f07955d HEAD -- tools/liftdiff` は `REPORT_LD287.md` の新規追加 (67 行) のみ。コードは変えていないため、測定値は再取得していない。`docs/DOC_MAP.md` は 1 行追加。
 
 ## 7. 未解決
 
