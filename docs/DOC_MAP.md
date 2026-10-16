@@ -116,6 +116,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_970.md` | ~100 | PERF-P14 (#970) の付録: boot closure の -O0 / -O2 / -O2 -flto 変種の build (wasm bytes・所要時間・ピーク RSS)、node 実行時間 (n=10)・署名の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4983.md` | ~70 | FLE-37 (#4983): 既定経路 `run_boot default` で `FLE_BOOT_LOG_CAP` が効かない不具合の修正 (`${6:-0}` → 環境変数を読む式)・修正前後の `log_cap` の実測・上限超過時の `hit` の実測。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5177.md` | ~70 | FLE-43 (#5177): 既定経路の出力 hash 非決定 (8 run・非決定 9 バイトの VA)・判定指標 (`image_writable` から非決定位置を除いた値・`outmem_judge.py`)。測定値の正本 |
+| `tools/flelift/boot/REPORT_APPENDIX_5897.md` | ~60 | #5897 (PY-5398): slot 35 (`call [reg+0x118]` 151 箇所) の実行時 VMT 採取 probe (`slot35_vmt_probe.sh`)。採取 0 件・陽性対照の発火・未解決 (boot を 895 より先へ)。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5215.md` | ~70 | PY-4887 (#5215): 選択リスト G の初期化 `0xe38870` の既定 boot での実起動確認 (G・isPatternSelected・呼出元 5 観測点は未到達・制御 1 件発火)。probe は `py5215_g_init_probe.sh` |
 | `tools/flelift/boot/REPORT_APPENDIX_5027.md` | ~80 | FLE-40 (#5027): `FLE_BOOT_LOG_CAP` 超過の例外が Emscripten の tty write で飲まれ `exit` に残る経路の特定・超過を `boot.threw` の `log_cap` として報告する修正・cap の有無での実測差。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4806.md` | ~60 | FLE-29 (#4806) A1: opt-in 経路 (FLE_IPP=1) の dsp_ippv2 load hook は非 0 を返す (前提の「0 を返す」は不成立)。`0x15F34A0` は unit 132 で登録され unit 209 の 16B store (ret `0x1078570`) で 0 に戻る。store 元の関数は未特定 |
