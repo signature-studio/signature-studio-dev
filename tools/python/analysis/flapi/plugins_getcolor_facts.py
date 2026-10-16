@@ -7,6 +7,8 @@
 - 0xd80b8d・0xd80c8c: obj.vtable[+8](obj, 0x21, flag, paramIndex) の呼出し (edx=0x21・r8=[rbp+0xa4]・r9=[rbp+0xa0])。
 - 戻り値 eax は BGR→RGB 入替え (0xff00ff・0xff00ff00 のマスク) をしてから [rip+0x8636ce] の関数へ渡す。alpha は付与しない。
 - 対象 obj は 0x1331340 の出力 [rbp+0x78] を vtable[+0x20] に通して得る (vtbl[+8] の型は未同定)。
+- 0x1331340 は this+0x38 の参照先の +0x48 を out 引数へ代入し、代入ヘルパ 0x41a7b0 は新値に [rax+8] (AddRef)・旧値に [rax+0x10] (Release) を呼ぶ。
+  this+0x38 の書込み元 (型) は未確認。
 
 vtbl[+8] の先と ID 0x21 の意味は未確定 (REPORT_PY5350.md §4 に未確認として残す)。
 実行すると PASS/FAIL を出し、1 つでも FAIL なら非 0 で終わる。
@@ -50,6 +52,12 @@ def main():
     results.append(("mask 0xff00ff00 in result path", any(s == "and eax, 0xff00ff00" for _, s in body)))
     results.append(("0x1331340 obtains obj", any(s == "call 0x1331340" for _, s in body)))
     results.append(("vtable[+0x20] before vtbl[+8]", any(s == "call qword ptr [rax + 0x20]" for _, s in body)))
+    chain = insns(0x1331340, 14)
+    results.append(("0x1331340 reads this+0x38", any(s == "mov rax, qword ptr [rcx + 0x38]" for _, s in chain)))
+    results.append(("0x1331340 passes [this+0x38]+0x48 as new value", any(s == "lea rdx, [rax + 0x48]" for _, s in chain)))
+    helper = insns(0x41A7B0, 25)
+    results.append(("0x41a7b0 AddRef new value via [rax+8]", any(s == "call qword ptr [rax + 8]" for _, s in helper)))
+    results.append(("0x41a7b0 Release old value via [rax+0x10]", any(s == "call qword ptr [rax + 0x10]" for _, s in helper)))
 
     ok = True
     for name, passed in results:
