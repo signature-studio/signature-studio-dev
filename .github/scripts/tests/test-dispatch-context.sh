@@ -289,6 +289,11 @@ expect "pm.md: a /oc string is banned even in negation, quote or explanation" $?
 pm_has '質問・`needs-user-input` の前に対象の状態を確認する'
 expect "pm.md: closed / merged / post-merge review are checked before asking" $?
 
+# 10f. #5470: 残件の子 issue は既存の関連子を優先し、新規子は明確な理由のある場合だけ (表記揺れの抑制を含む)。既存のガード (発散予算・最大 3・親に blocked_by なし) は残る。
+for s in '残件を子 issue へ移す前に、既存の関連子を優先する' 'gh api -X GET search/issues' '同一内容の言い換え子 (表記揺れ) を作らない' '1 run の上限を超える・別レーン' '1 起動 3 件まで' '+2 まで' '親に `blocked_by` を付けない'; do
+  pm_has "$s"
+  expect "pm.md existing-children rule: has '$s'" $?
+done
 # 10b. 不在中ダイジェスト (CI-70 #2349): digest 節は 24 時間ごと・件数だけ・1 日 1 件までの緊急コメント。user_answered は回答を反映して確定する。
 pm_has '### `digest`'
 expect "pm.md has the kind section 'digest'" $?

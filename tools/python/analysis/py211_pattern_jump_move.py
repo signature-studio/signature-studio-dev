@@ -11,6 +11,7 @@ capstone で関数先頭から ret までを逆アセンブルし、rip 相対�
 
 --mutate: 検査の感度を見るネガティブコントロール。movePattern の上限 `cmp eax, 0x3e7` の即値を 0x3e8 に書き換えたメモリ上の複製で
 検査し直し、`movePattern.upper_bound` が FAIL することを確認する (FAIL が出れば検査は効いている)。
+--mutate-helper: 0x11e84a0 の範囲外の `jl` (0f 8c) を `jge` (0f 8d) に書き換えた複製で検査し、`helper.11e84a0.range_guard` が FAIL することを確認する。
 """
 import sys
 
@@ -39,6 +40,11 @@ if mutate:
     o = foff(MOVE_BOUND_VA)
     assert data[o:o + 5] == b"\x3d\xe7\x03\x00\x00", "mutate target mismatch"
     data[o + 1] = 0xE8
+
+if "--mutate-helper" in sys.argv[2:]:
+    o = foff(0x11E84C2)
+    assert data[o:o + 2] == b"\x0f\x8c", "mutate-helper target mismatch"
+    data[o + 1] = 0x8D
 
 
 def decode(va, limit=0x1000):
@@ -157,6 +163,31 @@ r8 = find(0xD65B30, "mov", "r8d, 1")
 check("flags.copy_u8", a is not None and r8 is not None and find(0x409CC8, "movzx", "eax, byte ptr [rcx + r8 - 1]") is not None
       and find(0x409CC8, "mov", "byte ptr [rdx + r8 - 1], al") is not None,
       f"callback の call 0x409c80 at {a and hex(a)} (n=1)。0x409cc8 の 1 バイト経路で複写")
+
+# 補助 4 関数 (#4532・PY-365): 役割を 1 行ずつ確定する検査
+check("helper.e5af80_ret_only", (lambda i: len(i) == 1 and i[0][1] == "ret")(decode(0xE5AF80)),
+      "0xe5af80 は ret 1 命令のみ。呼出し (0x12d8b0f) は何もしない")
+jl_ = find(0x11E84A0, "jl", "0x11e85fc")
+jg_ = find(0x11E84A0, "jg", "0x11e85fc")
+epi = decode(0x11E85FC)
+check("helper.11e84a0.range_guard", jl_ is not None and jg_ is not None
+      and nxt(0x11E84A0, jl_, -1)[2] == "rcx, rcx" and nxt(0x11E84A0, jg_, -1)[2] == "rcx, rax"
+      and epi[0][1:3] == ("add", "rsp, 0x20"),
+      f"index (ecx) が 0 未満 (jl at {jl_ and hex(jl_)})・件数-1 超 (jg at {jg_ and hex(jg_)}) のとき 0x11e85fc (add rsp,0x20 のエピローグ) へ直接 return。範囲内だけ本体へ進む")
+dl_t = [t for _, m, _, t in decode(0x12DDAA0) if m == "movzx" and t is not None]
+dl_v = data[foff(dl_t[0])] if dl_t else None
+check("helper.12ddaa0.forward_flag1", find(0x12DDAA0, "call", "0x12ddb20") is not None and dl_v == 1,
+      f"0x12ddaa0 は rcx=[0x196eb00] (.bss) を this に、r8d=ecx (index) を渡して 0x12ddb20 を呼ぶ。dl = [rip+0x11] の byte = {dl_v} (1 に固定)")
+cm_ = find(0x12E21A0, "cmp", "eax, -1")
+je_ = find(0x12E21A0, "je", "0x12e21f7")
+c417 = find(0x12E21A0, "call", "0x417fc0")
+check("helper.12e21a0.minus1_branch", cm_ is not None and je_ is not None and c417 is not None
+      and je_ < c417 < 0x12E21F7 and nxt(0x12E21A0, je_, -1)[2] == "eax, -1",
+      f"0x12e21a0 は index (r8d) が -1 のとき 0x12e21f7 (0xea6e30 で件数を取り、0xea66b0 で各要素を埋める経路) へ、それ以外は 0x417fc0 で 1 要素の書込み (cmp at {cm_ and hex(cm_)})")
+f_flag = find(0x12DDB20, "test", "cl, 1")
+check("helper.12ddb20.flag_gate_callback", f_flag is not None and nxt(0x12DDB20, f_flag)[1] == "je"
+      and find(0x12DDB20, "call", "qword ptr [rbp + 0x68]") is not None,
+      f"0x12ddb20 は dl (flag) の bit0 が 0 なら何もしない。立つと [obj+8] の列を走査し、各要素で callback [rbp+0x68] を呼ぶ (未同定の callback の中身は本 REPORT の範囲外)")
 
 # 別算法の検算: 機械語の並び「cmp eax, 0x3e7 ; jg」(3d e7 03 00 00 と短距離 7f・近距離 0f 8f) を .text のファイル上で正規表現で数える
 import re
