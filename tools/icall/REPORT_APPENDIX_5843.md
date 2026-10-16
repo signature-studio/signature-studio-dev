@@ -48,7 +48,7 @@
 | `python3 tools/icall/cb_vtable_superset.py <SlateCore.core_64> tools/icall/work/core64.dsm` | 未実施 (同上) | — | — |
 | `python3 tools/icall/vtable_r13.py <SlateCore.core_64> tools/icall/work/core64.dsm` | 未実施 (同上) | — | — |
 
-旧版 (`33aa87e6e`) の実測値 (745 / 56 / 52 / 4、所要 5.91 s) は、保存の欠落を含む旧判定の数字のため採用しない。
+旧判定 (`33aa87e6e`) の実測値は、保存の欠落を含む判定のため採用しない (数字は残さない)。
 
 ## 未解決
 
