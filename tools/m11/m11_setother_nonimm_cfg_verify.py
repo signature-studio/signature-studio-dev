@@ -2,13 +2,15 @@
 """set_other 非 imm reg 台帳の 実値化 行の独立照合 (#3916 / M11-N198).
 
 m11_setother_nonimm_cfg.py (CFG 到達定義を逆向きに追う) と別手法で照合する。
-  手法: 関数を入口から具体実行し、probe (呼出し点) に届く全経路の値を列挙する。
+  手法: 関数を入口から具体実行し、probe (呼出し点) に届く全経路の値を集める。
     - 分岐条件が未知なら両方向を辿る (過大近似)。probe で値が未知の経路が 1 つでもあれば 判定不能。
     - 命令の意味は op_str の文字列だけで読む (capstone の regs_access / rw は使わない)。
     - 未対応の命令・step 上限・未知の flags は 判定不能 (PASS にしない)。
+    - 値が未知の経路には、未知の源の類を付ける (入力引数 / スタック slot / メモリ読込 / call 戻り値 / その他)。
+      類は判定を変えない (分類の追加だけ)。
 使い方:
   python3 m11_setother_nonimm_cfg_verify.py --selftest         合成検査 (期待値と照合・ネガティブコントロール込み)
-  python3 m11_setother_nonimm_cfg_verify.py ROWS.json --pe PE  nonimm_cfg_rows.json の 実値化 行を照合
+  python3 m11_setother_nonimm_cfg_verify.py ROWS.json --pe PE  nonimm_cfg_rows.json の 実値化 行を照合 (--all で全行)
 """
 import argparse, collections, json, os, re, sys
 
@@ -45,6 +47,7 @@ STRING_OPS = ('stosb', 'stosw', 'stosd', 'stosq', 'movsb', 'movsw', 'movsd', 'mo
               'scasb', 'scasw', 'scasd', 'scasq', 'cmpsb', 'cmpsw', 'cmpsd', 'cmpsq')
 XMOV = ('movdqa', 'movdqu', 'movaps', 'movups', 'movapd', 'movupd', 'movq', 'movd', 'movss', 'movsd',
         'pxor', 'xorps', 'xorpd', 'punpcklqdq', 'pshufd', 'paddd', 'paddq', 'psrldq', 'pslldq')
+STK = re.compile(r'\b(rsp|rbp|esp|ebp)\b')
 
 
 def get(st, name):
@@ -53,15 +56,40 @@ def get(st, name):
     return None if v is None else v & msk(w)
 
 
-def put(st, name, v):
+def famlab(st, fam):
+    """fam が未知のときの源の類。入口から一度も書かれていない reg は 入力引数。"""
+    if fam not in st:
+        return '入力引数'
+    return st.get('#' + fam, 'その他')
+
+
+def oplab(st, ops):
+    """ops のうち最初に未知となるオペランドの源の類。未知が無ければ その他。"""
+    for o in ops:
+        if o in REG:
+            if get(st, o) is None:
+                return famlab(st, REG[o][0])
+        elif '[' in o:
+            return 'スタック slot' if STK.search(o) else 'メモリ読込'
+    return 'その他'
+
+
+def put(st, name, v, lab='その他'):
     fam, w = REG[name]
+    if w < 32 and v is not None:
+        old = st.get(fam)
+        if old is None:
+            v = None
+            if lab == 'その他':
+                lab = famlab(st, fam)
+        else:
+            v = (old & ~msk(w)) | (v & msk(w))
     if v is None:
         st[fam] = None
-    elif w >= 32:
-        st[fam] = v & msk(w)
+        st['#' + fam] = lab
     else:
-        old = st.get(fam)
-        st[fam] = None if old is None else (old & ~msk(w)) | (v & msk(w))
+        st[fam] = v & msk(w) if w >= 32 else v
+        st.pop('#' + fam, None)
 
 
 def src_val(st, s, w):
@@ -104,9 +132,10 @@ def cond(mn, fl):
 
 
 def run(insns, probe, fam):
-    """probe に届く全経路で fam の値を集める。値は int か None (未知)。"""
+    """probe に届く全経路で fam の値を集める。値は int か None (未知)。
+    戻り値: (vals, labs)。labs は値が未知の経路の源の類の集合。"""
     idx = {x.address: i for i, x in enumerate(insns)}
-    vals, steps = set(), 0
+    vals, labs, steps = set(), set(), 0
     stack = [(0, {}, None)]
     while stack:
         i, st, fl = stack.pop()
@@ -118,6 +147,8 @@ def run(insns, probe, fam):
                 raise Unsup('関数末尾を越えた')
             if i == probe:
                 vals.add(st.get(fam))
+                if st.get(fam) is None:
+                    labs.add(famlab(st, fam))
             x = insns[i]
             mn = x.mnemonic
             ops = [o.strip() for o in x.op_str.split(',')] if x.op_str else []
@@ -141,13 +172,17 @@ def run(insns, probe, fam):
             if mn == 'call':
                 for f in VOLATILE:
                     st[f] = None
+                    st['#' + f] = 'call 戻り値'
+                st['#flags'] = 'call 戻り値'
                 fl = None
                 i += 1
                 continue
             if mn == 'push':
                 if ops[0] not in REG:
                     raise Unsup('push ' + ops[0])
-                st['__stk'] = st.get('__stk', ()) + (get(st, ops[0]),)
+                v = get(st, ops[0])
+                lab = None if v is not None else famlab(st, REG[ops[0]][0])
+                st['__stk'] = st.get('__stk', ()) + ((v, lab),)
                 i += 1
                 continue
             if mn == 'pop':
@@ -157,14 +192,15 @@ def run(insns, probe, fam):
                 if not stk:
                     raise Unsup('pop で空スタック')
                 st['__stk'] = stk[:-1]
-                put(st, ops[0], stk[-1])
+                v, lab = stk[-1]
+                put(st, ops[0], v, lab or 'その他')
                 i += 1
                 continue
             if mn == 'lea':
                 dst = ops[0]
                 if dst not in REG:
                     raise Unsup('lea メモリ宛先')
-                put(st, dst, None)
+                put(st, dst, None, 'スタック slot' if STK.search(ops[-1]) else 'その他')
                 i += 1
                 continue
             if mn in ('mov', 'movabs'):
@@ -172,28 +208,35 @@ def run(insns, probe, fam):
                 if dst not in REG:
                     i += 1
                     continue
-                put(st, dst, src_val(st, src, REG[dst][1]))
+                v = src_val(st, src, REG[dst][1])
+                put(st, dst, v, 'その他' if v is not None else oplab(st, [src]))
                 i += 1
                 continue
             if mn in ALU or mn in ('cmp', 'test'):
                 dst, src = ops
                 if '[' in dst or '[' in src:
+                    mem = dst if '[' in dst else src
+                    lab = oplab(st, [mem])
                     if mn not in ('cmp', 'test') and dst in REG:
-                        put(st, dst, None)
+                        put(st, dst, None, lab)
                     fl = None
+                    st['#flags'] = lab
                     i += 1
                     continue
                 if dst not in REG:
                     raise Unsup('メモリ宛先 ' + mn)
                 w = REG[dst][1]
                 a = get(st, dst)
+                b = src_val(st, src, w)
+                lab = oplab(st, [dst, src])
                 if mn == 'cmp':
-                    fl = ('cmp', a, src_val(st, src, w), w)
+                    fl = ('cmp', a, b, w)
+                    st['#flags'] = lab if a is None or b is None else 'その他'
                     i += 1
                     continue
-                b = src_val(st, src, w)
                 if mn == 'test':
                     fl = ('res', None if a is None or b is None else (a & b), w)
+                    st['#flags'] = lab if fl[1] is None else 'その他'
                     i += 1
                     continue
                 if dst == src and mn in ('xor', 'sub'):
@@ -202,8 +245,9 @@ def run(insns, probe, fam):
                     r = None
                 else:
                     r = {'xor': a ^ b, 'sub': a - b, 'add': a + b, 'and': a & b, 'or': a | b}[mn] & msk(w)
-                put(st, dst, r)
+                put(st, dst, r, lab)
                 fl = ('res', r, w)
+                st['#flags'] = lab if r is None else 'その他'
                 i += 1
                 continue
             if mn in ('inc', 'dec'):
@@ -213,8 +257,10 @@ def run(insns, probe, fam):
                 w = REG[dst][1]
                 a = get(st, dst)
                 r = None if a is None else (a + (1 if mn == 'inc' else -1)) & msk(w)
-                put(st, dst, r)
+                lab = oplab(st, [dst])
+                put(st, dst, r, lab)
                 fl = ('res', r, w)
+                st['#flags'] = lab if r is None else 'その他'
                 i += 1
                 continue
             if mn in ('shl', 'sal', 'shr', 'sar') and len(ops) == 2 and ops[0] in REG:
@@ -237,14 +283,16 @@ def run(insns, probe, fam):
                     r = (s >> c) & msk(w)
                 else:
                     r = (a << c) & msk(w)
-                put(st, dst, r)
+                lab = oplab(st, [dst, src])
+                put(st, dst, r, lab)
                 fl = None
+                st['#flags'] = lab if r is None else 'その他'
                 i += 1
                 continue
             if mn == 'not' and ops and ops[0] in REG:
                 w = REG[ops[0]][1]
                 a = get(st, ops[0])
-                put(st, ops[0], None if a is None else (~a) & msk(w))
+                put(st, ops[0], None if a is None else (~a) & msk(w), oplab(st, [ops[0]]))
                 i += 1
                 continue
             if mn == 'imul' and len(ops) in (2, 3) and ops[0] in REG:
@@ -253,14 +301,17 @@ def run(insns, probe, fam):
                 a = get(st, src) if len(ops) == 3 else get(st, dst)
                 b = src_val(st, ops[2] if len(ops) == 3 else src, w)
                 r = None if a is None or b is None else (a * b) & msk(w)
-                put(st, dst, r)
+                lab = oplab(st, ops)
+                put(st, dst, r, lab)
                 fl = None
+                st['#flags'] = lab if r is None else 'その他'
                 i += 1
                 continue
             if mn in ('cdq', 'cqo') and not ops:
                 w = 64 if mn == 'cqo' else 32
                 a = get(st, 'rax' if w == 64 else 'eax')
-                st['rdx'] = None if a is None else (msk(w) if (a >> (w - 1)) & 1 else 0)
+                put(st, 'rdx', None if a is None else (msk(w) if (a >> (w - 1)) & 1 else 0),
+                    oplab(st, ['rax' if w == 64 else 'eax']))
                 i += 1
                 continue
             if mn == 'idiv' and ops and (ops[0] in REG and REG[ops[0]][1] == 32 or '[' in ops[0]):
@@ -268,8 +319,9 @@ def run(insns, probe, fam):
                 ax = get(st, 'eax')
                 dx = get(st, 'edx')
                 if d is None or ax is None or dx is None:
-                    st['rax'] = None
-                    st['rdx'] = None
+                    lab = oplab(st, ['eax', 'edx', ops[0]])
+                    put(st, 'eax', None, lab)
+                    put(st, 'edx', None, lab)
                 else:
                     n = ((dx << 32) | ax) - ((1 << 64) if (dx >> 31) & 1 else 0)
                     dv = d - (1 << 32) if (d >> 31) & 1 else d
@@ -282,19 +334,22 @@ def run(insns, probe, fam):
                     put(st, 'eax', q & msk(32))
                     put(st, 'edx', r & msk(32))
                 fl = None
+                st['#flags'] = 'その他'
                 i += 1
                 continue
             if mn == 'neg' and ops and ops[0] in REG:
                 w = REG[ops[0]][1]
                 a = get(st, ops[0])
                 r = None if a is None else (-a) & msk(w)
-                put(st, ops[0], r)
+                lab = oplab(st, [ops[0]])
+                put(st, ops[0], r, lab)
                 fl = ('res', r, w)
+                st['#flags'] = lab if r is None else 'その他'
                 i += 1
                 continue
             if mn.startswith('set') and len(mn) > 3 and ops and ops[0] in REG:
                 c = cond('j' + mn[3:], fl)
-                put(st, ops[0], None if c is None else int(c))
+                put(st, ops[0], None if c is None else int(c), st.get('#flags', 'その他'))
                 i += 1
                 continue
             if mn in ('movzx', 'movsx', 'movsxd'):
@@ -303,7 +358,7 @@ def run(insns, probe, fam):
                     raise Unsup('メモリ宛先 ' + mn)
                 w = REG[dst][1]
                 if src not in REG:
-                    put(st, dst, None)
+                    put(st, dst, None, oplab(st, [src]))
                     i += 1
                     continue
                 sw = REG[src][1]
@@ -317,42 +372,45 @@ def run(insns, probe, fam):
                     if (sv >> (sw - 1)) & 1:
                         sv -= 1 << sw
                     v = sv & msk(w)
-                put(st, dst, v)
+                put(st, dst, v, 'その他' if v is not None else oplab(st, [src]))
                 i += 1
                 continue
             if mn in STRING_OPS and 'xmm' not in x.op_str:
                 for f in ('rsi', 'rdi', 'rcx'):
                     st[f] = None
+                    st['#' + f] = 'その他'
                 i += 1
                 continue
             if ops and ops[0].startswith('xmm'):
                 if mn.startswith(('ucomis', 'comis')):
                     fl = None
+                    st['#flags'] = 'その他'
                 i += 1
                 continue
             if mn.startswith('cvt') and ops and ops[0] in REG:
-                put(st, ops[0], None)
+                put(st, ops[0], None, oplab(st, ops[1:]))
                 i += 1
                 continue
             if mn in XMOV and ops:
                 if ops[0] in REG:
-                    put(st, ops[0], None)
+                    put(st, ops[0], None, oplab(st, ops[1:]))
                 i += 1
                 continue
             raise Unsup(mn)
-    return vals
+    return vals, labs
 
 
 def verify(insns, probe, fam, claim=None):
-    """戻り値: (判定, 詳細)。判定は 実値化 / 未決 / PASS / FAIL / 判定不能 のいずれか。"""
+    """戻り値: (判定, 詳細)。判定は 実値化 / 未決 / PASS / FAIL / 判定不能 のいずれか。
+    判定不能 (値が未知の経路) の詳細は '類=' に未知の源の類を付ける。"""
     try:
-        vals = run(insns, probe, fam)
+        vals, labs = run(insns, probe, fam)
     except (Unsup, Stop, KeyError, ValueError) as e:
         return '判定不能', '%s: %s' % (type(e).__name__, e)
     if not vals:
         return '判定不能', 'probe に到達しない'
     if None in vals:
-        return '判定不能', '値が未知の経路がある'
+        return '判定不能', '値が未知の経路がある 類=' + '/'.join(sorted(labs))
     if len(vals) > 1:
         return ('FAIL' if claim is not None else '未決'), '経路で値が違う: ' + ','.join(hex(v) for v in sorted(vals))
     v = vals.pop()
@@ -423,7 +481,29 @@ def selftest():
         ok = got == expect
         bad += not ok
         print('[selftest] %-44s 期待 %-6s 判定 %-6s %s %s' % (name, expect, got, det, 'OK' if ok else 'NG'))
-    print('[selftest] %d 件 / 不一致 %d' % (len(cases), bad))
+    # 未知の源の類 (値が未知の経路の 類=)。PASS = 類が一致 / FAIL = 類が違う (ネガティブコントロール)。
+    lab_cases = [
+        ('L1 入力引数 (esi は入口で未知)', '89f30fb6d3c3', 2, 'rdx', '入力引数', 'PASS'),
+        ('L1 ネガティブ (類を スタック slot と誤る)', '89f30fb6d3c3', 2, 'rdx', 'スタック slot', 'FAIL'),
+        ('L2 スタック slot (mov rax,[rsp+8])', '488b442408' '4889c3' '0fb6d3c3', 3, 'rdx', 'スタック slot', 'PASS'),
+        ('L2 ネガティブ (類を メモリ読込 と誤る)', '488b442408' '4889c3' '0fb6d3c3', 3, 'rdx', 'メモリ読込', 'FAIL'),
+        ('L3 メモリ読込 (mov rax,[rbx])', '488b03' '4889c3' '0fb6d3c3', 3, 'rdx', 'メモリ読込', 'PASS'),
+        ('L3 ネガティブ (類を 入力引数 と誤る)', '488b03' '4889c3' '0fb6d3c3', 3, 'rdx', '入力引数', 'FAIL'),
+        ('L4 call 戻り値 (call 後の rax を rbx 経由)', 'e800000000' '4889c3' '0fb6d3c3', 3, 'rdx', 'call 戻り値', 'PASS'),
+        ('L4 ネガティブ (類を スタック slot と誤る)', 'e800000000' '4889c3' '0fb6d3c3', 3, 'rdx', 'スタック slot', 'FAIL'),
+        ('L5 その他 (ucomiss の flags 未知を setcc)', '0f2ec1' '0f94c3' '0fb6d3c3', 3, 'rdx', 'その他', 'PASS'),
+        ('L5 ネガティブ (類を 入力引数 と誤る)', '0f2ec1' '0f94c3' '0fb6d3c3', 3, 'rdx', '入力引数', 'FAIL'),
+    ]
+    for name, hx, probe, fam, want, expect in lab_cases:
+        insns = list(md.disasm(bytes.fromhex(hx), B))
+        got, det = verify(insns, probe, fam, None)
+        lab = det.split('類=', 1)[1] if '類=' in det else None
+        st = 'PASS' if got == '判定不能' and lab == want else 'FAIL'
+        ok = st == expect
+        bad += not ok
+        print('[selftest] %-44s 期待 %-6s 判定 %-6s 類 %s %s' % (name, expect, st, lab, 'OK' if ok else 'NG'))
+    n = len(cases) + len(lab_cases)
+    print('[selftest] %d 件 / 不一致 %d' % (n, bad))
     return bad
 
 
@@ -438,6 +518,7 @@ def real(rows_path, pe, all_rows=False):
         return 0
     mach = ldmach.Machine(pe)
     cnt = collections.Counter()
+    kinds = collections.Counter()
     for r in rows:
         cva = int(r['caller'].split('_')[1], 16)
         tva = int(r['callee'].split('_')[1], 16)
@@ -447,8 +528,11 @@ def real(rows_path, pe, all_rows=False):
         claim = None if r.get('value') is None else int(r['value'], 0)
         got, det = verify(insns, calls[r['k']], r['fam'], claim)
         cnt[got] += 1
+        if got == '判定不能' and '類=' in det:
+            kinds[det.split('類=', 1)[1]] += 1
         print('[verify] %s -> %s pos %d: %s %s' % (r['caller'], r['callee'], r['pos'], got, det))
     print('[verify] 集計 ' + ' '.join('%s %d' % (k, v) for k, v in sorted(cnt.items())))
+    print('[verify] 値が未知の経路の類 (経路単位の集合) ' + ' '.join('%s %d' % (k, v) for k, v in sorted(kinds.items())))
     return cnt['FAIL']
 
 
