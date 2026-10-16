@@ -38,7 +38,7 @@
 - 下の表と「#5913 (KH-179) の扱い」節の数値は、前 run (`a83469d96` の測定時) の記録である。この run では再確認していない。
 - 再現に要る素材: `oc_artifacts: fl-win64 plugins-kilohearts toolchain-emsdk` (PR 本文に記載)。
 
-## 呼出し点の照合 (`void_ret_check.sh` の実出力・本 fix run で再実行)
+## 呼出し点の照合 (`void_ret_check.sh` の実出力・前 run の記録。本 run では未再実行)
 
 PE の objdump は `call   0x<番地>` の形で出る。前回の照合は `0x` なしの形しか見ておらず、実出力が空だった。前回の修正で両方の形を見るようにした。
 
