@@ -116,7 +116,8 @@
   `function_690763` 所属の site (`0x690804`・`0x6908b3`・`0x6909d4`) は対象外で、子 SHX-T57 に移す。
 - 判定スクリプト: `tools/m11/frame_share/callsite_audit.py`。画像全体の `e8 rel32` を走査して callee を指す site を抽出し、所属関数を `objdump` で線形逆アセンブルする。site を含む基本ブロック B の入口は、(a) B の直前命令が `ret`・`jmp`・`ud2`・`hlt` でなければ fall-through で到達しうる、(b) B と site への直接分岐・絶対参照の件数、の 2 点で判定する。
 - 状態: **未確定** (入口なしの判定は根拠が直接分岐・絶対参照・無条件転送の範囲に限られるため)。前版の「入口なし → 機械語として到達しない」の結論は撤回した (レビュー指摘 1)。
-- 素材: `work-m11.tar.zst` を `tools/m11/work/` 相当へ展開し、`m11_image.bin`・`boot1.drc.ll`・`boot_final3.ll` を使って本 head で実行した (下記の実出力)。
+- 測定 commit: `b50c10552` (実行コードは `0c3aa8431` と同一。`git diff b50c10552 0c3aa8431 -- tools/m11/frame_share` は 0 行)。
+- 素材: `work-m11.tar.zst` を `tools/m11/work/` 相当へ展開し、`m11_image.bin`・`boot1.drc.ll`・`boot_final3.ll` を使って測定 commit で実行した (下記の実出力)。
 - IR 側: `boot1.drc.ll` の `@function_690580(` の call は 2 件 (`!14278` = `0x69073b`・`!14369` = `0x6909d4`)。`0x69073b` のみが `function_6905f0` 内。`boot_final3.ll` の `@function_690580(` の call は 3 件で、所属は次のとおり。244849 行 = `function_6905f0` (site `0x69073b` に対応)、245171 行 = `function_690763` (対象外)、513910 行 = trampoline wrapper `@m11_tr_function_690580` 内 (site ではない)。
 
 ### 再現 (`oc_artifacts: work-m11` で取得した素材を使う)
