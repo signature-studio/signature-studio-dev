@@ -76,6 +76,12 @@
 | 引数解析失敗時の code (`0xd80e4c`・PyArg の戻り値を `esi` に入れて `0xd82c20` へ) | 不正引数の code | 未確認 |
 | code -4 / -8 の Python 側の値 (4 / 8) と `0xd82c20` の戻り値 | 例外の型と値 | PY-228 の対応を引き継ぐ。未確認 |
 
+### 4.1 PY-5361 (#5490) の追記: getColor の呼出し形 (PE 確認・検査 `analysis/flapi/plugins_getcolor_facts.py`)
+
+- `plugins.getColor` (0xd80a40) の値式は 2 箇所 (`0xd80b8d`・`0xd80c8c`) で同じ形を取る: `0x1331340(obj 取得, [rbp+0x78])` → `[rbp+0x78]` の `vtable[+0x20]` (`0xd80b5a`) → 得た obj に対し `obj.vtable[+8](obj, 0x21, [rbp+0xa4] (= flag), [rbp+0xa0] (= paramIndex))`。
+- 戻り値 `eax` は BGR→RGB 入替え (`0xff00ff`・`0xff00ff00`) の後に `[rip+0x8636ce]` の関数へ渡る (`0xd80bab`)。alpha の付与は見えない。
+- **未確認 (受入 1 の未達)**: `0x1331340` の出力 (`[rcx+0x38]` 系の共有ポインタ) の型と、そこの `vtable[+8]` の先の VA。ID `0x21` の意味。flag・paramIndex の意味。`[rip+0x8636ce]` の関数の名前。
+
 ## 5. C・mock への影響
 
 - 本 issue では C provider と mock を変えていない (受入の実装は親 #5106 の範囲)。
