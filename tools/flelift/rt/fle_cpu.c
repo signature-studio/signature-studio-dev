@@ -61,6 +61,16 @@ void fle_wwatch(uint64_t a, uint32_t n, const void* src, const char* file, int l
         nlog++;
         fprintf(stderr, "[fle_wwatch] ret=%p slot=%#llx a=%#llx n=%u old=%#llx new=%#llx at %s:%d\n", __builtin_return_address(0),
                 (unsigned long long)w, (unsigned long long)a, n, (unsigned long long)ov, (unsigned long long)nv, file, line);
+#ifdef FLE_WWATCH_STACK
+        if (nv == 0 && ov != 0) {
+            fprintf(stderr, "[fle_wwatch_stack] slot=%#llx xrip=%#llx", (unsigned long long)w, (unsigned long long)ott_xrip);
+            for (int i = 0; i < 32; i++) {
+                uint64_t v = LD64(R[RSP] + 8ull * i);
+                if (v >= 0x400000ull && v < 0x2000000ull) fprintf(stderr, " [%d]=%#llx", i, (unsigned long long)v);
+            }
+            fprintf(stderr, "\n");
+        }
+#endif
     }
 }
 #endif
