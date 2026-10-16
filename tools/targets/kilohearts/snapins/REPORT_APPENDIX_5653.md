@@ -3,7 +3,7 @@
 - 親: #4689 [KH-111] (修正の本体) / 本 issue: #5653 [KH-172] (原因特定。#4689 から分割)。
 - 測定 commit: `f195a93a9` (origin/main)。測定は同 commit の worktree (`ws-5653`) で実施。
 - 素材: `plugins-kilohearts` の `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/*` → `HeartCore.core_64` (76,642,304 B・sha256 先頭 16 hex `d55ce8b4c0ad7ebe`。REPORT_APPENDIX_780 §3c と同一)。
-- ツール: `toolchain-emsdk` (emcc 6.0.12) と `toolchain-retdec` (`/opt/retdec/bin/retdec-decompiler`)。
+- ツール: [EMSDK] (emcc 6.0.12) と [RETDEC] (`retdec-decompiler`)。`docs/REFERENCES.md` のエントリ ID で参照。
 
 ## 0. 結論
 
