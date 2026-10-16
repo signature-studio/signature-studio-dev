@@ -147,6 +147,11 @@ ABI = {
         #   2521 = 180fb5f35 (rcx=rbp, rdx=rsi, r8=rdi, r9=ebx, [rsp+0x20]=rax)、2547 = 180fb5f85 (全部 0)。
         ('delay 2521 FUN_180fb5f8c 5 args dropped (180fb5f35)', r'(?:func_0x000|FUN_)180fb5f8c\(param_1,param_2,param_3,param_4,param_5\);', 'FUN_180fb5f8c();'),
         ('delay 2547 FUN_180fb5f8c 5 args dropped (180fb5f85)', r'(?:func_0x000|FUN_)180fb5f8c\(0,0,0,0,0\);', 'FUN_180fb5f8c();'),
+        # #4917 (KH-135): FUN_180fb5dd0 は C 宣言 void (void)。呼出し 2 件 (2535・2546) の 5 引数はすべて 0 (機械語 180fb5f40〜180fb5f85 で
+        #   rcx・rdx・r8・r9・[rsp+0x20] を 0 にしてから call)。callee 本体は [rbp+0x30] (= 呼出側 [rsp+0x20] = 0) を読むが、C 本体には
+        #   この読出しが無い (Ghidra 出力から落ちている)。よって引数を落としても生成 C の意味は変わらない。文脈 (直後の文) で 1 件ずつ特定する。
+        ('delay 2535 FUN_180fb5dd0 5 args (0) dropped (180fb5f3c 180fb5f50)', r'FUN_180fb5dd0\(0,0,0,0,0\);\n  return;', 'FUN_180fb5dd0();\n  return;'),
+        ('delay 2546 FUN_180fb5dd0 5 args (0) dropped (180fb5f5c 180fb5f70)', r'FUN_180fb5dd0\(0,0,0,0,0\);\n  FUN_180fb5f8c\(\);', 'FUN_180fb5dd0();\n  FUN_180fb5f8c();'),
         # #5401 (KH-160): FUN_180fe3510 (longlong 1 引数・rcx 入力) の呼出し 1 件 (FUN_180fd2f20 内 5129 行)。
         #   機械語: 180fd2f2a `mov rdi,rcx` → 180fd2f30 `mov rcx,[rcx+0x90]` → 180fd2f3c `call 180fe3510`。rcx = [param_1+0x90]。
         #   callee 180fe3510 は入口で rcx を読む (test rcx,rcx・[rcx+0x10])。よって引数は *(param_1+0x90)。
