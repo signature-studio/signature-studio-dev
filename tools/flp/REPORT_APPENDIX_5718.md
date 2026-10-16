@@ -58,7 +58,7 @@ WAIT=90 bash tools/flp/s6_pred_hit_probe.sh               # pred・loop にブ�
 
 ## 7. 静的解析: loop (0x12d94f0) の直接呼出し元 (実行なし)
 
-- 素材: `block00031_PE.bin` (FLEngine_x64.dll・ImageBase `0x400000`) を `objdump -d` で逆アセンブル。wine64 / gdb はこの runner に無く、実行時確認は行っていない。
+- 素材: `block00031_PE.bin` (FLEngine_x64.dll・ImageBase `0x400000`) を `objdump -d --no-show-raw-insn` で逆アセンブル (raw バイトを消さないと `s7_callgraph.py` が `call` を拾えない)。wine64 / gdb はこの runner に無く、実行時確認は行っていない。
 - `0x12d94f0` を直接 `call` する箇所は 2 つだけ (`tools/flp/s7_callgraph.py` で列挙):
 
 | 呼出し箇所 (RVA) | 所属関数 (RVA) | 形 |
@@ -66,8 +66,8 @@ WAIT=90 bash tools/flp/s6_pred_hit_probe.sh               # pred・loop にブ�
 | `0xed2c96` | `0xed2ac0` | 配列 `(%rdi)` の要素を 1 つずつ渡す前向きループ (`0xed2c71`〜`0xed2ca7`)。直前で `0x11f2ff0` を呼ぶ |
 | `0x1004db5` | `0x1004a20` | 配列 `0x70(%rbp)` を末尾 (`ebx`) から走査する逆向きループ (`0x1004da9`〜`0x1004dc0`)。直後に `0x423980` |
 
-- `ed2ac0` と `1004a20` の直接の呼出し元は、静的には見つからない (`call` の直接参照が 0 件)。関数ポインタ経由 (`call *(%rbx)` 等) の可能性は残るが、32 bit の参照 (`0xad0120` 1 件) は `.pdata` の可能性が高く、呼出し元とは断定しない。
-- 上位側: `1004a20` の直接呼出し元は 10 関数以上 (`0xc307e0`・`0xd9b290`・`0xe1d090`・`0xe71980`・`0xe72cd0`・`0xe7d520`・`0xeb3a60` 等)。根は 640 個あり、どの根が GUI 起動で実行されるかは未確定。
-- `pred` (`0x12d8d30`) を呼ぶ関数は `0xd640a0`・`0xd66060`・`0xe7a470`・`0xea4240`・`0xebf8a0`・`0xec2740`・`0xec35f0`・`0xec3190` 等で、`ec2740`・`ec35f0`・`ec3190` は `0xea7f40`・`0xea7ae0` 系へ繋がる。`pred` の呼出し元 (`ebf8a0` 等) と loop の呼出し元 (`ed2ac0`・`1004a20`) が同じ上位に乗るかは未確認。
+- `0xed2ac0` は直接の呼出し元 0 件 (`call 0xed2ac0` の逆アセンブル上の参照 0 件)。`0x1004a20` は直接 `call` が 38 件・直接の呼出し元の関数が 31 件 (`0xc307e0`・`0xd9b290`・`0xe1d090`・`0xe71980`・`0xe72cd0`・`0xe7d520`・`0xeb3a60` 等)。関数ポインタ経由の呼出しは見ていない。
+- 上位側: `1004a20` の上位閉包 (呼出し元を再帰で辿った関数集合) は 1550 関数。そのうち呼出し元を持たない根は 640 個 (算出: `objdump` の `call` 辺を `s7_callgraph.py` と同じ関数境界で集計)。どの根が GUI 起動で実行されるかは未確定。
+- `pred` (`0x12d8d30`) を呼ぶ関数は `0xd640a0`・`0xd66060`・`0xe7a470`・`0xea4240`・`0xebf8a0`・`0xec2740`・`0xec35f0`・`0xec3190` 等で、`ec2740`・`ec35f0`・`ec3190` から `0xea7f40`・`0xea7ae0` への直接 `call` は 0 件 (推移的な繋がりは未確認)。`pred` の呼出し元 (`ebf8a0` 等) と loop の呼出し元 (`ed2ac0`・`1004a20`) が同じ上位に乗るかは未確認。
 - 結論: loop に入る経路は「直接 call の 2 関数 (`ed2ac0`・`1004a20`)」まで確定。その上位の実行時トリガは未確定 (実行で確認するまで述語は確定しない)。
 - 次の一手: wine64 + gdb の環境で `ed2ac0` と `1004a20` の entry に break を張り、命中の有無と直前のスタック (戻り先) を記録する (`tools/flp/s6_pred_hit_probe.sh` の LOOP を `ed2ac0`・`1004a20` に替える)。
