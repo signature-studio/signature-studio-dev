@@ -149,8 +149,9 @@ ildsp の規模測定 (命令数・call 数・export closure 表) と未解決�
 | 14 本 (`this+0xbc+8i`) への書き込み | 0 件 (`PTR14_ZERO_AFTER=14`) |
 | `fruity` (ctor 後の object に Process_Fruity n=4) | `FRUITY_SIGNAL=11`・14 本への書き込み 0 件 |
 | `vt` (vtable slot 0〜5) | slot 0 は this+0 の 1 件のみ・slot 1・3 は SIGSEGV・slot 5 は object 外へ 2048 件。14 本への書き込み 0 件 |
-| `sweep` (`.pdata` の全 1515 関数) | 444 件が完走 (exit 0)・1069 件が SIGSEGV (11)・1 件が SIGBUS (7)・1 件が SIGALRM (14, 2 秒の打ち切り)。14 本への qword 書き込み命令は 0 件 (下記) |
+| `sweep` (`.pdata` の全 1515 関数) | 完走 (exit 0) は 446〜457 件・SIGSEGV (11) は 1056〜1067 件・SIGBUS (7) 1 件・SIGALRM (14, 2 秒の打ち切り) 1 件 (ASLR 有効の 5 回実測。ASLR 無効 `setarch -R` の 2 回は完走 458 件・SIGSEGV 1055 件で安定)。14 本への qword 書き込み命令は 0 件 (下記) |
 
-- 掃引で `this+0xbc+8i` の書き込みとして EMIT に出た 5 つの store 命令 (RIP RVA: `0x52e9`・`0x13e6b`・`0x3e49b`・`0x3e59b`・`0x4c8e7`) は、いずれも偽陽性: `0x52e9` は `rep stos`・`0x13e6b` は `rep movsb`・`0x4c8e7` は byte 単位の swap・`0x3e49b`・`0x3e59b` は 16 bit の `mov %cx`。qword の 14 本への書き込み命令は 0 件。`0x41ea0`・`0x41ec5` は byte 単位 (`mov %al`)・`0x51aba`・`0x520f6` は dword 単位 (`mov %edx`) の store で、ポインタ代入ではない。`0x5370`・`0x5395`・`0x53b0` は `movaps`・`movups` による領域ゼロ化。
-- 読み: 掃引で完走した 444 関数の範囲では、14 本への qword ポインタ書き込みは無い。ただし 1071 関数は zero 初期化の object で途中 SIGSEGV しており、その先の書き込みは観測していない。14 本を埋める entry は、この掃引では見つからなかった (未特定)。
+- 掃引で `this+0xbc+8i` の書き込みとして EMIT に出た 9 つの store 命令 (RIP RVA: `0x52e9`・`0x13e6b`・`0x3e49b`・`0x3e59b`・`0x41ea0`・`0x41ec5`・`0x4c8e7`・`0x51aba`・`0x520f6`) のうち、次の 5 つは偽陽性: `0x52e9` は `rep stos`・`0x13e6b` は `rep movsb`・`0x4c8e7` は byte 単位の swap・`0x3e49b`・`0x3e59b` は 16 bit の `mov %cx`。qword の 14 本への書き込み命令は 0 件。`0x41ea0`・`0x41ec5` は byte 単位 (`mov %al`)・`0x51aba`・`0x520f6` は dword 単位 (`mov %edx`) の store で、ポインタ代入ではない。`0x5370`・`0x5395`・`0x53b0` は `movaps`・`movups` による領域ゼロ化。
+- 揺れの原因: 完走数の揺れは ASLR 由来。ASLR 有効では、ポインタ値に依存する一部の関数 (例 RVA `0xaca4`・`0x25c4c`) の完走・SIGSEGV の結果が実行ごとに変わる。ASLR を切ると 2 回とも同じ結果になる。14 本への書き込み命令の RIP 集合 (9 箇所) と、14 スロット向け emit の件数 (128 件) は、ASLR 有効 3 回・無効 1 回で一致した。
+- 読み: 掃引で完走した関数の範囲では、14 本への qword ポインタ書き込みは無い。ただし 1056〜1067 関数は zero 初期化の object で途中 SIGSEGV しており、その先の書き込みは観測していない。14 本を埋める entry は、この掃引では見つからなかった (未特定)。
 - 観測の限界: 観測は確保領域内だけ。掃引は ctor 直後の 1 状態 (引数 NULL・zero 初期化) で、各関数に同じ `in`/`out` を渡すだけ。SIGSEGV で止まる関数は、途中の書き込みを残して打ち切られる。
