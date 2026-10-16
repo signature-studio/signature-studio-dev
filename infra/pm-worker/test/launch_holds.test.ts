@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readyHold, recentHold, stoppedHold } from "../src/holdinfo.ts";
-import { BOT_COMMENT_WINDOW_H, RUN_WINDOW_H } from "../src/classify.ts";
+import { BOT_COMMENT_WINDOW_H, LAUNCH_WINDOW_H, RUN_WINDOW_H } from "../src/classify.ts";
 import { noPrCooldownMs, planLaunch } from "../src/launch.ts";
 
 const H = 3_600_000;
@@ -15,8 +15,9 @@ test("recent の bot コメント: 解除見込みは bot コメント + BOT_COM
   assert.equal(h.until, iso(T + BOT_COMMENT_WINDOW_H * H));
 });
 
-test("recent の launched / run finished: 起点 + 3 時間", () => {
-  assert.equal(recentHold(8, "launched 1.0h ago", { launchedAt: T }).until, iso(T + RUN_WINDOW_H * H));
+test("recent の launched: 起点 + LAUNCH_WINDOW_H (3 時間)。run finished は起点 + RUN_WINDOW_H (1 時間)", () => {
+  assert.equal(LAUNCH_WINDOW_H, 3);
+  assert.equal(recentHold(8, "launched 1.0h ago", { launchedAt: T }).until, iso(T + LAUNCH_WINDOW_H * H));
   assert.equal(recentHold(8, "run finished 0.5h ago", { doneAt: T }).until, iso(T + RUN_WINDOW_H * H));
 });
 

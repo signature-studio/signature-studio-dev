@@ -1,7 +1,7 @@
 // 着手を保留している issue の理由と解除見込み (#5110)。観測のみ (launch・dispatch・no-PR 再投入の判断には使わない)。
 // 理由の語は classify.ts の rows の行名と engine.ts の再投入判断の note に対応させる。解除見込みは時間ベースの窓だけ。
 
-import { BOT_COMMENT_WINDOW_H, RUN_WINDOW_H } from "./classify.ts";
+import { BOT_COMMENT_WINDOW_H, LAUNCH_WINDOW_H, RUN_WINDOW_H } from "./classify.ts";
 
 const H = 3_600_000;
 
@@ -30,7 +30,7 @@ export function recentHold(n: number, note: string, t: HoldTimes): Hold {
   if (note.startsWith("bot comment")) return { n, row: "recent", reason: "bot-comment", until: iso(at(t.botAt, BOT_COMMENT_WINDOW_H)) };
   if (note.startsWith("launch not observed")) return { n, row: "recent", reason: "launch-not-observed", until: null };
   if (note.startsWith("run finished")) return { n, row: "recent", reason: "run-finished", until: iso(at(t.doneAt, RUN_WINDOW_H)) };
-  if (note.startsWith("launched ")) return { n, row: "recent", reason: "launched", until: iso(at(t.launchedAt, RUN_WINDOW_H)) };
+  if (note.startsWith("launched ")) return { n, row: "recent", reason: "launched", until: iso(at(t.launchedAt, LAUNCH_WINDOW_H)) };
   if (note === "oc:no-pr cooldown") return { n, row: "recent", reason: "oc:no-pr cooldown", until: iso(t.lastAct === undefined || t.cooldownMs === undefined ? null : t.lastAct + t.cooldownMs) };
   return { n, row: "recent", reason: "recent", until: null };
 }
