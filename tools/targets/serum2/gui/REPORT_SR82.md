@@ -12,7 +12,7 @@
 | 受入条件 | 判定 |
 |---|---|
 | 1. ARG 240 件・ARG-CHILD 68 件の呼出元 (直接・vtable 経由) をたどり、引数が SC の this かを確定、件数を REPORT に書く | **未達**。vtable 経由の候補を列挙した (§2)。候補 118,222 件・うち呼出元が SC の関数 19 件。候補の宛先 (reg の型) は未確定のため、確定・非確定の件数は出せない |
-| 2. THIS 69・THIS-CHILD 197 の SC 伝播と SC 証拠の件数 | **未達**。§3 に現状の件数のみ |
+| 2. THIS 69・THIS-CHILD 197 の SC 伝播と SC 証拠の件数 | **未達**。RTTI 照合 (§3) で THIS の前提「SC の this」は支持されず (SC の RTTI 0 件)。THIS-CHILD は SC の表の 6 関数。SC 伝播の再集計は未了 |
 | 3. 表の境界の決め方と、出現数の run 数への換算 | **達成** (§4)。run = distinct な表の先頭 h。152 slot → 144 run |
 | 4. 測定 commit と再現手順 | **達成** (§5) |
 
@@ -22,6 +22,7 @@
 
 - `arg_vt_indirect.py` (新規): F (ARG / ARG-CHILD の所属関数) の入口を指す表の slot ごとに、`arg_vtable_callers.py` と同じ窓 (`HEAD_WINDOW = 4096`) で表の先頭 h・index k を得る。`call qword ptr [reg + 8k]` の候補 (disp = 8k で照合) を数え、呼出元が SC の関数かを数える。
 - 限界: disp だけで照合するため、同じ disp を持つ別クラスの呼出が全て候補に入る。宛先の型 (reg の指す object) は見ない。よって候補は「F を呼び得る箇所」の上界であり、F を確実に呼ぶ箇所ではない。
+- `this_rtti_join.py` (新規): `receiver_this_trace.py` の trace と `arg_vtable_callers.py --cats vptr:THIS,vptr:THIS-CHILD` の出力を結び、所属関数ごとの表の RTTI を集計する (§3)。
 
 ## 2. vtable 経由の候補 (受入 1 の一部)
 
@@ -35,12 +36,21 @@
 
 読み方: 候補の大半は別クラスの同じ disp の呼出であり、ARG の型の確定には使えない。SC 関数内の件数も、受けた object が F の所属 class かは未確定。
 
-## 3. THIS・THIS-CHILD の件数 (受入 2 の現状)
+## 3. THIS・THIS-CHILD の件数 (受入 2)
 
-`arg_vtable_callers.py --cats vptr:THIS,vptr:THIS-CHILD` (測定 commit `6c2b01972`・`REPORT_SR60.md` の窓 4096 と同じ。`*.py` は `arg_vt_indirect.py` 以外 `6c2b01972` から不変):
+`arg_vtable_callers.py --cats vptr:THIS,vptr:THIS-CHILD` (窓 4096・`REPORT_SR60.md` と同じ):
 
 - THIS 系の所属関数 = 201 個 / データ表に現れる = 114 個 / 現れない = 87 個。
-- RTTI が SerumController の表に現れる関数 = 6 個。
+- 表 (run) 数 = 134 個 (slot 171 件)。`arg_vtable_callers.py` の run 数の換算は §4 と同じ (distinct な先頭 h)。
+
+**RTTI 照合 (本 run で実測)**: `this_rtti_join.py` で、所属関数ごとに「表の RTTI」を集計した。測定 commit は `8f5d7f32b` (`this_rtti_join.py` を追加した commit。`arg_vtable_callers.py` は main から不変)。`arg_vtable_callers.py` の出力 md5 `779e1d01…`、join の出力 md5 `8e07f244…` (2 回一致)。入力 `Serum2_win64.vst3` sha256 `501e7bb3…` / 19,236,864 B、TSV md5 `1e1f5500…`。real: `receiver_this_trace.py` 23.2 s、`arg_vtable_callers.py` 3.6 s。
+
+| 分類 | 関数 | RTTI あり | RTTI なし | SerumController の RTTI |
+|---|---|---|---|---|
+| THIS (行 69) | 65 | 40 | 25 | **0** |
+| THIS-CHILD (行 197) | 142 | 75 | 67 | 6 (`0x1800ab4d0`・`0x1800b4640`・`0x1800b5580`・`0x1800cf690`・`0x1800d0a70`・`0x1800d4340`) |
+
+THIS の所属関数は、どれも SerumController の表に現れない。THIS の大半は PitchQuantizer・XferFilter・EnvState 等の別クラスの表である。よって受入 2 の前提「THIS = SerumController の this」は、この照合では支持されない。THIS の SC 証拠 0 件は、ここでは「SC の表に現れない」ことの結果である。
 
 `receiver_this_trace.py --vtable 0x180a2bf58` の分類件数 (`cat_strict`): THIS 69・THIS-CHILD 197・ARG 240・ARG-CHILD 68 (前 run の記録。本 run 未再現)。`REPORT_SR60.md` §3 の不一致 (THIS 67→69、THIS-CHILD 191→197) の原因は未確認。
 
@@ -96,12 +106,12 @@ venv/bin/python $P/arg_vt_indirect.py Serum2_win64.vst3 trace.tsv --tsv vt_ind.t
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | (a) 間接 call の候補の宛先 (reg の指す object) の型を確定する。候補 118,222 件は disp のみの照合 (§5 で再測定済み)。SC 関数内の候補 14 件の受け手は §7 で出所を分類済みだが、型は未確定 | 受入 1 | #4930 (本 issue 残・親 #4164 の子) |
-| (b) THIS 69・THIS-CHILD 197 の SC 伝播と、THIS-CHILD の SC 証拠 (6 件 / 5 関数) の定義を揃えた再集計 | 受入 2 | #4930 (本 issue 残) |
+| (b) THIS-CHILD 197 のうち SC の表に現れる 6 関数の SC 伝播 (閉包)、THIS 側の前提の扱い | 受入 2 | #4930 (本 issue 残) |
 | (c) 表の境界の決め方 (§4 で決定・達成) | 受入 3 | 閉じた (§4) |
 | (d) `receiver_this_trace.py` の TSV md5 が SR60 (`ea2d93a2…`) と不一致。本 PR の測定 (`224202d55`) では `1e1f5500…` で、REPORT_SR49・REPORT_SR58 の既定 TSV md5 と**一致する** (SR60 の `ea2d93a2…` とは不一致)。SR60 側の差の原因は未確認 | 再現性 | #4930 (本 issue 残) |
-| (f) RTTI 照合 (THIS 所属関数の vtable RTTI・THIS-CHILD の SC RTTI 6 関数) は未実施。入力 `Serum2_win64.vst3` は §7 の測定で用意できた (`plugins-serum2`) | 受入 2 の前提見直し | #4930 (本 issue 残) |
+| (f) THIS の前提 (「THIS = SerumController の this」) は RTTI 照合で支持されない (§3)。THIS の this 型の別経路 (vtable 以外の参照) は未確認 | 受入 2 の前提 | #4930 (本 issue 残) |
 
-(e) は §5 の再測定で閉じた (`arg_vt_indirect.py` を HEAD で 2 回実行、118,222 件・md5 `42bcf98b…` で一致)。
+(e) は §5 の再測定で閉じた (`arg_vt_indirect.py` を HEAD で 2 回実行、118,222 件・md5 `42bcf98b…` で一致)。(f) の RTTI 照合は本 run で閉じた (§3)。
 
 ## 7. SC 関数内の候補の受け手型 (受入 1 の残り)
 
