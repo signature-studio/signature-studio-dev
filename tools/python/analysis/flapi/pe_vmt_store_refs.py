@@ -7,7 +7,7 @@
 - imm32: .text 内で、その VA を 4 バイト即値として持つ箇所 (mov qword ptr [reg], imm32 など)
 - rip  : .text の逆アセンブル (capstone) で、[rip+disp] が VA を指す命令
 - 各箇所は、含む .pdata 関数の先頭 VA と、VA を持つ section 名を出す。
-- 展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
+- 展開: `docs/WORKFLOW.md` §11 の fl-win64 の展開手順 (`tar --zstd -xf <artifacts>/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'`)
 """
 import bisect
 import os
