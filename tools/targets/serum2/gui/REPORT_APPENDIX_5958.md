@@ -57,10 +57,27 @@
 - 判定: この経路では XferOnOffButton の操作が成立しない。slot 0x1817bf760 の値は本節では確定していない。
 - 次の一手 (未着手): VSTGUI フレームを実寸にする経路の特定 (`IPlugFrame` の `resizeView` 呼出しの有無、`onSize` の発火条件)。これが無いと、ボタン座標が正しくても操作は届かない。
 
+## 2d. IPlugFrame を渡す経路 (S2HOST_FRAME・#5958 残件の原因切り分け)
+
+- 原因の仮説: 従来の host は `view->setFrame()` を呼ばず、editor に `resizeView` / `onSize` が届かなかった。子フレームが `(0,0)-(0,0)` のままだったのはこれが理由と考えた。
+- 変更: `host/vst3host.cpp` に `PlugFrame` (IPlugFrame 実装) を追加。`S2HOST_FRAME=1` のときだけ `attached` の前に `setFrame` を呼ぶ (既定経路は無変更)。commit `85f152ad6`。
+- 実測 (無改変 DLL・既定 state・4 block・`xvfb-run -a`・wine64 9.0。測定 commit `85f152ad6`。ベースラインは同じ commit の `S2HOST_FRAME` 無し):
+
+| 条件 | 子フレーム矩形 | 子フレーム可視 | slot (createView 後 / attached 後 / pump 後 / クリック後 / process 前) | 孫ウィンドウ |
+|---|---|---|---|---|
+| ベースライン (`S2HOST_ATTACH=1 S2HOST_CLICK_AT=1010,17`) | (0,0)-(0,0) | 0 | 0 / 0 / 0 / 0 / 0 | 0 |
+| `S2HOST_FRAME=1` (`S2HOST_SHOW=1`・`CLICK_AT=1010,17`) | (0,0)-(1190,740) | 1 | 0 / 0 / 0 / 0 / 0 | 0 |
+| `S2HOST_FRAME=1` (`S2HOST_SHOW=1`・`S2HOST_CLICKS=1` 格子 225 点) | (0,0)-(1190,740) | 1 | 0 / 0 / 0 / 0 (`slot_final=0`) / 0 | 0 |
+
+- `setFrame` = kResultTrue、`resizeView (0,0)-(1190,740)` を受け `onSize` = kResultTrue。`resizeView` で親を実寸にした。
+- 完走: `blocks=4 frames=512 nonzero_cells=1020/1024 peak=0.548306` (3 条件とも同値)。
+- 格子 225 点・`(1010,17)`・`(985,10)` のいずれでも slot は 0。子フレームに孫ウィンドウは生成されず、クリックを受けた部品は確認できなかった (VSTGUI は HWND の子として部品を持たない)。
+- 判定: `setFrame` を渡すとフレームは実寸・表示になるが、XferOnOffButton の操作は成立していない。slot 0x1817bf760 の値は本節でも確定していない。
+
 ## 3. 判定と未達
 
 - 観測の範囲: §2 の 3 条件 (GUI 非操作) と §2b の 2 条件 (editor を attach し格子クリック) で、slot `0x1817bf760` は**全て 0・書込 0 件**。
-- 未達: 格子クリックは XferOnOffButton の座標を特定していない (掃引)。ボタンの位置を指定した操作は未実施。したがって「XferOnOffButton 操作で slot が書かれない」の確定は、ボタンを狙った操作の観測が要る。
+- 未達: 格子クリックは XferOnOffButton の座標を特定していない (掃引)。§2d で `setFrame` により子フレームは実寸になったが、VSTGUI の部品へのクリックは届いていない。したがって「XferOnOffButton 操作で slot が書かれない」の確定は、部品のヒットテスト経路 (VSTGUI のマウス処理) を確定してから観測する要る。
 - 受入の「slot 由来 5 箇所の呼出し先の確定」は未達。
 
 ## 4. 未解決 (起票先)
