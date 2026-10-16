@@ -150,7 +150,7 @@ def run_one(ident, image, base, size, pe_data_sections):
     uc.reg_write(UC_X86_REG_RCX, HOST)
     uc.reg_write(UC_X86_REG_RDX, TAG)
     uc.reg_write(UC_X86_REG_R8, ident)
-    uc.reg_write(UC_X86_REG_R9, 0)
+    uc.reg_write(UC_X86_REG_R9, int(os.environ.get('HS_DISP_INDEX', '0'), 0))
     uc.reg_write(UC_X86_REG_RAX, 0)
     try:
         uc.emu_start(DISP, SENT, timeout=0, count=MAX_STEPS + 10)

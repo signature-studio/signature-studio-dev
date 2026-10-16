@@ -142,13 +142,13 @@
 
 ### 6.4 COPY 7・AMBIG 8 の終端 (`analysis/flapi/pe_py368_terminal.py`・#5409)
 
-測定 commit: `760faf2d1` (スクリプトを追加した commit)。HEAD (main 取り込み後の merge commit) で 2 回実行し、TSV は一致 (終了 0・rows=7・34.1 秒・34.3 秒)。依存先 (`pe_py368_terminal.py`・`pe_py368_copy_ambig.py`・`pe_py203_edx_sites.py`・`pe_py273_base.py`) は `git diff 760faf2d1 HEAD` が 0 行。`pe_py273_globals.py` のみ main 側の `c44281a3e` で変わったが、本スクリプトは import しない。
+測定 commit: `4adefbe8f` (コードを変えた最後の commit。`store_value` の部分書込み分類 `e4aa7fd27` を含む)。同じ commit で 2 回実行し、TSV は一致 (終了 0・rows=7・34.1 秒・34.3 秒)。`git diff 4adefbe8f HEAD -- tools/python/analysis/flapi/pe_py368_terminal.py tools/python/analysis/flapi/pe_py368_copy_ambig.py tools/python/analysis/flapi/pe_py203_edx_sites.py tools/python/analysis/flapi/pe_py273_base.py` は 0 行 (本節の REPORT 以外に依存先の変更なし)。
 
 対象は 6.3 の終端 7 箇所 (スロット `[rbp+X]` の直前 store と、AMBIG の合流元)。
 
 - `[rbp+X]` を基底・複製元とする 5 件 (スロット直前 store の格納値):
   - 0x1021826 (COPY rax ← `[rbp+0x150]`): 直前 store 0x10216ff `mov [rbp+0x150], rcx`、rcx = ENTRY 第 1 引数 (ecx)。窓 111 命令、窓内の非境界の飛び先 1 件 (0x1021733) の注記あり。スクリプトはこの飛び先を「線形走査のずれの疑い」と判定する (窓は線形走査の再同期結果のため、この判定をそのまま採る)。
-  - 0x12ab8e8 (COPY rax ← `[rbp+0xa0]` の movzx): 直前 store 0x12ab72f `mov word ptr [rbp+0xa0], r8w`。格納元は部分レジスタ r8w のため、その上流は未分類。
+  - 0x12ab8e8 (COPY rax ← `[rbp+0xa0]` の movzx): 直前 store 0x12ab72f `mov word ptr [rbp+0xa0], r8w`。格納元の r8w は族 r8 の下位ビットで、r8 の直前書込みは ENTRY (第 3 引数 r8d) まで確定 (部分書込みの格納元を族に解決する 1 段を `store_value` に追加)。
   - 0x118a275 (AMBIG 主経路 `[rax+0x258]`、rax = `[rbp+0x38]`): 直前 store 0x118a241 の格納値は r8 ← ENTRY 第 3 引数 (r8d)。合流 2 件 (0x118a22b→0x118a24b・0x118a23f→0x118a24b) の注記あり。
   - 0x118a3f4 (AMBIG 主経路 `[rax+0x130]`、rax = `[rbp+0x38]`): 直前 store 0x118a362 の格納値は r8 ← ENTRY 第 3 引数 (r8d)。
   - 0x12e6abe (AMBIG 主経路 `[rax+rbx*4+0xdc]`、rax = `[rbp+0x20]`): 直前 store 0x12e6a22 の格納値は rcx ← ENTRY 第 1 引数 (ecx)。合流 1 件 (0x12e6a03→0x12e6a2d) の注記あり。
@@ -156,8 +156,11 @@
   - 0x12c609e: 合流 1 件 (0x12c6252→0x12c5fa8)。合流元 0x12c6252 の分岐は未分類。
   - 0xfc820f: 合流 1 件 (0xfc81c2→0xfc81c7)。飛び元の rdi は AMBIG のまま (主経路 `xor edi, edi` 0xfc81ae の注記あり)。
 
-- まとめ: 7 件のうち、スロットの格納値まで分類できたのは 4 件 (0x1021826・0x118a275・0x118a3f4・0x12e6abe)。0x12ab8e8 は格納元が部分レジスタ r8w のため未分類。0x12c609e と 0xfc820f は合流元の分類が残る。
-- 残り (受入の残り): 0x12c609e の合流元 0x12c6252 の分岐、0xfc820f の飛び元 rdi、0x12ab8e8 の r8w の上流、スロット ENTRY 値 (ecx・r8d) の呼出し元 (間接呼出しのため未追跡)。
+- まとめ: 7 件のうち、スロットの格納値まで分類できたのは 5 件 (0x1021826・0x12ab8e8・0x118a275・0x118a3f4・0x12e6abe)。0x12c609e と 0xfc820f は合流元の分類が残る。
+  - 0xfc820f: 飛び元 0xfc81c2 の rdi は、主経路 `xor edi, edi` (定数 0) と、合流 0xfc81ac→0xfc81b0 からの `movsxd rdi, edi` (0xfc81a6) の 2 経路で、AMBIG のまま。
+  - 0x12c609e: 合流 1 件 (0x12c6252→0x12c5fa8) の注記。主経路は `add eax, [rcx+0x94]` (0x12c5f86) を経由する AMBIG で、1 段では閉じない (terminal・edx_sites とも同じ 1 件)。
+  - 0x12c6240 (edx_sites の注記): 合流 5 件 (`pe_py203_edx_sites.py` の `len(hits)`。注記に列挙されるのは先頭 3 件のみ)。主経路は `[rip+0x31c1ff]` (VA 0x15e22d8 の大域直読み、0x12c60d2・0x12c60f5)。0x12c6240 の数であり、0x12c609e の数ではない。
+- 残り (受入の残り): 0x12c609e の合流元 0x12c6252 の分岐、0xfc820f の飛び元 rdi、スロット ENTRY 値 (ecx・r8d) の呼出し元 (間接呼出しのため未追跡)。
 
 ### 6.5 #5407: 大域 3 種の入り方・rbx ENTRY の呼出し元・`[rbx+0x12b4]` の上流
 

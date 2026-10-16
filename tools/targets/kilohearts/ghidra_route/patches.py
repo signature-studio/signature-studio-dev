@@ -151,6 +151,10 @@ ABI = {
         #   機械語: 180fd2f2a `mov rdi,rcx` → 180fd2f30 `mov rcx,[rcx+0x90]` → 180fd2f3c `call 180fe3510`。rcx = [param_1+0x90]。
         #   callee 180fe3510 は入口で rcx を読む (test rcx,rcx・[rcx+0x10])。よって引数は *(param_1+0x90)。
         ('delay 5129 FUN_180fe3510 rcx=[param_1+0x90] (180fd2f3c)', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x90\) != 0\) \{\n\s*)FUN_180fe3510\(\);', r'\1FUN_180fe3510(*(longlong *)(param_1 + 0x90));'),
+        # #5401 (KH-160・2 件目): FUN_180fe4394 (longlong 1 引数・rcx 入力) の呼出し 1 件 (FUN_180fe34b0 内 6887 行)。
+        #   機械語: 180fe34d3 `call 180fe4394` の直前は rcx = 入口 param_1 (180fe34b1 `mov rbx,rcx` で保持・180fe34c1)。callee 180fe4394 は入口で test rcx,rcx・rbx = rcx。
+        #   よって引数は FUN_180fe34b0 の入力 param_1 (undefined *)。
+        ('delay 6887 FUN_180fe4394 rcx=param_1 (180fe34d3)', r'(\(\*\(int \*\)\(param_1 \+ 0x15c\) == 0\)\) \{\n\s*)FUN_180fe4394\(\);', r'\1FUN_180fe4394((longlong)param_1);'),
         # #5384 (KH-158): stereo ABI 族の前半 3 callee の呼出し 6 件。callee は入力を xmm0 のビット列で読む (入口 movd/movq・movaps xmm1,xmm0)。
         #   FUN_180fdc6ec・FUN_180fdc844 は引数 1 件宣言 (uint)。呼出し直前の xmm0 は入口 float (fVar) のまま = f2u(fVar)。
         #   FUN_180fdc858 は引数 1 件宣言 (ulonglong)。4042 (180fccf08) は入口 param_1 の bit を保持した経路 (movq rdx,xmm0・movaps xmm6,xmm0) で xmm0 = 入口 param_1 = d2u(param_1)。
