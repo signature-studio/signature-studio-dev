@@ -59,6 +59,12 @@ off_n="$("$PY" -c 'import json,sys; a=json.load(open(sys.argv[1])); print(sum(1 
 on_n="$("$PY" -c 'import json,sys; a=json.load(open(sys.argv[1])); print(sum(1 for v in a["functions"].values() for s in v["sites"] if s.get("frame") and (s.get("cell") or {}).get("verdict")=="CELL_COLLAPSED"))' "$OUT/ssa_spill.json")"
 [ "$off_n" = 28 ] && [ "$on_n" = 25 ] || { echo "[fix_d17_e2e] FAIL: ネガコン 5 で cmp gate の有無による spill 宛 CELL_COLLAPSED の差が 3 件 (off=28 on=25) にならない: off=$off_n on=$on_n" >&2; exit 1; }
 echo "[fix_d17_e2e] ネガコン 5: icmp 根拠 (cmp) の gate を外すと spill 宛 CELL_COLLAPSED が 28 件のまま、入れると 25 件 (3 件差。突合の C2 は両方 PASS)"
+step "5b/6 site 単位の判定 (#4556・非既定。既定の 37→25 assert は変えない) + ネガコン"
+sg="$("$PY" "$HERE/site_gran_4556.py" "$IR" "$OUT/boot_spill.ll" "$IMG" "$CFG" "$OUT/ssa_base.json" "$OUT/ssa_spill.json" --tsv "$OUT/site_gran.tsv")" || exit 1
+echo "$sg" | head -1 | grep -q '後 25 site / 16 関数 -> site 単位の後 24 site / 15 関数$' || { echo "[fix_d17_e2e] FAIL: site 単位の判定が 25 site / 16 関数 -> 24 site / 15 関数 にならない: $(echo "$sg" | head -1)" >&2; exit 1; }
+sgneg="$("$PY" "$HERE/site_gran_4556.py" "$IR" "$IR" "$IMG" "$CFG" "$OUT/ssa_base.json" "$OUT/ssa_base.json" --tsv "$OUT/site_gran_neg.tsv")" || exit 1
+echo "$sgneg" | head -1 | grep -q '後 37 site / 22 関数 -> site 単位の後 37 site / 22 関数$' || { echo "[fix_d17_e2e] FAIL: ネガコン (修復を外した site 単位の判定) で減少が 0 にならない: $(echo "$sgneg" | head -1)" >&2; exit 1; }
+echo "[fix_d17_e2e] ネガコン 6: 修復を外すと site 単位の減少は 0 (37 site / 22 関数 のまま)"
 step "6/6 emcc 構文検証 (修復 IR)"
 if ! source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1 || ! command -v emcc > /dev/null 2>&1; then
   echo "[fix_d17_e2e] FAIL: emsdk が無い (/opt/emsdk/emsdk_env.sh の source か emcc の検出に失敗)" >&2
