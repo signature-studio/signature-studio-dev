@@ -36,12 +36,12 @@ const changes = (pr: ReturnType<typeof prOn>, min: number, body = "- [blocking] 
 });
 
 // ---------------------------------------------------------------- 単体: 整列 (selectDispatch)
-test("(a) 同じ kind: 未送信の normal の no_pr 40 件 (785〜824) より後の critical の no_pr #3466 も、毎時 36 件の枠に入る (先頭)", () => {
-  const normal = Array.from({ length: 40 }, (_, i) => tg("no_pr", 785 + i));
+test("(a) 同じ kind: 未送信の normal の no_pr 80 件 (785〜864) より後の critical の no_pr #3466 も、毎時 72 件の枠に入る (先頭)", () => {
+  const normal = Array.from({ length: 80 }, (_, i) => tg("no_pr", 785 + i));
   const r = sel([...normal, tg("no_pr", 3466, "critical")]);
-  assert.equal(r.send.length, 36);
-  assert.deepEqual(names(r.send), ["no_pr#3466", ...Array.from({ length: 35 }, (_, i) => `no_pr#${785 + i}`)]);
-  assert.deepEqual(r.skipped.map((x) => x.why), Array(5).fill("hour"), "normal の残り 5 件は毎時の上限で見送り");
+  assert.equal(r.send.length, 72);
+  assert.deepEqual(names(r.send), ["no_pr#3466", ...Array.from({ length: 71 }, (_, i) => `no_pr#${785 + i}`)]);
+  assert.deepEqual(r.skipped.map((x) => x.why), Array(9).fill("hour"), "normal の残り 9 件は毎時の上限で見送り");
 });
 
 test("(b) kind をまたぐ: critical の no_pr は、同じ tick で送られる normal の needs_decision より先", () => {
@@ -54,7 +54,7 @@ test("(b) kind をまたぐ: critical の no_pr は、同じ tick で送られ�
 test("(c) prio:low は最後: low の no_pr は、normal の対象より後。枠が足りないときは low が見送られる", () => {
   const low = tg("no_pr", 10, "low");
   assert.deepEqual(names(sel([low, tg("no_pr", 20), tg("stuck", 30)]).send), ["no_pr#20", "stuck#30", "no_pr#10"]);
-  const full = Array.from({ length: 36 }, (_, i) => tg("no_pr", 100 + i));
+  const full = Array.from({ length: 72 }, (_, i) => tg("no_pr", 100 + i));
   const r = sel([low, ...full]);
   assert.deepEqual(names(r.send), names(full));
   assert.deepEqual(r.skipped, [{ kind: "no_pr", ref: 10, why: "hour" }]);
@@ -67,14 +67,14 @@ test("(e) ネガコン (dup): critical でも、60 分以内に送った同じ (
   assert.deepEqual(names(sel([tg("no_pr", 3466, "critical")], [h("no_pr", 3466, 60, "critical")]).send), ["no_pr#3466"]);
 });
 
-test("(e) ネガコン (ref): 同じ ref への 24 時間 3 回の上限は、critical でも破らない。2 回までなら送る", () => {
-  const three = [h("no_pr", 3466, 120, "critical"), h("no_pr", 3466, 180, "critical"), h("no_pr", 3466, 240, "critical")];
-  assert.deepEqual(sel([tg("no_pr", 3466, "critical")], three).skipped, [{ kind: "no_pr", ref: 3466, why: "ref" }]);
-  assert.deepEqual(names(sel([tg("no_pr", 3466, "critical")], three.slice(1)).send), ["no_pr#3466"]);
+test("(e) ネガコン (ref): 同じ ref への 24 時間 6 回の上限は、critical でも破らない。5 回までなら送る", () => {
+  const six = [120, 180, 240, 300, 360, 420].map((m) => h("no_pr", 3466, m, "critical"));
+  assert.deepEqual(sel([tg("no_pr", 3466, "critical")], six).skipped, [{ kind: "no_pr", ref: 3466, why: "ref" }]);
+  assert.deepEqual(names(sel([tg("no_pr", 3466, "critical")], six.slice(1)).send), ["no_pr#3466"]);
 });
 
-test("(e) ネガコン (hour): 毎時 24 件の上限は、critical でも破らない", () => {
-  const full = Array.from({ length: 36 }, (_, i) => h("no_pr", 100 + i, 1, "normal"));
+test("(e) ネガコン (hour): 毎時 72 件の上限は、critical でも破らない", () => {
+  const full = Array.from({ length: 72 }, (_, i) => h("no_pr", 100 + i, 1, "normal"));
   const r = sel([tg("no_pr", 3466, "critical")], full);
   assert.deepEqual(r.send, []);
   assert.deepEqual(r.skipped, [{ kind: "no_pr", ref: 3466, why: "hour" }]);
@@ -162,17 +162,17 @@ test("検出 (PR 起点): stuck・needs_decision の prio は、PR 自体のラ�
 });
 
 // ---------------------------------------------------------------- 送信 (pmDispatch・live)
-test("送信 (a): 未送信の normal の no_pr 40 件 (785〜824) があっても、critical の no_pr #3466 が毎時 36 件の最初の枠に入る", async () => {
+test("送信 (a): 未送信の normal の no_pr 80 件 (785〜864) があっても、critical の no_pr #3466 が毎時 72 件の最初の枠に入る", async () => {
   const ctx = await live();
   const items: Array<[string, unknown]> = [];
-  for (let n = 785; n <= 824; n++) items.push(["issues", issueEv(n, { labels: ["oc:no-pr"] })], ...noPrOutcome(n));
+  for (let n = 785; n <= 864; n++) items.push(["issues", issueEv(n, { labels: ["oc:no-pr"] })], ...noPrOutcome(n));
   items.push(["issues", issueEv(3466, { labels: ["oc:no-pr", "prio:critical"] })], ...noPrOutcome(3466));
   await sendAll(ctx, items);
   await markFresh(ctx);
   const r = await ctx.app.engine.pmDispatch(await gh(ctx));
-  assert.equal(r.sent.length, 36);
+  assert.equal(r.sent.length, 72);
   assert.deepEqual(names(r.sent.slice(0, 2)), ["no_pr#3466", "no_pr#785"]);
-  assert.equal(pmCalls(ctx.m.calls).length, 36);
+  assert.equal(pmCalls(ctx.m.calls).length, 72);
   assert.equal(pmCalls(ctx.m.calls)[0].body.client_payload.ref, 3466);
 });
 

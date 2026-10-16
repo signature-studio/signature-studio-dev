@@ -337,7 +337,7 @@ test("ネガコン (a): 本文・題名に \"kind\":\"x\" や ref を含む issu
   ]);
 });
 
-test("ネガコン (b): 同じ (kind, ref) の 2 回目は 60 分以内に送らない。60 分後は送る。同じ ref は 24 時間に 3 回まで", async () => {
+test("ネガコン (b): 同じ (kind, ref) の 2 回目は 60 分以内に送らない。60 分後は送る。同じ ref は 24 時間に 6 回まで", async () => {
   const clock = { t: T0 };
   const ctx = await live(clock);
   await seedStuck(ctx, [10]);
@@ -354,32 +354,35 @@ test("ネガコン (b): 同じ (kind, ref) の 2 回目は 60 分以内に送ら
   assert.equal(await step(58), 1, "59 分後");
   assert.equal(await step(2), 2, "61 分後");
   assert.equal(await step(61), 3, "122 分後");
-  assert.equal(await step(61), 3, "同じ ref は 24 時間に 3 回まで (4 回目は送らない)");
-  assert.equal(await step(60 * 24), 4, "24 時間たてば送る");
+  assert.equal(await step(61), 4, "183 分後");
+  assert.equal(await step(61), 5, "244 分後");
+  assert.equal(await step(61), 6, "305 分後 (同じ ref の 24 時間の 6 回目)");
+  assert.equal(await step(61), 6, "366 分後。同じ ref は 24 時間に 6 回まで (7 回目は送らない)");
+  assert.equal(await step(60 * 24), 7, "24 時間たてば送る");
 });
 
-test("ネガコン (c): 全体で 1 時間に 36 起動まで。37 件目は送らない", async () => {
+test("ネガコン (c): 全体で 1 時間に 72 起動まで。73 件目は送らない", async () => {
   const clock = { t: T0 };
   const ctx = await live(clock);
-  await seedStuck(ctx, Array.from({ length: 37 }, (_, i) => 100 + i));
+  await seedStuck(ctx, Array.from({ length: 73 }, (_, i) => 100 + i));
   await markFresh(ctx);
   const gh = await (ctx.app.engine as any).d.gh();
   await ctx.app.engine.pmDispatch(gh);
-  assert.equal(pmCalls(ctx.m.calls).length, 36);
-  assert.deepEqual(pmCalls(ctx.m.calls).map((c) => c.body.client_payload.ref), Array.from({ length: 36 }, (_, i) => 100 + i));
+  assert.equal(pmCalls(ctx.m.calls).length, 72);
+  assert.deepEqual(pmCalls(ctx.m.calls).map((c) => c.body.client_payload.ref), Array.from({ length: 72 }, (_, i) => 100 + i));
   clock.t += 30 * 60_000;
   await markFresh(ctx);
   await ctx.app.engine.pmDispatch(gh);
-  assert.equal(pmCalls(ctx.m.calls).length, 36, "30 分後もまだ 36 件 (37 件目 136 は hour で見送る)");
+  assert.equal(pmCalls(ctx.m.calls).length, 72, "30 分後もまだ 72 件 (73 件目 172 は hour で見送る)");
   clock.t += 31 * 60_000;
   await markFresh(ctx);
   await ctx.app.engine.pmDispatch(gh);
   assert.deepEqual(
-    pmCalls(ctx.m.calls).slice(36, 37).map((c) => c.body.client_payload.ref),
-    [136],
+    pmCalls(ctx.m.calls).slice(72, 73).map((c) => c.body.client_payload.ref),
+    [172],
     "1 時間たった分の枠では、未送信の対象を先に送る (送信済みの再送が押し出さない)",
   );
-  assert.equal(pmCalls(ctx.m.calls).length, 72, "その時間の枠も 36 件まで");
+  assert.equal(pmCalls(ctx.m.calls).length, 144, "その時間の枠も 72 件まで");
 });
 
 test("ネガコン (d): 許可外の起票者 (assoc が NONE の人・許可外の bot) の対象は送らない。MEMBER/COLLABORATOR・許可 bot は送る", async () => {

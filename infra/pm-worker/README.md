@@ -22,7 +22,7 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 
 1. blocked_by の一覧が不明な issue は着手しない。
 2. open な子 (`親: #N`) を持つ親 issue は着手対象から外す。
-3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。最後の `oc-run-outcome` の reason で再着手を決める (`plan()` の `noPr`)。cooldown (既定 6 時間。`NO_PR_COOLDOWN_H`) の間は着手しない。`prio:critical` の issue は cooldown を半分 (3 時間) にする (`noPrCooldownMs`。意図の投稿の判定 `intentGate` も同じ)。cooldown の後は次のとおり。
+3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。最後の `oc-run-outcome` の reason で再着手を決める (`plan()` の `noPr`)。cooldown (既定 1 時間。`NO_PR_COOLDOWN_H`) の間は着手しない。`prio:critical` の issue は cooldown を半分 (30 分) にする (`noPrCooldownMs`。意図の投稿の判定 `intentGate` も同じ)。cooldown の後は次のとおり。
    - `unknown`: 1 回だけ再着手する。
    - `artifact`: 直前の報告 (`botReport`。run-outcome と PM のマーカーを含むコメントを除く) に、前回の `oc_artifacts` (無ければ既定の行) に無い allowlist 内の素材があり、その報告が停止報告 (先頭行が見出し `## 停止報告`) のときは、素材を足して 1 回再着手する。
      新しい素材が無い (報告が無い古い保存値を含む) `artifact` は `unknown` と同じ扱い (#3185): cooldown の後に 1 回だけ、`unknown` の枠で再着手する。素材は前回の行のまま。本文に『前回の停止の理由を再確認し、素材が足りない以外の理由 (分割要・依存・判断待ち) なら、その種類の手順に従ってください』の 1 行を足す (artifact 由来の再投入だけ。`buildLaunchBody` の `recheck`)。その再投入の後の run も素材なしの `artifact` で終われば、`no_pr` として oc-pm に回す (再投入しない)。再投入の上限 (`NO_PR_MAX_RELAUNCH`) に達している素材なしの `artifact` は、unknown の枠を使わず (再投入せず)、上限に達した後の run が素材なしで終われば同じく oc-pm に回す。
@@ -82,7 +82,7 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 - 状態は `sig` (issue / PR 番号ごとの時刻・列挙値・真偽。本文は持たない)。webhook の増分で更新し、webhook で埋まらない reviewer の verdict と `needs-user-input` の付与時刻は reconcile で REST から一度だけ補う (best effort)。
 - 送信: payload は `{"event_type":"oc-pm","client_payload":{"kind":<列挙>,"ref":<数字>}}` だけ。値は検証済みの列挙・整数から組み立て、issue / PR の自由文は入らない。PM App の installation token で送る。スイッチは `LIVE_DISPATCH` (oc-watchdog と同じ。別スイッチは作らない)。
 - 絞り込み: 起票者が `MEMBER` / `OWNER` / `COLLABORATOR`、または許可 bot (`opencode-for-signature-studio[bot]` `oc-reviewer-for-signature-studio[bot]`) の対象だけ。起票者が未取得の対象は送らない。
-- 抑止 (DO の `meta/pmDispatch`): 同じ (kind, ref) は 60 分に 1 回・全体で 1 時間に 36 起動・同じ ref に 24 時間で 3 回まで。優先の区分 (`prio:critical` → 区分なし (normal) → `prio:low`) を先頭のキーにし、同じ区分の中は未送信の対象を先に、送信済みは古い順に選ぶ (その後は kind の順・番号の昇順。#3703)。失敗した試行も数える (403 / 429 はその tick を打ち切る)。同期が 15 分以上止まっている間は送らない。`refs_orphan` だけは種類ごとの毎時の最低配分 (`KIND_MIN_PER_HOUR` = 3。送れる対象がある間は毎時 3 件を残し、他の kind に使わせない。送れる対象が無い・抑止で送れない分は他の kind に回す。`user_answered` は最低配分より先に送る `MIN_EXEMPT_KINDS`) と、種類ごとの上限 (`KIND_LIMITS`) が加わる。上限は同じ N に 24 時間 1 回・1 日 72 件 (= 24 × 最低配分。全体の上限にも従う) (#3704)。
+- 抑止 (DO の `meta/pmDispatch`): 同じ (kind, ref) は 60 分に 1 回・全体で 1 時間に 72 起動・同じ ref に 24 時間で 6 回まで (`PM_LIMITS`。#CI-232 で 36・3 から上げた)。優先の区分 (`prio:critical` → 区分なし (normal) → `prio:low`) を先頭のキーにし、同じ区分の中は未送信の対象を先に、送信済みは古い順に選ぶ (その後は kind の順・番号の昇順。#3703)。失敗した試行も数える (403 / 429 はその tick を打ち切る)。同期が 15 分以上止まっている間は送らない。`refs_orphan` だけは種類ごとの毎時の最低配分 (`KIND_MIN_PER_HOUR` = 3。送れる対象がある間は毎時 3 件を残し、他の kind に使わせない。送れる対象が無い・抑止で送れない分は他の kind に回す。`user_answered` は最低配分より先に送る `MIN_EXEMPT_KINDS`) と、種類ごとの上限 (`KIND_LIMITS`) が加わる。上限は同じ N に 24 時間 1 回・1 日 72 件 (= 24 × 最低配分。全体の上限にも従う) (#3704)。
 - **dry-run (既定。`LIVE_DISPATCH` が `"1"` でないとき)**: 送らず、`/status` の `would_dispatch_pm` (`?detail=1` のみ) と `counters.wouldDispatchPm`、`pm_detected` (kind ごとの検出数) に記録する。履歴は live と分ける (`meta/pmWould`)。`LIVE_LAUNCH` は関係しない。
 - ラベル `pm-apply` / `needs-user-input` の issue (着手しても PR を出さない/出せない) は、`no_pr` の検出から除く。`plan()` は、この 2 ラベルの issue を ready・再投入の対象であっても着手せず `user` 行に置く (`oc:no-pr` の有無に依らない)。`user_answered` は `needs-user-input` が対象。`tools/pm/launch_issues.py` との差は PR 本文の未解決表に書く。
 - 検出するのは上の 5 kind。`refs_orphan` は [CI-58]、`supply` は [CI-71] が担当する。
@@ -162,7 +162,7 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `pm_dispatch_1h` | 直近 1 時間の `oc-pm` の送信数 (dry-run の would を含む。`pmHistory` と同じ live / dry-run の別) |
 | `pm_dispatch_1h_by_prio` | `pm_dispatch_1h` の区分別の内訳 `{critical, normal, low}` (送信時の区分。prio の無い古い履歴は normal。合計は `pm_dispatch_1h` と一致する。#3703) |
 | `pm_detected` | kind ごとの検出数 (`user_answered` `needs_decision` `stuck` `no_pr` `refs_orphan`) と `critical` (`prio:critical` の対象の数。kind の内訳と重なる。#3703) |
-| `pm_dispatch_cap` | `oc-pm` の毎時上限 (`PM_LIMITS.hourMax` = 36)。`pm_dispatch_1h` がこの値に達しているときは上限で見送りが出る |
+| `pm_dispatch_cap` | `oc-pm` の毎時上限 (`PM_LIMITS.hourMax` = 72)。`pm_dispatch_1h` がこの値に達しているときは上限で見送りが出る |
 | `pm_dispatch_1h_by_kind` | 直近 1 時間の `oc-pm` の送信数を kind 別に (`DETECTED_KINDS` の全キーを 0 から数える。`pmHistory()` の全件を kind 別に数えるので、digest / launch-halt の通知 (`DIGEST_KIND` = `digest`) の送信もキー `digest` として現れる。全キーの合計は `pm_dispatch_1h` と同じ)。最低配分 (`KIND_MIN_PER_HOUR`) が効いたかを見る (#3704) |
 | `pm_skipped_hour_24h` | 直近 24 時間に毎時上限で見送った件数 (`pmDispatch` の見送りの対象ごと、と `haltNotify` の見送りを tick ごとに数えた回数)。見送りには、他の kind の最低配分のために枠を残した分 (`reserve`) を含む (#3704)。時刻と件数を `meta` に持ち、24 時間で prune する (`pruneHistory` と同じ窓)。live / dry-run は分ける |
 | `launch_halted` | launch を止めている区間 `{reason, since}` (止まっていなければ `null`)。`reason` は先頭の理由、`since` は止まり始めた時刻。詳細は下の『launch の停止と通知』 (#2795) |
@@ -190,7 +190,7 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 
 - **区間**: 止まった時刻を `meta.halt.since` に保存する。止まり続けている間は起点を変えない。全ての条件が無くなると区間を消す (次の停止の起点に使い回さない)。
 - **/status**: `launch_halted` (`{reason, since}`。止まっていなければ `null`) と `launch_halted_overdue` (15 分以上止まり、かつ `ready` と `room` がある間は `true`)。
-- **PM agent への通知** (30 分継続で 1 回): 新しい kind は作らず、`oc-pm` の `digest` (`ref` 0) を送る。同じ停止区間では 1 回だけ (失敗した試行も数える)。`pmHistory` の上限 (同じ digest#0 は 60 分に 1 回、全体は 1 時間に 36 件) に従う。`LIVE_DISPATCH` が `"1"` のときだけ送り、そうでなければ `counters.wouldDispatchPm` に数える。降格中 (`demoted_reason` がある間) は送らず、区間の 1 回も使わずに保留する (解除の後に送る。降格中の would は 60 分に 1 回まで数える)。
+- **PM agent への通知** (30 分継続で 1 回): 新しい kind は作らず、`oc-pm` の `digest` (`ref` 0) を送る。同じ停止区間では 1 回だけ (失敗した試行も数える)。`pmHistory` の上限 (同じ digest#0 は 60 分に 1 回、全体は 1 時間に 72 件) に従う。`LIVE_DISPATCH` が `"1"` のときだけ送り、そうでなければ `counters.wouldDispatchPm` に数える。降格中 (`demoted_reason` がある間) は送らず、区間の 1 回も使わずに保留する (解除の後に送る。降格中の would は 60 分に 1 回まで数える)。
 - **限界**: `digest` の PM run が Worker から受け取るのは kind と ref だけで、`launch_halted` (停止の理由と時刻) は読まない。そのため通知を受けた PM agent は『launch が止まっている』とは分からず、通常の digest の集計をする。率制限は別で、digest の PM run は緊急の判定に `tools/pm/worker_url` の `/status` を `curl` で読む (`rate_limit_alert`・`rest_remaining`。#2539・`.github/prompts/pm.md` の digest 節)。停止の理由を通知に載せる経路 (`.github/scripts/watchdog.sh` が `/status` を読んで障害 issue を起票する経路への接続) は CI-135 (#2848) の範囲で、この README の範囲外。
 - **変異テスト**: `npm run test:mutation` が、既定値・閾値・区間の起点・解消・重複抑止・降格中の通知 (降格ゲートと保留) の 9 か所を 1 つずつ壊し、テストが落ちることを確かめる (`scripts/mutation_halt.mjs`)。
 
@@ -417,7 +417,7 @@ App の id・private key・webhook secret は Worker が受け取って暗号化
 VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済み。Worker が着手と `oc-watchdog` の dispatch を担う状態にするため、`LIVE_LAUNCH` `LIVE_DISPATCH` を `"1"` にした。VM の timer は**再開しない**。
 
 - 前提 (merged): #2398 (Review-Only と `oc:stuck` の上限)、#2418 (LIVE の分離)、#2420 (#2380 コメントを新しい順に 24 時間分読む)、#2422 (#2338 `/status` の観測・redact・rate-guard。Worker の REST 残量が 1,500 未満の間は launch を止める)。未 merge の #2343 (VM 状態の取り込み)・#2334 (no-pr の理由別再着手)・#2340 (shadow の自己昇格) は前提から外した。VM が止まっているので二重着手の窓が無く、phase は『open PR < 10 で解除』の規則で足りる。
-- merge 後に動く版は #2422 (rate-guard) と #2423 (#2333 oc-pm) を含む (この PR の差分には無い)。rate-guard は Worker の REST 残量 (`rest_remaining`) が 1,500 未満の間 launch を止める (`launch_stop: rate-guard`。未観測の間は止めない)。**`LIVE_DISPATCH="1"` は `oc-pm` (PM agent の起動) も送る**(別スイッチは無い。上限は全体で 1 時間に 36 起動・同じ (kind, ref) は 60 分に 1 回・同じ ref に 24 時間で 3 回。pm job の token は issues / pull-requests の write だけで contents を持たない)。止めるときは `LIVE_DISPATCH="0"` (`oc-watchdog` も止まる)。oc-pm を含めて live にするのは既定案 (#2319 の設計どおり)。PM の判断は PR #2453 の未解決表と PM のコメントに記録した。突き合わせはこの版 (`e88e1890`) で測り直した。
+- merge 後に動く版は #2422 (rate-guard) と #2423 (#2333 oc-pm) を含む (この PR の差分には無い)。rate-guard は Worker の REST 残量 (`rest_remaining`) が 1,500 未満の間 launch を止める (`launch_stop: rate-guard`。未観測の間は止めない)。**`LIVE_DISPATCH="1"` は `oc-pm` (PM agent の起動) も送る**(別スイッチは無い。上限は全体で 1 時間に 72 起動・同じ (kind, ref) は 60 分に 1 回・同じ ref に 24 時間で 6 回。pm job の token は issues / pull-requests の write だけで contents を持たない)。止めるときは `LIVE_DISPATCH="0"` (`oc-watchdog` も止まる)。oc-pm を含めて live にするのは既定案 (#2319 の設計どおり)。PM の判断は PR #2453 の未解決表と PM のコメントに記録した。突き合わせはこの版 (`e88e1890`) で測り直した。
 - 暫定の安全装置: `TARGET="50"` (最初の 1 時間。80 に戻す作業は #2458)。`NO_PR_COOLDOWN_H` は 24 から 6 に短縮した (#2650。理由別の再着手の規則 (上の 3.) が入ったため。値は下の表)。`TARGET` は後で『opencode.yaml の全 run の総数の目標』に意味を改め、既定を 58 にした (上の 6。#2458 は置き換え)。Review-Only は `phase.ts` / `engine.ts` が既に持つ (open PR が 80 超で launch しない、`oc:stuck` が `STUCK_HIGH` 超で止める)。
 - 突き合わせ: dry-run の Worker と VM の `launch_issues.py` の差は、open な子を持つ親の除外・`pm-apply` の user 扱い・`oc:no-pr` の cooldown・VM の `relaunch.json` の有無で説明がつく (推定を含む。測定は #2422・#2423 を含む版。内訳と未解決は `tools/pm/REPORT.md` §12)。(この版の時点では `NO_PR_COOLDOWN_H` の既定 3 が `oc:no-pr` の issue を大量に候補へ戻すので 24 にしていた。#2650 で、理由別の規則に合わせて 6 にした。)
 - 初回のデプロイ (2026-10-14) では、保存状態を整える一時ビルド (全体同期の前倒しと、phase を VM の `phase.json` に合わせる) を使った。リポジトリの差分には無い。理由と結果は `tools/pm/REPORT.md` §12-5。その後も保存 outcome の欠落が観測されている。観測と計測は `tools/pm/REPORT_APPENDIX_2652.md` §4・§5、原因の追跡は子 #2757 (根因は未特定)。保存状態の補完は下の『保存値の版 (`SIGNAL_VER`) を上げる』の仕組みで行う想定だが、その効果は本番で未確認。
@@ -427,7 +427,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 
 ## 保存値の版 (`SIGNAL_VER`) を上げる (#2652)
 
-派生値 (issue の起票者 `author`・`assoc`、PR・issue の手がかり `sig.outcome` など) を作る規則を変えたら、`src/engine.ts` の `SIGNAL_VER` を 1 上げて deploy する (現行は 2)。版は全体同期が完了したときに `meta.signalVer` へ記録する。保存値の版が `SIGNAL_VER` と違う最初の tick は、周期 (6 時間) を待たずに全体同期を 1 回走らせて、古い保存値を補完する。その全体同期が失敗したときは `SIGNAL_RETRY_MS` (15 分) ごとに再試行し、それより頻繁には叩かない。上げると次のことが起きる: (1) 全体同期の REST 呼び出しが 1 回増える (周期の全体同期と同じ量)。(2) 補完で新たに `no_pr` の対象になった issue の oc-pm 起動が増え得る (全体で 1 時間 36 件まで。同じ (kind, ref) は 60 分に 1 回)。(3) `artifact` の再投入の候補も増え得る。deploy 前の `/status` の `pm_detected` は今の保存値から数えた値なので、版の補完で増える件数は deploy 前には見えない (REST で再計算した件数は `tools/pm/REPORT_APPENDIX_2652.md` §5)。deploy は `LIVE_LAUNCH` / `LIVE_DISPATCH` の状態を確認してから行う (merge とデプロイは別)。
+派生値 (issue の起票者 `author`・`assoc`、PR・issue の手がかり `sig.outcome` など) を作る規則を変えたら、`src/engine.ts` の `SIGNAL_VER` を 1 上げて deploy する (現行は 2)。版は全体同期が完了したときに `meta.signalVer` へ記録する。保存値の版が `SIGNAL_VER` と違う最初の tick は、周期 (6 時間) を待たずに全体同期を 1 回走らせて、古い保存値を補完する。その全体同期が失敗したときは `SIGNAL_RETRY_MS` (15 分) ごとに再試行し、それより頻繁には叩かない。上げると次のことが起きる: (1) 全体同期の REST 呼び出しが 1 回増える (周期の全体同期と同じ量)。(2) 補完で新たに `no_pr` の対象になった issue の oc-pm 起動が増え得る (全体で 1 時間 72 件まで。同じ (kind, ref) は 60 分に 1 回)。(3) `artifact` の再投入の候補も増え得る。deploy 前の `/status` の `pm_detected` は今の保存値から数えた値なので、版の補完で増える件数は deploy 前には見えない (REST で再計算した件数は `tools/pm/REPORT_APPENDIX_2652.md` §5)。deploy は `LIVE_LAUNCH` / `LIVE_DISPATCH` の状態を確認してから行う (merge とデプロイは別)。
 
 全体同期が一覧を打ち切った (`sync_truncated`) ままでも版は記録する。打ち切りは `Gh.list` のページ上限に一覧の件数が届いたときに起きる (上の『同期の窓と打ち切り』)。窓 (`COMMENT_WINDOW_H`) が読む量を決めるのはコメントの一覧だけで、open の issue・PR の一覧は窓に依らない。そのため 15 分後の再試行も同じ打ち切りになりやすい (推定。再試行は REST を増やすだけになる)。打ち切りが残る間は `fresh=false` で launch と watchdog の dispatch が止まり、周期の全体同期 (6 時間) が次の機会になる。
 
@@ -446,7 +446,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 | `TARGET` | 同時に走らせる **opencode.yaml の run の総数** の上限 (room = target_eff − active_all。`active_all` は実装・review・fix・oc-pm・watchdog の全て。推定が無ければ target_eff = TARGET。推定の仕組みは『同時実行の上限の推定』) | `"58"` (上限 60 から 2 を残す。以前の暫定 `"50"` と、80 に戻す案 #2458 は置き換えた) |
 | `QUEUE_MARGIN` | 推定の上限 (`cap_est`) に足す余裕。`target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))` | 未設定 (コードの既定 10) |
 | `TARGET_MIN` | `target_eff` の下限 | 未設定 (コードの既定 30) |
-| `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間。`prio:critical` の issue は半分 (#2683) | `"6"` (コードの既定も 6。#2650 で 24 から短縮) |
+| `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間。`prio:critical` の issue は半分 (#2683) | `"1"` (コードの既定も 1。#2650 で 24 から 6 に、#CI-232 で 6 から 1 に短縮) |
 | `LOW_CAP` | `prio:low` の issue の未完了の run の上限。`prio:critical` が着手済みか launch 可能な間だけ効く (#2721)。空・非数・負は既定に戻す | `"10"` (`config.ts` の `DEFAULT_LOW_CAP` と同じ) |
 
 個別の設定があれば `LIVE` より優先する (`LIVE=1` かつ `LIVE_LAUNCH=0` なら launch だけ dry-run)。`LIVE=1` だけの旧デプロイは従来どおり両方 live。

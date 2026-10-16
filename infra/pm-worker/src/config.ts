@@ -14,7 +14,7 @@ export const MIN_COMMENT_WINDOW_H = 24;
 export const DEFAULT_COMMENT_WINDOW_H = 24;
 export const DEFAULT_COMMENT_MAX_PAGES = 80;
 // oc:no-pr の再着手の間隔 (時間)。最後の報告・/oc の投稿からこの時間が過ぎるまで再着手しない。wrangler.toml の NO_PR_COOLDOWN_H と揃える (test/active.test.ts が両方を見る)。
-export const DEFAULT_NO_PR_COOLDOWN_H = 6;
+export const DEFAULT_NO_PR_COOLDOWN_H = 1;
 // prio:low の issue の未完了の run の上限 (LOW_CAP)。wrangler.toml の LOW_CAP と揃える (test/active.test.ts が両方を見る)。
 export const DEFAULT_LOW_CAP = 10;
 
