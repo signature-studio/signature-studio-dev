@@ -955,6 +955,7 @@
 | `tools/plugins/p0c/REPORT_APPENDIX_J.md` | ~41 | p0c §23 (#3280 0x5dffc0 の x87 fsincos 66-bit π 縮約の原因・修復・測定)。H §23 から分割移動 (H の 250 行上限のため) |
 | `tools/plugins/p0c/REPORT_APPENDIX_K.md` | ~70 | p0c §24 (#3281 GLOBAL_INITS の PE 値化: `k80_pe_globals.py` の置換対象 0x6fffb0・0x6fc26c・測定・残った BODIES 14 本の根拠)。H の 250 行上限のため新設 |
 | `tools/plugins/p0c/REPORT_APPENDIX_L.md` | ~90 | p0c §25 (#3951 0x5e1280 の buf_diff=3996 の原因: `k80_diff.py` の 64bit xmm 引数の渡し方。修復と負論対照・実測) |
+| `tools/plugins/p0c/REPORT_APPENDIX_M.md` | ~90 | p0c §26 (#5832 E7: x86_fp80 ↔ i80 bitcast の展開。`f80b_rt/run.sh` の bit 一致・subnormal carry の修正前後の固定ベクタ・19165 の測定 (測定 commit `ce3872372`)) |
 | `tools/plugins/dynamics/REPORT_APPENDIX.md` | ~102 | dynamics §E ([PLG-F3-15] #1778): 19252 の残 helper `vmovsd` store の宛先 (spill → B1 の 0 埋め) の原因実測。 方式は DECISIONS D16。 dynamics REPORT §4 の「脱落の原因 (#1412)」の全文 (250 行上限のため分割移動。 静的検出 (`statically linked function`) による `.pdata` define 脱落 208 件の内訳と切替実測) |
 | `tools/plugins/sampler/REPORT.md` | ~245 | PLG-G3 (#208) sampler 8 本: lift 前提の実測。 engine lift 鎖の根本原因と `emcc -c` gate・NC。 §2b (#537 推移閉包) は REPORT_INDIRECT.md (#208 / #540) |
 | `tools/plugins/sampler/REPORT_APPENDIX.md` | ~60 | sampler REPORT §6 の旧版 (§A 検証起点 53c2eb6、§B 82a99ac/7de96e0、§C 7ffab50) と §D (RetDec C 出力段の経緯) の全文 (250 行上限のため分割移動) |
