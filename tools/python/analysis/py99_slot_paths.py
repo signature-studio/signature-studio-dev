@@ -143,12 +143,19 @@ EXP_CALL = 0x10469F0  # edx + rint(2^-30 · ecx · (r8d − edx))。py99_call104
 UNRESOLVED_EXP = ("SLOT[", "ACC?⚠", "clob@", "IN[", "⚠", "OP:", "CALL[", "VCALL", "…")
 
 
+SIGN_DIV8 = [("test", "eax, eax"), ("jns", None), ("add", "eax, 7")]  # + sar eax, 3 (合流先)
+SIGN_MOD8 = [("and", "eax, 0x80000007"), ("jns", None), ("sub", "eax, 1"), ("or", "eax, 0xfffffff8"),
+             ("add", "eax, 1")]  # + 合流先の store (値 = mod8)
+
+
 class ExpSlicer(w.Slicer):
     """py88 の式の SLOT[rbp+X]? と CALL[0x10469f0] を展開する。
 
     SLOT は届く store が 1 件・入口へ届かない・到達不能なし、の 3 条件を全部満たすときだけ、その store の値で置き換える
     (合流を越えても経路が 1 本に定まる場合のみ)。置換の後ろに `@<store の VA>` を付け、どの store から来たかを式に残す。
     届く store が複数 (分岐で値が割れる) なら置換せず、印をそのまま残す。
+    符号付き /8 (SIGN_DIV8 → sar eax,3) と符号付き %8 (SIGN_MOD8) の分岐は、命令列が型に一致するときだけ
+    div8(·)・mod8(·) の関数ノードに畳む (trunc 除算・剰余の全入力一致は py64_sign_branch_check.py で検証済み)。
     """
 
     def __init__(self, ins, order, cfg, entry):
@@ -156,6 +163,33 @@ class ExpSlicer(w.Slicer):
         self.cfg = cfg
         self.entry = entry
         self.active = set()
+
+    def sign_match(self, start, tmpl, tgt):
+        """order[start:start+len(tmpl)] が型に一致し、jns の飛び先が order[tgt] (= start+len(tmpl)) か。"""
+        if start < 1 or tgt != start + len(tmpl) or tgt >= len(self.order):
+            return False
+        if any(self.order[j] in self.targets for j in range(start + 1, tgt)):
+            return False
+        for k, (m, o) in enumerate(tmpl):
+            mi, oi = self.ins[self.order[start + k]]
+            if mi != m:
+                return False
+            if o is None:
+                if not (w.TARGET_RE.fullmatch(oi.strip()) and int(oi, 16) == self.order[tgt]):
+                    return False
+            elif oi != o:
+                return False
+        return True
+
+    def def_value(self, i, depth):
+        if self.ins[self.order[i]] == ("sar", "eax, 3") and self.sign_match(i - 3, SIGN_DIV8, i):
+            return f"div8({self.resolve('a', i - 3, depth + 1)})@{self.order[i - 3]:#x}"
+        return super().def_value(i, depth)
+
+    def resolve(self, fam, pos, depth=0):
+        if fam == "a" and self.sign_match(pos - 5, SIGN_MOD8, pos):
+            return f"mod8({self.resolve('a', pos - 5, depth + 1)})@{self.order[pos - 5]:#x}"
+        return super().resolve(fam, pos, depth)
 
     def mem_read(self, addr, size, pos, depth):
         r = super().mem_read(addr, size, pos, depth)

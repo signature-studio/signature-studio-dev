@@ -81,9 +81,16 @@ EXPANDED += [
 # P = *(*(0x15e1810) + [rbp+0x580]*8) (0x104bd61)。ACC は 0x104be79 の読みで、届く store は 0x1046d6b の d_in 1 本。
 G6_P = "*(*(0x15e1810) + (and(c_in,0xffff) + 0x70000000 - 0x70001fd0)*8)"
 EXPANDED += [(0x104bebf, G23_F.format(p=G6_P))]
+# G6 (PY-5409): 0x104bffa。[rbp+0x580] = v (0x104bd2d) を mod8 (0x104bd33〜0x104bd49 → [rbp+0x568]) と div8 (0x104be56〜0x104be66 → [rbp+0x580]) で割る。
+# 要素 = *(0x15e06a0) + imul(S578,0x28f)*8 + 0x1d4 + mod8*17*8 + div8*4 (0x104bfe5〜0x104bff7 の lea・mov の添字)。
+# 符号分岐の型一致は py99_slot_paths.ExpSlicer の SIGN_DIV8・SIGN_MOD8 が行い、全入力の一致は py64_sign_branch_check.py が検証する。
+G6_V = "(and(c_in,0xffff) + 0x70000000 - 0x70001fd0)"
+EXPANDED += [
+    (0x104bffa, f"*(*(0x15e06a0) + imul({S578},0x28f)*8 + 0x1d4 + (shl(mod8({G6_V}),4) + mod8({G6_V}))*8 + div8({G6_V})*4)"),
+]
 
 TOKEN = re.compile(r"\s*(\*\(|0x[0-9a-fA-F]+|\d+|[A-Za-z_][A-Za-z0-9_]*|[()+\-*·,])")
-FUNCS = ("shl", "imul", "and", "shr")  # 1〜2 引数の関数形 (#5905)
+FUNCS = ("shl", "imul", "and", "shr", "div8", "mod8")  # 1〜2 引数の関数形 (#5905・div8/mod8 は PY-5409)
 
 
 def tokenize(s):
@@ -201,7 +208,7 @@ def parse_canon(s):
 def machine_norm(s):
     s = re.sub(r"ACC\?⚠合流@0x[0-9a-f]+", "ACC", s)
     s = re.sub(r"(?<=[\w)\]])@0x[0-9a-f]+", "", s)
-    s = re.sub(r"&(?=M(8|16|32|64)\[)", "", s)
+    s = re.sub(r"&+(?=M(8|16|32|64)\[)", "", s)
     s = re.sub(r"\bM(8|16|32|64)\[", "*(", s)
     s = s.replace("G[", "(").replace("[", "(").replace("]", ")")
     return s
