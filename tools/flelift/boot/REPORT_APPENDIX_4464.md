@@ -101,7 +101,7 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 
 ## 16. 書込み元の特定を試みた結果 (#5337・診断 knob `FLE_WWATCH_STACK`・未確定)
 
-- 追加: `fle_cpu.c` の `fle_wwatch` に `-DFLE_WWATCH_STACK` (既定無効) を足した。受け手 slot や `0x976410` が非 0 から 0 に変わるとき、`R[RSP]` から 32 語を走査して 4 MiB 未満の guest VA 候補を出す。既定経路の挙動は変えない。
+- 追加: `fle_cpu.c` の `fle_wwatch` に `-DFLE_WWATCH_STACK` (既定無効) を足した。受け手 slot や `0x976410` が非 0 から 0 に変わるとき、`R[RSP]` から 32 語を走査して 4 MiB 以上 32 MiB 未満 (`0x400000`〜`0x2000000`) の guest VA 候補を出す。既定経路の挙動は変えない。
 - 測定: `FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_STACK -DFLE_WWATCH_SLOTS=0x5ac308ull,0x976410ull" FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0。dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob` と同じ計数。
 - boot: `FLE_CFI_SEED=1 FLE_CFI_RECV=1 FLE_IPP=1 FLE_TOLERANT=1` を 2 回 (rc 0)。stack 付きの 2 回目で `[fle_wwatch] ret=0x2ec1dc7 slot=0x5ac308 old=0x40f960 new=0`・`slot=0x976410 old=0x9764d8 new=0`。1 回目の診断無し版では `ret=0x2ec1de6`。§14 の `ret=0x2ec1f06`・§15 の `ret=0x2ec1dc7` とは番地が違う (ビルドのたびに wasm の code 位置が変わる)。
 - wasm の対応 (自作の code section 解析): `0x2ec1dc7`・`0x2ec1de6` はどちらも wasm 関数 `STX` (`fle_cpu.h:79` の 16B store ヘルパ) の範囲 `0x2ec1d98`〜`0x2ec1df6` に入る。ヘルパは呼出し元ではないため、guest 側の書込み元は `R[RSP]` の走査からしか引けない。
