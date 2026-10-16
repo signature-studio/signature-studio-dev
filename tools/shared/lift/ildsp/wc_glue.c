@@ -76,6 +76,7 @@ void imp_LeaveCriticalSection(void) { STUB_RET(0); }
 void imp_FlsGetValue(void) { STUB_RET(0); }
 void imp_FlsSetValue(void) { STUB_RET(1); }
 void imp_IsProcessorFeaturePresent(void) { STUB_RET(0); }
+/* 据え置き (T-SH-154 #5789): CreateInstance 側 (ci_iat.c) の停止規約とは統一しない。WaveformColouring の既存の測定値を変えないため。 */
 void imp_RaiseException(void) { STUB_RET(0); }
 void imp_RtlCaptureContext(void) { STUB_RET(0); }
 void imp_RtlLookupFunctionEntry(void) { STUB_RET(0); }
