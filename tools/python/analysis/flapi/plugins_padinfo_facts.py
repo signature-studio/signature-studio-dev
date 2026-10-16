@@ -9,7 +9,8 @@
 - slotIndex != -1 の経路 (0xd81374〜): 件数検査・slot 0..9 の検査・mixer 配列 (stride 0x28f*8、オフセット 0x134c) から plugin を取る
 - 値の取得: 0x1331340 → [obj]->vtbl[+0x20] → 得た obj の vtbl[+8](0x35, paramIndex, paramOption)
 - paramOption == 2 のときだけ eax を 16 bit 語ごとに組み替える (0xff00ff・0xff00ff00)
-- 戻り値: 整数を [0x15e4280] (実行時設定の関数ポインタ。import ではない) に渡す
+- 戻り値: 整数を [0x15e4280] の指すオブジェクトの vtbl[0] に渡す (0xd8135d。[0x15e4280] は import ではない)
+- 0xd82c20 (code 受け): code >= 0 は 0xc38bc0 で値を返す。code < 0 は [obj]->vtbl[+0x88] の判定後にコード別のメッセージを作り、例外経路 (0xd82da6 以降) に入る
 - 範囲外・空 slot の code: -4 (0xfffffffffffffffc)・-8 (0xfffffffffffffff8)。PyArg 失敗は ebx そのまま (0 以下) を 0xd82c20 へ
 
 実行すると PASS/FAIL を出し、1 つでも FAIL なら非 0 で終わる。
@@ -56,6 +57,21 @@ EXPECT = [
     (0xD81492, "mov ecx, ebx"),
     (0xD81494, "call 0xd82c20"),
     (0xD814B4, "mov rax, qword ptr [rbp + 0x68]"),
+    # 値の取得の補助 0x1331340: obj = plugin+0x38 の先 (+0x48 の位置) を返す
+    (0x1331348, "mov rax, qword ptr [rcx + 0x38]"),
+    (0x1331359, "lea rdx, [rax + 0x48]"),
+    (0x1331377, "mov rax, rbx"),
+    (0xD812D3, "mov rcx, qword ptr [rbp + 0x78]"),
+    (0xD81356, "mov rax, qword ptr [rip + 0x862f23]"),    # [0x15e4280] を読む (オブジェクト)
+    # 0xd82c20 の分岐: code > 0 は 0xc38bc0 (値)、code < 0 は vtbl+0x88 の判定の後にコード別の文字列
+    (0xD82C3A, "jne 0xd82c55"),
+    (0xD82C5A, "jl 0xd82c6a"),
+    (0xD82C5C, "call 0xc38bc0"),
+    (0xD82C7E, "call qword ptr [rax + 0x88]"),
+    (0xD82C8F, "cmp eax, -4"),
+    (0xD82DAA, "call 0x414000"),
+    (0xD82DC6, "call qword ptr [rbx]"),
+    (0xD82DDE, "call 0x412db0"),
 ]
 
 
@@ -65,8 +81,10 @@ def main():
     base = pe.OPTIONAL_HEADER.ImageBase
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     md.detail = False
-    code = pe.get_data(FN - base, END - FN)
-    ins = {i.address: f"{i.mnemonic} {i.op_str}".strip() for i in md.disasm(code, FN)}
+    ins = {}
+    for start, end in [(FN, END), (0x1331340, 0x1331380), (0xD82C20, 0xD82DF0)]:
+        code = pe.get_data(start - base, end - start)
+        ins.update({i.address: f"{i.mnemonic} {i.op_str}".strip() for i in md.disasm(code, start)})
     fails = 0
     for va, want in EXPECT:
         got = ins.get(va)
