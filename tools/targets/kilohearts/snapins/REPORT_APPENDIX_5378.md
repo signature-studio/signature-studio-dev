@@ -6,15 +6,15 @@
 
 ## 0. 結論
 
-> **状態: 未再現 (fix run)。** 本 fix run では素材 `plugins-kilohearts` (`HeartCore.core_64`) が取得できず、
-> `carve_process_split.py` と lift を再実行できなかった。以下の数値は **前 run の記録** で、本 run では確認していない。
-> 再現には `oc_artifacts: fl-win64 plugins-kilohearts` を付けて起動し直す必要がある。
+> **状態: 本 run で再測定 (infra 判定表は実測で再現)。** 素材 `plugins-kilohearts` の `HeartCore.core_64` から
+> `rtti_walk` → `callgraph` (4 proc) → `closures` → `carve_process_split.py` を実行した (stdout 全行は §2)。
+> lift (§1) は本 run では再実行していない (前 run の記録)。
 
-- process 直接 closure (slot 14 = RVA `0x37d210`) は **145 関数** = unique **25** + infra **120** (前 run の記録・未再現)。
+- process 直接 closure (slot 14 = RVA `0x37d210`) は **145 関数** = unique **25** + infra **120** (本 run で実測)。
   再現コマンド: `python3 snapins/scripts/carve_process_split.py work/callgraph.pkl work/closures_sets.pkl snapins/snapins.json`。
-- unique 25 の IAT 呼出は **0 件**、infra 120 の IAT 呼出は **60 件** (前 run の記録・未再現)。
-- unique 25 を `carveproc` (snapins.json) として既存 lift 経路 (`build.py carveproc --path s0 --no-compare`) で lift した前 run の結果: **20 関数**を wasm 化、`undefined_imports = []` (未再現)。
-- 残り 5 callgraph ノード (`0x18037e63f`・`0x180c23e02`・`0x180c23f28`・`0x180c2419a`・`0x180c243df`) は、RetDec の `--select-ranges` が関数入口として扱えず入力から外した (前 run の記録)。前 run は、これらを lift した 20 関数のいずれかの末尾からの **jmp の先** と記した (`0x18037e5e0`→`0x18037e63f`、`0x180c23d90`→`0x180c23e02`、`0x180c23ec0`→`0x180c23f28`、`0x180c240c0`→`0x180c2419a`、`0x180c242c0`→`0x180c243df`)。**jmp 辺の callgraph 出力は本 run で未確認**。`.pdata` 開始点でないことも未確認。
+- unique 25 の IAT 呼出は **0 件**、infra 120 の IAT 呼出は **60 件** (本 run で実測)。
+- unique 25 を `carveproc` (snapins.json) として既存 lift 経路 (`build.py carveproc --path s0 --no-compare`) で lift した前 run の結果: **20 関数**を wasm 化、`undefined_imports = []` (前 run の記録。本 run では再実行していない)。
+- 残り 5 callgraph ノード (`0x18037e63f`・`0x180c23e02`・`0x180c23f28`・`0x180c2419a`・`0x180c243df`) は、`callgraph.pkl` の関数ノード (`res` のキー) として存在し、それぞれに jmp 辺が 1 本ある (本 run で確認): `0x18037e5e0`→`0x18037e63f`、`0x180c23d90`→`0x180c23e02`、`0x180c23ec0`→`0x180c23f28`、`0x180c240c0`→`0x180c2419a`、`0x180c242c0`→`0x180c243df`。前 run は RetDec の `--select-ranges` が関数入口として扱えず入力から外したと記した (前 run の記録)。`.pdata` の開始点かは未確認。
 - bit-exact 比較は行っていない (`--no-compare`)。受入 1 の bit-exact は親 #4863 の受入 1。
 
 ## 1. lift 結果 (実測)
@@ -34,7 +34,7 @@
 
 ## 2. infra 120 の判定表
 
-unique 側 25 から呼ばれる infra 関数 (= 11 件)。以下は前 run の `carve_process_split.py` の出力 (**未再現**・本 run では確認していない):
+unique 側 25 から呼ばれる infra 関数 (= 11 件)。呼出元と khbase 区分は本 run の `carve_process_split.py` の出力。「本 lift での扱い」は前 run の lift の記録:
 
 | callee | khbase lift 対象か | 呼出元 (unique) | 本 lift での扱い |
 |---|---|---|---|
@@ -54,17 +54,38 @@ unique 側 25 から呼ばれる infra 関数 (= 11 件)。以下は前 run の 
 - memmove (`0x181384040`) は `abort` の stub。unique 側の `0x37d210`・`0x389700` が memmove を呼ぶため、wasm 実行時はこの経路で必ず trap する。wasm 動作は未検証で、memmove の shim 方針は後続 #4863 で決める。
 - unique 25 が直接呼ぶ callee は 11 件 (khbase 対象 6・khbase 外 5 = `carve_process_split.py` の出力)。khbase 外の 5 件は本 lift で stub (`abort`)。
 - stub 11 件を呼ぶ unique 関数は `0x37d210`・`0x389700`・`0x38a510`・`0x38a680`・`0xbacaa0`・`0xfd4d48`。これらの経路は wasm 実行時に `abort()` で止まる。bit-exact の対象にできるのは stub を解消した後。
-- infra 120 の判定 (前 run の記録・未再現。`carve_process_split.py` の末尾集計の出力):
+- `carve_process_split.py` の stdout 全行 (本 run・素材 `plugins-kilohearts` の `HeartCore.core_64`・`rtti_walk` → `callgraph` (4 proc) → `closures` の出力に対して実行):
+
+```
+process direct closure 145 / unique 25 / infra 120
+unique IAT calls 0 / infra IAT calls 60
+infra callees called by the unique side (khbase lift の有無):
+  0x180005c50 khbase-lifted  callers=['0x389700', '0x38a680']
+  0x18004cf20 khbase-lifted  callers=['0x37d210']
+  0x180f878e0 khbase-lifted  callers=['0x389700', '0x38a680']
+  0x180f8791c khbase-lifted  callers=['0x389700', '0x38a680']
+  0x180fb5f5c khbase-lifted  callers=['0x389700', '0x38a680']
+  0x180fbc1f4 not-khbase     callers=['0x37d210', '0x389700', '0x38a510']
+  0x180fcd690 not-khbase     callers=['0x389700', '0xbacaa0']
+  0x180fcde58 not-khbase     callers=['0xbacaa0']
+  0x180fce0d0 not-khbase     callers=['0xbacaa0']
+  0x180fd8bd4 khbase-lifted  callers=['0xfd4d48']
+  0x181384040 not-khbase     callers=['0x37d210', '0x389700']
+callee tally {'khbase-lifted': 6, 'not-khbase': 5}
+infra khbase-lifted: n 98 / size B 10044 / IAT calls 60
+infra not-khbase: n 22 / size B 10671 / IAT calls 0
+```
+
+- `closures.py` の出力は `infra 188 53010 n 42`。
+- infra 120 の判定 (本 run の実測):
 
 | 区分 | 件数 | size B | IAT 呼出 | 判定 |
 |---|---|---|---|---|
-| khbase lift 対象 (`snapins.json` `khbase.lift`) | 98 | 10,044 | 60 | 共有 (infra_all)。khbase の lift 集合に入る |
-| khbase lift 対象外 | 22 | 10,671 | 0 | 共有 (infra_all)。khbase の lift 集合に入らない |
-| 合計 | 120 | 20,715 | 60 | 全件が `closures_sets.pkl` の `infra` (到達 snap-in 数 ≥ `INFRA_K` = 8) に含まれる |
+| khbase lift 対象 (`snapins.json` `khbase.lift`) | 98 | 10,044 | 60 | 共有 (infra)。khbase の lift 集合に入る |
+| khbase lift 対象外 | 22 | 10,671 | 0 | 共有 (infra)。khbase の lift 集合に入らない |
+| 合計 | 120 | 20,715 | 60 | 全件が `closures_sets.pkl` の `infra` (188 件) に含まれる |
 
-- 「共有か個別か」の判定: 120 件とも到達 snap-in 数 ≥ 8 の共有基盤 (`infra_all` 188 件の一部) である。したがって process 専用の個別関数ではなく、snap-in 間で共有される基盤。内訳の khbase 対象 / 対象外は、khbase の lift 集合に入るかどうかの区分。
-- 検証 (前 run の記録・未再現): `closures_sets.pkl` の `infra` と突き合わせ、120 件すべてが含まれたとされる。
-- 98 / 22・10,044 B / 10,671 B は **未再現**。本 run では素材が無く、再生成できなかった。判定表は未確定として扱う。
+- 「共有か個別か」の根拠: 120 件はすべて `closures_sets.pkl` の `infra` (188 件) の部分集合 (本 run で確認: 120 / 120)。unique 25 は `infra` に 0 件 (重なり無し)。したがって process 専用の個別関数ではなく、snap-in 間で共有される基盤。内訳の khbase 対象 / 対象外は、khbase の lift 集合に入るかどうかの区分。
 
 ## 3. 未解決 (起票先)
 
