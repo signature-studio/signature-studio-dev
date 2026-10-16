@@ -13,6 +13,8 @@ import pefile
 
 
 def main():
+    if len(sys.argv) != 4:
+        sys.exit('usage: callsite_disasm.py <core.pe> <start_va_hex> <end_va_hex>')
     core, start, end = sys.argv[1], int(sys.argv[2], 16), int(sys.argv[3], 16)
     pe = pefile.PE(core, fast_load=True)
     base = pe.OPTIONAL_HEADER.ImageBase
