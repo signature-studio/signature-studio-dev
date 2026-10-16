@@ -54,6 +54,13 @@
 - 例: `0x6da2ae` → G `0x8020e3` (pdata 関数 `0x8016f0` の途中)。`0x8020e3` の復号は `or eax, 0xf6854504` で始まり、関数入口ではない。
 - G は入口として線形解析された値で、途中のアドレスからの livein である。関数入口の livein ではない。
 
+## 3b. 本 run の再測定 (未実行)
+
+- 本 run (HEAD `f3d6eead4` の fix) では、素材 `plugins-massivex` が `$ARTIFACTS_DIR` に無く (`fl-win64.tar.zst` のみ)、`fl-win64` 内にも Massive X の PE は無い。**`mx6_e2e.sh`・`mx63_u3e_split.py`・`mx63_g_containment.py` は本 run では実行していない。**
+- 以前に記した実行結果 (46 s・load・全判定 PASS・PE md5 一致・件数の一致) は、本 run の測定ではないため削除した。§1 の値は測定 commit `dba7c5908` の記録である。
+- `mx63_g_entry_check.py` は新規追加だが、本 run では **実行していない** (構文確認のみ)。その出力に基づく記述は無い。
+- G の関数先頭の同定 (詰め物による判定を含む) は未実施。G 側の判定は未確定のまま (§4・§5)。
+
 ## 4. 判定
 
 - **源側 (F の入口値が G へ届くこと)**: E 43 件は、F 内で xmm4/5 が定義されず前段 call もない site で、転送値は F の入口値と同一。

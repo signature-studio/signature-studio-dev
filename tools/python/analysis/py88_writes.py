@@ -48,6 +48,7 @@ IMM_RE = re.compile(r"-?(0x[0-9a-f]+|\d+)")
 TARGET_RE = re.compile(r"0x[0-9a-f]+")
 INNER_RE = re.compile(r"([+-]?)\s*([^\s+-]+)")
 DEPTH_LIMIT = 60
+RES_LIMIT = 4000
 ACC_SLOT = 0x5B8
 
 
@@ -134,8 +135,8 @@ class Slicer:
             if self.order[j] in self.targets:
                 res = res + f" ⚠合流@{self.order[j]:#x}"
                 break
-        if len(res) > 400:
-            res = res[:400] + "…"
+        if len(res) > RES_LIMIT:
+            res = res[:RES_LIMIT] + "…"
         self.memo[key] = res
         return res
 
@@ -153,6 +154,8 @@ class Slicer:
             return f"({self.reg_or_mem(ops[0], i, depth + 1)} - {self.ev(ops[1], i, depth + 1)})"
         if m == "xor" and len(ops) == 2 and ops[0] == ops[1]:
             return "0"
+        if m in ARITH and len(ops) == 3:
+            return f"{m}({self.ev(ops[1], i, depth + 1)}, {self.ev(ops[2], i, depth + 1)})"
         if m in ARITH and len(ops) >= 1:
             rhs = self.ev(ops[1], i, depth + 1) if len(ops) == 2 else ""
             return f"{m}({self.reg_or_mem(ops[0], i, depth + 1)}{', ' + rhs if rhs else ''})"

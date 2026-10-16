@@ -114,3 +114,18 @@ scratch は `work/scratch/` (gitignore) に複製し、本体は変えない。�
 ### 差分 (測定 commit から HEAD まで)
 
 測定 commit は `c9430d6a2` (`tools/python/analysis` を変えた最後の commit)。鮮度: `git diff c9430d6a2 HEAD -- tools/python/analysis` は 0 行 (本 PR の検証 HEAD 時点)。`e54706dec` (PY-5361 の `flapi/plugins_getcolor_facts.py`) は測定 commit より前の commit で、G2・G3 の式照合 (`py64_check_expr.py`・`py88_writes.py`・`py99_slot_paths.py`) の入力には影響しない。
+
+`git diff 53ab89b54 HEAD -- tools/python/analysis` は本 PR の commit 後の差分 (本 §7 の追記時点で 0 行)。
+
+
+## 9. PY-5404 (#5926): `imul` の源と `resolve()` の 400 字切れ (受入 1・2・4 の部分)
+
+- 測定 commit: `6f9c59646` (`analysis/py88_writes.py` のコードを変えた最後の commit)。入力: `fl-win64` の `block00031_PE.bin` → `py53_dispatch.py` (`fn=4664 dispatch=13 r8d_tests=174`)。load average 0.12 (測定時 17:02 UTC)。
+- 原因 1 (受入 1): `def_value` の ARITH 分岐は 2 オペランドしか見ず、`imul rcx, rcx, 0x28f` (0x104abce ほか 3 オペランド形) の源 `0x28f` を捨てていた。修正: 3 オペランドを `op(a, b)` で出す。0x104ad2e・0x104b093 の式に `imul(SLOT[rbp+0x578]?@0x104aabe, 0x28f)` が出る。
+- 原因 2 (受入 2): `resolve()` の上限 `res[:400] + "…"` を `RES_LIMIT = 4000` (定数化) に上げた。0x104aba9 (式 417 字)・0x104af7f (426 字)・0x104bebf (474 字) の展開 (`py99_slot_paths.expand`) から `…` が消えた。0x104bffa (544 字) も `…` は消えるが、`⚠合流@0x104bd49`・`⚠合流@0x104be63` が残る (分岐合流は別件・本 PR の範囲外)。
+- 残る印: 0x104aba9 の展開式 (`py99_slot_paths.expand`) に `SLOT[`・`ACC?⚠`・`…`・`⚠` は 0 件。`left=[]`。0x104bffa は `left=['⚠']` (上記の合流 2 件)。
+- 変化 (測定 commit から前後比較): `py88_writes.py` 既定 65 件の出力差は 5 行 (0x1049f24 は `shr` 連鎖・0x104ad2e/0x104b093/0x104b94e/0x104bffa は `imul` の源が出た分)。`py88_writes.py` 11 件の category 数は変わらず (SLOT? 5・SLOT?+ACC?⚠ 3・CALL+ACC?⚠ 1・ACC?⚠ 1・直接式 1)。65 件の category: 修正前後で同一。
+- 依存スクリプト (前後比較・同 fn.txt): `py99_slot_paths.py` 差分 2 行 (`store 0x104b2de` の式で `imul` の源が出た分)・`py99_merge_sets.py` 差分 2 行 (同)・`py64_check_expr.py` 差分 0・`py159_check_hand.py` 0・`py160_reach.py` 0・`py161_movabs_check.py` 0・`py99_closure.py` 0・`py163_vcall.py` 差分 2 行 (`式:` の `imul` 源)。
+  - `py99_slot_paths.py` の突合は不変: `U check n=57 match=57 mismatch=0`・`forward cross-check n=172 mismatch=0`。
+  - `py64_check_expr.py`: `n=8 mismatch=0`・`expanded n=1 mismatch=0`・exit 0 (不変)。
+- 未完 (受入 3・4 の残り): py64 の HAND 表に 0x104aba9・0x104ad2e・0x104af7f・0x104b093 を入れるには、手計算式を `shl`・`and`・`imul` を含む文法で書く必要がある (`py64_check_expr.py` の文法は `+ - * · rint f64 ACC d_in` のみ)。この run では文法を拡張しなかった (Refs #5926 の残り)。
