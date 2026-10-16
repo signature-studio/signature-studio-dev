@@ -45,6 +45,8 @@ def main():
                     help='LD-268 (#5268): NRST_MMAP の k 番目 (0 始まり) の領域だけを戻す (NRESETI)。--native 0・--native-reset none と併用')
     ap.add_argument('--native-reset-except', type=int, default=-1,
                     help='LD-268 (#5268): NRST_MMAP の k 番目 (0 始まり) 以外を戻す (NRESETX)。--native 0・--native-reset none と併用')
+    ap.add_argument('--native-reset-bytes', default='',
+                    help='LD-261 (#5268): k:off:len (16 進)。NRST_MMAP の k 番目の [off, off+len) だけを戻す (NRESETB)。--native 0・--native-reset none と併用')
     ap.add_argument('--wasm-restart', type=int, choices=[0, 1], default=0,
                     help='LD-261 (#5268): 1 で対象関数の直前に wasm runner も作り直す (--native 1 と合わせると both 条件)。wasm の RESET と併用しない')
     ap.add_argument('--out', required=True)
@@ -59,6 +61,13 @@ def main():
         raise SystemExit('--native-reset-one は --native 0 --native-reset none のときだけ使う')
     if a.native_reset_except >= 0 and (a.native or a.native_reset != 'none' or a.native_reset_one >= 0):
         raise SystemExit('--native-reset-except は --native 0 --native-reset none のときだけ使う')
+    rb = None
+    if a.native_reset_bytes:
+        if a.native or a.native_reset != 'none' or a.native_reset_one >= 0 or a.native_reset_except >= 0:
+            raise SystemExit('--native-reset-bytes は --native 0 --native-reset none のときだけ使う')
+        rb = [int(x, 16) for x in a.native_reset_bytes.split(':')]
+        if len(rb) != 3:
+            raise SystemExit('--native-reset-bytes は k:off:len')
     nmask = NMASK[a.native_reset]
     ns = argparse.Namespace(target=TARGET, state='auto')
     sess = Session(TARGET, shards=1, build=False, trace=True, timeout=10.0, state=liftdiff.state_path(ns))
@@ -102,7 +111,13 @@ def main():
             if va in aud:
                 if a.native or a.wasm_restart:
                     restart_runners()
-                if a.native_reset_one >= 0:
+                if rb is not None:
+                    nat._send('NRESETB %d %x %x' % tuple(rb))
+                    nat.p.stdin.flush()
+                    ack_r = ack(nat._recv(30.0), 'nresetb')
+                    ndiff = ack_r['diff']
+                    nskip = ack_r['skip']
+                elif a.native_reset_one >= 0:
                     nat._send('NRESETI %d' % a.native_reset_one)
                     nat.p.stdin.flush()
                     ack_r = ack(nat._recv(30.0), 'nreseti')
@@ -129,6 +144,7 @@ def main():
             v = liftdiff.make_record(sess, rec, irfeats)
             out.write(json.dumps({'native': a.native, 'wasm_restart': a.wasm_restart, 'reset': a.reset, 'native_reset': a.native_reset,
                                   'native_reset_one': a.native_reset_one, 'native_reset_except': a.native_reset_except,
+                                  'native_reset_bytes': a.native_reset_bytes,
                                   'native_reset_diff': ndiff, 'native_reset_skip': nskip, 'wasm_reset_diff': wdiff,
                                   'va': hex(va), 'name': rec['name'], 'verdict': v.get('verdict'),
                                   'cases': [[c.get('pattern'), c.get('outcome'), c.get('native_status'), c.get('wasm_status')]
