@@ -10,7 +10,8 @@ import sys
 from pathlib import Path
 
 BASE = 0x400000
-TARGET = 0x6906D7  # 対象 VA (SHX-T56)
+TARGET_VA = 0x6906D7  # 対象 VA (SHX-T56)
+TARGET = TARGET_VA - BASE  # objdump 表示値・画像 offset と同じ空間 (LB_BASE=0 で offset = RVA)
 WINDOW = 40
 NENT = 512
 WIDTH = {"BYTE": 1, "WORD": 2, "DWORD": 4, "QWORD": 8}
@@ -45,7 +46,7 @@ for i in jumps:
         continue
     windows_with_base_and_load += 1
     for tb in sorted(bases):
-        off = tb - BASE
+        off = tb
         if off < 0 or off >= len(img):
             continue
         for ew, sc in sorted(loads):
@@ -59,6 +60,6 @@ for i in jumps:
                     hits.append((i, tb, ew, sc, n))
 
 print(f"間接 jmp reg: {len(jumps)} 件 / 添字読み出しと rip 基底を両方含む窓: {windows_with_base_and_load} 件")
-print(f"0x{TARGET:x} を指す表エントリ: {len(hits)} 件")
+print(f"0x{TARGET_VA:x} (offset 0x{TARGET:x}) を指す表エントリ: {len(hits)} 件")
 for h in hits[:40]:
     print(f"jmp#{h[0]} base={h[1]:#x} w={h[2]} scale={h[3]} idx={h[4]}")

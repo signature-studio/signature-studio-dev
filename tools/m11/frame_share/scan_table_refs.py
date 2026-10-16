@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 
 BASE = 0x400000
-TARGET = 0x6906D7  # 対象 VA (SHX-T56)
+TARGET_VA = 0x6906D7  # 対象 VA (SHX-T56)
+TARGET = TARGET_VA - BASE  # objdump 表示値・画像 offset と同じ空間 (LB_BASE=0 で offset = RVA)
 NENT = 512
 LEA_RIP = re.compile(r"lea\s+\w+,\[rip\+0x[0-9a-f]+\]\s+#\s+0x([0-9a-f]+)")
 MOV_RIP = re.compile(r"\[rip\+0x[0-9a-f]+\]\s+#\s+0x([0-9a-f]+)")
@@ -24,7 +25,7 @@ for line in Path(sys.argv[2]).read_text().splitlines():
 hits = []
 checked = 0
 for tb in sorted(bases):
-    off = tb - BASE
+    off = tb
     if off < 0 or off >= len(img):
         continue
     checked += 1
@@ -38,6 +39,6 @@ for tb in sorted(bases):
                 if tb + rel == TARGET:
                     hits.append((tb, ew, sc, n))
 print(f"基底 (rip 相対 lea/mov の target, distinct): {len(bases)} / 画像内で検査: {checked}")
-print(f"0x6906d7 を指す (基底 + 相対値) の候補: {len(hits)} 件")
+print(f"0x{TARGET_VA:x} (offset 0x{TARGET:x}) を指す (基底 + 相対値) の候補: {len(hits)} 件")
 for h in hits[:40]:
     print(f"base={h[0]:#x} w={h[1]} scale={h[2]} idx={h[3]}")
