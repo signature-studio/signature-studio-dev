@@ -1,6 +1,6 @@
 # #5750: 証拠表の行 226〜232 (母数 7) の件ごとの判定
 
-判定: 母数 7 件のうち確定 3 件 (真陽性 3・偽陽性 0)、保留 4 件 (228・229・230・231)。226 は #5780 で確定 (§7)。受入 1 (全件の真偽判定) は未達。
+判定: 母数 7 件のうち確定 5 件 (真陽性 5・偽陽性 0)、保留 2 件 (228・229)。226 は #5780 で確定 (§7)。230・231 は #5773 で確定 (`REPORT_APPENDIX_5773.md`)。受入 1 (全件の真偽判定) は未達。
 偽陽性率は母数 288 の判定が終わるまで書かない。
 
 ## 1. 測定条件
@@ -28,21 +28,21 @@ REPORT_APPENDIX_3564 §基準 と同じ (構造判定)。
 | 227 | function_ddf630 | ddf8cc → ddf922 / ddf8d3 | **真陽性 (構造)** | 機械語: `ecx = [[[rbp+0x50]+8]+0x10] − 1` (`[rbp+0x50]` は ddf686 で arg1 を格納)。jcc は `0 > ecx` (signed) = count ≤ 0 で脱出。IR B (ddf8b0): `%139 = zext [[arg1+8]+16]` を `rcx.0` に格納。両者は同じ G・段数 (2)・幅 (i32)。L (ddf8d3) に入口判定は無く、末尾 `icmp eq (rcx−1), 0` の後判定。count = 0 で IR は本体を 1 回以上回る |
 | 228 | function_ddf630 | ddfb8c → ddff13 / ddfb97 | 保留 | count の源は 227 と同じ `[[arg1+8]+16]` だが、IR の L (ddfb97) の入口判定は `slt stack_var_-264.ph, ([arg1+208]−2)` で、loop 変数が機械語の rbx ではない。脱出先 ddff13 の末尾も `rsi.0.ph` の判定。counter 対応が未確定 |
 | 229 | function_ddf630 | de036c → de0b96 / de0379 | 保留 | 機械語の count は `[[rbp+0xc0]+0x14] − 1`。`[rbp+0xc0]` は de03bc・de0898・de0bfe でも書かれるため、ループ内で源が変わる。IR の L (de0379) の判定は `icmp ult (load+%671), %stack_var_-320` で count の判定ではない。源と述語の同一性が未確定 |
-| 230 | function_de2280 | de25bc → de267e / de25c7 | 保留 | 機械語の count は `[rbp+0x1f8]` (定数 3 の経路と `[rbp+0x200]` の経路がある)。IR の count は `min(%107, 3) + 1` (`%spec.select`)。前者の定数経路と後者の値の同一性が未確認 |
-| 231 | function_de2280 | de2799 → de285b / de27a4 | 保留 | 230 と同型。機械語の count は `[rbp+0x1d0]`、IR は `min(%149, 3) + 1` (`%spec.select19`)。同一性が未確認 |
+| 230 | function_de2280 | de25bc → de267e / de25c7 | **真陽性 (構造)** | #5773 で確定 (`REPORT_APPENDIX_5773.md` §3)。機械語の count (`[rbp+0x1f8]` = min(X,3)) と IR の count `min(%107, 3) + 1` が一致 |
+| 231 | function_de2280 | de2799 → de285b / de27a4 | **真陽性 (構造)** | #5773 で確定 (`REPORT_APPENDIX_5773.md` §3)。230 と同型 |
 | 232 | function_de4000 | de404f → de407e / de4058 | **真陽性 (構造)** | 機械語: `rcx = call de3ff0(rbx=arg1)`、`r8d = [rax+0x10] − 1`。jcc は `0 > r8d` (signed) = count ≤ 0 で脱出。IR B (de4032): `%13 = call de3ff0(arg1)`、`%17 = zext [%13+16]` を `r8.0` に格納。同じ呼出し・同じ段数・同じ幅。L (de4058) に count の入口判定は無く、de4072 の末尾 (`r8−1 ≠ 0`) が後判定。count ≤ 0 で IR は本体を回り、機械語は de407e へ直行する |
 
 ## 4. 保留の型
 
-- 228・230・231: IR のループ変数 (`stack_var_-264`・`rsi`・`%spec.select`) が機械語の counter (`rbx`) と対応しない。
+- 228: IR のループ変数 (`stack_var_-264`) が機械語の counter (`rbx`) と対応しない。`REPORT_APPENDIX_5773.md` §4 参照。
 - 229: 機械語の count 源 (`[rbp+0xc0]`) がループ内で書き換えられる。IR の判定は count ではない。
 
-保留 5 件の SSA 追跡 (機械語の被演算子と IR の被演算子を同じ値に結ぶ) は未完。起票先: #5750 (本 issue。Refs)。
+保留 2 件 (228・229) の SSA 追跡 (機械語の被演算子と IR の被演算子を同じ値に結ぶ) は未完。起票先: #5750 (本 issue。Refs)。
 
 ## 5. 未解決
 
-- 行 228・229・230・231 (保留 4 件): 上記 §4 の型ごとに SSA 追跡を続ける。起票先: #5750 (本 issue。子 issue は新規に起票しない)。
-- count = 0 (真陽性 2 件) の実行時到達性は未測定。`docs/DEFECTS.md` の類型への対応は PM 判断。
+- 行 228・229 (保留 2 件): 上記 §4 の型ごとに SSA 追跡を続ける。起票先: #5750 (本 issue。子 issue は新規に起票しない)。
+- count = 0 (真陽性 5 件) の実行時到達性は未測定。`docs/DEFECTS.md` の類型への対応は PM 判断。
 - 範囲外: `m11_ov.c`・`docs/DEFECTS.md`・`tools/m11/guard699/`・`RetDec` 本体は変更しない (受入 3)。
 
 ## 6. 再現
