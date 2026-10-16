@@ -17,7 +17,7 @@ import sys
 FN = re.compile(r'^define [^\n]*@function_439f90\(.*?\n}\n', re.M | re.S)
 DEF = re.compile(r'^define [^\n]*@function_439f90\(([^)]*)\)', re.M)
 
-NEW = '''define weak i64 @function_439f90(ptr %arg1, ptr %arg2, i64 %arg3) local_unnamed_addr {
+NEW = '''define i64 @function_439f90(ptr %arg1, ptr %arg2, i64 %arg3) local_unnamed_addr {
 dec_label_pc_439f90:
   %r13.slot = alloca i64
   %rdi.slot = alloca i64
