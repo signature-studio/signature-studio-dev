@@ -56,7 +56,7 @@
 
 ## 3b. 本 run の再測定 (未実行)
 
-- 本 run (HEAD `e2a47bf3a` の fix) では、素材 `plugins-massivex` が `$ARTIFACTS_DIR` に無く (`fl-win64.tar.zst` のみ)、`fl-win64` 内にも Massive X の PE は無い。**`mx6_e2e.sh`・`mx63_u3e_split.py`・`mx63_g_containment.py` は本 run では実行していない。**
+- 本 run (HEAD `f3d6eead4` の fix) では、素材 `plugins-massivex` が `$ARTIFACTS_DIR` に無く (`fl-win64.tar.zst` のみ)、`fl-win64` 内にも Massive X の PE は無い。**`mx6_e2e.sh`・`mx63_u3e_split.py`・`mx63_g_containment.py` は本 run では実行していない。**
 - 以前に記した実行結果 (46 s・load・全判定 PASS・PE md5 一致・件数の一致) は、本 run の測定ではないため削除した。§1 の値は測定 commit `dba7c5908` の記録である。
 - `mx63_g_entry_check.py` は新規追加だが、本 run では **実行していない** (構文確認のみ)。その出力に基づく記述は無い。
 - G の関数先頭の同定 (詰め物による判定を含む) は未実施。G 側の判定は未確定のまま (§4・§5)。
