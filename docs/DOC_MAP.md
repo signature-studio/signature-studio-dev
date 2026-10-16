@@ -331,7 +331,8 @@
 | `tools/m11/REPORT_N3113.md` | 103 | #3113 (M11-N168): 新規範囲内 word の 4 類分類 (A 関数 VA / B 未 remap 疑い / D イメージ由来の LVA コピー / C 他)・分類 B の基準 (run は f3aa9450 で 0 で合格・注入で FAIL)・D の block copy 根拠 (`m11_ptrclass.py`)・survey と `--survey` の negctl 未実行の理由 (wasm が survey 用 export を持たない)・測定 commit からの差分 (§8) |
 | `tools/m11/REPORT_N3129.md` | 106 | #3129 (M11-N170): fresh 再生成 IR (ir_conditions 付き・boot5 込み) で survey 用 wasm (`_m11_set_va_unit_budget` 付き) の survey・run の分類を実測し、分類 B の基準を設定。件数の不一致は #3958。数値は REPORT の §3 が正本 |
 | `tools/m11/REPORT_N3958.md` | 90 | #3958 (M11-N204): run の ptrcheck 件数 69,669 と基準の差を切り分け、`m11_e2e.sh --full` (全再生成) で 69,669 を実測。基準は変えず。数値は REPORT の §2 が正本 |
-| `tools/m11/REPORT_5667.md` | ~76 | #5667 (M11-N255): LB 依存 trap 7 件の wasm offset → 関数名 → faulting 命令 (LB=0 / LB=0x10000 の両 build)・IR 行の対応 (158・745 は未確定)・address 0 の判定は未確定 |
+| `tools/m11/REPORT_5667.md` | ~76 | #5667 (M11-N255): LB 依存 trap 7 件の wasm offset → 関数名 → faulting 命令。291・296・304 は 555 と同じ `function_535c11` の load で、LB=0x10000 でも再現。745・158 の IR 行は未確定。address 0 の判定は未確定 |
+| `tools/m11/REPORT_APPENDIX_5667.md` | ~162 | #5667 の付録: build 指紋 (LB 別の wasm sha256)・`llvm-objdump` 生出力 (555・291・296・304・153・158)・stack 実測の生行・`function_535c11` の IR 差分 0 行の記録・再現コマンド |
 | `tools/m11/REPORT_N3325.md` | 106 | #3325 (M11-N181): LB 依存 unit 差 8 件の切り分け。function_412770 の IR 本体は build で未実行 (手書き C 版 `m11_ov.c` が優先)・unit 40 の halt 分岐の入口・trap 関数 (build ごとの wasm 名) |
 | `tools/m11/REPORT_N189.md` | ~110 | #3574 (M11-N189, 親 #3492): strict 証拠表の行 270・271 (`function_f5cf40`・`function_f5d510`) を真陽性と判定 (間接 call の戻り値に対応する IR 値が無く、件数は vtable ポインタ由来 = D15 の変種)。行 255 の前提は 1060d20・12df530 を確認、区間の間接 call `ea8ad9` は遷移先未確定 (未解決)。判定材料 `trap_triage/judge_3574.py` |
 | `tools/m11/REPORT_N2768.md` | ~185 | #2768 (M11-N155): 寛容起動で skip した unit が trap までに heap へ書いた範囲 (72 unit の表)・上位のリスク評価 (推定)・PR #2752 との環境差。heap 範囲の結論は REPORT §0 を参照。集計は `m11_tolerant_heap.py`・測定は `m11_tolerant.mjs` の `M11_HEAP_FROM`/`M11_HEAP_OUT` |
