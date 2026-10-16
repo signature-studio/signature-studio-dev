@@ -15,7 +15,7 @@
 - 再現 (本 run・foreground): `scan_guard.py --report` で strict 288、`strict_evidence.py --out` で TSV 288 行 (ヘッダ除く)、`judge_ctx.py <IR> <TSV> <PE> 139 158` で文脈ダンプ (rc 0・約 63 KB・`tools/m11/work/` 配下、未コミット)。
 - 測定 commit: `739b46e2d` (origin/main の取り込み時点)。判定に使うコードは本 PR で変更していない (`git diff 739b46e2d HEAD -- tools/m11/guard699/ tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行)。
 - 判定規則 (`REPORT_718.md` §3): 真陽性 = 同じ値の入口判定が IR に無く、jcc が脱出先 T を指す。偽陽性 = 同じ値の同等判定が IR 側にある。被演算子の同一性は、関数先頭のレジスタ・フィールドの読み出しと IR の `arg1 + offset` の load で結ぶ。レジスタ名の一致だけでは根拠にしない。
-- 関数先頭の逆アセンブルは `work/boot1.drc.dsm` (`boot_final.ll` とは別の生成物) を使った。アドレスは両者で一致することを確かめた。入口レジスタ (`rcx`・`rbx` が `arg1` のままか) の確認にだけ使い、判定の主根拠は IR 側の load と機械語の jcc の対応にある。
+- 関数先頭の逆アセンブルは `work/boot1.drc.dsm` を使った。この dsm は `boot_final.ll` とは別ビルドの生成物で、両者の一致は確かめていない。入口レジスタ (`rcx`・`rbx` が `arg1` のままか) の確認にだけ使い、判定の主根拠は `judge_ctx.py` が出した機械語の jcc と IR の load・ループ先頭の対応にある。dsm と ll の対応を確かめるまでは、この確認は暫定扱い。
 - `m11_ov.c`・`tools/m11/guard699/`・RetDec 本体は変更していない。
 
 ## 3. 件ごとの判定
