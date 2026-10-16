@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # #5601 (L-25): FLEngine_x64.dll の poll 候補 0x604ea0 (GlobalFindAtomW 呼出し元) と 0x817aa0 (FindAtomW 呼出し元) の entry に gdb で break を張り、命中を記録する。s8 の派生。
 # 前提: s1_wine_probe.sh で $RUNNER_TEMP/fl-install が組立て済み。kernel.yama.ptrace_scope=0 (sudo sysctl -w kernel.yama.ptrace_scope=0)。
-# 1 コマンド: WAIT=90 bash tools/flp/s8_loop_caller_probe.sh   (出力は $RUNNER_TEMP 配下のみ・commit 対象外)
+# 1 コマンド: WAIT=90 bash tools/flp/s10_fn_probe.sh   (出力は $RUNNER_TEMP 配下のみ・commit 対象外)
 # VA は REPORT の表記 (= RVA + 0x400000)。DLL の実行時 base は mapping 行から取る (ASLR で変わる)。
 # 注意: timeout で gdb が落ちた場合、int3 (breakpoint) は外れないまま終わる。後で再利用するなら、終了前に外す処理を入れること。
 set -uo pipefail
@@ -58,7 +58,7 @@ timeout "$WAIT" gdb -p "$PID" -batch -x "$ART/s10_gdb_cmds.txt" > "$OUT" 2>&1
 GRC=$?
 echo "gdb rc=$GRC (124 = $WAIT s 内に終了せず)"
 grep -E 'Breakpoint [0-9]+ at|HIT |Cannot|not allowed|Operation not permitted|ptrace' "$OUT" | head -40
-echo "hits callerA=$(grep -c 'HIT callerA' "$OUT") callerB=$(grep -c 'HIT callerB' "$OUT")"
+echo "hits fn604ea0=$(grep -c 'HIT fn604ea0' "$OUT") fn817aa0=$(grep -c 'HIT fn817aa0' "$OUT")"
 
 kill "$PID" 2>/dev/null
 wineserver -k >/dev/null 2>&1 || true
