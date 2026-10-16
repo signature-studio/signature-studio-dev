@@ -7,7 +7,7 @@
 - 原因は **lift 側**。harness ではない。
 - IR の `define i128 @function_40c420()` は引数を持たず、入口で `xor i128 0, 0` を使う。機械語は入口で **xmm0 (double)** を読む (`movapd xmm3, xmm0` が先頭)。そのため wasm は入力 0 から計算し、結果 0 を返した。
 - 修正: (a) `ldlib/cases.py` の `MACHINE_ENTRY` に `0x40c420: ['double']` を追加 (入口型の投入)。(b) IR を `fix_xmm_args.py --only-funcs function_40c420` で `double %in.xmm0` に直し、wasm の入口 `m11_tr_function_40c420` が `%a0` を double に bitcast して渡す (`tests/ld288_40c420_xmm0.py` で生成)。
-- (a) だけでは不足 (実測 A で `wasm_trap`)。(b) だけでも不足 (実測 A の前段で `wasm_x0=0`)。両方そろって `verdict=match` (11 case 全 `equal`)。
+- (a) だけでは不足 (実測 2 で `wasm_x0=0`)。(b) だけでも不足 (実測 3 で `wasm_trap`)。両方そろって `verdict=match` (11 case 全 `equal`)。
 - 戻り型は double (`native_x0` が 1.5 付近の double bits `0x3ffa…` / `0x4024…`)。ただし型の確定は #5886 の受入 1 の作業で、本 PR は `40c420` の入力・戻り値の比較の成立までを扱う。`m11.json` の `ret_override` は変えていない。
 
 既知類型との関係 (DEFECTS.md): **D5** (float/double 引数の xmm 落ち。入口 live-in の xmm0 が read-before-write)。既存の `fix_xmm_args.py` (M11_XMM_ARGS) が扱う類型と同じ。icall REPORT §4 とは別体系。
@@ -62,7 +62,7 @@ bash tools/liftdiff/liftdiff_e2e.sh --m11-only                                  
 
 ## 6. 測定 commit からの差分
 
-`git diff c2efe08ef HEAD -- tools/liftdiff` は本節の REPORT 追記のみ (コード差分 0 行)。
+`git diff c2efe08ef HEAD -- tools/liftdiff` は REPORT の追記・訂正と、`tests/ld288_40c420_xmm0.py` への出力先ディレクトリ作成 1 行 (`os.makedirs`) のみ。`MACHINE_ENTRY`・IR 生成の処理・`m11_ld288.json` は変えていない。この 1 行は出力ファイルの内容を変えないため、測定値は再取得していない (`toolchain-emsdk`・`work-m11` が無く再測定できない)。
 
 ## 7. 未解決
 

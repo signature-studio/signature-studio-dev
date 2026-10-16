@@ -24,6 +24,7 @@ def main():
     if len(sys.argv) != 4:
         sys.exit(__doc__)
     pe, src, dst = sys.argv[1:]
+    os.makedirs(os.path.dirname(os.path.abspath(dst)), exist_ok=True)
     tmp = dst + '.fx.ll'
     r = subprocess.run([sys.executable, FX, src, tmp, '--pe', pe, '--only-funcs', 'function_40c420'],
                        capture_output=True, text=True)
