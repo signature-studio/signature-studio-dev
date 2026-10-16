@@ -3,7 +3,7 @@
 - 日付: 2026-10-16 / 親: #4930 (SR-82) / 前段: `REPORT_SR60.md` (直接呼出元)・`REPORT_SR82.md` (vtable 候補・SC 内の受け手分類)
 - 範囲: 静的解析のみ。実 VSTGUI 上の動的確認は範囲外。
 - 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3`。sha256 `501e7bb3…` / 19,236,864 B (REPORT_SR82 と一致を確認)。作業用 dir はリポジトリ外。
-- 測定 commit: 本 PR の変更 commit (`arg_vt_args.py` を追加した commit。下の §4 に hash と差分)。
+- 測定 commit: `9754af068` (origin/main。下の §4 に差分)。
 
 ## 0. 結論
 
@@ -16,14 +16,15 @@ vtable 経由は、宛先 F を disp だけで照合するため上界しか出�
 | 非確定 | 240 | 68 | **308** |
 
 - 「非確定」は、確定できなかったことを表す。SC と違うと確定したわけではない。
-- 「呼出元の証拠あり / なし」の内訳は本 HEAD で再現していない (未検証)。件数の根拠にしない。§2.2 を参照。
+- 「呼出元の証拠あり / なし」の内訳は §2.2 で再現した (`arg_row_join.py`・PE 不要)。
 
 ## 1. 変更点
 
-- `arg_vt_args.py` (新規): `arg_vt_indirect.py` の候補のうち、呼出元が SC の関数にあるものについて、rdx/r8/r9 の出所を `receiver_this_trace.py` の `origin` / `category` で strict・loose の両方に分類する。加えて trace の ARG / ARG-CHILD 行を、候補あり・なしで数える。
+- `arg_vt_args.py` (前 PR で新規): `arg_vt_indirect.py` の候補のうち、呼出元が SC の関数にあるものについて、rdx/r8/r9 の出所を `receiver_this_trace.py` の `origin` / `category` で strict・loose の両方に分類する。加えて trace の ARG / ARG-CHILD 行を、候補あり・なしで数える。
+- `arg_row_join.py` (本 PR で新規): trace の ARG / ARG-CHILD 行ごとに、直接呼出元・vtable 候補の証拠を突き合わせ、組み合わせごとの行数を出す。入力は TSV のみ。
 - 既存ツールは再利用し、変更していない。
 
-## 2. 測定 (入力は HEAD と同じ・逐次実行)
+## 2. 測定 (測定 commit `9754af068`・逐次実行)
 
 手順 (作業 dir: リポジトリ外。`$P` = `tools/targets/serum2/gui`):
 
@@ -31,22 +32,25 @@ vtable 経由は、宛先 F を disp だけで照合するため上界しか出�
 tar --zstd -xf "$ARTIFACTS_DIR/plugins-serum2.tar.zst" --wildcards '*Install_Xfer_Serum2_2.1.5.exe'
 7z x -y -oexe_extract Install_Xfer_Serum2_2.1.5.exe '$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3'
 cp -f 'exe_extract/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' Serum2_win64.vst3
-venv/bin/python $P/receiver_this_trace.py Serum2_win64.vst3 --vtable 0x180a2bf58 --tsv trace.tsv
-venv/bin/python $P/arg_caller_types.py Serum2_win64.vst3 trace.tsv --tsv direct.tsv
-venv/bin/python $P/arg_vt_indirect.py Serum2_win64.vst3 trace.tsv --tsv vt_ind.tsv
-venv/bin/python $P/arg_vt_args.py Serum2_win64.vst3 trace.tsv vt_ind.tsv --tsv vt_args.tsv
+python3 $P/receiver_this_trace.py Serum2_win64.vst3 --vtable 0x180a2bf58 --tsv trace.tsv
+python3 $P/arg_caller_types.py Serum2_win64.vst3 trace.tsv --tsv direct.tsv
+python3 $P/arg_vt_indirect.py Serum2_win64.vst3 trace.tsv --tsv vt_ind.tsv
+python3 $P/arg_vt_args.py Serum2_win64.vst3 trace.tsv vt_ind.tsv --tsv vt_args.tsv
+python3 $P/arg_row_join.py trace.tsv direct.tsv vt_args.tsv --tsv join.tsv
 ```
 
 | ツール | 結果 | 出力 md5 | real (s) |
 |---|---|---|---|
-| `receiver_this_trace.py` | cat_strict TSV 1053 行 | `1e1f5500…` (REPORT_SR82 と一致) | 22.8 |
-| `arg_caller_types.py` | 所属関数 145・直接呼出元あり 17・呼出元 call 65・SC の this 0 | `b449ddd0…` | (未計測) |
-| `arg_vt_indirect.py` | 候補 118,222 件・SC 呼出元 19 件 | `42bcf98b…` (REPORT_SR82 と一致) | 27.1 |
-| `arg_vt_args.py` | 候補 call 14 箇所・対 57 件・SC の this 0 | `972d6267…` | 23.6 |
+| `receiver_this_trace.py` | cat_strict TSV 1053 行 | `1e1f5500…` (REPORT_SR82 と一致) | 23.4 |
+| `arg_caller_types.py` | 所属関数 145・直接呼出元あり 17・呼出元 call 65・SC の this 0 | `b449ddd0…` (前 PR の値と一致) | 23.9 |
+| `arg_vt_indirect.py` | 候補 118,222 件・SC 呼出元 19 件 | `42bcf98b…` (REPORT_SR82 と一致) | 27.6 |
+| `arg_vt_args.py` | 候補 call 14 箇所・対 57 件・SC の this 0 | `972d6267…` (前 PR の値と一致) | 23.9 |
+| `arg_row_join.py` (新規・§2.2) | ARG 9/3/0/228・ARG-CHILD 56/4/0/8 | `c762b72e…` (join.tsv) | 0.02 |
 
+- 入力 PE の sha256 `501e7bb3…` / 19,236,864 B を、本 run で `plugins-serum2` から展開して確認した。
 - 直接呼出元 (`arg_caller_types.py`) の値は REPORT_SR60 と一致した (17 関数・65 件・SC の this 0 件)。
 - 間接候補 (`arg_vt_indirect.py`) の値は REPORT_SR82 と一致した (118,222 件・SC 19 件)。
-- load (1 分値): 本 run の開始時 0.54〜0.67 (各ツールの前後で 0.2〜0.4 の範囲)。
+- 4 ツールの real 合計 99.0 s。開始時の `uptime` load (1 分値) は 0.55。
 
 ### 2.1 vtable 候補の受け手 (SC 内の 14 箇所・57 対)
 
@@ -57,19 +61,25 @@ strict / loose の分類 (reg 単位・57 対):
 
 「SC の this」と分類された引数は、strict 0・loose 0。NODOM (支配が取れない) と CLOBBER (途中で上書き) が多く、確定の材料にならない。
 
-### 2.2 trace 行の内訳 (未検証・件数の根拠にしない)
+### 2.2 trace 行の内訳 (再現済み・`arg_row_join.py`)
 
-以下は、前 HEAD の作業で得た値の記録。行単位の結合が本 HEAD に無く、2 列の重なりも確認していないため、再現できるまで結論に使わない。
+trace の ARG / ARG-CHILD 行を、所属関数 F の証拠で分ける。直接呼出元 (`direct.tsv` の func)・vtable 候補 (`vt_args.tsv` の func) のどちらかを持つ F の行を「証拠あり」とする。
 
-| trace 行 | 証拠あり 計 | 内訳: 直接呼出元あり | 内訳: vtable 候補 (SC 内) あり | 証拠なし |
-|---|---|---|---|---|
-| ARG 240 | 12 | 9 | 3 | 228 |
-| ARG-CHILD 68 | 60 | 56 | 4 | 8 |
+| trace 行 | 計 | 直接呼出元あり | vtable 候補あり | 両方 | 証拠なし |
+|---|---|---|---|---|---|
+| ARG | 240 | 9 | 3 | 0 | 228 |
+| ARG-CHILD | 68 | 56 | 4 | 0 | 8 |
 
-(内訳の 2 列の重なりは未確認。「重ならない」は前提であり、結合の出力では示していない。証拠あり 72 行は、直接呼出元か vtable 候補のどちらかを持つ行。)
+- 証拠あり 72 行 (ARG 12 / ARG-CHILD 60)。直接と vtable の 2 列は**重ならない** (両方 0 行)。
+- 結合の出力: `c762b72e…` (join.tsv)。
 
-**本 HEAD で §2.2 は再現していない。** 行単位の結合を行うコードは `arg_vt_args.py` に無い。`arg_caller_types.py` は集計だけを出す。表の 9 / 3 / 56 / 4 を作った手順は REPORT に書かれていない。
-再現には `plugins-serum2` の PE が要る。本 run では素材が無く、実行していない。結合の手順は未確定で、素材を取得できる run で確定する (§3 (d))。
+### 2.3 この結果から言えること
+
+- 確定 0 の理由: 証拠あり 72 行のうち、vtable 側 7 行は宛先 F を disp だけで照合しており、受け手の型が未確定。
+- 直接側 65 行 (trace 行の数) と、呼出元 call 65 箇所 (`arg_caller_types.py` の数) は同じ数だが、別の量である。直接側 65 行の所属関数は `direct.tsv` の 17 関数で、その呼出元 call は `direct.tsv` の 65 箇所 (17 関数の全呼出元) に一致する。
+  - この 65 箇所の呼出元関数は、SC が 0 件・slot 関数が 2 件・それ以外が 63 件 (`caller_evidence` 列で確認)。rdx/r8/r9 に SC の this が現れる呼出元は 0 件 (`arg_caller_types.py` の SC this 0)。
+  - join の直接側 65 行それぞれについて、所属関数 F の呼出元 call 数と、そのうち SC の呼出元数を数えた (`direct.tsv` と `trace.tsv` から集計・§2 と同じ入力)。結果: 呼出元 call 数は 1 / 2 / 3 / 4 / 5 / 7 / 30 のいずれかで、SC の呼出元は全行で 0。
+- 証拠なし 236 行は、呼出元がこのツール群の照合 (直接 call・disp 一致) では見つからないもの。これらが SC 由来かは本 REPORT では判定しない。
 
 ## 3. 未解決 (起票先)
 
@@ -77,30 +87,10 @@ strict / loose の分類 (reg 単位・57 対):
 |---|---|---|
 | (a) vtable 候補 (disp のみの照合) の受け手の型 (reg の指す object の class) を確定する。型が決まれば、F の所属 class と一致するかで確定・非確定を分けられる | 受入 1 の確定 0 件の理由。確定件数を出すための前提 | #5612 (本 issue 残) |
 | (b) 呼出元の SC 判定 (SerumController の関数集合) の境界 | SC 19 件・14 箇所の母集団 | #4930 (親・REPORT_SR82 §6 (b)) |
-| (c) 直接呼出元・vtable 候補のいずれかを持つ trace 行の数 (証拠の有無) が未検証 | 確定の母集団の大きさが未確定 | #5612 (本 issue 残) |
-| (d) §2.2 の結合 (行単位で trace と直接呼出元・vtable 候補を突き合わせ、重なりを確認する) が無い。本 HEAD では再現していない | (c) と §2.2 の内訳が未検証 | #5612 (本 issue 残) |
+| (c) 証拠なし 236 行の扱い (呼出元が見つからない行が SC 由来かは未判定) | 確定件数の上界は 308 のまま | #5612 (本 issue 残) |
 
 ## 4. 測定 commit と差分
 
-- 測定 commit: `7390a5a4c` (`arg_vt_args.py` を追加した commit。§2 の 4 表の数値はこの版の入力で得た)。
-- 測定 commit 以降の変更: `de3045f12` (`arg_vt_args.py` から未使用の `targets` を削除)。出力に影響しない見込みだが、本 run では再測定していない。
-- 鮮度の証跡 (`git diff 7390a5a4c HEAD -- tools/targets/serum2/gui`):
-
-```
-diff --git a/tools/targets/serum2/gui/arg_vt_args.py b/tools/targets/serum2/gui/arg_vt_args.py
-@@ -32,14 +32,12 @@ with contextlib.redirect_stdout(io.StringIO()):
- REGS = ("rdx", "r8", "r9")
- ind_re = re.compile(r"qword ptr \[(\w+)(?: \+ (0x[0-9a-f]+|\d+))?\]")
- 
--targets = set()
- trace_rows = []
- with open(tsv_trace) as f:
-     next(f)
-     for line in f:
-         cols = line.rstrip("\n").split("\t")
-         if cols[4] in ("vptr:ARG", "vptr:ARG-CHILD"):
--            targets.add(int(cols[1], 16))
-             trace_rows.append((cols[4], int(cols[1], 16)))
-```
-
-- 結論: 差分は `targets` の削除だけ。`arg_caller_types.py` などの測定ツールは変わっていない。再測定は未実施 (入力の PE が本 run に無い)。
+- 測定 commit: `9754af068` (origin/main。§2 の 4 ツールと `arg_row_join.py` の出力は、この版の入力で得た)。
+- 測定 commit 以降の変更: `arg_row_join.py` (新規) と本 REPORT のみ。既存の測定ツールは変えていない。
+- 鮮度の証跡: `git diff --quiet 9754af068 HEAD -- tools/targets/serum2/gui/receiver_this_trace.py tools/targets/serum2/gui/arg_caller_types.py tools/targets/serum2/gui/arg_vt_indirect.py tools/targets/serum2/gui/arg_vt_args.py` は 0 (差分 0 バイト・終了コード 0)。`git diff 9754af068 HEAD -- tools/targets/serum2/gui` の stat は `REPORT_SR94.md` と `arg_row_join.py` の 2 ファイルのみ。
