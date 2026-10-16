@@ -175,16 +175,27 @@ section 単位の内訳 (#4547 実測。HEAD で `lift8 off/on` を再生成し�
 - LIFT8 の 8 VA のうち `180054bd0` は `kh_` 名を持たず `function_180054bd0` のみ。7 VA は `kh_` と `function_` の 2 行が同じ VA で並ぶ (別の code index・別の body。同一元関数かは未確認)。
 - VA なし 23 件は lift の出力ではなく runtime・生成補助由来で、VA を持たない。
 
-### 8.2 #4272: 313 集合の on/off と raw_va の値 store (測定 commit `091c68915` 時点の値。HEAD は未測定 (集合の定義元 `work/kh656_rounds.json` が repo に無い))
+### 8.2 #4272 / #5286: 313 集合の on/off と raw_va の値 store (HEAD 再測定の結果を先頭に置く)
 
-以下の値は測定 commit `091c68915` 時点の実測。HEAD の値は未測定で、再測定は #4670 (集合の tracked 化が前提)。
+HEAD 再測定 (#5286・測定 commit `c8a99163e`・`lic_build` の `CORE` は `work/winpkg/HeartCore.core_64` 76,642,304 B、driver は `scripts/kh656_window_measure.py set313 off|on`):
+
+| 条件 | HEAD wasm bytes | HEAD sha256 | HEAD globals | HEAD undefined import |
+|---|---|---|---|---|
+| 313 `rdata_str` 無し (off) | 1,543,976 | `422c129f…81a8e3` | 82 | 0 |
+| 313 `rdata_str` 有り (on) | **HEAD 未測定** (`lic_build` が `.rdata` 生 VA 許可外 129 件で停止。`rdata 生 VA が窓化されず残った (許可外・deref され得る)`) | — | — | — |
+
+- off は HEAD で測定し、測定 commit `091c68915` の値と一致する (受入 2 の off 側)。
+- on は HEAD 未測定。許可外 129 件は `rdata_raw_allow` に足していない (R7 (a) の既定。PM 判断 #5286)。
+- 下の表の on 値 (1,547,172 B) は、検査の無い `091c68915` で測った値。HEAD の値ではなく、HEAD の on 値として使わない。
+
+以下は測定 commit `091c68915` 時点の値 (HEAD ではない)。
 
 313 集合: F の初期 lift 8 件 + `kh656_rounds.json` の new_lift (全 4 ラウンド) − `1813846e0` (memset shim)。`kh656_closure.py` は 4 ラウンドで収束せず `FAIL` (lift 8→42→80→166 の途中)。313 はその記録から復元した (lift 件数の記録と一致)。
 
-| 条件 | wasm bytes | sha256 | globals |
+| 条件 (測定 commit `091c68915`) | wasm bytes | sha256 | globals |
 |---|---|---|---|
 | 313 `rdata_str` 無し | 1,543,976 | `422c129f…81a8e3` | 82 |
-| 313 `rdata_str` 有り | 1,547,172 | `1f9ad82f…39590f` | 116 |
+| 313 `rdata_str` 有り (検査無し・参考) | 1,547,172 | `1f9ad82f…39590f` | 116 |
 
 - `raw_va` の値 store (`store i64 <9 桁以上の即値>`): off 2,606 行 → on 2,522 行。消えた値は 34 種類・84 行 (全て `.rdata` の文字列 VA)、追加は 0 件。文字列以外の値 store は変わらない。
 - よって「文字列窓化で `raw_va` の値 store が変わらない」は**偽**。変わるのは文字列 VA を指す store の 84 行だけで、vtable・関数ポインタの値は変わらない (受入 3 の答え)。
