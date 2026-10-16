@@ -177,6 +177,15 @@ ABI = {
         #   X<0 は 1802ede21 (×+0.16609640419483185) → 1802ede2c call (C 1088)。movaps xmm0,xmm6 の後に call。rcx は設定しない。
         #   未確定 (#5402): 符号分岐の比較対象 xmm0 = 0.0 を示す命令と VA は未確認 (plugins-kilohearts 無しで逆アセンブル不可)。±0.166 の符号はこの前提の読みで入れている。
         #   callee 本体は xmm0 を movss [rsp+8] で読む (180fbc1f4)。よって宣言は float (float)、本体は bits 変換なしで fVar4 = param_1、戻り値は fVar4。
+        # #5385 (KH-159): stereo ABI 族の後半 callee (FUN_180fdc700・FUN_180fdc6d8) の呼出し 4 件。callee 宣言は ulonglong (入力 double の bit 列 = d2u)。
+        #   FUN_180fdc700 2 件 ← FUN_180fcd690: 4232 は 180fcd9e5 (`movq xmm0,rdx`・rdx = 入口 param_1 の bit)、4295 は 180fcdbf0 (分岐 180fcdab7 は vmovq xmm0,r9 より前・xmm0 は入口のまま)。
+        #   FUN_180fdc6d8 2 件 ← FUN_180fce0d0: 4512 は 180fce455 (`movq xmm0,rdx`・rdx = 入口 param_1)、4545 は 180fce640 (flag≠0 の 180fce460 系で xmm0 は入口のまま)。
+        #   未規則化 2 件 (FUN_180fcd400 ← FUN_180fcce40 の 4048・4060): 4048 (180fccee6) は xmm0 = 入口 param_1 だが、callee は double 2 引数 + int を取り xmm1・r8 の源 (0.0・0) の扱いを未決のため規則にしない。
+        #   4060 (180fcd074) は xmm0 が reduction 後の値 (subsd の結果) で、C 側の対応式が未確定。
+        ('delay 4232 FUN_180fdc700 xmm0 = param_1 (180fcd9e5)', r'(if \(\(ulonglong\)_DAT_1822829d0 <= \(ulonglong\)dVar2\) \{\n\s*)dVar2 = \(double\)(?:func_0x000|FUN_)180fdc700\(\);', r'\1dVar2 = (double)FUN_180fdc700(d2u(param_1));'),
+        ('delay 4295 FUN_180fdc700 xmm0 = param_1 (180fcdbf0)', r'(\n    \}\n)    dVar2 = \(double\)(?:func_0x000|FUN_)180fdc700\(\);', r'\1    dVar2 = (double)FUN_180fdc700(d2u(param_1));'),
+        ('delay 4512 FUN_180fdc6d8 xmm0 = param_1 (180fce455)', r'(return \(double\)\(\(ulonglong\)dVar4 \^ uVar1\);\n      \}\n      )dVar2 = \(double\)(?:func_0x000|FUN_)180fdc6d8\(\);', r'\1dVar2 = (double)FUN_180fdc6d8(d2u(param_1));'),
+        ('delay 4545 FUN_180fdc6d8 xmm0 = param_1 (180fce640)', r'(    else \{\n      if \(\(ulonglong\)_DAT_182282b18 <= \(ulonglong\)dVar2\) \{\n        )dVar2 = \(double\)(?:func_0x000|FUN_)180fdc6d8\(\);', r'\1dVar2 = (double)FUN_180fdc6d8(d2u(param_1));'),
         ('delay 1082 FUN_180fbc1f4 arg xmm0 = X*(-0.166) (1802ede18 jae -> 1802eded3)', r'(0\.0 <= fVar26 \* _DAT_1814dd30c \* \*\(float \*\)\(\*\(longlong \*\)\(param_2 \+ 0x3188\) \+ 0x24\)\) \{\n\s*)fVar33 = \(float\)FUN_180fbc1f4\(\);', r'\1fVar33 = (float)FUN_180fbc1f4(fVar26 * _DAT_1814dd30c * *(float *)(*(longlong *)(param_2 + 0x3188) + 0x24) * -0.16609640419483185f);'),
         ('delay 1088 FUN_180fbc1f4 arg xmm0 = X*(+0.166) (1802ede21, X<0)', r'(dVar32 = _DAT_18147d368;\n  \}\n  else \{\n\s*)fVar33 = \(float\)FUN_180fbc1f4\(\);', r'\1fVar33 = (float)FUN_180fbc1f4(fVar26 * _DAT_1814dd30c * *(float *)(*(longlong *)(param_2 + 0x3188) + 0x24) * 0.16609640419483185f);'),
         ('delay FUN_180fbc1f4 decl float(float)', r'undefined8 FUN_180fbc1f4\(undefined8 param_1\)', 'float FUN_180fbc1f4(float param_1)'),
