@@ -53,13 +53,14 @@
 
 ## 10. run 8: 転送 site の xmm4/5 生存判定 (`mx63_g_xmm_live.py`)
 
-- **測定 (HEAD 実測)**: 測定 commit = 本 fix の HEAD (`mx63_g_xmm_live.py` は `a725746bc` から pdata 範囲フィルタを追加)。素材 `plugins-massivex` から再生成した `Massive X.vst3` (95,356,824 B・md5 `622993e76565f49c094063a2b717d6ca` 一致) に対して実行した。
+- **測定 (HEAD 実測)**: 測定 commit = `c8181f487` (`mx63_g_xmm_live.py` を G への到達性で `G_reach_undef` を守るよう直した commit。pdata 範囲フィルタは `6740f0b02` で入った)。素材 `plugins-massivex` から再生成した `Massive X.vst3` (95,356,824 B・md5 `622993e76565f49c094063a2b717d6ca` 一致) に対して実行した。
   - 素材: `tar --zstd -xf plugins-massivex.tar.zst` → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` (extract の `md5-ok 0/125` は既知事象)。PE は repo 外。
   - 対象 G: `mx6_e2e.sh` (rc 0・57 s・load 0.86 → 0.95) の vectorcall.json から `mx63_u3e_split.py` を実行し、E 43 件の転送先 G (RVA。`cat == "E"` の site の `G`・重複 0)。
-  - 実行: `mx63_g_xmm_live.py <PE> <out.json> <G 43 件>` rc 0・5.3 s・load 0.41 → 0.41。
-  - 測定 commit `6740f0b02` (コードを変えた最後の commit)。同 commit で再実行し、出力 JSON は前回と `cmp` で同一 (md5 `09306b687e073e2dd00c3f643a3c2f30`)。
-  - `git diff 6740f0b02 HEAD -- tools/targets/massivex/dsp/scripts` は 0 行 (コード差分 0)。以後の commit は REPORT のみ。
-- **script の修正 (本 fix)**: pdata に `.text` 外へ広がる不正な範囲が 100 件あり (最大約 4 GB)。それを関数として採ると `insn_starts` が範囲全体を復号してメモリを使い切った (修正前の script で E 43 件を一括実行すると rc 137 で kill)。`.text` 外の pdata 範囲は関数として採らないよう直した。
+  - 実行: `mx63_g_xmm_live.py <PE> <out.json> <G 43 件>` rc 0・2.9 s・load 0.73 0.52 0.22 → 0.99 0.57 0.24 (2 回目の実行)。
+  - 測定 commit `c8181f487` (コードを変えた最後の commit)。同 commit で 2 回実行し、出力 JSON は `cmp` で同一 (md5 `c7edeac688b79a1ca0ab497d7890814b`)。
+  - `git diff c8181f487 HEAD -- tools/targets/massivex/dsp/scripts` の出力は 0 行 (コード差分 0)。以後の commit は REPORT のみ。
+- **script の修正**: (a) pdata に `.text` 外へ広がる不正な範囲が 100 件あり (最大約 4 GB)。それを関数として採ると `insn_starts` が範囲全体を復号してメモリを使い切った (修正前の script で E 43 件を一括実行すると rc 137 で kill)。`.text` 外の pdata 範囲は関数として採らないよう直した (`6740f0b02`)。(b) `G_reach_undef` は G への到達性 `reachable(glo, glo, ghi, g)` を先に見て、届く G だけ `must_undef` で判定するよう直した (`c8181f487`)。届かない G は `G_reach_no=True`。
+  - 前 round (`6740f0b02`) の `G_reach_undef=True` 32 件は、G に届かない G を含んでいた空振りである。(b) の後は 0 件。
   - 影響: 43 件のうち 1 件 (G `0x180cdfa85`) のみ結果が変わった。修正前は不正範囲 `0x180123920` 内と判定して `G_livein_read=True` としていたが、修正後は pdata 外として未判定にした。残り 42 件は修正前後で同一 (同じ入力で比較)。
 - 検算: `mx63_u3e_split.py` population 604・E 43・D 825・C 1549・G0 351・G 26 (`mx6_e2e.sh` の vectorcall.json から再実行・HEAD で一致)。
 - 旧 commit `4beb1179b` の 43/43・40/43・3/43 は HEAD の結果ではないため、この表から外した。
@@ -69,14 +70,16 @@
 | 転送 site (命令先頭の call/jmp・G へ直接) | 43 (候補 43・命令境界外 0・pdata 外 0) |
 | 入口から site まで到達しない (`F_reach_no`) | 0 |
 | F の入口 xmm4/5 が転送 site まで全経路で未定義 (`F_undef`) | 43 / 43 |
-| G の先頭から xmm4/5 を書かずに G へ届く (`G_reach_undef=True`) | 32 / 43 |
+| G が F_G の先頭から届かない (`G_reach_no=True`) | 32 / 43 |
+| G が F_G の先頭から届く (`G_reach_no=False`) | 10 / 43 (`0x181325f30`・`0x1819b9c3a`・`0x18030b278`・`0x180849ab1`・`0x180850d80`・`0x18086d66c`・`0x180a2e5d0`・`0x180cd9130`・`0x180cd97d3`・`0x180d0c546`) |
+| 届く かつ 書き込み無し (`G_reach_undef=True`) | 0 / 43 |
 | G が書き込み前に xmm4/5 を読む (`G_livein_read=True`) | 39 / 43 |
 | G が pdata 外で `G_livein_read` 未判定 | 1 / 43 (`0x180cdfa85`) |
 
 - `G_livein_read=True` の 39 件は、G の入口から書き込みより前に xmm4/5 を読む経路がある。転送された値を入口で要求し得る。
 - `G_livein_read=False` の 3 件 (`0x180a2b0d0`・`0x180c92cf2`・`0x180e91af5`) は、先頭が `hlt`・`jmp qword ptr [rsi+0x66]`・`pop rcx` で、読みが終端 (終端命令・間接 jmp・pop) まで届かない。**「依存なし」とは読まない**。命令としては復号できる。
-- 先頭から到達する 4 件 (`0x180850d80`・`0x18086d66c`・`0x180a2e5d0`・`0x180d0c546`) は `G_livein_read=True`・`G_reach_undef=False`。先頭から G までの経路で xmm4/5 が書かれるため、G 入口の値が F の入口値と同一とは言えない。
-- レビュー側の 7 G の実測 (head `a725746bc`) と、本 HEAD の値は、転送 site・`G_reach_undef`・`G_livein_read` が全 7 件で一致する。
+- 届く 10 件はすべて `G_reach_undef=False` (届く経路は全て xmm4/5 を書く) で、`G_livein_read` も 10 件とも True。G 入口の値が F の入口値と同一とは言えない。
+- レビュー側の 7 G の実測 (head `a725746bc`) と比べると、転送 site と `G_livein_read` は 7 件で一致する。`G_reach_undef` は `0x180a2b0d0`・`0x180c92cf2`・`0x180e91af5` の 3 件が True → False に変わった (届かない G の空振りだった)。
 
 ### 判定 (受入 1)
 
