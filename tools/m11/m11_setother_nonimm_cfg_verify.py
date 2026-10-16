@@ -451,7 +451,7 @@ def selftest():
     # 刈り込み (--prune) の検査: 同じ入力で prune の有無を比べる。
     #   P1 ループ (K2 と同じ循環・出口で rdx=1): prune 無し・有りとも 0x1 (PASS)。claim 0x0 は FAIL。
     #   P2 分岐 1 つ (K1 と同じ・両経路同値): prune 有りでも 0x0 (PASS)。
-    #   P3 ループ内に未知分岐 (合流で刈る): prune 有りで未決 (0x0,0x1) のまま、判定は変わらない。
+    #   P3 ループ内に未知分岐 (合流で刈る): prune 有りで PASS (rbx=5)、prune 無しは step 上限 (判定不能)。
     #   P4 無限ループ (出口なし): prune 有りでも step 上限に届かず 判定不能 (刈り込み)。
     prune_cases = [
         ('P1 ループ・刈り込み有り (rdx=1)', '31db' '89da' '83c301' '83fb02' '75f6' 'c3', 5, 'rdx', 0x1, 'PASS', True),
