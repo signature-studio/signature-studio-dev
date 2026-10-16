@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CreateInstance (0x1aa290) の ci_lift.sh 出力 (ci.rs_norm.ll・ci_helpers.c) を wasm にリンクし、未解決シンボルを数える (T-SH-152 #5748)。
-# 入力: ci_lift.sh の出力 (tools/shared/work/lift/ci/)。emsdk は EMSDK_ENV (既定 /opt/emsdk/emsdk_env.sh)。
+# 入力: ci_lift.sh の出力 (tools/shared/work/lift/ci/)。emsdk は EMSDK_ENV (既定は [EMSDK] の emsdk_env.sh。docs/REFERENCES.md §1)。
 # 処理: uselistorder 行を除く (emcc の LLVM が読めない) -> ci.o -> helpers.o -> 検査用 shim (外部グローバル 2 種) -> wasm-ld。
 # 出力: tools/shared/work/lift/ci-link/ (gitignore)。
 # 注意: shim の外部グローバル 2 種は「リンクが通るための仮置き」。画像上の意味 (VA 0x1803f6610 の敷設) は未検証 (REPORT_CI.md §8)。
@@ -11,7 +11,7 @@ source "$ROOT/env.sh"
 IN="$ROOT/work/lift/ci"
 W="$ROOT/work/lift/ci-link"; mkdir -p "$W"
 [ -f "$IN/ci.rs_norm.ll" ] && [ -f "$IN/ci_helpers.c" ] || { echo "[ci-link] ci_lift.sh の出力が無い: $IN"; exit 2; }
-source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1
+source "${EMSDK_ENV:?EMSDK_ENV を設定 ([EMSDK] の emsdk_env.sh)}" >/dev/null 2>&1
 
 grep -v '^  uselistorder' "$IN/ci.rs_norm.ll" > "$W/ci.ll"
 cat > "$W/shim.c" <<'EOF'
