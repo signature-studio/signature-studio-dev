@@ -211,7 +211,7 @@ node tools/perf/p15/ctor_vtable_ring.mjs tools/ott/work/lift/ottl_rc.wasm
 
 ## 3h. 子 #5403 (PERF-P28) の dest の由来 (Node・同期・`fd_write` stub 下)
 
-測定 commit: 本節を含む commit。計装は `tools/perf/p15/instr_calloc.py` (func 75 の `memory.fill` 直前で dest を記録する)、harness は `tools/perf/p15/ctor_calloc_image.mjs`。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を `wasm2wat` → 計装 → `wat2wasm` で作った (wabt は `/tmp/opencode/wabt` に一時導入・commit 外)。
+測定 commit: `7156a4b3e` (計装 3 ファイルを追加した commit。`tools/perf/p15` の既存ファイルは §3g の `195ee191f` から変更なし)。計装は `tools/perf/p15/instr_calloc.py` (func 75 の `memory.fill` 直前で dest を記録する)、harness は `tools/perf/p15/ctor_calloc_image.mjs`。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を `wasm2wat` → 計装 → `wat2wasm` で作った (wabt は `/tmp/opencode/wabt` に一時導入・commit 外)。
 
 | 測定 | 結果 |
 |---|---|
