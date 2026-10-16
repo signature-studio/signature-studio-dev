@@ -2,11 +2,12 @@
 """MX-63 (#5908): 非境界 G の判定を、線形復号でなく制御フローの再帰降下で行う。
 
 各非境界 G について次を数える。
-  - cf_from_fn: pdata 関数先頭から直接制御フロー (fallthrough・直接 jmp/jcc/call の飛び先) で G に到達する
-                (= G は関数内の命令境界として実行経路に現れる)。
-  - self_ret:   G から同じ規則で復号したとき、(bad) に当たらず ret に到達する (G 単独の復号が閉じる)。
+  - cf_from_fn: pdata 関数先頭から直接制御フロー (fallthrough・直接 jmp/jcc の飛び先) で G に到達する
+                (= G は関数内の命令境界として実行経路に現れる)。call は飛び先を追わず fallthrough だけをたどる。
+  - self_ret:   G から同じ規則で復号したとき、(bad) に当たらず終端 (ret・ud2・int3・hlt) に到達する
+                (G 単独の復号が閉じる)。
   - bad_on_path: G 起点の復号で (bad) に当たった経路が残る (G が埋め込みデータ・復号誤りの可能性)。
-間接 jmp/call・関数外への飛び先は追わない (未確認として数える)。
+間接 jmp・call の飛び先・関数外への飛び先は追わない (未確認として数える)。
 usage: mx63_g_recdesc.py <pe> <contain.json> <out.json>
 """
 import json

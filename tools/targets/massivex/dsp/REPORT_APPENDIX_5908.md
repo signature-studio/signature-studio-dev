@@ -210,49 +210,6 @@
 
 ## 9. run 7: 制御フローの再帰降下による非境界 G の判定 (U3e 残件 2 の続き)
 
-- 測定 commit: `2d1e52a43` (新規 script `mx63_g_recdesc.py` を含む commit)。本 REPORT の commit は HEAD。`git diff 2d1e52a43 HEAD -- tools/targets/massivex/dsp` は本 REPORT の commit のみ。
-- 素材: `plugins-massivex` → `parse_setup_headers.py` → `extract_massivex.py <exe> work key`。`Massive X.vst3` = 95,356,824 B・md5 `622993e76565f49c094063a2b717d6ca` (一致)。PE は repo 外。
-
-| 実行 (HEAD `2d1e52a43`) | 結果 | 経過 | load (start → end) |
-|---|---|---|---|
-| `mx6_e2e.sh` | rc 0・PASS 32・FAIL 1 (既知の負例) | 42 s | 終了後 `uptime` の 1 分値 0.71 (開始・終了の load は未採取) |
-| `mx63_u3e_split.py` | population 604・E 43・D 825・C 1549・G0 351・G 26 | — | — |
-| `mx63_g_containment.py` | 途中・命令境界 7 / 途中・非境界 35 / 範囲外 1 | — | — |
-| `mx63_g_cs_stop.py` | n 35・cs_stop_before_G 23・cs_full 12 | — | — |
-| `mx63_g_recdesc.py` (新規) | n 35・reached_from_fn_start 4・self_closed_no_bad 12・self_ret_with_bad 14・undetermined 5 | 0.5 s | — |
-
-### 9.1 `mx63_g_recdesc.py` の方法
-
-- pdata 関数の先頭から、fallthrough と直接の jmp/jcc/call の飛び先だけをたどる (RVA 単位・関数範囲内)。間接 jmp・関数外への飛び先は追わず、件数に数える。
-- 判定 (非境界 G 35 件):
-  - `reached_from_fn_start`: 関数先頭からの制御フローで G に到達する (G は実行経路上の命令境界)。
-  - `self_closed_no_bad`: G 起点で復号すると ret に到達し、(bad) に当たらない。
-  - `self_ret_with_bad`: G 起点で ret に到達するが、途中の経路に (bad) がある。
-  - `undetermined`: G 起点で ret に到達せず、(bad) か間接分岐で止まる。
-
-### 9.2 結果
-
-| 非境界 G 35 件の内訳 | capstone 停止 (`cs_stop_before_G`・(bad) 手前) 23 | 関数末尾まで復号 (`cs_full`) 12 |
-|---|---|---|
-| `reached_from_fn_start` | 4 | 0 |
-| `self_closed_no_bad` | 5 | 7 |
-| `self_ret_with_bad` | 13 | 1 |
-| `undetermined` | 1 | 4 |
-
-- `reached_from_fn_start` の 4 件 (`0x850d80`・`0x86d66c`・`0xa2e5d0`・`0xd0c546`) は、前 run の objdump の境界 4 件と一致する。関数先頭から直接制御フローで到達するため、途中の入口として成立し得る。
-- 残りの 31 件は、先頭からの到達は確認できない。`self_closed_no_bad` は「G から先の復号が閉じる」だけで、G が入口であることの証拠にはならない。
-
-### 9.3 判定 (受入 1 の G 側)
-
-- **確定**: 非境界 G のうち 4 件は、関数先頭から直接制御フローで到達する途中の入口。
-- **確定しない**: 残り 31 件。G が途中の入口か、埋め込みデータ・復号誤りかを区別できない。特に capstone の (bad) 停止の 23 件のうち 19 件は、先頭から G に到達する経路を制御フローで示せていない。
-- 4 件が入口でも、F の入口値が G の入口 livein に届くことの証拠 (経路上で xmm4/5 が定義されないこと) は、この script では確認していない。よって U3e の判定 (MX-6 の入口 livein 0 の陰性が過小検出か) は、本 run でも確定しない。
-- 件数の正 (47 / 42) は決めない (R7 (a))。本 run で件数は変えない。
-
-### 未解決
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 非境界 G 31 件の先頭からの到達が未確認 (埋め込みデータ・復号誤りか途中の入口か) | U3e の判定が確定しない | #5908 (残件) |
-| `reached_from_fn_start` 4 件について、経路上で xmm4/5 が未定義かの確認 (入口値の同一性) | 4 件を U3e の証拠にできるか未確定 | #5908 (残件) |
-| 件数の正 (47 / 42) | 両方記録。正は PM 判断 | #5908 |
+- 全文は `REPORT_APPENDIX_5908_RUN7.md` (250 行上限のため分割移動・内容無変更。call の扱いと終端の定義は付録で訂正)。
+- 結論: `mx63_g_recdesc.py` (測定 commit `2d1e52a43`) の `reached_from_fn_start` は 4 件 (`0x850d80`・`0x86d66c`・`0xa2e5d0`・`0xd0c546`)。call 経由の到達は含まない。残り 31 件は先頭からの到達が未確認。U3e の判定は未確定。
+- 件数の正 (47 / 42) は決めない (R7 (a))。
