@@ -23,17 +23,30 @@ probe: `tools/flp/s10_setter_hit_probe.sh` (gdb `-x tools/flp/s10_setter_hit.gdb
 
 | 項目 | 値 |
 |---|---|
-| 命中 (gdb の break を 120 s 〜 200 s 継続) | 15,067 〜 15,069 回 (2 回の実行で同数程度) |
-| `dl` (rdx の下位 8 bit) | `0x00` 12,280 回・`0x01` 2,787〜2,789 回 |
-| 呼出し元 (戻り先) | `0x7aa6d107` (= VA `0x73d107`・直接 call 元 `0x73d102`) 14,957 回・`0x7aa6d2a7` (= VA `0x73d2a7`・直接 call 元 `0x73d2a2`) 110 回 |
+| 命中 (gdb の break・WAIT_SEC=200) | 8,066 回 (本 run の 1 実行。前回の 15,069 回とは実行ごとに数が変わる) |
+| `dl` (rdx の下位 8 bit) | `0x00` 6,569 回・`0x01` 1,497 回 |
+| 呼出し元 (戻り先) | `0x7aa6d107` (= VA `0x73d107`・直接 call 元 `0x73d102`) 8,043 回・`0x7aa6d2a7` (= VA `0x73d2a7`・直接 call 元 `0x73d2a2`) 23 回 |
 | 静的解析との対応 | `tools/python/REPORT_PY388.md` §5b の直接 call 元 `0x73d102`・`0x73d2a2` と一致。`0x79fd44` は 1 回も命中しなかった |
 
-`dl` の値ごとの呼出し元の内訳は、この取得 (`printf` の 1 行) では記録していない。`dl=0x00` と `dl=0x01` の両方が同じ 2 呼出し元から来たかは未確認。
+**`dl` × 呼出し元の交差表** (本 run の `$RUNNER_TEMP/s10_gdb_session.txt` の `HIT` 行を集計。命中の合計 8,066):
+
+| dl | 呼出し元 `0x73d102` (ret `0x7aa6d107`) | 呼出し元 `0x73d2a2` (ret `0x7aa6d2a7`) | 計 |
+|---|---|---|---|
+| `0x00` | 6,551 | 18 | 6,569 |
+| `0x01` | 1,492 | 5 | 1,497 |
+| 計 | 8,043 | 23 | 8,066 |
+
+集計コマンド: `grep '^HIT ' s10_gdb_session.txt | sed -E 's/.*dl=(0x[0-9a-f]+).* ret=(0x[0-9a-f]+)/\1 \2/' | sort | uniq -c`。
+`dl=0x00` と `dl=0x01` は両方の呼出し元から来る (`0x73d2a2` 経由は 0 と 1 の両方を含む)。
+
+命中の件数は `WAIT_SEC` (gdb の打切り) と実行ごとの揺れで変わる。今回の 1 実行で、`dl` は 2 値・呼出し元は 2 件だった (前回の 2 実行も呼出し元は同じ 2 件)。
 
 ## 4. cfg の型と VMT (受入 1・2 は未達)
 
 - probe の取得: 命中時に `rcx` (this) の先頭 qword (vptr 候補)。
-- 結果: vptr 候補は `0x7aa64d10` (= VA `0x734d10`・14,955 件) と `0x7aa65908` (= VA `0x735908`・110 件)。この 2 つは FLEngine の `.text` を指す (`pefile` の section 判定で確認)。
+- 結果: 命中時の `*rcx` (vptr 候補) の内訳 (本 run の `HIT` 行を集計): `0x7aa64d10` 8,041 件 (呼出し元 `0x73d102`)・`0x7aa65908` 23 件 (呼出し元 `0x73d2a2`)・`0x7b311e60` 1 件・`0x7b3121d8` 1 件 (どちらも呼出し元 `0x73d102`)。`0x7aa64d10`・`0x7aa65908` は FLEngine の `.text` を指す。`0x7b...` の 2 値は FLEngine の範囲外 (ImageBase `0x7a730000` の外)。
+- 所属 section の確認 (`fl-install/FLEngine_x64.dll` に対し、`pefile` で `get_section_by_rva`。RVA = 実行時 VA − `0x7a730000`): `0x7aa64d10` (RVA `0x334d10`)・`0x7aa65908` (RVA `0x335908`)・`0x7aa6d107` (RVA `0x33d107`)・`0x7aa6d2a7` (RVA `0x33d2a7`)・`0x7aa67560` (RVA `0x337560`) は全て `.text` (Characteristics `0x60000020` = CODE・EXECUTE・READ)。`.rdata` (`0x40000040`) ではない。
+- 確認コマンド: `python3 -c "import pefile; pe=pefile.PE('fl-install/FLEngine_x64.dll', fast_load=True); print(pe.get_section_by_rva(0x334d10).Name)"` (`fl-install` は `s1_wine_probe.sh` が組み立てる。`$RUNNER_TEMP` 配下)。
 - 判定: C++ の VMT なら .rdata を指すはず。`.text` を指すことは、`rcx` が this でない (呼出し規約の前提違い)・あるいはオブジェクト先頭が vptr でないことを示す。よって VMT の所属はこの方法では確定しない。cfg の型も確定しない。
 - 次に要るもの (未達の範囲): 呼出し元 (`0x73d102`・`0x73d2a2`) の `this` を、呼出し元のレジスタ (`0x73d0e0`・`0x73d280` の `rcx`) から逆に辿って採る。または `0x737560` の this が指すオブジェクトの生成元 (ctor) にブレークを張る。
 
@@ -44,13 +57,16 @@ probe: `tools/flp/s10_setter_hit_probe.sh` (gdb `-x tools/flp/s10_setter_hit.gdb
 | cfg (`+0x49e` のクラス) の型 | `+0x49e` の名前付け (REPORT_PY388 §5a) | #5614 (受入 1 の残り・部分達成のため open のまま) |
 | `0x737560` の所属 VMT | 同上 | #5614 (同上) |
 | `0x79fd44` 経由の呼出しの `dl` 値 | この観測では命中なし | #5614 (同上) |
-| `dl=0x00`/`0x01` の呼出し元別の内訳 | 呼出し元ごとの値の分布 | #5614 (同上・取得 1 行の追加で可) |
 
 ## 6. 再現
 
 ```sh
-mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
+mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
 sudo apt-get install -y wine64 gdb && sudo sysctl -w kernel.yama.ptrace_scope=0
-FL_WIN64_DIR="$RUNNER_TEMP/fl-win64" bash tools/flp/s1_wine_probe.sh
-WAIT_SEC=200 bash tools/flp/s10_setter_hit_probe.sh
+bash tools/flp/s1_wine_probe.sh          # $RUNNER_TEMP/fl-win64/extracted を読み、$RUNNER_TEMP/fl-install を組む
+WAIT_SEC=200 bash tools/flp/s10_setter_hit_probe.sh   # 出力: $RUNNER_TEMP/s10_gdb_session.txt
+python3 -c "import pefile; pe=pefile.PE('$RUNNER_TEMP/fl-install/FLEngine_x64.dll', fast_load=True); print([pe.get_section_by_rva(r-0x7a730000).Name for r in (0x7aa64d10,0x7aa65908,0x7aa6d107,0x7aa6d2a7)])"
+grep '^HIT ' "$RUNNER_TEMP/s10_gdb_session.txt" | sed -E 's/.*dl=(0x[0-9a-f]+).* ret=(0x[0-9a-f]+)/\1 \2/' | sort | uniq -c
 ```
+
+測定 commit: `2e588bd3e` (コードを変えた最後の commit)。`git diff 2e588bd3e HEAD -- tools/flp` の出力は空 (差分 0)。
