@@ -160,3 +160,34 @@
 | `0xf48290` の受け手が chan か | 受入 2 | #3371 |
 | `0x1001ef0` の `this` の由来 (呼出し元 4 件) | 受入 2 | #3371 |
 | 一覧 A・B の容器 Q への要素追加箇所と要素型 T | 受入 3 | #3371 |
+
+## 追補 5 (#5205・受入 1: chan の VMT を格納する箇所は PE に無い。受け手の型は静的には決まらない・未達)
+
+- 方式: 受け手の型を「その型の VMT 値を格納する箇所 (コンストラクタ・class ref) から追う」方式を試した。VMT `TPublicChannel` (`0xfe2cf8`)・`TPreviewChannel` (`0xfe2fc8`) について、次の 3 形で PE 全体を探した。
+  - abs64: 8 バイトの VA 値 (ファイル全体)
+  - imm32: `.text` 内の 4 バイト即値
+  - rip: `.text` の逆アセンブルで `[rip+disp]` が VA を指す命令
+- 結果: 3 形とも、VMT 自身の slot 以外に 0 件。`block00031_PE.bin` の abs64 は各 2 件 (VMT 自身の slot `0xfe2c30`・`0xfe2ed8`・`0xfe2f00`・`0xfe31a9` を指す値。VMT 内の格納)。他の block 全体 (`extracted/*_PE.bin`, 313 block) の走査は、コミット済みの probe (`block00031_PE.bin` 固定) ではなく別途実施した未コミットのスクリプトで行い、0 件。この全 block 走査は本 commit のコードでは再現できない。
+- 検出器の陽性対照: `0x16babe8` は abs64 1 件・rip 5 件、`0x1012e78` は rip 1 件を検出した (検出器は動いている)。
+- 含意: VMT 値を直接格納する箇所が PE に無いので、「VMT 格納元から逆に追う」方式は使えない。受け手の型を決めるには別の手がかりが要る (未特定)。実行時の型の採取は FLEngine の起動が要るため、本 run では行っていない。
+- 受入 1 の判定: 未達。151 箇所は全て「受け手の型は未確定」のまま。
+
+### 測定
+
+- 測定 commit: `cf0f18f78` (`pe_vmt_store_refs.py` のコードを変えた最後の commit。docstring の展開手順の文言のみ)。
+- 測定 commit `cf0f18f78` (`pe_vmt_store_refs.py` のコードを変えた最後の commit。docstring の展開手順の文言のみ)。head `b1f3e85ed` までの `tools/python/analysis` の差分は 0 行 (REPORT の差分のみ)。
+- 素材: `fl-win64` (`[WIN64]`・`docs/WORKFLOW.md` §11)。`tar --zstd -xf <artifacts>/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (2.8 秒。展開先は repo 外の `$FL_WIN64_DIR`)。
+- 実行: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_vmt_store_refs.py 0xfe2cf8 0xfe2fc8` を測定 commit `cf0f18f78` で 2 回。rc 0・2 回とも出力が同一 (md5 `79831128a8a05021ba73ab436d2501d7`)。
+
+| 回 | 所要 | load (1 分値・開始時) |
+|---|---|---|
+| 1 | 11.89 s | 0.28 |
+| 2 | 11.94 s | 0.44 |
+
+### 未解決 (追補 5 後)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 151 箇所の受け手の型 (VMT 格納元は PE に 0 件。実行時の型の採取が要る) | 受入 1・2 | #5205 |
+| `0xfe9090` が chan で走るか (受け手の型に依存) | 受入 2 | #5205 |
+| 一覧 A・B の容器 Q への要素追加箇所と要素型 T | 受入 3 | #3371 |
