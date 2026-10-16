@@ -75,7 +75,10 @@ trace の ARG / ARG-CHILD 行を、所属関数 F の証拠で分ける。直接
 
 ### 2.3 この結果から言えること
 
-- 確定 0 の理由: 証拠あり 72 行のうち、vtable 側 7 行は宛先 F を disp だけで照合しており、受け手の型が未確定。直接側 65 行 (呼出元 call 65 件) は、rdx/r8/r9 に SC の this が現れる呼出元が 0 件だった (§2 の `arg_caller_types.py`)。
+- 確定 0 の理由: 証拠あり 72 行のうち、vtable 側 7 行は宛先 F を disp だけで照合しており、受け手の型が未確定。
+- 直接側 65 行 (trace 行の数) と、呼出元 call 65 箇所 (`arg_caller_types.py` の数) は同じ数だが、別の量である。直接側 65 行の所属関数は `direct.tsv` の 17 関数で、その呼出元 call は `direct.tsv` の 65 箇所 (17 関数の全呼出元) に一致する。
+  - この 65 箇所の呼出元関数は、SC が 0 件・slot 関数が 2 件・それ以外が 63 件 (`caller_evidence` 列で確認)。rdx/r8/r9 に SC の this が現れる呼出元は 0 件 (`arg_caller_types.py` の SC this 0)。
+  - join の直接側 65 行それぞれについて、所属関数 F の呼出元 call 数と、そのうち SC の呼出元数を数えた (`direct.tsv` と `trace.tsv` から集計・§2 と同じ入力)。結果: 呼出元 call 数は 1 / 2 / 3 / 4 / 5 / 7 / 30 のいずれかで、SC の呼出元は全行で 0。
 - 証拠なし 236 行は、呼出元がこのツール群の照合 (直接 call・disp 一致) では見つからないもの。これらが SC 由来かは本 REPORT では判定しない。
 
 ## 3. 未解決 (起票先)
@@ -90,4 +93,4 @@ trace の ARG / ARG-CHILD 行を、所属関数 F の証拠で分ける。直接
 
 - 測定 commit: `9754af068` (origin/main。§2 の 4 ツールと `arg_row_join.py` の出力は、この版の入力で得た)。
 - 測定 commit 以降の変更: `arg_row_join.py` (新規) と本 REPORT のみ。既存の測定ツールは変えていない。
-- 鮮度の証跡: 下の差分 (`git diff 9754af068 HEAD -- tools/targets/serum2/gui`) は、測定ツール (`arg_vt_args.py`・`arg_caller_types.py`・`arg_vt_indirect.py`・`receiver_this_trace.py`) を含まない。
+- 鮮度の証跡: `git diff --quiet 9754af068 HEAD -- tools/targets/serum2/gui/receiver_this_trace.py tools/targets/serum2/gui/arg_caller_types.py tools/targets/serum2/gui/arg_vt_indirect.py tools/targets/serum2/gui/arg_vt_args.py` は 0 (差分 0 バイト・終了コード 0)。`git diff 9754af068 HEAD -- tools/targets/serum2/gui` の stat は `REPORT_SR94.md` と `arg_row_join.py` の 2 ファイルのみ。
