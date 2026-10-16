@@ -90,16 +90,23 @@ python3 analysis/py64_check_expr.py work/py53/fn.txt --negctl p2   # exit 1
 
 | VA | 結果 | 原因 |
 |---|---|---|
-| 0x104aba9 (G2・F 型) | 不一致 (parse error) | 展開式が py88 の 400 字上限で `…` に切れる。`resolve()` の上限を 4000 に上げた scratch でも `…` が残る (DEPTH_LIMIT = 60 で止まる) |
+| 0x104aba9 (G2・F 型) | 不一致 (parse error) | 展開式が py88 の 400 字上限 (`py88_writes.py` の `res[:400]`) で `…` に切れる。上限を 4000 に上げた scratch では `…` は 0 件になるが、式は `SLOT[rbp+0x574]?@0x104aacd`・`ACC?⚠合流@0x104a9cd` を含む未展開の形で出る。`DEPTH_LIMIT` を外した scratch でも `…` は 0 件 (下の「再現手順」) |
 | 0x104af7f (G3・F 型) | 不一致 (parse error) | 0x104aba9 と同じ (`…`) |
 | 0x104ad2e (G2・M8 型) | 不一致 | py88 の `ARITH` は 2 オペランドのときだけ源を出す。`imul rcx, rcx, 0x28f` (3 オペランド) が `imul((…)*8)` になり 655 (0x28f) が落ちる。手計算式は 655 を保持 |
 | 0x104b093 (G3・M32 型) | 不一致 | 0x104ad2e と同じ (`imul` の 0x28f 欠落) |
 
 - 手計算式の確からしさ: 0x104ad2e の `imul` を落とした形の手計算式は機械式と一致しないままだった (`hand-without-0x28f == mach` が False)。0x104aba9 は展開の `…` を超えて比べられない。このため手計算式そのものの正しさは本 run では確定していない。
 - 不一致の VA と手計算式: 上の 4 点。受入 3 (不一致があれば VA と手計算式を REPORT に書く) を満たす。
-- 未解決の追跡 (本 PR の範囲外): (1) `py88_writes.ARITH` の 3 オペランド `imul` の源欠落、(2) `resolve()` の 400 字上限と `DEPTH_LIMIT` による `…` 切れ。いずれも `py88_writes.py` の修正になり、py88・py99 の既存測定値 (§6・§7・REPORT_PY99 系) が動く。単独の修正 PR として扱う。
+- 未解決の追跡 (本 PR の範囲外): (1) `py88_writes.ARITH` の 3 オペランド `imul` の源欠落、(2) `resolve()` の 400 字上限による `…` 切れ (0x104aba9・0x104af7f)、(3) 上限を上げた後に残る `SLOT?`・`ACC?⚠合流` (0x104aba9 は `SLOT[rbp+0x574]?` 等が式に残る)。いずれも `py88_writes.py` の修正になり、py88・py99 の既存測定値 (§6・§7・REPORT_PY99 系) が動く。単独の修正 PR として扱う。
+
+#### 再現手順 (§8 の `…` 検証・測定 commit `c9430d6a2`)
+
+scratch は `work/scratch/` (gitignore) に複製し、本体は変えない。
+- 上限 4000: `cp analysis/*.py work/scratch/` の後、`sed -i 's/if len(res) > 400:/if len(res) > 4000:/; s/res\[:400\]/res[:4000]/' work/scratch/py88_writes.py`。`python3 work/scratch/py88_writes.py work/py53/fn.txt 0x104aba9 | grep -o '…' | wc -l` → 0。
+- `DEPTH_LIMIT` を外す: `sed -i 's/if depth > DEPTH_LIMIT:/if depth > 10**6:/' work/scratch/py88_writes.py` の後、同じコマンド → 0。
+- 本体 (変更なし) の出力は 0x104aba9 が `…` を含む (上の表の parse error)。
 - 既存点への影響: `py99_slot_paths.py` と `py88_writes.py` は変更していない。`py159_check_hand.py` は `py64_check_expr` の `parse_canon`・`machine_norm` を使うが、文法追加は既存式の解釈を変えない。
 
 ### 差分 (測定 commit から HEAD まで)
 
-`git diff 53ab89b54 HEAD -- tools/python/analysis` は本 PR の commit 後の差分 (本 §7 の追記時点で 0 行)。
+測定 commit は `c9430d6a2` (`tools/python/analysis` を変えた最後の commit)。鮮度: `git diff c9430d6a2 HEAD -- tools/python/analysis` は 0 行 (本 PR の検証 HEAD 時点)。`e54706dec` (PY-5361 の `flapi/plugins_getcolor_facts.py`) は測定 commit より前の commit で、G2・G3 の式照合 (`py64_check_expr.py`・`py88_writes.py`・`py99_slot_paths.py`) の入力には影響しない。
