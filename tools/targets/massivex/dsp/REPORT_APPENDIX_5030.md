@@ -70,10 +70,12 @@
 - 素材: `plugins-massivex` → `Native Instruments Massive X v1.7.1.exe` → `parse_setup_headers.py` / `extract_massivex.py <exe> <work> key` で `Massive X.vst3` (95,356,824 B、md5 `622993e76565f49c094063a2b717d6ca` 一致)。展開先は `$RUNNER_TEMP` (repo 外)。
 - 再現: `python3 tools/targets/massivex/dsp/scripts/mx60_callers.py '<展開先>/VST3/Massive X.vst3'` (約 2 分 21 秒・単一プロセス・出力は `grep` で整理)。
 
-### 3.1 受入 3: 直接 E8/E9 の再確認 (確定)
+### 3.1 受入 3: 直接 E8/E9 の再確認 (修正前の結果は無効・再測定待ち)
 
-- 命令デコード (capstone・.pdata の全関数) と生バイト scan (E8/E9 rel32) の両方で、`0x17b460`・`0x17b680`・P1〜P6 への直接 call/jmp は **0 件**。
-- 2 つの方法が一致したので、§2 の「E8/E9 は .text 全体で 0 件」は確定扱いにしてよい (元の記録の確認スクリプトは残っていなかった)。
+- 修正前の `15c79a54d` の `mx60_callers.py` は、`TARGETS` が RVA (`0x17b680`・`0x17b460`) と絶対 VA (P1〜P6) を混在させていた。照合は全て RVA で行うため、P1〜P6 の 0 件は偽陰性の可能性があり、**無効**。`0x17b460`・`0x17b680` の 0 件は RVA 統一のため影響を受けない。
+- 修正 commit: `75026a5ac` (`fix(massivex): unify mx60_callers TARGETS keys to RVA`)。キーを RVA (`0x198700`・`0x1e47c0`・`0x1ef4b0`・`0x1f36a0`・`0x3bef80`・`0x104aea0`) に統一し、P1〜P6 の名前引きを `PN` に置き換えた。
+- 再測定の状況: 指摘対応の run では `plugins-massivex` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、修正後の `mx60_callers.py` は未実行。修正後の 0 件・非 0 件はまだ言えない。
+- 修正後に `plugins-massivex` で再実行して初めて受入 3 の P1〜P6 0 件を確定できる。
 
 ### 3.2 受入 2 の一部: `rbx` の vtable 候補 (未確定)
 
