@@ -4,7 +4,7 @@
 機械語 409d2d: `cmp rax,[rip+...]; jae 0x409c40`。0x409c40 は jmp 先で、戻り値はそのまま 409c80 の戻り値になる (tail jump)。
 lift 段 (boot0.lift.ll) は call + fall-through (`%101 = call i64 @function_409c40()` → `store` → 後続命令) にし、
 引数を渡さなかった。m11_post の sigfix はこの引数不足を 0 詰め (`(0,0,0)`) で埋め、戻った後に機械語に無い後続処理を実行していた
-(trap 位置 `function_409c80` wasm 0xbf736 の OOB の直接原因の経路。tools/m11/REPORT.md)。
+(#5358 の付録 tools/m11/REPORT_5358.md §2)。
 
 この経路では rcx・rdx・r8 は 409c80 の入口値のまま (409c80 → 409d03 → 409d2d の間に書込み無し) なので、
 引数は (%arg1, %arg2, %arg3) に等しい。分岐の条件 (%99) は機械語の jae と一致しており変えない。
