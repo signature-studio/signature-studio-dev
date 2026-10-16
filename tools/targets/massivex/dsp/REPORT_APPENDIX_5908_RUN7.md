@@ -57,6 +57,8 @@
   - 素材: `tar --zstd -xf plugins-massivex.tar.zst` → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` (extract の `md5-ok 0/125` は既知事象)。PE は repo 外。
   - 対象 G: `mx6_e2e.sh` (rc 0・57 s・load 0.86 → 0.95) の vectorcall.json から `mx63_u3e_split.py` を実行し、E 43 件の転送先 G (RVA。`cat == "E"` の site の `G`・重複 0)。
   - 実行: `mx63_g_xmm_live.py <PE> <out.json> <G 43 件>` rc 0・5.3 s・load 0.41 → 0.41。
+  - 測定 commit `6740f0b02` (コードを変えた最後の commit)。同 commit で再実行し、出力 JSON は前回と `cmp` で同一 (md5 `09306b687e073e2dd00c3f643a3c2f30`)。
+  - `git diff 6740f0b02 HEAD -- tools/targets/massivex/dsp` の差分は、本 REPORT の commit の後に追加する (下記)。
 - **script の修正 (本 fix)**: pdata に `.text` 外へ広がる不正な範囲が 100 件あり (最大約 4 GB)。それを関数として採ると `insn_starts` が範囲全体を復号してメモリを使い切った (修正前の script で E 43 件を一括実行すると rc 137 で kill)。`.text` 外の pdata 範囲は関数として採らないよう直した。
   - 影響: 43 件のうち 1 件 (G `0x180cdfa85`) のみ結果が変わった。修正前は不正範囲 `0x180123920` 内と判定して `G_livein_read=True` としていたが、修正後は pdata 外として未判定にした。残り 42 件は修正前後で同一 (同じ入力で比較)。
 - 検算: `mx63_u3e_split.py` population 604・E 43・D 825・C 1549・G0 351・G 26 (`mx6_e2e.sh` の vectorcall.json から再実行・HEAD で一致)。
