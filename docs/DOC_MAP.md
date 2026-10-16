@@ -304,6 +304,7 @@
 | `tools/m11/REPORT_SHX-T44.md` | ~70 | #4189 (SHX-T44, 親 #4123): `function_448490` の 10 mov 渡し site の機械語判定 (`frame_share/site_check.py`)。全 site で親 rbp を静的リンクとして渡し、callee が親の `[rbp+0x48]`・`[rbp+0x4c]` を読み書き。残り 291 site の callee 読み先の一括抽出 (`write_local` 121・`read_local` 106・`arg_home_only` 74)。修復 pass と OFF/ON 実測は子 [SHX-T45] #4459 |
 | `tools/m11/REPORT_SHX-T44_APPENDIX.md` | ~250 | #4189: mov 渡し 301 site の site 単位の表 (call・callee 読み先・access_class・IR 突合)。前半 (250 行まで)。REPORT_SHX-T44 §6 の付録 |
 | `tools/m11/REPORT_SHX-T44_APPENDIX_2.md` | ~60 | #4189: 上記付録の続き (site 表の後半) |
+| `tools/m11/REPORT_SHX-T48.md` | ~90 | #5576 (SHX-T48): D23 301 site のうち `unmatched` 56・`no_prologue` 3 の site 単位判定 (`frame_share/unmatched_check.py`)。`no_prologue` 3 は `ir_truncated`、`unmatched` 3 は call 欠落 (`function_40b620`)、残りは SSA 値渡し。制御フロー付き走査は子 [SHX-T48] #5575 |
 | `tools/m11/REPORT_SHX-T49.md` | ~70 | #5586 (SHX-T49, 親 #5576): `function_40b620` → `function_40b290` の call 欠落 3 site の機械語・生 grep・RetDec 単体再現による原因特定。機械語は本 run で再確認、IR 側は未再現。修復は子 [SHX-T52] #5591 |
 | `tools/m11/REPORT_N196.md` | ~90 | #3906 (M11-N196, 親 #3142): set_other 非 imm のスタック slot 読込・frame lea の IR 接続判定 (frame 定数 C と stack_var 対応・分類の件数は REPORT 参照)。load_def の誤判定の修正と負例 (`test_setother_slot_class.py`)。接続の注入と未決の接続先は #3932・#3933。分類器 `m11_setother_slot_class.py` |
 | `tools/m11/REPORT_3932.md` | ~50 | #3932 (M11-N201, 親 #3906): set_other 実値化 25 件の alloca 番地を 0 詰め call 引数へ注入する経路 (`m11_post.py --slots`・`M11_SLOT_ROWS`)。注入の支配条件 (entry block 内・呼出し前)・既定は不変の検証。survey の前後実測は未達 |
