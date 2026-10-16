@@ -7,9 +7,9 @@
 - 4 件の呼出し直後に読まれる戻り値レジスタは **機械語で確認済み** (下の表・`void_ret_check.sh` の実出力)。4 件とも戻り値を使っている。
 - 4329 の呼出先 `FUN_180fd27a8` は、機械語上 `call FUN_180fbde90` の後に rax・ax を書かずに `ret` する。よって呼出元が読む `ax` は `FUN_180fbde90` の戻り値の下位 16 bit である可能性が高い (未確認。`FUN_180fbde90` の戻り値型を機械語で見ていない)。前回の付録の「本体は `return;` で矛盾する」は、この機械語と合わない。
 - `FUN_180fe24b8` も同様に、`call FUN_180fe2470` の後に rax を書かずに `ret` する (未確認。`FUN_180fe2470` の生成宣言は repo 内に無い)。
-- 本 PR で入れた規則は **`FUN_180fdc880` (3968) の 2 件** (宣言 `double`・`return *param_2;`) のみ。根拠は下の「機械語」節。`FUN_180fbde90`・`FUN_180fe2470` の戻り値型は未確定のため、4329・5001 の規則は入れない (それらの規則は 0 件)。`short`・`ulonglong` は根拠の無い推定だった。emcc は pointer・整数型の不一致を通すので、件数が減っても値の正しさは検証されない。
+- 規則は `FUN_180fdc880` (3968) の 2 件 (宣言 `double`・`return *param_2;`) のみ。根拠は下の「機械語」節。emcc は pointer・整数型の不一致を通すので、件数が減っても値の正しさは検証されない。
+- 4329 `FUN_180fd27a8`・5001 `FUN_180fe24b8` の規則 (宣言 `short`・`ulonglong`) は **入れない (規則 0 件)**。callee `FUN_180fbde90`・`FUN_180fe2470` の生成宣言行が確定していないため。根拠と未確定点は「#5913 (KH-179) の扱い」節。確定条件は #5310 に移す。
 - 2122 (`FUN_180fc4590`) は未投入。本体の `return;` が 39 件あり、経路ごとの xmm0 を決めてから規則にする。受入 2 の残り・受入 3 は未達 (#5310 Refs)。
-- 再確定の条件 (4329・5001 共通): callee の生成宣言行 (`FUN_180fbde90`・`FUN_180fe2470`) を Ghidra 出力から引用し、ret 経路で rax (ax) が戻り値になることを機械語で示す。`HeartCore.core_64` は `fl-win64` 素材に無いため、`plugins-kilohearts` 由来の素材が要る。
 
 ## 機械語 (3968 `FUN_180fdc880` の規則の根拠)
 
@@ -34,11 +34,11 @@
 
 ## 素材
 
-- この fix run の `ARTIFACTS_DIR` には `fl-win64`・`plugins-kilohearts`・`toolchain-emsdk` の 3 点が実在した。3 点とも `tar --zstd -xf` で展開して使った。
-- `void_ret_check.sh` の実出力 (下の表) は本 fix run で `HeartCore.core_64` に対して再実行し、表と一致した。
+- 本 review-fix run (`b715c814f` 以降の再確認) の `ARTIFACTS_DIR` には `fl-win64.tar.zst` だけが実在し、`plugins-kilohearts` と `toolchain-emsdk` は無かった。`HeartCore.core_64` は展開できていない。よって下の `void_ret_check.sh` の表の再実行・Ghidra 出力の引用は、この run では**未確認**。
+- 下の表と「#5913 (KH-179) の扱い」節の数値は、前 run (`a83469d96` の測定時) の記録である。この run では再確認していない。
 - 再現に要る素材: `oc_artifacts: fl-win64 plugins-kilohearts toolchain-emsdk` (PR 本文に記載)。
 
-## 呼出し点の照合 (`void_ret_check.sh` の実出力・本 fix run で再実行)
+## 呼出し点の照合 (`void_ret_check.sh` の実出力・前 run の記録。本 run では未再実行)
 
 PE の objdump は `call   0x<番地>` の形で出る。前回の照合は `0x` なしの形しか見ておらず、実出力が空だった。前回の修正で両方の形を見るようにした。
 
@@ -53,12 +53,24 @@ PE の objdump は `call   0x<番地>` の形で出る。前回の照合は `0x`
 - 生成 C の宣言 (`void`) と Ghidra の `return;` は、`FUN_180fbde90` の戻り値型が未確定のため出た誤り。
 - 2122・3968・5001 の callee 本体の戻り値 (xmm0・rax) は、生成 C の `return` だけでは確定しない (`summary.tsv` の `body_bytes` が 1 で、関数範囲が Ghidra で正しく取れていない)。3968 は上の機械語で確定した。2122・5001 は未了。
 
+## #5913 (KH-179) の扱い (規則は入れない)
+
+- 4329 `FUN_180fd27a8` の呼出元 `180fcdc2d` は `movzx ecx,ax` で ax を読み、`FUN_180fd27a8` は `call 180fbde90` の後に ax を書かずに `ret` する (上の機械語の節)。ただし callee `FUN_180fbde90` の生成宣言行を引用して型を確定していない。
+- 5001 `FUN_180fe24b8` の呼出元 `180fd2a64` は `test rax,rax` で rax を読み、`FUN_180fe24b8` は `call 180fe2470` の後に rax を書かずに `ret` する。callee `FUN_180fe2470` の生成宣言行は repo 内に無い。
+- 同じ callee `FUN_180fbde90` の `(short *)` は、`REPORT_APPENDIX_4835.md` で宣言型が未確定として規則を撤回済み。`scen_qemath.h` の `_dtest` (rcx = `double*`) とも食い違う。よって `short`・`ulonglong` の規則は入れない。
+- 確定に必要な記録 (#5310 に移す): (a) `FUN_180fbde90` と `FUN_180fe2470` の生成宣言行の引用 (Ghidra 出力)、(b) 全 ret 経路で `ax`/`rax` が戻り値として設定されることの objdump 出力。`HeartCore.core_64` は `plugins-kilohearts` 由来で取得できるが、この run では未取得 (上の素材の節)。Ghidra 12.1.4 (`[GHIDRA]`) も本 run の環境に無く、公式 URL も 404 だった。
+- `FUN_180fc4590` (2122) の ret 命令の数 (前 run の記録では 176。この run では未確認) と、生成 C の 2122 行の本体。経路ごとの xmm0 の決定は未了。
+
+## 測定の扱い
+
+- PR 本文にあった census の数値 (emcc error 305 → 303、Gain/Haas/Gate の `.o` サイズ、decompile 151/151、wall 48.9 s) は、本付録の測定節に記録がないため採用しない。
+- `ghidra_route` は main と同一に戻した (`patches.py` の差分 0)。よってコードの測定 commit は `a83469d96` のまま、以後の差分 (文書のみ) は `git diff a83469d96 HEAD -- tools/targets/kilohearts/ghidra_route` で空。
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `FUN_180fbde90` の戻り値型 (`FUN_180fd27a8` の戻り値 ax の根拠) と `FUN_180fe2470` の戻り値型 (`FUN_180fe24b8` の戻り値 rax の根拠) | 4329・5001 の規則を決められない (規則 0 件) | #5310 (Refs) |
-| `FUN_180fc4590` (2122) の本体の戻り値 (xmm0) の経路別の決定と規則。`FUN_180fe24b8` の本体の戻り値 (rax) の機械語確認 | 2122・5001 が未解消 | #5310 (Refs) |
+| `FUN_180fc4590` (2122) の本体の戻り値 (xmm0) の経路別の決定と規則 (ret 数は未確認・2122 行の本体) | 2122 が未解消 | #5310 (Refs) |
 | Delay の数値検証 (戻り値の型を変えた後の bit-exact) | emcc 通過だけでは値は言えない | #3073 [KH-41] |
 
 ## 再現
