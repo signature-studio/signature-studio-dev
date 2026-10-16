@@ -158,7 +158,8 @@
 
 - まとめ: 7 件のうち、スロットの格納値まで分類できたのは 5 件 (0x1021826・0x12ab8e8・0x118a275・0x118a3f4・0x12e6abe)。0x12c609e と 0xfc820f は合流元の分類が残る。
   - 0xfc820f: 飛び元 0xfc81c2 の rdi は、主経路 `xor edi, edi` (定数 0) と、合流 0xfc81ac→0xfc81b0 からの `movsxd rdi, edi` (0xfc81a6) の 2 経路で、AMBIG のまま。
-  - 0x12c609e: 合流元 0x12c6252 の rbx は、主経路 `[rip+0x31c1ff]` (VA 0x15e22d8 の大域直読み) と、合流 9 件 (`add eax, [rcx+0x94]` 等) の AMBIG。1 段では閉じない。
+  - 0x12c609e: 合流 1 件 (0x12c6252→0x12c5fa8) の注記。主経路は `add eax, [rcx+0x94]` (0x12c5f86) を経由する AMBIG で、1 段では閉じない (terminal・edx_sites とも同じ 1 件)。
+  - 0x12c6240 (edx_sites の注記): 合流 5 件 (`pe_py203_edx_sites.py` の `len(hits)`。注記に列挙されるのは先頭 3 件のみ)。主経路は `[rip+0x31c1ff]` (VA 0x15e22d8 の大域直読み、0x12c60d2・0x12c60f5)。0x12c6240 の数であり、0x12c609e の数ではない。
 - 残り (受入の残り): 0x12c609e の合流元 0x12c6252 の分岐、0xfc820f の飛び元 rdi、スロット ENTRY 値 (ecx・r8d) の呼出し元 (間接呼出しのため未追跡)。
 
 ### 6.5 #5407: 大域 3 種の入り方・rbx ENTRY の呼出し元・`[rbx+0x12b4]` の上流
