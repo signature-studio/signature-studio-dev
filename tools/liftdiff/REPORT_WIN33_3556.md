@@ -184,3 +184,40 @@ KPI (`docs/WORKFLOW.md` §7・起動に関わる PR): FLEngine 起動の dispatc
 - 測定 commit `fa8ec63d9` と `7080aca8a` の差は、spike の数値・import 数・trace の行番号・V の負数化・writer rva がすべて同値。違うのは V のアドレスだけで、環境変数長による (0x10 ずれ)。
 - レビュー再実行 (`9694e7564`) と作者の実行 (`fa8ec63d9`) は、spike・trace・e2e (2 回目) で一致。`9694e7564` と `fa8ec63d9` の間の差分は `win33_catalog.sh` の copy 先と `spike_cfi.py` の正規表現 (`model_names()` の名前集合は変わらない) のみ。
 - 測定 commit `b01598aa2` 以降の HEAD (本文書の commit) はコード差分 0 (`git diff b01598aa2 HEAD -- tools/liftdiff ':(exclude)*.md'` の出力は空)。
+
+## 10. #4713 (WIN-53) の同定: 読取り呼出元・読む対象・Position 0
+
+測定: `tools/liftdiff/win33_pos_probe.sh` (`LD_STEP_MEM` で Position を監視)。素材 fl-win64 (`extracted/`)・work-m11・work-liftdiff・toolchain-emsdk。既定 spike 928/942・830・`0x4e0fab`・35 import と、実カタログ spike 928/942・895・`0x12a25`・39 import は §1 と同値 (`win33_catalog.sh` の 1 回目で再確認)。
+
+### 10.1 読取り関数 (rva `0x4d85d0`) の呼出元 (実測・trace と逆アセンブル)
+
+- 呼出連鎖 (trace の行順。関数入口の直前に実行した命令): `0x4e1879` (`call 0x8e13f0` = rva `0x4e13f0`) → `0x4e146b` (`call 0x8d85d0` = rva `0x4d85d0`)。
+- `0x4e1820` の関数 (`0x4e13f0` を `0x4e1879` で呼ぶ側) は、`0x4e1841` (`lea rdx,[rip+0x5b0]`) で **UTF-16 の `.moe`** (rva `0x4e1df8`・`2e 00 6d 00 6f 00 65 00`) を読み、`call 0x414e70` の結果 (`test eax,eax`) で分岐する。拡張子で `.moe` を判定していると読むのが妥当 (推定。比較関数の中身は未確認)。`0x4e13f0` は `rdx` に渡された path (`[rbp+0x68]`) を受け取る側。
+- `0x4e146b` で `r9 = [rbp+0x68]`、`r8 = [rbp+0x48]` (Stream オブジェクト・`0x3e1acd0`) を渡す。`0x4d85d0` の `[rbp+0x48]` は Stream の Read を呼ぶ `r8`。
+- 読取り関数の中で Stream の Read (`call [rax+0x30]` = rva `0x4d862a`) が 4 B を読み、`movsxd r9, [rbp+0x6c]` で範囲検査へ渡す (REPORT §3.4 と同じ)。
+
+### 10.2 読む対象: `.moe` (FL 独自の読込み系統。gettext `.mo` の検査ではない)
+
+- 読むのは `default.moe` (`\System\Languages\LC_MESSAGES\default.moe`)。その先頭 4 B は `de 12 04 95` (= `.mo` magic `0x950412de`) で、正規の gettext `.mo` と一致する (§3.4・REPORT_WIN7_2718 §141)。
+- `.moe` literal の直後の rva `0x4e1e10` (UTF-16) に `This file is not a valid GNU gettext ...` の文字列がある。`.mo` 検査の失敗メッセージと読めるが、参照元の同定は未実施 (推定)。
+- したがって「count として読む読取り」は、`.mo` 形式の header (magic の後の revision・count・offset 等) を読む経路に属する。**magic (先頭 4 B) を読んだ直後の値を count として扱う箇所の仕様は、本 REPORT では未同定** (次の子 §10.4 の対象)。
+
+### 10.3 Position 0 の根拠 (実測)
+
+- `LD_STEP_MEM=3e1ace8` (= Stream `0x3e1acd0` + 0x18 = Position) の trace で、Position の変化は `113b72` (Move 内の `add [rbx+0x18],rsi`) の 1 回だけ。旧値 `0` → 新値 `4`。
+- 読取り (`0x4d862a`・`113b90`) の直前の Position は **0** (旧値 0)。読取り後は 4。Read の返り値 4 B は blob 先頭 (magic) と一致。
+- よって **読取り呼出元は Position 0 で magic を読んでいる**。Position 4 以降ではない。Stream の初期 Position が 0 であることも同じ trace の旧値 0 で裏付けられる。
+
+### 10.4 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `.mo` の magic 読取り直後に、magic 自身を count として扱う箇所 (範囲検査 `0x17b70` の呼出し元 `0x4d8642`) の仕様と、正しい読取り位置・形式 (.mo header の offset か FL 独自 .moe の header か) | 範囲検査 RTE 201 を消すための正しい読取り位置・形式が決まらない。実カタログを通せない | #3636 ([WIN-36]) |
+
+### 10.5 受入条件の判定
+
+- 受入 1 (呼出元 VA の同定・読む対象): **達成**。呼出元 `0x4e146b`→`0x4d85d0` (実測)、読む対象は `.moe` 文字列 (逆アセンブル) と magic 一致 (trace)。
+- 受入 2 (Position の確認・位置 0 の根拠): **達成**。`LD_STEP_MEM` で Position の旧値 0 を実測。PEEK は trace の MEM 行で代替。
+- 既定 spike の不変: 928/942・830・`0x4e0fab`・35 import (変化なし)。`ld_core.h` は変更していない。
+- 製品 KPI (起動): FLEngine 起動の dispatch 数・通過 unit 数は既定で不変 (928/942)。最初のウィンドウは動かしていない。
+- 注: `count` 側 (範囲検査へ至る経路) の仕様は受入条件に含まれない。#3636 に残す。
