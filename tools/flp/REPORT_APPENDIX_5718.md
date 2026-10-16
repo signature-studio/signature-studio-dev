@@ -42,7 +42,7 @@
 ## 5. 再現手順
 
 ```sh
-mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
+mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
 sudo apt-get install -y wine64 xvfb gdb
 sudo sysctl -w kernel.yama.ptrace_scope=0
 WINEDEBUG=-all,+module bash tools/flp/s1_wine_probe.sh   # インストール木 $RUNNER_TEMP/fl-install
