@@ -21,6 +21,20 @@ from ldmach import Machine  # noqa: E402
 import detect  # noqa: E402
 
 
+ARG_HOME = 0x70
+
+
+def access_class(r):
+    """callee の rbp 基準アクセスを、親の局所 (ARG_HOME 未満) への書込み・読込み・引数 home のみに分ける。
+    線型走査 (制御フロー無視) の粗い分類で、真の D23 の確定ではない。"""
+    local = [a for a in r['callee_access'] if a['off'] < ARG_HOME]
+    if any(a['kind'] in ('store', 'rmw') for a in local):
+        return 'write_local'
+    if local:
+        return 'read_local'
+    return 'arg_home_only'
+
+
 def site_record(mach, cs, pins, i, got, ins, parent):
     cva = ins.operands[0].imm
     cins = mach.disasm_fn(cva)
@@ -58,8 +72,11 @@ def main():
             r = site_record(mach, cs, pins, i, got or (0, 'none'), pins[i], p)
             r['call_at'] = s['call_at']
             recs.append(r)
+        for r in recs:
+            r['access_class'] = access_class(r)
         cnt = collections.Counter('error' if 'error' in r else 'ok' for r in recs)
-        print(json.dumps(dict(sites=len(recs), by=dict(cnt)), ensure_ascii=False))
+        by_cls = collections.Counter(r.get('access_class') for r in recs)
+        print(json.dumps(dict(sites=len(recs), by=dict(cnt), access_class=dict(by_cls)), ensure_ascii=False))
         if a.out:
             json.dump(dict(sites=recs), open(a.out, 'w'), ensure_ascii=False, indent=1)
         return
