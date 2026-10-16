@@ -85,3 +85,56 @@ node trap_triage/probe5695_nz.mjs                # 0x12ba808 近傍の非 0 バ�
 1. `e3ef60` の arg1 (0x12ba808) を誰が確保・初期化するか (boot 中の alloc / 0 初期化の位置)。フィールドが「0 のまま」なら、e3ef60 が非 0 を期待する根拠の側を見る。
 2. C 側 (`memcpy`・`rep movs`) の書込みを監視する (`rep_watch_3972.py` の方式)。
 3. `40ffe0` の引数 (リスト先頭) の出所 (受入の残り)。
+
+## 7. 3 回目 run: C 側 (copy・rep helper) まで含めた書込み監視 (survey 未測定・次 run)
+
+本 run の結果: 監視 ON の survey は**未測定**。`work-m11` と `toolchain-emsdk` は展開できたが、`fl-win64` が無く `m11_gen_ir2.sh` (PE 必須) で `work/ir_conditions.json` (`ldfix=applied`・指紋) を作れず、`m11_build.sh` の gate で止まった (`ldfix=applied` の記録無し)。gate は迂回していない。したがって 3 経路の結果は本 run では得られていない (旧版の「0 件」結論は根拠が無いため取り下げた)。
+
+監視: `store_watch_5695.sh` (新規)。範囲 `[0x12ba808+0x778, +0x814)` を 3 経路で同時に見る。
+- IR store: `watch_arg1_5695.c` (`[a1]`)。
+- copy (`409c80` の入口): `watch_copy_5695.c` の `m11_copy_in` (`[a1cp]`)。
+- rep 系 helper (movsq/movsb/stosq 35 箇所の入口): 同 C の `m11_rep_in` (`[a1rp]`)。
+
+手順 (次 run で行う): `m11_gen_ir2.sh` (`fl-win64` が要る) → `bash trap_triage/store_watch_5695.sh <tag>` (全 942 unit の survey)。陽性対照は `WATCH_LO=0x10aa1428 WATCH_BASE=0 WATCH_SPAN=32`。
+
+| 測定 | 値 | 備考 |
+|---|---|---|
+| 監視 ON・survey (arg1 範囲) | 未測定 (次 run) | 本 run は IR 指紋を作れず build 前に停止 |
+| 陽性対照 (32 B) | 未測定 (次 run) | 監視が 3 経路で検出するかは未確認 |
+
+測定の記録 (review r4 の指摘への回答):
+- 測定 commit: 未確定。本節の監視コードを追加した commit は `42250fabc` と推定するが、測定は行っていないため測定 commit ではない。
+- 生の `SURVEY_UNITS` 行・`[a1]`/`[a1cp]`/`[a1rp]` の件数は本 run に存在しない。前 revision の数値は §5 の値と同一で、転記か偶然の一致かを確認できなかったため削除した。
+- `git diff 42250fabc HEAD -- tools/m11/trap_triage/store_watch_5695.sh tools/m11/trap_triage/watch_copy_5695.c tools/m11/trap_triage/watch_arg1_5695.c` の出力 (`22de1a37e` の差分のみ。ヘッダと取得行の周辺だけを抜粋):
+
+```diff
+diff --git a/tools/m11/trap_triage/store_watch_5695.sh b/tools/m11/trap_triage/store_watch_5695.sh
+@@ -2,12 +2,13 @@
+-#   usage: store_watch_5695.sh <tag>   (前提: 素材 work-m11 を展開済み・EMSDK_ENV を設定 (旧既定は [EMSDK] の位置))
++#   usage: store_watch_5695.sh <tag>   (前提: 素材 work-m11 を展開済み・EMSDK_ENV を設定 ([EMSDK]・docs/REFERENCES.md §4))
+ set -uo pipefail
+ HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
+-source "${EMSDK_ENV:-<[EMSDK] の既定パス>}" > /dev/null 2>&1   # [EMSDK] (docs/REFERENCES.md)
++: "${EMSDK_ENV:?EMSDK_ENV を設定してください ([EMSDK]・docs/REFERENCES.md §4)}"
++source "$EMSDK_ENV" > /dev/null 2>&1
+```
+
+- 差分は EMSDK 取得行だけ。`watch_copy_5695.c`・`watch_arg1_5695.c` は差分 0。監視の範囲・計装・survey の経路は不変。唯一の挙動差は `EMSDK_ENV` 未設定時に `[EMSDK]` の既定へ落とさず停止すること (測定時の環境では設定済みの前提で、経路は同じ)。
+
+解釈:
+- 5 フィールド (+0x778・+0x7d8・+0x7f0・+0x808・+0x810) の IR store・copy・rep helper 経由の書込みの有無は、本 run では判定していない (次 run で測定)。§5 の IR store 計装 (クリーン HEAD で 2 回) の結果は有効。
+- 残る書込み経路は C runtime 内の直接 store (`m11_rt`/`m11_win`)。この経路は計装していない。
+- 「0 のまま」の理由は、監視できた範囲では説明できない。次は `e3ef60` が arg1 を確保・初期化する位置と、`e3f178` の分岐条件を見る。
+
+### 7.1 `40ffe0` 引数の出所 (IR 読取り・受入 (b) の一部)
+
+- `60a270(arg1, arg2)` (IR 208429 行): `arg2 != *(arg1+169)` のとき `40ffe0(arg1, sext((arg2 & 0xFFFF0000) | 65485))` を呼ぶ。`65485 = 0xFFCD`。
+- つまり 895 の `40ffe0` の引数は、`60a270` の `arg2` の上位 16 bit を残し、下位を `0xFFCD` にした定数。OOB の原因は `arg2` (`e3ef60` 側の値) の上位 16 bit。
+- `40ffe0` (IR 113231) は `*(arg1)` を `40ff70` に渡すだけで、`p-144` の構造体は `40ff70` 側の入口で決まる。
+- 未了: `e3ef60` が `60a270` に渡す `arg2` の由来 (9 呼出しのうち 895 に至るもの)。
+
+### 7.2 未解決 (次 run・起票先)
+
+- C runtime 内の直接 store (`m11_rt`/`m11_win`) の監視: 親 #882 の続き。
+- `e3ef60` → `60a270` の `arg2` の由来と `e3f178` の分岐条件: 親 #882 の続き。
+- DEFECTS.md 行案 (受入 (c)): 書込み元と `arg2` の由来が未確定のため未判定。
