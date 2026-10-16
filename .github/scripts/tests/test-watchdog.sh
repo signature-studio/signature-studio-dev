@@ -913,6 +913,51 @@ for bad in '"launch_halted":"no-import","launch_halted_overdue":true' '"launch_h
   expect "unreadable launch_halted ($bad) -> warning only, the open issue is kept" $?
 done
 
+# 33j. 降格 (#2340・D26) の検知。demoted_reason が null でない間は障害 issue に理由を追記する (launch と同じ規則)。新規起票は同じ [CI-n] 採番
+dm() { printf '"demoted_reason":"%s"' "$1"; } # dm <reason>: /status に足す demoted_reason の JSON 片
+# 33j1. 降格中 (fresh) で障害 issue が無い -> [CI-62] PM Worker 降格 (dry-run) を起票する。理由を本文に書く
+worker_setup
+worker true true true "$(ago 1)" "$(dm 'double-oc #5130')"
+wd; rc=$?
+[ "$rc" = 0 ] && logged 'label create pm-worker-down' && logged "issue create --repo o/r --title \[CI-62\] PM Worker 降格 (dry-run) ($TODAY) --body-file .* --label pm-worker-down" && not_logged 'issue close' && grep -q 'demote=demoted (reason=double-oc #5130)' "$TMP/out"
+expect "demoted (fresh) with no outage issue -> [CI-62] PM Worker 降格 (dry-run) (label pm-worker-down)" $?
+grep -q 'double-oc #5130' "$BODY" && grep -q '@pycabbage' "$BODY" && grep -q 'POST /demote/reset' "$BODY"
+expect "the demote issue body has the reason, the reset procedure and @pycabbage" $?
+# 33j2. 降格中で障害 issue が開いていれば、理由の追記だけ。新規 0 件・close しない
+worker_setup
+worker true true true "$(ago 1)" "$(dm 'double-oc #5130')"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+logged 'issue comment 77 .*--body-file' && not_logged 'issue create' && not_logged 'issue close' && grep -q '降格はまだ解除されていません' "$BODY"
+expect "demoted + open outage issue -> note only (no new issue, not closed)" $?
+# 33j3. 降格が解除された (null) -> 既存の回復の規則のまま close する
+worker_setup
+worker true true true "$(ago 1)" '"demoted_reason":null'
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+wd
+logged 'issue close 77' && not_logged 'issue create'
+expect "demoted_reason back to null -> recovery and close on the open outage issue" $?
+# 33j4. ネガコン: 降格 (fresh=false) でも、理由を使った同じ障害 issue 経路で扱う。降格の追記と停止の起票は 1 件だけ
+worker_setup
+worker true true false "$(ago 1)" "$(dm 'double-oc #5130')"
+wd
+[ "$(grep -c 'issue create' "$LOG")" = 1 ] && grep -q 'fresh=false' "$BODY"
+expect "demoted + fresh=false -> exactly one outage issue is filed" $?
+# 33j5. ネガコン: 形が読めない demoted_reason (数値) は起票・追記・close をしない。警告だけ
+worker_setup
+worker true true true "$(ago 1)" '"demoted_reason":7'
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd; rc=$?
+[ "$rc" = 0 ] && not_logged 'issue close' && not_logged 'issue comment' && not_logged 'issue create' && grep -q 'demote check skipped' "$TMP/out"
+expect "unreadable demoted_reason (number) -> warning only, no write, open issue kept" $?
+# 33j6. ネガコン: 降格していない健全な Worker は、降格の追記も起票もしない (launch と同じ空振り)
+worker_setup
+worker true true true "$(ago 1)" '"demoted_reason":null'
+wd
+no_worker_writes
+expect "healthy worker (demoted_reason null) -> no outage write" $?
 # 33i8. ネガコン: /status が読めなければ launch の判定はせず、PR の点検は続く
 worker_setup
 base "[$(pr 6 fff666 false "$OLD")]"
@@ -1057,6 +1102,23 @@ pm_status live true
 wd
 not_logged 'dispatches' && grep -q 'oc-pm sent=0 (PM Worker is live' "$TMP/out"
 expect "ネガコン: PM Worker live and fresh -> no dispatch" $?
+
+# 36d. 降格中 (demoted_reason あり) は暫定の oc-pm も送らない (D26)。mode が dry-run でも送らない
+reset
+pm_base
+printf '{"mode":"dry-run","configured":true,"installed":true,"fresh":true,"last_tick":"%s","demoted_reason":"double-oc #5130"}' "$(ago 1)" > "$FAKE_STATUS"
+printf 'https://pm.example.test\n' > "$TMP/worker_url"; export OC_WORKER_URL_FILE="$TMP/worker_url"
+wd
+not_logged 'dispatches' && grep -q 'oc-pm sent=0 (PM Worker is demoted' "$TMP/out"
+expect "demoted (dry-run) -> no oc-pm dispatch (temporary path, D26)" $?
+# 36e. ネガコン: 降格していなければ (demoted_reason null) 従来どおり送る
+reset
+pm_base
+printf '{"mode":"dry-run","configured":true,"installed":true,"fresh":true,"last_tick":"%s","demoted_reason":null}' "$(ago 1)" > "$FAKE_STATUS"
+printf 'https://pm.example.test\n' > "$TMP/worker_url"; export OC_WORKER_URL_FILE="$TMP/worker_url"
+wd
+logged 'api -X POST repos/o/r/dispatches -f event_type=oc-pm'
+expect "ネガコン: demoted_reason null -> oc-pm is still dispatched" $?
 
 reset
 pm_base

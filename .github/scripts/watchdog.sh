@@ -179,12 +179,17 @@ worker_status_copy() { # worker_status_copy <status json>: /status の写し。�
 worker_body() { # worker_body <kind: new|note> <理由> <status json> [what: worker (既定) | launch]
   local at what="${4:-worker}"
   at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  if [ "$1" = new ] && [ "$what" = launch ]; then
+  if [ "$1" = new ] && [ "$what" = demote ]; then
+    printf '%s\n' "PM Worker (\`signature-studio-pm\`) が降格されています (dry-run)。watchdog.sh が \`/status\` を読んで検知しました (${at})。" ""
+    printf '%s\n' "- 判定: $2" "- 条件: \`demoted_reason\` が null でない (降格中は launch と dispatch が dry-run。\`launch_halted\` には出ない)" ""
+  elif [ "$1" = new ] && [ "$what" = launch ]; then
     printf '%s\n' "PM Worker (\`signature-studio-pm\`) は稼働していますが、launch が止まっています。watchdog.sh が \`/status\` を読んで検知しました (${at})。" ""
     printf '%s\n' "- 判定: $2" "- 条件: \`launch_halted\` があり、\`launch_halted_overdue\` が true (15 分以上止まり、着手待ち (ready) と空き枠 (room) がある。\`review-only\` は除く)" ""
   elif [ "$1" = new ]; then
     printf '%s\n' "PM Worker (\`signature-studio-pm\`) が停止している可能性があります。watchdog.sh が \`/status\` を読んで検知しました (${at})。" ""
     printf '%s\n' "- 判定: $2" "- 条件: \`configured\` と \`installed\` がともに true (一度でも稼働に入った Worker) で、\`fresh\` が false、または \`last_tick\` が 15 分より古い" ""
+  elif [ "$what" = demote ]; then
+    printf '%s\n' "[watchdog] 降格はまだ解除されていません (${at})。判定: $2" ""
   elif [ "$what" = launch ]; then
     printf '%s\n' "[watchdog] launch はまだ止まっています (${at})。判定: $2" ""
   else
@@ -193,7 +198,9 @@ worker_body() { # worker_body <kind: new|note> <理由> <status json> [what: wor
   printf '%s\n' "## /status の写し (集計のみ。秘密を含まない)" '```json'
   worker_status_copy "$3"
   printf '%s\n' '```' ""
-  if [ "$1" = new ] && [ "$what" = launch ]; then
+  if [ "$1" = new ] && [ "$what" = demote ]; then
+    printf '%s\n' "確認すること: 降格の理由 (\`demoted_reason\`) の経緯 (同じ issue に 30 分以内の 2 件の \`/oc\`)。解除は repo の push 権限者が \`POST /demote/reset\` で行う (自動では戻らない)。解除されると (\`demoted_reason\` が null) watchdog.sh がこの issue にコメントして close します。" "" "@pycabbage" "<!-- oc-worker-down -->"
+  elif [ "$1" = new ] && [ "$what" = launch ]; then
     printf '%s\n' "確認すること: \`launch_halted.reason\` の条件 (infra/pm-worker/README.md『launch の停止と通知』の表)。止まりが解けると (\`launch_halted\` が null に戻り、\`fresh\` が true かつ \`last_tick\` が 5 分以内) watchdog.sh がこの issue にコメントして close します。" "" "@pycabbage" "<!-- oc-worker-down -->"
   elif [ "$1" = new ]; then
     printf '%s\n' "確認すること: cron / Durable Object alarm の停止・例外、GitHub App (PM) の失効。回復すると (\`fresh\` が true かつ \`last_tick\` が 5 分以内) watchdog.sh がこの issue にコメントして close します。" "" "@pycabbage" "<!-- oc-worker-down -->"
@@ -260,6 +267,7 @@ worker_down() { # worker_down <status json> <理由> [what: worker (既定) | la
   ci_next_title_n || return 0
   title="[CI-$ci_next_n] PM Worker 停止 ($(date -u +%Y-%m-%d))"
   [ "$what" = launch ] && title="[CI-$ci_next_n] PM Worker launch 停止 ($(date -u +%Y-%m-%d))"
+  [ "$what" = demote ] && title="[CI-$ci_next_n] PM Worker 降格 (dry-run) ($(date -u +%Y-%m-%d))"
   worker_body new "$reason" "$body" "$what" > "$f"
   do_it "file '$title' with label $WORKER_LABEL" worker_file "$title" "$f"
 }
@@ -301,6 +309,32 @@ worker_launch() { # 止まっている launch が overdue (15 分以上・着手
   launch_abnormal && [ "$launch_overdue" = true ] || return 0
   worker_down "$worker_status_json" "launch が止まっています (reason=$launch_reason、止まり始め $launch_since)" launch
 }
+# 降格 (#2340・D26): /status の demoted_reason が null でない間は launch と dispatch が dry-run になる。解除は人の手 (POST /demote/reset) だけ。
+# 形が読めない値 (文字列でない) は警告だけ。起票や追記はせず、回復の close だけを止める (launch_halted と同じ規則)。
+demote_state=none demote_reason=""
+demote_parse() { # demote_parse <status json>: demoted_reason の形を読む。demote_state は none / demoted / unknown
+  demote_state=none demote_reason=""
+  demote_state="$(jq -r '
+    if .demoted_reason == null then "none"
+    elif (.demoted_reason | type) == "string" and (.demoted_reason | length) > 0 then "demoted"
+    else "unknown" end' <<< "$1")" || demote_state=unknown
+  case "$demote_state" in
+    demoted) demote_reason="$(jq -r .demoted_reason <<< "$1")" ;;
+    none) ;;
+    *)
+      demote_state=unknown
+      echo "::warning::/status demoted_reason has an unexpected shape; demote check skipped"
+      ;;
+  esac
+}
+demote_hold() { [ "$demote_state" != none ]; } # 降格中・形が読めない間は、fresh でも回復として close しない
+worker_demote() { # 降格中なら障害 issue に理由を追記する (起票・重複排除は worker_down の規則)
+  [ "$demote_state" = demoted ] || return 0
+  worker_down "$worker_status_json" "降格中 (demoted_reason=$demote_reason)。launch と dispatch は dry-run です" demote
+}
+worker_notice() { # 降格と launch の停止は同じ障害 issue を使う。1 回の点検で書くのは 1 件だけ (起票直後の一覧の遅れで二重に起票しないため)
+  if [ "$demote_state" = demoted ]; then worker_demote; else worker_launch; fi
+}
 worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返す
   local url body cfg inst fresh tick age="" ts reason=""
   if [ ! -f "$WORKER_URL_FILE" ]; then
@@ -327,6 +361,7 @@ worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返
   fi
   worker_status_json="$body"
   launch_parse "$body"
+  demote_parse "$body"
   cfg="$(jq -r .configured <<< "$body")"
   inst="$(jq -r .installed <<< "$body")"
   fresh="$(jq -r .fresh <<< "$body")"
@@ -337,8 +372,8 @@ worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返
   fi
   if [ "$fresh" = true ] && [ -n "$age" ] && [ "$age" -le "$WORKER_RECOVER_SEC" ]; then
     worker_line="worker=ok (fresh=true last_tick=${age}s ago)"
-    if launch_hold; then
-      worker_launch
+    if launch_hold || demote_hold; then
+      worker_notice
     else
       worker_recovered "$tick" "$age"
     fi
@@ -357,7 +392,13 @@ worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返
     worker_down "$body" "$reason"
   else
     worker_line="worker=ok (fresh=true last_tick=${age}s ago)"
-    worker_launch
+    worker_notice
+  fi
+  if [ "$demote_state" = demoted ]; then
+    worker_line="$worker_line demote=demoted (reason=$demote_reason)"
+  fi
+  if [ "$demote_state" = unknown ]; then
+    worker_line="$worker_line demote=unknown-shape"
   fi
   if [ "$launch_state" = halted ]; then
     worker_line="$worker_line launch=halted (reason=$launch_reason、止まり始め $launch_since、overdue=$launch_overdue)"
@@ -710,6 +751,9 @@ pm_line="oc-pm sent=0"
 pm_cands=()
 if [ -n "$worker_status_json" ] && jq -e '.mode == "live" and .fresh == true' <<< "$worker_status_json" > /dev/null 2>&1; then
   pm_line="oc-pm sent=0 (PM Worker is live and fresh; no dispatch)"
+elif [ "$demote_state" != none ]; then
+  # 降格中 (D26) は、暫定の oc-pm も止める (launch と dispatch は dry-run。解除は人の手)。
+  pm_line="oc-pm sent=0 (PM Worker is demoted; no dispatch)"
 else
   for sn in $(jq -r '.[]' <<< "$stuck_nums"); do
     if ! cm="$(gh api --paginate "repos/$R/issues/$sn/comments")"; then
