@@ -153,7 +153,7 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 
 ### 8-1. 実測 (`ci_link.sh`・rc 1 = 期待どおりの未解決)
 - 測定 commit: `5afe607d0` (`ci_link.sh` の EMSDK_ENV 必須化を含む現 head)。`ci_lift.sh` も `ci_link.sh` もこの HEAD で実行した。
-- 素材: R2 からは `fl-win64` のみ届いた (`$HOME/artifacts` に `fl-win64.tar.zst` のみ)。`toolchain-retdec`・`toolchain-emsdk` は R2 に無いため上流から取得した: RetDec v5.0 の GitHub release asset `RetDec-v5.0-Linux-Release.tar.xz` (`tar -xJf` で展開し `bin/retdec-decompiler`)、emsdk は git tag `6.0.12` を `install`・`activate` (展開先は `$RUNNER_TEMP/art/` 配下)。
+- 素材: R2 からは `fl-win64` のみ届いた (素材置き場に `fl-win64.tar.zst` のみ)。`toolchain-retdec`・`toolchain-emsdk` は R2 に無いため上流から取得した: RetDec v5.0 の GitHub release asset `RetDec-v5.0-Linux-Release.tar.xz` (`tar -xJf` で展開し `bin/retdec-decompiler`)、emsdk は git tag `6.0.12` を `install`・`activate` (展開先は `$RUNNER_TEMP/art/` 配下)。
 - 入力の生成: `ci_lift.sh` を先に実行して `tools/shared/work/lift/ci/` を作った (`FL_WIN64_DIR=$RUNNER_TEMP/art RETDEC_BIN=$RUNNER_TEMP/art/retdec/bin/retdec-decompiler bash tools/shared/lift/ildsp/ci_lift.sh` → rc 0・ALL OK)。
 - 未設定時: `env -u EMSDK_ENV bash tools/shared/lift/ildsp/ci_link.sh` → rc 1 (`EMSDK_ENV を設定` のエラーで停止し、リンクは走らない)。
 - 手順: `grep -v '^  uselistorder'` で行頭 2 空白の 137 行を除く (emcc 6.0.12 の LLVM が `uselistorder i64 %arg1, { 1, 0, 2 }` を読めず、`error: wrong number of indexes, expected 4` で止まることを再確認した)。`ci.ll` → `emcc -c -O1` → `ci.o`。`ci_helpers.c` → `helpers.o`。
