@@ -100,8 +100,27 @@ node trap_triage/probe5695_nz.mjs                # 0x12ba808 近傍の非 0 バ�
 | 監視 ON・survey (arg1 範囲) | 63 s・ok 873 / miss 47 / halt0 6 / oob 15 / noproc 1・`[a1]` 0 / `[a1cp]` 0 / `[a1rp]` 0 | load 1.04 (終了後) |
 | 陽性対照 `0x10aa1428` 32 B (`WATCH_LO=0x10aa1428 WATCH_BASE=0 WATCH_SPAN=32`) | 70 s・ok 871 / miss 47 / halt0 7 / oob 16・`[a1]` 69 / `[a1cp]` 5 / `[a1rp]` 4 | 3 経路とも検出する (監視は動いている) |
 
+測定の記録 (review r4 の指摘への回答):
+- 測定 commit: SHA は測定時に記録していなかった。`42250fabc` (本節と `store_watch_5695.sh` を追加した commit) を最後のコード変更と推定する。根拠は commit の内容だけで、実行ログは残っていない。
+- 生の `SURVEY_UNITS` 行 (`work/probe5695/c1.out` 等) は保存されていない。本 run には `work-m11` と `toolchain-emsdk` が無く、再測定できなかった。そのため上の表の survey 値は、§5 の値との一致を含めて**未検証**。
+- `git diff 42250fabc HEAD -- tools/m11/trap_triage/store_watch_5695.sh tools/m11/trap_triage/watch_copy_5695.c tools/m11/trap_triage/watch_arg1_5695.c` の出力 (`22de1a37e` の差分のみ。ヘッダと取得行の周辺だけを抜粋):
+
+```diff
+diff --git a/tools/m11/trap_triage/store_watch_5695.sh b/tools/m11/trap_triage/store_watch_5695.sh
+@@ -2,12 +2,13 @@
+-#   usage: store_watch_5695.sh <tag>   (前提: 素材 work-m11 を展開済み・EMSDK_ENV を設定 (既定 /opt/emsdk/emsdk_env.sh))
++#   usage: store_watch_5695.sh <tag>   (前提: 素材 work-m11 を展開済み・EMSDK_ENV を設定 ([EMSDK]・docs/REFERENCES.md §4))
+ set -uo pipefail
+ HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
+-source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" > /dev/null 2>&1   # [EMSDK] (docs/REFERENCES.md)
++: "${EMSDK_ENV:?EMSDK_ENV を設定してください ([EMSDK]・docs/REFERENCES.md §4)}"
++source "$EMSDK_ENV" > /dev/null 2>&1
+```
+
+- 差分は EMSDK 取得行だけ。`watch_copy_5695.c`・`watch_arg1_5695.c` は差分 0。監視の範囲・計装・survey の経路は不変。唯一の挙動差は `EMSDK_ENV` 未設定時に `/opt/emsdk` へ既定せず停止すること (測定時の環境では設定済みの前提で、経路は同じ)。
+
 解釈:
-- 5 フィールド (+0x778・+0x7d8・+0x7f0・+0x808・+0x810) は、boot 後から全 942 unit まで、IR store・copy・rep helper のいずれでも書かれない。
+- 5 フィールド (+0x778・+0x7d8・+0x7f0・+0x808・+0x810) は、boot 後から全 942 unit まで、IR store・copy・rep helper のいずれでも書かれない。(上記の通り、survey 値は未検証のため、この結論も再測定まで未検証扱い。)
 - 残る書込み経路は C runtime 内の直接 store (`m11_rt`/`m11_win`)。この経路は計装していない。
 - 「0 のまま」の理由は、監視できた範囲では説明できない。次は `e3ef60` が arg1 を確保・初期化する位置と、`e3f178` の分岐条件を見る。
 
