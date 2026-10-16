@@ -4,8 +4,8 @@
 
 - 受入 1 を達成した。判定器 `audit_frame_store_alias_2211.py` の NONFRAME 規則 (6) を call 戻り値へ広げた。call の戻り値 `rax` は、呼び出し先の全 `ret` の `rax` が frame 派生でないと示せるときだけ非 frame とする。PE 外の import (IAT 経由) は「未確定 (外部)」として扱い、False にする。
 - `5cb210` の `5cb4aa` (`cmp qword ptr [rbp+0xc0], 0`) の打ち切り理由は `ALIAS_FRAME_PTR` (`5cb47d`) から `LEAK_STORE` (`5cb456 movsq`) に移った。`5cb456` の基底 `rdi` は `5cb3d3 call 0x409410` の戻り値で、`rax` を辿ると `0x409410` の間接 call (`.data` の関数ポインタ) に行き着くため、非 frame と示せず UNDETERMINED のままになる (§3)。
-- 受入 2 を達成した。変更前後で verdict は全 48 関数・全 51 site で不変 (§2)。変わったのは `5cb4aa` の打ち切り理由 1 件だけ。
-- issue 本文の前提は一部違った。`5cb3d3` の呼び出し先 `0x409410` は import ではなく PE 内の関数で、その中の `call qword ptr [rip+0xf9c86c]` は IAT ではなく `.data` (RVA `0xfa5c90`) の関数ポインタを指す。その値は `0x407a50` (REPORT_5141 の関数) で、戻り値は `4073c0` (VirtualAlloc) に依る。これは REPORT_5141 の「外部依存」と同じ結論になる。
+- 受入 2 を達成した。変更前後で verdict は全 48 関数・全 51 site で不変 (§2)。打ち切り位置 (barrier の番地または outcome) が変わったのは 3 site (`5cb210`・`7e45e0`・`f61710`)。
+- issue 本文の前提は一部違った。`5cb3d3` の呼び出し先 `0x409410` は import ではなく PE 内の関数で、その中の `call qword ptr [rip+0xf9c86c]` は IAT ではなく `.data` (RVA `0xfa5c90`、VA `0x13a5c90` = image base `0x400000` + RVA) の関数ポインタを指す。以下、`.data` の位置は VA で書く。その値は `0x407a50` (REPORT_5141 の関数) で、戻り値は `4073c0` (VirtualAlloc) に依る。これは REPORT_5141 の「外部依存」と同じ結論になる。
 
 ## 2. 測定
 
@@ -19,8 +19,16 @@
 | site | 51 (UNDETERMINED 46 / DROP 3 / LIVE-IN 1 / PTR_READ 1) | 51 (同じ) |
 | verdict の差 (関数) | — | **0** |
 | verdict の差 (site) | — | **0** |
-| 打ち切り理由の差 | — | **1** (`5cb4aa`: `BARRIER(ALIAS_FRAME_PTR)` → `BARRIER(LEAK_STORE)`) |
+| 打ち切り位置の差 (site) | — | **3** (下表) |
 | `nonframe_stores` の差 (関数) | — | **0** |
+
+打ち切り位置の差 (site 単位・旧 `b63a955` と新 `9bd4afd` の `sites[].barrier_addrs`・`outcomes` を `(fn, addr)` で突き合わせた結果。verdict は 3 site とも UNDETERMINED のまま変わらない):
+
+| site (fn / addr) | 変更前 | 変更後 |
+|---|---|---|
+| `5cb210` / `5cb4aa` | barrier `5cb47d` `ALIAS_FRAME_PTR` | barrier `5cb456` `LEAK_STORE` |
+| `7e45e0` / `7e48d6` | barrier `7e48ce` `ALIAS_FRAME_PTR` | barrier `7e4629` `ALIAS_FRAME_PTR`、新たに outcome `STORE` (`7e4659 mov dword ptr [rbp+0x6c], eax`) |
+| `f61710` / `f61ce6` | barrier `f61c6b` `ALIAS_FRAME_PTR` | barrier `f6192b` `ALIAS_FRAME_PTR`、新たに outcome `ENTRY_AFTER_CALL` |
 
 - 対照 (既存結果との byte 一致): `audit_frame_store_callee_3228.py` (同じ判定器を import) の出力は `results/frame_store_callee_3228_head_4238.json` と `cmp` で一致。`alias_evidence_4167.py` の出力は `results/alias_evidence_4167.json` と `cmp` で一致。判定器の変更が既存の判定を変えていないことを確かめた。
 - 免除だけの実験 (call 戻り値の規則なし、`ALIAS_FRAME_PTR` を NONFRAME の store で免除) でも verdict は変わらなかった。打ち切りは `5cb456` (LEAK_STORE) へ移った。
@@ -40,7 +48,7 @@
 
 | 呼び出し | 解決先 | 判定 |
 |---|---|---|
-| `409410` の `call qword ptr [rip+0xf9c86c]` (`40941e`) | `.data` `0x13a5c90` の値 `0x407a50` (IAT ではない) | 間接 call。判定器は解決せず False (保守的) |
+| `409410` の `call qword ptr [rip+0xf9c86c]` (`40941e`) | `.data` (VA `0x13a5c90`) の値 `0x407a50` (IAT ではない) | 間接 call。判定器は解決せず False (保守的) |
 | `0x407a50` の戻り値 | REPORT_5141 §3・§4 のとおり `4073c0` (VirtualAlloc) の戻り値に依る | **未確定 (外部)** |
 
 - 判定器は間接 call を解決しない。`call_ret_nonframe` は直接 call (`CS_OP_IMM`) だけを追う。したがって `5cb456` の `rdi` は「非 frame と示せない」で、`5cb4aa` は UNDETERMINED。
