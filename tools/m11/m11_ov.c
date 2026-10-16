@@ -29,6 +29,29 @@ typedef unsigned char u8;
 #define Q(lva) (*(volatile u64*)(uintptr_t)(lva))
 #define D(lva) (*(volatile u32*)(uintptr_t)(lva))
 #define B(lva) (*(volatile u8*)(uintptr_t)(lva))
+#ifdef M11_WATCH_C5695
+#ifndef M11_WATCH_LO
+#define M11_WATCH_LO (0x12ba808ull + 0x778ull)
+#endif
+#ifndef M11_WATCH_HI
+#define M11_WATCH_HI (0x12ba808ull + 0x814ull)
+#endif
+static unsigned long long m11_cw_n = 0;
+static void* m11_cwatch(u64 a, u64 n, u32 line) {
+    if (a + n > (u64)M11_WATCH_LO && a < (u64)M11_WATCH_HI) {
+        m11_cw_n++;
+        if (m11_cw_n <= 20000)
+            fprintf(stderr, "[a1c] line=%u addr=%llx n=%llu hit=%llu\n", line, (unsigned long long)a, (unsigned long long)n, m11_cw_n);
+    }
+    return (void*)(uintptr_t)a;
+}
+#undef Q
+#undef D
+#undef B
+#define Q(lva) (*(volatile u64*)m11_cwatch((u64)(uintptr_t)(lva), 8, __LINE__))
+#define D(lva) (*(volatile u32*)m11_cwatch((u64)(uintptr_t)(lva), 4, __LINE__))
+#define B(lva) (*(volatile u8*)m11_cwatch((u64)(uintptr_t)(lva), 1, __LINE__))
+#endif
 
 typedef struct { u32 va; void* fn; } m11_disp_ent;
 extern const m11_disp_ent m11_disp_tab[];
@@ -311,6 +334,9 @@ u64 m11_InitLib(u64 ctx, u64 a1, u64 a2, u64 tbl, u64 dllproc, u64 hinst, u64 re
     u64 r13 = R(reason < 2 ? 0x11eac80 : 0x11eada8);
     u64 tmp[30];
     memcpy(tmp, (void*)(uintptr_t)(ctx + 0x38), 240);
+#ifdef M11_WATCH_C5695
+    m11_cwatch(ctx, 296, __LINE__);
+#endif
     memcpy((void*)(uintptr_t)ctx, (void*)(uintptr_t)r13, 296);
     memcpy((void*)(uintptr_t)(r13 + 0x38), tmp, 240);
     Q(r13 + 0x10) = a1;
@@ -531,6 +557,9 @@ static void ov_initinst_nested(u64 cls, u64 inst) {
 u64 function_40fb40(u64 self, u64 inst) {
     int flag = 0;
     u64 cls = self;
+#ifdef M11_WATCH_C5695
+    m11_cwatch(inst, (u64)(long long)(int)D(self - 0x80), __LINE__);
+#endif
     memset((void*)(uintptr_t)inst, 0, (size_t)(long long)(int)D(self - 0x80));
     Q(inst) = self;
 #if M11_INSTR_40F960
@@ -1489,6 +1518,9 @@ unsigned long long function_40a3b0(void) {
  * n <= 0 は何もしない。n > 0 のとき n byte を val (下位 8bit) で埋める。 */
 unsigned long long function_40d210(void *p, unsigned long long n, unsigned long long val, unsigned long long x) {
     (void)x;
+#ifdef M11_WATCH_C5695
+    if ((long long)n > 0) m11_cwatch((u64)(uintptr_t)p, n, __LINE__);
+#endif
     if ((long long)n > 0) memset(p, (int)(val & 0xff), (size_t)n);
     return 0;
 }
