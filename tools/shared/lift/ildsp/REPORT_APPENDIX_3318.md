@@ -10,26 +10,41 @@
 - `tools/shared/lift/ildsp/ci_lift.sh`:
   - `ci.rs_norm.ll` から `uselistorder` 行を除いて `ci.emc.ll` を作る。LLVM 21 系の emcc が `uselistorder i64 %arg1, { 1, 0, 2 }` の index 数を受け付けず、`clang` が `wrong number of indexes, expected 4` で止まったため (順序メタ情報で意味は持たない)。
   - `ci.emc.ll` を `-c` で obj 化、`ci_helpers.c` も obj 化。
-  - 間接 call 2 件の宛先 `function_1801cb5e0`・`function_1801cb600` の declare を検査し、`uint64_t f(void){ __builtin_trap(); }` を `ci_traps.c` に生成して obj 化。検査は `^declare i64 @<name>\(\)` (引数列が空) に限る。declare が無い・引数が付いている場合は exit 1 (引数付きの declare は `-w` で型不一致の警告が隠れるため)。
-- 測定 commit: `6220b651d` (gate と trap を入れた時点)。以降の変更は `4ed054729` (ヘッダコメントのみ)・`5dd6a2118` (docs のみ)・本 fix の commit (検査の正規表現を `()` に限定)。§3 の実測は `4ed054729` で取った値 (実行経路は `6220b651d` と同じ)。本 fix の commit の実行は §4 の注を参照。
+  - 間接 call 2 件の宛先 `function_1801cb5e0`・`function_1801cb600` の declare を検査し、`uint64_t f(uint64_t a){ (void)a; __builtin_trap(); }` を `ci_traps.c` に生成して obj 化。検査は `^declare i64 @<name>\(i64\) ` (引数 1 個の i64) に限る。declare が無い・引数の型や個数が違う場合は exit 1。
+  - RetDec 出力の実際の declare は `declare i64 @function_1801cb5e0(i64) local_unnamed_addr` と `...cb600(i64)` で、引数は 1 個の `i64` (直前の `()` 版は実 IR と合わず exit 1 になった。§4 の NC-B)。
+- 測定 commit: `6220b651d` (gate と trap を入れた時点)。以降の変更は `4ed054729` (ヘッダコメントのみ)・`5dd6a2118` (docs のみ)・`2c4b02070` (検査の正規表現)・本 fix の commit (検査を `i64(i64)` に直し、trap の定義を引数付きにした)。§3 の実測は本 fix の commit (HEAD) で取った値。
 
-## 3. 実測 (測定 commit `6220b651d`・HEAD `4ed054729` で再測定・4 core・n=3)
+## 3. 実測 (HEAD = 本 fix の commit・RetDec v5.0・emsdk 6.0.12・4 core・n=3)
+素材: `fl-win64` (`$HOME/artifacts/fl-win64.tar.zst` を `tar --zstd -xf` で展開、`extracted/block24360_PE.bin`)。RetDec は `RetDec-v5.0-Linux-Release.tar.xz` (GitHub release)、emsdk は `emsdk install 6.0.12`。runner の `/opt/` には無いので取得して使った。
+
 | 項目 | 値 |
 |---|---|
-| 実行時間 (`date` で計測) | 6220b651d: 1.816 / 1.774 / 1.870 s。4ed054729: 1.837 / 1.801 / 2.065 s |
-| load (実行前の 1 分平均) | 6220b651d: 0.36 / 0.41 / 0.41。4ed054729: 0.26 / 0.26 / 0.32 |
-| 3 回の stdout | `cmp` で 3 回とも一致 (両 commit)。rc 0・ALL OK・`[ci] emcc obj OK`・`[ci] traps: function_1801cb5e0, function_1801cb600` |
+| 実行時間 (`date` で計測) | 2.812 / 2.759 / 2.759 s (run 1–3。直前の検証 run で 2.769 / 2.768 / 2.770 s) |
+| load (実行前の 1 分平均) | 0.63 / 0.63 / 0.66 (run 1–3。`/proc/loadavg`) |
+| rc | 0 / 0 / 0 |
+| 3 回の stdout | `md5 e4d10020de6d16c6637d7a0e4a258fb5` で 3 回とも一致 (`cmp` 一致) |
+| stdout の内容 | `[census] ALL OK`・`[ci] emcc obj OK (uselistorder 除去後の IR と helper)`・`[ci] traps: function_1801cb5e0, function_1801cb600` |
 | 生成物 `ci.rs.ll` | md5 `4811e83e9e4343ad70e6ec883023641f` (§7-2 と同じ) |
 | 生成物 `ci_helpers.c` | md5 `497d886223a0625f2b236d105c7df119` (§7-2 と同じ) |
+| 生成物 `ci_traps.c` | `uint64_t function_1801cb5e0(uint64_t a) { (void)a; __builtin_trap(); return 0; }` と同形の `function_1801cb600` の 2 行 |
+
+RetDec 出力の該当行 (原文・`work/lift/ci/ci.rs.ll` の 2262・2264 行目):
+```
+declare i64 @function_1801cb5e0(i64) local_unnamed_addr
+declare i64 @function_1801cb600(i64) local_unnamed_addr
+```
 
 ## 4. ネガティブコントロール
+検査部分 (`ci_lift.sh` の python ブロックそのもの) を、実 RetDec の `ci.emc.ll` に対して直接実行した。
+
 | 名前 | 壊し方 | 結果 |
 |---|---|---|
-| NC-trap | `ci.emc.ll` から `declare i64 @function_1801cb600()` を削除して検査だけを実行 | `[ci] indirect call target not declared as i64(): function_1801cb600`・rc 1 |
-| NC-trap-args (fix で追加) | `declare i64 @function_1801cb5e0(i64)` (引数付き) を入れて検査だけを実行 | `[ci] indirect call target not declared as i64(): function_1801cb5e0`・rc 1 |
-| 正例 (fix で追加) | `declare i64 @function_1801cb5e0()`・`declare i64 @function_1801cb600()` を入れて検査だけを実行 | `[ci] traps: function_1801cb5e0, function_1801cb600`・rc 0 |
+| 正例 (実 IR) | 実 RetDec の `ci.emc.ll` をそのまま入力 | `[ci] traps: function_1801cb5e0, function_1801cb600`・rc 0 |
+| NC-A | `declare i64 @function_1801cb600(...)` の行を削除 | `[ci] indirect call target not declared as i64(i64): function_1801cb600`・rc 1 |
+| NC-B | `function_1801cb5e0` の declare を `()` に書き換え (2c4b02070 の検査が受理した形) | `[ci] indirect call target not declared as i64(i64): function_1801cb5e0`・rc 1 |
+| NC-C | `function_1801cb600` の declare を `(i64, i64)` に書き換え (引数個数違い) | `[ci] indirect call target not declared as i64(i64): function_1801cb600`・rc 1 |
 
-注: NC の検査は `ci_lift.sh` の検査部分を合成 IR (上の 3 種) に対して直接実行した。wasm のビルドまでの経路 (RetDec・emcc) は下の注のとおり未実行。
+注: NC-B は 2c4b02070 の検査 (`()` 限定) が実 IR では誤って落ちることの確認。そのため本 fix で `(i64)` に直した。
 
 ## 5. emcc のリンク時の未解決 (未対応・#3318 に残す)
 `ci.emc.o` の未定義シンボル (`llvm-nm` の `U`) のうち、ci_helpers.o / ci_traps.o で定義されないもの (14 件。リンクは未実施。集合差の手順は §6):
@@ -41,7 +56,7 @@
 | `__unnamed_1` | IR 中の `@0` (`external global i32`・`ret i64 ptrtoint (ptr @0 ...)`) の出どころ | 画像敷設 (受入 1) |
 | `__stack_pointer` | wasm の shadow stack (リンク時に供給される) | リンク設定 |
 
-注: 間接 call の宛先 2 件 (`function_1801cb5e0`・`function_1801cb600`) は `ci_traps.o` の trap で定義済み (`ci.emc.o` の U に残るが `und_left.txt` からは外れている)。リンクは未実施 (wasm 化は #3318 に残す)。
+注: 間接 call の宛先 2 件 (`function_1801cb5e0`・`function_1801cb600`) は `ci_traps.o` の trap で定義済み。リンクは未実施 (wasm 化は #3318 に残す)。
 
 ## 6. 検証範囲 / 範囲外
 - 範囲: IR を emcc で obj 化できること・trap 定義の生成と検査。

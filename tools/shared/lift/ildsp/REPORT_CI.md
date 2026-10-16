@@ -149,4 +149,4 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 
 ## 8. emcc の obj 化と間接 call 2 件の trap 化 (T-SH-65 #3318・部分達成)
 
-結論: `uselistorder` (順序メタ情報) を除いた IR は emcc で obj 化でき、間接 call 2 件 (`function_1801cb5e0`・`function_1801cb600`) は trap 定義を入れた (検査は引数列が空の declare に限る)。wasm のリンク・実行は未実施で、IAT 10 種 (#5747)・外部グローバル 2 種 (#5748)・範囲外の直接 call 先と計算ジャンプ表 (#5749) が残る。詳細と実測は `REPORT_APPENDIX_3318.md`。測定 commit `6220b651d` (コード差分は `ci_lift.sh` のみ)。
+結論: `uselistorder` (順序メタ情報) を除いた IR は emcc で obj 化でき、間接 call 2 件 (`function_1801cb5e0`・`function_1801cb600`) は trap 定義を入れた (検査は実 RetDec 出力の `declare i64 @<name>(i64)` に合わせた)。wasm のリンク・実行は未実施で、IAT 10 種 (#5747)・外部グローバル 2 種 (#5748)・範囲外の直接 call 先と計算ジャンプ表 (#5749) が残る。詳細と実測は `REPORT_APPENDIX_3318.md`。測定 commit `6220b651d` (コード差分は `ci_lift.sh` のみ)。

@@ -32,12 +32,12 @@ import re, sys
 ir = open(sys.argv[1]).read()
 names = ["function_1801cb5e0", "function_1801cb600"]
 for n in names:
-    if not re.search(r"^declare i64 @%s\(\)" % n, ir, re.M):
-        sys.exit("[ci] indirect call target not declared as i64(): %s" % n)
+    if not re.search(r"^declare i64 @%s\(i64\) " % n, ir, re.M):
+        sys.exit("[ci] indirect call target not declared as i64(i64): %s" % n)
 with open(sys.argv[2], "w") as fh:
     fh.write("#include <stdint.h>\n")
     for n in names:
-        fh.write("uint64_t %s(void) { __builtin_trap(); return 0; }\n" % n)
+        fh.write("uint64_t %s(uint64_t a) { (void)a; __builtin_trap(); return 0; }\n" % n)
 print("[ci] traps: " + ", ".join(names))
 PY
 emcc -c -O1 -w "$W/ci_traps.c" -o "$W/ci_traps.o"
