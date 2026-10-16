@@ -75,6 +75,10 @@ rc = 0
 if missing:
     print(f"[census] FAIL: 範囲の関数が define されていない: {missing}")
     rc = 1
+orphan = sorted(set(extra) - set(extra_ref))
+if orphan:
+    print(f"[census] FAIL: 範囲外の define が IR のどの call からも参照されない (計算ジャンプ表の経路の欠落の疑い・REPORT_CI §2-2 (b)): {orphan}")
+    rc = 1
 
 if len(sys.argv) > 3:
     EXPECT = {"movups": 3, "movntps": 8, "movaps": 7, "movapd": 1}

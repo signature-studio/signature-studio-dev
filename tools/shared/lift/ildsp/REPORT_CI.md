@@ -146,3 +146,28 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 | `movapd` の helper 分岐は実装したが、復元後 IR に `movapd` が無く生成 0 件。テストと NC は無い | 実行されない分岐 (未検証) | [T-SH-65] #3318 |
 | 差分 (native と wasm の全バイト比較・gate) | 復元の意味論が未検証 | [T-SH-66] #3320 |
 | IAT stub・閉包の取りこぼし・emcc | wasm 化 | [T-SH-65] #3318 |
+
+## 8. 方針の決定と census の検出 (T-SH-153 #5749)
+
+結論: (a) は閉包規則を変えず範囲外のままにする。(b) は受入として扱わず、census が FAIL で検出するようにした。IR の計算ジャンプ経路の修復は未了 (#3318)。
+
+### 8-1. (a) 直接 jcc 先 function_1801aef40
+- x86: 0x1aefa7 `jne 0x1801aef40` は **条件分岐**。0x1aef40 は `rep stosb` の memset ヘルパで、`ret` は呼び出し元へ戻らず 0x1aef60 の呼び出し元 (閉包の外) に返る。
+- IR: `call i64 @function_1801aef40` の後に fall-through で 0x1aefa9 へ続く。つまり IR は jcc を call に化かしている。これは現行の IR (baseline) に既にある誤モデルで、閉包を広げても直らない。
+- 試算 (scratch, 非コミット・`work/` の probe): jcc を辿ると 37 関数・969 命令 (+1 関数・+8 命令)。`ci_ranges.py` に入れて `ci_lift.sh` を回すと、RetDec は 0x1aef40 を `__asm_rep_stosb_memset` の呼び出しとして出し、`gen_helpers.py` が未対応の signature で exit 1 になった。閉包規則は戻し、コードの差分は 0 (`ci_ranges.py` は HEAD と同じ)。
+- 決定: 範囲外のまま扱う。誤モデルを閉包で正すには IR の jcc 扱いを直す必要があり、#3318 で扱う。
+
+### 8-2. (b) 計算ジャンプ表の経路 (n = 1〜16)
+- 決定: 欠落を受入として扱わない (silent miscompile を見逃さない)。census に検査を入れた。
+- 追加した検査 (`ci_census.py`): 範囲外の define のうち、IR のどの `call` からも参照されないものを FAIL にする。baseline では 9 件 (function_1801af090 ほか 8 件) が該当し、`ci_lift.sh` は rc 1 になる。
+- 本 PR の `ci_lift.sh` は HEAD で rc 1 を返す。これは (b) が未修復であることを示す意図した結果。修復 (表を解く経路を IR に戻す) は #3318 で行い、その時点で rc 0 に戻る。
+- 実測 (HEAD `ci_census.py` 変更後・4 core・n=1): 出力末尾 `[census] FAIL: 範囲外の define が IR のどの call からも参照されない ... ['function_1801af090', ..., 'function_1801af0e8']` (9 件)・rc 1。範囲の 36 関数は define 欠落 0 (他の検査は通る)。
+
+### 8-3. 閉包規則の再測定
+閉包規則 (`ci_ranges.py`) は変えていない。36 関数・961 命令・間接 call 10 は HEAD で再現 (`ci_ranges` ok)。よって 36/961 の再測定は要らない。8-1 の 37/969 は試算値のみ。
+
+### 8-4. 未解決 (起票先)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 計算ジャンプ表の経路 (n = 1〜16) を IR に戻す (RetDec 内部の段は未確認) | 1〜16 バイトの書込みの欠落 (census は FAIL で検出中) | [T-SH-65] #3318 |
+| 直接 jcc 先 function_1801aef40 の誤モデル (jcc を call として扱う) | 範囲・意味論。閉包を変えると wasm 化の前提が変わる | [T-SH-65] #3318 |
