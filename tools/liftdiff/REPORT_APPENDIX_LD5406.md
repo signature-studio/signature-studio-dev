@@ -19,7 +19,7 @@
 | diff | diff | 3 |
 
 - 合計: 旧 both_fault 24 / native_fault 15 / diff 3 → 新 both_fault 24 / native_fault 9 / diff 8 / equal 1。**wasm_trap 0 件、equal 1 件**。
-- 旧 both_fault の 24 件は native が vmtf でも segv のまま (wasm は trap のまま)。`wasm_trap` (native ok・wasm trap) への遷移は 0 件。
+- 旧 both_fault の 24 件は、vmtf でも native は 24 件すべて fault のまま。wasm は trap のままが 23 件 (`0xa96620` fvm0 は wasm ok に変化)。`wasm_trap` (native ok・wasm trap) への遷移は 0 件。
 - 結論: 受入 2 の**根拠付きの件数は 1 件 (equal)**。上限の推定 (wasm_trap 24・equal 18) は this の埋め方を変えた実測で大きく下がった。残り 41 件の阻害要因は未切り分け (native の segv 箇所と、wasm の trap・stub の原因は本測定では確認していない)。
 - **未切り分け**: 残り 8 件の native_fault→native_fault (addr の変化の原因)、wasm_trap 0 件の理由 (wasm の trap は this の内容ではなく stub・境界の欠陥と見られる)。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/liftdiff/ld5406_fvm_fill.py` (約 6 秒・出力 `work/m11/ld5406_fill.jsonl`)。
