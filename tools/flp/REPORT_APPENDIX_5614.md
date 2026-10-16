@@ -59,7 +59,25 @@ probe: `tools/flp/s10_setter_hit_probe.sh` (gdb `-x tools/flp/s10_setter_hit.gdb
 | `0x737560` の所属 VMT | 同上 | #5614 (同上) |
 | `0x79fd44` 経由の呼出しの `dl` 値 | この観測では命中なし | #5614 (同上) |
 
-## 6. 再現
+## 6. 追加実測 (run 38941207596 の再投入・s11)
+
+probe: `tools/flp/s11_setter_obj_probe.sh` (gdb `-x tools/flp/s11_setter_obj.gdb`)。命中時に `rcx` (this) の前後 0x20 バイトと戻り先を、先頭 40 件だけダンプする。
+
+| 項目 | 値 |
+|---|---|
+| 命中 (WAIT_SEC=200・real 3 m 21.2 s) | 14,867 回 (`hits=14867`・gdb rc=124) |
+| `dl` | 命中の上位で `0x00`・`0x01` (先頭 19 件を確認) |
+| `rcx` (this) の範囲 | `0x03421510`〜`0x03424570` など、ヒープ (FLEngine の .text 外) |
+| 先頭 qword (`*rcx`) | `0x7aa64d10` (先頭 40 件のうち確認した件) |
+| 先頭 qword の所属 | `.text` (`0x7aa64d10`・`0x7aa65908` は RVA `0x334d10`・`0x335908`)。`.rdata` ではない |
+| 中身の先頭 4 qword (`.text` 側) | `0x60e680`・`0x60cab0`・`0x50cc60`・`0x60e2b0` (= .text の関数列。VMT の並びとは見えない) |
+
+判定: 命中時の this の先頭は .text の関数アドレスを指す。前回 (§4) と同じく .rdata の VMT としては読めない。この観測だけでは cfg の型と所属 VMT は確定しない。`.text` の値が「関数ポインタ 1 段」なのか、this のオブジェクトの取り方が違うのかは未確認。次は `0x7aa64d10` を指す先の .text を逆アセンブルするか、this を生成する ctor (new の戻り) にブレークを張る。
+
+測定 commit: `64ac5dc19` (s11 の probe を追加した commit)。
+probe の 1 行 (s11 の結果 `hits`) は `grep -c '^HIT ' "$RUNNER_TEMP/s11_gdb_session.txt"` で再現できる。
+
+## 7. 再現
 
 ```sh
 mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
