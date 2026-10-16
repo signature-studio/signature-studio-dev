@@ -695,6 +695,7 @@
 | `tools/python/REPORT_PY159.md` | 134 | PY-159 (#3086): PY-88 の 65 件の `[rbp+0x5b8]` 書込みの全件表 (VA・式・未確定印)。手計算突合 (SLOT 非依存の 7 件) とネガティブコントロールを実施。結果は `REPORT_PY159.md` §4。残りの SLOT 依存 55 件と ACC 合流は #2874 (PY-99) |
 | `tools/python/REPORT_PY163.md` | 97 | PY-163 (#3135): PY-88 の VCALL 3 件の呼出し先・引数・戻り値式 (CFG 到達定義による式。呼出し先は実行時データで未確定)。結果は `REPORT_PY163.md` §1・§3〜§5。解析は `analysis/py163_vcall.py` |
 | `tools/python/REPORT_PY5407.md` | ~70 | PY-5407 (#5947・親 #4658): device.repeatMidiEvent (PE 0xd762f0)・stopRepeatMidiEvent (PE 0xd764a0) の VA 表と dispatch status 経路 (`task+0x60` → `*out` を PE で確定)。述語 0x11d1430 は真と仮定。C/mock は device 無し -7 のみ |
+| `tools/python/REPORT_PY5406.md` | ~80 | PY-5406 (#5838 の子・親 #5838): wine64 9.0 上の FLEngine_x64.dll 署名検証の切り分け。WinVerifyTrust は 1 回目 0x80096004・2 回目 0 (両方観測)。未対応 decoder fixme との因果は未確定。`wine_fl_probe.sh` が再現手段 |
 | `tools/python/REPORT_PY5392.md` | ~40 | PY-5392 (#5838・親 #5771): wine64 9.0 の導入可否 (導入済み)・FLEngine_x64.dll の展開同一性 (SHA-256 一致)・FL64.exe の relay での FLEngine 読込み開始。watch 0x15e4280 は未 hit (未確認)。`wine_fl_probe.sh` が再現手段 |
 | `tools/python/REPORT_PY359.md` | 67 | PY-359 (#4703): py88 式の手計算照合。G8 の 2 地点 (0x104c51a・0x104c56d) を `py64_check_expr.py` の HAND 表に加えて mismatch 0。親 #3101 の受入 1 の残り 9 地点は子 #4712 (PY-360)。§6 (PY-4909・#5800): py99 の SLOT・CALL 展開 (`ExpSlicer`) を突合に接続し、0x104b305 の 1 地点を mismatch 0 で照合 |
 | `tools/python/REPORT_PY161.md` | 94 | PY-161 (#3101): py88 の movabs 対応 (65 件の式表の変化は 1 件・0x104b843 の edx・r8d)、表引きの整数演算による検算 (`analysis/py161_movabs_check.py`)、0x104a945 の r8d の到達集合。結果は `REPORT_PY161.md` §3〜§5。残りの受入 (G11・vtbl・T ポインタ・戻り値式) は #3101 |
@@ -1109,7 +1110,7 @@
 | `tools/targets/serum2/gui/REPORT_SR57.md` | ~73 | SR-57 (#3626, SR-28 受入 3): patch 後の demo 表示経路の静的確認。demo 表示 `0x18004fc9c` は patch 後に関数内で到達不能 (証明)、`0x1800501c0` は汎用ヘルパで非 demo の呼出元が残るため受入文の前提は不成立、overlay_demo_version は呼出元 0 件。解析は `demo_dialog_reach.py` / `demo_dialog_strings.py` |
 | `tools/targets/serum2/gui/REPORT_M7_CANVAS.md` | ~120 | SR-7 (#68) の M7 接続照合 (静的): CanvasFrame を tools/gui の surface・out ring の記号と照合 (`gui/m7_canvas_connect.py`)。設計上は接続可・実装は一部のみ・画素形式が不一致。数値の正本は本体 §0・§2 |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
-| `tools/targets/serum2/gui/REPORT_APPENDIX_5935.md` | ~65 | #5935 (SR-97) 付録: 収束後の未解決間接 call 6 箇所の分類。slot `0x1817bf760` 由来 4 箇所・未確認 1 箇所・CFG 照合未実施 1 箇所 (PE 無しで未測定)。受入は未達のため `Refs #5935` |
+| `tools/targets/serum2/gui/REPORT_APPENDIX_5935.md` | ~65 | #5935 (SR-97) 付録: 収束後の未解決間接 call 6 箇所の分類。PE 実測後: slot `0x1817bf760` 由来 5 箇所 (PE 上は store 0 件・初期値 0)・CFG dispatch 経由 1 箇所 (Load Config 一致)。受入は未達のため `Refs #5935` |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_5005.md` | ~108 | #5005 付録 (#5034 SR-85): XferOnOffButton の間接 call の候補化と閉包の上限。own vtable の候補を加えて反復し 162 関数・23,190 B に収束 (真の上限ではない)。手順・実測は付録 §5.1〜§5.6 |
 | `tools/targets/serum2/gui/REPORT_SR48.md` | ~80 | SR-48 (#3236): ARG・THIS の呼出元を直接 call/jmp でたどる分類 (`sr48_arg_this.py`)・SC 伝播の末尾 jmp 拡張。ARG・THIS の型は確定 0 件 (残りは #4122)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR43.md` | ~115 | SR-43 (#2174): 間接 call `call [R+disp]` の呼出先オブジェクトを所属関数の this / 引数まで遡る分類 (`receiver_this_trace.py`)・判定点のネガティブコントロール (`negctl_this_trace.py`)。受信が SerumController の this と確定できた候補は 0 件 (残りは #3236・#3237)。測定値の正本 |

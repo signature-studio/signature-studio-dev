@@ -83,6 +83,7 @@
 - 経路の分岐 (PE 確認・検査 19 件 PASS): `slotIndex == -1` (channel) は `0x1005730(index, dl, &obj)` で obj を得て、`0x132f780(obj)` = `[obj+0x64] >= 0` で有効性を見る (`0xd80b27`〜`0xd80b3d`)。slot 経路は `obj = [mixer配列 + index*0x28f*8 + slot*8 + 0x134c]` で得て、同じく `0x132f780` で見る (`0xd80c12`〜`0xd80c65`)。`0x1005730` の obj の取り方は `0xfe8bb0(array, index)` の戻り値 (`[array+8][index]`、範囲外は NULL。`0xfe8bb0`〜`0xfe8bd5`)。配列の要素型は、この関数の呼出し元と格納元 (未追跡) で決まるため未同定。
 - 訂正 (PY-5361 #5490・本 run): 前 run までの「`0xd80b40` で `ecx = [rbp+0x90]` (32 bit)」は誤読。`0xd80b40` は命令の途中で、正しい開始は `0xd80b3f` の `mov rcx, qword ptr [rbp+0x90]` (64 bit)。検査の開始位置も `0xd80b3f` に直した。
 - `0x1331340(this, &out)` は `[this+0x38]` が非 NULL なら `&([this+0x38]+0x48)`、NULL なら NULL を out へ代入する。out が NULL のままなら `[rip+0x63d9c6]` の値で代入し直す (`0x1331362`〜`0x1331372`)。代入は `0x41a7b0` (新値 AddRef・旧値 Release) (`0x1331340`〜`0x133137f`・`0x41a7b0`〜`0x41a7f4`)。
+- 本 run の追加確認 (検査 22 件 PASS): channel 経路の obj は `0xd80b1b`〜`0xd80b22` で `0x1005730(..., &[rbp+0x90])` により out に入り、`0xd80b2f` の `0x132f780` を経て、`0xd80b3f` で `[rbp+0x90]` を `0x1331340` の this に渡す。`0x1331340` の out は `[rbp+0x78]` (`0xd80b46`)。`[rbp+0x78]` の値の `vtbl[+0x20]` (`0xd80b5a`) の戻りが obj2 で、`obj2.vtbl[+8]` は `0xd80b8d`。obj2 の class は未確定。
 - **未確認 (受入 1 の未達)**: `vtable[+8]` の先の VA。obj の class (vtable) は、`[this+0x38]` の書込み元 (コンストラクタ・代入箇所) で決まるため、この run では未同定。ID `0x21` の意味。flag・paramIndex の意味。`[rip+0x8636ce]` の関数の名前。
 
 ## 5. C・mock への影響
