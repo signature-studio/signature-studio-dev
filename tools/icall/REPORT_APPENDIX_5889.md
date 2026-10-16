@@ -5,7 +5,7 @@
 
 ## 1. 結論
 
-- **受入 1 (6 関数の機構): 部分達成。** `RtlPcToFileHeader` の戻り値が分岐に効くのは `_CxxThrowException` (`18102f728`) の中だけと確認した。6 関数 (`1803b3fc0`・`1803b5b60`・`180cbd860`・`18100cf60`・`181011058`・`18102f728`) は、単歩トレースで同じ経路を通ることを確認した。ただし **issue 本文の前提 (6 関数が rc=99) は現 main と合わない**。実測は rc=97 (`RaiseException(0xe06d7363)` の handler 無し fail-fast)。rc=99 は `UnhandledExceptionFilter` の 2 件 (`18100ca28`・`18103d218`) だけ。
+- **受入 1 (6 関数の機構): 部分達成。** 6 関数 (`1803b3fc0`・`1803b5b60`・`180cbd860`・`18100cf60`・`181011058`・`18102f728`) は、単歩トレースで `_CxxThrowException` を経て `RaiseException` に入る経路を通ることを、前回測定 (下記 §3) で確認した。`RtlPcToFileHeader` の戻り値が分岐に効くのは `_CxxThrowException` (`18102f728`) の中。ただし次の 2 点は未確認で、受入 1 の残件 (§6): (a) 分岐条件の `rbx` (ThrowInfo) の属性ビットを、単歩の実行時値で確認していない。(b) IAT slot `0x1810c4310` の名前 (`RtlPcToFileHeader`) を、PE の import 表から再確認していない (素材 `SlateCore.core_64` が本 run に無い)。ただし **issue 本文の前提 (6 関数が rc=99) は現 main と合わない**。実測は rc=97 (`RaiseException(0xe06d7363)` の handler 無し fail-fast)。rc=99 は `UnhandledExceptionFilter` の 2 件 (`18100ca28`・`18103d218`) だけ。
 - **受入 2 (`18100cc50`): 確認済み。** `RtlCaptureContext` の戻り値 `rax` は捨てられ、CONTEXT (`rcx`) は後続の `RtlVirtualUnwind` の入力になる。分岐を決めるのは `RtlLookupFunctionEntry` の戻り値。現 main では rc=0 で完走する (rc=99 ではない)。
 - **受入 3: 該当なし** (1・2 とも確認済みの範囲で記録した)。
 - **issue 本文の訂正**: 「`RtlPcToFileHeader` は分岐を変えない」という静的解析 (#5887) の見立ては、`_CxxThrowException` の magic 選択 (`0x19930520` / `0x1994000`) については正しい。ただし magic は `RaiseException` 後の例外レコードに入るだけで、guest の分岐そのものは `RaiseException` が fail-fast する時点で止まる。
@@ -30,6 +30,7 @@
 | `18100cc50` | 0 | 5539 | 正常完走 (`DONE`) |
 | `18100ca28`・`18103d218` | 99 | (未測定) | `MISSING IMPORT UnhandledExceptionFilter` |
 
+注: 上表は前回測定の値 (測定 commit `749a27433` の上に `cf4c8f666` の `slot_trace.c` 変更を載せたもの)。測定後のコード差分は `git diff cf4c8f666 HEAD -- tools/icall/diff tools/ott` で 0 行 (本 review 対応時点)。本 review 対応の run では素材 (`plugins-freshair` / `work-icall` / `work-liftlib-targets`) が無く、再実行していない。再測定は未実施 (§6)。
 注: 修正前の同条件 (`SLOT_ENC_INIT=1` の既定 rc) は `1803b3fc0`・`1803b5b60`・`180cbd860`・`18100cf60`・`181011058`・`18102f728` が 97、`18100cc50` が 0。`18100ca28`・`18103d218` が 99。
 
 ## 4. 機構 (逆アセンブル + 単歩の突き合わせ)
@@ -52,7 +53,7 @@
 
 - 単歩の実値 (次に実行された命令): 5 関数 (`1803b3fc0`・`1803b5b60`・`180cbd860`・`18100cf60`・`181011058`) は `18102f777` の直後に `18102f78b` を実行し、magic=`0x19930520`。このとき `rax`=`0x180000000` (IMG_BASE)。
 - `18102f728` 自身の単歩 (rc=97・magic=`0x1994000`) は `18102f777` の直後に `18102f786` を実行し、`rax`=`0x0`。`18102f786` は magic を `0x1994000` に置く命令。
-- ThrowInfo (`rbx`) の attributes は 5 関数の throwinfo (4 種: `0x181258050`・`0x1812589c0`・`0x1812589f8`・`0x1812591b0`) すべてで `0x0` (素材の PE 読取り。bit3 = 0)。よって `18102f77c` の `testb $0x8` は全件で不成立となり、分岐は `rax` (`RtlPcToFileHeader` の戻り値) だけで決まる。
+- ThrowInfo (`rbx`) の attributes は 5 関数の throwinfo (4 種: `0x181258050`・`0x1812589c0`・`0x1812589f8`・`0x1812591b0`) すべてで `0x0` (前回の素材の PE 読取り。bit3 = 0)。これは静的読取りであり、単歩の実行時 `rbx` の値 (`REG_RBX`) と、その先の attributes の読取りは未確認。実行時の `rbx` が上記 4 種のいずれかであることも、本 run では確認していない。よって「分岐は `rax` だけで決まる」は、静的読取りを前提とした推定として扱う (§6)。
 - よって `RtlPcToFileHeader` の戻り値 (`rax`) が magic 値 (`0x19930520` か `0x1994000`) を決める。`rax` が IMG_BASE なら `0x19930520`、0 なら `0x1994000`。`18102f728` 単独は `rbx`=`0x50000420` (ThrowInfo ではなく別の引数) で、属性の読取りは未実施 (`rbx` が 0 でないため `18102f77c` に入る)。
 - 6 関数は issue の列挙どおり。うち `18102f728` は `_CxxThrowException` 本体で、他 5 関数の呼び出し先でもある。
 - **分岐を変えるのは `RtlPcToFileHeader` の戻り値そのもの。** 戻り値が guest の制御フロー (`18100cc50` 系の unwind 分岐) には効かない。guest 側の分岐は `RaiseException` の handler 検索 (`eh_walk`) で止まり、handler の有無で rc が決まる。
@@ -69,13 +70,18 @@
 
 - `tools/icall/diff/fa_import_names.py` の出力は、IAT idx 64 を `LoadLibraryExW` と返す (`python3 tools/icall/diff/fa_import_names.py` の `idx 64`)。`REPORT_APPENDIX_2083.md` の「idx 64 = `KERNEL32!RtlPcToFileHeader`」は、現行の import 表の並びと合わない。
 - 本付録では、IAT スロット VA を PE の import 表から直接引いた値を採った: `0x1810c4310` = `RtlPcToFileHeader` (import index 85)・`0x1810c4318` = `RaiseException` (86)・`0x1810c4290` = `RtlCaptureContext` (69)・`0x1810c4298` = `RtlLookupFunctionEntry` (70)・`0x1810c42a0` = `RtlVirtualUnwind` (71)。
-- `fa_import_names.py` の idx の扱い (`ott_native.c` の `g_impname` と一致するか) は未確認。起票先: 本 issue の範囲外 (`tools/icall` の import 表の検証は #2083 系の子で扱う)。
+- 既存記録との差の原因 (時系列で確認): `REPORT_APPENDIX_2083.md` の「idx 64 = `RtlPcToFileHeader` (missing)」は 2026-10-14 の記録 (`f987d34ef`)。`ott_native.c` に `RtlPcToFileHeader` の native 実装 (`k_RtlPcToFileHeader`) が入ったのは 2026-10-15 の `b64cb3ae3` (ICALL-52)。実装が入ると `ott_load` の missing 登録順 (`g_nimp`) がずれるため、旧記録の idx 64 と現在の idx 64 が別の名前になるのは説明がつく。`fa_import_names.py` は現在の `ott_native.c` の IMPL を基に idx を振るので、現在は idx 64 = `LoadLibraryExW` を返す。
+- 未確定: IAT slot `0x1810c4310` が `RtlPcToFileHeader` であること (PE の import 表の再読取り) と、`ott_native.c` の `g_impname` がこの slot に同じ名前を割り当てること。どちらも `SlateCore.core_64` が本 run に無く、確認できていない。単歩で call 先の stub の名前を見ることもしていない。したがって 6 関数の機構は「`RtlPcToFileHeader` の戻り値が magic を決める」を前提にした推定。
+- 起票先: 未起票 (PM 判断)。import 表の検証は本 issue の範囲外。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `18100ca28`・`18103d218` の rc=99 (`UnhandledExceptionFilter`) の単歩 | #4881 の判断の対象 (本 issue の対象外) | #4881 (PM 判断) |
-| `fa_import_names.py` の idx 64 と IAT 実名の不一致 | 既存付録 (`REPORT_APPENDIX_2083.md`・`REPORT_APPENDIX_2247.md`) の import 名の記録 | 未起票 (PM 判断。本 PR では訂正のみ) |
+| 受入 1 の残件: 実行時の `rbx` (ThrowInfo) の値と attributes の単歩確認 (`REG_RBX` を取り、`testb $0x8` の不成立を示す) | 受入 1 の分岐条件 (`rax` だけで決まる、という主張) | 未起票 (本 issue の範囲内で未了。素材 `plugins-freshair` / `work-icall` / `work-liftlib-targets` が要る) |
+| IAT slot `0x1810c4310` の名前の再確認 (PE の import 表・単歩の stub 名) | 6 関数の機構 (`RtlPcToFileHeader` の戻り値が magic を決める) | 未起票 (同上の素材が要る。本 issue の範囲内で未了) |
+| 6 関数の rc・単歩 insn 数・`18100cc50` の rc=0 の再測定 | §3 の値の独立な再現 | 未起票 (同上の素材が要る。本 issue の範囲内で未了) |
+| `fa_import_names.py` の idx 64 と 2083 の記録の不一致 | 既存付録 (`REPORT_APPENDIX_2083.md`・`REPORT_APPENDIX_2247.md`) の import 名の記録。原因は §5 (実装追加の時期) | 未起票 (PM 判断。本 PR では訂正のみ) |
 | 6 関数の rc=97 (`RaiseException`) を handler 検出後の `__CxxFrameHandler` dispatch まで通すこと | 6 関数が wasm 側の結果になる条件 | #4362 (ICALL-103・既存) |
 | 受入 1 の issue 本文 (rc=99 の前提) の更新 | issue 本文と現 main の不一致 | 本 issue のコメントで PM に報告 |
