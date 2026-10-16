@@ -88,6 +88,29 @@ FL_WIN64_DIR=<展開先> python3 hs_store_supplier.py # REPORT_4130 §2 の 11 �
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `0x15e4790` の初期化の書込み元 (PE 外のランタイム、または計算アドレス経由) | 8 件の gate 入力が未確定。8 件を実行させる条件が決まらない | 本 PR の未解決。PE 外の実行時の観測 (`hs_dbg_trace.py` 系) が必要。次に実施できる条件: ランタイムの書込みを計装する run |
+| `0x15e4790` の初期化の書込み元 (PE 外のランタイム、または計算アドレス経由) | 8 件の gate 入力が未確定。8 件を実行させる条件が決まらない | #4444 (親) のチェックリストへ追記。PE 外の実行時の観測 (`hs_dbg_trace.py` 系) が必要。次に実施できる条件: ランタイムの書込みを計装する run |
 | 3 件の間接 call の受け手 VA | 応答表への反映の可否 | #4443 (PLG-P0b-48) |
 | Phase A 回帰 `dispatch=38 ff=0` の実測 | 応答表は未変更で影響なし。回帰の確認のみ | 本 PR の未解決。emsdk 6.0.12 の導入と `fw_stage2.sh` が走る run |
+
+## 8. #5547 (PLG-P0b-60) の追記: 生バイト検索と再測定
+
+測定 commit: `4a70740b7` (`hs_glob_bytes.py` の docstring のみ変更。`git diff 9364022b4 4a70740b7 -- tools/plugins/framework/hostshim/ ':!*.md'` は docstring 1 行。`hs_disp_emu.py`・`hostshim.c` は変更なし)。素材: `fl-win64` (`extracted/*_PE.bin` 313 件)。`work-fw-stage1` は展開したが、本測定では使わない (`fw_stage2.sh` の前提で、emsdk は未使用)。
+
+- `hs_glob_bytes.py` (生バイト検索): `G = 0x15e4790` と `P0 = 0x141d6b8` の 4 バイト LE を全 313 PE ブロックの全セクションで検索 → 0x15e4790 の hit は `block00031_PE.bin` の `.data` (0x15e4790 自身の値 `P0`) の 1 件だけ。`.text` 内の hit は 0 件。実測 real 1.8 秒。
+- 相対形式 (`G - ImageBase` 等) の検索: 未検証 (本 run では実施していない。受入 1 の根拠に使わない)。
+- `hs_glob_alltext.py` を HEAD で再実行: `text sections scanned: 311 (PE blocks: 313)`、STORE 0 / REF 0 / ABS 0。real 23.6 秒、load 1.75→0.67。
+- 基準 run (`hs_disp_emu.py`・`HS_DISP_PATH=1`・全 256 ID): real 49.7 秒、load 0.62。`distinct (rax, path) = 109 / IDs = 256`。§4 の表を本 run で再現した。
+
+### 判定 (#5547 の受入)
+
+- 受入 1 (`0x15e4790` の初期化元の VA): **未達**。PE 内の書込み VA は、生バイト検索 (`.text` 内 0 件) と `.text` の rip 相対 / 絶対の走査で 0 件。書込みは PE 外のランタイム、または計算アドレス経由と判断する。PE 外の書込み VA の列挙には、FL 本体の初期化を走らせて書込みを計装する必要がある。`hs_disp_emu.py` は dispatcher の 1 呼出しだけを走らせるため、この初期化は観測できない。
+- 受入 2 (8 件のうち基準 run で実行されうる格納と、`[rbp+0x89f]` の経路): **未達**。基準 run の 256 ID では 8 件・`[rbp+0x89f]` 書込み元のどれも実行されない (gate 0x13280c9・0x132815f は 1 件ずつ、いずれも `je` で分岐して閉じる)。gate の入力 (`G` の連鎖の先の値) が未確定のため、8 件を実行させる条件を決められない。
+- `hostshim.c` の応答表: 変更なし (受入 2 の結論どおり、到達しない値は入れない)。
+
+### 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| PE 外の `G` 初期化の書込み VA (ランタイム計装) | 受入 1 の列挙が未完。gate 入力が決まらない | #4444 (親) のチェックリストへ追記。FL 本体の初期化を走らせる計装が必要 (dispatcher 単体の emulator では観測不可) |
+| `[rbp+0x89f]` の書込み元の経路 (0x1326c34・0x1327f9a) | 基準 run で 0 件。gate 入力が決まらないと実行できない | 同上 |
+| Phase A 回帰 `dispatch=38 ff=0` | 応答表は未変更のため影響なし。回帰の確認のみ | 本 PR の未解決。emsdk を使う `fw_stage2.sh` が走る run (#5185 の範囲) |
