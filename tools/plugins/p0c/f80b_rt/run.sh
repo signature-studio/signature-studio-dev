@@ -7,7 +7,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 P0C="$(cd "$HERE/.." && pwd)"
 ROOT="$(cd "$HERE/../../../.." && pwd)"
 W="$ROOT/work/f80b_rt"
-EMCC="${EMCC:-$(command -v emcc || echo /opt/emsdk/upstream/emscripten/emcc)}"
+EMCC="${EMCC:-$(command -v emcc || echo "${EMSDK:?EMSDK に emsdk のルートを指定する (docs/REFERENCES.md [EMSDK])}/upstream/emscripten/emcc")}"
 mkdir -p "$W"
 cd "$W"
 gcc -O1 -o gen_cases "$HERE/gen_cases.c" -lm
