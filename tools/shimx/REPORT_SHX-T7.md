@@ -117,16 +117,16 @@
 
 | snap-in | build compare (native 突合) | 正規化前 / adapter / 重複統合 | unresolved | 正規化後 mismatch | sig_gate 結果 |
 |---|---|---|---|---|---|
-| gain | 200/200 bit-exact | — / 0 / 0 | 0 | **0** | exit 0 |
-| matrix | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
-| haas | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
-| clipper | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
-| gate | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
-| quickeq | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
-| resonator | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
-| stereo | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
-| disperser | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
-| formant | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
+| gain | 200/200 bit-exact | 0 / 0 / 0 | 0 | **0** | exit 0 |
+| matrix | 200/200 | 0 / 0 / 0 | 0 | **0** | exit 0 |
+| haas | 200/200 | 0 / 0 / 0 | 0 | **0** | exit 0 |
+| clipper | 200/200 | 0 / 0 / 0 | 0 | **0** | exit 0 |
+| gate | 200/200 | 0 / 0 / 0 | 0 | **0** | exit 0 |
+| quickeq | 200/200 | 0 / 0 / 0 | 0 | **0** | exit 0 |
+| resonator | 200/200 | 0 / 0 / 0 | 0 | **0** | exit 0 |
+| stereo | 200/200 | 0 / 0 / 0 | 0 | **0** | exit 0 |
+| disperser | 200/200 | 0 / 0 / 0 | 0 | **0** | exit 0 |
+| formant | 200/200 | 0 / 0 / 0 | 0 | **0** | exit 0 |
 | phaser | 200/200 | 未測定 / 14 / 0 | 1 (`GetCurrentProcess`) | 未測定 | **exit 1** |
 | delay | 200/200 | 未測定 / 18 / 0 | 1 (`GetCurrentProcess`) | 未測定 | **exit 1** |
 | limiter | 200/200 | 未測定 / 18 / 0 | 1 (`GetCurrentProcess`) | 未測定 | **exit 1** |
