@@ -34,6 +34,20 @@
 - **規則の正規表現**: 生成 C は `func_0x000180fdc700()` の形と `FUN_180fdc700()` の形の両方を出すため、既存規則と同じく `(?:func_0x000|FUN_)` で受けた。
 - **数値の扱い**: emcc 通過は値の正しさを示さない。delay の wasm は全体で未成立 (引数数不一致 65・型不一致 115 が残る) のため、1000 trial 突合は未実施 (#3073 [KH-41] が担当)。
 
+#### 10-7ab. #5385 (KH-159 残件): `FUN_180fcd400` ← `FUN_180fcce40` の 4048 を規則化 (4060 は未確定)
+
+- **結論**: 残り 2 件のうち **4048 (`180fccee6`) を規則化** (件数 1 の assert 通過)。emcc error は **339 → 338** (−1 = 4048 の引数数不一致)。4060 (`180fcd074`) は未規則化 (下記)。
+- **測定 commit**: `c1576d604` (コードを変えた commit: `ghidra_route/patches.py` +3 行)。基準は `e5261de58` (規則なし・origin/main)。
+- **素材**: `plugins-kilohearts` → `HeartCore.core_64` (76,642,304 B、sha256 先頭 `d55ce8b4`)。Ghidra 12.1.4 (公式 zip sha256 先頭 `ddac49f9` 一致)・JDK 21・emsdk 6.0.12。
+- **閉包**: `closure.py delay` = 139 関数・反復 1・FAIL 0 (wall 22.0 s)。
+- **生成 C**: `ghidra_to_c.py delay --fix bitcast,intload,stackpair,assoc,concat` (rc 0)。規則 1 件の件数 assert 通過。生成 C の差分は 1 行 (4048 の `FUN_180fcd400()` → `FUN_180fcd400(param_1,0.0,0)`)。
+- **emcc**: `emcc -c -w -O1 -ferror-limit=0 -Wno-error=int-conversion` → 基準 339・規則後 338。`grep -c error:` で計数。4048 の該当 error (`too few arguments ... expected 3, have 0`) は消え、新規 error は無い (差分 1 件のみ)。
+- **4048 の機械語 (capstone)**: `180fcce60 movq rdx,xmm0`・`movaps xmm6,xmm0` で入口値を保持。`180fccee0 xorps xmm1,xmm1` (+0.0)・`180fccee3 xor r8d,r8d` (0) の後、`180fccee6 call FUN_180fcd400`。この経路で xmm0 は書かれない (xmm0 = 入口 param_1)。xmm1 は call 直前に明示的に設定されるため、D5 の入口 live-in の置換には当たらない。
+- **4060 が未確定の理由**: `180fcd074 call` の直前の xmm0 は `180fcd042`〜`180fcd069` の `subsd` 群の結果 (縮約の余り)。`movaps xmm1,xmm6` で xmm1 も設定される。C 側 4060 (`param_1 = FUN_180fcd400()`) は縮約の途中値の式が生成 C に無く、対応式を機械語から確定できなかった。`FUN_180fccf30` 以降 (`180fccf51` 比較・`180fcd0a0` の `FUN_180fdfdb0` 経路) を含めて未読。次 run で確定する。
+- **stereo への影響**: 規則は `ABI['delay']` のみ。`ABI['stereo']` の抽出条件 (`'FUN_180fd4f30(' in r[2]`) に当たらず、stereo の生成 C は変わらない。
+- **回帰 (gain / haas / gate)**: 規則なし (`e5261de58` の `patches.py`) と規則あり (`c1576d604`) で `ghidra_to_c.py <name> --fix bitcast,intload,stackpair,assoc,concat` を同じ閉包 (`closure.py`) から生成し `diff -r` → **3 本とも 0 行**。`ABI.get(name)` が name ごとに引くため、delay の規則は他の name に効かない。
+- **未測定**: delay の数値突合 (wasm 未成立・#3073 [KH-41] の範囲)。
+
 **測定 commit** (コードを変えた最後の commit): 規則追加の commit は `e0aff674f`。再測定の 2 点は `origin/main` `a0b804faf` (規則なし) と head (`ghidra_route` は `e0aff674f` と同一)。`git diff a0b804faf HEAD -- tools/targets/kilohearts/ghidra_route` は `patches.py` の 9 行追加 (上の表の差の由来)。
 
 **残件の起票先** (本 issue の受入 1・2 の残り):

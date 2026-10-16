@@ -50,7 +50,7 @@ R2 の bundle (`artifacts/<name>.tar.zst`) と、その原本の所在。原本�
 |---|---|---|---|
 | `fl-win64` | installer の原本は `[DOWNLOADS]`。展開物は `[WIN64]` | 実測 (`tar --zstd -tf`): 最上位に installer `flstudio_win64_26.1.7.5653.exe` と `extracted/`。原本 installer の複製を含む | `block_manifest.json`・`pe_metadata.json` (`docs/WORKFLOW.md` §11: tarball に含まれない) |
 | `toolchain-retdec` | 上流 RetDec v5.0 の配布物 (取得元は本台帳に無い `[未確認]`)。展開先は `[RETDEC]` | 最上位 `retdec/` (install tree)。実装 run の実測。本 run の素材には無く再現していない | bundle が唯一の複製かは `[未確認]` |
-| `toolchain-emsdk` | 上流 emsdk (版は `tools/m1/flags.sh` の pin)。展開先は `[EMSDK]` | 最上位 `emsdk/`。実装 run の実測。本 run の素材には無く再現していない | 上流からの再取得経路は `[未確認]` |
+| `toolchain-emsdk` | 上流 emsdk (版は `tools/m1/flags.sh` の pin)。展開先は `[EMSDK]` | 最上位 `emsdk/`。実装 run の実測。本 run の素材には無く再現していない | 上流の再取得経路は実測 (#5177): `git clone --depth 1 https://github.com/emscripten-core/emsdk.git` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12` で `emsdk_env.sh` を得られる (6.0.12 で成功) |
 | `plugins-ott` | `[DOWNLOADS]` (Xfer OTT 1.37。`docs/LEGAL.md`) | `[未確認]` (本 run では展開していない) | `[DOWNLOADS]` は VM 上 (`~/ダウンロード/`)。R2 上の有無は run ごとに変わり得る (`tools/plugins/reverb_delay/REPORT_APPENDIX.md` は不在を記録) |
 | `plugins-freshair` | `[DOWNLOADS]` (Fresh Air 1.0.9。`docs/LEGAL.md`) | `docs/WORKFLOW.md` §11 の記述: 最上位 `Fresh Air.Win.zip` / `Fresh Air.pkg` (`[未確認]`) | `[DOWNLOADS]` は VM 上 |
 | `plugins-serum2` | `[PLUGINS-SERUM2]` (bundle そのものが原本の複製) | installer `Install_Xfer_Serum2_2.1.5.exe` の記述 (`[未確認]`) | 二次の所在は `[未確認]` |

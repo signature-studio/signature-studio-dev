@@ -38,6 +38,10 @@ def main(cgp, setp, snapp):
         cnt[tag] += 1
         print(f'  {c + B:#x} {tag:14s} callers={[hex(x) for x in callers]}')
     print('callee tally', dict(cnt))
+    lifted = infra & kb
+    outside = infra - kb
+    for name, S in (('infra khbase-lifted', lifted), ('infra not-khbase', outside)):
+        print(f'{name}: n {len(S)} / size B {sum(res[f]["size"] for f in S)} / IAT calls {sum(res[f]["iat"] for f in S)}')
 
 
 if __name__ == '__main__':
