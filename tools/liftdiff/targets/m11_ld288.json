@@ -1,0 +1,31 @@
+{
+ "name": "m11_ld288",
+ "desc": "LD-288 (#5888): m11 と同じだが、40c420 の入口 xmm0 を復元した IR (tests/ld288_40c420_xmm0.py で work/ に生成)",
+ "pe": "${FL_WIN64_DIR}/extracted/block00031_PE.bin",
+ "ir": "tools/liftdiff/work/ld288/boot3_40c420_tr.ll",
+ "image": "tools/m11/work/m11_image.bin",
+ "wasm_origin": "0x0",
+ "fn_prefix": "function_",
+ "simd": {
+  "gen": "python3 tools/m11/m11_simd2.py {ir}",
+  "ir": "tools/m11/work/boot_final.ll",
+  "include": [
+   "tools/m11"
+  ]
+ },
+ "initial_memory": 671088640,
+ "init_table_rva": "0xf768b0",
+ "ret_override": {
+  "function_6ed480": "double",
+  "function_6957d0": "double",
+  "function_6957f0": "double",
+  "function_695930": "double",
+  "function_695960": "double",
+  "function_812df0": "float",
+  "function_812e70": "float",
+  "function_cc32f0": "double",
+  "function_cc3660": "double",
+  "function_40c420": "double"
+ },
+ "ret_override_note": "LD-288 (#5888): 40c420 は入口が xmm0 (double)・戻りも xmm0 (double)。IR 署名を fix_xmm_args で直し、戻り型は ret_override で double。"
+}

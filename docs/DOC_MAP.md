@@ -215,6 +215,7 @@
 | `tools/liftdiff/REPORT_LD234.md` | ~70 | liftdiff LD-234 (#4667) 節: `liftdiff_e2e.sh --m11-only` の所要時間 (real/user/sys)・load・`[4/4]` (sample:800) の件数の実測 (2 回、測定 commit `fbb19946c`)。LD-215 の未解決を埋める |
 | `tools/liftdiff/REPORT_LD212.md` | ~90 | liftdiff LD-212 (#4379) 節: 併存 20 関数の呼出し元 581 件を窓 24 命令で読んだ rax / rdx / xmm0 の read/dead/unknown 件数。戻りは確定せず `ret_override` 未変更。確定作業は子 issue |
 | `tools/liftdiff/REPORT_LD263.md` | ~50 | liftdiff LD-263 (#5277) 節: `6ed480` の戻り型を callee の ret 直前命令と呼出し元の ucomisd 直前マスクで判定 (`tests/ld263_ret_type.py`)。結論 double。`ret_override` 未変更 (親 #4666 で反映) |
+| `tools/liftdiff/REPORT_LD288.md` | ~75 | liftdiff LD-288 (#5888) 節: `40c420` の wasm 戻り値 0 の原因は lift 側 (D5: 入口 xmm0 の落ち)。`MACHINE_ENTRY` と IR (`tests/ld288_40c420_xmm0.py`) の修正で `m11_ld288` が match (11/11)。e2e --m11-only PASS (測定 c2efe08ef) |
 | `tools/liftdiff/REPORT_LD233.md` | ~35 | liftdiff LD-233 (#4666) 節: 確定した戻り `6ed480` = double を `m11.json` の `ret_override` に反映し、`--m11-only` e2e を測定 (測定 commit c77cd1093)。他の候補・未確定は未反映 |
 | `tools/liftdiff/REPORT_LD215.md` | ~90 | liftdiff LD-215 (#4429) 節: 分岐を越えた呼出し元・呼出し先の経路判定 (`tests/ld215_retprop.py`)。確定は 20 関数中 1 件 (型未確定)。`ret_override` 未変更。残件は子 issue |
 | `tools/liftdiff/tests/ld158_ret_probe.py` | ~110 | LD-158 (#3470) の動的プローブ: i128 戻り関数を 11 pattern × xfill {1,0} で native 実行し、戻り後 rax / rdx / xmm0 の書換えを記録 (`work/ld158_probe.json`)。`--names` で陰性対照の関数を指定できる |
