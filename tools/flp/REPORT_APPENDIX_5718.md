@@ -84,3 +84,27 @@ WAIT=90 bash tools/flp/s6_pred_hit_probe.sh               # pred・loop にブ�
 - 判定: GUI 起動だけでは `ed2ac0` にも `1004a20` にも入らない。よって loop `0x12d94f0` に至る経路は、GUI 起動の範囲では通っていない。`pred` (6000 件命中) は起動時に通るが、loop の上位には届かない。
 - 未確認: GUI 操作 (プロジェクトの読込み・再生・ミキサ操作など) で上位が通るか。関数ポインタ経由の呼出し。
 - 次に要るもの: 上位のトリガを起こす操作。GUI 操作の自動化は本 issue の範囲外のため、受入 (loop の入力述語の確定) は未達のまま。
+
+## 9. 静的解析: 関数ポインタ表経由の可能性 (実行なし)
+
+- 素材: `fl-win64` の `extracted/block00031_PE.bin` (ImageBase `0x400000`)。`objdump -d --no-show-raw-insn` で逆アセンブル。
+- objdump のラベルは絶対 VA (ImageBase 込み)。`.text` の file offset `0x400` ↔ VA `0x401000` (差 `0xc00`)。
+- 直接の参照: `0xed2ac0`・`0x1004a20`・`0x12d94f0`・`0x12d8d30` は、`.text` の定義 (`push %rbp`) 以外に RIP 相対の参照を持たない。
+- データ内の絶対アドレス (`tools/flp/s9_fnptr_scan.py`): `0xed2ac0` を値とする 8 バイト slot は 1 件 (file `0xad0120`)。`0x1004a20`・`0x12d94f0`・`0x12d8d30` は 0 件。
+- 関数ポインタ表: file `0xacffb0`〜`0xad0168` (VA `0xed0bb0`〜`0xed0d68`・55 件)。各 slot は `.text` 内の関数 VA。`0xed2ac0` は index 46 (`(0xad0120 - 0xacffb0) / 8`)。
+- 表を RIP 相対で直接参照する命令は無い。表の直前の `lea 0x22f(%rip),%rax` (`0xed0902`・関数 `0xed0860`) は `0xed0b38` (機械語) を指すため、表の参照とは断定できない。
+- 間接 call (`call *`) は全体で 50277 件。表を引く箇所は未特定 (全件の対応づけは、この run の時間内では完了しなかった)。
+- 判定: loop `0x12d94f0` の直接呼出し元 `0xed2ac0` は、`.text` 内の関数ポインタ表の index 46 に載る。よって `0xed2ac0` は間接呼出しの対象になり得る。ただし表を引く呼出し箇所と、そこに至る上位トリガは**未確定**。
+- 未確認: 表 (`0xed0bb0`) を読む間接呼出し箇所の特定。`0x1004a20` は表に載らない (同じ slot 検索で 0 件)。
+- 次の一手: 表の base を載せる命令 (`lea` / `mov` で `0xed0bb0` 付近を指すもの) と、`call *` のレジスタ・インデックスの組を追う。実行時の確認は段 1b (GUI 操作あり) へ回す。
+- この run では wine64 / gdb を導入していない。`ptrace_scope` も変えていない。
+- 再実行 (review round 1 の再現・実測): `fl-win64.tar.zst` から `extracted/block00031_PE.bin` を展開 (real 1.645 s)。`python3 tools/flp/s9_fnptr_scan.py <bin> 0xed2ac0 0x1004a20 0x12d94f0 0x12d8d30` の結果は 上記と同一 (`0xed2ac0`: 8byte 1 件・4byte 1 件 (file `0xad0120`)、他 3 件は 0 件)。script の測定 commit は `c8093e31c` (以後 `tools/flp/*.py`・`*.sh` は未変更)。
+
+### 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 表 (VA `0xed0bb0`) を読む `call *` の特定 (base を載せる命令と index の組) | loop `0x12d94f0` への間接経路が確定しない | #5718 (継続・同 issue にコメント) |
+| `0x1004a20` の上位 (直接 call 31 関数) の扱い。表には載らない | 上位トリガの候補が閉じない | #5718 (継続) |
+| 上位トリガ (GUI 操作のどの操作で `0xed2ac0`・`0x1004a20` に入るか) | loop の入力述語 (受入) が未確定 | #5718 (段 1b・GUI 操作による実行確認) |
+| GUI 操作による loop の入口命中の確認 (§4・§8) | 述語 `G1 > 1 && pred(G1)` が静的な読みのまま | #5718 (段 1b) |
