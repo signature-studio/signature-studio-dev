@@ -184,16 +184,23 @@ tar --zstd -xf "$ARTIFACTS_DIR/plugins-serum2.tar.zst" Install_Xfer_Serum2_2.1.5
 7z x -y Install_Xfer_Serum2_2.1.5.exe '$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' -oexe
 cp -f 'exe/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' Serum2_win64.vst3
 python3 ../gui/vtable_fn_addrs.py Serum2_win64.vst3 XferOnOffButton > xferonoff_fns.tsv
+# Ghidra 12.1.4 は公式 release (ghidra_12.1.4_PUBLIC_20260921.zip) を取得し、sha256 ddac49f9…d4db を検査してから展開する (tools/m11/m11_ghidra_dll.sh と同じ)。展開先を GHIDRA_HOME とする
+mkdir -p ghproj                                  # Ghidra project 置き場 (無いと import が Directory not found で止まる)
 export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64 PATH=$JAVA_HOME/bin:$PATH FN_ADDRS_TSV=$PWD/xferonoff_fns.tsv OUT_DIR=$PWD/closure
-analyzeHeadless ghproj xo -import Serum2_win64.vst3 -overwrite -scriptPath ../gui -postScript ghidra_fn_size.java
-analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scriptPath ../gui -postScript ghidra_xferonoff_closure.java   # 下限 (87 関数)
-analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scriptPath ../gui -postScript ghidra_xferonoff_indirect.java > indirect_ghidra.log   # 間接 call の 1 件ずつ
+$GHIDRA_HOME/support/analyzeHeadless ghproj xo -import Serum2_win64.vst3 -overwrite -scriptPath ../gui -postScript ghidra_fn_size.java
+$GHIDRA_HOME/support/analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scriptPath ../gui -postScript ghidra_xferonoff_closure.java   # 下限 (87 関数)
+$GHIDRA_HOME/support/analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scriptPath ../gui -postScript ghidra_xferonoff_indirect.java > indirect_ghidra.log   # 間接 call の 1 件ずつ
 python3 ../gui/indirect_sr85_own_vt.py Serum2_win64.vst3 indirect_ghidra.log aa9750,aa96b0,aa9770 > own_vt_sites.tsv
 # 上限: 下限の root 8 件 (§2) と own vtable の候補 16 件 (§5.2) の union 19 件を root にして閉包を取り直す
 # root 集合は commit 済みの gui/xferonoff_upper_fns.tsv (19 行・先頭列 RVA・形式は xferonoff_fns.tsv と同じ)。作業用 dir へ複製して使う
 cp -f ../gui/xferonoff_upper_fns.tsv xferonoff_upper_fns.tsv
-FN_ADDRS_TSV=$PWD/xferonoff_upper_fns.tsv OUT_DIR=$PWD/closure_upper analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scriptPath ../gui -postScript ghidra_xferonoff_closure.java
+sha256sum xferonoff_upper_fns.tsv                # c741878353fee17bda93a14a581bcf8504de6795d6203b89d29a7837b76626fb
+FN_ADDRS_TSV=$PWD/xferonoff_upper_fns.tsv OUT_DIR=$PWD/closure_upper $GHIDRA_HOME/support/analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scriptPath ../gui -postScript ghidra_xferonoff_closure.java
+FN_ADDRS_TSV=$PWD/xferonoff_upper_fns.tsv OUT_DIR=$PWD/closure_upper $GHIDRA_HOME/support/analyzeHeadless ghproj xo -process Serum2_win64.vst3 -noanalysis -readOnly -scriptPath ../gui -postScript ghidra_xferonoff_indirect.java > upper_indirect.log   # 上限の computed call の種別 (m1)
 ```
+
+- 測定 commit (コード): `1542ade80` (以後 `gui/*.py`・`gui/*.java` は未変更)。上限の再測定は検証 HEAD (TSV 追加・REPORT の文言修正の commit) で実施。
+- 上限 root の入力 `gui/xferonoff_upper_fns.tsv`: sha256 `c741878353fee17bda93a14a581bcf8504de6795d6203b89d29a7837b76626fb`・19 行 (ヘッダ行を除く)。
 
 - 実測時間: import + 自動解析 (`ghidra_fn_size.java`) **19 分 25 秒** (real)。下限の閉包 `-process` **6.5 秒**。間接 call 列挙 `-process` **7.0 秒**。上限の閉包 `-process` **6.6 秒**。Python 解析 (`indirect_sr85_own_vt.py`) 約 4 秒。測定時の負荷は 4 vCPU の runner で他ジョブなし (load average 1 分値 1.08)。
 - 境界の再確認: 8 件すべて `start_eq=true`・未対応 0・合計 **507 B** (§2 と一致)。
@@ -212,20 +219,20 @@ Ghidra の計数 (`computed_call_sites=51`) の内訳は次のとおり。
 - レジスタ経由の間接 call 21 件は、全件が own vtable の COL 3 種の slot で候補化できた (未解決 0 件)。`[R8]`・`[RAX]` の 2 件は disp 無し = slot 0。
 - 候補の列挙: 候補関数は `work/own_vt_sites.tsv` の `result` 列 (VA)。候補の総数は重複除去後 **16 関数** (`0x180136bf0`・`0x1801428d0`・`0x180142180`・`0x180142150`・`0x1801470d0`・`0x180142540`・`0x18000d920`・`0x1804b6690`・`0x18018e4b0`・`0x1800181c0`・`0x18018f2e0`・`0x180138180`・`0x18018e800`・`0x18018f290`・`0x180622780`・`0x180622840`)。
 - 限界: 候補は「XferOnOffButton の vtable の同じ slot の関数」であり、実行時の動的型は未確認。同じ slot を持つ別クラスの vtable は見ていない (`this` の型を追跡していない)。
-- 解決の対象外: `call reg` (レジスタ値) は本 run の閉包内では 0 件。
+- 解決の対象外: 直接 `call reg` (レジスタ値 `call R10`・`call RAX`) は下限の閉包 (87 関数) では 0 件。上限の閉包 (157 関数) では 5 箇所 (`0x180136bf0` の 3 箇所・`0x180138180` の 1 箇所・`0x180142540` の 1 箇所。§5.3 の内訳)。いずれも候補化せず、解決対象外として残す。
 
 ### 5.3 受入 2: 上限 (閉包の候補込み、1 段)
 
 | 集合 | 関数数 | 本体合計 (外部 import 除く) | computed call 計数 (INT 系を含む) |
 |---|---|---|---|
 | 下限 (§4.3・SR-83) | 87 (外部 import 16・thunk 8・通常 63) | **10,194 B** | 51 (うち INT 系 3) |
-| 上限 (本 §5・1 段・**root 未確定**) | 157 (外部 import 24・thunk 8・通常 125) | **22,227 B** | 100 (うち INT 系 7・実 call 93: レジスタ経由 39・IAT 49・内訳未確認 5) |
+| 上限 (本 §5・1 段・union 19 件を root) | 157 (外部 import 24・thunk 8・通常 125) | **22,227 B** (通常 22,182 B・thunk 45 B) | 100 (うち INT 系 7・IAT・外部 49・`[reg+disp]` 39・直接 `call reg` 5) |
 
-- 上限の root 集合: §2 の 8 件 + §5.2 の候補 16 件の union **19 件** (重複 5 件 `0x18018f290`・`0x18018f2e0`・`0x1804b6690`・`0x180622780`・`0x180622840` を除くと新規 root は 11 件)。入力は commit 済みの `gui/xferonoff_upper_fns.tsv` (19 行)。
-- **未確定 (上の 157 / 22,227 B の root)**: 上記の数値が union 19 件を root として測った値か、候補 16 件だけを root として測った値かは、commit からは確定できない。TSV を commit したのは本 run で、数値の測定は TSV 追加より前の commit (`1542ade80`) で行われている。候補 16 件だけだった場合、既存 8 件から外れた `0x4b5670`・`0x4b66a0`・`0x6227b0` が root から抜けており、157 / 22,227 B は union で取り直す必要がある。**union 19 件での再測定は未実施** (素材 `plugins-serum2` が `$ARTIFACTS_DIR` に無く、Ghidra も未導入のため)。次の run で §5.1 の手順を `gui/xferonoff_upper_fns.tsv` で実行し、結果でこの表を差し替える。その際、測定 commit と測定 TSV の sha256 を書く。
-- computed call 100 の内訳: INT 系 7 + 実 call 93 (レジスタ経由 39・IAT 49・内訳未確認 5)。残り 5 件の種別は記録が無く未確認。
+- 上限の root 集合: §2 の 8 件 + §5.2 の候補 16 件の union **19 件** (重複 5 件 `0x18018f290`・`0x18018f2e0`・`0x1804b6690`・`0x180622780`・`0x180622840` を除くと新規 root は 11 件)。入力は commit 済みの `gui/xferonoff_upper_fns.tsv` (sha256 `c741878353fee17bda93a14a581bcf8504de6795d6203b89d29a7837b76626fb`・19 行)。
+- 測定: 上の値は union 19 件の TSV を root にした閉包 (`-process ghidra_xferonoff_closure.java`) の実測。import した Ghidra 12.1.4 の解析結果 (`ghidra_fn_size.java`) と同じ project で取った。下限の再測定 (87 関数・10,194 B・51) も §4.3 と一致。
 - 上限の内訳: 通常 125 関数 = 22,182 B、thunk 8 件 = 45 B (合計 22,227 B)。下限との差は **+12,033 B** (+118%)。
 - 注: 上限は 1 段 (own vtable の候補 16 関数を root に足した閉包)。新たに到達した 70 関数の中の間接 call は候補化していない。**真の上限ではない**。上限を閉じるには、新規到達分の間接 call の候補化を繰り返す必要がある (未実施)。
+- 測定時間: 上限の閉包 `-process` 6.8 秒 (real)。import + 自動解析は 18 分 21 秒 (real)。
 
 ### 5.4 受入 3: 下限と上限の差
 
@@ -240,4 +247,4 @@ Ghidra の計数 (`computed_call_sites=51`) の内訳は次のとおり。
 |---|---|---|
 | 上限 (2 段目以降) の間接 call の候補化 | 上限が 1 段のみ。真の上限は未測定 | #5005 の「残作業 (#5034 の run から追記)」の 1 項目目 (本 issue の範囲外) |
 | 同じ slot を持つ別クラス vtable の候補 (型未追跡) | 候補が XferOnOffButton の vtable に限定 | #5005 の同節の 2 項目目 |
-| `call reg` (レジスタ値) の 2 段目以降の解決 | 2 段目以降の呼出し先が未確定 | #5005 の同節の 3 項目目 |
+| `call reg` (レジスタ値) の 2 段目以降の解決 | 2 段目以降の呼出し先が未確定。上限 1 段の閉包内の直接 `call reg` 5 箇所も未解決 | #5005 の同節の 3 項目目 |
