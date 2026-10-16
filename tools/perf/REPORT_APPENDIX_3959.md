@@ -199,20 +199,20 @@ node tools/perf/p15/ctor_vtable_ring.mjs tools/ott/work/lift/ottl_rc.wasm
 | `ctor_fill_watch.mjs` (記録を ctor 1 から開始) ×1 | 同じ 1 回。145 以前の ctor で同じ範囲の重なりは無い |
 
 分かったこと:
-- vtable の 0 化を起こす store は、wasm func 75 の `memory.fill` (wat の 71184 行・dest は `local.get 1` (f75 の 2 番目の引数)・val 0・n 262144)。`ctor_call_window` で見た「`f23->f75` の call 戻り」の直後・f75 本体の中の位置と一致する (`call 119` の後〜fill)。
-- 「store が特定できない」だった §3f の未了は、この `memory.fill` で解消。ただし、dest `0x301d3e40` を与える呼び出し元の引数の由来 (`f23` の `call 75` のどの値か) は未確定。
+- 計装した store のうち vtable 範囲を覆うのは、wasm func 75 の `memory.fill` 1 箇所 (wat の 71184 行・dest は `local.get 1` (f75 の 2 番目の引数)・val 0・n 262144)。vtable 先頭語を 0 にしたのはこの fill と読める。`ctor_call_window` で見た「`f23->f75` の call 戻り」の直後・f75 本体の中の位置と一致する (`call 119` の後〜fill)。直接の `i32.store` などは未監視のため、この fill が唯一の書込みとは言えない。
+- §3f の「store が特定できない」は、計装済みの範囲では `memory.fill` 1 箇所まで絞れた。dest `0x301d3e40` を与える呼び出し元の引数の由来 (`f23` の `call 75` のどの値か) は未確定。
 - 3 run の同一性は §3f と同じく計装版の 3 run で確認した。
 
 未確定:
 - dest `0x301d3e40` が f75 の引数としてどう決まるか (`f23` の `call 75` の引数の計算)。
-- 計装版は `memory.fill` 1 箇所だけを監視する。vtable 範囲への他の store は見ていない (store 全部の監視は未実装)。
+- 計装版は `memory.fill` 1 箇所だけを監視する。vtable 範囲への他の store は見ていない (直接 store を含む全 store の監視は未実装)。
 - Chrome (AudioWorklet) で同じ fill が起きるかは未確認。
 
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ctor (`0x18011d400`) が同一 instance で 146 回目に戻らない原因 | 上限 145 の意味が未確定。M=146 を通す修正方針が立たない。§3g で vtable を 0 にした `memory.fill` (f75) まで特定。f75 の引数 dest の由来は未確定 | #4392 [PERF-P26] |
+| ctor (`0x18011d400`) が同一 instance で 146 回目に戻らない原因 | 上限 145 の意味が未確定。M=146 を通す修正方針が立たない。§3g で、計装済みの store のうち vtable 範囲を覆うのは f75 の `memory.fill` 1 箇所 (直接 store は未監視)。f75 の引数 dest の由来は未確定 | #4392 [PERF-P26] |
 | Chrome の M=147・149〜151・153〜159 と M=2〜129・131〜144 の成否 (単調性) | 成功最大 145 と失敗最小 146 の範囲外は未確認 | #4392 (コメントで追加) |
 | Node 掃引の再測定と生データの commit (§1) | 掃引の数値が根拠にならない | #4392 (コメントで追加) |
 | §3b の監視プローブ (145 回までの data hash 不変・`next_span_overlaps_data`) が commit 外・再現未整備 | §3b の (a) は再現できない。`ctor_heap_probe.mjs` の 3673848 (`next_span_overlaps_data` の判定定数) と観測 `bytes_per_ctor` 3673793 の 55 B 差は判定に影響しないが、由来は未記録 | #4392 (次の run で commit) |
