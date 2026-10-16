@@ -4,7 +4,7 @@
 #   2/4 wasm build: 既定 IR と fix IR を m11_build.sh で作る (fix IR は ir_conditions 439f90=applied)
 #   3/4 survey: 942 unit を既定 wasm と fix wasm で測る (trap_triage/survey_units.mjs)
 #   4/4 突合: survey_diff.py で ok 退行・kind 以外の差・icall 差を見る
-# 前提: tools/m11/work に work-m11 の展開、FL_WIN64_DIR (fl-win64 の展開先)、[EMSDK] (/opt/emsdk)、Python の capstone・pefile。
+# 前提: tools/m11/work に work-m11 の展開、FL_WIN64_DIR (fl-win64 の展開先)、[EMSDK] (docs/REFERENCES.md)、Python の capstone・pefile。
 # 使い方: FL_WIN64_DIR=<展開先> bash tools/m11/ldfix/fix_439f90_e2e.sh
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
