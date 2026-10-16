@@ -81,7 +81,7 @@ FL_WIN64_DIR=... PYTHONPATH=... python3 tools/plugins/framework/hostshim/hs_disp
 | `0x10f2372` | `0x10f2170` | `mov rcx,[rax+0x134c]` (`0x10f2358`) | グローバルオブジェクト `[[rip+0x4ee348]+0x134c]` |
 | `0x10f24b2` | `0x10f2170` | `mov rcx,[rbp+0xa8]` (`0x10f2498`) | 直前の `call 0x10041f0` の戻り値 |
 | `0x10f2cc4` | `0x10f2b20` | `mov rcx,[rax+0x134c]` (`0x10f2caa`) | グローバルオブジェクト `[[rip+0x4ed9f6]+0x134c]` |
-| `0x10f2d90` | `0x10f2b20` | `mov rcx,[rbp+0x98]` (`0x10f2d76`) | 関数内ローカル (段階的な書込みが窓の外) |
+| `0x10f2d90` | `0x10f2b20` | `mov rcx,[rbp+0x98]` (`0x10f2d76`) | 直前の `call 0x10041f0` (`0x10f2d20`) の戻り値 (`0x10f2d25` で `[rbp+0x98]` に格納) |
 | `0x132f43f` | `0x132f3f0` | `mov rcx,[rbp+0x20]` (`0x132f437`) | 引数 rcx (第 1 引数) |
 
 - `0x132f3f0` の呼出元は E8 で **1 件** `0x12ba5ec`。その rcx は `[rbp+0xa0]` で、`0x12ba440` の第 1 引数 rcx を `[rbp+0xa0]` に保存している (`0x12ba468`)。
@@ -97,8 +97,7 @@ FL_WIN64_DIR=... PYTHONPATH=... python3 tools/plugins/framework/hostshim/hs_disp
 ### 未確定 (本 issue に残す)
 
 1. `0x12b0380` の関数表を引く呼出側 (表 + インデックス、または表の走査) の特定。
-2. `0x10f2d90` の `[rbp+0x98]` の書込み (窓の外)。
-3. `0x10f24b2` の `call 0x10041f0` の戻り値の供給元。
-4. unicorn 未導入のため `hs_disp_emu.py` の再測定は未実施。
+2. `0x10f24b2`・`0x10f2d90` の `call 0x10041f0` の戻り値の供給元。
+3. unicorn 未導入のため `hs_disp_emu.py` の再測定は未実施。
 
 
