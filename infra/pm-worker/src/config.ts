@@ -20,6 +20,8 @@ export const DEFAULT_LOW_CAP = 10;
 
 export interface Env {
   PM: { idFromName(n: string): unknown; get(id: unknown): { fetch(r: Request): Promise<Response> } };
+  // Workers Analytics Engine (tick ごとの観測 CI-230)。wrangler.toml の [[analytics_engine_datasets]] が無い環境では未設定。
+  AE_METRICS?: { writeDataPoint(p: { indexes: string[]; blobs: string[]; doubles: number[] }): void };
   // Worker の secret binding (32 バイトの base64url)。App の private key / webhook secret の暗号化鍵。DO の外にだけある。
   STORE_KEY: string;
   REPO?: string;

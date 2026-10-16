@@ -41,6 +41,11 @@ class_name = "PmDO"
 tag = "v1"
 new_sqlite_classes = ["PmDO"]
 
+# tick ごとの観測を Custom Dashboard で時系列にする (CI-230)。写像と順序は README『Analytics Engine』表が正本。
+[[analytics_engine_datasets]]
+binding = "AE_METRICS"
+dataset = "pm_metrics"
+
 [triggers]
 crons = ["* * * * *"]
 
