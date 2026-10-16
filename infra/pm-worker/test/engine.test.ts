@@ -209,23 +209,23 @@ test("launch (prio:critical): room が限られたら critical を先に、low �
   assert.equal(s.ready, 3);
 });
 
-test("launch (prio:critical): oc:no-pr の cooldown は critical だけ半分 (3 時間)。通常は 6 時間のまま", async () => {
+test("launch (prio:critical): oc:no-pr の cooldown は critical だけ半分 (30 分)。通常は 1 時間のまま (既定)", async () => {
   const clock = { t: T0 };
   const ctx = await configuredApp({ now: clock, handlers: [(c) => (/\/comments$/.test(c.url) ? j({}, 201) : undefined)], live: true });
   await seed(ctx, 61, { labels: ["oc:no-pr", "prio:critical"] });
   await seed(ctx, 62, { labels: ["oc:no-pr"] });
   for (const n of [61, 62]) {
-    await send(ctx.app, "issue_comment", commentPayload(n, BOT, "<!-- oc-run-outcome: no-pr reason=unknown run=1 -->\n完了", new Date(T0 - 4 * 3_600_000).toISOString()));
+    await send(ctx.app, "issue_comment", commentPayload(n, BOT, "<!-- oc-run-outcome: no-pr reason=unknown run=1 -->\n完了", new Date(T0 - 40 * 60_000).toISOString()));
   }
   await markFresh(ctx);
   const p = ctx.app.engine.plan();
-  assert.deepEqual(p.picks.map((x) => x.n), [61], "報告から 4 時間: critical は再着手する");
-  assert.deepEqual(p.rows.recent.map(([n]) => n), [62], "報告から 4 時間: 通常は 6 時間まで待つ");
+  assert.deepEqual(p.picks.map((x) => x.n), [61], "報告から 40 分: critical は再着手する");
+  assert.deepEqual(p.rows.recent.map(([n]) => n), [62], "報告から 40 分: 通常は 1 時間まで待つ");
 });
 
 test("launch: oc:no-pr の stop・split は cooldown の後も再着手しない。新しい素材の無い artifact は cooldown の後に unknown と同じく 1 回だけ再着手する (#3185)", async () => {
   const clock = { t: T0 };
-  const ctx = await configuredApp({ now: clock, handlers: [(c) => (/\/comments$/.test(c.url) ? j({}, 201) : undefined)], live: true });
+  const ctx = await configuredApp({ now: clock, env: { NO_PR_COOLDOWN_H: "6" }, handlers: [(c) => (/\/comments$/.test(c.url) ? j({}, 201) : undefined)], live: true });
   for (const [n, reason] of [[61, "stop"], [62, "split"], [64, "artifact"]] as const) {
     await seed(ctx, n, { labels: ["oc:no-pr"] });
     await send(ctx.app, "issue_comment", commentPayload(n, BOT, `<!-- oc-run-outcome: no-pr reason=${reason} run=1 -->\n完了`, new Date(T0 - 30 * 60_000).toISOString()));

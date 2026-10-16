@@ -195,7 +195,7 @@ for (const [name, reason, o] of negatives) {
 }
 
 test("統合 (oc:no-pr の cooldown 中): 投稿せず、処理済みにもしない。cooldown が過ぎたら投稿する", async () => {
-  const ctx = await stopped({ LIVE_LAUNCH: "1" }, { labels: ["oc:no-pr"] });
+  const ctx = await stopped({ LIVE_LAUNCH: "1", NO_PR_COOLDOWN_H: "6" }, { labels: ["oc:no-pr"] });
   assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(5)))).status, 202);
   await tickNow(ctx);
   assert.equal(postsTo(ctx, 21).length, 0);
@@ -207,8 +207,8 @@ test("統合 (oc:no-pr の cooldown 中): 投稿せず、処理済みにもし�
 });
 
 test("統合 (prio:critical の cooldown): 報告から 3 時間で critical の意図は投稿し、通常の oc:no-pr は 6 時間まで待つ (ネガコン)", async () => {
-  const crit = await stopped({ LIVE_LAUNCH: "1" }, { labels: ["oc:no-pr", "prio:critical"] });
-  const norm = await stopped({ LIVE_LAUNCH: "1" }, { labels: ["oc:no-pr"] });
+  const crit = await stopped({ LIVE_LAUNCH: "1", NO_PR_COOLDOWN_H: "6" }, { labels: ["oc:no-pr", "prio:critical"] });
+  const norm = await stopped({ LIVE_LAUNCH: "1", NO_PR_COOLDOWN_H: "6" }, { labels: ["oc:no-pr"] });
   for (const ctx of [crit, norm]) assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(5)))).status, 202);
   for (const ctx of [crit, norm]) {
     await tickNow(ctx); // 報告 (10:00) から 2 時間
