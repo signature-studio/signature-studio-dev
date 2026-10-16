@@ -2,7 +2,7 @@
   "name": "m11",
   "desc": "FLEngine_x64.dll (FL Studio 26.1.7) \u2014 M11 closure 7,380 \u95a2\u6570 (RetDec lift \u2192 m11 passes \u2192 boot_final3.ll)",
   "pe": "${FL_WIN64_DIR}/extracted/block00031_PE.bin",
-  "ir": "tools/m11/work/boot_final3.ll",
+  "ir": "tools/liftdiff/work/ld288/boot3_40c420_tr.ll",
   "image": "tools/m11/work/m11_image.bin",
   "wasm_origin": "0x0",
   "fn_prefix": "function_",
@@ -17,6 +17,7 @@
   "init_table_rva": "0xf768b0",
   "ret_override_note": "LD-158 (#3470): IR は i128 戻りだが、実戻りは xmm0 (6 件は double、812df0・812e70 は mulss で書かれる float)。tools/liftdiff/REPORT_LD158.md §3 の動的実測で rax 不書換・xmm0 が入力で変化する 8 関数だけを対象にする。署名 ret を実戻りの型に直し、m11_tr_ 経由 (下位 64bit) で x0 と比較する (float は下位 32bit)。",
   "ret_override": {
+    "function_40c420": "double",
     "function_6ed480": "double",
     "function_6957d0": "double",
     "function_6957f0": "double",
