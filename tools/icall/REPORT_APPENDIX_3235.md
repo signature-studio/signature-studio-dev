@@ -63,8 +63,8 @@
 ### 3.1 既存 e2e の実測 (受入 3)
 
 - 測定 commit: `e5261de58` (origin/main。`ott_e2e.sh --quick` をこの HEAD で実行。コードを変えた最後の commit であり、測定以降のコード変更は無い)。
-- 素材: `fl-win64`・`plugins-ott`・`work-m6-ott`・`analysis-ott-binaries` (`ANALYSIS_DIR=$HOME/analysis`、`OTT_vst2_win64.dll` 3146752 B)。
-- emcc: 上流 emsdk 6.0.12 (`EMSDK_DIR=$HOME/emsdk`。`/opt/emsdk` は runner に無かった)。
+- 素材: `fl-win64`・`plugins-ott`・`work-m6-ott`・`analysis-ott-binaries` (`ANALYSIS_DIR` を runner の `analysis/` に設定。`OTT_vst2_win64.dll` 3146752 B)。
+- emcc: 上流 emsdk 6.0.12 (`EMSDK_DIR` で指定。runner に `toolchain-emsdk` の素材が無く、上流から取得した)。
 - 再現: `cd tools/ott && bash ott_e2e.sh --quick` を foreground で 2 回実行。
 
 | 実行 | real | load (1 分値, 開始→終了) | matrix | fma_sens | 判定 |
