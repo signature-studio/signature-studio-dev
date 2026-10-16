@@ -8,8 +8,8 @@
 - 入力 IR: `m11_gen_ir2.sh` で再生成した `work/boot_final.ll` (490,791 行・sha256 `e48c31d2…`・`ldfix=applied` `ld108=applied` `ld115=applied` `r8b=applied` `450560=applied`)。素材 (`69c774…`) と 8,024 行の差がある。
 - 生成器: `python3 m11_sigfix40c_ab.py work/boot_final.ll work/sigfix40c --pe $ANALYSIS_DIR/win64/extracted/block00031_PE.bin` (rc 0・`fixed=1`)。
 - 測定 commit: `86f9a1448` (`tools/m11/m11_sigfix_repro.sh` を追加。コードを変えた最後の commit)。
-- 再現: `ANALYSIS_DIR=$HOME/analysis bash tools/m11/m11_sigfix_repro.sh only40c ctlB ctlC sigzero`。出力は `work/repro5481/` (gitignore)。
-- 測定環境: 素材 `fl-win64` (`$HOME/analysis/win64`)・`toolchain-emsdk`・`work-m11` (`tools/m11/work/`) を展開。load average は測定中 0.8〜1.0 (`uptime`)。
+- 再現: `bash tools/m11/m11_sigfix_repro.sh only40c ctlB ctlC sigzero` (PE・emsdk は `docs/REFERENCES.md` の `[WIN64]`・`[EMSDK]` 経由)。出力は `tools/m11/work/repro5481/` (gitignore)。
+- 測定環境: 素材 `fl-win64`・`toolchain-emsdk`・`work-m11` を展開 (`docs/WORKFLOW.md` §11)。load average は測定中 0.8〜1.0 (`uptime`)。
 
 ## 2. 結果 (受入 1)
 
