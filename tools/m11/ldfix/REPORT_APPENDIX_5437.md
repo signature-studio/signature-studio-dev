@@ -4,7 +4,7 @@
 
 ## 1. 測定
 
-- 測定 commit: `219677f85` (判定器の修正。`judge_copy_3382.py` のみ)。`219677f85` は main (`7306126a0`) の祖先で、`git diff 219677f85 HEAD -- tools/m11/ldfix` は 0 行。
+- 測定 commit: `219677f85` (判定器の修正。`judge_copy_3382.py` のみ)。`219677f85` は main (`7306126a0`) の祖先。`git diff 219677f85 HEAD -- tools/m11/ldfix` は 18 ファイル・833 行追加 (`REPORT_3382.md` §12・§13、`REPORT_5434`/`5491`/`5527`/`5533`/`5143`、`ld269_reach.py` など) だが、判定に使うスクリプト 6 本 (`judge_copy_3382.py`・`scan_spill_deref_3328.py`・`show_site_2555.py`・`ldmach.py`・`scan_spill_deref_2502.py`・`verify_deref_sites_2555.py`) の同範囲の差分は 0 行 (`git diff 219677f85 HEAD -- <6 本>` の出力が空)。よって測定値は HEAD の判定器と同一のコードで得られたもの。
 - 素材: `fl-win64` の `extracted/block00031_PE.bin` (`$RUNNER_TEMP/fl-win64` 展開先。`REPORT_3382.md` §1 と同じ指紋)、IR は `tools/m11/work/boot_final3.ll` (`work-m11` 展開済み・gitignore)。
 - scan: `scan_spill_deref_3328.py` → `COPY 49 関数 103 箇所` (3.95 s)。
 - judge: `judge_copy_3382.py` → `ERR_BARE 15 / UNCLEAR 14 / REWRITE_NOARG 4 / ERR_CAND 47 / MISMATCH 13 / OK_ARGK 10` (`REPORT_3382.md` §13 の修正後の値と一致)。
