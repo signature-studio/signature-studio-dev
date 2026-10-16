@@ -66,3 +66,27 @@ REPORT_MX25 の本体は上限直前のため、判定の正本はここに置�
 | REX 直後 F0 17 件の規則番号付き判定 (SDM REX 節の本文が必要) | 1 | 本 issue #5399 (受入 1 のまま) |
 | capstone LOCK 規則の残件・capstone 不正 5 件の capstone 側修正 | 1 | #4068 [MX-44] (既存の子) |
 | mx_closure.py の REX 規則を変えるか | 2 | PM 判断 (SDM 本文の取得後) |
+
+## 6. SDM 本文による REX 規則の確定と再測定 (run 5)
+
+- 一次資料: Intel SDM Vol.2 §2.2.1.1 (Encoding、p.2-8)。PDF `https://cdrdv2.intel.com/v1/dl/getContent/671200` を取得 (26.6 MB・5,364 pages)。本文: 「A REX prefix is ignored, as are its individual bits, when it is not needed for an instruction or when it does not immediately precede the opcode byte or the escape opcode byte (0FH)」。
+- 判定: REX の直後が opcode (または 0F) でなければ REX は無視される。REX の後に F0 が来る形 (`4x f0`) は REX が無視されるだけで、#UD ではない。`mx_closure.py` の旧規則 (REX 直後の F0 は #UD) は SDM に根拠がなく、削除した。
+- 実機観測 (§2) とも一致する (`48 f0 01 07` は 32 bit 加算 = REX.W が無視される)。
+- `REX → F2 → F0` (`41 f2 f0`) も同じ REX 規則で判定できる (REX は F2 の直前で無視される)。残る判定は LOCK 規則 (REP と併用) で、capstone 側の扱い。
+
+### 再測定 (測定 commit `9ce634a72`・HEAD と同一・`git diff 9ce634a72 HEAD -- tools/targets/massivex/dsp/scripts` = 0 行)
+
+- 素材: `plugins-massivex` → `tools/targets/massivex/scripts/parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` → `Massive X.vst3` 95,356,824 B、md5 `622993e76565f49c094063a2b717d6ca` 一致。
+- `mx_rtti.py` rc 0 → `mx_closure.py flow pdata_call` rc 0・22 round・入口 169,814 (旧規則 169,752 から +62)。
+- `mx_flow_recheck.py` rc 1・RESULT=FAIL: (i) 0・(ii) 21,171・(iii) 160,303・取りこぼし 6・過剰 1・mismatch 7。
+- 旧規則 (`097da5a69`) の値: 取りこぼし 23・過剰 1・mismatch 24。REX 規則の変更で mismatch 17 件が解消した。
+
+### mismatch 7 件 (`_mismatch.tsv` と単独デコードの照合)
+
+| 区分 | 件数 | 番地 | 判定 |
+|---|--:|---|---|
+| capstone 不正・objdump 受理 | 6 | 0x81a740・0x1a2b67a・0x2486788・0x2486bc8 ほか 2 | capstone 側 (#4068 [MX-44]) の残件。0x1a2b67a は REP+LOCK の併用 (LOCK 規則) |
+| capstone 受理・objdump `(bad)` | 1 | 0x2470627 | objdump 側の表示。capstone の `add bh, cl` は規則上有効 |
+
+- 受入 1 の「未分類 0」は未達 (7 件が残る)。残件は capstone 側の修正 (#4068) で扱う。新規の子は切っていない。
+- `mx_closure.py` の既定 `ENTRY=any` は変えていない。`pdata_call` の入口数は変わる (+62) ため、影響は `pdata_call` を使う検算経路だけ (`insn_sdm_ok` は `mx_closure.py` と `mx_flow_recheck.py` からのみ呼ばれる。FL / 起動経路からは呼ばれない)。

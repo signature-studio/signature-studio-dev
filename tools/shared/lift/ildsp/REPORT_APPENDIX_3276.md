@@ -81,3 +81,19 @@
 - 方針への影響: `imp_RaiseException` の据え置き (§10) は変えない。0x1b8e68 の except 本体が 0xe06d7363 の catch 先でないことは、§10 の停止規約の統一の判断材料になる。
 - 道具: `tools/shared/lift/ildsp/seh_catch_check.py` (`FL_WIN64_DIR` の PE を読み、0x1b8e68 の scope・filter の許可コード・0x1aedc0 の rel32 呼出元 8 件を出す)。
 - 実測 (素材 `fl-win64` 26.1.7.5653 の `block24360_PE.bin`): 出力は `UNWIND 0x3f2d94 EHANDLER handler=0x1aebb4 scope_count=1` / `SCOPE try=[0x1b8eaa,0x1b8eb1) ... target=0x1b8eb1` / `FILTER 0x1ccb00 accepts codes: 0xc0000005, 0xc000001d` / `FILTER accepts 0xe06d7363: False` / `DIRECT rel32 call/jmp to 0x1aedc0 ... 8`。
+
+## 12. handler `0x1acf00` の解読 — T-SH-158 (#5859)
+- 結論: **`0x1acf00` は EH の scope 表ではなく `/GS` の cookie 検査 wrapper**。`0x1afbd4`・`0x1b009c` の catch 先は、本節の範囲では確定していない。
+  - `0x1acf00` は `sub rsp,0x28` → `call 0x1acf20` (cookie 検査の本体・`r8=[r9+0x38]` を使う) → `mov eax,1` (ExceptionContinueSearch) → `ret`。例外を捕まえず、常に「探索を続ける」を返す。
+  - `0x1afbd4` の unwind は `flags=EH|UH`・`handler=0x1acf00`・データ先頭 `0x110` (cookie オフセット)。`0x1b009c` は `0x170`。どちらも scope 表の形式ではない。
+  - `0x1acf20` は末尾で `jmp 0x1acee0`。`0x1acee0` は GS 検査の tail で、条件を満たさなければ `jmp 0x1ad668`。`0x1ad668` は `/GS` 失敗通知 (`ecx=0x17`・`0xc0000409`・`int 0x29`) で、EH dispatch ではない。
+  - よって「`0x1ad668` 以降の EH dispatch と scope 表」は、この handler の経路には存在しない (受入条件の前提が誤りだった)。
+- 上位の経路 (実測・未確定): `0x1afbd4` の直接 call 元は `0x1b0f30` (所属 fn `0x1b0d24`)、`0x1b009c` の直接 call 元は `0x1b11c3` (所属 fn `0x1b0f5c`)。`0x1b0d24`・`0x1b0f5c` の直接 call 元は、`0x1ae894` (fn `0x1ae828`)・`0x1cc6d3` (fn `0x1cc665`)、`0x1ae954` (fn `0x1ae8b0`)・`0x1cc772` (fn `0x1cc6f6`) の計 4 件。
+  - 上の 6 つの所属関数 (`0x1b0d24`・`0x1b0f5c`・`0x1ae828`・`0x1cc665`・`0x1ae8b0`・`0x1cc6f6`) は、いずれも pdata に handler を持たない (probe の `no handler`)。直接 call 元の上位フレームが EHANDLER を持つかは、ここでは未確定。
+  - `0x1b0d24`・`0x1b0f5c` は、`.data` の RVA `0x3fcb88`・`0x3fcb94` (関数ポインタ表) からも参照される。この表を読む間接 call 元は未特定。
+  - したがって、例外を捕まえる上位フレームと、その catch 先は未確定。
+- 道具: `tools/shared/lift/ildsp/seh_dispatch_probe.py` (`FL_WIN64_DIR` の PE を読み、上の 4 項目を出す。直接 call 元は所属関数と handler の有無を付けて出す。データ参照は `.text`・`.pdata` を除き RVA で出す)。
+- 実測 (測定 commit `fcc41515c`・素材 `fl-win64` 26.1.7.5653 の `block24360_PE.bin`): `python3 tools/shared/lift/ildsp/seh_dispatch_probe.py <PE>` → 3 回とも rc 0・722 ms / 739 ms / 735 ms・load 1 分 0.06 → 0.14。3 回の stdout は `cmp` で完全一致 (42 行)。出力の要点は次のとおり。`[2]` は `0x1afbd4 ... 直接 call 元: ['0x1b0f30']` (← fn `0x1b0d24`・no handler) / `0x1b009c ... 直接 call 元: ['0x1b11c3']` (← fn `0x1b0f5c`・no handler)。`[4]` は `0x1b0d24 直接 call 元: ['0x1ae894', '0x1cc6d3']` / `0x1b0f5c 直接 call 元: ['0x1ae954', '0x1cc772']` / データ参照 `['.data RVA 0x3fcb88']`・`['.data RVA 0x3fcb94']`。
+- 前の版 (`e457357aa`) の誤り: `[4]` が `.pdata` の関数開始 RVA を間接参照として出し、`.data` の表記が RVA でなく section 内オフセットに見えていた。本 commit で `.pdata` を除き RVA 表記に直した。この版の出力で、§12 前版の「直接 call されず」は誤りだったと確定した。
+- コード差分の証跡: `git diff fcc41515c HEAD -- tools/shared/lift/ildsp ':!tools/shared/lift/ildsp/REPORT*.md'` の出力は 0 行 (本節の追記は REPORT のみ)。`docs/WORKFLOW.md` §6 により、再測定は不要。
+- 未解決 (起票先 #5793 の残件・本 issue の受入は未達): `.data` の関数ポインタ表 (RVA `0x3fcb80` 付近) を読む間接 call 元と、上の所属関数 6 つ (`0x1b0d24`・`0x1b0f5c`・`0x1ae828`・`0x1cc665`・`0x1ae8b0`・`0x1cc6f6`) の上位の catch 先。`seh_dispatch_probe.py` の範囲外。

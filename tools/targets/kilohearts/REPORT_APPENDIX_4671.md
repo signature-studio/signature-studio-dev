@@ -4,7 +4,7 @@
 
 #### 10-7y. #4671 (KH-106): 関数ポインタ global `_DAT_1813a1d40` の型規則 (部分・9 → 3)
 
-- 結論: 関数ポインタ global 9 件のうち **6 件** を `GTYPE` の型 `FNPTR` (`void (*)()`・到達時 abort) で解消した。census の型不一致は **119 → 113** (`FX=…,gtype,lanes`・同一入力の直前比較)。残りの **3 件** (戻り値を代入する呼出し 3 箇所) は戻り値型が未確定で未解決。型不一致 9 件の 0 件は未達。Gain/Haas/Gate の `.o` は 3 本とも不変。
+- 結論: 関数ポインタ global 9 件のうち **6 件** を `GTYPE` の型 `FNPTR` (`void (*)()`・到達時 abort) で解消した。census の型不一致は **119 → 113** (`FX=…,gtype,lanes`・同一入力の直前比較)。残りの **3 件** (戻り値を代入する呼出し 3 箇所) は #4693 (KH-112) で戻り値型 `int` を機械語で決め、型を `int (*)()` に直した。int 段の型不一致 (`FX=…,gtype,lanes`) は未測定 (素材 `plugins-kilohearts` が無く再測定できなかった)。既定 FX の emcc error 行の合計は 312 → 309。Gain/Haas/Gate の `.o` は 3 本とも不変。
 - 測定 commit (コードを変えた最後の commit): `c0c75890f` (`git log -1 --format=%h -- tools/targets/kilohearts/ghidra_route` の結果)。測定は作業ツリーの `ghidra_route` (差分込み) で行い、その後 `git commit` した内容と同一。
 - 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)・`toolchain-emsdk` (emcc 6.0.12)・Ghidra 12.1.4 (zip sha256 `ddac49f9…d2db` 一致)・JDK 21 (temurin-21)。すべて `$RUNNER_TEMP/kh` (repo 外)。n=1。
 
@@ -32,16 +32,24 @@
 - 残り 3 件は戻り値を代入する箇所 (`int`・`undefined8` に `void` を代入) の型不一致 (`assigning to ... from incompatible type 'void'`) として残る。
 - prototype なしの呼出し 7 行 (2546・4648・4769・4875・4936・5948・6731) は、emcc では `-Wdeprecated-non-prototype` の warning になり、error 行には数えられない (census は error 行だけを数える)。
 
-**残件 3 件 (未解決・起票先 #4693 [KH-112])**
+**残件 3 件の戻り値型 (#4693 KH-112 で決定)**
 
-| delay.c | 行 | 形 | 必要な決定 |
+生成 C の行は現在 4916・5928・6711 (issue 本文の 4936・5948・6731 は旧版の行)。囲む関数は `FUN_180fd1ac4`・`FUN_180fd7f54`・`FUN_180fe27b0`。issue 本文の呼出元名 `FUN_180fd1b00`・`FUN_180fd7d94`・`FUN_180fe2788` は slot を呼ぶ関数ではない。
+
+| delay.c (現行) | 囲む関数 | 呼出し直後の読み方 (機械語) | 決定 |
 |---|---|---|---|
-| 4936 | `iVar1 = (*_DAT_1813a1d40)(param_1)` | `int` 戻り値を使う | 呼出元の rax の使われ方 (`test eax` 相当) で戻り値型 (int) を ABI 表に書く |
-| 5948 | `uVar2 = (*_DAT_1813a1d40)(0xfffffffffffffffa,param_1)` | `undefined8` 戻り値を返す | 戻り値型 (8 byte) と引数 2 個の意味 |
-| 6731 | `uVar1 = (*_DAT_1813a1d40)(param_1)` | `undefined8` 戻り値を返す | 戻り値型 (8 byte) |
+| 4916 | `FUN_180fd1ac4` (issue 4936) | 呼出元 `180fd1ae4` の後で `test eax,eax` (32bit) | **int** |
+| 5928 | `FUN_180fd7f54` (issue 5948) | 末尾 jump で戻る。呼出元 `180fe029f` は rax を読まず `[rsp+0x30]` を読む | 読み手なし。9 件共通の **int** に合わせる (値は使われない) |
+| 6711 | `FUN_180fe27b0` (issue 6731) | 呼出元 `180fd6016`・`180fd89d1` の後で `test eax,eax` (32bit) | **int** (issue の undefined8 は誤り。機械語は 32bit で読む) |
 
-- 残件の意味 (CFG dispatch 先の関数) は、呼出元の機械語で rax の行き先を確認すれば決まるが、本 run では 44 箇所の全件確認に至らなかった。
-- 規則案: 3 件とも `FNPTR` の戻り値だけを `ulonglong` にする (`void (*)()` → 戻り値型の付与)。ただし戻り値型を変えると 6 件 (戻り値を捨てる呼出し) の emcc 挙動も変わるため、型を変える前に 6 件の使われ方を機械語で確認する (#4693 [KH-112] で扱う)。
+- 規則: `patches.py` の `'1813a1d40': 'FNPTR'` の型を `int (*)()` にし、`ghidra_to_c.py` の `FNPTR` 分岐の戻り型を `int` にした。9 件の slot 全体で 1 つの型。
+- 5928 (`FUN_180fd7f54`) の戻り値 int は『読み手なし』からの共通型。値の使い道は未確認 (bit-exact 検証は未実施。PR 本文の未解決表に記載)。
+- 数字の定義 (3 種類。混ぜない):
+  - 型不一致 (`FX=…,gtype,lanes`・census の error 行のうち型不一致): FNPTR 段で 119 → 113 (上の表)。int 段の値は **未測定** (本 run は素材なしで再測定できない)。
+  - emcc error 行の合計 (既定 FX・`bcaa96dfd` の直前比較): **312 → 309**。型不一致の値ではない。`assigning to ... from incompatible type 'void'` の 3 件 (4916・5928・6711) が消えた、という前 run の log 比較の結論。本 run では再確認していない。309 の内訳は未分類。
+- 規則を入れたあとの確認: Gain/Haas/Gate の `.c` と `.o` は変更前と `cmp` 一致 (前 run の記録。本 run は素材が無く再確認していない)。
+- stereo 閉包 (`patches.py` の stereo 1300・1888 の間接呼出し): 型を `int (*)()` に変えた影響の emcc 行数は **未測定** (本 run は素材 `plugins-kilohearts` が無く測定できなかった)。stereo の生成 C は変わる。
+- 呼出元の確認範囲: rax の下位 32bit を読むと確認したのは 4916・6711 の 2 件 (機械語)。5928 は読み手なし。残り 6 件の呼出元は、int 前提の確認をしていない (本付録の対象外)。FNPTR の stub は `abort()` で、slot の値は C に入らない。
 
 **Gain/Haas/Gate の `.o` 不変**
 
