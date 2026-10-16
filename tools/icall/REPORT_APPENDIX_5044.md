@@ -14,7 +14,7 @@
 
 `tools/icall/r13_callee_check.sh` で行う。
 
-1. `objdump -d -M intel` の全量を `tools/icall/work/core64.dsm` に出力 (初回のみ)。測定は dsm を消してから全量生成 (`real 11.248 s`・`user 10.696 s`・測定時の load average 1.04、判定 3 関数を含む全体)。
+1. `objdump -d -M intel` の全量を `tools/icall/work/core64.dsm` に出力 (初回のみ)。測定は dsm を消してから全量生成し、判定 3 関数までを含む全体を `time` で計測 (HEAD `8b1618e7c`・測定開始時の load average 0.71): `real 14.464 s`・`user 13.955 s`・`sys 0.409 s`。
 2. 関数本体は、開始アドレス行から `ret` の直後に `int3` パディングが来るまでを切り出す。
 3. 本体の命令のうち、宛先 (第 1 オペランド) が `r13`/`r13b`/`r13w`/`r13d` のものを、ニーモニックを限定せずに数える。`cmp`・`test`・`push`・`call`・`jmp`・`jcc` は書込みではないので除外する。`push r13`・`pop r13` は保存・復元として別に数える (`r13_saves`)。`xchg` は両オペランドを見る。
 
