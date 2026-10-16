@@ -62,6 +62,16 @@
 - **未確認**: probe の未解決 19 組と表の行の 1 対 1 対応。表から数えた未測定組は 1 組 (上記 §2 の未確認を参照)。
 - **未検証**: 注釈の消失が「統合」によるかは確認していない (#4393 の推定のまま)。戻した C の wasm 実行による bit 一致は未実施。
 
+## 4b. 12 組の全 disable と VarDefStmtOptimizer 単独 (本 run)
+
+- 測定 commit: 本 run の `notloop_minset.sh`・`notloop_vardef.sh` を入れた commit (PR 本文に併記)。素材・RetDec・emcc は §1 と同じ。
+- 全 disable (`ヘッダ名 32 種` を `--backend-disabled-opts`): 表の未特定 13 行のうち、関数範囲を取れた 12 行で注釈が戻る (12/12)。0x683120 は範囲の取り直しができず未測定 (`NORANGE`)。
+- 1 組の最小集合 (`notloop_minset.sh`): 0x732ae0 は `EmptyStmtOptimizer,WhileTrueToWhileCondOptimizer` (§3 と一致)。
+- 残り 12 組の最小集合 (`minset` の 1-minimal): 0x408770・0x412db0・0x4166b0・0x52ef40・0x575480・0x59a1c0・0x717600・0x741340・0x7c0570・0x7c76b0 (2 行) は `VarDefStmtOptimizer` 単独で戻る。0x44abe0 は `VarDefStmtOptimizer,WhileTrueToWhileCondOptimizer`。
+- **注釈が戻っても直っていない**: `notloop_vardef.sh` で、VarDefStmtOptimizer のみ disable した C の `emcc -fsyntax-only` の `not in loop` 件数は、既定 C と全 12 組で同じ (0x4166b0・0x575480・0x7c76b0 系は 4 件、0x717600 は 2 件、他は 1 件)。注釈の復帰は break の構造エラーを消さない。
+- 判定: VarDefStmtOptimizer は注釈の消失の段として最小集合に現れるが、`not in loop` の原因ではない (注釈の有無と構文エラーは別)。注釈を戻す段と、エラーを消す段は一致しない。したがって「注釈の消失が段で、そこを直せば 27 件が解消する」とは言えない。
+- 未検証: 最小集合の C を wasm 実行して bit 一致を確認すること (未実施)。全 disable 32 種は `--backend-disabled-opts` に全名を渡しており、名前の全件が有効であることは未確認 (存在しない名前は無視される)。
+
 ## 5. 採らなかった方式
 
 - 両方 disable した C を既定に採用する: 制御構造が既定と変わる。13 組は戻らないため、採用しても 27 件は解消しない。
