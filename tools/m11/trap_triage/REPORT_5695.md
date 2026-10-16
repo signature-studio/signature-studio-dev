@@ -1,7 +1,7 @@
 # #5695 unit 895: e3ef60 の arg1 (0x12ba808) のフィールド書込み元 (部分達成)
 
 親: #882 (受入 2 の残り)。対象: `tools/m11/trap_triage/REPORT_684.md` §4 の unit 895 (`function_40ff70` の `*(p-144)` OOB)。
-素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・`work-m11` (展開先 `tools/m11/work`)・`/opt/emsdk`・`/opt/retdec` (既存)。
+素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・`work-m11` (展開先 `tools/m11/work`)・`[EMSDK]`・`[RETDEC]` (既存)。
 
 ## 0. 結論
 
