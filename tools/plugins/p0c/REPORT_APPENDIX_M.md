@@ -27,12 +27,12 @@
 
 ### 1.2 修正後の検査 (emcc 版)
 
-emsdk を導入し (`emsdk install latest`・`activate latest`)、`EMSDK` を設定して `run.sh` を実行した。
+emsdk を導入し (`git clone --depth 1 https://github.com/emscripten-core/emsdk.git` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12`。`tools/m1/flags.sh` の pin と同じ版)、`EMSDK` を設定して `run.sh` を実行した。
 
-- 測定 commit: `7bdaf7443` (HEAD。`842bc5ac3` 以降に `f80_lower.py` / `f80b_rt/` の差分は無い)
+- 測定 commit: `30640a2a4` (`f80_lower.py` / `f80b_rt/` は `842bc5ac3` 以降に無変更。 本付録だけを足す後続 commit では検査対象のコードは変わらない)
 - `to: n=200000 fail=0`
 - `from: n=200003 fail=0`
-- rc 0・所要 3.80 s real (`time bash tools/plugins/p0c/f80b_rt/run.sh`)
+- rc 0・所要 2.30 s real (`time bash tools/plugins/p0c/f80b_rt/run.sh`)
 
 ## 2. 共有鎖の退行 (T0 / T1, `batch_lift.sh --tier T0/T1`)
 
@@ -59,7 +59,7 @@ emsdk を導入し (`emsdk install latest`・`activate latest`)、`EMSDK` を設
 
 - 測定条件 (PR 本文の記載): `ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges <78 件>" ENGINE_TAG=_noipp_nobad engine_lift.sh 19165 900`。 wall 625 s・実行直後の 1 分平均 load 1.15 (4 core) は PR 本文の記載値で、 ログは保存されていない。
 - 測定スクリプトの所在: `engine_lift.sh` と `engine_f80_subset.sh` は `tools/plugins/reverb_delay/` にある (`tools/plugins/lift/` には無い)。
-- 本 runner では再測定していない。 `engine_lift.sh` も `lift_ranges.sh` 経由で RetDec を呼ぶため、§2 と同じ理由で走らない。 修正後 (`842bc5ac3` 以降) の 19165 は未再測定 (`emcc -c` の rc・最初の error は未確認)。
+- 本 runner では再測定していない。 `engine_lift.sh` も `lift_ranges.sh` 経由で RetDec を呼ぶため、§2 と同じ理由で走らない。 修正後 (`842bc5ac3` 以降) の 19165 は未再測定 (`emcc -c` の rc・最初の error は未確認)。 次の run に必要な素材: `oc_artifacts: fl-win64 toolchain-retdec` と plugin 素材 (`plugins-*`)。 RetDec の取得元は `docs/REFERENCES.md` で `[未確認]`。
 
 ## 4. 鮮度: `ce3872372` から HEAD までの差分
 
