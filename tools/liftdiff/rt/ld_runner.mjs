@@ -47,14 +47,18 @@ const sp_restore = mod.__emscripten_stack_restore || exp.emscripten_stack_restor
 let spSnap = 0;   // LD-126: SNAPSHOT 時の SP (RESET で戻す)
 // LD-240 (#4801): 戻しは JS で行う。戻す区間の中に wasm 側の戻り処理のフレームが入ると、戻し中に値が壊れるため。
 // 戻し前に選んだ区間の現在値と複製の差 (byte 数) を数えて返す。
+// 区間情報 (getter) は戻しの前に全部読み切る。getter 呼出しは wasm スタックを使うため、戻しの途中で呼ぶと戻した区間を書き換えうる。
 function resetRegions(m) {
   const H = mod.HEAPU8;
   let diff = 0;
   const n = mod._ld_w_nrst();
+  const rs = [];
   for (let i = 0; i < n; i++) {
     const cat = mod._ld_w_rst_cat(i), len = mod._ld_w_rst_n(i);
     if (!(m & cat) || !len) continue;
-    const lo = mod._ld_w_rst_lo(i), pr = mod._ld_w_rst_pr(i);
+    rs.push([mod._ld_w_rst_lo(i), mod._ld_w_rst_pr(i), len]);
+  }
+  for (const [lo, pr, len] of rs) {
     const a = H.subarray(lo, lo + len), b = H.subarray(pr, pr + len);
     for (let k = 0; k < len; k++) if (a[k] !== b[k]) diff++;
     a.set(b);
@@ -174,5 +178,7 @@ for await (const l of rl) {
   } else if (/^(SIMG|SHEAP|SMODEL) /.test(l) || l === 'SSNAP') {
     const parts = l.split(' ');
     putStr(parts[0], [parts[1] || '', parts[2] || '']); mod._ld_w_state();
+  } else if (l === 'STK') {
+    out(JSON.stringify({ sp: Number(sp_get()), base: Number(lay[4]), end: Number(lay[5]) }));
   } else if (l === 'QUIT') break;
 }
