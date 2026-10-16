@@ -176,7 +176,7 @@ PERF_FD_WRITE=1 node tools/perf/p15/ctor_loop_trace.mjs tools/ott/work/lift/ottl
 
 分かったこと:
 - ctor 146 の前、vtable `0x30203BD0` (`slot(145).obj` の vptr の指し先) は `3011de10 00000000 30127800 ...` (16 words) で、146 の trap 時には 16 words すべて 0。書換えは ctor 146 の内部で起きる。
-- 最初の 0 の観測は func 23 の入口。直前に走った関数は func 122 (`memory.size << 16` の leaf) → func 123 の順。func 123 は `call 122` の後に heap 上端 (`269004816`) を動かす割り当て関数で、`call 4` (`emscripten_resize_heap` の stub) を含む。書換えそのものは func 123 の本体 (`call 122` の後) か、その後の stub 呼び出しの前後のどこかに絞られる。書込みの store は未特定。
+- 最初の 0 の観測は func 23 の入口。直前に走った関数は func 123 → func 122 (`memory.size << 16` の leaf、func 123 から `call 122` で呼ばれる) → func 23 の順。func 123 は `call 122` の後に heap 上端 (`269004816`) を動かす割り当て関数で、`call 4` (`emscripten_resize_heap` の stub) を含む。書換えそのものは func 123 の本体 (`call 122` の後) か、その後の stub 呼び出しの前後のどこかに絞られる。書込みの store は未特定。
 - したがって「壊れた vtable を書いた store」は、func 123 の `call 122` 後から func 23 入口の間に限られる。これは §3e の「heap が data 領域に届いた後で vtable が壊れる」仮説と整合するが、store そのものを記録したわけではない。
 
 再現コマンド (素材展開後):
