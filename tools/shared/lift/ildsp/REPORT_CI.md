@@ -152,11 +152,16 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 結論: `ci_lift.sh` の出力を wasm にリンクすると、未解決は IAT 10 種 (#5747) と直接/画像内の呼び出し先 2 種 (閉包の取りこぼし #5749) の集合だけになる。外部グローバル 2 種と `__stack_pointer` はリンクが通った。ただし外部グローバルの画像上の敷設は未決 (§8-2)。
 
 ### 8-1. 実測 (`ci_link.sh`・rc 1 = 期待どおりの未解決)
-- 入力: `ci_lift.sh` の出力 (`ci.rs_norm.ll`・`ci_helpers.c`)。素材 `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を `$RUNNER_TEMP/art` に展開した。
-- 手順: `grep -v '^  uselistorder'` で行を除く (emcc 6.0.12 の LLVM が `uselistorder i64 %arg1, { 1, 0, 2 }` を読めず、`error: wrong number of indexes` で止まることを確認した)。`ci.ll` → `emcc -c -O1` → `ci.o`。`ci_helpers.c` → `helpers.o`。
-- 未解決 (リンクエラー行数): IAT (EnterCriticalSection 11・FlsGetValue 2・FlsSetValue 4・GetLastError 53・HeapAlloc 3・HeapFree 52・LeaveCriticalSection 11・RaiseException 5・RtlPcToFileHeader 5・SetLastError 1)、呼び出し先 (function_1801aef40 1・function_1801cb600 5)。
-- 解決済み: `__stack_pointer` (emcc が供給)、`global_var_1803f6610`・`__unnamed_1` (IR の `@0` のリンク名。検査用 shim で定義)。`ci.o` の未定義シンボルは `nm -u` で 19 件 (IAT・呼び出し先・`__asm_*` 4 種・`__stack_pointer`・外部グローバル 2 種・`__unnamed_1`) と一致。
-- 検証: `ci_link.sh` は未解決の集合が期待集合 (IAT 10 種 + 2 種) と一致すると exit 0、想定外が出ると exit 1。
+- 測定 commit: `5afe607d0` (`ci_link.sh` の EMSDK_ENV 必須化を含む現 head)。`ci_lift.sh` も `ci_link.sh` もこの HEAD で実行した。
+- 素材: R2 からは `fl-win64` のみ届いた (`$HOME/artifacts` に `fl-win64.tar.zst` のみ)。`toolchain-retdec`・`toolchain-emsdk` は R2 に無いため上流から取得した: RetDec v5.0 の `RetDec-v5.0-Linux-Release.tar.xz` (GitHub release asset、`tar -xJf` で展開し `bin/retdec-decompiler`)、emsdk は `git clone --branch 6.0.12` して `./emsdk install 6.0.12`・`activate 6.0.12` (`emsdk_env.sh` は `$RUNNER_TEMP/art/emsdk/`)。
+- 入力の生成: `ci_lift.sh` を先に実行して `tools/shared/work/lift/ci/` を作った (`FL_WIN64_DIR=$RUNNER_TEMP/art RETDEC_BIN=$RUNNER_TEMP/art/retdec/bin/retdec-decompiler bash tools/shared/lift/ildsp/ci_lift.sh` → rc 0・ALL OK)。
+- 未設定時: `env -u EMSDK_ENV bash tools/shared/lift/ildsp/ci_link.sh` → rc 1 (`EMSDK_ENV を設定` のエラーで停止し、リンクは走らない)。
+- 手順: `grep -v '^  uselistorder'` で行頭 2 空白の 137 行を除く (emcc 6.0.12 の LLVM が `uselistorder i64 %arg1, { 1, 0, 2 }` を読めず、`error: wrong number of indexes, expected 4` で止まることを再確認した)。`ci.ll` → `emcc -c -O1` → `ci.o`。`ci_helpers.c` → `helpers.o`。
+- 実測: `ci_link.sh` → wasm-ld rc 1 / 想定外 0 件 / 終了 exit 0 (実行 1.09 s)。
+- 未解決の一覧 (リンクエラー行数。`link.log` の `undefined symbol` 行から集計): IAT (EnterCriticalSection 11・FlsGetValue 2・FlsSetValue 4・GetLastError 53・HeapAlloc 3・HeapFree 52・LeaveCriticalSection 11・RaiseException 5・RtlPcToFileHeader 5・SetLastError 1 = 10 種)、呼び出し先 (function_1801aef40 1・function_1801cb600 5 = 2 種)。
+- `ci.o` の未定義シンボル (`llvm-nm -u`、emsdk 同梱。ホストの `nm` は wasm を読めない) は 19 件: IAT 10 種・呼び出し先 2 種・`__asm_int3`/`__asm_movq`/`__asm_punpcklbw`/`__asm_sfence` 4 種・`__stack_pointer`・`global_var_1803f6610`・`__unnamed_1`。旧記述の内訳 (20 件) は `__unnamed_1` を外部グローバル 2 種 (`global_var_1803f6610`・`__unnamed_1`) とは別に数えて二重計上していた。正しくは 19 件。
+- `__asm_*` 4 種が EXPECT に無いのに exit 0 になる根拠: `helpers.o` (`ci_helpers.c` から gen_helpers.py が生成) が `__asm_int3`・`__asm_movq`・`__asm_punpcklbw`・`__asm_sfence` を `T` (定義) で持つ (`llvm-nm --defined-only helpers.o`)。よって wasm-ld の未解決は出ず、`undefined.txt` にも現れない。`__stack_pointer` は emcc が供給、`global_var_1803f6610`・`__unnamed_1` は shim.o が定義 (`llvm-nm --defined-only shim.o`)。
+- 検証: `ci_link.sh` の判定は wasm-ld のリンクエラー行だけを数える。期待集合 (IAT 10 種 + 2 種) 以外が出ると exit 1、出なければ exit 0。
 
 ### 8-2. 外部グローバルの意味 (未決)
 - `global_var_1803f6610` (`external global i64`): VA `0x1803f6610` = RVA `0x3f6610` は `.data` の中。`.data` の初期値は 8 byte `0x1803f66a8` (`.data` 内の `global_var_1803f66a8` を指すポインタ)。IR は `icmp eq i64 %4, ptrtoint (ptr @global_var_1803f6610 to i64)` と `load i64, ptr @global_var_1803f6610` で読む。つまり画像内の 1 cell として敷設すれば、IR の意味 (cell の内容 = ポインタ値) と一致する。RetDec が `.data` の他のグローバルを `global` として出すのと同じ形。
