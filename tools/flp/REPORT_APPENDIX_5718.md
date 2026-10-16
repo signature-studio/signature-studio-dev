@@ -71,3 +71,14 @@ WAIT=90 bash tools/flp/s6_pred_hit_probe.sh               # pred・loop にブ�
 - `pred` (`0x12d8d30`) を呼ぶ関数は `0xd640a0`・`0xd66060`・`0xe7a470`・`0xea4240`・`0xebf8a0`・`0xec2740`・`0xec35f0`・`0xec3190` 等で、`ec2740`・`ec35f0`・`ec3190` から `0xea7f40`・`0xea7ae0` への直接 `call` は 0 件 (推移的な繋がりは未確認)。`pred` の呼出し元 (`ebf8a0` 等) と loop の呼出し元 (`ed2ac0`・`1004a20`) が同じ上位に乗るかは未確認。
 - 結論: loop に入る経路は「直接 call の 2 関数 (`ed2ac0`・`1004a20`)」まで確定。その上位の実行時トリガは未確定 (実行で確認するまで述語は確定しない)。
 - 次の一手: wine64 + gdb の環境で `ed2ac0` と `1004a20` の entry に break を張り、命中の有無と直前のスタック (戻り先) を記録する (`tools/flp/s6_pred_hit_probe.sh` の LOOP を `ed2ac0`・`1004a20` に替える)。
+
+## 8. 実行時確認: 直接呼出し元 2 関数 (`ed2ac0`・`1004a20`) の entry
+
+- 測定 (本 run・HEAD は PR 本文の commit): `tools/flp/s8_loop_caller_probe.sh`。素材 `fl-win64` を展開 (real 10.6 s)、`s1_wine_probe.sh` で GUI 起動 (real 2 m 12 s・rc=124 = GUI 継続)、その後 gdb attach。
+- ランナー: wine64 9.0・gdb 15.1 を apt で導入、`kernel.yama.ptrace_scope=0` (sudo)。`FLEngine_x64.dll` base は `0x7a730000` (§2 と同じ)。
+- ブレーク先 (実行時): `ed2ac0` = `0x7b202ac0`・`1004a20` = `0x7b334a20`。gdb は両方に挿入でき (`Breakpoint 1 at` / `Breakpoint 2 at`)、detach まで例外なし。
+- 測定 1 (WAIT=90 s): 両方とも 0 件 (gdb rc=124)。
+- 測定 2 (WAIT=240 s・attach 10:14:37 → detach 10:18:40): 両方とも 0 件 (gdb rc=124)。
+- 判定: GUI 起動だけでは `ed2ac0` にも `1004a20` にも入らない。よって loop `0x12d94f0` に至る経路は、GUI 起動の範囲では通っていない。`pred` (6000 件命中) は起動時に通るが、loop の上位には届かない。
+- 未確認: GUI 操作 (プロジェクトの読込み・再生・ミキサ操作など) で上位が通るか。関数ポインタ経由の呼出し。
+- 次に要るもの: 上位のトリガを起こす操作。GUI 操作の自動化は本 issue の範囲外のため、受入 (loop の入力述語の確定) は未達のまま。
