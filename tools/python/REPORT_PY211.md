@@ -4,8 +4,8 @@
 
 ## 結論
 
-- **受入 1 (委譲先の本体)**: 3 関数の本体の所在を PE 解析箇所つきで確定した (「委譲先の本体」)。**副作用の本体** (vtable `+0x1f0`・`+0x108` の呼出し先) は未確定で、子 #3558 (PY-213) に移す。
-- **受入 2 (範囲外 index)**: **暫定決定**。パターン番号は 1..999。範囲外は**何もせず None を返す** (例外も呼出しもしない)。根拠は弱い。jumpToPattern の本体には範囲検査が無く、表を引く前 (0x12d8b30) に生の index を vtable `+0x1f0` へ渡すため、範囲外で何もしないかは呼出し先が範囲外を無視するかに依る (未確定 → #3558)。movePattern の O=NULL 経路が範囲外の呼出しを省く (0xe33efe–0xe33f0e) のは確定だが、jumpToPattern の根拠にはならない。
+- **受入 1 (委譲先の本体)**: 3 関数の本体の所在を PE 解析箇所つきで確定した (「委譲先の本体」)。**副作用の本体** (vtable `+0x1f0`・`+0x108` の呼出し先) は未確定で、子 #5822 (PY-213) に移す。
+- **受入 2 (範囲外 index)**: **暫定決定**。パターン番号は 1..999。範囲外は**何もせず None を返す** (例外も呼出しもしない)。根拠は弱い。jumpToPattern の本体には範囲検査が無く、表を引く前 (0x12d8b30) に生の index を vtable `+0x1f0` へ渡すため、範囲外で何もしないかは呼出し先が範囲外を無視するかに依る (未確定 → #5822)。movePattern の O=NULL 経路が範囲外の呼出しを省く (0xe33efe–0xe33f0e) のは確定だが、jumpToPattern の根拠にはならない。
 - **受入 3 (index 基準)**: パターン番号は **1 始まり**。jumpToPattern・findFirstNextEmptyPat は Python 値をそのまま使う。selectPattern だけ Python 値から 1 を引く (0xd662e1) ので 0 始まりの選択位置になる。**movePattern の引数は番号ではなく相対量** (移動先 = 現在番号 + 引数。既定 1)。
 - **前段 `REPORT_PY208.md` の訂正 3 点** (「前段 REPORT_PY208 の訂正」): 表と G の番地は rip 相対の変位 (disp) で VA ではない / 表の要素幅は 24 B ではなく **192 B** / `0x409c80` は flags 変換ではなく **1 バイト複写**。
 
@@ -34,7 +34,7 @@
 |---|---|
 | 0x12d8af8 | `index == [0x15d51a0]` (現在番号と比較) なら `0xe5af80` を呼ぶ (役割は未同定) |
 | 0x12d8b14〜0x12d8b25 | Z = `[[[0x15e2eb8]]+0x7a8]` (オブジェクト) |
-| 0x12d8b30 | `call [Z.vtable+0x1f0]` (引数 Z, index, r8b=1)。**副作用の本体 (未同定 → #3558)** |
+| 0x12d8b30 | `call [Z.vtable+0x1f0]` (引数 Z, index, r8b=1)。**副作用の本体 (未同定 → #5822)** |
 | 0x12d8b39〜0x12d8b4f | 要素 E(i) = `0x193fcf8 + 192·i` (rip 解決先)。`cmp dword [E(i)], 0` の直後 `jl` で負なら 0x12d8b74 へ |
 | 0x12d8b51〜0x12d8b6f | `[[0x15e1610]]` の byte が非 0 なら `0x11e84a0(dword E(i))` (役割は未同定) |
 | 0x12d8b74〜0x12d8b8f | `0x12ddaa0([0x15d51a0])`。`0x1046710()` が非 0 なら `0xbd68e0(0x14, 0)` |
@@ -50,7 +50,7 @@
 | 0xe33ee7〜0xe33efb | O = NULL: `0xe5af90` が min = max = 現在番号 (`[[0x15e4018]]` の指す dword) を返す |
 | 0xe33efe〜0xe33f02 | `min + ebx <= 0` なら 0xe33f6f (呼出し無し) |
 | 0xe33f04〜0xe33f0e | `max + ebx > 999` なら 0xe33f6f (呼出し無し)。範囲内なら arr = [min..max] |
-| 0xe33f90〜0xe33fbc | T = `[[0x15e4790]]` (callback の gate と同じ T)、Y = `[T+0x10]`。`call [Y.vtable+0x108]` (引数 Y, arr, 末尾, ebx, flag)。**副作用の本体 (未同定 → #3558)** |
+| 0xe33f90〜0xe33fbc | T = `[[0x15e4790]]` (callback の gate と同じ T)、Y = `[T+0x10]`。`call [Y.vtable+0x108]` (引数 Y, arr, 末尾, ebx, flag)。**副作用の本体 (未同定 → #5822)** |
 
 - 0xe33f6f 以降の共通部は、配列の長さが 0 なら呼出しを飛ばす (`test`・`jle` の順。0xe33f7f〜0xe33fc2)。O = NULL で範囲外のとき、配列は 0 のままなので呼出しは起きない。
 
@@ -80,9 +80,9 @@
 
 | 関数 | 本体の検査 | 決定 | 根拠 |
 |---|---|---|---|
-| jumpToPattern | 無し (`0x12d8af0`) | **暫定**: 範囲外 (1..999 の外) は何もせず None | **根拠は弱い**。生の index を `0x12d8b30` で vtable `+0x1f0` に渡すため、範囲外の挙動は呼出し先次第 (#3558)。callback・wrapper に範囲外用のエラー経路が無い |
+| jumpToPattern | 無し (`0x12d8af0`) | **暫定**: 範囲外 (1..999 の外) は何もせず None | **根拠は弱い**。生の index を `0x12d8b30` で vtable `+0x1f0` に渡すため、範囲外の挙動は呼出し先次第 (#5822)。callback・wrapper に範囲外用のエラー経路が無い |
 | movePattern (O = NULL) | あり (0xe33efe〜0xe33f0e) | **確定** (native どおり): 移動先が 1..999 の外なら何もしない | 実測の分岐 |
-| movePattern (O ≠ NULL) | 無し | **暫定**: jumpToPattern と同じく何もしない (実機未確認 → #3558) | 本体は全選択を vtable `+0x108` に渡すだけ。範囲の判定は呼出し先次第 |
+| movePattern (O ≠ NULL) | 無し | **暫定**: jumpToPattern と同じく何もしない (実機未確認 → #5822) | 本体は全選択を vtable `+0x108` に渡すだけ。範囲の判定は呼出し先次第 |
 | findFirstNextEmptyPat | index は無い | 探索は 1..999 を wrap。空きが無ければ −1 で何もしない | 候補式 (0x12d8c18〜0x12d8c3b) |
 
 - **status −4 (Index out of range) は、この 3 関数では返らない。** callback が status に書くのは −2 (初期値) と 0 だけ (3 callback の `mov qword [rbx+0x60], 0` は `0xd659ee`・`0xd66e9e`・`0xd65b62`)。
@@ -115,10 +115,10 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| jumpToPattern の副作用本体 (vtable `+0x1f0`・Z の型) と、範囲外の実機の挙動 | jumpToPattern の副作用・暫定決定の確度 | #3558 (PY-213) |
-| movePattern の副作用本体 (vtable `+0x108`)・O ≠ NULL の範囲外の挙動 | movePattern の副作用・暫定決定の確度 | #3558 (PY-213) |
-| 空き判定 `0x12d8d30`・`0xe55c80` の本体・`0x12ddb20` の callback `[rbp+0x68]` の中身 | findFirst・jump の副作用の細部 (補助 4 関数の役割は下の節で確定) | #3558 (補助)・#3536 (構造体 E) |
-| `0xea7ae0`・`0xea6b30` (findFirst の、bit2 が立たない経路の後段の呼出し先。ガード `[0x15e1748]` の意味も未同定)。同じ VA の `0xea7ae0` は tools/m11/ldfix/REPORT_2794.md にも『対応未決 (C)』の関数として別の呼出し元で出る | 候補が見つかった後の副作用 (findFirst の副作用の細部) | #3558 (補助) |
+| jumpToPattern の副作用本体 (vtable `+0x1f0`・Z の型) と、範囲外の実機の挙動 | jumpToPattern の副作用・暫定決定の確度 | #5822 (PY-213) |
+| movePattern の副作用本体 (vtable `+0x108`)・O ≠ NULL の範囲外の挙動 | movePattern の副作用・暫定決定の確度 | #5822 (PY-213) |
+| 空き判定 `0x12d8d30`・`0xe55c80` の本体・`0x12ddb20` の callback `[rbp+0x68]` の中身 | findFirst・jump の副作用の細部 (補助 4 関数の役割は下の節で確定) | #5822 (補助)・#3536 (構造体 E) |
+| `0xea7ae0`・`0xea6b30` (findFirst の、bit2 が立たない経路の後段の呼出し先。ガード `[0x15e1748]` の意味も未同定)。同じ VA の `0xea7ae0` は tools/m11/ldfix/REPORT_2794.md にも『対応未決 (C)』の関数として別の呼出し元で出る | 候補が見つかった後の副作用 (findFirst の副作用の細部) | #5822 (補助) |
 | `[0x15d51a0]` と `[[0x15e4018]]` が同じ現在番号か (1 始まりの根拠の強さ) | index 基準の根拠 (推定) | 本 REPORT に推定として残す (追跡のみで子は起票しない) |
 | E(0) が実行時に未使用か | 0 を範囲外とする決定の根拠 | 同上 |
 
@@ -148,6 +148,16 @@ PE の逆アセンブル (capstone・rip 相対は VA 解決) で 1 行ずつ確
 - jumpToPattern 本体 (`0x12d8af0`) には範囲検査が無い。raw index は `0x12d8b30` の vcall へ渡り、表の引きも `[table + idx*192]` (`0x12d8b4b`) を無検査で読む。
 - `0x11e84a0` の範囲検査 (0 ≤ index ≤ 件数-1) は **別の object (`[0x15e2218]`) の件数** に対するもので、1..999 の検査ではない。また `0x11e84a0` は表の要素が 0 以上 (`jl 0x12d8b74` を通らない) のときだけ呼ばれる。
 - したがって『範囲外を無視するか』は vtable `+0x1f0` (Z の型) の本体で決まる。**受入 1 は未達のまま**。#4531 の結果を待つ。
+
+## movePattern の副作用呼出し `call [rbx+0x108]` (#5822・PY-5391)
+
+- 呼出し: `0xe33fbc` の `call qword ptr [rbx+0x108]`。引数は rcx = Y、rdx = arr (`[rbp+0x40]`)、r8 = 末尾 (`rax-1`)、r9d = ebx (相対量)、`[rsp+0x20]` = edi。**確定**。
+- Y の取得鎖: `G = [0x15e4790]`・`T = [G]`・`Y = [T+0x10]`・`rbx = [Y]` (`0xe33f90`〜`0xe33fb0`)。rip 参照の解決先は `0x15e4790` (G と一致、検査 `move.vt108_Y_chain`)。
+- **PE 上の静的な値**: `[G]` = `0x141d6b8` (.data)・`[[G]]` = 0 (ファイル上 NULL、検査 `move.vt108_static_unresolved`)。Y は実行時に作られるオブジェクトのため、**vtable `+0x108` の呼出し先は静的に確定しない (未確認)**。`0x976568` 付近の値は .text 内の UTF-16 並びで、オブジェクトではない。
+- O ≠ NULL 経路 (`0xe33ec3`〜`0xe33ee2`): 数 n と配列を埋めた後、`[O+0x6f7] = 0` を書いて `jmp 0xe33f6f` で呼出しへ直行する。範囲検査 (cmp) は 0 件 (検査 `move.nonnull_skips_range`)。範囲検査は O = NULL 側 (`0xe33f09`) だけにある。
+- **範囲外の挙動 (O ≠ NULL)**: 呼出し先の本体が未確定のため、**未確認**。PY211 の暫定 (何もしない) は、呼出し先が範囲外を無視するという仮定に依る。この節では確定させない。
+- 検査: `move.vt108_call`・`move.vt108_Y_chain`・`move.vt108_static_unresolved`・`move.nonnull_skips_range` の 4 件を追加 (28/28 → 32/32)。
+- ネガティブコントロール: `--mutate-move-vt` (`0xe33fbc` の disp `0x108`→`0x100`) → `FAIL move.vt108_call`・31/32・rc 1。既存の `--mutate` → `FAIL move.upper_bound_999` 系で 30/32・rc 1。
 
 ## 再現
 

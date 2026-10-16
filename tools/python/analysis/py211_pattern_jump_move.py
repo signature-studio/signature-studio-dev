@@ -46,6 +46,11 @@ if "--mutate-helper" in sys.argv[2:]:
     assert data[o:o + 2] == b"\x0f\x8c", "mutate-helper target mismatch"
     data[o + 1] = 0x8D
 
+if "--mutate-move-vt" in sys.argv[2:]:
+    o = foff(0xE33FBC)
+    assert data[o:o + 6] == b"\xff\x93\x08\x01\x00\x00", "mutate-move-vt target mismatch"
+    data[o + 2] = 0x00
+
 
 def decode(va, limit=0x1000):
     out = []
@@ -123,6 +128,33 @@ rips = [t for _, m, o, t in ins if t is not None]
 check("move.getter_min_eq_max", len(rips) == 2 and rips[0] == rips[1],
       f"0xe5af90 は同じ大域 {rips[0]:#x} を 2 回読み、*rdx と *r8 に書く (min == max)" if len(rips) == 2 else "rip 参照が 2 件でない")
 
+# movePattern の副作用呼出し 0xe33fbc: call [rbx+0x108]。rbx = [Y]、Y = [[[G]]+0x10]
+VT108_CALL = 0xE33FBC
+check("move.vt108_call", find(0xE33E20, "call", "qword ptr [rbx + 0x108]") == VT108_CALL,
+      f"call [rbx+0x108] at {VT108_CALL:#x} (rbx = [Y]・Y = [[[G]]+0x10])")
+ld = [t for a, m, o, t in decode(0xE33E20) if m == "mov" and a == 0xE33F90]
+chain_ok = ld == [G_CB] and find(0xE33E20, "mov", "rcx, qword ptr [rcx + 0x10]") is not None
+check("move.vt108_Y_chain", chain_ok,
+      f"0xe33f90 の rip 参照 = {ld[0] and hex(ld[0])} (G と一致)・[rcx+0x10] を取る (Y)")
+def read_q(va):
+    for s in pe.sections:
+        if s.VirtualAddress + base <= va < s.VirtualAddress + base + s.Misc_VirtualSize:
+            if s.Name.startswith(b".bss") or s.SizeOfRawData == 0:
+                return None
+            o = s.PointerToRawData + (va - base - s.VirtualAddress)
+            return int.from_bytes(data[o:o + 8], "little")
+    return None
+p_obj = read_q(G_CB)
+t_obj = read_q(p_obj) if p_obj is not None else None
+check("move.vt108_static_unresolved", p_obj == 0x141D6B8 and t_obj == 0,
+      f"PE 上の [G] = {p_obj and hex(p_obj)}・[[G]] = {t_obj} (ファイル上 NULL)。Y = [T+0x10] は静的に読めず、+0x108 の呼出し先は実行時のオブジェクトで決まる")
+
+# O ≠ NULL の経路 (0xe33ec3〜0xe33ee2) は 1..999 の検査を通らず 0xe33f6f へ進む
+nn = [(a, m, o, t) for a, m, o, t in decode(0xE33E20) if 0xE33EC3 <= a <= 0xE33EE2]
+jmp_ = [o for a, m, o, t in nn if m == "jmp"]
+check("move.nonnull_skips_range", not any(m == "cmp" for a, m, o, t in nn) and jmp_ == ["0xe33f6f"],
+      f"O ≠ NULL の経路 0xe33ec3〜0xe33ee2 に cmp は {sum(1 for a, m, o, t in nn if m == 'cmp')} 件・jmp 0xe33f6f で呼出しへ直行 (範囲検査は O = NULL 側の 0xe33f09 だけ)")
+
 # findFirstNextEmptyPat 探索 0x12d8be0: 候補は (start + k - 1) mod 999 + 1 (1..999)
 check("find.mod_999", find(0x12D8BE0, "imul", "eax, eax, 0x3e7") is not None,
       "imul eax, eax, 0x3e7 (x mod 999 の逆算)")
@@ -135,7 +167,7 @@ c_ea7 = find(0x12D8BE0, "call", "0xea7ae0")
 c_ea6 = find(0x12D8BE0, "call", "0xea6b30")
 guard = find(0x12D8BE0, "mov", "rax, qword ptr [rip", 0x15E1748)
 check("find.post_calls", c_ea7 is not None and c_ea6 is not None and guard is not None,
-      f"後段: call 0xea7ae0 at {c_ea7 and hex(c_ea7)}・ガード [0x15e1748] at {guard and hex(guard)}・call 0xea6b30 at {c_ea6 and hex(c_ea6)} (役割は未同定 → #3558)")
+      f"後段: call 0xea7ae0 at {c_ea7 and hex(c_ea7)}・ガード [0x15e1748] at {guard and hex(guard)}・call 0xea6b30 at {c_ea6 and hex(c_ea6)} (役割は未同定 → #5822)")
 w = 0x12D8D28
 check("find.word_zero", data[foff(w):foff(w) + 2] == b"\x00\x00", f"movzx r9 の word [0x12d8d28] はファイル上 {bytes(data[foff(w):foff(w) + 2]).hex()}")
 
