@@ -145,7 +145,7 @@ SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh            # n=3 で実行
 ### 11.1 結論
 
 - **特定: 2 段の変化。** 9 → 3 は `b64cb3ae3` (ICALL-52・KERNEL32 `RtlPcToFileHeader` を IMPL に追加)、3 → 2 は `a16424be0` (merge `origin/main into 4565-icall-cxx-eh-unwind`)。
-- `b64cb3ae3` で rc=99 から外れた 6 関数 (`1803b3fc0`・`1803b5b60`・`180cbd860`・`18100cf60`・`181011058`・`18102f728`) は、§9.3 の「`RtlPcToFileHeader` ×6」と件数が一致するだけで、関数ごとの対応は未確認。機構も未確認。
+- `b64cb3ae3` で rc=99 から外れた 6 関数 (`1803b3fc0`・`1803b5b60`・`180cbd860`・`18100cf60`・`181011058`・`18102f728`) は、§11.2 の集合差で特定した。§9.3 の「`RtlPcToFileHeader` ×6」と件数が一致するが、`RtlPcToFileHeader` との機構対応は未確認。
 - `a16424be0` で rc=99 から外れたのは `18100cc50` の 1 件。この merge が持ち込んだ `k_RtlCaptureContext` (ICALL-100) との関係は相関のみで、機構は未確認。
 - 残る 2 件 (`18100ca28`・`18103d218`) は `e5261de58` まで残る。
 
@@ -162,7 +162,7 @@ SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh            # n=3 で実行
 | `e5261de58` | 終点 (2 件) | 2 | rc=0: 70・rc=95: 44・rc=97: 6・rc=98: 8・rc=99: 2・rc=124: 1 | 1 回 (2) |
 | `cf486ff00` (main HEAD) | 本 run の測定 commit | 2 | rc=0: 70・rc=95: 44・rc=97: 6・rc=98: 8・rc=99: 2・rc=124: 1・既知 12 中 hit 3 | 3 回 (2・2・2) |
 
-- 測定 load (1 分値・開始時): 0.76〜1.13。real 12.39〜12.46 s (HEAD の 3 回)。
+- 測定 load (1 分値・開始時): 0.76〜1.13。real 12.39〜12.46 s (HEAD の 3 回)。load の値は測定時の記録を正とする (生ログは本 run で再確認できず、記録値の広い方の範囲を採る)。
 - 9 件の集合: `1803b3fc0`・`1803b5b60`・`180cbd860`・`18100ca28`・`18100cc50`・`18100cf60`・`181011058`・`18102f728`・`18103d218`。
 - 各 commit の rc=99 の集合 (`b64cb3ae3`): `18100ca28`・`18100cc50`・`18103d218` (3 件)。`e5261de58`: `18100ca28`・`18103d218` (2 件)。
 
@@ -178,5 +178,5 @@ SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh            # n=3 で実行
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `b64cb3ae3` と `a16424be0` で外れた関数の機構 (`RtlPcToFileHeader`・`RtlCaptureContext` の戻り値と、guest の分岐のどこが変わったか) | 相関のみ。機構未確認 | #3089 の範囲外 (`tools/ott/native/ott_native.c` を変える作業は子で扱う)。未起票 |
+| `b64cb3ae3` と `a16424be0` で外れた関数の機構 (`RtlPcToFileHeader`・`RtlCaptureContext` の戻り値と、guest の分岐のどこが変わったか) | 相関のみ。機構未確認 | #5887 (ICALL-121。機構の調査と記録。`ott_native.c` を変える場合は別 PR) |
 | 残る 2 件 (`18100ca28`・`18103d218`) の rc=99 の原因 | baseline の 2 件 | #4881 の判断 (PM) |
