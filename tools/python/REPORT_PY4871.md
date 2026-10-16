@@ -11,12 +11,12 @@
 
 ## 測定
 
-- 測定 commit (コードを最後に変えた commit): `dc31ff4c8` (`tools/python/analysis/flapi/pattern_write_semantics.py` の追加と本 REPORT の訂正)。
-- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を確認)。展開: `tools/python` で `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py5130 --wildcards '*block00031_PE.bin'` (実測 real 2.910 s)。展開先は `work/py5130/extracted/` (gitignore・commit しない)。
-- 再現 (1 コマンド): `cd tools/python && python3 analysis/flapi/pattern_write_semantics.py work/py5130/extracted/block00031_PE.bin` (HEAD `dc31ff4c8` で実測 real 0.086 s・user 0.069 s・sys 0.018 s、n=1。実行直前の load average は `0.09 0.19 0.08`。結果 `RESULT OK fail=0 total=11`)。
+- 測定 commit (コードを最後に変えた commit): `60aadd62b` (PY-5329: `0x663bf0` の判定と `0x11e7430` 後段の判定を `pattern_write_semantics.py` に追加)。
+- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を確認)。展開: `tools/python` で `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py5130 --wildcards '*block00031_PE.bin'` (実測 real 2.845 s)。展開先は `work/py5130/extracted/` (gitignore・commit しない)。
+- 再現 (1 コマンド): `cd tools/python && python3 analysis/flapi/pattern_write_semantics.py work/py5130/extracted/block00031_PE.bin` (HEAD `60aadd62b` で実測 real 0.088 s・user 0.064 s・sys 0.025 s、n=1。実行直前の load average は `0.57 0.37 0.16`。結果 `RESULT OK fail=0 total=13`)。
 - 前段の再現: `cd tools/python && python3 analysis/flapi/pattern_write_cores.py work/py5130/extracted/block00031_PE.bin` (実測 real 0.060 s・user 0.044 s・sys 0.016 s、n=1。`pattern_write_cores.py` は `317a10e46` で追加・変更なし)。
 - 逆アセンブル: `python3 analysis/py41_disasm.py work/py5130/extracted/block00031_PE.bin <VA...>` (`pe_disasm.py` と同じ capstone + pefile の方式)。
-- コード差分 (測定 commit から HEAD まで): `git diff dc31ff4c8 HEAD -- tools/python/analysis tools/python/provider tools/python/host` の出力は 0 行 (C provider・mock・テストは変えない。`all_tools.mjs` は再測定しない: `docs/WORKFLOW.md` §6)。
+- コード差分 (測定 commit から HEAD まで): `git diff 60aadd62b HEAD -- tools/python/analysis tools/python/provider tools/python/host` の出力は 0 行 (C provider・mock・テストは変えない。`all_tools.mjs` は再測定しない: `docs/WORKFLOW.md` §6)。
 
 ## 1. 共通の呼び出し形
 
@@ -67,7 +67,7 @@
 
 - `pattern_write_cores.py` の出力は、§2 の handler・fmt・core VA と一致する (実測)。
 - 5 コアの入口 (`[rbx+0x60]` = -2 → 準備判定) は `0xd65d60`・`0xd66cb0`・`0xd669f0`・`0xd66630`・`0xd66830` で確認した。
-- `pattern_write_semantics.py` (§6 の読解を VA ごとに命令順で判定): 11 件 PASS・0 件 FAIL (実測 `RESULT OK fail=0 total=11`)。
+- `pattern_write_semantics.py` (§6 の読解を VA ごとに命令順で判定): 13 件 PASS・0 件 FAIL (実測 `RESULT OK fail=0 total=13`)。
 - 負の対照: ハンドラ以外の VA (`0xd843d0` 等) を `pattern_write_cores.py` の対象に入れていない。書式抽出は `FMT` (英字と `|` のみ) で判定しており、文字列でない場合は除外される。
 
 ## 6. 読解の証跡 (本 PR で読み直した事実・VA と命令)
