@@ -152,14 +152,15 @@
 | 未決 | 1 | 1 |
 | 実値化 | 0 | 0 |
 | PASS / FAIL | 0 / 0 | 0 / 0 |
-| 所要 | 3.30 s (load 0.11→0.18) | 1.64 s (load 0.18) |
+| 所要 (`88d135116` で再測定) | 3.34 s | 1.62 s (load 0.18) |
 
 - step 上限 17 件の原因 (`--prune` の実測・件数は行単位):
 
 | 判定不能の理由 (`--prune` 後) | 件数 | 内訳 |
 |---|---:|---|
 | 刈り込み後も step 上限 (未知分岐が多く収束しない) | 5 | `function_1280530`→`function_7e3af0` pos 0・`function_dd5a80`→`function_6c3700` pos 0・`function_e391b0`→`function_6eeb40` pos 0・`function_e391b0`→`function_6ef3e0` pos 0・`function_11d4df0`→`function_7e3af0` pos 0 |
-| 刈り込みで収束し「値が未知」に変わった (原因: ループ・未知分岐の合流) | 11 | `function_cc7dd0`→`function_6ee750` 1・`function_dd5680`→`function_6bed60` 2・`function_ddcd00`→`function_6bed60` 3・`function_dde0e0`→`function_6bed60` 4・`function_e9d8a0`→`function_de10c0` pos 3 1 |
+| 値が未知の経路がある (刈り込みの切断あり・理由文に件数を付与) | 25 | うち後方ループの切断ありが 5 件 (`function_dd5680`→`function_6bed60` 2・`function_ddcd00`→`function_6bed60` 3)・分岐の合流のみが 20 件 |
+| 値が未知の経路がある (刈り込みの切断なし) | 2 | `function_6624a0`→`function_4420e0`・`function_9ce890`→`function_6774b0` (未知の源。刈り込みは効いていない) |
 | 刈り込み後に未対応命令 `imul` (1 オペランド形) | 1 | `function_ddf630`→`function_6bed60` pos 1 |
 
 - 原因の分け方: step 上限 17 件のうち、刈り込みを入れた後も収束しない 5 件は「刈り込み後も step 上限」。残りの 12 件は刈り込みで収束し、値が未知の経路 (11 件)・未対応命令 (1 件) になった。後方のループの切断 (`刈り込み(ループ)`) があったのは `function_1280530`・`function_dd5680`・`function_ddcd00` の 3 件だけで、他は分岐の合流 (`刈り込み(分岐の合流)`) のみ。
