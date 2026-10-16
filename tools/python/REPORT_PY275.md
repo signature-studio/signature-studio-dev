@@ -91,8 +91,7 @@
 | 7 関数の受け手の同インスタンス確定 (手作業追跡) | 受入条件の残り。slot 1 が TUndoEvent_MovedFXTracks を受けるかの確定 | 子 issue #4995 へ移送 |
 | `pe_py275_map_slot1.py` の自動追跡が候補ゼロ | 自動化の信頼性。結論には使っていない | #4995 |
 
-- 検証: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_map_slot1.py` → Q1〜Q5 ALL PASS、終了 0、所要 36.7 秒 (n=1、load average 0.70、HEAD `613bc9143` で再測定)。
-- 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py275_map_slot1.py` → Q1〜Q5 ALL PASS、終了 0、所要 36.7 秒 (n=1、load average 0.82)。
+- 検証: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_map_slot1.py` → Q1〜Q5 ALL PASS、終了 0、所要 28.1 秒 (n=1、load average 0.96、HEAD `5e11efbe6` で再測定)。
 
 ## 7a. #5471: 3 関数の受け手の追跡 (関数内で確定・関数をまたぐ箇所は未確定)
 
@@ -107,8 +106,7 @@
 
 - **同インスタンスの確定は 0 件**。3 関数とも、probe の検査範囲では「読出し値が slot 1 の receiver になる」箇所を検出しなかった。ただし、0x69b340 (69b640 からの r8 引数)・0x8c9a70 ほか (8c9d20 からの rsi 引数) の内部は、この probe では追っていない。確定には、これらの callee の receiver を追う必要がある。
 - 検査の限界: R6 は呼出し直前 3 命令の文字列一致だけを見る。別レジスタ経由の受け渡しは対象外。
-- 所見の訂正: 途中の確認で `0x8c9cc0` の範囲を誤って 0x8c9d20 の後半まで含めた。本 probe は int3 パディングで関数の末尾を決めるので、この誤りは解消。
-- 検証: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py275_receivers.py` → R1〜R12 ALL PASS、終了 0、所要 38.1 秒 (n=1、単独実行)。素材は `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB) から `block00031_PE.bin` (22,227,016 バイト) を 2.9 秒で展開。
+- 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py275_receivers.py` → R1〜R12 ALL PASS、終了 0、所要 29.7 秒 (HEAD `5e11efbe6` で再測定、n=1、load average 0.96)。素材は `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB) から `block00031_PE.bin` (22,227,016 バイト) を 2.9 秒で展開。
 
 ## 7. #5472: 4 関数の読出し値と slot 1 receiver の流れ (関数内で確認)
 
