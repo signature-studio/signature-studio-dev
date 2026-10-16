@@ -160,3 +160,22 @@ sha256sum work/m11_boot.cjs.wasm
 
 - 生ログ (`tolerant.out`・`tolerant_units.json`) は `work/lb0/`・`work/lb10000/` に出る (gitignore)。repo には commit しない (`tolerant_units.json` 48 KB × 2・ログは `work/` 配下でのみ再現可能)。
 - `m11_lb_tolerant_repro.sh` は `work/` 直下の wasm と IR を上書きする。LB を切り替える前に退避する。
+
+## 6. 745 の IR 突合 (`function_407e20__lifted`・LB=0・指紋 `d6274222`)
+
+逆アセンブルは `llvm-objdump -d work/lb0/m11_boot.cjs.wasm` の関数本体 (`0x13d52c` から)。faulting は `0x13d5e1`。
+
+```
+  13d598: 21 03        	local.set	3
+  13d59a: 20 03        	local.get	3
+  13d59c: 42 07        	i64.const	7
+  13d59e: 83           	i64.and
+  13d5a1: 51           	i64.eq
+  13d5de: 20 03        	local.get	3
+  13d5e0: a7           	i32.wrap_i64
+  13d5e1: 29 03 00     	i64.load	0
+```
+
+- `local 3` (`0x13d598` の `local.set 3`) = IR `%2 = load i64 [arg1-8]` (`boot_final.ll:104752` 付近)。
+- `0x13d5de`〜`0x13d5e1` の `local.get 3; i32.wrap_i64; i64.load 0` = IR `%8 = inttoptr %2`・`%9 = load i64 [%8]` (`boot_final.ll:104775`)。
+- `%2` の実行時の値 (address 0 か) は未観測。
