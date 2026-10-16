@@ -139,3 +139,30 @@
 ### 差分 (コードのみ・測定 commit 以降)
 
 `git diff cbacec6fa HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行 (本節の追記は REPORT のみ)。
+
+## 9. #5552: 値が未知の経路 16 件の未知の源の類 (測定 commit `51df584bd`)
+
+- 変更: `m11_setother_nonimm_cfg_verify.py` に未知の源の類を付けた (入力引数 / スタック slot / メモリ読込 / call 戻り値 / その他)。判定 (実値化・未決・判定不能) は変えていない。`verify` の判定不能の詳細に `類=` を付けた。
+- 類の付け方: 入口から一度も書かれていない reg は 入力引数。`call` で壊れた揮発 reg は call 戻り値。オペランドがメモリ (`[...]`) なら、rsp/rbp を含むものは スタック slot、それ以外は メモリ読込。その他は上記以外。値が未知の reg は、未知になった時点の源を継ぐ。
+- 合成検査 (`--selftest`): 48 件 → **58 件・不一致 0** (rc 0)。類ごとに PASS (正しい類) と FAIL (誤った類・ネガティブコントロール) を入れた (L1〜L5)。
+
+### 9-1. 実データ (`fl-win64` `block00031_PE.bin`・`work-m11`・台帳は §2-2 と同じ手順で再生成)
+
+- 台帳の再生成 (本 run): `m11_sigfix_stats.sh` → `m11_setother_ledger_verify.py` (`match 410`) → `m11_setother_nonimm_class.py` (349 件) → `m11_setother_nonimm_cfg.py` (34 件・実値化 0・未決 34)。
+- 照合 (`--all`・測定 commit `51df584bd`): **判定不能 33・未決 1・実値化 0・PASS 0・FAIL 0** (rc 0・5.28 秒・load 0.21)。判定は類を付ける前 (`07bae9afb`・§8) と同一。
+
+| 値が未知の経路 (16 件) の源の類 | 件数 | 対象 (caller → callee pos) |
+|---|---:|---|
+| 入力引数 | 7 | `function_6624a0`→`function_4420e0` pos 0・`function_9ce890`→`function_6774b0` pos 0・`function_9cf2e0`→`function_695e80` pos 0・`function_a97780`→`function_677f60` pos 0/1・`function_a97780`→`function_677fb0` pos 0/1 |
+| メモリ読込 | 5 | `function_cc6ae0`→`function_6ef3e0` pos 0・`function_cc6ae0`→`function_6eeb40` pos 0・`function_cc6ae0`→`function_6ee8a0` pos 0 (2 回)・`function_cc6ae0`→`function_6ef3c0` pos 0 |
+| call 戻り値 | 4 | `function_127a4a0`→`function_65f270` pos 1 (3 回)・`function_ff0600`→`function_a97410` pos 1 |
+| スタック slot | 0 | — |
+| その他 | 0 | — |
+| 合計 | 16 | 判定不能の「値が未知の経路」16 件と一致 |
+
+- 読み: 「直前の call が原因」(#5552 の前提の否定) は 16 件中 4 件だけ。残り 12 件は入力引数 (7) とメモリ読込 (5) で、#4807 の停止報告の推定 (入力引数・スタック・グローバル由来) と一致する。スタック slot は 0 件で、rsp 基準の読込はこの 16 件の未知の源には無い。
+- 限界: 類は未知になった時点の源を継ぐ近似で、経路の途中で別の源が混ざっても最後の源を報告する。類は分類の補助で、判定 (PASS・FAIL) の根拠にはしない。入力引数 7 件の関数の引数の実体 (どの引数か) は未特定。
+
+### 9-2. 測定 commit 以降の差分
+
+`git diff 51df584bd HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行 (本節の追記は REPORT のみ)。
