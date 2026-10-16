@@ -202,11 +202,31 @@ node tools/perf/p15/ctor_vtable_ring.mjs tools/ott/work/lift/ottl_rc.wasm
 - 計装した store のうち vtable 範囲を覆うのは、wasm func 75 の `memory.fill` 1 箇所 (wat の 71184 行・dest は `local.get 1` (f75 の 2 番目の引数)・val 0・n 262144)。vtable 先頭語を 0 にしたのはこの fill と読める。`ctor_call_window` で見た「`f23->f75` の call 戻り」の直後・f75 本体の中の位置と一致する (`call 119` の後〜fill)。直接の `i32.store` などは未監視のため、この fill が唯一の書込みとは言えない。
 - §3f の「store が特定できない」は、計装済みの範囲では `memory.fill` 1 箇所まで絞れた。dest `0x301d3e40` を与える呼び出し元の引数の由来 (`f23` の `call 75` のどの値か) は未確定。
 - 3 run の同一性は §3f と同じく計装版の 3 run で確認した。
+- **訂正 (本 §3h)**: §3g の「dest は `f75` の 2 番目の引数 (`local.get 1`)」は誤読だった。`f75` は引数を取らず (type 5: `() -> ()`)、`local 1` は `malloc` の戻り値 (`f119` = dlmalloc の `malloc`)。サイズ `max(i64.load 0x1008d070, 1)` = 262144 を `malloc` し、その領域を 0 埋めする calloc 形。dest は heap 側の確保結果である。
 
 未確定:
 - dest `0x301d3e40` が f75 の引数としてどう決まるか (`f23` の `call 75` の引数の計算)。
 - 計装版は `memory.fill` 1 箇所だけを監視する。vtable 範囲への他の store は見ていない (直接 store を含む全 store の監視は未実装)。
 - Chrome (AudioWorklet) で同じ fill が起きるかは未確認。
+
+## 3h. 子 #5403 (PERF-P28) の dest の由来 (Node・同期・`fd_write` stub 下)
+
+測定 commit: `7156a4b3e` (計装 3 ファイルを追加した commit。`tools/perf/p15` の既存ファイルは §3g の `195ee191f` から変更なし)。計装は `tools/perf/p15/instr_calloc.py` (func 75 の `memory.fill` 直前で dest を記録する)、harness は `tools/perf/p15/ctor_calloc_image.mjs`。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を `wasm2wat` → 計装 → `wat2wasm` で作った (wabt は `/tmp/opencode/wabt` に一時導入・commit 外)。
+
+| 測定 | 結果 |
+|---|---|
+| `ctor_calloc_image.mjs` (計装 wasm) ×3 | 3/3 同一。`image_calloc` は ctor 146 の中だけに 10 件: `0x30013dc0`・`0x30053dc8`・`0x30093dd0`・`0x300d3dd8`・`0x30113e28`・`0x30153e30`・`0x30193e38`・`0x301d3e40`・`0x30213e48`・`0x30253e50`。`0x301d3e40` は 8 番目 (vtable `0x30203BD0` を含む 262144 B の領域を覆う) |
+| `ctor_fill_watch.mjs` (§3g の計装) ×2 | 2/2 同じ。146 の dest `0x301d3e40`・n `262144`・`vt_head` = 0 |
+
+分かったこと:
+- 146 回目の ctor の中で、func 75 の calloc が guest image の範囲 (`0x30000000`〜`0x30284124`) を指す領域を 10 回返す。145 回以前の ctor では image 内の calloc は 0 件。
+- 返る領域は `0x40000` (262144 B) ずつ進み、image の data 領域 (`0x301e2000`〜`0x30284124`) の内側に入る。heap が image の上に伸びて、image の領域を再利用する形と読める。
+- ここで heap 先頭を直接読む計測は行わなかった。ctor の前後で `malloc` を呼ぶと割り当て順が変わり、dest が変わるため (§3h の検証で確認)。heap 先頭の値は未測定。
+
+未確定:
+- heap が image に届く機構 (heap 先頭が image 基底の何 B 手前まで伸びていたか) は未測定。
+- 145 回目までの ctor で heap が image に届かない理由、146 回目でだけ届く理由は未確定。
+- 「image の領域を calloc が返し、そこに vtable がある」ことが停止の原因かは、停止後の再現 (vtable を別の場所に置く等) で確かめていない。
 
 ## 4. 未解決
 
