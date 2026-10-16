@@ -19,7 +19,7 @@
 | 逆アセンブル | capstone 5.0.7。`0xd80d60`〜`0xd81127` (約 220 命令)。補助関数 `0x12b69b0`・`0x1331340`・`0x41a7b0`・`0xc3cfa0`・`0x413a60`・`0x41c650`・`0x414200`・`0x43c870` を読んだ |
 | load | 測定時の load average は 1 未満 (4 core) |
 
-差分確認: 測定 commit から HEAD までの `tools/python/analysis` と `tools/python/provider` `tools/python/host` `tools/python/tests` の差分は 0 行 (本 REPORT と `docs/DOC_MAP.md` の登録だけが後の commit)。
+差分確認: `git diff c14259c4f HEAD --stat -- tools/python` は 7 files, +208 −9 (本 REPORT +2 −2 を含む。他は `REPORT_PY211.md`・`REPORT_PY4871.md`・`REPORT_PY5351.md`・`analysis/flapi/pattern_write_semantics.py`・`analysis/flapi/plugins_padinfo_facts.py`・`analysis/py211_pattern_jump_move.py`。main 取り込みの merge で入った他 PR の変更)。本検査の対象 (`analysis/flapi/plugins_getname_facts.py`・`analysis/flapi/flapi_kwargs.json`・本 REPORT) は測定 commit から変わっていない (`git diff` 0 行)。入力の bin は素材 (`fl-win64`) 由来で git の管理対象外。
 
 ## 1. 引数 (確定)
 
