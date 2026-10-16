@@ -15,7 +15,7 @@ LD-240 (#4801) で hi 区間の測定誤りを直した (下の §0)。
 
 ## 1. 測定条件
 
-- 素材: `fl-win64` (`extracted/block00031_PE.bin`)・`work-liftdiff`・`work-m11`・`toolchain-emsdk` (`/opt/emsdk`)。
+- 素材: `[WIN64]` (`extracted/block00031_PE.bin`)・`[WORK-LIFTDIFF]`・`[WORK-M11]`・`[EMSDK]`。
 - wasm: `python3 ldlib/build_wasm.py targets/m11.json --force` → `OK` (`wasm_size` 4464521・`sig_mismatch` 0・`undefined` 0)。
 - 機: 4 vCPU・RAM 15 GiB。5 条件を `xargs -P 3` で流した。wall 7 分 15 秒 (435 s)。load 0.44 (開始時) 〜 1.97 (終了時)。
 - 対象: shard 1 の chunk 1 の対象件数は **17** (REPORT の 18 件と 1 件違う。§6)。
@@ -35,7 +35,7 @@ LD-240 (#4801) で hi 区間の測定誤りを直した (下の §0)。
 
 - SP = stack_base なので、hi 区間は 0 B。受入条件の「hi 区間が 8 MiB 以内」は満たす (0 B)。
 - probe の RESET 差分 (各 mask を別プロセスで、SNAPSHOT 直後に 1 回 RESET): `reset 1` (stk) = 5・`reset 256` (hi) = 4・`reset 512` (win) = 1・`reset 128` (deep) = 0・`reset 7` (all) = 5。連続 RESET (`6,6,2,2,4,4`) の差分は全て 0 (冪等)。
-- 実行コマンド: `cd tools/liftdiff && ANALYSIS_DIR=$HOME/work/analysis python3 ld240_hi_probe.py > work/ld240/probe.json` (27 s)。
+- 実行コマンド: `cd tools/liftdiff && ANALYSIS_DIR=<[ANALYSIS-DIR]> python3 ld240_hi_probe.py > work/ld240/probe.json` (27 s)。
 - 修正前の値 (`reset 256 diff 575469632`) は、戻し処理の frame の書き換えで壊れた値。この PR の修正後は 4 になった。
 
 ## 3. 結果 (コミット済み HEAD・n=1・対象 17 件)
