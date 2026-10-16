@@ -58,3 +58,6 @@ callee の需要域は `rbp+[0, E)`。親が同じ範囲の `[rbp + d]` を参�
 
 - `frame_share/frame_bound.py --ir work/boot_final3.ll --report REPORT_SHX-T48.md` の出力は、§3・§4 の表と一致した (5 組)。
 - 負荷: 測定時の load average は 1.42 (`uptime`・nproc 4)。
+- 測定 commit `739b46e2d` から本 PR の HEAD までのコード差分 (`git diff 739b46e2d HEAD -- tools/m11/frame_share tools/m11/ldfix tools/m11/*.sh tools/m11/*.py`):
+  `tools/m11/frame_share/frame_bound.py` | 105 insertions (新規)。判定本体は既存の `base_check.rbp_entry_offset` を使うため、既存の測定値は変わらない。
+- `frame_bound.py` の docstring を、測定後に説明文だけ直した (判定ロジックは変えていない)。
