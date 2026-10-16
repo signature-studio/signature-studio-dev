@@ -237,6 +237,13 @@ jobs:
           ref: ${{ github.event_name == 'pull_request_review' && github.event.pull_request.base.ref || '' }}
           persist-credentials: false
 
+      # 無音終了の検知 (implement-progress.sh) の基準時刻。script は checkout で得るので、checkout の直後に取る。
+      # agent-setup (2.3GB の展開を含む) より前なので、job の残り時間の見積もりに展開の時間が入る。
+      - name: Mark the job start (implement progress)
+        id: jobstart
+        shell: bash
+        run: bash .github/scripts/implement-progress.sh mark >> "$GITHUB_OUTPUT"
+
       # ---------------------------------------------------------------------
       # 2. untrusted input の隔離 (script injection / env injection の防止)。
       #    最も安価なステップなので最初に置き、コマンド判定を外れたコメントでは
@@ -324,6 +331,14 @@ jobs:
 
       # fix モードは step に上限を置く: job の 60 分を使い切ると、下の検証・再試行 step が走る前に
       # job ごと打ち切られ、無音終了になるため。
+      # 無音終了 (issue 上の /oc run が PR も push もコメントも残さずに終わる) の検知と、job 内の 1 回だけの再試行 (#5727 受入 6)。
+      # fix モードは下の fix-progress.sh の再試行が既にあるので対象外。
+      - name: Record the HEAD before the implementer (implement progress)
+        id: implsha
+        if: steps.context.outputs.should_run == 'true' && !contains(fromJSON('["pull_request_review","repository_dispatch"]'), github.event_name)
+        shell: bash
+        run: bash .github/scripts/implement-progress.sh sha >> "$GITHUB_OUTPUT"
+
       - name: Run OpenCode (implementer)
         id: oc
         if: steps.context.outputs.should_run == 'true' && steps.fixrec.outputs.stop != 'true' && needs.fixgate.outputs.stop != 'true'
@@ -336,6 +351,61 @@ jobs:
           prompt-file: ${{ steps.prompt.outputs.prompt_file }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      # issue の /oc run (implement) が何も残さずに終わったら、同じ job の中で 1 回だけ再試行する。
+      # 再試行は作業ツリーが clean で HEAD が開始時のままで、job の残り時間 (60 分の上限) に余裕があるときだけ。
+      # 再試行もなお無音なら job を失敗させる (record-run-outcome.sh の報告は always() で別に残る)。
+      - name: Check the implement progress
+        id: implprog
+        if: ${{ !cancelled() && steps.context.outputs.should_run == 'true' && github.event_name == 'issue_comment' && steps.implsha.outcome == 'success' && steps.implsha.outputs.start_sha != '' && needs.fixgate.outputs.stop != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          OC_REPO: ${{ github.repository }}
+          OC_START_ISO: ${{ steps.jobstart.outputs.start_iso }}
+          OC_START_SHA: ${{ steps.implsha.outputs.start_sha }}
+          OC_JOB_START_EPOCH: ${{ steps.jobstart.outputs.start_epoch }}
+        run: bash .github/scripts/implement-progress.sh check >> "$GITHUB_OUTPUT"
+
+      - name: Prepare the implement retry prompt
+        id: implretry-prompt
+        if: ${{ !cancelled() && steps.implprog.outputs.retry == 'true' }}
+        shell: bash
+        env:
+          OC_PROMPT_SRC: ${{ steps.prompt.outputs.prompt_file }}
+        run: bash .github/scripts/implement-progress.sh retry-prompt >> "$GITHUB_OUTPUT"
+
+      - name: Run OpenCode (implement run, retry)
+        id: oc-implretry
+        if: ${{ !cancelled() && steps.implprog.outputs.retry == 'true' }}
+        timeout-minutes: 15
+        uses: ./.github/actions/opencode
+        with:
+          model: ${{ vars.OC_MODEL_ID }}
+          agent: build
+          auth-export: ${{ secrets.OC_AUTH_EXPORT }}
+          prompt-file: ${{ steps.implretry-prompt.outputs.prompt_file }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Check the implement progress (retry)
+        id: implprog-retry
+        if: ${{ !cancelled() && steps.implprog.outputs.retry == 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          OC_REPO: ${{ github.repository }}
+          OC_START_ISO: ${{ steps.jobstart.outputs.start_iso }}
+          OC_START_SHA: ${{ steps.implsha.outputs.start_sha }}
+          OC_JOB_START_EPOCH: ${{ steps.jobstart.outputs.start_epoch }}
+        run: bash .github/scripts/implement-progress.sh check >> "$GITHUB_OUTPUT"
+
+      - name: Fail when the implement run made no progress
+        if: ${{ !cancelled() && steps.implprog.outputs.result == 'none' && steps.implprog-retry.outputs.result != 'done' }}
+        shell: bash
+        run: |
+          echo "::error::the implement run neither pushed, opened a PR, nor commented on the issue (reason: ${{ steps.implprog-retry.outputs.reason || steps.implprog.outputs.reason }}), even after one retry"
+          exit 1
 
       # ---------------------------------------------------------------------
       # fix モードの「無音終了」対策。差し戻された PR は、agent が push も PR コメントもせずに
