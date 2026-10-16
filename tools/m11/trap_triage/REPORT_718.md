@@ -219,6 +219,9 @@
 - 入力: `work-m11` の `boot_final.ll` (sha256 `69c774de…`。`597757f4…` の系統は未使用)・`fl-win64` の `block00031_PE.bin`。scan 288・TSV 288 行を再現。
 - 偽陽性率は母数 288 の判定が終わるまで書かない。
 
+## 4m. 証拠表の行 159〜193 (#5661・部分達成: 判定 35 件・真陽性 3・偽陽性 1・保留 31)
+件ごとの表・根拠・測定 commit (`f195a93a9`)・未解決は `REPORT_APPENDIX_5661.md` が正本。
+
 ## 5. 再現
 
 本 PR の再現手段は `guard699/scan_guard.py`・`trap_triage/strict_evidence.py`・`trap_triage/judge_entry_check.py` で、入力は `work-m11` の `boot_final.ll` を要する (`oc_artifacts: fl-win64 work-m11`)。`block00031_PE.bin` は `fl-win64` 素材に入っている。
