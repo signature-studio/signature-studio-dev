@@ -81,7 +81,7 @@ S4 の `must` が空になる関数 (12657b0・442670・5b0970・442890・4421d0
 | 項目 | 値 |
 |---|---|
 | 素材 | fl-win64 (`$HOME/artifacts/fl-win64.tar.zst` から `block00031_PE.bin` のみ `tar --zstd` で展開) |
-| 測定 commit | `062922cd9` (`tests/ld291_schemes.py` の初版 commit。その後 `--scheme S3/S4`・`--maxdepth`・`--budget` を足した版を本 PR に含める。測定の数値は本 PR の最終版で取り直した) |
+| 測定 commit | `8f62b8eef` (`tests/ld291_schemes.py` を最後に変えた commit。S3/S4・`--maxdepth`・`--budget` を含む。数値はこの版で取った) |
 | 基点 | `befbc8265` (origin/main) |
 | 所要 (wall) | S0 0.5 秒 / S4 (深さ 16・予算 20000) 1.5 秒 |
 | load | 測定時 load average 0.16〜0.32 (4 コア) |
@@ -107,5 +107,5 @@ python3 tools/liftdiff/tests/ld291_schemes.py $FL_WIN64_DIR/extracted/block00031
 
 ## 8. 測定 commit からの差分
 
-- 測定 commit: 本 PR の最終 commit (スクリプトを変えた最後の commit)。測定値はその版で取り直した。
-- 差分の証跡は PR 本文に `git diff <測定 commit> HEAD -- tools/liftdiff` の出力を添える。
+- 測定 commit: `8f62b8eef`。この版で S0・S4 を取り直し、§3 の数値と一致した。
+- 測定 commit 以降の差分は REPORT の追記・DOC_MAP の登録のみ (コードは変えていない)。PR 本文に `git diff 8f62b8eef HEAD -- tools/liftdiff` の出力を添える。
