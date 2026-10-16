@@ -41,6 +41,24 @@ static uint64_t __attribute__((ms_abi)) stub_unres(void) {
 
 /* IAT の未束縛スロット (ファイル上は hint/name RVA のまま) を stub に差替える。
  * GetLastError は 0 を返す (fault 経路で呼ばれる)。他の import を呼んだら unres_hits を増やす。 */
+/* FLS (FA-57 / #4622): index ごとの値の表と g_lasterr。index は 0x182989860 (HeartCore の .data) に入る。
+ * FLS_IDX 未指定 (-1) のときは FlsSetValue が FALSE を返す (現行の stub の戻り 0 と同じ)。 */
+#define FLS_N 64
+static uint64_t fls_val[FLS_N];
+static uint32_t g_lasterr;
+static uint64_t fls_set_calls, fls_set_ok;
+static uint64_t __attribute__((ms_abi)) fls_set(uint32_t idx, uint64_t val) {
+    fls_set_calls++;
+    if (idx >= FLS_N) return 0;
+    fls_set_ok++;
+    fls_val[idx] = val; return 1;
+}
+static uint64_t __attribute__((ms_abi)) fls_get(uint32_t idx) {
+    if (idx >= FLS_N) return 0;
+    return fls_val[idx];
+}
+static uint64_t __attribute__((ms_abi)) set_lasterr(uint32_t e) { g_lasterr = e; return 0; }
+
 static void patch_iat(uint8_t* m, uint32_t pe) {
     uint32_t imp_rva; memcpy(&imp_rva, m + pe + 144, 4);
     for (uint8_t* d = m + imp_rva; ; d += 20) {
@@ -52,6 +70,12 @@ static void patch_iat(uint8_t* m, uint32_t pe) {
             if (!ent) break;
             void* fp = (void*)stub_unres;
             if (!(ent >> 63) && !strcmp((const char*)m + (uint32_t)ent + 2, "GetLastError")) fp = (void*)stub_ret0;
+            if (getenv("FLS_IDX") && !(ent >> 63)) {
+                const char* nm = (const char*)m + (uint32_t)ent + 2;
+                if (!strcmp(nm, "FlsSetValue")) fp = (void*)fls_set;
+                else if (!strcmp(nm, "FlsGetValue")) fp = (void*)fls_get;
+                else if (!strcmp(nm, "SetLastError")) fp = (void*)set_lasterr;
+            }
             uint64_t v = (uint64_t)(uintptr_t)fp;
             memcpy(m + ft + 8 * k, &v, 8);
         }
@@ -115,6 +139,11 @@ int main(int argc, char** argv) {
     int neg = getenv("CHECK_NEG") && getenv("CHECK_NEG")[0] == '1';
     uint8_t* im = map_pe(argv[1]);
     (void)im;
+    if (getenv("FLS_IDX")) {
+        /* FLS index slot (HeartCore の RVA 0x189860 相当は .data 上の絶対 VA 0x182989860) */
+        int32_t fi = (int32_t)strtol(getenv("FLS_IDX"), 0, 0);
+        memcpy((void*)(uintptr_t)0x182989860ULL, &fi, 4);
+    }
     fn_t proc = (fn_t)PROC_VA;
     struct sigaction sa; memset(&sa, 0, sizeof sa); sa.sa_sigaction = on_fault; sa.sa_flags = SA_SIGINFO | SA_NODEFER;
     sigaction(SIGSEGV, &sa, 0); sigaction(SIGILL, &sa, 0); sigaction(SIGTRAP, &sa, 0); sigaction(SIGBUS, &sa, 0);
@@ -193,6 +222,7 @@ int main(int argc, char** argv) {
         printf("\n");
     }
     fprintf(stderr, "SUMMARY cases=%d err=%d audio_changed_cases=%d notify_total=%d no_notify_cases=%d unresolved_import_calls=%llu\n", nc, err, changed, nvec_total, nzero, (unsigned long long)unres_hits);
+    if (getenv("FLS_IDX")) fprintf(stderr, "FLS fls_set_calls=%llu fls_set_ok=%llu\n", (unsigned long long)fls_set_calls, (unsigned long long)fls_set_ok);
     for (int i = 0; i < 8 && unres_site[i]; i++)
         fprintf(stderr, "UNRES site=%llx count=%llu\n", (unsigned long long)unres_site[i] - 5, (unsigned long long)unres_cnt[i]);
     return err ? 1 : 0;
