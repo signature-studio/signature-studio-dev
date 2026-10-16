@@ -29,10 +29,10 @@
 
 emsdk を導入し (`git clone --depth 1 https://github.com/emscripten-core/emsdk.git` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12`。`tools/m1/flags.sh` の pin と同じ版)、`EMSDK` を設定して `run.sh` を実行した。
 
-- 測定 commit: `30640a2a4` (`f80_lower.py` / `f80b_rt/` は `842bc5ac3` 以降に無変更。 本付録だけを足す後続 commit では検査対象のコードは変わらない)
+- 測定 commit: `8e263e380` (main 取り込み後の HEAD。`f80_lower.py` / `f80b_rt/` は `842bc5ac3` 以降に無変更)
 - `to: n=200000 fail=0`
 - `from: n=200003 fail=0`
-- rc 0・所要 2.30 s real (`time bash tools/plugins/p0c/f80b_rt/run.sh`)
+- rc 0・所要 2.37 s real (`EMSDK=<emsdk のルート> bash tools/plugins/p0c/f80b_rt/run.sh`)
 
 ## 2. 共有鎖の退行 (T0 / T1, `batch_lift.sh --tier T0/T1`)
 
@@ -44,7 +44,9 @@ emsdk を導入し (`git clone --depth 1 https://github.com/emscripten-core/emsd
 
 注: 測定 commit 以降に `f80_lower.py` の `_f80b_from_image` (subnormal の丸め位置) を変えた (`842bc5ac3`)。 この修正後の T0/T1 は**未再測定**。
 
-未再測定の理由 (再実行 run の 2026-10-16 に確認): `batch_lift.sh` は RetDec (`[RETDEC]`・`docs/REFERENCES.md` §4) を呼ぶが、本 runner に RetDec が無い。 `artifacts/` にも `toolchain-retdec` が無い (`fl-win64.tar.zst` のみ)。 `PLUGIN_MATRIX.json` も本 worktree に無い。 `fl-win64` は展開可能 (block 10000 件)。 RetDec の取得元は `docs/REFERENCES.md` に `[未確認]` のため、この run では復元できない。 次に必要な素材: `oc_artifacts: fl-win64 toolchain-retdec` (取得元の確定後)。
+未再測定 (判断 (B)・round 6 の 2026-10-16 の run で確定)。 `batch_lift.sh` は RetDec (`[RETDEC]`・`docs/REFERENCES.md` §4) を呼ぶが、本 runner に RetDec が無い (`/opt/retdec` 無し)。 `$ARTIFACTS_DIR` にも `toolchain-retdec` が無い (`fl-win64.tar.zst` のみ)。 `PLUGIN_MATRIX.json` も本 worktree に無い。 RetDec の取得元は `docs/REFERENCES.md` §4 で `[未確認]` のため、取得元が確定するまで再測定できない。 再測定は子 issue に切らず、#5832 の未解決表に残す (PR 本文 参照)。 再測定に要る素材: `oc_artifacts: fl-win64 toolchain-retdec` と plugin 素材。
+
+ここの数値 (§2 の 41/41・44/45) は測定 commit `ce3872372` (`_f80b_from_image` の修正 `842bc5ac3` より前) の値で、現 HEAD の変換コードの効果を示さない。
 
 ## 3. 19165 engine (`engine_lift.sh 19165 900` → `engine_f80_subset.sh`)
 
@@ -54,16 +56,17 @@ emsdk を導入し (`git clone --depth 1 https://github.com/emscripten-core/emsd
 |---|---|---|
 | `emcc -c` (`e.final.ll`) の最初の error | `invalid cast opcode ... 'double' to 'i80'` (E7) | `do not know how to soften fp_extend` |
 | `emcc -c` (`e.final.ll`) rc | 139 (segfault) | 139 (segfault) |
+| 19165 の segfault の起点 | `function_1800ceec0` (`tools/plugins/reverb_delay/REPORT_APPENDIX.md` §16) | 同左 (未再測定) |
 | 部分集合 (f80 関数 5 件を除外) の `emcc -c` rc | 0 | 0 (gate PASS) |
 | lift rc / define / f80 関数 (本体) | 0 / 2,608 / 5 | 0 / 2,608 / 5 |
 
 - 測定条件 (PR 本文の記載): `ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges <78 件>" ENGINE_TAG=_noipp_nobad engine_lift.sh 19165 900`。 wall 625 s・実行直後の 1 分平均 load 1.15 (4 core) は PR 本文の記載値で、 ログは保存されていない。
 - 測定スクリプトの所在: `engine_lift.sh` と `engine_f80_subset.sh` は `tools/plugins/reverb_delay/` にある (`tools/plugins/lift/` には無い)。
-- 本 runner では再測定していない。 `engine_lift.sh` も `lift_ranges.sh` 経由で RetDec を呼ぶため、§2 と同じ理由で走らない。 修正後 (`842bc5ac3` 以降) の 19165 は未再測定 (`emcc -c` の rc・最初の error は未確認)。 次の run に必要な素材: `oc_artifacts: fl-win64 toolchain-retdec` と plugin 素材 (`plugins-*`)。 RetDec の取得元は `docs/REFERENCES.md` で `[未確認]`。
+- 本 runner では再測定していない。 `engine_lift.sh` も `lift_ranges.sh` 経由で RetDec を呼ぶため、§2 と同じ理由で走らない。 修正後 (`842bc5ac3` 以降) の 19165 は未再測定 (`emcc -c` の rc・最初の error は未確認)。 この表の値は `ce3872372` の値で、現 HEAD の効果を示さない。 再測定に要る素材は §2 と同じ。
 
 ## 4. 鮮度: `ce3872372` から HEAD までの差分
 
-差分の全文は `REPORT_APPENDIX_M2.md` (`git diff ce3872372 HEAD -- tools/plugins/p0c` の出力)。 要点:
+差分の全文は `REPORT_APPENDIX_M2.md` (`git diff ce3872372 8e263e380 -- tools/plugins/p0c ":!tools/plugins/p0c/REPORT*"` の出力)。 要点:
 
 - `f80b_rt/run.sh` の 1 行 (`EMCC` の解決を `$EMSDK` 必須にする変更)。 `EMCC` 変数は `command -v emcc` が先なので、 測定値は影響を受けない (`run.sh` の検査内容は変わらない)。 harness の変更であり、 測定対象の変換は変わらない。
 - 続けて `842bc5ac3` の修正 (`f80_lower.py` の `sn` / `low` と `gen_cases.c` の固定ベクタ)。 これは測定対象の変換を変える。 §1.1 の再検査で置換後の値を取った。 §2・§3 は未再測定。
