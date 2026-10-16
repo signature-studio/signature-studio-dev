@@ -6,7 +6,16 @@
 
 - 4 件の呼出し直後に読まれる戻り値レジスタは **機械語で確認済み** (下の表・`void_ret_check.sh` の実出力)。4 件とも戻り値を使っている。
 - 4329 の呼出先 `FUN_180fd27a8` は、機械語上 `call FUN_180fbde90` の後に rax・ax を書かずに `ret` する。よって呼出元が読む `ax` は `FUN_180fbde90` の戻り値の下位 16 bit である可能性が高い (未確認。`FUN_180fbde90` の戻り値型を機械語で見ていない)。前回の付録の「本体は `return;` で矛盾する」は、この機械語と合わない。
-- emcc error は 4 件とも再現した (既定 FX・`gtype_census.sh`)。規則 (`ABI`/`DELAY_RULES`) は **本 PR では入れていない**。戻り値の型を決めるには callee の戻り値 (xmm0 / rax / ax) を機械語で確定させる必要があり、受入 2〜4 は未達 (#5310 Refs)。
+- emcc error は 4 件とも再現した (既定 FX・`gtype_census.sh`)。
+- 本 PR で規則を 2 件入れた (`patches.py` の `ABI['delay']`)。`FUN_180fe24b8` は `ulonglong` (戻り値は `FUN_180fe2470` の rax をそのまま通す)、`FUN_180fd27a8` は `short` (戻り値は `FUN_180fbde90` の ax をそのまま通す)。機械語で `ret` 直前が callee の呼出しと `ret` だけであることを確認した。
+- 残り 2 件 (2122 `FUN_180fc4590`・3968 `FUN_180fdc880`) は xmm0 を返す。本体に `return;` と値を返す経路が混在するため、経路ごとの戻り値を決めてから規則にする。受入 2 の残り・3 は未達 (#5310 Refs)。
+
+## 規則投入後の測定 (本 PR)
+
+- 測定 commit: 本 PR の `patches.py` 変更 (規則 2 件) を入れた HEAD。基点 (`ac3d117b5`) では delay emcc error **309**、規則投入後は **307**。
+- 消えた行: 4329 (`FUN_180fd27a8`)・5001 (`FUN_180fe24b8`) の 2 件。残った void 関連は 2122・3968 (xmm0 callee 2 件)。
+- Gain/Haas/Gate の `.o` を基点と `cmp` で比較: 3 件とも一致 (1435 / 3217 / 3756 B)。
+- 規則の件数 (ABI の assert) は 1 件ずつ一致 (`abi_hits == 1`)。
 
 ## 測定条件
 
