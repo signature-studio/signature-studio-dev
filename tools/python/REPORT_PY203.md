@@ -148,7 +148,7 @@
 
 - `[rbp+X]` を基底・複製元とする 5 件 (スロット直前 store の格納値):
   - 0x1021826 (COPY rax ← `[rbp+0x150]`): 直前 store 0x10216ff `mov [rbp+0x150], rcx`、rcx = ENTRY 第 1 引数 (ecx)。窓 111 命令、窓内の非境界の飛び先 1 件 (0x1021733) の注記あり。スクリプトはこの飛び先を「線形走査のずれの疑い」と判定する (窓は線形走査の再同期結果のため、この判定をそのまま採る)。
-  - 0x12ab8e8 (COPY rax ← `[rbp+0xa0]` の movzx): 直前 store 0x12ab72f `mov word ptr [rbp+0xa0], r8w`。格納元は部分レジスタ r8w のため、その上流は未分類。
+  - 0x12ab8e8 (COPY rax ← `[rbp+0xa0]` の movzx): 直前 store 0x12ab72f `mov word ptr [rbp+0xa0], r8w`。格納元の r8w は族 r8 の下位ビットで、r8 の直前書込みは ENTRY (第 3 引数 r8d) まで確定 (部分書込みの格納元を族に解決する 1 段を `store_value` に追加)。
   - 0x118a275 (AMBIG 主経路 `[rax+0x258]`、rax = `[rbp+0x38]`): 直前 store 0x118a241 の格納値は r8 ← ENTRY 第 3 引数 (r8d)。合流 2 件 (0x118a22b→0x118a24b・0x118a23f→0x118a24b) の注記あり。
   - 0x118a3f4 (AMBIG 主経路 `[rax+0x130]`、rax = `[rbp+0x38]`): 直前 store 0x118a362 の格納値は r8 ← ENTRY 第 3 引数 (r8d)。
   - 0x12e6abe (AMBIG 主経路 `[rax+rbx*4+0xdc]`、rax = `[rbp+0x20]`): 直前 store 0x12e6a22 の格納値は rcx ← ENTRY 第 1 引数 (ecx)。合流 1 件 (0x12e6a03→0x12e6a2d) の注記あり。
@@ -156,8 +156,10 @@
   - 0x12c609e: 合流 1 件 (0x12c6252→0x12c5fa8)。合流元 0x12c6252 の分岐は未分類。
   - 0xfc820f: 合流 1 件 (0xfc81c2→0xfc81c7)。飛び元の rdi は AMBIG のまま (主経路 `xor edi, edi` 0xfc81ae の注記あり)。
 
-- まとめ: 7 件のうち、スロットの格納値まで分類できたのは 4 件 (0x1021826・0x118a275・0x118a3f4・0x12e6abe)。0x12ab8e8 は格納元が部分レジスタ r8w のため未分類。0x12c609e と 0xfc820f は合流元の分類が残る。
-- 残り (受入の残り): 0x12c609e の合流元 0x12c6252 の分岐、0xfc820f の飛び元 rdi、0x12ab8e8 の r8w の上流、スロット ENTRY 値 (ecx・r8d) の呼出し元 (間接呼出しのため未追跡)。
+- まとめ: 7 件のうち、スロットの格納値まで分類できたのは 5 件 (0x1021826・0x12ab8e8・0x118a275・0x118a3f4・0x12e6abe)。0x12c609e と 0xfc820f は合流元の分類が残る。
+  - 0xfc820f: 飛び元 0xfc81c2 の rdi は、主経路 `xor edi, edi` (定数 0) と、合流 0xfc81ac→0xfc81b0 からの `movsxd rdi, edi` (0xfc81a6) の 2 経路で、AMBIG のまま。
+  - 0x12c609e: 合流元 0x12c6252 の rbx は、主経路 `[rip+0x31c1ff]` (VA 0x15e22d8 の大域直読み) と、合流 9 件 (`add eax, [rcx+0x94]` 等) の AMBIG。1 段では閉じない。
+- 残り (受入の残り): 0x12c609e の合流元 0x12c6252 の分岐、0xfc820f の飛び元 rdi、スロット ENTRY 値 (ecx・r8d) の呼出し元 (間接呼出しのため未追跡)。
 
 ### 6.5 #5407: 大域 3 種の入り方・rbx ENTRY の呼出し元・`[rbx+0x12b4]` の上流
 
