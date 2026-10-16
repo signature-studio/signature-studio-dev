@@ -3,6 +3,7 @@
 # 前提: s1_wine_probe.sh で $RUNNER_TEMP/fl-install が組立て済み。kernel.yama.ptrace_scope=0 (sudo sysctl -w kernel.yama.ptrace_scope=0)。
 # 1 コマンド: WAIT=90 bash tools/flp/s8_loop_caller_probe.sh   (出力は $RUNNER_TEMP 配下のみ・commit 対象外)
 # VA は REPORT の表記 (= RVA + 0x400000)。DLL の実行時 base は mapping 行から取る (ASLR で変わる)。
+# 注意: timeout で gdb が落ちた場合、int3 (breakpoint) は外れないまま終わる。後で再利用するなら、終了前に外す処理を入れること。
 set -uo pipefail
 ART="${RUNNER_TEMP:-/tmp}"
 INST="$ART/fl-install"
@@ -14,12 +15,12 @@ export PATH="/usr/lib/wine:$PATH"
 
 [[ -f "$INST/FL64.exe" ]] || { echo "missing $INST/FL64.exe (s1_wine_probe.sh を先に実行)" >&2; exit 2; }
 
-cd "$INST"
+cd "$INST" || exit 2
 timeout $((WAIT + 150)) xvfb-run -a wine64 FL64.exe > "$LOG" 2>&1 &
 XPID=$!
 
 PID=""; BASE=""
-for i in $(seq 1 90); do
+for _ in $(seq 1 90); do
   PID=$(pgrep -x FL64.exe | head -1)
   BASE=$(grep -oE 'mapping PE file L"[^"]*FLEngine_x64\.dll" at 0x[0-9a-f]+' "$LOG" | grep -oE '0x[0-9a-f]+$' | head -1)
   [[ -n "$PID" && -n "$BASE" ]] && break
