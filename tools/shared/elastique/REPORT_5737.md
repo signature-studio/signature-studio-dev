@@ -37,7 +37,7 @@ export の呼出し・`run()` の差し替えは #3386 に残す。
 
 `0xa97780` 自身の引数は `rcx`=obj (`rbx`)・`edx`=`esi`・`r8d`・`xmm3`・`[sp+0x60]`。obj (`rcx`) は ElPro への呼出しで `ecx` が上書きされるため export には渡らない。
 
-ElPro (`0x677f60`) から export への引数は次の通り。wrap 内で `mov ecx,ebx`・`mov edx,esi`・`mov r9d,edi` (`0x677f86`〜`0x677f8d`) として渡し、r8 は設定しない。`ebx`=wrap の `ecx`=`0xa97780` の `esi`=`0xa97780` の `edx`、`esi`=wrap の `edx`=`0xa97780` の `r8d`、`edi`=wrap の `r9d` (`0xa977cc` で作った表値)。
+ElPro (`0x677f60`) から export への引数は次の通り。wrap 内で `mov ecx,ebx`・`mov edx,esi`・`mov r9d,edi` (`0x677f86`〜`0x677f8d`) として渡し、r8 は設定しない。wrap 側の対応は、`ebx`=wrap の `ecx` (`0xa977b6` の `mov ecx,esi`、`esi`=`0xa97780` の `edx` 引数)、`esi`=wrap の `edx` (`0xa977b8` の `mov edx,r8d`、`r8d`=`0xa97780` の `r8d` 引数)、`edi`=wrap の `r9d` (`0xa977cc` で作った表値)。
 
 | 呼出元 | export の rcx (= `0xa97780` の `edx`) | export の rdx (= `0xa97780` の `r8d`) | export の r8 | export の r9 (表。経路で分岐 §2.5) | 備考 |
 |---|---|---|---|---|---|
