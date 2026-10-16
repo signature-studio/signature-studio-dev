@@ -66,9 +66,9 @@ emsdk を導入し (`git clone --depth 1 https://github.com/emscripten-core/emsd
 - 19165 の segfault の起点 (`function_1800ceec0`) は、今回は未確認 (`engine_lift.sh` の出力に含まれない)。
 - 本 PR による `emcc -c` の最初の error は、旧 (`ce3872372`) の `invalid cast opcode ... 'double' to 'i80'` (E7) から `do not know how to soften fp_extend` に変わった。 segfault (rc 139) は既存の経路で残る。 この 19165 の残る欠陥 (f80 関数 5 件) は本 PR の範囲外で、部分集合 gate で到達性のみ確認する。
 
-## 4. 鮮度: `ce3872372` から HEAD までの差分
+## 4. 鮮度: 旧測定からの差分
 
-差分の全文は `REPORT_APPENDIX_M2.md` の要点。 測定 commit `2481d3a0e` のコード差分 (`git diff 2481d3a0e HEAD -- tools/plugins/p0c ':!tools/plugins/p0c/REPORT*'`) は 0 行 (測定 commit = HEAD)。 以下は旧測定からの差分の要点:
+測定 commit `2481d3a0e` のコード差分 (`git diff 2481d3a0e HEAD -- tools/plugins/p0c ':!tools/plugins/p0c/REPORT*'`) は 0 行 (測定 commit = HEAD)。 以下は旧測定 (`ce3872372`) からの差分の要点。 `ce3872372` → `8e263e380` の差分の全文は `REPORT_APPENDIX_M2.md` にある (`8e263e380` 以降の差分は下の要点で扱う):
 
 - `f80b_rt/run.sh` の 1 行 (`EMCC` の解決を `$EMSDK` 必須にする変更)。 `EMCC` 変数は `command -v emcc` が先なので、 測定値は影響を受けない (`run.sh` の検査内容は変わらない)。 harness の変更であり、 測定対象の変換は変わらない。
 - 続けて `842bc5ac3` の修正 (`f80_lower.py` の `sn` / `low` と `gen_cases.c` の固定ベクタ)。 これは測定対象の変換を変える。 §1 と §2・§3 は測定 commit `2481d3a0e` で再測定した。

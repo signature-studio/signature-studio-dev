@@ -1,6 +1,6 @@
-# tools/plugins/p0c REPORT 付録 M2 — #5832 の鮮度の証跡 (付録 M §4 の差分全文)
+# tools/plugins/p0c REPORT 付録 M2 — #5832 の鮮度の証跡 (付録 M §4 の旧差分の全文)
 
-測定 commit = `8e263e380` (emcc 版 `run.sh` の再実行。付録 M §1.2)。 本付録は `git diff ce3872372 8e263e380 -- tools/plugins/p0c ":!tools/plugins/p0c/REPORT*"` の出力 (コード・harness の差分のみ。REPORT 文書の差分は自己参照になるため除く)。 測定値は含まない。 差分中の repo 外絶対パス 1 箇所は `[EMSDK 参照]` に置換した (`docs/REFERENCES.md` の `[EMSDK]`)。
+差分の範囲は `ce3872372` → `8e263e380` だけ。 本付録は `git diff ce3872372 8e263e380 -- tools/plugins/p0c ":!tools/plugins/p0c/REPORT*"` の出力 (コード・harness の差分のみ。REPORT 文書の差分は自己参照になるため除く)。 `8e263e380` 以降 (`842bc5ac3` の修正を含む) の差分は本付録に含まれず、付録 M §4 の要点で扱う。 本付録の測定値は含まない。 測定 commit は付録 M の §1〜§3 (`2481d3a0e`)。 差分中の repo 外絶対パス 1 箇所は `[EMSDK 参照]` に置換した (`docs/REFERENCES.md` の `[EMSDK]`)。 その 1 箇所以外は `git diff` の出力のまま。
 
 ```diff
 diff --git a/tools/plugins/p0c/f80_lower.py b/tools/plugins/p0c/f80_lower.py
