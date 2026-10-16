@@ -34,8 +34,8 @@
 
 ## 素材
 
-- この fix run の `ARTIFACTS_DIR` には `fl-win64`・`plugins-kilohearts`・`toolchain-emsdk` の 3 点が実在した。3 点とも `tar --zstd -xf` で展開して使った。
-- `void_ret_check.sh` の実出力 (下の表) は本 fix run で `HeartCore.core_64` に対して再実行し、表と一致した。
+- 本 review-fix run (`b715c814f` 以降の再確認) の `ARTIFACTS_DIR` には `fl-win64.tar.zst` だけが実在し、`plugins-kilohearts` と `toolchain-emsdk` は無かった。`HeartCore.core_64` は展開できていない。よって下の `void_ret_check.sh` の表の再実行・Ghidra 出力の引用は、この run では**未確認**。
+- 下の表と「#5913 (KH-179) の扱い」節の数値は、前 run (`a83469d96` の測定時) の記録である。この run では再確認していない。
 - 再現に要る素材: `oc_artifacts: fl-win64 plugins-kilohearts toolchain-emsdk` (PR 本文に記載)。
 
 ## 呼出し点の照合 (`void_ret_check.sh` の実出力・本 fix run で再実行)
@@ -58,8 +58,8 @@ PE の objdump は `call   0x<番地>` の形で出る。前回の照合は `0x`
 - 4329 `FUN_180fd27a8` の呼出元 `180fcdc2d` は `movzx ecx,ax` で ax を読み、`FUN_180fd27a8` は `call 180fbde90` の後に ax を書かずに `ret` する (上の機械語の節)。ただし callee `FUN_180fbde90` の生成宣言行を引用して型を確定していない。
 - 5001 `FUN_180fe24b8` の呼出元 `180fd2a64` は `test rax,rax` で rax を読み、`FUN_180fe24b8` は `call 180fe2470` の後に rax を書かずに `ret` する。callee `FUN_180fe2470` の生成宣言行は repo 内に無い。
 - 同じ callee `FUN_180fbde90` の `(short *)` は、`REPORT_APPENDIX_4835.md` で宣言型が未確定として規則を撤回済み。`scen_qemath.h` の `_dtest` (rcx = `double*`) とも食い違う。よって `short`・`ulonglong` の規則は入れない。
-- 確定に必要な記録 (#5310 に移す): (a) `FUN_180fbde90` と `FUN_180fe2470` の生成宣言行の引用 (Ghidra 出力)、(b) 全 ret 経路で `ax`/`rax` が戻り値として設定されることの objdump 出力。`HeartCore.core_64` は `plugins-kilohearts` 由来 (sha256 `d55ce8b4c0ad7ebe…`) で取得できるが、Ghidra 12.1.4 (`[GHIDRA]`) の入手に要る。
-- `FUN_180fc4590` (2122) は 176 の `ret` 命令を持ち、生成 C の 2122 行の本体がある。経路ごとの xmm0 の決定は未了。
+- 確定に必要な記録 (#5310 に移す): (a) `FUN_180fbde90` と `FUN_180fe2470` の生成宣言行の引用 (Ghidra 出力)、(b) 全 ret 経路で `ax`/`rax` が戻り値として設定されることの objdump 出力。`HeartCore.core_64` は `plugins-kilohearts` 由来で取得できるが、この run では未取得 (上の素材の節)。Ghidra 12.1.4 (`[GHIDRA]`) も本 run の環境に無く、公式 URL も 404 だった。
+- `FUN_180fc4590` (2122) の ret 命令の数 (前 run の記録では 176。この run では未確認) と、生成 C の 2122 行の本体。経路ごとの xmm0 の決定は未了。
 
 ## 測定の扱い
 
@@ -70,7 +70,7 @@ PE の objdump は `call   0x<番地>` の形で出る。前回の照合は `0x`
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `FUN_180fc4590` (2122) の本体の戻り値 (xmm0) の経路別の決定と規則 (176 の ret・2122 行の本体) | 2122 が未解消 | #5310 (Refs) |
+| `FUN_180fc4590` (2122) の本体の戻り値 (xmm0) の経路別の決定と規則 (ret 数は未確認・2122 行の本体) | 2122 が未解消 | #5310 (Refs) |
 | Delay の数値検証 (戻り値の型を変えた後の bit-exact) | emcc 通過だけでは値は言えない | #3073 [KH-41] |
 
 ## 再現
