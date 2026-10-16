@@ -5,7 +5,7 @@
 あるかを調べる。ある → 呼出元の xmm2 (float 引数) が使われうる。
 無い → 呼出元が xmm2 に float を載せる必要は無い (受入 1 の判定)。
 
-間接 jmp・関数外への jmp は保守的に「読む」扱いにする。
+間接 jmp・関数外への jmp は解析できない箇所として数え、読む経路が見つからないときは判定保留にする。
 call は引数の読みを capstone の regs_read が表さないため、xmm2 を書く前に到達する call は
 保守的に「読む」扱いにする (呼出先の解析は行わない)。
 
@@ -96,8 +96,12 @@ def main(pe_path, entry_rva):
     print('== 制御が解析できない箇所: %d 件 ==' % len(unknown))
     for a in unknown:
         print('   %#x' % (a - base))
-    verdict = 'xmm2 を読む経路あり (呼出元の float 引数が使われうる)' if reads_before_def else \
-        'xmm2 を読む経路なし (呼出元の xmm2 は使われない)'
+    if reads_before_def:
+        verdict = 'xmm2 を読む経路あり (呼出元の float 引数が使われうる)'
+    elif unknown:
+        verdict = '判定保留 (制御が解析できない箇所があり、xmm2 を読む経路の有無を示せない)'
+    else:
+        verdict = 'xmm2 を読む経路なし (呼出元の xmm2 は使われない)'
     print('== 判定: %s ==' % verdict)
     return 0
 
