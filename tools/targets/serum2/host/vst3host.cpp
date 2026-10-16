@@ -880,6 +880,8 @@ int main(int argc, char** argv) {
   dumpVtable("SerumController_IEditController", ctrl, 20);
   // S2HOST_WATCH=1: ctrl iface+0xdc (= controller base+0x10c) への書込 PC を DR0 で捕まえる (SR-1c #256)
   if (getenv("S2HOST_WATCH")) armWatch((volatile int*)((unsigned char*)ctrl + 0xdc));
+  // S2HOST_SLOT=1: slot 0x1817bf760 (RVA 0x17bf760) への書込 PC を DR0 で捕まえる (SR-99 #5958)
+  if (getenv("S2HOST_SLOT")) armWatch((volatile int*)(gDllBase + 0x17bf760));
 
   r = ctrl->initialize((FUnknown*)hostApp);  // IPluginBase slot3
   L("controller->initialize(hostApp) = %s", tresName(r));
@@ -897,7 +899,9 @@ int main(int argc, char** argv) {
   // createView("editor") — GUI 無し運用だが controller 側の editor 状態フラグ (+0x10c) を
   //立てるためにフレーム取得のみ行う (open/setFrame はしない = ウィンドウは生成されない)
   {
+    L("[slot] 0x1817bf760 before createView = %lld", (long long)*(volatile long long*)(gDllBase + 0x17bf760));
     IPlugView* view = ctrl->createView(ViewType::kEditor);  // slot17
+    L("[slot] 0x1817bf760 after createView = %lld", (long long)*(volatile long long*)(gDllBase + 0x17bf760));
     L("controller->createView('editor') = view=%p (%s)", view, view ? "取得" : "NULL");
     SI("create_view", view ? 1 : 0);
     if (view) {
@@ -1174,6 +1178,7 @@ int main(int argc, char** argv) {
   static float inCh[2][kFrames];
   static float outCh[2][kFrames];
 
+  L("[slot] 0x1817bf760 before process = %lld", (long long)*(volatile long long*)(gDllBase + 0x17bf760));
   if (proc && nBlocks > 0) {
     ProcessContext ctx;
     memset(&ctx, 0, sizeof(ctx));
