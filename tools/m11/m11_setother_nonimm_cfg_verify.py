@@ -295,6 +295,33 @@ def run(insns, probe, fam):
                 put(st, ops[0], None if a is None else (~a) & msk(w), oplab(st, [ops[0]]))
                 i += 1
                 continue
+            if mn == 'imul' and len(ops) == 1:
+                src = ops[0]
+                if src in REG:
+                    w = REG[src][1]
+                    if w not in (32, 64):
+                        raise Unsup('imul 1 オペランドの幅 %d' % w)
+                    ax, dx = ('eax', 'edx') if w == 32 else ('rax', 'rdx')
+                    a = get(st, ax)
+                    b = get(st, src)
+                    if a is None or b is None:
+                        lab = oplab(st, [ax, src])
+                        put(st, ax, None, lab)
+                        put(st, dx, None, lab)
+                    else:
+                        sa = a - (1 << w) if (a >> (w - 1)) & 1 else a
+                        sb = b - (1 << w) if (b >> (w - 1)) & 1 else b
+                        p = sa * sb
+                        put(st, ax, p & msk(w))
+                        put(st, dx, (p >> w) & msk(w))
+                else:
+                    lab = oplab(st, [src])
+                    put(st, 'eax', None, lab)
+                    put(st, 'edx', None, lab)
+                fl = None
+                st['#flags'] = 'その他'
+                i += 1
+                continue
             if mn == 'imul' and len(ops) in (2, 3) and ops[0] in REG:
                 dst, src = ops[0], ops[1]
                 w = REG[dst][1]
@@ -455,6 +482,16 @@ def selftest():
         ('S9 ネガティブ (0x10)', 'bb030000006bdb050fb6d3c3', 3, 'rdx', 0x10, 'FAIL'),
         ('S10 not ebx (0→0xff 下位 8bit)', 'bb00000000f7d30fb6d3c3', 3, 'rdx', 0xff, 'PASS'),
         ('S10 ネガティブ (0x00)', 'bb00000000f7d30fb6d3c3', 3, 'rdx', 0x0, 'FAIL'),
+        ('I1 imul ebx 1 オペランド (eax=3*5 下位 15)', 'b803000000bb05000000f7ebc3', 3, 'rax', 0xf, 'PASS'),
+        ('I1 ネガティブ (0x10)', 'b803000000bb05000000f7ebc3', 3, 'rax', 0x10, 'FAIL'),
+        ('I2 imul ebx 1 オペランド (2^32 → edx=1)', 'b800000100bb00000100f7ebc3', 3, 'rdx', 0x1, 'PASS'),
+        ('I2 ネガティブ (edx=0)', 'b800000100bb00000100f7ebc3', 3, 'rdx', 0x0, 'FAIL'),
+        ('I3 imul ebx 符号 (-1*2 → edx=0xffffffff)', 'b8ffffffffbb02000000f7ebc3', 3, 'rdx', 0xffffffff, 'PASS'),
+        ('I3 ネガティブ (edx=0)', 'b8ffffffffbb02000000f7ebc3', 3, 'rdx', 0x0, 'FAIL'),
+        ('I4 imul rbx 1 オペランド (64bit 符号 → rdx=-1)', '48c7c0ffffffff48c7c302000000' '48f7ebc3', 3, 'rdx', 0xffffffffffffffff, 'PASS'),
+        ('I4 ネガティブ (rdx=0)', '48c7c0ffffffff48c7c302000000' '48f7ebc3', 3, 'rdx', 0x0, 'FAIL'),
+        ('I5 imul ebx 1 オペランド・eax 未知 → 判定不能', 'e800000000bb02000000f7ebc3', 3, 'rdx', None, '判定不能'),
+        ('I6 imul メモリ 1 オペランド → 判定不能', 'b803000000f72d00000000c3', 2, 'rdx', None, '判定不能'),
         ('C1 cdq eax=-1 → edx=0xffffffff', 'b8ffffffff99c3', 2, 'rdx', 0xffffffff, 'PASS'),
         ('C1 ネガティブ (0x0)', 'b8ffffffff99c3', 2, 'rdx', 0x0, 'FAIL'),
         ('C2 cdq eax=1 → edx=0', 'b801000000' '99' 'c3', 2, 'rdx', 0x0, 'PASS'),
