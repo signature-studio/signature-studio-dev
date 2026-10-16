@@ -73,7 +73,7 @@ abs8 pointer to 0xd76c90: 1
 ## 6. 動的 run (受入 2・#5771 の再 run)
 
 道具: `tools/flelift/boot/fle6_measure.sh` に `FLE_TRAP_VA` を追加 (x64c `--trap`)。指定 VA は lift せず `ott_unsup` の trap stub にする。呼ばれると `boot_threw=unsup` で止まる。
-測定 commit: `075a23d42` (`feat(flelift): fle6_measure.sh に FLE_TRAP_VA を足す`)。HEAD で再現。素材 `fl-win64` + `toolchain-emsdk` 6.0.12。shard 8・既定経路 (`FLE_IPP` 未指定 = mode 3)・`FLE_EXTRA_ROOTS=` (root 無し)。
+測定 commit: `075a23d42` (`feat(flelift): fle6_measure.sh に FLE_TRAP_VA を足す`)。HEAD で再現。素材 `fl-win64` (`$ARTIFACTS_DIR` の実在を確認)。emsdk の環境は本 run の runner には `/opt/emsdk` が無く、この run では確認していない。shard 8・既定経路 (`FLE_IPP` 未指定 = mode 3)・`FLE_EXTRA_ROOTS=` (root 無し)。
 
 実行: `FLE_TRAP_VA=0xd76c90 FLE_BOOT_RUNS=default FLE_SHARDS=8 FL_WIN64_DIR=<展開先の親> bash tools/flelift/boot/fle6_measure.sh`
 
@@ -83,7 +83,7 @@ abs8 pointer to 0xd76c90: 1
 | 陽性対照 `0x976da0` を trap (一時コピーの sed・repo 外) | units 851・`boot_threw=unsup` | 未記録 (time の出力を取り損ねた) | 1.9 |
 
 - 陽性対照で trap が検出されることを確認した (unit 851 で `unsup`)。このため「`0xd76c90` が 0 件」は trap が効かなかった結果ではない。
-- 既定経路の boot (`0xd76c90` trap 版) の値は、trap なしの既定経路 (§D-1・units 895・exit) と一致する。
+- 比較の出典: trap なしの既定経路の記録は `tools/flelift/boot/REPORT_APPENDIX_672.md` §C-2 (測定 commit `dec8fa928`・既定 `FLE_IPP` 未指定 = mode 3・`FLE_EXTRA_ROOTS` 未指定) の units 895・`exit` (code 0)。本 §6 の trap 版 (units 895・`exit`) は units と停止理由が同値。ただし、この記録は別 commit・別 run のもので、本 PR では trap なしの既定経路は再実行していない。GetMem/FreeMem は本 run で未記録のため比較していない。
 
 ### 判定
 
