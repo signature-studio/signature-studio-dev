@@ -173,3 +173,21 @@
   - 既定 (A_default) は HEAD でも 873/21/0 で、§5 の既定の変化は HEAD でも同じ。
   - IR md5 は HEAD `8b4461e0`・測定 commit `423c347e` で違う。F3c は両方 46。違いの原因は未確認 (§7)。
 - 本 PR の KPI: `tools/m11` の計測 knob のみ。起動・GUI に関わらないため、KPI は書かない。
+
+### 10.1 f195a93a9 での C_noren / NODATA_BODY の計測 (#5945)
+
+- 測定 commit: **`f195a93a9`** (= origin/main の merge #5651)。`tools/m11` のコードは変えていない (`git diff f195a93a9 -- tools/m11` は本節の追記だけ)。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` に設定。`work-m11` を `tools/m11/work/` に展開。`toolchain-emsdk` は展開せず runner の `[EMSDK]` を使った (`emcc` = `6.0.12 (5488e0871d46)` = pin)。`toolchain-retdec` は展開せず `[RETDEC]` を使った。
+- IR 再生成: `m11_gen_ir2.sh` rc=0・43.8 秒 (`work/ir_conditions.json` の `ldfix` 有り)。
+- 計測: `bash tools/m11/trap_triage/repro_1952_rt_mech.sh 3 C_noren NODATA_BODY` (rc=0・直列・foreground・2 分 40.9 秒)。開始時 load average 1 分 1.33。
+
+| 構成 | 回数 | boot_final3.ll md5 | undefined symbol | ok/trap/clobber | getmem | fastmm_getmem_impl |
+|---|--:|---|--:|--:|--:|--:|
+| C_noren | 3 | e5023e8e | 0 | 873/21/0 | **2017** | 2095 |
+| NODATA_BODY | 3 | e5023e8e | 0 | 873/21/0 | **2017** | 2095 |
+
+- 結論 (受入 1): **f195a93a9 では getmem は 2017** (C_noren・NODATA_BODY とも n=3 で同一)。2008 ではない。前の run (#5665) の「全構成 2017」と一致し、同じ commit では再現する。
+- 「2017 と 2008 のどちらか」の差は、commit 間の IR の差として見える: f195a93a9 の IR md5 は `e5023e8e`、bb8aaf1d5 (§10 の HEAD) は `8b4461e0`。同じ runner 上で bb8aaf1d5 を測り直してはいない (§10 は別 run)。よって runner 依存かどうかは未確定。runner 依存を確かめるには、同じ runner で bb8aaf1d5 と f195a93a9 を並べて測る必要がある (未実施)。
+- NODATA_BODY (静的データを無くした構成) も 2017。静的データを外しても値が変わらないので、この 2017 は静的データの配置ではなく、関数本体または IR の側から来ている可能性が高い。ただし A_default 等は f195a93a9 で未測定のため、判定は保留。
+- 生値: `table_2275_f195.tsv` (6 行・ヘッダ無し)、`addr_2275_f195.txt` (6 行)。`.data`・`.bss` の VA と大きさは C_noren と NODATA_BODY で同一 (`.data=10250ff0+1ac`・`.bss=10251740+53df4`)。
+- 既定値 (870/24/0) は変えていない。
