@@ -63,9 +63,13 @@ R13XCHG = re.compile(r'^xchg\s+.*\br13[bwd]?\b')
 
 
 def r13_unsaved(s):
+    # 本体に push r13 があれば保存済みとして 0 を返す (r13 への書込みが保存を要するのは push r13 が無い関数)
+    body = body_of[s]
+    if any(R13PUSH.match(t) for _, t in body):
+        return 0
     n = 0
-    for _, t in body_of[s]:
-        if R13PUSH.match(t) or R13POP.match(t):
+    for _, t in body:
+        if R13POP.match(t):
             continue
         if R13W.match(t) or R13XCHG.match(t):
             n += 1
