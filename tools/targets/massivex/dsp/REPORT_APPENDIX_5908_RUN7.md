@@ -53,8 +53,14 @@
 
 ## 10. run 8: 転送 site の xmm4/5 生存判定 (`mx63_g_xmm_live.py`)
 
-- 測定 commit: `4beb1179b` (script 追加のみ)。`plugins-massivex` を展開 (`Massive X.vst3` md5 `622993e7…` 一致)。`mx6_e2e.sh` rc 0・46 s・load 0.16 0.45 0.27 → 0.60 0.53 0.30 (PASS)。
-- 検算: `mx63_u3e_split.py` population 604・E 43 (前 run と一致)。
+- **状態 (round 1 fix)**: 下の表と判定は測定 commit `4beb1179b` の旧 script の出力。round 1 で script を次のとおり直した。直後の HEAD は未測定で、表は HEAD に対して無効。
+  - (a) 転送 site は、pdata 関数を先頭から線形復号して命令先頭と一致する `call`/`jmp` のみ採る (`not_insn_boundary` に分ける)。
+  - (b) 入口から site への到達性 (`F_reach_no`) を別に数え、到達する site だけを `F_undef` / `F_defined` に分ける。到達しない site は未判定。
+  - (c) docstring の regs_read/regs_write の記述を、実装の明示オペランド access に合わせた。
+  - 線形復号は、関数内にデータが混ざると命令境界がずれ得る。その場合は `not_insn_boundary` に出る。
+- 再測定: 未実施。`plugins-massivex` が R2 素材として取得されていない (`$ARTIFACTS_DIR` に `fl-win64` のみ)。`Massive X.vst3` md5 `622993e7…` は確認していない。PR 本文の `oc_artifacts: fl-win64 plugins-massivex` で review run に再測定を任せる。
+- 旧出力の md5 は記録していない (旧出力ファイルが残っていない)。「cmp で同一」は REPORT にも PR 本文にも書かない。
+- 検算 (旧 run の記録): `mx63_u3e_split.py` population 604・E 43 (前 run と一致)。
 - 方法: E 43 件の転送先 G について、(a) 転送元 F の入口から転送 site まで、全経路で xmm4/5 が未定義か (`F_must_undef`)、(b) G の入口から書き込み前に xmm4/5 を読む経路があるか (`G_livein_read`)。capstone の `regs_read`/`regs_write` は VEX 命令で空を返す (25/25 件) ため使わず、明示オペランドの access で読む。
 
 | 判定 | 件数 |

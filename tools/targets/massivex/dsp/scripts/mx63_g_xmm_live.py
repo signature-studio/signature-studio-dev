@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """MX-63 (#5908): 先頭から到達する G (4 件) について、xmm4/5 の入口値が転送経路で G に届くかを判定する。
 
-各 G について次を数える (capstone の regs_read/regs_write を使う)。
-  - caller:      G へ直接 call/jmp rel32 する転送 site (全 text を走査し、1 本だけ採る)
-  - F_undef:     転送元 F の入口から転送 site まで、xmm4/5 を書かずに到達できる経路がある
-                 (= 転送 site での xmm4/5 が F の入口値の可能性がある)
+各 G について次を数える (明示オペランドの access で読む。capstone の regs_read/regs_write は VEX 命令で誤るため使わない)。
+  - caller:      G へ直接 call/jmp rel32 する転送 site (全 text を走査し、その site の pdata 関数を線形復号して
+                 命令先頭と一致するものだけを採る。命令境界でない E8/E9 バイトは site に数えない)
+  - F_reach:     転送元 F の入口から転送 site まで、intra-function の経路が存在する (書き込みは問わない)
+  - F_undef:     F_reach かつ、その経路のどれも xmm4/5 を書かない (= site での xmm4/5 が F の入口値の可能性がある)
+                 F_reach=False の site は「未判定」として別に数える (未定義の証拠にしない)
   - G_livein:    G から書き込みより前に xmm4/5 を読む経路がある (= G が入口で値を要求する可能性がある)
   - G_reach:     F_G (G を含む pdata 関数) の先頭から、xmm4/5 を書かずに G へ到達できる経路がある
 判定は経路の存在による over/under の混在を含む。間接 jmp・call の飛び先は追わない。
@@ -15,6 +17,7 @@ import sys
 
 import capstone
 import pefile
+
 
 def main(pe_path, out_p):
     pe = pefile.PE(pe_path, fast_load=True)
@@ -51,8 +54,21 @@ def main(pe_path, out_p):
             return None
         return next(md.disasm(tbytes[off:off + 16], rva + base, 1), None)
 
+    def insn_starts(lo, hi):
+        """[lo, hi) を先頭から線形に復号し、命令先頭 (RVA) の集合を返す。復号できないバイトは 1 byte 進める。"""
+        starts = {}
+        a = lo
+        while a < hi:
+            ins = decode(a)
+            if ins is None:
+                a += 1
+                continue
+            starts[a] = ins
+            a += ins.size
+        return starts
+
     def ins_regs(ins):
-        # capstone の regs_read/regs_write は VEX 命令で誤るため、明示オペランドの access で読む。
+        # 明示オペランドの access で xmm4/5 の読み書きを見る。
         # call は呼び先が xmm4/5 を書き得るので書き込み扱い (経路を殺す側に倒す)。
         r, w = set(), set()
         for o in ins.operands:
@@ -87,9 +103,26 @@ def main(pe_path, out_p):
         out.append(nxt)
         return [x for x in out if lo <= x < hi]
 
+    def reachable(start, lo, hi, target):
+        """start から target へ intra-function の経路があるか (書き込みは問わない)。"""
+        seen, stack = set(), [start]
+        while stack:
+            a = stack.pop()
+            if a == target:
+                return True
+            if a in seen:
+                continue
+            seen.add(a)
+            ins = decode(a)
+            if ins is None:
+                continue
+            stack.extend(succs(ins, lo, hi))
+        return False
+
     def must_undef(start, lo, hi, target):
         """start から target までの全経路で xmm4/5 が未定義か (書き込みを経由する経路が 1 本も無い)。
-        状態は (命令, 既に書かれたか)。書かれた状態で target に届く経路があれば False。"""
+        状態は (命令, 既に書かれたか)。書かれた状態で target に届く経路があれば False。
+        target に届かない場合は呼び出し側で reachable を見ること (この関数は True を返し得る)。"""
         seen, stack = set(), [(start, False)]
         while stack:
             a, wrote = stack.pop()
@@ -128,7 +161,7 @@ def main(pe_path, out_p):
                 stack.append((s, nd))
         return False
 
-    # 全 text から E8/E9 rel32 の直接 call/jmp を走査し、G への転送 site を採る
+    # 全 text から E8/E9 rel32 の直接 call/jmp の候補を走査し、G への候補を採る (命令境界は後で確かめる)
     site_of = {}
     for g in gs:
         site_of[g] = []
@@ -144,21 +177,45 @@ def main(pe_path, out_p):
 
     rows = []
     for g in gs:
-        sites = site_of.get(g, [])
-        row = {'G': hex(g + base), 'sites': [hex(s + base) for s in sites]}
-        for s in sites:
+        cands = site_of.get(g, [])
+        row = {'G': hex(g + base), 'candidates': [hex(s + base) for s in cands],
+               'sites': [], 'not_insn_boundary': [], 'caller_no_pdata': [],
+               'F_reach_no': [], 'F_undef': [], 'F_defined': []}
+        starts_cache = {}
+        for s in cands:
             fn = fn_of(s)
             if fn is None:
-                row.setdefault('caller_no_pdata', []).append(hex(s + base))
+                row['caller_no_pdata'].append(hex(s + base))
                 continue
             flo, fhi = fn
-            row.setdefault('F_must_undef', []).append(must_undef(flo, flo, fhi, s))
+            if flo not in starts_cache:
+                starts_cache[flo] = insn_starts(flo, fhi)
+            ins = starts_cache[flo].get(s)
+            if ins is None or ins.mnemonic not in ('call', 'jmp'):
+                row['not_insn_boundary'].append(hex(s + base))
+                continue
+            row['sites'].append(hex(s + base))
+            if not reachable(flo, flo, fhi, s):
+                row['F_reach_no'].append(hex(s + base))
+            elif must_undef(flo, flo, fhi, s):
+                row['F_undef'].append(hex(s + base))
+            else:
+                row['F_defined'].append(hex(s + base))
         gfn = fn_of(g)
         if gfn is not None:
             glo, ghi = gfn
             row['F_G'] = hex(glo + base)
             row['G_reach_undef'] = must_undef(glo, glo, ghi, g)
             row['G_livein_read'] = livein_read(g, glo, ghi)
+        row['counts'] = {
+            'candidates': len(cands),
+            'sites_insn': len(row['sites']),
+            'not_insn_boundary': len(row['not_insn_boundary']),
+            'caller_no_pdata': len(row['caller_no_pdata']),
+            'F_reach_no': len(row['F_reach_no']),
+            'F_undef': len(row['F_undef']),
+            'F_defined': len(row['F_defined']),
+        }
         rows.append(row)
     json.dump(rows, open(out_p, 'w'), indent=1)
     for r in rows:
