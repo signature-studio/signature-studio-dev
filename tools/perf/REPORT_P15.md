@@ -212,7 +212,7 @@ bash tools/perf/p20/fa_negctl.sh                                       # NC-2
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| OTT と Fresh Air を 1 Memory に畳む (emcc 静的データ・heap の衝突、memory import 版の build、畳み込み後の署名一致と静的データ非汚染) | 受入 1 の残り。畳み込みは未検証 | #3680 [PERF-P23] |
+| OTT と Fresh Air を 1 Memory に畳む | 解決済み (#3680)。畳み込み後の署名は両者とも単独基準と一致 (付録 `tools/perf/REPORT_APPENDIX_3680.md`) | - |
 
 ## 9. AudioWorklet 上の instantiate 上限・setup 時間・ネガティブコントロール (PERF-P21 / #2988)
 
