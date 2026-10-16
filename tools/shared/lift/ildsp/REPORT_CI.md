@@ -146,3 +146,28 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 | `movapd` の helper 分岐は実装したが、復元後 IR に `movapd` が無く生成 0 件。テストと NC は無い | 実行されない分岐 (未検証) | [T-SH-65] #3318 |
 | 差分 (native と wasm の全バイト比較・gate) | 復元の意味論が未検証 | [T-SH-66] #3320 |
 | IAT stub・閉包の取りこぼし・emcc | wasm 化 | [T-SH-65] #3318 |
+
+## 8. wasm リンクと外部グローバル (T-SH-152 #5748)
+
+結論: `ci_lift.sh` の出力を wasm にリンクすると、未解決は IAT 10 種 (#5747) と直接/画像内の呼び出し先 2 種 (閉包の取りこぼし #5749) の集合だけになる。外部グローバル 2 種と `__stack_pointer` はリンクが通った。ただし外部グローバルの画像上の敷設は未決 (§8-2)。
+
+### 8-1. 実測 (`ci_link.sh`・rc 1 = 期待どおりの未解決)
+- 入力: `ci_lift.sh` の出力 (`ci.rs_norm.ll`・`ci_helpers.c`)。素材 `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を `$RUNNER_TEMP/art` に展開した。
+- 手順: `grep -v '^  uselistorder'` で行を除く (emcc 6.0.12 の LLVM が `uselistorder i64 %arg1, { 1, 0, 2 }` を読めず、`error: wrong number of indexes` で止まることを確認した)。`ci.ll` → `emcc -c -O1` → `ci.o`。`ci_helpers.c` → `helpers.o`。
+- 未解決 (リンクエラー行数): IAT (EnterCriticalSection 11・FlsGetValue 2・FlsSetValue 4・GetLastError 53・HeapAlloc 3・HeapFree 52・LeaveCriticalSection 11・RaiseException 5・RtlPcToFileHeader 5・SetLastError 1)、呼び出し先 (function_1801aef40 1・function_1801cb600 5)。
+- 解決済み: `__stack_pointer` (emcc が供給)、`global_var_1803f6610`・`__unnamed_1` (IR の `@0` のリンク名。検査用 shim で定義)。`ci.o` の未定義シンボルは `nm -u` で 19 件 (IAT・呼び出し先・`__asm_*` 4 種・`__stack_pointer`・外部グローバル 2 種・`__unnamed_1`) と一致。
+- 検証: `ci_link.sh` は未解決の集合が期待集合 (IAT 10 種 + 2 種) と一致すると exit 0、想定外が出ると exit 1。
+
+### 8-2. 外部グローバルの意味 (未決)
+- `global_var_1803f6610` (`external global i64`): VA `0x1803f6610` = RVA `0x3f6610` は `.data` の中。`.data` の初期値は 8 byte `0x1803f66a8` (`.data` 内の `global_var_1803f66a8` を指すポインタ)。IR は `icmp eq i64 %4, ptrtoint (ptr @global_var_1803f6610 to i64)` と `load i64, ptr @global_var_1803f6610` で読む。つまり画像内の 1 cell として敷設すれば、IR の意味 (cell の内容 = ポインタ値) と一致する。RetDec が `.data` の他のグローバルを `global` として出すのと同じ形。
+- `@0` (`external global i32`): `ret i64 ptrtoint (ptr @0 to i64)` が 3 箇所 (`function_1801aedc0`・`function_1801bb414`・`function_1801bb468` の末尾)。IR に定義が無い。画像上の該当 VA は未特定。
+- 敷設方式 (案・未実装): `wc_image.py` は PE 全体を VA 0x30000000 に敷設するので、`global_var_1803f6610` の cell (RVA 0x3f6610) は画像の中に既にある。C 側で別の cell を作ると、画像の `.data` の値 (`0x1803f66a8`) と食い違う。よって IR の `@global_var_1803f6610` を「画像基底 + 0x3f6610」に置き換える方式を案とする。`@0` は画像上の VA が未特定のため、同じ方式は決められない (実体の特定が先)。実装は ir_normalize の段で行う必要があり、本 run では行っていない。
+- 仮置きの効果: shim は cell を 0 初期化 (`global_var_1803f6610` は 0)。したがって仮置きのままでは `icmp eq` の比較対象が変わる。**リンクが通ることと、意味が正しいことは別**。意味の確認 (native との差分) は #3320 の範囲。
+
+### 8-3. 残り (起票先)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 外部グローバル 2 種の画像敷設 (`global_var_1803f6610` は `.data` の cell、`@0` は実体未特定) | リンクは通るが、仮置きの値で意味が変わりうる | 本 issue の範囲 (敷設方式を決めるのは次の子 or #3318) |
+| `uselistorder` 行 (174 行) を emcc が読めない | ci_link.sh は行を除いて回避。ir_normalize の対応が必要 | [T-SH-65] #3318 |
+| IAT 10 種 | 未解決 (リンクエラー) | #5747 |
+| 閉包の取りこぼし (function_1801aef40・function_1801cb600) | 未解決 (リンクエラー) | #5749 |
