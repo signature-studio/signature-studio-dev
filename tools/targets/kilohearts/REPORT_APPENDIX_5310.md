@@ -53,13 +53,16 @@ PE の objdump は `call   0x<番地>` の形で出る。前回の照合は `0x`
 - 生成 C の宣言 (`void`) と Ghidra の `return;` は、`FUN_180fbde90` の戻り値型が未確定のため出た誤り。
 - 2122・3968・5001 の callee 本体の戻り値 (xmm0・rax) は、生成 C の `return` だけでは確定しない (`summary.tsv` の `body_bytes` が 1 で、関数範囲が Ghidra で正しく取れていない)。3968 は上の機械語で確定した。2122・5001 は未了。
 
-## #5913 (KH-179) の確認
+## #5913 (KH-179) の確認 (未確認・暫定)
 
-- `FUN_180fbde90` の戻り値型: 生成 C の宣言は `short`。機械語の全 ret (`180fbdec4`・`180fbdef0`・`180fbdf30`・`180fbdf58`・`180fbdf78`・`180fbdfc8`・`180fbdff4`・`180fbe014`) の直前で `ax`/`eax` が設定される。4329 の規則の根拠。
-- `FUN_180fe2470` の戻り値型: 生成 C の宣言は `ulonglong`。本体は `return uVar2 >> bVar1 | uVar2 << 0x40 - bVar1;`。5001 の規則の根拠。
-- `FUN_180fd27a8` (4329): 機械語は `call 180fbde90` → `add rsp` → `ret` のみ。`ax` を書かずに返すので、戻り値は `FUN_180fbde90` の `short` をそのまま通す。
-- `FUN_180fe24b8` (5001): 機械語は `call 180fe2470` → `add rsp` → `ret` のみ。`rax` を書かずに返すので、戻り値は `FUN_180fe2470` の `ulonglong` をそのまま通す。
-- `FUN_180fc4590` (2122) は 176 の `ret` 命令を持ち、生成 C の 2122 行の本体がある。経路ごとの xmm0 の決定は本 run で完了しなかった。
+- 4329・5001 の規則 (`patches.py` の `delay` の 4 件) は、**callee の生成宣言行の引用も機械語の再確認も付録に記録されていない。暫定の規則であり、確定していない**。
+- 上の機械語の節の記述 (`call` → `add rsp` → `ret`) は `FUN_180fd27a8` (`180fd27a8`) と `FUN_180fe24b8` (`180fe24b8`) の直接の確認に基づく。ただし callee `FUN_180fbde90`・`FUN_180fe2470` の宣言型 (`short`・`ulonglong`) は、生成 C の宣言行を引用して照合していない。
+- 再確定に必要な記録 (未了): (a) `FUN_180fbde90` と `FUN_180fe2470` の生成宣言行の引用 (Ghidra 出力)、(b) 全 ret 経路で `ax`/`rax` が戻り値として設定されることの objdump 出力。`HeartCore.core_64` (`plugins-kilohearts` 由来) が要る。
+- `FUN_180fc4590` (2122) は 176 の `ret` 命令を持ち、生成 C の 2122 行の本体がある。経路ごとの xmm0 の決定は未了。
+
+## 未確認の記録 (本 PR の差し戻し対応)
+
+- PR 本文にあった census の数値 (emcc error 305 → 303、Gain/Haas/Gate の `.o` サイズ、decompile 151/151、wall 48.9 s) は、本 run で `plugins-kilohearts`・`toolchain-emsdk` が無く再現できなかった。**未確認のため本付録では採用しない**。再測定は `oc_artifacts: fl-win64 plugins-kilohearts toolchain-emsdk` で行い、結果を本付録の「測定」節に入れ直す。
 
 ## 未解決
 
