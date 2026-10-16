@@ -6,26 +6,26 @@
 ## 1. 結論
 
 - **trap 7 件すべて再現した。** LB=0: unit 555・745。LB=0x10000: unit 153・158・291・296・304 (+40 halt0)。
-- **291・296・304 は 555 と同じ関数・同じ命令で落ちる。** LB=0x10000 の build で `function_535c11` の `[14890]:0x353b81` (`i64.load 0`)。LB=0 の 555 の faulting 命令 (`0x353a06`) と同じ IR 命令 `load i64 [%8]` (`%8 = %5-8`) に当たる。両 build の `boot_final.ll` で `function_535c11` の本体は同一。
+- **291・296・304 は 555 と同じ関数・同じ IR 命令で落ちる。** LB=0x10000 の build で `function_535c11` の `[14890]:0x353b81` (`i64.load 0`)。LB=0 の 555 の faulting 命令 (`[14890]:0x353a06`、`i64.load 0`) と同じ IR 命令 `load i64 [%8]` (`%8 = %5-8`) に当たる。両 build の `boot_final.ll` で `function_535c11` の本体は同一 (差分 0 行・付録 §4)。逆アセンブルの生出力と build 指紋は付録 `REPORT_APPENDIX_5667.md`。
 - **153 は前回どおり IR 行一致 (高)。158 は候補のまま。745 は IR 行が未確定。**
 - **「address 0 を読むか」は未確定。** 実行時の値は未観測。wasm では address 0 の読みは trap しないため、trap の信号では検出できない (§4)。
 
-## 2. LB=0 (wasm 指紋 `d0aa354c`)
+## 2. LB=0 (wasm 指紋 `d6274222`)
 
-計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=291,296,304,555,745 bash tools/m11/m11_lb_tolerant_repro.sh 0 work/lb0`。rc=0・寛容起動 wall 12,364 ms・`time` 実測 1 分 28 秒 (06:48:46〜06:50:15)。
-trap 行: unit 555 (`va=0x7f2500`)・unit 745 (`va=0xabb3b0`)。291・296・304 は trap しなかった。
+計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=291,296,304,555,745 bash tools/m11/m11_lb_tolerant_repro.sh 0 work/lb0`。rc=0・寛容起動 wall 12,197 ms (#5667 の再測定 2026-10-16・worktree の再生成)。
+trap 行: unit 555 (`va=0x7f2500`)・unit 745 (`va=0xabb3b0`)。291・296・304 は trap しなかった。指紋・逆アセンブルの生出力は付録 §1・§2.2。
 
 | unit | trap の wasm 関数 (offset) | 関数名 | faulting 命令 | IR 対応 (`work/lb0/boot_final.ll`) |
 |---|---|---|---|---|
-| 555 | `[14890]:0x353a06` | `function_535c11` | `i64.load 0` (直前 `i64.load 8; i64.const 8; i64.sub; i32.wrap_i64`。その前に `i64.load 8; i64.const 0; i64.ne` の分岐) | `%5 = load [%2+8]`・`icmp eq %5, 0` → `%7 = add %5,-8` → `%9 = load i64 [%8]`。**一致 (高)** |
+| 555 | `[14890]:0x353a06` | `function_535c11` | `i64.load 0` (直前 `i64.load 8; i64.const 8; i64.sub; i32.wrap_i64`。その前に `local.get 1; i64.load 8; i64.const 0; i64.ne; i32.and 1` の分岐) | `%5 = load [%2+8]`・`icmp eq %5, 0` → `%7 = add %5,-8` → `%9 = load i64 [%8]`。**一致 (高)** |
 | 745 | `[1877]:0x13d5e1` | `function_407e20__lifted` | `i64.load 0` (直前 `local.get 3; i32.wrap_i64`) | 未確定。`boot_final.ll` に `__lifted` 本体は無い (`m11_post.py` が改名)。IR 本体 `function_407e20` (`boot_final.ll:104752`) の load 連鎖は未突合 |
 
 - unit 555 の呼出し鎖: `function_535c11` ← `function_4fad10` ← `function_4fb910` ← `m11_icall`。
 - unit 745 の呼出し鎖: `function_407e20__lifted` ← `function_407e20` ← `function_409440__lifted` ← `function_409440` ← `function_666bb0` ← `function_7745a0` ← `function_ebb3b0`。
 
-## 3. LB=0x10000 (wasm 指紋 `528af80d`・`m11_boot.cjs.wasm`)
+## 3. LB=0x10000 (wasm 指紋 `cb141c7f`・`m11_boot.cjs.wasm`)
 
-計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=40,153,158,291,296,304 bash tools/m11/m11_lb_tolerant_repro.sh 0x10000 work/lb10000`。rc=0・寛容起動 wall 15,652 ms・`time` 実測 1 分 28 秒 (06:50:22〜06:51:50)。
+計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=40,153,158,291,296,304 bash tools/m11/m11_lb_tolerant_repro.sh 0x10000 work/lb10000`。rc=0・寛容起動 wall 15,842 ms・`time` 実測 1 分 29 秒 (2026-10-16 再測定)。指紋・逆アセンブルは付録 §1・§2.1・§2.3。
 
 | unit | trap の wasm 関数 (offset) | 関数名 | faulting 命令 | IR 対応 (`work/lb10000/boot_final.ll`) |
 |---|---|---|---|---|
@@ -40,7 +40,7 @@ trap 行: unit 555 (`va=0x7f2500`)・unit 745 (`va=0xabb3b0`)。291・296・304 
 - unit 153 の呼出し鎖: `function_412e40` ← `function_664fd0` ← `function_665b90` ← `m11_icall`。
 - unit 158 の呼出し鎖: `function_412c20` ← `function_4136a0` ← `function_413760` ← `function_414bb0` ← `function_653660`。
 
-注意: 同じ IR でも wasm の分岐の書き方は build で違う。LB=0x10000 の `function_535c11` は `i32.and 1` で分岐する (`0x353b72`)。LB=0 は `i64.ne 0` で分岐する (`0x3539f1`)。faulting 命令は同じ IR 命令に当たるが、分岐の差の意味は未確認。
+注意: LB=0 と LB=0x10000 の `function_535c11` は、分岐の並び (`i64.ne 0; i32.and 1; i32.eqz; br_if`) もアドレス以外は同じ。wasm の offset だけが違う (`0x3539fb`・`0x353b76` の分岐。付録 §2)。
 
 ## 4. address 0 の判定 (受入 2 の後半)
 
@@ -78,4 +78,5 @@ python3 tools/m11/m11_wasmnames.py <wasm> <idx>                                 
 ```
 
 - wasm と IR は build ごとに変わる。`work/lb0/`・`work/lb10000/` に退避した `boot_final.ll`・`m11_boot.cjs.wasm` を使う (`work/boot_final.ll` は後の run で上書きされる)。
+- 指紋 `6fe40c2e` の snapshot (`work-m11` 展開直後の `tools/m11/work/m11_boot.cjs.wasm`) は、上の 2 build のどちらとも一致しない。逆アセンブルは build ごとの wasm で行う (付録 §5)。
 - 注意: `m11_lb_tolerant_repro.sh` は work 直下の wasm を上書きする。LB を切り替える前に退避する。
