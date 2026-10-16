@@ -57,7 +57,22 @@ def hand_table(p):
     ]
 
 
-TOKEN = re.compile(r"\s*(\*\(|0x[0-9a-fA-F]+|\d+|[A-Za-z_][A-Za-z0-9_]*|[()+\-*·])")
+X_IN = "c_in - 0x70000000"  # 0x104aaa3: ecx − 0x70000000 (c_in = [rbp+0x5b0] の読み 0x1046d65)
+S574 = f"and(shr({X_IN}, 0x10), 0x3f)"  # [rbp+0x574] (0x104aacd): 0x31c の RMW (shr 16) の後の下位 6 bit
+S578 = f"shr(shr({X_IN}, 0x10), 6)"  # [rbp+0x578] (0x104aabe): 同じ 0x31c の >> 6
+P8 = f"*(*(0x15e3ac8) + shl({S574}, 2)*8 + 8)"  # 0x104aba9 の基準ポインタ (0x104aba1・0x104ab9a の読み)
+P18 = f"*(*(0x15e3ac8) + shl({S574}, 2)*8 + 0x18)"  # 0x104af7f の基準ポインタ (+0x18 の枝)
+G23_F = "*({p} +0x3b8) + rint(*(0x104ccd8) · d_in · (*({p} +0x3bc) − *({p} +0x3b8)))"  # 0x104aba9・0x104af7f の F 型
+G23_TBL = "*(*(*(0x15e06a0) + imul({s578}, 0x28f)*8 + 0x134c + {s574}*8) +{off})"  # 0x104ad2e・0x104b093 の表引き (M8/M32)
+EXPANDED += [  # G2・G3 (#5905): 展開版 (ExpSlicer) で突合する。d_in は py160 の到達定義が入口 store 1 本
+    (0x104aba9, G23_F.format(p=P8)),
+    (0x104ad2e, G23_TBL.format(s578=S578, s574=S574, off="0x148")),
+    (0x104af7f, G23_F.format(p=P18)),
+    (0x104b093, G23_TBL.format(s578=S578, s574=S574, off="0x138")),
+]
+
+TOKEN = re.compile(r"\s*(\*\(|0x[0-9a-fA-F]+|\d+|[A-Za-z_][A-Za-z0-9_]*|[()+\-*·,])")
+FUNCS = ("shl", "imul", "and", "shr")  # 1〜2 引数の関数形 (#5905)
 
 
 def tokenize(s):
@@ -127,7 +142,15 @@ class Parser:
             e = self.expr()
             self.take(")")
             return ("rint", e)
-        if t in ("ACC", "d_in"):
+        if t in FUNCS and self.peek() == "(":
+            self.take("(")
+            args = [self.expr()]
+            while self.peek() == ",":
+                self.take(",")
+                args.append(self.expr())
+            self.take(")")
+            return ("fn", t, args)
+        if t in ("ACC", "d_in", "c_in"):
             return (t,)
         raise ValueError(f"未知のトークン {t!r}")
 
@@ -151,6 +174,8 @@ def canon(t):
         return ("neg", canon(t[1]))
     if k == "rint":
         return ("rint", canon(t[1]))
+    if k == "fn":
+        return ("fn", t[1], [canon(a) for a in t[2]])
     return t
 
 
@@ -165,6 +190,7 @@ def parse_canon(s):
 def machine_norm(s):
     s = re.sub(r"ACC\?⚠合流@0x[0-9a-f]+", "ACC", s)
     s = re.sub(r"(?<=[\w)\]])@0x[0-9a-f]+", "", s)
+    s = re.sub(r"&(?=M(8|16|32|64)\[)", "", s)
     s = re.sub(r"\bM(8|16|32|64)\[", "*(", s)
     s = s.replace("G[", "(").replace("[", "(").replace("]", ")")
     return s

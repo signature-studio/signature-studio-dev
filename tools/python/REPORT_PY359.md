@@ -81,11 +81,39 @@ python3 analysis/py64_check_expr.py work/py53/fn.txt --negctl p2   # exit 1
 - 実時間: `py88_writes.py` 4 点 0.02 秒・`py99_slot_paths.py` 既定 0.35 秒。load average 0.25 (`uptime`・測定直前)。
 - 未解決: 4 地点 (0x104b5aa・0x104b94e・0x104bebf・0x104bffa) の展開は本 PR の範囲外 (既存の未解決として §6 の残り 4 地点と同じ)。
 
+## 8. G2・G3 の 4 地点の手計算照合 (PY-5400 / #5905・#5312 の単位 B)
+
+- 文法: `py64_check_expr.py` の `TOKEN`・`Parser` に `shl(` `imul(` `and(` `shr(` (1〜2 引数の関数形)・`c_in`・`,` を加えた。`machine_norm` は `&M64[`/`&M8[` の `&` を落とす。
+- 手計算式 (展開版 `EXPANDED`): 0x104aba9・0x104af7f は `F` 型 (`[P+0x3b8] + rint(*(0x104ccd8) · d_in · ([P+0x3bc] − [P+0x3b8]))`)、0x104ad2e・0x104b093 は表引き (M8 型・M32 型)。`c_in` は入口の ecx (0x1046d65 の store)、`[rbp+0x574]`・`[rbp+0x578]` は 0x104aacd・0x104aabe の式 (`and(shr(X,0x10),0x3f)`・`shr(shr(X,0x10),6)`、X = c_in − 0x70000000)。
+- 測定 commit: `6d69e896d` (main (#5927) を取り込んだ merge commit = 検証 HEAD)。入力: `work/py53/fn.txt` (`fl-win64` の `block00031_PE.bin` を `work/py64/extracted/` に展開 → `py53_dispatch.py` で 4664 命令・`fn=4664 dispatch=13 r8d_tests=174`)。
+- 結果 (現 HEAD 実測): `python3 analysis/py64_check_expr.py work/py53/fn.txt` → HAND 8 点 `n=8 mismatch=0`・展開版 `expanded n=5 mismatch=0`・exit 0。`--negctl p2` → HAND `n=8 mismatch=3`・展開版 `expanded n=5 mismatch=0`・exit 1 (HAND 側で失敗する negative control)。
+- 取り込み前の値 (`99065f2cb`・#5927 の前): 展開版 `expanded n=5 mismatch=4`・exit 1。4 点とも不一致だった。取り込み前の analysis は `git archive 99065f2cb tools/python/analysis` で別ディレクトリに出して再実行し、同じ値を再現した。
+
+| VA | 現 HEAD (`6d69e896d`) の展開照合 | 取り込み前 (`99065f2cb`) の結果 | 取り込み前の原因 |
+|---|---|---|---|
+| 0x104aba9 (G2・F 型) | 一致 | 不一致 (parse error) | base が py88 の 400 字上限 (`res[:400]`) で `…` に切れた。#5927 で上限を `RES_LIMIT = 4000` に上げて解消 |
+| 0x104af7f (G3・F 型) | 一致 | 不一致 (parse error) | 0x104aba9 と同じ `…` 切れ。#5927 で解消 |
+| 0x104ad2e (G2・M8 型) | 一致 | 不一致 | `imul rcx, rcx, 0x28f` (3 オペランド) の 0x28f 源が落ちていた。#5927 で `op(a, b)` の形で出すよう修正し解消 |
+| 0x104b093 (G3・M32 型) | 一致 | 不一致 | 0x104ad2e と同じ (`imul` の 0x28f 欠落)。#5927 で解消 |
+
+- 手計算式の確からしさ: 現 HEAD では 4 点とも機械式と一致する (展開版 `mismatch=0`)。ただし HAND 表 (手計算の正本) への登録はまだ無い。HAND 表の 8 点は変えていない。4 地点の HAND 登録は子 #5926 の範囲。
+- 未解決 (本 PR の範囲外・子 #5926): (1) 4 地点の HAND 表入り (手計算式は `shl`・`and`・`imul` を含む文法で書く必要がある)。(2) py88 の生の出力 (`py88_writes.py` 直接) に `SLOT?`・`ACC?⚠合流` が残る。ExpSlicer 経路の展開照合 (`py64_check_expr.py`) では `SLOT` は 0 件で、照合を妨げない。
+
+#### 再現手順 (現 HEAD `6d69e896d` と、取り込み前の再現)
+
+scratch は `work/scratch/` (gitignore) に複製し、本体は変えない。
+
+- 現 HEAD (本体・変更なし): `python3 analysis/py64_check_expr.py work/py53/fn.txt` → `n=8 mismatch=0`・`expanded n=5 mismatch=0`・exit 0。`python3 analysis/py88_writes.py work/py53/fn.txt` の出力は `…` 0 件・`SLOT[rbp+0x574]?` 4 件 (0x104aba9・0x104af7f の行に残る)。
+- 取り込み前の再現 (`99065f2cb` の analysis を別ディレクトリに出す): `git archive 99065f2cb tools/python/analysis | tar -x -C work/scratch_pre` → `python3 work/scratch_pre/tools/python/analysis/py64_check_expr.py work/py53/fn.txt` → `expanded n=5 mismatch=4`・exit 1。`--negctl p2` は `n=8 mismatch=3`・`expanded n=5 mismatch=4`・exit 1。
+- 上限だけ 400 に戻す検証 (現 HEAD の `RES_LIMIT` を 400 に下げた scratch `work/scratch_400/`): `expanded n=5 mismatch=2`・exit 1。0x104aba9・0x104af7f が不一致になる (`…` による parse error)。これが取り込み前の F 型 2 点の不一致の原因だった。
+- 既存点への影響: 現 HEAD で `py99_slot_paths.py`・`py159_check_hand.py` は exit 0 (`U check n=57 match=57 mismatch=0`・`forward cross-check n=172 mismatch=0`・`n=7 mismatch=0`)。
+
 ### 差分 (測定 commit から HEAD まで)
 
-`git diff 53ab89b54 HEAD -- tools/python/analysis` は本 PR の commit 後の差分 (本 §7 の追記時点で 0 行)。
+測定 commit は `6d69e896d` (main 取り込み後の検証 HEAD・`tools/python/analysis` を変えた最後の commit)。鮮度: `git diff 6d69e896d HEAD -- tools/python/analysis` は 0 行。
 
-## 8. PY-5404 (#5926): `imul` の源と `resolve()` の 400 字切れ (受入 1・2・4 の部分)
+
+## 9. PY-5404 (#5926): `imul` の源と `resolve()` の 400 字切れ (受入 1・2・4 の部分)
 
 - 測定 commit: `6f9c59646` (`analysis/py88_writes.py` のコードを変えた最後の commit)。入力: `fl-win64` の `block00031_PE.bin` → `py53_dispatch.py` (`fn=4664 dispatch=13 r8d_tests=174`)。load average 0.12 (測定時 17:02 UTC)。
 - 原因 1 (受入 1): `def_value` の ARITH 分岐は 2 オペランドしか見ず、`imul rcx, rcx, 0x28f` (0x104abce ほか 3 オペランド形) の源 `0x28f` を捨てていた。修正: 3 オペランドを `op(a, b)` で出す。0x104ad2e・0x104b093 の式に `imul(SLOT[rbp+0x578]?@0x104aabe, 0x28f)` が出る。
