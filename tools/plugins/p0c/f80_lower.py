@@ -1076,6 +1076,154 @@ def ext_emulate(text, ext_funcs, rep, chop_funcs='', chop_ranges=None):
     return result, used_rint, used_fpr2, used_nextafter
 
 
+F80B_DECL = 'declare i64 @llvm.ctlz.i64(i64, i1)'
+RE_F80B_TO = re.compile(r'^(\s*)(%[\w.$-]+) = bitcast x86_fp80 (%[\w.$-]+) to i80(.*)$')
+RE_F80B_FROM = re.compile(r'^(\s*)(%[\w.$-]+) = bitcast i80 (%[\w.$-]+) to x86_fp80(.*)$')
+
+
+def _f80b_to_image(ind, dst, src, p):
+    """double src → x87 80-bit 像 i80 (dst)。 符号 / 指数 15 bit / 仮数 64 bit (整数ビット付き)。
+    subnormal double は ctlz で正規化する。 NaN / inf は指数 0x7FFF。"""
+    L = []
+
+    def o(name, rhs):
+        L.append('%s%s = %s' % (ind, name, rhs))
+    o(p + 'b', 'bitcast double %s to i64' % src)
+    o(p + 'sg', 'lshr i64 %sb, 63' % p)
+    o(p + 'sx', 'zext i64 %ssg to i80' % p)
+    o(p + 'sh', 'shl i80 %ssx, 79' % p)
+    o(p + 'eh', 'lshr i64 %sb, 52' % p)
+    o(p + 'e11', 'and i64 %seh, 2047' % p)
+    o(p + 'raw', 'and i64 %sb, 4503599627370495' % p)
+    o(p + 'rz', 'icmp eq i64 %sraw, 0' % p)
+    o(p + 'ez', 'icmp eq i64 %se11, 0' % p)
+    o(p + 'nz', 'xor i1 %srz, true' % p)
+    o(p + 'sub', 'and i1 %sez, %snz' % (p, p))
+    o(p + 'zd', 'and i1 %sez, %srz' % (p, p))
+    o(p + 'spec', 'icmp eq i64 %se11, 2047' % p)
+    o(p + 'rg', 'select i1 %srz, i64 1, i64 %sraw' % (p, p))
+    o(p + 's', 'call i64 @llvm.ctlz.i64(i64 %srg, i1 false)' % p)
+    o(p + 'msub', 'shl i64 %srg, %ss' % (p, p))
+    o(p + 'm11', 'shl i64 %sraw, 11' % p)
+    o(p + 'mn', 'or i64 %sm11, 9223372036854775808' % p)
+    o(p + 'ms', 'select i1 %ssub, i64 %smsub, i64 %smn' % (p, p, p))
+    o(p + 'mant', 'select i1 %szd, i64 0, i64 %sms' % (p, p))
+    o(p + 'ex1', 'add i64 %se11, 15360' % p)
+    o(p + 'ex2', 'sub i64 15372, %ss' % p)
+    o(p + 'ex3', 'select i1 %sspec, i64 32767, i64 %sex1' % (p, p))
+    o(p + 'ex4', 'select i1 %ssub, i64 %sex2, i64 %sex3' % (p, p, p))
+    o(p + 'ex', 'select i1 %szd, i64 0, i64 %sex4' % (p, p))
+    o(p + 'ex80', 'zext i64 %sex to i80' % p)
+    o(p + 'exs', 'shl i80 %sex80, 64' % p)
+    o(p + 'mz', 'zext i64 %smant to i80' % p)
+    o(p + 't1', 'or i80 %ssh, %sexs' % (p, p))
+    o(dst, 'or i80 %st1, %smz' % (p, p))
+    return L
+
+
+def _f80b_from_image(ind, dst, src, p):
+    """x87 80-bit 像 i80 src → double (dst)。 仮数 64 bit を 53 bit に最近接偶数丸め。
+    double の指数範囲外は inf / 0 に丸める (subnormal の結果は 0 に落とす: 精度の制限)。"""
+    L = []
+
+    def o(name, rhs):
+        L.append('%s%s = %s' % (ind, name, rhs))
+    o(p + 'xs', 'lshr i80 %s, 79' % src)
+    o(p + 'xs64', 'trunc i80 %sxs to i64' % p)
+    o(p + 'sgn', 'shl i64 %sxs64, 63' % p)
+    o(p + 'xe', 'lshr i80 %s, 64' % src)
+    o(p + 'xe64', 'trunc i80 %sxe to i64' % p)
+    o(p + 'ex', 'and i64 %sxe64, 32767' % p)
+    o(p + 'mt', 'trunc i80 %s to i64' % src)
+    o(p + 'exz', 'icmp eq i64 %sex, 0' % p)
+    o(p + 'exs', 'icmp eq i64 %sex, 32767' % p)
+    o(p + 'keep', 'lshr i64 %smt, 11' % p)
+    o(p + 'rem', 'and i64 %smt, 2047' % p)
+    o(p + 'hgt', 'icmp ugt i64 %srem, 1024' % p)
+    o(p + 'heq', 'icmp eq i64 %srem, 1024' % p)
+    o(p + 'kl', 'and i64 %skeep, 1' % p)
+    o(p + 'kb', 'icmp ne i64 %skl, 0' % p)
+    o(p + 'tie', 'and i1 %sheq, %skb' % (p, p))
+    o(p + 'up', 'or i1 %shgt, %stie' % (p, p))
+    o(p + 'upz', 'zext i1 %sup to i64' % p)
+    o(p + 'keep2', 'add i64 %skeep, %supz' % (p, p))
+    o(p + 'carry', 'icmp eq i64 %skeep2, 9007199254740992' % p)
+    o(p + 'keep3', 'select i1 %scarry, i64 4503599627370496, i64 %skeep2' % (p, p))
+    o(p + 'carz', 'zext i1 %scarry to i64' % p)
+    o(p + 'E0', 'sub i64 %sex, 15360' % p)
+    o(p + 'E', 'add i64 %sE0, %scarz' % (p, p))
+    o(p + 'inf', 'icmp sge i64 %sE, 2047' % p)
+    o(p + 'low', 'icmp sle i64 %sE, 0' % p)
+    o(p + 'fb', 'shl i64 %sE, 52' % p)
+    o(p + 'frac', 'and i64 %skeep3, 4503599627370495' % p)
+    o(p + 'bn', 'or i64 %sfb, %sfrac' % (p, p))
+    o(p + 'bi', 'select i1 %sinf, i64 9218868437227405312, i64 %sbn' % (p, p))
+    o(p + 'sn', 'sub i64 1, %sE' % p)
+    o(p + 'snok', 'icmp sle i64 %ssn, 52' % p)
+    o(p + 'snc', 'select i1 %ssnok, i64 %ssn, i64 1' % (p, p))
+    o(p + 'sh2', 'add i64 %ssnc, 11' % p)
+    o(p + 'sq', 'lshr i64 %smt, %ssh2' % (p, p))
+    o(p + 'smask0', 'shl i64 1, %ssh2' % p)
+    o(p + 'smask', 'sub i64 %ssmask0, 1' % p)
+    o(p + 'srem', 'and i64 %smt, %ssmask' % (p, p))
+    o(p + 'shm1', 'sub i64 %ssh2, 1' % p)
+    o(p + 'shalf', 'shl i64 1, %sshm1' % p)
+    o(p + 'sgt', 'icmp ugt i64 %ssrem, %sshalf' % (p, p))
+    o(p + 'seq', 'icmp eq i64 %ssrem, %sshalf' % (p, p))
+    o(p + 'sqo0', 'and i64 %ssq, 1' % p)
+    o(p + 'sqo', 'icmp ne i64 %ssqo0, 0' % p)
+    o(p + 'stie', 'and i1 %sseq, %ssqo' % (p, p))
+    o(p + 'sup', 'or i1 %ssgt, %sstie' % (p, p))
+    o(p + 'supz', 'zext i1 %ssup to i64' % p)
+    o(p + 'sfr', 'add i64 %ssq, %ssupz' % (p, p))
+    o(p + 'sbits0', 'or i64 %ssfr, %ssgn' % (p, p))
+    o(p + 'sn53', 'icmp eq i64 %ssn, 53' % p)
+    o(p + 'sm53', 'icmp ugt i64 %smt, 9223372036854775808' % p)
+    o(p + 'sm53z', 'zext i1 %ssm53 to i64' % p)
+    o(p + 'sb53', 'or i64 %ssm53z, %ssgn' % (p, p))
+    o(p + 'sbits1', 'select i1 %ssn53, i64 %ssb53, i64 %ssgn' % (p, p, p))
+    o(p + 'sbits', 'select i1 %ssnok, i64 %ssbits0, i64 %ssbits1' % (p, p, p))
+    o(p + 'b2', 'select i1 %slow, i64 %ssbits, i64 %sbi' % (p, p, p))
+    o(p + 'nf', 'lshr i64 %smt, 11' % p)
+    o(p + 'nfr', 'and i64 %snf, 4503599627370495' % p)
+    o(p + 'nb', 'or i64 %snfr, 9218868437227405312' % p)
+    o(p + 'b3', 'select i1 %sexs, i64 %snb, i64 %sb2' % (p, p, p))
+    o(p + 'b4', 'select i1 %sexz, i64 0, i64 %sb3' % (p, p))
+    o(p + 'bf', 'or i64 %sb4, %ssgn' % (p, p))
+    o(dst, 'bitcast i64 %sbf to double' % p)
+    return L
+
+
+def expand_f80_bitcasts(text, rep):
+    """E7: bitcast x86_fp80 ↔ i80 (x87 の 80 bit 像を読む・組む命令) を double の bit 再構成に展開する。
+    型名の置換 (token_lower) では bitcast double to i80 が残り emcc が落ちるため、先に展開する。
+    精度: 結果は 53 bit の double に丸まる (f80 → f64 の既存方式と同じ)。 native x87 とはビット一致しない。
+    末尾メタデータ (例: !insn.addr) は展開の最後の命令に付け直す。 llvm.ctlz.i64 の declare は呼び元で足す。"""
+    out = []
+    n_to = n_from = 0
+    for k, ln in enumerate(text.split('\n')):
+        mt = RE_F80B_TO.match(ln)
+        mf = RE_F80B_FROM.match(ln) if not mt else None
+        if mt:
+            ind, dst, src, tail = mt.group(1), mt.group(2), mt.group(3), mt.group(4)
+            p = '%%f80b%d.' % k
+            seq = _f80b_to_image(ind, dst, src, p)
+            n_to += 1
+        elif mf:
+            ind, dst, src, tail = mf.group(1), mf.group(2), mf.group(3), mf.group(4)
+            p = '%%f80b%d.' % k
+            seq = _f80b_from_image(ind, dst, src, p)
+            n_from += 1
+        else:
+            out.append(ln)
+            continue
+        seq[-1] = seq[-1] + tail
+        out.extend(seq)
+    rep['f80_bitcast_to_image'] = n_to
+    rep['f80_bitcast_from_image'] = n_from
+    return '\n'.join(out)
+
+
 def token_lower(text, rep):
     """S1+S2+S4 のトークン置換 (f80 定数 / 型 / intrinsic 名 / i3)。冪等。"""
     text = lower_constants(text, rep)
@@ -1128,11 +1276,14 @@ def main():
 
     rep = {'f80_tokens_in': 0, 'f80_tokens_out': 0, 'f80_consts': 0, 'intrinsics_renamed': 0,
            'same_type_conv_erased': 0, 'fild_fistp_i64_folded': 0, 'fistp_rint_inserted': 0,
-           'i3_replaced': 0, 'chop_funcs': sorted(chop_set), 'no_rint': bool(a.no_rint)}
+           'i3_replaced': 0, 'chop_funcs': sorted(chop_set), 'no_rint': bool(a.no_rint),
+           'f80_bitcast_to_image': 0, 'f80_bitcast_from_image': 0}
 
     text = open(a.src, errors='replace').read()
     rep['f80_tokens_in'] = text.count('x86_fp80')
     rep['intrinsics_renamed'] = len(re.findall(r'@llvm\.[a-z0-9.]+\.f80\b', text))
+    text = expand_f80_bitcasts(text, rep)
+    f80b_decl = bool(rep['f80_bitcast_to_image'] or rep['f80_bitcast_from_image'])
 
     # --- 関数 split: preamble + (header, body, inter) 連鎖 ---
     starts = [m.start() for m in re.finditer(r'(?m)^define [^\n]*\{', text)]
@@ -1188,6 +1339,8 @@ def main():
     result = token_lower(result, rep)
     if rep['fistp_rint_inserted'] and rint_decl not in result:
         result = result.rstrip('\n') + '\n\n' + rint_decl + '\n'
+    if f80b_decl and F80B_DECL not in result:
+        result = result.rstrip('\n') + '\n\n' + F80B_DECL + '\n'
 
     result = dedupe_declares(result)
     rep['f80_tokens_out'] = result.count('x86_fp80')
