@@ -220,6 +220,7 @@
 | `tools/liftdiff/tests/ld158_ret_probe.py` | ~110 | LD-158 (#3470) の動的プローブ: i128 戻り関数を 11 pattern × xfill {1,0} で native 実行し、戻り後 rax / rdx / xmm0 の書換えを記録 (`work/ld158_probe.json`)。`--names` で陰性対照の関数を指定できる |
 | `tools/liftdiff/tests/ld158_summarize.py` | ~70 | LD-158 (#3470) の集計: 動的分類・静的 dsm 判定 (窓 3 / 8) の件数と、`ret_override` と動的 xmm0 のみ集合の一致を出す (`work/ld158_table.tsv`) |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
+| `tools/icall/REPORT_APPENDIX_5843.md` | ~60 | icall #5843 (ICALL-119): slot 関数 56 件のうち全 ret 経路で `push r13` が釣り合うのが 52 件 (`tools/icall/ret_r13_check.py`)。間接 `180cbba21`・`180cbba36` の具象型は未特定 (部分達成・残件は #5843) |
 | `tools/icall/REPORT_APPENDIX_5044.md` | ~50 | icall #5044 (ICALL-108): 180cbb930 の直接呼出し 2 件 (`180cbcd90`・`180cb9890`) が `r13` を書かないことの機械判定 (`tools/icall/r13_callee_check.sh`)。間接呼出し `180cbba21`・`180cbba36` の具象型は未特定 (部分達成・残件は #5044) |
 | `tools/icall/REPORT_APPENDIX_5125.md` | ~60 | icall #5125 (親 #4245): icall 代表 e2e の before (`706147914`) / after (`e5261de58`) 一致の実測 (両方 PASS・所要・監査/matrix/crt gate の値)・前提素材の展開手順・`/opt` 直書きと `libottnative.so` の注意。REPORT §0 の参照先 |
 | `tools/icall/REPORT_APPENDIX_5338.md` | ~45 | icall #5338 (ICALL-114): `ott_ms_call` で 12 語の stack 引数を 5 引数以上の間接 call に注入し、被呼側で値一致 (12/12)・1 語ずらしで FAIL (0/12) を確認。書換え後の STKBUF/BLK 経路は未達 (親 #5338 のチェックリスト) |
