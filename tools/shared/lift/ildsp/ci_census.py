@@ -3,6 +3,7 @@
 
 usage: ci_census.py <ci.drc.ll> <ranges.json> [ci.rs.ll]
 検査 (欠けると exit 1): 範囲の 36 関数が全て define されていること (entry は export 名 GeneralPitchShifter_CreateInstance で出る)。
+  範囲外の define のうち IR のどの call からも参照されないもの (orphan。計算ジャンプ表の経路の欠落の疑い) が無いこと。
   ci.rs.ll (ci_restore_stores.py の出力) を渡したときは、書き込み系 helper (movups・movntps・movaps・movapd) の件数が
   x86 の期待値と一致すること、復元後の `store i128` が「復元前 + movups/movntps の件数」と一致すること (movaps/movapd は
   既存の store を置き換えるだけで件数は変わらない)、復元後に helper の呼び出しが残らないこと。
@@ -74,6 +75,10 @@ print(f"[census] 範囲内の IAT + 画像内ポインタ呼び出し (IR 行・
 rc = 0
 if missing:
     print(f"[census] FAIL: 範囲の関数が define されていない: {missing}")
+    rc = 1
+orphan = sorted(set(extra) - set(extra_ref))
+if orphan:
+    print(f"[census] FAIL: 範囲外の define が IR のどの call からも参照されない (計算ジャンプ表の経路の欠落の疑い・REPORT_CI §2-2 (b)): {orphan}")
     rc = 1
 
 if len(sys.argv) > 3:

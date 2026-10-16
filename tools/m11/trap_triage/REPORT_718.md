@@ -221,6 +221,8 @@
 件ごとの表・根拠・測定 commit (`f195a93a9`)・未解決は `REPORT_APPENDIX_5661.md` が正本。
 行 233〜240 (#5751): 真陽性 6・偽陽性 0・保留 2 (236・237)。正本は `REPORT_APPENDIX_5751.md`。
 
+## 4n. 証拠表の行 226〜232 (#5750・母数 7: 真陽性 2 (構造)・保留 5)。正本は `REPORT_APPENDIX_5750.md`
+
 ## 5. 再現
 
 本 PR の再現手段は `guard699/scan_guard.py`・`trap_triage/strict_evidence.py`・`trap_triage/judge_entry_check.py` で、入力は `work-m11` の `boot_final.ll` を要する (`oc_artifacts: fl-win64 work-m11`)。`block00031_PE.bin` は `fl-win64` 素材に入っている。
