@@ -13,13 +13,13 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit (コードを最後に変えた commit) | `c14259c4f` (検査スクリプトの分岐先検査)。下の差分はその commit から HEAD まで |
+| 測定 commit (コードを最後に変えた commit) | `23f286181` (検査スクリプトに呼出し経路 4 件を assert として追加) |
 | 素材 | `[WIN64]` (`fl-win64.tar.zst`) から `block00031_PE.bin`・`block24429_DATA.bin` (midi.py)・`block24430_DATA.bin` (utils.py)・`block25159_DATA.bin` を展開 (展開先は `FL_WIN64_DIR/extracted`)。`tar --zstd --wildcards` で real 2.642 s (1 回目は `block_manifest.json` が無く警告のみ) |
-| 検査 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/plugins_getname_facts.py` → 23 項目 PASS・FAIL 0・rc 0 |
+| 検査 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/plugins_getname_facts.py` → 27 項目 PASS・FAIL 0・rc 0 (`23f286181` で実行) |
 | 逆アセンブル | capstone 5.0.7。`0xd80d60`〜`0xd81127` (約 220 命令)。補助関数 `0x12b69b0`・`0x1331340`・`0x41a7b0`・`0xc3cfa0`・`0x413a60`・`0x41c650`・`0x414200`・`0x43c870` を読んだ |
 | load | 測定時の load average は 1 未満 (4 core) |
 
-差分確認: `git diff c14259c4f HEAD --stat -- tools/python` は 7 files, +209 −10 (本 REPORT +3 −3 を含む。他は `REPORT_PY211.md`・`REPORT_PY4871.md`・`REPORT_PY5351.md`・`analysis/flapi/pattern_write_semantics.py`・`analysis/flapi/plugins_padinfo_facts.py`・`analysis/py211_pattern_jump_move.py`。main 取り込みの merge で入った他 PR の変更)。本検査の対象 (`analysis/flapi/plugins_getname_facts.py`・`analysis/flapi/flapi_kwargs.json`・本 REPORT) は測定 commit から変わっていない (`git diff` 0 行)。入力の bin は素材 (`fl-win64`) 由来で git の管理対象外。
+差分確認: 検査の対象 (`analysis/flapi/plugins_getname_facts.py`・`analysis/flapi/flapi_kwargs.json`) は `git diff 23f286181 HEAD -- tools/python/analysis/flapi/plugins_getname_facts.py tools/python/analysis/flapi/flapi_kwargs.json` が 0 行で、測定 commit から変わっていない。本 REPORT の文言修正 (docs のみ) は測定 commit より後の commit に入る。入力の bin は素材 (`fl-win64`) 由来で git の管理対象外。
 
 ## 1. 引数 (確定)
 
@@ -81,8 +81,19 @@
 - 本 issue では C provider と mock を変えていない (受入の実装は親 #5106 の範囲)。
 - #5106 で実装するときの前提: 解決順 (§2) と経路の分岐 (§3) は確定。**戻り値の中身は未確認**なので、§4 の 1 と 2 を確定させてから名前を実装する。推測で名前を置かない。
 
+## 6. PY-5355 (#5529) の追記: 戻り値の中身を決める経路の PE 上の確認
+
+戻り値の文字列の中身を決める経路を、`0x12b69b0` (flag == 6) と `0xd80f36` (flag != 6) について機械語で確かめた。結論は「中身は静的な PE だけでは確定できない」。
+
+- **flag == 6 (`0x12b69b0`)**: `0x1331340` (`0x12b6a2c`) で sub-object の参照を得て、その vtable `+0x20` を `edx = 6` で呼ぶ (`0x12b6a3c`・`0x12b6a56`・`0x12b6a71`)。戻る名前は `0x413a60` (`0x12b6a88`、長さ上限 0x1000) で読み、`0x41c650` (`0x12b6a95`) で `[rbp+0x60]` に代入する。`0x1331340` は `REPORT_PY163.md` §3・§4 で機械語を読んだ関数と同じ (`[this+0x38]+0x48` を out 引数へ書く)。
+- **flag != 6 (`0xd80f36`)**: `obj.vt[+0x20](obj, flag, paramIndex, 0, &buf)` を呼ぶ (§3 の既述)。
+- **未確定**: 両経路の `+0x20` の実体は、呼ばれる object の具体的な class (vtable) で決まる。その class は `0x1331340` の `[this+0x38]` の値 (PY163 で未確定) に依存し、PE の静的な読みでは確定しない。よって戻り値の中身 (何の名前か) と flag 1〜5・7 以上の意味は、本 PR では「未確認」のまま。推測で名前を実装しない。
+- 検査 (`analysis/flapi/plugins_getname_facts.py`) に、上の呼出し経路 4 件を assert として加えた (27 項目 PASS)。
+
+受入条件 1 (戻り値の中身の確定) は**未達**。残りは §4 の 1・2 (vtable 先の実体と flag の意味) で、親 #5106 が扱う。
+
 ## 関連
 
-- `tools/python/analysis/flapi/plugins_getname_facts.py` (本 REPORT の根拠 23 件を assert)
+- `tools/python/analysis/flapi/plugins_getname_facts.py` (本 REPORT の根拠 27 件を assert)
 - `tools/python/REPORT_PY228.md` (`getParamValueString`・同じ解決の並び。§2・§3)
 - `tools/python/REPORT_PY16.md` (`plugins.getName` の既定値 `midi.FPN_Param`・許可表)
