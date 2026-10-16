@@ -65,7 +65,7 @@ reloc 位置の命令境界は `reloc_boundary_3546.py` で確かめる: `python
 
 測定 commit: `e4567aeeb` (lift_text.py の再分類ループ・コミット済み HEAD で再現)。 素材 fl-win64 の PE は SHA-256 `84b64c43…724a9` と一致。 emsdk 6.0.12 (`toolchain-emsdk`) で `emcc -c` を実行。
 
-- 原因: `lift_text.py` は roots を pass 1 の分類から 1 回だけ作るため、pass 2 で `0x1000c516`・`0x10012a10` を lift した後に現れる区間の後半の関数先頭が roots に入らない。 `0x1000c529` は `0x1000c63c`・`0x1000c65a` ほかの直接 call (`call 0x1000c529`・8 箇所) の呼び出し先で、`0x1000c53c` で ret する関数。 `0x10012ae0` は prologue `55 8b ec` で始まり `0x10012be1` で ret する関数で、direct call / reloc は見つからなかった (区間外からの参照元は未確認。 分類器は prologue 規則で (b) と判定)。
+- 原因: `lift_text.py` は roots を pass 1 の分類から 1 回だけ作るため、pass 2 で `0x1000c516`・`0x10012a10` を lift した後に現れる区間の後半の関数先頭が roots に入らない。 `0x1000c529` は `0x1000c65a`・`0x1000c66f`・`0x1000c6a6`・`0x1000c6bb`・`0x1000c6e2`・`0x1000c6f7`・`0x1000c716`・`0x1000c72b` の直接 call (`call 0x1000c529`・8 箇所。 E8 直接走査で確認) の呼び出し先で、`0x1000c53b` (ret) で終わる関数。 `0x10012ae0` は prologue `55 8b ec` で始まり `0x10012be0` で ret する関数 (`0x10012be1` は次の関数の先頭 `push esi`)で、direct call / reloc は見つからなかった (区間外からの参照元は未確認。 分類器は prologue 規則で (b) と判定)。
 - 修正: 第 2 パス以降も分類し直し、(b) の先頭のうち roots に無いものが 0 個になるまで lift を繰り返す (上限 `MAX_PASS = 5`)。 emcc は最後の 1 回だけ実行する。 `check_issue_gap` (#4726 回帰検査) は pass 1 の区間表に対してだけ行う。
 - 収束: pass 1 → pass 2 → pass 3 で (b) の先頭が 0 個。 判定保留 `0x10010bc0` (`HOLD_B`) は変えない。
 
