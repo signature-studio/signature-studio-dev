@@ -37,6 +37,8 @@ def main():
     ap.add_argument('--out', default='work/ld238_probe.json')
     ap.add_argument('--target', default='targets/m11.json')
     a = ap.parse_args()
+    from ldlib import build_wasm
+    build_wasm.ensure_native()  # 素材同梱の古い work/ld_native は仮 proc thunk を敷けず全 case が segv する (#3088)
     sess = Session(a.target, build=False, shards=1, trace=False, state='work/m11/boot_state.json')
     nat, was = sess.make_runners()
     res = {}

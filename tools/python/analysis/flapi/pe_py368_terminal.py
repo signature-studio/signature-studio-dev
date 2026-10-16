@@ -47,9 +47,10 @@ def store_value(s, j):
     src = ops[1]
     if E.IMM_RE.match(src):
         return f"IMM {E.imm_text(src, ops[0])} @{E.va(j)}"
-    if src in E.FAM and src not in E.PARTIAL:
+    if src in E.FAM:
         r = E.resolve(s, j, E.FAM[src])
-        return f"{src} ← {E.desc(r)}" + (f" [notes: {'; '.join(r['notes'])}]" if r["notes"] else "")
+        tag = " (部分書込みの格納元: 族 %s の下位ビット)" % E.FAM[src] if src in E.PARTIAL else ""
+        return f"{src} ← {E.desc(r)}{tag}" + (f" [notes: {'; '.join(r['notes'])}]" if r["notes"] else "")
     return f"{m} {o} @{E.va(j)}"
 
 
