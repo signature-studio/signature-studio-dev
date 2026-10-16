@@ -77,6 +77,7 @@ infra not-khbase: n 22 / size B 10671 / IAT calls 0
 ```
 
 - `closures.py` の出力は `infra 188 53010 n 42`。
+- 実測所要 (本 run・4 CPU・開始時 load average 1.58): `rtti_walk.py` 1.7 s、`callgraph.py` (4 proc・120,856 関数 sweep) 7.1 s、`closures.py` 0.2 s、`carve_process_split.py` は 1 s 未満。
 - infra 120 の判定 (本 run の実測):
 
 | 区分 | 件数 | size B | IAT 呼出 | 判定 |
