@@ -5,6 +5,7 @@ import { b64u } from "../src/crypto.ts";
 import { SIGNAL_VER } from "../src/engine.ts";
 import { signBody } from "../src/hmac.ts";
 import { MemoryStore } from "../src/kvstore.ts";
+import type { AeSink } from "../src/metrics.ts";
 
 export const T0 = Date.parse("2026-10-14T12:00:00Z");
 export const STORE_KEY = b64u(new Uint8Array(32).fill(7));
@@ -50,7 +51,7 @@ export function mockFetch(handlers: Handler[]) {
 }
 
 // App 作成済み・Install 済みの状態を、本物の manifest flow で作る。
-export async function configuredApp(opts: { live?: boolean; now?: { t: number }; handlers?: Handler[]; env?: Record<string, string>; store?: MemoryStore } = {}) {
+export async function configuredApp(opts: { live?: boolean; now?: { t: number }; handlers?: Handler[]; env?: Record<string, string>; store?: MemoryStore; ae?: AeSink } = {}) {
   const clock = opts.now ?? { t: T0 };
   const pems = rsaPems();
   const store = opts.store ?? new MemoryStore();
@@ -71,6 +72,7 @@ export async function configuredApp(opts: { live?: boolean; now?: { t: number };
     scheduleSoon: async () => {
       soon++;
     },
+    ae: opts.ae,
   });
   const page = await app.handle(new Request("https://pm.example/setup"));
   const html = await page.text();

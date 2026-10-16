@@ -314,6 +314,36 @@ m = "metrics"  →  runs_running, runs_queued, peak_running, room, ready を時�
 
 テストは `test/metrics.test.ts` (必須キーの欠落を検出するネガコンを含む)。
 
+### Analytics Engine (Custom Dashboard の時系列・CI-230)
+
+tick の 1 回ごとに、同じ `metricsRow` から 1 データポイントを `AE_METRICS` (dataset `pm_metrics`) へ書く。binding が無い環境 (dev・テスト) では書かない。書き込みの失敗は握り、tick を止めない。
+
+| AE の欄 | 中身 |
+|---|---|
+| `indexes[0]` | `"pm"` (固定) |
+| `blobs[0]` | `mode` |
+| `blobs[1]` | `phase` |
+| `doubles[0..13]` | 下表の順序 (`src/metrics.ts` の `AE_DOUBLES` と一致。順序はテストが固定する) |
+
+| doubles の位置 | 行のキー |
+|---|---|
+| 0 | `active` |
+| 1 | `active_impl` |
+| 2 | `active_other` |
+| 3 | `active_critical` |
+| 4 | `active_normal` |
+| 5 | `active_low` |
+| 6 | `target` |
+| 7 | `target_eff` |
+| 8 | `room` |
+| 9 | `ready` |
+| 10 | `would_launch_now` |
+| 11 | `holds` |
+| 12 | `runs_running` |
+| 13 | `runs_queued` |
+
+null・欠けた値は 0 になる (AE は数値のみ受けるため)。`cap_est`・`peak_running`・`rest_remaining` などの null になり得る値は AE に入れない (Workers Logs の `m = "metrics"` 行で見る)。
+
 ## ファイル構成
 
 - `src/index.ts` Worker の入口 (対象外のイベントは DO を起こさず捨てる)。`src/do.ts` Durable Object `PmDO` (SQLite の `kv` 表 + alarm)。

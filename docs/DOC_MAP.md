@@ -305,6 +305,7 @@
 | `tools/m11/REPORT_SHX-T44_APPENDIX.md` | ~250 | #4189: mov 渡し 301 site の site 単位の表 (call・callee 読み先・access_class・IR 突合)。前半 (250 行まで)。REPORT_SHX-T44 §6 の付録 |
 | `tools/m11/REPORT_SHX-T44_APPENDIX_2.md` | ~60 | #4189: 上記付録の続き (site 表の後半) |
 | `tools/m11/REPORT_SHX-T48.md` | ~90 | #5576 (SHX-T48): D23 301 site のうち `unmatched` 56・`no_prologue` 3 の site 単位判定 (`frame_share/unmatched_check.py`)。`no_prologue` 3 は `ir_truncated`、`unmatched` 3 は call 欠落 (`function_40b620`)、残りは SSA 値渡し。制御フロー付き走査は子 [SHX-T48] #5575 |
+| `tools/m11/REPORT_SHX-T49.md` | ~70 | #5586 (SHX-T49, 親 #5576): `function_40b620` → `function_40b290` の call 欠落 3 site の機械語・生 grep・RetDec 単体再現による原因特定。機械語は本 run で再確認、IR 側は未再現。修復は子 [SHX-T52] #5591 |
 | `tools/m11/REPORT_N196.md` | ~90 | #3906 (M11-N196, 親 #3142): set_other 非 imm のスタック slot 読込・frame lea の IR 接続判定 (frame 定数 C と stack_var 対応・分類の件数は REPORT 参照)。load_def の誤判定の修正と負例 (`test_setother_slot_class.py`)。接続の注入と未決の接続先は #3932・#3933。分類器 `m11_setother_slot_class.py` |
 | `tools/m11/REPORT_3932.md` | ~50 | #3932 (M11-N201, 親 #3906): set_other 実値化 25 件の alloca 番地を 0 詰め call 引数へ注入する経路 (`m11_post.py --slots`・`M11_SLOT_ROWS`)。注入の支配条件 (entry block 内・呼出し前)・既定は不変の検証。survey の前後実測は未達 |
 | `tools/m11/REPORT_N202.md` | ~70 | #3933 (M11-N202, 親 #3906): set_other スタック slot 未決 85 件の再測定 (現 HEAD で 112 件・実値化 25・未決 87)・C 規則の IR 突合 (引数単位 0・名前単位 22)。検算 `m11_setother_slot_check.py` |
@@ -489,6 +490,7 @@
 | `tools/m11/ldfix/REPORT_3372.md` | ~157 | CI-151 (#3372): REPORT_2555 表の誤り箇所のうち 0x44f040・0x47cf10・0x6074b0 の 3 箇所を機械照合付きの IR 修復 `fix_site_3372.py` で直す (20 命令照合・NC 4 種)。`ldfix_e2e.sh` step 1c で配線し、最終 commit で完走 (stage4・survey は base と同一)。残りの 0x413340 系・0x47b4a0・0xc40770 は子 issue |
 | `tools/m11/ldfix/REPORT_2555.md` | ~130 | CI-103 (#2555): 走査候補 14 関数 16 箇所 + 取りこぼし 0x7888f0 の IR 側判定 (誤り 13 箇所 / 11 関数・偽陽性 3・判定不能 1)。機械語窓と IR 引数の 1 対 1 判定表。一次分類 `verify_deref_sites_2555.py`・窓表示 `show_site_2555.py`。修復は子 #3326 (CI-148)、取りこぼし定義は子 #3328 (CI-149) |
 | `tools/m11/ldfix/REPORT_3328.md` | ~100 | CI-149 (#3328): スピル引数 deref の走査定義 (CALL・EXCL・COPY・CMP の kind 分け、偽陽性の再ロード除外、判定不能の定義)。件数と判定は本 REPORT §0・§6。未判定は子 #3381 [CI-152]・#3382 [CI-153] |
+| `tools/m11/ldfix/REPORT_APPENDIX_5437.md` | ~45 | CI-220 (#5437): rewrite 行 2 件の窓確認。0x43adf0 は `*arg3` を argpos 2 へ渡し OK_ARGK と一致、0x439f90 は argpos 3 が計算値で判定不能 (REPORT_3382 §9・§13 の付録) |
 | `tools/m11/ldfix/REPORT_3382.md` | ~80 | CI-153 (#3382): COPY 103 箇所 (49 関数) の IR 側一次分類 (`judge_copy_3382.py`: ERR_BARE 14・ERR_CAND 57・UNCLEAR 16・MISMATCH 14・OK_ARGK 2)、0x7888f0 の 0x78892d を誤り・0x78890f を保留と判定。全数の窓判定は子 #4211 [CI-186] |
 | `tools/m11/ldfix/REPORT_3326.md` | ~110 | CI-148 (#3326): 誤り 13 箇所 (DEFECTS D4) のうち単純型 5 箇所を機械照合 22 命令付きの site 単位 IR 修復 `fix_site_3326.py` で直す (既存 pass で直る 4 箇所を除く)。ネガティブコントロール 4/4 拒否。`ldfix_e2e.sh` の stage4・survey は base と一致 (変化なし・OOB は両方に残る)。複雑型 4 箇所と 0x413340 の 3 番目引数は子 #3372 (CI-151) |
 | `tools/m11/ldfix/REPORT_2660.md` | ~70 | LD-119 (#2660): spill 宛 判定不能 9 site を再検証。4 site は上流 `xor i64 0,0` (型タグ読みの置換) が作る死んだ辺に依存するため TRUE_DROP を取り下げ、判定不能のまま (`ir_reach_2660.py` で到達性を検査)。脱落関数の和集合は 72 (未確定・#1161 残) |
@@ -704,7 +706,7 @@
 | `tools/python/REPORT_PY86.md` | ~120 | PY-86 (#2701, 部分): call [reg+0x1a0] の受け手の分類 (受入 2b の一部)。残りは子 #3337・#3338。測定値は REPORT_PY86.md が正本 |
 | `tools/python/REPORT_PY116.md` | 105 | PY-116 (#2952): flapi 表の kwlist 無し引数 (flags=1) の書式を wrapper の出力ポインタ数と照合 (304 件中 302 件一致。`screen.addTextLine`・`screen.addMeter` の 6 個目は解析されない余剰で、表の個数 5 は正)。`plugins.getPresetCount` は kw 形式の唯一の flags=1 として書式 `i\|ii` を照合 (表の kwsig 1 件のみ変更)。名前の新規確定 0 件 (未確定 42 位置は `arg{i}` のまま) |
 | `tools/python/REPORT_PY123.md` | 243 | PY-123 (#3028, 未達・部分): undo 管理 global `0x15e1c78` は unit 209 の fill で 0 になる。unit 209 直前の pos/count は 0/0 (§2-6)。安全判定 obj は 0 で述語 VA は未確定。obj の設定経路は停止点までに未実行 (§2-7)。fill 後の値は #3112 待ち。0 化の命令は §2-5 (付録) |
-| `tools/python/REPORT_APPENDIX_PY123.md` | 58 | PY-123 (#3028): REPORT_PY123.md §2-5 (0 化の命令の特定 = fill `f_6a7b70` の `movdqu`) の全文と §2-7 (obj 設定経路の静的・入口観測・書込み監視)。250 行上限のため分割移動 |
+| `tools/python/REPORT_APPENDIX_PY123.md` | 82 | PY-123 (#3028): REPORT_PY123.md §2-5 (0 化の命令の特定 = fill `f_6a7b70` の `movdqu`) の全文と §2-7 (obj 設定経路の静的・入口観測・書込み監視)。250 行上限のため分割移動 |
 | `tools/python/REPORT_PY233.md` | 123 | PY-233 (#3690, 親 #3003): getRecPPB の切替先 (`0x15e4558`・`0x15e35c8`) の実行時値。切替関数 `0xd68d90`・`general.getRecPPB` 本体 `0xd69310` は boot (root 有り・root 無しの対照とも) で未到達 (§5)。停止点の P・Q は fill `f_6a7b70` の buf=0 呼出しで 0 化されると推定 (書込み監視で書込みを実測。root 無し対照 (`FLE_DIAG_NULLFILL=1`) では書込み 0 件。書込み元は推定。観測スクリプト `tools/flelift/boot/py233_getrecppb_probe.sh`) |
 | `tools/python/REPORT_PY12.md` | ~46 | PY-12 (#587): `_flhost` の per-module state 化・サブインタプリタ採用判断の実測 (REPORT.md の PY-12 節の全文。250 行上限のため分離) |
 | `tools/python/REPORT_PY31.md` | ~50 | PY-31 (#1329): mixer 残り 57 関数の扱い決定 (今回非実装・根拠は MCP 利用 0 件と mock 定義 0 件)、未実装 57 件の一覧、分割先 #941、検証 (provider_check / mixer_diff / all_tools) |

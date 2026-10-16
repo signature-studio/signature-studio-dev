@@ -162,6 +162,19 @@
   - 0x12c6240 (edx_sites の注記): 合流 5 件 (`pe_py203_edx_sites.py` の `len(hits)`。注記に列挙されるのは先頭 3 件のみ)。主経路は `[rip+0x31c1ff]` (VA 0x15e22d8 の大域直読み、0x12c60d2・0x12c60f5)。0x12c6240 の数であり、0x12c609e の数ではない。
 - 残り (受入の残り): 0x12c609e の合流元 0x12c6252 の分岐、0xfc820f の飛び元 rdi、スロット ENTRY 値 (ecx・r8d) の呼出し元 (間接呼出しのため未追跡)。
 
+### 6.4a COPY 7・AMBIG 8 の残り 2 件と ENTRY 値の 1 段上 (#5409・逆アセンブル直接確認)
+
+測定 commit: `ae7168da0` (`analysis/flapi/pe_py368_merge_probe.py` を追加した最後のコード変更 commit)。素材 `fl-win64` の `block00031_PE.bin`。`pe_py368_merge_probe.py` は 39.7 秒・終了 0。同じ commit で `pe_py368_terminal.py` (39.2 秒・rows=7・終了 0)、`pe_py368_copy_ambig.py` (rows=15・終了 0)、`pe_py273_base.py` (rows=60・終了 0)、`pe_py273_globals.py` (53.9 秒・終了 0) を実行。`git diff ae7168da0 HEAD -- tools/python/analysis/flapi` は 0 行。
+
+- **0x12c609e** (edx = ebx): 関数 0x12c5f20 のループ添字。`ebx` は `call 0x12c68f0` の戻り値。0x12c68f0 は `[rcx]` (= `[rbp+0x6c]`) を返すが、その値が `N−1` (N = VA 0x15e2198 の大域) のときは 0x1f5 を返す。`[rbp+0x6c]` は 0x12c6930 (`add [rcx],1`) で増分され、0x12c6252 の `jne 0x12c5fa8` で 0x12c5fa8 に戻って使われる。よって edx は「0 から N−2 の添字、N−1 のとき 0x1f5」の経路依存値で、定数ではない。N の書込み元は未追跡。
+- **0xfc820f** (edx = edi): 関数 0xfc8150 で `edi = clamp(v ± 1, 0, M−1)` (v = `[ctx+0x258]`、ctx は `call 0xfe8bb0` の戻り値、±は第 1 引数 ebx = 1 の判定、上限は大域 VA 0x15e2198 の値 −1 = 0x12c609e 側の N と同じ大域)。`test rdi,rdi / jg` の else が `xor edi,edi` (0)。主経路は v の読込みで、定数ではない。
+- **ENTRY 値の 1 段上 (直接呼出し元のみ)**:
+  - 0x118a1c0 の r8 (0x118a275・0x118a3f4 の格納値): 直接呼出し 3 件。0xfee12f は `MEM [rax+0x1d0]`、0x12a739d は `xor` (0)、0x12b7e6b は `[rbp+0x150]` (直前 store 0x12b76f7 `mov [rbp+0x150], rcx`)。
+  - 0x12e6960 の ecx (0x12e6abe の格納値): 直接呼出し 2 件。0xe71c30 は AMBIG (0 と合流 UNKNOWN の `setne al` 経由)、0xe7a192 は AMBIG (`[rbp+0x40]` の主経路)。
+  - 0x12ab710 の r8 (0x12ab8e8 の格納値): 直接呼出し 1 件 0x12ac257 は `MEM [rbp+0x70]` (movzx)、直前 store 0x12ac22a `mov word [rbp+0x70], r8w`。
+  - 0x1021670 の ecx (0x1021826 の格納値): 直接呼出し 0 件 (間接呼出しのみ・未追跡)。
+- **未確定 (受入の残り)**: 0x12c609e の N (大域 0x15e2198) の書込み元、0xfc820f の v (`[ctx+0x258]`) の ctx、0x1021670 の ecx の呼出し元 (間接)、0x118a1c0 の r8 の呼出し元 0xfee12f・0x12b7e6b の 1 段上、0x12e6960 の ecx の呼出し元 0xe71c30・0xe7a192 の 1 段上。
+
 ### 6.5 #5407: 大域 3 種の入り方・rbx ENTRY の呼出し元・`[rbx+0x12b4]` の上流
 
 測定 commit: `c44281a3e` (`pe_py273_globals.py` に reloc・初期値の節を足した最後のコード変更 commit)。`git diff c44281a3e HEAD -- tools/python/analysis/flapi` は 0 行。素材は `fl-win64` の `block00031_PE.bin` (展開 3.3 秒)。
@@ -198,3 +211,17 @@
 - 限界: 間接書込みを追う経路 (大域スロットへの書込みや、ポインタの複製) は本測定では見ていない。受入の「大域 3 種の入り方」は未達。
 
 **受入は未達** (大域 `.bss` の間接書込み元と、ENTRY 4 件の間接呼出し元は未特定のまま)。残りは #5407 の受入として残す (親 #4588 は CLOSED)。
+
+### 6.7 #5407: rbx ENTRY 4 件の取得経路 (`analysis/flapi/pe_py273_entry_lea.py`)
+
+測定 commit: `60eb21311` (スクリプトを追加した commit)。`git diff 60eb21311 HEAD -- tools/python/analysis/flapi` は 0 行。素材は `fl-win64` の `block00031_PE.bin` (展開 2.8 秒)。exit 0・40.7 秒・load 0.99。
+
+- 6.5 で「間接呼出しのみ・未追跡」とした ENTRY 4 件 (0xd5e6c0・0xd615a0・0xd626c0・0x1185840) は、`.data` の関数ポインタスロットでも `.rdata` の表でもない。`.text` 内の `lea` で番地を取り、直後の直接呼出しの引数に渡される。
+  - 0xd5e6c0: `lea r8, [rip-0x142]` (0xd5e7fb) → 直接呼出し 0xd843d0
+  - 0xd615a0: `lea r8, [rip-0xf8]` (0xd61691) → 直接呼出し 0xd843d0
+  - 0xd626c0: `lea r8, [rip-0x1fe]` (0xd628b7) → 直接呼出し 0xd843d0
+  - 0x1185840: `lea rax, [rip+0x18e77e]` (0xff70bb)。直後の `mov [rbx+0x1f4], rax` (0xff70c2) で構造体に格納され、次の直接呼出し 0x60a270 (0xff70ed、rcx = rbx) は引数として rax を渡していない。格納先の読み手は未確認。
+- 絶対値の出現 (`.data`・`.rdata`・`.text` の合計、スクリプト修正後の値): 0x1185840 の 8 バイト 1 件・4 バイト 1 件 (いずれも .text 内)。他 3 件は 0 件。
+- 含意: 0xd5e6c0・0xd615a0・0xd626c0 は、lea の後の呼出し 0xd843d0 の第 3 引数 (r8 → rdi) として渡される。0xd843d0 の呼出し元と、0x1185840 の格納先の読み手は未追跡。
+
+**受入は未達のまま**: ENTRY 経路は「lea → 0xd843d0・0x60a270」まで確定。大域 3 種の `.bss` 書込み元と `[rbx+0x12b4]` の上流 (0xf5b101 AMBIG・0xf5c6e8) は未追跡。残りは #5407 の受入として残す (親 #4588 は CLOSED)。

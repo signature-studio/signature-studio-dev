@@ -33,7 +33,7 @@ import { RATE_EVAL_GAP_MS, RATE_EVAL_MAX_GAP_MS, RATE_STREAK, RATE_WINDOW_MS, ra
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { readyHold, recentHold, stoppedHold, type Hold } from "./holdinfo.ts";
 import { redact } from "./redact.ts";
-import { metricsRow } from "./metrics.ts";
+import { aePoint, metricsRow, type AeSink } from "./metrics.ts";
 import type { VmState } from "./vmstate.ts";
 import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type Sample } from "./saturation.ts";
 import {
@@ -297,6 +297,8 @@ export interface EngineDeps {
   secrets?: () => string[];
   // App の JWT で叩く REST (配送の一覧と再配送)。installation token の枠とは別なので、レート情報は持ち込まない。未設定なら再配送しない。
   app?: () => Promise<Gh | null>;
+  // Workers Analytics Engine の書き込み口 (CI-230)。binding が無い環境 (dev・テスト) では未設定で、何も書かない。
+  ae?: AeSink;
 }
 
 const COUNTED_BUCKETS = ["issues", "prs", "runs", "botLast", "pmArt", "launchedAt"] as const;
@@ -1730,8 +1732,19 @@ export class Engine {
     try {
       const row = metricsRow(this.status(), iso(now), !!this.meta.demoted, restGuardOn(this.meta.rest?.remaining));
       console.log(this.clean(JSON.stringify(row)));
+      this.writeAe(row);
     } catch {
       // 観測ログは付随の出力。失敗しても launch・dispatch の判定は続ける。
+    }
+  }
+
+  // AE へ 1 データポイント (CI-230)。書けなくても tick は止めない (書き込みの失敗は握る)。
+  private writeAe(row: Record<string, unknown>): void {
+    if (!this.d.ae) return;
+    try {
+      this.d.ae.writeDataPoint(aePoint(row));
+    } catch {
+      // 観測の書き込みは付随。失敗しても判定は続ける。
     }
   }
 
