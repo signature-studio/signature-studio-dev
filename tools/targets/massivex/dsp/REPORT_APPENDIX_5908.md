@@ -107,3 +107,51 @@
 | capstone (境界 7) と objdump (境界 4) の境界判定の食い違い (原因未確定) | G 側の判定 (受入 1) が確定しない | #5908 (残件) |
 | 非境界 G 31 件の真偽 (復号誤りか、途中の入口か) | U3e の判定 (MX-6 入口 livein 0 の陰性が過小検出か) を確定できない | #5908 (残件) |
 | 件数の正 (47 / 42) | 両方記録。正は PM 判断 | #5908 |
+
+## 7. run 5: 非境界 G の線形復号の食い違いの原因 (U3e 残件 2)
+
+- 測定 commit: `9b78745e2` (新規 script `mx63_g_bad_bytes.py` を含む commit)。`git diff 32c1f5d9c 9b78745e2 -- tools/targets/massivex/dsp` は本 REPORT と新規 script の追加のみで、既存 script は変わらない。
+- PE = `plugins-massivex` 由来の `Massive X.vst3` (md5 `622993e7…` 一致)。素材は `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` で展開 (extract の checksum 不一致 0/125 は §1 と同じ既知事象)。
+- **出所**: 以下の §7 の数値は作成者 run の記録。round 1 fix run では素材 `plugins-massivex` が取得されず、§7 のどの script も再実行していない (§7b)。
+  - `mx6_e2e.sh`: rc 0・59 s・load 0.59 0.30 0.12 → 0.89 0.45 0.18・全判定 PASS (作成者 run)。
+  - `mx63_u3e_split.py`: population 604・E 43・D 825・C 1549・G0 351・G 26 (§1 と一致)。
+  - `mx63_g_containment.py`: 途中・命令境界 7 / 途中・非境界 35 / 範囲外 1 (§1 と一致)。
+  - `mx63_g_objdump_check.py`: n 35・転送 site 一致 35・G 線形境界 4・直接到達 4・間接 jmp 関数 1・再同期 31 (§1 と一致)。
+  - `mx63_g_bad_bytes.py` (新規): 非境界 35 件の G について、G の関数内の objdump 線形復号に (bad) があるかを数えた (作成者 run の出力: n 35・bad_before_G 23・bad_free_fn 12・G_objdump_boundary 4)。
+
+| 判定 (`mx63_g_bad_bytes.py`) | 件数 |
+|---|---|
+| G より手前に (bad) がある (線形復号が G の手前で信用できない) | 23 |
+| 関数全体に (bad) が無い (線形復号は関数全体で成立し、G は命令境界でない) | 12 |
+| G が objdump の線形境界 | 4 |
+
+### 食い違いの原因 (推定・未確認)
+
+- **測定済み**: `mx63_g_bad_bytes.py` は objdump 側の (bad) の位置だけを数えた。G より手前に (bad) がある非境界は 23 件、関数全体に (bad) が無い非境界は 12 件。
+- **未測定**: capstone の線形復号が (bad) で止まるかどうか (停止位置) は、どの script でも計測していない。`tools/targets/massivex` を `cs_stop|capstone.*stop|bad_before` で検索しても一致は 0 件。よって「capstone は (bad) で止まる」は仮説であり、確定ではない。
+- **仮説**: capstone の境界 7 と objdump の境界 4 の差は、(bad) の後の再同期の扱いの違いによる可能性がある。検証には capstone の停止位置 (`cs_stop`) を G ごとに出す script が要る (未作成)。
+- (bad) の位置の例 (作成者 run の出力。本 run では未再確認): `0xd789c4` (G) の手前の `0xd770c9` に `(bad)`、`0xd0c546` の手前の `0xd09dd8` に `(bad)`。バイト列の出典は同じ作成者 run の objdump 出力。
+
+### 判定 (受入 1 の G 側)
+
+- **信用できる区間で判定できたのは 12 件**: 関数全体に (bad) が無く、線形復号は成立しているが、G は命令境界でない。この 12 件は「G は関数途中の非境界」であり、G の入口 livein を入口値の証拠に使えない。
+- **残り 23 件は未確認**: (bad) の後の復号が正しいかを、この検算では確定できない。G が途中の入口か、(bad) を含む埋め込みデータ・復号誤りかは区別できない。
+- 境界 4 件 (`0x850d80`・`0x86d66c`・`0xa2e5d0`・`0xd0c546`) は、objdump の線形境界かつ直接制御フローで到達するため、途中の入口として成立し得る (§6 と同じ)。ただし capstone では境界でないため、確定ではない。
+
+### 件数 (変化なし)
+
+- 47 (`mx4989_probe.py`) と 42 (`mx54_u3e.py`) は両方記録し、正は決めない (R7 (a))。本 run で件数は変えない。
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| (bad) を含む関数の後半 23 件の G が途中の入口か、復号誤りか | G 側の判定 (受入 1) が確定しない。MX-6 入口 livein 0 の陰性が過小検出か未確定 | #5908 (残件) |
+| capstone の線形復号の停止位置 (`cs_stop`) が未計測 | §7 の「食い違いの原因」は仮説のまま | #5908 (残件) |
+| 件数の正 (47 / 42) | 両方記録。正は PM 判断 | #5908 |
+
+## 7b. round 1 fix run: 再測定の状況
+
+- この run では `$ARTIFACTS_DIR` に `fl-win64.tar.zst` のみがあり、`plugins-massivex` は無かった (`oc_artifacts` 行も無かった)。
+- よって §7 の script (`mx6_e2e.sh`・`mx63_u3e_split.py`・`mx63_g_containment.py`・`mx63_g_objdump_check.py`・`mx63_g_bad_bytes.py`) は、この run では**一つも再実行していない**。§7 の数値は作成者 run の記録のまま残し、本 run の実測とは書かない。
+- PR 本文に `oc_artifacts: plugins-massivex` を書き、素材が取得される run で §7 の全 script を HEAD で再実行する。その出力で本節の数値を置き換える (未実施の間は作成者 run の記録である)。
