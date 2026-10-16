@@ -165,3 +165,26 @@
 - 結論: `0x17b460` は保守的判定で xmm2 を読みうる (call 経由を含む)。したがって**呼出元の xmm2 が使われうる**。「渡さないこと」は示せない。受入 1 の xmm2 判定は**確定不能**のまま (保守的判定で「使われない」とは言えない)。
 - `0x1807568e8` は解析不能 5 件があるため「判定保留」。docstring の「保守的に読む扱い」と判定ロジックの食い違いは、このコミットで「判定保留」を出すよう直した。
 - 未解決: `0x18038dfe8` 以降の解析不能箇所の詳細、pdata 不正範囲の修正、index 30 の 27 箇所の `this` 型。いずれも #5498 の次の run で行う。
+
+### 3.9 追補 (MX-61 #5656・`scripts/mx61_entry_xmm2_paths.py`・実測)
+
+- 測定条件: `plugins-massivex` を `$RUNNER_TEMP/mx` に展開 (6.5 秒) → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` (11.1 秒・`md5-ok 0/125` は既知事象) → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` 一致。
+- 方法: 関数入口の xmm2 (呼出元の値) を、経路上で読むか・残したまま call するか・上書きするかを辿る。直接 call は callee を深さ 2 まで同じ判定にかける。間接 call (`call [reg+...]`) は target 不明として pass に数える。
+- 測定: `python3 mx61_entry_xmm2_paths.py "<vst3>" 0x18017b460 0x18017b680 0x180198700 0x1801e47c0 0x1801ef4b0 0x1801f36a0 0x1803bef80 0x18104aea0` (exit 0・0.15 s)。
+
+| 入口 | 入口 xmm2 を読む命令 | 残したまま call | unknown | 判定 |
+|---|---|---|---|---|
+| `0x18017b460` | 0 | 1 (`0x18038dfe8` 直接・callee read 0 / unknown 0) | 0 | **入口 xmm2 は読まれない** |
+| `0x18017b680` (slot 32) | 0 | 1 (`call [rax+0xd0]` 間接) | 0 | 間接 call で target 不明 |
+| `0x198700` | 0 | 1 (間接 `[rax+0x100]`) | 0 | 間接 call で target 不明 |
+| `0x1e47c0` | 0 | 2 (間接 1・直接 `0x1803caf83` は callee unknown 4) | 1 | 間接 call + callee 未解決 |
+| `0x1ef4b0` | 0 | 1 (間接 `[rax+0x100]`) | 0 | 間接 call で target 不明 |
+| `0x1f36a0` | 0 | 1 (間接 `[rax+0x100]`) | 0 | 間接 call で target 不明 |
+| `0x3bef80` | 0 | 1 (間接 `[rax+0x100]`) | 0 | 間接 call で target 不明 |
+| `0x104aea0` | 0 | 1 (間接 `[rax+0x100]`) | 0 | 間接 call で target 不明 |
+
+- **受入 1 の結論 (`0x18017b460`)**: 入口の xmm2 はどの経路でも読まれない。`0x18017b4a1` の `movss xmm2, [rsp+0x2c]` が上書きしてから `call [rax+0x100]` に届く。`0x18038dfe8` (唯一、入口 xmm2 が残る call) は深さ 2 まで xmm2 を読まない。よって呼出元が xmm2 に float を載せても載せなくても `0x17b460` の結果は変わらない。**「呼出元が xmm2 に float を渡さない」は、この関数に限って確定**。
+- **受入 1 の未確定 (`livein_passthrough` 6 関数)**: 入口 xmm2 は間接 call (`[rax+0x100]` など) にそのまま渡る。読むかどうかは target の関数次第で、target は object の型 (vtable) で決まる。静的に型を確定していない。`0x1e47c0` は直接 call 先 `0x1803caf83` の解析が未解決 (unknown 4)。
+- 注意 (解析の限界): 分岐は両方の経路を辿るが、loop の不動点や間接分岐の先は見ない。`mx55_callers_fn.py` と同じく線形寄りの判定。callee の深さは 2 で打ち切り、打ち切りは unknown に数える。
+- 解析不能の残り: `0x1803caf83` の unknown 4 件、6 関数の間接 call 先 (vtable slot 32 の object 型)。いずれも次の run の対象 (受入 1 の残り・受入 2)。
+- 測定 commit: 本節を含む commit (`mx61_entry_xmm2_paths.py` を追加した commit)。以後 scripts は変えない。
