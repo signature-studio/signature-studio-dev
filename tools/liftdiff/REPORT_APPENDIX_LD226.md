@@ -1,72 +1,69 @@
 # liftdiff REPORT 付録: LD-226 (#4590) sta_img にスタック復元を足すと効果が消える機構
 
 親 #3384 (LD-155)。前提は `REPORT_APPENDIX_LD126.md` §3・§3.1 (sta_img で match 4 件、スタック復元 (`all`) で 0 件)。
-LD-240 (#4801) で hi 区間の測定誤りを直した (下の §0)。
+LD-240 (#4801) で RESET の測定誤りを直した (下の §0)。
 
-測定 commit: **`253902726`** (コードを変えた最後の commit。`rt/ld_runner.mjs`・`rt/ld_native.c`・`ld240_hi_probe.py`)。
+測定 commit: **`4f9e652c0`** (コードを変えた最後の commit。`rt/ld_wasm.c`・`rt/ld_runner.mjs`・`ldlib/build_wasm.py`・`ld240_hi_probe.py`)。
 
 ## 0. 前回の誤り (LD-240 で修正)
 
-- 前版の `hi` の RESET 差分 587,202,032 B は、`ld_w_reset` が wasm 内で戻す処理のせいで出た誤りだった。
-- `hi` 区間 `[SP, stack_base)` は、戻す処理自身のフレーム (`-O0` の `i`・`k`・`diff`) と重なる。`memcpy` でこの区間を戻すと、戻し中のループ変数が上書きされ、戻り値が壊れる。
-- 戻り値の 575,469,632 は、その壊れた値の一つで、差分量ではない。実測の `stack_end` (`0x224cf840` = 575,469,632) と一致した (§2)。
-- 修正: 戻しと差分の数えを JS 側 (`ld_runner.mjs` の `resetRegions`) に移した。wasm 側は区間情報を読むゲッターだけにする。区間情報は戻しの前に全部読み切る (getter の呼出しは wasm スタックを使うため)。
-- 前版 `hi` の「match 0/17」は誤った差分による結果なので、根拠にしない。
+- 前版の `hi` の RESET 差分 587,202,032 B と、後の版の 575,469,632 B は、どちらも測定誤り。wasm 側の `ld_w_reset` が、戻し処理自身のフレーム (`-O0` の `i`・`k`・`diff`) を hi 区間に積んで、その値を壊していた。
+- 次の版では JS 側の `resetRegions` で戻すように直したが、RESET のたびに wasm の関数 (`_ld_w_nrst`・`_ld_w_rst_*`) を呼んでいた。そのフレームが hi 区間 `[spS, stack_base)` を書き換え、hi の差分 4 件に getter 由来の byte が混ざっていた。
+- 修正 (測定 commit `4f9e652c0`): RESET 中は wasm の関数を一切呼ばない。区間表 (`ld_rst`) の番地と SNAPSHOT 時の値 (`ld_info`: `spS`・stack_base・stack_end・件数) を、init 時に 1 度だけ取って JS から直接読む。SNAPSHOT 関数の内側で記録した `spS` を hi 区間の下端に使う。
+- 前版の「hi 0 B」「SP = stack_base」「hi の差分 4 件」は、どれも SNAPSHOT 時の値ではなかった。以下の値に置き換える。
 
 ## 1. 測定条件
 
-- 素材: `[WIN64]` (`extracted/block00031_PE.bin`)・`work-liftdiff` (`tools/liftdiff/work/`)・`[WORK-M11]`・`[EMSDK]`。
-- wasm: `python3 ldlib/build_wasm.py targets/m11.json --force` → `OK` (`wasm_size` 4464521・`sig_mismatch` 0・`undefined` 0)。
-- 機: 4 vCPU・RAM 15 GiB。5 条件を `xargs -P 3` で流した。wall 7 分 15 秒 (435 s)。load 0.44 (開始時) 〜 1.97 (終了時)。
+- 素材: `[WIN64]` (`extracted/block00031_PE.bin`)・`work-liftdiff` (`tools/liftdiff/work/`)・`work-m11` (`tools/m11/work/`)・`[EMSDK]`。
+- wasm: `python3 ldlib/build_wasm.py targets/m11.json --force` → `OK` (`wasm_size` 4464335・`sig_mismatch` 0・`undefined` 0)。
+- 機: 4 vCPU・RAM 15 GiB。5 条件を `xargs -P 3` で流した。wall 432 s (7 分 12 秒)。load 0.30 (開始時) 〜 1.94 (終了時)。
 - 対象: shard 1 の chunk 1 の対象件数は **17** (REPORT の 18 件と 1 件違う。§6)。
 
-## 2. SNAPSHOT 直後の実測 (probe)
+## 2. SNAPSHOT 時の実測 (probe)
 
-`ld240_hi_probe.py` (repo 内・`work/ld240/probe.json` に出力) の出力 (HEAD `253902726`、wasm は §1 のビルド):
+`ld240_hi_probe.py` (repo 内・`work/ld240/probe.json` に出力)。HEAD `4f9e652c0`、wasm は §1 のビルド。
 
 | 項目 | 値 |
 |---|---|
-| SP (`emscripten_stack_get_current`) | `0x22ccf840` |
-| stack_base | `0x22ccf840` |
-| stack_end | `0x224cf840` (= 575,469,632) |
+| SP (SNAPSHOT 関数内 `spS`・`snap_sp`) | `0x22ccf730` |
+| SNAPSHOT が戻った後の SP (RESET で戻す値) | `0x22ccf750` (= stack_base) |
+| stack_base | `0x22ccf750` |
+| stack_end | `0x224cf750` |
 | スタック全体 `[stack_end, stack_base)` | 8,388,608 B (8 MiB) |
-| hi 区間 `[SP, stack_base)` | **0 B** |
-| deep 区間 `[stack_end, SP)` | 8,388,608 B |
+| hi 区間 `[snap_sp, stack_base)` | **32 B** |
+| deep 区間 `[stack_end, snap_sp)` | 8,388,576 B |
 
-- SP = stack_base なので、hi 区間は 0 B。受入条件の「hi 区間が 8 MiB 以内」は満たす (0 B)。
-- probe の RESET 差分 (各 mask を別プロセスで、SNAPSHOT 直後に 1 回 RESET): `reset 1` (stk) = 5・`reset 256` (hi) = 4・`reset 512` (win) = 1・`reset 128` (deep) = 0・`reset 7` (all) = 5。連続 RESET (`6,6,2,2,4,4`) の差分は全て 0 (冪等)。
-- 実行コマンド: `cd tools/liftdiff && ANALYSIS_DIR=<[ANALYSIS-DIR]> python3 ld240_hi_probe.py > work/ld240/probe.json` (27 s)。
-- 修正前の値 (`reset 256 diff 575469632`) は、戻し処理の frame の書き換えで壊れた値。この PR の修正後は 4 になった。
+- hi 区間は 32 B で、受入条件の「hi 区間が 8 MiB 以内」を満たす。
+- probe の RESET 差分 (各 mask を別プロセスで、SNAPSHOT 直後に 1 回 RESET): `reset 1` (stk) = 1・`reset 256` (hi) = 0・`reset 512` (win) = 1・`reset 128` (deep) = 0・`reset 7` (all) = 1。連続 RESET (`6,6,2,2,4,4`) の差分は全て 0 (冪等)。
+- 実行コマンド: `cd tools/liftdiff && FL_WIN64_DIR=<[WIN64]> python3 ld240_hi_probe.py > work/ld240/probe.json` (33 s)。
 
 ## 3. 結果 (コミット済み HEAD・n=1・対象 17 件)
 
 | 条件 | match | mismatch | RESET 差分の先頭 4 件 (B) |
 |---|---|---|---|
-| `sta_img` (6) | 4 | 13 | 15,321,054 / 14,699,527 / 9,658 / 193,698 |
-| `sta_img_deep` (6+128) | 4 | 13 | 15,321,060 / 14,699,535 / 9,658 / 193,698 |
-| `sta_img_win` (6+512) | 4 | 13 | 15,451,859 / 14,699,810 / 9,963 / 324,290 |
-| `sta_img_hi` (6+256) | 4 | 13 | 15,321,083 / 14,699,540 / 9,682 / 193,722 |
-| `all` (7) | 4 | 13 | 15,451,894 / 14,699,831 / 9,987 / 324,314 |
-
-(上表は本測定 (`253902726`)。`0a7e580f8` 時の 2 件目以降は `sta_img_hi` で 39,757 B だった。)
+| `sta_img` (6) | 4 | 13 | 15,321,056 / 14,699,489 / 9,658 / 193,698 |
+| `sta_img_deep` (6+128) | 4 | 13 | 15,321,062 / 14,699,497 / 9,658 / 193,698 |
+| `sta_img_win` (6+512) | 4 | 13 | 15,451,859 / 14,699,774 / 9,964 / 324,291 |
+| `sta_img_hi` (6+256) | 4 | 13 | 15,321,085 / 14,699,501 / 9,682 / 193,722 |
+| `all` (7) | 4 | 13 | 15,451,894 / 14,699,794 / 9,988 / 324,315 |
 
 - 5 条件とも match 4 件は `0x4bf600`・`0x50ab90`・`0x7850d0`・`0xb77200`。全件の verdict は `results/ld226_sta_img_stack.tsv`。
-- RESET 差分の列は、対象 17 件の各 RESET で戻した byte 数 (`*.reset.json` の先頭 4 件)。RESET は対象 case の直前に送るため、各値は「その時点までに case が書き換えた量」で、snapshot からの累積ではない。同じ HEAD (`253902726`) を 2 回流した (`0a7e580f8` 時の 1 回目と本測定) ところ、verdict 19 件は一致し、`sta_img_hi` の 1 件目の差分も 15,321,083 B で一致した。2 件目以降の差分は測定ごとに変わった (`0a7e580f8` 時は `sta_img_hi` の 2 件目が 39,757 B、本測定は 14,699,540 B)。原因は未特定で、この列は n=2 でしか確認していない (未解決 → #3384)。
-- 前版 (誤った差分) からの変化は、`sta_img_hi` と `all` で `0x4bf600`・`0x50ab90`・`0x7850d0`・`0xb77200` の 4 件が mismatch → match になったこと。他の値は変わらない。
-- 同じ wasm で `RESET 6`・`RESET 2`・`RESET 4` を連続で送った直接確認では、いずれも `diff 0` (戻し後の 2 回目は差分なし)。戻しは冪等。
-- main 取り込み後 (merge `88c5e6164`) に `ld_native` を作り直し、`sta_img_hi`・`sta_img` の 2 条件を再測定した。verdict 17 件は本測定と全件一致 (差分 0)。取り込みで入った `ld_native.c` の変更は LD-268 の `NRESETB` 経路で、本測定の `RESET` 経路 (wasm・native) とは別。
+- RESET 差分の列は、対象 17 件の各 RESET で戻した byte 数 (`*.reset.json` の先頭 4 件)。RESET は対象 case の直前に送るため、各値は「その時点までに case が書き換えた量」で、snapshot からの累積ではない。
+- 差分は wasm の関数を呼ばずに数えた値なので、getter 由来の byte は混ざらない (§2 の hi 区間 32 B)。
+- 前版 (修正前の JS 版 `253902726`) からの verdict の変化は無い。`sta_img_hi` と `all` の match は 4 件のまま。
+- 戻しの冪等性: 同じ wasm で `RESET 6,6,2,2,4,4` を連続で送ると、いずれも diff 0 (§2)。
 
 ## 4. 読み取り
 
-- 前版の「`hi` を足すと match 0 件」は、誤った差分による結果だった。修正後は、どの区間を足しても match 4 件は消えない。
-- 「スタック復元 (`all`) で効果が消える」(前版 LD-226 の結論) は、修正後の測定では再現しなかった (`all` = match 4)。前版の 0 件は、§0 の戻し処理の不具合に由来する。
-- SP = stack_base (§2) なので、hi 区間は実行時点で実質空。hi 区間の差分 (`sta_img_hi` の 1 件目 15,321,083 B) は、sta_img と同じ桁で、stack の区間は効果を持たない。
+- どの区間 (deep・win・hi) を sta_img に足しても、match 4 件は消えない。
+- 「スタック復元 (`all`) で効果が消える」(前版 LD-226 の結論) は、この測定では再現しなかった (`all` = match 4)。前版の 0 件は、§0 の戻し処理の不具合に由来する。
+- hi 区間は 32 B で実質空。スタックの区間は、この 17 件では効果を持たない。
 - LD-126 §3 の stk/all の結果は、不具合版の reset で測られたもの。再測定まで結論は保留 (`REPORT_APPENDIX_LD126.md` 注記・#3384)。
 
 ## 5. 再現
 
 ```sh
-export ANALYSIS_DIR=<[ANALYSIS-DIR]>   # fl-win64 を $ANALYSIS_DIR/win64 に展開 (extracted/ が直下)。docs/REFERENCES.md §4
+export FL_WIN64_DIR=<[WIN64]>   # fl-win64 を展開したディレクトリ (extracted/ が直下)。docs/REFERENCES.md §4
 cd "$(git rev-parse --show-toplevel)/tools/liftdiff"
 python3 ldlib/build_wasm.py targets/m11.json --force
 python3 ld240_hi_probe.py > work/ld240/probe.json
