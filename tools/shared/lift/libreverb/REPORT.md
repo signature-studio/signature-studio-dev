@@ -5,7 +5,7 @@
 
 ## 結論 (1 行)
 win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を RetDec で lift し、`ucomiss` flags 修復 (1 pass) + SSE scalar helper 生成で wasm 化。
-**native 実機械語 vs wasm の全バイト比較 240/240 一致** (ネガコン 4 件は全て FAIL = ゲートは効く)。**実インスタンス (CreateReverbInstance) 駆動は未達**: 生成直後の状態では `Process_Fruity` が SIGSEGV (§7 → [T-SH-71] #3361)。**ildsp は未達**: WaveformColouring は #3216 (CLOSED・部分達成。残りは #3274・#3275・#3276)。GeneralPitchShifter の残件は #3318・#3320。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance は未起票で #161 に残す (§6)。
+**native 実機械語 vs wasm の全バイト比較 240/240 一致** (ネガコン 4 件は全て FAIL = ゲートは効く)。**実インスタンス (CreateReverbInstance) 駆動は未達**: 生成直後の状態では `Process_Fruity` が SIGSEGV (§7 → [T-SH-71] #3361)。**ildsp は未達**: WaveformColouring は #3216 (CLOSED・部分達成。残りは #3274・#3275・#3276)。GeneralPitchShifter の残件は #3316 [T-SH-63]・#3320。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance は未起票で #161 に残す (§6)。
 
 ## 0. gen_helpers の未対応 op 全数 (#3316・ildsp 0x161fc0 closure)
 
@@ -23,7 +23,22 @@ win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を
 - issue #3316 の題名の「49 種」は古い数字で、本文の「54 種」が (b) と一致する。
 - 未対応の op 名の例: `cvttss2si`・`movd`・`cvtdq2ps`・`divss`・`vfmadd231sd`・`ucomisd`。
 - 未再測定の扱い: (a) と (c) は、`toolchain-retdec` の素材を付けた run (`oc_artifacts: fl-win64 toolchain-retdec`) で `lift_vtable.sh 0x161fc0` を再実行して確定する。それまでは上の値を「過去の記録」として扱う。
-- `gen_helpers.py` の rc=1。残りの wasm 化 (helper の C 実装) は [T-SH-65] #3318、native 差分は [T-SH-64] #3317 が持つ。
+- `gen_helpers.py` の rc=1。残りの wasm 化 (helper の C 実装) は [T-SH-63] #3316、native 差分は [T-SH-64] #3317 が持つ。
+
+### 0-2. 対応表の拡張 (#3316 受入 1 の実装)
+
+測定 commit: `fc7465982` (コードを変えた最後の commit。main `732795918` の `gen_helpers.py` からの変更)。
+
+- 結果: `lift_vtable.sh 0x161fc0` は **rc=0**・`[ildsp] helpers ok`。`declare @__asm_*` の 73 行を全て対応 (distinct op 名 54 種は closure 全体の数。内訳は `[gen_helpers]` 行の op 別件数)。C 出力 161 行を clang -c で通した。
+- 対応済みの op 名の数: main の `gen_helpers.py` が対応していた op 名は、movss/movaps/movapd/movq/punpcklbw/int3/sfence/addss/subss/mulss/xorps/ucomiss の 12 名 (うち closure に現れるものの数は `.ll` 未取得のため未確定)。本 commit で新たに加えたのは、2ae10ac85 で未対応だった declare 行 (実測 62 件・(c)) に対応する op 名。「既存 7 種」「6 名」という旧記述は使わない。
+- 追加した対応: cvt 系 (cvttss2si/cvttsd2si/cvttpd2dq/cvtdq2ps/cvtdq2pd/cvtps2pd/cvtsd2ss)・movd/movsd/movq/vmovq/vmovsd・movlhps/movhlps・packed (mulpd・psrldq/psrlq/psllq・xorpd/vxorpd/vandpd/movapd/movdqa/movdqu)・scalar 倍精度 (add/sub/mul/div sd・divss)・FMA (vfmadd/vfnmadd/vfmsub の sd 版)。
+- **trap にした命令**: `comiss`・`ucomisd`・`ldmxcsr`・`stmxcsr`・`int`。EFLAGS / MXCSR を IR に繋がない (D1a 変種。`ucomiss` の no-op 化と同じ危険)。黙って no-op にせず `__builtin_trap()` にした。実行されれば trap で止まる。closure の実行経路で trap が出るかは未確認 (受入 2・3 の範囲)。
+- `ucomiss` (既存の対応) は C 側で no-op (空の body) のまま。これは意図した挙動で、RetDec が `ucomiss` の flags を IR に繋がないため、後段の `fix_rv.py` が `%or.cond` の 2 箇所を `fcmp oeq float lane0(A), lane0(B)` に置換して分岐条件を作り直す (D1a 対応・上の表の `fix_rv.py` 行)。helper 側の空 body は、この置換の前提として残している。
+- 既存の対応 (movss/movaps/movapd/movq/punpcklbw/int3/sfence/addss/subss/mulss/xorps/ucomiss) の出力は変えていない (下の回帰で確認)。
+- 回帰: `libreverb/lift.sh ok` 240/240 PASS (15.0 s, load 0.67)。`neg-helper` (mulss→add) は 39/240 で FAIL し、ゲートは効いている。
+- CreateInstance (`ci_lift.sh` の gen_helpers 段) は、入力 `ci.rs_norm.ll` で 4 helper (int3・movq・punpcklbw・sfence) を rc=0 で通す。ただし `ci_lift.sh` 全体は census の段 (`function_1801af090` 等の参照されない define) で FAIL する。これは `origin/main` (732795918) でも同じ結果で、本 PR の変更ではない。
+
+未達 (本 PR では扱わない): gen_helpers の未対応 0 件は達成。emcc の standalone wasm と 67 関数 export は [T-SH-63] #3316 の残件、IAT・全バイト差分は #3317。
 
 ## 1. 対象の再特定 (mac の 0x25c0-0x2f87 は win では使えない)
 `python3 locate.py <Reverb.dll> <out>` が export stub → 実体 → `.pdata` の連鎖で範囲を求める (RVA, 範囲内に base reloc 0 件・外部 call 0 件)。
@@ -69,7 +84,7 @@ win 版 `Reverb.dll` の `Process_Fruity_32FM_32FS` / `Process_UF_32FM_32FS` を
 
 ## 6. ildsp (`block24360_PE.bin`) 調査のみ (lift 未実施)
 ildsp の規模測定 (命令数・call 数・export closure 表) と未解決は [lift/ildsp/REPORT.md](ildsp/REPORT.md) が正本。
-追跡先 (いずれも実在): WaveformColouring は #3216 (CLOSED・部分達成。残りは #3274 [T-SH-57]・#3275 [T-SH-58]・#3276 [T-SH-59])。GeneralPitchShifter は #2483 の子 #2528・#2529・#3300 (いずれも CLOSED)。その残件は CreateInstance closure の wasm 化 #3318 [T-SH-65] と全バイト差分 #3320 [T-SH-66]、vtable slot 1–3 は #3299 [T-SH-61]、slot 5 は #3404。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance (LimiterLite・Limiter・LowFreqEnhancer・Shimmer・StereoEnhancer・TransientLooper・Transmitter) は子 issue が未起票のため、親 #161 に残す (一覧は #161 のコメント)。
+追跡先 (いずれも実在): WaveformColouring は #3216 (CLOSED・部分達成。残りは #3274 [T-SH-57]・#3275 [T-SH-58]・#3276 [T-SH-59])。GeneralPitchShifter は #2483 の子 #2528・#2529・#3300 (いずれも CLOSED)。その残件は CreateInstance closure の wasm 化 #3316 [T-SH-63] と全バイト差分 #3320 [T-SH-66]、vtable slot 1–3 は #3299 [T-SH-61]、slot 5 は #3404。PSOLA は [T-SH-75] #3401 (起票済み)。残り 7 instance (LimiterLite・Limiter・LowFreqEnhancer・Shimmer・StereoEnhancer・TransientLooper・Transmitter) は子 issue が未起票のため、親 #161 に残す (一覧は #161 のコメント)。
 
 ## 検証範囲 / 範囲外
 - 範囲: win 版 Process_Fruity/UF の**合成状態** (乱数 + 境界値) に対する wasm と native 機械語のビット一致。
