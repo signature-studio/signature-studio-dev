@@ -1105,6 +1105,7 @@
 | `tools/targets/serum2/gui/REPORT_SR57.md` | ~73 | SR-57 (#3626, SR-28 受入 3): patch 後の demo 表示経路の静的確認。demo 表示 `0x18004fc9c` は patch 後に関数内で到達不能 (証明)、`0x1800501c0` は汎用ヘルパで非 demo の呼出元が残るため受入文の前提は不成立、overlay_demo_version は呼出元 0 件。解析は `demo_dialog_reach.py` / `demo_dialog_strings.py` |
 | `tools/targets/serum2/gui/REPORT_M7_CANVAS.md` | ~120 | SR-7 (#68) の M7 接続照合 (静的): CanvasFrame を tools/gui の surface・out ring の記号と照合 (`gui/m7_canvas_connect.py`)。設計上は接続可・実装は一部のみ・画素形式が不一致。数値の正本は本体 §0・§2 |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
+| `tools/targets/serum2/gui/REPORT_APPENDIX_5005.md` | ~108 | #5005 付録 (#5034 SR-85): XferOnOffButton の間接 call の候補化と閉包の上限。own vtable の候補を加えて反復し 162 関数・23,190 B に収束 (真の上限ではない)。手順・実測は付録 §5.1〜§5.6 |
 | `tools/targets/serum2/gui/REPORT_SR48.md` | ~80 | SR-48 (#3236): ARG・THIS の呼出元を直接 call/jmp でたどる分類 (`sr48_arg_this.py`)・SC 伝播の末尾 jmp 拡張。ARG・THIS の型は確定 0 件 (残りは #4122)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR43.md` | ~115 | SR-43 (#2174): 間接 call `call [R+disp]` の呼出先オブジェクトを所属関数の this / 引数まで遡る分類 (`receiver_this_trace.py`)・判定点のネガティブコントロール (`negctl_this_trace.py`)。受信が SerumController の this と確定できた候補は 0 件 (残りは #3236・#3237)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR49.md` | ~95 | SR-49 (#3237): `receiver_this_trace.py` の spill 検出を call 越えに広げ、escape したスロットを `OUTPARAM` に分類 (STACKSLOT 80 件 → 10 件、THIS +2)。NODOM 242 件の支配判定は未着手 (#4097)。測定値の正本 |
