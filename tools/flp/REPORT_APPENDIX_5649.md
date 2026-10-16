@@ -14,7 +14,7 @@
 
 - 素材: `fl-win64.tar.zst` を `tar --zstd -xf` で展開 (real 13.07 s)。インストーラ `flstudio_win64_26.1.7.5653.exe` と `extracted/` (25,166 件) を得る。
 - wine: apt の `wine64` 9.0 (`/usr/lib/wine/wine64`)・`xvfb`・`gdb` (15.1) を導入。`wine32` は未導入 (警告のみ・起動に不要だった)。
-- インストール木: `tools/flp/s1_wine_probe.sh` をそのまま実行 (`RUNNER_TEMP=$HOME/rt`)。インストール木 25,164 / 25,165 block にパスを付与。G03 (Authenticode) の 3 箇所を `s1_g03_patch.py` で書換え (既存 S1 と同じ。oracle ローカルコピーのみ)。
+- インストール木: `tools/flp/s1_wine_probe.sh` をそのまま実行 (`RUNNER_TEMP` 配下に組立て)。インストール木 25,164 / 25,165 block にパスを付与。G03 (Authenticode) の 3 箇所を `s1_g03_patch.py` で書換え (既存 S1 と同じ。oracle ローカルコピーのみ)。
 - 結果: `S1 rc=124` (120 s で終了せず GUI 継続)。所要 2 m 11 s。`WINEDEBUG=-all` のため MSGBOX / native-load は未計測。
 
 ## 3. gdb アタッチとブレーク (受入 2)
