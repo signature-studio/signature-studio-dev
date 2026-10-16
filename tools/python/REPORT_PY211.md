@@ -149,6 +149,16 @@ PE の逆アセンブル (capstone・rip 相対は VA 解決) で 1 行ずつ確
 - `0x11e84a0` の範囲検査 (0 ≤ index ≤ 件数-1) は **別の object (`[0x15e2218]`) の件数** に対するもので、1..999 の検査ではない。また `0x11e84a0` は表の要素が 0 以上 (`jl 0x12d8b74` を通らない) のときだけ呼ばれる。
 - したがって『範囲外を無視するか』は vtable `+0x1f0` (Z の型) の本体で決まる。**受入 1 は未達のまま**。#4531 の結果を待つ。
 
+## movePattern の副作用呼出し `call [rbx+0x108]` (#5822・PY-5391)
+
+- 呼出し: `0xe33fbc` の `call qword ptr [rbx+0x108]`。引数は rcx = Y、rdx = arr (`[rbp+0x40]`)、r8 = 末尾 (`rax-1`)、r9d = ebx (相対量)、`[rsp+0x20]` = edi。**確定**。
+- Y の取得鎖: `G = [0x15e4790]`・`T = [G]`・`Y = [T+0x10]`・`rbx = [Y]` (`0xe33f90`〜`0xe33fb0`)。rip 参照の解決先は `0x15e4790` (G と一致、検査 `move.vt108_Y_chain`)。
+- **PE 上の静的な値**: `[G]` = `0x141d6b8` (.data)・`[[G]]` = 0 (ファイル上 NULL、検査 `move.vt108_static_unresolved`)。Y は実行時に作られるオブジェクトのため、**vtable `+0x108` の呼出し先は静的に確定しない (未確認)**。`0x976568` 付近の値は .text 内の UTF-16 並びで、オブジェクトではない。
+- O ≠ NULL 経路 (`0xe33ec3`〜`0xe33ee2`): 数 n と配列を埋めた後、`[O+0x6f7] = 0` を書いて `jmp 0xe33f6f` で呼出しへ直行する。範囲検査 (cmp) は 0 件 (検査 `move.nonnull_skips_range`)。範囲検査は O = NULL 側 (`0xe33f09`) だけにある。
+- **範囲外の挙動 (O ≠ NULL)**: 呼出し先の本体が未確定のため、**未確認**。PY211 の暫定 (何もしない) は、呼出し先が範囲外を無視するという仮定に依る。この節では確定させない。
+- 検査: `move.vt108_call`・`move.vt108_Y_chain`・`move.vt108_static_unresolved`・`move.nonnull_skips_range` の 4 件を追加 (28/28 → 32/32)。
+- ネガティブコントロール: `--mutate-move-vt` (`0xe33fbc` の disp `0x108`→`0x100`) → `FAIL move.vt108_call`・31/32・rc 1。既存の `--mutate` → `FAIL move.upper_bound_999` 系で 30/32・rc 1。
+
 ## 再現
 
 ```
