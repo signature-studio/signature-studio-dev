@@ -3,7 +3,7 @@
 # 入力: ci_lift.sh の出力 (tools/shared/work/lift/ci/)。emsdk は EMSDK_ENV (既定は [EMSDK] の emsdk_env.sh。docs/REFERENCES.md §1)。
 # 処理: uselistorder 行を除く (emcc の LLVM が読めない) -> ci.o -> helpers.o -> 検査用 shim (外部グローバル 2 種) -> wasm-ld。
 # 出力: tools/shared/work/lift/ci-link/ (gitignore)。
-# 注意: shim の外部グローバル 2 種は「リンクが通るための仮置き」。画像上の意味 (VA 0x1803f6610 の敷設) は未検証 (REPORT_CI.md §8)。
+# 注意: shim の外部グローバル 2 種は「リンクが通るための仮置き」。画像上の意味 (VA 0x1803f6610 の敷設) は未検証 (REPORT_CI.md §9)。
 # usage: bash tools/shared/lift/ildsp/ci_link.sh   (exit 0 = 未解決の集合が期待集合と一致 / exit 1 = 想定外の未解決 / exit 2 = 入力が無い)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."

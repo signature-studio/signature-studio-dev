@@ -6,7 +6,7 @@
 測定 commit: `eb6f0e1c7` (#3300 時点の closure 入力作成の測定。本 PR の数値の根拠は下の §7 の `56ec5cf11`)。`git diff eb6f0e1c7 HEAD -- tools/shared/lift/ildsp ':!*.md'` は 24 ファイルの差分があり、差分 0 ではない。
 
 ## 結論 (1 行)
-closure は 36 関数・961 命令・間接 call 10 件で、RetDec の範囲入力と IR の define 検査は通る。ただし closure は条件分岐と計算ジャンプの先を辿らず、範囲外の直接呼び出し先 1 件が IR に declare のみで残る (§2-2 (a))。IR は計算ジャンプ表の経路 (n = 1〜16) を落とし、その書き込みは IR に無い (§2-2 (b))。census はこれを検出しない。wasm 化 (#3318) と native 差分 (#3320) が残る。
+closure は 36 関数・961 命令・間接 call 10 件で、RetDec の範囲入力と IR の define 検査は通る。ただし closure は条件分岐と計算ジャンプの先を辿らず、範囲外の直接呼び出し先 1 件が IR に declare のみで残る (§2-2 (a))。IR は計算ジャンプ表の経路 (n = 1〜16) を落とし、その書き込みは IR に無い (§2-2 (b))。baseline 時点の census はこれを検出しなかったが、§8-2 で検出器を追加した (現在は FAIL で検出)。wasm 化 (#3318) と native 差分 (#3320) が残る。
 
 ## 1. 再現
 ```
@@ -47,7 +47,7 @@ closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が
 - **(a) 条件分岐の先の直接呼び出し先 (1 件)**: 0x1aefa7 `jne 0x1801aef40` (閉包関数 0x1aef60 の中)。0x1aef40 は `.pdata` の無い 16 バイトの `rep stosb` ヘルパ (`push rdi; mov eax,edx; mov rdi,rcx; mov rcx,r8; rep stosb; mov rax,r11; pop rdi; ret`)。IR では `declare` だけがあり、0x1aef60 の本体から `call @function_1801aef40` で呼ばれる。`ci_census.py` は「範囲外で define の無い直接呼び出し先」として別行に出す。
 - **(b) 計算ジャンプの表の経路 (n = 1〜16) を IR が落とす (9 define は未参照)**: x86 では 0x1aef74 `cmp r8,0x10` → 0x1aef78 `jbe 0x1af070` が、n ≤ 16 のとき計算ジャンプへ進み 1〜16 バイトを書く。0x1af070 の `lea r9,[rip-0x1af07a]` は r9 = イメージ基底 (0x180000000) を作り、0x1af07a `mov eax,[r9+r8*4+0x442000]`・0x1af082 `add r9,rax`・0x1af08b `jmp r9` で飛ぶ。表 0x442000 (`_RDATA`) の k = 0〜16 の 32 bit 値は RVA の 17 件 (k = 17〜19 は 0)。17 件のうち 9 件は RetDec の define の先頭 (function_1801af090・af0a0・af0a8・af0b0・af0c0・af0cc・af0d0・af0e0・af0e8)、残り 8 件は case 本体の途中 (0x1af094・0x1af097・0x1af09b・0x1af09e・0x1af0a4・0x1af0b4・0x1af0c4・0x1af0c7)。
   IR (`ci.drc.ll`) では `@function_1801aef60` の先頭が `%0 = icmp ult i64 %arg3, 17` → `br` で `dec_label_pc_1801af028` (`ret i64 %arg1`) に入る。`1801af070`・`1801af07a` を参照する行は 0 件で、0x1aef60 の本体に `indirectbr`・`switch`・`unreachable` は無い。つまり n = 1〜16 の書き込みは IR に無いまま `ret` する。9 define はどの `call` からも参照されない (census の「IR 内の call 参照 0 件」)。症状は DEFECTS D9 と同じ形 (間接 jmp の経路が `ret` に化け、case ブロックが呼び出し元の無いまま残る)。ret の値は undef ではなく `%arg1`。
-  census はこれを検出しない (define の有無だけを見る)。RetDec 内部でどの段がこの経路を落としたかは未確認。
+  baseline 時点の census は検出しなかった (define の有無だけを見ていた)。§8-2 で orphan 検査を追加して検出するようにした。RetDec 内部でどの段がこの経路を落としたかは未確認。
 - 閉包規則を変える (jcc と計算ジャンプの表を辿る) と 36 関数・961 命令が変わるので、再測定を伴う。判断は #3318 で行う。
 
 ## 3. IR の呼び出し行数と x86 件数
@@ -68,7 +68,7 @@ closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が
 | SSE helper 8 種 (`__asm_`) の C 実装 (解消は §7。5 種は #4229 で C 実装済み) | wasm 化 | [T-SH-65] #3318 |
 | 間接 call 4 件の trap 化 (ac 4) | 正常系の到達 | [T-SH-65] #3318 (到達実測は #3250) |
 | 閉包の取りこぼし: 直接 jcc 先 function_1801aef40 (§2-2 (a))。閉包規則を変えるか。変えれば 36/961 が変わり再測定 | 範囲・wasm 化の意味 | [T-SH-65] #3318 |
-| 計算ジャンプ表の経路 (n = 1〜16) が IR で `ret` になる (§2-2 (b))。表を解く経路を IR に戻すか、欠落を受入として扱うかを決める。census は検出しないので検出器も対象 | 1〜16 バイトの書き込みの欠落 (silent) | [T-SH-65] #3318 |
+| 計算ジャンプ表の経路 (n = 1〜16) が IR で `ret` になる (§2-2 (b))。表を解く経路を IR に戻すか、欠落を受入として扱うかを決める。baseline の census は検出しなかったため、§8-2 で検出器を追加済み (現在は FAIL で検出) | 1〜16 バイトの書き込みの欠落 (silent) | [T-SH-65] #3318 |
 | 全バイト差分・ネガティブコントロール・gate | 受入の残り | [T-SH-66] #3320 |
 | `.pdata` の無い葉 12 件の範囲 (次の `.pdata` 先頭まで) | 命令数は上限側に偏りうる | #161 |
 
@@ -147,11 +147,37 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 | 差分 (native と wasm の全バイト比較・gate) | 復元の意味論が未検証 | [T-SH-66] #3320 |
 | IAT stub・閉包の取りこぼし・emcc | wasm 化 | [T-SH-65] #3318 |
 
-## 8. wasm リンクと外部グローバル (T-SH-152 #5748)
+## 8. 方針の決定と census の検出 (T-SH-153 #5749)
 
-結論: `ci_lift.sh` の出力を wasm にリンクすると、未解決は IAT 10 種 (#5747) と直接/画像内の呼び出し先 2 種 (閉包の取りこぼし #5749) の集合だけになる。外部グローバル 2 種と `__stack_pointer` はリンクが通った。ただし外部グローバルの画像上の敷設は未決 (§8-2)。
+結論: (a) は閉包規則を変えず範囲外のままにする。(b) は受入として扱わず、census が FAIL で検出するようにした。IR の計算ジャンプ経路の修復は未了 (#3318)。
 
-### 8-1. 実測 (`ci_link.sh`・rc 1 = 期待どおりの未解決)
+### 8-1. (a) 直接 jcc 先 function_1801aef40
+- x86: 0x1aefa7 `jne 0x1801aef40` は **条件分岐**。0x1aef40 は `rep stosb` の memset ヘルパで、`ret` は呼び出し元へ戻らず 0x1aef60 の呼び出し元 (閉包の外) に返る。
+- IR: `call i64 @function_1801aef40` の後に fall-through で 0x1aefa9 へ続く。つまり IR は jcc を call に化かしている。これは現行の IR (baseline) に既にある誤モデルで、閉包を広げても直らない。
+- 試算 (scratch, 非コミット・`work/` の probe): jcc を辿ると 37 関数・969 命令 (+1 関数・+8 命令)。`ci_ranges.py` に入れて `ci_lift.sh` を回すと、RetDec は 0x1aef40 を `__asm_rep_stosb_memset` の呼び出しとして出し、`gen_helpers.py` が未対応の signature で exit 1 になった。閉包規則は戻し、コードの差分は 0 (`ci_ranges.py` は HEAD と同じ)。
+- 決定: 範囲外のまま扱う。誤モデルを閉包で正すには IR の jcc 扱いを直す必要があり、#3318 で扱う。
+
+### 8-2. (b) 計算ジャンプ表の経路 (n = 1〜16)
+- 決定: 欠落を受入として扱わない (silent miscompile を見逃さない)。census に検査を入れた。
+- 追加した検査 (`ci_census.py`): 範囲外の define のうち、IR のどの `call` からも参照されないものを FAIL にする。baseline では 9 件 (function_1801af090 ほか 8 件) が該当し、`ci_lift.sh` は rc 1 になる。
+- 本 PR の `ci_lift.sh` は HEAD で rc 1 を返す。これは (b) が未修復であることを示す意図した結果。修復 (表を解く経路を IR に戻す) は #3318 で行い、その時点で rc 0 に戻る。
+- 検出器の限界: この検査は「範囲外 define のうち IR の call から未参照のもの」という副次的な形にだけ依存する。RetDec が 9 件の define を出さなくなると、(b) の欠落があっても PASS する (現在の RetDec 出力の形に依存する)。
+- 実測 (HEAD `ci_census.py` 変更後・4 core・n=1): 出力末尾 `[census] FAIL: 範囲外の define が IR のどの call からも参照されない ... ['function_1801af090', ..., 'function_1801af0e8']` (9 件)・rc 1。範囲の 36 関数は define 欠落 0 (他の検査は通る)。
+
+### 8-3. 閉包規則の再測定
+閉包規則 (`ci_ranges.py`) は変えていない。36 関数・961 命令・間接 call 10 は HEAD で再現 (`ci_ranges` ok)。よって 36/961 の再測定は要らない。8-1 の 37/969 は試算値のみ。
+
+### 8-4. 未解決 (起票先)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 計算ジャンプ表の経路 (n = 1〜16) を IR に戻す (RetDec 内部の段は未確認) | 1〜16 バイトの書込みの欠落 (census は FAIL で検出中) | [T-SH-65] #3318 |
+| 直接 jcc 先 function_1801aef40 の誤モデル (jcc を call として扱う) | 範囲・意味論。閉包を変えると wasm 化の前提が変わる | [T-SH-65] #3318 |
+
+## 9. wasm リンクと外部グローバル (T-SH-152 #5748)
+
+結論: `ci_lift.sh` の出力を wasm にリンクすると、未解決は IAT 10 種 (#5747) と直接/画像内の呼び出し先 2 種 (閉包の取りこぼし #5749) の集合だけになる。外部グローバル 2 種と `__stack_pointer` はリンクが通った。ただし外部グローバルの画像上の敷設は未決 (§9-2)。
+
+### 9-1. 実測 (`ci_link.sh`・rc 1 = 期待どおりの未解決)
 - 測定 commit: `5afe607d0` (`ci_link.sh` の EMSDK_ENV 必須化を含む現 head)。`ci_lift.sh` も `ci_link.sh` もこの HEAD で実行した。
 - 素材: R2 からは `fl-win64` のみ届いた (素材置き場に `fl-win64.tar.zst` のみ)。`toolchain-retdec`・`toolchain-emsdk` は R2 に無いため上流から取得した: RetDec v5.0 の GitHub release asset `RetDec-v5.0-Linux-Release.tar.xz` (`tar -xJf` で展開し `bin/retdec-decompiler`)、emsdk は git tag `6.0.12` を `install`・`activate` (展開先は `$RUNNER_TEMP/art/` 配下)。
 - 入力の生成: `ci_lift.sh` を先に実行して `tools/shared/work/lift/ci/` を作った (`FL_WIN64_DIR=$RUNNER_TEMP/art RETDEC_BIN=$RUNNER_TEMP/art/retdec/bin/retdec-decompiler bash tools/shared/lift/ildsp/ci_lift.sh` → rc 0・ALL OK)。
@@ -163,13 +189,13 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 - `__asm_*` 4 種が EXPECT に無いのに exit 0 になる根拠: `helpers.o` (`ci_helpers.c` から gen_helpers.py が生成) が `__asm_int3`・`__asm_movq`・`__asm_punpcklbw`・`__asm_sfence` を `T` (定義) で持つ (`llvm-nm --defined-only helpers.o`)。よって wasm-ld の未解決は出ず、`undefined.txt` にも現れない。`__stack_pointer` は emcc が供給、`global_var_1803f6610`・`__unnamed_1` は shim.o が定義 (`llvm-nm --defined-only shim.o`)。
 - 検証: `ci_link.sh` の判定は wasm-ld のリンクエラー行だけを数える。期待集合 (IAT 10 種 + 2 種) 以外が出ると exit 1、出なければ exit 0。
 
-### 8-2. 外部グローバルの意味 (未決)
+### 9-2. 外部グローバルの意味 (未決)
 - `global_var_1803f6610` (`external global i64`): VA `0x1803f6610` = RVA `0x3f6610` は `.data` の中。`.data` の初期値は 8 byte `0x1803f66a8` (`.data` 内の `global_var_1803f66a8` を指すポインタ)。IR は `icmp eq i64 %4, ptrtoint (ptr @global_var_1803f6610 to i64)` と `load i64, ptr @global_var_1803f6610` で読む。つまり画像内の 1 cell として敷設すれば、IR の意味 (cell の内容 = ポインタ値) と一致する。RetDec が `.data` の他のグローバルを `global` として出すのと同じ形。
 - `@0` (`external global i32`): `ret i64 ptrtoint (ptr @0 to i64)` が 3 箇所 (`function_1801aedc0`・`function_1801bb414`・`function_1801bb468` の末尾)。IR に定義が無い。画像上の該当 VA は未特定。
 - 敷設方式 (案・未実装): `wc_image.py` は PE 全体を VA 0x30000000 に敷設するので、`global_var_1803f6610` の cell (RVA 0x3f6610) は画像の中に既にある。C 側で別の cell を作ると、画像の `.data` の値 (`0x1803f66a8`) と食い違う。よって IR の `@global_var_1803f6610` を「画像基底 + 0x3f6610」に置き換える方式を案とする。`@0` は画像上の VA が未特定のため、同じ方式は決められない (実体の特定が先)。実装は ir_normalize の段で行う必要があり、本 run では行っていない。
 - 仮置きの効果: shim は cell を 0 初期化 (`global_var_1803f6610` は 0)。したがって仮置きのままでは `icmp eq` の比較対象が変わる。**リンクが通ることと、意味が正しいことは別**。意味の確認 (native との差分) は #3320 の範囲。
 
-### 8-3. 残り (起票先)
+### 9-3. 残り (起票先)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 外部グローバル 2 種の画像敷設 (`global_var_1803f6610` は `.data` の cell、`@0` は実体未特定) | リンクは通るが、仮置きの値で意味が変わりうる | 本 issue の範囲 (敷設方式を決めるのは次の子 or #3318) |
