@@ -4,7 +4,7 @@
 
 #### 10-7y. #4671 (KH-106): 関数ポインタ global `_DAT_1813a1d40` の型規則 (部分・9 → 3)
 
-- 結論: 関数ポインタ global 9 件のうち **6 件** を `GTYPE` の型 `FNPTR` (`void (*)()`・到達時 abort) で解消した。census の型不一致は **119 → 113** (`FX=…,gtype,lanes`・同一入力の直前比較)。残りの **3 件** (戻り値を代入する呼出し 3 箇所) は #4693 (KH-112) で戻り値型 `int` を機械語で決め、型を `int (*)()` に直して解消 (型不一致 312 → 309)。Gain/Haas/Gate の `.o` は 3 本とも不変。
+- 結論: 関数ポインタ global 9 件のうち **6 件** を `GTYPE` の型 `FNPTR` (`void (*)()`・到達時 abort) で解消した。census の型不一致は **119 → 113** (`FX=…,gtype,lanes`・同一入力の直前比較)。残りの **3 件** (戻り値を代入する呼出し 3 箇所) は #4693 (KH-112) で戻り値型 `int` を機械語で決め、型を `int (*)()` に直した。int 段の型不一致 (`FX=…,gtype,lanes`) は未測定 (素材 `plugins-kilohearts` が無く再測定できなかった)。既定 FX の emcc error 行の合計は 312 → 309。Gain/Haas/Gate の `.o` は 3 本とも不変。
 - 測定 commit (コードを変えた最後の commit): `c0c75890f` (`git log -1 --format=%h -- tools/targets/kilohearts/ghidra_route` の結果)。測定は作業ツリーの `ghidra_route` (差分込み) で行い、その後 `git commit` した内容と同一。
 - 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)・`toolchain-emsdk` (emcc 6.0.12)・Ghidra 12.1.4 (zip sha256 `ddac49f9…d2db` 一致)・JDK 21 (temurin-21)。すべて `$RUNNER_TEMP/kh` (repo 外)。n=1。
 
@@ -43,9 +43,13 @@
 | 6711 | `FUN_180fe27b0` (issue 6731) | 呼出元 `180fd6016`・`180fd89d1` の後で `test eax,eax` (32bit) | **int** (issue の undefined8 は誤り。機械語は 32bit で読む) |
 
 - 規則: `patches.py` の `'1813a1d40': 'FNPTR'` の型を `int (*)()` にし、`ghidra_to_c.py` の `FNPTR` 分岐の戻り型を `int` にした。9 件の slot 全体で 1 つの型。
-- 型不一致 (census): **312 → 309** (`assigning to ... from incompatible type 'void'` の 3 件が消えた)。残る 309 は別の分類 (128bit レーン型・引数数不一致・演算の型不一致)。
-- 規則を入れたあとの確認: Gain/Haas/Gate の `.c` と `.o` は変更前と `cmp` 一致。
-- 未確認: 呼出元 2 箇所 (`180fd6016`・`180fd89d1`) が返す値の使い道は、この付録の範囲外。型を int に決めたのは rax の下位 32bit が読まれることだけに基づく。
+- 5928 (`FUN_180fd7f54`) の戻り値 int は『読み手なし』からの共通型。値の使い道は未確認 (bit-exact 検証は未実施。PR 本文の未解決表に記載)。
+- 数字の定義 (3 種類。混ぜない):
+  - 型不一致 (`FX=…,gtype,lanes`・census の error 行のうち型不一致): FNPTR 段で 119 → 113 (上の表)。int 段の値は **未測定** (本 run は素材なしで再測定できない)。
+  - emcc error 行の合計 (既定 FX・`bcaa96dfd` の直前比較): **312 → 309**。型不一致の値ではない。`assigning to ... from incompatible type 'void'` の 3 件 (4916・5928・6711) が消えた、という前 run の log 比較の結論。本 run では再確認していない。309 の内訳は未分類。
+- 規則を入れたあとの確認: Gain/Haas/Gate の `.c` と `.o` は変更前と `cmp` 一致 (前 run の記録。本 run は素材が無く再確認していない)。
+- stereo 閉包 (`patches.py` の stereo 1300・1888 の間接呼出し): 型を `int (*)()` に変えた影響の emcc 行数は **未測定** (本 run は素材 `plugins-kilohearts` が無く測定できなかった)。stereo の生成 C は変わる。
+- 呼出元の確認範囲: rax の下位 32bit を読むと確認したのは 4916・6711 の 2 件 (機械語)。5928 は読み手なし。残り 6 件の呼出元は、int 前提の確認をしていない (本付録の対象外)。FNPTR の stub は `abort()` で、slot の値は C に入らない。
 
 **Gain/Haas/Gate の `.o` 不変**
 
