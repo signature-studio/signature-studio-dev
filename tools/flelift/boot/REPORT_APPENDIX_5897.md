@@ -21,7 +21,7 @@
 
 ## 2. 実測
 
-測定 commit: `abb026116` (probe 追加 commit)。probe の出力式を直した commit は `<FIX_COMMIT>`。`abb026116` から `<FIX_COMMIT>` までの差分は probe の出力式と本付録のみ (`git diff abb026116 <FIX_COMMIT> -- tools/flelift/boot/slot35_vmt_probe.sh`)。probe の実行結果 (採取 0 件) は出力式を直す前の `abb026116` で得たもの。出力式の変更は採取行の値の意味だけを変え、発火条件 (挿入位置・件数) は変えない。
+測定 commit: `abb026116` (probe 追加 commit)。probe の出力式を直した commit は `d938b7cc6`。`abb026116` から `d938b7cc6` までの code の差分は `slot35_vmt_probe.sh` の出力式 1 箇所だけ (`git diff abb026116 d938b7cc6 -- tools/flelift/boot/slot35_vmt_probe.sh`)。probe の実行結果 (採取 0 件) は出力式を直す前の `abb026116` で得たもの。出力式の変更は採取行の値の意味だけを変え、発火条件 (挿入位置・件数) は変えない。
 
 | 条件 | lift に載った slot 35 箇所 | boot 結果 (units / stopped_at) | `[S35]` 採取 | 陽性対照 `[S35-control]` |
 |---|--:|---|--:|--:|
