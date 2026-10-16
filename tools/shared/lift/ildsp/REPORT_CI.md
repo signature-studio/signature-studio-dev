@@ -146,3 +146,7 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 | `movapd` の helper 分岐は実装したが、復元後 IR に `movapd` が無く生成 0 件。テストと NC は無い | 実行されない分岐 (未検証) | [T-SH-65] #3318 |
 | 差分 (native と wasm の全バイト比較・gate) | 復元の意味論が未検証 | [T-SH-66] #3320 |
 | IAT stub・閉包の取りこぼし・emcc | wasm 化 | [T-SH-65] #3318 |
+
+## 8. emcc の obj 化と間接 call 2 件の trap 化 (T-SH-65 #3318・部分達成)
+
+結論: `uselistorder` (順序メタ情報) を除いた IR は emcc で obj 化でき、間接 call 2 件 (`function_1801cb5e0`・`function_1801cb600`) は trap 定義を入れた。wasm のリンク・実行は未実施で、IAT 10 種・外部グローバル 2 種・範囲外の直接 call 先 1 種が残る。詳細と実測は `REPORT_APPENDIX_3318.md`。測定 commit `6220b651d` (コード差分は `ci_lift.sh` のみ)。
