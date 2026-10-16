@@ -387,6 +387,7 @@
 | `tools/m11/trap_triage/REPORT_APPENDIX_5661.md` | ~100 | #5661: strict 候補の証拠表 行 159〜193 (35 件) の件ごとの判定 (真陽性 3・偽陽性 1・保留 31・機械語と IR の突合・未解決)。REPORT_718 §4m の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_4885.md` | ~90 | #4885: 証拠表の行 67・68・71〜74 の件ごとの判定 (母数 13・真陽性 6・偽陽性 0・保留 7)。REPORT_718 §4l の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5660.md` | ~90 | #5660: 証拠表の行 119〜158 (母数 40) の件ごとの突合表。判定 0 件・保留 40 (保留の型 (i)〜(iv))。REPORT_718 §4l の行 119〜158 の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_5689.md` | ~90 | #5689: 証拠表の行 139〜158 (母数 20) の件ごとの判定。確定 0・保留 20 (140・141・143 は別ビルド dsm のみを根拠にしたため保留)。REPORT_718 §4l の行 139〜158 の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` | ~79 | #3498 (PR #3567): strict 候補の証拠表 行 4〜35 (32 件) の件ごとの表・判定規則・未解決 (REPORT_718 §4h の全文。REPORT_718.md の 250 行上限のため分割移動)。判定の内訳は付録 §4h が正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3823.md` | ~67 | #3823: 923 の obj 0x10bd3960 への書込み (全 store 計装・unit 830/880 の 0 書込み)。呼出し鎖は未確定 |
