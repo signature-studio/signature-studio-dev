@@ -19,6 +19,20 @@ import pe_py203_edx_sites as E  # noqa: E402
 import pe_py273_base as B  # noqa: E402
 
 POINTEES = {0x193FA10: "G1", 0x16BAFC8: "G2", 0x16BD450: "G3"}
+# 第 1 オペランド (Intel 記法の宛先) が RIP 相対でも、メモリへ書かない命令。
+# 比較・分岐・呼出し・読込み専用の x87 演算・単一オペランドの乗除算 (idiv 等は読込み) など。
+NOT_WRITE = {
+    "cmp", "test", "call", "push", "bt", "lea", "nop", "prefetchnta",
+    "ucomiss", "ucomisd", "comiss", "comisd", "lar", "lsl", "verr", "verw",
+    "fcom", "fcomp", "ficom", "ficomp", "fld", "fild", "fldcw", "fldenv", "frstor", "ldmxcsr", "lldt", "ltr",
+    "fadd", "fsub", "fsubr", "fmul", "fdiv", "fdivr", "fiadd", "fisub", "fisubr", "fimul", "fidiv", "fidivr",
+    "mul", "imul", "div", "idiv",
+}
+
+
+def writes_dest(m, o):
+    m = m.replace("lock ", "")
+    return m not in NOT_WRITE and not m.startswith("j") and E.split_ops(o)[0].find("[rip") >= 0
 
 
 def main():
@@ -38,11 +52,11 @@ def main():
             nxt = E.INS[E.ADDR_IDX[a] + 1][0]
             d = int(mm.group(2), 16) * (1 if mm.group(1) == "+" else -1)
             t = nxt + d
-            if lo <= t < hi and m.startswith("mov") and E.split_ops(o)[0].find("[rip") >= 0:
+            if lo <= t < hi and writes_dest(m, o):
                 bss_rip_write += 1
         for g in POINTEES:
             if t == g:
-                kind = "write" if (m.startswith("mov") and E.split_ops(o)[0].find("[rip") >= 0) else "read"
+                kind = "write" if writes_dest(m, o) else "read"
                 ptr[g][kind].append(a)
             elif "[rip" not in o and f"0x{g:x}" in o.lower():
                 ptr[g]["lea" if m == "lea" else "imm"].append(a)
