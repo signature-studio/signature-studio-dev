@@ -113,7 +113,7 @@
 - 正規化前後とも mismatch 0 (M11 の adapter は重複統合名のみ。§16 の既存結果と一致)。
 - 素材の `work-liftlib-targets` は HeartCore / SlateCore の lift IR を含まない (freshair `lift_gain` と kilohearts `winpkg` のみ)。HeartCore / SlateCore の lift IR は未実測。
 
-**Kilohearts snap-in 13 本の sig_gate 実測 (#1170, 2026-10-16, Actions runner, 検証起点 = 1170 ブランチ (origin/main b51786338 起点), `EMSDK_ENV=/opt/emsdk/emsdk_env.sh`, emcc (`/opt/emsdk`), 素材 plugins-kilohearts / toolchain-retdec / toolchain-emsdk 展開済み, `lift/build.py <n> --path s0 --trials 200 --seed 1`)**:
+**Kilohearts snap-in 13 本の sig_gate 実測 (#1170, 2026-10-16, Actions runner, 検証起点 = 1170 ブランチ (origin/main b51786338 起点), `EMSDK_ENV` = `[EMSDK]` の env (`docs/REFERENCES.md` §4), emcc は同 toolchain, 素材 plugins-kilohearts / toolchain-retdec / toolchain-emsdk 展開済み, `lift/build.py <n> --path s0 --trials 200 --seed 1`)**:
 
 | snap-in | build compare (native 突合) | 正規化前 / adapter / 重複統合 | unresolved | 正規化後 mismatch | sig_gate 結果 |
 |---|---|---|---|---|---|
