@@ -84,9 +84,6 @@ print(f"table refs: {refs}")
 
 # pass 2: direct disassembly of the given functions
 wanted = {int(x, 16): x for x in args.dis}
-for ins in []:
-    pass
-found = {}
 remaining = dict(wanted)
 emit = {}
 for ins in stream():
