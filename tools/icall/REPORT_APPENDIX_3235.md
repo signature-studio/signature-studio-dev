@@ -7,7 +7,7 @@
 - `tools/ott/native/ott_native.c` の `make_thunk` で、`call rax` の直前に `sub $8,%rsp` (`48 83 EC 08`) を入れた。thunk は 21 バイトで 32 バイト枠内に収まる。
 - `slot_trace` の 131 関数で rc 分布が変わった: `rc=95` 53 → 44 (-9)、`rc=99` 0 → 9 (+9)。`rc=0`・`rc=124`・`rc=98` は不変。
 - 9 件の `rc=99` (`MISSING IMPORT` の fail-fast) は、§2.6 の 3 件 (`1803b3fc0`・`1803b5b60`・`18103d218`) を含む。
-- 既存 e2e (`tools/ott/ott_e2e.sh`・`tools/icall/icall_e2e.sh`) は `plugins-ott` と `work-m6-ott` が要るため、今回の素材では**実行していない** (§4)。
+- 既存 e2e `tools/ott/ott_e2e.sh --quick` は HEAD `e5261de58` で PASS (§3.1)。`icall_e2e.sh` は未実行。
 
 ## 2. 測定
 
@@ -58,13 +58,27 @@
 |---|---|
 | 1. thunk を 16 バイト整列して `missing_import` を呼ぶ・thunk 1 個 ≤ 32 バイト | 達成。21 バイト、`sub rsp,8` を `call rax` の直前に入れた |
 | 2. `SLOT_ENC_INIT=1 slot_trace.sh` の rc 分布の変化を実測し、§2.1 baseline との差分を記録 | 達成。§2.2・§2.3 |
-| 3. `tools/ott/native` を使う既存 e2e を 1 本以上実行し、結果が変わらないことを確認 | **未達**。`ott_e2e.sh` / `icall_e2e.sh` は `plugins-ott`・`work-m6-ott` を要し、今回の素材に無い (§4) |
+| 3. `tools/ott/native` を使う既存 e2e を 1 本以上実行し、結果が変わらないことを確認 | 達成。`ott_e2e.sh --quick` が HEAD で PASS (§3.1) |
+
+### 3.1 既存 e2e の実測 (受入 3)
+
+- 測定 commit: `e5261de58` (origin/main。`ott_e2e.sh --quick` をこの HEAD で実行。コードを変えた最後の commit であり、測定以降のコード変更は無い)。
+- 素材: `fl-win64`・`plugins-ott`・`work-m6-ott`・`analysis-ott-binaries` (`ANALYSIS_DIR=$HOME/analysis`、`OTT_vst2_win64.dll` 3146752 B)。
+- emcc: 上流 emsdk 6.0.12 (`EMSDK_DIR=$HOME/emsdk`。`/opt/emsdk` は runner に無かった)。
+- 再現: `cd tools/ott && bash ott_e2e.sh --quick` を foreground で 2 回実行。
+
+| 実行 | real | load (1 分値, 開始→終了) | matrix | fma_sens | 判定 |
+|---|---|---|---|---|---|
+| 1 回目 (lift・emcc 込み) | 19.9 s | 0.17 → 0.49 | scenarios 22, failed 0, cells 9620, equal 9620, max_ulp 0, state_diff_qwords 0 | cases 12, cells 18432, differing 0 | PASS (exit 0) |
+| 2 回目 (lift 済み) | 9.0 s | 0.40 → 0.49 | 同上 | 同上 | PASS (exit 0) |
+
+- 両回とも `std` / `std_f248_0` は 512/512 cells bit-equal・max_ulp 0・`|max|` 0.2516。RetDec 比較 (INFO 節 [6/6]) は `tools/m6/work` が無いためスキップ。
+- 差分: `git diff adda5c027 HEAD -- tools/ott tools/shared tools/m1` は 87 ファイル・約 11362 行 (`tools/shared` の ildsp 等を含む)。測定は HEAD で行ったため、この差分込みの HEAD で PASS している。`ott_native.c` の `make_thunk` 修正 (`adda5c027`) は HEAD に含まれる。
 
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 既存 e2e (`ott_e2e.sh`) の PASS 未確認 | 受入条件 3 が未達。`ott_native` の変更が OTT の bit 一致に影響しないことは未確認 | 子 issue (`oc_artifacts: plugins-ott work-m6-ott`) |
 | rc=95 残 44 件の原因 | `make_thunk` 外の fatal。群 I 以外 | #2247 の後続 (未起票) |
 
 ## 5. 変更
