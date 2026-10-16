@@ -9,7 +9,7 @@ const H = 3_600_000;
 const T = Date.parse("2026-10-15T00:00:00Z");
 const iso = (ms: number) => new Date(ms).toISOString();
 
-test("recent の bot コメント: 解除見込みは bot コメント + 1.5 時間 (classify.ts の窓)", () => {
+test("recent の bot コメント: 解除見込みは bot コメント + BOT_COMMENT_WINDOW_H (classify.ts の窓)", () => {
   const h = recentHold(7, "bot comment 0.2h ago", { botAt: T });
   assert.equal(h.reason, "bot-comment");
   assert.equal(h.until, iso(T + BOT_COMMENT_WINDOW_H * H));

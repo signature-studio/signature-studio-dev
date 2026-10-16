@@ -3,7 +3,7 @@
 //   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
 import { AUTO_CLOSE_MAX, AUTO_CLOSE_RETRY_MS, AUTO_CLOSE_WOULD_MS, closeComment, detectRuleA, type CloseTarget } from "./autoclose.ts";
 import { countOpencodeRuns, countRunsByPrio, type ActiveCount } from "./active.ts";
-import { classify, isStopReport, neededArtsOf, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
+import { classify, isStopReport, neededArtsOf, RUN_WINDOW_H, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
 import { addArts, buildLaunchBody, checkRelaunchIntent, defaultArtLine, effectivePrioMap, lowAllowance, noPrCooldownMs, planLaunch, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
@@ -1185,8 +1185,8 @@ export class Engine {
         lowGate.left--;
       }
       if (!live) {
-        // dry-run: 同じ issue を 3 時間は再掲しない (計画の変化だけを残す)。投稿はしない。
-        if (this.d.now() - (planned[String(p.n)] ?? 0) < 3 * 3_600_000) continue;
+        // dry-run: 同じ issue を RUN_WINDOW_H の間は再掲しない (計画の変化だけを残す)。投稿はしない。
+        if (this.d.now() - (planned[String(p.n)] ?? 0) < RUN_WINDOW_H * 3_600_000) continue;
         planned[String(p.n)] = this.d.now();
         this.meta.counters.wouldLaunch++;
         this.pushLog({ kind: "would-launch", n: p.n, art: p.art, note: p.relaunch ? "relaunch" : undefined });
@@ -1301,8 +1301,8 @@ export class Engine {
       }
       handled.add(n);
       if (!live) {
-        // dry-run: launch の計画と同じく、同じ issue は 3 時間は再掲しない。
-        if (nowMs - (planned[key] ?? 0) < 3 * 3_600_000) continue;
+        // dry-run: launch の計画と同じく、同じ issue は RUN_WINDOW_H の間は再掲しない。
+        if (nowMs - (planned[key] ?? 0) < RUN_WINDOW_H * 3_600_000) continue;
         planned[key] = nowMs;
         c.intentWouldLaunch = (c.intentWouldLaunch ?? 0) + 1;
         this.pushLog({ kind: "would-launch", n, art: v.art, note: "relaunch intent" });
