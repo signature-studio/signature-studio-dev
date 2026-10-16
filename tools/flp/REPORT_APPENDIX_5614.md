@@ -16,7 +16,7 @@
 - 導入: `apt-get install wine64 gdb xvfb` (apt、rc=0。wine64 は `/usr/lib/wine/wine64` に入る)。`kernel.yama.ptrace_scope=0` (sudo sysctl)。
 - インストール木: `tools/flp/s1_wine_probe.sh` (前回と同じ)。結果 `S1 rc=124` (120 s で終了せず GUI 継続)・`MSGBOX_OnInit=0`・`native-load=0`。real 2 m 6.6 s。
 - S10: `WAIT_SEC=200 bash tools/flp/s10_setter_hit_probe.sh` を foreground で実行。real 3 m 21.3 s・gdb rc=124 (打切り)・`flengine_base=0x7a730000`・`Breakpoint 1 at 0x7aa67560`・hits=15,069。命中数は §3。
-- S11: `WAIT_SEC=200 bash tools/flp/s11_setter_obj_probe.sh` を foreground で実行。real 3 m 21.2 s・hits=15,045。gdb の rc は未取得 (出力の tail で切れた)。数値は §6。
+- S11: `WAIT_SEC=200 bash tools/flp/s11_setter_obj_probe.sh` を foreground で実行。real 3 m 21.2 s・hits=15,045。gdb rc 未取得。数値は §6。
 - ブレーク先の換算: FLEngine_x64.dll の ImageBase は `0x400000` (`FL64.exe` は `0x140000000`)。`0x737560` は FLEngine の VA なので、実行時は `FLEngine base + 0x337560` (base は `mapping PE file ... FLEngine_x64.dll` の行から取る)。前回の probe は FL64.exe の VA (`0x140006eaf`) を使っていたため、命中しなかった。
 
 ## 3. 命中と dl の値 (受入 3)
@@ -66,16 +66,16 @@ probe: `tools/flp/s11_setter_obj_probe.sh` (gdb `-x tools/flp/s11_setter_obj.gdb
 
 | 項目 | 値 |
 |---|---|
-| 命中 (WAIT_SEC=200・real 3 m 21.2 s・gdb rc=124) | 15,045 回 (`hits=15045`) |
+| 命中 (WAIT_SEC=200・real 3 m 21.2 s・gdb rc 未取得) | 15,045 回 (`hits=15045`) |
 | `dl` (先頭 19 件) | 19 件すべて `0x01` |
-| 戻り先 (先頭 40 件) | `0x7aa6d2a7` 39 件・`0x7aa6d107` 1 件 |
-| `rcx` (this) (先頭 40 件) | `0x02c7c170`〜`0x03548120` (ヒープ。FLEngine の .text 外) |
+| 戻り先 (先頭 40 件) | `0x7aa6d2a7` 39 件・`0x7aa6d107` 1 件 (全 15,045 件: `0x7aa6d107` 14,944 件・`0x7aa6d2a7` 101 件) |
+| `rcx` (this) (先頭 40 件) | `0x02bdc640`〜`0x03534f80` (ヒープ。FLEngine の .text 外) |
 | 先頭 qword (`*rcx`・先頭 40 件) | `0x7aa65908` 39 件・`0x7aa64d10` 1 件 |
 | 先頭 qword の所属 | `.text` (RVA `0x335908`・`0x334d10`)。`.rdata` ではない |
 
 判定: 命中時の this の先頭は .text のアドレスを指す。§4 と同じく .rdata の VMT としては読めない。この観測だけでは cfg の型と所属 VMT は確定しない。`*rcx` の指す先を逆アセンブルするか、this を生成する ctor (new の戻り) にブレークを張るのが次の手。
 
-probe の 1 行 (s11 の結果 `hits`) は `grep -c '^HIT ' "$RUNNER_TEMP/s11_gdb_session.txt"` で再現できる。
+probe の 1 行 (s11 の結果 `hits`) は `grep -c '^HIT ' "$RUNNER_TEMP/s11_gdb_session.txt"` で再現できる。根拠: run `38952137658` (fix round 2 の再測定。`grep -c '^HIT '` = `15045`)。前回の run `38950001306` のログは残っていなかったため、この再測定の値で置き換えた。
 
 ## 7. 再現
 
@@ -89,4 +89,4 @@ python3 -c "import pefile; pe=pefile.PE('$RUNNER_TEMP/fl-install/FLEngine_x64.dl
 grep '^HIT ' "$RUNNER_TEMP/s10_gdb_session.txt" | sed -E 's/.*dl=(0x[0-9a-f]+).* ret=0x0*([0-9a-f]+)$/\1 \2/' | sort | uniq -c
 ```
 
-測定 commit: `64ac5dc19` (コードを変えた最後の commit)。実測は `29f45c13b` の HEAD で行った。`git diff 64ac5dc19 HEAD -- tools/flp ':!tools/flp/REPORT_APPENDIX_5614.md'` の出力は空 (コード差分 0)。
+測定 commit: `64ac5dc19` (コードを変えた最後の commit)。§6 の再測定は `fdf2f3320` の HEAD で行った (run `38952137658`)。`git diff 64ac5dc19 HEAD -- tools/flp ':!tools/flp/REPORT_APPENDIX_5614.md'` の出力は空 (コード差分 0)。
