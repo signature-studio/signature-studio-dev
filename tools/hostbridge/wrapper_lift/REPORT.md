@@ -223,7 +223,7 @@
 ## 12. #1679: loop 外 break・undeclared label の制御構造復元 (測定 commit: 98c5f8ca)
 
 - 結論: loop 外の `break -> 0x<VA>` は、飛び先の注釈 `// 0x<VA>` が同じ関数内にあるものだけ `goto lab_0x<VA>` に直す (`retdec_gotofix.py`)。機械的な `break` 書換えは採らない。
-- 測定値・方式・未検証は付録 `REPORT_APPENDIX_1679.md` が正本。27 件の原因は付録 `REPORT_APPENDIX_4393.md` (#4393)。引数・代入・初期化の `L"..."` 型不一致は #2071 で修復 (測定は付録 `REPORT_APPENDIX_2071.md`)。残る 8 件のうち struct 代入・member 参照の 5 件は #2853 (HB-H47) で `retdec_repair.py --struct` により修復 (測定は付録 `REPORT_APPENDIX_2853.md`)。未宣言 identifier 2 件と整数リテラル 1 件は直さない (同付録 §2)。
+- 測定値・方式・未検証は付録 `REPORT_APPENDIX_1679.md` が正本。27 件の原因は付録 `REPORT_APPENDIX_4393.md` (#4393)。既定段の特定は `REPORT_APPENDIX_5743.md` (#5743): 19 組中 5 組は `EmptyStmtOptimizer`・`WhileTrueToWhileCondOptimizer` の両 disable で注釈が戻る。残り 13 組は段未特定。引数・代入・初期化の `L"..."` 型不一致は #2071 で修復 (測定は付録 `REPORT_APPENDIX_2071.md`)。残る 8 件のうち struct 代入・member 参照の 5 件は #2853 (HB-H47) で `retdec_repair.py --struct` により修復 (測定は付録 `REPORT_APPENDIX_2853.md`)。未宣言 identifier 2 件と整数リテラル 1 件は直さない (同付録 §2)。
 
 ## 13. #1822: exit 0 ファイルの wasm link と採用方式 (測定 commit: 7d15ceab)
 
