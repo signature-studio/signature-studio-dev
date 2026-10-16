@@ -1151,6 +1151,7 @@
 | `tools/targets/massivex/dsp/REPORT_MX15.md` | ~50 | MX-15 (#1810): MX-12 残件 490 件 (0 件 458・2 件以上 32) の失敗理由の内訳と、MX-10 親 18 件の母集団。読み方の規則・親の解決は子 issue (MX-49・MX-50)。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_MX33.md` | ~153 | MX-33 (#3032) 受入 1: xmm0〜3 だけの入口 livein 保留 17 件の読み幅による判定 (0 件確定・判定不能 17)・NC 9 件・線形上限。受入 2〜5 は子 issue。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_5030.md` | ~60 | MX-55 (#5030) 付録: 0x17b680 の同定 (scalar 読み・入口 xmm2)・vtable slot 32 の呼出元 1 件 (xmm2 に float)・測定値の正本。REPORT_MX33 §9 から分割移動 |
+| `tools/targets/massivex/dsp/REPORT_APPENDIX_5908_RUN7.md` | ~52 | Massive X MX-63 (#5908) run 7 (REPORT_APPENDIX_5908 §9 の分割移動): `mx63_g_recdesc.py` の制御フロー再帰降下 (call は飛び先を追わない・終端は ret/ud2/int3/hlt)・9.2 の表・未解決。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_5399.md` | ~70 | MX-58 (#5399) 付録: pdata_call 残 mismatch 24 件の理由別分類 (実測 commit `097da5a69`)・REX 直後 F0 の実機観測 (AMD EPYC 9V74、REX→F0 は非 #UD・REX.W は無効)。SDM REX 節は未確認。REPORT_MX25 §5.5 から参照 |
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_5546.md` | ~60 | KH-168 (#5546): HeartCore.core_64 の Wine 実行環境。LoadLibrary・export 144/144 解決は成功、ACFStartup は page fault で未達 (子 KH-169)。測定値の正本 |
