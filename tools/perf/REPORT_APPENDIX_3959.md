@@ -162,77 +162,48 @@ PERF_FD_WRITE=1 node tools/perf/p15/ctor_loop_trace.mjs tools/ott/work/lift/ottl
 
 出力 JSON の `fd_text` に `fd_write` の書込み内容 (最大 4000 字) が入る。`perCtor` は完走した ctor と trap した ctor (`trapped: true`) の loop 別回数と `budget_left` を持つ。
 
-## 3f. 子 #5403 の再測定と vtable の書き換え窓 (Node・同期・`fd_write` 書込み版と stub の両方)
+## 3f〜3h (前 run までの vtable 窓・memory.fill・calloc)
 
-測定 commit: `42fad4a17` (origin/main 取り込み後の HEAD)。`tools/perf/p15` は `545bec77b` から変更なし (`git diff 545bec77b 42fad4a17 -- tools/perf/p15` が 0 行)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を展開し、`wasm2wat` → `instr_loops.py` → `wat2wasm` で計装した (wabt は npm で `/tmp/opencode/wabt` に一時導入・commit 外)。
+全文は `REPORT_APPENDIX_5403.md` に分割移動した (250 行上限)。要点: func 23 が vtable `0x30203BD0` を 0 にする `memory.fill` (func 75) の dest `0x301d3e40` は、func 75 の引数ではなく `malloc` (f119) の戻り値で、146 回目の ctor の中だけ image 内の領域を返す (§3i の機構の結果)。
 
-| 測定 (HEAD `42fad4a17`) | 結果 |
+## 3i. 子 #5403 (PERF-P28) の停止原因: sbrk の break が image 基底を越える (Node・同期・`fd_write` nwritten 版)
+
+測定 commit: `320bb129a` (`tools/perf/p15/ctor_brk_trace.mjs` を追加した commit。`tools/perf/p15` の既存ファイルは §3h の `7156a4b3e` から変更なし)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を計装なしで使った。harness は `ctor_calloc_image.mjs` と同じく `fd_write` が `nwritten` を書く版。
+
+wasm func 123 は sbrk 相当で、break 値を線形メモリ `269004816` (`0x1008AFD0`) の i32 に持つ。初期値は `0x1038D520` (global 0 と同じ)。image (`0x30000000`〜`0x30284124`) は線形メモリの固定位置にあり、break の上限は `memory.size` だけで見て image を避けない。
+
+| 測定 (HEAD `320bb129a`) | 結果 |
 |---|---|
-| `node_init_sweep.mjs --m 145,146 --timeout 15000` (計装なし) ×1 | M=145 ok (setup 796 ms)・M=146 timeout。前 run と同じ |
-| `ctor_loop_trace.mjs 145` (計装) ×1 | 完走 (`completed: 145`)。wall 2.8 s |
-| `ctor_loop_trace.mjs 146` (計装) ×3 | 3/3 `unreachable`。loop 170 = 399,163,510 回 (99.09%)。前 run と同値 |
-| `PERF_FD_WRITE=1 ctor_loop_trace.mjs 146` ×3 | 3/3 `Error: abort`。loop 170 = 2 回。`fd_text` は前 run と同じ |
-| `ctor_vtable_ring.mjs` (`instr_ring.py` で計装) ×3 | 3/3 同じ。ctor 146 の関数入り 418 回のうち、vtable (`0x30203BD0`) 先頭語が 0 と最初に観測されるのは entry 305 (func 23 の入口)。直前 12 entry は `123,122,23,75,119,123,122,23,75,119,123,122,23` |
+| `ctor_brk_trace.mjs 146` ×3 | 3/3 同一。ctor 1〜145 完走・break は単調増加。146 で `Error: abort`。145 完走後の break `0x2ff94000` (image 基底の手前)、trap 時 `0x30314000` (image 基底を超える) |
+| ctor ごとの break 増分 | 最小 3670016 B・最大 3674112 B (3670016 = 14 × 262144。差 4096 B は割り当て境界の差と読める)。ctor 1〜145 の全増分がこの範囲 |
+| `ctor_brk_trace.mjs 146 33554432` (shift 32 MiB) ×1 | trap は ctor 137 (completed 136)。break 最後 `0x3000b000`、image 内に入った完了 ctor は 136 のみ |
+| 同 shift 64 MiB ×1 | trap は ctor 128 (completed 127)。completed 127 は image 内 (`0x30083000`) |
+| 同 shift 128 MiB ×1 | trap は ctor 109 (completed 108)。break は image の手前 (`0x2fdf1000`) で止まる |
 
 分かったこと:
-- ctor 146 の前、vtable `0x30203BD0` (`slot(145).obj` の vptr の指し先) は `3011de10 00000000 30127800 ...` (16 words) で、146 の trap 時には 16 words すべて 0。書換えは ctor 146 の内部で起きる。
-- 最初の 0 の観測は func 23 の入口。直前に走った関数は func 123 → func 122 (`memory.size << 16` の leaf、func 123 から `call 122` で呼ばれる) → func 23 の順。func 123 は `call 122` の後に heap 上端 (`269004816`) を動かす割り当て関数で、`call 4` (`emscripten_resize_heap` の stub) を含む。書換えそのものは func 123 の本体 (`call 122` の後) か、その後の stub 呼び出しの前後のどこかに絞られる。書込みの store は未特定。
-- したがって「壊れた vtable を書いた store」は、func 123 の `call 122` 後から func 23 入口の間に限られる。これは §3e の「heap が data 領域に届いた後で vtable が壊れる」仮説と整合するが、store そのものを記録したわけではない。
+- 停止の機構: ctor 1 回ごとに break が約 3.5 MiB (増分 3670016〜3674112 B) 押し上げられ、解放は break に戻されない (break は単調増加)。145 回目の終わりで break は image 基底 `0x30000000` の直前まで来る。増分が 14 × 262144 B と一致するのは算術上の一致で、割り当て個数は未計数 (推測)。146 回目の ctor 内で break が image に入り、calloc が image 内の領域を返す (§3h の 10 件。§3g・§3h の本文は `REPORT_APPENDIX_5403.md` に分割移動した)。その 8 番目 `0x301d3e40` の 262144 B が vtable `0x30203BD0` を覆って 0 にする (§3g)。vtable が 0 になった後で `call [rax+0x38]` (`18011d9f9`) が VA 0 を呼び、abort する (§3e)。
+- 機構の鎖は、break が image に届く → calloc が image 内を返す → 0 埋めで vtable が壊れる → 間接呼び出しが 0 へ飛ぶ、で閉じる。
+- 起動直後の break 押し上げ量と trap する ctor 番号が直線的 (shift 0 / 32 / 64 / 128 MiB で 146 / 137 / 128 / 109)。shift との差を trap 番号の差 (9 / 18 / 37 ctor) で割ると 1 ctor あたり 3.56 / 3.56 / 3.46 MiB で、1 ctor あたり約 3.5 MiB と概ね整合する (trap 番号は整数のため、厳密な一致ではない)。
+- 「146 で止まる」は ctor の番号の性質ではなく、break と image 基底の残余 (`0x30000000 − 0x2ff94000` = 442368 B = 約 0.42 MiB) の結果と読める。残余が 1 ctor の増分 (約 3.5 MiB) より小さいため、146 回目の ctor の中で break が image に入る。
 
-再現コマンド (素材展開後):
+未確定:
+- 1 ctor が約 3.5 MiB を解放せず積む理由 (割り当ての個数・解放経路は未計数。ctor 側の leak か、同一 instance に繰り返し呼ぶ harness の前提の違いかは未確定)。実機 (Chrome・AudioWorklet) で同じ積み上げが起きるかは未確認。
+- image が固定 `0x30000000` に置かれ、heap の上限検査がそれを避けない点は、lift の配置の問題。修正方針 (image を heap の上に置く・break の上限を image 基底にする・ctor の解放を入れる) は本 run では選んでいない。
+- VA `0x18011d400` ↔ wasm 関数番号の対応表は未作成 (本 run は関数番号で語った)。
+
+再現コマンド (素材展開後。`tools/ott/work/lift/` 配下に出力):
 
 ```sh
 wasm2wat tools/ott/work/lift/ottl.wasm -o tools/ott/work/lift/ottl.wat
-python3 tools/perf/p15/instr_ring.py tools/ott/work/lift/ottl.wat tools/ott/work/lift/ottl_rc.wat
-wat2wasm tools/ott/work/lift/ottl_rc.wat -o tools/ott/work/lift/ottl_rc.wasm
-node tools/perf/p15/ctor_vtable_ring.mjs tools/ott/work/lift/ottl_rc.wasm
+node tools/perf/p15/ctor_brk_trace.mjs tools/ott/work/lift/ottl.wasm 146
+node tools/perf/p15/ctor_brk_trace.mjs tools/ott/work/lift/ottl.wasm 146 33554432
 ```
-
-## 3g. 子 #5403 (PERF-P28) の書込み store の特定 (Node・同期・`fd_write` stub 下)
-
-測定 commit: `195ee191f` (`instr_fill.py` と `ctor_fill_watch.mjs` を追加した commit。`tools/perf/p15` の既存ファイルは §3f の `42fad4a17` から変更なし)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を `tools/ott/work/lift/` に置き、`wasm2wat` → `instr_fill.py` → `wat2wasm` で計装した (wabt は npm で `/tmp/opencode/wabt` に一時導入・commit 外)。
-
-| 測定 (HEAD `195ee191f`) | 結果 |
-|---|---|
-| `instr_calls.py` + `ctor_call_window.mjs` ×1 | 0 を最初に観測した call 戻りは site 133 (`f23->f75`)。直前の site 368 (`f75->f119`) の戻りでは非 0 |
-| `instr_fill.py` + `ctor_fill_watch.mjs` ×3 | 3/3 同一。146 の ctor の中で vtable 範囲に重なる `memory.fill` が 1 回: dest `0x301d3e40`・n `262144`・範囲 `[0x301d3e40, 0x30213e40)`。vtable `0x30203BD0` は範囲内 offset `0x2FD90`。trap 時 `vt_head` = 0 |
-| `ctor_fill_watch.mjs` (記録を ctor 1 から開始) ×1 | 同じ 1 回。145 以前の ctor で同じ範囲の重なりは無い |
-
-分かったこと:
-- 計装した store のうち vtable 範囲を覆うのは、wasm func 75 の `memory.fill` 1 箇所 (wat の 71184 行・dest は `local.get 1` (f75 の 2 番目の引数)・val 0・n 262144)。vtable 先頭語を 0 にしたのはこの fill と読める。`ctor_call_window` で見た「`f23->f75` の call 戻り」の直後・f75 本体の中の位置と一致する (`call 119` の後〜fill)。直接の `i32.store` などは未監視のため、この fill が唯一の書込みとは言えない。
-- §3f の「store が特定できない」は、計装済みの範囲では `memory.fill` 1 箇所まで絞れた。dest `0x301d3e40` を与える呼び出し元の引数の由来 (`f23` の `call 75` のどの値か) は未確定。
-- 3 run の同一性は §3f と同じく計装版の 3 run で確認した。
-- **訂正 (本 §3h)**: §3g の「dest は `f75` の 2 番目の引数 (`local.get 1`)」は誤読だった。`f75` は引数を取らず (type 5: `() -> ()`)、`local 1` は `malloc` の戻り値 (`f119` = dlmalloc の `malloc`)。サイズ `max(i64.load 0x1008d070, 1)` = 262144 を `malloc` し、その領域を 0 埋めする calloc 形。dest は heap 側の確保結果である。
-
-未確定:
-- dest `0x301d3e40` が f75 の引数としてどう決まるか (`f23` の `call 75` の引数の計算)。
-- 計装版は `memory.fill` 1 箇所だけを監視する。vtable 範囲への他の store は見ていない (直接 store を含む全 store の監視は未実装)。
-- Chrome (AudioWorklet) で同じ fill が起きるかは未確認。
-
-## 3h. 子 #5403 (PERF-P28) の dest の由来 (Node・同期・`fd_write` stub 下)
-
-測定 commit: `7156a4b3e` (計装 3 ファイルを追加した commit。`tools/perf/p15` の既存ファイルは §3g の `195ee191f` から変更なし)。計装は `tools/perf/p15/instr_calloc.py` (func 75 の `memory.fill` 直前で dest を記録する)、harness は `tools/perf/p15/ctor_calloc_image.mjs`。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を `wasm2wat` → 計装 → `wat2wasm` で作った (wabt は `/tmp/opencode/wabt` に一時導入・commit 外)。
-
-| 測定 | 結果 |
-|---|---|
-| `ctor_calloc_image.mjs` (計装 wasm) ×3 | 3/3 同一。`image_calloc` は ctor 146 の中だけに 10 件: `0x30013dc0`・`0x30053dc8`・`0x30093dd0`・`0x300d3dd8`・`0x30113e28`・`0x30153e30`・`0x30193e38`・`0x301d3e40`・`0x30213e48`・`0x30253e50`。`0x301d3e40` は 8 番目 (vtable `0x30203BD0` を含む 262144 B の領域を覆う) |
-| `ctor_fill_watch.mjs` (§3g の計装) ×2 | 2/2 同じ。146 の dest `0x301d3e40`・n `262144`・`vt_head` = 0 |
-
-分かったこと:
-- 146 回目の ctor の中で、func 75 の calloc が guest image の範囲 (`0x30000000`〜`0x30284124`) を指す領域を 10 回返す。145 回以前の ctor では image 内の calloc は 0 件。
-- 返る領域は `0x40000` (262144 B) ずつ進み、image の data 領域 (`0x301e2000`〜`0x30284124`) の内側に入る。heap が image の上に伸びて、image の領域を再利用する形と読める。
-- ここで heap 先頭を直接読む計測は行わなかった。ctor の前後で `malloc` を呼ぶと割り当て順が変わり、dest が変わるため (§3h の検証で確認)。heap 先頭の値は未測定。
-
-未確定:
-- heap が image に届く機構 (heap 先頭が image 基底の何 B 手前まで伸びていたか) は未測定。
-- 145 回目までの ctor で heap が image に届かない理由、146 回目でだけ届く理由は未確定。
-- 「image の領域を calloc が返し、そこに vtable がある」ことが停止の原因かは、停止後の再現 (vtable を別の場所に置く等) で確かめていない。
 
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ctor (`0x18011d400`) が同一 instance で 146 回目に戻らない原因 | 上限 145 の意味が未確定。M=146 を通す修正方針が立たない。§3g で、計装済みの store のうち vtable 範囲を覆うのは f75 の `memory.fill` 1 箇所 (直接 store は未監視)。f75 の引数 dest の由来は未確定 | #4392 [PERF-P26] |
+| ctor (`0x18011d400`) が同一 instance で 146 回目に戻らない原因 | §3i で機構 (break が image 基底 `0x30000000` を越える) を特定。未確定は、1 ctor が 14 個の 262144 B を解放しない理由と、Chrome で同じ積み上げが起きるか。§3g の vtable 0 化の store (func 75 の memory.fill) はこの機構の結果 | #4392 [PERF-P26] |
 | Chrome の M=147・149〜151・153〜159 と M=2〜129・131〜144 の成否 (単調性) | 成功最大 145 と失敗最小 146 の範囲外は未確認 | #4392 (コメントで追加) |
 | Node 掃引の再測定と生データの commit (§1) | 掃引の数値が根拠にならない | #4392 (コメントで追加) |
 | §3b の監視プローブ (145 回までの data hash 不変・`next_span_overlaps_data`) が commit 外・再現未整備 | §3b の (a) は再現できない。`ctor_heap_probe.mjs` の 3673848 (`next_span_overlaps_data` の判定定数) と観測 `bytes_per_ctor` 3673793 の 55 B 差は判定に影響しないが、由来は未記録 | #4392 (次の run で commit) |
