@@ -294,7 +294,7 @@ def cell_check(mach, body, site, alg3):
         r = 'CELL_COLLAPSED'
     else:
         r = 'CELL_DEEP'
-    return dict(verdict=r, cell='%x' % x, k='%x' % k, content='%x' % v if v is not None else None)
+    return dict(verdict=r, cell='%x' % x, k='%x' % k, content='%x' % v if v is not None else None, src='%x' % a)
 
 
 def judge(body, sites):

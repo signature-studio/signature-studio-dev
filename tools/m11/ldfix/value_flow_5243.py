@@ -79,7 +79,7 @@ def mach_chains(mach, labels, want, rule):
                 why = 'base_clobbered'
                 break
         if d is None:
-            res[k].append((blk, None, why, None))
+            res[k].append((blk, None, why, None, i.address))
             continue
         rD = ins_list[d].operands[0].reg
         used = None
@@ -92,9 +92,9 @@ def mach_chains(mach, labels, want, rule):
             if m.operands and m.operands[0].type == capstone.CS_OP_REG and m.operands[0].reg == rD:
                 break
         if used is None:
-            res[k].append((blk, None, 'dst_unused', None))
+            res[k].append((blk, None, 'dst_unused', None, i.address))
             continue
-        res[k].append((blk, ins_list[d].operands[0].size * 8, None, used))
+        res[k].append((blk, ins_list[d].operands[0].size * 8, None, used, i.address))
     return res
 
 
@@ -127,7 +127,7 @@ def link_fn(lines, mach, labels, ks, rule):
         for (n, blk, w, _k, nm) in by_k[k]:
             ir_by_blk[blk].append((n, w, nm))
         m_by_blk = collections.defaultdict(list)
-        for (blk, w, why, used) in chains.get(k, []):
+        for (blk, w, why, used, _a) in chains.get(k, []):
             m_by_blk[blk].append((w, why, used))
         for blk in set(ir_by_blk) | set(m_by_blk):
             irs = ir_by_blk.get(blk, [])
