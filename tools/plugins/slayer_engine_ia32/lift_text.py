@@ -22,6 +22,7 @@ WORK = os.path.join(HERE, 'work')
 EXPORT_MAIN = 0x10007CA0
 # 判定保留 (全数未確認): (b) と分類されても roots に入れない。 根拠と未解決は REPORT_APPENDIX_3546.md §2・REPORT_APPENDIX_4727.md。
 HOLD_B = {0x10010BC0}
+MAX_PASS = 5  # 再分類の上限 (収束しなければ失敗)
 # --no-emcc: emcc -c を飛ばす (被覆の測定だけに使う。 gate C1〜C4・jt/iat は実行されない)。
 NO_EMCC = '--no-emcc' in sys.argv
 sys.path.insert(0, HERE)
@@ -36,20 +37,23 @@ def pe_path():
     return p
 
 
-def lift_once(pth, roots, out, tag):
+def lift_x64c(pth, roots, out, tag):
     ej = os.path.join(WORK, 'entries_text.json')
     json.dump({'roots': sorted(roots), 'calltgt': []}, open(ej, 'w'))
     r = subprocess.run([sys.executable, X64C, '--pe', pth, '--entries', ej, '--out', out, '--closure', '999', '--arch', 'ia32'],
                        capture_output=True, text=True)
-    print(r.stdout.strip()); print(r.stderr.strip()[-400:])
+    print('(%s)' % tag); print(r.stdout.strip()); print(r.stderr.strip()[-400:])
     if r.returncode != 0:
         sys.exit('[lift_text] FAIL: x64c rc %d (%s)' % (r.returncode, tag))
+
+
+def emit_obj(out):
     if NO_EMCC:
-        print('[emcc -c] (%s) 省略 (--no-emcc)' % tag)
+        print('[emcc -c] 省略 (--no-emcc)')
         return
     cc = ['emcc', '-c', '-O1', '-w', '-I', RT, os.path.join(out, 'ott_lifted.c'), '-o', os.path.join(out, 'ott_lifted.o')]
     r2 = subprocess.run(cc, capture_output=True, text=True)
-    print('[emcc -c] (%s) rc %d, object %d B' % (tag, r2.returncode, os.path.getsize(os.path.join(out, 'ott_lifted.o')) if r2.returncode == 0 else 0))
+    print('[emcc -c] rc %d, object %d B' % (r2.returncode, os.path.getsize(os.path.join(out, 'ott_lifted.o')) if r2.returncode == 0 else 0))
     if r2.returncode != 0:
         print(r2.stderr[-800:]); sys.exit('[lift_text] FAIL: emcc -c')
 
@@ -102,26 +106,33 @@ def main():
     roots |= data_t | imm_t
     print('[roots] export 1 + .rdata/.data の .text 向き絶対ポインタ %d (distinct) + code 即値 %d (distinct) = %d' % (len(data_t), len(imm_t), len(roots)))
     out = os.path.join(WORK, 'lift_text')
-    lift_once(pth, roots, out, 'pass1')
-    vas, cov = coverage(img, IMG, T0, text, md, out)
-    print('[coverage pass1] 命令の起点 %d、被覆 %d / %d B (%.2f%%)' % (len(vas), sum(cov), len(cov), 100.0 * sum(cov) / len(cov)))
-    env = dict(pe=pe, IMG=IMG, T0=T0, TS=text.Misc_VirtualSize, text=text, img=img, md=md, cov=cov,
-               meta=json.load(open(os.path.join(out, 'lift_meta.json'))))
-    rows = gap_classify.classify(env)
-    json.dump(rows, open(os.path.join(out, 'gap_classes.json'), 'w'), indent=1)
-    gap_classify.selftest()
-    err = gap_classify.check_issue_gap(rows)
-    if err:
-        sys.exit('[gap_classify #4726] FAIL: ' + err)
-    cnt = {c: [sum(1 for r in rows if r['cls'] == c), sum(r['size'] for r in rows if r['cls'] == c)] for c in 'abc'}
-    print('[classify] (a) %d 区間 %d B / (b) %d 区間 %d B / (c) %d 区間 %d B' % tuple(cnt['a'] + cnt['b'] + cnt['c']))
-    b_roots = ({r['fva'] for r in rows if r['cls'] == 'b'} | {e for r in rows if r['cls'] == 'b' for e in r['entries']}) - HOLD_B
-    print('[classify] (b) の先頭 %d 個を roots に追加 (判定保留 %s を除く): %s' % (
-        len(b_roots), ' '.join('0x%x' % x for x in sorted(HOLD_B)), ' '.join('0x%x' % x for x in sorted(b_roots))))
-    if b_roots - roots:
-        roots |= b_roots
-        lift_once(pth, roots, out, 'pass2')
+    # 第 2 パス以降: (b) の先頭を roots に加えて再 lift し、再分類する。 新しい (b) の先頭が無くなるまで繰り返す (#4815)。
+    # roots を 1 回だけ作ると、(b) 関数を lift した後に現れる区間の後半 (呼び出し先) が roots に入らないため。
+    for it in range(1, MAX_PASS + 1):
+        lift_x64c(pth, roots, out, 'pass%d' % it)
         vas, cov = coverage(img, IMG, T0, text, md, out)
+        print('[coverage pass%d] 命令の起点 %d、被覆 %d / %d B (%.2f%%)' % (it, len(vas), sum(cov), len(cov), 100.0 * sum(cov) / len(cov)))
+        env = dict(pe=pe, IMG=IMG, T0=T0, TS=text.Misc_VirtualSize, text=text, img=img, md=md, cov=cov,
+                   meta=json.load(open(os.path.join(out, 'lift_meta.json'))))
+        rows = gap_classify.classify(env)
+        json.dump(rows, open(os.path.join(out, 'gap_classes.json'), 'w'), indent=1)
+        gap_classify.selftest()
+        if it == 1:
+            err = gap_classify.check_issue_gap(rows)
+            if err:
+                sys.exit('[gap_classify #4726] FAIL: ' + err)
+        cnt = {c: [sum(1 for r in rows if r['cls'] == c), sum(r['size'] for r in rows if r['cls'] == c)] for c in 'abc'}
+        print('[classify pass%d] (a) %d 区間 %d B / (b) %d 区間 %d B / (c) %d 区間 %d B' % ((it,) + tuple(cnt['a'] + cnt['b'] + cnt['c'])))
+        b_roots = ({r['fva'] for r in rows if r['cls'] == 'b'} | {e for r in rows if r['cls'] == 'b' for e in r['entries']}) - HOLD_B
+        new = b_roots - roots
+        print('[classify pass%d] (b) の先頭のうち roots に無いもの %d 個 (判定保留 %s を除く): %s' % (
+            it, len(new), ' '.join('0x%x' % x for x in sorted(HOLD_B)), ' '.join('0x%x' % x for x in sorted(new))))
+        if not new:
+            break
+        roots |= new
+    else:
+        sys.exit('[lift_text] FAIL: %d 回の再分類で (b) の先頭が収束しない' % MAX_PASS)
+    emit_obj(out)
     meta = json.load(open(os.path.join(out, 'lift_meta.json')))
     print('[coverage] 命令の起点 %d、被覆 %d / %d B (%.2f%%)、未被覆 %d B' % (
         len(vas), sum(cov), len(cov), 100.0 * sum(cov) / len(cov), len(cov) - sum(cov)))
