@@ -3,7 +3,7 @@
 ## 0. 結論 (先出し)
 
 - **判定: 達成**。RetDec route に「間接 call 復元 pass」を入れるだけで **OTT は native 実機械語と全 bit 一致**した (x64c.py 不使用)。
-  `bash tools/icall/icall_e2e.sh` (約 85 秒) = **PASS**: scenario matrix **89/89 本・全 cell が native と bit 一致 (max_ulp 0), 最終 heap/obj state 差 0 qword**
+  `bash tools/icall/icall_e2e.sh` = **PASS** (#5125: before `706147914` / after `e5261de58` とも PASS・所要 1 分 55 秒 / 2 分 2 秒。付録 `REPORT_APPENDIX_5125.md`): scenario matrix **89/89 本・全 cell が native と bit 一致 (max_ulp 0), 最終 heap/obj state 差 0 qword**
   (cell 総数・内訳の正本は `tools/ott/REPORT.md` §2) (t1 標準 512 cell: zero 5 / normal 507 / **junkHi 0 / junkTiny 0**, |max| 0.2516 = native と同値)。旧 RetDec chain は同 matrix で 4,791 cell (9.5%) のみ一致。
 - 手法は「**RetDec の入力 PE を decode 専用に書換える (binary pre-rewrite)**」: 間接 call/jmp を memory-ABI (固定 BLK への引数 store → 共有 stub call → 戻り load) に展開 →
   RetDec が引数の SSA 配線を普通の store として保持 → 後段で stub call を `__icall_dispatch(site_va)` に置換 (VA→関数表 = call_indirect 相当)。
