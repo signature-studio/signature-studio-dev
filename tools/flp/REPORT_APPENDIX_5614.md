@@ -69,4 +69,4 @@ python3 -c "import pefile; pe=pefile.PE('$RUNNER_TEMP/fl-install/FLEngine_x64.dl
 grep '^HIT ' "$RUNNER_TEMP/s10_gdb_session.txt" | sed -E 's/.*dl=(0x[0-9a-f]+).* ret=(0x[0-9a-f]+)/\1 \2/' | sort | uniq -c
 ```
 
-測定 commit: `2e588bd3e` (コードを変えた最後の commit)。`git diff 2e588bd3e HEAD -- tools/flp` の出力は空 (差分 0)。
+測定 commit: `2e588bd3e` (コードを変えた最後の commit)。`git diff 2e588bd3e HEAD -- tools/flp ':!tools/flp/REPORT_APPENDIX_5614.md'` の出力は空 (コード差分 0。変わったのは本 REPORT だけ)。
