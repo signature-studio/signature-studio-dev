@@ -141,13 +141,15 @@
 
 - 前提の訂正: #5493 本文の経路「0x80d9c0 → 0x80dcc0」は誤り。`0x80d9c0` は `mov dl,1; call 0x85c440; ret` の thunk で、`0x80dcc0` を呼ばない。`0x80dcc0` の直接呼出しは 0x80d912 と 0x80d9ec の 2 件 (0x80d9ec は 0x80d9d0 の中)。
 - 参照の経路 (`analysis/py5493_global.py`・既定値):
-  - `0xbd1bd8` (fn `0xbd1b30`): `mov rcx,[rip+0xae51a1]`。解決先は VA `0x16b6d80` (.bss)。直後の `0xbd1bdf` で `call 0x80d9c0`。受け手は `*0x16b6d80` (rcx)。
+  - global `0x16b6d80` を RIP 相対で指す命令は **9 件** (全て読出し・`cmp` または `mov r*, [rip+…]`)。全て fn `0xbd1b30` 内: `0xbd1b45`・`0xbd1b84`・`0xbd1b9d`・`0xbd1bae`・`0xbd1bb5`・`0xbd1bc8`・`0xbd1bd8`・`0xbd1be4`・`0xbd1beb`。
+- `0xbd1bd8` (fn `0xbd1b30`): `mov rcx,[rip+0xae51a1]`。解決先は VA `0x16b6d80` (.bss)。`0x80d9c0` へ渡るのは、この `0xbd1bd8` の値 (`0xbd1bdf` の `call 0x80d9c0`)。受け手は `*0x16b6d80` (rcx)。
   - `0x71f86a` (fn `0x71f840`) も `call 0x80d9c0` (rcx=rbx)。
 - `0x16b6d80` への RIP 相対の書込みは `.text` 全域で 0 件。`0x16b6d80` の 4 バイト一致は、ポインタ表と同じ `.data` (file offset `0x11de718`・VA `0x15dfd18`) の 1 件のみ。
-- `0x16b6d80` の VA を値として持つのは `.data` のポインタ表 VA `0x15dfd18` の 1 箇所のみ。表を RIP 相対で読む命令は 36 件 (`0x111defe`〜`0x11fd6a5`)。`0x11be43d` は `rdx=[0x15dfd18]` (= &global) を `0x11c8950` に渡し、`0x11c8950` は `0x86a470` を呼ぶ。この経路が書込み先の登録かは未確認。
+- `0x16b6d80` の VA を値として持つのは `.data` のポインタ表 VA `0x15dfd18` の 1 箇所のみ。表を RIP 相対で読む命令は **46 件** (範囲 `0x10022ac`〜`0x11fd6a5`・全て `mov` の読出し・書込み 0 件)。`0x11be43d` は `rdx=[0x15dfd18]` (= &global) を `0x11c8950` に渡し、`0x11c8950` は `0x86a470` を呼ぶ。この経路が書込み先の登録かは未確認。
 - 所属: `0x80d9c0`・`0x80dcc0`・`0x80d9d0`・`0xbd1b30`・`0x71f840` はいずれも VMT の所属を持たない (`owners 0`)。
 - 結論: global の型は**未確定**。書込み元 (表経由の登録 `0x86a470` の先、または global を引数として書く関数) が特定できていない。
-- 測定: `analysis/py5493_global.py <PE.bin>`・1 回の線形走査・n=1・実行 42.3 秒・load 0.44 (1 分平均)。素材 `block00031_PE.bin` (`fl-win64`)。
+- 測定: `analysis/py5493_global.py <PE.bin>`・1 回の線形走査・n=1・real 42.9 秒 (再測定・実行時の load 0.81・uptime の 1 分平均)。出力: global 9 件・表 46 件・直接 call 4 件。素材 `block00031_PE.bin` (`fl-win64`)。前回測定 (42.3 秒) の件数 (1 件・36 件) は誤り。
+- 測定 commit (`py5493_global.py`): `e08011bc2` (追加した版。以後の変更なし)。
 
 ## 6. 群 C の受け手 (#5144) — 未達
 
