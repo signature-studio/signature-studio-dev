@@ -23,15 +23,15 @@ if os.environ.get('M11_INSTR_412BR') == '1':
     assert len(_m) == 1, '412770 呼出し (4128b0 の分岐 2-3 の後) が一意に見つからない: %d' % len(_m)
     _call412770 = '  %%13 = call i64 @function_412770(ptr nonnull inttoptr (i64 %s to ptr))\n' % _m[0]
     text = text.replace(_call412770, '  call void @m11_412770_br_obs(i64 %7, i32 %9, i32 %10)\n' + _call412770)
-    _gate = '  %8 = icmp eq i64 %7, 0\n'
-    if os.environ.get('M11_INSTR_412BR') == '3':   # 3 = 呼出し直前ではなく分岐 2 の判定 (%7) の直前で 3 値を観測する (呼出しに届かない unit の原因を見る)
-        assert text.count(_gate) == 1, 'gate が一意に見つからない'
-        text = text.replace(_gate, '  call void @m11_412770_gate_obs(i64 %7)\n' + _gate)
-    if os.environ.get('M11_INSTR_412BR') == '2':   # 2 = 2 本目の呼出し (分岐 2・3 を通らない経路) も観測する
-        _m2 = re.findall(r'^  %52 = call i64 @function_412770\(ptr inttoptr \(i64 (\d+) to ptr\)\)\n', text, re.M)
-        assert len(_m2) == 1, '412770 の 2 本目の呼出し (4128b0 の [18787456] 経路) が一意に見つからない: %d' % len(_m2)
-        _call2 = '  %%52 = call i64 @function_412770(ptr inttoptr (i64 %s to ptr))\n' % _m2[0]
-        text = text.replace(_call2, '  call void @m11_412770_br2_obs()\n' + _call2)
+_gate = '  %8 = icmp eq i64 %7, 0\n'
+if os.environ.get('M11_INSTR_412BR') == '3':   # 3 = 呼出し直前ではなく分岐 2 の判定 (%7) の直前で 3 値を観測する (呼出しに届かない unit の原因を見る)
+    assert text.count(_gate) == 1, 'gate が一意に見つからない'
+    text = text.replace(_gate, '  call void @m11_412770_gate_obs(i64 %7)\n' + _gate)
+if os.environ.get('M11_INSTR_412BR') == '2':   # 2 = 2 本目の呼出し (分岐 2・3 を通らない経路) も観測する
+    _m2 = re.findall(r'^  %52 = call i64 @function_412770\(ptr inttoptr \(i64 (\d+) to ptr\)\)\n', text, re.M)
+    assert len(_m2) == 1, '412770 の 2 本目の呼出し (4128b0 の [18787456] 経路) が一意に見つからない: %d' % len(_m2)
+    _call2 = '  %%52 = call i64 @function_412770(ptr inttoptr (i64 %s to ptr))\n' % _m2[0]
+    text = text.replace(_call2, '  call void @m11_412770_br2_obs()\n' + _call2)
 
 def ptypes(args):
     out = []
