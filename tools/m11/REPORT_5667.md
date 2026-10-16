@@ -1,7 +1,7 @@
 # LB 依存 trap 7 件の wasm offset → IR 命令の特定 (#5667・親 #3389・M11-N255)
 
 測定主体: 作業 runner (2026-10-16 UTC)。素材は `fl-win64` (`extracted/block00031_PE.bin` 22,227,016 B のみ展開)・`work-m11` (`tools/m11/work/` に展開・233 件)・`toolchain-emsdk` (`[EMSDK]` emsdk 6.0.12)。
-測定 commit: `739b46e2d` (origin/main。本 PR はコードを変えない。`git diff 739b46e2d HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` は空)。
+測定 commit: `95249ebbc` (origin/main。本 PR はコードを変えない。`git diff 95249ebbc HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` は空)。
 
 ## 1. 結論
 
@@ -12,7 +12,7 @@
 
 ## 2. LB=0 (wasm 指紋 `d6274222`)
 
-計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=291,296,304,555,745 bash tools/m11/m11_lb_tolerant_repro.sh 0 work/lb0`。rc=0・寛容起動 wall 12,197 ms (#5667 の再測定 2026-10-16・worktree の再生成)。
+計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=291,296,304,555,745 bash tools/m11/m11_lb_tolerant_repro.sh 0 work/lb0`。rc=0・寛容起動 wall 8,054 ms・`time` 実測 1 分 3 秒 (commit `95249ebbc`・2026-10-16 07:27 UTC)。wasm 指紋 `d6274222` を再現。
 trap 行: unit 555 (`va=0x7f2500`)・unit 745 (`va=0xabb3b0`)。291・296・304 は trap しなかった。指紋・逆アセンブルの生出力は付録 §1・§2.2。
 
 | unit | trap の wasm 関数 (offset) | 関数名 | faulting 命令 | IR 対応 (`work/lb0/boot_final.ll`) |
@@ -25,7 +25,7 @@ trap 行: unit 555 (`va=0x7f2500`)・unit 745 (`va=0xabb3b0`)。291・296・304 
 
 ## 3. LB=0x10000 (wasm 指紋 `cb141c7f`・`m11_boot.cjs.wasm`)
 
-計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=40,153,158,291,296,304 bash tools/m11/m11_lb_tolerant_repro.sh 0x10000 work/lb10000`。rc=0・寛容起動 wall 15,842 ms・`time` 実測 1 分 29 秒 (2026-10-16 再測定)。指紋・逆アセンブルは付録 §1・§2.1・§2.3。
+計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=40,153,158,291,296,304 bash tools/m11/m11_lb_tolerant_repro.sh 0x10000 work/lb10000`。rc=0・寛容起動 wall 10,130 ms・`time` 実測 1 分 4 秒 (commit `95249ebbc`・2026-10-16 07:30 UTC)。wasm 指紋 `cb141c7f` を再現。指紋・逆アセンブルは付録 §1・§2.1・§2.3。
 
 | unit | trap の wasm 関数 (offset) | 関数名 | faulting 命令 | IR 対応 (`work/lb10000/boot_final.ll`) |
 |---|---|---|---|---|
