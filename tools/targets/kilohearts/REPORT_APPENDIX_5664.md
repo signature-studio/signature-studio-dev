@@ -6,8 +6,9 @@
 
 - float 変数・float グローバルの `(uint)` は、符号マスク XOR・符号ビット判定 (`test ... 0x8000`) では **ビット列** (機械語の `movss`/`xorps`/`test` の幅)。値変換 `(uint)` は**誤り**だった (例: `(float)((uint)X ^ 0x80000000)` は X の値を整数化してから XOR するため、符号反転にならない)。
 - 規則 12 件 (件数 1 件ずつ assert) を入れた。Gain/Haas/Gate の `.o` は `origin/main` の `.o` と `cmp` 一致 (`delay` 限定の規則のため)。
-- 差し戻し (round 1) への対応: 3594・3784 は「変更なし」と書いていたが誤りだったため、`f2u()` の規則を追加した (同じ式の 3653・3909 も同様)。下の「測定」の数値は `51b85e2f1` の時点のもので、この変更後の値ではない (下の「再測定の状態」を参照)。
+- 差し戻し (round 1) への対応: 3594・3784 は「変更なし」と書いていたが誤りだったため、`f2u()` の規則を追加した (同じ式の 3653・3909 も同様)。下の「測定」の数値は、この変更後の HEAD `c194ac1ec` で再測定した値 (「HEAD の実測」)。旧版 `51b85e2f1` の値は「旧版」として残す。
 - emcc の error 件数は変わらない (315 → 315)。これは silent miscompile (値の誤り) で、emcc は検出しないため。数値の正しさは emcc では確認できない (下の限界)。
+- HEAD `c194ac1ec` で再測定した (上の「HEAD の実測」)。census rc=0・delay emcc error 315・gain/haas/gate の `.o` は基準と `cmp` 一致。
 
 ## 機械語の確認 (1 件ずつ)
 
@@ -39,36 +40,40 @@ HeartCore は `HeartCore.core_64` (sha256 先頭 16 桁 `d55ce8b4c0ad7ebe`、REP
 
 ## 測定
 
-- 測定 commit (コードを変えた最後の commit): `51b85e2f1` (`fix(kilohearts): 符号判定 2 件もビット列で読む`)。その前の commit `9fef6d84b` は 6 規則。
-- 基準: `origin/main` = `679661428` (`git archive` で `tools/targets/kilohearts` を展開したツリー・同じ `gtype_census.sh`・同じ素材)。
-- 環境: 素材 `plugins-kilohearts` (`Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`、76,642,304 B、sha256 先頭 16 桁 `d55ce8b4c0ad7ebe`)・`toolchain-emsdk` (`emsdk/emsdk_env.sh`)・Ghidra 12.1.4 (zip sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)・JDK 21。作業は repo 外 (`$RUNNER_TEMP/kh`・`$RUNNER_TEMP/kh2`)。n=1。
-- 実行: `bash tools/targets/kilohearts/ghidra_route/gtype_census.sh <work>`。decompile 151/151 OK。
-- 所要 (real): 基準 `origin/main` 48.7 s / `51b85e2f1` 47.0 s。load (1 分平均): 06:22 時点 0.98 (4 vCPU)。
+- 測定 commit (コードを変えた最後の commit): `c194ac1ec` (HEAD。`ghidra_route` は `51b85e2f1` から差分あり・下の「測定 commit から HEAD までの差分」)。旧測定 `51b85e2f1` (8 規則版) の値は「旧版の値」として下に残す。
+- 基準: `679661428` (PR が取り込む前の `origin/main`。`git archive` で `tools/targets/kilohearts` を展開・同じ `gtype_census.sh`・同じ素材)。
+- 環境: 素材 `plugins-kilohearts` (`Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`、76,642,304 B、sha256 先頭 16 桁 `d55ce8b4c0ad7ebe`)・`toolchain-emsdk` 6.0.12 (`emsdk install 6.0.12`)・Ghidra 12.1.4 (GitHub Releases `ghidra_12.1.4_PUBLIC_20260921.zip`、sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)・JDK 21 (`temurin-21-jdk-amd64`)。作業は repo 外 (`$RUNNER_TEMP/kh`)。n=1。
+- 実行: `JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64 FX=bitcast,intload,stackpair,assoc,concat,gtype bash tools/targets/kilohearts/ghidra_route/gtype_census.sh <work>`。decompile 151/151 OK・census rc=0 (規則の件数 assert を通過)。
+- 所要 (real): HEAD `c194ac1ec` の census 50.8 s (初回 57.7 s)。load (1 分平均): 06:48 時点 1.26 (4 vCPU)。
+- 注記: 初回の実行で Ghidra が `~/.config/ghidra/.../osgi/compiled-bundles/dc471a53/` の古い `DecompEach.class` (class version 69 = JDK 25 でコンパイル) を読み、失敗した。このキャッシュ dir を退避して再生成させた (runner 上の派生物。repo には無関係)。
 
-| 項目 | 基準 `origin/main` `679661428` | PR `51b85e2f1` |
-|---|---|---|
-| delay emcc error 行 | 315 | **315** |
-| 演算・代入・ポインタの型不一致 | 84 | **84** |
-| 128bit レーン型 | 166 | 166 |
-| 引数数不一致 | 65 | 65 |
-| 合計 | 315 | 315 |
-| gain / haas / gate `.o` | 1435 / 3217 / 3756 B | 1435 / 3217 / 3756 B (`cmp` 一致) |
-| `delay.c` の差分行 (基準との diff) | — | 旧 `51b85e2f1` は **8 行**。HEAD の値は未実測 (上の「再測定の状態」) |
+### HEAD `c194ac1ec` の実測
 
-## 再測定の状態 (差し戻し対応)
+| 項目 | 基準 `679661428` (旧) | 旧版 `51b85e2f1` (8 規則) | **HEAD `c194ac1ec` (12 規則)** |
+|---|---|---|---|
+| delay emcc error 行 | 315 | 315 | **315** |
+| 演算・代入・ポインタの型不一致 | 84 | 84 | **84** |
+| 128bit レーン型 | 166 | 166 | **166** |
+| 引数数不一致 | 65 | 65 | **65** |
+| 合計 | 315 | 315 | **315** |
+| gain / haas / gate `.o` | 1435 / 3217 / 3756 B | 同左 (`cmp` 一致) | **同左。基準 `679661428` と `cmp` 一致** (3 件とも) |
+| `delay.c` の差分行 (基準との diff) | — | 8 行 | **12 行** |
 
-- 差し戻し対応で `ghidra_route` を変えた (規則 4 件追加・ABI 規則 4 件の左辺を変更)。このため、上の表の `51b85e2f1` の数値は、この commit (以下 HEAD) の数値ではない。
-- 本 run では素材 `plugins-kilohearts` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、HeartCore の decompile・emcc の再測定を行えなかった。HEAD の delay emcc error 件数・`delay.c` の差分行数は未実測。
-- 代わりに、新規則の正規表現と ABI 規則を、機械語の判定と同じ形の合成テキストに当てて確認した (各規則 1 件ずつ hit、ABI 4 件 hit)。これは規則の文字列の確認であり、emcc 結果の代わりにはならない。
-- 再測定が要る (`plugins-kilohearts` を `oc_artifacts:` で取得して `gtype_census.sh` を実行する) ことを、PR 本文の未解決に書く。
+- HEAD の `delay.c` 差分 12 行 (基準 `679661428` との diff。全行が `#5664` の規則による): 旧版 8 行 (1249・1250・1254・1255・2684・2707・2766・3549) に、差し戻し対応で増えた指数判定 4 行 (3594・3652・3784・3908) を足した 12 行。
+- 規則 hit (生成 C の行で確認): DELAY 12 件 (2684・2707・1249・1250・1254・1255・2766・3549・3594・3653・3784・3909 の各行) と ABI 規則 4 件 (3595・3653・3785・3909 の呼出し引数が `FUN_180fdc6ec(f2u(fVar3))`・`FUN_180fdc844(f2u(fVar22))`)。件数 assert は census の run で通過。
+
+### 旧版 `51b85e2f1` の実測 (参考)
+
+- 基準 `679661428` との比較の旧値。`delay.c` 差分は 8 行。gain/haas/gate の `.o` は `cmp` 一致。HEAD では上の値に置き換わる。
 
 ## 測定 commit から HEAD までの差分
 
-`git diff 51b85e2f1 HEAD -- tools/targets/kilohearts/ghidra_route` は、差し戻し対応の commit で差分が出る (下の HEAD 行を参照)。
+- 測定 commit `c194ac1ec` から HEAD までの差分: 0 (`git diff c194ac1ec HEAD -- tools/targets/kilohearts/ghidra_route` は空)。
+- 旧版 `51b85e2f1` からの差分: `git diff 51b85e2f1 HEAD -- tools/targets/kilohearts/ghidra_route` = 10 行追加・4 行削除 (`ghidra_to_c.py` 6 行・`patches.py` 8 行)。差し戻し対応の規則 4 件 (3594・3653・3784・3909) と ABI 規則 4 件の左辺が変わった分。
 
 ## 限界・未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 数値の正しさ (1000 trial の bit-exact 突合) は未確認。emcc の error 件数は silent miscompile を数えないため、変化ゼロは「正しい」の証拠にならない | 8 行の値が機械語どおりかは機械語の読みに依存 | #3073 [KH-41] |
+| 数値の正しさ (1000 trial の bit-exact 突合) は未確認。emcc の error 件数は silent miscompile を数えないため、変化ゼロは「正しい」の証拠にならない | delay.c の 12 行の値が機械語どおりかは機械語の読みに依存 | #3073 [KH-41] |
 | `stereo` 側に同形の float 符号判定があるかは未確認 (本 PR は `delay` の `DELAY_RULES` のみ) | stereo の float 符号判定 | #4687 (KH-110) の残件として扱う |
