@@ -4,7 +4,7 @@
 hs_tbl_refs.py (線形逆アセンブル) は命令境界のずれを含みうるので、ここでは .text の全バイト位置
 (p = 0 .. len-1) から 1 命令ずつ復号し、次の 3 形式を数える:
   - rip 相対メモリオペランドの実効アドレスが表の範囲に入る
-  - 絶対 disp (base なし) + index のメモリオペランドの disp が表の範囲に入る
+  - 絶対 disp (base なし・index の有無を問わない) のメモリオペランドの disp が表の範囲に入る
   - 即値・絶対 disp の 4 バイト値が表の範囲に入る (復号できた命令のみ)
 表の範囲外の値の検出は行わない。
 
@@ -48,7 +48,7 @@ def main():
                         ea = i.address + i.size + op.mem.disp
                         if TABLE_LO <= ea <= TABLE_HI:
                             rip_hits.append((i.address, i.mnemonic, i.op_str))
-                    elif op.mem.base == X86_REG_INVALID and op.mem.index != X86_REG_INVALID:
+                    elif op.mem.base == X86_REG_INVALID:
                         if TABLE_LO <= op.mem.disp <= TABLE_HI:
                             abs_hits.append((i.address, i.mnemonic, i.op_str))
                 elif op.type == X86_OP_IMM and TABLE_LO <= (op.imm & 0xFFFFFFFF) <= TABLE_HI:

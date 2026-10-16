@@ -142,7 +142,7 @@ FL_WIN64_DIR=... PYTHONPATH=... python3 tools/plugins/framework/hostshim/hs_disp
 | 走査 | 結果 |
 |---|---|
 | rip 相対で表の範囲を指す命令 (全 .text の復号開始位置 15,626,746 件) | 0 件 |
-| 絶対 disp + index で表の範囲を指す命令 | 0 件 |
+| 絶対 disp で表の範囲を指す命令 (base なし。index の有無を問わない: `[abs32]`・`lea [abs32]`・`[reg*8+abs32]`) | 0 件 (index なし 0 件・index あり 0 件) |
 | 即値が表の範囲に入る命令 | 11 件。すべて条件分岐の飛び先 (`loopne`・`jo`・`jne`・`jae`) か、`0x132d5ad` の `call 0x12b039a` (表の内側への直接呼出し)。表の読み出しではない |
 | PE 全体のバイト列: 表の基底 `0x12b02e0` (8 バイト・4 バイト) | 0 件 |
 | PE 全体のバイト列: 表の終端 `0x12b0468` | 1 件 (走査範囲の境界。表の要素ではない) |
