@@ -4,7 +4,7 @@
 hs_glob_alltext.py は rip 相対と絶対オペランドだけを見る。本スクリプトは、G / P0 の
 リトルエンディアン 4 バイトが、どの PE ブロックのどのセクションに現れるかを生バイトで数える。
 .text に現れた場合は、その位置を含む命令を線形逆アセンブルで特定する。
-結果は REPORT_DISPATCHER_APPENDIX_5547.md が解釈する。
+結果は REPORT_DISPATCHER_APPENDIX_4444.md が解釈する。
 
 使い方: FL_WIN64_DIR=<fl-win64 の展開先> PYTHONPATH=<pefile,capstone> python3 hs_glob_bytes.py
   (展開先は extracted/*_PE.bin を含むこと)

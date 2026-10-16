@@ -97,20 +97,9 @@ FL_WIN64_DIR=<展開先> python3 hs_store_supplier.py # REPORT_4130 §2 の 11 �
 測定 commit: `9364022b4` (`hs_glob_bytes.py` を追加した commit。`hs_disp_emu.py`・`hostshim.c` は変更なし)。素材: `fl-win64` (`extracted/*_PE.bin` 313 件)。`work-fw-stage1` は展開したが、本測定では使わない (`fw_stage2.sh` の前提で、emsdk は未使用)。
 
 - `hs_glob_bytes.py` (生バイト検索): `G = 0x15e4790` と `P0 = 0x141d6b8` の 4 バイト LE を全 313 PE ブロックの全セクションで検索 → 0x15e4790 の hit は `block00031_PE.bin` の `.data` (0x15e4790 自身の値 `P0`) の 1 件だけ。`.text` 内の hit は 0 件。実測 real 1.8 秒。
-- 相対形式 (`G - ImageBase` と `G - セクション VA` の 32bit): 全 PE で 0 件 (ad hoc 検索。スクリプトは未コミット)。
+- 相対形式 (`G - ImageBase` 等) の検索: 未検証 (本 run では実施していない。受入 1 の根拠に使わない)。
 - `hs_glob_alltext.py` を HEAD で再実行: `text sections scanned: 311 (PE blocks: 313)`、STORE 0 / REF 0 / ABS 0。real 23.6 秒、load 1.75→0.67。
-- 基準 run (`hs_disp_emu.py`・`HS_DISP_PATH=1`・全 256 ID): real 49.7 秒、load 0.62。`distinct (rax, path) = 109 / IDs = 256`。path 上の出現 (ID 数):
-
-| VA | 役割 | 件数 |
-|---|---|---|
-| 0x1326c34 | `[rbp+0x89f]` 書込み元 1 | 0 |
-| 0x1327f9a | `[rbp+0x89f]` 書込み元 2 | 0 |
-| 0x13280c9 | gate (ID 108) | 1 |
-| 0x132815f | gate (ID 109) | 1 |
-| 0x1328098・0x1328104・0x1328114・0x1328124・0x1328131・0x132818a・0x1328197・0x13281a4 | 8 件の即値格納 | 0 (各 0) |
-| 0x1320e23・0x13213f3・0x1322971 | call 戻り値格納 | 0 (各 0) |
-
-§4 の表と一致 (再現)。
+- 基準 run (`hs_disp_emu.py`・`HS_DISP_PATH=1`・全 256 ID): real 49.7 秒、load 0.62。`distinct (rax, path) = 109 / IDs = 256`。§4 の表を本 run で再現した。
 
 ### 判定 (#5547 の受入)
 
