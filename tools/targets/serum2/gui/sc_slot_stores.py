@@ -21,6 +21,7 @@ with contextlib.redirect_stdout(io.StringIO()):
 
 lea_re = re.compile(r"^(r\w+), \[rip ([+-]) (0x[0-9a-f]+)\]$")
 st_re = re.compile(r"^qword ptr \[rcx(?: \+ (0x[0-9a-f]+|\d+))?\], (r\w+)$")
+nowrite = {"cmp", "test", "push", "nop", "ret", "jmp"}
 
 stores = defaultdict(set)
 for f in R.SC:
@@ -28,22 +29,25 @@ for f in R.SC:
         continue
     lea = {}
     for ins in R.by_func[f]:
-        if ins.mnemonic == "lea":
-            m = lea_re.match(ins.op_str)
-            if m:
-                d = int(m.group(3), 16) * (1 if m.group(2) == "+" else -1)
-                t = ins.address + ins.size + d
-                if R.rva_to_off(t) is not None and R.func_of(t) is None:
-                    lea[m.group(1)] = t
-                    continue
-            lea.pop(ins.op_str.split(",")[0], None)
-            continue
+        if ins.mnemonic == "call":
+            break
         m = st_re.match(ins.op_str)
         if ins.mnemonic == "mov" and m and m.group(2) in lea:
             off = int(m.group(1) or "0", 16 if (m.group(1) or "").startswith("0x") else 10)
             stores[off].add((f, lea[m.group(2)]))
-        if ins.mnemonic in ("mov", "lea", "xor", "add", "sub", "pop") and ins.op_str.split(",")[0] == "rcx":
+        if ins.mnemonic in nowrite:
+            continue
+        dst = ins.op_str.split(",")[0]
+        if dst == "rcx":
             break
+        lea.pop(dst, None)
+        if ins.mnemonic == "lea":
+            lm = lea_re.match(ins.op_str)
+            if lm:
+                d = int(lm.group(3), 16) * (1 if lm.group(2) == "+" else -1)
+                t = ins.address + ins.size + d
+                if R.rva_to_off(t) is not None and R.func_of(t) is None:
+                    lea[lm.group(1)] = t
 
 for off in sorted(stores):
     for f, t in sorted(stores[off]):
