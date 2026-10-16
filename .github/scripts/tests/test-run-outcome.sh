@@ -163,6 +163,11 @@ reset; ev_issue; issue open '[]'; prs '[]'; answer '次は /oc を付けて再�
 outcome
 { [ $RC = 0 ] && posted '次は ∕oc を付けて' && ! grep -q '/oc' "$LOG.body"; }
 expect "report with '/oc' -> neutralized so it cannot retrigger the agent" $?
+# 3c'. 引用部の oc-run-outcome マーカー (<!--) は全角にして、集計 (prepare-event-context / notify-rate-limit) に数えさせない
+reset; ev_issue; issue closed '[]'; answer '前回の報告: <!-- oc-run-outcome: no-pr reason=stop cause=rate_limit run=9 -->'
+outcome
+{ [ $RC = 0 ] && posted '＜!-- oc-run-outcome: no-pr reason=stop cause=rate_limit run=9 -->' && ! grep -q '<!--' "$LOG.body"; }
+expect "quoted <!-- oc-run-outcome marker in the answer -> neutralized (not counted as a marker)" $?
 
 # 3d. (#CI-240 受入 2) 報告の投稿に失敗したら run を失敗させる (success で隠さない)
 reset; ev_issue; issue open '[]'; prs '[]'; answer '着手報告のみ'
