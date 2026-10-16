@@ -107,4 +107,8 @@
 
 - 4 関数とも、読出し値が slot 1 の receiver として渡る経路は関数内に無い。0x1046a30 は `[rbp+0x508]` を receiver とする間接 call が `[rbx+0x1f0]` (slot 1 ではない) の 1 件 (0x104ad81)。
 - **未確定 (受入条件の「同インスタンス確定」は 0 件)**: 関数内の流れは確認したが、読出し値が関数の外 (引数として渡った先 0x417fc0・0x40c660・0xd32560 等) で格納され receiver に戻る経路は未追跡。receiver の `[[reg+0xa0/0xb0/0xd0]+0x10]` が TUndoEvent_MovedFXTracks を指すかも未確定。
-- 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py5472_slot1_receivers.py` → 逆アセ行 32 件 (読出し・格納・receiver 取得・slot 1 呼出し) と `[rbp+0x508]` 格納の 1 件 (0x1046a30 内) の完全一致 ALL PASS、終了 0、所要 28.4 秒 (n=1、load average 0.76)。測定 commit `f157ab98e`。probe は文字列の完全一致を固定するだけで、同一インスタンス性は確定しない。
+- 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py5472_slot1_receivers.py` → `EXPECT` の逆アセ行 28 件 (読出し・格納・receiver 取得・slot 1 呼出し) と `[rbp+0x508]` 格納の 1 件 (0x1046a30 内) の計 29 行が完全一致 ALL PASS、終了 0。測定 commit `c11573df5` (修正前 HEAD で実測。所要 36.98 秒、n=1、load average 1.02 (測定直後))。probe は文字列の完全一致を固定するだけで、同一インスタンス性は確定しない。
+- probe が固定していない手読みの結論 (probe 行には無い。上の表の記述はこれらを含むが、文字列としては固定していない):
+  - 0xd328f0: 読出し 4 件のうち 0xd329b2・0xd32a32・0xd32a94・0xd32b50 は probe に無い (引数・コピー先の手読み)。
+  - 0xc3b930: 0xc3bb38・0xc3bb49 (rip 相対 call の引数) は probe に無い。0xc3bb16 の `rax` の元 (`[[rbp+0xd0]+0x10]`) は手読み (probe の `mov [rbp+0x98], rax` は格納のみ)。
+  - 0x1046a30: receiver の根 `[rip+x]` 側は probe に無い。probe が固定するのは `mov rax, [rax]` 以降の `[rax+0x5c]` (2 段) までで、`[rip+x]` の具体的な命令は手読み。
