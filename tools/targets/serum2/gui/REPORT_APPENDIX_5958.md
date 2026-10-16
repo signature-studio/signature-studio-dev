@@ -39,10 +39,9 @@
 
 | 条件 | slot (createView 後 / attached 後 / pump 後 / 格子クリック後 / process 前) | 書込 watch hit | 子ウィンドウ数 (attached 後) |
 |---|---|---|---|
-| attach のみ (`S2HOST_ATTACH=1`) | 0 / 0 / 0 / – / 0 | 0 件 | 1 |
 | attach + 格子 225 点 (`S2HOST_ATTACH=1 S2HOST_CLICKS=1`) | 0 / 0 / 0 / 0 / 0 | 0 件 | 1 |
 
-- attach のみ行は、子ウィンドウ数のログを足す前の実行 (同じ attach 経路・同じ slot 出力)。最終 HEAD の再測定は格子行 (下記) のみ。
+- attach のみ (格子なし) の行は、測定 commit のログで再取得していないため削除した (素材 `plugins-serum2` が無く、測定 commit 由来の値を示せない)。
 - `attached` は `kResultTrue`。子ウィンドウ 1 件が生成されており、editor は実際に開いている。
 - 格子クリックは 225 回すべて送信。非 0 になった点は無し。
 - 完走: `blocks=4 frames=512 nonzero_cells=1020/1024 peak=0.548306` (§2 の seed と同値)。
