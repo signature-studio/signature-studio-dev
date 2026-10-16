@@ -25,7 +25,7 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | (下記 §検証) |
+| 測定 commit | `0de90193c` (コードを変えた最後の commit) |
 | PE block 件数 | 313 (合計 1,262,116,832 B) |
 | `FLEngine_x64.dll` | `block00031_PE.bin` / 22,227,016 B / sha256 `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d` / export 3 件 |
 
@@ -48,4 +48,5 @@ FL 系の関連 DLL (同じ `extracted/` の PE・export 名で確認):
 
 ## 検証
 
-- 再現: `bash tools/plugins/framework/hostshim/hs_flengine_list.sh` (素材 `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst`) が必要)。
+- 再現: `ARTIFACTS_DIR=<素材 dir> bash tools/plugins/framework/hostshim/hs_flengine_list.sh` (素材 `fl-win64` = `fl-win64.tar.zst` が必要)。
+- 測定 (commit `0de90193c`・load 1.48・展開込み 8.0 秒): PE blocks 313・`FLEngine_x64.dll` 1 件・`pe_list.tsv` の sha256 先頭 16 桁 `3d2a043167b7d96c` (2 回の測定で一致)。
