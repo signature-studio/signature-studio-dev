@@ -74,7 +74,9 @@ r1 対 r2 で差が出た 4 KiB ページは 11 枚。image 内 4 枚 (`0x13a500
 
 工程 (run の再現コマンド):
 
-1. build: `FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> FLE_BOOT_TAG=fle5865rerun FLE_BOOT_RUNS=shim bash tools/flelift/boot/fle6_measure.sh`。shim 段が IPP 判定 NG で rc 3 を返したのは想定どおり (下記)。build は gen-A 7 s / lift 81 s / clang-plain 99 s で完了 (fleboot_plain.cjs を作る目的)。
+1. build: `FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> FLE_BOOT_TAG=fle5865rerun FLE_BOOT_RUNS=shim bash tools/flelift/boot/fle6_measure.sh`。build は gen-A 7 s / lift 81 s / clang-plain 99 s で完了し、`fleboot_plain.cjs` は作られている。shim 段の rc 3 は build の失敗ではなく、後段の IPP 判定 (`fle_boot.mjs` の `ptr_15F34A0 != 0` 確認、rc 3) の NG。
+
+IPP 判定 NG の理由 (`boot_summary_fle5865.json` の `boot.py_events`・`ipp`): shim の登録自体は起きている。`ptr_15F34A0` は unit 132 で `0x7f10001c` に書かれ、`ippsZero_8u` は 2 回呼ばれた (`ipp.called`・`ipp.total` = 2)。しかし unit 209 (boot の停止点) で同じ slot が `0x0` に戻り、判定は終了時の値を読むため NG になる。unit 209 の書込み元は未特定。shim 経路は通っており、判定指標 (§4) は登録と呼出しが行われた経路の dump に対する run 間一致を見ている。ただし終了時に登録が保たれていない点は、shim 経路が「正常に成立した」状態ではないことを意味する。この点は本 issue の受入条件の範囲外として残す。run 単位の py_events は 1 run 分 (`boot_summary_fle5865.json`) のみ保存されている。
 2. boot: build の成果物 `work/boot/fleboot_plain.cjs` に対して `node tools/flelift/boot/fle_boot.mjs <絶対パス>/fleboot_plain.cjs <json> --boot-only` を `FLE_IPP=1`・`FLE_TOLERANT=0`・`FLE_DIAG_NULLFILL=0`・`FLE_BOOT_LOG_CAP=0`・`FLE_OUTMEM_DUMP=<repo 外>` で 8 回 (r1〜r8)。`fle6_measure.sh` は boot 段で rc 3 を返すため、8 run は手動 loop で実行した (`fle6_measure.sh` は 1 回で止まる)。
 3. 判定: `python3 tools/flelift/boot/outmem_judge.py <dump dir> --pe <PE>`。
 
@@ -99,13 +101,6 @@ outmem_boot_plain_r1.bin 〜 r8.bin: 判定指標 891b29801d1bd50a (8 本全て)
 検出力: マスク外 1 バイト (0x13a5020) の変更で指標が変わる = True
 RESULT PASS
 ```
-
-注記:
-
-- 判定指標の絶対値は build ごとに違う (§4・§6 の `7aa20126…`・`f39730d3…` と別値)。run 間一致と検出力だけを根拠にする。
-- 停止点 (units 209) は shim 有の既知の値で、本 PR で変えていない。既定経路の 895 units とは別経路 (shim 有は 209 で停止する)。
-- 製品 KPI: 起動の進行 (FLEngine dispatch・通過 unit) は本 PR で変えていない。測定は shim 経路の再現で、既定経路の KPI は動かしていない。
-- `full` (線形メモリ全体) は shim 有でも判定に使わない (従来どおり)。
 
 注記:
 
