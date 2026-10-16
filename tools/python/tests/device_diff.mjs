@@ -236,6 +236,34 @@ mock.state.devAssigned = true;
 mock.state.linkAssigned = true;
 wasm.setDeviceLink(1, 1);
 
+// PY-5407 (#5947): repeatMidiEvent (PE 0xd762f0・"O|ii") と stopRepeatMidiEvent (PE 0xd764a0・引数なし)。device 無しは -7、device 有りは None (述語・vtbl 先の効果は仮置き)
+// eventData は FlMidiMsg (Python 側オブジェクト) で、wasm の bridge は object を運べない (fl_provider.mjs は bytes/scalar/__cb のみ)。値は Uint8Array で代用し、status と arity の経路だけを比べる
+const ev = new Uint8Array([0x90, 60, 100]);
+const repeatRes = {};
+const repeatCases = [
+  [[1, 1], "device.repeatMidiEvent", [ev]], [[1, 1], "device.repeatMidiEvent", [ev, 10, 20]],
+  [[0, 1], "device.repeatMidiEvent", [ev]], [[1, 1], "device.repeatMidiEvent", []],
+  [[1, 1], "device.stopRepeatMidiEvent", []], [[0, 1], "device.stopRepeatMidiEvent", []],
+];
+for (const [[dev, link], name, args] of repeatCases) {
+  mock.state.devAssigned = !!dev;
+  mock.state.linkAssigned = !!link;
+  wasm.setDeviceLink(dev, link);
+  const a = run(mock, name, args);
+  const b = run(wasm, name, args);
+  repeatRes[`${name}(${args.length})/dev${dev}`] = "code" in b ? `code ${b.code}` : b.ok;
+  if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ name, args: args.length, dev, link, mock: a, wasm: b });
+}
+const repeatExpect = {
+  "device.repeatMidiEvent(1)/dev1": null, "device.repeatMidiEvent(3)/dev1": null,
+  "device.repeatMidiEvent(1)/dev0": "code 7", "device.repeatMidiEvent(0)/dev1": "code 5",
+  "device.stopRepeatMidiEvent(0)/dev1": null, "device.stopRepeatMidiEvent(0)/dev0": "code 7",
+};
+if (JSON.stringify(repeatRes) !== JSON.stringify(repeatExpect)) diffs.push({ state: "repeat expect", expect: repeatExpect, wasm: repeatRes });
+mock.state.devAssigned = true;
+mock.state.linkAssigned = true;
+wasm.setDeviceLink(1, 1);
+
 assert.deepEqual(diffs, [], `device 差分 ${diffs.length} 件`);
 assert.deepEqual(rejectDiffs, [], `署名違反が code 5 で拒否されない ${rejectDiffs.length} 件`);
 console.log(JSON.stringify({

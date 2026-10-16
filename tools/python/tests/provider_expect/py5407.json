@@ -1,0 +1,6 @@
+{
+  "tag": "py5407",
+  "refs": ["#5947"],
+  "note": "device repeat 系 2 関数 (PY-5407・#5947)。PE 0xd762f0 (repeatMidiEvent・書式 O|ii) と 0xd764a0 (stopRepeatMidiEvent) の status 経路 (assigned 無し → -7)。述語 0x11d1430 は真と仮定。vtbl 先の効果は未読",
+  "functions": ["device.repeatMidiEvent", "device.stopRepeatMidiEvent"]
+}

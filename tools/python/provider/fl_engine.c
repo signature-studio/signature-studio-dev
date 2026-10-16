@@ -829,6 +829,11 @@ FL_H(device, isDoubleClick) {
     if (!dev_assigned) return fl_err(c, FL_E_DEVICE, "Device not assigned");
     return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error (not implemented: device.isDoubleClick assigned)");
 }
+/* PY-5407 (#5947): PE 0xd762f0 (repeatMidiEvent, 書式 "O|ii"・delay/rate は既定 300) と 0xd764a0 (stopRepeatMidiEvent・引数なし)。
+   dispatch 0xd843d0 の callback (0xd76190 / 0xd76450) は述語 0x11d1430 が真のとき assigned (obj+0x50) の vtbl を呼ぶ。assigned 無し → status -7 (0xd82c20)。
+   述語は真と仮定。vtbl 先の効果 (repeat の 0x90・stop の 0x88) は未読のため状態を持たない */
+FL_H(device, repeatMidiEvent) { NARGS(1, 3); (void)A_INT(1, 300); (void)A_INT(2, 300); if (!dev_assigned) return fl_err(c, FL_E_DEVICE, "Device not assigned"); return fl_ret_none(c); }
+FL_H(device, stopRepeatMidiEvent) { NARGS(0, 0); if (!dev_assigned) return fl_err(c, FL_E_DEVICE, "Device not assigned"); return fl_ret_none(c); }
 FL_H(device, createRefreshThread) { return fl_ret_none(c); }
 FL_H(device, destroyRefreshThread) { return fl_ret_none(c); }
 FL_H(device, fullRefresh) { return fl_ret_none(c); }
