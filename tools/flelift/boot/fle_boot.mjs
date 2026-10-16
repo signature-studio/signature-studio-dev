@@ -452,6 +452,10 @@ if (process.env.FLE_PY106_BIND === '1') {
     const rd64 = (a) => new DataView(m.HEAPU8.buffer).getBigUint64(Number(a), true);
     const head0 = rd64(SLOT_HEAD);
     const getproc0 = m._fle_n_getproc();
+    // FLE_PY106_MM=1: unit 209 で 0 になった GetMem の関数ポインタ (0x13a5c90) を boot 初期値 0x407a50 に戻してから束縛を試す (計測のみ)
+    const mmBefore = rd64(0x13a5c90);
+    if (process.env.FLE_PY106_MM === '1') new DataView(m.HEAPU8.buffer).setBigUint64(0x13a5c90, 0x407a50n, true);
+    console.log('FLEBOOT_PY106MM ' + JSON.stringify({ restore: process.env.FLE_PY106_MM === '1', before: hx(mmBefore), after: hx(rd64(0x13a5c90)) }));
     let threw = null;
     try { m._fle_py_bind_probe(); } catch (e) { threw = classify(e); }
     // throw (exit) の経路でも C 側の計数と名前表を読む。読みは戻り値に頼らず、名前表は空文字まで、計数は前後差で取る
