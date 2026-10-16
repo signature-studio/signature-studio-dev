@@ -85,7 +85,8 @@
 ## 9. 間接 call の具象型の上界 (#5843 / ICALL-119)
 
 - 測定 commit: `0469f6e6d` (`vtable_r13.py` の判定修正。`tools/icall/vtable_r13.py` の最後のコード変更 commit)。
-  検証起点: `66d518bf9` (前 commit)。差分: `git diff 66d518bf9 HEAD -- tools/icall/vtable_r13.py` (19 行変更・`REPORT` の数値はこの判定に依る)。
+  前 commit: `66d518bf9` (旧判定)。
+  測定 commit から HEAD までのコード差分: `git diff 0469f6e6d HEAD -- tools/icall/vtable_r13.py` の出力は 0 バイト (差分 0。後続の commit は本 REPORT のみ)。
 - 素材: `plugins-freshair` の `Fresh Air.Win.zip` から展開した `SlateCore.core_64` (36,285,952 B・sha256 `2cf759f712adf955a56684df4b24454690ac878105d4433de16c88626a45dd3b`・一致)。
 - 測定手順: `objdump -d -M intel <SlateCore.core_64> > tools/icall/work/core64.dsm` (全量 4,553,159 行・real 4.782 s・user 4.586 s・測定前 load average 0.28)。続けて `python3 tools/icall/vtable_r13.py <SlateCore.core_64> tools/icall/work/core64.dsm` (real 7.619 s・user 7.163 s・測定後 load average 0.39)。
 - 実測 (`vtable_r13.py`・測定 commit `0469f6e6d`):
