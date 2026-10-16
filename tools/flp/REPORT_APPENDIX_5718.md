@@ -98,3 +98,13 @@ WAIT=90 bash tools/flp/s6_pred_hit_probe.sh               # pred・loop にブ�
 - 未確認: 表 (`0xed0bb0`) を読む間接呼出し箇所の特定。`0x1004a20` は表に載らない (同じ slot 検索で 0 件)。
 - 次の一手: 表の base を載せる命令 (`lea` / `mov` で `0xed0bb0` 付近を指すもの) と、`call *` のレジスタ・インデックスの組を追う。実行時の確認は段 1b (GUI 操作あり) へ回す。
 - この run では wine64 / gdb を導入していない。`ptrace_scope` も変えていない。
+- 再実行 (review round 1 の再現・実測): `fl-win64.tar.zst` から `extracted/block00031_PE.bin` を展開 (real 1.645 s)。`python3 tools/flp/s9_fnptr_scan.py <bin> 0xed2ac0 0x1004a20 0x12d94f0 0x12d8d30` の結果は 上記と同一 (`0xed2ac0`: 8byte 1 件・4byte 1 件 (file `0xad0120`)、他 3 件は 0 件)。script の測定 commit は `c8093e31c` (以後 `tools/flp/*.py`・`*.sh` は未変更)。
+
+### 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 表 (VA `0xed0bb0`) を読む `call *` の特定 (base を載せる命令と index の組) | loop `0x12d94f0` への間接経路が確定しない | #5718 (継続・同 issue にコメント) |
+| `0x1004a20` の上位 (直接 call 31 関数) の扱い。表には載らない | 上位トリガの候補が閉じない | #5718 (継続) |
+| 上位トリガ (GUI 操作のどの操作で `0xed2ac0`・`0x1004a20` に入るか) | loop の入力述語 (受入) が未確定 | #5718 (段 1b・GUI 操作による実行確認) |
+| GUI 操作による loop の入口命中の確認 (§4・§8) | 述語 `G1 > 1 && pred(G1)` が静的な読みのまま | #5718 (段 1b) |
