@@ -149,11 +149,13 @@ python3 tools/m11/frame_share/callsite_audit.py tools/m11/work/m11_image.bin 0x6
 
 ### SHX-T56 表復元 (画像全体, 2 回目の run)
 
-- 測定 commit: 本 PR のコード変更は `tools/m11/frame_share/scan_table_refs.py` の追加のみ。`git diff 739b46e2d HEAD -- tools/m11/frame_share` で確認する。
+- 測定 commit: 本 PR のコード変更は `tools/m11/frame_share/scan_table_refs.py` と `tools/m11/frame_share/scan_jmp_tables.py` の追加・本節の修正のみ (測定は `scan_table_refs.py` を 8d5340d8a 時点で実行し、`scan_jmp_tables.py` は本 commit で追加)。
 - 素材: `work-m11` の `m11_image.bin` (22515781 byte) を使い、`objdump -D -b binary -m i386:x86-64 -M intel` で全体 6111956 行に展開した。
-- 間接 `jmp reg` は 612 件 (`jmp <reg>` 形式・`ff /4`)。`jmp QWORD/DWORD PTR [...]` 形式は別途 3299 件を数えたが、`call` の `FWORD` 等を含むため、表経由の飛び先の判定は `jmp reg` を基準にした。
-- 方法 A (jmp と表の対応づけ): 各 `jmp reg` の直前 40 命令の窓で `movsxd/movsx/movzx/mov` の添字読み出しと rip 相対 `lea` の基底を対応づけ、基底 + 相対値 (1/2/4 byte・scale 1〜8・先頭 512 エントリ) を復元した。`0x6906d7` を指すエントリは **0 件**。
-- 方法 B (全基底の総当たり): rip 相対参照の target 55889 種類のうち画像内の 38330 件を基底として、同じ形式で `0x6906d7` を指すエントリを検索 (`tools/m11/frame_share/scan_table_refs.py`)。候補は 4 件で、すべて基底 `0x688f88` の 16bit・scale 1 の一致。`0x688f88` は `addsd xmm0,QWORD PTR [rip+0x20]` の倍精度定数読み出しで、表ではない (偶然一致)。
+- 間接 `jmp reg` は 612 件 (REX・セグメント接頭辞なしの `jmp <reg>` 形式。接頭辞付きの 17 件を含めると 629 件)。`jmp QWORD/DWORD PTR [...]` 形式は表経由の飛び先の判定の対象外 (`call` の `FWORD` 等を含むため数えていない)。
+- 方法 A (jmp と表の対応づけ): `tools/m11/frame_share/scan_jmp_tables.py` で、各 `jmp reg` の直前 40 命令の窓から、添字読み出し (`*scale` を含む `mov/movzx/movsx/movsxd`) と rip 相対 `lea` の基底を対応づけ、基底 + 相対値 (1/2/4/8 byte・scale 1〜8・先頭 512 エントリ) を復元した。結果: `jmp reg` 612 件・添字読み出しと基底を両方含む窓 3 件・`0x6906d7` を指すエントリ **0 件**。
+- 方法 B (全基底の総当たり): `tools/m11/frame_share/scan_table_refs.py`。rip 相対参照の target 55889 種類のうち画像内の 38330 件を基底として、同じ形式で `0x6906d7` を指すエントリを検索。候補は 4 件 (基底 `0x688f88` の 16bit・scale 1 が 3 件、scale 2 が 1 件)。
+- 候補 4 件の確認 (基底 `0x688f88` は表ではないこと): `grep -E '#\s+0x688f88$' work/image_disasm.txt` の出力は 1 件のみで、`688f60: f2 0f 58 05 20 00 00  addsd xmm0,QWORD PTR [rip+0x20]  # 0x688f88` (倍精度定数の読み出し)。この基底を参照する `jmp reg` の窓も 0 件。`0x688f88` の先頭 16 B は `00 00 00 e0 ff ff df bf 56 53 48 83 ec 28 48 89` で、`0x6906d7` を指す表ではない (偶然一致)。
+- 再現手順: `objdump -D -b binary -m i386:x86-64 -M intel work/m11_image.bin > work/image_disasm.txt` の後、`python3 frame_share/scan_jmp_tables.py work/m11_image.bin work/image_disasm.txt` (方法 A) と `python3 frame_share/scan_table_refs.py work/m11_image.bin work/image_disasm.txt` (方法 B・約 60 s)。`work/m11_image.bin` は `FL_WIN64_DIR=<展開先> python3 m11_image_gen.py <展開先>/extracted/block00031_PE.bin` で作る (22,515,781 B)。
 - 結論: 画像内の表から `0x6906d7` を指すエントリは検出されなかった (方法 A 0 件・方法 B は偶然一致のみ)。関数内からの到達も無い (前節)。この範囲で「表経由の到達は無い」と扱う。ただし上の限界の範囲 (窓外の間接ジャンプ・表でない計算による飛び先) は残るため、確定ではなく「未検出」の結論とする。
 - 限界: 方法 A は直前 40 命令の窓に依存する。方法 B は偶然一致を含みうる (本件は 4 件とも表でないと確認)。線形逆アセンブルのずれも残る。機械的に復元しきれない間接ジャンプ (関数ポインタ・テーブル以外の計算) は対象外。
 
