@@ -58,29 +58,27 @@ node trap_triage/probe5695_nz.mjs                # 0x12ba808 近傍の非 0 バ�
 
 ## 5. 2 回目 run: IR store 計装による arg1 の書込み監視 (結論: IR store の書込みは 0 件)
 
-**検証状態: クリーン HEAD では未再現**。以下の値は、main 共有 worktree の `tools/m11/work/` を `m11_gen_ir2.sh` で作り直した後
-(`cp -al` で worktree と inode を共有した状態) に得た。`work-m11`・`[EMSDK]`・`[RETDEC]` の素材が本 run に無く、
-`git worktree add --detach <dir>/work/wt_verify HEAD` での再現はできていない。共有 work の作り直しで検証スナップショットが変わった可能性があり、
-その影響は本 run では判定できない (`docs/WORKFLOW.md` §6)。下表の値は、クリーン HEAD で再測定するまでは参考値として扱う。
+測定 commit: `09ceb363a` (HEAD のクリーン worktree `git worktree add --detach` で測定。コードを変えた最後の commit は `086abd95a`)。
+`git diff 086abd95a HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行 (実行コードの差分 0)。
 
-測定 commit: `086abd95a` (コードを変えた最後の commit。`trap_triage/watch_arg1_5695.c` の追加のみ)。
-`git diff 086abd95a HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行 (測定時のコードと HEAD が一致)。
-
-手順: `m11_gen_ir2.sh` (ldfix applied) → `ALLOCA_SKIP=1 M11_WATCH_SRC=trap_triage/watch_arg1_5695.c bash trap_triage/store_watch_1783.sh <tag>`
+手順 (すべてコミット済み HEAD の内容。`work-m11` ・`toolchain-*`・`fl-win64` は本 run の素材から展開):
+`m11_gen_ir2.sh` (52 s・rc 0・ldfix applied) → `ALLOCA_SKIP=1 M11_WATCH_SRC=trap_triage/watch_arg1_5695.c bash trap_triage/store_watch_1783.sh <tag>`
 (全 store 計装 15,028 site・survey は全 942 unit を順に実行)。`[a1]` は範囲 `[0x12ba808+0x778, 0x12ba808+0x814)` と store の範囲が重なる書込み。
 
 | 測定 | 値 | 備考 |
 |---|---|---|
-| コミット `086abd95a` のコードの survey (計装 ON・共有 work 由来・未再現) | 62 s・ok 873 / miss 47 / halt0 6 / oob 15 / noproc 1・`[a1]` 0 件 | load 0.94 (開始前)・0.94 (終了後) |
-| 陽性対照 `0x10aa1428` (4B 範囲) | `[a1]` 20 件 (unit -1 / 134 / 144 ほか) | 監視 C の範囲だけを変えた (非コミット)。HEAD の内容からは再現していない (本 PR では未再現) |
-| 陰性対照 `0x10a9f910` (REPORT_1046 の番地) | `[a1]` 0 件 | 共有 work 由来。この build では書込みが観測されない (REPORT_1046 の番地は本 build の対照にならない) |
-| 範囲 `[0x12ba808, +0x1000)` | `[a1]` 88 件。store offset は 0x818・0x81c・0x820・0x840・0x848・0x850・0x858・0x868・0x878・0x888 | 5 フィールド (+0x778・+0x7d8・+0x7f0・+0x808・+0x810) への書込みは 0 件 |
+| クリーン HEAD・計装 ON・survey 1 回目 | 60 s・ok 873 / miss 47 / halt0 6 / oob 15 / noproc 1・`[a1]` 0 件 | load 0.78 (開始前) |
+| 同・survey 2 回目 | 69 s・ok 871 / miss 47 / halt0 7 / oob 16 / noproc 1・`[a1]` 0 件 | load 1.08 (終了後) |
+| 陽性対照 `0x10aa1428` (4B・コミット済み `watch_addr_1046.c` に `M11_WATCH_1783=0x10aa1428`) | `[aw]` 22 件 (unit -1 / 134 / 830 ほか)・ok 870 / oob 17 | HEAD の内容のみで再現 |
+| 陰性対照 `0x10a9f910` (同) | `[aw]` 0 件・ok 871 / oob 16 | HEAD の内容のみで再現 |
+| 範囲 `[0x12ba808, +0x1000)` の `[a1]` 88 件 | 未再現 | 前 run の値は非コミットの C 由来。本 PR では数値を書かない |
 
-解釈 (共有 work 由来の値。未再現):
-- 監視の仕組みは動いている (陽性対照で検出)。5 フィールドは 942 unit の survey 中に **本 build の IR store では 1 回も書かれない**。
+解釈 (クリーン HEAD で 2 回実測):
+- 監視の仕組みは動いている (陽性対照で検出、陰性対照で 0 件)。5 フィールドは本 build の survey 中に **IR store では 1 回も書かれない** (2 回とも `[a1]` 0 件)。
+- survey の内訳は実行ごとに揺れる (ok 871〜873、oob 15〜17)。基準値は 1 点ではなく、この幅で読む。
 - `initial= 0 0 0 0 0` (boot 後) から 0 のまま。IR store に書込みが無いので、書込み元の特定は IR store 計装の範囲では行えない。
 - 残る書込み経路は C 側 (`memcpy`・`rep movs` 等の runtime 関数)。store 計装 (`watch_store_682.py`) はそれを映さない (`rep_watch_3972.py` の注記)。C 側を見るには `m11_rt`/`m11_win` の copy に監視を入れる必要がある (未実施)。
-- 本 build の survey (ok 873 / oob 15) は PR #5707 の測定 (ok 875 / oob 14) と一致しない。`m11_gen_ir2.sh` を作り直したためで、計装の影響ではない (計装 OFF の基準は未測定)。
+- PR #5707 の測定 (ok 875 / oob 14) とは一致しない (e2e・build の差。計装 OFF の基準は未測定)。
 
 ## 6. 次の一手 (未解決)
 
