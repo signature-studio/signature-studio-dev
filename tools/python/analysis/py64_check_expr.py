@@ -70,6 +70,13 @@ EXPANDED += [  # G2・G3 (#5905): 展開版 (ExpSlicer) で突合する。d_in �
     (0x104af7f, G23_F.format(p=P18)),
     (0x104b093, G23_TBL.format(s578=S578, s574=S574, off="0x138")),
 ]
+# G5・G4 (PY-4909): 手計算 (逆アセンブル 0x104aa97・0x104aabe・0x104b2aa・0x104b2de・0x104b744 の代入元を 1 本ずつ追う)。
+# [rbp+0x580] = (and(c_in,0xffff)+0x70000000) - 0x70002000 (0x104b2aa)、[rbp+0x3e0] = *(0x15e06a0) + imul(s578,0x28f)*8 (0x104b2de)。
+# 0x104bebf・0x104bffa は ACC の合流・⚠合流を含むため未確定 (本表には入れない)。
+EXPANDED += [
+    (0x104b5aa, f"*(*(0x15e06a0) + imul({S578},0x28f)*8 + (and(c_in,0xffff) + 0x70000000 - 0x70002000)*8 + 0x394)"),
+    (0x104b94e, f"*(*(0x15e06a0) + imul({S578},0x28f)*8 + 0x384 + (and(c_in,0xffff) + 0x70000000 - 0x70001fc0)*4)"),
+]
 
 TOKEN = re.compile(r"\s*(\*\(|0x[0-9a-fA-F]+|\d+|[A-Za-z_][A-Za-z0-9_]*|[()+\-*·,])")
 FUNCS = ("shl", "imul", "and", "shr")  # 1〜2 引数の関数形 (#5905)

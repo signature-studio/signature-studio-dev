@@ -66,6 +66,13 @@ python3 analysis/py64_check_expr.py work/py53/fn.txt --negctl p2   # exit 1
 
 残り 4 地点 (0x104b5aa・0x104b94e・0x104bebf・0x104bffa) は展開しても `SLOT`・`…` (深さ上限) が残る。分岐を越える経路を手で追う必要があり、本 run では式を確定していない。親 #5313 の本文に残す (新しい子 issue は作らない)。
 
+### 6.1 PY-4909 (#5313) の追記: 0x104b5aa・0x104b94e を HAND 表に追加
+
+- 手計算 (逆アセンブルの代入元を 1 本ずつ追った): `[rbp+0x580]` = `(and(c_in,0xffff)+0x70000000) − 0x70002000` (0x104b2aa)・`[rbp+0x3e0]` = `*(0x15e06a0) + imul(s578,0x28f)*8` (0x104b2de)。0x104b94e は `[rbp+0x580]` = `(…) − 0x70001fc0` (0x104b744)。
+- 突合: `py64_check_expr.py` の `EXPANDED` に 2 件を加えた (commit 48684b32f)。HEAD 測定の結果は `# expanded n=7 mismatch=0`・exit 0。既存の `# n=8 mismatch=0` も再現。
+- 注意: 手計算式は機械展開 (`py99_slot_paths.expand`) と同じ形に組んでいる。値の独立検算は未了。
+- 未確定: 0x104bebf (ACC の合流 0x104b954 を含む)・0x104bffa (`⚠合流@0x104bd49`・`⚠合流@0x104be63` が残る)。これら 2 地点は本表に入れていない。
+
 ## 7. RMW store の式化 (PY-5399 / #5904・#5312 の単位 A)
 
 - 対象: 直前の store が同じスロットへの ARITH の RMW (`shr dword ptr [rbp+0x31c], 0x10` at 0x104aaae) のとき、`py88_writes.py` の `mem_read` は `SLOT[rbp+0x31c]?` で止まり、`py99_slot_paths.py` の `store_value` は `OP:shr` を返していた。
