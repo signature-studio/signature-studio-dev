@@ -56,6 +56,8 @@ def main():
     results.append(("0x1331340 reads this+0x38", any(s == "mov rax, qword ptr [rcx + 0x38]" for _, s in chain)))
     results.append(("0x1331340 passes [this+0x38]+0x48 as new value", any(s == "lea rdx, [rax + 0x48]" for _, s in chain)))
     helper = insns(0x41A7B0, 25)
+    fallback = insns(0x1331362, 5)
+    results.append(("0x1331340 re-stores default when out is NULL", fallback[0][1] == "cmp qword ptr [rbx], 0" and fallback[3][1] == "mov rdx, qword ptr [rip + 0x63d9c6]"))
     results.append(("0x41a7b0 AddRef new value via [rax+8]", any(s == "call qword ptr [rax + 8]" for _, s in helper)))
     results.append(("0x41a7b0 Release old value via [rax+0x10]", any(s == "call qword ptr [rax + 0x10]" for _, s in helper)))
 
