@@ -181,10 +181,10 @@ wasm func 123 は sbrk 相当で、break 値を線形メモリ `269004816` (`0x1
 | 同 shift 128 MiB ×1 | trap は ctor 109 (completed 108)。break は image の手前 (`0x2fdf1000`) で止まる |
 
 分かったこと:
-- 停止の機構: ctor 1 回ごとに break が約 3.5 MiB (増分 3670016〜3674112 B) 押し上げられ、解放は break に戻されない (break は単調増加)。145 回目の終わりで break は image 基底 `0x30000000` の直前まで来る。増分が 14 × 262144 B と一致するのは算術上の一致で、割り当て個数は未計数 (推測)。146 回目の ctor 内で break が image に入り、calloc が image 内の領域を返す (§3h の 10 件)。その 8 番目 `0x301d3e40` の 262144 B が vtable `0x30203BD0` を覆って 0 にする (§3g)。vtable が 0 になった後で `call [rax+0x38]` (`18011d9f9`) が VA 0 を呼び、abort する (§3e)。
+- 停止の機構: ctor 1 回ごとに break が約 3.5 MiB (増分 3670016〜3674112 B) 押し上げられ、解放は break に戻されない (break は単調増加)。145 回目の終わりで break は image 基底 `0x30000000` の直前まで来る。増分が 14 × 262144 B と一致するのは算術上の一致で、割り当て個数は未計数 (推測)。146 回目の ctor 内で break が image に入り、calloc が image 内の領域を返す (§3h の 10 件。§3g・§3h の本文は `REPORT_APPENDIX_5403.md` に分割移動した)。その 8 番目 `0x301d3e40` の 262144 B が vtable `0x30203BD0` を覆って 0 にする (§3g)。vtable が 0 になった後で `call [rax+0x38]` (`18011d9f9`) が VA 0 を呼び、abort する (§3e)。
 - 機構の鎖は、break が image に届く → calloc が image 内を返す → 0 埋めで vtable が壊れる → 間接呼び出しが 0 へ飛ぶ、で閉じる。
-- 起動直後の break 押し上げ量と trap する ctor 番号が直線的 (shift 0 / 32 / 64 / 128 MiB で 146 / 137 / 128 / 109)。1 ctor あたり約 3.5 MiB を使うことと整合する。
-- 「146 で止まる」は ctor の番号の性質ではなく、break と image 基底の距離 (`0x30000000 − 0x2ff94000` = 約 3.5 MiB、145 回目までの積み上げ) の結果と読める。
+- 起動直後の break 押し上げ量と trap する ctor 番号が直線的 (shift 0 / 32 / 64 / 128 MiB で 146 / 137 / 128 / 109)。shift との差を trap 番号の差 (9 / 18 / 37 ctor) で割ると 1 ctor あたり 3.56 / 3.56 / 3.46 MiB で、1 ctor あたり約 3.5 MiB と概ね整合する (trap 番号は整数のため、厳密な一致ではない)。
+- 「146 で止まる」は ctor の番号の性質ではなく、break と image 基底の残余 (`0x30000000 − 0x2ff94000` = 442368 B = 約 0.42 MiB) の結果と読める。残余が 1 ctor の増分 (約 3.5 MiB) より小さいため、146 回目の ctor の中で break が image に入る。
 
 未確定:
 - 1 ctor が約 3.5 MiB を解放せず積む理由 (割り当ての個数・解放経路は未計数。ctor 側の leak か、同一 instance に繰り返し呼ぶ harness の前提の違いかは未確定)。実機 (Chrome・AudioWorklet) で同じ積み上げが起きるかは未確認。
