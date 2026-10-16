@@ -13,7 +13,7 @@
 ## 1. 測定
 
 - 測定 commit: **`75a400c4f`** (origin/main・枝 `4143-plg-p0b-44` の起点。stage-2 のパイプラインのコードは変更していない)。
-- 素材: `work-fw-stage1`・`work-liftlib`・`fl-win64` (block18983/00031) を `$HOME/artifacts` から展開。`fl-win64` のみ `$RUNNER_TEMP/fl-win64` へ展開。
+- 素材: `work-fw-stage1`・`work-liftlib`・`fl-win64` (block18983/00031) を artifact 置き場から展開 (`docs/WORKFLOW.md` §11)。`fl-win64` は member 2 本のみ `FL_WIN64_DIR` 配下へ展開。
 - stage-1 (RetDec 8 chunk) は**再実行していない**。`work-fw-stage1` の `r2`/`r3.restored.ll`・`fw_icall.dll`・`fw_map.json` を再利用。`fw_stage2.sh` は `--fresh` なしで実行 (`fw_all8.ll` 等の merge 中間は素材に無いため再生成される)。
 - 実行環境: runner 4 vCPU・RAM 15 GiB。load は stage-2 終了時点で 2.04 1.98 1.00。
 
