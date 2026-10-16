@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # hs_flengine_list.sh — fl-win64 素材から FLEngine 実体 (PE) の一覧を作る (#5923)。
-#   bash hs_flengine_list.sh
+#   ARTIFACTS_DIR=<素材 dir> bash hs_flengine_list.sh
 # 入力: $ARTIFACTS_DIR/fl-win64.tar.zst (展開先は $RUNNER_TEMP/flw)
 # 出力: work/flengine/pe_list.tsv (全 PE block の一覧、gitignore 対象)
 #       stdout に FLEngine_x64.dll の確定行。
@@ -9,7 +9,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
-SRC="${FL_WIN64_TAR:-${ARTIFACTS_DIR:-$HOME/artifacts}/fl-win64.tar.zst}"
+SRC="${FL_WIN64_TAR:-${ARTIFACTS_DIR:?ARTIFACTS_DIR を設定する}/fl-win64.tar.zst}"
 TMP="${RUNNER_TEMP:-/tmp/opencode}/flw"
 OUT="$ROOT/tools/plugins/framework/hostshim/work/flengine"
 
