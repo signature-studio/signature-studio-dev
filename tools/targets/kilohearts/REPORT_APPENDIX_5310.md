@@ -19,7 +19,7 @@
 
 ## 素材
 
-- `ARTIFACTS_DIR` (`$HOME/artifacts`) には `fl-win64.tar.zst` のみ。`tar --zstd -tf` で `HeartCore.core_64` / `plugins-kilohearts` は見つからなかった。
+- 素材ディレクトリ (`ARTIFACTS_DIR`) には `fl-win64.tar.zst` のみ。`tar --zstd -tf` で `HeartCore.core_64` / `plugins-kilohearts` は見つからなかった。
 - そのため `void_ret_check.sh` の実出力 (下の表) は、本 PR で `HeartCore.core_64` に対して再実行していない。表は前回 (#5820・#5841) の確認結果。
 
 ## 呼出し点の照合 (前回の `void_ret_check.sh` 実出力)
