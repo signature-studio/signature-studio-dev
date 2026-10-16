@@ -65,3 +65,11 @@
 
 ## コード差分の証跡
 - `git diff 9c55235ba HEAD -- tools/shared/lift/ildsp/native_ref_wc.c tools/shared/lift/ildsp/native_image.py`: 本付録の commit 時点で空 (差分 0)。測定 commit (`9c55235ba`) 以降はコードに変更がないため、再測定は不要 (`docs/WORKFLOW.md` §6)。
+
+## 10. imp_RaiseException の扱い — T-SH-154 (#5789)
+- 判断: **据え置き** (`wc_glue.c` の `imp_RaiseException` は `STUB_RET(0)` のまま)。CreateInstance 側 (`ci_iat.c`・RaiseException を記録して exit 3 で停止) とは統一しない。統一すると WaveformColouring の既存の測定値 (§7・PASS 64/64) が変わるおそれがあるため。統一するなら、先に差分テストの値が変わらないことを示す (受入 2 の条件)。
+- 食い違いの扱い: 同じ IAT 名 (`RaiseException`) に停止規約が二つ並ぶ。WaveformColouring 側は 0 を返して続行し、CreateInstance 側は停止する。正常系では両方とも 0 回 (§1 の表) なので、現時点の測定には影響しない。例外 path の catch 先の扱いは §7 の未解決 (#3216) のまま。
+- 再測定 (測定 commit `07cc0f7c2`・コードは同 commit の `wc_glue.c` のコメント 1 行のみ変更): `FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<emsdk_env.sh (emsdk 6.0.12)> bash tools/shared/lift/ildsp/lift_wc.sh all`。
+  - 本検査 `ok`: x64c `functions 60・insns 2656・unsup {}・traps 0`、wasm 172,024 B、`wc diff cases=64 PASS=64 FAIL=0 excluded=0`、rc 0、2.22 s、load 0.72 0.35 0.14 → 0.72 0.35 0.14。
+  - ネガコン `neg-cmp` (wasm 結果を反転): `FAIL=64`、rc 1 (期待どおり FAIL を検出)。`ALL OK`。
+  - コード差分の証跡: `git diff 07cc0f7c2 HEAD -- tools/shared/lift/ildsp ':!tools/shared/lift/ildsp/REPORT*.md'` の出力は 0 行 (本節の REPORT の追記後も、実行コードの差分は 0)。`docs/WORKFLOW.md` §6 により、再測定は不要。
