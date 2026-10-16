@@ -59,6 +59,12 @@ def main():
     results.append(("0x41a7b0 AddRef new value via [rax+8]", any(s == "call qword ptr [rax + 8]" for _, s in helper)))
     results.append(("0x41a7b0 Release old value via [rax+0x10]", any(s == "call qword ptr [rax + 0x10]" for _, s in helper)))
 
+    full = [s for _, s in insns(0xD80A40, 200)]
+    results.append(("getColor channel path gated by 0x132f780", "call 0x132f780" in full))
+    results.append(("getColor channel obj from 0x1005730", "call 0x1005730" in full))
+    results.append(("0x132f780 = cmp [obj+0x64], 0 (setge)", any(s == "cmp dword ptr [rcx + 0x64], 0" for _, s in insns(0x132F780, 2))))
+    results.append(("slot path obj = [mixer + index*0x28f*8 + slot*8 + 0x134c]", "imul rcx, rcx, 0x28f" in full and "mov rsi, qword ptr [rax + rcx*8 + 0x134c]" in full))
+
     ok = True
     for name, passed in results:
         print(("PASS" if passed else "FAIL"), name)
