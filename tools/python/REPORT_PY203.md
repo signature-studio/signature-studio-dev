@@ -238,3 +238,14 @@
 - 含意: オフセットだけでは格納先オブジェクトの型を区別できない。0xd843d0 の第 1 引数 (rbx) の型を決める上流は未特定。受入の「ENTRY の呼出し元」は未達のまま。
 
 **受入は未達**。0xd843d0 の上流 (rbx の型と第 1 引数の出どころ) を型つきで追う必要がある。
+
+### 6.9 #5407: 0xd843d0 の第 1 引数 (rbx) の 1 段分類 (`analysis/flapi/pe_py273_d843_arg1.py`)
+
+測定 commit: `0947c8554` (スクリプトを追加した commit = HEAD)。`git diff 0947c8554 HEAD -- tools/python/analysis/flapi` は 0 行。素材は `fl-win64` の `block00031_PE.bin`。exit 0・36.3 秒・同 commit の 2 回目の出力と一致。
+
+- 0xd843d0 の直接呼出しは 164 箇所 (`pe_callgraph.py callers`)。各呼出し直前の rcx 族を `pe_py203_edx_sites.resolve` で 1 段分類した。
+- 内訳: COPY 144 (rbx ← `[rax]` 115・rax ← `[rax]` 25・rsi ← `[rax]` 4)、AMBIG 19 (copy rbx 18・copy rsi 1。いずれも主経路は `[rax]` の読込み)、ENTRY 1 (0xd84798 の ecx)。
+- 含意: 第 1 引数の大半は、`[rax]` の読込み値 (ポインタ) を受け取る。この読込み元の基底 rax は本測定では未分類。ENTRY 3 件の格納先 (rbx) の型は、この基底を追うまで決まらない。
+- 未確定: AMBIG 19 件の合流元 (`merge` の注記)。`[rax]` の rax の上流。ENTRY 1 件 (0xd84798) の直接呼出し元。
+
+**受入は未達**。第 1 引数の 1 段分類まで。残りは #5407 の受入として残す (親 #4588 は CLOSED)。
