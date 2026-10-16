@@ -122,7 +122,7 @@ test("検出 no_pr: split / stop は即、unknown は再投入済みのときだ
   assert.ok(!targets(ctx).includes("no_pr#24"));
 });
 
-test("検出 no_pr: 偽の outcome (非 bot) とラベルの無い issue は対象外。最後の outcome で判定する", async () => {
+test("検出 no_pr / stopped_report: 偽の outcome (非 bot) と oc:no-pr の無い split は no_pr にしない。ラベルの無い停止行は stopped_report で回す。最後の outcome で判定する", async () => {
   const ctx = await configuredApp();
   await sendAll(ctx, [
     ["issues", issueEv(30, { labels: ["oc:no-pr"] })],
@@ -133,7 +133,7 @@ test("検出 no_pr: 偽の outcome (非 bot) とラベルの無い issue は対�
     ["issue_comment", commentEv(32, { login: IMPL }, outcomeBody("split"), at(10))],
     ["issue_comment", commentEv(32, { login: IMPL }, outcomeBody("artifact", 2), at(20))],
   ]);
-  assert.deepEqual(targets(ctx), []);
+  assert.deepEqual(targets(ctx), ["stopped_report#31"]);
 });
 
 test("検出 needs_decision: KEY に一致する最新の CHANGES_REQUESTED で、その後に PM 応答が無いもの", async () => {
@@ -443,7 +443,7 @@ test("ネガコン (f): dry-run では fetch の POST が 0 回。/status の wo
   assert.deepEqual(s.would_dispatch_pm.map((x: any) => `${x.kind}#${x.ref}`), ["stuck#10", "stuck#11", "no_pr#20"]);
   assert.equal(s.counters.wouldDispatchPm, 3);
   assert.equal(s.counters.pmDispatched, 0);
-  assert.deepEqual(s.pm_detected, { user_answered: 0, needs_decision: 0, stuck: 2, no_pr: 1, refs_orphan: 0, critical: 0 });
+  assert.deepEqual(s.pm_detected, { user_answered: 0, needs_decision: 0, stuck: 2, no_pr: 1, refs_orphan: 0, stopped_report: 0, critical: 0 });
   // dry-run でも抑止は効く (同じ記録を毎分増やさない)
   await ctx.app.engine.pmDispatch(gh);
   assert.equal((ctx.app.engine.status() as any).counters.wouldDispatchPm, 3);

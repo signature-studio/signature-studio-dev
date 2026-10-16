@@ -130,9 +130,15 @@ export function buildLaunchBody(artLine: string, focus?: number, recheck = false
 }
 
 // PM の再投入の意図 (<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->) を、Worker が /oc として投稿してよいか。
-// bot: コメントの書き手が実装 App か。issue: マーカーの issue=、arts: 素材名の並び、focus: 生の字句 (無ければ null)。
+// 書き手の区分 (author): impl = 実装 App、pm = PM App (oc-pm の run の identity。#5146 以降の PM agent)、other = 第三者 (拒否する)。
+// #5722: #5146 で oc-pm の投稿が実装 App から PM App に変わり、PM の意図が author で拒否されていた。測定の所在は #5722 の PM 判断コメント。
+export type RelaunchAuthor = "impl" | "pm" | "other";
+// 保存値の互換: 旧版 (#5146 まで) の値は bot (実装 App の投稿か) だけを持つ。author が無ければ bot=true を impl とし、それ以外は other (第三者と同じ扱い)。
+export const relaunchAuthorOf = (r: { author?: RelaunchAuthor; bot?: boolean }): RelaunchAuthor => r.author ?? (r.bot ? "impl" : "other");
 export interface RelaunchIntent {
-  bot: boolean;
+  author?: RelaunchAuthor;
+  // 旧版の保存値だけが持つ (author が無いときの互換に使う)。
+  bot?: boolean;
   issue: string;
   arts: string;
   focus: string | null;
@@ -148,7 +154,7 @@ export function checkRelaunchIntent(
   executedMs: number[],
   nowMs: number,
 ): { ok: true; art: string; focus?: number } | { ok: false; reason: IntentReject } {
-  if (!r.bot) return { ok: false, reason: "author" };
+  if (relaunchAuthorOf(r) === "other") return { ok: false, reason: "author" };
   if (r.issue !== String(n)) return { ok: false, reason: "issue" };
   if (!artsAllowed(r.arts)) return { ok: false, reason: "arts" };
   if (r.focus !== null && !/^[1-9]$/.test(r.focus)) return { ok: false, reason: "focus" };
