@@ -168,15 +168,15 @@
 
 ### 3.9 追補 (MX-61 #5656・`scripts/mx61_entry_xmm2_paths.py`・実測)
 
-- **注意 (表は旧値)**: 以下の表と結論は `int3` 詰め物の修正 (`88577641f`) より前の script の出力。§3.10 で結論を撤回した。表の値は HEAD で再測定していない (未実施・素材 `plugins-massivex` が run に無かった)。
-- 測定 commit (表の値): `3c6e8d460`。script は `88577641f` で変更済みのため、現在の script の出力とは一致しない。
+- 表は HEAD `457fd052d` で再測定 (7 行一致・`0x18017b460` は §3.10 の値)。`0x18017b460` の行は HEAD の出力で差し替えた。表の判定列の結論は §3.10 で撤回・保留に直した。
+- 測定 commit: `457fd052d` (script の最後の変更は `88577641f`)。`457fd052d` 以降で `scripts/` は変わっていない。
 - 測定条件: `plugins-massivex` を `$RUNNER_TEMP/mx` に展開 (6.5 秒) → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` (11.1 秒・`md5-ok 0/125` は既知事象) → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` 一致。
 - 方法: 関数入口の xmm2 (呼出元の値) を、経路上で読むか・残したまま call するか・上書きするかを辿る。直接 call は callee を深さ 2 まで同じ判定にかける。間接 call (`call [reg+...]`) は target 不明として pass に数える。
 - 測定: `python3 mx61_entry_xmm2_paths.py "<vst3>" 0x18017b460 0x18017b680 0x180198700 0x1801e47c0 0x1801ef4b0 0x1801f36a0 0x1803bef80 0x18104aea0` (exit 0・0.15 s)。
 
 | 入口 | 入口 xmm2 を読む命令 | 残したまま call | unknown | 判定 |
 |---|---|---|---|---|
-| `0x18017b460` | 0 | 1 (`0x18038dfe8` 直接・callee read 0 / unknown 0) | 0 | **入口 xmm2 は読まれない** |
+| `0x18017b460` | 0 | 1 (`0x18038dfe8` 直接・callee read 0 / unknown 1) | 1 (callee unresolved) | **保留 (§3.10)** |
 | `0x18017b680` (slot 32) | 0 | 1 (`call [rax+0xd0]` 間接) | 0 | 間接 call で target 不明 |
 | `0x198700` | 0 | 1 (間接 `[rax+0x100]`) | 0 | 間接 call で target 不明 |
 | `0x1e47c0` | 0 | 2 (間接 1・直接 `0x1803caf83` は callee unknown 4) | 1 | 間接 call + callee 未解決 |
@@ -189,7 +189,7 @@
 - **受入 1 の未確定 (`livein_passthrough` 6 関数)**: 入口 xmm2 は間接 call (`[rax+0x100]` など) にそのまま渡る。読むかどうかは target の関数次第で、target は object の型 (vtable) で決まる。静的に型を確定していない。`0x1e47c0` は直接 call 先 `0x1803caf83` の解析が未解決 (unknown 4)。
 - 注意 (解析の限界): 分岐は両方の経路を辿るが、loop の不動点や間接分岐の先は見ない。`mx55_callers_fn.py` と同じく線形寄りの判定。callee の深さは 2 で打ち切り、打ち切りは unknown に数える。
 - 解析不能の残り: `0x1803caf83` の unknown 4 件、6 関数の間接 call 先 (vtable slot 32 の object 型)。いずれも次の run の対象 (受入 1 の残り・受入 2)。
-- 測定 commit (表の値): `3c6e8d460`。以後の script 変更は `88577641f` (§3.10)。
+- 測定 commit (表の値): `457fd052d` (HEAD で再測定・8 入口・exit 0・0.15 s・load 1.02 0.39 0.14 (測定時))。script の最後の変更は `88577641f` (§3.10)。
 
 ### 3.10 訂正 (MX-61 #5656・§3.9 の「入口 xmm2 は読まれない」を撤回)
 
@@ -198,3 +198,4 @@
 - **結論 (訂正)**: `0x18017b460` の入口 xmm2 が読まれないことは**確定していない**。読むかは `0x1807568e8` (解析不能 5 件) の扱いで決まり、現時点では判定保留。受入 1 の「`0x17b460` の呼出元が xmm2 を渡すか」は未確定に戻す。
 - 残件: `0x1807568e8` の解析不能 5 件の解消 (間接分岐の先の特定)。これが済めば `0x17b460` の判定を確定できる。
 - 測定: `python3 tools/targets/massivex/dsp/scripts/mx61_entry_xmm2_paths.py "<vst3>" 0x18038dfe8 0x18038dff0 0x18017b460` (exit 0・0.15 s)。
+- HEAD `457fd052d` の再測定 (8 入口・`plugins-massivex` 展開 → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key`・md5 `622993e7…` 一致): `0x18017b460` = read 0 / pass 1 (`0x18017b493` → `0x18038dfe8`・callee read 0 / unknown 1) / unknown 1。他の 7 入口は §3.9 の表と一致。
