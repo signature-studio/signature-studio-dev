@@ -70,7 +70,7 @@ r1 対 r2 で差が出た 4 KiB ページは 11 枚。image 内 4 枚 (`0x13a500
 ## 7. shim 有 (`FLE_IPP=1`) 経路の 8 run 一致 (#5865)
 
 測定 commit: `cf486ff00` (origin/main・コード変更なし。本 PR は REPORT のみ)。
-工程: `fle6_measure.sh` (`FLE_BOOT_RUNS=shim`・`FLE_BOOT_TAG=fle5865`・`FLE_EXTRA_ROOTS` 既定 = 0x6a7b70) で build → `fle_boot.mjs` を `FLE_IPP=1` で 8 回 (r1〜r8)・`FLE_OUTMEM_DUMP`。dump は gitignore の `tools/flelift/boot/work/` に置き、commit していない。素材: `fl-win64` (block00031_PE.bin のみ展開)。emsdk は runner 同梱の `/opt/emsdk` を使用 (`toolchain-emsdk` 素材は展開していない)。判定: `outmem_judge.py` を §4 と同じ NONDET・同じ検出力の確認で実行。
+工程: `fle6_measure.sh` (`FLE_BOOT_RUNS=shim`・`FLE_BOOT_TAG=fle5865`・`FLE_EXTRA_ROOTS` 既定 = 0x6a7b70) で build → `fle_boot.mjs` を `FLE_IPP=1` で 8 回 (r1〜r8)・`FLE_OUTMEM_DUMP`。dump は gitignore の `tools/flelift/boot/work/` に置き、commit していない。素材: `fl-win64` (block00031_PE.bin のみ展開)。emsdk は runner 同梱のものを使用 (`[EMSDK]`・`toolchain-emsdk` 素材は展開していない)。判定: `outmem_judge.py` を §4 と同じ NONDET・同じ検出力の確認で実行。
 
 | 項目 | 値 |
 |---|---|
