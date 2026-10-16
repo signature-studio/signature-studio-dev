@@ -229,6 +229,10 @@ bash tools/plugins/reverb_delay/engine_f80_nc.sh "$PWD/tools/plugins/work/reverb
 | 19000 Delay 3 | 全 3,632 関数 (既定 `PLUG_F80_LOWER=1`) | 0 | 4,107 | 0 | **0** | 105 | PASS (除外 0) |
 | 19165 Multiband Delay | IPPCODE 除外 + AVX 系 78 除外 (既定 `PLUG_F80_LOWER=1`) | 0 | 2,608 | 0 | **0** | 374 | PASS (除外 0) |
 
-- **除外 (受入 1 の「除外理由と VA」)**: 19165 は IPPCODE 272 関数 (`--exclude IPPCODE`。 扱いは #3445) と AVX 系 78 関数 (`avx_bad_ranges.py 19165` の 78 範囲。 理由は E5 = AVX2/AVX-512 命令の変換未実装。 起票先は #3447 受入 4 / #5040)。 19000 は除外なし。 78 範囲の VA 一覧は同スクリプトの出力で再生成できる (本 REPORT には転記しない)。
+- **除外 (受入 1 の「除外理由と VA」)**: 19165 は IPPCODE 272 関数 (`--exclude IPPCODE`。 扱いは #3445) と AVX 系 78 関数 (理由は E5 = AVX2/AVX-512 命令の変換未実装。 起票先は #3447 受入 4 / #5040)。 78 範囲の VA は追跡ファイル `tools/plugins/reverb_delay/avx_excluded_19165.tsv` (`avx_bad_ranges.py 19165` の出力と同一。 `engine_ranges.py --exclude-ranges` がそのまま読む)。 19000 は除外なし。
+- **測定コマンド** (`source tools/plugins/reverb_delay/env.sh` の後。 「既定」= `PLUG_F80_LOWER` 未指定で 1、`ENGINE_RANGE_ARGS` 未指定で全 section):
+  - 19000: `bash tools/plugins/reverb_delay/engine_lift.sh 19000 800`
+  - 19165: `ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges $PWD/tools/plugins/reverb_delay/avx_excluded_19165.tsv" ENGINE_TAG=_noipp_nobad bash tools/plugins/reverb_delay/engine_lift.sh 19165 900`
+- **gate の NC 列 (意味の変化)**: `summary_sub.csv` の `nc_emcc_c_rc_unmodified` は `summary.csv` 第 9 列 (`erc2`) を読む。 既定 1 の下では lowering 後の rc なので、無改変の NC を示さない (値 0 は lowering 後の rc)。 無改変の emcc rc は `PLUG_F80_LOWER=0` の実行で別途取る (本 PR では未実施)。
 - **unimpl helper (受入 5 の一部)**: 本 commit の既定経路の実測は 19000 = 17、19165 = 136 (`summary.csv` 第 6 列)。 §15 の 241・§16 の 148 は別の測定構成の値で、構成差はまだ切り分けていない。 受入 5 は未完。
-- **未達**: 受入 3 (精度影響) は未測定。 19000 の `function_1800bcb00` で `PLUG_F80_LOWER=0` / `=1` の出力差を見る必要がある。 19165 の 78 関数の lift (受入 4 相当) は #3447 / 子 PLG-F4-9。
+- **未達**: 受入 3 (精度影響) は未測定。 19000 の lowering 前の f80 関数は 1 本 (`function_1800bcb00`)。 確認方法: `PLUG_F80_LOWER=0` と `=1` で `engine_lift.sh 19000` を回し、両方の `e.final.ll` の同関数本体を比較する (差があれば f64 化の精度影響が出ている)。 次 run に残す (#5039)。 19165 の 78 関数の lift (受入 4 相当) は #3447 / 子 PLG-F4-9。
