@@ -163,6 +163,7 @@ def supported_sig(sig):
 MACHINE_ENTRY = {
     0x40c660: ['double'],               # xmm0 (IR は i128 の型誤り)
     0x40c750: ['double'],               # xmm0
+    0x40c420: ['double'],               # xmm0 (LD-288 / #5888: 入力 xmm0 を IR が落とし 0 固定になっていた)
     0x653c80: ['i64', 'i64', 'i64'],    # r8 の整数 (rcx・rdx は未使用)
     0x691dd0: ['i64', 'i64', 'i64'],    # rcx: オブジェクトのポインタ / rdx: i64 / r8: 1 byte flag
     0x442a50: ['double', 'i64', 'i64', 'i64'],  # xmm0 (4428c0 経由で 40c660)。rdx/r8/r9 は出力 word*
