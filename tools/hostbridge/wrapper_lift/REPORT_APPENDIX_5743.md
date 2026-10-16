@@ -2,7 +2,7 @@
 
 > **正本**: `tools/hostbridge/wrapper_lift/REPORT.md` §12。本付録は計測の全文。
 
-測定 commit: §1〜§4 は `67c85ae87` (`notloop_passes.sh` の commit)。§4b は `112cdcf32` (本 PR の唯一のコード commit)。
+測定 commit: §1〜§4 は `67c85ae87` (`notloop_passes.sh` の commit)。§4b は `112cdcf32` (main 取り込み済みの測定 commit。`notloop_minset.sh`・`notloop_vardef.sh` と測定値を同 commit に含む)。§4c は本 PR のコード commit `a34f768e7` (`notloop_minset_err.sh` の旧版)。`notloop_minset_err.sh` はその後に修正しており、修正版の実測は未実施 (下記 §4c)。
 素材: `fl-win64` (`extracted/block19091_PE.bin`)・`toolchain-retdec` (RetDec v5.0)・`toolchain-emsdk`。`$RUNNER_TEMP` に展開。load average (1 分値) 1.08 (測定中)。
 起点: origin/main `912bba735` から `5743-retdec-stmt-not-in-loop` を切った worktree `ws-5743`。
 
@@ -64,9 +64,9 @@
 
 ## 4b. 12 組の全 disable と VarDefStmtOptimizer 単独 (本 run)
 
-- 測定 commit: `112cdcf32` (本 PR の唯一のコード commit。`notloop_minset.sh`・`notloop_vardef.sh` と測定値を同 commit に含む)。素材・RetDec・emcc は §1 と同じ。
-- **母集団**: §4b の全 disable と 1-minimal は、`--backend-disabled-opts` に渡した **ヘッダ名 32 種** の範囲でのみ成り立つ。§3 の「既定の 48 個」との差 16 種は、§4b では探索していない。差の 16 種が RetDec の名前として渡せるかは未確認 (本 run に RetDec が無く、ヘッダ名一覧もリポジトリに無い)。したがって下記の結論は「32 種の中での最小」であり、全 optimizer の中での最小ではない。
-- 全 disable (32 種): 表の未特定 13 行のうち、関数範囲を取れた 12 行で注釈が戻る (12/12)。0x683120 は範囲の取り直しができず未測定 (`NORANGE`)。
+- 測定 commit: `112cdcf32` (main 取り込み済み。`notloop_minset.sh`・`notloop_vardef.sh` と測定値を同 commit に含む)。素材・RetDec・emcc は §1 と同じ。
+- **母集団**: §4b の全 disable と 1-minimal は、`--backend-disabled-opts` に渡した **ヘッダ名 32 種** の範囲でのみ成り立つ。ヘッダ名は本 run に展開した RetDec の `optimizers/*.h` のファイル名から `.h` を除いたもの (32 件)。§3 の「既定の 48 個」との差 16 種は、§4b では探索していない。差の 16 種が RetDec の名前として渡せるかは未確認 (本 run に RetDec が無く、ヘッダ名一覧もリポジトリに無い)。したがって下記の結論は「32 種の中での最小」であり、全 optimizer の中での最小ではない。件数 32 は再計数していない (素材が無い)。
+- 全 disable (32 種): 表の未特定 13 行のうち、関数範囲を取れた 12 行で注釈が戻る (12/12)。0x683120 は当時 `NORANGE` で未測定だったが、§4c で範囲を取得して測定済み (注釈は戻る)。
 - 1 組の最小集合 (`notloop_minset.sh`): 0x732ae0 は `EmptyStmtOptimizer,WhileTrueToWhileCondOptimizer` (§3 と一致)。
 
 | 関数 | 飛び先 | 全 disable (32 種) で戻る | 32 種の中での 1-minimal |
@@ -83,12 +83,24 @@
 | 0x7c0570 | 0x7c062e | 戻る | VarDefStmtOptimizer |
 | 0x7c76b0 | 0x7c773b | 戻る | VarDefStmtOptimizer |
 | 0x7c76b0 | 0x7c7796 | 戻る | VarDefStmtOptimizer |
-| 0x683120 | 0x6835cb | 未測定 (`NORANGE`) | — |
+| 0x683120 | 0x6835cb | 戻る (§4c で測定。当時の表は `NORANGE`) | VarDefStmtOptimizer (§4c) |
 
 - 上表の範囲 (`lo-hi`) は本 run の `targets.txt` にあり、リポジトリに収録していない。`notloop_vardef.sh` の入力として再現するには、関数の範囲を取り直す必要がある (未収録)。
 - **VarDef 単独の disable で件数は減らない**: `notloop_vardef.sh` で、VarDefStmtOptimizer のみ disable した C の `emcc -fsyntax-only` の `not in loop` 件数は、既定 C と全 12 組で同じ (0x4166b0・0x575480・0x7c76b0 系は 4 件、0x717600 は 2 件、他は 1 件)。注釈の復帰は、この件数を変えなかった。
 - 判定 (測定の範囲に留める): 注釈の消失は VarDefStmtOptimizer 単独 (11 組) と、VarDefStmtOptimizer + WhileTrueToWhileCondOptimizer (0x44abe0) の disable で戻る。VarDef 単独の disable では `not in loop` の件数は減らない。これ以上の結論 (VarDef が原因ではない等) は、件数を減らす別の段・組み合わせを測っていないので言えない。
 - 未検証: 最小集合の C を wasm 実行して bit 一致を確認すること (未実施)。全 disable 32 種は `--backend-disabled-opts` に全名を渡しており、名前の全件が有効であることは未確認 (存在しない名前は無視される)。
+
+## 4c. 0x683120 (`0x6835cb`) の測定 (本 run。測定 commit は本 PR のコード commit)
+
+- 素材: `toolchain-retdec` (RetDec v5.0)・`toolchain-emsdk` (6.0.12)・`fl-win64` (`extracted/block19091_PE.bin`)。`$RUNNER_TEMP` に展開。emcc は `PATH` に通した (通さないと `emcc` が見つからず、`not in loop` が 0 と誤読される)。
+- 範囲: `0x683120-0x6835ff` (lift 可能。前 run の `NORANGE` の解消。`--backend-no-opts` で注釈 1 件)。
+- 全 32 種 disable: 注釈 0 → 1 (戻る)、`not in loop` 1 → 0。
+- VarDefStmtOptimizer 単独: 注釈 0 → 1 (戻る)、`not in loop` は 1 のまま (`notloop_vardef.sh`)。
+- 注釈を戻す最小集合 (`notloop_minset.sh`・所要 88.7 s): `VarDefStmtOptimizer` 単独。
+- `not in loop` を 0 にする最小集合 (旧版 `notloop_minset_err.sh`・所要 93.0 s・測定 commit `a34f768e7`): `WhileTrueToWhileCondOptimizer` 単独。**旧版の値で、未検証 (旧版)。** 旧版は RetDec 失敗時に前候補の `e.c` が残る・emcc の終了コードを見ない偽陽性の余地があった。修正版 (`885a2b627`) では未実測 (`toolchain-retdec`・`toolchain-emsdk` が素材に無いため)。
+- 修正版 (本 PR の HEAD): 候補ごとに `e.c` を消し、RetDec の終了コード・`e.c` の存在・emcc の終了コードを確認する。既定 C で `not in loop` が 0 なら中止する (正対照)。この修正版での再測定は素材 (`toolchain-retdec`・`toolchain-emsdk`) が無く未実施。修正版の分岐は偽の RetDec / emcc で確認済み (正常系・RetDec 失敗で中止・emcc 無しで中止)。
+- 判定: 未確定 (旧版の値のみ・未検証)。注釈を戻す段 (VarDef 単独) と、旧版が出した `not in loop` を消す段 (WhileTrueToWhileCond 単独) が一致するかは、修正版で再測定するまで言えない。「注釈の段 = エラーの段」という前提が成り立たないかどうかも、この時点では判断しない。
+- 未測定: 0x683120 の C を wasm 実行して bit 一致を見ること (未実施)。残り 12 組の `not in loop` の最小集合 (範囲の確定が要るため未実施。0x408770 は範囲を推定で `0x4087ff` と置いて測ったが、範囲の根拠が無いため結果は採らない)。
 
 ## 5. 採らなかった方式
 

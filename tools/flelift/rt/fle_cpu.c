@@ -83,6 +83,23 @@ void fle_wwatch(uint64_t a, uint32_t n, const void* src, const char* file, int l
     }
 }
 #endif
+#ifdef FLE_RWATCH
+/* #4426: 読出し監視。[FLE_RWATCH_LO, FLE_RWATCH_HI) に重なる読出しを、読出し元 (__FILE__:__LINE__) 付きで出す。
+ * guest_ret は読出し時の [rsp] の値であり、読出し元の戻り番地とは限らない (関数本体で sub rsp・push の後の読出しはローカル変数になる)。 */
+#ifndef FLE_RWATCH_LO
+#define FLE_RWATCH_LO 0x12d677d0ull + 0x18ull
+#endif
+#ifndef FLE_RWATCH_HI
+#define FLE_RWATCH_HI 0x12d677d0ull + 0x28ull
+#endif
+void fle_rwatch(uint64_t a, uint32_t n, const char* file, int line) {
+    static int nlog = 0;
+    if (a >= FLE_RWATCH_HI || a + n <= FLE_RWATCH_LO || nlog >= 200) return;
+    nlog++;
+    fprintf(stderr, "[fle_rwatch] rsp_val=%#llx a=%#llx n=%u at %s:%d\n",
+            (unsigned long long)(*(u64u*)A_(R[RSP])), (unsigned long long)a, n, file, line);
+}
+#endif
 #ifdef FLE_CHK
 void fle_chk(uint64_t a, int line) {
     /* wasm linear 上限 (initial-memory) と emcc static 領域 (GLOBAL_BASE 0x10000000..) を避ける */

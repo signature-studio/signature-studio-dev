@@ -67,6 +67,7 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 - 測定: `FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0・所要 3 分 56 秒 (lift 〜48 s・clang plain 119 s・boot tol 25 s)。load 0.85 → 2.19。baseline の計数は dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob`・longjmp 0・exit 0 で §11 と一致 (測定 commit `6e1b4d6c8` = origin/main)。
 - 受け手 VA: `f_410320` の `call [rax-0x30]` は `rax = rcx = self` で、受け手 slot は `self - 0x30`。`self = 0x5ac338` のとき slot は `0x5ac308`。PE 静的値は `0x40f960` (`.text` 内 raw off `0x1ab708`・`f_40f960` は lift 済み)。
 - 実行時の値: `0x5ac308` は呼出し前 `0x0`。理由は `fle_data_install` がこの slot を含まないため。生成器の実出力は `[fle_data_gen] sections ..., windows 11079, total 4002981 bytes` (`fle_data_gen.py`・PR HEAD の `x64c.py` lift 出力に対して静的に実行。`tools/flelift` のコード差分は 0)。敷設は memcpy 11,083 件 (窓 11,079 + セクション 4) で、合計 4,002,981 B。`fle_data.c` を走査し、`0x5ac308` を覆う memcpy は 0 件。PE の値は harness に敷設されていない。
+- 訂正 (#5881・§18 で実測): 上の「`0x5ac308` は呼出し前 `0x0`」は §14 で否定されている。呼出し前の値は敷設直後・初期化直後に `0x40f960` になる。
 - `FLE_CFI_RECV=1` (新設): `0x5ac308` へ `0x40f960` を書く。`FLE_CFI_SELF=<VA>` (新設): `fle_run` の第 1 引数 (rcx) を渡す。
 - seed 有 (`FLE_CFI_SEED=1`・RECV 無し): trap 段 `f_410360` ← `f_5af120` ← `f_1105350` ← `f_13752f0` ← `f_1375990`。§4 と一致。
 - seed 有 + RECV (A): trap 段の先頭 `f_410320` ← `f_976b60` ← `f_976a90` ← `f_1264050` ← `f_12652c0` ← `f_1265390` ← `f_1265690` ← `f_1375990`。`threw=oob`・dispatch 209・GetMem 2,314・FreeMem 1,199 (計数は不変)。
@@ -124,3 +125,14 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 - 結論: 両 slot を 0 にする書込み元は `f_6a7b70` の本体 (`fill6a7b70` と同じ関数)。`f_6a7b70` は `FLE_EXTRA_ROOTS` で root 化した関数。#3060 の「`f_6a7b70` 広域ゼロ埋め」と同じ関数であることは STX の連鎖で確認したが、#3060 の記述との一致は本節では未確認。
 - §16 の走査候補 `f_5af330`・`f_413060` と `f_409c80` は、この連鎖にも書込み元にも含まれない (候補から外す)。
 - 残り (#5337 に残す): (1) `f_6a7b70` の本体のどの store が `0x5ac308`・`0x976410` を指すか (ループの添字と範囲。`dst`/`cnt` は呼出し引数で範囲を表さない)。(2) `f_410320` が rcx=0 で oob になる直接原因 (`rax` 未計測)。(3) 実機の loader が `0x5ac308` に充填する値 (#4384 は CLOSED)。
+
+## 18. 残件 (b)(c)(d) の実測 (#5881・測定 commit `2b5704e12`・mode tol・寛容起動)
+
+- probe: `tools/flelift/boot/probe_5881.py` (生成 C の `work/` コピーだけを書き換える)。`[p410320]` は `mov rax, rcx` の直後の rax・rcx・rdx。`[p6a7b70]` は `f_6a7b70` の各 store 直前に、書込み先 `a`・幅 `n`・store 番号 (`pc`) を出し、受け手 slot (`0x5ac308`・`0x976410`) を覆うものだけ残す。
+- 測定 commit: `2b5704e12` (probe `probe_5881.py` を含む。`749a27433` には probe が無いため測定元ではない)。
+- 測定: `FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_SLOTS=0x5ac308ull,0x976410ull" FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` (probe 無しの基準) → rc 0。probe 付きは同じ HEAD で build.sh・boot を 1 回ずつ。
+- (b) `f_410320` の rax (実測): CFI 経路の `[p410320] rax=0x5ac338 rcx=0x5ac338` (受け手 slot の基底 `self`)。oob 直前の `f_410320` は `rax=rcx=0x0 rdx=0x1`。`rax` は常に `rcx` と一致 (`mov rax, rcx`)。よって `LD64(rax-0x30)` の `0xffffffffffffffd0` は `rax=0` のときの oob。推定は実測で確定した。
+- (c) `f_6a7b70` の store のうち受け手を覆うもの (実測): `[p6a7b70] slot=0x5ac308 pc=0x1 a=0x5ac300 n=16 dst=0x400000 cnt=0x100000` (`0x5ac300` の 16B store・slot を覆う)、`[p6a7b70] slot=0x976410 pc=0x2 a=0x976410 n=16 dst=0x800000 cnt=0x100000`。`dst`・`cnt` は呼出し引数で、`f_6a7b70` は `dst` から `cnt` バイトを 0 で塗る関数 (16B 単位・末尾は 4B 単位)。書込み store は `pc` の 16B (movdqu) 1 件ずつで、両 slot を同時には覆わない。
+- (d) 実機の充填値: PE は `DYNAMIC_BASE` 付きの DLL (`IMAGE_FILE_DLL`・`DYNAMIC_BASE` を確認)。両 slot は base relocation (`.reloc`・DIR64) の対象 (`0x1ac308`・`0x576410`)。実機の loader は base に合わせて値を補正するため、実機で入る値は loader が決める base に依存する。harness の base `0x400000` では `0x40f960`・`0x9764d8` (PE 静的値)。実機の base は本環境では測れないため、(d) は未確定のまま #5881 に残す (#5337 は CLOSED)。
+- 計数 (両測定): dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob`・exit 0・tolerant kinds `ok 208 / empty 37 / exit 1 / clobber 695 / noproc 1` (§11・§14 と一致)。
+- 注意: probe 付きの `[p6a7b70]` は窓幅の判定 (8B) の修正後の値。修正前は `a=0x5ac310` (slot を覆わない store) を誤って含めた。
