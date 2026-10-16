@@ -202,6 +202,7 @@ def main():
     spec_checks()
     round_checks()
     desc_checks()
+    desc_text_checks()
     typecheck_checks()
     pct_fmt_checks()
     round_facts_checks()
@@ -393,6 +394,48 @@ def desc_checks():
     check("0xb6fe4d の rcx は [rbp+0x20] (引数の保存元 0xb6fb8c)",
           ins_at(0xB6FE4D).op_str == "rcx, qword ptr [rbp + 0x20]"
           and ins_at(0xB6FB8C).op_str == "qword ptr [rbp + 0x20], rcx")
+
+
+def desc_text_checks():
+    # PY-191 (#3377): 0x104f2d0 の desc 経路。out1 = trim(マーカー除去(区切り '|' 以降 (無ければ全体)))
+    check("0x104f2d0 の desc 判定 (test rax,rax; je 0x104f346) と空時の out1 クリア (0x104f351 → 0x412d60)",
+          ins_at(0x104F300).op_str == "0x104f346" and ins_at(0x104F351).op_str == "0x412d60")
+    check("0x104f2d0 の連鎖 0x605020 (0x104f311) → 0x662d20 (0x104f31e) → 0x439c90 (0x104f32b) → 0x4133f0 (0x104f33f)",
+          ins_at(0x104F311).op_str == "0x605020" and ins_at(0x104F31E).op_str == "0x662d20"
+          and ins_at(0x104F32B).op_str == "0x439c90" and ins_at(0x104F33F).op_str == "0x4133f0")
+    check("0x104f2d0 の入力は [desc+0xe4] (0x104f30a)", ins_at(0x104F30A).op_str == "rdx, qword ptr [rax + 0xe4]")
+    check("0x605020 の区切り文字 '|' (0x60507c) と 0x44b430 → 0x4150d0 (0x605036・0x44b43a)",
+          u16z(0x60507C, 1) == "|" and ins_at(0x605036).op_str == "0x44b430"
+          and ins_at(0x44B43A).op_str == "0x4150d0" and ins_at(0x44B434).op_str == "r8d, 1")
+    check("0x605020 の一致時 0x414ec0(out, S, 検出位置+1, 0x7fffffff) (0x605055・0x60505f)",
+          ins_at(0x60503D).op_str == "0x60504c" and ins_at(0x605055).op_str == "r8d, 1"
+          and ins_at(0x60505F).op_str == "0x414ec0")
+    check("0x605020 の不一致時は全体を複写 0x4133f0 (0x605045)", ins_at(0x605045).op_str == "0x4133f0")
+    check("0x4150d0 の戻り値は 1 始まりの位置 (0x4151c1 add rdx,2 → 0x4151c8 sub rax,r10 → 0x4151cb shr rax,1)",
+          ins_at(0x4151C1).op_str == "rdx, 2" and ins_at(0x4151C8).op_str == "rax, r10"
+          and ins_at(0x4151CB).op_str == "rax, 1" and ins_at(0x41511F).op_str == "r10, rdx")
+    check("0x414f20 は 1 始まりの pos から count 文字を削除 (sub esi,1 at 0x414f51 → 0x414f20 内の 0x414f5a 以降)",
+          ins_at(0x414F51).op_str == "esi, 1" and ins_at(0x414F5A).op_str == "edi, ecx")
+    check("0x662c30 の先頭判定 cmp word [rax],0x5e (^) → 0x662c50 へ繰り返し (0x662cfa・0x662cfe)",
+          ins_at(0x662CFA).op_str == "word ptr [rax], 0x5e" and ins_at(0x662CFE).op_str == "0x662c50")
+    check("0x662c30 の 2 文字目分岐: '.' (0x662c5e → 0x662cba)・'?' (0x662c65 → 0x662c6f)・{^,_,`,a} (0x662c6d は範囲外で 0x662cd2)",
+          ins_at(0x662C5E).op_str == "0x662cba" and ins_at(0x662C65).op_str == "0x662c6f"
+          and ins_at(0x662C6D).op_str == "0x662cd2" and ins_at(0x662C6A).op_str == "eax, 3")
+    check("0x662c30 '.' 分岐: 3 文字削除 (0x662cc2) + flags |= 2 (0x662ccd)",
+          ins_at(0x662CC2).op_str == "r8d, 3" and ins_at(0x662CCD).op_str == "dword ptr [rsi], 2")
+    check("0x662c30 既定分岐: 2 文字削除 (0x662cda) で flags は変えない",
+          ins_at(0x662CDA).op_str == "r8d, 2" and ins_at(0x662CE0).op_str == "0x414f20")
+    check("0x662c30 '?'・'^'・'_'・'`'・'a' 分岐: 2 文字削除後に '^' (0x662d1c) を検索 (0x662c82・0x662c8c)",
+          ins_at(0x662C82).op_str == "rcx, [rip + 0x93]" and rip_target(0x662C82) == 0x662D1C
+          and u16z(0x662D1C, 1) == "^" and ins_at(0x662C8C).op_str == "r8d, 1")
+    check("0x662c30 の 'a'-'`' 系の flags |= 1 (0x662cb5) と、'^'・'?' は flags 無し (0x662cae・0x662cb3)",
+          ins_at(0x662CAE).op_str == "0x662ce5" and ins_at(0x662CB0).op_str == "edi, 0x3f"
+          and ins_at(0x662CB5).op_str == "dword ptr [rsi], 1")
+    check("0x439c90 の trim は (<= 0x20) の 16bit 文字を両端から削る (0x439cc0・0x439cd0・0x439cf6)",
+          ins_at(0x439CC0).op_str == "word ptr [rdx + r8*2], 0x20" and ins_at(0x439CD0).op_str == "word ptr [rdx + r8*2], 0x20"
+          and ins_at(0x439CF6).op_str == "word ptr [rdx + r8*2], 0x20")
+    check("0x662d20 は flags (0x662d2f の r8=[rbp+0x2c]) を捨てる (out は [rbp+0x40] への複写のみ)",
+          ins_at(0x662D2F).op_str == "r8, [rbp + 0x2c]" and ins_at(0x662D33).op_str == "0x662c30")
 
 
 def typecheck_checks():
