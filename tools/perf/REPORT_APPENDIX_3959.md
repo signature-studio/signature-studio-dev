@@ -188,11 +188,31 @@ wat2wasm tools/ott/work/lift/ottl_rc.wat -o tools/ott/work/lift/ottl_rc.wasm
 node tools/perf/p15/ctor_vtable_ring.mjs tools/ott/work/lift/ottl_rc.wasm
 ```
 
+## 3g. 子 #5403 (PERF-P28) の書込み store の特定 (Node・同期・`fd_write` stub 下)
+
+測定 commit: `195ee191f` (`instr_fill.py` と `ctor_fill_watch.mjs` を追加した commit。`tools/perf/p15` の既存ファイルは §3f の `42fad4a17` から変更なし)。素材 `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`) を `tools/ott/work/lift/` に置き、`wasm2wat` → `instr_fill.py` → `wat2wasm` で計装した (wabt は npm で `/tmp/opencode/wabt` に一時導入・commit 外)。
+
+| 測定 (HEAD `195ee191f`) | 結果 |
+|---|---|
+| `instr_calls.py` + `ctor_call_window.mjs` ×1 | 0 を最初に観測した call 戻りは site 133 (`f23->f75`)。直前の site 368 (`f75->f119`) の戻りでは非 0 |
+| `instr_fill.py` + `ctor_fill_watch.mjs` ×3 | 3/3 同一。146 の ctor の中で vtable 範囲に重なる `memory.fill` が 1 回: dest `0x301d3e40`・n `262144`・範囲 `[0x301d3e40, 0x30213e40)`。vtable `0x30203BD0` は範囲内 offset `0x2FD90`。trap 時 `vt_head` = 0 |
+| `ctor_fill_watch.mjs` (記録を ctor 1 から開始) ×1 | 同じ 1 回。145 以前の ctor で同じ範囲の重なりは無い |
+
+分かったこと:
+- 計装した store のうち vtable 範囲を覆うのは、wasm func 75 の `memory.fill` 1 箇所 (wat の 71184 行・dest は `local.get 1` (f75 の 2 番目の引数)・val 0・n 262144)。vtable 先頭語を 0 にしたのはこの fill と読める。`ctor_call_window` で見た「`f23->f75` の call 戻り」の直後・f75 本体の中の位置と一致する (`call 119` の後〜fill)。直接の `i32.store` などは未監視のため、この fill が唯一の書込みとは言えない。
+- §3f の「store が特定できない」は、計装済みの範囲では `memory.fill` 1 箇所まで絞れた。dest `0x301d3e40` を与える呼び出し元の引数の由来 (`f23` の `call 75` のどの値か) は未確定。
+- 3 run の同一性は §3f と同じく計装版の 3 run で確認した。
+
+未確定:
+- dest `0x301d3e40` が f75 の引数としてどう決まるか (`f23` の `call 75` の引数の計算)。
+- 計装版は `memory.fill` 1 箇所だけを監視する。vtable 範囲への他の store は見ていない (直接 store を含む全 store の監視は未実装)。
+- Chrome (AudioWorklet) で同じ fill が起きるかは未確認。
+
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ctor (`0x18011d400`) が同一 instance で 146 回目に戻らない原因 | 上限 145 の意味が未確定。M=146 を通す修正方針が立たない | #4392 [PERF-P26] |
+| ctor (`0x18011d400`) が同一 instance で 146 回目に戻らない原因 | 上限 145 の意味が未確定。M=146 を通す修正方針が立たない。§3g で、計装済みの store のうち vtable 範囲を覆うのは f75 の `memory.fill` 1 箇所 (直接 store は未監視)。f75 の引数 dest の由来は未確定 | #4392 [PERF-P26] |
 | Chrome の M=147・149〜151・153〜159 と M=2〜129・131〜144 の成否 (単調性) | 成功最大 145 と失敗最小 146 の範囲外は未確認 | #4392 (コメントで追加) |
 | Node 掃引の再測定と生データの commit (§1) | 掃引の数値が根拠にならない | #4392 (コメントで追加) |
 | §3b の監視プローブ (145 回までの data hash 不変・`next_span_overlaps_data`) が commit 外・再現未整備 | §3b の (a) は再現できない。`ctor_heap_probe.mjs` の 3673848 (`next_span_overlaps_data` の判定定数) と観測 `bytes_per_ctor` 3673793 の 55 B 差は判定に影響しないが、由来は未記録 | #4392 (次の run で commit) |
