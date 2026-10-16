@@ -90,21 +90,25 @@ python3 analysis/py64_check_expr.py work/py53/fn.txt --negctl p2   # exit 1
 
 | VA | 結果 | 原因 |
 |---|---|---|
-| 0x104aba9 (G2・F 型) | 不一致 (parse error) | 展開式が py88 の 400 字上限 (`py88_writes.py` の `res[:400]`) で `…` に切れる。上限を 4000 に上げた scratch では `…` は 0 件になるが、式は `SLOT[rbp+0x574]?@0x104aacd`・`ACC?⚠合流@0x104a9cd` を含む未展開の形で出る。`DEPTH_LIMIT` を外した scratch でも `…` は 0 件 (下の「再現手順」) |
-| 0x104af7f (G3・F 型) | 不一致 (parse error) | 0x104aba9 と同じ (`…`) |
+| 0x104aba9 (G2・F 型) | 不一致 (parse error) | base は py88 の 400 字上限 (`py88_writes.py` の `res[:400]`) で式が `…` に切れ、parse error。上限を 4000 にした scratch では py64 の展開照合が一致する (下の「再現手順」の 2 行目)。py88 の上限修正が必要 (#5926) |
+| 0x104af7f (G3・F 型) | 不一致 (parse error) | base は 0x104aba9 と同じ `…` で parse error。上限を 4000 にした scratch では一致する。py88 の上限修正が必要 (#5926) |
 | 0x104ad2e (G2・M8 型) | 不一致 | py88 の `ARITH` は 2 オペランドのときだけ源を出す。`imul rcx, rcx, 0x28f` (3 オペランド) が `imul((…)*8)` になり 655 (0x28f) が落ちる。手計算式は 655 を保持 |
 | 0x104b093 (G3・M32 型) | 不一致 | 0x104ad2e と同じ (`imul` の 0x28f 欠落) |
 
 - 手計算式の確からしさ: 0x104ad2e の `imul` を落とした形の手計算式は機械式と一致しないままだった (`hand-without-0x28f == mach` が False)。0x104aba9 は展開の `…` を超えて比べられない。このため手計算式そのものの正しさは本 run では確定していない。
 - 不一致の VA と手計算式: 上の 4 点。受入 3 (不一致があれば VA と手計算式を REPORT に書く) を満たす。
-- 未解決の追跡 (本 PR の範囲外): (1) `py88_writes.ARITH` の 3 オペランド `imul` の源欠落、(2) `resolve()` の 400 字上限による `…` 切れ (0x104aba9・0x104af7f)、(3) 上限を上げた後に残る `SLOT?`・`ACC?⚠合流` (0x104aba9 は `SLOT[rbp+0x574]?` 等が式に残る)。いずれも `py88_writes.py` の修正になり、py88・py99 の既存測定値 (§6・§7・REPORT_PY99 系) が動く。単独の修正 PR として扱う。
+- 未解決の追跡 (本 PR の範囲外): (1) `py88_writes.ARITH` の 3 オペランド `imul` の源欠落、(2) `resolve()` の 400 字上限による `…` 切れ (0x104aba9・0x104af7f)、(3) py88 の生の出力に `SLOT?`・`ACC?⚠合流` が残る (ExpSlicer 経路では照合を妨げない。上限 4000 の scratch の py64 出力に `SLOT` は 0 件)。(1)(2) は `py88_writes.py` の修正になり、py88・py99 の既存測定値 (§6・§7・REPORT_PY99 系) が動く。子 #5926 で扱う。
 
 #### 再現手順 (§8 の `…` 検証・測定 commit `c9430d6a2`)
 
-scratch は `work/scratch/` (gitignore) に複製し、本体は変えない。
-- 上限 4000: `cp analysis/*.py work/scratch/` の後、`sed -i 's/if len(res) > 400:/if len(res) > 4000:/; s/res\[:400\]/res[:4000]/' work/scratch/py88_writes.py`。`python3 work/scratch/py88_writes.py work/py53/fn.txt 0x104aba9 | grep -o '…' | wc -l` → 0。
-- `DEPTH_LIMIT` を外す: `sed -i 's/if depth > DEPTH_LIMIT:/if depth > 10**6:/' work/scratch/py88_writes.py` の後、同じコマンド → 0。
-- 本体 (変更なし) の出力は 0x104aba9 が `…` を含む (上の表の parse error)。
+scratch は `work/scratch/` (gitignore) に複製し、本体は変えない。結果は 2 経路で分けて書く。
+
+- (a) py88 の生の出力 (`py88_writes.py` を直接実行): 本体 (変更なし) の 0x104aba9・0x104af7f は `…` 0 件・`SLOT?` 6 件。上限 4000 (`sed -i 's/if len(res) > 400:/if len(res) > 4000:/; s/res\[:400\]/res[:4000]/'`) でも、`DEPTH_LIMIT` を外す (`sed -i 's/if depth > DEPTH_LIMIT:/if depth > 10**6:/'`) でも `…` 0 件。`SLOT?` は残る。
+- (b) py64 の展開照合 (`py64_check_expr.py work/py53/fn.txt`、ExpSlicer を通る):
+  - 本体: `n=8 mismatch=0`・`expanded n=5 mismatch=4`・exit 1。0x104aba9・0x104af7f の機械式に `…` が入り、未解決 `['…']`。
+  - 上限 4000 の scratch: `expanded n=5 mismatch=2`・exit 1。0x104aba9 と 0x104af7f は **一致**。残る不一致は 0x104ad2e・0x104b093 (`imul` の源欠落・#5926)。py64 出力に `SLOT` は 0 件。
+  - `DEPTH_LIMIT` を外した scratch: `expanded n=5 mismatch=4`。`…` は本体と同じ 6 件が残る (py64 経路の `…` は深さ上限とは別で、上限 400 字の切れによるもの)。
+- つまり上限 4000 で F 型 2 点は py64 の照合が通る。`SLOT?` は py88 の生の出力 (a) にだけ残り、py64 の照合を妨げない。
 - 既存点への影響: `py99_slot_paths.py` と `py88_writes.py` は変更していない。`py159_check_hand.py` は `py64_check_expr` の `parse_canon`・`machine_norm` を使うが、文法追加は既存式の解釈を変えない。
 
 ### 差分 (測定 commit から HEAD まで)
