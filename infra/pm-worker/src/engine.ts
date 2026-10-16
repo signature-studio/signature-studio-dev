@@ -1720,6 +1720,12 @@ export class Engine {
     }
     this.sampleOpen(now);
     this.saveMeta();
+    // 観測ログ (Cloudflare の Custom Dashboard 用): 1 tick 1 行の metrics (#5565)。ここで失敗しても tick の結果 (saveMeta 済み) は変えない。
+    try {
+      this.metricsLog(now);
+    } catch {
+      this.pushLog({ kind: "error", note: "metrics log failed" });
+    }
     return { ready: true };
   }
 
@@ -1757,6 +1763,69 @@ export class Engine {
       .filter(([, v]) => v.state === "failed")
       .map(([k]) => Number(k))
       .sort((a, b) => a - b);
+  }
+
+  // 1 tick 1 行の観測ログ (#5565)。Cloudflare の Custom Dashboard (Workers Logs) が JSON のフィールドを自動抽出・索引できるよう、
+  // 文字列ではなくオブジェクトのまま出す (公式の 'Logging structured JSON objects'。文字列のログは全文検索だけで、フィールドの抽出は無い)。
+  // 値は status() と同じ集計 (plan / rows / counters / runCounts / obs) から取り、GitHub へは呼ばない。
+  // tick の最後に出すのは、累積カウンタにこの tick の投稿 (launch・dispatch・close) を含めるため。
+  // 自由文・題名・secret は入れない (数値・真偽・列挙・ISO 時刻だけ)。念のため行全体を clean() (redact) に通す。
+  private metricsLog(now: number): void {
+    const { rows, plan } = this.plan();
+    const c = (k: keyof Rows) => rows[k].length;
+    const prios = this.prioMap();
+    const byPrio = (ns: number[]): Record<Prio, number> => {
+      const out: Record<Prio, number> = { critical: 0, normal: 0, low: 0 };
+      for (const n of ns) out[prios.get(n) ?? "normal"]++;
+      return out;
+    };
+    const readyByPrio = byPrio(rows.ready);
+    const cnt = this.runCounts(now);
+    const counters = { ...this.zero(), ...(this.meta.counters ?? {}) };
+    const line = {
+      m: "metrics",
+      ts: iso(now),
+      fresh: this.fresh(),
+      // status の mode と同じ式 (両方 live のときだけ live)。
+      mode: this.launchLive() && this.dispatchLive() ? "live" : this.launchLive() || this.dispatchLive() ? "partial" : "dry-run",
+      phase: plan.phase.review_only ? "review-only" : "launch",
+      demoted: !!this.meta.demoted,
+      rate_guard: !!this.meta.rateGuardOn,
+      // status の launch_stop / launch_blocked と同じ。
+      stop: plan.stop ?? null,
+      blocked: plan.blocked ?? null,
+      // 同時実行 (status の active_all / active_impl / active_other / active_by_prio)。
+      active: plan.active,
+      active_impl: plan.active_impl,
+      active_other: plan.active_other,
+      active_critical: plan.active_by_prio.critical,
+      active_normal: plan.active_by_prio.normal,
+      active_low: plan.active_by_prio.low,
+      target: plan.target,
+      target_eff: plan.targetEff,
+      cap_est: plan.capEst ?? null,
+      room: plan.room,
+      // 着手待ち (status の ready / ready_by_prio)。
+      ready: c("ready"),
+      ready_critical: readyByPrio.critical,
+      ready_normal: readyByPrio.normal,
+      ready_low: readyByPrio.low,
+      would_launch_now: plan.picks.length,
+      // status の launch_holds 相当の件数 (recent・stopped の行 + 今回は launch しない ready)。
+      holds: c("recent") + c("stopped") + plan.ready_held.length,
+      // 毎 tick の run 数の観測 (observe と同じ runCounts。queued は queued・pending・waiting の合計)。
+      runs_running: cnt.running,
+      runs_queued: cnt.queued,
+      peak_running: peakRunning(this.obs, now) ?? null,
+      // 累積カウンタ (status の counters)。launched / dispatched / pmDispatched / closed。
+      launched: counters.launched,
+      dispatched: counters.dispatched,
+      pm_dispatched: counters.pmDispatched ?? 0,
+      closed: counters.closed ?? 0,
+      rest_remaining: this.meta.rest?.remaining ?? null,
+    };
+    // clean() は文字列を受け取るので、行全体を一度 JSON にして通し、またオブジェクトに戻して出す (値は数値・列挙だけなので通常は何も変わらない)。
+    console.log(JSON.parse(this.clean(JSON.stringify(line))));
   }
 
   // 集計だけを返す (本文・タイトルは含めない。issue 番号は公開 repo の情報)。

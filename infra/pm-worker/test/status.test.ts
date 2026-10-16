@@ -531,7 +531,7 @@ const DUMMY_BEARER = "Bearer dummy-opaque-bearer-credential-123";
 test("secret (a): ダミーの PEM / secret / token を状態に入れても、/status の JSON と console.log に 0 件", async () => {
   const logs: string[] = [];
   const orig = console.log;
-  console.log = (...a: unknown[]) => void logs.push(a.map(String).join(" "));
+  console.log = (...a: unknown[]) => void logs.push(a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" "));
   try {
     const w = restWorld();
     const ctx = await configuredApp({

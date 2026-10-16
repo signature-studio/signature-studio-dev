@@ -219,6 +219,45 @@ GitHub の同時実行の上限は契約で変わる (Team 60、終了後 20 な
 
 現行の `wrangler.toml` は `TARGET="58"` なので、推定が 48 以上のとき `target_eff` は 58 に張り付く (上限 60 でも 58 まで。上限 60 から 2 を残す)。
 
+## 観測ログ (Custom Dashboard 用) (#5565)
+
+過去の期間の容量 (Actions の同時実行数など) を Cloudflare の dashboard 側で集計するための、tick ごとの観測ログ。
+`/status` (即時確認用) と同じ集計 (`plan` / `rows` / `counters` / `runCounts` / `obs`) から値を作り、GitHub へは呼ばない。
+イベント (launch・dispatch・pm-dispatch・close・demote・restore など) は既存の `{pm:...}` の 1 行ログ (`src/engine.ts` の `pushLog`) をそのまま使う (形式は変えない)。
+
+- **出力**: tick (alarm の毎分・cron の保険・webhook 後の点検) の最後に、1 tick 1 行だけ `m: "metrics"` を出す (`src/engine.ts` の `metricsLog`)。行の生成に失敗しても tick の結果は変えない (既存のログに `error` が 1 行残る)。
+- **形式**: 文字列ではなく JSON オブジェクトで出す。Workers Logs がフィールドを自動抽出・索引するのは構造化ログだけで、文字列のログは全文検索のみ (公式『Logging structured JSON objects』)。`{pm:...}` の既存の行は文字列のまま (形式を変えない)。
+- **redact**: 行全体を `clean()` (`src/redact.ts`) に通す。値は数値・真偽・列挙・ISO 時刻だけで、自由文・題名・secret は入れない。
+- **限界**: alarm と cron の両方が来る分だけ、同じ分に 2 行出ることがある (どちらも 1 tick 1 行)。
+
+| フィールド | 意味 (`/status` の対応) |
+|---|---|
+| `m` | `"metrics"` (行の種別) |
+| `ts` | tick の時刻 (ISO) |
+| `fresh` | 同期が新しい (`fresh()`)。false の間の値は古い状態に基づく |
+| `mode` | `live` / `partial` / `dry-run` (`/status.mode` と同じ式) |
+| `phase` | `review-only` / `launch` (`/status.phase`) |
+| `demoted` | 降格中か (`/status.demoted_reason` の有無) |
+| `rate_guard` | REST の残量が 1,500 未満か (launch を止めるフラグ) |
+| `stop` | `stuck-ceiling` / `rate-guard` / `null` (`/status.launch_stop`) |
+| `blocked` | `no-import` / `null` (`/status.launch_blocked`) |
+| `active` | TARGET に数える未完了の run (`/status.active_all`) |
+| `active_impl` / `active_other` | `active` の内訳 (`/status.active_impl` / `active_other`) |
+| `active_critical` / `active_normal` / `active_low` | `active` を優先の区分別に (`/status.active_by_prio` を平坦化) |
+| `target` / `target_eff` / `cap_est` / `room` | 上限と目標 (`/status.target` / `target_eff` / `cap_est` / `room`)。`cap_est` は推定が無ければ `null` |
+| `ready` | 着手待ちの件数 (`/status.ready`) |
+| `ready_critical` / `ready_normal` / `ready_low` | `ready` を優先の区分別に (`/status.ready_by_prio` を平坦化) |
+| `would_launch_now` | この tick で launch する picks の数 (`/status.would_launch_now` と同じ集合) |
+| `holds` | `launch_holds` 相当の件数 (`recent` + `stopped` + 今回は launch しない `ready`) |
+| `runs_running` / `runs_queued` | 毎 tick の run 数の観測 (`in_progress` と、`queued`・`pending`・`waiting` の合計)。`/status.running` とは数え方が違う (`pending` は `runs_queued` に入る) |
+| `peak_running` | 直近 24 時間の `runs_running` の最大 (`/status.peak_running`) |
+| `launched` / `dispatched` / `pm_dispatched` / `closed` | 累積カウンタ (`/status.counters` の `launched` / `dispatched` / `pmDispatched` / `closed`) |
+| `rest_remaining` | REST の残量 (`/status.rest_remaining`) |
+
+抽出 (Workers Logs / Custom Dashboard の Query Builder)。行の識別はフィールド `m = "metrics"` (文字列検索なら `"m":"metrics"`)。
+容量の履歴は `active` / `runs_running` / `runs_queued` / `target_eff` / `room` / `rest_remaining` を `ts` の時系列で見る。実行の推移は累積カウンタの差を取る (`launched` は `/oc` の投稿数)。停止は `phase` / `stop` / `blocked` / `rate_guard` で絞る。
+保持される期間は Workers Logs の設定による。Custom Dashboard (グラフ) の作り方は依頼者側の操作で、この節では扱わない。
+
 ## 失敗した webhook 配送の回収と `/admin/resync` (#2339)
 
 - **再送**: GitHub は失敗した配送を自動で再送しない。tick は 5 分ごとに、App の JWT (`appJwt`。installation token とは別枠) で `GET /app/hook/deliveries?per_page=100` を 1 ページ読み、`status != OK` の配送を古い順に `POST /app/hook/deliveries/{id}/attempts` で再送する。同じ `guid` に OK の配送が 1 つでもあれば回収済みとみなして触らない。再送された配送 (`redelivery: true`) は、失敗しても再送しない (連鎖させない。元の配送の上限だけで止まる)。
