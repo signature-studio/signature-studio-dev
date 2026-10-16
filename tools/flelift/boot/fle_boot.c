@@ -251,10 +251,15 @@ static int ipp_call(u64 t) {   /* fle_ff から。処理したら 1 */
 #define ILT_HMOD 0x7F0D0000u   /* #672: ILTools_x64.dll の擬似 HMODULE (mode 3 だけ) */
 #define PY_HMOD 0x7F0E0000u    /* PY-106 (#2909): Python312 の擬似 HMODULE (束縛呼出し中だけ有効) */
 static int g_py_probe = 0; static u32 g_py_hook_n;
+static u32 g_ipp_hook_n;   /* A1 (#4806): dsp_ippv2 の load hook 呼出し回数 (mode 1/2/3) */
 static HMODULE fle_ipp_load_hook(const char* name, DWORD flags) {
-    (void)flags;
     if (g_py_probe && name && strstr(name, "Python312")) { g_py_hook_n++; return (HMODULE)(uintptr_t)PY_HMOD; }
-    if (g_ipp_on && name && strstr(name, "dsp_ippv2")) { g_ipp_h = IPP_HMOD; return (HMODULE)(uintptr_t)IPP_HMOD; }
+    if (g_ipp_on && name && strstr(name, "dsp_ippv2")) {
+        HMODULE r = (HMODULE)(uintptr_t)IPP_HMOD;
+        g_ipp_h = IPP_HMOD; g_ipp_hook_n++;
+        fprintf(stderr, "[fleboot-ipp] load_hook name=%s flags=0x%lx ret=0x%llx n=%u\n", name, (unsigned long)flags, (unsigned long long)(uintptr_t)r, (unsigned)g_ipp_hook_n);
+        return r;
+    }
     if (g_ilt_on && name && strstr(name, "ILTools")) return (HMODULE)(uintptr_t)ILT_HMOD;
     return 0;
 }
