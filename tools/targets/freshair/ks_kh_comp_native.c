@@ -39,8 +39,6 @@ static uint64_t __attribute__((ms_abi)) stub_unres(void) {
     return 0;
 }
 
-/* IAT の未束縛スロット (ファイル上は hint/name RVA のまま) を stub に差替える。
- * GetLastError は 0 を返す (fault 経路で呼ばれる)。他の import を呼んだら unres_hits を増やす。 */
 /* FLS (FA-57 / #4622): index ごとの値の表と g_lasterr。index は 0x182989860 (HeartCore の .data) に入る。
  * FLS_IDX 未指定 (-1) のときは FlsSetValue が FALSE を返す (現行の stub の戻り 0 と同じ)。 */
 #define FLS_N 64
@@ -59,6 +57,8 @@ static uint64_t __attribute__((ms_abi)) fls_get(uint32_t idx) {
 }
 static uint64_t __attribute__((ms_abi)) set_lasterr(uint32_t e) { g_lasterr = e; return 0; }
 
+/* IAT の未束縛スロット (ファイル上は hint/name RVA のまま) を stub に差替える。
+ * GetLastError は 0 を返す (fault 経路で呼ばれる)。他の import を呼んだら unres_hits を増やす。 */
 static void patch_iat(uint8_t* m, uint32_t pe) {
     uint32_t imp_rva; memcpy(&imp_rva, m + pe + 144, 4);
     for (uint8_t* d = m + imp_rva; ; d += 20) {

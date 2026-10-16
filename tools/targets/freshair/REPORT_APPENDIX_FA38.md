@@ -104,18 +104,28 @@ P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r
 - 並列実行の確認 (739c90452 で seed 11・99 を `xargs -P 2` で同時実行。両 script の実行区間が重なり、開始時刻の差 0.30 ms、各 script 全体 0.25 s): 両 SUMMARY と kh_a.txt が直列実行と一致 (seed 11 = 200・292・25・136、seed 99 = 198・293・29・102、byte 一致)。
 - blob 監査: 20 MiB 超の追加なし。`work/` (gitignore) は使用のみ。
 
-## 6. 未解決
+## 6. FLS 実体化 (FA-57 / #4622・部分達成)
+
+- 実装: `ks_kh_comp_native.c` で `FLS_IDX` を指定したときだけ、`FlsSetValue`・`FlsGetValue`・`SetLastError` を実体化する (index 表 `fls_val[64]`・`g_lasterr`)。index は絶対 VA `0x182989860` に書く。`FLS_IDX` 未指定は従来の stub のまま (`FlsSetValue` は FALSE を返す)。
+- 対象 VA: `FlsSetValue` `0x1813a1368`・`SetLastError` `0x1813a12c0` (§3 の IAT 経路)。`GetLastError` は従来どおり 0 を返す stub。
+- 未実測: 上記の実体化後の出力・ERR・未束縛 import 呼び出し数は、本付録に転記していない。`HeartCore.core_64` (`work-liftlib-targets`) が未展開のため `ks_kh_comp.sh` を実行できず、測定値の正本は無い。再測定は §8 の手順で行い、出力 (`SUMMARY`・`FLS`・`UNRES` 行) をここに転記すること。
+- 未確認: `0x182989860` が実バイナリでその VA に対応する `.data` を指すか (素材が無いため)。
+
+## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | SC⇄KH 同一入力の bit 一致実測 (旧受入 2) と #52 への判定返し (旧受入 3) | Compressor の判定が未了 | #3534 (FA-41) |
 | `P+0x00`・`P+0x10`・`P+0x14` が出力に届かない原因 (写像か分岐か) | 比較の意味。SC の P 写像の確定 | #3534 (FA-41) |
-| 未束縛 import 2 経路 (mode=1 のみ。`KERNEL32!FlsSetValue`・`KERNEL32!SetLastError` を stub 化) の stub 依存 | mode=1 の出力 | #3534 (FA-41) |
+| `FLS_IDX` 指定時の再測定 (seed 7・11・99) と、`0x182989860` が実バイナリの `.data` を指すかの確認 | §6 の実体化の効果が未実測 | #4622 (残件) |
+| 既定 (`FLS_IDX` 未指定) の stub 依存。`0x182989860` の実 index の機械語での確定が必要 | mode=1 の出力 | #4622 (残件・親 #3534) |
+| 成功側で呼ばれる `HeapAlloc` (IAT `0x1813a1748`) が stub (戻り 0) のまま | `FlsSetValue` 成功側の出力 | #4622 (残件) |
 | ID 一致 37 組の振り分け表は親 #2739 の付録 (main の `tools/targets/freshair/REPORT_APPENDIX_2739.md` §3) にある | 本付録は参照しない | 不要 (main に既存) |
 
-## 7. 再現
+## 8. 再現
 
 ```sh
 # 素材: work-liftlib-targets (tools/targets/kilohearts/work/winpkg/HeartCore.core_64)
 bash tools/targets/freshair/ks_kh_comp.sh 200 7   # ERR 0・決定性・負例を判定 (run1 実測 0.03 s)
+FLS_IDX=0 bash tools/targets/freshair/ks_kh_comp.sh 200 7   # FLS 実体化の経路 (§6)
 ```
