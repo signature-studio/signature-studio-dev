@@ -52,7 +52,7 @@ r1 対 r2 で差が出た 4 KiB ページは 11 枚。image 内 4 枚 (`0x13a500
 |---|---|---|
 | 非決定 9 バイトの書込み元 (関数) の特定 | マスクの根拠が測定値だけで、なぜ非決定かは不明 | #5830 (FLE-48) |
 | C heap / C スタックの非決定ページ (11 枚) の扱い | `full`・`no_cstack` は判定に使えない (従来どおり) | #5830 (FLE-48) |
-| shim 有 (`FLE_IPP=1`) 経路の同じ 8 run 測定 | マスク後の指標が shim 有でも一致するかは未確認 | #5830 (FLE-48) |
+| ~~shim 有 (`FLE_IPP=1`) 経路の同じ 8 run 測定~~ | 解消 (§7・#5865) | — |
 
 受入条件は「原因特定 または 判定指標の策定」の選言で、本 PR は後者を満たす。原因特定は子 issue #5830 (FLE-48、親 #5177) に分離した。
 
@@ -66,3 +66,45 @@ r1 対 r2 で差が出た 4 KiB ページは 11 枚。image 内 4 枚 (`0x13a500
 - 注記: 判定指標の絶対値は、この build (`f39730d3…`) と PR 初版の測定 build (`7aa20126…`) で異なる。build 間で一致する値ではない。判定は run 間一致と検出力で行う。
 - dst buffer `0x12d677d0` (長さ 0x28): 新規 10 run で全 0 (同一)。全 8 run の比較は §4 のとおり未確認で、補助指標は「候補 (未検証)」扱い。
 - `full` の sha256: 新規 10 run で 10 通り (従来どおり判定に使わない)。
+
+## 7. shim 有 (`FLE_IPP=1`) 経路の 8 run 一致 (#5865)
+
+測定 commit: `cf486ff00` (origin/main・コード変更なし。本 PR は REPORT と結果 JSON のみ)。コード差分 `git diff cf486ff00 HEAD -- tools/flelift` は REPORT / results の 2 ファイルだけ (`tools/flelift` 配下の code 差分 0)。
+素材: `fl-win64` (`fl-win64.tar.zst` から `extracted/block00031_PE.bin` のみ展開)。emsdk は `[EMSDK]` の pin どおり上流から `emsdk install 6.0.12` → `emsdk activate 6.0.12` で repo 外に入れた (runner に既定の `[EMSDK]` 配置は無い)。
+
+工程 (run の再現コマンド):
+
+1. build: `FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk_env.sh> FLE_BOOT_TAG=fle5865rerun FLE_BOOT_RUNS=shim bash tools/flelift/boot/fle6_measure.sh`。build は gen-A 7 s / lift 81 s / clang-plain 99 s で完了し、`fleboot_plain.cjs` は作られている。shim 段の rc 3 は build の失敗ではなく、後段の IPP 判定 (`fle_boot.mjs` の `ptr_15F34A0 != 0` 確認、rc 3) の NG。
+
+IPP 判定 NG の理由 (`boot_summary_fle5865.json` の `boot.py_events`・`ipp`): shim の登録自体は起きている。`ptr_15F34A0` は unit 132 で `0x7f10001c` に書かれ、`ippsZero_8u` は 2 回呼ばれた (`ipp.called`・`ipp.total` = 2)。しかし unit 209 (boot の停止点) で同じ slot が `0x0` に戻り、判定は終了時の値を読むため NG になる。unit 209 の書込み元は未特定。shim 経路は通っており、判定指標 (§4) は登録と呼出しが行われた経路の dump に対する run 間一致を見ている。ただし終了時に登録が保たれていない点は、shim 経路が「正常に成立した」状態ではないことを意味する。この点は本 issue の受入条件の範囲外として残す。run 単位の py_events は 1 run 分 (`boot_summary_fle5865.json`) のみ保存されている。
+2. boot: build の成果物 `work/boot/fleboot_plain.cjs` に対して `node tools/flelift/boot/fle_boot.mjs <絶対パス>/fleboot_plain.cjs <json> --boot-only` を `FLE_IPP=1`・`FLE_TOLERANT=0`・`FLE_DIAG_NULLFILL=0`・`FLE_BOOT_LOG_CAP=0`・`FLE_OUTMEM_DUMP=<repo 外>` で 8 回 (r1〜r8)。`fle6_measure.sh` は boot 段で rc 3 を返すため、8 run は手動 loop で実行した (`fle6_measure.sh` は 1 回で止まる)。
+3. 判定: `python3 tools/flelift/boot/outmem_judge.py <dump dir> --pe <PE>`。
+
+run 単位の結果 (全文は `results/outmem_judge_shim_fle5865_r1-8.json`):
+
+| run | units_run | units_total | boot_threw | ipp `ptr_15F34A0` | IPP 判定 | dump sha256 (full) 先頭 16 桁 |
+|---|---|---|---|---|---|---|
+| r1 | 209 | 942 | `exit` (code 0) | 0x0 | NG (rc 3) | 4c1e212355cd380a |
+| r2 | 209 | 942 | `exit` (code 0) | 0x0 | NG (rc 3) | 3bfa7cae237a3898 |
+| r3 | 209 | 942 | `exit` (code 0) | 0x0 | NG (rc 3) | 1b7383b110c5e09f |
+| r4 | 209 | 942 | `exit` (code 0) | 0x0 | NG (rc 3) | 9b42341eeb8b2e1a |
+| r5 | 209 | 942 | `exit` (code 0) | 0x0 | NG (rc 3) | ff6e5678af4ad68e |
+| r6 | 209 | 942 | `exit` (code 0) | 0x0 | NG (rc 3) | 0703aafb1ab9f708 |
+| r7 | 209 | 942 | `exit` (code 0) | 0x0 | NG (rc 3) | 4dbf20df5081bb23 |
+| r8 | 209 | 942 | `exit` (code 0) | 0x0 | NG (rc 3) | 685c4dac9acea0b7 |
+
+`outmem_judge.py` の出力 (rc 0):
+
+```
+outmem_boot_plain_r1.bin 〜 r8.bin: 判定指標 891b29801d1bd50a (8 本全て)
+判定指標: 全 8 run で一致 = True
+検出力: マスク外 1 バイト (0x13a5020) の変更で指標が変わる = True
+RESULT PASS
+```
+
+注記:
+
+- 判定指標の絶対値は build ごとに違う (§4・§6 の `7aa20126…`・`f39730d3…` と別値)。run 間一致と検出力だけを根拠にする。
+- 停止点 (units 209) は shim 有の既知の値で、本 PR で変えていない。既定経路の 895 units とは別経路 (shim 有は 209 で停止する)。
+- 製品 KPI: 起動の進行 (FLEngine dispatch・通過 unit) は本 PR で変えていない。測定は shim 経路の再現で、既定経路の KPI は動かしていない。
+- `full` (線形メモリ全体) は shim 有でも判定に使わない (従来どおり)。

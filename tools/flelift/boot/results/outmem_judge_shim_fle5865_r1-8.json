@@ -1,0 +1,111 @@
+{
+ "issue": 5865,
+ "route": "shim (FLE_IPP=1)",
+ "build_source": "fle6_measure.sh FLE_BOOT_TAG=fle5865rerun FLE_BOOT_RUNS=shim (rc 3)",
+ "judge": {
+  "tool": "tools/flelift/boot/outmem_judge.py",
+  "indicator": "891b29801d1bd50a",
+  "all_same": true,
+  "detection": true,
+  "rc": 0,
+  "RESULT": "PASS"
+ },
+ "runs": [
+  {
+   "run": "r1",
+   "units_run": 209,
+   "units_total": 942,
+   "boot_threw": {
+    "cls": "exit",
+    "code": 0
+   },
+   "ipp_ptr_15F34A0": "0x0",
+   "ipp_ok": false,
+   "dump_sha256_full": "4c1e212355cd380ac570f5261647a600c461671645172286cf82100ef426732f"
+  },
+  {
+   "run": "r2",
+   "units_run": 209,
+   "units_total": 942,
+   "boot_threw": {
+    "cls": "exit",
+    "code": 0
+   },
+   "ipp_ptr_15F34A0": "0x0",
+   "ipp_ok": false,
+   "dump_sha256_full": "3bfa7cae237a389871e2a449a13a85205dd3dfa387c8500fad894eecb2f9a454"
+  },
+  {
+   "run": "r3",
+   "units_run": 209,
+   "units_total": 942,
+   "boot_threw": {
+    "cls": "exit",
+    "code": 0
+   },
+   "ipp_ptr_15F34A0": "0x0",
+   "ipp_ok": false,
+   "dump_sha256_full": "1b7383b110c5e09f73c6c2fd4288de62af87ac96f60684fbd36c99495ee71315"
+  },
+  {
+   "run": "r4",
+   "units_run": 209,
+   "units_total": 942,
+   "boot_threw": {
+    "cls": "exit",
+    "code": 0
+   },
+   "ipp_ptr_15F34A0": "0x0",
+   "ipp_ok": false,
+   "dump_sha256_full": "9b42341eeb8b2e1a510a556556007f7547be02e1e786d8a6140a17d635dfd14d"
+  },
+  {
+   "run": "r5",
+   "units_run": 209,
+   "units_total": 942,
+   "boot_threw": {
+    "cls": "exit",
+    "code": 0
+   },
+   "ipp_ptr_15F34A0": "0x0",
+   "ipp_ok": false,
+   "dump_sha256_full": "ff6e5678af4ad68eff308f3dfc5a17d07de92fc3b61f86e353a10217a5bdc458"
+  },
+  {
+   "run": "r6",
+   "units_run": 209,
+   "units_total": 942,
+   "boot_threw": {
+    "cls": "exit",
+    "code": 0
+   },
+   "ipp_ptr_15F34A0": "0x0",
+   "ipp_ok": false,
+   "dump_sha256_full": "0703aafb1ab9f7083b9479b13a1228ba9654013a666a51c9dc5a3650062738a4"
+  },
+  {
+   "run": "r7",
+   "units_run": 209,
+   "units_total": 942,
+   "boot_threw": {
+    "cls": "exit",
+    "code": 0
+   },
+   "ipp_ptr_15F34A0": "0x0",
+   "ipp_ok": false,
+   "dump_sha256_full": "4dbf20df5081bb2374cbf630e56cc646df3cfe8618e41d1578eab59d460102b5"
+  },
+  {
+   "run": "r8",
+   "units_run": 209,
+   "units_total": 942,
+   "boot_threw": {
+    "cls": "exit",
+    "code": 0
+   },
+   "ipp_ptr_15F34A0": "0x0",
+   "ipp_ok": false,
+   "dump_sha256_full": "685c4dac9acea0b7f5419a31b4cf866e16682c08819a328104f4104003406b74"
+  }
+ ]
+}
