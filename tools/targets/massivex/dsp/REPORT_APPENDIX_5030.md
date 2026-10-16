@@ -169,7 +169,7 @@
 ### 3.9 追補 (MX-61 #5656・`scripts/mx61_entry_xmm2_paths.py`・実測)
 
 - 表は HEAD `457fd052d` で再測定 (7 行一致・`0x18017b460` は §3.10 の値)。`0x18017b460` の行は HEAD の出力で差し替えた。表の判定列の結論は §3.10 で撤回・保留に直した。
-- 測定 commit: `457fd052d` (script の最後の変更は `88577641f`)。`457fd052d` 以降で `scripts/` は変わっていない。
+- 測定 commit: `457fd052d` (script の最後の変更は `88577641f`)。`457fd052d` 以降で `mx61_entry_xmm2_paths.py` は変わっていない (同ディレクトリの `mx62_vtable_slots.py` は main 取り込みで追加。本節の判定には使わない)。
 - 測定条件: `plugins-massivex` を `$RUNNER_TEMP/mx` に展開 (6.5 秒) → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` (11.1 秒・`md5-ok 0/125` は既知事象) → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` 一致。
 - 方法: 関数入口の xmm2 (呼出元の値) を、経路上で読むか・残したまま call するか・上書きするかを辿る。直接 call は callee を深さ 2 まで同じ判定にかける。間接 call (`call [reg+...]`) は target 不明として pass に数える。
 - 測定: `python3 mx61_entry_xmm2_paths.py "<vst3>" 0x18017b460 0x18017b680 0x180198700 0x1801e47c0 0x1801ef4b0 0x1801f36a0 0x1803bef80 0x18104aea0` (exit 0・0.15 s)。
