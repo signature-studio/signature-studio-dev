@@ -34,17 +34,19 @@ def main(pe_path, entry_rva):
     for k in range(ex.Size // 12):
         b, e = struct.unpack_from('<II', data, ex_off + k * 12)[:2]
         funcs[base + b] = base + e
-    fs = base + entry_rva
-    if fs not in funcs:
-        print('entry %#x is not a pdata function start' % fs)
+    a_in = base + entry_rva
+    cand = [b for b, e in funcs.items() if b <= a_in < e]
+    if not cand:
+        print('entry %#x is not inside a pdata function' % a_in)
         return 1
+    fs = max(cand)
     fe = funcs[fs]
     md = Cs(CS_ARCH_X86, CS_MODE_64)
     md.detail = True
     code = blob[fs - t_lo:fe - t_lo]
     ins = {i.address: i for i in md.disasm(code, fs)}
     order = sorted(ins)
-    print('== 0x%x: %d 命令 (%#x-%#x) ==' % (entry_rva, len(order), fs - base, fe - base))
+    print('== 0x%x (関数先頭 %#x): %d 命令 (%#x-%#x) ==' % (entry_rva, fs - base, len(order), fs - base, fe - base))
 
     reads_before_def = []
     seen = set()
