@@ -1,7 +1,7 @@
 # liftdiff LD-238 (#4423) — ret=i128 の segv 5 関数 (2 段 this 疑似オブジェクト) (付録)
 
 > 親 #4378 (LD-211) の子。前段 [`REPORT_APPENDIX_LD211.md`](REPORT_APPENDIX_LD211.md) §3 の segv 5 関数が対象。
-> 測定 commit: `65d7e01e3` (コード変更は `ldlib/cases.py` の `vmt2` 追加と `tests/ld238_probe.py`)。プローブ: `tests/ld238_probe.py`。
+> 測定 commit: §3・§4 は `65d7e01e3` (コード変更は `ldlib/cases.py` の `vmt2` 追加と `tests/ld238_probe.py`)。§5 は `570611d4e` (`ensure_native()` 修正を含む)。プローブ: `tests/ld238_probe.py`。
 
 ## 1. 結論 (部分達成)
 
@@ -38,19 +38,11 @@
 | 45e1a0 45e280 45e2e0 45eb00 45ecc0 45ed20 | 3/3 ずつ |
 | 668390 6683d0 784520 8e7e10 a965c0 | 0 (LD-211 §3 と同じ) |
 
-## 5. 未解決
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| VMT slot 4 の仮 proc 番地 (0x50018080) の命令フェッチ segv。thunk 敷設 (`ld_fake_ptr`) と boot state 経路 (`state_lines_for` → `SSNAP`) のどちらが原因か未切り分け | 668390 / 6683d0 の実行可能化が止まる | [LD-238] #4423 (本 issue を継続) |
-| 784520 (整数引数を vtable として参照) / 8e7e10 (グローバル 0x1599430 の初期化) / a965c0 (逆アセンブル未実施) | 3 関数が判定不能のまま | [LD-238] #4423 (本 issue を継続) |
-| 6 関数の戻りレジスタ (rax・rdx・xmm0) と戻り型 | `ret_override` 未付与 | [LD-238] #4423 (本 issue を継続) |
-
-## 6. 追補 (LD-238 再 run・古い実行器バイナリの修正)
+## 5. 追補 (LD-238 再 run・古い実行器バイナリの修正)
 
 - **前回の 668390 / 6683d0 の segv の原因**: 素材 `work-liftdiff` 同梱の `work/ld_native` が古く、仮 proc の thunk を敷けなかった (`rip=0x50018080` の命令フェッチ)。`ldlib/build_wasm.py` の `ensure_native()` は mtime で再ビルドするが、`Session(build=False)` の probe は呼ばないため古いバイナリを使い続けていた (#3088 と同じ症状)。
 - **修正**: `tests/ld238_probe.py` が実行前に `build_wasm.ensure_native()` を呼ぶようにした (mtime が古いバイナリを検出すると `rt/` の現版から作り直す)。
-- **測定 commit**: `eb943cdde` (origin/main) からの作業ブランチ。コード差分は `tests/ld238_probe.py` の 2 行のみ。
+- **測定 commit**: `570611d4e` (修正を含む。`eb943cdde` は修正前のため、ここでは §5 の数値は再現しない)。コード差分は `tests/ld238_probe.py` の 2 行のみ。
 - **実測 (blob=vmt2・native・古い mtime のバイナリで再ビルド後)**:
 
 | 関数 | 実行 ok | segv |
@@ -65,7 +57,7 @@
 - **784520**: `rcx`・`rdx` (ポインタ) と `xmm2` を取り、`call 0x50f600` で間接呼出し。第 2 引数 (整数) が `[r8]` で読まれるため、引数割り当てが誤り。
 - **戻り経路の判定 (6 関数)**: 未着手。呼出し元の追跡が要るため、1 run では判定しない。
 
-## 7. 未解決
+## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
