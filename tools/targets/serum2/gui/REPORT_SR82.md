@@ -43,7 +43,7 @@
 - THIS 系の所属関数 = 201 個 / データ表に現れる = 114 個 / 現れない = 87 個。
 - 表 (run) 数 = 134 個 (slot 171 件)。`arg_vtable_callers.py` の run 数の換算は §4 と同じ (distinct な先頭 h)。
 
-**RTTI 照合 (本 run で実測)**: `this_rtti_join.py` で、所属関数ごとに「表の RTTI」を集計した。
+**RTTI 照合 (本 run で実測)**: `this_rtti_join.py` で、所属関数ごとに「表の RTTI」を集計した。測定 commit は `8f5d7f32b` (`this_rtti_join.py` を追加した commit。`arg_vtable_callers.py` は main から不変)。`arg_vtable_callers.py` の出力 md5 `779e1d01…`、join の出力 md5 `8e07f244…` (2 回一致)。入力 `Serum2_win64.vst3` sha256 `501e7bb3…` / 19,236,864 B、TSV md5 `1e1f5500…`。real: `receiver_this_trace.py` 23.2 s、`arg_vtable_callers.py` 3.6 s。
 
 | 分類 | 関数 | RTTI あり | RTTI なし | SerumController の RTTI |
 |---|---|---|---|---|
