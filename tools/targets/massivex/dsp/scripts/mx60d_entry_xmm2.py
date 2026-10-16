@@ -6,6 +6,8 @@
 無い → 呼出元が xmm2 に float を載せる必要は無い (受入 1 の判定)。
 
 間接 jmp・関数外への jmp は保守的に「読む」扱いにする。
+call は引数の読みを capstone の regs_read が表さないため、xmm2 を書く前に到達する call は
+保守的に「読む」扱いにする (呼出先の解析は行わない)。
 
 usage: mx60d_entry_xmm2.py <pe> [entry_rva_hex]
 """
@@ -56,8 +58,8 @@ def main(pe_path, entry_rva):
             continue
         seen.add(a)
         i = ins[a]
-        rd = XMM2 in i.regs_read
-        wr = XMM2 in i.regs_write
+        rd = XMM2 in i.regs_read or i.mnemonic == 'call'
+        wr = XMM2 in i.regs_write and i.mnemonic != 'call'
         if rd:
             reads_before_def.append(i)
         if wr and not rd:

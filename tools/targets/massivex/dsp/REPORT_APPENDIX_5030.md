@@ -136,11 +136,10 @@
 
 ### 3.7 追補 (MX-60 #5498・`scripts/mx60d_entry_xmm2.py`・測定 commit は本節の commit)
 
-- 素材: `plugins-massivex` → `Massive X.vst3` md5 `622993e7…` 一致 (exit 0)。`mx60c_slot30.py` の再実行 (exit 0・1 分 04 秒) で index 30 の呼出し箇所は 27 件・出力 17 関数を再現。
-- `0x17b460` の全 37 命令を逆アセンブルして確認:
-  - 呼出元から受けるレジスタは `rcx`・`edx`・`r8`・`r9`。`xmm2` は入口で読まれない。
-  - `xmm2` は `call 0x18038dfe8` の出力 (`[rsp+0x2c]`) を `movss xmm2` で載せた**後**にだけ読まれ、直後の `call [rax+0x100]` (index 32) に渡る。
-  - `mx60d_entry_xmm2.py` (exit 0・0.2 秒): 入口から `xmm2` を読みうる命令 0 件・解析不能な分岐 0 件。
-- **受入 1 のうち「呼出元が xmm2 に float を載せて渡すか」: 確定 (渡さない)**。`0x17b460` は呼出元の `xmm2` を使わない。
+- 旧判定の撤回: 前 round の `mx60d_entry_xmm2.py` は capstone の `regs_read` だけで判定しており、`call` の暗黙の引数読みを見ていなかった。このため「確定 (渡さない)」は**撤回する**。前 round の出力 (判定 0 件) は無効。
+- `0x17b460` の逆アセンブル (事実): 呼出元から受けるレジスタは `rcx`・`edx`・`r8`・`r9`。`xmm2` は `call 0x18038dfe8` の後の `movss xmm2` で載せられ、直後の `call [rax+0x100]` (index 32) に渡る。`movss` の前に `call 0x18038dfe8` がある。
+- 判定ロジックの修正: `call` は xmm2 を読みうるものとして数え、xmm2 を書く前に到達する `call` で書込みによる遮断をしない (保守的扱い・修正案 (b))。呼出先 `0x18038dfe8` の解析は行わない。
+- 受入 1 (呼出元が xmm2 に float を載せて渡すか): **未確定**。修正後の判定を素材で実測していないため、結論は出さない。
+- 測定の状態: 本 round は素材 `plugins-massivex` が `$ARTIFACTS_DIR` に無く、`Massive X.vst3` を取得できなかったため `mx60d_entry_xmm2.py` を再実行していない。修正後の判定の出力 (exit code・判定行) は未実測。再実行は `oc_artifacts: plugins-massivex` を付けた次の run で行う (起票先: #5498 の次の run)。
 - 受入 1 の残り (`this` の出所・27 箇所の呼出元の確定) と受入 2 (`rbx` の動的型): **未達のまま** (§3.4・§3.6 の未了を継続)。
 - 未了 (起票先: #5498 の次の run): `0x17a2ac0` の `this` は `[rbp+0xd8]` から来る (関数内で vtable 呼出しが多く、個別の遡りは本 run の範囲外)。index 30 の 27 箇所の `this` 型の分類。`0x17a4b0` の生成元。
