@@ -126,12 +126,13 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 - §16 の走査候補 `f_5af330`・`f_413060` と `f_409c80` は、この連鎖にも書込み元にも含まれない (候補から外す)。
 - 残り (#5337 に残す): (1) `f_6a7b70` の本体のどの store が `0x5ac308`・`0x976410` を指すか (ループの添字と範囲。`dst`/`cnt` は呼出し引数で範囲を表さない)。(2) `f_410320` が rcx=0 で oob になる直接原因 (`rax` 未計測)。(3) 実機の loader が `0x5ac308` に充填する値 (#4384 は CLOSED)。
 
-## 18. 残件 (b)(c)(d) の実測 (#5881・測定 commit `749a27433`・mode tol・寛容起動)
+## 18. 残件 (b)(c)(d) の実測 (#5881・測定 commit `2b5704e12`・mode tol・寛容起動)
 
 - probe: `tools/flelift/boot/probe_5881.py` (生成 C の `work/` コピーだけを書き換える)。`[p410320]` は `mov rax, rcx` の直後の rax・rcx・rdx。`[p6a7b70]` は `f_6a7b70` の各 store 直前に、書込み先 `a`・幅 `n`・store 番号 (`pc`) を出し、受け手 slot (`0x5ac308`・`0x976410`) を覆うものだけ残す。
+- 測定 commit: `2b5704e12` (probe `probe_5881.py` を含む。`749a27433` には probe が無いため測定元ではない)。
 - 測定: `FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_SLOTS=0x5ac308ull,0x976410ull" FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` (probe 無しの基準) → rc 0。probe 付きは同じ HEAD で build.sh・boot を 1 回ずつ。
 - (b) `f_410320` の rax (実測): CFI 経路の `[p410320] rax=0x5ac338 rcx=0x5ac338` (受け手 slot の基底 `self`)。oob 直前の `f_410320` は `rax=rcx=0x0 rdx=0x1`。`rax` は常に `rcx` と一致 (`mov rax, rcx`)。よって `LD64(rax-0x30)` の `0xffffffffffffffd0` は `rax=0` のときの oob。推定は実測で確定した。
 - (c) `f_6a7b70` の store のうち受け手を覆うもの (実測): `[p6a7b70] slot=0x5ac308 pc=0x1 a=0x5ac300 n=16 dst=0x400000 cnt=0x100000` (`0x5ac300` の 16B store・slot を覆う)、`[p6a7b70] slot=0x976410 pc=0x2 a=0x976410 n=16 dst=0x800000 cnt=0x100000`。`dst`・`cnt` は呼出し引数で、`f_6a7b70` は `dst` から `cnt` バイトを 0 で塗る関数 (16B 単位・末尾は 4B 単位)。書込み store は `pc` の 16B (movdqu) 1 件ずつで、両 slot を同時には覆わない。
-- (d) 実機の充填値: PE は `DYNAMIC_BASE` 付きの DLL (`IMAGE_FILE_DLL`・`DYNAMIC_BASE` を確認)。両 slot は base relocation (`.reloc`・DIR64) の対象 (`0x1ac308`・`0x576410`)。実機の loader は base に合わせて値を補正するため、実機で入る値は loader が決める base に依存する。harness の base `0x400000` では `0x40f960`・`0x9764d8` (PE 静的値)。実機の base は本環境では測れないため、(d) は未確定のまま #5337 に残す。
+- (d) 実機の充填値: PE は `DYNAMIC_BASE` 付きの DLL (`IMAGE_FILE_DLL`・`DYNAMIC_BASE` を確認)。両 slot は base relocation (`.reloc`・DIR64) の対象 (`0x1ac308`・`0x576410`)。実機の loader は base に合わせて値を補正するため、実機で入る値は loader が決める base に依存する。harness の base `0x400000` では `0x40f960`・`0x9764d8` (PE 静的値)。実機の base は本環境では測れないため、(d) は未確定のまま #5881 に残す (#5337 は CLOSED)。
 - 計数 (両測定): dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob`・exit 0・tolerant kinds `ok 208 / empty 37 / exit 1 / clobber 695 / noproc 1` (§11・§14 と一致)。
 - 注意: probe 付きの `[p6a7b70]` は窓幅の判定 (8B) の修正後の値。修正前は `a=0x5ac310` (slot を覆わない store) を誤って含めた。
