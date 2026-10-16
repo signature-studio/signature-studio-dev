@@ -69,9 +69,21 @@
 | 未了 | 影響 | 起票先 |
 |---|---|---|
 | 受入 1: `write_local` 121・`read_local` 106 の site ごとの「call 直前の引数が親の rbp 由来か」の制御フロー付き走査 | 真の D23 の確定 | #5575 (既存の子。残り 291 site の突合) |
-| `function_40b620` の 3 site (call 欠落の疑い) の IR 側の再確認と、欠落の原因 (lift 段の制御フロー) の特定 | 受入 2 の優先箇所。修復の対象 | #5576 (本 issue に残す) |
-| `function_6905f0` → `function_690580` の 5 対 1 (4 site の call 欠落の候補) | 同上 | #5576 (本 issue に残す) |
-| `base_mismatch` 53 site の判定 (SSA 値を渡す site は alloca 幅では決まらない) | 修復範囲の決定 | #5576 (本 issue に残す) |
+| `function_40b620` の 3 site (call 欠落の疑い) の生 grep による確定と、欠落の原因 (lift 段の制御フロー) の特定 | 修復の対象 | #5586 |
+| `function_6905f0` → `function_690580` の 5 対 1 (4 site の call 欠落の候補) の site 単位の突合 | 同上 | #5587 |
+| `base_mismatch` 53 site (18 組) の修復範囲の決定 (SSA 値を渡す site は alloca 幅では決まらない) | 修復範囲の決定 | #5588 |
+
+- 子 issue 3 件 (#5586・#5587・#5588) はいずれも親 #5576 を `親:` で指す。親の blocker にはしない。
+- #5576 は closed 済みのため、本 PR の `Closes #5576` は範囲を縮めた完了として扱う。上の表の未了はすべて子に移した。
+
+### 4.1 生 grep による確定 (未実施)
+
+reviewer の指摘 (`no_ir_call` の根拠を引数型を問わない生 grep で確定する) は、本 run では実施できなかった。
+
+- 必要な `work/boot_final3.ll` は `m11_gen_ir2.sh` で作るが、その入力 (`work-m11`・`toolchain-retdec`) が本 run の `$HOME/artifacts` に無い (`fl-win64.tar.zst` のみ)。
+- したがって `grep -c '@function_40b290(' work/boot_final3.ll` 等の出力は、本 REPORT には無い。確定は子 #5586・#5587 で行う。
+- 代わりに、`unmatched_check.py` の `no_ir_call` 判定を、引数型を限定しない `call` 行の数 (`raw_calls`) に変えた。`raw_calls == 0` のときだけ `no_ir_call` とする。`raw_calls > 0` で引数が取れないものは `arg_type_unmatched` として分ける。`rbp_entry` が取れない site は `no_rbp_entry`、`callee_access` が空の site は `no_callee_access` に分けた (`max` の空ガード)。
+- **この変更は実データで再実行していない** (`boot_final3.ll` が無いため)。§3・§4 の表の数は、変更前のコードで得た値のままである。新しいコードの出力は、子 #5586・#5587 の生 grep と合わせて確認する。
 
 ## 6. 検証
 

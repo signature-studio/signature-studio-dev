@@ -68,12 +68,20 @@ def main():
         p, callee = r['parent'], r['callee']
         body = fns.get(p)
         X = rbp_entry_offset(mach, int(p.split('_')[1], 16))
-        E = max(x['off'] + x['size'] for x in sites[(p, r['call_at'])]['callee_access'])
+        E = max((x['off'] + x['size'] for x in sites[(p, r['call_at'])]['callee_access']), default=None)
         rec = dict(call_at=r['call_at'], parent=p, callee=callee, prev=r['verdict'], rbp_entry=X, need=E)
         args = set(m.group(1) for m in re.finditer(r'call [^@]*@%s\((?:ptr|i64|i32)[^%%,]*%%([\w.\-]+)' % re.escape(callee), body or ''))
-        if body is None or not args:
+        raw = len(re.findall(r'^\s*(?:%[\w.\-]+ = )?call [^\n]*@%s\(' % re.escape(callee), body or '', re.M))
+        rec['raw_calls'] = raw
+        if E is None:
+            rec['verdict'] = 'no_callee_access'
+        elif body is None or raw == 0:
             rec['verdict'] = 'no_ir_call'
-        elif X is not None and args == {'stack_var_%d' % X}:
+        elif not args:
+            rec['verdict'] = 'arg_type_unmatched'
+        elif X is None:
+            rec['verdict'] = 'no_rbp_entry'
+        elif args == {'stack_var_%d' % X}:
             sizes = classify.alloca_sizes(body)
             S = sizes.get('stack_var_%d' % X)
             rec.update(passed='stack_var_%d' % X, alloca_size=S)
