@@ -1138,6 +1138,7 @@
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_4192.md` | ~130 | MX-47 (#4192): .text 外の FH3 funclet 候補 211 件の由来 (誤読・root から除外。画像外 208 / .data 3)・FH3 棄却 355 件の内訳 (大半は読取不能の FuncInfo 339 件、上限は 9 件のみ。REPORT_APPENDIX_3776 §9.2 の記述を訂正)・U4g/U4h/U4i の確認 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_4198.md` | ~43 | MX-50 (#4198) 親 18 件の RUNTIME_FUNCTION 解決 (部分・未達)。親 18 件の所在の再現が REPORT_MX5 と一致せず、UNWIND_INFO の読み方の疑いは未確定。e2e・negctl は素材 `plugins-massivex` 不足で未実施 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_4989.md` | ~60 | MX-52 (#4989) 受入 2〜4 の感度測定: U3d (merge 上位保持・感度 18 件・P 17 関数 / A 1 件 0xefe0)・U3e (call/jmp 転送の未確定の候補 193 件・pdata 始点 47 件)・U3g (未実施)。測定値の正本 |
+| `tools/targets/massivex/dsp/REPORT_APPENDIX_5908.md` | ~90 | MX-63 (#5908) U3e の pdata 始点 47 件と mx54 の 42 件の差の切り分け: 源側 (F 内で未定義・前段 call なし) の E 43 件、G (転送先) が pdata 始点 0 件で関数入口でないこと (G 入口 livein は根拠にならない)。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_MX15.md` | ~50 | MX-15 (#1810): MX-12 残件 490 件 (0 件 458・2 件以上 32) の失敗理由の内訳と、MX-10 親 18 件の母集団。読み方の規則・親の解決は子 issue (MX-49・MX-50)。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_MX33.md` | ~153 | MX-33 (#3032) 受入 1: xmm0〜3 だけの入口 livein 保留 17 件の読み幅による判定 (0 件確定・判定不能 17)・NC 9 件・線形上限。受入 2〜5 は子 issue。測定値の正本 |
 | `tools/targets/massivex/dsp/REPORT_APPENDIX_5030.md` | ~60 | MX-55 (#5030) 付録: 0x17b680 の同定 (scalar 読み・入口 xmm2)・vtable slot 32 の呼出元 1 件 (xmm2 に float)・測定値の正本。REPORT_MX33 §9 から分割移動 |
