@@ -77,10 +77,10 @@
 ## 6. #5028: exit 枝の判定 (diagnostic probe)
 
 - **結論 (lift C の読みによる。実機照合は未実施)**: exit 直前の分岐条件は `[0x15eac80]=0`・`[0x15e6068]=0`・`[0x13a5000]=0` (実測ログ `[EXITBR-412a0d]`)。エラー番号を書く `f_412a40` は boot 中に入っていない (`[EXITBR-412a40]` 0 件)。`f_4096b0` の 4 呼出し元 (`0x409553`・`0x409722`・`0x40c841`・`0x412acf`) は、いずれも boot 中に実行されなかった (`[EXITBR-caller]` 0 件・`[EXITBR-4096b0]` 0 件。§6.2)。`f_4096b0` が呼ばれないので、エラー番号を書く経路は boot 中に通っていない。
-- 測定 commit: `e178472e4` (HEAD・2026-10-16 実測)。コードを変えた最後の commit は `35dbc7734`。`git diff 35dbc7734 HEAD -- tools/flelift/x64c.py tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh tools/flelift/boot/exit_branch_probe.sh tools/flelift/boot/fle46_412acf_probe.sh tools/flelift/boot/dbg_lift.py tools/shared` は空 (差分 0)。経路: 既定 (mode 3・補修あり・`FLE_EXTRA_ROOTS` 既定 `0x6a7b70`)。旧 `916de996d` の run は現 HEAD 向けではないため採らない。
+- 測定 commit: `b53105d23` (測定時の HEAD)。boot 側のコードは `e178472e4` と同一 (差分 0 の証跡は §6.1 末尾)。コードを変えた最後の commit は `9b8a0426c` (`tools/flelift/rt/fle_cpu.c`・boot のビルド入力)。経路: 既定 (mode 3・補修あり・`FLE_EXTRA_ROOTS` 既定 `0x6a7b70`)。旧 `916de996d`・`35dbc7734` の数値は現 HEAD 向けではないため採らない。
 - 実行: `FL_WIN64_DIR=<展開先> SS_EMSDK_ENV=<emsdk 6.0.12> bash tools/flelift/boot/exit_branch_probe.sh` (同 HEAD で `fle6_measure.sh` を先に実行して `work/boot/lift` を作った後に実行。probe は `work/boot/lift_exitbranch` にだけ入る)。
-  - 既定 (`fle6_measure.sh`・`FLE_BOOT_RUNS=default`・probe なし): 所要 3 分 11 秒 (`time` 実測)。工程 lift 81 s・clang-plain 94 s・boot 10 s。ログ上の 1 分平均 load の最大 1.99。`units_run=895`・`stopped_at=895`・`exit`・IPP `ok` (`ptr_15F34A0=0x7f10001c`)・rc 0。
-  - probe 版 (`exit_branch_probe.sh`): 所要 1 分 58 秒 (`time` 実測・スクリプト全体)。`units_run=895`・`stopped_at=895`・`exit`・`[fleboot][exit] code=0 call_site=0x412a12`・rc 0。
+  - 既定 (`fle6_measure.sh`・`FLE_BOOT_RUNS=default`・`FLE_BOOT_TAG=fle6def`・probe なし): 所要 2 分 59 秒 (`time` 実測)。工程 lift 68 s・clang-plain 95 s・boot 9 s。ログ上の 1 分平均 load の最大 2.14。`units_run=895`・`stopped_at=895`・`exit`・IPP `ok` (`ptr_15F34A0=0x7f10001c`)・rc 0。
+  - probe 版 (`exit_branch_probe.sh`): 所要 1 分 39 秒 (`time` 実測・スクリプト全体)。`probes: 7`。`units_run=895`・`stopped_at=895`・`exit`・`[fleboot][exit] code=0 call_site=0x412a12`・rc 0。
 - probe 着床 (`dbg_lift.py`・8 shard 分を集計): 8 サイトのうち 7 サイトが既定 root の lift に各 1 件着床 (`probes: 7`)。着床行は `0x4128b0`→line 33201・`0x412a0d`→33361・`0x412a40`→32755・`0x4096b0`→31957・`0x409553`→30988・`0x409722`→31041・`0x40c841`→31725。`0x412acf` は 8 shard すべて未着床 (既定 root に `f_412a90` が無い。§6.1)。
 - ログ行 (判定根拠・実測ログそのまま):
   ```
@@ -101,7 +101,7 @@
 - **静的**: `0x412a82`〜`0x412adf` は `int3` パディングで、実体は関数 `f_412a90` (`0x412a90`〜`0x412ada`)。`0x412acf` は `call 0x4096b0` (`ecx=0xd9`)。
 - **lift 条件**: 既定 root には `f_412a90` が無く、lift 出力に `0x412a82`〜`0x412adf` が出ていなかった (`x64c --closure 2` の既定 root からの到達不可)。`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` で root に足すと、`f_412a90` と `0x412acf` の `call` が lift 出力に入る (`fle_lifted_s0.c`)。既定ビルドは不変。
 - **到達性 (PE 全体・実測)**: 検索は `pefile` で実行セクション (`IMAGE_SCN_MEM_EXECUTE`) を走査し、`E8` (call rel32) / `E9` (jmp rel32) の移動先を `0x412a90` と比較した (`block00031_PE.bin`・`PointerToRawData` からの `E8`/`E9` 1 バイト走査)。再現は `fl-win64` の `extracted/block00031_PE.bin` を入力にこの走査を行う。結果は `E8` が `0x412b24` の 1 件、`E9` は 0 件。`0x412b24` は `0x412b20: jmp 0x412b2f` の直後にあり、この `jmp` で飛び越えられるため実行経路に載らない (死んだコード)。`imm32` の絶対アドレス (`0x412a90`) は 0 件。`.pdata` (例外テーブル) に RVA `0x12a90` (VA `0x412a90`) の 4 バイトが 1 件 (file offset `0x1279390`) あるが、これは `RUNTIME_FUNCTION.BeginAddress` で、呼出し参照ではない。
-- **probe 結果** (`tools/flelift/boot/fle46_412acf_probe.sh`・陽性対照 `0x412a0d` 込み・`FLE_IPP=3`・`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90`・測定 commit `35dbc7734`):
+- **probe 結果** (`tools/flelift/boot/fle46_412acf_probe.sh`・陽性対照 `0x412a0d` 込み・`FLE_IPP=3`・`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90`・測定 commit `b53105d23`):
   - 着床: `probes: 3 (expect 3)` (`0x412acf`・`0x412a90`・`0x412a0d` の各 1 件。`work/boot/lift_fle46/fle_lifted_s0.c` に 2 件・`s3.c` に 1 件)。
   - boot 中のログ (`work/boot/run_fle46_probe.log`・gitignore・要約はここ):
     ```
@@ -112,15 +112,16 @@
   - JSON: `results/boot_summary_fle46x_default.json` = `FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` の run (probe ログと同一 boot)。`results/boot_summary_fle6def_default.json` = 既定 root の run。`boot_summary_fle46_default.json` は旧 `5e9d18bf6` の run で、本測定では使わない。
 - **判定**: `0x412acf` は boot 中に実行されなかった (陰性)。`f_4096b0` の 4 呼出し元のうち `0x412acf` は除外。残りは `0x409553`・`0x409722`・`0x40c841`。この判定は FLE_EXTRA_ROOTS 経路の probe によるもので、既定 root の lift (`exit_branch_probe.sh`) では `0x412acf` を probe できない (上の「lift 条件」)。
 - **結果の返却先**: 上の結果を親 #4970 の未判定項目 (exit 枝) に返す (#5443 の受入条件)。
-- **測定 (実測・測定 commit `35dbc7734`・HEAD と同一)**:
-  - 既定 root (`fle6_measure.sh`・`FLE_BOOT_RUNS=default`・`FLE_BOOT_TAG=fle6def`): units 895・stopped 895・exit・rc 0・IPP ok。工程 lift 76 s・clang-plain 76 s・boot 10 s・load 最大 1.99。JSON: `boot_summary_fle6def_default.json`。
-  - `FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` (`FLE_BOOT_TAG=fle46x`): units 895・exit・IPP ok・rc 0。工程 lift 76 s・clang-plain 89 s・boot 10 s・load 最大 1.80。JSON: `boot_summary_fle46x_default.json`。
-  - probe 版 (`fle46_412acf_probe.sh`・`work/boot/lift` を再利用): probe 3 件着床・units 895・exit・IPP ok。スクリプト全体 93 s (clang-fle46 + boot 込み・実測 21:27:31〜21:29:04)。
+- **測定 (実測・測定 commit `b53105d23`・boot 側コードは `e178472e4` と同一)**:
+  - 既定 root (`fle6_measure.sh`・`FLE_BOOT_RUNS=default`・`FLE_BOOT_TAG=fle6def`): units 895・stopped 895・exit・rc 0・IPP ok。所要 2 分 59 秒 (`time` 実測)。工程 lift 68 s・clang-plain 95 s・boot 9 s・load 最大 2.14。JSON: `boot_summary_fle6def_default.json` (本 run の出力)。
+  - `FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` (`FLE_BOOT_TAG=fle46x`): units 895・exit・IPP ok・rc 0。所要 2 分 36 秒 (`time` 実測)。工程 lift 70 s・clang-plain 71 s・boot 8 s・load 最大 2.29。JSON: `boot_summary_fle46x_default.json` (本 run の出力)。
+  - probe 版 (`fle46_412acf_probe.sh`・上の `fle46x` の lift を再利用): probe 3 件着床・units 895・exit・IPP ok・rc 0。スクリプト全体 1 分 26 秒 (`time` 実測)。
   - 注: `boot_summary_fle46_default.json` は旧測定 (`5e9d18bf6`) のファイルで、今回の run の値ではない。
+  - 差分 0 の証跡 (boot ビルド入力・`tools/flelift/rt` を含む): `git diff --stat e178472e4 b53105d23 -- tools/flelift/rt tools/flelift/boot tools/flelift/x64c.py tools/shared` は空。`git diff --stat 35dbc7734 b53105d23 -- 同範囲` の出力は `tools/flelift/rt/fle_cpu.c | 2 +-` (`9b8a0426c`・#5337)。このため `35dbc7734` の値 (旧 probe・旧 JSON) は現 HEAD の値ではなく、上の再測定値を採る。
 
 ### 6.2 `f_4096b0` の 4 呼出し元 (#5028 の受入条件 2・FLE-42)
 
-- **測定**: 既定 root の probe は `tools/flelift/boot/exit_branch_probe.sh` (`FLE_EXTRA_ROOTS` 既定 `0x6a7b70`)。`0x412acf` を含む経路は `tools/flelift/boot/fle46_412acf_probe.sh` (`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90`)。測定 commit はどちらも `e178472e4` (HEAD と同一・probe は `work/boot/lift_exitbranch` と `work/boot/lift_fle46` にだけ入る)。
+- **測定**: 既定 root の probe は `tools/flelift/boot/exit_branch_probe.sh` (`FLE_EXTRA_ROOTS` 既定 `0x6a7b70`)。`0x412acf` を含む経路は `tools/flelift/boot/fle46_412acf_probe.sh` (`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90`)。測定 commit はどちらも `b53105d23` (boot 側コードは `e178472e4` と同一・probe は `work/boot/lift_exitbranch` と `work/boot/lift_fle46` にだけ入る)。
 - **サイト別の着床 (8 shard 集計)**: `0x409553`・`0x409722`・`0x40c841` は既定 root で各 1 件着床 (`call 0x4096b0` の直前)。`0x412acf` は既定 root に無く未着床 (`[EXITBR-caller] site=412acf` の経路は §6.1 の `FLE_EXTRA_ROOTS` 版で判定)。
 - **既定 root の run (`exit_branch_probe.sh`)**: `[EXITBR-caller]` 0 件 (`0x409553`・`0x409722`・`0x40c841` の 3 件とも)。`[EXITBR-4096b0]` 0 件。`[EXITBR-412a40]` 0 件。陽性対照 `[EXITBR-412a0d]` は 1 件で発火しており、probe 機構は動いている。
 - **`FLE_EXTRA_ROOTS=0x6a7b70,0x412a90` の run (`fle46_412acf_probe.sh`)**: `probes: 3 (expect 3)` (`0x412acf`・`0x412a90`・`0x412a0d` 各 1 件着床)。boot 中の `[EXITBR-caller]` は `site=412a0d n=1 (control)` の 1 件のみ。`site=412acf` 0 件・`site=412a90` 0 件。`units_run=895`・exit・IPP ok。
