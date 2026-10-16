@@ -134,6 +134,7 @@
 - 正規化前の mismatch: gain / matrix / haas / clipper / gate / quickeq / resonator / stereo / disperser / formant は `正規化前 0 件` (sig_gate 情報行を確認)。phaser / delay / limiter は `sig_normalize --strict` が raw 検証より前に止まるため **未測定**。
 - `data/sig_ext.json` に 11 API を追記 (根拠は各 `why`)。`ret` = `zext`: `HeapFree` / `IsProcessorFeaturePresent` / `TerminateProcess` / `UnhandledExceptionFilter` / `LoadLibraryExW` / `GetLastError` / `IsDebuggerPresent` / `FreeLibrary` / `GetModuleHandleW` / `GetModuleHandleExW` / `FlsSetValue` (shimx 定義の値域が非負: BOOL / DWORD / HMODULE)。既存は `GetComputerNameExW` / `GetFileAttributesExW` / `SHGetFolderPathW`。
 - **未解決 (本 issue の残件)**: `GetCurrentProcess` の `ret` 符号。shimx 定義は擬似ハンドル `(HANDLE)-1` を返すため、zext (4294967295) と sext (-1) で値が変わる。呼出側 IR の用途を読んで決める必要があり、本 run では確定できず silent に決めなかった。phaser / delay / limiter はこの 1 件で止まっている (他の未解決は全て解決)。
+  - 追記 (#5762): 上記の残件は、下記 175 行以降の 13 本の実測で解決した (`ret = sext`)。
 - `sig_test.sh` ALL PASS は HEAD で再現 (24.6 s)。
 - 受入条件「SlateCore の未測 lift 対象」は本 run で未実測 (素材 `work-liftlib-targets` は SlateCore の lift IR を含まない。`plugins-freshair` の `tools/targets/freshair/` 側の build は未着手)。
 - 除外: `tools/liftlib/work/cab238/p1_only/work/ott_m8.ll` は正規化前の時点で `%p1r_1801209c9_cl1` が未定義 (clang error)。診断用の派生物で正規の成果物ではないため対象外。
@@ -182,4 +183,5 @@
 | limiter | 200/200 bit-exact (calls 1100/1100) | 25 | 25 | 0 | **0** | exit 0 |
 
 - **残件 (`GetCurrentProcess` の `ret` 符号) の決定**: `data/sig_ext.json` に `GetCurrentProcess` の `ret = sext` を根拠付きで登録した。根拠: (1) shimx 定義 `thread.c` は擬似ハンドル `(HANDLE)-1` を返す。(2) native 側の定数 `gen_stubs_sigs.py` は `rax = 0xffffffffffffffff` (64bit の -1)。sext は native と一致し、zext は `0x00000000FFFFFFFF` となり不一致。(3) 呼出 site は phaser 1 + delay 3 + limiter 3 の計 7 件で、全件が `rax → rcx` 経由で `TerminateProcess(handle, code)` の第 1 引数に渡るだけ (値の用途は他に無い)。`sig_test.sh` は ALL PASS (1d7d6d6e5, 19.3 s, load average 0.69 → 0.82)。
+- **適用範囲の限界**: `sig_ext.json` は API 単位の global 設定。`tools/shimx/data/inventory.csv` では `GetCurrentProcess` は 31 site (FL64 / FreshAir / OTT / Serum2) に現れるが、本節の根拠は 13 本の内の 7 site (phaser / delay / limiter) のみ。他 plugin の 24 site は未測定で、sext は ABI 根拠 (HANDLE の -1) から適用している。
 - **受入条件 2 (`gain` の `declare` 重複)**: 今回の RetDec 出力では重複が再現しなかった。`stage0.ll` (declare 427 行)・`build.py` の n1 段 (gain 17 行)・最終 `final.ll` の完全一致重複と名前重複は、全 13 本で 0 件。手作業経路 `ir_normalize.py` → `ir5_patch.py` (declare 427 → 427、重複 0) でも 0 件。既存の pass は `build.py` の declare 重複除去 (`lift/build.py` 「declare 重複除去」節、s0 経路で有効) と `ir5_patch.py` の C1 段の重複除去 (`uniq` / `seen_d`) の 2 つで、#966 の awk 前処理は不要になっている。恒常化は既存 pass で満たすため、新規の pass は追加していない。
