@@ -37,7 +37,8 @@
 - `180cbba21`: `ff 50 08` = `call QWORD PTR [rax+0x8]`。直前は `mov rax,[rbx]`・`rbx` = `[rsp+0x28]` (= `[rdi+0xa80]` の control block 相当)。
 - `180cbba36`: `ff 50 10` = `call QWORD PTR [rax+0x10]`。直前は `mov rax,[rcx]` (同上)。
 
-`[rdi+0xa80]` の格納箇所は、全量 dsm で 48 件 (`mov QWORD PTR [r*+0xa80],` の数。`grep -c 'mov.*+0xa80'` は 133 件でこれは別の数え方)。格納は 47 関数に分かれる (`tools/icall/cb_writers.py`・§7)。格納元の関数 `180cbc77c` は、関数 `180cbc770` の内側の位置で、直接の `call`・`jmp`・絶対アドレスの参照が 0 件。`180cbc770` への呼出しは 6 箇所 (§7)。`180cb5d3e` は `+0xa80` に `rbp` (0) を書く初期化。
+`[rdi+0xa80]` の格納箇所は、全量 dsm で 48 件 (`mov QWORD PTR [r*+0xa80],` の数。`grep -c 'mov.*+0xa80'` は 133 件でこれは別の数え方)。格納は 47 関数に分かれる (`tools/icall/cb_writers.py`・§7)。`180cbc770` (関数の開始) への呼出し元は `cb_writers.py <dsm> 180cbc770` で列挙する (§7)。`180cb5d3e` は `+0xa80` に `rbp` (0) を書く初期化。
+前 run の記述の `180cbc77c` は、`cb_writers.py` の出力では格納箇所ではない (格納は関数 `180cbc770` 内の `180cbc7e0`・`180cbc963`)。本付録では `180cbc77c` を格納元・呼出し先として扱わない。
 
 ## 4. 前 run との関係
 
@@ -64,11 +65,11 @@
 
 ## 7. 格納元の集計 (#5843 / ICALL-119)
 
-- 素材: `plugins-freshair` の `Fresh Air.Win.zip` → `SlateCore.core_64` (sha256 `2cf759f712adf955a56684df4b24454690ac878105d4433de16c88626a45dd3b` で一致)。全量 dsm は `tools/icall/work/core64.dsm` (gitignore)。
-- `objdump -d -M intel` の全量生成: real 2.650 s・user 2.501 s (load は測定時点で低い)。
-- `bash tools/icall/r13_callee_check.sh <core_64> <dsm>` → `180cbb930`・`180cbcd90`・`180cb9890` の `r13` 書込み 0 件 (push 0 / pop 0)。`+0xa80` の格納 48 件。前付録 §3 と一致。
-- `python3 tools/icall/cb_writers.py tools/icall/work/core64.dsm` → 関数 20,701 件を境界で切り、`mov QWORD PTR [r*+0xa80],` を含む関数は 47 件・格納 48 件。`180cbc770` (`180cbc77c` を含む) が 2 件 (`180cbc7e0`・`180cbc963`)。
-- `180cbc770` の呼出し元 6 件 (`call 0x180cbc770` / `jmp` の合計): `180cb60cb`・`180cb6965`・`180cb6a76`・`180cbaf0b`・`180cbafc4`・`180cbb147`。直前の処理を見ると、`180cb60cb`・`180cbaf0b`・`180cbafc4`・`180cbb147` は `rdx` に作った pair をゼロで渡し、格納される control block は NULL になる。`180cb6965`・`180cb6a76` は `rdx` が `0x18040e0e0` の戻り値で、その関数は `[rdx+0x8]` を読んで `[rdi]` に書く (control block の値は呼出し元に依る)。この 2 件は未確定。
+- 本 run の状況: 素材 `plugins-freshair` (`Fresh Air.Win.zip` → `SlateCore.core_64`) は取得できず、`fl-win64` にも `SlateCore.core_64` は含まれなかった。そのため本 run では objdump・`r13_callee_check.sh`・`cb_writers.py` の実 binary への再実行を行っていない。下記の数値は前 run の記録であり、本 run では再現していない。
+- 前 run の記録 (未再現): 素材 sha256 `2cf759f712adf955a56684df4b24454690ac878105d4433de16c88626a45dd3b`・`objdump` 全量 real 2.650 s。`cb_writers.py` で関数 20,701 件 (近似)・格納関数 47・格納 48 件。
+- 呼出し元の数え方 (前 run の 6 件の根拠): `python3 tools/icall/cb_writers.py <core64.dsm> 180cbc770` が、`call` と `jmp` の直接参照を呼出し元の位置と関数開始つきで列挙する。前 run の 6 件 (`180cb60cb`・`180cb6965`・`180cb6a76`・`180cbaf0b`・`180cbafc4`・`180cbb147`) は、この出力と一致するかをまだ確認していない。次の run で同じコマンドを実行して確認する。
+- 前 run の 6 件の処理 (未確認の記述): `180cb60cb`・`180cbaf0b`・`180cbafc4`・`180cbb147` は `rdx` に作った pair をゼロで渡し control block が NULL になる、と読んだ。`180cb6965`・`180cb6a76` は `rdx` が `0x18040e0e0` の戻り値とされ、この 2 件は未確定。
+- 近似の注記: 関数境界は「ret の直後の int3 パディング」のみで切る。パディング無しで隣の関数が続く場合は一つにまとまるため、関数 20,701 件は近似の結果である。
 - 具象型の全数 (control block の vtable が指す `_Destroy`・`_Delete_this`) は未確定。`.rdata`・`.data` の関数ポインタ並びは 26,149 件あるが、vtable の候補への対応付けは未実施。
 
 ## 8. 検証のみで未了の項目
