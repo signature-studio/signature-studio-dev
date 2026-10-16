@@ -95,10 +95,31 @@ venv/bin/python $P/arg_vt_indirect.py Serum2_win64.vst3 trace.tsv --tsv vt_ind.t
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (a) 間接 call の候補の宛先 (reg の指す object) の型を確定する。候補 118,222 件は disp のみの照合で、SC 関数内の 19 件も受け手は未確定 | 受入 1 | #4930 (本 issue 残・親 #4164 の子) |
+| (a) 間接 call の候補の宛先 (reg の指す object) の型を確定する。候補 118,222 件は disp のみの照合。SC 関数内の候補は 14 サイト (§7) で、受け手の vtable は SC の表と一致せず型は未確定 | 受入 1 | #4930 (本 issue 残・親 #4164 の子) |
 | (b) THIS 69・THIS-CHILD 197 の SC 伝播と、THIS-CHILD の SC 証拠 (6 件 / 5 関数) の定義を揃えた再集計 | 受入 2 | #4930 (本 issue 残) |
 | (c) 表の境界の決め方 (§4 で決定・達成) | 受入 3 | 閉じた (§4) |
 | (d) `receiver_this_trace.py` の TSV md5 が SR60 (`ea2d93a2…`) と不一致。本 PR の測定 (`224202d55`) では `1e1f5500…` で、REPORT_SR49・REPORT_SR58 の既定 TSV md5 と**一致する** (SR60 の `ea2d93a2…` とは不一致)。SR60 側の差の原因は未確認 | 再現性 | #4930 (本 issue 残) |
 | (f) RTTI 照合 (THIS 所属関数の vtable RTTI・THIS-CHILD の SC RTTI 6 関数) は本 run で未再現。入力 `Serum2_win64.vst3` (`plugins-serum2` 素材) が本 run の `$ARTIFACTS_DIR` に無い | 受入 2 の前提見直し | #4930 (本 issue 残・次 run で `oc_artifacts: plugins-serum2` を指定して再照合) |
 
 (e) は §5 の再測定で閉じた (`arg_vt_indirect.py` を HEAD で 2 回実行、118,222 件・md5 `42bcf98b…` で一致)。
+
+## 7. SC 関数内の候補の受け手型 (受入 1 の残り・本 run)
+
+`recv_sc_sites.py` (新規): §2 の候補のうち、呼出元が SC の関数で disp が候補の表と一致する call について、受け手 (reg) の出所を `receiver_this_trace.receiver()` で strict / loose の両方で分類する。`sc_slot_stores.py` (新規): SC の関数内で `this+off` に vtable 先頭を書く `mov` を列挙する。
+
+- SC 関数内の候補 = 一意の call サイト 14 件 (§2 の 19 は、同じサイトを別の (F, slot) 行で数えた和で、重複を含む)。
+- 受け手の分類 (strict): `this+off` 系 5 件 (`+0x10`・`+0x18`・`+0x40`・`+0x118`・`+0xc8`)、引数 1 件、スタック系 5 件、`callret` 1 件、`nodom` 等 2 件。loose では `this[+0x22388]`・`this[+0x22798]` を経由する 4 件が追加される。
+- SC の関数内で `this+off` に書かれる vtable 先頭は 5 本 (`0x180a1d6f8`・`0x180a1d7d8`・`0x180a1d808`・`0x180a1d848`・`0x180a1d8e8`)。**5 本とも RTTI は `Vst::EditController` で、SerumController の表 (`0x180a2bf58`) ではない**。候補の表の先頭 (121 種) と一致するものは 0 件。
+- SerumController の表 (`0x180a2bf58`) への `lea` は 1 箇所 (`0x1800a9f40` 内・SC 関数)。これは THIS-CHILD の SC 証拠 1 件 (§3) と同じ関数で、SC の表の書込みは他に無い。
+- 結論: 受入 1 の宛先型は、この方法では確定できなかった。SC 関数内の候補 14 サイトの受け手は、SC 自身の表への呼出としては確認できない。受け手は基底 `EditController` や別 object の可能性がある。`this+off` の値の書込みを追う簡易版の限界で、型は確定していない。
+
+**実測** (`origin/main` `ade5c781e` の worktree で実行。入力 `Serum2_win64.vst3` sha256 `501e7bb3…`・19,236,864 B を本 run で確認):
+
+| ツール | real (s) | load (開始前 → 終了後) | md5 |
+|---|---|---|---|
+| `receiver_this_trace.py` | 23.75 | 0.79 → 0.38 | `1e1f5500…` (一致) |
+| `arg_vt_indirect.py` | 28.83 | 0.75 → 0.41 | `42bcf98b…` (§2 の値と一致) |
+
+`recv_sc_sites.py` と `sc_slot_stores.py` の実行時間は計測していない (数十秒以内で完了)。
+
+**測定 commit**: 本節の結果は `ade5c781e` で測定した。測定に使った `receiver_this_trace.py` と `arg_vt_indirect.py` は `58fd96bdd` 以降に変更が無い (`git diff 58fd96bdd ade5c781e -- tools/targets/serum2/gui/receiver_this_trace.py tools/targets/serum2/gui/arg_vt_indirect.py` = 0 行)。本 PR の変更 commit は `recv_sc_sites.py`・`sc_slot_stores.py` の追加と本節のみ。gui 配下の他ファイル (`xferonoff_upper_fns.tsv` 等) は別 SR の変更で、本節の測定には使っていない。
