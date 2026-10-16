@@ -122,12 +122,12 @@ static void fle_probe_dispatch(u64 t) {
  *       4 = ExitProcess / 5 = MessageBoxW / 6 = GetMem 直後 / 7 = FreeMem 直後 / 8 = GetMem 呼出し直前。
  * proc: site 1・2 は unit の proc VA、3 は memset の長さ、4 は呼出し元、6 は要求サイズ、7 は解放ポインタ。
  * aux: site 3 は memset の dst、6 は GetMem の戻り値 (0 = 失敗)、7 は FastMM の応答 (0 = 成功)。 */
-#define PY_WATCH_N 7
+#define PY_WATCH_N 8
 #define PY_EV_MAX 64
 typedef struct { u32 unit, site, slot, proc; u64 old, nw, aux; } py_ev;   /* 40 B (JS 側の読出しと一致) */
 /* PY-106 (#2909) の 4 件: 0x15e1140 = 例外型の参照の起点 (.data)、0x16b8488 = PyExc_RuntimeError の束縛 slot、0x16b8250 = Py_NewInterpreterFromConfig の束縛 slot (束縛が走ったかの指標)、
  * 0x13a5c90 = MM_TABLE (GetMem の間接 call 0x40941e の pointer slot。null のまま呼ばれる元。最初の変化の unit と proc を残す) */
-static const u32 g_py_watch[PY_WATCH_N] = { 0x15e1c78u, 0x15e4790u, 0x16b82e0u, 0x15e1140u, 0x16b8488u, 0x16b8250u, 0x13a5c90u };
+static const u32 g_py_watch[PY_WATCH_N] = { 0x15e1c78u, 0x15e4790u, 0x16b82e0u, 0x15e1140u, 0x16b8488u, 0x16b8250u, 0x13a5c90u, 0x15f34a0u };   /* 0x15f34a0 = ippsZero_8u の slot (A1・#4806) */
 static u64 g_py_last[PY_WATCH_N];
 static py_ev g_py_ev[PY_EV_MAX];
 static u32 g_py_ev_n, g_py_ev_over;
@@ -251,10 +251,15 @@ static int ipp_call(u64 t) {   /* fle_ff から。処理したら 1 */
 #define ILT_HMOD 0x7F0D0000u   /* #672: ILTools_x64.dll の擬似 HMODULE (mode 3 だけ) */
 #define PY_HMOD 0x7F0E0000u    /* PY-106 (#2909): Python312 の擬似 HMODULE (束縛呼出し中だけ有効) */
 static int g_py_probe = 0; static u32 g_py_hook_n;
+static u32 g_ipp_hook_n;   /* A1 (#4806): dsp_ippv2 の load hook 呼出し回数 (mode 1/2/3) */
 static HMODULE fle_ipp_load_hook(const char* name, DWORD flags) {
-    (void)flags;
     if (g_py_probe && name && strstr(name, "Python312")) { g_py_hook_n++; return (HMODULE)(uintptr_t)PY_HMOD; }
-    if (g_ipp_on && name && strstr(name, "dsp_ippv2")) { g_ipp_h = IPP_HMOD; return (HMODULE)(uintptr_t)IPP_HMOD; }
+    if (g_ipp_on && name && strstr(name, "dsp_ippv2")) {
+        HMODULE r = (HMODULE)(uintptr_t)IPP_HMOD;
+        g_ipp_h = IPP_HMOD; g_ipp_hook_n++;
+        fprintf(stderr, "[fleboot-ipp] load_hook name=%s flags=0x%lx ret=0x%llx n=%u\n", name, (unsigned long)flags, (unsigned long long)(uintptr_t)r, (unsigned)g_ipp_hook_n);
+        return r;
+    }
     if (g_ilt_on && name && strstr(name, "ILTools")) return (HMODULE)(uintptr_t)ILT_HMOD;
     return 0;
 }

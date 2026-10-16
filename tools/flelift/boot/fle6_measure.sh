@@ -29,6 +29,8 @@ RUNS="${FLE_BOOT_RUNS:-shim negctl ipp2}"   # shim=FLE_IPP=1 / negctl=FLE_IPP=0 
 # diag_shim / diag_negctl (#672): FLE_DIAG_NULLFILL=1 (buf=0 の fill を戻す診断)。lift 条件は FLE_EXTRA_ROOTS で指定する (未指定は既定 root 0x6a7b70)。
 #   付録 672 §1 の測定は FLE_EXTRA_ROOTS= (root 無し)、付録 3770 §2 の測定は FLE_EXTRA_ROOTS=0x6bbc20。
 # lifted C は N 本 (fle_lifted_s<k>.c) に分けて並列 clang する (FLE-9, #2700)。1 にすると単一 TU (cap 11000MB で打ち切り)。
+# FLE_TRAP_VA (例 0xd76c90・PY-5388 #5771): その VA を lift せず trap stub にする (x64c --trap)。呼ばれると ott_unsup で
+#   boot_threw=unsup になるので、boot 経路でその関数に到達したかを観測できる。未指定は従来どおり (trap を足さない)。
 export FLE_SHARDS="${FLE_SHARDS:-8}"
 export TMPDIR="$W/tmp"
 mkdir -p "$W/tmp" "$W/obj" "$HERE/results"
@@ -48,7 +50,7 @@ python3 "$HERE/rss_cap.py" --cap-mb "${FLE_RSS_CAP_MB:-13800}" --log "$W/rss_lif
   python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$LIFT" --closure "${FLE_LIFT_CLOSURE:-2}" \
   --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000 \
   --override 0x4126f0=fle_ov_longjmp --override 0x409410=fle_ov_getmem \
-  --override 0x409440=fle_ov_freemem --override 0x4120c0=fle_ov_initunits --shards "$FLE_SHARDS" | tail -3
+  --override 0x409440=fle_ov_freemem --override 0x4120c0=fle_ov_initunits --shards "$FLE_SHARDS" ${FLE_TRAP_VA:+--trap "$FLE_TRAP_VA"} | tail -3
 python3 "$FLE/fle_data_gen.py" "$PE" "$LIFT/fle_data.c" "$LIFT/lift_meta.json" > /dev/null
 python3 "$HERE/gen_boot.py" --pe "$PE" --meta "$LIFT/lift_meta.json" --out "$W" > /dev/null
 elapsed "lift" "$T"

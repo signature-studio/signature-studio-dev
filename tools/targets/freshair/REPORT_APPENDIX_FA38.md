@@ -104,18 +104,41 @@ P の写像は**一部だけ確定**: SC の `P+0x9dc4`・`P+0x9e0c` は sr (`[r
 - 並列実行の確認 (739c90452 で seed 11・99 を `xargs -P 2` で同時実行。両 script の実行区間が重なり、開始時刻の差 0.30 ms、各 script 全体 0.25 s): 両 SUMMARY と kh_a.txt が直列実行と一致 (seed 11 = 200・292・25・136、seed 99 = 198・293・29・102、byte 一致)。
 - blob 監査: 20 MiB 超の追加なし。`work/` (gitignore) は使用のみ。
 
-## 6. 未解決
+## 6. FLS 実体化 (FA-57 / #4622・部分達成)
+
+- 実装: `ks_kh_comp_native.c` で `FLS_IDX` を指定したときだけ、`FlsSetValue`・`FlsGetValue`・`SetLastError` を実体化する (index 表 `fls_val[64]`・`g_lasterr`)。index は絶対 VA `0x182989860` に書く。`FLS_IDX` 未指定は従来の stub のまま (`FlsSetValue` は FALSE を返す)。
+- 対象 VA: `FlsSetValue` `0x1813a1368`・`SetLastError` `0x1813a12c0` (§3 の IAT 経路)。`GetLastError` は従来どおり 0 を返す stub。
+- 測定 commit: `eb2fc311c` (`ks_kh_comp_native.c` を最後に変えた commit)。`git diff eb2fc311c HEAD -- tools/targets/freshair/ks_kh_comp_native.c` の差分 0 なら再測定は要らない。
+- 環境: nproc=4、`work-liftlib-targets` 展開の `HeartCore.core_64` (76642304 B)。load average (1 分) 0.62 (各 run の前後、同値)。run1 は seed 7・11・99 とも 0.03 s。
+- 測定コマンド: `bash tools/targets/freshair/ks_kh_comp.sh 200 <seed>` (既定) と `FLS_IDX=0 bash tools/targets/freshair/ks_kh_comp.sh 200 <seed>` (FLS 実体化)。各 run の `SUMMARY`・`FLS`・`UNRES` 行は以下のとおり (両経路とも `determinism: run1 == run2 (byte 一致)`・`RESULT: ... ERR 0`)。
+
+| seed | 経路 | SUMMARY (cases・err・audio_changed・notify_total・no_notify・unresolved) | FLS | UNRES |
+|---|---|---|---|---|
+| 7 | 既定 | cases=200 err=0 audio_changed_cases=197 notify_total=294 no_notify_cases=25 unresolved_import_calls=134 | (なし) | 180fd3189 count=67・180fd31f4 count=67 |
+| 7 | FLS_IDX=0 | cases=200 err=0 audio_changed_cases=197 notify_total=294 no_notify_cases=25 unresolved_import_calls=67 | fls_set_calls=134 fls_set_ok=134 | 180fd5222 count=67 |
+| 11 | 既定 | cases=200 err=0 audio_changed_cases=200 notify_total=292 no_notify_cases=25 unresolved_import_calls=136 | (なし) | 180fd3189 count=68・180fd31f4 count=68 |
+| 11 | FLS_IDX=0 | cases=200 err=0 audio_changed_cases=200 notify_total=292 no_notify_cases=25 unresolved_import_calls=68 | fls_set_calls=136 fls_set_ok=136 | 180fd5222 count=68 |
+| 99 | 既定 | cases=200 err=0 audio_changed_cases=198 notify_total=293 no_notify_cases=29 unresolved_import_calls=102 | (なし) | 180fd3189 count=51・180fd31f4 count=51 |
+| 99 | FLS_IDX=0 | cases=200 err=0 audio_changed_cases=198 notify_total=293 no_notify_cases=29 unresolved_import_calls=51 | fls_set_calls=102 fls_set_ok=102 | 180fd5222 count=51 |
+
+- 出力差 (既定 vs `FLS_IDX=0`、`kh_a.txt` の行比較): seed 7・11・99 とも 0/200。`negative control` (`CHECK_NEG=1 NEG_OFF=0x4 NEG_MUL=2.0`) は seed 7 で 197/200、seed 11 で 200/200、seed 99 で 198/200 の case が変化 (感度あり)。
+- 残存 site の同定 (IAT は PE 解析で確認): `UNRES` の表示は `ra − 5` (`e8` 前提)。`180fd5222` は実際には `0x180fd5221` の `ff 15 21 c5 3c 00` (`call [rip+0x3cc521]` = slot `0x1813a1748`) の戻り先 (ra=`0x180fd5227`) で、slot `0x1813a1748` は **KERNEL32!HeapAlloc**。`FLS_IDX=0` で残る未束縛呼び出しは HeapAlloc (戻り 0 の stub) だけ。
+- 同定の補足: `0x182989860` は `.data` セクション (VA `0x182870000`〜`0x18436df0c`) の内側。ただし DLL 初期化がここに index を書く経路は未確認。
+
+## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | SC⇄KH 同一入力の bit 一致実測 (旧受入 2) と #52 への判定返し (旧受入 3) | Compressor の判定が未了 | #3534 (FA-41) |
 | `P+0x00`・`P+0x10`・`P+0x14` が出力に届かない原因 (写像か分岐か) | 比較の意味。SC の P 写像の確定 | #3534 (FA-41) |
-| 未束縛 import 2 経路 (mode=1 のみ。`KERNEL32!FlsSetValue`・`KERNEL32!SetLastError` を stub 化) の stub 依存 | mode=1 の出力 | #3534 (FA-41) |
+| 既定 (`FLS_IDX` 未指定) の stub 依存。`0x182989860` の index を DLL 初期化が書く経路 (DLL エントリから `0x180fd32dc` への到達) が未確認 | mode=1 の出力 | #4622 (残件・親 #3534) |
+| 成功側で呼ばれる `HeapAlloc` (IAT `0x1813a1748`) が stub (戻り 0) のまま。`FLS_IDX=0` の残存未束縛呼び出し (seed 7・11・99 で 67・68・51) | `FlsSetValue` 成功側の出力は未変化 (0/200 差)。HeapAlloc 実体化後の出力は未測定 | #4622 (残件) |
 | ID 一致 37 組の振り分け表は親 #2739 の付録 (main の `tools/targets/freshair/REPORT_APPENDIX_2739.md` §3) にある | 本付録は参照しない | 不要 (main に既存) |
 
-## 7. 再現
+## 8. 再現
 
 ```sh
 # 素材: work-liftlib-targets (tools/targets/kilohearts/work/winpkg/HeartCore.core_64)
 bash tools/targets/freshair/ks_kh_comp.sh 200 7   # ERR 0・決定性・負例を判定 (run1 実測 0.03 s)
+FLS_IDX=0 bash tools/targets/freshair/ks_kh_comp.sh 200 7   # FLS 実体化の経路 (§6)
 ```

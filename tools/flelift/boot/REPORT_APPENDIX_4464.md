@@ -85,3 +85,16 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 - 既定経路 (root 無し・`FLE_EXTRA_LDF` 付き・`9b8a0426c^` と `9b8a0426c` で同一): dispatch 895 / GetMem 3,680 / FreeMem 1,499 / exit。この値は前回 REPORT の 209 (root 有・既定 root 無し) と条件が異なる。既定の数値は変えていない (`9b8a0426c^` で同じ値を再現)。
 - 所見: 受け手 slot の消失は、既知の clobber (unit 246〜) と同じ時点・同じ経路。受け手の実行時 VA (`0x40f960` が正しい値) は、書込みを止めれば取れる見込み。ただし書込みを止める処理 (clobber の原因) はまだ特定していない。
 - 未解決 (起票先: #5337 に残す): (1) 書込み元の関数 `f_134cad0` の実行時の名前と役割 (推定の段階)。(2) clobber を起こす unit 245 の後の処理 (#3060 の `f_6a7b70` 広域ゼロ埋めと同じ現象かは未確認)。(3) 実機の loader が充填する値 (#4384 は CLOSED)。
+
+## 15. 段の特定: oob は `f_976b60` 経由の rcx=0 (#5337・測定 commit `dd047c232`・mode tol・寛容起動)
+
+- probe: `tools/flelift/boot/probe_976.py` (生成 C の `work/` コピーだけを書き換える。`[p976a90]` 入口の global `0x976410`・`0x141d6b8`・`0x141d6c0`、`[p976b60]`・`[p410320]` の rcx・rdx)。
+- 測定: `FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_SLOTS=0x5ac308ull,0x976410ull" FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` を lift 再生成で 1 回 (rc 0・所要 3 分 4 秒 (lift 62 s・clang plain 76 s・boot tol 20 s)・load 1.1〜1.8)。その後 probe を入れた work/ の lift で `FLE_CFI_SEED=1 FLE_CFI_RECV=1 FLE_IPP=1 FLE_TOLERANT=1` の boot を 1 回 (rc 0・dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob`)。計数は §11・§12-1 と一致。
+- 時系列 (1 回の boot):
+  1. `[cfi] f_1375990 rcx=0` → `f_13752f0` → `f_1105350 rcx=0x1104ef8` → `f_5af120 rcx=0x5ac338` → `f_410320 rcx=0x5ac338 rdx=1` → `[icall] rax=0x5ac338 target=0x40f960` (受け手 VA は実行時に `0x40f960`)。
+  2. 同じ run で `[fle_wwatch] ret=0x2ec1f06 slot=0x5ac308 old=0x40f960 new=0` と `slot=0x976410 old=0x9764d8 new=0` が同じ 16B store で出る (unit 246 の直前・§14 と一致)。
+  3. 後で `[p976a90] mem976410=0x0 mem141d6b8=0x0 mem141d6c0=0x0` → `[p976b60] rcx=0x0 rdx=0x1` → `[p410320] rcx=0x0 rdx=0x1` → `threw=oob`。
+- 段の結論: oob を起こすのは直接経路 (`f_5af120` → `f_410320`) ではなく、**`f_976a90` が読む global `0x976410` が 0 になった後の `f_976b60` 経由の `f_410320` (rcx=0)**。`f_976b60` は引数 rcx を `f_410320` にそのまま渡すので、`f_410320` の `rax=0`・受け手 slot `LD64(0xffffffffffffffd0)` の oob は、この rcx=0 から来る (推定を含む。`rax` は未計測)。
+- 出所: `0x976410` の書込みは `ret=0x2ec1f06` の 16B store (§14 の書込み元と同じ経路)。書込み元の関数名は未確定 (#5337 に残す)。
+- 注意: lift 済み C に probe を重ねると clang の obj が古いまま残るため、`FLE_EXTRA_CCF` を変えるときは `obj/plain_*.o` を消してから build する (`cc()` は C のソースが新しいときだけ再コンパイルする)。
+- 差分 0 の証跡: 測定 commit `dd047c232` から HEAD までのコード差分は本節のみ (`git diff dd047c232 HEAD -- tools/flelift` は REPORT のみ)。

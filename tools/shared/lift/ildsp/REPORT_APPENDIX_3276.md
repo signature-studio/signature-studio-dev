@@ -73,3 +73,11 @@
   - 本検査 `ok`: x64c `functions 60・insns 2656・unsup {}・traps 0`、wasm 172,024 B、`wc diff cases=64 PASS=64 FAIL=0 excluded=0`、rc 0、2.22 s、load 0.72 0.35 0.14 → 0.72 0.35 0.14。
   - ネガコン `neg-cmp` (wasm 結果を反転): `FAIL=64`、rc 1 (期待どおり FAIL を検出)。`ALL OK`。
   - コード差分の証跡: `git diff 07cc0f7c2 HEAD -- tools/shared/lift/ildsp ':!tools/shared/lift/ildsp/REPORT*.md'` の出力は 0 行 (本節の REPORT の追記後も、実行コードの差分は 0)。`docs/WORKFLOW.md` §6 により、再測定は不要。
+
+## 11. RaiseException (0xe06d7363) の catch 先 — T-SH-156 (#5795)
+- 結論: **except 本体 `0x1b8eb1` は、この例外の catch 先ではない**。`0x1b8e68` の唯一の scope は filter `0x1ccb00` が `0xc0000005`・`0xc000001d` (AV・不正命令) しか許可せず、`0xe06d7363` を許可しない。try 範囲も `call 0x1be130` (`ldmxcsr` だけの関数) の 1 命令で、C++ 例外を送出しない。よって `0x1b8e68` の except 6 件 (§7-7b) は C++ 例外 path の到達先から外れる。
+- 例外を投げる helper `0x1aedc0` (`0xe06d7363`・args[0] `0x19930520` を組み立てる) の .text 内の rel32 直接 call/jmp は 8 件 (byte 走査)。うち 6 件は EHANDLER を持たない関数内、2 件 (`0x1b006a`・`0x1b056d`) は関数 `0x1afbd4`・`0x1b009c` 内で、いずれも handler `0x1acf00`。
+- 未解決 (#5793 の残件に移送済み): 呼出元 2 件 (`0x1b006a`・`0x1b056d`) は handler `0x1acf00` を持つ関数 (`0x1afbd4`・`0x1b009c`) の中にある。`0x1acf00` は scope 表の形式ではない (MSVC の frame handler の形) ため、本道具では filter と catch 先を確定していない。残りの呼出元 6 件は EHANDLER を持たない関数内で、上位フレームの catch は未確定。
+- 方針への影響: `imp_RaiseException` の据え置き (§10) は変えない。0x1b8e68 の except 本体が 0xe06d7363 の catch 先でないことは、§10 の停止規約の統一の判断材料になる。
+- 道具: `tools/shared/lift/ildsp/seh_catch_check.py` (`FL_WIN64_DIR` の PE を読み、0x1b8e68 の scope・filter の許可コード・0x1aedc0 の rel32 呼出元 8 件を出す)。
+- 実測 (素材 `fl-win64` 26.1.7.5653 の `block24360_PE.bin`): 出力は `UNWIND 0x3f2d94 EHANDLER handler=0x1aebb4 scope_count=1` / `SCOPE try=[0x1b8eaa,0x1b8eb1) ... target=0x1b8eb1` / `FILTER 0x1ccb00 accepts codes: 0xc0000005, 0xc000001d` / `FILTER accepts 0xe06d7363: False` / `DIRECT rel32 call/jmp to 0x1aedc0 ... 8`。

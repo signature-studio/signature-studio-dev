@@ -61,22 +61,14 @@ def block_starts(rows, start: int, end: int) -> set[int]:
     return starts
 
 
-def direct_refs(img: bytes, targets: set[int]) -> dict[int, int]:
+def direct_refs(path: Path, targets: set[int]) -> dict[int, int]:
+    # 命令境界で数える (バイト列の全走査は call 命令内の偶然一致を分岐と誤認する: SHX-T57)
     hits = {t: 0 for t in targets}
-    n = len(img)
-    for m in re.finditer(rb"[\x0f\x70-\x7f\xe8\xe9\xeb]", img):
-        i = m.start()
-        op = img[i]
-        if (0x70 <= op <= 0x7F or op == 0xEB) and i + 2 <= n:
-            t = BASE + i + 2 + struct.unpack_from("<b", img, i + 1)[0]
-        elif op in (0xE8, 0xE9) and i + 5 <= n:
-            t = BASE + i + 5 + struct.unpack_from("<i", img, i + 1)[0]
-        elif op == 0x0F and i + 6 <= n and 0x80 <= img[i + 1] <= 0x8F:
-            t = BASE + i + 6 + struct.unpack_from("<i", img, i + 2)[0]
-        else:
-            continue
-        if t in hits:
-            hits[t] += 1
+    for _, mnem, ops in listing(path, 0, path.stat().st_size):
+        if mnem == "call" or mnem.startswith("j"):
+            t = branch_target(mnem, ops)
+            if t in hits:
+                hits[t] += 1
     return hits
 
 
@@ -122,7 +114,7 @@ def main(argv: list[str]) -> int:
     targets = set(sites)
     for s in starts.values():
         targets |= s
-    drefs = direct_refs(img, targets)
+    drefs = direct_refs(path, targets)
     arefs = abs_refs(img, targets)
 
     print(f"callee {callee:#x}: e8 rel32 で callee を指す site {len(sites)} 件 (画像全体)")
