@@ -19,6 +19,42 @@ import sys
 import pefile
 
 IMAGE_BASE_FALLBACK = 0x180000000
+JUMP_RE = re.compile(r'(call|jmp|j\w+)\s+(?:0x)?([0-9a-f]+)\b')
+
+
+def jump_target(t, base):
+    m = JUMP_RE.match(t)
+    return (int(m.group(2), 16) - base) if m else None
+
+
+def lengths(ins):
+    ks = sorted(ins)
+    return {k: (ks[i + 1] - k if i + 1 < len(ks) else 1) for i, k in enumerate(ks)}
+
+
+def flow(ins, lens, start, end, base):
+    seen, stack, indirect = set(), [start], 0
+    while stack:
+        a = stack.pop()
+        if a in seen or a not in ins or not (start <= a < end):
+            continue
+        seen.add(a)
+        t = ins[a]
+        mn = t.split()[0] if t else ''
+        tgt = jump_target(t, base)
+        nxt = a + lens.get(a, 1)
+        if mn == 'jmp' and tgt is not None:
+            stack.append(tgt)
+        elif mn == 'jmp':
+            indirect += 1
+        elif mn.startswith('j') and tgt is not None:
+            stack.append(tgt)
+            stack.append(nxt)
+        elif mn in ('ret', 'ud2', 'int3'):
+            pass
+        else:
+            stack.append(nxt)
+    return seen, indirect
 
 
 def main(pe_path, contain_p, out_p):
@@ -51,39 +87,11 @@ def main(pe_path, contain_p, out_p):
         cache[(lo, hi)] = ins
         return ins
 
-    def lengths(ins):
-        ks = sorted(ins)
-        return {k: (ks[i + 1] - k if i + 1 < len(ks) else 1) for i, k in enumerate(ks)}
-
-    def flow(ins, lens, start, end):
-        seen, stack, indirect = set(), [start], 0
-        while stack:
-            a = stack.pop()
-            if a in seen or a not in ins or not (start <= a < end):
-                continue
-            seen.add(a)
-            t = ins[a]
-            mn = t.split()[0] if t else ''
-            m = re.match(r'(j\w+|call)\s+0x([0-9a-f]+)\s*$', t)
-            nxt = a + lens.get(a, 1)
-            if mn == 'jmp' and m:
-                stack.append(int(m.group(2), 16) - base)
-            elif mn == 'jmp':
-                indirect += 1
-            elif mn.startswith('j') and m:
-                stack.append(int(m.group(2), 16) - base)
-                stack.append(nxt)
-            elif mn in ('ret', 'ud2', 'int3'):
-                pass
-            else:
-                stack.append(nxt)
-        return seen, indirect
-
     def site_target(site):
         out = dis(site, site + 16)
         t = out.get(site, '')
-        m = re.match(r'(call|jmp)\s+0x([0-9a-f]+)', t)
-        return (int(m.group(2), 16) - base) if m else None, t
+        tgt = jump_target(t, base) if t.split()[:1] in (['call'], ['jmp']) else None
+        return tgt, t
 
     d = json.load(open(contain_p))
     rows = []
@@ -95,7 +103,7 @@ def main(pe_path, contain_p, out_p):
         tgt, site_txt = site_target(site)
         ins = dis(fs, fe + 0x40)
         lens = lengths(ins)
-        seen, ind = flow(ins, lens, fs, fe)
+        seen, ind = flow(ins, lens, fs, fe, base)
         g_bound = g in ins
         g_reach = g in seen
         lin = sorted(k for k in ins if k < fe)
