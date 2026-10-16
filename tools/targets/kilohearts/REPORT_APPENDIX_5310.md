@@ -56,7 +56,7 @@ bash tools/targets/kilohearts/ghidra_route/void_ret_check.sh <HeartCore.core_64>
 
 出力は 4 呼出し点の call と直後 6 命令。判定は上の表。
 
-HeartCore.core_64 の実出力は **未取得** (素材 `plugins-kilohearts` が `$HOME/artifacts` に無く、この run では展開できなかった)。表の番地・レジスタは、取得後に上のコマンドの出力と照合して確定する。
+HeartCore.core_64 の実出力は **未取得** (素材 `plugins-kilohearts` が取得されておらず、この run では展開できなかった)。表の番地・レジスタは、取得後に上のコマンドの出力と照合して確定する。
 
 照合ロジックの確認 (テスト用 ELF・`gcc -O0` で作った 2 関数・objdump 表記 `call   1030` = `0x` なし)。修正後の照合で一致する:
 
