@@ -7,7 +7,7 @@
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
 OUT="${1:?out_dir}"
-source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
+source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" > /dev/null 2>&1   # [EMSDK] (docs/REFERENCES.md §4)
 CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0} -I."
 restore() { rm -f work/obj/m11_439f90_probe_rt.o; touch work/boot_final3.ll; rm -f work/obj/boot.o; bash m11_build.sh > /dev/null 2>&1; }
 trap restore EXIT
