@@ -159,3 +159,23 @@ tools/m7 REPORT §3-(a) pattern C (xmm 引数は i32 raw-bits + `__asm_*` 疑似
 4. broken-lift OOB 2 件 (c38c8 family, ir6_shift 算術合成 base remap)。
 5. NaN-tracer (msimd8_dbg.c) の ring buffer 記録は M9 の新規接続点特定で
    1 コマンド再実効の実測資産 (出生 op 無し = uninit/spill 誤翻の判別)。
+
+## 8. #4218 置換の同一性実測 (2026-10-16, issue #4465)
+
+- 対象: `171b28c2a` (`/home/ubuntu` 直書きを REPO_ROOT 相対に置換: m7/m6_e2e.sh・m8/m8_e2e.sh・m8/m8_quickbuild.sh)。
+- 方法: 置換前 `171b28c2a^` と置換後 `171b28c2a` の detached worktree で `bash tools/m8/m8_e2e.sh` を各 1 回実行し、`tools/m8/work/e2e_result.json` と stdout を比較。両 worktree で `/home/ubuntu/work/webstudio` を各々の worktree に、`/home/ubuntu/work/analysis` を `$HOME/analysis` (analysis-ott-binaries 展開先) に symlink。素材は work-m6-ott / analysis-ott-binaries / toolchain-emsdk (emcc 6.0.12)。
+- 両回とも `m8_build.sh` が emcc を実行して `ott_m8.cjs` を再生成 (タイムスタンプが実行時刻)。
+
+| 項目 | 置換前 (`171b28c2a^`) | 置換後 (`171b28c2a`) |
+|---|---|---|
+| e2e_result.json | 同一 (diff 0) | 同一 |
+| stdout (時刻除く) | 同一 | 同一 |
+| 所要 (real) | 4.984 s | 4.737 s |
+| exit | 1 | 1 |
+
+- 一致項目: signature mismatch 0 / undefined 47 (function_18* 23・Win/CRT 24) / simd 0・0 / t1 512 行・determinism 一致 / t1 value-flow diffs 192・225 / t3 OK 1 / rt_leaf OK 19・NG 0。
+- **不一致 (両回共通・置換とは無関係)**: trap8 OK 15 / FAIL 4 (期待 14 / 5。§5 の 2026-10-10 実測 OK 14 / FAIL 5 から変化)。`m8_e2e.sh` の §4 判定が NG のため exit 1。置換の前後で同じ値のため、#4218 の置換は挙動を変えていない。trap8 の差分の原因は未調査 (未解決表に記載)。
+
+### 差分確認 (測定 commit `171b28c2a` → HEAD)
+
+`git diff 171b28c2a HEAD -- tools/m7 tools/m8` の出力は 0 行 (`git log 171b28c2a..HEAD -- tools/m7 tools/m8` も空)。main 取り込み後の再測定は不要 (`docs/WORKFLOW.md` §6)。
