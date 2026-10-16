@@ -42,22 +42,24 @@
 | 0x7c76b0 | 0x7c773b | 0 | 1 | 0 | 0 | 0 |
 | 0x7c76b0 | 0x7c7796 | 0 | 1 | 0 | 0 | 0 |
 
-- 19 組すべてで noopt は注釈が出る (19/19)。
-- `dis_both` で戻るのは 5 組 (0x487c30・0x6a0ae0・0x732ae0・0x732c50・0x7c32c0)。
-- 0x5e5d60 は default で既に 1 (注釈あり)。probe は関数範囲の内側だけを見るため、probe の未解決 19 組に入っている値と一致しない。範囲の扱いの違いは未確認。
-- 残り 13 組は、どの変種でも注釈が戻らない。
+- 19 行 (関数 18 個。0x7c76b0 は飛び先 2 つ) すべてで noopt は注釈が出る (19/19)。
+- 表の内訳: 0x5e5d60 (既定で注釈有り) を除く 18 行が probe の未解決組に当たる。その内訳は、特定 5 行 (単独 disable で戻る 2 行: 0x487c30 は dis_wtwc、0x6a0ae0 は dis_empty / 両 disable で戻る 3 行: 0x732ae0・0x732c50・0x7c32c0) と未特定 13 行 (どの変種でも戻らない)。5 + 13 = 18。
+- 0x5e5d60 は default で既に 1 (注釈あり) のため、probe の未解決には入らず、「段の特定」には数えない (特定 5 組・既定で注釈有り 1 組・probe 外、と書き分ける)。
+- **未確認**: probe は未解決を 19 組と報告するが、表の 18 行 (0x7c76b0 は 2 行として数えた) は 18 組しか測っていない。残る 1 組は本付録では測定していない。probe の入力 `pairs.txt` と RetDec が本 PR の作業環境に無く、再実行で 1 対 1 に合わせられなかった。
 
 ## 3. 代表 1 組 (0x732ae0 → 0x732b75) の絞り込み
 
 - 単独の disable: 既定の 48 個の optimizer を 1 つずつ disable した。どれ 1 つでも注釈は戻らない (48 件とも 0)。
-- 単独の enable (`--backend-enabled-opts`): EmptyStmtOptimizer・WhileTrueToWhileCondOptimizer・BreakContinueReturnOptimizer・GotoStmtOptimizer・IfStructureOptimizer・DeadCodeOptimizer・CopyPropagationOptimizer の各 1 件のみでは、いずれも注釈は有り (1)。
+- 単独の enable (`--backend-enabled-opts`): EmptyStmtOptimizer・WhileTrueToWhileCondOptimizer・BreakContinueReturnOptimizer・GotoStmtOptimizer・IfStructureOptimizer・DeadCodeOptimizer・CopyPropagationOptimizer の各 1 件のみでは、いずれも注釈は有り (1)。`EmptyStmtOptimizer` のように既定で有効な optimizer を列挙しても結果が既定 (0) から変わる (1) のは、このオプションが「列挙したものだけを有効にする」指定だからと推定する (RetDec の仕様は未確認。列挙外の既定 optimizer が無効になる前提)。
 - 両方の disable のみ戻る。よって注釈の消失は、この 2 つの組み合わせ (相互作用) による。単独の原因は特定できない。
 
 ## 4. 判定
 
 - **測定済み**: 19 組すべて notloop の飛び先は命令境界、`--backend-no-opts` で注釈が出る (19/19)。
-- **測定済み**: 19 組中 5 組 (+ 既定で注釈有りの 1 組) は `EmptyStmtOptimizer` と `WhileTrueToWhileCondOptimizer` のどちらか・両方の disable で注釈が戻る。
-- **未特定**: 残り 13 組は、どの単独 disable・両方 disable でも戻らない。段は特定できていない。
+- **測定済み**: 表の 18 行 (0x5e5d60 を除く) のうち、`EmptyStmtOptimizer` と `WhileTrueToWhileCondOptimizer` のどちらか単独の disable で注釈が戻る 2 行 (0x487c30 は dis_wtwc、0x6a0ae0 は dis_empty)、両方 disable で戻る 3 行 (0x732ae0・0x732c50・0x7c32c0) の計 5 行。
+- **既定で注釈有り**: 0x5e5d60 は default で注釈が出るため段の特定の対象外 (probe の未解決に入らない)。
+- **未特定**: 残り 13 行は、どの単独 disable・両方 disable でも戻らない。段は特定できていない。
+- **未確認**: probe の未解決 19 組と表の行の 1 対 1 対応。表から数えた未測定組は 1 組 (上記 §2 の未確認を参照)。
 - **未検証**: 注釈の消失が「統合」によるかは確認していない (#4393 の推定のまま)。戻した C の wasm 実行による bit 一致は未実施。
 
 ## 5. 採らなかった方式
