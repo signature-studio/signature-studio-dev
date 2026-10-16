@@ -381,6 +381,9 @@ def verify(insns, probe, fam, claim=None, prune=False):
     if not vals:
         return '判定不能', 'probe に到達しない'
     if None in vals:
+        if prune and stats.get('刈り込み(ループ)', 0) + stats.get('刈り込み(分岐の合流)', 0):
+            return '判定不能', '値が未知の経路がある (刈り込み ループ %d・分岐の合流 %d)' % (
+                stats.get('刈り込み(ループ)', 0), stats.get('刈り込み(分岐の合流)', 0))
         return '判定不能', '値が未知の経路がある'
     if len(vals) > 1:
         return ('FAIL' if claim is not None else '未決'), '経路で値が違う: ' + ','.join(hex(v) for v in sorted(vals))
