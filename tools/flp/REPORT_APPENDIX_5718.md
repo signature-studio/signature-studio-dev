@@ -74,11 +74,12 @@ WAIT=90 bash tools/flp/s6_pred_hit_probe.sh               # pred・loop にブ�
 
 ## 8. 実行時確認: 直接呼出し元 2 関数 (`ed2ac0`・`1004a20`) の entry
 
-- 測定 (本 run・HEAD は PR 本文の commit): `tools/flp/s8_loop_caller_probe.sh`。素材 `fl-win64` を展開 (real 10.6 s)、`s1_wine_probe.sh` で GUI 起動 (real 2 m 12 s・rc=124 = GUI 継続)、その後 gdb attach。
+- 測定 commit: 3d27fcbb0ddcc29ed2da780ad0d0a26495885b04 (測定はこの commit の script で実施)。以後 HEAD までの `tools/flp` の差分は script のコメント・エラー処理 (`cd ... || exit`・ループ変数名) のみで、測定経路は変えていない。差分の出力は PR 本文に添付 (`git diff 3d27fcbb HEAD -- tools/flp`)。
+- 測定 (`tools/flp/s8_loop_caller_probe.sh`)。素材 `fl-win64` を展開 (real 10.6 s)、`s1_wine_probe.sh` で GUI 起動 (real 2 m 12 s・rc=124 = GUI 継続)、その後 gdb attach。
 - ランナー: wine64 9.0・gdb 15.1 を apt で導入、`kernel.yama.ptrace_scope=0` (sudo)。`FLEngine_x64.dll` base は `0x7a730000` (§2 と同じ)。
-- ブレーク先 (実行時): `ed2ac0` = `0x7b202ac0`・`1004a20` = `0x7b334a20`。gdb は両方に挿入でき (`Breakpoint 1 at` / `Breakpoint 2 at`)、detach まで例外なし。
-- 測定 1 (WAIT=90 s): 両方とも 0 件 (gdb rc=124)。
-- 測定 2 (WAIT=240 s・attach 10:14:37 → detach 10:18:40): 両方とも 0 件 (gdb rc=124)。
+- ブレーク先 (実行時): `ed2ac0` = `0x7b202ac0`・`1004a20` = `0x7b334a20`。gdb は両方に挿入できた (`Breakpoint 1 at` / `Breakpoint 2 at`)。gdb の命令列は末尾が `continue` で、`detach` コマンドには到達していない (`timeout` で強制終了)。
+- 測定 1 (WAIT=90 s): 両方とも 0 件 (gdb rc=124 = `timeout` による終了)。
+- 測定 2 (WAIT=240 s・attach 10:14:37 〜 timeout 終了 10:18:40): 両方とも 0 件 (gdb rc=124 = `timeout` による終了)。
 - 判定: GUI 起動だけでは `ed2ac0` にも `1004a20` にも入らない。よって loop `0x12d94f0` に至る経路は、GUI 起動の範囲では通っていない。`pred` (6000 件命中) は起動時に通るが、loop の上位には届かない。
 - 未確認: GUI 操作 (プロジェクトの読込み・再生・ミキサ操作など) で上位が通るか。関数ポインタ経由の呼出し。
 - 次に要るもの: 上位のトリガを起こす操作。GUI 操作の自動化は本 issue の範囲外のため、受入 (loop の入力述語の確定) は未達のまま。
