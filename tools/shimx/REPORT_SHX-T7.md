@@ -112,6 +112,30 @@
 
 - 正規化前後とも mismatch 0 (M11 の adapter は重複統合名のみ。§16 の既存結果と一致)。
 - 素材の `work-liftlib-targets` は HeartCore / SlateCore の lift IR を含まない (freshair `lift_gain` と kilohearts `winpkg` のみ)。HeartCore / SlateCore の lift IR は未実測。
+
+**Kilohearts snap-in 13 本の sig_gate 実測 (#1170, 2026-10-16, Actions runner, 検証起点 = 1170 ブランチ (origin/main b51786338 起点), `EMSDK_ENV=/opt/emsdk/emsdk_env.sh`, emcc (`/opt/emsdk`), 素材 plugins-kilohearts / toolchain-retdec / toolchain-emsdk 展開済み, `lift/build.py <n> --path s0 --trials 200 --seed 1`)**:
+
+| snap-in | build compare (native 突合) | 正規化前 / adapter / 重複統合 | unresolved | 正規化後 mismatch | sig_gate 結果 |
+|---|---|---|---|---|---|
+| gain | 200/200 bit-exact | — / 0 / 0 | 0 | **0** | exit 0 |
+| matrix | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
+| haas | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
+| clipper | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
+| gate | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
+| quickeq | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
+| resonator | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
+| stereo | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
+| disperser | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
+| formant | 200/200 | — / 0 / 0 | 0 | **0** | exit 0 |
+| phaser | 200/200 | 未測定 / 14 / 0 | 1 (`GetCurrentProcess`) | 未測定 | **exit 1** |
+| delay | 200/200 | 未測定 / 18 / 0 | 1 (`GetCurrentProcess`) | 未測定 | **exit 1** |
+| limiter | 200/200 | 未測定 / 18 / 0 | 1 (`GetCurrentProcess`) | 未測定 | **exit 1** |
+
+- 正規化前の mismatch: gain / matrix / haas / clipper / gate / quickeq / resonator / stereo / disperser / formant は `正規化前 0 件` (sig_gate 情報行を確認)。phaser / delay / limiter は `sig_normalize --strict` が raw 検証より前に止まるため **未測定**。
+- `data/sig_ext.json` に 11 API を追記 (根拠は各 `why`)。`ret` = `zext`: `HeapFree` / `IsProcessorFeaturePresent` / `TerminateProcess` / `UnhandledExceptionFilter` / `LoadLibraryExW` / `GetLastError` / `IsDebuggerPresent` / `FreeLibrary` / `GetModuleHandleW` / `GetModuleHandleExW` / `FlsSetValue` (shimx 定義の値域が非負: BOOL / DWORD / HMODULE)。既存は `GetComputerNameExW` / `GetFileAttributesExW` / `SHGetFolderPathW`。
+- **未解決 (本 issue の残件)**: `GetCurrentProcess` の `ret` 符号。shimx 定義は擬似ハンドル `(HANDLE)-1` を返すため、zext (4294967295) と sext (-1) で値が変わる。呼出側 IR の用途を読んで決める必要があり、本 run では確定できず silent に決めなかった。phaser / delay / limiter はこの 1 件で止まっている (他の未解決は全て解決)。
+- `sig_test.sh` ALL PASS は HEAD で再現 (24.6 s)。
+- 受入条件「SlateCore の未測 lift 対象」は本 run で未実測 (素材 `work-liftlib-targets` は SlateCore の lift IR を含まない。`plugins-freshair` の `tools/targets/freshair/` 側の build は未着手)。
 - 除外: `tools/liftlib/work/cab238/p1_only/work/ott_m8.ll` は正規化前の時点で `%p1r_1801209c9_cl1` が未定義 (clang error)。診断用の派生物で正規の成果物ではないため対象外。
 - `sig_test.sh` (HEAD 36edc993, `env -u EMSDK`): **ALL PASS**, 24.1 s, load average 0.65→0.75。(a)〜(h) すべて OK
 
