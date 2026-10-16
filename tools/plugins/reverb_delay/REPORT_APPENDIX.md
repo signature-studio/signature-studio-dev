@@ -222,7 +222,7 @@ bash tools/plugins/reverb_delay/engine_f80_nc.sh "$PWD/tools/plugins/work/reverb
 - **測定 commit**: `3376c8471` (`engine_lift.sh` の既定を `PLUG_F80_LOWER=1` にした commit。 コードを変えた最後の commit)。 起点は main `36cb9906b` (E7 修正 #5858 取り込み済み)。
 - **方式**: `p0c/f80_lower.py` による x86_fp80 → f64 lowering (D28 と同系列。 `docs/DECISIONS.md`)。 **精度**: f80 の 64 bit 仮数を 53 bit に下げる。 native x87 とビット一致しない。 この精度差は gate の外の記録であり、正しさは未検証 (到達性のみ)。
 - **変更**: `tools/plugins/reverb_delay/engine_lift.sh` で `PLUG_F80_LOWER` を既定 1 にした (従来は未設定で 0)。 dynamics / distortion と同じ既定。 `PLUG_F80_LOWER=0` を明示すれば従来の経路 (19000 rc 1、19165 は E7 / segfault) に戻る。
-- **素材**: `fl-win64` / `toolchain-retdec` (`/opt/retdec`) / `toolchain-emsdk` (`/opt/emsdk`) を使用。
+- **素材**: `fl-win64` / `toolchain-retdec` ([RETDEC]) / `toolchain-emsdk` ([EMSDK]) を使用。
 
 | engine | 条件 | lift rc | define | f80 関数 (本体基準) | `emcc -c` rc | lift 秒 | gate (`engine_f80_subset.sh`) |
 |---|---|--:|--:|--:|--:|--:|---|
