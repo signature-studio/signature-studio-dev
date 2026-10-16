@@ -32,8 +32,8 @@ import re, sys
 ir = open(sys.argv[1]).read()
 names = ["function_1801cb5e0", "function_1801cb600"]
 for n in names:
-    if not re.search(r"^declare i64 @%s\b" % n, ir, re.M):
-        sys.exit("[ci] indirect call target not declared as i64: %s" % n)
+    if not re.search(r"^declare i64 @%s\(\)" % n, ir, re.M):
+        sys.exit("[ci] indirect call target not declared as i64(): %s" % n)
 with open(sys.argv[2], "w") as fh:
     fh.write("#include <stdint.h>\n")
     for n in names:
