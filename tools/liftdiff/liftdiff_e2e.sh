@@ -28,6 +28,8 @@ need() { [ -e "$1" ] || { echo "missing input: $1 ($2)" >&2; exit 2; }; }
 need ../m11/work/boot_final3.ll "oc_artifacts: work-m11"
 need ../m11/work/m11_image.bin "oc_artifacts: work-m11"
 [ "$M11_ONLY" = 1 ] || need ../ott/work/ott.ll "oc_artifacts: work-m6-ott (or --m11-only)"
+echo "== [0/4] LD-288 の入口 xmm0 修正 IR を生成 (targets/m11.json の ir。40c420 の入力を復元)"
+python3 tests/ld288_40c420_xmm0.py "$FL_WIN64_DIR/extracted/block00031_PE.bin" ../m11/work/boot_final3.ll work/ld288/boot3_40c420_tr.ll
 echo "== [0/4] build (単体テストの p= 実測 (LD-259) が wasm を要るため、テストより先に作る)"
 gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm
 python3 liftdiff.py build targets/m11.json >/dev/null
