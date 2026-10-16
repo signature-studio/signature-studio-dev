@@ -47,12 +47,25 @@ void fle_chk(uint64_t a, int line);
 #else
 #define A_(a) ((uintptr_t)(a))
 #endif
+#ifdef FLE_RWATCH
+/* 読出し監視 (診断用・既定無効・#4426)。読出し範囲が [FLE_RWATCH_LO, FLE_RWATCH_HI) に重なるときだけ fle_rwatch が出す (fle_cpu.c)。
+ * LD* の a は RW_ と A_ で評価されるので、一時変数に取ってから使う。 */
+void fle_rwatch(uint64_t a, uint32_t n, const char* file, int line);
+#define RW_(a, n) fle_rwatch((uint64_t)(a), (n), __FILE__, __LINE__)
+#define LD8(a) ({ uint64_t ra_ = (uint64_t)(a); RW_(ra_, 1); (*(u8u*)A_(ra_)); })
+#define LD16(a) ({ uint64_t ra_ = (uint64_t)(a); RW_(ra_, 2); (*(u16u*)A_(ra_)); })
+#define LD32(a) ({ uint64_t ra_ = (uint64_t)(a); RW_(ra_, 4); (*(u32u*)A_(ra_)); })
+#define LD64(a) ({ uint64_t ra_ = (uint64_t)(a); RW_(ra_, 8); (*(u64u*)A_(ra_)); })
+#define LDF32(a) ({ uint64_t ra_ = (uint64_t)(a); RW_(ra_, 4); (*(f32u*)A_(ra_)); })
+#define LDF64(a) ({ uint64_t ra_ = (uint64_t)(a); RW_(ra_, 8); (*(f64u*)A_(ra_)); })
+#else
 #define LD8(a) (*(u8u*)A_(a))
 #define LD16(a) (*(u16u*)A_(a))
 #define LD32(a) (*(u32u*)A_(a))
 #define LD64(a) (*(u64u*)A_(a))
 #define LDF32(a) (*(f32u*)A_(a))
 #define LDF64(a) (*(f64u*)A_(a))
+#endif
 #ifdef FLE_WWATCH
 /* 書込み監視 (診断用・既定無効)。書込み先が監視 slot に重なるときだけ fle_wwatch が stderr に出す (fle_cpu.c)。
  * 書込み値は一時変数に取ってから監視して store する (値の式を 2 回評価しない)。
@@ -73,7 +86,13 @@ void fle_wwatch(uint64_t a, uint32_t n, const void* src, const char* file, int l
 #define STF32(a, v) (*(f32u*)A_(a) = (float)(v))
 #define STF64(a, v) (*(f64u*)A_(a) = (double)(v))
 #endif
-static inline X128 LDX(uint64_t a) { X128 x; memcpy(&x, (void*)A_(a), 16); return x; }
+static inline X128 LDX(uint64_t a) {
+    X128 x;
+#ifdef FLE_RWATCH
+    RW_(a, 16);
+#endif
+    memcpy(&x, (void*)A_(a), 16); return x;
+}
 static inline void STX(uint64_t a, X128 x) {
 #ifdef FLE_WWATCH
     WW_(a, 16, &x);
@@ -82,6 +101,9 @@ static inline void STX(uint64_t a, X128 x) {
 }
 /* ymm (32B): lo = X[i], hi = YL[i] */
 static inline void LDYSPLIT(uint64_t a, X128* lo, X128* hi) {
+#ifdef FLE_RWATCH
+    RW_(a, 32);
+#endif
     memcpy(lo, (void*)A_(a), 16); memcpy(hi, (void*)(A_(a) + 16), 16);
 }
 static inline void STY(uint64_t a, X128 lo, X128 hi) {
