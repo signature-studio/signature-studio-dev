@@ -103,10 +103,27 @@ def cond(mn, fl):
     return t[mn]
 
 
-def run(insns, probe, fam):
-    """probe に届く全経路で fam の値を集める。値は int か None (未知)。"""
+def run(insns, probe, fam, prune=False, stats=None):
+    """probe に届く全経路で fam の値を集める。値は int か None (未知)。
+    prune=True: 分岐先 (fork の先・ジャンプ先) に、同じ状態 (ip・レジスタ・flags・スタック) で再訪した経路を切る。
+      切った先は初回訪問で既に辿られているので、値の集合は変わらない (健全)。
+      切断の種類: 後方の再訪 = ループ、前方の再訪 = 未知分岐の合流 (diamond)。stats に件数を積む。"""
     idx = {x.address: i for i, x in enumerate(insns)}
     vals, steps = set(), 0
+    stats = {} if stats is None else stats
+    seen = set()
+
+    def cut(t, st, fl, src):
+        if not prune:
+            return False
+        key = (t, tuple(sorted(st.items())), fl)
+        if key not in seen:
+            seen.add(key)
+            return False
+        k = '刈り込み(ループ)' if t <= src else '刈り込み(分岐の合流)'
+        stats[k] = stats.get(k, 0) + 1
+        return True
+
     stack = [(0, {}, None)]
     while stack:
         i, st, fl = stack.pop()
@@ -127,13 +144,20 @@ def run(insns, probe, fam):
                 i += 1
                 continue
             if mn == 'jmp':
-                i = idx[int(ops[0], 0)]
+                t = idx[int(ops[0], 0)]
+                if cut(t, st, fl, i):
+                    break
+                i = t
                 continue
             if mn.startswith('j'):
                 tgt = idx[int(ops[0], 0)]
                 c = cond(mn, fl)
                 if c is None:
-                    stack.append((tgt, dict(st), fl))
+                    stats['未知分岐'] = stats.get('未知分岐', 0) + 1
+                    if not cut(tgt, st, fl, i):
+                        stack.append((tgt, dict(st), fl))
+                    if cut(i + 1, st, fl, i):
+                        break
                     i += 1
                 else:
                     i = tgt if c else i + 1
@@ -343,11 +367,16 @@ def run(insns, probe, fam):
     return vals
 
 
-def verify(insns, probe, fam, claim=None):
-    """戻り値: (判定, 詳細)。判定は 実値化 / 未決 / PASS / FAIL / 判定不能 のいずれか。"""
+def verify(insns, probe, fam, claim=None, prune=False):
+    """戻り値: (判定, 詳細)。判定は 実値化 / 未決 / PASS / FAIL / 判定不能 のいずれか。
+    prune=True で step 上限の打ち切りを刈り込みで収束させる (既定は False = 従来の判定)。"""
+    stats = {}
     try:
-        vals = run(insns, probe, fam)
+        vals = run(insns, probe, fam, prune, stats)
     except (Unsup, Stop, KeyError, ValueError) as e:
+        if isinstance(e, Stop) and prune:
+            return '判定不能', '刈り込み後も step 上限 (未知分岐 %d・刈り込み %d)' % (
+                stats.get('未知分岐', 0), sum(v for k, v in stats.items() if k.startswith('刈り込み')))
         return '判定不能', '%s: %s' % (type(e).__name__, e)
     if not vals:
         return '判定不能', 'probe に到達しない'
@@ -416,6 +445,22 @@ def selftest():
         ('E2 sar ebx,4 (0x80 → 0x8 、符号なし)', 'bb80000000c1fb040fb6d3c3', 3, 'rdx', 0x8, 'PASS'),
         ('E2 ネガティブ (0x0)', 'bb80000000c1fb040fb6d3c3', 3, 'rdx', 0x0, 'FAIL'),
     ]
+    # 刈り込み (--prune) の検査: 同じ入力で prune の有無を比べる。
+    #   P1 ループ (K2 と同じ循環・出口で rdx=1): prune 無し・有りとも 0x1 (PASS)。claim 0x0 は FAIL。
+    #   P2 分岐 1 つ (K1 と同じ・両経路同値): prune 有りでも 0x0 (PASS)。
+    #   P3 ループ内に未知分岐 (合流で刈る): prune 有りで未決 (0x0,0x1) のまま、判定は変わらない。
+    #   P4 無限ループ (出口なし): prune 有りでも step 上限に届かず 判定不能 (刈り込み)。
+    prune_cases = [
+        ('P1 ループ・刈り込み有り (rdx=1)', '31db' '89da' '83c301' '83fb02' '75f6' 'c3', 5, 'rdx', 0x1, 'PASS', True),
+        ('P1 ネガティブ (刈り込み有り・claim 0x0)', '31db' '89da' '83c301' '83fb02' '75f6' 'c3', 5, 'rdx', 0x0, 'FAIL', True),
+        ('P2 分岐 1 つ・刈り込み有り (両経路 0x0)', '31db83ff007405' '31d2' 'eb03' '90' '31d2' 'c3', 7, 'rdx', 0x0, 'PASS', True),
+        ('P2 ネガティブ (刈り込み有り・claim 0x1)', '31db83ff007405' '31d2' 'eb03' '90' '31d2' 'c3', 7, 'rdx', 0x1, 'FAIL', True),
+        ('P3 未知分岐を出口に持つループ・刈り込み有り (rbx=5)', 'bb05000000' 'e800000000' '7402' 'ebf7' 'c3', 4, 'rbx', 0x5, 'PASS', True),
+        ('P3 ネガティブ (刈り込み有り・claim 0x6)', 'bb05000000' 'e800000000' '7402' 'ebf7' 'c3', 4, 'rbx', 0x6, 'FAIL', True),
+        ('P3 ネガティブ (刈り込み無し → step 上限)', 'bb05000000' 'e800000000' '7402' 'ebf7' 'c3', 4, 'rbx', 0x5, '判定不能', False),
+        ('P4 出口なしループ・刈り込み有り (rdx=0 で実値化)', '31d2' 'ebfe', 1, 'rdx', None, '実値化', True),
+        ('P4 ネガティブ (刈り込み無し → step 上限で判定不能)', '31d2' 'ebfe', 1, 'rdx', None, '判定不能', False),
+    ]
     bad = 0
     for name, hx, probe, fam, claim, expect in cases:
         insns = list(md.disasm(bytes.fromhex(hx), B))
@@ -423,11 +468,17 @@ def selftest():
         ok = got == expect
         bad += not ok
         print('[selftest] %-44s 期待 %-6s 判定 %-6s %s %s' % (name, expect, got, det, 'OK' if ok else 'NG'))
-    print('[selftest] %d 件 / 不一致 %d' % (len(cases), bad))
+    for name, hx, probe, fam, claim, expect, prune in prune_cases:
+        insns = list(md.disasm(bytes.fromhex(hx), B))
+        got, det = verify(insns, probe, fam, claim, prune)
+        ok = got == expect
+        bad += not ok
+        print('[selftest] %-44s 期待 %-6s 判定 %-6s %s %s' % (name, expect, got, det, 'OK' if ok else 'NG'))
+    print('[selftest] %d 件 / 不一致 %d' % (len(cases) + len(prune_cases), bad))
     return bad
 
 
-def real(rows_path, pe, all_rows=False):
+def real(rows_path, pe, all_rows=False, prune=False):
     sys.path.insert(0, os.path.join(HERE, 'ldfix'))
     sys.path.insert(0, HERE)
     import ldmach
@@ -445,7 +496,7 @@ def real(rows_path, pe, all_rows=False):
         calls = [i for i, x in enumerate(insns) if x.mnemonic == 'call' and x.op_str.startswith('0x')
                  and int(x.op_str, 0) == tva]
         claim = None if r.get('value') is None else int(r['value'], 0)
-        got, det = verify(insns, calls[r['k']], r['fam'], claim)
+        got, det = verify(insns, calls[r['k']], r['fam'], claim, prune)
         cnt[got] += 1
         print('[verify] %s -> %s pos %d: %s %s' % (r['caller'], r['callee'], r['pos'], got, det))
     print('[verify] 集計 ' + ' '.join('%s %d' % (k, v) for k, v in sorted(cnt.items())))
@@ -458,9 +509,10 @@ if __name__ == '__main__':
     ap.add_argument('--pe')
     ap.add_argument('--selftest', action='store_true')
     ap.add_argument('--all', action='store_true', help='class によらず全行を照合する (claim なし)')
+    ap.add_argument('--prune', action='store_true', help='同一状態の再訪 (ループ・分岐の合流) を刈り込む (既定は従来どおり)')
     a = ap.parse_args()
     if a.selftest:
         sys.exit(1 if selftest() else 0)
     if not a.rows or not a.pe:
         ap.error('ROWS と --pe を指定する (合成検査は --selftest)')
-    sys.exit(1 if real(a.rows, a.pe, a.all) else 0)
+    sys.exit(1 if real(a.rows, a.pe, a.all, a.prune) else 0)
