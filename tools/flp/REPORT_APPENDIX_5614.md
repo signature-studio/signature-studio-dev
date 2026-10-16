@@ -12,9 +12,9 @@
 
 ## 2. 環境
 
-- 素材: `fl-win64.tar.zst` を `tar --zstd -xf` で展開 (real 5.7 s・展開先 `$RUNNER_TEMP/fl-win64/extracted`・25,166 件)。
-- 導入: `apt-get install wine64 gdb` (apt、rc=0)。`kernel.yama.ptrace_scope=0` (sudo sysctl)。
-- インストール木: `tools/flp/s1_wine_probe.sh` (前回と同じ)。結果 `S1 rc=124` (120 s で終了せず GUI 継続)。real 2 m 13 s。
+- 素材: `fl-win64.tar.zst` を `tar --zstd -xf` で展開 (real 14.8 s・展開先 `$RUNNER_TEMP/fl-win64/extracted`・25,166 件)。
+- 導入: `apt-get install wine64 gdb xvfb` (apt、rc=0)。`kernel.yama.ptrace_scope=0` (sudo sysctl)。
+- インストール木: `tools/flp/s1_wine_probe.sh` (前回と同じ)。結果 `S1 rc=124` (120 s で終了せず GUI 継続)・`MSGBOX_OnInit=0`・`native-load=0`。real 2 m 10.1 s。
 - ブレーク先の換算: FLEngine_x64.dll の ImageBase は `0x400000` (`FL64.exe` は `0x140000000`)。`0x737560` は FLEngine の VA なので、実行時は `FLEngine base + 0x337560` (base は `mapping PE file ... FLEngine_x64.dll` の行から取る)。前回の probe は FL64.exe の VA (`0x140006eaf`) を使っていたため、命中しなかった。
 
 ## 3. 命中と dl の値 (受入 3)
@@ -23,18 +23,18 @@ probe: `tools/flp/s10_setter_hit_probe.sh` (gdb `-x tools/flp/s10_setter_hit.gdb
 
 | 項目 | 値 |
 |---|---|
-| 命中 (gdb の break・WAIT_SEC=200) | 8,066 回 (本 run の 1 実行。前回の 15,069 回とは実行ごとに数が変わる) |
-| `dl` (rdx の下位 8 bit) | `0x00` 6,569 回・`0x01` 1,497 回 |
-| 呼出し元 (戻り先) | `0x7aa6d107` (= VA `0x73d107`・直接 call 元 `0x73d102`) 8,043 回・`0x7aa6d2a7` (= VA `0x73d2a7`・直接 call 元 `0x73d2a2`) 23 回 |
+| 命中 (gdb の break・WAIT_SEC=200) | 9,479 回 (本 run の 1 実行。前回の 8,066 回・前々回の 15,069 回とは実行ごとに数が変わる) |
+| `dl` (rdx の下位 8 bit) | `0x00` 7,873 回・`0x01` 1,606 回 |
+| 呼出し元 (戻り先) | `0x7aa6d107` (= VA `0x73d107`・直接 call 元 `0x73d102`) 9,456 回・`0x7aa6d2a7` (= VA `0x73d2a7`・直接 call 元 `0x73d2a2`) 23 回 |
 | 静的解析との対応 | `tools/python/REPORT_PY388.md` §5b の直接 call 元 `0x73d102`・`0x73d2a2` と一致。`0x79fd44` は 1 回も命中しなかった |
 
-**`dl` × 呼出し元の交差表** (本 run の `$RUNNER_TEMP/s10_gdb_session.txt` の `HIT` 行を集計。命中の合計 8,066):
+**`dl` × 呼出し元の交差表** (本 run の `$RUNNER_TEMP/s10_gdb_session.txt` の `HIT` 行を集計。命中の合計 9,479):
 
 | dl | 呼出し元 `0x73d102` (ret `0x7aa6d107`) | 呼出し元 `0x73d2a2` (ret `0x7aa6d2a7`) | 計 |
 |---|---|---|---|
-| `0x00` | 6,551 | 18 | 6,569 |
-| `0x01` | 1,492 | 5 | 1,497 |
-| 計 | 8,043 | 23 | 8,066 |
+| `0x00` | 7,855 | 18 | 7,873 |
+| `0x01` | 1,601 | 5 | 1,606 |
+| 計 | 9,456 | 23 | 9,479 |
 
 集計コマンド: `grep '^HIT ' s10_gdb_session.txt | sed -E 's/.*dl=(0x[0-9a-f]+).* ret=(0x[0-9a-f]+)/\1 \2/' | sort | uniq -c`。
 `dl=0x00` と `dl=0x01` は両方の呼出し元から来る (`0x73d2a2` 経由は 0 と 1 の両方を含む)。
@@ -44,7 +44,7 @@ probe: `tools/flp/s10_setter_hit_probe.sh` (gdb `-x tools/flp/s10_setter_hit.gdb
 ## 4. cfg の型と VMT (受入 1・2 は未達)
 
 - probe の取得: 命中時に `rcx` (this) の先頭 qword (vptr 候補)。
-- 結果: 命中時の `*rcx` (vptr 候補) の内訳 (本 run の `HIT` 行を集計): `0x7aa64d10` 8,041 件 (呼出し元 `0x73d102`)・`0x7aa65908` 23 件 (呼出し元 `0x73d2a2`)・`0x7b311e60` 1 件・`0x7b3121d8` 1 件 (どちらも呼出し元 `0x73d102`)。`0x7aa64d10`・`0x7aa65908` は FLEngine の `.text` を指す。`0x7b...` の 2 値は FLEngine の範囲外 (ImageBase `0x7a730000` の外)。
+- 結果: 命中時の `*rcx` (vptr 候補) の内訳 (本 run の `HIT` 行を集計): `0x7aa64d10` 9,454 件 (呼出し元 `0x73d102`)・`0x7aa65908` 23 件 (呼出し元 `0x73d2a2`)・`0x7b311e60` 1 件・`0x7b3121d8` 1 件 (どちらも呼出し元 `0x73d102`)。`0x7aa64d10`・`0x7aa65908` は FLEngine の `.text` を指す。`0x7b...` の 2 値は FLEngine の範囲外 (ImageBase `0x7a730000` の外)。
 - 所属 section の確認 (`fl-install/FLEngine_x64.dll` に対し、`pefile` で `get_section_by_rva`。RVA = 実行時 VA − `0x7a730000`): `0x7aa64d10` (RVA `0x334d10`)・`0x7aa65908` (RVA `0x335908`)・`0x7aa6d107` (RVA `0x33d107`)・`0x7aa6d2a7` (RVA `0x33d2a7`)・`0x7aa67560` (RVA `0x337560`) は全て `.text` (Characteristics `0x60000020` = CODE・EXECUTE・READ)。`.rdata` (`0x40000040`) ではない。
 - 確認コマンド: `python3 -c "import pefile; pe=pefile.PE('fl-install/FLEngine_x64.dll', fast_load=True); print(pe.get_section_by_rva(0x334d10).Name)"` (`fl-install` は `s1_wine_probe.sh` が組み立てる。`$RUNNER_TEMP` 配下)。
 - 判定: C++ の VMT なら .rdata を指すはず。`.text` を指すことは、`rcx` が this でない (呼出し規約の前提違い)・あるいはオブジェクト先頭が vptr でないことを示す。よって VMT の所属はこの方法では確定しない。cfg の型も確定しない。
