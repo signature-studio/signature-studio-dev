@@ -129,7 +129,9 @@ scratch は `work/scratch/` (gitignore) に複製し、本体は変えない。
 
 ### 9.2 PY-4909 (#5313) G6: 0x104bffa の分岐意味の検証 (照合は未了)
 
-- 測定 commit: `42fad4a17` (origin/main = PR #5962 merge 後)。素材 `fl-win64` の `block00031_PE.bin` → `py53_dispatch.py` (`fn=4664 dispatch=13 r8d_tests=174`)。
+- 測定 commit (分けて記載):
+  - `py53_dispatch.py` / `py64_check_expr.py` / `py99` 系: `42fad4a17` (origin/main = PR #5962 merge 後・差分 0)。素材 `fl-win64` の `block00031_PE.bin` → `py53_dispatch.py` (`fn=4664 dispatch=13 r8d_tests=174`)。
+  - `py64_sign_branch_check.py` の結果: `2b0b6ef` (本 PR の HEAD で追加・この commit で測定)。`42fad4a17` にはこのスクリプトが無い。
 - 機械展開 (`py99_slot_paths.expand`) は 0x104bffa を `left=['⚠']` で返す。`⚠合流@0x104bd49` (`[rbp+0x580]` の符号付き剰余 `%8`: `and 0x80000007`・`jns`・`sub 1`・`or 0xfffffff8`・`add 1`) と `⚠合流@0x104be63` (符号付き除算 `/8`: `test`・`jns`・`add 7`・`sar 3`) を式にできないため、HAND 表には入れていない。
 - 分岐の意味を `analysis/py64_sign_branch_check.py` で全入力突合した: `v = and(c_in,0xffff) + 0x70000000 − 0x70001fd0` の下位 16bit 全 65536 通り + 乱数 20000 で、`/8` (trunc) と `%8` (符号付き) の asm 模擬が C の値と一致。`# n=85536 div8 mismatch=0 mod8 mismatch=0`・exit 0。
 - これは分岐の意味の検証であり、0x104bffa の式そのものの照合ではない (`d_in` の独立検算・`sar`/`and` の文法は未実装)。
