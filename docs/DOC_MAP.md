@@ -1174,6 +1174,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_4883.md` | ~60 | KH-127 (#4883): Delay の引数過不足 10 件のうち 4 件 (`FUN_180fb5c6c`・`FUN_180fb5f8c`) を機械語で確定し規則化 (86 → 82)・残件 6 件は子 #4917 [KH-135]。§10-7v の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_5362.md` | ~90 | KH-154 (#5362): Delay の残件 callee `FUN_181384040` (memmove shim) の呼出し 6 行を機械語で確定し ABI 規則化 (測定値は付録の 5362-4)・Gain/Haas/Gate の `.o` 不変。残りの pointer⇔整数規則は親 #5362 に残す |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3800.md` | ~66 | KH-64 (#3800): Delay の引数過不足のうち呼出先 FUN_180fd4f30 分の ABI 規則 (部分)。根拠・census・未解決は §10-7u が正本 (残りは子 #3844・#3847) |
+| `tools/targets/kilohearts/REPORT_APPENDIX_5868.md` | ~60 | KH-178 (#5868): 関数ポインタ slot `_DAT_1813a1d40` の型不一致 (stereo 1300・1888) を FNPTR で 0 件化。Gain/Haas/Gate の `.o` は origin/main 規則と cmp 一致。根拠・測定値は本付録が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4911.md` | ~60 | KH-134 (#4911): Stereo 閉包の型不一致 12 件のうち 10 件を delay 表の機械語確定済み GTYPE で書換え (部分・emcc 型不一致 12 → 2)。根拠・件数・未解決は本付録が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4871.md` | ~60 | KH-124 (#4871): Stereo 閉包の FUN_180fd4f30 引数なし呼出 22 件を delay の ABI 規則で書換え (emcc 42 → 20)。根拠・内訳・未解決は §10-7v が正本 (残りは子 #4910・#4911) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3096.md` | ~70 | KH-44 (#3096): `code` 関数ポインタ化で Delay の間接呼出し 21 件を解消 (emcc 577 → 556)・gain/haas/gate の .o 新旧 byte 一致・残件の子 issue 分割。§10-7t の正本 |
