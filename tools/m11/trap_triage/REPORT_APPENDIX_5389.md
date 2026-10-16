@@ -11,7 +11,7 @@ REPORT_718 §4o の正本。親 #4886 (分割元)・前 run の停止報告 (#53
 
 ## 2. 入力と再現
 
-- **本 run の素材**: `fl-win64` と `work-m11` (ともに `$HOME/artifacts` に実在)。`work-m11` の `tools/m11/work/tools/m11/work/boot_final.ll` (19,787,837 B・sha256 `69c774de…`) を `tools/m11/work/boot_final.ll` に置いて照合した (`tools/m11/work/` は gitignore)。
+- **本 run の素材**: `fl-win64` と `work-m11` (ともに素材ディレクトリ `ARTIFACTS_DIR` に実在)。`work-m11` の `tools/m11/work/tools/m11/work/boot_final.ll` (19,787,837 B・sha256 `69c774de…`) を `tools/m11/work/boot_final.ll` に置いて照合した (`tools/m11/work/` は gitignore)。
 - PE: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B・sha256 `b2c64da4…`)。本 run で展開して逆アセンブルした。
 - 測定 commit: `e5261de58` (origin/main)。本 PR はコードを変えていない。`git diff e5261de58 HEAD -- tools/m11/guard699 tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py` = 0 行。
 - 再実行 (本 run・foreground・各 1 回。commit は `6ec088555` 系統で、コードは `e5261de58` と同一): `scan_guard.py --report` 4.45 s で strict 288 (dropped 1380・jcc 25618)。`strict_evidence.py --out` 14.7 s で TSV 288 行 (ヘッダ除く 288 件)。`judge_dump.py <IR> <TSV> 78 84` 0.2 s で 78・81〜84 の IR 本文を出力 (rc 0)。strict 288 と TSV 288 行は REPORT_718 §4a と一致する。
