@@ -12,7 +12,7 @@
   - `ci.emc.ll` を `-c` で obj 化、`ci_helpers.c` も obj 化。
   - 間接 call 2 件の宛先 `function_1801cb5e0`・`function_1801cb600` の declare を検査し、`uint64_t f(uint64_t a){ (void)a; __builtin_trap(); }` を `ci_traps.c` に生成して obj 化。検査は `^declare i64 @<name>\(i64\) ` (引数 1 個の i64) に限る。declare が無い・引数の型や個数が違う場合は exit 1。
   - RetDec 出力の実際の declare は `declare i64 @function_1801cb5e0(i64) local_unnamed_addr` と `...cb600(i64)` で、引数は 1 個の `i64` (直前の `()` 版は実 IR と合わず exit 1 になった。§4 の NC-B)。
-- 測定 commit: `6220b651d` (gate と trap を入れた時点)。以降の変更は `4ed054729` (ヘッダコメントのみ)・`5dd6a2118` (docs のみ)・`2c4b02070` (検査の正規表現)・本 fix の commit (検査を `i64(i64)` に直し、trap の定義を引数付きにした)。§3 の実測は本 fix の commit (HEAD) で取った値。
+- 測定 commit: `6220b651d` (gate と trap を入れた時点)。以降の変更は `4ed054729` (ヘッダコメントのみ)・`5dd6a2118` (docs のみ)・`2c4b02070` (検査の正規表現)・本 fix の commit (検査を `i64(i64)` に直し、trap の定義を引数付きにした)。§3 の実測は測定 commit `374feea46` (コードを変えた最後の commit) で取った値。`374feea46..HEAD` の `tools/shared/lift` の差分は本付録の 1 行 (文言) のみで、実行経路の差分は 0 (`git diff 374feea46 HEAD -- tools/shared/lift/ildsp/ci_lift.sh` の出力は空)。
 
 ## 3. 実測 (HEAD = 本 fix の commit・RetDec v5.0・emsdk 6.0.12・4 core・n=3)
 素材: `fl-win64` (`fl-win64` の tarball を `tar --zstd -xf` で展開、`extracted/block24360_PE.bin`)。RetDec は `RetDec-v5.0-Linux-Release.tar.xz` (GitHub release)、emsdk は `emsdk install 6.0.12`。この run の runner には `[EMSDK]`・`[RETDEC]` の入っていない環境だったので、上の取得で用意した (`docs/REFERENCES.md` の `toolchain-retdec`・`toolchain-emsdk`)。
