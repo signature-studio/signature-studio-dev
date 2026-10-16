@@ -60,8 +60,9 @@ r1 対 r2 で差が出た 4 KiB ページは 11 枚。image 内 4 枚 (`0x13a500
 
 マスク (`NONDET`) の導出に使っていない新規 run で判定を再確認した。
 
-- 手順: `fle6_measure.sh` (`FLE_BOOT_RUNS=default`・`FLE_EXTRA_ROOTS=`) で build (`fleboot_plain.cjs`) を作り、その build に対して既定経路 boot (`FLE_IPP`・`FLE_TOLERANT` 未指定) を 10 回 (r1〜r10) 実行。dump は repo 外 (`$FLE_BOOT_WORK`) の `outmem_boot_plain_r{1..10}.bin`。
-- 結果 (10 run): units_run 895・boot_threw `exit`・IPP ok (全 run 同一)。`outmem_judge.py` rc 0・判定指標 `f39730d34b15e8c1` が 10 run 全一致・検出力 True (マスク外 0x13a5020 の反転で変化)・RESULT PASS。
+- 測定 commit (検証 HEAD): `ad0231fa3`。手順: `fle6_measure.sh` (`FLE_BOOT_RUNS=default`・`FLE_EXTRA_ROOTS=`・`FLE_BOOT_TAG=fle43`) rc 0・所要 3m18s で build (`fleboot_plain.cjs`) を作り、その build に対して既定経路 boot (`FLE_IPP`・`FLE_TOLERANT` 未指定) を 10 回 (r1〜r10) 実行。dump は repo 外 (`$FLE_BOOT_WORK`) の `outmem_boot_plain_r{1..10}.bin` (8.5 GiB)。判定ログは repo 外の `judge.log` (本文に全行を記載済み)。
+- 結果 (10 run): units_run 895・IPP ok (全 run 同一)。`outmem_judge.py` rc 0・判定指標 `f39730d34b15e8c1` が 10 run 全一致・検出力 True (マスク外 0x13a5020 の反転で変化)・RESULT PASS。
+- HEAD までのコード差分 (`git diff 3a39e2683 HEAD -- tools/flelift`) は `fle6_measure.sh` の `FLE_TRAP_VA` (未指定で従来どおり) と main 由来の `probe_976.py` 等。判定に使うファイルは変更なし。
 - 新規 10 run だけで求めた `image_writable` の差分位置 (個別バイト照合): `0x13a5010`〜13・`0x13e4d58`・`0x15f26e8`〜e9・`0x16bcbf0` の 8 位置。既存 `NONDET` の部分集合で、既存に無い位置は 0。`0x15f26ea` は新規 10 run では出なかった (8 run の和集合にある)。
 - 注記: 判定指標の絶対値は、この build (`f39730d3…`) と PR 初版の測定 build (`7aa20126…`) で異なる。build 間で一致する値ではない。判定は run 間一致と検出力で行う。
 - dst buffer `0x12d677d0` (長さ 0x28): 新規 10 run で全 0 (同一)。全 8 run の比較は §4 のとおり未確認で、補助指標は「候補 (未検証)」扱い。
