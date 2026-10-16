@@ -110,6 +110,11 @@ ABI = {
     #   FUN_180fcf904 の 2 件 (2667・2760): 宣言は undefined4 (bit 列)。float 式をそのまま渡すと C が数値変換するので f2u() で包み bit を渡す (resonator の float 宣言とは逆)。
     #   規則 1 件 = 呼出し 1 件 (件数 1 を assert)。残り 86 件は REPORT_APPENDIX_3800.md の分類を参照。
     'delay': [
+        # #5862 (KH-177): 戻り値を読む呼出元が有る callee の宣言 (void → 戻り値型)。機械語で呼出元の読みを確認済み。
+        #   FUN_180fcf904 (short・ax): 呼出元 180fbbfb8 (2667) と 180fbc1f4 (2759) が call 直後に ax を読む。本体は FUN_180fbdfcc の ax を素通しする。
+        #   FUN_180f878e0 (rax) は本体の値付けが意味の補正に当たるため本規則に入れない (子 issue へ切り出し・PR 本文の未解決表)。
+        ('delay 5862 FUN_180fcf904 def void → short (ax)', r'void FUN_180fcf904\(undefined4 param_1\)(?=\s*\{)', 'short FUN_180fcf904(undefined4 param_1)'),
+        ('delay 5862 FUN_180fcf904 body return = FUN_180fbdfcc result (ax)', r'(?:func_0x000|FUN_)180fbdfcc\(auStackX_8\);\n  return;\n', 'return FUN_180fbdfcc((short *)auStackX_8);\n'),
         ('delay 2667 FUN_180fbbfb8 xmm0 = param_2 bits (FUN_180fcf904 undefined4 arg)', r'sVar2 = (?:func_0x000|FUN_)180fcf904\(\);', 'sVar2 = FUN_180fcf904(f2u(param_2));'),
         ('delay 2760 FUN_180fbc1f4 xmm0 = input float bits (afStackX_8 source)', r'sVar1 = (?:func_0x000|FUN_)180fcf904\(\);', 'sVar1 = FUN_180fcf904(f2u(fVar4));'),
         ('delay 6939 FUN_180fe3690 rcx=[param_1+0x18]', r'(if \(\*\(longlong \*\)\(param_1 \+ 0x18\) != _DAT_182989698\) \{\n\s*)FUN_180fd4f30\(\);', r'\1FUN_180fd4f30(*(undefined8 *)(param_1 + 0x18));'),
