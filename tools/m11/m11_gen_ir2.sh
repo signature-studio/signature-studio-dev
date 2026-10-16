@@ -90,6 +90,15 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
   else
     python3 m11_cond.py ld236=not-applied
   fi
+  # #5693 (CI-235): function_439f90 を機械語どおりの IR に組み直す (fix_439f90.py)。既定 OFF (wasm unit 結果は未測定。tools/m11/ldfix/REPORT_5693.md)。
+  #   M11_FIX_439F90=1 のときだけ適用する (ir_conditions.json 439f90=applied)。想定外の入力は assert で止まる。
+  if [ "${M11_FIX_439F90:-0}" = 1 ]; then
+    python3 ldfix/fix_439f90.py work/boot_final.ll work/boot_final.439f90.ll
+    mv work/boot_final.439f90.ll work/boot_final.ll
+    python3 m11_cond.py 439f90=applied
+  else
+    python3 m11_cond.py 439f90=not-applied
+  fi
   # #3296: function_412770 の rep movsq 源 (機械語 mov rsi,[rax] の load が lift で脱落し ptr null)。想定外の入力は assert で止まる (fail-closed)。
   python3 ldfix/fix_src412770.py work/boot_final.ll work/boot_final.src412770.ll
   mv work/boot_final.src412770.ll work/boot_final.ll
