@@ -8,6 +8,7 @@
 - 真陽性 3 件: 行 178 (`function_8c5eb0`・既知の positive control)、行 189 (`function_a9ece0`)、行 190 (`function_bb5fd0`)。
 - 偽陽性 1 件: 行 188 (`function_a97930`)。
 - 保留 31 件。偽陽性率は母数 288 の判定が終わるまで書かない。
+- 追記 (#5685): 行 168・169 は §6 で真陽性 (構造) に確定した。現在の内訳は真陽性 5・偽陽性 1・保留 29 (母数 35)。
 
 ## 2. 測定
 
@@ -33,8 +34,8 @@
 | 165 | function_80e040 | 80e094 → 80e133 / 80e09f | 保留 | 機械語は `[rip+…]` の 2 段 load、IR は `load [18762880]` の 1 段。rip 先アドレスの一致が未確認 |
 | 166 | function_81a710 | 81a9b5 → 81aa57 / 81a9c0 | 保留 | 機械語の count は `call [rax+0x28]` の戻り値。IR の B の count 源 (`%69`) との対応が未確認 |
 | 167 | function_81a710 | 81aac4 → 81ab19 / 81aacb | 保留 | 機械語の count は `call [rax+0x28]`。IR の B の `%93` (load `%91`) との同一性が未確認 |
-| 168 | function_821210 | 821226 → 821253 / 82122d | 保留 | count は `[arg1+16]` で IR の B の `%4` と一致。L の `icmp eq %15,0` は要素の null 判定で count 判定ではない。back-edge の `rsi` 更新を未確認 |
-| 169 | function_821550 | 821571 → 8216db / 82157e | 保留 | count は `[arg1+16]` (IR の B の `%2`)。L の判定は `icmp eq %12, arg2` (要素比較)。count 判定の対応が未確認 |
+| 168 | function_821210 | 821226 → 821253 / 82122d | 真陽性 (構造) | count は `[arg1+16]` で IR の B の `%4` と一致 (§6.1)。L の `icmp eq %15,0` は要素の null 判定で count 判定ではない。#5685 で確定 |
+| 169 | function_821550 | 821571 → 8216db / 82157e | 真陽性 (構造) | count は `[arg1+16]` (IR の B の `%2`) と一致。L の判定は `icmp eq %12, arg2` (要素比較)。#5685 で確定 (§6.1) |
 | 170 | function_824460 | 8244f0 → 82462a / 8244fb | 保留 | count は `call 611430` の戻り値。機械語の引数 `[rsp+0x28]` と IR の `arg1` の対応が未確認 |
 | 171 | function_825fc0 | 8260a1 → 82616e / 8260ae | 保留 | count は `[[rsi+0x370]+0x10]`−1 。IR の L の判定は `call 81fed0` の戻り値で、対応が未確認 |
 | 172 | function_8261a0 | 82682d → 8268a0 / 826836 | 保留 | count は `[[rbp+0x80]+8]`−1。IR の B の `%284` (load `%282`+8) との同一性が未確認 |
@@ -78,3 +79,28 @@ python3 trap_triage/judge_ctx.py work/boot_final.ll work/strict_evidence_5661.ts
 
 - 入力は `oc_artifacts: fl-win64 work-m11` で展開する (`tools/m11/work/` 配下・gitignore)。
 - 出力の文脈ダンプは `tools/m11/work/judge_5661.txt` (gitignore・未コミット)。
+
+## 6. #5685 (行 159〜177・母数 19 件): 確定 2 件・保留 17 件
+
+- 測定 commit: `739b46e2d` (origin/main)。本 PR はコードを変えない。`git diff 739b46e2d HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/` = 0 行。
+- 入力: `work-m11` の `boot_final.ll` (19,787,837 B・sha256 `69c774de…`・§4a と一致)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
+- 実行 (foreground・各 1 回): `scan_guard.py --report` 4.3 s (strict 288)、`strict_evidence.py` 12.1 s (TSV 288 行)、`judge_ctx.py <IR> <TSV> <PE> 159 177` rc 0 (1,237 行の文脈ダンプ)。
+- 件数の数え直し (`ir_loop_head_icmp` 列・行 159〜177): 0 件 0 / 1 件 9 / 2 件 8 / 5 件 1 / 6 件 1 (計 19)。付録 §2 の 35 件の内訳とは範囲が違う。
+- 判定母数 19、確定 2 (真陽性 2・偽陽性 0)、保留 17。偽陽性率は書かない。
+
+### 6.1 確定 (真陽性・構造判定)
+
+| 行 | 関数 | jcc → 脱出先 / L | 判定 | 理由 |
+|---|---|---|---|---|
+| 168 | function_821210 | 821226 → 821253 / 82122d | 真陽性 (構造) | 機械語: 関数先頭で `mov rbx, rcx` (rcx = arg1) の後に `edi = [rbx+0x10]−1`、`esi = 0`、`cmp esi, edi`、`jg 821253`。count=0 で脱出する。IR: B の `%4 = load [arg1+16]` が同じ count 源 (段数 1・幅 i32)。L の入口判定は要素 null の `icmp eq %15, 0` (`%16`) で count 判定ではない。末尾の `%22` は `i32` の 0 判定で後判定 (do-while)。count=0 のとき IR は本体を 1 回実行し、`%20` が `0xFFFFFFFF` になって `trunc` 後も 0 にならず、loop を抜けない。機械語は count=0 で `821253` へ直行する。count=0 の実行時到達は未測定。 |
+| 169 | function_821550 | 821571 → 8216db / 82157e | 真陽性 (構造) | 機械語: 先頭の `mov r9d, [rcx+0x10]` (rcx = arg1。`rcx` はそれまで書き換えられない)、`r9d = count−1`、`cmp eax, r9d`、`jg 8216db`。IR: B の `%2 = load [arg1+16]` が count 源 (`%0 = arg1+16`) で一致。L の判定は要素比較 `icmp eq %12, arg2` で、count の入口判定ではない。末尾 8216cb の `%75 = r9−1` が `trunc` で 0 かを見る後判定で、count=0 では loop を抜けない。到達性は未測定。 |
+
+- 168・169 の確定の範囲: 同じ count 源の同一性は、関数先頭の命令 (rbx・rcx = arg1) と IR の `arg1` の対応で確認した。back-edge の `rsi`・`rdi`・`r9` の更新式は本文で読んだ。
+- 到達性 (count=0 の実行時到達) は未測定。判定基準は付録 §4 (#3564) と同じ構造判定。
+
+### 6.2 保留 17 件 (残件)
+
+- 保留: 159・160・161・162・163・164・165・166・167・170・171・172・173・174・175・176・177。
+- 型: (a) count 源が `[rbp+…]` のスロット経由で、スロットが `arg1` を保存しているかの確認が未了 (160・163・172・173・174・171 ほか)。(b) count 源が関数戻り値 (`call 5281a0`・`call 8657d0`・`call 865850`・`call [rax+0x28]`・`call 611430`・`call 50aa70` ほか)で、IR の同じ callee と引数の一致が未了 (159・162・165・166・167・170・175・176・177)。(c) 機械語が `[rip+…]` 経由で、IR の定数アドレスとの一致が未了 (165・177)。(d) 機械語の被演算子が stack 変数 (`[rbp+0x7c]`・`[rbp+0x4c]`・`[rbp+0x5c]`・`[rbp+0x6c]`・`[rbp+0x8c]`・`[rbp+0xa4]`) で、store/load の追跡が未了 (159・162・163・164・173・174)。
+- 注: 行 173 の L の判定は複合 `icmp` (`%or.cond40`) で、count 源との対応が未確認。行 164・170 は機械語の count が `min` や戻り値の合成で、IR の `spec.select`・`call` 結果との同一性が未確認。
+- 起票先: #5685 (Refs。子 issue は新規に起票しない。判定だけの残作業のため、規約上の『未解決の追跡』に当たる)。
