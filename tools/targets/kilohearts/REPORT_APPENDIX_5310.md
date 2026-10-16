@@ -37,6 +37,14 @@ PE の objdump は `call   0x<番地>` の形で出る。前回の照合は `0x`
 - 生成 C の宣言 (`void`) と Ghidra の `return;` は、`FUN_180fbde90` の戻り値型が未確定のため出た誤り。
 - 2122・3968・5001 の callee 本体の戻り値 (xmm0・rax) は、生成 C の `return` だけでは確定しない (`summary.tsv` の `body_bytes` が 1 で、関数範囲が Ghidra で正しく取れていない)。規則を入れるには機械語での確認が要る。未了。
 
+## 実測 (KH-149 受入 2・3・4 の再測定)
+
+- 基点: `origin/main` `749a27433` (規則 0 件)。`gtype_census.sh` (既定 FX)・decompile 151/151 OK・delay emcc error **309**・Gain/Haas/Gate `.o` 1435 / 3217 / 3756 B。
+- 規則投入 (`FUN_180fdc880` の戻り値 xmm0): delay emcc error **308** (3968 の `void` エラーが消えた)・Gain/Haas/Gate の `.o` は 3 件とも基点と `cmp` 一致。
+- 機械語: `FUN_180fdc880` の ret (`180fdca0b`) は 1 出口。直前の `movq xmm0,r10`・`mulsd`・`movsd [rsi],xmm0` で xmm0 を確定し、呼出元 180fc7004 が `movsd xmm2,xmm0` で読む。
+- 未規則: `FUN_180fc4590` (2122)。本体の `return;` は 39 件で、経路ごとに xmm0 が違う。経路ごとの決定が要る (未了)。
+- 素材: `plugins-kilohearts`・`fl-win64`・`toolchain-emsdk` は `$HOME/artifacts` に実在。Ghidra は公開 release の `ghidra_12.1.4_PUBLIC_20260921.zip` を取得 (sha256 `ddac49f9…d2db` 一致)。
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |

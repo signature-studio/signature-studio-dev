@@ -199,6 +199,10 @@ ABI = {
         ('delay FUN_180fbc1f4 decl float(float)', r'undefined8 FUN_180fbc1f4\(undefined8 param_1\)', 'float FUN_180fbc1f4(float param_1)'),
         ('delay FUN_180fbc1f4 input = xmm0 float bits (fVar4 = param_1)', r'uVar3 = \(undefined4\)\(\(ulonglong\)param_1 >> 0x20\);\n  fVar4 = \(float\)param_1;', 'fVar4 = param_1;'),
         ('delay FUN_180fbc1f4 return = xmm0 float (fVar4)', r'(FUN_180fbbfb8\(afStackX_8,_DAT_1813a9da0,iVar2\);\n    uVar3 = 0;\n    fVar4 = afStackX_8\[0\];\n  \}\n  )return CONCAT44\(uVar3,f2u\(fVar4\)\);', r'\1return fVar4;'),
+        # #5310 (KH-149): FUN_180fdc880 (C 宣言 void) の戻り値は xmm0 (double)。機械語 180fdc9e9〜180fdc9f6 は `movq xmm0,r10; mulsd xmm0,[..]; movsd [rsi],xmm0` で、
+        #   ret (180fdca0b) までの出口は 1 つ。呼出元 180fc7004 は call 直後に `movsd xmm2,xmm0` で読む。宣言は double、本体の出力先 *param_2 への書込みは残す。
+        ('delay FUN_180fdc880 decl double', r'void FUN_180fdc880\(ulonglong param_1,double \*param_2,uint \*param_3\)', 'double FUN_180fdc880(ulonglong param_1,double *param_2,uint *param_3)'),
+        ('delay FUN_180fdc880 return = xmm0 (*param_2 と同じ値)', r'(\n  \*param_2 = \(double\)\(uVar13 & 0xffefffffffffffff \| uVar16 \| lVar14 \+ lVar17 \+ 0x3ff << 0x34\) \*\n\s*_DAT_18228a9c0;\n)  return;\n\}', r'\1  return *param_2;\n}'),
     ],
 }
 # stereo 閉包 (#4871 KH-124) も、同じ 3 呼出元 (FUN_180fe3690・FUN_180fe3310・FUN_180fe3cd0。VA と機械語が delay と同一) を含む。
