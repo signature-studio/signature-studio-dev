@@ -84,7 +84,10 @@ def main():
         and ins(0xD80F63)[1] == "call 0x41c650" and ins(0xD80F6F)[1] == "call 0xc3cfa0",
         "slot != -1: 件数 [0x15e2198] の参照 (0xd80fa0)": rip_target(0xD80FA0) == MIX_COUNT,
         "slot != -1: slot の上限 9 (0xd80fc8)": ins(0xD80FC8)[1] == "cmp rax, 9",
-        "slot != -1: code -4 (0xd80f89 の index 範囲 → 0xd810d6)": ins(0xD80F90)[1] == "movsxd rax, dword ptr [rbp + 0x10cc]",
+        "slot != -1: code -4 (0xd80f89 で rsi = -4) と範囲外の分岐 (0x9a・0xb2・0xc2・0xcc → 0xd810d6、0xd810d6 で rsi を渡す)": ins(0xD80F89)[1] == "mov rsi, 0xfffffffffffffffc"
+        and ins(0xD80F9A)[1] == "jl 0xd810d6" and ins(0xD80FB2)[1] == "jg 0xd810d6"
+        and ins(0xD80FC2)[1] == "jl 0xd810d6" and ins(0xD80FCC)[1] == "jg 0xd810d6"
+        and ins(0xD810D6)[1] == "mov ecx, esi" and ins(0xD810D8)[1] == "call 0xd82c20",
         "0xc3cfa0 の CP 指定 65001 (0xfde9 = UTF-8)": ins(0xC3CFBD)[1] == "mov r8w, 0xfde9" and 0xFDE9 == 65001,
         "midi.py: FPN_Preset = 6 (flag == 6 の意味)": bool(fpn_preset) and fpn_preset[0].strip() == "FPN_Preset = 6",
         "エラー文言 code -4 (0xd82e8c)": ascii_at(0xD82E8C, 18) == b"Index out of range",
