@@ -17,7 +17,7 @@
 | `watch_shim_5533.c` | `m11_wv(id, value)` を EM_JS で JS 配列 `globalThis.__m11_wv` に `[id, value]` として積む (上限 2000 件)。linear memory は使わない |
 | `watch_survey_5533.mjs` | survey と同じ経路 (`_m11_set_survey(1)` → boot → 942 unit) で、unit ごとに `__m11_wv` を空にしてから実行し、積まれた値を読む |
 
-## 3. 失敗の実測 (測定 commit は本 PR の最後の commit)
+## 3. 失敗の実測 (測定 commit: `b0ce3b992`。以後の commit は REPORT のみでコードは変えていない)
 
 - watch build (`stage4.sh watch5533`) は link 成功 (`undefined symbol: 0`・`signature mismatch: 0`)。`m11_wv` は shim の `T` で解決している。
 - 942 unit を走らせた結果、リングの count は全 unit で 0 (`WATCH_DONE units_with_hooks: 0`)。
