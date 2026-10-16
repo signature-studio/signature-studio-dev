@@ -111,15 +111,13 @@ EMSCRIPTEN_KEEPALIVE void ld_w_snapshot(int imglen) {
   ld_rst_add(LD_RST_IMG, (u8*)(uintptr_t)ld_img, (u64)imglen);
   ld_rst_take();
 }
-/* 戻す前に、選んだ区間のうち現在の内容が snapshot と違う byte 数を返す (戻しの証跡) */
-EMSCRIPTEN_KEEPALIVE int ld_w_reset(int mask) {
-  int diff = 0;
-  for (int i = 0; i < ld_nrst; i++) if ((mask & ld_rst[i].cat) && ld_rst[i].n) {
-    for (u64 k = 0; k < ld_rst[i].n; k++) diff += ld_rst[i].lo[k] != ld_rst[i].pr[k];
-    memcpy(ld_rst[i].lo, ld_rst[i].pr, ld_rst[i].n);
-  }
-  return diff;
-}
+/* RESET の戻しと差分数えは JS 側 (ld_runner.mjs の resetRegions) で行う。wasm 側で戻すと hi 区間の差分が 5.8 億 B になった (LD-240 #4801)。
+ * ここは区間情報を読むゲッターだけにする。 */
+EMSCRIPTEN_KEEPALIVE int ld_w_nrst(void) { return ld_nrst; }
+EMSCRIPTEN_KEEPALIVE int ld_w_rst_cat(int i) { return ld_rst[i].cat; }
+EMSCRIPTEN_KEEPALIVE u8* ld_w_rst_lo(int i) { return ld_rst[i].lo; }
+EMSCRIPTEN_KEEPALIVE u8* ld_w_rst_pr(int i) { return ld_rst[i].pr; }
+EMSCRIPTEN_KEEPALIVE int ld_w_rst_n(int i) { return (int)ld_rst[i].n; }
 /* inbuf に "name\0payload\0" を置いて呼ぶ */
 EMSCRIPTEN_KEEPALIVE void ld_w_blob(void) { ld_cmd_blob(g_inbuf, g_inbuf + strlen(g_inbuf) + 1); }
 EMSCRIPTEN_KEEPALIVE void ld_w_fix(void) { ld_cmd_fix(g_inbuf, g_inbuf + strlen(g_inbuf) + 1); }

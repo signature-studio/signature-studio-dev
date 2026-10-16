@@ -45,6 +45,22 @@ function putStr(s, extra = []) {
 const sp_get = mod._emscripten_stack_get_current;
 const sp_restore = mod.__emscripten_stack_restore || exp.emscripten_stack_restore || mod._emscripten_stack_restore;
 let spSnap = 0;   // LD-126: SNAPSHOT 時の SP (RESET で戻す)
+// LD-240 (#4801): 戻しは JS で行う。戻す区間の中に wasm 側の戻り処理のフレームが入ると、戻し中に値が壊れるため。
+// 戻し前に選んだ区間の現在値と複製の差 (byte 数) を数えて返す。
+function resetRegions(m) {
+  const H = mod.HEAPU8;
+  let diff = 0;
+  const n = mod._ld_w_nrst();
+  for (let i = 0; i < n; i++) {
+    const cat = mod._ld_w_rst_cat(i), len = mod._ld_w_rst_n(i);
+    if (!(m & cat) || !len) continue;
+    const lo = mod._ld_w_rst_lo(i), pr = mod._ld_w_rst_pr(i);
+    const a = H.subarray(lo, lo + len), b = H.subarray(pr, pr + len);
+    for (let k = 0; k < len; k++) if (a[k] !== b[k]) diff++;
+    a.set(b);
+  }
+  return diff;
+}
 
 const dv = new DataView(new ArrayBuffer(8));
 const toF64 = (b) => { dv.setBigUint64(0, BigInt.asUintN(64, b), true); return dv.getFloat64(0, true); };
@@ -138,7 +154,7 @@ for await (const l of rl) {
   } else if (l.startsWith('RESET ')) {
     const m = Number(l.slice(6));
     if (m & 9) sp_restore(spSnap);   // 1 (stk) と 8 (sp) のどちらでも SP を戻す
-    out(JSON.stringify({ reset: m, diff: mod._ld_w_reset(m) }));
+    out(JSON.stringify({ reset: m, diff: resetRegions(m) }));
   } else if (l.startsWith('BLOB ')) {
     const k = l.indexOf(' ', 5); putStr(l.slice(5, k), [l.slice(k + 1)]); mod._ld_w_blob();
   } else if (l.startsWith('FIX ')) {
