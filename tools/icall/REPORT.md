@@ -237,7 +237,7 @@ FMA3 経路 `1801a9be0` を 42/600 → **600/600** (N3: RetDec の `vmovapd xmm�
 
 ## 12. ICALL-16: stack 引数の動的検証 (#1023)
 
-結論・実測表・未解決は `REPORT_APPENDIX.md` §14 (250 行上限のため分割移動)。結論: OTT では stack 引数の値一致を動的に検証できない。起票先 #854 / #229。harness 直接注入による 12 語の値一致 (12/12) とネガコン (0/12 FAIL) は `REPORT_APPENDIX_5338.md` (部分達成、STKBUF/BLK 経路は未達)。#5889 (ICALL-122): `slot_trace` の単歩を fatal・正常経路の両方で dump するようにし、`RtlPcToFileHeader` の戻り値が `_CxxThrowException` の magic 選択に効くことを単歩で確認 (`REPORT_APPENDIX_5889.md`・部分達成。issue 本文の rc=99 の前提は現 main と不一致で、実測は rc=97)。
+結論・実測表・未解決は `REPORT_APPENDIX.md` §14 (250 行上限のため分割移動)。結論: OTT では stack 引数の値一致を動的に検証できない。起票先 #854 / #229。harness 直接注入による 12 語の値一致 (12/12) とネガコン (0/12 FAIL) は `REPORT_APPENDIX_5338.md` (部分達成、STKBUF/BLK 経路は未達)。#5889 (ICALL-122): `slot_trace` の単歩を fatal・正常経路の両方で dump するようにし、`RtlPcToFileHeader` の戻り値が `_CxxThrowException` の magic 選択に効くことを単歩で確認 (`REPORT_APPENDIX_5889.md`・達成 (受入 1 は run 2 で確定)。issue 本文の rc=99 の前提は現 main と不一致で、実測は rc=97)。
 
 ## 13. #1026 (ICALL-18): Fresh Air 残落ち 6 件
 
