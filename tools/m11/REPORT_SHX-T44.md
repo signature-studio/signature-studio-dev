@@ -47,7 +47,7 @@
 - 検出器 `tools/m11/frame_share/cfg_check.py` (新規)。301 site (`base_check.json`) を site ごとに判定する。
 - **呼び出し側の確定** (条件 3 つ): (a) 直前の `mov rcx, rbp` から call までの区間 (`(mov, call]`) に分岐先 (合流点) が無い、(b) その区間で rcx (ecx/cx/cl を含む) が書き換えられない、(c) 親の rbp が prologue の `mov rbp, rsp` 以外で書かれない (エピローグの `pop rbp` は除く)。
 - **callee 側**: `walk_callee_flow` で callee を基本ブロックに分け、rcx の別名を流れに沿って追う (合流では一致する別名だけ残す)。線型走査 (`site_check`) との比較。
-- 判定の実測 (測定 commit `<後述>`・IR は HEAD の `m11_gen_ir2.sh` → `m11_build.sh` で再生成):
+- 判定の実測 (測定 commit `ad0f8e100`・IR は `m11_gen_ir2.sh` → `m11_build.sh` で再生成。PE は `block00031_PE.bin` 22,227,016 B):
 
 | 項目 | 件数 |
 |---|---|
@@ -57,7 +57,7 @@
 | 流れ感知と線型走査の読み先が一致 | 295 |
 | 一致しない site (分類は全て変わらず) | 6 |
 
-- 不一致 6 site: `function_40f210→function_40f160` (0x40f412)・`function_441b20→function_441930` (0x441bb3)・`function_6a25b0→function_6a23d0` (2 site)・`function_977f50→function_977870` (2 site)。線型走査が分岐の反対側の別名を含めていた。`0x40f412` だけ `ir_truncated` の E が 116 → 64 となり、S=88 との比較で `ir_covers`→`ir_truncated` の向きが変わる (流れ感知では E=64 ≤ S=88 で `ir_covers`)。残りの 5 site は判定 (`ir_truncated`/`unmatched`) を変えない。
+- 不一致 6 site: `function_40f210→function_40f160` (0x40f412)・`function_441b20→function_441930` (0x441bb3)・`function_6a25b0→function_6a23d0` (2 site)・`function_977f50→function_977870` (2 site)。線型走査が分岐の反対側の別名を含めていた。`0x40f412` だけ判定が変わる: 線型走査の E=116 > S=88 で `ir_truncated`、流れ感知の E=64 ≤ S=88 で `ir_covers`。残りの 5 site は判定 (`ir_truncated`/`unmatched`) を変えない。
 - 判定ロジックの検証: 陽性対照として、実 site `0x448588` の `mov` と `call` の間 (`0x448580`) に合流点を人工的に置くと `label_between` になった。`mov` 自身 (`0x44857d`) を置いたときは `confirmed` のままで、区間が半開区間 `(mov, call]` であることを確認した。
 - **受入 3 の注意 (access_class の定義)**: `arg_home_only` は `off >= 0x70` で定義している。実測では 74 site のうち `+0x70` のみを読むのは **6 site**、`+0x70` より上 (`+0x8c`・`+0xb0`・`+0x15c`・`+0x1004f` など) を読むのが **68 site**。「引数 home (`+0x70`) だけを読む」という受入の前提は、このままでは 6 site しか満たさない。`+0x70` 超の読みは親の引数 home より上の領域への読みで、親の局所とは限らない (親 IR の alloca 外)。これは site 単位の確定の対象のまま残す。
 
