@@ -212,6 +212,30 @@ const linkedNameExpect = {
 };
 if (JSON.stringify(linkedNameRes) !== JSON.stringify(linkedNameExpect)) diffs.push({ state: "linked name expect", expect: linkedNameExpect, wasm: linkedNameRes });
 
+// PY-260 (#3840) / PY-390 (#4830): findEventID (PE 0xd75b60) の未発見 -1、isDoubleClick (PE 0xd76060) の device 無し -7 と device 有りの未実装 (code 2)。mock と C で同じ code
+const evtRes = {};
+const evtCases = [
+  [[1, 1], "device.findEventID", [5]], [[0, 0], "device.findEventID", [5, 1]], [[1, 1], "device.findEventID", []],
+  [[1, 1], "device.isDoubleClick", [0]], [[0, 1], "device.isDoubleClick", [0]],
+];
+for (const [[dev, link], name, args] of evtCases) {
+  mock.state.devAssigned = !!dev;
+  mock.state.linkAssigned = !!link;
+  wasm.setDeviceLink(dev, link);
+  const a = run(mock, name, args);
+  const b = run(wasm, name, args);
+  evtRes[`${name}(${args.join(",")})/dev${dev}`] = "code" in b ? `code ${b.code}` : b.ok;
+  if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ name, args, dev, link, mock: a, wasm: b });
+}
+const evtExpect = {
+  "device.findEventID(5)/dev1": -1, "device.findEventID(5,1)/dev0": -1, "device.findEventID()/dev1": "code 5",
+  "device.isDoubleClick(0)/dev1": "code 2", "device.isDoubleClick(0)/dev0": "code 7",
+};
+if (JSON.stringify(evtRes) !== JSON.stringify(evtExpect)) diffs.push({ state: "event expect", expect: evtExpect, wasm: evtRes });
+mock.state.devAssigned = true;
+mock.state.linkAssigned = true;
+wasm.setDeviceLink(1, 1);
+
 assert.deepEqual(diffs, [], `device 差分 ${diffs.length} 件`);
 assert.deepEqual(rejectDiffs, [], `署名違反が code 5 で拒否されない ${rejectDiffs.length} 件`);
 console.log(JSON.stringify({
