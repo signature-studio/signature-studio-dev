@@ -15,6 +15,7 @@ const MUTANTS = [
   { name: "cooldown を外す (noPr の経路)", file: "src/engine.ts", from: "} else if (nowMs - this.lastAct(n) < cool(n)) {", to: "} else if (false) {" },
   { name: "再投入の計数 (count) を数えない", file: "src/engine.ts", from: "count: c.count + 1,", to: "count: c.count," },
   { name: "unknown の枠を数えない (fallback を何度でも出す)", file: "src/engine.ts", from: 'unknown: c.unknown + (p.np === "unknown" ? 1 : 0),', to: "unknown: c.unknown," },
+  { name: "unknown の再投入 (1 回目) を外す (#2334 の unknown は再着手する)", file: "src/engine.ts", from: '} else if (reason === "unknown" && c.unknown === 0) {', to: "} else if (false) {" },
   { name: "unknown の枠の上限を外す (fallback の c.unknown === 0 を外す)", file: "src/engine.ts", from: '} else if (reason === "artifact" && c.unknown === 0) {', to: '} else if (reason === "artifact" && c.unknown < 99) {' },
   { name: "再投入後の素材なし artifact を oc-pm に渡さない", file: "src/pm.ts", from: "const artDone = oc.reason === \"artifact\" && !!o.artSpent?.(i.number);", to: "const artDone = false;" },
   { name: "上限に達した素材なし artifact を oc-pm に渡さない (artSpent の上限の枝を外す)", file: "src/engine.ts", from: "this.noPrState(n).unknown >= 1 || this.noPrState(n).count >= NO_PR_MAX_RELAUNCH", to: "this.noPrState(n).unknown >= 1" },
