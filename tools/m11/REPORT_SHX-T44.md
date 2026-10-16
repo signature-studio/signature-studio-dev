@@ -109,3 +109,32 @@
 | 301 site のうち 291 site の call 直前の引数と callee の読み先の site 単位の機械語突合 (`base_check` は base の一致だけ) | 真の D23 の確定 (`ir_truncated` 204 の中身) | #4189 (open のまま追跡) |
 | `unmatched` 56 site (19 組) と `no_prologue` 3 site (`function_517b50`) の判定 | 修復範囲の決定 | #4189 |
 | 素材の `work-m11` の `boot_final3.ll` が HEAD の生成経路と一致しない件 | 素材の再作成が必要か | #4189 (本節の注) |
+
+## 5b. function_6905f0 → function_690580 の call site 突合 (#5587 / SHX-T50)
+
+- 親 #5576・測定 commit は本節を含む PR の直前の main (`ee40eb02f`)。IR は `tools/m11/work/` (非コミット) の `boot1.drc.ll`・`boot_final3.ll`。イメージは `m11_image.bin` (22,515,781 B・file = VA − 0x400000)。
+- 生 grep (`boot1.drc.ll`):
+
+```
+$ grep -n '@function_690580(' boot1.drc.ll
+48923:define i64 @function_690580(i64 %arg1, i32 %arg2) local_unnamed_addr {
+49064:  %31 = call i64 @function_690580(i64 %27, i32 %30), !insn.addr !14278
+49384:  %143 = call i64 @function_690580(i64 %3, i32 %142), !insn.addr !14369
+$ grep -E '^!(14278|14369) = ' boot1.drc.ll
+!14278 = !{i64 6883131}   -> 0x69073b
+!14369 = !{i64 6883796}   -> 0x6909d4
+```
+
+- `boot_final3.ll` は 4 件。うち 244849・245171 行が上記 2 call の実体。513910 行は `@m11_tr_function_690580` (trampoline の wrapper) の中の call で、site ではない。
+
+| site | 所属関数 (DSM) | IR | 直前ブロック → 入口 (`callsite_audit.py`) |
+|---|---|---|---|
+| `0x6906ec` | function_6905f0 | 無し | `0x6906d7` → 直接分岐 0・絶対参照 0 (入口なし) |
+| `0x69073b` | function_6905f0 | `%31` | IR に残る (判定対象外) |
+| `0x690804` | function_690763 | 無し | `0x6907f7` → 0・0 (入口なし) |
+| `0x6908b3` | function_690763 | 無し | `0x6908a4` → 0・0 (入口なし) |
+| `0x6909d4` | function_690763 | `%143` | IR に残る (判定対象外) |
+
+- 結論: 欠落の疑いのある 3 site は、直接分岐・絶対参照の範囲では入口を持たない (機械語として到達しない)。lift 段の欠落ではないと判断し、修復は行わない。
+- 限界: switch テーブル (相対オフセット方式) による飛び先は走査していない。「到達しない」は直接分岐・絶対参照の範囲での結論。
+- 再現: `python3 tools/m11/frame_share/callsite_audit.py <m11_image.bin>`。
