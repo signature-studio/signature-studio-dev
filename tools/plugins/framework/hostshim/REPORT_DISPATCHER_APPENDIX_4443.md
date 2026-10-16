@@ -34,6 +34,7 @@ python3 hs_store_supplier.py                                                    
 |---|---|---|
 | `hs_disp_emu.py` (基準・256 ID・既定 callee 戻り値 0) | exit 0・real 1 分 12.9 秒 (`time` real 72.8 秒) | 1 分 12.8 秒 |
 | 同上 (別 run・レビューアの再測定) | exit 0・real 51.7 秒。72.8 秒は本件のレビュー run では再現せず、負荷差と推定 (レビューアの測定値) | — |
+| 同上 (HEAD `5a5c96eca` で再測定・n=1・load 0.40→0.92) | exit 0・real 1 分 10.3 秒・distinct 109・IDs 256・unmapped 61 ID / 5,340 件 / 200 組 / 197 ページ | 同じ |
 | 基準 distinct (rax, path) | 109 / IDs 256 | 109 |
 | unmapped | 61 ID・5,340 件・200 組・197 ページ | 同じ |
 | `hs_store_cov.py` | 静的 69・基準被覆 30・未実行 39・no-case-store 202 | 同じ |
