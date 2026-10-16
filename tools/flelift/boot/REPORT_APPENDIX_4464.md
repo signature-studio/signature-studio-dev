@@ -98,3 +98,13 @@ probe: `tools/flelift/boot/cfi_entry_probe.py` (生成 C の `work/` コピー�
 - 出所: `0x976410` の書込みは `ret=0x2ec1f06` の 16B store (§14 の書込み元と同じ経路)。書込み元の関数名は未確定 (#5337 に残す)。
 - 注意: lift 済み C に probe を重ねると clang の obj が古いまま残るため、`FLE_EXTRA_CCF` を変えるときは `obj/plain_*.o` を消してから build する (`cc()` は C のソースが新しいときだけ再コンパイルする)。
 - 差分 0 の証跡: 測定 commit `dd047c232` から HEAD までのコード差分は本節のみ (`git diff dd047c232 HEAD -- tools/flelift` は REPORT のみ)。
+
+## 16. 書込み元の特定を試みた結果 (#5337・診断 knob `FLE_WWATCH_STACK`・未確定)
+
+- 追加: `fle_cpu.c` の `fle_wwatch` に `-DFLE_WWATCH_STACK` (既定無効) を足した。受け手 slot や `0x976410` が非 0 から 0 に変わるとき、`R[RSP]` から 32 語を走査して 4 MiB 未満の guest VA 候補を出す。既定経路の挙動は変えない。
+- 測定: `FLE_EXTRA_CCF="-DFLE_WWATCH -DFLE_WWATCH_STACK -DFLE_WWATCH_SLOTS=0x5ac308ull,0x976410ull" FLE_SHARDS=8 FLE_EXTRA_LDF="-g --profiling-funcs" FLE_BOOT_RUNS=tol FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` → rc 0。dispatch 209・GetMem 2,314 / FreeMem 1,199・`cfi threw oob` と同じ計数。
+- boot: `FLE_CFI_SEED=1 FLE_CFI_RECV=1 FLE_IPP=1 FLE_TOLERANT=1` を 2 回 (rc 0)。stack 付きの 2 回目で `[fle_wwatch] ret=0x2ec1dc7 slot=0x5ac308 old=0x40f960 new=0`・`slot=0x976410 old=0x9764d8 new=0`。1 回目の診断無し版では `ret=0x2ec1de6`。§14 の `ret=0x2ec1f06`・§15 の `ret=0x2ec1dc7` とは番地が違う (ビルドのたびに wasm の code 位置が変わる)。
+- wasm の対応 (自作の code section 解析): `0x2ec1dc7`・`0x2ec1de6` はどちらも wasm 関数 `STX` (`fle_cpu.h:79` の 16B store ヘルパ) の範囲 `0x2ec1d98`〜`0x2ec1df6` に入る。ヘルパは呼出し元ではないため、guest 側の書込み元は `R[RSP]` の走査からしか引けない。
+- 走査の結果: `[1]=0x6c7923`・`[3]=0x6cf116`・`[5]=0x15eac01`・`[15]=0x15eac80`・`[17]=0x815920`・`[23]=0x5af36a`・`[25]=0x4130b4`。lift の関数範囲で引くと `0x5af36a` は `f_5af330`、`0x4130b4` は `f_413060` の中。ただし走査は古いスタック語を含むため、実行中の呼出し連鎖とは断定できない。
+- 所見: `fill6a7b70` の書込み範囲 (`dst`・`cnt`) は両 slot を覆わないので、0 書込みは fill 以外の guest 16B store。走査の候補 `f_5af330`・`f_413060` は呼出し連鎖の一部で、書込みを行うと断定できる根拠は無い。`f_409c80` は候補にしない (16B store を含むが、0 を書く経路は未確認)。書込み元の guest 関数は未確定。
+- 未解決 (起票先: #5337 に残す): (1) 走査でなく実行中の呼出し連鎖を取る (`ott` の call 深さ追跡)。(2) `f_409c80` を呼ぶ 20 件の呼出し元のどれが unit 245 の後で動くかの確定。(3) 実機の loader が `0x5ac308` に充填する値 (#4384 は CLOSED)。
