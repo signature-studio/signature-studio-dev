@@ -25,10 +25,10 @@
 |---|---|
 | delay の emcc error 行 | 277 |
 | 演算・代入・ポインタの型不一致 | 81 |
-| スロット呼出し 3 件 (4916・5928・6711 相当) の error | 0 (`int` 代入の error は消えた。5947・6730 は `-Wdeprecated-non-prototype` の warning のみ) |
+| スロット呼出し 3 件 (生成 C の 4935・5947・6730) の error | 0 (4935 は `int` 代入でも error なし。5947・6730 は `-Wdeprecated-non-prototype` の warning のみ) |
 | 測定の wall | 1 分 10 秒 (Ghidra 込み) |
 
-- スロット 9 件の呼出し行 (生成 C の 2546・4034・4647・4768・4874・4935・4967・5947・6730) は、error ではなく `-Wdeprecated-non-prototype` の warning だけになった。型不一致 (`assigning to ... from incompatible type 'void'`) の行はスロットに無い。
+- スロット 9 件の呼出し行 (生成 C の 2546・4034・4647・4768・4874・4935・4967・5947・6730) で、型不一致の error が出る行は 0 件。本 PR は delay の規則を変えていない (変更は stereo の GTYPE 1 行のみ) ので、delay の出力は origin/main と同一。本 PR で新たに消えたのは stereo の 1300・1888 のみ。
 
 #### 測定 2: stereo の emcc (`stereo.c` 単体・`-w -O1 -Wno-error=...` 条件)
 
