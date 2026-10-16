@@ -8,8 +8,8 @@
 
 | 方向 | 件数 | 不一致 | 測定 commit |
 |---|--:|--:|---|
-| double → x87 像 | 200,000 | 0 | `ce3872372` |
-| x87 像 → double (subnormal・tie 含む) | 200,000 | 0 | `ce3872372` |
+| double → x87 像 | 200,000 | 0 | `2481d3a0e` |
+| x87 像 → double (subnormal・tie 含む) | 200,000 | 0 | `2481d3a0e` |
 
 ### 1.1 修正 (指摘 #5858 round 1)
 
@@ -29,44 +29,47 @@
 
 emsdk を導入し (`git clone --depth 1 https://github.com/emscripten-core/emsdk.git` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12`。`tools/m1/flags.sh` の pin と同じ版)、`EMSDK` を設定して `run.sh` を実行した。
 
-- 測定 commit: `8e263e380` (main 取り込み後の HEAD。`f80_lower.py` / `f80b_rt/` は `842bc5ac3` 以降に無変更)
+- 測定 commit: `2481d3a0e` (HEAD。`EMSDK=/opt/emsdk bash tools/plugins/p0c/f80b_rt/run.sh` を今回の run で実行)
 - `to: n=200000 fail=0`
 - `from: n=200003 fail=0`
-- rc 0・所要 2.37 s real (`EMSDK=<emsdk のルート> bash tools/plugins/p0c/f80b_rt/run.sh`)
+- rc 0・所要 3.2 s real (load 1.1 前後、4 core)
 
 ## 2. 共有鎖の退行 (T0 / T1, `batch_lift.sh --tier T0/T1`)
 
-測定 commit `ce3872372` (修正前) の値。
+測定 commit: `2481d3a0e` (HEAD。`842bc5ac3` 以降のコードを含む)。 素材: `fl-win64` (展開先は `$RUNNER_TEMP/analysis/win64`・`FL_WIN64_DIR` で指定)・`toolchain-retdec` (`[RETDEC]`)・`toolchain-emsdk` (`[EMSDK]`)。
 
-- T0: 41 blocks。 `lift_rc` 0・`emcc_c_rc` 0 が 41/41。 closure 関数 781 (REPORT と一致)。 所要: 実測ログ未保存 (PR 本文の記載のみ。時間の数値は採らない)。
-- T1: 45 blocks。 `emcc_c_rc` 0 が 44/45。 唯一の不通過は 24161 ReWired (f80 2 関数)。 REPORT §4.3 の既存の結果と同じで、本 PR による変化は無い。 closure 関数 2,835。 所要: 実測ログ未保存 (同上)。
-- 退行 0。 本 PR は T0/T1 の f80 関数を 0 〜 2 しか持たないブロックにしか効かないため、差は出ない。
+入力の再構成 (`fl-win64` tarball に `block_manifest.json` / `nsis_blockmap.json` が無いため): `python3 tools/plugins/f2/mk_blockmap.py` (PLUGIN_MATRIX.json から block 対応表を作る。`docs/REFERENCES.md` の Actions 用代替) → `inventory/win_scan.py`・`win_funcs.py`・`win_unique.py`・`win_abi.py` → `lift/plugin_closure.py --all`。 inventory 全体は 8 分 24 秒 (foreground)。
 
-注: 測定 commit 以降に `f80_lower.py` の `_f80b_from_image` (subnormal の丸め位置) を変えた (`842bc5ac3`)。 この修正後の T0/T1 は**未再測定**。
+- T0: `batch_lift.sh --tier T0` の実行 3 分 28 秒 (foreground、rc 0)。 41 blocks。 `lift_rc` 0 が 41/41・`emcc_c_rc` 0 が 41/41。 `f80_funcs` は 41 件すべて 0。
+- T1: `batch_lift.sh --tier T1` の実行 7 分 47 秒 (rc 0)。 45 blocks。 closure 関数 2,835。 `lift_rc` 0 が 45/45。 `emcc_c_rc` 0 が 44/45。 唯一の不通過は 24161 ReWired (`emcc_c_rc` 1・`f80_funcs` 2)。 REPORT §4.3 の既存の結果と同じ。
+- 退行 0。 `emcc_c_rc` の不通過は既存の 24161 のみで、本 PR による増減は無い。
+- 所要と load: T0 の起動直後の load は 10 台 (inventory 直後)、T1 の終了時 load は 1.0。 4 core。
 
-未再測定 (判断 (B)・round 6 の 2026-10-16 の run で確定)。 `batch_lift.sh` は RetDec (`[RETDEC]`・`docs/REFERENCES.md` §4) を呼ぶが、本 runner に RetDec が無い (`[RETDEC]` 未展開)。 `$ARTIFACTS_DIR` にも `toolchain-retdec` が無い (`fl-win64.tar.zst` のみ)。 `PLUGIN_MATRIX.json` も本 worktree に無い。 RetDec の取得元は `docs/REFERENCES.md` §4 で `[未確認]` のため、取得元が確定するまで再測定できない。 再測定は子 issue に切らず、#5832 の未解決表に残す (PR 本文 参照)。 再測定に要る素材: `oc_artifacts: fl-win64 toolchain-retdec` と plugin 素材。
-
-ここの数値 (§2 の 41/41・44/45) は測定 commit `ce3872372` (`_f80b_from_image` の修正 `842bc5ac3` より前) の値で、現 HEAD の変換コードの効果を示さない。
+注: `842bc5ac3` の修正 (subnormal の丸め位置) の効果は、この再測定で新コードの値として取った。 旧値 (`ce3872372`) は付録 M 自体からは外した (§4 の鮮度の証跡で差分を示す)。
 
 ## 3. 19165 engine (`engine_lift.sh 19165 900` → `engine_f80_subset.sh`)
 
-測定 commit `ce3872372` (修正前) の値。
+測定 commit: `2481d3a0e` (HEAD)。 測定の入力は §2 と同じ (`fl-win64` 展開物・`toolchain-retdec`)。 範囲ファイルは `avx_bad_ranges.py 19165` が出した 78 件 (`tools/plugins/work/reverb_delay/bad19165.out`、gitignore)。
 
-| 項目 | 本 PR 前 (REPORT §17) | 本 PR 後 |
-|---|---|---|
-| `emcc -c` (`e.final.ll`) の最初の error | `invalid cast opcode ... 'double' to 'i80'` (E7) | `do not know how to soften fp_extend` |
-| `emcc -c` (`e.final.ll`) rc | 139 (segfault) | 139 (segfault) |
-| 19165 の segfault の起点 | `function_1800ceec0` (`tools/plugins/reverb_delay/REPORT_APPENDIX.md` §16) | 同左 (未再測定) |
-| 部分集合 (f80 関数 5 件を除外) の `emcc -c` rc | 0 | 0 (gate PASS) |
-| lift rc / define / f80 関数 (本体) | 0 / 2,608 / 5 | 0 / 2,608 / 5 |
+| 項目 | 今回の実測 (`2481d3a0e`) |
+|---|---|
+| `engine_lift.sh 19165 900` (`ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges <78 件>" ENGINE_TAG=_noipp_nobad`) | rc 0・wall 10 分 23 秒 |
+| summary (`pdata_funcs,lift_rc,defines,f80,unimpl,emcc_c_rc,fixcmp,emcc_c_rc_after_fixcmp,lift_s`) | `2000,0,2608,6,136,139,0,139,608` |
+| `emcc -c` (`e.final.ll`) の最初の error | `do not know how to soften fp_extend` |
+| `emcc -c` (`e.final.ll`) rc | 139 (segfault) |
+| `emcc -c` (`e.fixcmp.ll`) の最初の error | `do not know how to soften fp_extend` (rc 139) |
+| 部分集合 (`engine_f80_subset.sh 19165`): f80 関数を除外 | `f80_excluded=5`・`f80_body_full=5`・`f80_body_sub=0`・除外集合 = f80 本体 (`same`) |
+| 部分集合の `emcc -c` rc | 0 (gate PASS) |
+| 同じ入力の無改変 `emcc -c` rc (NC) | 139 |
 
-- 測定条件 (PR 本文の記載): `ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges <78 件>" ENGINE_TAG=_noipp_nobad engine_lift.sh 19165 900`。 wall 625 s・実行直後の 1 分平均 load 1.15 (4 core) は PR 本文の記載値で、 ログは保存されていない。
-- 測定スクリプトの所在: `engine_lift.sh` と `engine_f80_subset.sh` は `tools/plugins/reverb_delay/` にある (`tools/plugins/lift/` には無い)。
-- 本 runner では再測定していない。 `engine_lift.sh` も `lift_ranges.sh` 経由で RetDec を呼ぶため、§2 と同じ理由で走らない。 修正後 (`842bc5ac3` 以降) の 19165 は未再測定 (`emcc -c` の rc・最初の error は未確認)。 この表の値は `ce3872372` の値で、現 HEAD の効果を示さない。 再測定に要る素材は §2 と同じ。
+- 補足: summary の f80 は 6、gate の `f80_body_full` は 5。 差の原因は未確認。 部分集合の検査 (除外 5 件と本体の f80 集合の一致) は PASS。
+- 19165 の segfault の起点 (`function_1800ceec0`) は、今回は未確認 (`engine_lift.sh` の出力に含まれない)。
+- 本 PR による `emcc -c` の最初の error は、旧 (`ce3872372`) の `invalid cast opcode ... 'double' to 'i80'` (E7) から `do not know how to soften fp_extend` に変わった。 segfault (rc 139) は既存の経路で残る。 この 19165 の残る欠陥 (f80 関数 5 件) は本 PR の範囲外で、部分集合 gate で到達性のみ確認する。
 
 ## 4. 鮮度: `ce3872372` から HEAD までの差分
 
-差分の全文は `REPORT_APPENDIX_M2.md` (`git diff ce3872372 8e263e380 -- tools/plugins/p0c ":!tools/plugins/p0c/REPORT*"` の出力)。 要点:
+差分の全文は `REPORT_APPENDIX_M2.md` の要点。 測定 commit `2481d3a0e` のコード差分 (`git diff 2481d3a0e HEAD -- tools/plugins/p0c ':!tools/plugins/p0c/REPORT*'`) は 0 行 (測定 commit = HEAD)。 以下は旧測定からの差分の要点:
 
 - `f80b_rt/run.sh` の 1 行 (`EMCC` の解決を `$EMSDK` 必須にする変更)。 `EMCC` 変数は `command -v emcc` が先なので、 測定値は影響を受けない (`run.sh` の検査内容は変わらない)。 harness の変更であり、 測定対象の変換は変わらない。
-- 続けて `842bc5ac3` の修正 (`f80_lower.py` の `sn` / `low` と `gen_cases.c` の固定ベクタ)。 これは測定対象の変換を変える。 §1.1 の再検査で置換後の値を取った。 §2・§3 は未再測定。
+- 続けて `842bc5ac3` の修正 (`f80_lower.py` の `sn` / `low` と `gen_cases.c` の固定ベクタ)。 これは測定対象の変換を変える。 §1 と §2・§3 は測定 commit `2481d3a0e` で再測定した。
+- 旧差分の全文: `REPORT_APPENDIX_M2.md` (`ce3872372` → `8e263e380`)。 測定 commit から HEAD までの差分は空 (上の注)。
