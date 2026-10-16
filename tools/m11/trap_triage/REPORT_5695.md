@@ -85,3 +85,35 @@ node trap_triage/probe5695_nz.mjs                # 0x12ba808 近傍の非 0 バ�
 1. `e3ef60` の arg1 (0x12ba808) を誰が確保・初期化するか (boot 中の alloc / 0 初期化の位置)。フィールドが「0 のまま」なら、e3ef60 が非 0 を期待する根拠の側を見る。
 2. C 側 (`memcpy`・`rep movs`) の書込みを監視する (`rep_watch_3972.py` の方式)。
 3. `40ffe0` の引数 (リスト先頭) の出所 (受入の残り)。
+
+## 6. 3 回目 run: C 側 (copy・rep helper) まで含めた書込み監視 (結論: 3 経路とも 0 件)
+
+監視: `store_watch_5695.sh` (新規)。範囲 `[0x12ba808+0x778, +0x814)` を 3 経路で同時に見る。
+- IR store: `watch_arg1_5695.c` (`[a1]`)。
+- copy (`409c80` の入口): `watch_copy_5695.c` の `m11_copy_in` (`[a1cp]`)。
+- rep 系 helper (movsq/movsb/stosq 35 箇所の入口): 同 C の `m11_rep_in` (`[a1rp]`)。
+
+手順: `m11_gen_ir2.sh` (53 s・rc 0・`ldfix=applied`) → `bash trap_triage/store_watch_5695.sh c1` (全 942 unit の survey)。
+
+| 測定 | 値 | 備考 |
+|---|---|---|
+| 監視 ON・survey (arg1 範囲) | 63 s・ok 873 / miss 47 / halt0 6 / oob 15 / noproc 1・`[a1]` 0 / `[a1cp]` 0 / `[a1rp]` 0 | load 1.04 (終了後) |
+| 陽性対照 `0x10aa1428` 32 B (`WATCH_LO=0x10aa1428 WATCH_BASE=0 WATCH_SPAN=32`) | 70 s・ok 871 / miss 47 / halt0 7 / oob 16・`[a1]` 69 / `[a1cp]` 5 / `[a1rp]` 4 | 3 経路とも検出する (監視は動いている) |
+
+解釈:
+- 5 フィールド (+0x778・+0x7d8・+0x7f0・+0x808・+0x810) は、boot 後から全 942 unit まで、IR store・copy・rep helper のいずれでも書かれない。
+- 残る書込み経路は C runtime 内の直接 store (`m11_rt`/`m11_win`)。この経路は計装していない。
+- 「0 のまま」の理由は、監視できた範囲では説明できない。次は `e3ef60` が arg1 を確保・初期化する位置と、`e3f178` の分岐条件を見る。
+
+### 6.1 `40ffe0` 引数の出所 (IR 読取り・受入 (b) の一部)
+
+- `60a270(arg1, arg2)` (IR 208429 行): `arg2 != *(arg1+169)` のとき `40ffe0(arg1, sext((arg2 & 0xFFFF0000) | 65485))` を呼ぶ。`65485 = 0xFFCD`。
+- つまり 895 の `40ffe0` の引数は、`60a270` の `arg2` の上位 16 bit を残し、下位を `0xFFCD` にした定数。OOB の原因は `arg2` (`e3ef60` 側の値) の上位 16 bit。
+- `40ffe0` (IR 113231) は `*(arg1)` を `40ff70` に渡すだけで、`p-144` の構造体は `40ff70` 側の入口で決まる。
+- 未了: `e3ef60` が `60a270` に渡す `arg2` の由来 (9 呼出しのうち 895 に至るもの)。
+
+### 6.2 未解決 (次 run・起票先)
+
+- C runtime 内の直接 store (`m11_rt`/`m11_win`) の監視: 親 #882 の続き。
+- `e3ef60` → `60a270` の `arg2` の由来と `e3f178` の分岐条件: 親 #882 の続き。
+- DEFECTS.md 行案 (受入 (c)): 書込み元と `arg2` の由来が未確定のため未判定。
