@@ -12,7 +12,10 @@
 
 ## 2. dispatch callback の status 経路 (PE 確定)
 
-- `0xd843d0` (dispatch) の入口で `*out = -2` (0xd843e9)。`[obj+0x50]` (assigned) が非 null なら述語 `0xd84f30` を見る (0xd843f9〜0xd84403)。偽なら分岐して `*out` は `-2` のまま。
+- `0xd843d0` (dispatch) の入口で `*out = -2` (0xd843e9)。`[obj+0x50]` (assigned) の分岐は次の 3 通り (逆アセンブル実測・`tools/python/analysis/flapi/pe_disasm.py`):
+  - **assigned が null**: `0xd843f0`〜`0xd843f7` で述語を飛ばし `0xd84409` の enqueue へ進む。callback は呼ばれ、`task+0x60` は callback が決める (`-7`、下記「assigned 無しの経路」)。
+  - **assigned 非 null かつ述語 `0xd84f30` が真**: `0xd84409` の enqueue へ進む。callback は `task+0x60 = 0` で本体を実行する。
+  - **assigned 非 null かつ述語が偽** (`0xd84403` の `je 0xd84500`): enqueue せず抜ける。`*out` は `-2` のまま。
 - callback `0xd76190` (repeat) と `0xd76450` (stop) の先頭は `task+0x60 = -2`。述語 `0x11d1430` (= `vtbl(G→+8)[+0x88]()`、REPORT_PY73_APPENDIX_2817 §1) が真なら `task+0x60 = 0` にして本体を呼ぶ。偽なら `-2` のまま。
 - **dispatch は `task+0x60` を `*out` へ写す** (0xd844d7〜0xd844db: `mov rax,[rbx+0x60]; mov [rsi],rax`)。REPORT_PY125 で「未確認 (推定)」だった点はこれで確定。
 - 戻りは `0xd82c20(status)` (0 → "OK"、-2 → "Operation unsafe at current time"、-7 → "Device not assigned"、既定 "Unknown error")。
@@ -20,7 +23,11 @@
 
 ### assigned 無しの経路
 
-callback の `[obj+0x50] == 0` で `task+0x60 = -7` (0xd762c2 / 0xd76450 の `0xd7648c`)。`0xd82c20(-7)` → "Device not assigned" (fl_err code 7)。
+callback の `[obj+0x50] == 0` で `task+0x60 = -7` (repeat は `0xd762c2`・stop は `0xd7648c`: `mov qword ptr [rbx+0x60], 0xfffffffffffffff9`)。`0xd82c20(-7)` → "Device not assigned" (fl_err code 7)。
+
+- 実装判定: 「device 無し → -7」は、上の assigned null の経路 (dispatch が enqueue し callback が -7 を書く) と一致する。ただし callback 先頭の述語 `0x11d1430` が偽なら assigned null でも `-2` になる。`0x11d1430` は未確定で真と仮定している (§3・§6)。
+- stop (`0xd76450`): 述語 `0x11d1430` が真 → `task+0x60 = 0` → assigned null なら `-7`、非 null なら vtbl `[+0x88]` を呼んで `task+0x60 = 0` のまま。
+- repeat (`0xd76190`): 述語が偽なら `0xd762ca` へ抜けて `-2`。真なら assigned null で `0xd762c2` の `-7`。
 
 ## 3. 未確定 (仮置き)
 
@@ -39,9 +46,9 @@ callback の `[obj+0x50] == 0` で `task+0x60 = -7` (0xd762c2 / 0xd76450 の `0x
 - `tests/device_diff.mjs`: 6 件 (device 有無 × 引数個数)。`eventData` は `Uint8Array` で代用 (上記 §3)。
 - `tests/provider_expect/py5407.json`: 2 関数を登録。
 
-## 5. 検証 (commit は本 PR の HEAD)
+## 5. 検証
 
-測定 commit: `816f0bd36` (コードを変えた最後の commit)。環境: Linux runner・emsdk latest・CPython 3.12.1 (`build_cpython_wasm.sh` → `build_flpy.sh`)。
+測定 commit: `816f0bd36` (コードを変えた最後の commit。以降の commit は REPORT と DOC_MAP と merge のみ)。環境: Linux runner・emsdk latest・CPython 3.12.1 (`build_cpython_wasm.sh` → `build_flpy.sh`)。
 
 | 検査 | 結果 (実測) |
 |---|---|
@@ -53,11 +60,11 @@ callback の `[obj+0x50] == 0` で `task+0x60 = -7` (0xd762c2 / 0xd76450 の `0x
 
 load: 本 run は単独の runner 上で実行 (他ジョブとの併走なし)。CPython wasm build は 18:50:42 〜 18:53:27 (約 3 分)・`build_flpy.sh` は 18:53:36 〜 18:53:43。
 
-測定 commit 以降のコード差分 (`git diff 816f0bd36 HEAD -- tools/python` の対象は本 REPORT のみ。コード差分 0):
+測定 commit 以降のコード差分 (provider/host/tests): 0 byte。
 
 ```
-git diff 816f0bd36 HEAD -- tools/python/provider tools/python/host tools/python/tests
-(出力なし: コード差分 0)
+$ git diff 816f0bd36 HEAD -- tools/python/provider tools/python/host tools/python/tests | wc -c
+0
 ```
 
 ## 6. 未解決
@@ -68,5 +75,3 @@ git diff 816f0bd36 HEAD -- tools/python/provider tools/python/host tools/python/
 | repeat/stop の vtbl 先の効果・record の中身 (`0xd87a90` 先) | 状態を持たない | 親 #4658 の追跡 |
 | `FlMidiMsg` の bridge 表現 (object 型) | eventData の型違いを wasm で検査できない (`Uint8Array` で代用) | 親 #4658 の追跡 |
 | `tools/python/REPORT_PY5407.md` の VA 表の runtime 検証 (動的 run) | PE 静的確定のみ。動的 run は未実施 | 親 #4658 の追跡 |
-| repeat/stop の vtbl 先の効果・record の中身 | 状態を持たない | 親 #4658 の追跡 |
-| `FlMidiMsg` の bridge 表現 (object 型) | eventData の型違いを wasm で検査できない | 親 #4658 の追跡 |
