@@ -33,6 +33,7 @@ import { RATE_EVAL_GAP_MS, RATE_EVAL_MAX_GAP_MS, RATE_STREAK, RATE_WINDOW_MS, ra
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { readyHold, recentHold, stoppedHold, type Hold } from "./holdinfo.ts";
 import { redact } from "./redact.ts";
+import { metricsRow } from "./metrics.ts";
 import type { VmState } from "./vmstate.ts";
 import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type Sample } from "./saturation.ts";
 import {
@@ -1719,8 +1720,19 @@ export class Engine {
       this.pushLog({ kind: "error", note: this.meta.lastError?.what });
     }
     this.sampleOpen(now);
+    this.logMetrics(now);
     this.saveMeta();
     return { ready: true };
+  }
+
+  // Custom Dashboard 用の観測ログ (CI-229)。tick の 1 回につき 1 行。観測の失敗で tick を止めない。
+  private logMetrics(now: number): void {
+    try {
+      const row = metricsRow(this.status(), iso(now), !!this.meta.demoted, restGuardOn(this.meta.rest?.remaining));
+      console.log(this.clean(JSON.stringify(row)));
+    } catch {
+      // 観測ログは付随の出力。失敗しても launch・dispatch の判定は続ける。
+    }
   }
 
   // 次の alarm までの待ち (ms)。dirty (webhook 直後) は 2 秒、それ以外は 60 秒。
