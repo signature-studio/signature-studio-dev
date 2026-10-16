@@ -68,3 +68,24 @@ node tools/perf/p15/ctor_vtable_ring.mjs tools/ott/work/lift/ottl_rc.wasm
 - 145 回目までの ctor で heap が image に届かない理由、146 回目でだけ届く理由は未確定。
 - 「image の領域を calloc が返し、そこに vtable がある」ことが停止の原因かは、停止後の再現 (vtable を別の場所に置く等) で確かめていない。
 
+## 3j. VA ↔ wasm 関数番号の対応表 (PERF-P28 の受入 1 の残り)
+
+一次根拠: `ott_run` の dispatcher は wasm func 10。`i64.const <guest 番地>; i64.eq; br_if` の葉ごとに、分岐先ブロックの終端直後の `call N` が wasm 関数番号になる。`ott_lifted.c` の `case 0x...: f_<VA>()` と照合する。計算は `tools/perf/p15/va_func_map.py` (commit に入る) で行い、出力 JSON は `tools/ott/work/map/va_func_map.json` (gitignore) に置く。
+
+| 項目 | 結果 |
+|---|---|
+| 素材 | `work-m6-ott` の `ottl.wasm` (sha `e8fb06203811ff1f`)。wabt (npm) の `readWasm` → `toText` で wat 化 (commit 外) |
+| dispatch の葉 | 38 件 (C の `case` は 75 件)。うち C 名と照合できたのは 36 件 |
+| `0x18011d400` (ctor) | **wasm func 16**。C の `f_18011d400` と一致 |
+| 停止点 | `0x18011d9f9` (`call [rax+0x38]`) の戻り `0x3011d9fc` は func 16 の中。前 run の `fd_text` `ret=0x3011d9fc` と一致 |
+| 分岐先が `call` でない葉 | 2 件 (`0x18002d200`・`0x1801d2750`)。wasm 関数番号は未確定 |
+| dispatch に現れない C case | 37 件 (C の `case` は 75 件、葉は 38 件)。`ott_run` の別経路での呼び出しと読めるが未確認 |
+
+分かったこと:
+- ctor `0x18011d400` → wasm func 16 の根拠は 2 本: (a) dispatch の葉の分岐先が `call 16` で、C 側の `case 0x3011d400ULL: f_18011d400()` と対応する。(b) §3e の停止点の戻り番地 `0x3011d9fc` が func 16 の本体の中にある (前 run の `fd_text` `ret=0x3011d9fc` と一致)。
+- 全 75 case の 1 対 1 対応は作っていない。C 本体の呼び出し列と wasm 本体の `call` 列を比べる照合は、本 run では行っていない。
+
+未確定:
+- 2 件の葉の wasm 関数番号。dispatch に無い 37 件の C case の wasm 関数番号。
+- C の本体と wasm 本体の呼び出し列の全数照合。
+

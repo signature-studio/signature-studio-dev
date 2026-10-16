@@ -189,7 +189,7 @@ wasm func 123 は sbrk 相当で、break 値を線形メモリ `269004816` (`0x1
 未確定:
 - 1 ctor が約 3.5 MiB を解放せず積む理由 (割り当ての個数・解放経路は未計数。ctor 側の leak か、同一 instance に繰り返し呼ぶ harness の前提の違いかは未確定)。実機 (Chrome・AudioWorklet) で同じ積み上げが起きるかは未確認。
 - image が固定 `0x30000000` に置かれ、heap の上限検査がそれを避けない点は、lift の配置の問題。修正方針 (image を heap の上に置く・break の上限を image 基底にする・ctor の解放を入れる) は本 run では選んでいない。
-- VA `0x18011d400` ↔ wasm 関数番号の対応表は未作成 (本 run は関数番号で語った)。
+- VA `0x18011d400` ↔ wasm 関数番号: ctor は func 16 (`REPORT_APPENDIX_5403.md` §3j)。全 case の対応は未完。
 
 再現コマンド (素材展開後。`tools/ott/work/lift/` 配下に出力):
 
