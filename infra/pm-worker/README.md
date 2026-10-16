@@ -279,6 +279,41 @@ Worker の状態 (Durable Object) に、VM が持っていた `launched`・`rela
 - 打ち切った一覧は `meta.syncTruncated` (対象名・読んだページ数・時刻。本文・題名は入れない) に残し、1 件でもあれば `fresh=false`。同じ一覧を次に読んで打ち切りが無ければ自動で消える。
   打ち切ったときは『一覧に無い』ことを根拠にした close / completed 扱い (issue・PR・run) をしない。`/status` は `sync_truncated` と `last_full_sync_rest_calls` (全体同期の REST 回数。うちコメントは `last_full_sync_comment_rest_calls`) を出す。
 
+## 観測ログ (Custom Dashboard 用・CI-229)
+
+tick の終わりに、1 tick につき 1 行の `{"m":"metrics",...}` を `console.log` に出す。値は `/status` と同じ集計から取る。数値・真偽・列挙・ISO 時刻だけで、題名・本文・login・secret は入れない (`redact` を通す)。
+イベント (launch・dispatch・pm-dispatch・close・demote・restore) は既存の `{"pm":...}` 行を使い、この行には入れない。`/status` の応答は変わらない。
+
+| キー | 意味 |
+|---|---|
+| `m` | 常に `"metrics"` |
+| `ts` | tick の時刻 (ISO) |
+| `fresh` | 同期が新しく、一覧を打ち切っていないか |
+| `mode` | `live` / `partial` / `dry-run` (`/status.mode` と同じ) |
+| `phase` | `launch` / `review-only` |
+| `demoted` | 降格中か |
+| `rate_guard` | REST の残量が少なく launch を止めているか |
+| `stop` | launch を止めている理由 (無ければ `null`) |
+| `blocked` | 取り込み前の `no-import` など (無ければ `null`) |
+| `active` / `active_impl` / `active_other` | 未完了の run の総数 / 実装 / その他 |
+| `active_critical` / `active_normal` / `active_low` | 未完了の run を優先の区分別に数えた値 |
+| `target` / `target_eff` / `cap_est` / `room` | 設定の上限 / 推定を足した目標 / 観測から推定した上限 (無ければ `null`) / 空き枠 |
+| `ready` / `ready_critical` / `ready_normal` / `ready_low` | 着手待ちの件数と区分別 |
+| `would_launch_now` | 今回の tick の計画に載った件数 |
+| `holds` | 着手待ちでない issue の件数 (`launch_holds`) |
+| `runs_running` / `runs_queued` | in_progress の run / queued・pending・waiting の run |
+| `peak_running` | 直近 24 時間の tick ごとの in_progress の最大 (観測が無ければ `null`) |
+| `launched` / `dispatched` / `pm_dispatched` / `closed` | 累計 (`counters` の同名の値) |
+| `rest_remaining` | GitHub REST の残り (無ければ `null`) |
+
+抽出例 (Workers Logs の JSON フィールドから値を取る。`m` が `metrics` の行だけを対象にする):
+
+```
+m = "metrics"  →  runs_running, runs_queued, peak_running, room, ready を時系列にする
+```
+
+テストは `test/metrics.test.ts` (必須キーの欠落を検出するネガコンを含む)。
+
 ## ファイル構成
 
 - `src/index.ts` Worker の入口 (対象外のイベントは DO を起こさず捨てる)。`src/do.ts` Durable Object `PmDO` (SQLite の `kv` 表 + alarm)。
