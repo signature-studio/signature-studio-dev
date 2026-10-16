@@ -118,6 +118,6 @@ wrap `0x677f60`・`0x677fb0` は、`0x677d10` (loader) を呼んだ後に `call 
 ## 6. 再現
 
 - 素材: `oc_artifacts: fl-win64` → `$RUNNER_TEMP/fl-win64` (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst`、展開 6.2 s)
-- 直接呼出元: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/shared/elastique/fl_wrap_disasm.py callers 677f60 678010 c67520 a97780 67d5a0 c67730 c69d10 c69d60` — 28.1 s・load 0.46 (nproc 4)・rc 0。
+- 直接呼出元: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/shared/elastique/fl_wrap_disasm.py callers 677f60 678010 c67520 a97780 67d5a0 c67730 c69d10 c69d60` — 測定 commit `fc0f43f61`。同 HEAD で再実行: rc 0・28.0 s・load 0.32→0.67 (nproc 4)。出力は §1 の表と一致。
 - 逆アセンブル: `python3 tools/shared/elastique/fl_wrap_disasm.py disasm <start> <end>`
-- 測定 commit: 本 PR の最後にコードを変えた commit (本 REPORT と `fl_wrap_disasm.py`)。
+- 測定 commit: `fc0f43f61` (`fl_wrap_disasm.py` と本 REPORT を含む)。
