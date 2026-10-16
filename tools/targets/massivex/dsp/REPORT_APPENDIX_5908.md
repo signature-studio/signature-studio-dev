@@ -54,6 +54,17 @@
 - 例: `0x6da2ae` → G `0x8020e3` (pdata 関数 `0x8016f0` の途中)。`0x8020e3` の復号は `or eax, 0xf6854504` で始まり、関数入口ではない。
 - G は入口として線形解析された値で、途中のアドレスからの livein である。関数入口の livein ではない。
 
+## 3b. 再測定 (run 2・HEAD `6cb49b9d2`・素材 `plugins-massivex` を展開して実行)
+
+- `mx6_e2e.sh`: rc 0・46 s・load 0.99 0.60 0.25 → 1.05 0.67 0.29・全判定 PASS (PE md5 `622993e7…` 一致)。
+- `mx63_u3e_split.py`: population 604・E 43・site_cat D 825・C 1549・G0 351・G 26・E 43 (前回と一致)。4.96 s。
+- `mx63_g_containment.py`: `mid_function_insn_boundary` 7・`mid_function_not_boundary` 35・`no_pdata_range` 1 (前回と一致)。
+- `mx63_g_entry_check.py` (新規): E 43 件の G の直前 1 バイトを見た。`0xCC` / `0x90` の詰め物は **0 件**。
+  直前バイトは任意の命令の終端 (例: `0x8020e3` の直前は `0x59`)。G は関数の先頭らしさを持たない。
+- 解釈: G は pdata 始点でもなく、詰め物で始まる関数先頭でもない。REPORT §2 の定義 (入口 = 直接 call/jmp 先) を
+  当てはめても、G の入口 livein は「関数の先頭からの値」にならない (G が途中の命令列である)。
+  G 側の判定 (G が転送値を入口で要求するか) は、G の実際の関数先頭の同定なしには閉じられない。
+
 ## 4. 判定
 
 - **源側 (F の入口値が G へ届くこと)**: E 43 件は、F 内で xmm4/5 が定義されず前段 call もない site で、転送値は F の入口値と同一。
