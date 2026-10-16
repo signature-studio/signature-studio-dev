@@ -20,12 +20,13 @@
 import os
 import sys
 import json
+import struct
 from collections import Counter
 
 import pefile
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED, UC_HOOK_MEM_WRITE, UC_PROT_ALL
 from unicorn import UC_MEM_READ_UNMAPPED, UC_MEM_WRITE_UNMAPPED, UC_MEM_FETCH_UNMAPPED
-from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_RSP, UC_X86_REG_RBP, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_RIP
+from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_RSP, UC_X86_REG_RBP, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_RIP, UC_X86_REG_XMM0
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'shared'))
 from paths import FL_WIN64_DIR
@@ -49,10 +50,16 @@ RET_ARG_VA = {0x412d60, 0x416230}
 KEEP_PATH = os.environ.get('HS_DISP_PATH') == '1'
 # HS_DISP_RET_SPEC="VA:rcx,VA:host,VA:one,..." で callee ごとの戻り値を指定する (#1222 §8・#2782 §10)。
 # rcx = 第1引数を返す / host = HOST 領域 (有効ポインタ) を返す / one = 整数 1 を返す。未指定の callee は従来どおり 0。
+# x<浮動小数> = xmm0 に double を入れる (例: 0x40ae70:x2.0)。浮動小数の戻り値を取る callee 用 (#5422)。
 RET_SPEC = {}
+# VA:x<浮動小数> は xmm0 (double) に値を入れて返す (#5422)。rax は 0 のまま。例: 0x40ae70:x1.5
+XMM_SPEC = {}
 for _item in filter(None, os.environ.get('HS_DISP_RET_SPEC', '').split(',')):
     _va, _mode = _item.split(':')
-    RET_SPEC[int(_va, 0)] = _mode
+    if _mode.startswith('x'):
+        XMM_SPEC[int(_va, 0)] = float(_mode[1:])
+    else:
+        RET_SPEC[int(_va, 0)] = _mode
 # 応答値の格納先 [rbp+0x11a0] (#2782)。Dispatcher 末尾 0x1328a38 の `mov rax,[rbp+0x11a0]` が応答になる。
 # rbp = STACK_TOP-40-0x1838 (entry rsp=STACK_TOP-8・push 4 本・sub 0x1838)。
 RESP_SLOT = STACK_TOP - 40 - 0x1838 + 0x11a0
@@ -111,6 +118,8 @@ def run_one(ident, image, base, size, pe_data_sections):
             if addr in RET_SPEC:
                 ret_rax = {'rcx': uc_.reg_read(UC_X86_REG_RCX), 'host': HOST, 'one': 1}[RET_SPEC[addr]]
             uc_.reg_write(UC_X86_REG_RAX, ret_rax)
+            if addr in XMM_SPEC:
+                uc_.reg_write(UC_X86_REG_XMM0, struct.unpack('<Q', struct.pack('<d', XMM_SPEC[addr]))[0])
             uc_.reg_write(UC_X86_REG_RSP, sp + 8)
             uc_.reg_write(UC_X86_REG_RIP, ret)
             return
