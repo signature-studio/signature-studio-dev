@@ -2,11 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { configuredApp, j, markFresh, T0, type Call } from "./helpers.ts";
 import { HUMAN, IMPL_BOT, PM_BOT, at, commentEv, issueEv, outcomeBody, prEv, send, type Ctx } from "./pm_helpers.ts";
-import { DEFAULT_STOPPED_INTAKE_PER_H, STOPPED_REF_DAY_MAX, selectDispatch, type HistoryEntry, type PmTarget } from "../src/pm.ts";
+import { DEFAULT_STOPPED_INTAKE_PER_H, KIND_MIN_PER_HOUR, PM_LIMITS, STOPPED_REF_DAY_MAX, selectDispatch, type HistoryEntry, type PmTarget } from "../src/pm.ts";
 
 // 停止行 (run-outcome が stop / split) を oc-pm の判断キューへ回す (CI-239・#5722)。
 // (a) 検出: 停止行を oldest-first で回す。no_pr と二重に送らない。実行中・PR あり・親・保留は回さない。
-// (b) 送信: 1 時間の上限 (STOPPED_INTAKE_PER_H。既定 24) と、同じ issue 24 時間 3 件の上限を守る (ネガコン)。
+// (b) 送信: 1 時間の上限 (STOPPED_INTAKE_PER_H。既定 48) と、同じ issue 24 時間 3 件の上限を守る (ネガコン)。
 // (c) 再投入の判断は oc-pm が行う: 検出・送信の経路で /oc は投稿しない (ラベルの付け外しでも変わらない)。
 
 const pmCalls = (calls: Call[]) => calls.filter((c) => c.method === "POST" && c.url.endsWith("/dispatches") && c.body?.event_type === "oc-pm");
@@ -80,7 +80,7 @@ test("検出: oldest-first (停止の古い順)。ref の大小では並べな�
   );
 });
 
-test("送信 (b): 1 時間の上限 (STOPPED_INTAKE_PER_H) を守り、古い停止から送る。既定は 24", async () => {
+test("送信 (b): 1 時間の上限 (STOPPED_INTAKE_PER_H) を守り、古い停止から送る。既定は 48 (#5899)", async () => {
   const ctx = await live({ t: T0 }, { STOPPED_INTAKE_PER_H: "2" });
   await stopped(ctx, 540, { atMin: 30, answerMin: 40 }); // 新しい
   await stopped(ctx, 541, { atMin: 5, answerMin: 40 }); // 古い
@@ -91,7 +91,16 @@ test("送信 (b): 1 時間の上限 (STOPPED_INTAKE_PER_H) を守り、古い停
     { kind: "stopped_report", ref: 541 },
     { kind: "stopped_report", ref: 542 },
   ]);
-  assert.equal(DEFAULT_STOPPED_INTAKE_PER_H, 24);
+  assert.equal(DEFAULT_STOPPED_INTAKE_PER_H, 48);
+});
+
+test("枠 (#5899): 停止行 1 時間の上限 48 は、全体の毎時上限 (PM_LIMITS.hourMax) と他 kind の最低配分の内に収まる", () => {
+  const minOthers = Object.entries(KIND_MIN_PER_HOUR).filter(([k]) => k !== "stopped_report").reduce((a, [, n]) => a + (n ?? 0), 0);
+  assert.ok(DEFAULT_STOPPED_INTAKE_PER_H + minOthers <= PM_LIMITS.hourMax, `48 + ${minOthers} ≤ ${PM_LIMITS.hourMax}`);
+  const now = 1_700_000_000_000;
+  const tg = (ref: number): PmTarget => ({ kind: "stopped_report", ref, at: new Date(now).toISOString(), prio: "normal" });
+  const send = selectDispatch(now, Array.from({ length: 60 }, (_, i) => tg(i + 1)), []).send;
+  assert.equal(send.length, 48, "停止行だけ溢れたときは既定の 48 件まで送る");
 });
 
 test("送信 (b ネガコン): 同じ issue は 24 時間に 3 件まで。4 件目は送らない (2 連続の stop でも item cap で止まる)", async () => {

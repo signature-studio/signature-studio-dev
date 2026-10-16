@@ -53,7 +53,7 @@ export interface Env {
   NO_PR_COOLDOWN_H?: string;
   // prio:low の未完了の run の上限 (既定 10。空・非数・負は既定に戻す)。prio:critical が着手済みか launch 可能な間だけ効く (launch.ts の LowCap)。
   LOW_CAP?: string;
-  // 停止行 (run-outcome の reason が stop / split の issue) を oc-pm の判断キューへ 1 時間に送る件数の上限 (#5722。既定は pm.ts の DEFAULT_STOPPED_INTAKE_PER_H = 24)。
+  // 停止行 (run-outcome の reason が stop / split の issue) を oc-pm の判断キューへ 1 時間に送る件数の上限 (#5722。既定は pm.ts の DEFAULT_STOPPED_INTAKE_PER_H = 48。#5899 で 24 → 48)。
   STOPPED_INTAKE_PER_H?: string;
   // 全体同期でコメントを読む窓 (時間。24 未満は 24 に切り上げる) と、コメント一覧のページ上限 (1 ページ 100 件)。
   COMMENT_WINDOW_H?: string;

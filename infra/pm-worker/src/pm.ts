@@ -64,10 +64,11 @@ export const KIND_LIMITS: Partial<Record<DetectedKind, { dupMs: number; dayMax: 
 // 停止行 (run-outcome の reason が stop / split のまま止まっている issue) を oc-pm の判断キューへ回す上限 (CI-239・#5722)。
 // 1 時間に STOPPED_INTAKE_PER_H 件 (config。既定 DEFAULT_STOPPED_INTAKE_PER_H) まで、同じ issue は 24 時間に STOPPED_REF_DAY_MAX 件まで。
 // 同じ issue の上限は全体の上限 (PM_LIMITS.refDayMax) より厳しくする (判断済みの停止行を毎時送り続けない)。
-// 既定 24/h は、1 時間の上限と全体の枠 (PM_LIMITS.hourMax) の内で滞留を捌ける値。測定の所在は #5722 の PM 判断コメント。
+// 既定 48/h (#5899。旧 24/h は在庫の増加に追いつかなかった)。全体の枠 (PM_LIMITS.hourMax = 72) の内に収まる:
+// 48 + 他 kind の最低配分 (KIND_MIN_PER_HOUR の合計 = 3) = 51 ≤ 72。残りは no_pr・stuck 等が使う。測定の所在は #5722・#5899 の PM 判断コメント。
 // 枠が厳しければ wrangler.toml の値を下げる。
 export const STOPPED_REF_DAY_MAX = 3;
-export const DEFAULT_STOPPED_INTAKE_PER_H = 24;
+export const DEFAULT_STOPPED_INTAKE_PER_H = 48;
 // PM が停止行の判断 (応答) を書いた直後に、同じ停止行をすぐ送り直さない猶予 (CI-239・#5722)。
 // no_pr の検出 (未回答のときだけ送る) と stopped_report (応答後も上限まで送る) が同じ行を続けて 2 回送るのを防ぐ。
 export const PM_INTAKE_GRACE_MS = 3_600_000;
