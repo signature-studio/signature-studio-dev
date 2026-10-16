@@ -75,7 +75,6 @@ probe: `tools/flp/s11_setter_obj_probe.sh` (gdb `-x tools/flp/s11_setter_obj.gdb
 
 判定: 命中時の this の先頭は .text のアドレスを指す。§4 と同じく .rdata の VMT としては読めない。この観測だけでは cfg の型と所属 VMT は確定しない。`*rcx` の指す先を逆アセンブルするか、this を生成する ctor (new の戻り) にブレークを張るのが次の手。
 
-測定 commit: `29f45c13b` (本 run の HEAD。`tools/flp` のコードは `64ac5dc19` と同一)。
 probe の 1 行 (s11 の結果 `hits`) は `grep -c '^HIT ' "$RUNNER_TEMP/s11_gdb_session.txt"` で再現できる。
 
 ## 7. 再現
@@ -90,4 +89,4 @@ python3 -c "import pefile; pe=pefile.PE('$RUNNER_TEMP/fl-install/FLEngine_x64.dl
 grep '^HIT ' "$RUNNER_TEMP/s10_gdb_session.txt" | sed -E 's/.*dl=(0x[0-9a-f]+).* ret=0x0*([0-9a-f]+)$/\1 \2/' | sort | uniq -c
 ```
 
-測定 commit: `29f45c13b` (コードを変えた最後の commit は `64ac5dc19`。両者の `tools/flp` (本 REPORT を除く) は同一)。
+測定 commit: `64ac5dc19` (コードを変えた最後の commit)。実測は `29f45c13b` の HEAD で行った。`git diff 64ac5dc19 HEAD -- tools/flp ':!tools/flp/REPORT_APPENDIX_5614.md'` の出力は空 (コード差分 0)。
