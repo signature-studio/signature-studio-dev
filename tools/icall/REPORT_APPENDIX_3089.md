@@ -91,3 +91,51 @@ python3 tools/icall/diff/index_reach.py tools/icall/work/core64_dis.txt
 python3 tools/icall/diff/index_table_scan.py "tools/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64"
 bash tools/icall/diff/index_table_scan_selftest.sh
 ```
+
+## 9. baseline の main 上の再測定 (#4881 / ICALL-107)
+
+> 親: #3940 (ICALL-91)。切り分けの対象: #3235 (`adda5c027`) の前後で増えた rc=99 9 件。
+
+### 9.1 結論
+
+- **受入 1 (元の条件: funcs 131・rc=95: 53): 未達のまま。** main の `94b7275ef` では rc=95 は 44 (n=3 で同値)。§1 の 53 は `d22576191` の測定値で、main では再現しない。
+- **受入 1' (R6 代替条件・main 基準): 達成。** funcs 131・rc=0: 70・rc=95: 44・rc=97: 6・rc=98: 8・rc=99: 2・rc=124: 1・既知 12 中 hit 3 (n=3 で同値)。
+- **rc=99 と `adda5c027` の関係: 未確認 (bisect 未実施)。** n=1 の時点 (`adda5c027`) では rc=99 が 9 件で、その 9 関数は `d22576191` の rc=95 の集合と一致した (下の 9.3)。main で 2 件に減った理由は未確認。
+
+### 9.2 測定 (`SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh`・測定 commit `94b7275ef` = origin/main・foreground・n=3)
+
+| 回 | load (1 分値・開始時) | real | funcs | rc=0 | rc=95 | rc=97 | rc=98 | rc=99 | rc=124 | 既知 12 hit |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0.91 | 13.048 s | 131 | 70 | 44 | 6 | 8 | 2 | 1 | 3 |
+| 2 | 0.85 | 12.402 s | 131 | 70 | 44 | 6 | 8 | 2 | 1 | 3 |
+| 3 | 0.87 | 12.427 s | 131 | 70 | 44 | 6 | 8 | 2 | 1 | 3 |
+
+- 素材: `work-icall` (`tools/icall/work/` へ展開)・`plugins-freshair` (`fetch.sh` で win 17 files・factory .epf 8)。mac の展開は skip (lift2 は win のみ)。
+- 測定 commit `94b7275ef` = HEAD のため、`git diff 94b7275ef HEAD -- tools/icall/diff tools/ott tools/targets/freshair` は 0 行。
+- 同じ分布が `e5261de58` でも出た (§9.4)。
+
+### 9.3 n=1 の切り分け (`d22576191` → `adda5c027`・前 run の記録)
+
+- `d22576191` (#3235 の親): rc=0: 69・rc=95: 53・rc=98: 8・rc=124: 1・既知 3。
+- `adda5c027` (#3235): rc=0: 69・rc=95: 44・rc=98: 8・rc=99: 9・rc=124: 1・既知 3。
+- rc=95 → rc=99 の 9 関数: `1803b3fc0`・`1803b5b60`・`180cbd860`・`18100ca28`・`18100cc50`・`18100cf60`・`181011058`・`18102f728`・`18103d218`。import 単独実行で RtlPcToFileHeader ×6・SetUnhandledExceptionFilter ×1・RtlCaptureContext ×2。
+- 注意: n=1。`fc48aa8a5` の時点で rc=99 は 2 件 (`18100cc50` 等が rc=0 に、`1803b3fc0` 等が rc=97 に変わった)。この変化の commit は bisect していないため未確認。
+
+### 9.4 注意
+
+- 本測定の rc 分布は `e5261de58` と `94b7275ef` で同じ (差分の大半は docs と freshair の HEAD 実体化で、slot_trace の経路には効かない前提。経路への影響は未確認)。
+- `ott_native.c` の変更は #3089 の範囲外。本付録では変更していない。
+
+### 9.5 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| main で rc=99 が 2 件に減った commit の特定 (bisect)・`d22576191` 基準 53 の回復要否 | baseline の期待値 (R6) | #4881 の判断 (PM)。bisect の実作業は子 (未起票) |
+| 元の受入 1 の期待値 (rc=95: 53) を main で回復させるか | 受入 1 の判定 | PM 判断 (R6 の (a)/(b) 選択) |
+
+## 10. 再現 (#4881)
+
+```
+FA_DL="$RUNNER_TEMP/fa" bash tools/targets/freshair/fetch.sh   # $RUNNER_TEMP/fa に plugins-freshair を展開した後
+SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh            # n=3 で実行
+```
