@@ -42,3 +42,34 @@
 | `ACFStartup` の正しい引数 (型・仕様) が未確定。`NULL` で戻ることは初期化完了を意味しない | 初期化後の trace (#5118 の受入 1) を取れない | 本 PR の後続 (次 run・#5556 の残り) |
 | `ACFStartup(NULL)` の戻り値 0 が「初期化した」か「何もせず抜けた」か未検証 | 受入 (1) の判定 | 同上 |
 | `ACFGetSDKVersion()` 以外の SDK 関数の呼出順 (`ACFRegisterComponent` 等) | 初期化の全体像が不明 | 同上 |
+
+## 6. 追加測定 (KH-169 第 2 run・commit は本 PR の HEAD)
+
+前回 §5 の未解決「正しい引数の型」を、逆アセンブルと偽オブジェクトで切り分けた。
+
+### 6.1 `ACFStartup` の引数の読み
+
+- `0x1800211c0` (`ACFStartup`) は `call 0x1802606e0` の後に `call 0x180263130` を呼ぶ。引数 `rcx` は `rsi` に保持される。
+- `0x180263130`: `rsi == NULL` なら `0x18026317c` へ進み何もせず戻る。非 NULL なら `0x180264b40(rcx=確保済み object, rdx=rsi)` を呼ぶ。
+- `0x180264b40`: 引数 `rdx` の先頭 qword を vtable として `call [r9]` (`r9 = [rdx]`、`rdx` の 2 番目の引数は IID `0x181429538`、`r8` は出力先) を呼ぶ。`QueryInterface` の形。失敗 (`eax != 0`) なら `0x180264c9c`、成功なら出力を次段で使う。
+
+よって引数は「`QueryInterface` を持つ COM 風オブジェクトへのポインタ」と読める。
+
+### 6.2 偽オブジェクトによる実測
+
+`runtime_wine/loader_com.c` (新規): vtable[0] に `QueryInterface` を立てた 3 slot の偽オブジェクトを渡す。
+
+| 呼出し | 結果 | 備考 |
+|---|---|---|
+| `wine loader_com.exe HeartCore.core_64` | `QueryInterface called self=… iid=00006ffff5d59538` → 戻り値 `0` (`0x0`)・exit 0 | IID は rdata `0x181429538` の 16 byte。GUID に直すと `382B6A96-7FD0-11D6-BCFE-00306542A024` (バイト列から計算) |
+
+- 偽 QI は `E_NOINTERFACE` (`0x80004002`) を返した。それでも `ACFStartup` は 0 で戻った。
+- よって、戻り値 0 は「QI 成功で初期化した」ことを示さない。失敗経路 (`0x180264c9c`) で 0 を返す可能性がある。未確定。
+- 初期化の判定に必要な「QI 成功時の後続」(`0x180264bb8` 以降の `ACFRegisterComponent` 相当) は未実測。
+
+### 6.3 未解決 (本 run で残したもの)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| IID `0x181429538` (GUID 382B6A96-7FD0-11D6-BCFE-00306542A024) の名前を特定できていない。Web 検索は本 run で失敗 | QI 成功時に必要な interface の型が決まらない | #5556 (本 issue の残り) |
+| QI 成功時の後続 (`0x180264bb8` 以降) の実測 | 受入 (1) の初期化成功の判定 | #5556 (本 issue の残り) |
