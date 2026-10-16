@@ -80,8 +80,8 @@ CALLS = [
     (0x180136D1D, "call rax", "global"),
     (0x1801381D8, "call rax", "global"),
     (0x1801425E3, "call rax", "global"),
-    (0x1809CA7B2, "call [rip] (IAT形式)", "cfg"),
-    (0x1809CA88D, "call [rip] (IAT形式)", "cfg"),
+    (0x1809CA7B2, "call [rip] (CFG候補: slot 中身を確認)", "cfg"),
+    (0x1809CA88D, "call [rip] (CFG候補: slot 中身を確認)", "cfg"),
 ]
 
 for va, label, kind in CALLS:
