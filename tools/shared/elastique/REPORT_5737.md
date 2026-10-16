@@ -8,7 +8,7 @@ export の呼出し・`run()` の差し替えは #3386 に残す。
 
 | 項目 | 結果 |
 |---|---|
-| 受入 (上位 5 関数の呼出元で、export に渡す引数 rcx・rdx・r8・r9 を静的に読む) | **部分達成**。rcx・rdx は全呼出元で出どころを読めた。r8 は呼出元の値が実行時オブジェクトのフィールドで、ElPro・ElProV3 の wrap は loader 呼出し後の r8 を使うため **静的には確定しない** (§2.6)。r9 は ElPro 系が表経由、ElResampleSource・Auftakt 系は未設定 (§2.1〜2.3)。 |
+| 受入 (上位 5 関数の呼出元で、export に渡す引数 rcx・rdx・r8・r9 を静的に読む) | **部分達成**。rcx・rdx は全呼出元で出どころを読めた (§2.1〜2.3 の表は export 側の引数)。r8 は wrap が export 直前に設定せず、wrap が呼ぶ loader (`0x677d10`) の後の値になるため **静的には確定しない** (§2.6)。r9 は ElPro (`0x677f60`) と ElProV3 (`0x677fb0`) が表経由で、表は両者で異なる。ElResampleSource・Auftakt は設定しない (§2.1〜2.3)。 |
 | 同定の方式 | 静的。capstone で逆アセンブルし、`call`/`jmp` の直接呼出元を列挙 (`fl_wrap_disasm.py`)。動的実行は行っていない |
 | 読み直しで見つかった REPORT_4396 の誤り | §4 |
 
@@ -35,34 +35,40 @@ export の呼出し・`run()` の差し替えは #3386 に残す。
 
 ### 2.1 `0xa97780` の 5 呼出元 (wrap → `0x677f60` = ElPro / `0x677fb0` = ElProV3)
 
-`0xa97780` 自身の引数は `rcx`=obj・`edx`=`esi`・`r8d`・`xmm3`・`[sp+0x60]`。wrap に渡す値は次の通り。
+`0xa97780` 自身の引数は `rcx`=obj (`rbx`)・`edx`=`esi`・`r8d`・`xmm3`・`[sp+0x60]`。obj (`rcx`) は ElPro への呼出しで `ecx` が上書きされるため export には渡らない。
 
-| 呼出元 | rcx (obj) | rdx | r8 | r9 | 備考 |
+ElPro (`0x677f60`) から export への引数は次の通り。wrap 内で `mov ecx,ebx`・`mov edx,esi`・`mov r9d,edi` (`0x677f86`〜`0x677f8d`) として渡し、r8 は設定しない。`ebx`=wrap の `ecx`=`0xa97780` の `esi`=`0xa97780` の `edx`、`esi`=wrap の `edx`=`0xa97780` の `r8d`、`edi`=wrap の `r9d` (`0xa977cc` で作った表値)。
+
+| 呼出元 | export の rcx (= `0xa97780` の `edx`) | export の rdx (= `0xa97780` の `r8d`) | export の r8 | export の r9 (表。経路で分岐 §2.5) | 備考 |
 |---|---|---|---|---|---|
-| `0xa9830d` | `[rbp+0x70]` (ローダ由来のオブジェクト) | `0x100` | `[rax+0x74]` の byte (`rax`=`[rbp+0x48]`) | 呼出元で未設定。wrap 内 `movsx r9, byte ptr [rax+r8]` で表から決まる | `[sp+0x60]` は `[rbp+0x60]` の dword |
-| `0xc65a29` | `[rbp+0x68]` | `0x100` | `[rax+0x74]` の byte (`rax`=`[rbp+0x60]`) | 同上 | `[sp+0x20]` = 即値 1 |
-| `0xc65bb2` | `[rbp+0x68]` | `ebx` (`0x100` か `[rbp+0x68]` 経路の値) | `[rax+0x74]` の byte (`rax`=`[rbp+0x60]`) | 同上 | `[sp+0x20]` = 即値 1 |
-| `0xc7a2cf` | `rbx` | `0x100` | `[rax+0x74]` の byte (`rax`=`[rbp+0x70]`) | 同上 | `[sp+0x20]` = `[rbp+0x5c]` の dword |
-| `0xc7be49` | `rsi` | `0x100` | `[rax+0x74]` の byte (`rax`=`[rbp+0x58]`) | 同上 | `[sp+0x20]` = `ebx-1` |
+| `0xa9830d` | `0x100` (`0xa982ee`) | `[rax+0x74]` の byte (`rax`=`[rbp+0x48]`、`0xa982f7`) | 未設定 (loader 後の値) | ElPro なら `0xa48a23[添字]`、ElProV3 なら `0xa489fd[添字]` (添字 = `[sp+0x60]` = `[rbp+0x60]` の dword) | 即値は `[sp+0x20]` = `[rbp+0x60]` の dword |
+| `0xc65a29` | `0x100` (`0xc65a0a`) | `[rax+0x74]` の byte (`rax`=`[rbp+0x60]`、`0xc65a13`) | 同上 | 同上 | `[sp+0x20]` = 即値 1 |
+| `0xc65bb2` | `ebx` (`min(rbx, 0x100)`、`0xc65b69`〜`0xc65b72`。§2.7) | `movzx r8, byte ptr [rax+0x74]` の値 (`rax`=`[rbp+0x60]`、`0xc65b9c`) | 同上 | 同上 | `[sp+0x20]` = 即値 1 |
+| `0xc7a2cf` | `0x100` (`0xc7a2b1`) | `[rax+0x74]` の byte (`rax`=`[rbp+0x70]`、`0xc7a2ba`) | 同上 | 同上 | `[sp+0x20]` = `[rbp+0x5c]` の dword |
+| `0xc7be49` | `0x100` (`0xc7be29`) | `[rax+0x74]` の byte (`rax`=`[rbp+0x58]`、`0xc7be32`) | 同上 | 同上 | `[sp+0x20]` = `ebx-1` |
 
-wrap 側の r9 は、wrap 内で `movsx r9, byte ptr [rax + r8]` (`rax` = 表 `0xa48a23 + 0xa977c7`) として決まる。表の先頭は `ff 00 03 00 ff ff 00 02 04 05 00 01 02 06 07 08` (`0xa48a23` 起点、`r8` は 0〜15 の添字)。ElPro 経路 (`0x677f60`) は `r8` が 0〜15 のとき表の値、範囲外なら `r9` は 0 になるものとして扱う (`cmp eax,0xf; ja` で `al=0` に落ちる分岐は `0xa977b0`)。
+r9 の表の添字は `0xa977c7` の `movsxd r8, dword ptr [rsp+0x60]` で、ElPro 経路 (`0xa977b6`) に入るのは添字 (`eax`) が 0〜15 かつ `1 << (eax & 0x7f)` と `[rip+0x98]` の word の `test` が成立するときだけ (`0xa9778f`〜`0xa977ab`)。それ以外は `al=0` (`0xa977b0`) になり、`je 0xa977dc` で **ElProV3 経路** に進む (§2.5)。ElPro 経路で `r9` を 0 にする分岐は無い。
+
+ElProV3 (`0x677fb0`) の経路は、`0xa977dc`〜`0xa977f2` で `ecx=esi`・`edx=r8d`・`r9 = byte [0xa489fd + r8]` (添字は同じ `[rsp+0x60]`) を作るところまでを確認した。`0x677fb0` の export 呼出し部 (`0x677ff8` 以降) は本 fix では読んでいない。
 
 ### 2.2 `0x67d5a0` の呼出元 `0x67d556` (wrap `0x678010` = ElResampleSource)
 
-| rcx | rdx | r8 | r9 | 備考 |
+| export の rcx | export の rdx | export の r8 | export の r9 | 備考 |
 |---|---|---|---|---|
-| `rbx` (`0x67d520` の obj) | `0x67d5a0` 内で `rdx=rbx` に設定 | `movzx r8, byte ptr [rbx+0xa0]` | 呼出元で未設定 | `[sp+0x20]`=`eax` (`[rbx+0x38]==2` で 0 / それ以外 1)・`[sp+0x28]`=float 定数 (未確認)・`[sp+0x30]`=`0x2b2a`・`[sp+0x38]`=0 |
+| `rbx` (obj。`0x67d607` の `mov rcx,rdx`、`0x67d5c8` で `rdx=rbx`) | `movzx r8, byte ptr [rbx+0xa0]` の値 (`0x67d60a` の `mov edx,r8d` で wrap の `edx` に入る) | 未設定 (loader 後の値) | 未設定 (`0x67d5a0` の呼出し時の値を継承。静的に確定しない) | `[sp+0x20]`=`eax` (`[rbx+0x38]==2` で 0 / それ以外 1)・`[sp+0x28]`=float 定数 (未確認)・`[sp+0x30]`=`0x2b2a`・`[sp+0x38]`=0 |
 
-wrap `0x678010` の中では `r9` を使わず、`[sp+0xa0]` 以降の引数を `[sp+0x20]`・`[sp+0x28]`・`[sp+0x30]`・`[sp+0x38]` に再格納している。したがって ElResampleSource の第 5 引数以降は、上位 `0x67d5a0` が設定した値そのものになる。
+wrap `0x678010` は export 呼出し前に `r8`・`r9` を設定しない (`0x678067`〜`0x6780a2`)。export の第 5 引数以降は、wrap が `[sp+0xa0]`・`[sp+0xa8]`・`[sp+0xb0]`・`[sp+0xb8]` から `[sp+0x20]`・`[sp+0x28]`・`[sp+0x30]`・`[sp+0x38]` に再格納した値で、上位 `0x67d5a0` が設定した値そのものになる。
 
 ### 2.3 `0xc67730` の呼出元 (wrap `0xc67520` = Auftakt)
 
-| 呼出元 | rcx | rdx | r8 | r9 |
-|---|---|---|---|---|
-| `0xc6c533` | `[rbp+0x48]`系のオブジェクト (`rcx`=`[rip-0x4f1f]` の load) | `dl=1` | `[rax+0x11e8]` (`rax`=`[rbp+0x30]+0x778`) | 未設定 |
-| `0xce314f` | `[rip-0x7bb42]` の load | `dl=1` | `[rax+0x11e8]` (`rax`=`[rbp+0x28]`) | 未設定 |
+Auftakt (`0xc67520`) から export への引数 (wrap 内 `0xc67592`: `mov ecx,ebx`・`mov edx,esi` で呼ぶ slot)。
 
-`0xc67730` 内では `r8` を `[rbp+0x60]` に保存し、`[rbx+0x74]` と `[rbx+0x7c]` (`rbx`=`[rbp+0x60]`) を `wrap` に渡す。すなわち Auftakt の wrap が受け取る `edx`・`r8` は、`0xc67730` の `dl` と `[obj+0x11e8]` で決まる。
+| 呼出元 (`0xc67730`) | export の rcx | export の rdx | export の r8 | export の r9 |
+|---|---|---|---|---|
+| `0xc6c533` | `eax` = `0x40c660([rbx+0x7c])` の戻り値 (`0xc67782`〜`0xc67789`) | `movzx rdx, byte ptr [rbx+0x74]` (`0xc67784`。`rbx`=`[rbp+0x60]`=`0xc67730` の `r8` 引数 = `[rax+0x11e8]`、`rax`=`[[rbp+0x30]+0x778]`、`0xc6c521`〜`0xc6c52c`) | 未設定 (loader 後の値) | 未設定 |
+| `0xce314f` | 同上 | `movzx rdx, byte ptr [rbx+0x74]` (`rbx`=`[rax+0x11e8]`、`rax`=`[rbp+0x28]`) | 未設定 (loader 後の値) | 未設定 |
+
+`0xc67730` の `dl` (`0xc67741` で `[rbp+0x58]` に保存) は、`0xc67748`〜`0xc67757` の `0x410320` を呼ぶ条件分岐にしか使われず、wrap の `edx` には入らない。wrap の `edx` は `0xc67784` の `movzx` で決まり、`rcx` は `0xc67782` の `ecx = eax` で決まる。wrap は `r8` を設定しない。
 
 ### 2.4 `0xc69d10` の呼出元 `0xc69f63` と `0xc69d60` の呼出元 `0xc69f28`
 
