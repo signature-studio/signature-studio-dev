@@ -188,3 +188,11 @@
 - 注意 (解析の限界): 分岐は両方の経路を辿るが、loop の不動点や間接分岐の先は見ない。`mx55_callers_fn.py` と同じく線形寄りの判定。callee の深さは 2 で打ち切り、打ち切りは unknown に数える。
 - 解析不能の残り: `0x1803caf83` の unknown 4 件、6 関数の間接 call 先 (vtable slot 32 の object 型)。いずれも次の run の対象 (受入 1 の残り・受入 2)。
 - 測定 commit: 本節を含む commit (`mx61_entry_xmm2_paths.py` を追加した commit)。以後 scripts は変えない。
+
+### 3.10 訂正 (MX-61 #5656・§3.9 の「入口 xmm2 は読まれない」を撤回)
+
+- 誤り: §3.9 の `0x18038dfe8` は pdata の始点 (`0x18038dfe8`) が `int3` 詰め物の上にあり、本体は `0x18038dff0` から始まる。旧版の script は `int3` で打ち切り、callee を「読み 0・未解決 0」と誤判定した (偽陰性)。script は詰め物を unknown に数えるように直した。
+- 再測定 (`mx61_entry_xmm2_paths.py`・exit 0): `0x18038dfe8` (詰め物) = unknown 1。`0x18038dff0` (本体) は `call 0x1807568e8` (入口 xmm2 が残る) の callee が **unknown 6** (§3.8 の `0x1807568e8` の解析不能 5 件を含む)。`0x18017b460` の唯一の入口 xmm2 の call (`0x18017b493`) は callee unknown 1。
+- **結論 (訂正)**: `0x18017b460` の入口 xmm2 が読まれないことは**確定していない**。読むかは `0x1807568e8` (解析不能 5 件) の扱いで決まり、現時点では判定保留。受入 1 の「`0x17b460` の呼出元が xmm2 を渡すか」は未確定に戻す。
+- 残件: `0x1807568e8` の解析不能 5 件の解消 (間接分岐の先の特定)。これが済めば `0x17b460` の判定を確定できる。
+- 測定: `python3 tools/targets/massivex/dsp/scripts/mx61_entry_xmm2_paths.py "<vst3>" 0x18038dfe8 0x18038dff0 0x18017b460` (exit 0・0.15 s)。

@@ -101,6 +101,9 @@ def main(pe_path, entries):
                     entry = False
                     r = nxt
                     continue
+                if m == 'int3' and entry:
+                    res['unknown'].append(('entry is padding int3', hex(a)))
+                    break
                 if m in ('ret', 'retn', 'int3', 'ud2'):
                     break
                 if m == 'jmp':
