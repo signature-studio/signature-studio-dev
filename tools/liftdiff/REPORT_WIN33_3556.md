@@ -192,7 +192,8 @@ KPI (`docs/WORKFLOW.md` §7・起動に関わる PR): FLEngine 起動の dispatc
 ### 10.1 読取り関数 (rva `0x4d85d0`) の呼出元 (実測・trace と逆アセンブル)
 
 - 呼出連鎖 (trace の行順。関数入口の直前に実行した命令): `0x4e1879` (`call 0x8e13f0` = rva `0x4e13f0`) → `0x4e146b` (`call 0x8d85d0` = rva `0x4d85d0`)。
-- `0x4e1820` の関数 (`0x4e13f0` を `0x4e1879` で呼ぶ側) は、`0x4e1841` (`lea rdx,[rip+0x5b0]`) で **UTF-16 の `.moe`** (rva `0x4e1df8`・`2e 00 6d 00 6f 00 65 00`) を読み、`call 0x414e70` の結果 (`test eax,eax`) で分岐する。拡張子で `.moe` を判定していると読むのが妥当 (推定。比較関数の中身は未確認)。`0x4e13f0` は `rdx` に渡された path (`[rbp+0x68]`) を受け取る側。
+- `0x4e1820` の関数 (`0x4e13f0` を `0x4e1879` で呼ぶ側) は、`0x4e1841` (`lea rdx,[rip+0x5b0]`) で **UTF-16 の `.moe`** (rva `0x4e1df8`・`2e 00 6d 00 6f 00 65 00`) を読み、`call 0x414e70` の結果 (`test eax,eax`) で分岐する。`0x4e13f0` は `rdx` に渡された path (`[rbp+0x68]`) を受け取る側。
+- 逆アセンブル (fl-win64 の PE・VA 表記。image base `0x400000`): 比較対象は `call 0x43c8f0` (= rva `0x3c8f0`) で作る。これは末尾の `.` の位置を `call 0x44f5d0` で探し、その位置の文字が `0x2e` であることを確かめてから、そこから後ろを切り出す。切り出し結果は `call 0x439550` で小文字化し、`call 0x414e70` で `.moe` と比較する。`0x414e70` は長さ (`[obj-4]`) を比べたうえで UTF-16 を要素ごとに完全一致で比べる関数。よって「拡張子 (最後の `.` 以降) が `.moe` (大文字小文字を区別しない) か」を判定している。`0x44f5d0` の中身は未確認。
 - `0x4e146b` で `r9 = [rbp+0x68]`、`r8 = [rbp+0x48]` (Stream オブジェクト・`0x3e1acd0`) を渡す。`0x4d85d0` の `[rbp+0x48]` は Stream の Read を呼ぶ `r8`。
 - 読取り関数の中で Stream の Read (`call [rax+0x30]` = rva `0x4d862a`) が 4 B を読み、`movsxd r9, [rbp+0x6c]` で範囲検査へ渡す (REPORT §3.4 と同じ)。
 
@@ -205,8 +206,9 @@ KPI (`docs/WORKFLOW.md` §7・起動に関わる PR): FLEngine 起動の dispatc
 ### 10.3 Position 0 の根拠 (実測)
 
 - `LD_STEP_MEM=3e1ace8` (= Stream `0x3e1acd0` + 0x18 = Position) の trace で、Position の変化は `113b72` (Move 内の `add [rbx+0x18],rsi`) の 1 回だけ。旧値 `0` → 新値 `4`。
-- 読取り (`0x4d862a`・`113b90`) の直前の Position は **0** (旧値 0)。読取り後は 4。Read の返り値 4 B は blob 先頭 (magic) と一致。
-- よって **読取り呼出元は Position 0 で magic を読んでいる**。Position 4 以降ではない。Stream の初期 Position が 0 であることも同じ trace の旧値 0 で裏付けられる。
+- 作者の trace (`LD_STEP_MEM=3e1ace8`) では、Position の**最初の変化**が `113b72` (Move 内の `add [rbx+0x18],rsi`) で、その旧値は `0`、新値は `4`。読取り (`0x4d862a`・`113b90`。`113b90` は §3 の仮想呼出し先 `call [rbx+0x40]` → `Move`) は、この変化より前に行われる。Read の返り値 4 B は blob 先頭 (magic) と一致。
+- よって **読取り呼出元は Position 0 で magic を読んでいる**と読める。ただし、この根拠は 1 本の trace で最初に変化したときの旧値であり、初期値の証明ではない。
+- 未記載: 読取り行と `113b72` 行の trace 行番号と MEM 行の抜粋。`win33_pos_probe.sh` が `pos.cfi` を最後に削除するため、作者の trace は PR に残っていない。本 fix run では素材 (`work-m11`・`work-liftdiff`・`toolchain-emsdk`) が展開されず trace を再取得できなかった。素材を指定した次の run で再取得して行番号を書く。
 
 ### 10.4 未解決 (起票先)
 
@@ -216,8 +218,8 @@ KPI (`docs/WORKFLOW.md` §7・起動に関わる PR): FLEngine 起動の dispatc
 
 ### 10.5 受入条件の判定
 
-- 受入 1 (呼出元 VA の同定・読む対象): **達成**。呼出元 `0x4e146b`→`0x4d85d0` (実測)、読む対象は `.moe` 文字列 (逆アセンブル) と magic 一致 (trace)。
-- 受入 2 (Position の確認・位置 0 の根拠): **達成**。`LD_STEP_MEM` で Position の旧値 0 を実測。PEEK は trace の MEM 行で代替。
+- 受入 1 (呼出元 VA の同定・読む対象): **達成**。呼出元 `0x4e146b`→`0x4d85d0` は trace で実測。読む対象は逆アセンブルで確認した (`.moe` の拡張子判定: `0x3c8f0` → `0x39550` → `0x414e70`。§10.2)。magic 一致は trace で確認した。
+- 受入 2 (Position の確認・位置 0 の根拠): **一部達成**。`LD_STEP_MEM` で Position の最初の変化の旧値 0 を作者の run で測定した。読取りと変化の trace 行番号は未記載 (§10.3 の未記載の項目)。本 fix run では再測定していない。PEEK は trace の MEM 行で代替。
 - 既定 spike の不変: 928/942・830・`0x4e0fab`・35 import (変化なし)。`ld_core.h` は変更していない。
 - 製品 KPI (起動): FLEngine 起動の dispatch 数・通過 unit 数は既定で不変 (928/942)。最初のウィンドウは動かしていない。
 - 注: `count` 側 (範囲検査へ至る経路) の仕様は受入条件に含まれない。#3636 に残す。

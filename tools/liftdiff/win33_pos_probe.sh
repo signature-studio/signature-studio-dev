@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# WIN-33 (#4713) 再現: default.moe の読取り関数 (rva 0x4d85d0) の呼出元と、その Stream の Position [obj+0x18] の変化を trace で実測する。
-# 素材: fl-win64 (FL_WIN64_DIR)。出力は work/flelift/win33/ (gitignore・commit しない)。
-# 使い方: FL_WIN64_DIR=<展開先> bash tools/liftdiff/win33_pos_probe.sh   (約 3 分)
+# WIN-53 (#4713) 再現: default.moe の読取り関数 (rva 0x4d85d0) の呼出元と、その Stream の Position [obj+0x18] の変化を trace で実測する。
+# 素材: fl-win64 (FL_WIN64_DIR)。出力は tools/liftdiff/work/flelift/win33/ (gitignore・commit しない)。
+# 前提生成物 (本 script は生成しない。先に用意する):
+#   - tools/m11/work/boot_final3.ll (targets/flelift.json の ir): bash tools/m11/m11_e2e.sh --full (FL_WIN64_DIR 必要)。素材 work-m11 でも可
+#   - tools/flelift/work/lift/{fle_lifted.c,fle_data.c,lift_meta.json} (clift_sources・clift_data・clift_meta): FL_WIN64_DIR=<展開先> bash tools/flelift/fle_lift.sh (emsdk 必要。EMSDK_ENV で指定)
+# 使い方: FL_WIN64_DIR=<展開先> bash tools/liftdiff/win33_pos_probe.sh
+# 時間: 上の前提生成を除いた本 script の実測は作者の run で約 3 分 (前提生成の時間は含まない)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
