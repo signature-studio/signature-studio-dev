@@ -51,8 +51,7 @@
 
 ## 4a. 件ごとの真偽判定 (#1187・部分達成)
 
-- 注記: 本節の件数 (288) は前版の記録であり、本 run では再実行していない (入力 `boot_final.ll` (`work-m11`) が無いため)。§3 の表は前版の記録として扱う。
-- 再現に必要な入力: `work-m11` の `boot_final.ll` (19,787,837 B 記録)、`fl-win64` の `block00031_PE.bin`。
+- 注記: 本節の件数 (288) は前版の記録。再現に必要な入力は `work-m11` の `boot_final.ll`・`fl-win64` の `block00031_PE.bin`。
 - 判定規則 (件ごと・機械語と IR の突合):
   1. 機械語: 候補 jcc の直前の `cmp` 被演算子 (レジスタ/メモリ) と条件コード (`jg` 等) を取る。
   2. IR: 対応する loop_head 側の判定 (`icmp`) を SSA を遡って同じ値に結ぶ。
@@ -64,8 +63,7 @@
 ## 4b. 件ごとの判定の続き (#1498・保留)
 
 - 数値の出所: §4c (#1654 節) と同じ (前版の記録。本 run では再測定していない)。`git diff 088d9eaf HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py` は 0 行。
-- 入力: `boot_final.ll` (`work-m11`) はこの run に無く、`scan_guard.py` の再実行も `strict_evidence.py` の実行もしていない。したがって本節は件数の再現も、TSV の生成もしていない。§3 の 288 は前版の記録として扱う。
-- 証拠表: `tools/m11/trap_triage/strict_evidence.py` は strict 候補ごとに機械語 (jcc 直前 2 命令) と IR (帰属ブロックの終端・loop_head の icmp 本数) を TSV に書くスクリプトで、判定はしない。TSV はコミットしない (`work/` 配下に生成する)。
+- 入力・再現は本節では未実施 (前版の記録)。`strict_evidence.py` は TSV を生成するだけで判定はしない (TSV は `work/` 配下に生成し、コミットしない)。
 - 判定: 3 件 (`10039be`・`1003a66`・`1003b10`) とも**保留**。前版の「真陽性」判定 (IR の `dec_label_pc_*` を根拠にしたもの) は、IR を見ずに書かれていたため撤回する。
 - 偽陽性率: 未測定 (判定母数 0)。
 - 残り 285 件は子 issue に 3 分割した (§6b)。
@@ -187,8 +185,7 @@
 
 ## 4j. 証拠表の行 36〜66 (#3499・部分達成)
 
-- 結論の正本: 件ごとの判定表・根拠・注 1〜4・未解決は `REPORT_APPENDIX_3499.md` の §4j。250 行上限のため分割移動した (内容は削除していない)。
-- 判定ツール `tools/m11/trap_triage/judge_ctx_3499.py` は、main の `judge_ctx.py` (#3502) と名前が衝突したため改名した。
+- 結論の正本: 件ごとの判定表・根拠・注 1〜4・未解決は `REPORT_APPENDIX_3499.md` の §4j (250 行上限のため分割移動。判定ツールは `judge_ctx_3499.py`)。
 
 ## 4i. 証拠表の行 36〜66 の残り (#3564・部分達成: 判定 21 件・真陽性 12・偽陽性 1・保留 8)
 
@@ -217,6 +214,12 @@
 - 残り 0 件 (#4885 の担当 13 件のうち 13 件に判定を付けた)。受入条件 1 の「全件を真偽判定」は保留 6 件のため未達。#4885 は open のまま継続する。
 - 行 119〜158 (#5660): 判定 0 件・保留 40 (`REPORT_APPENDIX_5660.md`)。行 139〜158 (#5689): 真陽性 12・偽陽性 0・保留 8 (`REPORT_APPENDIX_5689.md` §8)。判定方法と入力は付録 §7 に移した。偽陽性率は母数 288 の判定が終わるまで書かない。
 
+## 4o. 証拠表の行 78・81〜84 (#5389・母数 5: 真陽性 0・偽陽性 0・保留 5)
+
+- 件ごとの判定理由・測定 commit (`e5261de58`)・未解決は `REPORT_APPENDIX_5389.md` が正本。本節は結論のみ。
+- 保留 5 件: 78 (count の SSA 同一性)・81 (jcc 左辺と IR の SSA 対応)・82 (間接呼び出しの戻り値)・83・84 (機械語は読み出し 3 回 (cell → qword → `+0x10` dword)、IR は読み出し 2 回 (cell i32/i64 → `+16` i32)。読み出し回数と幅の差が lift 段の欠陥か IR 解釈の誤りかは未確定。判断は PM)。
+- 本 run の素材は `fl-win64` と `work-m11` (ともに実在)。機械語の照合 (jcc の VA・飛び先・deref の段数と幅) は `block00031_PE.bin` で逆アセンブルして確認した。IR (`work-m11` の `boot_final.ll`・sha256 `69c774de…`) は展開して照合した (strict 288・TSV 288 行を再現。judge_dump で 78・81〜84 の IR 本文を取得)。IR の SSA 対応は保留 5 件とも未確定のまま (付録 §3)。`597757f4…` の系統は素材に無く未使用。偽陽性率は母数 288 の判定が終わるまで書かない。
+
 ## 4m. 証拠表の行 159〜193 (#5661・部分達成: 確定 6 件 (真陽性 5・偽陽性 1)・保留 29 (母数 35)。#5685 で 168・169 を確定)
 件ごとの表・根拠・測定 commit (`f195a93a9`)・未解決は `REPORT_APPENDIX_5661.md` が正本。
 行 233〜240 (#5751): 真陽性 8・偽陽性 0・保留 0。236・237 は前 run の保留を、内側ループの counter (`stack_var_-184`・`-180`) で訂正して確定。正本は `REPORT_APPENDIX_5751.md`。
@@ -224,8 +227,7 @@
 ## 4n. 証拠表の行 226〜232 (#5750・母数 7: 真陽性 5 (構造)・保留 2)。正本は `REPORT_APPENDIX_5750.md`。行 226 は #5780 で真陽性 (構造) に確定。行 230・231 は #5773 で真陽性 (構造) に確定 (`REPORT_APPENDIX_5773.md`)。行 228・229 は保留のまま
 
 ## 5. 再現
-
-本 PR の再現手段は `guard699/scan_guard.py`・`trap_triage/strict_evidence.py`・`trap_triage/judge_entry_check.py` で、入力は `work-m11` の `boot_final.ll` を要する (`oc_artifacts: fl-win64 work-m11`)。`block00031_PE.bin` は `fl-win64` 素材に入っている。
+再現手段は `guard699/scan_guard.py`・`trap_triage/strict_evidence.py`・`trap_triage/judge_entry_check.py`。入力は `work-m11` の `boot_final.ll` (`oc_artifacts: fl-win64 work-m11`)。
 
 ```sh
 cd tools/m11
@@ -234,8 +236,7 @@ python3 trap_triage/strict_evidence.py <boot_final.ll> --pe <block00031_PE.bin> 
 python3 trap_triage/judge_entry_check.py <boot_final.ll> strict_evidence.tsv 4 35
 ```
 
-- 期待する出力 (`judge_entry_check.py`): 32 行。行 i の形式は `#<i> <関数> jcc=<jcc の VA> target=<target の VA> | jcc ブロック終端: ... | 脱出先 preds: ...`。先頭行は `#4 function_100bb90 jcc=100bcf4 target=100bd4d` で、以降の各行の関数・jcc・target は上の表の行 i と一致する (前版の記録。IR が無いと照合できない)。
-- 形式の確認 (本 run): 合成 IR (`function_100bb90` を模した 1 関数) と TSV の 1 行で `judge_entry_check.py <IR> <TSV> 1 1` を実行し、rc 0 で `#1 function_100bb90 jcc=100bcf4 target=100bd4d | ...` の形式で出ることを確かめた。IR の実データは使っていない。
+- 期待する出力と形式確認の詳細は `REPORT_APPENDIX_3498.md` §4h。
 
 ## 6. 未解決 (子 issue に分割)
 
@@ -246,5 +247,4 @@ python3 trap_triage/judge_entry_check.py <boot_final.ll> strict_evidence.tsv 4 3
 
 ## 7. 範囲
 
-- 本 REPORT の範囲と 20 MiB 超の blob は `REPORT_APPENDIX_5661.md` §7 に分割移動した (250 行上限・内容は削除していない)。
-- 範囲外: `m11_ov.c`・`docs/DEFECTS.md` (PM 判断)。
+- 範囲外: `m11_ov.c`・`docs/DEFECTS.md` (PM 判断)。範囲と 20 MiB 超の blob は `REPORT_APPENDIX_5661.md` §7 (分割移動)。
