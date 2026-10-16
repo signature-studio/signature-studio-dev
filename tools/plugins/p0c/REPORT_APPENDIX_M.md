@@ -44,7 +44,7 @@ emsdk を導入し (`git clone --depth 1 https://github.com/emscripten-core/emsd
 
 注: 測定 commit 以降に `f80_lower.py` の `_f80b_from_image` (subnormal の丸め位置) を変えた (`842bc5ac3`)。 この修正後の T0/T1 は**未再測定**。
 
-未再測定 (判断 (B)・round 6 の 2026-10-16 の run で確定)。 `batch_lift.sh` は RetDec (`[RETDEC]`・`docs/REFERENCES.md` §4) を呼ぶが、本 runner に RetDec が無い (`/opt/retdec` 無し)。 `$ARTIFACTS_DIR` にも `toolchain-retdec` が無い (`fl-win64.tar.zst` のみ)。 `PLUGIN_MATRIX.json` も本 worktree に無い。 RetDec の取得元は `docs/REFERENCES.md` §4 で `[未確認]` のため、取得元が確定するまで再測定できない。 再測定は子 issue に切らず、#5832 の未解決表に残す (PR 本文 参照)。 再測定に要る素材: `oc_artifacts: fl-win64 toolchain-retdec` と plugin 素材。
+未再測定 (判断 (B)・round 6 の 2026-10-16 の run で確定)。 `batch_lift.sh` は RetDec (`[RETDEC]`・`docs/REFERENCES.md` §4) を呼ぶが、本 runner に RetDec が無い (`[RETDEC]` 未展開)。 `$ARTIFACTS_DIR` にも `toolchain-retdec` が無い (`fl-win64.tar.zst` のみ)。 `PLUGIN_MATRIX.json` も本 worktree に無い。 RetDec の取得元は `docs/REFERENCES.md` §4 で `[未確認]` のため、取得元が確定するまで再測定できない。 再測定は子 issue に切らず、#5832 の未解決表に残す (PR 本文 参照)。 再測定に要る素材: `oc_artifacts: fl-win64 toolchain-retdec` と plugin 素材。
 
 ここの数値 (§2 の 41/41・44/45) は測定 commit `ce3872372` (`_f80b_from_image` の修正 `842bc5ac3` より前) の値で、現 HEAD の変換コードの効果を示さない。
 
