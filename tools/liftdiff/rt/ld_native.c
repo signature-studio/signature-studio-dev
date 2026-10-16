@@ -708,6 +708,20 @@ int main(int argc, char** argv) {
     } else if (!strncmp(l, "NRESETI ", 8)) {   /* LD-268 (#5268): NRST_MMAP の k 番目だけを戻す */
       int nt = 0; u64 d = nrst_reset_mmap_at(atoi(l + 8), &nt);
       printf("{\"nreseti\":%d,\"ntot\":%d,\"diff\":%llu,\"skip\":%llu}\n", atoi(l + 8), nt, (unsigned long long)d, (unsigned long long)g_nrst_skip); fflush(stdout);
+    } else if (!strncmp(l, "NRESETB ", 8)) {   /* LD-268 (#5268): NRST_MMAP の k 番目の [off, off+len) だけを戻す (領域内の半分割り) */
+      int k = 0; unsigned long long off = 0, len = 0; int nt = 0; u64 d = 0; g_nrst_skip = 0;
+      if (sscanf(l + 8, "%d %llx %llx", &k, &off, &len) != 3) { fprintf(stderr, "bad NRESETB\n"); return 4; }
+      int c = 0;
+      for (int i = 0; i < g_nnrst; i++) if (g_nrst[i].cat == NRST_MMAP) {
+        if (c++ != k) continue;
+        if (msync(g_nrst[i].lo, g_nrst[i].n, MS_ASYNC) != 0) { g_nrst_skip++; continue; }
+        u64 lo = off < g_nrst[i].n ? off : g_nrst[i].n;
+        u64 hi = (off + len < g_nrst[i].n) ? off + len : g_nrst[i].n;
+        for (u64 q = lo; q < hi; q++) d += g_nrst[i].lo[q] != g_nrst[i].pr[q];
+        memcpy(g_nrst[i].lo + lo, g_nrst[i].pr + lo, hi - lo);
+      }
+      nt = c;
+      printf("{\"nresetb\":%d,\"ntot\":%d,\"diff\":%llu,\"skip\":%llu}\n", k, nt, (unsigned long long)d, (unsigned long long)g_nrst_skip); fflush(stdout);
     } else if (!strncmp(l, "NRESETX ", 8)) {   /* LD-268 (#5268): NRST_MMAP の k 番目以外を全部戻す (leave-one-out) */
       int k = atoi(l + 8), nt = 0; u64 d = 0; g_nrst_skip = 0; int c = 0;
       for (int i = 0; i < g_nnrst; i++) if (g_nrst[i].cat == NRST_MMAP) {
