@@ -362,6 +362,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     (step の timeout 後に走るかは未実測。merge 後の実 run で確認する)。
     (fix モードの step 上限は agent 40 分・retry 15 分。setup を足すと job の 60 分に近い。素材指定で setup が長い PR では
     retry の上限を縮めることを検討する)。
+  - **implement (issue の /oc run)**: agent の後に `implement-progress.sh check` が、実装 App のコメント・対象ブランチの commit・対象 PR の更新のいずれも無い (`none`) と判定したとき、
+    作業ツリーが clean で HEAD が開始時のまま、残り時間が 1080 秒以上ある場合に限り、job 内で 1 回だけ再試行する (15 分上限)。再試行後もなお `none` なら job を失敗させる。
+    `unknown` (読めない・PR が 1 ページを超える) は再試行しない。fix モードは上の `fix-progress.sh` が対象で、この再試行は対象外 (#5727 受入 6)。
   - **往復の上限**: oc-reviewer の CHANGES_REQUESTED が 1 PR で 5 件に達すると、fix を起動せず PR にコメントを残し
     ラベル `oc:stuck` を付けて止める (`changes_requested -> fix -> review` と `answered -> reopen -> review` の
     どちらの循環も 1 周に 1 件増えるため)。件数は直前の停止コメント (`<!-- oc-fix-limit -->`、bot 投稿) 以降の差し戻しに限る。
