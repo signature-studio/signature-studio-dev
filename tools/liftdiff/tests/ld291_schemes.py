@@ -7,7 +7,8 @@
   S1: IAT 参照の call [rip+disp] だけを外部 API とみなす。戻りは rax 上書き、rdx / xmm0 は引数読みとみなす。
   S2: 上限見積もり (非健全)。呼出し元の継続にある間接 call だけを素通し (何も読まず書かない) とみなす。
       呼出し先の中の間接 call は対象外。候補が増えても採用の根拠にはしない。基準線としてだけ使う。
-  S3: 上限見積もり (非健全)。呼出し先の中の間接 call も素通しとみなす。解決方式が完全に効いたときの上限。
+  S3: 上限見積もり (非健全)。呼出し先の中の間接 call も素通しとみなす。
+  S4: S3 + 呼出し先の間接 jmp は経路ごと捨てる (非健全)。間接 call と間接 jmp の両方を解いたときの近似。
 
 --reasons を付けると、未確定を生んだ理由 (間接 call の形・深さ超過など) を形別に数える。
 """
@@ -28,10 +29,13 @@ BUDGET = 400
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('pe')
-    ap.add_argument('--scheme', default='S0', choices=['S0', 'S1', 'S2', 'S3'])
+    ap.add_argument('--scheme', default='S0', choices=['S0', 'S1', 'S2', 'S3', 'S4'])
     ap.add_argument('--reasons', action='store_true')
+    ap.add_argument('--budget', type=int, default=BUDGET, help='呼出し先の解析の step 上限 (既定 400 = ld215 の --budget)')
     ap.add_argument('--maxdepth', type=int, default=4, help='直接 call の再帰の深さ上限 (既定 4 = ld215 と同じ)')
     a = ap.parse_args()
+    global STEP_BUDGET
+    STEP_BUDGET = a.budget * 4
     t = R.Text(a.pe)
     p = P.PE(a.pe)
     hits = R.call_sites(t, {int(x, 16): x for x in T13})
@@ -58,7 +62,7 @@ def main():
                 continue
             seen.add((va, w))
             steps += 1
-            if steps > BUDGET * 4:
+            if steps > STEP_BUDGET:
                 return 'callee-budget'
             ins = t.at(va)
             if ins is None:
@@ -69,7 +73,7 @@ def main():
                 continue
             if m == 'call':
                 if not ins.op_str.startswith('0x'):
-                    if a.scheme == 'S3':
+                    if a.scheme in ('S3', 'S4'):
                         stack.append((va + ins.size, w))
                         continue
                     return 'callee-indcall:' + form(ins)
@@ -83,6 +87,8 @@ def main():
             w2 = w | frozenset(wr)
             if m == 'jmp':
                 if not ins.op_str.startswith('0x'):
+                    if a.scheme == 'S4':
+                        continue
                     return 'callee-indjmp'
                 stack.append((int(ins.op_str, 16), w2))
             elif m.startswith('j'):
@@ -107,7 +113,7 @@ def main():
                 continue
             seen.add((va, w))
             steps += 1
-            if steps > BUDGET * 4:
+            if steps > STEP_BUDGET:
                 return None
             ins = t.at(va)
             if ins is None:
@@ -136,6 +142,8 @@ def main():
             w2 = w | frozenset(wr)
             if m == 'jmp':
                 if not ins.op_str.startswith('0x'):
+                    if a.scheme == 'S4':
+                        continue
                     return None
                 stack.append((int(ins.op_str, 16), w2))
             elif m.startswith('j'):
@@ -149,7 +157,7 @@ def main():
 
     def reads_of(va):
         if va not in rcache:
-            rcache[va] = callee_reads_s3(va) if a.scheme == 'S3' else R.callee_reads(t, va, BUDGET * 4)
+            rcache[va] = callee_reads_s3(va) if a.scheme in ('S3', 'S4') else R.callee_reads(t, va, BUDGET * 4)
         return rcache[va]
 
     def caller(ret_va):
@@ -239,7 +247,7 @@ def main():
 
     for name in T13:
         va = int(name, 16)
-        if a.scheme == 'S3':
+        if a.scheme in ('S3', 'S4'):
             sm = callee_reads_s3(va)
             ok, must = sm is not None, (sm[1] if sm else set())
         else:
