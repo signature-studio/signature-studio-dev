@@ -59,7 +59,7 @@ def main():
     print('rip 相対で指す命令: %d 件' % len(rip_hits))
     for a, m, s in rip_hits[:20]:
         print('  %s %s %s' % (hex(a), m, s))
-    print('絶対 disp + index で指す命令: %d 件' % len(abs_hits))
+    print('絶対 disp (base なし) で指す命令: %d 件' % len(abs_hits))
     for a, m, s in abs_hits[:20]:
         print('  %s %s %s' % (hex(a), m, s))
     print('即値が表の範囲に入る命令: %d 件' % len(imm_hits))
