@@ -65,6 +65,31 @@ python3 tools/m11/ldfix/mismatch_5436.py OUT.ll --pe <PE> --judge J.json
 **既定 ON の判断**: 既定 OFF のまま据え置く。理由は (1) 到達性が未確定で、差分が効いたかどうか分からない、(2) 機械語との突合は呼出し件数 (IR_FEWER 3→0) による近似で block 単位の完全一致は未確認、の 2 点。
 既定 ON への変更は、到達性の計測 (wasm の `function_439f90` の入口計数) の結果を見てから別 PR で判断する。到達性の計測は #5715 ([CI-238]・親 #5700) で行う。
 
+## 4b. 到達性計測 (#5715 / CI-238)
+
+計測 build は opt-in (`M11_FIX_439F90=1`)。既定 build と既定 IR は変えていない。
+
+- **入口計数**: `function_439f90` の入口に volatile store を 1 つ入れた (`ldfix/m11_439f90_probe_insert.py`)。
+  呼出し無しの store のみ (survey を変えない・#1847)。実行は `ldfix/m11_439f90_reach.sh`、survey は
+  `ldfix/m11_439f90_reach_survey.mjs`。結果は `ldfix/results/reach_439f90_5715.json` (unit 別・942 件)。
+- **結果 (942 unit)**: `function_439f90` 入口に到達 **0 unit** / 未到達 **942 unit**。
+  kind 内訳は ok 873・miss 47・halt0 6・oob 15・noproc 1。
+- **陽性対照**: 同じ build で `function_417b70` (`m11_ov.c` が `M11_ENTRY_PROBE` で常に立てる probe) は **21 unit** で到達。
+  計数の仕組みが動いていることの確認。
+- **読み**: 直接の呼出し元は `function_510750` (IR 185554 行) と間接 call 表の trampoline (`m11_tr_function_439f90`) の 2 つ。
+  どの unit でも入口計数が立たないため、この 942 unit の実行では `function_439f90` は呼ばれない。
+  `function_510750` 自体の到達は本計測では測っていない (未測定)。
+- **build 上の注意**: 計測 build は `m11_build.sh` の既定と同じ link に `m11_439f90_probe_rt.c` を足しただけ。
+  `m11_entry_probe.sh` の 8 関数固定 probe は使わない (439f90 を含まないため)。
+- **残り (本 issue の範囲外)**: 既定 ON への変更は別判断。`function_510750` の到達計測は別 issue が要る。
+
+## 4a. 未測定 (旧記述の解消)
+
+- 旧 §4 の「wasm 直接呼びで unit の結果が変わらないこと」は、`toolchain-emsdk` を素材に含めた本 run で
+  emcc build が通ったため計測可能になった。unit 結果 (ok/miss 件数) の既定 IR との比較は本 run では行っていない
+  (入口計数の目的は到達の確認で、既定 OFF のままの判断材料)。
+- `m11_gen_ir2.sh` の既定 IR への組込み (`M11_FIX_439F90=1` を既定にする判断) は、到達が確認できていないため行わない。
+
 ## 5. 検証の限界
 
 - 機械語との照合は `mismatch_5436.py` の件数 (呼出し件数) による。block 単位の完全一致は取っていない。
