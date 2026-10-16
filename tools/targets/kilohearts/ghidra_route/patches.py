@@ -34,14 +34,14 @@ GTYPE = {
         '184162a98': 'ulonglong',  # xor qword (180fe2791・180fe27bc)・mov qword 書込 (180fe27a8)
         '182989380': 'ulonglong',  # mov qword (180fd1b0e・180fe248a 等)・& 0x3f と ^ の被演算子
         # 関数ポインタ slot (#4671 KH-106)。呼出し 44 箇所は全て `call/jmp [rip+slot]` (CFG dispatch) で、呼び先は直前に rax へ入る値で決まる。
-        # slot の PE 初期値は CFG thunk (`jmp [rip+..]`→`jmp rax`) で、データとして使わない。型は `void (*)()` (引数・戻り値は呼出し側で決まる)。
+        # slot の PE 初期値は CFG thunk (`jmp [rip+..]`→`jmp rax`) で、データとして使わない。型は `int (*)()` (引数は呼出し側で決まる。戻り値は呼出元が eax しか読まない・読まない箇所があるため int。#4693 KH-112)。
         '1813a1d40': 'FNPTR',
     },
     # stereo 閉包 (#4911 KH-134): 型不一致 12 → 2 (emcc error 10 件の解消。本規則が効く C の行は 6 箇所)。
     # 型は同じ PE の同じ VA を delay の表 (上) で機械語確定済みのものを流用する。stereo 側の命令の幅は逆アセンブルで確認済み (REPORT_APPENDIX_4911.md)。
     #   stereo.c 行 1318・1869・1870・1884・1885: `_DAT_182989380`・`_DAT_184162a98` の xor/shift (64bit) → ulonglong。
     #   stereo.c 行 2290: `_DAT_18436cd18 = puVar3 + 0x40` (8 byte 書込み) → longlong。
-    # 残り (1300・1888): `(*_DAT_1813a1d40)(param_1)` の間接呼出し。FNPTR (void (*)()) にすると戻り値を代入する行が void 代入の error になるため未解決。
+    # 残り (1300・1888): `(*_DAT_1813a1d40)(param_1)` の間接呼出し。FNPTR を void (*)() にすると戻り値を代入する行が void 代入の error になるため、int (*)() に直した (#4693)。
     'stereo': {
         '182989380': 'ulonglong',
         '184162118': 'ulonglong',

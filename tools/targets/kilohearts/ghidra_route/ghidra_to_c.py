@@ -362,8 +362,8 @@ def main():
         out.append(LANE_F8_HELPER)
     for va, (ty, kind, _) in sorted(gtypes.items()):
         if ty == 'FNPTR':  # 関数ポインタ slot (#4671): PE の thunk を値として再現せず、到達時 abort の関数を指す
-            out.append('static void FNPTR_%x() { abort(); }' % va)
-            out.append('static void (*fp_%x)() = FNPTR_%x;' % (va, va))
+            out.append('static int FNPTR_%x() { abort(); }' % va)
+            out.append('static int (*fp_%x)() = FNPTR_%x;' % (va, va))
             out.append('#define %s_%x fp_%x' % (kind, va, va))
             continue
         d = pe_bytes(pe, va, 16)
