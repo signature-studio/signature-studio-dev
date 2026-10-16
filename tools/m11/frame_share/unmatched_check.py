@@ -49,6 +49,14 @@ def rbp_entry_offset(mach, va):
     return None
 
 
+def resolve_ptrtoint(body, call_pos, name):
+    defs = list(re.finditer(r'%' + re.escape(name) + r' = ([^\n]*)', body[:call_pos]))
+    if not defs:
+        return name
+    m = re.match(r'ptrtoint ptr %([\w.\-]+) to i64', defs[-1].group(1))
+    return m.group(1) if m else name
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--ir', required=True)
@@ -70,8 +78,8 @@ def main():
         X = rbp_entry_offset(mach, int(p.split('_')[1], 16))
         E = max((x['off'] + x['size'] for x in sites[(p, r['call_at'])]['callee_access']), default=None)
         rec = dict(call_at=r['call_at'], parent=p, callee=callee, prev=r['verdict'], rbp_entry=X, need=E)
-        args = set(m.group(1) for m in re.finditer(r'call [^@]*@%s\((?:ptr|i64|i32)[^%%,]*%%([\w.\-]+)' % re.escape(callee), body or ''))
-        raw = len(re.findall(r'^\s*(?:%[\w.\-]+ = )?call [^\n]*@%s\(' % re.escape(callee), body or '', re.M))
+        args = set(resolve_ptrtoint(body or '', m.start(), m.group(1)) for m in re.finditer(r'call [^@]*@' + re.escape(callee) + r'\((?:ptr|i64|i32)[^%,]*%([\w.\-]+)', body or ''))
+        raw = len(re.findall(r'^\s*(?:%[\w.\-]+ = )?call [^\n]*@' + re.escape(callee) + r'\(', body or '', re.M))
         rec['raw_calls'] = raw
         if E is None:
             rec['verdict'] = 'no_callee_access'
