@@ -29,7 +29,7 @@
 | `FLE_EXTRA_ROOTS` = 98 関数入口 (151 箇所を含む関数) + probe | 151 | 895 / `exit` | 0 | 0 |
 
 - 2 行目の再現手順: 98 関数入口は `pe_slot35_sites.py` の `fn=` 列を一意化したもの (151 箇所・所属関数 98 種・`fn=-` は 0)。`FL_WIN64_DIR=<展開先>` で `python3 tools/python/analysis/flapi/pe_slot35_sites.py | grep ' refs=' | grep -v 'fn=-' | grep -oE 'fn=[0-9a-f]+' | sed 's/fn=/0x/' | sort -u | paste -sd, > roots98.csv` を実行し、その中身 (902 bytes・98 件) を `FLE_EXTRA_ROOTS=$(cat roots98.csv)` に渡して `fle6_measure.sh` (`FLE_BOOT_RUNS=default`) を先に走らせてから、`slot35_vmt_probe.sh` を実行する。
-- 生成元の確認 (本 run): 上のコマンドで 98 件を得た。`fle6_measure.sh` は emsdk 無し (`/opt/emsdk` 無し) の runner で実行できなかったため、2 行目の boot 結果は本付録の前 round の測定値 (`abb026116` 時点) をそのまま引く。本 run の修正は出力式と文書のみで、boot 経路は変えていない。
+- 生成元の確認 (本 run): 上のコマンドで 98 件を得た。`fle6_measure.sh` は emsdk 無し (`toolchain-emsdk` 未配置) の runner で実行できなかったため、2 行目の boot 結果は本付録の前 round の測定値 (`abb026116` 時点) をそのまま引く。本 run の修正は出力式と文書のみで、boot 経路は変えていない。
 
 - 既定経路の基準 (probe なし・worktree): `FLEBOOT_RESULT units_run=895 stopped_at=895 boot_threw=exit`・`ipp ok` (`ptr_15F34A0=0x7f10001c`)。`fle6_measure.sh` (`FLE_BOOT_RUNS=default`) は rc 0・所要 3 分 22 秒 (lift 81 s・clang-plain 100 s・boot 10 s)。
 - `FLE_EXTRA_ROOTS` 付き lift の工程: `fle6_measure.sh` 所要 3 分 29 秒 (lift 84 s・clang-plain 90 s)。`slot35_vmt_probe.sh` の 1 回目は 2 分 18 秒。
