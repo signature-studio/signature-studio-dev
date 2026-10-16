@@ -8,9 +8,11 @@
 - 真陽性 6 (233・234・235・238・239・240)、偽陽性 0、保留 2 (236・237)。
 - 偽陽性率は母数 288 の判定が終わるまで書かない。count = 0 の実行時到達性は未測定。
 
-## 2. 入力と再現 (本 run・foreground)
+## 2. 入力と再現 (判定時の run・foreground)
 
-- 素材: `work-m11` の `tools/m11/work/boot_final.ll` (19,787,837 B・sha256 `69c774de…`)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。`ir_conditions.json` は work-m11 に無く、本付録の判定では使っていない。
+- 素材指定: PR 本文の `oc_artifacts: fl-win64 work-m11` (`work-m11` → `tools/m11/work/`・`fl-win64` → `extracted/`。`docs/WORKFLOW.md` §11)。素材を指定しない run では `work-m11` は展開されず、本付録の判定は再実行できない。
+- 判定時の入力 (展開の事実): `tools/m11/work/boot_final.ll` (19,787,837 B・sha256 `69c774de…`)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。`ir_conditions.json` は work-m11 に無く、本付録の判定では使っていない。
+- 判定時の展開確認: `fl-win64.tar.zst` の内容に `extracted/block00031_PE.bin` が含まれることを `tar --zstd -tf` で確認した (`$ARTIFACTS_DIR` = `/home/runner/artifacts`・`fl-win64.tar.zst` 2,324,302,252 B)。`work-m11` の sha256 一致は判定時の記録による (再実行していない)。
 - `scan_guard.py --report` で strict 288 (fn・jcc は §3 と一致)。`strict_evidence.py --out` で TSV 288 行 (ヘッダ除く)。
 - 文脈: `judge_ctx.py <IR> <TSV> <PE> 233 240` (rc 0・477 行)。関数 `function_e25ef0`・`function_e26510`・`function_e24ee0` の該当ブロックは `grep` と `awk` で個別に読んだ。
 - 測定 commit: `58ee21f1e` (origin/main)。判定に使ったコード (`tools/m11/guard699/`・`tools/m11/ldfix/ldmach.py`・`tools/m11/trap_triage/strict_evidence.py`・`judge_ctx.py`) はこの PR で変更していない。
