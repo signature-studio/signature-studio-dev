@@ -182,7 +182,7 @@
 
 `analysis/flapi/pe_py273_pointee.py` (終了 0・45.0 秒・load 0.99):
 
-- `.bss` の範囲 0x15e6000-0x196ee9c で、宛先オペランドが RIP 相対で、メモリへ書く命令は 4,726 件 (`rip_writes_total=4726`)。書込みの判定は `writes_dest`: 第 1 オペランドが `[rip ...]` で、`cmp`・`test`・`call`・`push`・`bt`・`lea`・分岐・読込み専用の x87 演算・単一オペランドの `mul`/`imul`/`div`/`idiv` を除く (`lock` 接頭辞は外して判定)。内訳は `mov` 2,717・`movsd` 33・`movss` 37 と、`add` 940・`sub` 923・`or` 41・`cmpxchg` 16・`xadd` 5・`xchg` 3・`and` 4・`btr` 2・`cmpxchg16b` 1 (計 4,726)。前版の 2,787 は `mov` 系のみの数で、`mov` 系の件数として読むこと。
+- `.bss` の範囲 0x15e6000-0x196ee9c で、宛先オペランドが RIP 相対で、メモリへ書く命令は 4,726 件 (`rip_writes_total=4726`)。書込みの判定は `writes_dest`: 第 1 オペランドが `[rip ...]` で、`cmp`・`test`・`call`・`push`・`bt`・`lea`・分岐・読込み専用の x87 演算・単一オペランドの `mul`/`imul`/`div`/`idiv` を除く (`lock` 接頭辞は外して判定)。内訳は `mov` 2,717・`movsd` 33・`movss` 37 と、`add` 940・`sub` 923・`or` 41・`fistp` 4・`cmpxchg` 16・`xadd` 5・`xchg` 3・`and` 4・`btr` 2・`cmpxchg16b` 1 (計 4,726)。前版の 2,787 は `mov` 系のみの数で、`mov` 系の件数として読むこと。
 - 大域 3 種が指す `.bss` の実アドレスを、`.text` 内の RIP 相対参照で直接読み書きする件数:
 
 | 大域の指す先 | 読込み | 書込み | 即値 | lea |
