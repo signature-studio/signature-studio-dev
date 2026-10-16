@@ -70,7 +70,7 @@ r1 対 r2 で差が出た 4 KiB ページは 11 枚。image 内 4 枚 (`0x13a500
 ## 7. shim 有 (`FLE_IPP=1`) 経路の 8 run 一致 (#5865)
 
 測定 commit: `cf486ff00` (origin/main・コード変更なし。本 PR は REPORT と結果 JSON のみ)。コード差分 `git diff cf486ff00 HEAD -- tools/flelift` は REPORT / results の 2 ファイルだけ (`tools/flelift` 配下の code 差分 0)。
-素材: `fl-win64` (`$HOME/artifacts/fl-win64.tar.zst` から `extracted/block00031_PE.bin` のみ展開)。emsdk は `[EMSDK]` の pin どおり上流から `emsdk install 6.0.12` → `emsdk activate 6.0.12` で repo 外 (`$RUNNER_TEMP/emsdk`) に入れた (runner に `/opt/emsdk` は無い)。
+素材: `fl-win64` (`fl-win64.tar.zst` から `extracted/block00031_PE.bin` のみ展開)。emsdk は `[EMSDK]` の pin どおり上流から `emsdk install 6.0.12` → `emsdk activate 6.0.12` で repo 外に入れた (runner に既定の `[EMSDK]` 配置は無い)。
 
 工程 (run の再現コマンド):
 
