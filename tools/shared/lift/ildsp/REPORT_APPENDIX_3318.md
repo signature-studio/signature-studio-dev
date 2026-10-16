@@ -15,7 +15,7 @@
 - 測定 commit: `6220b651d` (gate と trap を入れた時点)。以降の変更は `4ed054729` (ヘッダコメントのみ)・`5dd6a2118` (docs のみ)・`2c4b02070` (検査の正規表現)・本 fix の commit (検査を `i64(i64)` に直し、trap の定義を引数付きにした)。§3 の実測は本 fix の commit (HEAD) で取った値。
 
 ## 3. 実測 (HEAD = 本 fix の commit・RetDec v5.0・emsdk 6.0.12・4 core・n=3)
-素材: `fl-win64` (`$HOME/artifacts/fl-win64.tar.zst` を `tar --zstd -xf` で展開、`extracted/block24360_PE.bin`)。RetDec は `RetDec-v5.0-Linux-Release.tar.xz` (GitHub release)、emsdk は `emsdk install 6.0.12`。runner の `/opt/` には無いので取得して使った。
+素材: `fl-win64` (`$HOME/artifacts/fl-win64.tar.zst` を `tar --zstd -xf` で展開、`extracted/block24360_PE.bin`)。RetDec は `RetDec-v5.0-Linux-Release.tar.xz` (GitHub release)、emsdk は `emsdk install 6.0.12`。この run の runner には `[EMSDK]`・`[RETDEC]` の入っていない環境だったので、上の取得で用意した (`docs/REFERENCES.md` の `toolchain-retdec`・`toolchain-emsdk`)。
 
 | 項目 | 値 |
 |---|---|
