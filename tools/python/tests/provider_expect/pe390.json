@@ -1,0 +1,6 @@
+{
+  "tag": "pe390",
+  "refs": ["#3840", "#4830", "#4870"],
+  "note": "PE 0xd75b60 で findEventID の未発見 -1 (PY-400 で確定)、PE 0xd76060 で isDoubleClick の device 無し -7 を確定 (REPORT_PY390・PY-260 #3840)。表 0x16bacb8 の供給元・準備判定・device 有りの値は未確定 (仮置き)。tests/device_diff.mjs が mock と照合",
+  "functions": ["device.findEventID", "device.isDoubleClick"]
+}

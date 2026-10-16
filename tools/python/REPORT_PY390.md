@@ -79,6 +79,19 @@
 - 実測: real **0.09 秒**・user 0.06 秒・sys 0.02 秒。実行前の load average (1 分) 0.07。確認 14 件 OK・rc 0。
 - 素材: `fl-win64.tar.zst` を `tar --zstd -xf` で展開 (real 5.595 秒・user 4.587 秒・sys 5.817 秒)。
 
+## 8. PY-260 (#3840) の実装 (C provider と mock)
+
+PE で確定した分だけを `provider/fl_engine.c` と `host/fl_mock.mjs` に入れた。推測の値は書いていない。
+
+| 関数 | 実装 | 根拠 | 未確定 (仮置き) |
+|---|---|---|---|
+| findEventID (fl_table 331) | 引数 1〜2 (`i\|i`) の型だけ見て **-1** を返す。device・link の割当は見ない | §7 (未発見の -1 は PE 確定) | 表 0x16bacb8 の供給元が空と仮定。見つかった場合の値域は未確定 (§4) |
+| isDoubleClick (fl_table 348) | device 無し (`dev_assigned` 0) → **-7** ("Device not assigned")。device 有りは Unspecified error (code 2) | §1・§2 (-7 は PE 確定) | 準備判定 0x11d1430 は真と仮定。device 有りの値 (plugin の vtbl+0x80) は未実装 |
+
+- 検査: `tests/device_diff.mjs` に両関数の呼出し (device 割当 1/0 × 引数有無) を追加し、mock と C の code・戻り値が一致することを見る。期待値は PE 確定の code で固定。
+- 件数: `tests/provider_expect/pe390.json` を追加 (2 関数)。`provider_check` の implemented は PE 件数から導出される。
+- 測定 commit: 本節の commit (コードを変えた最後の commit)。
+
 ## 6. 差分 (PY-390 時点)
 
 `git diff 60534394a HEAD -- tools/python/analysis/flapi/pe_py390_probe.py` の出力は 0 行 (スクリプトは測定 commit と同一)。`git diff 60534394a HEAD -- tools/python/REPORT_PY390.md docs/DOC_MAP.md` は本 REPORT の commit (REPORT と索引) だけ。

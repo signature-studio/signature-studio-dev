@@ -821,6 +821,14 @@ FL_H(device, getLinkedValue) { int64_t i = A_INT(0, 0); if (i == -1) return fl_r
 FL_H(device, getLinkedInfo) { int64_t i = A_INT(0, 0); if (i == -1) return fl_ret_i(c, -1); LINK_UNIMPL("getLinkedInfo"); }
 FL_H(device, getLinkedParamName) { int64_t i = A_INT(0, 0); if (i == -1) return fl_err(c, FL_E_PLUGIN, "Plugin not valid"); LINK_UNIMPL("getLinkedParamName"); }
 FL_H(device, getLinkedValueString) { int64_t i = A_INT(0, 0); if (i == -1) return fl_err(c, FL_E_PLUGIN, "Plugin not valid"); LINK_UNIMPL("getLinkedValueString"); }
+/* PY-260 (#3840) / PY-390 (#4830): PE 0xd75b60 (書式 "i|i"・引数 2 つは型だけ見る)。成功経路の表 (helper 0xf8c8e0 の表 0x16bacb8) は供給元未確定のため空と仮定し、未発見の -1 を返す (PE 確定・REPORT_PY390 §7)。device の割当は見ない */
+FL_H(device, findEventID) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_i(c, -1); }
+/* PY-260 (#3840) / PY-390 (#4830): PE 0xd76060 (書式 "i")。device 無し (sub object 0) は status -7 (PE 確定)。準備判定 (0x11d1430) は真と仮定。device 有りの値 (plugin の vtbl+0x80) は未確定のため未実装 */
+FL_H(device, isDoubleClick) {
+    NARGS(1, 1); (void)A_INT(0, 0);
+    if (!dev_assigned) return fl_err(c, FL_E_DEVICE, "Device not assigned");
+    return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error (not implemented: device.isDoubleClick assigned)");
+}
 FL_H(device, createRefreshThread) { return fl_ret_none(c); }
 FL_H(device, destroyRefreshThread) { return fl_ret_none(c); }
 FL_H(device, fullRefresh) { return fl_ret_none(c); }

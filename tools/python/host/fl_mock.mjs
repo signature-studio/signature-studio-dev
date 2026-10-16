@@ -623,6 +623,14 @@ export function createMockEngine() {
     "device.getLinkedInfo": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) return -1; throw new FlError("Unspecified error (not implemented: device.getLinkedInfo index>=0)", 2); },
     "device.getLinkedParamName": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) throw new FlError("Plugin not valid", 8); throw new FlError("Unspecified error (not implemented: device.getLinkedParamName index>=0)", 2); },
     "device.getLinkedValueString": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i === -1) throw new FlError("Plugin not valid", 8); throw new FlError("Unspecified error (not implemented: device.getLinkedValueString index>=0)", 2); },
+    // PY-260 (#3840) / PY-390 (#4830): PE 0xd75b60 (書式 "i|i")。表 0x16bacb8 は供給元未確定のため空と仮定し、未発見の -1 を返す。device・link の割当は見ない (C provider と同じ)
+    "device.findEventID": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return -1; },
+    // PY-260 (#3840) / PY-390 (#4830): PE 0xd76060 (書式 "i")。device 無しは -7 (PE 確定・準備判定は真と仮定)。device 有りの値は未確定のため C provider と同じ未実装 error (code 2)
+    "device.isDoubleClick": (...a) => {
+      arity(a, 1, 1); argI(a, 0, 0);
+      if (!st.devAssigned) throw new FlError("Device not assigned", 7);
+      throw new FlError("Unspecified error (not implemented: device.isDoubleClick assigned)", 2);
+    },
     // PY-206 (#3494): PE 0xd75f40・0xd75f80・0xd75fc0 は assigned 機器 (obj.+0x50) の vtbl 先を呼び、戻り status 0 で None を返す (REPORT_PY206)。vtbl 先の効果は未読のため状態を持たない
     "device.createRefreshThread": (...a) => { arity(a, 0, 0); },
     "device.destroyRefreshThread": (...a) => { arity(a, 0, 0); },
