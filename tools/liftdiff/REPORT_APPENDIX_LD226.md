@@ -15,7 +15,7 @@ LD-240 (#4801) で hi 区間の測定誤りを直した (下の §0)。
 
 ## 1. 測定条件
 
-- 素材: `[WIN64]` (`extracted/block00031_PE.bin`)・`[WORK-LIFTDIFF]`・`[WORK-M11]`・`[EMSDK]`。
+- 素材: `[WIN64]` (`extracted/block00031_PE.bin`)・`work-liftdiff` (`tools/liftdiff/work/`)・`[WORK-M11]`・`[EMSDK]`。
 - wasm: `python3 ldlib/build_wasm.py targets/m11.json --force` → `OK` (`wasm_size` 4464521・`sig_mismatch` 0・`undefined` 0)。
 - 機: 4 vCPU・RAM 15 GiB。5 条件を `xargs -P 3` で流した。wall 7 分 15 秒 (435 s)。load 0.44 (開始時) 〜 1.97 (終了時)。
 - 対象: shard 1 の chunk 1 の対象件数は **17** (REPORT の 18 件と 1 件違う。§6)。
@@ -54,6 +54,7 @@ LD-240 (#4801) で hi 区間の測定誤りを直した (下の §0)。
 - RESET 差分の列は、対象 17 件の各 RESET で戻した byte 数 (`*.reset.json` の先頭 4 件)。RESET は対象 case の直前に送るため、各値は「その時点までに case が書き換えた量」で、snapshot からの累積ではない。同じ HEAD (`253902726`) を 2 回流した (`0a7e580f8` 時の 1 回目と本測定) ところ、verdict 19 件は一致し、`sta_img_hi` の 1 件目の差分も 15,321,083 B で一致した。2 件目以降の差分は測定ごとに変わった (`0a7e580f8` 時は `sta_img_hi` の 2 件目が 39,757 B、本測定は 14,699,540 B)。原因は未特定で、この列は n=2 でしか確認していない (未解決 → #3384)。
 - 前版 (誤った差分) からの変化は、`sta_img_hi` と `all` で `0x4bf600`・`0x50ab90`・`0x7850d0`・`0xb77200` の 4 件が mismatch → match になったこと。他の値は変わらない。
 - 同じ wasm で `RESET 6`・`RESET 2`・`RESET 4` を連続で送った直接確認では、いずれも `diff 0` (戻し後の 2 回目は差分なし)。戻しは冪等。
+- main 取り込み後 (merge `88c5e6164`) に `ld_native` を作り直し、`sta_img_hi`・`sta_img` の 2 条件を再測定した。verdict 17 件は本測定と全件一致 (差分 0)。取り込みで入った `ld_native.c` の変更は LD-268 の `NRESETB` 経路で、本測定の `RESET` 経路 (wasm・native) とは別。
 
 ## 4. 読み取り
 
