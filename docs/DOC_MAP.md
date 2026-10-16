@@ -875,7 +875,7 @@
 | `tools/flp/REPORT_APPENDIX_3053.md` | ~40 | flp #3053 (L-15): Render tests の 32-bit float 全数書き出しの部分結果 (59 本実行・54 本成功・結果 TSV は `corpus/render_export_3053.tsv`)。残りは子 issue |
 | `tools/flp/REPORT_APPENDIX_4376.md` | ~40 | flp #4376 (L-17): Render tests 残り 23 本の 32-bit float 書き出し (成功 19・WAV なし 3・要確認 1。結果 TSV は `corpus/render_export_4376.tsv`)。残りは #4598・#4599 |
 | `tools/flp/REPORT_APPENDIX_5649.md` | ~45 | flp #5649 (PY-5381): 実行時観測の前提。wine64 9.0 + gdb で FL64.exe を起動し、attach して VA `0x140006eaf` にブレークを張れることを実測 (命中は未確認)。ptrace_scope=0 の前提と再現手順 |
-| `tools/flp/REPORT_APPENDIX_5718.md` | ~84 | flp #5718 (PY-5384): FLEngine_x64.dll の `pred` (VA `0x12d8d30`) を gdb で実測 (命中 6000 件・呼出し元 3 系統)。loop (`0x12d94f0`) は未命中で入力述語は未確定 |
+| `tools/flp/REPORT_APPENDIX_5718.md` | ~86 | flp #5718 (PY-5384): FLEngine_x64.dll の `pred` (VA `0x12d8d30`) を gdb で実測 (命中 6000 件・呼出し元 3 系統)。loop (`0x12d94f0`) は未命中で入力述語は未確定 |
 | `tools/flp/REPORT_APPENDIX_4598.md` | ~50 | flp #4598 (L-18): 打ち切り 8 本の再測定 (Patcher (effect) は rc=0 で成功、未達 8 本は 120 s で WAV なし・Fruity Center は 300 s でも不可)。結果 TSV は `corpus/render_export_4598.tsv`。原因は未特定 |
 | `tools/flp/REPORT_APPENDIX_3052.md` | ~233 | flp REPORT §18 全文 (#3052 WFBox/DitherBox 読取り関数の静的調査: 文字列・thunk・直接呼出しの計数、候補と未解決。再現 `s3_regread_xref.py`) と §19 (WFBox の RegQuery が通る汎用ループ `0xba5d10` の関数先頭置換による確認。再現 `s4_bisect.sh`・`s4_xref.py` (既定と `fn`))・§20 (読取り関数 `0xd1da70`・呼出し箇所 `0xd1dd61` を置換試験で確定。書式引数の上流は未確定。再現 `s2_render_probe.sh` の `S2_PATCH`)。§21 (Autogun の 32-bit 書出しの書き手の切り分け: `0x670fd0` は実行されず、実行される書き手は `0x674620`・`0x674800`。再現 `s5_writer_matrix.sh`)。250 行上限のため分割移動 |
 | `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
