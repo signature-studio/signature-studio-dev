@@ -51,6 +51,9 @@ static void* m11_cwatch(u64 a, u64 n, u32 line) {
 #define Q(lva) (*(volatile u64*)m11_cwatch((u64)(uintptr_t)(lva), 8, __LINE__))
 #define D(lva) (*(volatile u32*)m11_cwatch((u64)(uintptr_t)(lva), 4, __LINE__))
 #define B(lva) (*(volatile u8*)m11_cwatch((u64)(uintptr_t)(lva), 1, __LINE__))
+#define WA(a, n) ((void*)m11_cwatch((u64)(uintptr_t)(a), (n), __LINE__))
+#else
+#define WA(a, n) ((void*)(uintptr_t)(a))
 #endif
 
 typedef struct { u32 va; void* fn; } m11_disp_ent;
@@ -863,7 +866,7 @@ u64 function_414ad0(u64 arg1, u64 arg2) {
         D(slot + 0xc) = esi;
         Q(arg1) = slot + 0x10;
         u64 r = function_414850(Q(arg1));
-        *(volatile unsigned short*)(uintptr_t)(r + (u64)(r13 * 2)) = 0;
+        *(volatile unsigned short*)WA(r + (u64)(r13 * 2), 2) = 0;
         return r;
     }
     u64 rdi = function_412c20(esi);
@@ -898,7 +901,7 @@ unsigned long long function_414ad0(unsigned long long s, unsigned long long newl
         D(tmp + 0xc) = (u32)n;
         Q(s) = tmp + 0x10;
         u64 pc = function_414850(Q(s));
-        *(unsigned short*)(uintptr_t)(pc + (u64)(long long)n * 2) = 0;
+        *(unsigned short*)WA(pc + (u64)(long long)n * 2, 2) = 0;
         return 0;
     }
     rdi = function_412c20((u64)(u32)n);
@@ -952,17 +955,17 @@ unsigned long long function_43a3f0(unsigned long long s, unsigned long long valu
     else nd = 9 + (v >= 1000000000u);
     function_414ad0(s, (u64)(u32)(nd + sb));
     u64 r8 = Q(s);
-    *(unsigned short*)(uintptr_t)r8 = 0x2d;
+    *(unsigned short*)WA(r8, 2) = 0x2d;
     r8 += (u64)(long long)(signed char)sb * 2;
     while (nd > 1) {
         u32 q = v / 100u;
         u32 rem = v - q * 100u;
         nd -= 2;
         u32 pair = (u32)('0' + rem / 10u) | ((u32)('0' + rem % 10u) << 16);
-        *(u32*)(uintptr_t)(r8 + (u64)(long long)nd * 2) = pair;
+        *(u32*)WA(r8 + (u64)(long long)nd * 2, 4) = pair;
         v = q;
     }
-    if (nd != 0) *(unsigned short*)(uintptr_t)r8 = (unsigned short)(v | 0x30u);
+    if (nd != 0) *(unsigned short*)WA(r8, 2) = (unsigned short)(v | 0x30u);
     return s;
 }
 
@@ -1093,7 +1096,7 @@ static u64 function_9b4b00(u64 rcx) {
     u64 rbx = rcx;
     u64 rax = function_481790((void*)(uintptr_t)Q(R(0x805a8)), 1);
     Q(rbx + 0x54) = rax;
-    *(volatile u8*)(uintptr_t)(rbx + 0x34) = 0;
+    *(volatile u8*)WA(rbx + 0x34, 1) = 0;
     function_9b5450(rbx);
     function_4133f0(rbx + 0x48, R(0x5b4b74));
     function_412d60(rbx + 0x80, 0);
