@@ -13,7 +13,7 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit (コードを最後に変えた commit) | `plugins_getname_facts.py` を追加した commit (`git log -1 --format=%h -- tools/python/analysis/flapi/plugins_getname_facts.py`)。下の差分はその commit から HEAD まで |
+| 測定 commit (コードを最後に変えた commit) | `git log -1 --format=%h -- tools/python/analysis/flapi/plugins_getname_facts.py` の出力。下の差分はその commit から HEAD まで |
 | 素材 | `[WIN64]` (`fl-win64.tar.zst`) から `block00031_PE.bin`・`block24429_DATA.bin` (midi.py)・`block24430_DATA.bin` (utils.py)・`block25159_DATA.bin` を展開 (展開先は `FL_WIN64_DIR/extracted`)。`tar --zstd --wildcards` で real 2.642 s (1 回目は `block_manifest.json` が無く警告のみ) |
 | 検査 | `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/plugins_getname_facts.py` → 23 項目 PASS・FAIL 0・rc 0 |
 | 逆アセンブル | capstone 5.0.7。`0xd80d60`〜`0xd81127` (約 220 命令)。補助関数 `0x12b69b0`・`0x1331340`・`0x41a7b0`・`0xc3cfa0`・`0x413a60`・`0x41c650`・`0x414200`・`0x43c870` を読んだ |
