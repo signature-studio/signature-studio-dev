@@ -32,7 +32,7 @@
 
 ## 3. 影響範囲 (`final.ll` を走査した結果)
 
-RetDec 定義の引数を超えて、本体が `%argN` を読むのに定義が無い関数を数えた (`final.ll` の全 define を走査):
+RetDec 定義の引数を超えて、本体が `%argN` を読むのに定義が無い関数を数えた (`final.ll` の全 define を走査。走査スクリプトは repo に無く、本 PR では保存していない。再現には `final.ll` の define ごとに `%argN` の使用と定義を照合する一時スクリプトが要る):
 
 | 関数 | 定義行 | 未定義の `%argN` |
 |---|--:|---|
@@ -62,7 +62,7 @@ khsk18:
 - `final.ll` は `%arg3` の箇所 (4918 行) で emcc が止まるため、この欠陥は今の run では見えない。`%arg3` を直した後の `clang -x ir` で `expected instruction opcode` (5228 行) として初めて出る。
 - 実測: `final.ll` の 4876 行の定義だけを `(... , i64 %arg3, i64 %arg4)` に置き換えた試験コピーは、`5228:1: error: expected instruction opcode` で止まった (`%arg3` の報告は消えた)。
 
-## 5. 修正の方向 (未実施・#5111 の受入)
+## 5. 修正の方向 (未実施・#4689 の受入)
 
 - `pass_f2` の署名組み立てを、GPR 引数は位置に関係なく必ず残し、xmm の live-in は**追加**の引数として足す形にする (GPR と XMM の位置の衝突を解く)。call 側の引数数も同時に揃える。
 - `pass_branches` は、領域の末尾が terminator で終わるときに `fn.after` へ `br` を足さない。
