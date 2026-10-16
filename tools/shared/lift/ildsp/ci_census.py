@@ -3,6 +3,7 @@
 
 usage: ci_census.py <ci.drc.ll> <ranges.json> [ci.rs.ll]
 検査 (欠けると exit 1): 範囲の 36 関数が全て define されていること (entry は export 名 GeneralPitchShifter_CreateInstance で出る)。
+  範囲外の define のうち IR のどの call からも参照されないもの (orphan。計算ジャンプ表の経路の欠落の疑い) が無いこと。
   ci.rs.ll (ci_restore_stores.py の出力) を渡したときは、書き込み系 helper (movups・movntps・movaps・movapd) の件数が
   x86 の期待値と一致すること、復元後の `store i128` が「復元前 + movups/movntps の件数」と一致すること (movaps/movapd は
   既存の store を置き換えるだけで件数は変わらない)、復元後に helper の呼び出しが残らないこと。
