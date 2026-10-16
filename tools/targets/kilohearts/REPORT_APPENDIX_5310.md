@@ -7,9 +7,9 @@
 - 4 件の呼出し直後に読まれる戻り値レジスタは **機械語で確認済み** (下の表・`void_ret_check.sh` の実出力)。4 件とも戻り値を使っている。
 - 4329 の呼出先 `FUN_180fd27a8` は、機械語上 `call FUN_180fbde90` の後に rax・ax を書かずに `ret` する。よって呼出元が読む `ax` は `FUN_180fbde90` の戻り値の下位 16 bit である可能性が高い (未確認。`FUN_180fbde90` の戻り値型を機械語で見ていない)。前回の付録の「本体は `return;` で矛盾する」は、この機械語と合わない。
 - `FUN_180fe24b8` も同様に、`call FUN_180fe2470` の後に rax を書かずに `ret` する (未確認。`FUN_180fe2470` の生成宣言は repo 内に無い)。
-- 規則は `FUN_180fdc880` (3968) の 2 件 (宣言 `double`・`return *param_2;`) と、#5913 (KH-179) で追加した **4329 `FUN_180fd27a8` (宣言 `short`・`return FUN_180fbde90(...)`) の 2 件** と **5001 `FUN_180fe24b8` (宣言 `ulonglong`・`return FUN_180fe2470(...)`) の 2 件**。根拠は下の「機械語」節と「#5913 の確認」節。emcc は pointer・整数型の不一致を通すので、件数が減っても値の正しさは検証されない。
+- 規則は `FUN_180fdc880` (3968) の 2 件 (宣言 `double`・`return *param_2;`) のみ。根拠は下の「機械語」節。emcc は pointer・整数型の不一致を通すので、件数が減っても値の正しさは検証されない。
+- 4329 `FUN_180fd27a8`・5001 `FUN_180fe24b8` の規則 (宣言 `short`・`ulonglong`) は **入れない (規則 0 件)**。callee `FUN_180fbde90`・`FUN_180fe2470` の生成宣言行が確定していないため。根拠と未確定点は「#5913 (KH-179) の扱い」節。確定条件は #5310 に移す。
 - 2122 (`FUN_180fc4590`) は未投入。本体の `return;` が 39 件あり、経路ごとの xmm0 を決めてから規則にする。受入 2 の残り・受入 3 は未達 (#5310 Refs)。
-- 再確定の条件 (4329・5001 共通): callee の生成宣言行 (`FUN_180fbde90`・`FUN_180fe2470`) を Ghidra 出力から引用し、ret 経路で rax (ax) が戻り値になることを機械語で示す。`HeartCore.core_64` は `fl-win64` 素材に無いため、`plugins-kilohearts` 由来の素材が要る。
 
 ## 機械語 (3968 `FUN_180fdc880` の規則の根拠)
 
@@ -53,16 +53,18 @@ PE の objdump は `call   0x<番地>` の形で出る。前回の照合は `0x`
 - 生成 C の宣言 (`void`) と Ghidra の `return;` は、`FUN_180fbde90` の戻り値型が未確定のため出た誤り。
 - 2122・3968・5001 の callee 本体の戻り値 (xmm0・rax) は、生成 C の `return` だけでは確定しない (`summary.tsv` の `body_bytes` が 1 で、関数範囲が Ghidra で正しく取れていない)。3968 は上の機械語で確定した。2122・5001 は未了。
 
-## #5913 (KH-179) の確認 (未確認・暫定)
+## #5913 (KH-179) の扱い (規則は入れない)
 
-- 4329・5001 の規則 (`patches.py` の `delay` の 4 件) は、**callee の生成宣言行の引用も機械語の再確認も付録に記録されていない。暫定の規則であり、確定していない**。
-- 上の機械語の節の記述 (`call` → `add rsp` → `ret`) は `FUN_180fd27a8` (`180fd27a8`) と `FUN_180fe24b8` (`180fe24b8`) の直接の確認に基づく。ただし callee `FUN_180fbde90`・`FUN_180fe2470` の宣言型 (`short`・`ulonglong`) は、生成 C の宣言行を引用して照合していない。
-- 再確定に必要な記録 (未了): (a) `FUN_180fbde90` と `FUN_180fe2470` の生成宣言行の引用 (Ghidra 出力)、(b) 全 ret 経路で `ax`/`rax` が戻り値として設定されることの objdump 出力。`HeartCore.core_64` (`plugins-kilohearts` 由来) が要る。
+- 4329 `FUN_180fd27a8` の呼出元 `180fcdc2d` は `movzx ecx,ax` で ax を読み、`FUN_180fd27a8` は `call 180fbde90` の後に ax を書かずに `ret` する (上の機械語の節)。ただし callee `FUN_180fbde90` の生成宣言行を引用して型を確定していない。
+- 5001 `FUN_180fe24b8` の呼出元 `180fd2a64` は `test rax,rax` で rax を読み、`FUN_180fe24b8` は `call 180fe2470` の後に rax を書かずに `ret` する。callee `FUN_180fe2470` の生成宣言行は repo 内に無い。
+- 同じ callee `FUN_180fbde90` の `(short *)` は、`REPORT_APPENDIX_4835.md` で宣言型が未確定として規則を撤回済み。`scen_qemath.h` の `_dtest` (rcx = `double*`) とも食い違う。よって `short`・`ulonglong` の規則は入れない。
+- 確定に必要な記録 (#5310 に移す): (a) `FUN_180fbde90` と `FUN_180fe2470` の生成宣言行の引用 (Ghidra 出力)、(b) 全 ret 経路で `ax`/`rax` が戻り値として設定されることの objdump 出力。`HeartCore.core_64` は `plugins-kilohearts` 由来 (sha256 `d55ce8b4c0ad7ebe…`) で取得できるが、Ghidra 12.1.4 (`[GHIDRA]`) の入手に要る。
 - `FUN_180fc4590` (2122) は 176 の `ret` 命令を持ち、生成 C の 2122 行の本体がある。経路ごとの xmm0 の決定は未了。
 
-## 未確認の記録 (本 PR の差し戻し対応)
+## 測定の扱い
 
-- PR 本文にあった census の数値 (emcc error 305 → 303、Gain/Haas/Gate の `.o` サイズ、decompile 151/151、wall 48.9 s) は、本 run で `plugins-kilohearts`・`toolchain-emsdk` が無く再現できなかった。**未確認のため本付録では採用しない**。再測定は `oc_artifacts: fl-win64 plugins-kilohearts toolchain-emsdk` で行い、結果を本付録の「測定」節に入れ直す。
+- PR 本文にあった census の数値 (emcc error 305 → 303、Gain/Haas/Gate の `.o` サイズ、decompile 151/151、wall 48.9 s) は、本付録の測定節に記録がないため採用しない。
+- `ghidra_route` は main と同一に戻した (`patches.py` の差分 0)。よってコードの測定 commit は `a83469d96` のまま、以後の差分 (文書のみ) は `git diff a83469d96 HEAD -- tools/targets/kilohearts/ghidra_route` で空。
 
 ## 未解決
 
