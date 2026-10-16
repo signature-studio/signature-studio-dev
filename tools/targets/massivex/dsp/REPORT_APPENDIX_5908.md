@@ -10,7 +10,7 @@
 3. **issue 本文の site 分類を訂正**: `0x15d4c00` は「前段 call なし」ではなく **F 内で xmm4 が定義済みの経路がある (D)**。残り 3 件 (`0x1191850`・`0x6be100`・`0x6beae0`) は前段 call あり (C) で、一致する。`0x1a11e00` は E。
 4. **G 側の入口読みは成立しない (未解決)**: E 43 件の転送先 G は、いずれも pdata 始点ではなく、pdata 関数の**途中**にある (43/43)。命令境界は 7 件のみで、35 件は線形復号の命令境界ではなく、1 件は pdata 範囲外。よって「G の入口 livein が立つ」は関数入口の読みになっておらず、G が実際に転送値を要求するかは判定できない。
 
-## 1. 手順と測定 (測定 commit = 本 PR の scripts commit・HEAD 上で再実行済み)
+## 1. 手順と測定 (測定 commit = `dba7c5908`・scripts は HEAD まで差分 0・本 run では再実行していない。出力は測定時の記録)
 
 - `scripts/mx63_u3e_split.py`: 母集団 = seeds ∪ one_round の pdata 始点 604 件 (入口 livein xmm4/5 = 0)。各 F の direct call/jmp site を次で分類する。
   - D: F 内で xmm4/5 が (いずれかの経路で) 定義済み (may-def ≠ 0)
