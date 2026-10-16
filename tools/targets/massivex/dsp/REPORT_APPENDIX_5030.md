@@ -142,10 +142,18 @@
 - 受入 1 (呼出元が xmm2 に float を載せて渡すか): **未確定**。修正後の判定を素材で実測していないため、結論は出さない。
 - 測定の状態: `mx60d_entry_xmm2.py` は再実行していない。修正後の判定の出力 (exit code・判定行) は未実測。
 - 素材 `plugins-massivex.tar.zst` の中身 (実測): `NI_Massive_X_1.7.1.dmg` (1.58 GB) と `Native Instruments Massive X v1.7.1.exe` (1.87 GB) の 2 件。`Massive X.vst3` は tar の直下には無い。
-  - 訂正 (§3.8 で実測): 上の「取り出せない」は誤り。`parse_setup_headers.py` → `extract_massivex.py <exe> work key` で `Massive X.vst3` は取り出せ、md5 `622993e7…` (95,356,824 B) が一致する (§3.8)。
+  - 訂正の主張 (取り出せた・md5 一致) は、本節の時点で REPORT に実測として残っていない。本 run でも素材が無く再現できないため、実測としては扱わない (§3.8)。
   - `.dmg`: `7z` で HFS として開けるが、中身は macOS 版 installer (`.app`・`osx-arm64`/`osx-x86_64`)。`.vst3` の文字列・ファイルは無い。
   - `.exe`: PE 本体 (約 1.15 MB) の後ろに約 1.7 GB のオーバーレイ。オーバーレイ先頭の CAB (`MSCF`, offset 1702051165) は、ヘッダの `cbCabinet` が 388 MB、実際の残りが 168 MB しかなく、途中で切れている。`7z` は開けない。オーバーレイ全体のエントロピーは約 8.0 で、別形式の平文は見つからなかった。
   - 結論: 現在の素材から `Massive X.vst3` は取り出せない。取り出し経路 (完全な `.exe` の再取得、または installer の別経路) は素材側の問題で、本 PR のコードでは直せない。判定は未実測のまま。
   - 再測定の条件: `Massive X.vst3` (md5 `622993e76565f49c094063a2b717d6ca`) を含む素材で `mx60d_entry_xmm2.py <vst3> 17b460` を実行し、exit code と判定行を本節に貼る (起票先: #5498 の次の run)。
 - 受入 1 の残り (`this` の出所・27 箇所の呼出元の確定) と受入 2 (`rbx` の動的型): **未達のまま** (§3.4・§3.6 の未了を継続)。
 - 未了 (起票先: #5498 の次の run): `0x17a2ac0` の `this` は `[rbp+0xd8]` から来る (関数内で vtable 呼出しが多く、個別の遡りは本 run の範囲外)。index 30 の 27 箇所の `this` 型の分類。`0x17a4b0` の生成元。
+
+### 3.8 追補 (MX-60 #5498・`scripts/mx60d_entry_xmm2.py`・測定未実施)
+
+- 結論: 受入 1 の xmm2 判定は**確定不能** (渡さない / 渡す のどちらにも結論を出さない)。
+- 測定の状態: **未実測**。`mx60d_entry_xmm2.py <vst3> 17b460` の exit code・所要時間・判定行、`0x18038dfe8` の判定行、`0x1807568e8` の解析不能箇所 (件数・先頭アドレス)、`0x181a52850` の pdata 範囲の不正は、いずれも本節では確定していない。実測値の追記は #5498 の次の run で行う。
+- 素材: `$ARTIFACTS_DIR` には `fl-win64.tar.zst` のみで、`plugins-massivex` は無い。`Massive X.vst3` を用意できず、本 run では再測定しなかった。
+- 測定の再実行条件: `plugins-massivex` を含む `oc_artifacts:` で起動し、`Massive X.vst3` の md5 (期待値 `622993e76565f49c094063a2b717d6ca`・95,356,824 B) を確認してから `mx60d_entry_xmm2.py <vst3> 17b460` を実行する。
+- 測定 commit: 本 run では測定していないため、判定の根拠にしない。
