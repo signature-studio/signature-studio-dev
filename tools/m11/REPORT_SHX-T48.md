@@ -98,6 +98,7 @@
 ## 6. 検証
 
 - 測定 commit: `7306126a0` (origin/main)。本 PR の変更は `tools/m11/frame_share/unmatched_check.py` (`ptrtoint` 解決・書式化の修正) と本 REPORT。
+- `git diff 7306126a0 HEAD -- tools/m11/frame_share` には `unmatched_check.py` (113 行追加) と `cfg_check.py` (244 行追加) が出る。判定の連鎖 (detect → site_check → base_check → unmatched_check) は `cfg_check.py` を呼ばないため、上記の測定値への影響はない。
 - 実データ run: `m11_gen_ir2.sh` → `m11_post.py` → `detect.py` → `site_check.py` → `base_check.py` → `unmatched_check.py` の順に、本 PR の HEAD で実行した。
 - `ptrtoint` 解決は、呼出し行より前で最も近い同名 SSA の定義を使う。同じ名前が複数の定義を持つ IR では誤る余地がある。本データの 59 site では、解決先が全て alloca 名 (`stack_var_X`) に一致した。
 - 既存の `site_check.py` (301 ok) は REPORT_SHX-T44 §6 と一致。`base_check.py` の `ir_truncated` / `unmatched` / `no_prologue` は 242 / 56 / 3 (旧 204 / 38 とは不一致。§3 の注)。
