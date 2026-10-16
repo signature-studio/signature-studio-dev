@@ -91,7 +91,22 @@
 | 7 関数の受け手の同インスタンス確定 (手作業追跡) | 受入条件の残り。slot 1 が TUndoEvent_MovedFXTracks を受けるかの確定 | 子 issue #4995 へ移送 |
 | `pe_py275_map_slot1.py` の自動追跡が候補ゼロ | 自動化の信頼性。結論には使っていない | #4995 |
 
-- 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py275_map_slot1.py` → Q1〜Q5 ALL PASS、終了 0、所要 36.7 秒 (n=1、load average 0.82)。
+- 検証: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_map_slot1.py` → Q1〜Q5 ALL PASS、終了 0、所要 28.1 秒 (n=1、load average 0.96、HEAD `5e11efbe6` で再測定)。
+
+## 7a. #5471: 3 関数の受け手の追跡 (関数内で確定・関数をまたぐ箇所は未確定)
+
+- 本節の probe: `pe_py275_receivers.py` (R1〜R12)。対象は 0x69b640・0x8c9d20・0xb70190 の 3 関数。関数の範囲は次の int3 パディングまで (0x69b640..0x69be16・0x8c9d20..0x8ca20e・0xb70190..0xb702eb)。
+- 関数内の命令だけで確定した事実:
+
+| 関数 | [map+8] 読出し | 読出し値の行き先 (関数内) | slot 1 呼出し | slot 1 の receiver の出所 | 判定 |
+|---|---|---|---|---|---|
+| 0x69b640 | 69b74b (キー取得)・69b88e (値) | 69b88e の値は `[rbp+0xe0]`・`[rbp+0xd8]` に入り、算術と 69b8c5 の格納にだけ使われる。69b340 へは `r8` 引数として渡る (69bb8e) | 5 件。69b79e・69ba6c・69bdcc・69be0c は `[Self+0x44]` (`[rbp+0x120/0x128]` 経由)。69b7f1 は `0x68b3a0` の戻り値 (大域変数の singleton) | 読出し値を receiver に使う箇所は関数内にない | probe の検査範囲 (R6: 呼出し直前 3 命令と `[rbp+0xd8]`・`[rbp+0xe0]` の 2 スロット) では、読出し値が receiver になる箇所を検出しなかった。69b340 内の receiver 出所は未追跡 |
+| 0x8c9d20 | 8c9e38 (`rsi`) | `rsi` は 8c9e38 以降、各種 helper の引数 (`rcx`・`rdx`・`r8`) としてだけ使われる | 1 件 (8ca1be)。receiver `[rbp+0x28]` は 8c9d8f で virtual call `[rax+0x10]` の戻り値を 1 回だけ書かれる | 読出し値と別経路 | probe の検査範囲 (R9: receiver スロットの書込みを 1 箇所に限定) では、読出し値が receiver になる箇所を検出しなかった。`rsi` を受けた helper (8c9a70・8c9c70・8c9a60・8cabf0・8c63d0・8c6530・8c67c0・8c7370・8c7450) 内の slot 1 は、関数本体の列挙では 0 件だが、関数をまたぐ受け渡しは未追跡 |
+| 0xb70190 | b7024b (`[Self+0x950]` の固定テーブル) | 新規オブジェクト `rdi` (0xb721a0 の戻り値) の `+0x18` に格納される。`rdi` はこの関数内で他に渡されない | 1 件 (b70297)。receiver は `[Self+0x988]` (b7028a) | 読出し値と別経路 | probe の検査範囲 (R10〜R12) では、読出し値が receiver になる箇所を検出しなかった。`rdi` の出所 (0xb721a0 の結果) は関数外に渡らないことを命令列で確認 |
+
+- **同インスタンスの確定は 0 件**。3 関数とも、probe の検査範囲では「読出し値が slot 1 の receiver になる」箇所を検出しなかった。ただし、0x69b340 (69b640 からの r8 引数)・0x8c9a70 ほか (8c9d20 からの rsi 引数) の内部は、この probe では追っていない。確定には、これらの callee の receiver を追う必要がある。
+- 検査の限界: R6 は呼出し直前 3 命令の文字列一致だけを見る。別レジスタ経由の受け渡しは対象外。
+- 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py275_receivers.py` → R1〜R12 ALL PASS、終了 0、所要 29.7 秒 (HEAD `5e11efbe6` で再測定、n=1、load average 0.96)。素材は `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB) から `block00031_PE.bin` (22,227,016 バイト) を 2.9 秒で展開。
 
 ## 7. #5472: 4 関数の読出し値と slot 1 receiver の流れ (関数内で確認)
 
