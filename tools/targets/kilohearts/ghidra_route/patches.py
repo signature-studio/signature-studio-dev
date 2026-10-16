@@ -199,14 +199,6 @@ ABI = {
         ('delay FUN_180fbc1f4 decl float(float)', r'undefined8 FUN_180fbc1f4\(undefined8 param_1\)', 'float FUN_180fbc1f4(float param_1)'),
         ('delay FUN_180fbc1f4 input = xmm0 float bits (fVar4 = param_1)', r'uVar3 = \(undefined4\)\(\(ulonglong\)param_1 >> 0x20\);\n  fVar4 = \(float\)param_1;', 'fVar4 = param_1;'),
         ('delay FUN_180fbc1f4 return = xmm0 float (fVar4)', r'(FUN_180fbbfb8\(afStackX_8,_DAT_1813a9da0,iVar2\);\n    uVar3 = 0;\n    fVar4 = afStackX_8\[0\];\n  \}\n  )return CONCAT44\(uVar3,f2u\(fVar4\)\);', r'\1return fVar4;'),
-        # #5310 (KH-149): FUN_180fe24b8 (C 宣言 void (void)) は FUN_180fe2470 (戻り値 ulonglong) を呼んで ret する。機械語 180fe24b8〜180fe24e5 は rax を書かずに ret。
-        #   呼出元 180fd2a64 は call 直後に test rax,rax (REPORT_APPENDIX_5310.md)。戻り値を rax で通す。
-        ('delay FUN_180fe24b8 decl ulonglong', r'void FUN_180fe24b8\(void\)', 'ulonglong FUN_180fe24b8(void)'),
-        ('delay FUN_180fe24b8 return = FUN_180fe2470 (rax)', r'  FUN_180fe2470\(auStackX_8,auStackX_18,auStackX_8,auStackX_10\);\n  return;\n', '  return FUN_180fe2470(auStackX_8,auStackX_18,auStackX_8,auStackX_10);\n'),
-        # #5310 (KH-149): FUN_180fd27a8 (C 宣言 void) は FUN_180fbde90 (戻り値 short) を呼んで ret する。機械語 180fd27a8〜180fd27c0 は ax を書かずに ret。
-        #   呼出元 180fcdc2d は call 直後に movzx ecx,ax (REPORT_APPENDIX_5310.md)。戻り値を ax で通す。
-        ('delay FUN_180fd27a8 decl short', r'void FUN_180fd27a8\(undefined8 param_1\)', 'short FUN_180fd27a8(undefined8 param_1)'),
-        ('delay FUN_180fd27a8 return = FUN_180fbde90 (ax)', r'  (?:func_0x000|FUN_)180fbde90\(auStackX_8\);\n  return;\n', '  return FUN_180fbde90(auStackX_8);\n'),
     ],
 }
 # stereo 閉包 (#4871 KH-124) も、同じ 3 呼出元 (FUN_180fe3690・FUN_180fe3310・FUN_180fe3cd0。VA と機械語が delay と同一) を含む。
