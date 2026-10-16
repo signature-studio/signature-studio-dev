@@ -913,6 +913,12 @@ int main(int argc, char** argv) {
         HWND parent = CreateWindowExA(0, "STATIC", "s2host", WS_POPUP, 0, 0, 1024, 768, nullptr, nullptr,
                                       GetModuleHandleA(nullptr), nullptr);
         tresult rs = view->isPlatformTypeSupported(kPlatformTypeHWND);
+        if (getenv("S2HOST_SHOW")) ShowWindow(parent, SW_SHOWNOACTIVATE);
+        ViewRect vr = {0, 0, 0, 0};
+        tresult rg = view->getSize(&vr);
+        L("[attach] getSize=%s rect=(%d,%d)-(%d,%d)", tresName(rg), vr.left, vr.top, vr.right, vr.bottom);
+        if (rg == kResultTrue && vr.right > vr.left && vr.bottom > vr.top)
+          SetWindowPos(parent, nullptr, 0, 0, vr.right - vr.left, vr.bottom - vr.top, SWP_NOMOVE | SWP_NOZORDER);
         tresult ra = view->attached((void*)parent, kPlatformTypeHWND);
         L("[attach] parent=%p isPlatformTypeSupported=%s attached=%s", parent, tresName(rs), tresName(ra));
         {
@@ -927,6 +933,47 @@ int main(int argc, char** argv) {
           Sleep(100);
         }
         L("[slot] 0x1817bf760 after pump = %lld", (long long)*(volatile long long*)(gDllBase + 0x17bf760));
+        // S2HOST_CLICK_AT="x,y;x,y" (SR-99 #5958): 指定座標 (editor の client 座標) を 1 点ずつクリックし、点ごとに slot を読む
+        if (const char* ca = getenv("S2HOST_CLICK_AT")) {
+          std::string spec(ca);
+          size_t pos = 0;
+          while (pos < spec.size()) {
+            size_t semi = spec.find(';', pos);
+            std::string item = spec.substr(pos, semi == std::string::npos ? std::string::npos : semi - pos);
+            pos = (semi == std::string::npos) ? spec.size() : semi + 1;
+            int px = 0, py = 0;
+            if (sscanf(item.c_str(), "%d,%d", &px, &py) != 2) continue;
+            POINT pt = {px, py};
+            HWND target = GetWindow(parent, GW_CHILD);
+            if (!target) target = parent;
+            for (HWND w = GetWindow(parent, GW_CHILD); w; w = GetWindow(w, GW_HWNDNEXT)) {
+              RECT wr;
+              char cls[64] = {0};
+              GetClassNameA(w, cls, sizeof(cls));
+              GetWindowRect(w, &wr);
+              L("[click_at] child %p class=%s rect=(%ld,%ld)-(%ld,%ld) vis=%d", (void*)w, cls, wr.left, wr.top, wr.right, wr.bottom, IsWindowVisible(w));
+              for (HWND g = GetWindow(w, GW_CHILD); g; g = GetWindow(g, GW_HWNDNEXT)) {
+                RECT gr;
+                GetWindowRect(g, &gr);
+                GetClassNameA(g, cls, sizeof(cls));
+                L("[click_at]   grand %p class=%s rect=(%ld,%ld)-(%ld,%ld)", (void*)g, cls, gr.left, gr.top, gr.right, gr.bottom);
+              }
+            }
+            POINT cpt = pt;
+            ClientToScreen(parent, &cpt);
+            ScreenToClient(target, &cpt);
+            LPARAM lp = MAKELPARAM(cpt.x, cpt.y);
+            SendMessageA(target, WM_LBUTTONDOWN, MK_LBUTTON, lp);
+            SendMessageA(target, WM_LBUTTONUP, 0, lp);
+            for (int k = 0; k < 20; k++) {
+              MSG m;
+              while (PeekMessageA(&m, nullptr, 0, 0, PM_REMOVE)) { TranslateMessage(&m); DispatchMessageA(&m); }
+              Sleep(50);
+            }
+            L("[click_at] (%d,%d) target=%p slot=%lld", px, py, (void*)target,
+              (long long)*(volatile long long*)(gDllBase + 0x17bf760));
+          }
+        }
         // S2HOST_CLICKS=1: editor 内を格子状にクリックする (XferOnOffButton の位置は未確定のため掃引)
         if (getenv("S2HOST_CLICKS")) {
           int hits = 0;

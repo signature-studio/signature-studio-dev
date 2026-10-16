@@ -46,6 +46,17 @@
 - 格子クリックは 225 回すべて送信。非 0 になった点は無し。
 - 完走: `blocks=4 frames=512 nonzero_cells=1020/1024 peak=0.548306` (§2 の seed と同値)。
 
+## 2c. XferOnOffButton 座標の指定 (S2HOST_CLICK_AT・未達)
+
+- 座標の出所: `work/uidesc.json` (`gui/extract_uidesc.py`・素材 `plugins-serum2` の DLL 由来。XferOnOffButton の定義は 43 件)。MainUI (1190×740) 配下を origin で積算できたのは 1 件のみ (`Header/CViewContainer/XferOnOffButton` = MainUI 基準 `985,1`・51×33、control-tag `UI::MainUI::kUIParamShowPresetBrowser`)。他のボタンは template 参照の積算が未完で、座標を確定していない。
+- 観測手段: `S2HOST_CLICK_AT="x,y;…"` (opt-in) で指定点に `WM_LBUTTONDOWN/UP` を送り、点ごとに slot を読む。`S2HOST_SHOW=1` で親を表示。`attached` の前に `getSize` の寸法へ親を合わせる。
+- 実測 (`S2HOST_ATTACH=1 S2HOST_CLICK_AT="1010,17"`・無改変 DLL・既定 state・4 block・`xvfb-run`・wine64 9.0。測定 commit は本節の commit):
+  - `getSize` = 1190×740、`attached` = kResultTrue、子ウィンドウ 1 件 (VSTGUI のフレーム `VSTGUI00006…`)。
+  - **子フレームの矩形は (0,0)-(0,0) のまま**、その下に孫ウィンドウは 0 件。親を `getSize` の寸法に合わせ `S2HOST_SHOW=1` で表示した run でも同じ (寸法合わせだけの run は測っていない)。
+  - よって、クリックは VSTGUI の部品に届いていない (送信先はフレーム自身)。1 点 (1010,17) の slot は 0。
+- 判定: この経路では XferOnOffButton の操作が成立しない。slot 0x1817bf760 の値は本節では確定していない。
+- 次の一手 (未着手): VSTGUI フレームを実寸にする経路の特定 (`IPlugFrame` の `resizeView` 呼出しの有無、`onSize` の発火条件)。これが無いと、ボタン座標が正しくても操作は届かない。
+
 ## 3. 判定と未達
 
 - 観測の範囲: §2 の 3 条件 (GUI 非操作) と §2b の 2 条件 (editor を attach し格子クリック) で、slot `0x1817bf760` は**全て 0・書込 0 件**。
