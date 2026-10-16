@@ -1,6 +1,6 @@
 # tools/plugins/p0c REPORT 付録 M2 — #5832 の鮮度の証跡 (付録 M §4 の差分全文)
 
-測定 commit = `30640a2a4` (emcc 版 `run.sh` の実測)。 本付録は `git diff ce3872372 30640a2a4 -- tools/plugins/p0c ":!tools/plugins/p0c/REPORT*"` の出力 (コード・harness の差分のみ。REPORT 文書の差分は自己参照になるため除く)。 測定値は含まない。
+測定 commit = `30640a2a4` (emcc 版 `run.sh` の実測)。 本付録は `git diff ce3872372 30640a2a4 -- tools/plugins/p0c ":!tools/plugins/p0c/REPORT*"` の出力 (コード・harness の差分のみ。REPORT 文書の差分は自己参照になるため除く)。 測定値は含まない。 引用中の repo 外絶対パス 1 箇所は `[EMSDK 参照]` に置換した (`docs/REFERENCES.md` の `[EMSDK]`)。
 
 ```diff
 diff --git a/tools/plugins/p0c/f80_lower.py b/tools/plugins/p0c/f80_lower.py
@@ -98,7 +98,7 @@ index 88f66f1b8..ad8183eab 100644
  P0C="$(cd "$HERE/.." && pwd)"
  ROOT="$(cd "$HERE/../../../.." && pwd)"
  W="$ROOT/work/f80b_rt"
--EMCC="${EMCC:-$(command -v emcc || echo /opt/emsdk/upstream/emscripten/emcc)}"
+-EMCC="${EMCC:-$(command -v emcc || echo [EMSDK 参照]/upstream/emscripten/emcc)}"
 +EMCC="${EMCC:-$(command -v emcc || echo "${EMSDK:?EMSDK に emsdk のルートを指定する (docs/REFERENCES.md [EMSDK])}/upstream/emscripten/emcc")}"
  mkdir -p "$W"
  cd "$W"
