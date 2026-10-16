@@ -418,17 +418,19 @@ def desc_text_checks():
           ins_at(0x414F51).op_str == "esi, 1" and ins_at(0x414F5A).op_str == "edi, ecx")
     check("0x662c30 の先頭判定 cmp word [rax],0x5e (^) → 0x662c50 へ繰り返し (0x662cfa・0x662cfe)",
           ins_at(0x662CFA).op_str == "word ptr [rax], 0x5e" and ins_at(0x662CFE).op_str == "0x662c50")
-    check("0x662c30 の 2 文字目分岐: '.' (0x662c5e → 0x662cba)・'?' (0x662c65 → 0x662c6f)・{^,_,`,a} (0x662c6d は範囲外で 0x662cd2)",
+    check("0x662c30 の 2 文字目分岐: '.' (0x662c5e → 0x662cba)・'?' (0x662c65 → 0x662c6f)・{^,_,`} の検索経路 (0x662c6a の範囲内)",
           ins_at(0x662C5E).op_str == "0x662cba" and ins_at(0x662C65).op_str == "0x662c6f"
           and ins_at(0x662C6D).op_str == "0x662cd2" and ins_at(0x662C6A).op_str == "eax, 3")
+    check("0x662c30 の 'a' (0x61) は範囲外: cmp eax,3 (0x662c6a) の jae (0x662c6d) が 0x662cd2 へ (0x61-0x5e = 3)",
+          ins_at(0x662C6A).mnemonic == "cmp" and ins_at(0x662C6D).mnemonic == "jae" and ins_at(0x662C6D).op_str == "0x662cd2")
     check("0x662c30 '.' 分岐: 3 文字削除 (0x662cc2) + flags |= 2 (0x662ccd)",
           ins_at(0x662CC2).op_str == "r8d, 3" and ins_at(0x662CCD).op_str == "dword ptr [rsi], 2")
     check("0x662c30 既定分岐: 2 文字削除 (0x662cda) で flags は変えない",
           ins_at(0x662CDA).op_str == "r8d, 2" and ins_at(0x662CE0).op_str == "0x414f20")
-    check("0x662c30 '?'・'^'・'_'・'`'・'a' 分岐: 2 文字削除後に '^' (0x662d1c) を検索 (0x662c82・0x662c8c)",
+    check("0x662c30 '?'・'^'・'_'・'`' 分岐: 2 文字削除後に '^' (0x662d1c) を検索 (0x662c82・0x662c8c)",
           ins_at(0x662C82).op_str == "rcx, [rip + 0x93]" and rip_target(0x662C82) == 0x662D1C
           and u16z(0x662D1C, 1) == "^" and ins_at(0x662C8C).op_str == "r8d, 1")
-    check("0x662c30 の 'a'-'`' 系の flags |= 1 (0x662cb5) と、'^'・'?' は flags 無し (0x662cae・0x662cb3)",
+    check("0x662c30 の '_'・'`' の flags |= 1 (0x662cb5) と、'^'・'?' は flags 無し (0x662cae・0x662cb3)",
           ins_at(0x662CAE).op_str == "0x662ce5" and ins_at(0x662CB0).op_str == "edi, 0x3f"
           and ins_at(0x662CB5).op_str == "dword ptr [rsi], 1")
     check("0x439c90 の trim は (<= 0x20) の 16bit 文字を両端から削る (0x439cc0・0x439cd0・0x439cf6)",
