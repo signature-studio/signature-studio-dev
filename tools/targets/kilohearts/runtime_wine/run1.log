@@ -119,7 +119,7 @@ ELF         7ff1b1aca000-    7ff1b1b85000       Export          ntdll.so
 ELF         7ff1b1b9d000-    7ff1b1bd7000       Deferred        ld-linux-x86-64.so.2
 Threads:
 process  tid      prio    name (all IDs are in hex)
-00000020 (D) Z:\home\runner\work\signature-studio-dev\signature-studio-dev\work\kh168\loader.exe
+00000020 (D) <runner-work>\kh168\loader.exe
 	00000024    0 <== 
 	00000110    0     
 00000038 services.exe

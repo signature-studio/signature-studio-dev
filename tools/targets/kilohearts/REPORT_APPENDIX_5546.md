@@ -12,7 +12,7 @@
 
 - 素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64`。
 - `HeartCore.core_64`: 76,642,304 B、sha256 `d55ce8b4c0ad7ebedf1a4a1f74443a91d255596be887a514e54269ec8751441e`、PE32+ DLL x64。
-- export 144 件 (`exports.txt`。`GetPluginFactory_<id>`・`VSTPluginMain_<id>`・`ACF*`・`KHSUnlock` 等)。
+- export 一覧 144 名 (`exports.txt`。`GetPluginFactory_<id>`・`VSTPluginMain_<id>`・`ACF*`・`KHSUnlock` 等)。一覧の生成元 (コマンド) は本 PR で記録していない。各名は下記ローダーの `GetProcAddress` で解決済み (§4)。DLL の export 表そのものとの突合 (`objdump -p` 等) は未実施。
 - import DLL 17 本 (KERNEL32・USER32・ole32・bcrypt 等)。すべて Wine 側で解決された。
 
 ## 3. 方式
@@ -27,10 +27,9 @@
 |---|---|
 | LoadLibraryExA | OK (handle 取得) |
 | import 解決 | OK (ロード成功に含まれる) |
-| export 解決 | **144 / 144** |
+| export 解決 | **144 / 144** (`MISSING` 0 件。`__ref__` を含む一覧の全名が `GetProcAddress` で解決) |
 | `ACFGetSDKVersion()` | 0 |
 | `ACFStartup()` | **page fault で Wine 落ち** (未達。ログ `run1.log`) |
-| 所要 (1 回) | wall 2.5 s (`time`) |
 
 `ACFStartup` の失敗箇所: `ACFStartup` の呼出 (loader +0x165b) → HeartCore の `0x1800211d7`〜の関数 → `call (%r9)` で読めないアドレスを参照 (`0x20601345598`)。
 `r9` の値は未同定 (原因は未確定。間接 call の宛先が Wine 上で解決されていない可能性があるが、未検証)。完全なログは `runtime_wine/run1.log`。
