@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # slot35_vmt_probe.sh — #5897 (PY-5398): slot 35 (`call qword ptr [reg+0x118]`) の箇所で、
-# 実行時の受け手オブジェクトの VMT (`*(reg)`) を採取する probe。
+# 実行時の呼出しレジスタの値 (= VMT のアドレス) を採取する probe。
 #   bash tools/flelift/boot/slot35_vmt_probe.sh     # 前提: 先に fle6_measure.sh (RUNS=default) で work/boot/lift を作る
 #
 # 手順: pe_slot35_sites.py の箇所 (151 件) の lift 行 `/* <va>: call qword ptr [<reg> + 0x118] */` の直前に、
-# <reg> の指す値 (VMT) を出す。呼出しの直前で R[k] は未変更なので、LD64(R[k]) が受け手の先頭 8 バイト (VMT) に等しい。
-# 出力: work/boot/run_slot35.log (gitignore)。採取行は `[S35] site=<VA> reg=<reg> vmt=<hex>`。既定ビルド (work/boot/lift) は変えない。
+# <reg> の値 R[k] を出す。`[<reg>+0x118]` は VMT のアドレスに 0x118 (= slot 35 × 8) を足した番地なので、R[k] が VMT のアドレスそのもの。
+# 呼出しの直前で R[k] は未変更。出力: work/boot/run_slot35.log (gitignore)。採取行は `[S35] site=<VA> reg=<reg> vmt=<hex>` (vmt = R[k] の値)。既定ビルド (work/boot/lift) は変えない。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 FLE="$(cd "$HERE/.." && pwd)"
@@ -41,7 +41,7 @@ for k in 0 1 2 3 4 5 6 7; do
     reg=$(sed -E 's/.*\[(r[a-z0-9]+) \+ 0x118\].*/\1/' <<< "$line")
     idx=$(reg_index "$reg") || { echo "[slot35] 未知のレジスタ $reg ($va)"; exit 4; }
     python3 "$HERE/dbg_lift.py" --src "$f" --out "$f" --at "0x$va" \
-      --c "{ static int n_; if (n_++ < 64) fprintf(stderr, \"[S35] site=$va reg=$reg vmt=%llx\\n\", (unsigned long long)LD64(R[$idx])); }" > /dev/null
+      --c "{ static int n_; if (n_++ < 64) fprintf(stderr, \"[S35] site=$va reg=$reg vmt=%llx\\n\", (unsigned long long)R[$idx]); }" > /dev/null
   done < "$SITES"
   # 陽性対照: 既知に通る exit 直前 (0x412a0d・run の [EXITBR-412a0d] で発火を確認済み)。probe 機構が動くことを示す。
   python3 "$HERE/dbg_lift.py" --src "$f" --out "$f" --at 0x412a0d \

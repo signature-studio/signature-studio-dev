@@ -14,19 +14,22 @@
 
 - `tools/flelift/boot/slot35_vmt_probe.sh` (本 PR で追加)。
 - 箇所の列挙: `tools/python/analysis/flapi/pe_slot35_sites.py` の出力 (151 箇所)。
-- lift 行 `/* <VA>: call qword ptr [<reg> + 0x118] */` の直前に、`LD64(R[k])` (呼出しレジスタ = 受け手オブジェクトの指す先頭 8 バイト = VMT) を出す probe を `dbg_lift.py` で挿入する。
+- lift 行 `/* <VA>: call qword ptr [<reg> + 0x118] */` の直前に、`R[k]` (呼出しレジスタの値) を出す probe を `dbg_lift.py` で挿入する。`[<reg>+0x118]` の `<reg>` は VMT のアドレスそのもの (0x118 = slot 35 × 8)。`LD64(R[k])` (VMT の先頭 8 バイトの中身) は出さない。受け手オブジェクトの値も採っていない。
 - レジスタ → `R[]` 添字は `x64c.py` の並び (rax..rdi = 0..7・r8..r15 = 8..15)。
-- 出力行 `[S35] site=<VA> reg=<reg> vmt=<hex>`。陽性対照 `[S35-control] site=412a0d` を同時に入れる。
+- 出力行 `[S35] site=<VA> reg=<reg> vmt=<hex>` (`vmt` = `R[k]` の値 = VMT のアドレス)。陽性対照 `[S35-control] site=412a0d` を同時に入れる。
 - 既定 build (`work/boot/lift`) は変えない。probe は `work/boot/lift_slot35` にだけ入る。
 
 ## 2. 実測
 
-測定 commit: `16c3f5790` (origin/main 取り込み時点・probe 追加前のコード)。probe の追加は本 PR の差分。
+測定 commit: `abb026116` (probe 追加 commit)。probe の出力式を直した commit は `<FIX_COMMIT>`。`abb026116` から `<FIX_COMMIT>` までの差分は probe の出力式と本付録のみ (`git diff abb026116 <FIX_COMMIT> -- tools/flelift/boot/slot35_vmt_probe.sh`)。probe の実行結果 (採取 0 件) は出力式を直す前の `abb026116` で得たもの。出力式の変更は採取行の値の意味だけを変え、発火条件 (挿入位置・件数) は変えない。
 
 | 条件 | lift に載った slot 35 箇所 | boot 結果 (units / stopped_at) | `[S35]` 採取 | 陽性対照 `[S35-control]` |
 |---|--:|---|--:|--:|
 | 既定 root (`work/boot/lift`) + probe | 63 | 895 / `exit` | 0 | 1 (`0x412a0d`) |
 | `FLE_EXTRA_ROOTS` = 98 関数入口 (151 箇所を含む関数) + probe | 151 | 895 / `exit` | 0 | 0 |
+
+- 2 行目の再現手順: 98 関数入口は `pe_slot35_sites.py` の `fn=` 列を一意化したもの (151 箇所・所属関数 98 種・`fn=-` は 0)。`FL_WIN64_DIR=<展開先>` で `python3 tools/python/analysis/flapi/pe_slot35_sites.py | grep ' refs=' | grep -v 'fn=-' | grep -oE 'fn=[0-9a-f]+' | sed 's/fn=/0x/' | sort -u | paste -sd, > roots98.csv` を実行し、その中身 (902 bytes・98 件) を `FLE_EXTRA_ROOTS=$(cat roots98.csv)` に渡して `fle6_measure.sh` (`FLE_BOOT_RUNS=default`) を先に走らせてから、`slot35_vmt_probe.sh` を実行する。
+- 生成元の確認 (本 run): 上のコマンドで 98 件を得た。`fle6_measure.sh` は emsdk 無し (`/opt/emsdk` 無し) の runner で実行できなかったため、2 行目の boot 結果は本付録の前 round の測定値 (`abb026116` 時点) をそのまま引く。本 run の修正は出力式と文書のみで、boot 経路は変えていない。
 
 - 既定経路の基準 (probe なし・worktree): `FLEBOOT_RESULT units_run=895 stopped_at=895 boot_threw=exit`・`ipp ok` (`ptr_15F34A0=0x7f10001c`)。`fle6_measure.sh` (`FLE_BOOT_RUNS=default`) は rc 0・所要 3 分 22 秒 (lift 81 s・clang-plain 100 s・boot 10 s)。
 - `FLE_EXTRA_ROOTS` 付き lift の工程: `fle6_measure.sh` 所要 3 分 29 秒 (lift 84 s・clang-plain 90 s)。`slot35_vmt_probe.sh` の 1 回目は 2 分 18 秒。
