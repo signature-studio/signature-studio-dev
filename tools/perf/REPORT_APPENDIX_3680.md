@@ -33,6 +33,8 @@ NEG_OTT=1 node tools/perf/p20/fold_sig.mjs tools/perf/p20/work/fold/fold.cjs 400
 
 ## 4. 未解決
 
+| 項目 | 影響 | 起票先 |
+|---|---|---|
 | 受入の未達 | なし (受入 3 件は §2 の実測で満たす) | - |
 | 畳み込み後の出力と native の突合 (差分 harness) は未実施。判定は署名一致のみ | 署名が一致しても、畳み込み後の全出力が native と一致するかは未確認 | 本 issue の受入外 |
 | AudioWorklet 上の畳み込み後の駆動は未測定 | ブラウザ上の成否は未確認 | 本 issue の受入外 |

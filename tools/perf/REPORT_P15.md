@@ -93,7 +93,7 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 異なる plugin (OTT + Fresh Air) を 1 Memory に畳む際の emcc 静的データ・heap の衝突と、node での署名一致 (本計測は同一 OTT の M 個 = 同一 binary の別 state)。Fresh Air は lift 時に画像窓を分けた (§8) | 畳み込みは未検証。異なる plugin を同居させる場合は未検証 | #3680 [PERF-P23] (#2963 から分割) |
+| 異なる plugin (OTT + Fresh Air) の 1 Memory 畳み込み (本計測は同一 OTT の M 個 = 同一 binary の別 state) | 解決済み (#3680)。付録 `tools/perf/REPORT_APPENDIX_3680.md` | なし (#3680 で解決) |
 | AudioWorklet 上の M=130 の instantiate・署名一致 | 解消 (本 PR): §7 で 130/130 一致・instantiate 失敗なし | なし (§7 で解消) |
 | AudioWorklet 上の instantiate 上限 (M=130 を超える M) | 測定点の範囲で成功最大 M=145、失敗最小 M=146 (無応答、各 3 run)。147 以上と M=2〜129・131〜144 は未測で単調性は未確認。原因は未切り分け (§9) | #3959 [PERF-P25] (親 #2988) |
 | setup 時間 (M=130 で 790〜999 ms、Dedicated Worker・§3) | 起動時の一括 instantiate/setup の遅延。pre-warm の設計が必要 | REPORT_P8 §11 (pre-warm) と同じ経路 |
@@ -180,14 +180,14 @@ node tools/perf/p15/chrome_worklet.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3 
 
 ## 8. 第 2 plugin (Fresh Air GainDsp) の x64c lift と単独 instance の署名 (PERF-P20 / #2963)
 
-**結論**: Fresh Air の `gain::GainDsp::process` (SlateCore `0x180afe090`) を x64c で lift し emcc で wasm 化した。単独 instance の署名は node で `5e5287b5` (400 シナリオ・3 回一致)。同じシナリオで実機機械語 (ms_abi 直接実行) と突き合わせ、**400/400 シナリオ一致**。異なる plugin 2 種の **1 Memory への畳み込みは未実施** で、残りは子 issue #3680 [PERF-P23] に移した。impbase 分離と fa_ 改名の再 lift は §8 の付録 `tools/perf/REPORT_APPENDIX_4732.md` (#4732)。
+**結論**: Fresh Air の `gain::GainDsp::process` (SlateCore `0x180afe090`) を x64c で lift し emcc で wasm 化した。単独 instance の署名は node で `5e5287b5` (400 シナリオ・3 回一致)。同じシナリオで実機機械語 (ms_abi 直接実行) と突き合わせ、**400/400 シナリオ一致**。異なる plugin 2 種の 1 Memory への畳み込みは #3680 で実施し、結果は付録 `tools/perf/REPORT_APPENDIX_3680.md` にある。impbase 分離と fa_ 改名の再 lift は §8 の付録 `tools/perf/REPORT_APPENDIX_4732.md` (#4732)。
 
 | 項目 | 結果 (実測) |
 |---|---|
 | 第 2 plugin | Fresh Air。`SlateCore.core_64` (PE32+ DLL、ImageBase `0x180000000`、SizeOfImage `0x2319000`)。素材 `plugins-freshair` の `Fresh Air.Win.zip` を `tools/targets/freshair/fetch.sh` で展開 |
 | lift | `x64c.py --closure 60 --img 0x180000000 --shift 0x17E000000 --img-size 0x2319000`。functions 57、insns 2102、unsup `{}`、traps 0、imports 22、unlifted callees 0 |
 | wasm | `fa.wasm` 2,148,176 B。`emcc -O0 -ffp-contract=off`、compile の warnings 0 / errors 0 |
-| 窓 (lift 時の再配置) | wasm アドレス = VA − `0x17E000000`。画像は wasm `0x02000000`〜`0x04319000`。OTT の画像窓 `0x30000000` (§0 の `shared_worker.mjs`) と重ならない。emcc の静的データ・heap の衝突は未検証 (#3680) |
+| 窓 (lift 時の再配置) | wasm アドレス = VA − `0x17E000000`。画像は wasm `0x02000000`〜`0x04319000`。OTT の画像窓 `0x30000000` (§0 の `shared_worker.mjs`) と重ならない。emcc の静的データ・heap の衝突は #3680 で畳み込み後の署名一致により確認 (付録) |
 | 単独署名 | `fa_gain_sig.mjs` 400 シナリオ・seed 64030: `5e5287b5` (3 回とも一致)。出力が変わったシナリオ 371/400 |
 | 差分 (native) | `fa_native_diff.py` seed 64030: 400/400 一致、比較バッファ 2,800、差分 0、native crash 0、wasm trap 0。seed 7 も 400/400 一致 |
 | NC-1 (入力) | wasm 側だけ seed 64031 のシナリオを流す: 0/400 一致 (400 mismatch) |
