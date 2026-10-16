@@ -6,7 +6,7 @@
 - 要確認 14 行のうち **7 行は、CAST の機械語が C 式のビット操作と一致して「ビット再解釈」と確定した** (357・361・363・101・102・38・39)。`dbitcast` 規則の入力として使える。
 - 363 行は、CAST の `>> 0x34` の命令が `psrlq xmm5,0x34` (180fc4ae1) と確定した。`psubd` (180fc4ae6) は後段の整数減算 `(uint)(… ) - _DAT_182280e00` で、CAST ではない。前 run の「`PSUBD` と確定」は誤りだった。
 - 38 行は、C の `& 0xffffffff00000000` が `and rax,rcx` (180fcd57c) に対応し、マスクの値 (`movabs rcx,0xffffffff00000000` 180fcd565) を確認した。`mulsd` は後段の積。ビット操作と確定。
-- 17・44 行は、CAST の位置が `cmp` の比較対象 (`btr rcx,0x3f` で符号を外した値との整数比較)。`ja` ではなく比較の入力側。ビット操作 (符号除去) を経た値の比較で、浮動小数点の数値演算ではない。
+- 17・44 行は、CAST の位置が `cmp` の比較対象 (`btr rcx,0x3f` で符号を外した値との整数比較)。`ja` ではなく比較の入力側。ビット操作 (符号除去) を経た値の比較の入力側と読める。浮動小数点の数値演算かどうかは判定を保留 (注参照)。
 - 252 行の `dVar12` の対応先 `xor rax,rax` (180fc5b20) は誤対応。C は `(double)((ulonglong)dVar12 | _DAT_182280c30)` で、定数 `0x182280c30` を `or` する命令は範囲内に複数ある (180fc4cfd 等)。本 run では対応する 1 箇所を確定できなかった。未確定。
 - 85・91・296・301 行は、C の `>> 0x20` に対応する shift 命令が範囲内 (`shr`/`psrlq` で 0x20) に見当たらない。Ghidra の対応先 (`vcvtsd2ss` 180fc6bc1・`divsd` 1802edf6f・`mulsd` 1802edf7d) は、objdump 上の命令と一致するが、CAST の真の命令ではない疑いが強い。未確定。
 - CAST の objdump 突合 (5506-3) は 107 件すべて一致 (`check_cast_objdump.py`)。ただし、Ghidra の記録と objdump が**同じアドレスで一致する**ことしか見ていない。上記の 363 行・252 行のような「対応づけは一致するが命令の意味が違う」ケースは検出できない。
@@ -19,7 +19,7 @@
 | 180fc4590 | 361 | `(ulonglong)dVar15` | `por xmm2,[0x182280d60]` (180fc4ac0) | ビット再解釈 (CAST 部分)。`subsd` は CAST ではない |
 | 180fc4590 | 252 | `(ulonglong)dVar12` | 対応先 `xor rax,rax` (180fc5b20) は誤対応。`or` の定数 `0x182280c30` を参照する命令群 (180fc4cfd 等) に対応がある | **未確定** |
 | 180fc4590 | 363 | `(ulonglong)dVar15 >> 0x34` | CAST の命令は `psrlq xmm5,0x34` (180fc4ae1)。`psubd xmm5,[0x182280e00]` (180fc4ae6) は後段の整数減算 `(uint)(…) - _DAT_182280e00` | **ビット再解釈** (CAST 部分。前 run の `PSUBD` 確定は誤り) |
-| 180fcce40 | 17 | `(ulonglong)dVar2` | `btr rcx,0x3f` (180fcce6b) で符号を外した値と `cmp rcx,[0x182282840]` (180fcce70) の比較。CAST はこの比較の入力側 | 未確定 (浮動小数点の数値演算ではない。ビット操作後の整数比較と読めるが、分類規則の確定は保留) |
+| 180fcce40 | 17 | `(ulonglong)dVar2` | `btr rcx,0x3f` (180fcce6b) で符号を外した値と `cmp rcx,[0x182282840]` (180fcce70) の比較。CAST はこの比較の入力側 | 未確定 (ビット操作後の整数比較の入力側と読めるが、分類規則の確定は保留) |
 | 180fcce40 | 44 | `(ulonglong)dVar2` | 同上 (180fcd0f2 の `cmp` 系) | 未確定 (同上) |
 | 180fcce40 | 101 | `(ulonglong)dVar4` | `vandpd xmm7,xmm1,[0x182282830]` (180fcd2f7) | ビット再解釈 (CAST 部分)。`vsubsd`/`vfmadd` は CAST ではない |
 | 180fcce40 | 102 | `(ulonglong)dVar4` | 同上 (180fcd2f7) | ビット再解釈 (CAST 部分) |
@@ -49,7 +49,7 @@
 | Delay の 1000 trial 突合 | 規則の効果が未確認 | #3073 [KH-41] |
 
 #### 5506-5. 環境と再現
-- 素材 `plugins-kilohearts` (`$HOME/artifacts/plugins-kilohearts.tar.zst`・7.6 GB) → `Kilohearts Offline Installer.zip` → `payload.dat` (7z で `windows.zip/1ccb1df8c8f10745` だけ抽出) → `HeartCore.core_64` (76,642,304 B)。展開先は `$RUNNER_TEMP/kh5506` (repo 外)。
+- 素材 `plugins-kilohearts` (`docs/REFERENCES.md` の `plugins-kilohearts` 行。取得は `docs/WORKFLOW.md` §11・7.6 GB) → `Kilohearts Offline Installer.zip` → `payload.dat` (7z で `windows.zip/1ccb1df8c8f10745` だけ抽出) → `HeartCore.core_64` (76,642,304 B)。展開先は `$RUNNER_TEMP/kh5506` (repo 外)。
 - [GHIDRA] 12.1.4 = GitHub release `Ghidra_12.1.4_build` の `ghidra_12.1.4_PUBLIC_20260921.zip` (sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)。JDK 21 (`temurin-21-jdk-amd64`)。
 - 手順: `DecompEach.java` で 8 関数 (`out/*.c`)、`MapLines.java` で `tokens.tsv` 1,183 行、`check_cast_objdump.py` で突合 (`ok=107 ng=0 na=0`)。wall: DecompEach 35.7 s。
 - 本付録の判定 (5506-2) は、上記の tokens と objdump の番地の読みに基づく。判定の根拠は表の各行の機械語。
