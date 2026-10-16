@@ -80,6 +80,7 @@ WAIT=90 bash tools/flp/s6_pred_hit_probe.sh               # pred・loop にブ�
 - ブレーク先 (実行時): `ed2ac0` = `0x7b202ac0`・`1004a20` = `0x7b334a20`。gdb は両方に挿入できた (`Breakpoint 1 at` / `Breakpoint 2 at`)。gdb の命令列は末尾が `continue` で、`detach` コマンドには到達していない (`timeout` で強制終了)。
 - 測定 1 (WAIT=90 s): 両方とも 0 件 (gdb rc=124 = `timeout` による終了)。
 - 測定 2 (WAIT=240 s・attach 10:14:37 〜 timeout 終了 10:18:40): 両方とも 0 件 (gdb rc=124 = `timeout` による終了)。
+- 測定 3 (検証 HEAD `90623fdd3`・WAIT=90 s・real 1 m 31 s・10:28:43 開始): DLL base `0x7a730000` (同じ)、ブレーク先は測定 1 と同じ (`0x7b202ac0`・`0x7b334a20`)、両方とも 0 件 (gdb rc=124)。script 変更後も結論は変わらない。
 - 判定: GUI 起動だけでは `ed2ac0` にも `1004a20` にも入らない。よって loop `0x12d94f0` に至る経路は、GUI 起動の範囲では通っていない。`pred` (6000 件命中) は起動時に通るが、loop の上位には届かない。
 - 未確認: GUI 操作 (プロジェクトの読込み・再生・ミキサ操作など) で上位が通るか。関数ポインタ経由の呼出し。
 - 次に要るもの: 上位のトリガを起こす操作。GUI 操作の自動化は本 issue の範囲外のため、受入 (loop の入力述語の確定) は未達のまま。
