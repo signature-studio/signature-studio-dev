@@ -134,5 +134,24 @@ ildsp の規模測定 (命令数・call 数・export closure 表) と未解決�
 - `lift.sh all` は fix 環境に `toolchain-retdec` / `toolchain-emsdk` が無く、再実行していない (上の行は `2de7679d` の実測)。`2de7679d` から HEAD までの lift の入力 (`lift.sh`・`locate.py`・`fix_rv.py`・`gen_helpers.py`・`diff_test.py`・`native_ref.c`・`run_wasm.mjs`) の差分は 0 行。
 - `inst_probe.sh` の実測は fix 環境で `fl-win64` の `extracted/block24352_PE.bin` だけを展開して行った (他のファイルは使わない)。
 - ネガティブコントロール: 期待値 `FRUITY_SIGNAL=11` を `10` に変えた一時コピーの `inst_probe.sh` は `MISMATCH`・rc 1 (実測。一時コピーは削除済み)。
-
 - `lift.sh all` の所要は §5 (24.8〜28.1 s) より長い (36.2〜36.5 s)。load は §5 と同程度 (0.5〜1.2) で、原因は未確認。判定 (PASS / FAIL の内容) には影響しない。
+
+### 14 本の間接書き込みの観測 (#5616・親 #5355 の残件)
+
+測定 commit: `19f0a9631` (`inst_probe.c` に this 以外の領域の書き込み (`OTHER_W`)・`sweep` モードを追加、`inst_probe.sh` に `OTHER_WRITES` の期待値を追加)。`git diff 19f0a9631 HEAD -- tools/shared/lift/libreverb ':!tools/shared/lift/libreverb/REPORT.md'` の出力は空。
+手順: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/libreverb/inst_probe.sh` (既定の検査)。全 `.pdata` 関数の掃引は `inst_probe image.bin 3fa0 1240 sweep` (ctor 直後の object に対して、1515 関数を各 fork で 1 回ずつ呼ぶ。引数は全関数で同じ `in`/`out`)。
+
+観測方式: 確保した 5 領域 (`HeapAlloc` の全件。object と遅延線 2 本の sub-object と、その buffer 2 本) をすべて PROT_READ にし、書き込みを SIGSEGV で捕まえて TF で 1 命令進める。書き込み先が object 外でも捕まえる (`OTHER_W`)。
+
+| 項目 | 実測 |
+|---|---|
+| ctor 時の全書き込み (HEAPALLOC 5 件の領域) | `OTHER_WRITES=14 PTRVAL_WRITES=4 REGIONS=5`。sub-object 2 本 (領域 1 と 3) の header 初期化 (buf ptr `+4`・idx `+0x10`・mask `+0x14`・size `+0xc`) |
+| 14 本 (`this+0xbc+8i`) への書き込み | 0 件 (`PTR14_ZERO_AFTER=14`) |
+| `fruity` (ctor 後の object に Process_Fruity n=4) | `FRUITY_SIGNAL=11`・14 本への書き込み 0 件 |
+| `vt` (vtable slot 0〜5) | slot 0 は this+0 の 1 件のみ・slot 1・3 は SIGSEGV・slot 5 は object 外へ 2048 件。14 本への書き込み 0 件 |
+| `sweep` (`.pdata` の全 1515 関数) | 完走 (exit 0) は 446〜457 件・SIGSEGV (11) は 1056〜1067 件・SIGBUS (7) 1 件・SIGALRM (14, 2 秒の打ち切り) 1 件 (ASLR 有効の 5 回実測。ASLR 無効 `setarch -R` の 2 回は完走 458 件・SIGSEGV 1055 件で安定)。14 本への qword 書き込み命令は 0 件 (下記) |
+
+- 掃引で `this+0xbc+8i` の書き込みとして EMIT に出た 9 つの store 命令 (RIP RVA: `0x52e9`・`0x13e6b`・`0x3e49b`・`0x3e59b`・`0x41ea0`・`0x41ec5`・`0x4c8e7`・`0x51aba`・`0x520f6`) のうち、次の 5 つは偽陽性: `0x52e9` は `rep stos`・`0x13e6b` は `rep movsb`・`0x4c8e7` は byte 単位の swap・`0x3e49b`・`0x3e59b` は 16 bit の `mov %cx`。qword の 14 本への書き込み命令は 0 件。`0x41ea0`・`0x41ec5` は byte 単位 (`mov %al`)・`0x51aba`・`0x520f6` は dword 単位 (`mov %edx`) の store で、ポインタ代入ではない。`0x5370`・`0x5395`・`0x53b0` は `movaps`・`movups` による領域ゼロ化。
+- 揺れの原因: 完走数の揺れは ASLR 由来。ASLR 有効では、ポインタ値に依存する一部の関数 (例 RVA `0xaca4`・`0x25c4c`) の完走・SIGSEGV の結果が実行ごとに変わる。ASLR を切ると 2 回とも同じ結果になる。14 本への書き込み命令の RIP 集合 (9 箇所) と、14 スロット向け emit の件数 (128 件) は、ASLR 有効 3 回・無効 1 回で一致した。
+- 読み: 掃引で完走した関数の範囲では、14 本への qword ポインタ書き込みは無い。ただし 1056〜1067 関数は zero 初期化の object で途中 SIGSEGV しており、その先の書き込みは観測していない。14 本を埋める entry は、この掃引では見つからなかった (未特定)。
+- 観測の限界: 観測は確保領域内だけ。掃引は ctor 直後の 1 状態 (引数 NULL・zero 初期化) で、各関数に同じ `in`/`out` を渡すだけ。SIGSEGV で止まる関数は、途中の書き込みを残して打ち切られる。

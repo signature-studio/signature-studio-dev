@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
   sa.sa_sigaction = on_trap; sigaction(SIGTRAP, &sa, NULL);
   tracing = 1;
   uint8_t *obj;
-  if (!strcmp(mode, "ctor") || !strcmp(mode, "vt")) obj = ((CRI)(img + strtoul(argv[2], 0, 16)))(NULL);
+  if (!strcmp(mode, "ctor") || !strcmp(mode, "vt") || !strcmp(mode, "fruity") || !strcmp(mode, "sweep")) obj = ((CRI)(img + strtoul(argv[2], 0, 16)))(NULL);
   else {
     obj = my_HeapAlloc(NULL, 0, OBJ);
     if (!strcmp(mode, "selftest"))
@@ -130,6 +130,20 @@ int main(int argc, char **argv) {
   printf("WRITES_TOTAL=%d WRITES_OBJ=%d WRITES_PTR=%d WRITES_OUTSIDE_IMAGE=%d PTR_SLOTS_SEEN=%d\n", nw, nwo, nwp, nwext, nslot);
   printf("SLOT_LASTWRITE_EQ_FINAL=%d\n", match);
   printf("PTR14_ZERO_AFTER=%d\n", zero);
+  int nother = 0, nptrval = 0;
+  for (int i = 0; i < nw; i++) {
+    int r = find_reg(ws[i].addr);
+    if (r < 0) continue;
+    int pv = -1;
+    for (int j = 0; j < nreg && pv < 0; j++) if (ws[i].val >= (uint64_t)regs[j].base && ws[i].val < (uint64_t)regs[j].base + regs[j].len) pv = j;
+    if (r != oi) {
+      nother++;
+      printf("OTHER_W region=%d off=%#lx rip_rva=%#lx val=%#lx ptr_to_region=%d\n", r, (unsigned long)(ws[i].addr - (uint64_t)regs[r].base),
+             (unsigned long)(ws[i].rip - (uint64_t)img), (unsigned long)ws[i].val, pv);
+    }
+    nptrval += pv >= 0;
+  }
+  printf("OTHER_WRITES=%d PTRVAL_WRITES=%d REGIONS=%d\n", nother, nptrval, nreg);
   fflush(stdout);
   if (!strcmp(mode, "vt")) {
     uint64_t ib; memcpy(&ib, img + *(uint32_t *)(img + 0x3c) + 48, 8);
@@ -184,6 +198,43 @@ int main(int argc, char **argv) {
     int fst = 0; waitpid(fp, &fst, 0);
     if (WIFSIGNALED(fst)) printf("FRUITY_TRACE_SIGNAL=%d\n", WTERMSIG(fst));
     else printf("FRUITY_TRACE_EXIT=%d\n", WEXITSTATUS(fst));
+    return 0;
+  }
+  if (!strcmp(mode, "sweep")) {
+    uint32_t pe = *(uint32_t *)(img + 0x3c);
+    uint16_t nsec = *(uint16_t *)(img + pe + 6), optsz = *(uint16_t *)(img + pe + 20);
+    uint32_t pd_rva = 0, pd_sz = 0;
+    for (int s = 0; s < nsec; s++) {
+      uint8_t *sh = img + pe + 24 + optsz + 40 * s;
+      if (!memcmp(sh, ".pdata", 6)) { pd_sz = *(uint32_t *)(sh + 8); pd_rva = *(uint32_t *)(sh + 12); }
+    }
+    int nfn = 0, nhit = 0;
+    for (uint32_t k = 0; k + 12 <= pd_sz; k += 12) {
+      uint32_t b = *(uint32_t *)(img + pd_rva + k);
+      if (!b) continue;
+      nfn++;
+      fflush(stdout);
+      pid_t sp = fork();
+      if (sp == 0) {
+        alarm(2);
+        nw = 0; pend = 0;
+        if (oi >= 0) mprotect(regs[oi].base, regs[oi].len, PROT_READ);
+        emit_obj = 1; emit_base = (uint64_t)obj; emit_img = (uint64_t)img;
+        float in[8] = {0.5f, -0.25f, 0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f}, out[16];
+        memset(out, 0, sizeof out);
+        printf("SWEEP_BEGIN=%#x\n", b); fflush(stdout);
+        tracing = 1;
+        ((FF)(img + b))(obj, in, out, 4);
+        tracing = 0;
+        printf("SWEEP_DONE=%#x\n", b); fflush(stdout);
+        _exit(0);
+      }
+      int st = 0; waitpid(sp, &st, 0);
+      if (WIFSIGNALED(st)) printf("SWEEP_END=%#x SIGNAL=%d\n", b, WTERMSIG(st));
+      else printf("SWEEP_END=%#x EXIT=%d\n", b, WEXITSTATUS(st));
+      fflush(stdout);
+    }
+    printf("SWEEP_FUNCTIONS=%d\n", nfn);
     return 0;
   }
   if (strcmp(mode, "ctor")) return 0;
