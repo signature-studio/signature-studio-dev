@@ -114,17 +114,17 @@ static LONG CALLBACK watchVeh(PEXCEPTION_POINTERS ep) {
   }
   return EXCEPTION_CONTINUE_SEARCH;
 }
-static void armWatch(volatile int* addr) {
+static void armWatch(volatile int* addr, int bytes) {
   gWatchAddr = addr;
   AddVectoredExceptionHandler(1, watchVeh);
-  // DR0 = addr, DR7: L0=1, RW0=01 (write), LEN0=11 (4 byte)
+  // DR0 = addr, DR7: L0=1, RW0=01 (write), LEN0=11 (4 byte) / 10 (8 byte。addr は 8 byte 境界であること)
   CONTEXT c = {};
   c.ContextFlags = CONTEXT_DEBUG_REGISTERS;
   GetThreadContext(GetCurrentThread(), &c);
   c.Dr0 = (DWORD64)addr;
-  c.Dr7 = (1ULL << 0) | (1ULL << 16) | (3ULL << 18);
+  c.Dr7 = (1ULL << 0) | (1ULL << 16) | ((bytes == 8 ? 2ULL : 3ULL) << 18);
   SetThreadContext(GetCurrentThread(), &c);
-  L("[watch] armed DR0=%p (controller iface+0xdc)", (void*)addr);
+  L("[watch] armed DR0=%p bytes=%d", (void*)addr, bytes);
 }
 
 static void S(const char* key, const char* value) {  // summary へ "key": value
@@ -879,9 +879,9 @@ int main(int argc, char** argv) {
   if (!ctrl) return 1;
   dumpVtable("SerumController_IEditController", ctrl, 20);
   // S2HOST_WATCH=1: ctrl iface+0xdc (= controller base+0x10c) への書込 PC を DR0 で捕まえる (SR-1c #256)
-  if (getenv("S2HOST_WATCH")) armWatch((volatile int*)((unsigned char*)ctrl + 0xdc));
-  // S2HOST_SLOT=1: slot 0x1817bf760 (RVA 0x17bf760) への書込 PC を DR0 で捕まえる (SR-99 #5958)
-  if (getenv("S2HOST_SLOT")) armWatch((volatile int*)(gDllBase + 0x17bf760));
+  if (getenv("S2HOST_WATCH")) armWatch((volatile int*)((unsigned char*)ctrl + 0xdc), 4);
+  // S2HOST_SLOT=1: slot 0x1817bf760 (RVA 0x17bf760、8 byte の関数ポインタ) への書込 PC を DR0 で捕まえる (SR-99 #5958)
+  if (getenv("S2HOST_SLOT")) armWatch((volatile int*)(gDllBase + 0x17bf760), 8);
 
   r = ctrl->initialize((FUnknown*)hostApp);  // IPluginBase slot3
   L("controller->initialize(hostApp) = %s", tresName(r));
