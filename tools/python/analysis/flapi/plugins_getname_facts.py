@@ -89,6 +89,12 @@ def main():
         and ins(0xD80FC2)[1] == "jl 0xd810d6" and ins(0xD80FCC)[1] == "jg 0xd810d6"
         and ins(0xD810D6)[1] == "mov ecx, esi" and ins(0xD810D8)[1] == "call 0xd82c20",
         "0xc3cfa0 の CP 指定 65001 (0xfde9 = UTF-8)": ins(0xC3CFBD)[1] == "mov r8w, 0xfde9" and 0xFDE9 == 65001,
+        "0x12b69b0: 0x1331340 で sub-object を得る (0x12b6a2c)": ins(0x12B6A2C)[1] == "call 0x1331340",
+        "0x12b69b0: sub.vt[+0x20] を呼ぶ (0x12b6a3c)": ins(0x12B6A3C)[1] == "call qword ptr [rax + 0x20]",
+        "0x12b69b0: sub.vt[+0x20] に edx = 6 を渡す (0x12b6a56)": ins(0x12B6A56)[1] == "mov edx, 6"
+        and ins(0x12B6A71)[1] == "call qword ptr [rbx + 0x20]",
+        "0x12b69b0: 名前の読出し 0x413a60 (0x12b6a88)・0x41c650 (0x12b6a95)": ins(0x12B6A88)[1] == "call 0x413a60"
+        and ins(0x12B6A95)[1] == "call 0x41c650",
         "midi.py: FPN_Preset = 6 (flag == 6 の意味)": bool(fpn_preset) and fpn_preset[0].strip() == "FPN_Preset = 6",
         "エラー文言 code -4 (0xd82e8c)": ascii_at(0xD82E8C, 18) == b"Index out of range",
         "エラー文言 code -8 (0xd82f3c)": ascii_at(0xD82F3C, 16) == b"Plugin not valid",

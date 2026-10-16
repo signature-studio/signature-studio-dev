@@ -32,7 +32,8 @@
 | `ACFStartup()` | **page fault で Wine 落ち** (未達。ログ `run1.log`) |
 
 `ACFStartup` の失敗箇所: `ACFStartup` の呼出 (loader +0x165b) → HeartCore の `0x1800211d7`〜の関数 → `call (%r9)` で読めないアドレスを参照 (`0x20601345598`)。
-`r9` の値は未同定 (原因は未確定。間接 call の宛先が Wine 上で解決されていない可能性があるが、未検証)。完全なログは `runtime_wine/run1.log`。
+完全なログは `runtime_wine/run1.log`。
+> **訂正 (KH-169 #5556)**: 上の「間接 call の宛先が未解決」は誤り。原因は loader が `ACFStartup()` を引数なしで呼んだこと。`ACFStartup(NULL)` は戻り、`ACFStartup(1)` で同じ fault が出る。詳細は `REPORT_APPENDIX_5556.md`。
 
 ## 5. 未解決
 
