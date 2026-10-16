@@ -60,12 +60,19 @@ R13W = re.compile(r'^(?!cmp|test|push|call|jmp|j[a-z]+\b)[a-z0-9]+\s+r13[bwd]?\b
 R13PUSH = re.compile(r'^push\s+r13\b')
 R13POP = re.compile(r'^pop\s+r13\b')
 R13XCHG = re.compile(r'^xchg\s+.*\br13[bwd]?\b')
+R13SPILL = re.compile(r'^mov\s+QWORD PTR \[rsp[+-]0x[0-9a-f]+\],r13$')
+
+
+def r13_saved_by_spill(s):
+    # push r13 が無く、rsp 相対の退避 (mov [rsp+X],r13) で保存する関数。全 ret 経路の確認は手作業 (REPORT §9)
+    body = body_of[s]
+    return not any(R13PUSH.match(t) for _, t in body) and any(R13SPILL.match(t) for _, t in body)
 
 
 def r13_unsaved(s):
-    # 本体に push r13 があれば保存済みとして 0 を返す (r13 への書込みが保存を要するのは push r13 が無い関数)
+    # 本体に push r13 も rsp 退避も無く、r13 へ書く関数の書込み数
     body = body_of[s]
-    if any(R13PUSH.match(t) for _, t in body):
+    if any(R13PUSH.match(t) for _, t in body) or any(R13SPILL.match(t) for _, t in body):
         return 0
     n = 0
     for _, t in body:
@@ -104,5 +111,9 @@ print('vtable_targets_stored', len(vt_sites))
 print('vtables_with_slot1_slot2_code', len(targets))
 print('distinct_slot_functions', len(slots))
 print('slot_functions_writing_r13_unsaved', len(bad))
+spill = sorted(s for s in slots if r13_saved_by_spill(s))
+print('slot_functions_r13_spill_only', len(spill))
+for s in spill:
+    print('  spill %x' % s)
 for s in bad[:40]:
     print('  %x writes=%d' % (s, r13_unsaved(s)))
