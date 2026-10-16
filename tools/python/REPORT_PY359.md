@@ -81,6 +81,25 @@ python3 analysis/py64_check_expr.py work/py53/fn.txt --negctl p2   # exit 1
 - 実時間: `py88_writes.py` 4 点 0.02 秒・`py99_slot_paths.py` 既定 0.35 秒。load average 0.25 (`uptime`・測定直前)。
 - 未解決: 4 地点 (0x104b5aa・0x104b94e・0x104bebf・0x104bffa) の展開は本 PR の範囲外 (既存の未解決として §6 の残り 4 地点と同じ)。
 
+## 8. G2・G3 の 4 地点の手計算照合 (PY-5400 / #5905・#5312 の単位 B)
+
+- 文法: `py64_check_expr.py` の `TOKEN`・`Parser` に `shl(` `imul(` `and(` `shr(` (1〜2 引数の関数形)・`c_in`・`,` を加えた。`machine_norm` は `&M64[`/`&M8[` の `&` を落とす。
+- 手計算式 (展開版 `EXPANDED`): 0x104aba9・0x104af7f は `F` 型 (`[P+0x3b8] + rint(*(0x104ccd8) · d_in · ([P+0x3bc] − [P+0x3b8]))`)、0x104ad2e・0x104b093 は表引き (M8 型・M32 型)。`c_in` は入口の ecx (0x1046d65 の store)、`[rbp+0x574]`・`[rbp+0x578]` は 0x104aacd・0x104aabe の式 (`and(shr(X,0x10),0x3f)`・`shr(shr(X,0x10),6)`、X = c_in − 0x70000000)。
+- 測定 commit: 本 PR の code commit (`tools/python/analysis/py64_check_expr.py`)。入力: `work/py53/fn.txt` (`fl-win64` の `block00031_PE.bin`・`py53_dispatch.py` で 4664 命令)。
+- 結果 (実測): `python3 analysis/py64_check_expr.py work/py53/fn.txt` → 既存 HAND 8 点 `mismatch=0` (受入 1 を満たす)。展開版 `expanded n=5 mismatch=4`・exit 1。
+
+| VA | 結果 | 原因 |
+|---|---|---|
+| 0x104aba9 (G2・F 型) | 不一致 (parse error) | 展開式が py88 の 400 字上限で `…` に切れる。`resolve()` の上限を 4000 に上げた scratch でも `…` が残る (DEPTH_LIMIT = 60 で止まる) |
+| 0x104af7f (G3・F 型) | 不一致 (parse error) | 0x104aba9 と同じ (`…`) |
+| 0x104ad2e (G2・M8 型) | 不一致 | py88 の `ARITH` は 2 オペランドのときだけ源を出す。`imul rcx, rcx, 0x28f` (3 オペランド) が `imul((…)*8)` になり 655 (0x28f) が落ちる。手計算式は 655 を保持 |
+| 0x104b093 (G3・M32 型) | 不一致 | 0x104ad2e と同じ (`imul` の 0x28f 欠落) |
+
+- 手計算式の確からしさ: 0x104ad2e の `imul` を落とした形の手計算式は機械式と一致しないままだった (`hand-without-0x28f == mach` が False)。0x104aba9 は展開の `…` を超えて比べられない。このため手計算式そのものの正しさは本 run では確定していない。
+- 不一致の VA と手計算式: 上の 4 点。受入 3 (不一致があれば VA と手計算式を REPORT に書く) を満たす。
+- 未解決の追跡 (本 PR の範囲外): (1) `py88_writes.ARITH` の 3 オペランド `imul` の源欠落、(2) `resolve()` の 400 字上限と `DEPTH_LIMIT` による `…` 切れ。いずれも `py88_writes.py` の修正になり、py88・py99 の既存測定値 (§6・§7・REPORT_PY99 系) が動く。単独の修正 PR として扱う。
+- 既存点への影響: `py99_slot_paths.py` と `py88_writes.py` は変更していない。`py159_check_hand.py` は `py64_check_expr` の `parse_canon`・`machine_norm` を使うが、文法追加は既存式の解釈を変えない。
+
 ### 差分 (測定 commit から HEAD まで)
 
 `git diff 53ab89b54 HEAD -- tools/python/analysis` は本 PR の commit 後の差分 (本 §7 の追記時点で 0 行)。
