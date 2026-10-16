@@ -55,3 +55,18 @@ bash tools/targets/kilohearts/ghidra_route/void_ret_check.sh <HeartCore.core_64>
 ```
 
 出力は 4 呼出し点の call と直後 6 命令。判定は上の表。
+
+HeartCore.core_64 の実出力は **未取得** (素材 `plugins-kilohearts` が `$HOME/artifacts` に無く、この run では展開できなかった)。表の番地・レジスタは、取得後に上のコマンドの出力と照合して確定する。
+
+照合ロジックの確認 (テスト用 ELF・`gcc -O0` で作った 2 関数・objdump 表記 `call   1030` = `0x` なし)。修正後の照合で一致する:
+
+```
+== 1102 call 1030
+    1102:	call   1030 <__cxa_finalize@plt>
+    1107:	call   1070 <deregister_tm_clones>
+    110c:	mov    BYTE PTR [rip+0x2efd],0x1        # 4010 <__TMC_END__>
+    1113:	pop    rbp
+    1114:	ret
+    1115:	nop    DWORD PTR [rax]
+    1118:	ret
+```
