@@ -11,12 +11,14 @@ typedef unsigned long long u64;
 #endif
 static u64 n_cp = 0, n_rp = 0;
 void m11_copy_in(u64 dst, u64 src, u64 n) {
+    if (n > (1ull << 40)) return;
     if (dst + n <= (u64)(M11_WATCH_LO) || dst >= (u64)(M11_WATCH_HI)) return;
     n_cp++;
     if (n_cp <= 2000)
         fprintf(stderr, "[a1cp] dst=%llx src=%llx n=%llu hit=%llu\n", dst, src, n, n_cp);
 }
 void m11_rep_in(u64 dst, u64 bytes, u64 site) {
+    if (bytes > (1ull << 40)) return;
     if (dst + bytes <= (u64)(M11_WATCH_LO) || dst >= (u64)(M11_WATCH_HI)) return;
     n_rp++;
     if (n_rp <= 2000)
