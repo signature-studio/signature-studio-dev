@@ -56,3 +56,27 @@ KPI (起動に関わる変更ではないが、boot 実行の前後を記録): u
 - 本体 (HEAD `729a5aaab`): `bash tools/flelift/boot/py301_undo_obj_probe.sh` real 2 分 18.1 秒 (build + boot)。出力: `probes: 3 (expect 3)`・`PY301 行: 1`・`fle_wwatch` 2 件・`FLEBOOT_RESULT` units_run 209 (前記)。
 - 差分 (WORKFLOW §6): 測定 commit `729a5aaab` は、この節の時点で `tools/flelift` のコードを変えた最後の commit。`git diff 729a5aaab HEAD -- tools/flelift` は REPORT の commit までで空 (差分 0)。
 
+
+## 付録 §B. 既定経路 (`FLE_IPP` 未指定) での undo 状態と obj 設定経路 (PY-304・#4135)
+
+前 run までの測定は shim 有 (`FLE_IPP=1`) で units 209 の停止点までだった。既定経路は付録 672 §C-2 で units 895 まで進むため、同じ観測を既定経路で行った (`#3112` の fill 修復を待たずに、停止点の後の値を見るため)。
+
+- lift・root: `env -u FLE_EXTRA_ROOTS FLE_BOOT_TAG=py304root FLE_BOOT_RUNS=default bash tools/flelift/boot/fle6_measure.sh` (既定 root `0x6a7b70` + boot_roots `0x976da0`)。lift 81 s・clang-plain 81 s・boot 10 s。
+- 判定 (既定 root): `units_run` **895 / 942**・停止 `exit` (code 0)・`FLEBOOT_IPP_CHECK` `ok:true` (ptr `0x7f10001c`)。§C-2 と一致。`FLE_EXTRA_ROOTS=` (root 無し) で同じ boot を流すと units は 895 (`py304def`)。
+- probe: `PY301_IPP= bash tools/flelift/boot/py301_undo_obj_probe.sh`。`probes: 3 (expect 3)`・`PY301 行: 6`・`fle_wwatch` 1 件 (`0x141d6b8`: 0 → `0x12d15e20`)・陽性対照 `[PY301-c] 0x412a0d n=1` あり。
+
+| 観測 | 既定経路 (units 895) | shim 有 (units 209・§2-6・§2-7) |
+|---|---|---|
+| `0x976a95` (obj 設定経路の入口) | **4 回**入る。`obj` = `0x0` のまま | 入口 0 件 (§2-7) |
+| `0x976b60` (作成呼出し先の入口) | **1 回**入る (`rcx=0x9764d8`・`dl=1`)。その時点の `[0x141d6b8]` = 0 | 入口 0 件 (§2-7) |
+| `obj` (`0x141d6c0`) の書込み (WWATCH) | **0 件** (`0x141d6b8` の書込み 1 件だけ) | 0 件 |
+| py_snap `last` (boot 終了時 = unit 895 の直後) | pos `0`・count `0`・`safe_obj` `0x0`・`f98`/`f88` `0x0`・`sing` `0x0` | pos 0・count 0・obj 0・sing 0 (unit 209 の直前) |
+| py_snap `trace` | 1 件 (unit 0 のみ)・`over` 0 | 1 件 (unit 0 のみ) |
+| `py_events` | 6 件 (site 0 の初期値のみ・unit 0)。unit 209 の 0 化は**無い** | 6 件 (初期値 + unit 209 の 0 化 3 件) |
+
+読み取り:
+
+- 既定経路では **作成呼出し `0x976b60` まで実行される**。shim 有では実行されなかったので、「設定経路が停止点までに未実行」は shim 有の停止点の性質で、既定経路では当てはまらない。
+- ただし `obj` (`[0x141d6c0]`) は既定経路でも boot 終了まで **0 のまま**。`0x976b60` の作成結果を `obj` に入れる書込みは、WWATCH (ST* 系の書込み監視) で捕まっていない。`obj` を書く経路は ST* 以外 (直接の memory 書込み・別関数の内部) か、作成が NULL を返しているかのどちらか。ここでは区別できない。
+- singleton `[0x16b82e0]` は boot 終了時点で 0 (NULL)。ただし Python の `None` は別の静的オブジェクトのアドレスで、0 は「未設定」と同じ。受入 2 の『`None` か』は、この値では判定できない (`None` の VA の特定が要る)。
+- unit 895 の `exit` は、付録 672 §C-2 の未解決 (#4782 [FLE-24]・MessageBoxW 不在の影響か) と同じ停止。fill の 0 化 (`py_events` の unit 209 の 3 件) は既定経路では起きない。
