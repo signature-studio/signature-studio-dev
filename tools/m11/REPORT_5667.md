@@ -1,7 +1,7 @@
 # LB 依存 trap 7 件の wasm offset → IR 命令の特定 (#5667・親 #3389・M11-N255)
 
 測定主体: 作業 runner (2026-10-16 UTC)。素材は `fl-win64` (`extracted/block00031_PE.bin` 22,227,016 B のみ展開)・`work-m11` (`tools/m11/work/` に展開・233 件)・`toolchain-emsdk` (`[EMSDK]` emsdk 6.0.12)。
-測定 commit: `739b46e2d` (origin/main。本 PR はコードを変えない。`git diff 739b46e2d HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` は空)。
+測定 commit: `95249ebbc` (origin/main。本 PR はコードを変えない。`git diff 95249ebbc HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` は空)。
 
 ## 1. 結論
 
@@ -12,20 +12,20 @@
 
 ## 2. LB=0 (wasm 指紋 `d6274222`)
 
-計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=291,296,304,555,745 bash tools/m11/m11_lb_tolerant_repro.sh 0 work/lb0`。rc=0・寛容起動 wall 12,197 ms (#5667 の再測定 2026-10-16・worktree の再生成)。
+計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=291,296,304,555,745 bash tools/m11/m11_lb_tolerant_repro.sh 0 work/lb0`。rc=0・寛容起動 wall 8,054 ms・`time` 実測 1 分 3 秒 (commit `95249ebbc`・2026-10-16 07:27 UTC)。wasm 指紋 `d6274222` を再現。
 trap 行: unit 555 (`va=0x7f2500`)・unit 745 (`va=0xabb3b0`)。291・296・304 は trap しなかった。指紋・逆アセンブルの生出力は付録 §1・§2.2。
 
 | unit | trap の wasm 関数 (offset) | 関数名 | faulting 命令 | IR 対応 (`work/lb0/boot_final.ll`) |
 |---|---|---|---|---|
 | 555 | `[14890]:0x353a06` | `function_535c11` | `i64.load 0` (直前 `i64.load 8; i64.const 8; i64.sub; i32.wrap_i64`。その前に `local.get 1; i64.load 8; i64.const 0; i64.ne; i32.and 1` の分岐) | `%5 = load [%2+8]`・`icmp eq %5, 0` → `%7 = add %5,-8` → `%9 = load i64 [%8]`。**一致 (高)** |
-| 745 | `[1877]:0x13d5e1` | `function_407e20__lifted` | `i64.load 0` (直前 `local.get 3; i32.wrap_i64`) | 未確定。`boot_final.ll` に `__lifted` 本体は無い (`m11_post.py` が改名)。IR 本体 `function_407e20` (`boot_final.ll:104752`) の load 連鎖は未突合 |
+| 745 | `[1877]:0x13d5e1` | `function_407e20__lifted` | `i64.load 0` (直前 `local.get 3; i32.wrap_i64`。`local 3` は `0x13d593`〜`0x13d598` の `i64.load [arg-8]` の結果と推定。この範囲の逆アセンブルは付録 §6 に未掲載で、根拠は未確認) | `function_407e20` (`boot_final.ll:104752`) の `%2 = load [arg1-8]`・`%8 = inttoptr %2`・`%9 = load i64 [%8]` (`boot_final.ll:104775`)。**一致 (中)。** 分岐経路 (`%4`・`%5`・`%7`) は一致したが、`%9` の到達経路の全体は未突合 |
 
 - unit 555 の呼出し鎖: `function_535c11` ← `function_4fad10` ← `function_4fb910` ← `m11_icall`。
 - unit 745 の呼出し鎖: `function_407e20__lifted` ← `function_407e20` ← `function_409440__lifted` ← `function_409440` ← `function_666bb0` ← `function_7745a0` ← `function_ebb3b0`。
 
 ## 3. LB=0x10000 (wasm 指紋 `cb141c7f`・`m11_boot.cjs.wasm`)
 
-計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=40,153,158,291,296,304 bash tools/m11/m11_lb_tolerant_repro.sh 0x10000 work/lb10000`。rc=0・寛容起動 wall 15,842 ms・`time` 実測 1 分 29 秒 (2026-10-16 再測定)。指紋・逆アセンブルは付録 §1・§2.1・§2.3。
+計測: `M11_TOLERANT_ERR=1 M11_TOLERANT_STACK=40,153,158,291,296,304 bash tools/m11/m11_lb_tolerant_repro.sh 0x10000 work/lb10000`。rc=0・寛容起動 wall 10,130 ms・`time` 実測 1 分 4 秒 (commit `95249ebbc`・2026-10-16 07:30 UTC)。wasm 指紋 `cb141c7f` を再現。指紋・逆アセンブルは付録 §1・§2.1・§2.3。
 
 | unit | trap の wasm 関数 (offset) | 関数名 | faulting 命令 | IR 対応 (`work/lb10000/boot_final.ll`) |
 |---|---|---|---|---|
@@ -56,7 +56,7 @@ trap 行: unit 555 (`va=0x7f2500`)・unit 745 (`va=0xabb3b0`)。291・296・304 
 | 555・291・296・304 の `%5` の実行時の値 | 未観測 |
 | 153 の `%1` の実行時の値 | 未観測 |
 | address 0 の読み (trap にならない読み) の有無 | 未観測。観測には load の実効アドレスを記録する計測が要る |
-| 745 の IR 行 (`function_407e20` の `i64.load`) | 未確定 (`__lifted` 改名後の IR との突合が未実施) |
+| 745 の IR 行 | 中 (`%9 = load i64 [%8]`・`%8 = %2`。到達経路は未突合) |
 | 158 の `store16` の IR 行 | 候補のみ |
 
 ## 6. 未解決 (起票先)
@@ -65,7 +65,7 @@ trap 行: unit 555 (`va=0x7f2500`)・unit 745 (`va=0xabb3b0`)。291・296・304 
 |---|---|---|
 | 555・291・296・304 の `%5`・153 の `%1` の実行時の値 (null 基底か) | 受入「address 0 を読むか」の判定 | #5667 (次の run。計測の実装が要る) |
 | address 0 の読み (trap にならない読み) の観測 | 「address 0 を読むか」の残り。trap の信号では分からない | #5667 |
-| 745 の IR 行 (`function_407e20` の `i64.load`)・158 の `store16` の IR 行の確定 | 命令の対応が候補止まり | #5667 |
+| 745 の IR 到達経路の突合・158 の `store16` の IR 行の確定 | 745 は中、158 は候補止まり | #5667 |
 
 ## 7. 再現
 
