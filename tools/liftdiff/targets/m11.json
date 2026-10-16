@@ -17,6 +17,7 @@
   "init_table_rva": "0xf768b0",
   "ret_override_note": "LD-158 (#3470): IR は i128 戻りだが、実戻りは xmm0 (6 件は double、812df0・812e70 は mulss で書かれる float)。tools/liftdiff/REPORT_LD158.md §3 の動的実測で rax 不書換・xmm0 が入力で変化する 8 関数だけを対象にする。署名 ret を実戻りの型に直し、m11_tr_ 経由 (下位 64bit) で x0 と比較する (float は下位 32bit)。",
   "ret_override": {
+    "function_6ed480": "double",
     "function_6957d0": "double",
     "function_6957f0": "double",
     "function_695930": "double",
