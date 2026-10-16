@@ -1,16 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildLaunchBody, checkRelaunchIntent, RELAUNCH_MAX_PER_WINDOW } from "../src/launch.ts";
+import { buildLaunchBody, checkRelaunchIntent, relaunchAuthorOf, RELAUNCH_MAX_PER_WINDOW } from "../src/launch.ts";
 import { parseRelaunchIntent } from "../src/webhook.ts";
 import { configuredApp, issuePayload, j, markFresh, runPayload, send, T0, type Call, type Handler } from "./helpers.ts";
-import { commentEv, HUMAN, IMPL_BOT, REVIEWER, at, prEv, type Ctx } from "./pm_helpers.ts";
+import { commentEv, HUMAN, IMPL_BOT, PM_BOT, REVIEWER, at, prEv, type Ctx } from "./pm_helpers.ts";
 
 // PM の再投入の意図 (oc-pm-intent: relaunch) は、検査を全て通し、分類で投稿してよい行のときだけ /oc として投稿する。
-// (a) allowlist 外の素材 (b) 実装 App 以外の書き手 (c) 24 時間で 4 回目 (d) focus=10 は拒否 (ネガコン)。
+// (a) allowlist 外の素材 (b) 実装 App・PM App 以外の書き手 (c) 24 時間で 4 回目 (d) focus=10 は拒否 (ネガコン)。
 
 const H = 3_600_000;
-const r = (o: Partial<{ bot: boolean; issue: string; arts: string; focus: string | null }> = {}) => ({
-  bot: true,
+const r = (o: Partial<{ author: "impl" | "pm" | "other"; issue: string; arts: string; focus: string | null }> = {}) => ({
+  author: "impl" as const,
   issue: "21",
   arts: "fl-win64 plugins-ott",
   focus: null,
@@ -40,9 +40,18 @@ test("ネガコン (a): allowlist 外の素材名・空の素材・none は拒�
   }
 });
 
-test("ネガコン (b): 実装 App 以外が書いた意図は拒否。issue が違えば拒否", () => {
-  assert.deepEqual(checkRelaunchIntent(21, r({ bot: false }), [], T0), { ok: false, reason: "author" });
+test("ネガコン (b): 実装 App・PM App 以外が書いた意図は拒否。issue が違えば拒否", () => {
+  assert.deepEqual(checkRelaunchIntent(21, r({ author: "other" }), [], T0), { ok: false, reason: "author" });
   assert.deepEqual(checkRelaunchIntent(21, r({ issue: "22" }), [], T0), { ok: false, reason: "issue" });
+});
+
+test("検査 (b'): PM App (oc-pm の run の identity) の意図も通す (#5146 の後も PM の再投入を実行する。#5722)", () => {
+  assert.deepEqual(checkRelaunchIntent(21, r({ author: "pm" }), [], T0), OK);
+  assert.deepEqual(checkRelaunchIntent(21, r({ author: "pm", focus: "3" }), [], T0), { ...OK, focus: 3 });
+  // 旧版の保存値 (author が無い) の互換: bot=true は impl、それ以外は other (第三者と同じ)。
+  assert.equal(relaunchAuthorOf({ bot: true }), "impl");
+  assert.equal(relaunchAuthorOf({ bot: false }), "other");
+  assert.equal(relaunchAuthorOf({ author: "pm", bot: false }), "pm");
 });
 
 test("ネガコン (c): 24 時間に 3 回投稿済みなら 4 回目は拒否。窓の外 (25 時間前) は数えない", () => {
@@ -127,6 +136,14 @@ test("統合 (live): 停止報告の後の実装 App の意図は 1 回だけ /o
   assert.equal(run.ctx.app.engine.s.botLast["21"]?.body, REPORT, "意図の投稿は停止報告の窓 (botLast) を動かさない");
   await tickNow(run.ctx);
   assert.equal(postsTo(run.ctx, 21).length, 1, "処理済みの意図は再投稿しない");
+});
+
+test("統合 (live): 停止報告の後の PM App の意図も /oc として投稿する (#5146 以降の PM agent の identity。#5722)", async () => {
+  const run = await intentRun({ LIVE_LAUNCH: "1" }, PM_BOT, GOOD);
+  assert.equal(run.posts.length, 1);
+  assert.ok(String(run.posts[0].body.body).includes("この issue の受入条件 3 だけを実装して PR を出してください"));
+  assert.equal(run.counters.intentLaunched, 1);
+  assert.equal(run.counters.intentRejected?.author, undefined, "PM App を author で拒否しない");
 });
 
 test("統合 (dry-run 既定): 投稿せず、would の記録だけ残す", async () => {
@@ -251,6 +268,46 @@ test("統合 (書き手の競合): 第三者の意図は、実装 App の意図�
     assert.equal(ps.length, 1);
     assert.ok(String(ps[0].body.body).includes("oc_artifacts: fl-win64 plugins-ott"), "実装 App の素材行で投稿する");
     assert.equal((ctx.app.engine.status() as any).counters.intentRejected, undefined, "第三者の意図は残らない (拒否として数えない)");
+  }
+});
+
+test("統合 (書き手の競合 2): PM App の意図は第三者の意図を置き換え、実装 App の意図が後から届けば置き換えられる (区分の順は impl > pm > other。順序に依らない。#5722)", async () => {
+  // PM > 第三者: 第三者の後の PM App の意図を使う
+  {
+    const ctx = await stopped({ LIVE_LAUNCH: "1" });
+    for (const [i, [who, marker]] of (
+      [
+        [HUMAN, HUMAN_INTENT],
+        [PM_BOT, GOOD],
+      ] as const
+    ).entries()) {
+      assert.equal((await send(ctx.app, "issue_comment", commentEv(21, who, marker, at(5 + i)))).status, 202);
+    }
+    await tickNow(ctx);
+    const ps = postsTo(ctx, 21);
+    assert.equal(ps.length, 1);
+    assert.ok(String(ps[0].body.body).includes("oc_artifacts: fl-win64 plugins-ott"), "PM App の素材行で投稿する");
+    assert.equal((ctx.app.engine.status() as any).counters.intentRejected, undefined, "第三者ではないので捨てない");
+  }
+  // 実装 App > PM: 前後どちらの順で届いても実装 App の意図を使う
+  for (const order of [
+    [
+      [PM_BOT, '<!-- oc-pm-intent: relaunch issue=21 arts="fl-win64" -->'],
+      [IMPL_BOT, GOOD],
+    ],
+    [
+      [IMPL_BOT, GOOD],
+      [PM_BOT, '<!-- oc-pm-intent: relaunch issue=21 arts="fl-win64" -->'],
+    ],
+  ] as const) {
+    const ctx = await stopped({ LIVE_LAUNCH: "1" });
+    for (const [i, [who, marker]] of order.entries()) {
+      assert.equal((await send(ctx.app, "issue_comment", commentEv(21, who, marker, at(5 + i)))).status, 202);
+    }
+    await tickNow(ctx);
+    const ps = postsTo(ctx, 21);
+    assert.equal(ps.length, 1);
+    assert.ok(String(ps[0].body.body).includes("oc_artifacts: fl-win64 plugins-ott"), "実装 App の素材行で投稿する");
   }
 });
 

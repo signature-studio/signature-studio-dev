@@ -112,13 +112,15 @@ test("保存値の版が無い状態では、最初の tick の全体同期で�
   assert.equal(ctx.app.engine.meta.signalVer, SIGNAL_VER);
   assert.deepEqual(noPrRefs(ctx.app), Array.from({ length: 40 }, (_, i) => 101 + i), "対象は Bot 起票・oc:no-pr・split の 40 件だけ");
   assert.equal(ctx.app.engine.status().pm_detected.no_pr, 40);
-  // 対象 40 件は毎時の上限 (PM_LIMITS.hourMax = 72) に収まるので全件送る。2 回目の tick (1 分後) は同じ (kind, ref) を 60 分以内に再送しない。
+  // 対象 40 件は毎時の上限 (PM_LIMITS.hourMax = 72) に収まるので全件送る。ラベルの無い停止行 #202 は stopped_report として送る (CI-239・#5722)。
+  // 2 回目の tick (1 分後) は同じ (kind, ref) を 60 分以内に再送しない。
   const first = ctx.m.calls.filter(isPmDispatch);
-  assert.equal(first.length, 40);
-  assert.ok(first.every((c) => c.body.client_payload.kind === "no_pr"));
+  assert.equal(first.length, 41);
+  assert.equal(first.filter((c) => c.body.client_payload.kind === "no_pr").length, 40);
+  assert.deepEqual(first.filter((c) => c.body.client_payload.kind === "stopped_report").map((c) => c.body.client_payload.ref), [202]);
   clock.t += MIN;
   await ctx.app.engine.tick();
-  assert.equal(ctx.m.calls.filter(isPmDispatch).length, 40, "同じ対象は 60 分以内に再送しない");
+  assert.equal(ctx.m.calls.filter(isPmDispatch).length, 41, "同じ対象は 60 分以内に再送しない");
 });
 
 test("ネガコン: 外部起票者・ラベル無し・outcome 無し・保留ラベル・PM の後続応答・reason が artifact・人間 (CONTRIBUTOR) 起票は対象外", async () => {

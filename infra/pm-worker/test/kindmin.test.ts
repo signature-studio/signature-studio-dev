@@ -132,7 +132,7 @@ test("(a) 検出から送信まで: 未送信の no_pr 70 件 + refs_orphan 60 �
   assert.equal(sent.filter((k) => k === "refs_orphan").length, 3);
   assert.equal(sent.filter((k) => k === "no_pr").length, 69);
   const s = ctx.app.engine.status() as any;
-  assert.deepEqual(s.pm_dispatch_1h_by_kind, { user_answered: 0, needs_decision: 0, stuck: 0, no_pr: 69, refs_orphan: 3 });
+  assert.deepEqual(s.pm_dispatch_1h_by_kind, { user_answered: 0, needs_decision: 0, stuck: 0, no_pr: 69, refs_orphan: 3, stopped_report: 0 });
   assert.equal(s.pm_dispatch_1h, PM_LIMITS.hourMax, "内訳の合計は pm_dispatch_1h と同じ");
   assert.equal(s.pm_skipped_hour_24h, 58, "見送り = no_pr の残り 1 (予約 reserve) + refs_orphan の残り 57 (毎時上限 hour)");
 });

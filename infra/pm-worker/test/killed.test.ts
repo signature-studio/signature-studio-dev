@@ -68,7 +68,7 @@ test("2 回連続で打ち切られた issue は stopped (killed x2) に置き�
   assert.deepEqual(s.killed_issues, [300]);
   assert.equal(s.stopped, 1);
   assert.deepEqual(ctx.app.engine.detectPmTargets(), [{ kind: "no_pr", ref: 300, at: "2026-10-14T11:40:00Z", prio: "normal" }]);
-  assert.deepEqual(s.pm_detected, { user_answered: 0, needs_decision: 0, stuck: 0, no_pr: 1, refs_orphan: 0, critical: 0 });
+  assert.deepEqual(s.pm_detected, { user_answered: 0, needs_decision: 0, stuck: 0, no_pr: 1, refs_orphan: 0, stopped_report: 0, critical: 0 });
 });
 
 test("LIVE: /oc を投稿した run が 2 回続けて打ち切られたら、3 回目は投稿しない (旧実装は cooldown ごとに無限に再投稿)", async () => {

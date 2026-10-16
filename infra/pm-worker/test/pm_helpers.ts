@@ -13,6 +13,8 @@ export interface Author {
 export const HUMAN: Author = { login: "pycabbage", type: "User", assoc: "OWNER" };
 export const OUTSIDER: Author = { login: "stranger", type: "User", assoc: "NONE" };
 export const IMPL_BOT: Author = { login: IMPL, type: "Bot", assoc: "NONE" };
+// PM App (oc-pm の run の identity。テストの App は slug が oc-pm-for-signature-studio。#5146 以降の PM agent)。
+export const PM_BOT: Author = { login: "oc-pm-for-signature-studio[bot]", type: "Bot", assoc: "NONE" };
 export const EVIL_BOT: Author = { login: "evil-app[bot]", type: "Bot", assoc: "NONE" };
 export const MEMBER_USER: Author = { login: "member-user", type: "User", assoc: "MEMBER" };
 export const COLLAB_USER: Author = { login: "collab-user", type: "User", assoc: "COLLABORATOR" };

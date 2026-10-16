@@ -216,7 +216,7 @@ test("/status: pm_dispatch_1h_by_prio は直近 1 時間の送信を区分別に
   const s = ctx.app.engine.status() as any;
   assert.deepEqual(s.pm_dispatch_1h_by_prio, { critical: 1, normal: 2, low: 0 });
   assert.equal(s.pm_dispatch_1h, 3, "内訳の合計は pm_dispatch_1h と一致する");
-  assert.deepEqual(s.pm_detected, { user_answered: 0, needs_decision: 0, stuck: 0, no_pr: 2, refs_orphan: 0, critical: 1 });
+  assert.deepEqual(s.pm_detected, { user_answered: 0, needs_decision: 0, stuck: 0, no_pr: 2, refs_orphan: 0, stopped_report: 0, critical: 1 });
   clock.t += 61 * 60_000;
   const later = ctx.app.engine.status() as any;
   assert.deepEqual(later.pm_dispatch_1h_by_prio, { critical: 0, normal: 0, low: 0 }, "1 時間たったら数えない");

@@ -1,7 +1,7 @@
 // webhook 受信の純関数。署名を検証してから状態を変える (未検証の入力では状態を一切変えない)。
 // 永続化 (Durable Object / SQLite) は呼び出し側の責務。ここは state を受け取り、次の state を返すだけ。
 import { verifySignature } from "./hmac.ts";
-import { bodyArtLine, type PrioIssue } from "./launch.ts";
+import { bodyArtLine, relaunchAuthorOf, type PrioIssue, type RelaunchAuthor } from "./launch.ts";
 import { needsPmDecision } from "./needs.ts";
 import { rateMarkRun } from "./ratealert.ts";
 import { closeRefs, mentionRefs, refsOnlyNumbers } from "./refs.ts";
@@ -84,8 +84,9 @@ export interface Signal {
   kill?: { count: number; at: string };
   // 最後に数えた run の id。kill とは別に持ち、連続を消しても残す (完了済みの run の配送が再送・順不同で届いても、同じ run を数え直さない)。
   killRun?: number;
-  // 最新の oc-pm-intent: relaunch (issue コメント)。書き手が実装 App かどうか (bot) と、マーカーの字句 (issue・arts・focus) だけを持つ。検査は engine が行う。
-  relaunch?: { at: string; id?: number; bot: boolean; issue: string; arts: string; focus: string | null };
+  // 最新の oc-pm-intent: relaunch (issue コメント)。書き手の区分 (author: impl = 実装 App・pm = PM App・other = 第三者。旧保存値は bot だけを持つ) と、
+  // マーカーの字句 (issue・arts・focus) だけを持つ。検査は engine が行う。
+  relaunch?: { at: string; id?: number; author?: RelaunchAuthor; bot?: boolean; issue: string; arts: string; focus: string | null };
   // sub-issue の親 (sub_issues の webhook)。n が null は親の取り外し (tombstone。古い追加の配送で戻さないため at を持つ)。区分の継承に使う (#3989)。
   subParent?: { n: number | null; at: string };
 }
@@ -341,12 +342,13 @@ function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: str
     if (reason) patch.outcome = { at, reason };
   }
   if ((pmLogins.includes(login) || (trusted && PM_MARK_RE.test(body))) && later(cur?.pmAt)) patch.pmAt = at;
-  // 再投入の意図は issue のコメントだけ。実装 App の意図は第三者の意図より優先する (第三者の後に来ても置き換えない)。
-  // 同じ区分の中では最新を残す。どの順に適用しても結果は同じ。第三者の意図も残す (engine が author として拒否し、counters に記録する)。
+  // 再投入の意図は issue のコメントだけ。書き手の区分は impl (実装 App) > pm (PM App) > other (第三者)。上位の区分は下位を順序に依らず置き換える。
+  // 同じ区分の中では最新を残す。第三者の意図も残す (engine が author として拒否し、counters に記録する。保存値の互換は launch.ts の relaunchAuthorOf)。
   const rel = !("pull_request" in i) ? parseRelaunchIntent(body) : null;
-  const impl = login === botLogin;
-  if (rel && (!cur?.relaunch || (impl && !cur.relaunch.bot) || (impl === cur.relaunch.bot && notOlder(cur.relaunch, c)))) {
-    patch.relaunch = { at, ...(typeof c.id === "number" ? { id: c.id } : {}), bot: impl, ...rel };
+  const relAuthor: RelaunchAuthor = login === botLogin ? "impl" : isBotUser(c.user) && pmLogins.includes(login) ? "pm" : "other";
+  const relRank: Record<RelaunchAuthor, number> = { impl: 2, pm: 1, other: 0 };
+  if (rel && (!cur?.relaunch || relRank[relAuthor] > relRank[relaunchAuthorOf(cur.relaunch)] || (relAuthor === relaunchAuthorOf(cur.relaunch) && notOlder(cur.relaunch, c)))) {
+    patch.relaunch = { at, ...(typeof c.id === "number" ? { id: c.id } : {}), author: relAuthor, ...rel };
   }
   // 人の回答は、非 bot かつ MEMBER / OWNER / COLLABORATOR のコメントだけ (第三者のコメントで PM を起こさない)。
   const human = !!login && !isBotUser(c.user) && ASSOC_OK.includes(c.author_association);

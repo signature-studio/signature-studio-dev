@@ -218,6 +218,15 @@ test("LOW_CAP: 既定は 10。空・空白・非数・負は既定に戻し、0 
   assert.match(toml, /^LOW_CAP = "10"$/m);
 });
 
+test("STOPPED_INTAKE_PER_H: 既定は 24 (停止行の 1 時間の上限。#5722)。wrangler.toml も 24 で、env で下げられる", () => {
+  assert.equal(loadConfig({}, {}).stoppedIntakePerH, 24);
+  assert.equal(loadConfig({ STOPPED_INTAKE_PER_H: "12" }, {}).stoppedIntakePerH, 12);
+  assert.equal(loadConfig({ STOPPED_INTAKE_PER_H: "0" }, {}).stoppedIntakePerH, 0, "0 は停止行の受け渡しを止める");
+  assert.equal(loadConfig({ STOPPED_INTAKE_PER_H: "abc" }, {}).stoppedIntakePerH, 24, "非数は既定に戻す");
+  const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+  assert.match(toml, /^STOPPED_INTAKE_PER_H = "24"$/m);
+});
+
 test("active: 未完了の opencode.yaml の run を区分別に数える。合計は all と一致し、対応の取れない run は normal (#2721)", () => {
   const issues = [
     { title: "[A-1] a", prio: "low" as const },

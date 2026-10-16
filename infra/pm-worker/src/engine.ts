@@ -6,7 +6,7 @@ import { countOpencodeRuns, countRunsByPrio, type ActiveCount } from "./active.t
 import { classify, isStopReport, neededArtsOf, RUN_WINDOW_H, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
-import { addArts, buildLaunchBody, checkRelaunchIntent, defaultArtLine, effectivePrioMap, lowAllowance, noPrCooldownMs, planLaunch, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
+import { addArts, buildLaunchBody, checkRelaunchIntent, defaultArtLine, effectivePrioMap, lowAllowance, noPrCooldownMs, planLaunch, relaunchAuthorOf, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
 import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { haltNotifyDue, haltOverdue, haltReasons, nextHalt, type Halt } from "./halt.ts";
@@ -1271,7 +1271,7 @@ export class Engine {
       const st = this.d.store.get<{ seen?: string; posted?: number[] }>("relaunch", key) ?? {};
       const at = Date.parse(r.at);
       // 処理済みかは、いまの意図 (issue ごとの 1 枠) の識別子で比べる。時刻で比べると、先に処理した第三者の意図より後に届く bot の古い意図が捨てられる。
-      const ident = `${r.bot ? "bot" : "user"}:${r.id ?? r.at}`;
+      const ident = `${relaunchAuthorOf(r)}:${r.id ?? r.at}`;
       if (st.seen === ident) continue;
       // 最後の /oc より前に出た意図は捨てる (PM の手動の /oc を含む)。
       if ((Date.parse(this.s.launchedAt[k] ?? "") || 0) >= at) {
@@ -1401,6 +1401,7 @@ export class Engine {
   detectPmTargets(): PmTarget[] {
     return detectPm(this.s, {
       bots: this.d.cfg.pmTargetBots,
+      nowMs: this.d.now(),
       npCount: (n) => this.d.store.get<{ count: number }>("relaunch", `np:${n}`)?.count ?? 0,
       // 新しい素材の無い artifact は、unknown の枠 (再投入 1 回) を使い切るか、再投入の上限に達したら oc-pm に回す (#3185)。
       artSpent: (n) => this.artExtra(n) === null && (this.noPrState(n).unknown >= 1 || this.noPrState(n).count >= NO_PR_MAX_RELAUNCH),
@@ -1439,7 +1440,7 @@ export class Engine {
     const live = !!(this.dispatchLive() && gh);
     const now = this.d.now();
     const hist = this.pmHistory();
-    const { send, skipped } = selectDispatch(now, this.detectPmTargets(), hist);
+    const { send, skipped } = selectDispatch(now, this.detectPmTargets(), hist, { stoppedPerHour: this.d.cfg.stoppedIntakePerH });
     this.meta.counters = this.meta.counters ?? this.zero();
     for (const tg of send) {
       if (!validPayload(tg.kind, tg.ref)) continue;
