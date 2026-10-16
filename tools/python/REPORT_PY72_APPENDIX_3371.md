@@ -174,8 +174,8 @@
 
 ### 測定
 
-- 測定 commit: `fefde10b4` (`pe_vmt_store_refs.py` を追加した commit。コードを変えた最後の commit)。
-- 測定 HEAD: `fefde10b4`。本節は REPORT だけを変える commit で、`git diff fefde10b4 HEAD -- tools/python/analysis` の差分は 0 行。
+- 測定 commit: `cf0f18f78` (`pe_vmt_store_refs.py` のコードを変えた最後の commit。docstring の展開手順の文言のみ)。
+- 測定 HEAD: `cf0f18f78` と同じ commit で測った。`git diff cf0f18f78 HEAD -- tools/python/analysis` の差分は 0 行 (本節は REPORT だけを変える)。
 - 素材: `fl-win64` (`[WIN64]`・`docs/WORKFLOW.md` §11)。`tar --zstd -xf <artifacts>/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (2.8 秒。展開先は repo 外の `$FL_WIN64_DIR`)。全 PE block の走査は `extracted/*_PE.bin` (素材内 PE 全体) に対して同じ abs64 / imm32 検索を行った。
 - 実行: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_vmt_store_refs.py 0xfe2cf8 0xfe2fc8` を同一 HEAD で 2 回。rc 0・2 回とも出力が同一 (md5 `79831128a8a05021ba73ab436d2501d7`)。
 
