@@ -29,9 +29,10 @@
 
 emsdk を導入し (`emsdk install latest`・`activate latest`)、`EMSDK` を設定して `run.sh` を実行した。
 
+- 測定 commit: `7bdaf7443` (HEAD。`842bc5ac3` 以降に `f80_lower.py` / `f80b_rt/` の差分は無い)
 - `to: n=200000 fail=0`
 - `from: n=200003 fail=0`
-- rc 0・所要 1.37 s (`time`)
+- rc 0・所要 3.80 s real (`time bash tools/plugins/p0c/f80b_rt/run.sh`)
 
 ## 2. 共有鎖の退行 (T0 / T1, `batch_lift.sh --tier T0/T1`)
 
@@ -41,7 +42,9 @@ emsdk を導入し (`emsdk install latest`・`activate latest`)、`EMSDK` を設
 - T1: 45 blocks。 `emcc_c_rc` 0 が 44/45。 唯一の不通過は 24161 ReWired (f80 2 関数)。 REPORT §4.3 の既存の結果と同じで、本 PR による変化は無い。 closure 関数 2,835。 所要: 実測ログ未保存 (同上)。
 - 退行 0。 本 PR は T0/T1 の f80 関数を 0 〜 2 しか持たないブロックにしか効かないため、差は出ない。
 
-注: 測定 commit 以降に `f80_lower.py` の `_f80b_from_image` (subnormal の丸め位置) を変えた (`842bc5ac3`)。 この修正後の T0/T1 は**未再測定**。 `batch_lift.sh` の実行基盤 (`shared/env.sh`・RetDec・plugin 素材) が本 runner に無いため。 再測定は未実施として PR 本文の未解決に書く。
+注: 測定 commit 以降に `f80_lower.py` の `_f80b_from_image` (subnormal の丸め位置) を変えた (`842bc5ac3`)。 この修正後の T0/T1 は**未再測定**。
+
+未再測定の理由 (再実行 run の 2026-10-16 に確認): `batch_lift.sh` は `/opt/retdec/bin/retdec-decompiler` (RetDec) を呼ぶが、本 runner に `/opt/retdec` が無い。 `artifacts/` にも `toolchain-retdec` が無い (`$HOME/artifacts` は `fl-win64.tar.zst` のみ)。 `PLUGIN_MATRIX.json` も本 worktree に無い。 `fl-win64` は展開可能 (block 10000 件)。 RetDec の取得元は `docs/REFERENCES.md` に `[未確認]` のため、この run では復元できない。 次に必要な素材: `oc_artifacts: fl-win64 toolchain-retdec` (取得元の確定後)。
 
 ## 3. 19165 engine (`engine_lift.sh 19165 900` → `engine_f80_subset.sh`)
 
@@ -55,7 +58,8 @@ emsdk を導入し (`emsdk install latest`・`activate latest`)、`EMSDK` を設
 | lift rc / define / f80 関数 (本体) | 0 / 2,608 / 5 | 0 / 2,608 / 5 |
 
 - 測定条件 (PR 本文の記載): `ENGINE_RANGE_ARGS="--exclude IPPCODE --exclude-ranges <78 件>" ENGINE_TAG=_noipp_nobad engine_lift.sh 19165 900`。 wall 625 s・実行直後の 1 分平均 load 1.15 (4 core) は PR 本文の記載値で、 ログは保存されていない。
-- 注: `engine_lift.sh` は本 worktree (`tools/plugins/lift/`) に無い。 `engine_f80_subset.sh` の所在は `tools/plugins/reverb_delay/`。 本 runner では再測定していない。 修正後 (`842bc5ac3`) の 19165 も未再測定。
+- 測定スクリプトの所在: `engine_lift.sh` と `engine_f80_subset.sh` は `tools/plugins/reverb_delay/` にある (`tools/plugins/lift/` には無い)。
+- 本 runner では再測定していない。 `engine_lift.sh` も `lift_ranges.sh` 経由で `/opt/retdec/bin/retdec-decompiler` を呼ぶため、§2 と同じ理由で走らない。 修正後 (`842bc5ac3` 以降) の 19165 は未再測定 (`emcc -c` の rc・最初の error は未確認)。
 
 ## 4. 鮮度: `ce3872372` から HEAD までの差分
 
