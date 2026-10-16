@@ -4,17 +4,18 @@
 
 ## 1. 結論
 
-- X・P の実行時値は**未取得**。trace の計装は作ったが、値が一度も記録されなかった。判定 (`10479c7`) は**判定不能のまま**。`candidate_verdicts_277.jsonl` と `spill178_1161.tsv` は変えていない。
-- 失敗の原因: 固定アドレスのリング `0x11FFF000` が boot 中のプログラム自身の書込みで上書きされる。実測は §3。REPORT_942 の方式 (固定リング) は、この build では成立しない。
-- 検証済みの事実: 現 IR (`M11_FIX_LD236=1`、`ir_sha256` `c572d427…`) で `m11_gen_ir2.sh` → `m11_e2e.sh` が通り、#4676 と同じ survey 結果 (ok=875・miss=46・trap=20・clobber=0) に一致した。
+- X・P の実行時値は**未取得**。判定 (`10479c7`) は**判定不能のまま**。`candidate_verdicts_277.jsonl` と `spill178_1161.tsv` は変えていない。
+- **主因: survey 経路 (boot と 942 unit) で `function_1046a30` に到達しない** (§3b: `m11_wv_push` の呼出し 0 件)。値を記録する先をどう変えても、survey からは X・P を取れない。到達には unit の実行経路の変更が要り、計装の範囲を超える。
+- 前 run (§3) の「固定リング `0x11FFF000` が boot 中の heap に上書きされる」は実測どおりだが、主因ではない。固定リング方式は捨てた (§2・§3b)。
+- 現 IR は `M11_FIX_LD236=1`・`ir_sha256` `667bbb…` (§3b)。前 run の `c572d427…` とは生成経路の差分が未切り分け。この IR で `m11_gen_ir2.sh` → `m11_e2e.sh` が通り、#4676 と同じ survey 結果 (ok=875・miss=46・trap=20・clobber=0) に一致した。
 
 ## 2. 作ったもの (`tools/m11/ldfix/`・診断専用)
 
 | ファイル | 役割 |
 |---|---|
 | `watch_ir_5533.py` | `function_1046a30` だけに観測フック `m11_wv(id, value)` を入れる。id 0 = 入口, 1 = `%359`, 2 = X (`%363`), 3 = P (`%491`), 4 = P の指す 4B (`%505`) |
-| `watch_shim_5533.c` | リング (`0x11FFF000`) に (id, value) を書く `m11_wv` |
-| `watch_survey_5533.mjs` | survey と同じ経路 (`_m11_set_survey(1)` → boot → 942 unit) で unit ごとにリングを読む |
+| `watch_shim_5533.c` | `m11_wv(id, value)` を EM_JS で JS 配列 `globalThis.__m11_wv` に `[id, value]` として積む (上限 2000 件)。linear memory は使わない |
+| `watch_survey_5533.mjs` | survey と同じ経路 (`_m11_set_survey(1)` → boot → 942 unit) で、unit ごとに `__m11_wv` を空にしてから実行し、積まれた値を読む |
 
 ## 3. 失敗の実測 (測定 commit は本 PR の最後の commit)
 
@@ -55,6 +56,9 @@
 cd tools/m11 && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 M11_FIX_LD236=1 M11_SKIP_LIFT_FP=1 M11_LB_BASE=0 bash m11_gen_ir2.sh
 FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 M11_FIX_LD236=1 M11_SKIP_LIFT_FP=1 M11_LB_BASE=0 bash m11_e2e.sh   # survey ok=875 を確認
 python3 ldfix/watch_ir_5533.py work/boot_final3.ll $RUNNER_TEMP/watch5533.ll
+# stage4.sh は shim_*.o を compile しないため、shim を手で obj/ に置く (link は obj/*.o を読む)
+mkdir -p ldfix/work/stage4/watch5533/obj
+emcc -c ldfix/watch_shim_5533.c -o ldfix/work/stage4/watch5533/obj/shim_watch5533.o -O0 -g1
 bash ldfix/stage4.sh $RUNNER_TEMP/watch5533.ll watch5533
 S4_NAME=watch5533 node ldfix/watch_survey_5533.mjs   # WATCH_DONE units_with_hooks: 0 (§3)
 ```
