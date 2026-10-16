@@ -90,7 +90,7 @@ PE で確定した分だけを `provider/fl_engine.c` と `host/fl_mock.mjs` に
 
 - 検査: `tests/device_diff.mjs` に両関数の呼出し (device 割当 1/0 × 引数有無) を追加し、mock と C の code・戻り値が一致することを見る。期待値は PE 確定の code で固定。
 - 件数: `tests/provider_expect/pe390.json` を追加 (2 関数)。`provider_check` の implemented は PE 件数から導出される。
-- 測定 commit: 本節の commit (コードを変えた最後の commit)。
+- 測定 commit: `839cfc5e4` (コードを変えた最後の commit)。
 
 ## 6. 差分 (PY-390 時点)
 
