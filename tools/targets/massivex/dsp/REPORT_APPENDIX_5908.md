@@ -155,3 +155,55 @@
 - この run では `$ARTIFACTS_DIR` に `fl-win64.tar.zst` のみがあり、`plugins-massivex` は無かった (`oc_artifacts` 行も無かった)。
 - よって §7 の script (`mx6_e2e.sh`・`mx63_u3e_split.py`・`mx63_g_containment.py`・`mx63_g_objdump_check.py`・`mx63_g_bad_bytes.py`) は、この run では**一つも再実行していない**。§7 の数値は作成者 run の記録のまま残し、本 run の実測とは書かない。
 - PR 本文に `oc_artifacts: plugins-massivex` を書き、素材が取得される run で §7 の全 script を HEAD で再実行する。その出力で本節の数値を置き換える (未実施の間は作成者 run の記録である)。
+- 次 run (§8) で、素材 `plugins-massivex` を取得して §7 の全 script を HEAD で再実行した。§7 の数値は §8 の実測と一致した。
+
+## 8. run 6: §7 の実測 (HEAD 再実行) と capstone 停止位置の判定 (U3e 残件 2 の続き)
+
+- 測定 commit: `60a688535` (新規 script `mx63_g_cs_stop.py` を含む commit。本 REPORT の commit は HEAD)。`git diff 60a688535 HEAD -- tools/targets/massivex/dsp` は本 REPORT の commit のみ。
+- 素材: `plugins-massivex` → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key`。`Massive X.vst3` = 95,356,824 B・md5 `622993e76565f49c094063a2b717d6ca` (§0 と一致)。extract の checksum 不一致 0/125 は既知事象。PE は repo 外。
+
+| 実行 (HEAD `60a688535`) | 結果 | 経過 | load (start → end) |
+|---|---|---|---|
+| `mx6_e2e.sh` | rc 0・全判定 PASS (32 PASS・FAIL 行は既知の負例テスト 1 件のみ) | 57 s | 0.48 0.59 0.29 → 0.79 0.66 0.33 |
+| `mx63_u3e_split.py` | population 604・E 43・D 825・C 1549・G0 351・G 26 | — | — |
+| `mx63_g_containment.py` | 途中・命令境界 7 / 途中・非境界 35 / 範囲外 1 | — | — |
+| `mx63_g_objdump_check.py` | n 35・転送 site 一致 35・G 線形境界 4・直接到達 4・間接 jmp 関数 1・再同期 31 | — | — |
+| `mx63_g_bad_bytes.py` | n 35・bad_before_G 23・bad_free_fn 12・G_objdump_boundary 4 | — | — |
+| `mx63_g_cs_stop.py` (新規) | n 35・cs_stop_before_G 23・cs_full 12 | — | — |
+
+### 8.1 capstone の停止位置 (cs_stop) の判定
+
+- `mx63_g_cs_stop.py`: 非境界 G 35 件について、capstone の線形復号 (関数先頭から) の停止位置 (最後に復号できた命令の終端) を出す。
+  - `cs_stop_before_G` 23: 停止位置が G より手前。
+  - `cs_full` 12: 関数末尾まで復号でき、G は命令境界でない。
+- 停止位置の命令を objdump で確認: 23 件とも `(bad)` (復号不能)。capstone の停止は復号不能バイトによる。**確定**。
+- G から先の復号 (`from_G`): `fwd_ret` (G から `ret` まで復号できた) は 10 件、`fwd_bad` は 25 件 (G から先にも `(bad)`・G が途中の入口か埋め込みデータかは未確定)。
+
+### 8.2 食い違い (7 対 4) の正体
+
+- 前 run の「capstone 境界 7 対 objdump 境界 4」は、比べた母集団が違った。
+  - capstone の境界 7 は **E 42 件** (境界/非境界の全体) 中の数。
+  - objdump の境界 4 は **非境界 35 件** 中の数。
+- 同じ非境界 35 件で比べると: objdump が境界と判定する 4 件は、すべて capstone が (bad) で停止する G (`cs_stop_before_G`)。食い違いの原因は「(bad) を挟んだ後の再同期の扱い」で、capstone は (bad) で止まり、objdump は (bad) を飛ばして再同期する。
+
+| 非境界 35 件の内訳 (HEAD `60a688535`) | capstone | objdump | 件数 |
+|---|---|---|---|
+| (bad) 手前で停止・objdump 非境界 | cs_stop_before_G | objdump_nonboundary | 19 |
+| (bad) 手前で停止・objdump 境界 | cs_stop_before_G | objdump_boundary | 4 |
+| 関数末尾まで復号・G 非境界 | cs_full | objdump_nonboundary | 12 |
+
+- 「objdump が G を境界と判定する 4 件」は、(bad) を飛ばした後に G が命令境界に一致したもので、G が本当に命令境界かは (bad) の扱いに依る。確定ではない。
+
+### 8.3 判定 (受入 1 の G 側)
+
+- **G が関数途中の非境界である 12 件**: 関数末尾まで復号が成立し、G は命令境界でない。G の入口 livein を入口値の証拠にできない。
+- **残り 23 件** (`(bad)` の手前で capstone が止まる): G が途中の入口か、(bad) を含む埋め込みデータ・復号誤りかは、この検算では確定できない。G の入口 livein は入口値の証拠にならない。
+- 件数の正 (47 / 42) は決めない (R7 (a))。本 run で件数は変えない。
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| (bad) の手前で止まる 23 件の G が途中の入口か、埋め込みデータ・復号誤りか | G 側の判定 (受入 1) が確定しない。MX-6 入口 livein 0 の陰性が過小検出か未確定 | #5908 (残件) |
+| objdump が境界と判定する 4 件の (bad) 再同期の扱い | 4 件の境界判定の確度 | #5908 (残件) |
+| 件数の正 (47 / 42) | 両方記録。正は PM 判断 | #5908 |
