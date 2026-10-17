@@ -12,7 +12,7 @@
 
 - 測定 commit: `bc4d4586a` (`tools/flp/s2_render_probe.sh` のコメントだけを直した commit。測定はこの HEAD のまま、コードを変えずに実行)。base は `b900bf5ad` (origin/main)。
 - 差分 (測定 commit から HEAD まで): `git diff bc4d4586a HEAD -- tools/flp/s2_render_probe.sh` は空 (差分 0)。
-- 素材 `fl-win64`: `$HOME/artifacts/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (5.4 s)。wine は apt の wine64 9.0 (`/usr/lib/wine/wine64`) + xvfb-run。
+- 素材 `fl-win64`: `$ARTIFACTS_DIR/fl-win64.tar.zst` を展開 (5.4 s)。wine は apt の wine64 9.0 + xvfb-run。
 - S1 `tools/flp/s1_wine_probe.sh`: rc=124 (GUI 継続)・MSGBOX_OnInit=0・native-load=0 (前回と同じ)。
 - S2 `S2_TIMEOUT=150 S2_THREAD_AT="60 90" bash tools/flp/s2_render_probe.sh FLEX.flp 1` (48000 Hz・WFBox=2・DitherBox=0 は既定のまま): rc=124・WAV なし・150 s。
 - 採取: `s2_threads_1.tsv` (列: 経過秒・pid・tid・comm・state・utime・stime・wchan・syscall)。
