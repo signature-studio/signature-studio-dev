@@ -570,6 +570,7 @@
 | `tools/shimx/REPORT_R1-R8.md` | ~78 | shimx §9 (CAB-211: M11 リンク フィードバック R1〜R8) + §10 (CAB-177: cbtrans R2/R3 実体接続) 全文 (REPORT.md から分割, #584) |
 | `tools/shimx/REPORT_CAB-214.md` | ~141 | shimx §11 (CAB-214: vreg reg.c 取込 + username 統一) + §12 (follow-up 後始末 3 件) 全文 (REPORT.md から分割, #584) |
 | `tools/shimx/REPORT_SHX-T8.md` | ~60 | SHX-T8 (#175): 序数 import・Crypt・CP932 (REPORT.md §15 から分割) |
+| `tools/shimx/REPORT_MX-57.md` | ~45 | MX-57 (#4928): FH3 try/IP map → `ShxSehScope` 表 (`shimx_fh3_scopes`) の単体テストの測定 (native clang ASan/UBSan・測定 commit・未測定の emcc 段)。受入 1 (SjLj 形の pad 呼出し) は未達。測定値の正本 |
 | `tools/shimx/REPORT_SHX-T7.md` | ~84 | SHX-T7 (#173): 署名正規化 IR pass + ゲート (REPORT.md §16 から分割) |
 | `tools/shimx/REPORT_SHX-T9.md` | ~84 | SHX-T9 (#177): DllMain 経路の SHIMX_TRACE 収集と残一覧 (REPORT.md §6 の付録。数値は commit 済み results の引用) |
 | `tools/shimx/REPORT_SHX-T9h.md` | ~49 | SHX-T9h (#2489): 現行 `m11_ov.c` から baseline を再生成して unit 23 を shimx 版と比較。測定値の正本。REPORT_SHX-T9.md の旧 §3.3.5 から分割移動 (250 行上限のため) |
