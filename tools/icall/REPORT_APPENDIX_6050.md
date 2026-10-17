@@ -24,6 +24,10 @@
 | `OTT_KEEP_XMM0=0` | match 0 / mismatch 8 (従来どおり) | bit一致 55 / 値の不一致 2 (`6af773cb4` 既定と同一) |
 | `OTT_KEEP_XMM0=1` (`dd4e2b602`) | match 8 / mismatch 0 | bit一致 56 / 値の不一致 1 |
 
+§3 の sweep 行は、同じ 131 関数に対して `missing function` 7 件と「native crash 64 / wasm のみ err 10」の内訳が両立しておらず、一次出力から再集計するまで正本とみなさない (下記 §5)。
+
+既定 ON の再測定は未実施。`icall_e2e.sh` / `entry_e2e.sh` を既定 (env 未設定) で走らせた結果はまだ無い (§5)。
+
 sweep の比較 (同じ 131 関数):
 
 | 版 | bit一致 | 値の不一致 | 備考 |
@@ -37,7 +41,10 @@ sweep の比較 (同じ 131 関数):
 
 ## 4. 変更の範囲と差分
 
-測定 commit: `af7718c92`。`git diff 6af773cb4 HEAD -- tools/icall tools/ott/native` の出力は PR 本文に載せる。
+測定 commit: `af7718c92`。`af7718c92` から HEAD までのコード差分は 0 (追加は docs/DOC_MAP.md・tools/icall/REPORT.md・本付録のみ)。
+- `git diff --numstat origin/main...HEAD -- tools/ott/native/ott_native.c`: 10 行追加・1 行削除 (変更は `k_HeapAlloc` と `g_keep_x0` のみ)。
+- `git diff 6af773cb4 HEAD -- tools/icall tools/ott/native | wc -l`: 79 行 (差分の内訳は REPORT.md 1 行・本付録・ott_native.c)。
+- PR 本文には結論 1 行とこの付録へのリンクだけを書く (DOC_MAP §2)。
 
 ## 5. 検証環境
 
@@ -45,3 +52,5 @@ sweep の比較 (同じ 131 関数):
 - `bash tools/icall/fa_route_build.sh` rc 0 (`fa_route.cjs` 88,639 B)。`bash tools/ott/native/build.sh` で `libottnative.so` を再ビルド。
 - sweep: `bash tools/icall/diff/fa_sweep.sh 8 60` 約 74 秒 (131 関数を 1 関数 1 プロセス)。
 - sweep 出力の `missing function` は 7 件 (`function_1803b5546`・`function_18040ca0d`・`function_180ca1651`・`function_180da6084`・`function_181066530` 等の wasm 側の未解決 call)。`6af773cb4` 基準でも 7 件で、本 issue の修正では増減しない。受入条件の「0 件のまま」は基準時点で満たしていない。残件は #4348 に移す。
+- **未照合 (reviewer 指摘 2)**: 上記 7 件と §3 の 4 分類 (crash 64 / wasm err 10) の関係を、一次出力から再集計していない。sweep の一次出力は現在の run に残っていない。
+- **未実施 (reviewer 指摘 1)**: 既定 ON の影響範囲 (`icall_e2e.sh`・`entry_e2e.sh` ほか `ott_native.c` の利用元) は再測定していない。この run では `work-icall`・`plugins-freshair`・`plugins-ott`・`toolchain-*`・`work-m6-ott` が `$ARTIFACTS_DIR` に無く、`tools/ott/work`・`tools/icall/work` も無い。再実行は PR 本文の `oc_artifacts:` 行で素材を指定した run で行う。
