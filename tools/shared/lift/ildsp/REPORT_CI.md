@@ -200,13 +200,20 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 ### 9-2. 外部グローバルの意味 (未決)
 - `global_var_1803f6610` (`external global i64`): VA `0x1803f6610` = RVA `0x3f6610` は `.data` の中。`.data` の初期値は 8 byte `0x1803f66a8` (`.data` 内の `global_var_1803f66a8` を指すポインタ)。IR は `icmp eq i64 %4, ptrtoint (ptr @global_var_1803f6610 to i64)` と `load i64, ptr @global_var_1803f6610` で読む。つまり画像内の 1 cell として敷設すれば、IR の意味 (cell の内容 = ポインタ値) と一致する。RetDec が `.data` の他のグローバルを `global` として出すのと同じ形。
 - `@0` (`external global i32`): `ret i64 ptrtoint (ptr @0 to i64)` が 3 箇所 (`function_1801aedc0`・`function_1801bb414`・`function_1801bb468` の末尾)。IR に定義が無い。画像上の該当 VA は未特定。
-- 敷設方式 (案・未実装): `wc_image.py` は PE 全体を VA 0x30000000 に敷設するので、`global_var_1803f6610` の cell (RVA 0x3f6610) は画像の中に既にある。C 側で別の cell を作ると、画像の `.data` の値 (`0x1803f66a8`) と食い違う。よって IR の `@global_var_1803f6610` を「画像基底 + 0x3f6610」に置き換える方式を案とする。`@0` は画像上の VA が未特定のため、同じ方式は決められない (実体の特定が先)。実装は ir_normalize の段で行う必要があり、本 run では行っていない。
+- **方式の決定 (T-SH-152 #5748・測定 commit `2c79d1fb2`・コードの変更なし)**:
+  - `global_var_1803f6610` は**画像内の cell として敷設する**。IR の `@global_var_1803f6610` を「wasm 側の画像基底 0x30000000 + RVA 0x3f6610 = 0x303f6610」の絶対アドレスに置き換える (`ir_normalize` の段)。
+    実測: `wc_image.py` が出す `image_wasm.bin` の RVA 0x3f6610 の中身は `0x303f66a8` (`.data` 内の cell `0x3f66a8` を指す、DIR64 補正済みのポインタ)。`@0x3f66a8` の中身は `0x2e0000002e`。画像に既にある値なので、C 側で cell を作ると値が食い違う。
+    IR の使い方 (`icmp eq i64 %4, ptrtoint (@global_var_1803f6610)`・`load i64, @global_var_1803f6610`) は、この絶対アドレスに置き換えれば画像内の値と一致する。
+  - `@0` (`__unnamed_1`) は**今回は敷設せず、shim の仮置きのまま**。実測: 3 箇所の `ret i64 ptrtoint (@0)` は、`RaiseException` (`function_1801aedc0`) の後、および `EnterCriticalSection` / `LeaveCriticalSection` への末尾 `jmp` (`function_1801bb414` / `bb468`) の後に残る `rax` の値。
+  - `@0` の値は `function_1801bb468` の戻り値 → `function_1801b82ec` / `function_1801b836c` の戻り値 → `function_1801b8414` の入力へ流れる (IR 上で USED)。よって値の意味は未決。wasm 側の仮置き (shim の `__unnamed_1`) は、この範囲で値を固定するだけになる。値の意味は #3320 で確認する。
+  - 実装 (`ci_link.sh` に実装。`ir_normalize.py` は他の lift と共有のため触っていない): `ci_link.sh` が `@global_var_1803f6610` の宣言を外し、参照 2 箇所 (`icmp`・`load`) を `inttoptr (i64 0x303f6610 to ptr)` に置き換える。shim は `__unnamed_1` のみ。`__unnamed_1` は shim に残す (意味は #3320)。
+  - 実測 (素材 fl-win64 / toolchain-retdec / toolchain-emsdk を展開して測定。測定 commit は PR 本文に記す): `ci_link.sh` rc 0・wasm-ld rc 1・未解決は期待集合のみ。`@global_var_1803f6610` の参照を絶対アドレスに置いた IR (`ci.ll`) と置く前の IR の差分は参照 2 行のみ。未解決の総行数は 149 (変更前 153)。差 4 行 (GetLastError 2・HeapFree 2) の原因は未確認。絶対アドレス化で emcc の最適化結果が変わったことが考えられるが、この run では確かめていない。
 - 仮置きの効果: shim は cell を 0 初期化 (`global_var_1803f6610` は 0)。したがって仮置きのままでは `icmp eq` の比較対象が変わる。**リンクが通ることと、意味が正しいことは別**。意味の確認 (native との差分) は #3320 の範囲。
 
 ### 9-3. 残り (起票先)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 外部グローバル 2 種の画像敷設 (`global_var_1803f6610` は `.data` の cell、`@0` は実体未特定) | リンクは通るが、仮置きの値で意味が変わりうる | 本 issue の範囲 (敷設方式を決めるのは次の子 or #3318) |
+| 外部グローバル: `global_var_1803f6610` は絶対アドレス化済み (§9-2・ci_link.sh)。`@0` (`__unnamed_1`) は shim の仮置きのまま (画像に敷設しない方式を決定、§9-2) | リンクは通るが、仮置きの値で意味が変わりうる | 意味の確認は #3320 |
 | `uselistorder` 行 (174 行) を emcc が読めない | ci_link.sh は行を除いて回避。ir_normalize の対応が必要 | [T-SH-65] #3318 |
 | IAT 10 種 | 未解決 (リンクエラー) | #5747 |
 | 閉包の取りこぼし (function_1801aef40・function_1801cb600) | 未解決 (リンクエラー) | #5749 |
