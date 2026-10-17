@@ -46,3 +46,19 @@
 - 測定 commit: `021b79922` (SR-62 #4233 を main 取り込みで含む merge。canvas のコードを変えた最後の commit)。`git diff 021b79922 HEAD -- tools/targets/serum2/gui/canvas` の出力は 0 行。
 - 結果: `check_transform.sh` rc=0 (compile 71/71 fail=0・link rc=0・run rc=0・`origin_px=300 shifted_px=300 expected=300 result=pass`)。所要 31.7 s、load 3.43 → 3.78 (直列実行・開始前に load 1 分平均 1.15 まで待ってから他の 4 本と順に実行)。
 - 素材: toolchain-emsdk は `$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` を展開 (上流 emsdk の取得はしていない)。
+
+## 2. 2026-10-17 run (#3424 / SR-56 受入 4): HEAD で再測定した実測値
+- 測定 commit: `ff41e8aae` (origin/main・Merge #6051)。3 本の判定 harness の対象は canvas/ を含むこの HEAD のコード。
+- コード差分 (測定 commit から HEAD まで): `git diff ff41e8aae HEAD -- tools/targets/serum2/gui/canvas` は 0 行 (この付録 §2 を含む commit は REPORT のみ)。
+- 比較用の旧測定: §1-6 (測定 commit `021b79922`)。`021b79922` から `ff41e8aae` までの canvas 差分は 10 files・994 行追加・122 行削除 (#3424 の受入 4 が指す差分。今回は HEAD で取り直した値を正とする)。
+- 素材: `toolchain-emsdk.tar.zst` を `tools/targets/serum2/gui/work/emsdk` に展開 (3.6 s)。vstgui4 は `steinbergmedia/vstgui` を `vstgui4_14_3` (`b1e82355`) に checkout。`work/` は gitignore。
+- 実行環境: runner (nproc 4)。3 本は直列実行。load は `/proc/loadavg` の 1 分平均 (開始時 → 終了時)。所要は `date` の差 (real)。
+
+| スクリプト (HEAD `ff41e8aae`) | rc | 所要 (real) | load (1 分平均・開始→終了) | 判定の内訳 |
+|---|---|---|---|---|
+| `check_render_poc.sh` | **0** | 33.229 s | 1.34 → 2.44 | compile 71/71 ok (32195 ms)・link rc=0 (691 ms)・run rc=0 (157 ms)。render pass: `nonzero_after=12000 text_px=112 text_width=54` |
+| `check_transform.sh` | **0** | 31.172 s | 2.25 → 2.99 | compile 71/71 fail=0 (30462 ms)・link rc=0 (501 ms)・run rc=0 (62 ms)。`origin_px=300 shifted_px=300 expected=300 result=pass`。`transform_ops untransformed_px=0 point=1 arc_px=168 path_px=100 result=pass` |
+| `check_line_width.sh` | **0** | 31.612 s | 2.99 → 3.20 | link rc=0・run rc=0。全 19 ケース rc=1 かつ nonzero>0。12 check すべて pass (例: `w1_alias nonzero=55`・`w4_alias nonzero=250`・`w4_aa nonzero=321 partial=140`・`w8_join_miter nonzero=1184`・`w4_dash nonzero=154`) |
+
+- 3 本とも rc=0。受入 4 の「測定 commit・rc・所要秒・load average・画素数」を満たす。
+- 旧測定 (§1-6・`021b79922`) の `check_transform.sh` は `origin_px=300 shifted_px=300` で、HEAD でも同じ値。
