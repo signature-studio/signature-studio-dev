@@ -155,8 +155,8 @@ DEFECTS.md 行案 (編集は PM 判断):
 
 ### 23.15 LIFTLIB-26 (#4350) — bsr の flag 種別の修正と測定の扱い (review 1)
 - **変更**: `bsr` の flag 状態を `("int", ...)` から専用種別 `("bsrzf", (src, bits))` に変更。ZF (`e`/`ne`/`z`/`nz`) だけを `icmp eq/ne src,0` で読み、CF・SF・OF を読む cc (`b`/`l`/`s`/`a` ほか) と CF 参照は `Unsupported`。T32 に `e` の IR 固定と `b`/`l`/`s`/`a` の Unsupported を追加。修正 commit: `c56bbafd9`。
-- **単体テスト (この run・実測)**: `tools/liftlib/tests/test_unit.py` の T22・T28・T29・T32 を個別に実行し ALL PASS。**全件 (T1〜T32) は未実行**: `tools/liftlib/work` と `tools/m6/work` が無く、T1〜T9・T26 が FileNotFoundError (素材 `work-liftlib`・`work-m6-ott` 未展開)。
-- **leafspec / e2e の再測定: 未実施**。素材が無く `targets/ott_leaf.json --n 40` を回せない。下の数値は前 commit `4fde610dc` の測定 (PR #6077 の初版で取った値) で、HEAD の値ではない。
+- **単体テスト (HEAD `1e49fd0bc`・実測)**: `python3 tests/test_unit.py` を全件実行 (素材 `work-liftlib`・`work-m6-ott` を展開)。35 件中 26 件 PASS、**9 件 FAIL: t2 t6 t7 t10 t12 t13 t14 t15 t16**。9 件とも FileNotFoundError で、OTT 実機 DLL (`analysis-ott-binaries`) と Fresh Air の `SlateCore.core_64` (`work-liftlib-targets` 系) が無いことが原因。アサーションの失敗は無い。**全件 PASS は未確認**。
+- **leafspec / e2e の再測定: 未実施**。`targets/ott_leaf.json --n 40` は OTT 実機 DLL が要り、素材が無く回せない。下の数値は前 commit `4fde610dc` の測定 (PR #6077 の初版で取った値) で、HEAD の値ではない。
   - 測定 commit: `4fde610dc` (exp 40/0/0/0, tan 40/0/0/0, tanf 40/0/0/0, log 32/0/8/0, cvt 17/0/23/0, svf 2/30/8/1)。
   - `git diff 4fde610dc HEAD -- tools/liftlib/liftlib` の出力 (p1.py の flag 種別の変更。bsr の flag を読む consumer の IR だけが変わる見込み・未測定):
     ```diff
@@ -221,4 +221,4 @@ index f66f69b4d..289a1e6c1 100644
     ```
   - 既定 build の統計に `vocab_bsr` は出ない (前測定)。よって既定経路の出力は変わらない見込みだが、**HEAD での再測定をしていないため、不変の確認は未了**。
 - §23.10 の「bsr は ZF を追跡しない」は、上の §23.10 の箇条で更新済み。
-- 未解決 (起票先): HEAD での leafspec 再測定と全 unit test → #4350 (次 run)。`shr cl`・`adc`・`cmp rcx,0` → 子 issue。
+- 未解決 (起票先): HEAD での leafspec 再測定と、素材を揃えた全 unit test (T1〜T32、35 件) → #4350 (次 run。素材 `analysis-ott-binaries` `work-liftlib-targets` `plugins-freshair` を指定)。`shr cl`・`adc`・`cmp rcx,0` → 子 issue。
