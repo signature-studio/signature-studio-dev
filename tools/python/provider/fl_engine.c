@@ -679,6 +679,15 @@ FL_H(general, dumpScoreLog) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, 0);
 static int rec_pass_family(uint32_t e, uint32_t f) {
     return (e & 0xffff) != 8 && ((e >= 0x10000000u && e < 0x40000000u) || (e >= 0x40000003u && e <= 0x40000004u) || (e > 0x40000005u && e < 0x70000000u) || e >= 0xf0000000u || ((e == 0x40000000u || e == 0x40000001u || e == 0x40000002u || e == 0x40000005u) && (f & 0x22u) == 0));
 }
+/* PY-146 (#2544): channels 版 0xd58e00 は general 版と同じ 0xd84740 → 0x1046a30 (REPORT_PY146)。成功経路は PY-235 と同じ */
+FL_H(channels, processRECEvent) {
+    NARGS(3, 3);
+    uint32_t e = (uint32_t)A_INT(0, 0);
+    int64_t v = A_INT(1, 0);
+    uint32_t f = (uint32_t)A_INT(2, 0);
+    if (!rec_pass_family(e, f)) return fl_err(c, FL_E_UNSPECIFIED, "Unspecified error (not implemented: channels.processRECEvent)");
+    return fl_ret_i(c, (int32_t)v);
+}
 FL_H(general, processRECEvent) {
     NARGS(3, 3);
     uint32_t e = (uint32_t)A_INT(0, 0);
