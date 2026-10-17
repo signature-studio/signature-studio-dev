@@ -21,6 +21,12 @@
 | 基準 `M11_XMM_ARGS=0` | 942 | 873 | 1 | 47 | 21 | 0 | — |
 | 変換 (3・4 を 0.0) `M11_XMM_ARGS=1` | 942 | 873 | 1 | 47 | 21 | 0 | 0 (`cmp` 終了 0) |
 
+### 再測定 (コミット済み HEAD `a2a7fa2bf`)
+
+`m11_gen_ir2.sh` (rc 0) → `M11_XMM_ARGS=1 m11_build.sh` (rc 0、`fixed=47 skipped=651`) → `m11_survey.mjs` (rc 0): ok 873 / noproc 1 / miss 47 / trap 21 / clobber 0。基準 JSON との `cmp` は終了 0。load 0.40 (開始時)。
+
+コードの差分 (測定の基点 `fe48dca85` からの変更): `git diff fe48dca85 a2a7fa2bf -- tools/plugins/lift/passes/fix_xmm_args.py` は `NO_CONV` を空にし、`CONV_ZERO_SITES` と除外判定を加える (13 行追加・2 行削除)。
+
 ## 前提と限界
 
 - 基準は issue の値 (ok 873 / noproc 1 / miss 47 / trap 21 / clobber 0) と一致。
