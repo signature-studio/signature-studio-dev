@@ -181,3 +181,14 @@ pdata の関数境界ごとに逆アセンブル (capstone) し、E8/E9 の直�
 - 測定 commit: 本 PR の `fa31_ctor.py` を追加した commit (コードの対象は `lift2/` 内の新規 1 ファイル)。
 - `python3 tools/targets/freshair/lift2/fa31_ctor.py "<SlateCore.core_64>"`: rc=0、出力 20 行 (VT 書込み関数 2・ctor 呼出元 13・`+0xb98`/`+0xba8` のスタック外書込み 115 件の集計)。所要・load は未測定 (静的解析のみで判定には使わない)。
 - 製品 KPI: **動かしていない** (静的解析のみ。起動・GUI の挙動は不変)。
+
+### 8.5 FA-74 (#5255): 実機 ctor で P を構築する試行 (FA_UI31_CTOR・既定 OFF)
+
+- 追加: `FA_UI31_CTOR=1` のとき、`FA_UI31` の slot 5 呼出前に P を実機 ctor `0x180d8a6e0` で構築し、構築前後の `[P+0xb98]`・`[P+0xba8]`・vtable を `UI31CTOR` 行に記録する。既定 (未設定) は従来どおり 0 埋めで、判定基準・既定経路は不変。
+- 実測 (測定 commit `97a5bd8ab`・`FA_CTL31=1 FA_HEAP_ZERO=1 FA_UI31=1 FA_UI31_CTOR=1 ./native_fa31 SlateCore.core_64 fa31_epf.txt 0`・S900〜S907): rc=0。
+  - ctor の構築は **全 8 シナリオで FAULT**: `rip=0x18040ddbb addr=0x394e0`。ctor が呼ぶ shared_ptr 解放経路 (`0x18040dd9a`〜`0x18040ddbb`) の `[rdi+0xc]` 参照で落ちる。引数 `A = {P 所有, 制御ブロック}` の与え方が実機と合っていない (推測)。
+  - ctor 前の `+0xb98`・`+0xba8` は 0、FAULT 後も 0 のまま。vtable は `0x18110a420` (ctor の先頭まで実行されたことは確認)。
+  - その後の slot 5 は従来どおり `rip=0x180cb9ce9 addr=0xa80` で FAULT (`returned` 0 件)。
+- 結論 (本 run): **受入 1〜3 は未達**。ctor の引数 (第 2 引数の 2 語・制御ブロック) を実機の呼出元どおりに与えない限り、P は構築できず、`+0xb98`・`+0xba8` への書込みも捕まえられない。書込みフックは ctor が通った後の段階でしか意味を持たないため、本 run では設置しない。
+- 製品 KPI (FLEngine 起動 dispatch・units_run・最初のウィンドウ): 動かしていない。harness の観測のみ。
+- 測定: `fa31_ctl.sh` (既定) は rc=0・31 s・`caa820=0 ca7db0=72 d8c140=0 d8d700=0` (本 run の基準)。FA_UI31_CTOR 試行は real 0.021 s (FAULT で即終了・n=1)。
