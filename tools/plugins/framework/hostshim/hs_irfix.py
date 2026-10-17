@@ -107,6 +107,8 @@ def main():
     fix_414390(lines)
     fix_40c4d0(lines)
     fix_40b3f0(lines)
+    fix_40b370(lines)
+    fix_40b550(lines)
     open(dst, 'w').write('\n'.join(lines))
     print('[hs_irfix] function_6bdde0 patched: %d 置換 (Host=%s Tag=%s; signature+2x(Host,Tag)+Tag_r8+Host_r9+Tag_rdx素) -> %s' % (n[0], H, T, dst))
 
@@ -257,6 +259,57 @@ def fix_40b3f0(lines):
     if re.search(r'ptr @59[234]\b', rest):
         print('[hs_irfix] function_40b3f0 に定数 (@592/@593/@594) が残存'); sys.exit(1)
     print('[hs_irfix] function_40b3f0 patched: this を BLK+0x08、flag を BLK+0x10 (entry 1 回) から読む')
+
+
+def _fix_body(lines, fn, rules, tag):
+    lo = hi = None
+    for i, l in enumerate(lines):
+        if l.startswith('define ') and ('@%s(' % fn) in l:
+            lo = i
+        elif lo is not None and l == '}':
+            hi = i
+            break
+    if lo is None:
+        print('[hs_irfix] %s が見つからない' % fn); sys.exit(1)
+    for old, expect, new in rules:
+        cnt = 0
+        for i in range(lo, hi + 1):
+            if old in lines[i]:
+                lines[i] = lines[i].replace(old, new)
+                cnt += 1
+        if cnt != expect:
+            print('[hs_irfix] %s 置換数不一致 (%d != %d): %s' % (fn, cnt, expect, old[:80])); sys.exit(1)
+    print('[hs_irfix] %s patched: %s' % (fn, tag))
+
+
+def fix_40b370(lines):
+    # #3355: native 0x40b370 は rcx=this を rbx に保持し、40b550(this, 407010 の戻り値) を呼ぶ。
+    # lift 版は this を "$" 定数 @153 に畳む。this は entry で BLK+0x08 から 1 回読む (407010 が BLK+0x08 を上書きするため)。
+    _fix_body(lines, 'function_40b370', [
+        ('%ce5n11_function_40b370 = ptrtoint ptr @153 to i64', 1,
+         '%hs370_this = load i64, ptr inttoptr (i64 9048072 to ptr), align 8\n'
+         '  %ce5n11_function_40b370 = add i64 %hs370_this, 0'),
+        ('store ptr getelementptr inbounds ([2 x i8], ptr @153, i64 0, i64 0), ptr inttoptr (i64 9048072 to ptr), align 8', 1,
+         'store i64 %hs370_this, ptr inttoptr (i64 9048072 to ptr), align 8'),
+    ], 'this を BLK+0x08 から読み、40b550 への第 1 引数に渡す')
+
+
+def fix_40b550(lines):
+    # #3355: native 0x40b550 は rcx=this (rbx)・rdx=確保先 (rsi) を取る。40a5a0(確保先, [this-0x80], 0) の後に
+    # [確保先] = this (`mov [rsi], rdi` 0x40b576)。lift 版は this を @381、確保先を @382 の定数に畳み、
+    # 40a5a0 の第 1 引数と [rsi]=rdi の store が欠落する。this は BLK+0x08、確保先は BLK+0x10 から entry で読む。
+    _fix_body(lines, 'function_40b550', [
+        ('%ce5n11_function_40b550 = ptrtoint ptr @381 to i64', 1,
+         '%hs550_this = load i64, ptr inttoptr (i64 9048072 to ptr), align 8\n'
+         '  %hs550_dst = load i64, ptr inttoptr (i64 9048080 to ptr), align 8\n'
+         '  %ce5n11_function_40b550 = add i64 %hs550_this, 0'),
+        ('store ptr getelementptr inbounds ([2 x i8], ptr @382, i64 0, i64 0), ptr inttoptr (i64 9048072 to ptr), align 8', 1,
+         'store i64 %hs550_dst, ptr inttoptr (i64 9048072 to ptr), align 8'),
+        ('%ce13n11_function_40b550 = ptrtoint ptr @381 to i64', 1,
+         '%ce13n11_function_40b550 = add i64 %hs550_this, 0'),
+        ('store i64 %ce12n11_function_40b550, ptr @382, align 8', 1,
+         'store i64 %hs550_this, ptr %sf223, align 8'),
+    ], '確保先を BLK+0x08 (40a5a0 の第 1 引数)、this を BLK+0x08 entry から読み [確保先]=this を書く')
 
 
 if __name__ == '__main__':
