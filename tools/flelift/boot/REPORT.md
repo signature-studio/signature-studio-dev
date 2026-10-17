@@ -235,5 +235,5 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 | `merge_survey.py` | `covered=942` (規則テスト `merge_survey_test.py` で固定) |
 
 - 未解決: 補修が判定を変えるか → #4901 [FLE-33]。unit 280/659/895 の補修なし unlifted → #4855 [FLE-32]。PY-379 gate フラグ `0x16baff0` は unit 209 まで全 0 (#5216・`REPORT_APPENDIX_5216.md`)。
-- #6219 (FLE-53): obj+0xc4 (mode) の 0 の書込み元は、確保直後の `f_40fb40` → `f_40d210` の 0 埋め (`0x40d300`・16 byte)。前回の監視は store の開始位置しか見ておらず取りこぼしていた。修正後 (測定 commit `6e2c7ec49`) も診断 route units 209 で同値。既定 route は入口フック 0 件で、設定元は未特定 → #6220 [FLE-53]。詳細は `REPORT_APPENDIX_6219.md`。
+- #6219 (FLE-53): obj+0xc4 (mode) の 0 の書込み元は、確保直後の `f_40fb40` → `f_40d210` の 0 埋め (`0x40d300`・16 byte)。前回の監視は store の開始位置しか見ておらず取りこぼしていた。修正後 (測定 commit `62bc6ddb0`) も診断 route units 209 で同値。既定 route (`720ada7de` で再測定) は units 895・入口フック 0 件で、設定元は未特定 → #6220 [FLE-53]。詳細は `REPORT_APPENDIX_6219.md`。
 - #5168 (PY-4877): boot 後の `patternCount` は icall-miss (0xd64d7a) で戻り値 0 が信用できず、E[1..999] は全 0 (受入 1 未達)。詳細は `REPORT_APPENDIX_5168.md`。

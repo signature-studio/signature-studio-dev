@@ -15,13 +15,15 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | 診断 route は `62bc6ddb0` (現 HEAD)。既定 route は `949ec634a` と `6e2c7ec49` (下の n=2)。`wval_lift.py` の重なり判定は `6e2c7ec49` から変えていない。`fle_boot.c` の監視 slot (#5415) は main 取り込みで入った計測のみの差分 |
+| 測定 commit | 既定 route (通常版・監視版) は `720ada7de` で再測定 (コードは `62bc6ddb0` と同一: `git diff 62bc6ddb0 720ada7de -- tools/flelift/boot ':!*.md'` は空)。診断 route は `62bc6ddb0`。過去の既定 route 行は下の表の注記のとおり (監視の有無は当時の記録による)。`wval_lift.py` の重なり判定は `6e2c7ec49` から変えていない。`fle_boot.c` の監視 slot (#5415) は main 取り込みで入った計測のみの差分 |
 | 素材 | `fl-win64` (`$ARTIFACTS_DIR`) / `toolchain-emsdk` (上流 `emsdk install 6.0.12`) を `$RUNNER_TEMP` に展開 (repo 外) |
 | 診断 route (root 無し・`FLE_BOOT_RUNS=diag_shim`・`62bc6ddb0`) | units_run **209** / `unlifted 0x6bbc20` / getmem 2314 / freemem 1200 / `IPP_CHECK mode:1 ok:true`。n=2 (`fle6_measure.sh` 1 回 + 同じ build の boot 再実行 1 回 (`fle_boot.mjs`)。2 回とも同値) |
 | 監視版 (診断 route・`WVAL_OBJWATCH=1`・`62bc6ddb0`) | units_run **209** / 停止点同じ / getmem 2314 / freemem 1200 (差 0・通常版と同値)。n=1 |
-| 監視版 (既定 route・`WVAL_OBJWATCH=1 WVAL_IPP= WVAL_NULLFILL=0`) | units_run **895** / `boot_threw: exit` / `IPP_CHECK mode:3 ok:true` (既定 route の再実行。前回の既定経路と同じ停止。#4806 の IPP 判定は別件)。測定は同一 commit `6e2c7ec49` の lift (既定 root `0x6a7b70` 有) で行い、`fle6_measure.sh` (`FLE_EXTRA_ROOTS` 未指定) → `wval_measure.sh` の順 |
+| 既定 route 通常版 (`FLE_EXTRA_ROOTS` 未指定・root `0x6a7b70` 有・`720ada7de`) | units_run **895** / `boot_threw: exit` / `IPP_CHECK mode:3 ok:true` / getmem 3680 / freemem 1499 (`fle6_measure.sh`・`FLE_BOOT_RUNS=default`・n=1) |
+| 監視版 (既定 route・`WVAL_OBJWATCH=1 WVAL_IPP= WVAL_NULLFILL=0`・`720ada7de`) | units_run **895** / `boot_threw: exit` / `IPP_CHECK mode:3 ok:true` / getmem 3680 / freemem 1499 (通常版と同値)。`fle6_measure.sh` (既定 route・上の行と同じ lift) → `wval_measure.sh` の順・n=1 |
+| 既定 route の過去測定 (`949ec634a`・`6e2c7ec49`) | 両方 units 895 / `boot_threw: exit`。`6e2c7ec49` は監視版 (`WVAL_OBJWATCH=1`) で測った記録。`949ec634a` は本文に `WVAL_OBJWATCH=1` の記載が無く、監視の有無は未確認 (`[wobj]` 0 件の根拠には使わない) |
 | 監視の一致 (診断 route) | `[wobj]` 10 件: `0x40d300` (0 書込み・16 byte)・`0x6bc010` (0 書込み・1 byte)・`[wobj-set]` 1 件 (`0x6ba25b`)・`[wobj-getmem]` 2 件・`[wobj-free]` 多数 |
-| 監視の一致 (既定 route) | `[wobj]` (lifted の store) は **0 件**。`0x40d300`・`0x6bc010` は出ていない。出たのは `[wobj-free]` 7 件・`[wobj-getmem]` 1 件 (`p=0x12d7a090 size=70 obj+0xc4=0` の 1 件のみ・obj が確定していないため `freed_before=0`) のみ。`[wval-enter]`・`[wval-mode]`・`[wobj-set]` は **0 件** (入口 `f_6ba1f0` / `f_6bc010` / `f_6cd520` / `f_6c9280` の入口フックに届いていない) |
+| 監視の一致 (既定 route・`720ada7de`・n=1) | `[wobj]` (lifted の store) は **0 件** (`grep -c '^\[wobj\] va='` = 0)。`0x40d300`・`0x6bc010` は出ていない。出たのは `[wobj-free]` 7 件・`[wobj-getmem]` 1 件 (`p=0x12d7a090 size=70 obj+0xc4=0 freed_before=0 freed_val=0` の 1 件のみ・obj が確定していないため) のみ。`[wval-enter]`・`[wval-mode]`・`[wval-call]`・`[wobj-set]` は **0 件** (入口 `f_6ba1f0` / `f_6bc010` / `f_6cd520` / `f_6c9280` の入口フックに届いていない) |
 | 監視の穴の修正 | 前回の判定は `a == obj+0xc4` (store の開始位置一致) だった。`a <= obj+0xc4 < a+n` に直した (`wval_lift.py`) |
 
 KPI (起動に関わる PR): FLEngine 起動の units_run は **前 209 / 後 209** (診断 route)。既定 route は前 895 / 後 895。最初のウィンドウ: **無し**。ビルド・lift 経路は変えていない (監視は `--objwatch` の時だけ挿入)。
@@ -41,7 +43,7 @@ KPI (起動に関わる PR): FLEngine 起動の units_run は **前 209 / 後 20
 
 ## D. 限界
 
-- 既定 route は 2 回測定した (n=2): 取り込み前 (測定 commit `6e2c7ec49`) と取り込み後 (HEAD `949ec634a`・main の #5415 の監視 slot を含む)。両方とも units 895 / `[wobj]` 0 件 / 入口フック 0 件。`949ec634a` から `62bc6ddb0` までのコード差分は 0 (下の差分確認) なので、既定 route は現 HEAD でも同じ結果と読める。
+- 既定 route は現 HEAD のコード (`720ada7de` = `62bc6ddb0` と同一) で、通常版と監視版をそれぞれ 1 回再測定した (units 895 / `[wobj]` 0 件 / 入口フック 0 件)。過去の `6e2c7ec49` (監視版) と `949ec634a` (監視の有無は未確認) の 895 は同値。既定 route の監視版は n=1 である点に注意。
 - 診断 route は現 HEAD `62bc6ddb0` で n=2 (boot の再実行を含む)。値は `6e2c7ec49` 版と同じ (209 / 2314 / 1200)。ただし n=2 の 2 回目は lift・build を作り直さず、同じ C から boot だけを再実行したもの。lift の再現性は 1 回ぶんしか測っていない。
 - 既定 route では `0x40d300` は出ていない。ただし既定 route は `f_6ba1f0` の入口 (`[wval-enter]`) にも届いていない (`[wval-enter]` 0 件) ため、「既定 route で `f_6cd520` / `0x6bc010` に届いていない」ことの根拠は、入口フックの 0 件 (`run_wval_default_6219.log`) である。`f_40fb40` の入口は `wval_lift.py` の `ENTER_FN` 対象外のため、既定 route で `f_40fb40` / `0x40d300` に届いたかは、この測定では判定できない (monitor の対象外)。既定経路での mode の設定元は未測定 (#4806 の IPP 判定が先)。
 - ホスト側 C (`fle_boot.c`・shimx・`rt/fle_glue.c`) の書込みは監視していない (前回 §E と同じ)。確保領域の getmem (FastMM) の 0 埋めの有無はホスト側のため見えていない。
