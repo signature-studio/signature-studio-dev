@@ -151,6 +151,7 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 | §24 | #3281: GLOBAL_INITS を PE の .data から読む pass に置換 (測定 commit `74ae2bbf2`) | `REPORT_APPENDIX_K.md` |
 | §25 | #3951: 0x5e1280 の buf_diff=3996 の原因は k80_diff の 64bit xmm 引数の渡し方 (driver)。修復 `73409179c` で buf_diff=0 (2000/10000) | `REPORT_APPENDIX_L.md` |
 | §26 | #5832 (E7): x86_fp80 ↔ i80 bitcast の展開。bit 一致 (`f80b_rt/run.sh`)・subnormal carry の修正・19165 の測定 | `REPORT_APPENDIX_M.md` |
+| §27 | #3281 残件 B: 0x5e12c0 の ucomisd flags を `k80_ucomi_br.py` で jbe に接続し、手書き本体を外す (BODIES 14→13・測定 commit `ba6009b23`) | `REPORT_APPENDIX_N.md` |
 
 ## 26. #5832 (E7): x86_fp80 ↔ i80 bitcast の展開
 

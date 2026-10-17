@@ -981,6 +981,7 @@
 | `tools/plugins/p0c/REPORT_APPENDIX_J.md` | ~41 | p0c §23 (#3280 0x5dffc0 の x87 fsincos 66-bit π 縮約の原因・修復・測定)。H §23 から分割移動 (H の 250 行上限のため) |
 | `tools/plugins/p0c/REPORT_APPENDIX_K.md` | ~70 | p0c §24 (#3281 GLOBAL_INITS の PE 値化: `k80_pe_globals.py` の置換対象 0x6fffb0・0x6fc26c・測定・残った BODIES 14 本の根拠)。H の 250 行上限のため新設 |
 | `tools/plugins/p0c/REPORT_APPENDIX_L.md` | ~90 | p0c §25 (#3951 0x5e1280 の buf_diff=3996 の原因: `k80_diff.py` の 64bit xmm 引数の渡し方。修復と負論対照・実測) |
+| `tools/plugins/p0c/REPORT_APPENDIX_N.md` | ~60 | p0c §27 (#3281 残件 B: 0x5e12c0 の ucomisd flags を jbe に接続する一般 pass `k80_ucomi_br.py` と、手書き本体の削減 14→13・負論対照・測定) |
 | `tools/plugins/p0c/REPORT_APPENDIX_M.md` | ~65 | p0c §26 (#5832 E7: x86_fp80 ↔ i80 bitcast の展開。`f80b_rt/run.sh` の bit 一致・subnormal carry の修正前後の固定ベクタ・19165 の測定 (測定 commit `ce3872372`)) |
 | `tools/plugins/p0c/REPORT_APPENDIX_M2.md` | ~110 | p0c §26 付録 M の鮮度の証跡: `git diff ce3872372 HEAD -- tools/plugins/p0c` の全文 |
 | `tools/plugins/dynamics/REPORT_APPENDIX.md` | ~102 | dynamics §E ([PLG-F3-15] #1778): 19252 の残 helper `vmovsd` store の宛先 (spill → B1 の 0 埋め) の原因実測。 方式は DECISIONS D16。 dynamics REPORT §4 の「脱落の原因 (#1412)」の全文 (250 行上限のため分割移動。 静的検出 (`statically linked function`) による `.pdata` define 脱落 208 件の内訳と切替実測) |
