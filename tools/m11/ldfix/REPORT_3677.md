@@ -75,3 +75,18 @@
 - `git diff 3987f8c HEAD -- tools/m11/m11_passes.py tools/m11/ldfix/*.py` は、main 取り込みで入った 3 ファイル (`value_judge_6124.py`・`test_value_judge_6124.py`・`trap114_probe_5280.py`。本 PR の変更ではない) のみを出す。本 PR が追加・変更した py は `depth_4498.py` のみで、その差分は測定 commit 以降 0。
 - `m11_passes.py` は未変更 (IR 変化 0)。
 - 本番 IR・unit の結果は変わらない (IR を書き換えていないため)。KPI (`tools/flelift/boot/REPORT.md`) は動かしていない。
+
+## 7. 受入 2 の remap (#4498 LD-221・`pass_m2r_fn1046a30` 拡張)
+
+- 対象: 段数一致 (§6・`depth_1046a30_4498.tsv` の match=yes) かつ VA 0x15e0000〜0x15e4fff の cell 25 件 (22946304 を含む)。0x104cxxx 系 (コード範囲・受入 3) は含めない。
+- 既定 (`M11_M2R` 未設定): 22946304 の 1 件だけ直す (#2958 と同じ)。新旧の IR は `cmp` で一致 (差分 0)。
+- `M11_M2R=1`: 25 件を直す。新旧の IR 差分は 24 行 (22946304 は旧版でも直っているため差分に出ない)。変換は `VA − 0x400000`。
+- 突合の検証: 25 件の VA 集合 = `depth_1046a30_4498.tsv` の 0x15e 系・match=yes と差分 0 (`set` の比較)。
+- 測定 commit: `m11_passes.py` を変えた最後の commit (本 PR)。入力: `work/boot_allfx.ll` (`pass_m2r` 前の IR)。
+- 既定 OFF の理由: 本番 IR (`m11_gen_ir2.sh`) を変えるため、unit e2e で前後比較するまで既定にしない (M2s・M2v と同じ扱い)。
+
+### 未実施 (受入 3〜5)
+
+- 受入 3 (0x104ccd0〜0x104cfxx 系): 未着手。
+- 受入 4 (`audit_lsf_ssa_e2e.sh` 7/7・`spill178_1161.tsv` 差分): 未実施。
+- 受入 5 (`m11_gen_ir2.sh` → `m11_build.sh` → unit e2e 前後比較): 未実施。`M11_M2R=1` の unit 結果は未測定。
