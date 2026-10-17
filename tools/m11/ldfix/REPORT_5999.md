@@ -49,7 +49,7 @@ IR の差分 (修正 pass による変換):
 | ON | `9d4c050c` | applied (fx5999o 12 行) | 99 / 391 / 3 | 98 / 3 | 875 / 20 | 871 / 70 | 71003 (max 71001 で FAIL) |
 
 - 出所: 通常起動は `work/<構成>/run.out` の `M11_RESULT`、survey は `work/<構成>/survey.out` の `"ok":875` と `"trap":20`、寛容起動は `tgate.out` の `M11_TOLERANT gate`。
-- boot5 の扱い (訂正): 前版の本節は「RetDec v5.0 で `boot5.lift.ll` を lift した」と書いたが、この記述は誤り。本 runner には `retdec-decompiler` も `/opt/retdec` も無く、`tools/m11/work/boot5*` も無い (§3.3)。素材の `work-m11` 由来の `boot_final.ll` (sha `69c774de…`) は `function_457860` を含まない。§3.2 の IR は boot5 を含まない可能性が高いが、§3.3 と指紋が一致しないため、生成条件は確定できない。
+- boot5 の扱い (訂正): 前版の本節は「RetDec v5.0 で `boot5.lift.ll` を lift した」と書いたが、この記述は誤り。本 runner には `retdec-decompiler` も RetDec の実行体も無く、`tools/m11/work/boot5*` も無い (§3.3)。素材の `work-m11` 由来の `boot_final.ll` (sha `69c774de…`) は `function_457860` を含まない。§3.2 の IR は boot5 を含まない可能性が高いが、§3.3 と指紋が一致しないため、生成条件は確定できない。
 - §3.2 の OFF 指紋 `b15e2d23…` は、同じコード (`bebd3e2b`・`77d789b6`) で作った §3.3 の `b202c157…` と一致しない。入力か生成条件が §3.2 と §3.3 で違うが、理由は未確認。ON/OFF の比較は同一セッション内でのみ有効。
 - OFF と ON で通常起動・survey・寛容起動の結果は一致した (run.out はスタックトレースの wasm 関数番号だけが違い、結果行は同じ)。修正は実行結果に出ない。
 - 既存ゲートの状態 (両方共通): `m11_tolerant_gate.py` が「通常起動の完了数 114 != 期待 101」で FAIL、`m11_survey.mjs` の ptrcheck が 71003 > 71001 で FAIL。いずれも修正の有無と無関係に出ている。
