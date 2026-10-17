@@ -220,3 +220,42 @@ index と名前の対応は `m11_wasmnames.py` (今回の build の wasm) で確
 
 1. 既定 build (`M11_FIX_652500=0`) の `652500` 出口に `s24` を出す計装を入れる。`m11_genstubs.py` のスタブ化を避けるため、計装は `m11_ov.c` の強定義で `652500` の lift 版を置き換えるのではなく、`414bb0` 入口 (`m11_ov.c` 側の既存転記があれば) で採る。
 2. `M11_FIX_652500=1` の 134 と §7.6 の 129 の差を、ldfix・指紋・work/ の差に分けて切る。
+
+## 10. 既定 build で 414c70 入口の arg 実値を採取する計装経路 (#5358 PM 07:18Z の範囲)
+
+測定 commit: `97a5bd8ab` 系 (origin/main `448d36738` に取り込み)。以降のコード差分は下記 §10.1 の 4 ファイルのみ。素材: fl-win64 (`block00031_PE.bin` を `$RUNNER_TEMP/fl/extracted/` に展開)・work-m11 (`tools/m11/work/` に展開)・toolchain-emsdk。IR は `M11_M2V=1 m11_gen_ir2.sh` で作り直した (`ir_conditions.json`: ldfix/ld108/ld115/r8b/450560 = applied・`ir_sha256` `8840c541…`)。
+
+### 10.1 経路 (計装の作り方)
+
+- 既存の `M11_INSTR_412770` / `M11_INSTR_E3EF60` と同じ方式。IR 本体は書き換えず、`m11_post.py` が env ゲートの probe wrapper を `function_414c70` に被せる (`M11_INSTR_414C70=1` のときだけ。既定 0 では何も入らない)。
+- 観測関数 `m11_414c70_obs(arg1, arg2, arg3)` を `m11_ov.c` に置く (既定 0 で `#if` の外)。出力は `[m11][414c70] #n arg1=… arg2=… arg3=… [arg2-4]=… [arg2]=…` (上限 64 行。線形メモリ外は読まない)。
+- `m11_build.sh` に stamp (`work/instr_414c70.stamp`) と `-DM11_INSTR_414C70` を足した。`tools/gui/flengine/build.sh` の `CF` も同じ `-D` を渡す (前 run の時点では、この `CF` が M11_INSTR_* を渡さず、計装版の `ov.o` が undefined symbol になっていた)。
+- 変更ファイル: `tools/m11/m11_post.py` / `tools/m11/m11_ov.c` / `tools/m11/m11_build.sh` / `tools/gui/flengine/build.sh`。
+
+### 10.2 既定の不変性 (ゲート OFF)
+
+- `M11_INSTR_414C70` 未設定の `boot_final3.ll` の sha256: 計装追加の前後で `ad30a949…` で一致 (差分 0)。
+- 既定 build の `boot_halt_probe.mjs`: units_run 129 / init 132 / icall_miss 16 / threw `memory access out of bounds` / last_unit 144 (`0x65c540`)。前 run の既定値と一致。
+
+### 10.3 計装版 (`M11_INSTR_414C70=1`) の採取
+
+`m11_run.mjs` (計装版 `m11_boot.cjs`) を 3 回回した。stderr の観測行:
+
+| run | 呼出し # | arg1 | arg2 | arg3 | [arg2-4] | [arg2] |
+|---|---|---|---|---|---|---|
+| 1 | #1 | `0x10aa1098` | `0x6c` | `0x2539c8` | 0 | `0x0` |
+| 1 | #2 | `0x10aa10b8` | `0xa44eb0` | `0x0` | 2917695616 | `0x4174438d48ff8840` |
+| 2 | #1・#2 | 同上 | 同上 | 同上 | 同上 | 同上 |
+| 3 | #1・#2 | 同上 | 同上 | 同上 | 同上 | 同上 |
+
+- 呼出し #2 の `arg2 = 0xa44eb0` は、前 run の観測 (`src = 0xa44eb0`) と一致。`arg3 == 0` なので、§9.3 の経路 (`arg3 == 0` かつ `arg2 != 0` → `4133f0(arg1, arg2)`) に入る。よって `src` は `arg2` = `*s24` 由来が実値でも確認された。
+- `arg2 = 0xa44ed0` は今回の 3 回では出ていない。`arg2` の run 間変動は再現しなかった (§9.6 の未確定 2 は未確定のまま)。
+- 計装版の結果: units_run 129 / init 132 / icall_miss 16 / threw `memory access out of bounds` (既定と同一。計装は挙動を変えない)。
+
+### 10.4 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `arg2 = 0xa44ed0` の経路 (前 run の `src` 変動の片方) が今回の 3 回で観測されない | 受入 3 の判定 (deref 欠落が書換えに効くか) | #5358 (次 run) |
+| `m11_run.mjs` の経路と `boot_halt_probe.mjs` (flengine) の経路で 414c70 観測の値が一致するか | 観測経路の差 | #5358 (次 run) |
+| 計装版の `[arg2-4]` (長さ) は 2917695616 で、文字列ポインタとして読めない (命令列の先頭) | `arg2` が文字列ポインタか否か | #5358 (次 run) |
