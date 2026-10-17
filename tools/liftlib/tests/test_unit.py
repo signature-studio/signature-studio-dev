@@ -1125,7 +1125,7 @@ def t33():
         f = x86_flags(a)
         assert pred_eval(ir_l, a) == (f["sf"] != f["of"]), ("jl", a)
         assert pred_eval(ir_e, a) == f["zf"], ("je", a)
-        assert pred_eval(ir_b, a, ) == f["cf"], ("jb", a)
+        assert pred_eval(ir_b, a) == f["cf"], ("jb", a)
     print("T33 ok (cmp rcx,0: jl=icmp slt(SF!=OF), je=icmp eq(ZF), CF は常に 0 (x86 の定義と %d 値で一致))" % len(samples))
 
 
