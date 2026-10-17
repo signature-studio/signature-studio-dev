@@ -107,7 +107,7 @@ DEFECTS.md 行案 (編集は PM 判断):
 
 - **p1 の処理 (`tools/liftlib/liftlib/passes/p1.py`)**:
   - `shr` reg,imm の handler (line 1455-1466) は値だけ更新し `st["fl"] = None` にする。`shr rax,cl` (レジスタ shift) は handler に入らず、フラグは前段の状態のまま残る。
-  - (LIFTLIB-26 / #4350 で更新) `bsr r,r` の handler を追加し、ZF を flag 種別 `bsrzf` に載せる。`bsr` の直後に読めるのは e/ne/z/nz のみ。CF・SF・OF を読む cc は Unsupported。`shr reg,cl` の CF・`adc`・`cmp rcx,0` の SF/ZF/CF は未実装 (子 issue へ)。4 分岐の `icmp` 再結線も未実施。
+  - (LIFTLIB-26 / #4350 で更新) `bsr r,r` の handler を追加し、ZF を flag 種別 `bsrzf` に載せる。`bsr` の直後に読めるのは e/ne/z/nz のみ。CF・SF・OF を読む cc は Unsupported。(LIFTLIB-30 / #6078 で更新) `shr r32/r64,cl` の handler を追加し、CF を flag 種別 `shrcf` に載せる。CF は `count=cl&(bits-1)` が 0 でないとき src の bit (count-1)、0 のとき前の CF (`select`)。`shrcf` の直後に読めるのは b/c/nae/ae/nb/nc のみ。ZF/SF/OF は未実装で Unsupported。`adc`・`cmp rcx,0` の SF/ZF/CF は未実装 (子 issue へ)。4 分岐の `icmp` 再結線も未実施。測定: `liftlib_e2e.sh --quick` は FA/KH/OTT auto が PASS (`ott_auto_none` は main でも同じ FAIL)。
   - `flag_consumers` (line 73) は `defs_before(va,"flags") == {A}` (comis 起点) の jcc だけを拾う。したがって `jae` / `jne` / `jl` / `je` はいずれも comis 由来ではないため、分岐の再構成 (dropped/folded 経路) の対象外になっている。
 - **IR との対応 (VA 順からの推定・未検証)**: `dec_label_pc_1801ba9c8` の `br i1 true` が `jae 0x1801baa70` に、`dec_label_pc_1801baa70` の `br i1 false` が `jne 0x1801baab0` に、`dec_label_pc_1801baab0` の `br i1 false` が `jl 0x1801baae0` に、`dec_label_pc_1801baabd` の `br i1 undef` が `je 0x1801bab00` に当たると読める。どの値が畳まれたかは IR の `%` 定義を追うまで確定しない。
 - **修正の方向 (案)**: p1 に整数 flag 生成 (`shr` reg,cl の CF / `bsr` の ZF / `cmp rcx,0` の SF・ZF) を追加し、上の 4 分岐を `icmp` で再結線する。これは comis 起点の `p1` 経路とは別の経路になる。実装と測定は子 issue に分ける。
