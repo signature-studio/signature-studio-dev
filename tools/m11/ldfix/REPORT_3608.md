@@ -132,7 +132,7 @@
 |---|---|---|
 | 144: `function_6539e0` が `dsp_ippv2.dll` (0x2572dc) を選ぶ条件 (呼出し元の分岐) | 項目 1 (受入 1 の残り) | #3608 |
 | 149: `function_412c20` の戻り値 0 の由来・`Blend2D.dll` (0x264208) を渡す上流 | 項目 1 (受入 1 の残り) | #3608 |
-| 114: Halt 呼出し元 (halt0 の probe が未実装) | 項目 1 (受入 1 の残り) | #3608 |
+| 114 ほか halt0 の 7 件: call site B の分岐 `18787504` の i8 の trap 時の値 (B 直前の `dec_label_pc_4129be`) と、A が他 unit で走るか | 項目 1 (受入 1 の残り) | #3608 |
 | ldfix の F3a 2・F3c 43 のうち件数に反映されなかった修復 (反映は unit 895 の 1 件) の理由 | 項目 3 の理由 | #3608 |
 | `stage4.sh` が `llvm-nm` を PATH から引けず、`defined_c.txt` が空になる (`emsdk_env.sh` は `upstream/bin` を PATH に入れない)。空だと `m11_winstubs.c` と `win.o` の定義が重複し wasm-ld が落ちる | 再現環境の stage4 (§8 の採取手順 4) | #3608 |
 
@@ -211,10 +211,18 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 
 ### 8-3 unit 114 (halt0・Halt 呼出し元)
 
-- reader に halt0 の枝を入れた (`trap144_read_3608.mjs`・halt0 は kind `halt0->longjmp` で採取。枝の追加は commit `77ead008e`)。`77ead008e` の reader の出力では halt0 8 件 (114・245・279・314・368・509・647・895) と OOB 14 件を採取した、と前 run で記録された。**ただし本 run では再採取していない**: `$ARTIFACTS_DIR` に `work-m11`・`toolchain-emsdk` が無く、`stage4/` を要する `trap144_read_3608.mjs`・`prod_order_3608.sh` を再実行できないため。halt0 8 件・OOB 14 件の unit 番号と kind の再現は未済 (未解決)。
+- reader に halt0 の枝を入れた (`trap144_read_3608.mjs`・halt0 は kind `halt0->longjmp` で採取。枝の追加は commit `77ead008e`)。`77ead008e` の reader の出力では halt0 8 件 (114・245・279・314・368・509・647・895) と OOB 14 件を採取した、と前 run で記録された。(#5280 の run で、素材 (`work-m11`・`toolchain-emsdk`・`fl-win64`) を展開して再採取した。halt0 8 件・OOB 14 件の unit 番号と kind は §1-3 の S22 と一致。)
 - wasm 位置 → IR 名 (`m11_wasmnames.py` で `m11_boot.cjs.wasm` から解決): 114 の最内は `function_412770` (`0x806d16`)、その呼出し元は `function_4128b0__lifted` (`0x2d7a94`) ← `function_4128b0` ← `function_412a40` ← `function_4096b0` ← `function_4096d0`。245・279・509・647 は `function_412a60` ← `function_411d20` の鎖。
 - `function_412770` は `arg1` の領域へ 37 要素を書く関数 (IR 117827 行)。`function_4128b0__lifted` の 2 つの call site (IR 117917 行・118017 行) のうち、どちらが 114 を引いたかは**未確定**。`function_412770` の entry 計数を probe に入れて試したが全 unit で 0 になり、計装の正しさを確認できなかったため撤回した (probe は元の 5 entry に戻した)。
-- 未解決: `function_4128b0__lifted` の分岐条件 (先頭の global 読みと `GetCurrentThreadId` 判定) の trap 時の値は未採取。どの call site かの確定もここから。受入 1 は部分。
+- 確定 (#5280・本 run・測定 commit は下の §8-5): call site を計装 (`trap114_probe_5280.py`・`trap114_read_5280.mjs`) で採った。halt0 の 8 件 (114・245・279・314・368・509・647・895) はすべて **call site B** (IR 118017 相当・`function_412770(18787456)`) を 1 回通り、call site A (IR 117917 相当・`18787752`) は 0 回。entry 時の global は全 8 件で 18787760=0・18787504=`0x100000002`・18768032=0 (いずれも entry 時点の値。B の直前の分岐 (`dec_label_pc_4129be` の `18787504` の i8 読み) の値は未採取)。18787760=0 のため `dec_label_pc_4128e0` の A 側の枝には入らない (IR 117917 を経由しない)。
+- 注 (対照の弱さ): 計装版では `function_4128b0__lifted` の entry が halt0 の 8 件以外の unit で 1 回も立たなかった。したがって「A が 0 回」は halt0 unit の中での観測で、A が他の unit で走るかは未測定。
+
+### 8-5 unit 114 の call site 計装 (#5280・受入 1 の call site 部分)
+
+- 手順: `ldfix_e2e.sh` (rc 0・PASS) → `prod_order_3608.sh h_nor8b fix ld108,ld115,src412770,qstore,alloca,guard699,guard4fa210` (872/47/22・halt0 8・OOB 14) → `python3 trap114_probe_5280.py work/p3608/h_nor8b/prod.ll work/t114/probe.ll` → `bash stage4.sh work/t114/probe.ll t114` (rc 0・units_run 109・dllmain_done True) → `S4_NAME=t114 node trap114_read_5280.mjs`。
+- 結果: halt0 8 件すべてで call site B (IR 118017 相当) 1 回・call site A 0 回。OOB 14 件は A・B とも 0 回 (`function_4128b0__lifted` を通らない)。
+- 対照の制約: 計装版で entry が立ったのは halt0 の 8 件だけ (正常 unit は 0)。A の 0 回は halt0 の中での観測。
+- 未確定: B の分岐条件 (`18787504` の i8 の trap 時の値)。受入 1 の残りは、この値と B 直前の分岐の確認。
 
 ### 8-4 未解決 (起票先 #3608)
 
