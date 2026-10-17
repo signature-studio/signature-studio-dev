@@ -70,6 +70,8 @@ const INTENT_HARD_STOP = ["launch-unobserved"];
 export const WATCHDOG_JITTER_MS = 30_000;
 // 降格 (#2340): 同じ issue に、この時間内に Worker (PM App) と個人の /oc の組が付いたら DO を dry-run に戻す。
 export const OC_DOUBLE_MS = 30 * 60_000;
+// 降格の時限復帰 (CI-251)。降格からこの時間を超えたら tick が自動で解除する。
+export const DEMOTE_AUTO_LIFT_MS = 60 * 60_000;
 // shadow (#2340): would_launch と VM の /oc を、この窓 (15 分) で突き合わせる。
 export const SHADOW_WINDOW_MS = 15 * 60_000;
 const OC_KEEP_MS = 2 * 3_600_000;
@@ -431,17 +433,23 @@ export class Engine {
     this.saveMeta();
   }
 
-  // 降格の解除。自動では戻さない (呼び出し側が repo の push 権限を確認してから呼ぶ)。
+  // 降格の解除。手動 (POST /demote/reset・呼び出し側が repo の push 権限を確認してから呼ぶ) か、時限復帰 (auto-stale)。
   // 判定の起点を解除の時刻に移す。解除前の /oc の組は、full sync が読み直しても再判定しない。
-  resetDemote(): boolean {
+  resetDemote(note: "manual" | "auto-stale" = "manual"): boolean {
     if (!this.meta.demoted) return false;
     this.meta.demoted = undefined;
     this.meta.ocWatchFrom = this.d.now();
     this.meta.counters = this.meta.counters ?? this.zero();
     this.meta.counters.restored = (this.meta.counters.restored ?? 0) + 1;
-    this.pushLog({ kind: "restore", note: "manual" });
+    this.pushLog({ kind: "restore", note });
     this.saveMeta();
     return true;
+  }
+
+  // 降格から DEMOTE_AUTO_LIFT_MS を超えたら、人の操作を待たずに解除する (時限復帰)。
+  private autoLiftStaleDemote(): void {
+    const at = this.meta.demoted ? Date.parse(this.meta.demoted.at) : NaN;
+    if (Number.isFinite(at) && this.d.now() - at > DEMOTE_AUTO_LIFT_MS) this.resetDemote("auto-stale");
   }
 
   // 投稿・dispatch の実効モード。設定が live でも、降格中は dry-run。
@@ -1703,6 +1711,7 @@ export class Engine {
     const now = this.d.now();
     this.meta.tickAt = now;
     this.dirty = false;
+    this.autoLiftStaleDemote();
     let gh: Gh | null = null;
     try {
       gh = await this.d.gh();
