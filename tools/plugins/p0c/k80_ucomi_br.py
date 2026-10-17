@@ -13,7 +13,8 @@
     jb → fcmp ult (CF) / jbe → fcmp ule (CF|ZF) / ja → fcmp ogt (!CF&!ZF) / jae → fcmp oge (!CF)
   対象 function と jcc は --func / --cc で opt-in (機械語を確認済みのものだけ)。
   block 内に ucomi が無い・reload の use が分岐以外にある・jcc が未知のときは触らない (fail-closed)。
-  冪等 (`%ucb.` 定義があれば再適用しない)。
+  再実行は 0 site として fail-closed で止まる (出力を再入力にしても何も書き換えない)。
+  1 関数に対象 site が 2 つ以上あるときも止まる (`%ucb.` の名前が衝突するため)。
 """
 import argparse
 import json
@@ -100,8 +101,8 @@ def main():
             before = rep['sites']
             rest = fix_func(rest, a.cc, rep)
             rep['funcs'][fname] = rep['sites'] - before
-            if rep['funcs'][fname] == 0:
-                raise SystemExit('[k80_ucomi_br] %s: ucomi + 分岐の対象が無い (fail-closed)' % fname)
+            if rep['funcs'][fname] != 1:
+                raise SystemExit('[k80_ucomi_br] %s: 対象 site が %d 件 (1 件のみ可・fail-closed)' % (fname, rep['funcs'][fname]))
         parts.append(header + rest)
     missing = sorted(set(a.func) - set(rep['funcs']))
     if missing:

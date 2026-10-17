@@ -21,7 +21,7 @@
 
 - `tools/plugins/p0c/k80_ucomi_br.py` (新規): ucomi 直後の基本ブロック内で、唯一の `br i1 %cf.N.reload` の条件を、ucomi のオペランドから作る `fcmp` に置換する。
   - jcc の対応: `jb` → `ult` / `jbe` → `ule` / `ja` → `ogt` / `jae` → `oge` (ucomi の flags は CF = a<b または非順序、ZF = a==b または非順序)。
-  - fail-closed: ucomi が無い・分岐が 1 本でない・reload の use が分岐以外にある・function が無いときは止める。冪等 (`%ucb.` 定義があれば再適用しない)。
+  - fail-closed: ucomi が無い・分岐が 1 本でない・reload の use が分岐以外にある・function が無いときは止める。1 関数の対象 site が 1 件以外 (0 件・2 件以上) のときも止める (`%ucb.` の名前衝突防止)。再実行は 0 site で止まる。
 - 配線: `p0c4_abi_e2e.py` で `k80_deref_fix` の後、ext pass の前に実行 (`K80_NO_UCOMI_BR=1` で外せる)。
 - 実 IR の確認: `llvm-as` 通過。生成された式は `%ucb.c = fcmp ule double %ucb.af, %ucb.bf` (double の入力は `%4` = cvtss2sd の結果, `%11` = pand の結果)。
 
@@ -38,6 +38,13 @@
 
 - 測定時の load average: 開始 0.47 (06:48 頃)・終了 0.37 程度。4 コア runner。
 - 基準 (修復前の HEAD `df5e40d69` の同じ harness): rc 0・30.2 秒・0x5e12c0 buf_diff=0 (旧 hand body 使用)。REPORT_APPENDIX_H §18.3 の census (非 ext 鎖) では 0x5e12c0 buf_diff=1,814,580 で、この差は ext 鎖 (`k80_hand_bodies` 経由) の結果。
+
+### 27.4a レビュー差し戻し (round 1) の対応
+
+- 測定は `ba6009b23` のまま (再測定は未実施)。以降の変更は `k80_ucomi_br.py` の fail-closed の範囲と docstring のみで、1 site の入力に対する出力は変わらない。
+- `k80_ucomi_br.py` は 1 関数の対象 site が 1 件以外 (0 件・2 件以上) なら止まる (`%ucb.` の名前衝突防止)。
+- 合成 IR で確認 (`/tmp/opencode/ucb_test`): 1 site は `%ucb.c = fcmp ule double` を生成し rc 0。出力を再入力すると `対象 site が 0 件` で rc 1。2 site は `対象 site が 2 件` で rc 1。
+- 再測定できていない: この run では `toolchain-retdec` の素材と `p0c/work` が無く、`p0c4_abi_e2e.py` を実行できなかった。測定 commit から HEAD までの `tools/plugins/p0c` のコード差分は 0 ではない (上記 2 点のみ)。e2e の再測定は PM の判断待ち。
 
 ### 27.5 未解決
 
