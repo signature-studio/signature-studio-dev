@@ -62,6 +62,29 @@ def main():
         print("NG KH table: lea @0x%x not found" % KH_TABLE_RIP_INS)
         ok = False
 
+    fb = [
+        (0x1802ED930, "movss", "xmm12, dword ptr [rax + 0x10]"),
+        (0x1802EDA8A, "movss", "dword ptr [rdi + 0xb8], xmm12"),
+        (0x1802EE127, "movss", "xmm2, dword ptr [rdi + 0xb0]"),
+        (0x1802EE12F, "movss", "xmm3, dword ptr [rdi + 0xb4]"),
+        (0x1802EE143, "movss", "dword ptr [rdi + 0xb8], xmm3"),
+        (0x1802EE2A1, "movq", "xmm0, xmm1"),
+        (0x1802EE2C7, "movups", "xmm3, xmmword ptr [rdi + 0xb8]"),
+        (0x1802EE2D2, "mulps", "xmm3, xmm0"),
+        (0x1802EE2D5, "addps", "xmm3, xmm2"),
+        (0x1802EE3B3, "movups", "xmm3, xmmword ptr [rdi + 0xb8]"),
+        (0x1802EE3BE, "mulps", "xmm3, xmm0"),
+        (0x1802EE4C1, "movss", "dword ptr [rdx + rax*4], xmm3"),
+        (0x1802EE2B6, "test", "bpl, 1"),
+        (0x1802EE2C0, "shufps", "xmm2, xmm2, 0xe1"),
+    ]
+    by_va = {i.address: i for i in kh_i}
+    for va, mn, ops in fb:
+        i = by_va.get(va)
+        hit = i is not None and i.mnemonic == mn and i.op_str == ops
+        print("%s KH feedback @0x%x %s %s" % ("OK" if hit else "NG", va, mn, ops))
+        ok &= hit
+
     print("OK: Delay param 読み出しの検査 (意味ラベルは未確定)" if ok else "NG: 検査に失敗")
     print("EXIT=%d" % (0 if ok else 1))
     return 0 if ok else 1

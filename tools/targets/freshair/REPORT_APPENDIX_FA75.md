@@ -6,7 +6,8 @@
 ## §1. 結論
 
 - **部分達成**。KH 側 P の読み出しは 8 オフセットすべてを機械語で確認した。時間・同期・音符分割の役割は読めた (§2)。
-- 未確定: KH の `+0x10`・`+0x18`・`+0x1c`・`+0x20` の意味、SC 側 P の 5 オフセット (`0x9ee4`・`0x9f38`・`0x9f74`・`0x9fbc`・`0xa004`) の意味、**KH と SC の P オフセットの対応**。したがって受入条件 (param offset→意味の確定) は未達。PR は `Refs #5451`。
+- 未確定: KH の `+0x18`・`+0x1c`・`+0x20` の意味、SC 側 P の 5 オフセット (`0x9ee4`・`0x9f38`・`0x9f74`・`0x9fbc`・`0xa004`) の意味、**KH と SC の P オフセットの対応**。したがって受入条件 (param offset→意味の確定) は未達。PR は `Refs #5451`。
+- 追加: KH `+0x10` は、遅延線の書き戻しに掛かる係数 (帰還量) と読める (確度 中。§2 の表の行)。意味ラベルは差分実行で未確認のため、確定扱いはしない。
 
 ## §2. KH 側 P (`this+0x3188`) の読み (Delay process `0x1802ed7f0`)
 
@@ -18,7 +19,7 @@
 | `+0x4` (int) | `mov edx,[rax+4]`・`cvtsi2sd xmm2,edx` | 同期オン時の音符分子。確定度: 高 |
 | `+0x8` (int) | `dec r8d`・`cmp r8d,5`・`ja`・テーブル引き | 分割の選択 (1〜6)。確定度: 高 |
 | `+0xc` (int) | `cmp dword [rax+0xc],0` の分岐 | 同期フラグ (0 = オフ・非 0 = オン)。確定度: 高 |
-| `+0x10` (float) | `movss xmm12,[rax+0x10]` → `[rdi+0xb0/0xb4/0xb8]` へ格納 | 不明 (3 箇所に同値を書くので出力係数の類と推定)。確定度: 低 |
+| `+0x10` (float) | `movss xmm12,[rax+0x10]` (`0x1802ed930`) → 目標値として `[rdi+0xb4]` に入る (`0x1802edc07`・`0x1802eda93`)。即時経路では `[rdi+0xb0]`・`[rdi+0xb8]` にも入る (`0x1802eda9c`・`0x1802edbf0`)。サンプル毎のループで `[rdi+0xb0]`→`[rdi+0xb4]` を `[rdi+0xa8]`・`[rdi+0xac]` の進行率で補間し `[rdi+0xb8]` に書く (`0x1802ee127`〜`0x1802ee143`)。その `[rdi+0xb8]` を遅延線の読み出しに掛けて、混合結果を同じ遅延線に書き戻す (`0x1802ee2c7`・`0x1802ee4c1`) | 遅延線の書き戻しに掛かる係数 (帰還量)。確度: 中 (機械語の構造から。意味は差分実行で未確認) |
 | `+0x18` (byte) | `movzx ebp,byte [rax+0x18]` | 不明 (モードフラグと推定)。確定度: 低 |
 | `+0x1c` (float) | `movss xmm11,[rax+0x1c]`・`mulss xmm11,xmm11` → `[rdi+0x118/0x11c/0x120]` | 不明 (2 乗して 3 箇所に格納。幅・深さの類と推定)。確定度: 低 |
 | `+0x20` (float) | `movss xmm10,[rax+0x20]` → `[rdi+0x130/0x134/0x138]` | 不明 (3 箇所に格納)。確定度: 低 |
@@ -49,26 +50,30 @@
 
 ## §5. 検証 (測定 commit と再現)
 
-- 測定 commit: `ffd13c3b8` (`ks_fa75_delay_map.py` を追加した commit。本 PR の REPORT は、この commit の上に積む)。
+- 測定 commit: `466d59d58` (`ks_fa75_delay_map.py` に KH `+0x10` の帰還経路 14 行の検査を追加した commit。本 PR の REPORT は、この commit の上に積む)。
 - 再現: `python3 tools/targets/freshair/ks_fa75_delay_map.py <HeartCore.core_64> <SlateCore.core_64>` (素材 `work-liftlib-targets` を `tar --zstd -xf` で展開したもの)。
-- 実測 (`ffd13c3b8`・素材あり): `real 15.463 s`・`user 14.987 s`・EXIT=0・load 1 分値 0.39 (12:07 時点)。
-- 出力 (要点):
+- 再測定: **未実施**。`work-liftlib-targets` (HeartCore / SlateCore) が `$ARTIFACTS_DIR` と `fl-win64` の中に無く、この run では実行できなかった。前回の記録 (「OK 29 件」・所要時間・load) は、この run で再現も出力ファイルの確認もできなかったため採用しない。
+- スクリプトの期待件数 (コードの数え上げ): **28 件** = KH P 8 + SC P 5 + KH table 1 + KH feedback 14 (`fb` リストは 14 行)。下の出力は、この件数からの導出で、実行結果ではない。
+- 期待する出力 (未実行・コードから導出):
 
 ```
-OK KH P+0x0 ... OK KH P+0x20 (8 件すべて)
-OK SC P+0x9ee4 ... OK SC P+0xa004 (5 件すべて)
+OK KH P+0x0 ... OK KH P+0x20 (8 件)
+OK SC P+0x9ee4 ... OK SC P+0xa004 (5 件)
 OK KH table 0x181563298 = 0.666667, 0.5, 0.333333, 0.25, 0.166667, 0.125
+OK KH feedback @0x1802ed930 ... @0x1802ee2c0 (14 件)
 OK: Delay param 読み出しの検査 (意味ラベルは未確定)
 EXIT=0
 ```
 
-- 判定の限界: この検査は「期待するオフセットが機械語に現れる」ことだけを見る。意味ラベルは検査していない。
-- 鮮度: `git diff ffd13c3b8 HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` の出力は 0 行 (本 PR の REPORT 以外は変更しない)。
+- 再測定 (要素材 `work-liftlib-targets`): 上の 28 件が実際の標準出力と一致することを確認するまで、本節の件数は「期待値」として扱う。
+
+- 判定の限界: この検査は「期待するオフセットと命令が機械語に現れる」ことだけを見る。意味ラベルは検査していない。帰還経路の検査は、命令の並びが REPORT の記述と一致することの確認で、機械語の構造からの読みである。
+- 鮮度: `git diff 466d59d58 HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` の出力は 0 行 (`174f1e83d` は REPORT のみを変える)。
 
 ## §6. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| KH の `+0x10`・`+0x18`・`+0x1c`・`+0x20` と SC の `0x9ee4`・`0x9f38`・`0x9f74`・`0x9fbc`・`0xa004` の意味 | Delay の差分 param 写像が未確定 | #5451 (Refs・残件) |
+| KH の `+0x18`・`+0x1c`・`+0x20` と SC の `0x9ee4`・`0x9f38`・`0x9f74`・`0x9fbc`・`0xa004` の意味 (KH `+0x10` は帰還量と読めた・確度 中) | Delay の差分 param 写像が未確定 | #5451 (Refs・残件) |
 | KH と SC の P オフセットの対応 (`call` 引数 slot での連鎖検査) | 同上 | #5451 (Refs・残件) |
 | 呼出先 `0x18100c790`・`0x180ba88a0` (SC) と `0x180fc6870`・`0x180fc6d70` (KH) の同一性 | 対応の根拠が足りない | #5451 (Refs・残件) |
