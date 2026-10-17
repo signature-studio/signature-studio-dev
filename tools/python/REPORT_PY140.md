@@ -85,6 +85,13 @@
 - **mode の源**: `0xfdd270` は `0x1542bec` (`.data` の定数表) を `vtbl+0x80` の戻り値で引き、`call 0x81c0a0` の戻り値が 0 のとき `or bl, byte ptr [rip+0xa]` (`0xfdd2a8`、対象 VA `0xfdd2b9`) を行う。表の添字の値域と `0x81c0a0` は未確定。
 - **runtime の状態**: `rsi` (`0xfdd402` の `[rax+0xcc]` と比較する値) やゲート関数の対象 `obj` は runtime の状態。送出の成否はこの状態に依存する。
 
+## PY-406 受入 1: `0x60c220` の戻り値条件
+
+- **確定した構造** (`pe_disasm.py 60c220`): `0x60c220` は `msg.Result` (`[rbp+0x38]`、初期値 0) を戻す。`[rbp+0x20]`=edx (0x57f)・`[rbp+0x28]`=r8・`[rbp+0x30]`=r9 を立てたあと、`obj` (`rbx`=rcx) が非 0 なら `call qword ptr [rbx+0x80]` を `rcx=[rbx+0x88]`・`rdx=&msg` で呼ぶ (`0x60c244`〜`0x60c24f`)。よって戻り値は呼ばれた先が `msg.Result` に書く値そのもの。
+- **未確定**: 呼ばれる先 (`[obj+0x80]`) の値。REPORT の旧記載「vtbl+0x80」は誤りで、`[obj+0x80]` を直接読む (VMT 経由ではない: `0x410090` の `call [rbx-0x38]` は VMT 経路)。この関数ポインタは obj のインスタンス状態で、PE 内の静的な書込み元が確定できない。
+- **探索範囲と結果**: `analysis/flapi/pe_obj80_writers.py` が block00031_PE の実行可能 section を線形走査 (5,022,467 命令を復号)。`mov qword ptr [<非フレーム reg>+0x80], <src>` は 77 件。うち src が `lea reg,[rip+disp]` で `0x410090` を指すものは 0 件。`call 0x410090` の直接参照も 0 件。すなわち「`0x410090` が `obj+0x80` に入る」経路は静的な即値・rip 相対では見つからない。線形走査のため、間接 (レジスタ経由の複数段) の書込みは除外しきれない。
+- **結論**: 戻り値 ≤ 0 の条件は、`obj+0x80` の実行時の値 (呼び先) と、その呼び先が `msg.Result` に書く値で決まる。静的には確定できない。理由は上記の書込み元が PE から一意に決まらないことである。確定には実行時の trace (`obj`・`[obj+0x80]`・呼び先が書く `msg.Result`) が要る。
+
 ## 検証
 
 - 本 REPORT の数値は PY-246 の実装 commit `a0fc92492` (tools/python のコードを最後に変えた commit) で測定した。`9b57a83cd` 以降の差分は REPORT のみ。
