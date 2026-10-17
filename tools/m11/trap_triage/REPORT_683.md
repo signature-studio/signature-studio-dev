@@ -223,3 +223,21 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
   - **取り込み後の build gate (本 run、HEAD `6b5774526`)**: `m11_build.sh` の gate 部分だけを一時コピーで検査した (emsdk の参照先のみ差替え。リポジトリは未変更)。ir_conditions.json の組合せ 6 通り: S1 全 applied → gate 通過 (後段の指紋検査で停止)。S2 r8b 記録無し → 拒否。S3 ld115 記録無し → 拒否。S4 r8b=disabled (ALLOW 無し) → 拒否。S5 r8b=disabled + `M11_ALLOW_R8B_DISABLED=1` → WARNING で続行。S6 ld115=disabled (ALLOW 無し) → 拒否。r8b と ld115 の 2 つの検査が独立に効くことを確認。
 - **survey の基準 (#1448)**: 本節の survey は、work-m11 の lift 断片から `m11_gen_ir2.sh` で作り直した IR での OFF / ON の A/B である。`docs/WORKFLOW.md` §11 は work-m11 の snapshot を survey の基準にしないと定めるため、ok 873 などの絶対値は正の基準ではなく、OFF と ON の対比としてのみ読む。
 
+#### 8.1b #4308 (§8.1 の追記): g (0x11f5fc0) の構造体の base/cnt への書込み元 (計装 6 関数・survey)
+
+- **対象**: `g = [0x11f5fc0]` を読む関数は IR 上 4 つ (`6cefb0` `6cf1b0` `6cf240` `6cf270`)。前 run の 5 関数 (`6cf240` `6cf270` `815050` `815e10` `6cefb0`) に `6cf1b0` を足した 6 関数・100 store を計装 (`watch_store_682.py --fns-file`)。
+- **監視**: `trap_triage/watch_base_4308.c`。`g` を毎回読み、`[g+8, g+20)` (base = i64、cnt = i32) と store の範囲が重なる書込みを `[wb]` で出す。
+- **結果**: survey rc=0・11 秒。`[wb]` は **0 件**。kind は 942 unit のうち OOB 15 / halt0 6 (前 run の OOB 対象 15 unit と同数)。
+- **陽性対照**: 監視範囲を `g` 本体 (0x11f5fc0) に替えた同じ計装で、`[wb] site=24 addr=11f5fc0` (`function_6cf240` 273906 行) が 1 件出た。前 run の「g への書込みは unit 190 で 1 回」と整合する。計装は効いている。この実測は前 run で行い、そのときの C は commit していない。commit した `trap_triage/watch_g_ctrl_4308.c` は、同じ監視を再構成した版 (`gcc -fsyntax-only` のみ通過。未コンパイル・未実行)。
+- **再現手順** (作業ディレクトリ `tools/m11`。素材は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`fl-win64` の展開先)):
+  1. `bash m11_gen_ir2.sh` で `work/boot_final3.ll` と `work/ir_conditions.json` を作る (ldfix・PE 指紋が要る)。
+  2. 計装 IR: `python3 trap_triage/watch_store_682.py --out work/probe4308 --fns-file trap_triage/fns_4308.txt` (6 関数・100 store。関数リストは `trap_triage/fns_4308.txt`)。
+  3. 監視 C: `emcc -c trap_triage/watch_base_4308.c -o work/obj/sw682.o $CF` (`$CF` は `store_watch_682.sh` と同じ `-O0 -g1 -I.` 系)。`emcc -c work/probe4308/boot_sw.ll -o work/obj/boot.o $CF`、`emcc -c m11_ov.c -o work/obj/ov.o $CF -DM11_FIX_682=1 -DM11_NOTIFY_682=0` の後、`bash m11_build.sh`。
+  4. survey: `store_watch_682.sh` の末尾と同じ (`m11_survey.mjs` の複製に `SV_PROG=1` を付けて実行し、`[wb]` 行を数える)。
+  5. 陽性対照: 手順 3 の監視 C を `trap_triage/watch_g_ctrl_4308.c` (監視番地 g 本体 0x11f5fc0) に替えて同じ手順を行う。
+  6. 終了時は `rm -f work/obj/sw682.o work/obj/boot.o work/obj/ov.o` の後 `bash m11_build.sh` で clean な wasm に戻す (`store_watch_682.sh` の `restore` と同じ)。
+- **注意 (この PR の時点)**: 上記の実行に用いた素材 (`fl-win64`・`work/`・emsdk) は、この fix run の環境には無く、手順 1〜6 は再実行していない。結果 (survey rc=0・`[wb]` 0 件・陽性対照 1 件) は前 run の実測で、この手順 (2)〜(5) の再構成が前 run の実際の呼出しと同一であることは、この run では確認できていない。`[wb]` 0 件も陽性対照 1 件も前 run の実測であり、この run では再測定していない。陽性対照 C (`watch_g_ctrl_4308.c`) は `watch_base_4308.c` と監視番地だけを替えた版として作成した。`gcc -fsyntax-only` は通過したが、emcc によるコンパイル・実行はしていない。前 run の実測に使った C とは一致しない可能性がある。
+- **読み**: 計装した 6 関数の中には、`g` の指す構造体の base/cnt を書く store が無い。したがって 0 化の書込みは、この 6 関数の外側 (`g` を経由せず別の alias で書く関数) か、ptr 操作数が `%name`/`@name`/`inttoptr` 定数でない store (計装の対象外。`skipped` は 0 件) による。
+- **計装の範囲 (読みの前提)**: 監視対象は **6 関数内の store 命令だけ**。`llvm.memset` / `llvm.memcpy` や外部関数経由の書込み、6 関数から呼ばれる callee 内の store は計装していない。したがって `[wb] 0 件` は「6 関数の store 命令による書込みが無かった」ことだけを示す。
+- **未確認**: 上記の外側の関数の特定。全 store (54,041) の計装は前 run と同じく 400 秒で打ち切りになるため、この run では測っていない。
+- **本 run の build 注意**: `m11_gen_ir2.sh` を `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` で再生成してから build する (`ir_conditions.json` の ldfix・PE 指紋が必要)。build 後は clean な wasm に戻す (前 run の実測 rc=0)。
