@@ -19,9 +19,9 @@
 | 素材 | `fl-win64` / `toolchain-emsdk` を `$RUNNER_TEMP` に展開 (repo 外) |
 | 診断 route (root 無し・`FLE_BOOT_RUNS=diag_shim`) | units_run **209** / `unlifted 0x6bbc20` / getmem 2314 / freemem 1200 (前回と同値) |
 | 監視版 (診断 route・`WVAL_OBJWATCH=1`) | units_run **209** / 停止点同じ / getmem 2314 / freemem 1200 (差 0) |
-| 監視版 (既定 route・`WVAL_OBJWATCH=1 WVAL_IPP= WVAL_NULLFILL=0`) | units_run **895** / `boot_threw: exit` (前回の既定経路と同じ。#4806 の IPP 判定は別件) |
+| 監視版 (既定 route・`WVAL_OBJWATCH=1 WVAL_IPP= WVAL_NULLFILL=0`) | units_run **895** / `boot_threw: exit` / `IPP_CHECK mode:3 ok:true` (既定 route の再実行。前回の既定経路と同じ停止。#4806 の IPP 判定は別件)。測定は同一 commit `6e2c7ec49` の lift (既定 root `0x6a7b70` 有) で行い、`fle6_measure.sh` (`FLE_EXTRA_ROOTS` 未指定) → `wval_measure.sh` の順 |
 | 監視の一致 (診断 route) | `[wobj]` 10 件: `0x40d300` (0 書込み・16 byte)・`0x6bc010` (0 書込み・1 byte)・`[wobj-set]` 1 件 (`0x6ba25b`)・`[wobj-getmem]` 2 件・`[wobj-free]` 多数 |
-| 監視の一致 (既定 route) | `[wobj]` の書込みは 0 件 (`[wobj-free]` `[wobj-getmem]` のみ)。既定経路で `0x40d300` を通ったかは未確認 (`wval-enter` は `f_40fb40` を対象にしていない) |
+| 監視の一致 (既定 route) | `[wobj]` (lifted の store) は **0 件**。`0x40d300`・`0x6bc010` は出ていない。出たのは `[wobj-free]` 7 件・`[wobj-getmem]` 1 件 (`p=0x12d7a090 size=70 obj+0xc4=0` の 1 件のみ・obj が確定していないため `freed_before=0`) のみ。`[wval-enter]`・`[wval-mode]`・`[wobj-set]` は **0 件** (入口 `f_6ba1f0` / `f_6bc010` / `f_6cd520` / `f_6c9280` の入口フックに届いていない) |
 | 監視の穴の修正 | 前回の判定は `a == obj+0xc4` (store の開始位置一致) だった。`a <= obj+0xc4 < a+n` に直した (`wval_lift.py`) |
 
 KPI (起動に関わる PR): FLEngine 起動の units_run は **前 209 / 後 209** (診断 route)。既定 route は前 895 / 後 895。最初のウィンドウ: **無し**。ビルド・lift 経路は変えていない (監視は `--objwatch` の時だけ挿入)。
@@ -41,8 +41,8 @@ KPI (起動に関わる PR): FLEngine 起動の units_run は **前 209 / 後 20
 
 ## D. 限界
 
-- 1 run・n=1。決定的な boot のため同一 commit の再実行は同値と見る。
-- 既定 route では `0x40d300` は出ていない (boot が 895 units で `exit` する)。既定経路での mode の設定元は未測定 (#4806 の IPP 判定が先)。
+- 1 run・n=1 (診断 route・既定 route とも)。同一 commit の再実行は未測定で、「決定的 boot のため同値」は推定であり測定ではない。
+- 既定 route では `0x40d300` は出ていない。ただし既定 route は `f_6ba1f0` の入口 (`[wval-enter]`) にも届いていない (`[wval-enter]` 0 件) ため、「既定 route で `f_6cd520` / `0x6bc010` に届いていない」ことの根拠は、入口フックの 0 件 (`run_wval_default_6219.log`) である。`f_40fb40` の入口は `wval_lift.py` の `ENTER_FN` 対象外のため、既定 route で `f_40fb40` / `0x40d300` に届いたかは、この測定では判定できない (monitor の対象外)。既定経路での mode の設定元は未測定 (#4806 の IPP 判定が先)。
 - ホスト側 C (`fle_boot.c`・shimx・`rt/fle_glue.c`) の書込みは監視していない (前回 §E と同じ)。確保領域の getmem (FastMM) の 0 埋めの有無はホスト側のため見えていない。
 - `f_40fb40` の呼出元 (`NewInstance` の段) の VA は本付録の対象外。
 
@@ -53,9 +53,16 @@ FL_WIN64_DIR=<fl-win64 展開先> FLE_EXTRA_ROOTS= FLE_BOOT_WORK=<work> FLE_BOOT
 FL_WIN64_DIR=<fl-win64 展開先> FLE_BOOT_WORK=<work> WVAL_OBJWATCH=1 bash tools/flelift/boot/wval_measure.sh
 ```
 
-素材: `oc_artifacts: fl-win64 toolchain-emsdk`。
+既定 route (§B の表と同じ条件・既定 root `0x6a7b70` 有の lift):
+
+```sh
+FL_WIN64_DIR=<fl-win64 展開先> FLE_BOOT_WORK=<work> bash tools/flelift/boot/fle6_measure.sh
+FL_WIN64_DIR=<fl-win64 展開先> FLE_BOOT_WORK=<work> WVAL_OBJWATCH=1 WVAL_IPP= WVAL_NULLFILL=0 bash tools/flelift/boot/wval_measure.sh
+```
+
+素材: `oc_artifacts: fl-win64 toolchain-emsdk`。`toolchain-emsdk` は上流から `git clone --depth 1 https://github.com/emscripten-core/emsdk.git` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12` で得て `SS_EMSDK_ENV` に指定する (REFERENCES `toolchain-emsdk`)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 既定 route (895 units) の mode の設定元 | 既定経路での obj の書込み方式 | #4806 (IPP 判定 NG の解消後に測る) |
+| 既定 route (895 units) の mode の設定元 | 既定経路での obj の書込み方式 | #6220 (親 #4287 の残件・受入 2。既定 route で `f_6ba1f0` の入口に届かない (§B) ため、設定元の測り方から見直す) |
 | ホスト側 C・getmem (FastMM) の 0 埋め | 監視の網羅性 | 本付録 D (未監視の限界として残す) |

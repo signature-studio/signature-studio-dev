@@ -133,6 +133,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_4384.md` | ~40 | #4384 (WIN-49): CFI 経路の値の観測 (REPORT_APPENDIX_2719 §13 から移動)。受け手 VA は未取得・再現なし |
 | `tools/flelift/boot/REPORT_APPENDIX_4464.md` | ~55 | #4464 (WIN-51): CFI 経路の入口値 (rcx・rdx・dl) の再現 (受入 1)・間接 call の受け手 (`[rax-0x30]`) の実行時値 0x0 (受入 2 の一部。実機の充填は未特定) |
 | `tools/flelift/boot/REPORT_APPENDIX_4287.md` | ~75 | FLE-22 (#4287) の付録: `f_6cd520` の mode (`obj+0xc4`) の設定元 (store 監視・既定経路の比較・未解決)。付録 3771 の監視を拡張 |
+| `tools/flelift/boot/REPORT_APPENDIX_4854.md` | ~20 | FLE-22 系 (#4854) の付録: REPORT §12 (mode 3 の survey が InitTable 0 で測定不能・補修と jsonl の残し方) の全文。250 行上限のため分割移動 (内容は変えていない) |
 | `tools/flelift/boot/REPORT_APPENDIX_6219.md` | ~70 | FLE-53 (#6219) の付録: 監視の重なり判定への修正後の再測定。`obj+0xc4` の 0 の書込み元 (確保直後の `f_40fb40` → `f_40d210` の 0 埋め `0x40d300`)。付録 4287 §F・§G の後続 |
 | `tools/flelift/boot/REPORT_APPENDIX_3330.md` | ~160 | PERF-P22 (#3330) の付録: boot 停止時点の線形メモリの sha256 (全体・C スタック除く・PE 書込み可能セクション) を 3 変種 × 2 run とネガコンで比較した実測値と差分の所在。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_3090.md` | ~80 | FLE-12 (#3090) の詳細: 0x6a7b70 への dispatch の呼出元 (0x6c7923 ← 0x815920)・幅 r8 の源 (即値 2^20 由来の推定)・未修復の理由・0x15F34A0 書込み元の未了。REPORT §0 から参照 |
