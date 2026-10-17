@@ -67,7 +67,7 @@ closure は `call` と直接 `jmp` だけを辿る。そのため次の 2 種が
 | IAT 10 種の stub 化の方針 (C 実装か wasm import)。直接 call のサンク 2 種 (0x1b932c・0x1b9334) と末尾 jmp の 2 種 (0x1bb426・0x1bb47a) を含む | wasm 化 | [T-SH-65] #3318 |
 | SSE helper 8 種 (`__asm_`) の C 実装 (解消は §7。5 種は #4229 で C 実装済み) | wasm 化 | [T-SH-65] #3318 |
 | 間接 call 4 件の trap 化 (ac 4) | 正常系の到達 | [T-SH-65] #3318 (到達実測は #3250) |
-| 閉包の取りこぼし: 直接 jcc 先 function_1801aef40 (§2-2 (a))。閉包規則を変えるか。変えれば 36/961 が変わり再測定 | 範囲・wasm 化の意味 | [T-SH-65] #3318 |
+| 閉包の取りこぼし: 直接 jcc 先 function_1801aef40 (§2-2 (a))。IR 側で解消 (§8-1)。閉包規則は未変更 | 解消 | #6231 (本 PR) |
 | 計算ジャンプ表の経路 (n = 1〜16) が IR で `ret` になる (§2-2 (b))。§11 で `switch` に戻し、census は ALL OK (修復済み) | 解消 | #6184 (§11) |
 | 全バイト差分・ネガティブコントロール・gate | 受入の残り | [T-SH-66] #3320 |
 | `.pdata` の無い葉 12 件の範囲 (次の `.pdata` 先頭まで) | 命令数は上限側に偏りうる | #161 |
@@ -155,7 +155,9 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 - x86: 0x1aefa7 `jne 0x1801aef40` は **条件分岐**。0x1aef40 は `rep stosb` の memset ヘルパで、`ret` は呼び出し元へ戻らず 0x1aef60 の呼び出し元 (閉包の外) に返る。
 - IR: `call i64 @function_1801aef40` の後に fall-through で 0x1aefa9 へ続く。つまり IR は jcc を call に化かしている。これは現行の IR (baseline) に既にある誤モデルで、閉包を広げても直らない。
 - 試算 (scratch, 非コミット・`work/` の probe): jcc を辿ると 37 関数・969 命令 (+1 関数・+8 命令)。`ci_ranges.py` に入れて `ci_lift.sh` を回すと、RetDec は 0x1aef40 を `__asm_rep_stosb_memset` の呼び出しとして出し、`gen_helpers.py` が未対応の signature で exit 1 になった。閉包規則は戻し、コードの差分は 0 (`ci_ranges.py` は HEAD と同じ)。
-- 決定: 範囲外のまま扱う。誤モデルを閉包で正すには IR の jcc 扱いを直す必要があり、#3318 で扱う。
+- 決定 (T-SH-163 #6231・旧決定 #5749 を更新): 閉包規則は変えず、IR 側で直す。`ci_restore_memset.py` が `call i64 @function_1801aef40` を memset ループ (`i8` store を `arg3` 回) に置き換え、0x1aefa7 の jcc の偽側を `ci_ms` へ向ける。ループ後は `ret` ブロック `dec_label_pc_1801af028` へ `br` する (x86 の `ret` と同じ行き先)。`ci_restore_memset.py` は 0x1aef40 の 8 命令の形と jne の飛び先を逆アセンブルで確かめ、外れたら exit 1 で止まる。
+- 検証 (測定 commit `e1d5dbe2b`・4 core・n=3): `ci_lift.sh` rc 0・ALL OK・`直接 jcc 先への call (復元後 IR): 0 件 (復元前 1 件)`。`ci_link.sh` rc 0 (wasm-ld rc 1・未解決は期待集合のみ)。`function_1801aef40` は未解決から消えた。NC: 旧 IR (call 残存) を census の第 4 引数に渡すと `FAIL`・rc 1。`ci_restore_memset.py` に復元済み IR を渡すと `jcc の分岐が想定と違う`・rc 1。
+- 閉包規則は変えていない (36 関数・961 命令・間接 call 10 は不変)。よって 36/961 の再測定は要らない (§8-3)。
 
 ### 8-2. (b) 計算ジャンプ表の経路 (n = 1〜16)
 - 決定: 欠落を受入として扱わない (silent miscompile を見逃さない)。census に検査を入れた。
@@ -171,7 +173,7 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 計算ジャンプ表の経路 (n = 1〜16) を IR に戻す | 解消 (§11)。RetDec 内部の段は未確認 | #6184 (§11) |
-| 直接 jcc 先 function_1801aef40 の誤モデル (jcc を call として扱う) | 範囲・意味論。閉包を変えると wasm 化の前提が変わる | [T-SH-65] #3318 |
+| 直接 jcc 先 function_1801aef40 の誤モデル | 解消 (§8-1・`ci_restore_memset.py`)。`ci_link.sh` の未解決から消えた | #6231 (本 PR) |
 
 ## 11. 計算ジャンプ表の経路を IR に戻す (T-SH-161 #6184)
 
