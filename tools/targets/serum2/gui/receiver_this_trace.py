@@ -33,6 +33,7 @@ pe = pefile.PE(ARGS[1])
 data = open(ARGS[1], "rb").read()
 IMG = pe.OPTIONAL_HEADER.ImageBase
 DISPS = {0x30, 0x38, 0x88}
+ALL_DISPS = "--all-disps" in ARGS
 HEAD = int(ARGS[ARGS.index("--vtable") + 1], 16) if "--vtable" in ARGS else 0x180A2BF58
 TSV = ARGS[ARGS.index("--tsv") + 1] if "--tsv" in ARGS else None
 MAXLOAD = 5
@@ -429,7 +430,7 @@ def analyze(strict):
         if ins.mnemonic != "call":
             continue
         mm = parse_mem(ins.op_str.strip(), ins)
-        if mm is None or mm["disp"] not in DISPS or mm["index"] or mm["rip"] or mm["base"] is None:
+        if mm is None or (mm["disp"] not in DISPS and not ALL_DISPS) or mm["index"] or mm["rip"] or mm["base"] is None:
             continue
         f = func_of(ins.address)
         if f is None:
