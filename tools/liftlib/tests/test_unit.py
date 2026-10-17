@@ -1200,7 +1200,22 @@ def t35():
         except p1.Unsupported:
             continue
         raise AssertionError("shr cl の直後の cc %s は Unsupported のはず" % bad)
-    print("T35 ok (shr r64,cl: count&63 で CF を select、count==0 は前 CF 保持、CF 以外の cc は Unsupported)")
+    # 32bit 形: 結果は i32 の lshr を i64 へ zero-extend して書き戻す (実機 shr eax,cl は上位 32bit を 0 にする)
+    out32 = []
+    st32 = {"__w": set(), "rax": ("%old", "i64"), "rcx": ("%cnt", "i64"), "fl": ("rcrcf", ("%pcf", 64, None))}
+    it32 = NS(va=0x1000, mnem="shr", op_str="eax, cl", mem=None, is_call=False,
+              ops=[NS(type=1, reg="eax"), NS(type=1, reg="rcx")],
+              _ci=NS(operands=[NS(size=4), NS(size=1)]))
+    st32["eax"] = ("%old32", "i32")
+    stub32 = NS(mod=mod, nm=lambda va, t: "%%%s_%d" % (t, len(out32)), used=lambda k: None,
+                _GPR_ALU=p1.Region._GPR_ALU, _gpr_val=lambda st_, reg, va, o, bits=64: st_[reg][0],
+                _flag_cf_i1=lambda *a: p1.Region._flag_cf_i1(stub32, *a),
+                _flag_cc_i1=lambda *a: p1.Region._flag_cc_i1(stub32, *a))
+    assert p1.Region.lift_data_insn(stub32, it32, [("reg", "eax"), ("reg", "rcx")], st32, out32, "") is True
+    t32 = "\n".join(out32)
+    assert "and i32 %cnt, 31" in t32 and "lshr i32 %old32, " in t32, t32
+    assert "zext i32 " in t32 and " to i64" in t32 and st32["eax"][1] == "i64", (t32, st32["eax"])
+    print("T35 ok (shr r64,cl: count&63 で CF を select、count==0 は前 CF 保持、CF 以外の cc は Unsupported。shr r32,cl は i64 へ zero-extend)")
 
 
 if __name__ == "__main__":

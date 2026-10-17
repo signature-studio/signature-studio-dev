@@ -1572,7 +1572,11 @@ class Region:
             out.append("  %s = select i1 %s, i1 %s, i1 %s%s" % (cf, nz, bc, prev, tag))
             n = self.nm(va, "sr")
             out.append("  %s = lshr %s %s, %s%s" % (n, ity, a, cnt, tag))
-            st[dst] = (n, ity if bits < 64 else "i64")
+            if bits == 32:
+                z = self.nm(va, "srz")
+                out.append("  %s = zext i32 %s to i64%s" % (z, n, tag))
+                n = z
+            st[dst] = (n, "i64")
             st["__w"].add(dst)
             st["fl"] = ("shrcf", (cf, bits))
             self.used("shift_cl")
