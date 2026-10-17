@@ -23,6 +23,14 @@ if os.environ.get('M11_INSTR_412BR') == '1':
     assert len(_m) == 1, '412770 呼出し (4128b0 の分岐 2-3 の後) が一意に見つからない: %d' % len(_m)
     _call412770 = '  %%13 = call i64 @function_412770(ptr nonnull inttoptr (i64 %s to ptr))\n' % _m[0]
     text = text.replace(_call412770, '  call void @m11_412770_br_obs(i64 %7, i32 %9, i32 %10)\n' + _call412770)
+# #5761: 計測専用 (M11_INSTR_80E040=1)。function_80e040 の loop 内 864fe0 呼出し直前で (ebx, 残り反復 rsi, this) を観測する。
+#   count (list+16) は観測 call の中で [[G]]+188 を読み直す (80e084 の 1 回読みとの差を見る)。
+if os.environ.get('M11_INSTR_80E040') == '1':
+    _f0 = text.index('\ndefine i64 @function_80e040() ')
+    _f1 = text.index('\ndefine ', _f0 + 1)
+    _c = '  %24 = call i64 @function_864fe0(i64 %23, ptr nonnull %21)\n'
+    assert text[_f0:_f1].count(_c) == 1, '80e040 の 864fe0 呼出しが一意に見つからない'
+    text = text[:_f0] + text[_f0:_f1].replace(_c, '  call void @m11_80e040_loop_obs(i64 %rbx.0.reload, i64 %rsi.0, i64 %23)\n' + _c) + text[_f1:]
 _gate = '  %8 = icmp eq i64 %7, 0\n'
 if os.environ.get('M11_INSTR_412BR') == '3':   # 3 = 呼出し直前ではなく分岐 2 の判定 (%7) の直前で 3 値を観測する (呼出しに届かない unit の原因を見る)
     _f0 = text.index('\ndefine i64 @function_4128b0() ')
@@ -445,7 +453,7 @@ for (nm, ret, args) in fns:
 open(dst.replace('.ll', '_sigs.h'), 'w').write('\n'.join(hdr) + '\n')
 ent = ', '.join('{ i32, ptr } { i32 %d, ptr @m11_tr_%s }' % (va, nm) for va, nm in tab)
 # 計測時 (M11_INSTR_413060=1) のみ PROBES に 0x413060 が入り、dest 観測の宣言が出る
-tail = ['', 'declare void @m11_probe(i32)'] + (['declare void @m11_dest_obs(i64)'] if 0x413060 in PROBES and M11_PROBE_VARIANT not in ('nodecl', 'noren') else []) + (['declare void @m11_p144_obs(i64)'] if M11_INSTR_40FF70 else []) + (['declare void @m11_ffe0_obs(i64)'] if M11_INSTR_40FFE0 else []) + (['declare void @m11_a270_obs(i64)'] if M11_INSTR_60A270 else []) + (['declare void @m11_412770_obs(i64)'] if M11_INSTR_412770 else []) + (['declare void @m11_4128b0_obs()'] if M11_INSTR_4128B0 else []) + (['declare void @m11_412770_br_obs(i64, i32, i32)'] if os.environ.get('M11_INSTR_412BR') in ('1', '2') else []) + (['declare void @m11_412770_gate_obs(i64)'] if os.environ.get('M11_INSTR_412BR') == '3' else []) + (['declare void @m11_412770_br2_obs()'] if os.environ.get('M11_INSTR_412BR') == '2' else []) + (['declare void @m11_e3ef60_obs(i64)'] if M11_INSTR_E3EF60 else []) + (['declare void @m11_414c70_obs(i64, i64, i64)'] if M11_INSTR_414C70 else []) + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
+tail = ['', 'declare void @m11_probe(i32)'] + (['declare void @m11_dest_obs(i64)'] if 0x413060 in PROBES and M11_PROBE_VARIANT not in ('nodecl', 'noren') else []) + (['declare void @m11_p144_obs(i64)'] if M11_INSTR_40FF70 else []) + (['declare void @m11_ffe0_obs(i64)'] if M11_INSTR_40FFE0 else []) + (['declare void @m11_a270_obs(i64)'] if M11_INSTR_60A270 else []) + (['declare void @m11_412770_obs(i64)'] if M11_INSTR_412770 else []) + (['declare void @m11_4128b0_obs()'] if M11_INSTR_4128B0 else []) + (['declare void @m11_412770_br_obs(i64, i32, i32)'] if os.environ.get('M11_INSTR_412BR') in ('1', '2') else []) + (['declare void @m11_412770_gate_obs(i64)'] if os.environ.get('M11_INSTR_412BR') == '3' else []) + (['declare void @m11_80e040_loop_obs(i64, i64, i64)'] if os.environ.get('M11_INSTR_80E040') == '1' else []) + (['declare void @m11_412770_br2_obs()'] if os.environ.get('M11_INSTR_412BR') == '2' else []) + (['declare void @m11_e3ef60_obs(i64)'] if M11_INSTR_E3EF60 else []) + (['declare void @m11_414c70_obs(i64, i64, i64)'] if M11_INSTR_414C70 else []) + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
 tail.extend(tr)
 tail.append('@m11_disp_n = constant i32 %d' % len(tab))
 tail.append('@m11_disp_tab = constant [%d x { i32, ptr }] [%s]' % (len(tab), ent))

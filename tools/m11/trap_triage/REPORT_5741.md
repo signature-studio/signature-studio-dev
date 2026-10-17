@@ -77,3 +77,17 @@ M11_FIX_50A830=1 bash m11_e2e.sh                   # ON: 275 は oob のまま�
 
 注意: `M11_FIX_50A830` を使うときは `rm -f work/obj/ov.o` を先に行う (REPORT_2408 §7.3)。
 `[0,32)` への書込み 117 件 (§2) は、この再現手順には含まれない (計装スクリプトは未 commit。§2 の表を参照)。
+
+## 8. 80e040 loop の計装 (#5761、`M11_INSTR_80E040=1`、既定 0)
+
+測定 commit: `26aa90724` (計装を入れた最後の commit。既定 0 の build 出力は変えない)。基点 `origin/main` `f82959016`。
+
+- 計装: `m11_post.py` が 80e040 の `864fe0` 呼出し直前に `m11_80e040_loop_obs(ebx, rsi, this)` を挿す。`m11_ov.c` は `list` (`[[G]]+188`)・`base`・`count` を読み直して stderr に出す。
+- 基準 e2e (計装なし、増分、foreground): wall 3 分 01 秒、rc=1、`survey_ok` 875、`ok 875 / oob 14 / miss 46 / halt0 6`。§1 と同じ。
+- 計装 build: `M11_INSTR_80E040=1 bash m11_build.sh` rc=0 (23 秒)。probe `probe5741_loop275.mjs` の 275 前後は `count` 1→2・`base=0`。
+- 観測: 80e040 の loop 行は全 unit で 7994 行。unit 275 の `trap` は probe 上で再現した。観測の上限 (65536) には達していない。
+- 実測値: 観測の `list` は全行 `0x10bd4c20`、`base=0x0`、`count=2`。ebx 0 の行から count=2 が既に出ている。
+- 未確定: loop 上限 `rsi` の初期値は `3204488` (0x30E588 + 0x100000000。`8657d0` の戻り値 `eax` に相当)。これは観測した `count=2` と一致しない。probe の読み方と `8657d0` の読み方 (IR の `[obj+0xbc]+0x10`) の違いが原因かは未確認。trap 時の添字と count の関係は、unit 275 の行だけを抜き出して特定していない。
+- 逆アセンブル: `8657d0` は `cmp qword ptr [rax+0x10], 0` の後 `mov eax, dword ptr [rax+0x10]` (0 なら `424ee0`)。`disasm_fn.py` は `FL_WIN64_DIR` が無いと既定パスで落ちる。
+
+判定: 受入 1 (trap 添字と count の読み方の特定) は未達。計装の入口と観測値は揃ったが、上限の食い違いの解消が次の一手。

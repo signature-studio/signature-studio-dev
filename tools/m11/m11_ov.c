@@ -1318,6 +1318,25 @@ void m11_412770_gate_obs(unsigned long long v2) {
                 g_412gate_n, a1, v1, v2, a3, v3);
 }
 #endif
+#ifndef M11_INSTR_80E040
+#define M11_INSTR_80E040 0
+#endif
+#if M11_INSTR_80E040
+/* #5761 計測専用: function_80e040 の loop 内 864fe0 呼出し直前. ebx=反復添字, rsi=残り反復 (32bit), this=864fe0 に渡す値.
+ *   count は [[G]]+188 の list を読み直す (G=0x11e4c80, list+16 = count, list+8 = base). */
+static int g_80e040_n;
+void m11_80e040_loop_obs(unsigned long long ebx, unsigned long long rsi, unsigned long long th) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long cnt = 0, base = 0, o1 = 0, obj = 0, list = 0;
+    if (R(0x11e4c80) + 8 <= heap) o1 = *(volatile unsigned long long*)(uintptr_t)R(0x11e4c80);
+    if (o1 + 8 <= heap) obj = *(volatile unsigned long long*)(uintptr_t)o1;
+    if (obj + 0xc0 <= heap) list = *(volatile unsigned long long*)(uintptr_t)(obj + 0xbc);
+    if (list + 24 <= heap) { base = *(volatile unsigned long long*)(uintptr_t)(list + 8); cnt = *(volatile unsigned long long*)(uintptr_t)(list + 16); }
+    if (g_80e040_n++ < 65536)
+        fprintf(stderr, "[m11][80e040] #%d ebx=%llu rsi=%llu this=0x%llx list=0x%llx base=0x%llx count=%llu\n",
+                g_80e040_n, ebx, rsi & 0xffffffffULL, th, list, base, cnt);
+}
+#endif
 #if M11_INSTR_412BR == 2
 void m11_412770_br2_obs(void) {
     unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
