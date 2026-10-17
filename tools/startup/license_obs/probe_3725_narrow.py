@@ -7,6 +7,9 @@
   (c) 即値 0x7fffffff の dword 書込みを全件数え、(b) の関数内にあるものを列挙する
   (d) g1 への書込み (スロット経由の mov [reg], reg) の格納元 eax の直前の代入を表示する
 
+注: (d) は「スロットを読んだ直後 1 命令」だけを見る。離れた命令・別レジスタ経由は見ない (下限)。
+広い列挙は probe_3725_taint.py。
+
 usage: python probe_3725_narrow.py --write   (要 FL_WIN64_DIR・venv: tools/startup/license_obs/env.sh)
 出力: results/probe_3725_narrow.json (--write 時)
 """
@@ -67,6 +70,7 @@ def main():
     if '--write' in sys.argv:
         with open(os.path.join(HERE, 'results', 'probe_3725_narrow.json'), 'w') as f:
             json.dump(res, f, ensure_ascii=False, indent=1)
+            f.write('\n')
     return 0
 
 
