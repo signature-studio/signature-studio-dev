@@ -174,7 +174,46 @@ def join(s1, f1, s2, f2):
     return out, (f1 if f1 == f2 else None)
 
 
-def run(insns, probe, fam, prune=False, stats=None, merge=False):
+SZW = {'byte': 8, 'word': 16, 'dword': 32, 'qword': 64}
+RIP_MEM = re.compile(r'^(byte|word|dword|qword) ptr \[rip ([+-]) (0x[0-9a-fA-F]+)\]$')
+
+
+def ro_load(x, ro):
+    """rip 相対の読込 (mov/movzx/movsx/movsxd reg, 幅付きメモリ) を、ro が既知の値を返すときだけ (宛先, 値) にする。
+    ro(va, n) は n バイトの値 (bytes)、または None (未知)。フラグは変えない。"""
+    ops = [o.strip() for o in x.op_str.split(',')] if x.op_str else []
+    if x.mnemonic not in ('mov', 'movzx', 'movsx', 'movsxd') or len(ops) != 2:
+        return None
+    dst, src = ops
+    m = RIP_MEM.match(src)
+    if dst not in REG or m is None:
+        return None
+    w = REG[dst][1]
+    sw = SZW[m.group(1)]
+    if x.mnemonic == 'mov' and sw != w:
+        return None
+    disp = int(m.group(3), 0) * (1 if m.group(2) == '+' else -1)
+    data = ro(x.address + x.size + disp, sw // 8)
+    if data is None or len(data) != sw // 8:
+        return None
+    v = int.from_bytes(data, 'little')
+    if x.mnemonic in ('movsx', 'movsxd') and (v >> (sw - 1)) & 1:
+        v -= 1 << sw
+    return dst, v & msk(w)
+
+
+def ro_reader(sections):
+    """読み取り専用の読込口。sections: [(VA, bytes)] は書込み不可のセクション (.rdata 等) だけを渡す。
+    範囲の外の読込は None (未知)。書込み可能なセクションを渡さないことが健全性の前提。"""
+    def ro(va, n):
+        for base, data in sections:
+            if base <= va and va + n <= base + len(data):
+                return data[va - base: va - base + n]
+        return None
+    return ro
+
+
+def run(insns, probe, fam, prune=False, stats=None, merge=False, ro=None):
     """probe に届く全経路で fam の値を集める。値は int か None (未知)。
     戻り値: (vals, labs)。labs は値が未知の経路の源の類の集合。
     prune=True: 分岐先 (fork の先・ジャンプ先) に、同じ状態 (ip・レジスタ・flags・スタック) で再訪した経路を切る。
@@ -303,6 +342,12 @@ def run(insns, probe, fam, prune=False, stats=None, merge=False):
                 put(st, dst, None, 'スタック slot' if STK.search(ops[-1]) else 'その他')
                 i += 1
                 continue
+            if ro is not None and mn in ('mov', 'movzx', 'movsx', 'movsxd'):
+                hit = ro_load(x, ro)
+                if hit is not None:
+                    put(st, hit[0], hit[1], 'その他')
+                    i += 1
+                    continue
             if mn in ('mov', 'movabs'):
                 dst, src = ops
                 if dst not in REG:
@@ -527,14 +572,14 @@ def run(insns, probe, fam, prune=False, stats=None, merge=False):
     return vals, labs
 
 
-def verify(insns, probe, fam, claim=None, prune=False, merge=False):
+def verify(insns, probe, fam, claim=None, prune=False, merge=False, ro=None):
     """戻り値: (判定, 詳細)。判定は 実値化 / 未決 / PASS / FAIL / 判定不能 のいずれか。
     prune=True で step 上限の打ち切りを刈り込みで収束させる (既定は False = 従来の判定)。
     merge=True は prune の代わりに同じ ip の状態を併合する (run の説明を参照)。
     判定不能 (値が未知の経路) の詳細は末尾の '類=' に未知の源の類を付ける。"""
     stats = {}
     try:
-        vals, labs = run(insns, probe, fam, prune, stats, merge)
+        vals, labs = run(insns, probe, fam, prune, stats, merge, ro)
     except (Unsup, Stop, KeyError, ValueError) as e:
         if isinstance(e, Stop) and (prune or merge):
             return '判定不能', '%s後も step 上限 (未知分岐 %d・%s %d)' % (
@@ -676,6 +721,23 @@ def selftest():
         ok = got == expect
         bad += not ok
         print('[selftest] %-44s 期待 %-6s 判定 %-6s %s %s' % (name, expect, got, det, 'OK' if ok else 'NG'))
+    # 読み取り専用の固定アドレス読込 (--ro): rip 相対の読込を、読み取り専用セクションの値で既知にする。
+    #   R1 movzx edx,[rip+0xf9] (B+7+0xf9 = B+0x100 の 0x2a): 読み取り専用なら 0x2a (PASS)。claim 0x2b は FAIL。
+    #   R2 同じ読込で、対象の範囲が読み取り専用セクションの外 → 未知 (判定不能)。
+    #   R3 同じ読込だが ro 無し (既定) → 未知 (判定不能)。
+    rd = [(B + 0x100, bytes([0x2a, 0, 0, 0]))]
+    ro_cases = [
+        ('R1 rip 読込・読み取り専用 (0x2a)', '0fb615f9000000' 'c3', 1, 'rdx', 0x2a, 'PASS', ro_reader(rd)),
+        ('R1 ネガティブ (claim 0x2b)', '0fb615f9000000' 'c3', 1, 'rdx', 0x2b, 'FAIL', ro_reader(rd)),
+        ('R2 範囲外の読込は未知 (判定不能)', '0fb615f9000000' 'c3', 1, 'rdx', None, '判定不能', ro_reader([(B + 0x800, bytes([1]))])),
+        ('R3 ro 無し (既定は未知・判定不能)', '0fb615f9000000' 'c3', 1, 'rdx', None, '判定不能', None),
+    ]
+    for name, hx, probe, fam, claim, expect, reader in ro_cases:
+        insns = list(md.disasm(bytes.fromhex(hx), B))
+        got, det = verify(insns, probe, fam, claim, ro=reader)
+        ok = got == expect
+        bad += not ok
+        print('[selftest] %-44s 期待 %-6s 判定 %-6s %s %s' % (name, expect, got, det, 'OK' if ok else 'NG'))
     # 未知の源の類 (値が未知の経路の 類=)。PASS = 類が一致 / FAIL = 類が違う (ネガティブコントロール)。
     lab_cases = [
         ('L1 入力引数 (esi は入口で未知)', '89f30fb6d3c3', 2, 'rdx', '入力引数', 'PASS'),
@@ -697,21 +759,35 @@ def selftest():
         ok = st == expect
         bad += not ok
         print('[selftest] %-44s 期待 %-6s 判定 %-6s 類 %s %s' % (name, expect, st, lab, 'OK' if ok else 'NG'))
-    n = len(cases) + len(prune_cases) + len(merge_cases) + len(lab_cases)
+    n = len(cases) + len(prune_cases) + len(merge_cases) + len(ro_cases) + len(lab_cases)
     print('[selftest] %d 件 / 不一致 %d' % (n, bad))
     return bad
 
 
-def real(rows_path, pe, all_rows=False, prune=False, merge=False):
+def ro_sections(pe):
+    """PE の読み取り専用セクション (書込み不可・.rdata 等) の (VA, データ) 一覧。書込み可能なセクションは含めない。"""
+    import pefile
+    pef = pefile.PE(pe, fast_load=True)
+    base = pef.OPTIONAL_HEADER.ImageBase
+    out = []
+    for s in pef.sections:
+        if s.Characteristics & 0x80000000:
+            continue
+        out.append((base + s.VirtualAddress, s.get_data()))
+    return out
+
+
+def real(rows_path, pe, all_rows=False, prune=False, merge=False, ro=False):
     sys.path.insert(0, os.path.join(HERE, 'ldfix'))
     sys.path.insert(0, HERE)
     import ldmach
     import m11_argrecover as AR
     rows = [r for r in json.load(open(rows_path)) if all_rows or r['class'] == '実値化']
-    print('[verify] 対象 %d 件 (all=%s)' % (len(rows), all_rows))
+    print('[verify] 対象 %d 件 (all=%s・ro=%s)' % (len(rows), all_rows, ro))
     if not rows:
         return 0
     mach = ldmach.Machine(pe)
+    reader = ro_reader(ro_sections(pe)) if ro else None
     cnt = collections.Counter()
     kinds = collections.Counter()
     for r in rows:
@@ -721,7 +797,7 @@ def real(rows_path, pe, all_rows=False, prune=False, merge=False):
         calls = [i for i, x in enumerate(insns) if x.mnemonic == 'call' and x.op_str.startswith('0x')
                  and int(x.op_str, 0) == tva]
         claim = None if r.get('value') is None else int(r['value'], 0)
-        got, det = verify(insns, calls[r['k']], r['fam'], claim, prune, merge)
+        got, det = verify(insns, calls[r['k']], r['fam'], claim, prune, merge, reader)
         cnt[got] += 1
         if got == '判定不能' and '類=' in det:
             kinds[det.split('類=', 1)[1]] += 1
@@ -739,9 +815,10 @@ if __name__ == '__main__':
     ap.add_argument('--all', action='store_true', help='class によらず全行を照合する (claim なし)')
     ap.add_argument('--prune', action='store_true', help='同一状態の再訪 (ループ・分岐の合流) を刈り込む (既定は従来どおり)')
     ap.add_argument('--merge', action='store_true', help='分岐の合流を、同じ ip の状態の併合で収束させる (既定は従来どおり)')
+    ap.add_argument('--ro', action='store_true', help='PE の読み取り専用セクションの rip 相対の固定アドレス読込を既知値にする (既定は従来どおり未知)')
     a = ap.parse_args()
     if a.selftest:
         sys.exit(1 if selftest() else 0)
     if not a.rows or not a.pe:
         ap.error('ROWS と --pe を指定する (合成検査は --selftest)')
-    sys.exit(1 if real(a.rows, a.pe, a.all, a.prune, a.merge) else 0)
+    sys.exit(1 if real(a.rows, a.pe, a.all, a.prune, a.merge, a.ro) else 0)
