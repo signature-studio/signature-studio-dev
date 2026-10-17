@@ -9,28 +9,37 @@
 |---|---|
 | 1. F=281 で emcc が dominance 違反 0 | **達成**。変更前: `Instruction does not dominate all uses!` ×4 で emcc 失敗。変更後: `ott_getparam_fixed.ll` を emcc が受理し link まで成功 |
 | 2. `icall_tbl_n > 0` を `*_stubs.c` で確認 | **達成**。`icall_tbl_n = 105` (`ott_getparam_stubs.c`)。登録 105 関数 (引数無し i64 関数) |
-| 3. FAIL-FAST 経路が発火する入力で wasm_trap に数える (ネガティブコントロール) | **一部達成** (#4299)。直接呼出し (`__icall_dispatch`) で、表に無い target の abort を wasm crash として計数し、表有無で呼出し結果が分かれることを確認 (§4.3)。leafspec の 200 scenario では fail-fast 不発火のまま |
-| 4. leafspec `wasm_trap` 0 のまま、T2 の IR 不変 | **達成** (wasm_trap 0)。`tests/test_unit.py` は `ALL UNIT TESTS PASS` (T2 含む)。match は 147/200 で変化なし (#2128 付録と同値) |
+| 3. FAIL-FAST 経路が発火する入力で wasm_trap に数える (ネガティブコントロール) | **一部達成** (#4299)。直接呼出し (`__icall_dispatch`) で、表に無い target の abort を wasm crash として計数し、表有無で呼出し結果が分かれることを確認 (§4.3。測定 commit `3870e0afc`)。leafspec の 200 scenario では fail-fast 不発火のまま |
+| 4. leafspec `wasm_trap` 0 のまま、T2 の IR 不変 | **達成 (b1c2d148 時点の値)**。`tests/test_unit.py` は `ALL UNIT TESTS PASS` (T2 含む)。match 147/200 は #2128 付録と同値。**現 HEAD での再測定は未実施** (素材不足。§6) |
 
 leafspec の gate は FAIL のまま (`match_rate_excl_crash` 0.735 < 1.0)。これは #1270 (HB-H29) の範囲で、本 issue の範囲外。
+
+測定 commit の扱い (#4299 review 指摘への対応):
+
+- 表 (§4.3) の測定 commit は `3870e0afc` の 1 つ。`de7278d5a` と `097225b74` は `3870e0afc` と liftlib/icall で差分 0 (下の確認コマンド)。
+- leafspec の 147/53 は `b1c2d148` 時点で測定した値。`b1c2d148` から `3870e0afc` までの liftlib/icall の差分は 1636 行あり、**この値は現 HEAD の値として使えない** (再測定は未実施)。
+- 旧 PR 本文にあった `ott_getparam_idx` match 200 / mismatch 0 (1m33s) は、本 REPORT に測定記録が無いため撤回する。147/200 との食い違いの原因は未調査 (§6)。
+
+確認コマンド (差分の数):
+
+```
+git diff de7278d5a 3870e0afc -- tools/liftlib/liftlib tools/liftlib/targets tools/icall/rt | wc -l    # 0
+git diff 097225b74 3870e0afc -- tools/liftlib/liftlib tools/liftlib/targets tools/icall/rt | wc -l    # 0
+git diff b1c2d148 3870e0afc -- tools/liftlib/liftlib tools/liftlib/targets tools/icall/rt | wc -l     # 1636
+```
 
 ## 1. 測定 config
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit (コードを変えた最後の commit) | `b1c2d148` (`fix(liftlib): bind iargs call args only where they dominate (#2181)`) |
-| 測定 commit 以降の差分 | 本付録と `docs/DOC_MAP.md` の行・`tools/liftlib/REPORT.md` の索引行のみ (下の確認コマンド) |
+| 測定 commit (コードを変えた最後の commit) | leafspec (§0・§4.1・§4.2・§4.3 の基準): `b1c2d148` (`fix(liftlib): bind iargs call args only where they dominate (#2181)`)。§4.3 の probe 表: `3870e0afc` |
+| 測定 commit 以降の差分 | `b1c2d148` → `3870e0afc` は liftlib/icall で 1636 行 (leafspec の値は現 HEAD で無効)。`de7278d5a` → `3870e0afc` は 0 (下の確認コマンド) |
 | 素材 | `$ARTIFACTS_DIR` の `work-liftlib` (raw RetDec .ll と F.txt の作業物)・`work-icall` (`tools/icall/work/ott_F.txt` = F=281)・`analysis-ott-binaries` (OTT_vst2_win64.dll)・`toolchain-emsdk` ([EMSDK])・`toolchain-retdec` ([RETDEC]) |
 | 再現 | `cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 200` (RetDec は raw .ll を再利用。wall 64 秒 = 19:43:23〜19:44:27 の実測) |
 | 負荷 | 開始時 load 0.23 / 0.64 / 0.55 (runner 4 コア, 単発) |
 | 単体 | `python3 tests/test_unit.py` → `ALL UNIT TESTS PASS` (19:35:45〜19:40:31 の実測, 4 分 46 秒) |
 
-確認コマンド (測定 commit から HEAD までのコード差分。0 なら測定値は現 HEAD で有効):
-
-```
-git diff b1c2d148 HEAD -- tools/liftlib/liftlib tools/liftlib/targets tools/icall/rt | wc -l
-0
-```
+確認コマンドの実測 (現 HEAD `3870e0afc` 時点の値。0 なら測定値は現 HEAD で有効。`b1c2d148` は HEAD と差分ありのため無効): 上の §0 を参照。
 
 ## 2. 原因 (機械語 / IR の対応)
 
@@ -70,8 +79,10 @@ emcc の link 段で出た順の障害: dominance ×4 → 重複シンボル (Wi
 ### 4.3 ネガティブコントロール (受入 3) — 一部達成 (#4299)
 
 - 試験ドライバ: `tools/liftlib/harness/icall_probe/` (`probe.c` が BLK+0 に target・BLK+16 に index=19・BLK+24 に 64 byte バッファを置いて `__icall_dispatch` を呼ぶ。`build.py` が通常変種と表空変種を作る。`drive.mjs` が 1 試行 1 プロセスで走らせる。`run_matrix.sh` が 4 試行を流す)。
-- 測定 commit: `de7278d5a` (liftlib / icall は `097225b74` と差分 0)。
-- 結果 (各試行 1 プロセス。`crashed` = diff.py の `crash` → `wasm_trap` に相当):
+- 測定 commit: `3870e0afc` (liftlib / icall は `de7278d5a`・`097225b74` と差分 0。`3870e0afc` = HEAD)。
+- 数値の出所: `drive.mjs` が出す `crashed` (JS 例外の有無)。diff.py の `crash` → `wasm_trap` 判定とは同じ条件 (abort = wasm crash) として扱うが、diff.py 経路 (leafspec) は通していない。
+- 試行数: 各セル 1 試行。表有り・表空の差を示すためで、件数を比べる根拠にはしない。
+- 結果 (各試行 1 プロセス):
 
 | 変種 | target | `crashed` | 出力 |
 |---|---|---|---|
