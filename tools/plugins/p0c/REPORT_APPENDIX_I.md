@@ -147,3 +147,63 @@
 |---|---|---|
 | IR に xmm0 の戻り値を接続する pass が無く、xmm0 戻り値の汎用判定ができない (現状は 0x5e12b0 だけ [5b] で判定) | xmm0 で返す kernel の戻り値は census で判定されない | #3573 [P0c-23] |
 | `unknown` 43 件 (xmm0 を書き store を持つ 5 件 と、rax と xmm0 を両方書く 38 件) の戻り slot が未確定 | 戻り slot の誤分類は gate の対象外。rax 比較の ret_diff は従来どおり意味を持たない | #3573 [P0c-23] |
+
+### 22.7 判定表: `unknown` 43 件の戻り slot (#5229・代替条件 R6)
+
+測定 commit: `93628ce3c` (main 起点。コード変更なし・本節は REPORT のみ。`git diff 93628ce3c HEAD -- tools/plugins/p0c ':!*REPORT*'` の出力は空)。素材 `fl-win64` と `toolchain-retdec` (実在確認済み)。`kernel_table.py` (80・45・10,886 B) → 80 kernel の `lift_ranges.sh` (`PLUG_CANON_ALLOCA=1`・rc 0・80 defines) → `f80_assess.py` (rc 0) → `k80abi.py` (rc 0) の順で再生成した。`ret_slot` は rax 13 / none 23 / unknown 43 / xmm0 1 (§22.2 と一致)。
+
+呼出し site の列は前 run の `kernel_matrix.py 12` (n=43・8 分 16 秒・rc 0) の実測を引く。本 run では再測定していない。`ret_used` は rax だけを見るため、xmm0 で返す kernel はここでは判定できない。
+
+判定の方針: 推定で分類しない。呼出し側で戻り値の読みが確認できなかった kernel は「未確認」とする。`k80abi.py` の分類は変えない。
+
+| kernel | 担当 | 呼出し site (前 run 実測) | ret_used | 判定 |
+|---|---|---|---|---|
+| 0x5de5a0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5de710 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5de8e0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5deb10 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5decb0 | #4544 (xmm0 を書き store を持つ 5 件) | — | — | #4544 で判定 (本節の対象外) |
+| 0x5dee90 | 本 issue | 0x6bf0d4 (間接 `call qword ptr [rax]`) | ret_used=False (rax のみ見る) | 未確認 (間接呼出しで戻り値を読めない) |
+| 0x5df040 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5df270 | #4544 (xmm0 を書き store を持つ 5 件) | — | — | #4544 で判定 (本節の対象外) |
+| 0x5df340 | #4544 (xmm0 を書き store を持つ 5 件) | — | — | #4544 で判定 (本節の対象外) |
+| 0x5df4d0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5df610 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5df750 | 本 issue | 0x6e17fc (別 plugin 領域・読めず) | ret_used=False (rax のみ見る) | 未確認 (呼出し先の読み直しが要る) |
+| 0x5df860 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5dfa40 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e03f0 | #4544 (xmm0 を書き store を持つ 5 件) | — | — | #4544 で判定 (本節の対象外) |
+| 0x5e05b0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0680 | 本 issue | 0x5e231a (直後が引数準備) | ret_used=False (rax のみ見る) | 未確認 (戻り値の読みが無い) |
+| 0x5e06e0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0760 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e07b0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0830 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0890 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e08d0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0930 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0980 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e09f0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0a70 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0b10 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0b70 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0bb0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0c00 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0d80 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e0ea0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e1010 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e11a0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e1210 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e1280 | #4544 (xmm0 を書き store を持つ 5 件) | — | — | #4544 で判定 (本節の対象外) |
+| 0x5e12c0 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e1330 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e1490 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e1590 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e1780 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+| 0x5e1870 | 本 issue | なし (141 plugin の呼出し site 0 件) | — | 未確認 (呼出し側なし・rax と xmm0 を機械語で区別不能) |
+
+集計: 43 件 = #4544 担当 5 件 + 呼出し site あり 3 件 (判定は全て未確認) + 呼出し側なし 35 件 (全て未確認)。戻り値か scratch かの判定 0 件。
+
+#### 原条件 1 (機械語の意味で確定) の判定
+
+未達 (理由: 上記の実測。呼出し site があるのは 43 件中 3 件で、機械語の線形走査だけでは rax (ポインタ増分) と xmm0 (作業値) を区別できない)。原条件の残りは #4544 の受入として残す。
