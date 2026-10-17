@@ -199,6 +199,54 @@ static const char* knownVtableName(uint32_t rva) {
 
 static uintptr_t gDllBase = 0;
 
+// S2HOST_BP="rva,rva,..." (SR-99 #5958・最大 4 件): DR0〜DR3 の execute breakpoint を DLL の関数先頭に張り、
+// 呼出し時の RIP・戻り先・slot 値を記録する。関数が呼ばれたかどうかだけを見る (クリック注入はしない)。
+static uintptr_t gBpAddr[4];
+static int gBpN = 0;
+static int gBpHits = 0;
+static LONG CALLBACK bpVeh(PEXCEPTION_POINTERS ep) {
+  CONTEXT* c = ep->ContextRecord;
+  if (ep->ExceptionRecord->ExceptionCode != EXCEPTION_SINGLE_STEP || !(c->Dr6 & 0xF)) return EXCEPTION_CONTINUE_SEARCH;
+  for (int i = 0; i < gBpN; i++) {
+    if (!(c->Dr6 & (1ULL << i)) || gBpHits >= 64) continue;
+    gBpHits++;
+    uintptr_t ret = *(uintptr_t*)c->Rsp;
+    L("[bp] hit#%d DR%d fn=0x%llx rip=%p ret=%p slot=%lld", gBpHits, i, (unsigned long long)(gBpAddr[i] - gDllBase),
+      (void*)c->Rip, (void*)ret, (long long)*(volatile long long*)(gDllBase + 0x17bf760));
+  }
+  c->Dr6 = 0;
+  c->EFlags |= 0x10000;  // RF: 同じ命令で再度 trap しないよう再開する
+  return EXCEPTION_CONTINUE_EXECUTION;
+}
+static void armBp(const char* spec) {
+  AddVectoredExceptionHandler(1, bpVeh);
+  DWORD64 drs[4] = {0, 0, 0, 0};
+  DWORD64 dr7 = 0;
+  std::string s(spec);
+  size_t pos = 0;
+  while (pos < s.size() && gBpN < 4) {
+    size_t comma = s.find(',', pos);
+    std::string tok = s.substr(pos, comma == std::string::npos ? std::string::npos : comma - pos);
+    pos = (comma == std::string::npos) ? s.size() : comma + 1;
+    uintptr_t rva = (uintptr_t)strtoull(tok.c_str(), nullptr, 16);
+    if (!rva) continue;
+    gBpAddr[gBpN] = gDllBase + rva;
+    drs[gBpN] = (DWORD64)gBpAddr[gBpN];
+    dr7 |= 1ULL << (2 * gBpN);  // L_n=1、RW=00 (execute)、LEN=00
+    gBpN++;
+  }
+  CONTEXT c = {};
+  c.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+  GetThreadContext(GetCurrentThread(), &c);
+  c.Dr0 = drs[0];
+  c.Dr1 = drs[1];
+  c.Dr2 = drs[2];
+  c.Dr3 = drs[3];
+  c.Dr7 = dr7;
+  SetThreadContext(GetCurrentThread(), &c);
+  L("[bp] armed %d execute breakpoints", gBpN);
+}
+
 // vtable を実読みして slot → RVA をダンプ (med ABI slot 確定の本体)
 static void dumpVtable(const char* label, void* itf, int nSlots, bool json = true) {
   if (!itf) {
@@ -908,6 +956,8 @@ int main(int argc, char** argv) {
   if (getenv("S2HOST_WATCH")) armWatch((volatile int*)((unsigned char*)ctrl + 0xdc), 4);
   // S2HOST_SLOT=1: slot 0x1817bf760 (RVA 0x17bf760、8 byte の関数ポインタ) への書込 PC を DR0 で捕まえる (SR-99 #5958)
   if (getenv("S2HOST_SLOT")) armWatch((volatile int*)(gDllBase + 0x17bf760), 8);
+  // S2HOST_BP="rva,..." (SR-99 #5958): DR0〜DR3 を使うため S2HOST_SLOT・S2HOST_WATCH と併用しない
+  if (const char* bp = getenv("S2HOST_BP")) armBp(bp);
 
   r = ctrl->initialize((FUnknown*)hostApp);  // IPluginBase slot3
   L("controller->initialize(hostApp) = %s", tresName(r));
