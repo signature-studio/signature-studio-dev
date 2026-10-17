@@ -126,6 +126,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_4806.md` | ~60 | FLE-29 (#4806) A1: opt-in 経路 (FLE_IPP=1) の dsp_ippv2 load hook は非 0 を返す (前提の「0 を返す」は不成立)。`0x15F34A0` は unit 132 で登録され unit 209 の 16B store (ret `0x1078570`) で 0 に戻る。store 元の関数は未特定 |
 | `tools/flelift/boot/REPORT_APPENDIX_5058.md` | ~70 | FLE-41 (#5058): cap 超過後の次の dispatch で `log_cap` の例外を投げて boot を止める修正・既定 cap 4096 の停止 (units 13) と cap 0 の対照 (units 895)・規則検査の変異。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4931.md` | ~50 | FLE-4931 (#4931): REPORT §13 の全文 (既定経路 mode 3 の survey で 942 unit を分類・covered=942・測定 commit `ceb5a0ba6`・差分 0 の証跡・件数 47 の説明・boot_metric の再生成理由)。REPORT §13 は結論と要点表 |
+| `tools/flelift/boot/REPORT_APPENDIX_5415.md` | ~40 | FLE-45 (#5415): InitContext.InitTable (0x15eac90) の 0 化の時点 (unit 895 の ExitProcess 直前・書込み命令は未特定)。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_6054.md` | ~80 | FLE-51 (#6054): 0x4080a2 の rsi = dst (`0x12d777d0`) の既定経路での確認・残骸を消す対照 (zero) の GetMem 変化・受入 1 は未達 (0x6b91e8 は既定経路で未実行) |
 | `tools/flelift/boot/REPORT_APPENDIX_4004.md` | ~80 | FLE-18 (#4004): 既定経路の dispatch(0) (0x67264b の target 0)・呼出時の `[0x15e0a48]` の実測 (既定 / shim の call-time 表)・0x6b91e8 の第 2 呼出点。REPORT §10 の「唯一の呼出し点」の訂正 |
 | `tools/flelift/boot/REPORT_APPENDIX_3868.md` | ~90 | FLE-17 (#3868) の付録: `0x6bbc20` の書込み経路の上流 (実行時の呼出し連鎖・既定 route の書込み・静的走査 (rip 相対 lea)・監視の範囲)。REPORT_APPENDIX_3771 §A の後続 |
@@ -231,6 +232,7 @@
 | `tools/liftdiff/tests/ld158_ret_probe.py` | ~110 | LD-158 (#3470) の動的プローブ: i128 戻り関数を 11 pattern × xfill {1,0} で native 実行し、戻り後 rax / rdx / xmm0 の書換えを記録 (`work/ld158_probe.json`)。`--names` で陰性対照の関数を指定できる |
 | `tools/liftdiff/tests/ld158_summarize.py` | ~70 | LD-158 (#3470) の集計: 動的分類・静的 dsm 判定 (窓 3 / 8) の件数と、`ret_override` と動的 xmm0 のみ集合の一致を出す (`work/ld158_table.tsv`) |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
+| `tools/icall/REPORT_APPENDIX_6205.md` | 46 | icall #6205 (ICALL-128, 親 #6052): 関数 `0xc589b0` の `0x353`・`0x364`・`0x360`・`0x3b6`・`0x41b` の書込み元と表 `0x15e0ab0` (miss 時の追記のみ・`.data` ポインタ・初期化は本関数の外)・`0x390` (定数 `0x425c4587`) の静的追跡。実行による検証は未実施 |
 | `tools/icall/REPORT_APPENDIX_3940.md` | ~50 | icall #3940 (ICALL-91): 直接 entry の heap 引数指定 (`slot_trace.c`)。受入 2 は未達 (mode==2 の枝まで)。`1810806a0` の SIGSEGV の原因は未確認。PR 本文から移送した実測は未再測定 |
 | `tools/icall/REPORT_APPENDIX_5843.md` | ~60 | icall #5843 (ICALL-119): slot 関数の r13 保存分類 (`tools/icall/ret_r13_check.py`・件数は付録)。間接 `180cbba21`・`180cbba36` の具象型は未特定 (部分達成・残件は #5843) |
 | `tools/icall/REPORT_APPENDIX_5044.md` | ~50 | icall #5044 (ICALL-108): 180cbb930 の直接呼出し 2 件 (`180cbcd90`・`180cb9890`) が `r13` を書かないことの機械判定 (`tools/icall/r13_callee_check.sh`)。間接呼出し `180cbba21`・`180cbba36` の具象型は未特定 (部分達成・残件は #5044) |
@@ -424,6 +426,8 @@
 | `tools/m11/trap_triage/REPORT_APPENDIX_5389.md` | ~40 | #5389: 証拠表の行 78・81〜84 の保留 5 件の判定理由 (真陽性 0・偽陽性 0・保留 5・機械語と IR の照合・未解決)。REPORT_718 §4o の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5845.md` | ~60 | #5845: 証拠表の行 78・81・82 の保留 3 件の判定理由 (確定 0・保留 3・機械語と IR の SSA 対応の深掘り・未解決)。REPORT_718 §4o の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5660.md` | ~90 | #5660: 証拠表の行 119〜158 (母数 40) の件ごとの突合表。判定 0 件・保留 40 (保留の型 (i)〜(iv))。REPORT_718 §4l の行 119〜158 の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_1654.md` | ~30 | #1654・#1655: REPORT_718 §4c (証拠表の行 99〜193) と §4e (行 194〜288) の全文。250 行上限のため分割移動 (削除していない)。REPORT_718 §4c・§4e の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_6211.md` | ~60 | #6211: 証拠表の行 224・225 (母数 2) の件ごとの判定 (真陽性 0・偽陽性 0・保留 2。機械語と IR の count 源の段数が不一致)。REPORT_718 §4p の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5751.md` | ~60 | #5751: 証拠表の行 233〜240 (母数 8) の件ごとの判定 (真陽性 6・偽陽性 0・保留 2 (236・237))。REPORT_718 §4m の行 233〜240 の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5689.md` | ~90 | #5689: 証拠表の行 139〜158 (母数 20) の件ごとの判定。確定 0・保留 20 (140・141・143 は別ビルド dsm のみを根拠にしたため保留)。REPORT_718 §4l の行 139〜158 の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_5805.md` | ~45 | #5805: 証拠表の行 72 (母数 1) の件ごとの判定 (真陽性 (構造) 1・偽陽性 0・保留 0)。REPORT_APPENDIX_4885 §4 の行 72 の正本 |

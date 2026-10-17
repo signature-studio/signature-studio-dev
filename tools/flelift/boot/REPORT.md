@@ -235,7 +235,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 | survey 補修なし (`FLE_SURVEY_NOREPAIR=1`) | `InitTable == 0` で不成立 (`survey.error`) |
 | survey mode 0 (`FLE_IPP=0`) | `InitTable == 0` で不成立。`survey_seg_0.json` の boot は units 209・exit code 0 |
 
-- 未解決: 補修の判定への影響 → #4901 [FLE-33]。unit 280 / 659 / 895 の補修なし unlifted → #4855 [FLE-32]。注記 (load・mode 0 の未実施) は付録 §5。
+- 未解決: 補修の判定への影響 → #4901 [FLE-33]。unit 280 / 659 / 895 の補修なし unlifted → #4855 [FLE-32]。注記 (load・mode 0 の未実施) は付録 §5。InitTable の 0 化の時点 (unit 895 の ExitProcess 直前) は `REPORT_APPENDIX_5415.md`。
 
 ## 13. #4931: 既定経路 (mode 3) の survey で 942 unit を分類し covered=942
 
