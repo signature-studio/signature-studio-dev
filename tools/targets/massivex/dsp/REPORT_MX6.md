@@ -182,7 +182,7 @@
 ### 8.1 可変長整数 (compressed int) の符号化 (MX-48・#4787)
 
 - 一次資料: `ehdata4_export.h` の公開写し (trcrsired/windows-msvc-sysroot `include/ehdata4_export.h`)。`ReadUnsigned` と `getNETencoded` の規則を `scripts/mx6_fh4_cint.py` に移植。先頭 byte の下位 4 bit で長さ L を決め、値は LE(bytes[pb:pb+L]) >> L (L=5 は flag 0x0F で、後続 4 byte の LE32)。pb は前から L 進める。`s_negLengthTab` と一致。
-- 測定 commit = **3239e912d** (`scripts/mx6_fh4_cint.py` の追加のみ。素材 `plugins-massivex` の `Massive X.vst3` md5 `622993e7` 一致)。再現: `python3 scripts/mx6_fh4_cint.py --selftest` と `python3 scripts/mx6_fh4_cint.py "$PE" "$RUNNER_TEMP/fh4_cint.json"`。所要 3.6 秒・load 0.13→0.20。
+- 測定 commit = **eecfb86a9** (測定したコード。素材 `plugins-massivex` の `Massive X.vst3` md5 `622993e7` 一致)。3239e912d で `scripts/mx6_fh4_cint.py` を追加した後、eecfb86a9 までに SepIPtoStateMap 対応を含む修正あり。再現: `python3 scripts/mx6_fh4_cint.py --selftest` と `python3 scripts/mx6_fh4_cint.py "$PE" "$RUNNER_TEMP/fh4_cint.json"`。所要 3.55〜3.6 秒 (eecfb86a9 の census 実行・reviewer と実施者の各 run)。load は eecfb86a9 の run では未記録 (旧 run の 0.13→0.20 は 3239e912d 時点の値のため、本測定の値として書かない)。
 
 | 項目 | 結果 |
 |---|--:|
