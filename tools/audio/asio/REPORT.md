@@ -247,4 +247,5 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 | 実行 A は HEAD `fef39e5` (別コミット)。同一 HEAD での再現ではない | 同一 HEAD の再現条件が未確定 | #998 |
 
 負荷下の再現試験 (L1〜L3・§12-3 の A〜D) は [REPORT_APPENDIX_998.md](REPORT_APPENDIX_998.md) を参照。負荷下の完全実行 6 回中 2 回 underrun (`com_ramp_b256_d2`)。underrun 時は ring 充填が 0 まで枯渇 (`min_fill=0`)。原因は未特定。underrun 直前の充填推移 (producer 追従不足の形) は §12-4 (付録) を参照。
+#6037 (AU-50) の停止時の時系列計装と切り分けは [REPORT_APPENDIX_6037.md](REPORT_APPENDIX_6037.md) (結論: 負荷下の停止は producer thread 側で、worklet と main thread は止まっていなかった。preempt かの区別は未確定)。
 #2934 (AU-26) の初期 T 下限 (`FLA_F_T_FLOOR`・main 済み) の実測は [REPORT_APPENDIX_2934.md](REPORT_APPENDIX_2934.md)。#4593 (AU-47) の callback 区間内訳の計装と 20 回測定は [REPORT_APPENDIX_4593.md](REPORT_APPENDIX_4593.md)。#2777 の原因 (部分特定)・床の適用後の再測定 (測定 commit `c0fb6e074` の 15 回で 1 FAIL・producer の 24 ms 以上の停止) は [REPORT_APPENDIX_2777.md](REPORT_APPENDIX_2777.md) §7。直接経路は [AU-40] #3757 へ。
