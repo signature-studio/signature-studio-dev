@@ -65,7 +65,7 @@ EXIT=0
 ```
 
 - 判定の限界: この検査は「期待するオフセットと命令が機械語に現れる」ことだけを見る。意味ラベルは検査していない。帰還経路の検査は、命令の並びが REPORT の記述と一致することの確認で、機械語の構造からの読みである。
-- 鮮度: `git diff 466d59d58 HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` の出力は、本 PR の commit 後に 0 行とする (REPORT のみを変える)。
+- 鮮度: `git diff 466d59d58 HEAD -- tools/targets/freshair/*.py tools/targets/freshair/*.sh` の出力は 0 行 (`174f1e83d` は REPORT のみを変える)。
 
 ## §6. 未解決 (起票先)
 
