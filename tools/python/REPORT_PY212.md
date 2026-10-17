@@ -14,7 +14,7 @@
 
 ## 1. 表 (表順前半・C 未実装 21 件)
 
-測定 commit: `eb943cdde` (解析スクリプトは `eb943cdde`〜HEAD で差分 0)。VA は `block00031_PE.bin` 内の wrapper。
+測定 commit: `afbb15db7` (解析スクリプトの既定出力は `eb943cdde`〜`afbb15db7` で不変。`git diff eb943cdde afbb15db7 -- tools/python/analysis/flapi/pe_mixer_wrappers.py` は 13 行追加・0 行削除で、追加はすべて `--table` 分岐と docstring。`--table` 分岐は既定経路より前で return する)。VA は `block00031_PE.bin` 内の wrapper。
 件数の確認: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_mixer_wrappers.py --table` の出力のうち `C=未` が 21 行 (表順 5〜32 の 28 行から、C 実装済みの soloTrack・muteTrack・getTrackVolume・setTrackVolume・getTrackPan・setTrackPan・isTrackSelected の 7 件を除いた数)。
 
 | 関数 (VA) | fmt | 読めた内容 | 未確認 |
