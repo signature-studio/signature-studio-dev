@@ -1,8 +1,9 @@
 # 付録: icall #3940 (ICALL-91) — 直接 entry の heap 引数指定 (受入 2 途中経過)
 
 > 親: #3940 (ICALL-91)。PR #6070 の本文から移送した (review round 1 の指摘 2)。
-> 測定 commit: `763cba53e` (コードを変えた最後の commit)。以後のコード差分は `tools/icall/diff/slot_trace.c` の用法コメントと引数検査のみ (`git diff 763cba53e HEAD -- tools/icall/diff/slot_trace.c`)。
-> **注意**: 本付録の数値は PR 本文の記載を移したもので、移送時点では素材 (`freshair` の作業ディレクトリ・`icall/work`) が手元に無く再測定していない。再測定の結果は下の §4 に別途書く。
+> 測定 commit: `763cba53e` (§3 の数値を測った commit)。
+> **注意**: 測定 commit から現 head までには、`slot_trace.c` の用法コメント・引数検査に加えて `tools/ott/native/ott_native.c` の差分 (#6050 由来の xmm0 保存 `k_HeapAlloc`・既定 ON) がある。`slot_trace.c` は `ott_native.c` を取り込むため、§3 の数値は現 head の実行経路では測られていない。差分の実出力は §4.1 に書く。
+> §3 の数値は PR 本文の記載を移したもので、移送時点では素材 (`plugins-freshair`・`work-icall`) が runner に無く再測定していない。現 head での再測定は §4 に書く。
 
 ## 1. 結論
 
@@ -22,7 +23,7 @@
 | `SLOT_ENC_INIT=1` | `enc(NULL)=cookie` の 12 slot を事前に敷く | なし |
 
 - 上の変数のどれかを指定すると heap は 0x1000 バイト、無指定なら従来どおり 0x400 バイト。
-- 直接 entry (`1806dbc10`・`1806f71e0`) の単体再現: `SLOT_SET_R1=b58 SLOT_ENC_INIT=1 <build>/slot_trace "<SlateCore.core_64>" 1806dbc10`。`<build>` は `gcc -O1 -g -o slot_trace tools/icall/diff/slot_trace.c tools/ott/native/ms_call.S -lm` で作る。`slot_trace.sh` は 131 関数すべてを回すため、単体の確認には使わない。
+- 直接 entry (`1806dbc10`・`1806f71e0`) の単体再現: `SLOT_SET_R1=b58 SLOT_ENC_INIT=1 <build>/slot_trace "<SlateCore.core_64>" 1806dbc10`。`<build>` は `tools/icall/work/slot_trace` (`gcc -O1 -g -o tools/icall/work/slot_trace tools/icall/diff/slot_trace.c tools/ott/native/ms_call.S -lm` で作る)。`slot_trace.sh` は 131 関数すべてを回すため、単体の確認には使わない。
 - 単歩トレースは `SLOT_TRACE_FN=<FN_VA hex>` を付け、`SLOT_TRACE_OUT` で出力先を指定する。
 
 ## 3. PR 本文に記載されていた実測 (移送分・未再測定)
@@ -36,10 +37,24 @@
 | `SLOT_SET_R1=b58` | `1806dbcf4` (mode==2 の枝) に入る |
 | `SLOT_SET_R1=b58` の後 | `1810806a0` (`jmp rax`) で SIGSEGV (rc=95)。`181065928` の暗号化 slot の復号結果 `rax` が不正 |
 
-## 4. 再測定 (未実施)
+## 4. 再測定 (未実施・素材待ち)
 
-- 本 run では素材不足 (`freshair` 作業ディレクトリ・`icall/work` が無い) のため再測定していない。
-- 未解決: `1810806a0` の SIGSEGV の原因。`1806dbd25` 以降の `0x1810492b0`・`0x1810483f4` 等の呼出しが `rax`/`rcx` を変える、という仮説は未確認。
+### 4.1 測定 commit から現 head までの差分 (実出力)
+
+`git diff 763cba53e 4dd094a4e -- tools/icall/diff tools/ott tools/targets/freshair` (`4dd094a4e` 時点):
+
+- `tools/icall/diff/slot_trace.c`: 追加 4 行・変更 1 行 (用法コメントと `SLOT_*_VAL` の引数検査。closure 131 の既定経路は変えない)
+- `tools/ott/native/ott_native.c`: 11 行 (`k_HeapAlloc` が `xmm0` を退避・復元する。`OTT_KEEP_XMM0=0` で従来経路。既定は ON。#6050 由来)
+
+### 4.2 未実施の理由と、次の run で揃えるもの
+
+- 本 run では素材が無い (`plugins-freshair`・`work-icall` が `ARTIFACTS_DIR` に無い)。`ott_native.c` の差分を含む現 head での実行は、この素材が無いと測れない。
+- PR 本文の `oc_artifacts: plugins-freshair work-icall` で次の run に取得させる (`plugins-freshair` → `tools/targets/freshair/work/win/Fresh Air/`、`work-icall` → `tools/icall/work/`)。
+- 次の run で測って、ここに書く項目: (a) `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh` (n=1・foreground) の real / user / sys / rc 分布、(b) `SLOT_SET_R1=b58 SLOT_ENC_INIT=1 <build>/slot_trace "<SlateCore.core_64>" 1806dbc10` の `1806dbcf4` 到達と `1810806a0` の rc。`<build>` は `tools/icall/work/slot_trace`。`OTT_KEEP_XMM0` は既定 (ON) のまま。
+
+### 4.3 未解決
+
+- `1810806a0` の SIGSEGV の原因。`1806dbd25` 以降の `0x1810492b0`・`0x1810483f4` 等の呼出しが `rax`/`rcx` を変える、という仮説は未確認。
 
 ## 5. 未解決
 
