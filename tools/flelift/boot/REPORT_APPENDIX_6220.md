@@ -14,13 +14,16 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | 本 PR の commit (コードを変えた最後の commit。hash は PR 本文) |
-| base | `15ca7325e` (origin/main) |
-| 素材 | `fl-win64` / `toolchain-emsdk` を `$RUNNER_TEMP/ss6220` に展開 (repo 外) |
-| 工程 (diag_shim・既存 `fle6_measure.sh`) | 全体 3 分 46 秒: lift 82 s / clang 115 s / boot 22 s。load 1.06〜2.13 |
-| 監視版 build (`wval_measure.sh`・`WVAL_OBJWATCH=1`) | build 102 s / 全体 2 分 10 秒 (1 回目)・2 分 4 秒 (rep 監視版) |
-| diag_shim (既定 `FLE_IPP=1` の監視版) | units_run **209** / stopped_at 209 / `unlifted`・`[wobj]` 1 件 (`v=0`) |
-| 既定経路 (`FLE_IPP` 未指定・root `0x6a7b70` 有) | units_run **895** / `boot_threw: exit` / `[wval]` 0 件 / `[wobj-enter]`・`[wobj-set]` 0 件 (`f_6ba1f0` 未到達) |
+| 測定 commit | `2dd69b94b` (main 取り込み merge。コードを変えた最後の commit。`git diff 2dd69b94b HEAD -- tools/flelift/boot` の `.c`・`.py`・`.sh` は空) |
+| base | `ca8500c7b` (origin/main。取り込み元。#5415 の `py_watch(9, ...)` と `InitContext.InitTable` の slot を含む) |
+| 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開。`toolchain-emsdk` は `$HOME/artifacts` に無いため、上流 emsdk 6.0.12 を REFERENCES §4 の手順で `$RUNNER_TEMP/emsdk-src` に取得 (repo 外) |
+| 工程 (diag_shim・既存 `fle6_measure.sh`・HEAD 再測定) | 全体 2 分 57 秒: lift 69 s / clang 80 s / boot 21 s。開始時 load 1.16 |
+| 監視版 build (`wval_measure.sh`・`WVAL_OBJWATCH=1`・HEAD 再測定) | build 75 s / 全体 1 分 39 秒。`[wobj]` 9 件 (うち `[wobj]` の書込み 1 件、他は確保・解放の観測) |
+| diag_shim (既定 `FLE_IPP=1` の監視版) | units_run **209** / stopped_at 209 / `unlifted`・`[wobj]` 1 件 (`v=0`)・`[wval]` 6 件 |
+| 既定経路 (`FLE_IPP` 未指定・root `0x6a7b70` 有・HEAD 再測定) | units_run **895** / `boot_threw: exit` / `[wval]` 0 件 / `[wobj-enter]`・`[wobj-set]` 0 件 (`f_6ba1f0` 未到達)。`[wobj-free]`・`[wobj-getmem]` のみ 8 件 |
+
+- 取り込み元 (#5415) の `py_watch` 追加で、diag_shim の `py_events` は 6 → 20 件に増えた (`results/boot_summary_wv0_diag_shim.json`)。units 209 と `[wobj]` 1 件 (`v=0`) は前回 (`b08e776d9`) の値と一致した。
+- 既定経路の結果は `results/boot_summary_def0_default.json`。
 
 KPI (起動に関わる PR): FLEngine 起動 units は **前 209 / 後 209** (diag_shim・監視版と同値)。既定経路は 895 のまま変わらず。最初のウィンドウ: **無し** (boot は `exit` / `unlifted` で止まる)。既定の build・lift 経路は変えていない (監視は `--objwatch` と診断出力だけ)。
 
@@ -31,6 +34,8 @@ KPI (起動に関わる PR): FLEngine 起動 units は **前 209 / 後 209** (di
 | lifted の ST8〜STY (store) | `wo_chk_` (宛先一致) | `f_6bc010` の `0x6bc010` 1 件 (`v=0`・`obj=0x12d7a154`) のみ |
 | lifted の `rep movs*` (memmove) | `wo_rep_` (宛先範囲 `[d, d+n*sz)` の一致) | 0 件 (本 PR で追加。前回の監視の穴) |
 | lifted の `rep stos*` | ST64 のループ (既存の store 監視で拾う) | 0 件 |
+
+- `rep stos` の根拠: 生成 C では `rep stosq` は `ST64(d0_ + k_ * 8, R[RAX])` のループに展開される (`fle_lifted_s*.c`・43 箇所を実測)。`wval_lift.py` の `REP_HOOK` は `memmove` の行にだけ当てるので、`rep stos` は `WO_ST64` の既存の store 監視が拾う。
 | ホスト `imp_memset` (`fle_boot.c`) | `wobj_hw_` | 0 件 (本 PR で追加) |
 | ホスト `ippsZero_8u` の memset | `wobj_hw_` | 0 件 (本 PR で追加) |
 | 確保 (`fle_ov_getmem`) | `[wobj-getmem]` | `size=70` と `size=320` の両方で `obj+0xc4=0` |
