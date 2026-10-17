@@ -249,6 +249,9 @@ int main(int argc, char** argv) {
         g_p_ca = im + (0x180ca1480ULL - 0x180000000ULL); g_p_da = im + (0x180da6c00ULL - 0x180000000ULL);
         patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca); patch12(g_p_da, (const void*)&da6c00_probe, g_sv_da);
     }
+    if (getenv("FA_DA9ONLY")) {   /* FA-81 (#6032): 0x180da6c00 の入口だけを記録 (ca1480 は触らない・既定 OFF) */
+        g_p_da = im + (0x180da6c00ULL - 0x180000000ULL); patch12(g_p_da, (const void*)&da6c00_probe, g_sv_da);
+    }
     if (getenv("FA_CTL31")) {
         g_p_caa = im + (0x180caa820ULL - 0x180000000ULL); patch12(g_p_caa, (const void*)&caa820_probe, g_sv_caa);
         g_p_lb = im + (0x180ca7db0ULL - 0x180000000ULL); patch12(g_p_lb, (const void*)&lb_probe, g_sv_lb);
