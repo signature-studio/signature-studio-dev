@@ -185,9 +185,9 @@ pdata の関数境界ごとに逆アセンブル (capstone) し、E8/E9 の直�
 ### 8.5 FA-74 (#5255): 実機 ctor で P を構築する試行 (FA_UI31_CTOR・既定 OFF)
 
 - 追加: `FA_UI31_CTOR=1` のとき、`FA_UI31` の slot 5 呼出前に P を実機 ctor `0x180d8a6e0` で構築し、構築前後の `[P+0xb98]`・`[P+0xba8]`・vtable を `UI31CTOR` 行に記録する。既定 (未設定) は従来どおり 0 埋めで、判定基準・既定経路は不変。
-- 測定 commit の扱い: `FA_UI31_CTOR` の分岐は `97a5bd8ab` に無い (`97a5bd8ab` は測定の基準であり、この試行の測定 commit ではない)。試行コードは `c01e2d022` で入り、`451c9fb76` (現 PR head) で `ca3d50` 経由に変わった。
-  `git diff 97a5bd8ab 451c9fb76 -- tools/targets/freshair/lift2/native/` の出力は `FA_UI31_CTOR` 分岐の内側の +22 行・-0 行 (`if (getenv("FA_UI31_CTOR"))` の中)。既定経路 (`FA_UI31_CTOR` 未設定) は同じ分岐に入らないため挙動は変わらない。
-- 実測 (旧 run・`FA_CTL31=1 FA_HEAP_ZERO=1 FA_UI31=1 FA_UI31_CTOR=1 ./native_fa31 SlateCore.core_64 fa31_epf.txt 0`・S900〜S907): rc=0。以下の数値は旧 run の記録で、本 fix run では素材が無く再現していない (『再測定の状況』参照)。
+- 測定 commit: `451c9fb76` (`ca3d50` 経由の A を入れた commit。以下の FA_UI31_CTOR の数値はこの commit で取った記録)。`git diff 451c9fb76 HEAD -- tools/targets/freshair/lift2` = 0 行 (`72a31de09` まで。本 fix の commit は lift2 の外のみ変更)。WORKFLOW §6 により、この差分 0 行で `451c9fb76` の記録を現 head の記録として扱う。ただし素材が無く現 head で再実行していないため、**現 head での再検証は未了** (『再測定の状況』参照)。
+- 基準の差分: `git diff 97a5bd8ab 451c9fb76 -- tools/targets/freshair/lift2/native/` は `FA_UI31_CTOR` 分岐の内側の +22 行・-0 行 (`if (getenv("FA_UI31_CTOR"))` の中)。既定経路 (`FA_UI31_CTOR` 未設定) は同じ分岐に入らない。`97a5bd8ab` は既定経路の基準値の commit で、FA_UI31_CTOR の測定 commit ではない。
+- 実測 (測定 commit `451c9fb76`・`FA_CTL31=1 FA_HEAP_ZERO=1 FA_UI31=1 FA_UI31_CTOR=1 ./native_fa31 SlateCore.core_64 fa31_epf.txt 0`・S900〜S907): rc=0。以下の数値はこの記録で、本 fix run では素材が無く再現していない (『再測定の状況』参照)。
   - ctor の構築は **全 8 シナリオで FAULT**: `rip=0x18040ddbb addr=0x394e0`。ctor が呼ぶ shared_ptr 解放経路 (`0x18040dd9a`〜`0x18040ddbb`) の `[rdi+0xc]` 参照で落ちる。引数 `A = {P 所有, 制御ブロック}` の与え方が実機と合っていない (推測)。
   - ctor 前の `+0xb98`・`+0xba8` は 0、FAULT 後も 0 のまま。vtable は `0x18110a420` (ctor の先頭まで実行されたことは確認)。
   - その後の slot 5 は従来どおり `rip=0x180cb9ce9 addr=0xa80` で FAULT (`returned` 0 件)。
