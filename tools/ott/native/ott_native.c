@@ -66,7 +66,16 @@ static void* heap_alloc(uint64_t sz, int zero) {
 
 /* ---- 実装済み Win32 API ---- */
 static MS void* k_GetProcessHeap(void) { return (void*)0x1000; }
-static MS void* k_HeapAlloc(void* h, uint32_t flags, uint64_t sz) { (void)h; return heap_alloc(sz, (flags & 8) != 0); }
+static int g_keep_x0 = -1;
+static MS void* k_HeapAlloc(void* h, uint32_t flags, uint64_t sz) {
+    (void)h; double keep; void* p;
+    __asm__ volatile("movsd %%xmm0, %0" : "=m"(keep));
+    if (g_keep_x0 < 0) { const char* e = getenv("OTT_KEEP_XMM0"); g_keep_x0 = !(e && e[0] == '0'); }
+    if (!g_keep_x0) return heap_alloc(sz, (flags & 8) != 0);
+    p = heap_alloc(sz, (flags & 8) != 0);
+    __asm__ volatile("movsd %0, %%xmm0" :: "m"(keep) : "xmm0");
+    return p;
+}
 static MS int k_HeapFree(void* h, uint32_t f, void* p) { (void)h; (void)f; (void)p; return 1; }
 static uint64_t heap_size_of(void* p) {
     for (int i = g_nlog - 1; i >= 0; i--) if (g_log_ptr[i] == (uint64_t)p) return g_log_sz[i];
