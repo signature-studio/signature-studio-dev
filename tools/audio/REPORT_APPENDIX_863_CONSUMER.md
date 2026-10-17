@@ -74,9 +74,9 @@
 
 | 区分 | HEAD | 結果 | 判定行 |
 |---|---|---|---|
-| e2e (1 回) | `b10972c73` | 15 PASS・0 FAIL・exit 0 (wall 約 38 s、`time` の実測) | dev:tone / preview:tone とも `prod_target_fill=1536`・`max_err=1.49e-8`・`underrun_cap=0`・`cw_at_underrun=[none]` |
+| e2e (1 回) | `b10972c73` | 15 PASS・0 FAIL・exit 0 (wall 38.3 s・`time` の実測) | dev:tone / preview:tone とも `prod_target_fill=1536`・`max_err=1.49e-8`・`underrun_cap=0`・`cw_at_underrun=[none]` |
 
-- 1 分 load: 起動時 0.41 (`uptime`)。
+- 1 分 load: 実行直前の `uptime` は 0.41 (実行後の値は未取得)。
 - 読み: 無負荷の PASS run で T = 1536 frames。underrun は 0 件のため、失敗時の T はこの run からは分からない。
 - 失敗時の T は `underrun` の記録に入っていない。失敗 run で `prod_target_fill` を見るには、verify 時点の値 (= 終了時の T) で代用する。T の変化 (`latency_changes`・`fla_ctl.depth` の自動拡張) は起きうるため、失敗 run の T が起床間隔の判定に使えるかは未確認。
 
