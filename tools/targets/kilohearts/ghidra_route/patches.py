@@ -184,6 +184,13 @@ ABI = {
         ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x1d0 (180fe443a, n=12)', r'FUN_180fe4020\(param_1 \+ 0x1d0,0xc\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0x1d0),0xc);'),
         ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x230 (180fe4448, n=12)', r'FUN_180fe4020\(param_1 \+ 0x230,0xc\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0x230),0xc);'),
         ('delay 5361 FUN_180fe4394 FUN_180fe4020 rcx=param_1+0x290 (180fe4457, n=2)', r'FUN_180fe4020\(param_1 \+ 0x290,2\);', 'FUN_180fe4020((undefined8 *)(param_1 + 0x290),2);'),
+        # #5401 (KH-160・3 件目): FUN_180fd0ac8 (undefined4 1 引数を rcx で読む) の呼出し 3 件。宣言は 4 引数のまま。
+        #   callee 180fd0ac8 は入口で `mov ebx,ecx` のみ rcx を読み、rdx・r8・r9 は `lea` で書いてから使う (読まない)。
+        #   よって呼出し側は rcx = param_1 だけが意味を持つ。3 件とも `FUN_180fd0ac8(param_1);` で字句が同じため、直前の文脈で 1 件ずつ特定する。
+        #   4694 = FUN_180fd099c 内 (GetModuleHandle の if の中)・4727 = FUN_180fd0a64 (TerminateProcess 後・ExitProcess の前)・4801 = FUN_180fd0b50 (if の中)。
+        ('delay 4694 FUN_180fd0ac8 rcx=param_1 (FUN_180fd099c 内)', r'(\(piVar3\[0x3e\] != 0\)\)\)\) \{\n      )FUN_180fd0ac8\(param_1\);\n    \}\n  \}\n  auStackX_20\[0\] = 0;', r'\1FUN_180fd0ac8(param_1,0,0,0);\n    }\n  }\n  auStackX_20[0] = 0;'),
+        ('delay 4727 FUN_180fd0ac8 rcx=param_1 (FUN_180fd0a64 内)', r'(    TerminateProcess\(uVar2,param_1\);\n  \}\n  )FUN_180fd0ac8\(param_1\);', r'\1FUN_180fd0ac8(param_1,0,0,0);'),
+        ('delay 4801 FUN_180fd0ac8 rcx=param_1 (FUN_180fd0b50 内)', r'(\(piVar3\[0x3e\] != 0\)\)\)\) \{\n    )FUN_180fd0ac8\(param_1\);\n  \}\n  auStackX_20\[0\] = 0;', r'\1FUN_180fd0ac8(param_1,0,0,0);\n  }\n  auStackX_20[0] = 0;'),
         # #5384 (KH-158): stereo ABI 族の前半 3 callee の呼出し 6 件。callee は入力を xmm0 のビット列で読む (入口 movd/movq・movaps xmm1,xmm0)。
         #   FUN_180fdc6ec・FUN_180fdc844 は引数 1 件宣言 (uint)。呼出し直前の xmm0 は入口 float (fVar) のまま = f2u(fVar)。
         #   FUN_180fdc858 は引数 1 件宣言 (ulonglong)。4042 (180fccf08) は入口 param_1 の bit を保持した経路 (movq rdx,xmm0・movaps xmm6,xmm0) で xmm0 = 入口 param_1 = d2u(param_1)。
