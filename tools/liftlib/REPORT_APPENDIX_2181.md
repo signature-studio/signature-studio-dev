@@ -10,7 +10,7 @@
 | 1. F=281 で emcc が dominance 違反 0 | **達成**。変更前: `Instruction does not dominate all uses!` ×4 で emcc 失敗。変更後: `ott_getparam_fixed.ll` を emcc が受理し link まで成功 |
 | 2. `icall_tbl_n > 0` を `*_stubs.c` で確認 | **達成**。`icall_tbl_n = 105` (`ott_getparam_stubs.c`)。登録 105 関数 (引数無し i64 関数) |
 | 3. FAIL-FAST 経路が発火する入力で wasm_trap に数える (ネガティブコントロール) | **一部達成** (#4299)。直接呼出し (`__icall_dispatch`) で、表に無い target の abort を wasm crash として計数し、表有無で呼出し結果が分かれることを確認 (§4.3。測定 commit `e05270d33`)。leafspec の 200 scenario では fail-fast 不発火のまま |
-| 4. leafspec `wasm_trap` 0 のまま、T2 の IR 不変 | **達成**。現 HEAD `e05270d33` で leafspec `ott_getparam_idx` = **200/200 PASS** (wasm_trap 0)。同 spec を `b1c2d148` で測ると 147/200 (従来値) で、HEAD の変更で match が上がった。`tests/test_unit.py` の再実行は本 fix run では未実施 |
+| 4. leafspec `wasm_trap` 0 のまま、T2 の IR 不変 | **一部達成**。leafspec `ott_getparam_idx` = **200/200 PASS** (wasm_trap 0。測定 commit `e05270d33`)。同 spec を `b1c2d148` で測ると 147/200 (従来値)。**T2 の IR 不変は未検証**: `tests/test_unit.py` (T2 含む) は本 fix run で未再実行 |
 
 leafspec の gate は現 HEAD で PASS (`match_rate_excl_crash` 1.000)。`b1c2d148` の 147/200 (gate FAIL) は HEAD の値ではない。
 
@@ -24,7 +24,7 @@ leafspec の gate は現 HEAD で PASS (`match_rate_excl_crash` 1.000)。`b1c2d1
 
 ```
 git diff b1c2d148 e05270d33 -- tools/liftlib/liftlib tools/liftlib/targets tools/icall/rt | wc -l    # 1636 (leafspec の 147 → 200 の差はこの間の変更に由来。個別の切り分けは未実施)
-git diff e05270d33 HEAD -- tools/liftlib/liftlib tools/liftlib/targets tools/icall/rt | wc -l          # 測定後に記録 (本 REPORT の commit は docs のみ)
+git diff e05270d33 HEAD -- tools/liftlib/liftlib tools/liftlib/targets tools/icall/rt | wc -l          # 0 (実測: e05270d33..b9de6f813 で 0。以降も docs のみの commit を積む)
 ```
 
 ## 1. 測定 config
@@ -37,9 +37,7 @@ git diff e05270d33 HEAD -- tools/liftlib/liftlib tools/liftlib/targets tools/ica
 | 再現 | `cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 200` (leafspec 200/200 は 1m19.8s の実測。rc 0) |
 | 負荷 | 開始時 load 1.84 / 1.05 / 0.44 (runner 4 コア, 単発。14:50:28) |
 | 対照 | 同じ spec を `b1c2d148` で測定 (worktree で `work-liftlib` / `work-icall` を展開): 147/53/0/0、1m16.5s、rc 1 (gate FAIL)。fix run 内の実測 (HEAD と同一の素材・同一 cfg) |
-| 単体 | `tests/test_unit.py` は本 fix run では未再実行 (前回 run の 19:35 実測は `b1c2d148` 時点の値) |
-
-## 2. 原因 (機械語 / IR の対応)
+| 単体 | `tests/test_unit.py` は本 fix run では未再実行 (前回 run の 19:35 実測は `b1c2d148` 時点の値)。**素材を展開した環境でのみ実行可能** (`m6/work`・`liftlib/work`・`targets/freshair` が必要)。素材の無い fresh worktree では 7/37 FAIL (t1 t2 t3 t4 t6 t9 t26) で、`origin/main` (`fba691471`) でも同じ 7 件が FAIL (本 PR 起因ではない) |
 
 ## 2. 原因 (機械語 / IR の対応)
 
