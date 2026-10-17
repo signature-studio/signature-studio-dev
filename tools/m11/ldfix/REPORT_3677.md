@@ -89,7 +89,7 @@
 
 ## 5. 検証と差分
 
-- 測定 commit: `db897aecc` (コードを変えた最後の commit)。測定対象 (`tools/m11/ldfix/depth_4498.py`・`rip_match_3677.py`・`results/*.tsv`・`tools/m11/m11_passes.py`) は `db897aecc` から head まで差分 0 (`git diff db897aecc HEAD -- tools/m11` が空。`docs/DOC_MAP.md` の 1 行のみ)。
+- 測定 commit: `db897aecc` (コードを変えた最後の commit)。測定対象 (`tools/m11/ldfix/depth_4498.py`・`rip_match_3677.py`・`results/*.tsv`・`tools/m11/m11_passes.py`) は `db897aecc` から head まで差分 0 (`git diff db897aecc HEAD -- tools/m11/ldfix/depth_4498.py tools/m11/ldfix/rip_match_3677.py tools/m11/ldfix/results tools/m11/m11_passes.py` が空)。`db897aecc..HEAD` の `tools/m11` の差分は `const_4498.py` の未使用 import 1 行の削除のみ。
 - `m11_passes.py` は `3987f8c` 以降に `8f3760e86`・`4b2d1a703` で変わったが、どちらも測定 commit `db897aecc` より前。`origin/main` と同一 (`git diff origin/main HEAD -- tools/m11/m11_passes.py` が空・IR 変化 0)。
 - 測定 commit 以降に変えたのは、`const_4498.py` の未使用 import の削除と、本節・§8 の文言のみ (コードの挙動は変わらない)。`const_4498.py` は `m11_image.bin` が無く再実行していない。構文検査 (`python3 -m py_compile`) のみ行った。
 - 本番 IR・unit の結果は変わらない (IR を書き換えていないため)。KPI (`tools/flelift/boot/REPORT.md`) は動かしていない。
