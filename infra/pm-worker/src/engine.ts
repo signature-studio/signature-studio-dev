@@ -189,7 +189,7 @@ interface Meta {
   installationId?: number | null;
   lastPlan?: Plan;
   lastError?: { at: string; what: string };
-  // 降格 (#2340)。値があると launch と dispatch は dry-run になる。解除は手動 (POST /demote/reset)。
+  // 降格 (#2340)。値があると launch と dispatch は dry-run になる。解除は手動 (POST /demote/reset) か、60 分の時限復帰 (auto-stale)。
   demoted?: { at: string; reason: string };
   // 降格の判定を始めた時刻 (コードが最初に動いた時刻・解除した時刻)。これより前の /oc は判定の対象にしない (過去の二重投稿で止めない・解除前の組を再降格させない)。
   ocWatchFrom?: number;
@@ -1899,7 +1899,7 @@ export class Engine {
       mode_close: this.d.cfg.liveClose ? "live" : "dry-run",
       // 規則 A の候補数 (issue 番号は出さない。記録は counters.wouldClose と log の would-close)。
       auto_close_detected: detectRuleA(this.s).length,
-      // 降格 (#2340) の理由。issue 番号だけを含む。降格していなければ null。解除は POST /demote/reset (手動)。
+      // 降格 (#2340) の理由。issue 番号だけを含む。降格していなければ null。解除は POST /demote/reset (手動) か、60 分の時限復帰 (auto-stale)。
       demoted_reason: this.meta.demoted?.reason ?? null,
       shadow: this.shadow(),
       // TARGET に数える run の総数 (opencode.yaml の in_progress + queued など。実装・review・fix・oc-pm・watchdog の全て)。active_all と同じ値。
