@@ -119,15 +119,16 @@ static void fle_probe_dispatch(u64 t) {
 /* PY-123 (#3028): undo 系 global の 0 化を unit 単位で追う (計測のみ・挙動は変えない)。
  * 監視 slot の値が変わったときだけ記録する。unit = g_units_run (1-based・0 は InitUnits 前)。
  * site: 0 = fle_run 直前 (snap) / 1 = unit dispatch 直前 / 2 = unit dispatch 直後 / 3 = memset 直後 /
- *       4 = ExitProcess / 5 = MessageBoxW / 6 = GetMem 直後 / 7 = FreeMem 直後 / 8 = GetMem 呼出し直前。
+ *       4 = ExitProcess / 5 = MessageBoxW / 6 = GetMem 直後 / 7 = FreeMem 直後 / 8 = GetMem 呼出し直前 /
+ *       9 = ippsZero_8u 直後 (#5415)。
  * proc: site 1・2 は unit の proc VA、3 は memset の長さ、4 は呼出し元、6 は要求サイズ、7 は解放ポインタ。
  * aux: site 3 は memset の dst、6 は GetMem の戻り値 (0 = 失敗)、7 は FastMM の応答 (0 = 成功)。 */
-#define PY_WATCH_N 14
+#define PY_WATCH_N 15
 #define PY_EV_MAX 64
 typedef struct { u32 unit, site, slot, proc; u64 old, nw, aux; } py_ev;   /* 40 B (JS 側の読出しと一致) */
 /* PY-106 (#2909) の 4 件: 0x15e1140 = 例外型の参照の起点 (.data)、0x16b8488 = PyExc_RuntimeError の束縛 slot、0x16b8250 = Py_NewInterpreterFromConfig の束縛 slot (束縛が走ったかの指標)、
  * 0x13a5c90 = MM_TABLE (GetMem の間接 call 0x40941e の pointer slot。null のまま呼ばれる元。最初の変化の unit と proc を残す) */
-static const u32 g_py_watch[PY_WATCH_N] = { 0x15e1c78u, 0x15e4790u, 0x16b82e0u, 0x15e1140u, 0x16b8488u, 0x16b8250u, 0x13a5c90u, 0x15f34a0u, 0x16baff0u, 0x13a5010u, 0x13e4d58u, 0x15f26e8u, 0x16bcbf0u, 0x13e7628u };   /* 0x15f34a0 = ippsZero_8u の slot (A1・#4806) / 0x16baff0 = gate フラグ 2 つ (byte 0・1・PY-379) / 0x13e7628 = [0x13e7628] (vt[+0x48] の読み先・byte 0・#5216) を先頭に持つ 8B ワード / 末尾 4 つ = #5830 非決定 9 バイトを含む 8B ワード (0x13a5010・0x13e4d58・0x15f26e8・0x16bcbf0) */
+static const u32 g_py_watch[PY_WATCH_N] = { 0x15e1c78u, 0x15e4790u, 0x16b82e0u, 0x15e1140u, 0x16b8488u, 0x16b8250u, 0x13a5c90u, 0x15f34a0u, 0x16baff0u, 0x13a5010u, 0x13e4d58u, 0x15f26e8u, 0x16bcbf0u, 0x13e7628u, 0x15eac90u };   /* 0x15f34a0 = ippsZero_8u の slot (A1・#4806) / 0x16baff0 = gate フラグ 2 つ (byte 0・1・PY-379) / 0x13e7628 = [0x13e7628] (vt[+0x48] の読み先・byte 0・#5216) を先頭に持つ 8B ワード / 末尾 4 つ = #5830 非決定 9 バイトを含む 8B ワード (0x13a5010・0x13e4d58・0x15f26e8・0x16bcbf0) / 0x15eac90 = InitContext.InitTable (#5415) */
 static u64 g_py_last[PY_WATCH_N];
 static py_ev g_py_ev[PY_EV_MAX];
 static u32 g_py_ev_n, g_py_ev_over;
@@ -246,6 +247,7 @@ static int ipp_call(u64 t) {   /* fle_ff から。処理したら 1 */
     if (!strcmp(g_ipp_nm[i], "ippsZero_8u")) {   /* IppStatus ippsZero_8u(Ipp8u* pDst, int len) */
         u64 dst = R[1]; int len = (int)(R[2] & 0xffffffffu);
         if (dst && len > 0) { wobj_hw_("ippsZero_8u", dst, (u64)len, (u32)LD8(0x12d7a090ull + 0xc4ull)); memset((void*)(uintptr_t)dst, 0, (size_t)len); }
+        py_watch(9, (u32)len, dst);
     } else if (g_ipp_stop) {                     /* mode 2: 停止して名前と呼出元を残す */
         g_ipp_stop_nm = g_ipp_nm[i]; g_ipp_stop_site = LD64(R[4]);
         fle_throw_kind((long)(intptr_t)"ipp_stop", (long)i);
