@@ -6,7 +6,7 @@
 
 ## 1. VA 表 (PE 確定)
 
-測定 commit: `a2718eca0` を基点にした本 PR の commit。素材: `fl-win64` の `block00031_PE.bin` (展開先 `$RUNNER_TEMP/fl-win64/extracted`)。
+解析の基点: origin/main `a2718eca0`。素材: `fl-win64` の `block00031_PE.bin` (展開先は実行時の `$RUNNER_TEMP/fl-win64/extracted`)。
 
 | 関数 | name 文字列 | 記録 (PyMethodDef) | fn (本体) | 書式 (kwsig) | flags |
 |---|---|---|---|---|---|

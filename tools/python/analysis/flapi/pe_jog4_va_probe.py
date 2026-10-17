@@ -4,7 +4,7 @@ PyMethodDef 記録 (name・fn VA・flags・doc) を FLEngine PE から引く (PY
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_jog4_va_probe.py
 
-展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
+展開: tar --zstd -xf fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin' (素材名は REFERENCES の fl-win64 を参照)
 - name 文字列の VA を指す 8 byte ポインタを PE 全体から探し、その位置を 32 バイト記録の先頭とみなす。
 - 出力の flags は kwsig.flags (flapi_table.json) と一致するはず (continuousMove 系 1、jog marker 系 3)。
 """
