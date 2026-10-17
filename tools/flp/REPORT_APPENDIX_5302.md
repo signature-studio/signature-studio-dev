@@ -41,7 +41,7 @@
 - tid 4947 は 60 s→90 s で utime が 2755 ticks (27.55 s) 増え、30 s の実時間の約 0.92 コア。両時点で state は R。
 - main thread (4875) は utime +547・stime +1086 ticks。
 - 他の thread は待ち (anon_pipe_read・futex) で増分 0。
-- `s2_progress_1.tsv` の末尾 (ログ バイト数 1434 のまま) で、同じ期間にログは増えていない。WAV は出ていない。
+- `s2_progress_1.tsv` で、0〜141 s の全サンプルのログ バイト数が 1434 のまま増えない (ログ増分 0)。WAV は出ていない。
 - **判定に使えるのは、utime 増分と state R だけ。** 「spin か長い計算か」は、この採取からは言えない。wchan が 0 なのは、カーネルの待ち関数を示さないという意味で、ユーザー空間の計算を証明しない。
 - 参考: 前回 round の採取 (`bc4d4586a`・pid 5125・tid 5199) でも同じ形 (60→90 s で utime +2841 ticks・state R) だった。その生の TSV は本ランナーに残っていない。tid は run ごとに変わり、30d973d95 の tid 5048 とは別 run。
 
