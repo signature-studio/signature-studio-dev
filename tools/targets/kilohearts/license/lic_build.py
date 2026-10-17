@@ -135,7 +135,21 @@ def decl_named_imports(txt):
     return re.sub(r'(?m)^declare void @llvm\.trap\(\)$', lambda m: '\n'.join(add) + '\n' + m.group(0), txt, count=1)
 
 
-def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=None, emcc_extra_exports=None, raw_va=False, volatile_ret=False, emcc_opt='-O1', rdata_str=False, rdata_raw_allow=''):
+def make_flag_setters(globals_c, flags):
+    """flags: {"182989344": "kh_set_flag_a"}。global_var_<va> を書換可能にし、u32 setter を追記する (経路フラグの切替用・KH-98)"""
+    txt = open(globals_c).read()
+    names = []
+    for va, fn in flags.items():
+        pat = 'const unsigned char global_var_%s[' % va
+        assert pat in txt, 'flag global not found: ' + va
+        txt = txt.replace(pat, 'unsigned char global_var_%s[' % va)
+        txt += '\nvoid %s(unsigned v) { *(volatile unsigned*)global_var_%s = v; }\n' % (fn, va)
+        names.append(fn)
+    open(globals_c, 'w').write(txt)
+    return names
+
+
+def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=None, emcc_extra_exports=None, raw_va=False, volatile_ret=False, emcc_opt='-O1', rdata_str=False, rdata_raw_allow='', flag_setters=None):
     """lift → (stub pass) → normalize → helper 生成 → emcc。stat dict を返す"""
     W = tag_dir
     os.makedirs(W, exist_ok=True)
@@ -193,11 +207,12 @@ def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=N
     stat['simd'] = r.stdout.strip()
     r, _ = sh('python3 %s/lift/gen_globals.py %s %s %s --window 64' % (ROOT, P('final.ll'), CORE, P('globals.c')))
     stat['globals'] = r.stdout.strip()
+    setters = make_flag_setters(P('globals.c'), flag_setters) if flag_setters else []
     json.dump(shims or {}, open(P('shims.json'), 'w'))
     r, _ = sh('python3 %s/lift/gen_stubs_sigs.py %s %s %s %s' % (ROOT, P('final.ll'), P('stubs.c'), P('sigs.json'), P('shims.json')))
     stat['stubs'] = r.stdout.strip()
     sig = json.load(open(P('sigs.json')))
-    exports = ['_function_' + k for k in sig] + ['_malloc', '_free', '_kh_stack_ptr']
+    exports = ['_function_' + k for k in sig] + ['_malloc', '_free', '_kh_stack_ptr'] + ['_' + s for s in setters]
     if emcc_extra_exports:
         exports += emcc_extra_exports
     extra_ll = (' ' + P('simd.c.i256.ll')) if os.path.exists(P('simd.c.i256.ll')) else ''
@@ -221,7 +236,7 @@ def build(vas, tag_dir, tag, apply_stub, module=None, abi=None, jt=None, shims=N
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--module', choices=['A', 'B', 'E', 'F'])
+    ap.add_argument('--module', choices=['A', 'B', 'E', 'F', 'K'])
     ap.add_argument('--dsp', default=None, help='snapin name (matrix/gain/haas/clipper/gate/quickeq)')
     ap.add_argument('--tag', default='lic')
     ap.add_argument('--no-stub', action='store_true')
@@ -239,7 +254,8 @@ def main():
                      volatile_ret=mod.get('volatile_ret', False),
                      emcc_opt=mod.get('emcc_opt', '-O1'),
                      rdata_str=mod.get('rdata_str', False),
-                     rdata_raw_allow=mod.get('rdata_raw_allow', ''))
+                     rdata_raw_allow=mod.get('rdata_raw_allow', ''),
+                     flag_setters=mod.get('flag_setters'))
         print(json.dumps({k: v for k, v in stat.items() if k != 'ranges'}, ensure_ascii=False))
         return
 

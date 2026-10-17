@@ -41,8 +41,18 @@ const stat = { trials: 0, trialsOk: 0, calls: 0, callsOk: 0, firstFail: [], nanR
 const byCall = {};
 const hex = (n) => '0x' + n.toString(16);
 
+/* --path-flags: 経路フラグを trial ごとに書く (native の scen_kclp.h と同じ規則: 偶数 trial = ymm 0x20 / 奇数 = scalar 0x2)。
+ * 値は wasm 側 setter (kh_set_flag_a/b) で .data へ書く。KH-98 専用 */
+const pfIdx = args.indexOf('--path-flags');
+const pathFlags = pfIdx >= 0;
+const negCtrl = args.includes('--neg-ctrl');   /* ネガコン: 合否を反転し、全 trial が FAIL になることを確かめる (KH-98) */
+
 for (let t = 0; t < ntrials; t++) {
   const ncalls = u32(); u32();
+  if (pathFlags) {
+    if (!M._kh_set_flag_a) throw new Error('--path-flags: kh_set_flag_a 未 export (lic_build --module K の flag_setters を確認)');
+    M._kh_set_flag_a((t & 1) ? 0x2 : 0x20);
+  }
   H8().fill(0, ARENA, ARENA + 0x10000);   /* trial 冒頭の zero 化は固定窓 (native_ref.c の ARENA_CLEAR と同一: mgr slot 0x0400F020 を含む) */
   if (KH_BASE) H8().fill(0, Number(KH_BASE + KH_SIZE - 0x48n - 0x300n), Number(KH_BASE + KH_SIZE - 0x48n + 0x40n));   /* callee フレーム窓を 0 確定 (native の clone offset パッチと対) */
   let usedNow = 0, failed = null;
@@ -78,6 +88,7 @@ for (let t = 0; t < ntrials; t++) {
       if (first < 0) first = i;
       ndiff++;
     }
+    if (negCtrl) { if (first < 0 && retOk) first = 0; else { first = -1; retOk = true; } }   /* ネガコン: 判定を反転 (一致を不一致、不一致を一致として数える) */
     if (first < 0 && retOk) { stat.callsOk++; byCall[key].ok++; }
     else failed = { call: c, va: key, ndiff, first, retOk, retInfo, plen, post, mem: mem.slice() };
   }
