@@ -151,23 +151,9 @@ Index 別の実測 (`hs_store_cov.py`・基準 `base.json` 対比・`HS_DISP_RET
 
 受入 2 の判定: **1/11** (0x132206e のみ。範囲は上記のとおり、供給元の真値は未確定で、非 0 の仮値 `2.0` を xmm0 に与えて格納の実行を確認したもの)。残り 10 行は未実測。
 
-#### 5.1.3 0x13221be の到達条件の確認 (#5623・次の一手)
+#### 5.1.3 0x13221be の到達条件 (#5623)
 
-`hs_store_branch.py 0x13221be` (機械語のみ) の支配分岐: `0x1321e97 jne 0x13281af` (fall 側必須・`sub eax,3` 後)、`0x1321e8c je 0x13220be` (fall)、`0x1321e81 je 0x132207a` (fall)、`0x1321e76 je 0x1321fce` (fall)、`0x1321e3b jg` (`[rbp+0x1878]` > 4)、`0x1321e19 je 0x13281af` (fall・`call 0x40fe90` の戻り値 ≠ 0)。つまり `[rbp+0x1878]` = 11 (`sub eax,3` で 8 → 以降の分岐を fall で通る値) と、`0x40fe90` の戻り値 ≠ 0 が要る。
-
-実測 (`hs_store_cov.py`・基準 `base.json` 対比・測定 commit `a2718eca0`・hostshim の差分 0 行):
-
-| 条件 | real | 終了時 load | 0x13221be |
-|---|---|---|---|
-| 基準 (`HS_DISP_PATH=1`・既定) | 73.58 s (rc=0) | 0.94 | 未実行 |
-| `HS_DISP_INDEX=11` のみ | 73.23 s (rc=0) | 1.00 | 未実行 (新規 3・失う 3) |
-| `HS_DISP_INDEX=11` + `HS_DISP_RET_SPEC=0x40fe90:one` | 71.01 s (rc=0) | 0.94 | **ID 0x4c で実行** (新規 6・失う 4) |
-
-- 初回の `HS_DISP_INDEX=11` 実行は環境変数の設定漏れで PE 既定パス (`/home/ubuntu/...`) を読み失敗した (測定値なし)。環境変数を明示して再実行した値を上の表に書いた。
-- 格納値: `[rbp+0x11a0]` への書込みは `0x13221be=0x-42333333`。`0x40ae70` の stub (戻り値 0) 由来で、**供給元の真値ではない**。
-- 判定: 0x13221be は、分岐の条件 (Index=11・`0x40fe90` の戻り値 ≠ 0) を与えて到達させた。ただし格納される rax の供給元は未確定で、格納値は stub 由来の値 (`x0` と同じ) のため、「供給元の値を与えた実行」には数えない。受入 2 は **1/11 のまま**。到達条件は確定し、残るのは格納値の供給元。
-- 再現: `HS_DISP_INDEX=11 HS_DISP_RET_SPEC=0x40fe90:one HS_DISP_PATH=1 HS_DISP_OUT=idx11r.json` → `hs_store_cov.py base.json idx11r.json`。
-- 残作業: 0x40ae70 の戻り値の真値 (0x132206e と 0x13221be の格納値の確定)、0x13220b2・残り 7 行の供給元。
+結論: 到達条件は確定 (Index=11・`call 0x40fe90` の戻り値 ≠ 0)。受入 2 は **1/11 のまま** (格納値は stub 由来で供給元の真値ではない)。詳細・実測表は `REPORT_DISPATCHER_APPENDIX_5623.md` (測定 commit `a2718eca0`)。
 
 測定 commit: `6d46d9bcd` (`hs_disp_emu.py` に `VA:x<値>` を追加した commit)。素材 `fl-win64` の `extracted/block00031_PE.bin` を `$RUNNER_TEMP/fl` に `tar --zstd -xf` で当該 1 件展開。Python venv: `unicorn 2.1.4`・`pefile`・`capstone 5.0.7`。
 
