@@ -19,7 +19,7 @@ done
 M11_LB_BASE="${M11_LB_BASE:-0}"
 M11_OV_CLASSCREATE="${M11_OV_CLASSCREATE:-0}"   # m11_build.sh と同じ -D を揃える (m11_ov.c の既定も 0)
 # M11_FIX_535BF2 は m11_ov.c の既定が 1 (#2521)。GUI の実測 (tools/gui/flengine/REPORT.md) は lift 版 (0) で取った値なので 0 に固定する
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -pthread -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_FIX_535BF2=0"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -pthread -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_FIX_535BF2=0 -DM11_INSTR_414C70=${M11_INSTR_414C70:-0}"
 cc() { local src="$1" obj="$2"; shift 2
   if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then echo "[gf] cc $(basename "$src")"; emcc -c "$src" -o "$obj" "$@"; fi; }
 

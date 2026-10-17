@@ -267,6 +267,7 @@
 | `tools/icall/REPORT_APPENDIX_2695.md` | ~249 | icall #2695 (ICALL-81): 0x180da6e60 の native harness 初期化 (件数 0 経路で SIGSEGV を解消)。§10 で件数 1 の hang を解消 (`node[0].next = nil`)。候補 6 件は判定 0 件 (受入 2 未達。残件は state 2・8 の harness)。0x1803dee20 の native 既定出力は測定ごとに異なる (7763 は 0/8、6973P-C は入力素通し 8/8・未解決)。結論・数値・未解決は付録が正本 |
 | `tools/icall/REPORT_APPENDIX_2695B.md` | 194 | icall #2695 (ICALL-81・第 2 報): state 2・8 の harness (A の vtable を image 内の ret 系機械語で作る・`FA_ELEM_SPEC`)。候補 6 件 (No 1・2・6・7・9・10) の store を native で実行確認 (判定は 0 件・呼び出し元 `function_180ca2450` は S1・S2 の 2 回呼び・仮想 callee が runtime の object graph に依存)。0x1803dee20 は測定 (6973P-C) で 8/8 (関数本体が xmm0 を書かない所見)。測定値・再現は付録が正本 |
 | `tools/icall/REPORT_APPENDIX_2565.md` | ~110 | icall #2565 (PLG-P0b-20): BLK (0x8A1000) を再配置範囲の外へ。BLK の VA は据え置き、`icall_rewrite.py` の `place()` が関数・stub を BLK 域 `[blk, blk+0x280)` の後ろへ送る。成果物の交差 1 件 → 修正後 0 件・PE の BLK 域 0 埋め。検算は `check_blk_domain.py`、F.ranges は `mk_franges.py` |
+| `tools/icall/REPORT_APPENDIX_6050.md` | ~46 | icall #6050 (ICALL-124): `0x1803dee20` の xmm0 不一致 1 件の原因 (harness `k_HeapAlloc` の `getenv` 順序バグ) と退避の既定化。測定 commit `af7718c92`・sweep の比較表・`git diff` は付録の正本 |
 | `tools/icall/REPORT_APPENDIX_2696.md` | ~129 | icall #2696 (ICALL-82): closure 関数のうち dsm の data 区分に実コードを含む関数の実測 (件数は候補。非コード対照でも一部が通るため確定ではない)。修復と受入 3 は子 #2708 (ICALL-83)。測定値・定義・negative control の正本 |
 | `tools/icall/REPORT_APPENDIX_2708.md` | ~185 | icall #2708 (ICALL-83): RetDec が fall-through 先を data 区分にする原因 (rewriter の chained 断片の複製が `j*` 即値参照だけを見る)・A 型候補 11 件の判定 (修復対象の候補 4 / 症状なし 4 / 判定保留 3)・断片判定 `tools/icall/diff/chain_chunk_check.py`。修復と sweep 比較は子 #3198 (ICALL-87)。§10 は修復前後の sweep 比較と変化関数の理由が正本 (ICALL-101 / #4353) |
 | `tools/icall/REPORT_APPENDIX_2900.md` | ~103 | icall #2900 (ICALL-84): 4 命令 (`180703913`・`180703b7c`・`1806dbe61`・`1806f7431`) の添字上限の確定 (部分達成)。受入 3 (baseline rc=95: 53・既知 12 中 hit 3) を再現。`180703913` は `18070390b` の fall-through でのみ入り、その経路では到達しない (静的・直接 jump 照合は未実施)。float の基底 `rax` は未確認。届く添字の算術と負の対照は `tools/icall/diff/index_reach.py`。動的採取は int3 が closure の挙動を変えるため不採用。残件は #3089 (ICALL-85) |
@@ -341,6 +342,7 @@
 | `tools/m11/REPORT_N87.md` | ~80 | #1373 (M11-N87, 部分達成せず・実値化 0 件): sigfix 0 詰め inherit 1,172 件の呼出元 def 追跡 (基本ブロック到達定義・入口の呼出元再帰・call 越しの引数レジスタ要約)・復元不能 1,172 件 (未分類 0) の理由別内訳・survey ok 872 (退行なし) |
 | `tools/m11/REPORT_3296.md` | ~95 | #3296 (親 #3229・REPORT_N403 §7): `function_412770` の rep movsq 源 `ptr null` (機械語 `mov rsi,[rax]` の load 脱落・D4 再発例) の修正 `ldfix/fix_src412770.py` と、修正前後の寛容起動の unit 結果 (kind 差 8 件は不変)。判定 (D4 再発例・REPORT_1080 と一致)・撤回した address 0 の記述・測定 commit 以降の差分 |
 | `tools/m11/REPORT_5358.md` | ~70 | m11 #5358 (FLE-44, 親 #4011): `function_409c80` の `0x409d2d jae 0x409c40` を引数付き tail call に直す修正 (`ldfix/fix_tail409c80.py`) の機械語の根拠・修正前後の boot 測定 (既定 OFF・`M11_M2V=1`)・未解決 (trap アドレス・OOB の直接原因)。測定値の正本 |
+| `tools/m11/REPORT_APPENDIX_5358.md` | ~100 | m11 #5358: `REPORT_5358.md` §8 (arg 実値と s24 の書換え位置) の移送 (§8 の移送 + §9 (本 PR で追加: 書換え経路の機械語突合・同一 build の再測定・計装)。行数上限のため分割移動。移送分の内容は不変) |
 | `tools/m11/REPORT_APPENDIX_3161.md` | ~20 | m11 #3161 (REPORT_N403.md §10 の分割移動): 1 通りの所要 (IR 46–47 s・build 22–24 s・run 1–2 s・survey 15–16 s)・LB=0x10000 の boot5 有無の補足・寛容起動 (#2779) との関係・§10-4 結論 |
 | `tools/m11/REPORT_294.md` | ~70 | #294 m11 area: `FL_WIN64_DIR` 既定値の tools/shared 経由への置換。before (706147914) / after (256a869d1) で `m11_data.c`・`m11_image.bin`・reloc gate の出力一致 (実測)。`m11_e2e.sh --full` の before/after は子 #4245 |
 | `tools/m11/REPORT_APPENDIX_3229.md` | ~47 | m11 #3229 (親 #3188・子 #3296): LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (REPORT_N403 §7 の全文。IR 段で LB 直書きは確認した範囲で見つからず・機構は未特定) |
@@ -986,6 +988,7 @@
 | `tools/plugins/p0c/REPORT_APPENDIX_J.md` | ~41 | p0c §23 (#3280 0x5dffc0 の x87 fsincos 66-bit π 縮約の原因・修復・測定)。H §23 から分割移動 (H の 250 行上限のため) |
 | `tools/plugins/p0c/REPORT_APPENDIX_K.md` | ~70 | p0c §24 (#3281 GLOBAL_INITS の PE 値化: `k80_pe_globals.py` の置換対象 0x6fffb0・0x6fc26c・測定・残った BODIES 14 本の根拠)。H の 250 行上限のため新設 |
 | `tools/plugins/p0c/REPORT_APPENDIX_L.md` | ~90 | p0c §25 (#3951 0x5e1280 の buf_diff=3996 の原因: `k80_diff.py` の 64bit xmm 引数の渡し方。修復と負論対照・実測) |
+| `tools/plugins/p0c/REPORT_APPENDIX_N.md` | ~55 | p0c §27 (#3281 残件 B: 0x5e12c0 の ucomisd flags を jbe に接続する一般 pass `k80_ucomi_br.py` と、手書き本体の削減 14→13・負論対照・測定) |
 | `tools/plugins/p0c/REPORT_APPENDIX_M.md` | ~65 | p0c §26 (#5832 E7: x86_fp80 ↔ i80 bitcast の展開。`f80b_rt/run.sh` の bit 一致・subnormal carry の修正前後の固定ベクタ・19165 の測定 (測定 commit `ce3872372`)) |
 | `tools/plugins/p0c/REPORT_APPENDIX_M2.md` | ~110 | p0c §26 付録 M の鮮度の証跡: `git diff ce3872372 HEAD -- tools/plugins/p0c` の全文 |
 | `tools/plugins/p0c/REPORT_APPENDIX_O.md` | ~130 | p0c §28 (#6046): 手書き本体 14 → 9 の置換 (x87fix の対象に 5 本を追加)。根本原因 (x87fix の `--funcs` 未登録)・10 本の判定 (5 本 fixed・5 本 skip 4 種)・負論対照・測定 (commit `ecadfb82d`) |
