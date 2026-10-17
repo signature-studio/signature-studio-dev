@@ -1,6 +1,6 @@
 # #6211: 証拠表の行 224・225 (母数 2) の件ごとの判定 (真陽性 0・偽陽性 0・保留 2)
 
-本付録が #6211 の判定の正本。結論は `REPORT_718.md` §4n の要約行に載せる。判定の基準は `REPORT_APPENDIX_5751.md` §2 と同じ (構造判定・到達性は範囲外)。
+本付録が #6211 の判定の正本。結論は `REPORT_718.md` §4p の要約行に載せる。判定の基準は `REPORT_APPENDIX_5751.md` §2 と同じ (構造判定・到達性は範囲外)。
 
 ## 1. 結果
 
@@ -18,7 +18,7 @@
   - `scan_guard.py <IR> --pe <PE> --report work/strict.json`: 4.0 s で strict 288。
   - `strict_evidence.py <IR> --pe <PE> --report work/strict.json --out work/strict_evidence_6211.tsv`: 12.0 s で TSV 288 行 (ヘッダ除く)。
   - `judge_ctx.py <IR> work/strict_evidence_6211.tsv <PE> 224 225`: rc 0 (122 行)。
-  - 機械語の全体: `LD_M11_PE=<PE> disasm_fn.py dce130` で関数 `function_dce130` を逆アセンブル。
+  - 機械語の全体: `LD_M11_PE=<PE> python3 tools/m11/trap_triage/disasm_fn.py dce130` で関数 `function_dce130` を逆アセンブル。
 - 測定 commit: `b912d309f` (origin/main 取り込み前の HEAD)。判定に使ったコード (`tools/m11/guard699/`・`tools/m11/ldfix/ldmach.py`・`tools/m11/trap_triage/strict_evidence.py`・`judge_ctx.py`) は `git diff b912d309f origin/main -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行。
 - 作業ファイルは `tools/m11/work/` (gitignore・未コミット)。
 
@@ -35,7 +35,7 @@
 
 - 両件の count 源は、機械語・IR とも `.data` の同じスロット `0x15E2218` (IR 表記は `0x11E2218`、ImageBase `0x400000` の差) を指す。PE の `.data` の値は `c8af6b0100000000` (qword)。
 - 機械語は、このスロットの qword (P) をさらに 1 段読み (`[P]`)、その先の `+0x10` を読む。IR は、スロットを `load i32` で 1 段だけ読み、その下位 32 bit を基底にして `+16` を読む。IR の値 = `[low32(P)+16]`、機械語の値 = `[[P]+0x10]` で、同じ値として結べない。
-- この段数の差が lift 段の欠陥 (中間の `mov rcx,[rcx]` が IR で落ちた) か、IR の読み方の誤りか、機械語の別の意味かは未確定。判断は PM (`REPORT_718` §4n の 228・229 と同じ扱い)。
+- この段数の差が lift 段の欠陥 (中間の `mov rcx,[rcx]` が IR で落ちた) か、IR の読み方の誤りか、機械語の別の意味かは未確定。判断は PM (`REPORT_718` §4n の 228・229 と同じ扱い。追跡先は #6232)。
 - 「count = 0 で IR が本体を回り、機械語は脱出先へ直行する」は、count 源が同じ値であることを前提にする。段数が違うなら IR の count はこの式で決まらないため、真陽性 (構造) とは書けない。偽陽性とも書けない (機械語の jcc が機械語だけでは決まらない)。
 
 ## 5. 範囲
