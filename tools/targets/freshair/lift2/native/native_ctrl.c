@@ -249,7 +249,8 @@ int main(int argc, char** argv) {
         g_p_ca = im + (0x180ca1480ULL - 0x180000000ULL); g_p_da = im + (0x180da6c00ULL - 0x180000000ULL);
         patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca); patch12(g_p_da, (const void*)&da6c00_probe, g_sv_da);
     }
-    if (getenv("FA_DA9ONLY")) {   /* FA-81 (#6032): 0x180da6c00 の入口だけを記録 (ca1480 は触らない・既定 OFF) */
+    /* FA_PROBE9 と FA_DA9ONLY は排他 (両方だと g_sv_da が patch 済みバイト列で上書きされ、da6c00_probe が自己再帰する) */
+    if (!getenv("FA_PROBE9") && getenv("FA_DA9ONLY")) {   /* FA-81 (#6032): 0x180da6c00 の入口だけを記録 (ca1480 は触らない・既定 OFF) */
         g_p_da = im + (0x180da6c00ULL - 0x180000000ULL); patch12(g_p_da, (const void*)&da6c00_probe, g_sv_da);
     }
     if (getenv("FA_CTL31")) {
