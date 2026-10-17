@@ -74,3 +74,31 @@
 | 基底 reg の再定義を跨ぐ接続 (`ptr_base_def` 82 件) | 基底の値を辿る別名解析 (reg の到達定義) が要る | #4890 (親) の残作業 |
 | 呼出しを跨ぐ接続 (`ptr_call` 17 件) | 呼出し先の書込み範囲の解析が要る | #4890 (親) の残作業 |
 | IR への注入 (実値化した値を `m11_post.py` に入れる経路) | 実値化 0 件のため未実施 | #4890 (親) の残作業 |
+
+## 6. M11-N286 (#6123): 呼出しを跨ぐ接続 (ptr_call)
+
+- 方式: 基底が非揮発 (rbx/rsi/rdi/rbp 等) の `call` は、呼出し先が **直接 call かつ再帰的に非スタック書込みを持たない** ときだけ区間を跨ぐ。判定は `callee_pure` (循環・間接 call・解決不能な先は不可)。書込みの判定は `insn_may_write_nonstack` (rsp 基底の格納・push・読取り専用命令以外を書込みありとする。文字列命令・rep・xchg 系も書込みあり)。
+- 基底が揮発 (rax/rcx/rdx/r8〜r11) の `call` は、呼出しで値が変わるので `ptr_base_def` とする (跨がない)。
+- **測定 commit: `c2541ca39` (現 HEAD の分類器・テストは `21265b1ed` 以降変わっていない)。** `git diff c2541ca39 HEAD -- tools/m11/m11_setother_ptr_class.py tools/m11/test_setother_ptr_class.py` は 0 行。下の内訳は、このコードで実行した実測値。
+- 入力の再生成 (`work-m11` 素材 `$ARTIFACTS_DIR/work-m11.tar.zst` を `tools/m11/work/` に展開し、`fl-win64` の `extracted/block00031_PE.bin` を PE として使用。`work/sigfix_stats/` は gitignore 対象): `m11_post.py` → `m11_argrecover.py` → `m11_setother_ledger_verify.py` (`match 410`) → `m11_setother_nonimm_class.py` (非 imm 349・`load_ptr` 122)。入力 sha は `boot_final.ll` `69c774ded8aaf717`・PE `b2c64da40921cf26` (§2 と同一)。`m11_post.py` 出力 sha `c029ada4…` は §2 の記載と一致。
+- 測定 (`python3 m11_setother_ptr_class.py work/sigfix_stats/nonimm_class_rows.json --pe <PE> --out work/sigfix_stats/ptr_class_rows.json`・real 0.29 秒・user 0.24 秒・load average 0.82 (1 プロセス単独)):
+
+```
+[ptr-class] 対象 122 件 (load_ptr・chain>load_ptr)
+  実値化      0
+  復元不能     0
+  未決       122
+  未分類   0
+  未決       no_mem_operand         3
+  未決       ptr_alias_write        3
+  未決       ptr_base_def           85
+  未決       ptr_call               10
+  未決       ptr_unknown_write      3
+  未決       slot_merge             18
+```
+
+- 前回 (`c988679dc`) からの差: `ptr_call` 17→10。`ptr_base_def` 82→85、`ptr_alias_write` 2→3、`ptr_unknown_write` 2→3、`slot_merge` 16→18 は、跨いだ先の後段判定の移動。実値化は 0 のまま。
+- 残る `ptr_call` 10 件の呼出し先 (実測・`callee_pure` が偽): 呼出し先の本体に非スタック書込みがある (`mov qword ptr [rdx+r8*8], r9`・`movsd qword ptr [rbx+0x18], xmm0`・`movdqa xmmword ptr [rbp+0xc0], xmm9`・`movsd qword ptr [rbp+0x90], xmm2` など) 8 件、本体は直接書かないが呼出し先の先で書込みがある (推移) 2 件。間接 call の先は解決できないため、すべて未決のまま。
+- 単体テスト: `test_setother_ptr_class.py` 現 HEAD (`c2541ca39`) で 13 件 OK (純粋な呼出し先を跨ぐ正例・書込みのある呼出し先の負例・揮発基底の負例・読取り専用接頭辞の負例を含む)。
+- 受入条件: `ptr_call` 件数の 3 値実測は測定 commit `c2541ca39` で達成 (`ptr_call` 10 件は未決・未分類 0)。実値化 0 件のため `m11_argrecover_verify.py` の照合は該当なし。
+- 未解決: 残る `ptr_call` 10 件は呼出し先の書込み範囲が非スタック領域に及ぶため、区間を跨げない (別名解析が要る)。起票先: #4890 (親)。

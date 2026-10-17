@@ -35,9 +35,20 @@ def seq(*hexes):
     return out
 
 
-def load_at_end(*hexes, base='rax'):
+class FakeMach:
+    """fns (VA -> (rva, size)) と disasm_fn (VA -> ins) だけを持つ最小の Machine 代用。"""
+    def __init__(self, fns=None):
+        self.cs = CS
+        self.fns = fns or {}
+        self.bodies = {}
+
+    def disasm_fn(self, va):
+        return self.bodies.get(va)
+
+
+def load_at_end(*hexes, base='rax', mach=None):
     ins = seq(*hexes)
-    return M.load_def(CS, ins, len(ins) - 1, base, 8, 64, set())
+    return M.load_def(mach or FakeMach(), ins, len(ins) - 1, base, 8, 64, set(), {})
 
 
 class LoadDefTest(unittest.TestCase):
@@ -54,10 +65,56 @@ class LoadDefTest(unittest.TestCase):
         self.assertEqual(load_at_end(MOV_IMM32_RAX8, MOV_LD_RAX8), ('未決', 'ptr_width_mismatch', None))
 
     def test_call_blocks(self):
-        self.assertEqual(load_at_end(MOV_IMM_RAX8, CALL_REL, MOV_LD_RAX8), ('未決', 'ptr_call', None))
+        # 揮発基底 (rax) は call で値が変わるので ptr_base_def。非揮発基底の未知の先は ptr_call
+        self.assertEqual(load_at_end(MOV_IMM_RAX8, CALL_REL, MOV_LD_RAX8)[1], 'ptr_base_def')
+        self.assertEqual(load_at_end(MOV_IMM_RBX8, CALL_REL, MOV_LD_RBX8, base='rbx')[1], 'ptr_call')
 
     def test_base_redefined_blocks(self):
         self.assertEqual(load_at_end(MOV_IMM_RAX8, MOV_RAX_RAX8, MOV_LD_RAX8)[1], 'ptr_base_def')
+
+    def test_call_to_pure_callee_passes_nonvolatile_base(self):
+        # 呼出し先は rsp 基底の格納と ret だけ (非スタック書込みなし) → rbx 基底の区間を跨いで実値化
+        mach = FakeMach()
+        callee_va = 0x2000
+        mach.fns[callee_va] = (0, 0x10)
+        mach.bodies[callee_va] = list(CS.disasm(bytes.fromhex('48c7442408' + '01000000' + 'c3'), callee_va))
+        ins = list(CS.disasm(bytes.fromhex(MOV_IMM_RBX8) + bytes.fromhex('e8' + (callee_va - 0x1008 - 5).to_bytes(4, 'little', signed=True).hex()) + bytes.fromhex(MOV_LD_RBX8), 0x1000))
+        self.assertEqual([i.mnemonic for i in ins], ['mov', 'call', 'mov'])
+        self.assertEqual(M.load_def(mach, ins, 2, 'rbx', 8, 64, set(), {}), ('実値化', 'ptr_imm', 1))
+
+    def test_call_to_writing_callee_blocks(self):
+        # 呼出し先が非スタック (rbp 基底) へ書く → 未決 (ptr_call)
+        mach = FakeMach()
+        mach.fns[0x2000] = (0, 0x10)
+        mach.bodies[0x2000] = list(CS.disasm(bytes.fromhex('48c7450801000000' + 'c3'), 0x2000))
+        ins = list(CS.disasm(bytes.fromhex(MOV_IMM_RBX8) + bytes.fromhex('e8' + (0x2000 - 0x1008 - 5).to_bytes(4, 'little', signed=True).hex()) + bytes.fromhex(MOV_LD_RBX8), 0x1000))
+        self.assertEqual(M.load_def(mach, ins, 2, 'rbx', 8, 64, set(), {})[:2], ('未決', 'ptr_call'))
+
+    def test_call_to_callee_writing_via_rmw_blocks(self):
+        # cmp/bt 接頭辞で読取り専用扱いになると誤って跨ぐ。書込みを持つ命令は必ず未決 (ptr_call)
+        writers = {
+            'lock cmpxchg [rbp+8], ecx': 'f00fb14d08',
+            'cmpxchg16b [rbp+8]': '480fc74d08',
+            'cmpxchg8b [rbp+8]': '0fc74d08',
+            'bts qword ptr [rbp+8], 0': '480fba6d0800',
+            'btc [rbp+8], rcx': '480fbb4d08',
+            'btr [rbp+8], rcx': '480fb34d08',
+        }
+        for name, enc in writers.items():
+            with self.subTest(insn=name):
+                mach = FakeMach()
+                mach.fns[0x2000] = (0, 0x10)
+                mach.bodies[0x2000] = list(CS.disasm(bytes.fromhex(enc + 'c3'), 0x2000))
+                ins = list(CS.disasm(bytes.fromhex(MOV_IMM_RBX8) + bytes.fromhex('e8' + (0x2000 - 0x1008 - 5).to_bytes(4, 'little', signed=True).hex()) + bytes.fromhex(MOV_LD_RBX8), 0x1000))
+                self.assertEqual(M.load_def(mach, ins, 2, 'rbx', 8, 64, set(), {})[:2], ('未決', 'ptr_call'))
+
+    def test_read_only_callee_passes(self):
+        # cmp/bt の読取りだけの呼出し先は非スタック書込みなし → 跨いで実値化
+        mach = FakeMach()
+        mach.fns[0x2000] = (0, 0x10)
+        mach.bodies[0x2000] = list(CS.disasm(bytes.fromhex('483b4d08' + '480fba6508' + '00' + 'c3'), 0x2000))
+        ins = list(CS.disasm(bytes.fromhex(MOV_IMM_RBX8) + bytes.fromhex('e8' + (0x2000 - 0x1008 - 5).to_bytes(4, 'little', signed=True).hex()) + bytes.fromhex(MOV_LD_RBX8), 0x1000))
+        self.assertEqual(M.load_def(mach, ins, 2, 'rbx', 8, 64, set(), {}), ('実値化', 'ptr_imm', 1))
 
     def test_no_store_is_entry(self):
         self.assertEqual(load_at_end(MOV_RCX_RSI, MOV_LD_RAX8), ('未決', 'ptr_entry', None))

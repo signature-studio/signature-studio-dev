@@ -7,7 +7,10 @@ IR は変更しない (分類のみ)。
 接続方式 (ptr_mem): `mov r, <幅> ptr [base+d]` の読込を、同じ関数内で同じ [base+d] へ最後に格納した命令まで
   直線区間で後ろ向きに探す。区間は次で打ち切る (未決・理由付き):
     slot_merge   : 読込命令が分岐先 (合流点)
-    ptr_call     : 呼出し (別名の書込みが起きうる)
+    ptr_call     : 呼出し (別名の書込みが起きうる)。基底が非揮発 (rbx/rsi/rdi/rbp 等) で、
+                   呼出し先が直接 call かつ再帰的に非スタック書込みを持たないときだけ区間を跨ぐ。
+                   それ以外は未決 (間接 call・解決不能な先・書込みの可能性あり)
+    ptr_base_def も揮発基底 (rax/rcx/rdx/r8〜r11) の call 跨ぎに使う (呼出しで値が変わる)
     ptr_branch   : ret/jmp (区間の外)
     ptr_base_def : 基底 reg の族を書き換える命令 (以後の [base+d] は別の番地)
     ptr_unknown_write : メモリ書込みの可能性がある未知の命令 (kind=other)・メモリオペランドを持つ set*
@@ -75,15 +78,87 @@ def writes_reg(x, base):
     return fam(dst) == base
 
 
-def load_def(cs, ins, idx, base, d, width, tg):
+VOLATILE = {'rax', 'rcx', 'rdx', 'r8', 'r9', 'r10', 'r11'}
+READ_ONLY = ('test', 'cmps', 'ucomis', 'ucomi', 'comis', 'nop', 'prefetch', 'push')
+READ_ONLY_EXACT = ('cmp', 'bt', 'lea')  # cmpxchg*・bts/btr/btc* は書込みありなので接頭辞では判定しない
+STR_OPS = ('rep', 'movsb', 'movsw', 'movsq', 'stos', 'ins', 'outs', 'syscall', 'int', 'sysenter')
+
+
+def call_target(x):
+    """直接 call / jmp の先 VA。間接の場合は None。"""
+    if x.operands and x.operands[0].type == capstone.CS_OP_IMM:
+        return x.operands[0].imm
+    return None
+
+
+def insn_may_write_nonstack(mach, x, fn_range):
+    """命令 x が rsp 基底以外の番地へ書く可能性があるか (保守的)。fn_range は所属関数の [lo, hi)。"""
+    mn = x.mnemonic
+    if mn.startswith(STR_OPS) or (mn in ('movsd', 'movsw') and not x.operands):
+        return True
+    if mn.startswith('j') and mn != 'jmp':
+        return False
+    if mn == 'jmp':
+        t = call_target(x)
+        return t is None or not (fn_range[0] <= t < fn_range[1])
+    if mn in READ_ONLY_EXACT or mn.startswith(READ_ONLY) or mn == 'ret':
+        return False
+    body = mn[5:] if mn.startswith('lock ') else mn
+    for i, op in enumerate(x.operands):
+        if op.type != capstone.CS_OP_MEM:
+            continue
+        if i != 0 and not body.startswith(('xchg', 'xadd', 'cmpxchg')):
+            continue
+        base = mach.cs.reg_name(op.mem.base) if op.mem.base else None
+        if base != 'rsp' or op.mem.index:
+            return True
+    return False
+
+
+def callee_pure(mach, va, memo, stack=()):
+    """関数 va が呼出し後に非スタックのメモリへ書かないか (直接 call の再帰を含む・循環は不可)。"""
+    if va in memo:
+        return memo[va]
+    if va in stack:
+        # 循環中の再入は未決側 (False) に倒す。推移結果としてのメモ化はこの値で確定する (保守的)
+        return False
+    ent = mach.fns.get(va)
+    ins = mach.disasm_fn(va) if ent else None
+    if not ins:
+        memo[va] = False
+        return False
+    rng = (va, va + ent[1])
+    ok = True
+    for x in ins:
+        if x.mnemonic == 'call':
+            t = call_target(x)
+            if t is None or not callee_pure(mach, t, memo, stack + (va,)):
+                ok = False
+                break
+            continue
+        if insn_may_write_nonstack(mach, x, rng):
+            ok = False
+            break
+    memo[va] = ok
+    return ok
+
+
+def load_def(mach, ins, idx, base, d, width, tg, memo):
     """[base+d] を読む ins[idx] の直前で、同じ [base+d] への最後の格納を直線区間で探す。"""
+    cs = mach.cs
     k = idx - 1
     while k >= 0:
         if ins[k + 1].address in tg:
             return ('未決', 'slot_merge', None)
         x = ins[k]
         if x.mnemonic == 'call':
-            return ('未決', 'ptr_call', None)
+            if base in VOLATILE:
+                return ('未決', 'ptr_base_def', None)
+            t = call_target(x)
+            if t is None or not callee_pure(mach, t, memo):
+                return ('未決', 'ptr_call', None)
+            k -= 1
+            continue
         if x.mnemonic in ('ret', 'jmp'):
             return ('未決', 'ptr_branch', None)
         if x.mnemonic.startswith('j') or x.mnemonic in NOWRITE:
@@ -190,6 +265,7 @@ def main():
     rows_in = [r for r in json.load(open(a.rows))
                if r['reason'].endswith('load_ptr')]
     fcache = {}
+    memo = {}
     out_rows = []
     cnt = collections.Counter()
     bcnt = collections.Counter()
@@ -210,7 +286,7 @@ def main():
             if base == 'rbp' or base == 'rsp':
                 cls, why, val = '未決', 'frame_base', None
             else:
-                cls, why, val = load_def(cs, ins, idx, base, d, width, tg)
+                cls, why, val = load_def(mach, ins, idx, base, d, width, tg, memo)
         bcls, bwhy = None, None
         if why == 'ptr_base_def':
             bcls, bwhy = base_origin(cs, ins, idx, base, tg)
