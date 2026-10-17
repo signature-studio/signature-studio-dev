@@ -35,6 +35,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| wasm 側 `icall_rt.c` の dispatch で `BLK+0x48` が `BLK+0x100` を指すことと `ICALL_CHECK_STK` の検査 | 受入条件の「被呼側まで」の wasm 側の部分 | #5338 (親のチェックリスト) |
-| 実在の 5 引数以上の間接 call 先 (OTT / FLEngine) での値一致 | 実行経路の値一致 | #1023 (親。FLEngine/IPP の実行経路が前提) |
+| wasm 側 `icall_rt.c` の dispatch で `BLK+0x48` が `BLK+0x100` を指すことと `ICALL_CHECK_STK` の検査 | 受入条件の「被呼側まで」の wasm 側の部分 | #5598 (open のまま `Refs`。受入の未達条件はこの issue が追跡) |
+| 実在の 5 引数以上の間接 call 先 (OTT / FLEngine) での値一致 | 実行経路の値一致 | #1023 の既存の受入 (#5598 本文の注記どおり本 issue の範囲外。FLEngine/IPP の実行経路が前提) |
 | RetDec (`retdec-decompiler`) が runner に無い | `ott_route.sh` のフル再生成ができない | tools/icall 側の素材定義 (再開時に確認) |
