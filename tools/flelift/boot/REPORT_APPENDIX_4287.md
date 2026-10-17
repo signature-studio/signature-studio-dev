@@ -76,7 +76,7 @@ FL_WIN64_DIR=<fl-win64 展開先> FLE_BOOT_WORK=<work> WVAL_OBJWATCH=1 bash tool
   - `[wobj-free] p=0x12d7a090 obj+0xc4=0` が 3 回 (seq 2297・2307・2308)。解放時点で obj+0xc4 は常に 0。
   - 再確保 `[wobj-getmem] p=0x12d7a090 size=320 obj+0xc4=0 freed_before=1 freed_val=0`。解放済み領域の再利用である。
   - 以降 `[wobj] va=0x6bc010 ... v=0` の 1 件のみ (lifted の store は 0 を書く 1 件のみ)。
-- 既定経路 (root 0x6a7b70 有・`WVAL_IPP= WVAL_NULLFILL=0`) でも同じ連鎖。`boot_threw: exit`・`px6bbc20.calls_all` 0。
+- 既定経路 (root 0x6a7b70 有・`WVAL_IPP= WVAL_NULLFILL=0`): `boot_threw: exit`・`px6bbc20.calls_all` 0。`[wobj-free]`・`[wobj-getmem]` は出るが、`0x6bc010` の store は出ない。「同じ連鎖」とは書けない (`f_6cd520` 系の入口に届いたかの確認が無かったため)。訂正は `REPORT_APPENDIX_6219.md` §B・§D (既定 route の入口 0 件)。
 - 結論: obj+0xc4 の 0 は、解放時点の値が既に 0 の領域を再利用した結果。**0 がどこで最初に書かれたか (最初の確保時の 0 埋めか、ホスト C の書込みか) は、解放・確保の区間の観測では特定できない**。最初の確保 (解放より前) の値は本測定の対象外。
 - 診断の入り方: `fle_boot.c` の `fle_ov_getmem` (`[wobj-getmem]`) と `fle_ov_freemem` (`[wobj-free]`) は既定 build にも入る (`boot_e2e.sh` は全 variant で同じ `fle_boot.c` を cc する)。環境変数による分岐は無い。obj を含む範囲に当たったときだけ stderr に出る。制御フローは変えていない (記録変数の更新と出力のみ)。
 - KPI: FLEngine 起動 units 前 209 / 後 209 (baseline・既定)。最初のウィンドウ: 無し。
