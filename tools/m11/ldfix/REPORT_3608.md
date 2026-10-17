@@ -240,6 +240,15 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 - memcpy 直前の源の計装は 0 件。B の `function_412770` (117995 行) は `412a12` (memcpy) より前で halt0 し、halt0 の unit は memcpy に届かない。
 - 結論: 受入 1 の残りの「出所」は boot (`entry_point`) 内の書込みで、unit 側の経路ではない。boot 内の書込み元 (動的ポインタ経由の store) は未特定。
 
+### 8-8 `18787504` の書込み元: IR store では捕まらない (#5280・受入 1 の残り・負の結果)
+
+- 計装: `trap114_w_probe_5280.py` (prod fix の全 54,043 store に、宛先が `[G-7, G+7]` (G = 18787504) に入ったら回数と格納値を記録する判定を入れる)・`trap114_w_read_5280.mjs` (boot 中と各 unit の前後で回数を読む)。stage4 は `work/stage4/t114w` で rc 0・units_run 109・dllmain_done True・threw なし。
+- 実測: boot 後の G は `0x100000002` (計装なしと同じ) だが、計装の回数 (`0x11FFA000`) は boot 前後・全 unit で 0。計装の SCRATCH 側には `0x336e` が入っており、判定の経路は走っている。つまり **G へ書く IR の store は 1 件も無い**。
+- IR 上の確認: `prod.ll` には `atomicrmw`・`cmpxchg`・`llvm.mem*`・vector store が 0 件。G を直接指す store は 0 件 (G の読みは 4 箇所: 117921・117975・118011・118033 行)。
+- C 側の候補: `m11_ov.c` の `D()`・`Q()` (volatile) と `memcpy`・`memset`。`D(0x11eac98)`・`D(0x11eac90)` 系は InitCount で G と無関係。`__asm_*` (`m11_simd.c`) は SSE の register 演算で、guest memory へ書かない。
+- 候補 (未検証): `G = r13 + 0x30` (`r13 = 0x11eac80`・`m11_InitLib` が使う global)。`m11_InitLib` の `memcpy(ctx, r13, 296)` は `ctx` の範囲に G が入れば G を書く。`ctx` は引数で、本 run では値を採っていないため棄却できない。`memcpy(r13 + 0x38, tmp, 240)` は 0x11EACB8 から始まり G を含まない。`Q(r13+0x10/0x20/0)` は G に当たらない。boot 後の `r13+0x30` (= G) は `0x100000002` で、boot 前は 0。
+- 結論: G への書込みは IR store でも `m11_InitLib` の memcpy でもない。残る候補は C 側の `memcpy`/`memset` (`m11_ov.c` 566・1565 行など) か、boot 中に呼ばれる C helper の volatile 書込み。未特定。次の手は、C 側の書込みに G の範囲判定を入れて stage4 を再ビルドすること (C の `D()`・`Q()` と `memcpy` の宛先を `m11_cwatch` で見る。`M11_WATCH_C5695` の仕組みが流用できる)。
+
 ### 8-4 未解決 (起票先 #3608)
 
 - 149: `function_412c20` の戻り値 (0) の由来、`0x264208` (`Blend2D.dll`) を `function_6539e0` に渡す上流の呼出し元。
