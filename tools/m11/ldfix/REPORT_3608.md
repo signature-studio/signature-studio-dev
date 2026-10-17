@@ -233,8 +233,15 @@ cd tools/m11 && python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block000
 - 未確定: `18787504` (= 18787456 + 48・引数領域の 6 番目 qword) の値 `0x100000002` の出所。entry 時点 (4128b0) で既に入っており、読み出し (`4129be`・B より前) も 2 。prod.ll 全体で `18787504` を直接指定する store は無く、読み出しは 4 箇所だけ (117921・117975・118011・118033 行)。118032 行の memcpy (37 qword) は B の後 (`412a12`) なので値の出所ではない。前段 (4128b0 の呼出し元 `function_412a40` ← `function_4096b0` の鎖) で入る値として未追跡。
 - 対照の制約: OOB 14 件は entry 0 回 (`function_4128b0__lifted` を通らない)。
 
+### 8-7 `18787504` (0x100000002) の書込み時点 (#5280・受入 1 の残り・診断)
+
+- 計装: `trap114_g_read_5280.mjs` (boot 前後と各 unit の前後で `18787504` を読む)・`trap114_src_5280.py` + `trap114_src_read_5280.mjs` (memcpy 直前の源を読む)。測定 commit は `0c0984281` (origin/main・計装ファイルは未 commit で追加)。`ldfix_e2e.sh` rc 0・64 秒・PASS、`prod_order_3608.sh h_nor8b fix` rc 0・41 秒・872/47/22。
+- 実測: boot 前 `0x0` → `entry_point` 後 `0x100000002`。942 unit の各呼出しの前後では変化 0 (halt0 8・OOB 14 の全件で pre = post = `0x100000002`)。書込みは `m11_boot_enter` の中。
+- memcpy 直前の源の計装は 0 件。B の `function_412770` (117995 行) は `412a12` (memcpy) より前で halt0 し、halt0 の unit は memcpy に届かない。
+- 結論: 受入 1 の残りの「出所」は boot (`entry_point`) 内の書込みで、unit 側の経路ではない。boot 内の書込み元 (動的ポインタ経由の store) は未特定。
+
 ### 8-4 未解決 (起票先 #3608)
 
 - 149: `function_412c20` の戻り値 (0) の由来、`0x264208` (`Blend2D.dll`) を `function_6539e0` に渡す上流の呼出し元。
 - 144: `function_6539e0` が `0x2572dc` (`dsp_ippv2.dll`) を選ぶ条件 (呼出し元の分岐)。
-- 114: call site B (`function_412770(18787456)`) を確定 (A は 0 回・§8-5)。B の分岐条件 (`18787504` の i8 の trap 時の値) は未確定。受入 1 の残り。
+- 114: call site B (`function_412770(18787456)`) を確定 (A は 0 回・§8-5)。B の分岐値 `18787504` = 0x100000002 は boot (`entry_point`) で書かれ、unit 側では変わらない (§8-7)。boot 内の書込み元は未特定。受入 1 の残り。
