@@ -11,6 +11,9 @@ if [ ! -f /opt/emsdk/emsdk_env.sh ]; then
   echo "[m11build] ERROR: prerequisite missing: emsdk 無し (/opt/emsdk/emsdk_env.sh が見つからない)" >&2; exit 1
 fi
 source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
+# #6010: emsdk_env.sh は upstream/bin を PATH に足さないため、llvm-nm を emsdk 内から明示的に解決する (runner の手作業 symlink に頼らない)
+LLVM_NM="${EMSDK:-/opt/emsdk}/upstream/bin/llvm-nm"
+[ -x "$LLVM_NM" ] || { echo "[m11build] ERROR: llvm-nm が無い: $LLVM_NM (toolchain-emsdk の展開を確認)" >&2; exit 1; }
 export TMPDIR="$HERE/work/tmp"
 mkdir -p work/tmp work/obj
 M11_LB_BASE="${M11_LB_BASE:-0}"; export M11_LB_BASE   # #222: LVA = RVA + M11_LB_BASE (0 = 従来)
@@ -231,7 +234,7 @@ CF_BASE="$CF"
 CF="${CF_BASE//-DM11_INSTR_413060=$M11_INSTR_413060/-DM11_INSTR_413060=$M11_RT_INSTR}" cc m11_rt.c work/obj/rt.o
 CF="$CF_BASE" cc m11_win.c work/obj/win.o
 echo "$RTWIN_SHA" > work/rtwin.sha256
-llvm-nm --defined-only work/obj/shim_*.o work/obj/rt.o work/obj/win.o 2>/dev/null | awk '$2 ~ /^[TtWwDd]$/ {print $3}' | sort -u > work/defined_c.txt
+"$LLVM_NM" --defined-only work/obj/shim_*.o work/obj/rt.o work/obj/win.o 2>/dev/null | awk '$2 ~ /^[TtWwDd]$/ {print $3}' | sort -u > work/defined_c.txt
 if [ ! -f work/m11_winstubs.c ] || [ work/defined_c.txt -nt work/m11_winstubs.c ] || [ m11_genstubs.py -nt work/m11_winstubs.c ] || [ work/boot_final.ll -nt work/m11_winstubs.c ]; then
   M11_EXCLUDE=work/defined_c.txt python3 m11_genstubs.py work/boot_final.ll work > work/genstubs.log
   touch work/m11_winstubs.c work/m11_fnstubs.c
