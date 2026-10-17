@@ -4,7 +4,8 @@
 
 - 親: #5934 (SR-85 の受入) / 前段: REPORT_APPENDIX_5005.md §5.10・§5.11 (突き合わせ 46/46 一致・測定 commit `41a9499ba`)。
 - 入力: `Serum2_win64.vst3` (sha256 `501e7bb3…4e5283`・19,236,864 B)。素材 `plugins-serum2` の installer から取り出し。
-- 測定 commit (コード): 本付録を含む commit の直前の HEAD (`bcd2435ac`・origin/main)。新規のコードは `gui/indirect_sr85_this_slot.py` のみ。
+- 測定 commit (コード): `424c8dacf` (`gui/indirect_sr85_this_slot.py` を追加した commit)。以後このディレクトリのコードは未変更。
+- 同一 commit での再実行: `indirect_sr85_this_slot.py` 18.2 秒 (real)・出力 md5 `621acd0f…` (2 回一致)。
 
 ### 6.1 手順
 
