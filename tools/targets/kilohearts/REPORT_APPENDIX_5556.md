@@ -162,3 +162,10 @@ ACFStartup() = 0 (0x0)
 - Wine 9.0・MinGW `x86_64-w64-mingw32-gcc`。`loader_branch.exe` sha256 `16ab2917…`。
 - 実行: `WINEDEBUG=-all wine ./loader_branch.exe "$PWD/HeartCore.core_64" <QI> <slot>`。全条件 exit 0・stderr 空。
 - `loader_qi_ok.c` の再現 (本 run): LOAD OK・QI S_OK・slot[3] 3 回・slot[2] 1 回・戻り値 0・exit 0 (§7 と一致)。
+
+### 8.3 再現情報 (第 4 run の記録の不足分)
+
+- ビルド: `x86_64-w64-mingw32-gcc -O0 -o loader_branch.exe loader_branch.c` (`runtime_wine/` で実行)。第 4 run の `loader_branch.exe` sha256 `16ab2917…` は記録値。本 run では再ビルドしていないため照合していない。
+- 実行: `WINEDEBUG=-all wine ./loader_branch.exe "$PWD/HeartCore.core_64" <QI の戻り値 16 進> <slot 戻り値 16 進>`。表の 4 条件は `(0 0)`・`(0 1)`・`(0 80004005)`・`(80004002 0)`。
+- stdout の生ログ (各条件の全行): **未採取**。第 4 run の stdout は保存されておらず、本 run では wine・MinGW と `plugins-kilohearts` 素材が無いため再実行できない。表の値は第 4 run の記録に基づく。再採取の条件は素材 `plugins-kilohearts` と Wine 9.0 + MinGW。採取後にここへ全行を追記する。
+- 参考: `loader_qi_ok.exe` (QI S_OK・slot 戻り値 0) の §7 の生ログ (7 行) は残っている。`(0 0)` 条件の土台になるが、`loader_branch` 自体の生ログではない。
