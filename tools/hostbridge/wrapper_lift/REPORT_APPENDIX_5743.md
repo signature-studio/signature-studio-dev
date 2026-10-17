@@ -85,7 +85,7 @@
 | 0x7c76b0 | 0x7c7796 | 戻る | VarDefStmtOptimizer |
 | 0x683120 | 0x6835cb | 戻る (§4c で測定。当時の表は `NORANGE`) | VarDefStmtOptimizer (§4c) |
 
-- 上表の範囲 (`lo-hi`) は本 run の `targets.txt` にあり、リポジトリに収録していない。`notloop_vardef.sh` の入力として再現するには、関数の範囲を取り直す必要がある (未収録)。
+- 上表の範囲 (`lo-hi`) は `notloop_targets.txt` に収録した (§4e で `.pdata` から取り直した値)。`notloop_vardef.sh` の入力はこの一覧を使う。
 - **VarDef 単独の disable で件数は減らない**: `notloop_vardef.sh` で、VarDefStmtOptimizer のみ disable した C の `emcc -fsyntax-only` の `not in loop` 件数は、既定 C と全 12 組で同じ (0x4166b0・0x575480・0x7c76b0 系は 4 件、0x717600 は 2 件、他は 1 件)。注釈の復帰は、この件数を変えなかった。
 - 判定 (測定の範囲に留める): 注釈の消失は VarDefStmtOptimizer 単独 (11 組) と、VarDefStmtOptimizer + WhileTrueToWhileCondOptimizer (0x44abe0) の disable で戻る。VarDef 単独の disable では `not in loop` の件数は減らない。これ以上の結論 (VarDef が原因ではない等) は、件数を減らす別の段・組み合わせを測っていないので言えない。
 - 未検証: 最小集合の C を wasm 実行して bit 一致を確認すること (未実施)。全 disable 32 種は `--backend-disabled-opts` に全名を渡しており、名前の全件が有効であることは未確認 (存在しない名前は無視される)。
@@ -127,6 +127,13 @@
 - 過去 PR (#5833・#5872・#5890) の diff には名前一覧が含まれず、渡した形式は diff からは確定できない。
 - 未確認: 残り 16 種 (§3 の 48 個との差) の名前。`WhileTrueToUForLoop` 等の綴りの扱いは、クラス宣言と `getId()` の両方で一致したが、RetDec の内部一覧 (`optimizerManager`) 自体は未読。12 組の入力範囲は未収録のまま。
 
+## 4e. 残り 12 組の入力範囲の取り直し (本 run・測定なし)
+
+- 方法: `notloop_ranges.py` が `block19091_PE.bin` の `.pdata` を `Image.func_at` で引き、飛び先 VA を含む関数の `begin-end` を出す。RetDec 出力の `// Address range` 行には依らない。
+- 結果: 13 行 (`notloop_targets.txt`) すべて範囲が引けた (`NORANGE` 0 件)。0x7c76b0 の 2 飛び先は同じ関数。
+- 素材: `fl-win64` の `extracted/block19091_PE.bin` (`$RUNNER_TEMP` に展開)。RetDec・emcc は本節では使わない。
+- 未実施: 取り直した範囲での `not in loop` の段の測定 (RetDec・emcc が必要)。§4b の表の「範囲未収録」の未解決は、この範囲取得で解消した。
+
 ## 5. 採らなかった方式
 
 - 両方 disable した C を既定に採用する: 制御構造が既定と変わる。13 組は戻らないため、採用しても 27 件は解消しない。
@@ -138,7 +145,7 @@
 |---|---|---|
 | 残り 13 組の注釈消失の段 (単独・組み合わせの disable では戻らない) | 27 件のうち 13 組の直し方が決まらない | #1954 (HB-H41) |
 | 全 optimizer 48 個のうち 32 種の外 (16 種) の探索 | 最小集合が 32 種の中でのみ成り立つ | #1954 (HB-H41) |
-| 12 組の入力範囲 (`targets.txt`) が未収録 | §4b の再現手段 | #1954 (HB-H41) |
+| 12 組の入力範囲は §4e で `.pdata` から取得・収録済み。取り直した範囲での段の測定は未実施 | §4b の再測定 | #1954 (HB-H41) |
 | VarDef 単独 disable で件数が減らない段の特定 | 27 件の直し方が決まらない | #1954 (HB-H41) |
 | 両方 disable (5 組) の C の wasm 実行 (bit 一致) | 戻した C の正しさ未検証 | #1954 (HB-H41) |
 | probe の範囲と grep の範囲の差 (0x5e5d60) | 未解決 19 組の数え方 | #1954 (HB-H41) |
