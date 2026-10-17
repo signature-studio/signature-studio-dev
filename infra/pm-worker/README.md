@@ -115,7 +115,7 @@ merged PR を持つ親 issue を閉じる (`src/autoclose.ts`)。判定は保存
 
 - **保存の範囲**: merged PR の参照は、Worker が見たものだけ (webhook、または全体同期の窓 24 時間)。窓より前に merge された PR は見ていないので、その親は閉じない (保守的な側に倒す)。
 - **抜けは閉じないほうに倒す**: `mentions` の無い open PR (保存形式の移行前) が 1 件でもあれば全体で閉じない。blocked_by の一覧が件数に足りない open issue (件数 `total_blocked_by` > 一覧の件数) があれば、子でない限り全体で閉じない。この状態は同期 (`syncBlockers`) が REST から一覧を取り直して直す。同期が古い間 (`fresh=false`) も閉じない。
-- 1 tick で最大 5 件。同じ issue は書き込みを試してから 24 時間は再試行しない (閉じ損ねた後のコメントの二重投稿を防ぐ)。
+- 1 tick で最大 5 件、1 時間で最大 10 件 (`AUTO_CLOSE_MAX_PER_HOUR`。試行を数え、失敗した試行も含む)。上限に達したら残りは次の時間の tick まで待つ。同じ issue は書き込みを試してから 24 時間は再試行しない (閉じ損ねた後のコメントの二重投稿を防ぐ)。
 - **書き込みは `LIVE_CLOSE="1"` のときだけ** (`LIVE` や `LIVE_LAUNCH` / `LIVE_DISPATCH` では動かない)。既定は記録のみ: `/status` の `counters.wouldClose` と log の `would-close`。`mode_close` が `live` / `dry-run` を示す。
 - live の順序: コメント (`[auto-close] 規則 A: merged PR #<x>、残りは #<c> が追跡 <!-- oc-auto-close: rule=A -->`) → `PATCH` で `state=closed`・`state_reason=completed` (PM App の token、issues:write)。閉じた後の状態は Worker の手元でも closed にする。
 

@@ -12,6 +12,9 @@ import { NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
 export const AUTO_CLOSE_RULE = "A";
 // 1 tick に閉じる上限。
 export const AUTO_CLOSE_MAX = 5;
+// 1 時間に閉じる上限 (書き込みの試行で数える)。誤判定が続いても、1 時間あたりの被害をこの件数で止める。
+export const AUTO_CLOSE_MAX_PER_HOUR = 10;
+export const AUTO_CLOSE_HOUR_MS = 3_600_000;
 // 同じ issue を試す間隔 (閉じ損ねても、この間は再試行しない。コメントの二重投稿を防ぐ)。
 export const AUTO_CLOSE_RETRY_MS = 24 * 3_600_000;
 // dry-run の記録の重複排除 (同じ候補を毎分ログに残さない)。

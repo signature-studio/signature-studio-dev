@@ -1,7 +1,7 @@
 // PM の本体: 状態の同期 (full / reconcile)・分類・launch の選定と実行・watchdog dispatch・status。
 // 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
 //   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
-import { AUTO_CLOSE_MAX, AUTO_CLOSE_RETRY_MS, AUTO_CLOSE_WOULD_MS, closeComment, detectRuleA, type CloseTarget } from "./autoclose.ts";
+import { AUTO_CLOSE_HOUR_MS, AUTO_CLOSE_MAX, AUTO_CLOSE_MAX_PER_HOUR, AUTO_CLOSE_RETRY_MS, AUTO_CLOSE_WOULD_MS, closeComment, detectRuleA, type CloseTarget } from "./autoclose.ts";
 import { countOpencodeRuns, countRunsByPrio, type ActiveCount } from "./active.ts";
 import { classify, isStopReport, neededArtsOf, RUN_WINDOW_H, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
@@ -1580,9 +1580,13 @@ export class Engine {
     const hold = live ? AUTO_CLOSE_RETRY_MS : AUTO_CLOSE_WOULD_MS;
     const seen: Record<string, number> = {};
     for (const [k, at] of Object.entries(this.d.store.get<Record<string, number>>("meta", key) ?? {})) if (now - at < hold) seen[k] = at;
+    // 直近 1 時間に live で書いた件数 (試行を含む)。上限に達したら、残りは次の時間の tick まで待つ。
+    const tryAt: Record<string, number> = {};
+    for (const [k, at] of Object.entries(this.d.store.get<Record<string, number>>("meta", "autoCloseTries") ?? {})) if (now - at < AUTO_CLOSE_HOUR_MS) tryAt[k] = at;
+    const hourLeft = AUTO_CLOSE_MAX_PER_HOUR - Object.keys(tryAt).length;
     const picks = detectRuleA(this.s)
       .filter((t) => !(String(t.n) in seen))
-      .slice(0, AUTO_CLOSE_MAX);
+      .slice(0, live ? Math.max(0, Math.min(AUTO_CLOSE_MAX, hourLeft)) : AUTO_CLOSE_MAX);
     if (picks.length === 0) return out;
     this.meta.counters = this.meta.counters ?? this.zero();
     for (const t of picks) {
@@ -1596,6 +1600,7 @@ export class Engine {
       // レート制限の守りに当たったら、まだ試していない候補は記録しない (次の tick で改めて試す)。
       if (restGuardOn(this.meta.rest?.remaining)) break;
       seen[String(t.n)] = now;
+      tryAt[String(t.n)] = now;
       try {
         await gh!.comment(t.n, closeComment(t));
         await gh!.closeIssue(t.n);
@@ -1615,6 +1620,7 @@ export class Engine {
       out.closed.push(t);
     }
     this.d.store.put("meta", key, seen);
+    if (live) this.d.store.put("meta", "autoCloseTries", tryAt);
     this.saveMeta();
     return out;
   }
