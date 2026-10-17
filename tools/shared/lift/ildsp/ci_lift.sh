@@ -18,8 +18,9 @@ RANGES=$(python3 -c "import json;print(','.join(json.load(open('$W/ranges.json')
 echo "[ci] retdec: $(grep -c '^define' "$W/ci.drc.ll") define (範囲 36)"
 python3 "$HERE/ci_restore_stores.py" "$W/ci.drc.ll" "$W/ci.rs.ll"
 python3 "$HERE/ci_restore_jump_table.py" "$W/pe.bin" "$W/ci.rs.ll" "$W/ci.rj.ll"
-python3 "$HERE/ci_census.py" "$W/ci.drc.ll" "$W/ranges.json" "$W/ci.rs.ll" "$W/ci.rj.ll"
-python3 "$ROOT/lift/libkio/ir_normalize.py" "$W/ci.rj.ll" "$W/ci.rs_norm.ll" > /dev/null
+python3 "$HERE/ci_restore_memset.py" "$W/pe.bin" "$W/ci.rj.ll" "$W/ci.rm.ll"
+python3 "$HERE/ci_census.py" "$W/ci.drc.ll" "$W/ranges.json" "$W/ci.rs.ll" "$W/ci.rm.ll"
+python3 "$ROOT/lift/libkio/ir_normalize.py" "$W/ci.rm.ll" "$W/ci.rs_norm.ll" > /dev/null
 python3 "$ROOT/lift/libreverb/gen_helpers.py" "$W/ci.rs_norm.ll" "$W/ci_helpers.c"
 # emcc (LLVM 21 系) は RetDec 出力の use-list 指令 (順序メタ情報・意味なし) を受け付けない。除いてから IR→obj まで通す (REPORT_CI §8)。
 source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1

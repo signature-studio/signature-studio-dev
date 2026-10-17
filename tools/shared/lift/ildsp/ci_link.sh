@@ -32,7 +32,7 @@ set -e
 grep -o 'undefined symbol: [A-Za-z_0-9]*' "$W/link.log" | sed 's/undefined symbol: //' | sort | uniq -c > "$W/undefined.txt" || true
 echo "[ci-link] wasm-ld rc=$RC / 未解決シンボル (種, 件数 = リンクエラー行数)"
 cat "$W/undefined.txt"
-EXPECT='EnterCriticalSection|FlsGetValue|FlsSetValue|GetLastError|HeapAlloc|HeapFree|LeaveCriticalSection|RaiseException|RtlPcToFileHeader|SetLastError|function_1801aef40|function_1801cb600'
+EXPECT='EnterCriticalSection|FlsGetValue|FlsSetValue|GetLastError|HeapAlloc|HeapFree|LeaveCriticalSection|RaiseException|RtlPcToFileHeader|SetLastError|function_1801cb600'
 BAD=$(sed -E 's/^ *[0-9]+ //' "$W/undefined.txt" | grep -Ev "^($EXPECT)$" || true)
 if [ -n "$BAD" ]; then echo "[ci-link] 想定外の未解決: $BAD"; exit 1; fi
 echo "[ci-link] 未解決は期待集合 (IAT 10 種・直接/画像内の呼び出し先 2 種) のみ。global_var_1803f6610 と __stack_pointer は解決済み (@0 は shim)"
