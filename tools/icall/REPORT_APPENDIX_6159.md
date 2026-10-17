@@ -4,7 +4,7 @@
 
 ## 1. 結論
 
-- debug 有効 (`CMAKE_BUILD_TYPE=Debug`, `-g`) の `retdec-decompiler` を上流 `avast/retdec` の `v5.0` から再ビルドし、完走した。
+- debug 有効 (`CMAKE_BUILD_TYPE=Debug` を指定) の `retdec-decompiler` を上流 `avast/retdec` の `v5.0` から再ビルドし、完走した。
 - `--version` は `v5.0` / commit `53e55b4b26e9b843787f0e06d867441e32b1604e`。素材 install tree の `share/retdec/BUILD-ID` と **commit hash が一致**。
 - 同一入力 (`/bin/true`) で新旧の出力 C は **sha256 一致** (`3fb49af7…41fe`)。ログ差は時間のみ。
 - **未達**: `getJumpTarget` の Undefined 値確定 (受入 1 の本体) は本 run では未実施。`/bin/true` は間接 call を含まないため icall 経路の検証には使えない。#5115 の受入 1 は前提が揃った後の別 run。
@@ -41,6 +41,8 @@
 | `make retdec-decompiler` (LLVM 込み) | **成功** (`[100%] Built target retdec-decompiler`) | 14:40 〜 14:55 (`uptime` 表示の実測。110 秒 × 区切り 8 回) |
 | 実行確認 | 支援データ (`share/retdec/decompiler-config.json` 等) は build tree に無いため、素材 install tree を複製し `bin/retdec-decompiler` だけを新ビルドに差替えて実行 | 14 秒 (`/bin/true`) |
 
+yara の configure 失敗 (上表 2 回目) は `make retdec-decompiler` の成否に影響しなかった。`retdec-decompiler` 本体は yara に依存せず、同 target は成功した。
+
 **合計**: 14:22 (run 開始) 〜 14:57 (実行確認まで)。LLVM 込みの debug 再ビルド (14:40〜14:55) が支配的。`make install` は yaramod の失敗で止まるため使えず、上記の複製方式で検証した。
 
 ### 注意 (再現手順)
@@ -53,13 +55,13 @@
 ## 3a. 測定 commit と差分 (WORKFLOW §6)
 
 - 測定 commit: `097225b74` (main)。ビルド対象の上流は `avast/retdec` `v5.0` = `53e55b4b26e9b843787f0e06d867441e32b1604e` (`git ls-remote` で確認)。
-- 検証起点 (本付録を書いた時点の PR head): `72bf22db2`。
-- `git diff 097225b74 72bf22db2 -- tools/icall docs/DOC_MAP.md --stat` の出力:
+- 検証起点 (本付録を書いた時点の PR head): `0bbff4a7c`。
+- `git diff 097225b74 0bbff4a7c -- tools/icall docs/DOC_MAP.md --stat` の出力:
 
 ```
  docs/DOC_MAP.md                     |  1 +
- tools/icall/REPORT_APPENDIX_6159.md | 65 +++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
+ tools/icall/REPORT_APPENDIX_6159.md | 84 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 85 insertions(+)
 ```
 
 - 同 diff の `docs/DOC_MAP.md` 部分は本 PR で追加した 1 行 (`tools/icall/REPORT_APPENDIX_6159.md` の索引行) のみ。コード (`tools/icall` 配下のスクリプト・ソース) の変更は 0 件。
