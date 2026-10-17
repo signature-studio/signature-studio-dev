@@ -139,6 +139,14 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
   else
     python3 m11_cond.py shx_t40=not-applied
   fi
+  # #5855 (SHX-T61) 計装用: M11_FIX_SHX_T61=1 のときだけ callee function_4483f0 の入口に呼出し計数と this+0x4c / +0x48 の出力を入れる (既定 OFF)。
+  if [ "${M11_FIX_SHX_T61:-0}" = 1 ]; then
+    python3 ldfix/fix_shx_t61.py work/boot_final.ll work/boot_final.shx61.ll
+    mv work/boot_final.shx61.ll work/boot_final.ll
+    python3 m11_cond.py shx_t61=applied
+  else
+    python3 m11_cond.py shx_t61=not-applied
+  fi
 else
   python3 m11_cond.py ldfix=skipped
   echo "[gen_ir2] ERROR: ldfix skip (PE 無し: $PE / capstone・pefile 無し) — fail-closed で失敗" >&2
