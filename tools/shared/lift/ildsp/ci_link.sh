@@ -25,15 +25,15 @@ emcc -c -O1 -w "$W/ci.ll" -o "$W/ci.o"
 emcc -c -O1 -w "$IN/ci_helpers.c" -o "$W/helpers.o"
 emcc -c -O1 -w "$W/shim.c" -o "$W/shim.o"
 set +e
-emcc -O1 -w "$W/ci.o" "$W/helpers.o" "$W/shim.o" -sSTANDALONE_WASM=1 --no-entry -sERROR_ON_UNDEFINED_SYMBOLS=1 \
+emcc -O1 -w "$W/ci.o" "$W/helpers.o" "$W/shim.o" "$IN/ci_iat.o" "$IN/ci_traps.o" -sSTANDALONE_WASM=1 --no-entry -sERROR_ON_UNDEFINED_SYMBOLS=1 \
   -Wl,--no-gc-sections -Wl,--error-limit=0 -Wl,--export=GeneralPitchShifter_CreateInstance -o "$W/ci.wasm" > "$W/link.log" 2>&1
 RC=$?
 set -e
 grep -o 'undefined symbol: [A-Za-z_0-9]*' "$W/link.log" | sed 's/undefined symbol: //' | sort | uniq -c > "$W/undefined.txt" || true
 echo "[ci-link] wasm-ld rc=$RC / 未解決シンボル (種, 件数 = リンクエラー行数)"
 cat "$W/undefined.txt"
-EXPECT='EnterCriticalSection|FlsGetValue|FlsSetValue|GetLastError|HeapAlloc|HeapFree|LeaveCriticalSection|RaiseException|RtlPcToFileHeader|SetLastError|function_1801aef40|function_1801cb600'
+EXPECT='function_1801aef40'
 BAD=$(sed -E 's/^ *[0-9]+ //' "$W/undefined.txt" | grep -Ev "^($EXPECT)$" || true)
 if [ -n "$BAD" ]; then echo "[ci-link] 想定外の未解決: $BAD"; exit 1; fi
-echo "[ci-link] 未解決は期待集合 (IAT 10 種・直接/画像内の呼び出し先 2 種) のみ。global_var_1803f6610 と __stack_pointer は解決済み (@0 は shim)"
+echo "[ci-link] 未解決は期待集合 (function_1801aef40 のみ・#3318)。IAT 10 種 (ci_iat.o)・trap 2 種 (ci_traps.o) はリンク済み。global_var_1803f6610 と __stack_pointer は解決済み (@0 は shim)"
 exit 0
