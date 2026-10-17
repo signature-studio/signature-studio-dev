@@ -15,6 +15,10 @@ SRC="${FA_SRC:-$HERE/work/rt_freshair-core/after.0.restored.ll}"
 MAP="${FA_MAP:-$HERE/work/rt_freshair-core/map.json}"
 DLL="${FA_CORE:-$T/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64}"
 if [ ! -f "$SRC" ] || [ ! -f "$MAP" ]; then echo "[fa_route] $SRC / $MAP が無い: 素材 work-icall を展開 (tools/icall/work/rt_freshair-core)" >&2; exit 2; fi
+# ICALL-97 (#4290): roundtrip.sh の CHUNKS=N が出した全 chunk を統合する (chunk 0 だけでは入口表に入らない関数が出る)
+if [ -z "${FA_SRC:-}" ] && ls "$(dirname "$SRC")"/after.[1-9]*.restored.ll >/dev/null 2>&1; then
+  python3 "$HERE/ir_merge_restored.py" "$W/merged.restored.ll" "$(dirname "$SRC")"/after.[0-9]*.restored.ll; SRC="$W/merged.restored.ll"
+fi
 if [ ! -f "$DLL" ]; then echo "[fa_route] $DLL が無い: 素材 plugins-freshair を展開し tools/targets/freshair/fetch.sh を実行" >&2; exit 2; fi
 BLK_SHIFTED="$(python3 -c "import json,sys;m=json.load(open(sys.argv[1]));print(hex(m['blk']-0x180000000+0x30000000))" "$MAP")"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
