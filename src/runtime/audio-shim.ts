@@ -47,6 +47,8 @@ export interface ProducerStats {
   cb_count: number;
   cb_max_us: number;
   cb_max_q: number;
+  /** 目標充填 T (frames) = depth × buffer_frames。verify 時点の値 (underrun 時点の T は記録していない) */
+  target_fill: number;
   /** write の通算数 (writes はその直近 FLA_PW_N 件・古い順) */
   pw_n: number;
   writes: ProducerWrite[];
@@ -402,6 +404,7 @@ export class FlAudioShim {
       cb_count: this.ld("cb_count") >>> 0,
       cb_max_us: this.ld("cb_max_us") >>> 0,
       cb_max_q: this.ld("cb_max_q") >>> 0,
+      target_fill: (this.ld("depth") >>> 0) * (this.ld("buffer_frames") >>> 0),
       pw_n: n,
       writes,
     };
