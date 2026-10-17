@@ -139,6 +139,15 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
   else
     python3 m11_cond.py shx_t40=not-applied
   fi
+  # #5203 (SHX-T46, D23 段 1) 実験用: M11_FIX_SHX_T46=1 のときだけ function_448490 の count (-32) の 6 スロットを object +0x48 のメモリに統合する。
+  #   既定 OFF (既定の IR は変えない)。想定外の入力は assert で止まる (fail-closed)。ldfix/fix_shx_t46.py。
+  if [ "${M11_FIX_SHX_T46:-0}" = 1 ]; then
+    python3 ldfix/fix_shx_t46.py work/boot_final.ll work/boot_final.shx46.ll
+    mv work/boot_final.shx46.ll work/boot_final.ll
+    python3 m11_cond.py shx_t46=applied
+  else
+    python3 m11_cond.py shx_t46=not-applied
+  fi
   # #5855 (SHX-T61) 計装用: M11_FIX_SHX_T61=1 のときだけ callee function_4483f0 の入口に呼出し計数と this+0x4c / +0x48 の出力を入れる (既定 OFF)。
   if [ "${M11_FIX_SHX_T61:-0}" = 1 ]; then
     python3 ldfix/fix_shx_t61.py work/boot_final.ll work/boot_final.shx61.ll
