@@ -156,3 +156,13 @@ GHIDRA_HOME=<Ghidra 12.1.4 の展開先> python3 ../gui/iterate_sr85_upper.py   
 - `receiver_this_trace.py` (SR-43) との結合: このスクリプトは disp 0x30/0x38/0x88 だけを対象にするので、閉包内 46 サイトのうち一致は **2 件** (`vptr:INDEX`・`vptr:THIS-CHILD`)。残りは対象外。
 - 結論: **受入は未達**。「同じ slot を持つ別クラス vtable」は、vptr 書込みの有無では絞れない (ほぼ全 vtable が構築される)。型を絞るには、受信オブジェクトの生成元 (ctor 呼出し・引数) を関数間で追う必要がある。これは本 run の範囲外。
 - 未解決 (次の起票先): 型追跡の関数間化 → #5934 (本 issue の受入、未達のまま open)。
+
+### 5.9 次の一手 (#5934・run 3): `receiver_this_trace.py` の disp 制限の解除
+
+- 変更: `receiver_this_trace.py` に `--all-disps` を追加 (既定は従来どおり disp 0x30/0x38/0x88 のみ)。候補列挙の 1 行だけを変えた。測定 commit (コード): `7efc4f52f`。
+- 既定の挙動は変わらない: 既定実行の候補 1052 件・所要 23.4 秒 (前 run §5.8 の 1052 件と一致)。
+- `--all-disps` (測定 commit `7efc4f52f`・入力 sha256 `501e7bb3…4e5283`・19,236,864 B・素材 `plugins-serum2` の installer から取り出し): 候補 24,651 件・rc 0・所要 47.97 秒 (user 45.9 秒)。load 0.59〜0.81。出力 TSV の md5 は 2 回一致 (`5d52fe41…`)。
+- strict の分類は、上位が `R-nodom` 3,617・`vptr:THIS-CHILD` 2,990・`vptr:NODOM` 2,736・`vptr:CALLRET` 2,524。`vptr:THIS` は 2,004 件。
+- 閉包 (SC) の関数だけで見ると候補は 33 件・12 関数。
+- 未了 (受入に残る作業): 閉包内の間接 call 46 サイト (`ghidra_xferonoff_indirect` の SITE 行) との突き合わせは、この run では行っていない。SITE 行を作るには Ghidra の import が要る (前 run で 18 分 39 秒)。突き合わせ後に、同じ slot の別クラス vtable を型で絞る (受入) を判定する。
+- 判定: 候補の分類器としての流用は可能 (disp 制限は候補の列挙だけで、分類ロジックは変えていない)。受入は未達のまま。
