@@ -8,8 +8,10 @@
 #include "scen_qemath.h"
 #include "scen_em.h"
 #include "scen_kclp.h"
+#include "scen_kclp_b.h"
 Scenario SCEN_LIST[] = {
     {"kclp", trial_kclp, 20},
+    {"kclpb", trial_kclp_b, 20},
     {"matrix", trial_matrix, 6},
     {"gain", trial_gain, 6},
     {"haas", trial_haas, 6},
