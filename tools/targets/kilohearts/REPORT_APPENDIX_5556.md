@@ -82,18 +82,46 @@
 
 | 呼出し | 結果 |
 |---|---|
-| `wine loader_qi_ok.exe HeartCore.core_64` | `QI … -> S_OK` → slot[3] の呼出し → slot[2] の呼出し → `ACFStartup() = 0`・exit 0 |
+| `wine loader_qi_ok.exe HeartCore.core_64` | `QI … -> S_OK` → slot[3] を **3 回** → slot[2] を 1 回 → `ACFStartup() = 0`・exit 0 |
 
-**未確定 (本 PR の時点)**: slot[3] の呼出し回数は **3 回か 4 回か未確定**。本表 (3 回) と下の箇条 (4 アドレス) が矛盾している。生ログを保存していないため、どちらが正かを本文から判定できない。slot[2] の呼出し (`a`=`0x6fffff053120`・`b`=2) は箇条の記述のままで、同じく生ログで未検証。
+**実測 (第 3 run・測定 commit は本ファイル末尾の検証情報を参照)**:
 
-- slot[3] の第 1 引数 `a` の候補は rdata の GUID (`0x181429558`・`0x181429568`・`0x181429578`・`0x181429588`)。GUID の候補は `88882C2D-EBBC-42EF-C0AB-8981B0BD0CCA`・`96D42C2D-EBBC-41EF-B0AB-9991A0ED0CCA`・`A207EE9E-B442-11E4-A71E-12E3F512A338`・`12BEA399-9A4F-4353-8098-3916FA71898D`。ただし変換元のバイト列 (hexdump) は本 PR に記録していないため、変換は未検証。
+- slot[3] は **3 回**呼ばれる。3 回とも `a` は同じ `0x…9558` (`88882C2D-EBBC-42EF-C0AB-8981B0BD0CCA`)。変わるのは `c` (`0x…9568`・`0x…9578`・`0x…9588`)。
+- slot[2] は 1 回 (`a`=`0x6fffff053120`・`b`=2)。
+- `ACFStartup()` の戻り値は 0。
+
+GUID の変換 (PE の `.rdata` を直接読んで変換):
+
+| rdata アドレス (ImageBase 0x180000000) | GUID |
+|---|---|
+| `0x181429538` | `382B6A96-7FD0-11D6-BCFE-00306542A024` (QI の IID) |
+| `0x181429558` | `88882C2D-EBBC-42EF-C0AB-8981B0BD0CCA` (slot[3] の `a`) |
+| `0x181429568` | `96D42C2D-EBBC-41EF-B0AB-9991A0ED0CCA` (slot[3] の `c` の参照先) |
+| `0x181429578` | `A207EE9E-B442-11E4-A71E-12E3F512A338` (同上) |
+| `0x181429588` | `12BEA399-9A4F-4353-8098-3916FA71898D` (同上) |
+
+**生ログ (実装 run の stdout 全行・`WINEDEBUG=-all`・stderr 空・exit 0)**。ASLR で handle・スタック由来の値は実行ごとに変わるが、件数と `a` は同じ:
+
+```
+LOAD OK handle=00006ffff4930000
+QI self=00007ffffe2ffea0 iid=00006ffff5d59538 -> S_OK
+slot[3] self=0000000140009080 a=00006ffff5d59558 b=0000000000000000 c=00006ffff5d59568
+slot[3] self=0000000140009080 a=00006ffff5d59558 b=0000000000000000 c=00006ffff5d59578
+slot[3] self=0000000140009080 a=00006ffff5d59558 b=0000000000000000 c=00006ffff5d59588
+slot[2] self=0000000140009080 a=00006fffff053120 b=0000000000000002 c=00007ffffe8945f0
+ACFStartup() = 0 (0x0)
+```
+
+(同じ commit で reviewer 側の実行 `handle=00006ffff49b0000` でも slot[3] 3 回・`a`=`…9558` の同一結果を得た。)
 
 ### 検証情報 (本 PR の時点)
 
-- 生ログ (`loader_qi_ok.exe` の stdout): **未保存**。本 run では `plugins-kilohearts` が展開されておらず (`$ARTIFACTS_DIR` は `fl-win64` のみ)、`HeartCore.core_64` を再実行できなかった。
-- 検証起点 commit: `60c94d658` (WORKFLOW §6)。
-- MinGW のコンパイル行・`WINEDEBUG` の設定: **未記録**。Wine は 9.0 (apt `wine64`)、MinGW は apt `gcc-mingw-w64-x86-64`。
-- 再実行には `oc_artifacts: fl-win64 plugins-kilohearts` が要る (PR 本文に記載)。
+- 素材: `plugins-kilohearts.tar.zst` → `Kilohearts Offline Installer.zip` → `inst/payload.dat` (zip・store) → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B)。`zstd -dc … | tar -x` と `unzip` で展開 (`tools/targets/kilohearts/work/rerun/`・gitignore)。
+- `HeartCore.core_64` の sha256: `d55ce8b4c0ad7ebedf1a4a1f74443a91d255596be887a514e54269ec8751441e` (§2 と一致)。
+- Wine: `wine-9.0 (Ubuntu 9.0~repack-4build3)` (apt `wine64`・`/usr/bin/wine`)。MinGW: `x86_64-w64-mingw32-gcc (GCC) 13-win32` (apt `gcc-mingw-w64-x86-64`)。
+- ビルド: `cd tools/targets/kilohearts/runtime_wine && x86_64-w64-mingw32-gcc -O0 -o loader_qi_ok.exe loader_qi_ok.c` (`loader_qi_ok.exe` sha256 `d0ab08a7…`)。
+- 実行: `WINEDEBUG=-all wine ./loader_qi_ok.exe "$PWD/HeartCore.core_64"`。exit 0・stderr 空。stdout は §7 の生ログと同じ 8 行。
+- 検証起点 commit: `60c94d658`。`git diff 60c94d658 HEAD -- tools/targets/kilohearts/runtime_wine` は**空** (差分 0)。`tools/targets/kilohearts` 全体の差分は本 PR の REPORT のみ。
 - QI の IID `0x181429538` は `382B6A96-7FD0-11D6-BCFE-00306542A024` (§6.2 と一致)。
 - QI 成功時も `ACFStartup` は 0 で戻る。戻り値 0 は初期化成功の根拠にならない (§6.2 と同じ結論)。slot の戻り値を変えた場合の分岐は未測定。
 
@@ -102,6 +130,5 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | IID を除く 4 つの GUID (`88882C2D…`・`96D42C2D…`・`A207EE9E…`・`12BEA399…`) の interface 名 (IID `382B6A96…` は §6.2 で同定済み) | slot の型が決まらず、受入 (1) の初期化判定に使う戻り値の意味が決まらない | #5556 (本 issue の残り) |
-| slot[3] の呼出し回数 (3 回か 4 回か) と各呼出しの `a` の値 | 生ログ未保存のため確定できない。再実行が要る | #5556 (本 issue の残り) |
 | slot の戻り値を変えたときの分岐 (`0x180264bb8` 以降の `ACFRegisterComponent` 相当の有無) | 受入 (1) の判定 | #5556 (本 issue の残り) |
 | Web 検索 (GUID の名前引き) は本 run で失敗 | GUID の名前を外部から確定できない | #5556 (本 issue の残り) |
