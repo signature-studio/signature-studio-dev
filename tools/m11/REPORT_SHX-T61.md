@@ -12,11 +12,11 @@
 - 差分 0 の証跡 (本 run・HEAD で確認):
 
 ```
-$ git diff 390061627 HEAD -- tools/m11 | wc -l
+$ git diff 390061627 HEAD -- tools/m11 ':!tools/m11/REPORT_SHX-T61.md' | wc -l
 0
 ```
 
-- 素材: `fl-win64` (`$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`) を本 run で展開。`work-m11` は本 run の `$HOME/artifacts` に無い。
+- 素材: `fl-win64` (`$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`) を本 run で展開。`work-m11` は本 run の artifacts 配置先 (`docs/WORKFLOW.md` §11 の `work-m11`) に無い。
 - 負荷 (前 run): 1 分平均 0.99〜1.00 (nproc 4)。
 
 ## 3. 実測
@@ -35,7 +35,7 @@ $ git diff 390061627 HEAD -- tools/m11 | wc -l
 ### 3.2 本 run の再現 (失敗)
 
 - `m11_gen_ir2.sh` (既定・FL_WIN64_DIR を展開先に設定): rc 1。`work/boot0.lift.ll` が無い (`m11_merge.py` が FileNotFoundError)。
-- 原因: lift 素材 `boot0〜5.lift.ll` を含む `work-m11` が本 run に配置されていない。`$HOME/artifacts` は `fl-win64.tar.zst` のみ。`boot*.lift.ll` の再生成は RetDec を使うため、新規の作業としては行わない (D5)。
+- 原因: lift 素材 `boot0〜5.lift.ll` を含む `work-m11` が本 run に配置されていない。本 run の artifacts 配置先は `fl-win64.tar.zst` のみ。`boot*.lift.ll` の再生成は RetDec を使うため、新規の作業としては行わない (D5)。
 - よって本 run では §3.1 の `ir_sha256` 全文と `fx61` 件数を再確認できなかった。
 
 ### 3.3 ON 計装 (`M11_FIX_SHX_T40=1 M11_FIX_SHX_T61=1`・前 run の実測)
@@ -62,5 +62,5 @@ $ git diff 390061627 HEAD -- tools/m11 | wc -l
 ## 5. 未実装・未解決
 
 - `fx61_rec.c` の `fx61_count` / `fx61_self` / `fx61_c4c` / `fx61_c48` を呼ぶ JS 側の経路は無い。読み出し口は定義済みだが未使用。
-- hang 中の `@fx61_buf` を読む経路 (wasm メモリを hang 後に読む、または回数上限で callee から戻す計装)。親 #5855 の本文のチェックリストに追記する。
-- 修復 ON の hang の機序 (#5846 受入 1 の続き)。親 #5846 (#5855 の続き)。
+- hang 中の `@fx61_buf` を読む経路 (wasm メモリを hang 後に読む、または回数上限で callee から戻す計装)。起票先: #5855 (本 PR の Refs 先) の本文「次段の残り」チェックリスト。fix round 1 で追記済み。
+- 修復 ON の hang の機序 (#5846 受入 1 の続き)。起票先: #5855 (受入 1 の続き)。#5846 の現タイトル (「(#4121 残件)」) とは対応しないため、#5846 へは追記しない。
