@@ -60,6 +60,45 @@ def reg_id(name):
     return getattr(unicorn.x86_const, 'UC_X86_REG_' + name.upper())
 
 
+DELPHI_EXC_CODE = 0xeedfade
+
+
+def eh_frames(pe):
+    # EHANDLER を持つ関数だけ: (begin, end, handler_rva_ok, scopes[(b, e, kind, jump)])
+    # UNWIND_INFO: header 4B・codes 2*round_up(count,2)・EHANDLER なら handler RVA 4B・scope 数 4B・scope 16B×n。
+    # frame reg = rbp (5)・offset 0 の関数だけ扱う。rsp == rbp が本体で成り立つ (push/pop なし)。
+    out = []
+    for f in pe.DIRECTORY_ENTRY_EXCEPTION:
+        s = f.struct
+        hdr = pe.get_data(s.UnwindData, 4)
+        if not (hdr[0] >> 3) & 1 or hdr[3] != 0x05:
+            continue
+        pos = s.UnwindData + 4 + 2 * ((hdr[2] + 1) & ~1) + 4
+        n = struct.unpack('<I', pe.get_data(pos, 4))[0]
+        scopes = [struct.unpack('<IIII', pe.get_data(pos + 4 + 16 * k, 16)) for k in range(n)]
+        out.append((s.BeginAddress, s.EndAddress, scopes))
+    return out
+
+
+def seh_catch(uc_, frames, ib):
+    # -E: 0xeedfade の RaiseException を、スタック上で最も内側の EHANDLER フレームの kind=2 scope へ移す。
+    # 戻り番地 v の slot を s とすると、その呼出し元 (call 命令) の rsp は s+8 で rbp と一致する。
+    # 戻り番地 v-1 (call 命令) が scope の try 範囲内で kind=2 なら、jump 先へ rsp=rbp=s+8 で再開する。
+    # 戻り値を捨てる後続の epilogue は、landing pad 側の `pop rbp; ret` で既存どおり動く。
+    rsp = uc_.reg_read(UC_X86_REG_RSP)
+    for i in range(0x400):
+        s = rsp + 8 * i
+        v = struct.unpack('<Q', uc_.mem_read(s, 8))[0]
+        for begin, end, scopes in frames:
+            if not (ib + begin <= v - 1 < ib + end):
+                continue
+            for b, e, kind, jump in scopes:
+                if ib + b <= v - 1 < ib + e and kind == 2:
+                    return ib + jump, s + 8
+            break
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('pe')
@@ -77,6 +116,8 @@ def main():
                     help='en-US の実値 (#3295)。kernel32!GetThreadLocale は 0x409。GetLocaleInfoW は表 EN_US の値 (表に無い LCTYPE・未知の LCID は 0)。LCMapStringW は大文字・小文字変換を行い文字数を返す。既定 (オフ) では 0 を返す')
     ap.add_argument('-N', action='store_true',
                     help='stub の呼出しを順に出す (名前・rcx/rdx/r8/r9・戻り番地)。デバッグ用')
+    ap.add_argument('-E', action='store_true',
+                    help='RaiseException(0xeedfade) (Delphi 例外) を、スタック上で最も内側の kind=2 scope (EHANDLER フレーム) の landing pad へ移す (#3374)。既定 (オフ) は stub として 0 を返す')
     ap.add_argument('-m', type=int, default=2000000, help='最大命令数')
     ap.add_argument('-d', action='append', default=[], help='実行前に書く qword addr=val (hex)')
     ap.add_argument('-t', action='append', default=[], type=lambda s: int(s, 0),
@@ -149,6 +190,8 @@ def main():
                 uc.mem_write(tab + 8 * i, struct.pack('<Q', sva))
                 if nm == 'host' and i == 0:
                     rets[sva] = obj
+
+    eh = eh_frames(pe) if a.E else []
 
     strings = {}
     if a.S:
@@ -273,6 +316,19 @@ def main():
                 else:
                     uc_.mem_write(dst, mapped.encode('utf-16le'))
                     uc_.reg_write(UC_X86_REG_RAX, len(mapped))
+            elif a.E and names[addr].lower() == 'kernel32.dll!raiseexception' and \
+                    uc_.reg_read(UC_X86_REG_RCX) & 0xffffffff == DELPHI_EXC_CODE:
+                hit = seh_catch(uc_, eh, ib)
+                if hit is None:
+                    print('seh: 0xeedfade の catch scope が見つからない (0 を返す)')
+                    uc_.reg_write(UC_X86_REG_RAX, 0)
+                else:
+                    target, new_rsp = hit
+                    print('seh: 0xeedfade を %#x へ移す (rsp=%#x)' % (target, new_rsp))
+                    uc_.reg_write(UC_X86_REG_RSP, new_rsp)
+                    uc_.reg_write(UC_X86_REG_RBP, new_rsp)
+                    uc_.reg_write(UC_X86_REG_RIP, target)
+                    return
             else:
                 uc_.reg_write(UC_X86_REG_RAX, rets.get(addr, 0))
 
