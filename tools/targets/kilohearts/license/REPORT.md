@@ -227,3 +227,14 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 | `kh710_check.py` | RESULT PASS |
 
 - 制約: HeapAlloc の実行は `test_heap(n)` ラッパーから `r8` に引数を入れて呼ぶ (export 経由の直接呼出しは不可)。module 全体 (`function_180156e50`) は未 lift callee `0x180156f40`/`0x180106440` を含むため wasm 上で丸ごと実行しない。
+
+## 13. #4413 kclp native_ref scenario (ctx-fuzz native oracle)
+
+- 対象: `harness/scen_kclp.h` (ACFRegisterPlugin_kclp の 32bit 検索関数 0x180f89cf0 を、経路フラグ .data 0x182989344 を指定して呼ぶ)。偶数 trial = ymm 経路 (flag 0x20)、奇数 trial = scalar 経路 (flag 0x2)。
+- 測定 commit: `876bb09f7` (コードを変えた最後の commit)。以後 harness の差分は 0 (`git diff 876bb09f7 HEAD -- tools/targets/kilohearts/license/harness` = 空)。
+- 正しいコマンド (引数 5 つ。4 つでは usage で rc=2): `native_ref <HeartCore.core_64> kclp 200 1 <out.bin>`。出力は `work/` 配下に置く。
+- ビルド: `cc -O1 -Wall native_ref.c scenarios.c` rc=0 (本 run で再確認)。`native_ref - list` に `kclp` を含む (本 run で確認)。
+- 前 run の記録 (測定 commit `876bb09f7`・素材 `plugins-kilohearts` 展開): rc=0・0.017 s・出力 66,146 B・不一致 0 件・ネガコン (比較の向きを反転) で 200 行の不一致・`HeartCore.core_64` sha256 一致 (`d55ce8b4c0ad7ebedf1a4a1f74443a91d255596be887a514e54269ec8751441e`、76,642,304 B)。
+- **本 run で未再実行**: `$ARTIFACTS_DIR` (`fl-win64` のみ) に `HeartCore.core_64` が無く、正しいコマンドの再測定ができなかった。上の前 run 値は再確認されていない。再測定は `oc_artifacts: fl-win64 plugins-kilohearts` を付けた run で行う。
+- 未確認: ymm 経路 (flag 0x20) に入ったことを示すトレース・分岐カウントは未記録。
+- 関数 B (0x180fb6124) は未実装。wasm 側の突合 (`compare.mjs`) と `modules.F.lift` 追加は未実施 (#4413 の次 run)。
