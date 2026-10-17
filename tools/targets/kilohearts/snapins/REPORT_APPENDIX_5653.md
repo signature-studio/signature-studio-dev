@@ -107,7 +107,13 @@ khsk18:
 
 ### 7.3 二重 terminator の解消 (修正前後の IR を比べた結果)
 
-数え方: `final.ll` を基本ブロック (ラベル行・`<label>:N` 行で区切る) ごとに、terminator (`br`・`ret`・`switch`・`unreachable`・`invoke` 等) の行数を数え、2 以上のブロックの数を出す。スクリプトは `work/` 外の一時ファイルで、repo には入れていない。
+数え方: `final.ll` を基本ブロック (ラベル行・`; <label>:N` 行で区切る) ごとに terminator (`br`・`ret`・`switch`・`unreachable`・`indirectbr`・`invoke`・`resume`) の行数を数え、2 以上のブロックの数を出す。1 本のコマンドで、引数は `final.ll` のパス:
+
+```
+awk '/^[A-Za-z0-9_.$-]+:/ || /^; <label>:/ { if (n >= 2) d++; n = 0 } /^[ \t]*(%[^ ]+ = )?(br|ret|switch|unreachable|indirectbr|invoke|resume)[ ,]/ { n++ } END { if (n >= 2) d++; print d+0 }' <final.ll>
+```
+
+実測 (HEAD `e8dfc4af5` の `final.ll` は `0`、修正前 `fe48dca85` の `final.ll` は `5`。上の表と一致)。
 
 | 対象 | 二重 terminator ブロック数 | 例 (修正前) |
 |---|--:|---|
