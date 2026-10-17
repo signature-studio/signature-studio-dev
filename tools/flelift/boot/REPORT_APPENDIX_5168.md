@@ -36,7 +36,7 @@ REPORT.md §14 の分割移動先。測定値・経緯はここ。
   - `c396c5` (STORE): `-> line 254555 in f_c395a0` (shard 7)
   - 上記は測定時の挿入と別 (`s0.c:258322`・`s7.c:36080` の行番号は旧測定の記録)。probe 機構は動く (resolver は既定経路で 16 件以上発火)。
   - 検証: 挿入段のみを HEAD の `c395_entry_probe.sh` で実行 (`insert_probe` の shard 単位判定) し、4 点とも 1 回ずつ解決して `inserted=4`。boot 段 (`build.sh plain` → `fle_boot.mjs`) は emsdk が runner に無く未実行。上の 0 件の boot 結果は `54ba2ac7e` 時点の実測のまま。
-- 測定時の `SS_EMSDK_ENV`: 実行ログに記録が無く、どの emsdk で走ったかは未確認 (`3b081a0f9` の script の既定値 `/opt/emsdk/...` か、指定値かは不明)。HEAD の script は `SS_EMSDK_ENV` 必須なので、以後は必ず指定して run する。
+- 測定時の `SS_EMSDK_ENV`: 実行ログに記録が無く、どの emsdk で走ったかは未確認 (`3b081a0f9` の script の既定値 [EMSDK] か、指定値かは不明)。HEAD の script は `SS_EMSDK_ENV` 必須なので、以後は必ず指定して run する。
 
 | 項目 | 結果 (`54ba2ac7e`) |
 |---|---|
