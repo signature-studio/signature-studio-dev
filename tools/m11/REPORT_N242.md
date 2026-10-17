@@ -97,7 +97,7 @@
 ```
 
 - 前回 (`c988679dc`) からの差: `ptr_call` 17→10。`ptr_base_def` 82→85、`ptr_alias_write` 2→3、`ptr_unknown_write` 2→3、`slot_merge` 16→18 は、跨いだ先の後段判定の移動。実値化は 0 のまま。
-- 残る `ptr_call` 10 件の呼出し先 (実測): 非スタック書込みあり (`[rbp+…]`・`[rcx+…]`・`[rbx+…]` への movsd/movdqa 等) 6 件、間接 call または他関数への推移的な書込み 4 件。
+- 残る `ptr_call` 10 件の呼出し先 (実測・`callee_pure` が偽): 呼出し先の本体に非スタック書込みがある (`mov qword ptr [rdx+r8*8], r9`・`movsd qword ptr [rbx+0x18], xmm0`・`movdqa xmmword ptr [rbp+0xc0], xmm9`・`movsd qword ptr [rbp+0x90], xmm2` など) 8 件、本体は直接書かないが呼出し先の先で書込みがある (推移) 2 件。間接 call の先は解決できないため、すべて未決のまま。
 - 単体テスト: `test_setother_ptr_class.py` 11 件 PASS (純粋な呼出し先を跨ぐ正例・書込みのある呼出し先の負例・揮発基底の負例を追加)。
 - 受入条件: `ptr_call` 件数の 3 値実測・未分類 0 は達成。実値化 0 件のため `m11_argrecover_verify.py` の照合は該当なし。
 - 未解決: 残る `ptr_call` 10 件は呼出し先の書込み範囲が非スタック領域に及ぶため、区間を跨げない (別名解析が要る)。起票先: #4890 (親)。
