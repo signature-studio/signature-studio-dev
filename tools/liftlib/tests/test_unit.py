@@ -1059,9 +1059,79 @@ def t32():
     print("T32 ok (bsr r64: ctlz + select(src==0 で dst 保持), ZF は bsrzf(src,64)、e/ne 以外の cc は Unsupported)")
 
 
+def t33():
+    """[LIFTLIB-32 / #6080] `cmp rcx,0` の直後の jl (SF/OF) / je (ZF) / jb (CF) の IR を固定し、x86 の定義どおりの値になることを確認する。
+
+    x86 の cmp a,b: 結果 r = a-b (mod 2^bits)。ZF=(r==0), SF=(r の最上位 bit), CF=(a <u b), OF=符号付き溢れ。
+    jl = SF!=OF, je = ZF, jb = CF。生成 IR の icmp 述語を Python で評価し、上の定義と全サンプルで一致することを見る。"""
+    import re
+    from types import SimpleNamespace as NS
+    from liftlib.passes import p1
+    from liftlib import ir as IR
+
+    mod = IR.Module.parse("define void @function_1000() {\nentry:\n  ret void\n}\n")
+    out = []
+    st = {"__w": set(), "rcx": ("%rcx", "i64"), "fl": None}
+    stub = NS(mod=mod, nm=lambda va, t: "%%%s_%d" % (t, len(out)), used=lambda k: None,
+              _GPR_ALU=p1.Region._GPR_ALU, _gpr_val=lambda st_, reg, va, o, bits=64: st_[reg][0])
+    stub._flag_zf_i1 = lambda *a: p1.Region._flag_zf_i1(stub, *a)
+    stub._flag_cc_i1 = lambda *a: p1.Region._flag_cc_i1(stub, *a)
+    stub._flag_cf_i1 = lambda *a: p1.Region._flag_cf_i1(stub, *a)
+    cmp_it = NS(va=0x1000, mnem="cmp", op_str="rcx, 0", mem=None, is_call=False,
+                ops=[NS(type=1, reg="rcx"), NS(type=2, imm=0)],
+                _ci=NS(operands=[NS(size=8), NS(size=8)]))
+    res = p1.Region.lift_data_insn(stub, cmp_it, [("reg", "rcx"), ("imm", 0)], st, out, "")
+    assert res is True and st["fl"] == ("int", ("%rcx", "0", False, 64)), st["fl"]
+
+    def jcc_ir(cc):
+        o = []
+        c = p1.Region._int_jcc_cond(stub, NS(cc=cc), st, o, 0x1001, "")
+        return c, "\n".join(o)
+
+    def pred_eval(ir, a, bits=64):
+        m = re.search(r"icmp (\w+) i%d %%rcx, (-?\d+)" % bits, ir)
+        assert m, ir
+        p, b = m.group(1), int(m.group(2))
+        mask = (1 << bits) - 1
+        sa, sb = a & mask, b & mask
+        if p in ("slt", "sge", "sle", "sgt"):
+            sg = lambda v: v - (1 << bits) if v >> (bits - 1) else v
+            sa, sb = sg(sa), sg(sb)
+        return {"slt": sa < sb, "sge": sa >= sb, "sle": sa <= sb, "sgt": sa > sb,
+                "ult": sa < sb, "uge": sa >= sb, "ule": sa <= sb, "ugt": sa > sb,
+                "eq": sa == sb, "ne": sa != sb}[p]
+
+    def x86_flags(a, bits=64):
+        mask = (1 << bits) - 1
+        ra, rb = a & mask, 0
+        r = (ra - rb) & mask
+        sign = 1 << (bits - 1)
+        sa = ra - (1 << bits) if ra & sign else ra
+        sr = r - (1 << bits) if r & sign else r
+        zf = r == 0
+        sf = bool(r & sign)
+        cf = ra < rb
+        of = (sa - 0) != sr
+        return {"zf": zf, "sf": sf, "cf": cf, "of": of}
+
+    samples = [0, 1, -1, 2, -2, 5, -5, (1 << 63) - 1, 1 << 63, (1 << 63) + 1, (1 << 64) - 2, 0x7FFFFFFF, 0x80000000]
+    c_l, ir_l = jcc_ir("l")
+    assert "icmp slt i64 %rcx, 0" in ir_l, ir_l
+    c_e, ir_e = jcc_ir("e")
+    assert "icmp eq i64 %rcx, 0" in ir_e, ir_e
+    c_b, ir_b = jcc_ir("b")
+    assert "icmp ult i64 %rcx, 0" in ir_b, ir_b
+    for a in samples:
+        f = x86_flags(a)
+        assert pred_eval(ir_l, a) == (f["sf"] != f["of"]), ("jl", a)
+        assert pred_eval(ir_e, a) == f["zf"], ("je", a)
+        assert pred_eval(ir_b, a, ) == f["cf"], ("jb", a)
+    print("T33 ok (cmp rcx,0: jl=icmp slt(SF!=OF), je=icmp eq(ZF), CF は常に 0 (x86 の定義と %d 値で一致))" % len(samples))
+
+
 if __name__ == "__main__":
     import traceback
-    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t27b, t28, t29, t30, t31, t32)
+    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t27b, t28, t29, t30, t31, t32, t33)
     fails = []
     for f in tests:
         try:
