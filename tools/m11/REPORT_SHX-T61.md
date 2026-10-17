@@ -3,20 +3,24 @@
 ## 1. 結論
 
 - 計装の基盤を入れた。`M11_FIX_SHX_T61=1` のときだけ callee `function_4483f0` の入口に呼出し回数と `this+0x4c`・`this+0x48` を `@fx61_buf` へ書く。既定 OFF で、既定 IR は変わらない (`shx_t61=not-applied`)。
-- 受入 1 (hang の機序の確定) は未達。ON で実 boot は rc 124 (hang) し、hang 後に `@fx61_buf` を読む経路が無い。hang 位置は未確定。
-- 本 REPORT の ON・既定の数値は、PR 本文に書かれた前 run の実測である。本 run では lift 素材 (`tools/m11/work/boot*.lift.ll`) が無く、IR を再生成できなかった (§3)。
+- 受入 1 (hang の機序の確定) は未達。前 run の ON では実 boot が rc 124 (hang) し、hang 後に `@fx61_buf` を読む経路が無かった (trap 方式より前の状態)。hang 位置は未確定。
+- trap 方式 (§5) は、前 run の実測で hang の前に記録を読めることを確認した (fix run では再現していない・再現は未確認)。ON の値は §5 の表が正本。
+- §3.1・§3.3 は前 run の実測である。本 run (fix) では lift 素材 (`tools/m11/work/boot*.lift.ll`) が無く、IR を再生成できなかった (§3.2)。
 
 ## 2. 測定条件
 
-- 測定 commit: `390061627` (コード差分の最終 commit)。
-- 差分 0 の証跡 (本 run・HEAD で確認):
+- 測定 commit: `b07e20aaf` (本 run でコードを変えた最後の commit)。
+- 差分 0 の証跡 (fix run・HEAD で確認。測定経路 = 計装・IR 生成・build・trace のコードは測定 commit から変わっていない):
 
 ```
-$ git diff 390061627 HEAD -- tools/m11 ':!tools/m11/REPORT_SHX-T61.md' | wc -l
+$ git diff b07e20aaf HEAD -- tools/m11/ldfix/fix_shx_t61.py tools/m11/shimx_link tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_lift.sh ':!tools/m11/shimx_link/REPORT*' | wc -l
 0
 ```
 
+- 注: `tools/m11` 全体では、`main` の取り込み (merge) により測定 commit から HEAD まで別 PR のコード (`ldfix/depth_4498.py` 等 7 ファイル) が入っている。これらは測定経路から参照されない (`grep` で確認)。
+
 - 素材: `fl-win64` (`$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`) を本 run で展開。`work-m11` は本 run の artifacts 配置先 (`docs/WORKFLOW.md` §11 の `work-m11`) に無い。
+- §5 の IR の出所: 記録が無い。PR 本文と REPORT の既存記述のどこにも、§5 の trap 実測に使った IR の生成元 (生成スクリプト・素材の版・`ir_sha256`) が書かれていない。生成物 (`work/`) と lift 素材は fix run の環境に無く、再生成には RetDec が要る (D5 で新規作業は不可)。よって fix run では §5 の表を再現できなかった。
 - 負荷 (前 run): 1 分平均 0.99〜1.00 (nproc 4)。
 
 ## 3. 実測
@@ -32,11 +36,11 @@ $ git diff 390061627 HEAD -- tools/m11 ':!tools/m11/REPORT_SHX-T61.md' | wc -l
 
 全文の `ir_sha256` は前 run の PR 本文に無く、本 run でも再生成できないため未記録。
 
-### 3.2 本 run の再現 (失敗)
+### 3.2 前 run の再現 (失敗・fix run でも同じ)
 
-- `m11_gen_ir2.sh` (既定・FL_WIN64_DIR を展開先に設定): rc 1。`work/boot0.lift.ll` が無い (`m11_merge.py` が FileNotFoundError)。
-- 原因: lift 素材 `boot0〜5.lift.ll` を含む `work-m11` が本 run に配置されていない。本 run の artifacts 配置先は `fl-win64.tar.zst` のみ。`boot*.lift.ll` の再生成は RetDec を使うため、新規の作業としては行わない (D5)。
-- よって本 run では §3.1 の `ir_sha256` 全文と `fx61` 件数を再確認できなかった。
+- `m11_gen_ir2.sh` (既定・FL_WIN64_DIR を展開先に設定): rc 1。`work/boot0.lift.ll` が無い (`m11_merge.py` が FileNotFoundError)。fix run でも同じ rc 1 を確認した。
+- 原因: lift 素材 `boot0〜5.lift.ll` を含む `work-m11` が fix run に配置されていない。fix run の artifacts 配置先は `fl-win64.tar.zst` のみ。`boot*.lift.ll` の再生成は RetDec を使うため、新規の作業としては行わない (D5)。
+- よって fix run では §3.1 の `ir_sha256` 全文と `fx61` 件数を再確認できなかった。
 
 ### 3.3 ON 計装 (`M11_FIX_SHX_T40=1 M11_FIX_SHX_T61=1`・前 run の実測)
 
@@ -57,10 +61,34 @@ $ git diff 390061627 HEAD -- tools/m11 ':!tools/m11/REPORT_SHX-T61.md' | wc -l
 - `printf` を計装に使うと、`m11_winstubs.c` の `printf` stub と型が衝突してビルドが落ちた。
 - `sx_t61_rec` (IR から C の関数を呼ぶ形) も `genstubs` が生成する stub と名前が衝突し、リンクが落ちた (`gui_stubs_*.c`・`trace_wrap.c`)。IR の `declare` は stub 化されるため、IR から C を呼ぶ形は使えない。
 - そこで IR 側は `@fx61_buf` (global) に書き、C 側は読み出し関数だけを持つ形にした。リンクは通った。
-- ただし hang 中は `run_trace.mjs` が JS に制御を戻さないため、`fx61_buf` を読めない。
+- hang 中は `run_trace.mjs` が JS に制御を戻さないため、前 run の計装 (trap なし) では `fx61_buf` を読めなかった。trap 方式 (§5) で読めるようになった。
 
-## 5. 未実装・未解決
+## 5. 読み出し経路 (trap 方式・前 run の実測、fix run で未再現)
 
-- `fx61_rec.c` の `fx61_count` / `fx61_self` / `fx61_c4c` / `fx61_c48` を呼ぶ JS 側の経路は無い。読み出し口は定義済みだが未使用。
-- hang 中の `@fx61_buf` を読む経路 (wasm メモリを hang 後に読む、または回数上限で callee から戻す計装)。起票先: #5855 (本 PR の Refs 先) の本文「次段の残り」チェックリスト。fix round 1 で追記済み。
+測定 run = 測定 commit `b07e20aaf` の run。IR の生成元は未記録 (§2)。
+
+- hang の前に記録を読むため、呼出し回数が `FX61_LIMIT` (既定 100000) を超えたら IR の `unreachable` で trap させる (`fix_shx_t61.py`)。trap は wasm 例外として JS に戻るため、`run_trace.mjs` は `_fx61_count` / `_fx61_self` / `_fx61_c4c` / `_fx61_c48` を読んで run.json の `fx61` に入れる (`build.sh` は計装の IR のときだけ export する)。
+- 実測 (commit は測定 commit `b07e20aaf`。ON = `M11_FIX_SHX_T40=1 M11_FIX_SHX_T61=1`・trace_soft):
+
+| `FX61_LIMIT` | 結果 | `count` (呼出し回数) | `c4c` (this+0x4c) | `c48` (this+0x48) | 所要 |
+|---|---|---|---|---|---|
+| 0 | trap (unreachable) | 1 | 1 | 0 | 未計測 |
+| 1 | trap | 2 | 2 | 1 | 未計測 |
+| 2 | trap | 3 | 3 | 2 | 未計測 |
+| 3 | trap | 4 | 4 | 3 | 未計測 |
+| 5 | trap | 6 | 6 | 5 | 未計測 |
+| 100000 (既定) | trap | 100001 | 100001 | 100000 | 0.25 s (`time` の real。run_trace.mjs 単体) |
+
+- 読み取り: callee は呼ばれるたびに `this+0x4c`・`+0x48` を 1 ずつ増やし、`this` (`fx61_self`) は全呼出しで同じ値 (親の `%stack_var_-104` alloca)。これは callee が親の alloca を書換えていることを実行で示す。
+- 負荷: 実行 0.25 秒 (上限まで hang しない)。前 run の hang (rc 124・100 s 以上) とは挙動が違う。前 run で hang と見えたのは、trap しない版で制御が戻らなかったためと推測する (未確認)。
+
+## 6. 静的な読み (親 IR の loop 条件)
+
+- 親 `function_448490` の外側 loop は `dec_label_pc_4484f4` の `-32` (SSA の `stack_var_-32.0.reload` / `stack_var_-32.2.reload`) で進み、`dec_label_pc_448731` で `%9` (`[arg2-4]` の値) と比べる。
+- callee `function_4483f0` が書く `this+0x48`・`+0x4c` は、この loop 条件 (`%9`・`%12`) の入力に入っていない。callee の書換えは親の SSA 変数に届かない。
+- 静的にはこれが、`+0x4c` 初期 store で callee の書換えが loop を抜けさせない理由と整合する。ただし loop が抜けない具体的な分岐は未確定。
+
+## 7. 未解決
+
+- hang の位置 (どの分岐で親の loop が抜けないか) は未確定。前 run の trap 方式では callee の呼出し回数と値を読めたが、親の loop のどの分岐を通り続けるかは見ていない。次段は、親 loop 内の分岐 (`dec_label_pc_448681`・`dec_label_pc_44870f`・`dec_label_pc_448731`) ごとに通過回数を同じ方式で記録すること。
 - 修復 ON の hang の機序 (#5846 受入 1 の続き)。起票先: #5855 (受入 1 の続き)。#5846 の現タイトル (「(#4121 残件)」) とは対応しないため、#5846 へは追記しない。
