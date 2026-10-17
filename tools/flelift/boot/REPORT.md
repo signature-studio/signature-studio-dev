@@ -246,5 +246,5 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 | boot 既定 (mode 3) / survey (1 セグメント) | units 895・IPP ok・窓無し / ok 895・empty 46・noproc 1 (942・重複 0) |
 | `merge_survey.py` | `covered=942` (規則テスト `merge_survey_test.py` で固定) |
 
-- 未解決: 補修が判定を変えるか → #4901 [FLE-33]。unit 280/659/895 の補修なし unlifted → #4855 [FLE-32]。
+- 未解決: 補修が判定を変えるか → #4901 [FLE-33]。unit 280/659/895 の補修なし unlifted → #4855 [FLE-32]。PY-379 gate フラグ `0x16baff0` は unit 209 まで全 0 (#5216・`REPORT_APPENDIX_5216.md`)。
 - #5168 (PY-4877): boot 後の `patternCount` は icall-miss (0xd64d7a) で戻り値 0 が信用できず、E[1..999] は全 0 (受入 1 未達)。詳細は `REPORT_APPENDIX_5168.md`。
