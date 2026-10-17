@@ -16,13 +16,13 @@
 | ON (`M11_FIX_SHX_T46=1`・`shx_t46=applied`) | rc 0・`fx46cnt` 29 件・`llvm-as` rc 0 | rc 0・mismatch 0・undefined 0 / trace rc 0 | rc 0・`units_run=17`・`dllmain_done=false`・`va_calls=1`・`icall_ok=24`・`icall_miss=1`・`threw="memory access out of bounds"` |
 
 - 実 boot の時間は OFF・ON とも 0.5 s 以下 (`time` の real)。
-- 素材: `fl-win64` を `FL_WIN64_DIR=/tmp/opencode/fl` に展開 (`extracted/block00031_PE.bin`)。`work-m11` は `tools/m11/work/`。
+- 素材: `docs/REFERENCES.md` `[WIN64]` の `extracted/block00031_PE.bin` (`fl-win64` 展開物)。展開先は環境変数 `FL_WIN64_DIR` で指定。`work-m11` は `tools/m11/work/`。
 
 ## 3. 機械語・IR の確認
 
 - 機械語では count は親の `[rbp+0x48]` (= IR `-104 + 72` = `-32`) の 1 か所。callee `function_4483f0` は `this+0x48` を `+1` する (IR で `load`・`add`・`store`)。
 - lift 後の IR では count が `%stack_var_-32.{0,1.lcssa,124,1249091,2,12768}.reg2mem` の 6 スロットに分かれ、callee の書込みと結び付いていなかった。6 スロットへのアクセスは `store i32`/`load i32` のみで、形は揃っていた (検査で確認)。
-- 本 pass は 10 site ごとの before/after 表を作らずに、6 スロットを同じ 1 つのメモリに置く。callee の書込みが次の親の読出しに届く。
+- 本 pass は 10 site ごとの before/after 表を作らずに、6 スロットを同じ 1 つのメモリ (`%fx46cnt`) に置く。これは callee の書込みが次の親の読出しに届くことを意図した設計である。ON の実測では効果は確認できなかった (boot は OOB で止まる)。読出し・書込みの対応は未測定。
 
 ## 4. 未解決
 
