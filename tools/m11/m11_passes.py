@@ -311,6 +311,10 @@ def pass_m2r_fn1046a30(text, report):
     0x104cxxx 系 (コード範囲) は含めない (#4498 受入 3)。全件 remap (M2P) は使わない (#417)。"""
     n = 0
     extra = os.environ.get('M11_M2R') == '1'
+    if extra:
+        pat = r'(%ce\d+n11_function_1046a30) = inttoptr i64 (\d+) to ptr'
+    else:
+        pat = r'(%ce12n11_function_1046a30) = inttoptr i64 (22946304) to ptr'
 
     def fix(m):
         nonlocal n
@@ -320,7 +324,7 @@ def pass_m2r_fn1046a30(text, report):
         n += 1
         return '%s = inttoptr i64 %d to ptr' % (m.group(1), shiftva(v))
 
-    text = re.sub(r'(%ce\d+n11_function_1046a30) = inttoptr i64 (\d+) to ptr', fix, text)
+    text = re.sub(pat, fix, text)
     stage('M2r', 'function_1046a30 VA->LVA remap: %d sites (M11_M2R=%s)' % (n, '1' if extra else '0'))
     report['m2r_fn1046a30_remap'] = n
     return text
