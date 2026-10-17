@@ -16,3 +16,11 @@ REPORT.md §14 の分割移動先。測定値・経緯はここ。
 
 - **読み**: 呼出し前後とも `E[1..999]` は全 0 で、述語は 999 回呼ばれたが、`patternCount` の戻り値は icall-miss による 0 である。0 は「999 件を数えた」でも「0 件」でもなく、観測不能。E の内容が実起動で崩れるかは、この icall-miss を解消してから判定する。
 - 未解決: icall-miss (0xd64d7a の間接呼出し先) の解消 → 親 #5168 の残件。boot 本体の KPI は変えていない。
+
+### 14-2. icall-miss の原因 (測定 commit `48d217792`・`py4877_pred_e_probe.sh` の ICALL 行)
+
+- 0xd64d78 の `call qword ptr [rax]` は `rax = [0x15e4280]` (`.data`) を経由する。`[0x15e4280] = 0x16b8298` (`.bss`) で、PE の静的値どおり。
+- 実行時 (呼出し直前・n=1): `[ICALL] n=1 slot=16b8298 [slot]=0`。`0x16b8298` の中身 (CPython API の関数ポインタ = PyLong_FromLong 相当) が 0 のままで、`dispatch(0)` → 戻り値 0 になる。
+- 同じ boot で `0x12d8d30` は 999 回呼ばれ (`[PY4877-PC]` n=999)、`0xd64d40` 入口も 1 回発火。boot 本体は units_run 895 (既定 mode 3・`fle6_measure.sh` の `FLE_BOOT_RUNS=default` で再現)。
+- 読み: 戻り値 0 は「999 件を数えた」でも「0 件」でもなく、変換スロットが未初期化のための観測不能。E の内容は呼出し前後とも全 0 のまま (`FLEBOOT_PY4877_PRE`・`POST` の nonzero_rows = 0)。
+- 残件: `0x16b8298` を埋める箇所 (CPython API の GetProcAddress 結果の格納先) を特定し、既定経路で埋まるか確認する。埋めると boot の挙動が変わるため、KPI 影響を測ってから判定する。
