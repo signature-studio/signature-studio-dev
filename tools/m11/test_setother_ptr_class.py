@@ -90,6 +90,32 @@ class LoadDefTest(unittest.TestCase):
         ins = list(CS.disasm(bytes.fromhex(MOV_IMM_RBX8) + bytes.fromhex('e8' + (0x2000 - 0x1008 - 5).to_bytes(4, 'little', signed=True).hex()) + bytes.fromhex(MOV_LD_RBX8), 0x1000))
         self.assertEqual(M.load_def(mach, ins, 2, 'rbx', 8, 64, set(), {})[:2], ('未決', 'ptr_call'))
 
+    def test_call_to_callee_writing_via_rmw_blocks(self):
+        # cmp/bt 接頭辞で読取り専用扱いになると誤って跨ぐ。書込みを持つ命令は必ず未決 (ptr_call)
+        writers = {
+            'lock cmpxchg [rbp+8], ecx': 'f00fb14d08',
+            'cmpxchg16b [rbp+8]': '480fc74d08',
+            'cmpxchg8b [rbp+8]': '0fc74d08',
+            'bts qword ptr [rbp+8], 0': '480fba6d0800',
+            'btc [rbp+8], rcx': '480fbb4d08',
+            'btr [rbp+8], rcx': '480fb34d08',
+        }
+        for name, enc in writers.items():
+            with self.subTest(insn=name):
+                mach = FakeMach()
+                mach.fns[0x2000] = (0, 0x10)
+                mach.bodies[0x2000] = list(CS.disasm(bytes.fromhex(enc + 'c3'), 0x2000))
+                ins = list(CS.disasm(bytes.fromhex(MOV_IMM_RBX8) + bytes.fromhex('e8' + (0x2000 - 0x1008 - 5).to_bytes(4, 'little', signed=True).hex()) + bytes.fromhex(MOV_LD_RBX8), 0x1000))
+                self.assertEqual(M.load_def(mach, ins, 2, 'rbx', 8, 64, set(), {})[:2], ('未決', 'ptr_call'))
+
+    def test_read_only_callee_passes(self):
+        # cmp/bt の読取りだけの呼出し先は非スタック書込みなし → 跨いで実値化
+        mach = FakeMach()
+        mach.fns[0x2000] = (0, 0x10)
+        mach.bodies[0x2000] = list(CS.disasm(bytes.fromhex('483b4d08' + '480fba6508' + '00' + 'c3'), 0x2000))
+        ins = list(CS.disasm(bytes.fromhex(MOV_IMM_RBX8) + bytes.fromhex('e8' + (0x2000 - 0x1008 - 5).to_bytes(4, 'little', signed=True).hex()) + bytes.fromhex(MOV_LD_RBX8), 0x1000))
+        self.assertEqual(M.load_def(mach, ins, 2, 'rbx', 8, 64, set(), {}), ('実値化', 'ptr_imm', 1))
+
     def test_no_store_is_entry(self):
         self.assertEqual(load_at_end(MOV_RCX_RSI, MOV_LD_RAX8), ('未決', 'ptr_entry', None))
 

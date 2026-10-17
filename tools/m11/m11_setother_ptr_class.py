@@ -79,7 +79,8 @@ def writes_reg(x, base):
 
 
 VOLATILE = {'rax', 'rcx', 'rdx', 'r8', 'r9', 'r10', 'r11'}
-READ_ONLY = ('cmp', 'test', 'bt', 'ucomis', 'ucomi', 'comis', 'lea', 'nop', 'prefetch', 'push')
+READ_ONLY = ('test', 'cmps', 'ucomis', 'ucomi', 'comis', 'nop', 'prefetch', 'push')
+READ_ONLY_EXACT = ('cmp', 'bt', 'lea')  # cmpxchg*・bts/btr/btc* は書込みありなので接頭辞では判定しない
 STR_OPS = ('rep', 'movsb', 'movsw', 'movsq', 'stos', 'ins', 'outs', 'syscall', 'int', 'sysenter')
 
 
@@ -100,12 +101,13 @@ def insn_may_write_nonstack(mach, x, fn_range):
     if mn == 'jmp':
         t = call_target(x)
         return t is None or not (fn_range[0] <= t < fn_range[1])
-    if mn.startswith(READ_ONLY) or mn == 'ret':
+    if mn in READ_ONLY_EXACT or mn.startswith(READ_ONLY) or mn == 'ret':
         return False
+    body = mn[5:] if mn.startswith('lock ') else mn
     for i, op in enumerate(x.operands):
         if op.type != capstone.CS_OP_MEM:
             continue
-        if i != 0 and not mn.startswith(('xchg', 'xadd', 'cmpxchg')):
+        if i != 0 and not body.startswith(('xchg', 'xadd', 'cmpxchg')):
             continue
         base = mach.cs.reg_name(op.mem.base) if op.mem.base else None
         if base != 'rsp' or op.mem.index:
@@ -118,6 +120,7 @@ def callee_pure(mach, va, memo, stack=()):
     if va in memo:
         return memo[va]
     if va in stack:
+        # 循環中の再入は未決側 (False) に倒す。推移結果としてのメモ化はこの値で確定する (保守的)
         return False
     ent = mach.fns.get(va)
     ins = mach.disasm_fn(va) if ent else None
