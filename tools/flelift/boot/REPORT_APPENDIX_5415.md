@@ -1,7 +1,7 @@
 # REPORT_APPENDIX_5415 — FLE-45 (#5415): InitContext.InitTable (0x15eac90) の 0 化の時点
 
 測定 commit: `b0c6e835a` (`fle_boot.c` の `py_watch` に `0x15eac90` と `ippsZero_8u` 直後 (site 9) を足した。挙動は変えず記録だけ増やした)。
-コード差分 `git diff 3a3a1f152 b0c6e835a -- tools/flelift` は `fle_boot.c` の監視 slot 2 本と site 9 の 1 件だけ。
+コード差分: `fle_boot.c` は `git diff 3a3a1f152 b0c6e835a -- tools/flelift/boot/fle_boot.c` で監視 slot 2 本 (`0x13e7628`・`0x15eac90`) と site 9 の 1 件。`0x13e7628` は `4fc1472ff` (#5216)、`0x15eac90` と site 9 は `b0c6e835a`。`tools/flelift` 全体の差分 (10 ファイル・419 行) は他 commit の変更を含む。
 素材: `fl-win64` (`extracted/block00031_PE.bin`)・`toolchain-emsdk` ([EMSDK] の pin 6.0.12)。
 実測: `boot_e2e.sh --fast` (lift 再利用・build 4 variant・run 4 variant) `real 4m11s`・`user 7m39s`・`sys 1m02s`・RC 0。load 開始 1.74。
 
@@ -24,4 +24,4 @@ site 9 (`ippsZero_8u` 直後) は 0 件。`py_events` は n 24・over 0。
 
 ## 3. 結果 (plain)
 
-`units_run 895 / 942`・`boot_threw exit`・`exit 1`・`getmem 3680 / freemem 1499`・`ipp_ptr_15F34A0 0x7f10001c`。監視 slot 追加前 (#4854 / 前 run) と一致する。`FLE_SURVEY_NOREPAIR` の survey は実行していない (補修なしは `InitTable == 0` で開始できないため、§1 のとおり判定の差は未測定)。
+`units_run 895 / 942`・`boot_threw exit`・`exit 1`・`getmem 3680 / freemem 1499`・`ipp_ptr_15F34A0 0x7f10001c`。監視 slot 追加前 (#4854 / 前 run) と一致する。比較元は `REPORT.md` §12 の測定 commit `a64aa3aab` (boot 既定 units 895・`exit`)。`FLE_SURVEY_NOREPAIR` の survey は実行していない (補修なしは `InitTable == 0` で開始できないため、§1 のとおり判定の差は未測定)。
