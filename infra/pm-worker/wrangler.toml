@@ -27,6 +27,9 @@ LOW_CAP = "10"
 # 停止行 (run-outcome の reason が stop / split の issue) を oc-pm の判断キューへ 1 時間に送る件数の上限 (#5722。既定 24)。
 # 値の根拠と測定は #5722 の PM 判断コメント。oc-pm の全体の枠 (PM_LIMITS.hourMax) の内で、厳しくするなら下げる。
 STOPPED_INTAKE_PER_H = "48"
+# 停止行の直接の再投入 (wake・CI-250)。1 時間に WAKE_PER_H 件・同じ issue は 24 時間に WAKE_REF_DAY_MAX 件。0 で止める。
+WAKE_PER_H = "24"
+WAKE_REF_DAY_MAX = "2"
 # コメントの全体同期は新しい順に 24 時間分を読む。窓内の件数は実測で既定の上限 (80 ページ = 8,000 件) を超える
 # (tools/pm/REPORT_APPENDIX_2380.md) ので、そのままだと全体同期のたびに打ち切りになる。余裕を見て 150 ページ (15,000 件) にする。
 COMMENT_MAX_PAGES = "150"
