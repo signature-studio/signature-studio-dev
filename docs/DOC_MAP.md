@@ -719,6 +719,7 @@
 | `tools/python/REPORT_PY41_3860.md` | ~125 | PY-262 (#3860): PY-65 節の受入 2 (戻り値 `[rbp+0x584]` の書込み元) の付録。0x104cc65 に届く `[rbp+0x5b8]` の書込み 72 件 (`analysis/py65_ret584_reach.py`)。判定の行き先と戻り値分岐の突合 (`analysis/py342_r8d_ret_cross.py`・§7)。分岐ごとの式は未確定 (250 行上限のため `REPORT_PY41.md` から分割)。§9 (PY-341): 書込みごとの必須分岐 (`analysis/py341_ret584_dominators.py`) |
 | `tools/python/REPORT_APPENDIX_PY341.md` | ~80 | PY-341 (#4574): `REPORT_PY41_3860.md` §9 の 72 件の表 (書く値の直前命令・必須分岐) |
 | `tools/python/REPORT_APPENDIX_5801.md` | ~80 | PY-5390 (#5801): mask 0x4 tail 側の未確認呼出し先 5 件 (1 段目) とその直接の呼出し先 24 関数 (2 段目) の書込み先・判定の側ごとの呼出し先。測定値の正本 (REPORT_PY257 §8.3 から参照)。解析は `analysis/py5801_callees2.py`。 |
+| `tools/python/REPORT_APPENDIX_6207.md` | ~55 | PY-5418 (#6207): グローバル `0x16bd1d8`・`0x16bd1e0`・`0x16bd1a8` の読み手・書き手の列挙 (rip 相対参照の全件・所属関数の線形デコード照合)。判定の作用は #5801 側。解析は `analysis/flapi/pe_py193_refs.py` と `analysis/flapi/pe_py6207_readers.py` |
 | `tools/python/REPORT_APPENDIX_5295.md` | ~100 | PY-4905 (#5295): mask 0x4 tail 到達側の直接呼出し先 32 件と `0xf8d730`・`0xf8d580`・`0xf783c0` の中身 (グローバル書込み・間接 call・ret 到達)。解析は `analysis/py381_r8d_callees.py`・表は解析器の関数から作った一時集計 (commit 外)。 |
 | `tools/python/REPORT_APPENDIX_PY392.md` | ~80 | PY-392 (#4828): `REPORT_PY41_3860.md` §10 の 72 件の表 (書く値の式・必須分岐数・cube の分岐数)。自動生成 (`analysis/py392_summary.py`) |
 | `tools/python/REPORT_APPENDIX_PY392_cubes.tsv` | ~73 | PY-392 (#4828): 72 件の代表 cube の全分岐 VA (立ちは無印・落ちは `!`)。自動生成 (`analysis/py392_summary.py`) |
