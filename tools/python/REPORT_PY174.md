@@ -54,3 +54,33 @@
 - 展開: 素材 `fl-win64` (`oc_artifacts` の名前) を `tar --zstd -xf <素材>.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (`FL_WIN64_DIR=<展開先>`)
 - 注釈付き逆アセンブル: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_pattern_attr_probe.py d657e0 d65d00 d658a0 4f2990 12d0750 12d8740`
 - 書込み先の検索 (`.text` の rip 相対 mov): `... pe_pattern_attr_probe.py --writers` (実測 34 秒)
+
+## 6. #6016 の追加解析 (未達の 3 件)
+
+再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_xref.py 193fd08` (rip 相対の参照 49 件・store 0 件・約 62 秒)、`pe_xref.py` の `pe_e8_callers.py 12d0750` (直接 call 元 10 件)。
+
+### 6-1. getChannelLoopStyle の第 1 引数 (`0x12d0750(a, b)` の a)
+- 意味: **表 `0x193fd08` の行添字** (192 B 刻み)。`flapi_table.json` の sig は第 1 引数を `pattern: int` と名付けている。PE 上も `a` を検査なしで行に当てる (`0x12d0750` の `shl rcx,3`・`lea ...*3`。`0xd65d00` も検査しない)。
+- 上限: **PE からは決まらない**。行の件数は表の実行時の大きさで、静的に持つ件数が無い (`0x193fd08` は `.bss`)。範囲外の `a` は表の外を読む。未確定。
+- 第 2 引数 `b`: 行の list の 20 B 記録 (`rec+0` = key, `rec+4` = value) の key と比べる (`cmp dword [r11+rbx*4], edx`)。REPORT_PY101 の `0x12d3ff0` も同じ 20 B 記録の `rec+0 == cid` (channel index) で引く。したがって `b` は channel の key と読めるが、呼出し元の値の由来は**未確認**。
+
+### 6-2. 表 `0x193fd08` の内容
+- 静的には作られない: `.text` の rip 相対 store は 0 件 (`pe_xref.py`)。実行時に計算した先へ書かれる。
+- 行 (192 B) の形: `+0x54` = byte フラグ (0 なら不一致扱い)、`+0x58` = list ポインタ (件数は `[list-8]`)。list の要素 = 20 B 記録。
+- 直接 call 元は 10 件 (`pe_e8_callers.py 12d0750`: `0xd3482e`・`0xe487ab`・`0xe54cf8`・`0xe57ca8`・`0xfc9e4e`・`0xfcb8d7`・`0x102dd83`・`0x12cf572`・`0x12dd9c0`・`0xd65d31`)。うち `0xd65d31` が getChannelLoopStyle。**他の 9 件の引数の由来は未確認** (逆アセンブルの確認は未実施)。`0xe54cf8`・`0x12cf572` は `[rax+0xc48]` を第 2 引数 (`edx`) に入れており、行の値は実行時の状態のまま。
+
+### 6-3. getBlockSetStatus の引数名と戻り値
+- 引数の対応は確定 (`0xd658a0` の `PyArg` 格納先 → `0x4f2990` の store 順 → `0x12d8740` の読み出し):
+  `S+0 = 第 1 (x)`・`S+4 = 第 2 (y)`・`S+8 = 第 3 (z)`・`S+0xc = 第 4 (w)`。
+- 読み出しの丸め: `x` は `max(x,0)` (列の下限)、`y` は `max(y,1)` (行の下限)、`z` は検査なし (列の上限・右端)、`w` は `min(w,500)` (行の上限)。
+- 名前: 丸めの方向と `(z-x+1)` の幅の取り方から **left = x, top = y, right = z, bottom = w** と整合する。ただし Python 側の引数名は REPORT_PY32 の文書由来で、PE から名前そのものは確定しない (推定のまま)。
+- 戻り値 0..2 の意味: **未確認**。セル値は `0x100bfa0` の `[0x15453b4 + flag*4]` (表 `{0,1,2,2,2,2,2,2}`) の最大値。`flag` の意味 (`+0xd2`・`+0xda` の一致) が未確定のため、値の意味は決められない。
+
+### 6-4. 受入条件の判定
+| 受入 | 判定 | 残り |
+|---|---|---|
+| 第 1 引数の上限と意味 | 意味は行添字 (確定寄り・根拠 6-1)、上限は**未確定** | 上限は実行時の表の件数。PE からは出ない |
+| 表 `0x193fd08` の内容と第 2 引数 key | 作られ方 (実行時・rip store 0) を確定。key = channel は**推定** | 呼出し元の値の由来 (6-1 の b) |
+| getBlockSetStatus の戻り値・引数名 | 引数の対応 (x,y,z,w) は確定。名前は推定のまま。戻り値 0..2 の意味は**未確認** | `flag` の意味 (`+0xd2`・`+0xda`) |
+
+PE 解析は完了。以上 3 件は子 #4010 の入力として残す (実装は本 issue の範囲外)。

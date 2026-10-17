@@ -304,6 +304,8 @@ export function createMockEngine() {
       return stepParam(st.channels[idx], step - q * pads + st0, prm);
     },
     // PY-89 (#2805): C と同一。identity (全 channel が 1 グループ)・既定 -2 (未割当)
+    // PY-146 (#2544): channels 版 0xd58e00 は general 版と同じ wrapper 0xd84740 → 0x1046a30 を呼ぶ (REPORT_PY146)。成功経路の式は PY-235 と同じ
+    "channels.processRECEvent": (...a) => { arity(a, 3, 3); const e = ix(a[0]) >>> 0; const v = ix(a[1]) | 0; const f = ix(a[2]); if (!recPassFamily(e, f)) throw new FlError("Unspecified error (not implemented: channels.processRECEvent)", 2); return v; },
     "channels.getChannelIndex": (...a) => { arity(a, 1, 1); const i = ix(a[0]); ch(i); return i; },
     "channels.getChannelMidiInPort": (...a) => { arity(a, 1, 2); ch(a[0]); argI(a, 1, 0); return -2; },
     "channels.selectChannel": (i, v) => { ch(i).sel = tog(ch(i).sel, v); },

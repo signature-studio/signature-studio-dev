@@ -260,6 +260,14 @@ const seq = [
   ["channels.soloChannel", [0, -1, 1]],
   ["channels.isChannelSolo", [0]],
   ["channels.soloChannel", [0, "x"]],
+  // PY-146 (#2544): processRECEvent は PY-235 の成功経路 (R-other・low16 != 8) で戻り値 = value。未確定の family は code 2 (未実装)
+  ["channels.processRECEvent", [0x10000000, 5, 0]], ["channels.processRECEvent", [0x40000003, -7, 2]], ["channels.processRECEvent", [-0x10000000, 100, 0x20]],
+  ["channels.processRECEvent", [0x50000000, 1, 0]], ["channels.processRECEvent", [0x10000008, 9, 0]],
+  ["channels.processRECEvent", [0, 1, 0]], ["channels.processRECEvent", [-0x80000000, 1, 0]],
+  ["channels.processRECEvent", [0x40000005, 3, 0]], ["channels.processRECEvent", [0x40000001, 3, 0]],
+  ["channels.processRECEvent", [0x40000000, -4, 0x1c]], ["channels.processRECEvent", [0x40000002, 7, 0x1]],
+  ["channels.processRECEvent", [0x40000000, 3, 0x2]], ["channels.processRECEvent", [0x40000005, 3, 0x20]],
+  ["channels.processRECEvent", [1, 2]], ["channels.processRECEvent", [1, 2, 3, 4]],
 ];
 
 const diffs = [];

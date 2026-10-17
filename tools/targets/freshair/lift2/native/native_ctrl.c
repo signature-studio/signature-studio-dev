@@ -276,6 +276,28 @@ int main(int argc, char** argv) {
          * popup 入力: [P+0xb48]=1, [P+0xbb8]=非 NULL。rdx は 0x180d215e0 のゲート対象 (先頭 byte が非0 なら通過) として G を渡す。 */
         if (getenv("FA_UI31")) {
             unsigned char* P = gr_alloc(0x1000); unsigned char* PB = gr_alloc(0x1000); unsigned char* G = gr_alloc(0x40);
+            /* FA-74 (#5255): FA_UI31_CTOR=1 は P を実機 ctor 0x180d8a6e0 で構築する (既定 OFF = 従来どおり 0 埋め)。
+             * ctor 前後の [P+0xb98]・[P+0xba8]・vtable を記録し、書込みが ctor の外で起きるかを見る。 */
+            if (getenv("FA_UI31_CTOR")) {
+                /* 実機の呼出元 (13 箇所) は rdx = ca3d50(weak, out) を渡す。weak は [+0x60]=ptr・[+0x68]=制御ブロック。 */
+                unsigned char* A = gr_alloc(0x10); unsigned char* cb = gr_alloc(0x30); unsigned char* Q = gr_alloc(0x80);
+                W64(cb, 0, cb + 0x10); W32(cb, 8, 0x40); W32(cb, 0xc, 0x40); W64(cb, 0x18, 0x1803b4070ULL); W64(cb, 0x20, 0x1803b4070ULL);
+                W64(Q, 0x60, PB); W64(Q, 0x68, cb);
+                g_in_guard = 1; int ls = sigsetjmp(g_jb, 1);
+                if (ls == 0) ((void* (__attribute__((ms_abi)) *)(void*, void*))0x180ca3d50ULL)(Q, A);
+                g_in_guard = 0;
+                if (ls) fprintf(stderr, "UI31CTOR lock FAULT S%d rip=%llx addr=%llx\n", sidx, (unsigned long long)g_fault_rip, (unsigned long long)g_fault_addr);
+                uint64_t b98 = 0, ba8 = 0; memcpy(&b98, P + 0xb98, 8); memcpy(&ba8, P + 0xba8, 8);
+                fprintf(stderr, "UI31CTOR pre  S%d +b98=%llx +ba8=%llx\n", sidx, (unsigned long long)b98, (unsigned long long)ba8);
+                g_in_guard = 1; int cs = sigsetjmp(g_jb, 1);
+                if (cs == 0) ((void* (__attribute__((ms_abi)) *)(void*, void*, long long, long long))0x180d8a6e0ULL)(P, A, 0, 0);
+                g_in_guard = 0;
+                memcpy(&b98, P + 0xb98, 8); memcpy(&ba8, P + 0xba8, 8);
+                uint64_t vt = 0; memcpy(&vt, P, 8);
+                fprintf(stderr, "UI31CTOR post S%d %s rip=%llx addr=%llx vt=%llx +b98=%llx +ba8=%llx\n", sidx, cs ? "FAULT" : "returned",
+                        (unsigned long long)g_fault_rip, (unsigned long long)g_fault_addr, (unsigned long long)vt,
+                        (unsigned long long)b98, (unsigned long long)ba8);
+            }
             P[0xb48] = 1; W64(P, 0xbb8, PB); W64(P, 0xbc0, PB); G[0] = 1;
             fprintf(stderr, "UI31 S%d call slot5 P=%p G=%p\n", sidx, (void*)P, (void*)G);
             g_in_guard = 1; int us = sigsetjmp(g_jb, 1);

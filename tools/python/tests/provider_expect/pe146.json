@@ -1,0 +1,6 @@
+{
+  "tag": "pe146",
+  "refs": ["#2544"],
+  "note": "channels 版 0xd58e00 は general 版と同じ wrapper 0xd84740 → 0x1046a30 を呼ぶ。PE で成功経路 (R-other・low16 != 8) の戻り値 = value を channels.processRECEvent に当てた 1 件 (REPORT_PY146・PY-146 #2544)。他の family は未実装 error。tests/channels_diff.mjs が mock と照合",
+  "functions": ["channels.processRECEvent"]
+}
