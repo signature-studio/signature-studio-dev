@@ -105,19 +105,28 @@
 係数計算関数 (SC `0x180b7fa80` ⇄ KH `0x180469d40`) の呼出し引数・入口ブロック・出口ブロックを両側で記録した (`lift2/native/coef_probe.c`・`ks_coef_scen.sh`・`ks_coef_cmp.py`)。
 同一シナリオ 200 本 (seed 0xF117E4、fma 0)。
 
-**再測定の状態 (未実施)**: 前版の §6 の数値は、現在の `ks_coef_cmp.py` の出力から再現できなかったため削除した。
-再測定には `work-liftlib-targets` (`tools/targets/{freshair,kilohearts}/work/`) が要るが、この run で取得できた素材 (`fl-win64`) には SlateCore / HeartCore が無い。
-新しい数値は、再測定後に `ks_coef_cmp.py` の出力をそのまま転記する (2×2 表・o2 別・|KH| 区分・first mismatch を含む)。
+測定 commit: `aab22f608` (harness の最後のコード変更 commit)。素材: `work-liftlib-targets` (SlateCore / HeartCore)。
+再現: `bash tools/targets/freshair/ks_coef_scen.sh 200 0xF117E4 0` (出力は下、`ks_coef_cmp.py` の出力をそのまま転記)。
 
-- 入力 (type / order×2 / freq / Q / gain / sr): 前版では全 call で一致。`ks_coef_cmp.py` は再測定時に再確認する。
-- 入口ブロック (係数 slot の呼出し前内容): 前版で不一致 call があった (数値は未再現)。state 側 (写像) の差の候補。
-- 出口ブロック: 入口一致でも出力が違う call の有無は、2×2 表 (入口一致/不一致 × 出口一致/不一致) で判定する。
+```
+SC_DETERMINISTIC=1
+KH_DETERMINISTIC=1
+groups=598 group_count_differs=0 coef_calls=284
+input mismatch (calls): ty=0 o2=0 f=0 q=0 g=0 sr=0
+entry block (pre) mismatch calls=75 / 284
+out block mismatch calls=209 / 284; mismatched float words=2637 / 41800
+2x2 (entry same/diff x out same/diff): entry_same&out_same=75 entry_same&out_diff=134 entry_diff&out_same=0 entry_diff&out_diff=75
+out mismatch by o2: o2=0:0/37 o2=2:69/90 o2=4:40/46 o2=6:53/59 o2=8:47/52
+rel dist of mismatched words (|SC-KH|/|KH|): <=1e-6=1591 <=1e-4=404 <=1e-3=269 <=1e-2=179 >1e-2=194
+|KH| of mismatched words with rel>1e-2: |KH|<1e-20=66 1e-20<=|KH|<1e-3=10 |KH|>=1e-3=55
+first mismatched word byte offsets (offset:count): 0x10:55 0x18:52 0x20:51 0x28:54 0x30:46 0x38:51 0x40:19 0x44:12 0x48:39 0x4c:5 0x50:33 0x54:5
+first mismatch: ('out', (0, 0), 504, '8e75e40d', '8d75e40d')
+```
 
-**判定 (現時点)**: 引数は一致。係数 slot の入口状態の不一致 (写像候補) と、入口一致でも出力が違う係数計算側の差の両方がある。
-どちらが支配的かは、再測定の 2×2 表で決める。式の特定は未了 (係数計算の呼出し先 `0x180d22850`・`0x180d235b0`・`0x18100c1e0` の入出力は未記録)。
-
-- 決定性: `ks_coef_scen.sh` が SC・KH それぞれを 2 回実行して `cmp` し、`SC_DETERMINISTIC=` / `KH_DETERMINISTIC=` を出す (再測定で確認する)。
-- 測定 commit: 再測定後に更新する (現版の harness の最後の変更 commit)。再現: `bash tools/targets/freshair/ks_coef_scen.sh 200 0xF117E4 0`。
+**判定**: 引数は一致 (input mismatch 0)。入口一致でも出力が違う call が 134 件あり、係数計算側の差がある。
+入口不一致の 75 件はすべて出力も不一致で、写像側 (入口状態) の差も寄与する。
+- 入口ブロック (0x320 B) が係数計算の読む状態の全部かは**未確定**。入口一致・出口不一致の 134 件は、入口ブロック外の入力を読んでいる可能性を排除していない。
+- 式の特定は未了 (係数計算の呼出し先 `0x180d22850`・`0x180d235b0`・`0x18100c1e0` の入出力は未記録)。
 
 ## 7. 未解決
 
