@@ -14,4 +14,9 @@ python3 "$FA/lift2/gen_filter_scen.py" filter_scen.txt "$N" "$SEED"
 cp "$FA/lift2/pokes.txt" pokes.txt
 FA_IAT_ALL=1 timeout 300 ./coef_probe sc "$SC" filter_scen.txt sc_coef.txt "$FMA"
 timeout 300 ./coef_probe kh "$KH" filter_scen.txt kh_coef.txt
+# 決定性: 同一入力で 2 回目を取り、出力を cmp する (差があれば比較結果は信用しない)
+FA_IAT_ALL=1 timeout 300 ./coef_probe sc "$SC" filter_scen.txt sc_coef2.txt "$FMA"
+timeout 300 ./coef_probe kh "$KH" filter_scen.txt kh_coef2.txt
+if cmp -s sc_coef.txt sc_coef2.txt; then echo "SC_DETERMINISTIC=1"; else echo "SC_DETERMINISTIC=0"; fi
+if cmp -s kh_coef.txt kh_coef2.txt; then echo "KH_DETERMINISTIC=1"; else echo "KH_DETERMINISTIC=0"; fi
 python3 "$HERE/ks_coef_cmp.py" sc_coef.txt kh_coef.txt | tee coef_cmp.txt
