@@ -8,6 +8,7 @@
 #   例 (#113 の 16-bit 試行、既定 WFBox=2 のため S2_WFBOX=0 を付ける): S2_WFBOX=0 S2_REG=$'Software\\Image-Line\\FL Studio 26\\General|LastExportedFormats|4' bash tools/flp/s2_render_probe.sh Autogun.flp 1
 # 検証用の即値パッチ: S2_PATCH に 1 行 1 件 `<VA hex>|<期待バイト hex>|<新バイト hex>` を入れる (oracle ローカルコピーの FLEngine_x64.dll のみ)。
 # レジストリ・トレース: S2_TRACE_REG=1 で WINEDEBUG=+reg にし、開かれたキーを $WORKDIR/s2_reg_keys_<n>.txt に出す。
+# thread 状態の採取: S2_THREAD_AT (既定 "60 90" の秒・空白区切り・0 で無効) ごとに $WORKDIR/s2_threads_<n>.tsv へ wine 系プロセスの全 thread を追記する (列: 経過秒・pid・tid・comm・state・utime・stime・wchan・syscall)。
 # 実行中の観測: S2_SAMPLE (既定 5 秒・0 で無効) ごとに $WORKDIR/s2_progress_<n>.tsv へ「epoch・WAV バイト数(- は無し)・ログ バイト数・wine 系プロセスの CPU 秒合計・RSS KiB 合計」を追記する。WAV サイズが増え続ければ書き出し中、ログとCPU が止まれば停止の疑い。
 # WAV 形式: WAVRenderForm\WFBox = ${S2_WFBOX:-2} (0 = 16-bit / 1 = 24-bit / 2 = 32-bit float、#3052 で実測)、WAVRenderForm\DitherBox = 0 (dither off)。16-bit に戻すには S2_WFBOX=0。
 # 出力は $RUNNER_TEMP 配下のみ (commit 対象外)。結果の要約は tools/flp/REPORT_APPENDIX.md §15・§16・§17。
@@ -21,6 +22,7 @@ WORKDIR="$ART/s2"
 NAME="${1:?usage: s2_render_probe.sh <name.flp> [repeat]}"
 # thread 状態の採取: 起動からの秒 (既定 "60 90"・0 で無効) に wine 系プロセスの全 thread の state・utime・stime・wchan を追記する。
 # 同じ thread の utime が増えていれば spin (CPU を使用中)、増えず wchan が待ちを示していれば待ち。
+# 注: stat の列 3・14・15 は comm (括弧内) に空白が無い前提で切る。comm は別に読む。
 dump_threads() {
   local out="$1" el="$2" pid t tid
   for pid in $(ps -C wine64-preloader,wine64,FL64.exe -o pid= 2>/dev/null || true); do
