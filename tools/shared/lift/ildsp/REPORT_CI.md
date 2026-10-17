@@ -156,7 +156,7 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 - IR: `call i64 @function_1801aef40` の後に fall-through で 0x1aefa9 へ続く。つまり IR は jcc を call に化かしている。これは現行の IR (baseline) に既にある誤モデルで、閉包を広げても直らない。
 - 試算 (scratch, 非コミット・`work/` の probe): jcc を辿ると 37 関数・969 命令 (+1 関数・+8 命令)。`ci_ranges.py` に入れて `ci_lift.sh` を回すと、RetDec は 0x1aef40 を `__asm_rep_stosb_memset` の呼び出しとして出し、`gen_helpers.py` が未対応の signature で exit 1 になった。閉包規則は戻し、コードの差分は 0 (`ci_ranges.py` は HEAD と同じ)。
 - 決定 (T-SH-163 #6231・旧決定 #5749 を更新): 閉包規則は変えず、IR 側で直す。`ci_restore_memset.py` が `call i64 @function_1801aef40` を memset ループ (`i8` store を `arg3` 回) に置き換え、0x1aefa7 の jcc の偽側を `ci_ms` へ向ける。ループ後は `ret` ブロック `dec_label_pc_1801af028` へ `br` する (x86 の `ret` と同じ行き先)。`ci_restore_memset.py` は 0x1aef40 の 8 命令の形と jne の飛び先を逆アセンブルで確かめ、外れたら exit 1 で止まる。
-- 検証 (測定 commit `8a4474076`・4 core・n=3): `ci_lift.sh` rc 0・ALL OK を 3 回 (2.353 / 2.331 / 2.254 s)・`直接 jcc 先への call (復元後 IR): 0 件 (復元前 1 件)`。`ci_link.sh` rc 0 (wasm-ld rc 0・未解決 0 件) を 3 回 (0.499 / 0.501 / 0.777 s)。`function_1801aef40` は未解決から消えた。`%2` の出どころ: `ci.rm.ll` の `function_1801aef60` 入口の `%1 = urem i32 %arg2, 256`・`%2 = zext i32 %1 to i64` で、`trunc i64 %2 to i8` は arg2 の下位 8 bit (x86 の `dl`) を指す。NC: 旧 IR (call 残存) を census の第 4 引数に渡すと `FAIL`・rc 1。`ci_restore_memset.py` に復元済み IR を渡すと `jcc の分岐が想定と違う`・rc 1。
+- 検証 (測定 commit `8339e3fa5`・4 core・n=3・§9-4): `ci_lift.sh` rc 0・ALL OK を 3 回 (2.898 / 2.834 / 2.851 s)・`直接 jcc 先への call (復元後 IR): 0 件 (復元前 1 件)`。`function_1801aef40` は未解決から消えた。(旧測定 `8a4474076` の値 2.353 / 2.331 / 2.254 s と `ci_link.sh` 0.499 / 0.501 / 0.777 s は時点の記録として §9-4 に残す。)`%2` の出どころ: `ci.rm.ll` の `function_1801aef60` 入口の `%1 = urem i32 %arg2, 256`・`%2 = zext i32 %1 to i64` で、`trunc i64 %2 to i8` は arg2 の下位 8 bit (x86 の `dl`) を指す。NC: 旧 IR (call 残存) を census の第 4 引数に渡すと `FAIL`・rc 1。`ci_restore_memset.py` に復元済み IR を渡すと `jcc の分岐が想定と違う`・rc 1。
 - 閉包規則は変えていない (36 関数・961 命令・間接 call 10 は不変)。よって 36/961 の再測定は要らない (§8-3)。
 
 ### 8-2. (b) 計算ジャンプ表の経路 (n = 1〜16)
@@ -182,7 +182,7 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 
 ## 9. wasm リンクと外部グローバル (T-SH-152 #5748)
 
-結論: `ci_lift.sh` の出力を wasm にリンクすると、未解決は 0 件 (wasm-ld rc 0・HEAD `8a4474076`・§9-4)。直接 jcc 先 `function_1801aef40` は #6231 で IR 側を直して消えた。IAT 10 種は #5787・#6226 でリンク済み。外部グローバル 2 種と `__stack_pointer` はリンクが通った。ただし外部グローバルの画像上の敷設は未決 (§9-2)。
+結論: `ci_lift.sh` の出力を wasm にリンクすると、未解決は 0 件 (wasm-ld rc 0・測定 commit `8339e3fa5`・§9-4)。直接 jcc 先 `function_1801aef40` は #6231 で IR 側を直して消えた。IAT 10 種は #5787・#6226 でリンク済み。外部グローバル 2 種と `__stack_pointer` はリンクが通った。ただし外部グローバルの画像上の敷設は未決 (§9-2)。
 
 ### 9-1. 実測 (`ci_link.sh`・rc 1 = 期待どおりの未解決)
 - 測定 commit: `9f3c2a969` (コードを変えた最後の commit。`ci_link.sh` のコメント 1 行と本節の更新)。`ci_lift.sh`・`ci_link.sh` はこの HEAD で実行した。`git diff 332faf055 9f3c2a969 -- tools/shared/lift/ildsp tools/shared/lift/libreverb` の差分は `ci_link.sh` のコメント 1 行のみ (実行されるコードは同じ)。
@@ -230,8 +230,10 @@ movaps/movapd の sext 除去の理由: RetDec の helper は xmm の下位 64bi
 | 直接 jcc 先 `function_1801aef40` (閉包の誤モデル・§8-1) | 解消 (wasm-ld rc 0・§9-4) | #6231 (T-SH-163) |
 
 ### 9-4. 再測定 (T-SH-152 #5748・受入 2)
-- **現 head の実測 (測定 commit `8a4474076`・4 core・n=3)**: `ci_lift.sh` rc 0・ALL OK を 3 回 (2.353 / 2.331 / 2.254 s)。`ci_link.sh` rc 0・wasm-ld rc 0・`undefined.txt` 0 行 (未解決 0 件) を 3 回 (0.499 / 0.501 / 0.777 s)。素材は `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を展開して実行 (RetDec v5.0 Linux・emsdk 6.0.12)。
-- 測定 commit `8a4474076` 以前の値 (下の 2 項) は、その時点の記録として残す。
+- **現 head の実測 (測定 commit `8339e3fa5`・4 core・n=3)**: `ci_lift.sh` rc 0・ALL OK を 3 回 (2.898 / 2.834 / 2.851 s)・`直接 jcc 先への call (復元後 IR): 0 件 (復元前 1 件)`。`ci_link.sh` rc 0・wasm-ld rc 0・`undefined.txt` 0 行 (未解決 0 件) を 3 回 (0.608 / 0.616 / 0.620 s)。素材は `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を展開して実行 (RetDec v5.0 Linux・emsdk 6.0.12)。
+- `8339e3fa5` は `ci_link.sh` の判定を「期待集合 (`function_1801aef40`) との照合」から「wasm-ld rc 0 かつ未解決 0 件」に変えた commit。`ci_lift.sh` の入力と段は変えていない。`git diff 0c36f172a 8339e3fa5 -- tools/shared/lift/ildsp` は `ci_link.sh` の 8 行 (3 追加・5 削除) のみ。
+- 同じ `ci_lift.sh` (`0c36f172a` 時点) の測定: rc 0・ALL OK を 3 回 (3.688 / 2.954 / 3.391 s)。`ci_link.sh` (`0c36f172a` 時点・判定は旧): rc 0・wasm-ld rc 0・未解決 0 件 (2 回目以降 0.641 / 0.636 s。初回 13.7 s は emsdk キャッシュ生成を含む)。
+- 測定 commit `8a4474076` の値 (`ci_lift.sh` 2.353 / 2.331 / 2.254 s・`ci_link.sh` 0.499 / 0.501 / 0.777 s) は、その時点の記録として残す。
 - 測定 commit: `f46916860` (`ci_link.sh` に `ci_iat.o`・`ci_traps.o` を追加した commit)。以後の変更は `ci_link.sh` の出力文言とヘッダコメントのみで、リンクの入力・期待集合・終了条件は変えていない。`git diff f46916860 HEAD -- tools/shared/lift/ildsp` は `ci_link.sh` の文言・コメントと本 REPORT の差分だけ。
 - 実測の記録 (測定 commit `f46916860` 時点。この記録は、その commit で素材 `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を展開して実行した結果である):
   - `ci_lift.sh` → rc 0 (ALL OK。census FAIL は #6184 で解消済み)。
