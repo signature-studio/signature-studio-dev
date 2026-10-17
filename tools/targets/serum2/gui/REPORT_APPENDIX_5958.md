@@ -77,9 +77,10 @@
 ## 2e. slot 参照関数の実行 breakpoint (S2HOST_BP・クリック注入なし)
 
 - 目的: クリック注入 (§2b〜§2d) をやめ、slot を参照する関数そのものに実行 breakpoint を張って、呼出しの有無を見る (PM 判断の提案 1)。
-- 変更: `host/vst3host.cpp` に `S2HOST_BP="rva,…"` (最大 4 件) を追加。DR0〜DR3 の execute 比較で関数先頭に張り、hit ごとに関数 RVA・戻り先・slot 値を出す。`S2HOST_SLOT`・`S2HOST_WATCH` と併用しない (DR0 を共用するため)。既定経路は無変更。
-- 対象 RVA: `0x136bf0` (slot 由来 call を持つ関数)・`0x138180` (同)・`0x142540` (同)・`0x622840` (XferOnOffButton の own vtable の候補 slot 0)。
+- 変更: `host/vst3host.cpp` に `S2HOST_BP="rva,…"` (最大 4 件) を追加。DR0〜DR3 の execute 比較で関数先頭に張り、hit ごとに関数 RVA・戻り先・slot 値を出す。`S2HOST_SLOT`・`S2HOST_WATCH` と同時指定すると起動時に拒否する (DR レジスタを共用するため)。既定経路は無変更。
+- 対象 RVA: `0x136bf0`・`0x138180` (slot 由来 call を持つ関数)・`0x142540` (slot 由来として並べる候補。`REPORT_APPENDIX_5935.md` §2 で「本 run で再確認していない」と注記された関数)・`0x622840` (XferOnOffButton の own vtable の候補 slot 0)。
 - 測定 commit: `d1e3cab19` (HEAD で再現)。コマンド: `S2HOST_ATTACH=1 S2HOST_BP="136bf0,138180,142540,622840" xvfb-run -a wine64 vst3host.exe …`。無改変 DLL・既定 state・4 block・wine64 9.0・load 0.45。
+- 測定範囲: DR レジスタはスレッド単位で、本 run の bp は attach 時の main thread だけに効く。他スレッドでの呼出しは見えていない。
 
 | 関数 | hit 件数 | slot 値 (hit 時) |
 |---|---|---|
@@ -89,7 +90,8 @@
 | `0x622840` | 0 | — |
 
 - slot 値は全 hit で 0。`before process` も 0。完走 `blocks=4 frames=512 nonzero_cells=1020/1024 peak=0.548306`。
-- 解釈: 関数の呼出しは起きているが、slot 由来の間接 call の直前には `test r10,r10; je` (§5935 の表) があり、slot=0 のときは call を飛ばす。よって hit は関数の入口であって、slot 由来 call の実行ではない。XferOnOffButton の vtable 候補 `0x622840` は本 run では呼ばれなかった。
+- 解釈 (入口の観測まで): 入口で slot=0 を観測した。`0x622840` は本 run では hit 0 (呼ばれなかった)。`0x136bf0` / `0x138180` は入口 hit あり・slot 由来 call の実行は未確定。slot 由来 call の直前には `test r10,r10; je` (§5935 の表) があるが、call 命令位置での slot 値は測っていないため、slot=0 で call が飛ばされたとは言えない。`0x142540` は hit 0 で、slot 由来かどうかも本 run では判定できない。
+- 未確定の残件: call 命令位置への bp、または call 直前の slot 読みで、slot 由来 call の実行の有無を測る必要がある。
 - 限界: 1 条件 (クリックなし・attach のみ) での観測。XferOnOffButton の操作 (クリック) を伴う条件では未測定。
 
 ## 3. 判定と未達
@@ -103,6 +105,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | GUI (editor open・XferOnOffButton 操作) 経路での slot 観測 | slot 由来 5 箇所の確定 | #5958 (本 issue の残件・Refs のまま open) |
+| slot 由来 call 命令の位置での slot 値・call 命令への bp (§2e) | `0x136bf0`・`0x138180` の slot 由来 call の実行の有無 | #5958 (同上) |
 | `0x1809ca77c` の CFG 経由 vtable 呼出し先 | 閉包 1 箇所 | #5934 (SR-96) の結果待ち |
 
 ## 5. 再測定の前提

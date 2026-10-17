@@ -780,6 +780,11 @@ int main(int argc, char** argv) {
   std::string outDir = argv[3];
   int nBlocks = (argc > 4) ? atoi(argv[4]) : 64;
   const char* contentDir = (argc > 5) ? argv[5] : nullptr;  // Tables/.. を含むルート (CWD)
+  // S2HOST_BP は DR0〜DR3 を使う。S2HOST_SLOT・S2HOST_WATCH は DR0 を使い、armBp が DR7 全体を上書きするため併用は拒否する
+  if (getenv("S2HOST_BP") && (getenv("S2HOST_SLOT") || getenv("S2HOST_WATCH"))) {
+    fprintf(stderr, "S2HOST_BP は S2HOST_SLOT・S2HOST_WATCH と併用できない (DR レジスタを共用するため)\n");
+    return 2;
+  }
 
   CreateDirectoryA(outDir.c_str(), nullptr);
   std::string logPath = outDir + "\\log.txt";
