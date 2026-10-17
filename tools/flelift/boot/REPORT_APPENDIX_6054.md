@@ -152,7 +152,7 @@ A	tools/flelift/boot/rsi_zero_variant.sh
 
 ## 19. 陽性対照が既定経路で 0 件になる理由 (#6213・測定 commit `02d46f1fc`)
 
-- 結論: 既定経路 (`FLE_IPP` 未指定・mode 3) で `0x5ac308`・`0x11f6100` が 0 件なのは、mode 3 の boot 停止時に 2 slot の値が初期値のまま (mode 1 では 0) で、監視の範囲で書込みが出なかったため。差は `FLE_IPP` の mode (3 と 1) だけで、root (`0x1375990` の有無) と寛容起動 (`FLE_TOLERANT`) は原因ではない。「mode 3 では書込み処理が走らない」は仮説で、未解決側に置く。
+- 結論: 既定経路 (`FLE_IPP` 未指定・mode 3) で `0x5ac308`・`0x11f6100` が 0 件なのは、mode 3 の boot 停止時に 2 slot の値が 0 でなく (mode 1 では 0)、監視の範囲で書込みが出なかったため。差は `FLE_IPP` の mode (3 と 1) だけで、root (`0x1375990` の有無) と寛容起動 (`FLE_TOLERANT`) は原因ではない。「mode 3 では書込み処理が走らない」は仮説で、未解決側に置く。
 - 同じ build (`FLE_EXTRA_CCF` で `0x5ac308`・`0x11f6100` を監視) の boot 停止時の値 (`FLEBOOT_SLOT6213`・`fle_boot.mjs` に読取りを追加):
 
 | 条件 | 停止 unit | `0x5ac308` | `0x11f6100` | 監視の出力 |
@@ -161,7 +161,7 @@ A	tools/flelift/boot/rsi_zero_variant.sh
 | `FLE_IPP=1` (4464 条件) | 209 | `0x0` | `0x0` | 2 件 (unit 209 の同じ 16B 書込み) |
 
 - root 差の確認: mode 3 で root を `0x6a7b70,0x1375990` にしても 0 件 (`pcA`)。mode 1 で root を `0x6a7b70` だけにしても 2 件 (`pcB`)。
-- mode 3 の監視は 0 件。停止時の 2 slot の値は mode 3 では初期値のまま (`0x5ac308`=`0x40f960`・`0x11f6100` 不変) で、mode 1 では 0 (`FLEBOOT_SLOT6213` の読取り)。
+- mode 3 の監視は 0 件。停止時点の値は mode 3 で `0x5ac308`=`0x40f960`、`0x11f6100` は監視 0 件のため変化なしとだけ言える (snapshot 時点の値は読んでいないので「初期値」とは書かない)。mode 1 では 0 (`FLEBOOT_SLOT6213` の読取り)。`fle_boot.mjs` の `FLEBOOT_SLOT6213` は `0x976410` も読むが、結果は記録しておらず本件の判定には使っていない。
 - 書込み元 (受入 2・rc 3 の診断 run での観測 = `pcF`・mode 1 (shim)): 2 slot を 0 にする書込みの呼出し連鎖は `fle_wwatch` ← `STX` ← **`f_6a7b70`** ← `ott_dispatch` ← `f_6c7610` ← `f_815050` ← `f_815e10`。§17 の書込み元と一致する。`f_6a7b70` は既定経路でも root 化されている (`FLE_EXTRA_ROOTS=0x6a7b70`)。
 - 未解決 (起票先: #5337): (a) mode 3 で `f_6a7b70` が呼ばれて別の範囲を塗るのか、呼ばれないのかは未計測。mode 3 の監視で 0 件だったことは、呼ばれないことを意味しない。(b) mode 1 と mode 3 で `f_6a7b70` の呼出し引数 (`dst`・`cnt`) がどう違うか。`0x6a7b70` の root 化は本件の範囲外 (PM 判断 blocklist) のまま。
 
