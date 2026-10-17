@@ -1,6 +1,6 @@
 import manualDepsJson from "../../../tools/pm/manual_deps.json" with { type: "json" };
 import { DEFAULT_BATCH } from "./launch.ts";
-import { DEFAULT_STOPPED_INTAKE_PER_H } from "./pm.ts";
+import { DEFAULT_STOPPED_INTAKE_PER_H, DEFAULT_WAKE_PER_H, DEFAULT_WAKE_REF_DAY_MAX } from "./pm.ts";
 import { DEFAULT_MARK_LOGIN, DEFAULT_REVIEWER_LOGIN } from "./webhook.ts";
 
 // 既定の TARGET は 58: 同時に走らせる opencode.yaml の run の総数 (実装・review・fix・oc-pm・watchdog の全て。active.ts) の上限。
@@ -55,6 +55,9 @@ export interface Env {
   LOW_CAP?: string;
   // 停止行 (run-outcome の reason が stop / split の issue) を oc-pm の判断キューへ 1 時間に送る件数の上限 (#5722。既定は pm.ts の DEFAULT_STOPPED_INTAKE_PER_H = 48。#5899 で 24 → 48)。
   STOPPED_INTAKE_PER_H?: string;
+  // 停止行の直接の再投入 (wake・CI-250) の上限。1 時間に WAKE_PER_H 件 (既定 24)・同じ issue は 24 時間に WAKE_REF_DAY_MAX 件 (既定 2)。0 で止める。
+  WAKE_PER_H?: string;
+  WAKE_REF_DAY_MAX?: string;
   // 全体同期でコメントを読む窓 (時間。24 未満は 24 に切り上げる) と、コメント一覧のページ上限 (1 ページ 100 件)。
   COMMENT_WINDOW_H?: string;
   COMMENT_MAX_PAGES?: string;
@@ -92,6 +95,9 @@ export interface Config {
   lowCap: number;
   // 停止行 (stopped_report) を 1 時間に oc-pm へ送る件数の上限 (#5722)。
   stoppedIntakePerH: number;
+  // 停止行の直接の再投入 (wake・CI-250) の上限。
+  wakePerH: number;
+  wakeRefDayMax: number;
   commentWindowH: number;
   commentMaxPages: number;
   stuckHigh: number;
@@ -137,6 +143,8 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     noPrCooldownH: num(env.NO_PR_COOLDOWN_H, DEFAULT_NO_PR_COOLDOWN_H),
     lowCap: Math.floor(num(env.LOW_CAP?.trim(), DEFAULT_LOW_CAP)),
     stoppedIntakePerH: Math.floor(num(env.STOPPED_INTAKE_PER_H?.trim(), DEFAULT_STOPPED_INTAKE_PER_H)),
+    wakePerH: Math.floor(num(env.WAKE_PER_H?.trim(), DEFAULT_WAKE_PER_H)),
+    wakeRefDayMax: Math.floor(num(env.WAKE_REF_DAY_MAX?.trim(), DEFAULT_WAKE_REF_DAY_MAX)),
     // classify が見る bot の報告は 24 時間以内。窓がそれより短いと、取りこぼした報告で誤って着手する。
     commentWindowH: Math.max(MIN_COMMENT_WINDOW_H, num(env.COMMENT_WINDOW_H, DEFAULT_COMMENT_WINDOW_H)),
     commentMaxPages: Math.max(1, Math.floor(num(env.COMMENT_MAX_PAGES, DEFAULT_COMMENT_MAX_PAGES))),

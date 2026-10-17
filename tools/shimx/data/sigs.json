@@ -4728,6 +4728,28 @@
 ],
 "ret": "i32"
 },
+"shimx_fh3_scopes": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
+"shimx_fh3_unwind_scopes": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"i32",
+"ptr",
+"i32"
+],
+"ret": "i32"
+},
 "shimx_get_callback_translator": {
 "params": [],
 "ret": "ptr"

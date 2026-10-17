@@ -120,7 +120,7 @@
 | `tools/flelift/boot/REPORT_APPENDIX_5177.md` | ~70 | FLE-43 (#5177): 既定経路の出力 hash 非決定 (8 run・非決定 9 バイトの VA)・判定指標 (`image_writable` から非決定位置を除いた値・`outmem_judge.py`)。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5830.md` | ~40 | FLE-48 (#5830): 既定経路の非決定 9 バイトを含む 8B ワードの変化 unit 帰属 (site 1・2・8 の監視点)。書込み命令は未特定。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_5897.md` | ~60 | #5897 (PY-5398): slot 35 (`call [reg+0x118]` 151 箇所) の実行時 VMT 採取 probe (`slot35_vmt_probe.sh`)。採取 0 件・陽性対照の発火・未解決 (boot を 895 より先へ)。測定値の正本 |
-| `tools/flelift/boot/REPORT_APPENDIX_5168.md` | ~20 | PY-4877 (#5168): boot 後の `patternCount` (0xd64d40) 直接呼出し driver の測定 (述語 999 回呼出し・icall-miss (0xd64d7a) で戻り値 0 は信用不可・E[1..999] は全 0・測定 commit `8613de75b`)。probe は `py4877_pred_e_probe.sh` |
+| `tools/flelift/boot/REPORT_APPENDIX_5168.md` | ~20 | PY-4877 (#5168): boot 後の `patternCount` (0xd64d40) 直接呼出し driver の測定 (述語 999 回呼出し・icall-miss (0xd64d7a) で戻り値 0 は信用不可・E[1..999] は全 0・icall-miss の原因の測定)。probe は `py4877_pred_e_probe.sh` |
 | `tools/flelift/boot/REPORT_APPENDIX_5215.md` | ~70 | PY-4887 (#5215): 選択リスト G の初期化 `0xe38870` の既定 boot での実起動確認 (G・isPatternSelected・呼出元 5 観測点は未到達・制御 1 件発火)。probe は `py5215_g_init_probe.sh` |
 | `tools/flelift/boot/REPORT_APPENDIX_5027.md` | ~80 | FLE-40 (#5027): `FLE_BOOT_LOG_CAP` 超過の例外が Emscripten の tty write で飲まれ `exit` に残る経路の特定・超過を `boot.threw` の `log_cap` として報告する修正・cap の有無での実測差。測定値の正本 |
 | `tools/flelift/boot/REPORT_APPENDIX_4806.md` | ~60 | FLE-29 (#4806) A1: opt-in 経路 (FLE_IPP=1) の dsp_ippv2 load hook は非 0 を返す (前提の「0 を返す」は不成立)。`0x15F34A0` は unit 132 で登録され unit 209 の 16B store (ret `0x1078570`) で 0 に戻る。store 元の関数は未特定 |
@@ -237,6 +237,7 @@
 | `tools/icall/REPORT_APPENDIX_5125.md` | ~60 | icall #5125 (親 #4245): icall 代表 e2e の before (`706147914`) / after (`e5261de58`) 一致の実測 (両方 PASS・所要・監査/matrix/crt gate の値)・前提素材の展開手順・`/opt` 直書きと `libottnative.so` の注意。REPORT §0 の参照先 |
 | `tools/icall/REPORT_APPENDIX_5889.md` | ~90 | icall #5889 (ICALL-122): `slot_trace` の単歩を fatal・正常経路で dump。6 関数の `RtlPcToFileHeader` の戻り値が `_CxxThrowException` の magic 選択 (`0x19930520`/`0x1994000`) に効くことを単歩と逆アセンブルで確認。`18100cc50` の `RtlCaptureContext` 戻り値は未使用・分岐は `RtlLookupFunctionEntry` で決まる。issue 本文の rc=99 は現 main で rc=97 |
 | `tools/icall/REPORT_APPENDIX_5598.md` | ~45 | icall #5598 (ICALL-118): 書換え後の呼出し点 (`build_site`) と stub (`stub_code`) の機械語を x86-64 で直接実行し、stack 引数 12 語の copy と被呼側までの値一致を確認 (測定 commit `f2bcf3576`・正常 12/12 PASS・ネガコン 0/12 FAIL)。wasm 側 dispatch と実在の被呼側は未達 (#5338・#1023) |
+| `tools/icall/REPORT_APPENDIX_4290.md` | ~60 | icall #4290 (ICALL-97): リーフ 3 関数 (`181056a4c` `181056aa0` `18105d9fc`) の abort 原因は route 入力が chunk 0 だけだったこと。`ir_merge_restored.py` で全 chunk を統合 (測定 commit `8def758ae`)。`18105d9fc` は `unreachable` trap で未解決。 |
 | `tools/icall/REPORT_APPENDIX_5338.md` | ~45 | icall #5338 (ICALL-114): `ott_ms_call` で 12 語の stack 引数を 5 引数以上の間接 call に注入し、被呼側で値一致 (12/12)・1 語ずらしで FAIL (0/12) を確認。書換え後の STKBUF/BLK 経路は未達 (親 #5338 のチェックリスト) |
 | `tools/icall/REPORT_APPENDIX_4565.md` | ~73 | icall #4565 (ICALL-105): ott_native の x64 unwind (`.pdata` 検索・UNWIND_INFO 逆適用) の実装と 6 関数の単独実測。`RtlUnwindEx`・`__CxxFrameHandler` の dispatch は未実装 (子 #4592 / ICALL-106) |
 | `tools/icall/REPORT_APPENDIX_4271.md` | ~80 | icall #4271 (ICALL-96): Fresh Air closure に callee を加えた sweep の実測 (測定 commit `181e26ebd`・`missing function` 7 → 0・wasm のみ err 9 → 2)。未解決 10 件は #4328 (ICALL-99) |
@@ -336,6 +337,7 @@
 | `tools/m11/REPORT_3932.md` | ~50 | #3932 (M11-N201, 親 #3906): set_other 実値化 25 件の alloca 番地を 0 詰め call 引数へ注入する経路 (`m11_post.py --slots`・`M11_SLOT_ROWS`)。注入の支配条件 (entry block 内・呼出し前)・既定は不変の検証。survey の前後実測は未達 |
 | `tools/m11/REPORT_N202.md` | ~70 | #3933 (M11-N202, 親 #3906): set_other スタック slot 未決 85 件の再測定 (現 HEAD で 112 件・実値化 25・未決 87)・C 規則の IR 突合 (引数単位 0・名前単位 22)。検算 `m11_setother_slot_check.py` |
 | `tools/m11/REPORT_N242.md` | ~70 | #5392 (M11-N242, 親 #4890): set_other 非 imm のポインタ経由読込 122 件 (load_ptr) を同一基底の直線区間格納で分類 (実測 実値化 0・復元不能 0・未決 122・未分類 0)。基底の再定義・呼出しを跨ぐ接続は未実装。分類器 `m11_setother_ptr_class.py`・負例 `test_setother_ptr_class.py` |
+| `tools/m11/REPORT_6122.md` | ~70 | #6122 (M11-N285, 親 #4890): ptr_base_def 82 件の基底 reg の出所を直線区間で分類 (実測 実値化 0・復元不能 0・未決 82・未分類 0)。spill 経由 48・別ポインタ 18・グローバル 13・複写 3。分類器 `m11_setother_ptr_class.py` の `base_origin` |
 | `tools/m11/REPORT_N228.md` | ~60 | #4905 (M11-N228, 親 #4891): set_other 非 imm の gep 17 件の基底 reg を到達定義で分類 (実測 実値化 0・復元不能 0・未決 20・未分類 0)。IR への GEP 接続は未実装。分類器 `m11_setother_gep_global.py --pe` |
 | `tools/m11/REPORT_N229.md` | ~60 | #4906 (M11-N229, 親 #4891): set_other 書込可能グローバル 3 件 (VA 0x15e3a70) の格納元探索 (IR・PE 直接経路の store 0 件・計算ポインタ経由は未決)。分類器 `m11_setother_gep_global.py --pe` |
 | `tools/m11/REPORT_N244.md` | ~70 | #5449 (M11-N244, 親 #4906・#4891): set_other 書込可能グローバル 3 件 (VA 0x15e3a70) の IR 全体の SSA 連鎖探索 (VA への直接 store 0 件・計算ポインタ 10,774 件は未決)。分類器 `m11_global_store_alias.py` |
@@ -374,6 +376,7 @@
 | `tools/m11/REPORT_APPENDIX.md` | ~238 | m11 REPORT §8 (LB_BASE=0x10000 適用 #222)・§9 (sigfix 0 詰め #131)・§10a (#132 commit 別測定表と注記)・§10b (#132 真因・修正 4 点・NC・次 blocker・外した内容)・§12 の一部 (#513 新規類型の行案)・§12b (#513 巨大 VirtualAlloc の n の出所) の全文 (250 行上限のため本体から無変更で分割移動) |
 | `tools/m11/REPORT_N1318.md` | ~69 | #1318 (N82): 10 進 inttoptr 4364 件の VA→LVA 仕分け表 (分類件数・判定規則・QPF 整数定数 1 件の誤 remap)・再現 `m11_inttoptr_class.py` |
 | `tools/m11/REPORT_N54.md` | 108 | #954: xmm を読む callee の IR 署名復元 (opt-in `M11_XMM_ARGS=1`)・34/49 件復元・survey 差 0・全件復元時の退行の二分探索表・`fix_xmm_args.py` の呼出し引数個数検査 |
+| `tools/m11/REPORT_N211.md` | ~25 | #4748 (N211): `function_40c650` を IR 順 3・4 番目の site を 0.0 のまま残して変換し、survey (942 unit) の基準差 0 を実測 (`fix_xmm_args.py` の `CONV_ZERO_SITES`) |
 | `tools/m11/REPORT_N210.md` | 74 | #4747 (N210): `function_40c650` の署名変更で unit 149・158 が退行する要因の切り分け (実値を渡すことが原因・署名だけでは退行しない)。wasm 機構は未特定 |
 | `tools/m11/REPORT_N154.md` | 94 | #2762: arity 不一致 callee の xmm 呼出し引数の復元 (i128 placeholder を float/double へ変換)・復元 39 件・survey 差 0・`function_40c650` の退行による保留 |
 | `tools/m11/REPORT_N165.md` | 81 | #2903: arity 不一致の 9 callee の分類 (呼出し site の個数・型で 8 件が IR 引数の欠落・1 件が余分な引数の型)・復元 0 件・survey A/B 差 0 件・結論は手書き条件の IR に限る・`fix_xmm_args.py` の cause 出力 |
@@ -1220,6 +1223,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_5077.md` | 152 | #5077 (KH-138): Delay の `(ulonglong)dVarN` 98 行を機械語 (p-code 経由) と突き合わせて分類した表。98 行の機械語分類の正本 (内訳の数値は REPORT 冒頭の結論。#3836 受入 1 の分割先) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3802_DIFF.md` | ~165 | #3802 付録 §⑧ の差分の全文: 測定 commit `6323671e7` → HEAD の `ghidra_route` の `git diff` 出力 (main 取り込み分を含む)。差分の記録であり測定値の正本ではない |
 | `tools/targets/kilohearts/REPORT_APPENDIX_5401_RUN4.md` | ~45 | KH-160 (#5401): Delay の `FUN_180fd0ac8` 呼出し 3 件 (4694・4727・4801) を機械語で確定し `ABI['delay']` に規則化 (census は af24091a4 で 61・cf32f7d29 で 58)。#3847 [KH-73] の範囲と重なる。本付録が正本 |
+| `tools/targets/kilohearts/REPORT_APPENDIX_5401_RUN5.md` | ~40 | KH-160 (#5401): Delay の `FUN_180fe5f00` 引数なし呼出し 1 件 (`FUN_180fd622c` 内 5723 行) を機械語で確定し `ABI['delay']` に規則化 (census は fe48dca85 で 58・8d8b49ccf で 57)。本付録が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_5401.md` | ~40 | KH-160 (#5401): Delay の引数過不足 1 件 (`FUN_180fe3510` 呼出し・180fd2f3c) を機械語で確定し規則化 (census は fb4b67659 で 78・26bc08453 で 70)。残件は親 #5401 の本文に追記。本付録が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_5384.md` | ~62 | KH-158 (#5384): Delay の stereo ABI 族前半 3 callee (`FUN_180fdc6ec`・`FUN_180fdc844`・`FUN_180fdc858`) を機械語で確定し `ABI['delay']` に規則化。結論・数値・未解決は付録 §10-7z が正本。後半 3 callee は #5385 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_5385.md` | ~70 | KH-159 (#5385): Delay の stereo ABI 族後半 callee の呼出し 6 件のうち 5 件を機械語で確定し `ABI['delay']` に規則化 (`FUN_180fdc700`・`FUN_180fdc6d8`・`FUN_180fcd400` の 4048)。`FUN_180fcd400` の 4060 の 1 件は未確定。結論・数値・未解決は付録 §10-7aa・§10-7ab が正本 |

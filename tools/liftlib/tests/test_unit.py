@@ -1060,6 +1060,43 @@ def t32():
 
 
 def t33():
+    """[LIFTLIB-31 / #6079] p1 `adc r64,imm`: dst = dst + imm + CF。入力 CF は flag 状態から読み、CF を作れない経路は Unsupported。
+
+    合成機械語 `48 83 d0 00` (adc rax,0) を lift_data_insn に通す。直前の整数 cmp (ult) の CF を zext して加算することを固定する。
+    flag 状態が無い・bsr 由来 (CF 未定義) の場合は Unsupported に落ちること、後続 flag は None に戻ること。"""
+    from types import SimpleNamespace as NS
+    from liftlib.passes import p1
+    from liftlib import ir as IR
+
+    mod = IR.Module.parse("define void @function_1000() {\nentry:\n  ret void\n}\n")
+    out = []
+    st = {"__w": set(), "rax": ("%old", "i64"), "fl": ("int", ("%a", "%b", False, 64))}
+    it = NS(va=0x1000, mnem="adc", op_str="rax, 0", mem=None, is_call=False,
+            ops=[NS(type=1, reg="rax"), NS(type=2, imm=0)],
+            _ci=NS(operands=[NS(size=8), NS(size=8)]))
+    stub = NS(mod=mod, nm=lambda va, t: "%%%s_%d" % (t, len(out)), used=lambda k: None,
+              _GPR_ALU=p1.Region._GPR_ALU, _gpr_val=lambda st_, reg, va, o, bits=64: st_[reg][0])
+    stub._flag_cf_i1 = lambda *a: p1.Region._flag_cf_i1(stub, *a)
+    stub._flag_zf_i1 = lambda *a: p1.Region._flag_zf_i1(stub, *a)
+    stub._flag_cc_i1 = lambda *a: p1.Region._flag_cc_i1(stub, *a)
+    ops = [("reg", "rax"), ("imm", 0)]
+    res = p1.Region.lift_data_insn(stub, it, ops, st, out, "")
+    text = "\n".join(out)
+    assert res is True, res
+    assert "icmp ult i64 %a, %b" in text and "zext i1" in text, text
+    assert text.count("add i64") == 2, text
+    assert st["rax"][1] == "i64" and st["fl"] is None, st
+    for bad in ({"fl": None}, {"fl": ("bsrzf", ("%src", 64))}):
+        st2 = {"__w": set(), "rax": ("%old", "i64"), **bad}
+        try:
+            p1.Region.lift_data_insn(stub, it, ops, st2, [], "")
+        except p1.Unsupported:
+            continue
+        raise AssertionError("CF を作れない flag 状態 %s は Unsupported のはず" % bad)
+    print("T33 ok (adc r64,imm: CF を flag 状態から zext して加算、CF 無し・bsr 由来は Unsupported)")
+
+
+def t34():
     """[LIFTLIB-32 / #6080] `cmp rcx,0` の直後の jl (SF/OF) / je (ZF) / jb (CF) の IR を固定し、x86 の定義どおりの値になることを確認する。
 
     x86 の cmp a,b: 結果 r = a-b (mod 2^bits)。ZF=(r==0), SF=(r の最上位 bit), CF=(a <u b), OF=符号付き溢れ。
@@ -1126,12 +1163,12 @@ def t33():
         assert pred_eval(ir_l, a) == (f["sf"] != f["of"]), ("jl", a)
         assert pred_eval(ir_e, a) == f["zf"], ("je", a)
         assert pred_eval(ir_b, a) == f["cf"], ("jb", a)
-    print("T33 ok (cmp rcx,0: jl=icmp slt(SF!=OF), je=icmp eq(ZF), CF は常に 0 (x86 の定義と %d 値で一致))" % len(samples))
+    print("T34 ok (cmp rcx,0: jl=icmp slt(SF!=OF), je=icmp eq(ZF), CF は常に 0 (x86 の定義と %d 値で一致))" % len(samples))
 
 
 if __name__ == "__main__":
     import traceback
-    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t27b, t28, t29, t30, t31, t32, t33)
+    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t27b, t28, t29, t30, t31, t32, t33, t34)
     fails = []
     for f in tests:
         try:
