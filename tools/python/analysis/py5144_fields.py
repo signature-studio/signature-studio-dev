@@ -39,7 +39,13 @@ for vmt in vmts:
     cname = pstr(q(vmt - 24))
     isz = q(vmt - 16)
     ft = q(vmt - 48)
-    print(f"VMT {vmt:#x} ClassName={cname.decode('latin1')} InstanceSize={isz}")
+    cls_ok = IDENT.match(cname) is not None
+    print(
+        f"VMT {vmt:#x} ClassName={cname.decode('latin1')} InstanceSize={isz}"
+        f" check={'ok' if cls_ok else 'NG'}"
+    )
+    if not cls_ok:
+        continue
     if ft == 0:
         print("  FieldTable: nil")
         continue
