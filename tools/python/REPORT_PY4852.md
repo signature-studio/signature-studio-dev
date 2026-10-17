@@ -53,7 +53,7 @@ flags は `flapi_table.json` の kwsig.flags と一致する。
 ### 3.1 `0xfdd2c0` の op 0x23・0x24 の経路 (`pe_ui_dispatch_probe.py`・arg・mode は未知で両分岐を辿った)
 
 - 両 op とも、`0xfdeaf0` と `0x728f50` の両方に `rcx = op` (0x23 または 0x24) を渡す。
-- `0xfde3e7` の `0x1180ef0(ecx = [rbp+0x3c], dl = [rbp+0x43])` で `dl` が **op 0x23 は 0、op 0x24 は 1**。`markerJumpJog` と `markerSelJog` の作用の違いはこの `dl` にあると読めるが、`0x1180ef0` の中身は未読。
+- `0xfde3e7` の `0x1180ef0(ecx = [rbp+0x3c], dl = [rbp+0x43])` で `dl` が **op 0x23 は 0、op 0x24 は 1**。`markerJumpJog` と `markerSelJog` の作用の違いはこの `dl` にあると読めるが、`dl` 分岐の先は §4.1 の表 (`0x1180ef0` の入口と呼出し先) までしか確定していない。
 - `0xfdeaf0` は `0x617920` を呼んだ後 `0x425210(obj, [edx], r8 = op, r9 = arg)` を呼ぶ (`0x425210` は PostMessageW の thunk。§4.2)。
 - `0x728f50` は `[rip+0xecd1fc]` が 0 なら 0 を返し、非 0 なら `0x72afa0(obj, op, arg)` を呼ぶ (`0x72afa0` の分岐と呼出し元は §4.2)。
 
