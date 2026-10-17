@@ -140,12 +140,12 @@ load average: 0.64 → 0.72 (1 分平均、同 run 内で逐次実行)。両 roo
 |---|---|---|
 | (a) `call reg`・`call [rsp+disp]` の 970 サイト (全体)。解決は 98 サイトのみ (§1.2) | 受入 1・2 の『交わり 0』は未解決サイトを含めた完全な結論ではない | #4610 (本 issue を継続) |
 | (b) C 内の未解決 28 (setState)・25 (getState) サイトの供給元。`load[reg+other]`・`after-call`・`stack-arg` の個別解決 | 受入 2 の『C∩R = 0』が、これらのサイトを通る経路を除外できていない | #4610 (本 issue を継続) |
-| (c) `load[reg+other]` の disp が vptr のスロット途中 (MI・別 vtable) を指す場合に R へ届くか | 一部検証 (SR-102 #6182・§6.1)。disp 0x58 の 2 候補 vptr だけが R を指すが、呼出しの receiver との結び付きが未了。残り 7 件は R を指す候補なし | #4610 (本 issue を継続) |
+| (c) `load[reg+other]` の disp が vptr のスロット途中 (MI・別 vtable) を指す場合に R へ届くか | 一部検証 (SR-102 #6182・§6.1)。disp 0x58 の 2 候補 vptr だけが R を指すが、呼出しの receiver との結び付きが未了。残り **6 件**は R を指す候補なし | #4610 (本 issue を継続) |
 | (d) demo bit 関数が .text で 2 件 (根のみ) しかない。`0x22792` の読出しは別経路 (オブジェクト経由の間接読出し) の可能性 (REPORT_SR76 §5(b) と同じ) | 『demo∩C』の意味が根自身だけになる | #4610 (本 issue を継続) |
 
 ## 6.1 SR-102 (#6182): `load[reg+other]` 18 件の disp と vptr の対応 (§6(c))
 
-- 測定 commit: `993bd8750` (分類の修正と `vt_disp_match.py` の追加)。素材: `plugins-serum2` の `Serum2.vst3` (sha256 `501e7bb3…`)。静的解析のみ。
+- 測定 commit: `993bd8750` (分類の修正と `vt_disp_match.py` の追加)。素材: `plugins-serum2` の `Serum2_win64.vst3` (= `Serum2.vst3` の copy、sha256 `501e7bb3…`)。静的解析のみ。
 - 分類の修正: `provenance()` が `[rip+X]` の global 読みを `load[reg+other]` と誤分類していた (`mem_re` が rip をベースレジスタとして拾う)。並べ替えで `global-load` に分けた。解決結果は不変 (解決 98・未解決 970・C∩R=0)。
 - setState の `load[reg+other]` は 18 → 9。9 件は `global-load` (下記 (1))。残りは vtable 読み 7 件と、オブジェクトの関数ポインタ欄 2 件。
 
@@ -160,7 +160,7 @@ load average: 0.64 → 0.72 (1 分平均、同 run 内で逐次実行)。両 roo
 | (7) オブジェクトの関数ポインタ欄 `[obj+0x6ac8]`・`[obj+0x6ad0]` (`0x18020ad9f`・`0x18020c861`) | 2 | vtable ではないため disp と vptr の対応を取る対象外 | **未解決** (供給元は別経路) |
 
 - 注: (2)〜(6) の『候補なし』は、`lea rip` で構築される vptr に限った結果。データ中の定数 vptr・別経路の書込みは見ていない。
-- 再現: `vt_disp_match.py <Serum2.vst3> 0x1803573f0 0x30 0x38 0x50 0x58 0x2f8` (実測 wall 9.43 秒・user 9.24 秒・同 run の load 平均 0.30〜0.54)。
+- 再現: `vt_disp_match.py <Serum2_win64.vst3> 0x1803573f0 0x30 0x38 0x50 0x58 0x2f8` (実測 wall 9.43 秒・user 9.24 秒・同 run の load 平均 0.30〜0.54)。
 - 結論: disp と vptr の対応は、disp 0x58 の 2 候補を除き候補 0 で、R に届く経路は見つからなかった。ただし、0x58 の結び付き・global `0x1817bf760` の実行時値は未確定で、『R に届かない』とは主張しない。
 - 起動・GUI: 静的解析のみ。FLEngine 起動・GUI は**動かしていない** (製品 KPI は測っていない)。
 
