@@ -166,3 +166,15 @@ GHIDRA_HOME=<Ghidra 12.1.4 の展開先> python3 ../gui/iterate_sr85_upper.py   
 - 閉包 (SC) の関数だけで見ると候補は 33 件・12 関数。
 - 未了 (受入に残る作業): 閉包内の間接 call 46 サイト (`ghidra_xferonoff_indirect` の SITE 行) との突き合わせは、この run では行っていない。SITE 行を作るには Ghidra の import が要る (前 run で 18 分 39 秒)。突き合わせ後に、同じ slot の別クラス vtable を型で絞る (受入) を判定する。
 - 判定: 候補の分類器としての流用は可能 (disp 制限は候補の列挙だけで、分類ロジックは変えていない)。受入は未達のまま。
+
+### 5.10 閉包内 46 サイトと `--all-disps` の突き合わせ (#5934・run 4)
+
+- 測定 commit (コード): 本節を追加した commit (`indirect_sr85_join_recv.py` を追加)。入力 sha256 `501e7bb3…4e5283` (19,236,864 B)。素材 `plugins-serum2` の installer から取り出し。Ghidra 12.1.4 (sha256 `ddac49f9…d4db` を検査済み) import **18 分 37 秒** (rc 0)。
+- 閉包 `-process` (root = `xferonoff_upper2_fns.tsv`・sha256 `fcafc8df…82f9`) **6.98 秒**。間接 call 列挙 **6.31 秒**・SITE 107 行 (§5.6 と一致)。
+- `indirect_sr85_all_vt.py` (閉包内のレジスタ経由 46 サイト・標準出力に出力): 全 vtable 3,633・構築 3,622 (§5.8 と一致)。実行 48.2 秒。
+- `receiver_this_trace.py --all-disps` (TSV 24,651 行・§5.9 と一致) との突き合わせ: `gui/indirect_sr85_join_recv.py`。
+  - 46 サイトのうち **40 件**が TSV に一致、**6 件**は不一致。
+  - 一致 40 件の分類 (strict): `vptr:THIS` 14・`R-nodom` 8・`R-index` 5・`vptr:NODOM` 4・`vptr:THIS-CHILD` 3・`vptr:CALLRET` 2・`vptr:THIS-EMB` 1・`vptr:OUTPARAM` 1・`vptr:INDEX` 1・`vptr-emb:THIS-EMB` 1。
+  - 不一致 6 件は全て `[RAX+0x8]` (slot 1) で、`--all-disps` の TSV に行が無い。理由は未確認 (候補列挙の条件を読んだだけでは説明できなかった。`receiver_this_trace.py` の 433 行付近の条件を次 run で確かめる)。
+- 判定: 受入 (同じ slot を持つ別クラス vtable の候補を型で絞る) は**未達**。`vptr:THIS` 14 件は「所属関数の this」であって、呼出先の型を証明しない。別クラス候補の絞り込みには、この 14 件を slot 関数に結び付ける段が要る (本 run では未実施)。
+- 未解決: 不一致 6 件 (slot 1 の `[RAX+0x8]`) の分類、`vptr:THIS` 14 件から別クラス候補を絞る段 → #5934 (open のまま)。
