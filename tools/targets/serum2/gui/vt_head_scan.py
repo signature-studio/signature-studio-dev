@@ -31,7 +31,10 @@ def rva_to_off(rva):
 
 
 def read_q(va):
-    return struct.unpack_from("<Q", data, rva_to_off(va - IMG))[0]
+    off = rva_to_off(va - IMG)
+    if off is None:
+        return None
+    return struct.unpack_from("<Q", data, off)[0]
 
 
 def rtti_of_col(col_va):
@@ -44,7 +47,9 @@ def rtti_of_col(col_va):
     off = rva_to_off(IMG + td_rva + 16 - IMG)
     if off is None:
         return None
-    end = data.index(b"\0", off)
+    end = data.find(b"\0", off)
+    if end < 0:
+        return None
     name = data[off:end].decode(errors="replace")
     return name if name.startswith((".?AV", ".?AU")) else None
 
@@ -55,7 +60,7 @@ for arg in ARGS[1:]:
     for back in range(0, MAX_BACK // 8):
         head = slot - 8 * back
         col_va = read_q(head - 8)
-        if IMG <= col_va < IMG + 0x10000000:
+        if col_va is not None and IMG <= col_va < IMG + 0x10000000:
             name = rtti_of_col(col_va)
             if name:
                 found = (head, col_va, name)
