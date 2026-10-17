@@ -176,3 +176,12 @@ cd tools/plugins/work/hs && node ../../framework/hostshim/hs_probe_40c4.mjs ../f
 
 - 測定 commit `b87aa8e6` から HEAD までの差分 (`git diff b87aa8e6 HEAD -- tools/plugins/framework ':!*.md'`) は `hostshim/hs_probe_40c4.mjs` の 38 行追加 (診断専用)。`hs_e2e.sh`・`fw_stage2.sh`・`hs_irfix.py` からは参照されないため、§9.1 の e2e 実測は有効。
 - `REPORT_2426.md` の差分は `*.md` のため上の出力に含まれない。
+
+### 9.9 #3355: `function_40b370`・`function_40b550` の入力を BLK から読む (部分)
+
+- 直前の停止報告 (#3355) の次の一手。native `40b370` は `rcx=this` を保持し、`40b550(this, 407010 の戻り値)` を呼ぶ。`40b550` は `40a5a0(確保先, [this-0x80], 0)` の後に `[確保先]=this` (`0x40b576`)。lift 版は両関数の入力を `@153`・`@381`・`@382` の定数に畳み、`40a5a0` の第 1 引数と `[確保先]=this` の store が欠けていた。
+- 修復 (`hs_irfix.py`): `fix_40b370` (this = `load BLK+0x08`)・`fix_40b550` (this = BLK+0x08、確保先 = BLK+0x10・`40a5a0` の第 1 引数に確保先・`[確保先]=this` を書く)。置換数は想定どおり (40b370 1 件・40b550 4 件)。
+- 測定 commit: `20a0763e7` (コードを変えた最後の commit)。起点 `origin/main` `97a5bd8ab`。差分: `git diff 20a0763e7 HEAD -- tools/plugins/framework` は本 PR の commit のみ (上の差分から REPORT の追記を除く)。
+- 実測 (HEAD `20a0763e7`・`hs_e2e.sh --fresh`・`HS_WFW=tools/plugins/work/fw`): rc 1。Phase A PASS (`dispatch=38 ff=0`・回帰なし)。Phase B は `memory access out of bounds`・`status=0xffffffff plug=0x0 rec=7`。所要 1 分 25.4 秒 (`time`・emcc 込み)。load は未記録。修復前 (§9.1) と同じ停止位置。
+- 未実施: `hs_probe_40c4.mjs` と `hs_preinit.mjs` による InitUnits の止まる idx の再測定 (本 run の指示で再測定しない)。よって受入 1 (idx 18 の先へ進む) は未確認。
+- 未解決: 修復で `40b550` が正しく呼ばれるかは未確認。`this` (`0x10fcbcf0`) の VMT を書く経路の確定は次 run。受入 1・2・3 は #3355 に残す。
