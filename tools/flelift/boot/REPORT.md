@@ -247,7 +247,4 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 | `merge_survey.py` | `covered=942` (規則テスト `merge_survey_test.py` で固定) |
 
 - 未解決: 補修が判定を変えるか → #4901 [FLE-33]。unit 280/659/895 の補修なし unlifted → #4855 [FLE-32]。
-
-## 14. #5168 (PY-4877): boot 後の patternCount 直接呼出し
-
-- 結論: driver は動くが `patternCount` 内の icall-miss (0xd64d7a) で戻り値 0 は信用できず、E[1..999] は全 0。受入 1 は未達。詳細 (測定 commit `8613de75b`) は `REPORT_APPENDIX_5168.md`。
+- #5168 (PY-4877): boot 後の `patternCount` は icall-miss (0xd64d7a) で戻り値 0 が信用できず、E[1..999] は全 0 (受入 1 未達)。詳細は `REPORT_APPENDIX_5168.md`。
