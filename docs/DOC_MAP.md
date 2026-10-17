@@ -707,6 +707,7 @@
 | `tools/python/REPORT_PY99_3085.md` | 81 | PY-99 (#3085) 付録: SLOT? 49 件の先行辺 p ごとの store 集合 S_p・算法 A/B の検算とネガティブコントロール・未解決。S_p の全件表は `analysis/py99_merge_sets.md` (自動生成)。PY-41 付録から分割移動 (250 行上限のため) |
 | `tools/python/REPORT_PY41_3860.md` | ~125 | PY-262 (#3860): PY-65 節の受入 2 (戻り値 `[rbp+0x584]` の書込み元) の付録。0x104cc65 に届く `[rbp+0x5b8]` の書込み 72 件 (`analysis/py65_ret584_reach.py`)。判定の行き先と戻り値分岐の突合 (`analysis/py342_r8d_ret_cross.py`・§7)。分岐ごとの式は未確定 (250 行上限のため `REPORT_PY41.md` から分割)。§9 (PY-341): 書込みごとの必須分岐 (`analysis/py341_ret584_dominators.py`) |
 | `tools/python/REPORT_APPENDIX_PY341.md` | ~80 | PY-341 (#4574): `REPORT_PY41_3860.md` §9 の 72 件の表 (書く値の直前命令・必須分岐) |
+| `tools/python/REPORT_APPENDIX_5801.md` | ~80 | PY-5390 (#5801): mask 0x4 tail 側の未確認呼出し先 5 件 (1 段目) とその直接の呼出し先 24 関数 (2 段目) の書込み先・判定の側ごとの呼出し先。測定値の正本 (REPORT_PY257 §8.3 から参照)。解析は `analysis/py5801_callees2.py`。 |
 | `tools/python/REPORT_APPENDIX_5295.md` | ~100 | PY-4905 (#5295): mask 0x4 tail 到達側の直接呼出し先 32 件と `0xf8d730`・`0xf8d580`・`0xf783c0` の中身 (グローバル書込み・間接 call・ret 到達)。解析は `analysis/py381_r8d_callees.py`・表は解析器の関数から作った一時集計 (commit 外)。 |
 | `tools/python/REPORT_APPENDIX_PY392.md` | ~80 | PY-392 (#4828): `REPORT_PY41_3860.md` §10 の 72 件の表 (書く値の式・必須分岐数・cube の分岐数)。自動生成 (`analysis/py392_summary.py`) |
 | `tools/python/REPORT_APPENDIX_PY392_cubes.tsv` | ~73 | PY-392 (#4828): 72 件の代表 cube の全分岐 VA (立ちは無印・落ちは `!`)。自動生成 (`analysis/py392_summary.py`) |
