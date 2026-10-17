@@ -155,10 +155,11 @@ DEFECTS.md 行案 (編集は PM 判断):
 
 ### 23.15 LIFTLIB-26 (#4350) — bsr の flag 種別の修正と測定の扱い (review 1)
 - **変更**: `bsr` の flag 状態を `("int", ...)` から専用種別 `("bsrzf", (src, bits))` に変更。ZF (`e`/`ne`/`z`/`nz`) だけを `icmp eq/ne src,0` で読み、CF・SF・OF を読む cc (`b`/`l`/`s`/`a` ほか) と CF 参照は `Unsupported`。T32 に `e` の IR 固定と `b`/`l`/`s`/`a` の Unsupported を追加。修正 commit: `c56bbafd9`。
-- **単体テスト (HEAD `1e49fd0bc`・実測)**: `python3 tests/test_unit.py` を全件実行 (素材 `work-liftlib`・`work-m6-ott` を展開)。35 件中 26 件 PASS、**9 件 FAIL: t2 t6 t7 t10 t12 t13 t14 t15 t16**。9 件とも FileNotFoundError で、OTT 実機 DLL (`analysis-ott-binaries`) と Fresh Air の `SlateCore.core_64` (`work-liftlib-targets` 系) が無いことが原因。アサーションの失敗は無い。**全件 PASS は未確認**。
-- **leafspec / e2e の再測定: 未実施**。`targets/ott_leaf.json --n 40` は OTT 実機 DLL が要り、素材が無く回せない。下の数値は前 commit `4fde610dc` の測定 (PR #6077 の初版で取った値) で、HEAD の値ではない。
-  - 測定 commit: `4fde610dc` (exp 40/0/0/0, tan 40/0/0/0, tanf 40/0/0/0, log 32/0/8/0, cvt 17/0/23/0, svf 2/30/8/1)。
-  - `git diff 4fde610dc HEAD -- tools/liftlib/liftlib` の出力 (p1.py の flag 種別の変更。bsr の flag を読む consumer の IR だけが変わる見込み・未測定):
+- **単体テスト (測定 commit `639a51c54`・実測・素材 9 件展開)**: `python3 tests/test_unit.py` → `ALL UNIT TESTS PASS (35)`、rc=0。T1〜T32 すべて ok。
+- **leafspec 再測定 (測定 commit `639a51c54`・`python3 -m liftlib leafspec targets/ott_leaf.json --n 40`・rc=0)**: exp 40/0/0/0、tan 40/0/0/0、tanf 40/0/0/0、log 32/0/8/0、cvt 26/0/14/0、svf 24/9/7/2 (match/mismatch/crash/trap)。
+  - 比較対照 main `972b3fa3b` で同じコマンドを実行: 上の 6 件と**完全に一致**。bsr の変更は既定経路の測定値を変えていない。
+  - 前 commit `4fde610dc` の参考値 (exp 40/0/0/0, tan 40/0/0/0, tanf 40/0/0/0, log 32/0/8/0, cvt 17/0/23/0, svf 2/30/8/1) は、HEAD と main の両方で再現しなかった。cvt・svf の差は 4fde 時点の環境差と判断する (worktree 間で切り分けると HEAD と main が一致)。
+- 測定 commit の差分: `git diff 4fde610dc HEAD -- tools/liftlib/liftlib` (差分 0 ではないので、HEAD で再測定した):
     ```diff
 diff --git a/tools/liftlib/liftlib/passes/p1.py b/tools/liftlib/liftlib/passes/p1.py
 index f66f69b4d..289a1e6c1 100644
@@ -219,6 +220,6 @@ index f66f69b4d..289a1e6c1 100644
              return True
          # --- cmp / test (整数フラグ生成。値は flag 状態に記録)
     ```
-  - 既定 build の統計に `vocab_bsr` は出ない (前測定)。よって既定経路の出力は変わらない見込みだが、**HEAD での再測定をしていないため、不変の確認は未了**。
+  - 既定経路の不変は、HEAD と main `972b3fa3b` の leafspec A/B (上の 6 件が一致) で示した。
 - §23.10 の「bsr は ZF を追跡しない」は、上の §23.10 の箇条で更新済み。
-- 未解決 (起票先): HEAD での leafspec 再測定と、素材を揃えた全 unit test (T1〜T32、35 件) → #4350 (次 run。素材 `analysis-ott-binaries` `work-liftlib-targets` `plugins-freshair` を指定)。`shr cl`・`adc`・`cmp rcx,0` → 子 issue。
+- 未解決 (起票先): `shr cl`・`adc`・`cmp rcx,0` → 子 #6078〜#6080 (親 #4350)。
