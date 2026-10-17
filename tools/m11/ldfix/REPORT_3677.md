@@ -72,11 +72,12 @@
 
 ## 8. 受入 3: 0x104ccd0〜0x104cfxx 系の定数 (#4498 LD-221)
 
-- 入口: `M11_WORK=tools/m11/work python3 tools/m11/ldfix/const_4498.py` → `results/const_1046a30_4498.tsv` (16 VA・48 行)。
-- 判定: 1046a30 の最後の `ret` (`0x104ccca`) の後ろは、関数の外の領域。`0x104ccd0`〜`0x104ccee` を逆アセンブルすると `add byte ptr [rax], al` の並びになり、コードではない (定数の 0 バイトを命令として読んだもの)。
-- 参照 (48 行): すべて `mulsd`・`divsd`・`addsd`・`movzx`・`mov` のメモリ読み。関数ポインタ (call/jmp の間接先) は 0 件。
-- 中身: 8 B の値は妥当な倍精度・単精度の定数 (例: `0x104ccd8` = `0x3e10000000000000`、`0x104ccd0` = `0x408f400000000000` = 1000.0)。
-- **結論: 16 VA すべて DATA (定数プール)。** remap の対象にするかは、受入 2 と同じく「段数一致の件だけ」で決める。0x104cxxx 系の 48 行は段数 1 段 (VAL) なので、`pass_m2r_fn1046a30` の PTR 系の remap 対象には入らない。本 PR では IR を変えない。
+- 入口: `M11_WORK=tools/m11/work python3 tools/m11/ldfix/const_4498.py` → `results/const_1046a30_4498.tsv` (16 VA・48 行)。本 run では `m11_image.bin` が無く再実行していない。TSV (commit 済み出力) の内容を読んで確認した。
+- 判定: 1046a30 の最後の `ret` (`0x104ccca`) の後ろは、関数の外の領域。前 run の記録では `0x104ccd0`〜`0x104ccee` を逆アセンブルすると `add byte ptr [rax], al` の並びになった (定数の 0 バイトを命令として読んだもの)。この逆アセンブル出力は保存されておらず、本 run では再現していない。
+- 参照 (48 行): すべて `mulsd`・`divsd`・`addsd`・`movzx`・`mov` のメモリ読み。関数ポインタ (call/jmp の間接先) は 0 件。ただし kind 判定は mnemonic の allowlist なので、`mov reg,[rip+X]` で読んだ値を後で `call reg` する間接先は検出できない。そのため次の値域の確認で補う。
+- 値域の確認 (本 run で実施): 16 VA それぞれについて、8 B 値とその下位 4 B・上位 4 B (計 48 値) を見た。いずれもコード範囲 `[0x400000, 0x1abf400)` に入らない。よって間接 call/jmp の先として使われうる code 番地は含まれない。
+- 中身: 13 VA (`0x104ccd0`〜`0x104cd30`) は倍精度として妥当な値 (`0x104ccd0` = `0x408f400000000000` = 1000.0、`0x104ccf0` = 1.0、`0x104cd18` = 64.0 など)。残り 3 VA (`0x104cea6`・`0x104cf24`・`0x104cf25`) は参照が 1〜4 B の `movzx`・`mov` で、8 B の値は参照幅と整合しない (倍精度としての意味は持たない)。3 件とも値域の確認 (コード範囲外) は満たすので、DATA の判定は変えない。
+- **結論: 16 VA すべて DATA (定数プール)。** 関数ポインタは 0 件。remap の対象にするかは、受入 2 と同じく「段数一致の件だけ」で決める。0x104cxxx 系の 48 行は段数 1 段 (VAL) なので、`pass_m2r_fn1046a30` の PTR 系の remap 対象には入らない。本 PR では IR を変えない。
 
 ## 9. 受入 4: audit 7/7・spill178 差分 (#4498 LD-221)
 
@@ -88,9 +89,9 @@
 
 ## 5. 検証と差分
 
-- 測定 commit: `3987f8c`。測定対象 (`tools/m11/ldfix/depth_4498.py`・`rip_match_3677.py`・`results/*.tsv`・`tools/m11/m11_passes.py`) は `3987f8c` から HEAD まで差分 0 バイト (main 取り込みのみで変わっていない)。
-- `git diff 3987f8c HEAD -- tools/m11/m11_passes.py tools/m11/ldfix/*.py` は、main 取り込みで入った 3 ファイル (`value_judge_6124.py`・`test_value_judge_6124.py`・`trap114_probe_5280.py`。本 PR の変更ではない) のみを出す。本 PR が追加・変更した py は `depth_4498.py` のみで、その差分は測定 commit 以降 0。
-- `m11_passes.py` は未変更 (IR 変化 0)。
+- 測定 commit: `db897aecc` (コードを変えた最後の commit)。測定対象 (`tools/m11/ldfix/depth_4498.py`・`rip_match_3677.py`・`results/*.tsv`・`tools/m11/m11_passes.py`) は `db897aecc` から head まで差分 0 (`git diff db897aecc HEAD -- tools/m11` が空。`docs/DOC_MAP.md` の 1 行のみ)。
+- `m11_passes.py` は `3987f8c` 以降に `8f3760e86`・`4b2d1a703` で変わったが、どちらも測定 commit `db897aecc` より前。`origin/main` と同一 (`git diff origin/main HEAD -- tools/m11/m11_passes.py` が空・IR 変化 0)。
+- 測定 commit 以降に変えたのは、`const_4498.py` の未使用 import の削除と、本節・§8 の文言のみ (コードの挙動は変わらない)。`const_4498.py` は `m11_image.bin` が無く再実行していない。構文検査 (`python3 -m py_compile`) のみ行った。
 - 本番 IR・unit の結果は変わらない (IR を書き換えていないため)。KPI (`tools/flelift/boot/REPORT.md`) は動かしていない。
 
 ## 7. 受入 2 の remap (#4498 LD-221・`pass_m2r_fn1046a30` 拡張)

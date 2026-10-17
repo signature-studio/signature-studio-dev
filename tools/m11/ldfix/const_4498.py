@@ -14,8 +14,6 @@ import os
 import sys
 from collections import OrderedDict
 
-from capstone import Cs, CS_ARCH_X86, CS_MODE_64
-
 HERE = os.path.dirname(os.path.abspath(__file__))
 BASE = 0x400000
 DATA_OPS = ('mulsd', 'divsd', 'addsd', 'subsd', 'movzx', 'mov', 'movsd', 'movss', 'ucomiss', 'comisd', 'mulss', 'addss')
