@@ -38,3 +38,11 @@
 | use-list 計装パッチ (LLVM の use-list 出力) を適用し、計装が入ったことを確認する | 受入 1 の残り。段の特定 (#6021) が出来ない | 親 #6023 の本文にチェックリストとして残す (次 run で着手) |
 | 計装版での 150 range の段特定 (#6021 の受入) | 上流 (RetDec) の修正箇所が決まらない | #6021 (親 #2577 の子) |
 | 計装版での rc と drc.ll md5 の記録 | 受入 4 | 上と同じ |
+
+## 5. 計装パッチの設計と適用確認 (ポンプ波 42・未ビルド)
+
+- パッチ: `tools/m11/patches/llvm-uselist-dump-6023.patch` (LLVM fork `2a1f3d8a` の `lib/IR/AsmWriter.cpp` に対する `patch -p1`)。
+- 挿入点: `AssemblyWriter::printModule` で `predictUseListOrder(M)` の直後。`M11_USELIST_DUMP=1` のときだけ、予測された use-list 並びを stderr に `M11_UL<TAB>関数名<TAB>要素数<TAB>shuffle` として出す。未設定なら従来どおり (分岐のみ追加)。
+- 確認 (実測): fork の `AsmWriter.cpp` (sha256 先頭 16 字 `d4f8c4ed19f17212`・4349 行) に `patch -p1 --dry-run` が rc=0 で当たり、適用結果は作業コピーと一致。
+- 未確認: このパッチは**コンパイルしていない** (LLVM 全体のビルドが必要で、本 run の範囲外)。`UseListOrder` のフィールド (`V`・`F`・`Shuffle`) は fork の `include/llvm/IR/UseListOrder.h` で確認した。
+- 未達 (親 #6023 のチェックリストに残す): パッチを当てた LLVM のビルド、計装が入ったことの確認、計装版での 150 range の 1 回実行 (rc と drc.ll md5)、段の特定 (#6021)。

@@ -1,0 +1,30 @@
+--- a/lib/IR/AsmWriter.cpp
++++ b/lib/IR/AsmWriter.cpp
+@@ -80,6 +80,7 @@
+ #include <cctype>
+ #include <cstddef>
+ #include <cstdint>
++#include <cstdlib>
+ #include <iterator>
+ #include <memory>
+ #include <string>
+@@ -2552,6 +2553,19 @@
+   if (ShouldPreserveUseListOrder)
+     UseListOrders = predictUseListOrder(M);
+ 
++  // M11 (#6023): use-list 計装。M11_USELIST_DUMP=1 のときだけ、予測された並びを stderr に出す。
++  if (const char *Dump = std::getenv("M11_USELIST_DUMP")) {
++    if (Dump[0] == '1') {
++      for (const UseListOrder &O : UseListOrders) {
++        errs() << "M11_UL\t" << (O.F ? O.F->getName() : StringRef("-")) << "\t"
++               << O.Shuffle.size() << "\t";
++        for (unsigned I = 0, E = O.Shuffle.size(); I != E; ++I)
++          errs() << (I ? "," : "") << O.Shuffle[I];
++        errs() << "\n";
++      }
++    }
++  }
++
+   if (!M->getModuleIdentifier().empty() &&
+       // Don't print the ID if it will start a new line (which would
+       // require a comment char before it).
