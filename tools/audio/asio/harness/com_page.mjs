@@ -101,7 +101,11 @@ window.__done = new Promise((resolveAll, rejectAll) => {
           const f64 = new Float64Array(M.wasmMemory.buffer, M._flasio_tl_ptr(), 2048 * 7);
           const rows = [];
           for (let i = 0; i < n; i++) rows.push(Array.from(f64.subarray(i * 7, i * 7 + 7)));
-          result.tl = { n, cols: ["notify_ms", "fill", "underruns", "wake", "cb0", "cb1", "wr"], rows };
+          // 段別 (JS 側 bufferSwitchTimeInfo の前後): tb = memset 直前 (in_read 後), t0 = memset 直後 (ホスト呼出し直前), cb1 = ホスト呼出し直後
+          const f2 = new Float64Array(M.wasmMemory.buffer, M._flasio_tl2_ptr(), 2048 * 3);
+          const seg = [];
+          for (let i = 0; i < n; i++) seg.push(Array.from(f2.subarray(i * 3, i * 3 + 3)));
+          result.tl = { n, cols: ["notify_ms", "fill", "underruns", "wake", "cb0", "cb1", "wr"], rows, seg_cols: ["tb", "t0", "cb1"], seg };
         }
         result.hb_gaps = window.__hb_gaps ?? [];
         // recs = worklet の直近 64 quantum: [p, rd, wr, wl, dms (前 quantum からの Date.now 差)]
