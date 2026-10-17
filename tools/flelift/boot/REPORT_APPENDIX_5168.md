@@ -45,6 +45,6 @@ REPORT.md §14 の分割移動先。測定値・経緯はここ。
 #### 実行手順 (再現)
 
 ```
-FL_WIN64_DIR=$HOME/analysis/win64 SS_EMSDK_ENV=$HOME/emsdk/emsdk_env.sh FLE_BOOT_RUNS=default bash tools/flelift/boot/fle6_measure.sh
-FL_WIN64_DIR=$HOME/analysis/win64 SS_EMSDK_ENV=$HOME/emsdk/emsdk_env.sh bash tools/flelift/boot/c395_entry_probe.sh
+FL_WIN64_DIR=<fl-win64 展開先 [WIN64]> SS_EMSDK_ENV=<emsdk_env.sh [EMSDK]> FLE_BOOT_RUNS=default bash tools/flelift/boot/fle6_measure.sh
+FL_WIN64_DIR=<fl-win64 展開先 [WIN64]> SS_EMSDK_ENV=<emsdk_env.sh [EMSDK]> bash tools/flelift/boot/c395_entry_probe.sh
 ```

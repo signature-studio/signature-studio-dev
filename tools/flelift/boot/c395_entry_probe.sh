@@ -12,7 +12,7 @@
 #
 #   bash tools/flelift/boot/c395_entry_probe.sh   # 前提: 先に fle6_measure.sh (FLE_BOOT_RUNS=default) で work/boot/lift を作る
 #
-# 前提: FL_WIN64_DIR / SS_EMSDK_ENV (既定 /opt/emsdk) / node / python3 (capstone, pefile)。出力は work/boot/ (gitignore)。
+# 前提: FL_WIN64_DIR / SS_EMSDK_ENV (必須) / node / python3 (capstone, pefile)。出力は work/boot/ (gitignore)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 FLE="$(cd "$HERE/.." && pwd)"
@@ -20,7 +20,7 @@ source "$HERE/../../shared/env.sh"
 W="${FLE_BOOT_WORK:-$FLE/work/boot}"
 LIFT="$W/lift"
 DBG="$W/lift_dbg5168"
-SS_EMSDK_ENV="${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"
+SS_EMSDK_ENV="${SS_EMSDK_ENV:?SS_EMSDK_ENV に emsdk_env.sh のパスを指定する}"
 [ -f "$LIFT/fle_lifted_s0.c" ] || { echo "[c395] $LIFT が無い。先に bash tools/flelift/boot/fle6_measure.sh を実行する"; exit 2; }
 
 mk_probe() { echo '{ static int n_; if (n_++ < 16) fprintf(stderr, "[C395-'"$1"'] n=%d ret=%llx\n", n_, (unsigned long long)LD64(R[4])); }'; }
