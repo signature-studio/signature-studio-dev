@@ -167,6 +167,15 @@
 - 結論: 型は**引き続き未確定**。G1 (`0xbd0ba0`) に入る object の生成元が次の未確定点。
 - 測定: `analysis/py5493_rcx.py <PE.bin>` (新規・測定 commit `2b293f938`・real 1 分 20.4 秒・exit 0・n=1・load 0.68 → 0.92 (測定前後の `/proc/loadavg`)。出力: G1 `0xbd0ba0` の参照 1 件)。素材 `block00031_PE.bin` (`fl-win64`)。前回測定 (commit `5593cbad3`・real 1 分 19 秒) は docstring の手順 3 を削る前のもの。`py5493_writer.py --dis 86a470`・`--dis 11c8950` (`--nins 60/45`) の逆アセンブルも併せて確認。
 
+### 5.4 `0x11c8950` の呼出し元 23 件の `rdx` (#5493・残件の静的確認)
+
+- 方法: `analysis/py5493_rdx.py <PE.bin> --target 16b6d80` が各直接 call の前 25 命令で `rdx` を最後に書いた命令を探し、RIP 相対の参照先を計算する。`lea` は `rdx = T`、`mov` は `rdx = *(T)` (qword)。`*(T)` が `0x16b6d80` なら target の値、`lea` の基底が rbp/rax などの場合は解決不能として `lea (t 不明)` と出す。
+- 結果 (23 件): `&global (0x16b6d80)` になるのは `0x11be444` の 1 件のみ (`*[0x15dfd18]` (表) 経由)。非 global の解決は 18 件 (`lea` 6 件: `&0x152bef8`・`&0x16baaf0`・`&0x16bab98`・`&0x16bba78` ×2・`&0x16bcc00`、表経由の `mov` 12 件: 値 `0x16b8db8`・`0x15372e0` 等の .data 参照先)。解決不能は 4 件 (`lea (t 不明)`: `0xe3469e`・`0xf779c0`・`0xf841f0`・`0x132edc1`、rbp/rax 基底の `lea`)。
+- `0x86a470` の直接呼出し 2 件: `0x10dc775` は `r8 = rbp+0x68` (スタック) で global ではない。`0x11c896d` は `0x11c8950` の内部 (ラッパーが `0x86a470` を呼ぶ箇所) で、外部の呼出し元ではない。
+- 結論: global `0x16b6d80` の代入元 (書込みサイト) は `0x11be444` 経由の 1 件に限られる。型 (G1 `0xbd0ba0` の値の生成元) は本節では確定しない。
+- 測定: `analysis/py5493_rdx.py` (新規・測定 commit `8262bb63f`・real 46.7 秒・n=1・load 0.90 → 1.04)。`analysis/py5493_callers.py` (`0x86a470` 2 件)。素材 `block00031_PE.bin` (`fl-win64`)。
+- 未解決 (#5493 の続き): 型の確定 (G1 の間接書込み・実行時値) は #5932 / 親 #5145 の範囲。`lea (t 不明)` 4 件の rbp/rax 基底の解決。
+
 ## 6. 群 C の受け手 (#5144) — 未達
 
 対象: `0xb35298` (fn `0xb35250`・受け手 `[Self+0x18]`) と `0xb671a2` (fn `0xb67190`・受け手 `[Self+0x7a0]`)。
