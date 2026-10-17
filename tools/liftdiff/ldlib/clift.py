@@ -57,6 +57,32 @@ def instrument_clift(src, dst, vas):
     return n
 
 
+def instrument_clift_blocks(src, dst, vas):
+    """lift 集合の各 `L_<hex>:;` (基本ブロック入口) の直後に volatile store で block 入口を記録する (LD-64 / LD-67 の clift 版)。
+    ir 版 (irtool._blk_store) と同じ ld_blk_n / ld_blk_arr を使う。call は戻り値を変えるため使わない。
+    記録は f_ の内側だけ (関数 VA ごとに L_ を対応させる)。戻り値: 挿入したブロック数"""
+    pat_f = re.compile(r'^void f_([0-9a-f]+)\(void\) \{$')
+    pat_l = re.compile(r'^L_([0-9a-f]+):;$')
+    n = 0
+    cur = None
+    with open(src, errors='replace') as fi, open(dst, 'w') as fo:
+        fo.write('/* 計装済コピー (ldlib/clift.py): 基本ブロック入口の記録 (block_trace) */\n'
+                 'extern volatile unsigned long long ld_blk_n;\n'
+                 'extern volatile unsigned long long ld_blk_arr[65536];\n')
+        for line in fi:
+            s = line.rstrip('\n')
+            mf = pat_f.match(s)
+            if mf:
+                cur = int(mf.group(1), 16) if int(mf.group(1), 16) in vas else None
+            fo.write(line)
+            ml = pat_l.match(s)
+            if ml and cur is not None:
+                va = int(ml.group(1), 16)
+                fo.write('  { unsigned long long _n = ld_blk_n; ld_blk_arr[_n & 65535] = 0x%xULL; ld_blk_n = _n + 1; }\n' % va)
+                n += 1
+    return n
+
+
 def gen_imps(names, dst):
     """全 IAT 名の強い imp_<名前> (ブリッジ TU へ #include される): ld_core 応答モデル + 呼出しログ。
     CAB-233: 第5/6引数を guest stack ([R4+0x28]/[R4+0x30]) からも読む (6引数 API の dst 書込み用)。"""
@@ -150,6 +176,11 @@ def build(t, force=False):
         t0 = time.time()
         n = instrument_clift(src, tr_c, lifted)
         print('[clift] instrumented %d f_ entries (%.1fs)' % (n, time.time() - t0))
+        if t.get('block_trace'):
+            tmp_c = W + '/fle_lifted_f.c'
+            nb = instrument_clift_blocks(tr_c, tmp_c, lifted)
+            os.replace(tmp_c, tr_c)
+            print('[clift] block_trace: %d basic-block entries' % nb)
     imp_names = list(meta['imports_used'])
     imps_inc = W + '/imps.inc'
     if force or newer(src, imps_inc):

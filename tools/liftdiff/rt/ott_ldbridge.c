@@ -132,7 +132,20 @@ void ott_dispatch(uint64_t t) {
   ott_dispatch_impl(t);
 }
 
+/* block 入口記録 (clift.py の計装が ld_blk_arr へ volatile store する。ld_wasm.c の ld_blk_sync と同一規則)。
+ * 既定版は書かない (ld_blk_on = 0 で同期が早期 return する)。 */
+volatile u64 ld_blk_n;
+volatile u64 ld_blk_arr[65536];
+static void ott_blk_sync(void) {
+  u64 n = ld_blk_n;
+  ld_blk_n = 0;
+  if (!ld_blk_on) return;
+  if (n > 65536) { ld_blk_over += (int)(n - 65536); n = 65536; }
+  for (u64 i = 0; i < n; i++) ld_blk_rec(ld_blk_arr[i]);
+}
+
 EMSCRIPTEN_KEEPALIVE const char* ld_w_case_end(u64 rax, u64 rdx, u64 x0, u64 x1, int has_ret) {
+  ott_blk_sync();
   const char* st = g_inbuf; const char* det = st + strlen(st) + 1; const char* rt = det + strlen(det) + 1;
   const char* j = ld_case_end(st, det, 0, 0, rax, rdx, x0, x1, has_ret);
   size_t n = strlen(ld_out);
