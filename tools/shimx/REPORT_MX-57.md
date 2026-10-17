@@ -1,7 +1,7 @@
 # tools/shimx REPORT 付録 — MX-57 (#4928): FH3 try/IP map → ShxSehScope 表
 
 > 正本: 本ファイル。親の REPORT は `tools/shimx/REPORT.md` (250 行上限のため本節を分割)。
-> 対象 issue: #4928 (題名 `[MX-57]`)。PR: #6069。
+> 対象 issue: #4928 (題名 `[MX-57]`)。PR: #6130。
 
 ## 1. 結論
 
@@ -29,8 +29,10 @@
   - `bash test.sh --quick`: exit 0・122 s (全 7 段 PASS・MT 9 グループ・M4 互換 PASS・sig_test ALL PASS・guard 全 OK)。
 - 生成物: `data/sigs.json` と `exports.txt` に `shimx_fh3_scopes`・`shimx_fh3_unwind_scopes` の 2 件を追加 (`gen_sigs.py` で再生成)。
 - 未確認: `shimx_fh3_unwind_scopes` の出力を `seh_run_pads` (pad 実行) に接続した実行は無い。実 PE の FH3 FuncInfo での照合も未実施 (合成入力のみ)。
+- 後続 commit `3884fd19b` (`tools/shimx/test/test_fh3.c` の循環ケースの期待値 `>= 0` → `== 2`) は、clang (ASan + UBSan・§2 と同じスタブ) でのみ実行した: ビルド rc=0・`fh3 OK`・exit 0。emcc での再実行は未了 (本 runner に emcc が無い)。循環ケースの期待値は、state 2 の自己循環で range 1 は 0 件・range 2 (state 1 → 0 → -1) は 2 件・range 3 は 0 件、の計算による。
 
 ## 3. 未測定 (この run で再現できなかったもの)
 
-- emcc (6.0.12) による ST/MT ビルドと `test.sh` の全段。この runner に emcc が無い。前 run (測定 commit `3d5753b9c`・コードは同一) では ST/MT とも `fh3 OK`・`ALL PASS` の記録がある。ただし今回の HEAD では再実行していない。
+- emcc (6.0.12) による ST/MT ビルドと `test.sh` の全段の**この HEAD での再実行**。emcc は §2b (測定 commit `573444dba`) で全段 PASS を記録済み。この run の runner には emcc が無く、後続 commit はテストの期待値 1 件の変更のみ (clang で確認)。
+- 受入 2 (二重 lift 防止) の実測。本 PR では未測定 (次 run)。
 - 実 PE の FH3 FuncInfo に対する `shimx_fh3_scopes` の照合 (IP map 範囲と try 範囲の実数)。次の run の課題 (#4928)。
