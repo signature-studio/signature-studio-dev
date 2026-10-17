@@ -1166,9 +1166,61 @@ def t34():
     print("T34 ok (cmp rcx,0: jl=icmp slt(SF!=OF), je=icmp eq(ZF), CF は常に 0 (x86 の定義と %d 値で一致))" % len(samples))
 
 
+def t35():
+    """[LIFTLIB-30 / #6078] p1 `shr r64,cl`: CF を flag 種別 "shrcf" に載せる。count==0 のとき CF は前値を保つ。
+
+    合成機械語 `48 d3 e8` (shr rax,cl) → 直後の jae の CF 読みが i1 の select を経由すること、ZF/SF 読みは Unsupported。"""
+    from types import SimpleNamespace as NS
+    from liftlib.passes import p1
+    from liftlib import ir as IR
+
+    mod = IR.Module.parse("define void @function_1000() {\nentry:\n  ret void\n}\n")
+    out = []
+    st = {"__w": set(), "rax": ("%old", "i64"), "rcx": ("%cnt", "i64"), "fl": ("rcrcf", ("%pcf", 64, None))}
+    it = NS(va=0x1000, mnem="shr", op_str="rax, cl", mem=None, is_call=False,
+            ops=[NS(type=1, reg="rax"), NS(type=1, reg="rcx")],
+            _ci=NS(operands=[NS(size=8), NS(size=1)]))
+    stub = NS(mod=mod, nm=lambda va, t: "%%%s_%d" % (t, len(out)), used=lambda k: None,
+              _GPR_ALU=p1.Region._GPR_ALU, _gpr_val=lambda st_, reg, va, o, bits=64: st_[reg][0],
+              _flag_cf_i1=lambda *a: p1.Region._flag_cf_i1(stub, *a),
+              _flag_cc_i1=lambda *a: p1.Region._flag_cc_i1(stub, *a))
+    res = p1.Region.lift_data_insn(stub, it, [("reg", "rax"), ("reg", "rcx")], st, out, "")
+    text = "\n".join(out)
+    assert res is True, res
+    assert "and i64 %cnt, 63" in text and "lshr i64 %old, " in text, text
+    assert "select i1 " in text and st["fl"][0] == "shrcf" and st["fl"][1][1] == 64, st["fl"]
+    cf_name = st["fl"][1][0]
+    o2 = []
+    c = stub._flag_cc_i1(st, "ae", o2, 0x1000, "")
+    assert c is not None and "xor i1 %s, true" % cf_name in "\n".join(o2), o2
+    assert p1.Region._flag_cc_i1(stub, st, "b", [], 0x1000, "") == cf_name
+    for bad in ("e", "ne", "s", "a"):
+        try:
+            stub._flag_cc_i1(st, bad, [], 0x1000, "")
+        except p1.Unsupported:
+            continue
+        raise AssertionError("shr cl の直後の cc %s は Unsupported のはず" % bad)
+    # 32bit 形: 結果は i32 の lshr を i64 へ zero-extend して書き戻す (実機 shr eax,cl は上位 32bit を 0 にする)
+    out32 = []
+    st32 = {"__w": set(), "rax": ("%old", "i64"), "rcx": ("%cnt", "i64"), "fl": ("rcrcf", ("%pcf", 64, None))}
+    it32 = NS(va=0x1000, mnem="shr", op_str="eax, cl", mem=None, is_call=False,
+              ops=[NS(type=1, reg="eax"), NS(type=1, reg="rcx")],
+              _ci=NS(operands=[NS(size=4), NS(size=1)]))
+    st32["eax"] = ("%old32", "i32")
+    stub32 = NS(mod=mod, nm=lambda va, t: "%%%s_%d" % (t, len(out32)), used=lambda k: None,
+                _GPR_ALU=p1.Region._GPR_ALU, _gpr_val=lambda st_, reg, va, o, bits=64: st_[reg][0],
+                _flag_cf_i1=lambda *a: p1.Region._flag_cf_i1(stub32, *a),
+                _flag_cc_i1=lambda *a: p1.Region._flag_cc_i1(stub32, *a))
+    assert p1.Region.lift_data_insn(stub32, it32, [("reg", "eax"), ("reg", "rcx")], st32, out32, "") is True
+    t32 = "\n".join(out32)
+    assert "and i32 %cnt, 31" in t32 and "lshr i32 %old32, " in t32, t32
+    assert "zext i32 " in t32 and " to i64" in t32 and st32["eax"][1] == "i64", (t32, st32["eax"])
+    print("T35 ok (shr r64,cl: count&63 で CF を select、count==0 は前 CF 保持、CF 以外の cc は Unsupported。shr r32,cl は i64 へ zero-extend)")
+
+
 if __name__ == "__main__":
     import traceback
-    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t27b, t28, t29, t30, t31, t32, t33, t34)
+    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t16c, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27, t27b, t28, t29, t30, t31, t32, t33, t34, t35)
     fails = []
     for f in tests:
         try:
