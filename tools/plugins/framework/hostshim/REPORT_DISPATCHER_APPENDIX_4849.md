@@ -222,6 +222,15 @@ Index 別の実測 (`hs_store_cov.py`・基準 `base.json` 対比・`HS_DISP_RET
 - 結論: Index (r9) の作りは未確定。受入 1 の『供給元の値』は、この 2 件の呼出側と `[rbp+0x60]`・`[rbp+0x98]` の書込み元を追えるまで決まらない。
 - 測定: 全 .text の線形走査 1 回で `real 1m4s`、rc=0、起動直後の load 0.89 (`uptime`)。`hs_store_111c.py` (機械語のみ) の出力は §5.3.1 と一致。
 
+#### 5.3.3 (c) 2 件の呼出元関数の r9 元 (`hs_r9_locals.py`・機械語のみ・再測定なし)
+
+- 2 件 (`0x1090dc4`・`0x1090ff9`) は同じ関数 `0x1090cb0` 内にある (先頭は `push rbp` の直前が `ret`/`int3`/`nop` のものを後方探索)。
+- `0x1090cca mov [rbp+0x60], r9`: 関数入口の r9 (= この関数の呼出元が渡した Index) を保存する。よって `0x1090dc4` の `r9 = [rbp+0x60]` は、この関数の呼出元の Index に依る。
+- `0x1090d0a mov qword ptr [rbp+0x98], 0`: `[rbp+0x98]` は 0 で初期化される。`0x1090ff9` の `r9 = [rbp+0x98]` はこの 0 を指すが、`0x1090f9d lea rcx, [rbp+0x98]` で `[rbp+0x98]` のアドレスが渡されるため、その先の呼出先が書き換え得る (未追跡)。
+- `0x1090cb0` を直接 `call rel32` する箇所は `.text 0x1000000..0x1400000` に 0 件。呼出元は間接 call か、別形式の呼出し。ここで止まる。
+- 結論: Index の作りは「関数入口の r9 (呼出元依存)」と「0 初期化の `[rbp+0x98]` (呼出先の書換えに依る)」の 2 経路に分かれた。どの経路が格納 `0x1321966` まで届くかは未確定。受入 1 は未達のまま。
+- 測定: `hs_r9_locals.py` の `real 52.8 秒`、rc=0、起動直後の load 0.88 (`uptime`)。
+
 ## 6. コード差分
 
 - `git diff 31208b4c8 HEAD -- tools/plugins/framework/hostshim/` は `hs_store_src27.py` の新規追加と、本 REPORT の新規追加だけ。`hs_disp_emu.py`・`hostshim.c`・`hs_store_cov.py` は変更なし。
