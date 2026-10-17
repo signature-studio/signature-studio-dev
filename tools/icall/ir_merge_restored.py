@@ -11,6 +11,31 @@ import re, sys
 
 MD_DEF = re.compile(r'^!(\d+) = ')
 MD_REF = re.compile(r'(?<![\w"])!(\d+)\b')
+ASM_DECL = re.compile(r'^declare (\S+) @(__asm_[\w.$-]+)\((.*?)\)')
+ASM_RENAME_BASE = 9000  # 改名 suffix。base_of() (m11_simd2.py) は末尾の __数字 を落とすので、base 名 (movss 等) は変わらない
+
+
+def asm_rename(chunks):
+    # ICALL-126 (#6140): chunk ごとに __asm_* の declare 署名が違う名前 (例: __asm_movss.3 は chunk 0・2 が i64(i128)、chunk 1 が i128(i32))
+    # は、統合 IR で先頭 chunk の宣言だけが残り、後続 chunk の call が型不一致になる。LLVM の wasm backend はその call を unreachable の thunk にする。
+    # 署名が食い違う名前だけを、chunk ごとに一意な名前 (__asm_<name>__<9000+i>) へ付け替える。declare と call の両方を直す。
+    sig = {}
+    for ls in chunks:
+        for l in ls:
+            m = ASM_DECL.match(l)
+            if m:
+                sig.setdefault(m.group(2), set()).add((m.group(1), m.group(3)))
+    conflict = {n for n, s in sig.items() if len(s) > 1}
+    if not conflict:
+        return chunks, 0
+    out = []
+    for i, ls in enumerate(chunks):
+        if i == 0:
+            out.append(ls)
+            continue
+        pat = re.compile(r'@(' + '|'.join(re.escape(n) for n in sorted(conflict, key=len, reverse=True)) + r')(?![\w.$-])')
+        out.append([pat.sub(lambda m: '@%s__%d' % (m.group(1), ASM_RENAME_BASE + i), l) for l in ls])
+    return out, len(conflict)
 
 
 def main():
@@ -18,6 +43,7 @@ def main():
     if not ins:
         sys.exit('usage: ir_merge_restored.py OUT.ll IN.ll ...')
     chunks = [open(p, errors='replace').read().split('\n') for p in ins]
+    chunks, n_renamed = asm_rename(chunks)
     defined = set()
     for ls in chunks:
         for l in ls:
