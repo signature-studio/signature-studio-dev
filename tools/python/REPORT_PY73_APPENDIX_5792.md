@@ -9,7 +9,7 @@
 - 対象: 閉包内の `[reg+disp]` を書き先にする命令 (`mov` 等の書込み系)。`[rip+disp]`・`[rbp/rsp+disp]` は別集計。
 - 書込み先 (target): 静的に決まらないため、全件「未確認 (実行時 object 状態)」。PM 決定 2 (2026-10-17) に従う。
 - 列 `dead_suspect`: 関数内で `ret`/無条件 `jmp` の直後から、次に分岐先になる命令までの区間に入るか。誤逆アセンブル (`ret` 後のデータ領域) の疑いを示すヒューリスティック。**除外はしない**。
-- 出力: `pe_closure_ptr_writes_5792.py` → TSV。TSV は `work/5792/ptr.tsv` (gitignore)。
+- 出力: `pe_closure_ptr_writes_5792.py` → TSV。TSV は `analysis/flapi/pe_closure_ptr_writes_5792.tsv` (commit 済み・全 547 行)。
 
 ## 2. 実測
 
@@ -20,16 +20,17 @@
 | うち `dead_suspect=1` (誤逆アセンブルの疑い) | 138 |
 | うち `dead_suspect=0` | 409 |
 | 基底レジスタ別 (全 547) | rax 374・rdi 47・rcx 44・rbx 35・rsi 20・rdx 17・r13 5・r8 3・ebp 1・r14 1 |
-| 測定時間 | 実測 2 分 0.7 秒 (real 2m0.660s・user 1m59.606s・load 0.43) |
+| 測定時間 | 再測定 real 1m43.200s・user 1m42.527s・load 0.96 (commit 後の HEAD で実行)。初回は real 2m0.660s・load 0.43 (機械差) |
+| TSV 列挙 | `analysis/flapi/pe_closure_ptr_writes_5792.tsv` (header 1 行 + 547 行。HEAD で再生成して一致を確認) |
 
-- 測定 commit: `bc3dd88ea` (スクリプトを含むコード変更 commit。測定はこの commit の `pe_closure_ptr_writes_5792.py`)。
-- 再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_closure_ptr_writes_5792.py 0x12cab20 3 > ptr.tsv`
-  (展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'`・`<展開先>/extracted/` に置く)。
+- 測定 commit: `bc3dd88ea` (スクリプトを含むコード変更 commit。測定はこの commit の `pe_closure_ptr_writes_5792.py`)。以後のコード差分は無し (TSV の追加のみ)。
+- 再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_closure_ptr_writes_5792.py 0x12cab20 3 > analysis/flapi/pe_closure_ptr_writes_5792.tsv`
+  (展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'`。展開後のファイルは `<展開先>/extracted/block00031_PE.bin`)。
 
 ## 3. 判定 (受入条件)
 
 - [x] 間接 call の解決方法を決めた (§8-1 を継承。静的に解決せず未解決の枝)
-- [x] 閉包内の `[reg+disp]` 書込み箇所を全件 PE 解析箇所つきで列挙 (547 件・TSV)。各箇所の書込み先は「未確認 (実行時 object 状態)」
+- [x] 閉包内の `[reg+disp]` 書込み箇所を全件 PE 解析箇所つきで列挙 (547 件・`analysis/flapi/pe_closure_ptr_writes_5792.tsv`)。各箇所の書込み先は「未確認 (実行時 object 状態)」
 
 ## 4. 未解決 (起票先)
 
@@ -42,4 +43,4 @@
 ## 5. 補足: 制御フロー到達解析を採らなかった理由
 
 `ret`/`jmp` の直後を到達不能として除外する案を試したが、閉包内の `jmp` の多くが別箇所を指し、jump table の先も辿れないため、真の書込みを取りこぼす。
-到達解析の結果は 280 件で、線形走査の 547 件と乖離する。除外の根拠にならないと判断し、疑いフラグに留めた。
+試行したが採用しなかった。採用しなかった解析の数値は記載せず、本付録の集計は線形走査 (547 件) のみ。除外はせず、疑いフラグに留めた。
