@@ -7,7 +7,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source ../shared/env.sh   # FL_WIN64_DIR
 export PE="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
-export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 OUT=work/unit_4498
 rm -rf "$OUT"; mkdir -p "$OUT/default" "$OUT/m2r1"
 run_one() {  # run_one <name> <M11_M2R 値 (0 は未設定扱い)>
