@@ -191,9 +191,11 @@
 | 固定部が読めない entry (既知の画像外 2 件) | 2 |
 | UnwindMap entry (5,621 件・nextOffset の戻り先が state -1 (buffer 前) か entry 先頭) | 不整合 0 |
 | TryBlockMap entry (185 件・tryLow ≤ tryHigh ≤ catchHigh) | 不整合 0 |
-| IPtoStateMap entry (9,850 件) | 11 行 (fi 10 件・entry 数 1〜70) が関数範囲外 |
+| IPtoStateMap entry (9,850 件) | **旧値 (修正前)**。分離 code の表を通常の IP map として読んでいた。下の再測定まで無効 |
 
-- IP map の 11 行は、2 本目以降の entry が関数長を超える (値が数千万から 4 億台)。fi 0x62ef3b0 は 2 行が共有する。確認した 4 件 (fi 0x6257284・0x62ef3b0・0x630bcc8・0x639080c) では dispIPtoStateMap が fi+9 または fi+27 にあり、funclet の範囲とずれている。残り 6 件は未確認。符号化の誤りとは断定できない (表の位置の割当て・別関数との共有の可能性)。**未解決**。
+- **修正 (reviewer 指摘 1)**: 旧版 census は `isSeparated` を見ず、全 entry で dispIPtoStateMap を IP map として読んでいた。分離 code (isSeparated = 1) では dispIPtoStateMap は SepIPtoStateMap への RVA なので、上の 9,850 件・11 行は誤読を含む旧値である。現行の `ip_map_for` は SepIPtoStateMap の行を pdata の開始 RVA で選び、その dispOfIPMap を IP map として検査する。分離・非分離の件数は census の `ip_kind` / `ip_out_of_range_by_kind` に出る。
+- **再測定は未実施**: 入力の `Massive X.vst3` (`plugins-massivex`) が本 run の `$ARTIFACTS_DIR` に無いため。修正後の IP map の数値はまだ無く、「11 行は符号化の誤りか」の判定はできていない。**未解決**。
+- 修正前の 4 件 (fi+9 / fi+27) の位置計算は、現行スクリプトの census 出力 `ip_out_of_range_detail` (`dispIPtoStateMap_at_fi_plus` を含む) から再現する (旧版は `mx6_fh4.py` の未使用の `ptr_after` で計算していた)。
 - 受入 1 の判定: 符号化そのものは一次資料どおり復号し、unwind / try は全件整合。IP map の 11 行を切り分けるまで「確定」とは書かない → `Refs #4787`。
 
 ## 9. MX-39 (#3776): 付録へ分割移動

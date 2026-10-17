@@ -22,6 +22,7 @@
 | `[MAC]` | `../analysis/mac/` (`REPORT.md`・`pkg_extract/`) | FL Studio mac 解析。dmg 展開・`FLEngine_x64.dylib` |
 | `[ANALYSIS-PLUGINS]` | `../analysis/plugins/` (`ott/REPORT.md` 等) | プロプライエタリ plugin の事前解析 |
 | `[LEGAL-WORK]` | `../analysis/legal_work/` | EULA/規約の抽出物・NSIS ヘッダ解析スクリプト (`nsis_hdr.py`) |
+| `[EHDATA4]` | 公開写し https://github.com/trcrsired/windows-msvc-sysroot/blob/main/include/ehdata4_export.h (Microsoft 由来の `ehdata4.h` 抜粋) | `__CxxFrameHandler4` の FuncInfo4・UWMap4・TryBlockMap4・IPtoStateMap4・SepIPtoStateMap4 の on-disk 形式と `ReadUnsigned` (可変長整数)。MX-48 (#4787) の `tools/targets/massivex/dsp/scripts/mx6_fh4_cint.py` が参照。原本の版は未確認 (写しの取得時点の内容) |
 | `[SUBAGENT-RULES]` | `../analysis/SUBAGENT_RULES.md` | subagent 共通ルールの**原本 (repo 外)**。**repo 内正本は `docs/WORKFLOW.md`** (import 済み。原本は凍結) |
 | `[CAB_TO_GH]` | `../analysis/CAB_TO_GH.md` | 旧 Linear `CAB-xxx` → GitHub issue `#N` の対応表 |
 | `[RETROSPECTIVE]` | `../analysis/RETROSPECTIVE_2026-10-11.md` | 2026-10-11 レトロスペクティブ (報告訂正 36 commit の分析・規則案の根拠) |
