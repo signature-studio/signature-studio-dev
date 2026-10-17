@@ -75,3 +75,23 @@
 - `git diff 3987f8c HEAD -- tools/m11/m11_passes.py tools/m11/ldfix/*.py` は、main 取り込みで入った 3 ファイル (`value_judge_6124.py`・`test_value_judge_6124.py`・`trap114_probe_5280.py`。本 PR の変更ではない) のみを出す。本 PR が追加・変更した py は `depth_4498.py` のみで、その差分は測定 commit 以降 0。
 - `m11_passes.py` は未変更 (IR 変化 0)。
 - 本番 IR・unit の結果は変わらない (IR を書き換えていないため)。KPI (`tools/flelift/boot/REPORT.md`) は動かしていない。
+
+## 7. 受入 2 の remap (#4498 LD-221・`pass_m2r_fn1046a30` 拡張)
+
+- 対象: 段数一致 (§6・`depth_1046a30_4498.tsv` の match=yes) かつ VA 0x15e0000〜0x15e4fff の cell 25 件 (22946304 を含む)。0x104cxxx 系 (コード範囲・受入 3) は含めない。
+- 既定 (`M11_M2R` 未設定): 完全一致 `%ce12n11_function_1046a30 = inttoptr i64 22946304 to ptr` の 1 行だけを置換する (旧版 `origin/main` と同じ範囲)。`%ceNn11` の他の名前は触らない。
+- `M11_M2R=1`: `%ceNn11_function_1046a30` のうち VA が 25 件の集合 (`M2R_FN1046A30_VAS` + 22946304) に入るものを置換する。変換は `VA − 0x400000`。
+- 突合の検証: 25 件の VA 集合 = `depth_1046a30_4498.tsv` の 0x15e 系・match=yes と差分 0 (`set` の比較)。
+- synthetic IR の再現 (入力: `%ce12n11` と `%ce3n11` と `%ce5n11` (22937624) と `%ce7n11` (22946280) と `%ce9n11` (1234) に定数行を置いた IR。`origin/main` の `m11_passes.py` と head を同じ入力で比較):
+  - main 既定: `%ce12n11` → 18752000、`%ce3n11`・`%ce5n11`・`%ce7n11` は変わらず、`%ce9n11` は変わらず。
+  - head 既定: main と出力が完全一致 (`==` True)。`%ce3n11` は 22946304 のまま。
+  - head `M11_M2R=1`: `%ce12n11`・`%ce3n11`・`%ce5n11`・`%ce7n11` の 4 件を置換 (22946304 の 2 行 + 22937624 + 22946280)、`%ce9n11` は変わらず。
+  - 検証スクリプト: `/tmp/opencode/m2r_check.py` (PR の成果物ではない・repo 外)。
+- **未実施 (実 IR)**: 実 IR (`boot_allfx.ll`) での `cmp` (既定) と行数差 (`M11_M2R=1`) は未測定。入力の `work/boot_allfx.ll` は本 run の runner に無い (`fl-win64` のみ展開可能)。`work-m11` 素材は `oc_artifacts` 指定が要り、その素材の IR が現 main の生成手順と一致するかは `docs/WORKFLOW.md` §11 の注記どおり `[未確認]`。
+- 既定 OFF の理由: 本番 IR (`m11_gen_ir2.sh`) を変えるため、unit e2e で前後比較するまで既定にしない (M2s・M2v と同じ扱い)。
+
+### 未実施 (受入 3〜5)
+
+- 受入 3 (0x104ccd0〜0x104cfxx 系): 未着手。
+- 受入 4 (`audit_lsf_ssa_e2e.sh` 7/7・`spill178_1161.tsv` 差分): 未実施。
+- 受入 5 (`m11_gen_ir2.sh` → `m11_build.sh` → unit e2e 前後比較): 未実施。`M11_M2R=1` の unit 結果は未測定。

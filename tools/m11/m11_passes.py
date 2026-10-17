@@ -293,15 +293,39 @@ def pass_m2q_fn980ed0(text, report):
     return text
 
 
+# #4498 (LD-221): 段数が IR と機械語で一致する 25 件 (ldfix/results/depth_1046a30_4498.tsv の match=yes・0x15e 系)。
+# 既定は 22946304 の 1 件 (#2958) だけ。残り 24 件は M11_M2R=1 の時だけ直す (未検証の runtime 確認まで既定 OFF)。
+M2R_FN1046A30_VAS = frozenset([
+    22937624, 22942488, 22950312, 22948232, 22946280, 22937720, 22940032, 22947960,
+    22947080, 22953672, 22949400, 22951184, 22940536, 22943760, 22957000,
+    22956552, 22951640, 22957928, 22951168, 22948096, 22949192, 22953072, 22947608,
+    22952864,
+])
+
+
 def pass_m2r_fn1046a30(text, report):
-    """[M2r] function_1046a30 の cell 参照 `%ce12n11_function_1046a30` の定数 VA 22946304 (0x15e2200) を LVA に remap (#2958 / LD-142).
-    機械語 104754c `mov rax,[rip+0x59acad]` は VA 0x15e2200 (LVA 18752000) を読む。RetDec が 10 進 VA で出したこの 1 件だけが VA→LVA 漏れ (M2q と同型)。
-    残ると IR の load は linear 22946304 (画像長 22515781 の外) を読み、1047556 の spill 宛の値が機械語と食い違う。全件 remap (M2P) は使わない (#417)。"""
-    old = '%ce12n11_function_1046a30 = inttoptr i64 22946304 to ptr'
-    n = text.count(old)
-    new = '%ce12n11_function_1046a30 = inttoptr i64 ' + str(shiftva(22946304)) + ' to ptr'
-    text = text.replace(old, new)
-    stage('M2r', 'function_1046a30 VA->LVA remap: %d sites' % n)
+    """[M2r] function_1046a30 の cell 参照 `%ceNn11_function_1046a30` の定数 VA を LVA に remap (#2958 / LD-142 → #4498 / LD-221).
+    機械語の rip 先が cell (VA 0x15e0000〜0x15e4fff・LVA 0x11e0000〜0x11e4fff) を指す件を直す。
+    22946304 (0x15e2200) の 1 件は #2958 から既定 ON。残り 24 件は段数一致を確認済みだが、起動結果 (本番 IR) の検証は未実施のため M11_M2R=1 で有効化する。
+    RetDec が 10 進 VA で出したこの定数は、残すと linear の画像外 (22515781 B 超) や別の cell を読む (M2q と同型)。
+    0x104cxxx 系 (コード範囲) は含めない (#4498 受入 3)。全件 remap (M2P) は使わない (#417)。"""
+    n = 0
+    extra = os.environ.get('M11_M2R') == '1'
+    if extra:
+        pat = r'(%ce\d+n11_function_1046a30) = inttoptr i64 (\d+) to ptr'
+    else:
+        pat = r'(%ce12n11_function_1046a30) = inttoptr i64 (22946304) to ptr'
+
+    def fix(m):
+        nonlocal n
+        v = int(m.group(2))
+        if v != 22946304 and not (extra and v in M2R_FN1046A30_VAS):
+            return m.group(0)
+        n += 1
+        return '%s = inttoptr i64 %d to ptr' % (m.group(1), shiftva(v))
+
+    text = re.sub(pat, fix, text)
+    stage('M2r', 'function_1046a30 VA->LVA remap: %d sites (M11_M2R=%s)' % (n, '1' if extra else '0'))
     report['m2r_fn1046a30_remap'] = n
     return text
 
