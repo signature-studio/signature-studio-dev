@@ -27,12 +27,22 @@ mk_probe() { echo '{ static int n_; if (n_++ < 16) fprintf(stderr, "[C395-'"$1"'
 STORE_PROBE='{ static int s_; if (s_++ < 4) fprintf(stderr, "[C395-STORE] n=%d R0=%llx slot=%llx\n", s_, (unsigned long long)R[0], (unsigned long long)LD64(0x16b8298ULL)); }'
 
 rm -rf "$DBG" && cp -r "$LIFT" "$DBG"
-for k in 0 1 2 3 4 5 6 7; do
-  python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0xc3b3a2 --c "$(mk_probe callsite)" || true
-  python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0xc395a0 --c "$(mk_probe entry)" || true
-  python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0x4235f0 --c "$(mk_probe resolver)" || true
-  python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at 0xc396c5 --c "$STORE_PROBE" || true
-done
+# 各 VA は 1 つの shard にしか無い。shard ごとに dbg_lift を呼び、どこか 1 shard で必ず 1 回だけ解決されることを確かめる
+# (0 件・2 件以上は挿入失敗として exit 2)。shard に無いときの unresolved は正常なので握りつぶす。
+insert_probe() {
+  local name="$1" va="$2" c="$3" n=0 k out
+  for k in 0 1 2 3 4 5 6 7; do
+    out="$(python3 "$HERE/dbg_lift.py" --src "$DBG/fle_lifted_s$k.c" --out "$DBG/fle_lifted_s$k.c" --at "$va" --c "$c" 2>&1 || true)"
+    if grep -q -- '-> line' <<<"$out"; then
+      n=$((n + 1)); echo "[c395] $name $(grep -- '-> line' <<<"$out" | head -1) (shard $k)"
+    fi
+  done
+  if [ "$n" -ne 1 ]; then echo "[c395] $name ($va) の挿入先が $n 件 (1 件であること)。挿入失敗のため中止" >&2; exit 2; fi
+}
+insert_probe callsite 0xc3b3a2 "$(mk_probe callsite)"
+insert_probe entry 0xc395a0 "$(mk_probe entry)"
+insert_probe resolver 0x4235f0 "$(mk_probe resolver)"
+insert_probe STORE 0xc396c5 "$STORE_PROBE"
 echo "[c395] probe 挿入行数: $(grep -c 'C395-' "$DBG"/fle_lifted_s*.c | awk -F: '{s+=$2} END {print s}')"
 
 FLE_LIFT_DIR="$DBG" FLE_LABEL=c395 FLE_SHARDS=8 SS_EMSDK_ENV="$SS_EMSDK_ENV" bash "$HERE/build.sh" plain

@@ -29,7 +29,14 @@ REPORT.md §14 の分割移動先。測定値・経緯はここ。
 
 - **結論**: 既定経路 (FLE_IPP 未指定・mode 3) で、`0x16b8298` を書く `f_c395a0` の入口 (`c395a0`)・格納直前 (`c396c5`)・唯一の直接呼出元 (`c3b3a2`) は 0 件だった。したがって `0x16b8298` が 0 のままなのは、この束縛関数が既定 boot で走らないためと読める。受入 1 (E[1..999] の実測) は未達のまま。
 - 測定: `tools/flelift/boot/c395_entry_probe.sh` (lift 生成 C に `dbg_lift.py` で 4 点を挿入し、`build.sh plain` → `fle_boot.mjs --boot-only`)。
-- 挿入の確認: `[C395-entry]` は `fle_lifted_s0.c` の `f_c395a0` 冒頭、`[C395-STORE]` は `c396c5` の直前 (`s0.c:258322`)、`[C395-resolver]` は `f_4235f0` 冒頭 (`s7.c:36080`) に入った。probe 機構は動く (resolver は既定経路で 16 件以上発火)。
+- 挿入の確認 (4 点・`dbg_lift.py` の出力を転記。shard は `FLE_SHARDS=8` の `fle_lifted_s<k>.c`):
+  - `c3b3a2` (callsite): `-> line 249823 in f_c3b340` (shard 2)。unresolved ではない。0 件の読みはこの挿入の上で得た。
+  - `c395a0` (entry): `-> line 254453 in f_c395a0` (shard 7)
+  - `4235f0` (resolver): `-> line 36079 in f_4235f0` (shard 7)
+  - `c396c5` (STORE): `-> line 254555 in f_c395a0` (shard 7)
+  - 上記は測定時の挿入と別 (`s0.c:258322`・`s7.c:36080` の行番号は旧測定の記録)。probe 機構は動く (resolver は既定経路で 16 件以上発火)。
+  - 検証: 挿入段のみを HEAD の `c395_entry_probe.sh` で実行 (`insert_probe` の shard 単位判定) し、4 点とも 1 回ずつ解決して `inserted=4`。boot 段 (`build.sh plain` → `fle_boot.mjs`) は emsdk が runner に無く未実行。上の 0 件の boot 結果は `54ba2ac7e` 時点の実測のまま。
+- 測定時の `SS_EMSDK_ENV`: 実行ログに記録が無く、どの emsdk で走ったかは未確認 (`3b081a0f9` の script の既定値 `/opt/emsdk/...` か、指定値かは不明)。HEAD の script は `SS_EMSDK_ENV` 必須なので、以後は必ず指定して run する。
 
 | 項目 | 結果 (`54ba2ac7e`) |
 |---|---|
