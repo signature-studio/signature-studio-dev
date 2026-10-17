@@ -71,6 +71,7 @@ error 行は stderr の `error:` 行の数 (`grep -c 'error:'`)。
 | head (`b3cdbcebc`) | 291 | 0 | 46 | 51 | 7.4 s |
 
 - 10 件の呼出し (各 2 行 = 20 行) の型エラーが消えた。FUN_180fe4020 系の error は head で 0 件。
+- 合計の差分の内訳: 合計は 301 → 291 (−10) だが、FUN_180fe4020 系は −20 なので、それ以外の error は 281 → 291 (**+10**)。増えた 10 行の出所 (カテゴリ) は、この表の計数 (`grep -c`) では切り分けていない。カテゴリ別の再計数 (素材展開 + Ghidra decompile) はこの fix round では行っていないため、出所は未確定。
 - head の error 行の内訳 (上位): `member reference base type 'undefined1[6…]'` 106、`'undefined1[1…]'` 32、`incompatible pointer to integer conversion` 27、`too few arguments to function call` 26。delay の emcc 不通過は残る (wasm 不成立は未解決表の通り)。
 - 注: 旧表 (`342ec0dcd` 基点 304 → `cf8667a06` 294) は main 取り込み前の値。上表 (基点 `4eaf8315c`・head `b3cdbcebc`) が現行の正本。基点の値が変わった原因は未切り分け。
 
