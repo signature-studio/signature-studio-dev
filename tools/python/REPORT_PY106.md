@@ -86,7 +86,7 @@
 - `FLEBOOT_PY106B`: `names_n 110`・`getproc_calls 110`・`hook_calls 1`。`head_at_stop` = `0x16b8488`。`name_of_slot_exc` = **`PyExc_RuntimeError`**。他: `PyErr_SetString` (実測の slot `0x115a62d0`・JSON の `slot_setstr_after_bind`。静的 map の slot は `0x16b8408`)、`Py_NewInterpreterFromConfig` (`0x16b8250`)。`threw` は `unlifted` (target `0x115a6170`)。
 - 結果 JSON: `tools/flelift/boot/results/boot_summary_py106def_default_py106bind.json` (`probe.names` に 110 件の名前表)。
 - 読み: 既定経路では束縛関数が GetProcAddress と Python312 の load hook に届く (§2-2・§2-3 の 209 停止点とは違う)。読めたのは、束縛が slot `0x16b8488` に格納する**名前の文字列** (`PyExc_RuntimeError`) と、probe が返した cell の型トークン (`0x7f300045`) である。名前は束縛関数 `0xc39ceb` の `lea` が渡す静的な文字列 (§1) なので、この観測は静的判定を実行時に再現したもの。**実 Python の型オブジェクト (`PyExc_RuntimeError` の実体の値) は読めていない**。したがって受入 1 (PyExc_* の実体の観測) は未達のまま。
-- 注意: 束縛の後の `unlifted 0x115a6170` は probe 後段の停止で、boot 本体の `exit` とは別。本 REPORT では扱わない (#2909 の範囲外。PM agent の判断待ち: 子 issue を切るか。既定案: 切らず §6 の再開条件に残す)。
+- 注意: 束縛の後の `unlifted 0x115a6170` は probe 後段の停止で、boot 本体の `exit` とは別。本 REPORT では扱わない (#2909 の範囲外。起票先は #6274 [PY-5425]・§6 参照)。
 
 ## 3. RANGE (-4) と repo の写像 (受入 2)
 
@@ -128,7 +128,8 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 実行時の型名 (`PyExc_*` の実体) の観測 (受入 1 の残り) | 静的には `PyExc_RuntimeError` と確定したが、実行時の確認は未達。直接実行 (§2-2) は GetProcAddress・load hook に届かず、null 呼出し (最後の呼出し元 0x409424) の後に exit する。GetMem 関数ポインタ `0x13a5c90` の 0 化 (unit 209) を戻しても束縛は進まない (§2-3) | #2909 (open のまま残す。再開条件: (a) unit 209 の fill 経路 (`0x15e1140`・`0x13a5c90`・undo global の同時 0 化) の原因を特定して解消する、または (b) boot 中に束縛関数 0xc395a0 (呼出し元 `0xc3b3a2`) へ到達する) |
-| repo の RANGE → IndexError (`fl_api.h:35`・`fl_api.py:18`・`provider_check.mjs:171`) と FL の型 (RuntimeError) の不一致 | Python 側で RANGE の型が FL と食い違う。直すと tests も直す | #2909。PM 判断: 写像は現状維持。修正の要否は #2909 受入 1 の後に判断 (2026-10-15 PM 決定) |
+| 束縛後の `unlifted 0x115a6170` (probe 後段の停止・§2-4) | boot 本体の `exit` とは別。受入には入らない | #6274 [PY-5425] (実装の子。原因特定と修正) |
+| repo の RANGE → IndexError (`fl_api.h:35`・`fl_api.py:18`・`provider_check.mjs:171`) と FL の型 (RuntimeError) の不一致 | Python 側で RANGE の型が FL と食い違う。直すと tests も直す | #6275 [PY-5426] (PM の判断待ちが子の前提)。PM agent の判断待ち: 写像を直すか。既定案: 2026-10-15 PM 決定どおり現状維持、#2909 受入 1 の後に判断 |
 | boot の unit 209 で `.data` の `0x15e1140` が 0 になる (PY-123 の undo global と同じ時点) | 停止点で chain を読めない | `tools/python/REPORT_PY123.md` §2-5 の fill 経路 (#3112 [FLE-13] が追う)・停止点は #3060 [FLE-11] |
 | FL の status (-1〜-9) と repo の code (1〜8) の数値対応 | 写像の根拠 | `tools/python/REPORT_PY61.md` §4-2 (#2026) の既存の未解決 |
 
