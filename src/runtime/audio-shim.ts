@@ -294,7 +294,7 @@ export class FlAudioShim {
       },
     });
     node.port.onmessage = (e: MessageEvent) => {
-      const d = e.data as { type: string; message?: string; q?: number; d?: number; frame?: number; prev?: number; ms?: number; ct?: number; cb?: number; p?: number; consumed?: number; rebuf?: number; recs?: number[][] };
+      const d = e.data as { type: string; message?: string; q?: number; d?: number; frame?: number; prev?: number; ms?: number; ct?: number; cb?: number; p?: number; consumed?: number; rebuf?: number; T?: number; recs?: number[][] };
       if (d.type === "error") { this.workletErrors.push(d.message ?? "?"); this.log(`worklet error: ${d.message}`); }
       if (d.type === "clock_jump") this.clockJumpLog.push({ q: d.q ?? -1, d: d.d ?? 0, frame: d.frame ?? -1, prev: d.prev ?? -1, ms: d.ms ?? 0, ct: d.ct ?? -1, pn: performance.now(), rx: Date.now(), cb: d.cb ?? -1 });
       if (d.type === "underrun_trace") this.underrunLog.push({ p: d.p ?? -1, consumed: d.consumed ?? -1, rebuf: d.rebuf ?? -1, T: d.T ?? -1, recs: d.recs ?? [], ms: d.ms });
