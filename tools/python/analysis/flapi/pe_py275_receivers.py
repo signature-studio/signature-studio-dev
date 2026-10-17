@@ -96,6 +96,21 @@ def main():
           and "mov rdi, qword ptr [rax]" in before(0xB70297, 1),
           str(before(0xB70297, 2)))
 
+    # 0x69b640 の r8 引数 (69bb8e) の先: 0x69b340 内の slot 1 receiver の出所 (#4995 未解決 1)
+    f_r = body(0x69B340)
+    slots_r = [a for a in f_r if SLOT1.match(txt(a))]
+    check("R13 0x69b340 の slot 1 呼出しは 2 件 (69b496・69b52e)",
+          hexes(slots_r) == ["0x69b496", "0x69b52e"], str(hexes(slots_r)))
+    check("R14 0x69b340 の slot 1 receiver は [[this+0x10]] 由来 (69b465・69b48d・69b4fb・69b52b)",
+          txt(0x69B465) == "mov rcx, qword ptr [rcx + 0x10]" and txt(0x69B48D) == "mov rbx, qword ptr [rcx]"
+          and txt(0x69B4FB) == "mov rax, qword ptr [rax + 0x10]" and txt(0x69B52B) == "mov rbx, qword ptr [rax]",
+          str([txt(0x69B465), txt(0x69B48D), txt(0x69B4FB), txt(0x69B52B)]))
+    check("R15 69bb8e の r8 引数は [rbp+0xe0] の複写 [rbp+0xd0] (69bb4c→69bb53→69bb69)。0x69b340 の slot 1 receiver は rbx を [rcx]・[rax] から直接取る (r8・rsi 由来ではない)",
+          txt(0x69BB4C) == "mov rax, qword ptr [rbp + 0xe0]" and txt(0x69BB53) == "mov qword ptr [rbp + 0xd0], rax"
+          and txt(0x69BB69) == "mov r8, qword ptr [rbp + 0xd0]"
+          and txt(0x69B48D) == "mov rbx, qword ptr [rcx]" and txt(0x69B52B) == "mov rbx, qword ptr [rax]",
+          "")
+
     print(f"\nsummary: {'ALL PASS' if not FAILS else 'FAIL: ' + ', '.join(FAILS)}")
     sys.exit(1 if FAILS else 0)
 

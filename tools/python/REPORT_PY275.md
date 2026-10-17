@@ -108,6 +108,14 @@
 - 検査の限界: R6 は呼出し直前 3 命令の文字列一致だけを見る。別レジスタ経由の受け渡しは対象外。
 - 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py275_receivers.py` → R1〜R12 ALL PASS、終了 0、所要 29.7 秒 (HEAD `5e11efbe6` で再測定、n=1、load average 0.96)。素材は `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB) から `block00031_PE.bin` (22,227,016 バイト) を 2.9 秒で展開。
 
+### 7b. #5471 未解決 1: 0x69b340 (0x69b640 の r8 引数の先) の slot 1 receiver
+
+- 0x69bb8e の `call 0x69b340` の r8 は `[rbp+0xd0]` (= `[rbp+0xe0]` の複写。`[rbp+0xe0]` は 0x69b893・0x69bb1b で算術・格納される map 値)。
+- 0x69b340 の slot 1 呼出しは 2 件 (69b496・69b52e)。receiver は 69b48d `mov rbx, [rcx]` (rcx = `[[this+0x10]]`・69b465) と 69b52b `mov rbx, [rax]` (rax = `[this+0x10]`・69b4fb) で、いずれも `[this+0x10]` 由来。r8・rsi (map 値) 由来ではない。
+- 0x69b340 は map 値 (`rsi` = 旧 `r8`) を `r8` (begin)・`r9` = `rsi+rdi` (end) の組で 0x691a40 (69b455・69b4b5・69b54b) に渡す。範囲の形で、オブジェクトの receiver としては使われていない。ただし 0x691a40 の内部は未追跡 (下表の未解決)。
+- 判定: 0x69b340 の**関数内**では、map 値が slot 1 の receiver になる箇所はない。0x69b640 の未解決 1 のうち「0x69b340 内の receiver 出所」は解決。残り: 0x691a40 (map 値を r8/r9 範囲として受ける) の内部で slot 1 が呼ばれるか。
+- 検証: `FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py275_receivers.py` → R1〜R15 ALL PASS、終了 0 (R13〜R15 を追加)。所要 37.9 秒 (測定 commit `479b81053`、n=1、load average 0.51)。素材 `fl-win64.tar.zst` から `block00031_PE.bin` を 2.9 秒で展開。
+
 ## 7. #5472: 4 関数の読出し値と slot 1 receiver の流れ (関数内で確認)
 
 - 本節の逆アセ (`pe_callgraph.py around`・`pe_py5472_slot1_receivers.py`) は子 #5472 の結果。関数内のスロット流れだけを見る (関数境界を越える流れは見ない)。

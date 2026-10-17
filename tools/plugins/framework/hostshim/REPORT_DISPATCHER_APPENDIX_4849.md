@@ -157,6 +157,10 @@ Index 別の実測 (`hs_store_cov.py`・基準 `base.json` 対比・`HS_DISP_RET
 - 変更 `HS_DISP_INDEX=6 HS_DISP_RET_SPEC=0x40fe90:one,0x40ae70:x2.0`: real 39.38 秒、終了時 load 1.11。`distinct = 109`。
 - Index 0〜9 の走査は各 run を 4 並列で実施し、全 10 件の完了を確認 (個別の real は未計測。終了時 load 最大 2.84)。
 
+#### 5.1.3 0x13221be の到達条件 (#5623)
+
+結論: 到達条件は確定 (Index=11・`call 0x40fe90` の戻り値 ≠ 0)。受入 2 は **1/11 のまま** (格納値は stub 由来で供給元の真値ではない)。詳細・実測表は `REPORT_DISPATCHER_APPENDIX_5623.md` (測定 commit `a2718eca0`)。
+
 ### 5.2 #5421 (PLG-P0b-58) — call 戻り値経路の 5 行
 
 対象 5 行 (`0x13218c1`・`0x13219b0`・`0x1321966`・`0x1321b6c`・`0x132257d`)。解析は `hs_store5_src.py` (新規)。
