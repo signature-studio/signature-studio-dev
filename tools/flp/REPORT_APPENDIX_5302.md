@@ -55,40 +55,42 @@
 
 ## 5. 残作業 (a)(b) の測定 (本 PR)
 
-- 測定 commit: 本 PR の `s2_render_probe.sh` を commit した HEAD (下の §5.3 で再現)。前回の測定 commit `a1e14e07a` からの差分は `s2_render_probe.sh` の RIP 採取 (`S2_RIP_AT`) 追加のみ。
+- 測定 commit: `666a5d4c8` (RIP 採取 `S2_RIP_AT` を入れた script。§5.1・§5.2 の run はすべてこの script)。前回 (§3) の測定 commit `a1e14e07a` からの差分は `git diff a1e14e07a 666a5d4c8 -- tools/flp/s2_render_probe.sh` の RIP 採取 (`S2_RIP_AT`) 追加のみ。
+- 再現コマンド: `S2_TIMEOUT=300 S2_THREAD_AT="60 150 240" S2_RIP_AT="60 150 240" bash tools/flp/s2_render_probe.sh "Fruity Convolver.flp" 1` (`kernel.yama.ptrace_scope=0` を事前に設定)。
+- 注: 既定の `S2_THREAD_AT="60 90"`・`S2_TIMEOUT=120` では、300 s 時点の値は出ない。§5.1 の値は下の採取時刻の指定で得たもの。
 - 素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開。wine64 9.0・gdb (apt)。`kernel.yama.ptrace_scope=0` を runner で設定 (gdb attach に必要)。
 - S1 (120 s): rc=124・MSGBOX_OnInit=0・native-load=0 (前回と同じ)。
 
-### 5.1 4 本の結果 (48000 Hz・WFBox=2・DitherBox=0 は既定のまま・各 300 s)
+### 5.1 4 本の再測定 (48000 Hz・WFBox=2・DitherBox=0 は既定のまま・S2_TIMEOUT=300・S2_THREAD_AT="60 150 240")
 
-| 本 | rc | WAV | ログ (バイト) | 300 s 時点の wine 系 CPU (R の thread) |
+| 本 | rc | WAV | ログ (バイト) | 計算 thread (R・wchan 0) の utime (ticks) |
 |---|---|---|---|---|
-| FLEX | 未再測 (前回 §3: 150 s・600 s で WAV なし) | なし | 1434 | 前回 §3 |
-| Fruity Convolver | 124 | なし | 1434 (不変) | 約 1 コア (tid 5263: 60→150→240 s で utime 5494→14028→22464 ticks) |
-| Fruity Parametric EQ 2 | 124 | なし | 1562 | 約 1 コア (tid 11475: 5501→13947→22489 ticks) |
-| Fruity Center | 124 | なし | 1498 | 約 1 コア (tid 13275: 5668→14377→23184 ticks) |
+| Fruity Convolver (RIP 採取あり) | 124 | なし | 1434 | tid 7657: 60 s 5376 → 150 s 13869 → 240 s 22273 |
+| Fruity Parametric EQ 2 | 124 | なし | 1562 | tid 10383: 60 s 5484 → 150 s 13903 → 240 s 22435 |
+| Fruity Center | 124 | なし | 1498 | tid 12187: 60 s 5647 → 150 s 14366 → 240 s 23184 |
+| FLEX | 未再測 | なし | 1434 | 前回 §3 の 150 s のみ (600 s の記録は無い) |
 
-- 4 本とも、ログは ALSA 警告と `X connection broken` で止まり、書き出しの進行は見えない。
-- 注: 表の 3 本は同じ 300 s 上限の run。FLEX は今回の run に含めていない (表の値は前回 §3 の値)。
-- 4 本とも、wine 系の thread で utime が増え続けて R のままの thread が 1 本ある。他の thread は pipe 読み (`anon_pipe_read`)・futex の待ち。
-- Fruity Center の 240 s 時点では main thread (13200) が `poll_schedule_timeout` (待ち) にいる。計算 thread (13275) は R のまま。
+- 採取は 4 点 (60/150/240 s) で同じ形: 計算 thread が 1 本だけ R のまま utime が増え続け、他の thread は pipe 読み・futex の待ち。
+- 3 本の run は `S2_RIP_AT` を空にして行った (RIP 採取の影響を除く)。Convolver のみ RIP 採取あり。
+- 前回 (旧 §5.1) の値は、tid と値の生データが本ランナーに残っていないため採用しない。
+- 前提: `kernel.yama.ptrace_scope=0` (既定 1 では gdb が `Could not attach to process` で、RIP 採取は空になる)。
 
-### 5.2 RIP 採取 (Fruity Convolver・S2_RIP_AT="60 150 240"・gdb attach)
+### 5.2 RIP 採取 (Fruity Convolver・S2_TIMEOUT=300・S2_RIP_AT="60 150 240")
 
-- 採取: `s2_rip_1.tsv` (列: 経過秒・LWP・rip)。`gdb -p` の `thread apply all info registers rip`。
-- ほとんどの thread の RIP は `libc read` (pipe 待ち) で、3 時点で変わらない。
-- 採取は第 1 run (`S2_RIP_AT="60 150 240"`・Fruity Convolver) で 60 / 150 / 240 s の 3 点、第 2 run (`S2_RIP_AT="60 90"`・同じ本) で 60 / 90 s の 2 点。
-- 計算 thread は両 run とも 1 本 (第 1 run tid 7368・第 2 run tid 9883)。残りの thread の RIP は libc `read` (pipe 待ち) で変化なし。
-- 計算 thread の RIP (`QuickFontCache_x64.dll` の `r-xp` 領域。ロード先 0x79f70000・RVA = RIP − 0x79f70000):
-  - 第 1 run: 60 s `0x7a0f5b81` (RVA 0x185b81) → 150 s・240 s `0x7a0f5c0d` (RVA 0x185c0d)。
-  - 第 2 run: 60 s `0x7a0f5b95` (RVA 0x185b95) → 90 s `0x7a0f5c0d`。
-- 逆アセンブル (`objdump -d -M intel`・ImageBase 0x400000 の VA で表示。RVA 0x185c0d = VA 0x585c0d):
-  - `0x585c05`〜`0x585c0d`: `cmp BYTE PTR [rax+0x1a],0` → `je 0x585bf0`。`0x585bf0`〜`0x585c00` は `call 0x5860a0` と `call 0x585b70` を繰り返す。
-  - つまり `[obj+0x1a]` が 0 になるまで回るループの末尾。`0x585c0d` で止まる採取が 150・240 s・第 2 run の 90 s で一致しており、ループの末尾を繰り返し通っている。
-- 判定: **ループは特定できた (`0x585bf0`〜`0x585c0d`)。** ただし `[obj+0x1a]` の値・`call 0x5860a0` の中身・終了条件は未確認。spin か、待ちの代わりの polling かは、この採取からは言えない。関数名は stripped で不明。
+- 再現コマンド: `S2_TIMEOUT=300 S2_THREAD_AT="60 150 240" S2_RIP_AT="60 150 240" bash tools/flp/s2_render_probe.sh "Fruity Convolver.flp" 1`。
+- 計算 thread は LWP 7657 (main の 7578 とは別)。`QuickFontCache_x64.dll` のロード先は 0x79f70000 (RVA = RIP − 0x79f70000)。
+  - 60 s: `0x6ffffbfc1b64` (QuickFontCache の範囲外)。
+  - 150 s: `0x7a0f5c0d` (RVA 0x185c0d)。
+  - 240 s: `0x7a0f60a2` (RVA 0x1860a2)。
+- 150 s の `0x185c0d` は前回 (旧 §5.2) の値と一致。240 s の RIP は前回の記録 (`0x185c0d`) と一致しない。旧 §5.2 の「150 s・240 s で一致」は、この run では成り立たない。
+- 逆アセンブル: `0x185c0d` (VA 0x585c0d) の `cmp BYTE PTR [rax+0x1a],0` → `je 0x585bf0` は、前回の REPORT 記述どおり (レビューで照合済み)。RVA 0x1860a2 の逆アセンブルは未確認 (今回は生バイナリの offset が RVA と合わず、確認できなかった)。
+- 判定: 150 s でループ末尾 (`0x585c0d`) を確認。240 s は別の RIP (`0x1860a2`)。`[obj+0x1a]` の値・終了条件・関数名は未確認。spin か polling かは、この採取からは言えない。
+- 注: gdb の attach は各採取で FL64.exe を止めるため、RIP 採取の run の時間は採取なしの run と比べられない。
 
 ### 5.3 未解決 (起票先: #5302 のまま `Refs`)
 
-- 高 CPU thread の呼び出し元 (ループ本体) の特定。次の一手: RIP を 0.1 s 間隔で多数採るか、`QuickFontCache_x64.dll` の `0x585b70` を呼ぶ呼び出し元を gdb の breakpoint (hit count) で数える。1 run に収まる。
-- 受入 1 (4 本の原因記録): 4 本とも「WAV なし・1 thread が計算を続けている」までで、「遅い」と「固まっている」の区別は未達。
-- wine の `ptrace` 経由の backtrace は PE 側で取れなかった (未試行)。
+- 計算 thread の呼び出し元 (ループ本体) の特定。RIP を 0.1 s 間隔で多数採る、または `QuickFontCache_x64.dll` の `0x585b70` を呼ぶ呼び出し元を gdb の breakpoint (hit count) で数える。
+- 240 s の RIP (`0x1860a2`) の逆アセンブル。
+- 受入 1 (4 本の原因記録): 4 本とも「WAV なし・1 thread が CPU を使い続ける」まで。「遅い」と「固まっている」の区別は未達。
+- FLEX の 300 s 再測定は未実施 (前回 §3 の 150 s のみ)。
+- wine の ptrace 経由の backtrace: 今回は未試行。

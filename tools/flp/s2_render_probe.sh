@@ -35,9 +35,11 @@ dump_threads() {
   done >> "$out" || true
 }
 # RIP 採取: 秒の空白区切り S2_RIP_AT の時点で、FL64.exe の全 thread の rip を gdb で取る (既定 空 = 無効)。
-# 出力: $WORKDIR/s2_rip_<n>.tsv (列: 経過秒・LWP・rip)、$WORKDIR/s2_maps_<n>_<経過秒>.txt (/proc/<pid>/maps)。
+# 出力: $WORKDIR/s2_rip_<n>.tsv (列: 経過秒・LWP・rip)。gdb の生出力は $WORKDIR/s2_rip_<n>_gdb_<経過秒>.txt (先頭の info proc mappings が maps、後段が thread apply all info registers rip)。
+# gdb が無い・attach できない場合は stderr に出す (kernel.yama.ptrace_scope=0 が必要)。
 rip_sample() {
   local out="$1" el="$2" pid
+  if ! command -v gdb >/dev/null 2>&1; then echo "rip_sample: gdb が無いので RIP を採らない" >&2; return 0; fi
   pid=$(ps -C FL64.exe -o pid= 2>/dev/null | head -1 || true)
   [[ -n "$pid" ]] || return 0
   gdb -p "$pid" -batch -ex "set pagination off" -ex "info proc mappings" -ex "thread apply all info registers rip" > "${out%.tsv}_gdb_$el.txt" 2>&1 || true
