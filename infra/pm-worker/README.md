@@ -187,7 +187,9 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 | `stale` | 同期が古い (reconcile から 15 分以上) か、一覧を打ち切った。launch は書かない | `fresh()` |
 
 含めないもの: `/oc` の投稿で 403/429 が返ったとき (一時的。次の tick で再試行し、`last_error` に出る)。`room` が 0 (同時実行の上限に達しただけで、正常な待ち)。
-降格 (#2340・`meta.demoted`) も含めない。降格中は launch が dry-run になる (投稿しない) が、`launch_halted` には出さない。降格は『投稿と dispatch を止めて人が確認する』安全装置で、解除は repo の push 権限者の操作 (`/demote/reset`) による。PM agent へ知らせる対象ではなく、`/status.demoted_reason` で見える。
+降格 (#2340・`meta.demoted`) も含めない。降格中は launch が dry-run になる (投稿しない) が、`launch_halted` には出さない。降格は『投稿と dispatch を止めて人が確認する』安全装置で、解除は次のどちらか。PM agent へ知らせる対象ではなく、`/status.demoted_reason` で見える。
+- **手動**: repo の push 権限者の操作 (`POST /demote/reset`・`log` の restore の note は `manual`)。
+- **時限復帰 (CI-251)**: 降格から `DEMOTE_AUTO_LIFT_MS` (60 分) を超えたら、tick が人の操作なしで解除する (`log` の restore の note は `auto-stale`・`counters.restored` が増える)。解除の起点は解除の時刻なので、解除前の `/oc` の組は再判定しない。60 分の判定は tick の先頭で行い、GitHub の同期の失敗に左右されない。
 
 - **区間**: 止まった時刻を `meta.halt.since` に保存する。止まり続けている間は起点を変えない。全ての条件が無くなると区間を消す (次の停止の起点に使い回さない)。
 - **/status**: `launch_halted` (`{reason, since}`。止まっていなければ `null`) と `launch_halted_overdue` (15 分以上止まり、かつ `ready` と `room` がある間は `true`)。

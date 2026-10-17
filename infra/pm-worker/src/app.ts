@@ -296,7 +296,7 @@ export class PmApp {
   // 自動では戻さない。repo の push 権限を示す token (Bearer) を持つ人だけが、/status の demoted_reason を見てから呼ぶ。
   private async resetDemote(req: Request): Promise<Response> {
     if (!(await this.callerCanPush(req.headers.get("authorization")))) return json({ error: "unauthorized" }, 401);
-    return json({ ok: true, reset: this.engine.resetDemote() });
+    return json({ ok: true, reset: this.engine.resetDemote("manual") });
   }
 
   private async callerCanPush(h: string | null): Promise<boolean> {
