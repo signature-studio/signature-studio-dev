@@ -97,7 +97,7 @@ def main():
     matched = sum(1 for k in range(NSTK) if words[k] == expect[k])
 
     # stub の戻り値 = tgt + rcx + rdx + r8 + r9 + xmm0..3 (bit) + stk 12 語 (mod 2^64)
-    exp_sum = (tgt + ints[3] + ints[2] + ints[4] + ints[5] + sum(dbls) + sum(expect)) & M64
+    exp_sum = (tgt + ints[3] + ints[2] + ints[4] + ints[5] + sum(dbls) + sum(stkv)) & M64
     sum_ok = got == exp_sum
 
     print('sum_ok=%d got=0x%016x exp=0x%016x' % (sum_ok, got, exp_sum))
