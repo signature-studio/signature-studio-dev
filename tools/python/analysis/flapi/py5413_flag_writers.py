@@ -68,13 +68,19 @@ def main():
         i = buf.find(b"\xe8", i + 1)
     for fs, lst in fn_sites.items():
         cs = ", ".join(f"{c:#x}" for c in callers[fs][:10]) or "(直接呼出し無し)"
-        print(f"  fn {fs:#x} sites {[(n, hex(s)) for n, s in lst]} callers: {cs}")
+        print(f"  fn {fs:#x} sites {[(n, hex(s)) for n, s in lst]} callers 計 {len(callers[fs])} 件 (先頭 10): {cs}")
 
-    print("== 4. set/clear の対 (同一関数内)")
+    print("== 4. 同一関数内の store の値 (c6 00 imm = 定数, 88 = レジスタ値で値は未確認)")
     for fs, lst in fn_sites.items():
-        names = {n for n, _ in lst}
-        if len(names) == 1 and len(lst) >= 2:
-            print(f"  fn {fs:#x} {sorted(names)[0]}: {len(lst)} 件 (set/clear 両方がある関数)")
+        ones, zeros, regs = [], [], []
+        for _, s in lst:
+            rel = s - t0
+            if buf[rel] == 0xC6 and buf[rel + 1] == 0x00:
+                (ones if buf[rel + 2] == 1 else zeros).append(s)
+            else:
+                regs.append(s)
+        ok = "定数 1 と定数 0 の store がある" if ones and zeros else "定数 1 と定数 0 の対は未確認"
+        print(f"  fn {fs:#x} 定数1 {[hex(x) for x in ones]} 定数0 {[hex(x) for x in zeros]} レジスタ {[hex(x) for x in regs]} → {ok}")
     print("  注: 状態名は未確認 (PE の文字列から特定できず)。")
 
 
