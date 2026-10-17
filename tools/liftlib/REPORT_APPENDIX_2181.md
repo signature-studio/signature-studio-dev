@@ -33,7 +33,7 @@ git diff e05270d33 HEAD -- tools/liftlib/liftlib tools/liftlib/targets tools/ica
 |---|---|
 | 測定 commit (コードを変えた最後の commit) | `e05270d33` (leafspec と §4.3 probe 表の両方)。`b1c2d148` は §4.1 の変更前後比較の旧測定として残す |
 | 測定 commit 以降の差分 | `e05270d33` 以降は docs (REPORT) のみの commit を積む。コード差分は下の確認コマンドで 0 |
-| 素材 | `$ARTIFACTS_DIR` の `fl-win64` (`$HOME/analysis/win64`)・`work-liftlib` / `work-icall` (`tools/liftlib/work`・`tools/icall/work`)・`analysis-ott-binaries` (`$HOME/analysis/plugins/ott/binaries`)・`toolchain-emsdk` (`/opt/emsdk`)・`toolchain-retdec` (`/opt/retdec`) を fix run で展開 |
+| 素材 | `$ARTIFACTS_DIR` の `fl-win64` ([WIN64])・`work-liftlib` / `work-icall` (`tools/liftlib/work`・`tools/icall/work`)・`analysis-ott-binaries` (`$ANALYSIS_DIR/plugins/ott/binaries`)・`toolchain-emsdk` ([EMSDK])・`toolchain-retdec` ([RETDEC]) を fix run で展開 |
 | 再現 | `cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 200` (leafspec 200/200 は 1m19.8s の実測。rc 0) |
 | 負荷 | 開始時 load 1.84 / 1.05 / 0.44 (runner 4 コア, 単発。14:50:28) |
 | 対照 | 同じ spec を `b1c2d148` で測定 (worktree で `work-liftlib` / `work-icall` を展開): 147/53/0/0、1m16.5s、rc 1 (gate FAIL)。fix run 内の実測 (HEAD と同一の素材・同一 cfg) |
