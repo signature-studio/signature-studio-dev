@@ -111,6 +111,8 @@ window.__done = new Promise((resolveAll, rejectAll) => {
         // recs = worklet の直近 64 quantum: [p, rd, wr, wl, dms (前 quantum からの Date.now 差)]
         result.ul_ms = (shim.underrunLog ?? []).map((u) => ({ ms: u.ms ?? null, p: u.p, consumed: u.consumed, recs: u.recs }));
         result.shim_open = shimLines.filter((s) => /OPEN |burst probe/.test(s));
+        // 初期 depth (fla_open 直後の実効値。床 FLA_F_T_FLOOR と burst 拡張の結果)。判定には使わない。
+        result.open_depth = M._flasio_open_depth();
         result.workletErrors = shim.workletErrors;
         result.cfg = cfg;
         if (ver) { result.verify = ver.finish(); result.verify.sr = ctxInfo.sampleRate; }
