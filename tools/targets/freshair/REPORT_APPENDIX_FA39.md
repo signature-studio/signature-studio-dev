@@ -100,7 +100,23 @@
 - 測定 commit: `747bab931` (`ks_filter_scen_cmp.py` に語単位の出力を足した、コードを変えた最後の commit)。§3 の数値はすべてこの commit で測定した。
 - `git diff 747bab931 HEAD -- tools/targets/freshair/ks_semantic_filter_kh.c tools/targets/freshair/ks_semantic_filter_kh.sh tools/targets/freshair/ks_semantic_filter_scen.sh tools/targets/freshair/ks_filter_scen_cmp.py tools/targets/freshair/lift2/native` の出力: 空 (以降の追加は本付録と DOC_MAP だけ)。
 
-## 6. 未解決
+## 6. 係数計算の入出力の比較 (FA-65 / #5042)
+
+係数計算関数 (SC `0x180b7fa80` ⇄ KH `0x180469d40`) の呼出し引数と出口ブロックを両側で記録した (`lift2/native/coef_probe.c`・`ks_coef_scen.sh`・`ks_coef_cmp.py`)。
+同一シナリオ 200 本 (seed 0xF117E4、fma 0)、処理 call 598、係数計算 284 回。
+
+- 入力 (type / order×2 / freq / Q / gain / sr): 284 回すべて bit 一致。**写像 (引数の取り違え) は食い違いの原因ではない。**
+- 入口ブロック (係数 slot の呼出し前内容): 598 処理 call 中 75 で不一致。
+- 出口ブロック 0x320 B: 284 回中 209 回で不一致。内訳は 2637 / 41800 語。
+  - 相対差 (|SC−KH|/|KH|) の分布: ≤1e-6 が 1591、≤1e-4 が 404、≤1e-3 が 269、≤1e-2 が 179、>1e-2 が 194。
+  - 入口ブロックが同一でも 134/209 回で出力が違う (入口の不一致だけでは説明できない)。
+  - order×2=0 は全 type で一致。order×2≥2 で不一致が出る。最初の不一致語は 0x10 または 0x1f0〜0x208 (多くは相対 1e-6 前後の丸め級)。
+- 相対差 >1e-2 の 126 語の内訳: |KH|<1e-20 が 61 語、|KH|≥1e-3 が 55 語、1e-20〜1e-3 が 10 語。極小値の語は丸め・打ち切り、大きい語は式の分岐か係数項の違いを示唆する。語ごとの式は未特定。
+- 判定: **写像ではなく係数計算の内部 (式の順序・丸め・分岐のいずれか) の差**。どの式かは未特定。
+- 未確認: 係数計算の内部の分岐 (SC 側 `0x180b7fa80` の呼出し先 `0x180d22850`・`0x180d235b0`・`0x18100c1e0`、KH 側 `0x180469d40` の呼出し先) の入出力は未記録。
+- 測定 commit: `b628a07b1` (本 PR の harness)。再現: `bash tools/targets/freshair/ks_coef_scen.sh 200 0xF117E4 0`。
+
+## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
