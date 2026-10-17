@@ -923,6 +923,7 @@
 | `tools/flp/REPORT_APPENDIX_4376.md` | ~40 | flp #4376 (L-17): Render tests 残り 23 本の 32-bit float 書き出し (成功 19・WAV なし 3・要確認 1。結果 TSV は `corpus/render_export_4376.tsv`)。残りは #4598・#4599 |
 | `tools/flp/REPORT_APPENDIX_5649.md` | ~45 | flp #5649 (PY-5381): 実行時観測の前提。wine64 9.0 + gdb で FL64.exe を起動し、attach して VA `0x140006eaf` にブレークを張れることを実測 (命中は未確認)。ptrace_scope=0 の前提と再現手順 |
 | `tools/flp/REPORT_APPENDIX_5614.md` | ~75 | flp #5614 (PY-5373): `0x737560` (FLEngine の +0x49e setter) を gdb で実測。命中・`dl` の値と呼出し元は REPORT §3 参照。cfg の型と所属 VMT は未確定 (§4) |
+| `tools/flp/REPORT_APPENDIX_5650.md` | ~40 | flp #5650 (PY-5377): `0x12e3a60` (select 後処理) と `0x128f9e0` を gdb で実測。`0x12e3a60` は GUI 起動で命中 0・`0x128f9e0` は命中 5 (id=0)。名前は未確認 |
 | `tools/flp/REPORT_APPENDIX_5718.md` | ~110 | flp #5718 (PY-5384): FLEngine_x64.dll の `pred` (VA `0x12d8d30`) を gdb で実測 (命中・呼出し元 3 系統)。loop (`0x12d94f0`) は未命中で入力述語は未確定。§7・§9 は静的解析 (直接呼出し元 `0xed2ac0` が関数ポインタ表に載ることの確認)・未解決の表 (起票先 #5718) |
 | `tools/flp/REPORT_APPENDIX_5601.md` | ~85 | flp #5601 (L-25): Asher・Astes の WAV 未出力。FindAtomW / GlobalFindAtomW の呼出し元を静的に特定 (`s10_findatom_static.py`)。poll 候補 3 関数まで絞った。実行時の命中は未測定。抜け条件は未特定 |
 | `tools/flp/REPORT_APPENDIX_4598.md` | ~50 | flp #4598 (L-18): 打ち切り 8 本の再測定 (Patcher (effect) は rc=0 で成功、未達 8 本は 120 s で WAV なし・Fruity Center は 300 s でも不可)。結果 TSV は `corpus/render_export_4598.tsv`。原因は未特定 |
