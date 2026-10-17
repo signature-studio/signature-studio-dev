@@ -12,7 +12,7 @@ m11_setother_nonimm_cfg.py (CFG 到達定義を逆向きに追う) と別手法�
   python3 m11_setother_nonimm_cfg_verify.py --selftest         合成検査 (期待値と照合・ネガティブコントロール込み)
   python3 m11_setother_nonimm_cfg_verify.py ROWS.json --pe PE  nonimm_cfg_rows.json の 実値化 行を照合 (--all で全行)
 """
-import argparse, collections, json, os, re, sys
+import argparse, bisect, collections, json, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MAX_STEPS = 200000
@@ -202,10 +202,16 @@ def ro_load(x, ro):
     return dst, v & msk(w)
 
 
-def ro_reader(sections):
+def ro_reader(sections, relocs=()):
     """読み取り専用の読込口。sections: [(VA, bytes)] は書込み不可のセクション (.rdata 等) だけを渡す。
+    relocs: Base Relocation の fixup の VA 一覧 (各 8 バイト幅)。読込がいずれかに 1 バイトでも掛かれば未知 (ロード時に値が変わり得る)。
     範囲の外の読込は None (未知)。書込み可能なセクションを渡さないことが健全性の前提。"""
+    rel = sorted(relocs)
+
     def ro(va, n):
+        i = bisect.bisect_left(rel, va - 7)
+        if i < len(rel) and rel[i] < va + n:
+            return None
         for base, data in sections:
             if base <= va and va + n <= base + len(data):
                 return data[va - base: va - base + n]
@@ -731,6 +737,11 @@ def selftest():
         ('R1 ネガティブ (claim 0x2b)', '0fb615f9000000' 'c3', 1, 'rdx', 0x2b, 'FAIL', ro_reader(rd)),
         ('R2 範囲外の読込は未知 (判定不能)', '0fb615f9000000' 'c3', 1, 'rdx', None, '判定不能', ro_reader([(B + 0x800, bytes([1]))])),
         ('R3 ro 無し (既定は未知・判定不能)', '0fb615f9000000' 'c3', 1, 'rdx', None, '判定不能', None),
+        ('R4 fixup に掛かる読込は未知 (判定不能)', '0fb615f9000000' 'c3', 1, 'rdx', None, '判定不能', ro_reader(rd, [B + 0x100])),
+        ('R4 fixup が 8 バイト幅の下端で掛かる', '0fb615f9000000' 'c3', 1, 'rdx', None, '判定不能', ro_reader(rd, [B + 0xf9])),
+        ('R4 ネガティブ (fixup は読込の直後・既知)', '0fb615f9000000' 'c3', 1, 'rdx', 0x2a, 'PASS', ro_reader(rd, [B + 0x101])),
+        ('R4 ネガティブ (fixup は下端の外・既知)', '0fb615f9000000' 'c3', 1, 'rdx', 0x2a, 'PASS', ro_reader(rd, [B + 0xf8])),
+        ('R4 ネガティブ (fixup 無し・既知)', '0fb615f9000000' 'c3', 1, 'rdx', 0x2a, 'PASS', ro_reader(rd, [])),
     ]
     for name, hx, probe, fam, claim, expect, reader in ro_cases:
         insns = list(md.disasm(bytes.fromhex(hx), B))
@@ -765,16 +776,19 @@ def selftest():
 
 
 def ro_sections(pe):
-    """PE の読み取り専用セクション (書込み不可・.rdata 等) の (VA, データ) 一覧。書込み可能なセクションは含めない。"""
+    """PE の読み取り専用セクション (書込み不可・.rdata 等) の (VA, データ) 一覧と、Base Relocation の fixup の VA 一覧。
+    書込み可能なセクションは含めない。fixup に掛かる読込は ro_reader が未知にする。"""
     import pefile
     pef = pefile.PE(pe, fast_load=True)
+    pef.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_BASERELOC']])
     base = pef.OPTIONAL_HEADER.ImageBase
     out = []
     for s in pef.sections:
         if s.Characteristics & 0x80000000:
             continue
         out.append((base + s.VirtualAddress, s.get_data()))
-    return out
+    relocs = [base + e.rva for blk in getattr(pef, 'DIRECTORY_ENTRY_BASERELOC', []) for e in blk.entries if e.rva]
+    return out, relocs
 
 
 def real(rows_path, pe, all_rows=False, prune=False, merge=False, ro=False):
@@ -787,7 +801,10 @@ def real(rows_path, pe, all_rows=False, prune=False, merge=False, ro=False):
     if not rows:
         return 0
     mach = ldmach.Machine(pe)
-    reader = ro_reader(ro_sections(pe)) if ro else None
+    reader = None
+    if ro:
+        secs, relocs = ro_sections(pe)
+        reader = ro_reader(secs, relocs)
     cnt = collections.Counter()
     kinds = collections.Counter()
     for r in rows:
