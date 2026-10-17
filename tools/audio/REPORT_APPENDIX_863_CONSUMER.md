@@ -66,3 +66,24 @@
 ### 未解決 (追跡 **#863**。新規 issue は起票していない)
 
 (a) 実失敗の捕獲 (通算 0 件・本節 123 run 全 PASS)。(b) 再現条件の特定 (通算 頻度 5/760)。(c) 初回 run 仮説 (通算 5 件は、いずれも各節で最初に走らせた run。ただし節の初回 run でも PASS がある (§28 の初回 1 run など)。本節の初回 run は PASS。キャッシュ状態を分けた実測は未実施)。
+
+## 33 AU-15 (#863) 目標充填 T を判定行へ出す (測定 commit `b10972c73`)
+
+- 変更: `src/runtime/audio-shim.ts` の `ProducerStats` に `target_fill` (= ctl の `depth` × `buffer_frames`) を追加し、`tools/audio/integration/e2e.mjs` の判定行に `prod_target_fill=` を出す。C・worklet・SAB レイアウトは変えていない。
+- 方法: worktree `ws-863` (origin/main `97a5bd8ab` 基点)。`TMPDIR=$RUNNER_TEMP EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh bash tools/audio/integration/e2e.sh`、foreground。素材 `toolchain-emsdk` を展開して使用。`e2e.sh` は `git archive HEAD` を検証するため、最初の実行 (未コミット) では `undefined` になった。コミット後に再実行して確認した。
+
+| 区分 | HEAD | 結果 | 判定行 |
+|---|---|---|---|
+| e2e (1 回) | `b10972c73` | 15 PASS・0 FAIL・exit 0 (wall 約 38 s、`time` の実測) | dev:tone / preview:tone とも `prod_target_fill=1536`・`max_err=1.49e-8`・`underrun_cap=0`・`cw_at_underrun=[none]` |
+
+- 1 分 load: 起動時 0.41 (`uptime`)。
+- 読み: 無負荷の PASS run で T = 1536 frames。underrun は 0 件のため、失敗時の T はこの run からは分からない。
+- 失敗時の T は `underrun` の記録に入っていない。失敗 run で `prod_target_fill` を見るには、verify 時点の値 (= 終了時の T) で代用する。T の変化 (`latency_changes`・`fla_ctl.depth` の自動拡張) は起きうるため、失敗 run の T が起床間隔の判定に使えるかは未確認。
+
+### 通算
+
+- 通算は §32 までの 5 件 / 760 run のまま (本節は PASS 1 回の判定行確認で、捕獲試行ではない)。
+
+### 未解決 (追跡 **#863**。新規 issue は起票していない)
+
+(a) 実失敗の捕獲 (通算 0 件)。(b) 再現条件の特定 (頻度 5/760)。(c) 失敗時の T は記録されない (verify 時点の値のみ)。underrun 時点の T の記録は別途必要。(d) 初回 run 仮説 (キャッシュ状態との切り分け)。
