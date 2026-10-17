@@ -142,9 +142,12 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
   # #5203 (SHX-T46, D23 段 1) 実験用: M11_FIX_SHX_T46=1 のときだけ function_448490 の count (-32) の 6 スロットを object +0x48 のメモリに統合する。
   #   既定 OFF (既定の IR は変えない)。想定外の入力は assert で止まる (fail-closed)。ldfix/fix_shx_t46.py。
   if [ "${M11_FIX_SHX_T46:-0}" = 1 ]; then
-    python3 ldfix/fix_shx_t46.py work/boot_final.ll work/boot_final.shx46.ll
+    #   M11_FIX_SHX_T46_LEN=1 は entry の +0x70 (arg1) と +0x4c (length) の初期化も入れる (機械語 0x4484b3・0x4484e4)。
+    SHX46_ARGS=""
+    if [ "${M11_FIX_SHX_T46_LEN:-0}" = 1 ]; then SHX46_ARGS="--length"; fi
+    python3 ldfix/fix_shx_t46.py $SHX46_ARGS work/boot_final.ll work/boot_final.shx46.ll
     mv work/boot_final.shx46.ll work/boot_final.ll
-    python3 m11_cond.py shx_t46=applied
+    python3 m11_cond.py shx_t46=applied${SHX46_ARGS:+-length}
   else
     python3 m11_cond.py shx_t46=not-applied
   fi

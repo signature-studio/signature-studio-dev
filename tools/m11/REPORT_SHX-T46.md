@@ -4,7 +4,16 @@
 
 - `ldfix/fix_shx_t46.py` を追加した。`M11_FIX_SHX_T46=1` のときだけ、count (IR `-32`) の 6 つの reg2mem スロットを、親 object `%stack_var_-104` の `+0x48` を指す GEP (`%fx46cnt`) への load/store に置き換える。object は `[15 x i64]` (120 B) に拡幅する。
 - 実測 (ON): IR 生成 rc 0・build rc 0・trace build rc 0 (`mismatch=0 undefined=0 duplicate=0`)。実 boot は `memory access out of bounds` (`dllmain_done=false`・`va_calls=1`)。既定 OFF の baseline は従来どおり。ON は baseline より悪化した。
-- 受入 1 の一部 (count の統合と拡幅) のみ。`-28` の store 補完・length (`-28`)・arg1 の同期は未実装。
+- 受入 1 の一部 (count の統合と拡幅) のみ。`-28` の store 補完・length (`-28`)・arg1 の同期は未実装 (段 2 の opt-in `M11_FIX_SHX_T46_LEN` を §1.1 に示す。ON は hang)。
+
+## 1.1 追記 (SHX-T46 段 2: entry の +0x70 / +0x4c 初期化・`M11_FIX_SHX_T46_LEN=1`・既定 OFF)
+
+- `fix_shx_t46.py --length` は、既存の統合に加えて entry の `+0x70` (`store i64 %arg1`・機械語 `0x4484b3`) と `+0x4c` (`store i32 1`・機械語 `0x4484e4`) を入れる。`m11_gen_ir2.sh` は `M11_FIX_SHX_T46=1 M11_FIX_SHX_T46_LEN=1` のときだけ付ける。`ir_conditions.json` は `shx_t46=applied-length`。
+- 実測 (ON・length): IR 生成 rc 0 (490,795 行)・build rc 0 (mismatch 0・undefined 0)・trace build rc 0 (mismatch 0・undefined 0・duplicate 0)。実 boot (`run_trace.mjs`・上限 150 s) は **rc 124 (hang)**・出力なし。T40 の `+0x4c` 初期 store と同じ症状。
+- 既定 OFF の IR sha は変更前と一致 (`b202c157a80807f2`)。OFF の実 boot は `units_run=17`・`dllmain_done=true`・`va_calls=2`・`icall_ok=24`・`boot_rc="1"`・0.24 s。
+- 同じ環境で T46 単独 (`M11_FIX_SHX_T46=1`) を再測: `dllmain_done=false`・`va_calls=1`・`threw="memory access out of bounds"` (§2 の ON と一致)。
+- `+0x70` のみの変種は、IR 指紋 (`ir_conditions.json`) の不一致で build が止まったため **未測定**。機序の切り分けは未完。
+- 受入 1 の残り (`-28` の初期化の位置・call 前後の length/arg1 同期) は未達。ON は hang のため既定にできない。
 
 ## 2. 実測
 
