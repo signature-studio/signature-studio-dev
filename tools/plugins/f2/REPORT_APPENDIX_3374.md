@@ -1,7 +1,7 @@
 # tools/plugins/f2 REPORT_APPENDIX_3374 — PLG-F3-37 (#3374): Delphi 例外 (0xeedfade) の `-E` 経路の実測
 
 - 測定 commit: **c4b6efbfe** (`unicorn_trace.py` の `-E` を追加した最後のコード commit)。
-- 鮮度: `git diff c4b6efbfe HEAD -- tools/plugins/f2/unicorn_trace.py` は、本節を含む commit で変わる (コメント追記のみ。§4)。
+- 鮮度: 測定 commit `c4b6efbfe` 以降の `unicorn_trace.py` の差分はコメント追記のみ (§4)。HEAD `fe4adb84b` で再測定済み (§1)。
 - 入力: `block19148_PE.bin` (fl-win64、`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 extracted/block19148_PE.bin`)。
 - 依存: `uv venv $RUNNER_TEMP/f2venv && VIRTUAL_ENV=$RUNNER_TEMP/f2venv uv pip install unicorn==2.1.4 pefile capstone`。
 - 実 FL の host 値は得られない。
@@ -28,6 +28,13 @@ python3 tools/plugins/f2/unicorn_trace.py $PE 0x8525f0 -H -V -S -L -N -p 0x40909
 - 負荷: 測定前の `/proc/loadavg` は `1.35 0.49 0.18`、測定後は `1.35` と `1.24` (1 分値)。
 - 既定と `-E` の差は `-E` の seh 行の有無と RaiseException の扱いだけ。
 
+HEAD `fe4adb84b` での再測定 (コメント追記後。pr-lint `violations=0`):
+
+| 実行 | 結果 | wall (time real) | 負荷 (測定前・後の 1 分値) |
+|---|---|---|---|
+| 既定 | `rax=0`・`[0x8cd068]` 0→0・`[0x8bf040]` 0→0x4455a0・RaiseException 1 件・`MessageBoxA` 1 件 | 1.456 s | 0.50 / 0.54 |
+| `-E` | `seh: 0xeedfade を 0x411305 へ移す (rsp=0x300ffa60)`・`rax=0`・`[0x8cd068]` 0→0・RaiseException 1 件・`MessageBoxA` 1 件 | 1.455 s | 0.50 / 0.54 |
+
 ## 2. scope の実在 (静的)
 
 - 関数 `0x411290` (flags=3・frame reg=rbp) の scope 2 件 (`block19148_PE.bin` の `.pdata`・UnwindData を直接読んだ値):
@@ -51,6 +58,7 @@ python3 tools/plugins/f2/unicorn_trace.py $PE 0x8525f0 -H -V -S -L -N -p 0x40909
 ## 4. 鮮度
 
 - 測定 commit `c4b6efbfe` 以降に `unicorn_trace.py` へ入れた変更は、`seh_catch` のコメント追記 (指摘 3・4 への対応) のみ。コードの挙動は変えていない。
+- `git diff c4b6efbfe fe4adb84b -- tools/plugins/f2/unicorn_trace.py` の追加行は 2 行 (コメント)。`seh_catch` の中の `#` 行だけ。
 
 ## 5. 未解決
 
