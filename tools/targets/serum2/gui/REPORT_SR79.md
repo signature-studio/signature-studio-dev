@@ -140,7 +140,7 @@ load average: 0.64 → 0.72 (1 分平均、同 run 内で逐次実行)。両 roo
 |---|---|---|
 | (a) `call reg`・`call [rsp+disp]` の 970 サイト (全体)。解決は 98 サイトのみ (§1.2) | 受入 1・2 の『交わり 0』は未解決サイトを含めた完全な結論ではない | #4610 (本 issue を継続) |
 | (b) C 内の未解決 28 (setState)・25 (getState) サイトの供給元。`load[reg+other]`・`after-call`・`stack-arg` の個別解決 | 受入 2 の『C∩R = 0』が、これらのサイトを通る経路を除外できていない | #4610 (本 issue を継続) |
-| (c) `load[reg+other]` の disp が vptr のスロット途中 (MI・別 vtable) を指す場合に R へ届くか | 一部検証 (SR-102 #6182・§6.1)。disp 0x58 の 2 候補 vptr だけが R を指すが、呼出しの receiver との結び付きが未了。残り 7 件は R を指す候補なし | #6182 (本 issue を継続) |
+| (c) `load[reg+other]` の disp が vptr のスロット途中 (MI・別 vtable) を指す場合に R へ届くか | 一部検証 (SR-102 #6182・§6.1)。disp 0x58 の 2 候補 vptr だけが R を指すが、呼出しの receiver との結び付きが未了。残り 7 件は R を指す候補なし | #4610 (本 issue を継続) |
 | (d) demo bit 関数が .text で 2 件 (根のみ) しかない。`0x22792` の読出しは別経路 (オブジェクト経由の間接読出し) の可能性 (REPORT_SR76 §5(b) と同じ) | 『demo∩C』の意味が根自身だけになる | #4610 (本 issue を継続) |
 
 ## 6.1 SR-102 (#6182): `load[reg+other]` 18 件の disp と vptr の対応 (§6(c))
