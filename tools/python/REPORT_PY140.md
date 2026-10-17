@@ -112,7 +112,8 @@
 | `node tests/provider_check.mjs` | rc 1。§1 (表の整合) は通過し、件数は `{"functions":435,"implemented":220,"unimplemented":215,"mcp_static":60,"PASS":true}` (§1 のみを切り出して実行。rc 0)。§2 (エラー code) のアサートも通過。§3 で `work/midi.py` が無く ENOENT (`work/` は gitignore の素材置き場。`fetch_inputs.sh` 未実行)。受入 4・5 の未達は未解決表 (#4579) のとおり | — |
 
 - 修飾子 (`rdx`) の値: 上の出力では cut/copy/paste = 0x4、selectWindow の arg≤0 = 0x1、他 = 0x0。PE の静的値と一致。
-- 差分の証跡 (`docs/WORKFLOW.md` §6): 27 関数の表の測定 commit `a0fc92492` から HEAD までの `pe_ui_dispatch_probe.py`・`pe_disasm.py` の差分は 0 行 (`git diff a0fc92492 HEAD -- tools/python/analysis/flapi/pe_ui_dispatch_probe.py tools/python/analysis/flapi/pe_disasm.py` が 0 byte)。新節の測定 commit `70c323053` の差分は上の「検証」のとおり。
+- 差分の証跡 (`docs/WORKFLOW.md` §6): 27 関数の表の測定 commit `a0fc92492` から HEAD `f8ba50187` までに、上の表のテストが読むコードは変わっている。`git diff --stat a0fc92492 f8ba50187 -- tools/python/host tools/python/provider tools/python/tests` は 20 ファイル (`host/fl_mock.mjs`・`provider/fl_engine.c`・`provider/gen/fl_table.c`・`tests/*.mjs`・`tests/provider_expect/*.json`、main 側 `9b57a83cd`..`1e95ba237` の取り込み)。このため表のうち `ui_keys_diff`・`ui_diff` の 2 行は HEAD `f8ba50187` で再実行し、下の「HEAD 再測定」の値が表の値と同じであることを確認した。`pe_ui_dispatch_probe.py`・`pe_disasm.py` は a0fc92492..f8ba50187 で 0 byte。`provider_check` の行は HEAD で再実行していない (§3 の素材が無いため)。`gen/fl_table.c` は HEAD のビルドで「435 関数」と出ており、§1 の件数 `functions:435` と一致する。新節の測定 commit は `70c323053` (上の「検証」)。
+- HEAD 再測定 (`f8ba50187`・emsdk 6.0.12 を `$RUNNER_TEMP` に導入): `bash tools/python/provider/build.sh` rc 0。`node tests/ui_keys_diff.mjs` rc 0 `{"calls":26,"diffs":0,"PASS":true}`。`node tests/ui_diff.mjs` rc 0 `{"calls":17,"diffs":0,"outOfRangeKnownDiffs":3,"PASS":true}`。ネガティブコントロール (`host/fl_mock.mjs` 489 行の `ui.selectWindow` の符号を反転) で `ui_keys_diff` は `AssertionError: ui 送出キー差分 4 件` rc 1、元に戻して `git diff` は 0 行。表の数値 (件数・VK・修飾・回数) は a0fc92492 の値と一致。
 - `FL_ENGINE=wasm node tests/all_tools.mjs` は本 PR では実行していない (受入 5 は子 #4579 で扱う)。
 
 ## 未解決
