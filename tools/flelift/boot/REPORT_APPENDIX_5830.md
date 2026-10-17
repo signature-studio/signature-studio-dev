@@ -3,7 +3,7 @@
 測定 commit: `3a3a1f152` (`fle_boot.c` の `g_py_watch` に非決定 8B ワード 4 つを追加。挙動は変えず記録だけ増やした)。
 コード差分 `git diff f82959016 3a3a1f152 -- tools/flelift` は `fle_boot.c` の 2 行 (`PY_WATCH_N` 9→13 と配列 4 要素の追加) だけ。
 工程: `fle6_measure.sh` (`FLE_BOOT_RUNS=default`・`FLE_EXTRA_ROOTS=`・`FLE_BOOT_TAG=fle5830`) で build → 既定経路 boot 1 回 (`FLE_IPP`・`FLE_TOLERANT` 未指定)。
-素材: `fl-win64` (`extracted/block00031_PE.bin` のみ展開)・`toolchain-emsdk` (`/opt/emsdk` の pin 6.0.12)。
+素材: `fl-win64` (`extracted/block00031_PE.bin` のみ展開)・`toolchain-emsdk` (`[EMSDK]` の pin 6.0.12)。
 実測: build (gen-A・lift 82 s・clang-plain 98 s)・boot 9 s・load 2.16。`fle6_measure.sh` rc 0。
 boot 結果: units_run 895・units_total 942・boot_threw `exit`・IPP ok (`ptr_15F34A0=0x7f10001c`)。REPORT_APPENDIX_5177 §2 と一致。
 
