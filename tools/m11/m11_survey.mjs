@@ -85,9 +85,10 @@ for (let i = SV_FROM; i < SV_END; i++) {
   let r, err = null;
   if (process.env.M11_SURVEY_PROGRESS === '1') fs.writeSync(2, '[progress] unit ' + i + ' ' + va + ' begin\n');
   const trU = process.env.M11_SURVEY_TRACE === '1' && i === 144;
-  if (trU) { errs.length = 0; mod._m11_set_trace(1); }
+  const errN0 = errs.length;
+  if (trU) mod._m11_set_trace(1);
   try { r = mod._m11_call_unit(i); } catch (e) { err = e; }
-  if (trU) { mod._m11_set_trace(0); for (const l of errs) if (/\[probe_free\]|\[probe_list\]|\[m11\]/.test(l)) console.error('[survey][trace144] ' + l.trimEnd()); }
+  if (trU) { mod._m11_set_trace(0); for (const l of errs.slice(errN0)) if (/\[probe_free\]|\[probe_list\]|\[m11\]/.test(l)) console.error('[survey][trace144] ' + l.trimEnd()); }
   if (process.env.M11_SURVEY_PROGRESS === '1') fs.writeSync(2, '[progress] unit ' + i + ' ' + va + ' end\n');
   const clob = !tableIntact();
   if (P134 && i === P134_UNIT) console.error('[probe134] unit ' + i + ' ' + va + ' err=' + JSON.stringify(err ? String((err && err.message) || err) : null) + ' trap_state=' + JSON.stringify(p134obj()));
