@@ -99,7 +99,7 @@ static void wo_set_(uint64_t va, uint64_t obj) {
 static void wo_chk_(uint64_t va, uint64_t a, uint32_t n, const void* p) {
     uint64_t q[2] = { 0, 0 };
     uint64_t tgt = wo_obj_ ? wo_obj_ + 0xc4ULL : @FIXOBJ@ + 0xc4ULL;
-    if (a != tgt || wo_n_ >= @CAP@) return;
+    if (!(a <= tgt && tgt < a + n) || wo_n_ >= @CAP@) return;
     memcpy(q, p, n < 16 ? n : 16);
     wo_n_++;
     fprintf(stderr, "[wobj] va=%#llx a=%#llx n=%u v=%#llx obj=%#llx R0=%#llx R1=%#llx R2=%#llx R3=%#llx R5=%#llx ret=%#llx\n",
