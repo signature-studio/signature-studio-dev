@@ -64,4 +64,27 @@ REPORT_1325 は 6905f0 を「支配は成立するが、前段パスとの相互
 | 残り 3 組 (w32) の 32bit 版の門。`fix_f3c_use` の 64bit 限定の拡張 | 3 組は現状のまま | 未起票 (PM が起票を判断) |
 | `REPORT_930` の 23/24 と 30/33 の不一致 (REPORT_1325 §8 の既存行) | 分類の母集団の差 | #1134 (既存) |
 
+## 6. w32 の門の決定 (#6067 / LD-297)
+
+**決定: `fix_f3c_use` の 32bit deref の門は開けない (64bit 限定のまま)**。1050f90 arg2・arg3 は見送りのまま。コードは棄却の counter (`f3c_use_w32`) を足しただけで、IR は変えていない。
+
+根拠 (1050f90 の機械語と IR):
+
+- 置換対象の `%argN` は、store の宛先ポインタ (`store i32 %54, ptr (inttoptr %arg2)`・`store i32 %59, ptr (inttoptr %arg3)`) である。
+- 32bit deref (`mov ecx, dword ptr [rbx]` 0x1051098・`mov ecx, dword ptr [rsi]` 0x105114c) は、同じ宛先を直前に store した値の読み直し。arg3 側は間に直接 call (0x664090) がある。
+- 門を開けて probe すると (一時コピー・門だけ外す)、`%55 = inttoptr i64 %arg2` が `inttoptr i64 %ldfxu1` (`*arg2` の内容 = 格納前の値) に置換される。宛先を格納値に取り違えるので、32bit 版の門は誤った IR になる。
+
+測定 (測定 commit: 本 PR の HEAD、base `50e2f813b`、素材 `work-m11` + `fl-win64` の `block00031_PE.bin`):
+
+- `python3 ldfix/residual_3195.py work/extracted/block00031_PE.bin`: rc 0・0.7 秒。出力 md5 `044cf4af123b382bd749b4177a0a658a` (§4 と一致)。
+- `python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe ...`: base と HEAD の出力 IR が `cmp` で一致 (IR 差 0)。`f3c_use_replaced` 80・`f3c_use_dom` 11・`f3c_use_w32` 95 (棄却数の新 counter)。`f3c_fns` は base でも 42 (§4 の 43 は別測定の値。本 PR では変えていない)。
+- 同じ判定で w32 になる組は他にもある: 784790 arg2・105f2e0 arg1・dc1a30 arg2 (`residual_3195.py` の既定 VA 外の関数、`residual_3195.py` の表示では同じ w32 門)。決定は同じ理由で全体に効く。
+- `ldfix_509_e2e.sh` は実行していない。IR が base と byte 一致のため、修復後 wasm は変わらない (門の変更なし)。
+
+未解決:
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 1050f90 arg2・arg3 (w32・store 宛先の reload 形) の修復方式。宛先の store 値を使う形を表す設計が必要 | 2 組は現状のまま | 未起票 (設計判断。PM が起票を判断) |
+
 12f9730 の事実 (3 回連続の実行と probe で確認): `fix_f3c_use` は 12f9730 で毎回 `replaced=2 dom=0 not_dom=1`。`replaced=2` は arg2 の分で、arg2 の最初の deref (`19896141`) は entry ブロックにあり、`fix_f3c_use` の entry 経路で 2 件置換される。単独 probe でも `{'f3c_use_replaced': 2, 'f3c_use_not_dom': 1}` だった。`not_dom` は arg3 の分で、不能理由は rep-not-dominated (§2)。見送り 10 組の判定は arg3 についてのもので、arg2 の置換は本体パイプラインで実際に起きている (§4 の IR 差分)。過去の「呼出しごとに戻り値が変わる」という記述は、arg2 の entry 経路と取り違えた誤りで、取り下げる。
