@@ -4,7 +4,7 @@
 - 素材: `plugins-massivex` の `Native Instruments Massive X v1.7.1.exe` (1,870,391,792 B) を既存パーサで展開
   (`scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> <work> key`)。
   `Massive X.vst3` = 95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca` (検収値と一致)。PE の置き場所は `$RUNNER_TEMP` 配下。
-- **測定 commit = `1083467fe`** (コードを変えた最後の commit・前版 = `d9a2b7ec2`)。再現: `MX_PE='$RUNNER_TEMP/mx33/work/extracted/VST3/Massive X.vst3' MX6_WORK='$RUNNER_TEMP/massivex-mx33' bash tools/targets/massivex/dsp/mx6_e2e.sh`。
+- **測定 commit = `28240e666`** (コードを変えた最後の commit・前版 = `1083467fe` (#3774)・`d9a2b7ec2` (#3032))。再現: `MX_PE='$RUNNER_TEMP/mx33/work/extracted/VST3/Massive X.vst3' MX6_WORK='$RUNNER_TEMP/massivex-mx33' bash tools/targets/massivex/dsp/mx6_e2e.sh`。
 
 ## 0. 結論 (先出し)
 
@@ -18,7 +18,7 @@
    受入 1 の確定にはこの追跡が要る (未解決 U3h・§6)。
 4. **独立再計算 (線形): 範囲内に 128 bit 読みを持つ関数は 9 件**。ただし CFG で入口から未定義と判定された読みに 128 bit 型はなく、
    線形の 128 bit 読みは定義後 (または CFG 非到達) の読み。CFG 側の 128 bit 候補は 0 件のため包含検査 `CFG-P ⊆ 線形-P` は空真。構造上の上限確認にとどまる (§4)。
-5. **NC 17/17 PASS** (MX-33 の合成列 17 件・§3。前版 9 件 + #3774 で 6 件 + MX-64 で vzeroupper 2 件)。MX-6 の `mx6_vectorcall.py --selftest` 5/5 は別集合 (§3・§5)。e2e `mx6_e2e.sh` は exit 0 (48 s・測定 commit `1083467fe`)。funclet は REPORT_MX6.md §4 と一致 (step 7/7 で assert・positive control PASS)。
+5. **NC 17/17 PASS** (MX-33 の合成列 17 件・§3。前版 9 件 + #3774 で 6 件 + MX-64 で vzeroupper 2 件)。MX-6 の `mx6_vectorcall.py --selftest` 5/5 は別集合 (§3・§5)。e2e `mx6_e2e.sh` は exit 0 (31 s・測定 commit `28240e666`・§5)。funclet は REPORT_MX6.md §4 と一致 (step 7/7 で assert・positive control PASS)。
 6. **MX-6 の表示値は不変**: pdata 始点の xmm4/5 livein 0・保留 17 (seeds)・census・funclet の値は MX-6 §1 と一致。
 
 ## 1. 判定定義 (実装: `scripts/mx33_xmm03.py`・読み列挙は `scripts/mx6_vectorcall.py` の `analyze`)
@@ -122,8 +122,10 @@
 | funclet (positive control) | REPORT_MX6.md §1・§4 と一致 (step 7/7 で assert) |
 | 判定 | PASS (step 6/7・7/7)。step 6/7 の「包含 OK」は空真 (CFG 側の 128 bit 候補 0 件・§4) |
 
-- e2e: `mx6_e2e.sh` (7 工程) → **exit 0・elapsed 48 s** (#3774 後・測定 commit `1083467fe`)。load average: 開始 `0.08 0.06 0.09` → 終了 `0.64 0.21 0.14`。前版 (#3032・`d9a2b7ec2`) は 35 s。
-- 本 HEAD (`docs` commit) の再実行は未実施: この run では `plugins-massivex` が `$ARTIFACTS_DIR` に無く、`mx6_e2e.sh` は回せなかった。上記は測定 commit の記録。
+- e2e: `mx6_e2e.sh` (7 工程) → **exit 0・elapsed 31 s** (測定 commit `28240e666`・MX-64 の PR 作成 run の記録)。load average: 開始 `0.15 0.33 0.17` → 終了 `0.48 0.39 0.20`。素材 `Massive X.vst3` md5 `622993e7…` 一致、NC 17/17 PASS、受入 1 = scalar 1 / 128 bit 0 / 判定不能 16。
+  同 HEAD のベースライン (`101c61351`): exit 0・elapsed 33 s・counts 1 / 0 / 16。前版 (#3774・`1083467fe`) は 48 s、(#3032・`d9a2b7ec2`) は 35 s。
+- 差分: `git diff 28240e666 HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は 0 行 (HEAD の差分は REPORT の docs と main の取り込みのみ)。
+- 本 fix run (review 差し戻し対応) の再実行は未実施: `plugins-massivex` が `$ARTIFACTS_DIR` に無く (`fl-win64` のみ)、`mx6_e2e.sh` は回せなかった。上記 31 s は PR 作成 run の記録。
 - 追加した assert: step 6/7 は `vectorcall` の livein 0・整合 OK に加え、受入 1 の件数 17 と内訳合計 17、包含 OK を要求。
   step 7/7 は `pdata_eh.json` の `funclets_fh3.seeds` の funclet 数を `mx6_e2e.sh` 内の固定値と比べ、不一致なら exit 1。
 
@@ -188,6 +190,9 @@
 
 ## 8. 測定 commit と差分 (docs/WORKFLOW.md §6)
 
+- MX-33 受入 1 (#6255・§0〜§6) の測定 commit = **`28240e666`** (`fix(massivex): treat vzeroupper as upper-only write in xmm0-3 follow`)。
+  測定値は §5 (exit 0・31 s・NC 17/17・受入 1 = 1 / 0 / 16・素材 md5 `622993e7…`)。測定 commit から HEAD までの scripts・`mx6_e2e.sh` の差分は 0 行 (§5)。
+- 以下は MX-55 (#5030) の節。
 - 測定 commit = **`4840cc082`** (`feat(massivex): find vtable caller of 0x17b680 and check xmm2 arg (MX-55 #5030)`)。コードを変えた最後の commit (HEAD と同じ)。
   - 本 run の測定: `mx6_e2e.sh` exit 0・elapsed 59 s・load 0.50 0.56 0.27 → 0.82 0.64 0.31・PASS 32 件。`mx55_callers.py` exit 0 (§9 の呼出元の値)。
   - 前回 (実装 run・commit `d9edb0ad9`): 同じ `mx6_e2e.sh` で exit 0・elapsed 58 s。
