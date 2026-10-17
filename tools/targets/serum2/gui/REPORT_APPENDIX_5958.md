@@ -74,6 +74,24 @@
 - 格子 225 点・`(1010,17)`・`(985,10)` のいずれでも slot は 0。子フレームに孫ウィンドウは生成されず、クリックを受けた部品は確認できなかった (VSTGUI は HWND の子として部品を持たない)。
 - 判定: `setFrame` を渡すとフレームは実寸・表示になるが、XferOnOffButton の操作は成立していない。slot 0x1817bf760 の値は本節でも確定していない。
 
+## 2e. slot 参照関数の実行 breakpoint (S2HOST_BP・クリック注入なし)
+
+- 目的: クリック注入 (§2b〜§2d) をやめ、slot を参照する関数そのものに実行 breakpoint を張って、呼出しの有無を見る (PM 判断の提案 1)。
+- 変更: `host/vst3host.cpp` に `S2HOST_BP="rva,…"` (最大 4 件) を追加。DR0〜DR3 の execute 比較で関数先頭に張り、hit ごとに関数 RVA・戻り先・slot 値を出す。`S2HOST_SLOT`・`S2HOST_WATCH` と併用しない (DR0 を共用するため)。既定経路は無変更。
+- 対象 RVA: `0x136bf0` (slot 由来 call を持つ関数)・`0x138180` (同)・`0x142540` (同)・`0x622840` (XferOnOffButton の own vtable の候補 slot 0)。
+- 測定 commit: `d1e3cab19` (HEAD で再現)。コマンド: `S2HOST_ATTACH=1 S2HOST_BP="136bf0,138180,142540,622840" xvfb-run -a wine64 vst3host.exe …`。無改変 DLL・既定 state・4 block・wine64 9.0・load 0.45。
+
+| 関数 | hit 件数 | slot 値 (hit 時) |
+|---|---|---|
+| `0x138180` | 5 | 0 (全 hit) |
+| `0x136bf0` | 9 | 0 (全 hit) |
+| `0x142540` | 0 | — |
+| `0x622840` | 0 | — |
+
+- slot 値は全 hit で 0。`before process` も 0。完走 `blocks=4 frames=512 nonzero_cells=1020/1024 peak=0.548306`。
+- 解釈: 関数の呼出しは起きているが、slot 由来の間接 call の直前には `test r10,r10; je` (§5935 の表) があり、slot=0 のときは call を飛ばす。よって hit は関数の入口であって、slot 由来 call の実行ではない。XferOnOffButton の vtable 候補 `0x622840` は本 run では呼ばれなかった。
+- 限界: 1 条件 (クリックなし・attach のみ) での観測。XferOnOffButton の操作 (クリック) を伴う条件では未測定。
+
 ## 3. 判定と未達
 
 - 観測の範囲: §2 の 3 条件 (GUI 非操作) と §2b の 2 条件 (editor を attach し格子クリック) で、slot `0x1817bf760` は**全て 0・書込 0 件**。
