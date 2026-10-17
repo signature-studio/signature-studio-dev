@@ -4,7 +4,7 @@
 
 - 計装の基盤を入れた。`M11_FIX_SHX_T61=1` のときだけ callee `function_4483f0` の入口に呼出し回数と `this+0x4c`・`this+0x48` を `@fx61_buf` へ書く。既定 OFF で、既定 IR は変わらない (`shx_t61=not-applied`)。
 - 受入 1 (hang の機序の確定) は未達。前 run の ON では実 boot が rc 124 (hang) し、hang 後に `@fx61_buf` を読む経路が無かった (trap 方式より前の状態)。hang 位置は未確定。
-- trap 方式 (§5) で、hang の前に記録を読めるようになった。ON の値は §5 の表が正本。
+- trap 方式 (§5) は、前 run の実測で hang の前に記録を読めることを確認した (fix run では再現していない・再現は未確認)。ON の値は §5 の表が正本。
 - §3.1・§3.3 は前 run の実測である。本 run (fix) では lift 素材 (`tools/m11/work/boot*.lift.ll`) が無く、IR を再生成できなかった (§3.2)。
 
 ## 2. 測定条件
@@ -63,10 +63,12 @@ $ git diff b07e20aaf HEAD -- tools/m11/ldfix/fix_shx_t61.py tools/m11/shimx_link
 - そこで IR 側は `@fx61_buf` (global) に書き、C 側は読み出し関数だけを持つ形にした。リンクは通った。
 - hang 中は `run_trace.mjs` が JS に制御を戻さないため、前 run の計装 (trap なし) では `fx61_buf` を読めなかった。trap 方式 (§5) で読めるようになった。
 
-## 5. 読み出し経路 (fix run・trap 方式)
+## 5. 読み出し経路 (trap 方式・前 run の実測、fix run で未再現)
+
+測定 run = 測定 commit `b07e20aaf` の run。IR の生成元は未記録 (§2)。
 
 - hang の前に記録を読むため、呼出し回数が `FX61_LIMIT` (既定 100000) を超えたら IR の `unreachable` で trap させる (`fix_shx_t61.py`)。trap は wasm 例外として JS に戻るため、`run_trace.mjs` は `_fx61_count` / `_fx61_self` / `_fx61_c4c` / `_fx61_c48` を読んで run.json の `fx61` に入れる (`build.sh` は計装の IR のときだけ export する)。
-- 実測 (commit は本 PR の HEAD。ON = `M11_FIX_SHX_T40=1 M11_FIX_SHX_T61=1`・trace_soft):
+- 実測 (commit は測定 commit `b07e20aaf`。ON = `M11_FIX_SHX_T40=1 M11_FIX_SHX_T61=1`・trace_soft):
 
 | `FX61_LIMIT` | 結果 | `count` (呼出し回数) | `c4c` (this+0x4c) | `c48` (this+0x48) | 所要 |
 |---|---|---|---|---|---|
@@ -88,5 +90,5 @@ $ git diff b07e20aaf HEAD -- tools/m11/ldfix/fix_shx_t61.py tools/m11/shimx_link
 
 ## 7. 未解決
 
-- hang の位置 (どの分岐で親の loop が抜けないか) は未確定。trap 方式は callee の呼出し回数と値を読めたが、親の loop のどの分岐を通り続けるかは見ていない。次段は、親 loop 内の分岐 (`dec_label_pc_448681`・`dec_label_pc_44870f`・`dec_label_pc_448731`) ごとに通過回数を同じ方式で記録すること。
+- hang の位置 (どの分岐で親の loop が抜けないか) は未確定。前 run の trap 方式では callee の呼出し回数と値を読めたが、親の loop のどの分岐を通り続けるかは見ていない。次段は、親 loop 内の分岐 (`dec_label_pc_448681`・`dec_label_pc_44870f`・`dec_label_pc_448731`) ごとに通過回数を同じ方式で記録すること。
 - 修復 ON の hang の機序 (#5846 受入 1 の続き)。起票先: #5855 (受入 1 の続き)。#5846 の現タイトル (「(#4121 残件)」) とは対応しないため、#5846 へは追記しない。
