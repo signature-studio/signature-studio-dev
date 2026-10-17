@@ -13,7 +13,7 @@
 
 - 変更: `tools/flelift/boot/fle_boot.c` の `g_py_watch` に `0x16baff0` を 1 slot 追加 (`PY_WATCH_N` 8 → 9)。計測のみ (監視の読出し・挙動は変えない)。`0x16baff0` の 8 byte には、フラグ 2 つ (byte 0・1) が含まれる。
 - 測定 commit: **`c7361691a`** (`feat(flelift): watch gate flags 0x16baff0 in py_snap (#5216)`)。ベース `219e4d0ff` (origin/main)。`git diff c7361691a HEAD -- tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` の出力は **空 (差分 0)**。
-- 手順: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`fl-win64` を展開) / emsdk 6.0.12 (`/opt/emsdk`) / `FLE_BOOT_WORK=$RUNNER_TEMP/flelift-boot-work` / `FLE_BOOT_TAG=py5216 FLE_BOOT_RUNS=shim bash tools/flelift/boot/fle6_measure.sh`。
+- 手順: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` (`fl-win64` を展開) / emsdk 6.0.12 ([EMSDK]) / `FLE_BOOT_WORK=$RUNNER_TEMP/flelift-boot-work` / `FLE_BOOT_TAG=py5216 FLE_BOOT_RUNS=shim bash tools/flelift/boot/fle6_measure.sh`。
 - 実測: real 2m41s・rc=3 (shim の既知 `ok:false`・#5168 までと同じ)。load 1.43 → 1.89 (clang 中) → 1.84。lift 61 s・clang-plain 75 s・boot 20 s。
 
 ## 3. 結果 (unit 209 までの監視 slot の変化)
