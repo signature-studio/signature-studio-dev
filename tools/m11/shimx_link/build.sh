@@ -129,6 +129,11 @@ if [ $TRACE = 1 ]; then
     cc "$HERE/fx61_rec.c" "$W/obj/fx61_rec.o" $CF
     BOOT="$BOOT $W/obj/fx61_rec.o"
   fi
+  # #5855 (SHX-T61 次段): 親 loop 入口の計装 (IR に @fx61b_buf があるときだけ)
+  if grep -q '^@fx61b_buf' "$GEN/boot_trace.ll" 2>/dev/null; then
+    cc "$HERE/fx61b_rec.c" "$W/obj/fx61b_rec.o" $CF
+    BOOT="$BOOT $W/obj/fx61b_rec.o"
+  fi
 else
   cc "$IR" "$W/obj/boot_plain$SUF.o" $CF
   BOOT="$W/obj/boot_plain$SUF.o"
@@ -150,7 +155,8 @@ WSEXP=""; [ $WS = 1 ] && WSEXP=_sx_ws_probe_cpuid,_sx_ws_probe_g03,_sx_ws_probe_
 EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_GetLastError,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_shimx_set_trace,_shimx_set_trace_file,_shimx_init,${WSEXP}__emscripten_stack_restore,_emscripten_stack_get_current
 # sxt_* は trace_rt.c (--trace のみリンク) が定義する。plain で export すると emcc 6.x が undefined exported symbol で止まる
 if [ $TRACE = 1 ]; then EXPORTS="$EXPORTS,_sxt_n,_sxt_name,_sxt_count,_sxt_ret_n,_sxt_ret_unit,_sxt_ret_idx,_sxt_ret_site,_sxt_site_name,_sxt_ret_a,_sxt_ret_b,_sxt_ret_r,_sxt_set_print,_sxt_set_stack"; fi   # SHX-T9k #2593: 呼出し直前の GetLastError と呼出し元 wasm スタックの計装
-if grep -q '^@fx61_buf' "$GEN/boot_trace.ll" 2>/dev/null; then EXPORTS="$EXPORTS,_fx61_count,_fx61_self,_fx61_c4c,_fx61_c48"; fi   # #5855 (SHX-T61): 計装の読み出し口 (IR に計装があるときだけ)
+if grep -q '^@fx61_buf' "$GEN/boot_trace.ll" 2>/dev/null; then EXPORTS="$EXPORTS,_fx61_count,_fx61_self,_fx61_c4c,_fx61_c48"; fi
+if grep -q '^@fx61b_buf' "$GEN/boot_trace.ll" 2>/dev/null; then EXPORTS="$EXPORTS,_fx61b_count,_fx61b_lim,_fx61b_idx,_fx61b_idx2"; fi   # #5855 (SHX-T61 次段): 親 loop 入口の計装の読み出し口 (IR に @fx61b_buf があるときだけ)
 OUT="$W/m11_sx_$TAG"
 emcc "${OBJS[@]}" -o "$OUT.cjs.tmp" \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \

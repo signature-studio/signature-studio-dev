@@ -45,6 +45,10 @@ const num = (f) => { try { return Number(f()); } catch (_) { return null; } };
 const fx61 = typeof mod._fx61_count === 'function'
   ? { count: num(mod._fx61_count), self: num(mod._fx61_self), c4c: num(mod._fx61_c4c), c48: num(mod._fx61_c48) }
   : null;
+// #5855 (SHX-T61 次段): 親 function_448490 の外側 loop 入口の計装 (IR に @fx61b_buf があるときだけ)
+const fx61b = typeof mod._fx61b_count === 'function'
+  ? { count: num(mod._fx61b_count), lim: num(mod._fx61b_lim), idx: num(mod._fx61b_idx), idx2: num(mod._fx61b_idx2) }
+  : null;
 const initCount = mod.HEAPU32[(0x11eac98 + Number(process.env.M11_LB_BASE || 0)) >> 2];
 const units = [];
 const stubs = [];
@@ -55,7 +59,7 @@ const res = {
   units_total: num(mod._m11_units_total), units_run: num(mod._m11_units_run),
   va_calls: num(mod._m11_va_calls), va_used: num(mod._m11_va_used),
   icall_ok: num(mod._m11_icall_ok), icall_miss: num(mod._m11_icall_miss),
-  dllmain_done, longjmp_hit: num(mod._m11_longjmp_hit), boot_rc: rc === null ? null : String(rc), threw, stack, fx61,
+  dllmain_done, longjmp_hit: num(mod._m11_longjmp_hit), boot_rc: rc === null ? null : String(rc), threw, stack, fx61, fx61b,
   m11_stub_total: num(mod._m11_stub_total), m11_stub_hits: stubs,
   last_stderr: stderrLines.slice(-12),
 };
