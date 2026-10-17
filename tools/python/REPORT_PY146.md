@@ -8,7 +8,7 @@
 - **channels 版 `0xd58e00` は general 版 `0xd69f00` と同じ呼出し鎖に入る**。解析失敗 (0xd58e94)・成功時の `0xd84740(rbx, &out, eventId, value, flags)` (0xd58e74)・status ≠ 0 の例外経路 (0xd58e94)・`out+0x08` の int 化 (0xd58e82〜) は、general 版 (REPORT_PY126) と同形。
 - よって戻り値の式は PY-235 のものを channels 版にもそのまま当てる。**成功経路 (R-other 族かつ `(eventId & 0xffff) != 8`) で戻り値 = value**。族の定義は `host/fl_mock.mjs` の `recPassFamily` と `provider/fl_engine.c` の `rec_pass_family` (general 版と共有の式)。
 - mock と C に `channels.processRECEvent` を実装。族外・未確定の経路は code 2 (未実装 error)。
-- **未確定** (受入 1 の残り。既存 issue が追跡): gate `*(0x15e1890)` の意味 (#3777)・`(eventId & 0xffff) == 8` の -1 条件 (#3777)・固定 eventId 4 族の `flags & 0x22 != 0` の右辺 (#4616)・0x70000000 族と index 族 (#3779)。channels 版も同じ核なので、これらは general 版と同じ未確定。
+- **未確定**: gate `*(0x15e1890)` の意味 (#3777 は close 済み)・`(eventId & 0xffff) == 8` の -1 条件 (#3777)・固定 eventId 4 族の `flags & 0x22 != 0` の右辺 (#4616 は NOT_PLANNED で close)・0x70000000 族と index 族 (#3779 が open で追跡)。channels 版も同じ核なので、これらは general 版と同じ未確定。
 
 ## PE 解析 (fl-win64 `block00031_PE.bin`)
 
@@ -42,11 +42,19 @@
 - wasm 差分テスト (`grep -l createWasmEngine tests/*.mjs` の 28 本、`all_tools` を除く): 28 本全て rc 0。PASS 判定があるもの 26 本で全て diffs 0 または fails 0 (`provider_impl_dump.mjs`・`static_bench.mjs` は PASS 判定なし)。
 - KPI: 起動・GUI に関わらない PR のため、製品 KPI は記載しない。
 
+## 副作用 (PE)
+
+- **ハンドラ `0xd58e00`**: 書込みは自分のスタックフレーム (`[rbp+...]`・0xd58e0c〜0xd58e9f) だけ。外部へ作用する呼出しは `0xd84740` (0xd58e74) のみ。その他の呼出し (0xd5e620・0x415610・0x415c30・PyArg 解析の IAT 0x889004・int 化の IAT 0x88b3f4・0xd82c20) は副作用を確認していない。
+- **`0xd84740` の callback** (`fl-win64` block00031): `job+0x60` = -2 (0xd846e8) → 0 (0xd8470e)、結果を `job+0x10` へ (0xd84725)。REPORT_PY126 の記述と一致 (再確認: `pe_disasm.py 0xd846e0`)。
+- **共通本体 `0x1046a30`**: 入口で gate `*(0x15e1890)` を読む (0x1046d83)。general 版と同じ gate で、1 のとき -1 の経路 (0x1046d8d)。本体の heap への書込み (base レジスタ経由の store) は線形走査で 58 件。channels 成功経路でどの store が実行されるかは CFG で追っていないため、**未確定**。
+- 結論: channels 版の副作用は「job の 2 フィールド (0xd84740 経由)」までが PE で確定。本体の書込み先の全列挙は未確定で、未解決表に残す。
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| gate フラグ `0x15e1890` の意味・`0x663bf0`・`0xffac50`・`[0x15e2878]` | gate 0 を仮定した成功経路の前提。実行時に gate が 1 の場合の挙動が未確定 | #3777 (PY-251) |
-| 固定 eventId 4 族の `flags & 0x22 != 0` の右辺 | `flags & 0x22 == 0` の成功経路だけ実装。0x20・0x2 のとき code 2 | #4616 (PY-349) |
+| 共通本体 `0x1046a30` の heap への書込み先 (channels 成功経路で実行される store の列挙) | 副作用の全列挙が未確定 | 本表で追跡 (追跡 issue なし。解析のみのため子 issue は切らない) |
+| gate フラグ `0x15e1890` の意味・`0x663bf0`・`0xffac50`・`[0x15e2878]` | gate 0 を仮定した成功経路の前提。実行時に gate が 1 の場合の挙動が未確定。#3777 は 2026-10-15 に close 済みで、この残りは open な追跡先が無い | 本表で追跡 (PM 判断待ち) |
+| 固定 eventId 4 族の `flags & 0x22 != 0` の右辺 | `flags & 0x22 == 0` の成功経路だけ実装。0x20・0x2 のとき code 2 | #4616 (PY-349、NOT_PLANNED で close 済み。追跡先が無い) |
 | 0x70000000 族・index 族 (eventId < 0x10000000) の戻り値式 | 2 族が code 2 (未実装) | #3779 (PY-253) |
 | 範囲外 code の PE 確定 (受入 1 の「範囲外 code」) | 族外の経路の code は現状 2 で固定。PE 上の範囲外経路は上の未確定族に含まれる | #3779 (PY-253) |
