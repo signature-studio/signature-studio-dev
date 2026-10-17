@@ -1,0 +1,278 @@
+{
+ "g1": "0x14f852c",
+ "g1_slots": [
+  "0x15e14a8"
+ ],
+ "source_funcs": 15,
+ "sources": [
+  {
+   "func": "0xefb0d0",
+   "at": "0xefb37e",
+   "insn": "rax, qword ptr [rip + 0x6e6123]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0xefb0d0",
+   "at": "0xefb399",
+   "insn": "rax, qword ptr [rip + 0x6e6108]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0xefb0d0",
+   "at": "0xefb3b5",
+   "insn": "rax, qword ptr [rip + 0x6e60ec]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x10c7cd0",
+   "at": "0x10c9bf2",
+   "insn": "rcx, qword ptr [rip + 0x5178af]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x10c7cd0",
+   "at": "0x10cd13a",
+   "insn": "rax, qword ptr [rip + 0x514367]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x10c7cd0",
+   "at": "0x10cf49d",
+   "insn": "rax, qword ptr [rip + 0x512004]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x10c7cd0",
+   "at": "0x10cf4a9",
+   "insn": "rax, qword ptr [rip + 0x511ff8]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x10d1340",
+   "at": "0x10d157d",
+   "insn": "rax, qword ptr [rip + 0x50ff24]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x10d1340",
+   "at": "0x10d15ae",
+   "insn": "rax, qword ptr [rip + 0x50fef3]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x10d1340",
+   "at": "0x10d15ca",
+   "insn": "rax, qword ptr [rip + 0x50fed7]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x10d3a30",
+   "at": "0x10d3a34",
+   "insn": "rax, qword ptr [rip + 0x50da6d]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x10d3a30",
+   "at": "0x10d3a58",
+   "insn": "rcx, qword ptr [rip + 0x50da49]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x10d3a30",
+   "at": "0x10d3a61",
+   "insn": "rax, qword ptr [rip + 0x50da40]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x1145c60",
+   "at": "0x1145c8a",
+   "insn": "rax, qword ptr [rip + 0x49b817]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x11c2d80",
+   "at": "0x11c4261",
+   "insn": "rax, qword ptr [rip + 0x41d240]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x11c2d80",
+   "at": "0x11c4271",
+   "insn": "rax, qword ptr [rip + 0x41d230]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x11c2d80",
+   "at": "0x11c42b6",
+   "insn": "rax, qword ptr [rip + 0x41d1eb]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x11c71b0",
+   "at": "0x11c7ac5",
+   "insn": "rax, qword ptr [rip + 0x4199dc]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x11cb000",
+   "at": "0x11cce05",
+   "insn": "rax, qword ptr [rip + 0x41469c]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x11f16b0",
+   "at": "0x11f1742",
+   "insn": "rax, qword ptr [rip + 0x3efd5f]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x11f16b0",
+   "at": "0x11f174e",
+   "insn": "rax, qword ptr [rip + 0x3efd53]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x11f16b0",
+   "at": "0x11f177c",
+   "insn": "rax, qword ptr [rip + 0x3efd25]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x11fc770",
+   "at": "0x11fd448",
+   "insn": "rax, qword ptr [rip + 0x3e4059]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x11fc770",
+   "at": "0x11fe618",
+   "insn": "rax, qword ptr [rip + 0x3e2e89]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x1214160",
+   "at": "0x12141b3",
+   "insn": "rax, qword ptr [rip + 0x3cd2ee]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x121adc0",
+   "at": "0x121adf7",
+   "insn": "rax, qword ptr [rip + 0x3c66aa]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x121d7e0",
+   "at": "0x121d93c",
+   "insn": "rax, qword ptr [rip + 0x3c3b65]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x121d7e0",
+   "at": "0x121d9f9",
+   "insn": "rax, qword ptr [rip + 0x3c3aa8]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x121d7e0",
+   "at": "0x121da14",
+   "insn": "rax, qword ptr [rip + 0x3c3a8d]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x121d7e0",
+   "at": "0x121da2f",
+   "insn": "rax, qword ptr [rip + 0x3c3a72]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x121d7e0",
+   "at": "0x121da3b",
+   "insn": "rax, qword ptr [rip + 0x3c3a66]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x121d7e0",
+   "at": "0x121da6b",
+   "insn": "rax, qword ptr [rip + 0x3c3a36]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x121d7e0",
+   "at": "0x121da83",
+   "insn": "rax, qword ptr [rip + 0x3c3a1e]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x121d7e0",
+   "at": "0x121da8f",
+   "insn": "rax, qword ptr [rip + 0x3c3a12]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x121d7e0",
+   "at": "0x121daa7",
+   "insn": "rax, qword ptr [rip + 0x3c39fa]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x124f050",
+   "at": "0x124f0c4",
+   "insn": "rax, qword ptr [rip + 0x3923dd]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x124f050",
+   "at": "0x124f13e",
+   "insn": "rax, qword ptr [rip + 0x392363]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x124f050",
+   "at": "0x124f246",
+   "insn": "rax, qword ptr [rip + 0x39225b]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x124f050",
+   "at": "0x124f275",
+   "insn": "rax, qword ptr [rip + 0x39222c]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x124f050",
+   "at": "0x124f2a4",
+   "insn": "rax, qword ptr [rip + 0x3921fd]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x124fd10",
+   "at": "0x124fd92",
+   "insn": "rax, qword ptr [rip + 0x39170f]",
+   "kind": "g1-slot-load"
+  },
+  {
+   "func": "0x124fd10",
+   "at": "0x124fda8",
+   "insn": "rax, qword ptr [rip + 0x3916f9]",
+   "kind": "g1-slot-load"
+  }
+ ],
+ "g1_stores": [
+  {
+   "func": "0x10c7cd0",
+   "at": "0x10c9bf9",
+   "insn": "dword ptr [rcx], eax",
+   "via": "taint:rcx",
+   "disp": 0
+  },
+  {
+   "func": "0x10d3a30",
+   "at": "0x10d3a5f",
+   "insn": "dword ptr [rcx], eax",
+   "via": "taint:rcx",
+   "disp": 0
+  }
+ ],
+ "call_with_g1_arg": []
+}
