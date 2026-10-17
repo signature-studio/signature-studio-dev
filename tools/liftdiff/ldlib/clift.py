@@ -137,7 +137,8 @@ def build(t, force=False):
             except ValueError:
                 pass   # function_<hex>__lifted 等の派生名は closure 集合外
     # ---- 2) lift 定義集合 (lift_meta.json = x64c lift 実績) ----
-    meta = json.load(open(rp(t['clift_meta'])))
+    meta_p = rp(t['clift_meta'])
+    meta = json.load(open(meta_p))
     lifted = {int(v, 16) for v in meta['functions']}
     json.dump({'vas': ['%x' % v for v in sorted(lifted)]}, open(W + '/lifted.json', 'w'))
     print('[clift] lifted: %d / closure %d (non-lifted %d → unexec no_wasm_definition)' % (
@@ -162,8 +163,8 @@ def build(t, force=False):
     widths = decl_widths(t['ir'])
     json.dump({'stubs': imp_names, 'skipped': [], 'widths': {n: widths.get(n, [32] * 4) for n in imp_names}},
               open(W + '/stubs.json', 'w'))
-    # ---- 4) fle_cpu.c の既定 import を -D でリネーム (imps.inc の強い定義と衝突しないように) ----
-    cpu_c = rp(t['clift_rt'] + '/fle_cpu.c')
+    # ---- 4) CPU 実装 (既定 fle_cpu.c / OTT は ott_cpu.c) の既定 import を -D でリネーム (imps.inc と衝突しないように) ----
+    cpu_c = rp(t['clift_rt'] + '/' + t.get('clift_cpu', 'fle_cpu.c'))
     cpu_imps = []
     with open(cpu_c, errors='replace') as f:
         for line in f:
@@ -171,8 +172,14 @@ def build(t, force=False):
             if m:
                 cpu_imps.append(m.group(1))
     rename = ' '.join('-D%s=flecpu_%s' % (n, n) for n in cpu_imps + ['ott_unlifted'])
-    # fle_lifted.c 側: ott_dispatch をラッパ経由に差し替え (guest stack 範囲外 push の検出)
-    lifted_extra = '-Dott_dispatch=flelift_dispatch_impl'
+    if t.get('clift_cpu'):   # OTT 系: 同名の ott_unlifted は bridge 側が持つ (ott_cpu.c 側は退避)
+        rename = ' '.join('-D%s=ottcpu_%s' % (n, n) for n in cpu_imps + ['ott_unlifted'])
+    # lift 産物側: ott_dispatch をラッパ経由に差し替え (guest stack 範囲外 push の検出)。既定 flelift_dispatch_impl
+    lifted_extra = '-Dott_dispatch=%s' % t.get('clift_dispatch', 'flelift_dispatch_impl')
+    # ---- data: clift_data_gen (例 OTT = tools/ott/lift/data_gen.py) があれば DLL から生成 ----
+    data_c = rp(t['clift_data']) if t.get('clift_data') else W + '/data.c'
+    if t.get('clift_data_gen') and (force or newer(rp(t['pe']), data_c)):
+        sh([sys.executable, rp(t['clift_data_gen']), rp(t['pe']), data_c, meta_p])
     # ---- 5) コンパイル + リンク (bridge が imps.inc を #include → ld_core 状態を共有) ----
     env_sh = 'source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; export TMPDIR=%s/tmp; ' % W
     objs = []
@@ -180,11 +187,11 @@ def build(t, force=False):
     INC = '-I"%s" -I"%s" -I"%s"' % (os.path.join(ROOT, 'rt'), rp(t['clift_rt']), W)
     for tag, path_, extra in (
         ('lifted', tr_c, lifted_extra),
-        ('data', rp(t['clift_data']), ''),
+        ('data', data_c, ''),
         ('cpu', cpu_c, rename),
         ('nptab', nptab_c, ''),
-        ('bridge', os.path.join(ROOT, 'rt/fle_ldbridge.c'), ''),
-    ):
+        ('bridge', os.path.join(ROOT, t.get('clift_bridge', 'rt/fle_ldbridge.c')), ''),
+    ) + tuple(('extra%d' % k, rp(p), '') for k, p in enumerate(t.get('clift_extra_c', []))):
         obj = W + '/obj/%s.o' % tag
         if force or newer(path_, obj):
             sh(env_sh + 'emcc -c %s -o %s %s %s %s' % (path_, obj, CF, INC, extra), executable='/bin/bash')
@@ -195,7 +202,7 @@ def build(t, force=False):
     gb = t.get('global_base', 0x10000000)
     exports = ('_ld_w_inbuf,_ld_w_layout,_ld_w_init,_ld_w_add_wr,_ld_w_snapshot,_ld_w_blob,_ld_w_fix,'
                '_ld_w_case_begin,_fle_ld_run,_fle_ld_xmm0,_ld_w_case_end,_ld_w_state,'
-               '_fle_data_install,_malloc,_free,_emscripten_stack_get_current,__emscripten_stack_restore')
+               '_malloc,_free,_emscripten_stack_get_current,__emscripten_stack_restore')
     for e in t.get('init_exports', []):
         exports += ',_' + e
     cmd = (env_sh + 'emcc %s -o %s -O0 --profiling-funcs -sALLOW_MEMORY_GROWTH=1 --no-entry '
