@@ -398,6 +398,15 @@ EMSCRIPTEN_KEEPALIVE int fle_py_bind_probe(void) {
     return (int)g_py_nm_n;
 }
 EMSCRIPTEN_KEEPALIVE int fle_py_bind_hook_n(void) { return (int)g_py_hook_n; }
+/* PY-4877 (#5168): boot 停止後に patternCount (0xd64d40) を直接実行する。戻り値 = patternCount の RAX (int)。
+ * 呼出し前の述語テーブル E = 0x193fce0 + i*0xc0 は呼出し側が fle_py_e_* で読む (計測のみ) */
+EMSCRIPTEN_KEEPALIVE int fle_py_pattern_count(void) {
+    fle_run(0xd64d40u, 0, 0, 0, 0, 0, 0, 0, 0);
+    return (int)(uint32_t)R[0];
+}
+EMSCRIPTEN_KEEPALIVE u32 fle_py_e_u8(u32 i, u32 off) { return (u32)LD8(0x193fce0ull + (u64)i * 0xc0ull + off); }
+EMSCRIPTEN_KEEPALIVE u32 fle_py_e_u32(u32 i, u32 off) { return LD32(0x193fce0ull + (u64)i * 0xc0ull + off); }
+EMSCRIPTEN_KEEPALIVE u64 fle_py_e_u64(u32 i, u32 off) { return LD64(0x193fce0ull + (u64)i * 0xc0ull + off); }
 EMSCRIPTEN_KEEPALIVE const char* fle_py_bind_name(int i) { return (u32)i < g_py_nm_n ? g_py_nm[i] : ""; }
 EMSCRIPTEN_KEEPALIVE u32 fle_py_bind_cell(int i) { return (u32)i < g_py_nm_n ? (u32)(uintptr_t)&g_py_cell[i] : 0; }
 void imp_LoadStringW(void) {   /* gui_compat.c と同一: buf[0]=0 を書かないと LoadResString が暴走 */
