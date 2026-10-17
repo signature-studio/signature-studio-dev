@@ -44,3 +44,4 @@ sweep の比較 (同じ 131 関数):
 - 素材: `work-icall`・`plugins-freshair`・`fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を `$ARTIFACTS_DIR` から展開 (worktree `ws-6050`)。
 - `bash tools/icall/fa_route_build.sh` rc 0 (`fa_route.cjs` 88,639 B)。`bash tools/ott/native/build.sh` で `libottnative.so` を再ビルド。
 - sweep: `bash tools/icall/diff/fa_sweep.sh 8 60` 約 74 秒 (131 関数を 1 関数 1 プロセス)。
+- sweep 出力の `missing function` は 7 件 (`function_1803b5546`・`function_18040ca0d`・`function_180ca1651`・`function_180da6084`・`function_181066530` 等の wasm 側の未解決 call)。`6af773cb4` 基準でも 7 件で、本 issue の修正では増減しない。受入条件の「0 件のまま」は基準時点で満たしていない。残件は #4348 に移す。
