@@ -99,3 +99,12 @@
 - 測定 (測定 commit `197f3972c`・HEAD 同一): `hs_call_41d050.py` rc=0、real 41.6 秒、load 0.68 (実行直前の `uptime`)。出力 sha256 先頭 16 桁 `a3d72e1b6116471e`。
 - 受入 1・2 は未達のまま。確定 0 / 未確定 5 は変わらない。
 
+#### 5.7 0x1313220 の関数ポインタ源 (`hs_resolver_0ffef.py`・機械語のみ)
+
+- 0x1313220 の `call rax` (0x131325f) の関数ポインタは、`call 0x40ffe0` (0x1313253) の戻り値。キーは `mov dx, 0xffef` (0x131324f) の定数。
+- 0x40ffe0 (resolver) は `mov rcx, [rcx]` の後 `call 0x40ff70` (0x40ffe8) を呼ぶ。0x40ff70 が 0 を返すと `call 0x40c820` (0x40fff5) へ進む。
+- 0x40ff70 (walker) は `[rcx]` のオブジェクトを辿る。先頭は `[rax-0x90]` (0x40ff73)、次は `[rax-0x78]` (0x40ffcb)。各ノードは語数 N・N 語のキー列・qword 配列を持ち、`cmp word ptr [rcx+r9*2+2], dx` (0x40ff9c) で dx と照合する。一致すると `[rcx+rax+2+r8*8]` を返す (0x40ffb7)。
+- よって関数ポインタ源は、キー 0xffef を持つノードの qword 配列の要素。このノードは実行時のオブジェクトで、静的な表の中身は決まらない。**供給元の値は未確定**。
+- 実行記録: `hs_resolver_0ffef.py` (commit は本 PR の HEAD)、rc=0、real 5.6 秒、load 0.56 (起動直前の `/proc/loadavg`)。素材 `fl-win64` の `extracted/block00031_PE.bin` を使用。
+- 次の作業: (a) 0xffef のノードを作る経路 (`[rcx]` の初期化) を追う。(b) 0xfdd2c0 の `[rbp+0x4c]` 書込み経路 (受入 1 の残り)。
+
