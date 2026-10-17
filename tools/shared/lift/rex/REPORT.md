@@ -60,7 +60,7 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/lift/rex/rex_closure.py [
 - **近似の影響**: `approx` (`.pdata` 無しの関数) は閉包の 33〜69% を占める (§3 表の「うち近似」÷「閉包の関数数」。最小が `REXGetInfoFromBuffer` 80/242 = 33%、最大が `REXGetInfo` 27/39 = 69%)。関数数の少ない export ほど比率が高く、39 関数以下の 7 本は 46〜69%、51 関数以上の 7 本は 33〜42%。関数数・命令数の上限は近似で膨らみうる。正確な値は lift 後の関数単位突合で確定する。
 
 ## 5. 未解決 (起票先)
-`.data` 書込の到達元は DllMain の `reason == 1` 経路で、方式 A (export 前に DllMain を 1 回呼ぶ) を採る (T-SH-129 #4833・正本は付録 `REPORT_APPENDIX_4833.md` §12)。
+`.data` 書込の到達元は DllMain の `reason == 1` 経路で、方式 A (export 前に DllMain を 1 回呼ぶ) を採る (T-SH-129 #4833・正本は付録 `REPORT_APPENDIX_4833.md` §12)。`dllmain` モードの実測 (223 件 FAIL・host 依存の 6 バイト) は付録 `REPORT_APPENDIX_4834.md` §13。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
