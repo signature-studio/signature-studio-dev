@@ -100,7 +100,7 @@
 | 8e7e10 | 0/2 | 0/2 | addr 0x0 @ 0x8e7fbd (変化なし) |
 | a965c0 | 0/3 | 0/3 | fault 記録なし (変化なし) |
 
-回帰 `tests/ld211_fvm_probe.py` (同 commit): 45e1a0 系 6 件は 3/3 (変化なし)。784520 は 0/5 → 1/5。668390・6683d0 は 0/3 のまま (LD-211 §3 と同じ)。
+回帰 `tests/ld211_fvm_probe.py` (`d7ff728d8` 時点): 45e1a0 系 6 件は 3/3 (変化なし)。784520 は 0/5 → 1/5。668390・6683d0 は 0/3 のまま (LD-211 §3 と同じ)。**注: 1/5 は vmt 入力が 24 slot だった `d7ff728d8` の値。§9 で入力を戻した現行 HEAD では 784520 は 0/5 (§11 の HEAD 実測)。現行 HEAD で再現しない。**
 
 回帰テスト (native・wasm を含む build 後): `test_ld199_fvm_pin` / `test_ld200_struct_stub` / `test_ld203_slot_fill` / `test_ld253_point_arg_slot` / `test_ld259_patch_p` は全て PASS (rc=0)。
 
@@ -144,3 +144,20 @@
   - `tests/ld238_probe.py`: `vmt2_line` の `blob` 引数化。5 関数は `vmt24` を使う。
 - **既存 blob の入力**: §9 のとおり、`vm` / `vmt` / `vmt2` / `u16` / `vmtf` は `a34610a8b` と HEAD でバイト一致 (sha256)。`vmt24` は `d7ff728d8` の 24 slot `vmt2` と一致。したがって §8 の入力は `d7ff728d8` と同一。ただし、HEAD で走らせた結果ではない。
 - **未実施 (次の run で必要)**: `tests/ld238_probe.py` (5 関数・`vmt24`)、`ld199`・`ld200`・`ld203`・`ld253`・`ld259`・`ld211` の HEAD 実測。`oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff` が要る。これが揃ったら、測定 commit を HEAD の最終 code commit に更新し、再測定の結果が §8 と違えばその数値を訂正する。
+- **§10 は §11 で置き換えた** (素材が揃い、HEAD 実測を実施したため)。
+
+## 11. 追補 (HEAD 実測・素材 work-m11 / work-liftdiff / toolchain-emsdk / fl-win64 を展開)
+
+- **測定 commit**: `dcee6eed2` (`tools/liftdiff` の `rt`・`ldlib`・`tests`・fvm 関連スクリプトを変えた最後の commit)。`git diff dcee6eed2 HEAD -- tools/liftdiff ':!tools/liftdiff/REPORT*'` は 0 行 (HEAD = 測定 commit の code 状態)。
+- **素材**: 実行 run の素材 (`fl-win64`・`work-m11`・`work-liftdiff`・`toolchain-emsdk`) を展開 (`work-m11` は `tools/m11/work/`、`work-liftdiff` は `tools/liftdiff/work/`、`fl-win64` は runner の一時展開先)。
+- **IR・build**: `tests/ld288_40c420_xmm0.py` (2.6 秒) → `liftdiff.py build targets/m11.json`: `sig_mismatch 0`・`undefined 0`・OK。
+- **単体・回帰 (HEAD・rc)**: `test_compare_ld11` / `test_ld52_machine_sig` / `test_ld200_struct_stub` / `test_ld181_i128_entry` / `test_ld248_i128_xmm_entry` / `test_ld179_tagpoint_tr` / `test_ld203_slot_fill` / `test_ld225_sample_vmo` / `test_ld259_patch_p` は全て rc=0。`test_ld207_obj_pattern` / `test_ld199_fvm_pin` / `test_ld253_point_arg_slot` も rc=0。
+- **5 関数 probe (`tests/ld238_probe.py`・vmt24)**: 668390 1/1・6683d0 1/1・784520 1/2 (`vmt24:0` segv addr 0x1 @ 0x50f666、`:1` ok)・8e7e10 0/2 (addr 0x0 @ 0x8e7fbd)・a965c0 0/3。§8 の表と一致。
+- **ld211 probe (HEAD)**: 45e1a0 系 6 件は 3/3。668390 0/3・6683d0 0/3・**784520 0/5**・8e7e10 0/5・a965c0 0/7。§8 の回帰行 (1/5) は HEAD で再現しない (上記 §8 の注)。
+- **fvm 42 件 (HEAD 再測定・ld5406_fvm_fill.py・既定入力)**: 入力は HEAD で `liftdiff_e2e.sh` の [4/4] と同じ手順 (`liftdiff.py batch targets/m11.json --set sample:800 --shards 12 --nobuild --state auto`) で作り直した `work/m11/batch_sample_800.jsonl` (801 行・verdict match 360 / mismatch 236 / unexec 205・121 秒・rc=0)。fvm case 42 件を読めた (旧入力は `work/m11/batch_sample_800.jsonl` の 10/12 生成で fvm 0 件。旧版は `batch_sample_800_stale_1012.jsonl` として残置)。
+  - 旧 (batch の fvm 内訳) both_fault 23 / native_fault 15 / diff 3 / hang 1 → 新 (vmtf) both_fault 24 / native_fault 9 / diff 8 / equal 1。`wasm_trap` 0 件。
+  - 遷移: both_fault→both_fault 22・native_fault→native_fault 8・native_fault→diff 5・diff→diff 3・native_fault→both_fault 1・hang→both_fault 1・native_fault→equal 1 (`0x681380` fvm0)・both_fault→native_fault 1。
+  - 分類 (`ld5406_fvm_classify.py`・HEAD batch): wasm_stub_unreach 14・native_null_field 10・wasm_oob 8・native_noaddr 4・diff 3・wasm_other 1・native_cand_arg 1・other:hang 1 (計 42)。
+  - 入力 batch の fvm 内訳は前回測定 (`09dd25790`・both_fault 24 / native_fault 15 / diff 3) と 1 件ずつずれる (both_fault 23・hang 1)。`09dd25790` から HEAD までには `rt`・`ldlib` 等の code 差分 (11 files) がある (`git diff 09dd25790 HEAD --stat -- tools/liftdiff/rt tools/liftdiff/ldlib tools/liftdiff/tests`)。このため前回の数値は HEAD の入力では再現しない。HEAD の値は上の §11 の数値を正とする。ずれの原因の切り分けは未実施。
+- **691dd0 (HEAD batch)**: verdict `mismatch` (`vmo` の `diff`・`z` は native_fault)。LD-225 の記録と一致。
+- **ld259**: `test_ld259_patch_p` rc=0 (13 秒)。
